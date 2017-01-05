@@ -334,7 +334,6 @@ opt/zabbix/scripts/slv/rsm.slv.rdds.avail.pl svneol=native#text/x-perl
 opt/zabbix/scripts/slv/rsm.slv.rdds.rollweek.pl svneol=native#text/x-perl
 opt/zabbix/scripts/slv/rsm.slv.rollweek.usage -text
 opt/zabbix/scripts/sql-test.pl svneol=native#text/x-perl
-opt/zabbix/scripts/test-sender.pl svneol=native#text/x-perl
 opt/zabbix/scripts/tld.pl svneol=native#text/x-perl
 opt/zabbix/scripts/update-api-data.pl svneol=native#text/x-perl
 sass/apple-touch-icon-120x120-precomposed.png -text svneol=unset#image/png
