@@ -312,7 +312,6 @@ opt/zabbix/scripts/RSMSLV.pm -text
 opt/zabbix/scripts/Sender.pm -text
 opt/zabbix/scripts/TLD_constants.pm -text
 opt/zabbix/scripts/TLDs.pm -text
-opt/zabbix/scripts/Zabbix.pm -text
 opt/zabbix/scripts/change-delay.pl svneol=native#text/x-perl
 opt/zabbix/scripts/export/DaWa.pm -text
 opt/zabbix/scripts/export/export.pl svneol=native#text/x-perl
