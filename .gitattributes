@@ -332,7 +332,9 @@ opt/zabbix/scripts/slv/rsm.slv.dns.downtime.pl svneol=native#text/x-perl
 opt/zabbix/scripts/slv/rsm.slv.dns.rollweek.pl svneol=native#text/x-perl
 opt/zabbix/scripts/slv/rsm.slv.dnssec.avail.pl svneol=native#text/x-perl
 opt/zabbix/scripts/slv/rsm.slv.dnssec.rollweek.pl svneol=native#text/x-perl
+opt/zabbix/scripts/slv/rsm.slv.epp.downtime.pl svneol=native#text/x-perl
 opt/zabbix/scripts/slv/rsm.slv.rdds.avail.pl svneol=native#text/x-perl
+opt/zabbix/scripts/slv/rsm.slv.rdds.downtime.pl svneol=native#text/x-perl
 opt/zabbix/scripts/slv/rsm.slv.rdds.rollweek.pl svneol=native#text/x-perl
 opt/zabbix/scripts/slv/rsm.slv.rollweek.usage -text
 opt/zabbix/scripts/sql-test.pl svneol=native#text/x-perl
