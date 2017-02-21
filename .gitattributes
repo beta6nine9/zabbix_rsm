@@ -330,6 +330,7 @@ opt/zabbix/scripts/probes-enabled.pl svneol=native#text/x-perl
 opt/zabbix/scripts/probes.pl svneol=native#text/x-perl
 opt/zabbix/scripts/rsm.conf.example -text
 opt/zabbix/scripts/slv-results.pl svneol=native#text/x-perl
+opt/zabbix/scripts/slv/rsm.probe.online.pl svneol=native#text/x-perl
 opt/zabbix/scripts/slv/rsm.slv.avail.usage -text
 opt/zabbix/scripts/slv/rsm.slv.dns.avail.pl svneol=native#text/x-perl
 opt/zabbix/scripts/slv/rsm.slv.dns.downtime.pl svneol=native#text/x-perl
