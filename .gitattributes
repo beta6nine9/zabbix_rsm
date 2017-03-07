@@ -316,6 +316,7 @@ opt/zabbix/scripts/TLD_constants.pm -text
 opt/zabbix/scripts/TLD_constants1.pm -text
 opt/zabbix/scripts/TLDs.pm -text
 opt/zabbix/scripts/change-delay.pl svneol=native#text/x-perl
+opt/zabbix/scripts/change-macro.pl svneol=native#text/x-perl
 opt/zabbix/scripts/export/DaWa.pm -text
 opt/zabbix/scripts/export/db-patch.pl svneol=native#text/x-perl
 opt/zabbix/scripts/export/export.pl svneol=native#text/x-perl
