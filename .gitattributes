@@ -326,6 +326,7 @@ opt/zabbix/scripts/get-downtime.pl svneol=native#text/x-perl
 opt/zabbix/scripts/get-incidents.pl svneol=native#text/x-perl
 opt/zabbix/scripts/get-results.pl svneol=native#text/x-perl
 opt/zabbix/scripts/probe-avail.pl svneol=native#text/x-perl
+opt/zabbix/scripts/probe-macros.pl svneol=native#text/x-perl
 opt/zabbix/scripts/probe-manual.pl svneol=native#text/x-perl
 opt/zabbix/scripts/probe-results.pl svneol=native#text/x-perl
 opt/zabbix/scripts/probes-enabled.pl svneol=native#text/x-perl
