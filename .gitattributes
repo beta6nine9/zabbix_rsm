@@ -293,15 +293,11 @@ misc/init.d/freebsd/zabbix_server -text
 misc/init.d/tru64/zabbix_server -text
 opt/README -text
 opt/zabbix/alertscripts/salesforce.pl svneol=native#text/x-perl
-opt/zabbix/docs/adding_new_proxies -text
 opt/zabbix/docs/config/mysql_proxy.cnf -text
 opt/zabbix/docs/config/mysql_server.cnf -text
 opt/zabbix/docs/init.d/zabbix-agent -text
 opt/zabbix/docs/init.d/zabbix-proxy -text
 opt/zabbix/docs/init.d/zabbix-server -text
-opt/zabbix/docs/proxy_install -text
-opt/zabbix/docs/server_install -text
-opt/zabbix/docs/web_interface_install -text
 opt/zabbix/externalscripts/online.nodes.pl svneol=native#text/x-perl
 opt/zabbix/scripts/Alerts.pm -text
 opt/zabbix/scripts/ApiHelper.pm -text
