@@ -238,6 +238,11 @@ src/libs/zbxsysinfo/unknown/.deps
 src/libs/zbxsysinfo/unknown/.dirstamp
 src/libs/zbxsysinfo/unknown/Makefile
 src/libs/zbxsysinfo/unknown/Makefile.in
+src/tests/.deps
+src/tests/Makefile
+src/tests/Makefile.in
+src/tests/t_rsm_dns
+src/tests/t_rsm_rdds
 src/zabbix_agent/.deps
 src/zabbix_agent/Makefile
 src/zabbix_agent/Makefile.in
