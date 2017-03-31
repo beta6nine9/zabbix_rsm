@@ -93,6 +93,7 @@ misc/images/pngcrush.log.txt
 misc/images/pngcrushoutput.txt
 /missing
 /nbproject
+opt/zabbix/scripts/rsm.conf
 sass/.sass-cache
 sass/code_example_templates
 sass/doc_assets
