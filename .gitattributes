@@ -9,6 +9,7 @@ bin/win64/dev/zabbix_sender.lib -text svneol=unset#application/x-archive
 bin/win64/zabbix_agentd.exe -text svneol=unset#application/x-dosexec
 bin/win64/zabbix_get.exe -text svneol=unset#application/x-dosexec
 bin/win64/zabbix_sender.exe -text svneol=unset#application/x-dosexec
+/build-rpms.sh svneol=native#text/x-sh
 frontends/php/audio/alarm_average.wav -text svneol=unset#audio/x-wav
 frontends/php/audio/alarm_disaster.wav -text svneol=unset#audio/x-wav
 frontends/php/audio/alarm_high.wav -text svneol=unset#audio/x-wav
@@ -337,6 +338,7 @@ opt/zabbix/scripts/slv/rsm.slv.rollweek.usage -text
 opt/zabbix/scripts/sql-test.pl svneol=native#text/x-perl
 opt/zabbix/scripts/tld.pl svneol=native#text/x-perl
 opt/zabbix/scripts/update-api-data.pl svneol=native#text/x-perl
+rpmbuild/SOURCES/partitioning.sql svneol=native#text/x-sql
 sass/apple-touch-icon-120x120-precomposed.png -text svneol=unset#image/png
 sass/apple-touch-icon-152x152-precomposed.png -text svneol=unset#image/png
 sass/apple-touch-icon-180x180-precomposed.png -text svneol=unset#image/png
