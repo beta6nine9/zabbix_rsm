@@ -338,6 +338,7 @@ opt/zabbix/scripts/slv/rsm.slv.rollweek.usage -text
 opt/zabbix/scripts/sql-test.pl svneol=native#text/x-perl
 opt/zabbix/scripts/tld.pl svneol=native#text/x-perl
 opt/zabbix/scripts/update-api-data.pl svneol=native#text/x-perl
+opt/zabbix/scripts/users.pl svneol=native#text/x-perl
 rpmbuild/SOURCES/partitioning.sql svneol=native#text/x-sql
 sass/apple-touch-icon-120x120-precomposed.png -text svneol=unset#image/png
 sass/apple-touch-icon-152x152-precomposed.png -text svneol=unset#image/png
