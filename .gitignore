@@ -94,6 +94,11 @@ misc/images/pngcrushoutput.txt
 /missing
 /nbproject
 opt/zabbix/scripts/rsm.conf
+rpmbuild/BUILD
+rpmbuild/BUILDROOT
+rpmbuild/RPMS
+rpmbuild/SOURCES/zabbix-*.tar.gz
+rpmbuild/SRPMS
 sass/.sass-cache
 sass/code_example_templates
 sass/doc_assets
