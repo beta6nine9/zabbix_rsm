@@ -316,6 +316,7 @@ opt/zabbix/scripts/misc/change-delay.pl svneol=native#text/x-perl
 opt/zabbix/scripts/misc/get-downtime.pl svneol=native#text/x-perl
 opt/zabbix/scripts/misc/get-incidents.pl svneol=native#text/x-perl
 opt/zabbix/scripts/misc/get-results.pl svneol=native#text/x-perl
+opt/zabbix/scripts/misc/list-tlds.pl svneol=native#text/x-perl
 opt/zabbix/scripts/misc/probe-avail.pl svneol=native#text/x-perl
 opt/zabbix/scripts/misc/probe-macros.pl svneol=native#text/x-perl
 opt/zabbix/scripts/misc/probe-results.pl svneol=native#text/x-perl
