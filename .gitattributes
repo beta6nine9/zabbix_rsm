@@ -299,7 +299,6 @@ opt/zabbix/scripts/Alerts.pm -text
 opt/zabbix/scripts/ApiHelper.pm -text
 opt/zabbix/scripts/ApiHelper1.pm -text
 opt/zabbix/scripts/MySQL_part_management.pl svneol=native#text/x-perl
-opt/zabbix/scripts/Parallel.pm -text
 opt/zabbix/scripts/Pusher.pm -text
 opt/zabbix/scripts/RSM.pm -text
 opt/zabbix/scripts/RSMSLV.pm -text
