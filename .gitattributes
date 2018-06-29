@@ -297,14 +297,11 @@ opt/zabbix/alertscripts/salesforce.pl svneol=native#text/x-perl
 opt/zabbix/externalscripts/online.nodes.pl svneol=native#text/x-perl
 opt/zabbix/scripts/Alerts.pm -text
 opt/zabbix/scripts/ApiHelper.pm -text
-opt/zabbix/scripts/ApiHelper1.pm -text
 opt/zabbix/scripts/MySQL_part_management.pl svneol=native#text/x-perl
 opt/zabbix/scripts/Pusher.pm -text
 opt/zabbix/scripts/RSM.pm -text
 opt/zabbix/scripts/RSMSLV.pm -text
-opt/zabbix/scripts/RSMSLV1.pm -text
 opt/zabbix/scripts/TLD_constants.pm -text
-opt/zabbix/scripts/TLD_constants1.pm -text
 opt/zabbix/scripts/TLDs.pm -text
 opt/zabbix/scripts/change-macro.pl svneol=native#text/x-perl
 opt/zabbix/scripts/export/DaWa.pm -text
