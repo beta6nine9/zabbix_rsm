@@ -309,6 +309,7 @@ opt/zabbix/scripts/export/export.pl svneol=native#text/x-perl
 opt/zabbix/scripts/export/test-export.pl svneol=native#text/x-perl
 opt/zabbix/scripts/export/translate.pl svneol=native#text/x-perl
 opt/zabbix/scripts/misc/change-delay.pl svneol=native#text/x-perl
+opt/zabbix/scripts/misc/change-lastvalue.pl svneol=native#text/x-perl
 opt/zabbix/scripts/misc/get-downtime.pl svneol=native#text/x-perl
 opt/zabbix/scripts/misc/get-incidents.pl svneol=native#text/x-perl
 opt/zabbix/scripts/misc/get-results.pl svneol=native#text/x-perl
