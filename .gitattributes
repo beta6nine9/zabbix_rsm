@@ -339,6 +339,9 @@ opt/zabbix/scripts/tests/test-sla-api-recent.sh svneol=native#text/x-sh
 opt/zabbix/scripts/tld.pl svneol=native#text/x-perl
 opt/zabbix/scripts/update-api-data.pl svneol=native#text/x-perl
 opt/zabbix/scripts/users.pl svneol=native#text/x-perl
+rpmbuild/SOURCES/cron.d/rsm-slv-dns-tcp-rtt-pl -text
+rpmbuild/SOURCES/cron.d/rsm-slv-dns-udp-rtt-pl -text
+rpmbuild/SOURCES/cron.d/rsm-slv-rdds-rtt-pl -text
 rpmbuild/SOURCES/partitioning.sql svneol=native#text/x-sql
 sass/apple-touch-icon-120x120-precomposed.png -text svneol=unset#image/png
 sass/apple-touch-icon-152x152-precomposed.png -text svneol=unset#image/png
