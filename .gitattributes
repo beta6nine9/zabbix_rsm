@@ -327,6 +327,7 @@ opt/zabbix/scripts/sla-api-recent.pl svneol=native#text/x-perl
 opt/zabbix/scripts/slv/rsm.probe.online.pl svneol=native#text/x-perl
 opt/zabbix/scripts/slv/rsm.slv.dns.avail.pl svneol=native#text/x-perl
 opt/zabbix/scripts/slv/rsm.slv.dns.downtime.pl svneol=native#text/x-perl
+opt/zabbix/scripts/slv/rsm.slv.dns.ns.downtime.pl svneol=native#text/x-perl
 opt/zabbix/scripts/slv/rsm.slv.dns.rollweek.pl svneol=native#text/x-perl
 opt/zabbix/scripts/slv/rsm.slv.dnssec.avail.pl svneol=native#text/x-perl
 opt/zabbix/scripts/slv/rsm.slv.dnssec.rollweek.pl svneol=native#text/x-perl
@@ -339,6 +340,8 @@ opt/zabbix/scripts/tests/test-sla-api-recent.sh svneol=native#text/x-sh
 opt/zabbix/scripts/tld.pl svneol=native#text/x-perl
 opt/zabbix/scripts/update-api-data.pl svneol=native#text/x-perl
 opt/zabbix/scripts/users.pl svneol=native#text/x-perl
+rpmbuild/SOURCES/cron.d/rsm-slv-dns-ns-avail-pl -text
+rpmbuild/SOURCES/cron.d/rsm-slv-dns-ns-dowtime-pl -text
 rpmbuild/SOURCES/cron.d/rsm-slv-dns-tcp-rtt-pl -text
 rpmbuild/SOURCES/cron.d/rsm-slv-dns-udp-rtt-pl -text
 rpmbuild/SOURCES/cron.d/rsm-slv-rdds-rtt-pl -text
