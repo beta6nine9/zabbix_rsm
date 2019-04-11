@@ -335,6 +335,7 @@ opt/zabbix/scripts/slv/rsm.slv.rdds.avail.pl svneol=native#text/x-perl
 opt/zabbix/scripts/slv/rsm.slv.rdds.downtime.pl svneol=native#text/x-perl
 opt/zabbix/scripts/slv/rsm.slv.rdds.rollweek.pl svneol=native#text/x-perl
 opt/zabbix/scripts/slv/rsm.slv.usage -text
+opt/zabbix/scripts/tests/test-scripts.sh svneol=native#text/x-sh
 opt/zabbix/scripts/tests/test-sla-api-recent.schema -text
 opt/zabbix/scripts/tests/test-sla-api-recent.sh svneol=native#text/x-sh
 opt/zabbix/scripts/tld.pl svneol=native#text/x-perl
