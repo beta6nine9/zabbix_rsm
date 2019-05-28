@@ -98,6 +98,9 @@ AC_DEFUN([AX_LIB_MYSQL],
                     -lmariadbclient)
                         _client_lib_name="mariadbclient"
                 ;;
+                    -lmariadb)
+                        _client_lib_name="mariadb"
+                ;;
                     -L*)
                         MYSQL_LDFLAGS="${MYSQL_LDFLAGS} $i"
                 ;;
@@ -107,7 +110,7 @@ AC_DEFUN([AX_LIB_MYSQL],
             if test "x$enable_static" = "xyes"; then
                for i in $_full_libmysql_libs; do
                    case $i in
-           	      -lmysqlclient|-lperconaserverclient|-lmariadbclient)
+           	      -lmysqlclient|-lperconaserverclient|-lmariadbclient|-lmariadb)
            	    ;;
                       -l*)
 				_lib_name="`echo "$i" | cut -b3-`"
