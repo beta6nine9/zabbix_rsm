@@ -149,9 +149,14 @@ else {
 	$incidentTestingInterface = null;
 }
 
+$object_name_label = ($data['rsm_monitoring_mode'] == RSM_MONITORING_TYPE_REGISTRAR) ? _('Registrar ID') : _('TLD');
+$object_name = ($data['rsm_monitoring_mode'] == RSM_MONITORING_TYPE_REGISTRAR)
+	? (new CSpan($data['tld']['name']))->setHint(getRegistrarDetailsHint($data['tld']))
+	: $data['tld']['name'];
+
 $testsInfoTable->addRow([
 	[
-		new CSpan([bold(_('TLD')), ':', SPACE, $this->data['tld']['name']]),
+		new CSpan([bold($object_name_label), ':', SPACE, $object_name]),
 		BR(),
 		new CSpan([bold(_('Service')), ':', SPACE, $data['slvItem']['name']]),
 		BR(),
@@ -170,7 +175,7 @@ $widget->additem([$testsInfoTable]);
 $widget->addItem([$data['paging'], $table, $data['paging']]);
 
 if (CWebUser::getType() == USER_TYPE_ZABBIX_ADMIN || CWebUser::getType() == USER_TYPE_SUPER_ADMIN
-		|| CWebUser::getType() == USER_TYPE_TEHNICAL_SERVICE) {
+		|| CWebUser::getType() == USER_TYPE_POWER_USER) {
 	$widget->addItem((new CButton('mark_incident', $changeIncidentTypeName))
 		->onClick('javascript: location.href = "rsm.incidents.php?mark_incident='.$changeIncidentType.
 			'&eventid='.$data['eventid'].'&host='.$data['tld']['host'].'&type='.$data['type'].'";'
