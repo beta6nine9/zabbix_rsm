@@ -136,7 +136,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		fail_if_running
 		exit_if_running
 		trim
-		parse_opts parse_slv_opts
+		parse_opts parse_slv_opts override_opts
 		opt getopt setopt unsetopt optkeys ts_str ts_full selected_period
 		cycle_start
 		cycle_end
@@ -3584,6 +3584,13 @@ sub parse_slv_opts
 	$POD2USAGE_FILE = '/opt/zabbix/scripts/slv/rsm.slv.usage';
 
 	parse_opts('tld=s', 'now=n', 'cycles=n', 'output-file=s');
+}
+
+sub override_opts($)
+{
+	my $new_opts = shift;
+
+	%OPTS = %{$new_opts};
 }
 
 sub opt
