@@ -1,56 +1,13 @@
 #!/usr/bin/perl
 #
-# - DNS availability test		(data collection)	rsm.dns.udp			(simple, every minute)
-#								rsm.dns.tcp			(simple, every 60 minutes)
-#								rsm.dns.udp.rtt			(trapper, Proxy)
-#								rsm.dns.tcp.rtt			-|-
-#								rsm.dns.udp.upd			-|-
-#
-# - RDDS availability test		(data collection)	rsm.rdds			(simple, every 5 minutes)
-#   (also RDDS43 and RDDS80					rsm.rdds.43.ip			(trapper, Proxy)
-#   availability at a particular				rsm.rdds.43.rtt			-|-
-#   minute)							rsm.rdds.43.upd			-|-
-#								rsm.rdds.80.ip			-|-
-#								rsm.rdds.80.rtt			-|-
-#
-# - EPP	availability test		(data collection)	rsm.epp				(simple, every 5 minutes)
-# - info RTT							rsm.epp.ip[{$RSM.TLD}]		(trapper, Proxy)
-# - login RTT							rsm.epp.rtt[{$RSM.TLD},login]	-|-
-# - update RTT							rsm.epp.rtt[{$RSM.TLD},update]	-|-
-# - info RTT							rsm.epp.rtt[{$RSM.TLD},info]	-|-
-#
-# - DNS NS availability			(given minute)		rsm.slv.dns.ns.avail		(trapper, Server)
-# - DNS NS monthly availability		(monthly)		rsm.slv.dns.ns.month		-|-
-# - DNS monthly resolution RTT		(monthly)		rsm.slv.dns.ns.rtt.udp.month	-|-
-# - DNS monthly resolution RTT (TCP)	(monthly, TCP)		rsm.slv.dns.ns.rtt.tcp.month	-|-
-# - DNS monthly update time		(monthly)		rsm.slv.dns.ns.upd.month	-|-
-# - DNS availability			(given minute)		rsm.slv.dns.avail		-|-
-# - DNS rolling week			(rolling week)		rsm.slv.dns.rollweek		-|-
-#
-# - DNSSEC proper resolution		(given minute)		rsm.slv.dnssec.avail		-|-
-# - DNSSEC rolling week			(rolling week)		rsm.slv.dnssec.rollweek		-|-
-#
-# - RDDS availability			(given minute)		rsm.slv.rdds.avail		-|-
-# - RDDS rolling week			(rolling week)		rsm.slv.rdds.rollweek		-|-
-# - RDDS43 monthly resolution RTT	(monthly)		rsm.slv.rdds.43.rtt.month	-|-
-# - RDDS80 monthly resolution RTT	(monthly)		rsm.slv.rdds.80.rtt.month	-|-
-# - RDDS monthly update time		(monthly)		rsm.slv.rdds.upd.month		-|-
-#
-# - EPP availability			(given minute)		rsm.slv.epp.avail		-|-
-# - EPP minutes of downtime		(monthlhy)		rsm.slv.epp.downtime		-|-
-# - EPP weekly unavailability		(rolling week)		rsm.slv.epp.rollweek		-|-
-# - EPP monthly LOGIN resolution RTT	(monthly)		rsm.slv.epp.rtt.login.month	-|-
-# - EPP monthly UPDATE resolution RTT	(monthly)		rsm.slv.epp.rtt.update.month	-|-
-# - EPP monthly INFO resolution RTT	(monthly)		rsm.slv.epp.rtt.info.month	-|-
-
-BEGIN
-{
-	our $MYDIR = $0; $MYDIR =~ s,(.*)/.*,$1,; $MYDIR = '.' if ($MYDIR eq $0);
-}
-use lib $MYDIR;
+# Script to manage TLDs in Zabbix.
 
 use strict;
 use warnings;
+
+use Path::Tiny;
+use lib path($0)->parent->realpath()->stringify();
+
 use Zabbix;
 use Getopt::Long;
 use MIME::Base64;
@@ -89,42 +46,45 @@ sub main()
 	{
 		create_cron_jobs($config->{'slv'}{'path'});
 		print("cron jobs created successfully\n");
+
+		return;
+	}
+
+	my $server_key = opt('server-id') ? get_rsm_server_key(getopt('server-id')) : get_rsm_local_key($config);
+	init_zabbix_api($config, $server_key);
+
+	# set monitoring target type to "Registry"
+	create_macro('{$RSM.MONITORING.TARGET}', RSM_MONITORING_TARGET_REGISTRY, undef, 1);	# global, force update
+
+	if (opt('set-type'))
+	{
+		set_type();
+	}
+	elsif (opt('list-services'))
+	{
+		list_services(getopt('tld'));
+	}
+	elsif (opt('get-nsservers-list'))
+	{
+		list_nsservers(getopt('tld'));
+	}
+	elsif (opt('update-nsservers'))
+	{
+		# possible use dig instead of --ns-servers-v4 and --ns-servers-v6
+		$ns_servers = get_ns_servers(getopt('tld'));
+		update_nsservers(getopt('tld'), $ns_servers);
+	}
+	elsif (opt('delete'))
+	{
+		manage_tld_objects('delete', getopt('tld'), getopt('dns'), getopt('dnssec'), getopt('epp'), getopt('rdds'));
+	}
+	elsif (opt('disable'))
+	{
+		manage_tld_objects('disable', getopt('tld'), getopt('dns'), getopt('dnssec'), getopt('epp'), getopt('rdds'));
 	}
 	else
 	{
-		my $server_key = opt('server-id') ? get_rsm_server_key(getopt('server-id')) : get_rsm_local_key($config);
-		init_zabbix_api($config, $server_key);
-
-		if (opt('set-type'))
-		{
-			set_type();
-		}
-		elsif (opt('list-services'))
-		{
-			list_services(getopt('tld'));
-		}
-		elsif (opt('get-nsservers-list'))
-		{
-			list_nsservers(getopt('tld'));
-		}
-		elsif (opt('update-nsservers'))
-		{
-			# possible use dig instead of --ns-servers-v4 and --ns-servers-v6
-			$ns_servers = get_ns_servers(getopt('tld'));
-			update_nsservers(getopt('tld'), $ns_servers);
-		}
-		elsif (opt('delete'))
-		{
-			manage_tld_objects('delete', getopt('tld'), getopt('dns'), getopt('dnssec'), getopt('epp'), getopt('rdds'));
-		}
-		elsif (opt('disable'))
-		{
-			manage_tld_objects('disable', getopt('tld'), getopt('dns'), getopt('dnssec'), getopt('epp'), getopt('rdds'));
-		}
-		else
-		{
-			add_new_tld();
-		}
+		add_new_tld();
 	}
 }
 

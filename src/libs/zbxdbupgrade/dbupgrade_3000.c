@@ -982,9 +982,9 @@ static int	DBpatch_3000134(void)
 
 static int	DBpatch_3000135(void)
 {
-#define RESERVE_GLOBALMACROID								\
-		"update globalmacro"							\
-		" set globalmacroid=(select nextid from ("				\
+#define RESERVE_GLOBALMACROID									\
+		"update globalmacro"								\
+		" set globalmacroid=(select nextid from ("					\
 			"select max(globalmacroid)+1 as nextid from globalmacro) as tmp)"	\
 		" where globalmacroid=" ZBX_FS_UI64
 
@@ -4295,6 +4295,66 @@ static int	DBpatch_3000318(void)
 	return SUCCEED;
 }
 
+static int	DBpatch_3000400(void)
+{
+	return SUCCEED;
+}
+
+static int	DBpatch_3000401(void)
+{
+#define RESERVE_GLOBALMACROID									\
+		"update globalmacro"								\
+		" set globalmacroid=(select nextid from ("					\
+			"select max(globalmacroid)+1 as nextid from globalmacro) as tmp)"	\
+		" where globalmacroid=" ZBX_FS_UI64
+
+	DB_RESULT	result;
+	DB_ROW		row;
+	int		rsm_monitoring_target;
+
+	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
+		return SUCCEED;
+
+	if (ZBX_DB_OK > DBexecute(RESERVE_GLOBALMACROID, 105))
+		return FAIL;
+
+	/* get hostid of all hosts that have status = HOST_STATUS_MONITORED and are in "TLDs" group */
+	result = DBselect("select count(*) from hosts h,hosts_groups hg where hg.hostid=h.hostid and hg.groupid=140");
+
+	if (NULL == (row = DBfetch(result)))
+	{
+		rsm_monitoring_target = -1;
+	}
+	else if (atoi(row[0]) == 0)
+	{
+		/* new or empty installation, monitoring target unknown */
+		rsm_monitoring_target = 0;
+	}
+	else
+	{
+		/* existing installation, monitoring target is "Registry" */
+		rsm_monitoring_target = 1;
+	}
+
+	DBfree_result(result);
+
+	if (rsm_monitoring_target == -1)
+	{
+		zabbix_log(LOG_LEVEL_CRIT, "error while trying to list hosts in hostgroup ID 140");
+		return FAIL;
+	}
+
+	if (ZBX_DB_OK > DBexecute(
+			"insert into globalmacro (globalmacroid,macro,value)"
+			" values (105,'{$RSM.MONITORING.TARGET}','%d')",
+			rsm_monitoring_target))
+	{
+		return FAIL;
+	}
+
+	return SUCCEED;
+}
+
 #endif
 
 DBPATCH_START(3000)
@@ -4399,5 +4459,7 @@ DBPATCH_ADD(3000315, 0, 0)	/* fix item value_type for rsm.slv.dns.ns.* to uint *
 DBPATCH_ADD(3000316, 0, 0)	/* set RSM.DNS.TCP.DELAY macro to 1h, set update interval of rsm.dns.tcp[%] items to 1h */
 DBPATCH_ADD(3000317, 0, 0)	/* set update interval of items in "Global macro history" host to 60 seconds */
 DBPATCH_ADD(3000318, 0, 0)	/* add new items to "Global macro history" host */
+DBPATCH_ADD(3000400, 0, 0)	/* Phase 3, version 1.4.0 */
+DBPATCH_ADD(3000401, 0, 0)	/* add macro {$RSM.MONITORING.TARGET} with value 0 (unknown) or 1 (Registry) */
 
 DBPATCH_END()
