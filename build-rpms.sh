@@ -17,6 +17,7 @@ usage()
 	echo "       -f|--force      force all compilation steps"
 	echo "       -c|--clean      clean all previously generated files"
 	echo "       -r|--restore    restore the versions and exit"
+	echo "       -s|--set-only   set versions and exit, do not build anything"
 	echo "       -h|--help       print this help message"
 
 	exit $FAILURE
@@ -43,6 +44,7 @@ fail()
 
 OPT_FORCE=0
 OPT_CLEAN=0
+OPT_SET_ONLY=0
 while [ -n "$1" ]; do
 	case "$1" in
 		-f|--force)
@@ -54,6 +56,9 @@ while [ -n "$1" ]; do
 		-r|--restore)
 			restore_versions
 			exit $SUCCESS
+			;;
+		-s|--set-only)
+			OPT_SET_ONLY=1
 			;;
 		-h|--help)
 			usage
@@ -103,6 +108,8 @@ if ! grep -q "^Version:\s+[0-9\.]+$RSM_VERSION)$" $SPEC; then
 	msg "setting version for rpm ($RSM_VERSION)"
 	sed -i.rpmbak -r "s/(^Version:\s+[0-9\.]+)$/\1$RSM_VERSION/" $SPEC || fail
 fi
+
+[[ $OPT_SET_ONLY -eq 1 ]] && exit $SUCCESS
 
 if [[ $OPT_FORCE -eq 1 || ! -f configure ]]; then
 	msg "running ./bootstrap.sh"
