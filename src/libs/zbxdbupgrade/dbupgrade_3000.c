@@ -4355,6 +4355,23 @@ static int	DBpatch_3000401(void)
 	return SUCCEED;
 }
 
+static int	DBpatch_3000402(void)
+{
+	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
+		return SUCCEED;
+
+	if (ZBX_DB_OK > DBexecute("update usrgrp set name = 'Read-only user' where usrgrpid = 100"))
+	{
+		return FAIL;
+	}
+	if (ZBX_DB_OK > DBexecute("update usrgrp set name = 'Power user' where usrgrpid = 110"))
+	{
+		return FAIL;
+	}
+
+	return SUCCEED;
+}
+
 #endif
 
 DBPATCH_START(3000)
@@ -4461,5 +4478,6 @@ DBPATCH_ADD(3000317, 0, 0)	/* set update interval of items in "Global macro hist
 DBPATCH_ADD(3000318, 0, 0)	/* add new items to "Global macro history" host */
 DBPATCH_ADD(3000400, 0, 0)	/* Phase 3, version 1.4.0 */
 DBPATCH_ADD(3000401, 0, 0)	/* add macro {$RSM.MONITORING.TARGET} with value 0 (unknown) or 1 (Registry) */
+DBPATCH_ADD(3000402, 0, 0)	/* rename "EBERO users" user group to "Read-only user", "Technical services users" to "Power user" */
 
 DBPATCH_END()
