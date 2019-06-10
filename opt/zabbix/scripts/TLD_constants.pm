@@ -7,9 +7,9 @@ use base 'Exporter';
 use constant true => 1;
 use constant false => 0;
 
-use constant RSM_MONITORING_TARGET_UNKNOWN   => 0;
-use constant RSM_MONITORING_TARGET_REGISTRY  => 1;
-use constant RSM_MONITORING_TARGET_REGISTRAR => 2;
+use constant RSM_MONITORING_TARGET_UNKNOWN   => "";
+use constant RSM_MONITORING_TARGET_REGISTRY  => "registry";
+use constant RSM_MONITORING_TARGET_REGISTRAR => "registrar";
 
 use constant LINUX_TEMPLATEID			=> 10001;	# Template "Template OS Linux"
 use constant APP_ZABBIX_PROXY_TEMPLATEID	=> 10058;	# Template "Template App Zabbix Proxy"

@@ -51,8 +51,18 @@ sub main()
 	my $server_key = opt('server-id') ? get_rsm_server_key(getopt('server-id')) : get_rsm_local_key($config);
 	init_zabbix_api($config, $server_key);
 
-	# TODO: check if this central server is for registrars; fail if it is for TLDs
-	# TODO: add the same check in tld.pl
+	# expect "registrar" monitoring target
+	my $target = get_global_macro_value('{$RSM.MONITORING.TARGET}');
+	if (!defined($target))
+	{
+		pfail('cannot find global macro {$RSM.MONITORING.TARGET}');
+	}
+
+	if ($target ne RSM_MONITORING_TARGET_REGISTRAR)
+	{
+		pfail("expected monitoring target \"${\RSM_MONITORING_TARGET_REGISTRAR}\", but got \"$target\", if you'd like to change it, please run:".
+			"\n\n/opt/zabbix/scripts/change-macro.pl --macro '{\$RSM.MONITORING.TARGET}' --value '${\RSM_MONITORING_TARGET_REGISTRAR}'");
+	}
 
 	if (opt('list-services'))
 	{

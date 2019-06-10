@@ -4310,7 +4310,7 @@ static int	DBpatch_3000401(void)
 
 	DB_RESULT	result;
 	DB_ROW		row;
-	int		rsm_monitoring_target;
+	char		*rsm_monitoring_target;
 
 	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
 		return SUCCEED;
@@ -4323,36 +4323,39 @@ static int	DBpatch_3000401(void)
 
 	if (NULL == (row = DBfetch(result)))
 	{
-		rsm_monitoring_target = -1;
+		/* this means the above SQL is faulty, which shouldn't happen */
+		rsm_monitoring_target = NULL;
 	}
 	else if (atoi(row[0]) == 0)
 	{
 		/* new or empty installation, monitoring target unknown */
-		rsm_monitoring_target = 0;
+		rsm_monitoring_target = "";
 	}
 	else
 	{
 		/* existing installation, monitoring target is "Registry" */
-		rsm_monitoring_target = 1;
+		rsm_monitoring_target = "registry";
 	}
 
 	DBfree_result(result);
 
-	if (rsm_monitoring_target == -1)
+	if (NULL == rsm_monitoring_target)
 	{
-		zabbix_log(LOG_LEVEL_CRIT, "error while trying to list hosts in hostgroup ID 140");
+		zabbix_log(LOG_LEVEL_CRIT, "error while trying to list hosts of hostgroup with ID 140");
 		return FAIL;
 	}
 
 	if (ZBX_DB_OK > DBexecute(
 			"insert into globalmacro (globalmacroid,macro,value)"
-			" values (105,'{$RSM.MONITORING.TARGET}','%d')",
+			" values (105,'{$RSM.MONITORING.TARGET}','%s')",
 			rsm_monitoring_target))
 	{
 		return FAIL;
 	}
 
 	return SUCCEED;
+
+#undef RESERVE_GLOBALMACROID
 }
 
 static int	DBpatch_3000402(void)
@@ -4477,7 +4480,7 @@ DBPATCH_ADD(3000316, 0, 0)	/* set RSM.DNS.TCP.DELAY macro to 1h, set update inte
 DBPATCH_ADD(3000317, 0, 0)	/* set update interval of items in "Global macro history" host to 60 seconds */
 DBPATCH_ADD(3000318, 0, 0)	/* add new items to "Global macro history" host */
 DBPATCH_ADD(3000400, 0, 0)	/* Phase 3, version 1.4.0 */
-DBPATCH_ADD(3000401, 0, 0)	/* add macro {$RSM.MONITORING.TARGET} with value 0 (unknown) or 1 (Registry) */
+DBPATCH_ADD(3000401, 0, 0)	/* add macro {$RSM.MONITORING.TARGET} with empty string as value (unknown) or "registry" */
 DBPATCH_ADD(3000402, 0, 0)	/* rename "EBERO users" user group to "Read-only user", "Technical services users" to "Power user" */
 
 DBPATCH_END()

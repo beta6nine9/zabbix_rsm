@@ -53,8 +53,18 @@ sub main()
 	my $server_key = opt('server-id') ? get_rsm_server_key(getopt('server-id')) : get_rsm_local_key($config);
 	init_zabbix_api($config, $server_key);
 
-	# set monitoring target type to "Registry"
-	create_macro('{$RSM.MONITORING.TARGET}', RSM_MONITORING_TARGET_REGISTRY, undef, 1);	# global, force update
+	# expect "registry" monitoring target
+	my $target = get_global_macro_value('{$RSM.MONITORING.TARGET}');
+	if (!defined($target))
+	{
+		pfail('cannot find global macro {$RSM.MONITORING.TARGET}');
+	}
+
+	if ($target ne RSM_MONITORING_TARGET_REGISTRY)
+	{
+		pfail("expected monitoring target \"${\RSM_MONITORING_TARGET_REGISTRY}\", but got \"$target\", if you'd like to change it, please run:".
+			"\n\n/opt/zabbix/scripts/change-macro.pl --macro '{\$RSM.MONITORING.TARGET}' --value '${\RSM_MONITORING_TARGET_REGISTRY}'");
+	}
 
 	if (opt('set-type'))
 	{
