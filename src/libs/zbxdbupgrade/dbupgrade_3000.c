@@ -4377,12 +4377,12 @@ static int	DBpatch_3000402(void)
 
 static int	DBpatch_3000403(void)
 {
-	// patch for both server and proxy
+	/* patch for both server and proxy */
 
 	if (ZBX_DB_OK > DBexecute(
-			"alter table `hosts`"
-			" add column `family` varchar(128) collate utf8_bin not null default ''"
-			" after `name`"))
+			"alter table hosts"
+			" add column family varchar(128) collate utf8_bin not null default ''"
+			" after name"))
 	{
 		return FAIL;
 	}
