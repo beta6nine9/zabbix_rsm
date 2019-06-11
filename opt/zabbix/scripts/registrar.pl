@@ -615,6 +615,7 @@ sub create_rsmhost()
 		],
 		'host'       => $rr_id,
 		'name'       => $rr_name,
+		'family'     => $rr_family,
 		'status'     => HOST_STATUS_MONITORED,
 		'interfaces' => [DEFAULT_MAIN_INTERFACE]
 	}));
