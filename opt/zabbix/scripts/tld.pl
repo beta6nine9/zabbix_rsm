@@ -25,8 +25,8 @@ my $exp_timeout = 3;
 my $exp_command = '/opt/zabbix/bin/rsm_epp_enc';
 my $exp_output;
 
-my $trigger_thresholds = rsm_trigger_thresholds;  # TODO: should be written in upper case; this is constant, not a function
-my $cfg_global_macros = cfg_global_macros; # TODO: should be written in upper case; this is constant, not a function
+my $trigger_thresholds = RSM_TRIGGER_THRESHOLDS;
+my $cfg_global_macros = CFG_GLOBAL_MACROS;
 
 my $ns_servers;
 
@@ -1084,7 +1084,7 @@ sub create_main_template($$)
 	really(create_macro('{$RSM.TLD}', $tld, $templateid));
 	really(create_macro('{$RSM.DNS.TESTPREFIX}', getopt('dns-test-prefix'), $templateid, 1));
 	really(create_macro('{$RSM.RDDS.TESTPREFIX}', getopt('rdds-test-prefix'), $templateid, 1)) if (opt('rdds-test-prefix'));
-	really(create_macro('{$RSM.RDDS.NS.STRING}', opt('rdds-ns-string') ? getopt('rdds-ns-string') : cfg_default_rdds_ns_string, $templateid, 1));
+	really(create_macro('{$RSM.RDDS.NS.STRING}', opt('rdds-ns-string') ? getopt('rdds-ns-string') : CFG_DEFAULT_RDDS_NS_STRING, $templateid, 1));
 	really(create_macro('{$RSM.TLD.DNSSEC.ENABLED}', getopt('dnssec'), $templateid, 1));
 	really(create_macro('{$RSM.TLD.RDDS.ENABLED}', opt('rdds43-servers') ? 1 : 0, $templateid, 1));
 	really(create_macro('{$RSM.TLD.EPP.ENABLED}', opt('epp-servers') ? 1 : 0, $templateid, 1));
@@ -1166,7 +1166,7 @@ sub create_item_dns_rtt($$$$$)
 		'applications' => [get_application_id('DNS RTT (' . $proto_uc . ')', $templateid)],
 		'type'         => ITEM_TYPE_TRAPPER,
 		'value_type'   => ITEM_VALUE_TYPE_FLOAT,
-		'valuemapid'   => rsm_value_mappings->{'rsm_dns_rtt'}
+		'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_dns_rtt'}
 	}));
 }
 
@@ -1188,7 +1188,7 @@ sub create_slv_item($$$$$)
 			'type'         => ITEM_TYPE_TRAPPER,
 			'value_type'   => ITEM_VALUE_TYPE_UINT64,
 			'applications' => $applicationids,
-			'valuemapid'   => rsm_value_mappings->{'rsm_avail'}
+			'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_avail'}
 		}));
 	}
 
@@ -1238,7 +1238,7 @@ sub create_item_dns_udp_upd($$$)
 		'applications' => [get_application_id('DNS RTT (' . $proto_uc . ')', $templateid)],
 		'type'         => ITEM_TYPE_TRAPPER,
 		'value_type'   => ITEM_VALUE_TYPE_FLOAT,
-		'valuemapid'   => rsm_value_mappings->{'rsm_dns_rtt'}
+		'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_dns_rtt'}
 	}));
 }
 
@@ -1320,7 +1320,7 @@ sub create_items_rdds($)
 			'applications' => [$applicationid_43],
 			'type'         => ITEM_TYPE_TRAPPER,
 			'value_type'   => ITEM_VALUE_TYPE_FLOAT,
-			'valuemapid'   => rsm_value_mappings->{'rsm_rdds_rtt'}
+			'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_rdds_rtt'}
 		}));
 
 		if (opt('epp-servers'))
@@ -1335,7 +1335,7 @@ sub create_items_rdds($)
 				'applications' => [$applicationid_43],
 				'type'         => ITEM_TYPE_TRAPPER,
 				'value_type'   => ITEM_VALUE_TYPE_FLOAT,
-				'valuemapid'   => rsm_value_mappings->{'rsm_rdds_rtt'}
+				'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_rdds_rtt'}
 			}));
 		}
 
@@ -1361,7 +1361,7 @@ sub create_items_rdds($)
 			'applications' => [$applicationid_80],
 			'type'         => ITEM_TYPE_TRAPPER,
 			'value_type'   => ITEM_VALUE_TYPE_FLOAT,
-			'valuemapid'   => rsm_value_mappings->{'rsm_rdds_rtt'}
+			'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_rdds_rtt'}
 		}));
 
 		$item_key = 'rsm.rdds[{$RSM.TLD},"' . getopt('rdds43-servers') . '","' . getopt('rdds80-servers') . '"]';
@@ -1380,7 +1380,7 @@ sub create_items_rdds($)
 			'type'         => ITEM_TYPE_SIMPLE,
 			'value_type'   => ITEM_VALUE_TYPE_UINT64,
 			'delay'        => $cfg_global_macros->{'{$RSM.RDDS.DELAY}'},
-			'valuemapid'   => rsm_value_mappings->{'rsm_rdds_result'}
+			'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_rdds_result'}
 		}));
 	}
 
@@ -1412,7 +1412,7 @@ sub create_items_epp($)
 		'type'         => ITEM_TYPE_SIMPLE,
 		'value_type'   => ITEM_VALUE_TYPE_UINT64,
 		'delay'        => $cfg_global_macros->{'{$RSM.EPP.DELAY}'},
-		'valuemapid'   => rsm_value_mappings->{'rsm_epp_result'}
+		'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_epp_result'}
 	}));
 
 	really(create_item({
@@ -1433,7 +1433,7 @@ sub create_items_epp($)
 		'applications' => [$applicationid],
 		'type'         => ITEM_TYPE_TRAPPER,
 		'value_type'   => ITEM_VALUE_TYPE_FLOAT,
-		'valuemapid'   => rsm_value_mappings->{'rsm_epp_rtt'}
+		'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_epp_rtt'}
 	}));
 
 	really(create_item({
@@ -1444,7 +1444,7 @@ sub create_items_epp($)
 		'applications' => [$applicationid],
 		'type'         => ITEM_TYPE_TRAPPER,
 		'value_type'   => ITEM_VALUE_TYPE_FLOAT,
-		'valuemapid'   => rsm_value_mappings->{'rsm_epp_rtt'}
+		'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_epp_rtt'}
 	}));
 
 	really(create_item({
@@ -1455,7 +1455,7 @@ sub create_items_epp($)
 		'applications' => [$applicationid],
 		'type'         => ITEM_TYPE_TRAPPER,
 		'value_type'   => ITEM_VALUE_TYPE_FLOAT,
-		'valuemapid'   => rsm_value_mappings->{'rsm_epp_rtt'}
+		'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_epp_rtt'}
 	}));
 }
 
@@ -1975,8 +1975,7 @@ sub create_tld_hosts_on_probes($$$$)
 
 		really(create_macro('{$RSM.PROXY_NAME}', $probe_name, $hostid, 1));
 
-		#  TODO: add the host above
-		#	  to more host groups: "TLD Probe Results" and\/or "gTLD Probe Results" and perhaps others
+		#  TODO: add the host above to more host groups: "TLD Probe Results" and/or "gTLD Probe Results" and perhaps others
 
 		really(create_host({
 			'groups' => [
@@ -2133,7 +2132,7 @@ Other options
                 (default: /opt/test-sla/epp-commands/TLD)
         --rdds-ns-string=STRING
                 name server prefix in the WHOIS output
-                (default: "${\cfg_default_rdds_ns_string}")
+                (default: "${\CFG_DEFAULT_RDDS_NS_STRING}")
         --root-servers=STRING
                 list of IPv4 and IPv6 root servers separated by comma and semicolon: "v4IP1[,v4IP2,...][;v6IP1[,v6IP2,...]]"
                 (default: taken from DNS)

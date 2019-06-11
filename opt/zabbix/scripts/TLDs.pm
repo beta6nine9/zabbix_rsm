@@ -628,8 +628,8 @@ sub create_probe_status_template {
 	'key_'=> 'rsm.probe.status[automatic,'.$root_servers_macros.']',
 	'hostid' => $templateid,
 	'applications' => [get_application_id('Probe status', $templateid)],
-	'type' => 3, 'value_type' => 3, 'delay' => cfg_probe_status_delay,
-	'valuemapid' => rsm_value_mappings->{'rsm_probe'}
+	'type' => 3, 'value_type' => 3, 'delay' => CFG_PROBE_STATUS_DELAY,
+	'valuemapid' => RSM_VALUE_MAPPINGS->{'rsm_probe'}
     };
 
     create_item($options);
@@ -640,7 +640,7 @@ sub create_probe_status_template {
 	'hostid' => $templateid,
 	'applications' => [get_application_id('Probe status', $templateid)],
 	'type' => 2, 'value_type' => 3,
-	'valuemapid' => rsm_value_mappings->{'rsm_probe'}
+	'valuemapid' => RSM_VALUE_MAPPINGS->{'rsm_probe'}
     };
 
     create_item($options);
@@ -650,8 +650,8 @@ sub create_probe_status_template {
 	'key_'=> 'resolver.status[{$RSM.RESOLVER},{$RESOLVER.STATUS.TIMEOUT},{$RESOLVER.STATUS.TRIES},{$RSM.IP4.ENABLED},{$RSM.IP6.ENABLED}]',
 	'hostid' => $templateid,
 	'applications' => [get_application_id('Probe status', $templateid)],
-	'type' => 3, 'value_type' => 3, 'delay' => cfg_probe_status_delay,
-	'valuemapid' => rsm_value_mappings->{'service_state'}
+	'type' => 3, 'value_type' => 3, 'delay' => CFG_PROBE_STATUS_DELAY,
+	'valuemapid' => RSM_VALUE_MAPPINGS->{'service_state'}
     };
 
     create_item($options);
@@ -944,7 +944,7 @@ sub create_probe_health_tmpl()
 		],
 		'type'		=> 2,
 		'value_type'	=> 3,
-		'valuemapid'	=> rsm_value_mappings->{'rsm_probe'}
+		'valuemapid'	=> RSM_VALUE_MAPPINGS->{'rsm_probe'}
 	});
 
 	return $templateid;
