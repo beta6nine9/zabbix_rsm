@@ -72,17 +72,17 @@ sub main()
 	}
 	elsif (opt('list-services'))
 	{
-		list_services(getopt('tld'));
+		list_services($server_key, getopt('tld'));
 	}
 	elsif (opt('get-nsservers-list'))
 	{
-		list_nsservers(getopt('tld'));
+		list_nsservers($server_key, getopt('tld'));
 	}
 	elsif (opt('update-nsservers'))
 	{
 		# possible use dig instead of --ns-servers-v4 and --ns-servers-v6
 		$ns_servers = get_ns_servers(getopt('tld'));
-		update_nsservers(getopt('tld'), $ns_servers);
+		update_nsservers($server_key, getopt('tld'), $ns_servers);
 	}
 	elsif (opt('delete'))
 	{
@@ -331,9 +331,10 @@ sub set_type()
 # list services for a single RSMHOST or all RSMHOSTs
 ################################################################################
 
-sub list_services(;$)
+sub list_services($;$)
 {
-	my $rsmhost = shift; # optional
+	my $server_key = shift;
+	my $rsmhost    = shift; # optional
 
 	# NB! Keep @columns in sync with __usage()!
 	my @columns = (
@@ -358,7 +359,7 @@ sub list_services(;$)
 	{
 		my @row = ();
 
-		my $services = get_services($rsmhost);
+		my $services = get_services($server_key, $rsmhost);
 
 		push(@row, $rsmhost);
 		push(@row, map($services->{$_} // "", @columns));
@@ -402,12 +403,13 @@ sub get_tld_list()
 {
 	my $tlds = get_host_group('TLDs', true, false);
 
-	return map($_->{'name'}, @{$tlds->{'hosts'}});
+	return map($_->{'host'}, @{$tlds->{'hosts'}});
 }
 
-sub get_services($)
+sub get_services($$)
 {
-	my $tld = shift;
+	my $server_key = shift;
+	my $tld        = shift;
 
 	my @tld_types = (TLD_TYPE_G, TLD_TYPE_CC, TLD_TYPE_OTHER, TLD_TYPE_TEST);
 
@@ -451,9 +453,10 @@ sub get_services($)
 # manage NS + IP server pairs
 ################################################################################
 
-sub list_nsservers(;$)
+sub list_nsservers($;$)
 {
-	my $rsmhost = shift; # optional
+	my $server_key = shift;
+	my $rsmhost    = shift; # optional
 
 	# all fields in a CSV must be double-quoted, even if empty
 	my $csv = Text::CSV_XS->new({binary => 1, auto_diag => 1, always_quote => 1, eol => "\n"});
@@ -462,7 +465,7 @@ sub list_nsservers(;$)
 
 	foreach my $rsmhost (sort(@rsmhosts))
 	{
-		my $nsservers = get_nsservers_list($rsmhost);
+		my $nsservers = get_nsservers_list($server_key, $rsmhost);
 		my @ns_types = keys(%{$nsservers});
 
 		foreach my $type (sort(@ns_types))
@@ -480,15 +483,16 @@ sub list_nsservers(;$)
 	}
 }
 
-sub update_nsservers($$)
+sub update_nsservers($$$)
 {
+	my $server_key     = shift;
 	my $TLD            = shift;
 	my $new_ns_servers = shift;
 
 	# allow disabling all the NSs
 	#return unless defined $new_ns_servers;
 
-	my $old_ns_servers = get_nsservers_list($TLD);
+	my $old_ns_servers = get_nsservers_list($server_key, $TLD);
 
 	# allow adding NSs on an empty set
 	#return unless defined $old_ns_servers;
@@ -570,9 +574,10 @@ sub update_nsservers($$)
 	disable_old_ns($TLD, \@to_be_removed) if scalar(@to_be_removed);
 }
 
-sub get_nsservers_list($)
+sub get_nsservers_list($$)
 {
-	my $TLD = shift;
+	my $server_key = shift;
+	my $TLD        = shift;
 
 	my $result;
 

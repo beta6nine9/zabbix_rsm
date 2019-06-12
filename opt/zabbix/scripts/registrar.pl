@@ -66,7 +66,7 @@ sub main()
 
 	if (opt('list-services'))
 	{
-		list_services(getopt('rr-id'));
+		list_services($server_key, getopt('rr-id'));
 	}
 	elsif (opt('delete'))
 	{
@@ -241,11 +241,12 @@ sub init_zabbix_api($$)
 # list services for a single RSMHOST or all RSMHOSTs
 ################################################################################
 
-sub list_services(;$)
+sub list_services($;$)
 {
 	# TODO: needs more info what should be printed and what format should be used
 
-	my $rsmhost = shift; # optional
+	my $server_key = shift;
+	my $rsmhost    = shift; # optional
 
 	# NB! Keep @columns in sync with __usage()!
 	my @columns = (
@@ -270,7 +271,7 @@ sub list_services(;$)
 	{
 		my @row = ();
 
-		my $services = get_services($rsmhost);
+		my $services = get_services($server_key, $rsmhost);
 
 		push(@row, $rsmhost);
 		push(@row, map($services->{$_} // "", @columns));
@@ -314,12 +315,13 @@ sub get_tld_list()
 {
 	my $tlds = get_host_group('TLDs', true, false);
 
-	return map($_->{'name'}, @{$tlds->{'hosts'}});
+	return map($_->{'host'}, @{$tlds->{'hosts'}});
 }
 
-sub get_services($)
+sub get_services($$)
 {
-	my $tld = shift;
+	my $server_key = shift;
+	my $tld        = shift;
 
 	my @tld_types = (TLD_TYPE_G, TLD_TYPE_CC, TLD_TYPE_OTHER, TLD_TYPE_TEST);
 
@@ -327,7 +329,7 @@ sub get_services($)
 
 	my $main_templateid = get_template('Template ' . $tld, false, false);
 
-	pfail("TLD \"$tld\" does not exist on \"$server_key\"") unless ($main_templateid->{'templateid'});
+	pfail("Registrar \"$tld\" does not exist on \"$server_key\"") unless ($main_templateid->{'templateid'});
 
 	my $macros = get_host_macro($main_templateid, undef);
 
