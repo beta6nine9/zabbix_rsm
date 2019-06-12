@@ -23,26 +23,26 @@ use constant TLDS_GROUPID			=> 140;		# Host group "TLDs"
 use constant TLD_PROBE_RESULTS_GROUPID		=> 190;		# Host group "TLD Probe results"
 
 use constant VALUE_TYPE_AVAIL => 0;
-use constant VALUE_TYPE_PERC => 1;
-use constant VALUE_TYPE_NUM => 2;
+use constant VALUE_TYPE_PERC  => 1;
+use constant VALUE_TYPE_NUM   => 2;
 
-use constant HOST_STATUS_MONITORED => 0;
+use constant HOST_STATUS_MONITORED     => 0;
 use constant HOST_STATUS_NOT_MONITORED => 1;
 
-use constant HOST_STATUS_PROXY_ACTIVE => 5;
+use constant HOST_STATUS_PROXY_ACTIVE  => 5;
 use constant HOST_STATUS_PROXY_PASSIVE => 6;
 
 use constant HOST_ENCRYPTION_PSK => 2;
 
-use constant ITEM_STATUS_ACTIVE => 0;
+use constant ITEM_STATUS_ACTIVE   => 0;
 use constant ITEM_STATUS_DISABLED => 1;
 
-use constant TRIGGER_STATUS_ENABLED => 0;
+use constant TRIGGER_STATUS_ENABLED  => 0;
 use constant TRIGGER_STATUS_DISABLED => 1;
 
 use constant INTERFACE_TYPE_AGENT => 1;
 
-use constant DEFAULT_MAIN_INTERFACE	=> {
+use constant DEFAULT_MAIN_INTERFACE => {
 	'type'	=> INTERFACE_TYPE_AGENT,
 	'main'	=> true,
 	'useip'	=> true,
@@ -51,54 +51,54 @@ use constant DEFAULT_MAIN_INTERFACE	=> {
 	'port'	=> '10050'
 };
 
-use constant ITEM_VALUE_TYPE_FLOAT => 0;
-use constant ITEM_VALUE_TYPE_STR =>   1;
-use constant ITEM_VALUE_TYPE_LOG =>   2;
-use constant ITEM_VALUE_TYPE_UINT64=> 3;
-use constant ITEM_VALUE_TYPE_TEXT =>  4;
+use constant ITEM_VALUE_TYPE_FLOAT  => 0;
+use constant ITEM_VALUE_TYPE_STR    => 1;
+use constant ITEM_VALUE_TYPE_LOG    => 2;
+use constant ITEM_VALUE_TYPE_UINT64 => 3;
+use constant ITEM_VALUE_TYPE_TEXT   => 4;
 
-use constant ITEM_TYPE_ZABBIX =>             0;
-use constant ITEM_TYPE_TRAPPER =>            2;
-use constant ITEM_TYPE_SIMPLE =>             3;
-use constant ITEM_TYPE_INTERNAL =>           5;
-use constant ITEM_TYPE_ZABBIX_ACTIVE =>      7;
-use constant ITEM_TYPE_AGGREGATE =>          8;
-use constant ITEM_TYPE_EXTERNAL =>           10;
-use constant ITEM_TYPE_CALCULATED =>         15;
+use constant ITEM_TYPE_ZABBIX        => 0;
+use constant ITEM_TYPE_TRAPPER       => 2;
+use constant ITEM_TYPE_SIMPLE        => 3;
+use constant ITEM_TYPE_INTERNAL      => 5;
+use constant ITEM_TYPE_ZABBIX_ACTIVE => 7;
+use constant ITEM_TYPE_AGGREGATE     => 8;
+use constant ITEM_TYPE_EXTERNAL      => 10;
+use constant ITEM_TYPE_CALCULATED    => 15;
 
-use constant ZBX_EC_INTERNAL_FIRST	=> -1;
-use constant ZBX_EC_INTERNAL_LAST	=> -199;
+use constant ZBX_EC_INTERNAL_FIRST => -1;
+use constant ZBX_EC_INTERNAL_LAST  => -199;
 
 # define ranges of DNSSEC error codes of DNS UDP/TCP
-use constant ZBX_EC_DNS_UDP_DNSSEC_FIRST	=> -401;	# DNS UDP - The TLD is configured as DNSSEC-enabled, but no DNSKEY was found in the apex
-use constant ZBX_EC_DNS_UDP_DNSSEC_LAST		=> -427;	# DNS UDP - Malformed DNSSEC response
-use constant ZBX_EC_DNS_TCP_DNSSEC_FIRST	=> -801;	# DNS TCP - The TLD is configured as DNSSEC-enabled, but no DNSKEY was found in the apex
-use constant ZBX_EC_DNS_TCP_DNSSEC_LAST		=> -827;	# DNS TCP - Malformed DNSSEC response
+use constant ZBX_EC_DNS_UDP_DNSSEC_FIRST => -401;	# DNS UDP - The TLD is configured as DNSSEC-enabled, but no DNSKEY was found in the apex
+use constant ZBX_EC_DNS_UDP_DNSSEC_LAST  => -427;	# DNS UDP - Malformed DNSSEC response
+use constant ZBX_EC_DNS_TCP_DNSSEC_FIRST => -801;	# DNS TCP - The TLD is configured as DNSSEC-enabled, but no DNSKEY was found in the apex
+use constant ZBX_EC_DNS_TCP_DNSSEC_LAST  => -827;	# DNS TCP - Malformed DNSSEC response
 
 use constant CFG_DEFAULT_RDDS_NS_STRING => 'Name Server:';
 
-use constant PROBE_KEY_ONLINE	=> 'rsm.probe.online';
+use constant PROBE_KEY_ONLINE => 'rsm.probe.online';
 
-use constant CONFIGVALUE_DNS_UDP_RTT_HIGH_ITEMID	=> 100011;	# itemid of rsm.configvalue[RSM.DNS.UDP.RTT.HIGH] item
+use constant CONFIGVALUE_DNS_UDP_RTT_HIGH_ITEMID => 100011;	# itemid of rsm.configvalue[RSM.DNS.UDP.RTT.HIGH] item
 
 use constant RSM_VALUE_MAPPINGS => {
-	'service_state' => 1,
-	'rsm_dns_rtt' => 120,
-	'rsm_rdds_rtt' => 130,
+	'service_state'   => 1,
+	'rsm_dns_rtt'     => 120,
+	'rsm_rdds_rtt'    => 130,
 	'rsm_rdds_result' => 140,
-	'rsm_epp_rtt' => 150,
-	'rsm_epp_result' => 160,
-	'rsm_avail' => 110,
-	'rsm_probe' => 100
+	'rsm_epp_rtt'     => 150,
+	'rsm_epp_result'  => 160,
+	'rsm_avail'       => 110,
+	'rsm_probe'       => 100
 };
 
 # 'RSM RDDS result' value mappings
-use constant RDDS_DOWN		=> 0;
-use constant RDDS_UP		=> 1;
-use constant RDDS_43_ONLY	=> 2;
-use constant RDDS_80_ONLY	=> 3;
+use constant RDDS_DOWN    => 0;
+use constant RDDS_UP      => 1;
+use constant RDDS_43_ONLY => 2;
+use constant RDDS_80_ONLY => 3;
 
-use constant AUDIT_RESOURCE_INCIDENT	=> 32;
+use constant AUDIT_RESOURCE_INCIDENT => 32;
 
 use constant RSM_TRIGGER_THRESHOLDS => {
 	'1' => {'threshold' => '10', 'priority' => 2},
@@ -112,15 +112,15 @@ use constant CFG_GLOBAL_MACROS => {'{$RSM.DNS.UDP.DELAY}' => '', '{$RSM.DNS.TCP.
 
 use constant CFG_PROBE_STATUS_DELAY => 60;
 
-use constant APP_SLV_MONTHLY => 'SLV monthly';
+use constant APP_SLV_MONTHLY  => 'SLV monthly';
 use constant APP_SLV_ROLLWEEK => 'SLV rolling week';
 use constant APP_SLV_PARTTEST => 'SLV particular test';
-use constant APP_SLV_CURMON => 'SLV current month';
+use constant APP_SLV_CURMON   => 'SLV current month';
 
-use constant TLD_TYPE_G => 'gTLD';
-use constant TLD_TYPE_CC => 'ccTLD';
+use constant TLD_TYPE_G     => 'gTLD';
+use constant TLD_TYPE_CC    => 'ccTLD';
 use constant TLD_TYPE_OTHER => 'otherTLD';
-use constant TLD_TYPE_TEST => 'testTLD';
+use constant TLD_TYPE_TEST  => 'testTLD';
 
 use constant TLD_TYPE_GROUPIDS	=> {
 	TLD_TYPE_G,	150,	# Host group "gTLD"
