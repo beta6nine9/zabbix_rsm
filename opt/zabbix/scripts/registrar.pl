@@ -517,6 +517,7 @@ sub create_main_template($)
 	really(create_macro('{$RSM.RDDS.TESTPREFIX}', getopt('rdds-test-prefix'), $templateid, 1)) if (opt('rdds-test-prefix'));
 	really(create_macro('{$RSM.RDDS.NS.STRING}', opt('rdds-ns-string') ? getopt('rdds-ns-string') : CFG_DEFAULT_RDDS_NS_STRING, $templateid, 1));
 	really(create_macro('{$RSM.TLD.RDDS.ENABLED}', opt('rdds43-servers') ? 1 : 0, $templateid, 1));
+	really(create_macro('{$RSM.TLD.EPP.ENABLED}', 0, $templateid));
 
 	if (opt('rdap-base-url') && opt('rdap-test-domain'))
 	{
