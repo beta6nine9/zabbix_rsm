@@ -243,37 +243,42 @@ sub init_zabbix_api($$)
 
 sub list_services($;$)
 {
-	# TODO: needs more info what should be printed and what format should be used
-
 	my $server_key = shift;
 	my $rsmhost    = shift; # optional
 
 	# NB! Keep @columns in sync with __usage()!
 	my @columns = (
-		'tld_type',
-		'tld_status',
-		'{$RSM.DNS.TESTPREFIX}',
+		'rr_id',
+		'rr_name',
+		'rr_family',
+		'rr_status',
 		'{$RSM.RDDS.NS.STRING}',
 		'{$RSM.RDDS.TESTPREFIX}',
-		'{$RSM.TLD.DNSSEC.ENABLED}',
-		'{$RSM.TLD.EPP.ENABLED}',
 		'{$RSM.TLD.RDDS.ENABLED}',
 		'{$RDAP.TLD.ENABLED}',
 		'{$RDAP.BASE.URL}',
 		'{$RDAP.TEST.DOMAIN}'
 	);
 
-	my @rsmhosts = ($rsmhost // get_tld_list());
+	#my @rsmhosts = ($rsmhost // get_registrar_list());
+	my %rsmhosts = get_registrar_list();
+
+	if (defined($rsmhost))
+	{
+		#%rsmhosts = {$rsmhost => $rsmhosts{$rsmhost}};
+	}
 
 	my @rows = ();
 
-	foreach my $rsmhost (sort(@rsmhosts))
+	foreach my $rsmhost (sort(keys(%rsmhosts)))
 	{
 		my @row = ();
 
 		my $services = get_services($server_key, $rsmhost);
 
 		push(@row, $rsmhost);
+		push(@row, $rsmhosts{$rsmhost}{'name'});
+		push(@row, $rsmhosts{$rsmhost}{'family'});
 		push(@row, map($services->{$_} // "", @columns));
 
 		# obtain rsm.rdds[] item key and extract RDDS(43|80).SERVERS strings
@@ -305,17 +310,30 @@ sub list_services($;$)
 		push(@rows, \@row);
 	}
 
+	# convert undefs to empty strings
+	@rows = map([map($_ // "", @{$_})], @rows);
+
 	# all fields in a CSV must be double-quoted, even if empty
 	my $csv = Text::CSV_XS->new({binary => 1, auto_diag => 1, always_quote => 1, eol => "\n"});
 
 	$csv->print(*STDOUT, $_) foreach (@rows);
 }
 
-sub get_tld_list()
+sub get_registrar_list()
 {
-	my $tlds = get_host_group('TLDs', true, false);
+	my $registrars = get_host_group('TLDs', true, false);
 
-	return map($_->{'host'}, @{$tlds->{'hosts'}});
+	my %result;
+
+	foreach my $host (@{$registrars->{'hosts'}})
+	{
+		$result{$host->{'host'}} = {
+			'name'   => $host->{'name'},
+			'family' => $host->{'family'}
+		};
+	}
+
+	return %result;
 }
 
 sub get_services($$)
@@ -1009,14 +1027,14 @@ Other options
         --server-id=STRING
                 ID of Zabbix server (default: $default_server_id)
         --delete
-                delete specified TLD
+                delete specified Registrar
         --disable
-                disable specified TLD
+                disable specified Registrar
         --list-services
-                list services of each TLD, the output is comma-separated list:
-                <TLD>,<TLD-TYPE>,<TLD-STATUS>,<RDDS.DNS.TESTPREFIX>,<RDDS.NS.STRING>,<RDDS.TESTPREFIX>,
-                <TLD.DNSSEC.ENABLED>,<TLD.EPP.ENABLED>,<TLD.RDDS.ENABLED>,<TLD.RDAP.ENABLED>,
-                <RDAP.BASE.URL>,<RDAP.TEST.DOMAIN>,<RDDS43.SERVERS>,<RDDS80.SERVERS>
+                list services of each Regstrar, the output is comma-separated list:
+                <RR-ID>,<RR-NAME>,<RR-FAMILY>,<RR-STATUS>,<RDDS.NS.STRING>,<RDDS.TESTPREFIX>,
+                <RDDS.ENABLED>,<RDAP.ENABLED>,<RDAP.BASE.URL>,<RDAP.TEST.DOMAIN>,
+		<RDDS43.SERVERS>,<RDDS80.SERVERS>
         --rdds43-servers=STRING
                 list of RDDS43 servers separated by comma: "NAME1,NAME2,..."
         --rdds80-servers=STRING
