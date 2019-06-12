@@ -129,42 +129,16 @@ if (!$data['host'] || !$data['slvItemId'] || $data['type'] === null) {
 
 // get TLD
 $tld = API::Host()->get([
-	'tlds' => true,
-	'output' => ['hostid', 'host', 'name'],
+	'output' => ['hostid', 'host', 'name', 'family'],
 	'filter' => [
 		'host' => $data['host']
-	]
+	],
+	'tlds' => true
 ]);
 
 if ($tld) {
 	$data['tld'] = reset($tld);
 	$data['rsm_monitoring_mode'] = get_rsm_monitoring_type();
-
-	// Get registrar details.
-	if ($data['rsm_monitoring_mode'] == RSM_MONITORING_TYPE_REGISTRAR) {
-		$data['tld'] += [
-			'registrar_name' => '',
-			'registrar_family' => ''
-		];
-
-		$host_macros = API::UserMacro()->get([
-			'output' => ['macro', 'value'],
-			'hostids' => $data['tld']['hostid'],
-			'filter' => [
-				'macro' => [REGISTRAR_FAMILY_MACROS, REGISTRAR_NAME_MACROS]
-			],
-			'usermacros' => true
-		]);
-
-		foreach ($host_macros as $macro) {
-			if ($macro['macro'] === REGISTRAR_FAMILY_MACROS) {
-				$data['tld']['registrar_family'] = $macro['value'];
-			}
-			elseif ($macro['macro'] === REGISTRAR_NAME_MACROS) {
-				$data['tld']['registrar_name'] = $macro['value'];
-			}
-		}
-	}
 }
 else {
 	show_error_message(_('No permissions to referred TLD or it does not exist!'));

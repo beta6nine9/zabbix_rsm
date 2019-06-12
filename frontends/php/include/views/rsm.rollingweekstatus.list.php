@@ -21,7 +21,7 @@
 
 require_once dirname(__FILE__).'/js/rsm.rollingweekstatus.list.js.php';
 
-$page_title = ($data['rsm_monitoring_mode'] == RSM_MONITORING_TYPE_REGISTRAR)
+$page_title = ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR)
 	? _('Registrar rolling week status')
 	: _('TLD Rolling week status');
 $widget = (new CWidget())->setTitle($page_title);
@@ -61,7 +61,7 @@ if (!$this->data['allowedGroups'][RSM_TEST_GROUP]) {
 	$filterTestGroup->setAttribute('disabled', true);
 }
 
-if ($data['rsm_monitoring_mode'] == RSM_MONITORING_TYPE_REGISTRAR) {
+if ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR) {
 	$filterColumn1
 		->addRow(_('Registrar ID'), (new CTextBox('filter_registrar_id', $data['filter_registrar_id']))
 			->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH)
@@ -86,20 +86,15 @@ else {
 		->addRow(SPACE);
 }
 
-if ($data['rsm_monitoring_mode'] == RSM_MONITORING_TYPE_REGISTRY) {
-	$services_filter = [];
-
-	// Show DNS checkbox only if {$DNS.TLD.ENABLED} is enabled.
-	if ($data['dns_tld_enabled']) {
-		$services_filter = array_merge($services_filter, [
-			[
-				(new CCheckBox('filter_dns'))->setChecked($this->data['filter_dns']),
-				SPACE,
-				_('DNS')
-			],
-			SPACE
-		]);
-	}
+if ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRY) {
+	$services_filter = [[
+		[
+			(new CCheckBox('filter_dns'))->setChecked($this->data['filter_dns']),
+			SPACE,
+			_('DNS')
+		],
+		SPACE
+	]];
 
 	$services_filter = array_merge($services_filter, [
 		new CSpan([
@@ -172,7 +167,7 @@ else {
 	$filterColumn2 = null;
 }
 
-if ($data['rsm_monitoring_mode'] == RSM_MONITORING_TYPE_REGISTRY) {
+if ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRY) {
 	$filterColumn3 = new CFormList();
 
 	// Make Filter values.
@@ -212,31 +207,24 @@ $widget->addItem($filter);
 $form = (new CForm())
 	->setName('rollingweek');
 
-if ($data['rsm_monitoring_mode'] == RSM_MONITORING_TYPE_REGISTRAR) {
+if ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR) {
 	$header_columns = [
-		make_sorting_header(_('Registrar ID'), 'name', $data['sort'], $data['sortorder']),
-		make_sorting_header(_('Registrar name'), 'registrar_name', $data['sort'], $data['sortorder']),
-		make_sorting_header(_('Registrar family'), 'registrar_family', $data['sort'], $data['sortorder']),
+		make_sorting_header(_('Registrar ID'), 'host', $data['sort'], $data['sortorder']),
+		make_sorting_header(_('Registrar name'), 'name', $data['sort'], $data['sortorder']),
+		make_sorting_header(_('Registrar family'), 'family', $data['sort'], $data['sortorder']),
 		make_sorting_header(_('RDDS (24Hrs)'), 'rdds_lastvalue', $data['sort'], $data['sortorder'])
 	];
 }
 else {
 	$header_columns = [
 		make_sorting_header(_('TLD'), 'name', $data['sort'], $data['sortorder']),
-		make_sorting_header(_('Type'), 'type', $data['sort'], $data['sortorder'])
-	];
-
-	// Show DNS checkbox only if {$DNS.TLD.ENABLED} is enabled.
-	if ($data['dns_tld_enabled']) {
-		$header_columns[] = make_sorting_header(_('DNS (4Hrs)'), 'dns_lastvalue', $data['sort'], $data['sortorder']);
-	}
-
-	$header_columns = array_merge($header_columns, [
+		make_sorting_header(_('Type'), 'type', $data['sort'], $data['sortorder']),
+		make_sorting_header(_('DNS (4Hrs)'), 'dns_lastvalue', $data['sort'], $data['sortorder']),
 		make_sorting_header(_('DNSSEC (4Hrs)'), 'dnssec_lastvalue', $data['sort'], $data['sortorder']),
 		make_sorting_header(_('RDDS (24Hrs)'), 'rdds_lastvalue', $data['sort'], $data['sortorder']),
 		make_sorting_header(_('EPP (24Hrs)'), 'epp_lastvalue', $data['sort'], $data['sortorder']),
 		make_sorting_header(_('Server'), 'server', $data['sort'], $data['sortorder'])
-	]);
+	];
 }
 
 $table = (new CTableInfo())->setHeader($header_columns);
@@ -248,11 +236,11 @@ if ($data['tld']) {
 
 	foreach ($data['tld'] as $key => $tld) {
 		// REGISTRAR type.
-		if ($data['rsm_monitoring_mode'] == RSM_MONITORING_TYPE_REGISTRAR) {
+		if ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR) {
 			$row = [
+				$tld['host'],
 				$tld['name'],
-				$tld['registrar_name'],
-				$tld['registrar_family']
+				$tld['family']
 			];
 		}
 		// TLD type.
@@ -264,7 +252,8 @@ if ($data['tld']) {
 		}
 
 		// DNS
-		if ($data['dns_tld_enabled'] && array_key_exists(RSM_DNS, $tld)
+		if ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRY
+				&& array_key_exists(RSM_DNS, $tld)
 				&& array_key_exists('trigger', $tld[RSM_DNS])) {
 			if ($tld[RSM_DNS]['trigger'] && $tld[RSM_DNS]['incident']) {
 				if (array_key_exists('availItemId', $tld[RSM_DNS]) && array_key_exists('itemid', $tld[RSM_DNS])) {
@@ -301,14 +290,14 @@ if ($data['tld']) {
 				: null;
 			$row[] = [(new CSpan($dnsValue))->addClass('right'), $dnsStatus, SPACE, $dnsGraph];
 		}
-		elseif ($data['dns_tld_enabled']) {
+		elseif ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRY) {
 			$row[] = (new CDiv(null))
 				->addClass('service-icon status_icon_extra iconrollingweekdisabled disabled-service')
 				->setHint('Incorrect TLD configuration.', '', 'on');
 		}
 
 		// DNSSEC
-		if ($data['rsm_monitoring_mode'] == RSM_MONITORING_TYPE_REGISTRY && array_key_exists(RSM_DNSSEC, $tld)
+		if ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRY && array_key_exists(RSM_DNSSEC, $tld)
 				&& array_key_exists('trigger', $tld[RSM_DNSSEC])) {
 			if ($tld[RSM_DNSSEC]['trigger'] && $tld[RSM_DNSSEC]['incident']) {
 				if (array_key_exists('availItemId', $tld[RSM_DNSSEC]) && array_key_exists('itemid', $tld[RSM_DNSSEC])) {
@@ -346,7 +335,7 @@ if ($data['tld']) {
 				: null;
 			$row[] = [(new CSpan($dnssecValue))->addClass('right'), $dnssecStatus, SPACE, $dnssecGraph];
 		}
-		elseif ($data['rsm_monitoring_mode'] == RSM_MONITORING_TYPE_REGISTRY) {
+		elseif ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRY) {
 			$row[] = (new CDiv(null))
 				->addClass('service-icon status_icon_extra iconrollingweekdisabled disabled-service')
 				->setHint('DNSSEC is disabled.', '', 'on');
@@ -411,7 +400,7 @@ if ($data['tld']) {
 		}
 
 		// EPP
-		if ($data['rsm_monitoring_mode'] == RSM_MONITORING_TYPE_REGISTRY && array_key_exists(RSM_EPP, $tld)
+		if ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRY && array_key_exists(RSM_EPP, $tld)
 				&& array_key_exists('trigger', $tld[RSM_EPP])) {
 			if ($tld[RSM_EPP]['trigger'] && $tld[RSM_EPP]['incident']) {
 				if (array_key_exists('availItemId', $tld[RSM_EPP]) && array_key_exists('itemid', $tld[RSM_EPP])) {
@@ -449,7 +438,7 @@ if ($data['tld']) {
 
 			$row[] = [(new CSpan($eppValue))->addClass('right'), $eppStatus, SPACE, $eppGraph];
 		}
-		elseif ($data['rsm_monitoring_mode'] == RSM_MONITORING_TYPE_REGISTRY) {
+		elseif ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRY) {
 			$row[] = (new CDiv(null))
 				->addClass('service-icon status_icon_extra iconrollingweekdisabled disabled-service')
 				->setHint('EPP is disabled.', '', 'on');

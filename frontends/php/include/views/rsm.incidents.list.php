@@ -31,7 +31,7 @@ $filterColumn2 = new CFormList();
 $filterColumn3 = new CFormList();
 $filterColumn4 = new CFormList();
 
-$object_name_label = ($data['rsm_monitoring_mode'] == RSM_MONITORING_TYPE_REGISTRAR) ? _('Registrar ID') : _('TLD');
+$object_name_label = ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR) ? _('Registrar ID') : _('TLD');
 $filterColumn1
 	->addRow($object_name_label, (new CTextBox('filter_search', $data['filter_search']))
 		->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH)
@@ -61,25 +61,30 @@ if (isset($data['tld'])) {
 	$dateFrom = date(DATE_TIME_FORMAT, zbxDateToTime($data['filter_from']));
 	$dateTill = date(DATE_TIME_FORMAT, zbxDateToTime($data['filter_to']));
 
-	$object_name = ($data['rsm_monitoring_mode'] == RSM_MONITORING_TYPE_REGISTRAR)
-		? (new CSpan($data['tld']['name']))->setHint(getRegistrarDetailsHint($data['tld']))
-		: $data['tld']['name'];
+	if ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR) {
+		$infoBlock
+			->addRow([new CSpan([bold(_('Registrar ID')), ':', SPACE, $data['tld']['host']])])
+			->addRow([new CSpan([bold(_('Registrar name')), ':', SPACE, $data['tld']['name']])])
+			->addRow([new CSpan([bold(_('Registrar family')), ':', SPACE, $data['tld']['family']])]);
+	}
+	else {
+		$infoBlock->addRow([[
+			bold(_('TLD')),
+			':',
+			SPACE,
+			$data['tld']['name']
+		]]);
+	}
 
-	$infoBlock->addRow([[
-		bold($object_name_label),
-		':',
-		SPACE,
-		$object_name,
-		BR(),
-		_s('From %1$s till %2$s', $dateFrom, $dateTill),
-		BR(),
-		bold(_('Server')),
-		':',
-		SPACE,
-		new CLink($this->data['server'],
-			$this->data['url'].'rsm.rollingweekstatus.php?sid='.$this->data['sid'].'&set_sid=1'
-		),
-	]]);
+	$infoBlock
+		->addRow(_s('From %1$s till %2$s', $dateFrom, $dateTill))
+		->addRow([[
+			bold(_('Server')),
+			':',
+			SPACE,
+			new CLink($this->data['server'], $this->data['url'].'rsm.rollingweekstatus.php?sid='.$this->data['sid'].'&set_sid=1')
+		]]);
+
 	$widget->additem($infoBlock);
 }
 
@@ -105,7 +110,7 @@ if (isset($this->data['tld'])) {
 	}
 
 	// DNS
-	if ($data['rsm_monitoring_mode'] == RSM_MONITORING_TYPE_REGISTRAR || $data['dns_tld_enabled'] === false) {
+	if ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR) {
 		$dnsTab = null;
 	}
 	elseif (isset($this->data['dns']['events'])) {
@@ -192,7 +197,7 @@ if (isset($this->data['tld'])) {
 	}
 
 	// DNSSEC
-	if ($data['rsm_monitoring_mode'] == RSM_MONITORING_TYPE_REGISTRAR) {
+	if ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR) {
 		$dnssecTab = null;
 	}
 	elseif (isset($this->data['dnssec']['events'])) {
@@ -363,7 +368,7 @@ if (isset($this->data['tld'])) {
 	}
 
 	// EPP
-	if ($data['rsm_monitoring_mode'] == RSM_MONITORING_TYPE_REGISTRAR) {
+	if ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR) {
 		$eppTab = null;
 	}
 	elseif (isset($this->data['epp']['events'])) {
@@ -449,13 +454,11 @@ if (isset($this->data['tld'])) {
 		$eppTab->additem(new CDiv(bold(_('EPP is disabled.')), 'red center'));
 	}
 
-	if ($data['rsm_monitoring_mode'] == RSM_MONITORING_TYPE_REGISTRAR) {
+	if ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR) {
 		$incidentPage->addTab('rddsTab', _('RDDS'), $rddsTab);
 	}
 	else {
-		if ($data['dns_tld_enabled']) {
-			$incidentPage->addTab('dnsTab', _('DNS'), $dnsTab);
-		}
+		$incidentPage->addTab('dnsTab', _('DNS'), $dnsTab);
 		$incidentPage->addTab('dnssecTab', _('DNSSEC'), $dnssecTab);
 		$incidentPage->addTab('rddsTab', _('RDDS'), $rddsTab);
 		$incidentPage->addTab('eppTab', _('EPP'), $eppTab);

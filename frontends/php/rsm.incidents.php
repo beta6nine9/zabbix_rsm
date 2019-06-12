@@ -23,7 +23,7 @@ require_once dirname(__FILE__).'/include/config.inc.php';
 require_once dirname(__FILE__).'/include/incidents.inc.php';
 require_once dirname(__FILE__).'/include/incidentdetails.inc.php';
 
-$page['title'] = (get_rsm_monitoring_type() == RSM_MONITORING_TYPE_REGISTRAR)
+$page['title'] = (get_rsm_monitoring_type() === RSM_MONITORING_TARGET_REGISTRAR)
 	? _('Registrar rolling week status')
 	: _('TLD Rolling week status');
 $page['file'] = 'rsm.incidents.php';
@@ -148,23 +148,19 @@ $data = [];
 $data['url'] = '';
 $data['sid'] = CWebUser::getSessionCookie();
 $data['rsm_monitoring_mode'] = get_rsm_monitoring_type();
-$data['dns_tld_enabled'] = false;
 $rollWeekSeconds = null;
 
 $macros = API::UserMacro()->get([
 	'globalmacro' => true,
 	'output' => API_OUTPUT_EXTEND,
 	'filter' => [
-		'macro' => [RSM_ROLLWEEK_SECONDS, DNS_TLD_ENABLED]
+		'macro' => [RSM_ROLLWEEK_SECONDS]
 	]
 ]);
 
 foreach ($macros as $macro) {
 	if ($macro['macro'] === RSM_ROLLWEEK_SECONDS) {
 		$rollWeekSeconds = $macro;
-	}
-	elseif ($macro['macro'] === DNS_TLD_ENABLED) {
-		$data['dns_tld_enabled'] = (bool) $macro['value'];
 	}
 }
 
@@ -175,11 +171,6 @@ if (!$rollWeekSeconds) {
 }
 
 $serverTime = time() - RSM_ROLLWEEK_SHIFT_BACK;
-
-// Unset to avoid redundant validation later.
-if ($data['rsm_monitoring_mode'] == RSM_MONITORING_TYPE_REGISTRAR) {
-	$data['dns_tld_enabled'] = false;
-}
 
 /*
  * Filter
@@ -241,16 +232,16 @@ if ($host || $data['filter_search']) {
 			continue;
 		}
 
-		$options = array(
-			'tlds' => true,
-			'output' => array('hostid', 'host', 'name')
-		);
+		$options = [
+			'output' => ['hostid', 'host', 'name', 'family'],
+			'tlds' => true
+		];
 
 		if ($host) {
-			$options['filter'] = array('host' => $host);
+			$options['filter'] = ['host' => $host];
 		}
 		else {
-			$options['filter'] = array('name' => $data['filter_search']);
+			$options['filter'] = ['name' => $data['filter_search']];
 		}
 
 		$tld = API::Host()->get($options);
@@ -261,32 +252,6 @@ if ($host || $data['filter_search']) {
 			continue;
 		}
 		else {
-			// Get registrar details.
-			if ($data['rsm_monitoring_mode'] == RSM_MONITORING_TYPE_REGISTRAR) {
-				$data['tld'] += [
-					'registrar_name' => '',
-					'registrar_family' => ''
-				];
-
-				$host_macros = API::UserMacro()->get([
-					'output' => ['macro', 'value'],
-					'hostids' => $data['tld']['hostid'],
-					'filter' => [
-						'macro' => [REGISTRAR_FAMILY_MACROS, REGISTRAR_NAME_MACROS]
-					],
-					'usermacros' => true
-				]);
-
-				foreach ($host_macros as $macro) {
-					if ($macro['macro'] === REGISTRAR_FAMILY_MACROS) {
-						$data['tld']['registrar_family'] = $macro['value'];
-					}
-					elseif ($macro['macro'] === REGISTRAR_NAME_MACROS) {
-						$data['tld']['registrar_name'] = $macro['value'];
-					}
-				}
-			}
-
 			// Update profile.
 			if ($host && $data['filter_search'] != $data['tld']['name']) {
 				$data['filter_search'] = $data['tld']['name'];
@@ -294,14 +259,14 @@ if ($host || $data['filter_search']) {
 			}
 
 			// get items
-			$item_keys = ($data['rsm_monitoring_mode'] == RSM_MONITORING_TYPE_REGISTRAR)
+			$item_keys = ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR)
 				? [RSM_SLV_RDDS_ROLLWEEK]
 				: [RSM_SLV_DNSSEC_ROLLWEEK, RSM_SLV_RDDS_ROLLWEEK, RSM_SLV_EPP_ROLLWEEK];
-			$avail_item_keys = ($data['rsm_monitoring_mode'] == RSM_MONITORING_TYPE_REGISTRAR)
+			$avail_item_keys = ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR)
 				? [RSM_SLV_RDDS_AVAIL]
 				: [RSM_SLV_DNSSEC_AVAIL, RSM_SLV_RDDS_AVAIL, RSM_SLV_EPP_AVAIL];
 
-			if ($data['dns_tld_enabled']) {
+			if ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRY) {
 				$item_keys[] = RSM_SLV_DNS_ROLLWEEK;
 				$avail_item_keys[] = RSM_SLV_DNS_AVAIL;
 			}

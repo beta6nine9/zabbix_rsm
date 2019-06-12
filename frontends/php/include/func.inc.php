@@ -2324,7 +2324,7 @@ function get_rsm_monitoring_type() {
 	if ($type === null) {
 		$db_macro = API::UserMacro()->get([
 			'output' => ['value'],
-			'filter' => ['macro' => RSM_MONITORING_TYPE],
+			'filter' => ['macro' => RSM_MONITORING_TARGET],
 			'globalmacro' => true
 		]);
 
@@ -2333,28 +2333,5 @@ function get_rsm_monitoring_type() {
 		}
 	}
 
-	return (int) $type;
-}
-
-/**
- * Function returns HTML to display in registrar hint-box.
- *
- * @param type $registrar
- *
- * @return CList
- */
-function getRegistrarDetailsHint(array $registrar) {
-	return (new CList())
-		->addItem([
-			(new CTag('b', true))->addItem(_('Registrar ID').': '),
-			$registrar['name']
-		])
-		->addItem([
-			(new CTag('b', true))->addItem(_('Registrar name').': '),
-			$registrar['registrar_name']
-		])
-		->addItem([
-			(new CTag('b', true))->addItem(_('Registrar family').': '),
-			$registrar['registrar_family']
-		]);
+	return $type;
 }

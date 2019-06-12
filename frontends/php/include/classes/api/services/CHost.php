@@ -507,6 +507,7 @@ class CHost extends CHostGeneral {
 	 * @param string $hosts[]['tls_psk']					PSK (required if "PSK" type is set).
 	 * @param string $hosts[]['tls_issuer']					Certificate issuer (optional).
 	 * @param string $hosts[]['tls_subject']				Certificate subject (optional).
+	 * @param string $hosts[]['family']						Registrar family name (optional).
 	 *
 	 * @return array
 	 */
@@ -616,6 +617,7 @@ class CHost extends CHostGeneral {
 	 * @param string $hosts[]['tls_psk']							PSK (required if "PSK" type is set).
 	 * @param string $hosts[]['tls_issuer']							Certificate issuer (optional).
 	 * @param string $hosts[]['tls_subject']						Certificate subject (optional).
+	 * @param string $hosts[]['family']						Registrar family name (optional).
 	 *
 	 * @return array
 	 */
