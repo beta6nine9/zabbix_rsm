@@ -1101,6 +1101,12 @@ sub tld_interface_enabled($$$)
 		fail("unknown monitoring target '$monitoring_target'");
 	}
 
+	if ($interface eq 'epp' || $interface eq 'dnssec')
+	{
+		# registrars don't have dnssec-related or epp-related items
+		return 0 if (get_monitoring_target() eq RSM_MONITORING_TARGET_REGISTRAR);
+	}
+
 	my $item_key = enabled_item_key_from_interface($interface);
 
 	if (!defined($enabled_items_cache{$item_key}))
