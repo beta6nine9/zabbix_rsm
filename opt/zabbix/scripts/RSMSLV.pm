@@ -98,6 +98,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		get_macro_epp_rtt_low get_macro_probe_avail_limit
 		get_macro_incident_dns_fail get_macro_incident_dns_recover
 		get_macro_incident_rdds_fail get_macro_incident_rdds_recover
+		get_monitoring_target
 		get_itemid_by_key get_itemid_by_host
 		get_itemid_by_hostid get_itemid_like_by_hostid get_itemids_by_host_and_keypart get_lastclock
 		get_tlds get_tlds_and_hostids
@@ -163,6 +164,8 @@ my $sql_time = 0.0;
 my $sql_count = 0;
 
 my $log_open = 0;
+
+my $monitoring_target; # see get_monitoring_target()
 
 sub get_macro_minns
 {
@@ -366,6 +369,21 @@ sub get_macro_incident_rdds_fail()
 sub get_macro_incident_rdds_recover()
 {
 	return __get_macro('{$RSM.INCIDENT.RDDS.RECOVER}');
+}
+
+sub get_monitoring_target()
+{
+	if (!defined($monitoring_target))
+	{
+		$monitoring_target = __get_macro('{$RSM.MONITORING.TARGET}');
+
+		if ($monitoring_target ne RSM_MONITORING_TARGET_REGISTRY && $monitoring_target ne RSM_MONITORING_TARGET_REGISTRAR)
+		{
+			wrn("{\$RSM.MONITORING.TARGET} has unexpected value: '$monitoring_target'");
+		}
+	}
+
+	return $monitoring_target;
 }
 
 sub get_itemid_by_key

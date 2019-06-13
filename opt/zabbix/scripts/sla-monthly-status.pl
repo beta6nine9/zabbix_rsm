@@ -162,22 +162,49 @@ sub get_items($)
 {
 	my $slr = shift;
 
-	my $sql = "select items.itemid, items.key_, items.value_type, hosts.host" .
-		" from items" .
-			" left join hosts on hosts.hostid = items.hostid" .
-			" left join hosts_groups on hosts_groups.hostid = hosts.hostid" .
-		" where (items.key_ in (?, ?, ?, ?, ?) or items.key_ like ?) and" .
-			" hosts_groups.groupid = ?";
+	my $monitoring_target = get_monitoring_target();
 
-	my $params = [
-		SLV_ITEM_KEY_DNS_DOWNTIME,
-		SLV_ITEM_KEY_RDDS_DOWNTIME,
-		SLV_ITEM_KEY_DNS_UDP_PFAILED,
-		SLV_ITEM_KEY_DNS_TCP_PFAILED,
-		SLV_ITEM_KEY_RDDS_PFAILED,
-		SLV_ITEM_KEY_DNS_NS_DOWNTIME,
-		TLDS_GROUPID
-	];
+	my $sql;
+	my $params;
+
+	if ($monitoring_target eq RSM_MONITORING_TARGET_REGISTRY)
+	{
+		$sql = "select items.itemid, items.key_, items.value_type, hosts.host" .
+			" from items" .
+				" left join hosts on hosts.hostid = items.hostid" .
+				" left join hosts_groups on hosts_groups.hostid = hosts.hostid" .
+			" where (items.key_ in (?, ?, ?, ?, ?) or items.key_ like ?) and" .
+				" hosts_groups.groupid = ?";
+
+		$params = [
+			SLV_ITEM_KEY_DNS_DOWNTIME,
+			SLV_ITEM_KEY_RDDS_DOWNTIME,
+			SLV_ITEM_KEY_DNS_UDP_PFAILED,
+			SLV_ITEM_KEY_DNS_TCP_PFAILED,
+			SLV_ITEM_KEY_RDDS_PFAILED,
+			SLV_ITEM_KEY_DNS_NS_DOWNTIME,
+			TLDS_GROUPID
+		];
+	}
+	elsif ($monitoring_target eq RSM_MONITORING_TARGET_REGISTRAR)
+	{
+		$sql = "select items.itemid, items.key_, items.value_type, hosts.host" .
+			" from items" .
+				" left join hosts on hosts.hostid = items.hostid" .
+				" left join hosts_groups on hosts_groups.hostid = hosts.hostid" .
+			" where items.key_ in (?, ?) and" .
+				" hosts_groups.groupid = ?";
+
+		$params = [
+			SLV_ITEM_KEY_RDDS_DOWNTIME,
+			SLV_ITEM_KEY_RDDS_PFAILED,
+			TLDS_GROUPID
+		];
+	}
+	else
+	{
+		fail("unknown monitoring target '$monitoring_target'");
+	}
 
 	my $rows = db_select($sql, $params);
 
