@@ -2,11 +2,17 @@
 
 class CSlaReport
 {
+	const RSM_MONITORING_TARGET_MACRO     = "{\$RSM.MONITORING.TARGET}";
+	const RSM_MONITORING_TARGET_REGISTRY  = "registry";
+	const RSM_MONITORING_TARGET_REGISTRAR = "registrar";
+
 	public static $error;
 
 	private static $sql_count;
 	private static $sql_time;
 	private static $dbh;
+
+	private static $monitoring_target;
 
 	/**
 	 * Generates SLA reports.
@@ -358,6 +364,8 @@ class CSlaReport
 	{
 		foreach ($data as $hostid => $tld)
 		{
+			// validate host
+
 			if (is_null($tld["host"]))
 			{
 				if (defined("DEBUG") && DEBUG === true)
@@ -365,80 +373,105 @@ class CSlaReport
 
 				throw new Exception("partial or missing TLD data in the database");
 			}
-			if (is_null($tld["dns"]["availability"]))
-			{
-				if (defined("DEBUG") && DEBUG === true)
-					printf("(DEBUG) %s() \$data[{$hostid}]['dns']['availability'] is null (TLD: '{$tld["host"]}')\n", __method__);
 
-				throw new Exception("partial or missing DNS Service Availability data in the database");
-			}
-			if (!is_array($tld["dns"]["ns"]))
-			{
-				if (defined("DEBUG") && DEBUG === true)
-					printf("(DEBUG) %s() \$data[{$hostid}]['dns']['ns'] is not an array (TLD: '{$tld["host"]}')\n", __method__);
+			// validate DNS
 
-				throw new Exception("unexpected XML data structure");
-			}
-			if (count($tld["dns"]["ns"]) === 0)
+			if (self::getMonitoringTarget() == self::RSM_MONITORING_TARGET_REGISTRY)
 			{
-				if (defined("DEBUG") && DEBUG === true)
-					printf("(DEBUG) %s() \$data[{$hostid}]['dns']['ns'] is empty array (TLD: '{$tld["host"]}')\n", __method__);
-
-				throw new Exception("no Name Server availability data in the database");
-			}
-			foreach ($tld["dns"]["ns"] as $i => $ns)
-			{
-				if (is_null($ns["hostname"]))
+				if (is_null($tld["dns"]["availability"]))
 				{
 					if (defined("DEBUG") && DEBUG === true)
-						printf("(DEBUG) %s() \$data[{$hostid}]['dns']['ns'][{$i}]['hostname'] is null (TLD: '{$tld["host"]}')\n", __method__);
+						printf("(DEBUG) %s() \$data[{$hostid}]['dns']['availability'] is null (TLD: '{$tld["host"]}')\n", __method__);
+
+					throw new Exception("partial or missing DNS Service Availability data in the database");
+				}
+				if (!is_array($tld["dns"]["ns"]))
+				{
+					if (defined("DEBUG") && DEBUG === true)
+						printf("(DEBUG) %s() \$data[{$hostid}]['dns']['ns'] is not an array (TLD: '{$tld["host"]}')\n", __method__);
 
 					throw new Exception("unexpected XML data structure");
 				}
-				if (is_null($ns["ipAddress"]))
+				if (count($tld["dns"]["ns"]) === 0)
 				{
 					if (defined("DEBUG") && DEBUG === true)
-						printf("(DEBUG) %s() \$data[{$hostid}]['dns']['ns'][{$i}]['ipAddress'] is null (TLD: '{$tld["host"]}')\n", __method__);
+						printf("(DEBUG) %s() \$data[{$hostid}]['dns']['ns'] is empty array (TLD: '{$tld["host"]}')\n", __method__);
 
-					throw new Exception("unexpected XML data structure");
+					throw new Exception("no Name Server availability data in the database");
 				}
-				// TODO: "availability", "from", "till" - what if NS was disabled for whole month?
-				if (is_null($ns["availability"]))
+				foreach ($tld["dns"]["ns"] as $i => $ns)
 				{
-					if (defined("DEBUG") && DEBUG === true)
-						printf("(DEBUG) %s() \$data[{$hostid}]['dns']['ns'][{$i}]['availability'] is null (TLD: '{$tld["host"]}')\n", __method__);
+					if (is_null($ns["hostname"]))
+					{
+						if (defined("DEBUG") && DEBUG === true)
+							printf("(DEBUG) %s() \$data[{$hostid}]['dns']['ns'][{$i}]['hostname'] is null (TLD: '{$tld["host"]}')\n", __method__);
 
-					throw new Exception("no availability data of Name Server ".$ns["hostname"].":".$ns["ipAddress"]." in the database");
+						throw new Exception("unexpected XML data structure");
+					}
+					if (is_null($ns["ipAddress"]))
+					{
+						if (defined("DEBUG") && DEBUG === true)
+							printf("(DEBUG) %s() \$data[{$hostid}]['dns']['ns'][{$i}]['ipAddress'] is null (TLD: '{$tld["host"]}')\n", __method__);
+
+						throw new Exception("unexpected XML data structure");
+					}
+					// TODO: "availability", "from", "till" - what if NS was disabled for whole month?
+					if (is_null($ns["availability"]))
+					{
+						if (defined("DEBUG") && DEBUG === true)
+							printf("(DEBUG) %s() \$data[{$hostid}]['dns']['ns'][{$i}]['availability'] is null (TLD: '{$tld["host"]}')\n", __method__);
+
+						throw new Exception("no availability data of Name Server ".$ns["hostname"].":".$ns["ipAddress"]." in the database");
+					}
+					if (is_null($ns["from"]))
+					{
+						if (defined("DEBUG") && DEBUG === true)
+							printf("(DEBUG) %s() \$data[{$hostid}]['dns']['ns'][{$i}]['from'] is null (TLD: '{$tld["host"]}')\n", __method__);
+
+						throw new Exception("unexpected XML data structure");
+					}
+					if (is_null($ns["to"]))
+					{
+						if (defined("DEBUG") && DEBUG === true)
+							printf("(DEBUG) %s() \$data[{$hostid}]['dns']['ns'][{$i}]['to'] is null (TLD: '{$tld["host"]}')\n", __method__);
+
+						throw new Exception("unexpected XML data structure");
+					}
 				}
-				if (is_null($ns["from"]))
+				if (!is_float($tld["dns"]["rttUDP"]))
 				{
 					if (defined("DEBUG") && DEBUG === true)
-						printf("(DEBUG) %s() \$data[{$hostid}]['dns']['ns'][{$i}]['from'] is null (TLD: '{$tld["host"]}')\n", __method__);
+						printf("(DEBUG) %s() \$data[{$hostid}]['dns']['rttUDP'] is not float (TLD: '{$tld["host"]}')\n", __method__);
 
-					throw new Exception("unexpected XML data structure");
+					throw new Exception("invalid DNS UDP Resolution RTT value type in the database");
 				}
-				if (is_null($ns["to"]))
+				if (!is_float($tld["dns"]["rttTCP"]))
 				{
 					if (defined("DEBUG") && DEBUG === true)
-						printf("(DEBUG) %s() \$data[{$hostid}]['dns']['ns'][{$i}]['to'] is null (TLD: '{$tld["host"]}')\n", __method__);
+						printf("(DEBUG) %s() \$data[{$hostid}]['dns']['rttTCP'] is not float (TLD: '{$tld["host"]}')\n", __method__);
 
-					throw new Exception("unexpected XML data structure");
+					throw new Exception("invalid DNS TCP Resolution RTT value type in the database");
 				}
 			}
-			if (!is_float($tld["dns"]["rttUDP"]))
+			if (self::getMonitoringTarget() == self::RSM_MONITORING_TARGET_REGISTRAR)
 			{
-				if (defined("DEBUG") && DEBUG === true)
-					printf("(DEBUG) %s() \$data[{$hostid}]['dns']['rttUDP'] is not float (TLD: '{$tld["host"]}')\n", __method__);
+				/*
+					TODO: consider adding checks for DNS
 
-				throw new Exception("invalid DNS UDP Resolution RTT value type in the database");
-			}
-			if (!is_float($tld["dns"]["rttTCP"]))
-			{
-				if (defined("DEBUG") && DEBUG === true)
-					printf("(DEBUG) %s() \$data[{$hostid}]['dns']['rttTCP'] is not float (TLD: '{$tld["host"]}')\n", __method__);
+					We might want to check that DNS-related values aren't filled, i.e.,
+					* $tld["dns"]["availability"] is null
+					* $tld["dns"]["ns"] is array
+					* $tld["dns"]["ns"] is empty
+					* $tld["dns"]["rttUDP"] is null
+					* $tld["dns"]["rttTCP"] is null
 
-				throw new Exception("invalid DNS TCP Resolution RTT value type in the database");
+					On the other hand, these checks would make it harder to develop & test in environments where
+					switching between registries and registrars is possible.
+				*/
 			}
+
+			// validate RDDS
+
 			if (!is_bool($tld["rdds"]["enabled"]))
 			{
 				if (defined("DEBUG") && DEBUG === true)
@@ -495,24 +528,27 @@ class CSlaReport
 			$xml->addAttribute("reportPeriodFrom", $reportPeriodFrom);
 			$xml->addAttribute("reportPeriodTo", $reportPeriodTo);
 
-			$xml_dns = $xml->addChild("DNS");
-			$xml_dns_avail = $xml_dns->addChild("serviceAvailability", $tld["dns"]["availability"]);
-			$xml_dns_avail->addAttribute("downtimeSLR", $slrs["dns-avail"]);
-			foreach ($tld["dns"]["ns"] as $ns)
+			if (self::getMonitoringTarget() == self::RSM_MONITORING_TARGET_REGISTRY)
 			{
-				$xml_ns = $xml_dns->addChild("nsAvailability", $ns["availability"]);
-				$xml_ns->addAttribute("hostname", $ns["hostname"]);
-				$xml_ns->addAttribute("ipAddress", $ns["ipAddress"]);
-				$xml_ns->addAttribute("from", $ns["from"]);
-				$xml_ns->addAttribute("to", $ns["to"]);
-				$xml_ns->addAttribute("downtimeSLR", $slrs["ns-avail"]);
+				$xml_dns = $xml->addChild("DNS");
+				$xml_dns_avail = $xml_dns->addChild("serviceAvailability", $tld["dns"]["availability"]);
+				$xml_dns_avail->addAttribute("downtimeSLR", $slrs["dns-avail"]);
+				foreach ($tld["dns"]["ns"] as $ns)
+				{
+					$xml_ns = $xml_dns->addChild("nsAvailability", $ns["availability"]);
+					$xml_ns->addAttribute("hostname", $ns["hostname"]);
+					$xml_ns->addAttribute("ipAddress", $ns["ipAddress"]);
+					$xml_ns->addAttribute("from", $ns["from"]);
+					$xml_ns->addAttribute("to", $ns["to"]);
+					$xml_ns->addAttribute("downtimeSLR", $slrs["ns-avail"]);
+				}
+				$xml_dns_udp_rtt = $xml_dns->addChild("rttUDP", $tld["dns"]["rttUDP"]);
+				$xml_dns_udp_rtt->addAttribute("rttSLR", $slrs["dns-udp-rtt"]);
+				$xml_dns_udp_rtt->addAttribute("percentageSLR", $slrs["dns-udp-percentage"]);
+				$xml_dns_tcp_rtt = $xml_dns->addChild("rttTCP", $tld["dns"]["rttTCP"]);
+				$xml_dns_tcp_rtt->addAttribute("rttSLR", $slrs["dns-tcp-rtt"]);
+				$xml_dns_tcp_rtt->addAttribute("percentageSLR", $slrs["dns-tcp-percentage"]);
 			}
-			$xml_dns_udp_rtt = $xml_dns->addChild("rttUDP", $tld["dns"]["rttUDP"]);
-			$xml_dns_udp_rtt->addAttribute("rttSLR", $slrs["dns-udp-rtt"]);
-			$xml_dns_udp_rtt->addAttribute("percentageSLR", $slrs["dns-udp-percentage"]);
-			$xml_dns_tcp_rtt = $xml_dns->addChild("rttTCP", $tld["dns"]["rttTCP"]);
-			$xml_dns_tcp_rtt->addAttribute("rttSLR", $slrs["dns-tcp-rtt"]);
-			$xml_dns_tcp_rtt->addAttribute("percentageSLR", $slrs["dns-tcp-percentage"]);
 
 			$xml_rdds = $xml->addChild("RDDS");
 			if ($tld["rdds"]["enabled"])
@@ -763,6 +799,31 @@ class CSlaReport
 		}
 
 		return $slrs;
+	}
+
+	private static function getMonitoringTarget()
+	{
+		if (is_null(self::$monitoring_target))
+		{
+			$rows = self::dbSelect("select value from globalmacro where macro = ?", [self::RSM_MONITORING_TARGET_MACRO]);
+			if (!$rows)
+			{
+				throw new Exception("no macro '" . self::RSM_MONITORING_TARGET_MACRO . "'");
+			}
+
+			self::$monitoring_target = $rows[0][0];
+			if (self::$monitoring_target != self::RSM_MONITORING_TARGET_REGISTRY && self::$monitoring_target != self::RSM_MONITORING_TARGET_REGISTRAR)
+			{
+				throw new Exception("unexpected value of '" . self::RSM_MONITORING_TARGET_MACRO . "' - '" . self::$monitoring_target . "'");
+			}
+
+			if (defined("DEBUG") && DEBUG === true)
+			{
+				printf("(DEBUG) %s() monitoring target - %s\n", __method__, self::$monitoring_target);
+			}
+		}
+
+		return self::$monitoring_target;
 	}
 
 	################################################################################
