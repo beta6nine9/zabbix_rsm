@@ -901,7 +901,22 @@ sub validate_service($)
 {
 	my $service = shift;
 
-	fail("service \"$service\" is unknown") if (!grep {/$service/} ('dns', 'dnssec', 'rdds', 'epp'));
+	my $monitoring_target = get_monitoring_target();
+
+	if ($monitoring_target eq RSM_MONITORING_TARGET_REGISTRY)
+	{
+		if (!grep {/$service/} ('dns', 'dnssec', 'rdds', 'epp'))
+		{
+			fail("service \"$service\" is unknown");
+		}
+	}
+	elsif ($monitoring_target eq RSM_MONITORING_TARGET_REGISTRAR)
+	{
+		if (!grep {/$service/} ('rdds', 'epp'))
+		{
+			fail("service \"$service\" is unknown");
+		}
+	}
 }
 
 my %tld_service_enabled_cache = ();
@@ -928,7 +943,15 @@ sub __tld_service_enabled($$$)
 	my $service = shift;
 	my $now     = shift;
 
-	return 1 if ($service eq 'dns');
+	if ($service eq 'dns')
+	{
+		my $monitoring_target = get_monitoring_target();
+
+		return 1 if ($monitoring_target eq RSM_MONITORING_TARGET_REGISTRY);
+		return 0 if ($monitoring_target eq RSM_MONITORING_TARGET_REGISTRAR);
+
+		fail("unknown monitoring target '$monitoring_target'");
+	}
 
 	if ($service eq 'rdds')
 	{
@@ -1068,7 +1091,15 @@ sub tld_interface_enabled($$$)
 
 	$interface = lc($interface);
 
-	return 1 if ($interface eq 'dns');
+	if ($interface eq 'dns')
+	{
+		my $monitoring_target = get_monitoring_target();
+
+		return 1 if ($monitoring_target eq RSM_MONITORING_TARGET_REGISTRY);
+		return 0 if ($monitoring_target eq RSM_MONITORING_TARGET_REGISTRAR);
+
+		fail("unknown monitoring target '$monitoring_target'");
+	}
 
 	my $item_key = enabled_item_key_from_interface($interface);
 
