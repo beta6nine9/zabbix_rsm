@@ -1091,6 +1091,8 @@ sub tld_interface_enabled($$$)
 
 	$interface = lc($interface);
 
+	return 0 if ($interface eq 'epp'); # always disabled for now
+
 	if ($interface eq 'dns')
 	{
 		my $monitoring_target = get_monitoring_target();
@@ -1101,7 +1103,7 @@ sub tld_interface_enabled($$$)
 		fail("unknown monitoring target '$monitoring_target'");
 	}
 
-	if ($interface eq 'epp' || $interface eq 'dnssec')
+	if ($interface eq 'dnssec')
 	{
 		# registrars don't have dnssec-related or epp-related items
 		return 0 if (get_monitoring_target() eq RSM_MONITORING_TARGET_REGISTRAR);
