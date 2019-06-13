@@ -83,9 +83,20 @@ if (opt('service'))
 }
 else
 {
-	foreach my $service ('dns', 'dnssec', 'rdds', 'epp')
+	db_connect();
+	my $monitoring_target = get_monitoring_target();
+	db_disconnect();
+
+	if ($monitoring_target eq RSM_MONITORING_TARGET_REGISTRY)
 	{
-		$services{$service} = undef;
+		$services{'dns'} = undef;
+		$services{'dnssec'} = undef;
+		$services{'rdds'} = undef;
+		$services{'epp'} = undef;
+	}
+	elsif ($monitoring_target eq RSM_MONITORING_TARGET_REGISTRAR)
+	{
+		$services{'rdds'} = undef;
 	}
 }
 
