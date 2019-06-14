@@ -44,6 +44,7 @@ $fields = [
 	'filter_set' =>				[T_ZBX_STR, O_OPT, null,	null,			null],
 	'filter_rst' =>				[T_ZBX_STR, O_OPT, null,	null,			null],
 	'filter_search' =>			[T_ZBX_STR, O_OPT, null,	null,			null],
+	'filter_search_host' =>		[T_ZBX_STR, O_OPT, null,	null,			null],
 	'filter_from' =>			[T_ZBX_INT, O_OPT, null,	null,			null],
 	'filter_to' =>				[T_ZBX_INT, O_OPT, null,	null,			null],
 	'filter_rolling_week' =>	[T_ZBX_INT, O_OPT, null,	null,			null],
@@ -171,20 +172,23 @@ if (!$rollWeekSeconds) {
 }
 
 $serverTime = time() - RSM_ROLLWEEK_SHIFT_BACK;
+$filter_search_key = ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR)
+	? 'filter_search_host'
+	: 'filter_search';
 
 /*
  * Filter
  */
 if (isset($_REQUEST['filter_set'])) {
-	$data['filter_search'] = getRequest('filter_search');
-	CProfile::update('web.rsm.incidents.filter_search', $data['filter_search'], PROFILE_TYPE_STR);
+	$data[$filter_search_key] = getRequest($filter_search_key);
+	CProfile::update('web.rsm.incidents.'.$filter_search_key, $data[$filter_search_key], PROFILE_TYPE_STR);
 }
 elseif (hasRequest('filter_rst')) {
-	CProfile::delete('web.rsm.incidents.filter_search');
-	$data['filter_search'] = '';
+	CProfile::delete('web.rsm.incidents.'.$filter_search_key);
+	$data[$filter_search_key] = '';
 }
 else {
-	$data['filter_search'] = CProfile::get('web.rsm.incidents.filter_search');
+	$data[$filter_search_key] = CProfile::get('web.rsm.incidents.'.$filter_search_key);
 }
 
 if (getRequest('filter_rolling_week')) {
@@ -223,7 +227,7 @@ $filterTimeFrom = zbxDateToTime($data['filter_from']);
 $filterTimeTill = zbxDateToTime($data['filter_to']);
 
 // get TLD
-if ($host || $data['filter_search']) {
+if ($host || $data[$filter_search_key]) {
 	$master = $DB;
 
 	foreach ($DB['SERVERS'] as $server) {
@@ -241,7 +245,9 @@ if ($host || $data['filter_search']) {
 			$options['filter'] = ['host' => $host];
 		}
 		else {
-			$options['filter'] = ['name' => $data['filter_search']];
+			$options['filter'] = ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR)
+				? ['host' => $data[$filter_search_key]]
+				: ['name' => $data[$filter_search_key]];
 		}
 
 		$tld = API::Host()->get($options);
@@ -253,9 +259,17 @@ if ($host || $data['filter_search']) {
 		}
 		else {
 			// Update profile.
-			if ($host && $data['filter_search'] != $data['tld']['name']) {
-				$data['filter_search'] = $data['tld']['name'];
-				CProfile::update('web.rsm.incidents.filter_search', $data['tld']['name'], PROFILE_TYPE_STR);
+			if ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR) {
+				if ($host && $data[$filter_search_key] != $data['tld']['host']) {
+					$data[$filter_search_key] = $data['tld']['host'];
+					CProfile::update('web.rsm.incidents.'.$filter_search_key, $data['tld']['host'], PROFILE_TYPE_STR);
+				}
+			}
+			else {
+				if ($host && $data[$filter_search_key] != $data['tld']['name']) {
+					$data[$filter_search_key] = $data['tld']['name'];
+					CProfile::update('web.rsm.incidents.'.$filter_search_key, $data['tld']['name'], PROFILE_TYPE_STR);
+				}
 			}
 
 			// get items
