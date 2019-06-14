@@ -74,60 +74,62 @@ $widget->additem((new CDiv())
 );
 
 // DNS Service Availability.
-$table->addRow([
-		bold(_('DNS Service Availability')),
-		'-',
-		gmdate('Y-m-d H:i:s e', $data['details']['from']),
-		gmdate('Y-m-d H:i:s e', $data['details']['to']),
-		_s('%d (minutes of downtime)', $data['slv_dns_downtime']),
-		_s('%d (minutes of downtime)', $data['slr_dns_downtime'])
-	],
-	($data['slv_dns_downtime'] > $data['slr_dns_downtime']) ? 'red-bg' : null
-);
-
-// DNS Name Server Availability.
-foreach ($data['ns_items'] as $item) {
+if ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRY) {
 	$table->addRow([
-			_('DNS Name Server Availability'),
-			implode(', ', array_filter([$item['host'], $item['ip']], 'strlen')),
-			gmdate('Y-m-d H:i:s e', $item['from']),
-			gmdate('Y-m-d H:i:s e', $item['to']),
-			_s('%1$s (minutes of downtime)', $item['slv']),
-			_s('%1$s (minutes of downtime)', $item['slr'])
+			bold(_('DNS Service Availability')),
+			'-',
+			gmdate('Y-m-d H:i:s e', $data['details']['from']),
+			gmdate('Y-m-d H:i:s e', $data['details']['to']),
+			_s('%d (minutes of downtime)', $data['slv_dns_downtime']),
+			_s('%d (minutes of downtime)', $data['slr_dns_downtime'])
 		],
-		($item['slv'] > $item['slr']) ? 'red-bg' : null
+		($data['slv_dns_downtime'] > $data['slr_dns_downtime']) ? 'red-bg' : null
+	);
+
+	// DNS Name Server Availability.
+	foreach ($data['ns_items'] as $item) {
+		$table->addRow([
+				_('DNS Name Server Availability'),
+				implode(', ', array_filter([$item['host'], $item['ip']], 'strlen')),
+				gmdate('Y-m-d H:i:s e', $item['from']),
+				gmdate('Y-m-d H:i:s e', $item['to']),
+				_s('%1$s (minutes of downtime)', $item['slv']),
+				_s('%1$s (minutes of downtime)', $item['slr'])
+			],
+			($item['slv'] > $item['slr']) ? 'red-bg' : null
+		);
+	}
+
+	// DNS UDP/TCP Resolution RTT.
+	$table
+		->addRow([
+				_('DNS UDP Resolution RTT'),
+				'-',
+				gmdate('Y-m-d H:i:s e', $data['details']['from']),
+				gmdate('Y-m-d H:i:s e', $data['details']['to']),
+				_s('%1$s %% (queries <= %2$s ms)', $data['slv_dns_udp_pfailed'],
+					$data['slr_dns_udp_pfailed_ms']
+				),
+				_s('<= %1$s ms, for at least %2$s %% of queries', $data['slr_dns_udp_pfailed_ms'],
+					$data['slr_dns_udp_pfailed']
+				)
+			],
+			($data['slv_dns_udp_pfailed'] < (100 - $data['slr_dns_udp_pfailed'])) ? 'red-bg' : null
+		)->addRow([
+				_('DNS TCP Resolution RTT'),
+				'-',
+				gmdate('Y-m-d H:i:s e', $data['details']['from']),
+				gmdate('Y-m-d H:i:s e', $data['details']['to']),
+				_s('%1$s %% (queries <= %2$s ms)', $data['slv_dns_tcp_pfailed'],
+					$data['slr_dns_tcp_pfailed_ms']
+				),
+				_s('<= %1$s ms, for at least %2$s %% of queries', $data['slr_dns_tcp_pfailed_ms'],
+					$data['slr_dns_tcp_pfailed']
+				)
+			],
+			($data['slv_dns_tcp_pfailed'] < (100 - $data['slr_dns_tcp_pfailed'])) ? 'red-bg' : null
 	);
 }
-
-// DNS UDP/TCP Resolution RTT.
-$table
-	->addRow([
-			_('DNS UDP Resolution RTT'),
-			'-',
-			gmdate('Y-m-d H:i:s e', $data['details']['from']),
-			gmdate('Y-m-d H:i:s e', $data['details']['to']),
-			_s('%1$s %% (queries <= %2$s ms)', $data['slv_dns_udp_pfailed'],
-				$data['slr_dns_udp_pfailed_ms']
-			),
-			_s('<= %1$s ms, for at least %2$s %% of queries', $data['slr_dns_udp_pfailed_ms'],
-				$data['slr_dns_udp_pfailed']
-			)
-		],
-		($data['slv_dns_udp_pfailed'] < (100 - $data['slr_dns_udp_pfailed'])) ? 'red-bg' : null
-	)->addRow([
-			_('DNS TCP Resolution RTT'),
-			'-',
-			gmdate('Y-m-d H:i:s e', $data['details']['from']),
-			gmdate('Y-m-d H:i:s e', $data['details']['to']),
-			_s('%1$s %% (queries <= %2$s ms)', $data['slv_dns_tcp_pfailed'],
-				$data['slr_dns_tcp_pfailed_ms']
-			),
-			_s('<= %1$s ms, for at least %2$s %% of queries', $data['slr_dns_tcp_pfailed_ms'],
-				$data['slr_dns_tcp_pfailed']
-			)
-		],
-		($data['slv_dns_tcp_pfailed'] < (100 - $data['slr_dns_tcp_pfailed'])) ? 'red-bg' : null
-);
 
 // RDDS Service Availability and Query RTT.
 if (array_key_exists('slv_rdds_downtime', $data) && $data['slv_rdds_downtime'] !== 'disabled'
