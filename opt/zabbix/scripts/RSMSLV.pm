@@ -943,24 +943,16 @@ sub __tld_service_enabled($$$)
 	my $service = shift;
 	my $now     = shift;
 
-	if ($service eq 'dns')
-	{
-		my $monitoring_target = get_monitoring_target();
-
-		return 1 if ($monitoring_target eq RSM_MONITORING_TARGET_REGISTRY);
-		return 0 if ($monitoring_target eq RSM_MONITORING_TARGET_REGISTRAR);
-
-		fail("unknown monitoring target '$monitoring_target'");
-	}
-
 	if ($service eq 'rdds')
 	{
 		return 1 if tld_interface_enabled($tld, 'rdds43', $now);
-
-		return tld_interface_enabled($tld, 'rdap', $now);
+		return 1 if tld_interface_enabled($tld, 'rdap', $now);
+		return 0;
 	}
-
-	return tld_interface_enabled($tld, $service, $now);
+	else
+	{
+		return tld_interface_enabled($tld, $service, $now);
+	}
 }
 
 sub enabled_item_key_from_interface
