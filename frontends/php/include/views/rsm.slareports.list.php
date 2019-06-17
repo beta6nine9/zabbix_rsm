@@ -24,13 +24,13 @@ $widget = (new CWidget())->setTitle(_('SLA report'));
 $months = range(1, 12);
 $years = range(SLA_MONITORING_START_YEAR, date('Y', time()));
 
-$object_name = ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR) ? _('Registrar ID') : _('TLD');
+$object_label = ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR) ? _('Registrar ID') : _('TLD');
 
 $widget->addItem(
 	(new CFilter('web.rsm.slareports.filter.state'))->addColumn(
 		(new CFormList())
 			->addVar('filter_set', 1)
-			->addRow($object_name, (new CTextBox('filter_search', $data['filter_search']))
+			->addRow($object_label, (new CTextBox('filter_search', $data['filter_search']))
 				->setWidth(ZBX_TEXTAREA_FILTER_STANDARD_WIDTH)
 				->setAttribute('autocomplete', 'off')
 			)
@@ -61,6 +61,10 @@ if (!array_key_exists('details', $data)) {
 	]);
 }
 
+$object_name = ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR)
+	? $data['tld']['host']
+	: $data['tld']['name'];
+
 // TLD details.
 $widget->additem((new CDiv())
 	->addClass(ZBX_STYLE_TABLE_FORMS_CONTAINER)
@@ -68,7 +72,7 @@ $widget->additem((new CDiv())
 		bold(_s('Period: %1$s - %2$s', gmdate('Y/m/d H:i:s', $data['details']['from']),
 			gmdate('Y/m/d H:i:s', $data['details']['to']))), BR(),
 		bold(_s('Generation time: %1$s', gmdate('dS F Y, H:i:s e', $data['details']['generated']))), BR(),
-		bold(_s('TLD: %1$s', $data['tld']['name'])), BR(),
+		bold(_s('%1$s: %2$s', $object_label,  $object_name)), BR(),
 		bold(_('Server: ')), new CLink($data['server'], $data['rolling_week_url'])
 	])
 );

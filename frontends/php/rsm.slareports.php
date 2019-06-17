@@ -65,13 +65,17 @@ elseif ($data['filter_search']) {
 			continue;
 		}
 
-		$tld = API::Host()->get([
+		$options = [
 			'output' => ['hostid', 'host', 'name'],
 			'tlds' => true,
 			'selectMacros' => ['macro', 'value'],
 			'selectItems' => ['itemid', 'key_', 'value_type'],
-			'filter' => ['name' => $data['filter_search']]
-		]);
+		];
+		$options += ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR)
+			? ['filter' => ['host' => $data['filter_search']]]
+			: ['filter' => ['name' => $data['filter_search']]];
+
+		$tld = API::Host()->get($options);
 
 		// TLD not found, proceed to search on another server.
 		if (!$tld) {
@@ -197,6 +201,9 @@ if ($data['tld']) {
 			->setArgument('set_sid', 1)
 			->getUrl();
 	}
+}
+elseif ($data['filter_search']) {
+	show_error_message(_s('Host "%s" doesn\'t exist or you don\'t have permissions to access it.', $data['filter_search']));
 }
 
 (new CView('rsm.slareports.list', $data))
