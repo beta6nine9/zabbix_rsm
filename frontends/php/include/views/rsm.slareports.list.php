@@ -61,18 +61,22 @@ if (!array_key_exists('details', $data)) {
 	]);
 }
 
-$object_name = ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR)
-	? $data['tld']['host']
-	: $data['tld']['name'];
-
 // TLD details.
 $widget->additem((new CDiv())
-	->addClass(ZBX_STYLE_TABLE_FORMS_CONTAINER)
 	->addItem([
 		bold(_s('Period: %1$s - %2$s', gmdate('Y/m/d H:i:s', $data['details']['from']),
 			gmdate('Y/m/d H:i:s', $data['details']['to']))), BR(),
 		bold(_s('Generation time: %1$s', gmdate('dS F Y, H:i:s e', $data['details']['generated']))), BR(),
-		bold(_s('%1$s: %2$s', $object_label,  $object_name)), BR(),
+		($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR)
+			? [
+				bold(_s('Registrar ID: %1$s', $data['tld']['host'])),
+				BR(),
+				bold(_s('Registrar name: %1$s', $data['tld']['name'])),
+				BR(),
+				bold(_s('Registrar family: %1$s', $data['tld']['family'])),
+			]
+			: bold(_s('TLD: %2$s', $data['tld']['name'])),
+		BR(),
 		bold(_('Server: ')), new CLink($data['server'], $data['rolling_week_url'])
 	])
 );
