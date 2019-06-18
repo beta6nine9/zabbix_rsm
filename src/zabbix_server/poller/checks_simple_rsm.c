@@ -222,17 +222,33 @@ static int	unpack_values(size_t *v1, size_t *v2, int *v3, int *v4, char *buf)
 	return sscanf(buf, PACK_FORMAT, v1, v2, v3, v4);
 }
 
+static char	*rsm_log_prefixes[] = { "Empty", "Fatal", "Error", "Warning", "Info", "Debug" };
+
 #define rsm_dump(log_fd, fmt, ...)	fprintf(log_fd, ZBX_CONST_STRING(fmt), ##__VA_ARGS__)
-#define rsm_errf(log_fd, fmt, ...)	rsm_logf(log_fd, "Error", ZBX_CONST_STRING(fmt), ##__VA_ARGS__)
-#define rsm_warnf(log_fd, fmt, ...)	rsm_logf(log_fd, "Warning", ZBX_CONST_STRING(fmt), ##__VA_ARGS__)
-#define rsm_infof(log_fd, fmt, ...)	rsm_logf(log_fd, "Info", ZBX_CONST_STRING(fmt), ##__VA_ARGS__)
-static void	rsm_logf(FILE *log_fd, const char *prefix, const char *fmt, ...)
+#define rsm_errf(log_fd, fmt, ...)	rsm_logf(log_fd, LOG_LEVEL_ERR, ZBX_CONST_STRING(fmt), ##__VA_ARGS__)
+#define rsm_warnf(log_fd, fmt, ...)	rsm_logf(log_fd, LOG_LEVEL_WARNING, ZBX_CONST_STRING(fmt), ##__VA_ARGS__)
+#define rsm_infof(log_fd, fmt, ...)	rsm_logf(log_fd, LOG_LEVEL_DEBUG, ZBX_CONST_STRING(fmt), ##__VA_ARGS__)
+
+static void	rsm_logf(FILE *log_fd, int level, const char *fmt, ...)
 {
 	va_list		args;
 	char		fmt_buf[ZBX_ERR_BUF_SIZE];
 	struct timeval	current_time;
 	struct tm	*tm;
 	long		ms;
+
+	va_start(args, fmt);
+
+	/* fall back to regular Zabbix log */
+	if (NULL == log_fd)
+	{
+		zbx_vsnprintf(fmt_buf, sizeof(fmt_buf), fmt, args);
+		__zbx_zabbix_log(level, fmt_buf);
+		goto out;
+	}
+
+	if (level > LOG_LEVEL_TRACE)
+		level = LOG_LEVEL_TRACE;
 
 	gettimeofday(&current_time, NULL);
 	tm = localtime(&current_time.tv_sec);
@@ -247,22 +263,32 @@ static void	rsm_logf(FILE *log_fd, const char *prefix, const char *fmt, ...)
 			tm->tm_min,
 			tm->tm_sec,
 			ms,
-			prefix,
+			rsm_log_prefixes[level],
 			fmt);
-	fmt = fmt_buf;
 
-	va_start(args, fmt);
-	vfprintf(log_fd, fmt, args);
+	vfprintf(log_fd, fmt_buf, args);
+out:
 	va_end(args);
 }
 
-#define rsm_err(log_fd, text)	rsm_log(log_fd, "Error", text)
-#define rsm_info(log_fd, text)	rsm_log(log_fd, "Info", text)
-static void	rsm_log(FILE *log_fd, const char *prefix, const char *text)
+#define rsm_err(log_fd, text)	rsm_log(log_fd, LOG_LEVEL_ERR, text)
+#define rsm_info(log_fd, text)	rsm_log(log_fd, LOG_LEVEL_DEBUG, text)
+
+static void	rsm_log(FILE *log_fd, int level, const char *text)
 {
 	struct timeval	current_time;
 	struct tm	*tm;
 	long		ms;
+
+	/* fall back to regular Zabbix log */
+	if (NULL == log_fd)
+	{
+		__zbx_zabbix_log(level, text);
+		return;
+	}
+
+	if (level > LOG_LEVEL_TRACE)
+		level = LOG_LEVEL_TRACE;
 
 	gettimeofday(&current_time, NULL);
 	tm = localtime(&current_time.tv_sec);
@@ -277,7 +303,7 @@ static void	rsm_log(FILE *log_fd, const char *prefix, const char *text)
 			tm->tm_min,
 			tm->tm_sec,
 			ms,
-			prefix,
+			rsm_log_prefixes[level],
 			text);
 }
 
@@ -6049,7 +6075,7 @@ int	check_rsm_resolver_status(DC_ITEM *item, const AGENT_REQUEST *request, AGENT
 	if (5 != request->nparam)
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid number of parameters."));
-		goto out;;
+		goto out;
 	}
 
 	/* TLD goes first, then RDAP specific parameters, then TLD options, probe options and global settings */
@@ -6062,31 +6088,31 @@ int	check_rsm_resolver_status(DC_ITEM *item, const AGENT_REQUEST *request, AGENT
 	if ('\0' == *res_ip)
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "IP address of local resolver cannot be empty."));
-		goto out;;
+		goto out;
 	}
 
 	if (SUCCEED != is_uint31(timeout_str, &timeout))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid second parameter."));
-		goto out;;
+		goto out;
 	}
 
 	if (SUCCEED != is_uint31(tries_str, &tries))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid third parameter."));
-		goto out;;
+		goto out;
 	}
 
 	if (SUCCEED != is_uint31(ipv4_enabled_str, &ipv4_enabled))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid fourth parameter."));
-		goto out;;
+		goto out;
 	}
 
 	if (SUCCEED != is_uint31(ipv6_enabled_str, &ipv6_enabled))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid fifth parameter."));
-		goto out;;
+		goto out;
 	}
 
 	/* open log file */
@@ -6094,7 +6120,7 @@ int	check_rsm_resolver_status(DC_ITEM *item, const AGENT_REQUEST *request, AGENT
 			err, sizeof(err))))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
-		goto out;;
+		goto out;
 	}
 
 	extras = RESOLVER_EXTRAS_DNSSEC;
