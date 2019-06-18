@@ -64,20 +64,33 @@ if (!array_key_exists('details', $data)) {
 // TLD details.
 $widget->additem((new CDiv())
 	->addItem([
-		bold(_s('Period: %1$s - %2$s', gmdate('Y/m/d H:i:s', $data['details']['from']),
-			gmdate('Y/m/d H:i:s', $data['details']['to']))), BR(),
-		bold(_s('Generation time: %1$s', gmdate('dS F Y, H:i:s e', $data['details']['generated']))), BR(),
 		($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR)
 			? [
-				bold(_s('Registrar ID: %1$s', $data['tld']['host'])),
+				bold(_s('Registrar ID')),
+				': ',
+				$data['tld']['host'],
 				BR(),
-				bold(_s('Registrar name: %1$s', $data['tld']['name'])),
+				bold(_s('Registrar name')),
+				': ',
+				$data['tld']['name'],
 				BR(),
-				bold(_s('Registrar family: %1$s', $data['tld']['family'])),
+				bold(_s('Registrar family')),
+				': ',
+				$data['tld']['family']
 			]
-			: bold(_s('TLD: %2$s', $data['tld']['name'])),
+			: [bold(_s('TLD')), ': ', $data['tld']['name']],
 		BR(),
-		bold(_('Server: ')), new CLink($data['server'], $data['rolling_week_url'])
+		bold(_s('Period')),
+		': ',
+		gmdate('Y/m/d H:i:s', $data['details']['from']),
+		' '._('till').' ',
+		gmdate('Y/m/d H:i:s', $data['details']['to']),
+		BR(),
+		bold(_s('Generation time')), 
+		': ',
+		gmdate('dS F Y, H:i:s e', $data['details']['generated']),
+		BR(),
+		bold(_('Server')), ': ', new CLink($data['server'], $data['rolling_week_url'])
 	])
 );
 

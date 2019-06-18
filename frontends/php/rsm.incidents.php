@@ -23,9 +23,7 @@ require_once dirname(__FILE__).'/include/config.inc.php';
 require_once dirname(__FILE__).'/include/incidents.inc.php';
 require_once dirname(__FILE__).'/include/incidentdetails.inc.php';
 
-$page['title'] = (get_rsm_monitoring_type() === RSM_MONITORING_TARGET_REGISTRAR)
-	? _('Registrar rolling week status')
-	: _('TLD Rolling week status');
+$page['title'] = _('Incidents');
 $page['file'] = 'rsm.incidents.php';
 $page['hist_arg'] = array('groupid', 'hostid');
 $page['scripts'] = array('class.calendar.js');

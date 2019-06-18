@@ -66,7 +66,7 @@ elseif ($data['filter_search']) {
 		}
 
 		$options = [
-			'output' => ['hostid', 'host', 'name'],
+			'output' => ['hostid', 'host', 'name', 'family'],
 			'tlds' => true,
 			'selectMacros' => ['macro', 'value'],
 			'selectItems' => ['itemid', 'key_', 'value_type'],
