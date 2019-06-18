@@ -901,18 +901,16 @@ sub validate_service($)
 {
 	my $service = shift;
 
-	my $monitoring_target = get_monitoring_target();
-
-	if ($monitoring_target eq RSM_MONITORING_TARGET_REGISTRY)
+	if (get_monitoring_target() eq RSM_MONITORING_TARGET_REGISTRAR)
 	{
-		if (!grep {/$service/} ('dns', 'dnssec', 'rdds', 'epp'))
+		if (!grep {/$service/} ('rdds', 'epp'))
 		{
 			fail("service \"$service\" is unknown");
 		}
 	}
-	elsif ($monitoring_target eq RSM_MONITORING_TARGET_REGISTRAR)
+	else
 	{
-		if (!grep {/$service/} ('rdds', 'epp'))
+		if (!grep {/$service/} ('dns', 'dnssec', 'rdds', 'epp'))
 		{
 			fail("service \"$service\" is unknown");
 		}
@@ -1083,22 +1081,31 @@ sub tld_interface_enabled($$$)
 
 	$interface = lc($interface);
 
-	return 0 if ($interface eq 'epp'); # always disabled for now
+	if ($interface eq 'epp')
+	{
+		# disabled for now
+		return 0;
+	}
 
 	if ($interface eq 'dns')
 	{
-		my $monitoring_target = get_monitoring_target();
+		if (get_monitoring_target() eq RSM_MONITORING_TARGET_REGISTRAR)
+		{
+			# disabled for Registrars
+			return 0;
+		}
 
-		return 1 if ($monitoring_target eq RSM_MONITORING_TARGET_REGISTRY);
-		return 0 if ($monitoring_target eq RSM_MONITORING_TARGET_REGISTRAR);
-
-		fail("unknown monitoring target '$monitoring_target'");
+		# enabled for Registries
+		return 1;
 	}
 
 	if ($interface eq 'dnssec')
 	{
-		# registrars don't have dnssec-related or epp-related items
-		return 0 if (get_monitoring_target() eq RSM_MONITORING_TARGET_REGISTRAR);
+		if (get_monitoring_target() eq RSM_MONITORING_TARGET_REGISTRAR)
+		{
+			# disabled for Registrars
+			return 0;
+		}
 	}
 
 	my $item_key = enabled_item_key_from_interface($interface);
