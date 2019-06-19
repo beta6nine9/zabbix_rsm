@@ -22,7 +22,7 @@
 require_once dirname(__FILE__).'/include/config.inc.php';
 require_once dirname(__FILE__).'/include/rollingweekstatus.inc.php';
 
-$page['title'] = (get_rsm_monitoring_type() === RSM_MONITORING_TARGET_REGISTRAR)
+$page['title'] = (get_rsm_monitoring_type() === MONITORING_TARGET_REGISTRAR)
 	? _('Registrar rolling week status')
 	: _('TLD Rolling week status');
 $page['file'] = 'rsm.rollingweekstatus.php';
@@ -150,7 +150,7 @@ $data['sortorder'] = $sort_order;
 $data['rsm_monitoring_mode'] = get_rsm_monitoring_type();
 
 // Erase fields that are not supported in particular mode.
-if ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR) {
+if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
 	$data['filter_search'] = '';
 	$data['filter_dns'] = '';
 	$data['filter_dnssec'] = '';
@@ -195,7 +195,7 @@ foreach ($macros as $macro) {
 }
 
 // Unset to avoid redundant validation later.
-if ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR) {
+if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
 	$data['filter_dns'] = 0;
 }
 
@@ -237,7 +237,7 @@ foreach ($DB['SERVERS'] as $key => $value) {
 	$filter_by_tlds = ($data['filter_cctld_group'] || $data['filter_gtld_group'] || $data['filter_othertld_group']
 		|| $data['filter_test_group']);
 
-	if ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR || $filter_by_tlds) {
+	if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR || $filter_by_tlds) {
 		// Check if new database connection should be made.
 		if ($DB['SERVER'] !== $DB['SERVERS'][$key]['SERVER']
 				|| $DB['PORT'] !== $DB['SERVERS'][$key]['PORT']
@@ -271,7 +271,7 @@ foreach ($DB['SERVERS'] as $key => $value) {
 				case RSM_CC_TLD_GROUP:
 					$data['allowedGroups'][RSM_CC_TLD_GROUP] = true;
 
-					if ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR || $data['filter_cctld_group']) {
+					if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR || $data['filter_cctld_group']) {
 						$included_groupids[$tld_group['groupid']] = $tld_group['groupid'];
 					}
 					break;
@@ -279,7 +279,7 @@ foreach ($DB['SERVERS'] as $key => $value) {
 				case RSM_G_TLD_GROUP:
 					$data['allowedGroups'][RSM_G_TLD_GROUP] = true;
 
-					if ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR || $data['filter_gtld_group']) {
+					if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR || $data['filter_gtld_group']) {
 						$included_groupids[$tld_group['groupid']] = $tld_group['groupid'];
 					}
 					break;
@@ -287,7 +287,7 @@ foreach ($DB['SERVERS'] as $key => $value) {
 				case RSM_OTHER_TLD_GROUP:
 					$data['allowedGroups'][RSM_OTHER_TLD_GROUP] = true;
 
-					if ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR || $data['filter_othertld_group']) {
+					if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR || $data['filter_othertld_group']) {
 						$included_groupids[$tld_group['groupid']] = $tld_group['groupid'];
 					}
 					break;
@@ -295,7 +295,7 @@ foreach ($DB['SERVERS'] as $key => $value) {
 				case RSM_TEST_GROUP:
 					$data['allowedGroups'][RSM_TEST_GROUP] = true;
 
-					if ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR || $data['filter_test_group']) {
+					if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR || $data['filter_test_group']) {
 						$included_groupids[$tld_group['groupid']] = $tld_group['groupid'];
 					}
 					break;
@@ -466,14 +466,14 @@ foreach ($tlds_by_server as $key => $hosts) {
 
 	if ($hosts) {
 		// get items
-		$item_keys = ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR)
+		$item_keys = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR)
 			? [RSM_SLV_RDDS_ROLLWEEK]
 			: [RSM_SLV_DNSSEC_ROLLWEEK, RSM_SLV_RDDS_ROLLWEEK, RSM_SLV_EPP_ROLLWEEK];
-		$avail_items = ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRY)
+		$avail_items = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY)
 			? [RSM_SLV_DNSSEC_AVAIL, RSM_SLV_RDDS_AVAIL, RSM_SLV_EPP_AVAIL]
 			: [];
 
-		if ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRY) {
+		if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY) {
 			$item_keys[] = RSM_SLV_DNS_ROLLWEEK;
 			$avail_items[] = RSM_SLV_DNS_AVAIL;
 		}

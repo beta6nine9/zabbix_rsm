@@ -71,7 +71,7 @@ elseif ($data['filter_search']) {
 			'selectMacros' => ['macro', 'value'],
 			'selectItems' => ['itemid', 'key_', 'value_type'],
 		];
-		$options += ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR)
+		$options += ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR)
 			? ['filter' => ['host' => $data['filter_search']]]
 			: ['filter' => ['name' => $data['filter_search']]];
 
@@ -140,7 +140,7 @@ if ($data['tld']) {
 		$xml = new SimpleXMLElement($report_row['report']);
 		$details = $xml->attributes();
 
-		if ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRY) {
+		if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY) {
 			$ns_items = [];
 			foreach ($xml->DNS->nsAvailability as $ns_item) {
 				$attrs = $ns_item->attributes();

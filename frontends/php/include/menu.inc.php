@@ -132,7 +132,7 @@ function zbx_construct_menu(&$main_menu, &$sub_menus, &$page, $action = null) {
 			]
 		],
 		'rsm' => array(
-			'label'				=> ($rsm_monitoring_type === RSM_MONITORING_TARGET_REGISTRAR)
+			'label'				=> ($rsm_monitoring_type === MONITORING_TARGET_REGISTRAR)
 				? _('Registrar monitoring')
 				: _('Registry monitoring'),
 			'user_type'			=> [USER_TYPE_READ_ONLY, USER_TYPE_ZABBIX_USER, USER_TYPE_POWER_USER,
@@ -360,7 +360,7 @@ function zbx_construct_menu(&$main_menu, &$sub_menus, &$page, $action = null) {
 	$deny = true;
 
 	// Don't show Registry/Registrar monitoring menu if none of both modes are enabled.
-	if ($rsm_monitoring_type !== RSM_MONITORING_TARGET_REGISTRY && $rsm_monitoring_type !== RSM_MONITORING_TARGET_REGISTRAR) {
+	if ($rsm_monitoring_type !== MONITORING_TARGET_REGISTRY && $rsm_monitoring_type !== MONITORING_TARGET_REGISTRAR) {
 		unset($zbx_menu['rsm']);
 	}
 

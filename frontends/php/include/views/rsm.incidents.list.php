@@ -27,7 +27,7 @@ $filter = (new CFilter('web.rsm.incidents.filter.state'))
 	->addVar('filter_from', zbxDateToTime($data['filter_from']))
 	->addVar('filter_to', zbxDateToTime($data['filter_to']));
 
-$search_label = ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR) ? _('Registrar ID') : _('TLD');
+$search_label = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) ? _('Registrar ID') : _('TLD');
 
 $filter
 	->addColumn(
@@ -63,7 +63,7 @@ if (isset($data['tld'])) {
 	$dateFrom = date(DATE_TIME_FORMAT, zbxDateToTime($data['filter_from']));
 	$dateTill = date(DATE_TIME_FORMAT, zbxDateToTime($data['filter_to']));
 
-	if ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR) {
+	if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
 		$infoBlock
 			->addRow([new CSpan([bold(_('Registrar ID')), ':', SPACE, $data['tld']['host']])])
 			->addRow([new CSpan([bold(_('Registrar name')), ':', SPACE, $data['tld']['name']])])
@@ -112,7 +112,7 @@ if (isset($this->data['tld'])) {
 	}
 
 	// DNS
-	if ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR) {
+	if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
 		$dnsTab = null;
 	}
 	elseif (isset($this->data['dns']['events'])) {
@@ -199,7 +199,7 @@ if (isset($this->data['tld'])) {
 	}
 
 	// DNSSEC
-	if ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR) {
+	if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
 		$dnssecTab = null;
 	}
 	elseif (isset($this->data['dnssec']['events'])) {
@@ -370,7 +370,7 @@ if (isset($this->data['tld'])) {
 	}
 
 	// EPP
-	if ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR) {
+	if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
 		$eppTab = null;
 	}
 	elseif (isset($this->data['epp']['events'])) {
@@ -456,7 +456,7 @@ if (isset($this->data['tld'])) {
 		$eppTab->additem(new CDiv(bold(_('EPP is disabled.')), 'red center'));
 	}
 
-	if ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR) {
+	if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
 		$incidentPage->addTab('rddsTab', _('RDDS'), $rddsTab);
 	}
 	else {

@@ -149,7 +149,7 @@ else {
 	$incidentTestingInterface = null;
 }
 
-$object_info = ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR)
+$object_info = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR)
 	? [
 		new CSpan([bold(_('Registrar ID')), ':', SPACE, $data['tld']['host']]),
 		BR(),

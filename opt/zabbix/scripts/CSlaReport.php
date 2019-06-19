@@ -2,9 +2,9 @@
 
 class CSlaReport
 {
-	const RSM_MONITORING_TARGET_MACRO     = "{\$RSM.MONITORING.TARGET}";
-	const RSM_MONITORING_TARGET_REGISTRY  = "registry";
-	const RSM_MONITORING_TARGET_REGISTRAR = "registrar";
+	const MONITORING_TARGET_MACRO     = "{\$RSM.MONITORING.TARGET}";
+	const MONITORING_TARGET_REGISTRY  = "registry";
+	const MONITORING_TARGET_REGISTRAR = "registrar";
 
 	public static $error;
 
@@ -376,7 +376,7 @@ class CSlaReport
 
 			// validate DNS
 
-			if (self::getMonitoringTarget() == self::RSM_MONITORING_TARGET_REGISTRY)
+			if (self::getMonitoringTarget() == self::MONITORING_TARGET_REGISTRY)
 			{
 				if (is_null($tld["dns"]["availability"]))
 				{
@@ -453,7 +453,7 @@ class CSlaReport
 					throw new Exception("invalid DNS TCP Resolution RTT value type in the database");
 				}
 			}
-			if (self::getMonitoringTarget() == self::RSM_MONITORING_TARGET_REGISTRAR)
+			if (self::getMonitoringTarget() == self::MONITORING_TARGET_REGISTRAR)
 			{
 				/*
 					TODO: consider adding checks for DNS
@@ -528,7 +528,7 @@ class CSlaReport
 			$xml->addAttribute("reportPeriodFrom", $reportPeriodFrom);
 			$xml->addAttribute("reportPeriodTo", $reportPeriodTo);
 
-			if (self::getMonitoringTarget() == self::RSM_MONITORING_TARGET_REGISTRY)
+			if (self::getMonitoringTarget() == self::MONITORING_TARGET_REGISTRY)
 			{
 				$xml_dns = $xml->addChild("DNS");
 				$xml_dns_avail = $xml_dns->addChild("serviceAvailability", $tld["dns"]["availability"]);
@@ -805,16 +805,16 @@ class CSlaReport
 	{
 		if (is_null(self::$monitoring_target))
 		{
-			$rows = self::dbSelect("select value from globalmacro where macro = ?", [self::RSM_MONITORING_TARGET_MACRO]);
+			$rows = self::dbSelect("select value from globalmacro where macro = ?", [self::MONITORING_TARGET_MACRO]);
 			if (!$rows)
 			{
-				throw new Exception("no macro '" . self::RSM_MONITORING_TARGET_MACRO . "'");
+				throw new Exception("no macro '" . self::MONITORING_TARGET_MACRO . "'");
 			}
 
 			self::$monitoring_target = $rows[0][0];
-			if (self::$monitoring_target != self::RSM_MONITORING_TARGET_REGISTRY && self::$monitoring_target != self::RSM_MONITORING_TARGET_REGISTRAR)
+			if (self::$monitoring_target != self::MONITORING_TARGET_REGISTRY && self::$monitoring_target != self::MONITORING_TARGET_REGISTRAR)
 			{
-				throw new Exception("unexpected value of '" . self::RSM_MONITORING_TARGET_MACRO . "' - '" . self::$monitoring_target . "'");
+				throw new Exception("unexpected value of '" . self::MONITORING_TARGET_MACRO . "' - '" . self::$monitoring_target . "'");
 			}
 
 			if (defined("DEBUG") && DEBUG === true)

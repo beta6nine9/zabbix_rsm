@@ -1127,11 +1127,11 @@ sub calculate_cycle($$$$$$$$$)
 
 	my $json = {};
 
-	if (get_monitoring_target() eq RSM_MONITORING_TARGET_REGISTRY)
+	if (get_monitoring_target() eq MONITORING_TARGET_REGISTRY)
 	{
 		$json->{'tld'} = $tld;
 	}
-	elsif (get_monitoring_target() eq RSM_MONITORING_TARGET_REGISTRAR)
+	elsif (get_monitoring_target() eq MONITORING_TARGET_REGISTRAR)
 	{
 		$json->{'registrarID'} = $tld;
 	}

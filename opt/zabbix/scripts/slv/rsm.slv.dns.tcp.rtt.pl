@@ -20,7 +20,7 @@ set_slv_config(get_rsm_config());
 
 db_connect();
 
-slv_exit(SUCCESS) if (get_monitoring_target() ne RSM_MONITORING_TARGET_REGISTRY);
+slv_exit(SUCCESS) if (get_monitoring_target() ne MONITORING_TARGET_REGISTRY);
 
 my $single_tld;
 

@@ -24,7 +24,7 @@ $widget = (new CWidget())->setTitle(_('SLA report'));
 $months = range(1, 12);
 $years = range(SLA_MONITORING_START_YEAR, date('Y', time()));
 
-$object_label = ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR) ? _('Registrar ID') : _('TLD');
+$object_label = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) ? _('Registrar ID') : _('TLD');
 
 $widget->addItem(
 	(new CFilter('web.rsm.slareports.filter.state'))->addColumn(
@@ -64,7 +64,7 @@ if (!array_key_exists('details', $data)) {
 // TLD details.
 $widget->additem((new CDiv())
 	->addItem([
-		($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR)
+		($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR)
 			? [
 				bold(_s('Registrar ID')),
 				': ',
@@ -95,7 +95,7 @@ $widget->additem((new CDiv())
 );
 
 // DNS Service Availability.
-if ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRY) {
+if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY) {
 	$table->addRow([
 			bold(_('DNS Service Availability')),
 			'-',

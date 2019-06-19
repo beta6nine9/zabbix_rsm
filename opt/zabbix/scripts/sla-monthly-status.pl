@@ -167,7 +167,7 @@ sub get_items($)
 	my $sql;
 	my $params;
 
-	if ($monitoring_target eq RSM_MONITORING_TARGET_REGISTRY)
+	if ($monitoring_target eq MONITORING_TARGET_REGISTRY)
 	{
 		$sql = "select items.itemid, items.key_, items.value_type, hosts.host" .
 			" from items" .
@@ -186,7 +186,7 @@ sub get_items($)
 			TLDS_GROUPID
 		];
 	}
-	elsif ($monitoring_target eq RSM_MONITORING_TARGET_REGISTRAR)
+	elsif ($monitoring_target eq MONITORING_TARGET_REGISTRAR)
 	{
 		$sql = "select items.itemid, items.key_, items.value_type, hosts.host" .
 			" from items" .

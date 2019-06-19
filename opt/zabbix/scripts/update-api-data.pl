@@ -87,14 +87,14 @@ else
 	my $monitoring_target = get_monitoring_target();
 	db_disconnect();
 
-	if ($monitoring_target eq RSM_MONITORING_TARGET_REGISTRY)
+	if ($monitoring_target eq MONITORING_TARGET_REGISTRY)
 	{
 		$services{'dns'} = undef;
 		$services{'dnssec'} = undef;
 		$services{'rdds'} = undef;
 		$services{'epp'} = undef;
 	}
-	elsif ($monitoring_target eq RSM_MONITORING_TARGET_REGISTRAR)
+	elsif ($monitoring_target eq MONITORING_TARGET_REGISTRAR)
 	{
 		$services{'rdds'} = undef;
 	}
@@ -481,11 +481,11 @@ foreach (@server_keys)
 
 				$state_file_exists = 0;
 
-				if (get_monitoring_target() eq RSM_MONITORING_TARGET_REGISTRY)
+				if (get_monitoring_target() eq MONITORING_TARGET_REGISTRY)
 				{
 					$json_state_ref->{'tld'} = $tld;
 				}
-				elsif (get_monitoring_target() eq RSM_MONITORING_TARGET_REGISTRAR)
+				elsif (get_monitoring_target() eq MONITORING_TARGET_REGISTRAR)
 				{
 					$json_state_ref->{'registrarID'} = $tld;
 				}

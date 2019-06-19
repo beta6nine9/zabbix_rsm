@@ -79,8 +79,8 @@ function local_generateHeader($data) {
 	zbx_add_post_js('initMessages({});');
 
 	// Show error message if unknown {$RSM.MONITORING.TARGET} is set.
-	if (get_rsm_monitoring_type() !== RSM_MONITORING_TARGET_REGISTRY
-		&& get_rsm_monitoring_type() !== RSM_MONITORING_TARGET_REGISTRAR) {
+	if (get_rsm_monitoring_type() !== MONITORING_TARGET_REGISTRY
+		&& get_rsm_monitoring_type() !== MONITORING_TARGET_REGISTRAR) {
 		error('Unknown monitoring target.');
 	}
 

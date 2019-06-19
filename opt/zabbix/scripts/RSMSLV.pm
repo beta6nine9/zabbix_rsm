@@ -377,7 +377,7 @@ sub get_monitoring_target()
 	{
 		$monitoring_target = __get_macro('{$RSM.MONITORING.TARGET}');
 
-		if ($monitoring_target ne RSM_MONITORING_TARGET_REGISTRY && $monitoring_target ne RSM_MONITORING_TARGET_REGISTRAR)
+		if ($monitoring_target ne MONITORING_TARGET_REGISTRY && $monitoring_target ne MONITORING_TARGET_REGISTRAR)
 		{
 			wrn("{\$RSM.MONITORING.TARGET} has unexpected value: '$monitoring_target'");
 		}
@@ -901,7 +901,7 @@ sub validate_service($)
 {
 	my $service = shift;
 
-	if (get_monitoring_target() eq RSM_MONITORING_TARGET_REGISTRAR)
+	if (get_monitoring_target() eq MONITORING_TARGET_REGISTRAR)
 	{
 		if (!grep {/$service/} ('rdds', 'epp'))
 		{
@@ -1089,7 +1089,7 @@ sub tld_interface_enabled($$$)
 
 	if ($interface eq 'dns')
 	{
-		if (get_monitoring_target() eq RSM_MONITORING_TARGET_REGISTRAR)
+		if (get_monitoring_target() eq MONITORING_TARGET_REGISTRAR)
 		{
 			# disabled for Registrars
 			return 0;
@@ -1101,7 +1101,7 @@ sub tld_interface_enabled($$$)
 
 	if ($interface eq 'dnssec')
 	{
-		if (get_monitoring_target() eq RSM_MONITORING_TARGET_REGISTRAR)
+		if (get_monitoring_target() eq MONITORING_TARGET_REGISTRAR)
 		{
 			# disabled for Registrars
 			return 0;

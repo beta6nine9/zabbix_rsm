@@ -170,7 +170,7 @@ if (!$rollWeekSeconds) {
 }
 
 $serverTime = time() - RSM_ROLLWEEK_SHIFT_BACK;
-$filter_search_key = ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR)
+$filter_search_key = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR)
 	? 'filter_search_host'
 	: 'filter_search';
 
@@ -243,7 +243,7 @@ if ($host || $data['filter_search']) {
 			$options['filter'] = ['host' => $host];
 		}
 		else {
-			$options['filter'] = ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR)
+			$options['filter'] = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR)
 				? ['host' => $data['filter_search']]
 				: ['name' => $data['filter_search']];
 		}
@@ -256,7 +256,7 @@ if ($host || $data['filter_search']) {
 		}
 		else {
 			// Update profile.
-			if ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR) {
+			if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
 				if ($host && $data['filter_search'] != $data['tld']['host']) {
 					$data['filter_search'] = $data['tld']['host'];
 					CProfile::update('web.rsm.incidents.filter_search', $data['tld']['host'], PROFILE_TYPE_STR);
@@ -270,14 +270,14 @@ if ($host || $data['filter_search']) {
 			}
 
 			// get items
-			$item_keys = ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR)
+			$item_keys = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR)
 				? [RSM_SLV_RDDS_ROLLWEEK]
 				: [RSM_SLV_DNSSEC_ROLLWEEK, RSM_SLV_RDDS_ROLLWEEK, RSM_SLV_EPP_ROLLWEEK];
-			$avail_item_keys = ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR)
+			$avail_item_keys = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR)
 				? [RSM_SLV_RDDS_AVAIL]
 				: [RSM_SLV_DNSSEC_AVAIL, RSM_SLV_RDDS_AVAIL, RSM_SLV_EPP_AVAIL];
 
-			if ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRY) {
+			if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY) {
 				$item_keys[] = RSM_SLV_DNS_ROLLWEEK;
 				$avail_item_keys[] = RSM_SLV_DNS_AVAIL;
 			}

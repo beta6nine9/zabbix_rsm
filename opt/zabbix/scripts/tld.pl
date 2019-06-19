@@ -60,10 +60,10 @@ sub main()
 		pfail('cannot find global macro {$RSM.MONITORING.TARGET}');
 	}
 
-	if ($target ne RSM_MONITORING_TARGET_REGISTRY)
+	if ($target ne MONITORING_TARGET_REGISTRY)
 	{
-		pfail("expected monitoring target \"${\RSM_MONITORING_TARGET_REGISTRY}\", but got \"$target\", if you'd like to change it, please run:".
-			"\n\n/opt/zabbix/scripts/change-macro.pl --macro '{\$RSM.MONITORING.TARGET}' --value '${\RSM_MONITORING_TARGET_REGISTRY}'");
+		pfail("expected monitoring target \"${\MONITORING_TARGET_REGISTRY}\", but got \"$target\", if you'd like to change it, please run:".
+			"\n\n/opt/zabbix/scripts/change-macro.pl --macro '{\$RSM.MONITORING.TARGET}' --value '${\MONITORING_TARGET_REGISTRY}'");
 	}
 
 	if (opt('set-type'))

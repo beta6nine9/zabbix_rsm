@@ -248,8 +248,8 @@ if ($page['type'] == PAGE_TYPE_HTML && $showGuiMessaging) {
 }
 
 // Show error message if unknown {$RSM.MONITORING.TARGET} is set.
-if (get_rsm_monitoring_type() !== RSM_MONITORING_TARGET_REGISTRY
-		&& get_rsm_monitoring_type() !== RSM_MONITORING_TARGET_REGISTRAR) {
+if (get_rsm_monitoring_type() !== MONITORING_TARGET_REGISTRY
+		&& get_rsm_monitoring_type() !== MONITORING_TARGET_REGISTRAR) {
 	error('Unknown monitoring target.');
 }
 
