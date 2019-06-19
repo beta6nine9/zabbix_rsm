@@ -26,33 +26,35 @@ $filter = (new CFilter('web.rsm.incidents.filter.state'))
 	->addVar('filter_set', 1)
 	->addVar('filter_from', zbxDateToTime($data['filter_from']))
 	->addVar('filter_to', zbxDateToTime($data['filter_to']));
-$filterColumn1 = new CFormList();
-$filterColumn2 = new CFormList();
-$filterColumn3 = new CFormList();
-$filterColumn4 = new CFormList();
 
-$object_name_label = ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR) ? _('Registrar ID') : _('TLD');
-$filterColumn1
-	->addRow($object_name_label, (new CTextBox('filter_search', $data['filter_search']))
-		->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH)
-		->setAttribute('autocomplete', 'off')
-	);
-$filterColumn2
-	->addRow(_('From'), createDateSelector('filter_from', zbxDateToTime($this->data['filter_from'])));
-$filterColumn3
-	->addRow(_('To'), createDateSelector('filter_to', zbxDateToTime($this->data['filter_to'])));
-$filterColumn4
-	->addRow((new CLink(_('Rolling week'),
-		$this->data['url'].'rsm.incidents.php?incident_type='.$this->data['type'].'&filter_set=1&filter_search='.
-			$this->data['filter_search'].'&filter_rolling_week=1&sid='.$this->data['sid'].'&set_sid=1'
-	))
-		->addClass(ZBX_STYLE_BTN_LINK));
+$search_label = ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR) ? _('Registrar ID') : _('TLD');
 
 $filter
-	->addColumn($filterColumn1)
-	->addColumn($filterColumn2)
-	->addColumn($filterColumn3)
-	->addColumn($filterColumn4);
+	->addColumn(
+		(new CFormList())
+			->addRow($search_label, (new CTextBox('filter_search', $data['filter_search']))
+				->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH)
+				->setAttribute('autocomplete', 'off')
+			)
+	)
+	->addColumn(
+		(new CFormList())
+			->addRow(_('From'), createDateSelector('filter_from', zbxDateToTime($this->data['filter_from'])))
+	)
+	->addColumn(
+		(new CFormList())
+			->addRow(_('To'), createDateSelector('filter_to', zbxDateToTime($this->data['filter_to'])))
+	)
+	->addColumn(
+		(new CFormList())
+			->addRow((new CLink(_('Rolling week'),
+					$this->data['url'].'rsm.incidents.php?incident_type='.$this->data['type'].'&filter_set=1'.
+					'&filter_search='.$this->data['filter_search'].'&filter_rolling_week=1&sid='.$this->data['sid'].
+					'&set_sid=1'
+				))
+					->addClass(ZBX_STYLE_BTN_LINK)
+			)
+	);
 
 $widget->addItem($filter);
 

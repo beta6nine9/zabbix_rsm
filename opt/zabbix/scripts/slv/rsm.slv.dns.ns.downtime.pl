@@ -17,6 +17,8 @@ fail_if_running();
 set_slv_config(get_rsm_config());
 db_connect();
 
+slv_exit(SUCCESS) if (get_monitoring_target() ne RSM_MONITORING_TARGET_REGISTRY);
+
 use constant AVAIL_KEY_PATTERN => 'rsm.slv.dns.ns.avail';
 use constant DOWNTIME_KEY_PATTERN => 'rsm.slv.dns.ns.downtime';
 

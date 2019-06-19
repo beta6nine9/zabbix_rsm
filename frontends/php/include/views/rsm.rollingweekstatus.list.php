@@ -167,34 +167,27 @@ else {
 	$filterColumn2 = null;
 }
 
-if ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRY) {
-	$filterColumn3 = new CFormList();
+// Make Filter values.
+$filter_value = new CComboBox('filter_slv', isset($data['filter_slv']) ? $data['filter_slv'] : null);
+$slvs = explode(',', $data['slv']);
+$filter_value->addItem('', _('any'));
+$filter_value->addItem(SLA_MONITORING_SLV_FILTER_NON_ZERO, _('non-zero'));
 
-	// Make Filter values.
-	$filter_value = new CComboBox('filter_slv', isset($data['filter_slv']) ? $data['filter_slv'] : null);
-	$slvs = explode(',', $data['slv']);
-	$filter_value->addItem('', _('any'));
-	$filter_value->addItem(SLA_MONITORING_SLV_FILTER_NON_ZERO, _('non-zero'));
-
-	foreach ($slvs as $slv) {
-		$filter_value->addItem($slv, $slv.'%');
-	}
-
-	// Add filter fields to third column.
-	$filterColumn3
-		->addRow(_('Exceeding or equal to'), $filter_value)
-		->addRow(_('Current status'),
-			(new CComboBox('filter_status',
-					array_key_exists('filter_status', $data) ? $data['filter_status'] : null)
-			)
-				->addItem(0, _('all'))
-				->addItem(1, _('fail'))
-				->addItem(2, _('disabled'))
-		);
+foreach ($slvs as $slv) {
+	$filter_value->addItem($slv, $slv.'%');
 }
-else {
-	$filterColumn3 = null;
-}
+
+// Add filter fields to third column.
+$filterColumn3 = (new CFormList())
+	->addRow(_('Exceeding or equal to'), $filter_value)
+	->addRow(_('Current status'),
+		(new CComboBox('filter_status',
+				array_key_exists('filter_status', $data) ? $data['filter_status'] : null)
+		)
+			->addItem(0, _('all'))
+			->addItem(1, _('fail'))
+			->addItem(2, _('disabled'))
+	);
 
 $filter
 	->addColumn($filterColumn1)

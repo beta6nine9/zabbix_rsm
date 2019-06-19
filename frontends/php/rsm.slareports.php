@@ -24,6 +24,7 @@ require_once dirname(__FILE__).'/include/config.inc.php';
 $page['title'] = _('SLA report');
 $page['file'] = 'rsm.slareports.php';
 $page['type'] = detect_page_type(hasRequest('export') ? PAGE_TYPE_XML : PAGE_TYPE_HTML);
+$data['rsm_monitoring_mode'] = get_rsm_monitoring_type();
 
 require_once dirname(__FILE__).'/include/page_header.php';
 
@@ -64,13 +65,17 @@ elseif ($data['filter_search']) {
 			continue;
 		}
 
-		$tld = API::Host()->get([
-			'output' => ['hostid', 'host', 'name'],
+		$options = [
+			'output' => ['hostid', 'host', 'name', 'family'],
 			'tlds' => true,
 			'selectMacros' => ['macro', 'value'],
 			'selectItems' => ['itemid', 'key_', 'value_type'],
-			'filter' => ['name' => $data['filter_search']]
-		]);
+		];
+		$options += ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR)
+			? ['filter' => ['host' => $data['filter_search']]]
+			: ['filter' => ['name' => $data['filter_search']]];
+
+		$tld = API::Host()->get($options);
 
 		// TLD not found, proceed to search on another server.
 		if (!$tld) {
@@ -135,36 +140,42 @@ if ($data['tld']) {
 		$xml = new SimpleXMLElement($report_row['report']);
 		$details = $xml->attributes();
 
-		$ns_items = [];
-		foreach ($xml->DNS->nsAvailability as $ns_item) {
-			$attrs = $ns_item->attributes();
-			$ns_items[] = [
-				'from'	=> (int) $attrs->from,
-				'to'	=> (int) $attrs->to,
-				'host'	=> (string) $attrs->hostname,
-				'ip'	=> (string) $attrs->ipAddress,
-				'slv'	=> (string) $ns_item[0],
-				'slr'	=> (string) $attrs->downtimeSLR
+		if ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRY) {
+			$ns_items = [];
+			foreach ($xml->DNS->nsAvailability as $ns_item) {
+				$attrs = $ns_item->attributes();
+				$ns_items[] = [
+					'from'	=> (int) $attrs->from,
+					'to'	=> (int) $attrs->to,
+					'host'	=> (string) $attrs->hostname,
+					'ip'	=> (string) $attrs->ipAddress,
+					'slv'	=> (string) $ns_item[0],
+					'slr'	=> (string) $attrs->downtimeSLR
+				];
+			}
+
+			$data += [
+				'ns_items'	=> $ns_items,
+
+				'slv_dns_downtime'			=> (string) $xml->DNS->serviceAvailability,
+				'slr_dns_downtime'			=> (string) $xml->DNS->serviceAvailability->attributes()->downtimeSLR,
+
+				'slv_dns_tcp_pfailed'		=> (string) $xml->DNS->rttTCP,
+				'slr_dns_tcp_pfailed'		=> (String) $xml->DNS->rttTCP->attributes()->percentageSLR,
+				'slr_dns_tcp_pfailed_ms'	=> (string) $xml->DNS->rttTCP->attributes()->rttSLR,
+
+				'slv_dns_udp_pfailed'		=> (string) $xml->DNS->rttUDP,
+				'slr_dns_udp_pfailed'		=> (string) $xml->DNS->rttUDP->attributes()->percentageSLR,
+				'slr_dns_udp_pfailed_ms'	=> (string) $xml->DNS->rttUDP->attributes()->rttSLR,
 			];
 		}
 
 		$data += [
-			'ns_items'	=> $ns_items,
 			'details'	=> [
 				'from'		=> (int) $details->reportPeriodFrom,
 				'to'		=> (int) $details->reportPeriodTo,
 				'generated'	=> (int) $details->generationDateTime
 			],
-			'slv_dns_downtime'			=> (string) $xml->DNS->serviceAvailability,
-			'slr_dns_downtime'			=> (string) $xml->DNS->serviceAvailability->attributes()->downtimeSLR,
-
-			'slv_dns_tcp_pfailed'		=> (string) $xml->DNS->rttTCP,
-			'slr_dns_tcp_pfailed'		=> (String) $xml->DNS->rttTCP->attributes()->percentageSLR,
-			'slr_dns_tcp_pfailed_ms'	=> (string) $xml->DNS->rttTCP->attributes()->rttSLR,
-
-			'slv_dns_udp_pfailed'		=> (string) $xml->DNS->rttUDP,
-			'slr_dns_udp_pfailed'		=> (string) $xml->DNS->rttUDP->attributes()->percentageSLR,
-			'slr_dns_udp_pfailed_ms'	=> (string) $xml->DNS->rttUDP->attributes()->rttSLR,
 
 			'slv_rdds_downtime'			=> (string) $xml->RDDS->serviceAvailability,
 			'slr_rdds_downtime'			=> (string) $xml->RDDS->serviceAvailability->attributes()->downtimeSLR,
@@ -190,6 +201,9 @@ if ($data['tld']) {
 			->setArgument('set_sid', 1)
 			->getUrl();
 	}
+}
+elseif ($data['filter_search']) {
+	show_error_message(_s('Host "%s" doesn\'t exist or you don\'t have permissions to access it.', $data['filter_search']));
 }
 
 (new CView('rsm.slareports.list', $data))

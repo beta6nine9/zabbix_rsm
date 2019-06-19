@@ -155,8 +155,6 @@ if ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR) {
 	$data['filter_dns'] = '';
 	$data['filter_dnssec'] = '';
 	$data['filter_epp'] = '';
-	$data['filter_slv'] = '';
-	$data['filter_status'] = '';
 	$data['filter_gtld_group'] = '';
 	$data['filter_cctld_group'] = '';
 	$data['filter_othertld_group'] = '';
@@ -170,6 +168,7 @@ if ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR) {
 	if (!$data['filter_registrar_family']) {
 		$data['filter_registrar_family'] = '';
 	}
+	$data['filter_rdds'] = true;
 }
 else {
 	$data['filter_registrar_id'] = '';

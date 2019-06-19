@@ -98,6 +98,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		get_macro_epp_rtt_low get_macro_probe_avail_limit
 		get_macro_incident_dns_fail get_macro_incident_dns_recover
 		get_macro_incident_rdds_fail get_macro_incident_rdds_recover
+		get_monitoring_target
 		get_itemid_by_key get_itemid_by_host
 		get_itemid_by_hostid get_itemid_like_by_hostid get_itemids_by_host_and_keypart get_lastclock
 		get_tlds get_tlds_and_hostids
@@ -163,6 +164,8 @@ my $sql_time = 0.0;
 my $sql_count = 0;
 
 my $log_open = 0;
+
+my $monitoring_target; # see get_monitoring_target()
 
 sub get_macro_minns
 {
@@ -366,6 +369,21 @@ sub get_macro_incident_rdds_fail()
 sub get_macro_incident_rdds_recover()
 {
 	return __get_macro('{$RSM.INCIDENT.RDDS.RECOVER}');
+}
+
+sub get_monitoring_target()
+{
+	if (!defined($monitoring_target))
+	{
+		$monitoring_target = __get_macro('{$RSM.MONITORING.TARGET}');
+
+		if ($monitoring_target ne RSM_MONITORING_TARGET_REGISTRY && $monitoring_target ne RSM_MONITORING_TARGET_REGISTRAR)
+		{
+			wrn("{\$RSM.MONITORING.TARGET} has unexpected value: '$monitoring_target'");
+		}
+	}
+
+	return $monitoring_target;
 }
 
 sub get_itemid_by_key
@@ -883,7 +901,20 @@ sub validate_service($)
 {
 	my $service = shift;
 
-	fail("service \"$service\" is unknown") if (!grep {/$service/} ('dns', 'dnssec', 'rdds', 'epp'));
+	if (get_monitoring_target() eq RSM_MONITORING_TARGET_REGISTRAR)
+	{
+		if (!grep {/$service/} ('rdds', 'epp'))
+		{
+			fail("service \"$service\" is unknown");
+		}
+	}
+	else
+	{
+		if (!grep {/$service/} ('dns', 'dnssec', 'rdds', 'epp'))
+		{
+			fail("service \"$service\" is unknown");
+		}
+	}
 }
 
 my %tld_service_enabled_cache = ();
@@ -910,16 +941,16 @@ sub __tld_service_enabled($$$)
 	my $service = shift;
 	my $now     = shift;
 
-	return 1 if ($service eq 'dns');
-
 	if ($service eq 'rdds')
 	{
 		return 1 if tld_interface_enabled($tld, 'rdds43', $now);
-
-		return tld_interface_enabled($tld, 'rdap', $now);
+		return 1 if tld_interface_enabled($tld, 'rdap', $now);
+		return 0;
 	}
-
-	return tld_interface_enabled($tld, $service, $now);
+	else
+	{
+		return tld_interface_enabled($tld, $service, $now);
+	}
 }
 
 sub enabled_item_key_from_interface
@@ -1050,7 +1081,32 @@ sub tld_interface_enabled($$$)
 
 	$interface = lc($interface);
 
-	return 1 if ($interface eq 'dns');
+	if ($interface eq 'epp')
+	{
+		# disabled for now
+		return 0;
+	}
+
+	if ($interface eq 'dns')
+	{
+		if (get_monitoring_target() eq RSM_MONITORING_TARGET_REGISTRAR)
+		{
+			# disabled for Registrars
+			return 0;
+		}
+
+		# enabled for Registries
+		return 1;
+	}
+
+	if ($interface eq 'dnssec')
+	{
+		if (get_monitoring_target() eq RSM_MONITORING_TARGET_REGISTRAR)
+		{
+			# disabled for Registrars
+			return 0;
+		}
+	}
 
 	my $item_key = enabled_item_key_from_interface($interface);
 

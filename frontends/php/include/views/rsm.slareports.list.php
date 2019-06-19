@@ -24,13 +24,13 @@ $widget = (new CWidget())->setTitle(_('SLA report'));
 $months = range(1, 12);
 $years = range(SLA_MONITORING_START_YEAR, date('Y', time()));
 
-$object_name = ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR) ? _('Registrar ID') : _('TLD');
+$object_label = ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR) ? _('Registrar ID') : _('TLD');
 
 $widget->addItem(
 	(new CFilter('web.rsm.slareports.filter.state'))->addColumn(
 		(new CFormList())
 			->addVar('filter_set', 1)
-			->addRow($object_name, (new CTextBox('filter_search', $data['filter_search']))
+			->addRow($object_label, (new CTextBox('filter_search', $data['filter_search']))
 				->setWidth(ZBX_TEXTAREA_FILTER_STANDARD_WIDTH)
 				->setAttribute('autocomplete', 'off')
 			)
@@ -63,71 +63,94 @@ if (!array_key_exists('details', $data)) {
 
 // TLD details.
 $widget->additem((new CDiv())
-	->addClass(ZBX_STYLE_TABLE_FORMS_CONTAINER)
 	->addItem([
-		bold(_s('Period: %1$s - %2$s', gmdate('Y/m/d H:i:s', $data['details']['from']),
-			gmdate('Y/m/d H:i:s', $data['details']['to']))), BR(),
-		bold(_s('Generation time: %1$s', gmdate('dS F Y, H:i:s e', $data['details']['generated']))), BR(),
-		bold(_s('TLD: %1$s', $data['tld']['name'])), BR(),
-		bold(_('Server: ')), new CLink($data['server'], $data['rolling_week_url'])
+		($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR)
+			? [
+				bold(_s('Registrar ID')),
+				': ',
+				$data['tld']['host'],
+				BR(),
+				bold(_s('Registrar name')),
+				': ',
+				$data['tld']['name'],
+				BR(),
+				bold(_s('Registrar family')),
+				': ',
+				$data['tld']['family']
+			]
+			: [bold(_s('TLD')), ': ', $data['tld']['name']],
+		BR(),
+		bold(_s('Period')),
+		': ',
+		gmdate('Y/m/d H:i:s', $data['details']['from']),
+		' '._('till').' ',
+		gmdate('Y/m/d H:i:s', $data['details']['to']),
+		BR(),
+		bold(_s('Generation time')), 
+		': ',
+		gmdate('dS F Y, H:i:s e', $data['details']['generated']),
+		BR(),
+		bold(_('Server')), ': ', new CLink($data['server'], $data['rolling_week_url'])
 	])
 );
 
 // DNS Service Availability.
-$table->addRow([
-		bold(_('DNS Service Availability')),
-		'-',
-		gmdate('Y-m-d H:i:s e', $data['details']['from']),
-		gmdate('Y-m-d H:i:s e', $data['details']['to']),
-		_s('%d (minutes of downtime)', $data['slv_dns_downtime']),
-		_s('%d (minutes of downtime)', $data['slr_dns_downtime'])
-	],
-	($data['slv_dns_downtime'] > $data['slr_dns_downtime']) ? 'red-bg' : null
-);
-
-// DNS Name Server Availability.
-foreach ($data['ns_items'] as $item) {
+if ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRY) {
 	$table->addRow([
-			_('DNS Name Server Availability'),
-			implode(', ', array_filter([$item['host'], $item['ip']], 'strlen')),
-			gmdate('Y-m-d H:i:s e', $item['from']),
-			gmdate('Y-m-d H:i:s e', $item['to']),
-			_s('%1$s (minutes of downtime)', $item['slv']),
-			_s('%1$s (minutes of downtime)', $item['slr'])
+			bold(_('DNS Service Availability')),
+			'-',
+			gmdate('Y-m-d H:i:s e', $data['details']['from']),
+			gmdate('Y-m-d H:i:s e', $data['details']['to']),
+			_s('%d (minutes of downtime)', $data['slv_dns_downtime']),
+			_s('%d (minutes of downtime)', $data['slr_dns_downtime'])
 		],
-		($item['slv'] > $item['slr']) ? 'red-bg' : null
+		($data['slv_dns_downtime'] > $data['slr_dns_downtime']) ? 'red-bg' : null
+	);
+
+	// DNS Name Server Availability.
+	foreach ($data['ns_items'] as $item) {
+		$table->addRow([
+				_('DNS Name Server Availability'),
+				implode(', ', array_filter([$item['host'], $item['ip']], 'strlen')),
+				gmdate('Y-m-d H:i:s e', $item['from']),
+				gmdate('Y-m-d H:i:s e', $item['to']),
+				_s('%1$s (minutes of downtime)', $item['slv']),
+				_s('%1$s (minutes of downtime)', $item['slr'])
+			],
+			($item['slv'] > $item['slr']) ? 'red-bg' : null
+		);
+	}
+
+	// DNS UDP/TCP Resolution RTT.
+	$table
+		->addRow([
+				_('DNS UDP Resolution RTT'),
+				'-',
+				gmdate('Y-m-d H:i:s e', $data['details']['from']),
+				gmdate('Y-m-d H:i:s e', $data['details']['to']),
+				_s('%1$s %% (queries <= %2$s ms)', $data['slv_dns_udp_pfailed'],
+					$data['slr_dns_udp_pfailed_ms']
+				),
+				_s('<= %1$s ms, for at least %2$s %% of queries', $data['slr_dns_udp_pfailed_ms'],
+					$data['slr_dns_udp_pfailed']
+				)
+			],
+			($data['slv_dns_udp_pfailed'] < (100 - $data['slr_dns_udp_pfailed'])) ? 'red-bg' : null
+		)->addRow([
+				_('DNS TCP Resolution RTT'),
+				'-',
+				gmdate('Y-m-d H:i:s e', $data['details']['from']),
+				gmdate('Y-m-d H:i:s e', $data['details']['to']),
+				_s('%1$s %% (queries <= %2$s ms)', $data['slv_dns_tcp_pfailed'],
+					$data['slr_dns_tcp_pfailed_ms']
+				),
+				_s('<= %1$s ms, for at least %2$s %% of queries', $data['slr_dns_tcp_pfailed_ms'],
+					$data['slr_dns_tcp_pfailed']
+				)
+			],
+			($data['slv_dns_tcp_pfailed'] < (100 - $data['slr_dns_tcp_pfailed'])) ? 'red-bg' : null
 	);
 }
-
-// DNS UDP/TCP Resolution RTT.
-$table
-	->addRow([
-			_('DNS UDP Resolution RTT'),
-			'-',
-			gmdate('Y-m-d H:i:s e', $data['details']['from']),
-			gmdate('Y-m-d H:i:s e', $data['details']['to']),
-			_s('%1$s %% (queries <= %2$s ms)', $data['slv_dns_udp_pfailed'],
-				$data['slr_dns_udp_pfailed_ms']
-			),
-			_s('<= %1$s ms, for at least %2$s %% of queries', $data['slr_dns_udp_pfailed_ms'],
-				$data['slr_dns_udp_pfailed']
-			)
-		],
-		($data['slv_dns_udp_pfailed'] < (100 - $data['slr_dns_udp_pfailed'])) ? 'red-bg' : null
-	)->addRow([
-			_('DNS TCP Resolution RTT'),
-			'-',
-			gmdate('Y-m-d H:i:s e', $data['details']['from']),
-			gmdate('Y-m-d H:i:s e', $data['details']['to']),
-			_s('%1$s %% (queries <= %2$s ms)', $data['slv_dns_tcp_pfailed'],
-				$data['slr_dns_tcp_pfailed_ms']
-			),
-			_s('<= %1$s ms, for at least %2$s %% of queries', $data['slr_dns_tcp_pfailed_ms'],
-				$data['slr_dns_tcp_pfailed']
-			)
-		],
-		($data['slv_dns_tcp_pfailed'] < (100 - $data['slr_dns_tcp_pfailed'])) ? 'red-bg' : null
-);
 
 // RDDS Service Availability and Query RTT.
 if (array_key_exists('slv_rdds_downtime', $data) && $data['slv_rdds_downtime'] !== 'disabled'

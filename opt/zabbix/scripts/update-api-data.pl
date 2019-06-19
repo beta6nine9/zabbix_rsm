@@ -83,9 +83,20 @@ if (opt('service'))
 }
 else
 {
-	foreach my $service ('dns', 'dnssec', 'rdds', 'epp')
+	db_connect();
+	my $monitoring_target = get_monitoring_target();
+	db_disconnect();
+
+	if ($monitoring_target eq RSM_MONITORING_TARGET_REGISTRY)
 	{
-		$services{$service} = undef;
+		$services{'dns'} = undef;
+		$services{'dnssec'} = undef;
+		$services{'rdds'} = undef;
+		$services{'epp'} = undef;
+	}
+	elsif ($monitoring_target eq RSM_MONITORING_TARGET_REGISTRAR)
+	{
+		$services{'rdds'} = undef;
 	}
 }
 
@@ -470,7 +481,15 @@ foreach (@server_keys)
 
 				$state_file_exists = 0;
 
-				$json_state_ref->{'tld'} = $tld;
+				if (get_monitoring_target() eq RSM_MONITORING_TARGET_REGISTRY)
+				{
+					$json_state_ref->{'tld'} = $tld;
+				}
+				elsif (get_monitoring_target() eq RSM_MONITORING_TARGET_REGISTRAR)
+				{
+					$json_state_ref->{'registrarID'} = $tld;
+				}
+
 				$json_state_ref->{'testedServices'} = {};
 			}
 			else

@@ -95,10 +95,13 @@ if (opt('service'))
 }
 else
 {
-	foreach my $service ('dns', 'dnssec', SERVICE_DNS_TCP, 'rdds', 'epp')	# Export DNS-TCP tests
+	if (get_monitoring_target() eq RSM_MONITORING_TARGET_REGISTRY)
 	{
-		$services->{$service} = undef;
+		$services->{'dns'} = undef;
+		$services->{'dnssec'} = undef;
+		$services->{'epp'} = undef;
 	}
+	$services->{'rdds'} = undef;
 }
 
 my @interfaces;

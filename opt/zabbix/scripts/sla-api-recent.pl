@@ -1125,7 +1125,19 @@ sub calculate_cycle($$$$$$$$$)
 	my $from = cycle_start($cycle_clock, $delay);
 	my $till = cycle_end($cycle_clock, $delay);
 
-	my $json = {'tld' => $tld, 'service' => $service, 'cycleCalculationDateTime' => $from};
+	my $json = {};
+
+	if (get_monitoring_target() eq RSM_MONITORING_TARGET_REGISTRY)
+	{
+		$json->{'tld'} = $tld;
+	}
+	elsif (get_monitoring_target() eq RSM_MONITORING_TARGET_REGISTRAR)
+	{
+		$json->{'registrarID'} = $tld;
+	}
+
+	$json->{'service'} = $service;
+	$json->{'cycleCalculationDateTime'} = $from;
 
 	my %tested_interfaces;
 

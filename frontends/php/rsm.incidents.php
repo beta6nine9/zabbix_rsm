@@ -23,9 +23,7 @@ require_once dirname(__FILE__).'/include/config.inc.php';
 require_once dirname(__FILE__).'/include/incidents.inc.php';
 require_once dirname(__FILE__).'/include/incidentdetails.inc.php';
 
-$page['title'] = (get_rsm_monitoring_type() === RSM_MONITORING_TARGET_REGISTRAR)
-	? _('Registrar rolling week status')
-	: _('TLD Rolling week status');
+$page['title'] = _('Incidents');
 $page['file'] = 'rsm.incidents.php';
 $page['hist_arg'] = array('groupid', 'hostid');
 $page['scripts'] = array('class.calendar.js');
@@ -44,6 +42,7 @@ $fields = [
 	'filter_set' =>				[T_ZBX_STR, O_OPT, null,	null,			null],
 	'filter_rst' =>				[T_ZBX_STR, O_OPT, null,	null,			null],
 	'filter_search' =>			[T_ZBX_STR, O_OPT, null,	null,			null],
+	'filter_search_host' =>		[T_ZBX_STR, O_OPT, null,	null,			null],
 	'filter_from' =>			[T_ZBX_INT, O_OPT, null,	null,			null],
 	'filter_to' =>				[T_ZBX_INT, O_OPT, null,	null,			null],
 	'filter_rolling_week' =>	[T_ZBX_INT, O_OPT, null,	null,			null],
@@ -171,6 +170,9 @@ if (!$rollWeekSeconds) {
 }
 
 $serverTime = time() - RSM_ROLLWEEK_SHIFT_BACK;
+$filter_search_key = ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR)
+	? 'filter_search_host'
+	: 'filter_search';
 
 /*
  * Filter
@@ -241,21 +243,30 @@ if ($host || $data['filter_search']) {
 			$options['filter'] = ['host' => $host];
 		}
 		else {
-			$options['filter'] = ['name' => $data['filter_search']];
+			$options['filter'] = ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR)
+				? ['host' => $data['filter_search']]
+				: ['name' => $data['filter_search']];
 		}
 
 		$tld = API::Host()->get($options);
 		$data['tld'] = reset($tld);
 
 		if (!$data['tld']) {
-			unset($data['tld']);
 			continue;
 		}
 		else {
 			// Update profile.
-			if ($host && $data['filter_search'] != $data['tld']['name']) {
-				$data['filter_search'] = $data['tld']['name'];
-				CProfile::update('web.rsm.incidents.filter_search', $data['tld']['name'], PROFILE_TYPE_STR);
+			if ($data['rsm_monitoring_mode'] === RSM_MONITORING_TARGET_REGISTRAR) {
+				if ($host && $data['filter_search'] != $data['tld']['host']) {
+					$data['filter_search'] = $data['tld']['host'];
+					CProfile::update('web.rsm.incidents.filter_search', $data['tld']['host'], PROFILE_TYPE_STR);
+				}
+			}
+			else {
+				if ($host && $data['filter_search'] != $data['tld']['name']) {
+					$data['filter_search'] = $data['tld']['name'];
+					CProfile::update('web.rsm.incidents.filter_search', $data['tld']['name'], PROFILE_TYPE_STR);
+				}
 			}
 
 			// get items
@@ -1068,6 +1079,12 @@ if ($host || $data['filter_search']) {
 	unset($DB['DB']);
 	$DB = $master;
 	DBconnect($error);
+}
+
+// Show error if no matching hosts found.
+if ($data['filter_search'] && !$data['tld']) {
+	unset($data['tld']);
+	show_error_message(_s('Host "%s" doesn\'t exist or you don\'t have permissions to access it.', $data['filter_search']));
 }
 
 // data sorting
