@@ -4310,7 +4310,7 @@ static int	DBpatch_3000401(void)
 
 	DB_RESULT	result;
 	DB_ROW		row;
-	char		*rsm_monitoring_target;
+	char		*monitoring_target;
 
 	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
 		return SUCCEED;
@@ -4324,22 +4324,22 @@ static int	DBpatch_3000401(void)
 	if (NULL == (row = DBfetch(result)))
 	{
 		/* this means the above SQL is faulty, which shouldn't happen */
-		rsm_monitoring_target = NULL;
+		monitoring_target = NULL;
 	}
 	else if (atoi(row[0]) == 0)
 	{
 		/* new or empty installation, monitoring target unknown */
-		rsm_monitoring_target = "";
+		monitoring_target = "";
 	}
 	else
 	{
 		/* existing installation, monitoring target is "Registry" */
-		rsm_monitoring_target = "registry";
+		monitoring_target = "registry";
 	}
 
 	DBfree_result(result);
 
-	if (NULL == rsm_monitoring_target)
+	if (NULL == monitoring_target)
 	{
 		zabbix_log(LOG_LEVEL_CRIT, "error while trying to list hosts of hostgroup with ID 140");
 		return FAIL;
@@ -4348,7 +4348,7 @@ static int	DBpatch_3000401(void)
 	if (ZBX_DB_OK > DBexecute(
 			"insert into globalmacro (globalmacroid,macro,value)"
 			" values (105,'{$RSM.MONITORING.TARGET}','%s')",
-			rsm_monitoring_target))
+			monitoring_target))
 	{
 		return FAIL;
 	}
