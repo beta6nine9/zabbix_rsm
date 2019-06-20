@@ -276,9 +276,9 @@ sub list_services($;$)
 
 		my $services = get_services($server_key, $rsmhost);
 
-		push(@row, $rsmhost);
-		push(@row, $rsmhosts{$rsmhost}{'name'});
-		push(@row, $rsmhosts{$rsmhost}{'family'});
+		push(@row, $rsmhost);                      # Registrar ID
+		push(@row, $rsmhosts{$rsmhost}{'info_1'}); # Registrar name
+		push(@row, $rsmhosts{$rsmhost}{'info_2'}); # Registrar family
 		push(@row, map($services->{$_} // "", @columns));
 
 		# obtain rsm.rdds[] item key and extract RDDS(43|80).SERVERS strings
@@ -328,8 +328,8 @@ sub get_registrar_list()
 	foreach my $host (@{$registrars->{'hosts'}})
 	{
 		$result{$host->{'host'}} = {
-			'name'   => $host->{'name'},
-			'family' => $host->{'family'}
+			'name'   => $host->{'info_1'},
+			'family' => $host->{'info_2'}
 		};
 	}
 
@@ -635,8 +635,8 @@ sub create_rsmhost()
 			{'groupid' => TLD_TYPE_GROUPIDS->{${\TLD_TYPE_G}}}
 		],
 		'host'       => $rr_id,
-		'name'       => $rr_name,
-		'family'     => $rr_family,
+		'info_1'     => $rr_name,
+		'info_2'     => $rr_family,
 		'status'     => HOST_STATUS_MONITORED,
 		'interfaces' => [DEFAULT_MAIN_INTERFACE]
 	}));
