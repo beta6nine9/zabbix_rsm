@@ -72,11 +72,11 @@ $widget->additem((new CDiv())
 				BR(),
 				bold(_s('Registrar name')),
 				': ',
-				$data['tld']['name'],
+				$data['tld']['info_1'],
 				BR(),
 				bold(_s('Registrar family')),
 				': ',
-				$data['tld']['family']
+				$data['tld']['info_2']
 			]
 			: [bold(_s('TLD')), ': ', $data['tld']['name']],
 		BR(),

@@ -61,7 +61,7 @@ $fields = [
 	'favref' =>					[T_ZBX_STR, O_OPT, P_ACT,  NOT_EMPTY,	'isset({favobj})'],
 	'favstate' =>				[T_ZBX_INT, O_OPT, P_ACT,  NOT_EMPTY,	'isset({favobj})&&("filter"=={favobj})'],
 	// sort and sortorder
-	'sort' =>			[T_ZBX_STR, O_OPT, P_SYS, IN('"host","name","family","type","server","dns_lastvalue","dnssec_lastvalue","rdds_lastvalue","epp_lastvalue"'),	null],
+	'sort' =>			[T_ZBX_STR, O_OPT, P_SYS, IN('"host","info_1","info_2","type","server","dns_lastvalue","dnssec_lastvalue","rdds_lastvalue","epp_lastvalue"'),	null],
 	'sortorder' =>		[T_ZBX_STR, O_OPT, P_SYS, IN('"'.ZBX_SORT_DOWN.'","'.ZBX_SORT_UP.'"'),	null]
 ];
 
@@ -320,10 +320,10 @@ foreach ($DB['SERVERS'] as $key => $value) {
 			$where_host[] = dbConditionString($hosts_table_alias.'.host ', [$data['filter_registrar_id']]);
 		}
 		if ($data['filter_registrar_name'] !== '') {
-			$where_host[] = $hosts_table_alias.'.name LIKE ('.zbx_dbstr('%'.$data['filter_registrar_name'].'%').')';
+			$where_host[] = $hosts_table_alias.'.info_1 LIKE ('.zbx_dbstr('%'.$data['filter_registrar_name'].'%').')';
 		}
 		if ($data['filter_registrar_family'] !== '') {
-			$where_host[] = $hosts_table_alias.'.family LIKE ('.zbx_dbstr('%'.$data['filter_registrar_family'].'%').')';
+			$where_host[] = $hosts_table_alias.'.info_2 LIKE ('.zbx_dbstr('%'.$data['filter_registrar_family'].'%').')';
 		}
 
 		// Stringify query where conditions.
@@ -334,7 +334,7 @@ foreach ($DB['SERVERS'] as $key => $value) {
 			$host_count = (count($selected_groupids) >= 2) ? 2 : 1;
 
 			$db_tlds = DBselect(
-				'SELECT h.hostid,h.host,h.name,h.family,h.status'.
+				'SELECT h.hostid,h.host,h.info_1,h.info_2,h.status'.
 				' FROM hosts h'.
 				' WHERE hostid IN ('.
 					'SELECT hg.hostid from hosts_groups hg'.
@@ -347,7 +347,7 @@ foreach ($DB['SERVERS'] as $key => $value) {
 			$user_groupids = getUserGroupsByUserId(CWebUser::$data['userid']);
 
 			$db_tlds = DBselect(
-				'SELECT h.hostid,h.host,h.name,h.family,h.status'.
+				'SELECT h.hostid,h.host,h.info_1,h.info_2,h.status'.
 				' FROM hosts h'.
 				' WHERE hostid IN ('.
 					'SELECT hgg.hostid'.
@@ -373,8 +373,8 @@ foreach ($DB['SERVERS'] as $key => $value) {
 				$data['tld'][$db_nr.$db_tld['hostid']] = [
 					'hostid' => $db_tld['hostid'],
 					'host' => $db_tld['host'],
-					'name' => $db_tld['name'],
-					'family' => $db_tld['family'],
+					'info_1' => $db_tld['info_1'],
+					'info_2' => $db_tld['info_2'],
 					'status' => $db_tld['status'],
 					'dns_lastvalue' => 0,
 					'dnssec_lastvalue' => 0,

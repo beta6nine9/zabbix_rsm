@@ -66,14 +66,14 @@ elseif ($data['filter_search']) {
 		}
 
 		$options = [
-			'output' => ['hostid', 'host', 'name', 'family'],
+			'output' => ['hostid', 'host', 'info_1', 'info_2'],
 			'tlds' => true,
 			'selectMacros' => ['macro', 'value'],
 			'selectItems' => ['itemid', 'key_', 'value_type'],
 		];
 		$options += ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR)
-			? ['filter' => ['host' => $data['filter_search']]]
-			: ['filter' => ['name' => $data['filter_search']]];
+			? ['filter' => ['info_1' => $data['filter_search']]]
+			: ['filter' => ['host' => $data['filter_search']]];
 
 		$tld = API::Host()->get($options);
 

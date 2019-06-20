@@ -235,7 +235,7 @@ if ($host || $data['filter_search']) {
 		}
 
 		$options = [
-			'output' => ['hostid', 'host', 'name', 'family'],
+			'output' => ['hostid', 'host', 'info_1', 'info_2'],
 			'tlds' => true
 		];
 
@@ -244,8 +244,8 @@ if ($host || $data['filter_search']) {
 		}
 		else {
 			$options['filter'] = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR)
-				? ['host' => $data['filter_search']]
-				: ['name' => $data['filter_search']];
+				? ['info_1' => $data['filter_search']]
+				: ['host' => $data['filter_search']];
 		}
 
 		$tld = API::Host()->get($options);

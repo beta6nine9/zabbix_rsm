@@ -129,7 +129,7 @@ if (!$data['host'] || !$data['slvItemId'] || $data['type'] === null) {
 
 // get TLD
 $tld = API::Host()->get([
-	'output' => ['hostid', 'host', 'name', 'family'],
+	'output' => ['hostid', 'host', 'info_1', 'info_2'],
 	'filter' => [
 		'host' => $data['host']
 	],

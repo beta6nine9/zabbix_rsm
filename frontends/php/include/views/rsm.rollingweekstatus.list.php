@@ -203,8 +203,8 @@ $form = (new CForm())
 if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
 	$header_columns = [
 		make_sorting_header(_('Registrar ID'), 'host', $data['sort'], $data['sortorder']),
-		make_sorting_header(_('Registrar name'), 'name', $data['sort'], $data['sortorder']),
-		make_sorting_header(_('Registrar family'), 'family', $data['sort'], $data['sortorder']),
+		make_sorting_header(_('Registrar name'), 'info_1', $data['sort'], $data['sortorder']),
+		make_sorting_header(_('Registrar family'), 'info_2', $data['sort'], $data['sortorder']),
 		make_sorting_header(_('RDDS (24Hrs)'), 'rdds_lastvalue', $data['sort'], $data['sortorder'])
 	];
 }
@@ -232,8 +232,8 @@ if ($data['tld']) {
 		if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
 			$row = [
 				$tld['host'],
-				$tld['name'],
-				$tld['family']
+				$tld['info_1'],
+				$tld['info_2']
 			];
 		}
 		// TLD type.

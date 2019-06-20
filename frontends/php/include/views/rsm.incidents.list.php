@@ -66,8 +66,8 @@ if (isset($data['tld'])) {
 	if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
 		$infoBlock
 			->addRow([new CSpan([bold(_('Registrar ID')), ':', SPACE, $data['tld']['host']])])
-			->addRow([new CSpan([bold(_('Registrar name')), ':', SPACE, $data['tld']['name']])])
-			->addRow([new CSpan([bold(_('Registrar family')), ':', SPACE, $data['tld']['family']])]);
+			->addRow([new CSpan([bold(_('Registrar name')), ':', SPACE, $data['tld']['info_1']])])
+			->addRow([new CSpan([bold(_('Registrar family')), ':', SPACE, $data['tld']['info_2']])]);
 	}
 	else {
 		$infoBlock->addRow([[

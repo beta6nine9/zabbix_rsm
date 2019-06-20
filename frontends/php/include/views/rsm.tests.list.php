@@ -101,9 +101,9 @@ $object_info = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR)
 	? [
 		new CSpan([bold(_('Registrar ID')), ':', SPACE, $data['tld']['host']]),
 		BR(),
-		new CSpan([bold(_('Registrar name')), ':', SPACE, $data['tld']['name']]),
+		new CSpan([bold(_('Registrar name')), ':', SPACE, $data['tld']['info_1']]),
 		BR(),
-		new CSpan([bold(_('Registrar family')), ':', SPACE, $data['tld']['family']])
+		new CSpan([bold(_('Registrar family')), ':', SPACE, $data['tld']['info_2']])
 	]
 	: new CSpan([bold(_('TLD')), ':', SPACE, $data['tld']['name']]);
 
