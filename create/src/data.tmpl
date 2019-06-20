@@ -18,17 +18,17 @@
 --
 
 TABLE |hosts
-FIELDS|hostid|proxy_hostid|host                      |status|ipmi_authtype|ipmi_privilege|ipmi_username|ipmi_password|name                      |family|flags|templateid|description|tls_connect|tls_accept|tls_issuer|tls_subject|tls_psk_identity|tls_psk|
-ROW   |10001 |NULL        |Template OS Linux         |3     |0            |2             |             |             |Template OS Linux         |      |0    |NULL      |           |1          |1         |          |           |                |       |
-ROW   |10047 |NULL        |Template App Zabbix Server|3     |0            |2             |             |             |Template App Zabbix Server|      |0    |NULL      |           |1          |1         |          |           |                |       |
-ROW   |10050 |NULL        |Template App Zabbix Agent |3     |0            |2             |             |             |Template App Zabbix Agent |      |0    |NULL      |           |1          |1         |          |           |                |       |
-ROW   |10056 |NULL        |Template App Agentless    |3     |0            |2             |             |             |Template App Agentless    |      |0    |NULL      |           |1          |1         |          |           |                |       |
-ROW   |10057 |NULL        |Zabbix Server             |0     |-1           |2             |             |             |Zabbix Server             |      |0    |NULL      |           |1          |1         |          |           |                |       |
-ROW   |10058 |NULL        |Template App Zabbix Proxy |3     |0            |2             |             |             |Template App Zabbix Proxy |      |0    |NULL      |           |1          |1         |          |           |                |       |
-ROW   |99980 |NULL        |Template RDAP             |3     |0            |2             |             |             |Template RDAP             |      |0    |NULL      |           |1          |1         |          |           |                |       |
-ROW   |99990 |NULL        |Template Probe Errors     |3     |0            |2             |             |             |Template Probe Errors     |      |0    |NULL      |           |1          |1         |          |           |                |       |
-ROW   |100000|NULL        |Global macro history      |0     |-1           |2             |             |             |Global macro history      |      |0    |NULL      |           |1          |1         |          |           |                |       |
-ROW   |100001|NULL        |Probe statuses            |0     |-1           |2             |             |             |Probe statuses            |      |0    |NULL      |           |1          |1         |          |           |                |       |
+FIELDS|hostid|proxy_hostid|host                      |status|ipmi_authtype|ipmi_privilege|ipmi_username|ipmi_password|name                      |info_1|info_2|flags|templateid|description|tls_connect|tls_accept|tls_issuer|tls_subject|tls_psk_identity|tls_psk|
+ROW   |10001 |NULL        |Template OS Linux         |3     |0            |2             |             |             |Template OS Linux         |      |      |0    |NULL      |           |1          |1         |          |           |                |       |
+ROW   |10047 |NULL        |Template App Zabbix Server|3     |0            |2             |             |             |Template App Zabbix Server|      |      |0    |NULL      |           |1          |1         |          |           |                |       |
+ROW   |10050 |NULL        |Template App Zabbix Agent |3     |0            |2             |             |             |Template App Zabbix Agent |      |      |0    |NULL      |           |1          |1         |          |           |                |       |
+ROW   |10056 |NULL        |Template App Agentless    |3     |0            |2             |             |             |Template App Agentless    |      |      |0    |NULL      |           |1          |1         |          |           |                |       |
+ROW   |10057 |NULL        |Zabbix Server             |0     |-1           |2             |             |             |Zabbix Server             |      |      |0    |NULL      |           |1          |1         |          |           |                |       |
+ROW   |10058 |NULL        |Template App Zabbix Proxy |3     |0            |2             |             |             |Template App Zabbix Proxy |      |      |0    |NULL      |           |1          |1         |          |           |                |       |
+ROW   |99980 |NULL        |Template RDAP             |3     |0            |2             |             |             |Template RDAP             |      |      |0    |NULL      |           |1          |1         |          |           |                |       |
+ROW   |99990 |NULL        |Template Probe Errors     |3     |0            |2             |             |             |Template Probe Errors     |      |      |0    |NULL      |           |1          |1         |          |           |                |       |
+ROW   |100000|NULL        |Global macro history      |0     |-1           |2             |             |             |Global macro history      |      |      |0    |NULL      |           |1          |1         |          |           |                |       |
+ROW   |100001|NULL        |Probe statuses            |0     |-1           |2             |             |             |Probe statuses            |      |      |0    |NULL      |           |1          |1         |          |           |                |       |
 
 TABLE |groups
 FIELDS|groupid|name                  |internal|flags|

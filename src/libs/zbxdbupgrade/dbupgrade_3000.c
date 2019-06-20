@@ -4381,8 +4381,8 @@ static int	DBpatch_3000403(void)
 
 	if (ZBX_DB_OK > DBexecute(
 			"alter table hosts"
-			" add column family varchar(128) collate utf8_bin not null default ''"
-			" after name"))
+			" add column info_1 varchar(128) collate utf8_bin not null default '' after name,"
+			" add column info_2 varchar(128) collate utf8_bin not null default '' after info_1"))
 	{
 		return FAIL;
 	}
@@ -4497,6 +4497,6 @@ DBPATCH_ADD(3000318, 0, 0)	/* add new items to "Global macro history" host */
 DBPATCH_ADD(3000400, 0, 0)	/* Phase 3, version 1.4.0 */
 DBPATCH_ADD(3000401, 0, 0)	/* add macro {$RSM.MONITORING.TARGET} with empty string as value (unknown) or "registry" */
 DBPATCH_ADD(3000402, 0, 0)	/* rename "EBERO users" user group to "Read-only user", "Technical services users" to "Power user" */
-DBPATCH_ADD(3000403, 0, 0)	/* add column "family" to the "hosts" table */
+DBPATCH_ADD(3000403, 0, 0)	/* add columns "info_1" and "info_2" to the "hosts" table */
 
 DBPATCH_END()
