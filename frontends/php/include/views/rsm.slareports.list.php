@@ -52,33 +52,21 @@ $table = (new CTableInfo())->setHeader([
 	_('Monthly SLR')
 ]);
 
-if (!array_key_exists('details', $data)) {
-	return $widget->addItem([
-		$table,
-		(new CDiv())
-			->addItem((new CButton('export', 'Download XML'))->setEnabled(false))
-			->addClass('action-buttons')
-	]);
-}
-
 // TLD details.
-$widget->additem((new CDiv())
-	->addItem([
-		($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR)
-			? [
-				bold(_s('Registrar ID')),
-				': ',
-				$data['tld']['host'],
-				BR(),
-				bold(_s('Registrar name')),
-				': ',
-				$data['tld']['info_1'],
-				BR(),
-				bold(_s('Registrar family')),
-				': ',
-				$data['tld']['info_2']
-			]
-			: [bold(_s('TLD')), ': ', $data['tld']['name']],
+$details = [
+	($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR)
+		? [
+			bold(_s('Registrar ID')), ': ', $data['tld']['host'], BR(),
+			bold(_s('Registrar name')), ': ', $data['tld']['info_1'], BR(),
+			bold(_s('Registrar family')), ': ', $data['tld']['info_2']
+		]
+		: [
+			bold(_s('TLD')), ': ', $data['tld']['host']
+		]
+];
+
+if (array_key_exists('details', $data)) {
+	$details += [
 		BR(),
 		bold(_s('Period')),
 		': ',
@@ -91,8 +79,19 @@ $widget->additem((new CDiv())
 		gmdate('dS F Y, H:i:s e', $data['details']['generated']),
 		BR(),
 		bold(_('Server')), ': ', new CLink($data['server'], $data['rolling_week_url'])
-	])
-);
+	];
+}
+
+$widget->additem((new CDiv())->addItem($details));
+
+if (!array_key_exists('details', $data)) {
+	return $widget->addItem([
+		$table,
+		(new CDiv())
+			->addItem((new CButton('export', 'Download XML'))->setEnabled(false))
+			->addClass('action-buttons')
+	]);
+}
 
 // DNS Service Availability.
 if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY) {

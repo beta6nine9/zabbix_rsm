@@ -52,7 +52,7 @@ $data = [
 /*
  * Filter
  */
-if ($data['filter_year'] == date('Y') && $data['filter_month'] > date('n')) {
+if ($data['filter_year'] > date('Y') || ($data['filter_year'] == date('Y') && $data['filter_month'] > date('n'))) {
 	show_error_message(_('Incorrect report period.'));
 }
 elseif ($data['filter_search']) {
@@ -92,37 +92,41 @@ elseif ($data['filter_search']) {
 }
 
 if ($data['tld']) {
-	// Searching for pregenerated SLA report in database.
-	$report_row = DB::find('sla_reports', [
-		'hostid'	=> $data['tld']['hostid'],
-		'month'		=> $data['filter_month'],
-		'year'		=> $data['filter_year']
-	]);
-	$report_row = reset($report_row);
+	if (!class_exists('CSlaReport')) {
+		show_error_message(_('SLA Report generation file is missing.'));
+		$report_row = false;
+	}
+	elseif (date('Y') >= $data['filter_year'] && date('n') > $data['filter_month']) { // Past
+		// Searching for pregenerated SLA report in database.
+		$report_row = DB::find('sla_reports', [
+			'hostid'	=> $data['tld']['hostid'],
+			'month'		=> $data['filter_month'],
+			'year'		=> $data['filter_year']
+		]);
+		$report_row = reset($report_row);
 
-	if (!$report_row) {
-		// Include file by build in autoloader.
-		new CSlaReport();
+		if (!$report_row) {
+			show_error_message(_('Report is not generated for requested month.'));
+		}
+	}
+	else {
+		$report_row = CSlaReport::generate($data['server_nr'], [$data['tld']['host']], $data['filter_year'],
+			$data['filter_month']
+		);
 
-		if (!class_exists('CSlaReport')) {
-			show_error_message(_('SLA Report generation file is missing.'));
+		if (!$report_row) {
+			show_error_message(_s('Unable to generate XML report: %1$s', CSlaReport::$error));
+			if ($data['filter_year'] == date('Y') && $data['filter_month'] == date('n')) {
+				show_error_message(_('Please try again after 5 minutes.'));
+			}
 		}
 		else {
-			$report_row = CSlaReport::generate($data['server_nr'], [$data['tld']['host']], $data['filter_year'],
-				$data['filter_month']
-			);
-
-			if ($report_row === null) {
-				show_error_message(_s('Unable to generate XML report: %1$s', CSlaReport::$error));
-				if ($data['filter_year'] == date('Y') && $data['filter_month'] == date('n')) {
-					show_error_message(_('Please try again after 5 minutes.'));
-				}
-			}
-			else {
-				$report_row = reset($report_row);
-				$report_row += ['year' => $data['filter_year'], 'month' => $data['filter_month']];
-			}
+			$report_row = reset($report_row);
 		}
+	}
+
+	if ($report_row) {
+		$report_row += ['year' => $data['filter_year'], 'month' => $data['filter_month']];
 	}
 
 	// SLA Report download as XML file

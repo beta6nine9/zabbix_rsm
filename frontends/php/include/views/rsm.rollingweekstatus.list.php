@@ -239,7 +239,7 @@ if ($data['tld']) {
 		// TLD type.
 		else {
 			$row = [
-				$tld['name'],
+				$tld['host'],
 				$tld['type']
 			];
 		}

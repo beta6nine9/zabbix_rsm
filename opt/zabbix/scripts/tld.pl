@@ -2113,7 +2113,7 @@ Other options
         --rdds80-servers=STRING
                 list of RDDS80 servers separated by comma: "NAME1,NAME2,..."
         --rdap-base-url=STRING
-                base URL for RDAP queries
+                RDAP service endpoint, e.g. "http://rdap.nic.cz"
                 Specify "not listed" to get error -390, e. g. --rdap-base-url="not listed"
                 Specify "no https" to get error -391, e. g. --rdap-base-url="no https"
         --rdap-test-domain=STRING
