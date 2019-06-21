@@ -119,11 +119,12 @@ sub get_probe($$)
 	return $result;
 }
 
-sub get_host_group($$$)
+sub get_host_group($$$;$)
 {
 	my $group_name  = shift;
 	my $selectHosts = shift;
 	my $selectType  = shift;
+	my $fields      = shift // [];
 
 	my $options = {
 		'output' => 'extend',
@@ -132,7 +133,7 @@ sub get_host_group($$$)
 
 	if (defined($selectHosts) && $selectHosts eq true)
 	{
-		$options->{'selectHosts'} = ['hostid', 'host', 'name'];
+		$options->{'selectHosts'} = ['hostid', 'host', 'name', @{$fields}];
 	}
 
 	my $result = $zabbix->get('hostgroup', $options);
