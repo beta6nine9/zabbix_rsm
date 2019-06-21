@@ -260,12 +260,11 @@ sub list_services($;$)
 		'{$RDAP.TEST.DOMAIN}'
 	);
 
-	#my @rsmhosts = ($rsmhost // get_registrar_list());
 	my %rsmhosts = get_registrar_list();
 
 	if (defined($rsmhost))
 	{
-		#%rsmhosts = {$rsmhost => $rsmhosts{$rsmhost}};
+		%rsmhosts = ($rsmhost => $rsmhosts{$rsmhost});
 	}
 
 	my @rows = ();
@@ -277,8 +276,8 @@ sub list_services($;$)
 		my $services = get_services($server_key, $rsmhost);
 
 		push(@row, $rsmhost);                      # Registrar ID
-		push(@row, $rsmhosts{$rsmhost}{'info_1'}); # Registrar name
-		push(@row, $rsmhosts{$rsmhost}{'info_2'}); # Registrar family
+		push(@row, $rsmhosts{$rsmhost}{'name'});   # Registrar name
+		push(@row, $rsmhosts{$rsmhost}{'family'}); # Registrar family
 		push(@row, map($services->{$_} // "", @columns));
 
 		# obtain rsm.rdds[] item key and extract RDDS(43|80).SERVERS strings
@@ -321,7 +320,7 @@ sub list_services($;$)
 
 sub get_registrar_list()
 {
-	my $registrars = get_host_group('TLDs', true, false);
+	my $registrars = get_host_group('TLDs', true, false, ['info_1', 'info_2']);
 
 	my %result;
 
