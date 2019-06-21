@@ -33,9 +33,6 @@ $fields = [
 	'export' =>						[T_ZBX_STR, O_OPT,  null,	null,		null],
 	'filter_set' =>					[T_ZBX_STR, O_OPT,  null,	null,		null],
 	'filter_search' =>				[T_ZBX_STR, O_OPT,  null,	null,		null],
-	'filter_registrar_id' =>		[T_ZBX_STR, O_OPT,  null,	null,		null],
-	'filter_registrar_name' =>		[T_ZBX_STR, O_OPT,  null,	null,		null],
-	'filter_registrar_family' =>	[T_ZBX_STR, O_OPT,  null,	null,		null],
 	'filter_year' =>				[T_ZBX_INT, O_OPT,  null,	null,		null],
 	'filter_month' =>				[T_ZBX_INT, O_OPT,  null,	null,		null]
 ];
@@ -47,22 +44,10 @@ $data = [
 	'url' => '',
 	'sid' => CWebUser::getSessionCookie(),
 	'filter_search' => getRequest('filter_search'),
-	'filter_registrar_id' => getRequest('filter_registrar_id'),
-	'filter_registrar_name' => getRequest('filter_registrar_name'),
-	'filter_registrar_family' => getRequest('filter_registrar_family'),
 	'filter_year' => (int) getRequest('filter_year', date('Y')),
 	'filter_month' => (int) getRequest('filter_month', date('n')),
 	'rsm_monitoring_mode' => get_rsm_monitoring_type()
 ];
-
-if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
-	$data['filter_search'] = '';
-}
-else {
-	$data['filter_registrar_id'] = '';
-	$data['filter_registrar_name'] = '';
-	$data['filter_registrar_family'] = '';
-}
 
 /*
  * Filter
@@ -70,8 +55,7 @@ else {
 if ($data['filter_year'] == date('Y') && $data['filter_month'] > date('n')) {
 	show_error_message(_('Incorrect report period.'));
 }
-elseif ($data['filter_search'] || $data['filter_registrar_id'] || $data['filter_registrar_name']
-		|| $data['filter_registrar_family']) {
+elseif ($data['filter_search']) {
 	$error = '';
 	$master = $DB;
 
@@ -86,22 +70,10 @@ elseif ($data['filter_search'] || $data['filter_registrar_id'] || $data['filter_
 			'tlds' => true,
 			'selectMacros' => ['macro', 'value'],
 			'selectItems' => ['itemid', 'key_', 'value_type'],
+			'filter' => [
+				'host' => $data['filter_search']
+			]
 		];
-
-		if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
-			if ($data['filter_registrar_id'] !== '') {
-				$options['filter']['host'] = $data['filter_registrar_id'];
-			}
-			if ($data['filter_registrar_name'] !== '') {
-				$options['filter']['info_1'] = $data['filter_registrar_name'];
-			}
-			if ($data['filter_registrar_family'] !== '') {
-				$options['filter']['info_2'] = $data['filter_registrar_family'];
-			}
-		}
-		else {
-			$options['filter']['host'] = $data['filter_search'];
-		}
 
 		$tld = API::Host()->get($options);
 

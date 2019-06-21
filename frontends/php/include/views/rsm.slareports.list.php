@@ -24,38 +24,24 @@ $widget = (new CWidget())->setTitle(_('SLA report'));
 $months = range(1, 12);
 $years = range(SLA_MONITORING_START_YEAR, date('Y', time()));
 
-$filter_form = (new CFormList())->addVar('filter_set', 1);
+$object_label = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) ? _('Registrar ID') : _('TLD');
 
-if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
-	$filter_form
-		->addRow(_('Registrar ID'), (new CTextBox('filter_registrar_id', $data['filter_registrar_id']))
-			->setWidth(ZBX_TEXTAREA_FILTER_STANDARD_WIDTH)
-			->setAttribute('autocomplete', 'off')
-		)
-		->addRow(_('Registrar name'), (new CTextBox('filter_registrar_name', $data['filter_registrar_name']))
-			->setWidth(ZBX_TEXTAREA_FILTER_STANDARD_WIDTH)
-			->setAttribute('autocomplete', 'off')
-		)
-		->addRow(_('Registrar family'), (new CTextBox('filter_registrar_family', $data['filter_registrar_family']))
-			->setWidth(ZBX_TEXTAREA_FILTER_STANDARD_WIDTH)
-			->setAttribute('autocomplete', 'off')
-		);	
-}
-else {
-	$filter_form->addRow(_('TLD'), (new CTextBox('filter_search', $data['filter_search']))
-		->setWidth(ZBX_TEXTAREA_FILTER_STANDARD_WIDTH)
-		->setAttribute('autocomplete', 'off')
-	);
-}
-
-$filter_form->addRow(_('Period'), [
-	new CComboBox('filter_month', $data['filter_month'], null, array_combine($months,
-		array_map('getMonthCaption', $months))),
-	SPACE,
-	new CComboBox('filter_year', $data['filter_year'], null, array_combine($years, $years))
-]);
-
-$widget->addItem((new CFilter('web.rsm.slareports.filter.state'))->addColumn($filter_form));
+$widget->addItem(
+	(new CFilter('web.rsm.slareports.filter.state'))->addColumn(
+		(new CFormList())
+			->addVar('filter_set', 1)
+			->addRow($object_label, (new CTextBox('filter_search', $data['filter_search']))
+				->setWidth(ZBX_TEXTAREA_FILTER_STANDARD_WIDTH)
+				->setAttribute('autocomplete', 'off')
+			)
+			->addRow(_('Period'), [
+				new CComboBox('filter_month', $data['filter_month'], null, array_combine($months,
+					array_map('getMonthCaption', $months))),
+				SPACE,
+				new CComboBox('filter_year', $data['filter_year'], null, array_combine($years, $years))
+			])
+	)
+);
 
 $table = (new CTableInfo())->setHeader([
 	_('Service'),

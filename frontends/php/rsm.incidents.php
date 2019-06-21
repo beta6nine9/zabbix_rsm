@@ -42,9 +42,6 @@ $fields = [
 	'filter_set' =>				[T_ZBX_STR, O_OPT, null,	null,			null],
 	'filter_rst' =>				[T_ZBX_STR, O_OPT, null,	null,			null],
 	'filter_search' =>			[T_ZBX_STR, O_OPT, null,	null,			null],
-	'filter_registrar_id' =>	[T_ZBX_STR, O_OPT, null,	null,			null],
-	'filter_registrar_name' =>	[T_ZBX_STR, O_OPT, null,	null,			null],
-	'filter_registrar_family' => [T_ZBX_STR, O_OPT, null,	null,			null],
 	'filter_from' =>			[T_ZBX_INT, O_OPT, null,	null,			null],
 	'filter_to' =>				[T_ZBX_INT, O_OPT, null,	null,			null],
 	'filter_rolling_week' =>	[T_ZBX_INT, O_OPT, null,	null,			null],
@@ -177,47 +174,16 @@ $serverTime = time() - RSM_ROLLWEEK_SHIFT_BACK;
  * Filter
  */
 if (isset($_REQUEST['filter_set'])) {
-	if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
-		$data['filter_registrar_id'] = getRequest('filter_registrar_id');
-		$data['filter_registrar_name'] = getRequest('filter_registrar_name');
-		$data['filter_registrar_family'] = getRequest('filter_registrar_family');
-		$data['filter_search'] = '';
-	}
-	else {
-		$data['filter_search'] = getRequest('filter_search');
-		$data['filter_registrar_id'] = '';
-		$data['filter_registrar_name'] = '';
-		$data['filter_registrar_family'] = '';
-	}
+	$data['filter_search'] = getRequest('filter_search');
 
 	CProfile::update('web.rsm.incidents.filter_search', $data['filter_search'], PROFILE_TYPE_STR);
-	CProfile::update('web.rsm.incidents.filter_registrar_id', $data['filter_registrar_id'], PROFILE_TYPE_STR);
-	CProfile::update('web.rsm.incidents.filter_registrar_name', $data['filter_registrar_name'], PROFILE_TYPE_STR);
-	CProfile::update('web.rsm.incidents.filter_registrar_family', $data['filter_registrar_family'], PROFILE_TYPE_STR);
 }
 elseif (hasRequest('filter_rst')) {
 	CProfile::delete('web.rsm.incidents.filter_search');
-	CProfile::delete('web.rsm.incidents.filter_registrar_id');
-	CProfile::delete('web.rsm.incidents.filter_registrar_name');
-	CProfile::delete('web.rsm.incidents.filter_registrar_family');
 	$data['filter_search'] = '';
-	$data['filter_registrar_id'] = '';
-	$data['filter_registrar_name'] = '';
-	$data['filter_registrar_family'] = '';
 }
 else {
-	if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
-		$data['filter_registrar_id'] = CProfile::get('web.rsm.incidents.filter_registrar_id');
-		$data['filter_registrar_name'] = CProfile::get('web.rsm.incidents.filter_registrar_name');
-		$data['filter_registrar_family'] = CProfile::get('web.rsm.incidents.filter_registrar_family');
-		$data['filter_search'] = '';
-	}
-	else {
-		$data['filter_search'] = CProfile::get('web.rsm.incidents.filter_search');
-		$data['filter_registrar_id'] = '';
-		$data['filter_registrar_name'] = '';
-		$data['filter_registrar_family'] = '';
-	}
+	$data['filter_search'] = CProfile::get('web.rsm.incidents.filter_search');
 }
 
 if (getRequest('filter_rolling_week')) {
@@ -256,8 +222,7 @@ $filterTimeFrom = zbxDateToTime($data['filter_from']);
 $filterTimeTill = zbxDateToTime($data['filter_to']);
 
 // get TLD
-if ($host || $data['filter_search'] || $data['filter_registrar_id'] || $data['filter_registrar_name']
-		|| $data['filter_registrar_family']) {
+if ($host || $data['filter_search']) {
 	$master = $DB;
 
 	foreach ($DB['SERVERS'] as $server) {
@@ -274,19 +239,8 @@ if ($host || $data['filter_search'] || $data['filter_registrar_id'] || $data['fi
 		if ($host) {
 			$options['filter'] = ['host' => $host];
 		}
-		elseif ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
-			if ($data['filter_registrar_id'] !== '') {
-				$options['filter']['host'] = $data['filter_registrar_id'];
-			}
-			if ($data['filter_registrar_name'] !== '') {
-				$options['filter']['info_1'] = $data['filter_registrar_name'];
-			}
-			if ($data['filter_registrar_family'] !== '') {
-				$options['filter']['info_2'] = $data['filter_registrar_family'];
-			}
-		}
 		else {
-			$options['filter']['host'] = $data['filter_search'];
+			$options['filter'] = ['host' => $data['filter_search']];
 		}
 
 		$tld = API::Host()->get($options);
@@ -297,25 +251,9 @@ if ($host || $data['filter_search'] || $data['filter_registrar_id'] || $data['fi
 		}
 		else {
 			// Update profile.
-			if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
-				if ($host && $data['filter_search'] != $data['tld']['host']) {
-					$data['filter_search'] = $data['tld']['host'];
-					CProfile::update('web.rsm.incidents.filter_search', $data['tld']['host'], PROFILE_TYPE_STR);
-				}
-				if ($host && $data['filter_registrar_name'] != $data['tld']['info_1']) {
-					$data['filter_registrar_name'] = $data['tld']['info_1'];
-					CProfile::update('web.rsm.incidents.filter_registrar_name', $data['tld']['info_1'], PROFILE_TYPE_STR);
-				}
-				if ($host && $data['filter_registrar_family'] != $data['tld']['info_2']) {
-					$data['filter_registrar_name'] = $data['tld']['info_2'];
-					CProfile::update('web.rsm.incidents.filter_registrar_family', $data['tld']['info_2'], PROFILE_TYPE_STR);
-				}
-			}
-			else {
-				if ($host && $data['filter_search'] != $data['tld']['name']) {
-					$data['filter_search'] = $data['tld']['name'];
-					CProfile::update('web.rsm.incidents.filter_search', $data['tld']['name'], PROFILE_TYPE_STR);
-				}
+			if ($host && $data['filter_search'] != $data['tld']['host']) {
+				$data['filter_search'] = $data['tld']['host'];
+				CProfile::update('web.rsm.incidents.filter_search', $data['tld']['host'], PROFILE_TYPE_STR);
 			}
 
 			// get items
@@ -1134,14 +1072,6 @@ if ($host || $data['filter_search'] || $data['filter_registrar_id'] || $data['fi
 if ($data['filter_search'] && !$data['tld']) {
 	unset($data['tld']);
 	show_error_message(_s('Host "%s" doesn\'t exist or you don\'t have permissions to access it.', $data['filter_search']));
-}
-elseif (($data['filter_registrar_id'] || $data['filter_registrar_name'] || $data['filter_registrar_family']) && !$data['tld']) {
-	unset($data['tld']);
-	$filter_search = array_filter([
-		$data['filter_registrar_id'], $data['filter_registrar_name'], $data['filter_registrar_family']
-	]);
-
-	show_error_message(_s('Host "%s" doesn\'t exist or you don\'t have permissions to access it.', reset($filter_search)));
 }
 
 // data sorting
