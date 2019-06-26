@@ -99,6 +99,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		get_macro_incident_dns_fail get_macro_incident_dns_recover
 		get_macro_incident_rdds_fail get_macro_incident_rdds_recover
 		get_monitoring_target
+		get_rdap_standalone_ts is_rdap_standalone
 		get_itemid_by_key get_itemid_by_host
 		get_itemid_by_hostid get_itemid_like_by_hostid get_itemids_by_host_and_keypart get_lastclock
 		get_tlds get_tlds_and_hostids
@@ -386,6 +387,24 @@ sub get_monitoring_target()
 	return $monitoring_target;
 }
 
+# Returns timestamp, when treating RDAP as a standalone service has to be started, or undef
+sub get_rdap_standalone_ts()
+{
+	my $ts = __get_macro('{$RSM.RDAP.STANDALONE}');
+
+	return $ts ? int($ts) : undef;
+}
+
+# Returns 1, if RDAP has to be treated as a standalone service, 0 otherwise
+sub is_rdap_standalone(;$)
+{
+	my $now = shift // time();
+
+	my $ts = get_rdap_standalone_ts();
+
+	return defined($ts) && $now >= $ts ? 1 : 0;
+}
+
 sub get_itemid_by_key
 {
 	my $key = shift;
@@ -402,7 +421,7 @@ sub get_itemid_by_host
 		"select i.itemid".
 		" from items i,hosts h".
 		" where i.hostid=h.hostid".
-	    		" and h.host='$host'".
+			" and h.host='$host'".
 			" and i.key_='$key'"
 	);
 
@@ -455,7 +474,7 @@ sub get_itemids_by_host_and_keypart
 		"select i.itemid,i.key_".
 		" from items i,hosts h".
 		" where i.hostid=h.hostid".
-	    		" and h.host='$host'".
+			" and h.host='$host'".
 			" and i.key_ like '$key_part%'");
 
 	fail("cannot find items ($key_part%) at host ($host)") if (scalar(@$rows_ref) == 0);
@@ -4824,8 +4843,8 @@ sub __get_reachable_times
 		"select clock,value".
 		" from history_uint".
 		" where itemid=$itemid".
-	    		" and clock between $from and $till".
-	    		" and value!=0".
+			" and clock between $from and $till".
+			" and value!=0".
 		" order by itemid,clock");
 
 	foreach my $row_ref (@$rows_ref)
