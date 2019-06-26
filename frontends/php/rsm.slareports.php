@@ -52,12 +52,16 @@ $data = [
 /*
  * Filter
  */
+$filter_valid = false;
+
 if ($data['filter_year'] > date('Y') || ($data['filter_year'] == date('Y') && $data['filter_month'] > date('n'))) {
 	show_error_message(_('Incorrect report period.'));
+	$filter_valid = false;
 }
 elseif ($data['filter_search']) {
 	$error = '';
 	$master = $DB;
+	$filter_valid = true;
 
 	foreach ($DB['SERVERS'] as $server_nr => $server) {
 		if (!multiDBconnect($server, $error)) {
@@ -92,11 +96,7 @@ elseif ($data['filter_search']) {
 }
 
 if ($data['tld']) {
-	if (!class_exists('CSlaReport')) {
-		show_error_message(_('SLA Report generation file is missing.'));
-		$report_row = false;
-	}
-	elseif (date('Y') >= $data['filter_year'] && date('n') > $data['filter_month']) { // Past
+	if ((date('Y') == $data['filter_year'] && date('n') > $data['filter_month']) || date('Y') > $data['filter_year']) {
 		// Searching for pregenerated SLA report in database.
 		$report_row = DB::find('sla_reports', [
 			'hostid'	=> $data['tld']['hostid'],
@@ -108,6 +108,10 @@ if ($data['tld']) {
 		if (!$report_row) {
 			show_error_message(_('Report is not generated for requested month.'));
 		}
+	}
+	elseif (!class_exists('CSlaReport')) {
+		show_error_message(_('SLA Report generation file is missing.'));
+		$report_row = false;
 	}
 	else {
 		$report_row = CSlaReport::generate($data['server_nr'], [$data['tld']['host']], $data['filter_year'],
@@ -205,7 +209,7 @@ if ($data['tld']) {
 			->getUrl();
 	}
 }
-elseif ($data['filter_search']) {
+elseif ($filter_valid) {
 	show_error_message(_s('Host "%s" doesn\'t exist or you don\'t have permissions to access it.', $data['filter_search']));
 }
 
