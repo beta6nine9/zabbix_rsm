@@ -167,6 +167,7 @@ my $sql_count = 0;
 my $log_open = 0;
 
 my $monitoring_target; # see get_monitoring_target()
+my $rdap_standalone_ts; # see get_rdap_standalone_ts()
 
 sub get_macro_minns
 {
@@ -390,9 +391,13 @@ sub get_monitoring_target()
 # Returns timestamp, when treating RDAP as a standalone service has to be started, or undef
 sub get_rdap_standalone_ts()
 {
-	my $ts = __get_macro('{$RSM.RDAP.STANDALONE}');
+	if (!defined($rdap_standalone_ts))
+	{
+		# NB! Don't store undef as cached value!
+		$rdap_standalone_ts = __get_macro('{$RSM.RDAP.STANDALONE}');
+	}
 
-	return $ts ? int($ts) : undef;
+	return $rdap_standalone_ts ? int($rdap_standalone_ts) : undef;
 }
 
 # Returns 1, if RDAP has to be treated as a standalone service, 0 otherwise
