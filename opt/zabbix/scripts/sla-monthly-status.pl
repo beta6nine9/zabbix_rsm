@@ -18,9 +18,11 @@ use DateTime;
 use constant SLV_ITEM_KEY_DNS_DOWNTIME    => "rsm.slv.dns.downtime";
 use constant SLV_ITEM_KEY_DNS_NS_DOWNTIME => "rsm.slv.dns.ns.downtime[%,%]";
 use constant SLV_ITEM_KEY_RDDS_DOWNTIME   => "rsm.slv.rdds.downtime";
+use constant SLV_ITEM_KEY_RDAP_DOWNTIME   => "rsm.slv.rdap.downtime";
 use constant SLV_ITEM_KEY_DNS_UDP_PFAILED => "rsm.slv.dns.udp.rtt.pfailed";
 use constant SLV_ITEM_KEY_DNS_TCP_PFAILED => "rsm.slv.dns.tcp.rtt.pfailed";
 use constant SLV_ITEM_KEY_RDDS_PFAILED    => "rsm.slv.rdds.rtt.pfailed";
+use constant SLV_ITEM_KEY_RDAP_PFAILED    => "rsm.slv.rdap.rtt.pfailed";
 
 sub main()
 {
@@ -57,6 +59,10 @@ sub main()
 		{
 			push(@{$tlds{$tld}}, ["RDDS availability", $value, $clock]);
 		}
+		elsif ($itemkey eq SLV_ITEM_KEY_RDAP_DOWNTIME)
+		{
+			push(@{$tlds{$tld}}, ["RDAP availability", $value, $clock]);
+		}
 		elsif ($itemkey eq SLV_ITEM_KEY_DNS_UDP_PFAILED)
 		{
 			push(@{$tlds{$tld}}, ["UDP DNS Resolution RTT", 100 - $value, $clock]);
@@ -68,6 +74,10 @@ sub main()
 		elsif ($itemkey eq SLV_ITEM_KEY_RDDS_PFAILED)
 		{
 			push(@{$tlds{$tld}}, ["RDDS query RTT", 100 - $value, $clock]);
+		}
+		elsif ($itemkey eq SLV_ITEM_KEY_RDAP_PFAILED)
+		{
+			push(@{$tlds{$tld}}, ["RDAP query RTT", 100 - $value, $clock]);
 		}
 		else # if ($itemkey eq SLV_ITEM_KEY_DNS_NS_DOWNTIME
 		{
@@ -125,14 +135,16 @@ sub get_slrs()
 {
 	my %slr;
 
-	my $sql = "select macro, value from globalmacro where macro in (?, ?, ?, ?, ?, ?)";
+	my $sql = "select macro, value from globalmacro where macro in (?, ?, ?, ?, ?, ?, ?, ?)";
 	my $params = [
 		'{$RSM.SLV.DNS.DOWNTIME}',
 		'{$RSM.SLV.NS.DOWNTIME}',
 		'{$RSM.SLV.DNS.UDP.RTT}',
 		'{$RSM.SLV.DNS.TCP.RTT}',
 		'{$RSM.SLV.RDDS.DOWNTIME}',
-		'{$RSM.SLV.RDDS.RTT}'
+		'{$RSM.SLV.RDDS.RTT}',
+		'{$RSM.SLV.RDAP.DOWNTIME}',
+		'{$RSM.SLV.RDAP.RTT}',
 	];
 	my $rows = db_select($sql, $params);
 
@@ -146,6 +158,8 @@ sub get_slrs()
 		$slr{'dns_tcp_rtt'}     = $value if ($macro eq '{$RSM.SLV.DNS.TCP.RTT}');
 		$slr{'rdds_downtime'}   = $value if ($macro eq '{$RSM.SLV.RDDS.DOWNTIME}');
 		$slr{'rdds_rtt'}        = $value if ($macro eq '{$RSM.SLV.RDDS.RTT}');
+		$slr{'rdap_downtime'}   = $value if ($macro eq '{$RSM.SLV.RDAP.DOWNTIME}');
+		$slr{'rdap_rtt'}        = $value if ($macro eq '{$RSM.SLV.RDAP.RTT}');
 	}
 
 	fail('global macro {$RSM.SLV.DNS.DOWNTIME} was not found')  unless (exists($slr{'dns_downtime'}));
@@ -154,6 +168,8 @@ sub get_slrs()
 	fail('global macro {$RSM.SLV.DNS.TCP.RTT} was not found')   unless (exists($slr{'dns_tcp_rtt'}));
 	fail('global macro {$RSM.SLV.RDDS.DOWNTIME} was not found') unless (exists($slr{'rdds_downtime'}));
 	fail('global macro {$RSM.SLV.RDDS.RTT} was not found')      unless (exists($slr{'rdds_rtt'}));
+	fail('global macro {$RSM.SLV.RDAP.DOWNTIME} was not found') unless (exists($slr{'rdap_downtime'}));
+	fail('global macro {$RSM.SLV.RDAP.RTT} was not found')      unless (exists($slr{'rdap_rtt'}));
 
 	return \%slr;
 }
@@ -173,17 +189,19 @@ sub get_items($)
 			" from items" .
 				" left join hosts on hosts.hostid = items.hostid" .
 				" left join hosts_groups on hosts_groups.hostid = hosts.hostid" .
-			" where (items.key_ in (?, ?, ?, ?, ?) or items.key_ like ?) and" .
+			" where (items.key_ in (?, ?, ?, ?, ?, ?, ?) or items.key_ like ?) and" .
 				" hosts_groups.groupid = ?";
 
 		$params = [
 			SLV_ITEM_KEY_DNS_DOWNTIME,
 			SLV_ITEM_KEY_RDDS_DOWNTIME,
+			SLV_ITEM_KEY_RDAP_DOWNTIME,
 			SLV_ITEM_KEY_DNS_UDP_PFAILED,
 			SLV_ITEM_KEY_DNS_TCP_PFAILED,
 			SLV_ITEM_KEY_RDDS_PFAILED,
+			SLV_ITEM_KEY_RDAP_PFAILED,
 			SLV_ITEM_KEY_DNS_NS_DOWNTIME,
-			TLDS_GROUPID
+			TLDS_GROUPID,
 		];
 	}
 	elsif ($monitoring_target eq MONITORING_TARGET_REGISTRAR)
@@ -192,13 +210,15 @@ sub get_items($)
 			" from items" .
 				" left join hosts on hosts.hostid = items.hostid" .
 				" left join hosts_groups on hosts_groups.hostid = hosts.hostid" .
-			" where items.key_ in (?, ?) and" .
+			" where items.key_ in (?, ?, ?, ?) and" .
 				" hosts_groups.groupid = ?";
 
 		$params = [
 			SLV_ITEM_KEY_RDDS_DOWNTIME,
 			SLV_ITEM_KEY_RDDS_PFAILED,
-			TLDS_GROUPID
+			SLV_ITEM_KEY_RDAP_DOWNTIME,
+			SLV_ITEM_KEY_RDAP_PFAILED,
+			TLDS_GROUPID,
 		];
 	}
 	else
@@ -228,6 +248,11 @@ sub get_items($)
 			fail("Unexpected item type (key: '$key', type: '$type'") unless ($type == ITEM_VALUE_TYPE_UINT64);
 			push(@{$itemids_uint{$slr->{'rdds_downtime'}}}, $itemid);
 		}
+		elsif ($key eq SLV_ITEM_KEY_RDAP_DOWNTIME)
+		{
+			fail("Unexpected item type (key: '$key', type: '$type'") unless ($type == ITEM_VALUE_TYPE_UINT64);
+			push(@{$itemids_uint{$slr->{'rdap_downtime'}}}, $itemid);
+		}
 		elsif ($key eq SLV_ITEM_KEY_DNS_UDP_PFAILED)
 		{
 			fail("Unexpected item type (key: '$key', type: '$type'") unless ($type == ITEM_VALUE_TYPE_FLOAT);
@@ -242,6 +267,11 @@ sub get_items($)
 		{
 			fail("Unexpected item type (key: '$key', type: '$type'") unless ($type == ITEM_VALUE_TYPE_FLOAT);
 			push(@{$itemids_float{$slr->{'rdds_rtt'}}}, $itemid);
+		}
+		elsif ($key eq SLV_ITEM_KEY_RDAP_PFAILED)
+		{
+			fail("Unexpected item type (key: '$key', type: '$type'") unless ($type == ITEM_VALUE_TYPE_FLOAT);
+			push(@{$itemids_float{$slr->{'rdap_rtt'}}}, $itemid);
 		}
 		else # if ($key eq SLV_ITEM_KEY_DNS_NS_DOWNTIME
 		{
