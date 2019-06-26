@@ -74,7 +74,7 @@ if (isset($data['tld'])) {
 			bold(_('TLD')),
 			':',
 			SPACE,
-			$data['tld']['name']
+			$data['tld']['host']
 		]]);
 	}
 
