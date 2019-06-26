@@ -54,11 +54,7 @@ $data = [
  */
 $filter_valid = false;
 
-if ($data['filter_year'] > date('Y') || ($data['filter_year'] == date('Y') && $data['filter_month'] > date('n'))) {
-	show_error_message(_('Incorrect report period.'));
-	$filter_valid = false;
-}
-elseif ($data['filter_search']) {
+if ($data['filter_search']) {
 	$error = '';
 	$master = $DB;
 	$filter_valid = true;
@@ -95,8 +91,16 @@ elseif ($data['filter_search']) {
 	}
 }
 
+if ($data['filter_year'] > date('Y') || ($data['filter_year'] == date('Y') && $data['filter_month'] > date('n'))) {
+	show_error_message(_('Incorrect report period.'));
+	$filter_valid = false;
+}
+
 if ($data['tld']) {
-	if ((date('Y') == $data['filter_year'] && date('n') > $data['filter_month']) || date('Y') > $data['filter_year']) {
+	if (!$filter_valid) {
+		$report_row = false;
+	}
+	elseif ((date('Y') == $data['filter_year'] && date('n') > $data['filter_month']) || date('Y') > $data['filter_year']) {
 		// Searching for pregenerated SLA report in database.
 		$report_row = DB::find('sla_reports', [
 			'hostid'	=> $data['tld']['hostid'],
