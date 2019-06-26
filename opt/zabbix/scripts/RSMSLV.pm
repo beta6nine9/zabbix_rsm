@@ -379,7 +379,7 @@ sub get_monitoring_target()
 
 		if ($monitoring_target ne MONITORING_TARGET_REGISTRY && $monitoring_target ne MONITORING_TARGET_REGISTRAR)
 		{
-			wrn("{\$RSM.MONITORING.TARGET} has unexpected value: '$monitoring_target'");
+			fail("{\$RSM.MONITORING.TARGET} has unexpected value: '$monitoring_target'");
 		}
 	}
 
@@ -901,20 +901,24 @@ sub validate_service($)
 {
 	my $service = shift;
 
-	if (get_monitoring_target() eq MONITORING_TARGET_REGISTRAR)
-	{
-		if (!grep {/$service/} ('rdds', 'epp'))
-		{
-			fail("service \"$service\" is unknown");
-		}
-	}
-	else
+	db_connect();
+
+	if (get_monitoring_target() eq MONITORING_TARGET_REGISTRY)
 	{
 		if (!grep {/$service/} ('dns', 'dnssec', 'rdds', 'epp'))
 		{
 			fail("service \"$service\" is unknown");
 		}
 	}
+	elsif (get_monitoring_target() eq MONITORING_TARGET_REGISTRAR)
+	{
+		if (!grep {/$service/} ('rdds'))
+		{
+			fail("service \"$service\" is unknown");
+		}
+	}
+
+	db_disconnect();
 }
 
 my %tld_service_enabled_cache = ();
@@ -1083,29 +1087,16 @@ sub tld_interface_enabled($$$)
 
 	if ($interface eq 'epp')
 	{
-		# disabled for now
 		return 0;
 	}
-
-	if ($interface eq 'dns')
+	elsif ($interface eq 'dns')
 	{
-		if (get_monitoring_target() eq MONITORING_TARGET_REGISTRAR)
-		{
-			# disabled for Registrars
-			return 0;
-		}
-
-		# enabled for Registries
-		return 1;
+		return 1 if (get_monitoring_target() eq MONITORING_TARGET_REGISTRY);
+		return 0 if (get_monitoring_target() eq MONITORING_TARGET_REGISTRAR);
 	}
-
-	if ($interface eq 'dnssec')
+	elsif ($interface eq 'dnssec')
 	{
-		if (get_monitoring_target() eq MONITORING_TARGET_REGISTRAR)
-		{
-			# disabled for Registrars
-			return 0;
-		}
+		return 0 if (get_monitoring_target() eq MONITORING_TARGET_REGISTRAR);
 	}
 
 	my $item_key = enabled_item_key_from_interface($interface);
