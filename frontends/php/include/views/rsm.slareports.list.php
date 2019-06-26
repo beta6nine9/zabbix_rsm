@@ -67,7 +67,7 @@ if ($data['tld']) {
 	];
 
 	if (array_key_exists('details', $data)) {
-		$details += [
+		$details = array_merge($details, [
 			BR(),
 			bold(_s('Period')),
 			': ',
@@ -80,7 +80,7 @@ if ($data['tld']) {
 			gmdate('dS F Y, H:i:s e', $data['details']['generated']),
 			BR(),
 			bold(_('Server')), ': ', new CLink($data['server'], $data['rolling_week_url'])
-		];
+		]);
 	}
 
 	$widget->additem((new CDiv())->addItem($details));
