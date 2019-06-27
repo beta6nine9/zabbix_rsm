@@ -19,9 +19,9 @@ use constant DEFAULT_PROBE_PORT => 10051;
 use constant true => 1;
 use constant false => 0;
 
-my %macros = ('{$RSM.EPP.ENABLED}' => 0, '{$RSM.IP4.ENABLED}' => 0, '{$RSM.IP6.ENABLED}' => 0, '{$RSM.RDDS.ENABLED}' => 0);
+my %macros = ('{$RSM.EPP.ENABLED}' => 0, '{$RSM.IP4.ENABLED}' => 0, '{$RSM.IP6.ENABLED}' => 0, '{$RSM.RDDS.ENABLED}' => 0, '{$RSM.RDAP.ENABLED}' => 0);
 
-sub add_probe($$$$$$$$$$);
+sub add_probe($$$$$$$$$$$);
 sub delete_probe($);
 sub disable_probe($);
 sub rename_probe($$);
@@ -33,7 +33,7 @@ sub usage;
 
 my %OPTS;
 my $rv = GetOptions(\%OPTS, "probe=s", "ip=s", "port=s", "new-name=s", "server-id=s",
-			    "epp!", "ipv4!", "ipv6!", "rdds!", "resolver=s",
+			    "epp!", "ipv4!", "ipv6!", "rdds!", "rdap!", "resolver=s",
                 	    "delete!", "disable!", "add!", "rename!",
 			    "psk-identity=s", "psk=s",
                 	    "verbose!", "quiet!", "help|?");
@@ -77,6 +77,7 @@ elsif ($OPTS{'add'})
 		$OPTS{'ipv4'},
 		$OPTS{'ipv6'},
 		$OPTS{'rdds'},
+		$OPTS{'rdap'},
 		$OPTS{'resolver'}
 	);
 }
@@ -89,7 +90,7 @@ exit;
 
 ################
 
-sub add_probe($$$$$$$$$$)
+sub add_probe($$$$$$$$$$$)
 {
 	my $probe_name = shift;
 	my $probe_ip = shift;
@@ -100,6 +101,7 @@ sub add_probe($$$$$$$$$$)
 	my $ipv4 = shift;
 	my $ipv6 = shift;
 	my $rdds = shift;
+	my $rdap = shift;
 	my $resolver = shift;
 
 	print("Trying to add '$probe_name' probe...\n");
@@ -126,7 +128,7 @@ sub add_probe($$$$$$$$$$)
     ########## Creating Probe template
 
 	print("Creating '$probe_name' template: ");
-	my $probe_tmpl = create_probe_template($probe_name, $epp, $ipv4, $ipv6, $rdds, $resolver);
+	my $probe_tmpl = create_probe_template($probe_name, $epp, $ipv4, $ipv6, $rdds, $rdap, $resolver);
 	is_not_empty($probe_tmpl, true);
 
 
@@ -256,7 +258,7 @@ sub add_probe($$$$$$$$$$)
 
 	print("Updating RDAP items status...\n");
 
-	if ($rdds)
+	if ($rdap)
 	{
 		update_rdap_items($probe_name, 1);
 	}
@@ -512,9 +514,9 @@ sub rename_probe($$) {
     $probe_hostgroup = get_host_group($old_name, false, false);
 
     check_probe_data($probe_hostgroup, "Host group with name '$old_name' is not found", false);
-    
+
     $probe_macro = get_host_macro($probe_host_mon->{'hostid'}, '{$RSM.PROXY_NAME}');
-    
+
     check_probe_data($probe_macro, "Host group with name '{\$RSM.PROXY_NAME}' is not found", false);
 
     print "Trying to rename '$old_name' probe: ";
@@ -525,9 +527,9 @@ sub rename_probe($$) {
     foreach my $host (@{$probe->{'hosts'}}) {
 	my $host_name = $host->{'host'};
 	my $hostid = $host->{'hostid'};
-	
+
 	print "Trying to rename '$host_name' host: ";
-	
+
 	if ($host_name=~/(.+)\s$old_name$/) {
 	    $host_name = $1." ".$new_name;
 	}
@@ -536,7 +538,7 @@ sub rename_probe($$) {
 	}
 
 	$result = rename_host($hostid, $host_name);
-	
+
 	is_not_empty($result->{'hostids'}, false);
     }
 
@@ -565,11 +567,11 @@ sub rename_probe($$) {
     print "Trying to rename '$old_name' host group: ";
     $result = rename_hostgroup($probe_hostgroup->{'groupid'}, $new_name);
     is_not_empty($result->{'groupids'}, false);
-    
+
     print "Trying to update '{\$RSM.PROXY_NAME}' macro on '$new_name - mon' host: ";
     $result = macro_value($probe_macro->{'hostmacroid'}, $new_name);
     is_not_empty($result->{'hostmacroids'}, false);
-    
+
     # rsm_probes table?
     print "The probe has been renamed successfully\n";
 }
@@ -686,6 +688,9 @@ Options for adding new probe. Argument --add.
 	--rdds
 		Enable RDDS support for the Probe
 		(default: disabled)
+	--rdap
+		Enable RDAP support for the Probe
+		(default: disabled)
 	--resolver
 		The name of resolver
 		(default: 127.0.0.1)
@@ -729,7 +734,7 @@ sub validate_input
 		$OPTS{'psk-identity'} //= $OPTS{'probe'} if (defined($OPTS{'psk'}));
 
 		my @service_list;
-		foreach my $option (('epp', 'rdds', 'ipv4', 'ipv6'))
+		foreach my $option (('epp', 'rdds', 'rdap', 'ipv4', 'ipv6'))
 		{
 			$OPTS{$option} //= 0;
 
