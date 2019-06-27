@@ -4775,6 +4775,25 @@ out:
 	return ret;
 }
 
+static int	DBpatch_3000406(void)
+{
+	int		ret = FAIL;
+	DB_RESULT	result;
+	DB_ROW		row;
+
+	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
+		return SUCCEED;
+
+	if (ZBX_DB_OK > DBexecute("update items set"
+			" key_=replace(key_,'{$RSM.RDDS.ENABLED}','{$RSM.RDAP.ENABLED}')"
+			" where key_ like 'rdap[%{$RSM.RDDS.ENABLED}%]'"))
+	{
+		return FAIL;
+	}
+
+	return SUCCEED;
+}
+
 #endif
 
 DBPATCH_START(3000)
@@ -4885,5 +4904,6 @@ DBPATCH_ADD(3000402, 0, 0)	/* rename "EBERO users" user group to "Read-only user
 DBPATCH_ADD(3000403, 0, 0)	/* add columns "info_1" and "info_2" to the "hosts" table */
 DBPATCH_ADD(3000404, 0, 0)	/* add macros, items and triggers for Standalone RDAP */
 DBPATCH_ADD(3000405, 0, 0)	/* add {$RSM.RDAP.ENABLED} macro on probes */
+DBPATCH_ADD(3000406, 0, 0)	/* replace {$RSM.RDDS.ENABLED} with {$RSM.RDAP.ENABLED} in rdap[] keys */
 
 DBPATCH_END()
