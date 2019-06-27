@@ -4747,6 +4747,34 @@ out:
 	return ret;
 }
 
+static int	DBpatch_3000405(void)
+{
+	int		ret = FAIL;
+	DB_RESULT	result;
+	DB_ROW		row;
+
+	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
+		return SUCCEED;
+
+	result = DBselect("select hostid, value from hostmacro where macro = '{$RSM.RDDS.ENABLED}'");
+
+	while (NULL != (row = DBfetch(result)))
+	{
+		if (ZBX_DB_OK > DBexecute("insert into hostmacro (hostmacroid,hostid,macro,value)"
+				" values (" ZBX_FS_UI64 ",%s,'%s','%s')",
+				DBget_maxid_num("hostmacro", 1), row[0], "{$RSM.RDAP.ENABLED}", row[1]))
+		{
+			goto out;
+		}
+	}
+
+	ret = SUCCEED;
+out:
+	DBfree_result(result);
+
+	return ret;
+}
+
 #endif
 
 DBPATCH_START(3000)
@@ -4856,5 +4884,6 @@ DBPATCH_ADD(3000401, 0, 0)	/* add macro {$RSM.MONITORING.TARGET} with empty stri
 DBPATCH_ADD(3000402, 0, 0)	/* rename "EBERO users" user group to "Read-only user", "Technical services users" to "Power user" */
 DBPATCH_ADD(3000403, 0, 0)	/* add columns "info_1" and "info_2" to the "hosts" table */
 DBPATCH_ADD(3000404, 0, 0)	/* add macros, items and triggers for Standalone RDAP */
+DBPATCH_ADD(3000405, 0, 0)	/* add {$RSM.RDAP.ENABLED} macro on probes */
 
 DBPATCH_END()
