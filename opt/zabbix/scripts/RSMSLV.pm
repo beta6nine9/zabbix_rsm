@@ -89,15 +89,33 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		PROBE_KEY_MANUAL
 		ONLINE OFFLINE
 		USE_CACHE_FALSE USE_CACHE_TRUE
-		get_macro_minns get_macro_dns_probe_online get_macro_rdds_probe_online get_macro_dns_rollweek_sla
-		get_macro_rdds_rollweek_sla get_macro_dns_udp_rtt_high get_macro_dns_udp_rtt_low
-		get_macro_dns_tcp_rtt_low get_macro_rdds_rtt_low get_dns_udp_delay get_dns_tcp_delay
-		get_rdds_delay get_epp_delay get_macro_epp_probe_online get_macro_epp_rollweek_sla
-		get_macro_dns_update_time get_macro_rdds_update_time get_tld_items get_hostid
+		get_macro_minns
+		get_macro_dns_probe_online
+		get_macro_rdds_probe_online
+		get_macro_rdap_probe_online
+		get_macro_dns_rollweek_sla
+		get_macro_rdds_rollweek_sla
+		get_macro_rdap_rollweek_sla
+		get_macro_dns_udp_rtt_high
+		get_macro_dns_udp_rtt_low
+		get_macro_dns_tcp_rtt_low
+		get_macro_rdds_rtt_low
+		get_macro_rdap_rtt_low
+		get_dns_udp_delay
+		get_dns_tcp_delay
+		get_rdds_delay
+		get_epp_delay
+		get_macro_epp_probe_online
+		get_macro_epp_rollweek_sla
+		get_macro_dns_update_time
+		get_macro_rdds_update_time
+		get_tld_items
+		get_hostid
 		get_rtt_low
 		get_macro_epp_rtt_low get_macro_probe_avail_limit
 		get_macro_incident_dns_fail get_macro_incident_dns_recover
 		get_macro_incident_rdds_fail get_macro_incident_rdds_recover
+		get_macro_incident_rdap_fail get_macro_incident_rdap_recover
 		get_monitoring_target
 		get_rdap_standalone_ts is_rdap_standalone
 		get_itemid_by_key get_itemid_by_host
@@ -184,6 +202,11 @@ sub get_macro_rdds_probe_online
 	return __get_macro('{$RSM.RDDS.PROBE.ONLINE}');
 }
 
+sub get_macro_rdap_probe_online
+{
+	return __get_macro('{$RSM.RDAP.PROBE.ONLINE}');
+}
+
 sub get_macro_dns_rollweek_sla
 {
 	return __get_macro('{$RSM.DNS.ROLLWEEK.SLA}');
@@ -192,6 +215,11 @@ sub get_macro_dns_rollweek_sla
 sub get_macro_rdds_rollweek_sla
 {
 	return __get_macro('{$RSM.RDDS.ROLLWEEK.SLA}');
+}
+
+sub get_macro_rdap_rollweek_sla
+{
+	return __get_macro('{$RSM.RDAP.ROLLWEEK.SLA}');
 }
 
 sub get_macro_dns_udp_rtt_high
@@ -212,6 +240,11 @@ sub get_macro_dns_tcp_rtt_low
 sub get_macro_rdds_rtt_low
 {
 	return __get_macro('{$RSM.RDDS.RTT.LOW}');
+}
+
+sub get_macro_rdap_rtt_low
+{
+	return __get_macro('{$RSM.RDAP.RTT.LOW}');
 }
 
 sub get_dns_udp_delay
@@ -371,6 +404,16 @@ sub get_macro_incident_rdds_fail()
 sub get_macro_incident_rdds_recover()
 {
 	return __get_macro('{$RSM.INCIDENT.RDDS.RECOVER}');
+}
+
+sub get_macro_incident_rdap_fail()
+{
+	return __get_macro('{$RSM.INCIDENT.RDAP.FAIL}');
+}
+
+sub get_macro_incident_rdap_recover()
+{
+	return __get_macro('{$RSM.INCIDENT.RDAP.RECOVER}');
 }
 
 sub get_monitoring_target()
@@ -657,13 +700,13 @@ my %probes_cache = ();
 # Returns a reference to hash of all probes (host => {'hostid' => hostid, 'status' => status}).
 sub get_probes(;$$)
 {
-	my $service = shift; # "IP4", "IP6", "RDDS" or any other
+	my $service = shift; # "IP4", "IP6", "RDDS", "RDAP" or any other
 	my $name = shift;
 
 	$service = defined($service) ? uc($service) : "ALL";
 	$name //= "";
 
-	if ($service ne "IP4" && $service ne "IP6" && $service ne "RDDS")
+	if ($service ne "IP4" && $service ne "IP6" && $service ne "RDDS" && $service ne "RDAP")
 	{
 		$service = "ALL";
 	}
@@ -690,13 +733,14 @@ sub __get_probes($)
 			" left join hostmacro on hostmacro.hostid=hosts_templates_2.templateid" .
 		" where $name_condition" .
 			" hosts_groups.groupid=" . PROBES_GROUPID . " and" .
-			" hostmacro.macro in ('{\$RSM.IP4.ENABLED}','{\$RSM.IP6.ENABLED}','{\$RSM.RDDS.ENABLED}')");
+			" hostmacro.macro in ('{\$RSM.IP4.ENABLED}','{\$RSM.IP6.ENABLED}','{\$RSM.RDDS.ENABLED},'{\$RSM.RDAP.ENABLED}')");
 
 	my %result = (
 		'ALL'  => {},
 		'IP4'  => {},
 		'IP6'  => {},
-		'RDDS' => {}
+		'RDDS' => {},
+		'RDAP' => {},
 	);
 
 	foreach my $row (@{$rows})
@@ -720,6 +764,10 @@ sub __get_probes($)
 		{
 			$result{'RDDS'}{$host} = {'hostid' => $hostid, 'status' => $status} if ($value);
 		}
+		elsif ($macro eq '{$RSM.RDAP.ENABLED}')
+		{
+			$result{'RDAP'}{$host} = {'hostid' => $hostid, 'status' => $status} if ($value);
+		}
 	}
 
 	if (opt("debug"))
@@ -728,6 +776,7 @@ sub __get_probes($)
 		dbg("number of probes with IP4 support  - " . scalar(keys(%{$result{'IP4'}})));
 		dbg("number of probes with IP6 support  - " . scalar(keys(%{$result{'IP6'}})));
 		dbg("number of probes with RDDS support - " . scalar(keys(%{$result{'RDDS'}})));
+		dbg("number of probes with RDAP support - " . scalar(keys(%{$result{'RDAP'}})));
 	}
 
 	return \%result;
@@ -929,14 +978,14 @@ sub validate_service($)
 
 	if (get_monitoring_target() eq MONITORING_TARGET_REGISTRY)
 	{
-		if (!grep {/$service/} ('dns', 'dnssec', 'rdds', 'epp'))
+		if (!grep {/$service/} ('dns', 'dnssec', 'rdds', 'rdap', 'epp'))
 		{
 			fail("service \"$service\" is unknown");
 		}
 	}
 	elsif (get_monitoring_target() eq MONITORING_TARGET_REGISTRAR)
 	{
-		if (!grep {/$service/} ('rdds'))
+		if (!grep {/$service/} ('rdds', 'rdap'))
 		{
 			fail("service \"$service\" is unknown");
 		}
@@ -1761,7 +1810,7 @@ sub slv_max_cycles($)
 	{
 		$var = 'max_cycles_dns';
 	}
-	elsif ($service eq 'rdds')
+	elsif ($service eq 'rdds' || $service eq 'rdap')
 	{
 		$var = 'max_cycles_rdds';
 	}
