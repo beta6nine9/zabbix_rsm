@@ -733,7 +733,7 @@ sub __get_probes($)
 			" left join hostmacro on hostmacro.hostid=hosts_templates_2.templateid" .
 		" where $name_condition" .
 			" hosts_groups.groupid=" . PROBES_GROUPID . " and" .
-			" hostmacro.macro in ('{\$RSM.IP4.ENABLED}','{\$RSM.IP6.ENABLED}','{\$RSM.RDDS.ENABLED},'{\$RSM.RDAP.ENABLED}')");
+			" hostmacro.macro in ('{\$RSM.IP4.ENABLED}','{\$RSM.IP6.ENABLED}','{\$RSM.RDDS.ENABLED}','{\$RSM.RDAP.ENABLED}')");
 
 	my %result = (
 		'ALL'  => {},
