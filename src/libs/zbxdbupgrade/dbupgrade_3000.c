@@ -4603,7 +4603,12 @@ static int	create_rollweek_triggers(zbx_uint64_t itemid, const char *service)
 #undef CHECK
 }
 
-static int	DBpatch_3000404(void)
+static int	DBpatch_3000500(void)
+{
+	return SUCCEED;
+}
+
+static int	DBpatch_3000501(void)
 {
 	int		ret = FAIL;
 	DB_RESULT	hosts_result;
@@ -4640,7 +4645,7 @@ do {                                                                            
 	CREATE_GLOBALMACRO(110, "{$RSM.RDAP.PROBE.ONLINE}"    , "10");
 	CREATE_GLOBALMACRO(111, "{$RSM.RDAP.ROLLWEEK.SLA}"    , "1440");
 	CREATE_GLOBALMACRO(112, "{$RSM.RDAP.RTT.HIGH}"        , "10000");
-	CREATE_GLOBALMACRO(113, "{$RSM.RDAP.RTT.LOW}"         , "2000");
+	CREATE_GLOBALMACRO(113, "{$RSM.RDAP.RTT.LOW}"         , "5000");
 	CREATE_GLOBALMACRO(114, "{$RSM.RDAP.STANDALONE}"      , "0");
 	CREATE_GLOBALMACRO(115, "{$RSM.SLV.RDAP.DOWNTIME}"    , "864");
 	CREATE_GLOBALMACRO(116, "{$RSM.SLV.RDAP.RTT}"         , "5");
@@ -4747,7 +4752,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_3000405(void)
+static int	DBpatch_3000502(void)
 {
 	int		ret = FAIL;
 	DB_RESULT	result;
@@ -4775,7 +4780,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_3000406(void)
+static int	DBpatch_3000503(void)
 {
 	int		ret = FAIL;
 	DB_RESULT	result;
@@ -4785,21 +4790,8 @@ static int	DBpatch_3000406(void)
 		return SUCCEED;
 
 	if (ZBX_DB_OK > DBexecute("update items set"
-			" key_=replace(key_,'{$RSM.RDDS.ENABLED}','{$RSM.RDAP.ENABLED}')"
-			" where key_ like 'rdap[%{$RSM.RDDS.ENABLED}%]'"))
-	{
-		return FAIL;
-	}
-
-	return SUCCEED;
-}
-
-static int	DBpatch_3000407(void)
-{
-	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
-		return SUCCEED;
-
-	if (ZBX_DB_OK > DBexecute("update globalmacro set value = 5000 where macro = '{$RSM.RDAP.RTT.LOW}'"))
+			" key_=replace(key_,'{$RSM.RDDS.','{$RSM.RDAP.')"
+			" where key_ like 'rdap[%]'"))
 	{
 		return FAIL;
 	}
@@ -4915,9 +4907,9 @@ DBPATCH_ADD(3000400, 0, 0)	/* Phase 3, version 1.4.0 */
 DBPATCH_ADD(3000401, 0, 0)	/* add macro {$RSM.MONITORING.TARGET} with empty string as value (unknown) or "registry" */
 DBPATCH_ADD(3000402, 0, 0)	/* rename "EBERO users" user group to "Read-only user", "Technical services users" to "Power user" */
 DBPATCH_ADD(3000403, 0, 0)	/* add columns "info_1" and "info_2" to the "hosts" table */
-DBPATCH_ADD(3000404, 0, 0)	/* add macros, items and triggers for Standalone RDAP */
-DBPATCH_ADD(3000405, 0, 0)	/* add {$RSM.RDAP.ENABLED} macro on probes */
-DBPATCH_ADD(3000406, 0, 0)	/* replace {$RSM.RDDS.ENABLED} with {$RSM.RDAP.ENABLED} in rdap[] keys */
-DBPATCH_ADD(3000407, 0, 0)	/* set value of {$RSM.RDAP.RTT.LOW} global macro to 5000 */
+DBPATCH_ADD(3000500, 0, 0)	/* Phase 4, version 2.0.0 */
+DBPATCH_ADD(3000501, 0, 0)	/* add macros, items and triggers for Standalone RDAP */
+DBPATCH_ADD(3000502, 0, 0)	/* add {$RSM.RDAP.ENABLED} macro on probes */
+DBPATCH_ADD(3000503, 0, 0)	/* replace {$RSM.RDDS.*} with {$RSM.RDAP.*} in rdap[] keys */
 
 DBPATCH_END()
