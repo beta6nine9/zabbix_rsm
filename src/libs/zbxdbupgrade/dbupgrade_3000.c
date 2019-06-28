@@ -4794,6 +4794,19 @@ static int	DBpatch_3000406(void)
 	return SUCCEED;
 }
 
+static int	DBpatch_3000407(void)
+{
+	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
+		return SUCCEED;
+
+	if (ZBX_DB_OK > DBexecute("update globalmacro set value = 5000 where macro = '{$RSM.RDAP.RTT.LOW}'"))
+	{
+		return FAIL;
+	}
+
+	return SUCCEED;
+}
+
 #endif
 
 DBPATCH_START(3000)
@@ -4905,5 +4918,6 @@ DBPATCH_ADD(3000403, 0, 0)	/* add columns "info_1" and "info_2" to the "hosts" t
 DBPATCH_ADD(3000404, 0, 0)	/* add macros, items and triggers for Standalone RDAP */
 DBPATCH_ADD(3000405, 0, 0)	/* add {$RSM.RDAP.ENABLED} macro on probes */
 DBPATCH_ADD(3000406, 0, 0)	/* replace {$RSM.RDDS.ENABLED} with {$RSM.RDAP.ENABLED} in rdap[] keys */
+DBPATCH_ADD(3000407, 0, 0)	/* set value of {$RSM.RDAP.RTT.LOW} global macro to 5000 */
 
 DBPATCH_END()
