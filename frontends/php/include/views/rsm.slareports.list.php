@@ -75,7 +75,7 @@ if ($data['tld']) {
 			' '._('till').' ',
 			gmdate('Y/m/d H:i:s', $data['details']['to']),
 			BR(),
-			bold(_s('Generation time')), 
+			bold(_s('Generation time')),
 			': ',
 			gmdate('dS F Y, H:i:s e', $data['details']['generated']),
 			BR(),
@@ -99,9 +99,9 @@ if (!array_key_exists('details', $data)) {
 if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY) {
 	$table->addRow([
 			bold(_('DNS Service Availability')),
-			'-',
-			gmdate('Y-m-d H:i:s e', $data['details']['from']),
-			gmdate('Y-m-d H:i:s e', $data['details']['to']),
+			'',
+			'',
+			'',
 			_s('%d (minutes of downtime)', $data['slv_dns_downtime']),
 			_s('%d (minutes of downtime)', $data['slr_dns_downtime'])
 		],
@@ -126,9 +126,9 @@ if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY) {
 	$table
 		->addRow([
 				_('DNS UDP Resolution RTT'),
-				'-',
-				gmdate('Y-m-d H:i:s e', $data['details']['from']),
-				gmdate('Y-m-d H:i:s e', $data['details']['to']),
+				'',
+				'',
+				'',
 				_s('%1$s %% (queries <= %2$s ms)', $data['slv_dns_udp_pfailed'],
 					$data['slr_dns_udp_pfailed_ms']
 				),
@@ -139,9 +139,9 @@ if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY) {
 			($data['slv_dns_udp_pfailed'] < (100 - $data['slr_dns_udp_pfailed'])) ? 'red-bg' : null
 		)->addRow([
 				_('DNS TCP Resolution RTT'),
-				'-',
-				gmdate('Y-m-d H:i:s e', $data['details']['from']),
-				gmdate('Y-m-d H:i:s e', $data['details']['to']),
+				'',
+				'',
+				'',
 				_s('%1$s %% (queries <= %2$s ms)', $data['slv_dns_tcp_pfailed'],
 					$data['slr_dns_tcp_pfailed_ms']
 				),
@@ -158,18 +158,18 @@ if (array_key_exists('slv_rdds_downtime', $data) && $data['slv_rdds_downtime'] !
 		&& $data['slv_rdds_rtt_downtime'] !== 'disabled') {
 	$table->addRow([
 			bold(_('RDDS Service Availability')),
-			'-',
-			gmdate('Y-m-d H:i:s e', $data['details']['from']),
-			gmdate('Y-m-d H:i:s e', $data['details']['to']),
+			'',
+			'',
+			'',
 			_s('%1$s (minutes of downtime)', $data['slv_rdds_downtime']),
 			_s('<= %1$s min of downtime', $data['slr_rdds_downtime'])
 		],
 		($data['slv_rdds_downtime'] > $data['slr_rdds_downtime']) ? 'red-bg' : null
 	)->addRow([
 			_('RDDS Query RTT'),
-			'-',
-			gmdate('Y-m-d H:i:s e', $data['details']['from']),
-			gmdate('Y-m-d H:i:s e', $data['details']['to']),
+			'',
+			'',
+			'',
 			_s('%1$s %% (queries <= %2$s ms)', $data['slv_rdds_rtt_downtime'], $data['slr_rdds_rtt_downtime_ms']),
 			_s('<= %1$s ms, for at least %2$s %% of the queries', $data['slr_rdds_rtt_downtime_ms'],
 				$data['slr_rdds_rtt_downtime']
