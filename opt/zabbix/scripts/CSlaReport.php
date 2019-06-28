@@ -5,14 +5,13 @@ class CSlaReport
 	const MONITORING_TARGET_MACRO     = "{\$RSM.MONITORING.TARGET}";
 	const MONITORING_TARGET_REGISTRY  = "registry";
 	const MONITORING_TARGET_REGISTRAR = "registrar";
+	const STANDALONE_RDAP_MACRO       = "{\$RSM.RDAP.STANDALONE}";
 
 	public static $error;
 
 	private static $sql_count;
 	private static $sql_time;
 	private static $dbh;
-
-	private static $monitoring_target;
 
 	/**
 	 * Generates SLA reports.
@@ -114,6 +113,11 @@ class CSlaReport
 							"availability" => int,
 							"rtt"          => float,
 						],
+						"rdap" => [
+							"enabled"      => true|false,
+							"availability" => int,
+							"rtt"          => float,
+						],
 					],
 					...
 				];
@@ -178,6 +182,17 @@ class CSlaReport
 					"rtt"          => null,
 				],
 			];
+
+			if (self::isRdapStandalone($from))
+			{
+				$data[$hostid] += [
+					"rdap" => [
+						"enabled"      => null,
+						"availability" => null,
+						"rtt"          => null,
+					],
+				];
+			}
 		}
 
 		if (count($tlds) > 0 && count($tlds) != count($data))
@@ -203,26 +218,46 @@ class CSlaReport
 			}
 		}
 
-		// get RDDS status (enabled/disabled)
+		// get RDDS and RDAP status (enabled/disabled)
 
-		$rows = self::getRddsStatus($tlds, $from, $till);
+		$rdds_rows = self::getServiceStatus($tlds, $from, $till, "rdds");
+		$rdap_rows = self::getServiceStatus($tlds, $from, $till, "rdap");
 
-		$rddsStatus = [];
-		foreach ($rows as $row)
+		$rdds_status = [];
+		$rdap_status = [];
+
+		foreach ($rdds_rows as $row)
 		{
 			list($tld, $status) = $row;
-			$rddsStatus[$tld] = (bool)$status;
+			$rdds_status[$tld] = (bool)$status;
+		}
+		foreach ($rdap_rows as $row)
+		{
+			list($tld, $status) = $row;
+			$rdap_status[$tld] = (bool)$status;
 		}
 
-		foreach ($data as $hostid => $tld)
+		if (self::isRdapStandalone($from))
 		{
-			$data[$hostid]["rdds"]["enabled"] = $rddsStatus[$tld["host"]];
+			foreach ($data as $hostid => $tld)
+			{
+				$data[$hostid]["rdds"]["enabled"] = $rdds_status[$tld["host"]];
+				$data[$hostid]["rdap"]["enabled"] = $rdap_status[$tld["host"]];
+			}
+		}
+		else
+		{
+			foreach ($data as $hostid => $tld)
+			{
+				$data[$hostid]["rdds"]["enabled"] = $rdds_status[$tld["host"]] || $rdap_status[$tld["host"]];
+			}
 		}
 
 		// get itemid of relevant items
 
 		$all_hostids = array_keys($data);
 		$rdds_hostids = [];
+		$rdap_hostids = [];
 
 		foreach ($data as $hostid => $tld)
 		{
@@ -230,9 +265,13 @@ class CSlaReport
 			{
 				array_push($rdds_hostids, $hostid);
 			}
+			if (self::isRdapStandalone($from) && $tld["rdap"]["enabled"])
+			{
+				array_push($rdap_hostids, $hostid);
+			}
 		}
 
-		$rows = self::getItemIds($all_hostids, $rdds_hostids);
+		$rows = self::getItemIds($all_hostids, $rdds_hostids, $rdap_hostids);
 
 		$itemkeys = [];
 		$itemhostids = [];
@@ -309,6 +348,14 @@ class CSlaReport
 
 				case "rsm.slv.rdds.rtt.pfailed":
 					$data[$hostid]["rdds"]["rtt"] = 100.0 - $value;
+					break;
+
+				case "rsm.slv.rdap.downtime":
+					$data[$hostid]["rdap"]["availability"] = $value;
+					break;
+
+				case "rsm.slv.rdap.rtt.pfailed":
+					$data[$hostid]["rdap"]["rtt"] = 100.0 - $value;
 					break;
 
 				default:
@@ -513,6 +560,53 @@ class CSlaReport
 					throw new Exception("RDDS Query RTT data found in the database while it shouldn't have been");
 				}
 			}
+
+			// validate RDAP
+			// TODO: remove "if" after switching to Standalone RDAP
+			if (array_key_exists("rdap", $tld))
+			{
+				if (!is_bool($tld["rdap"]["enabled"]))
+				{
+					if (defined("DEBUG") && DEBUG === true)
+						printf("(DEBUG) %s() \$data[{$hostid}]['rdap']['enabled'] is not bool (TLD: '{$tld["host"]}')\n", __method__);
+
+					throw new Exception("invalid RDAP state value type in the database");
+				}
+				if ($tld["rdap"]["enabled"])
+				{
+					if (is_null($tld["rdap"]["availability"]))
+					{
+						if (defined("DEBUG") && DEBUG === true)
+							printf("(DEBUG) %s() \$data[{$hostid}]['rdap']['availability'] is null (TLD: '{$tld["host"]}')\n", __method__);
+
+						throw new Exception("partial or missing RDAP Service Availability data in the database");
+					}
+					if (!is_float($tld["rdap"]["rtt"]))
+					{
+						if (defined("DEBUG") && DEBUG === true)
+							printf("(DEBUG) %s() \$data[{$hostid}]['rdap']['rtt'] is not float (TLD: '{$tld["host"]}')\n", __method__);
+
+						throw new Exception("partial or missing RDAP Query RTT data in the database");
+					}
+				}
+				else
+				{
+					if (!is_null($tld["rdap"]["availability"]))
+					{
+						if (defined("DEBUG") && DEBUG === true)
+							printf("(DEBUG) %s() \$data[{$hostid}]['rdap']['availability'] is not null (TLD: '{$tld["host"]}')\n", __method__);
+
+						throw new Exception("RDAP Service Availability data found in the database while it shouldn't have been");
+					}
+					if (!is_null($tld["rdap"]["rtt"]))
+					{
+						if (defined("DEBUG") && DEBUG === true)
+							printf("(DEBUG) %s() \$data[{$hostid}]['rdap']['rtt'] is not null (TLD: '{$tld["host"]}')\n", __method__);
+
+						throw new Exception("RDAP Query RTT data found in the database while it shouldn't have been");
+					}
+				}
+			}
 		}
 	}
 
@@ -566,6 +660,25 @@ class CSlaReport
 			$xml_rdds_rtt->addAttribute("rttSLR", $slrs["rdds-rtt"]);
 			$xml_rdds_rtt->addAttribute("percentageSLR", $slrs["rdds-percentage"]);
 
+			if (self::isRdapStandalone($reportPeriodFrom))
+			{
+				$xml_rdap = $xml->addChild("RDAP");
+				if ($tld["rdap"]["enabled"])
+				{
+					$xml_rdap_avail = $xml_rdap->addChild("serviceAvailability", $tld["rdap"]["availability"]);
+					$xml_rdap_rtt = $xml_rdap->addChild("rtt", $tld["rdap"]["rtt"]);
+				}
+				else
+				{
+					$xml_rdap_avail = $xml_rdap->addChild("serviceAvailability", "disabled");
+					$xml_rdap_rtt = $xml_rdap->addChild("rtt", "disabled");
+				}
+
+				$xml_rdap_avail->addAttribute("downtimeSLR", $slrs["rdap-avail"]);
+				$xml_rdap_rtt->addAttribute("rttSLR", $slrs["rdap-rtt"]);
+				$xml_rdap_rtt->addAttribute("percentageSLR", $slrs["rdap-percentage"]);
+			}
+
 			$dom = dom_import_simplexml($xml)->ownerDocument;
 			$dom->formatOutput = true;
 
@@ -583,7 +696,7 @@ class CSlaReport
 	# Data retrieval methods
 	################################################################################
 
-	private static function getItemIds($all_hostids, $rdds_hostids)
+	private static function getItemIds($all_hostids, $rdds_hostids, $rdap_hostids)
 	{
 		$hostids_placeholder = substr(str_repeat("?,", count($all_hostids)), 0, -1);
 		$sql = "select itemid,hostid,key_,value_type" .
@@ -608,10 +721,20 @@ class CSlaReport
 			$params = array_merge($params, $rdds_hostids);
 		}
 
+		if (count($rdap_hostids) > 0)
+		{
+			$hostids_placeholder = substr(str_repeat("?,", count($rdap_hostids)), 0, -1);
+			$sql .= " or (" .
+					"hostid in ({$hostids_placeholder}) and" .
+					" key_ in ('rsm.slv.rdap.downtime','rsm.slv.rdap.rtt.pfailed')" .
+				")";
+			$params = array_merge($params, $rdap_hostids);
+		}
+
 		return self::dbSelect($sql, $params);
 	}
 
-	private static function getRddsStatus($tlds, $from, $till)
+	private static function getServiceStatus($tlds, $from, $till, $service)
 	{
 		$tlds_subquery = "";
 		foreach ($tlds as $tld)
@@ -635,7 +758,7 @@ class CSlaReport
 						" left join hosts_groups on hosts_groups.hostid=hosts.hostid" .
 						" left join history_uint on history_uint.itemid=items.itemid" .
 					" where" .
-						" items.key_ in ('rdap.enabled','rdds.enabled') and" .
+						" items.key_ = ? and" .
 						" hosts.host like concat(tlds.tld,' %') and" .
 						" hosts_groups.groupid=190 and" .
 						" history_uint.clock between ? and ? and" .
@@ -643,7 +766,7 @@ class CSlaReport
 				") as status" .
 			" from ({$tlds_subquery}) as tlds";
 
-		$params = array_merge([$from, $till], $tlds);
+		$params = array_merge(["{$service}.enabled", $from, $till], $tlds);
 
 		return self::dbSelect($sql, $params);
 	}
@@ -713,8 +836,8 @@ class CSlaReport
 
 	private static function getSlrValues($from)
 	{
-		// map macro names with slr names
-		$macro_names = array(
+		// map macro names to slr names
+		$macro_names = [
 				'RSM.SLV.DNS.DOWNTIME'	=> 'dns-avail',				// minutes
 				'RSM.SLV.NS.DOWNTIME'	=> 'ns-avail',				// minutes
 				'RSM.SLV.DNS.TCP.RTT'	=> 'dns-tcp-percentage',	// %
@@ -723,10 +846,13 @@ class CSlaReport
 				'RSM.DNS.UDP.RTT.LOW'	=> 'dns-udp-rtt',			// ms
 				'RSM.SLV.RDDS.DOWNTIME'	=> 'rdds-avail',			// minutes
 				'RSM.SLV.RDDS.RTT'		=> 'rdds-percentage',		// %
-				'RSM.RDDS.RTT.LOW'		=> 'rdds-rtt'				// ms
-		);
+				'RSM.RDDS.RTT.LOW'		=> 'rdds-rtt',				// ms
+				'RSM.SLV.RDAP.DOWNTIME'	=> 'rdap-avail',			// minutes
+				'RSM.SLV.RDAP.RTT'		=> 'rdap-percentage',		// %
+				'RSM.RDAP.RTT.LOW'		=> 'rdap-rtt',				// ms
+		];
 
-		$items = array();
+		$items = [];
 
 		foreach (array_keys($macro_names) as $macro_name)
 		{
@@ -758,7 +884,8 @@ class CSlaReport
 			// TODO: fix percentage SLR in the database and remove this code!
 			if ($slr_name === 'dns-tcp-percentage' ||
 					$slr_name === 'dns-udp-percentage' ||
-					$slr_name === 'rdds-percentage')
+					$slr_name === 'rdds-percentage' ||
+					$slr_name === 'rdap-percentage')
 			{
 				$value = 100 - $value;
 			}
@@ -789,7 +916,8 @@ class CSlaReport
 				// TODO: fix percentage SLR in the database and remove this code!
 				if ($slr_name === 'dns-tcp-percentage' ||
 						$slr_name === 'dns-udp-percentage' ||
-						$slr_name === 'rdds-percentage')
+						$slr_name === 'rdds-percentage' ||
+						$slr_name === 'rdap-percentage')
 				{
 					$value = 100 - $value;
 				}
@@ -803,7 +931,9 @@ class CSlaReport
 
 	private static function getMonitoringTarget()
 	{
-		if (is_null(self::$monitoring_target))
+		static $monitoring_target;
+
+		if (is_null($monitoring_target))
 		{
 			$rows = self::dbSelect("select value from globalmacro where macro = ?", [self::MONITORING_TARGET_MACRO]);
 			if (!$rows)
@@ -811,19 +941,42 @@ class CSlaReport
 				throw new Exception("no macro '" . self::MONITORING_TARGET_MACRO . "'");
 			}
 
-			self::$monitoring_target = $rows[0][0];
-			if (self::$monitoring_target != self::MONITORING_TARGET_REGISTRY && self::$monitoring_target != self::MONITORING_TARGET_REGISTRAR)
+			$monitoring_target = $rows[0][0];
+			if ($monitoring_target != self::MONITORING_TARGET_REGISTRY && $monitoring_target != self::MONITORING_TARGET_REGISTRAR)
 			{
-				throw new Exception("unexpected value of '" . self::MONITORING_TARGET_MACRO . "' - '" . self::$monitoring_target . "'");
+				throw new Exception("unexpected value of '" . self::MONITORING_TARGET_MACRO . "' - '" . $monitoring_target . "'");
 			}
 
 			if (defined("DEBUG") && DEBUG === true)
 			{
-				printf("(DEBUG) %s() monitoring target - %s\n", __method__, self::$monitoring_target);
+				printf("(DEBUG) %s() monitoring target - %s\n", __method__, $monitoring_target);
 			}
 		}
 
-		return self::$monitoring_target;
+		return $monitoring_target;
+	}
+
+	private static function isRdapStandalone($clock)
+	{
+		static $rdap_standalone_ts;
+
+		if (is_null($rdap_standalone_ts))
+		{
+			$rows = self::dbSelect("select value from globalmacro where macro = ?", [self::STANDALONE_RDAP_MACRO]);
+			if (!$rows)
+			{
+				throw new Exception("no macro '" . self::STANDALONE_RDAP_MACRO . "'");
+			}
+
+			$rdap_standalone_ts = (int)$rows[0][0];
+
+			if (defined("DEBUG") && DEBUG === true)
+			{
+				printf("(DEBUG) %s() Standalone RDAP timestamp - %d\n", __method__, $rdap_standalone_ts);
+			}
+		}
+
+		return $rdap_standalone_ts && $now >= $rdap_standalone_ts;
 	}
 
 	################################################################################
