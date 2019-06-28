@@ -1,3 +1,9 @@
+Changes for rsm1.3.0rc2
+
+Bug fixes:
+..F....... [517] deleted "From" and "To" fields where unneeded (miks)
+
+--------------------------------------------------------------------------------
 Changes for rsm1.3.0rc1
 
 New features:
