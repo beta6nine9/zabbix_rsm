@@ -1,3 +1,9 @@
+Changes for rsm1.4.0rc2
+
+Bug fixes
+..F....... [514] fixed unconsistent display of host technical and visual name in different pages; removed unused file (miks)
+
+--------------------------------------------------------------------------------
 Changes for rsm1.4.0rc1
 
 New features:
