@@ -541,7 +541,7 @@ $object_info = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR)
 		BR(),
 		new CSpan([bold(_('Registrar family')), ':', SPACE, $data['tld']['info_2']])
 	]
-	: new CSpan([bold(_('TLD')), ':', SPACE, $data['tld']['name']]);
+	: new CSpan([bold(_('TLD')), ':', SPACE, $data['tld']['host']]);
 
 $particularTests = [
 	$object_info,
