@@ -111,7 +111,7 @@ $table
 				$data['slr_dns_udp_pfailed']
 			)
 		],
-		($data['slv_dns_udp_pfailed'] < (100 - $data['slr_dns_udp_pfailed'])) ? 'red-bg' : null
+		((100 - $data['slv_dns_udp_pfailed']) >= (100 - $data['slr_dns_udp_pfailed'])) ? 'red-bg' : null
 	)->addRow([
 			_('DNS TCP Resolution RTT'),
 			'',
@@ -124,7 +124,7 @@ $table
 				$data['slr_dns_tcp_pfailed']
 			)
 		],
-		($data['slv_dns_tcp_pfailed'] < (100 - $data['slr_dns_tcp_pfailed'])) ? 'red-bg' : null
+		((100 - $data['slv_dns_tcp_pfailed']) >= (100 - $data['slr_dns_tcp_pfailed'])) ? 'red-bg' : null
 );
 
 // RDDS Service Availability and Query RTT.
@@ -149,7 +149,7 @@ if (array_key_exists('slv_rdds_downtime', $data) && $data['slv_rdds_downtime'] !
 				$data['slr_rdds_rtt_downtime']
 			)
 		],
-		($data['slv_rdds_rtt_downtime'] < (100 - $data['slr_rdds_rtt_downtime'])) ? 'red-bg' : null
+		((100 - $data['slv_rdds_rtt_downtime']) >= (100 - $data['slr_rdds_rtt_downtime'])) ? 'red-bg' : null
 	);
 }
 
