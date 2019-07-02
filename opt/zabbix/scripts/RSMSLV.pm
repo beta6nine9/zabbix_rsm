@@ -4555,6 +4555,8 @@ sub __fp_generate_report($$)
 	push(@args, "--year"     , int($year));
 	push(@args, "--month"    , int($month));
 
+	@args = map('"' . $_ . '"', @args);
+
 	dbg("executing $cmd @args");
 	my $out = qx($cmd @args 2>&1);
 
