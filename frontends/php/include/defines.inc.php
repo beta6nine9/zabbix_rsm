@@ -22,10 +22,10 @@
 define('ZABBIX_VERSION',		'3.0.10');
 define('ZABBIX_API_VERSION',	'3.0.10');
 define('ZABBIX_EXPORT_VERSION',	'3.0');
-define('ZABBIX_DB_VERSION',		3000133);
+define('ZABBIX_DB_VERSION',		3000403);
 
 define('ZABBIX_COPYRIGHT_FROM',	'2001');
-define('ZABBIX_COPYRIGHT_TO',	'2017');
+define('ZABBIX_COPYRIGHT_TO',	'2019');
 
 define('ZBX_LOGIN_ATTEMPTS',	5);
 define('ZBX_LOGIN_BLOCK',		30); // sec
