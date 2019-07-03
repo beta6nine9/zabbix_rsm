@@ -4799,6 +4799,57 @@ static int	DBpatch_3000503(void)
 	return SUCCEED;
 }
 
+static int	DBpatch_3000504(void)
+{
+	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
+		return SUCCEED;
+
+	/* constant IDs are from data.tmpl */
+
+	if (FAIL == add_global_macro_history_item(100032, 100032, "RSM.INCIDENT.RDAP.FAIL"))
+	{
+		return FAIL;
+	}
+	if (FAIL == add_global_macro_history_item(100033, 100033, "RSM.INCIDENT.RDAP.RECOVER"))
+	{
+		return FAIL;
+	}
+	if (FAIL == add_global_macro_history_item(100034, 100034, "RSM.RDAP.DELAY"))
+	{
+		return FAIL;
+	}
+	if (FAIL == add_global_macro_history_item(100035, 100035, "RSM.RDAP.MAXREDIRS"))
+	{
+		return FAIL;
+	}
+	if (FAIL == add_global_macro_history_item(100036, 100036, "RSM.RDAP.PROBE.ONLINE"))
+	{
+		return FAIL;
+	}
+	if (FAIL == add_global_macro_history_item(100037, 100037, "RSM.RDAP.ROLLWEEK.SLA"))
+	{
+		return FAIL;
+	}
+	if (FAIL == add_global_macro_history_item(100038, 100038, "RSM.RDAP.RTT.HIGH"))
+	{
+		return FAIL;
+	}
+	if (FAIL == add_global_macro_history_item(100039, 100039, "RSM.RDAP.RTT.LOW"))
+	{
+		return FAIL;
+	}
+	if (FAIL == add_global_macro_history_item(100040, 100040, "RSM.SLV.RDAP.DOWNTIME"))
+	{
+		return FAIL;
+	}
+	if (FAIL == add_global_macro_history_item(100041, 100041, "RSM.SLV.RDAP.RTT"))
+	{
+		return FAIL;
+	}
+
+	return SUCCEED;
+}
+
 #endif
 
 DBPATCH_START(3000)
@@ -4911,5 +4962,6 @@ DBPATCH_ADD(3000500, 0, 0)	/* Phase 4, version 2.0.0 */
 DBPATCH_ADD(3000501, 0, 0)	/* add macros, items and triggers for Standalone RDAP */
 DBPATCH_ADD(3000502, 0, 0)	/* add {$RSM.RDAP.ENABLED} macro on probes */
 DBPATCH_ADD(3000503, 0, 0)	/* replace {$RSM.RDDS.*} with {$RSM.RDAP.*} in rdap[] keys */
+DBPATCH_ADD(3000504, 0, 0)	/* add RDAP-related macros to Global macro history */
 
 DBPATCH_END()

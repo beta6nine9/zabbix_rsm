@@ -14,9 +14,9 @@ use RSM;
 use RSMSLV;
 use TLD_constants qw(:api);
 
-my $cfg_keys_in_pattern = 'rsm.rdds[{$RSM.TLD}';
+use constant SLV_ITEM_KEY_RDAP_AVAIL	=> 'rsm.slv.rdap.avail';
+
 my $cfg_rdap_key_in = 'rdap[';
-my $cfg_key_out = 'rsm.slv.rdds.avail';
 my $cfg_value_type = ITEM_VALUE_TYPE_UINT64;
 
 parse_slv_opts();
@@ -26,13 +26,15 @@ set_slv_config(get_rsm_config());
 
 db_connect();
 
-# we don't know the cycle bounds yet so we assume it ends at least few minutes back
+slv_exit(SUCCESS) if (!is_rdap_standalone(getopt('now')));
+
+# get cycle length
 my $delay = get_rdds_delay(getopt('now') // time() - AVAIL_SHIFT_BACK);
 
 # get timestamp of the beginning of the latest cycle
 my (undef, undef, $max_clock) = get_cycle_bounds($delay, getopt('now'));
 
-my $cfg_minonline = get_macro_rdds_probe_online();
+my $cfg_minonline = get_macro_rdap_probe_online();
 
 my $tlds_ref;
 if (opt('tld'))
@@ -43,64 +45,40 @@ if (opt('tld'))
 }
 else
 {
-	$tlds_ref = get_tlds('RDDS', $max_clock);
+	$tlds_ref = get_tlds('RDAP', $max_clock);
 }
 
 slv_exit(SUCCESS) if (scalar(@{$tlds_ref}) == 0);
 
+# assume all cycles calculated by collect_slv_cycles() fall into period after standalone RDAP switch
+# because rsm.slv.rdap.avail should not have any values collected before the switch
+
 my $cycles_ref = collect_slv_cycles(
 	$tlds_ref,
 	$delay,
-	$cfg_key_out,
+	SLV_ITEM_KEY_RDAP_AVAIL,
 	ITEM_VALUE_TYPE_UINT64,
 	$max_clock,
-	(opt('cycles') ? getopt('cycles') : slv_max_cycles('rdds'))
+	(opt('cycles') ? getopt('cycles') : slv_max_cycles('rdap'))
 );
 
 slv_exit(SUCCESS) if (keys(%{$cycles_ref}) == 0);
 
-# split $cycles_ref into two hashes - $cycles_ref for all cycles w/o standalone RDAP and 
-# %cycles_rdap_standalone for timestamps that fall into period after switch standalone RDAP
-
-my %cycles_rdap_standalone = map {
-	is_rdap_standalone($_) ? ( $_ => delete ${$cycles_ref}{$_}) : ()
-} keys %{$cycles_ref};
-
-my $probes_ref = get_probes('RDDS');
+my $probes_ref = get_probes('RDAP');
 
 # process cycles before standalone RDAP switch, if any
 
-if (keys(%{$cycles_ref}) > 0)
-{
-	process_slv_avail_cycles(
-		$cycles_ref,
-		$probes_ref,
-		$delay,
-		undef,			# input keys are unknown
-		\&cfg_keys_in_cb,	# callback to get input keys
-		$cfg_key_out,
-		$cfg_minonline,
-		\&check_probe_values,
-		$cfg_value_type
-	);
-}
-
-# process cycles after standalone RDAP switch, if any
-
-if (keys(%cycles_rdap_standalone) > 0)
-{
-	process_slv_avail_cycles(
-		\%cycles_rdap_standalone,
-		$probes_ref,
-		$delay,
-		undef,					# input keys are unknown
-		\&cfg_keys_in_cb_rdap_standalone,	# callback to get input keys
-		$cfg_key_out,
-		$cfg_minonline,
-		\&check_probe_values,
-		$cfg_value_type
-	);
-}
+process_slv_avail_cycles(
+	$cycles_ref,
+	$probes_ref,
+	$delay,
+	undef,			# input keys are unknown
+	\&cfg_keys_in_cb,	# callback to get input keys
+	SLV_ITEM_KEY_RDAP_AVAIL,
+	$cfg_minonline,
+	\&check_probe_values,
+	$cfg_value_type
+);
 
 slv_exit(SUCCESS);
 
@@ -112,20 +90,7 @@ sub cfg_keys_in_cb($)
 
 	$rdap_items = get_templated_items_like("RDAP", $cfg_rdap_key_in) unless (defined($rdap_items));
 
-	# get all RDDS rtt items
-	my $cfg_keys_in = get_templated_items_like($tld, $cfg_keys_in_pattern);
-
-	# add RDAP rtt items
-	push(@{$cfg_keys_in}, @{$rdap_items});
-
-	return $cfg_keys_in;
-}
-
-sub cfg_keys_in_cb_rdap_standalone($)
-{
-	my $tld = shift;
-
-	return get_templated_items_like($tld, $cfg_keys_in_pattern);
+	return $rdap_items;
 }
 
 # SUCCESS - no values or at least one successful value
@@ -143,7 +108,7 @@ sub check_probe_values
 
 	if (scalar(keys(%{$values_ref})) == 0)
 	{
-		fail("THIS SHOULD NEVER HAPPEN rsm.slv.rdds.avail.pl:check_probe_values()");
+		fail("THIS SHOULD NEVER HAPPEN rsm.slv.rdap.avail.pl:check_probe_values()");
 	}
 
 	# all of received items (rsm.rdds, rdap) must have status UP in order for RDDS to be considered UP
