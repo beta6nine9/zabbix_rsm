@@ -44,7 +44,7 @@ check_fields($fields);
  */
 if (hasRequest('filter_set')) {
 	CProfile::update('web.rsm.slareports.filter_search', getRequest('filter_search'), PROFILE_TYPE_STR);
-	CProfile::update('web.rsm.slareports.filter_year', getRequest('filter_year'), PROFILE_TYPE_INT);
+	CProfile::update('web.rsm.slareports.filter_year', (int) getRequest('filter_year'), PROFILE_TYPE_INT);
 	CProfile::update('web.rsm.slareports.filter_month', (int) getRequest('filter_month'), PROFILE_TYPE_INT);
 }
 elseif (hasRequest('filter_rst')) {

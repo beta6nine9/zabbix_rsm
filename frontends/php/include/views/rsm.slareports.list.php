@@ -62,12 +62,13 @@ if (!array_key_exists('details', $data)) {
 // TLD details.
 $date_from = date(DATE_TIME_FORMAT_SECONDS, zbxDateToTime($data['details']['from']));
 $date_till = date(DATE_TIME_FORMAT_SECONDS, zbxDateToTime($data['details']['to']));
+$date_generated = date(DATE_TIME_FORMAT_SECONDS, zbxDateToTime($data['details']['generated']));
 
 $widget->additem((new CDiv())
 	->addClass(ZBX_STYLE_TABLE_FORMS_CONTAINER)
 	->addItem([
 		bold(_s('Period: %1$s - %2$s', $date_from, $date_till)), BR(),
-		bold(_s('Generation time: %1$s', gmdate('dS F Y, H:i:s e', $data['details']['generated']))), BR(),
+		bold(_s('Generation time: %1$s', $date_generated)), BR(),
 		bold(_s('TLD: %1$s', $data['tld']['name'])), BR(),
 		bold(_('Server: ')), new CLink($data['server'], $data['rolling_week_url'])
 	])
