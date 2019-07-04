@@ -1,6 +1,7 @@
 Changes for rsm1.3.0rc3
 
 Bug fixes:
+..F....... [534] fixed reset button; made filter values to be stored in user profile (miks)
 ....I..... [527] fixed quotting arguments when calling script.py; fixed cron job that calls sla-monthly-status.pl (asitals)
 ....I..... [525] fixed error reporting when disabling TLD with tld.pl (asitals)
 ....I..... [526] add SLV items when adding new NS,IP pair with tld.pl --update-nsservers (asitals)

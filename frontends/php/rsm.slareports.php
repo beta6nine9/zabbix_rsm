@@ -33,18 +33,35 @@ $fields = [
 	'filter_set' =>		[T_ZBX_STR, O_OPT,  null,	null,		null],
 	'filter_search' =>	[T_ZBX_STR, O_OPT,  null,	null,		null],
 	'filter_year' =>	[T_ZBX_INT, O_OPT,  null,	null,		null],
-	'filter_month' =>	[T_ZBX_INT, O_OPT,  null,	null,		null]
+	'filter_month' =>	[T_ZBX_INT, O_OPT,  null,	null,		null],
+	'filter_rst' =>		[T_ZBX_STR, O_OPT,  null,	null,		null],
 ];
 
 check_fields($fields);
+
+/*
+ * Filter
+ */
+if (hasRequest('filter_set')) {
+	CProfile::update('web.rsm.slareports.filter_search', getRequest('filter_search'), PROFILE_TYPE_STR);
+	CProfile::update('web.rsm.slareports.filter_year', getRequest('filter_year'), PROFILE_TYPE_INT);
+	CProfile::update('web.rsm.slareports.filter_month', (int) getRequest('filter_month'), PROFILE_TYPE_INT);
+}
+elseif (hasRequest('filter_rst')) {
+	DBStart();
+	CProfile::delete('web.rsm.slareports.filter_search');
+	CProfile::delete('web.rsm.slareports.filter_year');
+	CProfile::delete('web.rsm.slareports.filter_month');
+	DBend();
+}
 
 $data = [
 	'tld' => [],
 	'url' => '',
 	'sid' => CWebUser::getSessionCookie(),
-	'filter_search' => getRequest('filter_search'),
-	'filter_year' => (int) getRequest('filter_year', date('Y')),
-	'filter_month' => (int) getRequest('filter_month', date('n'))
+	'filter_search' => CProfile::get('web.rsm.slareports.filter_search'),
+	'filter_year' => (int) CProfile::get('web.rsm.slareports.filter_year', date('Y')),
+	'filter_month' => (int) CProfile::get('web.rsm.slareports.filter_month', date('n')),
 ];
 
 /*
