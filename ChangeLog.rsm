@@ -1,6 +1,7 @@
 Changes for rsm1.3.0rc3
 
 Bug fixes:
+..F....... [532] fixed incorrect label formatting in incidents page; fixed default value of selected hostids in latest data page (miks)
 ..F....... [532] fixed date and time format in SLA report page (miks)
 ..F....... [534] fixed reset button; made filter values to be stored in user profile (miks)
 ....I..... [527] fixed quotting arguments when calling script.py; fixed cron job that calls sla-monthly-status.pl (asitals)
