@@ -96,7 +96,7 @@ $filter = [
 	'showDetails' => CProfile::get('web.latest.filter.show_details'),
 	'application' => CProfile::get('web.latest.filter.application', ''),
 	'groupids' => CProfile::getArray('web.latest.filter.groupids'),
-	'hostids' => CProfile::getArray('web.latest.filter.hostids')
+	'hostids' => CProfile::getArray('web.latest.filter.hostids', [])
 ];
 
 // we'll need to hide the host column if only one host is selected
