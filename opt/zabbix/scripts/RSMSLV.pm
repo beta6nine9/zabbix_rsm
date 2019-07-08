@@ -4073,194 +4073,34 @@ sub recalculate_downtime($$$$$$)
 	# get list of events.eventid (incidents) that changed their "false positive" state
 	my @eventids = __fp_get_updated_eventids(\$last_auditlog_auditid);
 
+	# process incidents
 	if (@eventids)
 	{
-		# $report_updates = [[host, clock, incident, $false_positive], ...]
+		# my @report_updates = ([host, clock, incident, $false_positive], ...)
 		# One incident may start on one month, end on the next month.
 		# One incident may result in recalculating history of multiple items (downtime of DNS nameservers).
 		# In these cases, there will be more than 1 entry in @report_updates for an incident.
+		# __fp_regenerate_reports() must take care of removing "duplicates" from @report_updates.
 		my @report_updates = ();
 
-		# process incidents
 		foreach my $eventid (@eventids)
 		{
-			dbg("processing incident #$eventid");
-
-			# get info about an incident that changed its false positiveness
-
-			my ($triggerid, $from, $till, $rsmhostid, $rsmhost, $itemid, $key, $false_positive) = __fp_get_incident_info($eventid);
-
-			# check incident's item key to make sure that $service is related to this incident
-
-			my $skip = 0;
-			$skip = 1 if ($service eq 'DNS.NS' && $key ne 'rsm.slv.dns.avail');
-			$skip = 1 if ($service ne 'DNS.NS' && $key ne $item_key_avail);
-			if ($skip)
-			{
-				dbg("skipping incident #$eventid (\$service = '$service', \$item_key_avail = '$item_key_avail', incident's \$key = '$key')");
-				next;
-			}
-
-			# get $itemid_avail => $itemid_downtime map of items that have to be recalculated
-
-			my %itemids_map = __fp_get_itemids_map($service, $rsmhostid, $item_key_avail, $item_key_downtime);
-
-			# process each item
-
-			foreach my $itemid_avail (keys(%itemids_map))
-			{
-				my $itemid_downtime = $itemids_map{$itemid_avail};
-
-				# determine time interval that has to be recalculated
-
-				my $recalculate_from = cycle_start($from, $delay);
-				my $recalculate_till = cycle_start(get_end_of_month($till), $delay) if (defined($till));
-
-				my $lastclock = db_select_value("select clock from lastvalue where itemid=?", [$itemid_downtime]);
-				$recalculate_till = defined($recalculate_till) ? min($recalculate_till, $lastclock) : $lastclock;
-
-				dbg("eventid          - ", $eventid);
-				dbg("triggerid        - ", $triggerid);
-				dbg("itemid_avail     - ", $itemid_avail);
-				dbg("itemid_downtime  - ", $itemid_downtime);
-				dbg("incident from    - ", defined($from) ? ts_full($from) : 'undef');
-				dbg("incident till    - ", defined($till) ? ts_full($till) : 'undef');
-				dbg("recalculate from - ", defined($recalculate_from) ? ts_full($recalculate_from) : 'undef');
-				dbg("recalculate till - ", defined($recalculate_till) ? ts_full($recalculate_till) : 'undef');
-
-				# get downtime clocks & values right before the updated incident
-
-				dbg("getting last downtime data before the incident...");
-
-				my %downtime = __fp_get_history_values($itemid_downtime, $recalculate_from - $delay);
-
-				if (!%downtime)
-				{
-					dbg("skipping incident #$eventid for item #$itemid_downtime (was too long ago, not enough data for recalculating hitsory)");
-					next;
-				}
-
-				# get availability data
-
-				dbg("getting availability data...");
-
-				my %avail = __fp_get_history_values(
-					$itemid_avail,
-					$recalculate_from - $delay * ($incident_fail - 1),
-					$recalculate_till
-				);
-
-				for (my $clock = $recalculate_from - $delay * ($incident_fail - 1); $clock <= $recalculate_till; $clock += $delay)
-				{
-					if (!exists($avail{$clock}))
-					{
-						$clock = ts_full($clock);
-						fail("missing availability data (\$itemid = $itemid, \$clock = $clock)");
-					}
-				}
-
-				# update availability data, based on false positive incidents
-
-				dbg("getting time ranges of false positive incidents...");
-
-				my @fp_ranges = __fp_get_false_positive_ranges($triggerid, $recalculate_from, $recalculate_till);
-
-				foreach my $fp_range (@fp_ranges)
-				{
-					my ($fp_from, $fp_till) = @{$fp_range};
-
-					if (!defined($fp_till) || $fp_till > $recalculate_till)
-					{
-						$fp_till = $recalculate_till;
-					}
-
-					for (my $clock = $fp_from; $clock <= $fp_till; $clock += $delay)
-					{
-						$avail{$clock} = UP;
-					}
-				}
-
-				# recalculate downtime
-
-				my @downtime_values = ();
-
-				my $downtime_value = $downtime{$recalculate_from - $delay};
-				my $is_incident = 0;
-				my $counter = 0;
-				my $beginning_of_next_month = cycle_start(get_end_of_month($recalculate_from - $delay), $delay) + $delay;
-
-				push(@report_updates, [$rsmhost, $recalculate_from, $eventid, $false_positive]);
-
-				# Start the loop few cycles before $from to find out if $from cycle is in incident.
-				# This may happen if $from is the first cycle of the month and incident started in previous month.
-				# Potential bug - if incident has "up, down, up, down, up, down, ..." pattern, it won't be detected.
-
-				dbg("recalculating downtime values...");
-
-				for (my $clock = $recalculate_from - $delay * ($incident_fail - 1); $clock <= $recalculate_till; $clock += $delay)
-				{
-					if (!defined($avail{$clock}))
-					{
-						fail("failed to update history, missing availability data (itemid: $itemid_avail; clock: $clock)");
-					}
-
-					__fp_update_incident_state($incident_fail, $incident_recover, $avail{$clock}, \$counter, \$is_incident);
-
-					if ($clock >= $recalculate_from)
-					{
-						if ($clock == $beginning_of_next_month)
-						{
-							$downtime_value = 0;
-							$beginning_of_next_month = cycle_start(get_end_of_month($clock), $delay) + $delay;
-							push(@report_updates, [$rsmhost, $clock, $eventid, $false_positive]);
-						}
-
-						if ($is_incident && $avail{$clock} == DOWN)
-						{
-							$downtime_value += $delay / 60;
-						}
-
-						push(@downtime_values, [$clock, $downtime_value]);
-					}
-				}
-
-				# store new downtime values
-
-				dbg("updating downtime values...");
-
-				my $debug = opt('debug');
-				unsetopt('debug');
-
-				db_mass_update(
-					"history_uint",
-					["clock", "value"],
-					\@downtime_values,
-					["clock"],
-					[['itemid', $itemid_downtime]]
-				);
-
-				setopt('debug', 1) if ($debug);
-
-				# update lastvalue if necessary
-
-				if ($recalculate_till == $lastclock)
-				{
-					dbg("updating lastvalue of itemid $itemid_downtime...");
-					my $sql = "update" .
-							" lastvalue" .
-							" inner join history_uint on history_uint.itemid=lastvalue.itemid and history_uint.clock=lastvalue.clock" .
-						" set lastvalue.value=history_uint.value" .
-						" where lastvalue.itemid=?";
-					db_exec($sql, [$itemid_downtime]);
-				}
-			}
+			__fp_process_incident(
+				$service,
+				$eventid,
+				$item_key_avail,
+				$item_key_downtime,
+				$incident_fail,
+				$incident_recover,
+				$delay,
+				\@report_updates
+			);
 		}
 
 		__fp_regenerate_reports($service, \@report_updates);
-
-		fail("done");
 	}
 
+	# save last auditid (it may have changed even if @eventids is empty)
 	__fp_write_last_auditid($auditlog_log_file, $last_auditlog_auditid);
 }
 
@@ -4358,6 +4198,187 @@ sub __fp_get_updated_eventids($)
 	}
 
 	return sort { $a <=> $b } @eventids;
+}
+
+sub __fp_process_incident($$$$$$$)
+{
+	my $service            = shift;
+	my $eventid            = shift;
+	my $item_key_avail     = shift;
+	my $item_key_downtime  = shift;
+	my $incident_fail      = shift;
+	my $incident_recover   = shift;
+	my $delay              = shift;
+	my $report_updates_ref = shift;
+
+	dbg("processing incident #$eventid");
+
+	# get info about an incident that changed its false positiveness
+
+	my ($triggerid, $incident_from, $incident_till, $rsmhostid, $rsmhost, $itemid, $key, $false_positive) = __fp_get_incident_info($eventid);
+
+	# check incident's item key to make sure that $service is related to this incident
+
+	my $skip = 0;
+	$skip = 1 if ($service eq 'DNS.NS' && $key ne 'rsm.slv.dns.avail');
+	$skip = 1 if ($service ne 'DNS.NS' && $key ne $item_key_avail);
+	if ($skip)
+	{
+		dbg("skipping incident #$eventid (\$service = '$service', \$item_key_avail = '$item_key_avail', incident's \$key = '$key')");
+		return;
+	}
+
+	# get $itemid_avail => $itemid_downtime map of items that have to be recalculated
+
+	my %itemids_map = __fp_get_itemids_map($service, $rsmhostid, $item_key_avail, $item_key_downtime);
+
+	# process each item
+
+	while (my ($itemid_avail, $itemid_downtime) = each(%itemids_map))
+	{
+		# determine time interval that has to be recalculated
+
+		my $recalculate_from = cycle_start($incident_from, $delay);
+		my $recalculate_till = cycle_start(get_end_of_month($incident_till), $delay) if (defined($incident_till));
+
+		my $lastclock = db_select_value("select clock from lastvalue where itemid=?", [$itemid_downtime]);
+		$recalculate_till = defined($recalculate_till) ? min($recalculate_till, $lastclock) : $lastclock;
+
+		dbg("eventid          - ", $eventid);
+		dbg("triggerid        - ", $triggerid);
+		dbg("itemid_avail     - ", $itemid_avail);
+		dbg("itemid_downtime  - ", $itemid_downtime);
+		dbg("incident from    - ", defined($incident_from) ? ts_full($incident_from) : 'undef');
+		dbg("incident till    - ", defined($incident_till) ? ts_full($incident_till) : 'undef');
+		dbg("recalculate from - ", defined($recalculate_from) ? ts_full($recalculate_from) : 'undef');
+		dbg("recalculate till - ", defined($recalculate_till) ? ts_full($recalculate_till) : 'undef');
+
+		# get downtime clock & value right before the updated incident
+
+		dbg("getting last downtime data before the incident...");
+
+		my %downtime = __fp_get_history_values($itemid_downtime, $recalculate_from - $delay);
+
+		if (!%downtime)
+		{
+			dbg("skipping incident #$eventid for item #$itemid_downtime (was too long ago, not enough data for recalculating hitsory)");
+			next;
+		}
+
+		# get availability data
+
+		dbg("getting availability data...");
+
+		my %avail = __fp_get_history_values(
+			$itemid_avail,
+			$recalculate_from - $delay * ($incident_fail - 1),
+			$recalculate_till
+		);
+
+		for (my $clock = $recalculate_from - $delay * ($incident_fail - 1); $clock <= $recalculate_till; $clock += $delay)
+		{
+			if (!exists($avail{$clock}))
+			{
+				$clock = ts_full($clock);
+				fail("missing availability data (\$itemid = $itemid, \$clock = $clock)");
+			}
+		}
+
+		# update availability data, based on false positive incidents
+
+		dbg("getting time ranges of false positive incidents...");
+
+		my @fp_ranges = __fp_get_false_positive_ranges($triggerid, $recalculate_from, $recalculate_till);
+
+		foreach my $fp_range (@fp_ranges)
+		{
+			my ($fp_from, $fp_till) = @{$fp_range};
+
+			if (!defined($fp_till) || $fp_till > $recalculate_till)
+			{
+				$fp_till = $recalculate_till;
+			}
+
+			for (my $clock = $fp_from; $clock <= $fp_till; $clock += $delay)
+			{
+				$avail{$clock} = UP;
+			}
+		}
+
+		# recalculate downtime
+
+		my @downtime_values = ();
+
+		my $downtime_value = $downtime{$recalculate_from - $delay};
+		my $is_incident = 0;
+		my $counter = 0;
+		my $beginning_of_next_month = cycle_start(get_end_of_month($recalculate_from - $delay), $delay) + $delay;
+
+		push(@{$report_updates_ref}, [$rsmhost, $recalculate_from, $eventid, $false_positive]);
+
+		# Start the loop few cycles before $from to find out if $from cycle is in incident.
+		# This may happen if $from is the first cycle of the month and incident started in previous month.
+		# Potential bug - if incident has "up, down, up, down, up, down, ..." pattern, it won't be detected.
+
+		dbg("recalculating downtime values...");
+
+		for (my $clock = $recalculate_from - $delay * ($incident_fail - 1); $clock <= $recalculate_till; $clock += $delay)
+		{
+			if (!defined($avail{$clock}))
+			{
+				fail("failed to update history, missing availability data (itemid: $itemid_avail; clock: $clock)");
+			}
+
+			__fp_update_incident_state($incident_fail, $incident_recover, $avail{$clock}, \$counter, \$is_incident);
+
+			if ($clock >= $recalculate_from)
+			{
+				if ($clock == $beginning_of_next_month)
+				{
+					$downtime_value = 0;
+					$beginning_of_next_month = cycle_start(get_end_of_month($clock), $delay) + $delay;
+					push(@{$report_updates_ref}, [$rsmhost, $clock, $eventid, $false_positive]);
+				}
+
+				if ($is_incident && $avail{$clock} == DOWN)
+				{
+					$downtime_value += $delay / 60;
+				}
+
+				push(@downtime_values, [$clock, $downtime_value]);
+			}
+		}
+
+		# store new downtime values
+
+		dbg("updating downtime values...");
+
+		my $debug = opt('debug');
+		unsetopt('debug');
+
+		db_mass_update(
+			"history_uint",
+			["clock", "value"],
+			\@downtime_values,
+			["clock"],
+			[['itemid', $itemid_downtime]]
+		);
+
+		setopt('debug', 1) if ($debug);
+
+		# update lastvalue if necessary
+
+		if ($recalculate_till == $lastclock)
+		{
+			dbg("updating lastvalue of itemid $itemid_downtime...");
+			my $sql = "update" .
+					" lastvalue" .
+					" inner join history_uint on history_uint.itemid=lastvalue.itemid and history_uint.clock=lastvalue.clock" .
+				" set lastvalue.value=history_uint.value" .
+				" where lastvalue.itemid=?";
+			db_exec($sql, [$itemid_downtime]);
+		}
+	}
 }
 
 sub __fp_get_incident_info($)
@@ -4611,16 +4632,14 @@ sub __fp_regenerate_reports($$)
 		$report_updates{$rsmhost}{$clock}{$incidentid} = $false_positive;
 	}
 
-	foreach my $host (sort(keys(%report_updates)))
+	foreach my $rsmhost (sort(keys(%report_updates)))
 	{
-		foreach my $clock (sort {$a <=> $b} keys(%{$report_updates{$host}}))
+		foreach my $clock (sort {$a <=> $b} keys(%{$report_updates{$rsmhost}}))
 		{
-			__fp_generate_report($host, $clock);
-
 			my @incidents = ();
-			foreach my $incidentid (keys(%{$report_updates{$host}{$clock}}))
+			foreach my $incidentid (keys(%{$report_updates{$rsmhost}{$clock}}))
 			{
-				if ($report_updates{$host}{$clock}{$incidentid})
+				if ($report_updates{$rsmhost}{$clock}{$incidentid})
 				{
 					push(@incidents, "incident $incidentid was marked as false-positive");
 				}
@@ -4633,9 +4652,46 @@ sub __fp_regenerate_reports($$)
 			my $month = ts_ym($clock);
 			my $reason = join(", ", @incidents);
 
-			__fp_log($host, $service, "regenerated report for $month because $reason");
+			# To safely regenerate the repots, we may need data since the beginning of the month, e.g.,
+			# period when name servers were tested might be determined by reading min/max timestamps of RTT
+			# checks during the month. Therefore, it's important to check if we have the data since the
+			# beginning of the month before trying to regenerate the report.
+
+			my $oldest_clock = max(
+				__fp_get_oldest_clock($rsmhost, 'history'),
+				__fp_get_oldest_clock($rsmhost, 'history_uint')
+			);
+
+			if ($clock >= $oldest_clock)
+			{
+				__fp_generate_report($rsmhost, $clock);
+				__fp_log($rsmhost, $service, "regenerated report for $month ($reason)");
+			}
+			else
+			{
+				__fp_log($rsmhost, $service, "could not regenerate report for $month, not enough data in the database ($reason)");
+			}
 		}
 	}
+}
+
+sub __fp_get_oldest_clock($$)
+{
+	my $rsmhost = shift;
+	my $table   = shift;
+
+	my $sql = "select" .
+			" min(clock)" .
+		" from" .
+			" $table" .
+			" left join items on items.itemid=$table.itemid" .
+			" left join hosts on hosts.hostid=items.hostid" .
+		" where" .
+			" hosts.host=?";
+
+	my $params = [$rsmhost];
+
+	return db_select_value($sql, $params);
 }
 
 sub __fp_generate_report($$)
