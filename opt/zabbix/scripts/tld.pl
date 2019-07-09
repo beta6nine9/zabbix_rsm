@@ -1221,7 +1221,7 @@ sub create_slv_items($$$)
 	{
 		create_slv_item('Number of performed monthly RDDS queries', 'rsm.slv.rdds.rtt.performed', $hostid, VALUE_TYPE_NUM , [get_application_id(APP_SLV_CURMON, $hostid)]);
 		create_slv_item('Number of failed monthly RDDS queries'   , 'rsm.slv.rdds.rtt.failed'   , $hostid, VALUE_TYPE_NUM , [get_application_id(APP_SLV_CURMON, $hostid)]);
-		create_slv_item('Ratio of failed monthly RDDS queries  '  , 'rsm.slv.rdds.rtt.pfailed'  , $hostid, VALUE_TYPE_PERC, [get_application_id(APP_SLV_CURMON, $hostid)]);
+		create_slv_item('Ratio of failed monthly RDDS queries'    , 'rsm.slv.rdds.rtt.pfailed'  , $hostid, VALUE_TYPE_PERC, [get_application_id(APP_SLV_CURMON, $hostid)]);
 
 		create_dependent_trigger_chain($host_name, 'RDDS', \&create_ratio_of_failed_tests_trigger, $trigger_thresholds);
 	}

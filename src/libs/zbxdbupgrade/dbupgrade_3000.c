@@ -4295,6 +4295,22 @@ static int	DBpatch_3000318(void)
 	return SUCCEED;
 }
 
+static int	DBpatch_3000319(void)
+{
+	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
+		return SUCCEED;
+
+	if (ZBX_DB_OK > DBexecute(
+			"update items"
+			" set name='Ratio of failed monthly RDDS queries'"
+			" where name like 'Ratio of failed monthly RDDS queries %'"))
+	{
+		return FAIL;
+	}
+
+	return SUCCEED;
+}
+
 #endif
 
 DBPATCH_START(3000)
@@ -4399,5 +4415,6 @@ DBPATCH_ADD(3000315, 0, 0)	/* fix item value_type for rsm.slv.dns.ns.* to uint *
 DBPATCH_ADD(3000316, 0, 0)	/* set RSM.DNS.TCP.DELAY macro to 1h, set update interval of rsm.dns.tcp[%] items to 1h */
 DBPATCH_ADD(3000317, 0, 0)	/* set update interval of items in "Global macro history" host to 60 seconds */
 DBPATCH_ADD(3000318, 0, 0)	/* add new items to "Global macro history" host */
+DBPATCH_ADD(3000319, 0, 0)	/* remove trailing spaces from "Ratio of failed monthly RDDS queries" item names */
 
 DBPATCH_END()
