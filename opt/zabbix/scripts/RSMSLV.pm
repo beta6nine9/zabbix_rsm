@@ -4614,6 +4614,8 @@ sub __fp_regenerate_reports($$)
 	my $service            = shift;
 	my $report_updates_ref = shift;
 
+	require DateTime;
+
 	my %report_updates = ();
 
 	my $curr_month = DateTime->now()->truncate('to' => 'month')->epoch();
