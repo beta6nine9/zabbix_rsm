@@ -23,6 +23,8 @@ function main($argv)
 		}
 	}
 
+	printf("Generating reports (server-id: %d, year: %d, month: %d)\n", $args["server_id"], $args["year"], $args["month"]);
+
 	$reports = CSlaReport::generate($args["server_id"], $args["tlds"], $args["year"], $args["month"]);
 	if (is_null($reports))
 	{
@@ -42,6 +44,8 @@ function main($argv)
 	{
 		try
 		{
+			print("Saving reports to the database");
+
 			CSlaReport::dbConnect($args["server_id"]);
 
 			CSlaReport::dbBeginTransaction();
@@ -174,18 +178,59 @@ function parseArgs($argv)
 
 	if (is_null($args["server_id"]))
 	{
-		usage($script, "Missing argument: --server-id");
+		$args["server_id"] = getLocalServerId();
 	}
+
 	if (is_null($args["year"]))
 	{
-		usage($script, "Missing argument: --year");
+		$args["year"] = (int)date("Y");
 	}
+
 	if (is_null($args["month"]))
 	{
-		usage($script, "Missing argument: --month");
+		$args["month"] = (int)date("n") - 1;
+		if ($args["month"] === 0)
+		{
+			$args["year"]  = $args["year"] - 1;
+			$args["month"] = 12;
+		}
 	}
 
 	return $args;
+}
+
+function getLocalServerId()
+{
+	$conf_file = "/opt/zabbix/scripts/rsm.conf";
+
+	if (!is_file($conf_file))
+	{
+		fail("File not found: {$conf_file}");
+	}
+	if (!is_readable($conf_file))
+	{
+		fail("File is not readable: {$conf_file}");
+	}
+
+	// PHP 5.3.0 - Hash marks (#) should no longer be used as comments and will throw a deprecation warning if used.
+	// PHP 7.0.0 - Hash marks (#) are no longer recognized as comments.
+
+	$conf_string = file_get_contents($conf_file);
+	$conf_string = preg_replace("/^\s*#.*$/m", "", $conf_string);
+
+	$conf = parse_ini_string($conf_string, true);
+
+	if ($conf === false)
+	{
+		fail("Failed to parse {$conf_file}");
+	}
+
+	if (!preg_match("/\d+$/", $conf["local"], $id))
+	{
+		fail("Failed to get ID of local server");
+	}
+
+	return (int)$id[0];
 }
 
 function usage($script, $error_message = NULL)

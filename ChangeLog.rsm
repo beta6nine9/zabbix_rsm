@@ -1,6 +1,7 @@
 Changes for rsm1.3.0rc3
 
 Bug fixes:
+....I..... [533] added default arguments for sla-report.php; added monthly cronjob for sla-report.php (asitals)
 ..F....... [532] fixed incorrect label formatting in incidents page; fixed default value of selected hostids in latest data page (miks)
 ..F....... [532] fixed date and time format in SLA report page (miks)
 ..F....... [534] fixed reset button; made filter values to be stored in user profile (miks)
