@@ -4310,19 +4310,15 @@ sub __fp_process_incident($$$$$$$)
 		my @downtime_values = ();
 
 		my $downtime_value = $downtime{$recalculate_from - $delay};
-		my $is_incident = 0;
+		my $is_incident = $false_positive ? 0 : 1;
 		my $counter = 0;
 		my $beginning_of_next_month = cycle_start(get_end_of_month($recalculate_from - $delay), $delay) + $delay;
 
 		push(@{$report_updates_ref}, [$rsmhost, $recalculate_from, $eventid, $false_positive]);
 
-		# Start the loop few cycles before $from to find out if $from cycle is in incident.
-		# This may happen if $from is the first cycle of the month and incident started in previous month.
-		# Potential bug - if incident has "up, down, up, down, up, down, ..." pattern, it won't be detected.
-
 		dbg("recalculating downtime values...");
 
-		for (my $clock = $recalculate_from - $delay * ($incident_fail - 1); $clock <= $recalculate_till; $clock += $delay)
+		for (my $clock = $recalculate_from; $clock <= $recalculate_till; $clock += $delay)
 		{
 			if (!defined($avail{$clock}))
 			{
@@ -4331,22 +4327,19 @@ sub __fp_process_incident($$$$$$$)
 
 			__fp_update_incident_state($incident_fail, $incident_recover, $avail{$clock}, \$counter, \$is_incident);
 
-			if ($clock >= $recalculate_from)
+			if ($clock == $beginning_of_next_month)
 			{
-				if ($clock == $beginning_of_next_month)
-				{
-					$downtime_value = 0;
-					$beginning_of_next_month = cycle_start(get_end_of_month($clock), $delay) + $delay;
-					push(@{$report_updates_ref}, [$rsmhost, $clock, $eventid, $false_positive]);
-				}
-
-				if ($is_incident && $avail{$clock} == DOWN)
-				{
-					$downtime_value += $delay / 60;
-				}
-
-				push(@downtime_values, [$clock, $downtime_value]);
+				$downtime_value = 0;
+				$beginning_of_next_month = cycle_start(get_end_of_month($clock), $delay) + $delay;
+				push(@{$report_updates_ref}, [$rsmhost, $clock, $eventid, $false_positive]);
 			}
+
+			if ($is_incident && $avail{$clock} == DOWN)
+			{
+				$downtime_value += $delay / 60;
+			}
+
+			push(@downtime_values, [$clock, $downtime_value]);
 		}
 
 		# store new downtime values
@@ -4623,13 +4616,18 @@ sub __fp_regenerate_reports($$)
 
 	my %report_updates = ();
 
+	my $curr_month = DateTime->now()->truncate('to' => 'month')->epoch();
+
 	foreach my $row (@{$report_updates_ref})
 	{
 		my ($rsmhost, $clock, $incidentid, $false_positive) = @{$row};
 
 		$clock = DateTime->from_epoch('epoch' => $clock)->truncate('to' => 'month')->epoch();
 
-		$report_updates{$rsmhost}{$clock}{$incidentid} = $false_positive;
+		if ($clock < $curr_month)
+		{
+			$report_updates{$rsmhost}{$clock}{$incidentid} = $false_positive;
+		}
 	}
 
 	foreach my $rsmhost (sort(keys(%report_updates)))
