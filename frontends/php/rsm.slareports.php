@@ -1,4 +1,6 @@
 <?php
+
+include "../../opt/zabbix/scripts/CSlaReport.php";
 /*
 ** Zabbix
 ** Copyright (C) 2001-2016 Zabbix SIA
@@ -39,30 +41,20 @@ $fields = [
 
 check_fields($fields);
 
-/*
- * Filter
- */
-if (hasRequest('filter_set')) {
-	CProfile::update('web.rsm.slareports.filter_search', getRequest('filter_search'), PROFILE_TYPE_STR);
-	CProfile::update('web.rsm.slareports.filter_year', (int) getRequest('filter_year'), PROFILE_TYPE_INT);
-	CProfile::update('web.rsm.slareports.filter_month', (int) getRequest('filter_month'), PROFILE_TYPE_INT);
-}
-elseif (hasRequest('filter_rst')) {
-	DBStart();
-	CProfile::delete('web.rsm.slareports.filter_search');
-	CProfile::delete('web.rsm.slareports.filter_year');
-	CProfile::delete('web.rsm.slareports.filter_month');
-	DBend();
-}
-
 $data = [
 	'tld' => [],
 	'url' => '',
 	'sid' => CWebUser::getSessionCookie(),
-	'filter_search' => CProfile::get('web.rsm.slareports.filter_search'),
-	'filter_year' => (int) CProfile::get('web.rsm.slareports.filter_year', date('Y')),
-	'filter_month' => (int) CProfile::get('web.rsm.slareports.filter_month', date('n')),
+	'filter_search' => getRequest('filter_search'),
+	'filter_year' => (int) getRequest('filter_year', date('Y')),
+	'filter_month' => (int) getRequest('filter_month', date('n')),
 ];
+
+if (hasRequest('filter_rst')) {
+	$data['filter_search'] = '';
+	$data['filter_year'] = date('Y');
+	$data['filter_month'] = date('n');
+}
 
 /*
  * Filter

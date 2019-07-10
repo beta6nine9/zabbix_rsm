@@ -96,11 +96,11 @@ $filter = [
 	'showDetails' => CProfile::get('web.latest.filter.show_details'),
 	'application' => CProfile::get('web.latest.filter.application', ''),
 	'groupids' => CProfile::getArray('web.latest.filter.groupids'),
-	'hostids' => CProfile::getArray('web.latest.filter.hostids', [])
+	'hostids' => CProfile::getArray('web.latest.filter.hostids')
 ];
 
 // we'll need to hide the host column if only one host is selected
-$singleHostSelected = (count($filter['hostids']) == 1);
+$singleHostSelected = (is_array($filter['hostids']) && count($filter['hostids']) == 1);
 
 $sortField = getRequest('sort', CProfile::get('web.'.$page['file'].'.sort', 'name'));
 $sortOrder = getRequest('sortorder', CProfile::get('web.'.$page['file'].'.sortorder', ZBX_SORT_UP));
