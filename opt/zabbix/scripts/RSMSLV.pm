@@ -124,7 +124,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		process_slv_downtime_cycles
 		uint_value_exists
 		float_value_exists
-		sql_time_condition get_incidents get_downtime get_downtime_prepare get_downtime_execute
+		sql_time_condition get_incidents get_downtime
 		history_table
 		get_lastvalue get_lastvalues_by_itemids get_itemids_by_hostids get_nsip_values
 		get_valuemaps get_statusmaps get_detailed_result
@@ -2455,7 +2455,30 @@ sub process_slv_downtime_cycles($$$$)
 			# skip calculation if Service Availability value is not yet there
 			next if (!opt('dry-run') && !uint_value_exists($value_ts, $itemids{$tld}{'itemid_in'}));
 
-			my $downtime = get_downtime_execute($sth, $itemids{$tld}{'itemid_in'}, $from, $till, 0, $delay);
+			my $downtime;
+			if ($cfg_key_out eq 'rsm.slv.dns.downtime' && $value_ts == $from)
+			{
+				# There's a trigger "DNS service was unavailable for at least 1m", it goes into PROBLEM state
+				# as soon as 'rsm.slv.dns.downtime' is larger than 0. Value of 'rsm.slv.dns.downtime' resets
+				# to 0 at the beginning of each month. This also changes the state of the trigger to OK state
+				# at the beginning of the month.
+				#
+				# If an incident is active when the month switches, then value of 'rsm.slv.dns.downtime'
+				# resets to 0 *and* increases by 1 on the first cycle, because DNS service is down. This
+				# prevents trigger from switching to OK state and then again to PROBLEM state. As a result,
+				# alerts aren't being sent when the month switches.
+				#
+				# Workaround - always store 0 minutes of downtime on the first cycle of the month. This
+				# will make sure that trigger switches to OK state. This must be compensated on the second
+				# cycle of the month (i.e., downtime on the second cycle must be 2 if incident is active
+				# and availability on both first and second cycle of the month is DOWN).
+
+				$downtime = 0;
+			}
+			else
+			{
+				$downtime = get_downtime_execute($sth, $itemids{$tld}{'itemid_in'}, $from, $till, 0, $delay);
+			}
 
 			push_value($tld, $cfg_key_out, $value_ts, $downtime, ts_str($from), " - ", ts_str($till));
 		}
