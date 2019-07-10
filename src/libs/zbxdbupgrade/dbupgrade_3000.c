@@ -4303,7 +4303,7 @@ static int	DBpatch_3000319(void)
 	if (ZBX_DB_OK > DBexecute(
 			"update items"
 			" set name='Ratio of failed monthly RDDS queries'"
-			" where name like 'Ratio of failed monthly RDDS queries %'"))
+			" where name like 'Ratio of failed monthly RDDS queries %%'"))
 	{
 		return FAIL;
 	}
