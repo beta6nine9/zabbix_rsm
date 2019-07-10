@@ -1,6 +1,4 @@
 <?php
-
-include "../../opt/zabbix/scripts/CSlaReport.php";
 /*
 ** Zabbix
 ** Copyright (C) 2001-2016 Zabbix SIA
