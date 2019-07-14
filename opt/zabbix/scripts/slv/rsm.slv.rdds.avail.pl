@@ -59,7 +59,7 @@ my $cycles_ref = collect_slv_cycles(
 
 slv_exit(SUCCESS) if (keys(%{$cycles_ref}) == 0);
 
-# split $cycles_ref into two hashes - $cycles_ref for all cycles w/o standalone RDAP and 
+# split $cycles_ref into two hashes - $cycles_ref for all cycles w/o standalone RDAP and
 # %cycles_rdap_standalone for timestamps that fall into period after switch standalone RDAP
 
 my %cycles_rdap_standalone = map {

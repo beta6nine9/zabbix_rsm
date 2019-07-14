@@ -44,9 +44,9 @@ my (undef, undef, $max_clock) = get_cycle_bounds($delay, getopt('now'));
 my $tlds_ref;
 if (opt('tld'))
 {
-        fail("TLD ", getopt('tld'), " does not exist.") if (tld_exists(getopt('tld')) == 0);
+	fail("TLD ", getopt('tld'), " does not exist.") if (tld_exists(getopt('tld')) == 0);
 
-        $tlds_ref = [ getopt('tld') ];
+	$tlds_ref = [ getopt('tld') ];
 }
 else
 {
