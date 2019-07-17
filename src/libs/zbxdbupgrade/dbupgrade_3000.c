@@ -4782,10 +4782,6 @@ out:
 
 static int	DBpatch_3000503(void)
 {
-	int		ret = FAIL;
-	DB_RESULT	result;
-	DB_ROW		row;
-
 	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
 		return SUCCEED;
 
@@ -4801,53 +4797,85 @@ static int	DBpatch_3000503(void)
 
 static int	DBpatch_3000504(void)
 {
+	DB_RESULT	result = NULL;
+	DB_ROW		row;
+	zbx_uint64_t	cat_id;
+	int		ret = FAIL;
+
 	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
 		return SUCCEED;
 
-	/* constant IDs are from data.tmpl */
+	/* Add necessary extra RDAP macros. Constant IDs are from data.tmpl */
 
 	if (FAIL == add_global_macro_history_item(100032, 100032, "RSM.INCIDENT.RDAP.FAIL"))
 	{
-		return FAIL;
+		goto out;
 	}
 	if (FAIL == add_global_macro_history_item(100033, 100033, "RSM.INCIDENT.RDAP.RECOVER"))
 	{
-		return FAIL;
+		goto out;
 	}
 	if (FAIL == add_global_macro_history_item(100034, 100034, "RSM.RDAP.DELAY"))
 	{
-		return FAIL;
+		goto out;
 	}
 	if (FAIL == add_global_macro_history_item(100035, 100035, "RSM.RDAP.MAXREDIRS"))
 	{
-		return FAIL;
+		goto out;
 	}
 	if (FAIL == add_global_macro_history_item(100036, 100036, "RSM.RDAP.PROBE.ONLINE"))
 	{
-		return FAIL;
+		goto out;
 	}
 	if (FAIL == add_global_macro_history_item(100037, 100037, "RSM.RDAP.ROLLWEEK.SLA"))
 	{
-		return FAIL;
+		goto out;
 	}
 	if (FAIL == add_global_macro_history_item(100038, 100038, "RSM.RDAP.RTT.HIGH"))
 	{
-		return FAIL;
+		goto out;
 	}
 	if (FAIL == add_global_macro_history_item(100039, 100039, "RSM.RDAP.RTT.LOW"))
 	{
-		return FAIL;
+		goto out;
 	}
 	if (FAIL == add_global_macro_history_item(100040, 100040, "RSM.SLV.RDAP.DOWNTIME"))
 	{
-		return FAIL;
+		goto out;
 	}
 	if (FAIL == add_global_macro_history_item(100041, 100041, "RSM.SLV.RDAP.RTT"))
 	{
-		return FAIL;
+		goto out;
 	}
 
-	return SUCCEED;
+	/* add 'rdap' service category for data export */
+
+	if (NULL == (result = DBselect("select id from rsm_service_category where name='rdap'")))
+	{
+		goto out;
+	}
+
+	if (NULL == (row = DBfetch(result)))
+	{
+		if (ZBX_DB_OK > DBexecute("insert into rsm_service_category values(6,'rdap')"))
+		{
+			goto out;
+		}
+	}
+	else
+	{
+		ZBX_STR2UINT64(cat_id, row[0]);
+		if (6 != cat_id)
+		{
+			zabbix_log(LOG_LEVEL_ERR, "'rdap' service category exists, but it's not 6");
+			goto out;
+		}
+	}
+
+	ret = SUCCEED;
+out:
+	DBfree_result(result);
+	return ret;
 }
 
 #endif
