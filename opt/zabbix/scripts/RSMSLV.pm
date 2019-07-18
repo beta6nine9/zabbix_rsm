@@ -1032,8 +1032,8 @@ sub __tld_service_enabled($$$)
 
 	if ($service eq 'rdds')
 	{
-		return 1 if tld_interface_enabled($tld, 'rdds43', $now);
-		return 1 if tld_interface_enabled($tld, 'rdap', $now);
+		return 1 if (tld_interface_enabled($tld, 'rdds43', $now));
+		return 1 if (tld_interface_enabled($tld, 'rdap', $now) && !is_rdap_standalone($now));
 		return 0;
 	}
 	else
