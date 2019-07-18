@@ -55,6 +55,7 @@ use constant PROBE_KEY_AUTOMATIC => 'rsm.probe.status[automatic,%]'; # match all
 use constant RSM_CONFIG_DNS_UDP_DELAY_ITEMID => 100008;	# rsm.configvalue[RSM.DNS.UDP.DELAY]
 use constant RSM_CONFIG_RDDS_DELAY_ITEMID => 100009;	# rsm.configvalue[RSM.RDDS.DELAY]
 use constant RSM_CONFIG_EPP_DELAY_ITEMID => 100010;	# rsm.configvalue[RSM.EPP.DELAY]
+use constant RSM_CONFIG_RDAP_DELAY_ITEMID => 100034;	# rsm.configvalue[RSM.RDAP.DELAY]
 
 # In order to do the calculation we should wait till all the results
 # are available on the server (from proxies). We shift back 2 minutes
@@ -104,6 +105,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		get_dns_udp_delay
 		get_dns_tcp_delay
 		get_rdds_delay
+		get_rdap_delay
 		get_epp_delay
 		get_macro_epp_probe_online
 		get_macro_epp_rollweek_sla
@@ -277,9 +279,16 @@ sub get_rdds_delay
 
 	my $value = __get_configvalue(RSM_CONFIG_RDDS_DELAY_ITEMID, $value_time);
 
-	return $value if (defined($value));
+	return $value // __get_macro('{$RSM.RDDS.DELAY}');
+}
 
-	return __get_macro('{$RSM.RDDS.DELAY}');
+sub get_rdap_delay
+{
+	my $value_time = (shift or time() - AVAIL_SHIFT_BACK);
+
+	my $value = __get_configvalue(RSM_CONFIG_RDAP_DELAY_ITEMID, $value_time);
+
+	return $value // __get_macro('{$RSM.RDAP.DELAY}');
 }
 
 sub get_epp_delay
@@ -288,9 +297,7 @@ sub get_epp_delay
 
 	my $value = __get_configvalue(RSM_CONFIG_EPP_DELAY_ITEMID, $value_time);
 
-	return $value if (defined($value));
-
-	return __get_macro('{$RSM.EPP.DELAY}');
+	return $value // __get_macro('{$RSM.EPP.DELAY}');
 }
 
 sub get_macro_dns_update_time
@@ -344,13 +351,18 @@ sub get_rtt_low
 		return get_macro_rdds_rtt_low();
 	}
 
+	if ($service eq 'rdap')
+	{
+		return get_macro_rdap_rtt_low();
+	}
+
 	if ($service eq 'epp')
 	{
 		return get_macro_epp_rtt_low($command);	# can be per TLD
 	}
 
-	fail("dimir was wrong, thinking the only known services are \"dns\", \"dnssec\", \"rdds\" and \"epp\",",
-		" there is also \"$service\"");
+	fail("dimir was wrong, thinking the only known services are \"dns\", \"dnssec\", \"rdds\", \"rdap\" ",
+		"and \"epp\", there is also \"$service\"");
 }
 
 sub get_slv_rtt($;$)
@@ -4062,7 +4074,7 @@ sub get_slv_rtt_monthly_items($$$$)
 	return \%slv_items_by_tld;
 }
 
-sub update_slv_rtt_monthly_stats($$$$$$$$)
+sub update_slv_rtt_monthly_stats($$$$$$$$;$)
 {
 	my $now                    = shift;
 	my $max_cycles             = shift;
@@ -4072,6 +4084,8 @@ sub update_slv_rtt_monthly_stats($$$$$$$$)
 	my $slv_item_key_pfailed   = shift;
 	my $cycle_delay            = shift;
 	my $rtt_params_list        = shift;
+	my $rdap_standalone_params_list = shift;
+	my $params_list = $rtt_params_list;
 
 	# how long to wait for data after $cycle_end if number of performed checks is smaller than expected checks
 	# TODO: $max_nodata_time = $cycle_delay * x?
@@ -4121,7 +4135,13 @@ sub update_slv_rtt_monthly_stats($$$$$$$$)
 				next TLD_LOOP;
 			}
 
-			my $rtt_stats = get_slv_rtt_cycle_stats_aggregated($rtt_params_list, $cycle_start, $cycle_end, $tld);
+			if (defined($rdap_standalone_params_list) && is_rdap_standalone($cycle_start))
+			{
+				dbg("using parameters w/o RDAP, cycle_start=$cycle_start");
+				$params_list = $rdap_standalone_params_list;
+			}
+
+			my $rtt_stats = get_slv_rtt_cycle_stats_aggregated($params_list, $cycle_start, $cycle_end, $tld);
 
 			if ($rtt_stats->{'total'} < $rtt_stats->{'expected'} && $cycle_end > $now - $max_nodata_time)
 			{
@@ -4189,7 +4209,7 @@ sub recalculate_downtime($$$$$$)
 
 	fail("not supported when running in --dry-run mode") if (opt('dry-run'));
 
-	# get service from item's key (DNS or RDDS)
+	# get service from item's key (DNS, RDDS or RDAP)
 
 	my $service = uc($item_key_avail =~ s/rsm\.slv\.(.+)\.avail/$1/r);
 

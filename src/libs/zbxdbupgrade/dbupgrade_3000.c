@@ -4782,10 +4782,6 @@ out:
 
 static int	DBpatch_3000503(void)
 {
-	int		ret = FAIL;
-	DB_RESULT	result;
-	DB_ROW		row;
-
 	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
 		return SUCCEED;
 
@@ -4797,6 +4793,89 @@ static int	DBpatch_3000503(void)
 	}
 
 	return SUCCEED;
+}
+
+static int	DBpatch_3000504(void)
+{
+	DB_RESULT	result = NULL;
+	DB_ROW		row;
+	zbx_uint64_t	cat_id;
+	int		ret = FAIL;
+
+	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
+		return SUCCEED;
+
+	/* Add necessary extra RDAP macros. Constant IDs are from data.tmpl */
+
+	if (FAIL == add_global_macro_history_item(100032, 100032, "RSM.INCIDENT.RDAP.FAIL"))
+	{
+		goto out;
+	}
+	if (FAIL == add_global_macro_history_item(100033, 100033, "RSM.INCIDENT.RDAP.RECOVER"))
+	{
+		goto out;
+	}
+	if (FAIL == add_global_macro_history_item(100034, 100034, "RSM.RDAP.DELAY"))
+	{
+		goto out;
+	}
+	if (FAIL == add_global_macro_history_item(100035, 100035, "RSM.RDAP.MAXREDIRS"))
+	{
+		goto out;
+	}
+	if (FAIL == add_global_macro_history_item(100036, 100036, "RSM.RDAP.PROBE.ONLINE"))
+	{
+		goto out;
+	}
+	if (FAIL == add_global_macro_history_item(100037, 100037, "RSM.RDAP.ROLLWEEK.SLA"))
+	{
+		goto out;
+	}
+	if (FAIL == add_global_macro_history_item(100038, 100038, "RSM.RDAP.RTT.HIGH"))
+	{
+		goto out;
+	}
+	if (FAIL == add_global_macro_history_item(100039, 100039, "RSM.RDAP.RTT.LOW"))
+	{
+		goto out;
+	}
+	if (FAIL == add_global_macro_history_item(100040, 100040, "RSM.SLV.RDAP.DOWNTIME"))
+	{
+		goto out;
+	}
+	if (FAIL == add_global_macro_history_item(100041, 100041, "RSM.SLV.RDAP.RTT"))
+	{
+		goto out;
+	}
+
+	/* add 'rdap' service category for data export */
+
+	if (NULL == (result = DBselect("select id from rsm_service_category where name='rdap'")))
+	{
+		goto out;
+	}
+
+	if (NULL == (row = DBfetch(result)))
+	{
+		if (ZBX_DB_OK > DBexecute("insert into rsm_service_category values(6,'rdap')"))
+		{
+			goto out;
+		}
+	}
+	else
+	{
+		ZBX_STR2UINT64(cat_id, row[0]);
+		if (6 != cat_id)
+		{
+			zabbix_log(LOG_LEVEL_ERR, "'rdap' service category exists, but it's not 6");
+			goto out;
+		}
+	}
+
+	ret = SUCCEED;
+out:
+	DBfree_result(result);
+	return ret;
 }
 
 #endif
@@ -4911,5 +4990,6 @@ DBPATCH_ADD(3000500, 0, 0)	/* Phase 4, version 2.0.0 */
 DBPATCH_ADD(3000501, 0, 0)	/* add macros, items and triggers for Standalone RDAP */
 DBPATCH_ADD(3000502, 0, 0)	/* add {$RSM.RDAP.ENABLED} macro on probes */
 DBPATCH_ADD(3000503, 0, 0)	/* replace {$RSM.RDDS.*} with {$RSM.RDAP.*} in rdap[] keys */
+DBPATCH_ADD(3000504, 0, 0)	/* add RDAP-related macros to Global macro history */
 
 DBPATCH_END()

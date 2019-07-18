@@ -1,7 +1,8 @@
 /.buildpath
 /.project
 /.settings
-/.vstags
+.vstags
+.vscode
 Makefile
 Makefile.in
 !/build/win32/**/Makefile
