@@ -420,7 +420,7 @@ if ($data['tld']) {
 				$ok_rdds_services[] = 'RDAP';
 			}
 
-			$rdds_services = implode(' / ', $ok_rdds_services);
+			$rdds_services = is_RDAP_standalone() ? null : implode(' / ', $ok_rdds_services);
 
 			$row[] = [(new CSpan($rddsValue))->addClass('right'), $rddsStatus, SPACE, $rddsGraph, [SPACE,SPACE,SPACE],
 				new CSpan($rdds_services, 'bold')

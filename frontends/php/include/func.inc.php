@@ -2361,7 +2361,7 @@ function is_RDAP_standalone($timestamp = null) {
 
 		if ($db_macro) {
 			$macro_value = (string) reset($db_macro)['value'];
-			$standalone = !(bccomp($macro_value, '0') == 0 || bccomp($macro_value, $timestamp) == 1);
+			$standalone = (bccomp($macro_value, $timestamp) == 1);
 		}
 		else {
 			$standalone = false;

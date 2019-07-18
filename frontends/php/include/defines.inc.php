@@ -1404,6 +1404,7 @@ define('ZBX_EC_DNS_UDP_DNSKEY_NONE',	-428);
 define('CALCULATED_ITEM_DNS_FAIL',				'rsm.configvalue[RSM.INCIDENT.DNS.FAIL]');
 define('CALCULATED_ITEM_DNSSEC_FAIL',			'rsm.configvalue[RSM.INCIDENT.DNSSEC.FAIL]');
 define('CALCULATED_ITEM_RDDS_FAIL',				'rsm.configvalue[RSM.INCIDENT.RDDS.FAIL]');
+define('CALCULATED_ITEM_RDAP_FAIL',				'rsm.configvalue[RSM.INCIDENT.RDAP.FAIL]');
 define('CALCULATED_ITEM_EPP_FAIL',				'rsm.configvalue[RSM.INCIDENT.EPP.FAIL]');
 define('CALCULATED_ITEM_DNS_DELAY',				'rsm.configvalue[RSM.DNS.UDP.DELAY]');
 define('CALCULATED_ITEM_RDDS_DELAY',			'rsm.configvalue[RSM.RDDS.DELAY]');

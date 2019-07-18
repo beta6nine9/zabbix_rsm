@@ -201,6 +201,10 @@ if ($mainEvent) {
 			$keys = array(CALCULATED_ITEM_DNSSEC_FAIL, CALCULATED_ITEM_DNS_DELAY);
 			$data['type'] = RSM_DNSSEC;
 			break;
+		case RSM_SLV_RDAP_ROLLWEEK:
+			$keys = array(CALCULATED_ITEM_RDAP_FAIL, CALCULATED_ITEM_RDAP_DELAY);
+			$data['type'] = RSM_RDAP;
+			break;
 		case RSM_SLV_RDDS_ROLLWEEK:
 			$keys = array(CALCULATED_ITEM_RDDS_FAIL, CALCULATED_ITEM_RDDS_DELAY);
 			$data['type'] = RSM_RDDS;
@@ -260,8 +264,11 @@ if ($mainEvent) {
 	}
 
 	foreach ($items as $item) {
-		if ($item['key_'] == CALCULATED_ITEM_DNS_FAIL || $item['key_'] == CALCULATED_ITEM_DNSSEC_FAIL
-				|| $item['key_'] == CALCULATED_ITEM_RDDS_FAIL || $item['key_'] == CALCULATED_ITEM_EPP_FAIL) {
+		if ($item['key_'] == CALCULATED_ITEM_DNS_FAIL
+				|| $item['key_'] == CALCULATED_ITEM_DNSSEC_FAIL
+				|| $item['key_'] == CALCULATED_ITEM_RDDS_FAIL
+				|| $item['key_'] == CALCULATED_ITEM_RDAP_FAIL
+				|| $item['key_'] == CALCULATED_ITEM_EPP_FAIL) {
 			$failCount = getFirstUintValue($item['itemid'], $mainEvent['clock']);
 		}
 		else {

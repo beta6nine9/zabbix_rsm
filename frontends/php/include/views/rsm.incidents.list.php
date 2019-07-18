@@ -74,7 +74,7 @@ if (isset($data['tld'])) {
 			bold(_('TLD')),
 			':',
 			SPACE,
-			$data['tld']['name']
+			$data['tld']['host']
 		]]);
 	}
 
@@ -370,7 +370,7 @@ if (isset($this->data['tld'])) {
 		$rddsTab->additem(new CDiv(bold(_('RDDS is disabled.')), 'red center'));
 	}
 
-	// RDDS
+	// RDAP
 	if (isset($this->data['rdap']['events'])) {
 		$rdapInfoTable = (new CTable(null))->addClass('incidents-info');
 
@@ -402,7 +402,7 @@ if (isset($this->data['tld'])) {
 				$event['incidentTotalTests']
 			];
 
-			$rddsTable->addRow($row);
+			$rdapTable->addRow($row);
 		}
 
 		$testsDown = new CLink(
@@ -445,10 +445,10 @@ if (isset($this->data['tld'])) {
 			BR(),
 			(new CSpan(date(DATE_TIME_FORMAT, $this->data['rdap']['slvTestTime'])))->addClass('rsm-date-time')
 		];
-		$rddsInfoTable->addRow([$details, $rollingWeek]);
-		$rdapTab->additem($rddsInfoTable);
+		$rdapInfoTable->addRow([$details, $rollingWeek]);
+		$rdapTab->additem($rdapInfoTable);
 
-		$rdapTab->additem($rddsTable);
+		$rdapTab->additem($rdapTable);
 	}
 	else {
 		$message = is_RDAP_standalone($data['tests_start_time'])
