@@ -1,6 +1,7 @@
 Changes for rsm1.4.0rc1
 
 New features:
+..F....... [523] implemented support for standalone RDAP in rolling week status page, incidents and details of particular tests (miks)
 ..F.I..... [510] added support for Registrar RDDS Monitoring (dimir, yurii, asitals, miks, gcalenko)
 
 --------------------------------------------------------------------------------
