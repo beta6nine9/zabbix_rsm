@@ -219,7 +219,7 @@ if ($mainEvent) {
 				'output' => API_OUTPUT_EXTEND,
 				'hostids' => $template['templateid'],
 				'filter' => array(
-					'macro' => array(RSM_TLD_RDDS43_ENABLED, RSM_TLD_RDDS80_ENABLED, RSM_TLD_RDAP_ENABLED,
+					'macro' => array(RSM_TLD_RDDS43_ENABLED, RSM_TLD_RDDS80_ENABLED, RSM_RDAP_TLD_ENABLED,
 						RSM_RDAP_TLD_ENABLED, RSM_TLD_RDDS_ENABLED
 					)
 				)));
