@@ -240,17 +240,38 @@ sub __write_file
 		return AH_FAIL;
 	}
 
-	close($OUTFILE);
-
-	unless (move($full_path_new, $full_path))
+	unless (close($OUTFILE))
 	{
-		__set_error("cannot create file \"$full_path\": $!");
+		__set_error("cannot close file \"$full_path_new\": $!");
 		return AH_FAIL;
 	}
 
-	utime($clock, $clock, $full_path) if (defined($clock));
+	unless (move($full_path_new, $full_path))
+	{
+		__set_error("cannot rename file \"$full_path_new\" to \"$full_path\": $!");
+		return AH_FAIL;
+	}
+
+	if (defined($clock) && !utime($clock, $clock, $full_path))
+	{
+		__set_error("cannot set mtime of file \"$full_path\": $!");
+		return AH_FAIL;
+	}
 
 	RSMSLV::dbg("wrote file \"$full_path\"");
+
+	if ($_debug)
+	{
+		my $buf;
+
+		return AH_FAIL unless (__read_file($full_path, \$buf) == AH_SUCCESS);
+
+		if ($buf ne $text)
+		{
+			__set_error("contents of file \"$full_path\" is unexpected after writing, expected ==>$text<== got ==>$buf<==");
+			return AH_FAIL;
+		}
+	}
 
 	return AH_SUCCESS;
 }

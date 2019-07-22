@@ -1,3 +1,11 @@
+Changes for rsm1.2.5rc1
+
+Bug fixes:
+....I..... [509] made SLA API file wites atomic (dimir)
+....I..... [511] added handling of invalid timestamps far in the past to SLA API script (dimir)
+....I..... [513] added code to skip tests with missing RTT or IP to Data Export, this can happen when history syncer faces SQL error (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm1.2.4
 
 Bug fixes:

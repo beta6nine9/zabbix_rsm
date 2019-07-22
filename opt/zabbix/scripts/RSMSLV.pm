@@ -1865,7 +1865,7 @@ sub process_slv_avail_cycles($$$$$$$$$)
 
 	init_values();
 
-	foreach my $value_ts (sort(keys(%{$cycles_ref})))
+	foreach my $value_ts (sort { $a <=> $b } (keys(%{$cycles_ref})))
 	{
 		my $from = cycle_start($value_ts, $delay);
 		my $till = cycle_end($value_ts, $delay);
@@ -2006,7 +2006,7 @@ sub process_slv_rollweek_cycles($$$$$)
 
 	init_values();
 
-	foreach my $value_ts (sort(keys(%{$cycles_ref})))
+	foreach my $value_ts (sort { $a <=> $b } (keys(%{$cycles_ref})))
 	{
 		my ($from, $till, undef) = get_rollweek_bounds($delay, $value_ts);
 
@@ -2051,7 +2051,7 @@ sub process_slv_downtime_cycles($$$$)
 
 	init_values();
 
-	foreach my $value_ts (sort(keys(%{$cycles_ref})))
+	foreach my $value_ts (sort { $a <=> $b } (keys(%{$cycles_ref})))
 	{
 		my ($from, $till, undef) = get_downtime_bounds($delay, $value_ts);
 

@@ -590,6 +590,26 @@ sub add_cycles($$$$$$$$$$$)
 
 	my $max_clock = cycle_end($cycle_start + $max_period, $delay);
 
+	# issue #511
+	# Sometimes we get strange timestamp of cycle to calculate, e. g. 960 .
+	# Next time it happens, print out related variables, we want to find out
+	# if this value comes from cache, database (unlikely) or last_update.txt .
+	# Currently we keep 2 month of history, so we'll use 7776000 seconds
+	# (3 months) from current time to understand if the timestamp is corrupted.
+	if ($real_now - $cycle_start > 7776000)
+	{
+		my $rows_ref = db_select("select key_ from items where itemid=$itemid");
+		my $key = $rows_ref->[0]->[0];
+
+		fail("something went wrong, while getting cycles to calculate got time \"", ts_full($cycle_start), "\"",
+			", which is over 3 months old. Affected variables:\n",
+			"  itemid       : $itemid\n",
+			"  key          : $key\n",
+			"  probe        : $probe\n",
+			"  lastclock    : ", ts_full($lastclock), "\n",
+			"  lastclock_db : ", ts_full($lastclock_db));
+	}
+
 	# keep adding cycles to calculate while we are inside max period and within lastvalue
 	while ($cycle_start < $max_clock && $lastclock <= $lastclock_db)
 	{
@@ -616,7 +636,7 @@ sub add_cycles($$$$$$$$$$$)
 			);
 		}
 
-		# for cycles_to_calculate we must use cycle start
+		# for cycles_to_calculate we use the timestamp of the beginning of the cycle
 		$cycles_ref->{$cycle_start} = 1;
 
 		# move forward
@@ -711,7 +731,8 @@ sub cycles_to_calculate($$$$$$$$)
 		}
 	}
 
-	@{$cycles_ref} = sort(keys(%cycles));
+	# ensure numeric sort of timestamps
+	@{$cycles_ref} = sort { $a <=> $b } (keys(%cycles));
 
 	return SUCCESS;
 }
