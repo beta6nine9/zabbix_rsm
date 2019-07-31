@@ -1,3 +1,9 @@
+Changes for rsm1.2.6rc1
+
+Bug fixes:
+....I..... [539] fixed service downtime and rolling week calculation logic (asitals)
+
+--------------------------------------------------------------------------------
 Changes for rsm1.2.5
 
 rsm1.2.5rc1 was released as rsm1.2.5 without any changes
