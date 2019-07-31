@@ -31,7 +31,7 @@ require_once dirname(__FILE__).'/include/page_header.php';
 //		VAR			TYPE	OPTIONAL FLAGS	VALIDATION	EXCEPTION
 $fields = [
 	'host' =>		[T_ZBX_STR, O_OPT,	P_SYS,	null,				null],
-	'type' =>		[T_ZBX_INT, O_OPT,	null,	IN('0,1,2,3,4'),	null],
+	'type' =>		[T_ZBX_INT, O_OPT,	null,	IN([RSM_DNS, RSM_DNSSEC, RSM_RDDS, RSM_EPP, RSM_RDAP]),	null],
 	'time' =>		[T_ZBX_INT, O_OPT,	null,	null,				null],
 	'slvItemId' =>	[T_ZBX_INT, O_OPT,	P_SYS,	DB_ID,				null]
 ];
