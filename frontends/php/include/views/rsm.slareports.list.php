@@ -179,6 +179,32 @@ if (array_key_exists('slv_rdds_downtime', $data) && $data['slv_rdds_downtime'] !
 	);
 }
 
+// RDAP Service Availability and Query RTT.
+if (array_key_exists('slv_rdap_downtime', $data) && $data['slv_rdap_downtime'] !== 'disabled'
+		&& $data['slv_rdap_rtt_downtime'] !== 'disabled') {
+	$table->addRow([
+			bold(_('RDAP Service Availability')),
+			'-',
+			gmdate('Y-m-d H:i:s e', $data['details']['from']),
+			gmdate('Y-m-d H:i:s e', $data['details']['to']),
+			_s('%1$s (minutes of downtime)', $data['slv_rdap_downtime']),
+			_s('<= %1$s min of downtime', $data['slr_rdap_downtime'])
+		],
+		($data['slv_rdap_downtime'] > $data['slr_rdap_downtime']) ? 'red-bg' : null
+	)->addRow([
+			_('RDAP Query RTT'),
+			'-',
+			gmdate('Y-m-d H:i:s e', $data['details']['from']),
+			gmdate('Y-m-d H:i:s e', $data['details']['to']),
+			_s('%1$s %% (queries <= %2$s ms)', $data['slv_rdap_rtt_downtime'], $data['slr_rdap_rtt_downtime_ms']),
+			_s('<= %1$s ms, for at least %2$s %% of the queries', $data['slr_rdap_rtt_downtime_ms'],
+				$data['slr_rdap_rtt_downtime']
+			)
+		],
+		($data['slv_rdap_rtt_downtime'] < (100 - $data['slr_rdap_rtt_downtime'])) ? 'red-bg' : null
+	);
+}
+
 return $widget->addItem([
 	$table,
 	(new CDiv())
