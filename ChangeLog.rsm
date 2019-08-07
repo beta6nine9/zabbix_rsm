@@ -1,3 +1,9 @@
+Changes for rsm1.2.7
+
+New features:
+....I..... [543] added script /opt/zabbix/scripts/misc/handle-duplicates.pl for finding and removing duplicate history entries (asitals)
+
+--------------------------------------------------------------------------------
 Changes for rsm1.2.6
 
 rsm1.2.6rc1 was released as rsm1.2.6 without any changes
