@@ -20,6 +20,7 @@ use Fcntl qw(:flock);	# for the LOCK_* constants, logging to stdout by multiple 
 use RSM;
 use Pusher qw(push_to_trapper);
 use Fcntl qw(:flock);
+use List::Util qw(any none min max);
 
 use constant E_ID_NONEXIST => -2;
 use constant E_ID_MULTIPLE => -3;
@@ -70,9 +71,6 @@ use constant ROLLWEEK_SHIFT_BACK	=> 180;	# seconds (must be divisible by 60) bac
 use constant PROBE_ONLINE_STR => 'Online';
 
 use constant DETAILED_RESULT_DELIM => ', ';
-
-use constant DEFAULT_SLV_MAX_CYCLES => 10;	# maximum cycles to process by SLV scripts in 1 run, may be overriden
-						# by rsm.conf 'max_cycles_dns' and 'max_cycles_rdds'
 
 use constant USE_CACHE_FALSE => 0;
 use constant USE_CACHE_TRUE  => 1;
@@ -1816,22 +1814,23 @@ sub slv_max_cycles($)
 {
 	my $service = shift;
 
-	my $var;
-
-	if ($service eq 'dns' || $service eq 'dnssec')
+	if (none { $service eq $_ } ('dns', 'dnssec', 'rdap', 'rdds'))
 	{
-		$var = 'max_cycles_dns';
-	}
-	elsif ($service eq 'rdds' || $service eq 'rdap')
-	{
-		$var = 'max_cycles_rdds';
-	}
-	else
-	{
-		return DEFAULT_SLV_MAX_CYCLES;
+		fail("unhandled service: '$service'");
 	}
 
-	return (defined($config) && defined($config->{'slv'}->{$var}) ? $config->{'slv'}->{$var} : DEFAULT_SLV_MAX_CYCLES);
+	my $var = 'max_cycles_' . $service;
+
+	if (!defined($config))
+	{
+		fail("missing config");
+	}
+	if (!defined($config->{'slv'}{$var}))
+	{
+		fail("missing config option: '$var'");
+	}
+
+	return $config->{'slv'}->{$var};
 }
 
 sub __print_probe_times
