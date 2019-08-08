@@ -28,8 +28,6 @@ use constant MAX_PERIOD => 30 * 60;	# 30 minutes
 
 use constant SUBSTR_KEY_LEN => 20;	# for logging
 
-use constant MYSQL_TIMEOUT => 30;	# timeout while attempt to connect/read/write to/from MySQL server
-
 use constant DEFAULT_MAX_CHILDREN => 64;
 use constant DEFAULT_MAX_WAIT => 600;	# maximum seconds to wait befor terminating child process
 
@@ -100,7 +98,7 @@ my $now = (getopt('now') // $real_now);
 
 my $max_period = (opt('period') ? getopt('period') * 60 : MAX_PERIOD);
 
-db_connect(undef, MYSQL_TIMEOUT);
+db_connect();
 
 my $cfg_minonline = get_macro_dns_probe_online();
 my $cfg_minns = get_macro_minns();
@@ -276,7 +274,7 @@ sub process_server($)
 	my %probes;
 	my $server_tlds;
 
-	db_connect($server_key, MYSQL_TIMEOUT);
+	db_connect($server_key);
 
 	my $all_probes_ref = get_probes();
 
@@ -368,7 +366,7 @@ sub process_tld_batch($$$$$$)
 	my $probes_ref = shift;		# probes by services
 	my $all_probes_ref = shift;	# all available probes in the system
 
-	db_connect($server_key, MYSQL_TIMEOUT);
+	db_connect($server_key);
 
 	for (my $tldi = $tldi_begin; $tldi != $tldi_end; $tldi++)
 	{

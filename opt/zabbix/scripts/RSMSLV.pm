@@ -1016,7 +1016,6 @@ sub handle_db_error
 sub db_connect
 {
 	$server_key = shift;
-	my $timeout = shift;
 
 	dbg("server_key:", ($server_key ? $server_key : "UNDEF"));
 
@@ -1040,20 +1039,21 @@ sub db_connect
 
 	$_global_sql = "DBI:mysql:database=$section->{'db_name'};host=$section->{'db_host'};$db_tls_settings";
 
+	# NB! Timeouts have to be specified via DSN. To check if they're actually being used:
+	# $ export DBI_TRACE=2=dbitrace.log
+	# $ ./XXX.pl
+	# $ grep 'Setting' dbitrace.log
+	$_global_sql .= ';mysql_connect_timeout=' . ($section->{'db_connect_timeout'} // 30);
+	$_global_sql .= ';mysql_write_timeout='   . ($section->{'db_write_timeout'} // 30);
+	$_global_sql .= ';mysql_read_timeout='    . ($section->{'db_read_timeout'} // 30);
+
 	dbg($_global_sql);
 
 	my $connect_opts = {
-		PrintError		=> 0,
-		HandleError		=> \&handle_db_error,
-		mysql_auto_reconnect	=> 1
+		'PrintError'		=> 0,
+		'HandleError'		=> \&handle_db_error,
+		'mysql_auto_reconnect'	=> 1,
 	};
-
-	if (defined($timeout))
-	{
-		$connect_opts->{mysql_connect_timeout} = $timeout;
-		$connect_opts->{mysql_write_timeout} = $timeout;
-		$connect_opts->{mysql_read_timeout} = $timeout;
-	}
 
 	$dbh = DBI->connect($_global_sql, $section->{'db_user'}, $section->{'db_password'}, $connect_opts)
 		or handle_db_error(DBI->errstr);

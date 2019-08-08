@@ -1,3 +1,9 @@
+Changes for rsm1.2.8
+
+Bug fixes:
+....I..... [541] added MySQL connect, read and write timeouts in Zabbix server, Zabbix proxy and Perl scripts (asitals)
+
+--------------------------------------------------------------------------------
 Changes for rsm1.2.7
 
 New features:
