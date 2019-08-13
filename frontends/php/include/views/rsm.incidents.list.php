@@ -553,8 +553,8 @@ if (isset($this->data['tld'])) {
 		$incidentPage->addTab('dnsTab', _('DNS'), $dnsTab);
 		$incidentPage->addTab('dnssecTab', _('DNSSEC'), $dnssecTab);
 		$incidentPage->addTab('rddsTab', _('RDDS'), $rddsTab);
-		$incidentPage->addTab('rdapTab', _('RDAP'), $rdapTab);
 		$incidentPage->addTab('eppTab', _('EPP'), $eppTab);
+		$incidentPage->addTab('rdapTab', _('RDAP'), $rdapTab);
 	}
 }
 else {

@@ -34,7 +34,7 @@ require_once dirname(__FILE__).'/include/page_header.php';
 $fields = [
 	'host' =>					[T_ZBX_STR, O_OPT,	null,	null,			null],
 	'eventid' =>				[T_ZBX_INT, O_OPT,	P_SYS,	DB_ID,			null],
-	'type' =>					[T_ZBX_INT, O_OPT,	null,	IN('0,1,2,3'),	null],
+	'type' =>					[T_ZBX_INT, O_OPT,	null,	IN(implode(',', [RSM_DNS, RSM_DNSSEC, RSM_RDDS, RSM_RDAP, RSM_EPP])),null],
 	'mark_incident' =>			[T_ZBX_INT, O_OPT,	null,	null,			null],
 	'original_from' =>			[T_ZBX_INT, O_OPT, null,	null,			null],
 	'original_to' =>			[T_ZBX_INT, O_OPT, null,	null,			null],
