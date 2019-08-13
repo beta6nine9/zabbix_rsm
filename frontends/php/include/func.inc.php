@@ -2335,3 +2335,38 @@ function get_rsm_monitoring_type() {
 
 	return $type;
 }
+
+/**
+ * Based on timestamp value stored in {$RSM.RDAP.STANDALONE}, check if RDAP at given time $timestamp is configured as
+ * standalone service or as dependent sub-service of RDDS. It is expected that switch from RDAP as sub-service of RDDS
+ * to RDAP as standalone service will be done only once and will never be switched back to initial state.
+ *
+ * @param integer|string  $timestamp  Optional timestamp value.
+ *
+ * @return bool
+ */
+function is_RDAP_standalone($timestamp = null) {
+	static $standalone;
+
+	if ($standalone === null) {
+		$timestamp = ($timestamp === null)
+			? (string) time()
+			: (string) $timestamp;
+
+		$db_macro = API::UserMacro()->get([
+			'output' => ['value'],
+			'filter' => ['macro' => RSM_RDAP_STANDALONE],
+			'globalmacro' => true
+		]);
+
+		if ($db_macro) {
+			$macro_value = (string) reset($db_macro)['value'];
+			$standalone = ($macro_value != 0 && bccomp($macro_value, $timestamp) == -1);
+		}
+		else {
+			$standalone = false;
+		}
+	}
+
+	return $standalone;
+}

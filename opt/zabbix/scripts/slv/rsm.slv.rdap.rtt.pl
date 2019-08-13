@@ -58,8 +58,7 @@ update_slv_rtt_monthly_stats(
 	SLV_ITEM_KEY_RDAP_FAILED,
 	SLV_ITEM_KEY_RDAP_PFAILED,
 	get_rdap_delay(),
-	$rtt_params_list,
-	$rdap_standalone_params_list
+	$rtt_params_list
 );
 
 slv_exit(SUCCESS);

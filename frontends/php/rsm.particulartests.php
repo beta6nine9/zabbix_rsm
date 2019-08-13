@@ -30,10 +30,10 @@ require_once dirname(__FILE__).'/include/page_header.php';
 
 //		VAR			TYPE	OPTIONAL FLAGS	VALIDATION	EXCEPTION
 $fields = [
-	'host' =>		[T_ZBX_STR, O_OPT,	P_SYS,	null,			null],
-	'type' =>		[T_ZBX_INT, O_OPT,	null,	IN('0,1,2,3'),	null],
-	'time' =>		[T_ZBX_INT, O_OPT,	null,	null,			null],
-	'slvItemId' =>	[T_ZBX_INT, O_OPT,	P_SYS,	DB_ID,			null]
+	'host' =>		[T_ZBX_STR, O_OPT,	P_SYS,	null,				null],
+	'type' =>		[T_ZBX_INT, O_OPT,	null,	IN([RSM_DNS, RSM_DNSSEC, RSM_RDDS, RSM_EPP, RSM_RDAP]),	null],
+	'time' =>		[T_ZBX_INT, O_OPT,	null,	null,				null],
+	'slvItemId' =>	[T_ZBX_INT, O_OPT,	P_SYS,	DB_ID,				null]
 ];
 check_fields($fields);
 
@@ -64,7 +64,7 @@ elseif (!getRequest('host') && !getRequest('time') && !getRequest('slvItemId') &
 
 // check
 if ($data['host'] && $data['time'] && $data['slvItemId'] && $data['type'] !== null) {
-	$testTimeFrom = mktime(
+	$test_time_from = mktime(
 		date('H', $data['time']),
 		date('i', $data['time']),
 		0,
@@ -72,6 +72,14 @@ if ($data['host'] && $data['time'] && $data['slvItemId'] && $data['type'] !== nu
 		date('j', $data['time']),
 		date('Y', $data['time'])
 	);
+
+	$data['test_time_from'] = $test_time_from;
+
+	if ($data['type'] == RSM_RDAP && !is_RDAP_standalone($test_time_from)) {
+		show_error_message(_('RDAP wasn\'t a standalone service at requested time!'));
+		require_once dirname(__FILE__).'/include/page_footer.php';
+		exit;
+	}
 
 	$data['totalProbes'] = 0;
 
@@ -85,6 +93,9 @@ if ($data['host'] && $data['time'] && $data['slvItemId'] && $data['type'] !== nu
 		else {
 			$data['totalTests'] = 0;
 		}
+	}
+	elseif ($data['type'] == RSM_RDAP) {
+		$calculatedItemKey[] = CALCULATED_ITEM_RDAP_DELAY;
 	}
 	elseif ($data['type'] == RSM_RDDS) {
 		$calculatedItemKey[] = CALCULATED_ITEM_RDDS_DELAY;
@@ -127,7 +138,7 @@ if ($data['host'] && $data['time'] && $data['slvItemId'] && $data['type'] !== nu
 	foreach ($macroItems as $macroItem) {
 		$macroItemValue = API::History()->get([
 			'itemids' => $macroItem['itemid'],
-			'time_from' => $testTimeFrom,
+			'time_from' => $test_time_from,
 			'history' => $macroItem['value_type'],
 			'output' => API_OUTPUT_EXTEND,
 			'limit' => 1
@@ -152,7 +163,7 @@ if ($data['host'] && $data['time'] && $data['slvItemId'] && $data['type'] !== nu
 	}
 
 	// time calculation
-	$testTimeTill = $testTimeFrom + $macroTime;
+	$testTimeTill = $test_time_from + $macroTime;
 
 	// get TLD
 	$tld = API::Host()->get([
@@ -173,22 +184,27 @@ if ($data['host'] && $data['time'] && $data['slvItemId'] && $data['type'] !== nu
 	}
 
 	// Get TLD level macros.
-	if ($data['type'] == RSM_RDDS) {
-		$tld_templates = API::Template()->get(array(
+	if ($data['type'] == RSM_RDAP || $data['type'] == RSM_RDDS) {
+		$tld_templates = API::Template()->get([
 			'output' => [],
-			'filter' => array(
+			'filter' => [
 				'host' => ['Template '.$data['tld']['host']]
-			),
+			],
 			'preservekeys' => true
-		));
+		]);
 
-		$template_macros = API::UserMacro()->get(array(
+		$user_macros_filter = [RSM_TLD_RDDS_ENABLED];
+		if ($data['type'] == RSM_RDDS || !is_RDAP_standalone($test_time_from)) {
+			$user_macros_filter = array_merge($user_macros_filter, [RDAP_BASE_URL, RSM_RDAP_TLD_ENABLED]);
+		}
+
+		$template_macros = API::UserMacro()->get([
 			'output' => ['macro', 'value'],
 			'hostids' => array_keys($tld_templates),
-			'filter' => array(
-				'macro' => array(RSM_TLD_RDDS_ENABLED, RDAP_BASE_URL, RSM_RDAP_TLD_ENABLED)
-			)
-		));
+			'filter' => [
+				'macro' => $user_macros_filter
+			]
+		]);
 
 		$data['tld']['macros'] = [];
 		foreach ($template_macros as $template_macro) {
@@ -221,6 +237,9 @@ if ($data['host'] && $data['time'] && $data['slvItemId'] && $data['type'] !== nu
 	elseif ($data['type'] == RSM_RDDS) {
 		$key = RSM_SLV_RDDS_AVAIL;
 	}
+	elseif ($data['type'] == RSM_RDAP) {
+		$key = RSM_SLV_RDAP_AVAIL;
+	}
 	else {
 		$key = RSM_SLV_EPP_AVAIL;
 	}
@@ -240,7 +259,7 @@ if ($data['host'] && $data['time'] && $data['slvItemId'] && $data['type'] !== nu
 		$testResults = API::History()->get([
 			'output' => API_OUTPUT_EXTEND,
 			'itemids' => $availItem['itemid'],
-			'time_from' => $testTimeFrom,
+			'time_from' => $test_time_from,
 			'time_till' => $testTimeTill,
 			'history' => $availItem['value_type'],
 			'limit' => 1
@@ -252,7 +271,7 @@ if ($data['host'] && $data['time'] && $data['slvItemId'] && $data['type'] !== nu
 		}
 
 		// Get mapped value for test result.
-		if (in_array($data['type'], [RSM_DNS, RSM_DNSSEC, RSM_RDDS])) {
+		if (in_array($data['type'], [RSM_DNS, RSM_DNSSEC, RSM_RDDS, RSM_RDAP])) {
 			$test_result_label = ($test_result['value'] !== null)
 				? getMappedValue($test_result['value'], RSM_SERVICE_AVAIL_VALUE_MAP)
 				: false;
@@ -338,12 +357,21 @@ if ($data['host'] && $data['time'] && $data['slvItemId'] && $data['type'] !== nu
 				}
 			}
 
+			// No need to show RDAP integrated in RDDS if it is enabled as standalone service.
+			if (is_RDAP_standalone($test_time_from)) {
+				unset($_enabled_item_map[RDAP_ENABLED]);
+			}
+			// Since RDAP is separate service, no need to process RDDS data anymore.
+			if ($data['type'] == RSM_RDAP) {
+				unset($_enabled_item_map[RDDS_ENABLED]);
+			}
+
 			foreach ($_enabled_item_map as $_enabled_item => $_enabled_itemid) {
 				if ($_enabled_itemid !== null) {
 					$history_value = API::History()->get([
 						'output' => API_OUTPUT_EXTEND,
 						'itemids' => $_enabled_itemid,
-						'time_from' => $testTimeFrom,
+						'time_from' => $test_time_from,
 						'time_till' => $testTimeTill
 					]);
 
@@ -353,10 +381,10 @@ if ($data['host'] && $data['time'] && $data['slvItemId'] && $data['type'] !== nu
 					 * This is needed because originally system was designed to store historical value each minute and
 					 * also test cycles matched to one per minute.
 					 *
-					 * Later, at some point it was changed and now, difference between $testTimeFrom and $testTimeTill
+					 * Later, at some point it was changed and now, difference between $test_time_from and $testTimeTill
 					 * can be longer, although tests are still run each minute.
 					 *
-					 * Workaround looks at all historical values stored at period between $testTimeFrom and $testTimeTill
+					 * Workaround looks at all historical values stored at period between $test_time_from and $testTimeTill
 					 * and assumes that service was enabled whole cycle if at least in one minute it was enabled.
 					 *
 					 * Example:
@@ -410,7 +438,7 @@ if ($data['host'] && $data['time'] && $data['slvItemId'] && $data['type'] !== nu
 			'SELECT h.value'.
 			' FROM history_uint h'.
 			' WHERE h.itemid='.$probeItem['itemid'].
-				' AND h.clock='.$testTimeFrom
+				' AND h.clock='.$test_time_from
 		));
 		if ($itemValue && $itemValue['value'] == PROBE_DOWN) {
 			$data['probes'][$probeItem['hostid']]['status'] = PROBE_DOWN;
@@ -488,7 +516,7 @@ if ($data['host'] && $data['time'] && $data['slvItemId'] && $data['type'] !== nu
 	if ($data['type'] == RSM_DNS || $data['type'] == RSM_DNSSEC) {
 		$probeItemKey = ' AND (i.key_ LIKE ('.zbx_dbstr(PROBE_DNS_UDP_ITEM_RTT.'%').') OR i.key_='.zbx_dbstr(PROBE_DNS_UDP_ITEM).')';
 	}
-	elseif ($data['type'] == RSM_RDDS) {
+	elseif ($data['type'] == RSM_RDAP) {
 		$items_to_check = [];
 		$probeItemKey = [];
 
@@ -497,6 +525,24 @@ if ($data['host'] && $data['time'] && $data['slvItemId'] && $data['type'] !== nu
 			$items_to_check[] = PROBE_RDAP_RTT;
 			$probeItemKey[] = 'i.key_ LIKE ('.zbx_dbstr(PROBE_RDAP_ITEM.'%').')';
 		}
+
+		if ($items_to_check) {
+			$probeItemKey[] = dbConditionString('i.key_', $items_to_check);
+		}
+		$probeItemKey = $probeItemKey ? ' AND ('.implode(' OR ', $probeItemKey).')' : '';
+	}
+	elseif ($data['type'] == RSM_RDDS) {
+		$items_to_check = [];
+		$probeItemKey = [];
+
+		// RDAP should be under type=RSM_RDDS only if it is not enabled as standalone service.
+		if ((!isset($data['tld']['macros'][RSM_RDAP_TLD_ENABLED]) || $data['tld']['macros'][RSM_RDAP_TLD_ENABLED] != 0)
+				&& !is_RDAP_standalone($test_time_from)) {
+			$items_to_check[] = PROBE_RDAP_IP;
+			$items_to_check[] = PROBE_RDAP_RTT;
+			$probeItemKey[] = 'i.key_ LIKE ('.zbx_dbstr(PROBE_RDAP_ITEM.'%').')';
+		}
+
 		if (!isset($data['tld']['macros'][RSM_TLD_RDDS_ENABLED]) || $data['tld']['macros'][RSM_TLD_RDDS_ENABLED] != 0) {
 			$items_to_check[] = PROBE_RDDS43_IP;
 			$items_to_check[] = PROBE_RDDS43_RTT;
@@ -531,7 +577,7 @@ if ($data['host'] && $data['time'] && $data['slvItemId'] && $data['type'] !== nu
 		while ($item = DBfetch($items)) {
 			$itemValue = API::History()->get([
 				'itemids' => $item['itemid'],
-				'time_from' => $testTimeFrom,
+				'time_from' => $test_time_from,
 				'time_till' => $testTimeTill,
 				'history' => $item['value_type'],
 				'output' => API_OUTPUT_EXTEND
@@ -578,7 +624,7 @@ if ($data['host'] && $data['time'] && $data['slvItemId'] && $data['type'] !== nu
 
 				$hosts[$item['hostid']]['value']['total']++;
 			}
-			elseif ($data['type'] == RSM_RDDS) {
+			elseif ($data['type'] == RSM_RDDS || $data['type'] == RSM_RDAP) {
 				if ($item['key_'] == PROBE_RDDS43_IP) {
 					$hosts[$item['hostid']]['rdds43']['ip'] = $itemValue['value'];
 				}

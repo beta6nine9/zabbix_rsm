@@ -113,11 +113,13 @@ if ($data['tld']) {
 			show_error_message(_('Report is not generated for requested month.'));
 		}
 	}
-	elseif (!class_exists('CSlaReport')) {
+	elseif (!file_exists('./include/classes/services/CSlaReport.php')) {
 		show_error_message(_('SLA Report generation file is missing.'));
 		$report_row = false;
 	}
 	else {
+		include './include/classes/services/CSlaReport.php';
+
 		$report_row = CSlaReport::generate($data['server_nr'], [$data['tld']['host']], $data['filter_year'],
 			$data['filter_month']
 		);
@@ -147,8 +149,17 @@ if ($data['tld']) {
 		exit;
 	}
 
+	$xml = null;
+
 	if ($report_row && array_key_exists('report', $report_row)) {
-		$xml = new SimpleXMLElement($report_row['report']);
+		try {
+			$xml = new SimpleXMLElement($report_row['report']);
+		} catch (Exception $x) {
+			show_error_message(_('Unable to parse XML report.'));
+		}
+	}
+
+	if ($xml) {
 		$details = $xml->attributes();
 
 		if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY) {
@@ -195,6 +206,26 @@ if ($data['tld']) {
 			'slr_rdds_rtt_downtime'		=> (string) $xml->RDDS->rtt->attributes()->percentageSLR,
 			'slr_rdds_rtt_downtime_ms'	=> (string) $xml->RDDS->rtt->attributes()->rttSLR
 		];
+
+		if (!$xml->RDAP && is_RDAP_standalone($data['details']['from'])) {
+			show_error_message(_('Cannot find RDAP values.'));
+		}
+		else {
+			if ($xml->RDAP instanceof SimpleXMLElement && !is_RDAP_standalone($data['details']['from'])) {
+				show_error_message(_('RDAP values exists for time when service was not standalone.'));
+			}
+
+			$rdap = $xml->RDDS;
+
+			$data += [
+				'slv_rdap_downtime'			=> (string) $rdap->serviceAvailability,
+				'slr_rdap_downtime'			=> (string) $rdap->serviceAvailability->attributes()->downtimeSLR,
+
+				'slv_rdap_rtt_downtime'		=> (string) $rdap->rtt,
+				'slr_rdap_rtt_downtime'		=> (string) $rdap->rtt->attributes()->percentageSLR,
+				'slr_rdap_rtt_downtime_ms'	=> (string) $rdap->rtt->attributes()->rttSLR
+			];
+		}
 
 		if ($data['tld']['host'] !== strval($details->id)) {
 			show_error_message(_('Incorrect report tld value.'));

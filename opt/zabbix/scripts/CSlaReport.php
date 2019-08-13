@@ -976,7 +976,7 @@ class CSlaReport
 			}
 		}
 
-		return $rdap_standalone_ts && $now >= $rdap_standalone_ts;
+		return $rdap_standalone_ts && $clock >= $rdap_standalone_ts;
 	}
 
 	################################################################################

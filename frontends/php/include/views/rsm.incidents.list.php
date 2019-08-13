@@ -74,7 +74,7 @@ if (isset($data['tld'])) {
 			bold(_('TLD')),
 			':',
 			SPACE,
-			$data['tld']['name']
+			$data['tld']['host']
 		]]);
 	}
 
@@ -103,6 +103,7 @@ $noData = _('No incidents found.');
 $dnsTab = new CDiv();
 $dnssecTab = new CDiv();
 $rddsTab = new CDiv();
+$rdapTab = new CDiv();
 $eppTab = new CDiv();
 
 if (isset($this->data['tld'])) {
@@ -369,6 +370,94 @@ if (isset($this->data['tld'])) {
 		$rddsTab->additem(new CDiv(bold(_('RDDS is disabled.')), 'red center'));
 	}
 
+	// RDAP
+	if (isset($this->data['rdap']['events'])) {
+		$rdapInfoTable = (new CTable(null))->addClass('incidents-info');
+
+		$rdapTable = new CTableInfo($noData);
+		$rdapTable->setHeader($headers);
+
+		$delayTime = $this->data['rdap']['delay'];
+
+		foreach ($this->data['rdap']['events'] as $event) {
+			$incidentStatus = getIncidentStatus($event['false_positive'], $event['status']);
+
+			$startTime = date(DATE_TIME_FORMAT_SECONDS, $event['startTime'] - $event['startTime'] % $delayTime);
+			$endTime = array_key_exists('endTime', $event)
+				? date(DATE_TIME_FORMAT_SECONDS, $event['endTime'] - $event['endTime'] % $delayTime + $delayTime - 1)
+				: '-';
+
+			$row = [
+				new CLink(
+					$event['eventid'],
+					$this->data['url'].'rsm.incidentdetails.php?host='.$this->data['tld']['host'].
+						'&eventid='.$event['eventid'].'&slvItemId='.$this->data['rdap']['itemid'].
+						'&filter_from='.$this->data['filter_from'].'&filter_to='.$this->data['filter_to'].
+						'&availItemId='.$this->data['rdap']['availItemId'].'&filter_set=1&sid='.$this->data['sid'].'&set_sid=1'
+				),
+				$incidentStatus,
+				$startTime,
+				$endTime,
+				$event['incidentFailedTests'],
+				$event['incidentTotalTests']
+			];
+
+			$rdapTable->addRow($row);
+		}
+
+		$testsDown = new CLink(
+			$this->data['rdap']['totalTests'],
+			$this->data['url'].'rsm.tests.php?filter_from='.$this->data['filter_from'].'&filter_to='.$this->data['filter_to'].
+				'&filter_set=1&host='.$this->data['tld']['host'].'&type='.RSM_RDAP.'&slvItemId='.
+				$this->data['rdap']['itemid'].'&sid='.$this->data['sid'].'&set_sid=1'
+		);
+
+		$testsInfo = [
+			bold(_('Tests are down')),
+			':',
+			SPACE,
+			$testsDown,
+			SPACE,
+			_n('test', 'tests', $this->data['rdap']['totalTests']),
+			SPACE,
+			'('._s(
+				'%1$s in incidents, %2$s outside incidents',
+				$this->data['rdap']['inIncident'],
+				$this->data['rdap']['totalTests'] - $this->data['rdap']['inIncident']
+			).')'
+		];
+
+		$details = new CSpan([
+			bold(_('Incidents')),
+			':',
+			SPACE,
+			isset($this->data['rdap']) ? count($this->data['rdap']['events']) : 0,
+			BR(),
+			$testsInfo,
+			BR(),
+			[[bold(_('SLA')), ':'.SPACE], convert_units(['value' => $this->data['rdap']['slaValue'], 'units' => 's'])],
+			BR(),
+			[[bold(_('Frequency/delay')), ':'.SPACE], convert_units(['value' => $this->data['rdap']['delay'], 'units' => 's'])]
+		]);
+
+		$rollingWeek = [
+			(new CSpan(_s('%1$s Rolling week status', $this->data['rdap']['slv'].'%')))->addClass('rolling-week-status'),
+			BR(),
+			(new CSpan(date(DATE_TIME_FORMAT, $this->data['rdap']['slvTestTime'])))->addClass('rsm-date-time')
+		];
+		$rdapInfoTable->addRow([$details, $rollingWeek]);
+		$rdapTab->additem($rdapInfoTable);
+
+		$rdapTab->additem($rdapTable);
+	}
+	else {
+		$message = is_RDAP_standalone($data['tests_start_time'])
+			? _('RDAP is disabled.')
+			: _('RDAP is not a standalone service.');
+
+		$rdapTab->additem(new CDiv(bold($message), 'red center'));
+	}
+
 	// EPP
 	if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
 		$eppTab = null;
@@ -458,12 +547,14 @@ if (isset($this->data['tld'])) {
 
 	if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
 		$incidentPage->addTab('rddsTab', _('RDDS'), $rddsTab);
+		$incidentPage->addTab('rdapTab', _('RDAP'), $rdapTab);
 	}
 	else {
 		$incidentPage->addTab('dnsTab', _('DNS'), $dnsTab);
 		$incidentPage->addTab('dnssecTab', _('DNSSEC'), $dnssecTab);
 		$incidentPage->addTab('rddsTab', _('RDDS'), $rddsTab);
 		$incidentPage->addTab('eppTab', _('EPP'), $eppTab);
+		$incidentPage->addTab('rdapTab', _('RDAP'), $rdapTab);
 	}
 }
 else {
