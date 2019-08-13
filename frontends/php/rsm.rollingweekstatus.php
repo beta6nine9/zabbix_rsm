@@ -868,6 +868,12 @@ foreach ($tlds_by_server as $key => $hosts) {
 									$data['tld'][$DB['SERVERS'][$key]['NR'].$items[$trItem]['hostid']][RSM_RDDS]['trigger'] = true;
 								}
 								break;
+							case RSM_SLV_RDAP_AVAIL:
+								$data['tld'][$DB['SERVERS'][$key]['NR'].$items[$trItem]['hostid']][RSM_RDAP]['incident'] = $trigger['triggerid'];
+								if ($data['tld'][$DB['SERVERS'][$key]['NR'].$items[$trItem]['hostid']][RSM_RDAP]['incident']) {
+									$data['tld'][$DB['SERVERS'][$key]['NR'].$items[$trItem]['hostid']][RSM_RDAP]['trigger'] = true;
+								}
+								break;
 							case RSM_SLV_EPP_AVAIL:
 								$data['tld'][$DB['SERVERS'][$key]['NR'].$items[$trItem]['hostid']][RSM_EPP]['incident'] = $trigger['triggerid'];
 								if ($data['tld'][$DB['SERVERS'][$key]['NR'].$items[$trItem]['hostid']][RSM_EPP]['incident']) {
