@@ -1,11 +1,13 @@
 Changes for rsm1.3.0rc3
 
+New features:
+....I..... [516] added recalculation of DNS Name Server Availability when "false positive" is toggled (asitals)
+
 Bug fixes:
 ....I..... [531] reset "DNS service was unavailable for at least 1m" triggers when month switches (asitals)
 ....I..... [528] removed trailing spaces from "Ratio of failed monthly RDDS queries" item names (asitals)
 ....I..... [533] added default arguments for sla-report.php; added monthly cronjob for sla-report.php (asitals)
-..F....... [532] fixed incorrect label formatting in incidents page; fixed default value of selected hostids in latest data page (miks)
-..F....... [532] fixed date and time format in SLA report page (miks)
+..F....... [532] fixed incorrect label formatting in incidents page; fixed default value of selected hostids in latest data page; fixed date and time format in SLA report page (miks)
 ..F....... [534] fixed reset button; made filter values to be stored in user profile (miks)
 ....I..... [527] fixed quotting arguments when calling script.py; fixed cron job that calls sla-monthly-status.pl (asitals)
 ....I..... [525] fixed error reporting when disabling TLD with tld.pl (asitals)
