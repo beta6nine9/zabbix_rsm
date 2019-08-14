@@ -1,11 +1,11 @@
 Name:		zabbix
-Version:	3.0.10
-Release: 	1%{?alphatag:.%{alphatag}}%{?dist}
+Version:	3.0.10%{rsmversion}
+Release: 	%{?rsmprereleasetag:0.}1%{?rsmprereleasetag:%{rsmprereleasetag}}%{?dist}
 Summary:	The Enterprise-class open source monitoring solution
 Group:		Applications/Internet
 License:	GPLv2+
 URL:		http://www.zabbix.com/
-Source0:	zabbix-%{version}%{?alphatag:%{alphatag}}.tar.gz
+Source0:	zabbix-%{version}%{?rsmprereleasetag:%{rsmprereleasetag}}.tar.gz
 Source1:	selinux
 Source3:	zabbix-logrotate.in
 Source6:	zabbix-server.init
@@ -202,7 +202,7 @@ AutoReq:			no
 Zabbix scripts for RSM
 
 %prep
-%setup0 -q -n zabbix-%{version}%{?alphatag:%{alphatag}}
+%setup0 -q -n zabbix-%{version}%{?rsmprereleasetag:%{rsmprereleasetag}}
 %patch0 -p1
 %patch1 -p1
 %if 0%{?rhel} >= 7

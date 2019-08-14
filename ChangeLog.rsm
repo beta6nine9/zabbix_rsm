@@ -24,6 +24,42 @@ New features:
 ..F.I..... [170] added support for Compliance SLA monitoring (dimir, yurii, asitals, miks, gcalenko)
 
 --------------------------------------------------------------------------------
+Changes for rsm1.2.8
+
+Bug fixes:
+....I..... [541] added MySQL connect, read and write timeouts in Zabbix server, Zabbix proxy and Perl scripts (asitals)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.2.7
+
+New features:
+....I..... [543] added script /opt/zabbix/scripts/misc/handle-duplicates.pl for finding and removing duplicate history entries (asitals)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.2.6
+
+rsm1.2.6rc1 was released as rsm1.2.6 without any changes
+
+--------------------------------------------------------------------------------
+Changes for rsm1.2.6rc1
+
+Bug fixes:
+....I..... [539] fixed service downtime and rolling week calculation logic (asitals)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.2.5
+
+rsm1.2.5rc1 was released as rsm1.2.5 without any changes
+
+--------------------------------------------------------------------------------
+Changes for rsm1.2.5rc1
+
+Bug fixes:
+....I..... [509] made SLA API file wites atomic (dimir)
+....I..... [511] added handling of invalid timestamps far in the past to SLA API script (dimir)
+....I..... [513] added code to skip tests with missing RTT or IP to Data Export, this can happen when history syncer faces SQL error (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm1.2.4
 
 Bug fixes:

@@ -1171,7 +1171,6 @@ sub handle_db_error
 sub db_connect
 {
 	$server_key = shift;
-	my $timeout = shift;
 
 	dbg("server_key:", ($server_key ? $server_key : "UNDEF"));
 
@@ -1195,20 +1194,21 @@ sub db_connect
 
 	$_global_sql = "DBI:mysql:database=$section->{'db_name'};host=$section->{'db_host'};$db_tls_settings";
 
+	# NB! Timeouts have to be specified via DSN. To check if they're actually being used:
+	# $ export DBI_TRACE=2=dbitrace.log
+	# $ ./XXX.pl
+	# $ grep 'Setting' dbitrace.log
+	$_global_sql .= ';mysql_connect_timeout=' . ($section->{'db_connect_timeout'} // 30);
+	$_global_sql .= ';mysql_write_timeout='   . ($section->{'db_write_timeout'} // 30);
+	$_global_sql .= ';mysql_read_timeout='    . ($section->{'db_read_timeout'} // 30);
+
 	dbg($_global_sql);
 
 	my $connect_opts = {
-		PrintError		=> 0,
-		HandleError		=> \&handle_db_error,
-		mysql_auto_reconnect	=> 1
+		'PrintError'		=> 0,
+		'HandleError'		=> \&handle_db_error,
+		'mysql_auto_reconnect'	=> 1,
 	};
-
-	if (defined($timeout))
-	{
-		$connect_opts->{mysql_connect_timeout} = $timeout;
-		$connect_opts->{mysql_write_timeout} = $timeout;
-		$connect_opts->{mysql_read_timeout} = $timeout;
-	}
 
 	$dbh = DBI->connect($_global_sql, $section->{'db_user'}, $section->{'db_password'}, $connect_opts)
 		or handle_db_error(DBI->errstr);
@@ -2250,7 +2250,7 @@ sub process_slv_avail_cycles($$$$$$$$$)
 
 	init_values();
 
-	foreach my $value_ts (sort(keys(%{$cycles_ref})))
+	foreach my $value_ts (sort { $a <=> $b } (keys(%{$cycles_ref})))
 	{
 		my $from = cycle_start($value_ts, $delay);
 		my $till = cycle_end($value_ts, $delay);
@@ -2391,13 +2391,13 @@ sub process_slv_rollweek_cycles($$$$$)
 
 	init_values();
 
-	foreach my $value_ts (sort(keys(%{$cycles_ref})))
+	foreach my $clock (sort { $a <=> $b } keys(%{$cycles_ref}))
 	{
-		my ($from, $till, undef) = get_rollweek_bounds($delay, $value_ts);
+		my ($from, $till, $value_ts) = get_rollweek_bounds($delay, $clock);
 
-		dbg("selecting period ", selected_period($from, $till), " (value_ts:", ts_str($value_ts), ")");
+		dbg("selecting period ", selected_period($from, $till), " (value_ts:", ts_str($clock), ")");
 
-		foreach (@{$cycles_ref->{$value_ts}})
+		foreach (@{$cycles_ref->{$clock}})
 		{
 			# NB! This is needed in order to set the value globally.
 			$tld = $_;
@@ -2436,7 +2436,7 @@ sub process_slv_downtime_cycles($$$$)
 
 	init_values();
 
-	foreach my $clock (sort {$a <=> $b} keys(%{$cycles_ref}))
+	foreach my $clock (sort { $a <=> $b } keys(%{$cycles_ref}))
 	{
 		my ($from, $till, $value_ts) = get_downtime_bounds($delay, $clock);
 
@@ -2838,9 +2838,7 @@ sub get_downtime
 	my $count = 0;
 	my $downtime = 0;
 
-	my $fetches = 0;
-
-	foreach (@$incidents)
+	foreach (@{$incidents})
 	{
 		my $false_positive = $_->{'false_positive'};
 		my $period_from = $_->{'start'};
@@ -2863,38 +2861,26 @@ sub get_downtime
 				" and " . sql_time_condition($period_from, $period_till).
 			" order by clock");
 
-		my $is_down = 0;	# 1 if service is "Down"
-					# 0 if it is "Up", "Up-inconclusive-no-data" or "Up-inconclusive-no-probes"
-		my $prevclock = 0;
+		my $prevclock;
 
-		foreach my $row_ref (@$rows_ref)
+		foreach my $row_ref (@{$rows_ref})
 		{
-			$fetches++;
-
 			my $value = $row_ref->[0];
 			my $clock = $row_ref->[1];
 
-			# NB! Do not ignore the first downtime minute
-			if ($value == DOWN && $prevclock == 0)
+			if (defined($prevclock) && $clock - $prevclock != $delay)
 			{
-				# first run
-				$downtime += 60;
-			}
-			elsif ($is_down != 0)
-			{
-				$downtime += $clock - $prevclock;
+				fail("dimir was wrong, one cycle can have missing or more than one availability value");
 			}
 
-			$is_down = ($value == DOWN ? 1 : 0);
+			if ($value == DOWN)
+			{
+				$downtime += $delay;
+			}
+
 			$prevclock = $clock;
 		}
-
-		# leftover of downtime
-		$downtime += $period_till - $prevclock if ($is_down != 0);
 	}
-
-	# complete minute
-	$downtime += 60 - ($downtime % 60 ? $downtime % 60 : 60);
 
 	# return minutes
 	return int($downtime / 60);
@@ -2935,7 +2921,7 @@ sub get_downtime_execute
 	my $from = shift;
 	my $till = shift;
 	my $ignore_incidents = shift;	# if set check the whole period
-	my $delay = shift;		# only needed if incidents are not ignored
+	my $delay = shift;
 
 	my $incidents;
 	if ($ignore_incidents)
@@ -2956,15 +2942,16 @@ sub get_downtime_execute
 	my $count = 0;
 	my $downtime = 0;
 
-	my $fetches = 0;
-
-	foreach (@$incidents)
+	foreach (@{$incidents})
 	{
 		my $false_positive = $_->{'false_positive'};
 		my $period_from = $_->{'start'};
 		my $period_till = $_->{'end'};
 
-		fail("internal error: incident outside time bounds, check function get_incidents()") if (($period_from < $from) and defined($period_till) and ($period_till < $from));
+		if (($period_from < $from) && defined($period_till) && ($period_till < $from))
+		{
+			fail("internal error: incident outside time bounds, check function get_incidents()")
+		}
 
 		$period_from = $from if ($period_from < $from);
 		$period_till = $till unless (defined($period_till)); # last incident may be ongoing
@@ -2993,13 +2980,11 @@ sub get_downtime_execute
 			$sql_count++;
 		}
 
-		my $prevclock = 0;
+		my $prevclock;
 
 		while ($sth->fetch())
 		{
-			$fetches++;
-
-			if ($prevclock != 0 && $clock - $prevclock != $delay)
+			if (defined($prevclock) && $clock - $prevclock != $delay)
 			{
 				fail("dimir was wrong, one cycle can have missing or more than one availability value");
 			}
