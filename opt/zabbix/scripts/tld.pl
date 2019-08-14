@@ -1523,6 +1523,8 @@ sub manage_tld_objects($$$$$$) {
         }
 
 	if ($action eq 'disable') {
+		generate_report($tld, time(), 1);
+
 	    my $result = disable_hosts(\@tmp_hostids);
 
 	    if (scalar(%{$result})) {

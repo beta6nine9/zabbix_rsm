@@ -143,6 +143,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		cycle_end
 		update_slv_rtt_monthly_stats
 		recalculate_downtime
+		generate_report
 		usage);
 
 # configuration, set in set_slv_config()
@@ -4112,6 +4113,45 @@ sub recalculate_downtime($$$$$$)
 	__fp_write_last_auditid($auditlog_log_file, $last_auditlog_auditid);
 }
 
+sub generate_report($$;$)
+{
+	my $tld   = shift;
+	my $ts    = shift;
+	my $force = shift;
+
+	my ($year, $month) = split("-", ts_ym($ts));
+
+	my $cmd = "/opt/zabbix/scripts/sla-report.php";
+	my @args = ();
+
+	push(@args, "--debug") if opt("debug");
+	push(@args, "--stats") if opt("stats");
+	push(@args, "--force") if $force;
+
+	push(@args, "--tld"      , $tld);
+	push(@args, "--year"     , int($year));
+	push(@args, "--month"    , int($month));
+
+	@args = map('"' . $_ . '"', @args);
+
+	dbg("executing $cmd @args");
+	my $out = qx($cmd @args 2>&1);
+
+	if ($out)
+	{
+		dbg("output of $cmd:\n" . $out);
+	}
+
+	if ($? == -1)
+	{
+		fail("failed to generate reports, failed to execute $cmd: $!");
+	}
+	if ($? != 0)
+	{
+		fail("failed to generate report, command $cmd exited with value " . ($? >> 8));
+	}
+}
+
 sub usage
 {
 	pod2usage(shift);
@@ -4672,7 +4712,7 @@ sub __fp_regenerate_reports($$)
 
 			if ($clock >= $oldest_clock)
 			{
-				__fp_generate_report($rsmhost, $clock);
+				generate_report($rsmhost, $clock);
 				__fp_log($rsmhost, $service, "regenerated report for $month ($reason)");
 			}
 			else
@@ -4700,45 +4740,6 @@ sub __fp_get_oldest_clock($$)
 	my $params = [$rsmhost];
 
 	return db_select_value($sql, $params);
-}
-
-sub __fp_generate_report($$)
-{
-	my $tld = shift;
-	my $ts  = shift;
-
-	my $server_id = get_rsm_server_id($server_key);
-	my ($year, $month) = split("-", ts_ym($ts));
-
-	my $cmd = "/opt/zabbix/scripts/sla-report.php";
-	my @args = ();
-
-	push(@args, "--debug") if opt("debug");
-	push(@args, "--stats") if opt("stats");
-
-	push(@args, "--server-id", int($server_id));
-	push(@args, "--tld"      , $tld);
-	push(@args, "--year"     , int($year));
-	push(@args, "--month"    , int($month));
-
-	@args = map('"' . $_ . '"', @args);
-
-	dbg("executing $cmd @args");
-	my $out = qx($cmd @args 2>&1);
-
-	if ($out)
-	{
-		dbg("output of $cmd:\n" . $out);
-	}
-
-	if ($? == -1)
-	{
-		fail("failed to regenerate reports, failed to execute $cmd: $!");
-	}
-	if ($? != 0)
-	{
-		fail("failed to regenerate report, command $cmd exited with value " . ($? >> 8));
-	}
 }
 
 #################

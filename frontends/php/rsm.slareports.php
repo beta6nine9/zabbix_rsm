@@ -57,12 +57,12 @@ if (hasRequest('filter_rst')) {
 /*
  * Filter
  */
-if ($data['filter_year'] == date('Y') && $data['filter_month'] > date('n')) {
-	show_error_message(_('Incorrect report period.'));
-}
-elseif ($data['filter_search']) {
+$filter_valid = false;
+
+if ($data['filter_search']) {
 	$error = '';
 	$master = $DB;
+	$filter_valid = true;
 
 	foreach ($DB['SERVERS'] as $server_nr => $server) {
 		if (!multiDBconnect($server, $error)) {
@@ -71,7 +71,7 @@ elseif ($data['filter_search']) {
 		}
 
 		$tld = API::Host()->get([
-			'output' => ['hostid', 'host', 'name'],
+			'output' => ['hostid', 'host', 'name', 'status'],
 			'tlds' => true,
 			'selectMacros' => ['macro', 'value'],
 			'selectItems' => ['itemid', 'key_', 'value_type'],
@@ -92,37 +92,49 @@ elseif ($data['filter_search']) {
 	}
 }
 
-if ($data['tld']) {
-	// Searching for pregenerated SLA report in database.
-	$report_row = DB::find('sla_reports', [
-		'hostid'	=> $data['tld']['hostid'],
-		'month'		=> $data['filter_month'],
-		'year'		=> $data['filter_year']
-	]);
-	$report_row = reset($report_row);
+if ($data['filter_year'] > date('Y') || ($data['filter_year'] == date('Y') && $data['filter_month'] > date('n'))) {
+	show_error_message(_('Incorrect report period.'));
+	$filter_valid = false;
+}
 
-	if (!$report_row) {
-		// Include file by build in autoloader.
-		new CSlaReport();
+if ($data['tld'] && $filter_valid) {
+	$report_row = false;
+	$is_current_month = (date('Yn') === $data['filter_year'] . $data['filter_month']);
 
-		if (!class_exists('CSlaReport')) {
-			show_error_message(_('SLA Report generation file is missing.'));
+	if (($data['tld']['status'] != HOST_STATUS_MONITORED && $is_current_month) || !$is_current_month) {
+		// Searching for pregenerated SLA report in database.
+		$report_row = DB::find('sla_reports', [
+			'hostid'	=> $data['tld']['hostid'],
+			'month'		=> $data['filter_month'],
+			'year'		=> $data['filter_year']
+		]);
+
+		$report_row = reset($report_row);
+
+		if (!$report_row) {
+			show_error_message(_('Report is not generated for requested month.'));
+		}
+	}
+	elseif (!file_exists('./include/classes/services/CSlaReport.php')) {
+		show_error_message(_('SLA Report generation file is missing.'));
+	}
+	else {
+		include './include/classes/services/CSlaReport.php';
+
+		$report_row = CSlaReport::generate($data['server_nr'], [$data['tld']['host']], $data['filter_year'],
+			$data['filter_month']
+		);
+
+		if (!$report_row) {
+			show_error_message(_s('Unable to generate XML report: %1$s', CSlaReport::$error));
+
+			if ($is_current_month) {
+				show_error_message(_('Please try again after 5 minutes.'));
+			}
 		}
 		else {
-			$report_row = CSlaReport::generate($data['server_nr'], [$data['tld']['host']], $data['filter_year'],
-				$data['filter_month']
-			);
-
-			if ($report_row === null) {
-				show_error_message(_s('Unable to generate XML report: %1$s', CSlaReport::$error));
-				if ($data['filter_year'] == date('Y') && $data['filter_month'] == date('n')) {
-					show_error_message(_('Please try again after 5 minutes.'));
-				}
-			}
-			else {
-				$report_row = reset($report_row);
-				$report_row += ['year' => $data['filter_year'], 'month' => $data['filter_month']];
-			}
+			$report_row = reset($report_row);
+			$report_row += ['year' => $data['filter_year'], 'month' => $data['filter_month']];
 		}
 	}
 
@@ -132,8 +144,8 @@ if ($data['tld']) {
 		header(sprintf('Content-disposition: attachment; filename="%s-%d-%s.xml"',
 			$data['tld']['host'], $report_row['year'], getMonthCaption($report_row['month']))
 		);
-		echo $report_row['report'];
 
+		echo $report_row['report'];
 		exit;
 	}
 

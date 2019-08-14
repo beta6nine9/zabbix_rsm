@@ -13,7 +13,7 @@ function main($argv)
 
 	$args = parseArgs($argv);
 
-	if (!$args["dry_run"])
+	if (!$args["dry_run"] && !$args["force"])
 	{
 		$curr_year  = (int)date("Y");
 		$curr_month = (int)date("n");
@@ -44,7 +44,7 @@ function main($argv)
 	{
 		try
 		{
-			print("Saving reports to the database");
+			print("Saving reports to the database\n");
 
 			CSlaReport::dbConnect($args["server_id"]);
 
@@ -102,6 +102,7 @@ function parseArgs($argv)
 		"tlds"      => [],
 		"year"      => null,
 		"month"     => null,
+		"force"     => false,
 	];
 
 	$script = array_shift($argv);
@@ -156,6 +157,10 @@ function parseArgs($argv)
 				{
 					usage($script, "Invalid value of --month: {$args["month"]}");
 				}
+				break;
+
+			case "--force":
+				$args["force"] = true;
 				break;
 
 			case "--debug":
@@ -243,7 +248,7 @@ function usage($script, $error_message = NULL)
 	}
 
 	echo "Usage:\n";
-	echo "        {$script} [--help] [--debug] [--stats] [--dry-run] --server-id <server_id> --tld <tld> --year <year> --month <month>\n";
+	echo "        {$script} [--help] [--debug] [--stats] [--dry-run] [--server-id <server_id>] [--tld <tld>] [--year <year>] [--month <month>] [--force]\n";
 	echo "\n";
 
 	echo "Options:\n";
@@ -270,6 +275,9 @@ function usage($script, $error_message = NULL)
 	echo "\n";
 	echo "        --month <month>\n";
 	echo "                Specify the month of the report (1 through 12).\n";
+	echo "\n";
+	echo "        --force\n";
+	echo "                Generate and save report even if specified year/month hasn't ended yet.\n";
 	echo "\n";
 
 	if (!is_null($error_message))
