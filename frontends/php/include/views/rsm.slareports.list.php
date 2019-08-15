@@ -95,6 +95,21 @@ if (!array_key_exists('details', $data)) {
 	]);
 }
 
+// TLD details.
+$date_from = date(DATE_TIME_FORMAT_SECONDS, zbxDateToTime($data['details']['from']));
+$date_till = date(DATE_TIME_FORMAT_SECONDS, zbxDateToTime($data['details']['to']));
+$date_generated = date(DATE_TIME_FORMAT_SECONDS, zbxDateToTime($data['details']['generated']));
+
+$widget->additem((new CDiv())
+	->addClass(ZBX_STYLE_TABLE_FORMS_CONTAINER)
+	->addItem([
+		bold(_s('Period: %1$s - %2$s', $date_from, $date_till)), BR(),
+		bold(_s('Generation time: %1$s', $date_generated)), BR(),
+		bold(_s('TLD: %1$s', $data['tld']['name'])), BR(),
+		bold(_('Server: ')), new CLink($data['server'], $data['rolling_week_url'])
+	])
+);
+
 // DNS Service Availability.
 if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY) {
 	$table->addRow([
@@ -113,8 +128,8 @@ if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY) {
 		$table->addRow([
 				_('DNS Name Server Availability'),
 				implode(', ', array_filter([$item['host'], $item['ip']], 'strlen')),
-				gmdate('Y-m-d H:i:s e', $item['from']),
-				gmdate('Y-m-d H:i:s e', $item['to']),
+				date(DATE_TIME_FORMAT_SECONDS, zbxDateToTime($item['from'])),
+				date(DATE_TIME_FORMAT_SECONDS, zbxDateToTime($item['to'])),
 				_s('%1$s (minutes of downtime)', $item['slv']),
 				_s('%1$s (minutes of downtime)', $item['slr'])
 			],
@@ -123,33 +138,32 @@ if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY) {
 	}
 
 	// DNS UDP/TCP Resolution RTT.
-	$table
-		->addRow([
-				_('DNS UDP Resolution RTT'),
-				'',
-				'',
-				'',
-				_s('%1$s %% (queries <= %2$s ms)', $data['slv_dns_udp_pfailed'],
-					$data['slr_dns_udp_pfailed_ms']
-				),
-				_s('<= %1$s ms, for at least %2$s %% of queries', $data['slr_dns_udp_pfailed_ms'],
-					$data['slr_dns_udp_pfailed']
-				)
-			],
-			($data['slv_dns_udp_pfailed'] < (100 - $data['slr_dns_udp_pfailed'])) ? 'red-bg' : null
-		)->addRow([
-				_('DNS TCP Resolution RTT'),
-				'',
-				'',
-				'',
-				_s('%1$s %% (queries <= %2$s ms)', $data['slv_dns_tcp_pfailed'],
-					$data['slr_dns_tcp_pfailed_ms']
-				),
-				_s('<= %1$s ms, for at least %2$s %% of queries', $data['slr_dns_tcp_pfailed_ms'],
+	$table->addRow([
+			_('DNS UDP Resolution RTT'),
+			'',
+			'',
+			'',
+			_s('%1$s %% (queries <= %2$s ms)', $data['slv_dns_udp_pfailed'],
+				$data['slr_dns_udp_pfailed_ms']
+			),
+			_s('<= %1$s ms, for at least %2$s %% of queries', $data['slr_dns_udp_pfailed_ms'],
+				$data['slr_dns_udp_pfailed']
+			)
+		],
+		((100 - $data['slv_dns_udp_pfailed']) >= (100 - $data['slr_dns_udp_pfailed'])) ? 'red-bg' : null
+	)->addRow([
+			_('DNS TCP Resolution RTT'),
+			'',
+			'',
+			'',
+			_s('%1$s %% (queries <= %2$s ms)', $data['slv_dns_tcp_pfailed'],
+				$data['slr_dns_tcp_pfailed_ms']
+			),
+			_s('<= %1$s ms, for at least %2$s %% of queries', $data['slr_dns_tcp_pfailed_ms'],
 					$data['slr_dns_tcp_pfailed']
-				)
-			],
-			($data['slv_dns_tcp_pfailed'] < (100 - $data['slr_dns_tcp_pfailed'])) ? 'red-bg' : null
+			)
+		],
+		((100 - $data['slv_dns_tcp_pfailed']) >= (100 - $data['slr_dns_tcp_pfailed'])) ? 'red-bg' : null
 	);
 }
 
@@ -175,7 +189,7 @@ if (array_key_exists('slv_rdds_downtime', $data) && $data['slv_rdds_downtime'] !
 				$data['slr_rdds_rtt_downtime']
 			)
 		],
-		($data['slv_rdds_rtt_downtime'] < (100 - $data['slr_rdds_rtt_downtime'])) ? 'red-bg' : null
+		((100 - $data['slv_rdds_rtt_downtime']) >= (100 - $data['slr_rdds_rtt_downtime'])) ? 'red-bg' : null
 	);
 }
 

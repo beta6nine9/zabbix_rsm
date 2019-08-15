@@ -6,6 +6,10 @@ class CSlaReport
 	const MONITORING_TARGET_REGISTRY  = "registry";
 	const MONITORING_TARGET_REGISTRAR = "registrar";
 
+	const RSMHOST_DNS_NS_LOG_ACTION_CREATE  = 0;
+	const RSMHOST_DNS_NS_LOG_ACTION_ENABLE  = 1;
+	const RSMHOST_DNS_NS_LOG_ACTION_DISABLE = 2;
+
 	public static $error;
 
 	private static $sql_count;
@@ -238,9 +242,7 @@ class CSlaReport
 		$itemhostids = [];
 		$itemids_float = [];
 		$itemids_uint = [];
-		$itemids_ns_avail = [];
-		$itemids_meta_ns_downtime = [];
-		$itemids_meta_ns_avail = [];
+		$itemids_ns_downtime = [];
 
 		foreach ($rows as $row)
 		{
@@ -249,20 +251,7 @@ class CSlaReport
 			$itemkeys[$itemid] = $key;
 			$itemhostids[$itemid] = $hostid;
 
-			if (preg_match("/^rsm\.slv\.dns\.ns\.avail\[(.+),(.+)\]$/", $key, $matches))
-			{
-				$hostname   = $matches[1];
-				$ip_address = $matches[2];
-
-				$itemids_meta_ns_avail[$itemid] = [
-					'hostid'    => $hostid,
-					'hostname'  => $hostname,
-					'ipAddress' => $ip_address,
-				];
-
-				array_push($itemids_ns_avail, $itemid);
-			}
-			elseif ($type === 0)
+			if ($type === 0)
 			{
 				array_push($itemids_float, $itemid);
 			}
@@ -325,7 +314,7 @@ class CSlaReport
 							"to"           => null,
 						];
 
-						$itemids_meta_ns_downtime[$hostid][$hostname][$ip_address] = $itemid;
+						array_push($itemids_ns_downtime, $itemid);
 
 						break;
 					}
@@ -337,23 +326,14 @@ class CSlaReport
 
 		// get monthly min and max clocks
 
-		$rows = self::getNsAvailMinMaxClock($itemids_ns_avail, "history_uint", $from, $till);
+		$periods = self::getNsAvailabilityPeriod($itemids_ns_downtime, $from, $till);
 
-		foreach ($rows as $row)
+		foreach ($data as $hostid => $tld)
 		{
-			list($itemid_avail, $from, $to) = $row;
-
-			$hostid     = $itemids_meta_ns_avail[$itemid_avail]["hostid"];
-			$hostname   = $itemids_meta_ns_avail[$itemid_avail]["hostname"];
-			$ip_address = $itemids_meta_ns_avail[$itemid_avail]["ipAddress"];
-
-			// if $itemids_meta_ns_downtime doesn't contain info about $hostid, then NS was probably disabled
-			if (array_key_exists($hostid, $itemids_meta_ns_downtime))
+			foreach ($tld["dns"]["ns"] as $itemid => $ns)
 			{
-				$itemid_downtime = $itemids_meta_ns_downtime[$hostid][$hostname][$ip_address];
-
-				$data[$hostid]["dns"]["ns"][$itemid_downtime]["from"] = $from;
-				$data[$hostid]["dns"]["ns"][$itemid_downtime]["to"]   = $to;
+				$data[$hostid]["dns"]["ns"][$itemid]["from"] = $periods[$itemid]["from"];
+				$data[$hostid]["dns"]["ns"][$itemid]["to"]   = $periods[$itemid]["till"];
 			}
 		}
 
@@ -592,8 +572,7 @@ class CSlaReport
 					"hostid in ({$hostids_placeholder}) and" .
 					" (" .
 						"key_ in ('rsm.slv.dns.downtime','rsm.slv.dns.udp.rtt.pfailed','rsm.slv.dns.tcp.rtt.pfailed') or" .
-						" key_ like 'rsm.slv.dns.ns.downtime[%,%]' or" .
-						" key_ like 'rsm.slv.dns.ns.avail[%,%]'" .
+						" key_ like 'rsm.slv.dns.ns.downtime[%,%]'" .
 					")" .
 				")";
 		$params = $all_hostids;
@@ -653,7 +632,7 @@ class CSlaReport
 		$sql = "select hosts.hostid,hosts.host" .
 			" from hosts" .
 				" left join hosts_groups on hosts_groups.hostid=hosts.hostid" .
-			" where hosts_groups.groupid=140";
+			" where hosts_groups.groupid=140 and hosts.status=0";
 		$params = [];
 
 		if (count($tlds) === 0)
@@ -693,7 +672,7 @@ class CSlaReport
 		return self::dbSelect($sql, $params);
 	}
 
-	private static function getNsAvailMinMaxClock($itemids, $history_table, $from, $till)
+	private static function getNsAvailabilityPeriod($itemids, $from, $till)
 	{
 		if (count($itemids) === 0)
 		{
@@ -701,14 +680,122 @@ class CSlaReport
 		}
 
 		$itemids_placeholder = substr(str_repeat("?,", count($itemids)), 0, -1);
-		$sql = "select itemid,min(clock),max(clock)" .
-			" from {$history_table}" .
-			" where itemid in ({$itemids_placeholder}) and" .
-				" clock between ? and ? and" .
-				" value!=0" .
-			" group by itemid";
-		$params = array_merge($itemids, [$from, $till]);
-		return self::dbSelect($sql, $params);
+		$sql = "select" .
+				" rsmhost_dns_ns_log.itemid," .
+				"rsmhost_dns_ns_log.clock," .
+				"rsmhost_dns_ns_log.action" .
+			" from" .
+				" rsmhost_dns_ns_log" .
+				" inner join (" .
+					"select" .
+						" itemid," .
+						"max(clock) as clock" .
+					" from" .
+						" rsmhost_dns_ns_log" .
+					" where" .
+						" itemid in ($itemids_placeholder) and" .
+						" clock<=?" .
+					" group by" .
+						" itemid" .
+				") as max_clock on max_clock.itemid=rsmhost_dns_ns_log.itemid and max_clock.clock=rsmhost_dns_ns_log.clock" .
+			" union distinct" .
+			" select" .
+				" itemid," .
+				"clock," .
+				"action" .
+			" from" .
+				" rsmhost_dns_ns_log" .
+			" where" .
+				" itemid in ($itemids_placeholder) and" .
+				" clock between ? and ?" .
+			" order by" .
+				" itemid asc," .
+				"clock asc";
+		$params = array_merge(
+			$itemids,
+			[$from],
+			$itemids,
+			[$from, $till]
+		);
+
+		$rows = self::dbSelect($sql, $params);
+
+		$periods     = [];   // resulting array, ['itemid' => ['from' => $clock, 'till' => $clock], ...]
+		$itemid_tmp  = null; // temporary variable for detecting when data for new item starts
+		$period_from = null; // ref to $periods[$itemid]['from']
+		$period_till = null; // ref to $periods[$itemid]['till']
+		$state       = null; // state of an item (enabled/disabled) for integrity checking
+
+		foreach ($rows as $row)
+		{
+			list ($itemid, $clock, $action) = $row;
+
+			if ($itemid_tmp != $itemid)
+			{
+				$itemid_tmp = $itemid;
+				$periods[$itemid] = [
+					'from' => null,
+					'till' => null,
+				];
+				$period_from = &$periods[$itemid]['from'];
+				$period_till = &$periods[$itemid]['till'];
+				$state = null;
+			}
+
+			switch ($action)
+			{
+				case self::RSMHOST_DNS_NS_LOG_ACTION_CREATE:
+				case self::RSMHOST_DNS_NS_LOG_ACTION_ENABLE:
+					if ($state === true)
+					{
+						throw new Exception("Unexpected action: '{$action}' (itemid: {$itemid}, clock: {$clock})");
+					}
+					$state = true;
+					if (is_null($period_from))
+					{
+						$period_from = $clock;
+					}
+					if (!is_null($period_till))
+					{
+						$period_till = null;
+					}
+					break;
+
+				case self::RSMHOST_DNS_NS_LOG_ACTION_DISABLE:
+					if ($state === false)
+					{
+						throw new Exception("Unexpected action: '{$action}' (itemid: {$itemid}, clock: {$clock})");
+					}
+					$state = false;
+					if (!is_null($period_from))
+					{
+						$period_till = $clock;
+					}
+					break;
+
+				default:
+					throw new Exception("Unhandled action: '{$action}' (itemid: {$itemid}, clock: {$clock})");
+			}
+		}
+		unset($period_from);
+		unset($period_till);
+
+		foreach ($periods as &$period)
+		{
+			if ($period["from"] < $from)
+			{
+				$period["from"] = $from;
+			}
+			if (is_null($period["till"]))
+			{
+				$period["till"] = $till;
+			}
+			$period["from"] = (int)($period["from"] / 60) * 60;
+			$period["till"] = (int)($period["till"] / 60) * 60 + 59;
+		}
+		unset($period);
+
+		return $periods;
 	}
 
 	private static function getSlrValues($from)

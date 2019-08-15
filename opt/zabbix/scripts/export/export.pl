@@ -984,7 +984,7 @@ sub __save_csv_data
 							$target_id = dw_get_id(ID_NS_NAME, $target);
 						}
 
-						foreach my $metric_ref (@{$cycle_ref->{'interfaces'}->{$interface}->{'probes'}->{$probe}->{'targets'}->{$target}})
+						METRIC: foreach my $metric_ref (@{$cycle_ref->{'interfaces'}->{$interface}->{'probes'}->{$probe}->{'targets'}->{$target}})
 						{
 							my $test_status;
 
@@ -1026,8 +1026,42 @@ sub __save_csv_data
 
 							my ($ip, $ip_id, $ip_version_id, $rtt);
 
+							# Skip possibly broken RDDS test results, when one of RTT or IP is lost.
+							# This happens in case of SQL error when history syncer is inserting
+							# values to the database (seen cases with "duplicate values" error).
+
+							if (defined($metric_ref->{JSON_TAG_RTT()}))
+							{
+								if (!defined($metric_ref->{JSON_TAG_TARGET_IP()}))
+								{
+									wrn("skipping $interface test performed at ",
+										ts_full($testclock), " because of missing IP");
+									next METRIC;
+								}
+
+								$rtt = $metric_ref->{JSON_TAG_RTT()};
+							}
+							else
+							{
+								if ($metric_ref->{JSON_TAG_DESCRIPTION()})
+								{
+									($rtt) = split(',', $metric_ref->{JSON_TAG_DESCRIPTION()});
+								}
+								else
+								{
+									$rtt = '';
+								}
+							}
+
 							if ($metric_ref->{JSON_TAG_TARGET_IP()})
 							{
+								if ($rtt eq '')
+								{
+									wrn("skipping $interface test performed at ",
+										ts_full($testclock), " because of missing RTT");
+									next METRIC;
+								}
+
 								$ip = $metric_ref->{JSON_TAG_TARGET_IP()};
 								$ip_id = dw_get_id(ID_NS_IP, $ip);
 								$ip_version_id = dw_get_id(ID_IP_VERSION, __ip_version($ip));
@@ -1037,23 +1071,6 @@ sub __save_csv_data
 								$ip = '';
 								$ip_id = '';
 								$ip_version_id = '';
-							}
-
-							if (defined($metric_ref->{JSON_TAG_RTT()}))
-							{
-								$rtt = $metric_ref->{JSON_TAG_RTT()};
-							}
-							else
-							{
-								if ($metric_ref->{JSON_TAG_DESCRIPTION()})
-								{
-									my @a = split(',', $metric_ref->{JSON_TAG_DESCRIPTION()});
-									$rtt = $a[0];
-								}
-								else
-								{
-									$rtt = '';
-								}
 							}
 
 							# TEST
