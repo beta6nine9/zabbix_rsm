@@ -2394,30 +2394,30 @@ sub process_slv_avail_cycles($$$$$$$$$)
 
 		my @online_probe_names = keys(%{get_probe_times($from, $till, $probes_ref)});
 
-	foreach (@{$cycles_ref->{$value_ts}})
-	{
-		$tld = $_;	# set global variable here
-
-		if (!defined($keys_in{$tld}))
+		foreach (@{$cycles_ref->{$value_ts}})
 		{
-			$keys_in{$tld} = $cfg_keys_in // $cfg_keys_in_cb->($tld);
+			$tld = $_;	# set global variable here
 
 			if (!defined($keys_in{$tld}))
 			{
-				# fail("cannot get input keys for Service availability calculation");
+				$keys_in{$tld} = $cfg_keys_in // $cfg_keys_in_cb->($tld);
 
-				# We used to fail here but not anymore because rsm.rdds items can be 
-				# disabled after switch to RDAP standalone. So some of TLDs may not have
-				# RDDS checks thus making SLV calculations for rsm.slv.rdds.* useless
+				if (!defined($keys_in{$tld}))
+				{
+					# fail("cannot get input keys for Service availability calculation");
 
-				wrn("no input keys for $tld, skipping");
-				next;
+					# We used to fail here but not anymore because rsm.rdds items can be 
+					# disabled after switch to RDAP standalone. So some of TLDs may not have
+					# RDDS checks thus making SLV calculations for rsm.slv.rdds.* useless
+
+					wrn("no input keys for $tld, skipping");
+					next;
+				}
 			}
-		}
 
-		process_slv_avail($tld, $keys_in{$tld}, $cfg_key_out, $from, $till, $value_ts, $cfg_minonline,
-			\@online_probe_names, $check_probe_values_cb, $cfg_value_type);
-	}
+			process_slv_avail($tld, $keys_in{$tld}, $cfg_key_out, $from, $till, $value_ts, $cfg_minonline,
+				\@online_probe_names, $check_probe_values_cb, $cfg_value_type);
+		}
 
 		# unset TLD (for the logs)
 		$tld = undef;
