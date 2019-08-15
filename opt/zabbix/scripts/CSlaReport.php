@@ -2,9 +2,9 @@
 
 class CSlaReport
 {
-	private const RSMHOST_DNS_NS_LOG_ACTION_CREATE  = 0;
-	private const RSMHOST_DNS_NS_LOG_ACTION_ENABLE  = 1;
-	private const RSMHOST_DNS_NS_LOG_ACTION_DISABLE = 2;
+	const RSMHOST_DNS_NS_LOG_ACTION_CREATE  = 0;
+	const RSMHOST_DNS_NS_LOG_ACTION_ENABLE  = 1;
+	const RSMHOST_DNS_NS_LOG_ACTION_DISABLE = 2;
 
 	public static $error;
 
