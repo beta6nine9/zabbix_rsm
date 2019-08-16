@@ -649,8 +649,7 @@ sub add_new_ns($)
 			create_item_dns_rtt($ns, $ip, $main_templateid, 'tcp', $proto);
 			create_item_dns_rtt($ns, $ip, $main_templateid, 'udp', $proto);
 
-			# DNS NS are not currently used
-			#create_all_slv_ns_items($ns, $ip, $main_hostid);
+			create_all_slv_ns_items($ns, $ip, $main_hostid, $TLD);
 		}
 	}
 }
@@ -801,15 +800,13 @@ sub manage_tld_objects($$$$$$)
 
 		if ($action eq 'disable')
 		{
+			generate_report($tld, time(), 1);
+
 			my $result = disable_hosts(\@tmp_hostids);
 
-			if (scalar(%{$result}))
+			if (!$result || !%{$result})
 			{
-				compare_arrays(\@hostids_arr, \@{$result->{'hostids'}});
-			}
-			else
-			{
-				pfail("en error occurred while disabling hosts!");
+				pfail("an error occurred while disabling hosts!");
 			}
 
 			exit;
@@ -879,27 +876,6 @@ sub manage_tld_objects($$$$$$)
 			#remove_applications_by_items(\@itemids);
 		}
 	}
-}
-
-sub compare_arrays($$)
-{
-	my $array_A = shift;
-	my $array_B = shift;
-
-	my @result;
-
-	foreach my $a (@{$array_A})
-	{
-		my $found = false;
-		foreach $b (@{$array_B})
-		{
-			$found = true if $a eq $b;
-		}
-
-		push(@result, $a) if $found eq false;
-	}
-
-	return @result;
 }
 
 ################################################################################
@@ -1643,7 +1619,6 @@ sub create_slv_ns_items($$$)
 		{
 			next unless defined $ipv4[$i_ipv4];
 
-			# DNS NS are not currently used
 			create_all_slv_ns_items($ns_name, $ipv4[$i_ipv4], $hostid, $host_name);
 		}
 
@@ -1651,7 +1626,6 @@ sub create_slv_ns_items($$$)
 		{
 			next unless defined $ipv6[$i_ipv6];
 
-			# DNS NS are not currently used
 			create_all_slv_ns_items($ns_name, $ipv6[$i_ipv6], $hostid, $host_name);
 		}
 	}

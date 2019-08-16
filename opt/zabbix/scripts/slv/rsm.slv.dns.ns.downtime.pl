@@ -19,6 +19,18 @@ db_connect();
 
 slv_exit(SUCCESS) if (get_monitoring_target() ne MONITORING_TARGET_REGISTRY);
 
+if (!opt('dry-run'))
+{
+	recalculate_downtime(
+		"/opt/zabbix/data/rsm.slv.dns.ns.downtime.auditlog.txt",
+		"rsm.slv.dns.ns.avail[%,%]",
+		"rsm.slv.dns.ns.downtime[%,%]",
+		1,
+		1,
+		get_dns_udp_delay(getopt('now') // time() - AVAIL_SHIFT_BACK)
+	);
+}
+
 use constant AVAIL_KEY_PATTERN => 'rsm.slv.dns.ns.avail';
 use constant DOWNTIME_KEY_PATTERN => 'rsm.slv.dns.ns.downtime';
 

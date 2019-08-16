@@ -30,11 +30,12 @@ require_once dirname(__FILE__).'/include/page_header.php';
 
 //		VAR			TYPE	OPTIONAL FLAGS	VALIDATION	EXCEPTION
 $fields = [
-	'export' =>						[T_ZBX_STR, O_OPT,  null,	null,		null],
-	'filter_set' =>					[T_ZBX_STR, O_OPT,  null,	null,		null],
-	'filter_search' =>				[T_ZBX_STR, O_OPT,  null,	null,		null],
-	'filter_year' =>				[T_ZBX_INT, O_OPT,  null,	null,		null],
-	'filter_month' =>				[T_ZBX_INT, O_OPT,  null,	null,		null]
+	'export' =>			[T_ZBX_STR, O_OPT,  null,	null,		null],
+	'filter_set' =>		[T_ZBX_STR, O_OPT,  null,	null,		null],
+	'filter_search' =>	[T_ZBX_STR, O_OPT,  null,	null,		null],
+	'filter_year' =>	[T_ZBX_INT, O_OPT,  null,	null,		null],
+	'filter_month' =>	[T_ZBX_INT, O_OPT,  null,	null,		null],
+	'filter_rst' =>		[T_ZBX_STR, O_OPT,  null,	null,		null],
 ];
 
 check_fields($fields);
@@ -46,8 +47,14 @@ $data = [
 	'filter_search' => getRequest('filter_search'),
 	'filter_year' => (int) getRequest('filter_year', date('Y')),
 	'filter_month' => (int) getRequest('filter_month', date('n')),
-	'rsm_monitoring_mode' => get_rsm_monitoring_type()
+	'rsm_monitoring_mode' => get_rsm_monitoring_type(),
 ];
+
+if (hasRequest('filter_rst')) {
+	$data['filter_search'] = '';
+	$data['filter_year'] = date('Y');
+	$data['filter_month'] = date('n');
+}
 
 /*
  * Filter
@@ -65,8 +72,8 @@ if ($data['filter_search']) {
 			continue;
 		}
 
-		$options = [
-			'output' => ['hostid', 'host', 'info_1', 'info_2'],
+		$tld = API::Host()->get([
+			'output' => ['hostid', 'host', 'name', 'status', 'info_1', 'info_2'],
 			'tlds' => true,
 			'selectMacros' => ['macro', 'value'],
 			'selectItems' => ['itemid', 'key_', 'value_type'],
@@ -74,8 +81,6 @@ if ($data['filter_search']) {
 				'host' => $data['filter_search']
 			]
 		];
-
-		$tld = API::Host()->get($options);
 
 		// TLD not found, proceed to search on another server.
 		if (!$tld) {
@@ -96,17 +101,18 @@ if ($data['filter_year'] > date('Y') || ($data['filter_year'] == date('Y') && $d
 	$filter_valid = false;
 }
 
-if ($data['tld']) {
-	if (!$filter_valid) {
-		$report_row = false;
-	}
-	elseif ((date('Y') == $data['filter_year'] && date('n') > $data['filter_month']) || date('Y') > $data['filter_year']) {
+if ($data['tld'] && $filter_valid) {
+	$report_row = false;
+	$is_current_month = (date('Yn') === $data['filter_year'] . $data['filter_month']);
+
+	if (($data['tld']['status'] != HOST_STATUS_MONITORED && $is_current_month) || !$is_current_month) {
 		// Searching for pregenerated SLA report in database.
 		$report_row = DB::find('sla_reports', [
 			'hostid'	=> $data['tld']['hostid'],
 			'month'		=> $data['filter_month'],
 			'year'		=> $data['filter_year']
 		]);
+
 		$report_row = reset($report_row);
 
 		if (!$report_row) {
@@ -115,7 +121,6 @@ if ($data['tld']) {
 	}
 	elseif (!file_exists('./include/classes/services/CSlaReport.php')) {
 		show_error_message(_('SLA Report generation file is missing.'));
-		$report_row = false;
 	}
 	else {
 		include './include/classes/services/CSlaReport.php';
@@ -126,17 +131,15 @@ if ($data['tld']) {
 
 		if (!$report_row) {
 			show_error_message(_s('Unable to generate XML report: %1$s', CSlaReport::$error));
-			if ($data['filter_year'] == date('Y') && $data['filter_month'] == date('n')) {
+			if ($is_current_month) {
 				show_error_message(_('Please try again after 5 minutes.'));
 			}
 		}
 		else {
 			$report_row = reset($report_row);
-		}
-	}
 
-	if ($report_row) {
-		$report_row += ['year' => $data['filter_year'], 'month' => $data['filter_month']];
+			$report_row += ['year' => $data['filter_year'], 'month' => $data['filter_month']];
+		}
 	}
 
 	// SLA Report download as XML file
@@ -145,6 +148,7 @@ if ($data['tld']) {
 		header(sprintf('Content-disposition: attachment; filename="%s-%d-%s.xml"',
 			$data['tld']['host'], $report_row['year'], getMonthCaption($report_row['month']))
 		);
+
 		echo $report_row['report'];
 		exit;
 	}
