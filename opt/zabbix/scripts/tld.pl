@@ -1640,28 +1640,28 @@ sub create_rdds_or_rdap_slv_items($$$;$)
 
 	$item_status = ITEM_STATUS_ACTIVE unless (defined($item_status));
 
-	($service ne "RDDS" and $service ne "RDAP") and pfail("Internal error, invalid service '$service' while creating SLV items");
+	pfail("Internal error, invalid service '$service', expected RDDS or RDAP") unless ($service eq "RDDS" || $service eq "RDAP");
 
 	my $service_lc = lc($service);
 
-	create_slv_item("$service availability",          "rsm.slv.$service_lc.avail",    $hostid, VALUE_TYPE_AVAIL, [get_application_id(APP_SLV_PARTTEST, $hostid)]);
-	create_slv_item("$service minutes of downtime",   "rsm.slv.$service_lc.downtime", $hostid, VALUE_TYPE_NUM,   [get_application_id(APP_SLV_CURMON, $hostid)]);
-	create_slv_item("$service weekly unavailability", "rsm.slv.$service_lc.rollweek", $hostid, VALUE_TYPE_PERC,  [get_application_id(APP_SLV_ROLLWEEK, $hostid)]);
+	create_slv_item("$service availability"         , "rsm.slv.$service_lc.avail"   , $hostid, VALUE_TYPE_AVAIL, [get_application_id(APP_SLV_PARTTEST, $hostid)]);
+	create_slv_item("$service minutes of downtime"  , "rsm.slv.$service_lc.downtime", $hostid, VALUE_TYPE_NUM  , [get_application_id(APP_SLV_CURMON, $hostid)]);
+	create_slv_item("$service weekly unavailability", "rsm.slv.$service_lc.rollweek", $hostid, VALUE_TYPE_PERC , [get_application_id(APP_SLV_ROLLWEEK, $hostid)]);
 
 	create_avail_trigger($service, $host_name);
 	create_dependent_trigger_chain($host_name, $service, \&create_downtime_trigger, $trigger_thresholds);
 	create_dependent_trigger_chain($host_name, $service, \&create_rollweek_trigger, $trigger_thresholds);
 
-	create_slv_item("Number of performed monthly $service queries", "rsm.slv.$service_lc.rtt.performed", $hostid, VALUE_TYPE_NUM,  [get_application_id(APP_SLV_CURMON, $hostid)]);
-	create_slv_item("Number of failed monthly $service queries"   , "rsm.slv.$service_lc.rtt.failed"   , $hostid, VALUE_TYPE_NUM,  [get_application_id(APP_SLV_CURMON, $hostid)]);
+	create_slv_item("Number of performed monthly $service queries", "rsm.slv.$service_lc.rtt.performed", $hostid, VALUE_TYPE_NUM , [get_application_id(APP_SLV_CURMON, $hostid)]);
+	create_slv_item("Number of failed monthly $service queries"   , "rsm.slv.$service_lc.rtt.failed"   , $hostid, VALUE_TYPE_NUM , [get_application_id(APP_SLV_CURMON, $hostid)]);
 	create_slv_item("Ratio of failed monthly $service queries"    , "rsm.slv.$service_lc.rtt.pfailed"  , $hostid, VALUE_TYPE_PERC, [get_application_id(APP_SLV_CURMON, $hostid)]);
 
 	create_dependent_trigger_chain($host_name, $service, \&create_ratio_of_failed_tests_trigger, $trigger_thresholds);
 }
 
-sub is_standalone_rdap_active()
+sub __is_rdap_standalone()
 {
-	return time() > $cfg_global_macros->{'{$RSM.RDAP.STANDALONE}'};
+	return time() >= $cfg_global_macros->{'{$RSM.RDAP.STANDALONE}'};
 }
 
 sub create_slv_items($$$)
@@ -1711,9 +1711,9 @@ sub create_slv_items($$$)
 
 	if (opt('rdds43-servers') || opt('rdds80-servers') || opt('rdap-base-url'))
 	{
-		if (!is_standalone_rdap_active()) # we haven't switched to RDAP yet
+		if (!__is_rdap_standalone())
 		{
-			# create RDDS items which may also include RDAP check results
+			# we haven't switched to RDAP yet, create RDDS items which may also include RDAP check results
 			create_rdds_or_rdap_slv_items($hostid, $host_name, "RDDS");
 
 			# create future RDAP items, it's ok for them to be active
@@ -1722,9 +1722,7 @@ sub create_slv_items($$$)
 		else
 		{
 			# after the switch, RDDS and RDAP item sets are opt-in
-
 			create_rdds_or_rdap_slv_items($hostid, $host_name, "RDAP") if (opt('rdap-base-url'));
-
 			create_rdds_or_rdap_slv_items($hostid, $host_name, "RDDS") if (opt('rdds43-servers') || opt('rdds80-servers'));
 		}
 	}
