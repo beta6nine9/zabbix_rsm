@@ -74,6 +74,7 @@ if (is_rdap_standalone($now))
 	push(@{$rdap_standalone_params_list}, @{$rtt_params_list}[0,1]);
 }
 
+# TODO: remove $rdap_standalone_params_list after migration to Standalone RDAP
 update_slv_rtt_monthly_stats(
 	$now,
 	opt('cycles') ? getopt('cycles') : slv_max_cycles('rdds'),

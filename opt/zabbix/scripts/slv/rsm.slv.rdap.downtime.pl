@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# Minutes of RDDS downtime during running month
+# Minutes of RDAP downtime during running month
 
 BEGIN
 {
@@ -32,9 +32,9 @@ if (!opt('dry-run'))
 		"/opt/zabbix/data/rsm.slv.rdap.downtime.auditlog.txt",
 		$cfg_key_in,
 		$cfg_key_out,
-		get_macro_incident_rdds_fail(),
-		get_macro_incident_rdds_recover(),
-		get_rdds_delay(getopt('now') // time() - AVAIL_SHIFT_BACK)
+		get_macro_incident_rdap_fail(),
+		get_macro_incident_rdap_recover(),
+		get_rdap_delay(getopt('now') // time() - AVAIL_SHIFT_BACK)
 	);
 }
 

@@ -4075,15 +4075,20 @@ sub get_slv_rtt_monthly_items($$$$)
 
 sub update_slv_rtt_monthly_stats($$$$$$$$;$)
 {
-	my $now                    = shift;
-	my $max_cycles             = shift;
-	my $single_tld             = shift; # undef or name of TLD
-	my $slv_item_key_performed = shift;
-	my $slv_item_key_failed    = shift;
-	my $slv_item_key_pfailed   = shift;
-	my $cycle_delay            = shift;
-	my $rtt_params_list        = shift;
+	my $now                         = shift;
+	my $max_cycles                  = shift;
+	my $single_tld                  = shift; # undef or name of TLD
+	my $slv_item_key_performed      = shift;
+	my $slv_item_key_failed         = shift;
+	my $slv_item_key_pfailed        = shift;
+	my $cycle_delay                 = shift;
+	my $rtt_params_list             = shift;
 	my $rdap_standalone_params_list = shift;
+
+	# $params_list - for RDDS, this is either $rtt_params_list (RDDS43, RRDS80 and RDAP) the migration to
+	# Standalone RDAP, or $rdap_standalone_params_list (RDDS43 and RDDS80) after migration to Standalone RDAP.
+	# For other services, $params_list is always $rtt_params_list.
+	# TODO: remove after migration to Standalone RDAP
 	my $params_list = $rtt_params_list;
 
 	# how long to wait for data after $cycle_end if number of performed checks is smaller than expected checks

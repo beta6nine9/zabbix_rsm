@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# RDDS availability
+# RDAP availability
 
 BEGIN
 {
@@ -29,7 +29,7 @@ db_connect();
 slv_exit(SUCCESS) if (!is_rdap_standalone(getopt('now')));
 
 # get cycle length
-my $delay = get_rdds_delay(getopt('now') // time() - AVAIL_SHIFT_BACK);
+my $delay = get_rdap_delay(getopt('now') // time() - AVAIL_SHIFT_BACK);
 
 # get timestamp of the beginning of the latest cycle
 my (undef, undef, $max_clock) = get_cycle_bounds($delay, getopt('now'));
