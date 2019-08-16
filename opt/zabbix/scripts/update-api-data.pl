@@ -76,6 +76,13 @@ if (defined($opt_from))
 	dbg("option \"from\" truncated to the start of a minute: $opt_from") if ($opt_from != getopt('from'));
 }
 
+db_connect();
+my $monitoring_target = get_monitoring_target();
+my $rdap_is_standalone = is_rdap_standalone();
+db_disconnect();
+
+dbg("RDAP ", ($rdap_is_standalone ? "is" : "is NOT"), " standalone");
+
 my %services;
 if (opt('service'))
 {
@@ -83,20 +90,18 @@ if (opt('service'))
 }
 else
 {
-	db_connect();
-	my $monitoring_target = get_monitoring_target();
-	db_disconnect();
-
 	if ($monitoring_target eq MONITORING_TARGET_REGISTRY)
 	{
 		$services{'dns'} = undef;
 		$services{'dnssec'} = undef;
 		$services{'rdds'} = undef;
+		$services{'rdap'} = undef if ($rdap_is_standalone);
 		$services{'epp'} = undef;
 	}
 	elsif ($monitoring_target eq MONITORING_TARGET_REGISTRAR)
 	{
 		$services{'rdds'} = undef;
+		$services{'rdap'} = undef if ($rdap_is_standalone);
 	}
 }
 
@@ -105,7 +110,9 @@ foreach my $service (keys(%services))
 {
 	if ($service eq 'rdds')
 	{
-		push(@interfaces, 'rdds43', 'rdds80', 'rdap');
+		push(@interfaces, 'rdds43', 'rdds80');
+
+		push(@interfaces, 'rdap') if (!$rdap_is_standalone);
 	}
 	else
 	{
@@ -259,7 +266,10 @@ foreach my $service (keys(%services))
 	elsif ($service eq 'rdds')
 	{
 		$services{$service}{'delay'} = get_rdds_delay($check_from);
-		$services{$service}{'key_statuses'} = ['rsm.rdds[{$RSM.TLD}', 'rdap['];
+
+		$services{$service}{'key_statuses'} = ['rsm.rdds[{$RSM.TLD}'];
+
+		push(@{$services{$service}{'key_statuses'}}, 'rdap[') if (!$rdap_is_standalone);
 
 		$services{$service}{+AH_INTERFACE_RDDS43}{'valuemaps'} = get_valuemaps('rdds');
 		$services{$service}{+AH_INTERFACE_RDDS43}{'key_rtt'} = 'rsm.rdds.43.rtt[{$RSM.TLD}]';
@@ -269,6 +279,18 @@ foreach my $service (keys(%services))
 		$services{$service}{+AH_INTERFACE_RDDS80}{'valuemaps'} = $services{$service}{+AH_INTERFACE_RDDS43}{'valuemaps'};
 		$services{$service}{+AH_INTERFACE_RDDS80}{'key_rtt'} = 'rsm.rdds.80.rtt[{$RSM.TLD}]';
 		$services{$service}{+AH_INTERFACE_RDDS80}{'key_ip'} = 'rsm.rdds.80.ip[{$RSM.TLD}]';
+
+		if (!$rdap_is_standalone)
+		{
+			$services{$service}{+AH_INTERFACE_RDAP}{'valuemaps'} = get_valuemaps('rdap');
+			$services{$service}{+AH_INTERFACE_RDAP}{'key_rtt'} = 'rdap.rtt';
+			$services{$service}{+AH_INTERFACE_RDAP}{'key_ip'} = 'rdap.ip';
+		}
+	}
+	elsif ($service eq 'rdap')
+	{
+		$services{$service}{'delay'} = get_rdap_delay($check_from);
+		$services{$service}{'key_statuses'} = ['rdap['];
 
 		$services{$service}{+AH_INTERFACE_RDAP}{'valuemaps'} = get_valuemaps('rdap');
 		$services{$service}{+AH_INTERFACE_RDAP}{'key_rtt'} = 'rdap.rtt';

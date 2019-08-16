@@ -100,6 +100,11 @@ my $max_period = (opt('period') ? getopt('period') * 60 : MAX_PERIOD);
 
 db_connect();
 
+my $rdap_is_standalone = is_rdap_standalone();
+my $rdap_standalone_ts = get_rdap_standalone_ts();
+
+dbg("RDAP ", ($rdap_is_standalone ? "is" : "is NOT"), " standalone");
+
 my $cfg_minonline = get_macro_dns_probe_online();
 my $cfg_minns = get_macro_minns();
 
@@ -108,18 +113,22 @@ fail("number of required working Name Servers is configured as $cfg_minns") if (
 my %delays;
 $delays{'dns'} = $delays{'dnssec'} = get_dns_udp_delay($now);
 $delays{'rdds'} = get_rdds_delay($now);
+$delays{'rdap'} = get_rdap_delay($now) if ($rdap_is_standalone);
 
 my %clock_limits;
 $clock_limits{'dns'} = $clock_limits{'dnssec'} = cycle_start(time() - $incident_measurements_limit, $delays{'dnssec'});
 $clock_limits{'rdds'} = cycle_start(time() - $incident_measurements_limit, $delays{'rdds'});
+$clock_limits{'rdap'} = cycle_start(time() - $incident_measurements_limit, $delays{'rdap'}) if ($rdap_is_standalone);
 
 db_disconnect();
 
 my %service_keys = (
 	'dns' => 'rsm.slv.dns.avail',
 	'dnssec' => 'rsm.slv.dnssec.avail',
-	'rdds' => 'rsm.slv.rdds.avail'
+	'rdds' => 'rsm.slv.rdds.avail',
 );
+
+$service_keys{'rdap'} = 'rsm.slv.rdap.avail' if ($rdap_is_standalone);
 
 # keep to avoid reading multiple times
 my $global_lastclock;
@@ -460,7 +469,7 @@ sub process_tld($$$$$)
 
 		if (opt('print-period'))
 		{
-			info("selected $service period: ", selected_period(
+			info(sprintf("selected %4s period: ", $service), selected_period(
 				$cycles_from,
 				cycle_end($cycles_till, $delays{$service})
 			));
@@ -688,7 +697,16 @@ sub cycles_to_calculate($$$$$$$$)
 					return E_FAIL;
 				}
 
-				$lastclock = $global_lastclock;
+				if ($service eq "rdap" && $global_lastclock < $rdap_standalone_ts)
+				{
+					# when we switch to standalone RDAP we should start generating
+					# data starting from the time of the switch
+					$lastclock = $rdap_standalone_ts;
+				}
+				else
+				{
+					$lastclock = $global_lastclock;
+				}
 			}
 			else
 			{
@@ -808,7 +826,7 @@ sub get_service_from_probe_key($)
 	}
 	elsif (substr($key, 0, length("rdap")) eq "rdap")
 	{
-		$service = "rdds";
+		$service = ($rdap_is_standalone ? "rdap" : "rdds");
 	}
 
 	return $service;
@@ -834,6 +852,10 @@ sub get_service_from_slv_key($)
 	elsif (substr($key, 0, length("rdds.")) eq "rdds.")
 	{
 		$service = "rdds";
+	}
+	elsif (substr($key, 0, length("rdap.")) eq "rdap.")
+	{
+		$service = ($rdap_is_standalone ? "rdap" : "rdds");
 	}
 	else
 	{
@@ -1665,7 +1687,15 @@ sub get_interfaces($$$)
 	{
 		push(@result, AH_INTERFACE_RDDS43) if (tld_interface_enabled($tld, 'rdds43', $now));
 		push(@result, AH_INTERFACE_RDDS80) if (tld_interface_enabled($tld, 'rdds80', $now));
-		push(@result, AH_INTERFACE_RDAP) if (tld_interface_enabled($tld, 'rdap', $now));
+
+		if (!$rdap_is_standalone)
+		{
+			push(@result, AH_INTERFACE_RDAP) if (tld_interface_enabled($tld, 'rdap', $now));
+		}
+	}
+	elsif ($service eq 'rdap')
+	{
+		push(@result, AH_INTERFACE_RDAP);
 	}
 
 	return \@result;
@@ -1833,7 +1863,7 @@ Optionally specify TLD.
 
 =item B<--service> name
 
-Optionally specify service, one of: dns, dnssec, rdds
+Optionally specify service, one of: dns, dnssec, rdds, rdap (if it's standalone).
 
 =item B<--server-id> ID
 
