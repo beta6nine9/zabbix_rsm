@@ -18,6 +18,7 @@ usage()
 	echo "       -c|--clean      clean all previously generated files"
 	echo "       -r|--restore    restore the versions and exit"
 	echo "       -s|--set-only   set versions and exit, do not build anything"
+	echo "       -d|--dry-run    show generated package version and exit"
 	echo "       -h|--help       print this help message"
 
 	exit $FAILURE
@@ -54,6 +55,7 @@ fail()
 OPT_FORCE=0
 OPT_CLEAN=0
 OPT_SET_ONLY=0
+OPT_DRY_RUN=0
 while [ -n "$1" ]; do
 	case "$1" in
 		-f|--force)
@@ -68,6 +70,9 @@ while [ -n "$1" ]; do
 			;;
 		-s|--set-only)
 			OPT_SET_ONLY=1
+			;;
+		-d|--dry-run)
+			OPT_DRY_RUN=1
 			;;
 		-h|--help)
 			usage
@@ -98,6 +103,17 @@ if [[ $OPT_CLEAN -eq 1 ]]; then
 	done
 fi
 
+rsmversion=$(echo $RSM_VERSION | sed -r 's/^(rsm[1-9][0-9]*\.[0-9]+\.[0-9]+).*/\1/')
+rsmprereleasetag=$(echo $RSM_VERSION | sed -r 's/^rsm[1-9][0-9]*\.[0-9]+\.[0-9]+//')
+
+version_for_msg="$rsmversion"
+[ -n "$rsmprereleasetag" ] && version_for_msg="$version_for_msg, pre-release tag: $rsmprereleasetag"
+
+if [[ $OPT_DRY_RUN -eq 1 ]]; then
+	msg "[$version_for_msg]"
+	exit $SUCCESS
+fi
+
 msg "setting server version ($RSM_VERSION)"
 sed -i.rpmbak -r "s/(ZBX_STR\(ZABBIX_VERSION_PATCH\).*ZABBIX_VERSION_RC)/\1 \"$RSM_VERSION\"/" $SRV_VERSION_FILE || fail
 
@@ -106,12 +122,6 @@ sed -i.rpmbak -r "s/(ZABBIX_VERSION',\s+'[0-9\.]+)'.*/\1$RSM_VERSION');/" $FE_VE
 
 msg "setting version for autoconf ($RSM_VERSION)"
 sed -i.rpmbak -r "s/^(AC_INIT\(\[Zabbix\],\[[0-9\.]+)\]\)/\1$RSM_VERSION])/;s/^AM_INIT_AUTOMAKE.*$/AM_INIT_AUTOMAKE([1.9 tar-pax])/" $AC_VERSION_FILE || fail
-
-rsmversion=$(echo $RSM_VERSION | sed -r 's/^(rsm[1-9][0-9]*\.[0-9]+\.[0-9]+).*/\1/')
-rsmprereleasetag=$(echo $RSM_VERSION | sed -r 's/^rsm[1-9][0-9]*\.[0-9]+\.[0-9]+//')
-
-version_for_msg="$rsmversion"
-[ -n "$rsmprereleasetag" ] && version_for_msg="$version_for_msg, pre-release tag: $rsmprereleasetag"
 
 msg "setting version for rpm ($version_for_msg)"
 sed -i.rpmbak -r "s/(^Version:\s+[0-9\.]+)$/\1$rsmversion/" $SPEC || fail
