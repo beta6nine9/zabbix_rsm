@@ -1,3 +1,9 @@
+Changes for rsm2.0.0alpha1
+
+New features:
+..F.I..... [518] added support for Standalone RDAP service (asitals, dimir, gcalenko, miks, yurii)
+
+--------------------------------------------------------------------------------
 Changes for rsm1.4.0rc2
 
 Bug fixes
