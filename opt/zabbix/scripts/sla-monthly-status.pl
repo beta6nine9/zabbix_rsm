@@ -305,23 +305,28 @@ sub alert($$$$)
 	my $value = shift;
 	my $clock = shift;
 
+	my $action_target = {
+		MONITORING_TARGET_REGISTRY , "tld",
+		MONITORING_TARGET_REGISTRAR, "registrar",
+	}->{get_monitoring_target()};
+
 	my $cmd = "python";
 	my @args = ();
 
 	push(@args, "/opt/slam/library/alertcom/script.py");
 	push(@args, "zabbix alert");
-	push(@args, "tld#PROBLEM#$tld#Monthly SLV: $item#$value");
+	push(@args, "$action_target#PROBLEM#$tld#Monthly SLV: $item#$value");
 	push(@args, DateTime->from_epoch('epoch' => $clock)->strftime('%Y.%m.%d %H:%M:%S %Z'));
 
-	my $args = join(' ', map('"' . $_ . '"', @args));
+	@args = map('"' . $_ . '"', @args);
 
 	if (opt("dry-run"))
 	{
-		print "$cmd $args\n";
+		print "$cmd @args\n";
 	}
 	else
 	{
-		dbg("executing $cmd $args");
+		dbg("executing $cmd @args");
 		my $out = qx($cmd @args 2>&1);
 
 		if ($out)

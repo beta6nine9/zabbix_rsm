@@ -3,10 +3,16 @@ package TLDs;
 use strict;
 use warnings;
 use RSM;
+use RSMSLV;
 use Zabbix;
 use TLD_constants qw(:general :templates :groups :api :config :tls :items);
 use Data::Dumper;
+use Getopt::Long;
 use base 'Exporter';
+
+use constant RSMHOST_DNS_NS_LOG_ACTION_CREATE  => 0;
+use constant RSMHOST_DNS_NS_LOG_ACTION_ENABLE  => 1;
+use constant RSMHOST_DNS_NS_LOG_ACTION_DISABLE => 2;
 
 our @EXPORT = qw(zbx_connect check_api_error get_proxies_list
 		get_api_error zbx_need_relogin
@@ -278,7 +284,21 @@ sub update_items_status($$)
 
 	foreach my $itemid (@{$items})
 	{
+		my $rsmhost_dns_ns_log_action;
+
+		my $item = $zabbix->get('item', {'itemids' => [$itemid], 'output' => ['key_', 'status']});
+		if ($item->{'key_'} =~ '^rsm\.slv\.dns\.ns\.downtime\[.*,.*\]$' && $item->{'status'} != $status)
+		{
+			$rsmhost_dns_ns_log_action = RSMHOST_DNS_NS_LOG_ACTION_ENABLE  if ($status == 0);
+			$rsmhost_dns_ns_log_action = RSMHOST_DNS_NS_LOG_ACTION_DISABLE if ($status == 1);
+		}
+
 		$result->{$itemid} = $zabbix->update('item', {'itemid' => $itemid, 'status' => $status});
+
+		if (defined($rsmhost_dns_ns_log_action))
+		{
+			rsmhost_dns_ns_log($itemid, $rsmhost_dns_ns_log_action);
+		}
 	}
 
 	return $result;
@@ -593,13 +613,29 @@ sub create_item
 	my $result;
 	my $itemid;
 
+	my $rsmhost_dns_ns_log_action;
+
 	if ($itemid = $zabbix->exist('item', {'filter' => {'hostid' => $options->{'hostid'}, 'key_' => $options->{'key_'}}}))
 	{
 		$options->{'itemid'} = $itemid;
+
+		if ($options->{'key_'} =~ '^rsm\.slv\.dns\.ns\.downtime\[.*,.*\]$')
+		{
+			if ($zabbix->get('item', {'itemids' => [$itemid], 'output' => ['status']})->{'status'} != ITEM_STATUS_ACTIVE)
+			{
+				$rsmhost_dns_ns_log_action = RSMHOST_DNS_NS_LOG_ACTION_ENABLE;
+			}
+		}
+
 		$result = $zabbix->update('item', $options);
 	}
 	else
 	{
+		if ($options->{'key_'} =~ '^rsm\.slv\.dns\.ns\.downtime\[.*,.*\]$')
+		{
+			$rsmhost_dns_ns_log_action = RSMHOST_DNS_NS_LOG_ACTION_CREATE;
+		}
+
 		$result = $zabbix->create('item', $options);
 	}
 
@@ -617,6 +653,11 @@ sub create_item
 	#{
 	#	pfail("cannot create item:\n", Dumper($options));
 	#}
+
+	if (defined($rsmhost_dns_ns_log_action))
+	{
+		rsmhost_dns_ns_log($result, $rsmhost_dns_ns_log_action);
+	}
 
 	return $result;
 }
@@ -1233,6 +1274,35 @@ sub create_probe_health_tmpl()
 	});
 
 	return $templateid;
+}
+
+sub rsmhost_dns_ns_log($$)
+{
+	my $itemid = shift;
+	my $action = shift;
+
+	my %OPTS;
+	my $rv = GetOptions(\%OPTS, "server-id=i");
+
+	my $config = get_rsm_config();
+	set_slv_config($config);
+
+	my $server_key;
+	if (defined($OPTS{'server-id'}))
+	{
+		$server_key = get_rsm_server_key($OPTS{'server-id'});
+	}
+	else
+	{
+		$server_key = get_rsm_local_key($config);
+	}
+
+	my $sql = "insert into rsmhost_dns_ns_log (itemid,clock,action) values (?,?,?)";
+	my $params = [$itemid, time(), $action];
+
+	db_connect($server_key);
+	db_exec($sql, $params);
+	db_disconnect();
 }
 
 sub pfail

@@ -1,0 +1,1 @@
+0 15 1 * * root /opt/zabbix/scripts/sla-report.php >> /var/log/zabbix/sla-report.err 2>&1

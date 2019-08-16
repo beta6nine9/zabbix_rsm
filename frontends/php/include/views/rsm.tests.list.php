@@ -24,7 +24,7 @@ $widget = (new CWidget())->setTitle(_('Tests'));
 // filter
 $filter = (new CFilter('web.rsm.tests.filter.state'))
 	->addVar('filter_set', 1)
-	->addVar('host', $this->data['tld']['name'])
+	->addVar('host', $this->data['tld']['host'])
 	->addVar('type', $this->data['type'])
 	->addVar('slvItemId', $this->data['slvItemId'])
 	->addVar('filter_from', zbxDateToTime($data['filter_from']))
@@ -40,7 +40,7 @@ $filterColumn2
 $filterColumn3
 	->addRow((new CLink(_('Rolling week'),
 		'rsm.tests.php?type='.$this->data['type'].'&filter_set=1&filter_rolling_week=1'
-			.'&host='.$this->data['tld']['name'].'&slvItemId='.$this->data['slvItemId'])
+			.'&host='.$this->data['tld']['host'].'&slvItemId='.$this->data['slvItemId'])
 	)
 		->addClass(ZBX_STYLE_BTN_LINK));
 
@@ -105,7 +105,7 @@ $object_info = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR)
 		BR(),
 		new CSpan([bold(_('Registrar family')), ':', SPACE, $data['tld']['info_2']])
 	]
-	: new CSpan([bold(_('TLD')), ':', SPACE, $data['tld']['name']]);
+	: new CSpan([bold(_('TLD')), ':', SPACE, $data['tld']['host']]);
 
 $testsInfoTable->addRow([[
 	$object_info,

@@ -260,7 +260,7 @@ $addition_info = [
 ];
 
 $particular_test = [
-	new CSpan([bold(_('TLD')), ':', SPACE, $data['tld']['name']]),
+	new CSpan([bold(_('TLD')), ':', SPACE, $data['tld']['host']]),
 	BR(),
 	new CSpan([bold(_('Service')), ':', SPACE, $data['slvItem']['name']]),
 	BR(),
