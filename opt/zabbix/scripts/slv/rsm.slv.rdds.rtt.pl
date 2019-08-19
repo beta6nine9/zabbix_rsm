@@ -60,7 +60,7 @@ my $rtt_params_list =
 		'timeout_threshold_value' => $rtt_low_rdds
 	},
 	{
-		'probes'                  => get_probes("RDDS"),
+		'probes'                  => get_probes("RDAP"),
 		'tlds_service'            => "rdap",
 		'rtt_item_key_pattern'    => RTT_ITEM_KEY_PATTERN_RDAP,
 		'timeout_error_value'     => RTT_TIMEOUT_ERROR_RDAP,
