@@ -300,8 +300,8 @@ sub dw_get_cycle_id
 			_DIGITS_IP_ID."s", $clock, $service_category_id, $tld_id, $ns_id, $ip_id);
 	}
 
-	# todo: for RDDS the target and the IP can be an empty string
-	if ($service_category_id == 3)
+	# todo: for RDDS and RDAP the target and the IP can be an empty string
+	if ($service_category_id == 3 || $service_category_id == 6)
 	{
 		$ns_id = 0 if ($ns_id eq "");
 		$ip_id = 0 if ($ip_id eq "");
