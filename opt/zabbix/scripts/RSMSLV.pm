@@ -20,7 +20,7 @@ use Fcntl qw(:flock);	# for the LOCK_* constants, logging to stdout by multiple 
 use RSM;
 use Pusher qw(push_to_trapper);
 use Fcntl qw(:flock);
-use List::Util qw(any none min max);
+use List::Util qw(min max);
 
 use constant E_ID_NONEXIST => -2;
 use constant E_ID_MULTIPLE => -3;
@@ -1815,7 +1815,7 @@ sub slv_max_cycles($)
 {
 	my $service = shift;
 
-	if (none { $service eq $_ } ('dns', 'dnssec', 'rdap', 'rdds'))
+	if ($service ne 'dns' && $service ne 'dnssec' && $service ne 'rdap' && $service ne 'rdds')
 	{
 		fail("unhandled service: '$service'");
 	}
