@@ -724,10 +724,10 @@ sub cycles_to_calculate($$$$$$$$)
 					# when we switch to standalone RDAP we should start generating
 					# data starting from the time of the switch
 
-					$global_lastclock_str   = ts_full($global_lastclock);
-					$standalone_rdap_ts_str = ts_full(get_rdap_standalone_ts());
+					my $global_lastclock_str   = ts_full($global_lastclock);
+					my $standalone_rdap_ts_str = ts_full(get_rdap_standalone_ts());
 
-					wrn("skipping because \$global_lastclock is smaller than Standalone RDAP starting time"
+					wrn("skipping because \$global_lastclock is smaller than Standalone RDAP starting time".
 						" (itemid: $itemid, \$global_lastclock = $global_lastclock_str, get_rdap_standalone_ts() = $standalone_rdap_ts_str");
 
 					next;
