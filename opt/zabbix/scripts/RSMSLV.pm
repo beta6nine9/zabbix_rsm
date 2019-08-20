@@ -3093,7 +3093,7 @@ sub fail_if_running()
 
 sub exit_if_running()
 {
-	return if (opt('dry-run'));
+	return if (opt('dry-run') || opt('now'));
 
 	my $pid = __is_already_running();
 
