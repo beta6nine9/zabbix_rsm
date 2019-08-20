@@ -1175,7 +1175,7 @@ update-api-data.pl - save information about the incidents to a filesystem
 
 =head1 SYNOPSIS
 
-update-api-data.pl [--service <dns|dnssec|rdds|epp>] [--tld <tld>|--ignore-file <file>] [--from <timestamp>|--continue] [--print-period] [--period minutes] [--dry-run [--probe name]] [--warnslow <seconds>] [--debug] [--help]
+update-api-data.pl [--service <dns|dnssec|rdds|rdap|epp>] [--tld <tld>|--ignore-file <file>] [--from <timestamp>|--continue] [--print-period] [--period minutes] [--dry-run [--probe name]] [--warnslow <seconds>] [--debug] [--help]
 
 =head1 OPTIONS
 
@@ -1183,7 +1183,7 @@ update-api-data.pl [--service <dns|dnssec|rdds|epp>] [--tld <tld>|--ignore-file 
 
 =item B<--service> service
 
-Process only specified service. Service must be one of: dns, dnssec, rdds or epp.
+Process only specified service. Service must be one of: dns, dnssec, rdds, rdap or epp.
 
 =item B<--tld> tld
 
@@ -1268,6 +1268,6 @@ program to provide it for users in convenient way.
 
 ./update-api-data.pl --tld example --period 10
 
-This will update API data of the last 10 minutes of DNS, DNSSEC, RDDS and EPP services of TLD example.
+This will update API data of the last 10 minutes of DNS, DNSSEC, RDDS, RDAP and EPP services of TLD example.
 
 =cut
