@@ -496,7 +496,7 @@ sub get_tlds
 		" from hosts h,hosts_groups hg".
 		" where h.hostid=hg.hostid".
 			" and hg.groupid=".TLDS_GROUPID.
-			" and h.status=0".
+			" and h.status=".HOST_STATUS_MONITORED.
 		" order by h.host");
 
 	my @tlds;
