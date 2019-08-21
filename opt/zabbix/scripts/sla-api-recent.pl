@@ -849,14 +849,17 @@ sub get_lastvalues_from_db($$$)
 	my $tld = shift;
 	my $delays = shift;
 
-	my $host_cond = " and h.host like '%$tld%'";
+	my $host_cond = " and (" .
+				"(hg.groupid=" . TLDS_GROUPID . " and h.host='$tld') or" .
+				" (hg.groupid=" . TLD_PROBE_RESULTS_GROUPID . " and h.host like '$tld %')" .
+			")";
 
 	my $item_num_rows_ref = db_select(
-		"select h.host,i.itemid,i.key_,i.value_type".
-		" from items i,hosts h".
+		"select h.host,hg.groupid,i.itemid,i.key_,i.value_type".
+		" from items i,hosts h,hosts_groups hg".
 		" where h.hostid=i.hostid".
+			" and hg.hostid=h.hostid".
 			" and i.status=".ITEM_STATUS_ACTIVE.
-			" and h.status=".HOST_STATUS_MONITORED.
 			" and (i.value_type=".ITEM_VALUE_TYPE_FLOAT.
 			" or i.value_type=".ITEM_VALUE_TYPE_UINT64.")".
 			$host_cond
@@ -866,18 +869,18 @@ sub get_lastvalues_from_db($$$)
 
 	foreach my $row_ref (@{$item_num_rows_ref})
 	{
-		$itemids_num .= $row_ref->[1];
+		$itemids_num .= $row_ref->[2];
 		$itemids_num .= ',';
 	}
 
 	chop($itemids_num);
 
 	my $item_str_rows_ref = db_select(
-		"select h.host,i.itemid,i.key_,i.value_type".
-		" from items i,hosts h".
+		"select h.host,hg.groupid,i.itemid,i.key_,i.value_type".
+		" from items i,hosts h,hosts_groups hg".
 		" where h.hostid=i.hostid".
+			" and hg.hostid=h.hostid".
 			" and i.status=".ITEM_STATUS_ACTIVE.
-			" and h.status=".HOST_STATUS_MONITORED.
 			" and i.value_type=".ITEM_VALUE_TYPE_STR.
 			$host_cond
 	);
@@ -886,7 +889,7 @@ sub get_lastvalues_from_db($$$)
 
 	foreach my $row_ref (@{$item_str_rows_ref})
 	{
-		$itemids_str .= $row_ref->[1];
+		$itemids_str .= $row_ref->[2];
 		$itemids_str .= ',';
 	}
 
@@ -903,9 +906,8 @@ sub get_lastvalues_from_db($$$)
 		" where itemid in ($itemids_str)"
 	);
 
-	my %lastvalues_map;
+	my %lastvalues_map = map { $_->[0] => $_->[1] } @{$lastval_rows_ref};
 
-	map {$lastvalues_map{$_->[0]} = $_->[1]} (@{$lastval_rows_ref});
 	undef($lastval_rows_ref);
 
 	# join items and lastvalues
@@ -916,30 +918,22 @@ sub get_lastvalues_from_db($$$)
 
 	foreach my $row_ref (@item_rows_ref)
 	{
-		my $host = $row_ref->[0];
-		my $itemid = $row_ref->[1];
-		my $key = $row_ref->[2];
-		my $value_type = $row_ref->[3];
+		my ($host, $hostgroupid, $itemid, $key, $value_type) = @{$row_ref};
 
 		next unless(defined($lastvalues_map{$itemid}));
 
 		my $clock = $lastvalues_map{$itemid};
 
-		my $index = index($host, ' ');	# "<TLD> <Probe>" separator
+		my ($probe, $key_service);
 
-		my ($probe, $key_service, $tld);
-
-		if ($index == -1)
+		if ($hostgroupid == TLDS_GROUPID)
 		{
 			# this item belongs to TLD (we only care about Service availability (*.avail) items)
 			next unless (substr($key, -5) eq "avail");
 
-			$tld = $host;
-			$probe = '';
-
 			$key_service = get_service_from_slv_key($key);
 		}
-		else
+		elsif ($hostgroupid == TLD_PROBE_RESULTS_GROUPID)
 		{
 			# this item belongs to Probe (we do not care about DNS TCP)
 			next if (substr($key, 0, length("rsm.dns.tcp")) eq "rsm.dns.tcp");
@@ -952,17 +946,20 @@ sub get_lastvalues_from_db($$$)
 				substr($key, 0, length("rdap.ip")) eq "rdap.ip" ||
 				substr($key, 0, length("rdap.rtt")) eq "rdap.rtt");
 
-			$tld = substr($host, 0, $index);
-			$probe = substr($host, $index + 1);
+			(undef, $probe) = split(" ", $host, 2);
 
 			$key_service = get_service_from_probe_key($key);
+		}
+		else
+		{
+			fail("unexpected host group id \"$hostgroupid\"");
 		}
 
 		fail("cannot identify Service of key \"$key\"") unless ($key_service);
 
 		foreach my $service ($key_service eq 'dns' ? ('dns', 'dnssec') : ($key_service))
 		{
-			$lastvalues_db->{'tlds'}{$tld}{$service}{'probes'}{$probe}{$itemid} = {
+			$lastvalues_db->{'tlds'}{$tld}{$service}{'probes'}{$probe // ""}{$itemid} = {
 				'key' => $key,
 				'value_type' => $value_type,
 				'clock' => $clock

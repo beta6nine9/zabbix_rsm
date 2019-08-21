@@ -38,6 +38,15 @@ New features:
 ..F.I..... [170] added support for Compliance SLA monitoring (dimir, yurii, asitals, miks, gcalenko)
 
 --------------------------------------------------------------------------------
+Changes for rsm1.2.9
+
+Bug fixes:
+....I..... [502] don't stop script when executing with --now and another instance is running (dimir)
+....I..... [540] don't fail sla-api-recent.pl when disabling TLD while the script is running (asitals)
+....I..... [546] fixed error reporting when disabling TLD with tld.pl (asitals)
+........S. [548] bulk update of lastvalue tables, ignore errors when updating lastvalue tables (e.g., itemid refers to deleted item) (asitals)
+
+--------------------------------------------------------------------------------
 Changes for rsm1.2.8
 
 Bug fixes:
