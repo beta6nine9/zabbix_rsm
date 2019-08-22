@@ -1031,8 +1031,8 @@ sub __tld_service_enabled($$$)
 
 	if ($service eq 'rdds')
 	{
-		return 1 if tld_interface_enabled($tld, 'rdds43', $now);
-		return 1 if tld_interface_enabled($tld, 'rdap', $now);
+		return 1 if (tld_interface_enabled($tld, 'rdds43', $now));
+		return 1 if (tld_interface_enabled($tld, 'rdap', $now) && !is_rdap_standalone($now));
 		return 0;
 	}
 	else
@@ -2283,6 +2283,10 @@ sub get_templated_items_like
 	my $tld = shift;
 	my $key_in = shift;
 
+	# TODO: this function could benefit from some caching because it's called
+	# on every cycle during rsm.slv*.pl calculation even though list of items
+	# is not likely to change
+
 	my $hostid = get_hostid("Template $tld");
 
 	my $items_ref = db_select(
@@ -2396,18 +2400,18 @@ sub process_slv_avail_cycles($$$$$$$$$)
 
 			if (!defined($keys_in{$tld}))
 			{
-				if (defined($cfg_keys_in))
-				{
-					$keys_in{$tld} = $cfg_keys_in;
-				}
-				else
-				{
-					$keys_in{$tld} = $cfg_keys_in_cb->($tld);
-				}
+				$keys_in{$tld} = $cfg_keys_in // $cfg_keys_in_cb->($tld);
 
 				if (!defined($keys_in{$tld}))
 				{
-					fail("cannot get input keys for Service availability calculation");
+					# fail("cannot get input keys for Service availability calculation");
+
+					# We used to fail here but not anymore because rsm.rdds items can be 
+					# disabled after switch to RDAP standalone. So some of TLDs may not have
+					# RDDS checks thus making SLV calculations for rsm.slv.rdds.* useless
+
+					wrn("no input keys for $tld, skipping");
+					next;
 				}
 			}
 
