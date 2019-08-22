@@ -1,7 +1,6 @@
 #!/usr/bin/perl
 #
 # RDAP rolling week
-#
 
 BEGIN
 {
@@ -18,9 +17,6 @@ use TLD_constants qw(:api);
 use constant SLV_ITEM_KEY_RDAP_AVAIL	=> 'rsm.slv.rdap.avail';
 use constant SLV_ITEM_KEY_RDAP_ROLLWEEK	=> 'rsm.slv.rdap.rollweek';
 
-my $cfg_key_in = 'rsm.slv.rdds.avail';
-my $cfg_key_out = 'rsm.slv.rdds.rollweek';
-
 parse_slv_opts();
 fail_if_running();
 
@@ -31,7 +27,7 @@ db_connect();
 slv_exit(SUCCESS) if (!is_rdap_standalone(getopt('now')));
 
 # we don't know the rollweek bounds yet so we assume it ends at least few minutes back
-my $delay = get_rdds_delay(getopt('now') // time() - ROLLWEEK_SHIFT_BACK);
+my $delay = get_rdap_delay(getopt('now') // time() - ROLLWEEK_SHIFT_BACK);
 
 my (undef, undef, $max_clock) = get_cycle_bounds($delay, getopt('now'));
 

@@ -4295,6 +4295,64 @@ static int	DBpatch_3000318(void)
 	return SUCCEED;
 }
 
+static int	DBpatch_3000319(void)
+{
+	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
+		return SUCCEED;
+
+	if (ZBX_DB_OK > DBexecute(
+			"update items"
+			" set name='Ratio of failed monthly RDDS queries'"
+			" where name like 'Ratio of failed monthly RDDS queries %%'"))
+	{
+		return FAIL;
+	}
+
+	return SUCCEED;
+}
+
+static int	DBpatch_3000320(void)
+{
+	/* patch for both server and proxy */
+
+	if (ZBX_DB_OK > DBexecute(
+			"create table rsmhost_dns_ns_log ("
+				"itemid bigint(20) unsigned not null,"
+				"clock int(11) not null,"
+				"action int(11) not null,"
+				"primary key (itemid,clock),"
+				"constraint c_rsmhost_dns_ns_log_1 foreign key (itemid) references items (itemid) on delete cascade"
+			")"))
+	{
+		return FAIL;
+	}
+
+	return SUCCEED;
+}
+
+static int	DBpatch_3000321(void)
+{
+	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
+		return SUCCEED;
+
+	if (ZBX_DB_OK > DBexecute(
+			"insert into rsmhost_dns_ns_log"
+			" select"
+				" itemid,"
+				"1546300800," /* 2019-01-01 00:00:00 UTC */
+				"case status"
+					" when 0 then 1" /* enable */
+					" when 1 then 2" /* disable */
+				" end"
+			" from items"
+			" where key_ like 'rsm.slv.dns.ns.downtime[%,%]'"))
+	{
+		return FAIL;
+	}
+
+	return SUCCEED;
+}
+
 static int	DBpatch_3000400(void)
 {
 	return SUCCEED;
@@ -4982,6 +5040,9 @@ DBPATCH_ADD(3000315, 0, 0)	/* fix item value_type for rsm.slv.dns.ns.* to uint *
 DBPATCH_ADD(3000316, 0, 0)	/* set RSM.DNS.TCP.DELAY macro to 1h, set update interval of rsm.dns.tcp[%] items to 1h */
 DBPATCH_ADD(3000317, 0, 0)	/* set update interval of items in "Global macro history" host to 60 seconds */
 DBPATCH_ADD(3000318, 0, 0)	/* add new items to "Global macro history" host */
+DBPATCH_ADD(3000319, 0, 0)	/* remove trailing spaces from "Ratio of failed monthly RDDS queries" item names */
+DBPATCH_ADD(3000320, 0, 1)	/* create rsmhost_dns_ns_log table */
+DBPATCH_ADD(3000321, 0, 0)	/* fill rsmhost_dns_ns_log table */
 DBPATCH_ADD(3000400, 0, 0)	/* Phase 3, version 1.4.0 */
 DBPATCH_ADD(3000401, 0, 0)	/* add macro {$RSM.MONITORING.TARGET} with empty string as value (unknown) or "registry" */
 DBPATCH_ADD(3000402, 0, 0)	/* rename "EBERO users" user group to "Read-only user", "Technical services users" to "Power user" */

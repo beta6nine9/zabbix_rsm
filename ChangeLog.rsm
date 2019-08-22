@@ -1,14 +1,83 @@
+Changes for rsm2.0.0alpha1
+
+New features:
+..F.I..... [518] added support for Standalone RDAP service (asitals, dimir, gcalenko, miks, yurii)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.4.0rc2
+
+Bug fixes
+..F....... [514] fixed unconsistent display of host technical and visual name in different pages; removed unused file (miks)
+
+--------------------------------------------------------------------------------
 Changes for rsm1.4.0rc1
 
 New features:
-..F....... [523] implemented support for standalone RDAP in rolling week status page, incidents and details of particular tests (miks)
 ..F.I..... [510] added support for Registrar RDDS Monitoring (dimir, yurii, asitals, miks, gcalenko)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.3.0rc3
+
+Bug fixes:
+..F.I..... [530] fixed "from" and "to" Name Server values in SLA report, fixed XML report generation for disabled (and being disabled) TLDs (asitals, gcalenko, miks)
+....I..... [531] reset "DNS service was unavailable for at least 1m" triggers when month switches (asitals)
+....I..... [528] removed trailing spaces from "Ratio of failed monthly RDDS queries" item names (asitals)
+....I..... [533] added default arguments for sla-report.php; added monthly cronjob for sla-report.php (asitals)
+....I..... [516] fixed recalculating history after marking/unmarking incidents as false positive; added recalculation of DNS name server downtimes (asitals)
+..F....... [532] fixed date and time format in SLA report page, incorrect label formatting in incidents page and default value of selected hostids in latest data page (miks)
+..F....... [534] fixed reset button; made filter values to be stored in user profile (miks)
+..F....... [529] fixed coloring on SLA report page (miks)
+....I..... [527] fixed quoting arguments when calling script.py; fixed cron job that calls sla-monthly-status.pl (asitals)
+....I..... [525] fixed error reporting when disabling TLD with tld.pl (asitals)
+....I..... [526] added SLV items when adding new NS,IP pair with tld.pl --update-nsservers (asitals)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.3.0rc2
+
+Bug fixes:
+..F....... [517] deleted "From" and "To" fields where unneeded (miks)
 
 --------------------------------------------------------------------------------
 Changes for rsm1.3.0rc1
 
 New features:
 ..F.I..... [170] added support for Compliance SLA monitoring (dimir, yurii, asitals, miks, gcalenko)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.2.8
+
+Bug fixes:
+....I..... [541] added MySQL connect, read and write timeouts in Zabbix server, Zabbix proxy and Perl scripts (asitals)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.2.7
+
+New features:
+....I..... [543] added script /opt/zabbix/scripts/misc/handle-duplicates.pl for finding and removing duplicate history entries (asitals)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.2.6
+
+rsm1.2.6rc1 was released as rsm1.2.6 without any changes
+
+--------------------------------------------------------------------------------
+Changes for rsm1.2.6rc1
+
+Bug fixes:
+....I..... [539] fixed service downtime and rolling week calculation logic (asitals)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.2.5
+
+rsm1.2.5rc1 was released as rsm1.2.5 without any changes
+
+--------------------------------------------------------------------------------
+Changes for rsm1.2.5rc1
+
+Bug fixes:
+....I..... [509] made SLA API file wites atomic (dimir)
+....I..... [511] added handling of invalid timestamps far in the past to SLA API script (dimir)
+....I..... [513] added code to skip tests with missing RTT or IP to Data Export, this can happen when history syncer faces SQL error (dimir)
 
 --------------------------------------------------------------------------------
 Changes for rsm1.2.4
@@ -47,7 +116,7 @@ rsm1.2.0rc15 was released as rsm1.2.0 without any changes
 Changes for rsm1.2.0rc15
 
 Bug fixes:
-....I..... [493] fix handling of negative RTT without IP in recent measurements (dimir)
+....I..... [493] fixed handling of negative RTT without IP in recent measurements (dimir)
 
 --------------------------------------------------------------------------------
 Changes for rsm1.2.0rc14

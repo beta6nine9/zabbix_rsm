@@ -291,6 +291,8 @@ int	zbx_db_connect(char *host, char *user, char *password, char *dbname, char *d
 	char		*connect = NULL;
 #elif defined(HAVE_MYSQL)
 	my_bool		mysql_reconnect = 1;
+	unsigned int	mysql_read_timeout = 30;
+	unsigned int	mysql_write_timeout = 30;
 #ifdef DBTLS
 	unsigned char	use_tls;
 #endif
@@ -441,6 +443,12 @@ int	zbx_db_connect(char *host, char *user, char *password, char *dbname, char *d
 
 	if (0 != mysql_options(conn, MYSQL_OPT_RECONNECT, &mysql_reconnect))
 		zabbix_log(LOG_LEVEL_WARNING, "Cannot set MySQL reconnect option.");
+
+	if (0 != mysql_options(conn, MYSQL_OPT_READ_TIMEOUT, (void *)&mysql_read_timeout))
+		zabbix_log(LOG_LEVEL_WARNING, "Cannot set MySQL MYSQL_OPT_READ_TIMEOUT option.");
+
+	if (0 != mysql_options(conn, MYSQL_OPT_WRITE_TIMEOUT, (void *)&mysql_write_timeout))
+		zabbix_log(LOG_LEVEL_WARNING, "Cannot set MySQL MYSQL_OPT_WRITE_TIMEOUT option.");
 
 	/* in contrast to "set names utf8" results of this call will survive auto-reconnects */
 	if (0 != mysql_set_character_set(conn, "utf8"))

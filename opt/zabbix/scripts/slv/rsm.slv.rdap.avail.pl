@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# RDDS availability
+# RDAP availability
 
 BEGIN
 {
@@ -16,7 +16,6 @@ use TLD_constants qw(:api);
 
 use constant SLV_ITEM_KEY_RDAP_AVAIL	=> 'rsm.slv.rdap.avail';
 
-my $cfg_rdap_key_in = 'rdap[';
 my $cfg_value_type = ITEM_VALUE_TYPE_UINT64;
 
 parse_slv_opts();
@@ -29,7 +28,7 @@ db_connect();
 slv_exit(SUCCESS) if (!is_rdap_standalone(getopt('now')));
 
 # get cycle length
-my $delay = get_rdds_delay(getopt('now') // time() - AVAIL_SHIFT_BACK);
+my $delay = get_rdap_delay(getopt('now') // time() - AVAIL_SHIFT_BACK);
 
 # get timestamp of the beginning of the latest cycle
 my (undef, undef, $max_clock) = get_cycle_bounds($delay, getopt('now'));
@@ -50,9 +49,6 @@ else
 
 slv_exit(SUCCESS) if (scalar(@{$tlds_ref}) == 0);
 
-# assume all cycles calculated by collect_slv_cycles() fall into period after standalone RDAP switch
-# because rsm.slv.rdap.avail should not have any values collected before the switch
-
 my $cycles_ref = collect_slv_cycles(
 	$tlds_ref,
 	$delay,
@@ -61,6 +57,17 @@ my $cycles_ref = collect_slv_cycles(
 	$max_clock,
 	(opt('cycles') ? getopt('cycles') : slv_max_cycles('rdap'))
 );
+
+# clean up cycles before the switch
+# TODO: remove this cleanup after migrating to Standalone RDAP
+foreach my $clock (sort { $a <=> $b } keys(%{$cycles_ref}))
+{
+	if (is_rdap_standalone($clock))
+	{
+		last;
+	}
+	delete($cycles_ref->{$clock});
+}
 
 slv_exit(SUCCESS) if (keys(%{$cycles_ref}) == 0);
 
@@ -72,8 +79,8 @@ process_slv_avail_cycles(
 	$cycles_ref,
 	$probes_ref,
 	$delay,
-	undef,			# input keys are unknown
-	\&cfg_keys_in_cb,	# callback to get input keys
+	get_templated_items_like('RDAP', 'rdap['),
+	undef,
 	SLV_ITEM_KEY_RDAP_AVAIL,
 	$cfg_minonline,
 	\&check_probe_values,
@@ -81,17 +88,6 @@ process_slv_avail_cycles(
 );
 
 slv_exit(SUCCESS);
-
-my $rdap_items;
-
-sub cfg_keys_in_cb($)
-{
-	my $tld = shift;
-
-	$rdap_items = get_templated_items_like("RDAP", $cfg_rdap_key_in) unless (defined($rdap_items));
-
-	return $rdap_items;
-}
 
 # SUCCESS - no values or at least one successful value
 # E_FAIL  - all values unsuccessful

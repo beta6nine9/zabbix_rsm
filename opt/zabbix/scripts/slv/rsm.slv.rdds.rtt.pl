@@ -60,7 +60,7 @@ my $rtt_params_list =
 		'timeout_threshold_value' => $rtt_low_rdds
 	},
 	{
-		'probes'                  => get_probes("RDDS"),
+		'probes'                  => get_probes("RDAP"),
 		'tlds_service'            => "rdap",
 		'rtt_item_key_pattern'    => RTT_ITEM_KEY_PATTERN_RDAP,
 		'timeout_error_value'     => RTT_TIMEOUT_ERROR_RDAP,
@@ -74,6 +74,7 @@ if (is_rdap_standalone($now))
 	push(@{$rdap_standalone_params_list}, @{$rtt_params_list}[0,1]);
 }
 
+# TODO: remove $rdap_standalone_params_list after migration to Standalone RDAP
 update_slv_rtt_monthly_stats(
 	$now,
 	opt('cycles') ? getopt('cycles') : slv_max_cycles('rdds'),

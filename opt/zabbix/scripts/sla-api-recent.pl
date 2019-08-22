@@ -28,8 +28,6 @@ use constant MAX_PERIOD => 30 * 60;	# 30 minutes
 
 use constant SUBSTR_KEY_LEN => 20;	# for logging
 
-use constant MYSQL_TIMEOUT => 30;	# timeout while attempt to connect/read/write to/from MySQL server
-
 use constant DEFAULT_MAX_CHILDREN => 64;
 use constant DEFAULT_MAX_WAIT => 600;	# maximum seconds to wait befor terminating child process
 
@@ -100,7 +98,12 @@ my $now = (getopt('now') // $real_now);
 
 my $max_period = (opt('period') ? getopt('period') * 60 : MAX_PERIOD);
 
-db_connect(undef, MYSQL_TIMEOUT);
+db_connect();
+
+my $rdap_is_standalone = is_rdap_standalone();
+my $rdap_standalone_ts = get_rdap_standalone_ts();
+
+dbg("RDAP ", ($rdap_is_standalone ? "is" : "is NOT"), " standalone");
 
 my $cfg_minonline = get_macro_dns_probe_online();
 my $cfg_minns = get_macro_minns();
@@ -110,18 +113,22 @@ fail("number of required working Name Servers is configured as $cfg_minns") if (
 my %delays;
 $delays{'dns'} = $delays{'dnssec'} = get_dns_udp_delay($now);
 $delays{'rdds'} = get_rdds_delay($now);
+$delays{'rdap'} = get_rdap_delay($now) if ($rdap_is_standalone);
 
 my %clock_limits;
 $clock_limits{'dns'} = $clock_limits{'dnssec'} = cycle_start(time() - $incident_measurements_limit, $delays{'dnssec'});
 $clock_limits{'rdds'} = cycle_start(time() - $incident_measurements_limit, $delays{'rdds'});
+$clock_limits{'rdap'} = cycle_start(time() - $incident_measurements_limit, $delays{'rdap'}) if ($rdap_is_standalone);
 
 db_disconnect();
 
 my %service_keys = (
 	'dns' => 'rsm.slv.dns.avail',
 	'dnssec' => 'rsm.slv.dnssec.avail',
-	'rdds' => 'rsm.slv.rdds.avail'
+	'rdds' => 'rsm.slv.rdds.avail',
 );
+
+$service_keys{'rdap'} = 'rsm.slv.rdap.avail' if ($rdap_is_standalone);
 
 # keep to avoid reading multiple times
 my $global_lastclock;
@@ -276,7 +283,7 @@ sub process_server($)
 	my %probes;
 	my $server_tlds;
 
-	db_connect($server_key, MYSQL_TIMEOUT);
+	db_connect($server_key);
 
 	my $all_probes_ref = get_probes();
 
@@ -368,7 +375,7 @@ sub process_tld_batch($$$$$$)
 	my $probes_ref = shift;		# probes by services
 	my $all_probes_ref = shift;	# all available probes in the system
 
-	db_connect($server_key, MYSQL_TIMEOUT);
+	db_connect($server_key);
 
 	for (my $tldi = $tldi_begin; $tldi != $tldi_end; $tldi++)
 	{
@@ -462,7 +469,7 @@ sub process_tld($$$$$)
 
 		if (opt('print-period'))
 		{
-			info("selected $service period: ", selected_period(
+			info(sprintf("selected %4s period: ", $service), selected_period(
 				$cycles_from,
 				cycle_end($cycles_till, $delays{$service})
 			));
@@ -590,6 +597,26 @@ sub add_cycles($$$$$$$$$$$)
 
 	my $max_clock = cycle_end($cycle_start + $max_period, $delay);
 
+	# issue #511
+	# Sometimes we get strange timestamp of cycle to calculate, e. g. 960 .
+	# Next time it happens, print out related variables, we want to find out
+	# if this value comes from cache, database (unlikely) or last_update.txt .
+	# Currently we keep 2 month of history, so we'll use 7776000 seconds
+	# (3 months) from current time to understand if the timestamp is corrupted.
+	if ($real_now - $cycle_start > 7776000)
+	{
+		my $rows_ref = db_select("select key_ from items where itemid=$itemid");
+		my $key = $rows_ref->[0]->[0];
+
+		fail("something went wrong, while getting cycles to calculate got time \"", ts_full($cycle_start), "\"",
+			", which is over 3 months old. Affected variables:\n",
+			"  itemid       : $itemid\n",
+			"  key          : $key\n",
+			"  probe        : $probe\n",
+			"  lastclock    : ", ts_full($lastclock), "\n",
+			"  lastclock_db : ", ts_full($lastclock_db));
+	}
+
 	# keep adding cycles to calculate while we are inside max period and within lastvalue
 	while ($cycle_start < $max_clock && $lastclock <= $lastclock_db)
 	{
@@ -616,7 +643,7 @@ sub add_cycles($$$$$$$$$$$)
 			);
 		}
 
-		# for cycles_to_calculate we must use cycle start
+		# for cycles_to_calculate we use the timestamp of the beginning of the cycle
 		$cycles_ref->{$cycle_start} = 1;
 
 		# move forward
@@ -670,7 +697,16 @@ sub cycles_to_calculate($$$$$$$$)
 					return E_FAIL;
 				}
 
-				$lastclock = $global_lastclock;
+				if ($service eq "rdap" && $global_lastclock < $rdap_standalone_ts)
+				{
+					# when we switch to standalone RDAP we should start generating
+					# data starting from the time of the switch
+					$lastclock = $rdap_standalone_ts;
+				}
+				else
+				{
+					$lastclock = $global_lastclock;
+				}
 			}
 			else
 			{
@@ -711,7 +747,8 @@ sub cycles_to_calculate($$$$$$$$)
 		}
 	}
 
-	@{$cycles_ref} = sort(keys(%cycles));
+	# ensure numeric sort of timestamps
+	@{$cycles_ref} = sort { $a <=> $b } (keys(%cycles));
 
 	return SUCCESS;
 }
@@ -789,7 +826,7 @@ sub get_service_from_probe_key($)
 	}
 	elsif (substr($key, 0, length("rdap")) eq "rdap")
 	{
-		$service = "rdds";
+		$service = ($rdap_is_standalone ? "rdap" : "rdds");
 	}
 
 	return $service;
@@ -815,6 +852,10 @@ sub get_service_from_slv_key($)
 	elsif (substr($key, 0, length("rdds.")) eq "rdds.")
 	{
 		$service = "rdds";
+	}
+	elsif (substr($key, 0, length("rdap.")) eq "rdap.")
+	{
+		$service = ($rdap_is_standalone ? "rdap" : "rdds");
 	}
 	else
 	{
@@ -1646,7 +1687,15 @@ sub get_interfaces($$$)
 	{
 		push(@result, AH_INTERFACE_RDDS43) if (tld_interface_enabled($tld, 'rdds43', $now));
 		push(@result, AH_INTERFACE_RDDS80) if (tld_interface_enabled($tld, 'rdds80', $now));
-		push(@result, AH_INTERFACE_RDAP) if (tld_interface_enabled($tld, 'rdap', $now));
+
+		if (!$rdap_is_standalone)
+		{
+			push(@result, AH_INTERFACE_RDAP) if (tld_interface_enabled($tld, 'rdap', $now));
+		}
+	}
+	elsif ($service eq 'rdap')
+	{
+		push(@result, AH_INTERFACE_RDAP);
 	}
 
 	return \@result;
@@ -1814,7 +1863,7 @@ Optionally specify TLD.
 
 =item B<--service> name
 
-Optionally specify service, one of: dns, dnssec, rdds
+Optionally specify service, one of: dns, dnssec, rdds, rdap (if it's standalone).
 
 =item B<--server-id> ID
 
