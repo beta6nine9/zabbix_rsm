@@ -3,7 +3,6 @@
 use warnings;
 use strict;
 
-use Data::Dumper;
 use Pod::Usage qw(pod2usage);
 use Path::Tiny;
 use lib path($0)->parent()->realpath()->stringify();
@@ -11,96 +10,121 @@ use lib path($0)->parent()->realpath()->stringify();
 use Zabbix;
 use RSM;
 use RSMSLV;
-use TLD_constants qw(:general :templates :groups :value_types :ec :slv :config :api);
+use TLD_constants qw(:general :api);
 use TLDs;
 
 sub main()
 {
 	my ($tlds_processed, $items_processed) = (0, 0);
-	my ($tld_opt, @server_keys, $now, $config);
+	my ($single_tld, $now, $config, $server_key) = init_and_check_opts();
 
-	parse_opts('tld=s', 'now=n', 'enable', 'disable');
+	my $tlds_ref = defined($single_tld) ? [ $single_tld ] : get_tlds('RDAP', $now);
 
-	if (!opt('enable') and !opt('disable'))
+	foreach my $tld (@{$tlds_ref})
 	{
-		s_fail("Either --enable or --disable must be provided. Run \"$0 --help\" to get usage information.");
+		if (tld_interface_enabled($tld, "rdds43", $now))
+		{
+			dbg("skipping TLD $tld");
+			next;
+		}
+
+		dbg("processing TLD: $tld");
+
+		# process hosts "$tld", "Template $tld" and "$tld $probe"
+
+		my $probes_ref = get_probes('RDDS');
+
+		my %names_item_keys = (
+			"$tld" => "rsm.slv.rdds.%",
+			"Template $tld" => "rsm.rdds%",
+		);
+
+		$names_item_keys{"$tld $_"} = "rsm.rdds%" foreach (keys(%{$probes_ref}));
+
+		my $sql = "select i.itemid, i.name, h.name from items i, hosts h where i.hostid = h.hostid and ".
+				"h.name = ? and i.key_ like ? and i.status = ?";
+		my $items_for_tld = 0;
+
+		while (my ($host_name, $item_key_mask) = each(%names_item_keys))
+		{
+			my $params = [ $host_name, $item_key_mask, ITEM_STATUS_ACTIVE ];
+			my $rows = db_select($sql, $params);
+
+			$items_for_tld += disable_items_by_rows($rows);
+		}
+
+		$items_processed += $items_for_tld;
+		$tlds_processed++ if ($items_for_tld > 0);
 	}
+
+	db_disconnect();
+
+	info("$tlds_processed TLD(s) with total of $items_processed item(s) processed");
+
+	return SUCCESS;
+}
+
+sub init_and_check_opts()
+{
+	my ($tld_opt, $now, $config, $server_key);
+
+	parse_opts('tld=s', 'now=n', 'server-id=s');
 
 	fail_if_running();
 
 	$config = get_rsm_config();
 	set_slv_config($config);
-	@server_keys = get_rsm_server_keys($config);
+
+	$server_key = opt('server-id') ? get_rsm_server_key(getopt('server-id')) : get_rsm_local_key($config);
+	db_connect($server_key);
 
 	$now = getopt('now') // time();
+	$tld_opt = getopt('tld');
 
-	validate_tld($tld_opt = getopt('tld'), \@server_keys) if (opt('tld'));
-
-	fail_unless_rdap_standalone($now);
-
-	foreach (@server_keys)
+	if (defined($tld_opt) && !tld_exists($tld_opt))
 	{
-		$server_key = $_;
-
-		db_connect($server_key);
-		init_zabbix_api($config, $server_key);
-
-		my $tlds_ref = defined($tld_opt) ? [ $tld_opt ] : get_tlds('RDAP', $now);
-
-		foreach my $tld (@{$tlds_ref})
-		{
-			if (tld_interface_enabled($tld, "rdds43", $now))
-			{
-				dbg("Skipping TLD $tld");
-				next;
-			}
-
-			my $sql = "select i.itemid,i.name from items i, hosts h where i.hostid=h.hostid and ".
-					"h.name=? and i.key_ like 'rsm.slv.rdds.%' and i.status=?";
-			my $params = [ $tld, opt('disable') ? ITEM_STATUS_ACTIVE : ITEM_STATUS_DISABLED ];
-			my $rows = db_select($sql, $params);
-
-			foreach my $row (@{$rows})
-			{
-				my ($item, $name) = @{$row};
-
-				dbg("Processing $tld: $item ($name)");
-
-				unless (opt("dry-run"))
-				{
-					$result = opt('enable') ? enable_items([ $item ]) : disable_items([ $item ]);
-
-					$items_processed++ if (!defined($result->{$item}->{'error'}));
-				}
-			}
-
-			$tlds_processed++ if (scalar(@{$rows}));
-		}
-
-		db_disconnect();
+		fail("TLD $tld_opt not found on server $server_key");
 	}
 
-	my $msg = "$tlds_processed TLD(s) with total of $items_processed item(s) processed";
-	info($msg);
-	print($msg, "\n");
+	unless (is_rdap_standalone($now))
+	{
+		info("RDAP is not standalone yet");
+		slv_exit(SUCCESS);
+	}
 
-	return SUCCESS;
+	init_zabbix_api($config, $server_key);
+
+	return ($tld_opt, $now, $config, $server_key);
 }
 
-sub fail_unless_rdap_standalone($)
+sub disable_items_by_rows($)
 {
-	my $now = shift;
+	my $rows = shift;
+	my $item_counter = 0;
 
-	db_connect();
+	foreach my $row (@{$rows})
+	{
+		my ($item, $name, $host_name) = @{$row};
 
-	my $proceed = is_rdap_standalone($now);
+		dbg("processing '$host_name': $item ($name)");
 
-	db_disconnect();
+		unless (opt("dry-run"))
+		{
+			$result = disable_items([ $item ]);
 
-	s_fail("Error: RDAP is not standalone yet") unless ($proceed);
+			if (defined($result->{$item}->{'error'}))
+			{
+				fail("Failed to disable item $item for host '$host_name'");
+			}
+
+			$item_counter++;
+		}
+	}
+
+	return $item_counter;
 }
 
-# copied from tld.pl with minor changes
+# copied from tld.pl
 
 sub init_zabbix_api($$)
 {
@@ -109,28 +133,36 @@ sub init_zabbix_api($$)
 
 	my $section = $config->{$server_key};
 
-	s_fail("Zabbix API URL is not specified. Please check configuration file") unless defined $section->{'za_url'};
-	s_fail("Username for Zabbix API is not specified. Please check configuration file") unless defined $section->{'za_user'};
-	s_fail("Password for Zabbix API is not specified. Please check configuration file") unless defined $section->{'za_password'};
+	fail("Zabbix API URL is not specified. Please check configuration file") unless defined $section->{'za_url'};
+	fail("Username for Zabbix API is not specified. Please check configuration file") unless defined $section->{'za_user'};
+	fail("Password for Zabbix API is not specified. Please check configuration file") unless defined $section->{'za_password'};
 
+	my $attempts = 3;
 	my $result;
 	my $error;
 
+	RELOGIN:
 	$result = zbx_connect($section->{'za_url'}, $section->{'za_user'}, $section->{'za_password'}, getopt('debug'));
 
 	if ($result ne true)
 	{
-		s_fail("Could not connect to Zabbix API. " . $result->{'data'});
+		fail("Could not connect to Zabbix API. " . $result->{'data'});
 	}
-}
 
-sub s_fail($)
-{
-	my $msg = shift;
+	# make sure we re-login in case of session invalidation
+	my $tld_probe_results_groupid = create_group('TLD Probe results');
 
-	print STDERR ($msg, "\n");
+	$error = get_api_error($tld_probe_results_groupid);
 
-	fail($msg);
+	if (defined($error))
+	{
+		if (zbx_need_relogin($tld_probe_results_groupid) eq true)
+		{
+			goto RELOGIN if (--$attempts);
+		}
+
+		fail($error);
+	}
 }
 
 slv_exit(main());
@@ -143,37 +175,23 @@ disable-rdds-for-rdap-tlds.pl - disable unused RDDS SLV items after switch to St
 
 =head1 SYNOPSIS
 
-disable-rdds-for-rdap-tlds.pl --disable | --enable [--tld=TLD] [--dry-run] [--now=TIME] [--debug]
-
-This script disables unused RDDS SLV items after switch to Standalone RDAP. The following items are affected:
-
-=item rsm.slv.rdds.avail
-
-=item rsm.slv.rdds.downtime
-
-=item rsm.slv.rdds.rollweek
-
-=item rsm.slv.rdds.rtt.failed
-
-=item rsm.slv.rdds.rtt.performed
-
-=item rsm.slv.rdds.rtt.pfailed
+disable-rdds-for-rdap-tlds.pl [--tld=TLD] [--dry-run] [--now=TIME] [--server-id=ID] [--debug] [--help]
 
 =head1 OPTIONS
 
 =over 8
 
-=item B<--disable>
-
-Disable unused RDDS SLV items for TLD(s).
-
-=item B<--enable>
-
-Enable unused RDDS SLV items for TLD(s). This option should be used for testing only.
-
 =item B<--tld=TLD>
 
 Execute script for specific TLD.
+
+=item B<--now=TIME>
+
+Specify Unix timestamp to be assumed as current time.
+
+=item B<--server-id=ID>
+
+Specify server id to connect instead of local one.
 
 =item B<--dry-run>
 
