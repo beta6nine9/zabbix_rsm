@@ -15,60 +15,61 @@ use TLDs;
 
 sub main()
 {
-	my ($tlds_processed, $items_processed) = (0, 0);
-	my ($single_tld, $now, $config, $server_key) = init_and_check_opts();
+	my ($rsmhosts_processed, $items_processed) = (0, 0);
+	my ($single_rsmhost, $now) = init_and_check_opts();
 
-	my $tlds_ref = defined($single_tld) ? [ $single_tld ] : get_tlds('RDAP', $now);
+	my $rsmhosts_ref = defined($single_rsmhost) ? [ $single_rsmhost ] : get_tlds('RDAP', $now);
 
-	foreach my $tld (@{$tlds_ref})
+	foreach my $rsmhost (@{$rsmhosts_ref})
 	{
-		if (tld_interface_enabled($tld, "rdds43", $now))
+		if (tld_interface_enabled($rsmhost, "rdds43", $now))
 		{
-			dbg("skipping TLD $tld");
+			dbg("skipping RSMHOST $rsmhost");
 			next;
 		}
 
-		dbg("processing TLD: $tld");
+		dbg("processing RSMHOST: $rsmhost");
 
-		# process hosts "$tld", "Template $tld" and "$tld $probe"
+		# process hosts "$rsmhost", "Template $rsmhost" and "$rsmhost $probe"
 
 		my $probes_ref = get_probes('RDDS');
 
 		my %names_item_keys = (
-			"$tld" => "rsm.slv.rdds.%",
-			"Template $tld" => "rsm.rdds%",
+			"$rsmhost" => [ "rsm.slv.rdds.%" ],
+			"Template $rsmhost" => [ "rsm.rdds%", "rdds.enabled" ],
 		);
 
-		$names_item_keys{"$tld $_"} = "rsm.rdds%" foreach (keys(%{$probes_ref}));
+		$names_item_keys{"$rsmhost $_"} = [ "rsm.rdds%", "rdds.enabled" ] foreach (keys(%{$probes_ref}));
 
 		my $sql = "select i.itemid, i.name, h.name from items i, hosts h where i.hostid = h.hostid and ".
 				"h.name = ? and i.key_ like ? and i.status = ?";
-		my $items_for_tld = 0;
+		my $item_count = 0;
 
-		while (my ($host_name, $item_key_mask) = each(%names_item_keys))
+		while (my ($host_name, $item_key_patterns) = each(%names_item_keys))
 		{
-			my $params = [ $host_name, $item_key_mask, ITEM_STATUS_ACTIVE ];
-			my $rows = db_select($sql, $params);
+			foreach my $pattern (@{$item_key_patterns})
+			{
+				my $params = [ $host_name, $pattern, ITEM_STATUS_ACTIVE ];
+				my $rows = db_select($sql, $params);
 
-			$items_for_tld += disable_items_by_rows($rows);
+				$item_count += disable_items_by_rows($rows);
+			}
 		}
 
-		$items_processed += $items_for_tld;
-		$tlds_processed++ if ($items_for_tld > 0);
+		$items_processed += $item_count;
+		$rsmhosts_processed++ if ($item_count > 0);
 	}
 
-	db_disconnect();
-
-	info("$tlds_processed TLD(s) with total of $items_processed item(s) processed");
+	info("$rsmhosts_processed TLD(s) with total of $items_processed item(s) processed");
 
 	return SUCCESS;
 }
 
 sub init_and_check_opts()
 {
-	my ($tld_opt, $now, $config, $server_key);
+	my ($rsmhost_opt, $now, $config, $server_key);
 
-	parse_opts('tld=s', 'now=n', 'server-id=s');
+	parse_opts('rsmhost=s', 'now=n', 'server-id=s');
 
 	fail_if_running();
 
@@ -79,11 +80,11 @@ sub init_and_check_opts()
 	db_connect($server_key);
 
 	$now = getopt('now') // time();
-	$tld_opt = getopt('tld');
+	$rsmhost_opt = getopt('rsmhost');
 
-	if (defined($tld_opt) && !tld_exists($tld_opt))
+	if (defined($rsmhost_opt) && !tld_exists($rsmhost_opt))
 	{
-		fail("TLD $tld_opt not found on server $server_key");
+		fail("TLD $rsmhost_opt not found on server $server_key");
 	}
 
 	unless (is_rdap_standalone($now))
@@ -94,31 +95,32 @@ sub init_and_check_opts()
 
 	init_zabbix_api($config, $server_key);
 
-	return ($tld_opt, $now, $config, $server_key);
+	return ($rsmhost_opt, $now);
 }
 
 sub disable_items_by_rows($)
 {
 	my $rows = shift;
+
 	my $item_counter = 0;
 
 	foreach my $row (@{$rows})
 	{
-		my ($item, $name, $host_name) = @{$row};
+		my ($item_id, $item_name, $host_name) = @{$row};
 
-		dbg("processing '$host_name': $item ($name)");
+		dbg("processing '$host_name': $item_id ($item_name)");
 
 		unless (opt("dry-run"))
 		{
-			$result = disable_items([ $item ]);
+			$result = disable_items([ $item_id ]);
 
-			if (defined($result->{$item}->{'error'}))
+			if (defined($result->{$item_id}->{'error'}))
 			{
-				fail("Failed to disable item $item for host '$host_name'");
+				fail("Failed to disable item $item_id for host '$host_name'");
 			}
-
-			$item_counter++;
 		}
+
+		$item_counter++;
 	}
 
 	return $item_counter;
@@ -175,15 +177,15 @@ disable-rdds-for-rdap-tlds.pl - disable unused RDDS SLV items after switch to St
 
 =head1 SYNOPSIS
 
-disable-rdds-for-rdap-tlds.pl [--tld=TLD] [--dry-run] [--now=TIME] [--server-id=ID] [--debug] [--help]
+disable-rdds-for-rdap-tlds.pl [--rsmhost=RSMHOST] [--dry-run] [--now=TIME] [--server-id=ID] [--debug] [--help]
 
 =head1 OPTIONS
 
 =over 8
 
-=item B<--tld=TLD>
+=item B<--rsmhost=RSMHOST>
 
-Execute script for specific TLD.
+Execute script for specific TLD or registrar.
 
 =item B<--now=TIME>
 
