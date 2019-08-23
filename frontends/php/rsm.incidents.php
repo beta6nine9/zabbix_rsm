@@ -1089,6 +1089,19 @@ if ($host || $data['filter_search']) {
 	DBconnect($error);
 }
 
+// Chceck if RDAP standalone service was enabled during the filtered period.
+$rdap_standalpne_start = API::UserMacro()->get([
+	'output' => ['value'],
+	'filter' => ['macro' => RSM_RDAP_STANDALONE],
+	'globalmacro' => true
+]);
+
+$data['rdap_standalone_start_time'] = ($rdap_standalpne_start
+		&& $rdap_standalpne_start[0]['value'] > $data['tests_start_time']
+		&& $rdap_standalpne_start[0]['value'] < $filterTimeTill)
+	? $rdap_standalpne_start[0]['value']
+	: 0;
+
 // Show error if no matching hosts found.
 if ($data['filter_search'] && !$data['tld']) {
 	unset($data['tld']);
