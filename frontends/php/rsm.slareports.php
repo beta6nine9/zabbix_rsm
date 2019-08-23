@@ -80,7 +80,7 @@ if ($data['filter_search']) {
 			'filter' => [
 				'host' => $data['filter_search']
 			]
-		];
+		]);
 
 		// TLD not found, proceed to search on another server.
 		if (!$tld) {
