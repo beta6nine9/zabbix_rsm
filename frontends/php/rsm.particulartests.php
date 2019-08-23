@@ -194,7 +194,10 @@ if ($data['host'] && $data['time'] && $data['slvItemId'] && $data['type'] !== nu
 		]);
 
 		$user_macros_filter = [RSM_TLD_RDDS_ENABLED];
-		if ($data['type'] == RSM_RDDS || !is_RDAP_standalone($test_time_from)) {
+		if ($data['type'] == RSM_RDDS && !is_RDAP_standalone($test_time_from)) {
+			$user_macros_filter = array_merge($user_macros_filter, [RDAP_BASE_URL, RSM_RDAP_TLD_ENABLED]);
+		}
+		elseif (is_RDAP_standalone($test_time_from)) {
 			$user_macros_filter = array_merge($user_macros_filter, [RDAP_BASE_URL, RSM_RDAP_TLD_ENABLED]);
 		}
 
