@@ -2360,8 +2360,8 @@ function is_RDAP_standalone($timestamp = null) {
 		]);
 
 		if ($db_macro) {
-			$macro_value = (string) reset($db_macro)['value'];
-			$standalone = ($macro_value != 0 && bccomp($macro_value, $timestamp) == -1);
+			$macro_value = (int) reset($db_macro)['value'];
+			$standalone = ($macro_value != 0 && bccomp((string) $macro_value, $timestamp) <= 0);
 		}
 		else {
 			$standalone = false;
