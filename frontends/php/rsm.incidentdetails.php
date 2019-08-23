@@ -222,11 +222,11 @@ if ($mainEvent) {
 			$template_macros = API::UserMacro()->get(array(
 				'output' => API_OUTPUT_EXTEND,
 				'hostids' => $template['templateid'],
-				'filter' => array(
-					'macro' => array(RSM_TLD_RDDS43_ENABLED, RSM_TLD_RDDS80_ENABLED, RSM_RDAP_TLD_ENABLED,
-						RSM_RDAP_TLD_ENABLED, RSM_TLD_RDDS_ENABLED
-					)
-				)));
+				'filter' => [
+					'macro' => is_RDAP_standalone($serverTime - $rollWeekSeconds['value'])
+						? [RSM_TLD_RDDS43_ENABLED, RSM_TLD_RDDS80_ENABLED, RSM_TLD_RDDS_ENABLED]
+						: [RSM_TLD_RDDS43_ENABLED, RSM_TLD_RDDS80_ENABLED, RSM_RDAP_TLD_ENABLED, RSM_RDAP_TLD_ENABLED, RSM_TLD_RDDS_ENABLED]
+				]));
 
 				$data['tld']['subservices'] = [];
 				$ok_rdds_services = [];
