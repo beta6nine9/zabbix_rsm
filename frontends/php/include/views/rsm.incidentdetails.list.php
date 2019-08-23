@@ -168,11 +168,13 @@ $testsInfoTable->addRow([
 		new CSpan([bold(_('Incident type')), ':', SPACE, $incidentType]),
 		$incidentTestingInterface
 	],
-	[
-		(new CSpan(_s('%1$s Rolling week status', $this->data['slv'].'%')))->addClass('rolling-week-status'),
-		BR(),
-		(new CSpan(date(DATE_TIME_FORMAT, $this->data['slvTestTime'])))->addClass('rsm-date-time'),
-	]
+	($this->data['slvTestTime'] > 0)
+		? [
+			(new CSpan(_s('%1$s Rolling week status', $this->data['slv'].'%')))->addClass('rolling-week-status'),
+			BR(),
+			(new CSpan(date(DATE_TIME_FORMAT, $this->data['slvTestTime'])))->addClass('rsm-date-time'),
+		]
+		: null
 ]);
 
 $widget->additem([$testsInfoTable]);

@@ -322,7 +322,8 @@ if ($mainEvent) {
 
 	// result generation
 	$data['slv'] = sprintf('%.3f', $data['slvItem']['lastvalue']);
-	$data['slvTestTime'] = sprintf('%.3f', $data['slvItem']['lastclock']);
+	$data['slvTestTime'] = (int) $data['slvItem']['lastclock'];
+
 	if ($mainEvent['false_positive']) {
 		$data['incidentType'] = INCIDENT_FALSE_POSITIVE;
 	}
