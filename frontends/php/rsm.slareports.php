@@ -215,11 +215,11 @@ if ($data['tld'] && $filter_valid) {
 			show_error_message(_('Cannot find RDAP values.'));
 		}
 		else {
-			if ($xml->RDAP instanceof SimpleXMLElement && !is_RDAP_standalone($data['details']['from'])) {
+			if (isset($xml->RDAP) && !is_RDAP_standalone($data['details']['from'])) {
 				show_error_message(_('RDAP values exists for time when service was not standalone.'));
 			}
 
-			$rdap = $xml->RDDS;
+			$rdap = $xml->RDAP;
 
 			$data += [
 				'slv_rdap_downtime'			=> (string) $rdap->serviceAvailability,

@@ -95,21 +95,6 @@ if (!array_key_exists('details', $data)) {
 	]);
 }
 
-// TLD details.
-$date_from = date(DATE_TIME_FORMAT_SECONDS, zbxDateToTime($data['details']['from']));
-$date_till = date(DATE_TIME_FORMAT_SECONDS, zbxDateToTime($data['details']['to']));
-$date_generated = date(DATE_TIME_FORMAT_SECONDS, zbxDateToTime($data['details']['generated']));
-
-$widget->additem((new CDiv())
-	->addClass(ZBX_STYLE_TABLE_FORMS_CONTAINER)
-	->addItem([
-		bold(_s('Period: %1$s - %2$s', $date_from, $date_till)), BR(),
-		bold(_s('Generation time: %1$s', $date_generated)), BR(),
-		bold(_s('TLD: %1$s', $data['tld']['name'])), BR(),
-		bold(_('Server: ')), new CLink($data['server'], $data['rolling_week_url'])
-	])
-);
-
 // DNS Service Availability.
 if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY) {
 	$table->addRow([
@@ -199,8 +184,8 @@ if (array_key_exists('slv_rdap_downtime', $data) && $data['slv_rdap_downtime'] !
 	$table->addRow([
 			bold(_('RDAP Service Availability')),
 			'-',
-			gmdate('Y-m-d H:i:s e', $data['details']['from']),
-			gmdate('Y-m-d H:i:s e', $data['details']['to']),
+			'',
+			'',
 			_s('%1$s (minutes of downtime)', $data['slv_rdap_downtime']),
 			_s('<= %1$s min of downtime', $data['slr_rdap_downtime'])
 		],
@@ -208,8 +193,8 @@ if (array_key_exists('slv_rdap_downtime', $data) && $data['slv_rdap_downtime'] !
 	)->addRow([
 			_('RDAP Query RTT'),
 			'-',
-			gmdate('Y-m-d H:i:s e', $data['details']['from']),
-			gmdate('Y-m-d H:i:s e', $data['details']['to']),
+			'',
+			'',
 			_s('%1$s %% (queries <= %2$s ms)', $data['slv_rdap_rtt_downtime'], $data['slr_rdap_rtt_downtime_ms']),
 			_s('<= %1$s ms, for at least %2$s %% of the queries', $data['slr_rdap_rtt_downtime_ms'],
 				$data['slr_rdap_rtt_downtime']
