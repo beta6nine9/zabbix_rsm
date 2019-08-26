@@ -454,15 +454,6 @@ if (isset($this->data['tld'])) {
 			: _('RDAP is not a standalone service.');
 
 		$rdapTab->additem(new CDiv(bold($message), 'red center'));
-		/*
-		$message = is_RDAP_standalone($data['tests_start_time'])
-			? _('RDAP is disabled.')
-			: ($data['rdap_standalone_start_time']
-				? _s('RDAP was not a standalone service before %s.', date(DATE_TIME_FORMAT, $this->data['rdap_standalone_start_time']))
-				: _('RDAP is not a standalone service.'));
-
-		$rdapTab->additem(new CDiv(bold($message), 'red center'));
-		*/
 	}
 
 	// EPP
