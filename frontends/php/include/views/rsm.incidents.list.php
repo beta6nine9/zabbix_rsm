@@ -364,6 +364,12 @@ if (isset($this->data['tld'])) {
 
 	// RDAP
 	if (isset($this->data['rdap']['events'])) {
+		if ($data['rdap_standalone_start_ts'] > 0) {
+			$rdapTab->additem(new CDiv(bold(_s('RDAP was not a standalone service before %s.',
+				date(DATE_TIME_FORMAT, $data['rdap_standalone_start_ts'])
+			))));
+		}
+
 		$rdapInfoTable = (new CTable(null))->addClass('incidents-info');
 
 		$rdapTable = new CTableInfo($noData);
@@ -445,11 +451,18 @@ if (isset($this->data['tld'])) {
 	else {
 		$message = is_RDAP_standalone($data['tests_start_time'])
 			? _('RDAP is disabled.')
+			: _('RDAP is not a standalone service.');
+
+		$rdapTab->additem(new CDiv(bold($message), 'red center'));
+		/*
+		$message = is_RDAP_standalone($data['tests_start_time'])
+			? _('RDAP is disabled.')
 			: ($data['rdap_standalone_start_time']
 				? _s('RDAP was not a standalone service before %s.', date(DATE_TIME_FORMAT, $this->data['rdap_standalone_start_time']))
 				: _('RDAP is not a standalone service.'));
 
 		$rdapTab->additem(new CDiv(bold($message), 'red center'));
+		*/
 	}
 
 	// EPP

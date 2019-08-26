@@ -266,7 +266,7 @@ if ($host || $data['filter_search']) {
 				? [RSM_SLV_RDDS_AVAIL]
 				: [RSM_SLV_DNSSEC_AVAIL, RSM_SLV_RDDS_AVAIL, RSM_SLV_EPP_AVAIL];
 
-			if (is_RDAP_standalone($data['tests_start_time'])) {
+			if (is_RDAP_standalone($filterTimeFrom) || is_RDAP_standalone($filterTimeTill)) {
 				$avail_item_keys[] = RSM_SLV_RDAP_AVAIL;
 				$item_keys[] = RSM_SLV_RDAP_ROLLWEEK;
 			}
@@ -361,7 +361,7 @@ if ($host || $data['filter_search']) {
 							$data['rdap']['itemid'] = $item['itemid'];
 							$data['rdap']['slv'] = sprintf('%.3f', $item['lastvalue']);
 							$data['rdap']['slvTestTime'] = sprintf('%.3f', $item['lastclock']);
-							$data['rdap']['events'] = [];
+							$data['rdap']['events'] = [];							
 							break;
 
 						case RSM_SLV_EPP_ROLLWEEK:
@@ -1090,17 +1090,17 @@ if ($host || $data['filter_search']) {
 }
 
 // Chceck if RDAP standalone service was enabled during the filtered period.
-$rdap_standalpne_start = API::UserMacro()->get([
-	'output' => ['value'],
-	'filter' => ['macro' => RSM_RDAP_STANDALONE],
-	'globalmacro' => true
-]);
+$data['rdap_standalone_start_ts'] = 0;
 
-$data['rdap_standalone_start_time'] = ($rdap_standalpne_start
-		&& $rdap_standalpne_start[0]['value'] > $data['tests_start_time']
-		&& $rdap_standalpne_start[0]['value'] < $filterTimeTill)
-	? $rdap_standalpne_start[0]['value']
-	: 0;
+if (is_RDAP_standalone($filterTimeFrom) !== is_RDAP_standalone($filterTimeTill)) {
+	$rdap_standalone_ts = API::UserMacro()->get([
+		'output' => ['value'],
+		'filter' => ['macro' => RSM_RDAP_STANDALONE],
+		'globalmacro' => true
+	]);
+
+	$data['rdap_standalone_start_ts'] = $rdap_standalone_ts ? $rdap_standalone_ts[0]['value'] : 0;
+}
 
 // Show error if no matching hosts found.
 if ($data['filter_search'] && !$data['tld']) {
