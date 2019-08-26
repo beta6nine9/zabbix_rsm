@@ -2346,27 +2346,19 @@ function get_rsm_monitoring_type() {
  * @return bool
  */
 function is_RDAP_standalone($timestamp = null) {
-	static $standalone;
+	static $rsm_rdap_standalone_ts;
 
-	if ($standalone === null) {
-		$timestamp = ($timestamp === null)
-			? (string) time()
-			: (string) $timestamp;
-
+	if (is_null($rsm_rdap_standalone_ts)) {
 		$db_macro = API::UserMacro()->get([
 			'output' => ['value'],
 			'filter' => ['macro' => RSM_RDAP_STANDALONE],
 			'globalmacro' => true
 		]);
 
-		if ($db_macro) {
-			$macro_value = (int) reset($db_macro)['value'];
-			$standalone = ($macro_value != 0 && bccomp((string) $macro_value, $timestamp) <= 0);
-		}
-		else {
-			$standalone = false;
-		}
+		$rsm_rdap_standalone_ts = $db_macro ? (int) $db_macro[0]['value'] : 0;
 	}
 
-	return $standalone;
+	$timestamp = is_null($timestamp) ? time() : (int) $timestamp;
+
+	return ($rsm_rdap_standalone_ts > 0 && $rsm_rdap_standalone_ts <= $timestamp);
 }
