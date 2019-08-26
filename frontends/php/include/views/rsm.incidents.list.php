@@ -177,7 +177,7 @@ if (isset($this->data['tld'])) {
 			[[bold(_('Frequency/delay')), ':'.SPACE], convert_units(['value' => $this->data['dns']['delay'], 'units' => 's'])]
 		]);
 
-		$rollingWeek = [
+		$rollingWeek = is_null($data['dns']['slvTestTime']) ? [] : [
 			(new CSpan(_s('%1$s Rolling week status', $this->data['dns']['slv'].'%')))->addClass('rolling-week-status'),
 			BR(),
 			(new CSpan(date(DATE_TIME_FORMAT, $this->data['dns']['slvTestTime'])))->addClass('rsm-date-time')
@@ -264,7 +264,7 @@ if (isset($this->data['tld'])) {
 			[[bold(_('Frequency/delay')), ':'.SPACE], convert_units(['value' => $this->data['dnssec']['delay'], 'units' => 's'])]
 		]);
 
-		$rollingWeek = [
+		$rollingWeek = is_null($data['dnssec']['slvTestTime']) ? [] : [
 			(new CSpan(_s('%1$s Rolling week status', $this->data['dnssec']['slv'].'%')))->addClass('rolling-week-status'),
 			BR(),
 			(new CSpan(date(DATE_TIME_FORMAT, $this->data['dnssec']['slvTestTime'])))->addClass('rsm-date-time')
@@ -348,7 +348,7 @@ if (isset($this->data['tld'])) {
 			[[bold(_('Frequency/delay')), ':'.SPACE], convert_units(['value' => $this->data['rdds']['delay'], 'units' => 's'])]
 		]);
 
-		$rollingWeek = [
+		$rollingWeek = is_null($data['rdds']['slvTestTime']) ? [] : [
 			(new CSpan(_s('%1$s Rolling week status', $this->data['rdds']['slv'].'%')))->addClass('rolling-week-status'),
 			BR(),
 			(new CSpan(date(DATE_TIME_FORMAT, $this->data['rdds']['slvTestTime'])))->addClass('rsm-date-time')
@@ -438,7 +438,7 @@ if (isset($this->data['tld'])) {
 			[[bold(_('Frequency/delay')), ':'.SPACE], convert_units(['value' => $this->data['rdap']['delay'], 'units' => 's'])]
 		]);
 
-		$rollingWeek = [
+		$rollingWeek = is_null($data['rdap']['slvTestTime']) ? [] : [
 			(new CSpan(_s('%1$s Rolling week status', $this->data['rdap']['slv'].'%')))->addClass('rolling-week-status'),
 			BR(),
 			(new CSpan(date(DATE_TIME_FORMAT, $this->data['rdap']['slvTestTime'])))->addClass('rsm-date-time')
@@ -529,7 +529,7 @@ if (isset($this->data['tld'])) {
 			[[bold(_('Frequency/delay')), ':'.SPACE], convert_units(['value' => $this->data['epp']['delay'], 'units' => 's'])]
 		]);
 
-		$rollingWeek = [
+		$rollingWeek = is_null($data['epp']['slvTestTime']) ? [] : [
 			(new CSpan(_s('%1$s Rolling week status', $this->data['epp']['slv'].'%')))->addClass('rolling-week-status'),
 			BR(),
 			(new CSpan(date(DATE_TIME_FORMAT, $this->data['epp']['slvTestTime'])))->addClass('rsm-date-time')
