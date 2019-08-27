@@ -52,40 +52,7 @@ $table = (new CTableInfo())->setHeader([
 	_('Monthly SLR')
 ]);
 
-// TLD details.
-if ($data['tld']) {
-	$details = [
-		($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR)
-			? [
-				bold(_s('Registrar ID')), ': ', $data['tld']['host'], BR(),
-				bold(_s('Registrar name')), ': ', $data['tld']['info_1'], BR(),
-				bold(_s('Registrar family')), ': ', $data['tld']['info_2']
-			]
-			: [
-				bold(_s('TLD')), ': ', $data['tld']['host']
-			]
-	];
-
-	if (array_key_exists('details', $data)) {
-		$details = array_merge($details, [
-			BR(),
-			bold(_s('Period')),
-			': ',
-			gmdate('Y/m/d H:i:s', $data['details']['from']),
-			' '._('till').' ',
-			gmdate('Y/m/d H:i:s', $data['details']['to']),
-			BR(),
-			bold(_s('Generation time')),
-			': ',
-			gmdate('dS F Y, H:i:s e', $data['details']['generated']),
-			BR(),
-			bold(_('Server')), ': ', new CLink($data['server'], $data['rolling_week_url'])
-		]);
-	}
-
-	$widget->additem((new CDiv())->addItem($details));
-}
-
+// Return disabled "Download XML" button if nothing selected.
 if (!array_key_exists('details', $data)) {
 	return $widget->addItem([
 		$table,
@@ -94,6 +61,31 @@ if (!array_key_exists('details', $data)) {
 			->addClass('action-buttons')
 	]);
 }
+
+// TLD details.
+$date_from = date(DATE_TIME_FORMAT_SECONDS, zbxDateToTime($data['details']['from']));
+$date_till = date(DATE_TIME_FORMAT_SECONDS, zbxDateToTime($data['details']['to']));
+$date_generated = date(DATE_TIME_FORMAT_SECONDS, zbxDateToTime($data['details']['generated']));
+
+$details = [$object_label => $data['tld']['host']];
+
+if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
+	$details += [
+		_('Registrar name') => $data['tld']['info_1'],
+		_('Registrar family') => $data['tld']['info_2']
+	];
+}
+
+$details += [
+	_('Period') => $date_from . ' - ' . $date_till,
+	_('Generation time') => $date_generated,
+	_('Server: ') => new CLink($data['server'], $data['rolling_week_url'])
+];
+
+$widget->additem((new CDiv())
+	->addClass(ZBX_STYLE_TABLE_FORMS_CONTAINER)
+	->addItem(gen_details_item($details))
+);
 
 // DNS Service Availability.
 if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY) {

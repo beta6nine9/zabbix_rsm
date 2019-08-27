@@ -21,18 +21,18 @@
 
 $widget = (new CWidget())->setTitle(_('Incidents'));
 
+$object_label = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) ? _('Registrar ID') : _('TLD');
+
 // filter
 $filter = (new CFilter('web.rsm.incidents.filter.state'))
 	->addVar('filter_set', 1)
 	->addVar('filter_from', zbxDateToTime($data['filter_from']))
 	->addVar('filter_to', zbxDateToTime($data['filter_to']));
 
-$search_label = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) ? _('Registrar ID') : _('TLD');
-
 $filter
 	->addColumn(
 		(new CFormList())
-			->addRow($search_label, (new CTextBox('filter_search', $data['filter_search']))
+			->addRow($object_label, (new CTextBox('filter_search', $data['filter_search']))
 				->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH)
 				->setAttribute('autocomplete', 'off')
 			)
@@ -59,27 +59,27 @@ $filter
 $widget->addItem($filter);
 
 if (isset($data['tld'])) {
-	$infoBlock = new CTable(null, 'filter info-block');
+	$date_from = date(DATE_TIME_FORMAT, zbxDateToTime($data['filter_from']));
+	$date_till = date(DATE_TIME_FORMAT, zbxDateToTime($data['filter_to']));
 
-	$dateFrom = date(DATE_TIME_FORMAT, zbxDateToTime($data['filter_from']));
-	$dateTill = date(DATE_TIME_FORMAT, zbxDateToTime($data['filter_to']));
+	$details = [$object_label => $data['tld']['host']];
 
 	if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
-		$infoBlock
-			->addRow([new CSpan([bold(_('Registrar ID')), ':', SPACE, $data['tld']['host']])])
-			->addRow([new CSpan([bold(_('Registrar name')), ':', SPACE, $data['tld']['info_1']])])
-			->addRow([new CSpan([bold(_('Registrar family')), ':', SPACE, $data['tld']['info_2']])]);
-	}
-	else {
-		$infoBlock
-			->addRow([new CSpan([bold(_('TLD')), ':', SPACE, $data['tld']['host']])]);
+		$details += [
+			_('Registrar name') => $data['tld']['info_1'],
+			_('Registrar family') => $data['tld']['info_2']
+		];
 	}
 
-	$infoBlock
-		->addRow([new CSpan([bold(_('Period')), ':', SPACE, _s('from %1$s till %2$s', $dateFrom, $dateTill)])])
-		->addRow([new CSpan([bold(_('Server')), ':', SPACE, new CLink($this->data['server'], $this->data['url'].'rsm.rollingweekstatus.php?sid='.$this->data['sid'].'&set_sid=1')])]);
+	$details += [
+		_('Period') => $date_from . ' - ' . $date_till,
+		_('Server') => new CLink($data['server'], $data['url'].'rsm.rollingweekstatus.php?sid='.$this->data['sid'].'&set_sid=1')
+	];
 
-	$widget->additem($infoBlock);
+	$widget->additem((new CDiv())
+		->addClass(ZBX_STYLE_TABLE_FORMS_CONTAINER)
+		->addItem(gen_details_item($details))
+	);
 }
 
 $headers = [

@@ -21,6 +21,8 @@
 
 $widget = (new CWidget())->setTitle(_('Details of particular test'));
 
+$object_label = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) ? _('Registrar ID') : _('TLD');
+
 $use_rdap = ($this->data['type'] == RSM_RDDS && !is_RDAP_standalone($data['test_time_from']));
 
 if ($this->data['type'] == RSM_DNS || $this->data['type'] == RSM_DNSSEC) {
@@ -636,36 +638,58 @@ else {
 	}
 }
 
-$object_info = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR)
-	? [
-		new CSpan([bold(_('Registrar ID')), ':', SPACE, $data['tld']['host']]),
-		BR(),
-		new CSpan([bold(_('Registrar name')), ':', SPACE, $data['tld']['info_1']]),
-		BR(),
-		new CSpan([bold(_('Registrar family')), ':', SPACE, $data['tld']['info_2']])
-	]
-	: new CSpan([bold(_('TLD')), ':', SPACE, $data['tld']['host']]);
+$details = [$object_label => $data['tld']['host']];
 
-$particularTests = [
-	$object_info,
-	BR(),
-	new CSpan([bold(_('Service')), ':', SPACE, $this->data['slvItem']['name']]),
-	BR(),
-	new CSpan([bold(_('Test time')), ':', SPACE, date(DATE_TIME_FORMAT_SECONDS, $this->data['time'])]),
-	BR(),
-	new CSpan([bold(_('Test result')), ':', SPACE, $test_result, SPACE,
-		_s('(calculated at %1$s)', date(DATE_TIME_FORMAT_SECONDS, $this->data['time'] + RSM_ROLLWEEK_SHIFT_BACK))
-	]),
-	BR(),
-	new CSpan([bold(_('Note')), ':', SPACE, _('The following table displays the data that has been received by '.
-		'the central node, some of the values may not have been available at the time of the calculation of the '.
-		'"Test result"')
-	])
+if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
+	$details += [
+		_('Registrar name') => $data['tld']['info_1'],
+		_('Registrar family') => $data['tld']['info_2']
+	];
+}
+
+$details += [
+	_('Service') => $data['slvItem']['name'],
+	_('Test time') => date(DATE_TIME_FORMAT_SECONDS, $data['time']),
+	_('Test result') => $test_result,
+	_('Note') => _(
+		'The following table displays the data that has been received by the central node, some of'.
+		' the values may not have been available at the time of the calculation of the "Test result"'
+	)
 ];
-$particularTestsInfoTable = (new CTable(null))->addClass('incidents-info');
-$particularTestsInfoTable->addRow([$particularTests, $additionInfo]);
 
-$widget->addItem($particularTestsInfoTable);
+$right_details = [
+	_('Probes total') => $data['totalProbes'],
+	_('Probes offline') => $offlineProbes,
+	_('Probes with No Result') => $noResultProbes,
+	_('Probes with Result') => $data['totalProbes'] - $offlineProbes - $noResultProbes,
+];
+
+if ($this->data['type'] == RSM_DNSSEC) {
+	$right_details += [
+		_('Tests total') => $testTotal,
+		_('Tests Up') => $testUp,
+		_('Tests Down') => $testDown,
+	];
+}
+else {
+	$downProbes = $this->data['type'] == RSM_DNS ? $this->data['downProbes'] : $downProbes;
+
+	$right_details += [
+		_('Probes Up') => $data['totalProbes'] - $offlineProbes - $noResultProbes - $downProbes,
+		_('Probes Down') => $downProbes,
+	];
+}
+
+$widget->additem((new CDiv())
+	->addClass(ZBX_STYLE_TABLE_FORMS_CONTAINER)
+	->addItem((new CTable(null))
+		->addClass('incidents-info')
+		->addRow([
+			gen_details_item($details),
+			gen_details_item($right_details),
+		])
+	)
+);
 
 $widget->addItem($table);
 
