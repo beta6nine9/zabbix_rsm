@@ -223,7 +223,7 @@ if ($mainEvent) {
 				'output' => API_OUTPUT_EXTEND,
 				'hostids' => $template['templateid'],
 				'filter' => [
-					'macro' => is_RDAP_standalone($serverTime - $rollWeekSeconds['value'])
+					'macro' => is_RDAP_standalone($mainEvent['clock'])
 						? [RSM_TLD_RDDS43_ENABLED, RSM_TLD_RDDS80_ENABLED, RSM_TLD_RDDS_ENABLED]
 						: [RSM_TLD_RDDS43_ENABLED, RSM_TLD_RDDS80_ENABLED, RSM_RDAP_TLD_ENABLED, RSM_RDAP_TLD_ENABLED, RSM_TLD_RDDS_ENABLED]
 				]));
