@@ -211,11 +211,8 @@ if ($data['tld'] && $filter_valid) {
 			'slr_rdds_rtt_downtime_ms'	=> (string) $xml->RDDS->rtt->attributes()->rttSLR
 		];
 
-		if (!$xml->RDAP && is_RDAP_standalone($data['details']['from'])) {
-			show_error_message(_('Cannot find RDAP values.'));
-		}
-		else {
-			if (isset($xml->RDAP) && !is_RDAP_standalone($data['details']['from'])) {
+		if (isset($xml->RDAP)) {
+			if (!is_RDAP_standalone($data['details']['from'])) {
 				show_error_message(_('RDAP values exists for time when service was not standalone.'));
 			}
 
@@ -229,6 +226,9 @@ if ($data['tld'] && $filter_valid) {
 				'slr_rdap_rtt_downtime'		=> (string) $rdap->rtt->attributes()->percentageSLR,
 				'slr_rdap_rtt_downtime_ms'	=> (string) $rdap->rtt->attributes()->rttSLR
 			];
+		}
+		else if (is_RDAP_standalone($data['details']['from'])) {
+			show_error_message(_('Cannot find RDAP values.'));
 		}
 
 		if ($data['tld']['host'] !== strval($details->id)) {
