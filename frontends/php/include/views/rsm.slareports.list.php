@@ -79,7 +79,7 @@ if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
 $details += [
 	_('Period') => $date_from . ' - ' . $date_till,
 	_('Generation time') => $date_generated,
-	_('Server: ') => new CLink($data['server'], $data['rolling_week_url'])
+	_('Server') => new CLink($data['server'], $data['rolling_week_url'])
 ];
 
 $widget->additem((new CDiv())
