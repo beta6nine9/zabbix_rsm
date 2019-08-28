@@ -957,6 +957,13 @@ foreach ($tlds_by_server as $key => $hosts) {
 					$false_positive = false;
 				}
 			}
+			if (array_key_exists(RSM_RDAP, $data['tld'][$tld_key])
+					&& array_key_exists('incident', $data['tld'][$tld_key][RSM_RDAP])) {
+				$data['tld'][$tld_key][RSM_RDAP]['incident'] = getLastEvent($data['tld'][$tld_key][RSM_RDAP]['incident']);
+				if ($data['tld'][$tld_key][RSM_RDAP]['incident']) {
+					$false_positive = false;
+				}
+			}
 			if (array_key_exists(RSM_EPP, $data['tld'][$tld_key])
 					&& array_key_exists('incident', $data['tld'][$tld_key][RSM_EPP])) {
 				$data['tld'][$tld_key][RSM_EPP]['incident'] = getLastEvent($data['tld'][$tld_key][RSM_EPP]['incident']);
