@@ -66,6 +66,13 @@ sub main()
 			"\n\n/opt/zabbix/scripts/change-macro.pl --macro '{\$RSM.MONITORING.TARGET}' --value '${\MONITORING_TARGET_REGISTRY}'");
 	}
 
+	# geting some global macros required by this script
+	foreach my $macro (keys %{$cfg_global_macros})
+	{
+		$cfg_global_macros->{$macro} = get_global_macro_value($macro);
+		pfail('cannot get global macro ', $macro) unless defined($cfg_global_macros->{$macro});
+	}
+
 	if (opt('set-type'))
 	{
 		set_type();
@@ -86,11 +93,13 @@ sub main()
 	}
 	elsif (opt('delete'))
 	{
-		manage_tld_objects('delete', getopt('tld'), getopt('dns'), getopt('dnssec'), getopt('epp'), getopt('rdds'));
+		manage_tld_objects('delete', getopt('tld'), getopt('dns'), getopt('dnssec'), 
+				getopt('epp'), getopt('rdds'), getopt('rdap'));
 	}
 	elsif (opt('disable'))
 	{
-		manage_tld_objects('disable', getopt('tld'), getopt('dns'), getopt('dnssec'), getopt('epp'), getopt('rdds'));
+		manage_tld_objects('disable', getopt('tld'), getopt('dns'), getopt('dnssec'), 
+				getopt('epp'), getopt('rdds'), getopt('rdap'));
 	}
 	else
 	{
@@ -241,6 +250,7 @@ sub validate_input($)
 	setopt('dnssec', 0) unless opt('dnssec');
 	setopt('rdds'  , 0) unless opt('rdds');
 	setopt('epp'   , 0) unless opt('epp');
+	setopt('rdap'  , 0) unless opt('rdap');
 
 	if ($msg)
 	{
@@ -720,6 +730,7 @@ sub manage_tld_objects($$$$$$)
 	my $dnssec = shift;
 	my $epp    = shift;
 	my $rdds   = shift;
+	my $rdap   = shift;
 
 	my $types = {
 		'dns'    => $dns,
@@ -729,6 +740,8 @@ sub manage_tld_objects($$$$$$)
 	};
 
 	my $main_templateid;
+
+	$types->{'rdap'} = $rdap if (__is_rdap_standalone());
 
 	print "Getting main host of the TLD: ";
 	my $main_hostid = get_host($tld, false);
@@ -785,7 +798,8 @@ sub manage_tld_objects($$$$$$)
 		push(@tld_hostids, $host->{'hostid'});
 	}
 
-	if ($types->{'dns'} eq true and $types->{'epp'} eq true and $types->{'rdds'} eq true)
+	if ($types->{'dns'} eq true and $types->{'epp'} eq true and $types->{'rdds'} eq true and
+			(__is_rdap_standalone() ? ($types->{'rdap'} eq true) : 1))
 	{
 		my @tmp_hostids;
 		my @hostids_arr;
@@ -884,14 +898,6 @@ sub manage_tld_objects($$$$$$)
 
 sub add_new_tld()
 {
-	## Geting some global macros related to item refresh interval ##
-	## Values are used as item update interval ##
-	foreach my $macro (keys %{$cfg_global_macros})
-	{
-		$cfg_global_macros->{$macro} = get_global_macro_value($macro);
-		pfail('cannot get global macro ', $macro) unless defined($cfg_global_macros->{$macro});
-	}
-
 	$ns_servers = get_ns_servers(getopt('tld'));
 	pfail("Could not retrive NS servers for '" . getopt('tld') . "' TLD") unless (scalar(keys %{$ns_servers}));
 
@@ -2169,6 +2175,9 @@ Other options
         --rdds
                 Action with RDDS
                 (default: no)
+        --rdap
+                Action with RDAP
+                (only effective after switch to Standalone RDAP, default: no)
         --help
                 display this message
 EOF
