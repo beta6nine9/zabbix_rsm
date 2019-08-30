@@ -80,7 +80,6 @@ sub main()
 	}
 	elsif (opt('update-nsservers'))
 	{
-		# possible use dig instead of --ns-servers-v4 and --ns-servers-v6
 		$ns_servers = get_ns_servers(getopt('tld'));
 		update_nsservers($server_key, getopt('tld'), $ns_servers);
 	}
@@ -136,7 +135,6 @@ sub init_cli_opts($)
 			"server-id=s",
 			"get-nsservers-list!",
 			"update-nsservers!",
-			"resolver=s",
 			"list-services!",
 			"setup-cron!",
 			"verbose!",
@@ -181,6 +179,15 @@ sub validate_input($)
 			my $type = getopt('type');
 			$msg .= "invalid TLD type \"$type\", type must be one of: @{[TLD_TYPE_G]}, @{[TLD_TYPE_CC]}, @{[TLD_TYPE_OTHER]} or @{[TLD_TYPE_TEST]}\n";
 		}
+		elsif (!opt('ns-servers-v4') && !opt('ns-servers-v6'))
+		{
+			$msg .= "at least one of the --ns-servers-v4,--ns-servers-v6 options must be specified\n";
+		}
+	}
+
+	if (opt('update-nsservers') && (!opt('ns-servers-v4') && !opt('ns-servers-v6')))
+	{
+		$msg .= "--update-nsservers requires at least --ns-servers-v4 and/or --ns-servers-v6\n";
 	}
 
 	if (opt('set-type'))
@@ -914,85 +921,59 @@ sub get_ns_servers($)
 {
 	my $tld = shift;
 
-	if (getopt('ns-servers-v4') or getopt('ns-servers-v6'))
+	my $ns_servers;
+
+	# just in case, the input should have been validated by now
+	unless (opt('ns-servers-v4') or opt('ns-servers-v6'))
 	{
-		if (getopt('ns-servers-v4') and (getopt('ipv4') == 1 or getopt('update-nsservers')))
+		pfail("option --ns-servers-v4 and/or --ns-servers-v6 required for this invocation");
+	}
+
+	if (getopt('ns-servers-v4') and (getopt('ipv4') == 1 or getopt('update-nsservers')))
+	{
+		my @nsservers = split(/\s/, getopt('ns-servers-v4'));
+		foreach my $ns (@nsservers)
 		{
-			my @nsservers = split(/\s/, getopt('ns-servers-v4'));
-			foreach my $ns (@nsservers)
+			next if ($ns eq '');
+
+			my @entries = split(/,/, $ns);
+
+			pfail("incorrect Name Server format: expected \"<NAME>,<IP>\" got \"$ns\"") unless ($entries[0] && $entries[1]);
+
+			my $exists = 0;
+			foreach my $ip (@{$ns_servers->{$entries[0]}{'v4'}})
 			{
-				next if ($ns eq '');
-
-				my @entries = split(/,/, $ns);
-
-				pfail("incorrect Name Server format: expected \"<NAME>,<IP>\" got \"$ns\"") unless ($entries[0] && $entries[1]);
-
-				my $exists = 0;
-				foreach my $ip (@{$ns_servers->{$entries[0]}{'v4'}})
+				if ($ip eq $entries[1])
 				{
-					if ($ip eq $entries[1])
-					{
-						$exists = 1;
-						last;
-					}
+					$exists = 1;
+					last;
 				}
-
-				push(@{$ns_servers->{$entries[0]}{'v4'}}, $entries[1]) unless ($exists);
 			}
-		}
 
-		if (getopt('ns-servers-v6') and (getopt('ipv6') or getopt('update-nsservers')))
-		{
-			my @nsservers = split(/\s/, getopt('ns-servers-v6'));
-			foreach my $ns (@nsservers)
-			{
-				next if ($ns eq '');
-
-				my @entries = split(/,/, $ns);
-
-				my $exists = 0;
-				foreach my $ip (@{$ns_servers->{$entries[0]}{'v6'}})
-				{
-					if ($ip eq $entries[1])
-					{
-						$exists = 1;
-						last;
-					}
-				}
-
-				push(@{$ns_servers->{$entries[0]}{'v6'}}, $entries[1]) unless ($exists);
-			}
+			push(@{$ns_servers->{$entries[0]}{'v4'}}, $entries[1]) unless ($exists);
 		}
 	}
-	else
+
+	if (getopt('ns-servers-v6') and (getopt('ipv6') or getopt('update-nsservers')))
 	{
-		# implemented --resolver for automatically fetching NSs (NB, search for --resolver in this file)
-		my $add_opts = "";
-		$add_opts = "\@" . getopt('resolver') if (getopt('resolver'));
-		# NB! Fix duplicate items! Remove DOT from the end of NS.
-		my $nsservers = `dig $add_opts $tld NS +short | sed 's/\.\$//'`;
-
-		my @nsservers = split(/\n/, $nsservers);
-
-		print("Warning: resolver returned no Name Servers, did you forget to specify \"--resolver\"?\n") if (scalar(@nsservers) == 0);
-
-		for (my $i = 0; $i <= $#nsservers; $i++)
+		my @nsservers = split(/\s/, getopt('ns-servers-v6'));
+		foreach my $ns (@nsservers)
 		{
-			if (getopt('ipv4'))
-			{
-				my $ipv4 = `dig $add_opts $nsservers[$i] A +short`;
-				my @ipv4 = split(/\n/, $ipv4);
+			next if ($ns eq '');
 
-				@{$ns_servers->{$nsservers[$i]}{'v4'}} = @ipv4 if scalar @ipv4;
+			my @entries = split(/,/, $ns);
+
+			my $exists = 0;
+			foreach my $ip (@{$ns_servers->{$entries[0]}{'v6'}})
+			{
+				if ($ip eq $entries[1])
+				{
+					$exists = 1;
+					last;
+				}
 			}
 
-			if (getopt('ipv6'))
-			{
-				my $ipv6 = `dig $add_opts $nsservers[$i] AAAA +short` if getopt('ipv6');
-				my @ipv6 = split(/\n/, $ipv6);
-
-				@{$ns_servers->{$nsservers[$i]}{'v6'}} = @ipv6 if scalar @ipv6;
-			}
+			push(@{$ns_servers->{$entries[0]}{'v6'}}, $entries[1]) unless ($exists);
 		}
 	}
 
@@ -2100,8 +2081,6 @@ Other options
                 <TLD>,<IP-VERSION>,<NAME-SERVER>,<IP>
         --update-nsservers
                 update all NS + IP pairs for specified TLD.
-        --resolver=IP
-                specify resolver to use when querying Name Servers of a TLD
         --type=STRING
                 Type of TLD. Possible values: @{[TLD_TYPE_G]}, @{[TLD_TYPE_CC]}, @{[TLD_TYPE_OTHER]}, @{[TLD_TYPE_TEST]}.
         --set-type
@@ -2117,10 +2096,8 @@ Other options
                 (default: disabled)
         --ns-servers-v4=STRING
                 list of IPv4 name servers separated by space (name and IP separated by comma): "NAME,IP[ NAME,IP2 ...]"
-                (default: get the list from local resolver or specified with --resolver)
         --ns-servers-v6=STRING
                 list of IPv6 name servers separated by space (name and IP separated by comma): "NAME,IP[ NAME,IP2 ...]"
-                (default: get the list from local resolver or specified with --resolver)
         --rdds43-servers=STRING
                 list of RDDS43 servers separated by comma: "NAME1,NAME2,..."
         --rdds80-servers=STRING
