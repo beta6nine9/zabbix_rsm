@@ -66,7 +66,7 @@ sub main()
 			"\n\n/opt/zabbix/scripts/change-macro.pl --macro '{\$RSM.MONITORING.TARGET}' --value '${\MONITORING_TARGET_REGISTRY}'");
 	}
 
-	# geting some global macros required by this script
+	# get global macros required by this script
 	foreach my $macro (keys %{$cfg_global_macros})
 	{
 		$cfg_global_macros->{$macro} = get_global_macro_value($macro);
@@ -723,7 +723,7 @@ sub disable_old_ns($)
 # delete or disable RSMHOST or its objects
 ################################################################################
 
-sub manage_tld_objects($$$$$$)
+sub manage_tld_objects($$$$$$$)
 {
 	my $action = shift;
 	my $tld    = shift;
@@ -799,6 +799,8 @@ sub manage_tld_objects($$$$$$)
 		push(@tld_hostids, $host->{'hostid'});
 	}
 
+	# This condition checks if all services selected. This means we need to either check dns, epp, rdds
+	# before switch to Standalone RDAP or dns, epp, rdds, rdap after the switch.
 	if ($types->{'dns'} eq true and $types->{'epp'} eq true and $types->{'rdds'} eq true and
 			(__is_rdap_standalone() ? ($types->{'rdap'} eq true) : 1))
 	{
@@ -862,7 +864,7 @@ sub manage_tld_objects($$$$$$)
 				push(@itemids, $itemid);
 			}
 		}
-		elsif ($type ne 'rdap')
+		elsif ($type ne 'rdap') # RDAP doesn't have items in "Template $tld"
 		{
 			print "Could not find $type related items on the template level\n";
 		}
@@ -2093,10 +2095,10 @@ Required options
 
 Other options
         --delete
-                delete specified TLD or TLD services specifyed by: --dns, --rdds, --epp
+                delete specified TLD or TLD services specifyed by: --dns, --rdds, --rdap, --epp
                 if none or all services specified - will delete the whole TLD
         --disable
-                disable specified TLD or TLD services specified by: --dns, --rdds, --epp, --rdap
+                disable specified TLD or TLD services specified by: --dns, --rdds, --rdap, --epp
                 if none or all services specified - will disable the whole TLD
         --list-services
                 list services of each TLD, the output is comma-separated list:
