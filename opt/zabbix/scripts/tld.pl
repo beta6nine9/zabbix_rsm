@@ -66,6 +66,13 @@ sub main()
 			"\n\n/opt/zabbix/scripts/change-macro.pl --macro '{\$RSM.MONITORING.TARGET}' --value '${\MONITORING_TARGET_REGISTRY}'");
 	}
 
+	# get global macros required by this script
+	foreach my $macro (keys %{$cfg_global_macros})
+	{
+		$cfg_global_macros->{$macro} = get_global_macro_value($macro);
+		pfail('cannot get global macro ', $macro) unless defined($cfg_global_macros->{$macro});
+	}
+
 	if (opt('set-type'))
 	{
 		set_type();
@@ -86,11 +93,13 @@ sub main()
 	}
 	elsif (opt('delete'))
 	{
-		manage_tld_objects('delete', getopt('tld'), getopt('dns'), getopt('dnssec'), getopt('epp'), getopt('rdds'));
+		manage_tld_objects('delete', getopt('tld'), getopt('dns'), getopt('dnssec'),
+				getopt('epp'), getopt('rdds'), getopt('rdap'));
 	}
 	elsif (opt('disable'))
 	{
-		manage_tld_objects('disable', getopt('tld'), getopt('dns'), getopt('dnssec'), getopt('epp'), getopt('rdds'));
+		manage_tld_objects('disable', getopt('tld'), getopt('dns'), getopt('dnssec'),
+				getopt('epp'), getopt('rdds'), getopt('rdap'));
 	}
 	else
 	{
@@ -120,6 +129,7 @@ sub init_cli_opts($)
 			"dns!",
 			"epp!",
 			"rdds!",
+			"rdap!",
 			"dnssec!",
 			"epp-servers=s",
 			"epp-user=s",
@@ -241,6 +251,7 @@ sub validate_input($)
 	setopt('dnssec', 0) unless opt('dnssec');
 	setopt('rdds'  , 0) unless opt('rdds');
 	setopt('epp'   , 0) unless opt('epp');
+	setopt('rdap'  , 0) unless opt('rdap');
 
 	if ($msg)
 	{
@@ -712,7 +723,7 @@ sub disable_old_ns($)
 # delete or disable RSMHOST or its objects
 ################################################################################
 
-sub manage_tld_objects($$$$$$)
+sub manage_tld_objects($$$$$$$)
 {
 	my $action = shift;
 	my $tld    = shift;
@@ -720,6 +731,7 @@ sub manage_tld_objects($$$$$$)
 	my $dnssec = shift;
 	my $epp    = shift;
 	my $rdds   = shift;
+	my $rdap   = shift;
 
 	my $types = {
 		'dns'    => $dns,
@@ -729,6 +741,8 @@ sub manage_tld_objects($$$$$$)
 	};
 
 	my $main_templateid;
+
+	$types->{'rdap'} = $rdap if (__is_rdap_standalone());
 
 	print "Getting main host of the TLD: ";
 	my $main_hostid = get_host($tld, false);
@@ -785,7 +799,10 @@ sub manage_tld_objects($$$$$$)
 		push(@tld_hostids, $host->{'hostid'});
 	}
 
-	if ($types->{'dns'} eq true and $types->{'epp'} eq true and $types->{'rdds'} eq true)
+	# This condition checks if all services selected. This means we need to either check dns, epp, rdds
+	# before switch to Standalone RDAP or dns, epp, rdds, rdap after the switch.
+	if ($types->{'dns'} eq true and $types->{'epp'} eq true and $types->{'rdds'} eq true and
+			(__is_rdap_standalone() ? ($types->{'rdap'} eq true) : 1))
 	{
 		my @tmp_hostids;
 		my @hostids_arr;
@@ -847,7 +864,7 @@ sub manage_tld_objects($$$$$$)
 				push(@itemids, $itemid);
 			}
 		}
-		else
+		elsif ($type ne 'rdap') # RDAP doesn't have items in "Template $tld"
 		{
 			print "Could not find $type related items on the template level\n";
 		}
@@ -867,7 +884,8 @@ sub manage_tld_objects($$$$$$)
 		if ($action eq 'disable' and scalar(@itemids))
 		{
 			disable_items(\@itemids);
-			create_macro('{$RSM.TLD.' . uc($type) . '.ENABLED}', 0, $main_templateid, true);
+			my $macro = $type eq 'rdap' ? '{$RDAP.TLD.ENABLED}' : '{$RSM.TLD.' . uc($type) . '.ENABLED}';
+			create_macro($macro, 0, $main_templateid, true);
 		}
 
 		if ($action eq 'delete' and scalar(@itemids))
@@ -884,14 +902,6 @@ sub manage_tld_objects($$$$$$)
 
 sub add_new_tld()
 {
-	## Geting some global macros related to item refresh interval ##
-	## Values are used as item update interval ##
-	foreach my $macro (keys %{$cfg_global_macros})
-	{
-		$cfg_global_macros->{$macro} = get_global_macro_value($macro);
-		pfail('cannot get global macro ', $macro) unless defined($cfg_global_macros->{$macro});
-	}
-
 	$ns_servers = get_ns_servers(getopt('tld'));
 	pfail("Could not retrive NS servers for '" . getopt('tld') . "' TLD") unless (scalar(keys %{$ns_servers}));
 
@@ -2085,10 +2095,10 @@ Required options
 
 Other options
         --delete
-                delete specified TLD or TLD services specifyed by: --dns, --rdds, --epp
+                delete specified TLD or TLD services specifyed by: --dns, --rdds, --rdap, --epp
                 if none or all services specified - will delete the whole TLD
         --disable
-                disable specified TLD or TLD services specified by: --dns, --rdds, --epp
+                disable specified TLD or TLD services specified by: --dns, --rdds, --rdap, --epp
                 if none or all services specified - will disable the whole TLD
         --list-services
                 list services of each TLD, the output is comma-separated list:
@@ -2169,6 +2179,9 @@ Other options
         --rdds
                 Action with RDDS
                 (default: no)
+        --rdap
+                Action with RDAP
+                (only effective after switch to Standalone RDAP, default: no)
         --help
                 display this message
 EOF
