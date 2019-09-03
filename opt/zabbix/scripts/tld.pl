@@ -93,12 +93,12 @@ sub main()
 	}
 	elsif (opt('delete'))
 	{
-		manage_tld_objects('delete', getopt('tld'), getopt('dns'), getopt('dnssec'), 
+		manage_tld_objects('delete', getopt('tld'), getopt('dns'), getopt('dnssec'),
 				getopt('epp'), getopt('rdds'), getopt('rdap'));
 	}
 	elsif (opt('disable'))
 	{
-		manage_tld_objects('disable', getopt('tld'), getopt('dns'), getopt('dnssec'), 
+		manage_tld_objects('disable', getopt('tld'), getopt('dns'), getopt('dnssec'),
 				getopt('epp'), getopt('rdds'), getopt('rdap'));
 	}
 	else
