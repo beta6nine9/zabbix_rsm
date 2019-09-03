@@ -129,6 +129,7 @@ sub init_cli_opts($)
 			"dns!",
 			"epp!",
 			"rdds!",
+			"rdap!",
 			"dnssec!",
 			"epp-servers=s",
 			"epp-user=s",
@@ -861,7 +862,7 @@ sub manage_tld_objects($$$$$$)
 				push(@itemids, $itemid);
 			}
 		}
-		else
+		elsif ($type ne 'rdap')
 		{
 			print "Could not find $type related items on the template level\n";
 		}
@@ -881,7 +882,8 @@ sub manage_tld_objects($$$$$$)
 		if ($action eq 'disable' and scalar(@itemids))
 		{
 			disable_items(\@itemids);
-			create_macro('{$RSM.TLD.' . uc($type) . '.ENABLED}', 0, $main_templateid, true);
+			my $macro = $type eq 'rdap' ? '{$RDAP.TLD.ENABLED}' : '{$RSM.TLD.' . uc($type) . '.ENABLED}';
+			create_macro($macro, 0, $main_templateid, true);
 		}
 
 		if ($action eq 'delete' and scalar(@itemids))
@@ -2094,7 +2096,7 @@ Other options
                 delete specified TLD or TLD services specifyed by: --dns, --rdds, --epp
                 if none or all services specified - will delete the whole TLD
         --disable
-                disable specified TLD or TLD services specified by: --dns, --rdds, --epp
+                disable specified TLD or TLD services specified by: --dns, --rdds, --epp, --rdap
                 if none or all services specified - will disable the whole TLD
         --list-services
                 list services of each TLD, the output is comma-separated list:
