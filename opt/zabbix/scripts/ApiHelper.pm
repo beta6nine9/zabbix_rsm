@@ -8,6 +8,7 @@ use base 'Exporter';
 use JSON::XS;
 use Types::Serialiser;
 use File::Copy;
+use Fcntl qw(:flock);
 
 use constant AH_SUCCESS => 0;
 use constant AH_FAIL => 1;
@@ -53,7 +54,9 @@ our @EXPORT = qw(
 	AH_SLA_API_DIR AH_SLA_API_RECENT_DIR
 	AH_SLA_API_TMP_DIR ah_set_debug ah_get_error ah_state_file_json ah_save_state
 	ah_save_alarmed ah_save_downtime ah_create_incident_json ah_save_incident
-	ah_save_false_positive ah_save_measurement ah_continue_file_name ah_get_api_tld ah_get_last_audit
+	ah_save_false_positive ah_save_measurement
+	ah_continue_file_name ah_lock_continue_file ah_unlock_continue_file
+	ah_get_api_tld ah_get_last_audit
 	ah_get_recent_measurement ah_save_recent_measurement ah_save_recent_cache ah_get_recent_cache
 	ah_save_audit ah_save_continue_file ah_encode_pretty_json JSON_OBJECT_DISABLED_SERVICE
 	ah_get_dns_interface ah_get_rdds_interface ah_get_interface
@@ -643,9 +646,29 @@ sub ah_get_recent_cache($$)
 	return AH_SUCCESS;
 }
 
-sub ah_continue_file_name
+sub ah_continue_file_name()
 {
 	return AH_SLA_API_DIR . '/' . AH_CONTINUE_FILE;
+}
+
+sub ah_lock_continue_file($)
+{
+	my $handle_ref = shift;
+
+	my $lock_file = ah_continue_file_name() . '.lock';
+
+	open(${$handle_ref}, '>>', $lock_file) or fail("cannot open \"$lock_file\": $!");
+	flock(${$handle_ref}, LOCK_EX) or fail("cannot lock \"$lock_file\": $!");
+}
+
+sub ah_unlock_continue_file($)
+{
+	my $handle = shift;
+
+	my $lock_file = ah_continue_file_name() . '.lock';
+
+	flock($handle, LOCK_UN) or fail("cannot unlock \"$lock_file\": $!");
+	close($handle) or fail("cannot close '$lock_file': $!");
 }
 
 sub ah_save_continue_file

@@ -94,7 +94,6 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		get_rtt_low
 		get_macro_epp_rtt_low get_macro_probe_avail_limit get_itemid_by_key get_itemid_by_host
 		get_itemid_by_hostid get_itemid_like_by_hostid get_itemids_by_host_and_keypart get_lastclock get_tlds
-		get_oldest_clock
 		get_probes get_nsips get_nsip_items tld_exists tld_service_enabled db_connect db_disconnect
 		validate_tld validate_service
 		get_templated_nsips db_exec tld_interface_enabled
@@ -450,40 +449,6 @@ sub get_lastclock($$$)
 	}
 
 	return $lastclock;
-}
-
-# returns:
-# E_FAIL - if item was not found
-# undef  - if history table is empty
-# *      - lastclock
-sub get_oldest_clock($$$$)
-{
-	my $host = shift;
-	my $key = shift;
-	my $value_type = shift;
-	my $clock_limit = shift;
-
-	my $rows_ref = db_select(
-		"select i.itemid".
-		" from items i,hosts h".
-		" where i.hostid=h.hostid".
-			" and i.status=0".
-			" and h.host='$host'".
-			" and i.key_='$key'"
-	);
-
-	return E_FAIL if (scalar(@$rows_ref) == 0);
-
-	my $itemid = $rows_ref->[0]->[0];
-
-	$rows_ref = db_select(
-		"select min(clock)".
-		" from " . history_table($value_type).
-		" where itemid=$itemid".
-			" and clock>$clock_limit"
-	);
-
-	return $rows_ref->[0]->[0];
 }
 
 sub get_tlds
@@ -3212,9 +3177,7 @@ sub optkeys
 
 sub ts_str
 {
-	my $ts = shift;
-
-	$ts = time() unless ($ts);
+	my $ts = shift // time();
 
 	# sec, min, hour, mday, mon, year, wday, yday, isdst
 	my ($sec, $min, $hour, $mday, $mon, $year) = localtime($ts);
@@ -3224,9 +3187,7 @@ sub ts_str
 
 sub ts_full
 {
-	my $ts = shift;
-
-	$ts = time() unless ($ts);
+	my $ts = shift // time();
 
 	my $str = ts_str($ts);
 
