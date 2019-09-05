@@ -4190,9 +4190,6 @@ sub update_slv_rtt_monthly_stats($$$$$$$$;$)
 			$last_performed_value += $rtt_stats->{'performed'};
 			$last_failed_value    += $rtt_stats->{'failed'};
 
-			push_value($tld, $slv_item_key_performed, $cycle_start, $last_performed_value);
-			push_value($tld, $slv_item_key_failed   , $cycle_start, $last_failed_value);
-
 			my $performed_with_expected = $last_performed_value + $cycles_till_end_of_month * $rtt_stats->{'expected'};
 
 			if ($performed_with_expected == 0)
@@ -4200,13 +4197,30 @@ sub update_slv_rtt_monthly_stats($$$$$$$$;$)
 				wrn("performed ($last_performed_value)".
 					" + expected (cycles:$cycles_till_end_of_month * tests:$rtt_stats->{'expected'})".
 					" number of tests is zero");
+
+				if ($last_pfailed_value > 0)
+				{
+					fail("unexpected last pfailed value:\n".
+						"\$i                        = $i\n".
+						"\$tld                      = $tld\n".
+						"\$cycles_till_end_of_month = $cycles_till_end_of_month\n".
+						"\$end_of_prev_month        = $end_of_prev_month\n".
+						"\$last_clock               = $last_clock\n".
+						"\$cycle_delay              = $cycle_delay\n".
+						"\$cycle_start              = $cycle_start\n".
+						"\$cycle_end                = $cycle_end\n".
+						"\$last_pfailed_value       = $last_pfailed_value\n".
+						"\$rtt_stats->{'expected'}  = $rtt_stats->{'expected'}");
+				}
 			}
 			else
 			{
 				$last_pfailed_value = 100 * $last_failed_value / $performed_with_expected;
-
-				push_value($tld, $slv_item_key_pfailed, $cycle_start, $last_pfailed_value);
 			}
+
+			push_value($tld, $slv_item_key_performed, $cycle_start, $last_performed_value);
+			push_value($tld, $slv_item_key_failed   , $cycle_start, $last_failed_value);
+			push_value($tld, $slv_item_key_pfailed  , $cycle_start, $last_pfailed_value);
 
 			$last_clock = $cycle_start;
 		}
