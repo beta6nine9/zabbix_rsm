@@ -744,26 +744,26 @@ sub manage_tld_objects($$$$$$$)
 
 	$types->{'rdap'} = $rdap if (__is_rdap_standalone());
 
-	print "Getting main host of the TLD: ";
+	print("Getting main host of the TLD: ");
 	my $main_hostid = get_host($tld, false);
 
 	if (scalar(%{$main_hostid}))
 	{
 		$main_hostid = $main_hostid->{'hostid'};
-		print "$main_hostid\n";
+		print("$main_hostid\n");
 	}
 	else
 	{
 		pfail("cannot find host \"$tld\"");
 	}
 
-	print "Getting main template of the TLD: ";
+	print("Getting main template of the TLD: ");
 	my $tld_template = get_template('Template ' . $tld, false, true);
 
 	if (scalar(%{$tld_template}))
 	{
 		$main_templateid = $tld_template->{'templateid'};
-		print "$main_templateid\n";
+		print("$main_templateid\n");
 	}
 	else
 	{
@@ -787,12 +787,12 @@ sub manage_tld_objects($$$$$$$)
 		}
 	}
 
-	print "Requested to $action '$tld'";
+	print("Requested to $action '$tld'");
 	if (scalar(@affected_services) != 0 && scalar(@affected_services) != $total_services)
 	{
 		print(" (", join(',', @affected_services), ")");
 	}
-	print "\n";
+	print("\n");
 
 	foreach my $host (@{$tld_template->{'hosts'}})
 	{
@@ -866,7 +866,7 @@ sub manage_tld_objects($$$$$$$)
 		}
 		elsif ($type ne 'rdap') # RDAP doesn't have items in "Template $tld"
 		{
-			print "Could not find $type related items on the template level\n";
+			print("Could not find $type related items on the template level\n");
 		}
 
 		if (scalar(keys(%{$host_items})))
@@ -878,20 +878,24 @@ sub manage_tld_objects($$$$$$$)
 		}
 		else
 		{
-			print "Could not find $type related items on host level\n";
+			print("Could not find $type related items on host level\n");
 		}
 
-		if ($action eq 'disable' and scalar(@itemids))
+		if (scalar(@itemids))
 		{
-			disable_items(\@itemids);
 			my $macro = $type eq 'rdap' ? '{$RDAP.TLD.ENABLED}' : '{$RSM.TLD.' . uc($type) . '.ENABLED}';
-			create_macro($macro, 0, $main_templateid, true);
-		}
 
-		if ($action eq 'delete' and scalar(@itemids))
-		{
-			remove_items(\@itemids);
-			#remove_applications_by_items(\@itemids);
+			create_macro($macro, 0, $main_templateid, true);
+
+			if ($action eq 'disable')
+			{
+				disable_items(\@itemids);
+			}
+			else # $action is 'delete'
+			{
+				remove_items(\@itemids);
+				#remove_applications_by_items(\@itemids);
+			}
 		}
 	}
 }
@@ -903,10 +907,10 @@ sub manage_tld_objects($$$$$$$)
 sub add_new_tld()
 {
 	$ns_servers = get_ns_servers(getopt('tld'));
-	pfail("Could not retrive NS servers for '" . getopt('tld') . "' TLD") unless (scalar(keys %{$ns_servers}));
+	pfail("Could not retrieve NS servers for '" . getopt('tld') . "' TLD") unless (scalar(keys %{$ns_servers}));
 
 	my $root_servers_macros = update_root_servers(getopt('root-servers'));
-	print("Could not retrive list of root servers or create global macros\n") unless (defined($root_servers_macros));
+	print("Could not retrieve list of root servers or create global macros\n") unless (defined($root_servers_macros));
 
 	my $main_templateid = create_main_template(getopt('tld'), $ns_servers);
 	pfail("Main templateid is not defined") unless defined $main_templateid;
@@ -1044,7 +1048,7 @@ sub create_main_template($$)
 		for (my $i_ipv4 = 0; $i_ipv4 <= $#ipv4; $i_ipv4++)
 		{
 			next unless defined $ipv4[$i_ipv4];
-			print "	--v4     $ipv4[$i_ipv4]\n";
+			print("	--v4     $ipv4[$i_ipv4]\n");
 
 			create_item_dns_rtt($ns_name, $ipv4[$i_ipv4], $templateid, "tcp", '4');
 			create_item_dns_rtt($ns_name, $ipv4[$i_ipv4], $templateid, "udp", '4');
@@ -1057,7 +1061,7 @@ sub create_main_template($$)
 		for (my $i_ipv6 = 0; $i_ipv6 <= $#ipv6; $i_ipv6++)
 		{
 			next unless defined $ipv6[$i_ipv6];
-			print "	--v6     $ipv6[$i_ipv6]\n";
+			print("	--v6     $ipv6[$i_ipv6]\n");
 
 			create_item_dns_rtt($ns_name, $ipv6[$i_ipv6], $templateid, "tcp", '6');
 			create_item_dns_rtt($ns_name, $ipv6[$i_ipv6], $templateid, "udp", '6');
@@ -2095,7 +2099,7 @@ Required options
 
 Other options
         --delete
-                delete specified TLD or TLD services specifyed by: --dns, --rdds, --rdap, --epp
+                delete specified TLD or TLD services specified by: --dns, --rdds, --rdap, --epp
                 if none or all services specified - will delete the whole TLD
         --disable
                 disable specified TLD or TLD services specified by: --dns, --rdds, --rdap, --epp

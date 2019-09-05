@@ -51,18 +51,7 @@ sub main()
 	my $server_key = opt('server-id') ? get_rsm_server_key(getopt('server-id')) : get_rsm_local_key($config);
 	init_zabbix_api($config, $server_key);
 
-	# expect "registrar" monitoring target
-	my $target = get_global_macro_value('{$RSM.MONITORING.TARGET}');
-	if (!defined($target))
-	{
-		pfail('cannot find global macro {$RSM.MONITORING.TARGET}');
-	}
-
-	if ($target ne MONITORING_TARGET_REGISTRAR)
-	{
-		pfail("expected monitoring target \"${\MONITORING_TARGET_REGISTRAR}\", but got \"$target\", if you'd like to change it, please run:".
-			"\n\n/opt/zabbix/scripts/change-macro.pl --macro '{\$RSM.MONITORING.TARGET}' --value '${\MONITORING_TARGET_REGISTRAR}'");
-	}
+	init_macros_and_validate_env();
 
 	if (opt('list-services'))
 	{
@@ -70,11 +59,11 @@ sub main()
 	}
 	elsif (opt('delete'))
 	{
-		manage_registrar('delete', getopt('rr-id'));
+		manage_registrar('delete', getopt('rr-id'), getopt('rdds'), getopt('rdap'));
 	}
 	elsif (opt('disable'))
 	{
-		manage_registrar('disable', getopt('rr-id'));
+		manage_registrar('disable', getopt('rr-id'), getopt('rdds'), getopt('rdap'));
 	}
 	else
 	{
@@ -94,6 +83,8 @@ sub init_cli_opts($)
 			"server-id=s",
 			"delete!",
 			"disable!",
+			"rdds!",
+			"rdap!",
 			"list-services!",
 			"rdds43-servers=s",
 			"rdds80-servers=s",
@@ -136,10 +127,8 @@ sub validate_cli_opts($)
 		{
 			__usage($default_server_id, "Registrar ID must be specified (--rr-id)");
 		}
-		else
-		{
-			return;
-		}
+
+		return;
 	}
 
 	# when creating or editing registrar, --rr-id, --rr-name and --rr-family are required
@@ -195,6 +184,34 @@ sub validate_cli_opts($)
 	{
 		chomp($msg);
 		__usage($default_server_id, $msg);
+	}
+}
+
+sub init_macros_and_validate_env()
+{
+	# expect "registrar" monitoring target
+	my $target = get_global_macro_value('{$RSM.MONITORING.TARGET}');
+	if (!defined($target))
+	{
+		pfail('cannot find global macro {$RSM.MONITORING.TARGET}');
+	}
+
+	if ($target ne MONITORING_TARGET_REGISTRAR)
+	{
+		pfail("expected monitoring target \"${\MONITORING_TARGET_REGISTRAR}\", but got \"$target\", if you'd like to change it, please run:".
+			"\n\n/opt/zabbix/scripts/change-macro.pl --macro '{\$RSM.MONITORING.TARGET}' --value '${\MONITORING_TARGET_REGISTRAR}'");
+	}
+
+	# get global macros related to this script
+	foreach my $macro (keys(%{$cfg_global_macros}))
+	{
+		$cfg_global_macros->{$macro} = get_global_macro_value($macro);
+		pfail('cannot get global macro ', $macro) unless defined($cfg_global_macros->{$macro});
+	}
+
+	if (!__is_rdap_standalone() && (opt('rdds') || opt('rdap')))
+	{
+		pfail('--rdds, --rdap are only supported after switch to Standalone RDAP')
 	}
 }
 
@@ -382,10 +399,25 @@ sub get_services($$)
 # delete or disable RSMHOST
 ################################################################################
 
-sub manage_registrar($$)
+sub manage_registrar($$$$)
 {
 	my $action  = shift;
 	my $rsmhost = shift;
+	my $rdds    = shift;
+	my $rdap    = shift;
+
+	if (!__is_rdap_standalone())
+	{
+		# before switch to Standalone RDAP treat both services like one
+		# and delete or disable hosts without touching specific items or macros
+		$rdds = $rdap = 1;
+	}
+	elsif (!$rdds && !$rdap)
+	{
+		# after the switch - delete or disable hosts if no specific services
+		# provided in the command line
+		$rdds = $rdap = 1;
+	}
 
 	my $main_host = get_host($rsmhost, false);
 	pfail("cannot find host \"$rsmhost\"") unless %{$main_host};
@@ -405,32 +437,73 @@ sub manage_registrar($$)
 		map($_->{'hostid'}, @{$rsmhost_template->{'hosts'}})
 	);
 
-	if ($action eq 'disable')
+	if ($rdds && $rdap)
 	{
-		my @hostids_for_api = map({'hostid' => $_}, @hostids);
-
-		my $result = disable_hosts(\@hostids_for_api);
-
-		if (%{$result})
+		if ($action eq 'disable')
 		{
-			if (!compare_arrays(\@hostids, \@{$result->{'hostids'}}))
+			my @hostids_for_api = map({'hostid' => $_}, @hostids);
+
+			my $result = disable_hosts(\@hostids_for_api);
+
+			if (%{$result})
+			{
+				if (!compare_arrays(\@hostids, \@{$result->{'hostids'}}))
+				{
+					pfail("en error occurred while disabling hosts!");
+				}
+			}
+			else
 			{
 				pfail("en error occurred while disabling hosts!");
 			}
 		}
-		else
+		elsif ($action eq 'delete')
 		{
-			pfail("en error occurred while disabling hosts!");
-		}
-	}
-	elsif ($action eq 'delete')
-	{
-		remove_hosts(\@hostids);
-		remove_templates([$main_templateid]);
+			remove_hosts(\@hostids);
+			remove_templates([$main_templateid]);
 
-		my $hostgroupid = get_host_group('TLD ' . $rsmhost, false, false);
-		$hostgroupid = $hostgroupid->{'groupid'};
-		remove_hostgroups([$hostgroupid]);
+			my $hostgroupid = get_host_group('TLD ' . $rsmhost, false, false);
+			$hostgroupid = $hostgroupid->{'groupid'};
+			remove_hostgroups([$hostgroupid]);
+		}
+
+		return;
+	}
+
+	my $service = $rdds ? 'rdds' : 'rdap';
+	my $template_item_ids = [keys(%{get_items_like($main_templateid, $service, true)})];
+	my $host_items_ids = [keys(%{get_items_like($main_hostid, $service, false)})];
+
+	if (scalar(@{$template_item_ids}) == 0 && $service ne 'rdap') # RDAP doesn't have items in "Template $tld"
+	{
+		print("Could not find $service related items on the template level\n");
+	}
+
+	if (scalar(@{$host_items_ids}) == 0)
+	{
+		print("Could not find $service related items on host level\n");
+	}
+
+	my @itemids = (@{$template_item_ids}, @{$host_items_ids});
+
+	# print(Dumper(\@itemids));
+	# print(Dumper($host_items_ids));
+
+	if (scalar(@itemids))
+	{
+		my $macro = $service eq 'rdap' ? '{$RDAP.TLD.ENABLED}' : '{$RSM.TLD.' . uc($service) . '.ENABLED}';
+
+		create_macro($macro, 0, $main_templateid, true);
+
+		if ($action eq 'disable')
+		{
+			disable_items(\@itemids);
+
+		}
+		else # $action is 'delete'
+		{
+			remove_items(\@itemids);
+		}
 	}
 }
 
@@ -461,14 +534,6 @@ sub compare_arrays($$)
 
 sub add_new_registrar()
 {
-	# geting some global macros related to item refresh interval
-	# values are used as item update interval
-	foreach my $macro (keys(%{$cfg_global_macros}))
-	{
-		$cfg_global_macros->{$macro} = get_global_macro_value($macro);
-		pfail('cannot get global macro ', $macro) unless defined($cfg_global_macros->{$macro});
-	}
-
 	my $root_servers_macros = update_root_servers(getopt('root-servers'));
 	print("Could not retrive list of root servers or create global macros\n") unless (defined($root_servers_macros));
 
@@ -671,7 +736,7 @@ sub create_rdds_or_rdap_slv_items($$$;$)
 	create_dependent_trigger_chain($host_name, $service, \&create_ratio_of_failed_tests_trigger, $trigger_thresholds);
 }
 
-sub is_standalone_rdap_active()
+sub __is_rdap_standalone()
 {
 	return time() > $cfg_global_macros->{'{$RSM.RDAP.STANDALONE}'};
 }
@@ -1068,9 +1133,11 @@ Other options
         --server-id=STRING
                 ID of Zabbix server (default: $default_server_id)
         --delete
-                delete specified Registrar
+                delete specified Registrar or Registrar's services specified by: --rdds, --rdap
+                (services supported only after switch to Standalone RDAP)
         --disable
-                disable specified Registrar
+                disable specified Registrar or Registrar's services specified by: --rdds, --rdap
+                (services supported only after switch to Standalone RDAP)
         --list-services
                 list services of each Regstrar, the output is comma-separated list:
                 <RR-ID>,<RR-NAME>,<RR-FAMILY>,<RR-STATUS>,<RDDS.NS.STRING>,<RDDS.TESTPREFIX>,
@@ -1094,6 +1161,12 @@ Other options
                 (default: taken from DNS)
         --rdds-test-prefix=STRING
                 domain test prefix for RDDS monitoring (needed only if rdds servers specified)
+        --rdds
+                Action with RDDS
+                (only effective after switch to Standalone RDAP, default: no)
+        --rdap
+                Action with RDAP
+                (only effective after switch to Standalone RDAP, default: no)
         --help
                 display this message
 EOF
