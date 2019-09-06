@@ -67,7 +67,7 @@ sub get_slv_dns_ns_avail_items
 {
 	my $hostid = shift;
 
-	return db_select("select itemid,key_ from items where hostid=$hostid and key_ like '$slv_item_key_pattern\[%'");
+	return db_select("select itemid,key_ from items where hostid=$hostid and key_ like '$slv_item_key_pattern\[%' and status=${\ITEM_STATUS_ACTIVE}");
 }
 
 sub process_slv_item
