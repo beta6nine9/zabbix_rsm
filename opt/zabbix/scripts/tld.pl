@@ -1551,7 +1551,8 @@ sub manage_tld_objects($$$$$$) {
 	}
     }
 
-    foreach my $type (keys %{$types}) {
+    foreach my $type (keys %{$types})
+    {
 	next if $types->{$type} eq false;
 
 	if ($type eq 'dnssec')
@@ -1565,32 +1566,45 @@ sub manage_tld_objects($$$$$$) {
 	my $template_items = get_items_like($main_templateid, $type, true);
 	my $host_items = get_items_like($main_hostid, $type, false);
 
-	if (scalar(keys(%{$template_items}))) {
-	    foreach my $itemid (keys(%{$template_items})) {
-		push @itemids, $itemid;
-	    }
-	}
-	else {
-	    print "Could not find $type related items on the template level\n";
+	if ($type eq 'rdds')
+	{
+		my $service_enabled_itemkey = "$type.enabled";
+
+		my @service_enabled_itemid = grep { $template_items->{$_}{'key_'} eq $service_enabled_itemkey } keys(%{$template_items});
+		if (!@service_enabled_itemid)
+		{
+			pfail("failed to find $service_enabled_itemkey item");
+		}
+
+		delete($template_items->{$service_enabled_itemid[0]});
 	}
 
-	if (scalar(keys(%{$host_items}))) {
-	    foreach my $itemid (keys(%{$host_items})) {
-		push @itemids, $itemid;
-	    }
+	if (scalar(keys(%{$template_items})))
+	{
+		push(@itemids, keys(%{$template_items}));
 	}
-	else {
-	    print "Could not find $type related items on host level\n";
+	else
+	{
+		print "Could not find $type related items on the template level\n";
+	}
+
+	if (scalar(keys(%{$host_items})))
+	{
+		push(@itemids, keys(%{$host_items}));
+	}
+	else
+	{
+		print "Could not find $type related items on host level\n";
 	}
 
 	if ($action eq 'disable' and scalar(@itemids)) {
-	    disable_items(\@itemids);
-	    create_macro('{$RSM.TLD.'.uc($type).'.ENABLED}', 0, $main_templateid, true);
+		disable_items(\@itemids);
+		create_macro('{$RSM.TLD.'.uc($type).'.ENABLED}', 0, $main_templateid, true);
 	}
 
 	if ($action eq 'delete' and scalar(@itemids)) {
-	    remove_items(\@itemids);
-#	    remove_applications_by_items(\@itemids);
+		remove_items(\@itemids);
+		# remove_applications_by_items(\@itemids);
 	}
     }
 }
