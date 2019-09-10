@@ -36,10 +36,10 @@ sub main()
 
 		my %names_item_keys = (
 			"$rsmhost" => [ "rsm.slv.rdds.%" ],
-			"Template $rsmhost" => [ "rsm.rdds%", "rdds.enabled" ],
+			"Template $rsmhost" => [ "rsm.rdds%" ],
 		);
 
-		$names_item_keys{"$rsmhost $_"} = [ "rsm.rdds%", "rdds.enabled" ] foreach (keys(%{$probes_ref}));
+		$names_item_keys{"$rsmhost $_"} = [ "rsm.rdds%" ] foreach (keys(%{$probes_ref}));
 
 		my $sql = "select i.itemid, i.name, h.name from items i, hosts h where i.hostid = h.hostid and ".
 				"h.name = ? and i.key_ like ? and i.status = ?";
