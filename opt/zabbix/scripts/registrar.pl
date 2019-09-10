@@ -471,8 +471,24 @@ sub manage_registrar($$$$)
 	}
 
 	my $service = $rdds ? 'rdds' : 'rdap';
-	my $template_item_ids = [keys(%{get_items_like($main_templateid, $service, true)})];
-	my $host_items_ids = [keys(%{get_items_like($main_hostid, $service, false)})];
+	my $template_items = get_items_like($main_templateid, $service, true);
+	my $host_items = get_items_like($main_hostid, $service, false);
+
+	if ($rdds)
+	{
+		my $service_enabled_itemkey = "$service.enabled";
+
+		my @service_enabled_itemid = grep { $template_items->{$_}{'key_'} eq $service_enabled_itemkey } keys(%{$template_items});
+		if (!@service_enabled_itemid)
+		{
+			pfail("failed to find $service_enabled_itemkey item");
+		}
+
+		delete($template_items->{$service_enabled_itemid[0]});
+	}
+
+	my $template_item_ids = [keys(%{$template_items})];
+	my $host_items_ids = [keys(%{$host_items})];
 
 	if (scalar(@{$template_item_ids}) == 0 && $service ne 'rdap') # RDAP doesn't have items in "Template $tld"
 	{
