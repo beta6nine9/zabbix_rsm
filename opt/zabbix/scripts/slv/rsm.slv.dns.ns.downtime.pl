@@ -68,7 +68,8 @@ sub get_ns_items
 		"select itemid,key_".
 		" from items".
 		" where hostid=$hostid".
-			" and key_ like '" . AVAIL_KEY_PATTERN . "[%'"
+			" and key_ like '" . AVAIL_KEY_PATTERN . "[%'".
+			" and status=${\ITEM_STATUS_ACTIVE}"
 	);
 
 	fail("failed to obtain ns avail items") unless (scalar(@{$rows_avail}));
@@ -77,7 +78,8 @@ sub get_ns_items
 		"select itemid,key_".
 		" from items".
 		" where hostid=$hostid".
-			" and key_ like '" . DOWNTIME_KEY_PATTERN . "[%'"
+			" and key_ like '" . DOWNTIME_KEY_PATTERN . "[%'".
+			" and status=${\ITEM_STATUS_ACTIVE}"
 	);
 
 	fail("failed to obtain ns downtime items") unless (scalar(@{$rows_downtime}));

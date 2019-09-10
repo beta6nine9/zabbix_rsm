@@ -840,12 +840,22 @@ sub manage_tld_objects($$$$$$)
 		my $template_items = get_items_like($main_templateid, $type, true);
 		my $host_items = get_items_like($main_hostid, $type, false);
 
+		if ($type eq 'rdds')
+		{
+			my $service_enabled_itemkey = "$type.enabled";
+
+			my @service_enabled_itemid = grep { $template_items->{$_}{'key_'} eq $service_enabled_itemkey } keys(%{$template_items});
+			if (!@service_enabled_itemid)
+			{
+				pfail("failed to find $service_enabled_itemkey item");
+			}
+
+			delete($template_items->{$service_enabled_itemid[0]});
+		}
+
 		if (scalar(keys(%{$template_items})))
 		{
-			foreach my $itemid (keys(%{$template_items}))
-			{
-				push(@itemids, $itemid);
-			}
+			push(@itemids, keys(%{$template_items}));
 		}
 		else
 		{
@@ -854,10 +864,7 @@ sub manage_tld_objects($$$$$$)
 
 		if (scalar(keys(%{$host_items})))
 		{
-			foreach my $itemid (keys(%{$host_items}))
-			{
-				push(@itemids, $itemid);
-			}
+			push(@itemids, keys(%{$host_items}));
 		}
 		else
 		{
@@ -873,7 +880,7 @@ sub manage_tld_objects($$$$$$)
 		if ($action eq 'delete' and scalar(@itemids))
 		{
 			remove_items(\@itemids);
-			#remove_applications_by_items(\@itemids);
+			# remove_applications_by_items(\@itemids);
 		}
 	}
 }
