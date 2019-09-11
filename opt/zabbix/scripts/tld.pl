@@ -157,6 +157,7 @@ sub init_cli_opts($)
 	}
 
 	override_opts(\%OPTS);
+	setopt('nolog');
 
 	validate_input($default_server_id);
 	lc_options();
