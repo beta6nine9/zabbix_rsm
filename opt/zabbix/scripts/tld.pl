@@ -126,6 +126,9 @@ my $rv = GetOptions(\%OPTS,
 		    "quiet!",
 		    "help|?");
 
+setopt('server-id', $OPTS{'server-id'}) if (defined($OPTS{'server-id'}));
+setopt('nolog');
+
 __usage() if ($OPTS{'help'} or not $rv);
 
 print("\nIgnoring unknown command-line options:\n  ", join("\n  ", @ARGV), "\n\n") if (scalar(@ARGV));
