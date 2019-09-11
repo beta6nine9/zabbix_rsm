@@ -7,7 +7,6 @@ use RSMSLV;
 use Zabbix;
 use TLD_constants qw(:general :templates :groups :api :config :tls :items);
 use Data::Dumper;
-use Getopt::Long;
 use base 'Exporter';
 
 use constant RSMHOST_DNS_NS_LOG_ACTION_CREATE  => 0;
@@ -1281,21 +1280,10 @@ sub rsmhost_dns_ns_log($$)
 	my $itemid = shift;
 	my $action = shift;
 
-	my %OPTS;
-	my $rv = GetOptions(\%OPTS, "server-id=i");
-
 	my $config = get_rsm_config();
 	set_slv_config($config);
 
-	my $server_key;
-	if (defined($OPTS{'server-id'}))
-	{
-		$server_key = get_rsm_server_key($OPTS{'server-id'});
-	}
-	else
-	{
-		$server_key = get_rsm_local_key($config);
-	}
+	my $server_key = opt('server-id') ? get_rsm_server_key(getopt('server-id')) : get_rsm_local_key($config);
 
 	my $sql = "insert into rsmhost_dns_ns_log (itemid,clock,action) values (?,?,?)";
 	my $params = [$itemid, time(), $action];
