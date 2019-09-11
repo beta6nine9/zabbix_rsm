@@ -514,12 +514,16 @@ sub manage_registrar($$$$)
 		if ($action eq 'disable')
 		{
 			disable_items(\@itemids);
-
 		}
 		else # $action is 'delete'
 		{
 			remove_items(\@itemids);
 		}
+	}
+
+	if ($action eq 'disable' && $service eq 'rdap')
+	{
+		set_linked_items_enabled('rdap[', $rsmhost, 0);
 	}
 }
 

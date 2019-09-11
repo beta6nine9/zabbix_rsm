@@ -912,6 +912,11 @@ sub manage_tld_objects($$$$$$$)
 				# remove_applications_by_items(\@itemids);
 			}
 		}
+
+		if ($action eq 'disable' && $type eq 'rdap')
+		{
+			set_linked_items_enabled('rdap[', $tld, 0);
+		}
 	}
 }
 
