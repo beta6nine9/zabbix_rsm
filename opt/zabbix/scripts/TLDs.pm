@@ -990,7 +990,6 @@ sub rsmhost_dns_ns_log($$)
 	set_slv_config($config);
 
 	my $server_key = opt('server-id') ? get_rsm_server_key(getopt('server-id')) : get_rsm_local_key($config);
-	my $server_keyx = opt('server-id') ? print("get_rsm_server_key\n") : print("get_rsm_local_key\n");
 
 	my $sql = "insert into rsmhost_dns_ns_log (itemid,clock,action) values (?,?,?)";
 	my $params = [$itemid, time(), $action];
