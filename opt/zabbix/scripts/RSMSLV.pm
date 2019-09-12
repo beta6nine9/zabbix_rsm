@@ -3865,7 +3865,17 @@ sub get_slv_rtt_cycle_stats($$$$)
 	my $tld_itemids = get_itemids_by_key_pattern_and_hosts($rtt_item_key_pattern, $tld_hosts, ITEM_STATUS_ACTIVE);
 	my $tld_itemids_str = join(",", @{$tld_itemids});
 
-	fail("Items '$rtt_item_key_pattern' not found") if scalar(@{$tld_itemids}) == 0;
+	if (scalar(@{$tld_itemids}) == 0)
+	{
+		dbg("items '$rtt_item_key_pattern' not found for for TLD '$tld'");
+		return {
+			'expected'   => 0,
+			'total'      => 0,
+			'performed'  => 0,
+			'failed'     => 0,
+			'successful' => 0
+		};
+	}
 
 	my $rows = db_select(
 			"select count(*)," .
