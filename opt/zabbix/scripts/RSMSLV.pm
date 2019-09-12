@@ -484,8 +484,8 @@ sub get_itemid_by_host
 			" and i.key_='$key'"
 	);
 
-	fail("item \"$key\" does not exist") if ($itemid == E_ID_NONEXIST);
-	fail("more than one item \"$key\" found") if ($itemid == E_ID_MULTIPLE);
+	fail("item \"$key\" does not exist for \"$host\"") if ($itemid == E_ID_NONEXIST);
+	fail("more than one item \"$key\" found for \"$host\"") if ($itemid == E_ID_MULTIPLE);
 
 	return $itemid;
 }
@@ -1190,7 +1190,18 @@ sub tld_interface_enabled($$$)
 		tld_interface_enabled_create_cache($interface);
 	}
 
-	if (defined($enabled_items_cache{$item_key}{$tld}))
+	if (!defined($enabled_items_cache{$item_key}{$tld}))
+	{
+		# do nothing, no .enabled items in cache for this TLD
+	}
+	elsif (scalar(@{$enabled_items_cache{$item_key}{$tld}}) == 0)
+	{
+		# List of .enabled items for this TLD defined but is empty because
+		# tld_interface_enabled_create_cache() didn't find items. This is probably
+		# misconfiguration.
+		wrn("no items with '$item_key' for host '$tld'");
+	}
+	else
 	{
 		# find the latest value but make sure to specify time bounds, relatively to $now
 
@@ -1206,14 +1217,13 @@ sub tld_interface_enabled($$$)
 		);
 
 		my $condition_index = 0;
+		my $itemids_placeholder = join(",", ("?") x scalar(@{$enabled_items_cache{$item_key}{$tld}}));
 
 		while ($condition_index < scalar(@conditions))
 		{
 			my $from = $conditions[$condition_index]->[0];
 			my $till = $conditions[$condition_index]->[1];
 			my $clock = $conditions[$condition_index]->[2];
-
-			my $itemids_placeholder = join(",", ("?") x scalar(@{$enabled_items_cache{$item_key}{$tld}}));
 
 			my $rows_ref = db_select(
 				"select value" .
