@@ -813,7 +813,7 @@ sub __get_test_data
 
 		if ($service ne SERVICE_DNS_TCP && $cycles_count == 0)	# Export DNS-TCP tests, they do not refer to Service Availability
 		{
-			wrn("$service: no results");
+			wrn("$service: no results; will not process remaining services");
 			last;
 		}
 
