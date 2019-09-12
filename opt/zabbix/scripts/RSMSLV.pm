@@ -1190,7 +1190,18 @@ sub tld_interface_enabled($$$)
 		tld_interface_enabled_create_cache($interface);
 	}
 
-	if (defined($enabled_items_cache{$item_key}{$tld}))
+	if (!defined($enabled_items_cache{$item_key}{$tld}))
+	{
+		# do nothing, no .enabled items in cache for this TLD
+	}
+	elsif (scalar(@{$enabled_items_cache{$item_key}{$tld}}) == 0)
+	{
+		# List of .enabled items for this TLD defined but is empty because
+		# tld_interface_enabled_create_cache() didn't find items. This is probably
+		# misconfiguration.
+		wrn("no items with '$item_key' for host '$tld'");
+	}
+	else
 	{
 		# find the latest value but make sure to specify time bounds, relatively to $now
 
@@ -1208,9 +1219,7 @@ sub tld_interface_enabled($$$)
 		my $condition_index = 0;
 		my $itemids_placeholder = join(",", ("?") x scalar(@{$enabled_items_cache{$item_key}{$tld}}));
 
-		wrn("no items with '$item_key' for host '$tld'") if (!$itemids_placeholder);
-
-		while ($itemids_placeholder && $condition_index < scalar(@conditions))
+		while ($condition_index < scalar(@conditions))
 		{
 			my $from = $conditions[$condition_index]->[0];
 			my $till = $conditions[$condition_index]->[1];
