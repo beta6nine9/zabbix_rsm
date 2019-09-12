@@ -484,8 +484,8 @@ sub get_itemid_by_host
 			" and i.key_='$key'"
 	);
 
-	fail("item \"$key\" does not exist") if ($itemid == E_ID_NONEXIST);
-	fail("more than one item \"$key\" found") if ($itemid == E_ID_MULTIPLE);
+	fail("item \"$key\" does not exist for \"$host\"") if ($itemid == E_ID_NONEXIST);
+	fail("more than one item \"$key\" found for \"$host\"") if ($itemid == E_ID_MULTIPLE);
 
 	return $itemid;
 }
@@ -1206,14 +1206,15 @@ sub tld_interface_enabled($$$)
 		);
 
 		my $condition_index = 0;
+		my $itemids_placeholder = join(",", ("?") x scalar(@{$enabled_items_cache{$item_key}{$tld}}));
 
-		while ($condition_index < scalar(@conditions))
+		wrn("no items with '$item_key' for host '$tld'") if (!$itemids_placeholder);
+
+		while ($itemids_placeholder && $condition_index < scalar(@conditions))
 		{
 			my $from = $conditions[$condition_index]->[0];
 			my $till = $conditions[$condition_index]->[1];
 			my $clock = $conditions[$condition_index]->[2];
-
-			my $itemids_placeholder = join(",", ("?") x scalar(@{$enabled_items_cache{$item_key}{$tld}}));
 
 			my $rows_ref = db_select(
 				"select value" .
