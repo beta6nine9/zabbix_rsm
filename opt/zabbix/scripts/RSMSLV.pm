@@ -21,6 +21,7 @@ use RSM;
 use Pusher qw(push_to_trapper);
 use Fcntl qw(:flock);
 use List::Util qw(min max);
+use Devel::StackTrace;
 
 use constant E_ID_NONEXIST => -2;
 use constant E_ID_MULTIPLE => -3;
@@ -154,7 +155,7 @@ my $_sender_values;	# used to send values to Zabbix server
 
 my $POD2USAGE_FILE;	# usage message file
 
-my ($_global_sql, $_global_sql_bind_values, $_lock_fh);
+my $_lock_fh;
 
 my $get_stats = 0;
 my $start_time;
@@ -1201,19 +1202,48 @@ sub tld_interface_enabled($$$)
 	return 0;
 }
 
-sub handle_db_error
+sub generate_db_error($$)
 {
-	my $msg = shift;
+	my $handle  = shift;
+	my $message = shift // $handle->errstr;
 
-	my $prefix = "";
+	my @message_parts = ();
 
-	$prefix = "[tld:$tld] " if ($tld);
+	if ($tld)
+	{
+		push(@message_parts, "[tld:$tld]");
+	}
 
-	my $bind_values_str = "";
+	push(@message_parts, 'database error:');
 
-	$bind_values_str = ' bind values: ' . join(',', @{$_global_sql_bind_values}) if (defined($_global_sql_bind_values));
+	push(@message_parts, $message);
 
-	fail($prefix . "database error: $msg (query was: [$_global_sql]$bind_values_str)");
+	if (defined($handle->{'Statement'}))
+	{
+		push(@message_parts, "(query: [$handle->{'Statement'}])");
+	}
+
+	if (defined($handle->{'ParamValues'}) && %{$handle->{'ParamValues'}})
+	{
+		my $params = join(',', values(%{$handle->{'ParamValues'}}));
+		push(@message_parts, "(params: [$params])");
+	}
+
+	if (defined($handle->{'ParamArrays'}) && %{$handle->{'ParamArrays'}})
+	{
+		my $params = join(',', values(%{$handle->{'ParamArrays'}}));
+		push(@message_parts, "(params 2: [$params])");
+	}
+
+	return join(' ', @message_parts);
+}
+
+sub handle_db_error($$$)
+{
+	my $message = shift;
+	my $handle  = shift;
+
+	fail(generate_db_error($handle, undef));
 }
 
 sub db_connect
@@ -1240,17 +1270,17 @@ sub db_connect
 
 	my $db_tls_settings = get_db_tls_settings($section);
 
-	$_global_sql = "DBI:mysql:database=$section->{'db_name'};host=$section->{'db_host'};$db_tls_settings";
+	my $data_source = "DBI:mysql:database=$section->{'db_name'};host=$section->{'db_host'};$db_tls_settings";
 
 	# NB! Timeouts have to be specified via DSN. To check if they're actually being used:
 	# $ export DBI_TRACE=2=dbitrace.log
 	# $ ./XXX.pl
 	# $ grep 'Setting' dbitrace.log
-	$_global_sql .= ';mysql_connect_timeout=' . ($section->{'db_connect_timeout'} // 30);
-	$_global_sql .= ';mysql_write_timeout='   . ($section->{'db_write_timeout'} // 30);
-	$_global_sql .= ';mysql_read_timeout='    . ($section->{'db_read_timeout'} // 30);
+	$data_source .= ';mysql_connect_timeout=' . ($section->{'db_connect_timeout'} // 30);
+	$data_source .= ';mysql_write_timeout='   . ($section->{'db_write_timeout'} // 30);
+	$data_source .= ';mysql_read_timeout='    . ($section->{'db_read_timeout'} // 30);
 
-	dbg($_global_sql);
+	dbg($data_source);
 
 	my $connect_opts = {
 		'PrintError'		=> 0,
@@ -1258,8 +1288,16 @@ sub db_connect
 		'mysql_auto_reconnect'	=> 1,
 	};
 
-	$dbh = DBI->connect($_global_sql, $section->{'db_user'}, $section->{'db_password'}, $connect_opts)
-		or handle_db_error(DBI->errstr);
+	# errors should be handled by handle_db_error() automatically, but lets call fail() as a fallback
+	$dbh = DBI->connect($data_source, $section->{'db_user'}, $section->{'db_password'}, $connect_opts)
+		or fail("database error: " . DBI->errstr . " (data source was: [$data_source])");
+
+	# TODO: consider monitoring slow queries by using $dbh->{'Profile'} or by using callbacks:
+	#$dbh->{'Callbacks'}{'ChildCallbacks'}{'execute'} = sub()
+	#{
+	#	info("EXECUTE! $_[0]{'Statement'}");
+	#	return;
+	#};
 
 	# verify that established database connection uses TLS if there was any hint that it is required in the config
 	unless ($db_tls_settings eq "mysql_ssl=0")
@@ -1287,6 +1325,27 @@ sub db_disconnect
 
 	if (defined($dbh))
 	{
+		my @active_handles = ();
+
+		foreach my $handle (@{$dbh->{'ChildHandles'}})
+		{
+			if (defined($handle) && $handle->{'Type'} eq 'st' && $handle->{'Active'})
+			{
+				push(@active_handles, $handle);
+			}
+		}
+
+		if (@active_handles)
+		{
+			wrn("called while having " . scalar(@active_handles) . " active statement handle(s)");
+
+			foreach my $handle (@active_handles)
+			{
+				wrn(generate_db_error($handle, 'active statement'));
+				$handle->finish();
+			}
+		}
+
 		$dbh->disconnect() || wrn($dbh->errstr);
 		undef($dbh);
 	}
@@ -1294,8 +1353,8 @@ sub db_disconnect
 
 sub db_select($;$)
 {
-	$_global_sql = shift;
-	$_global_sql_bind_values = shift; # optional; reference to an array
+	my $sql = shift;
+	my $bind_values = shift; # optional; reference to an array
 
 	if ($get_stats)
 	{
@@ -1307,22 +1366,22 @@ sub db_select($;$)
 		$sql_warnslow_start = Time::HiRes::time();
 	}
 
-	my $sth = $dbh->prepare($_global_sql)
-		or fail("cannot prepare [$_global_sql]: ", $dbh->errstr);
+	my $sth = $dbh->prepare($sql)
+		or fail("cannot prepare [$sql]: ", $dbh->errstr);
 
-	if (defined($_global_sql_bind_values))
+	if (defined($bind_values))
 	{
-		dbg("[$_global_sql] ", join(',', @{$_global_sql_bind_values}));
+		dbg("[$sql] ", join(',', @{$bind_values}));
 
-		$sth->execute(@{$_global_sql_bind_values})
-			or fail("cannot execute [$_global_sql]: ", $sth->errstr);
+		$sth->execute(@{$bind_values})
+			or fail("cannot execute [$sql]: ", $sth->errstr);
 	}
 	else
 	{
-		dbg("[$_global_sql]");
+		dbg("[$sql]");
 
 		$sth->execute()
-			or fail("cannot execute [$_global_sql]: ", $sth->errstr);
+			or fail("cannot execute [$sql]: ", $sth->errstr);
 	}
 
 	my $rows_ref = $sth->fetchall_arrayref();
@@ -1340,7 +1399,7 @@ sub db_select($;$)
 
 		if  ($sql_warnslow_end - $sql_warnslow_start > getopt('warnslow'))
 		{
-			wrn("slow query: [$_global_sql] took ", sprintf("%.3f seconds", $sql_warnslow_end - $sql_warnslow_start));
+			wrn("slow query: [$sql] took ", sprintf("%.3f seconds", $sql_warnslow_end - $sql_warnslow_start));
 		}
 	}
 
@@ -1454,18 +1513,18 @@ sub db_explain($;$)
 
 sub db_select_binds
 {
-	$_global_sql = shift;
-	$_global_sql_bind_values = shift;
+	my $sql = shift;
+	my $bind_values = shift;
 
-	my $sth = $dbh->prepare($_global_sql)
-		or fail("cannot prepare [$_global_sql]: ", $dbh->errstr);
+	my $sth = $dbh->prepare($sql)
+		or fail("cannot prepare [$sql]: ", $dbh->errstr);
 
-	dbg("[$_global_sql] ", join(',', @{$_global_sql_bind_values}));
+	dbg("[$sql] ", join(',', @{$bind_values}));
 
 	my ($total);
 
 	my @rows;
-	foreach my $bind_value (@{$_global_sql_bind_values})
+	foreach my $bind_value (@{$bind_values})
 	{
 		if (opt('stats'))
 		{
@@ -1478,7 +1537,7 @@ sub db_select_binds
 		}
 
 		$sth->execute($bind_value)
-			or fail("cannot execute [$_global_sql] bind_value:$bind_value: ", $sth->errstr);
+			or fail("cannot execute [$sql] bind_value:$bind_value: ", $sth->errstr);
 
 		while (my @row = $sth->fetchrow_array())
 		{
@@ -1498,7 +1557,7 @@ sub db_select_binds
 
 			if ($sql_warnslow_end - $sql_warnslow_start > getopt('warnslow'))
 			{
-				wrn("slow query: [$_global_sql] ($bind_value) took ", sprintf("%.3f seconds", $sql_warnslow_end - $sql_warnslow_start));
+				wrn("slow query: [$sql] ($bind_value) took ", sprintf("%.3f seconds", $sql_warnslow_end - $sql_warnslow_start));
 			}
 		}
 	}
@@ -1520,8 +1579,8 @@ sub db_select_binds
 
 sub db_exec($;$)
 {
-	$_global_sql = shift;
-	$_global_sql_bind_values = shift; # optional; reference to an array
+	my $sql = shift;
+	my $bind_values = shift; # optional; reference to an array
 
 	if ($get_stats)
 	{
@@ -1533,22 +1592,22 @@ sub db_exec($;$)
 		$sql_warnslow_start = Time::HiRes::time();
 	}
 
-	my $sth = $dbh->prepare($_global_sql)
-		or fail("cannot prepare [$_global_sql]: ", $dbh->errstr);
+	my $sth = $dbh->prepare($sql)
+		or fail("cannot prepare [$sql]: ", $dbh->errstr);
 
-	if (defined($_global_sql_bind_values))
+	if (defined($bind_values))
 	{
-		dbg("[$_global_sql] ", join(',', @{$_global_sql_bind_values}));
+		dbg("[$sql] ", join(',', @{$bind_values}));
 
-		$sth->execute(@{$_global_sql_bind_values})
-			or fail("cannot execute [$_global_sql]: ", $sth->errstr);
+		$sth->execute(@{$bind_values})
+			or fail("cannot execute [$sql]: ", $sth->errstr);
 	}
 	else
 	{
-		dbg("[$_global_sql]");
+		dbg("[$sql]");
 
 		$sth->execute()
-			or fail("cannot execute [$_global_sql]: ", $sth->errstr);
+			or fail("cannot execute [$sql]: ", $sth->errstr);
 	}
 
 	if ($get_stats)
@@ -1564,11 +1623,11 @@ sub db_exec($;$)
 
 		if ($sql_warnslow_end - $sql_warnslow_start > getopt('warnslow'))
 		{
-			wrn("slow query: [$_global_sql] took ", sprintf("%.3f seconds", $sql_warnslow_end - $sql_warnslow_start));
+			wrn("slow query: [$sql] took ", sprintf("%.3f seconds", $sql_warnslow_end - $sql_warnslow_start));
 		}
 	}
 
-	return $sth->{mysql_insertid};
+	return $sth->{'mysql_insertid'};
 }
 
 sub db_mass_update($$$$$)
