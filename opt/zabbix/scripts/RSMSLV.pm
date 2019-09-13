@@ -3586,6 +3586,11 @@ sub slv_exit
 
 	finalize_process($rv);
 
+	if ($rv != SUCCESS)
+	{
+		map { __log('err', $_) } split("\n", Devel::StackTrace->new()->as_string());
+	}
+
 	exit($rv);
 }
 
