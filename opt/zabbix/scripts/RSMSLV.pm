@@ -1439,10 +1439,10 @@ sub db_get_stats()
 
 	# return number of queries and time spent in DBI
 
-	my $count = $dbh->{'Profile'}{'Data'}{'execute'}[0];
+	my $count = $dbh->{'Profile'}{'Data'}{'execute'}[0] if (exists($dbh->{'Profile'}{'Data'}{'execute'}));
 	my $duration = dbi_profile_merge_nodes(my $total = [], $dbh->{'Profile'}{'Data'});
 
-	return ($count, $duration);
+	return ($count // 0, $duration);
 }
 
 sub db_select($;$)
