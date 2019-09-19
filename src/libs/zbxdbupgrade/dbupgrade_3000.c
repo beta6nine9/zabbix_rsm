@@ -3698,15 +3698,15 @@ static int	create_slv_rtt_item(zbx_uint64_t hostid, zbx_uint64_t itemid, int ite
 			"insert into items (itemid,type,snmp_community,snmp_oid,hostid,name,key_,delay,history,trends,"
 				"status,value_type,trapper_hosts,units,multiplier,delta,"
 				"snmpv3_securityname,snmpv3_securitylevel,snmpv3_authpassphrase,snmpv3_privpassphrase,"
-				"formula,logtimefmt,templateid,valuemapid,delay_flex,params,ipmi_sensor,data_type,"
-				"authtype,username,password,publickey,privatekey,flags,interfaceid,port,description,"
-				"inventory_link,lifetime,snmpv3_authprotocol,snmpv3_privprotocol,snmpv3_contextname,evaltype)"
-			" values (" ZBX_FS_UI64 ",%d,'',''," ZBX_FS_UI64 ",'%s','%s','60','90','365',"
-				"'0',%d,'','%s','0','1',"
+				"formula,error,lastlogsize,logtimefmt,templateid,valuemapid,delay_flex,params,ipmi_sensor,data_type,"
+				"authtype,username,password,publickey,privatekey,mtime,flags,interfaceid,port,description,"
+				"inventory_link,lifetime,snmpv3_authprotocol,snmpv3_privprotocol,state,snmpv3_contextname,evaltype)"
+			" values (" ZBX_FS_UI64 ",%d,'',''," ZBX_FS_UI64 ",'%s','%s','0','90','365',"
+				"'0',%d,'','%s','0','0',"
 				"'','0','','',"
-				"'1','',NULL,NULL,'','','','0',"
-				"'0','','','','','0',NULL,'','',"
-				"'0','30','0','0','','0')",
+				"'1','','0','',NULL,NULL,'','','','0',"
+				"'0','','','','','0','0',NULL,'','',"
+				"'0','30','0','0','0','','0')",
 			itemid, item_type, hostid, item_name, item_key, item_value_type, item_units))
 	{
 		return FAIL;
@@ -4353,6 +4353,28 @@ static int	DBpatch_3000321(void)
 	return SUCCEED;
 }
 
+static int	DBpatch_3000322(void)
+{
+	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
+		return SUCCEED;
+
+#define CHECK(CODE) do {                \
+	int result = (CODE);            \
+	if (ZBX_DB_OK > result)         \
+	{                               \
+		return FAIL;            \
+	}                               \
+} while (0)
+
+	/* set item's "Update interval" to 0 seconds for ITEM_TYPE_TRAPPER items */
+	CHECK(DBexecute("update items set delay=0 where type=2"));
+
+	/* set item's "Store value" to "As is" for *.rtt.performed, *.rtt.failed and *.rtt.pfailed items */
+	CHECK(DBexecute("update items set delta=0 where key_ like 'rsm.slv.%.rtt.%'"));
+
+#undef CHECK
+}
+
 #endif
 
 DBPATCH_START(3000)
@@ -4460,5 +4482,6 @@ DBPATCH_ADD(3000318, 0, 0)	/* add new items to "Global macro history" host */
 DBPATCH_ADD(3000319, 0, 0)	/* remove trailing spaces from "Ratio of failed monthly RDDS queries" item names */
 DBPATCH_ADD(3000320, 0, 1)	/* create rsmhost_dns_ns_log table */
 DBPATCH_ADD(3000321, 0, 0)	/* fill rsmhost_dns_ns_log table */
+DBPATCH_ADD(3000322, 0, 0)	/* fix delta field for 'rsm.slv.%.rtt.%' items */
 
 DBPATCH_END()
