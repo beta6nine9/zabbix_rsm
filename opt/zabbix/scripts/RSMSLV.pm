@@ -1265,8 +1265,20 @@ sub handle_db_error($$$)
 
 		my $parent_method = "SUPER::$method";
 
+		my $result;
+		my @result;
+
 		my $start = Time::HiRes::time();
-		my $result = $handle->$parent_method(@args);
+
+		if (wantarray())
+		{
+			@result = $handle->$parent_method(@args);
+		}
+		else
+		{
+			$result = $handle->$parent_method(@args);
+		}
+
 		my $duration = Time::HiRes::time() - $start;
 
 		if ($duration > $warn_duration)
@@ -1274,7 +1286,7 @@ sub handle_db_error($$$)
 			$warn_function->(sprintf("slow query: [%s] took %.3f seconds (%s)", $handle->{'Statement'}, $duration, $method));
 		}
 
-		return $result;
+		return wantarray() ? @result : $result;
 	}
 
 	sub bind_param        { return query(shift, "bind_param"       , @_); }
