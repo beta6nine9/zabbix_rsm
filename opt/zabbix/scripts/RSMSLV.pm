@@ -158,6 +158,7 @@ my $POD2USAGE_FILE;	# usage message file
 
 my $_lock_fh;
 
+my $start_time;
 my $total_sql_count = 0;
 my $total_sql_duration = 0.0;
 
@@ -3529,6 +3530,7 @@ sub format_stats_time
 sub init_process
 {
 	$log_open = 0;
+	$start_time = Time::HiRes::time();
 	$total_sql_count = 0;
 	$total_sql_duration = 0.0;
 }
@@ -3553,8 +3555,6 @@ sub finalize_process
 
 	if (SUCCESS == $rv && opt('stats'))
 	{
-		my $start_time = [Time::HiRes::stat("/proc/$$/stat")]->[10];
-
 		info(sprintf("%sPID (%d), total: %s, sql: %s (%d queries)",
 				$tld ? "$tld " : '',
 				$$,
@@ -3693,6 +3693,8 @@ sub parse_opts
 	}
 
 	setopt('nolog') if (opt('dry-run') || opt('debug'));
+
+	$start_time = Time::HiRes::time() if (opt('stats'));
 
 	if (opt('debug'))
 	{
