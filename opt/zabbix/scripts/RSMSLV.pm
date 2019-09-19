@@ -1431,6 +1431,7 @@ sub db_get_stats()
 		'disconnect',
 		'execute',
 		'fetchall_arrayref',
+		'fetchrow_array',
 		'prepare',
 	);
 	my @unhandled_method_names = grep(!exists($allowed_method_names{$_}), keys(%{$dbh->{'Profile'}{'Data'}}));
