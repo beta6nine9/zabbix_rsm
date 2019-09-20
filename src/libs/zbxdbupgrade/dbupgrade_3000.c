@@ -4345,7 +4345,7 @@ static int	DBpatch_3000321(void)
 					" when 1 then 2" /* disable */
 				" end"
 			" from items"
-			" where key_ like 'rsm.slv.dns.ns.downtime[%,%]'"))
+			" where key_ like 'rsm.slv.dns.ns.downtime[%%,%%]'"))
 	{
 		return FAIL;
 	}
@@ -4370,7 +4370,9 @@ static int	DBpatch_3000322(void)
 	CHECK(DBexecute("update items set delay=0 where type=2"));
 
 	/* set item's "Store value" to "As is" for *.rtt.performed, *.rtt.failed and *.rtt.pfailed items */
-	CHECK(DBexecute("update items set delta=0 where key_ like 'rsm.slv.%.rtt.%'"));
+	CHECK(DBexecute("update items set delta=0 where key_ like 'rsm.slv.%%.rtt.%%'"));
+
+	return SUCCEED;
 
 #undef CHECK
 }
