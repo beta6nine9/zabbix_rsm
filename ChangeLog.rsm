@@ -11,6 +11,26 @@ New features:
 ..F.I..... [510] added support for Registrar RDDS Monitoring (dimir, yurii, asitals, miks, gcalenko)
 
 --------------------------------------------------------------------------------
+Changes for rsm1.3.0rc5
+
+Bug fixes:
+....I...S. [sub-567] fixed SQL query that updates lastvalue table (asitals, dimir)
+....I...S. [sub-564] fixed DB patch (asitals)
+....I...S. [sub-530] fixed DB patch (asitals)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.3.0rc4
+
+Bug fixes:
+........S. [567] added value timestamp checking when updating lastvalue and lastvalue_str tables (asitals, dimir)
+....I..... [564] fixed delta field for 'rsm.slv.%.rtt.%' items (asitals)
+....I..... [sub-516] added code to fail downtime SLV scripts while regenerating history because of false positives if DB was recreated, but state files were not deleted (asitals)
+....I..... [475] added code to no fail DNS RTT calculations when there are no items with IPv4 or IPv6 nameservers (asitals)
+....I..... [530] fixed storing data into rsmhost_dns_ns_log when tld.pl is called with --server-id, removed debug output (asitals)
+....I..... [552] added code to keep rdds.enabled item enabled when disabling rdds service (asitals)
+....I..... [473] added code to ignore disabled nameservers when calculating dns.ns.avail and dns.ns.downtime (asitals)
+
+--------------------------------------------------------------------------------
 Changes for rsm1.3.0rc3
 
 Bug fixes:
