@@ -1,8 +1,9 @@
 Changes for rsm1.3.0rc5
 
 Bug fixes:
-....I..... [564] fixed DB patch (asitals)
-....I..... [530] fixed DB patch (asitals)
+....I...S. [sub-567] fixed SQL query that updates lastvalue table (asitals, dimir)
+....I...S. [sub-564] fixed DB patch (asitals)
+....I...S. [sub-530] fixed DB patch (asitals)
 
 --------------------------------------------------------------------------------
 Changes for rsm1.3.0rc4
