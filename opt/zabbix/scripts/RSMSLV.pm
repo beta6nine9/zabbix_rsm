@@ -4339,6 +4339,14 @@ sub __fp_get_updated_eventids($)
 {
 	my $last_auditlog_auditid_ref = shift;
 
+	# check integrity
+
+	my $max_auditid = db_select_value("select max(auditid) from auditlog") // 0;
+	if (${$last_auditlog_auditid_ref} > $max_auditid)
+	{
+		fail("value of last processed auditlog.auditid (${$last_auditlog_auditid_ref}) is larger than max auditid in the database ($max_auditid)");
+	}
+
 	# get unprocessed auditlog entries
 
 	my $sql = "select if(resourcetype=?,resourceid,0) as auditlog_eventid,count(*),max(auditid)" .
