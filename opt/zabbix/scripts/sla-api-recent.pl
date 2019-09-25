@@ -40,6 +40,7 @@ sub process_tld_batch($$$$$$);
 sub process_tld($$$$$);
 sub cycles_to_calculate($$$$$$$$);
 sub get_lastvalues_from_db($$$);
+sub get_sla_api_last_update();
 sub calculate_cycle($$$$$$$$$);
 sub get_interfaces($$$);
 sub probe_online_at_init();
@@ -122,7 +123,7 @@ my %service_keys = (
 );
 
 # keep to avoid reading multiple times
-my $global_lastclock;
+my $sla_api_last_update = get_sla_api_last_update();
 
 my %rtt_limits;
 
@@ -428,8 +429,6 @@ sub process_tld($$$$$)
 	{
 		next if (opt('service') && $service ne getopt('service'));
 
-		undef($global_lastclock);	# is used in the following function (should be used per service)
-
 		my @cycles_to_calculate;
 
 		# get actual cycle times to calculate
@@ -505,63 +504,46 @@ sub process_tld($$$$$)
 	}
 }
 
-sub get_global_lastclock($$$$)
+sub get_sla_api_last_update()
 {
-	my $tld = shift;
-	my $service_key = shift;
-	my $service = shift;
-	my $delay = shift;
-
+	my $continue_file = ah_continue_file_name(); # last_update.txt in SLA API directory
+	my $continue_file_lock;
+	my $error;
 	my $lastclock;
 
-	if (opt('now'))
+	ah_lock_continue_file(\$continue_file_lock);
+
+	for (my $attempt = 1; $attempt <= 3; $attempt++)
 	{
-		$lastclock = cycle_start(getopt('now'), $delay);
-
-		dbg("using specified last clock: ", ts_str($lastclock));
-
-		return $lastclock;
-	}
-
-	# see if we have last_update.txt in SLA API directory
-
-	my $continue_file = ah_continue_file_name();
-
-	my $error;
-
-	# the continue file may sometimes be read at the time it's changed
-	my $attempts = 3;
-
-	while ($attempts--)
-	{
-		if (read_file($continue_file, \$lastclock, \$error) == SUCCESS)
+		if ($attempt > 1)
 		{
-			while (chomp($lastclock)) {}
-
-			dbg("using last clock from SLA API directory, file $continue_file: ", ts_str($lastclock));
-
-			return cycle_start($lastclock, $delay);
+			# sleep for 1.0 second
+			select(undef, undef, undef, 1.0);
 		}
 
-		# sleep for 0.2 seconds
-		select(undef, undef, undef, 0.2);
+		if (read_file($continue_file, \$lastclock, \$error) != SUCCESS)
+		{
+			wrn("cannot read file '$continue_file': $error");
+			next;
+		}
+
+		while (chomp($lastclock)) {}
+
+		if (!$lastclock)
+		{
+			wrn("file '$continue_file' is empty");
+			next;
+		}
+
+		if ($attempt > 1)
+		{
+			inf("succeeded to read '$continue_file' on attempt #$attempt");
+		}
+
+		last;
 	}
 
-	wrn("cannot read \"$continue_file\": $error");
-
-	# if not, get the oldest from the database
-
-	$lastclock = get_oldest_clock($tld, $service_key, ITEM_VALUE_TYPE_UINT64, $clock_limits{$service});
-
-	if (!defined($lastclock))
-	{
-		dbg("cannot yet calculate, item ", substr($service_key, 0, SUBSTR_KEY_LEN), "has no data in the database yet");
-		return;
-	}
-
-	fail("unexpected error: item \"$service_key\" not found on TLD $tld") if ($lastclock == E_FAIL);
-
-	dbg("using last clock from the database: ", ts_str($lastclock));
+	ah_unlock_continue_file($continue_file_lock);
 
 	return $lastclock;
 }
@@ -669,28 +651,11 @@ sub cycles_to_calculate($$$$$$$$)
 
 			if (opt('now'))
 			{
-				# time bounds were specified on the command line
-				$global_lastclock //= get_global_lastclock($tld, $service_key, $service, $delay);
+				$lastclock = cycle_start(getopt('now'), $delay);
 
-				$lastclock = $global_lastclock;
+				dbg("using specified last clock: ", ts_str($lastclock));
 			}
-			elsif (!defined($lastvalues_cache_tld->{$service}{'probes'}{$probe}{$itemid}))
-			{
-				dbg("$service: itemid $itemid from probe \"$probe\" not in cache yet");
-
-				# this partilular item is not in cache yet, get the time starting point for it
-				$global_lastclock //= get_global_lastclock($tld, $service_key, $service, $delay);
-
-				if (!defined($global_lastclock))
-				{
-					dbg("$service: no data in the database yet, so nothing to do");
-
-					return E_FAIL;
-				}
-
-				$lastclock = $global_lastclock;
-			}
-			else
+			elsif (defined($lastvalues_cache_tld->{$service}{'probes'}{$probe}{$itemid}))
 			{
 				$lastclock = $lastvalues_cache_tld->{$service}{'probes'}{$probe}{$itemid}{'clock'};
 
@@ -698,9 +663,22 @@ sub cycles_to_calculate($$$$$$$$)
 
 				if ($lastclock > $lastclock_db)
 				{
-					fail("dimir was wrong, item ($itemid) clock ($lastclock)".
-						" in cache can be newer than in database ($lastclock_db)");
+					fail("dimir was wrong, item ($itemid) clock ($lastclock) in cache can be newer than in database ($lastclock_db)");
 				}
+			}
+			elsif ($sla_api_last_update)
+			{
+				$lastclock = cycle_start($sla_api_last_update, $delay);
+
+				dbg("$service: itemid $itemid from probe \"$probe\" not in cache yet");
+				dbg("using last clock from SLA API directory: ", ts_str($lastclock));
+			}
+			else
+			{
+				$lastclock = cycle_start($clock_limits{$service}, $delay);
+
+				dbg("$service: itemid $itemid from probe \"$probe\" not in cache yet");
+				dbg("using last clock based on incident_measurements_limit: ", ts_str($lastclock));
 			}
 
 			if (opt('debug'))

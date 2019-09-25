@@ -62,10 +62,10 @@ New features:
 Changes for rsm1.2.9
 
 Bug fixes:
-....I..... [502] don't stop script when executing with --now and another instance is running (dimir)
-....I..... [540] don't fail sla-api-recent.pl when disabling TLD while the script is running (asitals)
+....I..... [502] allowed script to run when executing with --now and another instance is running (dimir)
+....I..... [540] allowed sla-api-recent.pl file continue running when disabling TLD (asitals)
 ....I..... [546] fixed error reporting when disabling TLD with tld.pl (asitals)
-........S. [548] bulk update of lastvalue tables, ignore errors when updating lastvalue tables (e.g., itemid refers to deleted item) (asitals)
+........S. [548] added bulk updates of lastvalue tables, ignore errors when updating lastvalue tables (e.g., itemid refers to deleted item) (asitals)
 
 --------------------------------------------------------------------------------
 Changes for rsm1.2.8
