@@ -998,7 +998,12 @@ if (!opt('dry-run'))
 		dbg("last update: ", ts_str($till));
 	}
 
-	if (my $error = rsm_targets_apply())
+	my $continue_file_lock;
+	ah_lock_continue_file(\$continue_file_lock);
+	my $error = rsm_targets_apply();
+	ah_unlock_continue_file($continue_file_lock);
+
+	if ($error)
 	{
 		fail($error);
 	}
