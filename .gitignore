@@ -1,7 +1,8 @@
 /.buildpath
 /.project
 /.settings
-/.vstags
+.vstags
+.vscode
 Makefile
 Makefile.in
 !/build/win32/**/Makefile
@@ -60,6 +61,7 @@ frontends/php/.project
 frontends/php/conf/zabbix.conf.php
 frontends/php/images/general/*.db
 frontends/php/images/general/tree/*.db
+frontends/php/include/classes/services/CSlaReport.php
 frontends/php/js/jsDump.js
 frontends/php/local/conf/brand.conf.php
 frontends/php/locale/POTFILES.in
