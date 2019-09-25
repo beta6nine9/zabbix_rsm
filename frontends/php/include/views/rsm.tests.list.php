@@ -91,6 +91,9 @@ elseif ($this->data['type'] == RSM_DNSSEC) {
 elseif ($this->data['type'] == RSM_RDDS) {
 	$serviceName = _('RDDS service availability');
 }
+elseif ($this->data['type'] == RSM_RDAP) {
+	$serviceName = _('RDAP service availability');
+}
 else {
 	$serviceName = _('EPP service availability');
 }

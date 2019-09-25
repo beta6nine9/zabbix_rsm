@@ -101,6 +101,9 @@ my $max_period = (opt('period') ? getopt('period') * 60 : MAX_PERIOD);
 
 db_connect();
 
+my $rdap_is_standalone = is_rdap_standalone($now);
+dbg("RDAP ", ($rdap_is_standalone ? "is" : "is NOT"), " standalone");
+
 my $cfg_minonline = get_macro_dns_probe_online();
 my $cfg_minns = get_macro_minns();
 
@@ -109,17 +112,20 @@ fail("number of required working Name Servers is configured as $cfg_minns") if (
 my %delays;
 $delays{'dns'} = $delays{'dnssec'} = get_dns_udp_delay($now);
 $delays{'rdds'} = get_rdds_delay($now);
+$delays{'rdap'} = get_rdap_delay($now) if ($rdap_is_standalone);
 
 my %clock_limits;
-$clock_limits{'dns'} = $clock_limits{'dnssec'} = cycle_start(time() - $incident_measurements_limit, $delays{'dnssec'});
-$clock_limits{'rdds'} = cycle_start(time() - $incident_measurements_limit, $delays{'rdds'});
+$clock_limits{'dns'} = $clock_limits{'dnssec'} = cycle_start($now - $incident_measurements_limit, $delays{'dnssec'});
+$clock_limits{'rdds'} = cycle_start($now - $incident_measurements_limit, $delays{'rdds'});
+$clock_limits{'rdap'} = cycle_start($now - $incident_measurements_limit, $delays{'rdap'}) if ($rdap_is_standalone);
 
 db_disconnect();
 
 my %service_keys = (
-	'dns' => 'rsm.slv.dns.avail',
+	'dns'    => 'rsm.slv.dns.avail',
 	'dnssec' => 'rsm.slv.dnssec.avail',
-	'rdds' => 'rsm.slv.rdds.avail'
+	'rdds'   => 'rsm.slv.rdds.avail',
+	'rdap'   => 'rsm.slv.rdap.avail',
 );
 
 # keep to avoid reading multiple times
@@ -459,13 +465,22 @@ sub process_tld($$$$$)
 
 		if (opt('print-period'))
 		{
-			info("selected $service period: ", selected_period(
+			info(sprintf("selected %4s period: ", $service), selected_period(
 				$cycles_from,
 				cycle_end($cycles_till, $delays{$service})
 			));
 		}
 
-		my $interfaces_ref = get_interfaces($tld, $service, $now);
+		# TODO: leave only next line after migrating to Standalone RDAP
+		# my $interfaces_ref = get_interfaces($tld, $service, $now);
+		my $interfaces_ref;
+		my $interfaces_ref_rdap_before_switch;
+		my $interfaces_ref_rdap_after_switch;
+
+		if ($service ne 'rdds')
+		{
+			$interfaces_ref = get_interfaces($tld, $service, $now);
+		}
 
 		$probes_ref->{$service} = get_probes($service) unless (defined($probes_ref->{$service}));
 
@@ -489,6 +504,21 @@ sub process_tld($$$$$)
 		# these are cycles we are going to recalculate for this tld-service
 		foreach my $clock (@cycles_to_calculate)
 		{
+			if ($service eq 'rdds')
+			{
+				if (!is_rdap_standalone($clock))
+				{
+					$interfaces_ref_rdap_before_switch //= get_interfaces($tld, $service, $clock);
+					$interfaces_ref = $interfaces_ref_rdap_before_switch;
+				}
+				else
+				{
+					$interfaces_ref_rdap_after_switch //= get_interfaces($tld, $service, $clock);
+					$interfaces_ref = $interfaces_ref_rdap_after_switch;
+				}
+
+			}
+
 			calculate_cycle(
 				$tld,
 				$service,
@@ -681,6 +711,17 @@ sub cycles_to_calculate($$$$$$$$)
 				dbg("using last clock based on incident_measurements_limit: ", ts_str($lastclock));
 			}
 
+			# TODO: remove this after migrating to Standalone RDAP
+			if ($service eq "rdap" && $lastclock < get_rdap_standalone_ts())
+			{
+				# when we switch to standalone RDAP we should start generating
+				# data starting from the time of the switch
+
+				wrn("truncating lastclock to Standalone RDAP switch time ", ts_str($lastclock));
+
+				$lastclock = get_rdap_standalone_ts();
+			}
+
 			if (opt('debug'))
 			{
 				my $key = substr($lastvalues_db_tld->{$service}{'probes'}{$probe}{$itemid}{'key'}, 0, SUBSTR_KEY_LEN);
@@ -786,7 +827,7 @@ sub get_service_from_probe_key($)
 	}
 	elsif (substr($key, 0, length("rdap")) eq "rdap")
 	{
-		$service = "rdds";
+		$service = "rdap";
 	}
 
 	return $service;
@@ -812,6 +853,10 @@ sub get_service_from_slv_key($)
 	elsif (substr($key, 0, length("rdds.")) eq "rdds.")
 	{
 		$service = "rdds";
+	}
+	elsif (substr($key, 0, length("rdap.")) eq "rdap.")
+	{
+		$service = "rdap";
 	}
 	else
 	{
@@ -931,6 +976,13 @@ sub get_lastvalues_from_db($$$)
 		else
 		{
 			fail("unexpected host group id \"$hostgroupid\"");
+		}
+
+		# TODO: remove this override after migrating to Standalone RDAP
+		if ($key_service eq "rdap" && !is_rdap_standalone($clock))
+		{
+			dbg("changing \$key_service from 'rdap' to 'rdds' because Standalone RDAP hasn't started yet");
+			$key_service = "rdds";
 		}
 
 		fail("cannot identify Service of key \"$key\"") unless ($key_service);
@@ -1624,7 +1676,7 @@ sub get_interfaces($$$)
 {
 	my $tld = shift;
 	my $service = shift;
-	my $now = shift;
+	my $clock = shift;
 
 	my @result;
 
@@ -1638,9 +1690,18 @@ sub get_interfaces($$$)
 	}
 	elsif ($service eq 'rdds')
 	{
-		push(@result, AH_INTERFACE_RDDS43) if (tld_interface_enabled($tld, 'rdds43', $now));
-		push(@result, AH_INTERFACE_RDDS80) if (tld_interface_enabled($tld, 'rdds80', $now));
-		push(@result, AH_INTERFACE_RDAP) if (tld_interface_enabled($tld, 'rdap', $now));
+		push(@result, AH_INTERFACE_RDDS43) if (tld_interface_enabled($tld, 'rdds43', $clock));
+		push(@result, AH_INTERFACE_RDDS80) if (tld_interface_enabled($tld, 'rdds80', $clock));
+
+		# TODO: remove this after migrating to Standalone RDAP
+		if (!is_rdap_standalone($clock))
+		{
+			push(@result, AH_INTERFACE_RDAP) if (tld_interface_enabled($tld, 'rdap', $clock));
+		}
+	}
+	elsif ($service eq 'rdap')
+	{
+		push(@result, AH_INTERFACE_RDAP);
 	}
 
 	return \@result;
@@ -1808,7 +1869,7 @@ Optionally specify TLD.
 
 =item B<--service> name
 
-Optionally specify service, one of: dns, dnssec, rdds
+Optionally specify service, one of: dns, dnssec, rdds, rdap (if it's standalone).
 
 =item B<--server-id> ID
 

@@ -153,8 +153,17 @@ if ($data['tld'] && $filter_valid) {
 		exit;
 	}
 
+	$xml = null;
+
 	if ($report_row && array_key_exists('report', $report_row)) {
-		$xml = new SimpleXMLElement($report_row['report']);
+		try {
+			$xml = new SimpleXMLElement($report_row['report']);
+		} catch (Exception $x) {
+			show_error_message(_('Unable to parse XML report.'));
+		}
+	}
+
+	if ($xml) {
 		$details = $xml->attributes();
 
 		if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY) {
@@ -201,6 +210,26 @@ if ($data['tld'] && $filter_valid) {
 			'slr_rdds_rtt_downtime'		=> (string) $xml->RDDS->rtt->attributes()->percentageSLR,
 			'slr_rdds_rtt_downtime_ms'	=> (string) $xml->RDDS->rtt->attributes()->rttSLR
 		];
+
+		if (isset($xml->RDAP)) {
+			if (!is_RDAP_standalone($data['details']['from'])) {
+				show_error_message(_('RDAP values exists for time when service was not standalone.'));
+			}
+
+			$rdap = $xml->RDAP;
+
+			$data += [
+				'slv_rdap_downtime'			=> (string) $rdap->serviceAvailability,
+				'slr_rdap_downtime'			=> (string) $rdap->serviceAvailability->attributes()->downtimeSLR,
+
+				'slv_rdap_rtt_downtime'		=> (string) $rdap->rtt,
+				'slr_rdap_rtt_downtime'		=> (string) $rdap->rtt->attributes()->percentageSLR,
+				'slr_rdap_rtt_downtime_ms'	=> (string) $rdap->rtt->attributes()->rttSLR
+			];
+		}
+		else if (is_RDAP_standalone($data['details']['from'])) {
+			show_error_message(_('Cannot find RDAP values.'));
+		}
 
 		if ($data['tld']['host'] !== strval($details->id)) {
 			show_error_message(_('Incorrect report tld value.'));

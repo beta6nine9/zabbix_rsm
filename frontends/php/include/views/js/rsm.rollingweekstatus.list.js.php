@@ -5,6 +5,7 @@
 				jQuery('#filter_dns').prop('checked', true);
 				jQuery('#filter_dnssec').prop('checked', true);
 				jQuery('#filter_rdds').prop('checked', true);
+				jQuery('#filter_rdap').prop('checked', true);
 				jQuery('#filter_epp').prop('checked', true);
 				jQuery('#checkAllServicesValue').val(1);
 			}
@@ -12,6 +13,7 @@
 				jQuery('#filter_dns').prop('checked', false);
 				jQuery('#filter_dnssec').prop('checked', false);
 				jQuery('#filter_rdds').prop('checked', false);
+				jQuery('#filter_rdap').prop('checked', false);
 				jQuery('#filter_epp').prop('checked', false);
 				jQuery('#checkAllServicesValue').val(0);
 			}

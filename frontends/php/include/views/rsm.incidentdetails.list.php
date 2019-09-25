@@ -21,6 +21,8 @@
 
 $widget = (new CWidget())->setTitle(_('Incident details'));
 
+$object_label = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) ? _('Registrar ID') : _('TLD');
+
 // filter
 $filter = (new CFilter('web.rsm.incidentdetails.filter.state'))
 	->addVar('filter_set', 1)
@@ -140,42 +142,46 @@ else {
 	$changeIncidentTypeName = _('Unmark incident as false positive');
 }
 
-$testsInfoTable = (new CTable(null))->addClass('incidents-info');
+$details = [$object_label => $data['tld']['host']];
+
+if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
+	$details += [
+		_('Registrar name') => $data['tld']['info_1'],
+		_('Registrar family') => $data['tld']['info_2']
+	];
+}
+
+$details += [
+	_('Service') => $data['slvItem']['name'],
+	_('Incident type') => $incidentType
+];
 
 if ($data['type'] == RSM_RDDS) {
-	$incidentTestingInterface = [BR(), new CSpan([bold(_('Current testing interface')), ':', SPACE, $data['testing_interfaces']])];
-}
-else {
-	$incidentTestingInterface = null;
+	$details += [
+		_('Current testing interface') => $data['testing_interfaces']
+	];
 }
 
-$object_info = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR)
-	? [
-		new CSpan([bold(_('Registrar ID')), ':', SPACE, $data['tld']['host']]),
-		BR(),
-		new CSpan([bold(_('Registrar name')), ':', SPACE, $data['tld']['info_1']]),
-		BR(),
-		new CSpan([bold(_('Registrar family')), ':', SPACE, $data['tld']['info_2']])
-	]
-	: new CSpan([bold(_('TLD')), ':', SPACE, $data['tld']['host']]);
+$right_details = [];
 
-$testsInfoTable->addRow([
-	[
-		$object_info,
-		BR(),
-		new CSpan([bold(_('Service')), ':', SPACE, $data['slvItem']['name']]),
-		BR(),
-		new CSpan([bold(_('Incident type')), ':', SPACE, $incidentType]),
-		$incidentTestingInterface
-	],
-	[
+if ($data['slvTestTime'] > 0) {
+	$right_details = [
 		(new CSpan(_s('%1$s Rolling week status', $this->data['slv'].'%')))->addClass('rolling-week-status'),
 		BR(),
 		(new CSpan(date(DATE_TIME_FORMAT, $this->data['slvTestTime'])))->addClass('rsm-date-time'),
-	]
-]);
+	];
+}
 
-$widget->additem([$testsInfoTable]);
+$widget->additem((new CDiv())
+	->addClass(ZBX_STYLE_TABLE_FORMS_CONTAINER)
+	->addItem((new CTable(null))
+		->addClass('incidents-info')
+		->addRow([
+			gen_details_item($details),
+			$right_details
+		])
+	)
+);
 
 $widget->addItem([$data['paging'], $table, $data['paging']]);
 
@@ -188,4 +194,5 @@ if (CWebUser::getType() == USER_TYPE_ZABBIX_ADMIN || CWebUser::getType() == USER
 		->addStyle('margin-top: 5px;')
 	);
 }
+
 return $widget;

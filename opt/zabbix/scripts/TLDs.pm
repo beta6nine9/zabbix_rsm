@@ -868,6 +868,7 @@ sub create_probe_template
 	my $ipv4      = shift;
 	my $ipv6      = shift;
 	my $rdds      = shift;
+	my $rdap      = shift;
 	my $resolver  = shift;
 
 	my $templateid = create_template('Template ' . $root_name);
@@ -876,6 +877,7 @@ sub create_probe_template
 	create_macro('{$RSM.IP6.ENABLED}' , defined($ipv6)     ? $ipv6     : '1'        , $templateid, defined($ipv6)     ? 1 : undef);
 	create_macro('{$RSM.RESOLVER}'    , defined($resolver) ? $resolver : '127.0.0.1', $templateid, defined($resolver) ? 1 : undef);
 	create_macro('{$RSM.RDDS.ENABLED}', defined($rdds)     ? $rdds     : '1'        , $templateid, defined($rdds)     ? 1 : undef);
+	create_macro('{$RSM.RDAP.ENABLED}', defined($rdap)     ? $rdap     : '1'        , $templateid, defined($rdap)     ? 1 : undef);
 	create_macro('{$RSM.EPP.ENABLED}' , defined($epp)      ? $epp      : '1'        , $templateid, defined($epp)      ? 1 : undef);
 
 	return $templateid;

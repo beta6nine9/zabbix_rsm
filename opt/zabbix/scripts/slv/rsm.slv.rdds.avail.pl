@@ -26,9 +26,10 @@ set_slv_config(get_rsm_config());
 
 db_connect();
 
-# we don't know the rollweek bounds yet so we assume it ends at least few minutes back
+# we don't know the cycle bounds yet so we assume it ends at least few minutes back
 my $delay = get_rdds_delay(getopt('now') // time() - AVAIL_SHIFT_BACK);
 
+# get timestamp of the beginning of the latest cycle
 my (undef, undef, $max_clock) = get_cycle_bounds($delay, getopt('now'));
 
 my $cfg_minonline = get_macro_rdds_probe_online();
@@ -56,21 +57,50 @@ my $cycles_ref = collect_slv_cycles(
 	(opt('cycles') ? getopt('cycles') : slv_max_cycles('rdds'))
 );
 
-slv_exit(SUCCESS) if (scalar(keys(%{$cycles_ref})) == 0);
+slv_exit(SUCCESS) if (keys(%{$cycles_ref}) == 0);
+
+# split $cycles_ref into two hashes - $cycles_ref for all cycles w/o standalone RDAP and
+# %cycles_rdap_standalone for timestamps that fall into period after switch standalone RDAP
+
+my %cycles_rdap_standalone = map {
+	is_rdap_standalone($_) ? ( $_ => delete ${$cycles_ref}{$_}) : ()
+} keys %{$cycles_ref};
 
 my $probes_ref = get_probes('RDDS');
 
-process_slv_avail_cycles(
-	$cycles_ref,
-	$probes_ref,
-	$delay,
-	undef,			# input keys are unknown
-	\&cfg_keys_in_cb,	# callback to get input keys
-	$cfg_key_out,
-	$cfg_minonline,
-	\&check_probe_values,
-	$cfg_value_type
-);
+# process cycles before standalone RDAP switch, if any
+
+if (keys(%{$cycles_ref}) > 0)
+{
+	process_slv_avail_cycles(
+		$cycles_ref,
+		$probes_ref,
+		$delay,
+		undef,			# input keys are unknown
+		\&cfg_keys_in_cb,	# callback to get input keys
+		$cfg_key_out,
+		$cfg_minonline,
+		\&check_probe_values,
+		$cfg_value_type
+	);
+}
+
+# process cycles after standalone RDAP switch, if any
+
+if (keys(%cycles_rdap_standalone) > 0)
+{
+	process_slv_avail_cycles(
+		\%cycles_rdap_standalone,
+		$probes_ref,
+		$delay,
+		undef,					# input keys are unknown
+		\&cfg_keys_in_cb_rdap_standalone,	# callback to get input keys
+		$cfg_key_out,
+		$cfg_minonline,
+		\&check_probe_values,
+		$cfg_value_type
+	);
+}
 
 slv_exit(SUCCESS);
 
@@ -86,9 +116,16 @@ sub cfg_keys_in_cb($)
 	my $cfg_keys_in = get_templated_items_like($tld, $cfg_keys_in_pattern);
 
 	# add RDAP rtt items
-	push(@{$cfg_keys_in}, $_) foreach (@{$rdap_items});
+	push(@{$cfg_keys_in}, @{$rdap_items});
 
 	return $cfg_keys_in;
+}
+
+sub cfg_keys_in_cb_rdap_standalone($)
+{
+	my $tld = shift;
+
+	return get_templated_items_like($tld, $cfg_keys_in_pattern);
 }
 
 # SUCCESS - no values or at least one successful value

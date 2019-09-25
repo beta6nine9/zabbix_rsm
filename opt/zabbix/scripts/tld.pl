@@ -66,6 +66,13 @@ sub main()
 			"\n\n/opt/zabbix/scripts/change-macro.pl --macro '{\$RSM.MONITORING.TARGET}' --value '${\MONITORING_TARGET_REGISTRY}'");
 	}
 
+	# get global macros required by this script
+	foreach my $macro (keys %{$cfg_global_macros})
+	{
+		$cfg_global_macros->{$macro} = get_global_macro_value($macro);
+		pfail('cannot get global macro ', $macro) unless defined($cfg_global_macros->{$macro});
+	}
+
 	if (opt('set-type'))
 	{
 		set_type();
@@ -80,17 +87,18 @@ sub main()
 	}
 	elsif (opt('update-nsservers'))
 	{
-		# possible use dig instead of --ns-servers-v4 and --ns-servers-v6
 		$ns_servers = get_ns_servers(getopt('tld'));
 		update_nsservers($server_key, getopt('tld'), $ns_servers);
 	}
 	elsif (opt('delete'))
 	{
-		manage_tld_objects('delete', getopt('tld'), getopt('dns'), getopt('dnssec'), getopt('epp'), getopt('rdds'));
+		manage_tld_objects('delete', getopt('tld'), getopt('dns'), getopt('dnssec'),
+				getopt('epp'), getopt('rdds'), getopt('rdap'));
 	}
 	elsif (opt('disable'))
 	{
-		manage_tld_objects('disable', getopt('tld'), getopt('dns'), getopt('dnssec'), getopt('epp'), getopt('rdds'));
+		manage_tld_objects('disable', getopt('tld'), getopt('dns'), getopt('dnssec'),
+				getopt('epp'), getopt('rdds'), getopt('rdap'));
 	}
 	else
 	{
@@ -120,6 +128,7 @@ sub init_cli_opts($)
 			"dns!",
 			"epp!",
 			"rdds!",
+			"rdap!",
 			"dnssec!",
 			"epp-servers=s",
 			"epp-user=s",
@@ -136,7 +145,6 @@ sub init_cli_opts($)
 			"server-id=s",
 			"get-nsservers-list!",
 			"update-nsservers!",
-			"resolver=s",
 			"list-services!",
 			"setup-cron!",
 			"verbose!",
@@ -182,6 +190,15 @@ sub validate_input($)
 			my $type = getopt('type');
 			$msg .= "invalid TLD type \"$type\", type must be one of: @{[TLD_TYPE_G]}, @{[TLD_TYPE_CC]}, @{[TLD_TYPE_OTHER]} or @{[TLD_TYPE_TEST]}\n";
 		}
+		elsif (!opt('ns-servers-v4') && !opt('ns-servers-v6'))
+		{
+			$msg .= "at least one of the --ns-servers-v4,--ns-servers-v6 options must be specified\n";
+		}
+	}
+
+	if (opt('update-nsservers') && (!opt('ns-servers-v4') && !opt('ns-servers-v6')))
+	{
+		$msg .= "--update-nsservers requires at least --ns-servers-v4 and/or --ns-servers-v6\n";
 	}
 
 	if (opt('set-type'))
@@ -242,6 +259,7 @@ sub validate_input($)
 	setopt('dnssec', 0) unless opt('dnssec');
 	setopt('rdds'  , 0) unless opt('rdds');
 	setopt('epp'   , 0) unless opt('epp');
+	setopt('rdap'  , 0) unless opt('rdap');
 
 	if ($msg)
 	{
@@ -713,7 +731,7 @@ sub disable_old_ns($)
 # delete or disable RSMHOST or its objects
 ################################################################################
 
-sub manage_tld_objects($$$$$$)
+sub manage_tld_objects($$$$$$$)
 {
 	my $action = shift;
 	my $tld    = shift;
@@ -721,6 +739,7 @@ sub manage_tld_objects($$$$$$)
 	my $dnssec = shift;
 	my $epp    = shift;
 	my $rdds   = shift;
+	my $rdap   = shift;
 
 	my $types = {
 		'dns'    => $dns,
@@ -731,26 +750,28 @@ sub manage_tld_objects($$$$$$)
 
 	my $main_templateid;
 
-	print "Getting main host of the TLD: ";
+	$types->{'rdap'} = $rdap if (__is_rdap_standalone());
+
+	print("Getting main host of the TLD: ");
 	my $main_hostid = get_host($tld, false);
 
 	if (scalar(%{$main_hostid}))
 	{
 		$main_hostid = $main_hostid->{'hostid'};
-		print "$main_hostid\n";
+		print("$main_hostid\n");
 	}
 	else
 	{
 		pfail("cannot find host \"$tld\"");
 	}
 
-	print "Getting main template of the TLD: ";
+	print("Getting main template of the TLD: ");
 	my $tld_template = get_template('Template ' . $tld, false, true);
 
 	if (scalar(%{$tld_template}))
 	{
 		$main_templateid = $tld_template->{'templateid'};
-		print "$main_templateid\n";
+		print("$main_templateid\n");
 	}
 	else
 	{
@@ -774,19 +795,22 @@ sub manage_tld_objects($$$$$$)
 		}
 	}
 
-	print "Requested to $action '$tld'";
+	print("Requested to $action '$tld'");
 	if (scalar(@affected_services) != 0 && scalar(@affected_services) != $total_services)
 	{
 		print(" (", join(',', @affected_services), ")");
 	}
-	print "\n";
+	print("\n");
 
 	foreach my $host (@{$tld_template->{'hosts'}})
 	{
 		push(@tld_hostids, $host->{'hostid'});
 	}
 
-	if ($types->{'dns'} eq true and $types->{'epp'} eq true and $types->{'rdds'} eq true)
+	# This condition checks if all services selected. This means we need to either check dns, epp, rdds
+	# before switch to Standalone RDAP or dns, epp, rdds, rdap after the switch.
+	if ($types->{'dns'} eq true and $types->{'epp'} eq true and $types->{'rdds'} eq true and
+			(__is_rdap_standalone() ? ($types->{'rdap'} eq true) : 1))
 	{
 		my @tmp_hostids;
 		my @hostids_arr;
@@ -858,9 +882,9 @@ sub manage_tld_objects($$$$$$)
 		{
 			push(@itemids, keys(%{$template_items}));
 		}
-		else
+		elsif ($type ne 'rdap') # RDAP doesn't have items in "Template $tld"
 		{
-			print "Could not find $type related items on the template level\n";
+			print("Could not find $type related items on the template level\n");
 		}
 
 		if (scalar(keys(%{$host_items})))
@@ -869,19 +893,29 @@ sub manage_tld_objects($$$$$$)
 		}
 		else
 		{
-			print "Could not find $type related items on host level\n";
+			print("Could not find $type related items on host level\n");
 		}
 
-		if ($action eq 'disable' and scalar(@itemids))
+		if (scalar(@itemids))
 		{
-			disable_items(\@itemids);
-			create_macro('{$RSM.TLD.' . uc($type) . '.ENABLED}', 0, $main_templateid, true);
+			my $macro = $type eq 'rdap' ? '{$RDAP.TLD.ENABLED}' : '{$RSM.TLD.' . uc($type) . '.ENABLED}';
+
+			create_macro($macro, 0, $main_templateid, true);
+
+			if ($action eq 'disable')
+			{
+				disable_items(\@itemids);
+			}
+			else # $action is 'delete'
+			{
+				remove_items(\@itemids);
+				# remove_applications_by_items(\@itemids);
+			}
 		}
 
-		if ($action eq 'delete' and scalar(@itemids))
+		if ($action eq 'disable' && $type eq 'rdap')
 		{
-			remove_items(\@itemids);
-			# remove_applications_by_items(\@itemids);
+			set_linked_items_enabled('rdap[', $tld, 0);
 		}
 	}
 }
@@ -892,19 +926,11 @@ sub manage_tld_objects($$$$$$)
 
 sub add_new_tld()
 {
-	## Geting some global macros related to item refresh interval ##
-	## Values are used as item update interval ##
-	foreach my $macro (keys %{$cfg_global_macros})
-	{
-		$cfg_global_macros->{$macro} = get_global_macro_value($macro);
-		pfail('cannot get global macro ', $macro) unless defined($cfg_global_macros->{$macro});
-	}
-
 	$ns_servers = get_ns_servers(getopt('tld'));
-	pfail("Could not retrive NS servers for '" . getopt('tld') . "' TLD") unless (scalar(keys %{$ns_servers}));
+	pfail("Could not retrieve NS servers for '" . getopt('tld') . "' TLD") unless (scalar(keys %{$ns_servers}));
 
 	my $root_servers_macros = update_root_servers(getopt('root-servers'));
-	print("Could not retrive list of root servers or create global macros\n") unless (defined($root_servers_macros));
+	print("Could not retrieve list of root servers or create global macros\n") unless (defined($root_servers_macros));
 
 	my $main_templateid = create_main_template(getopt('tld'), $ns_servers);
 	pfail("Main templateid is not defined") unless defined $main_templateid;
@@ -922,85 +948,59 @@ sub get_ns_servers($)
 {
 	my $tld = shift;
 
-	if (getopt('ns-servers-v4') or getopt('ns-servers-v6'))
+	my $ns_servers;
+
+	# just in case, the input should have been validated by now
+	unless (opt('ns-servers-v4') or opt('ns-servers-v6'))
 	{
-		if (getopt('ns-servers-v4') and (getopt('ipv4') == 1 or getopt('update-nsservers')))
+		pfail("option --ns-servers-v4 and/or --ns-servers-v6 required for this invocation");
+	}
+
+	if (getopt('ns-servers-v4') and (getopt('ipv4') == 1 or getopt('update-nsservers')))
+	{
+		my @nsservers = split(/\s/, getopt('ns-servers-v4'));
+		foreach my $ns (@nsservers)
 		{
-			my @nsservers = split(/\s/, getopt('ns-servers-v4'));
-			foreach my $ns (@nsservers)
+			next if ($ns eq '');
+
+			my @entries = split(/,/, $ns);
+
+			pfail("incorrect Name Server format: expected \"<NAME>,<IP>\" got \"$ns\"") unless ($entries[0] && $entries[1]);
+
+			my $exists = 0;
+			foreach my $ip (@{$ns_servers->{$entries[0]}{'v4'}})
 			{
-				next if ($ns eq '');
-
-				my @entries = split(/,/, $ns);
-
-				pfail("incorrect Name Server format: expected \"<NAME>,<IP>\" got \"$ns\"") unless ($entries[0] && $entries[1]);
-
-				my $exists = 0;
-				foreach my $ip (@{$ns_servers->{$entries[0]}{'v4'}})
+				if ($ip eq $entries[1])
 				{
-					if ($ip eq $entries[1])
-					{
-						$exists = 1;
-						last;
-					}
+					$exists = 1;
+					last;
 				}
-
-				push(@{$ns_servers->{$entries[0]}{'v4'}}, $entries[1]) unless ($exists);
 			}
-		}
 
-		if (getopt('ns-servers-v6') and (getopt('ipv6') or getopt('update-nsservers')))
-		{
-			my @nsservers = split(/\s/, getopt('ns-servers-v6'));
-			foreach my $ns (@nsservers)
-			{
-				next if ($ns eq '');
-
-				my @entries = split(/,/, $ns);
-
-				my $exists = 0;
-				foreach my $ip (@{$ns_servers->{$entries[0]}{'v6'}})
-				{
-					if ($ip eq $entries[1])
-					{
-						$exists = 1;
-						last;
-					}
-				}
-
-				push(@{$ns_servers->{$entries[0]}{'v6'}}, $entries[1]) unless ($exists);
-			}
+			push(@{$ns_servers->{$entries[0]}{'v4'}}, $entries[1]) unless ($exists);
 		}
 	}
-	else
+
+	if (getopt('ns-servers-v6') and (getopt('ipv6') or getopt('update-nsservers')))
 	{
-		# implemented --resolver for automatically fetching NSs (NB, search for --resolver in this file)
-		my $add_opts = "";
-		$add_opts = "\@" . getopt('resolver') if (getopt('resolver'));
-		# NB! Fix duplicate items! Remove DOT from the end of NS.
-		my $nsservers = `dig $add_opts $tld NS +short | sed 's/\.\$//'`;
-
-		my @nsservers = split(/\n/, $nsservers);
-
-		print("Warning: resolver returned no Name Servers, did you forget to specify \"--resolver\"?\n") if (scalar(@nsservers) == 0);
-
-		for (my $i = 0; $i <= $#nsservers; $i++)
+		my @nsservers = split(/\s/, getopt('ns-servers-v6'));
+		foreach my $ns (@nsservers)
 		{
-			if (getopt('ipv4'))
-			{
-				my $ipv4 = `dig $add_opts $nsservers[$i] A +short`;
-				my @ipv4 = split(/\n/, $ipv4);
+			next if ($ns eq '');
 
-				@{$ns_servers->{$nsservers[$i]}{'v4'}} = @ipv4 if scalar @ipv4;
+			my @entries = split(/,/, $ns);
+
+			my $exists = 0;
+			foreach my $ip (@{$ns_servers->{$entries[0]}{'v6'}})
+			{
+				if ($ip eq $entries[1])
+				{
+					$exists = 1;
+					last;
+				}
 			}
 
-			if (getopt('ipv6'))
-			{
-				my $ipv6 = `dig $add_opts $nsservers[$i] AAAA +short` if getopt('ipv6');
-				my @ipv6 = split(/\n/, $ipv6);
-
-				@{$ns_servers->{$nsservers[$i]}{'v6'}} = @ipv6 if scalar @ipv6;
-			}
+			push(@{$ns_servers->{$entries[0]}{'v6'}}, $entries[1]) unless ($exists);
 		}
 	}
 
@@ -1042,7 +1042,7 @@ sub create_main_template($$)
 		for (my $i_ipv4 = 0; $i_ipv4 <= $#ipv4; $i_ipv4++)
 		{
 			next unless defined $ipv4[$i_ipv4];
-			print "	--v4     $ipv4[$i_ipv4]\n";
+			print("	--v4     $ipv4[$i_ipv4]\n");
 
 			create_item_dns_rtt($ns_name, $ipv4[$i_ipv4], $templateid, "tcp", '4');
 			create_item_dns_rtt($ns_name, $ipv4[$i_ipv4], $templateid, "udp", '4');
@@ -1055,7 +1055,7 @@ sub create_main_template($$)
 		for (my $i_ipv6 = 0; $i_ipv6 <= $#ipv6; $i_ipv6++)
 		{
 			next unless defined $ipv6[$i_ipv6];
-			print "	--v6     $ipv6[$i_ipv6]\n";
+			print("	--v6     $ipv6[$i_ipv6]\n");
 
 			create_item_dns_rtt($ns_name, $ipv6[$i_ipv6], $templateid, "tcp", '6');
 			create_item_dns_rtt($ns_name, $ipv6[$i_ipv6], $templateid, "udp", '6');
@@ -1159,20 +1159,23 @@ sub create_item_dns_rtt($$$$$)
 	}));
 }
 
-sub create_slv_item($$$$$)
+sub create_slv_item($$$$$;$)
 {
 	my $name           = shift;
 	my $key            = shift;
 	my $hostid         = shift;
 	my $value_type     = shift;
 	my $applicationids = shift;
+	my $item_status    = shift;
+
+	$item_status = ITEM_STATUS_ACTIVE unless (defined($item_status));
 
 	if ($value_type == VALUE_TYPE_AVAIL)
 	{
 		return really(create_item({
 			'name'         => $name,
 			'key_'         => $key,
-			'status'       => ITEM_STATUS_ACTIVE,
+			'status'       => $item_status,
 			'hostid'       => $hostid,
 			'type'         => ITEM_TYPE_TRAPPER,
 			'value_type'   => ITEM_VALUE_TYPE_UINT64,
@@ -1186,7 +1189,7 @@ sub create_slv_item($$$$$)
 		return really(create_item({
 			'name'         => $name,
 			'key_'         => $key,
-			'status'       => ITEM_STATUS_ACTIVE,
+			'status'       => $item_status,
 			'hostid'       => $hostid,
 			'type'         => ITEM_TYPE_TRAPPER,
 			'value_type'   => ITEM_VALUE_TYPE_UINT64,
@@ -1199,7 +1202,7 @@ sub create_slv_item($$$$$)
 		return really(create_item({
 			'name'         => $name,
 			'key_'         => $key,
-			'status'       => ITEM_STATUS_ACTIVE,
+			'status'       => $item_status,
 			'hostid'       => $hostid,
 			'type'         => ITEM_TYPE_TRAPPER,
 			'value_type'   => ITEM_VALUE_TYPE_FLOAT,
@@ -1636,6 +1639,39 @@ sub create_slv_ns_items($$$)
 	}
 }
 
+sub create_rdds_or_rdap_slv_items($$$;$)
+{
+	my $hostid       = shift;
+	my $host_name    = shift;
+	my $service      = shift;
+	my $item_status  = shift;
+
+	$item_status = ITEM_STATUS_ACTIVE unless (defined($item_status));
+
+	pfail("Internal error, invalid service '$service', expected RDDS or RDAP") unless ($service eq "RDDS" || $service eq "RDAP");
+
+	my $service_lc = lc($service);
+
+	create_slv_item("$service availability"         , "rsm.slv.$service_lc.avail"   , $hostid, VALUE_TYPE_AVAIL, [get_application_id(APP_SLV_PARTTEST, $hostid)]);
+	create_slv_item("$service minutes of downtime"  , "rsm.slv.$service_lc.downtime", $hostid, VALUE_TYPE_NUM  , [get_application_id(APP_SLV_CURMON, $hostid)]);
+	create_slv_item("$service weekly unavailability", "rsm.slv.$service_lc.rollweek", $hostid, VALUE_TYPE_PERC , [get_application_id(APP_SLV_ROLLWEEK, $hostid)]);
+
+	create_avail_trigger($service, $host_name);
+	create_dependent_trigger_chain($host_name, $service, \&create_downtime_trigger, $trigger_thresholds);
+	create_dependent_trigger_chain($host_name, $service, \&create_rollweek_trigger, $trigger_thresholds);
+
+	create_slv_item("Number of performed monthly $service queries", "rsm.slv.$service_lc.rtt.performed", $hostid, VALUE_TYPE_NUM , [get_application_id(APP_SLV_CURMON, $hostid)]);
+	create_slv_item("Number of failed monthly $service queries"   , "rsm.slv.$service_lc.rtt.failed"   , $hostid, VALUE_TYPE_NUM , [get_application_id(APP_SLV_CURMON, $hostid)]);
+	create_slv_item("Ratio of failed monthly $service queries"    , "rsm.slv.$service_lc.rtt.pfailed"  , $hostid, VALUE_TYPE_PERC, [get_application_id(APP_SLV_CURMON, $hostid)]);
+
+	create_dependent_trigger_chain($host_name, $service, \&create_ratio_of_failed_tests_trigger, $trigger_thresholds);
+}
+
+sub __is_rdap_standalone()
+{
+	return time() >= $cfg_global_macros->{'{$RSM.RDAP.STANDALONE}'};
+}
+
 sub create_slv_items($$$)
 {
 	my $ns_servers = shift;
@@ -1661,17 +1697,6 @@ sub create_slv_items($$$)
 		create_dependent_trigger_chain($host_name, 'DNSSEC', \&create_rollweek_trigger, $trigger_thresholds);
 	}
 
-	if (opt('rdds43-servers') || opt('rdap-base-url'))
-	{
-		create_slv_item('RDDS availability', 'rsm.slv.rdds.avail', $hostid, VALUE_TYPE_AVAIL, [get_application_id(APP_SLV_PARTTEST, $hostid)]);
-		create_slv_item('RDDS minutes of downtime', 'rsm.slv.rdds.downtime', $hostid, VALUE_TYPE_NUM, [get_application_id(APP_SLV_CURMON, $hostid)]);
-		create_slv_item('RDDS weekly unavailability', 'rsm.slv.rdds.rollweek', $hostid, VALUE_TYPE_PERC, [get_application_id(APP_SLV_ROLLWEEK, $hostid)]);
-
-		create_avail_trigger('RDDS', $host_name);
-		create_dependent_trigger_chain($host_name, 'RDDS', \&create_downtime_trigger, $trigger_thresholds);
-		create_dependent_trigger_chain($host_name, 'RDDS', \&create_rollweek_trigger, $trigger_thresholds);
-	}
-
 	if (opt('epp-servers'))
 	{
 		create_slv_item('EPP availability', 'rsm.slv.epp.avail', $hostid, VALUE_TYPE_AVAIL, [get_application_id(APP_SLV_PARTTEST, $hostid)]);
@@ -1694,11 +1719,20 @@ sub create_slv_items($$$)
 
 	if (opt('rdds43-servers') || opt('rdds80-servers') || opt('rdap-base-url'))
 	{
-		create_slv_item('Number of performed monthly RDDS queries', 'rsm.slv.rdds.rtt.performed', $hostid, VALUE_TYPE_NUM , [get_application_id(APP_SLV_CURMON, $hostid)]);
-		create_slv_item('Number of failed monthly RDDS queries'   , 'rsm.slv.rdds.rtt.failed'   , $hostid, VALUE_TYPE_NUM , [get_application_id(APP_SLV_CURMON, $hostid)]);
-		create_slv_item('Ratio of failed monthly RDDS queries'    , 'rsm.slv.rdds.rtt.pfailed'  , $hostid, VALUE_TYPE_PERC, [get_application_id(APP_SLV_CURMON, $hostid)]);
+		if (!__is_rdap_standalone())
+		{
+			# we haven't switched to RDAP yet, create RDDS items which may also include RDAP check results
+			create_rdds_or_rdap_slv_items($hostid, $host_name, "RDDS");
 
-		create_dependent_trigger_chain($host_name, 'RDDS', \&create_ratio_of_failed_tests_trigger, $trigger_thresholds);
+			# create future RDAP items, it's ok for them to be active
+			create_rdds_or_rdap_slv_items($hostid, $host_name, "RDAP") if (opt('rdap-base-url'));
+		}
+		else
+		{
+			# after the switch, RDDS and RDAP item sets are opt-in
+			create_rdds_or_rdap_slv_items($hostid, $host_name, "RDAP") if (opt('rdap-base-url'));
+			create_rdds_or_rdap_slv_items($hostid, $host_name, "RDDS") if (opt('rdds43-servers') || opt('rdds80-servers'));
+		}
 	}
 }
 
@@ -1858,6 +1892,11 @@ sub create_ratio_of_failed_tests_trigger($$$$$)
 	{
 		$item_key = 'rsm.slv.rdds.rtt.pfailed';
 		$macro = '{$RSM.SLV.RDDS.RTT}';
+	}
+	elsif ($service eq 'RDAP')
+	{
+		$item_key = 'rsm.slv.rdap.rtt.pfailed';
+		$macro = '{$RSM.SLV.RDAP.RTT}';
 	}
 	else
 	{
@@ -2054,10 +2093,10 @@ Required options
 
 Other options
         --delete
-                delete specified TLD or TLD services specifyed by: --dns, --rdds, --epp
+                delete specified TLD or TLD services specified by: --dns, --rdds, --rdap, --epp
                 if none or all services specified - will delete the whole TLD
         --disable
-                disable specified TLD or TLD services specified by: --dns, --rdds, --epp
+                disable specified TLD or TLD services specified by: --dns, --rdds, --rdap, --epp
                 if none or all services specified - will disable the whole TLD
         --list-services
                 list services of each TLD, the output is comma-separated list:
@@ -2069,8 +2108,6 @@ Other options
                 <TLD>,<IP-VERSION>,<NAME-SERVER>,<IP>
         --update-nsservers
                 update all NS + IP pairs for specified TLD.
-        --resolver=IP
-                specify resolver to use when querying Name Servers of a TLD
         --type=STRING
                 Type of TLD. Possible values: @{[TLD_TYPE_G]}, @{[TLD_TYPE_CC]}, @{[TLD_TYPE_OTHER]}, @{[TLD_TYPE_TEST]}.
         --set-type
@@ -2086,10 +2123,8 @@ Other options
                 (default: disabled)
         --ns-servers-v4=STRING
                 list of IPv4 name servers separated by space (name and IP separated by comma): "NAME,IP[ NAME,IP2 ...]"
-                (default: get the list from local resolver or specified with --resolver)
         --ns-servers-v6=STRING
                 list of IPv6 name servers separated by space (name and IP separated by comma): "NAME,IP[ NAME,IP2 ...]"
-                (default: get the list from local resolver or specified with --resolver)
         --rdds43-servers=STRING
                 list of RDDS43 servers separated by comma: "NAME1,NAME2,..."
         --rdds80-servers=STRING
@@ -2138,6 +2173,9 @@ Other options
         --rdds
                 Action with RDDS
                 (default: no)
+        --rdap
+                Action with RDAP
+                (only effective after switch to Standalone RDAP, default: no)
         --help
                 display this message
 EOF

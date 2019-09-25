@@ -107,7 +107,13 @@ use constant RSM_TRIGGER_THRESHOLDS => {
 	'5' => {'threshold' => '100', 'priority' => 5}
 };
 
-use constant CFG_GLOBAL_MACROS => {'{$RSM.DNS.UDP.DELAY}' => '', '{$RSM.DNS.TCP.DELAY}' => '', '{$RSM.RDDS.DELAY}' => '', '{$RSM.EPP.DELAY}' => ''};
+use constant CFG_GLOBAL_MACROS => {
+	'{$RSM.DNS.UDP.DELAY}' => '', 
+	'{$RSM.DNS.TCP.DELAY}' => '', 
+	'{$RSM.RDDS.DELAY}' => '', 
+	'{$RSM.EPP.DELAY}' => '',
+	'{$RSM.RDAP.STANDALONE}' => ''
+};
 
 use constant CFG_PROBE_STATUS_DELAY => 60;
 

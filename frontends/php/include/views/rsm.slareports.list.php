@@ -52,40 +52,7 @@ $table = (new CTableInfo())->setHeader([
 	_('Monthly SLR')
 ]);
 
-// TLD details.
-if ($data['tld']) {
-	$details = [
-		($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR)
-			? [
-				bold(_s('Registrar ID')), ': ', $data['tld']['host'], BR(),
-				bold(_s('Registrar name')), ': ', $data['tld']['info_1'], BR(),
-				bold(_s('Registrar family')), ': ', $data['tld']['info_2']
-			]
-			: [
-				bold(_s('TLD')), ': ', $data['tld']['host']
-			]
-	];
-
-	if (array_key_exists('details', $data)) {
-		$details = array_merge($details, [
-			BR(),
-			bold(_s('Period')),
-			': ',
-			gmdate('Y/m/d H:i:s', $data['details']['from']),
-			' '._('till').' ',
-			gmdate('Y/m/d H:i:s', $data['details']['to']),
-			BR(),
-			bold(_s('Generation time')),
-			': ',
-			gmdate('dS F Y, H:i:s e', $data['details']['generated']),
-			BR(),
-			bold(_('Server')), ': ', new CLink($data['server'], $data['rolling_week_url'])
-		]);
-	}
-
-	$widget->additem((new CDiv())->addItem($details));
-}
-
+// Return disabled "Download XML" button if nothing selected.
 if (!array_key_exists('details', $data)) {
 	return $widget->addItem([
 		$table,
@@ -100,14 +67,24 @@ $date_from = date(DATE_TIME_FORMAT_SECONDS, zbxDateToTime($data['details']['from
 $date_till = date(DATE_TIME_FORMAT_SECONDS, zbxDateToTime($data['details']['to']));
 $date_generated = date(DATE_TIME_FORMAT_SECONDS, zbxDateToTime($data['details']['generated']));
 
+$details = [$object_label => $data['tld']['host']];
+
+if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
+	$details += [
+		_('Registrar name') => $data['tld']['info_1'],
+		_('Registrar family') => $data['tld']['info_2']
+	];
+}
+
+$details += [
+	_('Period') => $date_from . ' - ' . $date_till,
+	_('Generation time') => $date_generated,
+	_('Server') => new CLink($data['server'], $data['rolling_week_url'])
+];
+
 $widget->additem((new CDiv())
 	->addClass(ZBX_STYLE_TABLE_FORMS_CONTAINER)
-	->addItem([
-		bold(_s('Period: %1$s - %2$s', $date_from, $date_till)), BR(),
-		bold(_s('Generation time: %1$s', $date_generated)), BR(),
-		bold(_s('TLD: %1$s', $data['tld']['name'])), BR(),
-		bold(_('Server: ')), new CLink($data['server'], $data['rolling_week_url'])
-	])
+	->addItem(gen_details_item($details))
 );
 
 // DNS Service Availability.
@@ -190,6 +167,32 @@ if (array_key_exists('slv_rdds_downtime', $data) && $data['slv_rdds_downtime'] !
 			)
 		],
 		((100 - $data['slv_rdds_rtt_downtime']) >= (100 - $data['slr_rdds_rtt_downtime'])) ? 'red-bg' : null
+	);
+}
+
+// RDAP Service Availability and Query RTT.
+if (array_key_exists('slv_rdap_downtime', $data) && $data['slv_rdap_downtime'] !== 'disabled'
+		&& $data['slv_rdap_rtt_downtime'] !== 'disabled') {
+	$table->addRow([
+			bold(_('RDAP Service Availability')),
+			'-',
+			'',
+			'',
+			_s('%1$s (minutes of downtime)', $data['slv_rdap_downtime']),
+			_s('<= %1$s min of downtime', $data['slr_rdap_downtime'])
+		],
+		($data['slv_rdap_downtime'] > $data['slr_rdap_downtime']) ? 'red-bg' : null
+	)->addRow([
+			_('RDAP Query RTT'),
+			'-',
+			'',
+			'',
+			_s('%1$s %% (queries <= %2$s ms)', $data['slv_rdap_rtt_downtime'], $data['slr_rdap_rtt_downtime_ms']),
+			_s('<= %1$s ms, for at least %2$s %% of the queries', $data['slr_rdap_rtt_downtime_ms'],
+				$data['slr_rdap_rtt_downtime']
+			)
+		],
+		($data['slv_rdap_rtt_downtime'] < (100 - $data['slr_rdap_rtt_downtime'])) ? 'red-bg' : null
 	);
 }
 

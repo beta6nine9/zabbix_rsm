@@ -44,6 +44,7 @@ $fields = [
 	'filter_dns' =>				[T_ZBX_STR, O_OPT,  null,	null,		null],
 	'filter_dnssec' =>			[T_ZBX_STR, O_OPT,  null,	null,		null],
 	'filter_rdds' =>			[T_ZBX_STR, O_OPT,  null,	null,		null],
+	'filter_rdap' =>			[T_ZBX_STR, O_OPT,  null,	null,		null],
 	'filter_epp' =>				[T_ZBX_STR, O_OPT,  null,	null,		null],
 	'filter_slv' =>				[T_ZBX_STR, O_OPT,  null,	null,		null],
 	'filter_status' =>			[T_ZBX_INT, O_OPT,  null,	null,		null],
@@ -61,16 +62,14 @@ $fields = [
 	'favref' =>					[T_ZBX_STR, O_OPT, P_ACT,  NOT_EMPTY,	'isset({favobj})'],
 	'favstate' =>				[T_ZBX_INT, O_OPT, P_ACT,  NOT_EMPTY,	'isset({favobj})&&("filter"=={favobj})'],
 	// sort and sortorder
-	'sort' =>			[T_ZBX_STR, O_OPT, P_SYS, IN('"host","info_1","info_2","type","server","dns_lastvalue","dnssec_lastvalue","rdds_lastvalue","epp_lastvalue"'),	null],
+	'sort' =>			[T_ZBX_STR, O_OPT, P_SYS, IN('"host","info_1","info_2","type","server","dns_lastvalue","dnssec_lastvalue","rdds_lastvalue","rdap_lastvalue","epp_lastvalue"'),	null],
 	'sortorder' =>		[T_ZBX_STR, O_OPT, P_SYS, IN('"'.ZBX_SORT_DOWN.'","'.ZBX_SORT_UP.'"'),	null]
 ];
 
 check_fields($fields);
 
-if (isset($_REQUEST['favobj'])) {
-	if('filter' == $_REQUEST['favobj']){
-		CProfile::update('web.rsm.rollingweekstatus.filter.state', getRequest('favstate'), PROFILE_TYPE_INT);
-	}
+if (getRequest('favobj') === 'filter') {
+	CProfile::update('web.rsm.rollingweekstatus.filter.state', getRequest('favstate'), PROFILE_TYPE_INT);
 }
 
 if ((PAGE_TYPE_JS == $page['type']) || (PAGE_TYPE_HTML_BLOCK == $page['type'])) {
@@ -88,6 +87,7 @@ if (hasRequest('filter_set')) {
 	CProfile::update('web.rsm.rollingweekstatus.filter_dns', getRequest('filter_dns', 0), PROFILE_TYPE_INT);
 	CProfile::update('web.rsm.rollingweekstatus.filter_dnssec', getRequest('filter_dnssec', 0), PROFILE_TYPE_INT);
 	CProfile::update('web.rsm.rollingweekstatus.filter_rdds', getRequest('filter_rdds', 0), PROFILE_TYPE_INT);
+	CProfile::update('web.rsm.rollingweekstatus.filter_rdap', getRequest('filter_rdap', 0), PROFILE_TYPE_INT);
 	CProfile::update('web.rsm.rollingweekstatus.filter_epp', getRequest('filter_epp', 0), PROFILE_TYPE_INT);
 	CProfile::update('web.rsm.rollingweekstatus.filter_slv', getRequest('filter_slv', 0), PROFILE_TYPE_STR);
 	CProfile::update('web.rsm.rollingweekstatus.filter_status', getRequest('filter_status', 0), PROFILE_TYPE_INT);
@@ -107,6 +107,7 @@ elseif (hasRequest('filter_rst')) {
 	CProfile::delete('web.rsm.rollingweekstatus.filter_dns');
 	CProfile::delete('web.rsm.rollingweekstatus.filter_dnssec');
 	CProfile::delete('web.rsm.rollingweekstatus.filter_rdds');
+	CProfile::delete('web.rsm.rollingweekstatus.filter_rdap');
 	CProfile::delete('web.rsm.rollingweekstatus.filter_epp');
 	CProfile::delete('web.rsm.rollingweekstatus.filter_slv');
 	CProfile::delete('web.rsm.rollingweekstatus.filter_status');
@@ -126,6 +127,7 @@ $data['filter_search'] = CProfile::get('web.rsm.rollingweekstatus.filter_search'
 $data['filter_dns'] = CProfile::get('web.rsm.rollingweekstatus.filter_dns');
 $data['filter_dnssec'] = CProfile::get('web.rsm.rollingweekstatus.filter_dnssec');
 $data['filter_rdds'] = CProfile::get('web.rsm.rollingweekstatus.filter_rdds');
+$data['filter_rdap'] = CProfile::get('web.rsm.rollingweekstatus.filter_rdap');
 $data['filter_epp'] = CProfile::get('web.rsm.rollingweekstatus.filter_epp');
 $data['filter_slv'] = CProfile::get('web.rsm.rollingweekstatus.filter_slv');
 $data['filter_status'] = CProfile::get('web.rsm.rollingweekstatus.filter_status');
@@ -169,11 +171,19 @@ if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
 		$data['filter_registrar_family'] = '';
 	}
 	$data['filter_rdds'] = true;
+	$data['filter_rdap'] = true;
 }
 else {
 	$data['filter_registrar_id'] = '';
 	$data['filter_registrar_name'] = '';
 	$data['filter_registrar_family'] = '';
+}
+
+if (is_RDAP_standalone()) {
+	$data['filter_rdap_subgroup'] = false;
+}
+else {
+	$data['filter_rdap'] = false;
 }
 
 // Get global macros necessary for further calculation.
@@ -222,7 +232,7 @@ $master = $DB;
 $data['tld'] = [];
 
 if ($data['filter_status'] != 0 || $data['filter_slv'] != 0 || $data['filter_dns'] || $data['filter_dnssec']
-		|| $data['filter_rdds'] || $data['filter_epp']) {
+		|| $data['filter_rdds'] || $data['filter_rdap'] || $data['filter_epp']) {
 	$no_history = false;
 }
 else {
@@ -476,6 +486,14 @@ foreach ($tlds_by_server as $key => $hosts) {
 		if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY) {
 			$item_keys[] = RSM_SLV_DNS_ROLLWEEK;
 			$avail_items[] = RSM_SLV_DNS_AVAIL;
+
+			if (is_RDAP_standalone()) {
+				$avail_items[] = RSM_SLV_RDAP_AVAIL;
+			}
+		}
+
+		if (is_RDAP_standalone()) {
+			$item_keys[] = RSM_SLV_RDAP_ROLLWEEK;
 		}
 
 		$items = [];
@@ -532,6 +550,7 @@ foreach ($tlds_by_server as $key => $hosts) {
 						($data['filter_dns'] && $item['key_'] === RSM_SLV_DNS_ROLLWEEK)
 						|| ($data['filter_dnssec'] && $item['key_'] === RSM_SLV_DNSSEC_ROLLWEEK)
 						|| ($data['filter_rdds'] && $item['key_'] === RSM_SLV_RDDS_ROLLWEEK)
+						|| ($data['filter_rdap'] && $item['key_'] === RSM_SLV_RDAP_ROLLWEEK)
 						|| ($data['filter_epp'] && $item['key_'] === RSM_SLV_EPP_ROLLWEEK)
 					) {
 						if ($data['filter_slv'] != SLA_MONITORING_SLV_FILTER_NON_ZERO
@@ -567,6 +586,12 @@ foreach ($tlds_by_server as $key => $hosts) {
 					$data['tld'][$DB['SERVERS'][$key]['NR'].$item['hostid']][RSM_RDDS]['lastvalue'] = $lastvalue;
 					$data['tld'][$DB['SERVERS'][$key]['NR'].$item['hostid']][RSM_RDDS]['trigger'] = false;
 				}
+				elseif ($item['key_'] === RSM_SLV_RDAP_ROLLWEEK) {
+					$data['tld'][$DB['SERVERS'][$key]['NR'].$item['hostid']][RSM_RDAP]['itemid'] = $item['itemid'];
+					$data['tld'][$DB['SERVERS'][$key]['NR'].$item['hostid']]['rdds_lastvalue'] =
+					$data['tld'][$DB['SERVERS'][$key]['NR'].$item['hostid']][RSM_RDAP]['lastvalue'] = $lastvalue;
+					$data['tld'][$DB['SERVERS'][$key]['NR'].$item['hostid']][RSM_RDAP]['trigger'] = false;
+				}
 				elseif ($item['key_'] === RSM_SLV_EPP_ROLLWEEK) {
 					$data['tld'][$DB['SERVERS'][$key]['NR'].$item['hostid']][RSM_EPP]['itemid'] = $item['itemid'];
 					$data['tld'][$DB['SERVERS'][$key]['NR'].$item['hostid']]['epp_lastvalue'] =
@@ -586,6 +611,10 @@ foreach ($tlds_by_server as $key => $hosts) {
 				}
 				elseif ($item['key_'] === RSM_SLV_RDDS_AVAIL) {
 					$data['tld'][$DB['SERVERS'][$key]['NR'].$item['hostid']][RSM_RDDS]['availItemId'] = $item['itemid'];
+					$itemIds[$item['itemid']] = true;
+				}
+				elseif ($item['key_'] === RSM_SLV_RDAP_AVAIL) {
+					$data['tld'][$DB['SERVERS'][$key]['NR'].$item['hostid']][RSM_RDAP]['availItemId'] = $item['itemid'];
 					$itemIds[$item['itemid']] = true;
 				}
 				elseif ($item['key_'] === RSM_SLV_EPP_AVAIL) {
@@ -626,44 +655,85 @@ foreach ($tlds_by_server as $key => $hosts) {
 					$templateName[$template['host']] = $template['templateid'];
 				}
 
+				$template_macros = [RSM_TLD_DNSSEC_ENABLED, RSM_TLD_EPP_ENABLED, RSM_TLD_RDDS43_ENABLED,
+					RSM_TLD_RDDS80_ENABLED, RSM_RDAP_TLD_ENABLED, RSM_TLD_RDDS_ENABLED];
+
+				if (is_RDAP_standalone()) {
+					$template_macros[] = RSM_RDAP_TLD_ENABLED;
+				}
+
 				$templateMacros = API::UserMacro()->get([
 					'output' => API_OUTPUT_EXTEND,
 					'hostids' => $templateIds,
 					'filter' => [
-						'macro' => [RSM_TLD_DNSSEC_ENABLED, RSM_TLD_EPP_ENABLED, RSM_TLD_RDDS43_ENABLED,
-							RSM_TLD_RDDS80_ENABLED, RSM_RDAP_TLD_ENABLED, RSM_TLD_RDDS_ENABLED
-						]
+						'macro' => $template_macros
 					]
 				]);
 
 				// Holds hostids with at least one disabled item detected.
 				$hosts_with_disabled_items = [];
 
-				foreach ($templateMacros as $templateMacro) {
-					$current_hostid = $hostIdByTemplateName[$templates[$templateMacro['hostid']]['host']];
-					if ($templateMacro['macro'] === RSM_TLD_DNSSEC_ENABLED || $templateMacro['macro'] === RSM_TLD_EPP_ENABLED) {
-						if ($templateMacro['value'] == 0) {
-							if ($templateMacro['macro'] === RSM_TLD_DNSSEC_ENABLED) {
-								$service_type = RSM_DNSSEC;
-							}
-							else {
-								$service_type = RSM_EPP;
-							}
+				if (is_RDAP_standalone()) {
+					foreach ($templateMacros as $template_macro) {
+						$current_hostid = $hostIdByTemplateName[$templates[$template_macro['hostid']]['host']];
 
-							// Unset disabled services
-							if (isset($data['tld'][$DB['SERVERS'][$key]['NR'].$current_hostid][$service_type])) {
-								$hosts_with_disabled_items[$current_hostid] = true;
-
-								if (array_key_exists('availItemId', $data['tld'][$DB['SERVERS'][$key]['NR'].$current_hostid][$service_type])) {
-									unset($itemIds[$data['tld'][$DB['SERVERS'][$key]['NR'].$current_hostid][$service_type]['availItemId']]);
+						if (in_array($template_macro['macro'], [RSM_TLD_DNSSEC_ENABLED, RSM_TLD_EPP_ENABLED, RSM_RDAP_TLD_ENABLED])) {
+							if ($template_macro['value'] == 0) {
+								if ($template_macro['macro'] === RSM_TLD_DNSSEC_ENABLED) {
+									$service_type = RSM_DNSSEC;
 								}
-								unset($data['tld'][$DB['SERVERS'][$key]['NR'].$current_hostid][$service_type]);
+								elseif ($template_macro['macro'] === RSM_RDAP_TLD_ENABLED) {
+									$service_type = RSM_RDAP;
+								}
+								else {
+									$service_type = RSM_EPP;
+								}
+
+								// Unset disabled services.
+								if (isset($data['tld'][$DB['SERVERS'][$key]['NR'].$current_hostid][$service_type])) {
+									$hosts_with_disabled_items[$current_hostid] = true;
+
+									if (array_key_exists('availItemId', $data['tld'][$DB['SERVERS'][$key]['NR'].$current_hostid][$service_type])) {
+										unset($itemIds[$data['tld'][$DB['SERVERS'][$key]['NR'].$current_hostid][$service_type]['availItemId']]);
+									}
+									unset($data['tld'][$DB['SERVERS'][$key]['NR'].$current_hostid][$service_type]);
+								}
+							}
+						}
+						else {
+							if (array_key_exists(RSM_RDDS, $data['tld'][$DB['SERVERS'][$key]['NR'].$current_hostid])) {
+								$data['tld'][$DB['SERVERS'][$key]['NR'].$current_hostid][RSM_RDDS]['subservices'][$template_macro['macro']] = $template_macro['value'];
 							}
 						}
 					}
-					else {
-						if (array_key_exists(RSM_RDDS, $data['tld'][$DB['SERVERS'][$key]['NR'].$current_hostid])) {
-							$data['tld'][$DB['SERVERS'][$key]['NR'].$current_hostid][RSM_RDDS]['subservices'][$templateMacro['macro']] = $templateMacro['value'];
+				}
+				else {
+					foreach ($templateMacros as $templateMacro) {
+						$current_hostid = $hostIdByTemplateName[$templates[$templateMacro['hostid']]['host']];
+						if ($templateMacro['macro'] === RSM_TLD_DNSSEC_ENABLED || $templateMacro['macro'] === RSM_TLD_EPP_ENABLED) {
+							if ($templateMacro['value'] == 0) {
+								if ($templateMacro['macro'] === RSM_TLD_DNSSEC_ENABLED) {
+									$service_type = RSM_DNSSEC;
+								}
+								else {
+									$service_type = RSM_EPP;
+								}
+
+								// Unset disabled services
+								if (isset($data['tld'][$DB['SERVERS'][$key]['NR'].$current_hostid][$service_type])) {
+									$hosts_with_disabled_items[$current_hostid] = true;
+
+									if (array_key_exists('availItemId', $data['tld'][$DB['SERVERS'][$key]['NR'].$current_hostid][$service_type])) {
+										unset($itemIds[$data['tld'][$DB['SERVERS'][$key]['NR'].$current_hostid][$service_type]['availItemId']]);
+									}
+									unset($data['tld'][$DB['SERVERS'][$key]['NR'].$current_hostid][$service_type]);
+								}
+							}
+						}
+						else {
+							if (array_key_exists(RSM_RDDS, $data['tld'][$DB['SERVERS'][$key]['NR'].$current_hostid])) {
+								$data['tld'][$DB['SERVERS'][$key]['NR'].$current_hostid][RSM_RDDS]['subservices'][$templateMacro['macro']] = $templateMacro['value'];
+							}
 						}
 					}
 				}
@@ -671,6 +741,7 @@ foreach ($tlds_by_server as $key => $hosts) {
 				foreach ($hosts as $hostid => $host) {
 					$tld_key = $DB['SERVERS'][$key]['NR'].$hostid;
 					$tld = $data['tld'][$tld_key];
+
 					if (array_key_exists(RSM_RDDS, $tld)) {
 						if (!array_key_exists('subservices', $tld[RSM_RDDS]) || !array_sum($tld[RSM_RDDS]['subservices'])) {
 							unset($itemIds[$tld[RSM_RDDS]['availItemId']]);
@@ -732,6 +803,17 @@ foreach ($tlds_by_server as $key => $hosts) {
 							}
 						}
 
+						if (!$available && $data['filter_rdap'] && array_key_exists(RSM_RDAP, $host)) {
+							if ($data['filter_slv'] != SLA_MONITORING_SLV_FILTER_NON_ZERO
+									&& $host[RSM_RDAP]['lastvalue'] >= $data['filter_slv']) {
+								$available = true;
+							}
+							elseif ($data['filter_slv'] == SLA_MONITORING_SLV_FILTER_NON_ZERO
+									&& $host[RSM_RDAP]['lastvalue'] != 0) {
+								$available = true;
+							}
+						}
+
 						if (!$available && $data['filter_epp'] && array_key_exists(RSM_EPP, $host)) {
 							if ($data['filter_slv'] != SLA_MONITORING_SLV_FILTER_NON_ZERO
 									&& $host[RSM_EPP]['lastvalue'] >= $data['filter_slv']) {
@@ -786,6 +868,12 @@ foreach ($tlds_by_server as $key => $hosts) {
 									$data['tld'][$DB['SERVERS'][$key]['NR'].$items[$trItem]['hostid']][RSM_RDDS]['trigger'] = true;
 								}
 								break;
+							case RSM_SLV_RDAP_AVAIL:
+								$data['tld'][$DB['SERVERS'][$key]['NR'].$items[$trItem]['hostid']][RSM_RDAP]['incident'] = $trigger['triggerid'];
+								if ($data['tld'][$DB['SERVERS'][$key]['NR'].$items[$trItem]['hostid']][RSM_RDAP]['incident']) {
+									$data['tld'][$DB['SERVERS'][$key]['NR'].$items[$trItem]['hostid']][RSM_RDAP]['trigger'] = true;
+								}
+								break;
 							case RSM_SLV_EPP_AVAIL:
 								$data['tld'][$DB['SERVERS'][$key]['NR'].$items[$trItem]['hostid']][RSM_EPP]['incident'] = $trigger['triggerid'];
 								if ($data['tld'][$DB['SERVERS'][$key]['NR'].$items[$trItem]['hostid']][RSM_EPP]['incident']) {
@@ -806,6 +894,7 @@ if ($data['filter_status']) {
 			if ((!$data['filter_dns'] || (!array_key_exists(RSM_DNS, $tld) || !$tld[RSM_DNS]['trigger']))
 					&& (!$data['filter_dnssec'] || (!array_key_exists(RSM_DNSSEC, $tld) || !$tld[RSM_DNSSEC]['trigger']))
 					&& (!$data['filter_rdds'] || (!array_key_exists(RSM_RDDS, $tld) || !$tld[RSM_RDDS]['trigger']))
+					&& (!$data['filter_rdap'] || (!array_key_exists(RSM_RDAP, $tld) || !$tld[RSM_RDAP]['trigger']))
 					&& (!$data['filter_epp'] || (!array_key_exists(RSM_EPP, $tld) || !$tld[RSM_EPP]['trigger']))) {
 				unset($data['tld'][$key]);
 			}
@@ -865,6 +954,13 @@ foreach ($tlds_by_server as $key => $hosts) {
 					&& array_key_exists('incident', $data['tld'][$tld_key][RSM_RDDS])) {
 				$data['tld'][$tld_key][RSM_RDDS]['incident'] = getLastEvent($data['tld'][$tld_key][RSM_RDDS]['incident']);
 				if ($data['tld'][$tld_key][RSM_RDDS]['incident']) {
+					$false_positive = false;
+				}
+			}
+			if (array_key_exists(RSM_RDAP, $data['tld'][$tld_key])
+					&& array_key_exists('incident', $data['tld'][$tld_key][RSM_RDAP])) {
+				$data['tld'][$tld_key][RSM_RDAP]['incident'] = getLastEvent($data['tld'][$tld_key][RSM_RDAP]['incident']);
+				if ($data['tld'][$tld_key][RSM_RDAP]['incident']) {
 					$false_positive = false;
 				}
 			}

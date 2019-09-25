@@ -22,10 +22,10 @@
 define('ZABBIX_VERSION',		'3.0.10');
 define('ZABBIX_API_VERSION',	'3.0.10');
 define('ZABBIX_EXPORT_VERSION',	'3.0');
-define('ZABBIX_DB_VERSION',		3000320);
+define('ZABBIX_DB_VERSION',		3000403);
 
 define('ZABBIX_COPYRIGHT_FROM',	'2001');
-define('ZABBIX_COPYRIGHT_TO',	'2017');
+define('ZABBIX_COPYRIGHT_TO',	'2019');
 
 define('ZBX_LOGIN_ATTEMPTS',	5);
 define('ZBX_LOGIN_BLOCK',		30); // sec
@@ -1280,6 +1280,7 @@ define('RSM_DNS',			0);
 define('RSM_DNSSEC',		1);
 define('RSM_RDDS',			2);
 define('RSM_EPP',			3);
+define('RSM_RDAP',			4); // Standalone RDAP
 
 // SLA monitoring macros
 define('RSM_SLV_MACRO_EPP_AVAIL',	'{$RSM.SLV.EPP.AVAIL}');
@@ -1289,13 +1290,13 @@ define('RSM_MIN_DNS_COUNT',			'{$RSM.DNS.AVAIL.MINNS}');
 define('RSM_DNS_UDP_DELAY',			'{$RSM.DNS.UDP.DELAY}');
 define('RSM_RDDS_DELAY',			'{$RSM.RDDS.DELAY}');
 define('RSM_RDDS_ENABLED',			'{$RSM.RDDS.ENABLED}');
+define('RSM_RDAP_ENABLED',			'{$RSM.RDAP.ENABLED}');
 define('RSM_TLD_DNSSEC_ENABLED',	'{$RSM.TLD.DNSSEC.ENABLED}');
 define('RSM_TLD_EPP_ENABLED',		'{$RSM.TLD.EPP.ENABLED}');
 define('RSM_TLD_RDDS_ENABLED',		'{$RSM.TLD.RDDS.ENABLED}');
 define('RSM_TLD_RDDS43_ENABLED',	'{$RSM.TLD.RDDS43.ENABLED}');
 define('RSM_TLD_RDDS80_ENABLED',	'{$RSM.TLD.RDDS80.ENABLED}');
 define('RSM_RDAP_TLD_ENABLED',		'{$RDAP.TLD.ENABLED}');
-define('RSM_TLD_RDAP_ENABLED',		'{$RSM.TLD.RDAP.ENABLED}');
 define('RSM_SLV_DNS_NS_UPD',		'{$RSM.SLV.DNS.NS.UPD}');
 define('RSM_DNS_UPDATE_TIME',		'{$RSM.DNS.UPDATE.TIME}');
 define('RSM_SLV_EPP_LOGIN',			'{$RSM.SLV.EPP.LOGIN}');
@@ -1312,6 +1313,7 @@ define('RDAP_ENABLED',				'rdap.enabled');
 define('RSM_SLV_DNS_ROLLWEEK',		'rsm.slv.dns.rollweek');
 define('RSM_SLV_DNSSEC_ROLLWEEK',	'rsm.slv.dnssec.rollweek');
 define('RSM_SLV_RDDS_ROLLWEEK',		'rsm.slv.rdds.rollweek');
+define('RSM_SLV_RDAP_ROLLWEEK',		'rsm.slv.rdap.rollweek');
 define('RSM_SLV_EPP_ROLLWEEK',		'rsm.slv.epp.rollweek');
 
 // SLA monitoring availability items keys
@@ -1341,8 +1343,12 @@ define('RSM_SLV_EPP_RTT_UPDATE_PFAILED',	'rsm.slv.epp.rtt.update.pfailed');
 define('RSM_SLV_EPP_RTT_UPDATE_FAILED',		'rsm.slv.epp.rtt.update.failed');
 define('RSM_SLV_EPP_RTT_UPDATE_MAX',		'rsm.slv.epp.rtt.update.max');
 define('RSM_SLV_RDDS_AVAIL',				'rsm.slv.rdds.avail');
+define('RSM_SLV_RDAP_AVAIL',				'rsm.slv.rdap.avail');
 define('RSM_SLV_EPP_AVAIL',					'rsm.slv.epp.avail');
 define('RSM_SLV_DNSSEC_AVAIL',				'rsm.slv.dnssec.avail');
+
+// RDAP standalone.
+define('RSM_RDAP_STANDALONE', '{$RSM.RDAP.STANDALONE}');
 
 // "RSM Service Availability" value mapping:
 define('DOWN',	0);	// Down
@@ -1398,9 +1404,11 @@ define('ZBX_EC_DNS_UDP_DNSKEY_NONE',	-428);
 define('CALCULATED_ITEM_DNS_FAIL',				'rsm.configvalue[RSM.INCIDENT.DNS.FAIL]');
 define('CALCULATED_ITEM_DNSSEC_FAIL',			'rsm.configvalue[RSM.INCIDENT.DNSSEC.FAIL]');
 define('CALCULATED_ITEM_RDDS_FAIL',				'rsm.configvalue[RSM.INCIDENT.RDDS.FAIL]');
+define('CALCULATED_ITEM_RDAP_FAIL',				'rsm.configvalue[RSM.INCIDENT.RDAP.FAIL]');
 define('CALCULATED_ITEM_EPP_FAIL',				'rsm.configvalue[RSM.INCIDENT.EPP.FAIL]');
 define('CALCULATED_ITEM_DNS_DELAY',				'rsm.configvalue[RSM.DNS.UDP.DELAY]');
 define('CALCULATED_ITEM_RDDS_DELAY',			'rsm.configvalue[RSM.RDDS.DELAY]');
+define('CALCULATED_ITEM_RDAP_DELAY',			'rsm.configvalue[RSM.RDAP.DELAY]');
 define('CALCULATED_ITEM_EPP_DELAY',				'rsm.configvalue[RSM.EPP.DELAY]');
 define('CALCULATED_ITEM_DNS_AVAIL_MINNS',		'rsm.configvalue[RSM.DNS.AVAIL.MINNS]');
 define('CALCULATED_ITEM_DNS_UDP_RTT_HIGH',		'rsm.configvalue[RSM.DNS.UDP.RTT.HIGH]');
@@ -1416,6 +1424,7 @@ define('CALCULATED_ITEM_SLV_EPP_LOGIN',			'rsm.configvalue[RSM.SLV.EPP.LOGIN]');
 define('CALCULATED_ITEM_EPP_UPDATE',			'rsm.configvalue[RSM.SLV.EPP.UPDATE]');
 define('CALCULATED_DNS_ROLLWEEK_SLA',			'rsm.configvalue[RSM.DNS.ROLLWEEK.SLA]');
 define('CALCULATED_RDDS_ROLLWEEK_SLA',			'rsm.configvalue[RSM.RDDS.ROLLWEEK.SLA]');
+define('CALCULATED_RDAP_ROLLWEEK_SLA',			'rsm.configvalue[RSM.RDAP.ROLLWEEK.SLA]');
 define('CALCULATED_EPP_ROLLWEEK_SLA',			'rsm.configvalue[RSM.EPP.ROLLWEEK.SLA]');
 
 // Number of test cycles to show before and after incident recovery event.

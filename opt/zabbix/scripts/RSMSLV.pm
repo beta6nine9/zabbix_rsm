@@ -58,6 +58,7 @@ use constant PROBE_KEY_AUTOMATIC => 'rsm.probe.status[automatic,%]'; # match all
 use constant RSM_CONFIG_DNS_UDP_DELAY_ITEMID => 100008;	# rsm.configvalue[RSM.DNS.UDP.DELAY]
 use constant RSM_CONFIG_RDDS_DELAY_ITEMID => 100009;	# rsm.configvalue[RSM.RDDS.DELAY]
 use constant RSM_CONFIG_EPP_DELAY_ITEMID => 100010;	# rsm.configvalue[RSM.EPP.DELAY]
+use constant RSM_CONFIG_RDAP_DELAY_ITEMID => 100034;	# rsm.configvalue[RSM.RDAP.DELAY]
 
 # In order to do the calculation we should wait till all the results
 # are available on the server (from proxies). We shift back 2 minutes
@@ -72,9 +73,6 @@ use constant ROLLWEEK_SHIFT_BACK	=> 180;	# seconds (must be divisible by 60) bac
 use constant PROBE_ONLINE_STR => 'Online';
 
 use constant DETAILED_RESULT_DELIM => ', ';
-
-use constant DEFAULT_SLV_MAX_CYCLES => 10;	# maximum cycles to process by SLV scripts in 1 run, may be overriden
-						# by rsm.conf 'max_cycles_dns' and 'max_cycles_rdds'
 
 use constant USE_CACHE_FALSE => 0;
 use constant USE_CACHE_TRUE  => 1;
@@ -92,16 +90,36 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		PROBE_KEY_MANUAL
 		ONLINE OFFLINE
 		USE_CACHE_FALSE USE_CACHE_TRUE
-		get_macro_minns get_macro_dns_probe_online get_macro_rdds_probe_online get_macro_dns_rollweek_sla
-		get_macro_rdds_rollweek_sla get_macro_dns_udp_rtt_high get_macro_dns_udp_rtt_low
-		get_macro_dns_tcp_rtt_low get_macro_rdds_rtt_low get_dns_udp_delay get_dns_tcp_delay
-		get_rdds_delay get_epp_delay get_macro_epp_probe_online get_macro_epp_rollweek_sla
-		get_macro_dns_update_time get_macro_rdds_update_time get_tld_items get_hostid
+		get_macro_minns
+		get_macro_dns_probe_online
+		get_macro_rdds_probe_online
+		get_macro_rdap_probe_online
+		get_macro_dns_rollweek_sla
+		get_macro_rdds_rollweek_sla
+		get_macro_rdap_rollweek_sla
+		get_macro_dns_udp_rtt_high
+		get_macro_dns_udp_rtt_low
+		get_macro_dns_tcp_rtt_low
+		get_macro_rdds_rtt_low
+		get_macro_rdap_rtt_low
+		get_dns_udp_delay
+		get_dns_tcp_delay
+		get_rdds_delay
+		get_rdap_delay
+		get_epp_delay
+		get_macro_epp_probe_online
+		get_macro_epp_rollweek_sla
+		get_macro_dns_update_time
+		get_macro_rdds_update_time
+		get_tld_items
+		get_hostid
 		get_rtt_low
 		get_macro_epp_rtt_low get_macro_probe_avail_limit
 		get_macro_incident_dns_fail get_macro_incident_dns_recover
 		get_macro_incident_rdds_fail get_macro_incident_rdds_recover
+		get_macro_incident_rdap_fail get_macro_incident_rdap_recover
 		get_monitoring_target
+		get_rdap_standalone_ts is_rdap_standalone
 		get_itemid_by_key get_itemid_by_host
 		get_itemid_by_hostid get_itemid_like_by_hostid get_itemids_by_host_and_keypart get_lastclock
 		get_tlds get_tlds_and_hostids
@@ -165,6 +183,7 @@ my $total_sql_duration = 0.0;
 my $log_open = 0;
 
 my $monitoring_target; # see get_monitoring_target()
+my $rdap_standalone_ts; # see get_rdap_standalone_ts()
 
 sub get_macro_minns
 {
@@ -181,6 +200,11 @@ sub get_macro_rdds_probe_online
 	return __get_macro('{$RSM.RDDS.PROBE.ONLINE}');
 }
 
+sub get_macro_rdap_probe_online
+{
+	return __get_macro('{$RSM.RDAP.PROBE.ONLINE}');
+}
+
 sub get_macro_dns_rollweek_sla
 {
 	return __get_macro('{$RSM.DNS.ROLLWEEK.SLA}');
@@ -189,6 +213,11 @@ sub get_macro_dns_rollweek_sla
 sub get_macro_rdds_rollweek_sla
 {
 	return __get_macro('{$RSM.RDDS.ROLLWEEK.SLA}');
+}
+
+sub get_macro_rdap_rollweek_sla
+{
+	return __get_macro('{$RSM.RDAP.ROLLWEEK.SLA}');
 }
 
 sub get_macro_dns_udp_rtt_high
@@ -209,6 +238,11 @@ sub get_macro_dns_tcp_rtt_low
 sub get_macro_rdds_rtt_low
 {
 	return __get_macro('{$RSM.RDDS.RTT.LOW}');
+}
+
+sub get_macro_rdap_rtt_low
+{
+	return __get_macro('{$RSM.RDAP.RTT.LOW}');
 }
 
 sub get_dns_udp_delay
@@ -241,9 +275,16 @@ sub get_rdds_delay
 
 	my $value = __get_configvalue(RSM_CONFIG_RDDS_DELAY_ITEMID, $value_time);
 
-	return $value if (defined($value));
+	return $value // __get_macro('{$RSM.RDDS.DELAY}');
+}
 
-	return __get_macro('{$RSM.RDDS.DELAY}');
+sub get_rdap_delay
+{
+	my $value_time = (shift or time() - AVAIL_SHIFT_BACK);
+
+	my $value = __get_configvalue(RSM_CONFIG_RDAP_DELAY_ITEMID, $value_time);
+
+	return $value // __get_macro('{$RSM.RDAP.DELAY}');
 }
 
 sub get_epp_delay
@@ -252,9 +293,7 @@ sub get_epp_delay
 
 	my $value = __get_configvalue(RSM_CONFIG_EPP_DELAY_ITEMID, $value_time);
 
-	return $value if (defined($value));
-
-	return __get_macro('{$RSM.EPP.DELAY}');
+	return $value // __get_macro('{$RSM.EPP.DELAY}');
 }
 
 sub get_macro_dns_update_time
@@ -308,13 +347,18 @@ sub get_rtt_low
 		return get_macro_rdds_rtt_low();
 	}
 
+	if ($service eq 'rdap')
+	{
+		return get_macro_rdap_rtt_low();
+	}
+
 	if ($service eq 'epp')
 	{
 		return get_macro_epp_rtt_low($command);	# can be per TLD
 	}
 
-	fail("dimir was wrong, thinking the only known services are \"dns\", \"dnssec\", \"rdds\" and \"epp\",",
-		" there is also \"$service\"");
+	fail("dimir was wrong, thinking the only known services are \"dns\", \"dnssec\", \"rdds\", \"rdap\" ",
+		"and \"epp\", there is also \"$service\"");
 }
 
 sub get_slv_rtt($;$)
@@ -370,6 +414,16 @@ sub get_macro_incident_rdds_recover()
 	return __get_macro('{$RSM.INCIDENT.RDDS.RECOVER}');
 }
 
+sub get_macro_incident_rdap_fail()
+{
+	return __get_macro('{$RSM.INCIDENT.RDAP.FAIL}');
+}
+
+sub get_macro_incident_rdap_recover()
+{
+	return __get_macro('{$RSM.INCIDENT.RDAP.RECOVER}');
+}
+
 sub get_monitoring_target()
 {
 	if (!defined($monitoring_target))
@@ -383,6 +437,28 @@ sub get_monitoring_target()
 	}
 
 	return $monitoring_target;
+}
+
+# Returns timestamp, when treating RDAP as a standalone service has to be started, or undef
+sub get_rdap_standalone_ts()
+{
+	if (!defined($rdap_standalone_ts))
+	{
+		# NB! Don't store undef as cached value!
+		$rdap_standalone_ts = __get_macro('{$RSM.RDAP.STANDALONE}');
+	}
+
+	return $rdap_standalone_ts ? int($rdap_standalone_ts) : undef;
+}
+
+# Returns 1, if RDAP has to be treated as a standalone service, 0 otherwise
+sub is_rdap_standalone(;$)
+{
+	my $now = shift // time();
+
+	my $ts = get_rdap_standalone_ts();
+
+	return defined($ts) && $now >= $ts ? 1 : 0;
 }
 
 sub get_itemid_by_key
@@ -401,12 +477,12 @@ sub get_itemid_by_host
 		"select i.itemid".
 		" from items i,hosts h".
 		" where i.hostid=h.hostid".
-	    		" and h.host='$host'".
+			" and h.host='$host'".
 			" and i.key_='$key'"
 	);
 
-	fail("item \"$key\" does not exist") if ($itemid == E_ID_NONEXIST);
-	fail("more than one item \"$key\" found") if ($itemid == E_ID_MULTIPLE);
+	fail("item \"$key\" does not exist for \"$host\"") if ($itemid == E_ID_NONEXIST);
+	fail("more than one item \"$key\" found for \"$host\"") if ($itemid == E_ID_MULTIPLE);
 
 	return $itemid;
 }
@@ -454,7 +530,7 @@ sub get_itemids_by_host_and_keypart
 		"select i.itemid,i.key_".
 		" from items i,hosts h".
 		" where i.hostid=h.hostid".
-	    		" and h.host='$host'".
+			" and h.host='$host'".
 			" and i.key_ like '$key_part%'");
 
 	fail("cannot find items ($key_part%) at host ($host)") if (scalar(@$rows_ref) == 0);
@@ -632,13 +708,13 @@ my %probes_cache = ();
 # Returns a reference to hash of all probes (host => {'hostid' => hostid, 'status' => status}).
 sub get_probes(;$$)
 {
-	my $service = shift; # "IP4", "IP6", "RDDS" or any other
+	my $service = shift; # "IP4", "IP6", "RDDS", "RDAP" or any other
 	my $name = shift;
 
 	$service = defined($service) ? uc($service) : "ALL";
 	$name //= "";
 
-	if ($service ne "IP4" && $service ne "IP6" && $service ne "RDDS")
+	if ($service ne "IP4" && $service ne "IP6" && $service ne "RDDS" && $service ne "RDAP")
 	{
 		$service = "ALL";
 	}
@@ -665,13 +741,14 @@ sub __get_probes($)
 			" left join hostmacro on hostmacro.hostid=hosts_templates_2.templateid" .
 		" where $name_condition" .
 			" hosts_groups.groupid=" . PROBES_GROUPID . " and" .
-			" hostmacro.macro in ('{\$RSM.IP4.ENABLED}','{\$RSM.IP6.ENABLED}','{\$RSM.RDDS.ENABLED}')");
+			" hostmacro.macro in ('{\$RSM.IP4.ENABLED}','{\$RSM.IP6.ENABLED}','{\$RSM.RDDS.ENABLED}','{\$RSM.RDAP.ENABLED}')");
 
 	my %result = (
 		'ALL'  => {},
 		'IP4'  => {},
 		'IP6'  => {},
-		'RDDS' => {}
+		'RDDS' => {},
+		'RDAP' => {},
 	);
 
 	foreach my $row (@{$rows})
@@ -695,6 +772,10 @@ sub __get_probes($)
 		{
 			$result{'RDDS'}{$host} = {'hostid' => $hostid, 'status' => $status} if ($value);
 		}
+		elsif ($macro eq '{$RSM.RDAP.ENABLED}')
+		{
+			$result{'RDAP'}{$host} = {'hostid' => $hostid, 'status' => $status} if ($value);
+		}
 	}
 
 	if (opt("debug"))
@@ -703,6 +784,7 @@ sub __get_probes($)
 		dbg("number of probes with IP4 support  - " . scalar(keys(%{$result{'IP4'}})));
 		dbg("number of probes with IP6 support  - " . scalar(keys(%{$result{'IP6'}})));
 		dbg("number of probes with RDDS support - " . scalar(keys(%{$result{'RDDS'}})));
+		dbg("number of probes with RDAP support - " . scalar(keys(%{$result{'RDAP'}})));
 	}
 
 	return \%result;
@@ -904,14 +986,14 @@ sub validate_service($)
 
 	if (get_monitoring_target() eq MONITORING_TARGET_REGISTRY)
 	{
-		if (!grep {/$service/} ('dns', 'dnssec', 'rdds', 'epp'))
+		if (!grep {/$service/} ('dns', 'dnssec', 'rdds', 'rdap', 'epp'))
 		{
 			fail("service \"$service\" is unknown");
 		}
 	}
 	elsif (get_monitoring_target() eq MONITORING_TARGET_REGISTRAR)
 	{
-		if (!grep {/$service/} ('rdds'))
+		if (!grep {/$service/} ('rdds', 'rdap'))
 		{
 			fail("service \"$service\" is unknown");
 		}
@@ -946,8 +1028,8 @@ sub __tld_service_enabled($$$)
 
 	if ($service eq 'rdds')
 	{
-		return 1 if tld_interface_enabled($tld, 'rdds43', $now);
-		return 1 if tld_interface_enabled($tld, 'rdap', $now);
+		return 1 if (tld_interface_enabled($tld, 'rdds43', $now));
+		return 1 if (tld_interface_enabled($tld, 'rdap', $now) && !is_rdap_standalone($now));
 		return 0;
 	}
 	else
@@ -1105,7 +1187,18 @@ sub tld_interface_enabled($$$)
 		tld_interface_enabled_create_cache($interface);
 	}
 
-	if (defined($enabled_items_cache{$item_key}{$tld}))
+	if (!defined($enabled_items_cache{$item_key}{$tld}))
+	{
+		# do nothing, no .enabled items in cache for this TLD
+	}
+	elsif (scalar(@{$enabled_items_cache{$item_key}{$tld}}) == 0)
+	{
+		# List of .enabled items for this TLD defined but is empty because
+		# tld_interface_enabled_create_cache() didn't find items. This is probably
+		# misconfiguration.
+		wrn("no items with '$item_key' for host '$tld'");
+	}
+	else
 	{
 		# find the latest value but make sure to specify time bounds, relatively to $now
 
@@ -1121,14 +1214,13 @@ sub tld_interface_enabled($$$)
 		);
 
 		my $condition_index = 0;
+		my $itemids_placeholder = join(",", ("?") x scalar(@{$enabled_items_cache{$item_key}{$tld}}));
 
 		while ($condition_index < scalar(@conditions))
 		{
 			my $from = $conditions[$condition_index]->[0];
 			my $till = $conditions[$condition_index]->[1];
 			my $clock = $conditions[$condition_index]->[2];
-
-			my $itemids_placeholder = join(",", ("?") x scalar(@{$enabled_items_cache{$item_key}{$tld}}));
 
 			my $rows_ref = db_select(
 				"select value" .
@@ -1818,22 +1910,23 @@ sub slv_max_cycles($)
 {
 	my $service = shift;
 
-	my $var;
-
-	if ($service eq 'dns' || $service eq 'dnssec')
+	if ($service ne 'dns' && $service ne 'dnssec' && $service ne 'rdap' && $service ne 'rdds')
 	{
-		$var = 'max_cycles_dns';
-	}
-	elsif ($service eq 'rdds')
-	{
-		$var = 'max_cycles_rdds';
-	}
-	else
-	{
-		return DEFAULT_SLV_MAX_CYCLES;
+		fail("unhandled service: '$service'");
 	}
 
-	return (defined($config) && defined($config->{'slv'}->{$var}) ? $config->{'slv'}->{$var} : DEFAULT_SLV_MAX_CYCLES);
+	my $var = 'max_cycles_' . $service;
+
+	if (!defined($config))
+	{
+		fail("missing config");
+	}
+	if (!defined($config->{'slv'}{$var}))
+	{
+		fail("missing config option: '$var'");
+	}
+
+	return $config->{'slv'}->{$var};
 }
 
 sub __print_probe_times
@@ -2285,6 +2378,10 @@ sub get_templated_items_like
 	my $tld = shift;
 	my $key_in = shift;
 
+	# TODO: this function could benefit from some caching because it's called
+	# on every cycle during rsm.slv*.pl calculation even though list of items
+	# is not likely to change
+
 	my $hostid = get_hostid("Template $tld");
 
 	my $items_ref = db_select(
@@ -2398,18 +2495,18 @@ sub process_slv_avail_cycles($$$$$$$$$)
 
 			if (!defined($keys_in{$tld}))
 			{
-				if (defined($cfg_keys_in))
-				{
-					$keys_in{$tld} = $cfg_keys_in;
-				}
-				else
-				{
-					$keys_in{$tld} = $cfg_keys_in_cb->($tld);
-				}
+				$keys_in{$tld} = $cfg_keys_in // $cfg_keys_in_cb->($tld);
 
 				if (!defined($keys_in{$tld}))
 				{
-					fail("cannot get input keys for Service availability calculation");
+					# fail("cannot get input keys for Service availability calculation");
+
+					# We used to fail here but not anymore because rsm.rdds items can be 
+					# disabled after switch to RDAP standalone. So some of TLDs may not have
+					# RDDS checks thus making SLV calculations for rsm.slv.rdds.* useless
+
+					wrn("no input keys for $tld, skipping");
+					next;
 				}
 			}
 
@@ -4067,16 +4164,23 @@ sub get_slv_rtt_monthly_items($$$$)
 	return \%slv_items_by_tld;
 }
 
-sub update_slv_rtt_monthly_stats($$$$$$$$)
+sub update_slv_rtt_monthly_stats($$$$$$$$;$)
 {
-	my $now                    = shift;
-	my $max_cycles             = shift;
-	my $single_tld             = shift; # undef or name of TLD
-	my $slv_item_key_performed = shift;
-	my $slv_item_key_failed    = shift;
-	my $slv_item_key_pfailed   = shift;
-	my $cycle_delay            = shift;
-	my $rtt_params_list        = shift;
+	my $now                         = shift;
+	my $max_cycles                  = shift;
+	my $single_tld                  = shift; # undef or name of TLD
+	my $slv_item_key_performed      = shift;
+	my $slv_item_key_failed         = shift;
+	my $slv_item_key_pfailed        = shift;
+	my $cycle_delay                 = shift;
+	my $rtt_params_list             = shift;
+	my $rdap_standalone_params_list = shift;
+
+	# $params_list - for RDDS, this is either $rtt_params_list (RDDS43, RRDS80 and RDAP) the migration to
+	# Standalone RDAP, or $rdap_standalone_params_list (RDDS43 and RDDS80) after migration to Standalone RDAP.
+	# For other services, $params_list is always $rtt_params_list.
+	# TODO: remove after migration to Standalone RDAP
+	my $params_list = $rtt_params_list;
 
 	# how long to wait for data after $cycle_end if number of performed checks is smaller than expected checks
 	# TODO: $max_nodata_time = $cycle_delay * x?
@@ -4126,7 +4230,13 @@ sub update_slv_rtt_monthly_stats($$$$$$$$)
 				next TLD_LOOP;
 			}
 
-			my $rtt_stats = get_slv_rtt_cycle_stats_aggregated($rtt_params_list, $cycle_start, $cycle_end, $tld);
+			if (defined($rdap_standalone_params_list) && is_rdap_standalone($cycle_start))
+			{
+				dbg("using parameters w/o RDAP, cycle_start=$cycle_start");
+				$params_list = $rdap_standalone_params_list;
+			}
+
+			my $rtt_stats = get_slv_rtt_cycle_stats_aggregated($params_list, $cycle_start, $cycle_end, $tld);
 
 			if ($rtt_stats->{'total'} < $rtt_stats->{'expected'} && $cycle_end > $now - $max_nodata_time)
 			{
@@ -4158,9 +4268,6 @@ sub update_slv_rtt_monthly_stats($$$$$$$$)
 			$last_performed_value += $rtt_stats->{'performed'};
 			$last_failed_value    += $rtt_stats->{'failed'};
 
-			push_value($tld, $slv_item_key_performed, $cycle_start, $last_performed_value);
-			push_value($tld, $slv_item_key_failed   , $cycle_start, $last_failed_value);
-
 			my $performed_with_expected = $last_performed_value + $cycles_till_end_of_month * $rtt_stats->{'expected'};
 
 			if ($performed_with_expected == 0)
@@ -4168,13 +4275,30 @@ sub update_slv_rtt_monthly_stats($$$$$$$$)
 				wrn("performed ($last_performed_value)".
 					" + expected (cycles:$cycles_till_end_of_month * tests:$rtt_stats->{'expected'})".
 					" number of tests is zero");
+
+				if ($last_pfailed_value > 0)
+				{
+					fail("unexpected last pfailed value:\n".
+						"\$i                        = $i\n".
+						"\$tld                      = $tld\n".
+						"\$cycles_till_end_of_month = $cycles_till_end_of_month\n".
+						"\$end_of_prev_month        = $end_of_prev_month\n".
+						"\$last_clock               = $last_clock\n".
+						"\$cycle_delay              = $cycle_delay\n".
+						"\$cycle_start              = $cycle_start\n".
+						"\$cycle_end                = $cycle_end\n".
+						"\$last_pfailed_value       = $last_pfailed_value\n".
+						"\$rtt_stats->{'expected'}  = $rtt_stats->{'expected'}");
+				}
 			}
 			else
 			{
 				$last_pfailed_value = 100 * $last_failed_value / $performed_with_expected;
-
-				push_value($tld, $slv_item_key_pfailed, $cycle_start, $last_pfailed_value);
 			}
+
+			push_value($tld, $slv_item_key_performed, $cycle_start, $last_performed_value);
+			push_value($tld, $slv_item_key_failed   , $cycle_start, $last_failed_value);
+			push_value($tld, $slv_item_key_pfailed  , $cycle_start, $last_pfailed_value);
 
 			$last_clock = $cycle_start;
 		}
@@ -4194,7 +4318,7 @@ sub recalculate_downtime($$$$$$)
 
 	fail("not supported when running in --dry-run mode") if (opt('dry-run'));
 
-	# get service from item's key ('RDDS', 'DNS', 'DNS.NS')
+	# get service from item's key ('DNS', 'DNS.NS', 'RDDS', 'RDAP')
 	my $service = uc($item_key_avail =~ s/^rsm\.slv\.(.+)\.avail(?:\[.*\])?$/$1/r);
 
 	# get last auditid
@@ -5062,8 +5186,8 @@ sub __get_reachable_times
 		"select clock,value".
 		" from history_uint".
 		" where itemid=$itemid".
-	    		" and clock between $from and $till".
-	    		" and value!=0".
+			" and clock between $from and $till".
+			" and value!=0".
 		" order by itemid,clock");
 
 	foreach my $row_ref (@$rows_ref)
