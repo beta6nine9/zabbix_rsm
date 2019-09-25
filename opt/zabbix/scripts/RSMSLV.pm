@@ -3645,9 +3645,7 @@ sub optkeys
 
 sub ts_str
 {
-	my $ts = shift;
-
-	$ts = time() unless ($ts);
+	my $ts = shift // time();
 
 	# sec, min, hour, mday, mon, year, wday, yday, isdst
 	my ($sec, $min, $hour, $mday, $mon, $year) = localtime($ts);
@@ -3657,9 +3655,7 @@ sub ts_str
 
 sub ts_full
 {
-	my $ts = shift;
-
-	$ts = time() unless ($ts);
+	my $ts = shift // time();
 
 	my $str = ts_str($ts);
 
