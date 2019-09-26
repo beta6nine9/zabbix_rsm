@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -28,7 +28,7 @@ class CScreenTriggersInfo extends CScreenBase {
 	 */
 	public function get() {
 		$header = (new CDiv([
-			new CTag('h4', true, _('Triggers info'))
+			new CTag('h4', true, _('Trigger info'))
 		]))->addClass(ZBX_STYLE_DASHBRD_WIDGET_HEAD);
 
 		if ($this->screenitem['resourceid'] != 0) {

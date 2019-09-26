@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -18,23 +18,45 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
+
 $widget = (new CWidget())
 	->setTitle(_('Actions'))
-	->setControls((new CForm('get'))
-		->cleanItems()
-		->addItem((new CList())
-			->addItem([
-				new CLabel(_('Event source'), 'eventsource'),
-				(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
-				new CComboBox('eventsource', $data['eventsource'], 'submit()', [
-					EVENT_SOURCE_TRIGGERS => _('Triggers'),
-					EVENT_SOURCE_DISCOVERY => _('Discovery'),
-					EVENT_SOURCE_AUTO_REGISTRATION => _('Auto registration'),
-					EVENT_SOURCE_INTERNAL => _x('Internal', 'event source')
+	->setControls((new CTag('nav', true,
+		(new CForm('get'))
+			->cleanItems()
+			->addItem((new CList())
+				->addItem([
+					new CLabel(_('Event source'), 'eventsource'),
+					(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
+					new CComboBox('eventsource', $data['eventsource'], 'submit()', [
+						EVENT_SOURCE_TRIGGERS => _('Triggers'),
+						EVENT_SOURCE_DISCOVERY => _('Discovery'),
+						EVENT_SOURCE_AUTO_REGISTRATION => _('Auto registration'),
+						EVENT_SOURCE_INTERNAL => _x('Internal', 'event source')
+					])
 				])
-			])
-			->addItem(new CSubmit('form', _('Create action')))
-		)
+				->addItem(new CSubmit('form', _('Create action')))
+			)
+		))
+			->setAttribute('aria-label', _('Content controls'))
+	)
+	->addItem((new CFilter(new CUrl('actionconf.php')))
+		->setProfile($data['profileIdx'])
+		->setActiveTab($data['active_tab'])
+		->addFilterTab(_('Filter'), [
+			(new CFormList())->addRow(_('Name'),
+				(new CTextBox('filter_name', $data['filter']['name']))
+					->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH)
+					->setAttribute('autofocus', 'autofocus')
+			),
+			(new CFormList())->addRow(_('Status'),
+				(new CRadioButtonList('filter_status', (int) $data['filter']['status']))
+					->addValue(_('Any'), -1)
+					->addValue(_('Enabled'), ACTION_STATUS_ENABLED)
+					->addValue(_('Disabled'), ACTION_STATUS_DISABLED)
+					->setModern(true)
+			)
+		])
 	);
 
 // create form
@@ -47,15 +69,15 @@ $actionTable = (new CTableInfo())
 			(new CCheckBox('all_items'))
 				->onClick("checkAll('".$actionForm->getName()."', 'all_items', 'g_actionid');")
 		))->addClass(ZBX_STYLE_CELL_WIDTH),
-		make_sorting_header(_('Name'), 'name', $this->data['sort'], $this->data['sortorder']),
+		make_sorting_header(_('Name'), 'name', $data['sort'], $data['sortorder'], 'actionconf.php'),
 		_('Conditions'),
 		_('Operations'),
-		make_sorting_header(_('Status'), 'status', $this->data['sort'], $this->data['sortorder'])
+		make_sorting_header(_('Status'), 'status', $data['sort'], $data['sortorder'], 'actionconf.php')
 	]);
 
 if ($this->data['actions']) {
 	$actionConditionStringValues = actionConditionValueToString($this->data['actions'], $this->data['config']);
-	$actionOperationDescriptions = getActionOperationDescriptions($this->data['actions']);
+	$actionOperationDescriptions = getActionOperationDescriptions($this->data['actions'], ACTION_OPERATION);
 
 	foreach ($this->data['actions'] as $aIdx => $action) {
 		$conditions = [];
@@ -65,7 +87,7 @@ if ($this->data['actions']) {
 
 		foreach ($action['filter']['conditions'] as $cIdx => $condition) {
 			$conditions[] = getConditionDescription($condition['conditiontype'], $condition['operator'],
-				$actionConditionStringValues[$aIdx][$cIdx]
+				$actionConditionStringValues[$aIdx][$cIdx], $condition['value2']
 			);
 			$conditions[] = BR();
 		}

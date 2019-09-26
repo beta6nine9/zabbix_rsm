@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -22,6 +22,7 @@
 #include "log.h"
 #include "daemon.h"
 #include "zbxself.h"
+#include "dbcache.h"
 
 #include "housekeeper.h"
 
@@ -33,7 +34,7 @@ static int	hk_period;
 /* the maximum number of housekeeping periods to be removed per single housekeeping cycle */
 #define HK_MAX_DELETE_PERIODS	4
 
-void	zbx_housekeeper_sigusr_handler(int flags)
+static void	zbx_housekeeper_sigusr_handler(int flags)
 {
 	if (ZBX_RTC_HOUSEKEEPER_EXECUTE == ZBX_RTC_GET_MSG(flags))
 	{
@@ -64,14 +65,12 @@ void	zbx_housekeeper_sigusr_handler(int flags)
  ******************************************************************************/
 static int	delete_history(const char *table, const char *fieldname, int now)
 {
-	const char	*__function_name = "delete_history";
 	DB_RESULT       result;
 	DB_ROW          row;
 	int             minclock, records = 0;
 	zbx_uint64_t	lastid, maxid;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() table:'%s' now:%d",
-			__function_name, table, now);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() table:'%s' now:%d", __func__, table, now);
 
 	DBbegin();
 
@@ -170,7 +169,7 @@ static int	get_housekeeper_period(double time_slept)
 ZBX_THREAD_ENTRY(housekeeper_thread, args)
 {
 	int	records, start, sleeptime;
-	double	sec, time_slept;
+	double	sec, time_slept, time_now;
 	char	sleeptext[25];
 
 	process_type = ((zbx_thread_args_t *)args)->process_type;
@@ -195,7 +194,7 @@ ZBX_THREAD_ENTRY(housekeeper_thread, args)
 
 	zbx_set_sigusr_handler(zbx_housekeeper_sigusr_handler);
 
-	for (;;)
+	while (ZBX_IS_RUNNING())
 	{
 		sec = zbx_time();
 
@@ -204,9 +203,12 @@ ZBX_THREAD_ENTRY(housekeeper_thread, args)
 		else
 			zbx_sleep_loop(sleeptime);
 
-		zbx_handle_log();
+		if (!ZBX_IS_RUNNING())
+			break;
 
-		time_slept = zbx_time() - sec;
+		time_now = zbx_time();
+		time_slept = time_now - sec;
+		zbx_update_env(time_now);
 
 		hk_period = get_housekeeper_period(time_slept);
 
@@ -226,6 +228,8 @@ ZBX_THREAD_ENTRY(housekeeper_thread, args)
 
 		DBclose();
 
+		zbx_dc_cleanup_data_sessions();
+
 		zabbix_log(LOG_LEVEL_WARNING, "%s [deleted %d records in " ZBX_FS_DBL " sec, %s]",
 				get_process_type_string(process_type), records, sec, sleeptext);
 
@@ -235,4 +239,9 @@ ZBX_THREAD_ENTRY(housekeeper_thread, args)
 		if (0 != CONFIG_HOUSEKEEPING_FREQUENCY)
 			sleeptime = CONFIG_HOUSEKEEPING_FREQUENCY * SEC_PER_HOUR;
 	}
+
+	zbx_setproctitle("%s #%d [terminated]", get_process_type_string(process_type), process_num);
+
+	while (1)
+		zbx_sleep(SEC_PER_MIN);
 }

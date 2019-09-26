@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -18,15 +18,11 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-if (empty($this->data['hostid'])) {
-	$create_button = (new CSubmit('form', _('Create web scenario (select host first)')))->setEnabled(false);
-}
-else {
-	$create_button = new CSubmit('form', _('Create web scenario'));
-}
 
-$filter = (new CFilter('web.httpconf.filter.state'))
-	->addColumn(
+$filter = (new CFilter(new CUrl('httpconf.php')))
+	->setProfile($data['profileIdx'])
+	->setActiveTab($data['active_tab'])
+	->addFilterTab(_('Filter'), [
 		(new CFormList())
 			->addRow(_('Status'),
 				(new CRadioButtonList('filter_status', (int) $this->data['filter_status']))
@@ -35,27 +31,36 @@ $filter = (new CFilter('web.httpconf.filter.state'))
 					->addValue(httptest_status2str(HTTPTEST_STATUS_DISABLED), HTTPTEST_STATUS_DISABLED)
 					->setModern(true)
 			)
-	)
-	->addNavigator();
+	]);
 
 $widget = (new CWidget())
 	->setTitle(_('Web monitoring'))
-	->setControls((new CForm('get'))
-		->cleanItems()
-		->addItem((new CList())
-			->addItem([
-				new CLabel(_('Group'), 'groupid'),
-				(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
-				$this->data['pageFilter']->getGroupsCB()
-			])
-			->addItem([
-				new CLabel(_('Host'), 'hostid'),
-				(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
-				$this->data['pageFilter']->getHostsCB()
-			])
-			->addItem($create_button)
-		)
-	);
+	->setControls(new CList([
+		(new CForm('get'))
+			->cleanItems()
+			->setAttribute('aria-label', _('Main filter'))
+			->addItem((new CList())
+				->addItem([
+					new CLabel(_('Group'), 'groupid'),
+					(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
+					$this->data['pageFilter']->getGroupsCB()
+				])
+				->addItem([
+					new CLabel(_('Host'), 'hostid'),
+					(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
+					$this->data['pageFilter']->getHostsCB()
+				])
+			),
+		(new CTag('nav', true, ($this->data['pageFilter']->hostid > 0)
+			? new CRedirectButton(_('Create web scenario'), (new CUrl('httpconf.php'))
+				->setArgument('form', 'create')
+				->setArgument('groupid', $data['pageFilter']->groupid)
+				->setArgument('hostid', $data['pageFilter']->hostid)
+				->getUrl()
+			)
+			: (new CButton('form', _('Create web scenario (select host first)')))->setEnabled(false)
+		))->setAttribute('aria-label', _('Content controls'))
+	]));
 
 if (!empty($this->data['hostid'])) {
 	$widget->addItem(get_header_host_table('web', $this->data['hostid']));
@@ -68,22 +73,26 @@ $httpForm = (new CForm())
 	->setName('scenarios')
 	->addVar('hostid', $this->data['hostid']);
 
+$url = (new CUrl('httpconf.php'))
+	->setArgument('hostid', $data['hostid'])
+	->getUrl();
+
 $httpTable = (new CTableInfo())
 	->setHeader([
 		(new CColHeader(
 			(new CCheckBox('all_httptests'))->onClick("checkAll('".$httpForm->getName()."', 'all_httptests', 'group_httptestid');")
 		))->addClass(ZBX_STYLE_CELL_WIDTH),
 		($this->data['hostid'] == 0)
-			? make_sorting_header(_('Host'), 'hostname', $this->data['sort'], $this->data['sortorder'])
+			? make_sorting_header(_('Host'), 'hostname', $data['sort'], $data['sortorder'], $url)
 			: null,
-		make_sorting_header(_('Name'), 'name', $this->data['sort'], $this->data['sortorder']),
+		make_sorting_header(_('Name'), 'name', $data['sort'], $data['sortorder'], $url),
 		_('Number of steps'),
-		_('Update interval'),
+		_('Interval'),
 		_('Attempts'),
 		_('Authentication'),
 		_('HTTP proxy'),
 		_('Application'),
-		make_sorting_header(_('Status'), 'status', $this->data['sort'], $this->data['sortorder']),
+		make_sorting_header(_('Status'), 'status', $data['sort'], $data['sortorder'], $url),
 		$this->data['showInfoColumn'] ? _('Info') : null
 	]);
 
@@ -92,16 +101,16 @@ $httpTests = $this->data['httpTests'];
 
 foreach ($httpTests as $httpTestId => $httpTest) {
 	$name = [];
-	if (isset($this->data['parentTemplates'][$httpTestId])) {
-		$template = $this->data['parentTemplates'][$httpTestId];
-		$name[] = (new CLink($template['name'], '?groupid=0&hostid='.$template['id']))
-			->addClass(ZBX_STYLE_LINK_ALT)
-			->addClass(ZBX_STYLE_GREY);
-		$name[] = NAME_DELIMITER;
-	}
-	$name[] = new CLink($httpTest['name'], '?form=update'.'&httptestid='.$httpTestId.'&hostid='.$httpTest['hostid']);
+	$name[] = makeHttpTestTemplatePrefix($httpTestId, $data['parent_templates']);
+	$name[] = new CLink(CHtml::encode($httpTest['name']),
+		(new CUrl('httpconf.php'))
+			->setArgument('form', 'update')
+			->setArgument('hostid', $httpTest['hostid'])
+			->setArgument('httptestid', $httpTestId)
+	);
 
 	if ($this->data['showInfoColumn']) {
+		$info_icons = [];
 		if($httpTest['status'] == HTTPTEST_STATUS_ACTIVE && isset($httpTestsLastData[$httpTestId]) && $httpTestsLastData[$httpTestId]['lastfailedstep']) {
 			$lastData = $httpTestsLastData[$httpTestId];
 
@@ -117,14 +126,8 @@ foreach ($httpTests as $httpTestId => $httpTest) {
 				)
 				: _s('Unknown step failed: %1$s', $lastData['error']);
 
-			$infoIcon = makeErrorIcon($errorMessage);
+			$info_icons[] = makeErrorIcon($errorMessage);
 		}
-		else {
-			$infoIcon = '';
-		}
-	}
-	else {
-		$infoIcon = null;
 	}
 
 	$httpTable->addRow([
@@ -132,7 +135,7 @@ foreach ($httpTests as $httpTestId => $httpTest) {
 		($this->data['hostid'] > 0) ? null : $httpTest['hostname'],
 		$name,
 		$httpTest['stepscnt'],
-		convertUnitsS($httpTest['delay']),
+		$httpTest['delay'],
 		$httpTest['retries'],
 		httptest_authentications($httpTest['authentication']),
 		($httpTest['http_proxy'] !== '') ? _('Yes') : _('No'),
@@ -149,11 +152,9 @@ foreach ($httpTests as $httpTestId => $httpTest) {
 			->addClass(ZBX_STYLE_LINK_ACTION)
 			->addClass(httptest_status2style($httpTest['status']))
 			->addSID(),
-		$infoIcon
+		$this->data['showInfoColumn'] ? makeInformationList($info_icons) : null
 	]);
 }
-
-zbx_add_post_js('cookie.prefix = "'.$this->data['hostid'].'";');
 
 // append table to form
 $httpForm->addItem([

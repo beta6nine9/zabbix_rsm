@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -21,6 +21,11 @@
 
 #include "zbxalgo.h"
 
+#define ZBX_REGEXP_NO_MATCH	0
+#define ZBX_REGEXP_MATCH	1
+
+typedef struct zbx_regexp zbx_regexp_t;
+
 typedef struct
 {
 	char		*name;
@@ -32,10 +37,16 @@ typedef struct
 zbx_expression_t;
 
 /* regular expressions */
+int	zbx_regexp_compile(const char *pattern, zbx_regexp_t **regexp, const char **err_msg_static);
+int	zbx_regexp_compile_ext(const char *pattern, zbx_regexp_t **regexp, int flags, const char **error);
+void	zbx_regexp_free(zbx_regexp_t *regexp);
+int	zbx_regexp_match_precompiled(const char *string, const zbx_regexp_t *regexp);
 char	*zbx_regexp_match(const char *string, const char *pattern, int *len);
-char	*zbx_iregexp_match(const char *string, const char *pattern, int *len);
-char	*zbx_regexp_sub(const char *string, const char *pattern, const char *output_template);
-char	*zbx_mregexp_sub(const char *string, const char *pattern, const char *output_template);
+int	zbx_regexp_sub(const char *string, const char *pattern, const char *output_template, char **out);
+int	zbx_mregexp_sub(const char *string, const char *pattern, const char *output_template, char **out);
+int	zbx_iregexp_sub(const char *string, const char *pattern, const char *output_template, char **out);
+int	zbx_mregexp_sub_precompiled(const char *string, const zbx_regexp_t *regexp, const char *output_template,
+		size_t limit, char **out);
 
 void	zbx_regexp_clean_expressions(zbx_vector_ptr_t *expressions);
 
@@ -44,5 +55,7 @@ void	add_regexp_ex(zbx_vector_ptr_t *regexps, const char *name, const char *expr
 int	regexp_match_ex(const zbx_vector_ptr_t *regexps, const char *string, const char *pattern, int case_sensitive);
 int	regexp_sub_ex(const zbx_vector_ptr_t *regexps, const char *string, const char *pattern, int case_sensitive,
 		const char *output_template, char **output);
+int	zbx_global_regexp_exists(const char *name, const zbx_vector_ptr_t *regexps);
+void	zbx_regexp_escape(char **string);
 
 #endif /* ZABBIX_ZBXREGEXP_H */

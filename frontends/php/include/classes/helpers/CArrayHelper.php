@@ -1,7 +1,7 @@
 <?php
 /*
  ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -27,6 +27,25 @@ class CArrayHelper {
 	protected static $fields;
 
 	private function __construct() {}
+
+	/**
+	 * Copies keys according to given map for given array of the objects.
+	 *
+	 * @param array $array
+	 * @param array $field_map
+	 *
+	 * @return array
+	 */
+	public static function copyObjectsKeys(array $array, array $field_map) {
+		foreach ($array as &$object) {
+			foreach ($field_map as $old_key => $new_key) {
+				$object[$new_key] = $object[$old_key];
+			}
+		}
+		unset($object);
+
+		return $array;
+	}
 
 	/**
 	 * Get from array only values with given keys.
@@ -75,15 +94,37 @@ class CArrayHelper {
 	}
 
 	/**
-	 * Renames array elements keys according to given map.
+	 * Select sub-array of array items with keys in given numeric range.
 	 *
-	 * @param array $array
-	 * @param array $fieldMap
+	 * @static
+	 *
+	 * @param array $array    Array with numeric keys to test for given range.
+	 * @param int   $start    Range start value.
+	 * @param int   $end      Range end value.
 	 *
 	 * @return array
 	 */
-	public static function renameKeys(array $array, array $fieldMap) {
-		foreach ($fieldMap as $old_key => $new_key) {
+	public static function getByKeysRange(array $array, $start, $end) {
+		$result = [];
+		foreach ($array as $key => $val) {
+			if ($key >= $start && $key <= $end) {
+				$result[$key] = $val;
+			}
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Renames array elements keys according to given map.
+	 *
+	 * @param array $array
+	 * @param array $field_map
+	 *
+	 * @return array
+	 */
+	public static function renameKeys(array $array, array $field_map) {
+		foreach ($field_map as $old_key => $new_key) {
 			if (array_key_exists($old_key, $array)) {
 				$array[$new_key] = $array[$old_key];
 				unset($array[$old_key]);
@@ -92,6 +133,27 @@ class CArrayHelper {
 
 		return $array;
 	}
+
+	/**
+	 * Renames keys according to given map for given array of the objects.
+	 *
+	 * @param array $array
+	 * @param array $field_map
+	 *
+	 * @return array
+	 */
+	public static function renameObjectsKeys(array $array, array $field_map) {
+		foreach ($array as &$object) {
+			foreach ($field_map as $old_key => $new_key) {
+				$object[$new_key] = $object[$old_key];
+				unset($object[$old_key]);
+			}
+		}
+		unset($object);
+
+		return $array;
+	}
+
 	/**
 	 * Sort array by multiple fields.
 	 *
@@ -162,7 +224,8 @@ class CArrayHelper {
 
 		foreach ($a1 as $key => $value) {
 			// check if the values under $key are equal, skip arrays
-			if (isset($a2[$key]) && !is_array($value) && (string) $a1[$key] === (string) $a2[$key]) {
+			if (isset($a2[$key]) && !is_array($value) && !is_array($a2[$key])
+					&& (string) $a1[$key] === (string) $a2[$key]) {
 				unset($a1[$key]);
 			}
 		}
@@ -218,5 +281,42 @@ class CArrayHelper {
 				$uniqueValues[$value] = $value;
 			}
 		}
+	}
+
+	/**
+	 * Sort an array of objects so that the objects whose $field value matches $pattern are at the top. Return the first
+	 * $limit objects.
+	 *
+	 * @param array  $array    Array of objects to sort.
+	 * @param string $field    Name of the field to search.
+	 * @param string $pattern  String to match the value against $field.
+	 * @param int    $limit    Number of objects to return.
+	 *
+	 * @return array
+	 */
+	public static function sortByPattern(array $array, $field, $pattern, $limit) {
+		$chunk_size = $limit;
+
+		$result = [];
+
+		foreach ($array as $key => $value) {
+			if (mb_strtolower($value[$field]) === mb_strtolower($pattern)) {
+				$result = [$key => $value] + $result;
+			}
+			elseif ($limit > 0) {
+				$result[$key] = $value;
+			}
+			else {
+				continue;
+			}
+			$limit--;
+		}
+
+		if ($result) {
+			$result = array_chunk($result, $chunk_size, true);
+			$result = $result[0];
+		}
+
+		return $result;
 	}
 }

@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -32,9 +32,9 @@
 #endif
 
 #if !defined(_WINDOWS)
-#	define LOCK_CPUSTATS	zbx_mutex_lock(&cpustats_lock)
-#	define UNLOCK_CPUSTATS	zbx_mutex_unlock(&cpustats_lock)
-static ZBX_MUTEX	cpustats_lock = ZBX_MUTEX_NULL;
+#	define LOCK_CPUSTATS	zbx_mutex_lock(cpustats_lock)
+#	define UNLOCK_CPUSTATS	zbx_mutex_unlock(cpustats_lock)
+static zbx_mutex_t	cpustats_lock = ZBX_MUTEX_NULL;
 #else
 #	define LOCK_CPUSTATS
 #	define UNLOCK_CPUSTATS
@@ -47,13 +47,12 @@ static kstat_t		*(*ksp)[] = NULL;	/* array of pointers to "cpu_stat" elements in
 
 static int	refresh_kstat(ZBX_CPUS_STAT_DATA *pcpus)
 {
-	const char	*__function_name = "refresh_kstat";
 	static int	cpu_over_count_prev = 0;
 	int		cpu_over_count = 0, i, inserted;
 	kid_t		id;
 	kstat_t		*k;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
 	for (i = 0; i < pcpus->count; i++)
 		(*ksp)[i] = NULL;
@@ -66,7 +65,7 @@ static int	refresh_kstat(ZBX_CPUS_STAT_DATA *pcpus)
 	/*        kstat_open().									*/
 	if (-1 == (id = kstat_chain_update(kc)))
 	{
-		zabbix_log(LOG_LEVEL_ERR, "%s: kstat_chain_update() failed", __function_name);
+		zabbix_log(LOG_LEVEL_ERR, "%s: kstat_chain_update() failed", __func__);
 		return FAIL;
 	}
 
@@ -113,7 +112,7 @@ static int	refresh_kstat(ZBX_CPUS_STAT_DATA *pcpus)
 		}
 	}
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 
 	return SUCCEED;
 }
@@ -121,21 +120,21 @@ static int	refresh_kstat(ZBX_CPUS_STAT_DATA *pcpus)
 
 int	init_cpu_collector(ZBX_CPUS_STAT_DATA *pcpus)
 {
-	const char			*__function_name = "init_cpu_collector";
+	char				*error = NULL;
 	int				idx, ret = FAIL;
 #ifdef _WINDOWS
 	wchar_t				cpu[8];
-	char				counterPath[PDH_MAX_COUNTER_PATH], *error = NULL;
+	char				counterPath[PDH_MAX_COUNTER_PATH];
 	PDH_COUNTER_PATH_ELEMENTS	cpe;
 #endif
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
 #ifdef _WINDOWS
 	cpe.szMachineName = NULL;
 	cpe.szObjectName = get_counter_name(PCI_PROCESSOR);
 	cpe.szInstanceName = cpu;
 	cpe.szParentInstance = NULL;
-	cpe.dwInstanceIndex = -1;
+	cpe.dwInstanceIndex = (DWORD)-1;
 	cpe.szCounterName = get_counter_name(PCI_PROCESSOR_TIME);
 
 	for (idx = 0; idx <= pcpus->count; idx++)
@@ -145,11 +144,11 @@ int	init_cpu_collector(ZBX_CPUS_STAT_DATA *pcpus)
 		else
 			_itow_s(idx - 1, cpu, ARRSIZE(cpu), 10);
 
-		if (ERROR_SUCCESS != zbx_PdhMakeCounterPath(__function_name, &cpe, counterPath))
+		if (ERROR_SUCCESS != zbx_PdhMakeCounterPath(__func__, &cpe, counterPath))
 			goto clean;
 
 		if (NULL == (pcpus->cpu_counter[idx] = add_perf_counter(NULL, counterPath, MAX_COLLECTOR_PERIOD,
-				&error)))
+				PERF_COUNTER_LANG_DEFAULT, &error)))
 		{
 			goto clean;
 		}
@@ -159,11 +158,14 @@ int	init_cpu_collector(ZBX_CPUS_STAT_DATA *pcpus)
 	cpe.szInstanceName = NULL;
 	cpe.szCounterName = get_counter_name(PCI_PROCESSOR_QUEUE_LENGTH);
 
-	if (ERROR_SUCCESS != zbx_PdhMakeCounterPath(__function_name, &cpe, counterPath))
+	if (ERROR_SUCCESS != zbx_PdhMakeCounterPath(__func__, &cpe, counterPath))
 		goto clean;
 
-	if (NULL == (pcpus->queue_counter = add_perf_counter(NULL, counterPath, MAX_COLLECTOR_PERIOD, &error)))
+	if (NULL == (pcpus->queue_counter = add_perf_counter(NULL, counterPath, MAX_COLLECTOR_PERIOD,
+			PERF_COUNTER_LANG_DEFAULT, &error)))
+	{
 		goto clean;
+	}
 
 	ret = SUCCEED;
 clean:
@@ -174,9 +176,10 @@ clean:
 	}
 
 #else	/* not _WINDOWS */
-	if (FAIL == zbx_mutex_create_force(&cpustats_lock, ZBX_MUTEX_CPUSTATS))
+	if (SUCCEED != zbx_mutex_create(&cpustats_lock, ZBX_MUTEX_CPUSTATS, &error))
 	{
-		zbx_error("unable to create mutex for cpu collector");
+		zbx_error("unable to create mutex for cpu collector: %s", error);
+		zbx_free(error);
 		exit(EXIT_FAILURE);
 	}
 
@@ -214,18 +217,17 @@ clean:
 	ret = SUCCEED;
 #endif	/* _WINDOWS */
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __function_name, zbx_result_string(ret));
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
 
 	return ret;
 }
 
 void	free_cpu_collector(ZBX_CPUS_STAT_DATA *pcpus)
 {
-	const char	*__function_name = "free_cpu_collector";
 #ifdef _WINDOWS
-	int		idx;
+	int	idx;
 #endif
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
 #ifdef _WINDOWS
 	remove_perf_counter(pcpus->queue_counter);
@@ -237,6 +239,7 @@ void	free_cpu_collector(ZBX_CPUS_STAT_DATA *pcpus)
 		pcpus->cpu_counter[idx] = NULL;
 	}
 #else
+	ZBX_UNUSED(pcpus);
 	zbx_mutex_destroy(&cpustats_lock);
 #endif
 
@@ -244,7 +247,7 @@ void	free_cpu_collector(ZBX_CPUS_STAT_DATA *pcpus)
 	kstat_close(kc);
 	zbx_free(ksp);
 #endif
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
 #ifdef _WINDOWS
@@ -263,7 +266,7 @@ int	get_cpu_perf_counter_value(int cpu_num, int interval, double *value, char **
 	return get_perf_counter_value(collector->cpus.cpu_counter[idx], interval, value, error);
 }
 
-static int	get_cpu_perf_counter_status(int pc_status)
+static int	get_cpu_perf_counter_status(zbx_perf_counter_status_t pc_status)
 {
 	switch (pc_status)
 	{
@@ -305,7 +308,6 @@ static void	update_cpu_counters(ZBX_SINGLE_CPU_STAT_DATA *cpu, zbx_uint64_t *cou
 
 static void	update_cpustats(ZBX_CPUS_STAT_DATA *pcpus)
 {
-	const char	*__function_name = "update_cpustats";
 	int		idx;
 	zbx_uint64_t	counter[ZBX_CPU_STATE_COUNT];
 
@@ -347,7 +349,7 @@ static void	update_cpustats(ZBX_CPUS_STAT_DATA *pcpus)
 
 #endif
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
 #define ZBX_SET_CPUS_NOTSUPPORTED()				\
 	for (idx = 0; idx <= pcpus->count; idx++)		\
@@ -362,7 +364,7 @@ static void	update_cpustats(ZBX_CPUS_STAT_DATA *pcpus)
 		goto exit;
 	}
 
-	cpu_status = zbx_malloc(cpu_status, sizeof(unsigned char) * (pcpus->count + 1));
+	cpu_status = (unsigned char *)zbx_malloc(cpu_status, sizeof(unsigned char) * (pcpus->count + 1));
 
 	for (idx = 0; idx <= pcpus->count; idx++)
 		cpu_status[idx] = SYSINFO_RET_FAIL;
@@ -393,6 +395,10 @@ static void	update_cpustats(ZBX_CPUS_STAT_DATA *pcpus)
 				&counter[ZBX_CPU_STATE_IOWAIT], &counter[ZBX_CPU_STATE_INTERRUPT],
 				&counter[ZBX_CPU_STATE_SOFTIRQ], &counter[ZBX_CPU_STATE_STEAL],
 				&counter[ZBX_CPU_STATE_GCPU], &counter[ZBX_CPU_STATE_GNICE]);
+
+		/* Linux includes guest times in user and nice times */
+		counter[ZBX_CPU_STATE_USER] -= counter[ZBX_CPU_STATE_GCPU];
+		counter[ZBX_CPU_STATE_NICE] -= counter[ZBX_CPU_STATE_GNICE];
 
 		update_cpu_counters(&pcpus->cpu[idx], counter);
 		cpu_status[idx] = SYSINFO_RET_OK;
@@ -639,7 +645,7 @@ read_again:
 #if defined(HAVE_PROC_STAT) || (defined(HAVE_FUNCTION_SYSCTLBYNAME) && defined(CPUSTATES)) || defined(HAVE_KSTAT_H)
 exit:
 #endif
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
 void	collect_cpustat(ZBX_CPUS_STAT_DATA *pcpus)
@@ -730,8 +736,17 @@ int	get_cpustat(AGENT_RESULT *result, int cpu_num, int state, int mode)
 				idx_base -= MAX_COLLECTOR_HISTORY;
 
 		for (i = 0; i < ZBX_CPU_STATE_COUNT; i++)
-			total += cpu->h_counter[i][idx_curr] - cpu->h_counter[i][idx_base];
-		counter = cpu->h_counter[state][idx_curr] - cpu->h_counter[state][idx_base];
+		{
+			if (cpu->h_counter[i][idx_curr] > cpu->h_counter[i][idx_base])
+				total += cpu->h_counter[i][idx_curr] - cpu->h_counter[i][idx_base];
+		}
+
+		/* current counter might be less than previous due to guest time sometimes not being fully included */
+		/* in user time by "/proc/stat" */
+		if (cpu->h_counter[state][idx_curr] > cpu->h_counter[state][idx_base])
+			counter = cpu->h_counter[state][idx_curr] - cpu->h_counter[state][idx_base];
+		else
+			counter = 0;
 	}
 
 	UNLOCK_CPUSTATS;

@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -19,7 +19,6 @@
 
 #include "common.h"
 #include "listener.h"
-#include "zbxself.h"
 
 #include "comms.h"
 #include "cfg.h"
@@ -76,7 +75,7 @@ static void	process_listener(zbx_socket_t *s)
 				zabbix_log(LOG_LEVEL_DEBUG, "Sending back [" ZBX_NOTSUPPORTED ": %s]", *value);
 
 				if (NULL == buffer)
-					buffer = zbx_malloc(buffer, buffer_alloc);
+					buffer = (char *)zbx_malloc(buffer, buffer_alloc);
 
 				zbx_strncpy_alloc(&buffer, &buffer_alloc, &buffer_offset,
 						ZBX_NOTSUPPORTED, ZBX_CONST_STRLEN(ZBX_NOTSUPPORTED));
@@ -127,15 +126,16 @@ ZBX_THREAD_ENTRY(listener_thread, args)
 #endif
 	while (ZBX_IS_RUNNING())
 	{
-		zbx_handle_log();
-
 		zbx_setproctitle("listener #%d [waiting for connection]", process_num);
+		ret = zbx_tcp_accept(&s, configured_tls_accept_modes);
+		zbx_update_env(zbx_time());
 
-		if (SUCCEED == (ret = zbx_tcp_accept(&s, configured_tls_accept_modes)))
+		if (SUCCEED == ret)
 		{
 			zbx_setproctitle("listener #%d [processing request]", process_num);
 
-			if (SUCCEED == (ret = zbx_tcp_check_security(&s, CONFIG_HOSTS_ALLOWED, 0)))
+			if ('\0' != *CONFIG_HOSTS_ALLOWED &&
+					SUCCEED == (ret = zbx_tcp_check_allowed_peers(&s, CONFIG_HOSTS_ALLOWED)))
 			{
 #if defined(HAVE_POLARSSL) || defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
 				if (ZBX_TCP_SEC_TLS_CERT != s.connection_type ||
@@ -173,5 +173,10 @@ ZBX_THREAD_ENTRY(listener_thread, args)
 	ZBX_DO_EXIT();
 
 	zbx_thread_exit(EXIT_SUCCESS);
+#else
+	zbx_setproctitle("%s #%d [terminated]", get_process_type_string(process_type), process_num);
+
+	while (1)
+		zbx_sleep(SEC_PER_MIN);
 #endif
 }

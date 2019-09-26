@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -19,144 +19,96 @@
 **/
 
 
-require_once dirname(__FILE__).'/js/reports.toptriggers.js.php';
-
-$topTriggers = (new CWidget())->setTitle(_('100 busiest triggers'));
-
-$filterForm = (new CFilter('web.toptriggers.filter.state'))
-	->addVar('filter_from', date(TIMESTAMP_FORMAT, $this->data['filter']['filter_from']))
-	->addVar('filter_till', date(TIMESTAMP_FORMAT, $this->data['filter']['filter_till']));
-
-$filterColumn1 = new CFormList();
-$filterColumn2 = new CFormList();
-
-$filterColumn2->addRow(_('From'), createDateSelector('filter_from', $this->data['filter']['filter_from']));
-$filterColumn2->addRow(_('Till'), createDateSelector('filter_till', $this->data['filter']['filter_till']));
-$filterColumn2->addRow(null, [
-	new CHorList([
-		(new CButton(null, _('Today')))
-			->onClick('javascript: setPeriod('.REPORT_PERIOD_TODAY.');')
-			->addClass(ZBX_STYLE_BTN_LINK),
-		(new CButton(null, _('Yesterday')))
-			->onClick('javascript: setPeriod('.REPORT_PERIOD_YESTERDAY.');')
-			->addClass(ZBX_STYLE_BTN_LINK),
-		(new CButton(null, _('Current week')))
-			->onClick('javascript: setPeriod('.REPORT_PERIOD_CURRENT_WEEK.');')
-			->addClass(ZBX_STYLE_BTN_LINK),
-		(new CButton(null, _('Current month')))
-			->onClick('javascript: setPeriod('.REPORT_PERIOD_CURRENT_MONTH.');')
-			->addClass(ZBX_STYLE_BTN_LINK),
-		(new CButton(null, _('Current year')))
-			->onClick('javascript: setPeriod('.REPORT_PERIOD_CURRENT_YEAR.');')
-			->addClass(ZBX_STYLE_BTN_LINK)
-	]),
-	new CHorList([
-		(new CButton(null, _('Last week')))
-			->onClick('javascript: setPeriod('.REPORT_PERIOD_LAST_WEEK.');')
-			->addClass(ZBX_STYLE_BTN_LINK),
-		(new CButton(null, _('Last month')))
-			->onClick('javascript: setPeriod('.REPORT_PERIOD_LAST_MONTH.');')
-			->addClass(ZBX_STYLE_BTN_LINK),
-		(new CButton(null, _('Last year')))
-			->onClick('javascript: setPeriod('.REPORT_PERIOD_LAST_YEAR.');')
-			->addClass(ZBX_STYLE_BTN_LINK)
-	])
-]);
-
-$filterColumn1->addRow(
-	_('Host groups'),
-	(new CMultiSelect([
-		'name' => 'groupids[]',
-		'objectName' => 'hostGroup',
-		'data' => $this->data['multiSelectHostGroupData'],
-		'popup' => [
-			'parameters' => 'srctbl=host_groups&dstfrm='.$filterForm->getName().'&dstfld1=groupids_'.
-				'&srcfld1=groupid&multiselect=1'
-		]
-	]))->setWidth(ZBX_TEXTAREA_FILTER_STANDARD_WIDTH)
-);
-
-$filterColumn1->addRow(
-	_('Hosts'),
-	(new CMultiSelect([
-		'name' => 'hostids[]',
-		'objectName' => 'hosts',
-		'data' => $this->data['multiSelectHostData'],
-		'popup' => [
-			'parameters' => 'srctbl=hosts&dstfrm='.$filterForm->getName().'&dstfld1=hostids_&srcfld1=hostid'.
-				'&real_hosts=1&multiselect=1'
-		]
-	]))->setWidth(ZBX_TEXTAREA_FILTER_STANDARD_WIDTH)
-);
+$filterForm = new CFilter(new CUrl('toptriggers.php'));
 
 // severities
 $severity_columns = [0 => [], 1 => []];
 
-for ($severity = TRIGGER_SEVERITY_NOT_CLASSIFIED; $severity < TRIGGER_SEVERITY_COUNT; $severity++) {
-	$severity_columns[$severity % 2][] = new CLabel([
-		(new CCheckBox('severities['.$severity.']'))
-			->setChecked(in_array($severity, $this->data['filter']['severities'])),
-		getSeverityName($severity, $this->data['config'])
-	], 'severities['.$severity.']');
+foreach (range(TRIGGER_SEVERITY_NOT_CLASSIFIED, TRIGGER_SEVERITY_COUNT - 1) as $severity) {
+	$severity_columns[$severity % 2][] = (new CCheckBox('severities['.$severity.']'))
+		->setLabel(getSeverityName($severity, $data['config']))
+		->setChecked(in_array($severity, $data['filter']['severities']));
 }
 
-$filterColumn1->addRow(_('Severity'),
-	(new CTable())
-		->addRow($severity_columns[0])
-		->addRow($severity_columns[1])
-);
+$filter_column = (new CFormList())
+	->addRow((new CLabel(_('Host groups'), 'groupids__ms')),
+		(new CMultiSelect([
+			'name' => 'groupids[]',
+			'object_name' => 'hostGroup',
+			'data' => $data['multiSelectHostGroupData'],
+			'popup' => [
+				'parameters' => [
+					'srctbl' => 'host_groups',
+					'srcfld1' => 'groupid',
+					'dstfrm' => $filterForm->getName(),
+					'dstfld1' => 'groupids_',
+					'real_hosts' => true,
+					'enrich_parent_groups' => true
+				]
+			]
+		]))->setWidth(ZBX_TEXTAREA_FILTER_STANDARD_WIDTH)
+	)
+	->addRow((new CLabel(_('Hosts'), 'hostids__ms')),
+		(new CMultiSelect([
+			'name' => 'hostids[]',
+			'object_name' => 'hosts',
+			'data' => $data['multiSelectHostData'],
+			'popup' => [
+				'parameters' => [
+					'srctbl' => 'hosts',
+					'srcfld1' => 'hostid',
+					'dstfrm' => $filterForm->getName(),
+					'dstfld1' => 'hostids_'
+				]
+			]
+		]))->setWidth(ZBX_TEXTAREA_FILTER_STANDARD_WIDTH)
+	)
+	->addRow(_('Severity'),
+		(new CTable())
+			->addRow($severity_columns[0])
+			->addRow($severity_columns[1])
+	);
 
 $filterForm
-	->addColumn($filterColumn1)
-	->addColumn($filterColumn2);
-
-$topTriggers->addItem($filterForm);
+	->setProfile($data['filter']['timeline']['profileIdx'])
+	->setActiveTab($data['filter']['active_tab'])
+	->addTimeSelector($data['filter']['timeline']['from'], $data['filter']['timeline']['to'], true, ZBX_DATE_TIME)
+	->addFilterTab(_('Filter'), [$filter_column]);
 
 // table
-$table = (new CTableInfo())
-	->setHeader([
-		_('Host'),
-		_('Trigger'),
-		_('Severity'),
-		_('Number of status changes')
-	]);
+$table = (new CTableInfo())->setHeader([_('Host'), _('Trigger'), _('Severity'), _('Number of status changes')]);
 
-foreach ($this->data['triggers'] as $trigger) {
-	foreach ($trigger['hosts'] as $host) {
-		if ($host['status'] == HOST_STATUS_MONITORED) {
-			// Pass a monitored 'hostid' and corresponding first 'groupid' to menu pop-up "Events" link.
-			$trigger['hostid'] = $host['hostid'];
-			$trigger['groupid'] = $data['monitored_hosts'][$trigger['hostid']]['groups'][0]['groupid'];
-			break;
-		}
-		else {
-			// Unmonitored will have disabled "Events" link and there is no 'groupid' or 'hostid'.
-			$trigger['hostid'] = 0;
-			$trigger['groupid'] = 0;
-		}
-	}
-
+foreach ($data['triggers'] as $trigger) {
 	$hostId = $trigger['hosts'][0]['hostid'];
 
-	$hostName = (new CSpan($trigger['hosts'][0]['name']))
-		->addClass(ZBX_STYLE_LINK_ACTION);
-	if ($this->data['hosts'][$hostId]['status'] == HOST_STATUS_NOT_MONITORED) {
+	$hostName = (new CLinkAction($trigger['hosts'][0]['name']))->setMenuPopup(CMenuPopupHelper::getHost($hostId));
+	if ($data['hosts'][$hostId]['status'] == HOST_STATUS_NOT_MONITORED) {
 		$hostName->addClass(ZBX_STYLE_RED);
 	}
-	$hostName->setMenuPopup(CMenuPopupHelper::getHost($this->data['hosts'][$hostId], $this->data['scripts'][$hostId]));
 
-	$triggerDescription = (new CSpan($trigger['description']))
-		->addClass(ZBX_STYLE_LINK_ACTION)
-		->setMenuPopup(CMenuPopupHelper::getTrigger($trigger));
+	$triggerDescription = (new CLinkAction($trigger['description']))
+		->setMenuPopup(CMenuPopupHelper::getTrigger($trigger['triggerid'], 0, [], false));
 
 	$table->addRow([
 		$hostName,
 		$triggerDescription,
-		getSeverityCell($trigger['priority'], $this->data['config']),
+		getSeverityCell($trigger['priority'], $data['config']),
 		$trigger['cnt_event']
 	]);
 }
 
-$topTriggers->addItem($table);
+$obj_data = [
+	'id' => 'timeline_1',
+	'domid' => 'toptriggers',
+	'loadSBox' => 0,
+	'loadImage' => 0,
+	'dynamic' => 0,
+	'mainObject' => 1
+];
+zbx_add_post_js('timeControl.addObject("toptriggers", '.zbx_jsvalue($data['filter']).', '.zbx_jsvalue($obj_data).');');
+zbx_add_post_js('timeControl.processObjects();');
 
-return $topTriggers;
+return (new CWidget())
+	->setTitle(_('100 busiest triggers'))
+	->addItem($filterForm)
+	->addItem($table);

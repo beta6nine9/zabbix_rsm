@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -79,12 +79,10 @@ static int	unpack_ntp(ntp_data *data, const unsigned char *request, const unsign
 	/* Unpack the essential data from an NTP packet, bypassing struct layout */
 	/* and endian problems. Note that it ignores fields irrelevant to SNTP.  */
 
-	const char	*__function_name = "unpack_ntp";
+	int	i, ret = FAIL;
+	double	d;
 
-	int		i, ret = FAIL;
-	double		d;
-
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
 	if (NTP_PACKET_SIZE != length)
 	{
@@ -96,8 +94,10 @@ static int	unpack_ntp(ntp_data *data, const unsigned char *request, const unsign
 	{
 		zabbix_log(LOG_LEVEL_DEBUG, "originate timestamp in the response does not match"
 				" transmit timestamp in the request: 0x%04x%04x 0x%04x%04x",
-				*(int *)&response[NTP_OFFSET_ORIGINATE], *(int *)&response[NTP_OFFSET_ORIGINATE + 4],
-				*(int *)&request[NTP_OFFSET_TRANSMIT], *(int *)&request[NTP_OFFSET_TRANSMIT + 4]);
+				*(const unsigned int *)&response[NTP_OFFSET_ORIGINATE],
+				*(const unsigned int *)&response[NTP_OFFSET_ORIGINATE + 4],
+				*(const unsigned int *)&request[NTP_OFFSET_TRANSMIT],
+				*(const unsigned int *)&request[NTP_OFFSET_TRANSMIT + 4]);
 		goto out;
 	}
 
@@ -136,7 +136,7 @@ static int	unpack_ntp(ntp_data *data, const unsigned char *request, const unsign
 
 	ret = SUCCEED;
 out:
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __function_name, zbx_result_string(ret));
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
 
 	return ret;
 }
@@ -161,7 +161,7 @@ int	check_ntp(char *host, unsigned short port, int timeout, int *value_int)
 			if (SUCCEED == (ret = zbx_udp_recv(&s, timeout)))
 			{
 				*value_int = (SUCCEED == unpack_ntp(&data, (unsigned char *)request,
-						(unsigned char *)s.buffer, s.read_bytes));
+						(unsigned char *)s.buffer, (int)s.read_bytes));
 			}
 		}
 

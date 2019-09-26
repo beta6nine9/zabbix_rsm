@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -20,6 +20,10 @@
 
 
 class CRadioButtonList extends CList {
+	/**
+	 * Default CSS class name for HTML root element.
+	 */
+	const ZBX_STYLE_CLASS = 'radio-list-control';
 
 	const ORIENTATION_HORIZONTAL = 'horizontal';
 	const ORIENTATION_VERTICAL = 'vertical';
@@ -28,8 +32,20 @@ class CRadioButtonList extends CList {
 	private $value;
 	private $orientation;
 	private $enabled;
-	private $values;
+	private $readonly;
 	private $modern;
+	private $autofocused;
+
+	/**
+	 * Array of value elements.
+	 *
+	 * string $values[]['name']       Input form element label.
+	 * string $values[]['value']      Input form element value.
+	 * string $values[]['id']         Input form element id attribute.
+	 * string $values[]['on_change']  Javascript handler for onchange event.
+	 * @property array
+	 */
+	protected $values = [];
 
 	public function __construct($name, $value) {
 		parent::__construct();
@@ -40,9 +56,20 @@ class CRadioButtonList extends CList {
 		$this->enabled = true;
 		$this->values = [];
 		$this->modern = false;
+		$this->readonly = false;
 		$this->setId(zbx_formatDomId($name));
 	}
 
+	/**
+	 * Add value.
+	 *
+	 * @param string $name       Input element label.
+	 * @param string $value      Input element value.
+	 * @param string $id         Input element id.
+	 * @param string $on_change  Javascript handler for onchange event.
+	 *
+	 * @return CRadioButtonList
+	 */
 	public function addValue($name, $value, $id = null, $on_change = null) {
 		$this->values[] = [
 			'name' => $name,
@@ -66,6 +93,12 @@ class CRadioButtonList extends CList {
 		return $this;
 	}
 
+	public function setReadonly($readonly) {
+		$this->readonly = $readonly;
+
+		return $this;
+	}
+
 	public function setModern($modern) {
 		$this->modern = $modern;
 
@@ -74,12 +107,16 @@ class CRadioButtonList extends CList {
 
 	public function toString($destroy = true) {
 		if ($this->modern) {
-			$this->addClass(ZBX_STYLE_RADIO_SEGMENTED);
+			$this->addClass(static::ZBX_STYLE_CLASS);
 		}
 		else {
-			$this->addClass($this->orientation == self::ORIENTATION_HORIZONTAL
-				? ZBX_STYLE_LIST_HOR_CHECK_RADIO
-				: ZBX_STYLE_LIST_CHECK_RADIO
+			$this->addClass(ZBX_STYLE_LIST_CHECK_RADIO);
+			$this->addClass($this->orientation === self::ORIENTATION_HORIZONTAL ? ZBX_STYLE_HOR_LIST : null);
+		}
+
+		if ($this->readonly) {
+			$this->addItem(
+				(new CVar($this->name, $this->value, zbx_formatDomId($this->name)))->setEnabled($this->enabled)
 			);
 		}
 
@@ -89,21 +126,54 @@ class CRadioButtonList extends CList {
 			}
 
 			$radio = (new CInput('radio', $this->name, $value['value']))
-				->setEnabled($this->enabled)
+				// Read-only for radioboxes is simulated by disabling control and adding CVar with value.
+				->setEnabled($this->enabled && !$this->readonly)
 				->onChange($value['on_change'])
 				->setId($value['id']);
+
 			if ($value['value'] === $this->value) {
 				$radio->setAttribute('checked', 'checked');
+
+				if ($this->autofocused) {
+					$radio->setAttribute('autofocus', 'autofocus');
+				}
 			}
 
 			if ($this->modern) {
-				parent::addItem([$radio, new CLabel($value['name'], $value['id'])]);
+				$this->addItem((new CListItem([$radio, new CLabel($value['name'], $value['id'])]))->addClass(
+					array_key_exists('class', $value) ? $value['class'] : null
+				));
 			}
 			else {
-				parent::addItem(new CLabel([$radio, $value['name']], $value['id']));
+				$radio->addClass(ZBX_STYLE_CHECKBOX_RADIO);
+				$this->addItem((new CListItem([$radio, new CLabel([new CSpan(), $value['name']], $value['id'])]))
+					->addClass(array_key_exists('class', $value) ? $value['class'] : null)
+				);
 			}
 		}
 
+		if ($this->getAttribute('aria-required') === 'true') {
+			$this->setAttribute('role', 'radiogroup');
+		}
+
 		return parent::toString($destroy);
+	}
+
+	/**
+	 * Overrides base method to correctly handle autofocus attribute for radio buttons.
+	 *
+	 * @param $name
+	 * @param $value
+	 *
+	 * @return CRadioButtonList
+	 */
+	public function setAttribute($name, $value) {
+		if ($name === 'autofocus') {
+			$this->autofocused = true;
+
+			return $this;
+		}
+
+		return parent::setAttribute($name, $value);
 	}
 }

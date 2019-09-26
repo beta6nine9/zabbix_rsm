@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -30,17 +30,16 @@ function screen_resources($resource = null) {
 		SCREEN_RESOURCE_GRAPH => _('Graph'),
 		SCREEN_RESOURCE_ACTIONS => _('Action log'),
 		SCREEN_RESOURCE_EVENTS => _('History of events'),
-		SCREEN_RESOURCE_HOSTS_INFO => _('Hosts info'),
+		SCREEN_RESOURCE_HOST_INFO => _('Host info'),
 		SCREEN_RESOURCE_MAP => _('Map'),
 		SCREEN_RESOURCE_PLAIN_TEXT => _('Plain text'),
-		SCREEN_RESOURCE_SCREEN => _('Screen'),
-		SCREEN_RESOURCE_SERVER_INFO => _('Server info'),
+		SCREEN_RESOURCE_SERVER_INFO => _('System information'),
 		SCREEN_RESOURCE_SIMPLE_GRAPH => _('Simple graph'),
 		SCREEN_RESOURCE_HOSTGROUP_TRIGGERS => _('Host group issues'),
 		SCREEN_RESOURCE_HOST_TRIGGERS => _('Host issues'),
-		SCREEN_RESOURCE_SYSTEM_STATUS => _('System status'),
-		SCREEN_RESOURCE_TRIGGERS_INFO => _('Triggers info'),
-		SCREEN_RESOURCE_TRIGGERS_OVERVIEW => _('Triggers overview'),
+		SCREEN_RESOURCE_SYSTEM_STATUS => _('Problems by severity'),
+		SCREEN_RESOURCE_TRIGGER_INFO => _('Trigger info'),
+		SCREEN_RESOURCE_TRIGGER_OVERVIEW => _('Trigger overview'),
 		SCREEN_RESOURCE_URL => _('URL'),
 		SCREEN_RESOURCE_LLD_GRAPH => _('Graph prototype'),
 		SCREEN_RESOURCE_LLD_SIMPLE_GRAPH => _('Simple graph prototype')
@@ -56,26 +55,6 @@ function screen_resources($resource = null) {
 	else {
 		return _('Unknown');
 	}
-}
-
-function check_screen_recursion($mother_screenid, $child_screenid) {
-	if (bccomp($mother_screenid , $child_screenid) == 0) {
-		return true;
-	}
-
-	$db_scr_items = DBselect(
-		'SELECT si.resourceid'.
-		' FROM screens_items si'.
-		' WHERE si.screenid='.zbx_dbstr($child_screenid).
-		' AND si.resourcetype='.SCREEN_RESOURCE_SCREEN
-	);
-	while ($scr_item = DBfetch($db_scr_items)) {
-		if (check_screen_recursion($mother_screenid, $scr_item['resourceid'])) {
-			return true;
-		}
-	}
-
-	return false;
 }
 
 /**
@@ -317,11 +296,25 @@ function get_slideshow_by_slideshowid($slideshowid, $permission) {
 function add_slideshow($data) {
 	$user_data = CWebUser::$data;
 
+	if (!validateTimeUnit($data['delay'], 1, SEC_PER_DAY, false, $error)) {
+		error(_s('Incorrect value for field "%1$s": %2$s.', 'delay', $error));
+
+		return false;
+	}
+
 	// Validate slides.
 	if (empty($data['slides'])) {
 		error(_('Slide show must contain slides.'));
 
 		return false;
+	}
+
+	foreach ($data['slides'] as $slide) {
+		if (!validateTimeUnit($slide['delay'], 0, SEC_PER_DAY, false, $error)) {
+			error(_s('Incorrect value for field "%1$s": %2$s.', 'delay', $error));
+
+			return false;
+		}
 	}
 
 	// Validate screens.
@@ -416,11 +409,6 @@ function add_slideshow($data) {
 	foreach ($data['slides'] as $slide) {
 		$slideid = get_dbid('slides', 'slideid');
 
-		// set default delay
-		if (empty($slide['delay'])) {
-			$slide['delay'] = 0;
-		}
-
 		$result = DBexecute(
 			'INSERT INTO slides (slideid,slideshowid,screenid,step,delay)'.
 			' VALUES ('.zbx_dbstr($slideid).','.zbx_dbstr($slideshowid).','.zbx_dbstr($slide['screenid']).','.($i++).','.zbx_dbstr($slide['delay']).')'
@@ -437,11 +425,25 @@ function add_slideshow($data) {
 function update_slideshow($data) {
 	$user_data = CWebUser::$data;
 
+	if (!validateTimeUnit($data['delay'], 1, SEC_PER_DAY, false, $error)) {
+		error(_s('Incorrect value for field "%1$s": %2$s.', 'delay', $error));
+
+		return false;
+	}
+
 	// Validate slides.
 	if (empty($data['slides'])) {
 		error(_('Slide show must contain slides.'));
 
 		return false;
+	}
+
+	foreach ($data['slides'] as $slide) {
+		if (!validateTimeUnit($slide['delay'], 0, SEC_PER_DAY, false, $error)) {
+			error(_s('Incorrect value for field "%1$s": %2$s.', 'delay', $error));
+
+			return false;
+		}
 	}
 
 	// validate screens.
@@ -625,7 +627,6 @@ function update_slideshow($data) {
 	$slidesToDel = zbx_toHash($slidesToDel);
 	$step = 0;
 	foreach ($data['slides'] as $slide) {
-		$slide['delay'] = $slide['delay'] ? $slide['delay'] : 0;
 		if (isset($db_slides[$slide['slideid']])) {
 			// update slide
 			if ($db_slides[$slide['slideid']]['delay'] != $slide['delay'] || $db_slides[$slide['slideid']]['step'] != $step) {
@@ -696,7 +697,7 @@ function check_dynamic_items($elid, $config = 0) {
 function getResourceNameByType($resourceType) {
 	switch ($resourceType) {
 		case SCREEN_RESOURCE_DATA_OVERVIEW:
-		case SCREEN_RESOURCE_TRIGGERS_OVERVIEW:
+		case SCREEN_RESOURCE_TRIGGER_OVERVIEW:
 			return _('Group');
 	}
 

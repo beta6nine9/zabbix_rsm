@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -28,11 +28,18 @@ typedef struct
 	zbx_uint64_t ipackets;
 	zbx_uint64_t ierr;
 	zbx_uint64_t idrop;
+	zbx_uint64_t ififo;
+	zbx_uint64_t iframe;
+	zbx_uint64_t icompressed;
+	zbx_uint64_t imulticast;
 	zbx_uint64_t obytes;
 	zbx_uint64_t opackets;
 	zbx_uint64_t oerr;
 	zbx_uint64_t odrop;
-	zbx_uint64_t colls;
+	zbx_uint64_t ocolls;
+	zbx_uint64_t ofifo;
+	zbx_uint64_t ocarrier;
+	zbx_uint64_t ocompressed;
 }
 net_stat_t;
 
@@ -89,13 +96,13 @@ static int	find_tcp_port_by_state_nl(unsigned short port, int state, int *found)
 
 	struct sockaddr_nl	s_sa = { AF_NETLINK, 0, 0, 0 };
 	struct iovec		s_io[1] = { { &request, sizeof(request) } };
-	struct msghdr		s_msg = { (void *)&s_sa, sizeof(struct sockaddr_nl), s_io, 1 };
+	struct msghdr		s_msg = { (void *)&s_sa, sizeof(struct sockaddr_nl), s_io, 1, NULL, 0, 0};
 
 	char			buffer[BUFSIZ] = { 0 };
 
 	struct sockaddr_nl	r_sa = { AF_NETLINK, 0, 0, 0 };
 	struct iovec		r_io[1] = { { buffer, BUFSIZ } };
-	struct msghdr		r_msg = { (void *)&r_sa, sizeof(struct sockaddr_nl), r_io, 1 };
+	struct msghdr		r_msg = { (void *)&r_sa, sizeof(struct sockaddr_nl), r_io, 1, NULL, 0, 0};
 
 	struct nlmsghdr		*r_hdr;
 
@@ -149,7 +156,7 @@ static int	find_tcp_port_by_state_nl(unsigned short port, int state, int *found)
 			for (r_hdr = (struct nlmsghdr *)buffer; NLMSG_OK(r_hdr, (unsigned)status);
 					r_hdr = NLMSG_NEXT(r_hdr, status))
 			{
-				struct inet_diag_msg	*r = NLMSG_DATA(r_hdr);
+				struct inet_diag_msg	*r = (struct inet_diag_msg *)NLMSG_DATA(r_hdr);
 
 				if (sequence != r_hdr->nlmsg_seq)
 					continue;
@@ -224,20 +231,31 @@ static int	get_net_stat(const char *if_name, net_stat_t *result, char **error)
 
 		*p = '\t';
 
-		if (10 == sscanf(line, "%s\t" ZBX_FS_UI64 "\t" ZBX_FS_UI64 "\t"
-				ZBX_FS_UI64 "\t" ZBX_FS_UI64 "\t%*s\t%*s\t%*s\t%*s\t"
-				ZBX_FS_UI64 "\t" ZBX_FS_UI64 "\t" ZBX_FS_UI64 "\t"
-				ZBX_FS_UI64 "\t%*s\t" ZBX_FS_UI64 "\t%*s\t%*s\n",
+		if (17 == sscanf(line, "%s\t" ZBX_FS_UI64 "\t" ZBX_FS_UI64 "\t"
+				ZBX_FS_UI64 "\t" ZBX_FS_UI64 "\t"
+				ZBX_FS_UI64 "\t" ZBX_FS_UI64 "\t"
+				ZBX_FS_UI64 "\t" ZBX_FS_UI64 "\t"
+				ZBX_FS_UI64 "\t" ZBX_FS_UI64 "\t"
+				ZBX_FS_UI64 "\t" ZBX_FS_UI64 "\t"
+				ZBX_FS_UI64 "\t" ZBX_FS_UI64 "\t"
+				ZBX_FS_UI64 "\t" ZBX_FS_UI64 "\n",
 				name,
 				&result->ibytes,	/* bytes */
 				&result->ipackets,	/* packets */
 				&result->ierr,		/* errs */
 				&result->idrop,		/* drop */
+				&result->ififo,		/* fifo (overruns) */
+				&result->iframe,	/* frame */
+				&result->icompressed,	/* compressed */
+				&result->imulticast,	/* multicast */
 				&result->obytes,	/* bytes */
 				&result->opackets,	/* packets */
 				&result->oerr,		/* errs */
 				&result->odrop,		/* drop */
-				&result->colls))	/* icolls */
+				&result->ofifo,		/* fifo (overruns)*/
+				&result->ocolls,	/* colls (collisions) */
+				&result->ocarrier,	/* carrier */
+				&result->ocompressed))	/* compressed */
 		{
 			if (0 == strcmp(name, if_name))
 			{
@@ -294,7 +312,7 @@ static int    proc_read_tcp_listen(const char *filename, char **buffer, int *buf
 		if (offset == *buffer_alloc)
 		{
 			*buffer_alloc *= 2;
-			*buffer = zbx_realloc(*buffer, *buffer_alloc);
+			*buffer = (char *)zbx_realloc(*buffer, *buffer_alloc);
 		}
 
 		(*buffer)[offset] = '\0';
@@ -331,7 +349,7 @@ static int    proc_read_tcp_listen(const char *filename, char **buffer, int *buf
 				count++;
 			}
 
-			if (3 == count && 0 != strncmp(start, "0A", 2))
+			if (3 == count && 0 != strncmp(start, "0A", 2) && 0 != strncmp(start, "03", 2))
 				break;
 		}
 	}
@@ -375,7 +393,7 @@ static int	proc_read_file(const char *filename, char **buffer, int *buffer_alloc
 		if (offset == *buffer_alloc)
 		{
 			*buffer_alloc *= 2;
-			*buffer = zbx_realloc(*buffer, *buffer_alloc);
+			*buffer = (char *)zbx_realloc(*buffer, *buffer_alloc);
 		}
 	}
 
@@ -414,6 +432,14 @@ int	NET_IF_IN(AGENT_REQUEST *request, AGENT_RESULT *result)
 		SET_UI64_RESULT(result, ns.ierr);
 	else if (0 == strcmp(mode, "dropped"))
 		SET_UI64_RESULT(result, ns.idrop);
+	else if (0 == strcmp(mode, "overruns"))
+		SET_UI64_RESULT(result, ns.ififo);
+	else if (0 == strcmp(mode, "frame"))
+		SET_UI64_RESULT(result, ns.iframe);
+	else if (0 == strcmp(mode, "compressed"))
+		SET_UI64_RESULT(result, ns.icompressed);
+	else if (0 == strcmp(mode, "multicast"))
+		SET_UI64_RESULT(result, ns.imulticast);
 	else
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid second parameter."));
@@ -451,6 +477,14 @@ int	NET_IF_OUT(AGENT_REQUEST *request, AGENT_RESULT *result)
 		SET_UI64_RESULT(result, ns.oerr);
 	else if (0 == strcmp(mode, "dropped"))
 		SET_UI64_RESULT(result, ns.odrop);
+	else if (0 == strcmp(mode, "overruns"))
+		SET_UI64_RESULT(result, ns.ofifo);
+	else if (0 == strcmp(mode, "collisions"))
+		SET_UI64_RESULT(result, ns.ocolls);
+	else if (0 == strcmp(mode, "carrier"))
+		SET_UI64_RESULT(result, ns.ocarrier);
+	else if (0 == strcmp(mode, "compressed"))
+		SET_UI64_RESULT(result, ns.ocompressed);
 	else
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid second parameter."));
@@ -488,6 +522,10 @@ int	NET_IF_TOTAL(AGENT_REQUEST *request, AGENT_RESULT *result)
 		SET_UI64_RESULT(result, ns.ierr + ns.oerr);
 	else if (0 == strcmp(mode, "dropped"))
 		SET_UI64_RESULT(result, ns.idrop + ns.odrop);
+	else if (0 == strcmp(mode, "overruns"))
+		SET_UI64_RESULT(result, ns.ififo + ns.ofifo);
+	else if (0 == strcmp(mode, "compressed"))
+		SET_UI64_RESULT(result, ns.icompressed + ns.ocompressed);
 	else
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid second parameter."));
@@ -516,7 +554,7 @@ int	NET_IF_COLLISIONS(AGENT_REQUEST *request, AGENT_RESULT *result)
 		return SYSINFO_RET_FAIL;
 	}
 
-	SET_UI64_RESULT(result, ns.colls);
+	SET_UI64_RESULT(result, ns.ocolls);
 
 	return SYSINFO_RET_OK;
 }
@@ -527,15 +565,15 @@ int	NET_IF_DISCOVERY(AGENT_REQUEST *request, AGENT_RESULT *result)
 	FILE		*f;
 	struct zbx_json	j;
 
+	ZBX_UNUSED(request);
+
 	if (NULL == (f = fopen("/proc/net/dev", "r")))
 	{
 		SET_MSG_RESULT(result, zbx_dsprintf(NULL, "Cannot open /proc/net/dev: %s", zbx_strerror(errno)));
 		return SYSINFO_RET_FAIL;
 	}
 
-	zbx_json_init(&j, ZBX_JSON_STAT_BUF_LEN);
-
-	zbx_json_addarray(&j, ZBX_PROTO_TAG_DATA);
+	zbx_json_initarray(&j, ZBX_JSON_STAT_BUF_LEN);
 
 	while (NULL != fgets(line, sizeof(line), f))
 	{
@@ -630,7 +668,7 @@ int	NET_TCP_LISTEN(AGENT_REQUEST *request, AGENT_RESULT *result)
 		zabbix_log(LOG_LEVEL_DEBUG, "netlink interface error: %s", error);
 		zabbix_log(LOG_LEVEL_DEBUG, "falling back on reading /proc/net/tcp...");
 #endif
-		buffer = zbx_malloc(NULL, buffer_alloc);
+		buffer = (char *)zbx_malloc(NULL, buffer_alloc);
 
 		if (0 < (n = proc_read_tcp_listen("/proc/net/tcp", &buffer, &buffer_alloc)))
 		{
@@ -686,7 +724,7 @@ int	NET_UDP_LISTEN(AGENT_REQUEST *request, AGENT_RESULT *result)
 		return SYSINFO_RET_FAIL;
 	}
 
-	buffer = zbx_malloc(NULL, buffer_alloc);
+	buffer = (char *)zbx_malloc(NULL, buffer_alloc);
 
 	if (0 < (n = proc_read_file("/proc/net/udp", &buffer, &buffer_alloc)))
 	{

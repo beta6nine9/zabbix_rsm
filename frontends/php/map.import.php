@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -57,13 +57,18 @@ $data = [
 		'discoveryRules' => ['updateExisting' => false, 'createMissing' => false, 'deleteMissing' => false],
 		'triggers' => ['updateExisting' => false, 'createMissing' => false, 'deleteMissing' => false],
 		'graphs' => ['updateExisting' => false, 'createMissing' => false, 'deleteMissing' => false],
+		'httptests' => ['updateExisting' => false, 'createMissing' => false, 'deleteMissing' => false],
 		'screens' => ['updateExisting' => false, 'createMissing' => false],
 		'maps' => ['updateExisting' => false, 'createMissing' => false],
-		'images' => ['updateExisting' => false, 'createMissing' => false],
+		'images' => ['updateExisting' => false, 'createMissing' => true],
 		'valueMaps' => ['updateExisting' => false, 'createMissing' => false]
 	],
-	'backurl' => getRequest('backurl', 'zabbix.php?action=dashboard.view')
+	'backurl' => getRequest('backurl', '')
 ];
+
+if (!CHtmlUrlValidator::validate($data['backurl'], ['allow_user_macro' => false, 'validate_uri_schemes' => true])) {
+	$data['backurl'] = 'zabbix.php?action=dashboard.view';
+}
 
 // rules presets
 if (hasRequest('rules_preset') && !hasRequest('rules')) {
@@ -78,6 +83,7 @@ if (hasRequest('rules_preset') && !hasRequest('rules')) {
 			];
 			$data['rules']['triggers'] = ['updateExisting' => true, 'createMissing' => true, 'deleteMissing' => false];
 			$data['rules']['graphs'] = ['updateExisting' => true, 'createMissing' => true, 'deleteMissing' => false];
+			$data['rules']['httptests'] = ['updateExisting' => true, 'createMissing' => true, 'deleteMissing' => false];
 			$data['rules']['templateLinkage'] = ['createMissing' => true];
 			$data['rules']['valueMaps'] = ['updateExisting' => false, 'createMissing' => true];
 
@@ -97,6 +103,7 @@ if (hasRequest('rules_preset') && !hasRequest('rules')) {
 			];
 			$data['rules']['triggers'] = ['updateExisting' => true, 'createMissing' => true, 'deleteMissing' => false];
 			$data['rules']['graphs'] = ['updateExisting' => true, 'createMissing' => true, 'deleteMissing' => false];
+			$data['rules']['httptests'] = ['updateExisting' => true, 'createMissing' => true, 'deleteMissing' => false];
 			$data['rules']['templateLinkage'] = ['createMissing' => true];
 			$data['rules']['valueMaps'] = ['updateExisting' => false, 'createMissing' => true];
 
@@ -127,32 +134,19 @@ if (hasRequest('rules_preset') && !hasRequest('rules')) {
 if (hasRequest('rules')) {
 	$requestRules = getRequest('rules', []);
 	// if form was submitted with some checkboxes unchecked, those values are not submitted
-	// so that we set missing values to false
+	// so that we set missing values to false, existing to true
 	foreach ($data['rules'] as $ruleName => $rule) {
 		if (!array_key_exists($ruleName, $requestRules)) {
-			if (array_key_exists('updateExisting', $rule)) {
-				$requestRules[$ruleName]['updateExisting'] = false;
-			}
-
-			if (array_key_exists('createMissing', $rule)) {
-				$requestRules[$ruleName]['createMissing'] = false;
-			}
-
-			if (array_key_exists('deleteMissing', $rule)) {
-				$requestRules[$ruleName]['deleteMissing'] = false;
-			}
+			$requestRules[$ruleName] = [];
 		}
 
-		if (!isset($requestRules[$ruleName]['updateExisting']) && isset($rule['updateExisting'])) {
-			$requestRules[$ruleName]['updateExisting'] = false;
-		}
-
-		if (!isset($requestRules[$ruleName]['createMissing']) && isset($rule['createMissing'])) {
-			$requestRules[$ruleName]['createMissing'] = false;
-		}
-
-		if (!isset($requestRules[$ruleName]['deleteMissing']) && isset($rule['deleteMissing'])) {
-			$requestRules[$ruleName]['deleteMissing'] = false;
+		foreach (['updateExisting', 'createMissing', 'deleteMissing'] as $option) {
+			if (array_key_exists($option, $requestRules[$ruleName])) {
+				$requestRules[$ruleName][$option] = true;
+			}
+			elseif (array_key_exists($option, $rule)) {
+				$requestRules[$ruleName][$option] = false;
+			}
 		}
 	}
 

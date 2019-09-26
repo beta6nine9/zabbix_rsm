@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -18,9 +18,9 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-require_once dirname(__FILE__).'/../include/class.cwebtest.php';
+require_once dirname(__FILE__).'/../include/CLegacyWebTest.php';
 
-class testZBX6648 extends CWebTest {
+class testZBX6648 extends CLegacyWebTest {
 
 
 	// Returns test data
@@ -60,17 +60,23 @@ class testZBX6648 extends CWebTest {
 	 * @dataProvider zbx_data
 	 */
 	public function testZBX6648_eventFilter($zbx_data) {
-		$this->zbxTestLogin('events.php');
-		$this->zbxTestDropdownSelectWait('source', 'Trigger');
+		$this->zbxTestLogin('zabbix.php?action=problem.view');
+
+		$this->zbxTestClickButtonMultiselect('filter_triggerids_');
+		$this->zbxTestLaunchOverlayDialog('Triggers');
 
 		switch ($zbx_data['triggers']) {
 			case 'both' :
 				$this->zbxTestDropdownSelectWait('groupid', $zbx_data['hostgroup']);
+				$this->zbxTestLaunchOverlayDialog('Triggers');
 				$this->zbxTestDropdownSelectWait('hostid', $zbx_data['host']);
+				$this->zbxTestLaunchOverlayDialog('Triggers');
 				break;
 			case 'enabled' :
 				$this->zbxTestDropdownSelectWait('groupid', $zbx_data['hostgroup']);
+				$this->zbxTestLaunchOverlayDialog('Triggers');
 				$this->zbxTestDropdownSelectWait('hostid', $zbx_data['host']);
+				$this->zbxTestLaunchOverlayDialog('Triggers');
 				break;
 			case 'disabled' :
 				$hostgroup = $zbx_data['hostgroup'];

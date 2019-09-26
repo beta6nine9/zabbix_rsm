@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -32,20 +32,17 @@ class CTemplateImporter extends CImporter {
 	 * @throws Exception
 	 *
 	 * @param array $templates
-	 *
-	 * @return void
 	 */
 	public function import(array $templates) {
 		$templates = zbx_toHash($templates, 'host');
 
 		$this->checkCircularTemplateReferences($templates);
 
-		foreach ($templates as &$template) {
-			if (!$this->options['templateLinkage']['createMissing']) {
-				unset($template['templates']);
+		if (!$this->options['templateLinkage']['createMissing']) {
+			foreach ($templates as $name => $template) {
+				unset($templates[$name]['templates']);
 			}
 		}
-		unset($template);
 
 		do {
 			$independentTemplates = $this->getIndependentTemplates($templates);
@@ -66,10 +63,15 @@ class CTemplateImporter extends CImporter {
 					unset($template['templates']);
 				}
 
-				if (!empty($template['templateid'])) {
+				if (array_key_exists('templateid', $template) && ($this->options['templates']['updateExisting']
+						|| $this->options['process_templates'])) {
 					$templatesToUpdate[] = $template;
 				}
-				else {
+				else if ($this->options['templates']['createMissing']) {
+					if (array_key_exists('templateid', $template)) {
+						throw new Exception(_s('Template "%1$s" already exists.', $name));
+					}
+
 					$templatesToCreate[] = $template;
 				}
 			}
@@ -92,8 +94,10 @@ class CTemplateImporter extends CImporter {
 				}
 			}
 
-			if ($this->options['templates']['updateExisting'] && $templatesToUpdate) {
-				API::Template()->update($templatesToUpdate);
+			if ($templatesToUpdate) {
+				if ($this->options['templates']['updateExisting']) {
+					API::Template()->update($templatesToUpdate);
+				}
 
 				foreach ($templatesToUpdate as $updatedTemplate) {
 					$this->processedTemplateIds[$updatedTemplate['templateid']] = $updatedTemplate['templateid'];
@@ -138,8 +142,6 @@ class CTemplateImporter extends CImporter {
 	 * @see checkCircularRecursive
 	 *
 	 * @param array $templates
-	 *
-	 * @return void
 	 */
 	protected function checkCircularTemplateReferences(array $templates) {
 		foreach ($templates as $name => $template) {

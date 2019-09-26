@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -16,6 +16,7 @@
 ** along with this program; if not, write to the Free Software
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
+
 
 // Array indexOf method for javascript<1.6 compatibility
 if (!Array.prototype.indexOf) {
@@ -72,7 +73,11 @@ var PageRefresh = {
 
 		this.delayLeft -= 1000;
 		if (this.delayLeft < 0) {
-			location.replace(location.href);
+			if (IE || ED) {
+				sessionStorage.scrollTop = jQuery(window).scrollTop();
+			}
+
+			location.reload();
 		}
 		else {
 			this.timeout = setTimeout('PageRefresh.check()', 1000);
@@ -101,16 +106,44 @@ var PageRefresh = {
  * Main menu
  */
 var MMenu = {
-	menus:			{'rsm': 0, 'view': 0, 'cm': 0, 'reports': 0, 'config': 0, 'admin': 0},
+	menus:			{'view': 0, 'cm': 0, 'reports': 0, 'config': 0, 'admin': 0},
 	def_label:		null,
 	sub_active: 	false,
 	timeout_reset:	null,
 	timeout_change:	null,
 
+	init: function() {
+		// Detects when none of the selected elements are focused.
+		var elems = jQuery('.top-nav a, .top-subnav a').on('keydown', function(event) {
+			clearTimeout(this.timeout_reset);
+
+			if (event.which == 9) {
+				setTimeout(function() {
+					if (elems.toArray().indexOf(document.querySelector(':focus')) == -1) {
+						clearTimeout(this.timeout_reset);
+						this.timeout_reset = setTimeout(function() {
+							if (elems.toArray().indexOf(document.querySelector(':focus')) == -1){
+								MMenu.showSubMenu(MMenu.def_label)
+							}
+						}, 2500);
+					}
+				});
+			}
+		});
+	},
+
 	mouseOver: function(show_label) {
 		clearTimeout(this.timeout_reset);
-		this.timeout_change = setTimeout('MMenu.showSubMenu("' + show_label + '")', 10);
+		this.timeout_change = setTimeout('MMenu.showSubMenu("' + show_label + '", true)', 10);
 		PageRefresh.restart();
+	},
+
+	keyUp: function(show_label, event) {
+		if (event.which == 13) {
+			clearTimeout(this.timeout_reset);
+			this.timeout_change = setTimeout('MMenu.showSubMenu("' + show_label + '", true)', 10);
+			PageRefresh.restart();
+		}
 	},
 
 	submenu_mouseOver: function() {
@@ -124,11 +157,17 @@ var MMenu = {
 		this.timeout_reset = setTimeout('MMenu.showSubMenu("' + this.def_label + '")', 2500);
 	},
 
-	showSubMenu: function(show_label) {
-		var sub_menu = $('sub_' + show_label);
+	showSubMenu: function(show_label, focus_subitem) {
+		var sub_menu = $('sub_' + show_label),
+			focus_subitem = focus_subitem || false;
+
 		if (sub_menu !== null) {
 			$(show_label).className = 'selected';
 			sub_menu.show();
+
+			if (focus_subitem) {
+				jQuery('li:first > a', sub_menu).focus();
+			}
 
 			for (var key in this.menus) {
 				if (key == show_label) {
@@ -301,62 +340,41 @@ var AudioControl = {
  * @author Konstantin Buravcov
  */
 var jqBlink = {
-	shown: false, // are objects currently shown or hidden?
-	blinkInterval: 1000, // how fast will they blink (ms)
-	secondsSinceInit: 0,
+	shown: true, // are objects currently shown or hidden?
+	interval: 1000, // how fast will they blink (ms)
 
 	/**
 	 * Shows/hides the elements and repeats it self after 'this.blinkInterval' ms
 	 */
 	blink: function() {
-		var objects = jQuery('.blink');
-
-		// maybe some of the objects should not blink any more?
-		objects = this.filterOutNonBlinking(objects);
-
-		// changing visibility state
-		fun = this.shown ? 'removeClass' : 'addClass';
-		jQuery.each(objects, function() {
-			if (typeof jQuery(this).data('toggleClass') !== 'undefined') {
-				jQuery(this)[fun](jQuery(this).data('toggleClass'));
-			}
-			else {
-				jQuery(this).css('visibility', jqBlink.shown ? 'hidden' : 'visible');
-			}
-		})
-
-		// reversing the value of indicator attribute
-		this.shown = !this.shown;
-
-		// I close my eyes only for a moment, and a moment's gone
-		this.secondsSinceInit += this.blinkInterval / 1000;
-
-		// repeating this function with delay
-		setTimeout(jQuery.proxy(this.blink, this), this.blinkInterval);
-	},
-
-	/**
-	 * Check all currently found objects and exclude ones that should stop blinking by now
-	 */
-	filterOutNonBlinking: function(objects) {
 		var that = this;
 
-		return objects.filter(function() {
-			var obj = jQuery(this);
-			if (typeof obj.data('timeToBlink') !== 'undefined') {
-				var shouldBlink = parseInt(obj.data('timeToBlink'), 10) > that.secondsSinceInit;
+		setInterval(function() {
+			var $collection = jQuery('.blink');
 
-				// if object stops blinking, it should be left visible
-				if (!shouldBlink && !that.shown) {
-					obj.css('visibility', 'visible');
+			$collection.each(function() {
+				var $el = jQuery(this),
+					blink = true;
+
+				if (typeof $el.data('timeToBlink') !== 'undefined') {
+					blink = (($el.data()['timeToBlink']--) > 0);
 				}
-				return shouldBlink;
-			}
-			else {
-				// no time-to-blink attribute, should blink forever
-				return true;
-			}
-		});
+
+				if (blink) {
+					if (typeof $el.data('toggleClass') !== 'undefined') {
+						$el[that.shown ? 'removeClass' : 'addClass']($el.data('toggleClass'));
+					}
+					else {
+						$el.css('visibility', that.shown ? 'visible' : 'hidden');
+					}
+				}
+				else if (that.shown) {
+					$el.removeClass('blink').removeClass($el.data('toggleClass')).css('visibility', '');
+				}
+			});
+
+			that.shown = !that.shown;
+		}, this.interval);
 	}
 };
 
@@ -365,8 +383,63 @@ var jqBlink = {
  */
 var hintBox = {
 
-	createBox: function(e, target, hintText, className, isStatic, styles) {
-		var box = jQuery('<div></div>').addClass('overlay-dialogue');
+	/**
+	 * Initialize hint box event handlers.
+	 *
+	 * Triggered events:
+	 * - onDeleteHint.hintBox 	- when removing a hintbox.
+	 */
+	bindEvents: function () {
+		jQuery(document).on('keydown click mouseenter mouseleave', '[data-hintbox=1]', function (e) {
+
+			if (jQuery(this).hasClass('hint-item')) {
+				var target = jQuery(this).siblings('.main-hint');
+			}
+			else {
+				var target = jQuery(this);
+			}
+
+			switch (e.type) {
+				case 'mouseenter':
+					hintBox.showHint(e, target[0], target.next('.hint-box').html(), target.data('hintbox-class'), false,
+						target.data('hintbox-style')
+					);
+					break;
+
+				case 'mouseleave':
+					hintBox.hideHint(target[0], false);
+					break;
+
+				case 'keydown':
+					if (e.which == 13 && target.data('hintbox-static') == 1) {
+						var offset = target.offset(),
+							w = jQuery(window);
+						// Emulate click on left middle point of link.
+						e.clientX = offset.left - w.scrollLeft();
+						e.clientY = offset.top - w.scrollTop() + (target.height() / 2);
+						e.preventDefault();
+
+						hintBox.showStaticHint(e, target[0], target.data('hintbox-class'), false,
+							target.data('hintbox-style')
+						);
+					}
+					break;
+
+				case 'click':
+					if (target.data('hintbox-static') == 1) {
+						hintBox.showStaticHint(e, target[0], target.data('hintbox-class'), false,
+							target.data('hintbox-style')
+						);
+					}
+					break;
+			}
+		});
+	},
+
+	createBox: function(e, target, hintText, className, isStatic, styles, appendTo) {
+		var hintboxid = hintBox.getUniqueId(),
+			box = jQuery('<div></div>', {'data-hintboxid': hintboxid}).addClass('overlay-dialogue'),
+			appendTo = appendTo || 'body';
 
 		if (styles) {
 			// property1: value1; property2: value2; property(n): value(n)
@@ -387,57 +460,56 @@ var hintBox = {
 		}
 
 		if (!empty(className)) {
-			box.append(jQuery('<span></span>').addClass(className).html(hintText));
+			box.append(jQuery('<div></div>').addClass(className).html(hintText));
 		}
 		else {
 			box.html(hintText);
 		}
 
 		if (isStatic) {
+			target.hintboxid = hintboxid;
+			jQuery(target).attr('data-expanded', 'true');
+			addToOverlaysStack(hintboxid, target, 'hintbox');
+
 			var close_link = jQuery('<button>', {
-					'class': 'overlay-close-btn'}
-				)
+					'class': 'overlay-close-btn',
+					'title': t('S_CLOSE')
+				}
+			)
 				.click(function() {
-					hintBox.hideHint(e, target, true);
+					hintBox.hideHint(target, true);
 				});
 			box.prepend(close_link);
 		}
 
-		jQuery('body').append(box);
+		jQuery(appendTo).append(box);
+
+		var removeHandler = function() {
+			hintBox.deleteHint(target);
+		};
+
+		jQuery(target)
+			.off('remove', removeHandler)
+			.on('remove', removeHandler);
 
 		return box;
 	},
 
-	HintWraper: function(e, target, hintText, className, styles) {
-		target.isStatic = false;
-
-		jQuery(target).on('mouseenter', function(e, d) {
-			if (d) {
-				e = d;
-			}
-			hintBox.showHint(e, target, hintText, className, false, styles);
-
-		}).on('mouseleave', function(e) {
-			hintBox.hideHint(e, target);
-
-		}).on('remove', function(e) {
-			hintBox.deleteHint(target);
-		});
-
-		jQuery(target).removeAttr('onmouseover');
-		jQuery(target).trigger('mouseenter', e);
-	},
-
-	showStaticHint: function(e, target, hint, className, resizeAfterLoad, styles) {
+	showStaticHint: function(e, target, className, resizeAfterLoad, styles, hintText) {
 		var isStatic = target.isStatic;
-		hintBox.hideHint(e, target, true);
+		hintBox.hideHint(target, true);
 
 		if (!isStatic) {
+			if (typeof hintText === 'undefined') {
+				hintText = jQuery(target).next('.hint-box').html();
+			}
+
 			target.isStatic = true;
-			hintBox.showHint(e, target, hint, className, true, styles);
+			hintBox.showHint(e, target, hintText, className, true, styles);
+			jQuery(target).data('return-control', jQuery(e.target));
 
 			if (resizeAfterLoad) {
-				hint.one('load', function(e) {
+				hintText.one('load', function(e) {
 					hintBox.positionHint(e, target);
 				});
 			}
@@ -452,6 +524,10 @@ var hintBox = {
 		target.hintBoxItem = hintBox.createBox(e, target, hintText, className, isStatic, styles);
 		hintBox.positionHint(e, target);
 		target.hintBoxItem.show();
+
+		if (target.isStatic) {
+			overlayDialogueOnLoad(true, target.hintBoxItem);
+		}
 	},
 
 	positionHint: function(e, target) {
@@ -521,11 +597,11 @@ var hintBox = {
 		target.hintBoxItem.css({
 			top: top + 'px',
 			left: left + 'px',
-			zIndex: 100
+			zIndex: 1001
 		});
 	},
 
-	hideHint: function(e, target, hideStatic) {
+	hideHint: function(target, hideStatic) {
 		if (target.isStatic && !hideStatic) {
 			return;
 		}
@@ -534,75 +610,34 @@ var hintBox = {
 	},
 
 	deleteHint: function(target) {
+		if (typeof target.hintboxid !== 'undefined') {
+			jQuery(target).removeAttr('data-expanded');
+			removeFromOverlaysStack(target.hintboxid);
+		}
+
 		if (target.hintBoxItem) {
+			target.hintBoxItem.trigger('onDeleteHint.hintBox');
 			target.hintBoxItem.remove();
 			delete target.hintBoxItem;
 
 			if (target.isStatic) {
+				if (jQuery(target).data('return-control') !== 'undefined') {
+					jQuery(target).data('return-control').focus();
+				}
 				delete target.isStatic;
 			}
 		}
+	},
+
+	getUniqueId: function() {
+		var hintboxid = Math.random().toString(36).substring(7);
+		while (jQuery('[data-hintboxid="' + hintboxid + '"]').length) {
+			hintboxid = Math.random().toString(36).substring(7);
+		}
+
+		return hintboxid;
 	}
 };
-
-/*
- * Color picker
- */
-function hide_color_picker() {
-	if (!color_picker) {
-		return;
-	}
-
-	color_picker.style.zIndex = 1000;
-	color_picker.style.display = 'none';
-	color_picker.style.left = '-' + ((color_picker.style.width) ? color_picker.style.width : 100) + 'px';
-	curr_lbl = null;
-	curr_txt = null;
-}
-
-function show_color_picker(id) {
-	if (!color_picker) {
-		return;
-	}
-
-	curr_lbl = document.getElementById('lbl_' + id);
-	curr_txt = document.getElementById(id);
-	var pos = getPosition(curr_lbl);
-	color_picker.x = pos.left;
-	color_picker.y = pos.top;
-	color_picker.style.left = (color_picker.x + 20) + 'px';
-	color_picker.style.top = color_picker.y + 'px';
-	color_picker.style.display = 'block';
-}
-
-function create_color_picker() {
-	if (color_picker) {
-		return;
-	}
-
-	color_picker = document.createElement('div');
-	color_picker.setAttribute('class', 'overlay-dialogue');
-	color_picker.innerHTML = color_table;
-	document.body.appendChild(color_picker);
-	hide_color_picker();
-}
-
-function set_color(color) {
-	if (curr_lbl) {
-		curr_lbl.style.background = curr_lbl.style.color = '#' + color;
-		curr_lbl.title = '#' + color;
-	}
-	if (curr_txt) {
-		curr_txt.value = color.toString().toUpperCase();
-	}
-	hide_color_picker();
-}
-
-function set_color_by_name(id, color) {
-	curr_lbl = document.getElementById('lbl_' + id);
-	curr_txt = document.getElementById(id);
-	set_color(color);
-}
 
 /**
  * Add object to the list of favourites.
@@ -636,7 +671,7 @@ function rm4favorites(object, objectid) {
  * @param {object} 	idx2				An array of IDs
  */
 function updateUserProfile(idx, value_int, idx2) {
-	sendAjaxData('zabbix.php?action=profile.update', {
+	return sendAjaxData('zabbix.php?action=profile.update', {
 		data: {
 			idx: idx,
 			value_int: value_int,
@@ -645,7 +680,7 @@ function updateUserProfile(idx, value_int, idx2) {
 	});
 }
 
-function changeWidgetState(obj, widgetId, url) {
+function changeWidgetState(obj, widgetId, idx) {
 	var widgetObj = jQuery('#' + widgetId + '_widget'),
 		css = switchElementClass(obj, 'btn-widget-collapse', 'btn-widget-expand'),
 		state = 0;
@@ -661,14 +696,10 @@ function changeWidgetState(obj, widgetId, url) {
 		state = 1;
 	}
 
-	obj.title = (state == 1) ? locale['S_COLLAPSE'] : locale['S_EXPAND'];
-
-	sendAjaxData(url, {
-		data: {
-			widget: widgetId,
-			state: state
-		}
-	});
+	obj.title = (state == 1) ? t('S_COLLAPSE') : t('S_EXPAND');
+	if (idx !== '' && typeof idx !== 'undefined') {
+		updateUserProfile(idx, state, []);
+	}
 }
 
 /**
@@ -684,7 +715,7 @@ function sendAjaxData(url, options) {
 	options.type = 'post';
 	options.url = url.getUrl();
 
-	jQuery.ajax(options);
+	return jQuery.ajax(options);
 }
 
 /**
@@ -749,14 +780,14 @@ function getConditionFormula(conditions, evalType) {
 		case 1:
 			conditionOperator = 'and';
 			groupOperator = conditionOperator;
-
 			break;
+
 		// or
 		case 2:
 			conditionOperator = 'or';
 			groupOperator = conditionOperator;
-
 			break;
+
 		// and/or
 		default:
 			conditionOperator = 'or';
@@ -764,15 +795,17 @@ function getConditionFormula(conditions, evalType) {
 	}
 
 	var groupedFormulas = [];
+
 	for (var i = 0; i < conditions.length; i++) {
 		if (typeof conditions[i] === 'undefined') {
 			continue;
 		}
 
 		var groupedConditions = [];
+
 		groupedConditions.push(conditions[i].id);
 
-		// search for other conditions of the same type
+		// Search for other conditions of the same type.
 		for (var n = i + 1; n < conditions.length; n++) {
 			if (typeof conditions[n] !== 'undefined' && conditions[i].type == conditions[n].type) {
 				groupedConditions.push(conditions[n].id);
@@ -780,7 +813,7 @@ function getConditionFormula(conditions, evalType) {
 			}
 		}
 
-		// join conditions of the same type
+		// Join conditions of the same type.
 		if (groupedConditions.length > 1) {
 			groupedFormulas.push('(' + groupedConditions.join(' ' + conditionOperator + ' ') + ')');
 		}
@@ -791,7 +824,7 @@ function getConditionFormula(conditions, evalType) {
 
 	var formula = groupedFormulas.join(' ' + groupOperator + ' ');
 
-	// strip parentheses if there's only one condition group
+	// Strip parentheses if there's only one condition group.
 	if (groupedFormulas.length == 1) {
 		formula = formula.substr(1, formula.length - 2);
 	}
@@ -812,8 +845,10 @@ function getConditionFormula(conditions, evalType) {
 	 * - dataCallback	- function to generate the data passed to the template
 	 *
 	 * Triggered events:
-	 * - rowremove.dynamicRows 	- after removing a row (triggered before tableupdate.dynamicRows)
-	 * - tableupdate.dynamicRows 	- after adding or removing a row
+	 * - tableupdate.dynamicRows 	- after adding or removing a row.
+	 * - beforeadd.dynamicRows 	    - only before adding a new row.
+	 * - afteradd.dynamicRows 	    - only after adding a new row.
+	 * - afterremove.dynamicRows 	- only after removing a row.
 	 *
 	 * @param options
 	 */
@@ -823,7 +858,9 @@ function getConditionFormula(conditions, evalType) {
 			row: '.form_row',
 			add: '.element-table-add',
 			remove: '.element-table-remove',
+			disable: '.element-table-disable',
 			counter: null,
+			beforeRow: null,
 			dataCallback: function(data) {
 				return {};
 			}
@@ -838,14 +875,27 @@ function getConditionFormula(conditions, evalType) {
 
 			// add buttons
 			table.on('click', options.add, function() {
+				table.trigger('beforeadd.dynamicRows', options);
+
 				// add the new row before the row with the "Add" button
-				addRow(table, $(this).closest('tr'), options);
+				var beforeRow = (options['beforeRow'] !== null)
+					? $(options['beforeRow'], table)
+					:  $(this).closest('tr');
+				addRow(table, beforeRow, options);
+
+				table.trigger('afteradd.dynamicRows', options);
 			});
 
 			// remove buttons
 			table.on('click', options.remove, function() {
 				// remove the parent row
 				removeRow(table, $(this).closest(options.row), options);
+			});
+
+			// disable buttons
+			table.on('click', options.disable, function() {
+				// disable the parent row
+				disableRow($(this).closest(options.row));
 			});
 		});
 	};
@@ -880,8 +930,18 @@ function getConditionFormula(conditions, evalType) {
 	function removeRow(table, row, options) {
 		row.remove();
 
-		table.trigger('rowremove.dynamicRows', options);
 		table.trigger('tableupdate.dynamicRows', options);
+		table.trigger('afterremove.dynamicRows', options);
+	}
+
+	/**
+	 * Disables the given row.
+	 *
+	 * @param {jQuery} row
+	 */
+	function disableRow(row) {
+		row.find('input').prop('readonly', true);
+		row.find('button').prop('disabled', true);
 	}
 }(jQuery));
 
@@ -956,4 +1016,8 @@ jQuery(function ($) {
 			verticalHeaderTables[table.attr('id')] = table;
 		});
 	};
+
+	if ((IE || ED) && typeof sessionStorage.scrollTop !== 'undefined') {
+		$(window).scrollTop(sessionStorage.scrollTop);
+	}
 });

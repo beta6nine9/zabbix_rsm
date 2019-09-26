@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -21,8 +21,6 @@
 
 /**
  * Class containing methods for operations with graph.
- *
- * @package API
  */
 class CGraph extends CGraphGeneral {
 
@@ -39,7 +37,6 @@ class CGraph extends CGraphGeneral {
 			self::ERROR_MISSING_GRAPH_NAME => _('Missing "name" field for graph.'),
 			self::ERROR_MISSING_GRAPH_ITEMS => _('Missing items for graph "%1$s".'),
 			self::ERROR_MISSING_REQUIRED_VALUE => _('No "%1$s" given for graph.'),
-			self::ERROR_TEMPLATED_ID => _('Cannot update "templateid" for graph "%1$s".'),
 			self::ERROR_GRAPH_SUM => _('Cannot add more than one item with type "Graph sum" on graph "%1$s".')
 		]);
 	}
@@ -53,8 +50,6 @@ class CGraph extends CGraphGeneral {
 	 */
 	public function get($options = []) {
 		$result = [];
-		$userType = self::$userData['type'];
-		$userid = self::$userData['userid'];
 
 		$sqlParts = [
 			'select'	=> ['graphs' => 'g.graphid'],
@@ -73,14 +68,14 @@ class CGraph extends CGraphGeneral {
 			'itemids'					=> null,
 			'templated'					=> null,
 			'inherited'					=> null,
-			'editable'					=> null,
+			'editable'					=> false,
 			'nopermissions'				=> null,
 			// filter
 			'filter'					=> null,
 			'search'					=> null,
 			'searchByAny'				=> null,
-			'startSearch'				=> null,
-			'excludeSearch'				=> null,
+			'startSearch'				=> false,
+			'excludeSearch'				=> false,
 			'searchWildcardsEnabled'	=> null,
 			// output
 			'output'					=> API_OUTPUT_EXTEND,
@@ -91,9 +86,9 @@ class CGraph extends CGraphGeneral {
 			'selectGraphItems'			=> null,
 			'selectDiscoveryRule'		=> null,
 			'selectGraphDiscovery'		=> null,
-			'countOutput'				=> null,
-			'groupCount'				=> null,
-			'preservekeys'				=> null,
+			'countOutput'				=> false,
+			'groupCount'				=> false,
+			'preservekeys'				=> false,
 			'sortfield'					=> '',
 			'sortorder'					=> '',
 			'limit'						=> null
@@ -101,10 +96,9 @@ class CGraph extends CGraphGeneral {
 		$options = zbx_array_merge($defOptions, $options);
 
 		// permission check
-		if ($userType != USER_TYPE_SUPER_ADMIN && !$options['nopermissions']) {
+		if (self::$userData['type'] != USER_TYPE_SUPER_ADMIN && !$options['nopermissions']) {
 			$permission = $options['editable'] ? PERM_READ_WRITE : PERM_READ;
-
-			$userGroups = getUserGroupsByUserId($userid);
+			$userGroups = getUserGroupsByUserId(self::$userData['userid']);
 
 			// check permissions by graph items
 			$sqlParts['where'][] = 'NOT EXISTS ('.
@@ -166,7 +160,7 @@ class CGraph extends CGraphGeneral {
 			$sqlParts['where']['igi'] = 'i.itemid=gi.itemid';
 			$sqlParts['where']['hgi'] = 'hg.hostid=i.hostid';
 
-			if (!is_null($options['groupCount'])) {
+			if ($options['groupCount']) {
 				$sqlParts['group']['hg'] = 'hg.groupid';
 			}
 		}
@@ -194,7 +188,7 @@ class CGraph extends CGraphGeneral {
 			$sqlParts['where']['gig'] = 'gi.graphid=g.graphid';
 			$sqlParts['where']['igi'] = 'i.itemid=gi.itemid';
 
-			if (!is_null($options['groupCount'])) {
+			if ($options['groupCount']) {
 				$sqlParts['group']['i'] = 'i.hostid';
 			}
 		}
@@ -214,7 +208,7 @@ class CGraph extends CGraphGeneral {
 			$sqlParts['where']['gig'] = 'gi.graphid=g.graphid';
 			$sqlParts['where'][] = dbConditionInt('gi.itemid', $options['itemids']);
 
-			if (!is_null($options['groupCount'])) {
+			if ($options['groupCount']) {
 				$sqlParts['group']['gi'] = 'gi.itemid';
 			}
 		}
@@ -295,8 +289,8 @@ class CGraph extends CGraphGeneral {
 		$sqlParts = $this->applyQuerySortOptions($this->tableName(), $this->tableAlias(), $options, $sqlParts);
 		$dbRes = DBselect($this->createSelectQueryFromParts($sqlParts), $sqlParts['limit']);
 		while ($graph = DBfetch($dbRes)) {
-			if (!is_null($options['countOutput'])) {
-				if (!is_null($options['groupCount'])) {
+			if ($options['countOutput']) {
+				if ($options['groupCount']) {
 					$result[] = $graph;
 				}
 				else {
@@ -308,7 +302,7 @@ class CGraph extends CGraphGeneral {
 			}
 		}
 
-		if (!is_null($options['countOutput'])) {
+		if ($options['countOutput']) {
 			return $result;
 		}
 
@@ -321,7 +315,7 @@ class CGraph extends CGraphGeneral {
 		}
 
 		// removing keys (hash -> array)
-		if (is_null($options['preservekeys'])) {
+		if (!$options['preservekeys']) {
 			$result = zbx_cleanHashes($result);
 		}
 
@@ -520,76 +514,51 @@ class CGraph extends CGraphGeneral {
 	 * Delete graphs.
 	 *
 	 * @param array $graphids
-	 * @param bool  $nopermissions
 	 *
 	 * @return array
 	 */
-	public function delete(array $graphids, $nopermissions = false) {
-		if (empty($graphids)) {
-			self::exception(ZBX_API_ERROR_PARAMETERS, _('Empty input parameter.'));
-		}
+	public function delete(array $graphids) {
+		$this->validateDelete($graphids, $db_graphs);
 
-		$delGraphs = $this->get([
-			'output' => API_OUTPUT_EXTEND,
-			'graphids' => $graphids,
-			'editable' => true,
-			'preservekeys' => true,
-			'selectHosts' => ['name']
-		]);
+		CGraphManager::delete($graphids);
 
-		if (!$nopermissions) {
-			foreach ($graphids as $graphid) {
-				if (!isset($delGraphs[$graphid])) {
-					self::exception(ZBX_API_ERROR_PERMISSIONS, _('You do not have permission to perform this operation.'));
-				}
-
-				$delGraph = $delGraphs[$graphid];
-
-				if ($delGraph['templateid'] != 0) {
-					self::exception(ZBX_API_ERROR_PERMISSIONS, _('Cannot delete templated graphs.'));
-				}
-
-				if ($delGraph['flags'] == ZBX_FLAG_DISCOVERY_CREATED) {
-					self::exception(ZBX_API_ERROR_PARAMETERS, _s(
-						'Cannot delete discovered graph "%1$s".', $delGraph['name']
-					));
-				}
-			}
-		}
-
-		$parentGraphids = $graphids;
-		do {
-			$dbGraphs = DBselect('SELECT g.graphid FROM graphs g WHERE '.dbConditionInt('g.templateid', $parentGraphids));
-			$parentGraphids = [];
-			while ($dbGraph = DBfetch($dbGraphs)) {
-				$parentGraphids[] = $dbGraph['graphid'];
-				$graphids[] = $dbGraph['graphid'];
-			}
-		} while (!empty($parentGraphids));
-
-		$graphids = array_unique($graphids);
-
-		DB::delete('screens_items', [
-			'resourceid' => $graphids,
-			'resourcetype' => SCREEN_RESOURCE_GRAPH
-		]);
-
-		DB::delete('profiles', [
-			'idx' => 'web.favorite.graphids',
-			'source' => 'graphid',
-			'value_id' => $graphids
-		]);
-
-		DB::delete('graphs', [
-			'graphid' => $graphids
-		]);
-
-		foreach ($delGraphs as $graph) {
-			$host = reset($graph['hosts']);
-			info(_s('Deleted: Graph "%1$s" on "%2$s".', $graph['name'], $host['name']));
-		}
+		$this->addAuditBulk(AUDIT_ACTION_DELETE, AUDIT_RESOURCE_GRAPH, $db_graphs);
 
 		return ['graphids' => $graphids];
+	}
+
+	/**
+	 * Validates the input parameters for the delete() method.
+	 *
+	 * @param array $graphids   [IN/OUT]
+	 * @param array $db_graphs  [OUT]
+	 *
+	 * @throws APIException if the input is invalid.
+	 */
+	private function validateDelete(array &$graphids, array &$db_graphs = null) {
+		$api_input_rules = ['type' => API_IDS, 'flags' => API_NOT_EMPTY, 'uniq' => true];
+		if (!CApiInputValidator::validate($api_input_rules, $graphids, '/', $error)) {
+			self::exception(ZBX_API_ERROR_PARAMETERS, $error);
+		}
+
+		$db_graphs = $this->get([
+			'output' => ['graphid', 'name', 'templateid'],
+			'graphids' => $graphids,
+			'editable' => true,
+			'preservekeys' => true
+		]);
+
+		foreach ($graphids as $graphid) {
+			if (!array_key_exists($graphid, $db_graphs)) {
+				self::exception(ZBX_API_ERROR_PERMISSIONS,
+					_('No permissions to referred object or it does not exist!')
+				);
+			}
+
+			if ($db_graphs[$graphid]['templateid'] != 0) {
+				self::exception(ZBX_API_ERROR_PARAMETERS, _('Cannot delete templated graph.'));
+			}
+		}
 	}
 
 	protected function addRelatedObjects(array $options, array $result) {

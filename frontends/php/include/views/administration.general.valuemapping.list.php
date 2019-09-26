@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -21,13 +21,18 @@
 
 $widget = (new CWidget())
 	->setTitle(_('Value mapping'))
-	->setControls((new CForm())
-		->cleanItems()
-		->addItem((new CList())
-			->addItem(makeAdministrationGeneralMenu('adm.valuemapping.php'))
-			->addItem(new CSubmit('form', _('Create value map')))
-			->addItem((new CButton('form', _('Import')))->onClick('redirect("conf.import.php?rules_preset=valuemap")'))
-		)
+	->setControls((new CTag('nav', true,
+		(new CForm())
+			->cleanItems()
+			->addItem((new CList())
+				->addItem(makeAdministrationGeneralMenu('adm.valuemapping.php'))
+				->addItem(new CSubmit('form', _('Create value map')))
+				->addItem((new CButton('form', _('Import')))
+					->onClick('redirect("conf.import.php?rules_preset=valuemap")')
+				)
+			)
+		))
+			->setAttribute('aria-label', _('Content controls'))
 	);
 
 $form = (new CForm())
@@ -65,7 +70,14 @@ $form->addItem([
 	$table,
 	$data['paging'],
 	new CActionButtonList('action', 'valuemapids', [
-		'valuemap.export' => ['name' => _('Export')],
+		'valuemap.export' => ['name' => _('Export'), 'redirect' =>
+			(new CUrl('zabbix.php'))
+				->setArgument('action', 'export.valuemaps.xml')
+				->setArgument('backurl', (new CUrl('adm.valuemapping.php'))
+					->setArgument('page', getPageNumber())
+					->getUrl())
+				->getUrl()
+		],
 		'valuemap.delete' => ['name' => _('Delete'), 'confirm' => _('Delete selected value maps?')]
 	])
 ]);

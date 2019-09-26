@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -85,18 +85,15 @@ function pgettext($context, $msgId) {
 function npgettext($context, $msgId, $msgIdPlural, $num) {
 	$contextString = $context."\004".$msgId;
 	$contextStringp = $context."\004".$msgIdPlural;
-	$translation = ngettext($contextString, $contextStringp, $num);
-
-	return ($translation == $contextString || $translation == $contextStringp) ? $msgId : $translation;
+	return ngettext($contextString, $contextStringp, $num);
 }
 
 /**
  * Translates the string and substitutes the placeholders with the given parameters.
  * Placeholders must be defined as %1$s, %2$s etc.
  *
- * @param string $string
- * @param string $param			parameter to be replace the first placeholder
- * @param string $param,...		unlimited number of optional parameters
+ * @param string $string         String optionally containing placeholders to substitute.
+ * @param string $param,...      Unlimited number of optional parameters to replace sequential placeholders.
  *
  * @return string
  */
@@ -129,21 +126,38 @@ function _n($string1, $string2) {
 }
 
 /**
- * Translates the string with respect to the given context and replaces placeholders with supplied arguments.
- * If no translation is found, the original string will be used. Unlimited number of parameters supplied.
- * Parameter placeholders must be defined as %1$s, %2$s etc.
+ * Translates the string with respect to the given context.
+ * If no translation is found, the original string will be used.
  *
- * Example: _x('Message for arg1 "%1$s" and arg2 "%2$s"', 'context', 'arg1Value', 'arg2Value');
- * returns: 'Message for arg1 "arg1Value" and arg2 "arg2Value"'
+ * Example: _x('Message', 'context');
+ * returns: 'Message'
  *
  * @param string $message		string to translate
  * @param string $context		context of the string
- * @param string $param			parameter to be replace the first placeholder
- * @param string $param,... 	unlimited number of optional parameters
  *
  * @return string
  */
 function _x($message, $context) {
+	return ($context == '')
+		? _($message)
+		: pgettext($context, $message);
+}
+
+/**
+ * Translates the string with respect to the given context and replaces placeholders with supplied arguments.
+ * If no translation is found, the original string will be used. Unlimited number of parameters supplied.
+ * Parameter placeholders must be defined as %1$s, %2$s etc.
+ *
+ * Example: _xs('Message for arg1 "%1$s" and arg2 "%2$s"', 'context', 'arg1Value', 'arg2Value');
+ * returns: 'Message for arg1 "arg1Value" and arg2 "arg2Value"'
+ *
+ * @param string $message       String to translate.
+ * @param string $context       Context of the string.
+ * @param string $param,...     Unlimited number of optional parameters to replace sequential placeholders.
+ *
+ * @return string
+ */
+function _xs($message, $context) {
 	$arguments = array_slice(func_get_args(), 2);
 
 	return ($context == '')
@@ -159,12 +173,11 @@ function _x($message, $context) {
  * Example: _xn('%1$s message for arg1 "%2$s"', '%1$s messages for arg1 "%2$s"', 3, 'context', 'arg1Value');
  * returns: '3 messages for arg1 "arg1Value"'
  *
- * @param string $message			string to translate
- * @param string $messagePlural		string to translate for plural form
- * @param int    $num				number to determine usage of plural form, also is used as first replace argument
- * @param string $context			context of the string
- * @param string $param				parameter to be replace the first placeholder
- * @param string $param,...			unlimited number of optional parameters
+ * @param string $message           String to translate.
+ * @param string $messagePlural     String to translate for plural form.
+ * @param int    $num               Number to determine usage of plural form, also is used as first replace argument.
+ * @param string $context           Context of the string.
+ * @param string $param,...         Unlimited number of optional parameters to replace sequential placeholders.
  *
  * @return string
  */
@@ -172,9 +185,7 @@ function _xn($message, $messagePlural, $num, $context) {
 	$arguments = array_slice(func_get_args(), 4);
 	array_unshift($arguments, $num);
 
-	return ($context == '')
-		? _params(ngettext($message, $messagePlural, $num), $arguments)
-		: _params(npgettext($context, $message, $messagePlural, $num), $arguments);
+	return _params(pgettext($context, ngettext($message, $messagePlural, $num)), $arguments);
 }
 
 /**

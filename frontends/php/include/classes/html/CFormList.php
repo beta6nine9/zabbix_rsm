@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -22,7 +22,7 @@
 class CFormList extends CList {
 
 	protected $editable = true;
-	protected $formInputs = ['ctextbox', 'cnumericbox', 'ctextarea', 'ccombobox', 'ccheckbox', 'cpassbox', 'cipbox'];
+	protected $formInputs = ['ctextbox', 'cnumericbox', 'ctextarea', 'ccombobox', 'ccheckbox', 'cpassbox'];
 
 	public function __construct($id = null) {
 		parent::__construct();
@@ -46,7 +46,9 @@ class CFormList extends CList {
 			$input_class = strtolower(get_class($input));
 
 			if (in_array($input_class, $this->formInputs)) {
-				$input_id = $input->getAttribute('id');
+				if ($input_class !== 'ccheckbox' || $input->getLabel() === '') {
+					$input_id = $input->getAttribute('id');
+				}
 			}
 		}
 
@@ -71,7 +73,7 @@ class CFormList extends CList {
 	public function addInfo($text) {
 		$this->addItem(
 			[
-				(new CDiv(_('Info')))->addClass(ZBX_STYLE_TABLE_FORMS_TD_LEFT),
+				(new CDiv())->addClass(ZBX_STYLE_TABLE_FORMS_TD_LEFT),
 				(new CDiv(
 					(new CDiv($text))->addClass(ZBX_STYLE_TABLE_FORMS_SEPARATOR)
 				))->addClass(ZBX_STYLE_TABLE_FORMS_TD_RIGHT)

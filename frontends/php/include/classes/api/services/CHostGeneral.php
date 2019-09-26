@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -21,10 +21,43 @@
 
 /**
  * Class containing methods for operations with hosts.
- *
- * @package API
  */
 abstract class CHostGeneral extends CHostBase {
+
+	/**
+	 * Checks if the current user has access to the given hosts and templates. Assumes the "hostid" field is valid.
+	 *
+	 * @param array $hostids    an array of host or template IDs
+	 *
+	 * @throws APIException if the user doesn't have write permissions for the given hosts.
+	 */
+	private function checkHostPermissions(array $hostids) {
+		if ($hostids) {
+			$hostids = array_unique($hostids);
+
+			$count = API::Host()->get([
+				'countOutput' => true,
+				'hostids' => $hostids,
+				'editable' => true
+			]);
+
+			if ($count == count($hostids)) {
+				return;
+			}
+
+			$count += API::Template()->get([
+				'countOutput' => true,
+				'templateids' => $hostids,
+				'editable' => true
+			]);
+
+			if ($count != count($hostids)) {
+				self::exception(ZBX_API_ERROR_PERMISSIONS,
+					_('No permissions to referred object or it does not exist!')
+				);
+			}
+		}
+	}
 
 	/**
 	 * Allows to:
@@ -60,11 +93,7 @@ abstract class CHostGeneral extends CHostBase {
 
 		// link templates
 		if (!empty($data['templates_link'])) {
-			if (!API::Host()->isWritable($allHostIds)) {
-				self::exception(ZBX_API_ERROR_PERMISSIONS,
-					_('No permissions to referred object or it does not exist!')
-				);
-			}
+			$this->checkHostPermissions($allHostIds);
 
 			$this->link(zbx_objectValues(zbx_toArray($data['templates_link']), 'templateid'), $allHostIds);
 		}
@@ -110,11 +139,7 @@ abstract class CHostGeneral extends CHostBase {
 	public function massRemove(array $data) {
 		$allHostIds = array_merge($data['hostids'], $data['templateids']);
 
-		if (!API::Host()->isWritable($allHostIds)) {
-			self::exception(ZBX_API_ERROR_PERMISSIONS,
-				_('No permissions to referred object or it does not exist!')
-			);
-		}
+		$this->checkHostPermissions($allHostIds);
 
 		if (!empty($data['templateids_link'])) {
 			$this->unlink(zbx_toArray($data['templateids_link']), $allHostIds);
@@ -149,6 +174,14 @@ abstract class CHostGeneral extends CHostBase {
 		foreach ($hostsLinkageInserts as $hostTplIds){
 			Manager::Application()->link($hostTplIds['templateid'], $hostTplIds['hostid']);
 
+			// Fist link web items, so that later regular items can use web item as their master item.
+			Manager::HttpTest()->link($hostTplIds['templateid'], $hostTplIds['hostid']);
+
+			API::Item()->syncTemplates([
+				'hostids' => $hostTplIds['hostid'],
+				'templateids' => $hostTplIds['templateid']
+			]);
+
 			API::DiscoveryRule()->syncTemplates([
 				'hostids' => $hostTplIds['hostid'],
 				'templateids' => $hostTplIds['templateid']
@@ -163,13 +196,6 @@ abstract class CHostGeneral extends CHostBase {
 				'hostids' => $hostTplIds['hostid'],
 				'templateids' => $hostTplIds['templateid']
 			]);
-
-			API::Item()->syncTemplates([
-				'hostids' => $hostTplIds['hostid'],
-				'templateids' => $hostTplIds['templateid']
-			]);
-
-			Manager::HttpTest()->link($hostTplIds['templateid'], $hostTplIds['hostid']);
 		}
 
 		// we do linkage in two separate loops because for triggers you need all items already created on host
@@ -244,83 +270,130 @@ abstract class CHostGeneral extends CHostBase {
 			);
 		}
 
-		$sqlFrom = ' triggers t,hosts h';
-		$sqlWhere = ' EXISTS ('.
-			'SELECT ff.triggerid'.
-			' FROM functions ff,items ii'.
-			' WHERE ff.triggerid=t.templateid'.
-			' AND ii.itemid=ff.itemid'.
-			' AND '.dbConditionInt('ii.hostid', $templateids).')'.
-			' AND '.dbConditionInt('t.flags', $flags);
+		$templ_triggerids = [];
 
+		$db_triggers = DBselect(
+			'SELECT DISTINCT f.triggerid'.
+			' FROM functions f,items i'.
+			' WHERE f.itemid=i.itemid'.
+				' AND '.dbConditionInt('i.hostid', $templateids)
+		);
 
-		if (!is_null($targetids)) {
-			$sqlFrom = ' triggers t,functions f,items i,hosts h';
-			$sqlWhere .= ' AND '.dbConditionInt('i.hostid', $targetids).
-				' AND f.itemid=i.itemid'.
-				' AND t.triggerid=f.triggerid'.
-				' AND h.hostid=i.hostid';
+		while ($db_trigger = DBfetch($db_triggers)) {
+			$templ_triggerids[] = $db_trigger['triggerid'];
 		}
-		$sql = 'SELECT DISTINCT t.triggerid,t.description,t.flags,t.expression,h.name as host'.
-			' FROM '.$sqlFrom.
-			' WHERE '.$sqlWhere;
-		$dbTriggers = DBSelect($sql);
-		$triggers = [
-			ZBX_FLAG_DISCOVERY_NORMAL => [],
-			ZBX_FLAG_DISCOVERY_PROTOTYPE => []
-		];
-		$triggerids = [];
-		while ($trigger = DBfetch($dbTriggers)) {
-			$triggers[$trigger['flags']][$trigger['triggerid']] = [
-				'description' => $trigger['description'],
-				'expression' => $trigger['expression'],
-				'triggerid' => $trigger['triggerid'],
-				'host' => $trigger['host']
+
+		$triggerids = [ZBX_FLAG_DISCOVERY_NORMAL => [], ZBX_FLAG_DISCOVERY_PROTOTYPE => []];
+
+		if ($templ_triggerids) {
+			$sql_distinct = ($targetids !== null) ? ' DISTINCT' : '';
+			$sql_from = ($targetids !== null) ? ',functions f,items i' : '';
+			$sql_where = ($targetids !== null)
+				? ' AND t.triggerid=f.triggerid'.
+					' AND f.itemid=i.itemid'.
+					' AND '.dbConditionInt('i.hostid', $targetids)
+				: '';
+
+			$db_triggers = DBSelect(
+				'SELECT'.$sql_distinct.' t.triggerid,t.flags'.
+				' FROM triggers t'.$sql_from.
+				' WHERE '.dbConditionInt('t.templateid', $templ_triggerids).
+					' AND '.dbConditionInt('t.flags', $flags).
+					$sql_where
+			);
+
+			while ($db_trigger = DBfetch($db_triggers)) {
+				$triggerids[$db_trigger['flags']][] = $db_trigger['triggerid'];
+			}
+		}
+
+		if ($triggerids[ZBX_FLAG_DISCOVERY_NORMAL]) {
+			if ($clear) {
+				CTriggerManager::delete($triggerids[ZBX_FLAG_DISCOVERY_NORMAL]);
+			}
+			else {
+				DB::update('triggers', [
+					'values' => ['templateid' => 0],
+					'where' => ['triggerid' => $triggerids[ZBX_FLAG_DISCOVERY_NORMAL]]
+				]);
+			}
+		}
+
+		if ($triggerids[ZBX_FLAG_DISCOVERY_PROTOTYPE]) {
+			if ($clear) {
+				CTriggerPrototypeManager::delete($triggerids[ZBX_FLAG_DISCOVERY_PROTOTYPE]);
+			}
+			else {
+				DB::update('triggers', [
+					'values' => ['templateid' => 0],
+					'where' => ['triggerid' => $triggerids[ZBX_FLAG_DISCOVERY_PROTOTYPE]]
+				]);
+			}
+		}
+
+		/* GRAPHS {{{ */
+		$db_tpl_graphs = DBselect(
+			'SELECT DISTINCT g.graphid'.
+			' FROM graphs g,graphs_items gi,items i'.
+			' WHERE g.graphid=gi.graphid'.
+				' AND gi.itemid=i.itemid'.
+				' AND '.dbConditionInt('i.hostid', $templateids).
+				' AND '.dbConditionInt('g.flags', $flags)
+		);
+
+		$tpl_graphids = [];
+
+		while ($db_tpl_graph = DBfetch($db_tpl_graphs)) {
+			$tpl_graphids[] = $db_tpl_graph['graphid'];
+		}
+
+		if ($tpl_graphids) {
+			$sql = ($targetids !== null)
+				? 'SELECT DISTINCT g.graphid,g.flags'.
+					' FROM graphs g,graphs_items gi,items i'.
+					' WHERE g.graphid=gi.graphid'.
+						' AND gi.itemid=i.itemid'.
+						' AND '.dbConditionInt('g.templateid', $tpl_graphids).
+						' AND '.dbConditionInt('i.hostid', $targetids)
+				: 'SELECT g.graphid,g.flags'.
+					' FROM graphs g'.
+					' WHERE '.dbConditionInt('g.templateid', $tpl_graphids);
+
+			$db_graphs = DBSelect($sql);
+
+			$graphs = [
+				ZBX_FLAG_DISCOVERY_NORMAL => [],
+				ZBX_FLAG_DISCOVERY_PROTOTYPE => []
 			];
-			if (!in_array($trigger['triggerid'], $triggerids)) {
-				array_push($triggerids, $trigger['triggerid']);
+			while ($db_graph = DBfetch($db_graphs)) {
+				$graphs[$db_graph['flags']][] = $db_graph['graphid'];
 			}
-		}
 
-		if (!empty($triggers[ZBX_FLAG_DISCOVERY_NORMAL])) {
-			$triggers[ZBX_FLAG_DISCOVERY_NORMAL] =
-				CMacrosResolverHelper::resolveTriggerExpressions($triggers[ZBX_FLAG_DISCOVERY_NORMAL]);
-
-			if ($clear) {
-				$result = API::Trigger()->delete(array_keys($triggers[ZBX_FLAG_DISCOVERY_NORMAL]), true);
-				if (!$result) self::exception(ZBX_API_ERROR_INTERNAL, _('Cannot unlink and clear triggers'));
+			if ($graphs[ZBX_FLAG_DISCOVERY_PROTOTYPE]) {
+				if ($clear) {
+					CGraphPrototypeManager::delete($graphs[ZBX_FLAG_DISCOVERY_PROTOTYPE]);
+				}
+				else {
+					DB::update('graphs', [
+						'values' => ['templateid' => 0],
+						'where' => ['graphid' => $graphs[ZBX_FLAG_DISCOVERY_PROTOTYPE]]
+					]);
+				}
 			}
-			else{
-				DB::update('triggers', [
-					'values' => ['templateid' => 0],
-					'where' => ['triggerid' => array_keys($triggers[ZBX_FLAG_DISCOVERY_NORMAL])]
-				]);
 
-				foreach ($triggers[ZBX_FLAG_DISCOVERY_NORMAL] as $trigger) {
-					info(_s('Unlinked: Trigger "%1$s" on "%2$s".', $trigger['description'], $trigger['host']));
+			if ($graphs[ZBX_FLAG_DISCOVERY_NORMAL]) {
+				if ($clear) {
+					CGraphManager::delete($graphs[ZBX_FLAG_DISCOVERY_NORMAL]);
+				}
+				else {
+					DB::update('graphs', [
+						'values' => ['templateid' => 0],
+						'where' => ['graphid' => $graphs[ZBX_FLAG_DISCOVERY_NORMAL]]
+					]);
 				}
 			}
 		}
-
-		if (!empty($triggers[ZBX_FLAG_DISCOVERY_PROTOTYPE])) {
-			$triggers[ZBX_FLAG_DISCOVERY_PROTOTYPE] =
-				CMacrosResolverHelper::resolveTriggerExpressions($triggers[ZBX_FLAG_DISCOVERY_PROTOTYPE]);
-
-			if ($clear) {
-				$result = API::TriggerPrototype()->delete(array_keys($triggers[ZBX_FLAG_DISCOVERY_PROTOTYPE]), true);
-				if (!$result) self::exception(ZBX_API_ERROR_INTERNAL, _('Cannot unlink and clear triggers'));
-			}
-			else{
-				DB::update('triggers', [
-					'values' => ['templateid' => 0],
-					'where' => ['triggerid' => array_keys($triggers[ZBX_FLAG_DISCOVERY_PROTOTYPE])]
-				]);
-
-				foreach ($triggers[ZBX_FLAG_DISCOVERY_PROTOTYPE] as $trigger) {
-					info(_s('Unlinked: Trigger prototype "%1$s" on "%2$s".', $trigger['description'], $trigger['host']));
-				}
-			}
-		}
+		/* }}} GRAPHS */
 
 		/* ITEMS, DISCOVERY RULES {{{ */
 		$sqlFrom = ' items i1,items i2,hosts h';
@@ -367,8 +440,7 @@ abstract class CHostGeneral extends CHostBase {
 
 		if (!empty($items[ZBX_FLAG_DISCOVERY_NORMAL])) {
 			if ($clear) {
-				$result = API::Item()->delete(array_keys($items[ZBX_FLAG_DISCOVERY_NORMAL]), true);
-				if (!$result) self::exception(ZBX_API_ERROR_INTERNAL, _('Cannot unlink and clear items'));
+				CItemManager::delete(array_keys($items[ZBX_FLAG_DISCOVERY_NORMAL]));
 			}
 			else{
 				DB::update('items', [
@@ -387,11 +459,7 @@ abstract class CHostGeneral extends CHostBase {
 
 			if ($clear) {
 				// This will include deletion of linked application prototypes.
-				$result = API::ItemPrototype()->delete($item_prototypeids, true);
-
-				if (!$result) {
-					self::exception(ZBX_API_ERROR_INTERNAL, _('Cannot unlink and clear item prototypes'));
-				}
+				CItemPrototypeManager::delete($item_prototypeids);
 			}
 			else {
 				DB::update('items', [
@@ -459,76 +527,6 @@ abstract class CHostGeneral extends CHostBase {
 				}
 			}
 		}
-
-
-		/* GRAPHS {{{ */
-		$sqlFrom = ' graphs g,hosts h';
-		$sqlWhere = ' EXISTS ('.
-			'SELECT ggi.graphid'.
-			' FROM graphs_items ggi,items ii'.
-			' WHERE ggi.graphid=g.templateid'.
-			' AND ii.itemid=ggi.itemid'.
-			' AND '.dbConditionInt('ii.hostid', $templateids).')'.
-			' AND '.dbConditionInt('g.flags', $flags);
-
-
-		if (!is_null($targetids)) {
-			$sqlFrom = ' graphs g,graphs_items gi,items i,hosts h';
-			$sqlWhere .= ' AND '.dbConditionInt('i.hostid', $targetids).
-				' AND gi.itemid=i.itemid'.
-				' AND g.graphid=gi.graphid'.
-				' AND h.hostid=i.hostid';
-		}
-		$sql = 'SELECT DISTINCT g.graphid,g.name,g.flags,h.name as host'.
-			' FROM '.$sqlFrom.
-			' WHERE '.$sqlWhere;
-		$dbGraphs = DBSelect($sql);
-		$graphs = [
-			ZBX_FLAG_DISCOVERY_NORMAL => [],
-			ZBX_FLAG_DISCOVERY_PROTOTYPE => []
-		];
-		while ($graph = DBfetch($dbGraphs)) {
-			$graphs[$graph['flags']][$graph['graphid']] = [
-				'name' => $graph['name'],
-				'graphid' => $graph['graphid'],
-				'host' => $graph['host']
-			];
-		}
-
-		if (!empty($graphs[ZBX_FLAG_DISCOVERY_PROTOTYPE])) {
-			if ($clear) {
-				$result = API::GraphPrototype()->delete(array_keys($graphs[ZBX_FLAG_DISCOVERY_PROTOTYPE]), true);
-				if (!$result) self::exception(ZBX_API_ERROR_INTERNAL, _('Cannot unlink and clear graph prototypes'));
-			}
-			else{
-				DB::update('graphs', [
-					'values' => ['templateid' => 0],
-					'where' => ['graphid' => array_keys($graphs[ZBX_FLAG_DISCOVERY_PROTOTYPE])]
-				]);
-
-				foreach ($graphs[ZBX_FLAG_DISCOVERY_PROTOTYPE] as $graph) {
-					info(_s('Unlinked: Graph prototype "%1$s" on "%2$s".', $graph['name'], $graph['host']));
-				}
-			}
-		}
-
-		if (!empty($graphs[ZBX_FLAG_DISCOVERY_NORMAL])) {
-			if ($clear) {
-				$result = API::Graph()->delete(array_keys($graphs[ZBX_FLAG_DISCOVERY_NORMAL]), true);
-				if (!$result) self::exception(ZBX_API_ERROR_INTERNAL, _('Cannot unlink and clear graphs.'));
-			}
-			else{
-				DB::update('graphs', [
-					'values' => ['templateid' => 0],
-					'where' => ['graphid' => array_keys($graphs[ZBX_FLAG_DISCOVERY_NORMAL])]
-				]);
-
-				foreach ($graphs[ZBX_FLAG_DISCOVERY_NORMAL] as $graph) {
-					info(_s('Unlinked: Graph "%1$s" on "%2$s".', $graph['name'], $graph['host']));
-				}
-			}
-		}
-		/* }}} GRAPHS */
 
 		// http tests
 		$sqlWhere = '';
@@ -612,9 +610,11 @@ abstract class CHostGeneral extends CHostBase {
 							' WHERE '.dbConditionInt('ia.applicationid', $applicationids).
 						')'
 				));
-				$result = API::Application()->delete(zbx_objectValues($applications, 'applicationid'), true);
-				if (!$result) {
-					self::exception(ZBX_API_ERROR_INTERNAL, _('Cannot unlink and clear applications.'));
+				if ($applications) {
+					$result = API::Application()->delete(zbx_objectValues($applications, 'applicationid'), true);
+					if (!$result) {
+						self::exception(ZBX_API_ERROR_INTERNAL, _('Cannot unlink and clear applications.'));
+					}
 				}
 			}
 			else {
@@ -668,7 +668,7 @@ abstract class CHostGeneral extends CHostBase {
 		$hostids = array_keys($result);
 
 		// adding groups
-		if ($options['selectGroups'] !== null) {
+		if ($options['selectGroups'] !== null && $options['selectGroups'] != API_OUTPUT_COUNT) {
 			$relationMap = $this->createRelationMap($result, 'hostid', 'groupid', 'hosts_groups');
 			$groups = API::HostGroup()->get([
 				'output' => $options['selectGroups'],
@@ -700,7 +700,9 @@ abstract class CHostGeneral extends CHostBase {
 				]);
 				$templates = zbx_toHash($templates, 'hostid');
 				foreach ($result as $hostid => $host) {
-					$result[$hostid]['parentTemplates'] = isset($templates[$hostid]) ? $templates[$hostid]['rowscount'] : 0;
+					$result[$hostid]['parentTemplates'] = array_key_exists($hostid, $templates)
+						? $templates[$hostid]['rowscount']
+						: '0';
 				}
 			}
 		}
@@ -733,7 +735,7 @@ abstract class CHostGeneral extends CHostBase {
 				]);
 				$items = zbx_toHash($items, 'hostid');
 				foreach ($result as $hostid => $host) {
-					$result[$hostid]['items'] = isset($items[$hostid]) ? $items[$hostid]['rowscount'] : 0;
+					$result[$hostid]['items'] = array_key_exists($hostid, $items) ? $items[$hostid]['rowscount'] : '0';
 				}
 			}
 		}
@@ -766,7 +768,9 @@ abstract class CHostGeneral extends CHostBase {
 				]);
 				$items = zbx_toHash($items, 'hostid');
 				foreach ($result as $hostid => $host) {
-					$result[$hostid]['discoveries'] = isset($items[$hostid]) ? $items[$hostid]['rowscount'] : 0;
+					$result[$hostid]['discoveries'] = array_key_exists($hostid, $items)
+						? $items[$hostid]['rowscount']
+						: '0';
 				}
 			}
 		}
@@ -805,7 +809,9 @@ abstract class CHostGeneral extends CHostBase {
 				$triggers = zbx_toHash($triggers, 'hostid');
 
 				foreach ($result as $hostid => $host) {
-					$result[$hostid]['triggers'] = isset($triggers[$hostid]) ? $triggers[$hostid]['rowscount'] : 0;
+					$result[$hostid]['triggers'] = array_key_exists($hostid, $triggers)
+						? $triggers[$hostid]['rowscount']
+						: '0';
 				}
 			}
 		}
@@ -843,7 +849,9 @@ abstract class CHostGeneral extends CHostBase {
 				]);
 				$graphs = zbx_toHash($graphs, 'hostid');
 				foreach ($result as $hostid => $host) {
-					$result[$hostid]['graphs'] = isset($graphs[$hostid]) ? $graphs[$hostid]['rowscount'] : 0;
+					$result[$hostid]['graphs'] = array_key_exists($hostid, $graphs)
+						? $graphs[$hostid]['rowscount']
+						: '0';
 				}
 			}
 		}
@@ -875,8 +883,10 @@ abstract class CHostGeneral extends CHostBase {
 					'groupCount' => true
 				]);
 				$httpTests = zbx_toHash($httpTests, 'hostid');
-				foreach ($result as $hostId => $host) {
-					$result[$hostId]['httpTests'] = isset($httpTests[$hostId]) ? $httpTests[$hostId]['rowscount'] : 0;
+				foreach ($result as $hostid => $host) {
+					$result[$hostid]['httpTests'] = array_key_exists($hostid, $httpTests)
+						? $httpTests[$hostid]['rowscount']
+						: '0';
 				}
 			}
 		}
@@ -913,7 +923,9 @@ abstract class CHostGeneral extends CHostBase {
 
 				$applications = zbx_toHash($applications, 'hostid');
 				foreach ($result as $hostid => $host) {
-					$result[$hostid]['applications'] = isset($applications[$hostid]) ? $applications[$hostid]['rowscount'] : 0;
+					$result[$hostid]['applications'] = array_key_exists($hostid, $applications)
+						? $applications[$hostid]['rowscount']
+						: '0';
 				}
 			}
 		}
@@ -932,6 +944,126 @@ abstract class CHostGeneral extends CHostBase {
 			$result = $relationMap->mapMany($result, $macros, 'macros', $options['limitSelects']);
 		}
 
+		// adding tags
+		if ($options['selectTags'] !== null && $options['selectTags'] != API_OUTPUT_COUNT) {
+			if ($options['selectTags'] === API_OUTPUT_EXTEND) {
+				$options['selectTags'] = ['tag', 'value'];
+			}
+
+			$tags_options = [
+				'output' => $this->outputExtend($options['selectTags'], ['hostid']),
+				'filter' => ['hostid' => $hostids]
+			];
+			$tags = DBselect(DB::makeSql('host_tag', $tags_options));
+
+			foreach ($result as &$host) {
+				$host['tags'] = [];
+			}
+			unset($host);
+
+			while ($tag = DBfetch($tags)) {
+				$result[$tag['hostid']]['tags'][] = [
+					'tag' => $tag['tag'],
+					'value' => $tag['value']
+				];
+			}
+		}
+
 		return $result;
+	}
+
+	/**
+	 * Compares input tags with tags stored in the database and performs tag deleting and inserting.
+	 *
+	 * @param array  $hosts
+	 * @param int    $hosts[]['hostid']
+	 * @param int    $hosts[]['templateid']
+	 * @param array  $hosts[]['tags']
+	 * @param string $hosts[]['tags'][]['tag']
+	 * @param string $hosts[]['tags'][]['value']
+	 * @param string $id_field
+	 */
+	protected function updateTags(array $hosts, $id_field) {
+		$hostids = [];
+		foreach ($hosts as $host) {
+			if (array_key_exists('tags', $host)) {
+				$hostids[] = $host[$id_field];
+			}
+		}
+
+		if (!$hostids) {
+			return;
+		}
+
+		$options = [
+			'output' => ['hosttagid', 'hostid', 'tag', 'value'],
+			'filter' => ['hostid' => $hostids]
+		];
+
+		$db_tags = DBselect(DB::makeSql('host_tag', $options));
+		$db_hosts = [];
+		$del_hosttagids = [];
+
+		while ($db_tag = DBfetch($db_tags)) {
+			$db_hosts[$db_tag['hostid']]['tags'][] = $db_tag;
+			$del_hosttagids[$db_tag['hosttagid']] = true;
+		}
+
+		$ins_tags = [];
+		foreach ($hosts as $host) {
+			foreach ($host['tags'] as $tag) {
+				$tag += ['value' => ''];
+
+				if (array_key_exists($host[$id_field], $db_hosts)) {
+					foreach ($db_hosts[$host[$id_field]]['tags'] as $db_tag) {
+						if ($tag['tag'] === $db_tag['tag'] && $tag['value'] === $db_tag['value']) {
+							unset($del_hosttagids[$db_tag['hosttagid']]);
+							$tag = null;
+							break;
+						}
+					}
+				}
+
+				if ($tag !== null) {
+					$ins_tags[] = ['hostid' => $host[$id_field]] + $tag;
+				}
+			}
+		}
+
+		if ($del_hosttagids) {
+			DB::delete('host_tag', ['hosttagid' => array_keys($del_hosttagids)]);
+		}
+
+		if ($ins_tags) {
+			DB::insert('host_tag', $ins_tags);
+		}
+	}
+
+	/**
+	 * Validates tags.
+	 *
+	 * @param array  $host
+	 * @param int    $host['evaltype']
+	 * @param array  $host['tags']
+	 * @param string $host['tags'][]['tag']
+	 * @param string $host['tags'][]['value']
+	 *
+	 * @throws APIException if the input is invalid.
+	 */
+	protected function validateTags(array $host) {
+		$api_input_rules = ['type' => API_OBJECT, 'fields' => [
+			'evaltype'	=> ['type' => API_INT32, 'in' => implode(',', [TAG_EVAL_TYPE_AND_OR, TAG_EVAL_TYPE_OR])],
+			'tags'		=> ['type' => API_OBJECTS, 'uniq' => [['tag', 'value']], 'fields' => [
+				'tag'		=> ['type' => API_STRING_UTF8, 'flags' => API_REQUIRED | API_NOT_EMPTY, 'length' => DB::getFieldLength('host_tag', 'tag')],
+				'value'		=> ['type' => API_STRING_UTF8, 'length' => DB::getFieldLength('host_tag', 'value'), 'default' => DB::getDefault('host_tag', 'value')]
+			]]
+		]];
+
+		// Keep values only for fields with defined validation rules.
+		$host = array_intersect_key($host, $api_input_rules['fields']);
+
+		if (!CApiInputValidator::validate($api_input_rules, $host, '/', $error)) {
+			self::exception(ZBX_API_ERROR_PARAMETERS, $error);
+		}
 	}
 }

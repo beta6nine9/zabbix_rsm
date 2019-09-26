@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -19,7 +19,6 @@
 **/
 
 require_once dirname(__FILE__).'/general/GeneralTests.php';
-require_once dirname(__FILE__).'/api_json/ApiJsonTests.php';
 require_once dirname(__FILE__).'/selenium/SeleniumTests.php';
 
 class All {
@@ -27,7 +26,6 @@ class All {
 		$suite = new PHPUnit_Framework_TestSuite('Project');
 
 		$suite->addTest(GeneralTests::suite());
-		$suite->addTest(ApiJsonTests::suite());
 		$suite->addTest(SeleniumTests::suite());
 
 		return $suite;

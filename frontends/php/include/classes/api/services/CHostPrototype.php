@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -21,8 +21,6 @@
 
 /**
  * Class containing methods for operations with host prototypes.
- *
- * @package API
  */
 class CHostPrototype extends CHostBase {
 
@@ -40,7 +38,7 @@ class CHostPrototype extends CHostBase {
 			'selectParentHost'		=> null,
 			'selectTemplates' 		=> null,
 			'selectInventory' 		=> null,
-			'editable'				=> null,
+			'editable'				=> false,
 			'nopermissions'			=> null,
 			'sortfield'    			=> '',
 			'sortorder'     		=> ''
@@ -66,13 +64,13 @@ class CHostPrototype extends CHostBase {
 		$result = [];
 		while ($row = DBfetch($res)) {
 			// a count query, return a single result
-			if ($options['countOutput'] !== null) {
-			if ($options['groupCount'] !== null) {
-				$result[] = $row;
-			}
-			else {
-				$result = $row['rowscount'];
-			}
+			if ($options['countOutput']) {
+				if ($options['groupCount']) {
+					$result[] = $row;
+				}
+				else {
+					$result = $row['rowscount'];
+				}
 			}
 			// a normal select query
 			else {
@@ -80,7 +78,7 @@ class CHostPrototype extends CHostBase {
 			}
 		}
 
-		if ($options['countOutput'] !== null) {
+		if ($options['countOutput']) {
 			return $result;
 		}
 
@@ -89,7 +87,7 @@ class CHostPrototype extends CHostBase {
 			$result = $this->unsetExtraFields($result, ['triggerid'], $options['output']);
 		}
 
-		if ($options['preservekeys'] === null) {
+		if (!$options['preservekeys']) {
 			$result = zbx_cleanHashes($result);
 		}
 
@@ -97,190 +95,136 @@ class CHostPrototype extends CHostBase {
 	}
 
 	/**
-	 * Validates the input parameters for the create() method.
+	 * Check for duplicated names.
 	 *
-	 * @throws APIException if the input is invalid
+	 * @param string $field_name
+	 * @param array  $names_by_ruleid
 	 *
-	 * @param array $hostPrototypes
-	 *
-	 * @return void
+	 * @throws APIException  if host prototype with same name already exists.
 	 */
-	protected function validateCreate(array $hostPrototypes) {
-		// host prototype validator
-		$hostPrototypeValidator = new CSchemaValidator($this->getHostPrototypeSchema());
-		$hostPrototypeValidator->setValidator('ruleid', new CIdValidator([
-			'messageEmpty' => _('No discovery rule ID given for host prototype "%1$s".'),
-			'messageInvalid' => _('Incorrect discovery rule ID for host prototype "%1$s".')
-		]));
-
-		// group validators
-		$groupLinkValidator = new CSchemaValidator($this->getGroupLinkSchema());
-		$groupPrototypeValidator = new CSchemaValidator($this->getGroupPrototypeSchema());
-
-		$groupPrototypeGroupIds = [];
-		foreach ($hostPrototypes as $hostPrototype) {
-			// host prototype
-			$hostPrototypeValidator->setObjectName(isset($hostPrototype['host']) ? $hostPrototype['host'] : '');
-			$this->checkValidator($hostPrototype, $hostPrototypeValidator);
-
-			// groups
-			foreach ($hostPrototype['groupLinks'] as $groupPrototype) {
-				$this->checkValidator($groupPrototype, $groupLinkValidator);
-
-				$groupPrototypeGroupIds[$groupPrototype['groupid']] = $groupPrototype['groupid'];
-			}
-
-			// group prototypes
-			if (isset($hostPrototype['groupPrototypes'])) {
-				foreach ($hostPrototype['groupPrototypes'] as $groupPrototype) {
-					$groupPrototypeValidator->setObjectName(isset($groupPrototype['name']) ? $groupPrototype['name'] : '');
-					$this->checkValidator($groupPrototype, $groupPrototypeValidator);
-				}
-			}
+	private function checkDuplicates($field_name, array $names_by_ruleid) {
+		$sql_where = [];
+		foreach ($names_by_ruleid as $ruleid => $names) {
+			$sql_where[] = '(i.itemid='.$ruleid.' AND '.dbConditionString('h.'.$field_name, $names).')';
 		}
 
-		$this->checkDiscoveryRulePermissions(zbx_objectValues($hostPrototypes, 'ruleid'));
-		$this->checkHostGroupsPermissions($groupPrototypeGroupIds);
+		$db_host_prototypes = DBfetchArray(DBselect(
+				'SELECT i.name AS rule,h.'.$field_name.
+				' FROM items i,host_discovery hd,hosts h'.
+				' WHERE i.itemid=hd.parent_itemid'.
+					' AND hd.hostid=h.hostid'.
+					' AND '.implode(' OR ', $sql_where),
+				1
+		));
 
-		// check if the host is discovered
-		$discoveryRules = API::getApiService()->select('items', [
-			'output' => ['hostid'],
-			'itemids' => zbx_objectValues($hostPrototypes, 'ruleid')
-		]);
-		$this->checkValidator(zbx_objectValues($discoveryRules, 'hostid'), new CHostNormalValidator([
-			'message' => _('Cannot create a host prototype on a discovered host "%1$s".')
-		]));
+		if ($db_host_prototypes) {
+			$error = ($field_name === 'host')
+				? _('Host prototype with host name "%1$s" already exists in discovery rule "%2$s".')
+				: _('Host prototype with visible name "%1$s" already exists in discovery rule "%2$s".');
 
-		// check if group prototypes use discovered host groups
-		$this->checkValidator(array_unique($groupPrototypeGroupIds), new CHostGroupNormalValidator([
-			'message' => _('Group prototype cannot be based on a discovered host group "%1$s".')
-		]));
-
-		$this->checkDuplicates($hostPrototypes);
+			self::exception(ZBX_API_ERROR_PARAMETERS,
+				sprintf($error, $db_host_prototypes[0][$field_name], $db_host_prototypes[0]['rule'])
+			);
+		}
 	}
 
 	/**
-	 * Returns the parameters for creating a host prototype validator.
+	 * Validates the input parameters for the create() method.
 	 *
-	 * @return array
+	 * @throws APIException if the input is invalid.
+	 *
+	 * @param array $host_prototypes
 	 */
-	protected function getHostPrototypeSchema() {
-		return [
-			'validators' => [
-				'host' => new CLldMacroStringValidator([
-					'regex' => '/^('.ZBX_PREG_INTERNAL_NAMES.'|\{#'.ZBX_PREG_MACRO_NAME_LLD.'\})+$/',
-					'messageEmpty' => _('Empty host.'),
-					'messageRegex' => _('Incorrect characters used for host "%1$s".'),
-					'messageMacro' => _('Host name for host prototype "%1$s" must contain macros.')
-				]),
-				'name' => new CStringValidator([
-					// if an empty name is given, it should be replaced with the host name, but we'll validate it
-					// just in case
-					'messageEmpty' => _('Empty name for host prototype "%1$s".')
-				]),
-				'status' => new CLimitedSetValidator([
-					'values' => [HOST_STATUS_MONITORED, HOST_STATUS_NOT_MONITORED],
-					'messageInvalid' => _('Incorrect status for host prototype "%1$s".')
-				]),
-				'groupLinks' => new CCollectionValidator([
-					'uniqueField' => 'groupid',
-					'messageEmpty' => _('Host prototype "%1$s" cannot be without host group.'),
-					'messageInvalid' => _('Incorrect host groups for host prototype "%1$s".'),
-					'messageDuplicate' => _('Duplicate host group ID "%2$s" for host prototype "%1$s".')
-				]),
-				'groupPrototypes' => new CCollectionValidator([
-					'empty' => true,
-					'uniqueField' => 'name',
-					'messageInvalid' => _('Incorrect group prototypes for host prototype "%1$s".'),
-					'messageDuplicate' => _('Duplicate group prototype name "%2$s" for host prototype "%1$s".')
-				]),
-				'inventory' => new CSchemaValidator([
-					'validators' => [
-						'inventory_mode' => null,
-					],
-					'messageUnsupported' => _('Unsupported parameter "%2$s" for host prototype %1$s host inventory.'),
-				]),
-				'templates' => null
-			],
-			'required' => ['host', 'ruleid', 'groupLinks'],
-			'messageRequired' => _('No "%2$s" given for host prototype "%1$s".'),
-			'messageUnsupported' => _('Unsupported parameter "%2$s" for host prototype "%1$s".')
-		];
-	}
+	protected function validateCreate(array &$host_prototypes) {
+		$api_input_rules = ['type' => API_OBJECTS, 'flags' => API_NOT_EMPTY | API_NORMALIZE, 'uniq' => [['ruleid', 'host'], ['ruleid', 'name']], 'fields' => [
+			'ruleid' =>				['type' => API_ID, 'flags' => API_REQUIRED],
+			'host' =>				['type' => API_H_NAME, 'flags' => API_REQUIRED | API_REQUIRED_LLD_MACRO, 'length' => DB::getFieldLength('hosts', 'host')],
+			'name' =>				['type' => API_STRING_UTF8, 'flags' => API_NOT_EMPTY, 'length' => DB::getFieldLength('hosts', 'name'), 'default_source' => 'host'],
+			'status' =>				['type' => API_INT32, 'in' => implode(',', [HOST_STATUS_MONITORED, HOST_STATUS_NOT_MONITORED])],
+			'groupLinks' =>			['type' => API_OBJECTS, 'flags' => API_REQUIRED | API_NOT_EMPTY, 'uniq' => [['groupid']], 'fields' => [
+				'groupid' =>			['type' => API_ID, 'flags' => API_REQUIRED]
+			]],
+			'groupPrototypes' =>	['type' => API_OBJECTS, 'uniq' => [['name']], 'fields' => [
+				'name' =>				['type' => API_HG_NAME, 'flags' => API_REQUIRED | API_REQUIRED_LLD_MACRO, 'length' => DB::getFieldLength('hstgrp', 'name')]
+			]],
+			'inventory' =>			['type' => API_OBJECT, 'fields' => [
+				'inventory_mode' =>		['type' => API_INT32, 'flags' => API_REQUIRED, 'in' => implode(',', [HOST_INVENTORY_DISABLED, HOST_INVENTORY_MANUAL, HOST_INVENTORY_AUTOMATIC])]
+			]],
+			'templates' =>			['type' => API_OBJECTS, 'flags' => API_NORMALIZE, 'uniq' => [['templateid']], 'fields' => [
+				'templateid' =>			['type' => API_ID, 'flags' => API_REQUIRED]
+			]]
+		]];
+		if (!CApiInputValidator::validate($api_input_rules, $host_prototypes, '/', $error)) {
+			self::exception(ZBX_API_ERROR_PARAMETERS, $error);
+		}
 
-	/**
-	 * Returns the parameters for creating a group prototype validator.
-	 *
-	 * @return array
-	 */
-	protected function getGroupPrototypeSchema() {
-		return [
-			'validators' => [
-				'name' => new CLldMacroStringValidator([
-					'messageEmpty' => _('Empty name for group prototype.'),
-					'messageMacro' => _('Name for group prototype "%1$s" must contain macros.')
-				])
-			],
-			'required' => ['name'],
-			'messageUnsupported' => _('Unsupported parameter "%1$s" for group prototype.')
-		];
-	}
+		$hosts_by_ruleid = [];
+		$names_by_ruleid = [];
+		$groupids = [];
 
-	/**
-	 * Returns the parameters for creating a group link validator.
-	 *
-	 * @return array
-	 */
-	protected function getGroupLinkSchema() {
-		return [
-			'validators' => [
-				'groupid' => new CIdValidator([
-					'messageEmpty' => _('No host group ID for group prototype.'),
-					'messageInvalid' => _('Incorrect host group ID for group prototype.')
-				])
-			],
-			'required' => ['groupid'],
-			'messageUnsupported' => _('Unsupported parameter "%1$s" for group prototype.')
-		];
+		foreach ($host_prototypes as $host_prototype) {
+			// Collect host group ID links for latter validation.
+			foreach ($host_prototype['groupLinks'] as $group_prototype) {
+				$groupids[$group_prototype['groupid']] = true;
+			}
+
+			$hosts_by_ruleid[$host_prototype['ruleid']][] = $host_prototype['host'];
+			$names_by_ruleid[$host_prototype['ruleid']][] = $host_prototype['name'];
+		}
+
+		$ruleids = array_unique(zbx_objectValues($host_prototypes, 'ruleid'));
+		$groupids = array_keys($groupids);
+
+		$this->checkDiscoveryRulePermissions($ruleids);
+		$this->checkHostGroupsPermissions($groupids);
+
+		// Check if the host is discovered.
+		$db_discovered_hosts = DBfetchArray(DBselect(
+			'SELECT h.host'.
+			' FROM items i,hosts h'.
+			' WHERE i.hostid=h.hostid'.
+				' AND '.dbConditionInt('i.itemid', $ruleids).
+				' AND h.flags='.ZBX_FLAG_DISCOVERY_CREATED,
+			1
+		));
+
+		if ($db_discovered_hosts) {
+			self::exception(ZBX_API_ERROR_PARAMETERS,
+				_s('Cannot create a host prototype on a discovered host "%1$s".', $db_discovered_hosts[0]['host'])
+			);
+		}
+
+		$this->checkDuplicates('host', $hosts_by_ruleid);
+		$this->checkDuplicates('name', $names_by_ruleid);
 	}
 
 	/**
 	 * Creates the given host prototypes.
 	 *
-	 * @param array $hostPrototypes
+	 * @param array $host_prototypes
 	 *
 	 * @return array
 	 */
-	public function create(array $hostPrototypes) {
-		$hostPrototypes = zbx_toArray($hostPrototypes);
+	public function create(array $host_prototypes) {
+		// 'templateid' validation happens during linkage.
+		$this->validateCreate($host_prototypes);
 
-		foreach ($hostPrototypes as &$hostPrototype) {
-			// if the visible name is not set, use the technical name instead
-			if (!isset($hostPrototype['name']) || zbx_empty(trim($hostPrototype['name']))) {
-				$hostPrototype['name'] = $hostPrototype['host'];
-			}
-
-			if (isset($hostPrototype['templates'])) {
-				$hostPrototype['templates'] = zbx_toArray($hostPrototype['templates']);
-			}
+		// Merge groups into group prototypes.
+		foreach ($host_prototypes as &$host_prototype) {
+			$host_prototype['groupPrototypes'] = array_merge(
+				array_key_exists('groupPrototypes', $host_prototype) ? $host_prototype['groupPrototypes'] : [],
+				$host_prototype['groupLinks']
+			);
+			unset($host_prototype['groupLinks']);
 		}
-		unset($hostPrototype);
+		unset($host_prototype);
 
-		$this->validateCreate($hostPrototypes);
+		$host_prototypes = $this->createReal($host_prototypes);
+		$this->inherit($host_prototypes);
 
-		// merge groups into group prototypes
-		foreach ($hostPrototypes as &$hostPrototype) {
-			foreach ($hostPrototype['groupLinks'] as $group) {
-				$hostPrototype['groupPrototypes'][] = $group;
-			}
-			unset($hostPrototype['groupLinks']);
-		}
-		unset($hostPrototype);
+		$this->addAuditBulk(AUDIT_ACTION_ADD, AUDIT_RESOURCE_HOST_PROTOTYPE, $host_prototypes);
 
-		$hostPrototypes = $this->createReal($hostPrototypes);
-		$this->inherit($hostPrototypes);
-
-		return ['hostids' => zbx_objectValues($hostPrototypes, 'hostid')];
+		return ['hostids' => zbx_objectValues($host_prototypes, 'hostid')];
 	}
 
 	/**
@@ -318,7 +262,9 @@ class CHostPrototype extends CHostBase {
 			];
 
 			// inventory
-			if (isset($hostPrototype['inventory']) && $hostPrototype['inventory']) {
+			if (isset($hostPrototype['inventory']['inventory_mode'])
+					&& ($hostPrototype['inventory']['inventory_mode'] == HOST_INVENTORY_MANUAL
+						|| $hostPrototype['inventory']['inventory_mode'] == HOST_INVENTORY_AUTOMATIC)) {
 				$hostPrototypeInventory[] = [
 					'hostid' => $hostPrototype['hostid'],
 					'inventory_mode' => $hostPrototype['inventory']['inventory_mode']
@@ -351,163 +297,183 @@ class CHostPrototype extends CHostBase {
 			}
 		}
 
-		// TODO: REMOVE info
-		$createdHostPrototypes = $this->get([
-			'hostids' => $hostPrototypeIds,
-			'output' => ['host'],
-			'selectParentHost' => ['host'],
-			'nopermissions' => true
-		]);
-		foreach ($createdHostPrototypes as $hostProtototype) {
-			info(_s('Created: Host prototype "%1$s" on "%2$s".', $hostProtototype['host'], $hostProtototype['parentHost']['host']));
-		}
-
 		return $hostPrototypes;
 	}
 
 	/**
 	 * Validates the input parameters for the update() method.
 	 *
-	 * @throws APIException if the input is invalid
+	 * @throws APIException if the input is invalid.
 	 *
-	 * @param array $hostPrototypes
-	 * @param array $dbHostPrototypes	array of existing host prototypes with hostids as keys
-	 *
-	 * @return void
+	 * @param array $host_prototypes
+	 * @param array $db_host_prototypes
 	 */
-	protected function validateUpdate(array $hostPrototypes, array $dbHostPrototypes) {
-		// TODO: permissions should be checked using the $dbHostPrototypes array
-		$this->checkHostPrototypePermissions(zbx_objectValues($hostPrototypes, 'hostid'));
+	protected function validateUpdate(array &$host_prototypes, array &$db_host_prototypes = null) {
+		$api_input_rules = ['type' => API_OBJECTS, 'flags' => API_NOT_EMPTY | API_NORMALIZE, 'uniq' => [['hostid']], 'fields' => [
+			'hostid' =>				['type' => API_ID, 'flags' => API_REQUIRED],
+			'host' =>				['type' => API_H_NAME, 'flags' => API_REQUIRED_LLD_MACRO, 'length' => DB::getFieldLength('hosts', 'host')],
+			'name' =>				['type' => API_STRING_UTF8, 'flags' => API_NOT_EMPTY, 'length' => DB::getFieldLength('hosts', 'name')],
+			'status' =>				['type' => API_INT32, 'in' => implode(',', [HOST_STATUS_MONITORED, HOST_STATUS_NOT_MONITORED])],
+			'groupLinks' =>			['type' => API_OBJECTS, 'flags' => API_NOT_EMPTY, 'uniq' => [['group_prototypeid'], ['groupid']], 'fields' => [
+				'group_prototypeid' =>	['type' => API_ID],
+				'groupid' =>			['type' => API_ID]
+			]],
+			'groupPrototypes' =>	['type' => API_OBJECTS, 'uniq' => [['group_prototypeid'], ['name']], 'fields' => [
+				'group_prototypeid' =>	['type' => API_ID],
+				'name' =>				['type' => API_HG_NAME, 'flags' => API_REQUIRED_LLD_MACRO, 'length' => DB::getFieldLength('hstgrp', 'name')]
+			]],
+			'inventory' =>			['type' => API_OBJECT, 'fields' => [
+				'inventory_mode' =>		['type' => API_INT32, 'flags' => API_REQUIRED, 'in' => implode(',', [HOST_INVENTORY_DISABLED, HOST_INVENTORY_MANUAL, HOST_INVENTORY_AUTOMATIC])]
+			]],
+			'templates' =>			['type' => API_OBJECTS, 'flags' => API_NORMALIZE, 'uniq' => [['templateid']], 'fields' => [
+				'templateid' =>			['type' => API_ID, 'flags' => API_REQUIRED]
+			]]
+		]];
+		if (!CApiInputValidator::validate($api_input_rules, $host_prototypes, '/', $error)) {
+			self::exception(ZBX_API_ERROR_PARAMETERS, $error);
+		}
 
-		$hostPrototypes = $this->extendFromObjects(zbx_toHash($hostPrototypes, 'hostid'), $dbHostPrototypes, [
-			'host', 'name'
+		$db_host_prototypes = $this->get([
+			'output' => ['hostid', 'host', 'name', 'status'],
+			'selectDiscoveryRule' => ['itemid'],
+			'selectGroupLinks' => ['group_prototypeid', 'groupid'],
+			'selectGroupPrototypes' => ['group_prototypeid', 'name'],
+			'hostids' => zbx_objectValues($host_prototypes, 'hostid'),
+			'editable' => true,
+			'preservekeys' => true
 		]);
 
-		// host prototype validator
-		$hostPrototypeValidator = new CPartialSchemaValidator($this->getHostPrototypeSchema());
-		$hostPrototypeValidator->setValidator('hostid', null);
+		$hosts_by_ruleid = [];
+		$names_by_ruleid = [];
 
-		// group validator
-		$groupLinkValidator = new CPartialSchemaValidator($this->getGroupLinkSchema());
-		$groupLinkValidator->setValidator('group_prototypeid', new CIdValidator([
-			'messageEmpty' => _('Group prototype ID cannot be empty.'),
-			'messageInvalid' => _('Incorrect group prototype ID.')
-		]));
+		foreach ($host_prototypes as &$host_prototype) {
+			// Check if this host prototype exists.
+			if (!array_key_exists($host_prototype['hostid'], $db_host_prototypes)) {
+				self::exception(ZBX_API_ERROR_PERMISSIONS,
+					_('No permissions to referred object or it does not exist!')
+				);
+			}
 
-		// group prototype validator
-		$groupPrototypeValidator = new CPartialSchemaValidator($this->getGroupPrototypeSchema());
-		$groupPrototypeValidator->setValidator('group_prototypeid', new CIdValidator([
-			'messageEmpty' => _('Group prototype ID cannot be empty.'),
-			'messageInvalid' => _('Incorrect group prototype ID.')
-		]));
+			$db_host_prototype = $db_host_prototypes[$host_prototype['hostid']];
+			$host_prototype['ruleid'] = $db_host_prototype['discoveryRule']['itemid'];
 
-		$groupPrototypeGroupIds = [];
-		foreach ($hostPrototypes as $hostPrototype) {
-			// host prototype
-			$hostPrototypeValidator->setObjectName($hostPrototype['host']);
-			$this->checkPartialValidator($hostPrototype, $hostPrototypeValidator);
+			if (array_key_exists('host', $host_prototype) && $host_prototype['host'] !== $db_host_prototype['host']) {
+				$hosts_by_ruleid[$host_prototype['ruleid']][] = $host_prototype['host'];
+			}
 
-			// groups
-			if (isset($hostPrototype['groupLinks'])) {
-				foreach ($hostPrototype['groupLinks'] as $groupPrototype) {
-					$this->checkPartialValidator($groupPrototype, $groupLinkValidator);
+			if (array_key_exists('name', $host_prototype) && $host_prototype['name'] !== $db_host_prototype['name']) {
+				$names_by_ruleid[$host_prototype['ruleid']][] = $host_prototype['name'];
+			}
+		}
+		unset($host_prototype);
 
-					$groupPrototypeGroupIds[$groupPrototype['groupid']] = $groupPrototype['groupid'];
+		$api_input_rules = ['type' => API_OBJECTS, 'uniq' => [['ruleid', 'host'], ['ruleid', 'name']]];
+		if (!CApiInputValidator::validateUniqueness($api_input_rules, $host_prototypes, '/', $error)) {
+			self::exception(ZBX_API_ERROR_PARAMETERS, $error);
+		}
+
+		$groupids = [];
+		$db_groupids = [];
+
+		foreach ($host_prototypes as $host_prototype) {
+			$db_host_prototype = $db_host_prototypes[$host_prototype['hostid']];
+
+			foreach ($db_host_prototype['groupLinks'] as $db_group_link) {
+				$db_groupids[$db_group_link['groupid']] = true;
+			}
+
+			$db_group_links = zbx_toHash($db_host_prototype['groupLinks'], 'group_prototypeid');
+			$db_group_prototypes = zbx_toHash($db_host_prototype['groupPrototypes'], 'group_prototypeid');
+
+			// Validate 'group_prototypeid' in 'groupLinks' property.
+			if (array_key_exists('groupLinks', $host_prototype)) {
+				foreach ($host_prototype['groupLinks'] as $group_link) {
+					if (!$group_link) {
+						self::exception(ZBX_API_ERROR_PARAMETERS, _('Incorrect arguments passed to function.'));
+					}
+
+					// Don't allow invalid 'group_prototypeid' parameters which do not belong to this 'hostid'.
+					if (array_key_exists('group_prototypeid', $group_link)
+							&& !array_key_exists($group_link['group_prototypeid'], $db_group_links)) {
+						self::exception(ZBX_API_ERROR_PERMISSIONS,
+							_('No permissions to referred object or it does not exist!')
+						);
+					}
+
+					if (array_key_exists('groupid', $group_link)) {
+						$groupids[$group_link['groupid']] = true;
+					}
 				}
 			}
 
-			// group prototypes
-			if (isset($hostPrototype['groupPrototypes'])) {
-				foreach ($hostPrototype['groupPrototypes'] as $groupPrototype) {
-					$groupPrototypeValidator->setObjectName(isset($groupPrototype['name']) ? $groupPrototype['name'] : '');
-					$this->checkPartialValidator($groupPrototype, $groupPrototypeValidator);
+			// Validate 'group_prototypeid' in 'groupPrototypes' property.
+			if (array_key_exists('groupPrototypes', $host_prototype)) {
+				foreach ($host_prototype['groupPrototypes'] as $group_prototype) {
+					if (!$group_prototype) {
+						self::exception(ZBX_API_ERROR_PARAMETERS, _('Incorrect arguments passed to function.'));
+					}
+
+					// Don't allow invalid 'group_prototypeid' parameters which do not belong to this 'hostid'.
+					if (array_key_exists('group_prototypeid', $group_prototype)
+							&& !array_key_exists($group_prototype['group_prototypeid'], $db_group_prototypes)) {
+						self::exception(ZBX_API_ERROR_PERMISSIONS,
+							_('No permissions to referred object or it does not exist!')
+						);
+					}
 				}
 			}
 		}
 
-		$this->checkHostGroupsPermissions($groupPrototypeGroupIds);
+		// Collect only new given groupids for validation.
+		$groupids = array_diff_key($groupids, $db_groupids);
 
-		// check if group prototypes use discovered host groups
-		$this->checkValidator(array_unique($groupPrototypeGroupIds), new CHostGroupNormalValidator([
-			'message' => _('Group prototype cannot be based on a discovered host group "%1$s".')
-		]));
-
-		// check for duplicates
-		foreach ($hostPrototypes as &$hostPrototype) {
-			$hostPrototype['ruleid'] = $dbHostPrototypes[$hostPrototype['hostid']]['discoveryRule']['itemid'];
+		if ($groupids) {
+			$this->checkHostGroupsPermissions(array_keys($groupids));
 		}
-		unset($hostPrototype);
-		$this->checkDuplicates($hostPrototypes);
+
+		$host_prototypes = $this->extendObjectsByKey($host_prototypes, $db_host_prototypes, 'hostid',
+			['host', 'name', 'groupLinks', 'groupPrototypes']
+		);
+
+		if ($hosts_by_ruleid) {
+			$this->checkDuplicates('host', $hosts_by_ruleid);
+		}
+		if ($names_by_ruleid) {
+			$this->checkDuplicates('name', $names_by_ruleid);
+		}
 	}
 
 	/**
 	 * Updates the given host prototypes.
 	 *
-	 * @param array $hostPrototypes
+	 * @param array $host_prototypes
 	 *
 	 * @return array
 	 */
-	public function update(array $hostPrototypes) {
-		$hostPrototypes = zbx_toArray($hostPrototypes);
-
-		// check hostids before doing anything
-		$this->checkObjectIds($hostPrototypes, 'hostid',
-			_('No "%1$s" given for host prototype.'),
-			_('Empty host ID for host prototype.'),
-			_('Incorrect host prototype ID.')
-		);
-
-		// fetch updated objects from the DB
-		$dbHostPrototypes = $this->get([
-			'output' => ['host', 'name'],
-			'selectGroupLinks' => API_OUTPUT_EXTEND,
-			'selectGroupPrototypes' => API_OUTPUT_EXTEND,
-			'selectDiscoveryRule' => ['itemid'],
-			'hostids' => zbx_objectValues($hostPrototypes, 'hostid'),
-			'editable' => true,
-			'preservekeys' => true
-		]);
-
-		foreach ($hostPrototypes as &$hostPrototype) {
-			if (isset($hostPrototype['templates'])) {
-				$hostPrototype['templates'] = zbx_toArray($hostPrototype['templates']);
-			}
-
-			// if the visible name is not set, use the technical name instead
-			if (isset($hostPrototype['name']) && zbx_empty(trim($hostPrototype['name']))) {
-				$hostPrototype['name'] = isset($hostPrototype['host'])
-					? $hostPrototype['host']
-					: $dbHostPrototypes[$hostPrototype['hostid']]['host'];
-			}
-		}
-		unset($hostPrototype);
-
-		$this->validateUpdate($hostPrototypes, $dbHostPrototypes);
-
-		// fetch missing data from the DB
-		$hostPrototypes = $this->extendFromObjects(zbx_toHash($hostPrototypes, 'hostid'), $dbHostPrototypes, [
-			'host', 'groupLinks', 'groupPrototypes'
-		]);
-		foreach ($hostPrototypes as &$hostPrototype) {
-			$hostPrototype['ruleid'] = $dbHostPrototypes[$hostPrototype['hostid']]['discoveryRule']['itemid'];
-		}
-		unset($hostPrototype);
+	public function update(array $host_prototypes) {
+		$this->validateUpdate($host_prototypes, $db_host_prototypes);
 
 		// merge group links into group prototypes
-		foreach ($hostPrototypes as &$hostPrototype) {
-			if (isset($hostPrototype['groupLinks'])) {
-				foreach ($hostPrototype['groupLinks'] as $group) {
-					$hostPrototype['groupPrototypes'][] = $group;
-				}
-				unset($hostPrototype['groupLinks']);
-			}
+		foreach ($host_prototypes as &$host_prototype) {
+			$host_prototype['groupPrototypes'] =
+				array_merge($host_prototype['groupPrototypes'], $host_prototype['groupLinks']);
+			unset($host_prototype['groupLinks']);
 		}
-		unset($hostPrototype);
+		unset($host_prototype);
 
-		$hostPrototypes = $this->updateReal($hostPrototypes);
-		$this->inherit($hostPrototypes);
+		$host_prototypes = $this->updateReal($host_prototypes);
+		$this->inherit($host_prototypes);
 
-		return ['hostids' => zbx_objectValues($hostPrototypes, 'hostid')];
+		foreach ($db_host_prototypes as &$db_host_prototype) {
+			unset($db_host_prototype['discoveryRule'], $db_host_prototype['groupLinks'],
+				$db_host_prototype['groupPrototypes']
+			);
+		}
+		unset($db_host_prototype);
+
+		$this->addAuditBulk(AUDIT_ACTION_UPDATE, AUDIT_RESOURCE_HOST_PROTOTYPE, $host_prototypes, $db_host_prototypes);
+
+		return ['hostids' => zbx_objectValues($host_prototypes, 'hostid')];
 	}
 
 	/**
@@ -576,21 +542,20 @@ class CHostPrototype extends CHostBase {
 			// inventory
 			if (isset($hostPrototype['inventory']) ) {
 				$inventory = zbx_array_mintersect(['inventory_mode'], $hostPrototype['inventory']);
-				$inventory['hostid'] = $hostPrototype['hostid'];
 
-				if ($hostPrototype['inventory']
-					&& (!isset($hostPrototype['inventory']['inventory_mode']) || $hostPrototype['inventory']['inventory_mode'] != HOST_INVENTORY_DISABLED)) {
+				if (array_key_exists('inventory_mode', $inventory)
+					&& ($inventory['inventory_mode'] == HOST_INVENTORY_MANUAL
+						|| $inventory['inventory_mode'] == HOST_INVENTORY_AUTOMATIC)) {
 
-					if ($exHostPrototype['inventory']) {
+					if ($exHostPrototype['inventory']['inventory_mode'] != HOST_INVENTORY_DISABLED) {
 						DB::update('host_inventory', [
 							'values' => $inventory,
-							'where' => ['hostid' => $inventory['hostid']]
+							'where' => ['hostid' => $hostPrototype['hostid']]
 						]);
 					}
 					else {
-						$inventoryCreate[] = $inventory;
+						$inventoryCreate[] = $inventory + ['hostid' => $hostPrototype['hostid']];
 					}
-
 				}
 				else {
 					$inventoryDeleteIds[] = $hostPrototype['hostid'];
@@ -601,17 +566,6 @@ class CHostPrototype extends CHostBase {
 		// save inventory
 		DB::insert('host_inventory', $inventoryCreate, false);
 		DB::delete('host_inventory', ['hostid' => $inventoryDeleteIds]);
-
-		// TODO: REMOVE info
-		$updatedHostPrototypes = $this->get([
-			'hostids' => zbx_objectValues($hostPrototypes, 'hostid'),
-			'output' => ['host'],
-			'selectParentHost' => ['host'],
-			'nopermissions' => true
-		]);
-		foreach ($updatedHostPrototypes as $hostProtototype) {
-			info(_s('Updated: Host prototype "%1$s" on "%2$s".', $hostProtototype['host'], $hostProtototype['parentHost']['host']));
-		}
 
 		return $hostPrototypes;
 	}
@@ -915,8 +869,6 @@ class CHostPrototype extends CHostBase {
 	 *
 	 * @param array $hostPrototypeIds
 	 * @param bool 	$nopermissions
-	 *
-	 * @return void
 	 */
 	protected function validateDelete($hostPrototypeIds, $nopermissions) {
 		if (!$hostPrototypeIds) {
@@ -990,51 +942,8 @@ class CHostPrototype extends CHostBase {
 		return ['hostids' => $hostPrototypeIds];
 	}
 
-	/**
-	 * Returns true if all of the given objects are available for reading.
-	 *
-	 * @param $ids
-	 *
-	 * @return bool
-	 */
-	public function isReadable(array $ids) {
-		if (empty($ids)) {
-			return true;
-		}
-		$ids = array_unique($ids);
-
-		$count = $this->get([
-			'hostids' => $ids,
-			'countOutput' => true
-		]);
-		return count($ids) == $count;
-	}
-
-	/**
-	 * Returns true if all of the given objects are available for writing.
-	 *
-	 * @param $ids
-	 *
-	 * @return bool
-	 */
-	public function isWritable(array $ids) {
-		if (empty($ids)) {
-			return true;
-		}
-		$ids = array_unique($ids);
-
-		$count = $this->get([
-			'hostids' => $ids,
-			'editable' => true,
-			'countOutput' => true
-		]);
-		return count($ids) == $count;
-	}
-
 	protected function link(array $templateids, array $targetids) {
-		if (!$this->isWritable($targetids)) {
-			self::exception(ZBX_API_ERROR_PERMISSIONS, _('No permissions to referred object or it does not exist!'));
-		}
+		$this->checkHostPrototypePermissions($targetids);
 
 		$links = parent::link($templateids, $targetids);
 
@@ -1076,10 +985,16 @@ class CHostPrototype extends CHostBase {
 	 *
 	 * @throws APIException if the user doesn't have write permissions for the given LLD rules
 	 *
-	 * @param array $discoveryRuleIds
+	 * @param array $ruleids
 	 */
-	protected function checkDiscoveryRulePermissions(array $discoveryRuleIds) {
-		if (!API::DiscoveryRule()->isWritable($discoveryRuleIds)) {
+	protected function checkDiscoveryRulePermissions(array $ruleids) {
+		$count = API::DiscoveryRule()->get([
+			'countOutput' => true,
+			'itemids' => $ruleids,
+			'editable' => true
+		]);
+
+		if ($count != count($ruleids)) {
 			self::exception(ZBX_API_ERROR_PERMISSIONS, _('No permissions to referred object or it does not exist!'));
 		}
 	}
@@ -1089,11 +1004,31 @@ class CHostPrototype extends CHostBase {
 	 *
 	 * @throws APIException if the user doesn't have write permissions for the given host groups
 	 *
-	 * @param array $hostGroupIds
+	 * @param array $groupids
 	 */
-	protected function checkHostGroupsPermissions(array $hostGroupIds) {
-		if (!API::HostGroup()->isWritable($hostGroupIds)) {
-			self::exception(ZBX_API_ERROR_PERMISSIONS, _('No permissions to referred object or it does not exist!'));
+	protected function checkHostGroupsPermissions(array $groupids) {
+		$db_groups = API::HostGroup()->get([
+			'output' => ['name', 'flags'],
+			'groupids' => $groupids,
+			'editable' => true,
+			'preservekeys' => true
+		]);
+
+		foreach ($groupids as $groupid) {
+			if (!array_key_exists($groupid, $db_groups)) {
+				self::exception(ZBX_API_ERROR_PERMISSIONS,
+					_('No permissions to referred object or it does not exist!')
+				);
+			}
+
+			$db_group = $db_groups[$groupid];
+
+			// Check if group prototypes use discovered host groups.
+			if ($db_group['flags'] == ZBX_FLAG_DISCOVERY_CREATED) {
+				self::exception(ZBX_API_ERROR_PARAMETERS,
+					_s('Group prototype cannot be based on a discovered host group "%1$s".', $db_group['name'])
+				);
+			}
 		}
 	}
 
@@ -1105,8 +1040,20 @@ class CHostPrototype extends CHostBase {
 	 * @param array $hostPrototypeIds
 	 */
 	protected function checkHostPrototypePermissions(array $hostPrototypeIds) {
-		if (!$this->isWritable($hostPrototypeIds)) {
-			self::exception(ZBX_API_ERROR_PERMISSIONS, _('No permissions to referred object or it does not exist!'));
+		if ($hostPrototypeIds) {
+			$hostPrototypeIds = array_unique($hostPrototypeIds);
+
+			$count = $this->get([
+				'countOutput' => true,
+				'hostids' => $hostPrototypeIds,
+				'editable' => true
+			]);
+
+			if ($count != count($hostPrototypeIds)) {
+				self::exception(ZBX_API_ERROR_PERMISSIONS,
+					_('No permissions to referred object or it does not exist!')
+				);
+			}
 		}
 	}
 
@@ -1125,81 +1072,6 @@ class CHostPrototype extends CHostBase {
 		}
 	}
 
-	/**
-	 * Checks if host prototypes with the same technical or visible names already exist on the same LLD rule.
-	 *
-	 * Each host prototype must have the host, name and ruleid properties defined.
-	 *
-	 * @throws APIException 	if a host prototype with the same name or technical name exists
-	 * 							either in the given array or in the database.
-	 *
-	 * @param array $hostPrototypes
-	 */
-	protected function checkDuplicates(array $hostPrototypes) {
-		// check host name duplicates
-		$collectionValidator = new CCollectionValidator([
-			'empty' => true,
-			'uniqueField' => 'host',
-			'uniqueField2' => 'ruleid',
-			'messageDuplicate' => _('Host prototype with host name "%1$s" already exists.')
-		]);
-		$this->checkValidator($hostPrototypes, $collectionValidator);
-		$this->checkExistingHostPrototypes($hostPrototypes, 'host',
-			_('Host prototype with host name "%1$s" already exists in discovery rule "%2$s".')
-		);
-
-		// check visible name duplicates
-		$collectionValidator->uniqueField = 'name';
-		$collectionValidator->messageDuplicate = _('Host prototype with visible name "%1$s" already exists.');
-		$this->checkValidator($hostPrototypes, $collectionValidator);
-		$this->checkExistingHostPrototypes($hostPrototypes, 'name',
-			_('Host prototype with visible name "%1$s" already exists in discovery rule "%2$s".')
-		);
-	}
-
-	/**
-	 * Check if a host with the same value in $field already exists on an LLD rule.
-	 * If host prototypes have host IDs it will check for existing prototypes with different host IDs.
-	 *
-	 * @throw APIException
-	 *
-	 * @param array $hostPrototypes
-	 * @param string $field				name of the field to check uniqueness by
-	 * @param string $error				error message in case duplicates are found
-	 */
-	protected function checkExistingHostPrototypes(array $hostPrototypes, $field, $error) {
-		$valuesByDiscoveryRuleId = [];
-		$hostIds = [];
-		foreach ($hostPrototypes as $hostPrototype) {
-			$valuesByDiscoveryRuleId[$hostPrototype['ruleid']][] = $hostPrototype[$field];
-
-			if (isset($hostPrototype['hostid'])) {
-				$hostIds[] = $hostPrototype['hostid'];
-			}
-		}
-
-		$sqlWhere = [];
-		foreach ($valuesByDiscoveryRuleId as $discoveryRuleId => $values) {
-			$sqlWhere[] = '(hd.parent_itemid='.zbx_dbstr($discoveryRuleId).
-				' AND '.dbConditionString('h.'.$field, $values).')';
-		}
-
-		if ($sqlWhere) {
-			$sql = 'SELECT i.name as discovery_name,h.'.$field.
-				' FROM hosts h,host_discovery hd,items i'.
-				' WHERE h.hostid=hd.hostid AND hd.parent_itemid=i.itemid AND ('.implode(' OR ', $sqlWhere).')';
-
-			// if we update existing items we need to exclude them from result.
-			if ($hostIds) {
-				$sql .= ' AND '.dbConditionInt('h.hostid', $hostIds, true);
-			}
-			$query = DBselect($sql, 1);
-			while ($row = DBfetch($query)) {
-				self::exception(ZBX_API_ERROR_PARAMETERS, _s($error, $row[$field], $row['discovery_name']));
-			}
-		}
-	}
-
 	protected function applyQueryFilterOptions($tableName, $tableAlias, array $options, array $sqlParts) {
 		$sqlParts = parent::applyQueryFilterOptions($tableName, $tableAlias, $options, $sqlParts);
 
@@ -1212,7 +1084,7 @@ class CHostPrototype extends CHostBase {
 		$sqlParts['where'][] = 'i.hostid=ph.hostid';
 		$sqlParts['where'][] = 'ph.flags='.ZBX_FLAG_DISCOVERY_NORMAL;
 
-		if (CWebUser::getType() != USER_TYPE_SUPER_ADMIN && !$options['nopermissions']) {
+		if (self::$userData['type'] != USER_TYPE_SUPER_ADMIN && !$options['nopermissions']) {
 			$permission = $options['editable'] ? PERM_READ_WRITE : PERM_READ;
 
 			$sqlParts['where'][] = 'EXISTS ('.
@@ -1235,7 +1107,7 @@ class CHostPrototype extends CHostBase {
 		if ($options['discoveryids'] !== null) {
 			$sqlParts['where'][] = dbConditionInt('hd.parent_itemid', (array) $options['discoveryids']);
 
-			if ($options['groupCount'] !== null) {
+			if ($options['groupCount']) {
 				$sqlParts['group']['hd'] = 'hd.parent_itemid';
 			}
 		}
@@ -1248,6 +1120,14 @@ class CHostPrototype extends CHostBase {
 		return $sqlParts;
 	}
 
+	/**
+	 * Retrieves and adds additional requested data to the result set.
+	 *
+	 * @param array  $options
+	 * @param array  $result
+	 *
+	 * @return array
+	 */
 	protected function addRelatedObjects(array $options, array $result) {
 		$result = parent::addRelatedObjects($options, $result);
 
@@ -1260,7 +1140,7 @@ class CHostPrototype extends CHostBase {
 				'output' => $options['selectDiscoveryRule'],
 				'itemids' => $relationMap->getRelatedIds(),
 				'nopermissions' => true,
-				'preservekeys' => true,
+				'preservekeys' => true
 			]);
 			$result = $relationMap->mapOne($result, $discoveryRules, 'discoveryRule');
 		}
@@ -1325,7 +1205,7 @@ class CHostPrototype extends CHostBase {
 				'hostids' => $relationMap->getRelatedIds(),
 				'templated_hosts' => true,
 				'nopermissions' => true,
-				'preservekeys' => true,
+				'preservekeys' => true
 			]);
 			$result = $relationMap->mapOne($result, $hosts, 'parentHost');
 		}
@@ -1349,28 +1229,34 @@ class CHostPrototype extends CHostBase {
 				]);
 				$templates = zbx_toHash($templates, 'hostid');
 				foreach ($result as $hostid => $host) {
-					$result[$hostid]['templates'] = isset($templates[$hostid]) ? $templates[$hostid]['rowscount'] : 0;
+					$result[$hostid]['templates'] = array_key_exists($hostid, $templates)
+						? $templates[$hostid]['rowscount']
+						: '0';
 				}
 			}
 		}
 
 		// adding inventory
 		if ($options['selectInventory'] !== null) {
-			$relationMap = $this->createRelationMap($result, 'hostid', 'hostid');
-
-			// only allow to retrieve the hostid and inventory_mode fields
-			$output = [];
-			if ($this->outputIsRequested('hostid', $options['selectInventory'])) {
-				$output[] = 'hostid';
-			}
-			if ($this->outputIsRequested('inventory_mode', $options['selectInventory'])) {
-				$output[] = 'inventory_mode';
-			}
 			$inventory = API::getApiService()->select('host_inventory', [
-				'output' => $output,
-				'filter' => ['hostid' => $hostPrototypeIds]
+				'output' => ['hostid', 'inventory_mode'],
+				'filter' => ['hostid' => $hostPrototypeIds],
+				'preservekeys' => true
 			]);
-			$result = $relationMap->mapOne($result, zbx_toHash($inventory, 'hostid'), 'inventory');
+
+			foreach ($hostPrototypeIds as $host_prototypeid) {
+				// There is no DB record if inventory mode is HOST_INVENTORY_DISABLED.
+				if (!array_key_exists($host_prototypeid, $inventory)) {
+					$inventory[$host_prototypeid] = [
+						'hostid' => (string) $host_prototypeid,
+						'inventory_mode' => (string) HOST_INVENTORY_DISABLED
+					];
+				}
+			}
+
+			$relation_map = $this->createRelationMap($result, 'hostid', 'hostid');
+			$inventory = $this->unsetExtraFields($inventory, ['hostid', 'inventory_mode'], $options['selectInventory']);
+			$result = $relation_map->mapOne($result, $inventory, 'inventory');
 		}
 
 		return $result;

@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -34,25 +34,24 @@ class CScreenSystemStatus extends CScreenBase {
 		// rewrite page file
 		$page['file'] = $this->pageFile;
 
-		$table = make_system_status(
-			[
-				'groupids' => null,
-				'hostids' => null,
-				'maintenance' => null,
-				'trigger_name' => '',
-				'severity' => null,
-				'limit' => null,
-				'extAck' => 0
-			],
-			$this->pageFile.'?screenid='.$this->screenid
-		);
+		$config = select_config();
+		$severity_config = [
+			'severity_name_0' => $config['severity_name_0'],
+			'severity_name_1' => $config['severity_name_1'],
+			'severity_name_2' => $config['severity_name_2'],
+			'severity_name_3' => $config['severity_name_3'],
+			'severity_name_4' => $config['severity_name_4'],
+			'severity_name_5' => $config['severity_name_5']
+		];
+		$data = getSystemStatusData([]);
+		$table = makeSystemStatus([], $data, $severity_config, $this->pageFile.'?screenid='.$this->screenid);
 
 		$footer = (new CList())
 			->addItem(_s('Updated: %s', zbx_date2str(TIME_FORMAT_SECONDS)))
 			->addClass(ZBX_STYLE_DASHBRD_WIDGET_FOOT);
 
 		return $this->getOutput(
-			(new CUiWidget('hat_syssum', [$table, $footer]))->setHeader(_('Status of Zabbix'))
+			(new CUiWidget('hat_syssum', [$table, $footer]))->setHeader(_('Problems by severity'))
 		);
 	}
 }

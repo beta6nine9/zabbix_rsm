@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -31,6 +31,8 @@
 	#define ZBX_THREAD_HANDLE	HANDLE
 	#define ZBX_THREAD_HANDLE_NULL	NULL
 
+	#define ZBX_THREAD_WAIT_EXIT	1
+
 	#define ZBX_THREAD_ENTRY_POINTER(pointer_name) \
 		unsigned (__stdcall *pointer_name)(void *)
 
@@ -43,17 +45,19 @@
 
 	#define zbx_sleep(sec) SleepEx(((DWORD)(sec)) * ((DWORD)1000), TRUE)
 
-	#define zbx_thread_kill(h) QueueUserAPC(ZBXEndThread, h, 0);
-
+	#define zbx_thread_kill(h) QueueUserAPC(ZBXEndThread, h, 0)
+	#define zbx_thread_kill_fatal(h) QueueUserAPC(ZBXEndThread, h, 0)
 #else	/* not _WINDOWS */
 
-	int	zbx_fork();
-	int	zbx_child_fork();
+	int	zbx_fork(void);
+	void	zbx_child_fork(pid_t *pid);
 
 	#define ZBX_THREAD_ERROR	-1
 
 	#define ZBX_THREAD_HANDLE	pid_t
 	#define ZBX_THREAD_HANDLE_NULL	0
+
+	#define ZBX_THREAD_WAIT_EXIT	1
 
 	#define ZBX_THREAD_ENTRY_POINTER(pointer_name) \
 		unsigned (* pointer_name)(void *)
@@ -68,8 +72,8 @@
 
 	#define zbx_sleep(sec) sleep((sec))
 
-	#define zbx_thread_kill(h) kill(h, SIGTERM);
-
+	#define zbx_thread_kill(h) kill(h, SIGUSR2)
+	#define zbx_thread_kill_fatal(h) kill(h, SIGHUP)
 #endif	/* _WINDOWS */
 
 typedef struct
@@ -84,9 +88,10 @@ typedef struct
 }
 zbx_thread_args_t;
 
-ZBX_THREAD_HANDLE	zbx_thread_start(ZBX_THREAD_ENTRY_POINTER(handler), zbx_thread_args_t *thread_args);
-int			zbx_thread_wait(ZBX_THREAD_HANDLE thread);
+void	zbx_thread_start(ZBX_THREAD_ENTRY_POINTER(handler), zbx_thread_args_t *thread_args, ZBX_THREAD_HANDLE *thread);
+int	zbx_thread_wait(ZBX_THREAD_HANDLE thread);
+void			zbx_threads_wait(ZBX_THREAD_HANDLE *threads, const int *threads_flags, int threads_num, int ret);
 /* zbx_thread_exit(status) -- declared as define !!! */
-long int		zbx_get_thread_id();
+long int		zbx_get_thread_id(void);
 
 #endif	/* ZABBIX_THREADS_H */

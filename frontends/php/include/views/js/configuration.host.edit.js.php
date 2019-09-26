@@ -1,3 +1,25 @@
+<?php
+/*
+** Zabbix
+** Copyright (C) 2001-2019 Zabbix SIA
+**
+** This program is free software; you can redistribute it and/or modify
+** it under the terms of the GNU General Public License as published by
+** the Free Software Foundation; either version 2 of the License, or
+** (at your option) any later version.
+**
+** This program is distributed in the hope that it will be useful,
+** but WITHOUT ANY WARRANTY; without even the implied warranty of
+** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+** GNU General Public License for more details.
+**
+** You should have received a copy of the GNU General Public License
+** along with this program; if not, write to the Free Software
+** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+**/
+
+
+?>
 <script type="text/x-jquery-tmpl" id="hostInterfaceRow">
 <tr class="interfaceRow" id="hostInterfaceRow_#{iface.interfaceid}" data-interfaceid="#{iface.interfaceid}">
 	<td class="interface-drag-control <?= ZBX_STYLE_TD_DRAG_ICON ?>">
@@ -10,13 +32,19 @@
 		<input type="hidden" name="interfaces[#{iface.interfaceid}][interfaceid]" value="#{iface.interfaceid}">
 		<input type="hidden" id="interface_type_#{iface.interfaceid}" name="interfaces[#{iface.interfaceid}][type]" value="#{iface.type}">
 		<input name="interfaces[#{iface.interfaceid}][ip]" type="text" style="width: <?= ZBX_TEXTAREA_INTERFACE_IP_WIDTH ?>px" maxlength="64" value="#{iface.ip}">
-		<div class="interface-bulk">
-			<input type="checkbox" id="interfaces_#{iface.interfaceid}_bulk" name="interfaces[#{iface.interfaceid}][bulk]" value="1" #{attrs.checked_bulk}>
-			<label for="interfaces_#{iface.interfaceid}_bulk"><?= _('Use bulk requests') ?></label>
-		</div>
+		<ul class="interface-bulk <?= ZBX_STYLE_LIST_CHECK_RADIO ?> <?= ZBX_STYLE_HOR_LIST ?>">
+			<li>
+				<input class="<?= ZBX_STYLE_CHECKBOX_RADIO ?>" type="checkbox" id="interfaces_#{iface.interfaceid}_bulk" name="interfaces[#{iface.interfaceid}][bulk]" value="1" #{attrs.checked_bulk}>
+				<label for="interfaces_#{iface.interfaceid}_bulk"><span></span><?= _('Use bulk requests') ?></label>
+			</li>
+		</ul>
 	</td>
 	<td class="interface-dns">
-		<input name="interfaces[#{iface.interfaceid}][dns]" type="text" style="width: <?= ZBX_TEXTAREA_INTERFACE_DNS_WIDTH ?>px" maxlength="64" value="#{iface.dns}">
+		<?= (new CTextBox('interfaces[#{iface.interfaceid}][dns]', '#{iface.dns}', false,
+				DB::getFieldLength('interface', 'dns'))
+			)
+				->setWidth(ZBX_TEXTAREA_INTERFACE_DNS_WIDTH)
+		?>
 	</td>
 	<?= (new CCol(
 			(new CRadioButtonList('interfaces[#{iface.interfaceid}][useip]', null))
@@ -28,11 +56,14 @@
 		))->toString()
 	?>
 	<td class="interface-port">
-		<input name="interfaces[#{iface.interfaceid}][port]" type="text" style="width: <?= ZBX_TEXTAREA_INTERFACE_PORT_WIDTH ?>px" maxlength="64" value="#{iface.port}">
+		<?= (new CTextBox('interfaces[#{iface.interfaceid}][port]', '#{iface.port}', false, 64))
+				->setWidth(ZBX_TEXTAREA_INTERFACE_PORT_WIDTH)
+				->setAriaRequired()
+		?>
 	</td>
 	<td class="interface-default">
-		<input class="mainInterface" type="radio" id="interface_main_#{iface.interfaceid}" name="mainInterfaces[#{iface.type}]" value="#{iface.interfaceid}">
-		<label class="checkboxLikeLabel" for="interface_main_#{iface.interfaceid}" style="height: 16px; width: 16px;"></label>
+		<input class="mainInterface <?= ZBX_STYLE_CHECKBOX_RADIO ?>" type="radio" id="interface_main_#{iface.interfaceid}" name="mainInterfaces[#{iface.type}]" value="#{iface.interfaceid}">
+		<label class="checkboxLikeLabel" for="interface_main_#{iface.interfaceid}" style="height: 16px; width: 16px;"><span></span></label>
 	</td>
 	<td class="<?= ZBX_STYLE_NOWRAP ?> interface-control">
 		<button class="<?= ZBX_STYLE_BTN_LINK ?> remove" type="button" id="removeInterface_#{iface.interfaceid}" data-interfaceid="#{iface.interfaceid}" #{attrs.disabled}><?= _('Remove') ?></button>
@@ -66,7 +97,8 @@
 				jQuery('.interface-bulk', domRow).remove();
 			}
 
-			jQuery('#interfaces_' + hostInterface.interfaceid + '_useip_' + hostInterface.useip).prop('checked', true);
+			jQuery('#interfaces_' + hostInterface.interfaceid + '_useip_' + hostInterface.useip).prop('checked', true)
+				.trigger('click');
 
 			if (hostInterface.locked > 0) {
 				addNotDraggableIcon(domRow);
@@ -130,6 +162,7 @@
 		function addDraggableIcon(domElement) {
 			domElement.draggable({
 				handle: 'div.<?= ZBX_STYLE_DRAG_ICON ?>',
+				opacity: 0.6,
 				revert: 'invalid',
 				helper: function(event) {
 					var hostInterfaceId = jQuery(this).data('interfaceid');
@@ -148,7 +181,7 @@
 				},
 				start: function(event, ui) {
 					jQuery(ui.helper).css({'z-index': '1000'});
-					// Visibility is added to original element to hide it, while helper is beeing moved, but to keep
+					// Visibility is added to original element to hide it, while helper is being moved, but to keep
 					// it's place visually.
 					jQuery(this).css({'visibility': 'hidden'});
 				},
@@ -168,8 +201,8 @@
 							<?= CJs::encodeJson(_('Interface is used by items that require this type of the interface.')) ?>
 						);
 					},
-					function (event) {
-						hintBox.hideHint(event, this);
+					function () {
+						hintBox.hideHint(this);
 					}
 				);
 		}
@@ -308,8 +341,8 @@
 				jQuery('.interfaceRow').find('input')
 					.removeAttr('id')
 					.removeAttr('name');
-				jQuery('.interfaceRow').find('input[type="text"]').attr('readonly', true);
-				jQuery('.interfaceRow').find('input[type="radio"], input[type="checkbox"]').attr('disabled', true);
+				jQuery('.interfaceRow').find('input[type="text"]').prop('readonly', true);
+				jQuery('.interfaceRow').find('input[type="radio"], input[type="checkbox"]').prop('disabled', true);
 			}
 		}
 	}());
@@ -332,6 +365,12 @@
 		jQuery('#hostlist').on('click', 'input[type=radio][id*="_useip_"]', function() {
 			var interfaceId = jQuery(this).attr('id').match(/\d+/);
 			hostInterfacesManager.setUseipForInterface(interfaceId[0], jQuery(this).val());
+
+			jQuery('[name^="interfaces['+interfaceId[0]+']["]')
+				.filter('[name$="[ip]"],[name$="[dns]"]')
+				.removeAttr('aria-required')
+				.filter((jQuery(this).val() == <?= INTERFACE_USE_IP ?>) ? '[name$="[ip]"]' : '[name$="[dns]"]')
+				.attr('aria-required', true);
 		});
 
 		jQuery('#tls_connect, #tls_in_psk, #tls_in_cert').change(function() {
@@ -362,26 +401,34 @@
 
 				if (getHostInterfaceNumericType(hostInterfaceTypeName) == <?= INTERFACE_TYPE_SNMP ?>) {
 					if (jQuery('.interface-bulk', jQuery('#hostInterfaceRow_' + hostInterfaceId)).length == 0) {
-						var bulkDiv = jQuery('<div>', {
-							'class': 'interface-bulk'
+						var bulkList = jQuery('<ul>', {
+							'class': 'interface-bulk <?= ZBX_STYLE_LIST_CHECK_RADIO ?> <?= ZBX_STYLE_HOR_LIST ?>'
 						});
 
+						var bulkItem = jQuery('<li>');
+
 						// append checkbox
-						bulkDiv.append(jQuery('<input>', {
+						bulkItem.append(jQuery('<input>', {
 							id: 'interfaces_' + hostInterfaceId + '_bulk',
 							type: 'checkbox',
+							class: '<?= ZBX_STYLE_CHECKBOX_RADIO ?>',
 							name: 'interfaces[' + hostInterfaceId + '][bulk]',
 							value: 1,
 							checked: true
 						}));
 
 						// append label
-						bulkDiv.append(jQuery('<label>', {
+						var bulkLabel = jQuery('<label>', {
 							'for': 'interfaces_' + hostInterfaceId + '_bulk',
-							text: '<?= _('Use bulk requests') ?>'
-						}));
+						});
 
-						jQuery('.interface-ip', jQuery('#hostInterfaceRow_' + hostInterfaceId)).append(bulkDiv);
+						bulkLabel.append(jQuery('<span>'));
+						bulkLabel.append(<?= CJs::encodeJson(_('Use bulk requests')) ?>);
+
+						bulkItem.append(bulkLabel);
+						bulkList.append(bulkItem);
+
+						jQuery('.interface-ip', jQuery('#hostInterfaceRow_' + hostInterfaceId)).append(bulkList);
 					}
 				}
 				else {
@@ -456,7 +503,7 @@
 		jQuery('input[name=tls_connect]').trigger('change');
 
 		// Depending on checkboxes, create a value for hidden field 'tls_accept'.
-		jQuery('#hostForm').submit(function() {
+		jQuery('#hostsForm').submit(function() {
 			var tls_accept = 0x00;
 
 			if (jQuery('#tls_in_none').is(':checked')) {

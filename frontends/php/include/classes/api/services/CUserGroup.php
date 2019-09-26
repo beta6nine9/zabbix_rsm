@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -21,8 +21,6 @@
 
 /**
  * Class containing methods for operations with user groups.
- *
- * @package API
  */
 class CUserGroup extends CApiService {
 
@@ -48,7 +46,6 @@ class CUserGroup extends CApiService {
 	 */
 	public function get($options = []) {
 		$result = [];
-		$userType = self::$userData['type'];
 
 		$sqlParts = [
 			'select'	=> ['usrgrp' => 'g.usrgrpid'],
@@ -67,16 +64,17 @@ class CUserGroup extends CApiService {
 			'filter'					=> null,
 			'search'					=> null,
 			'searchByAny'				=> null,
-			'startSearch'				=> null,
-			'excludeSearch'				=> null,
+			'startSearch'				=> false,
+			'excludeSearch'				=> false,
 			'searchWildcardsEnabled'	=> null,
 			// output
-			'editable'					=> null,
+			'editable'					=> false,
 			'output'					=> API_OUTPUT_EXTEND,
 			'selectUsers'				=> null,
 			'selectRights'				=> null,
-			'countOutput'				=> null,
-			'preservekeys'				=> null,
+			'selectTagFilters'			=> null,
+			'countOutput'				=> false,
+			'preservekeys'				=> false,
 			'sortfield'					=> '',
 			'sortorder'					=> '',
 			'limit'						=> null
@@ -85,7 +83,7 @@ class CUserGroup extends CApiService {
 		$options = zbx_array_merge($defOptions, $options);
 
 		// permissions
-		if ($userType != USER_TYPE_SUPER_ADMIN) {
+		if (self::$userData['type'] != USER_TYPE_SUPER_ADMIN) {
 			if (!$options['editable']) {
 				$sqlParts['where'][] = 'g.usrgrpid IN ('.
 					'SELECT uug.usrgrpid'.
@@ -151,7 +149,7 @@ class CUserGroup extends CApiService {
 			}
 		}
 
-		if (!is_null($options['countOutput'])) {
+		if ($options['countOutput']) {
 			return $result;
 		}
 
@@ -160,7 +158,7 @@ class CUserGroup extends CApiService {
 		}
 
 		// removing keys (hash -> array)
-		if (is_null($options['preservekeys'])) {
+		if (!$options['preservekeys']) {
 			$result = zbx_cleanHashes($result);
 		}
 
@@ -168,528 +166,763 @@ class CUserGroup extends CApiService {
 	}
 
 	/**
-	 * Create UserGroups.
+	 * @param array  $usrgrps
 	 *
-	 * @param array $usrgrps
-	 * @return boolean
+	 * @return array
 	 */
-	public function create($usrgrps) {
-		if (self::$userData['type'] != USER_TYPE_SUPER_ADMIN) {
-			self::exception(ZBX_API_ERROR_PERMISSIONS, _('Only Super Admins can delete user groups.'));
+	public function create(array $usrgrps) {
+		$this->validateCreate($usrgrps);
+
+		$ins_usrgrps = [];
+
+		foreach ($usrgrps as $usrgrp) {
+			unset($usrgrp['rights'], $usrgrp['userids']);
+			$ins_usrgrps[] = $usrgrp;
 		}
+		$usrgrpids = DB::insert('usrgrp', $ins_usrgrps);
 
-		$usrgrps = zbx_toArray($usrgrps);
-		$insert = [];
-
-		foreach ($usrgrps as $gnum => $usrgrp) {
-			$usrgrpDbFields = [
-				'name' => null,
-			];
-			if (!check_db_fields($usrgrpDbFields, $usrgrp)) {
-				self::exception(ZBX_API_ERROR_PARAMETERS, _('Incorrect parameters for user group.'));
-			}
-
-			$userGroupExists = $this->get([
-				'output' => ['usrgrpid'],
-				'filter' => ['name' => $usrgrp['name']],
-				'limit' => 1
-			]);
-			if ($userGroupExists) {
-				self::exception(ZBX_API_ERROR_PARAMETERS, _s('User group "%1$s" already exists.', $usrgrp['name']));
-			}
-			$insert[$gnum] = $usrgrp;
+		foreach ($usrgrps as $index => &$usrgrp) {
+			$usrgrp['usrgrpid'] = $usrgrpids[$index];
 		}
-		$usrgrpids = DB::insert('usrgrp', $insert);
+		unset($usrgrp);
 
+		$this->updateRights($usrgrps, __FUNCTION__);
+		$this->updateTagFilters($usrgrps, __FUNCTION__);
+		$this->updateUsersGroups($usrgrps, __FUNCTION__);
 
-		foreach ($usrgrps as $gnum => $usrgrp) {
-			$massAdd = [];
-			if (isset($usrgrp['userids'])) {
-				$massAdd['userids'] = $usrgrp['userids'];
-			}
-			if (isset($usrgrp['rights'])) {
-				$massAdd['rights'] = $usrgrp['rights'];
-			}
-			if (!empty($massAdd)) {
-				$massAdd['usrgrpids'] = $usrgrpids[$gnum];
-				if (!$this->massAdd($massAdd))
-					self::exception(ZBX_API_ERROR_PARAMETERS, _('Cannot add users.'));
-			}
-		}
+		$this->addAuditBulk(AUDIT_ACTION_ADD, AUDIT_RESOURCE_USER_GROUP, $usrgrps);
 
 		return ['usrgrpids' => $usrgrpids];
 	}
 
 	/**
-	 * Update UserGroups.
-	 * Checks permissions - only super admins can update usergroups.
-	 * Formats data to be used in massUpdate() method.
-	 *
 	 * @param array $usrgrps
 	 *
-	 * @return int[] array['usrgrpids'] returns passed group ids
+	 * @throws APIException if the input is invalid.
+	 */
+	private function validateCreate(array &$usrgrps) {
+		if (self::$userData['type'] != USER_TYPE_SUPER_ADMIN) {
+			self::exception(ZBX_API_ERROR_PERMISSIONS, _('Only Super Admins can create user groups.'));
+		}
+
+		$api_input_rules = ['type' => API_OBJECTS, 'flags' => API_NOT_EMPTY | API_NORMALIZE, 'uniq' => [['name']], 'fields' => [
+			'name' =>			['type' => API_STRING_UTF8, 'flags' => API_REQUIRED | API_NOT_EMPTY, 'length' => DB::getFieldLength('usrgrp', 'name')],
+			'debug_mode' =>		['type' => API_INT32, 'in' => implode(',', [GROUP_DEBUG_MODE_DISABLED, GROUP_DEBUG_MODE_ENABLED])],
+			'gui_access' =>		['type' => API_INT32, 'in' => implode(',', [GROUP_GUI_ACCESS_SYSTEM, GROUP_GUI_ACCESS_INTERNAL, GROUP_GUI_ACCESS_LDAP, GROUP_GUI_ACCESS_DISABLED])],
+			'users_status' =>	['type' => API_INT32, 'in' => implode(',', [GROUP_STATUS_ENABLED, GROUP_STATUS_DISABLED])],
+			'rights' =>			['type' => API_OBJECTS, 'flags' => API_NORMALIZE, 'uniq' => [['id']], 'fields' => [
+				'id' =>				['type' => API_ID, 'flags' => API_REQUIRED],
+				'permission' =>		['type' => API_INT32, 'flags' => API_REQUIRED, 'in' => implode(',', [PERM_DENY, PERM_READ, PERM_READ_WRITE])]
+			]],
+			'tag_filters' =>	['type' => API_OBJECTS, 'uniq' => [['groupid', 'tag', 'value']], 'fields' => [
+				'groupid' =>		['type' => API_ID, 'flags' => API_REQUIRED],
+				'tag' =>			['type' => API_STRING_UTF8, 'length' => DB::getFieldLength('tag_filter', 'tag'), 'default' => DB::getDefault('tag_filter', 'tag')],
+				'value' =>			['type' => API_STRING_UTF8, 'length' => DB::getFieldLength('tag_filter', 'value'), 'default' => DB::getDefault('tag_filter', 'value')]
+			]],
+			'userids' =>		['type' => API_IDS, 'flags' => API_NORMALIZE]
+		]];
+		if (!CApiInputValidator::validate($api_input_rules, $usrgrps, '/', $error)) {
+			self::exception(ZBX_API_ERROR_PARAMETERS, $error);
+		}
+
+		$this->checkDuplicates(zbx_objectValues($usrgrps, 'name'));
+		$this->checkUsers($usrgrps);
+		$this->checkHimself($usrgrps, __FUNCTION__);
+		$this->checkHostGroups($usrgrps);
+		$this->checkTagFilters($usrgrps);
+	}
+
+	/**
+	 * @param array  $usrgrps
+	 *
+	 * @return array
 	 */
 	public function update($usrgrps) {
-		if (self::$userData['type'] != USER_TYPE_SUPER_ADMIN) {
-			self::exception(ZBX_API_ERROR_PERMISSIONS, _('Only Super Admins can delete user groups.'));
-		}
+		$this->validateUpdate($usrgrps, $db_usrgrps);
 
-		$usrgrps = zbx_toArray($usrgrps);
+		$upd_usrgrps = [];
 
 		foreach ($usrgrps as $usrgrp) {
-			// checks if usergroup id is present
-			$groupDbFields = ['usrgrpid' => null];
-			if (!check_db_fields($groupDbFields, $usrgrp)) {
-				self::exception(ZBX_API_ERROR_PARAMETERS, _('Incorrect parameters for user group.'));
+			$db_usrgrp = $db_usrgrps[$usrgrp['usrgrpid']];
+
+			$upd_usrgrp = [];
+
+			if (array_key_exists('name', $usrgrp) && $usrgrp['name'] !== $db_usrgrp['name']) {
+				$upd_usrgrp['name'] = $usrgrp['name'];
+			}
+			if (array_key_exists('debug_mode', $usrgrp) && $usrgrp['debug_mode'] != $db_usrgrp['debug_mode']) {
+				$upd_usrgrp['debug_mode'] = $usrgrp['debug_mode'];
+			}
+			if (array_key_exists('gui_access', $usrgrp) && $usrgrp['gui_access'] != $db_usrgrp['gui_access']) {
+				$upd_usrgrp['gui_access'] = $usrgrp['gui_access'];
+			}
+			if (array_key_exists('users_status', $usrgrp) && $usrgrp['users_status'] != $db_usrgrp['users_status']) {
+				$upd_usrgrp['users_status'] = $usrgrp['users_status'];
 			}
 
-			$usrgrp['usrgrpids'] = $usrgrp['usrgrpid'];
-			unset($usrgrp['usrgrpid']);
-			if (!$this->massUpdate($usrgrp)) {
-				self::exception(ZBX_API_ERROR_PARAMETERS, _('Cannot update group.'));
+			if ($upd_usrgrp) {
+				$upd_usrgrps[] = [
+					'values' => $upd_usrgrp,
+					'where' => ['usrgrpid' => $usrgrp['usrgrpid']]
+				];
 			}
 		}
+
+		if ($upd_usrgrps) {
+			DB::update('usrgrp', $upd_usrgrps);
+		}
+
+		$this->updateRights($usrgrps, __FUNCTION__);
+		$this->updateTagFilters($usrgrps, __FUNCTION__);
+		$this->updateUsersGroups($usrgrps, __FUNCTION__);
+
+		$this->addAuditBulk(AUDIT_ACTION_UPDATE, AUDIT_RESOURCE_USER_GROUP, $usrgrps, $db_usrgrps);
 
 		return ['usrgrpids'=> zbx_objectValues($usrgrps, 'usrgrpid')];
 	}
 
-	public function massAdd($data) {
-		if (self::$userData['type'] != USER_TYPE_SUPER_ADMIN) {
-			self::exception(ZBX_API_ERROR_PERMISSIONS, _('Only Super Admins can delete user groups.'));
-		}
-
-		$usrgrpids = array_keys(array_flip(zbx_toArray($data['usrgrpids'])));
-		$userids = (isset($data['userids']) && !is_null($data['userids'])) ? zbx_toArray($data['userids']) : null;
-		$rights = (isset($data['rights']) && !is_null($data['rights'])) ? zbx_toArray($data['rights']) : null;
-
-		if (!is_null($userids)) {
-			$options = [
-				'usrgrpids' => $usrgrpids,
-				'output' => API_OUTPUT_EXTEND,
-			];
-			$usrgrps = $this->get($options);
-			foreach ($usrgrps as $usrgrp) {
-				if ((($usrgrp['gui_access'] == GROUP_GUI_ACCESS_DISABLED)
-					|| ($usrgrp['users_status'] == GROUP_STATUS_DISABLED))
-					&& uint_in_array(self::$userData['userid'], $userids)) {
-					self::exception(ZBX_API_ERROR_PARAMETERS, _('User cannot change status of himself'));
-				}
-			}
-
-			$linkedUsers = [];
-			$sql = 'SELECT usrgrpid, userid'.
-				' FROM users_groups'.
-				' WHERE '.dbConditionInt('usrgrpid', $usrgrpids).
-				' AND '.dbConditionInt('userid', $userids);
-			$linkedUsersDb = DBselect($sql);
-			while ($link = DBfetch($linkedUsersDb)) {
-				if (!isset($linkedUsers[$link['usrgrpid']])) $linkedUsers[$link['usrgrpid']] = [];
-				$linkedUsers[$link['usrgrpid']][$link['userid']] = 1;
-			}
-
-			$usersInsert = [];
-			foreach ($usrgrpids as $usrgrpid) {
-				foreach ($userids as $userid) {
-					if (!isset($linkedUsers[$usrgrpid][$userid])) {
-						$usersInsert[] = [
-							'usrgrpid' => $usrgrpid,
-							'userid' => $userid,
-						];
-					}
-				}
-			}
-			DB::insert('users_groups', $usersInsert);
-		}
-
-		if (!is_null($rights)) {
-			$linkedRights = [];
-			$sql = 'SELECT groupid,id'.
-				' FROM rights'.
-				' WHERE '.dbConditionInt('groupid', $usrgrpids).
-					' AND '.dbConditionInt('id', zbx_objectValues($rights, 'id'));
-			$linkedRightsDb = DBselect($sql);
-			while ($link = DBfetch($linkedRightsDb)) {
-				if (!isset($linkedRights[$link['groupid']])) $linkedRights[$link['groupid']] = [];
-				$linkedRights[$link['groupid']][$link['id']] = 1;
-			}
-
-			$rightInsert = [];
-			foreach ($usrgrpids as $usrgrpid) {
-				foreach ($rights as $right) {
-					if (!isset($linkedRights[$usrgrpid][$right['id']])) {
-						$rightInsert[] = [
-							'groupid' => $usrgrpid,
-							'permission' => $right['permission'],
-							'id' => $right['id']
-						];
-					}
-				}
-			}
-			DB::insert('rights', $rightInsert);
-		}
-
-		return ['usrgrpids' => $usrgrpids];
-	}
-
 	/**
-	 * Mass update user group.
-	 * Checks for permissions - only super admins can change user groups.
-	 * Changes name to a group if name and one user group id is provided.
-	 * Links/unlinks users to user groups.
-	 * Links/unlinks rights to user groups.
+	 * @param array $usrgrps
+	 * @param array $db_usrgrps
 	 *
-	 * @param array $data
-	 * @param int|int[] $data['usrgrpids'] id or ids of user groups to be updated.
-	 * @param string $data['name'] name to be set to a user group. Only one host group id can be passed at a time!
-	 * @param null|int|int[] $data['userids'] user ids to link to given user groups. Missing user ids will be unlinked from user groups.
-	 * @param null|array $data['rights'] rights to link to given user groups. Missing rights will be unlinked from user groups.
-	 * @param int $data['rights']['id'] id of right.
-	 * @param int $data['rights']['permission'] permission level of right.
-	 *
-	 * @return int[] array['usrgrpids'] returns passed user group ids
+	 * @throws APIException if the input is invalid.
 	 */
-	public function massUpdate($data) {
+	private function validateUpdate(array &$usrgrps, array &$db_usrgrps = null) {
 		if (self::$userData['type'] != USER_TYPE_SUPER_ADMIN) {
-			self::exception(ZBX_API_ERROR_PERMISSIONS, _('Only Super Admins can delete user groups.'));
+			self::exception(ZBX_API_ERROR_PERMISSIONS, _('Only Super Admins can update user groups.'));
 		}
 
-		$usrgrpids = zbx_toArray($data['usrgrpids']);
-
-		if (count($usrgrpids) == 0) {
-			self::exception(ZBX_API_ERROR_PARAMETERS, _('Missing parameter: usrgrpids.'));
+		$api_input_rules = ['type' => API_OBJECTS, 'flags' => API_NOT_EMPTY | API_NORMALIZE, 'uniq' => [['usrgrpid'], ['name']], 'fields' => [
+			'usrgrpid' =>		['type' => API_ID, 'flags' => API_REQUIRED],
+			'name' =>			['type' => API_STRING_UTF8, 'flags' => API_NOT_EMPTY, 'length' => DB::getFieldLength('usrgrp', 'name')],
+			'debug_mode' =>		['type' => API_INT32, 'in' => implode(',', [GROUP_DEBUG_MODE_DISABLED, GROUP_DEBUG_MODE_ENABLED])],
+			'gui_access' =>		['type' => API_INT32, 'in' => implode(',', [GROUP_GUI_ACCESS_SYSTEM, GROUP_GUI_ACCESS_INTERNAL, GROUP_GUI_ACCESS_LDAP, GROUP_GUI_ACCESS_DISABLED])],
+			'users_status' =>	['type' => API_INT32, 'in' => implode(',', [GROUP_STATUS_ENABLED, GROUP_STATUS_DISABLED])],
+			'rights' =>			['type' => API_OBJECTS, 'flags' => API_NORMALIZE, 'uniq' => [['id']], 'fields' => [
+				'id' =>				['type' => API_ID, 'flags' => API_REQUIRED],
+				'permission' =>		['type' => API_INT32, 'flags' => API_REQUIRED, 'in' => implode(',', [PERM_DENY, PERM_READ, PERM_READ_WRITE])]
+			]],
+			'tag_filters' =>	['type' => API_OBJECTS, 'uniq' => [['groupid', 'tag', 'value']], 'fields' => [
+				'groupid' =>		['type' => API_ID, 'flags' => API_REQUIRED],
+				'tag' =>			['type' => API_STRING_UTF8, 'length' => DB::getFieldLength('tag_filter', 'tag'), 'default' => DB::getDefault('tag_filter', 'tag')],
+				'value' =>			['type' => API_STRING_UTF8, 'length' => DB::getFieldLength('tag_filter', 'value'), 'default' => DB::getDefault('tag_filter', 'value')]
+			]],
+			'userids' =>		['type' => API_IDS, 'flags' => API_NORMALIZE]
+		]];
+		if (!CApiInputValidator::validate($api_input_rules, $usrgrps, '/', $error)) {
+			self::exception(ZBX_API_ERROR_PARAMETERS, $error);
 		}
 
-		// $data['name'] parameter restrictions
-		if (isset($data['name'])) {
-			// same name can be set only to one hostgroup
-			if (count($usrgrpids) > 1) {
-				self::exception(ZBX_API_ERROR_PARAMETERS, _('Only one user group name can be changed at a time.'));
-			}
-			else {
-				// check if there already is hostgroup with this name, except current hostgroup
-				$groupExists = $this->get([
-					'filter' => ['name' => $data['name']],
-					'output' => ['usrgrpid'],
-					'limit' => 1
-				]);
-				$groupExists = reset($groupExists);
-				if ($groupExists && (bccomp($groupExists['usrgrpid'], $usrgrpids[0]) != 0) ) {
-					self::exception(ZBX_API_ERROR_PARAMETERS, _s('User group "%s" already exists.', $data['name']));
-				}
-			}
-		}
-
-		// update usrgrp (user group) table if there is something to update
-		$usrgrpTableUpdateData = $data;
-		unset($usrgrpTableUpdateData['usrgrpids'], $usrgrpTableUpdateData['userids'], $usrgrpTableUpdateData['rights']);
-		if (!empty($usrgrpTableUpdateData)) {
-			foreach ($usrgrpids as $usrgrpid) {
-				DB::update('usrgrp', [
-					'values' => $usrgrpTableUpdateData,
-					'where' => ['usrgrpid' => $usrgrpid],
-				]);
-			}
-		}
-
-		// check that user do not add himself to a disabled user group
-		// insert and delete user-userGroup links
-		if (isset($data['userids'])) {
-			$userids = zbx_toArray($data['userids']);
-
-			// check whether user tries to add himself to a disabled user group
-			$usrgrps = $this->get([
-				'output' => ['usrgrpid', 'gui_access', 'users_status'],
-				'usrgrpids' => $usrgrpids,
-				'selectUsers' => ['userid'],
-				'preservekeys' => true
-			]);
-			if (uint_in_array(self::$userData['userid'], $userids)) {
-				foreach ($usrgrps as $usrgrp) {
-					if (($usrgrp['gui_access'] == GROUP_GUI_ACCESS_DISABLED)
-						|| ($usrgrp['users_status'] == GROUP_STATUS_DISABLED)) {
-						self::exception(ZBX_API_ERROR_PARAMETERS, _('User cannot add himself to a disabled group or a group with disabled GUI access.'));
-					}
-				}
-			}
-
-			$userUsergroupLinksToInsert = [];
-			$amount_of_usrgrps_to_unlink = [];
-
-			foreach ($usrgrps as $usrgrpid => $usrgrp) {
-				$usrgrp_userids = [];
-
-				foreach ($usrgrp['users'] as $user) {
-					$usrgrp_userids[$user['userid']] = true;
-				}
-
-				foreach ($userids as $userid) {
-					if (!array_key_exists($userid, $usrgrp_userids)) {
-						$userUsergroupLinksToInsert[] = [
-							'usrgrpid' => $usrgrpid,
-							'userid' => $userid
-						];
-					}
-					else {
-						unset($usrgrp_userids[$userid]);
-					}
-				}
-
-				foreach ($usrgrp_userids as $userid => $value) {
-					$amount_of_usrgrps_to_unlink[$userid] = array_key_exists($userid, $amount_of_usrgrps_to_unlink)
-						? $amount_of_usrgrps_to_unlink[$userid] + 1
-						: 1;
-				}
-			}
-
-			// link users to user groups
-			if (!empty($userUsergroupLinksToInsert)) {
-				DB::insert('users_groups', $userUsergroupLinksToInsert);
-			}
-
-			if ($amount_of_usrgrps_to_unlink) {
-				// Unlink users from user groups.
-
-				$userids_to_unlink = array_keys($amount_of_usrgrps_to_unlink);
-
-				$db_users = API::User()->get([
-					'output' => ['userid', 'alias'],
-					'userids' => $userids_to_unlink,
-					'selectUsrgrps' => ['usrgrps']
-				]);
-
-				foreach ($db_users as $user) {
-					if (count($user['usrgrps']) <= $amount_of_usrgrps_to_unlink[$user['userid']]) {
-						self::exception(ZBX_API_ERROR_PARAMETERS,
-							_s('User "%1$s" cannot be without user group.', $user['alias'])
-						);
-					}
-				}
-
-				DB::delete('users_groups', [
-					'userid' => $userids_to_unlink,
-					'usrgrpid' => $usrgrpids
-				]);
-			}
-		}
-
-		// link rights to user groups
-		// update permissions to right-userGroup links
-		// unlink rights from user groups (permissions)
-		if (isset($data['rights'])) {
-			$rights = zbx_toArray($data['rights']);
-
-			// get already linked rights
-			$linkedRights = [];
-			$sql = 'SELECT groupid,permission,id'.
-				' FROM rights'.
-				' WHERE '.dbConditionInt('groupid', $usrgrpids);
-			$linkedRightsDb = DBselect($sql);
-			while ($link = DBfetch($linkedRightsDb)) {
-				if (!isset($linkedRights[$link['groupid']])) {
-					$linkedRights[$link['groupid']] = [];
-				}
-				$linkedRights[$link['groupid']][$link['id']] = $link['permission'];
-			}
-
-			// get right-userGroup links to insert
-			// get right-userGroup links to update permissions
-			// get rightIds to unlink rights from user groups
-			$rightUsergroupLinksToInsert = [];
-			$rightUsergroupLinksToUpdate = [];
-			$rightIdsToUnlink = [];
-			foreach ($usrgrpids as $usrgrpid) {
-				foreach ($rights as $right) {
-					if (!isset($linkedRights[$usrgrpid][$right['id']])) {
-						$rightUsergroupLinksToInsert[] = [
-							'groupid' => $usrgrpid,
-							'id' => $right['id'],
-							'permission' => $right['permission'],
-						];
-					}
-					elseif ($linkedRights[$usrgrpid][$right['id']] != $right['permission']) {
-						$rightUsergroupLinksToUpdate[] = [
-							'values' => ['permission' => $right['permission']],
-							'where' => ['groupid' => $usrgrpid, 'id' => $right['id']],
-						];
-					}
-					unset($linkedRights[$usrgrpid][$right['id']]);
-				}
-
-				if (isset($linkedRights[$usrgrpid]) && !empty($linkedRights[$usrgrpid])) {
-					$rightIdsToUnlink = array_merge($rightIdsToUnlink, array_keys($linkedRights[$usrgrpid]));
-				}
-			}
-
-			// link rights to user groups
-			if (!empty($rightUsergroupLinksToInsert)) {
-				DB::insert('rights', $rightUsergroupLinksToInsert);
-			}
-
-			// unlink rights from user groups
-			if (!empty($rightIdsToUnlink)) {
-				DB::delete('rights', [
-					'id' => $rightIdsToUnlink,
-					'groupid' => $usrgrpids,
-				]);
-			}
-
-			// update right-userGroup permissions
-			if (!empty($rightUsergroupLinksToUpdate)) {
-				DB::update('rights', $rightUsergroupLinksToUpdate);
-			}
-		}
-
-		return ['usrgrpids' => $usrgrpids];
-	}
-
-	/**
-	 * Delete user groups.
-	 *
-	 * @param array $usergroupids
-	 *
-	 * @return array
-	 */
-	public function delete(array $usergroupids) {
-		$this->validateDelete($usergroupids);
-
-		$db_operations = DBFetchArray(DBselect(
-			'SELECT DISTINCT om.operationid'.
-			' FROM opmessage_grp om'.
-			' WHERE '.dbConditionInt('om.usrgrpid', $usergroupids)
-		));
-
-		DB::delete('opmessage_grp', ['usrgrpid' => $usergroupids]);
-
-		// delete empty operations
-		$del_operations = DBFetchArray(DBselect(
-			'SELECT DISTINCT o.operationid,o.actionid'.
-			' FROM operations o'.
-			' WHERE '.dbConditionInt('o.operationid', zbx_objectValues($db_operations, 'operationid')).
-				' AND NOT EXISTS(SELECT NULL FROM opmessage_grp omg WHERE omg.operationid=o.operationid)'.
-				' AND NOT EXISTS(SELECT NULL FROM opmessage_usr omu WHERE omu.operationid=o.operationid)'
-		));
-
-		DB::delete('operations', ['operationid' => zbx_objectValues($del_operations, 'operationid')]);
-		DB::delete('rights', ['groupid' => $usergroupids]);
-		DB::delete('users_groups', ['usrgrpid' => $usergroupids]);
-		DB::delete('usrgrp', ['usrgrpid' => $usergroupids]);
-
-		$actionids = zbx_objectValues($del_operations, 'actionid');
-		if ($actionids) {
-			$this->disableActionsWithoutOperations($actionids);
-		}
-
-		return ['usrgrpids' => $usergroupids];
-	}
-
-	/**
-	 * Validates the input parameters for the delete() method.
-	 *
-	 * @throws APIException
-	 *
-	 * @param array $userGroupIds
-	 */
-	protected function validateDelete(array $userGroupIds) {
-		if (self::$userData['type'] != USER_TYPE_SUPER_ADMIN) {
-			self::exception(ZBX_API_ERROR_PERMISSIONS, _('Only Super Admins can delete user groups.'));
-		}
-
-		if (!$userGroupIds) {
-			self::exception(ZBX_API_ERROR_PARAMETERS, _('Empty input parameter.'));
-		}
-
-		$dbUserGroups = $this->get([
-			'output' => ['usrgrpid', 'name'],
-			'usrgrpids' => $userGroupIds,
+		// Check user group names.
+		$db_usrgrps = DB::select('usrgrp', [
+			'output' => ['usrgrpid', 'name', 'debug_mode', 'gui_access', 'users_status'],
+			'usrgrpids' => zbx_objectValues($usrgrps, 'usrgrpid'),
 			'preservekeys' => true
 		]);
 
-		// check if user group is used in scripts
-		$dbScripts = API::Script()->get([
-			'output' => ['scriptid', 'name', 'usrgrpid'],
-			'usrgrpids' => $userGroupIds,
-			'nopermissions' => true
-		]);
+		$names = [];
 
-		foreach ($dbScripts as $dbScript) {
-			if ($dbScript['usrgrpid'] == 0) {
-				continue;
+		foreach ($usrgrps as $usrgrp) {
+			// Check if this user group exists.
+			if (!array_key_exists($usrgrp['usrgrpid'], $db_usrgrps)) {
+				self::exception(ZBX_API_ERROR_PERMISSIONS,
+					_('No permissions to referred object or it does not exist!')
+				);
 			}
 
-			self::exception(ZBX_API_ERROR_PARAMETERS, _s(
-				'User group "%1$s" is used in script "%2$s".',
-				$dbUserGroups[$dbScript['usrgrpid']]['name'],
-				$dbScript['name']
-			));
+			$db_usrgrp = $db_usrgrps[$usrgrp['usrgrpid']];
+
+			if (array_key_exists('name', $usrgrp) && $usrgrp['name'] !== $db_usrgrp['name']) {
+				$names[] = $usrgrp['name'];
+			}
 		}
 
-		// check if user group is used in config
-		$config = select_config();
-
-		if (isset($dbUserGroups[$config['alert_usrgrpid']])) {
-			self::exception(ZBX_API_ERROR_PARAMETERS, _s(
-				'User group "%1$s" is used in configuration for database down messages.',
-				$dbUserGroups[$config['alert_usrgrpid']]['name']
-			));
+		if ($names) {
+			$this->checkDuplicates($names);
 		}
+		$this->checkUsers($usrgrps);
+		$this->checkHimself($usrgrps, __FUNCTION__, $db_usrgrps);
+		$this->checkUsersWithoutGroups($usrgrps);
+		$this->checkHostGroups($usrgrps);
+		$this->checkTagFilters($usrgrps);
+	}
 
-		// check if user group is used in users with 1 user group
-		$dbUsers = API::User()->get([
-			'output' => ['userid', 'usrgrpid', 'alias'],
-			'usrgrpids' => $userGroupIds,
-			'selectUsrgrps' => ['usrgrpid']
+	/**
+	 * Check for duplicated user groups.
+	 *
+	 * @param array  $names
+	 *
+	 * @throws APIException  if user group already exists.
+	 */
+	private function checkDuplicates(array $names) {
+		$db_usrgrps = DB::select('usrgrp', [
+			'output' => ['name'],
+			'filter' => ['name' => $names],
+			'limit' => 1
 		]);
 
-		foreach ($dbUsers as $dbUser) {
-			$db_usrgrpids = [];
+		if ($db_usrgrps) {
+			self::exception(ZBX_API_ERROR_PARAMETERS, _s('User group "%1$s" already exists.', $db_usrgrps[0]['name']));
+		}
+	}
 
-			foreach ($dbUser['usrgrps'] as $usrgrp) {
-				$db_usrgrpids[] = $usrgrp['usrgrpid'];
+	/**
+	 * Check for valid users.
+	 *
+	 * @param array  $usrgrps
+	 * @param array  $usrgrps[]['userids']   (optional)
+	 *
+	 * @throws APIException
+	 */
+	private function checkUsers(array $usrgrps) {
+		$userids = [];
+
+		foreach ($usrgrps as $usrgrp) {
+			if (array_key_exists('userids', $usrgrp)) {
+				foreach ($usrgrp['userids'] as $userid) {
+					$userids[$userid] = true;
+				}
+			}
+		}
+
+		if (!$userids) {
+			return;
+		}
+
+		$userids = array_keys($userids);
+
+		$db_users = DB::select('users', [
+			'output' => [],
+			'userids' => $userids,
+			'preservekeys' => true
+		]);
+
+		foreach ($userids as $userid) {
+			if (!array_key_exists($userid, $db_users)) {
+				self::exception(ZBX_API_ERROR_PARAMETERS, _s('User with ID "%1$s" is not available.', $userid));
+			}
+		}
+	}
+
+	/**
+	 * Check for valid host grups.
+	 *
+	 * @param array  $usrgrps
+	 * @param array  $usrgrps[]['rights']   (optional)
+	 *
+	 * @throws APIException
+	 */
+	private function checkHostGroups(array $usrgrps) {
+		$groupids = [];
+
+		foreach ($usrgrps as $usrgrp) {
+			if (array_key_exists('rights', $usrgrp)) {
+				foreach ($usrgrp['rights'] as $right) {
+					$groupids[$right['id']] = true;
+				}
+			}
+			if (array_key_exists('tag_filters', $usrgrp)) {
+				foreach ($usrgrp['tag_filters'] as $tag_filter) {
+					$groupids[$tag_filter['groupid']] = true;
+				}
+			}
+		}
+
+		if (!$groupids) {
+			return;
+		}
+
+		$groupids = array_keys($groupids);
+
+		$db_groups = DB::select('hstgrp', [
+			'output' => [],
+			'groupids' => $groupids,
+			'preservekeys' => true
+		]);
+
+		foreach ($groupids as $groupid) {
+			if (!array_key_exists($groupid, $db_groups)) {
+				self::exception(ZBX_API_ERROR_PARAMETERS, _s('Host group with ID "%1$s" is not available.', $groupid));
+			}
+		}
+	}
+
+	/**
+	 * Tag filter validation.
+	 *
+	 * @param array  $usrgrps
+	 *
+	 * @throws APIException
+	 */
+	private function checkTagFilters(array $usrgrps) {
+		foreach ($usrgrps as $usrgrp) {
+			if (array_key_exists('tag_filters', $usrgrp)) {
+				foreach ($usrgrp['tag_filters'] as $tag_filter) {
+					if ($tag_filter['tag'] === '' && $tag_filter['value'] !== '') {
+						self::exception(ZBX_API_ERROR_PARAMETERS,
+							_s('Incorrect value for field "%1$s": %2$s.', _('tag'), _('cannot be empty'))
+						);
+					}
+				}
+			}
+		}
+	}
+
+	/**
+	 * Auxiliary function for checkHimself().
+	 * Returns true if user group has GROUP_GUI_ACCESS_DISABLED or GROUP_STATUS_DISABLED states.
+	 *
+	 * @param array  $usrgrp
+	 * @param string $method
+	 * @param array  $db_usrgrps
+	 *
+	 * @return bool
+	 */
+	private static function userGroupDisabled(array $usrgrp, $method, array $db_usrgrps = null) {
+		$gui_access = array_key_exists('gui_access', $usrgrp)
+			? $usrgrp['gui_access']
+			: ($method === 'validateCreate' ? GROUP_GUI_ACCESS_SYSTEM : $db_usrgrps[$usrgrp['usrgrpid']]['gui_access']);
+		$users_status = array_key_exists('users_status', $usrgrp)
+			? $usrgrp['users_status']
+			: ($method === 'validateCreate' ? GROUP_STATUS_ENABLED : $db_usrgrps[$usrgrp['usrgrpid']]['users_status']);
+
+		return ($gui_access == GROUP_GUI_ACCESS_DISABLED || $users_status == GROUP_STATUS_DISABLED);
+	}
+
+	/**
+	 * Additional check to exclude an opportunity to deactivate himself.
+	 *
+	 * @param array  $usrgrps
+	 * @param string $method
+	 * @param array  $db_usrgrps
+	 *
+	 * @throws APIException
+	 */
+	private function checkHimself(array $usrgrps, $method, array $db_usrgrps = null) {
+		if ($method === 'validateUpdate') {
+			$groups_users = [];
+
+			foreach ($usrgrps as $usrgrp) {
+				if (self::userGroupDisabled($usrgrp, $method, $db_usrgrps) && !array_key_exists('userids', $usrgrp)) {
+					$groups_users[$usrgrp['usrgrpid']] = [];
+				}
 			}
 
-			if (!array_diff($db_usrgrpids, $userGroupIds)) {
+			if ($groups_users) {
+				$db_users_groups = DB::select('users_groups', [
+					'output' => ['usrgrpid', 'userid'],
+					'filter' => ['usrgrpid' => array_keys($groups_users)]
+				]);
+
+				foreach ($db_users_groups as $db_user_group) {
+					$groups_users[$db_user_group['usrgrpid']][] = $db_user_group['userid'];
+				}
+
+				foreach ($usrgrps as &$usrgrp) {
+					if (self::userGroupDisabled($usrgrp, $method, $db_usrgrps)
+							&& !array_key_exists('userids', $usrgrp)) {
+						$usrgrp['userids'] = $groups_users[$usrgrp['usrgrpid']];
+					}
+				}
+				unset($usrgrp);
+			}
+		}
+
+		foreach ($usrgrps as $usrgrp) {
+			if (self::userGroupDisabled($usrgrp, $method, $db_usrgrps)
+					&& uint_in_array(self::$userData['userid'], $usrgrp['userids'])) {
 				self::exception(ZBX_API_ERROR_PARAMETERS,
-					_s('User "%1$s" cannot be without user group.', $dbUser['alias'])
+					_('User cannot add himself to a disabled group or a group with disabled GUI access.')
 				);
 			}
 		}
 	}
 
-	public function isReadable($ids) {
-		if (!is_array($ids)) {
-			return false;
-		}
-		if (empty($ids)) {
-			return true;
+	/**
+	 * Check to exclude an opportunity to leave user without user groups.
+	 *
+	 * @param array  $usrgrps
+	 * @param array  $usrgrps[]['usrgrpid']
+	 * @param array  $usrgrps[]['userids']   (optional)
+	 *
+	 * @throws APIException
+	 */
+	private function checkUsersWithoutGroups(array $usrgrps) {
+		$users_groups = [];
+
+		foreach ($usrgrps as $usrgrp) {
+			if (array_key_exists('userids', $usrgrp)) {
+				$users_groups[$usrgrp['usrgrpid']] = [];
+
+				foreach ($usrgrp['userids'] as $userid) {
+					$users_groups[$usrgrp['usrgrpid']][$userid] = true;
+				}
+			}
 		}
 
-		$ids = array_unique($ids);
+		if (!$users_groups) {
+			return;
+		}
 
-		$count = $this->get([
-			'usrgrpids' => $ids,
-			'countOutput' => true
+		$db_users_groups = DB::select('users_groups', [
+			'output' => ['usrgrpid', 'userid'],
+			'filter' => ['usrgrpid' => array_keys($users_groups)]
 		]);
 
-		return (count($ids) == $count);
+		$ins_userids = [];
+		$del_userids = [];
+
+		foreach ($db_users_groups as $db_user_group) {
+			if (array_key_exists($db_user_group['userid'], $users_groups[$db_user_group['usrgrpid']])) {
+				unset($users_groups[$db_user_group['usrgrpid']][$db_user_group['userid']]);
+			}
+			else {
+				if (!array_key_exists($db_user_group['userid'], $del_userids)) {
+					$del_userids[$db_user_group['userid']] = 0;
+				}
+				$del_userids[$db_user_group['userid']]++;
+			}
+		}
+
+		foreach ($users_groups as $usrgrpid => $userids) {
+			foreach (array_keys($userids) as $userid) {
+				$ins_userids[$userid] = true;
+			}
+		}
+
+		$del_userids = array_diff_key($del_userids, $ins_userids);
+
+		if (!$del_userids) {
+			return;
+		}
+
+		$db_users = DBselect(
+			'SELECT u.userid,u.alias,count(ug.usrgrpid) as usrgrp_num'.
+			' FROM users u,users_groups ug'.
+			' WHERE u.userid=ug.userid'.
+				' AND '.dbConditionInt('u.userid', array_keys($del_userids)).
+			' GROUP BY u.userid,u.alias'
+		);
+
+		while ($db_user = DBfetch($db_users)) {
+			if ($db_user['usrgrp_num'] == $del_userids[$db_user['userid']]) {
+				self::exception(ZBX_API_ERROR_PARAMETERS,
+					_s('User "%1$s" cannot be without user group.', $db_user['alias'])
+				);
+			}
+		}
 	}
 
-	public function isWritable($ids) {
-		if (!is_array($ids)) {
-			return false;
-		}
-		if (empty($ids)) {
-			return true;
+	/**
+	 * Update table "rights".
+	 *
+	 * @param array  $usrgrps
+	 * @param string $method
+	 */
+	private function updateRights(array $usrgrps, $method) {
+		$rights = [];
+
+		foreach ($usrgrps as $usrgrp) {
+			if (array_key_exists('rights', $usrgrp)) {
+				$rights[$usrgrp['usrgrpid']] = [];
+
+				foreach ($usrgrp['rights'] as $right) {
+					$rights[$usrgrp['usrgrpid']][$right['id']] = $right['permission'];
+				}
+			}
 		}
 
-		$ids = array_unique($ids);
+		if (!$rights) {
+			return;
+		}
 
-		$count = $this->get([
-			'usrgrpids' => $ids,
-			'editable' => true,
-			'countOutput' => true
+		$db_rights = ($method === 'update')
+			? DB::select('rights', [
+				'output' => ['rightid', 'groupid', 'id', 'permission'],
+				'filter' => ['groupid' => array_keys($rights)]
+			])
+			: [];
+
+		$ins_rights = [];
+		$upd_rights = [];
+		$del_rightids = [];
+
+		foreach ($db_rights as $db_right) {
+			if (array_key_exists($db_right['groupid'], $rights)
+					&& array_key_exists($db_right['id'], $rights[$db_right['groupid']])) {
+				if ($db_right['permission'] != $rights[$db_right['groupid']][$db_right['id']]) {
+					$upd_rights[] = [
+						'values' => ['permission' => $rights[$db_right['groupid']][$db_right['id']]],
+						'where' => ['rightid' => $db_right['rightid']],
+					];
+				}
+				unset($rights[$db_right['groupid']][$db_right['id']]);
+			}
+			else {
+				$del_rightids[] = $db_right['rightid'];
+			}
+		}
+
+		foreach ($rights as $groupid => $usrgrp_rights) {
+			foreach ($usrgrp_rights as $id => $permission) {
+				$ins_rights[] = [
+					'groupid' => $groupid,
+					'id' => $id,
+					'permission' => $permission
+				];
+			}
+		}
+
+		if ($ins_rights) {
+			DB::insertBatch('rights', $ins_rights);
+		}
+
+		if ($upd_rights) {
+			DB::update('rights', $upd_rights);
+		}
+
+		if ($del_rightids) {
+			DB::delete('rights', ['rightid' => $del_rightids]);
+		}
+	}
+
+	/**
+	 * Update table "tag_filter".
+	 *
+	 * @param array  $usrgrps
+	 * @param string $method
+	 */
+	private function updateTagFilters(array $usrgrps, $method) {
+		$tag_filters = [];
+
+		foreach ($usrgrps as $usrgrp) {
+			if (array_key_exists('tag_filters', $usrgrp)) {
+				$tag_filters[$usrgrp['usrgrpid']] = [];
+
+				foreach ($usrgrp['tag_filters'] as $tag_filter) {
+					$tag_filter['usrgrpid'] = $usrgrp['usrgrpid'];
+					$tag_filters[$usrgrp['usrgrpid']][] = $tag_filter;
+				}
+				CArrayHelper::sort($tag_filters[$usrgrp['usrgrpid']], ['groupid', 'tag', 'value']);
+			}
+		}
+
+		if (!$tag_filters) {
+			return;
+		}
+
+		$db_tag_filters = ($method === 'update')
+			? DB::select('tag_filter', [
+				'output' => ['tag_filterid', 'usrgrpid', 'groupid', 'tag', 'value'],
+				'filter' => ['usrgrpid' => array_keys($tag_filters)]
+			])
+			: [];
+		CArrayHelper::sort($db_tag_filters, ['usrgrpid', 'groupid', 'tag', 'value']);
+
+		$ins_tag_filters = [];
+		$upd_tag_filters = [];
+		$del_tag_filterids = [];
+
+		foreach ($db_tag_filters as $db_tag_filter) {
+			if ($tag_filters[$db_tag_filter['usrgrpid']]) {
+				$tag_filter = array_shift($tag_filters[$db_tag_filter['usrgrpid']]);
+
+				$upd_tag_filter = [];
+
+				if (bccomp($tag_filter['groupid'], $db_tag_filter['groupid']) != 0) {
+					$upd_tag_filter['groupid'] = $tag_filter['groupid'];
+				}
+				if ($tag_filter['tag'] !== $db_tag_filter['tag']) {
+					$upd_tag_filter['tag'] = $tag_filter['tag'];
+				}
+				if ($tag_filter['value'] !== $db_tag_filter['value']) {
+					$upd_tag_filter['value'] = $tag_filter['value'];
+				}
+
+				if ($upd_tag_filter) {
+					$upd_tag_filters[] = [
+						'values' => $upd_tag_filter,
+						'where' => ['tag_filterid' => $db_tag_filter['tag_filterid']]
+					];
+				}
+			}
+			else {
+				$del_tag_filterids[] = $db_tag_filter['tag_filterid'];
+			}
+		}
+
+		foreach ($usrgrps as $usrgrp) {
+			$ins_tag_filters = array_merge($ins_tag_filters, $tag_filters[$usrgrp['usrgrpid']]);
+		}
+
+		if ($ins_tag_filters) {
+			DB::insertBatch('tag_filter', array_values($ins_tag_filters));
+		}
+
+		if ($upd_tag_filters) {
+			DB::update('tag_filter', array_values($upd_tag_filters));
+		}
+
+		if ($del_tag_filterids) {
+			DB::delete('tag_filter', ['tag_filterid' => $del_tag_filterids]);
+		}
+	}
+
+	/**
+	 * Update table "users_groups".
+	 *
+	 * @param array  $usrgrps
+	 * @param string $method
+	 */
+	private function updateUsersGroups(array $usrgrps, $method) {
+		$users_groups = [];
+
+		foreach ($usrgrps as $usrgrp) {
+			if (array_key_exists('userids', $usrgrp)) {
+				$users_groups[$usrgrp['usrgrpid']] = [];
+
+				foreach ($usrgrp['userids'] as $userid) {
+					$users_groups[$usrgrp['usrgrpid']][$userid] = true;
+				}
+			}
+		}
+
+		if (!$users_groups) {
+			return;
+		}
+
+		$db_users_groups = ($method === 'update')
+			? DB::select('users_groups', [
+				'output' => ['id', 'usrgrpid', 'userid'],
+				'filter' => ['usrgrpid' => array_keys($users_groups)]
+			])
+			: [];
+
+		$ins_users_groups = [];
+		$del_ids = [];
+
+		foreach ($db_users_groups as $db_user_group) {
+			if (array_key_exists($db_user_group['userid'], $users_groups[$db_user_group['usrgrpid']])) {
+				unset($users_groups[$db_user_group['usrgrpid']][$db_user_group['userid']]);
+			}
+			else {
+				$del_ids[] = $db_user_group['id'];
+			}
+		}
+
+		foreach ($users_groups as $usrgrpid => $userids) {
+			foreach (array_keys($userids) as $userid) {
+				$ins_users_groups[] = [
+					'usrgrpid' => $usrgrpid,
+					'userid' => $userid
+				];
+			}
+		}
+
+		if ($ins_users_groups) {
+			DB::insertBatch('users_groups', $ins_users_groups);
+		}
+
+		if ($del_ids) {
+			DB::delete('users_groups', ['id' => $del_ids]);
+		}
+	}
+
+	/**
+	 * @param array $usrgrpids
+	 *
+	 * @return array
+	 */
+	public function delete(array $usrgrpids) {
+		$this->validateDelete($usrgrpids, $db_usrgrps);
+
+		DB::delete('rights', ['groupid' => $usrgrpids]);
+		DB::delete('users_groups', ['usrgrpid' => $usrgrpids]);
+		DB::delete('usrgrp', ['usrgrpid' => $usrgrpids]);
+
+		$this->addAuditBulk(AUDIT_ACTION_DELETE, AUDIT_RESOURCE_USER_GROUP, $db_usrgrps);
+
+		return ['usrgrpids' => $usrgrpids];
+	}
+
+	/**
+	 * @throws APIException
+	 *
+	 * @param array $usrgrpids
+	 * @param array $db_usrgrps
+	 */
+	protected function validateDelete(array &$usrgrpids, array &$db_usrgrps = null) {
+		if (self::$userData['type'] != USER_TYPE_SUPER_ADMIN) {
+			self::exception(ZBX_API_ERROR_PERMISSIONS, _('Only Super Admins can delete user groups.'));
+		}
+
+		$api_input_rules = ['type' => API_IDS, 'flags' => API_NOT_EMPTY, 'uniq' => true];
+		if (!CApiInputValidator::validate($api_input_rules, $usrgrpids, '/', $error)) {
+			self::exception(ZBX_API_ERROR_PARAMETERS, $error);
+		}
+
+		$db_usrgrps = DB::select('usrgrp', [
+			'output' => ['usrgrpid', 'name'],
+			'usrgrpids' => $usrgrpids,
+			'preservekeys' => true
 		]);
 
-		return (count($ids) == $count);
+		$usrgrps = [];
+
+		foreach ($usrgrpids as $usrgrpid) {
+			// Check if this user group exists.
+			if (!array_key_exists($usrgrpid, $db_usrgrps)) {
+				self::exception(ZBX_API_ERROR_PERMISSIONS,
+					_('No permissions to referred object or it does not exist!')
+				);
+			}
+
+			$usrgrps[] = [
+				'usrgrpid' => $usrgrpid,
+				'userids' => []
+			];
+		}
+
+		// Check if user groups are used in actions.
+		$db_actions = DBselect(
+			'SELECT a.name,og.usrgrpid'.
+			' FROM opmessage_grp og,operations o,actions a'.
+			' WHERE og.operationid=o.operationid'.
+				' AND o.actionid=a.actionid'.
+				' AND '.dbConditionInt('og.usrgrpid', $usrgrpids),
+			1
+		);
+
+		if ($db_action = DBfetch($db_actions)) {
+			self::exception(ZBX_API_ERROR_PARAMETERS, _s('User group "%1$s" is used in "%2$s" action.',
+				$db_usrgrps[$db_action['usrgrpid']]['name'], $db_action['name']
+			));
+		}
+
+		// Check if user groups are used in scripts.
+		$db_scripts = DB::select('scripts', [
+			'output' => ['name', 'usrgrpid'],
+			'filter' => ['usrgrpid' => $usrgrpids],
+			'limit' => 1
+		]);
+
+		if ($db_scripts) {
+			self::exception(ZBX_API_ERROR_PARAMETERS, _s('User group "%1$s" is used in script "%2$s".',
+				$db_usrgrps[$db_scripts[0]['usrgrpid']]['name'], $db_scripts[0]['name']
+			));
+		}
+
+		// Check if user group are used in config.
+		$config = select_config();
+
+		if (array_key_exists($config['alert_usrgrpid'], $db_usrgrps)) {
+			self::exception(ZBX_API_ERROR_PARAMETERS, _s(
+				'User group "%1$s" is used in configuration for database down messages.',
+				$db_usrgrps[$config['alert_usrgrpid']]['name']
+			));
+		}
+
+		$this->checkUsersWithoutGroups($usrgrps);
 	}
 
 	protected function addRelatedObjects(array $options, array $result) {
@@ -748,42 +981,42 @@ class CUserGroup extends CApiService {
 			$result = $relationMap->mapMany($result, $db_rights, 'rights');
 		}
 
-		return $result;
-	}
+		// Adding usergroup tag filters.
+		if ($options['selectTagFilters'] !== null && $options['selectTagFilters'] != API_OUTPUT_COUNT) {
+			foreach ($result as &$usrgrp) {
+				$usrgrp['tag_filters'] = [];
+			}
+			unset($usrgrp);
 
-	/**
-	 * Disable actions that do not have operations.
-	 */
-	protected function disableActionsWithoutOperations(array $actionids) {
-		$actions = DBFetchArray(DBselect(
-			'SELECT DISTINCT a.actionid'.
-			' FROM actions a'.
-			' WHERE NOT EXISTS (SELECT NULL FROM operations o WHERE o.actionid=a.actionid)'.
-				' AND '.dbConditionInt('a.actionid', $actionids)
-		));
+			if (is_array($options['selectTagFilters'])) {
+				$output_fields = [];
 
-		$actions_without_operations = zbx_objectValues($actions, 'actionid');
-		if ($actions_without_operations) {
-			$this->disableActions($actions_without_operations);
-		}
-	}
+				foreach ($this->outputExtend($options['selectTagFilters'], ['usrgrpid']) as $field) {
+					if ($this->hasField($field, 'tag_filter')) {
+						$output_fields[$field] = $this->fieldId($field, 't');
+					}
+				}
 
-	/**
-	 * Disable actions.
-	 *
-	 * @param array $actionids
-	 */
-	protected function disableActions(array $actionids) {
-		$update = [
-			'values' => ['status' => ACTION_STATUS_DISABLED],
-			'where' => ['actionid' => $actionids]
-		];
-		DB::update('actions', $update);
+				$output_fields = implode(',', $output_fields);
+			}
+			else {
+				$output_fields = 't.*';
+			}
 
-		foreach($actionids as $actionid) {
-			add_audit_details(AUDIT_ACTION_DISABLE, AUDIT_RESOURCE_ACTION, $actionid, '',
-				_('Action disabled due to deletion of user group.'), null
+			$db_tag_filters = DBselect(
+				'SELECT '.$output_fields.
+				' FROM tag_filter t'.
+				' WHERE '.dbConditionInt('t.usrgrpid', array_keys($result))
 			);
+
+			while ($db_tag_filter = DBfetch($db_tag_filters)) {
+				$usrgrpid = $db_tag_filter['usrgrpid'];
+				unset($db_tag_filter['tag_filterid'], $db_tag_filter['usrgrpid']);
+
+				$result[$usrgrpid]['tag_filters'][] = $db_tag_filter;
+			}
 		}
+
+		return $result;
 	}
 }

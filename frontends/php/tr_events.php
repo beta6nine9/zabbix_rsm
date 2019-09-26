@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -20,7 +20,6 @@
 
 
 require_once dirname(__FILE__).'/include/config.inc.php';
-require_once dirname(__FILE__).'/include/acknow.inc.php';
 require_once dirname(__FILE__).'/include/actions.inc.php';
 require_once dirname(__FILE__).'/include/events.inc.php';
 require_once dirname(__FILE__).'/include/triggers.inc.php';
@@ -29,24 +28,21 @@ require_once dirname(__FILE__).'/include/html.inc.php';
 
 $page['title'] = _('Event details');
 $page['file'] = 'tr_events.php';
-$page['type'] = detect_page_type(PAGE_TYPE_HTML);
+$page['type'] = detect_page_type();
+$page['scripts'] = ['layout.mode.js'];
+
+CView::$has_web_layout_mode = true;
+$page['web_layout_mode'] = CView::getLayoutMode();
 
 require_once dirname(__FILE__).'/include/page_header.php';
-
-define('PAGE_SIZE', 100);
 
 // VAR	TYPE	OPTIONAL	FLAGS	VALIDATION	EXCEPTION
 $fields = [
 	'triggerid' =>	[T_ZBX_INT, O_OPT, P_SYS,	DB_ID,		PAGE_TYPE_HTML.'=='.$page['type']],
 	'eventid' =>	[T_ZBX_INT, O_OPT, P_SYS,	DB_ID,		PAGE_TYPE_HTML.'=='.$page['type']],
-	'fullscreen' =>	[T_ZBX_INT, O_OPT, P_SYS,	IN('0,1'),	null],
 	// Ajax
-	'widget' =>	[T_ZBX_STR, O_OPT, P_ACT,
-		IN('"'.WIDGET_HAT_EVENTACK.'","'.WIDGET_HAT_EVENTACTIONMSGS.'","'.WIDGET_HAT_EVENTACTIONMCMDS.'","'.
-			WIDGET_HAT_EVENTLIST.'"'),
-		null
-	],
-	'state'=>	[T_ZBX_INT, O_OPT, P_ACT, IN('0,1'), null]
+	'widget' =>		[T_ZBX_STR, O_OPT, P_ACT,	IN('"'.WIDGET_HAT_EVENTACTIONS.'","'.WIDGET_HAT_EVENTLIST.'"'), null],
+	'state' =>		[T_ZBX_INT, O_OPT, P_ACT,	IN('0,1'), null]
 ];
 check_fields($fields);
 
@@ -75,61 +71,124 @@ if (!$triggers) {
 
 $trigger = reset($triggers);
 
-// events
 $events = API::Event()->get([
-	'output' => API_OUTPUT_EXTEND,
-	'select_alerts' => API_OUTPUT_EXTEND,
-	'select_acknowledges' => API_OUTPUT_EXTEND,
-	'selectHosts' => API_OUTPUT_EXTEND,
+	'output' => ['eventid', 'r_eventid', 'clock', 'ns', 'objectid', 'name', 'acknowledged', 'severity'],
+	'selectTags' => ['tag', 'value'],
+	'select_acknowledges' => ['clock', 'message', 'action', 'userid', 'old_severity', 'new_severity'],
 	'source' => EVENT_SOURCE_TRIGGERS,
 	'object' => EVENT_OBJECT_TRIGGER,
 	'eventids' => getRequest('eventid'),
-	'objectids' => getRequest('triggerid')
+	'objectids' => getRequest('triggerid'),
+	'value' => TRIGGER_VALUE_TRUE
 ]);
 
+if (!$events) {
+	access_deny();
+}
 $event = reset($events);
+
+if ($event['r_eventid'] != 0) {
+	$r_events = API::Event()->get([
+		'output' => ['correlationid', 'userid'],
+		'source' => EVENT_SOURCE_TRIGGERS,
+		'object' => EVENT_OBJECT_TRIGGER,
+		'eventids' => [$event['r_eventid']],
+		'objectids' => getRequest('triggerid')
+	]);
+
+	if ($r_events) {
+		$r_event = reset($r_events);
+
+		$event['correlationid'] = $r_event['correlationid'];
+		$event['userid'] = $r_event['userid'];
+	}
+}
+
+if ($trigger['opdata'] !== '') {
+	$event['opdata'] = (new CCol(CMacrosResolverHelper::resolveTriggerOpdata(
+		[
+			'triggerid' => $trigger['triggerid'],
+			'expression' => $trigger['expression'],
+			'opdata' => $trigger['opdata'],
+			'clock' => $event['clock'],
+			'ns' => $event['ns']
+		],
+		[
+			'events' => true,
+			'html' => true
+		]
+	)))
+		->addClass('opdata')
+		->addClass(ZBX_STYLE_WORDWRAP);
+}
+else {
+	$db_items = API::Item()->get([
+		'output' => ['itemid', 'hostid', 'name', 'key_', 'value_type', 'units', 'valuemapid'],
+		'triggerids' => $event['objectid']
+	]);
+	$db_items = CMacrosResolverHelper::resolveItemNames($db_items);
+	$event['opdata'] = (new CCol(CScreenProblem::getLatestValues($db_items)))->addClass('latest-values');
+}
+
+$config = select_config();
+$severity_config = [
+	'severity_name_0' => $config['severity_name_0'],
+	'severity_name_1' => $config['severity_name_1'],
+	'severity_name_2' => $config['severity_name_2'],
+	'severity_name_3' => $config['severity_name_3'],
+	'severity_name_4' => $config['severity_name_4'],
+	'severity_name_5' => $config['severity_name_5']
+];
+$actions = getEventDetailsActions($event);
+$users = API::User()->get([
+	'output' => ['alias', 'name', 'surname'],
+	'userids' => array_keys($actions['userids']),
+	'preservekeys' => true
+]);
+$mediatypes = API::Mediatype()->get([
+	'output' => ['maxattempts'],
+	'mediatypeids' => array_keys($actions['mediatypeids']),
+	'preservekeys' => true
+]);
 
 /*
  * Display
  */
-$config = select_config();
-
 $eventTab = (new CTable())
 	->addRow([
 		new CDiv([
-			(new CUiWidget(WIDGET_HAT_TRIGGERDETAILS, make_trigger_details($trigger)))
-				->setHeader(_('Event source details')),
+			(new CUiWidget(WIDGET_HAT_TRIGGERDETAILS, make_trigger_details($trigger)))->setHeader(_('Trigger details')),
 			(new CUiWidget(WIDGET_HAT_EVENTDETAILS,
-				make_event_details($event, $trigger,
+				make_event_details($event,
 					$page['file'].'?triggerid='.getRequest('triggerid').'&eventid='.getRequest('eventid')
 				)
 			))->setHeader(_('Event details'))
 		]),
 		new CDiv([
-			$config['event_ack_enable']
-				? (new CCollapsibleUiWidget(WIDGET_HAT_EVENTACK, makeAckTab($event['acknowledges'])))
-					->setExpanded((bool) CProfile::get('web.tr_events.hats.'.WIDGET_HAT_EVENTACK.'.state', true))
-					->setHeader(_('Acknowledges'), [], false, 'tr_events.php')
-				: null,
-			(new CCollapsibleUiWidget(WIDGET_HAT_EVENTACTIONMSGS, getActionMessages($event['alerts'])))
-				->setExpanded((bool) CProfile::get('web.tr_events.hats.'.WIDGET_HAT_EVENTACTIONMSGS.'.state', true))
-				->setHeader(_('Message actions'), [], false, 'tr_events.php'),
-			(new CCollapsibleUiWidget(WIDGET_HAT_EVENTACTIONMCMDS, getActionCommands($event['alerts'])))
-				->setExpanded((bool) CProfile::get('web.tr_events.hats.'.WIDGET_HAT_EVENTACTIONMCMDS.'.state', true))
-				->setHeader(_('Command actions'), [], false, 'tr_events.php'),
+			(new CCollapsibleUiWidget(WIDGET_HAT_EVENTACTIONS,
+				makeEventDetailsActionsTable($actions, $users, $mediatypes, $severity_config)
+			))
+				->setExpanded((bool) CProfile::get('web.tr_events.hats.'.WIDGET_HAT_EVENTACTIONS.'.state', true))
+				->setHeader(_('Actions'), [], 'web.tr_events.hats.'.WIDGET_HAT_EVENTACTIONS.'.state'),
 			(new CCollapsibleUiWidget(WIDGET_HAT_EVENTLIST,
 				make_small_eventlist($event,
 					$page['file'].'?triggerid='.getRequest('triggerid').'&eventid='.getRequest('eventid')
 				)
 			))
 				->setExpanded((bool) CProfile::get('web.tr_events.hats.'.WIDGET_HAT_EVENTLIST.'.state', true))
-				->setHeader(_('Event list [previous 20]'), [], false, 'tr_events.php')
+				->setHeader(_('Event list [previous 20]'), [], 'web.tr_events.hats.'.WIDGET_HAT_EVENTLIST.'.state')
 		])
 	]);
 
 $eventWidget = (new CWidget())
 	->setTitle(_('Event details'))
-	->setControls((new CList())->addItem(get_icon('fullscreen', ['fullscreen' => getRequest('fullscreen')])))
+	->setWebLayoutMode($page['web_layout_mode'])
+	->setControls((new CTag('nav', true,
+		(new CList())
+			->addItem(get_icon('fullscreen'))
+		))
+		->setAttribute('aria-label', _('Content controls'))
+	)
 	->addItem($eventTab)
 	->show();
 

@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -18,16 +18,15 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-require_once dirname(__FILE__).'/../include/class.cwebtest.php';
+require_once dirname(__FILE__).'/../include/CLegacyWebTest.php';
 
-class testFormSysmap extends CWebTest {
+/**
+ * @backup sysmaps
+ */
+class testFormSysmap extends CLegacyWebTest {
 
 	public $mapName = 'Test map 1';
 	public $edit_map_name = 'Local network';
-
-	public function testFormSysmap_backup() {
-		DBsave_tables('sysmaps');
-	}
 
 	public function testFormSysmap_Layout() {
 		$this->zbxTestLogin('sysmaps.php?form=Create+map');
@@ -85,7 +84,7 @@ class testFormSysmap extends CWebTest {
 		$this->zbxTestAssertElementPresentId('cancel');
 	}
 
-		public static function create() {
+	public static function create() {
 		return [
 			[
 				[
@@ -114,7 +113,7 @@ class testFormSysmap extends CWebTest {
 					'columns' => 100,
 					'rows' => 100,
 					'url_name' => 'test url',
-					'url' => 'zabbix.com',
+					'url' => 'http://zabbix.com',
 					'dbCheck' => true,
 					'formCheck' => true
 				]
@@ -150,16 +149,6 @@ class testFormSysmap extends CWebTest {
 					'error_msg' => 'Page received incorrect data',
 					'errors' => [
 						'Incorrect value for field "Name": cannot be empty.',
-					]
-				]
-			],
-						[
-				[
-					'expected' => TEST_BAD,
-					'name' => '0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789',
-					'error_msg' => 'Cannot add network map',
-					'errors' => [
-						'Value "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789" is too long for field "name" - 160 characters. Allowed length is 128 characters.',
 					]
 				]
 			],
@@ -217,7 +206,7 @@ class testFormSysmap extends CWebTest {
 					'name' => 'map urls',
 					'width' => 1,
 					'height' => 1,
-					'url' => 'zabbix.com',
+					'url' => 'http://zabbix.com',
 					'error_msg' => 'Cannot add network map',
 					'errors' => [
 						'URL should have both "name" and "url" fields for map "map urls".',
@@ -225,6 +214,29 @@ class testFormSysmap extends CWebTest {
 				]
 			]
 		];
+	}
+
+	public function maxlengthDataProvider() {
+		return [
+			[
+				[
+					'field' => 'name',
+					'maxlength' => 128
+				]
+			]
+		];
+	}
+
+	/**
+	 * @dataProvider maxlengthDataProvider
+	 */
+	public function testFormFieldMaxLengthStripped($data) {
+		$maxlength = $data['maxlength'];
+		$test_value = str_repeat('0123456789', ceil($maxlength/10) + 10);
+
+		$this->zbxTestLogin('sysmaps.php?form=Create+map');
+		$this->zbxTestInputTypeWait($data['field'], $test_value);
+		$this->zbxTestAssertElementValue($data['field'], substr($test_value, 0, $maxlength));
 	}
 
 	/**
@@ -279,7 +291,7 @@ class testFormSysmap extends CWebTest {
 			case TEST_GOOD:
 				$this->zbxTestTextNotPresent('Page received incorrect data', 'Cannot add network map');
 				$this->zbxTestWaitUntilMessageTextPresent('msg-good', 'Network map added');
-				$this->assertEquals(1, DBcount("SELECT sysmapid FROM sysmaps WHERE name='".$data['name']."'"));
+				$this->assertEquals(1, CDBHelper::getCount("SELECT sysmapid FROM sysmaps WHERE name='".$data['name']."'"));
 				break;
 
 		case TEST_BAD:
@@ -330,8 +342,8 @@ class testFormSysmap extends CWebTest {
 
 		$this->zbxTestWaitUntilMessageTextPresent('msg-good', 'Network map updated');
 		$this->zbxTestTextPresent($new_map_name);
-		$this->assertEquals(1, DBcount("SELECT sysmapid FROM sysmaps WHERE name='".$new_map_name."'"));
-		$this->assertEquals(0, DBcount("SELECT sysmapid FROM sysmaps WHERE name='$this->edit_map_name'"));
+		$this->assertEquals(1, CDBHelper::getCount("SELECT sysmapid FROM sysmaps WHERE name='".$new_map_name."'"));
+		$this->assertEquals(0, CDBHelper::getCount("SELECT sysmapid FROM sysmaps WHERE name='$this->edit_map_name'"));
 	}
 
 	public function testFormSysmap_CloneMap() {
@@ -344,7 +356,7 @@ class testFormSysmap extends CWebTest {
 		$this->zbxTestClickWait('add');
 		$this->zbxTestCheckTitle('Configuration of network maps');
 		$this->zbxTestWaitUntilMessageTextPresent('msg-good', 'Network map added');
-		$this->assertEquals(1, DBcount("SELECT sysmapid FROM sysmaps WHERE name='".$mapName."'"));
+		$this->assertEquals(1, CDBHelper::getCount("SELECT sysmapid FROM sysmaps WHERE name='".$mapName."'"));
 		$this->zbxTestTextPresent($mapName);
 		return $mapName;
 
@@ -358,12 +370,8 @@ class testFormSysmap extends CWebTest {
 		$this->zbxTestLogin('sysmaps.php');
 		$this->zbxTestClickXpathWait("//a[text()='".$mapName."']/../..//a[text()='Properties']");
 		$this->zbxTestClickWait('delete');
-		$this->webDriver->switchTo()->alert()->accept();
+		$this->zbxTestAcceptAlert();
 		$this->zbxTestWaitUntilMessageTextPresent('msg-good', 'Network map deleted');
-		$this->assertEquals(0, DBcount("SELECT sysmapid FROM sysmaps WHERE name='".$mapName."'"));
-	}
-
-	public function testFormSysmap_restore() {
-		DBrestore_tables('sysmaps');
+		$this->assertEquals(0, CDBHelper::getCount("SELECT sysmapid FROM sysmaps WHERE name='".$mapName."'"));
 	}
 }

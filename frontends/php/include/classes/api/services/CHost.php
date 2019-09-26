@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -21,8 +21,6 @@
 
 /**
  * Class containing methods for operations with hosts.
- *
- * @package API
  */
 class CHost extends CHostGeneral {
 
@@ -31,41 +29,42 @@ class CHost extends CHostGeneral {
 	/**
 	 * Get host data.
 	 *
-	 * @param array         $options
-	 * @param array         $options['groupids']                 HostGroup IDs
-	 * @param array         $options['hostids']                  Host IDs
-	 * @param boolean       $options['monitored_hosts']          only monitored Hosts
-	 * @param boolean       $options['templated_hosts']          include templates in result
-	 * @param boolean       $options['with_items']               only with items
-	 * @param boolean       $options['with_monitored_items']     only with monitored items
-	 * @param boolean       $options['with_triggers']            only with triggers
-	 * @param boolean       $options['with_monitored_triggers']  only with monitored triggers
-	 * @param boolean       $options['with_httptests']           only with http tests
-	 * @param boolean       $options['with_monitored_httptests'] only with monitored http tests
-	 * @param boolean       $options['with_graphs']              only with graphs
-	 * @param boolean       $options['editable']                 only with read-write permission. Ignored for SuperAdmins
-	 * @param boolean       $options['selectGroups']             select HostGroups
-	 * @param boolean       $options['selectItems']              select Items
-	 * @param boolean       $options['selectTriggers']           select Triggers
-	 * @param boolean       $options['selectGraphs']             select Graphs
-	 * @param boolean       $options['selectApplications']       select Applications
-	 * @param boolean       $options['selectMacros']             select Macros
-	 * @param boolean|array $options['selectInventory']          select Inventory
-	 * @param boolean       $options['tlds']                     select only tlds
-	 * @param boolean       $options['withInventory']            select only hosts with inventory
-	 * @param int           $options['count']                    count Hosts, returned column name is rowscount
-	 * @param string        $options['pattern']                  search hosts by pattern in Host name
-	 * @param string        $options['extendPattern']            search hosts by pattern in Host name, ip and DNS
-	 * @param int           $options['limit']                    limit selection
-	 * @param string        $options['sortfield']                field to sort by
-	 * @param string        $options['sortorder']                sort order
+	 * @param array			$options
+	 * @param array			$options['groupids']					HostGroup IDs
+	 * @param array			$options['hostids']						Host IDs
+	 * @param bool			$options['monitored_hosts']				only monitored Hosts
+	 * @param bool			$options['templated_hosts']				include templates in result
+	 * @param bool			$options['with_items']					only with items
+	 * @param bool			$options['with_item_prototypes']		only with item prototypes
+	 * @param bool			$options['with_simple_graph_items']		only with items suitable for graphs
+	 * @param bool			$options['with_simple_graph_item_prototypes']	only with item prototypes suitable for graphs
+	 * @param bool			$options['with_monitored_items']		only with monitored items
+	 * @param bool			$options['with_triggers']				only with triggers
+	 * @param bool			$options['with_monitored_triggers']		only with monitored triggers
+	 * @param bool			$options['with_httptests']				only with http tests
+	 * @param bool			$options['with_monitored_httptests']	only with monitored http tests
+	 * @param bool			$options['with_graphs']					only with graphs
+	 * @param bool			$options['with_graph_prototypes']		only with graph prototypes
+	 * @param bool			$options['editable']					only with read-write permission. Ignored for SuperAdmins
+	 * @param bool			$options['selectGroups']				select HostGroups
+	 * @param bool			$options['selectItems']					select Items
+	 * @param bool			$options['selectTriggers']				select Triggers
+	 * @param bool			$options['selectGraphs']				select Graphs
+	 * @param bool			$options['selectApplications']			select Applications
+	 * @param bool			$options['selectMacros']				select Macros
+	 * @param bool|array	$options['selectInventory']				select Inventory
+	 * @param bool			$options['withInventory']				select only hosts with inventory
+	 * @param int			$options['count']						count Hosts, returned column name is rowscount
+	 * @param string		$options['pattern']						search hosts by pattern in Host name
+	 * @param string		$options['extendPattern']				search hosts by pattern in Host name, ip and DNS
+	 * @param int			$options['limit']						limit selection
+	 * @param string		$options['sortfield']					field to sort by
+	 * @param string		$options['sortorder']					sort order
 	 *
 	 * @return array|boolean Host data as array or false if error
 	 */
 	public function get($options = []) {
 		$result = [];
-		$userType = self::$userData['type'];
-		$userid = self::$userData['userid'];
 
 		$sqlParts = [
 			'select'	=> ['hosts' => 'h.hostid'],
@@ -77,73 +76,77 @@ class CHost extends CHostGeneral {
 		];
 
 		$defOptions = [
-			'groupids'					=> null,
-			'hostids'					=> null,
-			'proxyids'					=> null,
-			'templateids'				=> null,
-			'interfaceids'				=> null,
-			'itemids'					=> null,
-			'triggerids'				=> null,
-			'maintenanceids'			=> null,
-			'graphids'					=> null,
-			'applicationids'			=> null,
-			'dserviceids'				=> null,
-			'httptestids'				=> null,
-			'monitored_hosts'			=> null,
-			'templated_hosts'			=> null,
-			'proxy_hosts'				=> null,
-			'with_items'				=> null,
-			'with_monitored_items'		=> null,
-			'with_simple_graph_items'	=> null,
-			'with_triggers'				=> null,
-			'with_monitored_triggers'	=> null,
-			'with_httptests'			=> null,
-			'with_monitored_httptests'	=> null,
-			'with_graphs'				=> null,
-			'with_applications'			=> null,
-			'withInventory'				=> null,
-			'tlds'						=> null,
-			'editable'					=> null,
-			'nopermissions'				=> null,
+			'groupids'							=> null,
+			'hostids'							=> null,
+			'proxyids'							=> null,
+			'templateids'						=> null,
+			'interfaceids'						=> null,
+			'itemids'							=> null,
+			'triggerids'						=> null,
+			'maintenanceids'					=> null,
+			'graphids'							=> null,
+			'applicationids'					=> null,
+			'dserviceids'						=> null,
+			'httptestids'						=> null,
+			'monitored_hosts'					=> null,
+			'templated_hosts'					=> null,
+			'proxy_hosts'						=> null,
+			'with_items'						=> null,
+			'with_item_prototypes'				=> null,
+			'with_simple_graph_items'			=> null,
+			'with_simple_graph_item_prototypes'	=> null,
+			'with_monitored_items'				=> null,
+			'with_triggers'						=> null,
+			'with_monitored_triggers'			=> null,
+			'with_httptests'					=> null,
+			'with_monitored_httptests'			=> null,
+			'with_graphs'						=> null,
+			'with_graph_prototypes'				=> null,
+			'with_applications'					=> null,
+			'withInventory'						=> null,
+			'editable'							=> false,
+			'nopermissions'						=> null,
 			// filter
-			'filter'					=> null,
-			'search'					=> null,
-			'searchInventory'			=> null,
-			'searchByAny'				=> null,
-			'startSearch'				=> null,
-			'excludeSearch'				=> null,
-			'searchWildcardsEnabled'	=> null,
+			'evaltype'							=> TAG_EVAL_TYPE_AND_OR,
+			'tags'								=> null,
+			'filter'							=> null,
+			'search'							=> null,
+			'searchInventory'					=> null,
+			'searchByAny'						=> null,
+			'startSearch'						=> false,
+			'excludeSearch'						=> false,
+			'searchWildcardsEnabled'			=> false,
 			// output
-			'output'					=> API_OUTPUT_EXTEND,
-			'selectGroups'				=> null,
-			'selectParentTemplates'		=> null,
-			'selectItems'				=> null,
-			'selectDiscoveries'			=> null,
-			'selectTriggers'			=> null,
-			'selectGraphs'				=> null,
-			'selectApplications'		=> null,
-			'selectMacros'				=> null,
-			'selectScreens'				=> null,
-			'selectInterfaces'			=> null,
-			'selectInventory'			=> null,
-			'selectHttpTests'           => null,
-			'selectDiscoveryRule'		=> null,
-			'selectHostDiscovery'		=> null,
-			'countOutput'				=> null,
-			'groupCount'				=> null,
-			'preservekeys'				=> null,
-			'sortfield'					=> '',
-			'sortorder'					=> '',
-			'limit'						=> null,
-			'limitSelects'				=> null
+			'output'							=> API_OUTPUT_EXTEND,
+			'selectGroups'						=> null,
+			'selectParentTemplates'				=> null,
+			'selectItems'						=> null,
+			'selectDiscoveries'					=> null,
+			'selectTriggers'					=> null,
+			'selectGraphs'						=> null,
+			'selectApplications'				=> null,
+			'selectMacros'						=> null,
+			'selectScreens'						=> null,
+			'selectInterfaces'					=> null,
+			'selectInventory'					=> null,
+			'selectHttpTests'					=> null,
+			'selectDiscoveryRule'				=> null,
+			'selectHostDiscovery'				=> null,
+			'selectTags'						=> null,
+			'countOutput'						=> false,
+			'groupCount'						=> false,
+			'preservekeys'						=> false,
+			'sortfield'							=> '',
+			'sortorder'							=> '',
+			'limit'								=> null,
+			'limitSelects'						=> null
 		];
 		$options = zbx_array_merge($defOptions, $options);
 
 		// editable + PERMISSION CHECK
-		if ($userType != USER_TYPE_SUPER_ADMIN && !$options['nopermissions']) {
+		if (self::$userData['type'] != USER_TYPE_SUPER_ADMIN && !$options['nopermissions']) {
 			$permission = $options['editable'] ? PERM_READ_WRITE : PERM_READ;
-
-			$userGroups = getUserGroupsByUserId($userid);
+			$userGroups = getUserGroupsByUserId(self::$userData['userid']);
 
 			$sqlParts['where'][] = 'EXISTS ('.
 					'SELECT NULL'.
@@ -172,7 +175,7 @@ class CHost extends CHostGeneral {
 			$sqlParts['where'][] = dbConditionInt('hg.groupid', $options['groupids']);
 			$sqlParts['where']['hgh'] = 'hg.hostid=h.hostid';
 
-			if (!is_null($options['groupCount'])) {
+			if ($options['groupCount']) {
 				$sqlParts['group']['groupid'] = 'hg.groupid';
 			}
 		}
@@ -181,18 +184,7 @@ class CHost extends CHostGeneral {
 		if (!is_null($options['proxyids'])) {
 			zbx_value2array($options['proxyids']);
 
-			$sqlParts['where'][] = dbConditionInt('h.proxy_hostid', $options['proxyids']);
-		}
-
-		// tlds
-		if (!is_null($options['tlds'])) {
-			if (!array_key_exists('hosts_groups', $sqlParts['from'])) {
-				$sqlParts['from']['hosts_groups'] = 'hosts_groups hg';
-				$sqlParts['where']['hgh'] = 'hg.hostid=h.hostid';
-			}
-			$sqlParts['from']['groups'] = 'groups g';
-			$sqlParts['where'][] = 'g.name='.zbx_dbstr(RSM_TLDS_GROUP);
-			$sqlParts['where']['g'] = 'g.groupid=hg.groupid';
+			$sqlParts['where'][] = dbConditionId('h.proxy_hostid', $options['proxyids']);
 		}
 
 		// templateids
@@ -203,7 +195,7 @@ class CHost extends CHostGeneral {
 			$sqlParts['where'][] = dbConditionInt('ht.templateid', $options['templateids']);
 			$sqlParts['where']['hht'] = 'h.hostid=ht.hostid';
 
-			if (!is_null($options['groupCount'])) {
+			if ($options['groupCount']) {
 				$sqlParts['group']['templateid'] = 'ht.templateid';
 			}
 		}
@@ -276,7 +268,7 @@ class CHost extends CHostGeneral {
 			$sqlParts['where']['dsh'] = 'ds.ip=i.ip';
 			$sqlParts['where']['hi'] = 'h.hostid=i.hostid';
 
-			if (!is_null($options['groupCount'])) {
+			if ($options['groupCount']) {
 				$sqlParts['group']['dserviceid'] = 'ds.dserviceid';
 			}
 		}
@@ -289,7 +281,7 @@ class CHost extends CHostGeneral {
 			$sqlParts['where'][] = dbConditionInt('mh.maintenanceid', $options['maintenanceids']);
 			$sqlParts['where']['hmh'] = 'h.hostid=mh.hostid';
 
-			if (!is_null($options['groupCount'])) {
+			if ($options['groupCount']) {
 				$sqlParts['group']['maintenanceid'] = 'mh.maintenanceid';
 			}
 		}
@@ -308,33 +300,54 @@ class CHost extends CHostGeneral {
 			$sqlParts['where']['status'] = 'h.status IN ('.HOST_STATUS_MONITORED.','.HOST_STATUS_NOT_MONITORED.')';
 		}
 
-		// with_items, with_monitored_items, with_simple_graph_items
-		if (!is_null($options['with_items'])) {
+		// with_items, with_simple_graph_items, with_monitored_items
+		if ($options['with_items'] !== null
+				|| $options['with_simple_graph_items'] !== null
+				|| $options['with_monitored_items'] !== null) {
+
+			if ($options['with_items'] !== null) {
+				$where_and =
+					' AND '.dbConditionInt('i.flags', [ZBX_FLAG_DISCOVERY_NORMAL, ZBX_FLAG_DISCOVERY_CREATED]);
+			}
+			elseif ($options['with_monitored_items'] !== null) {
+				$where_and =
+					' AND '.dbConditionInt('i.flags', [ZBX_FLAG_DISCOVERY_NORMAL, ZBX_FLAG_DISCOVERY_CREATED]).
+					' AND '.dbConditionInt('i.status', [ITEM_STATUS_ACTIVE]);
+			}
+			elseif ($options['with_simple_graph_items'] !== null) {
+				$where_and =
+					' AND '.dbConditionInt('i.flags', [ZBX_FLAG_DISCOVERY_NORMAL, ZBX_FLAG_DISCOVERY_CREATED]).
+					' AND '.dbConditionInt('i.status', [ITEM_STATUS_ACTIVE]).
+					' AND '.dbConditionInt('i.value_type', [ITEM_VALUE_TYPE_FLOAT, ITEM_VALUE_TYPE_UINT64]);
+			}
+
 			$sqlParts['where'][] = 'EXISTS ('.
-					'SELECT NULL'.
-					' FROM items i'.
-					' WHERE h.hostid=i.hostid'.
-						' AND i.flags IN ('.ZBX_FLAG_DISCOVERY_NORMAL.','.ZBX_FLAG_DISCOVERY_CREATED.')'.
-					')';
+				'SELECT NULL'.
+				' FROM items i'.
+				' WHERE h.hostid=i.hostid'.
+					$where_and.
+				')';
 		}
-		elseif (!is_null($options['with_monitored_items'])) {
+
+		// with_item_prototypes, with_simple_graph_item_prototypes
+		if ($options['with_item_prototypes'] !== null || $options['with_simple_graph_item_prototypes'] !== null) {
+			if ($options['with_item_prototypes'] !== null) {
+				$where_and =
+					' AND '.dbConditionInt('i.flags', [ZBX_FLAG_DISCOVERY_PROTOTYPE]);
+			}
+			elseif ($options['with_simple_graph_item_prototypes'] !== null) {
+				$where_and =
+					' AND '.dbConditionInt('i.flags', [ZBX_FLAG_DISCOVERY_PROTOTYPE]).
+					' AND '.dbConditionInt('i.status', [ITEM_STATUS_ACTIVE]).
+					' AND '.dbConditionInt('i.value_type', [ITEM_VALUE_TYPE_FLOAT, ITEM_VALUE_TYPE_UINT64]);
+			}
+
 			$sqlParts['where'][] = 'EXISTS ('.
-					'SELECT NULL'.
-					' FROM items i'.
-					' WHERE h.hostid=i.hostid'.
-						' AND i.status='.ITEM_STATUS_ACTIVE.
-						' AND i.flags IN ('.ZBX_FLAG_DISCOVERY_NORMAL.','.ZBX_FLAG_DISCOVERY_CREATED.')'.
-					')';
-		}
-		elseif (!is_null($options['with_simple_graph_items'])) {
-			$sqlParts['where'][] = 'EXISTS ('.
-					'SELECT NULL'.
-					' FROM items i'.
-					' WHERE h.hostid=i.hostid'.
-						' AND i.value_type IN ('.ITEM_VALUE_TYPE_FLOAT.','.ITEM_VALUE_TYPE_UINT64.')'.
-						' AND i.status='.ITEM_STATUS_ACTIVE.
-						' AND i.flags IN ('.ZBX_FLAG_DISCOVERY_NORMAL.','.ZBX_FLAG_DISCOVERY_CREATED.')'.
-					')';
+				'SELECT NULL'.
+				' FROM items i'.
+				' WHERE h.hostid=i.hostid'.
+					$where_and.
+				')';
 		}
 
 		// with_triggers, with_monitored_triggers
@@ -375,15 +388,27 @@ class CHost extends CHostGeneral {
 		}
 
 		// with_graphs
-		if (!is_null($options['with_graphs'])) {
+		if ($options['with_graphs'] !== null) {
 			$sqlParts['where'][] = 'EXISTS ('.
-					'SELECT NULL'.
-					' FROM items i,graphs_items gi,graphs g'.
-					' WHERE i.hostid=h.hostid'.
-						' AND i.itemid=gi.itemid '.
-						' AND gi.graphid=g.graphid'.
-						' AND g.flags IN ('.ZBX_FLAG_DISCOVERY_NORMAL.','.ZBX_FLAG_DISCOVERY_CREATED.')'.
-					')';
+				'SELECT NULL'.
+				' FROM items i,graphs_items gi,graphs g'.
+				' WHERE i.hostid=h.hostid'.
+					' AND i.itemid=gi.itemid '.
+					' AND gi.graphid=g.graphid'.
+					' AND '.dbConditionInt('g.flags', [ZBX_FLAG_DISCOVERY_NORMAL, ZBX_FLAG_DISCOVERY_CREATED]).
+				')';
+		}
+
+		// with_graph_prototypes
+		if ($options['with_graph_prototypes'] !== null) {
+			$sqlParts['where'][] = 'EXISTS ('.
+				'SELECT NULL'.
+				' FROM items i,graphs_items gi,graphs g'.
+				' WHERE i.hostid=h.hostid'.
+					' AND i.itemid=gi.itemid '.
+					' AND gi.graphid=g.graphid'.
+					' AND '.dbConditionInt('g.flags', [ZBX_FLAG_DISCOVERY_PROTOTYPE]).
+				')';
 		}
 
 		// with applications
@@ -398,6 +423,13 @@ class CHost extends CHostGeneral {
 					' SELECT hin.hostid'.
 					' FROM host_inventory hin'.
 					')';
+		}
+
+		// tags
+		if ($options['tags'] !== null && $options['tags']) {
+			$sqlParts['where'][] = CApiTagHelper::addWhereCondition($options['tags'], $options['evaltype'], 'h',
+				'host_tag', 'hostid'
+			);
 		}
 
 		// search
@@ -444,11 +476,10 @@ class CHost extends CHostGeneral {
 
 		$sqlParts = $this->applyQueryOutputOptions($this->tableName(), $this->tableAlias(), $options, $sqlParts);
 		$sqlParts = $this->applyQuerySortOptions($this->tableName(), $this->tableAlias(), $options, $sqlParts);
-
 		$res = DBselect($this->createSelectQueryFromParts($sqlParts), $sqlParts['limit']);
 		while ($host = DBfetch($res)) {
-			if (!is_null($options['countOutput'])) {
-				if (!is_null($options['groupCount'])) {
+			if ($options['countOutput']) {
+				if ($options['groupCount']) {
 					$result[] = $host;
 				}
 				else {
@@ -460,7 +491,7 @@ class CHost extends CHostGeneral {
 			}
 		}
 
-		if (!is_null($options['countOutput'])) {
+		if ($options['countOutput']) {
 			return $result;
 		}
 
@@ -469,7 +500,7 @@ class CHost extends CHostGeneral {
 		}
 
 		// removing keys (hash -> array)
-		if (is_null($options['preservekeys'])) {
+		if (!$options['preservekeys']) {
 			$result = zbx_cleanHashes($result);
 		}
 
@@ -479,37 +510,40 @@ class CHost extends CHostGeneral {
 	/**
 	 * Add host.
 	 *
-	 * @param array  $hosts									An array with hosts data.
-	 * @param string $hosts[]['host']						Host technical name.
-	 * @param string $hosts[]['name']						Host visible name (optional).
-	 * @param array  $hosts[]['groups']						An array of host group objects with IDs that host will be added to.
-	 * @param int    $hosts[]['status']						Status of the host (optional).
-	 * @param array  $hosts[]['interfaces']					An array of host interfaces data.
-	 * @param int    $hosts[]['interfaces']['type']			Interface type.
-	 * @param int    $hosts[]['interfaces']['main']			Is this the default interface to use.
-	 * @param string $hosts[]['interfaces']['ip']			Interface IP (optional).
-	 * @param int    $hosts[]['interfaces']['port']			Interface port (optional).
-	 * @param int    $hosts[]['interfaces']['useip']		Interface shoud use IP (optional).
-	 * @param string $hosts[]['interfaces']['dns']			Interface shoud use DNS (optional).
-	 * @param int    $hosts[]['interfaces']['bulk']			Use bulk requests for interface (optional).
-	 * @param int    $hosts[]['proxy_hostid']				ID of the proxy that is used to monitor the host (optional).
-	 * @param int    $hosts[]['ipmi_authtype']				IPMI authentication type (optional).
-	 * @param int    $hosts[]['ipmi_privilege']				IPMI privilege (optional).
-	 * @param string $hosts[]['ipmi_username']				IPMI username (optional).
-	 * @param string $hosts[]['ipmi_password']				IPMI password (optional).
-	 * @param array  $hosts[]['inventory']					An array of host inventory data (optional).
-	 * @param array  $hosts[]['macros']						An array of host macros (optional).
-	 * @param string $hosts[]['macros'][]['macro']			Host macro (required if "macros" is set).
-	 * @param array  $hosts[]['templates']					An array of template objects with IDs that will be linked to host (optional).
-	 * @param string $hosts[]['templates'][]['templateid']	Template ID (required if "templates" is set).
-	 * @param string $hosts[]['tls_connect']				Connections to host (optional).
-	 * @param string $hosts[]['tls_accept']					Connections from host (optional).
-	 * @param string $hosts[]['tls_psk_identity']			PSK identity (required if "PSK" type is set).
-	 * @param string $hosts[]['tls_psk']					PSK (required if "PSK" type is set).
-	 * @param string $hosts[]['tls_issuer']					Certificate issuer (optional).
-	 * @param string $hosts[]['tls_subject']				Certificate subject (optional).
-	 * @param string $hosts[]['info_1']						Info field (optional).
-	 * @param string $hosts[]['info_2']						Info field (optional).
+	 * @param array  $hosts                                 An array with hosts data.
+	 * @param string $hosts[]['host']                       Host technical name.
+	 * @param string $hosts[]['name']                       Host visible name (optional).
+	 * @param array  $hosts[]['groups']                     An array of host group objects with IDs that host will be
+	 *                                                      added to.
+	 * @param int    $hosts[]['status']                     Status of the host (optional).
+	 * @param array  $hosts[]['interfaces']                 An array of host interfaces data.
+	 * @param int    $hosts[]['interfaces']['type']         Interface type.
+	 * @param int    $hosts[]['interfaces']['main']         Is this the default interface to use.
+	 * @param string $hosts[]['interfaces']['ip']           Interface IP (optional).
+	 * @param int    $hosts[]['interfaces']['port']         Interface port (optional).
+	 * @param int    $hosts[]['interfaces']['useip']        Interface shoud use IP (optional).
+	 * @param string $hosts[]['interfaces']['dns']          Interface shoud use DNS (optional).
+	 * @param int    $hosts[]['interfaces']['bulk']         Use bulk requests for interface (optional).
+	 * @param int    $hosts[]['proxy_hostid']               ID of the proxy that is used to monitor the host (optional).
+	 * @param int    $hosts[]['ipmi_authtype']              IPMI authentication type (optional).
+	 * @param int    $hosts[]['ipmi_privilege']             IPMI privilege (optional).
+	 * @param string $hosts[]['ipmi_username']              IPMI username (optional).
+	 * @param string $hosts[]['ipmi_password']              IPMI password (optional).
+	 * @param array  $hosts[]['tags']                       An array of tags (optional).
+	 * @param string $hosts[]['tags'][]['tag']              Tag name.
+	 * @param string $hosts[]['tags'][]['value']            Tag value.
+	 * @param array  $hosts[]['inventory']                  An array of host inventory data (optional).
+	 * @param array  $hosts[]['macros']                     An array of host macros (optional).
+	 * @param string $hosts[]['macros'][]['macro']          Host macro (required if "macros" is set).
+	 * @param array  $hosts[]['templates']                  An array of template objects with IDs that will be linked
+	 *                                                      to host (optional).
+	 * @param string $hosts[]['templates'][]['templateid']  Template ID (required if "templates" is set).
+	 * @param string $hosts[]['tls_connect']                Connections to host (optional).
+	 * @param string $hosts[]['tls_accept']                 Connections from host (optional).
+	 * @param string $hosts[]['tls_psk_identity']           PSK identity (required if "PSK" type is set).
+	 * @param string $hosts[]['tls_psk']                    PSK (required if "PSK" type is set).
+	 * @param string $hosts[]['tls_issuer']                 Certificate issuer (optional).
+	 * @param string $hosts[]['tls_subject']                Certificate subject (optional).
 	 *
 	 * @return array
 	 */
@@ -519,7 +553,7 @@ class CHost extends CHostGeneral {
 		$this->validateCreate($hosts);
 
 		$hostids = [];
-
+		$ins_tags = [];
 		foreach ($hosts as $host) {
 			// If visible name is not given or empty it should be set to host name.
 			if (!array_key_exists('name', $host) || !trim($host['name'])) {
@@ -540,6 +574,12 @@ class CHost extends CHostGeneral {
 				];
 			}
 			DB::insert('hosts_groups', $groupsToAdd);
+
+			if (array_key_exists('tags', $host)) {
+				foreach ($host['tags'] as $tag) {
+					$ins_tags[] = ['hostid' => $hostid] + $tag;
+				}
+			}
 
 			$options = [
 				'hosts' => $host
@@ -564,7 +604,6 @@ class CHost extends CHostGeneral {
 
 			if (array_key_exists('inventory', $host) && $host['inventory']) {
 				$hostInventory = $host['inventory'];
-				$hostInventory['hostid'] = $hostid;
 				$hostInventory['inventory_mode'] = HOST_INVENTORY_MANUAL;
 			}
 			else {
@@ -572,13 +611,19 @@ class CHost extends CHostGeneral {
 			}
 
 			if (array_key_exists('inventory_mode', $host) && $host['inventory_mode'] != HOST_INVENTORY_DISABLED) {
-				$hostInventory['hostid'] = $hostid;
 				$hostInventory['inventory_mode'] = $host['inventory_mode'];
 			}
 
-			if ($hostInventory) {
+			if (array_key_exists('inventory_mode', $hostInventory)
+					&& ($hostInventory['inventory_mode'] == HOST_INVENTORY_MANUAL
+						|| $hostInventory['inventory_mode'] == HOST_INVENTORY_AUTOMATIC)) {
+				$hostInventory['hostid'] = $hostid;
 				DB::insert('host_inventory', [$hostInventory], false);
 			}
+		}
+
+		if ($ins_tags) {
+			DB::insert('host_tag', $ins_tags);
 		}
 
 		return ['hostids' => $hostids];
@@ -587,40 +632,41 @@ class CHost extends CHostGeneral {
 	/**
 	 * Update host.
 	 *
-	 * @param array  $hosts											An array with hosts data.
-	 * @param string $hosts[]['hostid']								Host ID.
-	 * @param string $hosts[]['host']								Host technical name (optional).
-	 * @param string $hosts[]['name']								Host visible name (optional).
-	 * @param array  $hosts[]['groups']								An array of host group objects with IDs that host will be replaced to.
-	 * @param int    $hosts[]['status']								Status of the host (optional).
-	 * @param array  $hosts[]['interfaces']							An array of host interfaces data to be replaced.
-	 * @param int    $hosts[]['interfaces']['type']					Interface type.
-	 * @param int    $hosts[]['interfaces']['main']					Is this the default interface to use.
-	 * @param string $hosts[]['interfaces']['ip']					Interface IP (optional).
-	 * @param int    $hosts[]['interfaces']['port']					Interface port (optional).
-	 * @param int    $hosts[]['interfaces']['useip']				Interface shoud use IP (optional).
-	 * @param string $hosts[]['interfaces']['dns']					Interface shoud use DNS (optional).
-	 * @param int    $hosts[]['interfaces']['bulk']					Use bulk requests for interface (optional).
-	 * @param int    $hosts[]['proxy_hostid']						ID of the proxy that is used to monitor the host (optional).
-	 * @param int    $hosts[]['ipmi_authtype']						IPMI authentication type (optional).
-	 * @param int    $hosts[]['ipmi_privilege']						IPMI privilege (optional).
-	 * @param string $hosts[]['ipmi_username']						IPMI username (optional).
-	 * @param string $hosts[]['ipmi_password']						IPMI password (optional).
-	 * @param array  $hosts[]['inventory']							An array of host inventory data (optional).
-	 * @param array  $hosts[]['macros']								An array of host macros (optional).
-	 * @param string $hosts[]['macros'][]['macro']					Host macro (required if "macros" is set).
-	 * @param array  $hosts[]['templates']							An array of template objects with IDs that will be linked to host (optional).
-	 * @param string $hosts[]['templates'][]['templateid']			Template ID (required if "templates" is set).
-	 * @param array  $hosts[]['templates_clear']					Templates to unlink and clear from the host (optional).
-	 * @param string $hosts[]['templates_clear'][]['templateid']	Template ID (required if "templates" is set).
-	 * @param string $hosts[]['tls_connect']						Connections to host (optional).
-	 * @param string $hosts[]['tls_accept']							Connections from host (optional).
-	 * @param string $hosts[]['tls_psk_identity']					PSK identity (required if "PSK" type is set).
-	 * @param string $hosts[]['tls_psk']							PSK (required if "PSK" type is set).
-	 * @param string $hosts[]['tls_issuer']							Certificate issuer (optional).
-	 * @param string $hosts[]['tls_subject']						Certificate subject (optional).
-	 * @param string $hosts[]['info_1']								Info field (optional).
-	 * @param string $hosts[]['info_2']								Info field (optional).
+	 * @param array  $hosts                                       An array with hosts data.
+	 * @param string $hosts[]['hostid']                           Host ID.
+	 * @param string $hosts[]['host']                             Host technical name (optional).
+	 * @param string $hosts[]['name']                             Host visible name (optional).
+	 * @param array  $hosts[]['groups']                           An array of host group objects with IDs that host will be replaced to.
+	 * @param int    $hosts[]['status']                           Status of the host (optional).
+	 * @param array  $hosts[]['interfaces']                       An array of host interfaces data to be replaced.
+	 * @param int    $hosts[]['interfaces']['type']               Interface type.
+	 * @param int    $hosts[]['interfaces']['main']               Is this the default interface to use.
+	 * @param string $hosts[]['interfaces']['ip']                 Interface IP (optional).
+	 * @param int    $hosts[]['interfaces']['port']               Interface port (optional).
+	 * @param int    $hosts[]['interfaces']['useip']              Interface shoud use IP (optional).
+	 * @param string $hosts[]['interfaces']['dns']                Interface shoud use DNS (optional).
+	 * @param int    $hosts[]['interfaces']['bulk']               Use bulk requests for interface (optional).
+	 * @param int    $hosts[]['proxy_hostid']                     ID of the proxy that is used to monitor the host (optional).
+	 * @param int    $hosts[]['ipmi_authtype']                    IPMI authentication type (optional).
+	 * @param int    $hosts[]['ipmi_privilege']                   IPMI privilege (optional).
+	 * @param string $hosts[]['ipmi_username']                    IPMI username (optional).
+	 * @param string $hosts[]['ipmi_password']                    IPMI password (optional).
+	 * @param array  $hosts[]['tags']                             An array of tags (optional).
+	 * @param string $hosts[]['tags'][]['tag']                    Tag name.
+	 * @param string $hosts[]['tags'][]['value']                  Tag value.
+	 * @param array  $hosts[]['inventory']                        An array of host inventory data (optional).
+	 * @param array  $hosts[]['macros']                           An array of host macros (optional).
+	 * @param string $hosts[]['macros'][]['macro']                Host macro (required if "macros" is set).
+	 * @param array  $hosts[]['templates']                        An array of template objects with IDs that will be linked to host (optional).
+	 * @param string $hosts[]['templates'][]['templateid']        Template ID (required if "templates" is set).
+	 * @param array  $hosts[]['templates_clear']                  Templates to unlink and clear from the host (optional).
+	 * @param string $hosts[]['templates_clear'][]['templateid']  Template ID (required if "templates" is set).
+	 * @param string $hosts[]['tls_connect']                      Connections to host (optional).
+	 * @param string $hosts[]['tls_accept']                       Connections from host (optional).
+	 * @param string $hosts[]['tls_psk_identity']                 PSK identity (required if "PSK" type is set).
+	 * @param string $hosts[]['tls_psk']                          PSK (required if "PSK" type is set).
+	 * @param string $hosts[]['tls_issuer']                       Certificate issuer (optional).
+	 * @param string $hosts[]['tls_subject']                      Certificate subject (optional).
 	 *
 	 * @return array
 	 */
@@ -678,16 +724,14 @@ class CHost extends CHostGeneral {
 		]);
 
 		foreach ($hosts as $host) {
-			// extend host inventory with the required data
-			if (isset($host['inventory']) && $host['inventory']) {
-				$inventory = $inventories[$host['hostid']];
-
-				// if no host inventory record exists in the DB, it's disabled
-				if (!isset($inventory['inventory_mode'])) {
-					$inventory['inventory_mode'] = HOST_INVENTORY_DISABLED;
+			// Extend host inventory with the required data.
+			if (array_key_exists('inventory', $host) && $host['inventory']) {
+				// If inventory mode is HOST_INVENTORY_DISABLED, database record is not created.
+				if (array_key_exists('inventory_mode', $inventories[$host['hostid']])
+						&& ($inventories[$host['hostid']]['inventory_mode'] == HOST_INVENTORY_MANUAL
+							|| $inventories[$host['hostid']]['inventory_mode'] == HOST_INVENTORY_AUTOMATIC)) {
+					$host['inventory'] = $inventories[$host['hostid']];
 				}
-
-				$host['inventory'] = $inventory;
 			}
 
 			$data = $host;
@@ -698,6 +742,8 @@ class CHost extends CHostGeneral {
 				self::exception(ZBX_API_ERROR_INTERNAL, _('Host update failed.'));
 			}
 		}
+
+		$this->updateTags($hosts, 'hostid');
 
 		return ['hostids' => $hostids];
 	}
@@ -720,10 +766,7 @@ class CHost extends CHostGeneral {
 		$hosts = isset($data['hosts']) ? zbx_toArray($data['hosts']) : [];
 		$hostIds = zbx_objectValues($hosts, 'hostid');
 
-		// check permissions
-		if (!$this->isWritable($hostIds)) {
-			self::exception(ZBX_API_ERROR_PERMISSIONS, _('You do not have permission to perform this operation.'));
-		}
+		$this->checkPermissions($hostIds, _('You do not have permission to perform this operation.'));
 
 		// add new interfaces
 		if (!empty($data['interfaces'])) {
@@ -789,6 +832,17 @@ class CHost extends CHostGeneral {
 			}
 		}
 
+		// Check inventory mode value.
+		if (array_key_exists('inventory_mode', $data)) {
+			$valid_inventory_modes = [HOST_INVENTORY_DISABLED, HOST_INVENTORY_MANUAL, HOST_INVENTORY_AUTOMATIC];
+			$inventory_mode = new CLimitedSetValidator([
+				'values' => $valid_inventory_modes,
+				'messageInvalid' => _s('Incorrect value for field "%1$s": %2$s.', 'inventory_mode',
+					_s('value must be one of %1$s', implode(', ', $valid_inventory_modes)))
+			]);
+			$this->checkValidator($data['inventory_mode'], $inventory_mode);
+		}
+
 		// Check connection fields only for massupdate action.
 		if (array_key_exists('tls_connect', $data) || array_key_exists('tls_accept', $data)
 				|| array_key_exists('tls_psk_identity', $data) || array_key_exists('tls_psk', $data)
@@ -823,6 +877,11 @@ class CHost extends CHostGeneral {
 			);
 		}
 
+		// Property 'auto_compress' is not supported for hosts.
+		if (array_key_exists('auto_compress', $data)) {
+			self::exception(ZBX_API_ERROR_PARAMETERS, _('Incorrect input parameters.'));
+		}
+
 		/*
 		 * Update hosts properties
 		 */
@@ -832,9 +891,13 @@ class CHost extends CHostGeneral {
 			}
 		}
 
-		if (isset($data['host'])) {
-			if (!preg_match('/^'.ZBX_PREG_HOST_FORMAT.'$/', $data['host'])) {
-				self::exception(ZBX_API_ERROR_PARAMETERS, _s('Incorrect characters used for host name "%s".', $data['host']));
+		if (array_key_exists('host', $data)) {
+			$host_name_parser = new CHostNameParser();
+
+			if ($host_name_parser->parse($data['host']) != CParser::PARSE_SUCCESS) {
+				self::exception(ZBX_API_ERROR_PARAMETERS,
+					_s('Incorrect characters used for host name "%s".', $data['host'])
+				);
 			}
 
 			if (count($hosts) > 1) {
@@ -1130,7 +1193,7 @@ class CHost extends CHostGeneral {
 	public function massRemove(array $data) {
 		$hostids = zbx_toArray($data['hostids']);
 
-		$this->checkPermissions($hostids);
+		$this->checkPermissions($hostids, _('No permissions to referred object or it does not exist!'));
 
 		if (isset($data['interfaces'])) {
 			$options = [
@@ -1158,8 +1221,6 @@ class CHost extends CHostGeneral {
 	 *
 	 * @param array $hostIds
 	 * @param bool 	$nopermissions
-	 *
-	 * @return void
 	 */
 	protected function validateDelete(array $hostIds, $nopermissions = false) {
 		if (!$hostIds) {
@@ -1167,7 +1228,43 @@ class CHost extends CHostGeneral {
 		}
 
 		if (!$nopermissions) {
-			$this->checkPermissions($hostIds);
+			$this->checkPermissions($hostIds, _('No permissions to referred object or it does not exist!'));
+		}
+
+		$this->validateDeleteCheckMaintenances($hostIds);
+	}
+
+	/**
+	 * Validates if hosts may be deleted, due to maintenance constrain.
+	 *
+	 * @throws APIException if a constrain failed
+	 *
+	 * @param array $hostids
+	 */
+	protected function validateDeleteCheckMaintenances(array $hostids) {
+		$maintenance = DBfetch(DBselect(
+			'SELECT m.name'.
+			' FROM maintenances m'.
+			' WHERE NOT EXISTS ('.
+				'SELECT NULL'.
+				' FROM maintenances_hosts mh'.
+				' WHERE m.maintenanceid=mh.maintenanceid'.
+					' AND '.dbConditionInt('mh.hostid', $hostids, true).
+			')'.
+				' AND NOT EXISTS ('.
+					'SELECT NULL'.
+					' FROM maintenances_groups mg'.
+					' WHERE m.maintenanceid=mg.maintenanceid'.
+				')'
+		));
+
+		if ($maintenance) {
+			self::exception(ZBX_API_ERROR_PARAMETERS, _n(
+				'Cannot delete host because maintenance "%1$s" must contain at least one host or host group.',
+				'Cannot delete selected hosts because maintenance "%1$s" must contain at least one host or host group.',
+				$maintenance['name'],
+				count($hostids)
+			));
 		}
 	}
 
@@ -1183,25 +1280,25 @@ class CHost extends CHostGeneral {
 		$this->validateDelete($hostIds, $nopermissions);
 
 		// delete the discovery rules first
-		$delRules = API::DiscoveryRule()->get([
-			'output' => ['itemid'],
+		$del_rules = API::DiscoveryRule()->get([
+			'output' => [],
 			'hostids' => $hostIds,
 			'nopermissions' => true,
 			'preservekeys' => true
 		]);
-		if ($delRules) {
-			API::DiscoveryRule()->delete(array_keys($delRules), true);
+		if ($del_rules) {
+			API::DiscoveryRule()->delete(array_keys($del_rules), true);
 		}
 
 		// delete the items
-		$delItems = API::Item()->get([
+		$del_items = API::Item()->get([
+			'output' => [],
 			'templateids' => $hostIds,
-			'output' => ['itemid'],
 			'nopermissions' => true,
 			'preservekeys' => true
 		]);
-		if ($delItems) {
-			API::Item()->delete(array_keys($delItems), true);
+		if ($del_items) {
+			CItemManager::delete(array_keys($del_items));
 		}
 
 		// delete web tests
@@ -1326,71 +1423,39 @@ class CHost extends CHostGeneral {
 	}
 
 	/**
-	 * Check if user has read permissions for host.
+	 * Retrieves and adds additional requested data to the result set.
 	 *
-	 * @param array $ids
+	 * @param array  $options
+	 * @param array  $result
 	 *
-	 * @return bool
+	 * @return array
 	 */
-	public function isReadable(array $ids) {
-		if (!is_array($ids)) {
-			return false;
-		}
-		if (empty($ids)) {
-			return true;
-		}
-
-		$ids = array_unique($ids);
-
-		$count = $this->get([
-			'hostids' => $ids,
-			'templated_hosts' => true,
-			'countOutput' => true
-		]);
-
-		return (count($ids) == $count);
-	}
-
-	/**
-	 * Check if user has write permissions for host.
-	 *
-	 * @param array $ids
-	 *
-	 * @return bool
-	 */
-	public function isWritable(array $ids) {
-		if (!is_array($ids)) {
-			return false;
-		}
-		if (empty($ids)) {
-			return true;
-		}
-
-		$ids = array_unique($ids);
-
-		$count = $this->get([
-			'hostids' => $ids,
-			'editable' => true,
-			'templated_hosts' => true,
-			'countOutput' => true
-		]);
-
-		return (count($ids) == $count);
-	}
-
 	protected function addRelatedObjects(array $options, array $result) {
 		$result = parent::addRelatedObjects($options, $result);
 
 		$hostids = array_keys($result);
 
-		// adding inventories
+		// adding inventory
 		if ($options['selectInventory'] !== null) {
-			$relationMap = $this->createRelationMap($result, 'hostid', 'hostid');
 			$inventory = API::getApiService()->select('host_inventory', [
 				'output' => $options['selectInventory'],
-				'filter' => ['hostid' => $hostids]
+				'filter' => ['hostid' => $hostids],
+				'preservekeys' => true
 			]);
-			$result = $relationMap->mapOne($result, zbx_toHash($inventory, 'hostid'), 'inventory');
+
+			foreach ($hostids as $hostid) {
+				// There is no DB record if inventory mode is HOST_INVENTORY_DISABLED.
+				if (!array_key_exists($hostid, $inventory)) {
+					$inventory[$hostid] = [
+						'hostid' => (string) $hostid,
+						'inventory_mode' => (string) HOST_INVENTORY_DISABLED
+					];
+				}
+			}
+
+			$relation_map = $this->createRelationMap($result, 'hostid', 'hostid');
+			$inventory = $this->unsetExtraFields($inventory, ['hostid', 'inventory_mode'], $options['selectInventory']);
+			$result = $relation_map->mapOne($result, $inventory, 'inventory');
 		}
 
 		// adding hostinterfaces
@@ -1421,7 +1486,9 @@ class CHost extends CHostGeneral {
 
 				$interfaces = zbx_toHash($interfaces, 'hostid');
 				foreach ($result as $hostid => $host) {
-					$result[$hostid]['interfaces'] = isset($interfaces[$hostid]) ? $interfaces[$hostid]['rowscount'] : 0;
+					$result[$hostid]['interfaces'] = array_key_exists($hostid, $interfaces)
+						? $interfaces[$hostid]['rowscount']
+						: '0';
 				}
 			}
 		}
@@ -1457,7 +1524,9 @@ class CHost extends CHostGeneral {
 				$screens = zbx_toHash($screens, 'hostid');
 
 				foreach ($result as $hostid => $host) {
-					$result[$hostid]['screens'] = isset($screens[$hostid]) ? $screens[$hostid]['rowscount'] : 0;
+					$result[$hostid]['screens'] = array_key_exists($hostid, $screens)
+						? $screens[$hostid]['rowscount']
+						: '0';
 				}
 			}
 		}
@@ -1504,11 +1573,22 @@ class CHost extends CHostGeneral {
 	 *
 	 * @throws APIException     if a host is not writable or does not exist
 	 *
-	 * @param array $hostIds
+	 * @param array  $hostids
+	 * @param string $error
 	 */
-	protected function checkPermissions(array $hostIds) {
-		if (!$this->isWritable($hostIds)) {
-			self::exception(ZBX_API_ERROR_PERMISSIONS, _('No permissions to referred object or it does not exist!'));
+	protected function checkPermissions(array $hostids, $error) {
+		if ($hostids) {
+			$hostids = array_unique($hostids);
+
+			$count = $this->get([
+				'countOutput' => true,
+				'hostids' => $hostids,
+				'editable' => true
+			]);
+
+			if ($count != count($hostids)) {
+				self::exception(ZBX_API_ERROR_PERMISSIONS, $error);
+			}
 		}
 	}
 
@@ -1628,6 +1708,8 @@ class CHost extends CHostGeneral {
 	 * @throws APIException if the input is invalid.
 	 */
 	protected function validateCreate(array $hosts) {
+		$host_name_parser = new CHostNameParser();
+
 		$host_db_fields = ['host' => null];
 
 		$groupids = [];
@@ -1640,8 +1722,13 @@ class CHost extends CHostGeneral {
 				);
 			}
 
+			// Property 'auto_compress' is not supported for hosts.
+			if (array_key_exists('auto_compress', $host)) {
+				self::exception(ZBX_API_ERROR_PARAMETERS, _('Incorrect input parameters.'));
+			}
+
 			// Validate "host" field.
-			if (!preg_match('/^'.ZBX_PREG_HOST_FORMAT.'$/', $host['host'])) {
+			if ($host_name_parser->parse($host['host']) != CParser::PARSE_SUCCESS) {
 				self::exception(ZBX_API_ERROR_PARAMETERS,
 					_s('Incorrect characters used for host name "%s".', $host['host'])
 				);
@@ -1660,6 +1747,11 @@ class CHost extends CHostGeneral {
 			}
 
 			$groupids = array_merge($groupids, zbx_objectValues($host['groups'], 'groupid'));
+
+			// Validate tags.
+			if (array_key_exists('tags', $host)) {
+				$this->validateTags($host);
+			}
 		}
 		unset($host);
 
@@ -1700,6 +1792,13 @@ class CHost extends CHostGeneral {
 
 		$inventory_fields = zbx_objectValues(getHostInventories(), 'db_field');
 
+		$valid_inventory_modes = [HOST_INVENTORY_DISABLED, HOST_INVENTORY_MANUAL, HOST_INVENTORY_AUTOMATIC];
+		$inventory_mode = new CLimitedSetValidator([
+			'values' => $valid_inventory_modes,
+			'messageInvalid' => _s('Incorrect value for field "%1$s": %2$s.', 'inventory_mode',
+				_s('value must be one of %1$s', implode(', ', $valid_inventory_modes)))
+		]);
+
 		$status_validator = new CLimitedSetValidator([
 			'values' => [HOST_STATUS_MONITORED, HOST_STATUS_NOT_MONITORED],
 			'messageInvalid' => _('Incorrect status for host "%1$s".')
@@ -1715,6 +1814,11 @@ class CHost extends CHostGeneral {
 			if (array_key_exists('status', $host)) {
 				$status_validator->setObjectName($host['host']);
 				$this->checkValidator($host['status'], $status_validator);
+			}
+
+			if (array_key_exists('inventory_mode', $host)) {
+				$inventory_mode->setObjectName($host['host']);
+				$this->checkValidator($host['inventory_mode'], $inventory_mode);
 			}
 
 			if (array_key_exists('inventory', $host) && $host['inventory']) {
@@ -1804,6 +1908,11 @@ class CHost extends CHostGeneral {
 				);
 			}
 
+			// Property 'auto_compress' is not supported for hosts.
+			if (array_key_exists('auto_compress', $host)) {
+				self::exception(ZBX_API_ERROR_PARAMETERS, _('Incorrect input parameters.'));
+			}
+
 			// Validate host permissions.
 			if (!array_key_exists($host['hostid'], $db_hosts)) {
 				self::exception(ZBX_API_ERROR_PARAMETERS, _(
@@ -1823,6 +1932,13 @@ class CHost extends CHostGeneral {
 
 		$inventory_fields = zbx_objectValues(getHostInventories(), 'db_field');
 
+		$valid_inventory_modes = [HOST_INVENTORY_DISABLED, HOST_INVENTORY_MANUAL, HOST_INVENTORY_AUTOMATIC];
+		$inventory_mode = new CLimitedSetValidator([
+			'values' => $valid_inventory_modes,
+			'messageInvalid' => _s('Incorrect value for field "%1$s": %2$s.', 'inventory_mode',
+				_s('value must be one of %1$s', implode(', ', $valid_inventory_modes)))
+		]);
+
 		$status_validator = new CLimitedSetValidator([
 			'values' => [HOST_STATUS_MONITORED, HOST_STATUS_NOT_MONITORED],
 			'messageInvalid' => _('Incorrect status for host "%1$s".')
@@ -1833,6 +1949,8 @@ class CHost extends CHostGeneral {
 			'messageAllowedField' => _('Cannot update "%2$s" for a discovered host "%1$s".')
 		]);
 
+		$host_name_parser = new CHostNameParser();
+
 		$host_names = [];
 
 		foreach ($hosts as &$host) {
@@ -1842,6 +1960,11 @@ class CHost extends CHostGeneral {
 			if (array_key_exists('status', $host)) {
 				$status_validator->setObjectName($host_name);
 				$this->checkValidator($host['status'], $status_validator);
+			}
+
+			if (array_key_exists('inventory_mode', $host)) {
+				$inventory_mode->setObjectName($host_name);
+				$this->checkValidator($host['inventory_mode'], $inventory_mode);
 			}
 
 			if (array_key_exists('inventory', $host) && $host['inventory']) {
@@ -1868,7 +1991,7 @@ class CHost extends CHostGeneral {
 			}
 
 			if (array_key_exists('host', $host)) {
-				if (!preg_match('/^'.ZBX_PREG_HOST_FORMAT.'$/', $host['host'])) {
+				if ($host_name_parser->parse($host['host']) != CParser::PARSE_SUCCESS) {
 					self::exception(ZBX_API_ERROR_PARAMETERS,
 						_s('Incorrect characters used for host name "%s".', $host['host'])
 					);
@@ -1925,6 +2048,11 @@ class CHost extends CHostGeneral {
 						$host['tls_subject'] = '';
 					}
 				}
+			}
+
+			// Validate tags.
+			if (array_key_exists('tags', $host)) {
+				$this->validateTags($host);
 			}
 		}
 		unset($host);

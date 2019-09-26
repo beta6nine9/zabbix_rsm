@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -18,12 +18,14 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-require_once dirname(__FILE__).'/../include/class.cwebtest.php';
+require_once dirname(__FILE__).'/../include/CLegacyWebTest.php';
 
 /**
  * Test the creation of inheritance of new objects on a previously linked template.
+ *
+ * @backup graphs
  */
-class testInheritanceGraphPrototype extends CWebTest {
+class testInheritanceGraphPrototype extends CLegacyWebTest {
 	private $templateid = 15000;	// 'Inheritance test template'
 	private $template = 'Inheritance test template';
 
@@ -33,12 +35,8 @@ class testInheritanceGraphPrototype extends CWebTest {
 	private $discoveryRuleId = 15011;	// 'testInheritanceDiscoveryRule'
 	private $discoveryRule = 'testInheritanceDiscoveryRule';
 
-	public function testInheritanceGraphPrototype_backup() {
-		DBsave_tables('graphs');
-	}
-
 	public static function update() {
-		return DBdata(
+		return CDBHelper::getDataProvider(
 			'SELECT DISTINCT g.graphid,id.parent_itemid'.
 			' FROM graphs g,graphs_items gi,item_discovery id'.
 			' WHERE g.graphid=gi.graphid'.
@@ -60,14 +58,14 @@ class testInheritanceGraphPrototype extends CWebTest {
 	 */
 	public function testInheritanceGraphPrototype_SimpleUpdate($data) {
 		$sqlGraphs = 'SELECT * FROM graphs ORDER BY graphid';
-		$oldHashGraphs = DBhash($sqlGraphs);
+		$oldHashGraphs = CDBHelper::getHash($sqlGraphs);
 
 		$this->zbxTestLogin('graphs.php?form=update&graphid='.$data['graphid'].'&parent_discoveryid='.$data['parent_itemid']);
 		$this->zbxTestCheckTitle('Configuration of graph prototypes');
 		$this->zbxTestClickWait('update');
 		$this->zbxTestWaitUntilMessageTextPresent('msg-good', 'Graph prototype updated');
 
-		$this->assertEquals($oldHashGraphs, DBhash($sqlGraphs));
+		$this->assertEquals($oldHashGraphs, CDBHelper::getHash($sqlGraphs));
 	}
 
 	// Returns create data
@@ -110,10 +108,9 @@ class testInheritanceGraphPrototype extends CWebTest {
 
 		if (isset($data['addItemPrototypes'])) {
 			foreach ($data['addItemPrototypes'] as $item) {
-				$this->zbxTestClickWait('add_protoitem');
-				$this->zbxTestSwitchToNewWindow();
+				$this->zbxTestClick('add_protoitem');
+				$this->zbxTestLaunchOverlayDialog('Item prototypes');
 				$this->zbxTestClickLinkTextWait($item['itemName']);
-				$this->zbxTestWaitWindowClose();
 				$this->zbxTestTextPresent($this->template.': '.$item['itemName']);
 			}
 		}
@@ -137,9 +134,5 @@ class testInheritanceGraphPrototype extends CWebTest {
 				break;
 		}
 
-	}
-
-	public function testInheritanceGraphPrototype_restore() {
-		DBrestore_tables('graphs');
 	}
 }

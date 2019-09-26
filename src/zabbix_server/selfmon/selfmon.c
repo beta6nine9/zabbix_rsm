@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -37,19 +37,24 @@ ZBX_THREAD_ENTRY(selfmon_thread, args)
 	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(program_type),
 			server_num, get_process_type_string(process_type), process_num);
 
-	for (;;)
+	while (ZBX_IS_RUNNING())
 	{
-		zbx_handle_log();
+		sec = zbx_time();
+		zbx_update_env(sec);
 
 		zbx_setproctitle("%s [processing data]", get_process_type_string(process_type));
 
-		sec = zbx_time();
 		collect_selfmon_stats();
 		sec = zbx_time() - sec;
 
 		zbx_setproctitle("%s [processed data in " ZBX_FS_DBL " sec, idle 1 sec]",
 				get_process_type_string(process_type), sec);
 
-		zbx_sleep_loop(1);
+		zbx_sleep_loop(ZBX_SELFMON_DELAY);
 	}
+
+	zbx_setproctitle("%s #%d [terminated]", get_process_type_string(process_type), process_num);
+
+	while (1)
+		zbx_sleep(SEC_PER_MIN);
 }

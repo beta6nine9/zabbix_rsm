@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -42,11 +42,18 @@ zbx_dbpatch_t;
 
 #define DBPATCH_ADD(version, duplicates, mandatory)	{DBpatch_##version, version, duplicates, mandatory},
 
+#ifdef HAVE_MYSQL
+#define ZBX_FS_SQL_NAME "`%s`"
+#else
+#define ZBX_FS_SQL_NAME "%s"
+#endif
+
 int	DBcreate_table(const ZBX_TABLE *table);
+int	DBrename_table(const char *table_name, const char *new_name);
 int	DBdrop_table(const char *table_name);
 int	DBadd_field(const char *table_name, const ZBX_FIELD *field);
 int	DBrename_field(const char *table_name, const char *field_name, const ZBX_FIELD *field);
-int	DBmodify_field_type(const char *table_name, const ZBX_FIELD *field);
+int	DBmodify_field_type(const char *table_name, const ZBX_FIELD *field, const ZBX_FIELD *old_field);
 int	DBset_not_null(const char *table_name, const ZBX_FIELD *field);
 int	DBset_default(const char *table_name, const ZBX_FIELD *field);
 int	DBdrop_not_null(const char *table_name, const ZBX_FIELD *field);

@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -54,26 +54,27 @@ class CScreenChart extends CScreenBase {
 		$graphDims = getGraphDims($this->graphid);
 		if ($graphDims['graphtype'] == GRAPH_TYPE_PIE || $graphDims['graphtype'] == GRAPH_TYPE_EXPLODED) {
 			$loadSBox = 0;
-			$src = 'chart6.php';
+			$src = new CUrl('chart6.php');
 		}
 		else {
 			$loadSBox = 1;
-			$src = 'chart2.php';
+			$src = new CUrl('chart2.php');
 		}
-		$src .= '?graphid='.$this->graphid.'&period='.$this->timeline['period'].'&stime='.$this->timeline['stimeNow'].$this->getProfileUrlParams();
-
-		$this->timeline['starttime'] = date(TIMESTAMP_FORMAT, get_min_itemclock_by_graphid($this->graphid));
+		$src
+			->setArgument('graphid', $this->graphid)
+			->setArgument('from', $this->timeline['from'])
+			->setArgument('to', $this->timeline['to'])
+			->setArgument('profileIdx', $this->profileIdx)
+			->setArgument('profileIdx2', $this->profileIdx2);
 
 		$timeControlData = [
 			'id' => $this->getDataId(),
 			'containerid' => $containerId,
-			'src' => $src,
+			'src' => $src->getUrl(),
 			'objDims' => $graphDims,
 			'loadSBox' => $loadSBox,
 			'loadImage' => 1,
-			'dynamic' => 1,
-			'periodFixed' => CProfile::get($this->profileIdx.'.timelinefixed', 1),
-			'sliderMaximumTimePeriod' => ZBX_MAX_PERIOD
+			'dynamic' => 1
 		];
 
 		// output

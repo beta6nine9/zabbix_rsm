@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -26,6 +26,33 @@ function local_generateHeader($data) {
 	global $page;
 
 	header('Content-Type: text/html; charset=UTF-8');
+	header('X-Content-Type-Options: nosniff');
+	header('X-XSS-Protection: 1; mode=block');
+
+	if (X_FRAME_OPTIONS !== null) {
+		if (strcasecmp(X_FRAME_OPTIONS, 'SAMEORIGIN') == 0 || strcasecmp(X_FRAME_OPTIONS, 'DENY') == 0) {
+			$x_frame_options = X_FRAME_OPTIONS;
+		}
+		else {
+			$x_frame_options = 'SAMEORIGIN';
+			$allowed_urls = explode(',', X_FRAME_OPTIONS);
+			$url_to_check = array_key_exists('HTTP_REFERER', $_SERVER)
+				? parse_url($_SERVER['HTTP_REFERER'], PHP_URL_HOST)
+				: null;
+
+			if ($url_to_check) {
+				foreach ($allowed_urls as $allowed_url) {
+					if (strcasecmp(trim($allowed_url), $url_to_check) == 0) {
+						$x_frame_options = 'ALLOW-FROM '.$allowed_url;
+						break;
+					}
+				}
+			}
+		}
+
+		header('X-Frame-Options: '.$x_frame_options);
+	}
+
 
 	// construct menu
 	$main_menu = [];
@@ -43,21 +70,16 @@ function local_generateHeader($data) {
 		'user' => [
 			'lang' => CWebUser::$data['lang'],
 			'theme' => CWebUser::$data['theme']
-		]
+		],
+		'web_layout_mode' => $data['web_layout_mode']
 	]);
 	echo $pageHeader->getOutput();
 
-	if ($data['fullscreen'] == 0) {
-		global $ZBX_SERVER_NAME, $DB;
-
-		$servers = new CComboBox('servers', null, 'window.location.href=this.value');
-		foreach ($DB['SERVERS'] as $server) {
-			$servers->addItem($server['URL'].'rsm.rollingweekstatus.php?sid='.CWebUser::getSessionCookie().'&set_sid=1',
-				$server['NAME'], ($ZBX_SERVER_NAME === $server['NAME']) ? 'no' : null);
-		}
+	if ($data['web_layout_mode'] === ZBX_LAYOUT_NORMAL) {
+		global $ZBX_SERVER_NAME;
 
 		$pageMenu = new CView('layout.htmlpage.menu', [
-			'server_name' => $servers,
+			'server_name' => isset($ZBX_SERVER_NAME) ? $ZBX_SERVER_NAME : '',
 			'menu' => [
 				'main_menu' => $main_menu,
 				'sub_menus' => $sub_menus,
@@ -68,21 +90,13 @@ function local_generateHeader($data) {
 				'alias' => CWebUser::$data['alias'],
 				'name' => CWebUser::$data['name'],
 				'surname' => CWebUser::$data['surname']
-			]
+			],
+			'support_url' => getSupportUrl(CWebUser::getLang())
 		]);
 		echo $pageMenu->getOutput();
 	}
 
-	echo '<div class="'.ZBX_STYLE_ARTICLE.'">';
-
-	// should be replaced with addPostJS() at some point
-	zbx_add_post_js('initMessages({});');
-
-	// Show error message if unknown {$RSM.MONITORING.TARGET} is set.
-	if (get_rsm_monitoring_type() !== MONITORING_TARGET_REGISTRY
-		&& get_rsm_monitoring_type() !== MONITORING_TARGET_REGISTRAR) {
-		error('Unknown monitoring target.');
-	}
+	echo '<main'.(CView::getLayoutMode() === ZBX_LAYOUT_KIOSKMODE ? ' class="'.ZBX_STYLE_LAYOUT_KIOSKMODE.'"' : '').'>';
 
 	// if a user logs in after several unsuccessful attempts, display a warning
 	if ($failedAttempts = CProfile::get('web.login.attempt.failed', 0)) {
@@ -104,14 +118,15 @@ function local_generateHeader($data) {
 	show_messages();
 }
 
-function local_generateFooter($fullscreen) {
+function local_generateFooter($data) {
 	$pageFooter = new CView('layout.htmlpage.footer', [
-		'fullscreen' => $fullscreen,
 		'user' => [
 			'alias' => CWebUser::$data['alias'],
 			'debug_mode' => CWebUser::$data['debug_mode']
-		]
+		],
+		'web_layout_mode' => $data['web_layout_mode']
 	]);
+	echo '</main>'."\n";
 	echo $pageFooter->getOutput();
 }
 
@@ -135,14 +150,14 @@ function local_showMessage() {
 	}
 }
 
+$data['web_layout_mode'] = CView::getLayoutMode();
+
 local_generateHeader($data);
 local_showMessage();
 echo $data['javascript']['pre'];
 echo $data['main_block'];
 echo $data['javascript']['post'];
-
-local_generateFooter($data['fullscreen']);
-
+local_generateFooter($data);
 show_messages();
 
 echo '</body></html>';

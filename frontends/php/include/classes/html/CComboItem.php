@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -21,7 +21,7 @@
 
 class CComboItem extends CTag {
 
-	public function __construct($value, $caption = null, $selected = null, $enabled = null) {
+	public function __construct($value, $caption = null, $selected = false, $enabled = null) {
 		parent::__construct('option', true);
 		$this->setAttribute('value', $value);
 		$this->addItem($caption);
@@ -41,18 +41,21 @@ class CComboItem extends CTag {
 		return $this->getAttribute('value');
 	}
 
-	public function setCaption($value = null) {
-		$this->addItem(nbsp($value));
-		return $this;
-	}
-
-	public function setSelected($value = 'yes') {
-		if ((is_string($value) && ($value == 'yes' || $value == 'selected' || $value == 'on')) || (is_int($value) && $value <> 0)) {
+	/**
+	 * Set option as selected.
+	 *
+	 * @param bool $value
+	 *
+	 * @return CComboItem
+	 */
+	public function setSelected($value) {
+		if ($value) {
 			$this->attributes['selected'] = 'selected';
 		}
 		else {
 			$this->removeAttribute('selected');
 		}
+
 		return $this;
 	}
 
@@ -60,6 +63,8 @@ class CComboItem extends CTag {
 	 * Enable or disable the element.
 	 *
 	 * @param bool $value
+	 *
+	 * @return CComboItem
 	 */
 	public function setEnabled($value) {
 		if ($value) {

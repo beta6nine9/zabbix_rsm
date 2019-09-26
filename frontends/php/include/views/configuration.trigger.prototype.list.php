@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -21,10 +21,14 @@
 
 $widget = (new CWidget())
 	->setTitle(_('Trigger prototypes'))
-	->setControls((new CForm('get'))
-		->cleanItems()
-		->addVar('parent_discoveryid', $this->data['parent_discoveryid'])
-		->addItem((new CList())->addItem(new CSubmit('form', _('Create trigger prototype'))))
+	->setControls(
+		(new CTag('nav', true,
+			(new CList())->addItem(new CRedirectButton(_('Create trigger prototype'),
+				(new CUrl('trigger_prototypes.php'))
+					->setArgument('parent_discoveryid', $data['parent_discoveryid'])
+					->setArgument('form', 'create')
+			))
+		))->setAttribute('aria-label', _('Content controls'))
 	)
 	->addItem(get_header_host_table('triggers', $this->data['hostid'], $this->data['parent_discoveryid']));
 
@@ -33,19 +37,28 @@ $triggersForm = (new CForm())
 	->setName('triggersForm')
 	->addVar('parent_discoveryid', $this->data['parent_discoveryid']);
 
+$url = (new CUrl('trigger_prototypes.php'))
+	->setArgument('parent_discoveryid', $data['parent_discoveryid'])
+	->getUrl();
+
 // create table
 $triggersTable = (new CTableInfo())
 	->setHeader([
 		(new CColHeader(
 			(new CCheckBox('all_triggers'))->onClick("checkAll('".$triggersForm->getName()."', 'all_triggers', 'g_triggerid');")
 		))->addClass(ZBX_STYLE_CELL_WIDTH),
-		make_sorting_header(_('Severity'), 'priority', $this->data['sort'], $this->data['sortorder']),
-		make_sorting_header(_('Name'), 'description', $this->data['sort'], $this->data['sortorder']),
+		make_sorting_header(_('Severity'), 'priority', $data['sort'], $data['sortorder'], $url),
+		make_sorting_header(_('Name'), 'description', $data['sort'], $data['sortorder'], $url),
+		_('Operational data'),
 		_('Expression'),
-		make_sorting_header(_('Status'), 'status', $this->data['sort'], $this->data['sortorder'])
+		make_sorting_header(_('Create enabled'), 'status', $data['sort'], $data['sortorder'], $url),
+		_('Tags')
 	]);
 
-$this->data['triggers'] = CMacrosResolverHelper::resolveTriggerExpressions($this->data['triggers'], ['html' => true]);
+$this->data['triggers'] = CMacrosResolverHelper::resolveTriggerExpressions($this->data['triggers'], [
+	'html' => true,
+	'sources' => ['expression', 'recovery_expression']
+]);
 
 foreach ($this->data['triggers'] as $trigger) {
 	$triggerid = $trigger['triggerid'];
@@ -53,28 +66,9 @@ foreach ($this->data['triggers'] as $trigger) {
 
 	// description
 	$description = [];
-
-	if ($trigger['templateid'] > 0) {
-		if (!isset($this->data['realHosts'][$triggerid])) {
-			$description[] = (new CSpan(_('Template')))->addClass(ZBX_STYLE_GREY);
-			$description[] = NAME_DELIMITER;
-		}
-		else {
-			$real_hosts = $this->data['realHosts'][$triggerid];
-			$real_host = reset($real_hosts);
-
-			$tpl_disc_ruleid = get_realrule_by_itemid_and_hostid($this->data['parent_discoveryid'],
-				$real_host['hostid']
-			);
-			$description[] = (new CLink(
-				CHtml::encode($real_host['name']),
-				'trigger_prototypes.php?parent_discoveryid='.$tpl_disc_ruleid))
-					->addClass(ZBX_STYLE_LINK_ALT)
-					->addClass(ZBX_STYLE_GREY);
-
-			$description[] = NAME_DELIMITER;
-		}
-	}
+	$description[] = makeTriggerTemplatePrefix($trigger['triggerid'], $data['parent_templates'],
+		ZBX_FLAG_DISCOVERY_PROTOTYPE
+	);
 
 	$description[] = new CLink(
 		CHtml::encode($trigger['description']),
@@ -118,9 +112,9 @@ foreach ($this->data['triggers'] as $trigger) {
 
 	// status
 	$status = (new CLink(
-		triggerIndicator($trigger['status']),
+		($trigger['status'] == TRIGGER_STATUS_DISABLED) ? _('No') : _('Yes'),
 		'trigger_prototypes.php?'.
-			'action='.($trigger['status'] == TRIGGER_STATUS_DISABLED
+			'action='.(($trigger['status'] == TRIGGER_STATUS_DISABLED)
 				? 'triggerprototype.massenable'
 				: 'triggerprototype.massdisable'
 			).
@@ -131,6 +125,16 @@ foreach ($this->data['triggers'] as $trigger) {
 		->addClass(triggerIndicatorStyle($trigger['status']))
 		->addSID();
 
+	if ($trigger['recovery_mode'] == ZBX_RECOVERY_MODE_RECOVERY_EXPRESSION) {
+		$expression = [
+			_('Problem'), ': ', $trigger['expression'], BR(),
+			_('Recovery'), ': ', $trigger['recovery_expression']
+		];
+	}
+	else {
+		$expression = $trigger['expression'];
+	}
+
 	// checkbox
 	$checkBox = new CCheckBox('g_triggerid['.$triggerid.']', $triggerid);
 
@@ -138,12 +142,12 @@ foreach ($this->data['triggers'] as $trigger) {
 		$checkBox,
 		getSeverityCell($trigger['priority'], $this->data['config']),
 		$description,
-		$trigger['expression'],
-		$status
+		$trigger['opdata'],
+		$expression,
+		$status,
+		$data['tags'][$triggerid]
 	]);
 }
-
-zbx_add_post_js('cookie.prefix = "'.$this->data['parent_discoveryid'].'";');
 
 // append table to form
 $triggersForm->addItem([
@@ -151,11 +155,11 @@ $triggersForm->addItem([
 	$this->data['paging'],
 	new CActionButtonList('action', 'g_triggerid',
 		[
-			'triggerprototype.massenable' => ['name' => _('Enable'),
-				'confirm' => _('Enable selected trigger prototypes?')
+			'triggerprototype.massenable' => ['name' => _('Create enabled'),
+				'confirm' => _('Create triggers from selected prototypes as enabled?')
 			],
-			'triggerprototype.massdisable' => ['name' => _('Disable'),
-				'confirm' => _('Disable selected trigger prototypes?')
+			'triggerprototype.massdisable' => ['name' => _('Create disabled'),
+				'confirm' => _('Create triggers from selected prototypes as disabled?')
 			],
 			'triggerprototype.massupdateform' => ['name' => _('Mass update')],
 			'triggerprototype.massdelete' => ['name' => _('Delete'),

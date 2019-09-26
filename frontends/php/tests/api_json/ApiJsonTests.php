@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -18,19 +18,64 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-require_once dirname(__FILE__).'/APIInfo.php';
-require_once dirname(__FILE__).'/User.php';
+
 require_once dirname(__FILE__).'/CHost.php';
 require_once dirname(__FILE__).'/CItem.php';
+require_once dirname(__FILE__).'/testAPIInfo.php';
+require_once dirname(__FILE__).'/testAction.php';
+require_once dirname(__FILE__).'/testApplication.php';
+require_once dirname(__FILE__).'/testConfiguration.php';
+require_once dirname(__FILE__).'/testCorrelation.php';
+require_once dirname(__FILE__).'/testDRule.php';
+require_once dirname(__FILE__).'/testHistory.php';
+require_once dirname(__FILE__).'/testHost.php';
+require_once dirname(__FILE__).'/testHostGroup.php';
+require_once dirname(__FILE__).'/testIconMap.php';
+require_once dirname(__FILE__).'/testItem.php';
+require_once dirname(__FILE__).'/testMaintenance.php';
+require_once dirname(__FILE__).'/testProxy.php';
+require_once dirname(__FILE__).'/testScripts.php';
+require_once dirname(__FILE__).'/testTriggers.php';
+require_once dirname(__FILE__).'/testTaskCreate.php';
+require_once dirname(__FILE__).'/testUserGroup.php';
+require_once dirname(__FILE__).'/testUserMacro.php';
+require_once dirname(__FILE__).'/testUsers.php';
+require_once dirname(__FILE__).'/testValuemap.php';
+require_once dirname(__FILE__).'/testWebScenario.php';
+require_once dirname(__FILE__).'/testMap.php';
+require_once dirname(__FILE__).'/testDiscoveryRule.php';
+require_once dirname(__FILE__).'/testDependentItems.php';
 
 class ApiJsonTests {
 	public static function suite() {
 		$suite = new PHPUnit_Framework_TestSuite('API_JSON');
 
-		$suite->addTestSuite('API_JSON_APIInfo');
-		$suite->addTestSuite('API_JSON_User');
-		$suite->addTestSuite('API_JSON_Host');
-		$suite->addTestSuite('API_JSON_Item');
+//		$suite->addTestSuite('API_JSON_Host');
+//		$suite->addTestSuite('API_JSON_Item');
+		$suite->addTestSuite('testAPIInfo');
+		$suite->addTestSuite('testAction');
+		$suite->addTestSuite('testApplication');
+		$suite->addTestSuite('testConfiguration');
+		$suite->addTestSuite('testDependentItems');
+		$suite->addTestSuite('testCorrelation');
+		$suite->addTestSuite('testDRule');
+		$suite->addTestSuite('testHistory');
+		$suite->addTestSuite('testHost');
+		$suite->addTestSuite('testHostGroup');
+		$suite->addTestSuite('testIconMap');
+		$suite->addTestSuite('testItem');
+		$suite->addTestSuite('testMaintenance');
+		$suite->addTestSuite('testProxy');
+		$suite->addTestSuite('testScripts');
+		$suite->addTestSuite('testTriggers');
+		$suite->addTestSuite('testTaskCreate');
+		$suite->addTestSuite('testUserGroup');
+		$suite->addTestSuite('testUserMacro');
+		$suite->addTestSuite('testUsers');
+		$suite->addTestSuite('testValuemap');
+		$suite->addTestSuite('testWebScenario');
+		$suite->addTestSuite('testMap');
+		$suite->addTestSuite('testDiscoveryRule');
 
 		return $suite;
 	}

@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -35,16 +35,17 @@ class CNewValidator {
 	private $validationRuleParser;
 
 	/**
-	 * Validation errors.
+	 * Parser for range date/time.
 	 *
-	 * @var array
+	 * @var CRangeTimeParser
 	 */
-	private $error;
+	private $range_time_parser;
 
 	public function __construct(array $input, array $rules) {
 		$this->input = $input;
 		$this->rules = $rules;
 		$this->validationRuleParser = new CValidationRule();
+		$this->range_time_parser = null;
 
 		$this->validate();
 	}
@@ -70,6 +71,8 @@ class CNewValidator {
 
 		$fatal = array_key_exists('fatal', $rules);
 
+		$flags = array_key_exists('flags', $rules) ? $rules['flags'] : 0x00;
+
 		foreach ($rules as $rule => $params) {
 			switch ($rule) {
 				/*
@@ -93,10 +96,9 @@ class CNewValidator {
 
 				case 'json':
 					if (array_key_exists($field, $this->input)) {
-						if (!is_string($this->input[$field]) || !CJs::decodeJson($this->input[$field])) {
+						if (!is_string($this->input[$field]) || CJs::decodeJson($this->input[$field]) === null) {
 							$this->addError($fatal,
-								_s('Incorrect value "%1$s" for "%2$s" field.', $this->input[$field], $field)
-								// TODO: stringify($this->input[$field]) ???
+								_s('Incorrect value for field "%1$s": %2$s.', $field, _('JSON string is expected'))
 							);
 							return false;
 						}
@@ -104,14 +106,15 @@ class CNewValidator {
 					break;
 
 				/*
-				 * 'in' => array(<values)
+				 * 'in' => array(<values>)
 				 */
 				case 'in':
 					if (array_key_exists($field, $this->input)) {
 						if (!is_string($this->input[$field]) || !in_array($this->input[$field], $params)) {
 							$this->addError($fatal,
-								_s('Incorrect value "%1$s" for "%2$s" field.', $this->input[$field], $field)
-								// TODO: stringify($this->input[$field]) ???
+								is_scalar($this->input[$field])
+									? _s('Incorrect value "%1$s" for "%2$s" field.', $this->input[$field], $field)
+									: _s('Incorrect value for "%1$s" field.', $field)
 							);
 							return false;
 						}
@@ -122,8 +125,9 @@ class CNewValidator {
 					if (array_key_exists($field, $this->input)) {
 						if (!is_string($this->input[$field]) || !$this->is_int32($this->input[$field])) {
 							$this->addError($fatal,
-								_s('Incorrect value "%1$s" for "%2$s" field.', $this->input[$field], $field)
-								// TODO: stringify($this->input[$field]) ???
+								is_scalar($this->input[$field])
+									? _s('Incorrect value "%1$s" for "%2$s" field.', $this->input[$field], $field)
+									: _s('Incorrect value for "%1$s" field.', $field)
 							);
 							return false;
 						}
@@ -134,8 +138,9 @@ class CNewValidator {
 					if (array_key_exists($field, $this->input)) {
 						if (!is_string($this->input[$field]) || !$this->is_id($this->input[$field])) {
 							$this->addError($fatal,
-								_s('Incorrect value "%1$s" for "%2$s" field.', $this->input[$field], $field)
-								// TODO: stringify($this->input[$field]) ???
+								is_scalar($this->input[$field])
+									? _s('Incorrect value "%1$s" for "%2$s" field.', $this->input[$field], $field)
+									: _s('Incorrect value for "%1$s" field.', $field)
 							);
 							return false;
 						}
@@ -149,8 +154,9 @@ class CNewValidator {
 					if (array_key_exists($field, $this->input)) {
 						if (!is_array($this->input[$field]) || !$this->is_array_id($this->input[$field])) {
 							$this->addError($fatal,
-								_s('Incorrect value "%1$s" for "%2$s" field.', $this->input[$field], $field)
-								// TODO: stringify($this->input[$field]) ???
+								is_scalar($this->input[$field])
+									? _s('Incorrect value "%1$s" for "%2$s" field.', $this->input[$field], $field)
+									: _s('Incorrect value for "%1$s" field.', $field)
 							);
 							return false;
 						}
@@ -158,10 +164,7 @@ class CNewValidator {
 					break;
 
 				/*
-				 * 'array_db' => array(
-				 *     'table' => <table_name>,
-				 *     'field' => <field_name>
-				 * )
+				 * 'array' => true
 				 */
 				case 'array':
 					if (array_key_exists($field, $this->input) && !is_array($this->input[$field])) {
@@ -181,13 +184,45 @@ class CNewValidator {
 				 */
 				case 'array_db':
 					if (array_key_exists($field, $this->input)) {
-						if (!is_array($this->input[$field])
-								|| !$this->is_array_db($this->input[$field], $params['table'], $params['field'])) {
+						if (!$this->is_array_db($this->input[$field], $params['table'], $params['field'], $flags)
+								|| !is_array($this->input[$field])) {
+							$this->addError($fatal,
+								is_scalar($this->input[$field])
+									? _s('Incorrect value "%1$s" for "%2$s" field.', $this->input[$field], $field)
+									: _s('Incorrect value for "%1$s" field.', $field)
+							);
+							return false;
+						}
+					}
+					break;
 
+				/*
+				 * 'ge' => <value>
+				 */
+				case 'ge':
+					if (array_key_exists($field, $this->input)) {
+						if (!is_string($this->input[$field]) || !$this->is_int32($this->input[$field])
+								|| $this->input[$field] < $params) {
 							$this->addError($fatal,
 								_s('Incorrect value "%1$s" for "%2$s" field.', $this->input[$field], $field)
-								// TODO: stringify($this->input[$field]) ???
 							);
+
+							return false;
+						}
+					}
+					break;
+
+				/*
+				 * 'le' => <value>
+				 */
+				case 'le':
+					if (array_key_exists($field, $this->input)) {
+						if (!is_string($this->input[$field]) || !$this->is_int32($this->input[$field])
+								|| $this->input[$field] > $params) {
+							$this->addError($fatal,
+								_s('Incorrect value "%1$s" for "%2$s" field.', $this->input[$field], $field)
+							);
+
 							return false;
 						}
 					}
@@ -201,11 +236,11 @@ class CNewValidator {
 				 */
 				case 'db':
 					if (array_key_exists($field, $this->input)) {
-						if (!$this->is_db($this->input[$field], $params['table'], $params['field'])) {
-
+						if (!$this->is_db($this->input[$field], $params['table'], $params['field'], $flags)) {
 							$this->addError($fatal,
-								_s('Incorrect value "%1$s" for "%2$s" field.', $this->input[$field], $field)
-								// TODO: stringify($this->input[$field]) ???
+								is_scalar($this->input[$field])
+									? _s('Incorrect value "%1$s" for "%2$s" field.', $this->input[$field], $field)
+									: _s('Incorrect value for "%1$s" field.', $field)
 							);
 							return false;
 						}
@@ -223,6 +258,18 @@ class CNewValidator {
 					break;
 
 				/*
+				 * 'range_time' => true
+				 */
+				case 'range_time':
+					if (array_key_exists($field, $this->input) && !$this->isRangeTime($this->input[$field])) {
+						$this->addError($fatal,
+							_s('Incorrect value for field "%1$s": %2$s.', $field, _('a time is expected'))
+						);
+						return false;
+					}
+					break;
+
+				/*
 				 * 'string' => true
 				 */
 				case 'string':
@@ -232,6 +279,12 @@ class CNewValidator {
 						);
 						return false;
 					}
+					break;
+
+				/*
+				 * 'flags' => <value1> | <value2> | ... | <valueN>
+				 */
+				case 'flags':
 					break;
 
 				default:
@@ -250,7 +303,7 @@ class CNewValidator {
 		}
 
 		// between 0 and _I64_MAX
-		return (bccomp($value, '0') >= 0 && bccomp($value, '9223372036854775807') <= 0);
+		return (bccomp($value, '0') >= 0 && bccomp($value, ZBX_DB_MAX_ID) <= 0);
 	}
 
 	public static function is_int32($value) {
@@ -259,7 +312,7 @@ class CNewValidator {
 		}
 
 		// between INT_MIN and INT_MAX
-		return (bccomp($value, '-2147483648') >= 0 && bccomp($value, '2147483647') <= 0);
+		return (bccomp($value, ZBX_MIN_INT32) >= 0 && bccomp($value, ZBX_MAX_INT32) <= 0);
 	}
 
 	public static function is_uint64($value) {
@@ -271,7 +324,18 @@ class CNewValidator {
 		return (bccomp($value, '0') >= 0 && bccomp($value, '18446744073709551615') <= 0);
 	}
 
-	private function check_db_value($field_schema, $value) {
+	/**
+	 * Validate value against DB schema.
+	 *
+	 * @param array  $field_schema            Array of DB schema.
+	 * @param string $field_schema['type']    Type of DB field.
+	 * @param string $field_schema['length']  Length of DB field.
+	 * @param string $value                   [IN/OUT] IN - input value, OUT - changed value according to flags.
+	 * @param int    $flags                   Validation flags.
+	 *
+	 * @return bool
+	 */
+	private function check_db_value($field_schema, &$value, $flags) {
 		switch ($field_schema['type']) {
 			case DB::FIELD_TYPE_ID:
 				return $this->is_id($value);
@@ -280,9 +344,17 @@ class CNewValidator {
 				return $this->is_int32($value);
 
 			case DB::FIELD_TYPE_CHAR:
+				if ($flags & P_CRLF) {
+					$value = CRLFtoLF($value);
+				}
+
 				return (mb_strlen($value) <= $field_schema['length']);
 
 			case DB::FIELD_TYPE_TEXT:
+				if ($flags & P_CRLF) {
+					$value = CRLFtoLF($value);
+				}
+
 				// TODO: check length
 				return true;
 
@@ -291,9 +363,7 @@ class CNewValidator {
 		}
 	}
 
-	private function is_array_id(array $values, $table, $field) {
-		$table_schema = DB::getSchema($table);
-
+	private function is_array_id(array $values) {
 		foreach ($values as $value) {
 			if (!is_string($value) || !$this->is_id($value)) {
 				return false;
@@ -303,22 +373,67 @@ class CNewValidator {
 		return true;
 	}
 
-	private function is_array_db(array $values, $table, $field) {
+	/**
+	 * Validate array of string values against DB schema.
+	 *
+	 * @param array $values  [IN/OUT] IN - input values, OUT - changed values according to flags.
+	 * @param string $table  DB table name.
+	 * @param string $field  DB field name.
+	 * @param int $flags     Validation flags.
+	 *
+	 * @return bool
+	 */
+	private function is_array_db(array &$values, $table, $field, $flags) {
 		$table_schema = DB::getSchema($table);
 
-		foreach ($values as $value) {
-			if (!is_string($value) || !$this->check_db_value($table_schema['fields'][$field], $value)) {
+		foreach ($values as &$value) {
+			if (!is_string($value) || !$this->check_db_value($table_schema['fields'][$field], $value, $flags)) {
 				return false;
 			}
 		}
+		unset($value);
 
 		return true;
 	}
 
-	private function is_db($value, $table, $field) {
+	/**
+	 * Validate a string value against DB schema.
+	 *
+	 * @param string $value  [IN/OUT] IN - input value, OUT - changed value according to flags.
+	 * @param string $table  DB table name.
+	 * @param string $field  DB field name.
+	 * @param int $flags     Validation flags.
+	 *
+	 * @return bool
+	 */
+	private function is_db(&$value, $table, $field, $flags) {
 		$table_schema = DB::getSchema($table);
 
-		return (is_string($value) && $this->check_db_value($table_schema['fields'][$field], $value));
+		return (is_string($value) && $this->check_db_value($table_schema['fields'][$field], $value, $flags));
+	}
+
+	private function isLeapYear($year) {
+		return (0 == $year % 4 && (0 != $year % 100 || 0 == $year % 400));
+	}
+
+	private function getDaysInMonth($year, $month) {
+		if (in_array($month, [4, 6, 9, 11], true)) {
+			return 30;
+		}
+
+		if ($month == 2) {
+			return $this->isLeapYear($year) ? 29 : 28;
+		}
+
+		return 31;
+	}
+
+	private function isRangeTime($value) {
+		if ($this->range_time_parser === null) {
+			$this->range_time_parser = new CRangeTimeParser();
+		}
+
+		return is_string($value) && $this->range_time_parser->parse($value) == CParser::PARSE_SUCCESS;
 	}
 
 	/**

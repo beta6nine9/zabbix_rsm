@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -52,6 +52,13 @@ $fields = [
 ];
 check_fields($fields);
 
+$pageFilter = new CPageFilter([
+	'groups' => ['editable' => true, 'with_hosts_and_templates' => true],
+	'hosts' => ['editable' => true, 'templated_hosts' => true],
+	'hostid' => getRequest('hostid'),
+	'groupid' => getRequest('groupid')
+]);
+
 /*
  * Permissions
  */
@@ -69,185 +76,104 @@ if (hasRequest('action')) {
 		access_deny();
 	}
 	else {
-		$dbApplications = API::Application()->get([
-			'applicationids' => getRequest('applications'),
-			'countOutput' => true
+		$applications = API::Application()->get([
+			'output' => [],
+			'applicationids' => getRequest('applications')
 		]);
-		if ($dbApplications != count(getRequest('applications'))) {
-			access_deny();
+		if (count($applications) != count(getRequest('applications'))) {
+			uncheckTableRows($pageFilter->hostid, zbx_objectValues($applications, 'applicationid'));
 		}
 	}
 }
-if (getRequest('groupid') && !API::HostGroup()->isWritable([$_REQUEST['groupid']])) {
+if (getRequest('groupid') && !isWritableHostGroups([getRequest('groupid')])) {
 	access_deny();
 }
-if (getRequest('hostid') && !API::Host()->isWritable([$_REQUEST['hostid']])) {
+if (getRequest('hostid') && !isWritableHostTemplates([getRequest('hostid')])) {
 	access_deny();
 }
-
-$pageFilter = new CPageFilter([
-	'groups' => ['editable' => true, 'with_hosts_and_templates' => true],
-	'hosts' => ['editable' => true, 'templated_hosts' => true],
-	'hostid' => getRequest('hostid'),
-	'groupid' => getRequest('groupid')
-]);
 
 /*
  * Actions
  */
 if (hasRequest('add') || hasRequest('update')) {
-	DBstart();
+	if (hasRequest('applicationid')) {
+		$result = (bool) API::Application()->update([
+			'applicationid' => $_REQUEST['applicationid'],
+			'name' => $_REQUEST['appname']
+		]);
 
-	$application = [
-		'name' => $_REQUEST['appname'],
-		'hostid' => $_REQUEST['hostid']
-	];
-
-	if (isset($_REQUEST['applicationid'])) {
-		$application['applicationid'] = $_REQUEST['applicationid'];
-		$dbApplications = API::Application()->update($application);
-
-		$messageSuccess = _('Application updated');
-		$messageFailed = _('Cannot update application');
-		$auditAction = AUDIT_ACTION_UPDATE;
+		show_messages($result, _('Application updated'), _('Cannot update application'));
 	}
 	else {
-		$dbApplications = API::Application()->create($application);
+		$result = (bool) API::Application()->create([
+			'hostid' => $_REQUEST['hostid'],
+			'name' => $_REQUEST['appname']
+		]);
 
-		$messageSuccess = _('Application added');
-		$messageFailed = _('Cannot add application');
-		$auditAction = AUDIT_ACTION_ADD;
+		show_messages($result, _('Application added'), _('Cannot add application'));
 	}
-
-	if ($dbApplications) {
-		$applicationId = reset($dbApplications['applicationids']);
-
-		add_audit($auditAction, AUDIT_RESOURCE_APPLICATION,
-			_('Application').' ['.$_REQUEST['appname'].'] ['.$applicationId.']'
-		);
-		unset($_REQUEST['form']);
-	}
-
-	$result = DBend($dbApplications);
 
 	if ($result) {
 		uncheckTableRows(getRequest('hostid'));
+		unset($_REQUEST['form']);
 	}
-	show_messages($result, $messageSuccess, $messageFailed);
 }
 elseif (isset($_REQUEST['clone']) && isset($_REQUEST['applicationid'])) {
 	unset($_REQUEST['applicationid']);
 	$_REQUEST['form'] = 'clone';
 }
-elseif (isset($_REQUEST['delete'])) {
-	if (isset($_REQUEST['applicationid'])) {
-		$result = false;
+elseif (hasRequest('delete') && hasRequest('applicationid')) {
+	$result = (bool) API::Application()->delete([getRequest('applicationid')]);
 
-		DBstart();
-
-		if ($app = get_application_by_applicationid($_REQUEST['applicationid'])) {
-			$host = get_host_by_hostid($app['hostid']);
-
-			$result = API::Application()->delete([getRequest('applicationid')]);
-		}
-
-		if ($result) {
-			add_audit(AUDIT_ACTION_DELETE, AUDIT_RESOURCE_APPLICATION,
-				'Application ['.$app['name'].'] from host ['.$host['host'].']'
-			);
-		}
-
+	if ($result) {
+		uncheckTableRows(getRequest('hostid'));
 		unset($_REQUEST['form'], $_REQUEST['applicationid']);
-
-		$result = DBend($result);
-
-		if ($result) {
-			uncheckTableRows(getRequest('hostid'));
-		}
-		show_messages($result, _('Application deleted'), _('Cannot delete application'));
 	}
+	show_messages($result, _('Application deleted'), _('Cannot delete application'));
 }
 elseif (hasRequest('action') && getRequest('action') == 'application.massdelete' && hasRequest('applications')) {
-	$result = true;
-	$applications = getRequest('applications');
-	$deleted = 0;
+	$applicationids = getRequest('applications');
 
-	DBstart();
-
-	$dbApplications = DBselect(
-		'SELECT a.applicationid,a.name,a.hostid'.
-		' FROM applications a'.
-		' WHERE '.dbConditionInt('a.applicationid', $applications)
-	);
-
-	while ($dbApplication = DBfetch($dbApplications)) {
-		if (!isset($applications[$dbApplication['applicationid']])) {
-			continue;
-		}
-
-		$result &= (bool) API::Application()->delete([$dbApplication['applicationid']]);
-
-		if ($result) {
-			$host = get_host_by_hostid($dbApplication['hostid']);
-
-			add_audit(AUDIT_ACTION_DELETE, AUDIT_RESOURCE_APPLICATION,
-				'Application ['.$dbApplication['name'].'] from host ['.$host['host'].']'
-			);
-		}
-
-		$deleted++;
-	}
-
-	$result = DBend($result);
+	$result = (bool) API::Application()->delete($applicationids);
 
 	if ($result) {
 		uncheckTableRows($pageFilter->hostid);
 	}
 	show_messages($result,
-		_n('Application deleted', 'Applications deleted', $deleted),
-		_n('Cannot delete application', 'Cannot delete applications', $deleted)
+		_n('Application deleted', 'Applications deleted', count($applicationids)),
+		_n('Cannot delete application', 'Cannot delete applications', count($applicationids))
 	);
 }
 elseif (hasRequest('applications')
 		&& str_in_array(getRequest('action'), ['application.massenable', 'application.massdisable'])) {
-	$enableApplicationItems = (getRequest('action') === 'application.massenable');
+	$status = (getRequest('action') === 'application.massenable') ? ITEM_STATUS_ACTIVE : ITEM_STATUS_DISABLED;
 
-	$applications = API::Application()->get([
-		'output' => [],
-		'applicationids' => getRequest('applications', []),
-		'selectItems' => ['itemid'],
-		'hostids' => ($pageFilter->hostid > 0) ? $pageFilter->hostid : null
+	$db_items = API::Item()->get([
+		'output' => ['itemid'],
+		'applicationids' => getRequest('applications', [])
 	]);
 
-	$actionSuccessful = true;
-	$updatedItemCount = 0;
-
-	DBstart();
-
-	foreach ($applications as $application) {
-		foreach($application['items'] as $item) {
-			$actionSuccessful &= $enableApplicationItems
-				? activate_item($item['itemid'])
-				: disable_item($item['itemid']);
-
-			$updatedItemCount++;
-		}
+	$items = [];
+	foreach ($db_items as $db_item) {
+		$items[] = ['itemid' => $db_item['itemid'], 'status' => $status];
 	}
 
-	$actionSuccessful = DBend($actionSuccessful);
+	$result = (bool) API::Item()->update($items);
 
-	if ($actionSuccessful) {
+	if ($result) {
 		uncheckTableRows($pageFilter->hostid);
 	}
 
-	$messageSuccess = $enableApplicationItems
-		? _n('Item enabled', 'Items enabled', $updatedItemCount)
-		: _n('Item disabled', 'Items disabled', $updatedItemCount);
-	$messageFailed = $enableApplicationItems
-		? _n('Cannot enable item', 'Cannot enable items', $updatedItemCount)
-		: _n('Cannot disable item', 'Cannot disable items', $updatedItemCount);
+	$updated = count($items);
 
-	show_messages($actionSuccessful, $messageSuccess, $messageFailed);
+	$messageSuccess = ($status == ITEM_STATUS_ACTIVE)
+		? _n('Item enabled', 'Items enabled', $updated)
+		: _n('Item disabled', 'Items disabled', $updated);
+	$messageFailed = ($status == ITEM_STATUS_ACTIVE)
+		? _n('Cannot enable item', 'Cannot enable items', $updated)
+		: _n('Cannot disable item', 'Cannot disable items', $updated);
+
+	show_messages($result, $messageSuccess, $messageFailed);
 }
 
 /*
@@ -303,57 +229,23 @@ else {
 	if ($pageFilter->hostsSelected) {
 		$config = select_config();
 
-		// get application ids
-		$applications = API::Application()->get([
-			'output' => ['applicationid'],
+		// Get applications.
+		$data['applications'] = API::Application()->get([
+			'output' => ['applicationid', 'hostid', 'name', 'flags', 'templateids'],
 			'hostids' => ($pageFilter->hostid > 0) ? $pageFilter->hostid : null,
-			'groupids' => ($pageFilter->groupid > 0) ? $pageFilter->groupid : null,
+			'groupids' => $pageFilter->groupids,
+			'selectHost' => ['hostid', 'name'],
+			'selectItems' => ['itemid'],
+			'selectDiscoveryRule' => ['itemid', 'name'],
+			'selectApplicationDiscovery' => ['ts_delete'],
 			'editable' => true,
 			'sortfield' => $sortField,
 			'limit' => $config['search_limit'] + 1
 		]);
-		$applicationids = zbx_objectValues($applications, 'applicationid');
-
-		// get applications
-		$data['applications'] = API::Application()->get([
-			'output' => ['applicationid', 'hostid', 'name', 'flags', 'templateids'],
-			'selectHost' => ['hostid', 'name'],
-			'selectItems' => ['itemid'],
-			'selectHost' => ['hostid', 'name'],
-			'selectDiscoveryRule' => ['itemid', 'name'],
-			'selectApplicationDiscovery' => ['ts_delete'],
-			'applicationids' => $applicationids
-		]);
 
 		order_result($data['applications'], $sortField, $sortOrder);
 
-		// fetch template application source parents
-		$applicationSourceParentIds = getApplicationSourceParentIds($applicationids);
-		$parentAppIds = [];
-
-		foreach ($applicationSourceParentIds as $applicationParentIds) {
-			foreach ($applicationParentIds as $parentId) {
-				$parentAppIds[$parentId] = $parentId;
-			}
-		}
-
-		if ($parentAppIds) {
-			$parentTemplates = DBfetchArrayAssoc(DBselect(
-				'SELECT a.applicationid,h.hostid,h.name'.
-				' FROM applications a,hosts h'.
-				' WHERE a.hostid=h.hostid'.
-					' AND '.dbConditionInt('a.applicationid', $parentAppIds)
-			), 'applicationid');
-
-			foreach ($data['applications'] as &$application) {
-				if ($application['templateids'] && isset($applicationSourceParentIds[$application['applicationid']])) {
-					foreach ($applicationSourceParentIds[$application['applicationid']] as $parentAppId) {
-						$application['sourceTemplates'][] = $parentTemplates[$parentAppId];
-					}
-				}
-			}
-			unset($application);
-		}
+		$data['parent_templates'] = getApplicationParentTemplates($data['applications']);
 
 		/*
 		 * Calculate the 'ts_delete' which will display the of warning icon and hint telling when application will be
@@ -410,28 +302,6 @@ else {
 		->setArgument('hostid', $data['hostid']);
 
 	$data['paging'] = getPagingLine($data['applications'], $sortOrder, $url);
-
-	// Select writable templates IDs.
-	$hostids = [];
-
-	foreach ($data['applications'] as $application) {
-		if (array_key_exists('sourceTemplates', $application)) {
-			$hostids = array_merge($hostids, zbx_objectValues($application['sourceTemplates'], 'hostid'));
-		}
-
-		$hostids[] = $application['host']['hostid'];
-	}
-
-	$data['writable_templates'] = [];
-
-	if ($hostids) {
-		$data['writable_templates'] = API::Template()->get([
-			'output' => ['templateid'],
-			'templateids' => array_keys(array_flip($hostids)),
-			'editable' => true,
-			'preservekeys' => true
-		]);
-	}
 
 	// render view
 	$applicationView = new CView('configuration.application.list', $data);

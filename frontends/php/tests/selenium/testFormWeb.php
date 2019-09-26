@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -18,10 +18,13 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-require_once dirname(__FILE__).'/../include/class.cwebtest.php';
+require_once dirname(__FILE__).'/../include/CLegacyWebTest.php';
 require_once dirname(__FILE__).'/../../include/items.inc.php';
 
-class testFormWeb extends CWebTest {
+/**
+ * @backup httptest
+ */
+class testFormWeb extends CLegacyWebTest {
 
 	/**
 	 * The name of the test host created in the test data set.
@@ -43,10 +46,6 @@ class testFormWeb extends CWebTest {
 	 * @var int
 	 */
 	protected $hostid = 40001;
-
-	public function testFormWeb_backup() {
-		DBsave_tables('httptest');
-	}
 
 	// Returns layout data
 	public static function layout() {
@@ -74,90 +73,6 @@ class testFormWeb extends CWebTest {
 			],
 			[
 				[
-					'agent' => 'Firefox 33.0 (Windows)',
-					'authentication' => 'None',
-					'host' => 'Simple form test host'
-				]
-			],
-			[
-				[
-					'agent' => 'Firefox 33.0 (Windows)',
-					'authentication' => 'Basic',
-					'host' => 'Simple form test host'
-				]
-			],
-			[
-				[
-					'agent' => 'Firefox 33.0 (Windows)',
-					'authentication' => 'NTLM',
-					'host' => 'Simple form test host'
-				]
-			],
-			[
-				[
-					'agent' => 'Opera 25.0 (Windows)',
-					'authentication' => 'None',
-					'host' => 'Simple form test host'
-				]
-			],
-			[
-				[
-					'agent' => 'Opera 25.0 (Windows)',
-					'authentication' => 'Basic',
-					'host' => 'Simple form test host'
-				]
-			],
-			[
-				[
-					'agent' => 'Opera 25.0 (Windows)',
-					'authentication' => 'NTLM',
-					'host' => 'Simple form test host'
-				]
-			],
-			[
-				[
-					'agent' => 'Safari 7.0.6 (Mac)',
-					'authentication' => 'None',
-					'host' => 'Simple form test host'
-				]
-			],
-			[
-				[
-					'agent' => 'Safari 7.0.6 (Mac)',
-					'authentication' => 'Basic',
-					'host' => 'Simple form test host'
-				]
-			],
-			[
-				[
-					'agent' => 'Safari 7.0.6 (Mac)',
-					'authentication' => 'NTLM',
-					'host' => 'Simple form test host'
-				]
-			],
-			[
-				[
-					'agent' => 'Chrome 38.0 (Windows)',
-					'authentication' => 'None',
-					'host' => 'Simple form test host'
-				]
-			],
-			[
-				[
-					'agent' => 'Chrome 38.0 (Windows)',
-					'authentication' => 'Basic',
-					'host' => 'Simple form test host'
-				]
-			],
-			[
-				[
-					'agent' => 'Chrome 38.0 (Windows)',
-					'authentication' => 'NTLM',
-					'host' => 'Simple form test host'
-				]
-			],
-			[
-				[
 					'agent' => 'other ...',
 					'authentication' => 'None',
 					'host' => 'Simple form test host'
@@ -174,6 +89,13 @@ class testFormWeb extends CWebTest {
 				[
 					'agent' => 'other ...',
 					'authentication' => 'NTLM',
+					'host' => 'Simple form test host'
+				]
+			],
+			[
+				[
+					'agent' => 'other ...',
+					'authentication' => 'Kerberos',
 					'host' => 'Simple form test host'
 				]
 			],
@@ -197,102 +119,6 @@ class testFormWeb extends CWebTest {
 				[
 					'template' => 'Inheritance test template',
 					'agent' => 'Internet Explorer 10.0',
-					'authentication' => 'NTLM',
-					'template' => 'Inheritance test template'
-				]
-			],
-			[
-				[
-					'template' => 'Inheritance test template',
-					'agent' => 'Firefox 33.0 (Windows)',
-					'authentication' => 'None',
-					'template' => 'Inheritance test template'
-				]
-			],
-			[
-				[
-					'template' => 'Inheritance test template',
-					'agent' => 'Firefox 33.0 (Windows)',
-					'authentication' => 'Basic',
-					'template' => 'Inheritance test template'
-				]
-			],
-			[
-				[
-					'template' => 'Inheritance test template',
-					'agent' => 'Firefox 33.0 (Windows)',
-					'authentication' => 'NTLM',
-					'template' => 'Inheritance test template'
-				]
-			],
-			[
-				[
-					'template' => 'Inheritance test template',
-					'agent' => 'Opera 25.0 (Windows)',
-					'authentication' => 'None',
-					'template' => 'Inheritance test template'
-				]
-			],
-			[
-				[
-					'template' => 'Inheritance test template',
-					'agent' => 'Opera 25.0 (Windows)',
-					'authentication' => 'Basic',
-					'template' => 'Inheritance test template'
-				]
-			],
-			[
-				[
-					'template' => 'Inheritance test template',
-					'agent' => 'Opera 25.0 (Windows)',
-					'authentication' => 'NTLM',
-					'template' => 'Inheritance test template'
-				]
-			],
-			[
-				[
-					'template' => 'Inheritance test template',
-					'agent' => 'Safari 7.0.6 (Mac)',
-					'authentication' => 'None',
-					'template' => 'Inheritance test template'
-				]
-			],
-			[
-				[
-					'template' => 'Inheritance test template',
-					'agent' => 'Safari 7.0.6 (Mac)',
-					'authentication' => 'Basic',
-					'template' => 'Inheritance test template'
-				]
-			],
-			[
-				[
-					'template' => 'Inheritance test template',
-					'agent' => 'Safari 7.0.6 (Mac)',
-					'authentication' => 'NTLM',
-					'template' => 'Inheritance test template'
-				]
-			],
-			[
-				[
-					'template' => 'Inheritance test template',
-					'agent' => 'Chrome 38.0 (Windows)',
-					'authentication' => 'None',
-					'template' => 'Inheritance test template'
-				]
-			],
-			[
-				[
-					'template' => 'Inheritance test template',
-					'agent' => 'Chrome 38.0 (Windows)',
-					'authentication' => 'Basic',
-					'template' => 'Inheritance test template'
-				]
-			],
-			[
-				[
-					'template' => 'Inheritance test template',
-					'agent' => 'Chrome 38.0 (Windows)',
 					'authentication' => 'NTLM',
 					'template' => 'Inheritance test template'
 				]
@@ -367,7 +193,7 @@ class testFormWeb extends CWebTest {
 			$this->zbxTestClickLinkTextWait($data['form']);
 		}
 		else {
-			$this->zbxTestClickWait('form');
+			$this->zbxTestContentControlButtonClickTextWait('Create web scenario');
 		}
 
 		$this->zbxTestCheckTitle('Configuration of web monitoring');
@@ -409,11 +235,11 @@ class testFormWeb extends CWebTest {
 		$this->zbxTestAssertAttribute("//input[@id='new_application']", 'maxlength', 255);
 		$this->zbxTestAssertAttribute("//input[@id='new_application']", 'size', 20);
 
-		$this->zbxTestTextPresent('Update interval (in sec)');
+		$this->zbxTestTextPresent('Update interval');
 		$this->zbxTestAssertVisibleId('delay');
-		$this->zbxTestAssertAttribute("//input[@id='delay']", 'maxlength', 5);
+		$this->zbxTestAssertAttribute("//input[@id='delay']", 'maxlength', 255);
 		$this->zbxTestAssertAttribute("//input[@id='delay']", 'size', 20);
-		$this->zbxTestAssertElementValue('delay', 60);
+		$this->zbxTestAssertElementValue('delay', '1m');
 
 		$this->zbxTestTextPresent('Attempts');
 		$this->zbxTestAssertVisibleId('retries');
@@ -475,14 +301,20 @@ class testFormWeb extends CWebTest {
 		$this->zbxTestAssertVisibleId('http_proxy');
 		$this->zbxTestAssertAttribute("//input[@id='http_proxy']", 'maxlength', 255);
 		$this->zbxTestAssertAttribute("//input[@id='http_proxy']", 'size', 20);
-		$this->zbxTestAssertAttribute("//input[@id='http_proxy']", 'placeholder', 'http://[user[:password]@]proxy.example.com[:port]');
+		$this->zbxTestAssertAttribute("//input[@id='http_proxy']", 'placeholder', '[protocol://][user[:password]@]proxy.example.com[:port]');
 
 		$this->zbxTestTextPresent('Variables');
-		$this->zbxTestAssertVisibleId('variables');
-		$this->zbxTestAssertAttribute("//textarea[@id='variables']", 'rows', 7);
+		$this->zbxTestAssertVisibleXpath("//div[@id='scenarioTab']//table[contains(@data-type, 'variables')]");
+		$this->zbxTestAssertAttribute("//table[@data-type='variables']//tr[@data-index='1']//input[@data-type='name']", 'maxlength', 255);
+		$this->zbxTestAssertVisibleXpath("//table[@data-type='variables']//tr[@data-index='1']//input[@data-type='value']");
+
+		$this->zbxTestTextPresent('Headers');
+		$this->zbxTestAssertVisibleXpath("//div[@id='scenarioTab']//table[contains(@data-type, 'headers')]");
+		$this->zbxTestAssertAttribute("//table[@data-type='headers']//tr[@data-index='1']//input[@data-type='name']", 'maxlength', 255);
+		$this->zbxTestAssertVisibleXpath("//table[@data-type='headers']//tr[@data-index='1']//input[@data-type='value']");
 
 		$this->zbxTestTextPresent('Enabled');
-		$this->zbxTestAssertVisibleId('status');
+		$this->zbxTestAssertElementPresentId('status');
 		$this->assertTrue($this->zbxTestCheckboxSelected('status'));
 
 		$this->zbxTestAssertVisibleId('cancel');
@@ -516,7 +348,7 @@ class testFormWeb extends CWebTest {
 		$this->zbxTestWaitUntilElementVisible(WebDriverBy::id('authentication'));
 
 		$this->zbxTestTextPresent('Authentication');
-		$this->zbxTestDropdownHasOptions('authentication', ['None',	'Basic', 'NTLM']);
+		$this->zbxTestDropdownHasOptions('authentication', ['None',	'Basic', 'NTLM', 'Kerberos']);
 
 		if (isset($data['authentication'])) {
 			$this->zbxTestDropdownSelect('authentication', $data['authentication']);
@@ -547,27 +379,27 @@ class testFormWeb extends CWebTest {
 		$this->zbxTestTextPresent(['Steps', 'Name', 'Timeout', 'URL', 'Required' ,'Status codes', 'Action']);
 
 		if (isset($data['form']) && !isset($data['templatedHost'])) {
-			$this->zbxTestAssertVisibleId('add_step');
-			$this->zbxTestAssertElementText("//button[@id='add_step']", 'Add');
+			$this->zbxTestAssertVisibleXpath("//td[@colspan='8']/button[contains(@class, 'element-table-add')]");
+			$this->zbxTestAssertElementText("//td[@colspan='8']/button[contains(@class, 'element-table-add')]", 'Add');
 
-			$this->zbxTestAssertVisibleId('remove_0');
-			$this->zbxTestAssertElementText("//button[@id='remove_0']", 'Remove');
+			$this->zbxTestAssertVisibleXpath("//table[contains(@class,'httpconf-steps-dynamic-row')]//button[contains(@class,'element-table-remove')]");
+			$this->zbxTestAssertElementText("//table[contains(@class,'httpconf-steps-dynamic-row')]//button[contains(@class,'element-table-remove')]", 'Remove');
 		}
 		elseif (!isset($data['form'])) {
-			$this->zbxTestAssertVisibleId('add_step');
-			$this->zbxTestAssertElementText("//button[@id='add_step']", 'Add');
+			$this->zbxTestAssertVisibleXpath("//td[@colspan='8']/button[contains(@class, 'element-table-add')]");
+			$this->zbxTestAssertElementText("//td[@colspan='8']/button[contains(@class, 'element-table-add')]", 'Add');
 
-			$this->zbxTestAssertElementNotPresentId('remove_0');
+			$this->zbxTestAssertElementNotPresentXpath("//table[contains(@class,'httpconf-steps-dynamic-row')]//button[contains(@class,'element-table-remove')]");
 		}
 		else {
-			$this->zbxTestAssertElementNotPresentId('add_step');
-			$this->zbxTestAssertElementNotPresentId('remove_0');
+			$this->zbxTestAssertElementNotPresentXpath("//td[@colspan='8']/button[contains(@class, 'element-table-add')]");
+			$this->zbxTestAssertElementNotPresentXpath("//table[contains(@class,'httpconf-steps-dynamic-row')]//button[contains(@class,'element-table-remove')]");
 		}
 	}
 
 	// Returns update data
 	public static function update() {
-		return DBdata("select * from httptest where hostid = 40001 and name LIKE 'testFormWeb%'");
+		return CDBHelper::getDataProvider("select * from httptest where hostid = 40001 and name LIKE 'testFormWeb%'");
 	}
 
 	/**
@@ -577,7 +409,7 @@ class testFormWeb extends CWebTest {
 		$name = $data['name'];
 
 		$sqlItems = "select * from items ORDER BY itemid";
-		$oldHashItems = DBhash($sqlItems);
+		$oldHashItems = CDBHelper::getHash($sqlItems);
 
 		$this->zbxTestLogin('hosts.php');
 		$this->zbxTestClickLinkTextWait($this->host);
@@ -589,10 +421,9 @@ class testFormWeb extends CWebTest {
 		$this->zbxTestTextPresent("$name");
 		$this->zbxTestCheckTitle('Configuration of web monitoring');
 
-		$this->assertEquals($oldHashItems, DBhash($sqlItems));
+		$this->assertEquals($oldHashItems, CDBHelper::getHash($sqlItems));
 	}
 
-	// Returns create data
 	public static function create() {
 		return [
 			// Empty name/steps
@@ -710,48 +541,35 @@ class testFormWeb extends CWebTest {
 			// User/password empty
 			[
 				[
-					'expected' => TEST_BAD,
+					'expected' => TEST_GOOD,
 					'name' => 'User/password empty',
 					'authentication' => 'Basic',
 					'add_step' => [
 						['step' => 'User/password empty']
-					],
-					'error_msg' => 'Page received incorrect data',
-					'errors' => [
-						'Incorrect value for field "User": cannot be empty.',
-						'Incorrect value for field "Password": cannot be empty.'
 					]
 				]
 			],
 			// User empty
 			[
 				[
-					'expected' => TEST_BAD,
+					'expected' => TEST_GOOD,
 					'name' => 'Password empty',
 					'authentication' => 'Basic',
 					'http_user' => 'zabbix',
 					'add_step' => [
 						['step' => 'Password empty']
-					],
-					'error_msg' => 'Page received incorrect data',
-					'errors' => [
-						'Incorrect value for field "Password": cannot be empty.'
 					]
 				]
 			],
 			// Password empty
 			[
 				[
-					'expected' => TEST_BAD,
+					'expected' => TEST_GOOD,
 					'name' => 'User empty',
 					'authentication' => 'Basic',
 					'http_password' => 'zabbix',
 					'add_step' => [
 						['step' => 'User empty']
-					],
-					'error_msg' => 'Page received incorrect data',
-					'errors' => [
-						'Incorrect value for field "User": cannot be empty.'
 					]
 				]
 			],
@@ -883,9 +701,9 @@ class testFormWeb extends CWebTest {
 					'add_step' => [
 						['step' => 'Interval- minus one']
 					],
-					'error_msg' => 'Page received incorrect data',
+					'error_msg' => 'Cannot add web scenario',
 					'errors' => [
-						'Incorrect value "-1" for "Update interval (in sec)" field: must be between 1 and 86400.'
+						'Invalid parameter "/1/delay": value must be one of 1-86400.'
 					]
 				]
 			],
@@ -898,9 +716,9 @@ class testFormWeb extends CWebTest {
 					'add_step' => [
 						['step' => 'Interval- zero']
 					],
-					'error_msg' => 'Page received incorrect data',
+					'error_msg' => 'Cannot add web scenario',
 					'errors' => [
-						'Incorrect value "0" for "Update interval (in sec)" field: must be between 1 and 86400.'
+						'Invalid parameter "/1/delay": value must be one of 1-86400.'
 					]
 				]
 			],
@@ -935,9 +753,9 @@ class testFormWeb extends CWebTest {
 					'add_step' => [
 						['step' => 'Interval- 86401']
 					],
-					'error_msg' => 'Page received incorrect data',
+					'error_msg' => 'Cannot add web scenario',
 					'errors' => [
-						'Incorrect value "86401" for "Update interval (in sec)" field: must be between 1 and 86400.'
+						'Invalid parameter "/1/delay": value must be one of 1-86400.'
 					]
 				]
 			],
@@ -983,7 +801,9 @@ class testFormWeb extends CWebTest {
 				[
 					'expected' => TEST_GOOD,
 					'name' => 'Variables -just numbers',
-					'variables' => '1234567890',
+					'variables' => [
+						['name' => '{1234567890}']
+					],
 					'add_step' => [
 						['step' => 'Variables -just numbers']
 					]
@@ -994,24 +814,224 @@ class testFormWeb extends CWebTest {
 				[
 					'expected' => TEST_GOOD,
 					'name' => 'Variables -symbols',
-					'variables' => '!@#$%^&*()_+{}:"|<>?,./',
+					'variables' => [
+						['name' => '{!@#$%^&*()_+:"|<>?,./}']
+					],
 					'add_step' => [
 						['step' => 'Variables -symbols']
 					]
 				]
 			],
-			// Variables -255 length-allowed more
+			// Variables -255 max allowed
 			[
 				[
 					'expected' => TEST_GOOD,
 					'name' => 'Variables -255 length',
-					'http_proxy' => 'qwertyuiopqwertyuiopqwertyuiopqwertyui'.
-						'opqwertyuiopqwertyuiopqwertyuiopqwertyuiopqwe.'.
-						'rtyuiopqwertyuiopqwertyuiopqwertyuiopqwertyuiopqw'.
-						'ertyuiopqwertyuiopqwertyuiopqwertyuiopqwertyuiopqwer'.
-						'tyuiopqwertyuiopqwertyuiopqwertyuiopqwertyuiopqwertyuiop123456789012345',
+					'variables' => [
+						['name' => '{qwertyuiopqwertyuiopqwertyuiopqwertyui'.
+							'opqwertyuiopqwertyuiopqwertyuiopqwertyuiopqwe.'.
+							'rtyuiopqwertyuiopqwertyuiopqwertyuiopqwertyuiopqw'.
+							'ertyuiopqwertyuiopqwertyuiopqwertyuiopqwertyuiopqwer'.
+							'tyuiopqwertyuiopqwertyuiopqwertyuiopqwertyuiopqwertyuiop123456789012}']
+					],
 					'add_step' => [
 						['step' => 'Variables -255 length']
+					]
+				]
+			],
+			// Variables -without {}
+			[
+				[
+					'expected' => TEST_BAD,
+					'name' => 'Variables -without {}',
+					'variables' => [
+						['name' => 'test']
+					],
+					'add_step' => [
+						['step' => 'Variables -without {}']
+					],
+					'error_msg' => 'Cannot add web scenario',
+					'errors' => [
+						'Invalid parameter "/1/variables/1/name": is not enclosed in {} or is malformed.'
+					]
+				]
+			],
+			// Variables -without {}
+			[
+				[
+					'expected' => TEST_BAD,
+					'name' => 'Variables -without {}',
+					'variables' => [
+						['name' => '{test']
+					],
+					'add_step' => [
+						['step' => 'Variables -without {}']
+					],
+					'error_msg' => 'Cannot add web scenario',
+					'errors' => [
+						'Invalid parameter "/1/variables/1/name": is not enclosed in {} or is malformed.'
+					]
+				]
+			],
+			// Variables -without {}
+			[
+				[
+					'expected' => TEST_BAD,
+					'name' => 'Variables -without {}',
+					'variables' => [
+						['name' => 'test}']
+					],
+					'add_step' => [
+						['step' => 'Variables -without {}']
+					],
+					'error_msg' => 'Cannot add web scenario',
+					'errors' => [
+						'Invalid parameter "/1/variables/1/name": is not enclosed in {} or is malformed.'
+					]
+				]
+			],
+			// Variables -with the same names
+			[
+				[
+					'expected' => TEST_BAD,
+					'name' => 'Variables -with the same names',
+					'variables' => [
+						['name' => '{test}'],
+						['name' => '{test}']
+					],
+					'add_step' => [
+						['step' => 'Variables -with the same names']
+					],
+					'error_msg' => 'Cannot add web scenario',
+					'errors' => [
+						'Invalid parameter "/1/variables/2": value (name)=({test}) already exists.'
+					]
+				]
+			],
+			// Variables -two different
+			[
+				[
+					'expected' => TEST_GOOD,
+					'name' => 'Variables -two different',
+					'variables' => [
+						['name' => '{test1}', 'value' => 'test1'],
+						['name' => '{test2}', 'value' => 'test1']
+					],
+					'add_step' => [
+						['step' => 'Variables -two different']
+					]
+				]
+			],
+			// Variables -empty name
+			[
+				[
+					'expected' => TEST_BAD,
+					'name' => 'Variables -two different',
+					'variables' => [
+						['value' => 'test']
+					],
+					'add_step' => [
+						['step' => 'Variables -two different']
+					],
+					'error_msg' => 'Cannot add web scenario',
+					'errors' => [
+						'Invalid parameter "/1/variables/1/name": cannot be empty.'
+					]
+				]
+			],
+			// Headers -just numbers
+			[
+				[
+					'expected' => TEST_GOOD,
+					'name' => 'Headers -just numbers',
+					'headers' => [
+						['name' => '1234567890', 'value' => '123456']
+					],
+					'add_step' => [
+						['step' => 'Headers -just numbers']
+					]
+				]
+			],
+			// Headers -just symbols
+			[
+				[
+					'expected' => TEST_GOOD,
+					'name' => 'Headers -just symbols',
+					'headers' => [
+						['name' => '!@#$%^&*()_+:"{}|<>?,./', 'value' => '!@#$%^&*()_+:"{}|<>?,./']
+					],
+					'add_step' => [
+						['step' => 'Headers -just symbols']
+					]
+				]
+			],
+			// Headers -255 length
+			[
+				[
+					'expected' => TEST_GOOD,
+					'name' => 'Headers -255 length',
+					'headers' => [
+						['name' => 'qwertyuiopqwertyuiopqwertyuiopqwertyui'.
+							'opqwertyuiopqwertyuiopqwertyuiopqwertyuiopqwe.'.
+							'rtyuiopqwertyuiopqwertyuiopqwertyuiopqwertyuiopqw'.
+							'ertyuiopqwertyuiopqwertyuiopqwertyuiopqwertyuiopqwer'.
+							'tyuiopqwertyuiopqwertyuiopqwertyuiopqwertyuiopqwertyuiop12345678901234',
+							'value' => 'qwertyuiopqwertyuiopqwertyuiopqwertyui'.
+							'opqwertyuiopqwertyuiopqwertyuiopqwertyuiopqwe.'.
+							'rtyuiopqwertyuiopqwertyuiopqwertyuiopqwertyuiopqw'.
+							'ertyuiopqwertyuiopqwertyuiopqwertyuiopqwertyuiopqwer'.
+							'tyuiopqwertyuiopqwertyuiopqwertyuiopqwertyuiopqwertyuiop12345678901234']
+					],
+					'add_step' => [
+						['step' => 'Headers -255 length']
+					]
+				]
+			],
+			// Headers -two different
+			[
+				[
+					'expected' => TEST_GOOD,
+					'name' => 'Headers -two different',
+					'headers' => [
+						['name' => 'test', 'value' => 'test_value'],
+						['name' => 'test', 'value' => 'test_value']
+					],
+					'add_step' => [
+						['step' => 'Headers -two different']
+					]
+				]
+			],
+			// Headers -empty value
+			[
+				[
+					'expected' => TEST_BAD,
+					'name' => 'Headers -empty value',
+					'headers' => [
+						['name' => 'test'],
+					],
+					'add_step' => [
+						['step' => 'Headers -empty value']
+					],
+					'error_msg' => 'Cannot add web scenario',
+					'errors' => [
+						'Invalid parameter "/1/headers/1/value": cannot be empty.'
+					]
+				]
+			],
+			// Headers -empty name
+			[
+				[
+					'expected' => TEST_BAD,
+					'name' => 'Headers -empty name',
+					'headers' => [
+						['value' => 'test'],
+					],
+					'add_step' => [
+						['step' => 'Headers -empty name']
+					],
+					'error_msg' => 'Cannot add web scenario',
+					'errors' => [
+						'Invalid parameter "/1/headers/1/name": cannot be empty.'
 					]
 				]
 			],
@@ -1063,9 +1083,7 @@ class testFormWeb extends CWebTest {
 					'name' => 'Trigger create multiple steps web test',
 					'add_step' => [
 						['step' => 'Trigger create multiple steps web test1'],
-						['step' => 'Trigger create multiple steps web test2'],
-						['step' => 'Trigger create multiple steps web test3'],
-						['step' => 'Trigger create multiple steps web test4'],
+						['step' => 'Trigger create multiple steps web test2']
 					],
 					'createTriggers' => [
 						'web.test.in[Trigger create multiple steps web test,,bps]',
@@ -1076,13 +1094,7 @@ class testFormWeb extends CWebTest {
 						'web.test.rspcode[Trigger create multiple steps web test,Trigger create multiple steps web test1 step]',
 						'web.test.in[Trigger create multiple steps web test,Trigger create multiple steps web test2 step,bps]',
 						'web.test.time[Trigger create multiple steps web test,Trigger create multiple steps web test2 step,resp]',
-						'web.test.rspcode[Trigger create multiple steps web test,Trigger create multiple steps web test2 step]',
-						'web.test.in[Trigger create multiple steps web test,Trigger create multiple steps web test3 step,bps]',
-						'web.test.time[Trigger create multiple steps web test,Trigger create multiple steps web test3 step,resp]',
-						'web.test.rspcode[Trigger create multiple steps web test,Trigger create multiple steps web test3 step]',
-						'web.test.in[Trigger create multiple steps web test,Trigger create multiple steps web test4 step,bps]',
-						'web.test.time[Trigger create multiple steps web test,Trigger create multiple steps web test4 step,resp]',
-						'web.test.rspcode[Trigger create multiple steps web test,Trigger create multiple steps web test4 step]'
+						'web.test.rspcode[Trigger create multiple steps web test,Trigger create multiple steps web test2 step]'
 					]
 				]
 			],
@@ -1106,22 +1118,7 @@ class testFormWeb extends CWebTest {
 						['step' => 'Many websteps added web test12'],
 						['step' => 'Many websteps added web test13'],
 						['step' => 'Many websteps added web test14'],
-						['step' => 'Many websteps added web test15'],
-						['step' => 'Many websteps added web test16'],
-						['step' => 'Many websteps added web test17'],
-						['step' => 'Many websteps added web test18'],
-						['step' => 'Many websteps added web test19'],
-						['step' => 'Many websteps added web test20'],
-						['step' => 'Many websteps added web test21'],
-						['step' => 'Many websteps added web test22'],
-						['step' => 'Many websteps added web test23'],
-						['step' => 'Many websteps added web test24'],
-						['step' => 'Many websteps added web test25'],
-						['step' => 'Many websteps added web test26'],
-						['step' => 'Many websteps added web test27'],
-						['step' => 'Many websteps added web test28'],
-						['step' => 'Many websteps added web test29'],
-						['step' => 'Many websteps added web test30']
+						['step' => 'Many websteps added web test15']
 					]
 				]
 			],
@@ -1400,6 +1397,28 @@ class testFormWeb extends CWebTest {
 					'formCheck' => true,
 					'remove' => true
 				]
+			],
+			[
+				[
+					'expected' => TEST_GOOD,
+					'name' => 'Kerberos empty fields',
+					'authentication' => 'Kerberos',
+					'add_step' => [
+						['step' => 'Kerberos1']
+					]
+				]
+			],
+			[
+				[
+					'expected' => TEST_GOOD,
+					'name' => 'Kerberos user-password',
+					'authentication' => 'Kerberos',
+					'http_user' => 'k_user',
+					'http_password' => 'zabbix_k2',
+					'add_step' => [
+						['step' => 'Kerberos2']
+					]
+				]
 			]
 		];
 	}
@@ -1414,7 +1433,7 @@ class testFormWeb extends CWebTest {
 
 		$this->zbxTestCheckTitle('Configuration of web monitoring');
 
-		$this->zbxTestClickWait('form');
+		$this->zbxTestContentControlButtonClickTextWait('Create web scenario');
 		$this->zbxTestCheckTitle('Configuration of web monitoring');
 		$this->zbxTestCheckHeader('Web monitoring');
 
@@ -1456,7 +1475,31 @@ class testFormWeb extends CWebTest {
 		}
 
 		if (isset($data['variables'])) {
-			$this->zbxTestInputType('variables', $data['variables']);
+			$i = 1;
+			foreach($data['variables'] as $variable) {
+				if (isset($variable['name'])) {
+					$this->zbxTestInputTypeByXpath('//table[@data-type="variables"]//tr[@data-index="'.$i.'"]//input[@data-type="name"]', $variable['name']);
+				}
+				if (isset($variable['value'])) {
+					$this->zbxTestInputTypeByXpath('//table[@data-type="variables"]//tr[@data-index="'.$i.'"]//input[@data-type="value"]', $variable['value']);
+				}
+				$this->zbxTestClickXpath('//table[@data-type="variables"]//button[contains(@class, "element-table-add")]');
+				$i++;
+			}
+		}
+
+		if (isset($data['headers'])) {
+			$i = 1;
+			foreach($data['headers'] as $header) {
+				if (isset($header['name'])) {
+					$this->zbxTestInputTypeByXpath('//table[@data-type="headers"]//tr[@data-index="'.$i.'"]//input[@data-type="name"]', $header['name']);
+				}
+				if (isset($header['value'])) {
+					$this->zbxTestInputTypeByXpath('//table[@data-type="headers"]//tr[@data-index="'.$i.'"]//input[@data-type="value"]', $header['value']);
+				}
+				$this->zbxTestClickXpath('//table[@data-type="headers"]//button[contains(@class, "element-table-add")]');
+				$i++;
+			}
 		}
 
 		$this->zbxTestTabSwitchById('tab_authenticationTab', 'Authentication');
@@ -1477,18 +1520,18 @@ class testFormWeb extends CWebTest {
 		if (isset($data['add_step'])) {
 			$this->zbxTestTabSwitchById('tab_stepTab' ,'Steps');
 			foreach($data['add_step'] as $item) {
-				$this->zbxTestClickWait('add_step');
-				$this->zbxTestWaitWindowAndSwitchToIt('zbx_popup');
-				$this->zbxTestCheckFatalErrors();
-				$step = $item['step']." step";
-				$this->zbxTestInputTypeWait('name',$step);
-				$url = $step." url";
-				$this->zbxTestInputTypeWait('url', $url);
-				$this->zbxTestClick('add');
-				$this->zbxTestWaitWindowClose();
+				$this->zbxTestClickXpathWait('//td[@colspan="8"]/button[contains(@class, "element-table-add")]');
+				$this->zbxTestLaunchOverlayDialog('Step of web scenario');
+				$step = $item['step'].' step';
+				$this->zbxTestInputTypeByXpath('//div[@class="overlay-dialogue-body"]//input[@id="step_name"]', $step, false);
+				$url = $step.' url';
+				$this->zbxTestInputTypeByXpath('//div[@class="overlay-dialogue-body"]//input[@id="url"]', $url);
+				$this->zbxTestClickXpath('//div[@class="overlay-dialogue-footer"]//button[text()="Add"]');
+				$this->zbxTestWaitForPageToLoad();
+				$this->zbxTestWaitUntilElementNotVisible(WebDriverBy::xpath("//div[@id='overlay_bg']"));
 
-				if(isset($item['remove'])) {
-					$this->zbxTestClickWait('remove_0');
+				if (isset($item['remove'])) {
+					$this->zbxTestClickXpathWait('//table[contains(@class, "httpconf-steps-dynamic-row")]//button[contains(@class,"element-table-remove")]');
 				}
 			}
 		}
@@ -1499,7 +1542,7 @@ class testFormWeb extends CWebTest {
 			case TEST_GOOD:
 				$this->zbxTestWaitUntilMessageTextPresent('msg-good', 'Web scenario added');
 				$this->zbxTestCheckTitle('Configuration of web monitoring');
-				$this->zbxTestTextPresent(['Number of steps', 'Update interval', 'Status']);
+				$this->zbxTestTextPresent(['Number of steps', 'Interval', 'Status']);
 				break;
 
 			case TEST_BAD:
@@ -1525,6 +1568,7 @@ class testFormWeb extends CWebTest {
 				$httptestid = $row['httptestid'];
 			}
 		}
+
 		if (isset($data['formCheck'])) {
 			if (isset ($data['dbName'])) {
 				$dbName = $data['dbName'];
@@ -1553,7 +1597,7 @@ class testFormWeb extends CWebTest {
 			$this->zbxTestClickLinkTextWait('Triggers');
 
 			foreach ($data['createTriggers'] as $trigger) {
-				$this->zbxTestClickWait('form');
+				$this->zbxTestContentControlButtonClickTextWait('Create trigger');
 
 				$this->zbxTestInputType('description', $trigger);
 				$expressionTrigger = '{'.$this->host.':'.$trigger.'.last(0)}=0';
@@ -1570,16 +1614,12 @@ class testFormWeb extends CWebTest {
 			$this->zbxTestCheckboxSelect("group_httptestid_$httptestid");
 			$this->zbxTestClickButton('httptest.massdelete');
 
-			$this->webDriver->switchTo()->alert()->accept();
+			$this->zbxTestAcceptAlert();
 
 			$this->zbxTestWaitUntilMessageTextPresent('msg-good', 'Web scenario deleted');
-			$this->assertEquals(0, DBcount("SELECT * FROM httptest test LEFT JOIN httpstep step ON ".
+			$this->assertEquals(0, CDBHelper::getCount("SELECT * FROM httptest test LEFT JOIN httpstep step ON ".
 				"step.httptestid = test.httptestid ".
 				"WHERE test.name = '".$name."' AND step.name = '".$step."'"));
 		}
-	}
-
-	public function testFormWeb_restore() {
-		DBrestore_tables('httptest');
 	}
 }

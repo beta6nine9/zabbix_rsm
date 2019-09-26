@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -21,8 +21,6 @@
 
 /**
  * Class containing methods for operations with graphs.
- *
- * @package API
  */
 abstract class CGraphGeneral extends CApiService {
 
@@ -30,7 +28,6 @@ abstract class CGraphGeneral extends CApiService {
 	const ERROR_MISSING_GRAPH_NAME = 'missingGraphName';
 	const ERROR_MISSING_GRAPH_ITEMS = 'missingGraphItems';
 	const ERROR_MISSING_REQUIRED_VALUE = 'missingRequiredValue';
-	const ERROR_TEMPLATED_ID = 'templatedId';
 	const ERROR_GRAPH_SUM = 'graphSum';
 
 	/**
@@ -298,7 +295,7 @@ abstract class CGraphGeneral extends CApiService {
 		if ($graph['graphtype'] == GRAPH_TYPE_PIE || $graph['graphtype'] == GRAPH_TYPE_EXPLODED) {
 			$sumItems = 0;
 			foreach ($graph['gitems'] as $gitem) {
-				if ($gitem['type'] == GRAPH_ITEM_SUM) {
+				if (array_key_exists('type', $gitem) && $gitem['type'] == GRAPH_ITEM_SUM) {
 					$sumItems++;
 				}
 			}
@@ -421,6 +418,7 @@ abstract class CGraphGeneral extends CApiService {
 	 */
 	protected function validateItemsCreate(array $graphs) {
 		$itemIds = [];
+		$itemid_rules = ['type' => API_ID, 'flags' => API_NOT_EMPTY];
 
 		foreach ($graphs as $graph) {
 			// validate graph name
@@ -450,22 +448,20 @@ abstract class CGraphGeneral extends CApiService {
 				}
 			}
 
-			// add Y axis item IDs for persmission validation
-			if (isset($graph['ymin_type']) && $graph['ymin_type'] == GRAPH_YAXIS_TYPE_ITEM_VALUE) {
-				if (!isset($graph['ymin_itemid']) || zbx_empty($graph['ymin_itemid'])) {
-					self::exception(ZBX_API_ERROR_PARAMETERS,
-						_s($this->getErrorMsg(self::ERROR_MISSING_REQUIRED_VALUE), 'ymin_itemid')
-					);
+			// add Y min axis item ID for permission validation
+			if (array_key_exists('ymin_type', $graph) && $graph['ymin_type'] == GRAPH_YAXIS_TYPE_ITEM_VALUE) {
+				if (!CApiInputValidator::validate($itemid_rules, $graph['ymin_itemid'], 'ymin_itemid', $error)) {
+					self::exception(ZBX_API_ERROR_PARAMETERS, $error);
 				}
 				else {
 					$itemIds[$graph['ymin_itemid']] = $graph['ymin_itemid'];
 				}
 			}
-			if (isset($graph['ymax_type']) && $graph['ymax_type'] == GRAPH_YAXIS_TYPE_ITEM_VALUE) {
-				if (!isset($graph['ymax_itemid']) || zbx_empty($graph['ymax_itemid'])) {
-					self::exception(ZBX_API_ERROR_PARAMETERS,
-						_s($this->getErrorMsg(self::ERROR_MISSING_REQUIRED_VALUE), 'ymax_itemid')
-					);
+
+			// add Y max axis item ID for permission validation
+			if (array_key_exists('ymax_type', $graph) && $graph['ymax_type'] == GRAPH_YAXIS_TYPE_ITEM_VALUE) {
+				if (!CApiInputValidator::validate($itemid_rules, $graph['ymax_itemid'], 'ymax_itemid', $error)) {
+					self::exception(ZBX_API_ERROR_PARAMETERS, $error);
 				}
 				else {
 					$itemIds[$graph['ymax_itemid']] = $graph['ymax_itemid'];
@@ -485,12 +481,23 @@ abstract class CGraphGeneral extends CApiService {
 	protected function validateCreate(array $graphs) {
 		$colorValidator = new CColorValidator();
 
+		switch (get_class($this)) {
+			case 'CGraph':
+				$error_cannot_set = _('Cannot set "%1$s" for graph "%2$s".');
+				break;
+
+			case 'CGraphPrototype':
+				$error_cannot_set = _('Cannot set "%1$s" for graph prototype "%2$s".');
+				break;
+
+			default:
+				self::exception(ZBX_API_ERROR_INTERNAL, _('Internal error.'));
+		}
+
+		$read_only_fields = ['templateid', 'flags'];
+
 		foreach ($graphs as $graph) {
-			// check for "templateid", because it is not allowed
-			if (array_key_exists('templateid', $graph)) {
-				$error = _s($this->getErrorMsg(self::ERROR_TEMPLATED_ID), $graph['name']);
-				self::exception(ZBX_API_ERROR_PARAMETERS, $error);
-			}
+			$this->checkNoParameters($graph, $read_only_fields, $error_cannot_set, $graph['name']);
 
 			$templatedGraph = false;
 			if (isset($graph['gitems'])) {
@@ -547,6 +554,7 @@ abstract class CGraphGeneral extends CApiService {
 	 */
 	protected function validateItemsUpdate(array $graphs) {
 		$dbFields = ['itemid' => null];
+		$itemid_rules = ['type' => API_ID, 'flags' => API_NOT_EMPTY];
 
 		foreach ($graphs as $graph) {
 			// graph items are optional
@@ -569,24 +577,20 @@ abstract class CGraphGeneral extends CApiService {
 				}
 			}
 
-			// add Y min axis item IDs for persmission validation
-			if (isset($graph['ymin_type']) && $graph['ymin_type'] == GRAPH_YAXIS_TYPE_ITEM_VALUE) {
-				if (!isset($graph['ymin_itemid']) || zbx_empty($graph['ymin_itemid'])) {
-					self::exception(ZBX_API_ERROR_PARAMETERS,
-						_s($this->getErrorMsg(self::ERROR_MISSING_REQUIRED_VALUE), 'ymin_itemid')
-					);
+			// add Y min axis item ID for permission validation
+			if (array_key_exists('ymin_type', $graph) && $graph['ymin_type'] == GRAPH_YAXIS_TYPE_ITEM_VALUE) {
+				if (!CApiInputValidator::validate($itemid_rules, $graph['ymin_itemid'], 'ymin_itemid', $error)) {
+					self::exception(ZBX_API_ERROR_PARAMETERS, $error);
 				}
 				else {
 					$itemIds[$graph['ymin_itemid']] = $graph['ymin_itemid'];
 				}
 			}
 
-			// add Y max axis item IDs for persmission validation
-			if (isset($graph['ymax_type']) && $graph['ymax_type'] == GRAPH_YAXIS_TYPE_ITEM_VALUE) {
-				if (!isset($graph['ymax_itemid']) || zbx_empty($graph['ymax_itemid'])) {
-					self::exception(ZBX_API_ERROR_PARAMETERS,
-						_s($this->getErrorMsg(self::ERROR_MISSING_REQUIRED_VALUE), 'ymax_itemid')
-					);
+			// add Y max axis item ID for permission validation
+			if (array_key_exists('ymax_type', $graph) && $graph['ymax_type'] == GRAPH_YAXIS_TYPE_ITEM_VALUE) {
+				if (!CApiInputValidator::validate($itemid_rules, $graph['ymax_itemid'], 'ymax_itemid', $error)) {
+					self::exception(ZBX_API_ERROR_PARAMETERS, $error);
 				}
 				else {
 					$itemIds[$graph['ymax_itemid']] = $graph['ymax_itemid'];
@@ -608,13 +612,23 @@ abstract class CGraphGeneral extends CApiService {
 	protected function validateUpdate(array $graphs, array $dbGraphs) {
 		$colorValidator = new CColorValidator();
 
+		switch (get_class($this)) {
+			case 'CGraph':
+				$error_cannot_update = _('Cannot update "%1$s" for graph "%2$s".');
+				break;
+
+			case 'CGraphPrototype':
+				$error_cannot_update = _('Cannot update "%1$s" for graph prototype "%2$s".');
+				break;
+
+			default:
+				self::exception(ZBX_API_ERROR_INTERNAL, _('Internal error.'));
+		}
+
+		$read_only_fields = ['templateid', 'flags'];
+
 		foreach ($graphs as $graph) {
-			// check for "templateid", because it is not allowed
-			if (array_key_exists('templateid', $graph)) {
-				self::exception(ZBX_API_ERROR_PARAMETERS,
-					_s($this->getErrorMsg(self::ERROR_TEMPLATED_ID), $graph['name'])
-				);
-			}
+			$this->checkNoParameters($graph, $read_only_fields, $error_cannot_update, $graph['name']);
 
 			$templatedGraph = false;
 

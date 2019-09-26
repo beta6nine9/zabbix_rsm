@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -30,7 +30,6 @@ class CActionCondValidator extends CValidator {
 	 */
 	public function validate($condition) {
 		// build validators
-		$timePeriodValidator = new CTimePeriodValidator();
 		$discoveryCheckTypeValidator = new CLimitedSetValidator([
 			'values' => array_keys(discovery_check_type2str())
 		]);
@@ -112,18 +111,20 @@ class CActionCondValidator extends CValidator {
 				break;
 
 			case CONDITION_TYPE_TIME_PERIOD:
-				if (!$timePeriodValidator->validate($conditionValue)) {
-					$this->setError($timePeriodValidator->getError());
+				$time_period_parser = new CTimePeriodsParser(['usermacros' => true]);
+
+				if ($time_period_parser->parse($conditionValue) != CParser::PARSE_SUCCESS) {
+					$this->setError(_('Invalid time period.'));
 				}
 				break;
 
 			case CONDITION_TYPE_DHOST_IP:
-				$ipRangeValidator = new CIPRangeValidator();
+				$ip_range_parser = new CIPRangeParser(['v6' => ZBX_HAVE_IPV6, 'dns' => false, 'max_ipv4_cidr' => 30]);
 				if (zbx_empty($conditionValue)) {
 					$this->setError(_('Empty action condition.'));
 				}
-				elseif (!$ipRangeValidator->validate($conditionValue)) {
-					$this->setError($ipRangeValidator->getError());
+				elseif (!$ip_range_parser->parse($conditionValue)) {
+					$this->setError(_s('Invalid action condition: %1$s.', $ip_range_parser->getError()));
 				}
 				break;
 
@@ -154,9 +155,9 @@ class CActionCondValidator extends CValidator {
 				}
 				break;
 
-			case CONDITION_TYPE_MAINTENANCE:
+			case CONDITION_TYPE_SUPPRESSED:
 				if (!zbx_empty($conditionValue)) {
-					$this->setError(_('Maintenance action condition value must be empty.'));
+					$this->setError(_('Action condition value must be empty.'));
 				}
 				break;
 
@@ -166,15 +167,6 @@ class CActionCondValidator extends CValidator {
 				}
 				elseif (!$triggerSeverityValidator->validate($conditionValue)) {
 					$this->setError(_('Incorrect action condition trigger severity.'));
-				}
-				break;
-
-			case CONDITION_TYPE_TRIGGER_VALUE:
-				if (zbx_empty($conditionValue)) {
-					$this->setError(_('Empty action condition.'));
-				}
-				elseif (!$triggerValueValidator->validate($conditionValue)) {
-					$this->setError(_('Incorrect action condition trigger value.'));
 				}
 				break;
 
@@ -193,7 +185,15 @@ class CActionCondValidator extends CValidator {
 			case CONDITION_TYPE_APPLICATION:
 			case CONDITION_TYPE_HOST_NAME:
 			case CONDITION_TYPE_HOST_METADATA:
+			case CONDITION_TYPE_EVENT_TAG:
 				if (zbx_empty($conditionValue)) {
+					$this->setError(_('Empty action condition.'));
+				}
+				break;
+
+			case CONDITION_TYPE_EVENT_TAG_VALUE:
+				if (!is_string($condition['value']) || $condition['value'] === '' ||
+						!is_string($condition['value2']) || $condition['value2'] === '') {
 					$this->setError(_('Empty action condition.'));
 				}
 				break;

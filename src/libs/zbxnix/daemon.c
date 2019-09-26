@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -23,7 +23,7 @@
 #include "pid.h"
 #include "cfg.h"
 #include "log.h"
-#include "zbxself.h"
+#include "control.h"
 
 #include "fatal.h"
 #include "sighandler.h"
@@ -143,7 +143,7 @@ static void	zbx_signal_process_by_type(int proc_type, int proc_num, int flags)
 static void	zbx_signal_process_by_pid(int pid, int flags)
 {
 	union sigval	s;
-	int		i, found;
+	int		i, found = 0;
 
 	s.ZBX_SIVAL_INT = flags;
 
@@ -196,7 +196,7 @@ static void	user1_signal_handler(int sig, siginfo_t *siginfo, void *context)
 			SIG_CHECKED_FIELD(siginfo, si_pid),
 			SIG_CHECKED_FIELD(siginfo, si_uid),
 			SIG_CHECKED_FIELD(siginfo, si_value.ZBX_SIVAL_INT),
-			SIG_CHECKED_FIELD(siginfo, si_value.ZBX_SIVAL_INT));
+			(unsigned int)SIG_CHECKED_FIELD(siginfo, si_value.ZBX_SIVAL_INT));
 #ifdef HAVE_SIGQUEUE
 	flags = SIG_CHECKED_FIELD(siginfo, si_value.ZBX_SIVAL_INT);
 
@@ -300,12 +300,6 @@ int	daemon_start(int allow_root, const char *user, unsigned int flags)
 
 	if (0 == allow_root && 0 == getuid())	/* running as root? */
 	{
-		if (0 != (flags & ZBX_TASK_FLAG_FOREGROUND))
-		{
-			zbx_error("cannot run as root!");
-			exit(EXIT_FAILURE);
-		}
-
 		if (NULL == user)
 			user = "zabbix";
 

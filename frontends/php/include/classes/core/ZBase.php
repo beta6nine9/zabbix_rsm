@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -93,12 +93,12 @@ class ZBase {
 		require_once $this->getRootDir().'/include/db.inc.php';
 
 		// page specific includes
-		require_once $this->getRootDir().'/include/acknow.inc.php';
 		require_once $this->getRootDir().'/include/actions.inc.php';
 		require_once $this->getRootDir().'/include/discovery.inc.php';
 		require_once $this->getRootDir().'/include/draw.inc.php';
 		require_once $this->getRootDir().'/include/events.inc.php';
 		require_once $this->getRootDir().'/include/graphs.inc.php';
+		require_once $this->getRootDir().'/include/hostgroups.inc.php';
 		require_once $this->getRootDir().'/include/hosts.inc.php';
 		require_once $this->getRootDir().'/include/httptest.inc.php';
 		require_once $this->getRootDir().'/include/ident.inc.php';
@@ -127,13 +127,14 @@ class ZBase {
 				$this->loadConfigFile();
 				$this->initDB();
 				$this->authenticateUser();
-				$this->initLocales();
+				$this->initLocales(CWebUser::$data);
+				$this->setLayoutModeByUrl();
 				break;
 
 			case self::EXEC_MODE_API:
 				$this->loadConfigFile();
 				$this->initDB();
-				$this->initLocales();
+				$this->initLocales(['lang' => 'en_gb']);
 				break;
 
 			case self::EXEC_MODE_SETUP:
@@ -142,7 +143,7 @@ class ZBase {
 					$this->loadConfigFile();
 					$this->initDB();
 					$this->authenticateUser();
-					$this->initLocales();
+					$this->initLocales(CWebUser::$data);
 				}
 				catch (ConfigFileException $e) {}
 				break;
@@ -151,9 +152,10 @@ class ZBase {
 		// new MVC processing, otherwise we continue execution old style
 		if (hasRequest('action')) {
 			$router = new CRouter(getRequest('action'));
+
 			if ($router->getController() !== null) {
 				CProfiler::getInstance()->start();
-				$this->processRequest();
+				$this->processRequest($router);
 				exit;
 			}
 		}
@@ -196,6 +198,7 @@ class ZBase {
 			$this->rootDir.'/include/classes/mvc',
 			$this->rootDir.'/include/classes/api',
 			$this->rootDir.'/include/classes/api/services',
+			$this->rootDir.'/include/classes/api/helpers',
 			$this->rootDir.'/include/classes/api/managers',
 			$this->rootDir.'/include/classes/api/clients',
 			$this->rootDir.'/include/classes/api/wrappers',
@@ -212,6 +215,7 @@ class ZBase {
 			$this->rootDir.'/include/classes/export',
 			$this->rootDir.'/include/classes/export/writers',
 			$this->rootDir.'/include/classes/export/elements',
+			$this->rootDir.'/include/classes/graph',
 			$this->rootDir.'/include/classes/graphdraw',
 			$this->rootDir.'/include/classes/import',
 			$this->rootDir.'/include/classes/import/converters',
@@ -231,6 +235,7 @@ class ZBase {
 			$this->rootDir.'/include/classes/tree',
 			$this->rootDir.'/include/classes/html',
 			$this->rootDir.'/include/classes/html/pageheader',
+			$this->rootDir.'/include/classes/html/svg',
 			$this->rootDir.'/include/classes/html/widget',
 			$this->rootDir.'/include/classes/html/interfaces',
 			$this->rootDir.'/include/classes/parsers',
@@ -243,6 +248,9 @@ class ZBase {
 			$this->rootDir.'/include/classes/regexp',
 			$this->rootDir.'/include/classes/ldap',
 			$this->rootDir.'/include/classes/pagefilter',
+			$this->rootDir.'/include/classes/widgets/fields',
+			$this->rootDir.'/include/classes/widgets/forms',
+			$this->rootDir.'/include/classes/widgets',
 			$this->rootDir.'/local/app/controllers',
 			$this->rootDir.'/app/controllers'
 		];
@@ -257,6 +265,8 @@ class ZBase {
 		return [
 			'blue-theme' => _('Blue'),
 			'dark-theme' => _('Dark'),
+			'hc-light' => _('High-contrast light'),
+			'hc-dark' => _('High-contrast dark')
 		];
 	}
 
@@ -292,29 +302,19 @@ class ZBase {
 	 * @throws DBException
 	 */
 	protected function initDB() {
-		global $DB;
-
 		$error = null;
 		if (!DBconnect($error)) {
-			$last_server = "*UNKNOWN*";
-			foreach ($DB['SERVERS'] as $server) {
-				$last_server = $server['SERVER'];
-				if (($DB['SERVER'] !== $server['SERVER'] || $DB['PORT'] !== $server['PORT']
-						|| $DB['DATABASE'] !== $server['DATABASE'] || $DB['USER'] !== $server['USER']
-						|| $DB['PASSWORD'] !== $server['PASSWORD']) && multiDBconnect($server, $error)) {
-					redirect($server['URL']);
-				}
-			}
-
-			$error = _('All servers are down') . ". Last error was on server \"$last_server\": $error";
 			throw new DBException($error);
 		}
 	}
 
 	/**
 	 * Initialize translations.
+	 *
+	 * @param array  $user_data          Array of user data.
+	 * @param string $user_data['lang']  Language.
 	 */
-	protected function initLocales() {
+	protected function initLocales(array $user_data) {
 		init_mbstrings();
 
 		$defaultLocales = [
@@ -323,7 +323,7 @@ class ZBase {
 
 		if (function_exists('bindtextdomain')) {
 			// initializing gettext translations depending on language selected by user
-			$locales = zbx_locale_variants(CWebUser::$data['lang']);
+			$locales = zbx_locale_variants($user_data['lang']);
 			$locale_found = false;
 			foreach ($locales as $locale) {
 				// since LC_MESSAGES may be unavailable on some systems, try to set all of the locales
@@ -335,7 +335,6 @@ class ZBase {
 
 				if (setlocale(LC_ALL, $locale)) {
 					$locale_found = true;
-					CWebUser::$data['locale'] = $locale;
 					break;
 				}
 			}
@@ -346,8 +345,8 @@ class ZBase {
 			// this will be unnecessary in PHP 5.5
 			setlocale(LC_CTYPE, $defaultLocales);
 
-			if (!$locale_found && CWebUser::$data['lang'] != 'en_GB' && CWebUser::$data['lang'] != 'en_gb') {
-				error('Locale for language "'.CWebUser::$data['lang'].'" is not found on the web server. Tried to set: '.implode(', ', $locales).'. Unable to translate Zabbix interface.');
+			if (!$locale_found && $user_data['lang'] != 'en_GB' && $user_data['lang'] != 'en_gb') {
+				error('Locale for language "'.$user_data['lang'].'" is not found on the web server. Tried to set: '.implode(', ', $locales).'. Unable to translate Zabbix interface.');
 			}
 			bindtextdomain('frontend', 'locale');
 			bind_textdomain_codeset('frontend', 'UTF-8');
@@ -365,14 +364,14 @@ class ZBase {
 	 * Authenticate user.
 	 */
 	protected function authenticateUser() {
-		$sessionId = CWebUser::checkAuthentication(CWebUser::getSessionCookie());
+		$sessionid = CWebUser::checkAuthentication(CWebUser::getSessionCookie());
 
-		if (!$sessionId) {
+		if (!$sessionid) {
 			CWebUser::setDefault();
 		}
 
 		// set the authentication token for the API
-		API::getWrapper()->auth = $sessionId;
+		API::getWrapper()->auth = $sessionid;
 
 		// enable debug mode in the API
 		API::getWrapper()->debug = CWebUser::getDebugMode();
@@ -380,12 +379,13 @@ class ZBase {
 
 	/**
 	 * Process request and generate response. Main entry for all processing.
+	 *
+	 * @param CRouter $rourer
 	 */
-	private function processRequest() {
-		$router = new CRouter(getRequest('action'));
-
+	private function processRequest(CRouter $router) {
 		$controller = $router->getController();
 
+		/** @var \CController $controller */
 		$controller = new $controller();
 		$controller->setAction($router->getAction());
 		$response = $controller->run();
@@ -393,16 +393,16 @@ class ZBase {
 		// Controller returned data
 		if ($response instanceof CControllerResponseData) {
 			// if no view defined we pass data directly to layout
-			if ($router->getView() === null) {
+			if ($router->getView() === null || !$response->isViewEnabled()) {
 				$layout = new CView($router->getLayout(), $response->getData());
 				echo $layout->getOutput();
 			}
 			else {
 				$view = new CView($router->getView(), $response->getData());
 				$data['page']['title'] = $response->getTitle();
+				$data['page']['file'] = $response->getFileName();
 				$data['controller']['action'] = $router->getAction();
 				$data['main_block'] = $view->getOutput();
-				$data['fullscreen'] = isset($_REQUEST['fullscreen']) && $_REQUEST['fullscreen'] == 1 ? 1 : 0;
 				$data['javascript']['files'] = $view->getAddedJS();
 				$data['javascript']['pre'] = $view->getIncludedJS();
 				$data['javascript']['post'] = $view->getPostJS();
@@ -432,17 +432,39 @@ class ZBase {
 		// Controller returned fatal error
 		else if ($response instanceof CControllerResponseFatal) {
 			header('Content-Type: text/html; charset=UTF-8');
+
+			global $ZBX_MESSAGES;
+			$messages = (isset($ZBX_MESSAGES) && $ZBX_MESSAGES) ? filter_messages($ZBX_MESSAGES) : [];
+			foreach ($messages as $message) {
+				$response->addMessage($message['message']);
+			}
+
 			$response->addMessage('Controller: '.$router->getAction());
 			ksort($_REQUEST);
 			foreach ($_REQUEST as $key => $value) {
 				// do not output SID
 				if ($key != 'sid') {
-					$response->addMessage($key.': '.$value);
+					$response->addMessage(is_scalar($value) ? $key.': '.$value : $key.': '.gettype($value));
 				}
 			}
 			CSession::setValue('messages', $response->getMessages());
 
 			redirect('zabbix.php?action=system.warning');
 		}
+	}
+
+	/**
+	 * Set layout to fullscreen or kiosk mode if URL contains 'fullscreen' and/or 'kiosk' arguments.
+	 */
+	private function setLayoutModeByUrl() {
+		if (array_key_exists('kiosk', $_GET) && $_GET['kiosk'] === '1') {
+			CView::setLayoutMode(ZBX_LAYOUT_KIOSKMODE);
+		}
+		elseif (array_key_exists('fullscreen', $_GET)) {
+			CView::setLayoutMode($_GET['fullscreen'] === '1' ? ZBX_LAYOUT_FULLSCREEN : ZBX_LAYOUT_NORMAL);
+		}
+
+		// Remove $_GET arguments to prevent CUrl from generating URL with 'fullscreen'/'kiosk' arguments.
+		unset($_GET['fullscreen'], $_GET['kiosk']);
 	}
 }

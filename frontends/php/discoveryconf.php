@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -34,10 +34,14 @@ $fields = [
 	'druleid' =>		[T_ZBX_INT, O_OPT, P_SYS,	DB_ID,		'isset({form}) && {form} == "update"'],
 	'name' =>			[T_ZBX_STR, O_OPT, null,	NOT_EMPTY,	'isset({add}) || isset({update})'],
 	'proxy_hostid' =>	[T_ZBX_INT, O_OPT, null,	DB_ID,		'isset({add}) || isset({update})'],
-	'iprange' =>		[T_ZBX_STR, O_OPT, null,	null,		'isset({add}) || isset({update})'],
-	'delay' =>			[T_ZBX_INT, O_OPT, null,	BETWEEN(1, SEC_PER_WEEK), 'isset({add}) || isset({update})'],
+	'iprange' =>		[T_ZBX_STR, O_OPT, P_CRLF,	null,		'isset({add}) || isset({update})'],
+	'delay' =>			[T_ZBX_TU, O_OPT, P_ALLOW_USER_MACRO, null, 'isset({add}) || isset({update})',
+		_('Update interval')
+	],
 	'status' =>			[T_ZBX_INT, O_OPT, null,	IN('0,1'),	null],
 	'uniqueness_criteria' => [T_ZBX_STR, O_OPT, null, null,	'isset({add}) || isset({update})', _('Device uniqueness criteria')],
+	'host_source' =>	[T_ZBX_STR, O_OPT, null,	null,	null],
+	'name_source' =>	[T_ZBX_STR, O_OPT, null,	null,	null],
 	'g_druleid' =>		[T_ZBX_INT, O_OPT, null,	DB_ID,		null],
 	'dchecks' =>		[null, O_OPT, null,		null,		null],
 	// actions
@@ -54,6 +58,11 @@ $fields = [
 	'output' =>			[T_ZBX_STR, O_OPT, P_ACT,	null,		null],
 	'ajaxaction' =>		[T_ZBX_STR, O_OPT, P_ACT,	null,		null],
 	'ajaxdata' =>		[T_ZBX_STR, O_OPT, P_ACT,	null,		null],
+	// filter
+	'filter_set' =>		[T_ZBX_STR, O_OPT, P_SYS,	null,		null],
+	'filter_rst' =>		[T_ZBX_STR, O_OPT, P_SYS,	null,		null],
+	'filter_name' =>	[T_ZBX_STR, O_OPT, null,	null,		null],
+	'filter_status' =>	[T_ZBX_INT, O_OPT, null,	IN([-1, DRULE_STATUS_ACTIVE, DRULE_STATUS_DISABLED]),		null],
 	// sort and sortorder
 	'sort' =>			[T_ZBX_STR, O_OPT, P_SYS, IN('"name"'),								null],
 	'sortorder' =>		[T_ZBX_STR, O_OPT, P_SYS, IN('"'.ZBX_SORT_DOWN.'","'.ZBX_SORT_UP.'"'),	null]
@@ -73,7 +82,7 @@ if (isset($_REQUEST['druleid'])) {
 		'selectDChecks' => [
 			'type', 'key_', 'snmp_community', 'ports', 'snmpv3_securityname', 'snmpv3_securitylevel',
 			'snmpv3_authpassphrase', 'snmpv3_privpassphrase', 'uniq', 'snmpv3_authprotocol', 'snmpv3_privprotocol',
-			'snmpv3_contextname'
+			'snmpv3_contextname', 'host_source', 'name_source'
 		],
 		'editable' => true
 	]);
@@ -221,6 +230,15 @@ elseif (hasRequest('action') && getRequest('action') == 'drule.massdelete' && ha
 	show_messages($result, _('Discovery rules deleted'), _('Cannot delete discovery rules'));
 }
 
+if (hasRequest('action') && hasRequest('g_druleid') && !$result) {
+	$drules = API::DRule()->get([
+		'output' => [],
+		'druleids' => getRequest('g_druleid'),
+		'editable' => true
+	]);
+	uncheckTableRows(null, zbx_objectValues($drules, 'druleid'));
+}
+
 /*
  * Display
  */
@@ -236,11 +254,25 @@ if (isset($_REQUEST['form'])) {
 	if (isset($data['druleid']) && !isset($_REQUEST['form_refresh'])) {
 		$data['drule'] = reset($dbDRule);
 		$data['drule']['uniqueness_criteria'] = -1;
+		$data['drule']['host_source'] = ZBX_DISCOVERY_DNS;
+		$data['drule']['name_source'] = ZBX_DISCOVERY_UNSPEC;
 
 		if (!empty($data['drule']['dchecks'])) {
+			$dcheck = reset($data['drule']['dchecks']);
+			$data['drule']['host_source'] = $dcheck['host_source'];
+			$data['drule']['name_source'] = $dcheck['name_source'];
+
 			foreach ($data['drule']['dchecks'] as $id => $dcheck) {
 				if ($dcheck['uniq']) {
 					$data['drule']['uniqueness_criteria'] = $dcheck['dcheckid'];
+				}
+
+				if ($dcheck['host_source'] == ZBX_DISCOVERY_VALUE) {
+					$data['drule']['host_source'] = '_'.$dcheck['dcheckid'];
+				}
+
+				if ($dcheck['name_source'] == ZBX_DISCOVERY_VALUE) {
+					$data['drule']['name_source'] = '_'.$dcheck['dcheckid'];
 				}
 			}
 		}
@@ -249,11 +281,13 @@ if (isset($_REQUEST['form'])) {
 		$data['drule']['proxy_hostid'] = getRequest('proxy_hostid', 0);
 		$data['drule']['name'] = getRequest('name', '');
 		$data['drule']['iprange'] = getRequest('iprange', '192.168.0.1-254');
-		$data['drule']['delay'] = getRequest('delay', SEC_PER_HOUR);
+		$data['drule']['delay'] = getRequest('delay', DB::getDefault('drules', 'delay'));
 		$data['drule']['status'] = getRequest('status', DRULE_STATUS_ACTIVE);
 		$data['drule']['dchecks'] = getRequest('dchecks', []);
 		$data['drule']['nextcheck'] = getRequest('nextcheck', 0);
 		$data['drule']['uniqueness_criteria'] = getRequest('uniqueness_criteria', -1);
+		$data['drule']['host_source'] = getRequest('host_source', ZBX_DISCOVERY_DNS);
+		$data['drule']['name_source'] = getRequest('name_source', ZBX_DISCOVERY_UNSPEC);
 	}
 
 	if (!empty($data['drule']['dchecks'])) {
@@ -286,17 +320,41 @@ else {
 	CProfile::update('web.'.$page['file'].'.sort', $sortField, PROFILE_TYPE_STR);
 	CProfile::update('web.'.$page['file'].'.sortorder', $sortOrder, PROFILE_TYPE_STR);
 
+	// filter
+	if (hasRequest('filter_set')) {
+		CProfile::update('web.discoveryconf.filter_name', getRequest('filter_name', ''), PROFILE_TYPE_STR);
+		CProfile::update('web.discoveryconf.filter_status', getRequest('filter_status', -1), PROFILE_TYPE_INT);
+	}
+	elseif (hasRequest('filter_rst')) {
+		CProfile::delete('web.discoveryconf.filter_name');
+		CProfile::delete('web.discoveryconf.filter_status');
+	}
+
+	$filter = [
+		'name' => CProfile::get('web.discoveryconf.filter_name', ''),
+		'status' => CProfile::get('web.discoveryconf.filter_status', -1)
+	];
+
 	$config = select_config();
 
 	$data = [
 		'sort' => $sortField,
-		'sortorder' => $sortOrder
+		'sortorder' => $sortOrder,
+		'filter' => $filter,
+		'profileIdx' => 'web.discoveryconf.filter',
+		'active_tab' => CProfile::get('web.discoveryconf.filter.active', 1)
 	];
 
 	// get drules
 	$data['drules'] = API::DRule()->get([
 		'output' => ['proxy_hostid', 'name', 'status', 'iprange', 'delay'],
 		'selectDChecks' => ['type'],
+		'search' => [
+			'name' => ($filter['name'] === '') ? null : $filter['name']
+		],
+		'filter' => [
+			'status' => ($filter['status'] == -1) ? null : $filter['status']
+		],
 		'editable' => true,
 		'sortfield' => $sortField,
 		'limit' => $config['search_limit'] + 1
@@ -304,7 +362,6 @@ else {
 
 	if ($data['drules']) {
 		foreach ($data['drules'] as $key => $drule) {
-			// checks
 			$checks = [];
 
 			foreach ($drule['dchecks'] as $check) {
@@ -315,14 +372,9 @@ else {
 
 			$data['drules'][$key]['checks'] = $checks;
 
-			// description
-			$data['drules'][$key]['description'] = [];
-
-			if ($drule['proxy_hostid']) {
-				$proxy = get_host_by_hostid($drule['proxy_hostid']);
-
-				array_push($data['drules'][$key]['description'], $proxy['host'].NAME_DELIMITER);
-			}
+			$data['drules'][$key]['proxy'] = ($drule['proxy_hostid'] != 0)
+				? get_host_by_hostid($drule['proxy_hostid'])['host']
+				: '';
 		}
 
 		order_result($data['drules'], $sortField, $sortOrder);

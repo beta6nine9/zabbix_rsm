@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -21,8 +21,6 @@
 
 /**
  * Class containing methods for operations with discovery services.
- *
- * @package API
  */
 class CDService extends CApiService {
 
@@ -59,7 +57,6 @@ class CDService extends CApiService {
 	 */
 	public function get($options = []) {
 		$result = [];
-		$userType = self::$userData['type'];
 
 		$sqlParts = [
 			'select'	=> ['dservices' => 'ds.dserviceid'],
@@ -75,23 +72,23 @@ class CDService extends CApiService {
 			'dhostids'					=> null,
 			'dcheckids'					=> null,
 			'druleids'					=> null,
-			'editable'					=> null,
+			'editable'					=> false,
 			'nopermissions'				=> null,
 			// filter
 			'filter'					=> null,
 			'search'					=> null,
 			'searchByAny'				=> null,
-			'startSearch'				=> null,
-			'excludeSearch'				=> null,
+			'startSearch'				=> false,
+			'excludeSearch'				=> false,
 			'searchWildcardsEnabled'	=> null,
 			// output
 			'output'					=> API_OUTPUT_EXTEND,
 			'selectDRules'				=> null,
 			'selectDHosts'				=> null,
 			'selectHosts'				=> null,
-			'countOutput'				=> null,
-			'groupCount'				=> null,
-			'preservekeys'				=> null,
+			'countOutput'				=> false,
+			'groupCount'				=> false,
+			'preservekeys'				=> false,
 			'sortfield'					=> '',
 			'sortorder'					=> '',
 			'limit'						=> null,
@@ -99,12 +96,7 @@ class CDService extends CApiService {
 		];
 		$options = zbx_array_merge($defOptions, $options);
 
-// editable + PERMISSION CHECK
-		if (USER_TYPE_SUPER_ADMIN == $userType) {
-		}
-		elseif (is_null($options['editable']) && (self::$userData['type'] == USER_TYPE_ZABBIX_ADMIN)) {
-		}
-		elseif (!is_null($options['editable']) && (self::$userData['type']!=USER_TYPE_SUPER_ADMIN)) {
+		if (self::$userData['type'] < USER_TYPE_ZABBIX_ADMIN) {
 			return [];
 		}
 
@@ -120,7 +112,7 @@ class CDService extends CApiService {
 
 			$sqlParts['where'][] = dbConditionInt('ds.dhostid', $options['dhostids']);
 
-			if (!is_null($options['groupCount'])) {
+			if ($options['groupCount']) {
 				$sqlParts['group']['dhostid'] = 'ds.dhostid';
 			}
 		}
@@ -129,15 +121,10 @@ class CDService extends CApiService {
 		if (!is_null($options['dcheckids'])) {
 			zbx_value2array($options['dcheckids']);
 
-			$sqlParts['from']['dhosts'] = 'dhosts dh';
-			$sqlParts['from']['dchecks'] = 'dchecks dc';
+			$sqlParts['where'][] = dbConditionInt('ds.dcheckid', $options['dcheckids']);
 
-			$sqlParts['where'][] = dbConditionInt('dc.dcheckid', $options['dcheckids']);
-			$sqlParts['where']['dhds'] = 'dh.dhostid=ds.dhostid';
-			$sqlParts['where']['dcdh'] = 'dc.druleid=dh.druleid';
-
-			if (!is_null($options['groupCount'])) {
-				$sqlParts['group']['dcheckid'] = 'dc.dcheckid';
+			if ($options['groupCount']) {
+				$sqlParts['group']['dcheckid'] = 'ds.dcheckid';
 			}
 		}
 
@@ -150,7 +137,7 @@ class CDService extends CApiService {
 			$sqlParts['where']['druleid'] = dbConditionInt('dh.druleid', $options['druleids']);
 			$sqlParts['where']['dhds'] = 'dh.dhostid=ds.dhostid';
 
-			if (!is_null($options['groupCount'])) {
+			if ($options['groupCount']) {
 				$sqlParts['group']['druleid'] = 'dh.druleid';
 			}
 		}
@@ -175,18 +162,20 @@ class CDService extends CApiService {
 		$sqlParts = $this->applyQuerySortOptions($this->tableName(), $this->tableAlias(), $options, $sqlParts);
 		$res = DBselect($this->createSelectQueryFromParts($sqlParts), $sqlParts['limit']);
 		while ($dservice = DBfetch($res)) {
-			if (!is_null($options['countOutput'])) {
-				if (!is_null($options['groupCount']))
+			if ($options['countOutput']) {
+				if ($options['groupCount']) {
 					$result[] = $dservice;
-				else
+				}
+				else {
 					$result = $dservice['rowscount'];
+				}
 			}
 			else {
 				$result[$dservice['dserviceid']] = $dservice;
 			}
 		}
 
-		if (!is_null($options['countOutput'])) {
+		if ($options['countOutput']) {
 			return $result;
 		}
 
@@ -195,18 +184,18 @@ class CDService extends CApiService {
 			$result = $this->unsetExtraFields($result, ['dhostid'], $options['output']);
 		}
 
-// removing keys (hash -> array)
-		if (is_null($options['preservekeys'])) {
+		// removing keys (hash -> array)
+		if (!$options['preservekeys']) {
 			$result = zbx_cleanHashes($result);
 		}
 
-	return $result;
+		return $result;
 	}
 
 	protected function applyQueryOutputOptions($tableName, $tableAlias, array $options, array $sqlParts) {
 		$sqlParts = parent::applyQueryOutputOptions($tableName, $tableAlias, $options, $sqlParts);
 
-		if ($options['countOutput'] === null) {
+		if (!$options['countOutput']) {
 			if ($options['selectDHosts'] !== null) {
 				$sqlParts = $this->addQuerySelect('ds.dhostid', $sqlParts);
 			}
@@ -260,43 +249,52 @@ class CDService extends CApiService {
 		}
 
 		// selectHosts
-		if (!is_null($options['selectHosts'])) {
-			if ($options['selectHosts'] != API_OUTPUT_COUNT) {
-				$relationMap = new CRelationMap();
-				// discovered items
-				$dbRules = DBselect(
-					'SELECT ds.dserviceid,i.hostid'.
-						' FROM dservices ds,interface i'.
-						' WHERE '.dbConditionInt('ds.dserviceid', $dserviceIds).
-						' AND ds.ip=i.ip'
-				);
-				while ($rule = DBfetch($dbRules)) {
-					$relationMap->addRelation($rule['dserviceid'], $rule['hostid']);
-				}
-
-				$hosts = API::Host()->get([
-					'output' => $options['selectHosts'],
-					'hostids' => $relationMap->getRelatedIds(),
-					'preservekeys' => true,
-					'sortfield' => 'status'
-				]);
-				if (!is_null($options['limitSelects'])) {
-					order_result($hosts, 'hostid');
-				}
-				$result = $relationMap->mapMany($result, $hosts, 'hosts', $options['limitSelects']);
+		if ($options['selectHosts'] !== null) {
+			foreach ($result as $dserviceid => $dservice) {
+				$result[$dserviceid]['hosts'] = ($options['selectHosts'] == API_OUTPUT_COUNT) ? 0 : [];
 			}
-			else {
-				$hosts = API::Host()->get([
-					'dserviceids' => $dserviceIds,
-					'countOutput' => true,
-					'groupCount' => true
-				]);
-				$hosts = zbx_toHash($hosts, 'hostid');
+
+			$db_services = DBselect(
+				'SELECT DISTINCT ds.dserviceid,h.hostid'.
+				' FROM dservices ds,dchecks dc,drules dr,hosts h,interface i'.
+				' WHERE ds.dcheckid=dc.dcheckid'.
+					' AND dc.druleid=dr.druleid'.
+					' AND (dr.proxy_hostid=h.proxy_hostid OR (dr.proxy_hostid IS NULL AND h.proxy_hostid IS NULL))'.
+					' AND h.hostid=i.hostid'.
+					' AND ds.ip=i.ip'.
+					' AND '.dbConditionInt('ds.dserviceid', $dserviceIds)
+			);
+
+			$host_services = [];
+
+			while ($db_service = DBfetch($db_services)) {
+				$host_services[$db_service['hostid']][] = $db_service['dserviceid'];
+			}
+
+			$db_hosts = API::Host()->get([
+				'output' => ($options['selectHosts'] == API_OUTPUT_COUNT) ? [] : $options['selectHosts'],
+				'hostids' => array_keys($host_services),
+				'sortfield' => 'hostid',
+				'preservekeys' => true
+			]);
+
+			$db_hosts = $this->unsetExtraFields($db_hosts, ['hostid'], $options['selectHosts']);
+
+			foreach ($db_hosts as $hostid => $db_host) {
+				foreach ($host_services[$hostid] as $dserviceid) {
+					if ($options['selectHosts'] == API_OUTPUT_COUNT) {
+						$result[$dserviceid]['hosts']++;
+					}
+					elseif ($options['limitSelects'] === null
+							|| count($result[$dserviceid]['hosts']) < $options['limitSelects']) {
+						$result[$dserviceid]['hosts'][] = $db_host;
+					}
+				}
+			}
+
+			if ($options['selectHosts'] == API_OUTPUT_COUNT) {
 				foreach ($result as $dserviceid => $dservice) {
-					if (isset($hosts[$dserviceid]))
-						$result[$dserviceid]['hosts'] = $hosts[$dserviceid]['rowscount'];
-					else
-						$result[$dserviceid]['hosts'] = 0;
+					$result[$dserviceid]['hosts'] = (string) $dservice['hosts'];
 				}
 			}
 		}

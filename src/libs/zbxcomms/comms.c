@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -21,22 +21,29 @@
 #include "comms.h"
 #include "log.h"
 #include "../zbxcrypto/tls_tcp.h"
+#include "zbxcompress.h"
 
-#if defined(HAVE_IPV6)
-#	define ZBX_SOCKADDR struct sockaddr_storage
-#else
-#	define ZBX_SOCKADDR struct sockaddr_in
+#ifdef _WINDOWS
+#	ifndef _WIN32_WINNT_WIN7
+#		define _WIN32_WINNT_WIN7		0x0601	/* allow compilation on older Windows systems */
+#	endif
+#	ifndef WSA_FLAG_NO_HANDLE_INHERIT
+#		define WSA_FLAG_NO_HANDLE_INHERIT	0x80	/* allow compilation on older Windows systems */
+#	endif
 #endif
 
-#if !defined(ZBX_SOCKLEN_T)
+#define IPV4_MAX_CIDR_PREFIX	32	/* max number of bits in IPv4 CIDR prefix */
+#define IPV6_MAX_CIDR_PREFIX	128	/* max number of bits in IPv6 CIDR prefix */
+
+#ifndef ZBX_SOCKLEN_T
 #	define ZBX_SOCKLEN_T socklen_t
 #endif
 
-#if !defined(SOCK_CLOEXEC)
+#ifndef SOCK_CLOEXEC
 #	define SOCK_CLOEXEC 0	/* SOCK_CLOEXEC is Linux-specific, available since 2.6.23 */
 #endif
 
-#if defined(HAVE_OPENSSL)
+#ifdef HAVE_OPENSSL
 extern ZBX_THREAD_LOCAL char	info_buf[256];
 #endif
 
@@ -64,12 +71,8 @@ const char	*zbx_socket_strerror(void)
 	return zbx_socket_strerror_message;
 }
 
-#ifdef HAVE___VA_ARGS__
-#	define zbx_set_socket_strerror(fmt, ...) __zbx_zbx_set_socket_strerror(ZBX_CONST_STRING(fmt), ##__VA_ARGS__)
-#else
-#	define zbx_set_socket_strerror __zbx_zbx_set_socket_strerror
-#endif
-static void	__zbx_zbx_set_socket_strerror(const char *fmt, ...)
+__zbx_attr_format_printf(1, 2)
+static void	zbx_set_socket_strerror(const char *fmt, ...)
 {
 	va_list args;
 
@@ -80,40 +83,49 @@ static void	__zbx_zbx_set_socket_strerror(const char *fmt, ...)
 	va_end(args);
 }
 
-static char	*zbx_get_ip_by_socket(zbx_socket_t *s)
+/******************************************************************************
+ *                                                                            *
+ * Function: zbx_socket_peer_ip_save                                          *
+ *                                                                            *
+ * Purpose: get peer IP address info from a socket early while it is          *
+ *          connected. Connection can be terminated due to various errors at  *
+ *          any time and peer IP address will not be available anymore.       *
+ *                                                                            *
+ * Return value: SUCCEED or FAIL                                              *
+ *                                                                            *
+ ******************************************************************************/
+static int	zbx_socket_peer_ip_save(zbx_socket_t *s)
 {
-	ZBX_SOCKADDR			sa;
-	ZBX_SOCKLEN_T			sz = sizeof(sa);
-	ZBX_THREAD_LOCAL static char	host[64];
-	char				*error_message = NULL;
+	ZBX_SOCKADDR	sa;
+	ZBX_SOCKLEN_T	sz = sizeof(sa);
+	char		*error_message = NULL;
 
 	if (ZBX_PROTO_ERROR == getpeername(s->socket, (struct sockaddr *)&sa, &sz))
 	{
 		error_message = strerror_from_system(zbx_socket_last_error());
 		zbx_set_socket_strerror("connection rejected, getpeername() failed: %s", error_message);
-		goto out;
+		return FAIL;
 	}
 
-#if defined(HAVE_IPV6)
-	if (0 != zbx_getnameinfo((struct sockaddr *)&sa, host, sizeof(host), NULL, 0, NI_NUMERICHOST))
+	/* store getpeername() result to have IP address in numerical form for security check */
+	memcpy(&s->peer_info, &sa, (size_t)sz);
+
+	/* store IP address as a text string for error reporting */
+
+#ifdef HAVE_IPV6
+	if (0 != zbx_getnameinfo((struct sockaddr *)&sa, s->peer, sizeof(s->peer), NULL, 0, NI_NUMERICHOST))
 	{
 		error_message = strerror_from_system(zbx_socket_last_error());
 		zbx_set_socket_strerror("connection rejected, getnameinfo() failed: %s", error_message);
+		return FAIL;
 	}
 #else
-	zbx_snprintf(host, sizeof(host), "%s", inet_ntoa(sa.sin_addr));
+	strscpy(s->peer, inet_ntoa(sa.sin_addr));
 #endif
-out:
-	if (NULL != error_message)
-	{
-		zabbix_log(LOG_LEVEL_WARNING, "Cannot get socket IP address: %s", error_message);
-		strscpy(host, "unknown IP");
-	}
-
-	return host;
+	return SUCCEED;
 }
 
-#if !defined(_WINDOWS)
+#ifndef _WINDOWS
 /******************************************************************************
  *                                                                            *
  * Function: zbx_gethost_by_ip                                                *
@@ -123,7 +135,7 @@ out:
  * Author: Alexei Vladishev                                                   *
  *                                                                            *
  ******************************************************************************/
-#if defined(HAVE_IPV6)
+#ifdef HAVE_IPV6
 void	zbx_gethost_by_ip(const char *ip, char *host, size_t hostlen)
 {
 	struct addrinfo	hints, *ai = NULL;
@@ -171,7 +183,98 @@ void	zbx_gethost_by_ip(const char *ip, char *host, size_t hostlen)
 	zbx_strlcpy(host, hst->h_name, hostlen);
 }
 #endif	/* HAVE_IPV6 */
+
+/******************************************************************************
+ *                                                                            *
+ * Function: zbx_getip_by_host                                                *
+ *                                                                            *
+ * Purpose: retrieve IP addres by host name                                   *
+ *                                                                            *
+ ******************************************************************************/
+#ifdef HAVE_IPV6
+void	zbx_getip_by_host(const char *host, char *ip, size_t iplen)
+{
+	struct addrinfo	hints, *ai = NULL;
+
+	assert(ip);
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = PF_UNSPEC;
+
+	if (0 != getaddrinfo(host, NULL, &hints, &ai))
+	{
+		ip[0] = '\0';
+		return;
+	}
+
+	switch(ai->ai_addr->sa_family) {
+		case AF_INET:
+			inet_ntop(AF_INET, &(((struct sockaddr_in *)ai->ai_addr)->sin_addr), ip, iplen);
+			break;
+		case AF_INET6:
+			inet_ntop(AF_INET6, &(((struct sockaddr_in *)ai->ai_addr)->sin_addr), ip, iplen);
+			break;
+		default:
+			ip[0] = '\0';
+			return;
+	}
+}
+#else
+void	zbx_getip_by_host(const char *host, char *ip, size_t iplen)
+{
+	struct in_addr	*addr;
+	struct hostent  *hst;
+
+	assert(host);
+
+	if (NULL == (hst = gethostbyname(host)))
+	{
+		ip[0] = '\0';
+		return;
+	}
+
+	addr = (struct in_addr *)hst->h_addr_list[0];
+
+	zbx_strlcpy(ip , inet_ntoa(*addr),iplen);
+}
+#endif	/* HAVE_IPV6 */
+
+
 #endif	/* _WINDOWS */
+
+#ifdef _WINDOWS
+/******************************************************************************
+ *                                                                            *
+ * Function: zbx_is_win_ver_or_greater                                        *
+ *                                                                            *
+ * Purpose: check Windows version                                             *
+ *                                                                            *
+ * Parameters: major    - [IN] major windows version                          *
+ *             minor    - [IN] minor windows version                          *
+ *             servpack - [IN] service pack version                           *
+ *                                                                            *
+ * Return value: SUCCEED - Windows version matches input parameters           *
+ *                         or greater                                         *
+ *               FAIL    - Windows version is older                           *
+ *                                                                            *
+ * Comments: This is reimplementation of IsWindowsVersionOrGreater() from     *
+ *           Version Helper API. We need it because the original function is  *
+ *           only available in newer Windows toolchains (VS2013+)             *
+ *                                                                            *
+ ******************************************************************************/
+static int zbx_is_win_ver_or_greater(zbx_uint32_t major, zbx_uint32_t minor, zbx_uint32_t servpack)
+{
+	OSVERSIONINFOEXW vi = { sizeof(vi), major, minor, 0, 0, { 0 }, servpack, 0 };
+
+	/* no need to test for an error, check VersionHelpers.h and usage examples */
+
+	return VerifyVersionInfoW(&vi, VER_MAJORVERSION | VER_MINORVERSION | VER_SERVICEPACKMAJOR,
+			VerSetConditionMask(VerSetConditionMask(VerSetConditionMask(0,
+			VER_MAJORVERSION, VER_GREATER_EQUAL),
+			VER_MINORVERSION, VER_GREATER_EQUAL),
+			VER_SERVICEPACKMAJOR, VER_GREATER_EQUAL)) ? SUCCEED : FAIL;
+}
+#endif
 
 /******************************************************************************
  *                                                                            *
@@ -179,33 +282,27 @@ void	zbx_gethost_by_ip(const char *ip, char *host, size_t hostlen)
  *                                                                            *
  * Purpose: Initialize Windows Sockets APIs                                   *
  *                                                                            *
+ * Parameters: error - [OUT] the error message                                *
+ *                                                                            *
  * Return value: SUCCEED or FAIL - an error occurred                          *
  *                                                                            *
  * Author: Eugene Grigorjev                                                   *
  *                                                                            *
  ******************************************************************************/
-#if defined(_WINDOWS)
-
-#define ZBX_SOCKET_START()	if (FAIL == socket_started) socket_started = zbx_socket_start()
-
-int	socket_started = FAIL;	/* winXX threads require socket_started not to be static */
-
-static int	zbx_socket_start()
+#ifdef _WINDOWS
+int	zbx_socket_start(char **error)
 {
 	WSADATA	sockInfo;
 	int	ret;
 
 	if (0 != (ret = WSAStartup(MAKEWORD(2, 2), &sockInfo)))
 	{
-		zabbix_log(LOG_LEVEL_WARNING, "WSAStartup() failed: %s", strerror_from_system(ret));
+		*error = zbx_dsprintf(*error, "Cannot initialize Winsock DLL: %s", strerror_from_system(ret));
 		return FAIL;
 	}
 
 	return SUCCEED;
 }
-
-#else
-#	define ZBX_SOCKET_START()
 #endif
 
 /******************************************************************************
@@ -254,7 +351,7 @@ static void	zbx_socket_free(zbx_socket_t *s)
 static void	zbx_socket_timeout_set(zbx_socket_t *s, int timeout)
 {
 	s->timeout = timeout;
-#if defined(_WINDOWS)
+#ifdef _WINDOWS
 	timeout *= 1000;
 
 	if (ZBX_PROTO_ERROR == setsockopt(s->socket, SOL_SOCKET, SO_RCVTIMEO, (const char *)&timeout, sizeof(timeout)))
@@ -286,7 +383,7 @@ static void	zbx_socket_timeout_set(zbx_socket_t *s, int timeout)
  ******************************************************************************/
 static void	zbx_socket_timeout_cleanup(zbx_socket_t *s)
 {
-#if !defined(_WINDOWS)
+#ifndef _WINDOWS
 	if (0 != s->timeout)
 	{
 		zbx_alarm_off();
@@ -319,7 +416,7 @@ static void	zbx_socket_timeout_cleanup(zbx_socket_t *s)
 static int	zbx_socket_connect(zbx_socket_t *s, const struct sockaddr *addr, socklen_t addrlen, int timeout,
 		char **error)
 {
-#if defined(_WINDOWS)
+#ifdef _WINDOWS
 	u_long		mode = 1;
 	FD_SET		fdw, fde;
 	int		res;
@@ -328,7 +425,7 @@ static int	zbx_socket_connect(zbx_socket_t *s, const struct sockaddr *addr, sock
 	if (0 != timeout)
 		zbx_socket_timeout_set(s, timeout);
 
-#if defined(_WINDOWS)
+#ifdef _WINDOWS
 	if (0 != ioctlsocket(s->socket, FIONBIO, &mode))
 	{
 		*error = zbx_strdup(*error, strerror_from_system(zbx_socket_last_error()));
@@ -421,9 +518,9 @@ static int	zbx_socket_connect(zbx_socket_t *s, const struct sockaddr *addr, sock
  * Author: Alexei Vladishev                                                   *
  *                                                                            *
  ******************************************************************************/
-#if defined(HAVE_IPV6)
+#ifdef HAVE_IPV6
 static int	zbx_socket_create(zbx_socket_t *s, int type, const char *source_ip, const char *ip, unsigned short port,
-		int timeout, unsigned int tls_connect, char *tls_arg1, char *tls_arg2)
+		int timeout, unsigned int tls_connect, const char *tls_arg1, const char *tls_arg2)
 {
 	int		ret = FAIL;
 	struct addrinfo	*ai = NULL, hints;
@@ -449,8 +546,6 @@ static int	zbx_socket_create(zbx_socket_t *s, int type, const char *source_ip, c
 		return FAIL;
 	}
 #endif
-	ZBX_SOCKET_START();
-
 	zbx_socket_clean(s);
 
 	zbx_snprintf(service, sizeof(service), "%hu", port);
@@ -491,7 +586,7 @@ static int	zbx_socket_create(zbx_socket_t *s, int type, const char *source_ip, c
 			goto out;
 		}
 
-		if (ZBX_PROTO_ERROR == bind(s->socket, ai_bind->ai_addr, ai_bind->ai_addrlen))
+		if (ZBX_PROTO_ERROR == zbx_bind(s->socket, ai_bind->ai_addr, ai_bind->ai_addrlen))
 		{
 			zbx_set_socket_strerror("bind() failed: %s", strerror_from_system(zbx_socket_last_error()));
 			func_socket_close(s);
@@ -499,7 +594,7 @@ static int	zbx_socket_create(zbx_socket_t *s, int type, const char *source_ip, c
 		}
 	}
 
-	if (SUCCEED != zbx_socket_connect(s, ai->ai_addr, ai->ai_addrlen, timeout, &error))
+	if (SUCCEED != zbx_socket_connect(s, ai->ai_addr, (socklen_t)ai->ai_addrlen, timeout, &error))
 	{
 		func_socket_close(s);
 		zbx_set_socket_strerror("cannot connect to [[%s]:%hu]: %s", ip, port, error);
@@ -516,6 +611,9 @@ static int	zbx_socket_create(zbx_socket_t *s, int type, const char *source_ip, c
 		zbx_free(error);
 		goto out;
 	}
+#else
+	ZBX_UNUSED(tls_arg1);
+	ZBX_UNUSED(tls_arg2);
 #endif
 	zbx_strlcpy(s->peer, ip, sizeof(s->peer));
 
@@ -531,7 +629,7 @@ out:
 }
 #else
 static int	zbx_socket_create(zbx_socket_t *s, int type, const char *source_ip, const char *ip, unsigned short port,
-		int timeout, unsigned int tls_connect, char *tls_arg1, char *tls_arg2)
+		int timeout, unsigned int tls_connect, const char *tls_arg1, const char *tls_arg2)
 {
 	ZBX_SOCKADDR	servaddr_in;
 	struct hostent	*hp;
@@ -556,21 +654,21 @@ static int	zbx_socket_create(zbx_socket_t *s, int type, const char *source_ip, c
 		return FAIL;
 	}
 #endif
-	ZBX_SOCKET_START();
-
 	zbx_socket_clean(s);
 
 	if (NULL == (hp = gethostbyname(ip)))
 	{
-#if defined(_WINDOWS)
+#ifdef _WINDOWS
 		zbx_set_socket_strerror("gethostbyname() failed for '%s': %s",
 				ip, strerror_from_system(WSAGetLastError()));
-#elif defined(HAVE_HSTRERROR)
+#else
+#ifdef HAVE_HSTRERROR
 		zbx_set_socket_strerror("gethostbyname() failed for '%s': [%d] %s",
 				ip, h_errno, hstrerror(h_errno));
 #else
 		zbx_set_socket_strerror("gethostbyname() failed for '%s': [%d]",
 				ip, h_errno);
+#endif
 #endif
 		return FAIL;
 	}
@@ -626,6 +724,9 @@ static int	zbx_socket_create(zbx_socket_t *s, int type, const char *source_ip, c
 		zbx_free(error);
 		return FAIL;
 	}
+#else
+	ZBX_UNUSED(tls_arg1);
+	ZBX_UNUSED(tls_arg2);
 #endif
 	zbx_strlcpy(s->peer, ip, sizeof(s->peer));
 
@@ -634,7 +735,7 @@ static int	zbx_socket_create(zbx_socket_t *s, int type, const char *source_ip, c
 #endif	/* HAVE_IPV6 */
 
 int	zbx_tcp_connect(zbx_socket_t *s, const char *source_ip, const char *ip, unsigned short port, int timeout,
-		unsigned int tls_connect, char *tls_arg1, char *tls_arg2)
+		unsigned int tls_connect, const char *tls_arg1, const char *tls_arg2)
 {
 	if (ZBX_TCP_SEC_UNENCRYPTED != tls_connect && ZBX_TCP_SEC_TLS_CERT != tls_connect &&
 			ZBX_TCP_SEC_TLS_PSK != tls_connect)
@@ -653,7 +754,7 @@ static ssize_t	zbx_tcp_write(zbx_socket_t *s, const char *buf, size_t len)
 #if defined(HAVE_POLARSSL) || defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
 	char	*error = NULL;
 #endif
-#if defined(_WINDOWS)
+#ifdef _WINDOWS
 	double	sec;
 #endif
 #if defined(HAVE_POLARSSL) || defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
@@ -668,14 +769,14 @@ static ssize_t	zbx_tcp_write(zbx_socket_t *s, const char *buf, size_t len)
 		return res;
 	}
 #endif
-#if defined(_WINDOWS)
+#ifdef _WINDOWS
 	zbx_alarm_flag_clear();
 	sec = zbx_time();
 #endif
 	do
 	{
 		res = ZBX_TCP_WRITE(s->socket, buf, len);
-#if defined(_WINDOWS)
+#ifdef _WINDOWS
 		if (s->timeout < zbx_time() - sec)
 			zbx_alarm_flag_set();
 #endif
@@ -717,18 +818,17 @@ static ssize_t	zbx_tcp_write(zbx_socket_t *s, const char *buf, size_t len)
  ******************************************************************************/
 
 #define ZBX_TCP_HEADER_DATA	"ZBXD"
-#define ZBX_TCP_HEADER_VERSION	"\1"
-#define ZBX_TCP_HEADER		ZBX_TCP_HEADER_DATA ZBX_TCP_HEADER_VERSION
-#define ZBX_TCP_HEADER_LEN	5
+#define ZBX_TCP_HEADER_LEN	ZBX_CONST_STRLEN(ZBX_TCP_HEADER_DATA)
 
 int	zbx_tcp_send_ext(zbx_socket_t *s, const char *data, size_t len, unsigned char flags, int timeout)
 {
 #define ZBX_TLS_MAX_REC_LEN	16384
 
-	zbx_uint64_t	len64_le;
-	ssize_t		bytes_sent = 0, written = 0;
-	size_t		send_bytes;
+	ssize_t		bytes_sent, written = 0;
+	size_t		send_bytes, offset, send_len = len, reserved = 0;
 	int		ret = SUCCEED;
+	char		*compressed_data = NULL;
+	zbx_uint32_t	len32_le;
 
 	if (0 != timeout)
 		zbx_socket_timeout_set(s, timeout);
@@ -740,15 +840,36 @@ int	zbx_tcp_send_ext(zbx_socket_t *s, const char *data, size_t len, unsigned cha
 								/* will be short-lived in CPU cache. Static buffer is */
 								/* not used on purpose.				      */
 
-		memcpy(header_buf, ZBX_TCP_HEADER, (size_t)ZBX_TCP_HEADER_LEN);
+		if (0 != (flags & ZBX_TCP_COMPRESS))
+		{
+			if (SUCCEED != zbx_compress(data, len, &compressed_data, &send_len))
+			{
+				zbx_set_socket_strerror("cannot compress data: %s", zbx_compress_strerror());
+				ret = FAIL;
+				goto cleanup;
+			}
 
-		len64_le = zbx_htole_uint64((zbx_uint64_t)len);
-		memcpy(header_buf + ZBX_TCP_HEADER_LEN, &len64_le, sizeof(len64_le));
+			data = compressed_data;
+			reserved = len;
+		}
 
-		take_bytes = MIN(len, ZBX_TLS_MAX_REC_LEN - ZBX_TCP_HEADER_LEN - sizeof(len64_le));
-		memcpy(header_buf + ZBX_TCP_HEADER_LEN + sizeof(len64_le), data, take_bytes);
+		memcpy(header_buf, ZBX_TCP_HEADER_DATA, ZBX_CONST_STRLEN(ZBX_TCP_HEADER_DATA));
+		offset = ZBX_CONST_STRLEN(ZBX_TCP_HEADER_DATA);
 
-		send_bytes = ZBX_TCP_HEADER_LEN + sizeof(len64_le) + take_bytes;
+		header_buf[offset++] = flags;
+
+		len32_le = zbx_htole_uint32((zbx_uint32_t)send_len);
+		memcpy(header_buf + offset, &len32_le, sizeof(len32_le));
+		offset += sizeof(len32_le);
+
+		len32_le = zbx_htole_uint32((zbx_uint32_t)reserved);
+		memcpy(header_buf + offset, &len32_le, sizeof(len32_le));
+		offset += sizeof(len32_le);
+
+		take_bytes = MIN(send_len, ZBX_TLS_MAX_REC_LEN - offset);
+		memcpy(header_buf + offset, data, take_bytes);
+
+		send_bytes = offset + take_bytes;
 
 		while (written < (ssize_t)send_bytes)
 		{
@@ -761,15 +882,15 @@ int	zbx_tcp_send_ext(zbx_socket_t *s, const char *data, size_t len, unsigned cha
 			written += bytes_sent;
 		}
 
-		written -= ZBX_TCP_HEADER_LEN + (ssize_t)sizeof(len64_le);
+		written -= offset;
 	}
 
-	while (written < (ssize_t)len)
+	while (written < (ssize_t)send_len)
 	{
 		if (ZBX_TCP_SEC_UNENCRYPTED == s->connection_type)
-			send_bytes = len - (size_t)written;
+			send_bytes = send_len - (size_t)written;
 		else
-			send_bytes = MIN(ZBX_TLS_MAX_REC_LEN, len - (size_t)written);
+			send_bytes = MIN(ZBX_TLS_MAX_REC_LEN, send_len - (size_t)written);
 
 		if (ZBX_PROTO_ERROR == (bytes_sent = zbx_tcp_write(s, data + written, send_bytes)))
 		{
@@ -779,6 +900,8 @@ int	zbx_tcp_send_ext(zbx_socket_t *s, const char *data, size_t len, unsigned cha
 		written += bytes_sent;
 	}
 cleanup:
+	zbx_free(compressed_data);
+
 	if (0 != timeout)
 		zbx_socket_timeout_cleanup(s);
 
@@ -869,14 +992,24 @@ out:
  * Author: Alexei Vladishev, Aleksandrs Saveljevs                             *
  *                                                                            *
  ******************************************************************************/
-#if defined(HAVE_IPV6)
+#ifdef HAVE_IPV6
 int	zbx_tcp_listen(zbx_socket_t *s, const char *listen_ip, unsigned short listen_port)
 {
 	struct addrinfo	hints, *ai = NULL, *current_ai;
 	char		port[8], *ip, *ips, *delim;
 	int		i, err, on, ret = FAIL;
+#ifdef _WINDOWS
+	/* WSASocket() option to prevent inheritance is available on */
+	/* Windows Server 2008 R2 SP1 or newer and on Windows 7 SP1 or newer */
+	static int	no_inherit_wsapi = -1;
 
-	ZBX_SOCKET_START();
+	if (-1 == no_inherit_wsapi)
+	{
+		/* Both Windows 7 and Windows 2008 R2 are 0x0601 */
+		no_inherit_wsapi = zbx_is_win_ver_or_greater((_WIN32_WINNT_WIN7 >> 8) & 0xff,
+				_WIN32_WINNT_WIN7 & 0xff, 1) == SUCCEED;
+	}
+#endif
 
 	zbx_socket_clean(s);
 
@@ -913,15 +1046,27 @@ int	zbx_tcp_listen(zbx_socket_t *s, const char *listen_ip, unsigned short listen
 			if (PF_INET != current_ai->ai_family && PF_INET6 != current_ai->ai_family)
 				continue;
 
+#ifdef _WINDOWS
+			/* WSA_FLAG_NO_HANDLE_INHERIT prevents socket inheritance if we call CreateProcess() */
+			/* later on. If it's not available we still try to avoid inheritance by calling  */
+			/* SetHandleInformation() below. WSA_FLAG_OVERLAPPED is not mandatory but strongly */
+			/* recommended for every socket */
+			s->sockets[s->num_socks] = WSASocket(current_ai->ai_family, current_ai->ai_socktype,
+					current_ai->ai_protocol, NULL, 0,
+					(0 != no_inherit_wsapi ? WSA_FLAG_NO_HANDLE_INHERIT : 0) |
+					WSA_FLAG_OVERLAPPED);
+			if (ZBX_SOCKET_ERROR == s->sockets[s->num_socks])
+			{
+				zbx_set_socket_strerror("WSASocket() for [[%s]:%s] failed: %s",
+						ip ? ip : "-", port, strerror_from_system(zbx_socket_last_error()));
+				if (WSAEAFNOSUPPORT == zbx_socket_last_error())
+#else
 			if (ZBX_SOCKET_ERROR == (s->sockets[s->num_socks] =
 					socket(current_ai->ai_family, current_ai->ai_socktype | SOCK_CLOEXEC,
 					current_ai->ai_protocol)))
 			{
 				zbx_set_socket_strerror("socket() for [[%s]:%s] failed: %s",
 						ip ? ip : "-", port, strerror_from_system(zbx_socket_last_error()));
-#ifdef _WINDOWS
-				if (WSAEAFNOSUPPORT == zbx_socket_last_error())
-#else
 				if (EAFNOSUPPORT == zbx_socket_last_error())
 #endif
 					continue;
@@ -934,6 +1079,18 @@ int	zbx_tcp_listen(zbx_socket_t *s, const char *listen_ip, unsigned short listen
 #endif
 			on = 1;
 #ifdef _WINDOWS
+			/* If WSA_FLAG_NO_HANDLE_INHERIT not available, prevent listening socket from */
+			/* inheritance with the old API. Disabling handle inheritance in WSASocket() instead of */
+			/* SetHandleInformation() is preferred because it provides atomicity and gets the job done */
+			/* on systems with non-IFS LSPs installed. So there is a chance that the socket will be still */
+			/* inherited on Windows XP with 3rd party firewall/antivirus installed */
+			if (0 == no_inherit_wsapi && 0 == SetHandleInformation((HANDLE)s->sockets[s->num_socks],
+					HANDLE_FLAG_INHERIT, 0))
+			{
+				zabbix_log(LOG_LEVEL_WARNING, "SetHandleInformation() failed: %s",
+						strerror_from_system(GetLastError()));
+			}
+
 			/* prevent other processes from binding to the same port */
 			/* SO_EXCLUSIVEADDRUSE is mutually exclusive with SO_REUSEADDR */
 			/* on Windows SO_REUSEADDR has different semantics than on Unix */
@@ -968,7 +1125,7 @@ int	zbx_tcp_listen(zbx_socket_t *s, const char *listen_ip, unsigned short listen
 						strerror_from_system(zbx_socket_last_error()));
 			}
 #endif
-			if (ZBX_PROTO_ERROR == bind(s->sockets[s->num_socks], current_ai->ai_addr,
+			if (ZBX_PROTO_ERROR == zbx_bind(s->sockets[s->num_socks], current_ai->ai_addr,
 					current_ai->ai_addrlen))
 			{
 				zbx_set_socket_strerror("bind() for [[%s]:%s] failed: %s",
@@ -1037,8 +1194,18 @@ int	zbx_tcp_listen(zbx_socket_t *s, const char *listen_ip, unsigned short listen
 	ZBX_SOCKADDR	serv_addr;
 	char		*ip, *ips, *delim;
 	int		i, on, ret = FAIL;
+#ifdef _WINDOWS
+	/* WSASocket() option to prevent inheritance is available on */
+	/* Windows Server 2008 R2 or newer and on Windows 7 SP1 or newer */
+	static int	no_inherit_wsapi = -1;
 
-	ZBX_SOCKET_START();
+	if (-1 == no_inherit_wsapi)
+	{
+		/* Both Windows 7 and Windows 2008 R2 are 0x0601 */
+		no_inherit_wsapi = zbx_is_win_ver_or_greater((_WIN32_WINNT_WIN7 >> 8) & 0xff,
+				_WIN32_WINNT_WIN7 & 0xff, 1) == SUCCEED;
+	}
+#endif
 
 	zbx_socket_clean(s);
 
@@ -1063,10 +1230,23 @@ int	zbx_tcp_listen(zbx_socket_t *s, const char *listen_ip, unsigned short listen
 			goto out;
 		}
 
+#ifdef _WINDOWS
+		/* WSA_FLAG_NO_HANDLE_INHERIT prevents socket inheritance if we call CreateProcess() */
+		/* later on. If it's not available we still try to avoid inheritance by calling  */
+		/* SetHandleInformation() below. WSA_FLAG_OVERLAPPED is not mandatory but strongly */
+		/* recommended for every socket */
+		s->sockets[s->num_socks] = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0,
+				(0 != no_inherit_wsapi ? WSA_FLAG_NO_HANDLE_INHERIT : 0) | WSA_FLAG_OVERLAPPED);
+		if (ZBX_SOCKET_ERROR == s->sockets[s->num_socks])
+		{
+			zbx_set_socket_strerror("WSASocket() for [[%s]:%hu] failed: %s",
+					ip ? ip : "-", listen_port, strerror_from_system(zbx_socket_last_error()));
+#else
 		if (ZBX_SOCKET_ERROR == (s->sockets[s->num_socks] = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0)))
 		{
 			zbx_set_socket_strerror("socket() for [[%s]:%hu] failed: %s",
 					ip ? ip : "-", listen_port, strerror_from_system(zbx_socket_last_error()));
+#endif
 			goto out;
 		}
 
@@ -1075,6 +1255,18 @@ int	zbx_tcp_listen(zbx_socket_t *s, const char *listen_ip, unsigned short listen
 #endif
 		on = 1;
 #ifdef _WINDOWS
+		/* If WSA_FLAG_NO_HANDLE_INHERIT not available, prevent listening socket from */
+		/* inheritance with the old API. Disabling handle inheritance in WSASocket() instead of */
+		/* SetHandleInformation() is preferred because it provides atomicity and gets the job done */
+		/* on systems with non-IFS LSPs installed. So there is a chance that the socket will be still */
+		/* inherited on Windows XP with 3rd party firewall/antivirus installed */
+		if (0 == no_inherit_wsapi && 0 == SetHandleInformation((HANDLE)s->sockets[s->num_socks],
+				HANDLE_FLAG_INHERIT, 0))
+		{
+			zabbix_log(LOG_LEVEL_WARNING, "SetHandleInformation() failed: %s",
+					strerror_from_system(GetLastError()));
+		}
+
 		/* prevent other processes from binding to the same port */
 		/* SO_EXCLUSIVEADDRUSE is mutually exclusive with SO_REUSEADDR */
 		/* on Windows SO_REUSEADDR has different semantics than on Unix */
@@ -1177,7 +1369,7 @@ int	zbx_tcp_accept(zbx_socket_t *s, unsigned int tls_accept)
 	for (i = 0; i < s->num_socks; i++)
 	{
 		FD_SET(s->sockets[i], &sock_set);
-#if !defined(_WINDOWS)
+#ifndef _WINDOWS
 		if (s->sockets[i] > n)
 			n = s->sockets[i];
 #endif
@@ -1209,7 +1401,12 @@ int	zbx_tcp_accept(zbx_socket_t *s, unsigned int tls_accept)
 	s->socket = accepted_socket;	/* replace socket to accepted */
 	s->accepted = 1;
 
-	zbx_strlcpy(s->peer, zbx_get_ip_by_socket(s), sizeof(s->peer));	/* save peer IP address */
+	if (SUCCEED != zbx_socket_peer_ip_save(s))
+	{
+		/* cannot get peer IP address */
+		zbx_tcp_unaccept(s);
+		goto out;
+	}
 
 	zbx_socket_timeout_set(s, CONFIG_TIMEOUT);
 
@@ -1427,7 +1624,7 @@ const char	*zbx_tcp_recv_line(zbx_socket_t *s)
 		}
 		else
 		{
-			if (0 != (left = MIN(ZBX_TCP_LINE_LEN - s->read_bytes, ptr - buffer)))
+			if (0 != (left = MIN(ZBX_TCP_LINE_LEN - s->read_bytes, (size_t)(ptr - buffer))))
 			{
 				/* fill the string to the defined limit */
 				zbx_strncpy_alloc(&s->buffer, &alloc, &offset, buffer, left);
@@ -1457,7 +1654,7 @@ static ssize_t	zbx_tcp_read(zbx_socket_t *s, char *buf, size_t len)
 {
 	ssize_t	res;
 	int	err;
-#if defined(_WINDOWS)
+#ifdef _WINDOWS
 	double	sec;
 #endif
 #if defined(HAVE_POLARSSL) || defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
@@ -1474,14 +1671,14 @@ static ssize_t	zbx_tcp_read(zbx_socket_t *s, char *buf, size_t len)
 		return res;
 	}
 #endif
-#if defined(_WINDOWS)
+#ifdef _WINDOWS
 	zbx_alarm_flag_clear();
 	sec = zbx_time();
 #endif
 	do
 	{
 		res = ZBX_TCP_READ(s->socket, buf, len);
-#if defined(_WINDOWS)
+#ifdef _WINDOWS
 		if (s->timeout < zbx_time() - sec)
 			zbx_alarm_flag_set();
 #endif
@@ -1511,19 +1708,19 @@ static ssize_t	zbx_tcp_read(zbx_socket_t *s, char *buf, size_t len)
  * Author: Eugene Grigorjev                                                   *
  *                                                                            *
  ******************************************************************************/
-ssize_t	zbx_tcp_recv_ext(zbx_socket_t *s, unsigned char flags, int timeout)
+ssize_t	zbx_tcp_recv_ext(zbx_socket_t *s, int timeout)
 {
-#define ZBX_TCP_EXPECT_HEADER	1
-#define ZBX_TCP_EXPECT_LENGTH	2
-#define ZBX_TCP_EXPECT_TEXT_XML	3
-#define ZBX_TCP_EXPECT_SIZE	4
-#define ZBX_TCP_EXPECT_CLOSE	5
-#define ZBX_TCP_EXPECT_XML_END	6
+#define ZBX_TCP_EXPECT_HEADER		1
+#define ZBX_TCP_EXPECT_VERSION		2
+#define ZBX_TCP_EXPECT_VERSION_VALIDATE	3
+#define ZBX_TCP_EXPECT_LENGTH		4
+#define ZBX_TCP_EXPECT_SIZE		5
 
 	ssize_t		nbytes;
-	size_t		allocated = 8 * ZBX_STAT_BUF_LEN, buf_dyn_bytes = 0, buf_stat_bytes = 0, header_bytes = 0;
-	zbx_uint64_t	expected_len = 16 * ZBX_MEBIBYTE;
+	size_t		buf_dyn_bytes = 0, buf_stat_bytes = 0, offset = 0;
+	zbx_uint32_t	expected_len = 16 * ZBX_MEBIBYTE, reserved = 0;
 	unsigned char	expect = ZBX_TCP_EXPECT_HEADER;
+	int		protocol_version;
 
 	if (0 != timeout)
 		zbx_socket_timeout_set(s, timeout);
@@ -1541,144 +1738,266 @@ ssize_t	zbx_tcp_recv_ext(zbx_socket_t *s, unsigned char flags, int timeout)
 		if (ZBX_BUF_TYPE_STAT == s->buf_type)
 			buf_stat_bytes += nbytes;
 		else
-			zbx_strncpy_alloc(&s->buffer, &allocated, &buf_dyn_bytes, s->buf_stat, nbytes);
+		{
+			if (buf_dyn_bytes + nbytes <= expected_len)
+				memcpy(s->buffer + buf_dyn_bytes, s->buf_stat, nbytes);
+			buf_dyn_bytes += nbytes;
+		}
 
 		if (buf_stat_bytes + buf_dyn_bytes >= expected_len)
 			break;
-
-		/* performance short-circuit, can be omitted */
-		if (ZBX_TCP_EXPECT_SIZE == expect || (ZBX_TCP_EXPECT_CLOSE == expect && ZBX_BUF_TYPE_DYN == s->buf_type))
-			continue;
 
 		if (ZBX_TCP_EXPECT_HEADER == expect)
 		{
 			if (ZBX_TCP_HEADER_LEN > buf_stat_bytes)
 			{
-				if (0 == strncmp(s->buf_stat, ZBX_TCP_HEADER, buf_stat_bytes))
+				if (0 == strncmp(s->buf_stat, ZBX_TCP_HEADER_DATA, buf_stat_bytes))
 					continue;
 
-				expect = ZBX_TCP_EXPECT_TEXT_XML;
+				break;
 			}
 			else
 			{
-				if (0 == strncmp(s->buf_stat, ZBX_TCP_HEADER, ZBX_TCP_HEADER_LEN))
-					expect = ZBX_TCP_EXPECT_LENGTH;
-				else
-					expect = ZBX_TCP_EXPECT_TEXT_XML;
+				if (0 != strncmp(s->buf_stat, ZBX_TCP_HEADER_DATA, ZBX_TCP_HEADER_LEN))
+				{
+					/* invalid header, abort receiving */
+					break;
+				}
+
+				expect = ZBX_TCP_EXPECT_VERSION;
+				offset += ZBX_TCP_HEADER_LEN;
 			}
+		}
+
+		if (ZBX_TCP_EXPECT_VERSION == expect)
+		{
+			if (offset + 1 > buf_stat_bytes)
+				continue;
+
+			expect = ZBX_TCP_EXPECT_VERSION_VALIDATE;
+			protocol_version = s->buf_stat[ZBX_TCP_HEADER_LEN];
+
+			if (0 == (protocol_version & ZBX_TCP_PROTOCOL) ||
+					protocol_version > (ZBX_TCP_PROTOCOL | ZBX_TCP_COMPRESS))
+			{
+				/* invalid protocol version, abort receiving */
+				break;
+			}
+			s->protocol = protocol_version;
+			expect = ZBX_TCP_EXPECT_LENGTH;
+			offset++;
 		}
 
 		if (ZBX_TCP_EXPECT_LENGTH == expect)
 		{
-			if (ZBX_TCP_HEADER_LEN + sizeof(zbx_uint64_t) > buf_stat_bytes)
+			if (offset + 2 * sizeof(zbx_uint32_t) > buf_stat_bytes)
 				continue;
 
-			memcpy(&expected_len, s->buf_stat + ZBX_TCP_HEADER_LEN, sizeof(zbx_uint64_t));
-			expected_len = zbx_letoh_uint64(expected_len);
+			memcpy(&expected_len, s->buf_stat + offset, sizeof(zbx_uint32_t));
+			offset += sizeof(zbx_uint32_t);
+			expected_len = zbx_letoh_uint32(expected_len);
+
+			memcpy(&reserved, s->buf_stat + offset, sizeof(zbx_uint32_t));
+			offset += sizeof(zbx_uint32_t);
+			reserved = zbx_letoh_uint32(reserved);
 
 			if (ZBX_MAX_RECV_DATA_SIZE < expected_len)
 			{
 				zabbix_log(LOG_LEVEL_WARNING, "Message size " ZBX_FS_UI64 " from %s exceeds the "
-						"maximum size " ZBX_FS_UI64 " bytes. Message ignored.", expected_len,
-						s->peer, (zbx_uint64_t)ZBX_MAX_RECV_DATA_SIZE);
+						"maximum size " ZBX_FS_UI64 " bytes. Message ignored.",
+						(zbx_uint64_t)expected_len, s->peer,
+						(zbx_uint64_t)ZBX_MAX_RECV_DATA_SIZE);
+				nbytes = ZBX_PROTO_ERROR;
+				goto out;
+			}
+
+			/* compressed protocol stores uncompressed packet size in the reserved data */
+			if (0 != (protocol_version & ZBX_TCP_COMPRESS) && ZBX_MAX_RECV_DATA_SIZE < reserved)
+			{
+				zabbix_log(LOG_LEVEL_WARNING, "Uncompressed message size " ZBX_FS_UI64
+						" from %s exceeds the maximum size " ZBX_FS_UI64
+						" bytes. Message ignored.", (zbx_uint64_t)reserved, s->peer,
+						(zbx_uint64_t)ZBX_MAX_RECV_DATA_SIZE);
 				nbytes = ZBX_PROTO_ERROR;
 				goto out;
 			}
 
 			if (sizeof(s->buf_stat) > expected_len)
 			{
-				buf_stat_bytes -= ZBX_TCP_HEADER_LEN + sizeof(zbx_uint64_t);
-				memmove(s->buf_stat, s->buf_stat + ZBX_TCP_HEADER_LEN + sizeof(zbx_uint64_t),
-						buf_stat_bytes);
+				buf_stat_bytes -= offset;
+				memmove(s->buf_stat, s->buf_stat + offset, buf_stat_bytes);
 			}
 			else
 			{
 				s->buf_type = ZBX_BUF_TYPE_DYN;
-				s->buffer = zbx_malloc(NULL, allocated);
-				buf_dyn_bytes = buf_stat_bytes - ZBX_TCP_HEADER_LEN - sizeof(zbx_uint64_t);
+				s->buffer = (char *)zbx_malloc(NULL, expected_len + 1);
+				buf_dyn_bytes = buf_stat_bytes - offset;
 				buf_stat_bytes = 0;
-				memcpy(s->buffer, s->buf_stat + ZBX_TCP_HEADER_LEN + sizeof(zbx_uint64_t),
-						buf_dyn_bytes);
+				memcpy(s->buffer, s->buf_stat + offset, buf_dyn_bytes);
 			}
 
 			expect = ZBX_TCP_EXPECT_SIZE;
-			header_bytes = ZBX_TCP_HEADER_LEN + sizeof(zbx_uint64_t);
 
 			if (buf_stat_bytes + buf_dyn_bytes >= expected_len)
 				break;
-
-			continue;
-		}
-
-		if (sizeof(s->buf_stat) == buf_stat_bytes)
-		{
-			s->buf_type = ZBX_BUF_TYPE_DYN;
-			s->buffer = zbx_malloc(NULL, allocated);
-			buf_dyn_bytes = sizeof(s->buf_stat);
-			buf_stat_bytes = 0;
-			memcpy(s->buffer, s->buf_stat, sizeof(s->buf_stat));
-			continue;
-		}
-
-		if (sizeof(s->buf_stat) == nbytes)
-			continue;
-
-		if (ZBX_TCP_EXPECT_TEXT_XML == expect)
-		{
-			if (0 != (flags & ZBX_TCP_READ_UNTIL_CLOSE))
-			{
-				expect = ZBX_TCP_EXPECT_CLOSE;
-				continue;
-			}
-
-			if (ZBX_CONST_STRLEN("<req>") > buf_stat_bytes + buf_dyn_bytes)
-			{
-				if (0 != strncmp(s->buffer, "<req>", buf_stat_bytes + buf_dyn_bytes))
-					break;
-
-				continue;
-			}
-			else
-			{
-				if (0 != strncmp(s->buffer, "<req>", ZBX_CONST_STRLEN("<req>")))
-					break;
-
-				expect = ZBX_TCP_EXPECT_XML_END;
-			}
-		}
-
-		if (ZBX_TCP_EXPECT_XML_END == expect)
-		{
-			/* closing tag received in the last 10 bytes? */
-			s->buffer[buf_stat_bytes + buf_dyn_bytes] = '\0';
-			if (NULL != strstr(s->buffer + buf_stat_bytes + buf_dyn_bytes - (10 > buf_stat_bytes +
-					buf_dyn_bytes ? buf_stat_bytes + buf_dyn_bytes : 10), "</req>"))
-			{
-				break;
-			}
 		}
 	}
 
 	if (ZBX_TCP_EXPECT_SIZE == expect)
 	{
-		if (buf_stat_bytes + buf_dyn_bytes != expected_len)
+		if (buf_stat_bytes + buf_dyn_bytes == expected_len)
+		{
+			if (0 != (protocol_version & ZBX_TCP_COMPRESS))
+			{
+				char	*out;
+				size_t	out_size = reserved;
+
+				out = (char *)zbx_malloc(NULL, reserved + 1);
+				if (FAIL == zbx_uncompress(s->buffer, buf_stat_bytes + buf_dyn_bytes, out, &out_size))
+				{
+					zbx_free(out);
+					zbx_set_socket_strerror("cannot uncompress data: %s", zbx_compress_strerror());
+					nbytes = ZBX_PROTO_ERROR;
+					goto out;
+				}
+
+				if (out_size != reserved)
+				{
+					zbx_free(out);
+					zbx_set_socket_strerror("size of uncompressed data is less than expected");
+					nbytes = ZBX_PROTO_ERROR;
+					goto out;
+				}
+
+				if (ZBX_BUF_TYPE_DYN == s->buf_type)
+					zbx_free(s->buffer);
+
+				s->buf_type = ZBX_BUF_TYPE_DYN;
+				s->buffer = out;
+				s->read_bytes = reserved;
+
+				zabbix_log(LOG_LEVEL_TRACE, "%s(): received " ZBX_FS_SIZE_T " bytes with"
+						" compression ratio %.1f", __func__,
+						(zbx_fs_size_t)(buf_stat_bytes + buf_dyn_bytes),
+						(double)reserved / (buf_stat_bytes + buf_dyn_bytes));
+			}
+			else
+				s->read_bytes = buf_stat_bytes + buf_dyn_bytes;
+
+			s->buffer[s->read_bytes] = '\0';
+		}
+		else
 		{
 			if (buf_stat_bytes + buf_dyn_bytes < expected_len)
 			{
 				zabbix_log(LOG_LEVEL_WARNING, "Message from %s is shorter than expected " ZBX_FS_UI64
-						" bytes. Message ignored.", s->peer, expected_len);
+						" bytes. Message ignored.", s->peer, (zbx_uint64_t)expected_len);
 			}
 			else
 			{
 				zabbix_log(LOG_LEVEL_WARNING, "Message from %s is longer than expected " ZBX_FS_UI64
-						" bytes. Message ignored.", s->peer, expected_len);
+						" bytes. Message ignored.", s->peer, (zbx_uint64_t)expected_len);
 			}
 
 			nbytes = ZBX_PROTO_ERROR;
-			goto out;
 		}
 	}
-	else if (buf_stat_bytes + buf_dyn_bytes >= expected_len)
+	else if (ZBX_TCP_EXPECT_LENGTH == expect)
+	{
+		zabbix_log(LOG_LEVEL_WARNING, "Message from %s is missing data length. Message ignored.", s->peer);
+		nbytes = ZBX_PROTO_ERROR;
+	}
+	else if (ZBX_TCP_EXPECT_VERSION == expect)
+	{
+		zabbix_log(LOG_LEVEL_WARNING, "Message from %s is missing protocol version. Message ignored.",
+				s->peer);
+		nbytes = ZBX_PROTO_ERROR;
+	}
+	else if (ZBX_TCP_EXPECT_VERSION_VALIDATE == expect)
+	{
+		zabbix_log(LOG_LEVEL_WARNING, "Message from %s is using unsupported protocol version \"%d\"."
+				" Message ignored.", s->peer, protocol_version);
+		nbytes = ZBX_PROTO_ERROR;
+	}
+	else if (0 != buf_stat_bytes)
+	{
+		zabbix_log(LOG_LEVEL_WARNING, "Message from %s is missing header. Message ignored.", s->peer);
+		nbytes = ZBX_PROTO_ERROR;
+	}
+	else
+	{
+		s->read_bytes = 0;
+		s->buffer[s->read_bytes] = '\0';
+	}
+out:
+	if (0 != timeout)
+		zbx_socket_timeout_cleanup(s);
+
+	return (ZBX_PROTO_ERROR == nbytes ? FAIL : (ssize_t)(s->read_bytes + offset));
+
+#undef ZBX_TCP_EXPECT_HEADER
+#undef ZBX_TCP_EXPECT_LENGTH
+#undef ZBX_TCP_EXPECT_SIZE
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Function: zbx_tcp_recv_raw_ext                                             *
+ *                                                                            *
+ * Purpose: receive data till connection is closed                            *
+ *                                                                            *
+ * Return value: number of bytes received - success,                          *
+ *               FAIL - an error occurred                                     *
+ *                                                                            *
+ ******************************************************************************/
+ssize_t	zbx_tcp_recv_raw_ext(zbx_socket_t *s, int timeout)
+{
+	ssize_t		nbytes;
+	size_t		allocated = 8 * ZBX_STAT_BUF_LEN, buf_dyn_bytes = 0, buf_stat_bytes = 0;
+	zbx_uint64_t	expected_len = 16 * ZBX_MEBIBYTE;
+
+	if (0 != timeout)
+		zbx_socket_timeout_set(s, timeout);
+
+	zbx_socket_free(s);
+
+	s->buf_type = ZBX_BUF_TYPE_STAT;
+	s->buffer = s->buf_stat;
+
+	while (0 != (nbytes = zbx_tcp_read(s, s->buf_stat + buf_stat_bytes, sizeof(s->buf_stat) - buf_stat_bytes)))
+	{
+		if (ZBX_PROTO_ERROR == nbytes)
+			goto out;
+
+		if (ZBX_BUF_TYPE_STAT == s->buf_type)
+			buf_stat_bytes += nbytes;
+		else
+		{
+			if (buf_dyn_bytes + nbytes >= allocated)
+			{
+				while (buf_dyn_bytes + nbytes >= allocated)
+					allocated *= 2;
+				s->buffer = (char *)zbx_realloc(s->buffer, allocated);
+			}
+
+			memcpy(s->buffer + buf_dyn_bytes, s->buf_stat, nbytes);
+			buf_dyn_bytes += nbytes;
+		}
+
+		if (buf_stat_bytes + buf_dyn_bytes >= expected_len)
+			break;
+
+		if (sizeof(s->buf_stat) == buf_stat_bytes)
+		{
+			s->buf_type = ZBX_BUF_TYPE_DYN;
+			s->buffer = (char *)zbx_malloc(NULL, allocated);
+			buf_dyn_bytes = sizeof(s->buf_stat);
+			buf_stat_bytes = 0;
+			memcpy(s->buffer, s->buf_stat, sizeof(s->buf_stat));
+		}
+	}
+
+	if (buf_stat_bytes + buf_dyn_bytes >= expected_len)
 	{
 		zabbix_log(LOG_LEVEL_WARNING, "Message from %s is longer than " ZBX_FS_UI64 " bytes allowed for"
 				" plain text. Message ignored.", s->peer, expected_len);
@@ -1692,18 +2011,47 @@ out:
 	if (0 != timeout)
 		zbx_socket_timeout_cleanup(s);
 
-	return (ZBX_PROTO_ERROR == nbytes ? FAIL : (ssize_t)(s->read_bytes + header_bytes));
-
-#undef ZBX_TCP_EXPECT_HEADER
-#undef ZBX_TCP_EXPECT_LENGTH
-#undef ZBX_TCP_EXPECT_TEXT_XML
-#undef ZBX_TCP_EXPECT_SIZE
-#undef ZBX_TCP_EXPECT_CLOSE
-#undef ZBX_TCP_EXPECT_XML_END
+	return (ZBX_PROTO_ERROR == nbytes ? FAIL : (ssize_t)(s->read_bytes));
 }
 
-#if defined(HAVE_IPV6)
-static int	zbx_ip_cmp(const struct addrinfo *current_ai, ZBX_SOCKADDR name)
+static int	subnet_match(int af, unsigned int prefix_size, const void *address1, const void *address2)
+{
+	unsigned char	netmask[16] = {0};
+	int		i, j, bytes;
+
+	if (af == AF_INET)
+	{
+		if (prefix_size > IPV4_MAX_CIDR_PREFIX)
+			return FAIL;
+		bytes = 4;
+	}
+	else
+	{
+		if (prefix_size > IPV6_MAX_CIDR_PREFIX)
+			return FAIL;
+		bytes = 16;
+	}
+
+	/* CIDR notation to subnet mask */
+	for (i = (int)prefix_size, j = 0; i > 0 && j < bytes; i -= 8, j++)
+		netmask[j] = i >= 8 ? 0xFF : ~((1 << (8 - i)) - 1);
+
+	/* The result of the bitwise AND operation of IP address and the subnet mask is the network prefix. */
+	/* All hosts on a subnetwork have the same network prefix. */
+	for (i = 0; i < bytes; i++)
+	{
+		if ((((const unsigned char *)address1)[i] & netmask[i]) !=
+				(((const unsigned char *)address2)[i] & netmask[i]))
+		{
+			return FAIL;
+		}
+	}
+
+	return SUCCEED;
+}
+
+#ifdef HAVE_IPV6
+static int	zbx_ip_cmp(unsigned int prefix_size, const struct addrinfo *current_ai, ZBX_SOCKADDR name)
 {
 	/* Network Byte Order is ensured */
 	/* IPv4-compatible, the first 96 bits are zeros */
@@ -1725,14 +2073,15 @@ static int	zbx_ip_cmp(const struct addrinfo *current_ai, ZBX_SOCKADDR name)
 		switch (current_ai->ai_family)
 		{
 			case AF_INET:
-				if (name4->sin_addr.s_addr == ai_addr4->sin_addr.s_addr)
+				if (SUCCEED == subnet_match(current_ai->ai_family, prefix_size, &name4->sin_addr.s_addr,
+						&ai_addr4->sin_addr.s_addr))
 				{
 					return SUCCEED;
 				}
 				break;
 			case AF_INET6:
-				if (0 == memcmp(name6->sin6_addr.s6_addr, ai_addr6->sin6_addr.s6_addr,
-						sizeof(struct in6_addr)))
+				if (SUCCEED == subnet_match(current_ai->ai_family, prefix_size, name6->sin6_addr.s6_addr,
+						ai_addr6->sin6_addr.s6_addr))
 				{
 					return SUCCEED;
 				}
@@ -1741,24 +2090,32 @@ static int	zbx_ip_cmp(const struct addrinfo *current_ai, ZBX_SOCKADDR name)
 	}
 	else
 	{
+		unsigned char	ipv6_compat_address[16], ipv6_mapped_address[16];
+
 		switch (current_ai->ai_family)
 		{
 			case AF_INET:
 				/* incoming AF_INET6, must see whether it is compatible or mapped */
 				if ((0 == memcmp(name6->sin6_addr.s6_addr, ipv4_compat_mask, 12) ||
 						0 == memcmp(name6->sin6_addr.s6_addr, ipv4_mapped_mask, 12)) &&
-						0 == memcmp(&name6->sin6_addr.s6_addr[12],
-						(unsigned char *)&ai_addr4->sin_addr.s_addr, 4))
+						SUCCEED == subnet_match(AF_INET, prefix_size,
+						&name6->sin6_addr.s6_addr[12], &ai_addr4->sin_addr.s_addr))
 				{
 					return SUCCEED;
 				}
 				break;
 			case AF_INET6:
 				/* incoming AF_INET, must see whether the given is compatible or mapped */
-				if ((0 == memcmp(ai_addr6->sin6_addr.s6_addr, ipv4_compat_mask, 12) ||
-						0 == memcmp(ai_addr6->sin6_addr.s6_addr, ipv4_mapped_mask, 12)) &&
-						0 == memcmp(&ai_addr6->sin6_addr.s6_addr[12],
-						(unsigned char *)&name4->sin_addr.s_addr, 4))
+				memcpy(ipv6_compat_address, ipv4_compat_mask, sizeof(ipv4_compat_mask));
+				memcpy(&ipv6_compat_address[sizeof(ipv4_compat_mask)], &name4->sin_addr.s_addr, 4);
+
+				memcpy(ipv6_mapped_address, ipv4_mapped_mask, sizeof(ipv4_mapped_mask));
+				memcpy(&ipv6_mapped_address[sizeof(ipv4_mapped_mask)], &name4->sin_addr.s_addr, 4);
+
+				if (SUCCEED == subnet_match(AF_INET6, prefix_size,
+						&ai_addr6->sin6_addr.s6_addr, ipv6_compat_address) ||
+						SUCCEED == subnet_match(AF_INET6, prefix_size,
+						&ai_addr6->sin6_addr.s6_addr, ipv6_mapped_address))
 				{
 					return SUCCEED;
 				}
@@ -1770,15 +2127,65 @@ static int	zbx_ip_cmp(const struct addrinfo *current_ai, ZBX_SOCKADDR name)
 }
 #endif
 
+static int	validate_cidr(const char *ip, const char *cidr, void *value)
+{
+	if (SUCCEED == is_ip4(ip))
+		return is_uint_range(cidr, value, 0, IPV4_MAX_CIDR_PREFIX);
+#ifdef HAVE_IPV6
+	if (SUCCEED == is_ip6(ip))
+		return is_uint_range(cidr, value, 0, IPV6_MAX_CIDR_PREFIX);
+#endif
+	return FAIL;
+}
+
+int	zbx_validate_peer_list(const char *peer_list, char **error)
+{
+	char	*start, *end, *cidr_sep;
+	char	tmp[MAX_STRING_LEN];
+
+	strscpy(tmp, peer_list);
+
+	for (start = tmp; '\0' != *start;)
+	{
+		if (NULL != (end = strchr(start, ',')))
+			*end = '\0';
+
+		if (NULL != (cidr_sep = strchr(start, '/')))
+		{
+			*cidr_sep = '\0';
+
+			if (FAIL == validate_cidr(start, cidr_sep + 1, NULL))
+			{
+				*cidr_sep = '/';
+				*error = zbx_dsprintf(NULL, "\"%s\"", start);
+				return FAIL;
+			}
+		}
+		else if (FAIL == is_supported_ip(start) && FAIL == zbx_validate_hostname(start))
+		{
+			*error = zbx_dsprintf(NULL, "\"%s\"", start);
+			return FAIL;
+		}
+
+		if (NULL != end)
+			start = end + 1;
+		else
+			break;
+	}
+
+	return SUCCEED;
+}
+
 /******************************************************************************
  *                                                                            *
- * Function: zbx_tcp_check_security                                           *
+ * Function: zbx_tcp_check_allowed_peers                                      *
  *                                                                            *
- * Purpose: check if connection initiator is in list of IP addresses          *
+ * Purpose: check if connection initiator is in list of peers                 *
  *                                                                            *
- * Parameters: s - socket descriptor                                          *
- *             ip_list - comma-delimited list of IP addresses                 *
- *             allow_if_empty - allow connection if no IP given               *
+ * Parameters: s         - [IN] socket descriptor                             *
+ *             peer_list - [IN] comma-delimited list of allowed peers.        *
+ *                              NULL not allowed. Empty string results in     *
+ *                              return value FAIL.                            *
  *                                                                            *
  * Return value: SUCCEED - connection allowed                                 *
  *               FAIL - connection is not allowed                             *
@@ -1789,86 +2196,94 @@ static int	zbx_ip_cmp(const struct addrinfo *current_ai, ZBX_SOCKADDR name)
  *           the same: 127.0.0.1 == ::127.0.0.1 == ::ffff:127.0.0.1           *
  *                                                                            *
  ******************************************************************************/
-int	zbx_tcp_check_security(zbx_socket_t *s, const char *ip_list, int allow_if_empty)
+int	zbx_tcp_check_allowed_peers(const zbx_socket_t *s, const char *peer_list)
 {
-#if defined(HAVE_IPV6)
-	struct addrinfo	hints, *ai = NULL, *current_ai;
+	char	*start = NULL, *end = NULL, *cidr_sep, tmp[MAX_STRING_LEN];
+	int	prefix_size;
+
+	/* examine list of allowed peers which may include DNS names, IPv4/6 addresses and addresses in CIDR notation */
+
+	strscpy(tmp, peer_list);
+
+	for (start = tmp; '\0' != *start;)
+	{
+#ifdef HAVE_IPV6
+		struct addrinfo	hints, *ai = NULL, *current_ai;
 #else
-	struct hostent	*hp;
-	int		i;
-#endif
-	ZBX_SOCKADDR	name;
-	ZBX_SOCKLEN_T	nlen;
+		struct hostent	*hp;
+#endif /* HAVE_IPV6 */
 
-	char		tmp[MAX_STRING_LEN], *start = NULL, *end = NULL;
+		prefix_size = -1;
 
-	if (1 == allow_if_empty && (NULL == ip_list || '\0' == *ip_list))
-		return SUCCEED;
+		if (NULL != (end = strchr(start, ',')))
+			*end = '\0';
 
-	nlen = sizeof(name);
-
-	if (ZBX_PROTO_ERROR == getpeername(s->socket, (struct sockaddr *)&name, &nlen))
-	{
-		zbx_set_socket_strerror("connection rejected, getpeername() failed: %s",
-				strerror_from_system(zbx_socket_last_error()));
-		return FAIL;
-	}
-	else
-	{
-		strscpy(tmp, ip_list);
-
-		for (start = tmp; '\0' != *start;)
+		if (NULL != (cidr_sep = strchr(start, '/')))
 		{
-			if (NULL != (end = strchr(start, ',')))
-				*end = '\0';
+			*cidr_sep = '\0';
 
-			/* allow IP addresses or DNS names for authorization */
-#if defined(HAVE_IPV6)
-			memset(&hints, 0, sizeof(hints));
-			hints.ai_family = PF_UNSPEC;
-			if (0 == getaddrinfo(start, NULL, &hints, &ai))
-			{
-				for (current_ai = ai; NULL != current_ai; current_ai = current_ai->ai_next)
-				{
-					if (SUCCEED == zbx_ip_cmp(current_ai, name))
-					{
-						freeaddrinfo(ai);
-						return SUCCEED;
-					}
-				}
-				freeaddrinfo(ai);
-			}
-#else
-			if (NULL != (hp = gethostbyname(start)))
-			{
-				for (i = 0; NULL != hp->h_addr_list[i]; i++)
-				{
-					if (name.sin_addr.s_addr == ((struct in_addr *)hp->h_addr_list[i])->s_addr)
-						return SUCCEED;
-				}
-			}
-#endif	/* HAVE_IPV6 */
-			if (NULL != end)
-			{
-				*end = ',';
-				start = end + 1;
-			}
-			else
-				break;
+			/* validate_cidr() may overwrite 'prefix_size' */
+			if (SUCCEED != validate_cidr(start, cidr_sep + 1, &prefix_size))
+				*cidr_sep = '/';	/* CIDR is only supported for IP */
 		}
 
-		if (NULL != end)
-			*end = ',';
-	}
-#if defined(HAVE_IPV6)
-	if (0 == zbx_getnameinfo((struct sockaddr *)&name, tmp, sizeof(tmp), NULL, 0, NI_NUMERICHOST))
-		zbx_set_socket_strerror("connection from \"%s\" rejected, allowed hosts: \"%s\"", tmp, ip_list);
-	else
-		zbx_set_socket_strerror("connection rejected, allowed hosts: \"%s\"", ip_list);
+		/* When adding IPv6 support it was decided to leave current implementation   */
+		/* (based on gethostbyname()) for handling non-IPv6-enabled components. In   */
+		/* the future it should be considered to switch completely to getaddrinfo(). */
+
+#ifdef HAVE_IPV6
+		memset(&hints, 0, sizeof(hints));
+		hints.ai_family = AF_UNSPEC;
+		hints.ai_socktype = SOCK_STREAM;
+		hints.ai_protocol = IPPROTO_TCP;
+
+		if (0 == getaddrinfo(start, NULL, &hints, &ai))
+		{
+			for (current_ai = ai; NULL != current_ai; current_ai = current_ai->ai_next)
+			{
+				int	prefix_size_current = prefix_size;
+
+				if (-1 == prefix_size_current)
+				{
+					prefix_size_current = (current_ai->ai_family == AF_INET ?
+							IPV4_MAX_CIDR_PREFIX : IPV6_MAX_CIDR_PREFIX);
+				}
+
+				if (SUCCEED == zbx_ip_cmp(prefix_size_current, current_ai, s->peer_info))
+				{
+					freeaddrinfo(ai);
+					return SUCCEED;
+				}
+			}
+			freeaddrinfo(ai);
+		}
 #else
-	zbx_set_socket_strerror("connection from \"%s\" rejected, allowed hosts: \"%s\"",
-			inet_ntoa(name.sin_addr), ip_list);
-#endif
+		if (NULL != (hp = gethostbyname(start)))
+		{
+			int	i;
+
+			for (i = 0; NULL != hp->h_addr_list[i]; i++)
+			{
+				if (-1 == prefix_size)
+					prefix_size = IPV4_MAX_CIDR_PREFIX;
+
+				if (SUCCEED == subnet_match(AF_INET, prefix_size,
+						&((struct in_addr *)hp->h_addr_list[i])->s_addr,
+						&s->peer_info.sin_addr.s_addr))
+				{
+					return SUCCEED;
+				}
+			}
+		}
+#endif	/* HAVE_IPV6 */
+		if (NULL != end)
+			start = end + 1;
+		else
+			break;
+	}
+
+	zbx_set_socket_strerror("connection from \"%s\" rejected, allowed hosts: \"%s\"", s->peer, peer_list);
+
 	return FAIL;
 }
 
@@ -1906,7 +2321,7 @@ int	zbx_udp_send(zbx_socket_t *s, const char *data, size_t data_len, int timeout
 	if (0 != timeout)
 		zbx_socket_timeout_set(s, timeout);
 
-	if (ZBX_PROTO_ERROR == sendto(s->socket, data, data_len, 0, NULL, 0))
+	if (ZBX_PROTO_ERROR == zbx_sendto(s->socket, data, data_len, 0, NULL, 0))
 	{
 		zbx_set_socket_strerror("sendto() failed: %s", strerror_from_system(zbx_socket_last_error()));
 		ret = FAIL;
@@ -1945,7 +2360,7 @@ int	zbx_udp_recv(zbx_socket_t *s, int timeout)
 	else
 	{
 		s->buf_type = ZBX_BUF_TYPE_DYN;
-		s->buffer = zbx_malloc(s->buffer, read_bytes + 1);
+		s->buffer = (char *)zbx_malloc(s->buffer, read_bytes + 1);
 	}
 
 	buffer[read_bytes] = '\0';
@@ -1963,3 +2378,35 @@ void	zbx_udp_close(zbx_socket_t *s)
 	zbx_socket_free(s);
 	zbx_socket_close(s->socket);
 }
+
+#if !defined(_WINDOWS) && defined(HAVE_RESOLV_H)
+/******************************************************************************
+ *                                                                            *
+ * Function: zbx_update_resolver_conf                                         *
+ *                                                                            *
+ * Purpose: react to "/etc/resolv.conf" update                                *
+ *                                                                            *
+ * Comments: it is intended to call this function in the end of each process  *
+ *           main loop. The purpose of calling it at the end (instead of the  *
+ *           beginning of main loop) is to let the first initialization of    *
+ *           libc resolver proceed internally.                                *
+ *                                                                            *
+ ******************************************************************************/
+void	zbx_update_resolver_conf(void)
+{
+#define ZBX_RESOLV_CONF_FILE	"/etc/resolv.conf"
+
+	static time_t	mtime = 0;
+	zbx_stat_t	buf;
+
+	if (0 == zbx_stat(ZBX_RESOLV_CONF_FILE, &buf) && mtime != buf.st_mtime)
+	{
+		mtime = buf.st_mtime;
+
+		if (0 != res_init())
+			zabbix_log(LOG_LEVEL_WARNING, "zbx_update_resolver_conf(): res_init() failed");
+	}
+
+#undef ZBX_RESOLV_CONF_FILE
+}
+#endif

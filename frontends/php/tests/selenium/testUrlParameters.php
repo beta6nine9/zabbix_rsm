@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -18,9 +18,10 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-require_once dirname(__FILE__).'/../include/class.cwebtest.php';
 
-class testUrlParameters extends CWebTest {
+require_once dirname(__FILE__).'/../include/CLegacyWebTest.php';
+
+class testUrlParameters extends CLegacyWebTest {
 
 	public static function data() {
 		return [
@@ -628,8 +629,8 @@ class testUrlParameters extends CWebTest {
 						'text_not_present' => 'Latest data',
 						'text_present' => [
 							'Zabbix has received an incorrect request.',
-							'Incorrect value "Array" for "groupids" field.',
-							'Incorrect value "Array" for "hostids" field.'
+							'Incorrect value for "groupids" field.',
+							'Incorrect value for "hostids" field.'
 						]
 					],
 					[
@@ -639,105 +640,70 @@ class testUrlParameters extends CWebTest {
 				]
 			],
 			[
-				'title' => 'Status of triggers [refreshed every 30 sec.]',
-				'check_server_name' => true,
-				'server_name_on_page' => true,
+				'title' => '404 Not Found',
+				'check_server_name' => false,
+				'server_name_on_page' => false,
 				'test_cases' => [
 					[
-						'url' => 'tr_status.php?groupid=4&hostid=10084',
-						'text_present' => 'Status of triggers'
-					],
-					[
-						'url' => 'tr_status.php?groupid=9999999&hostid=10084',
-						'text_not_present' => 'STATUS OF TRIGGERS',
+						'url' => 'events.php',
+						'text_not_present' => 'Events',
 						'text_present' => [
-							'No permissions to referred object or it does not exist!'
+							'Not Found',
 						]
 					],
 					[
-						'url' => 'tr_status.php?groupid=4&hostid=9999999',
-						'text_not_present' => 'Status of triggers',
+						'url' => 'events.php?triggerid=13491',
+						'text_not_present' => 'Events',
 						'text_present' => [
-							'No permissions to referred object or it does not exist!'
+							'Not Found'
 						]
-					],
-					[
-						'url' => 'tr_status.php?groupid=abc&hostid=abc',
-						'text_not_present' => 'Status of triggers',
-						'text_present' => [
-							'Zabbix has received an incorrect request.',
-							'Field "groupid" is not integer.',
-							'Field "hostid" is not integer.'
-						]
-					],
-					[
-						'url' => 'tr_status.php?groupid=&hostid=',
-						'text_not_present' => 'Status of triggers',
-						'text_present' => [
-							'Zabbix has received an incorrect request.',
-							'Field "groupid" is not integer.',
-							'Field "hostid" is not integer.'
-						]
-					],
-					[
-						'url' => 'tr_status.php?groupid=-1&hostid=-1',
-						'text_not_present' => 'Status of triggers',
-						'text_present' => [
-							'Zabbix has received an incorrect request.',
-							'Incorrect value "-1" for "groupid" field.',
-							'Incorrect value "-1" for "hostid" field.'
-						]
-					],
-					[
-						'url' => 'tr_status.php',
-						'text_present' => 'Status of triggers'
 					]
 				]
 			],
 			[
-				'title' => 'Latest events [refreshed every 30 sec.]',
+				'title' => 'Problems',
 				'check_server_name' => true,
 				'server_name_on_page' => true,
 				'test_cases' => [
 					[
-						'url' => 'events.php?triggerid=13491',
-						'text_present' => 'Events'
+						'url' => 'zabbix.php?action=problem.view',
+						'text_present' => 'Problems'
 					],
 					[
-						'url' => 'events.php?triggerid=9999999',
-						'text_not_present' => 'Events',
-						'text_present' => [
-							'No permissions to referred object or it does not exist!'
-						]
-					],
-					[
-						'url' => 'events.php?triggerid=abc',
-						'text_not_present' => 'Events',
-						'text_present' => [
-							'Zabbix has received an incorrect request.',
-							'Field "triggerid" is not integer.'
-						]
-					],
-					[
-						'url' => 'events.php?triggerid=',
-						'text_not_present' => 'Events',
-						'text_present' => [
-							'Zabbix has received an incorrect request.',
-							'Field "triggerid" is not integer.'
-						]
-					],
-					[
-						'url' => 'events.php?triggerid=-1',
-						'text_not_present' => 'Events',
-						'text_present' => [
-							'Zabbix has received an incorrect request.',
-							'Incorrect value "-1" for "triggerid" field.'
-						]
-					],
-					[
-						'url' => 'events.php',
-						'text_present' => 'Events'
+						'url' => 'zabbix.php?action=problem.view&filter_triggerids[]=13491',
+						'text_present' => 'Problems'
 					]
+				]
+			],
+			[
+				'title' => 'Fatal error, please report to the Zabbix team',
+				'check_server_name' => false,
+				'server_name_on_page' => false,
+				'test_cases' => [
+					[
+						'url' => 'zabbix.php?action=problem.view&filter_triggerids[]=abc',
+						'text_not_present' => 'Problems',
+						'text_present' => [
+							'Fatal error, please report to the Zabbix team',
+							'Controller: problem.view'
+							]
+					],
+					[
+						'url' => 'zabbix.php?action=problem.view&filter_triggerids[]=',
+						'text_not_present' => 'Problems',
+						'text_present' => [
+							'Fatal error, please report to the Zabbix team',
+							'Controller: problem.view'
+						]
+					],
+					[
+						'url' => 'zabbix.php?action=problem.view&filter_triggerids[]=-1',
+						'text_not_present' => 'Problems',
+						'text_present' => [
+							'Fatal error, please report to the Zabbix team',
+							'Controller: problem.view'
+						]
+					],
 				]
 			],
 			[
@@ -893,8 +859,7 @@ class testUrlParameters extends CWebTest {
 						'url' => 'sysmaps.php?sysmapid=-1&severity_min=0',
 						'text_not_present' => 'Maps',
 						'text_present' => [
-							'Zabbix has received an incorrect request.',
-							'Incorrect value "-1" for "sysmapid" field.'
+							'No permissions to referred object or it does not exist!'
 						]
 					],
 					[
@@ -927,13 +892,21 @@ class testUrlParameters extends CWebTest {
 				'server_name_on_page' => true,
 				'test_cases' => [
 					[
-						'url' => 'zabbix.php?action=discovery.view&druleid=3',
+						'url' => 'zabbix.php?action=discovery.view&filter_druleids[]=3&filter_set=1',
+						'text_present' => 'Status of discovery'
+					],
+					[
+						'url' => 'zabbix.php?action=discovery.view&filter_druleids[]=3',
 						'text_present' => 'Status of discovery'
 					],
 					[
 						'url' => 'zabbix.php?action=discovery.view',
 						'text_present' => 'Status of discovery'
-					]
+					],
+					[
+						'url' => 'zabbix.php?action=discovery.view&filter_rst=1',
+						'text_present' => 'Status of discovery'
+					],
 				]
 			],
 			[
@@ -942,15 +915,7 @@ class testUrlParameters extends CWebTest {
 				'server_name_on_page' => false,
 				'test_cases' => [
 					[
-						'url' => 'zabbix.php?action=discovery.view&druleid=abc',
-						'text_not_present' => 'Status of discovery',
-						'text_present' => [
-							'Fatal error, please report to the Zabbix team',
-							'Controller: discovery.view'
-							]
-					],
-					[
-						'url' => 'zabbix.php?action=discovery.view&druleid=',
+						'url' => 'zabbix.php?action=discovery.view&filter_druleids[]=abc',
 						'text_not_present' => 'Status of discovery',
 						'text_present' => [
 							'Fatal error, please report to the Zabbix team',
@@ -958,71 +923,71 @@ class testUrlParameters extends CWebTest {
 						]
 					],
 					[
-						'url' => 'zabbix.php?action=discovery.view&druleid=-1',
+						'url' => 'zabbix.php?action=discovery.view&filter_druleids[]=-123',
 						'text_not_present' => 'Status of discovery',
 						'text_present' => [
 							'Fatal error, please report to the Zabbix team',
 							'Controller: discovery.view'
 						]
 					],
-				]
-			],
-			[
-				'title' => 'Warning [refreshed every 30 sec.]',
-				'check_server_name' => false,
-				'server_name_on_page' => false,
-				'test_cases' => [
 					[
-						'url' => 'zabbix.php?action=discovery.view&druleid=9999999',
+						'url' => 'zabbix.php?action=discovery.view&filter_druleids=123',
 						'text_not_present' => 'Status of discovery',
 						'text_present' => [
-							'Access denied',
-							'You are logged in as "Admin". You have no permissions to access this page.',
-							'If you think this message is wrong, please consult your administrators about getting the necessary permissions.'
+							'Fatal error, please report to the Zabbix team',
+							'Controller: discovery.view'
+						]
+					],
+					[
+						'url' => 'zabbix.php?action=discovery.view&filter_druleids=',
+						'text_not_present' => 'Status of discovery',
+						'text_present' => [
+							'Fatal error, please report to the Zabbix team',
+							'Controller: discovery.view'
 						]
 					]
 				]
 			],
 			[
-				'title' => 'IT services [refreshed every 30 sec.]',
+				'title' => 'Services [refreshed every 30 sec.]',
 				'check_server_name' => true,
 				'server_name_on_page' => true,
 				'test_cases' => [
 					[
 						'url' => 'srv_status.php?period=today',
-						'text_present' => 'IT services'
+						'text_present' => 'Services'
 					],
 					[
 						'url' => 'srv_status.php?period=week',
-						'text_present' => 'IT services'
+						'text_present' => 'Services'
 					],
 					[
 						'url' => 'srv_status.php?period=month',
-						'text_present' => 'IT services'
+						'text_present' => 'Services'
 					],
 					[
 						'url' => 'srv_status.php?period=year',
-						'text_present' => 'IT services'
+						'text_present' => 'Services'
 					],
 					[
 						'url' => 'srv_status.php?period=24',
-						'text_present' => 'IT services'
+						'text_present' => 'Services'
 					],
 					[
 						'url' => 'srv_status.php?period=168',
-						'text_present' => 'IT services'
+						'text_present' => 'Services'
 					],
 					[
 						'url' => 'srv_status.php?period=720',
-						'text_present' => 'IT services'
+						'text_present' => 'Services'
 					],
 					[
 						'url' => 'srv_status.php?period=8760',
-						'text_present' => 'IT services'
+						'text_present' => 'Services'
 					],
 					[
 						'url' => 'srv_status.php?period=1',
-						'text_not_present' => 'IT services',
+						'text_not_present' => 'Services',
 						'text_present' => [
 							'Zabbix has received an incorrect request.',
 							'Incorrect value "1" for "period" field.'
@@ -1030,7 +995,7 @@ class testUrlParameters extends CWebTest {
 					],
 					[
 						'url' => 'srv_status.php?period=abc',
-						'text_not_present' => 'IT services',
+						'text_not_present' => 'Services',
 						'text_present' => [
 							'Zabbix has received an incorrect request.',
 							'Incorrect value "abc" for "period" field.'
@@ -1038,7 +1003,7 @@ class testUrlParameters extends CWebTest {
 					],
 					[
 						'url' => 'srv_status.php?period=',
-						'text_not_present' => 'IT services',
+						'text_not_present' => 'Services',
 						'text_present' => [
 							'Zabbix has received an incorrect request.',
 							'Incorrect value "" for "period" field.'
@@ -1046,7 +1011,7 @@ class testUrlParameters extends CWebTest {
 					],
 					[
 						'url' => 'srv_status.php?period=-1',
-						'text_not_present' => 'IT services',
+						'text_not_present' => 'Services',
 						'text_present' => [
 							'Zabbix has received an incorrect request.',
 							'Incorrect value "-1" for "period" field.'
@@ -1054,7 +1019,7 @@ class testUrlParameters extends CWebTest {
 					],
 					[
 						'url' => 'srv_status.php',
-						'text_present' => 'IT services'
+						'text_present' => 'Services'
 					]
 				]
 			],
@@ -1159,6 +1124,7 @@ class testUrlParameters extends CWebTest {
 
 	/**
 	 * @dataProvider data
+	 * @ignore-browser-errors
 	 */
 	public function testUrlParameters_UrlLoad($title, $check_server_name, $server_name_on_page, $test_cases) {
 		foreach ($test_cases as $test_case) {

@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -23,7 +23,6 @@
  * @property string $groupid
  * @property string $hostid
  * @property string $graphid
- * @property string $druleid
  * @property string $severityMin
  * @property array  $groups
  * @property array  $hosts
@@ -43,7 +42,6 @@ class CPageFilter {
 	const GROUP_LATEST_IDX = 'web.latest.groupid';
 	const HOST_LATEST_IDX = 'web.latest.hostid';
 	const GRAPH_LATEST_IDX = 'web.latest.graphid';
-	const DRULE_LATEST_IDX = 'web.latest.druleid';
 
 	/**
 	 * Configuration options.
@@ -75,9 +73,6 @@ class CPageFilter {
 		// works only if a host is selected or the host filter value is set to 'all'
 		'graphid' => null,
 
-		// works only if a specific host has been selected, will NOT work if the host filter is set to 'all'
-		'druleid' => null,
-
 		// API parameters to be used to retrieve filter objects
 		'groups' => null,
 		'hosts' => null,
@@ -106,9 +101,9 @@ class CPageFilter {
 	 */
 	protected $ids = [
 		'groupid' => null,
+		'groupids' => null,
 		'hostid' => null,
 		'graphid' => null,
-		'druleid' => null,
 		'severityMin' => null
 	];
 
@@ -142,7 +137,6 @@ class CPageFilter {
 		'groupid' => null,
 		'hostid' => null,
 		'graphid' => null,
-		'druleid' => null,
 		'severityMin' => null
 	];
 
@@ -155,7 +149,6 @@ class CPageFilter {
 		'groupid' => null,
 		'hostid' => null,
 		'graphid' => null,
-		'druleid' => null,
 		'severityMin' => null
 	];
 
@@ -175,13 +168,13 @@ class CPageFilter {
 	 * @return mixed
 	 */
 	public function __get($name) {
-		if (isset($this->data[$name])) {
+		if (array_key_exists($name, $this->data)) {
 			return $this->data[$name];
 		}
-		elseif (isset($this->ids[$name])) {
+		elseif (array_key_exists($name, $this->ids)) {
 			return $this->ids[$name];
 		}
-		elseif (isset($this->isSelected[$name])) {
+		elseif (array_key_exists($name, $this->isSelected)) {
 			return $this->isSelected[$name];
 		}
 		else {
@@ -211,7 +204,6 @@ class CPageFilter {
 	 * @param string $options['graphid']
 	 * @param array  $options['triggers']
 	 * @param array  $options['drules']
-	 * @param string $options['druleid']
 	 * @param array  $options['severitiesMin']
 	 * @param int    $options['severitiesMin']['default']
 	 * @param string $options['severitiesMin']['mapId']
@@ -266,11 +258,6 @@ class CPageFilter {
 			$this->_initGraphs($options['graphid'], $options['graphs']);
 		}
 
-		// drules
-		if (isset($options['drules'])) {
-			$this->_initDiscoveries($options['druleid'], $options['drules']);
-		}
-
 		// severities min
 		if (isset($options['severitiesMin'])) {
 			$this->_initSeveritiesMin($options['severityMin'], $options['severitiesMin'], $config);
@@ -281,7 +268,7 @@ class CPageFilter {
 	 * Retrieve objects stored in the user profile.
 	 * If the 'select_latest' option is used, the IDs will be loaded from the web.latest.objectid profile values,
 	 * otherwise - from the web.*.objectid field, depending on the use of the 'individual' option.
-	 * If the 'DDReset' option is used, IDs will be reset to zeroes.
+	 * If the 'DDReset' option is used, IDs will be reset to zeros.
 	 * The method also sets the scope for remembering the selected values, see the 'individual' option for more info.
 	 *
 	 * @param array $options
@@ -294,26 +281,22 @@ class CPageFilter {
 		$this->_profileIdx['groups'] = 'web.'.$profileSection.'.groupid';
 		$this->_profileIdx['hosts'] = 'web.'.$profileSection.'.hostid';
 		$this->_profileIdx['graphs'] = 'web.'.$profileSection.'.graphid';
-		$this->_profileIdx['drules'] = 'web.'.$profileSection.'.druleid';
 		$this->_profileIdx['severityMin'] = 'web.maps.severity_min';
 
 		if ($this->config['select_latest']) {
 			$this->_profileIds['groupid'] = CProfile::get(self::GROUP_LATEST_IDX);
 			$this->_profileIds['hostid'] = CProfile::get(self::HOST_LATEST_IDX);
 			$this->_profileIds['graphid'] = CProfile::get(self::GRAPH_LATEST_IDX);
-			$this->_profileIds['druleid'] = CProfile::get(self::DRULE_LATEST_IDX);
 		}
 		elseif ($this->config['DDReset'] && !$this->config['DDRemember']) {
 			$this->_profileIds['groupid'] = 0;
 			$this->_profileIds['hostid'] = 0;
 			$this->_profileIds['graphid'] = 0;
-			$this->_profileIds['druleid'] = 0;
 		}
 		else {
 			$this->_profileIds['groupid'] = CProfile::get($this->_profileIdx['groups']);
 			$this->_profileIds['hostid'] = CProfile::get($this->_profileIdx['hosts']);
 			$this->_profileIds['graphid'] = CProfile::get($this->_profileIdx['graphs']);
-			$this->_profileIds['druleid'] = CProfile::get($this->_profileIdx['drules']);
 		}
 
 		// minimum severity
@@ -325,7 +308,6 @@ class CPageFilter {
 		$this->_requestIds['groupid'] = isset($options['groupid']) ? $options['groupid'] : null;
 		$this->_requestIds['hostid'] = isset($options['hostid']) ? $options['hostid'] : null;
 		$this->_requestIds['graphid'] = isset($options['graphid']) ? $options['graphid'] : null;
-		$this->_requestIds['druleid'] = isset($options['druleid']) ? $options['druleid'] : null;
 		$this->_requestIds['severityMin'] = isset($options['severityMin']) ? $options['severityMin'] : null;
 	}
 
@@ -383,31 +365,52 @@ class CPageFilter {
 	private function _initGroups($groupId, array $options, $hostId) {
 		$defaultOptions = [
 			'output' => ['groupid', 'name'],
-			'preservekeys' => true,
-			'sortfield' => ['name']
+			'preservekeys' => true
 		];
 		$options = zbx_array_merge($defaultOptions, $options);
 		$this->data['groups'] = API::HostGroup()->get($options);
+		$this->data['groups'] = enrichParentGroups($this->data['groups']);
 
-		// select remembered selection
+		CArrayHelper::sort($this->data['groups'], ['name']);
+
+		// Select remembered selection.
 		if ($groupId === null && $this->_profileIds['groupid'] > 0) {
 			// set group only if host is in group or hostid is not set
 			$host = null;
 			$template = null;
 
 			if ($hostId) {
+				// Get child groups for "profileIds['groupid']".
+				$group = reset($this->data['groups']);
+				$profileids = [];
+
+				if (array_key_exists($this->_profileIds['groupid'], $this->data['groups'])) {
+					$profileids = [$this->_profileIds['groupid']];
+					$parent = $this->data['groups'][$this->_profileIds['groupid']]['name'].'/';
+				}
+				elseif (array_key_exists($group['groupid'], $this->data['groups'])) {
+					$profileids = [$group['groupid']];
+					$parent = $this->data['groups'][$group['groupid']]['name'].'/';
+				}
+
+				foreach ($this->data['groups'] as $group) {
+					if (strpos($group['name'], $parent) === 0) {
+						$profileids[] = $group['groupid'];
+					}
+				}
+
 				// Profile ID can contain zero, hence no host will be selected.
 				$host = API::Host()->get([
 					'output' => ['hostid'],
 					'hostids' => $hostId,
-					'groupids' => $this->_profileIds['groupid']
+					'groupids' => $profileids
 				]);
 
 				if (!$host) {
 					$template = API::Template()->get([
 						'output' => ['hostid'],
 						'templateids' => $hostId,
-						'groupids' => $this->_profileIds['groupid']
+						'groupids' => $profileids
 					]);
 				}
 			}
@@ -474,6 +477,19 @@ class CPageFilter {
 		$this->isSelected['groupsAll'] = ($firstIsAllAndHaveGroups && $groupId == 0);
 
 		$this->ids['groupid'] = $groupId;
+
+		if ($groupId != 0) {
+			$this->ids['groupids'] = [$groupId];
+			$parent = $this->data['groups'][$groupId]['name'].'/';
+			foreach ($this->data['groups'] as $group) {
+				if (strpos($group['name'], $parent) === 0) {
+					$this->ids['groupids'][] = $group['groupid'];
+				}
+			}
+		}
+		else {
+			$this->ids['groupids'] = null;
+		}
 	}
 
 	/**
@@ -499,7 +515,7 @@ class CPageFilter {
 		else {
 			$defaultOptions = [
 				'output' => ['hostid', 'name', 'status'],
-				'groupids' => ($this->groupid > 0) ? $this->groupid : null
+				'groupids' => $this->groupids
 			];
 			$hosts = API::Host()->get(zbx_array_merge($defaultOptions, $options));
 
@@ -511,8 +527,8 @@ class CPageFilter {
 				}
 			}
 
-			// select remembered selection
-			if ($hostId === null) {
+			// Select stored hostid, ignore zero value ('All hosts').
+			if ($hostId === null && $this->_profileIds['hostid'] > 0) {
 				$hostId = $this->_profileIds['hostid'];
 			}
 
@@ -556,7 +572,7 @@ class CPageFilter {
 		else {
 			$def_ptions = [
 				'output' => ['graphid', 'name'],
-				'groupids' => ($this->groupid > 0 && $this->hostid == 0) ? $this->groupid : null,
+				'groupids' => ($this->groupid > 0 && $this->hostid == 0) ? $this->groupids : null,
 				'hostids' => ($this->hostid > 0) ? $this->hostid : null,
 				'expandName' => true
 			];
@@ -604,56 +620,13 @@ class CPageFilter {
 	}
 
 	/**
-	 * Load the available network discovery rules, choose the selected rule and remember the selection.
-	 *
-	 * @param int   $druleid
-	 * @param array $options
-	 */
-	private function _initDiscoveries($druleid, array $options) {
-		$def_options = [
-			'output' => API_OUTPUT_EXTEND
-		];
-		$options = zbx_array_merge($def_options, $options);
-		$drules = API::DRule()->get($options);
-		order_result($drules, 'name');
-
-		$this->data['drules'] = [];
-		foreach ($drules as $drule) {
-			$this->data['drules'][$drule['druleid']] = $drule;
-		}
-
-		if (is_null($druleid)) {
-			$druleid = $this->_profileIds['druleid'];
-		}
-
-		if ((!isset($this->data['drules'][$druleid]) && $druleid > 0) || is_null($druleid)) {
-			if ($this->config['DDFirst'] == ZBX_DROPDOWN_FIRST_NONE) {
-				$druleid = 0;
-			}
-			elseif (is_null($this->_requestIds['druleid']) || $this->_requestIds['druleid'] > 0) {
-				$druleids = array_keys($this->data['drules']);
-				$druleid = empty($druleids) ? 0 : reset($druleids);
-			}
-		}
-
-		CProfile::update($this->_profileIdx['drules'], $druleid, PROFILE_TYPE_ID);
-		CProfile::update(self::DRULE_LATEST_IDX, $druleid, PROFILE_TYPE_ID);
-
-		$this->isSelected['drulesSelected'] = ($this->config['DDFirst'] == ZBX_DROPDOWN_FIRST_ALL && !empty($this->data['drules'])) || $druleid > 0;
-		$this->isSelected['drulesAll'] = $this->config['DDFirst'] == ZBX_DROPDOWN_FIRST_ALL && !empty($this->data['drules']) && $druleid == 0;
-		$this->ids['druleid'] = $druleid;
-	}
-
-	/**
 	 * Initialize minimum trigger severities.
 	 *
-	 * @param string $severityMin			minimum trigger severity
+	 * @param string $severityMin			minimum severity
 	 * @param array  $options				array of options
 	 * @param int    $options['default']	default severity
 	 * @param string $options['mapId']		ID of a map
 	 * @param array	 $config				array of configuration parameters for getting severity names
-	 *
-	 * @return void
 	 */
 	private function _initSeveritiesMin($severityMin, array $options, array $config) {
 		$default = isset($options['default']) ? $options['default'] : TRIGGER_SEVERITY_NOT_CLASSIFIED;
@@ -691,30 +664,43 @@ class CPageFilter {
 	/**
 	 * Get hosts combobox with selected item.
 	 *
+	 * @param array  $options
+	 * @param array  $options['action']		onChange action.
+	 *
 	 * @return CComboBox
 	 */
-	public function getHostsCB() {
+	public function getHostsCB(array $options = []) {
 		$items = $classes = [];
 		foreach ($this->hosts as $id => $host) {
 			$items[$id] = $host['name'];
 			$classes[$id] = ($host['status'] == HOST_STATUS_NOT_MONITORED) ? ZBX_STYLE_RED : null;
 		}
-		$options = ['objectName' => 'hosts', 'classes' => $classes];
+		$options += ['objectName' => 'hosts', 'classes' => $classes];
 
-		return $this->_getCB('hostid', $this->hostid, $items, $options);
+		return $this->_getCB('hostid', $this->hostid, $items, $options)
+					->addStyle('max-width: '.ZBX_TEXTAREA_FILTER_STANDARD_WIDTH.'px;');
 	}
 
 	/**
 	 * Get host groups combobox with selected item.
 	 *
+	 * @param array  $options
+	 * @param array  $options['action']		onChange action.
+	 *
 	 * @return CComboBox
 	 */
-	public function getGroupsCB() {
+	public function getGroupsCB(array $options = []) {
 		$items = [];
 		foreach ($this->groups as $id => $group) {
 			$items[$id] = $group['name'];
 		}
-		return $this->_getCB('groupid', $this->groupid, $items, ['objectName' => 'groups']);
+
+		$options += [
+			'objectName' => 'groups'
+		];
+
+		return $this->_getCB('groupid', $this->groupid, $items, $options)
+					->addStyle('max-width: '.ZBX_TEXTAREA_FILTER_STANDARD_WIDTH.'px;');
 	}
 
 	/**
@@ -740,19 +726,6 @@ class CPageFilter {
 	}
 
 	/**
-	 * Get discovery rules combobox with selected item.
-	 *
-	 * @return CComboBox
-	 */
-	public function getDiscoveryCB() {
-		$items = [];
-		foreach ($this->drules as $id => $drule) {
-			$items[$id] = $drule['name'];
-		}
-		return $this->_getCB('druleid', $this->druleid, $items, ['objectName' => 'discovery']);
-	}
-
-	/**
 	 * Get minimum trigger severities combobox with selected item.
 	 *
 	 * @return CComboBox
@@ -772,11 +745,16 @@ class CPageFilter {
 	 * @param array  $options
 	 * @param string $options['objectName']
 	 * @param array  $options['classes']	array of class names for the combobox options with item IDs as keys
+	 * @param array  $options['action']		onChange action. Default value is 'submit()'.
 	 *
 	 * @return CComboBox
 	 */
 	private function _getCB($name, $selectedId, $items, array $options = []) {
-		$comboBox = new CComboBox($name, $selectedId, 'javascript: submit();');
+		if (!array_key_exists('action', $options)) {
+			$options['action'] = 'javascript: submit();';
+		}
+
+		$comboBox = (new CComboBox($name, $selectedId, $options['action']))->removeId();
 
 		natcasesort($items);
 

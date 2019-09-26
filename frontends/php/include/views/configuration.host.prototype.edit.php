@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -25,51 +25,41 @@ $parentHost = $data['parent_host'];
 
 require_once dirname(__FILE__).'/js/configuration.host.edit.js.php';
 require_once dirname(__FILE__).'/js/configuration.host.prototype.edit.js.php';
+require_once dirname(__FILE__).'/js/common.template.edit.js.php';
 
 $widget = (new CWidget())
 	->setTitle(_('Host prototypes'))
 	->addItem(get_header_host_table('hosts', $discoveryRule['hostid'], $discoveryRule['itemid']));
 
 $divTabs = new CTabView();
-if (!isset($_REQUEST['form_refresh'])) {
+if (!hasRequest('form_refresh')) {
 	$divTabs->setSelected(0);
 }
 
 $frmHost = (new CForm())
-	->setName('hostPrototypeForm.')
+	->setId('hostPrototypeForm')
+	->setName('hostPrototypeForm')
+	->setAttribute('aria-labeledby', ZBX_STYLE_PAGE_TITLE)
 	->addVar('form', getRequest('form', 1))
 	->addVar('parent_discoveryid', $discoveryRule['itemid'])
 	->addVar('tls_accept', $parentHost['tls_accept']);
 
-$hostList = new CFormList('hostlist');
-
-if ($hostPrototype['templateid'] && $data['parents']) {
-	$parents = [];
-	foreach (array_reverse($data['parents']) as $parent) {
-		if (array_key_exists($parent['parentHost']['hostid'], $hostPrototype['writable_templates'])) {
-			$parents[] = new CLink($parent['parentHost']['name'],
-				'?form=update&hostid='.$parent['hostid'].'&parent_discoveryid='.$parent['discoveryRule']['itemid']
-			);
-		}
-		else {
-			$parents[] = new CSpan($parent['parentHost']['name']);
-		}
-
-		$parents[] = SPACE.'&rArr;'.SPACE;
-	}
-	array_pop($parents);
-	$hostList->addRow(_('Parent discovery rules'), $parents);
+if ($hostPrototype['hostid'] != 0) {
+	$frmHost->addVar('hostid', $hostPrototype['hostid']);
 }
 
-if (isset($hostPrototype['hostid'])) {
-	$frmHost->addVar('hostid', $hostPrototype['hostid']);
+$hostList = new CFormList('hostlist');
+
+if ($data['templates']) {
+	$hostList->addRow(_('Parent discovery rules'), $data['templates']);
 }
 
 $hostTB = (new CTextBox('host', $hostPrototype['host'], (bool) $hostPrototype['templateid']))
 	->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
 	->setAttribute('maxlength', 128)
+	->setAriaRequired()
 	->setAttribute('autofocus', 'autofocus');
-$hostList->addRow(_('Host name'), $hostTB);
+$hostList->addRow((new CLabel(_('Host name'), 'host'))->setAsteriskMark(), $hostTB);
 
 $name = ($hostPrototype['name'] != $hostPrototype['host']) ? $hostPrototype['name'] : '';
 $visiblenameTB = (new CTextBox('name', $name, (bool) $hostPrototype['templateid']))
@@ -173,7 +163,7 @@ if ($parentHost['status'] != HOST_STATUS_TEMPLATE) {
 	$hostList->addRow(_('Monitored by proxy'), $proxyTb);
 }
 
-$hostList->addRow(_('Enabled'),
+$hostList->addRow(_('Create enabled'),
 	(new CCheckBox('status', HOST_STATUS_MONITORED))
 		->setChecked(HOST_STATUS_MONITORED == $hostPrototype['status'])
 );
@@ -188,24 +178,30 @@ $groups = [];
 foreach ($data['groups'] as $group) {
 	$groups[] = [
 		'id' => $group['groupid'],
-		'name' => $group['name']
+		'name' => $group['name'],
+		'inaccessible' => (array_key_exists('inaccessible', $group) && $group['inaccessible'])
 	];
 }
-$groupList->addRow(_('Groups'),
+$groupList->addRow(
+	(new CLabel(_('Groups'), 'group_links__ms'))->setAsteriskMark(),
 	(new CMultiSelect([
 		'name' => 'group_links[]',
-		'objectName' => 'hostGroup',
-		'objectOptions' => [
-			'editable' => true,
-			'filter' => ['flags' => ZBX_FLAG_DISCOVERY_NORMAL]
-		],
-		'data' => $groups,
+		'object_name' => 'hostGroup',
 		'disabled' => (bool) $hostPrototype['templateid'],
+		'data' => $groups,
 		'popup' => [
-			'parameters' => 'srctbl=host_groups&dstfrm='.$frmHost->getName().'&dstfld1=group_links_'.
-				'&srcfld1=groupid&writeonly=1&multiselect=1&normal_only=1'
+			'parameters' => [
+				'srctbl' => 'host_groups',
+				'srcfld1' => 'groupid',
+				'dstfrm' => $frmHost->getName(),
+				'dstfld1' => 'group_links_',
+				'editable' => true,
+				'normal_only' => true
+			]
 		]
-	]))->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
+	]))
+		->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
+		->setAriaRequired()
 );
 
 // new group prototypes
@@ -255,7 +251,7 @@ if ($hostPrototype['templateid']) {
 	);
 }
 else {
-	$ignoreTemplates = [];
+	$disableids = [];
 
 	$linkedTemplateTable = (new CTable())
 		->setAttribute('style', 'width: 100%;')
@@ -284,36 +280,26 @@ else {
 			))->addClass(ZBX_STYLE_NOWRAP)
 		]);
 
-		$ignoreTemplates[$template['templateid']] = $template['name'];
+		$disableids[] = $template['templateid'];
 	}
+
+	$linkedTemplateTable->addRow([
+		(new CSimpleButton(_('Add')))
+			->onClick('return PopUp("popup.generic",'.CJs::encodeJson([
+				'dstfrm' => $frmHost->getName(),
+				'dstfld1' => $frmHost->getName(),
+				'srctbl' => 'templates',
+				'srcfld1' => 'hostid',
+				'templated_hosts' => '1',
+				'popup_type' => 'templates',
+				'multiselect' => 1,
+				'disableids' => $disableids
+			]).', null, this);')
+			->addClass(ZBX_STYLE_BTN_LINK)
+	]);
 
 	$tmplList->addRow(_('Linked templates'),
 		(new CDiv($linkedTemplateTable))
-			->addClass(ZBX_STYLE_TABLE_FORMS_SEPARATOR)
-			->setAttribute('style', 'min-width: '.ZBX_TEXTAREA_BIG_WIDTH.'px;')
-	);
-
-	// create new linked template table
-	$newTemplateTable = (new CTable())
-		->addRow([
-			(new CMultiSelect([
-				'name' => 'add_templates[]',
-				'objectName' => 'templates',
-				'ignored' => $ignoreTemplates,
-				'popup' => [
-					'parameters' => 'srctbl=templates&srcfld1=hostid&srcfld2=host&dstfrm='.$frmHost->getName().
-						'&dstfld1=add_templates_&templated_hosts=1&multiselect=1'
-				]
-			]))->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
-		])
-		->addRow([
-			(new CSimpleButton(_('Add')))
-				->onClick('javascript: submitFormWithParam("'.$frmHost->getName().'", "add_template", "1");')
-				->addClass(ZBX_STYLE_BTN_LINK)
-		]);
-
-	$tmplList->addRow(_('Link new templates'),
-		(new CDiv($newTemplateTable))
 			->addClass(ZBX_STYLE_TABLE_FORMS_SEPARATOR)
 			->setAttribute('style', 'min-width: '.ZBX_TEXTAREA_BIG_WIDTH.'px;')
 	);
@@ -367,11 +353,11 @@ $inventoryFormList = (new CFormList('inventorylist'))
 			->addValue(_('Disabled'), HOST_INVENTORY_DISABLED)
 			->addValue(_('Manual'), HOST_INVENTORY_MANUAL)
 			->addValue(_('Automatic'), HOST_INVENTORY_AUTOMATIC)
-			->setEnabled($hostPrototype['templateid'] == 0)
+			->setReadonly($hostPrototype['templateid'] != 0)
 			->setModern(true)
 	);
 
-$divTabs->addTab('inventoryTab', _('Host inventory'), $inventoryFormList);
+$divTabs->addTab('inventoryTab', _('Inventory'), $inventoryFormList);
 
 // Encryption form list.
 $encryption_form_list = (new CFormList('encryption'))
@@ -383,13 +369,22 @@ $encryption_form_list = (new CFormList('encryption'))
 			->setModern(true)
 			->setEnabled(false)
 	)
-	->addRow(_('Connections from host'), [
-		new CLabel([(new CCheckBox('tls_in_none'))->setAttribute('disabled', 'disabled'), _('No encryption')]),
-		BR(),
-		new CLabel([(new CCheckBox('tls_in_psk'))->setAttribute('disabled', 'disabled'), _('PSK')]),
-		BR(),
-		new CLabel([(new CCheckBox('tls_in_cert'))->setAttribute('disabled', 'disabled'), _('Certificate')])
-	])
+	->addRow(_('Connections from host'),
+		(new CList())
+			->addClass(ZBX_STYLE_LIST_CHECK_RADIO)
+			->addItem((new CCheckBox('tls_in_none'))
+				->setLabel(_('No encryption'))
+				->setAttribute('disabled', 'disabled')
+			)
+			->addItem((new CCheckBox('tls_in_psk'))
+				->setLabel(_('PSK'))
+				->setAttribute('disabled', 'disabled')
+			)
+			->addItem((new CCheckBox('tls_in_cert'))
+				->setLabel(_('Certificate'))
+				->setAttribute('disabled', 'disabled')
+			)
+	)
 	->addRow(_('PSK identity'),
 		(new CTextBox('tls_psk_identity', $parentHost['tls_psk_identity'], false, 128))
 			->setWidth(ZBX_TEXTAREA_BIG_WIDTH)
@@ -416,7 +411,7 @@ $divTabs->addTab('encryptionTab', _('Encryption'), $encryption_form_list);
 /*
  * footer
  */
-if (isset($hostPrototype['hostid'])) {
+if ($hostPrototype['hostid'] != 0) {
 	$btnDelete = new CButtonDelete(
 		_('Delete selected host prototype?'),
 		url_param('form').url_param('hostid').url_param('parent_discoveryid')

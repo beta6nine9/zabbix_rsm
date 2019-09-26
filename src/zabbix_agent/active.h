@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -26,6 +26,8 @@ extern char	*CONFIG_SOURCE_IP;
 extern char	*CONFIG_HOSTNAME;
 extern char	*CONFIG_HOST_METADATA;
 extern char	*CONFIG_HOST_METADATA_ITEM;
+extern char	*CONFIG_HOST_INTERFACE;
+extern char	*CONFIG_HOST_INTERFACE_ITEM;
 extern int	CONFIG_REFRESH_ACTIVE_CHECKS;
 extern int	CONFIG_BUFFER_SEND;
 extern int	CONFIG_BUFFER_SIZE;
@@ -33,12 +35,8 @@ extern int	CONFIG_MAX_LINES_PER_SECOND;
 extern char	*CONFIG_LISTEN_IP;
 extern int	CONFIG_LISTEN_PORT;
 
-/* define minimal and maximal values of lines to send by agent */
-/* per second for checks `log' and `eventlog', used to parse key parameters */
-#define	MIN_VALUE_LINES	1
-#define	MAX_VALUE_LINES	1000
-
 #define HOST_METADATA_LEN	255	/* UTF-8 characters, not bytes */
+#define HOST_INTERFACE_LEN	255	/* UTF-8 characters, not bytes */
 
 /* Windows event types for `eventlog' check */
 #ifdef _WINDOWS
@@ -65,38 +63,6 @@ extern int	CONFIG_LISTEN_PORT;
 #	endif
 #endif	/* _WINDOWS */
 
-/* NB! Next list must fit in unsigned char (see ZBX_ACTIVE_METRIC "flags" field below). */
-#define ZBX_METRIC_FLAG_PERSISTENT	0x01	/* do not overwrite old values when adding to the buffer */
-#define ZBX_METRIC_FLAG_NEW		0x02	/* new metric, just added */
-#define ZBX_METRIC_FLAG_LOG_LOG		0x04	/* log[ */
-#define ZBX_METRIC_FLAG_LOG_LOGRT	0x08	/* logrt[ */
-#define ZBX_METRIC_FLAG_LOG_EVENTLOG	0x10	/* eventlog[ */
-#define ZBX_METRIC_FLAG_LOG			/* item for log file monitoring, one of the above */	\
-		(ZBX_METRIC_FLAG_LOG_LOG | ZBX_METRIC_FLAG_LOG_LOGRT | ZBX_METRIC_FLAG_LOG_EVENTLOG)
-
-typedef struct
-{
-	char			*key;
-	char			*key_orig;
-	zbx_uint64_t		lastlogsize;
-	int			refresh;
-	int			nextcheck;
-	int			mtime;
-	unsigned char		skip_old_data;	/* for processing [event]log metrics */
-	unsigned char		flags;
-	unsigned char		state;
-	unsigned char		refresh_unsupported;	/* re-check notsupported item */
-	int			big_rec;	/* for logfile reading: 0 - normal record, 1 - long unfinished record */
-	int			use_ino;	/* 0 - do not use inodes (on FAT, FAT32) */
-						/* 1 - use inodes (up to 64-bit) (various UNIX file systems, NTFS) */
-						/* 2 - use 128-bit FileID (currently only on ReFS) to identify files */
-						/* on a file system */
-	int			error_count;	/* number of file reading errors in consecutive checks */
-	int			logfiles_num;
-	struct st_logfile	*logfiles;	/* for handling of logfile rotation for logrt[] items */
-}
-ZBX_ACTIVE_METRIC;
-
 typedef struct
 {
 	char		*host;
@@ -118,6 +84,7 @@ typedef struct
 	int		logeventid;
 	int		mtime;
 	unsigned char	flags;
+	zbx_uint64_t	id;
 }
 ZBX_ACTIVE_BUFFER_ELEMENT;
 

@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -81,14 +81,14 @@ class CApiService {
 			'filter'				=> null,
 			'search'				=> null,
 			'searchByAny'			=> null,
-			'startSearch'			=> null,
-			'excludeSearch'			=> null,
+			'startSearch'			=> false,
+			'excludeSearch'			=> false,
 			'searchWildcardsEnabled'=> null,
 			// output
 			'output'				=> API_OUTPUT_EXTEND,
-			'countOutput'			=> null,
-			'groupCount'			=> null,
-			'preservekeys'			=> null,
+			'countOutput'			=> false,
+			'groupCount'			=> false,
+			'preservekeys'			=> false,
 			'limit'					=> null
 		];
 		$this->getOptions = $this->globalGetOptions;
@@ -349,7 +349,7 @@ class CApiService {
 
 		$objects = DBfetchArray(DBSelect($sql, $limit));
 
-		if (isset($options['preservekeys'])) {
+		if (array_key_exists('preservekeys', $options) && $options['preservekeys']) {
 			$rs = [];
 			foreach ($objects as $object) {
 				$rs[$object[$this->pk($tableName)]] = $object;
@@ -418,15 +418,27 @@ class CApiService {
 	 * @return string			The resulting SQL query
 	 */
 	protected function createSelectQueryFromParts(array $sqlParts) {
-		// build query
+		$sql_left_join = '';
+		if (array_key_exists('left_join', $sqlParts)) {
+			foreach ($sqlParts['left_join'] as $join) {
+				$sql_left_join .= ' LEFT JOIN '.$join['from'].' ON '.$join['on'];
+			}
+
+			// Moving a left table to the end.
+			$left_table = $sqlParts['from'][$sqlParts['left_table']];
+			unset($sqlParts['from'][$sqlParts['left_table']]);
+			$sqlParts['from'][$sqlParts['left_table']] = $left_table;
+		}
+
 		$sqlSelect = implode(',', array_unique($sqlParts['select']));
 		$sqlFrom = implode(',', array_unique($sqlParts['from']));
 		$sqlWhere = empty($sqlParts['where']) ? '' : ' WHERE '.implode(' AND ', array_unique($sqlParts['where']));
 		$sqlGroup = empty($sqlParts['group']) ? '' : ' GROUP BY '.implode(',', array_unique($sqlParts['group']));
 		$sqlOrder = empty($sqlParts['order']) ? '' : ' ORDER BY '.implode(',', array_unique($sqlParts['order']));
 
-		return 'SELECT '.zbx_db_distinct($sqlParts).' '.$sqlSelect.
+		return 'SELECT'.zbx_db_distinct($sqlParts).' '.$sqlSelect.
 				' FROM '.$sqlFrom.
+				$sql_left_join.
 				$sqlWhere.
 				$sqlGroup.
 				$sqlOrder;
@@ -443,14 +455,19 @@ class CApiService {
 	 * @return array		The resulting SQL parts array
 	 */
 	protected function applyQueryOutputOptions($tableName, $tableAlias, array $options, array $sqlParts) {
-		$pkFieldId = $this->fieldId($this->pk($tableName), $tableAlias);
+		// If table do not have a primary key, use COUNT(*) to select number of rows.
+		$pk = $this->pk($tableName);
+		$pkFieldId = $this->fieldId($pk, $tableAlias);
 
 		// count
-		if (isset($options['countOutput']) && !$this->requiresPostSqlFiltering($options)) {
-			$sqlParts['select'] = ['COUNT(DISTINCT '.$pkFieldId.') AS rowscount'];
+		if (array_key_exists('countOutput', $options) && $options['countOutput']
+				&& !$this->requiresPostSqlFiltering($options)) {
+			$sqlParts['select'] = ($pk !== '')
+				? ['COUNT(DISTINCT '.$pkFieldId.') AS rowscount']
+				: ['COUNT(*) AS rowscount'];
 
 			// select columns used by group count
-			if (isset($options['groupCount'])) {
+			if (array_key_exists('groupCount', $options) && $options['groupCount']) {
 				foreach ($sqlParts['group'] as $fields) {
 					$sqlParts['select'][] = $fields;
 				}
@@ -459,7 +476,7 @@ class CApiService {
 		// custom output
 		elseif (is_array($options['output'])) {
 			// the pk field must always be included for the API to work properly
-			$sqlParts['select'] = [$pkFieldId];
+			$sqlParts['select'] = ($pk !== '') ? [$pkFieldId] : [];
 			foreach ($options['output'] as $field) {
 				if ($this->hasField($field, $tableName)) {
 					$sqlParts['select'][] = $this->fieldId($field, $tableAlias);
@@ -563,7 +580,7 @@ class CApiService {
 	 */
 	protected function applyQuerySortField($sortfield, $sortorder, $alias, array $sqlParts) {
 		// add sort field to select if distinct is used
-		if (count($sqlParts['from']) > 1
+		if ((count($sqlParts['from']) > 1 || (isset($sqlParts['left_join']) && count($sqlParts['left_join'])))
 				&& !str_in_array($alias.'.'.$sortfield, $sqlParts['select'])
 				&& !str_in_array($alias.'.*', $sqlParts['select'])) {
 
@@ -631,8 +648,8 @@ class CApiService {
 	 * Adds the related objects requested by "select*" options to the resulting object set.
 	 *
 	 * @param array $options
-	 * @param array $result		an object hash with PKs as keys
-
+	 * @param array $result   An object hash with PKs as keys.
+	 *
 	 * @return array mixed
 	 */
 	protected function addRelatedObjects(array $options, array $result) {
@@ -702,7 +719,7 @@ class CApiService {
 
 	/**
 	 * For each object in $objects the method copies fields listed in $fields that are not present in the target
-	 * object from from the source object.
+	 * object from the source object.
 	 *
 	 * Matching objects in both arrays must have the same keys.
 	 *
@@ -739,7 +756,7 @@ class CApiService {
 		$fields = array_flip($fields);
 
 		foreach ($objects as &$object) {
-			if (array_key_exists($object[$field_name], $source)) {
+			if (array_key_exists($field_name, $object) && array_key_exists($object[$field_name], $source)) {
 				$object += array_intersect_key($source[$object[$field_name]], $fields);
 			}
 		}
@@ -864,9 +881,19 @@ class CApiService {
 			zbx_value2array($value);
 
 			$fieldName = $this->fieldId($field, $tableShort);
-			$filter[$field] = DB::isNumericFieldType($tableSchema['fields'][$field]['type'])
-				? dbConditionInt($fieldName, $value)
-				: dbConditionString($fieldName, $value);
+			switch ($tableSchema['fields'][$field]['type']) {
+				case DB::FIELD_TYPE_ID:
+					$filter[$field] = dbConditionId($fieldName, $value);
+					break;
+
+				case DB::FIELD_TYPE_INT:
+				case DB::FIELD_TYPE_UINT:
+					$filter[$field] = dbConditionInt($fieldName, $value);
+					break;
+
+				default:
+					$filter[$field] = dbConditionString($fieldName, $value);
+			}
 		}
 
 		if ($filter) {
@@ -915,7 +942,7 @@ class CApiService {
 	}
 
 	/**
-	 * Check if a set of parameters contains a deprecated parameter or a a parameter with a deprecated value.
+	 * Check if a set of parameters contains a deprecated parameter or a parameter with a deprecated value.
 	 * If $value is not set, the method will trigger a deprecated notice if $params contains the $paramName key.
 	 * If $value is set, the method will trigger a notice if the value of the parameter is equal to the deprecated value
 	 * or the parameter is an array and contains a deprecated value.
@@ -923,8 +950,6 @@ class CApiService {
 	 * @param array  $params
 	 * @param string $paramName
 	 * @param string $value
-	 *
-	 * @return void
 	 */
 	protected function checkDeprecatedParam(array $params, $paramName, $value = null) {
 		if (isset($params[$paramName])) {
@@ -1069,5 +1094,37 @@ class CApiService {
 		// must be implemented in each API separately
 
 		return $elements;
+	}
+
+	/**
+	 * Add simple audit record.
+	 *
+	 * @param int    $action        AUDIT_ACTION_*
+	 * @param int    $resourcetype  AUDIT_RESOURCE_*
+	 * @param string $details
+	 * @param string $userid
+	 * @param string $ip
+	 */
+	protected function addAuditDetails($action, $resourcetype, $details = '', $userid = null, $ip = null) {
+		if ($userid === null) {
+			$userid = self::$userData['userid'];
+			$ip = self::$userData['userip'];
+		}
+
+		CAudit::addDetails($userid, $ip, $action, $resourcetype, $details);
+	}
+
+	/**
+	 * Add audit records.
+	 *
+	 * @param int    $action        AUDIT_ACTION_*
+	 * @param int    $resourcetype  AUDIT_RESOURCE_*
+	 * @param array  $objects
+	 * @param array  $objects_old
+	 */
+	protected function addAuditBulk($action, $resourcetype, array $objects, array $objects_old = null) {
+		CAudit::addBulk(self::$userData['userid'], self::$userData['userip'], $action, $resourcetype, $objects,
+			$objects_old
+		);
 	}
 }

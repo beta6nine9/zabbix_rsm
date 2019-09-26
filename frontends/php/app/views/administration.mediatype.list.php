@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -20,14 +20,35 @@
 
 
 if ($data['uncheck']) {
-	uncheckTableRows();
+	uncheckTableRows('mediatype');
 }
 
 $widget = (new CWidget())
 	->setTitle(_('Media types'))
-	->setControls((new CForm())
-		->cleanItems()
-		->addItem((new CList())->addItem(new CRedirectButton(_('Create media type'), 'zabbix.php?action=mediatype.edit')))
+	->setControls((new CTag('nav', true,
+		(new CList())
+			->addItem(new CRedirectButton(_('Create media type'), 'zabbix.php?action=mediatype.edit'))
+		))
+			->setAttribute('aria-label', _('Content controls'))
+	)
+	->addItem((new CFilter((new CUrl('zabbix.php'))->setArgument('action', 'mediatype.list')))
+		->setProfile($data['profileIdx'])
+		->setActiveTab($data['active_tab'])
+		->addFilterTab(_('Filter'), [
+			(new CFormList())->addRow(_('Name'),
+				(new CTextBox('filter_name', $data['filter']['name']))
+					->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH)
+					->setAttribute('autofocus', 'autofocus')
+			),
+			(new CFormList())->addRow(_('Status'),
+				(new CRadioButtonList('filter_status', (int) $data['filter']['status']))
+					->addValue(_('Any'), -1)
+					->addValue(_('Enabled'), MEDIA_TYPE_STATUS_ACTIVE)
+					->addValue(_('Disabled'), MEDIA_TYPE_STATUS_DISABLED)
+					->setModern(true)
+			)
+		])
+		->addVar('action', 'mediatype.list')
 	);
 
 // create form
@@ -40,11 +61,12 @@ $mediaTypeTable = (new CTableInfo())
 			(new CCheckBox('all_media_types'))
 				->onClick("checkAll('".$mediaTypeForm->getName()."', 'all_media_types', 'mediatypeids');")
 		))->addClass(ZBX_STYLE_CELL_WIDTH),
-		make_sorting_header(_('Name'), 'description', $data['sort'], $data['sortorder']),
+		make_sorting_header(_('Name'), 'name', $data['sort'], $data['sortorder']),
 		make_sorting_header(_('Type'), 'type', $data['sort'], $data['sortorder']),
 		_('Status'),
 		_('Used in actions'),
-		_('Details')
+		_('Details'),
+		_('Action')
 	]);
 
 foreach ($data['mediatypes'] as $mediaType) {
@@ -62,14 +84,6 @@ foreach ($data['mediatypes'] as $mediaType) {
 
 		case MEDIA_TYPE_SMS:
 			$details = _('GSM modem').NAME_DELIMITER.'"'.$mediaType['gsm_modem'].'"';
-			break;
-
-		case MEDIA_TYPE_JABBER:
-			$details = _('Jabber identifier').NAME_DELIMITER.'"'.$mediaType['username'].'"';
-			break;
-
-		case MEDIA_TYPE_EZ_TEXTING:
-			$details = _('Username').NAME_DELIMITER.'"'.$mediaType['username'].'"';
 			break;
 
 		default:
@@ -109,7 +123,14 @@ foreach ($data['mediatypes'] as $mediaType) {
 			->addClass(ZBX_STYLE_RED)
 			->addSID();
 
-	$name = new CLink($mediaType['description'], '?action=mediatype.edit&mediatypeid='.$mediaType['mediatypeid']);
+	$test_link = (new CButton('mediatypetest_edit', _('Test')))
+		->addClass(ZBX_STYLE_BTN_LINK)
+		->setEnabled(MEDIA_TYPE_STATUS_ACTIVE == $mediaType['status'])
+		->onClick('return PopUp("popup.mediatypetest.edit",'.CJs::encodeJson([
+			'mediatypeid' => $mediaType['mediatypeid']
+		]).', "mediatypetest_edit", this);');
+
+	$name = new CLink($mediaType['name'], '?action=mediatype.edit&mediatypeid='.$mediaType['mediatypeid']);
 
 	// append row
 	$mediaTypeTable->addRow([
@@ -118,7 +139,8 @@ foreach ($data['mediatypes'] as $mediaType) {
 		media_type2str($mediaType['typeid']),
 		$status,
 		$actionColumn,
-		$details
+		$details,
+		$test_link
 	]);
 }
 
@@ -130,7 +152,7 @@ $mediaTypeForm->addItem([
 		'mediatype.enable' => ['name' => _('Enable'), 'confirm' => _('Enable selected media types?')],
 		'mediatype.disable' => ['name' => _('Disable'), 'confirm' => _('Disable selected media types?')],
 		'mediatype.delete' => ['name' => _('Delete'), 'confirm' => _('Delete selected media types?')]
-	])
+	], 'mediatype')
 ]);
 
 // append form to widget

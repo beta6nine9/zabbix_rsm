@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -103,17 +103,26 @@ static int	get_dmi_info(char *buf, int bufsize, int flags)
 	static long	pagesize = 0;
 	static int	smbios_status = SMBIOS_STATUS_UNKNOWN;
 	static size_t	smbios_len, smbios;	/* length and address of SMBIOS table (if found) */
-	zbx_stat_t	file_buf;
 
 	if (-1 != (fd = open(SYS_TABLE_FILE, O_RDONLY)))
 	{
+		ssize_t		nbytes;
+		zbx_stat_t	file_buf;
+
 		if (-1 == fstat(fd, &file_buf))
 			goto close;
 
-		smbuf = zbx_malloc(NULL, file_buf.st_size);
+		smbuf = (unsigned char *)zbx_malloc(NULL, file_buf.st_size);
 
-		if (-1 == (ssize_t)(smbios_len = read(fd, smbuf, file_buf.st_size)))
-			goto clean;
+		smbios_len = 0;
+
+		while (0 != (nbytes = read(fd, smbuf + smbios_len, file_buf.st_size - smbios_len)))
+		{
+			if (-1 == nbytes)
+				goto clean;
+
+			smbios_len += (size_t)nbytes;
+		}
 	}
 	else if (-1 != (fd = open(DEV_MEM, O_RDONLY)))
 	{
@@ -153,7 +162,7 @@ static int	get_dmi_info(char *buf, int bufsize, int flags)
 			goto close;
 		}
 
-		smbuf = zbx_malloc(smbuf, smbios_len);
+		smbuf = (unsigned char *)zbx_malloc(smbuf, smbios_len);
 
 		len = smbios % pagesize;	/* mmp needs to be a multiple of pagesize for munmap */
 		if (MAP_FAILED == (mmp = mmap(0, len + smbios_len, PROT_READ, MAP_SHARED, fd, smbios - len)))
@@ -410,7 +419,7 @@ int     SYSTEM_HW_CPU(AGENT_REQUEST *request, AGENT_RESULT *result)
 	}
 
 	if (-1 != cur_cpu && (HW_CPU_ALL_CPUS == cpu || cpu == cur_cpu))	/* print info about the last cpu */
-		offset += print_freq(buffer + offset, sizeof(buffer) - offset, filter, cpu, maxfreq, curfreq);
+		print_freq(buffer + offset, sizeof(buffer) - offset, filter, cpu, maxfreq, curfreq);
 
 	SET_TEXT_RESULT(result, zbx_strdup(NULL, buffer + 1));	/* buf has a leading space or '\n' */
 

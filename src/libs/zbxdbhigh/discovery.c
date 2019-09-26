@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -21,6 +21,7 @@
 #include "db.h"
 #include "log.h"
 #include "events.h"
+#include "discovery.h"
 
 static DB_RESULT	discovery_get_dhost_by_value(zbx_uint64_t dcheckid, const char *value)
 {
@@ -43,7 +44,7 @@ static DB_RESULT	discovery_get_dhost_by_value(zbx_uint64_t dcheckid, const char 
 	return result;
 }
 
-static DB_RESULT	discovery_get_dhost_by_ip(zbx_uint64_t druleid, const char *ip)
+static DB_RESULT	discovery_get_dhost_by_ip_port(zbx_uint64_t druleid, const char *ip, int port)
 {
 	DB_RESULT	result;
 	char		*ip_esc;
@@ -56,8 +57,9 @@ static DB_RESULT	discovery_get_dhost_by_ip(zbx_uint64_t druleid, const char *ip)
 			" where ds.dhostid=dh.dhostid"
 				" and dh.druleid=" ZBX_FS_UI64
 				" and ds.ip" ZBX_SQL_STRCMP
+				" and ds.port=%d"
 			" order by dh.dhostid",
-			druleid, ZBX_SQL_STRVAL_EQ(ip_esc));
+			druleid, ZBX_SQL_STRVAL_EQ(ip_esc), port);
 
 	zbx_free(ip_esc);
 
@@ -73,16 +75,14 @@ static DB_RESULT	discovery_get_dhost_by_ip(zbx_uint64_t druleid, const char *ip)
  * Parameters: host ip address                                                *
  *                                                                            *
  ******************************************************************************/
-static void	discovery_separate_host(DB_DRULE *drule, DB_DHOST *dhost, const char *ip)
+static void	discovery_separate_host(const DB_DRULE *drule, DB_DHOST *dhost, const char *ip)
 {
-	const char	*__function_name = "discovery_separate_host";
-
 	DB_RESULT	result;
 	DB_ROW		row;
 	char		*ip_esc, *sql = NULL;
 	zbx_uint64_t	dhostid;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() ip:'%s'", __function_name, ip);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() ip:'%s'", __func__, ip);
 
 	ip_esc = DBdyn_escape_field("dservices", "ip", ip);
 
@@ -119,7 +119,7 @@ static void	discovery_separate_host(DB_DRULE *drule, DB_DHOST *dhost, const char
 	zbx_free(sql);
 	zbx_free(ip_esc);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
 /******************************************************************************
@@ -131,32 +131,33 @@ static void	discovery_separate_host(DB_DRULE *drule, DB_DHOST *dhost, const char
  * Parameters: host ip address                                                *
  *                                                                            *
  ******************************************************************************/
-static void	discovery_register_host(DB_DRULE *drule, DB_DCHECK *dcheck, DB_DHOST *dhost,
-		const char *ip, int status, const char *value)
+static void	discovery_register_host(const DB_DRULE *drule, zbx_uint64_t dcheckid, DB_DHOST *dhost,
+		const char *ip, int port, int status, const char *value)
 {
-	const char	*__function_name = "discovery_register_host";
-
 	DB_RESULT	result;
 	DB_ROW		row;
+	int		match_value = 0;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() ip:'%s' status:%d value:'%s'",
-			__function_name, ip, status, value);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() ip:'%s' status:%d value:'%s'", __func__, ip, status, value);
 
-	if (drule->unique_dcheckid == dcheck->dcheckid)
+	if (drule->unique_dcheckid == dcheckid)
 	{
-		result = discovery_get_dhost_by_value(dcheck->dcheckid, value);
+		result = discovery_get_dhost_by_value(dcheckid, value);
 
 		if (NULL == (row = DBfetch(result)))
 		{
 			DBfree_result(result);
 
-			result = discovery_get_dhost_by_ip(drule->druleid, ip);
+			result = discovery_get_dhost_by_ip_port(drule->druleid, ip, port);
 			row = DBfetch(result);
 		}
+		else
+			match_value = 1;
+
 	}
 	else
 	{
-		result = discovery_get_dhost_by_ip(drule->druleid, ip);
+		result = discovery_get_dhost_by_ip_port(drule->druleid, ip, port);
 		row = DBfetch(result);
 	}
 
@@ -185,12 +186,12 @@ static void	discovery_register_host(DB_DRULE *drule, DB_DCHECK *dcheck, DB_DHOST
 		dhost->lastup = atoi(row[2]);
 		dhost->lastdown = atoi(row[3]);
 
-		if (0 == drule->unique_dcheckid)
+		if (0 == match_value)
 			discovery_separate_host(drule, dhost, ip);
 	}
 	DBfree_result(result);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
 /******************************************************************************
@@ -202,37 +203,26 @@ static void	discovery_register_host(DB_DRULE *drule, DB_DCHECK *dcheck, DB_DHOST
  * Parameters: host ip address                                                *
  *                                                                            *
  ******************************************************************************/
-static void	discovery_register_service(DB_DRULE *drule, DB_DCHECK *dcheck,
-		DB_DHOST *dhost, DB_DSERVICE *dservice, const char *ip, const char *dns,
-		int port, int status)
+static void	discovery_register_service(zbx_uint64_t dcheckid, DB_DHOST *dhost, DB_DSERVICE *dservice,
+		const char *ip, const char *dns, int port, int status)
 {
-	const char	*__function_name = "discovery_register_service";
-
 	DB_RESULT	result;
 	DB_ROW		row;
-	char		*key_esc, *ip_esc, *dns_esc;
+	char		*ip_esc, *dns_esc;
 
 	zbx_uint64_t	dhostid;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() ip:'%s' port:%d key:'%s'",
-			__function_name, ip, port, dcheck->key_);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() ip:'%s' port:%d", __func__, ip, port);
 
-	key_esc = DBdyn_escape_field("dservices", "key_", dcheck->key_);
 	ip_esc = DBdyn_escape_field("dservices", "ip", ip);
 
 	result = DBselect(
 			"select dserviceid,dhostid,status,lastup,lastdown,value,dns"
 			" from dservices"
 			" where dcheckid=" ZBX_FS_UI64
-				" and type=%d"
-				" and key_" ZBX_SQL_STRCMP
 				" and ip" ZBX_SQL_STRCMP
 				" and port=%d",
-			dcheck->dcheckid,
-			dcheck->type,
-			ZBX_SQL_STRVAL_EQ(key_esc),
-			ZBX_SQL_STRVAL_EQ(ip_esc),
-			port);
+			dcheckid, ZBX_SQL_STRVAL_EQ(ip_esc), port);
 
 	if (NULL == (row = DBfetch(result)))
 	{
@@ -246,10 +236,10 @@ static void	discovery_register_service(DB_DRULE *drule, DB_DCHECK *dcheck,
 
 			dns_esc = DBdyn_escape_field("dservices", "dns", dns);
 
-			DBexecute("insert into dservices (dserviceid,dhostid,dcheckid,type,key_,ip,dns,port,status)"
-					" values (" ZBX_FS_UI64 "," ZBX_FS_UI64 "," ZBX_FS_UI64 ",%d,'%s','%s','%s',%d,%d)",
-					dservice->dserviceid, dhost->dhostid, dcheck->dcheckid, dcheck->type,
-					key_esc, ip_esc, dns_esc, port, dservice->status);
+			DBexecute("insert into dservices (dserviceid,dhostid,dcheckid,ip,dns,port,status)"
+					" values (" ZBX_FS_UI64 "," ZBX_FS_UI64 "," ZBX_FS_UI64 ",'%s','%s',%d,%d)",
+					dservice->dserviceid, dhost->dhostid, dcheckid, ip_esc, dns_esc, port,
+					dservice->status);
 
 			zbx_free(dns_esc);
 		}
@@ -292,9 +282,8 @@ static void	discovery_register_service(DB_DRULE *drule, DB_DCHECK *dcheck,
 	DBfree_result(result);
 
 	zbx_free(ip_esc);
-	zbx_free(key_esc);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
 /******************************************************************************
@@ -337,29 +326,55 @@ static void	discovery_update_dservice_value(zbx_uint64_t dserviceid, const char 
 
 /******************************************************************************
  *                                                                            *
+ * Function: discovery_update_dhost                                           *
+ *                                                                            *
+ * Purpose: update discovered host details                                    *
+ *                                                                            *
+ ******************************************************************************/
+static void	discovery_update_dhost(const DB_DHOST *dhost)
+{
+	DBexecute("update dhosts set status=%d,lastup=%d,lastdown=%d where dhostid=" ZBX_FS_UI64,
+			dhost->status, dhost->lastup, dhost->lastdown, dhost->dhostid);
+}
+
+/******************************************************************************
+ *                                                                            *
  * Function: discovery_update_service_status                                  *
  *                                                                            *
  * Purpose: process and update the new service status                         *
  *                                                                            *
  ******************************************************************************/
-static void	discovery_update_service_status(const DB_DSERVICE *dservice, int status, const char *value, int now)
+static void	discovery_update_service_status(DB_DHOST *dhost, const DB_DSERVICE *dservice, int service_status,
+		const char *value, int now)
 {
-	const char	*__function_name = "discovery_update_service_status";
-
 	zbx_timespec_t	ts;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
 	ts.sec = now;
 	ts.ns = 0;
 
-	if (DOBJECT_STATUS_UP == status)
+	if (DOBJECT_STATUS_UP == service_status)
 	{
 		if (DOBJECT_STATUS_DOWN == dservice->status || 0 == dservice->lastup)
 		{
-			discovery_update_dservice(dservice->dserviceid, status, now, 0, value);
-			add_event(0, EVENT_SOURCE_DISCOVERY, EVENT_OBJECT_DSERVICE, dservice->dserviceid, &ts,
-					DOBJECT_STATUS_DISCOVER, NULL, NULL, 0, 0);
+			discovery_update_dservice(dservice->dserviceid, service_status, now, 0, value);
+			zbx_add_event(EVENT_SOURCE_DISCOVERY, EVENT_OBJECT_DSERVICE, dservice->dserviceid, &ts,
+					DOBJECT_STATUS_DISCOVER, NULL, NULL, NULL, 0, 0, NULL, 0, NULL, 0, NULL, NULL);
+
+			if (DOBJECT_STATUS_DOWN == dhost->status)
+			{
+				/* Service went UP, but host status is DOWN. Update host status. */
+
+				dhost->status = DOBJECT_STATUS_UP;
+				dhost->lastup = now;
+				dhost->lastdown = 0;
+
+				discovery_update_dhost(dhost);
+				zbx_add_event(EVENT_SOURCE_DISCOVERY, EVENT_OBJECT_DHOST, dhost->dhostid, &ts,
+						DOBJECT_STATUS_DISCOVER, NULL, NULL, NULL, 0, 0, NULL,
+						0, NULL, 0, NULL, NULL);
+			}
 		}
 		else if (0 != strcmp(dservice->value, value))
 		{
@@ -370,30 +385,17 @@ static void	discovery_update_service_status(const DB_DSERVICE *dservice, int sta
 	{
 		if (DOBJECT_STATUS_UP == dservice->status || 0 == dservice->lastdown)
 		{
-			discovery_update_dservice(dservice->dserviceid, status, 0, now, dservice->value);
-			add_event(0, EVENT_SOURCE_DISCOVERY, EVENT_OBJECT_DSERVICE, dservice->dserviceid, &ts,
-					DOBJECT_STATUS_LOST, NULL, NULL, 0, 0);
+			discovery_update_dservice(dservice->dserviceid, service_status, 0, now, dservice->value);
+			zbx_add_event(EVENT_SOURCE_DISCOVERY, EVENT_OBJECT_DSERVICE, dservice->dserviceid, &ts,
+					DOBJECT_STATUS_LOST, NULL, NULL, NULL, 0, 0, NULL, 0, NULL, 0, NULL, NULL);
+
+			/* service went DOWN, no need to update host status here as other services may be UP */
 		}
 	}
-	add_event(0, EVENT_SOURCE_DISCOVERY, EVENT_OBJECT_DSERVICE, dservice->dserviceid, &ts, status,
-			NULL, NULL, 0, 0);
+	zbx_add_event(EVENT_SOURCE_DISCOVERY, EVENT_OBJECT_DSERVICE, dservice->dserviceid, &ts, service_status,
+			NULL, NULL, NULL, 0, 0, NULL, 0, NULL, 0, NULL, NULL);
 
-	process_events();
-
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __function_name);
-}
-
-/******************************************************************************
- *                                                                            *
- * Function: discovery_update_dhost                                           *
- *                                                                            *
- * Purpose: update discovered host details                                    *
- *                                                                            *
- ******************************************************************************/
-static void	discovery_update_dhost(DB_DHOST *dhost)
-{
-	DBexecute("update dhosts set status=%d,lastup=%d,lastdown=%d where dhostid=" ZBX_FS_UI64,
-			dhost->status, dhost->lastup, dhost->lastdown, dhost->dhostid);
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
 /******************************************************************************
@@ -420,8 +422,8 @@ static void	discovery_update_host_status(DB_DHOST *dhost, int status, int now)
 			dhost->lastup = now;
 
 			discovery_update_dhost(dhost);
-			add_event(0, EVENT_SOURCE_DISCOVERY, EVENT_OBJECT_DHOST, dhost->dhostid, &ts,
-					DOBJECT_STATUS_DISCOVER, NULL, NULL, 0, 0);
+			zbx_add_event(EVENT_SOURCE_DISCOVERY, EVENT_OBJECT_DHOST, dhost->dhostid, &ts,
+					DOBJECT_STATUS_DISCOVER, NULL, NULL, NULL, 0, 0, NULL, 0, NULL, 0, NULL, NULL);
 		}
 	}
 	else	/* DOBJECT_STATUS_DOWN */
@@ -433,13 +435,12 @@ static void	discovery_update_host_status(DB_DHOST *dhost, int status, int now)
 			dhost->lastup = 0;
 
 			discovery_update_dhost(dhost);
-			add_event(0, EVENT_SOURCE_DISCOVERY, EVENT_OBJECT_DHOST, dhost->dhostid, &ts,
-					DOBJECT_STATUS_LOST, NULL, NULL, 0, 0);
+			zbx_add_event(EVENT_SOURCE_DISCOVERY, EVENT_OBJECT_DHOST, dhost->dhostid, &ts,
+					DOBJECT_STATUS_LOST, NULL, NULL, NULL, 0, 0, NULL, 0, NULL, 0, NULL, NULL);
 		}
 	}
-	add_event(0, EVENT_SOURCE_DISCOVERY, EVENT_OBJECT_DHOST, dhost->dhostid, &ts, status, NULL, NULL, 0, 0);
-
-	process_events();
+	zbx_add_event(EVENT_SOURCE_DISCOVERY, EVENT_OBJECT_DHOST, dhost->dhostid, &ts, status, NULL, NULL, NULL, 0, 0,
+			NULL, 0, NULL, 0, NULL, NULL);
 }
 
 /******************************************************************************
@@ -451,16 +452,17 @@ static void	discovery_update_host_status(DB_DHOST *dhost, int status, int now)
  * Parameters: host - host info                                               *
  *                                                                            *
  ******************************************************************************/
-void	discovery_update_host(DB_DHOST *dhost, const char *ip, int status, int now)
+void	discovery_update_host(DB_DHOST *dhost, int status, int now)
 {
-	const char	*__function_name = "discovery_update_host";
-
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
 	if (0 != dhost->dhostid)
 		discovery_update_host_status(dhost, status, now);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __function_name);
+	zbx_process_events(NULL, NULL);
+	zbx_clean_events();
+
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
 /******************************************************************************
@@ -472,31 +474,29 @@ void	discovery_update_host(DB_DHOST *dhost, const char *ip, int status, int now)
  * Parameters: service - service info                                         *
  *                                                                            *
  ******************************************************************************/
-void	discovery_update_service(DB_DRULE *drule, DB_DCHECK *dcheck, DB_DHOST *dhost, const char *ip, const char *dns,
-		int port, int status, const char *value, int now)
+void	discovery_update_service(const DB_DRULE *drule, zbx_uint64_t dcheckid, DB_DHOST *dhost, const char *ip,
+		const char *dns, int port, int status, const char *value, int now)
 {
-	const char	*__function_name = "discovery_update_service";
-
 	DB_DSERVICE	dservice;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() ip:'%s' dns:'%s' port:%d status:%d value:'%s'",
-			__function_name, ip, dns, port, status, value);
+			__func__, ip, dns, port, status, value);
 
 	memset(&dservice, 0, sizeof(dservice));
 
 	/* register host if is not registered yet */
 	if (0 == dhost->dhostid)
-		discovery_register_host(drule, dcheck, dhost, ip, status, value);
+		discovery_register_host(drule, dcheckid, dhost, ip, port, status, value);
 
 	/* register service if is not registered yet */
 	if (0 != dhost->dhostid)
-		discovery_register_service(drule, dcheck, dhost, &dservice, ip, dns, port, status);
+		discovery_register_service(dcheckid, dhost, &dservice, ip, dns, port, status);
 
 	/* service was not registered because we do not add down service */
 	if (0 != dservice.dserviceid)
-		discovery_update_service_status(&dservice, status, value, now);
+		discovery_update_service_status(dhost, &dservice, status, value, now);
 
 	zbx_free(dservice.value);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }

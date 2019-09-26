@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -18,9 +18,12 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-require_once dirname(__FILE__).'/../include/class.cwebtest.php';
+require_once dirname(__FILE__).'/../include/CLegacyWebTest.php';
 
-class testFormTrigger extends CWebTest {
+/**
+ * @backup triggers
+ */
+class testFormTrigger extends CLegacyWebTest {
 
 	/**
 	 * The name of the Simple form test host created in the test data set.
@@ -167,13 +170,6 @@ class testFormTrigger extends CWebTest {
 	}
 
 	/**
-	 * Backup the tables that will be modified during the tests.
-	 */
-	public function testFormTrigger_Setup() {
-		DBsave_tables('triggers');
-	}
-
-	/**
 	 * @dataProvider layout
 	 */
 	public function testFormTrigger_CheckLayout($data) {
@@ -188,7 +184,7 @@ class testFormTrigger extends CWebTest {
 			$this->zbxTestClickLinkTextWait($data['host']);
 		}
 
-		$this->zbxTestClickXpathWait("//ul[@class='object-group']//a[text()='Triggers']");
+		$this->zbxTestClickXpathWait("//ul[contains(@class, 'object-group')]//a[text()='Triggers']");
 		$this->zbxTestCheckTitle('Configuration of triggers');
 		$this->zbxTestCheckHeader('Triggers');
 
@@ -196,7 +192,7 @@ class testFormTrigger extends CWebTest {
 			$this->zbxTestClickLinkTextWait($data['form']);
 		}
 		else {
-			$this->zbxTestClickWait('form');
+			$this->zbxTestContentControlButtonClickTextWait('Create trigger');
 		}
 		$this->zbxTestCheckTitle('Configuration of triggers');
 
@@ -237,35 +233,34 @@ class testFormTrigger extends CWebTest {
 				$this->zbxTestAssertAttribute("//textarea[@id='expression']", 'readonly');
 			}
 
-			$this->zbxTestAssertVisibleId('insert');
-			$this->zbxTestAssertElementText("//button[@id='insert']", 'Add');
+			$this->zbxTestAssertVisibleXpath("//button[@name='insert']");
+			$this->zbxTestAssertElementText("//button[@name='insert']", 'Add');
 			if (isset($data['templatedHost'])) {
-				$this->zbxTestAssertAttribute("//button[@id='insert']", 'disabled');
+				$this->zbxTestAssertAttribute("//button[@name='insert']", 'disabled');
 			}
 
-			$this->zbxTestAssertElementNotPresentXpath("//ul[@id='triggersFormList']//button[contains(@onclick, 'add_expression')]");
+			$this->zbxTestAssertElementNotPresentXpath("//li[@id='expression_row']//button[contains(@onclick, 'add_expression')]");
 			$this->zbxTestAssertElementNotPresentId('insert_macro');
-			$this->zbxTestAssertElementNotPresentId('exp_list');
 		}
 		else {
 			$this->zbxTestTextPresent('Expression');
 			$this->zbxTestAssertVisibleId('expr_temp');
 			$this->zbxTestAssertAttribute("//textarea[@id='expr_temp']", 'rows', 7);
 			$this->zbxTestAssertAttribute("//textarea[@id='expr_temp']", 'readonly');
-			$this->zbxTestTextNotPresent('Expression constructor');
+			$this->zbxTestTextPresent('Close expression constructor');
 			$this->zbxTestAssertNotVisibleId('expression');
 
 			if (!isset($data['form'])) {
-				$this->zbxTestAssertVisibleXpath("//ul[@id='triggersFormList']//button[contains(@onclick, 'add_expression') and text()='Add']");
+				$this->zbxTestAssertVisibleXpath("//li[@id='expression_row']//button[contains(@onclick, 'add_expression') and text()='Add']");
 			}
 			else {
-				$this->zbxTestAssertElementNotPresentXpath("//ul[@id='triggersFormList']//button[contains(@onclick, 'add_expression')]");
+				$this->zbxTestAssertElementNotPresentXpath("//li[@id='expression_row']//button[contains(@onclick, 'add_expression')]");
 			}
 
-			$this->zbxTestAssertVisibleId('insert');
-			$this->zbxTestAssertElementText("//button[@id='insert']", 'Edit');
+			$this->zbxTestAssertVisibleXpath("//button[@name='insert']");
+			$this->zbxTestAssertElementText("//button[@name='insert']", 'Edit');
 			if (isset($data['templatedHost'])) {
-				$this->zbxTestAssertElementPresentXpath("//button[@id='insert'][@disabled]");
+				$this->zbxTestAssertElementPresentXpath("//button[@name='insert'][@disabled]");
 			}
 
 			$this->zbxTestAssertVisibleId('insert_macro');
@@ -280,13 +275,15 @@ class testFormTrigger extends CWebTest {
 			else {
 				$this->zbxTestTextPresent(['Expression', 'Info', 'Close expression constructor']);
 			}
-			$this->zbxTestAssertVisibleId('exp_list');
 			$this->zbxTestTextPresent('Close expression constructor');
 		}
 
-		$this->zbxTestTextPresent('Multiple PROBLEM events generation');
-		$this->zbxTestAssertVisibleId('type');
-		$this->zbxTestAssertAttribute("//input[@id='type']", 'type', 'checkbox');
+		$this->zbxTestTextPresent(['OK event generation', 'PROBLEM event generation mode']);
+		$this->zbxTestTextPresent(['Expression', 'Recovery expression', 'None']);
+		$this->zbxTestTextPresent(['Single', 'Multiple']);
+		if (!isset($data['templatedHost'])) {
+			$this->assertTrue($this->zbxTestCheckboxSelected('type_0'));
+		}
 
 		$this->zbxTestTextPresent('Description');
 		$this->zbxTestAssertVisibleId('comments');
@@ -297,18 +294,18 @@ class testFormTrigger extends CWebTest {
 		$this->zbxTestAssertAttribute("//input[@id='url']", 'maxlength', 255);
 		$this->zbxTestAssertAttribute("//input[@id='url']", 'size', 20);
 
-		$this->zbxTestAssertVisibleId('priority_0');
+		$this->zbxTestAssertElementPresentId('priority_0');
 		$this->assertTrue($this->zbxTestCheckboxSelected('priority_0'));
 		$this->zbxTestAssertElementText("//*[@id='priority_0']/../label", 'Not classified');
-		$this->zbxTestAssertVisibleId('priority_1');
+		$this->zbxTestAssertElementPresentId('priority_1');
 		$this->zbxTestAssertElementText("//*[@id='priority_1']/../label", 'Information');
-		$this->zbxTestAssertVisibleId('priority_2');
+		$this->zbxTestAssertElementPresentId('priority_2');
 		$this->zbxTestAssertElementText("//*[@id='priority_2']/../label", 'Warning');
-		$this->zbxTestAssertVisibleId('priority_3');
+		$this->zbxTestAssertElementPresentId('priority_3');
 		$this->zbxTestAssertElementText("//*[@id='priority_3']/../label", 'Average');
-		$this->zbxTestAssertVisibleId('priority_4');
+		$this->zbxTestAssertElementPresentId('priority_4');
 		$this->zbxTestAssertElementText("//*[@id='priority_4']/../label", 'High');
-		$this->zbxTestAssertVisibleId('priority_5');
+		$this->zbxTestAssertElementPresentId('priority_5');
 		$this->zbxTestAssertElementText("//*[@id='priority_5']/../label", 'Disaster');
 
 		if (isset($data['severity'])) {
@@ -335,7 +332,7 @@ class testFormTrigger extends CWebTest {
 		}
 
 		$this->zbxTestTextPresent('Enabled');
-		$this->zbxTestAssertVisibleId('status');
+		$this->zbxTestAssertElementPresentId('status');
 		$this->zbxTestAssertAttribute("//input[@id='status']", 'type', 'checkbox');
 
 		$this->zbxTestAssertVisibleId('cancel');
@@ -352,6 +349,8 @@ class testFormTrigger extends CWebTest {
 			$this->zbxTestAssertElementValue('delete', 'Delete');
 			if (isset($data['templatedHost'])) {
 				$this->zbxTestAssertElementPresentXpath("//button[@id='delete'][@disabled]");
+				$this->assertTrue($this->zbxTestCheckboxSelected('recovery_mode_0'));
+				$this->zbxTestAssertElementPresentXpath("//input[@id='recovery_mode_0'][@disabled]");
 			}
 		}
 		else {
@@ -368,7 +367,12 @@ class testFormTrigger extends CWebTest {
 
 	// Returns update data
 	public static function update() {
-		return DBdata("select description from triggers t left join functions f on f.triggerid=t.triggerid where f.itemid='30004' and t.description LIKE 'testFormTrigger%'");
+		return CDBHelper::getDataProvider(
+			'select description'.
+			' from triggers t'.
+			' left join functions f on f.triggerid=t.triggerid'.
+			' where f.itemid=30004 and t.description LIKE \'testFormTrigger%\''
+		);
 	}
 
 	/**
@@ -378,12 +382,12 @@ class testFormTrigger extends CWebTest {
 		$sqlTriggers = 'select * from triggers order by triggerid';
 		$sqlFunctions = 'select * from functions order by functionid';
 
-		$oldHashTriggers = DBhash($sqlTriggers);
-		$oldHashFunctions = DBhash($sqlFunctions);
+		$oldHashTriggers = CDBHelper::getHash($sqlTriggers);
+		$oldHashFunctions = CDBHelper::getHash($sqlFunctions);
 
 		$this->zbxTestLogin('hosts.php');
 		$this->zbxTestClickLinkTextWait($this->host);
-		$this->zbxTestClickXpathWait("//ul[@class='object-group']//a[text()='Triggers']");
+		$this->zbxTestClickXpathWait("//ul[contains(@class, 'object-group')]//a[text()='Triggers']");
 		$this->zbxTestClickLinkTextWait($data['description']);
 		$this->zbxTestClickWait('update');
 		$this->zbxTestCheckTitle('Configuration of triggers');
@@ -391,8 +395,8 @@ class testFormTrigger extends CWebTest {
 		$this->zbxTestTextPresent($data['description']);
 		$this->zbxTestCheckHeader('Triggers');
 
-		$this->assertEquals($oldHashTriggers, DBhash($sqlTriggers));
-		$this->assertEquals($oldHashFunctions, DBhash($sqlFunctions));
+		$this->assertEquals($oldHashTriggers, CDBHelper::getHash($sqlTriggers));
+		$this->assertEquals($oldHashFunctions, CDBHelper::getHash($sqlFunctions));
 	}
 
 	// Returns create data
@@ -480,7 +484,7 @@ class testFormTrigger extends CWebTest {
 					'description' => 'MyTrigger_allFields',
 					'type' => true,
 					'comments' => 'MyTrigger_allFields -Description textbox for comments',
-					'url' => 'MyTrigger_allFields -URL field for link',
+					'url' => 'http://MyTrigger_allFields.com',
 					'severity' => 'Disaster',
 					'status' => false,
 					'expression' => '{Simple form test host:test-item-reuse.last(0)}<0',
@@ -574,9 +578,41 @@ class testFormTrigger extends CWebTest {
 					'expression' => '{Simple form test host:test-item-reuse.last(0)}<5',
 					'type' => true,
 					'comments' => 'Trigger status (expression) is recalculated every time Zabbix server receives new value, if this value is part of this expression. If time based functions are used in the expression, it is recalculated every 30 seconds by a zabbix timer process.',
-					'url' => 'www.zabbix.com',
+					'url' => 'http://www.zabbix.com',
 					'severity' => 'High',
 					'status' => false
+				]
+			],
+			[
+				[
+					'expected' => TEST_GOOD,
+					'description' => 'MyTrigger_CheckURL',
+					'expression' => '{Simple form test host:test-item-reuse.last(0)}<4',
+					'url' => 'triggers.php',
+				]
+			],
+			[
+				[
+					'expected' => TEST_BAD,
+					'description' => 'MyTrigger_CheckUrl',
+					'expression' => '{Simple form test host:test-item-reuse.last(0)}<5',
+					'url' => 'www.zabbix.com',
+					'error_msg' => 'Cannot add trigger',
+					'errors' => [
+						'Wrong value for url field.'
+					]
+				]
+			],
+			[
+				[
+					'expected' => TEST_BAD,
+					'description' => 'MyTrigger_CheckUrl',
+					'expression' => '{Simple form test host:test-item-reuse.last(0)}<5',
+					'url' => 'zabbix.com',
+					'error_msg' => 'Cannot add trigger',
+					'errors' => [
+						'Wrong value for url field.'
+					]
 				]
 			],
 			[
@@ -608,7 +644,7 @@ class testFormTrigger extends CWebTest {
 					'expression' => '{Simple form test host:test-item-reuse.somefunc(0)}<0',
 					'error_msg' => 'Cannot add trigger',
 					'errors' => [
-						'Cannot implode expression "{Simple form test host:test-item-reuse.somefunc(0)}<0". Incorrect trigger function "somefunc(0)" provided in expression. Unknown function.'
+						'Incorrect trigger function "somefunc(0)" provided in expression. Unknown function.'
 					]
 				]
 			],
@@ -681,7 +717,7 @@ class testFormTrigger extends CWebTest {
 					'expression' => '{Simple form test host@:test-item-reuse.last(0)}',
 					'constructor' => [[
 						'errors' => [
-							'Expression Syntax Error.',
+							'Expression syntax error.',
 							'Incorrect trigger expression. Check expression part starting from "{Simple form test host@:test-item-reuse.last(0)}".'],
 						]
 					]
@@ -694,7 +730,7 @@ class testFormTrigger extends CWebTest {
 					'expression' => '{Simple form test host:system .uptime.last(0)}',
 					'constructor' => [[
 						'errors' => [
-							'Expression Syntax Error.',
+							'Expression syntax error.',
 							'Incorrect trigger expression. Check expression part starting from "{Simple form test host:system .uptime.last(0)}".'],
 						]
 					]
@@ -707,7 +743,7 @@ class testFormTrigger extends CWebTest {
 					'expression' => '{Simple form test host:system .uptime.last(0)}',
 					'constructor' => [[
 						'errors' => [
-							'Expression Syntax Error.',
+							'Expression syntax error.',
 							'Incorrect trigger expression. Check expression part starting from "{Simple form test host:system .uptime.last(0)}".'],
 						]
 					]
@@ -720,7 +756,7 @@ class testFormTrigger extends CWebTest {
 					'expression' => '{Simple form test host:test-item-reuse.lastA(0)}',
 					'constructor' => [[
 						'errors' => [
-							'Expression Syntax Error.',
+							'Expression syntax error.',
 							'Incorrect trigger expression. Check expression part starting from "{Simple form test host:test-item-reuse.lastA(0)}".'],
 						]
 					]
@@ -733,15 +769,13 @@ class testFormTrigger extends CWebTest {
 	 * @dataProvider create
 	 */
 	public function testFormTrigger_SimpleCreate($data) {
-
 		$this->zbxTestLogin('hosts.php');
 		$this->zbxTestClickLinkTextWait($this->host);
-		$this->zbxTestClickXpathWait("//ul[@class='object-group']//a[text()='Triggers']");
+		$this->zbxTestClickXpathWait("//ul[contains(@class, 'object-group')]//a[text()='Triggers']");
 		$this->zbxTestCheckTitle('Configuration of triggers');
 		$this->zbxTestCheckHeader('Triggers');
-		$this->zbxTestDropdownSelectWait('groupid', 'all');
 
-		$this->zbxTestClickWait('form');
+		$this->zbxTestContentControlButtonClickTextWait('Create trigger');
 		$this->zbxTestCheckTitle('Configuration of triggers');
 		$this->zbxTestCheckHeader('Triggers');
 
@@ -756,7 +790,7 @@ class testFormTrigger extends CWebTest {
 		$expression = $this->zbxTestGetValue("//textarea[@id='expression']");
 
 		if (isset($data['type'])) {
-			$this->zbxTestCheckboxSelect('type');
+			$this->zbxTestClickXpathWait("//label[@for='type_1']");
 			$type = 'checked';
 		}
 		else {
@@ -820,9 +854,9 @@ class testFormTrigger extends CWebTest {
 					}
 				}
 				else {
-					$this->zbxTestAssertVisibleXpath("//ul[@id='triggersFormList']//button[contains(@onclick, 'and_expression') and text()='And']");
-					$this->zbxTestAssertVisibleXpath("//ul[@id='triggersFormList']//button[contains(@onclick, 'or_expression') and text()='Or']");
-					$this->zbxTestAssertVisibleXpath("//ul[@id='triggersFormList']//button[contains(@onclick, 'replace_expression') and text()='Replace']");
+					$this->zbxTestAssertVisibleXpath("//li[@id='expression_row']//button[contains(@onclick, 'and_expression') and text()='And']");
+					$this->zbxTestAssertVisibleXpath("//li[@id='expression_row']//button[contains(@onclick, 'or_expression') and text()='Or']");
+					$this->zbxTestAssertVisibleXpath("//li[@id='expression_row']//button[contains(@onclick, 'replace_expression') and text()='Replace']");
 
 					if (isset($constructor['text'])) {
 						foreach($constructor['text'] as $txt) {
@@ -835,10 +869,10 @@ class testFormTrigger extends CWebTest {
 						}
 					}
 					if (isset($constructor['elementError'])) {
-						$this->zbxTestAssertElementPresentXpath('//table[@id="exp_list"]//span[@class="status-red cursor-pointer"]');
+						$this->zbxTestAssertElementPresentXpath('//span[@class="icon-info status-red"]');
 					}
 					else {
-						$this->zbxTestAssertElementNotPresentXpath('//table[@id="exp_list"]//span[@class="status-red cursor-pointer"]');
+						$this->zbxTestAssertElementNotPresentXpath('//span[@class="icon-info status-red"]');
 					}
 				}
 			}
@@ -851,7 +885,7 @@ class testFormTrigger extends CWebTest {
 					$this->zbxTestWaitUntilMessageTextPresent('msg-good' ,'Trigger added');
 					$this->zbxTestCheckTitle('Configuration of triggers');
 					$this->zbxTestAssertElementText("//tbody//a[text()='$description']", $description);
-					$this->zbxTestAssertElementText("//a[text()='$description']/ancestor::tr/td[4]", $expression);
+					$this->zbxTestAssertElementText("//a[text()='$description']/ancestor::tr/td[6]", $expression);
 					break;
 				case TEST_BAD:
 					$this->zbxTestWaitUntilMessageTextPresent('msg-bad', $data['error_msg']);
@@ -872,10 +906,10 @@ class testFormTrigger extends CWebTest {
 				$this->zbxTestAssertElementValue('expression', $expression);
 
 				if ($type == 'checked') {
-					$this->assertTrue($this->zbxTestCheckboxSelected('type'));
+					$this->assertTrue($this->zbxTestCheckboxSelected('type_1'));
 				}
 				else {
-					$this->assertFalse($this->zbxTestCheckboxSelected('type'));
+					$this->assertTrue($this->zbxTestCheckboxSelected('type_0'));
 				}
 
 				$this->zbxTestAssertElementValue('comments', $comments);
@@ -911,12 +945,5 @@ class testFormTrigger extends CWebTest {
 				}
 			}
 		}
-	}
-
-	/**
-	 * Restore the original tables.
-	 */
-	public function testFormTrigger_Teardown() {
-		DBrestore_tables('triggers');
 	}
 }

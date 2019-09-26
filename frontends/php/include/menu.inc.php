@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -33,23 +33,24 @@
  *	'sub_pages' = collection of pages for displaying but not remembered as last visited.
  */
 function zbx_construct_menu(&$main_menu, &$sub_menus, &$page, $action = null) {
-	// Get current registrar and registry monitoring state.
-	$rsm_monitoring_type = get_rsm_monitoring_type();
-
 	$zbx_menu = [
 		'view' => [
 			'label' => _('Monitoring'),
-			'user_type'	=> [USER_TYPE_ZABBIX_USER, USER_TYPE_POWER_USER, USER_TYPE_COMPLIANCE,
-				USER_TYPE_ZABBIX_ADMIN, USER_TYPE_SUPER_ADMIN
-			],
+			'user_type' => USER_TYPE_ZABBIX_USER,
 			'default_page_id' => 0,
 			'pages' => [
 				[
 					'url' => 'zabbix.php',
 					'action' => 'dashboard.view',
-					'active_if' => ['dashboard.view'],
+					'active_if' => ['dashboard.list', 'dashboard.view'],
 					'label' => _('Dashboard'),
-					'sub_pages' => ['dashconf.php']
+				],
+				[
+					'url' => 'zabbix.php',
+					'action' => 'problem.view',
+					'active_if' => ['problem.view', 'acknowledge.edit'],
+					'label' => _('Problems'),
+					'sub_pages' => ['tr_events.php']
 				],
 				[
 					'url' => 'overview.php',
@@ -65,21 +66,7 @@ function zbx_construct_menu(&$main_menu, &$sub_menus, &$page, $action = null) {
 				[
 					'url' => 'latest.php',
 					'label' => _('Latest data'),
-					'sub_pages' => ['history.php', 'chart.php'],
-					'user_type'	=> [USER_TYPE_READ_ONLY, USER_TYPE_ZABBIX_USER, USER_TYPE_POWER_USER,
-						USER_TYPE_COMPLIANCE, USER_TYPE_ZABBIX_ADMIN, USER_TYPE_SUPER_ADMIN
-					],
-				],
-				[
-					'url' => 'tr_status.php',
-					'active_if' => ['acknowledge.edit'],
-					'label' => _('Triggers'),
-					'sub_pages' => ['tr_comments.php', 'chart4.php', 'scripts_exec.php']
-				],
-				[
-					'url' => 'events.php',
-					'label' => _('Events'),
-					'sub_pages' => ['tr_events.php']
+					'sub_pages' => ['history.php', 'chart.php']
 				],
 				[
 					'url' => 'charts.php',
@@ -109,12 +96,12 @@ function zbx_construct_menu(&$main_menu, &$sub_menus, &$page, $action = null) {
 					'action' => 'discovery.view',
 					'active_if' => ['discovery.view'],
 					'label' => _('Discovery'),
-					'user_type' => [USER_TYPE_ZABBIX_ADMIN, USER_TYPE_SUPER_ADMIN],
+					'user_type' => USER_TYPE_ZABBIX_ADMIN
 				],
 				[
 					'url' => 'srv_status.php',
 					'active_if' => ['report.services'],
-					'label' => _('IT services'),
+					'label' => _('Services'),
 					'sub_pages' => ['chart5.php']
 				],
 				[
@@ -124,48 +111,18 @@ function zbx_construct_menu(&$main_menu, &$sub_menus, &$page, $action = null) {
 					'url' => 'imgstore.php'
 				],
 				[
-					'url' => 'search.php'
+					'url' => 'zabbix.php',
+					'action' => 'search',
+					'active_if' => ['search']
 				],
 				[
 					'url' => 'jsrpc.php'
 				]
 			]
 		],
-		'rsm' => array(
-			'label'				=> ($rsm_monitoring_type === MONITORING_TARGET_REGISTRAR)
-				? _('Registrar monitoring')
-				: _('Registry monitoring'),
-			'user_type'			=> [USER_TYPE_READ_ONLY, USER_TYPE_ZABBIX_USER, USER_TYPE_POWER_USER,
-				USER_TYPE_COMPLIANCE, USER_TYPE_ZABBIX_ADMIN, USER_TYPE_SUPER_ADMIN
-			],
-			'default_page_id'	=> 0,
-			'pages' => array(
-				array(
-					'url' => 'rsm.rollingweekstatus.php',
-					'label' => _('Rolling week status')
-				),
-				array(
-					'url' => 'rsm.incidents.php',
-					'label' => _('Incidents'),
-					'sub_pages' => array(
-						'rsm.incidentdetails.php',
-						'rsm.tests.php',
-						'rsm.particulartests.php',
-						'rsm.particularproxys.php',
-						'rsm.aggregatedetails.php'
-					)
-				),
-				array(
-					'url' => 'rsm.slareports.php',
-					'label' => _('SLA reports')
-				)
-			)
-		),
 		'cm' => [
 			'label' => _('Inventory'),
-			'user_type' => [USER_TYPE_ZABBIX_USER, USER_TYPE_POWER_USER, USER_TYPE_COMPLIANCE,
-				USER_TYPE_ZABBIX_ADMIN, USER_TYPE_SUPER_ADMIN
-			],
+			'user_type' => USER_TYPE_ZABBIX_USER,
 			'default_page_id' => 0,
 			'pages' => [
 				[
@@ -180,21 +137,20 @@ function zbx_construct_menu(&$main_menu, &$sub_menus, &$page, $action = null) {
 		],
 		'reports' => [
 			'label' => _('Reports'),
-			'user_type'	=> [USER_TYPE_ZABBIX_USER, USER_TYPE_POWER_USER, USER_TYPE_COMPLIANCE,
-				USER_TYPE_ZABBIX_ADMIN, USER_TYPE_SUPER_ADMIN
-			],
+			'user_type' => USER_TYPE_ZABBIX_USER,
 			'default_page_id' => 0,
 			'pages' => [
 				[
 					'url' => 'zabbix.php',
 					'action' => 'report.status',
 					'active_if' => ['report.status'],
-					'label' => _('Status of Zabbix'),
-					'user_type' => [USER_TYPE_SUPER_ADMIN]
+					'label' => _('System information'),
+					'user_type' => USER_TYPE_SUPER_ADMIN
 				],
 				[
 					'url' => 'report2.php',
-					'label' => _('Availability report')
+					'label' => _('Availability report'),
+					'sub_pages' => ['chart4.php']
 				],
 				[
 					'url' => 'toptriggers.php',
@@ -203,29 +159,23 @@ function zbx_construct_menu(&$main_menu, &$sub_menus, &$page, $action = null) {
 				[
 					'url' => 'auditlogs.php',
 					'label' => _('Audit'),
-					'user_type' => [USER_TYPE_SUPER_ADMIN]
+					'user_type' => USER_TYPE_SUPER_ADMIN
 				],
 				[
 					'url' => 'auditacts.php',
 					'label' => _('Action log'),
-					'user_type' => [USER_TYPE_SUPER_ADMIN]
+					'user_type' => USER_TYPE_SUPER_ADMIN
 				],
 				[
 					'url' => 'report4.php',
 					'label' => _('Notifications'),
-					'user_type' => [USER_TYPE_ZABBIX_ADMIN]
-				],
-				[
-					'url' => 'popup.php'
-				],
-				[
-					'url' => 'popup_right.php'
+					'user_type' => USER_TYPE_ZABBIX_ADMIN
 				]
 			]
 		],
 		'config' => [
 			'label' => _('Configuration'),
-			'user_type' => [USER_TYPE_ZABBIX_ADMIN, USER_TYPE_SUPER_ADMIN],
+			'user_type' => USER_TYPE_ZABBIX_ADMIN,
 			'default_page_id' => 0,
 			'pages' => [
 				[
@@ -251,15 +201,11 @@ function zbx_construct_menu(&$main_menu, &$sub_menus, &$page, $action = null) {
 						'triggers.php',
 						'graphs.php',
 						'applications.php',
-						'tr_logform.php',
-						'tr_testexpr.php',
-						'popup_trexpr.php',
 						'host_discovery.php',
 						'disc_prototypes.php',
 						'trigger_prototypes.php',
 						'host_prototypes.php',
-						'httpconf.php',
-						'popup_httpstep.php'
+						'httpconf.php'
 					]
 				],
 				[
@@ -271,18 +217,23 @@ function zbx_construct_menu(&$main_menu, &$sub_menus, &$page, $action = null) {
 					'label' => _('Actions')
 				],
 				[
+					'user_type' => USER_TYPE_SUPER_ADMIN,
+					'url' => 'correlation.php',
+					'label' => _('Event correlation')
+				],
+				[
 					'url' => 'discoveryconf.php',
 					'label' => _('Discovery')
 				],
 				[
 					'url' => 'services.php',
-					'label' => _('IT services')
+					'label' => _('Services')
 				]
 			]
 		],
 		'admin' => [
 			'label' => _('Administration'),
-			'user_type' => [USER_TYPE_SUPER_ADMIN],
+			'user_type' => USER_TYPE_SUPER_ADMIN,
 			'default_page_id' => 0,
 			'pages' => [
 				[
@@ -299,7 +250,8 @@ function zbx_construct_menu(&$main_menu, &$sub_menus, &$page, $action = null) {
 						'adm.triggerseverities.php',
 						'adm.triggerdisplayoptions.php',
 						'adm.other.php'
-					]
+					],
+					'active_if' => ['autoreg.edit']
 				],
 				[
 					'url' => 'zabbix.php',
@@ -308,7 +260,9 @@ function zbx_construct_menu(&$main_menu, &$sub_menus, &$page, $action = null) {
 					'label' => _('Proxies')
 				],
 				[
-					'url' => 'authentication.php',
+					'url' => 'zabbix.php',
+					'action' => 'authentication.edit',
+					'active_if' => ['authentication.edit', 'authentication.update'],
 					'label' => _('Authentication')
 				],
 				[
@@ -316,11 +270,10 @@ function zbx_construct_menu(&$main_menu, &$sub_menus, &$page, $action = null) {
 					'label' => _('User groups')
 				],
 				[
-					'url' => 'users.php',
-					'label' => _('Users'),
-					'sub_pages' => [
-						'popup_usrgrp.php'
-					]
+					'url' => 'zabbix.php',
+					'action' => 'user.list',
+					'active_if' => ['user.edit', 'user.list'],
+					'label' => _('Users')
 				],
 				[
 					'url' => 'zabbix.php',
@@ -342,14 +295,12 @@ function zbx_construct_menu(&$main_menu, &$sub_menus, &$page, $action = null) {
 		],
 		'login' => [
 			'label' => _('Login'),
-			'user_type'	=> [USER_TYPE_ZABBIX_GUEST, USER_TYPE_READ_ONLY, USER_TYPE_ZABBIX_USER, USER_TYPE_POWER_USER,
-				USER_TYPE_COMPLIANCE, USER_TYPE_ZABBIX_ADMIN, USER_TYPE_SUPER_ADMIN
-			],
+			'user_type' => 0,
 			'default_page_id' => 0,
 			'pages' => [
 				[
 					'url' => 'index.php',
-					'sub_pages' => ['profile.php', 'popup_media.php']
+					'sub_pages' => ['zabbix.php']
 				]
 			]
 		]
@@ -359,16 +310,11 @@ function zbx_construct_menu(&$main_menu, &$sub_menus, &$page, $action = null) {
 	$page_exists = false;
 	$deny = true;
 
-	// Don't show Registry/Registrar monitoring menu if none of both modes are enabled.
-	if ($rsm_monitoring_type !== MONITORING_TARGET_REGISTRY && $rsm_monitoring_type !== MONITORING_TARGET_REGISTRAR) {
-		unset($zbx_menu['rsm']);
-	}
-
 	foreach ($zbx_menu as $label => $menu) {
 		$show_menu = true;
 
 		if (isset($menu['user_type'])) {
-			$show_menu &= (in_array(CWebUser::$data['type'], $menu['user_type']));
+			$show_menu &= ($menu['user_type'] <= CWebUser::$data['type']);
 		}
 		if ($label == 'login') {
 			$show_menu = false;
@@ -387,7 +333,7 @@ function zbx_construct_menu(&$main_menu, &$sub_menus, &$page, $action = null) {
 			if (!isset($sub_page['user_type'])) {
 				$sub_page['user_type'] = $menu['user_type'];
 			}
-			if (!in_array(CWebUser::$data['type'], $sub_page['user_type'])) {
+			if (CWebUser::$data['type'] < $sub_page['user_type']) {
 				$show_sub_menu = false;
 			}
 
@@ -427,7 +373,7 @@ function zbx_construct_menu(&$main_menu, &$sub_menus, &$page, $action = null) {
 
 			if ($sub_menu_active) {
 				// permission check
-				$deny &= (!in_array(CWebUser::$data['type'], $sub_page['user_type']));
+				$deny &= (CWebUser::$data['type'] < $menu['user_type'] || CWebUser::$data['type'] < $sub_page['user_type']);
 
 				$menu_class = 'selected';
 				$page_exists = true;
@@ -461,11 +407,13 @@ function zbx_construct_menu(&$main_menu, &$sub_menus, &$page, $action = null) {
 		}
 		$mmenu_entry = (new CListItem(
 			(new CLink($menu['label']))
+				->onClick('javascript: MMenu.mouseOver(\''.$label.'\');')
+				->onKeyup('javascript: MMenu.keyUp(\''.$label.'\', event);')
 				->setAttribute('tabindex', 0)
 		))
 			->addClass($menu_class)
 			->setId($label);
-		$mmenu_entry->onClick('javascript: MMenu.mouseOver(\''.$label.'\');');
+
 		array_push($main_menu, $mmenu_entry);
 	}
 

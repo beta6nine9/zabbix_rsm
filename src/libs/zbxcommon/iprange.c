@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -134,8 +134,9 @@ static void	iprange_apply_mask(zbx_iprange_t *iprange, int bits)
  ******************************************************************************/
 static int	iprangev4_parse(zbx_iprange_t *iprange, const char *address)
 {
-	int		index, len, bits = -1;
+	int		index, bits = -1;
 	const char	*ptr = address, *dash, *end;
+	size_t		len;
 
 	iprange->type = ZBX_IPRANGE_V4;
 
@@ -227,8 +228,9 @@ static int	iprangev4_parse(zbx_iprange_t *iprange, const char *address)
  ******************************************************************************/
 static int	iprangev6_parse(zbx_iprange_t *iprange, const char *address)
 {
-	int		index, len, fill = -1, bits = -1, target;
+	int		index, fill = -1, bits = -1, target;
 	const char	*ptr = address, *dash, *end;
+	size_t		len;
 
 	iprange->type = ZBX_IPRANGE_V6;
 
@@ -317,7 +319,7 @@ check_fill:
 	if (ZBX_IPRANGE_GROUPS_V6 < index)
 		return FAIL;
 
-	/* expand the :: construct to the required number of zeroes */
+	/* expand the :: construct to the required number of zeros */
 	if (ZBX_IPRANGE_GROUPS_V6 > index)
 	{
 		/* fail if the address contains less than 8 groups and no :: construct was used */
@@ -330,7 +332,7 @@ check_fill:
 		while (--index > fill)
 			iprange->range[target--] = iprange->range[index];
 
-		/* fill the middle with zeroes */
+		/* fill the middle with zeros */
 		while (target > fill)
 		{
 			iprange->range[target].from = 0;
@@ -368,8 +370,8 @@ int	iprange_parse(zbx_iprange_t *iprange, const char *address)
 
 	if (NULL != strchr(address, '.'))
 		return iprangev4_parse(iprange, address);
-	else
-		return iprangev6_parse(iprange, address);
+
+	return iprangev6_parse(iprange, address);
 }
 
 /******************************************************************************

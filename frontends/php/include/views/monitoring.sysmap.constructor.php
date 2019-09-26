@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -19,69 +19,74 @@
 **/
 
 
-include('include/views/js/monitoring.sysmaps.js.php');
+include dirname(__FILE__).'/js/monitoring.sysmaps.js.php';
 
 // create menu
 $menu = (new CList())
 	->addClass(ZBX_STYLE_OBJECT_GROUP)
 	->addItem([
-		_('Icon').':'.SPACE,
+		_('Map element').':&nbsp;',
 		(new CButton('selementAdd', _('Add')))->addClass(ZBX_STYLE_BTN_LINK),
-		SPACE.'/'.SPACE,
+		'&nbsp;/&nbsp;',
 		(new CButton('selementRemove', _('Remove')))->addClass(ZBX_STYLE_BTN_LINK)
 	])
 	->addItem([
-		_('Link').':'.SPACE,
+		_('Shape').':&nbsp;',
+		(new CButton('shapeAdd', _('Add')))->addClass(ZBX_STYLE_BTN_LINK),
+		'&nbsp;/&nbsp;',
+		(new CButton('shapesRemove', _('Remove')))->addClass(ZBX_STYLE_BTN_LINK)
+	])
+	->addItem([
+		_('Link').':&nbsp;',
 		(new CButton('linkAdd', _('Add')))->addClass(ZBX_STYLE_BTN_LINK),
-		SPACE.'/'.SPACE,
+		'&nbsp;/&nbsp;',
 		(new CButton('linkRemove', _('Remove')))->addClass(ZBX_STYLE_BTN_LINK)
 	])
 	->addItem([
-		_('Expand macros').':'.SPACE,
-		(new CButton('expand_macros', ($this->data['sysmap']['expand_macros'] == SYSMAP_EXPAND_MACROS_ON) ? _('On') : _('Off')))->addClass(ZBX_STYLE_BTN_LINK)
+		_('Expand macros').':&nbsp;',
+		(new CButton('expand_macros',
+			($this->data['sysmap']['expand_macros'] == SYSMAP_EXPAND_MACROS_ON) ? _('On') : _('Off')
+		))->addClass(ZBX_STYLE_BTN_LINK)
 	])
 	->addItem([
-		_('Grid').':'.SPACE,
-		(new CButton('gridshow', ($this->data['sysmap']['grid_show'] == SYSMAP_GRID_SHOW_ON) ? _('Shown') : _('Hidden')))->addClass(ZBX_STYLE_BTN_LINK),
-		SPACE.'/'.SPACE,
-		(new CButton('gridautoalign', ($this->data['sysmap']['grid_align'] == SYSMAP_GRID_ALIGN_ON) ? _('On') : _('Off')))->addClass(ZBX_STYLE_BTN_LINK)
+		_('Grid').':&nbsp;',
+		(new CButton('gridshow',
+			($data['sysmap']['grid_show'] == SYSMAP_GRID_SHOW_ON) ? _('Shown') : _('Hidden')
+		))->addClass(ZBX_STYLE_BTN_LINK),
+		'&nbsp;/&nbsp;',
+		(new CButton('gridautoalign',
+			($data['sysmap']['grid_align'] == SYSMAP_GRID_ALIGN_ON) ? _('On') : _('Off')
+		))->addClass(ZBX_STYLE_BTN_LINK)
 	])
-	->addItem(new CComboBox('gridsize', $this->data['sysmap']['grid_size'], null, [
+	->addItem(new CComboBox('gridsize', $data['sysmap']['grid_size'], null, [
 		20 => '20x20',
 		40 => '40x40',
 		50 => '50x50',
 		75 => '75x75',
 		100 => '100x100'
 	]))
-	->addItem((new CButton('gridalignall', _('Align icons')))->addClass(ZBX_STYLE_BTN_LINK))
-	->addItem((new CSubmit('update', _('Update')))->setAttribute('id', 'sysmap_update'));
-
-// create map
-$backgroundImage = (new CImg('images/general/tree/zero.gif', 'Sysmap'))
-	->setId('sysmap_img', $this->data['sysmap']['width'], $this->data['sysmap']['height']);
-
-$backgroundImageTable = new CTable();
-$backgroundImageTable->addRow($backgroundImage);
+	->addItem((new CButton('gridalignall', _('Align map elements')))->addClass(ZBX_STYLE_BTN_LINK))
+	->addItem((new CSubmit('update', _('Update')))->setId('sysmap_update'));
 
 $container = (new CDiv())->setId(ZBX_STYLE_MAP_AREA);
 
 // create elements
 zbx_add_post_js('ZABBIX.apps.map.run("'.ZBX_STYLE_MAP_AREA.'", '.CJs::encodeJson([
-	'sysmap' => $this->data['sysmap'],
-	'iconList' => $this->data['iconList'],
-	'defaultAutoIconId' => $this->data['defaultAutoIconId'],
-	'defaultIconId' => $this->data['defaultIconId'],
-	'defaultIconName' => $this->data['defaultIconName']
+	'theme' => $data['theme'],
+	'sysmap' => $data['sysmap'],
+	'iconList' => $data['iconList'],
+	'defaultAutoIconId' => $data['defaultAutoIconId'],
+	'defaultIconId' => $data['defaultIconId'],
+	'defaultIconName' => $data['defaultIconName']
 ], true).');');
-
-insert_show_color_picker_javascript();
 
 return (new CWidget())
 	->setTitle(_('Network maps'))
 	->addItem($menu)
 	->addItem(
-		(new CDiv())
-			->addClass(ZBX_STYLE_TABLE_FORMS_CONTAINER)
-			->addItem($backgroundImageTable)
-			->addItem($container)
+		(new CDiv(
+			(new CDiv())
+				->addClass(ZBX_STYLE_TABLE_FORMS_CONTAINER)
+				->addItem($container)
+		))->addClass('sysmap-scroll-container')
 	);

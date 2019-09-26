@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -26,6 +26,7 @@ $widget = (new CWidget())->setTitle(_('Discovery rules'));
 // create form
 $discoveryForm = (new CForm())
 	->setName('discoveryForm')
+	->setAttribute('aria-labeledby', ZBX_STYLE_PAGE_TITLE)
 	->addVar('form', $this->data['form']);
 if (!empty($this->data['druleid'])) {
 	$discoveryForm->addVar('druleid', $this->data['druleid']);
@@ -33,9 +34,11 @@ if (!empty($this->data['druleid'])) {
 
 // create form list
 $discoveryFormList = (new CFormList())
-	->addRow(_('Name'),
+	->addRow(
+		(new CLabel(_('Name'), 'name'))->setAsteriskMark(),
 		(new CTextBox('name', $this->data['drule']['name']))
 			->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
+			->setAriaRequired()
 			->setAttribute('autofocus', 'autofocus')
 	);
 
@@ -48,15 +51,19 @@ foreach ($this->data['proxies'] as $proxy) {
 
 $discoveryFormList
 	->addRow(_('Discovery by proxy'), $proxyComboBox)
-	->addRow(_('IP range'),
+	->addRow((new CLabel(_('IP range'), 'iprange'))->setAsteriskMark(),
 		(new CTextArea('iprange', $this->data['drule']['iprange'], ['maxlength' => 2048]))
 			->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
+			->setAriaRequired()
 	)
-	->addRow(_('Delay (in sec)'),
-		(new CNumericBox('delay', $this->data['drule']['delay'], 6))->setWidth(ZBX_TEXTAREA_NUMERIC_STANDARD_WIDTH)
+	->addRow((new CLabel(_('Update interval'), 'delay'))->setAsteriskMark(),
+		(new CTextBox('delay', $data['drule']['delay']))
+			->setWidth(ZBX_TEXTAREA_SMALL_WIDTH)
+			->setAriaRequired()
 	);
 
-$discoveryFormList->addRow(_('Checks'),
+$discoveryFormList->addRow(
+	(new CLabel(_('Checks'), 'dcheckList'))->setAsteriskMark(),
 	(new CDiv(
 		(new CTable())
 			->setAttribute('style', 'width: 100%;')
@@ -69,7 +76,7 @@ $discoveryFormList->addRow(_('Checks'),
 			)
 	))
 		->addClass(ZBX_STYLE_TABLE_FORMS_SEPARATOR)
-		->setAttribute('style', 'min-width: '.ZBX_TEXTAREA_STANDARD_WIDTH.'px;')
+		->setAttribute('style', 'width: '.ZBX_TEXTAREA_STANDARD_WIDTH.'px;')
 		->setId('dcheckList')
 );
 
@@ -79,6 +86,31 @@ $discoveryFormList->addRow(_('Device uniqueness criteria'),
 		(new CRadioButtonList('uniqueness_criteria', (int) $this->data['drule']['uniqueness_criteria']))
 			->makeVertical()
 			->addValue(_('IP address'), -1, zbx_formatDomId('uniqueness_criteria_ip'))
+	))
+		->setAttribute('style', 'width: '.ZBX_TEXTAREA_STANDARD_WIDTH.'px;')
+		->addClass(ZBX_STYLE_TABLE_FORMS_SEPARATOR)
+);
+
+// append host source to form list
+$discoveryFormList->addRow(_('Host name'),
+	(new CDiv(
+		(new CRadioButtonList('host_source', $this->data['drule']['host_source']))
+			->makeVertical()
+			->addValue(_('DNS name'), ZBX_DISCOVERY_DNS, 'host_source_chk_dns')
+			->addValue(_('IP address'), ZBX_DISCOVERY_IP, 'host_source_chk_ip')
+	))
+		->setAttribute('style', 'min-width: '.ZBX_TEXTAREA_STANDARD_WIDTH.'px;')
+		->addClass(ZBX_STYLE_TABLE_FORMS_SEPARATOR)
+);
+
+// append name source to form list
+$discoveryFormList->addRow(_('Visible name'),
+	(new CDiv(
+		(new CRadioButtonList('name_source', $this->data['drule']['name_source']))
+			->makeVertical()
+			->addValue(_('Host name'), ZBX_DISCOVERY_UNSPEC, 'name_source_chk_host')
+			->addValue(_('DNS name'), ZBX_DISCOVERY_DNS, 'name_source_chk_dns')
+			->addValue(_('IP address'), ZBX_DISCOVERY_IP, 'name_source_chk_ip')
 	))
 		->setAttribute('style', 'min-width: '.ZBX_TEXTAREA_STANDARD_WIDTH.'px;')
 		->addClass(ZBX_STYLE_TABLE_FORMS_SEPARATOR)

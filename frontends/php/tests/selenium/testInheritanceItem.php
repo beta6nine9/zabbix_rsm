@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -18,26 +18,24 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-require_once dirname(__FILE__).'/../include/class.cwebtest.php';
+require_once dirname(__FILE__).'/../include/CLegacyWebTest.php';
 require_once dirname(__FILE__).'/../../include/items.inc.php';
 
 /**
  * Test the creation of inheritance of new objects on a previously linked template.
+ *
+ * @backup items
  */
-class testInheritanceItem extends CWebTest {
+class testInheritanceItem extends CLegacyWebTest {
 	private $templateid = 15000;	// 'Inheritance test template'
 	private $template  = 'Inheritance test template';
 
 	private $hostid = 15001;		// 'Template inheritance test host'
 	private $host = 'Template inheritance test host';
 
-	public function testInheritanceItem_backup() {
-		DBsave_tables('items');
-	}
-
 	// returns list of items from a template
 	public static function update() {
-		return DBdata(
+		return CDBHelper::getDataProvider(
 			'SELECT itemid'.
 			' FROM items'.
 			' WHERE hostid=15000'.	//	$this->templateid.
@@ -51,14 +49,14 @@ class testInheritanceItem extends CWebTest {
 	 */
 	public function testInheritanceItem_SimpleUpdate($data) {
 		$sqlItems = 'SELECT * FROM items ORDER BY itemid';
-		$oldHashItems = DBhash($sqlItems);
+		$oldHashItems = CDBHelper::getHash($sqlItems);
 
 		$this->zbxTestLogin('items.php?form=update&itemid='.$data['itemid']);
 		$this->zbxTestClickWait('update');
 		$this->zbxTestCheckTitle('Configuration of items');
 		$this->zbxTestTextPresent('Item updated');
 
-		$this->assertEquals($oldHashItems, DBhash($sqlItems));
+		$this->assertEquals($oldHashItems, CDBHelper::getHash($sqlItems));
 	}
 
 	// Returns create data
@@ -88,7 +86,7 @@ class testInheritanceItem extends CWebTest {
 	 * @dataProvider create
 	 */
 	public function testInheritanceItem_SimpleCreate($data) {
-		$this->zbxTestLogin('items.php?form=Create+item&hostid='.$this->templateid);
+		$this->zbxTestLogin('items.php?form=create&hostid='.$this->templateid);
 
 		$this->zbxTestInputTypeWait('name', $data['name']);
 		$this->zbxTestInputType('key', $data['key']);
@@ -141,9 +139,5 @@ class testInheritanceItem extends CWebTest {
 				$this->zbxTestTextPresent($data['errors']);
 				break;
 		}
-	}
-
-	public function testInheritanceItem_restore() {
-		DBrestore_tables('items');
 	}
 }

@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -18,9 +18,9 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-require_once dirname(__FILE__).'/../include/class.cwebtest.php';
+require_once dirname(__FILE__).'/../include/CLegacyWebTest.php';
 
-class testFormAdministrationGeneralImages extends CWebTest {
+class testFormAdministrationGeneralImages extends CLegacyWebTest {
 	public $icon_image_name = '1image1';
 	public $icon_image_name2 = '2image2';
 	public $bg_image_name = '1bgimage1';
@@ -54,30 +54,30 @@ class testFormAdministrationGeneralImages extends CWebTest {
 
 		$this->zbxTestAssertElementPresentId('name');
 		$this->zbxTestInputType('name', $this->icon_image_name);
-		$this->zbxTestInputType('image', PHPUNIT_BASEDIR.'/tests/images/image.png');
+		$this->zbxTestInputType('image', PHPUNIT_BASEDIR.'/frontends/php/tests/images/image.png');
 		$this->zbxTestClickWait('add');
 		$this->zbxTestCheckTitle('Configuration of images');
 		$this->zbxTestCheckHeader('Images');
 		$this->zbxTestTextPresent(['Images', 'Type', 'Image added']);
 
 		$sql = 'SELECT * FROM images WHERE imagetype=1 AND name=\''.$this->icon_image_name.'\'';
-		$this->assertEquals(1, DBcount($sql), 'Chuck Norris: Image with such name has not been added to the DB');
+		$this->assertEquals(1, CDBHelper::getCount($sql), 'Chuck Norris: Image with such name has not been added to the DB');
 
 	}
 
 	public function testFormAdministrationGeneralImages_CancelIconImageChanges() {
 
 		$sqlIcons = 'SELECT * FROM images WHERE imagetype=1';
-		$oldHashIcons=DBhash($sqlIcons);
+		$oldHashIcons=CDBHelper::getHash($sqlIcons);
 
 		$this->zbxTestLogin('adm.images.php');
 		$this->zbxTestClickLinkText($this->icon_image_name);
 		$this->zbxTestInputTypeWait('name', $this->icon_image_name2);
-		$this->zbxTestInputTypeWait('image', PHPUNIT_BASEDIR.'/tests/images/image.png');
+		$this->zbxTestInputTypeWait('image', PHPUNIT_BASEDIR.'/frontends/php/tests/images/image.png');
 		$this->zbxTestClick('cancel');
 
 		// checking that image has not been changed after clicking on the "Cancel" button in the confirm dialog box
-		$this->assertEquals($oldHashIcons, DBhash($sqlIcons), 'Chuck Norris: No-change images update should not update data in table "images"');
+		$this->assertEquals($oldHashIcons, CDBHelper::getHash($sqlIcons), 'Chuck Norris: No-change images update should not update data in table "images"');
 
 	}
 
@@ -86,13 +86,13 @@ class testFormAdministrationGeneralImages extends CWebTest {
 		$this->zbxTestLogin('adm.images.php');
 		$this->zbxTestClickLinkText($this->icon_image_name);
 		$this->zbxTestInputTypeOverwrite('name', $this->icon_image_name2);
-		$this->zbxTestInputType('image', PHPUNIT_BASEDIR.'/tests/images/image.png');
+		$this->zbxTestInputType('image', PHPUNIT_BASEDIR.'/frontends/php/tests/images/image.png');
 		$this->zbxTestClickWait('update');
 		$this->zbxTestCheckTitle('Configuration of images');
-		$this->zbxTestWaitUntilMessageTextPresent('msg-good', 'Image updated');;
+		$this->zbxTestWaitUntilMessageTextPresent('msg-good', 'Image updated');
 
 		$sql = 'SELECT * FROM images WHERE imagetype=1 AND name=\''.$this->icon_image_name2.'\'';
-		$this->assertEquals(1, DBcount($sql), 'Chuck Norris: Image with such name does not exist in the DB');
+		$this->assertEquals(1, CDBHelper::getCount($sql), 'Chuck Norris: Image with such name does not exist in the DB');
 	}
 
 	public function testFormAdministrationGeneralImages_DeleteImage() {
@@ -100,13 +100,13 @@ class testFormAdministrationGeneralImages extends CWebTest {
 		$this->zbxTestLogin('adm.images.php');
 		$this->zbxTestClickLinkTextWait($this->icon_image_name2);
 		$this->zbxTestClickWait('delete');
-		$this->webDriver->switchTo()->alert()->accept();
+		$this->zbxTestAcceptAlert();
 		$this->zbxTestCheckTitle('Configuration of images');
 		$this->zbxTestWaitUntilMessageTextPresent('msg-good', 'Image deleted');
 		$this->zbxTestTextPresent(['Images', 'Image deleted']);
 
 		$sql = 'SELECT * FROM images WHERE imagetype=1 AND name=\''.$this->icon_image_name2.'\'';
-		$this->assertEquals(0, DBcount($sql), 'Chuck Norris: Image with such name still exist in the DB');
+		$this->assertEquals(0, CDBHelper::getCount($sql), 'Chuck Norris: Image with such name still exist in the DB');
 	}
 
 	public function testFormAdministrationGeneralImages_AddBgImage() {
@@ -115,13 +115,13 @@ class testFormAdministrationGeneralImages extends CWebTest {
 		$this->zbxTestDropdownSelectWait('imagetype', 'Background');
 		$this->zbxTestClickWait('form');
 		$this->zbxTestInputType('name', $this->bg_image_name);
-		$this->zbxTestInputType('image', PHPUNIT_BASEDIR.'/tests/images/image.png');
+		$this->zbxTestInputType('image', PHPUNIT_BASEDIR.'/frontends/php/tests/images/image.png');
 		$this->zbxTestClickWait('add');
 		$this->zbxTestCheckTitle('Configuration of images');
 		$this->zbxTestTextPresent(['Images', 'Type', 'Image added']);
 
 		$sql = 'SELECT * FROM images WHERE imagetype=2 AND name=\''.$this->bg_image_name.'\'';
-		$this->assertEquals(1, DBcount($sql), 'Chuck Norris: Image with such name has not been added to the DB');
+		$this->assertEquals(1, CDBHelper::getCount($sql), 'Chuck Norris: Image with such name has not been added to the DB');
 	}
 
 	public function testFormAdministrationGeneralImages_UpdateBgImage() {
@@ -132,13 +132,13 @@ class testFormAdministrationGeneralImages extends CWebTest {
 		$this->zbxTestWaitUntilElementVisible(WebdriverBy::xpath("//div[@class='cell']"));
 		$this->zbxTestClickLinkText($this->bg_image_name);
 		$this->zbxTestInputTypeOverwrite('name', $this->bg_image_name2);
-		$this->zbxTestInputTypeWait('image', PHPUNIT_BASEDIR.'/tests/images/image.png');
+		$this->zbxTestInputTypeWait('image', PHPUNIT_BASEDIR.'/frontends/php/tests/images/image.png');
 		$this->zbxTestClickWait('update');
 		$this->zbxTestCheckTitle('Configuration of images');
 		$this->zbxTestWaitUntilMessageTextPresent('msg-good', 'Image updated');
 
 		$sql = 'SELECT * FROM images WHERE imagetype=2 AND name=\''.$this->bg_image_name2.'\'';
-		$this->assertEquals(1, DBcount($sql), 'Chuck Norris: Image with such name does not exist in the DB');
+		$this->assertEquals(1, CDBHelper::getCount($sql), 'Chuck Norris: Image with such name does not exist in the DB');
 	}
 
 	public function testFormAdministrationGeneralImages_DeleteBgImage() {
@@ -147,12 +147,12 @@ class testFormAdministrationGeneralImages extends CWebTest {
 		$this->zbxTestDropdownSelectWait('imagetype', 'Background');
 		$this->zbxTestClickLinkTextWait($this->bg_image_name2);
 		$this->zbxTestClickWait('delete');
-		$this->webDriver->switchTo()->alert()->accept();
+		$this->zbxTestAcceptAlert();
 		$this->zbxTestCheckHeader('Images');
 		$this->zbxTestTextPresent(['Images', 'Image deleted']);
 
 		$sql = 'SELECT * FROM images WHERE imagetype=2 AND name=\''.$this->bg_image_name2.'\'';
-		$this->assertEquals(0, DBcount($sql), 'Chuck Norris: Image with such name still exist in the DB');
+		$this->assertEquals(0, CDBHelper::getCount($sql), 'Chuck Norris: Image with such name still exist in the DB');
 	}
 
 }

@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -22,6 +22,7 @@
 #include "zbxregexp.h"
 #include "log.h"
 #include "stats.h"
+#include "proc.h"
 
 extern int	CONFIG_TIMEOUT;
 
@@ -47,7 +48,7 @@ zbx_sysinfo_proc_t;
  * Purpose: frees process data structure                                      *
  *                                                                            *
  ******************************************************************************/
-void	zbx_sysinfo_proc_free(zbx_sysinfo_proc_t *proc)
+static void	zbx_sysinfo_proc_free(zbx_sysinfo_proc_t *proc)
 {
 	zbx_free(proc->name);
 	zbx_free(proc->name_arg0);
@@ -62,7 +63,7 @@ static int	get_cmdline(FILE *f_cmd, char **line, size_t *line_offset)
 
 	rewind(f_cmd);
 
-	*line = zbx_malloc(*line, line_alloc + 2);
+	*line = (char *)zbx_malloc(*line, line_alloc + 2);
 	*line_offset = 0;
 
 	while (0 != (n = fread(*line + *line_offset, 1, line_alloc - *line_offset, f_cmd)))
@@ -73,7 +74,7 @@ static int	get_cmdline(FILE *f_cmd, char **line, size_t *line_offset)
 			break;
 
 		line_alloc *= 2;
-		*line = zbx_realloc(*line, line_alloc + 2);
+		*line = (char *)zbx_realloc(*line, line_alloc + 2);
 	}
 
 	if (0 == ferror(f_cmd))
@@ -222,6 +223,10 @@ static int	check_procstate(FILE *f_stat, int zbx_proc_stat)
 				return ('S' == *p) ? SUCCEED : FAIL;
 			case ZBX_PROC_STAT_ZOMB:
 				return ('Z' == *p) ? SUCCEED : FAIL;
+			case ZBX_PROC_STAT_DISK:
+				return ('D' == *p) ? SUCCEED : FAIL;
+			case ZBX_PROC_STAT_TRACE:
+				return ('T' == *p) ? SUCCEED : FAIL;
 			default:
 				return FAIL;
 		}
@@ -517,7 +522,7 @@ int	PROC_MEM(AGENT_REQUEST *request, AGENT_RESULT *result)
 		zbx_fclose(f_cmd);
 		zbx_fclose(f_stat);
 
-		if (0 == strcmp(entries->d_name, "self"))
+		if (0 == atoi(entries->d_name))
 			continue;
 
 		zbx_snprintf(tmp, sizeof(tmp), "/proc/%s/cmdline", entries->d_name);
@@ -758,6 +763,10 @@ int	PROC_NUM(AGENT_REQUEST *request, AGENT_RESULT *result)
 		zbx_proc_stat = ZBX_PROC_STAT_SLEEP;
 	else if (0 == strcmp(param, "zomb"))
 		zbx_proc_stat = ZBX_PROC_STAT_ZOMB;
+	else if (0 == strcmp(param, "disk"))
+		zbx_proc_stat = ZBX_PROC_STAT_DISK;
+	else if (0 == strcmp(param, "trace"))
+		zbx_proc_stat = ZBX_PROC_STAT_TRACE;
 	else
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid third parameter."));
@@ -780,7 +789,7 @@ int	PROC_NUM(AGENT_REQUEST *request, AGENT_RESULT *result)
 		zbx_fclose(f_cmd);
 		zbx_fclose(f_stat);
 
-		if (0 == strcmp(entries->d_name, "self"))
+		if (0 == atoi(entries->d_name))
 			continue;
 
 		zbx_snprintf(tmp, sizeof(tmp), "/proc/%s/cmdline", entries->d_name);
@@ -890,7 +899,7 @@ static int	proc_get_process_cmdline(pid_t pid, char **cmdline, size_t *cmdline_n
 	if (-1 == (fd = open(tmp, O_RDONLY)))
 		return FAIL;
 
-	*cmdline = zbx_malloc(NULL, cmdline_alloc);
+	*cmdline = (char *)zbx_malloc(NULL, cmdline_alloc);
 
 	while (0 < (n = read(fd, *cmdline + *cmdline_nbytes, cmdline_alloc - *cmdline_nbytes)))
 	{
@@ -899,7 +908,7 @@ static int	proc_get_process_cmdline(pid_t pid, char **cmdline, size_t *cmdline_n
 		if (*cmdline_nbytes == cmdline_alloc)
 		{
 			cmdline_alloc *= 2;
-			*cmdline = zbx_realloc(*cmdline, cmdline_alloc);
+			*cmdline = (char *)zbx_realloc(*cmdline, cmdline_alloc);
 		}
 	}
 
@@ -913,7 +922,7 @@ static int	proc_get_process_cmdline(pid_t pid, char **cmdline, size_t *cmdline_n
 			if (*cmdline_nbytes == cmdline_alloc)
 			{
 				cmdline_alloc += 1;
-				*cmdline = zbx_realloc(*cmdline, cmdline_alloc);
+				*cmdline = (char *)zbx_realloc(*cmdline, cmdline_alloc);
 			}
 
 			(*cmdline)[*cmdline_nbytes] = '\0';
@@ -1137,15 +1146,14 @@ static int	proc_match_cmdline(const zbx_sysinfo_proc_t *proc, const char *cmdlin
  ******************************************************************************/
 void	zbx_proc_get_process_stats(zbx_procstat_util_t *procs, int procs_num)
 {
-	const char	*__function_name = "zbx_proc_get_process_stats";
 	int	i;
 
-	zabbix_log(LOG_LEVEL_TRACE, "In %s() procs_num:%d", __function_name, procs_num);
+	zabbix_log(LOG_LEVEL_TRACE, "In %s() procs_num:%d", __func__, procs_num);
 
 	for (i = 0; i < procs_num; i++)
 		procs[i].error = proc_read_cpu_util(&procs[i]);
 
-	zabbix_log(LOG_LEVEL_TRACE, "End of %s()", __function_name);
+	zabbix_log(LOG_LEVEL_TRACE, "End of %s()", __func__);
 }
 
 /******************************************************************************
@@ -1238,14 +1246,12 @@ out:
  ******************************************************************************/
 int	zbx_proc_get_processes(zbx_vector_ptr_t *processes, unsigned int flags)
 {
-	const char		*__function_name = "zbx_proc_get_processes";
-
 	DIR			*dir;
 	struct dirent		*entries;
 	int			ret = FAIL, pid;
 	zbx_sysinfo_proc_t	*proc;
 
-	zabbix_log(LOG_LEVEL_TRACE, "In %s()", __function_name);
+	zabbix_log(LOG_LEVEL_TRACE, "In %s()", __func__);
 
 	if (NULL == (dir = opendir("/proc")))
 		goto out;
@@ -1266,7 +1272,7 @@ int	zbx_proc_get_processes(zbx_vector_ptr_t *processes, unsigned int flags)
 
 	ret = SUCCEED;
 out:
-	zabbix_log(LOG_LEVEL_TRACE, "End of %s(): %s, processes:%d", __function_name, zbx_result_string(ret),
+	zabbix_log(LOG_LEVEL_TRACE, "End of %s(): %s, processes:%d", __func__, zbx_result_string(ret),
 			processes->values_num);
 
 	return ret;
@@ -1306,12 +1312,11 @@ void	zbx_proc_free_processes(zbx_vector_ptr_t *processes)
 void	zbx_proc_get_matching_pids(const zbx_vector_ptr_t *processes, const char *procname, const char *username,
 		const char *cmdline, zbx_uint64_t flags, zbx_vector_uint64_t *pids)
 {
-	const char		*__function_name = "zbx_proc_get_matching_pids";
 	struct passwd		*usrinfo;
 	int			i;
 	zbx_sysinfo_proc_t	*proc;
 
-	zabbix_log(LOG_LEVEL_TRACE, "In %s() procname:%s username:%s cmdline:%s zone:%d", __function_name,
+	zabbix_log(LOG_LEVEL_TRACE, "In %s() procname:%s username:%s cmdline:%s flags:" ZBX_FS_UI64, __func__,
 			ZBX_NULL2EMPTY_STR(procname), ZBX_NULL2EMPTY_STR(username), ZBX_NULL2EMPTY_STR(cmdline), flags);
 
 	if (NULL != username)
@@ -1339,7 +1344,7 @@ void	zbx_proc_get_matching_pids(const zbx_vector_ptr_t *processes, const char *p
 		zbx_vector_uint64_append(pids, (zbx_uint64_t)proc->pid);
 	}
 out:
-	zabbix_log(LOG_LEVEL_TRACE, "End of %s()", __function_name);
+	zabbix_log(LOG_LEVEL_TRACE, "End of %s()", __func__);
 }
 
 int	PROC_CPU_UTIL(AGENT_REQUEST *request, AGENT_RESULT *result)

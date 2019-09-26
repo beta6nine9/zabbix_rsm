@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -52,6 +52,17 @@ class CZabbixServer {
 	const RESPONSE_FAILED = 'failed';
 
 	/**
+	 * Auxiliary constants for request() method.
+	 */
+	const ZBX_TCP_EXPECT_HEADER = 1;
+	const ZBX_TCP_EXPECT_DATA = 2;
+
+	/**
+	 * Max number of bytes to read from the response for each each iteration.
+	 */
+	const READ_BYTES_LIMIT = 8192;
+
+	/**
 	 * Zabbix server host name.
 	 *
 	 * @var string
@@ -78,13 +89,6 @@ class CZabbixServer {
 	 * @var int
 	 */
 	protected $totalBytesLimit;
-
-	/**
-	 * Bite count to read from the response with each iteration.
-	 *
-	 * @var int
-	 */
-	protected $readBytesLimit = 8192;
 
 	/**
 	 * Zabbix server socket resource.
@@ -127,14 +131,42 @@ class CZabbixServer {
 	 *
 	 * @param $scriptId
 	 * @param $hostId
+	 * @param $sid
 	 *
 	 * @return bool|array
 	 */
-	public function executeScript($scriptId, $hostId) {
+	public function executeScript($scriptId, $hostId, $sid) {
 		return $this->request([
 			'request' => 'command',
 			'scriptid' => $scriptId,
-			'hostid' => $hostId
+			'hostid' => $hostId,
+			'sid' => $sid
+		]);
+	}
+
+	/**
+	 * Request server to test item preprocessing steps.
+	 *
+	 * @param array  $data                                     Array of preprocessing steps test.
+	 * @param string $data['value']                            Value to use for preprocessing step testing.
+	 * @param int    $data['value_type']                       Item value type.
+	 * @param array  $data['history']                          Previous value object.
+	 * @param string $data['history']['value']                 Previous value.
+	 * @param string $data['history']['timestamp']             Previous value time.
+	 * @param array  $data['steps']                            Preprocessing step object.
+	 * @param int    $data['steps'][]['type']                  Type of preprocessing step.
+	 * @param string $data['steps'][]['params']                Parameters of preprocessing step.
+	 * @param int    $data['steps'][]['error_handler']         Error handler selected as "custom on fail".
+	 * @param string $data['steps'][]['error_handler_params']  Parameters configured for selected error handler.
+	 * @param string $sid                                      User session ID.
+	 *
+	 * @return array
+	 */
+	public function testPreprocessingSteps(array $data, $sid) {
+		return $this->request([
+			'request' => 'preprocessing.test',
+			'data' => $data,
+			'sid' => $sid
 		]);
 	}
 
@@ -167,12 +199,116 @@ class CZabbixServer {
 	}
 
 	/**
+	 * Request server to test media type.
+	 *
+	 * @param array  $data                 Array of media type test data to send.
+	 * @param string $data['mediatypeid']  Media type ID.
+	 * @param string $data['sendto']       Message destination.
+	 * @param string $data['subject']      Message subject.
+	 * @param string $data['message']      Message body.
+	 * @param string $sid                  User session ID.
+	 *
+	 * @return bool|array
+	 */
+	public function testMediaType(array $data, $sid) {
+		return $this->request([
+			'request' => 'alert.send',
+			'sid' => $sid,
+			'data' => [
+				'mediatypeid' => $data['mediatypeid'],
+				'sendto' => $data['sendto'],
+				'subject' => $data['subject'],
+				'message' => $data['message']
+			]
+		]);
+	}
+
+	/**
+	 * Retrieve System information.
+	 *
+	 * @param $sid
+	 *
+	 * @return bool|array
+	 */
+	public function getStatus($sid) {
+		$response = $this->request([
+			'request' => 'status.get',
+			'type' => 'full',
+			'sid' => $sid
+		]);
+
+		if ($response === false) {
+			return false;
+		}
+
+		$api_input_rules = ['type' => API_OBJECT, 'fields' => [
+			'template stats' =>			['type' => API_OBJECTS, 'flags' => API_REQUIRED | API_NOT_EMPTY, 'fields' => [
+				'count' =>					['type' => API_INT32, 'flags' => API_REQUIRED, 'in' => '0:'.ZBX_MAX_INT32]
+			]],
+			'host stats' =>				['type' => API_OBJECTS, 'flags' => API_REQUIRED | API_NOT_EMPTY, 'fields' => [
+				'attributes' =>				['type' => API_OBJECT, 'flags' => API_REQUIRED, 'fields' => [
+					'proxyid' =>				['type' => API_ID, 'flags' => API_REQUIRED],
+					'status' =>					['type' => API_INT32, 'flags' => API_REQUIRED, 'in' => implode(',', [HOST_STATUS_MONITORED, HOST_STATUS_NOT_MONITORED])]
+				]],
+				'count' =>					['type' => API_INT32, 'flags' => API_REQUIRED, 'in' => '0:'.ZBX_MAX_INT32]
+			]],
+			'item stats' =>				['type' => API_OBJECTS, 'flags' => API_REQUIRED | API_NOT_EMPTY, 'fields' => [
+				'attributes' =>				['type' => API_OBJECT, 'flags' => API_REQUIRED, 'fields' => [
+					'proxyid' =>				['type' => API_ID, 'flags' => API_REQUIRED],
+					'status' =>					['type' => API_INT32, 'flags' => API_REQUIRED, 'in' => implode(',', [ITEM_STATUS_ACTIVE, ITEM_STATUS_DISABLED])],
+					'state' =>					['type' => API_INT32, 'in' => implode(',', [ITEM_STATE_NORMAL, ITEM_STATE_NOTSUPPORTED])]
+				]],
+				'count' =>					['type' => API_INT32, 'flags' => API_REQUIRED, 'in' => '0:'.ZBX_MAX_INT32]
+			]],
+			'trigger stats' =>			['type' => API_OBJECTS, 'flags' => API_REQUIRED | API_NOT_EMPTY, 'fields' => [
+				'attributes' =>				['type' => API_OBJECT, 'flags' => API_REQUIRED, 'fields' => [
+					'status' =>					['type' => API_INT32, 'flags' => API_REQUIRED, 'in' => implode(',', [TRIGGER_STATUS_ENABLED, TRIGGER_STATUS_DISABLED])],
+					'value' =>					['type' => API_INT32, 'in' => implode(',', [TRIGGER_VALUE_FALSE, TRIGGER_VALUE_TRUE])]
+				]],
+				'count' =>					['type' => API_INT32, 'flags' => API_REQUIRED, 'in' => '0:'.ZBX_MAX_INT32]
+			]],
+			'user stats' =>				['type' => API_OBJECTS, 'flags' => API_REQUIRED | API_NOT_EMPTY, 'fields' => [
+				'attributes' =>				['type' => API_OBJECT, 'flags' => API_REQUIRED, 'fields' => [
+					'status' =>					['type' => API_INT32, 'flags' => API_REQUIRED, 'in' => implode(',', [ZBX_SESSION_ACTIVE, ZBX_SESSION_PASSIVE])]
+				]],
+				'count' =>					['type' => API_INT32, 'flags' => API_REQUIRED, 'in' => '0:'.ZBX_MAX_INT32]
+			]],
+			// only for super-admins 'required performance' is available
+			'required performance' =>	['type' => API_OBJECTS, 'flags' => API_NOT_EMPTY, 'fields' => [
+				'attributes' =>				['type' => API_OBJECT, 'flags' => API_REQUIRED, 'fields' => [
+					'proxyid' =>				['type' => API_ID, 'flags' => API_REQUIRED]
+				]],
+				'count' =>					['type' => API_STRING_UTF8, 'flags' => API_REQUIRED]	// API_FLOAT 0-n
+			]]
+		]];
+
+		if (!CApiInputValidator::validate($api_input_rules, $response, '/', $this->error)) {
+			return false;
+		}
+
+		return $response;
+	}
+
+	/**
 	 * Returns true if the Zabbix server is running and false otherwise.
+	 *
+	 * @param $sid
 	 *
 	 * @return bool
 	 */
-	public function isRunning() {
-		return (bool) $this->connect();
+	public function isRunning($sid) {
+		$response = $this->request([
+			'request' => 'status.get',
+			'type' => 'ping',
+			'sid' => $sid
+		]);
+
+		if ($response === false) {
+			return false;
+		}
+
+		$api_input_rules = ['type' => API_OBJECT, 'fields' => []];
+		return CApiInputValidator::validate($api_input_rules, $response, '/', $this->error);
 	}
 
 	/**
@@ -201,80 +337,108 @@ class CZabbixServer {
 	 * @return mixed    the output of the script if it has been executed successfully or false otherwise
 	 */
 	protected function request(array $params) {
-		// reset object state
+		// Reset object state.
 		$this->error = null;
 		$this->total = null;
 
-		// connect to the server
+		// Connect to the server.
 		if (!$this->connect()) {
 			return false;
 		}
 
-		// set timeout
+		// Set timeout.
 		stream_set_timeout($this->socket, $this->timeout);
 
-		// send the command
-		if (fwrite($this->socket, CJs::encodeJson($params)) === false) {
+		// Send the command.
+		$json = CJs::encodeJson($params);
+		if (fwrite($this->socket, ZBX_TCP_HEADER.pack('V', strlen($json))."\x00\x00\x00\x00".$json) === false) {
 			$this->error = _s('Cannot send command, check connection with Zabbix server "%1$s".', $this->host);
-
 			return false;
 		}
 
-		// read the response
-		$readBytesLimit = ($this->totalBytesLimit && $this->totalBytesLimit < $this->readBytesLimit)
-			? $this->totalBytesLimit
-			: $this->readBytesLimit;
-
+		$expect = self::ZBX_TCP_EXPECT_HEADER;
 		$response = '';
+		$response_len = 0;
+		$expected_len = null;
 		$now = time();
-		$i = 0;
-		while (!feof($this->socket)) {
-			$i++;
+
+		while (true) {
 			if ((time() - $now) >= $this->timeout) {
-				$this->error = _s('Connection timeout of %1$s seconds exceeded when connecting to Zabbix server "%2$s".', $this->timeout, $this->host);
-
-				return false;
-			}
-			elseif ($this->totalBytesLimit && ($i * $readBytesLimit) >= $this->totalBytesLimit) {
-				$this->error = _s('Size of the response received from Zabbix server "%1$s" exceeds the allowed size of %2$s bytes. This value can be increased in the ZBX_SOCKET_BYTES_LIMIT constant in include/defines.inc.php.', $this->host, $this->totalBytesLimit);
-
+				$this->error = _s(
+					'Connection timeout of %1$s seconds exceeded when connecting to Zabbix server "%2$s".',
+					$this->timeout, $this->host
+				);
 				return false;
 			}
 
-			if (($out = fread($this->socket, $readBytesLimit)) !== false) {
-				$response .= $out;
+			if (!feof($this->socket) && ($buffer = fread($this->socket, self::READ_BYTES_LIMIT)) !== false) {
+				$response_len += strlen($buffer);
+				$response .= $buffer;
+
+				if ($expect == self::ZBX_TCP_EXPECT_HEADER) {
+					if (strncmp($response, ZBX_TCP_HEADER, min($response_len, ZBX_TCP_HEADER_LEN)) != 0) {
+						$this->error = _s('Incorrect response received from Zabbix server "%1$s".', $this->host);
+						return false;
+					}
+
+					if ($response_len < ZBX_TCP_HEADER_LEN) {
+						continue;
+					}
+
+					$expect = self::ZBX_TCP_EXPECT_DATA;
+				}
+
+				if ($response_len < ZBX_TCP_HEADER_LEN + ZBX_TCP_DATALEN_LEN) {
+					continue;
+				}
+
+				if ($expected_len === null) {
+					$expected_len = unpack('Vlen', substr($response, ZBX_TCP_HEADER_LEN, 4))['len'];
+					$expected_len += ZBX_TCP_HEADER_LEN + ZBX_TCP_DATALEN_LEN;
+
+					if ($this->totalBytesLimit != 0 && $expected_len >= $this->totalBytesLimit) {
+						$this->error = _s(
+							'Size of the response received from Zabbix server "%1$s" exceeds the allowed size of %2$s bytes. This value can be increased in the ZBX_SOCKET_BYTES_LIMIT constant in include/defines.inc.php.',
+							$this->host, $this->totalBytesLimit
+						);
+						return false;
+					}
+				}
+
+				if ($response_len >= $expected_len) {
+					break;
+				}
 			}
 			else {
-				$this->error = _s('Cannot read the response, check connection with the Zabbix server "%1$s".', $this->host);
-
+				$this->error =
+					_s('Cannot read the response, check connection with the Zabbix server "%1$s".', $this->host);
 				return false;
 			}
 		}
 
 		fclose($this->socket);
 
-		// check if the response is empty
-		if (!strlen($response)) {
-			$this->error = _s('Empty response received from Zabbix server "%1$s".', $this->host);
-
+		if ($expected_len > $response_len || $response_len > $expected_len) {
+			$this->error = _s('Incorrect response received from Zabbix server "%1$s".', $this->host);
 			return false;
 		}
 
-		$response = CJs::decodeJson($response);
-		if (!$response || !$this->validateResponse($response)) {
+		$response = CJs::decodeJson(substr($response, ZBX_TCP_HEADER_LEN + ZBX_TCP_DATALEN_LEN));
+
+		if (!$response || !$this->normalizeResponse($response)) {
 			$this->error = _s('Incorrect response received from Zabbix server "%1$s".', $this->host);
 
 			return false;
 		}
 
-		// request executed successfully
+		// Request executed successfully.
 		if ($response['response'] == self::RESPONSE_SUCCESS) {
 			// saves total count
 			$this->total = array_key_exists('total', $response) ? $response['total'] : null;
 
-			return $response['data'];
+			return array_key_exists('data', $response) ? $response['data'] : true;
 		}
-		// an error on the server side occurred
+		// An error on the server side occurred.
 		else {
 			$this->error = $response['info'];
 
@@ -328,9 +492,9 @@ class CZabbixServer {
 	 *
 	 * @return bool
 	 */
-	protected function validateResponse(array $response) {
-		return (isset($response['response'])
-					&& ($response['response'] == self::RESPONSE_SUCCESS && isset($response['data'])
-						|| $response['response'] == self::RESPONSE_FAILED && isset($response['info'])));
+	protected function normalizeResponse(array &$response) {
+		return (array_key_exists('response', $response) && ($response['response'] == self::RESPONSE_SUCCESS
+				|| $response['response'] == self::RESPONSE_FAILED && array_key_exists('info', $response))
+		);
 	}
 }

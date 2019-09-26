@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -110,11 +110,6 @@ class CScreenBase {
 	public $profileIdx2;
 
 	/**
-	 * @see CScreenBuilder::updateProfile
-	 */
-	public $updateProfile;
-
-	/**
 	 * Time control dom element id
 	 *
 	 * @var string
@@ -140,7 +135,7 @@ class CScreenBase {
 	 *
 	 * @var array
 	 */
-	public $required_parameters;
+	private $required_parameters;
 
 	/**
 	 * Init screen data.
@@ -157,11 +152,10 @@ class CScreenBase {
 	 * @param string	$options['action']
 	 * @param int		$options['groupid']
 	 * @param int		$options['hostid']
-	 * @param int		$options['period']
-	 * @param int		$options['stime']
-	 * @param string	$options['profileIdx']
-	 * @param int		$options['profileIdx2']
-	 * @param boolean	$options['updateProfile']
+	 * @param string	$options['profileIdx']          Profile idx value.
+	 * @param int		$options['profileIdx2']         Profile idx2 value.
+	 * @param string	$options['from']                Start time of selected time period.
+	 * @param string	$options['to']                  End time of selected time period.
 	 * @param array		$options['timeline']
 	 * @param string	$options['dataId']
 	 */
@@ -179,7 +173,6 @@ class CScreenBase {
 			'pageFile'			=> null,
 			'profileIdx'		=> '',
 			'profileIdx2'		=> null,
-			'updateProfile'		=> true,
 			'timeline'			=> null,
 			'dataId'			=> null,
 			'page'				=> 1
@@ -206,7 +199,6 @@ class CScreenBase {
 					'pageFile'			=> false,
 					'profileIdx'		=> false,
 					'profileIdx2'		=> true,
-					'updateProfile'		=> false,
 					'timeline'			=> false,
 					'page'				=> false
 				];
@@ -222,7 +214,6 @@ class CScreenBase {
 					'pageFile'			=> false,
 					'profileIdx'		=> false,
 					'profileIdx2'		=> false,
-					'updateProfile'		=> false,
 					'timeline'			=> false,
 					'page'				=> false
 				];
@@ -238,11 +229,40 @@ class CScreenBase {
 					'pageFile'			=> false,
 					'profileIdx'		=> false,
 					'profileIdx2'		=> false,
-					'updateProfile'		=> false,
 					'timeline'			=> false,
 					'page'				=> true
 				];
 				break;
+
+			case SCREEN_RESOURCE_PROBLEM:
+				$this->required_parameters += [
+					'isTemplatedScreen'	=> false,
+					'screenid'			=> false,
+					'action'			=> false,
+					'groupid'			=> false,
+					'hostid'			=> false,
+					'pageFile'			=> false,
+					'profileIdx'		=> true,
+					'profileIdx2'		=> true,
+					'timeline'			=> true,
+					'page'				=> true
+				];
+				break;
+
+			case SCREEN_RESOURCE_HISTORY:
+				$this->required_parameters += [
+					'isTemplatedScreen'	=> true,
+					'screenid'			=> true,
+					'action'			=> true,
+					'groupid'			=> false,
+					'hostid'			=> false,
+					'pageFile'			=> true,
+					'profileIdx'		=> true,
+					'profileIdx2'		=> true,
+					'timeline'			=> true,
+					'page'				=> true
+				];
+			break;
 
 			default:
 				$this->required_parameters += [
@@ -254,7 +274,6 @@ class CScreenBase {
 					'pageFile'			=> true,
 					'profileIdx'		=> true,
 					'profileIdx2'		=> true,
-					'updateProfile'		=> true,
 					'timeline'			=> true,
 					'page'				=> false
 				];
@@ -309,12 +328,11 @@ class CScreenBase {
 
 		// Calculate timeline.
 		if ($this->required_parameters['timeline'] && $this->timeline === null) {
-			$this->timeline = $this->calculateTime([
+			$this->timeline = getTimeSelectorPeriod([
 				'profileIdx' => $this->profileIdx,
 				'profileIdx2' => $this->profileIdx2,
-				'updateProfile' => $this->updateProfile,
-				'period' => array_key_exists('period', $options) ? $options['period'] : null,
-				'stime' => array_key_exists('stime', $options) ? $options['stime'] : null
+				'from' => array_key_exists('from', $options) ? $options['from'] : null,
+				'to' => array_key_exists('to', $options) ? $options['to'] : null
 			]);
 		}
 
@@ -355,16 +373,6 @@ class CScreenBase {
 	}
 
 	/**
-	 * Get profile url params.
-	 *
-	 * @return string
-	 */
-	public function getProfileUrlParams() {
-		return '&updateProfile='.(int) $this->updateProfile.'&profileIdx='.$this->profileIdx.'&profileIdx2='.
-			$this->profileIdx2;
-	}
-
-	/**
 	 * Get enveloped screen inside container.
 	 *
 	 * @param object	$item
@@ -386,7 +394,7 @@ class CScreenBase {
 		if ($this->mode == SCREEN_MODE_EDIT) {
 			$div->addItem(
 				(new CDiv([
-					new CLink(_('Change'), $this->action)
+					new CLink(_x('Change', 'verb'), $this->action)
 				]))->addClass(ZBX_STYLE_CENTER)
 			);
 		}
@@ -402,7 +410,7 @@ class CScreenBase {
 	public function insertFlickerfreeJs(array $data = []) {
 		$jsData = [
 			'id' => $this->getDataId(),
-			'interval' => CWebUser::$data['refresh']
+			'interval' => CWebUser::getRefresh()
 		];
 
 		$parameters = $this->parameters;
@@ -433,127 +441,5 @@ class CScreenBase {
 		}
 
 		zbx_add_post_js('window.flickerfreeScreen.add('.zbx_jsvalue($jsData).');');
-	}
-
-	/**
-	 * Insert javascript flicker-free screen data.
-	 *
-	 * @static
-	 *
-	 * @param array		$options
-	 * @param string	$options['profileIdx']
-	 * @param int		$options['profileIdx2']
-	 * @param boolean	$options['updateProfile']
-	 * @param int		$options['period']
-	 * @param string	$options['stime']
-	 *
-	 * @return array
-	 */
-	public static function calculateTime(array $options = []) {
-		if (!array_key_exists('updateProfile', $options)) {
-			$options['updateProfile'] = true;
-		}
-		if (empty($options['profileIdx2'])) {
-			$options['profileIdx2'] = 0;
-		}
-
-		// Show only latest data without update is set only period.
-		if (!empty($options['period']) && empty($options['stime'])) {
-			$options['updateProfile'] = false;
-			$options['profileIdx'] = '';
-		}
-
-		// period
-		if (empty($options['period'])) {
-			$options['period'] = !empty($options['profileIdx'])
-				? CProfile::get($options['profileIdx'].'.period', ZBX_PERIOD_DEFAULT, $options['profileIdx2'])
-				: ZBX_PERIOD_DEFAULT;
-		}
-		else {
-			if ($options['period'] < ZBX_MIN_PERIOD) {
-				show_error_message(_n('Minimum time period to display is %1$s minute.',
-					'Minimum time period to display is %1$s minutes.',
-					(int) ZBX_MIN_PERIOD / SEC_PER_MIN
-				));
-				$options['period'] = ZBX_MIN_PERIOD;
-			}
-			elseif ($options['period'] > ZBX_MAX_PERIOD) {
-				show_error_message(_n('Maximum time period to display is %1$s day.',
-					'Maximum time period to display is %1$s days.',
-					(int) ZBX_MAX_PERIOD / SEC_PER_DAY
-				));
-				$options['period'] = ZBX_MAX_PERIOD;
-			}
-		}
-		if ($options['updateProfile'] && !empty($options['profileIdx'])) {
-			CProfile::update($options['profileIdx'].'.period', $options['period'], PROFILE_TYPE_INT, $options['profileIdx2']);
-		}
-
-		// stime
-		$time = time();
-		$usertime = null;
-		$stimeNow = null;
-		$isNow = 0;
-
-		if (!empty($options['stime'])) {
-			$stimeUnix = zbxDateToTime($options['stime']);
-
-			if ($stimeUnix > $time || zbxAddSecondsToUnixtime($options['period'], $stimeUnix) > $time) {
-				$stimeNow = zbxAddSecondsToUnixtime(SEC_PER_YEAR, $options['stime']);
-				$options['stime'] = date(TIMESTAMP_FORMAT, $time - $options['period']);
-				$usertime = date(TIMESTAMP_FORMAT, $time);
-				$isNow = 1;
-			}
-			else {
-				$usertime = date(TIMESTAMP_FORMAT, zbxAddSecondsToUnixtime($options['period'], $stimeUnix));
-				$isNow = 0;
-			}
-
-			if ($options['updateProfile'] && !empty($options['profileIdx'])) {
-				CProfile::update($options['profileIdx'].'.stime', $options['stime'], PROFILE_TYPE_STR, $options['profileIdx2']);
-				CProfile::update($options['profileIdx'].'.isnow', $isNow, PROFILE_TYPE_INT, $options['profileIdx2']);
-			}
-		}
-		else {
-			if (!empty($options['profileIdx'])) {
-				$isNow = CProfile::get($options['profileIdx'].'.isnow', null, $options['profileIdx2']);
-				if ($isNow) {
-					$options['stime'] = date(TIMESTAMP_FORMAT, $time - $options['period']);
-					$usertime = date(TIMESTAMP_FORMAT, $time);
-					$stimeNow = date(TIMESTAMP_FORMAT, zbxAddSecondsToUnixtime(SEC_PER_YEAR, $options['stime']));
-
-					if ($options['updateProfile']) {
-						CProfile::update($options['profileIdx'].'.stime', $options['stime'], PROFILE_TYPE_STR, $options['profileIdx2']);
-					}
-				}
-				else {
-					$options['stime'] = CProfile::get($options['profileIdx'].'.stime', null, $options['profileIdx2']);
-					$usertime = date(TIMESTAMP_FORMAT, zbxAddSecondsToUnixtime($options['period'], $options['stime']));
-				}
-			}
-
-			if (empty($options['stime'])) {
-				$options['stime'] = date(TIMESTAMP_FORMAT, $time - $options['period']);
-				$usertime = date(TIMESTAMP_FORMAT, $time);
-				$stimeNow = date(TIMESTAMP_FORMAT, zbxAddSecondsToUnixtime(SEC_PER_YEAR, $options['stime']));
-				$isNow = 1;
-
-				if ($options['updateProfile'] && !empty($options['profileIdx'])) {
-					CProfile::update($options['profileIdx'].'.stime', $options['stime'], PROFILE_TYPE_STR, $options['profileIdx2']);
-					CProfile::update($options['profileIdx'].'.isnow', $isNow, PROFILE_TYPE_INT, $options['profileIdx2']);
-				}
-			}
-		}
-
-		return [
-			'period' => $options['period'],
-			'stime' => date(TIMESTAMP_FORMAT, zbxDateToTime($options['stime'])),
-			'stimeNow' => ($stimeNow === null)
-				? date(TIMESTAMP_FORMAT, zbxAddSecondsToUnixtime(SEC_PER_YEAR, $options['stime']))
-				: $stimeNow,
-			'starttime' => date(TIMESTAMP_FORMAT, $time - ZBX_MAX_PERIOD),
-			'usertime' => $usertime,
-			'isNow' => $isNow
-		];
 	}
 }

@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -18,22 +18,21 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-require_once dirname(__FILE__).'/../include/class.cwebtest.php';
+require_once dirname(__FILE__).'/../include/CLegacyWebTest.php';
 require_once dirname(__FILE__).'/../../include/items.inc.php';
 
-class testInheritanceWeb extends CWebTest {
+/**
+ * @backup httptest
+ */
+class testInheritanceWeb extends CLegacyWebTest {
 	private $templateid = 15000;	// 'Inheritance test template'
 	private $template = 'Inheritance test template';
 
 	private $hostid = 15001;		// 'Template inheritance test host'
 	private $host = 'Template inheritance test host';
 
-	public function testInheritanceWeb_backup() {
-		DBsave_tables('httptest');
-	}
-
 	public static function update() {
-		return DBdata(
+		return CDBHelper::getDataProvider(
 			'SELECT httptestid,hostid'.
 			' FROM httptest'.
 			' WHERE hostid=15000'	//	$this->templateid.
@@ -45,26 +44,26 @@ class testInheritanceWeb extends CWebTest {
 	 */
 	public function testInheritanceWeb_SimpleUpdate($data) {
 		$sqlHttpTests = 'SELECT * FROM httptest ORDER BY httptestid';
-		$oldHashHttpTests = DBhash($sqlHttpTests);
+		$oldHashHttpTests = CDBHelper::getHash($sqlHttpTests);
 		$sqlHttpSteps = 'SELECT * FROM httpstep ORDER BY httpstepid';
-		$oldHashHttpSteps = DBhash($sqlHttpSteps);
+		$oldHashHttpSteps = CDBHelper::getHash($sqlHttpSteps);
 		$sqlHttpTestItems = 'SELECT * FROM httptestitem ORDER BY httptestitemid';
-		$oldHashHttpTestItems = DBhash($sqlHttpTestItems);
+		$oldHashHttpTestItems = CDBHelper::getHash($sqlHttpTestItems);
 		$sqlHttpStepItems = 'SELECT * FROM httpstepitem ORDER BY httpstepitemid';
-		$oldHashHttpStepItems = DBhash($sqlHttpStepItems);
+		$oldHashHttpStepItems = CDBHelper::getHash($sqlHttpStepItems);
 		$sqlItems = 'SELECT * FROM items ORDER BY itemid';
-		$oldHashItems = DBhash($sqlItems);
+		$oldHashItems = CDBHelper::getHash($sqlItems);
 
 		$this->zbxTestLogin('httpconf.php?form=update&hostid='.$data['hostid'].'&httptestid='.$data['httptestid']);
 		$this->zbxTestClickWait('update');
 		$this->zbxTestCheckTitle('Configuration of web monitoring');
 		$this->zbxTestTextPresent('Web scenario updated');
 
-		$this->assertEquals($oldHashHttpTests, DBhash($sqlHttpTests));
-		$this->assertEquals($oldHashHttpSteps, DBhash($sqlHttpSteps));
-		$this->assertEquals($oldHashHttpTestItems, DBhash($sqlHttpTestItems));
-		$this->assertEquals($oldHashHttpStepItems, DBhash($sqlHttpStepItems));
-		$this->assertEquals($oldHashItems, DBhash($sqlItems));
+		$this->assertEquals($oldHashHttpTests, CDBHelper::getHash($sqlHttpTests));
+		$this->assertEquals($oldHashHttpSteps, CDBHelper::getHash($sqlHttpSteps));
+		$this->assertEquals($oldHashHttpTestItems, CDBHelper::getHash($sqlHttpTestItems));
+		$this->assertEquals($oldHashHttpStepItems, CDBHelper::getHash($sqlHttpStepItems));
+		$this->assertEquals($oldHashItems, CDBHelper::getHash($sqlItems));
 	}
 
 	public static function create() {
@@ -105,13 +104,13 @@ class testInheritanceWeb extends CWebTest {
 
 		$this->zbxTestClick('tab_stepTab');
 		foreach ($data['addStep'] as $step) {
-			$this->zbxTestLaunchPopup('add_step');
-			$this->zbxTestInputTypeWait('name', $step['name']);
-			$this->zbxTestInputType('url', $step['url']);
-			$this->zbxTestClick('add');
+			$this->zbxTestClickXpathWait('//td[@colspan="8"]/button[contains(@class, "element-table-add")]');
+			$this->zbxTestLaunchOverlayDialog('Step of web scenario');
+			$this->zbxTestInputTypeByXpath('//div[@class="overlay-dialogue-body"]//input[@id="step_name"]', $step['name']);
+			$this->zbxTestInputTypeByXpath('//div[@class="overlay-dialogue-body"]//input[@id="url"]', $step['url']);
+			$this->zbxTestClickXpath('//div[@class="overlay-dialogue-footer"]//button[text()="Add"]');
 			$this->zbxTestTextNotPresent('Page received incorrect data');
-			$this->zbxTestWaitWindowClose();
-			$this->zbxTestWaitUntilElementVisible(WebDriverBy::id('name_0'));
+			$this->zbxTestWaitUntilElementVisible(WebDriverBy::xpath('//a[contains(@href,"javascript:httpconf.steps.open")]'));
 			$this->zbxTestTextPresent($step['name']);
 		}
 
@@ -119,7 +118,6 @@ class testInheritanceWeb extends CWebTest {
 
 		switch ($data['expected']) {
 			case TEST_GOOD:
-				$this->zbxTestCheckTitle('Configuration of web monitoring');
 				$this->zbxTestTextNotPresent('Cannot add web scenario');
 				$this->zbxTestWaitUntilMessageTextPresent('msg-good', 'Web scenario added');
 				break;
@@ -130,9 +128,5 @@ class testInheritanceWeb extends CWebTest {
 				$this->zbxTestTextPresent($data['errors']);
 				break;
 		}
-	}
-
-	public function testInheritanceWeb_restore() {
-		DBrestore_tables('httptest');
 	}
 }

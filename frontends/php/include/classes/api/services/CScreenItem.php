@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -21,8 +21,6 @@
 
 /**
  * Class containing methods for operations with screen items.
- *
- * @package API
  */
 class CScreenItem extends CApiService {
 
@@ -39,12 +37,11 @@ class CScreenItem extends CApiService {
 		SCREEN_RESOURCE_SIMPLE_GRAPH,
 		SCREEN_RESOURCE_MAP,
 		SCREEN_RESOURCE_PLAIN_TEXT,
-		SCREEN_RESOURCE_HOSTS_INFO,
-		SCREEN_RESOURCE_TRIGGERS_INFO,
+		SCREEN_RESOURCE_HOST_INFO,
+		SCREEN_RESOURCE_TRIGGER_INFO,
 		SCREEN_RESOURCE_SERVER_INFO,
 		SCREEN_RESOURCE_CLOCK,
-		SCREEN_RESOURCE_SCREEN,
-		SCREEN_RESOURCE_TRIGGERS_OVERVIEW,
+		SCREEN_RESOURCE_TRIGGER_OVERVIEW,
 		SCREEN_RESOURCE_DATA_OVERVIEW,
 		SCREEN_RESOURCE_URL,
 		SCREEN_RESOURCE_ACTIONS,
@@ -67,11 +64,11 @@ class CScreenItem extends CApiService {
 		$this->getOptions = zbx_array_merge($this->getOptions, [
 			'screenitemids'	=> null,
 			'screenids'		=> null,
-			'editable'		=> null,
+			'editable'		=> false,
 			'sortfield'		=> '',
 			'sortorder'		=> '',
-			'preservekeys'	=> null,
-			'countOutput'	=> null
+			'preservekeys'	=> false,
+			'countOutput'	=> false
 		]);
 	}
 
@@ -97,12 +94,12 @@ class CScreenItem extends CApiService {
 		$result = [];
 		while ($row = DBfetch($res)) {
 			// count query, return a single result
-			if ($options['countOutput'] !== null) {
+			if ($options['countOutput']) {
 				$result = $row['rowscount'];
 			}
 			// normal select query
 			else {
-				if ($options['preservekeys'] !== null) {
+				if ($options['preservekeys']) {
 					$result[$row['screenitemid']] = $row;
 				}
 				else {
@@ -160,6 +157,8 @@ class CScreenItem extends CApiService {
 			$screenItem += $defaults;
 		}
 		unset($screenItem);
+
+		$this->validateItemsURL($screenItems);
 
 		$screenIds = array_keys(array_flip(zbx_objectValues($screenItems, 'screenid')));
 
@@ -271,6 +270,8 @@ class CScreenItem extends CApiService {
 				self::exception(ZBX_API_ERROR_PARAMETERS, _('Invalid method parameters.'));
 			}
 		}
+
+		$this->validateItemsURL($screenItems);
 
 		$screenItems = zbx_toHash($screenItems, 'screenitemid');
 		$screenItemIds = array_keys($screenItems);
@@ -404,57 +405,6 @@ class CScreenItem extends CApiService {
 	}
 
 	/**
-	 * Returns true if the given screen items exist and are available for reading.
-	 *
-	 * @param array $screenItemIds
-	 *
-	 * @return bool
-	 */
-	public function isReadable(array $screenItemIds) {
-		if (!is_array($screenItemIds)) {
-			return false;
-		}
-		elseif (empty($screenItemIds)) {
-			return true;
-		}
-
-		$screenItemIds = array_unique($screenItemIds);
-
-		$count = $this->get([
-			'screenitemids' => $screenItemIds,
-			'countOutput' => true
-		]);
-
-		return (count($screenItemIds) == $count);
-	}
-
-	/**
-	 * Returns true if the given screen items exist and are available for writing.
-	 *
-	 * @param array $screenItemIds	An array if screen item IDs
-	 *
-	 * @return bool
-	 */
-	public function isWritable(array $screenItemIds) {
-		if (!is_array($screenItemIds)) {
-			return false;
-		}
-		elseif (empty($screenItemIds)) {
-			return true;
-		}
-
-		$screenItemIds = array_unique($screenItemIds);
-
-		$count = $this->get([
-			'screenitemids' => $screenItemIds,
-			'editable' => true,
-			'countOutput' => true
-		]);
-
-		return (count($screenItemIds) == $count);
-	}
-
-	/**
 	 * Validates screen items.
 	 *
 	 * If the $dbScreenItems parameter is given, the screen items will be matched
@@ -481,9 +431,9 @@ class CScreenItem extends CApiService {
 		$validStyles = [
 			SCREEN_RESOURCE_CLOCK => [TIME_TYPE_LOCAL, TIME_TYPE_SERVER, TIME_TYPE_HOST],
 			SCREEN_RESOURCE_DATA_OVERVIEW => [STYLE_TOP, STYLE_LEFT],
-			SCREEN_RESOURCE_TRIGGERS_OVERVIEW => [STYLE_TOP, STYLE_LEFT],
-			SCREEN_RESOURCE_HOSTS_INFO => [STYLE_VERTICAL, STYLE_HORIZONTAL],
-			SCREEN_RESOURCE_TRIGGERS_INFO => [STYLE_VERTICAL, STYLE_HORIZONTAL]
+			SCREEN_RESOURCE_TRIGGER_OVERVIEW => [STYLE_TOP, STYLE_LEFT],
+			SCREEN_RESOURCE_HOST_INFO => [STYLE_VERTICAL, STYLE_HORIZONTAL],
+			SCREEN_RESOURCE_TRIGGER_INFO => [STYLE_VERTICAL, STYLE_HORIZONTAL]
 		];
 
 		foreach ($screenItems as $screenItem) {
@@ -502,12 +452,12 @@ class CScreenItem extends CApiService {
 
 			// check resource id
 			switch ($screenItem['resourcetype']) {
-				case SCREEN_RESOURCE_HOSTS_INFO:
-				case SCREEN_RESOURCE_TRIGGERS_INFO:
-				case SCREEN_RESOURCE_TRIGGERS_OVERVIEW:
+				case SCREEN_RESOURCE_HOST_INFO:
+				case SCREEN_RESOURCE_TRIGGER_INFO:
+				case SCREEN_RESOURCE_TRIGGER_OVERVIEW:
 				case SCREEN_RESOURCE_HOSTGROUP_TRIGGERS:
 				case SCREEN_RESOURCE_DATA_OVERVIEW:
-					$overviewResources = [SCREEN_RESOURCE_TRIGGERS_OVERVIEW, SCREEN_RESOURCE_DATA_OVERVIEW];
+					$overviewResources = [SCREEN_RESOURCE_TRIGGER_OVERVIEW, SCREEN_RESOURCE_DATA_OVERVIEW];
 					if (in_array($screenItem['resourcetype'], $overviewResources)) {
 						if (!$screenItem['resourceid']) {
 							self::exception(ZBX_API_ERROR_PARAMETERS, _(
@@ -585,14 +535,6 @@ class CScreenItem extends CApiService {
 					}
 
 					$mapIds[$screenItem['resourceid']] = $screenItem['resourceid'];
-					break;
-
-				case SCREEN_RESOURCE_SCREEN:
-					if (!$screenItem['resourceid']) {
-						self::exception(ZBX_API_ERROR_PARAMETERS, _('No screen ID provided for screen element.'));
-					}
-
-					$screenIds[$screenItem['resourceid']] = $screenItem['resourceid'];
 					break;
 
 				case SCREEN_RESOURCE_ACTIONS:
@@ -1000,5 +942,21 @@ class CScreenItem extends CApiService {
 	 */
 	protected function isValidMaxColumns($maxColumns) {
 		return ($maxColumns >= SCREEN_SURROGATE_MAX_COLUMNS_MIN && $maxColumns <= SCREEN_SURROGATE_MAX_COLUMNS_MAX);
+	}
+
+	/**
+	 * Validates URL fields for submitted screen items.
+	 *
+	 * @throws APIException for invalid URL
+	 *
+	 * @param array $screen_items	Array of screen items.
+	 */
+	protected function validateItemsURL($screen_items) {
+		foreach ($screen_items as $screen_item) {
+			if ($screen_item['resourcetype'] == SCREEN_RESOURCE_URL && array_key_exists('url', $screen_item)
+					&& !CHtmlUrlValidator::validate($screen_item['url'])) {
+				self::exception(ZBX_API_ERROR_PARAMETERS, _('Wrong value for url field.'));
+			}
+		}
 	}
 }

@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -26,6 +26,11 @@ class CTabView extends CDiv {
 	protected $headers = [];
 	protected $footer = null;
 	protected $selectedTab = null;
+
+	/**
+	 * Script for tab change event.
+	 */
+	private $tab_change_js = '';
 
 	/**
 	 * Disabled tabs IDs, tab option
@@ -55,11 +60,22 @@ class CTabView extends CDiv {
 	}
 
 	/**
+	 * Set javascript on tab change event.
+	 *
+	 * @param string $value  Script body.
+	 *
+	 * @return CTabView
+	 */
+	public function onTabChange($value) {
+		$this->tab_change_js = $value;
+
+		return $this;
+	}
+
+	/**
 	 * Disable tabs
 	 *
 	 * @param array		$disabled	disabled tabs IDs (first tab - 0, second - 1...)
-	 *
-	 * @return void
 	 */
 	public function setDisabled($disabled) {
 		$this->disabledTabs = $disabled;
@@ -96,32 +112,36 @@ class CTabView extends CDiv {
 			$this->addItem($headersList);
 			$this->addItem($this->tabs);
 
-			if ($this->selectedTab === null) {
-				$activeTab = get_cookie('tab', 0);
-				$createEvent = '';
-			}
-			else {
-				$activeTab = $this->selectedTab;
-				$createEvent = 'create: function() { jQuery.cookie("tab", '.CJs::encodeJson($this->selectedTab).'); },';
-			}
-
-			$disabledTabs = ($this->disabledTabs === null) ? '' : 'disabled: '.CJs::encodeJson($this->disabledTabs).',';
-
-			zbx_add_post_js('
-				jQuery("#'.$this->id.'").tabs({
-					'.$createEvent.'
-					'.$disabledTabs.'
-					active: '.CJs::encodeJson($activeTab).',
-					activate: function(event, ui) {
-						jQuery.cookie("tab", ui.newTab.index().toString());
-					}
-				})
-				.css("visibility", "visible");'
-			);
+			zbx_add_post_js($this->makeJavascript());
 		}
 
 		$this->addItem($this->footer);
 
 		return parent::toString($destroy);
+	}
+
+	public function makeJavascript() {
+		if ($this->selectedTab === null) {
+			$active_tab = (int) get_cookie('tab', 0);
+			$create_event = '';
+		}
+		else {
+			$active_tab = $this->selectedTab;
+			$create_event = 'create: function() { jQuery.cookie("tab", '.CJs::encodeJson($this->selectedTab).'); },';
+		}
+
+		$disabled_tabs = ($this->disabledTabs === null) ? '' : 'disabled: '.CJs::encodeJson($this->disabledTabs).',';
+
+		return
+			'jQuery("#'.$this->id.'").tabs({'.
+				$create_event.
+				$disabled_tabs.
+				'active: '.CJs::encodeJson($active_tab).','.
+				'activate: function(event, ui) {'.
+					'jQuery.cookie("tab", ui.newTab.index().toString());'.
+					$this->tab_change_js.
+				'}'.
+			'})'.
+			'.css("visibility", "visible");';
 	}
 }

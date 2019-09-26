@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -25,21 +25,24 @@
 #ifdef _WINDOWS
 #	include "messages.h"
 #	include "service.h"
+#	include "sysinfo.h"
 static HANDLE		system_log_handle = INVALID_HANDLE_VALUE;
 #endif
 
 static char		log_filename[MAX_STRING_LEN];
 static int		log_type = LOG_TYPE_UNDEFINED;
-static ZBX_MUTEX	log_access = ZBX_MUTEX_NULL;
-static int		log_level = LOG_LEVEL_WARNING;
+static zbx_mutex_t	log_access = ZBX_MUTEX_NULL;
+int			zbx_log_level = LOG_LEVEL_WARNING;
 
-#define LOCK_LOG	zbx_mutex_lock(&log_access)
-#define UNLOCK_LOG	zbx_mutex_unlock(&log_access)
+#ifdef _WINDOWS
+#	define LOCK_LOG		zbx_mutex_lock(log_access)
+#	define UNLOCK_LOG	zbx_mutex_unlock(log_access)
+#else
+#	define LOCK_LOG		lock_log()
+#	define UNLOCK_LOG	unlock_log()
+#endif
 
 #define ZBX_MESSAGE_BUF_SIZE	1024
-
-#define ZBX_CHECK_LOG_LEVEL(level)	\
-		((LOG_LEVEL_INFORMATION != level && (level > log_level || LOG_LEVEL_EMPTY == level)) ? FAIL : SUCCEED)
 
 #ifdef _WINDOWS
 #	define STDIN_FILENO	_fileno(stdin)
@@ -53,9 +56,10 @@ static int		log_level = LOG_LEVEL_WARNING;
 #	define ZBX_DEV_NULL	"/dev/null"
 #endif
 
+#ifndef _WINDOWS
 const char	*zabbix_get_log_level_string(void)
 {
-	switch (log_level)
+	switch (zbx_log_level)
 	{
 		case LOG_LEVEL_EMPTY:
 			return "0 (none)";
@@ -77,23 +81,24 @@ const char	*zabbix_get_log_level_string(void)
 
 int	zabbix_increase_log_level(void)
 {
-	if (LOG_LEVEL_TRACE == log_level)
+	if (LOG_LEVEL_TRACE == zbx_log_level)
 		return FAIL;
 
-	log_level = log_level + 1;
+	zbx_log_level = zbx_log_level + 1;
 
 	return SUCCEED;
 }
 
 int	zabbix_decrease_log_level(void)
 {
-	if (LOG_LEVEL_EMPTY == log_level)
+	if (LOG_LEVEL_EMPTY == zbx_log_level)
 		return FAIL;
 
-	log_level = log_level - 1;
+	zbx_log_level = zbx_log_level - 1;
 
 	return SUCCEED;
 }
+#endif
 
 void	zbx_redirect_stdio(const char *filename)
 {
@@ -227,20 +232,24 @@ static void	lock_log(void)
 {
 	sigset_t	mask;
 
+	/* block signals to prevent deadlock on log file mutex when signal handler attempts to lock log */
 	sigemptyset(&mask);
 	sigaddset(&mask, SIGUSR1);
-	sigaddset(&mask, SIGTERM);	/* block SIGTERM, SIGINT to prevent deadlock on log file mutex */
+	sigaddset(&mask, SIGUSR2);
+	sigaddset(&mask, SIGTERM);
 	sigaddset(&mask, SIGINT);
+	sigaddset(&mask, SIGQUIT);
+	sigaddset(&mask, SIGHUP);
 
 	if (0 > sigprocmask(SIG_BLOCK, &mask, &orig_mask))
 		zbx_error("cannot set sigprocmask to block the user signal");
 
-	LOCK_LOG;
+	zbx_mutex_lock(log_access);
 }
 
 static void	unlock_log(void)
 {
-	UNLOCK_LOG;
+	zbx_mutex_unlock(log_access);
 
 	if (0 > sigprocmask(SIG_SETMASK, &orig_mask, NULL))
 		zbx_error("cannot restore sigprocmask");
@@ -248,12 +257,18 @@ static void	unlock_log(void)
 #else
 static void	lock_log(void)
 {
-	LOCK_LOG;
+#ifdef ZABBIX_AGENT
+	if (0 == (ZBX_MUTEX_LOGGING_DENIED & get_thread_global_mutex_flag()))
+#endif
+		LOCK_LOG;
 }
 
 static void	unlock_log(void)
 {
-	UNLOCK_LOG;
+#ifdef ZABBIX_AGENT
+	if (0 == (ZBX_MUTEX_LOGGING_DENIED & get_thread_global_mutex_flag()))
+#endif
+		UNLOCK_LOG;
 }
 #endif
 
@@ -262,25 +277,23 @@ void	zbx_handle_log(void)
 	if (LOG_TYPE_FILE != log_type)
 		return;
 
-	lock_log();
+	LOCK_LOG;
 
 	rotate_log(log_filename);
 
-	unlock_log();
+	UNLOCK_LOG;
 }
 
-int	zabbix_open_log(int type, int level, const char *filename)
+int	zabbix_open_log(int type, int level, const char *filename, char **error)
 {
-	FILE	*log_file = NULL;
-#ifdef _WINDOWS
-	wchar_t	*wevent_source;
-#endif
 	log_type = type;
-	log_level = level;
+	zbx_log_level = level;
 
 	if (LOG_TYPE_SYSTEM == type)
 	{
 #ifdef _WINDOWS
+		wchar_t	*wevent_source;
+
 		wevent_source = zbx_utf8_to_unicode(ZABBIX_EVENT_SOURCE);
 		system_log_handle = RegisterEventSource(NULL, wevent_source);
 		zbx_free(wevent_source);
@@ -290,38 +303,42 @@ int	zabbix_open_log(int type, int level, const char *filename)
 	}
 	else if (LOG_TYPE_FILE == type)
 	{
+		FILE	*log_file = NULL;
+
 		if (MAX_STRING_LEN <= strlen(filename))
 		{
-			zbx_error("too long path for logfile");
-			exit(EXIT_FAILURE);
+			*error = zbx_strdup(*error, "too long path for logfile");
+			return FAIL;
 		}
 
-		if (FAIL == zbx_mutex_create_force(&log_access, ZBX_MUTEX_LOG))
-		{
-			zbx_error("unable to create mutex for log file");
-			exit(EXIT_FAILURE);
-		}
+		if (SUCCEED != zbx_mutex_create(&log_access, ZBX_MUTEX_LOG, error))
+			return FAIL;
 
 		if (NULL == (log_file = fopen(filename, "a+")))
 		{
-			zbx_error("unable to open log file [%s]: %s", filename, zbx_strerror(errno));
-			exit(EXIT_FAILURE);
+			*error = zbx_dsprintf(*error, "unable to open log file [%s]: %s", filename, zbx_strerror(errno));
+			return FAIL;
 		}
 
 		strscpy(log_filename, filename);
 		zbx_fclose(log_file);
 	}
-	else if (LOG_TYPE_CONSOLE == type)
+	else if (LOG_TYPE_CONSOLE == type || LOG_TYPE_UNDEFINED == type)
 	{
-		if (FAIL == zbx_mutex_create_force(&log_access, ZBX_MUTEX_LOG))
+		if (SUCCEED != zbx_mutex_create(&log_access, ZBX_MUTEX_LOG, error))
 		{
-			zbx_error("unable to create mutex for standard output");
-			exit(EXIT_FAILURE);
+			*error = zbx_strdup(*error, "unable to create mutex for standard output");
+			return FAIL;
 		}
 
 		fflush(stderr);
 		if (-1 == dup2(STDOUT_FILENO, STDERR_FILENO))
 			zbx_error("cannot redirect stderr to stdout: %s", zbx_strerror(errno));
+	}
+	else
+	{
+		*error = zbx_strdup(*error, "unknown log type");
+		return FAIL;
 	}
 
 	return SUCCEED;
@@ -338,89 +355,30 @@ void	zabbix_close_log(void)
 		closelog();
 #endif
 	}
-	else if (LOG_TYPE_FILE == log_type || LOG_TYPE_CONSOLE == log_type)
+	else if (LOG_TYPE_FILE == log_type || LOG_TYPE_CONSOLE == log_type || LOG_TYPE_UNDEFINED == log_type)
 	{
 		zbx_mutex_destroy(&log_access);
 	}
 }
 
-void	zabbix_set_log_level(int level)
-{
-	log_level = level;
-}
-
-void	zabbix_errlog(zbx_err_codes_t err, ...)
-{
-	const char	*msg;
-	char		*s = NULL;
-	va_list		ap;
-
-	switch (err)
-	{
-		case ERR_Z3001:
-			msg = "connection to database '%s' failed: [%d] %s";
-			break;
-		case ERR_Z3002:
-			msg = "cannot create database '%s': [%d] %s";
-			break;
-		case ERR_Z3003:
-			msg = "no connection to the database";
-			break;
-		case ERR_Z3004:
-			msg = "cannot close database: [%d] %s";
-			break;
-		case ERR_Z3005:
-			msg = "query failed: [%d] %s [%s]";
-			break;
-		case ERR_Z3006:
-			msg = "fetch failed: [%d] %s";
-			break;
-		case ERR_Z3007:
-			msg = "query failed: [%d] %s";
-			break;
-		default:
-			msg = "unknown error";
-	}
-
-	va_start(ap, err);
-	s = zbx_dvsprintf(s, msg, ap);
-	va_end(ap);
-
-	zabbix_log(LOG_LEVEL_ERR, "[Z%04d] %s", err, s);
-
-	zbx_free(s);
-}
-
-/******************************************************************************
- *                                                                            *
- * Function: zabbix_check_log_level                                           *
- *                                                                            *
- * Purpose: checks if the specified log level must be logged                  *
- *                                                                            *
- * Return value: SUCCEED - the log level must be logged                       *
- *               FAIL    - otherwise                                          *
- *                                                                            *
- ******************************************************************************/
-int	zabbix_check_log_level(int level)
-{
-	return ZBX_CHECK_LOG_LEVEL(level);
-}
-
 void	__zbx_zabbix_log(int level, const char *fmt, ...)
 {
-	FILE		*log_file = NULL;
 	char		message[MAX_BUFFER_LEN];
 	va_list		args;
 #ifdef _WINDOWS
 	WORD		wType;
 	wchar_t		thread_id[20], *strings[2];
 #endif
+
+#ifndef ZBX_ZABBIX_LOG_CHECK
 	if (SUCCEED != ZBX_CHECK_LOG_LEVEL(level))
 		return;
-
+#endif
 	if (LOG_TYPE_FILE == log_type)
 	{
-		lock_log();
+		FILE	*log_file;
+
+		LOCK_LOG;
 
 		rotate_log(log_filename);
 
@@ -451,8 +409,18 @@ void	__zbx_zabbix_log(int level, const char *fmt, ...)
 
 			zbx_fclose(log_file);
 		}
+		else
+		{
+			zbx_error("failed to open log file: %s", zbx_strerror(errno));
 
-		unlock_log();
+			va_start(args, fmt);
+			zbx_vsnprintf(message, sizeof(message), fmt, args);
+			va_end(args);
+
+			zbx_error("failed to write [%s] into log file", message);
+		}
+
+		UNLOCK_LOG;
 
 		return;
 	}
@@ -462,7 +430,7 @@ void	__zbx_zabbix_log(int level, const char *fmt, ...)
 		long		milliseconds;
 		struct tm	tm;
 
-		lock_log();
+		LOCK_LOG;
 
 		zbx_get_time(&tm, &milliseconds, NULL);
 
@@ -486,7 +454,7 @@ void	__zbx_zabbix_log(int level, const char *fmt, ...)
 
 		fflush(stdout);
 
-		unlock_log();
+		UNLOCK_LOG;
 
 		return;
 	}
@@ -559,7 +527,7 @@ void	__zbx_zabbix_log(int level, const char *fmt, ...)
 	}	/* LOG_TYPE_SYSLOG */
 	else	/* LOG_TYPE_UNDEFINED == log_type */
 	{
-		lock_log();
+		LOCK_LOG;
 
 		switch (level)
 		{
@@ -583,16 +551,16 @@ void	__zbx_zabbix_log(int level, const char *fmt, ...)
 				break;
 		}
 
-		unlock_log();
+		UNLOCK_LOG;
 	}
 }
 
 int	zbx_get_log_type(const char *logtype)
 {
 	const char	*logtypes[] = {ZBX_OPTION_LOGTYPE_SYSTEM, ZBX_OPTION_LOGTYPE_FILE, ZBX_OPTION_LOGTYPE_CONSOLE};
-	size_t		i;
+	int		i;
 
-	for (i = 0; i < ARRSIZE(logtypes); i++)
+	for (i = 0; i < (int)ARRSIZE(logtypes); i++)
 	{
 		if (0 == strcmp(logtype, logtypes[i]))
 			return i + 1;
@@ -666,7 +634,9 @@ char	*strerror_from_system(unsigned long error)
 	zbx_rtrim(utf8_string, "\r\n ");
 
 	return utf8_string;
-#else
+#else	/* not _WINDOWS */
+	ZBX_UNUSED(error);
+
 	return zbx_strerror(errno);
 #endif	/* _WINDOWS */
 }

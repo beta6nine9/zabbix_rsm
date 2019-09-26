@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -25,18 +25,33 @@
 #include "mutexs.h"
 #include "sysinfo.h"
 
-static ZBX_PERF_STAT_DATA	ppsd;
-static ZBX_MUTEX		perfstat_access = ZBX_MUTEX_NULL;
+#define UNSUPPORTED_REFRESH_PERIOD		600
 
-#define LOCK_PERFCOUNTERS	zbx_mutex_lock(&perfstat_access)
-#define UNLOCK_PERFCOUNTERS	zbx_mutex_unlock(&perfstat_access)
+typedef struct
+{
+	zbx_perf_counter_data_t	*pPerfCounterList;
+	PDH_HQUERY		pdh_query;
+	time_t			nextcheck;	/* refresh time of not supported counters */
+}
+ZBX_PERF_STAT_DATA;
+
+static ZBX_PERF_STAT_DATA	ppsd;
+static zbx_mutex_t		perfstat_access = ZBX_MUTEX_NULL;
+
+#define LOCK_PERFCOUNTERS	zbx_mutex_lock(perfstat_access)
+#define UNLOCK_PERFCOUNTERS	zbx_mutex_unlock(perfstat_access)
+
+static int	perf_collector_started(void)
+{
+	return (NULL != ppsd.pdh_query ? SUCCEED : FAIL);
+}
 
 /******************************************************************************
  *                                                                            *
  * Comments: counter failed or disappeared, dismiss all previous values       *
  *                                                                            *
  ******************************************************************************/
-static void	deactivate_perf_counter(PERF_COUNTER_DATA *counter)
+static void	deactivate_perf_counter(zbx_perf_counter_data_t *counter)
 {
 	zabbix_log(LOG_LEVEL_DEBUG, "deactivate_perf_counter() counterpath:'%s'", counter->counterpath);
 
@@ -53,14 +68,14 @@ static void	deactivate_perf_counter(PERF_COUNTER_DATA *counter)
  *           added, a pointer to that counter is returned, NULL otherwise     *
  *                                                                            *
  ******************************************************************************/
-PERF_COUNTER_DATA	*add_perf_counter(const char *name, const char *counterpath, int interval, char **error)
+zbx_perf_counter_data_t	*add_perf_counter(const char *name, const char *counterpath, int interval,
+		zbx_perf_counter_lang_t lang, char **error)
 {
-	const char		*__function_name = "add_perf_counter";
-	PERF_COUNTER_DATA	*cptr = NULL;
+	zbx_perf_counter_data_t	*cptr = NULL;
 	PDH_STATUS		pdh_status;
 	int			added = FAIL;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() counter:'%s' interval:%d", __function_name, counterpath, interval);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() counter:'%s' interval:%d", __func__, counterpath, interval);
 
 	LOCK_PERFCOUNTERS;
 
@@ -75,20 +90,21 @@ PERF_COUNTER_DATA	*add_perf_counter(const char *name, const char *counterpath, i
 		/* add new parameters */
 		if (NULL == cptr)
 		{
-			cptr = (PERF_COUNTER_DATA *)zbx_malloc(cptr, sizeof(PERF_COUNTER_DATA));
+			cptr = (zbx_perf_counter_data_t *)zbx_malloc(cptr, sizeof(zbx_perf_counter_data_t));
 
 			/* initialize the counter */
-			memset(cptr, 0, sizeof(PERF_COUNTER_DATA));
+			memset(cptr, 0, sizeof(zbx_perf_counter_data_t));
 			if (NULL != name)
 				cptr->name = zbx_strdup(NULL, name);
 			cptr->counterpath = zbx_strdup(NULL, counterpath);
 			cptr->interval = interval;
+			cptr->lang = lang;
 			cptr->value_current = -1;
 			cptr->value_array = (double *)zbx_malloc(cptr->value_array, sizeof(double) * interval);
 
 			/* add the counter to the query */
-			pdh_status = zbx_PdhAddCounter(__function_name, cptr, ppsd.pdh_query, counterpath,
-					&cptr->handle);
+			pdh_status = zbx_PdhAddCounter(__func__, cptr, ppsd.pdh_query, counterpath,
+					lang, &cptr->handle);
 
 			cptr->next = ppsd.pPerfCounterList;
 			ppsd.pPerfCounterList = cptr;
@@ -103,18 +119,23 @@ PERF_COUNTER_DATA	*add_perf_counter(const char *name, const char *counterpath, i
 			break;
 		}
 
-		if (NULL != name && 0 == strcmp(cptr->name, name))
+		if (NULL != name)
+		{
+			if (0 == strcmp(cptr->name, name))
+				break;
+		}
+		else if (0 == strcmp(cptr->counterpath, counterpath) &&
+				cptr->interval == interval && cptr->lang == lang)
+		{
 			break;
-
-		if (NULL == name && 0 == strcmp(cptr->counterpath, counterpath) && cptr->interval == interval)
-			break;
+		}
 	}
 
 	if (FAIL == added)
 	{
-		zabbix_log(LOG_LEVEL_DEBUG, "%s() counter '%s' already exists", __function_name, counterpath);
+		zabbix_log(LOG_LEVEL_DEBUG, "%s() counter '%s' already exists", __func__, counterpath);
 	}
-	else if (NULL != name)
+	else if (NULL != name && NULL != cptr)
 	{
 		char	*alias_name;
 
@@ -125,7 +146,7 @@ PERF_COUNTER_DATA	*add_perf_counter(const char *name, const char *counterpath, i
 out:
 	UNLOCK_PERFCOUNTERS;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s(): %s", __function_name, NULL == cptr ? "FAIL" : "SUCCEED");
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s(): %s", __func__, NULL == cptr ? "FAIL" : "SUCCEED");
 
 	return cptr;
 }
@@ -141,7 +162,7 @@ out:
  *             interval  - [IN] the new data collection interval in seconds   *
  *                                                                            *
  ******************************************************************************/
-static void	extend_perf_counter_interval(PERF_COUNTER_DATA *counter, int interval)
+static void	extend_perf_counter_interval(zbx_perf_counter_data_t *counter, int interval)
 {
 	if (interval <= counter->interval)
 		return;
@@ -170,9 +191,9 @@ static void	extend_perf_counter_interval(PERF_COUNTER_DATA *counter, int interva
  *           the memory is freed - do not use it again                        *
  *                                                                            *
  ******************************************************************************/
-void	remove_perf_counter(PERF_COUNTER_DATA *counter)
+void	remove_perf_counter(zbx_perf_counter_data_t *counter)
 {
-	PERF_COUNTER_DATA	*cptr;
+	zbx_perf_counter_data_t	*cptr;
 
 	LOCK_PERFCOUNTERS;
 
@@ -205,9 +226,9 @@ out:
 
 }
 
-static void	free_perf_counter_list()
+static void	free_perf_counter_list(void)
 {
-	PERF_COUNTER_DATA	*cptr;
+	zbx_perf_counter_data_t	*cptr;
 
 	LOCK_PERFCOUNTERS;
 
@@ -231,7 +252,7 @@ static void	free_perf_counter_list()
  *           interval must be less than or equal to counter->interval         *
  *                                                                            *
  ******************************************************************************/
-double	compute_average_value(PERF_COUNTER_DATA *counter, int interval)
+static double	compute_average_value(zbx_perf_counter_data_t *counter, int interval)
 {
 	double	sum = 0;
 	int	i, j, count;
@@ -253,42 +274,44 @@ double	compute_average_value(PERF_COUNTER_DATA *counter, int interval)
 	return sum / (double)count;
 }
 
-int	init_perf_collector(int multithreaded)
+int	init_perf_collector(zbx_threadedness_t threadedness, char **error)
 {
-	const char	*__function_name = "init_perf_collector";
-	int		ret = FAIL;
+	int	ret = FAIL;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
-	if (0 != multithreaded)
+	switch (threadedness)
 	{
-		if (FAIL == zbx_mutex_create_force(&perfstat_access, ZBX_MUTEX_PERFSTAT))
-		{
-			zbx_error("cannot create mutex for performance counters");
-			exit(EXIT_FAILURE);
-		}
+		case ZBX_SINGLE_THREADED:
+			break;
+		case ZBX_MULTI_THREADED:
+			if (SUCCEED != zbx_mutex_create(&perfstat_access, ZBX_MUTEX_PERFSTAT, error))
+				goto out;
+			break;
+		default:
+			THIS_SHOULD_NEVER_HAPPEN;
+			*error = zbx_strdup(*error, "internal error");
+			goto out;
 	}
 
-	if (ERROR_SUCCESS != zbx_PdhOpenQuery(__function_name, &ppsd.pdh_query))
+	if (ERROR_SUCCESS != zbx_PdhOpenQuery(__func__, &ppsd.pdh_query))
+	{
+		*error = zbx_strdup(*error, "cannot open performance data query");
 		goto out;
+	}
 
 	ppsd.nextcheck = time(NULL) + UNSUPPORTED_REFRESH_PERIOD;
 
 	ret = SUCCEED;
 out:
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __function_name, zbx_result_string(ret));
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
 
 	return ret;
 }
 
-int	perf_collector_started()
+void	free_perf_collector(void)
 {
-	return (NULL != ppsd.pdh_query ? SUCCEED : FAIL);
-}
-
-void	free_perf_collector()
-{
-	PERF_COUNTER_DATA	*cptr;
+	zbx_perf_counter_data_t	*cptr;
 
 	if (SUCCEED != perf_collector_started())
 		return;
@@ -310,15 +333,14 @@ void	free_perf_collector()
 	zbx_mutex_destroy(&perfstat_access);
 }
 
-void	collect_perfstat()
+void	collect_perfstat(void)
 {
-	const char		*__function_name = "collect_perfstat";
-	PERF_COUNTER_DATA	*cptr;
+	zbx_perf_counter_data_t	*cptr;
 	PDH_STATUS		pdh_status;
 	time_t			now;
 	PDH_FMT_COUNTERVALUE	value;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
 	LOCK_PERFCOUNTERS;
 
@@ -338,7 +360,8 @@ void	collect_perfstat()
 			if (PERF_COUNTER_NOTSUPPORTED != cptr->status)
 				continue;
 
-			zbx_PdhAddCounter(__function_name, cptr, ppsd.pdh_query, cptr->counterpath, &cptr->handle);
+			zbx_PdhAddCounter(__func__, cptr, ppsd.pdh_query, cptr->counterpath,
+					cptr->lang, &cptr->handle);
 		}
 
 		ppsd.nextcheck = now + UNSUPPORTED_REFRESH_PERIOD;
@@ -354,7 +377,7 @@ void	collect_perfstat()
 		}
 
 		zabbix_log(LOG_LEVEL_DEBUG, "%s() call to PdhCollectQueryData() failed: %s",
-				__function_name, strerror_from_module(pdh_status, L"PDH.DLL"));
+				__func__, strerror_from_module(pdh_status, L"PDH.DLL"));
 
 		goto out;
 	}
@@ -365,7 +388,7 @@ void	collect_perfstat()
 		if (PERF_COUNTER_NOTSUPPORTED == cptr->status)
 			continue;
 
-		if (ERROR_SUCCESS != zbx_PdhGetRawCounterValue(__function_name, cptr->counterpath,
+		if (ERROR_SUCCESS != zbx_PdhGetRawCounterValue(__func__, cptr->counterpath,
 				cptr->handle, &cptr->rawValues[cptr->olderRawValue]))
 		{
 			deactivate_perf_counter(cptr);
@@ -437,7 +460,7 @@ void	collect_perfstat()
 out:
 	UNLOCK_PERFCOUNTERS;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
 /******************************************************************************
@@ -448,7 +471,9 @@ out:
  *                                                                            *
  * Parameters: name  - [IN] the performance counter name                      *
  *             value - [OUT] the calculated value                             *
- *             error - [OUT] the error message                                *
+ *             error - [OUT] the error message, it is not always produced     *
+ *                     when FAIL is returned. It is a caller responsibility   *
+ *                     to check if the error message is not NULL.             *
  *                                                                            *
  * Returns:  SUCCEED - the value was retrieved successfully                   *
  *           FAIL    - otherwise                                              *
@@ -460,12 +485,11 @@ out:
  ******************************************************************************/
 int	get_perf_counter_value_by_name(const char *name, double *value, char **error)
 {
-	const char		*__function_name = "get_perf_counter_value_by_name";
 	int			ret = FAIL;
-	PERF_COUNTER_DATA	*perfs = NULL;
+	zbx_perf_counter_data_t	*perfs = NULL;
 	char			*counterpath = NULL;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() name:%s", __function_name, name);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() name:%s", __func__, name);
 
 	LOCK_PERFCOUNTERS;
 
@@ -503,13 +527,17 @@ out:
 	if (NULL != counterpath)
 	{
 		/* request counter value directly from Windows performance counters */
-		if (ERROR_SUCCESS == calculate_counter_value(__function_name, counterpath, value))
+		PDH_STATUS pdh_status = calculate_counter_value(__func__, counterpath, perfs->lang, value);
+
+		if (PDH_NOT_IMPLEMENTED == pdh_status)
+			*error = zbx_strdup(*error, "Counter is not supported for this Microsoft Windows version");
+		else if (ERROR_SUCCESS == pdh_status)
 			ret = SUCCEED;
 
 		zbx_free(counterpath);
 	}
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __function_name, zbx_result_string(ret));
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
 
 	return ret;
 }
@@ -522,6 +550,7 @@ out:
  *                                                                            *
  * Parameters: counterpath - [IN] the performance counter path                *
  *             interval    - [IN] the data collection interval in seconds     *
+ *             lang        - [IN] counterpath language (default or English)   *
  *             value       - [OUT] the calculated value                       *
  *             error       - [OUT] the error message                          *
  *                                                                            *
@@ -533,13 +562,14 @@ out:
  *           possible.                                                        *
  *                                                                            *
  ******************************************************************************/
-int	get_perf_counter_value_by_path(const char *counterpath, int interval, double *value, char **error)
+int	get_perf_counter_value_by_path(const char *counterpath, int interval, zbx_perf_counter_lang_t lang,
+		double *value, char **error)
 {
-	const char		*__function_name = "get_perf_counter_value_by_path";
 	int			ret = FAIL;
-	PERF_COUNTER_DATA	*perfs = NULL;
+	zbx_perf_counter_data_t	*perfs = NULL;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() path:%s interval:%d", __function_name, counterpath, interval);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() path:%s interval:%d lang:%d", __func__, counterpath,
+			interval, lang);
 
 	LOCK_PERFCOUNTERS;
 
@@ -551,7 +581,7 @@ int	get_perf_counter_value_by_path(const char *counterpath, int interval, double
 
 	for (perfs = ppsd.pPerfCounterList; NULL != perfs; perfs = perfs->next)
 	{
-		if (0 == strcmp(perfs->counterpath, counterpath))
+		if (0 == strcmp(perfs->counterpath, counterpath) && perfs->lang == lang)
 		{
 			if (perfs->interval < interval)
 				extend_perf_counter_interval(perfs, interval);
@@ -568,18 +598,18 @@ int	get_perf_counter_value_by_path(const char *counterpath, int interval, double
 
 	/* if the requested counter is not already being monitored - start monitoring */
 	if (NULL == perfs)
-		perfs = add_perf_counter(NULL, counterpath, interval, error);
+		perfs = add_perf_counter(NULL, counterpath, interval, lang, error);
 out:
 	UNLOCK_PERFCOUNTERS;
 
 	if (SUCCEED != ret && NULL != perfs)
 	{
 		/* request counter value directly from Windows performance counters */
-		if (ERROR_SUCCESS == calculate_counter_value(__function_name, counterpath, value))
+		if (ERROR_SUCCESS == calculate_counter_value(__func__, counterpath, lang, value))
 			ret = SUCCEED;
 	}
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __function_name, zbx_result_string(ret));
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
 
 	return ret;
 }
@@ -599,12 +629,11 @@ out:
  *           FAIL    - otherwise                                              *
  *                                                                            *
  ******************************************************************************/
-int	get_perf_counter_value(PERF_COUNTER_DATA *counter, int interval, double *value, char **error)
+int	get_perf_counter_value(zbx_perf_counter_data_t *counter, int interval, double *value, char **error)
 {
-	const char	*__function_name = "get_perf_counter_value";
-	int		ret = FAIL;
+	int	ret = FAIL;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() path:%s interval:%d", __function_name, counter->counterpath, interval);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() path:%s interval:%d", __func__, counter->counterpath, interval);
 
 	LOCK_PERFCOUNTERS;
 
@@ -625,12 +654,7 @@ int	get_perf_counter_value(PERF_COUNTER_DATA *counter, int interval, double *val
 out:
 	UNLOCK_PERFCOUNTERS;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __function_name, zbx_result_string(ret));
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
 
 	return ret;
 }
-
-
-
-
-

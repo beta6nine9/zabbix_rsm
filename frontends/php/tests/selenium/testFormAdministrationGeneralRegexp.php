@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -18,17 +18,16 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-require_once dirname(__FILE__).'/../include/class.cwebtest.php';
+require_once dirname(__FILE__).'/../include/CLegacyWebTest.php';
 
-class testFormAdministrationGeneralRegexp extends CWebTest {
+/**
+ * @backup regexps
+ */
+class testFormAdministrationGeneralRegexp extends CLegacyWebTest {
 
 	private $regexp = 'test_regexp1';
 	private $regexp2 = 'test_regexp2';
 	private $cloned_regexp = 'test_regexp1_clone';
-
-	public function testFormAdministrationGeneralRegexp_backup() {
-		DBsave_tables('regexps');
-	}
 
 	public function testFormAdministrationGeneralRegexp_Layout() {
 		$this->zbxTestLogin('adm.gui.php');
@@ -95,13 +94,13 @@ class testFormAdministrationGeneralRegexp extends CWebTest {
 			$this->zbxTestCheckboxSelect('expressions_0_case_sensitive', false);
 		}
 
-		$this->zbxTestClick('tab_test');
-		$this->zbxTestInputType('test_string', $test_string);
+		$this->zbxTestTabSwitchById('tab_test', 'Test');
+		$this->zbxTestInputTypeWait('test_string', $test_string);
 		$this->zbxTestClick('add');
 		$this->zbxTestTextPresent('Regular expression added');
 
 		$sql = 'SELECT * FROM regexps r,expressions e WHERE r.name='.zbx_dbstr($name).' AND r.regexpid=e.regexpid';
-		$this->assertEquals(1, DBcount($sql), 'Chuck Norris: Regular expression with such name has not been added');
+		$this->assertEquals(1, CDBHelper::getCount($sql), 'Chuck Norris: Regular expression with such name has not been added');
 	}
 
 	public function testFormAdministrationGeneralRegexp_AddExisting() {
@@ -134,7 +133,7 @@ class testFormAdministrationGeneralRegexp extends CWebTest {
 		$this->zbxTestCheckHeader('Regular expressions');
 		$this->zbxTestClickLinkText($this->regexp);
 
-		$this->zbxTestClickWait('tab_test');
+		$this->zbxTestTabSwitchById('tab_test', 'Test');
 		$this->zbxTestWaitUntilElementVisible(WebDriverBy::xpath("//table[@id='testResultTable']//span[@class='green']"));
 		$this->zbxTestTextPresent('TRUE');
 	}
@@ -143,7 +142,7 @@ class testFormAdministrationGeneralRegexp extends CWebTest {
 		$this->zbxTestLogin('adm.regexps.php');
 		$this->zbxTestCheckHeader('Regular expressions');
 		$this->zbxTestClickLinkText($this->regexp);
-		$this->zbxTestClickWait('tab_test');
+		$this->zbxTestTabSwitchById('tab_test', 'Test');
 
 		$this->zbxTestInputType('test_string', 'abcdef');
 		$this->zbxTestClick('testExpression');
@@ -161,7 +160,7 @@ class testFormAdministrationGeneralRegexp extends CWebTest {
 		$this->zbxTestTextPresent('Regular expression added');
 
 		$sql = 'SELECT * FROM regexps r,expressions e WHERE r.name='.zbx_dbstr($this->cloned_regexp).' AND r.regexpid=e.regexpid';
-		$this->assertEquals(1, DBcount($sql), 'Chuck Norris: Cloned regular expression does not exist in the DB');
+		$this->assertEquals(1, CDBHelper::getCount($sql), 'Chuck Norris: Cloned regular expression does not exist in the DB');
 	}
 
 	public function testFormAdministrationGeneralRegexp_Update() {
@@ -173,26 +172,26 @@ class testFormAdministrationGeneralRegexp extends CWebTest {
 		$this->zbxTestTextPresent('Regular expression updated');
 
 		$sql = 'SELECT * FROM regexps r,expressions e WHERE r.name='.zbx_dbstr($this->regexp.'2').' AND r.regexpid=e.regexpid';
-		$this->assertEquals(1, DBcount($sql), 'Chuck Norris: Regexp name has not been changed in the DB');
+		$this->assertEquals(1, CDBHelper::getCount($sql), 'Chuck Norris: Regexp name has not been changed in the DB');
 	}
 
 	public function testFormAdministrationGeneralRegexp_Delete() {
 		$this->zbxTestLogin('adm.regexps.php');
 		$this->zbxTestCheckHeader('Regular expressions');
-		$this->zbxTestClickLinkText($this->regexp2);
+		$this->zbxTestClickLinkTextWait($this->regexp2);
 
 		$this->zbxTestClickWait('delete');
-		$this->webDriver->switchTo()->alert()->accept();
+		$this->zbxTestAcceptAlert();
 		$this->zbxTestWaitUntilMessageTextPresent('msg-good', 'Regular expression deleted');
 		$this->zbxTestTextPresent(['Regular expressions', 'Name', 'Expressions']);
 
 		$sql = 'SELECT * FROM regexps r WHERE r.name='.zbx_dbstr($this->regexp2);
-		$this->assertEquals(0, DBcount($sql), 'Chuck Norris: Regexp has not been deleted from the DB');
+		$this->assertEquals(0, CDBHelper::getCount($sql), 'Chuck Norris: Regexp has not been deleted from the DB');
 
 		$sql = 'SELECT * FROM regexps r,expressions e WHERE r.regexpid=e.regexpid and r.name='.zbx_dbstr($this->regexp2);
 
 		// this check will fail as at this moment expressions are not deleted when deleting related regexp
-		$this->assertEquals(0, DBcount($sql), 'Chuck Norris: Regexp expressions has not been deleted from the DB');
+		$this->assertEquals(0, CDBHelper::getCount($sql), 'Chuck Norris: Regexp expressions has not been deleted from the DB');
 	}
 
 	public function testFormAdministrationGeneralRegexp_DeleteAll() {
@@ -201,18 +200,14 @@ class testFormAdministrationGeneralRegexp extends CWebTest {
 		$this->zbxTestCheckboxSelect('all_regexps');
 		$this->zbxTestClickButton('regexp.massdelete');
 
-		$this->webDriver->switchTo()->alert()->accept();
+		$this->zbxTestAcceptAlert();
 		$this->zbxTestCheckHeader('Regular expressions');
 		$this->zbxTestTextPresent('Regular expressions deleted');
 
 		$sql = 'SELECT * FROM regexps';
-		$this->assertEquals(0, DBcount($sql), 'Chuck Norris: Regexp has not been deleted from the DB');
+		$this->assertEquals(0, CDBHelper::getCount($sql), 'Chuck Norris: Regexp has not been deleted from the DB');
 
 		$sql = 'SELECT * FROM expressions';
-		$this->assertEquals(0, DBcount($sql), 'Chuck Norris: Regexp expressions has not been deleted from the DB');
-	}
-
-	public function testFormAdministrationGeneralRegexp_restore() {
-		DBrestore_tables('regexps');
+		$this->assertEquals(0, CDBHelper::getCount($sql), 'Chuck Norris: Regexp expressions has not been deleted from the DB');
 	}
 }

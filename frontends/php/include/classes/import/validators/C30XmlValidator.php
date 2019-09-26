@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -20,7 +20,7 @@
 
 
 /**
- * Validate import data from Zabbix 3.x.
+ * Validate import data from Zabbix 3.0.x.
  */
 class C30XmlValidator {
 
@@ -1004,7 +1004,7 @@ class C30XmlValidator {
 
 				case SCREEN_RESOURCE_MAP:
 				case SCREEN_RESOURCE_SCREEN:
-				case SCREEN_RESOURCE_TRIGGERS_OVERVIEW:
+				case SCREEN_RESOURCE_TRIGGER_OVERVIEW:
 				case SCREEN_RESOURCE_DATA_OVERVIEW:
 					$rules = ['type' => XML_ARRAY, 'rules' => [
 						'name' =>			['type' => XML_STRING | XML_REQUIRED]

@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -19,7 +19,6 @@
 
 #include "common.h"
 #include "mutexs.h"
-#include "ipc.h"
 #include "log.h"
 
 #include "memalloc.h"
@@ -90,9 +89,6 @@
  *  (aligned)            have MEM_FLG_USED bit set                 (aligned)  *
  *                                                                            *
  ******************************************************************************/
-
-#define LOCK_INFO	if (1 == info->use_lock) zbx_mutex_lock(&info->mem_lock)
-#define UNLOCK_INFO	if (1 == info->use_lock) zbx_mutex_unlock(&info->mem_lock)
 
 static void	*ALIGN4(void *ptr);
 static void	*ALIGN8(void *ptr);
@@ -287,13 +283,15 @@ static void	*__mem_malloc(zbx_mem_info_t *info, zbx_uint64_t size)
 		{
 			if (NULL == chunk)
 			{
-				zabbix_log(LOG_LEVEL_CRIT, "__mem_malloc: skipped %d asked %u skip_min %u skip_max %u",
+				zabbix_log(LOG_LEVEL_CRIT, "__mem_malloc: skipped %d asked " ZBX_FS_UI64 " skip_min "
+						ZBX_FS_UI64 " skip_max " ZBX_FS_UI64,
 						counter, size, skip_min, skip_max);
 			}
 			else if (counter >= 100)
 			{
-				zabbix_log(LOG_LEVEL_DEBUG, "__mem_malloc: skipped %d asked %u skip_min %u skip_max %u"
-						" size %u", counter, size, skip_min, skip_max, CHUNK_SIZE(chunk));
+				zabbix_log(LOG_LEVEL_DEBUG, "__mem_malloc: skipped %d asked " ZBX_FS_UI64 " skip_min "
+						ZBX_FS_UI64 " skip_max " ZBX_FS_UI64 " size " ZBX_FS_UI64, counter,
+						size, skip_min, skip_max, CHUNK_SIZE(chunk));
 			}
 		}
 	}
@@ -540,88 +538,76 @@ static void	__mem_free(zbx_mem_info_t *info, void *ptr)
 
 /* public memory interface */
 
-void	zbx_mem_create(zbx_mem_info_t **info, key_t shm_key, int lock_name, zbx_uint64_t size,
-		const char *descr, const char *param, int allow_oom)
+int	zbx_mem_create(zbx_mem_info_t **info, zbx_uint64_t size, const char *descr, const char *param, int allow_oom,
+		char **error)
 {
-	const char	*__function_name = "zbx_mem_create";
-
-	int		shm_id, index;
-	void		*base;
+	int	shm_id, index, ret = FAIL;
+	void	*base;
 
 	descr = ZBX_NULL2STR(descr);
 	param = ZBX_NULL2STR(param);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() descr:'%s' param:'%s' size:" ZBX_FS_SIZE_T,
-			__function_name, descr, param, (zbx_fs_size_t)size);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() param:'%s' size:" ZBX_FS_SIZE_T, __func__, param, (zbx_fs_size_t)size);
 
 	/* allocate shared memory */
 
 	if (4 != ZBX_PTR_SIZE && 8 != ZBX_PTR_SIZE)
 	{
-		zabbix_log(LOG_LEVEL_CRIT, "failed assumption about pointer size (" ZBX_FS_SIZE_T " not in {4, 8})",
+		*error = zbx_dsprintf(*error, "failed assumption about pointer size (" ZBX_FS_SIZE_T " not in {4, 8})",
 				(zbx_fs_size_t)ZBX_PTR_SIZE);
-		exit(EXIT_FAILURE);
+		goto out;
 	}
 
 	if (!(MEM_MIN_SIZE <= size && size <= MEM_MAX_SIZE))
 	{
-		zabbix_log(LOG_LEVEL_CRIT, "requested size " ZBX_FS_SIZE_T " not within bounds [" ZBX_FS_UI64
+		*error = zbx_dsprintf(*error, "requested size " ZBX_FS_SIZE_T " not within bounds [" ZBX_FS_UI64
 				" <= size <= " ZBX_FS_UI64 "]", (zbx_fs_size_t)size, MEM_MIN_SIZE, MEM_MAX_SIZE);
-		exit(EXIT_FAILURE);
+		goto out;
 	}
 
-	if (-1 == (shm_id = zbx_shmget(shm_key, size)))
+	if (-1 == (shm_id = shmget(IPC_PRIVATE, size, 0600)))
 	{
-		zabbix_log(LOG_LEVEL_CRIT, "cannot allocate shared memory for %s", descr);
-		exit(EXIT_FAILURE);
+		*error = zbx_dsprintf(*error, "cannot get private shared memory of size " ZBX_FS_SIZE_T " for %s: %s",
+				(zbx_fs_size_t)size, descr, zbx_strerror(errno));
+		goto out;
 	}
 
 	if ((void *)(-1) == (base = shmat(shm_id, NULL, 0)))
 	{
-		zabbix_log(LOG_LEVEL_CRIT, "cannot attach shared memory for %s: %s", descr, zbx_strerror(errno));
-		exit(EXIT_FAILURE);
+		*error = zbx_dsprintf(*error, "cannot attach shared memory for %s: %s", descr, zbx_strerror(errno));
+		goto out;
 	}
+
+	if (-1 == shmctl(shm_id, IPC_RMID, NULL))
+		zbx_error("cannot mark shared memory %d for destruction: %s", shm_id, zbx_strerror(errno));
+
+	ret = SUCCEED;
 
 	/* allocate zbx_mem_info_t structure, its buckets, and description inside shared memory */
 
-	*info = ALIGN8(base);
+	*info = (zbx_mem_info_t *)ALIGN8(base);
 	(*info)->shm_id = shm_id;
 	(*info)->orig_size = size;
 	size -= (char *)(*info + 1) - (char *)base;
 
 	base = (void *)(*info + 1);
 
-	(*info)->buckets = ALIGNPTR(base);
+	(*info)->buckets = (void **)ALIGNPTR(base);
 	memset((*info)->buckets, 0, MEM_BUCKET_COUNT * ZBX_PTR_SIZE);
 	size -= (char *)((*info)->buckets + MEM_BUCKET_COUNT) - (char *)base;
 	base = (void *)((*info)->buckets + MEM_BUCKET_COUNT);
 
-	zbx_strlcpy(base, descr, size);
-	(*info)->mem_descr = base;
+	zbx_strlcpy((char *)base, descr, size);
+	(*info)->mem_descr = (char *)base;
 	size -= strlen(descr) + 1;
 	base = (void *)((char *)base + strlen(descr) + 1);
 
-	zbx_strlcpy(base, param, size);
-	(*info)->mem_param = base;
+	zbx_strlcpy((char *)base, param, size);
+	(*info)->mem_param = (char *)base;
 	size -= strlen(param) + 1;
 	base = (void *)((char *)base + strlen(param) + 1);
 
 	(*info)->allow_oom = allow_oom;
-
-	/* allocate mutex */
-
-	if (ZBX_NO_MUTEX != lock_name)
-	{
-		(*info)->use_lock = 1;
-
-		if (FAIL == zbx_mutex_create_force(&((*info)->mem_lock), lock_name))
-		{
-			zabbix_log(LOG_LEVEL_CRIT, "cannot create mutex for %s", descr);
-			exit(EXIT_FAILURE);
-		}
-	}
-	else
-		(*info)->use_lock = 0;
 
 	/* prepare shared memory for further allocation by creating one big chunk */
 	(*info)->lo_bound = ALIGN8(base);
@@ -640,56 +626,34 @@ void	zbx_mem_create(zbx_mem_info_t **info, key_t shm_key, int lock_name, zbx_uin
 	(*info)->free_size = (*info)->total_size;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "valid user addresses: [%p, %p] total size: " ZBX_FS_SIZE_T,
-			(char *)(*info)->lo_bound + MEM_SIZE_FIELD,
-			(char *)(*info)->hi_bound - MEM_SIZE_FIELD,
+			(void *)((char *)(*info)->lo_bound + MEM_SIZE_FIELD),
+			(void *)((char *)(*info)->hi_bound - MEM_SIZE_FIELD),
 			(zbx_fs_size_t)(*info)->total_size);
+out:
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __function_name);
-}
-
-void	zbx_mem_destroy(zbx_mem_info_t *info)
-{
-	const char	*__function_name = "zbx_mem_destroy";
-
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() descr:'%s'", __function_name, info->mem_descr);
-
-	if (1 == info->use_lock)
-		zbx_mutex_destroy(&info->mem_lock);
-
-	if (-1 == shmctl(info->shm_id, IPC_RMID, 0))
-	{
-		zabbix_log(LOG_LEVEL_WARNING, "cannot remove shared memory for %s: %s",
-				info->mem_descr, zbx_strerror(errno));
-	}
-
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __function_name);
+	return ret;
 }
 
 void	*__zbx_mem_malloc(const char *file, int line, zbx_mem_info_t *info, const void *old, size_t size)
 {
-	const char	*__function_name = "zbx_mem_malloc";
-
-	void		*chunk;
+	void	*chunk;
 
 	if (NULL != old)
 	{
 		zabbix_log(LOG_LEVEL_CRIT, "[file:%s,line:%d] %s(): allocating already allocated memory",
-				file, line, __function_name);
+				file, line, __func__);
 		exit(EXIT_FAILURE);
 	}
 
 	if (0 == size || size > MEM_MAX_SIZE)
 	{
 		zabbix_log(LOG_LEVEL_CRIT, "[file:%s,line:%d] %s(): asking for a bad number of bytes (" ZBX_FS_SIZE_T
-				")", file, line, __function_name, (zbx_fs_size_t)size);
+				")", file, line, __func__, (zbx_fs_size_t)size);
 		exit(EXIT_FAILURE);
 	}
 
-	LOCK_INFO;
-
 	chunk = __mem_malloc(info, size);
-
-	UNLOCK_INFO;
 
 	if (NULL == chunk)
 	{
@@ -697,9 +661,11 @@ void	*__zbx_mem_malloc(const char *file, int line, zbx_mem_info_t *info, const v
 			return NULL;
 
 		zabbix_log(LOG_LEVEL_CRIT, "[file:%s,line:%d] %s(): out of memory (requested " ZBX_FS_SIZE_T " bytes)",
-				file, line, __function_name, (zbx_fs_size_t)size);
+				file, line, __func__, (zbx_fs_size_t)size);
 		zabbix_log(LOG_LEVEL_CRIT, "[file:%s,line:%d] %s(): please increase %s configuration parameter",
-				file, line, __function_name, info->mem_param);
+				file, line, __func__, info->mem_param);
+		zbx_mem_dump_stats(LOG_LEVEL_CRIT, info);
+		zbx_backtrace();
 		exit(EXIT_FAILURE);
 	}
 
@@ -708,25 +674,19 @@ void	*__zbx_mem_malloc(const char *file, int line, zbx_mem_info_t *info, const v
 
 void	*__zbx_mem_realloc(const char *file, int line, zbx_mem_info_t *info, void *old, size_t size)
 {
-	const char	*__function_name = "zbx_mem_realloc";
-
-	void		*chunk;
+	void	*chunk;
 
 	if (0 == size || size > MEM_MAX_SIZE)
 	{
 		zabbix_log(LOG_LEVEL_CRIT, "[file:%s,line:%d] %s(): asking for a bad number of bytes (" ZBX_FS_SIZE_T
-				")", file, line, __function_name, (zbx_fs_size_t)size);
+				")", file, line, __func__, (zbx_fs_size_t)size);
 		exit(EXIT_FAILURE);
 	}
-
-	LOCK_INFO;
 
 	if (NULL == old)
 		chunk = __mem_malloc(info, size);
 	else
 		chunk = __mem_realloc(info, old, size);
-
-	UNLOCK_INFO;
 
 	if (NULL == chunk)
 	{
@@ -734,9 +694,11 @@ void	*__zbx_mem_realloc(const char *file, int line, zbx_mem_info_t *info, void *
 			return NULL;
 
 		zabbix_log(LOG_LEVEL_CRIT, "[file:%s,line:%d] %s(): out of memory (requested " ZBX_FS_SIZE_T " bytes)",
-				file, line, __function_name, (zbx_fs_size_t)size);
+				file, line, __func__, (zbx_fs_size_t)size);
 		zabbix_log(LOG_LEVEL_CRIT, "[file:%s,line:%d] %s(): please increase %s configuration parameter",
-				file, line, __function_name, info->mem_param);
+				file, line, __func__, info->mem_param);
+		zbx_mem_dump_stats(LOG_LEVEL_CRIT, info);
+		zbx_backtrace();
 		exit(EXIT_FAILURE);
 	}
 
@@ -745,31 +707,20 @@ void	*__zbx_mem_realloc(const char *file, int line, zbx_mem_info_t *info, void *
 
 void	__zbx_mem_free(const char *file, int line, zbx_mem_info_t *info, void *ptr)
 {
-	const char	*__function_name = "zbx_mem_free";
-
 	if (NULL == ptr)
 	{
-		zabbix_log(LOG_LEVEL_CRIT, "[file:%s,line:%d] %s(): freeing a NULL pointer",
-				file, line, __function_name);
+		zabbix_log(LOG_LEVEL_CRIT, "[file:%s,line:%d] %s(): freeing a NULL pointer", file, line, __func__);
 		exit(EXIT_FAILURE);
 	}
 
-	LOCK_INFO;
-
 	__mem_free(info, ptr);
-
-	UNLOCK_INFO;
 }
 
 void	zbx_mem_clear(zbx_mem_info_t *info)
 {
-	const char	*__function_name = "zbx_mem_clear";
+	int	index;
 
-	int		index;
-
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
-
-	LOCK_INFO;
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
 	memset(info->buckets, 0, MEM_BUCKET_COUNT * ZBX_PTR_SIZE);
 	index = mem_bucket_by_size(info->total_size);
@@ -780,21 +731,17 @@ void	zbx_mem_clear(zbx_mem_info_t *info)
 	info->used_size = 0;
 	info->free_size = info->total_size;
 
-	UNLOCK_INFO;
-
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
-void	zbx_mem_dump_stats(zbx_mem_info_t *info)
+void	zbx_mem_dump_stats(int level, zbx_mem_info_t *info)
 {
 	void		*chunk;
 	int		index;
 	zbx_uint64_t	counter, total, total_free = 0;
 	zbx_uint64_t	min_size = __UINT64_C(0xffffffffffffffff), max_size = __UINT64_C(0);
 
-	LOCK_INFO;
-
-	zabbix_log(LOG_LEVEL_DEBUG, "=== memory statistics for %s ===", info->mem_descr);
+	zabbix_log(level, "=== memory statistics for %s ===", info->mem_descr);
 
 	for (index = 0; index < MEM_BUCKET_COUNT; index++)
 	{
@@ -812,33 +759,32 @@ void	zbx_mem_dump_stats(zbx_mem_info_t *info)
 		if (counter > 0)
 		{
 			total_free += counter;
-			zabbix_log(LOG_LEVEL_DEBUG, "free chunks of size %2s %3d bytes: %8d",
+			zabbix_log(level, "free chunks of size %2s %3d bytes: %8llu",
 					index == MEM_BUCKET_COUNT - 1 ? ">=" : "",
-					MEM_MIN_BUCKET_SIZE + 8 * index, counter);
+					MEM_MIN_BUCKET_SIZE + 8 * index, (unsigned long long)counter);
 		}
 	}
 
-	zabbix_log(LOG_LEVEL_DEBUG, "min chunk size: %10u bytes", min_size);
-	zabbix_log(LOG_LEVEL_DEBUG, "max chunk size: %10u bytes", max_size);
+	zabbix_log(level, "min chunk size: %10llu bytes", (unsigned long long)min_size);
+	zabbix_log(level, "max chunk size: %10llu bytes", (unsigned long long)max_size);
 
 	total = (info->total_size - info->used_size - info->free_size) / (2 * MEM_SIZE_FIELD) + 1;
-	zabbix_log(LOG_LEVEL_DEBUG, "memory of total size %u bytes fragmented into %d chunks", info->total_size, total);
-	zabbix_log(LOG_LEVEL_DEBUG, "of those, %10u bytes are in %8d free chunks", info->free_size, total_free);
-	zabbix_log(LOG_LEVEL_DEBUG, "of those, %10u bytes are in %8d used chunks", info->used_size, total - total_free);
+	zabbix_log(level, "memory of total size %llu bytes fragmented into %llu chunks",
+			(unsigned long long)info->total_size, (unsigned long long)total);
+	zabbix_log(level, "of those, %10llu bytes are in %8llu free chunks",
+			(unsigned long long)info->free_size, (unsigned long long)total_free);
+	zabbix_log(level, "of those, %10llu bytes are in %8llu used chunks",
+			(unsigned long long)info->used_size, (unsigned long long)(total - total_free));
 
-	zabbix_log(LOG_LEVEL_DEBUG, "================================");
-
-	UNLOCK_INFO;
+	zabbix_log(level, "================================");
 }
 
 size_t	zbx_mem_required_size(int chunks_num, const char *descr, const char *param)
 {
-	const char	*__function_name = "zbx_mem_required_size";
-
-	size_t		size = 0;
+	size_t	size = 0;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() size:" ZBX_FS_SIZE_T " chunks_num:%d descr:'%s' param:'%s'",
-			__function_name, (zbx_fs_size_t)size, chunks_num, descr, param);
+			__func__, (zbx_fs_size_t)size, chunks_num, descr, param);
 
 	/* shared memory of what size should we allocate so that there is a guarantee */
 	/* that we will be able to get ourselves 'chunks_num' pieces of memory with a */
@@ -856,7 +802,7 @@ size_t	zbx_mem_required_size(int chunks_num, const char *descr, const char *para
 	size += (chunks_num - 1) * MEM_SIZE_FIELD * 2;	/* each additional chunk requires 16 bytes of overhead */
 	size += chunks_num * (MEM_MIN_ALLOC - 1);	/* each chunk has size of at least MEM_MIN_ALLOC bytes */
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s() size:" ZBX_FS_SIZE_T, __function_name, (zbx_fs_size_t)size);
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s() size:" ZBX_FS_SIZE_T, __func__, (zbx_fs_size_t)size);
 
 	return size;
 }

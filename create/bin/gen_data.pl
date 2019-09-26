@@ -1,7 +1,7 @@
-#!/usr/bin/perl -w
+#!/usr/bin/env perl
 #
 # Zabbix
-# Copyright (C) 2001-2017 Zabbix SIA
+# Copyright (C) 2001-2019 Zabbix SIA
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -16,13 +16,9 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
+
 use strict;
 use File::Basename;
-
-my $file = dirname($0)."/../src/data.tmpl";	# name the file
-open(INFO, $file);				# open the file
-my @lines = <INFO>;				# read it into an array
-close(INFO);					# close the file
 
 my (%output, $insert_into, $fields);
 
@@ -184,7 +180,14 @@ sub process_row
 
 	$values = "$values)";
 
-	print "$insert_into $fields values $values$output{'exec_cmd'}";
+	if ($output{'database'} eq 'oracle')
+	{
+		print "$insert_into $fields\nvalues $values$output{'exec_cmd'}";
+	}
+	else
+	{
+		print "$insert_into $fields values $values$output{'exec_cmd'}";
+	}
 }
 
 sub usage
@@ -200,6 +203,18 @@ sub main
 	{
 		usage();
 	}
+
+	open(INFO, dirname($0)."/../src/data.tmpl");
+	my @lines = <INFO>;
+	close(INFO);
+
+	open(INFO, dirname($0)."/../src/templates.tmpl");
+	push(@lines, <INFO>);
+	close(INFO);
+
+	open(INFO, dirname($0)."/../src/dashboards.tmpl");
+	push(@lines, <INFO>);
+	close(INFO);
 
 	if ($ARGV[0] eq 'ibm_db2')		{ %output = %ibm_db2; }
 	elsif ($ARGV[0] eq 'mysql')		{ %output = %mysql; }

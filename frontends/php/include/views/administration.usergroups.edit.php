@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -24,55 +24,64 @@ $widget = (new CWidget())->setTitle(_('User groups'));
 // create form
 $userGroupForm = (new CForm())
 	->setName('userGroupsForm')
-	->addVar('form', $this->data['form'])
-	->addVar('group_rights', $this->data['group_rights']);
-if (isset($this->data['usrgrpid'])) {
-	$userGroupForm->addVar('usrgrpid', $this->data['usrgrpid']);
+	->setAttribute('aria-labeledby', ZBX_STYLE_PAGE_TITLE)
+	->addVar('form', $data['form']);
+
+if ($data['usrgrpid'] != 0) {
+	$userGroupForm->addVar('usrgrpid', $data['usrgrpid']);
 }
 
-/*
- * User group tab
-*/
 $userGroupFormList = (new CFormList())
-	->addRow(_('Group name'),
-		(new CTextBox('gname', $this->data['name']))
+	->addRow(
+		(new CLabel(_('Group name'), 'gname'))->setAsteriskMark(),
+		(new CTextBox('gname', $data['name']))
 			->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
+			->setAriaRequired()
 			->setAttribute('autofocus', 'autofocus')
+			->setAttribute('maxlength', DB::getFieldLength('usrgrp', 'name'))
+	)
+	->addRow(
+		new CLabel(_('Users'), 'userids__ms'),
+		(new CMultiSelect([
+			'name' => 'userids[]',
+			'object_name' => 'users',
+			'data' => $data['users_ms'],
+			'popup' => [
+				'parameters' => [
+					'srctbl' => 'users',
+					'srcfld1' => 'userid',
+					'srcfld2' => 'fullname',
+					'dstfrm' => $userGroupForm->getName(),
+					'dstfld1' => 'userids_'
+				]
+			]
+		]))->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
 	);
 
-// append groups to form list
-$groupsComboBox = (new CComboBox('selusrgrp', $this->data['selected_usrgrp'], 'submit()'))
-	->addItem(0, _('All'));
-foreach ($this->data['usergroups'] as $group) {
-	$groupsComboBox->addItem($group['usrgrpid'], $group['name']);
-}
-
-// append user tweenbox to form list
-$usersTweenBox = new CTweenBox($userGroupForm, 'group_users', $this->data['group_users'], 10);
-foreach ($this->data['users'] as $user) {
-	$usersTweenBox->addItem($user['userid'], getUserFullname($user));
-}
-$userGroupFormList->addRow(_('Users'), $usersTweenBox->get(_('In group'), [_('Other groups'), SPACE, $groupsComboBox]));
-
 // append frontend and user status to from list
-$isGranted = isset($data['usrgrpid']) ? granted2update_group($data['usrgrpid']) : true;
+$isGranted = ($data['usrgrpid'] != 0) ? granted2update_group($data['usrgrpid']) : true;
 if ($isGranted) {
-	$userGroupFormList->addRow(_('Frontend access'), new CComboBox('gui_access', $this->data['gui_access'], null, [
-		GROUP_GUI_ACCESS_SYSTEM => user_auth_type2str(GROUP_GUI_ACCESS_SYSTEM),
-		GROUP_GUI_ACCESS_INTERNAL => user_auth_type2str(GROUP_GUI_ACCESS_INTERNAL),
-		GROUP_GUI_ACCESS_DISABLED => user_auth_type2str(GROUP_GUI_ACCESS_DISABLED)
-	]));
+	$userGroupFormList->addRow(
+		(new CLabel(_('Frontend access'), 'gui_access')),
+		(new CComboBox('gui_access', $data['gui_access'], null, [
+			GROUP_GUI_ACCESS_SYSTEM => user_auth_type2str(GROUP_GUI_ACCESS_SYSTEM),
+			GROUP_GUI_ACCESS_INTERNAL => user_auth_type2str(GROUP_GUI_ACCESS_INTERNAL),
+			GROUP_GUI_ACCESS_LDAP => user_auth_type2str(GROUP_GUI_ACCESS_LDAP),
+			GROUP_GUI_ACCESS_DISABLED => user_auth_type2str(GROUP_GUI_ACCESS_DISABLED)
+		]))
+	);
 	$userGroupFormList->addRow(_('Enabled'),
-		(new CCheckBox('users_status'))->setChecked($this->data['users_status'] ? (isset($data['usrgrpid']) ? false : true) : true)
+		(new CCheckBox('users_status', GROUP_STATUS_ENABLED))
+			->setChecked($data['users_status'] == GROUP_STATUS_ENABLED)
 	);
 }
 else {
 	$userGroupForm
-		->addVar('gui_access', $this->data['gui_access'])
+		->addVar('gui_access', $data['gui_access'])
 		->addVar('users_status', GROUP_STATUS_ENABLED);
 	$userGroupFormList
 		->addRow(_('Frontend access'),
-			(new CSpan(user_auth_type2str($this->data['gui_access'])))
+			(new CSpan(user_auth_type2str($data['gui_access'])))
 				->addClass('text-field')
 				->addClass('green')
 		)
@@ -82,84 +91,189 @@ else {
 				->addClass('green')
 		);
 }
-$userGroupFormList->addRow(_('Debug mode'), (new CCheckBox('debug_mode'))->setChecked($this->data['debug_mode'] == 1));
+$userGroupFormList->addRow(_('Debug mode'), (new CCheckBox('debug_mode'))->setChecked($data['debug_mode'] == 1));
 
 /*
  * Permissions tab
  */
 $permissionsFormList = new CFormList('permissionsFormList');
 
-// append permissions table to form list
-$permissionsTable = (new CTable())->setHeader([_('Read-write'), _('Read only'), _('Deny')]);
+$permissions_table = (new CTable())
+	->setAttribute('style', 'width: 100%;')
+	->setHeader([_('Host group'), _('Permissions')]);
 
-$lstWrite = new CListBox('right_to_del[read_write][]', null, 20);
-$lstRead = new CListBox('right_to_del[read_only][]', null, 20);
-$lstDeny = new CListBox('right_to_del[deny][]', null, 20);
+foreach ($data['groups_rights'] as $groupid => $group_rights) {
+	$userGroupForm->addVar('groups_rights['.$groupid.'][name]', $group_rights['name']);
 
-foreach ($this->data['group_rights'] as $id => $rights) {
-	if ($rights['permission'] == PERM_DENY) {
-		$lstDeny->addItem($id, $rights['name']);
+	if ($groupid == 0) {
+		$permissions_table->addRow([italic(_('All groups')), permissionText($group_rights['permission'])]);
+		$userGroupForm->addVar('groups_rights['.$groupid.'][grouped]', $group_rights['grouped']);
+		$userGroupForm->addVar('groups_rights['.$groupid.'][permission]', $group_rights['permission']);
 	}
-	elseif ($rights['permission'] == PERM_READ) {
-		$lstRead->addItem($id, $rights['name']);
-	}
-	elseif ($rights['permission'] == PERM_READ_WRITE) {
-		$lstWrite->addItem($id, $rights['name']);
+	else {
+		if (array_key_exists('grouped', $group_rights) && $group_rights['grouped']) {
+			$userGroupForm->addVar('groups_rights['.$groupid.'][grouped]', $group_rights['grouped']);
+			$group_name = [$group_rights['name'], SPACE, italic('('._('including subgroups').')')];
+		}
+		else {
+			$group_name = $group_rights['name'];
+		}
+
+		$permissions_table->addRow([$group_name,
+			(new CRadioButtonList('groups_rights['.$groupid.'][permission]', (int) $group_rights['permission']))
+				->addValue(_('Read-write'), PERM_READ_WRITE)
+				->addValue(_('Read'), PERM_READ)
+				->addValue(_('Deny'), PERM_DENY)
+				->addValue(_('None'), PERM_NONE)
+				->setModern(true)
+		]);
 	}
 }
 
-$permissionsTable->addRow([
-	(new CCol($lstWrite))->addClass('read_write'),
-	(new CCol($lstRead))->addClass('read_only'),
-	(new CCol($lstDeny))->addClass('deny')
-]);
-$permissionsTable->addRow([
-	[
-		(new CButton('add_read_write', _('Add')))
-			->addClass(ZBX_STYLE_BTN_GREY)
-			->onClick("return PopUp('popup_right.php?dstfrm=".$userGroupForm->getName().
-				'&permission='.PERM_READ_WRITE."');"),
-		(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
-		(new CSimpleButton(_('Delete selected')))
-			->onClick('javascript: submitFormWithParam("'.$userGroupForm->getName().'", "del_read_write", "1");')
-			->addClass(ZBX_STYLE_BTN_GREY)
-	],
-	[
-		(new CButton('add_read_only', _('Add')))
-			->addClass(ZBX_STYLE_BTN_GREY)
-			->onClick("return PopUp('popup_right.php?dstfrm=".$userGroupForm->getName().
-				'&permission='.PERM_READ."');"),
-		(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
-		(new CSimpleButton(_('Delete selected')))
-			->onClick('javascript: submitFormWithParam("'.$userGroupForm->getName().'", "del_read_only", "1");')
-			->addClass(ZBX_STYLE_BTN_GREY)
-	],
-	[
-		(new CButton('add_deny', _('Add')))
-			->addClass(ZBX_STYLE_BTN_GREY)
-			->onClick("return PopUp('popup_right.php?dstfrm=".$userGroupForm->getName().
-				'&permission='.PERM_DENY."');"),
-		(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
-		(new CSimpleButton(_('Delete selected')))
-			->onClick('javascript: submitFormWithParam("'.$userGroupForm->getName().'", "del_deny", "1");')
-			->addClass(ZBX_STYLE_BTN_GREY)
-	]
-]);
-$permissionsFormList
-	->addRow(_('Composing permissions'), $permissionsTable)
-	->addRow(_('Calculated permissions'), '');
-$permissionsFormList = getPermissionsFormList($this->data['group_rights'], null, $permissionsFormList);
+$permissionsFormList->addRow(_('Permissions'),
+	(new CDiv($permissions_table))
+		->addClass(ZBX_STYLE_TABLE_FORMS_SEPARATOR)
+		->setAttribute('style', 'min-width: '.ZBX_TEXTAREA_BIG_WIDTH.'px;')
+);
+
+$new_permissions_table = (new CTable())
+	->addRow([
+		(new CMultiSelect([
+			'name' => 'groupids[]',
+			'object_name' => 'hostGroup',
+			'data' => $data['permission_groups'],
+			'popup' => [
+				'parameters' => [
+					'srctbl' => 'host_groups',
+					'srcfld1' => 'groupid',
+					'dstfrm' => $userGroupForm->getName(),
+					'dstfld1' => 'groupids_'
+				]
+			]
+		]))->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH),
+		(new CCol(
+			(new CRadioButtonList('new_permission', (int) $data['new_permission']))
+				->addValue(_('Read-write'), PERM_READ_WRITE)
+				->addValue(_('Read'), PERM_READ)
+				->addValue(_('Deny'), PERM_DENY)
+				->addValue(_('None'), PERM_NONE)
+				->setModern(true)
+		))->setAttribute('style', 'vertical-align: top')
+	])
+	->addRow([[(new CCheckBox('subgroups'))->setChecked($data['subgroups'] == 1), _('Include subgroups')]])
+	->addRow([
+		(new CSimpleButton(_('Add')))
+			->onClick('javascript: submitFormWithParam("'.$userGroupForm->getName().'", "add_permission", "1");')
+			->addClass(ZBX_STYLE_BTN_LINK)
+	]);
+
+$permissionsFormList->addRow(null,
+	(new CDiv($new_permissions_table))
+		->addClass(ZBX_STYLE_TABLE_FORMS_SEPARATOR)
+		->setAttribute('style', 'min-width: '.ZBX_TEXTAREA_BIG_WIDTH.'px;')
+);
+
+/*
+ * Tag filter tab
+ */
+$tag_filter_form_list = new CFormList('tagFilterFormList');
+
+$tag_filter_table = (new CTable())
+	->setId('tag_filter_table')
+	->setAttribute('style', 'width: 100%;')
+	->setHeader([_('Host group'), _('Tags'), _('Action')]);
+
+$pre_name = '';
+
+foreach ($data['tag_filters'] as $key => $tag_filter) {
+	$action = (new CSimpleButton(_('Remove')))
+		->onClick('javascript: submitFormWithParam('.
+			'"'.$userGroupForm->getName().'", "remove_tag_filter['.$key.']", "1"'.
+		');')
+		->addClass(ZBX_STYLE_BTN_LINK);
+	if ($pre_name === $tag_filter['name']) {
+		$tag_filter['name'] = '';
+	}
+	else {
+		$pre_name = $tag_filter['name'];
+	}
+
+	if ($tag_filter['tag'] !== '' && $tag_filter['value'] !== '') {
+		$tag_value = $tag_filter['tag'].NAME_DELIMITER.$tag_filter['value'];
+	}
+	elseif ($tag_filter['tag'] !== '') {
+		$tag_value = $tag_filter['tag'];
+	}
+	else {
+		$tag_value = italic(_('All tags'));
+	}
+
+	$tag_filter_table->addRow([$tag_filter['name'], $tag_value, $action]);
+	$userGroupForm->addVar('tag_filters['.$key.'][groupid]', $tag_filter['groupid']);
+	$userGroupForm->addVar('tag_filters['.$key.'][tag]', $tag_filter['tag']);
+	$userGroupForm->addVar('tag_filters['.$key.'][value]', $tag_filter['value']);
+}
+
+$tag_filter_form_list->addRow(_('Permissions'),
+	(new CDiv($tag_filter_table))
+		->addClass(ZBX_STYLE_TABLE_FORMS_SEPARATOR)
+		->setAttribute('style', 'min-width: '.ZBX_TEXTAREA_BIG_WIDTH.'px;')
+);
+
+$new_tag_filter_table = (new CTable())
+	->addRow([
+		(new CMultiSelect([
+			'name' => 'tag_filter_groupids[]',
+			'object_name' => 'hostGroup',
+			'data' => $data['tag_filter_groups'],
+			'popup' => [
+				'parameters' => [
+					'srctbl' => 'host_groups',
+					'srcfld1' => 'groupid',
+					'dstfrm' => $userGroupForm->getName(),
+					'dstfld1' => 'tag_filter_groupids_'
+				]
+			],
+			'styles' => ['margin-top' => '-.3em']
+		]))->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH),
+		new CCol(
+			(new CTextBox('tag', $data['tag']))
+				->setWidth(ZBX_TEXTAREA_SMALL_WIDTH)
+				->setAttribute('placeholder', _('tag'))
+		),
+		new CCol(
+			(new CTextBox('value', $data['value']))
+				->setWidth(ZBX_TEXTAREA_SMALL_WIDTH)
+				->setAttribute('placeholder', _('value'))
+		)
+	])
+	->addRow([[
+		(new CCheckBox('tag_filter_subgroups'))->setChecked($data['tag_filter_subgroups'] == 1),
+		_('Include subgroups')
+	]])
+	->addRow([
+		(new CSimpleButton(_('Add')))
+			->onClick('javascript: submitFormWithParam("'.$userGroupForm->getName().'", "add_tag_filter", "1");')
+			->addClass(ZBX_STYLE_BTN_LINK)
+	]);
+
+$tag_filter_form_list->addRow(null,
+	(new CDiv($new_tag_filter_table))
+		->addClass(ZBX_STYLE_TABLE_FORMS_SEPARATOR)
+		->setAttribute('style', 'min-width: '.ZBX_TEXTAREA_BIG_WIDTH.'px;')
+);
 
 // append form lists to tab
 $userGroupTab = (new CTabView())
 	->addTab('userGroupTab', _('User group'), $userGroupFormList)
-	->addTab('permissionsTab', _('Permissions'), $permissionsFormList);
-if (!$this->data['form_refresh']) {
+	->addTab('permissionsTab', _('Permissions'), $permissionsFormList)
+	->addTab('tagFilterTab', _('Tag filter'), $tag_filter_form_list);
+if (!$data['form_refresh']) {
 	$userGroupTab->setSelected(0);
 }
 
 // append buttons to form
-if (isset($this->data['usrgrpid'])) {
+if ($data['usrgrpid'] != 0) {
 	$userGroupTab->setFooter(makeFormFooter(
 		new CSubmit('update', _('Update')),
 		[

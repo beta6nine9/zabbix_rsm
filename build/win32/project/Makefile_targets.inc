@@ -1,4 +1,4 @@
-all: $(PROGNAME) $(POSTBUILD)
+all: $(PREBUILD) $(PROGNAME) $(POSTBUILD)
 
 clean: $(POSTCLEAN)
 # break this down because del has limit for command-line args length (NMAKE : fatal error U1077: 'del' : return code '0x1')
@@ -25,6 +25,9 @@ $(RESOURCE_RES): $(RESOURCE_RC) $(RESOURCE_H) $(DESC_H)
 {..\..\..\src\libs\zbxcomms}.c{..\..\..\src\libs\zbxcomms}.o:
 	$(CC) $? /Fo"$@" $(CFLAGS)
 
+{..\..\..\src\libs\zbxcompress}.c{..\..\..\src\libs\zbxcompress}.o:
+	$(CC) $? /Fo"$@" $(CFLAGS)
+
 {..\..\..\src\libs\zbxconf}.c{..\..\..\src\libs\zbxconf}.o:
 	$(CC) $? /Fo"$@" $(CFLAGS)
 
@@ -44,6 +47,9 @@ $(RESOURCE_RES): $(RESOURCE_RC) $(RESOURCE_H) $(DESC_H)
 	$(CC) $? /Fo"$@" $(CFLAGS)
 
 {..\..\..\src\libs\zbxexec}.c{..\..\..\src\libs\zbxexec}.o:
+	$(CC) $? /Fo"$@" $(CFLAGS)
+
+{..\..\..\src\libs\zbxhttp}.c{..\..\..\src\libs\zbxhttp}.o:
 	$(CC) $? /Fo"$@" $(CFLAGS)
 
 {..\..\..\src\libs\zbxsysinfo}.c{..\..\..\src\libs\zbxsysinfo}.o:
@@ -67,7 +73,7 @@ $(RESOURCE_RES): $(RESOURCE_RC) $(RESOURCE_H) $(DESC_H)
 {..\..\..\src\libs\zbxwin32}.c{..\..\..\src\libs\zbxwin32}.o:
 	$(CC) $? /Fo"$@" $(CFLAGS)
 
-{..\..\..\src\libs\zbxself}.c{..\..\..\src\libs\zbxself}.o:
+{..\..\..\src\zabbix_agent\logfiles}.c{..\..\..\src\zabbix_agent\logfiles}.o:
 	$(CC) $? /Fo"$@" $(CFLAGS)
 
 {$(PROJECTDIR)}.c{$(PROJECTDIR)}.o:

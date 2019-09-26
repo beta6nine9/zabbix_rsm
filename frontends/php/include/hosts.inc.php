@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -478,7 +478,7 @@ function hostInterfaceTypeNumToName($type) {
 }
 
 function get_hostgroup_by_groupid($groupid) {
-	$groups = DBfetch(DBselect('SELECT g.* FROM groups g WHERE g.groupid='.zbx_dbstr($groupid)));
+	$groups = DBfetch(DBselect('SELECT g.* FROM hstgrp g WHERE g.groupid='.zbx_dbstr($groupid)));
 
 	if ($groups) {
 		return $groups;
@@ -560,121 +560,347 @@ function updateHostStatus($hostids, $status) {
 	]);
 }
 
-function get_application_by_applicationid($applicationid, $no_error_message = 0) {
-	$row = DBfetch(DBselect('SELECT a.* FROM applications a WHERE a.applicationid='.zbx_dbstr($applicationid)));
+/**
+ * Get parent templates for each given application.
+ *
+ * @param array  $applications                     An array of applications.
+ * @param string $applications[]['applicationid']  ID of an application.
+ * @param array  $applications[]['templateids]     IDs of parent template applications.
+ *
+ * @return array
+ */
+function getApplicationParentTemplates(array $applications) {
+	$parent_applicationids = [];
+	$data = [
+		'links' => [],
+		'templates' => []
+	];
 
-	if ($row) {
-		return $row;
+	foreach ($applications as $application) {
+		foreach ($application['templateids'] as $parent_applicationid) {
+			$parent_applicationids[$parent_applicationid] = true;
+			$data['links'][$application['applicationid']][] = ['applicationid' => $parent_applicationid];
+		}
 	}
 
-	if ($no_error_message == 0) {
-		error(_s('No application with ID "%1$s".', $applicationid));
+	if (!$parent_applicationids) {
+		return $data;
 	}
 
-	return false;
+	$all_parent_applicationids = [];
+	$hostids = [];
+
+	while ($parent_applicationids) {
+		$db_applications = API::Application()->get([
+			'output' => ['applicationid', 'hostid', 'templateids'],
+			'applicationids' => array_keys($parent_applicationids)
+		]);
+
+		$all_parent_applicationids += $parent_applicationids;
+		$parent_applicationids = [];
+
+		foreach ($db_applications as $db_application) {
+			$data['templates'][$db_application['hostid']] = [];
+			$hostids[$db_application['applicationid']] = $db_application['hostid'];
+
+			foreach ($db_application['templateids'] as $parent_applicationid) {
+				if (!array_key_exists($parent_applicationid, $all_parent_applicationids)) {
+					$parent_applicationids[$parent_applicationid] = true;
+				}
+			}
+
+			if (!array_key_exists($db_application['applicationid'], $data['links'])) {
+				foreach ($db_application['templateids'] as $parent_applicationid) {
+					$data['links'][$db_application['applicationid']][] = ['applicationid' => $parent_applicationid];
+				}
+			}
+		}
+	}
+
+	foreach ($data['links'] as $applicationid => &$parent_applications) {
+		foreach ($parent_applications as &$parent_application) {
+			$parent_application['hostid'] = array_key_exists($parent_application['applicationid'], $hostids)
+				? $hostids[$parent_application['applicationid']]
+				: 0;
+		}
+		unset($parent_application);
+	}
+	unset($parent_applications);
+
+	$db_templates = $data['templates']
+		? API::Template()->get([
+			'output' => ['name'],
+			'templateids' => array_keys($data['templates']),
+			'preservekeys' => true
+		])
+		: [];
+
+	$rw_templates = $db_templates
+		? API::Template()->get([
+			'output' => [],
+			'templateids' => array_keys($db_templates),
+			'editable' => true,
+			'preservekeys' => true
+		])
+		: [];
+
+	$data['templates'][0] = [];
+
+	foreach ($data['templates'] as $hostid => &$template) {
+		$template = array_key_exists($hostid, $db_templates)
+			? [
+				'hostid' => $hostid,
+				'name' => $db_templates[$hostid]['name'],
+				'permission' => array_key_exists($hostid, $rw_templates) ? PERM_READ_WRITE : PERM_READ
+			]
+			: [
+				'hostid' => $hostid,
+				'name' => _('Inaccessible template'),
+				'permission' => PERM_DENY
+			];
+	}
+	unset($template);
+
+	return $data;
 }
 
 /**
- * Returns the farthest application ancestor for each given application.
+ * Auxiliary function for makeApplicationTemplatePrefix().
  *
- * @param array $applicationIds
- * @param array $templateApplicationIds		array with parent application IDs as keys and arrays of child application
- * 											IDs as values
+ * @param string $applicationid
+ * @param array  $parent_templates
  *
- * @return array	an array with child IDs as keys and arrays of ancestor IDs as values
+ * @return array
  */
-function getApplicationSourceParentIds(array $applicationIds, array $templateApplicationIds = []) {
-	$query = DBSelect(
-		'SELECT at.applicationid,at.templateid'.
-		' FROM application_template at'.
-		' WHERE '.dbConditionInt('at.applicationid', $applicationIds)
-	);
+function getTopLevelTemplates($applicationid, array $parent_templates) {
+	$templates = [];
 
-	$applicationIds = [];
-	$unsetApplicationIds = [];
-	while ($applicationTemplate = DBfetch($query)) {
-		// check if we already have an application inherited from the current application
-		// if we do - copy all of its child applications to the parent template
-		if (isset($templateApplicationIds[$applicationTemplate['applicationid']])) {
-			$templateApplicationIds[$applicationTemplate['templateid']] = $templateApplicationIds[$applicationTemplate['applicationid']];
-			$unsetApplicationIds[$applicationTemplate['applicationid']] = $applicationTemplate['applicationid'];
+	foreach ($parent_templates['links'][$applicationid] as $parent_application) {
+		if (!array_key_exists($parent_application['applicationid'], $parent_templates['links'])) {
+			$templates[] = $parent_templates['templates'][$parent_application['hostid']];
 		}
-		// if no - just add the application
 		else {
-			$templateApplicationIds[$applicationTemplate['templateid']][] = $applicationTemplate['applicationid'];
+			$templates = array_merge($templates,
+				getTopLevelTemplates($parent_application['applicationid'], $parent_templates)
+			);
 		}
-		$applicationIds[$applicationTemplate['applicationid']] = $applicationTemplate['templateid'];
 	}
 
-	// unset children of all applications that we found a new parent for
-	foreach ($unsetApplicationIds as $applicationId) {
-		unset($templateApplicationIds[$applicationId]);
-	}
-
-	// continue while we still have new applications to check
-	if ($applicationIds) {
-		return getApplicationSourceParentIds($applicationIds, $templateApplicationIds);
-	}
-	else {
-		// return an inverse hash with application IDs as keys and arrays of parent application IDs as values
-		$result = [];
-		foreach ($templateApplicationIds as $templateId => $applicationIds) {
-			foreach ($applicationIds as $applicationId) {
-				$result[$applicationId][] = $templateId;
-			}
-		}
-
-		return $result;
-	}
+	return $templates;
 }
 
 /**
- * Returns the farthest host prototype ancestor for each given host prototype.
+ * Returns a template prefix for selected application.
  *
- * @param array $hostPrototypeIds
- * @param array $templateHostPrototypeIds	array with parent host prototype IDs as keys and arrays of child host
- * 											prototype IDs as values
+ * @param string $applicationid
+ * @param array  $parent_templates  The list of the templates, prepared by getApplicationParentTemplates() function.
  *
- * @return array	an array of child ID - ancestor ID pairs
+ * @return array|null
  */
-function getHostPrototypeSourceParentIds(array $hostPrototypeIds, array $templateHostPrototypeIds = []) {
-	$query = DBSelect(
-		'SELECT h.hostid,h.templateid'.
-		' FROM hosts h'.
-		' WHERE '.dbConditionInt('h.hostid', $hostPrototypeIds).
-			' AND h.templateid>0'
-	);
+function makeApplicationTemplatePrefix($applicationid, array $parent_templates) {
+	if (!array_key_exists($applicationid, $parent_templates['links'])) {
+		return null;
+	}
 
-	$hostPrototypeIds = [];
-	while ($hostPrototype = DBfetch($query)) {
-		// check if we already have host prototype inherited from the current host prototype
-		// if we do - move all of its child prototypes to the parent template
-		if (isset($templateHostPrototypeIds[$hostPrototype['hostid']])) {
-			$templateHostPrototypeIds[$hostPrototype['templateid']] = $templateHostPrototypeIds[$hostPrototype['hostid']];
-			unset($templateHostPrototypeIds[$hostPrototype['hostid']]);
+	$templates = getTopLevelTemplates($applicationid, $parent_templates);
+	CArrayHelper::sort($templates, ['name']);
+
+	$list = [];
+
+	foreach ($templates as $template) {
+		if ($template['permission'] == PERM_READ_WRITE) {
+			$name = (new CLink(CHtml::encode($template['name']),
+				(new CUrl('applications.php'))->setArgument('hostid', $template['hostid'])
+			))->addClass(ZBX_STYLE_LINK_ALT);
 		}
-		// if no - just add the prototype
 		else {
-			$templateHostPrototypeIds[$hostPrototype['templateid']][] = $hostPrototype['hostid'];
-			$hostPrototypeIds[] = $hostPrototype['templateid'];
+			$name = new CSpan(CHtml::encode($template['name']));
+		}
+
+		$list[] = $name->addClass(ZBX_STYLE_GREY);
+		$list[] = ', ';
+	}
+
+	array_pop($list);
+	$list[] = NAME_DELIMITER;
+
+	return $list;
+}
+
+/**
+ * Get parent templates for each given host prototype.
+ *
+ * @param array  $host_prototypes                  An array of host prototypes.
+ * @param string $host_prototypes[]['hostid']      ID of host prototype.
+ * @param string $host_prototypes[]['templateid']  ID of parent template host prototype.
+ *
+ * @return array
+ */
+function getHostPrototypeParentTemplates(array $host_prototypes) {
+	$parent_host_prototypeids = [];
+	$data = [
+		'links' => [],
+		'templates' => []
+	];
+
+	foreach ($host_prototypes as $host_prototype) {
+		if ($host_prototype['templateid'] != 0) {
+			$parent_host_prototypeids[$host_prototype['templateid']] = true;
+			$data['links'][$host_prototype['hostid']] = ['hostid' => $host_prototype['templateid']];
 		}
 	}
 
-	// continue while we still have new host prototypes to check
-	if ($hostPrototypeIds) {
-		return getHostPrototypeSourceParentIds($hostPrototypeIds, $templateHostPrototypeIds);
+	if (!$parent_host_prototypeids) {
+		return $data;
 	}
-	else {
-		// return an inverse hash with prototype IDs as keys and parent prototype IDs as values
-		$result = [];
-		foreach ($templateHostPrototypeIds as $templateId => $hostIds) {
-			foreach ($hostIds as $hostId) {
-				$result[$hostId] = $templateId;
+
+	$all_parent_host_prototypeids = [];
+	$hostids = [];
+	$lld_ruleids = [];
+
+	do {
+		$db_host_prototypes = API::HostPrototype()->get([
+			'output' => ['hostid', 'templateid'],
+			'selectDiscoveryRule' => ['itemid'],
+			'selectParentHost' => ['hostid'],
+			'hostids' => array_keys($parent_host_prototypeids)
+		]);
+
+		$all_parent_host_prototypeids += $parent_host_prototypeids;
+		$parent_host_prototypeids = [];
+
+		foreach ($db_host_prototypes as $db_host_prototype) {
+			$data['templates'][$db_host_prototype['parentHost']['hostid']] = [];
+			$hostids[$db_host_prototype['hostid']] = $db_host_prototype['parentHost']['hostid'];
+			$lld_ruleids[$db_host_prototype['hostid']] = $db_host_prototype['discoveryRule']['itemid'];
+
+			if ($db_host_prototype['templateid'] != 0) {
+				if (!array_key_exists($db_host_prototype['templateid'], $all_parent_host_prototypeids)) {
+					$parent_host_prototypeids[$db_host_prototype['templateid']] = true;
+				}
+
+				$data['links'][$db_host_prototype['hostid']] = ['hostid' => $db_host_prototype['templateid']];
 			}
 		}
-
-		return $result;
 	}
+	while ($parent_host_prototypeids);
+
+	foreach ($data['links'] as &$parent_host_prototype) {
+		$parent_host_prototype['parent_hostid'] = array_key_exists($parent_host_prototype['hostid'], $hostids)
+			? $hostids[$parent_host_prototype['hostid']]
+			: 0;
+
+		$parent_host_prototype['lld_ruleid'] = array_key_exists($parent_host_prototype['hostid'], $lld_ruleids)
+			? $lld_ruleids[$parent_host_prototype['hostid']]
+			: 0;
+	}
+	unset($parent_host_prototype);
+
+	$db_templates = $data['templates']
+		? API::Template()->get([
+			'output' => ['name'],
+			'templateids' => array_keys($data['templates']),
+			'preservekeys' => true
+		])
+		: [];
+
+	$rw_templates = $db_templates
+		? API::Template()->get([
+			'output' => [],
+			'templateids' => array_keys($db_templates),
+			'editable' => true,
+			'preservekeys' => true
+		])
+		: [];
+
+	$data['templates'][0] = [];
+
+	foreach ($data['templates'] as $hostid => &$template) {
+		$template = array_key_exists($hostid, $db_templates)
+			? [
+				'hostid' => $hostid,
+				'name' => $db_templates[$hostid]['name'],
+				'permission' => array_key_exists($hostid, $rw_templates) ? PERM_READ_WRITE : PERM_READ
+			]
+			: [
+				'hostid' => $hostid,
+				'name' => _('Inaccessible template'),
+				'permission' => PERM_DENY
+			];
+	}
+	unset($template);
+
+	return $data;
+}
+
+/**
+ * Returns a template prefix for selected host prototype.
+ *
+ * @param string $host_prototypeid
+ * @param array  $parent_templates  The list of the templates, prepared by getHostPrototypeParentTemplates() function.
+ *
+ * @return array|null
+ */
+function makeHostPrototypeTemplatePrefix($host_prototypeid, array $parent_templates) {
+	if (!array_key_exists($host_prototypeid, $parent_templates['links'])) {
+		return null;
+	}
+
+	while (array_key_exists($parent_templates['links'][$host_prototypeid]['hostid'], $parent_templates['links'])) {
+		$host_prototypeid = $parent_templates['links'][$host_prototypeid]['hostid'];
+	}
+
+	$template = $parent_templates['templates'][$parent_templates['links'][$host_prototypeid]['parent_hostid']];
+
+	if ($template['permission'] == PERM_READ_WRITE) {
+		$name = (new CLink(CHtml::encode($template['name']),
+			(new CUrl('host_prototypes.php'))
+				->setArgument('parent_discoveryid', $parent_templates['links'][$host_prototypeid]['lld_ruleid'])
+		))->addClass(ZBX_STYLE_LINK_ALT);
+	}
+	else {
+		$name = new CSpan(CHtml::encode($template['name']));
+	}
+
+	return [$name->addClass(ZBX_STYLE_GREY), NAME_DELIMITER];
+}
+
+/**
+ * Returns a list of host prototype templates.
+ *
+ * @param string $host_prototypeid
+ * @param array  $parent_templates  The list of the templates, prepared by getHostPrototypeParentTemplates() function.
+ *
+ * @return array
+ */
+function makeHostPrototypeTemplatesHtml($host_prototypeid, array $parent_templates) {
+	$list = [];
+
+	while (array_key_exists($host_prototypeid, $parent_templates['links'])) {
+		$template = $parent_templates['templates'][$parent_templates['links'][$host_prototypeid]['parent_hostid']];
+
+		if ($template['permission'] == PERM_READ_WRITE) {
+			$name = new CLink(CHtml::encode($template['name']),
+				(new CUrl('host_prototypes.php'))
+					->setArgument('form', 'update')
+					->setArgument('parent_discoveryid', $parent_templates['links'][$host_prototypeid]['lld_ruleid'])
+					->setArgument('hostid', $parent_templates['links'][$host_prototypeid]['hostid'])
+			);
+		}
+		else {
+			$name = (new CSpan(CHtml::encode($template['name'])))->addClass(ZBX_STYLE_GREY);
+		}
+
+		array_unshift($list, $name, '&nbsp;&rArr;&nbsp;');
+
+		$host_prototypeid = $parent_templates['links'][$host_prototypeid]['hostid'];
+	}
+
+	if ($list) {
+		array_pop($list);
+	}
+
+	return $list;
 }
 
 /**
@@ -725,7 +951,7 @@ function getDeletableHostGroupIds(array $groupIds) {
 
 	$dbResult = DBselect(
 		'SELECT g.groupid'.
-		' FROM groups g'.
+		' FROM hstgrp g'.
 		' WHERE g.internal='.ZBX_NOT_INTERNAL_GROUP.
 			' AND '.dbConditionInt('g.groupid', $groupIds).
 			' AND NOT EXISTS ('.
@@ -952,7 +1178,7 @@ function getInheritedMacros(array $hostids) {
  *   array(
  *       '{$MACRO}' => array(
  *           'macro' => '{$MACRO}',
- *           'type' => 0x03,						<- MACRO_TYPE_INHERITED, MACRO_TYPE_HOSTMACRO or MACRO_TYPE_BOTH
+ *           'type' => 0x03,                        <- ZBX_PROPERTY_INHERITED, ZBX_PROPERTY_OWN or ZBX_PROPERTY_BOTH
  *           'value' => 'effective value',
  *           'hostmacroid' => 7532,                 <- optional
  *           'template' => array(                   <- optional
@@ -966,8 +1192,8 @@ function getInheritedMacros(array $hostids) {
  *       )
  *   )
  *
- * @param array $host_macros		the list of host macros
- * @param array $inherited_macros	the list of inherited macros (the output of the getInheritedMacros() function)
+ * @param array $host_macros       The list of host macros.
+ * @param array $inherited_macros  The list of inherited macros (the output of the getInheritedMacros() function).
  *
  * @return array
  */
@@ -975,7 +1201,7 @@ function mergeInheritedMacros(array $host_macros, array $inherited_macros) {
 	$user_macro_parser = new CUserMacroParser();
 
 	foreach ($inherited_macros as &$inherited_macro) {
-		$inherited_macro['type'] = MACRO_TYPE_INHERITED;
+		$inherited_macro['type'] = ZBX_PROPERTY_INHERITED;
 		$inherited_macro['value'] = array_key_exists('template', $inherited_macro)
 			? $inherited_macro['template']['value']
 			: $inherited_macro['global']['value'];
@@ -1032,7 +1258,7 @@ function mergeInheritedMacros(array $host_macros, array $inherited_macros) {
 			}
 		}
 
-		$host_macro['type'] |= MACRO_TYPE_HOSTMACRO;
+		$host_macro['type'] |= ZBX_PROPERTY_OWN;
 	}
 	unset($host_macro);
 
@@ -1052,7 +1278,7 @@ function mergeInheritedMacros(array $host_macros, array $inherited_macros) {
  */
 function cleanInheritedMacros(array $macros) {
 	foreach ($macros as $idx => $macro) {
-		if (array_key_exists('type', $macro) && !($macro['type'] & MACRO_TYPE_HOSTMACRO)) {
+		if (array_key_exists('type', $macro) && !($macro['type'] & ZBX_PROPERTY_OWN)) {
 			unset($macros[$idx]);
 		}
 		else {
@@ -1074,4 +1300,84 @@ function getHostInventoryModes() {
 		HOST_INVENTORY_MANUAL => _('Manual'),
 		HOST_INVENTORY_AUTOMATIC => _('Automatic')
 	];
+}
+
+/**
+ * Check if user has read permissions for hosts.
+ *
+ * @param array $hostids
+ *
+ * @return bool
+ */
+function isReadableHosts(array $hostids) {
+	return count($hostids) == API::Host()->get([
+		'countOutput' => true,
+		'hostids' => $hostids
+	]);
+}
+
+/**
+ * Check if user has read permissions for templates.
+ *
+ * @param array $templateids
+ *
+ * @return bool
+ */
+function isReadableTemplates(array $templateids) {
+	return count($templateids) == API::Template()->get([
+		'countOutput' => true,
+		'templateids' => $templateids
+	]);
+}
+
+/**
+ * Check if user has read permissions for hosts or templates.
+ *
+ * @param array $hostids
+ *
+ * @return bool
+ */
+function isReadableHostTemplates(array $hostids) {
+	$count = API::Host()->get([
+		'countOutput' => true,
+		'hostids' => $hostids
+	]);
+
+	if ($count == count($hostids)) {
+		return true;
+	}
+
+	$count += API::Template()->get([
+		'countOutput' => true,
+		'templateids' => $hostids
+	]);
+
+	return ($count == count($hostids));
+}
+
+/**
+ * Check if user has read permissions for hosts or templates.
+ *
+ * @param array $hostids
+ *
+ * @return bool
+ */
+function isWritableHostTemplates(array $hostids) {
+	$count = API::Host()->get([
+		'countOutput' => true,
+		'hostids' => $hostids,
+		'editable' => true
+	]);
+
+	if ($count == count($hostids)) {
+		return true;
+	}
+
+	$count += API::Template()->get([
+		'countOutput' => true,
+		'templateids' => $hostids,
+		'editable' => true
+	]);
+
+	return ($count == count($hostids));
 }

@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -23,23 +23,42 @@ import java.util.Formatter;
 
 class ZabbixException extends Exception
 {
-	public ZabbixException(String message)
+	ZabbixException(String message)
 	{
 		super(message);
 	}
 
-	public ZabbixException(String message, Object... args)
+	ZabbixException(String message, Object... args)
 	{
 		this(new Formatter().format(message, args).toString());
 	}
 
-	public ZabbixException(String message, Throwable cause)
+	ZabbixException(String message, Throwable cause)
 	{
 		super(message, cause);
 	}
 
-	public ZabbixException(Throwable cause)
+	ZabbixException(Throwable cause)
 	{
 		super(cause);
+	}
+
+	static Throwable getRootCause(Throwable e)
+	{
+		Throwable cause = null;
+		Throwable result = e;
+
+		while ((null != (cause = result.getCause())) && (result != cause))
+			result = cause;
+
+		return result;
+	}
+	
+	static String getRootCauseMessage(Throwable e)
+	{
+		if (e != null)
+			return getRootCause(e).getMessage();
+
+		return null;
 	}
 }

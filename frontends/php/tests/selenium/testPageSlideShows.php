@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -18,12 +18,12 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-require_once dirname(__FILE__).'/../include/class.cwebtest.php';
+require_once dirname(__FILE__).'/../include/CLegacyWebTest.php';
 
-class testPageSlideShows extends CWebTest {
+class testPageSlideShows extends CLegacyWebTest {
 
 	public static function allSlideShows() {
-		return DBdata("select * from slideshows order by slideshowid");
+		return CDBHelper::getDataProvider("select * from slideshows order by slideshowid");
 	}
 
 	/**
@@ -50,16 +50,16 @@ class testPageSlideShows extends CWebTest {
 		$slideshowid = $slideshow['slideshowid'];
 
 		$sqlSlideShow = "select * from slideshows where name='$name' order by slideshowid";
-		$oldHashSlideShow = DBhash($sqlSlideShow);
+		$oldHashSlideShow = CDBHelper::getHash($sqlSlideShow);
 		$sqlSlide = "select * from slides where slideshowid=$slideshowid order by slideid";
-		$oldHashSlide = DBhash($sqlSlide);
+		$oldHashSlide = CDBHelper::getHash($sqlSlide);
 
 		$this->zbxTestLogin('slideconf.php');
 		$this->zbxTestCheckTitle('Configuration of slide shows');
 		$this->zbxTestHrefClickWait('?form=update&slideshowid='.$slideshow['slideshowid']);
 		$this->zbxTestCheckHeader('Slide shows');
 		$this->zbxTestTextPresent(['Slide','Sharing']);
-		$this->zbxTestTextPresent(['Owner', 'Name', 'Default delay (in seconds)', 'Slides']);
+		$this->zbxTestTextPresent(['Owner', 'Name', 'Default delay', 'Slides']);
 
 		$this->zbxTestClickWait('update');
 		$this->zbxTestCheckTitle('Configuration of slide shows');
@@ -67,8 +67,8 @@ class testPageSlideShows extends CWebTest {
 		$this->zbxTestTextPresent("$name");
 		$this->zbxTestCheckHeader('Slide shows');
 
-		$this->assertEquals($oldHashSlideShow, DBhash($sqlSlideShow), "Chuck Norris: Slide show update changed data in table 'slideshows'");
-		$this->assertEquals($oldHashSlide, DBhash($sqlSlide), "Chuck Norris: Slide show update changed data in table 'slides'");
+		$this->assertEquals($oldHashSlideShow, CDBHelper::getHash($sqlSlideShow), "Chuck Norris: Slide show update changed data in table 'slideshows'");
+		$this->assertEquals($oldHashSlide, CDBHelper::getHash($sqlSlide), "Chuck Norris: Slide show update changed data in table 'slides'");
 	}
 
 	public function testPageSlideShows_Create() {
@@ -78,20 +78,17 @@ class testPageSlideShows extends CWebTest {
 
 		$this->zbxTestCheckHeader('Slide shows');
 		$this->zbxTestTextPresent(['Slide','Sharing']);
-		$this->zbxTestTextPresent(['Owner', 'Name', 'Default delay (in seconds)', 'Slides']);
+		$this->zbxTestTextPresent(['Owner', 'Name', 'Default delay', 'Slides']);
 		$this->zbxTestTextPresent(['Screen', 'Delay', 'Action']);
 		$this->zbxTestClickWait('cancel');
 		$this->zbxTestTextPresent('Slide shows');
 	}
 
-	public function testPageSlideShows_backup() {
-		DBsave_tables('slideshows');
-	}
-
 	/**
-	* @dataProvider allSlideShows
-	*/
-	public function testPageSlideShows_MassDelete($slideshow) {
+	 * @dataProvider allSlideShows
+	 * @backup-once slideshows
+	 */
+	public function testPageSlideShows_DeleteSelected($slideshow) {
 		$slideshowid = $slideshow['slideshowid'];
 		$name = $slideshow['name'];
 
@@ -99,20 +96,31 @@ class testPageSlideShows extends CWebTest {
 		$this->zbxTestCheckTitle('Configuration of slide shows');
 		$this->zbxTestCheckboxSelect('shows_'.$slideshowid);
 		$this->zbxTestClickButton('slideshow.massdelete');
-		$this->webDriver->switchTo()->alert()->accept();
+		$this->zbxTestAcceptAlert();
 
 		$this->zbxTestCheckTitle('Configuration of slide shows');
 		$this->zbxTestTextPresent('Slide show deleted');
 		$this->zbxTestCheckHeader('Slide shows');
 
 		$sql = "select * from slideshows where slideshowid=$slideshowid";
-		$this->assertEquals(0, DBcount($sql));
+		$this->assertEquals(0, CDBHelper::getCount($sql));
 		$sql = "select * from slides where slideshowid=$slideshowid";
-		$this->assertEquals(0, DBcount($sql));
+		$this->assertEquals(0, CDBHelper::getCount($sql));
 	}
 
-	public function testPageSlideShows_restore() {
-		DBrestore_tables('slideshows');
-	}
+	/**
+	 * @backup-once slideshows
+	 */
+	public function testPageSlideShows_MassDeleteAll() {
+		$this->zbxTestLogin('slideconf.php');
+		$this->zbxTestCheckTitle('Configuration of slide shows');
+		$this->zbxTestCheckboxSelect('all_shows');
+		$this->zbxTestClickButton('slideshow.massdelete');
+		$this->zbxTestAcceptAlert();
 
+		$this->zbxTestWaitUntilMessageTextPresent('msg-good', 'Slide show deleted');
+
+		$this->assertEquals(0, CDBHelper::getCount('SELECT NULL FROM slideshows'));
+		$this->assertEquals(0, CDBHelper::getCount('SELECT NULL FROM slides'));
+	}
 }

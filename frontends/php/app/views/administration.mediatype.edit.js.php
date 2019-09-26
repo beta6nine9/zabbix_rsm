@@ -10,51 +10,39 @@
 </script>
 <script type="text/javascript">
 	jQuery(document).ready(function($) {
+		var old_media_type = $('#type').val();
+
 		// type of media
 		$('#type').change(function() {
-			switch ($(this).val()) {
-				case '<?= MEDIA_TYPE_EMAIL ?>':
-					$('#smtp_server, #smtp_port, #smtp_helo, #smtp_email, #smtp_security, #smtp_authentication').closest('li').show();
-					$('#exec_path, #gsm_modem, #jabber_username, #eztext_username, #eztext_limit, #exec_params_table')
-						.closest('li')
-						.hide();
-					$('#eztext_link').hide();
+			var media_type = $(this).val();
 
+			$('#smtp_server, #smtp_port, #smtp_helo, #smtp_email, #gsm_modem, #passwd, #smtp_verify_peer, ' +
+					'#smtp_verify_host, #smtp_username, #smtp_security, #smtp_authentication, #exec_path, ' +
+					'#exec_params_table, #content_type')
+				.closest('li')
+				.hide();
+
+			switch (media_type) {
+				case '<?= MEDIA_TYPE_EMAIL ?>':
+					$('#smtp_server, #smtp_port, #smtp_helo, #smtp_email, #smtp_security, #smtp_authentication, #content_type' )
+						.closest('li')
+						.show();
 					// radio button actions
 					toggleSecurityOptions();
 					toggleAuthenticationOptions();
+					setMaxSessionsType(media_type);
+
+					$('#passwd').parent().prev().find('label').removeClass('<?= ZBX_STYLE_FIELD_LABEL_ASTERISK ?>');
 					break;
 
 				case '<?= MEDIA_TYPE_EXEC ?>':
 					$('#exec_path, #exec_params_table').closest('li').show();
-					$('#smtp_server, #smtp_port, #smtp_helo, #smtp_email, #gsm_modem, #jabber_username, #eztext_username, #eztext_limit, #passwd, #smtp_verify_peer, #smtp_verify_host, #smtp_username, #smtp_security, #smtp_authentication')
-						.closest('li')
-						.hide();
-					$('#eztext_link').hide();
+					setMaxSessionsType(media_type);
 					break;
 
 				case '<?= MEDIA_TYPE_SMS ?>':
 					$('#gsm_modem').closest('li').show();
-					$('#smtp_server, #smtp_port, #smtp_helo, #smtp_email, #exec_path, #jabber_username, #eztext_username, #eztext_limit, #passwd, #smtp_verify_peer, #smtp_verify_host, #smtp_username, #smtp_security, #smtp_authentication, #exec_params_table')
-						.closest('li')
-						.hide();
-					$('#eztext_link').hide();
-					break;
-
-				case '<?= MEDIA_TYPE_JABBER ?>':
-					$('#jabber_username, #passwd').closest('li').show();
-					$('#smtp_server, #smtp_port, #smtp_helo, #smtp_email, #exec_path, #gsm_modem, #eztext_username, #eztext_limit, #smtp_verify_peer, #smtp_verify_host, #smtp_username, #smtp_security, #smtp_authentication, #exec_params_table')
-						.closest('li')
-						.hide();
-					$('#eztext_link').hide();
-					break;
-
-				case '<?= MEDIA_TYPE_EZ_TEXTING ?>':
-					$('#eztext_username, #eztext_limit, #passwd').closest('li').show();
-					$('#eztext_link').show();
-					$('#smtp_server, #smtp_port, #smtp_helo, #smtp_email, #exec_path, #gsm_modem, #jabber_username, #smtp_verify_peer, #smtp_verify_host, #smtp_username, #smtp_security, #smtp_authentication, #exec_params_table')
-						.closest('li')
-						.hide();
+					setMaxSessionsType(media_type);
 					break;
 			}
 		});
@@ -62,21 +50,43 @@
 		// clone button
 		$('#clone').click(function() {
 			$('#mediatypeid, #delete, #clone').remove();
+			$('#chPass_btn').hide();
+			$('#passwd').prop('disabled', false).show();
 			$('#update').text(<?= CJs::encodeJson(_('Add')) ?>);
 			$('#update').val('mediatype.create').attr({id: 'add'});
-			$('#description').focus();
+			$('#name').focus();
 		});
 
 		// Trim spaces on sumbit. Spaces for script parameters should not be trimmed.
 		$('#media_type_form').submit(function() {
+			var maxattempts = $('#maxattempts'),
+				maxsessions_type = $('#maxsessions_type :radio:checked').val(),
+				maxsessions = $('#maxsessions');
+
+			if ($.trim(maxattempts.val()) === '') {
+				maxattempts.val(0);
+			}
+
+			if (maxsessions_type !== 'custom') {
+				maxsessions.val(maxsessions_type === 'one' ? 1 : 0);
+			}
+			else if (maxsessions_type === 'custom' && $.trim(maxsessions.val()) === '') {
+				maxsessions.val(0);
+			}
+
 			$(this).trimValues([
-				'#description', '#smtp_server', '#smtp_port', '#smtp_helo', '#smtp_email', '#exec_path', '#gsm_modem',
-				'#jabber_username', '#eztext_username', '#smtp_username'
+				'#name', '#smtp_server', '#smtp_port', '#smtp_helo', '#smtp_email', '#exec_path', '#gsm_modem',
+				'#smtp_username', '#maxsessions'
 			]);
+		});
+
+		$('#maxsessions_type :radio').change(function() {
+			toggleMaxSessionsVisibility($(this).val());
 		});
 
 		// Refresh field visibility on document load.
 		$('#type').trigger('change');
+		$('#maxsessions_type :radio:checked').trigger('change');
 
 		$('input[name=smtp_security]').change(function() {
 			toggleSecurityOptions();
@@ -110,16 +120,51 @@
 			}
 		}
 
-		// When adding and removing dynamic rows, store counter in hidden field.
-		$('#exec_params_table').dynamicRows({
-			template: '#exec_params_row',
-			dataCallback: function() {
-				$('#exec_params_count').val(parseInt($('#exec_params_count').val()) + 1);
-			}
-		});
+		/**
+		 * Show or hide concurrent sessions custom input box.
+		 *
+		 * @param {string} maxsessions_type		Selected concurrent sessions value. One of 'one', 'unlimited', 'custom'.
+		 */
+		function toggleMaxSessionsVisibility(maxsessions_type) {
+			var maxsessions = $('#maxsessions');
 
-		$('#exec_params_table').on('click', 'button.element-table-remove', function() {
-			$('#exec_params_count').val($('#exec_params_table .form_row input[type="text"]').length);
+			if (maxsessions_type === 'one' || maxsessions_type === 'unlimited') {
+				maxsessions.hide();
+			}
+			else {
+				maxsessions.show().select().focus();
+			}
+		}
+
+		/**
+		 * Set concurrent sessions accessibility.
+		 *
+		 * @param {number} media_type		Selected media type.
+		 */
+		function setMaxSessionsType(media_type) {
+			var maxsessions_type = $('#maxsessions_type :radio');
+
+			if (media_type == <?= MEDIA_TYPE_SMS ?>) {
+				maxsessions_type.prop('disabled', true).filter('[value=one]').prop('disabled', false);
+			}
+			else {
+				maxsessions_type.prop('disabled', false);
+			}
+
+			if (old_media_type != media_type) {
+				old_media_type = media_type;
+				maxsessions_type.filter('[value=one]').click();
+			}
+		}
+
+		$('#exec_params_table').dynamicRows({ template: '#exec_params_row' });
+
+		$('#chPass_btn').on('click', function() {
+			$(this).hide();
+			$('#passwd')
+				.show()
+				.prop('disabled', false)
+				.focus();
 		});
 	});
 </script>

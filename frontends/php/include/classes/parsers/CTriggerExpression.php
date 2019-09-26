@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -53,14 +53,18 @@ class CTriggerExpression {
 	public $expressions = [];
 
 	/**
-	 * An options array
+	 * An options array.
 	 *
 	 * Supported options:
-	 *   'lldmacros' => true	low-level discovery macros can contain in trigger expression
+	 *   'lldmacros' => true        Enable low-level discovery macros usage in trigger expression.
+	 *   'allow_func_only' => true  Allow trigger expression without host:key pair, i.e. {func(param)}.
 	 *
 	 * @var array
 	 */
-	public $options = ['lldmacros' => true];
+	public $options = [
+		'lldmacros' => true,
+		'allow_func_only' => false
+	];
 
 	/**
 	 * Source string.
@@ -68,6 +72,13 @@ class CTriggerExpression {
 	 * @var
 	 */
 	public $expression;
+
+	/**
+	 * Object containing the results of parsing.
+	 *
+	 * @var CTriggerExpressionParserResult
+	 */
+	public $result;
 
 	/**
 	 * Current cursor position.
@@ -126,6 +137,13 @@ class CTriggerExpression {
 	protected $lld_macro_parser;
 
 	/**
+	 * Parser for LLD macros with functions.
+	 *
+	 * @var CLLDMacroFunctionParser
+	 */
+	protected $lld_macro_function_parser;
+
+	/**
 	 * Parser for user macros.
 	 *
 	 * @var CUserMacroParser
@@ -140,20 +158,12 @@ class CTriggerExpression {
 	protected $spaceChars = [' ' => true, "\r" => true, "\n" => true, "\t" => true];
 
 	/**
-	 * Object containing the results of parsing.
-	 *
-	 * @var CTriggerExpressionParserResult
-	 */
-	protected $result;
-
-	/**
 	 * @param array $options
-	 * @param bool $options['lldmacros']
+	 * @param bool  $options['lldmacros']
+	 * @param bool  $options['allow_func_only']
 	 */
-	public function __construct($options = []) {
-		if (isset($options['lldmacros'])) {
-			$this->options['lldmacros'] = $options['lldmacros'];
-		}
+	public function __construct(array $options = []) {
+		$this->options = array_merge($this->options, $options);
 
 		$this->binaryOperatorParser = new CSetParser(['<', '>', '<=', '>=', '+', '-', '/', '*', '=', '<>']);
 		$this->logicalOperatorParser = new CSetParser(['and', 'or']);
@@ -162,6 +172,7 @@ class CTriggerExpression {
 		$this->function_macro_parser = new CFunctionMacroParser();
 		$this->function_parser = new CFunctionParser();
 		$this->lld_macro_parser = new CLLDMacroParser();
+		$this->lld_macro_function_parser = new CLLDMacroFunctionParser;
 		$this->user_macro_parser = new CUserMacroParser();
 	}
 
@@ -343,16 +354,6 @@ class CTriggerExpression {
 								$state = self::STATE_AFTER_LOGICAL_OPERATOR;
 								break;
 							}
-
-							if (!$afterSpace) {
-								break 3;
-							}
-
-							if ($this->parseUsing($this->notOperatorParser,
-									CTriggerExpressionParserResult::TOKEN_TYPE_OPERATOR)) {
-
-								$state = self::STATE_AFTER_NOT_OPERATOR;
-							}
 							else {
 								break 3;
 							}
@@ -383,12 +384,7 @@ class CTriggerExpression {
 								break 3;
 							}
 
-							if ($this->parseUsing($this->notOperatorParser,
-									CTriggerExpressionParserResult::TOKEN_TYPE_OPERATOR)) {
-
-								$state = self::STATE_AFTER_NOT_OPERATOR;
-							}
-							elseif ($this->parseUsing($this->logicalOperatorParser,
+							if ($this->parseUsing($this->logicalOperatorParser,
 									CTriggerExpressionParserResult::TOKEN_TYPE_OPERATOR)) {
 
 								$state = self::STATE_AFTER_LOGICAL_OPERATOR;
@@ -514,15 +510,17 @@ class CTriggerExpression {
 
 	/**
 	 * Parses a constant in the trigger expression and moves a current position ($this->pos) on a last symbol of the
-	 * constant
+	 * constant.
 	 *
 	 * The constant can be:
-	 *  - trigger function like {host:item[].func()}
+	 *  - trigger function like {host:item[].func()}; can be without host:item pair
 	 *  - floating point number; can be with suffix [KMGTsmhdw]
 	 *  - macro like {TRIGGER.VALUE}
 	 *  - user macro like {$MACRO}
+	 *  - LLD macro like {#LLD}
+	 *  - LLD macro with function like {{#LLD}.func())}
 	 *
-	 * @return bool returns true if parsed successfully, false otherwise
+	 * @return bool  Returns true if parsed successfully, false otherwise.
 	 */
 	private function parseConstant() {
 		if ($this->parseFunctionMacro() || $this->parseNumber()
@@ -531,13 +529,76 @@ class CTriggerExpression {
 			return true;
 		}
 
-		// LLD macro support for trigger prototypes
-		if ($this->options['lldmacros']
-				&& $this->parseUsing($this->lld_macro_parser, CTriggerExpressionParserResult::TOKEN_TYPE_LLD_MACRO)) {
-			return true;
+		// LLD macro support for trigger prototypes.
+		if ($this->options['lldmacros']) {
+			if ($this->parseUsing($this->lld_macro_parser, CTriggerExpressionParserResult::TOKEN_TYPE_LLD_MACRO)
+					|| $this->parseUsing($this->lld_macro_function_parser,
+							CTriggerExpressionParserResult::TOKEN_TYPE_LLD_MACRO)) {
+				return true;
+			}
 		}
 
-		return false;
+		return ($this->options['allow_func_only'] && $this->parseFunction());
+	}
+
+	/**
+	 * Parses a trigger function in the trigger expression and moves a current position ($this->pos) on a last symbol of
+	 * the trigger function.
+	 *
+	 * @return bool  Returns true if parsed successfully, false otherwise.
+	 */
+	private function parseFunction() {
+		$pos = $this->pos;
+
+		if ($this->expression[$pos] !== '{') {
+			return false;
+		}
+
+		$pos++;
+
+		if ($this->function_parser->parse($this->expression, $pos) == CParser::PARSE_FAIL) {
+			return false;
+		}
+
+		$pos += $this->function_parser->getLength();
+
+		if (isset($this->expression[$pos]) && $this->expression[$pos] !== '}') {
+			return false;
+		}
+
+		$function_param_list = [];
+
+		for ($n = 0; $n < $this->function_parser->getParamsNum(); $n++) {
+			$function_param_list[] = $this->function_parser->getParam($n);
+		}
+
+		$expression = substr($this->expression, $this->pos, $pos + 1 - $this->pos);
+
+		$this->result->addToken(CTriggerExpressionParserResult::TOKEN_TYPE_FUNCTION_MACRO,
+			$expression, $this->pos, $this->function_parser->getLength() + 2,
+			[
+				'host' => '',
+				'item' => '',
+				'function' => $this->function_parser->getMatch(),
+				'functionName' => $this->function_parser->getFunction(),
+				'functionParams' => $function_param_list
+			]
+		);
+
+		$this->expressions[] = [
+			'expression' => $expression,
+			'pos' => $this->pos,
+			'host' => '',
+			'item' => '',
+			'function' => $this->function_parser->getMatch(),
+			'functionName' => $this->function_parser->getFunction(),
+			'functionParam' => $this->function_parser->getParameters(),
+			'functionParamList' => $function_param_list
+		];
+
+		$this->pos = $pos;
+
+		return true;
 	}
 
 	/**
@@ -593,6 +654,8 @@ class CTriggerExpression {
 	/**
 	 * Parses a number constant in the trigger expression and
 	 * moves a current position ($this->pos) on a last symbol of the number
+	 *
+	 * comments: !!! Don't forget sync code with C !!!
 	 *
 	 * @return bool returns true if parsed successfully, false otherwise
 	 */

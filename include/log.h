@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -38,6 +38,13 @@
 #define ZBX_OPTION_LOGTYPE_FILE		"file"
 #define ZBX_OPTION_LOGTYPE_CONSOLE	"console"
 
+#define LOG_ENTRY_INTERVAL_DELAY	60	/* seconds */
+
+extern int	zbx_log_level;
+#define ZBX_CHECK_LOG_LEVEL(level)			\
+		((LOG_LEVEL_INFORMATION != (level) &&	\
+		((level) > zbx_log_level || LOG_LEVEL_EMPTY == (level))) ? FAIL : SUCCEED)
+
 typedef enum
 {
 	ERR_Z3001 = 3001,
@@ -50,24 +57,29 @@ typedef enum
 }
 zbx_err_codes_t;
 
-extern int	CONFIG_LOG_FILE_SIZE;
-
 #ifdef HAVE___VA_ARGS__
-#	define zabbix_log(level, fmt, ...) __zbx_zabbix_log(level, ZBX_CONST_STRING(fmt), ##__VA_ARGS__)
+#	define ZBX_ZABBIX_LOG_CHECK
+#	define zabbix_log(level, ...)									\
+													\
+	do												\
+	{												\
+		if (SUCCEED == ZBX_CHECK_LOG_LEVEL(level))						\
+			__zbx_zabbix_log(level, __VA_ARGS__);						\
+	}												\
+	while (0)
 #else
 #	define zabbix_log __zbx_zabbix_log
 #endif
 
-int		zabbix_open_log(int type, int level, const char *filename);
-void		zabbix_errlog(zbx_err_codes_t err, ...);
-void		__zbx_zabbix_log(int level, const char *fmt, ...);
+int		zabbix_open_log(int type, int level, const char *filename, char **error);
+void		__zbx_zabbix_log(int level, const char *fmt, ...) __zbx_attr_format_printf(2, 3);
 void		zabbix_close_log(void);
 
-void		zabbix_set_log_level(int level);
+#ifndef _WINDOWS
 int		zabbix_increase_log_level(void);
 int		zabbix_decrease_log_level(void);
 const char	*zabbix_get_log_level_string(void);
-int		zabbix_check_log_level(int level);
+#endif
 
 char		*zbx_strerror(int errnum);
 char		*strerror_from_system(unsigned long error);

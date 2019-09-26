@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -17,6 +17,8 @@
 ** along with this program; if not, write to the Free Software
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
+
+
 ?>
 <!DOCTYPE html>
 <html>
@@ -27,18 +29,18 @@
 		<meta name="Author" content="Zabbix SIA" />
 		<title>You are using an outdated browser.</title>
 		<link rel="icon" href="favicon.ico">
-		<link rel="apple-touch-icon-precomposed" sizes="76x76" href="apple-touch-icon-76x76-precomposed.png">
-		<link rel="apple-touch-icon-precomposed" sizes="120x120" href="apple-touch-icon-120x120-precomposed.png">
-		<link rel="apple-touch-icon-precomposed" sizes="152x152" href="apple-touch-icon-152x152-precomposed.png">
-		<link rel="apple-touch-icon-precomposed" sizes="180x180" href="apple-touch-icon-180x180-precomposed.png">
-		<link rel="icon" sizes="192x192" href="touch-icon-192x192.png">
-		<meta name="msapplication-TileImage" content="ms-tile-144x144.png">
+		<link rel="apple-touch-icon-precomposed" sizes="76x76" href="assets/img/apple-touch-icon-76x76-precomposed.png">
+		<link rel="apple-touch-icon-precomposed" sizes="120x120" href="assets/img/apple-touch-icon-120x120-precomposed.png">
+		<link rel="apple-touch-icon-precomposed" sizes="152x152" href="assets/img/apple-touch-icon-152x152-precomposed.png">
+		<link rel="apple-touch-icon-precomposed" sizes="180x180" href="assets/img/apple-touch-icon-180x180-precomposed.png">
+		<link rel="icon" sizes="192x192" href="assets/img/touch-icon-192x192.png">
+		<meta name="msapplication-TileImage" content="assets/img/ms-tile-144x144.png">
 		<meta name="msapplication-TileColor" content="#d40000">
 		<meta name="msapplication-config" content="none"/>
-		<link rel="stylesheet" type="text/css" href="styles/<?= ZBX_DEFAULT_THEME ?>.css" />
+		<link rel="stylesheet" type="text/css" href="assets/styles/<?= ZBX_DEFAULT_THEME ?>.css" />
 	</head>
-	<body>
-		<div class="<?= ZBX_STYLE_ARTICLE ?>">
+	<body lang="en">
+		<main>
 			<div class="<?= ZBX_STYLE_BROWSER_WARNING_CONTAINER ?>">
 				<h2 class="<?= ZBX_STYLE_RED ?>">You are using an outdated browser.</h2>
 				<p>Zabbix frontend is built on advanced, modern technologies and does not support old browsers. It is highly recommended that you choose and install a modern browser. It is free of charge and only takes a couple of minutes.</p>
@@ -69,9 +71,11 @@
 					<a href="index.php" onClick="javascript: document.cookie='browserwarning_ignore=yes';">Continue despite this warning</a>
 				</div>
 			</div>
-		</div>
-		<div class="<?= ZBX_STYLE_FOOTER ?>">
-			&copy; <?= ZABBIX_COPYRIGHT_FROM ?>&ndash;<?= ZABBIX_COPYRIGHT_TO ?>, <a class="<?= ZBX_STYLE_GREY ?> <?= ZBX_STYLE_LINK_ALT ?>" target="_blank" href="http://www.zabbix.com/">Zabbix SIA</a>
-		</div>
+		</main>
+
+		<?php
+			$footer = makePageFooter(false);
+			echo $footer->toString();
+		?>
 	</body>
 </html>

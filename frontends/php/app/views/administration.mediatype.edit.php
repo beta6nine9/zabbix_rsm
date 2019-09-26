@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -23,45 +23,49 @@ $this->includeJSfile('app/views/administration.mediatype.edit.js.php');
 
 $widget = (new CWidget())->setTitle(_('Media types'));
 
+$tabs = new CTabView();
+
+if ($data['form_refresh'] == 0) {
+	$tabs->setSelected(0);
+}
+
 // create form
 $mediaTypeForm = (new CForm())
 	->setId('media_type_form')
 	->addVar('form', 1)
 	->addVar('mediatypeid', $data['mediatypeid'])
-	->addVar('exec_params_count', $data['exec_params_count']);
+	->addItem((new CVar('status', MEDIA_TYPE_STATUS_DISABLED))->removeId())
+	->disablePasswordAutofill()
+	->setAttribute('aria-labeledby', ZBX_STYLE_PAGE_TITLE);
 
-// create form list
-$nameTextBox = (new CTextBox('description', $data['description'], false, 100))
-	->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
-	->setAttribute('autofocus', 'autofocus');
-$mediaTypeFormList = (new CFormList())
-	->addRow(_('Name'), $nameTextBox);
-
-// append type to form list
-$cmbType = new CComboBox('type', $data['type'], null, [
-	MEDIA_TYPE_EMAIL => _('Email'),
-	MEDIA_TYPE_EXEC => _('Script'),
-	MEDIA_TYPE_SMS => _('SMS'),
-	MEDIA_TYPE_JABBER => _('Jabber')
-]);
-$cmbType->addItemsInGroup(_('Commercial'), [MEDIA_TYPE_EZ_TEXTING => _('Ez Texting')]);
-$cmbTypeRow = [$cmbType];
-$ez_texting_link = (new CLink('https://app.eztexting.com', 'https://app.eztexting.com/'))
-	->setId('eztext_link')
-	->setTarget('_blank');
-$cmbTypeRow[] = $ez_texting_link;
-
-$mediaTypeFormList
-	->addRow(_('Type'), $cmbTypeRow)
-	->addRow(_('SMTP server'),
-		(new CTextBox('smtp_server', $data['smtp_server']))->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
+// Create form list.
+$mediatype_formlist = (new CFormList())
+	->addRow((new CLabel(_('Name'), 'name'))->setAsteriskMark(),
+		(new CTextBox('name', $data['name'], false, 100))
+			->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
+			->setAriaRequired()
+			->setAttribute('autofocus', 'autofocus')
+	)
+	->addRow(new CLabel(_('Type'), 'type'), new CComboBox('type', $data['type'], null, media_type2str()))
+	->addRow((new CLabel(_('SMTP server'), 'smtp_server'))->setAsteriskMark(),
+		(new CTextBox('smtp_server', $data['smtp_server']))
+			->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
+			->setAriaRequired()
 	)
 	->addRow(_('SMTP server port'),
 		(new CNumericBox('smtp_port', $data['smtp_port'], 5, false, false, false))->setWidth(ZBX_TEXTAREA_TINY_WIDTH)
 	)
-	->addRow(_('SMTP helo'), (new CTextBox('smtp_helo', $data['smtp_helo']))->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH))
-	->addRow(_('SMTP email'), (new CTextBox('smtp_email', $data['smtp_email']))->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH))
-	->addRow(_('Connection security'),
+	->addRow((new CLabel(_('SMTP helo'), 'smtp_helo'))->setAsteriskMark(),
+		(new CTextBox('smtp_helo', $data['smtp_helo']))
+			->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
+			->setAriaRequired()
+	)
+	->addRow((new CLabel(_('SMTP email'), 'smtp_email'))->setAsteriskMark(),
+		(new CTextBox('smtp_email', $data['smtp_email']))
+			->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
+			->setAriaRequired()
+	)
+	->addRow(new CLabel(_('Connection security'), 'smtp_security'),
 		(new CRadioButtonList('smtp_security', (int) $data['smtp_security']))
 			->addValue(_('None'), SMTP_CONNECTION_SECURITY_NONE)
 			->addValue(_('STARTTLS'), SMTP_CONNECTION_SECURITY_STARTTLS)
@@ -70,82 +74,128 @@ $mediaTypeFormList
 	)
 	->addRow(_('SSL verify peer'), (new CCheckBox('smtp_verify_peer'))->setChecked($data['smtp_verify_peer']))
 	->addRow(_('SSL verify host'), (new CCheckBox('smtp_verify_host'))->setChecked($data['smtp_verify_host']))
-	->addRow(_('Authentication'),
+	->addRow(new CLabel(_('Authentication'), 'smtp_authentication'),
 		(new CRadioButtonList('smtp_authentication', (int) $data['smtp_authentication']))
 			->addValue(_('None'), SMTP_AUTHENTICATION_NONE)
-			->addValue(_('Normal password'), SMTP_AUTHENTICATION_NORMAL)
+			->addValue(_('Username and password'), SMTP_AUTHENTICATION_NORMAL)
 			->setModern(true)
 	)
 	->addRow(_('Username'), (new CTextBox('smtp_username', $data['smtp_username']))->setWidth(ZBX_TEXTAREA_SMALL_WIDTH))
-	->addRow(_('Script name'), (new CTextBox('exec_path', $data['exec_path']))->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH));
+	->addRow((new CLabel(_('Script name'), 'exec_path'))->setAsteriskMark(),
+		(new CTextBox('exec_path', $data['exec_path']))
+			->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
+			->setAriaRequired()
+	);
 
 $exec_params_table = (new CTable())
 	->setId('exec_params_table')
 	->setHeader([_('Parameter'), _('Action')])
 	->setAttribute('style', 'width: 100%;');
 
-if ($data['exec_params_count'] != 0) {
-	foreach ($data['exec_params'] as $i => $exec_param) {
-		$exec_params_table->addRow([
-			(new CTextBox('exec_params['.$i.'][exec_param]', $exec_param['exec_param'], false, 255))
-				->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH),
-			(new CButton('exec_params['.$i.'][remove]', _('Remove')))
-				->addClass(ZBX_STYLE_BTN_LINK)
-				->addClass('element-table-remove')
-			],
-			'form_row'
-		);
-	}
+foreach ($data['exec_params'] as $i => $exec_param) {
+	$exec_params_table->addRow([
+		(new CTextBox('exec_params['.$i.'][exec_param]', $exec_param['exec_param'], false, 255))
+			->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH),
+		(new CButton('exec_params['.$i.'][remove]', _('Remove')))
+			->addClass(ZBX_STYLE_BTN_LINK)
+			->addClass('element-table-remove')
+		],
+		'form_row'
+	);
 }
 
 $exec_params_table->addRow([(new CButton('exec_param_add', _('Add')))
 	->addClass(ZBX_STYLE_BTN_LINK)
 	->addClass('element-table-add')]);
 
-$mediaTypeFormList->addRow(_('Script parameters'),
+$mediatype_formlist->addRow(_('Script parameters'),
 	(new CDiv($exec_params_table))
 		->addClass(ZBX_STYLE_TABLE_FORMS_SEPARATOR)
 		->setAttribute('style', 'min-width: '.ZBX_TEXTAREA_STANDARD_WIDTH.'px;'),
 	'row_exec_params'
 );
 
-$mediaTypeFormList->addRow(_('GSM modem'),
-	(new CTextBox('gsm_modem', $data['gsm_modem']))->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
+$mediatype_formlist->addRow((new CLabel(_('GSM modem'), 'gsm_modem'))->setAsteriskMark(),
+	(new CTextBox('gsm_modem', $data['gsm_modem']))
+		->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
+		->setAriaRequired()
 );
 
-// create password field
-if ($data['passwd'] != '') {
-	$passwdField = [
-		(new CButton('chPass_btn', _('Change password')))
-			->onClick('this.style.display="none"; $("passwd").show().focus();'),
-		(new CPassBox('passwd', $data['passwd']))
+// Create password field.
+if ($data['passwd'] !== '' && !$data['change_passwd']) {
+	// Disabling 'passwd' field prevents stored passwords autofill by browser.
+	$passwd_field = [
+		(new CButton('chPass_btn', _('Change password'))),
+		(new CPassBox('passwd', ''))
 			->setWidth(ZBX_TEXTAREA_SMALL_WIDTH)
+			->setAriaRequired()
 			->addStyle('display: none;')
+			->setAttribute('disabled', 'disabled')
 	];
 }
 else {
-	$passwdField = (new CPassBox('passwd'))->setWidth(ZBX_TEXTAREA_SMALL_WIDTH);
+	$passwd_field = (new CPassBox('passwd', $data['passwd']))->setWidth(ZBX_TEXTAREA_SMALL_WIDTH);
 }
 
 // append password field to form list
-$mediaTypeFormList
-	->addRow(_('Jabber identifier'),
-		(new CTextBox('jabber_username', $data['jabber_username']))->setWidth(ZBX_TEXTAREA_SMALL_WIDTH)
+$mediatype_formlist
+	->addRow(new CLabel(_('Password'), 'passwd'), $passwd_field)
+	->addRow(new CLabel(_('Message format'), 'content_type'),
+		(new CRadioButtonList('content_type', (int) $data['content_type']))
+			->addValue(_('HTML'), SMTP_MESSAGE_FORMAT_HTML)
+			->addValue(_('Plain text'), SMTP_MESSAGE_FORMAT_PLAIN_TEXT)
+			->setModern(true)
 	)
-	->addRow(_('Username'),
-		(new CTextBox('eztext_username', $data['eztext_username']))->setWidth(ZBX_TEXTAREA_SMALL_WIDTH)
-	)
-	->addRow(_('Password'), $passwdField)
-	->addRow(_('Message text limit'), new CComboBox('eztext_limit', $data['eztext_limit'], null, [
-		EZ_TEXTING_LIMIT_USA => _('USA (160 characters)'),
-		EZ_TEXTING_LIMIT_CANADA => _('Canada (136 characters)')
-	]))
 	->addRow(_('Enabled'),
-		(new CCheckBox('status', MEDIA_TYPE_STATUS_ACTIVE))->setChecked(MEDIA_TYPE_STATUS_ACTIVE == $data['status'])
+		(new CCheckBox('status', MEDIA_TYPE_STATUS_ACTIVE))->setChecked($data['status'] == MEDIA_TYPE_STATUS_ACTIVE)
 	);
+$tabs->addTab('mediaTab', _('Media type'), $mediatype_formlist);
 
-// append form list to tab
-$mediaTypeTab = (new CTabView())->addTab('mediaTypeTab', _('Media type'), $mediaTypeFormList);
+// media options tab
+$max_sessions = ($data['maxsessions'] > 1) ? $data['maxsessions'] : 0;
+if ($data['type'] == MEDIA_TYPE_SMS) {
+	$max_sessions = 1;
+}
+
+switch ($data['maxsessions']) {
+	case 1:
+		$data['maxsessions_type'] = 'one';
+		break;
+	case 0:
+		$data['maxsessions_type'] = 'unlimited';
+		break;
+	default:
+		$data['maxsessions_type'] = 'custom';
+}
+
+$mediaOptionsForm = (new CFormList('options'))
+	->addRow(new CLabel(_('Concurrent sessions'), 'maxsessions_type'),
+		(new CDiv())
+			->addClass(ZBX_STYLE_NOWRAP)
+			->addItem([
+				(new CDiv(
+					(new CRadioButtonList('maxsessions_type', $data['maxsessions_type']))
+						->addValue(_('One'), 'one')
+						->addValue(_('Unlimited'), 'unlimited')
+						->addValue(_('Custom'), 'custom')
+						->setModern(true)
+				))->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
+				(new CNumericBox('maxsessions', $max_sessions, 3, false, false, false))
+					->setAriaRequired()
+					->setWidth(ZBX_TEXTAREA_TINY_WIDTH)
+			])
+	)
+	->addRow((new CLabel(_('Attempts'), 'maxattempts'))->setAsteriskMark(),
+		(new CNumericBox('maxattempts', $data['maxattempts'], 3, false, false, false))
+			->setWidth(ZBX_TEXTAREA_TINY_WIDTH)
+			->setAriaRequired()
+	)
+	->addRow((new CLabel(_('Attempt interval'), 'attempt_interval'))->setAsteriskMark(),
+		(new CTextBox('attempt_interval', $data['attempt_interval'], false, 12))
+			->setWidth(ZBX_TEXTAREA_TINY_WIDTH)
+			->setAriaRequired()
+	);
+$tabs->addTab('optionsTab', _('Options'), $mediaOptionsForm);
 
 // append buttons to form
 $cancelButton = (new CRedirectButton(_('Cancel'), 'zabbix.php?action=mediatype.list'))->setId('cancel');
@@ -153,7 +203,7 @@ $cancelButton = (new CRedirectButton(_('Cancel'), 'zabbix.php?action=mediatype.l
 if ($data['mediatypeid'] == 0) {
 	$addButton = (new CSubmitButton(_('Add'), 'action', 'mediatype.create'))->setId('add');
 
-	$mediaTypeTab->setFooter(makeFormFooter(
+	$tabs->setFooter(makeFormFooter(
 		$addButton,
 		[$cancelButton]
 	));
@@ -167,7 +217,7 @@ else {
 	))
 		->setId('delete');
 
-	$mediaTypeTab->setFooter(makeFormFooter(
+	$tabs->setFooter(makeFormFooter(
 		$updateButton,
 		[
 			$cloneButton,
@@ -178,7 +228,7 @@ else {
 }
 
 // append tab to form
-$mediaTypeForm->addItem($mediaTypeTab);
+$mediaTypeForm->addItem($tabs);
 
 // append form to widget
 $widget->addItem($mediaTypeForm)->show();

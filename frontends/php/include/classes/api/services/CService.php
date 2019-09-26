@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -20,9 +20,7 @@
 
 
 /**
- * Class containing methods for operations with IT services.
- *
- * @package API
+ * Class containing methods for operations with services.
  */
 class CService extends CApiService {
 
@@ -36,7 +34,7 @@ class CService extends CApiService {
 		$this->getOptions = array_merge($this->getOptions, [
 			'parentids' => null,
 			'childids' => null,
-			'countOutput' => null,
+			'countOutput' => false,
 			'selectParent' => null,
 			'selectDependencies' => null,
 			'selectParentDependencies' => null,
@@ -79,7 +77,7 @@ class CService extends CApiService {
 		$result = [];
 		while ($row = DBfetch($res)) {
 			// a count query, return a single result
-			if ($options['countOutput'] !== null) {
+			if ($options['countOutput']) {
 				$result = $row['rowscount'];
 			}
 			// a normal select query
@@ -88,7 +86,7 @@ class CService extends CApiService {
 			}
 		}
 
-		if ($options['countOutput'] !== null) {
+		if ($options['countOutput']) {
 			return $result;
 		}
 
@@ -97,7 +95,7 @@ class CService extends CApiService {
 			$result = $this->unsetExtraFields($result, ['triggerid'], $options['output']);
 		}
 
-		if ($options['preservekeys'] === null) {
+		if (!$options['preservekeys']) {
 			$result = zbx_cleanHashes($result);
 		}
 
@@ -110,8 +108,6 @@ class CService extends CApiService {
 	 * @throws APIException if the input is invalid
 	 *
 	 * @param array $services
-	 *
-	 * @return void
 	 */
 	protected function validateCreate(array $services) {
 		foreach ($services as $service) {
@@ -197,8 +193,6 @@ class CService extends CApiService {
 	 * @throws APIException if the input is invalid
 	 *
 	 * @param array $services
-	 *
-	 * @return void
 	 */
 	public function validateUpdate(array $services) {
 		foreach ($services as $service) {
@@ -333,8 +327,6 @@ class CService extends CApiService {
 	 * @throws APIException if the input is invalid
 	 *
 	 * @param array $serviceIds
-	 *
-	 * @return void
 	 */
 	public function validateDelete($serviceIds) {
 		if (!$serviceIds) {
@@ -368,8 +360,6 @@ class CService extends CApiService {
 	 * @throws APIException if the input is invalid
 	 *
 	 * @param array $dependencies
-	 *
-	 * @return void
 	 */
 	protected function validateAddDependencies(array $dependencies) {
 		if (!$dependencies) {
@@ -434,8 +424,6 @@ class CService extends CApiService {
 	 * @throws APIException if the given input is invalid
 	 *
 	 * @param array $serviceIds
-	 *
-	 * @return void
 	 */
 	protected function validateDeleteDependencies(array $serviceIds) {
 		if (!$serviceIds) {
@@ -469,8 +457,6 @@ class CService extends CApiService {
 	 * @throws APIException if the given input is invalid
 	 *
 	 * @param array $serviceTimes
-	 *
-	 * @return void
 	 */
 	public function validateAddTimes(array $serviceTimes) {
 		foreach ($serviceTimes as $serviceTime) {
@@ -506,8 +492,6 @@ class CService extends CApiService {
 	 * @throws APIException if the given input is invalid
 	 *
 	 * @param array $serviceIds
-	 *
-	 * @return void
 	 */
 	protected function validateDeleteTimes(array $serviceIds) {
 		if (!$serviceIds) {
@@ -597,7 +581,7 @@ class CService extends CApiService {
 						' FROM service_alarms sa'.
 						' WHERE '.dbConditionInt('sa.serviceid', $usedSeviceIds).
 							' AND ('.implode(' OR ', $intervalConditions).')'.
-						' ORDER BY sa.clock,sa.servicealarmid'
+						' ORDER BY sa.servicealarmid'
 					);
 					while ($data = DBfetch($query)) {
 						$services[$data['serviceid']]['alarms'][] = $data;
@@ -670,42 +654,9 @@ class CService extends CApiService {
 	}
 
 	/**
-	 * Returns true if all of the given objects are available for reading.
-	 *
-	 * @param $ids
-	 *
-	 * @return bool
-	 */
-	public function isReadable(array $ids) {
-		if (empty($ids)) {
-			return true;
-		}
-		$ids = array_unique($ids);
-
-		$count = $this->get([
-			'serviceids' => $ids,
-			'countOutput' => true
-		]);
-		return count($ids) == $count;
-	}
-
-	/**
-	 * Returns true if all of the given objects are available for writing.
-	 *
-	 * @param $ids
-	 *
-	 * @return bool
-	 */
-	public function isWritable(array $ids) {
-		return $this->isReadable($ids);
-	}
-
-	/**
 	 * Deletes the dependencies of the parent services on the given services.
 	 *
 	 * @param $serviceIds
-	 *
-	 * @return void
 	 */
 	protected function deleteParentDependencies($serviceIds) {
 		DB::delete('services_links', [
@@ -713,7 +664,6 @@ class CService extends CApiService {
 			'soft' => 0
 		]);
 	}
-
 
 	/**
 	 * Returns an array of triggers which are in a problem state and are linked to the given services.
@@ -798,18 +748,14 @@ class CService extends CApiService {
 	 * @return array
 	 */
 	protected function fetchLatestValues(array $serviceIds, $beforeTime) {
-		// the query will return the alarms with the maximum timestamp for each service
-		// since multiple alarms can have the same timestamp, we only need to save the last one
+		// The query will return the alarms with the latest servicealarmid for each service, before $beforeTime.
 		$query = DBSelect(
 			'SELECT sa.serviceid,sa.value'.
-			' FROM (SELECT MAX(sa3.servicealarmid) AS servicealarmid'.
-					' FROM (SELECT sa2.serviceid,MAX(sa2.clock) AS clock'.
-							' FROM service_alarms sa2'.
-							' WHERE sa2.clock<'.zbx_dbstr($beforeTime).
-								' AND '.dbConditionInt('sa2.serviceid', $serviceIds).
-							' GROUP BY sa2.serviceid) ss'.
-					' JOIN service_alarms sa3 ON sa3.serviceid = ss.serviceid and sa3.clock = ss.clock'.
-					' GROUP BY sa3.serviceid) ss2'.
+			' FROM (SELECT sa2.serviceid,MAX(sa2.servicealarmid) AS servicealarmid'.
+					' FROM service_alarms sa2'.
+					' WHERE sa2.clock<'.zbx_dbstr($beforeTime).
+						' AND '.dbConditionInt('sa2.serviceid', $serviceIds).
+					' GROUP BY sa2.serviceid) ss2'.
 			' JOIN service_alarms sa ON sa.servicealarmid = ss2.servicealarmid'
 		);
 		$rs = [];
@@ -841,7 +787,7 @@ class CService extends CApiService {
 		$sqlParts = $this->addQueryOrder($this->fieldId('serviceid'), $sqlParts);
 
 		// add permission filter
-		if (CWebUser::getType() != USER_TYPE_SUPER_ADMIN) {
+		if (self::$userData['type'] != USER_TYPE_SUPER_ADMIN) {
 			$sqlParts = $this->addPermissionFilter($sqlParts);
 		}
 
@@ -875,7 +821,7 @@ class CService extends CApiService {
 		$sqlParts = $this->addQueryOrder($this->fieldId('serviceid'), $sqlParts);
 
 		// add permission filter
-		if (CWebUser::getType() != USER_TYPE_SUPER_ADMIN) {
+		if (self::$userData['type'] != USER_TYPE_SUPER_ADMIN) {
 			$sqlParts = $this->addPermissionFilter($sqlParts);
 		}
 
@@ -901,8 +847,6 @@ class CService extends CApiService {
 	 * @throws APIException if the name is missing
 	 *
 	 * @param array $service
-	 *
-	 * @return void
 	 */
 	protected function checkName(array $service) {
 		if (!isset($service['name']) || zbx_empty($service['name'])) {
@@ -916,8 +860,6 @@ class CService extends CApiService {
 	 * @throws APIException if the name is missing or invalid
 	 *
 	 * @param array $service
-	 *
-	 * @return void
 	 */
 	protected function checkAlgorithm(array $service) {
 		if (!isset($service['algorithm']) || !serviceAlgorithm($service['algorithm'])) {
@@ -931,8 +873,6 @@ class CService extends CApiService {
 	 * @throws APIException if the name is missing or is not a boolean value
 	 *
 	 * @param array $service
-	 *
-	 * @return void
 	 */
 	protected function checkShowSla(array $service) {
 		$showSlaValues = [
@@ -950,8 +890,6 @@ class CService extends CApiService {
 	 * @throws APIException if the value is missing, or is out of bounds
 	 *
 	 * @param array $service
-	 *
-	 * @return void
 	 */
 	protected function checkGoodSla(array $service) {
 		if ((!empty($service['showsla']) && empty($service['goodsla']))
@@ -968,14 +906,12 @@ class CService extends CApiService {
 	 * @throws APIException if the value is missing, or is out of bounds
 	 *
 	 * @param array $service
-	 *
-	 * @return void
 	 */
 	protected function checkSortOrder(array $service) {
 		if (!isset($service['sortorder']) || !zbx_is_int($service['sortorder'])
 			|| $service['sortorder'] < 0 || $service['sortorder'] > 999) {
 
-			self::exception(ZBX_API_ERROR_PARAMETERS, _s('Incorrect sorder order for service "%1$s".', $service['name']));
+			self::exception(ZBX_API_ERROR_PARAMETERS, _s('Incorrect sort order for service "%1$s".', $service['name']));
 		}
 	}
 
@@ -985,8 +921,6 @@ class CService extends CApiService {
 	 * @throws APIException if the value is incorrect
 	 *
 	 * @param array $service
-	 *
-	 * @return void
 	 */
 	protected function checkTriggerId(array $service) {
 		if (!empty($service['triggerid']) && !zbx_is_int($service['triggerid'])) {
@@ -1000,8 +934,6 @@ class CService extends CApiService {
 	 * @throws APIException if the value is incorrect
 	 *
 	 * @param array $service
-	 *
-	 * @return void
 	 */
 	protected function checkParentId(array $service) {
 		if (!empty($service['parentid']) && !zbx_is_int($service['parentid'])) {
@@ -1024,8 +956,6 @@ class CService extends CApiService {
 	 * @throws APIException if the value is incorrect
 	 *
 	 * @param array $service
-	 *
-	 * @return void
 	 */
 	protected function checkStatus(array $service) {
 		if (!empty($service['status']) && !zbx_is_int($service['status'])) {
@@ -1039,18 +969,26 @@ class CService extends CApiService {
 	 * @throws APIException if the user doesn't have permission to access any of the triggers
 	 *
 	 * @param array $services
-	 *
-	 * @return void
 	 */
 	protected function checkTriggerPermissions(array $services) {
-		$triggerIds = [];
+		$triggerids = [];
 		foreach ($services as $service) {
 			if (!empty($service['triggerid'])) {
-				$triggerIds[] = $service['triggerid'];
+				$triggerids[$service['triggerid']] = true;
 			}
 		}
-		if (!API::Trigger()->isReadable($triggerIds)) {
-			self::exception(ZBX_API_ERROR_PERMISSIONS, _('No permissions to referred object or it does not exist!'));
+
+		if ($triggerids) {
+			$count = API::Trigger()->get([
+				'countOutput' => true,
+				'triggerids' => array_keys($triggerids)
+			]);
+
+			if ($count != count($triggerids)) {
+				self::exception(ZBX_API_ERROR_PERMISSIONS,
+					_('No permissions to referred object or it does not exist!')
+				);
+			}
 		}
 	}
 
@@ -1059,13 +997,22 @@ class CService extends CApiService {
 	 *
 	 * @throws APIException if at least one of the services doesn't exist
 	 *
-	 * @param array $serviceIds
-	 *
-	 * @return void
+	 * @param array $serviceids
 	 */
-	protected function checkServicePermissions(array $serviceIds) {
-		if (!$this->isReadable($serviceIds)) {
-			self::exception(ZBX_API_ERROR_PERMISSIONS, _('No permissions to referred object or it does not exist!'));
+	protected function checkServicePermissions(array $serviceids) {
+		if ($serviceids) {
+			$serviceids = array_unique($serviceids);
+
+			$count = $this->get([
+				'countOutput' => true,
+				'serviceids' => $serviceids
+			]);
+
+			if ($count != count($serviceids)) {
+				self::exception(ZBX_API_ERROR_PERMISSIONS,
+					_('No permissions to referred object or it does not exist!')
+				);
+			}
 		}
 	}
 
@@ -1075,8 +1022,6 @@ class CService extends CApiService {
 	 * @throws APIException if at least one of the services has a child service
 	 *
 	 * @param array $serviceIds
-	 *
-	 * @return void
 	 */
 	protected function checkThatServicesDontHaveChildren(array $serviceIds) {
 		$child = API::getApiService()->select('services_links', [
@@ -1107,8 +1052,6 @@ class CService extends CApiService {
 	 * @throws APIException if the dependency is invalid
 	 *
 	 * @param array $dependency
-	 *
-	 * @return void
 	 */
 	protected function checkDependency(array $dependency) {
 		if (idcmp($dependency['serviceid'], $dependency['dependsOnServiceid'])) {
@@ -1140,8 +1083,6 @@ class CService extends CApiService {
 	 * @throws APIException if at a least one service is hard linked to another service
 	 *
 	 * @param array $dependencies
-	 *
-	 * @return void
 	 */
 	protected function checkForHardlinkedDependencies(array $dependencies) {
 		// only check hard dependencies
@@ -1183,8 +1124,6 @@ class CService extends CApiService {
 	 * @throws APIException if at least one of the parent services is linked to a trigger
 	 *
 	 * @param array $dependencies
-	 *
-	 * @return void
 	 */
 	protected function checkThatParentsDontHaveTriggers(array $dependencies) {
 		$parentServiceIds = array_unique(zbx_objectValues($dependencies, 'serviceid'));
@@ -1207,8 +1146,6 @@ class CService extends CApiService {
 	 * @throws APIException if at least one cycle is possible
 	 *
 	 * @param array $depsToValid	dependency list to be validated
-	 *
-	 * @return void
 	 */
 	protected function checkForCircularityInDependencies($depsToValid) {
 		$dbDeps = API::getApiService()->select('services_links', [
@@ -1241,8 +1178,6 @@ class CService extends CApiService {
 	 * @param int $depId	dependency to id
 	 * @param ref $arr	reference to graph structure. Structure is associative array with keys as "from id"
 	 *			and values as arrays with keys and values as "to id".
-	 *
-	 * @return void
 	 */
 	protected function dfCircularitySearch($id, $depId, &$arr) {
 		if ($id == $depId) {
@@ -1262,8 +1197,6 @@ class CService extends CApiService {
 	 * @throws APIException if the service time is invalid
 	 *
 	 * @param array $serviceTime
-	 *
-	 * @return void
 	 */
 	protected function checkTime(array $serviceTime) {
 		if (empty($serviceTime['serviceid'])) {
@@ -1274,7 +1207,7 @@ class CService extends CApiService {
 	}
 
 	protected function applyQueryFilterOptions($tableName, $tableAlias, array $options, array $sqlParts) {
-		if (CWebUser::getType() != USER_TYPE_SUPER_ADMIN) {
+		if (self::$userData['type'] != USER_TYPE_SUPER_ADMIN) {
 			// if services with specific trigger IDs were requested, return only the ones accessible to the current user.
 			if ($options['filter']['triggerid']) {
 				$accessibleTriggers = API::Trigger()->get([
@@ -1395,7 +1328,7 @@ class CService extends CApiService {
 	protected function applyQueryOutputOptions($tableName, $tableAlias, array $options, array $sqlParts) {
 		$sqlParts = parent::applyQueryOutputOptions($tableName, $tableAlias, $options, $sqlParts);
 
-		if ($options['countOutput'] === null) {
+		if (!$options['countOutput']) {
 			if ($options['selectTrigger'] !== null) {
 				$sqlParts = $this->addQuerySelect($this->fieldId('triggerid'), $sqlParts);
 			}
@@ -1412,8 +1345,7 @@ class CService extends CApiService {
 	 * @return string
 	 */
 	protected function addPermissionFilter($sqlParts) {
-		$userid = self::$userData['userid'];
-		$userGroups = getUserGroupsByUserId($userid);
+		$userGroups = getUserGroupsByUserId(self::$userData['userid']);
 
 		$sqlParts['where'][] = '(EXISTS ('.
 									'SELECT NULL'.

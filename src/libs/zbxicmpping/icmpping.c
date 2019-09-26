@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -20,6 +20,7 @@
 #include "zbxicmpping.h"
 #include "threads.h"
 #include "comms.h"
+#include "zbxexec.h"
 #include "log.h"
 
 extern char	*CONFIG_SOURCE_IP;
@@ -40,6 +41,12 @@ static unsigned char	source_ip6_checked = 0;
 static const char	*source_ip6_option = NULL;
 #endif
 
+#define FPING_UNINITIALIZED_INTERVAL	-1
+static int		packet_interval = FPING_UNINITIALIZED_INTERVAL;
+#ifdef HAVE_IPV6
+static int		packet_interval6 = FPING_UNINITIALIZED_INTERVAL;
+#endif
+
 static void	get_source_ip_option(const char *fping, const char **option, unsigned char *checked)
 {
 	FILE	*f;
@@ -55,13 +62,13 @@ static void	get_source_ip_option(const char *fping, const char **option, unsigne
 		for (p = tmp; isspace(*p); p++)
 			;
 
-		if ('-' == p[0] && 'I' == p[1] && isspace(p[2]))
+		if ('-' == p[0] && 'I' == p[1] && (isspace(p[2]) || ',' == p[2]))
 		{
 			*option = "-I";
 			continue;
 		}
 
-		if ('-' == p[0] && 'S' == p[1] && isspace(p[2]))
+		if ('-' == p[0] && 'S' == p[1] && (isspace(p[2]) || ',' == p[2]))
 		{
 			*option = "-S";
 			break;
@@ -73,13 +80,47 @@ static void	get_source_ip_option(const char *fping, const char **option, unsigne
 	*checked = 1;
 }
 
+/******************************************************************************
+ *                                                                            *
+ * Function: get_interval_option                                              *
+ *                                                                            *
+ * Purpose: detect minimal possible fping packet interval                     *
+ *                                                                            *
+ * Parameters: fping - [IN] the the location of fping program                 *
+ *             dst   - [IN] the the ip address for test                       *
+ *                                                                            *
+ * Return value: interval between sending ping packets (in millisec)          *
+ *                                                                            *
+ * Comments: starting with fping (4.x), the packets interval can be 0ms,      *
+ *           otherwise minimum value is 10ms                                  *
+ ******************************************************************************/
+static int	get_interval_option(const char * fping, const char *dst)
+{
+	int	value, ret;
+	char	tmp[MAX_STRING_LEN], error[255], *out = NULL;
+
+	zbx_snprintf(tmp, sizeof(tmp), "%s -c1 -t50 -i0 %s", fping, dst);
+
+	if ((SUCCEED == (ret = zbx_execute(tmp, &out, error, sizeof(error), 1, ZBX_EXIT_CODE_CHECKS_DISABLED)) &&
+			ZBX_KIBIBYTE > strlen(out) && NULL != strstr(out, dst)) || TIMEOUT_ERROR == ret)
+	{
+		value = 0;
+	}
+	else
+	{
+		value = 10;
+	}
+
+	zbx_free(out);
+
+	return value;
+}
+
 static int	process_ping(ZBX_FPING_HOST *hosts, int hosts_count, int count, int interval, int size, int timeout,
 		char *error, int max_error_len)
 {
-	const char	*__function_name = "process_ping";
-
 	FILE		*f;
-	char		*c, params[64];
+	char		*c, params[70];
 	char		filename[MAX_STRING_LEN], tmp[MAX_STRING_LEN];
 	size_t		offset;
 	ZBX_FPING_HOST	*host;
@@ -88,7 +129,8 @@ static int	process_ping(ZBX_FPING_HOST *hosts, int hosts_count, int count, int i
 
 #ifdef HAVE_IPV6
 	int		family;
-	char		params6[64];
+	char		params6[70];
+	size_t		offset6;
 	char		fping_existence = 0;
 #define	FPING_EXISTS	0x1
 #define	FPING6_EXISTS	0x2
@@ -97,7 +139,7 @@ static int	process_ping(ZBX_FPING_HOST *hosts, int hosts_count, int count, int i
 
 	assert(hosts);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() hosts_count:%d", __function_name, hosts_count);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() hosts_count:%d", __func__, hosts_count);
 
 	if (-1 == access(CONFIG_FPING_LOCATION, X_OK))
 	{
@@ -148,6 +190,31 @@ static int	process_ping(ZBX_FPING_HOST *hosts, int hosts_count, int count, int i
 
 #ifdef HAVE_IPV6
 	strscpy(params6, params);
+	offset6 = offset;
+
+	if (0 != (fping_existence & FPING_EXISTS) && 0 != hosts_count)
+	{
+		if (FPING_UNINITIALIZED_INTERVAL == packet_interval)
+			packet_interval = get_interval_option(CONFIG_FPING_LOCATION, hosts[0].addr);
+
+		offset += zbx_snprintf(params + offset, sizeof(params) - offset, " -i%d", packet_interval);
+	}
+
+	if (0 != (fping_existence & FPING6_EXISTS) && 0 != hosts_count)
+	{
+		if (FPING_UNINITIALIZED_INTERVAL == packet_interval6)
+			packet_interval6 = get_interval_option(CONFIG_FPING6_LOCATION, hosts[0].addr);
+
+		offset6 += zbx_snprintf(params6 + offset6, sizeof(params6) - offset6, " -i%d", packet_interval6);
+	}
+#else
+	if (0 != hosts_count)
+	{
+		if (FPING_UNINITIALIZED_INTERVAL == packet_interval)
+			packet_interval = get_interval_option(CONFIG_FPING_LOCATION, hosts[0].addr);
+
+		offset += zbx_snprintf(params + offset, sizeof(params) - offset, " -i%d", packet_interval);
+	}
 #endif	/* HAVE_IPV6 */
 
 	if (NULL != CONFIG_SOURCE_IP)
@@ -167,7 +234,7 @@ static int	process_ping(ZBX_FPING_HOST *hosts, int hosts_count, int count, int i
 			if (0 == source_ip6_checked)
 				get_source_ip_option(CONFIG_FPING6_LOCATION, &source_ip6_option, &source_ip6_checked);
 			if (NULL != source_ip6_option)
-				zbx_snprintf(params6 + offset, sizeof(params6) - offset,
+				zbx_snprintf(params6 + offset6, sizeof(params6) - offset6,
 						" %s%s", source_ip6_option, CONFIG_SOURCE_IP);
 		}
 #else
@@ -261,7 +328,7 @@ static int	process_ping(ZBX_FPING_HOST *hosts, int hosts_count, int count, int i
 	{
 		for (i = 0; i < hosts_count; i++)
 		{
-			hosts[i].status = zbx_malloc(NULL, count);
+			hosts[i].status = (char *)zbx_malloc(NULL, count);
 			memset(hosts[i].status, 0, count);
 		}
 
@@ -365,7 +432,7 @@ static int	process_ping(ZBX_FPING_HOST *hosts, int hosts_count, int count, int i
 	if (NOTSUPPORTED == ret)
 		zbx_snprintf(error, max_error_len, "fping failed: %s", tmp);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 
 	return ret;
 }
@@ -388,16 +455,14 @@ static int	process_ping(ZBX_FPING_HOST *hosts, int hosts_count, int count, int i
  ******************************************************************************/
 int	do_ping(ZBX_FPING_HOST *hosts, int hosts_count, int count, int interval, int size, int timeout, char *error, int max_error_len)
 {
-	const char	*__function_name = "do_ping";
-
 	int	res;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() hosts_count:%d", __function_name, hosts_count);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() hosts_count:%d", __func__, hosts_count);
 
 	if (NOTSUPPORTED == (res = process_ping(hosts, hosts_count, count, interval, size, timeout, error, max_error_len)))
 		zabbix_log(LOG_LEVEL_ERR, "%s", error);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __function_name, zbx_result_string(res));
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(res));
 
 	return res;
 }

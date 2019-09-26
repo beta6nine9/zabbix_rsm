@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -19,97 +19,64 @@
 **/
 
 
-$triggersWidget = new CWidget();
+$widget = (new CWidget())->setTitle($data['title']);
 
 // append host summary to widget header
-if (!empty($this->data['hostid'])) {
-	$hostTableElement = ($this->data['elements_field'] == 'group_graphid') ? 'graphs' : 'trigger';
-	$triggersWidget->addItem(get_header_host_table($hostTableElement, $this->data['hostid']));
-}
+if ($data['hostid'] != 0) {
+	switch ($data['elements_field']) {
+		case 'group_itemid':
+			$host_table_element = 'items';
+			break;
+		case 'g_triggerid':
+			$host_table_element = 'triggers';
+			break;
+		case 'group_graphid':
+			$host_table_element = 'graphs';
+			break;
+		default:
+			$host_table_element = '';
+	}
 
-if (!empty($this->data['title'])) {
-	$triggersWidget->setTitle($this->data['title']);
+	$widget->addItem(get_header_host_table($host_table_element, $data['hostid']));
 }
 
 // create form
-$triggersForm = (new CForm())
-	->setName('triggersForm')
-	->addVar($this->data['elements_field'], $this->data['elements'])
-	->addVar('hostid', $this->data['hostid'])
-	->addVar('action', $this->data['action']);
+$form = (new CForm())
+	->setName('elements_form')
+	->setAttribute('aria-labeledby', ZBX_STYLE_PAGE_TITLE)
+	->addVar('action', $data['action'])
+	->addVar($data['elements_field'], $data['elements'])
+	->addVar('hostid', $data['hostid']);
 
 // create form list
-$triggersFormList = new CFormList('triggersFormList');
+$form_list = new CFormList('elements_form_list');
 
 // append copy types to form list
+$form_list->addRow(new CLabel(_('Target type'), 'copy_type'),
+	(new CRadioButtonList('copy_type', (int) $data['copy_type']))
+		->addValue(_('Host groups'), COPY_TYPE_TO_HOST_GROUP)
+		->addValue(_('Hosts'), COPY_TYPE_TO_HOST)
+		->addValue(_('Templates'), COPY_TYPE_TO_TEMPLATE)
+		->setModern(true)
+);
 
-$triggersFormList->addRow(_('Target type'), new CComboBox('copy_type', $this->data['copy_type'], 'submit()', [
-	COPY_TYPE_TO_HOST => _('Hosts'),
-	COPY_TYPE_TO_TEMPLATE => _('Templates'),
-	COPY_TYPE_TO_HOST_GROUP => _('Host groups')
-]));
-
-// append groups to form list
-if ($this->data['copy_type'] == COPY_TYPE_TO_HOST || $this->data['copy_type'] == COPY_TYPE_TO_TEMPLATE) {
-	$groupComboBox = new CComboBox('copy_groupid', $this->data['copy_groupid'], 'submit()');
-	foreach ($this->data['groups'] as $group) {
-		if (empty($this->data['copy_groupid'])) {
-			$this->data['copy_groupid'] = $group['groupid'];
-		}
-		$groupComboBox->addItem($group['groupid'], $group['name']);
-	}
-	$triggersFormList->addRow(_('Group'), $groupComboBox);
-}
-
-// append targets to form list
-$targets = [];
-if ($this->data['copy_type'] == COPY_TYPE_TO_HOST) {
-	foreach ($this->data['hosts'] as $host) {
-		$targets[] = new CLabel([
-			(new CCheckBox('copy_targetid['.$host['hostid'].']', $host['hostid']))
-				->setChecked(uint_in_array($host['hostid'], $this->data['copy_targetid'])), $host['name']],
-			'copy_targetid['.$host['hostid'].']'
-		);
-		$targets[] = BR();
-	}
-} elseif ($this->data['copy_type'] == COPY_TYPE_TO_TEMPLATE) {
-	foreach ($this->data['templates'] as $template) {
-		$targets[] = new CLabel([
-			(new CCheckBox('copy_targetid['.$template['templateid'].']', $template['templateid']))
-				->setChecked(uint_in_array($template['templateid'], $this->data['copy_targetid'])), $template['name']],
-			'copy_targetid['.$template['templateid'].']'
-		);
-		$targets[] = BR();
-	}
-} else {
-	foreach ($this->data['groups'] as $group) {
-		$targets[] = new CLabel([
-			(new CCheckBox('copy_targetid['.$group['groupid'].']', $group['groupid']))
-				->setChecked(uint_in_array($group['groupid'], $this->data['copy_targetid'])), $group['name']],
-			'copy_targetid['.$group['groupid'].']'
-		);
-		$targets[] = BR();
-	}
-}
-if ($targets) {
-	array_pop($targets);
-}
-$triggersFormList->addRow(_('Target'), $targets);
+// append multiselect wrapper to form list
+$form_list->addRow((new CLabel(_('Target'), 'copy_targetids_ms'))->setAsteriskMark(),
+	(new CDiv())->setId('copy_targets')
+);
 
 // append tabs to form
-$triggersTab = (new CTabView())
-	->addTab('triggersTab',
-		_n('Copy %1$s element to...', 'Copy %1$s elements to...', count($this->data['elements'])),
-		$triggersFormList
-	);
+$tab_view = (new CTabView())->addTab('elements_tab', '', $form_list);
 
 // append buttons to form
-$triggersTab->setFooter(makeFormFooter(
+$tab_view->setFooter(makeFormFooter(
 	new CSubmit('copy', _('Copy')),
 	[new CButtonCancel(url_param('groupid').url_param('hostid'))]
 ));
 
-$triggersForm->addItem($triggersTab);
-$triggersWidget->addItem($triggersForm);
+$form->addItem($tab_view);
+$widget->addItem($form);
 
-return $triggersWidget;
+require_once dirname(__FILE__).'/js/configuration.copy.elements.js.php';
+
+return $widget;

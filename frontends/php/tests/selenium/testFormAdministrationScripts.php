@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -18,9 +18,12 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-require_once dirname(__FILE__).'/../include/class.cwebtest.php';
+require_once dirname(__FILE__).'/../include/CLegacyWebTest.php';
 
-class testFormAdministrationScripts extends CWebTest {
+/**
+ * @backup scripts
+ */
+class testFormAdministrationScripts extends CLegacyWebTest {
 	// Data provider
 	public static function providerScripts() {
 		// data - values for form inputs
@@ -82,7 +85,8 @@ class testFormAdministrationScripts extends CWebTest {
 
 		$this->zbxTestTextPresent(['Type']);
 		$this->zbxTestAssertElementPresentId('type');
-		$this->zbxTestDropdownHasOptions('type', ['IPMI', 'Script']);
+		$this->zbxTestAssertElementText("//ul[@id='type']//label[@for='type_0']", 'IPMI');
+		$this->zbxTestAssertElementText("//ul[@id='type']//label[@for='type_1']", 'Script');
 
 		$this->zbxTestTextPresent(['Execute on', 'Zabbix agent', 'Zabbix server']);
 		$this->zbxTestAssertElementPresentId('execute_on_0');
@@ -104,7 +108,8 @@ class testFormAdministrationScripts extends CWebTest {
 
 		$this->zbxTestTextPresent(['Required host permissions']);
 		$this->zbxTestAssertElementPresentId('host_access');
-		$this->zbxTestDropdownHasOptions('host_access', ['Read', 'Write']);
+		$this->zbxTestAssertElementText("//ul[@id='host_access']//label[@for='host_access_0']", 'Read');
+		$this->zbxTestAssertElementText("//ul[@id='host_access']//label[@for='host_access_1']", 'Write');
 
 		$this->zbxTestTextPresent(['Enable confirmation']);
 		$this->zbxTestAssertElementPresentId('enable_confirmation');
@@ -112,10 +117,6 @@ class testFormAdministrationScripts extends CWebTest {
 
 		$this->zbxTestTextPresent(['Confirmation text']);
 		$this->zbxTestAssertElementPresentId('confirmation');
-	}
-
-	public function testFormAdministrationScripts_backup() {
-		DBsave_tables('scripts');
 	}
 
 	/**
@@ -132,7 +133,7 @@ class testFormAdministrationScripts extends CWebTest {
 					$this->zbxTestInputType($field['name'], $field['value']);
 					break;
 				case 'select':
-					$this->zbxTestDropdownSelect($field['name'], $field['value']);
+					$this->zbxTestClickXpathWait("//ul[@id='".$field['name']."']//label[text()='".$field['value']."']");
 					break;
 				case 'check':
 					$this->zbxTestCheckboxSelect($field['name']);
@@ -151,13 +152,13 @@ class testFormAdministrationScripts extends CWebTest {
 
 		if (!$resultSave) {
 			$sql = 'SELECT * FROM scripts';
-			$DBhash = DBhash($sql);
+			$hash = CDBHelper::getHash($sql);
 		}
 
 		$this->zbxTestClickWait('add');
 
 		if ($resultSave) {
-			$this->zbxTestTextPresent('Script added');
+			$this->zbxTestWaitUntilMessageTextPresent('msg-good', 'Script added');
 
 			$dbres = DBfetch(DBselect($sql));
 			foreach ($dbres as $field => $value) {
@@ -165,13 +166,8 @@ class testFormAdministrationScripts extends CWebTest {
 			}
 		}
 		else {
-			$this->zbxTestTextPresent('Cannot add script');
-			$this->assertEquals($DBhash, DBhash($sql));
+			$this->zbxTestWaitUntilMessageTextPresent('msg-bad', 'Cannot add script');
+			$this->assertEquals($hash, CDBHelper::getHash($sql));
 		}
 	}
-
-	public function testFormAdministrationScripts_restore() {
-		DBrestore_tables('scripts');
-	}
-
 }

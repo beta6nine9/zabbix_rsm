@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -123,7 +123,7 @@ function check_type(&$field, $flags, &$var, $type, $caption = null) {
 		$caption = $field;
 	}
 
-	if (is_array($var)) {
+	if (is_array($var) && $type != T_ZBX_RANGE_TIME) {
 		$err = ZBX_VALID_OK;
 
 		foreach ($var as $v) {
@@ -209,11 +209,38 @@ function check_type(&$field, $flags, &$var, $type, $caption = null) {
 		}
 	}
 	elseif ($type == T_ZBX_TP) {
-		$timePeriodValidator = new CTimePeriodValidator();
+		$time_period_parser = new CTimePeriodsParser(['usermacros' => true]);
 
-		if (!$timePeriodValidator->validate($var)) {
+		if ($time_period_parser->parse($var) != CParser::PARSE_SUCCESS) {
 			$error = true;
-			$message = _s('Field "%1$s" is not correct: %2$s', $caption, $timePeriodValidator->getError());
+			$message = _s('Field "%1$s" is not correct: %2$s', $caption, _('a time period is expected'));
+		}
+	}
+	elseif ($type == T_ZBX_TU) {
+		$simple_interval_parser = new CSimpleIntervalParser([
+			'usermacros' => ($flags & P_ALLOW_USER_MACRO),
+			'lldmacros' => ($flags & P_ALLOW_LLD_MACRO)
+		]);
+
+		if ($simple_interval_parser->parse($var) != CParser::PARSE_SUCCESS) {
+			$error = true;
+			$message = _s('Field "%1$s" is not correct: %2$s', $caption, _('a time unit is expected'));
+		}
+	}
+	elseif ($type == T_ZBX_RANGE_TIME) {
+		$range_time_parser = new CRangeTimeParser();
+
+		if (!is_string($var) || $range_time_parser->parse($var) != CParser::PARSE_SUCCESS) {
+			$error = true;
+			$message = _s('Field "%1$s" is not correct: %2$s', $caption, _('a time range is expected'));
+		}
+	}
+	elseif ($type == T_ZBX_ABS_TIME) {
+		$absolute_time_parser = new CAbsoluteTimeParser();
+
+		if (!is_string($var) || $absolute_time_parser->parse($var) != CParser::PARSE_SUCCESS) {
+			$error = true;
+			$message = _s('Field "%1$s" is not correct: %2$s', $caption, _('an explicit time is expected'));
 		}
 	}
 
@@ -291,25 +318,17 @@ function check_field(&$fields, &$field, $checks) {
 			return ZBX_VALID_OK;
 		}
 		elseif ($flags & P_ACT) {
-			$authorized = true;
-			if (hasRequest('sid')) {
-				if (strlen(getRequest('sid')) == 16) {
-					$authorized = (array_key_exists('zbx_sessionid', $_COOKIE)
-							&& getRequest('sid') == substr($_COOKIE['zbx_sessionid'], 16, 16));
-				}
-				else {
-					$authorized = (getRequest('sid') == CWebUser::getSessionCookie());
-				}
-			}
-			else {
-				$authorized = false;
-			}
-
-			if (!$authorized) {
+			if (!isset($_REQUEST['sid'])
+					|| (array_key_exists(ZBX_SESSION_NAME, $_COOKIE)
+							&& $_REQUEST['sid'] != substr($_COOKIE[ZBX_SESSION_NAME], 16, 16))) {
 				info(_('Operation cannot be performed due to unauthorized request.'));
 				return ZBX_VALID_ERROR;
 			}
 		}
+	}
+
+	if ($flags & P_CRLF) {
+		$_REQUEST[$field] = CRLFtoLF($_REQUEST[$field]);
 	}
 
 	if (!($flags & P_NO_TRIM)) {
@@ -324,7 +343,7 @@ function check_field(&$fields, &$field, $checks) {
 
 	if ((is_null($exception) || $except) && $validation && !calc_exp($fields, $field, $validation)) {
 		if ($validation == NOT_EMPTY) {
-			info(_s('Incorrect value for field "%1$s": cannot be empty.', $caption));
+			info(_s('Incorrect value for field "%1$s": %2$s.', $caption, _('cannot be empty')));
 		}
 
 		// check for BETWEEN() function pattern and extract numbers e.g. ({}>=0&&{}<=999)&&
@@ -332,8 +351,11 @@ function check_field(&$fields, &$field, $checks) {
 			info(_s('Incorrect value "%1$s" for "%2$s" field: must be between %3$s and %4$s.',
 				$_REQUEST[$field], $caption, $result[1], $result[2]));
 		}
-		else {
+		elseif (is_scalar($_REQUEST[$field])) {
 			info(_s('Incorrect value "%1$s" for "%2$s" field.', $_REQUEST[$field], $caption));
+		}
+		else {
+			info(_s('Incorrect value for "%1$s" field.', $caption));
 		}
 
 		return ($flags & P_SYS) ? ZBX_VALID_ERROR : ZBX_VALID_WARNING;
@@ -364,7 +386,14 @@ function invalid_url($msg = null) {
 	require_once dirname(__FILE__).'/page_footer.php';
 }
 
-function check_fields(&$fields, $show_messages = true) {
+/**
+ * Validate request fields and return result flags.
+ *
+ * @param array $fields field schema together with validation rules
+ *
+ * @return integer appropriate result flags ZBX_VALID_OK | ZBX_VALID_ERROR | ZBX_VALID_WARNING
+ */
+function check_fields_raw(&$fields) {
 	// VAR	TYPE	OPTIONAL	FLAGS	VALIDATION	EXCEPTION
 	$system_fields = [
 		'sid' =>			[T_ZBX_STR, O_OPT, P_SYS, HEX(),		null],
@@ -389,15 +418,66 @@ function check_fields(&$fields, $show_messages = true) {
 
 	$fields = null;
 
-	if ($err&ZBX_VALID_ERROR) {
+	return $err;
+}
+
+/**
+ * Validate request fields and return true on success, false on error.
+ *
+ * @param array $fields field schema together with validation rules
+ * @param bool $show_messages do show messages on error
+ *
+ * @return bool true on success, false on error.
+ */
+function check_fields(&$fields, $show_messages = true) {
+	$err = check_fields_raw($fields);
+
+	if ($err & ZBX_VALID_ERROR) {
 		invalid_url();
 	}
 
 	if ($show_messages && $err != ZBX_VALID_OK) {
-		show_messages(($err == ZBX_VALID_OK), null, _('Page received incorrect data'));
+		show_messages(false, null, _('Page received incorrect data'));
 	}
 
 	return ($err == ZBX_VALID_OK);
+}
+
+/**
+ * Validate "from" and "to" parameters for allowed period.
+ *
+ * @param string|null from
+ * @param string|null to
+ */
+function validateTimeSelectorPeriod($from, $to) {
+	if ($from === null || $to === null) {
+		return;
+	}
+
+	$ts = [];
+	$range_time_parser = new CRangeTimeParser();
+
+	foreach (['from' => $from, 'to' => $to] as $field => $value) {
+		$range_time_parser->parse($value);
+		$ts[$field] = $range_time_parser->getDateTime($field === 'from')->getTimestamp();
+	}
+
+	$period = $ts['to'] - $ts['from'] + 1;
+
+	if ($period < ZBX_MIN_PERIOD) {
+		error(_n('Minimum time period to display is %1$s minute.',
+			'Minimum time period to display is %1$s minutes.', (int) ZBX_MIN_PERIOD / SEC_PER_MIN
+		));
+
+		invalid_url();
+	}
+	elseif ($period > ZBX_MAX_PERIOD) {
+		error(_n('Maximum time period to display is %1$s day.',
+			'Maximum time period to display is %1$s days.', (int) ZBX_MAX_PERIOD / SEC_PER_DAY
+		));
+
+		invalid_url();
+	}
 }
 
 function validatePortNumberOrMacro($port) {
@@ -470,4 +550,47 @@ function validateDateTime($year, $month, $day, $hours, $minutes, $seconds = null
  */
 function validateDateInterval($year, $month, $day) {
 	return !($year < 1970 || $year > 2038 || ($year == 2038 && (($month > 1) || ($month == 1 && $day > 18))));
+}
+
+/**
+ * Validate a configuration value. Use simple interval parser to parse the string, convert to seconds and check
+ * if the value is in between given min and max values. In some cases it's possible to enter 0, or even 0s or 0d.
+ * If the value is incorrect, set an error.
+ *
+ * @param string $value                  Value to parse and validate.
+ * @param int    $min                    Lowed bound.
+ * @param int    $max                    Upper bound.
+ * @param bool   $allow_zero             Set to "true" to allow value to be zero.
+ * @param string $error
+ * @param array  $options
+ * @param bool   $options['usermacros']
+ * @param bool   $options['lldmacros']
+ *
+ * @return bool
+ */
+function validateTimeUnit($value, $min, $max, $allow_zero, &$error, array $options = []) {
+	$simple_interval_parser = new CSimpleIntervalParser($options);
+
+	if ($simple_interval_parser->parse($value) == CParser::PARSE_SUCCESS) {
+		if ($value[0] !== '{') {
+			$value = timeUnitToSeconds($value);
+
+			if ($allow_zero && $value == 0) {
+				return true;
+			}
+
+			if ($value < $min || $value > $max) {
+				$error = _s('value must be one of %1$s', $allow_zero ? '0, '.$min.'-'.$max : $min.'-'.$max);
+
+				return false;
+			}
+		}
+	}
+	else {
+		$error = _('a time unit is expected');
+
+		return false;
+	}
+
+	return true;
 }

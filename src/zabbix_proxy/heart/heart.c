@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -47,6 +47,7 @@ static int	send_heartbeat(void)
 	zbx_json_init(&j, 128);
 	zbx_json_addstring(&j, "request", ZBX_PROTO_VALUE_PROXY_HEARTBEAT, ZBX_JSON_TYPE_STRING);
 	zbx_json_addstring(&j, "host", CONFIG_HOSTNAME, ZBX_JSON_TYPE_STRING);
+	zbx_json_addstring(&j, ZBX_PROTO_TAG_VERSION, ZABBIX_VERSION, ZBX_JSON_TYPE_STRING);
 
 	if (FAIL == connect_to_server(&sock, CONFIG_HEARTBEAT_FREQUENCY, 0)) /* do not retry */
 		return FAIL;
@@ -94,9 +95,10 @@ ZBX_THREAD_ENTRY(heart_thread, args)
 
 	zbx_setproctitle("%s [sending heartbeat message]", get_process_type_string(process_type));
 
-	for (;;)
+	while (ZBX_IS_RUNNING())
 	{
-		zbx_handle_log();
+		sec = zbx_time();
+		zbx_update_env(sec);
 
 		if (0 != sleeptime)
 		{
@@ -107,7 +109,6 @@ ZBX_THREAD_ENTRY(heart_thread, args)
 		}
 
 		start = time(NULL);
-		sec = zbx_time();
 		res = send_heartbeat();
 		total_sec += zbx_time() - sec;
 
@@ -139,5 +140,9 @@ ZBX_THREAD_ENTRY(heart_thread, args)
 		zbx_sleep_loop(sleeptime);
 	}
 
+	zbx_setproctitle("%s #%d [terminated]", get_process_type_string(process_type), process_num);
+
+	while (1)
+		zbx_sleep(SEC_PER_MIN);
 #undef STAT_INTERVAL
 }

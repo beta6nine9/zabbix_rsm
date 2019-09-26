@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -71,7 +71,7 @@ var CViewSwitcher = Class.create({
 		// enable previously disabled dropdown items
 		if (this.disableDDItems && this.disableDDItems[this.lastValue]) {
 			for (var DDi in this.disableDDItems[this.lastValue]) {
-				jQuery('#' + DDi).find('option').attr('disabled', false);
+				jQuery('#' + DDi).find('option').prop('disabled', false);
 			}
 		}
 
@@ -80,11 +80,11 @@ var CViewSwitcher = Class.create({
 			for (var DDi in this.disableDDItems[myValue]) {
 				var DD = jQuery('#' + DDi);
 				for (var Oi in this.disableDDItems[myValue][DDi]) {
-					DD.find('[value='+this.disableDDItems[myValue][DDi][Oi]+']').attr('disabled', true);
+					DD.find('[value='+this.disableDDItems[myValue][DDi][Oi]+']').prop('disabled', true);
 				}
 				// if selected option unavailable set to first available
-				if (DD.find('option:selected').attr('disabled')) {
-					DD.find('option:not(:disabled):first').attr('selected', true);
+				if (DD.find('option:selected').prop('disabled')) {
+					DD.find('option:not(:disabled):first').prop('selected', true);
 					DD.trigger(this.objAction);
 				}
 			}
@@ -132,7 +132,7 @@ var CViewSwitcher = Class.create({
 				return (obj.selectedIndex > -1) ? obj.options[obj.selectedIndex].value : null;
 
 			case 'INPUT':
-				if (obj.getAttribute('type') === 'CHECKBOX') {
+				if (obj.getAttribute('type').toUpperCase() === 'CHECKBOX') {
 					return obj.checked ? obj.value : null;
 				}
 
@@ -351,10 +351,16 @@ ActionProcessor.prototype = {
 					this.actionToggle(action.value, !this.checkConditions(action.cond));
 					break;
 				case 'enable':
-					jQuery(action.value).prop('disabled', !this.checkConditions(action.cond));
+					jQuery(action.value)
+						.prop('disabled', !this.checkConditions(action.cond))
+						.closest('.input-color-picker')
+						.toggleClass('disabled', !this.checkConditions(action.cond));
 					break;
 				case 'disable':
-					jQuery(action.value).prop('disabled', this.checkConditions(action.cond));
+					jQuery(action.value)
+						.prop('disabled', this.checkConditions(action.cond))
+						.closest('.input-color-picker')
+						.toggleClass('disabled', this.checkConditions(action.cond));
 					break;
 			}
 		}

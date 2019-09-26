@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -19,19 +19,29 @@
 **/
 
 
-if (CWebUser::getType() == USER_TYPE_SUPER_ADMIN) {
-	$create_button = new CSubmit('form', _('Create host group'));
-}
-else {
-	$create_button = (new CSubmit('form', _('Create host group').' '._('(Only super admins can create groups)')))
-		->setEnabled(false);
-}
-
 $widget = (new CWidget())
 	->setTitle(_('Host groups'))
-	->setControls((new CForm('get'))
-		->cleanItems()
-		->addItem((new CList())->addItem($create_button))
+	->setControls((new CTag('nav', true, (new CList())
+			->addItem(CWebUser::getType() == USER_TYPE_SUPER_ADMIN
+				? new CRedirectButton(_('Create host group'), (new CUrl('hostgroups.php'))
+					->setArgument('form', 'create')
+					->getUrl()
+				)
+				: (new CSubmit('form', _('Create host group').' '._('(Only super admins can create groups)')))
+					->setEnabled(false)
+			)
+		))->setAttribute('aria-label', _('Content controls'))
+	)
+	->addItem((new CFilter(new CUrl('hostgroups.php')))
+		->setProfile($data['profileIdx'])
+		->setActiveTab($data['active_tab'])
+		->addFilterTab(_('Filter'), [
+			(new CFormList())->addRow(_('Name'),
+				(new CTextBox('filter_name', $data['filter']['name']))
+					->setWidth(ZBX_TEXTAREA_FILTER_STANDARD_WIDTH)
+					->setAttribute('autofocus', 'autofocus')
+			)
+		])
 	);
 
 // create form
@@ -116,11 +126,9 @@ foreach ($this->data['groups'] as $group) {
 	$name[] = new CLink($group['name'], 'hostgroups.php?form=update&groupid='.$group['groupid']);
 
 	// info, discovered item lifetime indicator
+	$info_icons = [];
 	if ($group['flags'] == ZBX_FLAG_DISCOVERY_CREATED && $group['groupDiscovery']['ts_delete'] != 0) {
-		$info = getHostGroupLifetimeIndicator($current_time, $group['groupDiscovery']['ts_delete']);
-	}
-	else {
-		$info = '';
+		$info_icons[] = getHostGroupLifetimeIndicator($current_time, $group['groupDiscovery']['ts_delete']);
 	}
 
 	$hostGroupTable->addRow([
@@ -132,7 +140,7 @@ foreach ($this->data['groups'] as $group) {
 			CViewHelper::showNum($templateCount)
 		],
 		empty($hostsOutput) ? '' : $hostsOutput,
-		$info
+		makeInformationList($info_icons)
 	]);
 }
 

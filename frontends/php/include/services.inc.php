@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -215,7 +215,10 @@ function createServiceMonitoringTree(array $services, array $slaData, $period, &
 				$caption,
 				' - ',
 				new CLink($trigger['description'],
-					'events.php?filter_set=1&source='.EVENT_SOURCE_TRIGGERS.'&triggerid='.$trigger['triggerid']
+					(new CUrl('zabbix.php'))
+						->setArgument('action', 'problem.view')
+						->setArgument('filter_triggerids[]', $trigger['triggerid'])
+						->setArgument('filter_set', '1')
 				)
 			];
 		}
@@ -227,7 +230,10 @@ function createServiceMonitoringTree(array $services, array $slaData, $period, &
 				$reason[] = ', ';
 			}
 			$reason[] = new CLink($problemTrigger['description'],
-				'events.php?filter_set=1&source='.EVENT_SOURCE_TRIGGERS.'&triggerid='.$problemTrigger['triggerid']
+				(new CUrl('zabbix.php'))
+					->setArgument('action', 'problem.view')
+					->setArgument('filter_triggerids[]', $problemTrigger['triggerid'])
+					->setArgument('filter_set', '1')
 			);
 		}
 
@@ -261,7 +267,7 @@ function createServiceMonitoringTree(array $services, array $slaData, $period, &
 				], 'srv_status.php?serviceid='.$service['serviceid'].'&showgraph=1'.url_param('path'))
 			))
 				->addClass(ZBX_STYLE_PROGRESS_BAR_CONTAINER)
-				->setAttribute('title', _s('Only the last 20%% of the indicator is displayed.'));
+				->setTitle(_s('Only the last 20%% of the indicator is displayed.'));
 
 			$sla2 = (new CSpan(sprintf('%.4f', $sla_bad)))
 				->addClass($service['goodsla'] > $sla_good ? ZBX_STYLE_RED : ZBX_STYLE_GREEN);
@@ -304,7 +310,7 @@ function createServiceMonitoringTree(array $services, array $slaData, $period, &
 }
 
 /**
- * Calculates the current IT service status based on it's child services.
+ * Calculates the current service status based on it's child services.
  *
  * The new statuses are written to the $services array in the "newStatus" property.
  *
@@ -374,7 +380,7 @@ function calculateItServiceStatusByTrigger($triggerStatus, $triggerValue, $trigg
 }
 
 /**
- * Updates the status of all IT services
+ * Updates the status of all services
  */
 function updateItServices() {
 	$servicesLinks = [];
@@ -468,8 +474,6 @@ function updateItServices() {
  * @throws APIException if the given service time is invalid
  *
  * @param array $serviceTime
- *
- * @return void
  */
 function checkServiceTime(array $serviceTime) {
 	// type validation
@@ -504,4 +508,37 @@ function checkServiceTime(array $serviceTime) {
 	if ($serviceTime['ts_from'] >= $serviceTime['ts_to']) {
 		throw new APIException(ZBX_API_ERROR_PARAMETERS, _('Service start time must be less than end time.'));
 	}
+}
+
+/**
+ * Method to sort list of Services by 'sortorder' field and then by 'name' field if more entries has same 'sortorder'
+ * value. Separate method is needed because entries make multilevel hierarchy and branches also must be sorted according
+ * fields 'sortorder' and 'name'.
+ *
+ * @param array $services
+ *
+ * @return void
+ */
+function sortServices(array &$services) {
+	$sort_options = [
+		['field' => 'sortorder', 'order' => ZBX_SORT_UP],
+		['field' => 'name', 'order' => ZBX_SORT_UP]
+	];
+
+	// Sort first level entries.
+	CArrayHelper::sort($services, $sort_options);
+
+	// Sort dependencies.
+	foreach ($services as &$service) {
+		if ($service['dependencies']) {
+			foreach ($service['dependencies'] as &$dependent_item) {
+				$dependent_item['name'] = $services[$dependent_item['serviceid']]['name'];
+				$dependent_item['sortorder'] = $services[$dependent_item['serviceid']]['sortorder'];
+			}
+			unset($dependent_item);
+
+			CArrayHelper::sort($service['dependencies'], $sort_options);
+		}
+	}
+	unset($service);
 }

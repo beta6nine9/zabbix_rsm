@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -18,9 +18,9 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-require_once dirname(__FILE__).'/../include/class.cwebtest.php';
+require_once dirname(__FILE__).'/../include/CLegacyWebTest.php';
 
-class testUrlUserPermissions extends CWebTest {
+class testUrlUserPermissions extends CLegacyWebTest {
 
 	public static function data() {
 		return [
@@ -28,7 +28,7 @@ class testUrlUserPermissions extends CWebTest {
 			[[
 				'url' => 'zabbix.php?action=dashboard.view',
 				'title' =>	'Dashboard',
-				'header' =>	'Dashboard',
+				'header' =>	'Global view',
 				'users' => [
 					'guest' => true,
 					'user-zabbix' => true,
@@ -36,9 +36,9 @@ class testUrlUserPermissions extends CWebTest {
 				]
 			]],
 			[[
-				'url' => 'dashconf.php',
-				'title' =>	'Dashboard configuration',
-				'header' =>	'Dashboard',
+				'url' => 'zabbix.php?action=problem.view',
+				'title' =>	'Problems',
+				'header' =>	'Problems',
 				'users' => [
 					'guest' => true,
 					'user-zabbix' => true,
@@ -106,26 +106,6 @@ class testUrlUserPermissions extends CWebTest {
 				]
 			]],
 			[[
-				'url' => 'tr_status.php',
-				'title' =>	'Status of triggers [refreshed every 30 sec.]',
-				'header' =>	'Status of triggers',
-				'users' => [
-					'guest' => true,
-					'user-zabbix' => true,
-					'admin-zabbix' => true
-				]
-			]],
-			[[
-				'url' => 'events.php',
-				'title' =>	'Latest events [refreshed every 30 sec.]',
-				'header' =>	'Events',
-				'users' => [
-					'guest' => true,
-					'user-zabbix' => true,
-					'admin-zabbix' => true
-				]
-			]],
-			[[
 				'url' => 'charts.php',
 				'title' =>	'Custom graphs [refreshed every 30 sec.]',
 				'header' =>	'Graphs',
@@ -176,7 +156,7 @@ class testUrlUserPermissions extends CWebTest {
 				]
 			]],
 			[[
-				'url' => 'screens.php?elementid=200009',
+				'url' => 'screens.php?elementid=200000',
 				'title' =>	'Custom screens [refreshed every 30 sec.]',
 				'no_permissions_to_object' => true,
 				'users' => [
@@ -235,8 +215,8 @@ class testUrlUserPermissions extends CWebTest {
 			]],
 			[[
 				'url' => 'srv_status.php',
-				'title' =>	'IT services [refreshed every 30 sec.]',
-				'header' =>	'IT services',
+				'title' =>	'Services [refreshed every 30 sec.]',
+				'header' =>	'Services',
 				'users' => [
 					'guest' => true,
 					'user-zabbix' => true,
@@ -267,7 +247,7 @@ class testUrlUserPermissions extends CWebTest {
 			// Reports
 			[[
 				'url' => 'zabbix.php?action=report.status',
-				'title' =>	'Status of Zabbix',
+				'title' =>	'System information',
 				'users' => [
 					'guest' => false,
 					'user-zabbix' => false,
@@ -514,6 +494,25 @@ class testUrlUserPermissions extends CWebTest {
 				]
 			]],
 			[[
+				'url' => 'correlation.php',
+				'title' =>	'Event correlation rules',
+				'header' => 'Event correlation',
+				'users' => [
+					'guest' => false,
+					'user-zabbix' => false,
+					'admin-zabbix' => false
+				]
+			]],
+			[[
+				'url' => 'correlation.php?form=Create+correlation',
+				'title' =>	'Event correlation rules',
+				'users' => [
+					'guest' => false,
+					'user-zabbix' => false,
+					'admin-zabbix' => false
+				]
+			]],
+			[[
 				'url' => 'discoveryconf.php',
 				'title' =>	'Configuration of discovery rules',
 				'header' => 'Discovery rules',
@@ -525,8 +524,8 @@ class testUrlUserPermissions extends CWebTest {
 			]],
 			[[
 				'url' => 'services.php',
-				'title' =>	'Configuration of IT services',
-				'header' => 'IT services',
+				'title' =>	'Configuration of services',
+				'header' => 'Services',
 				'users' => [
 					'guest' => false,
 					'user-zabbix' => false,
@@ -643,8 +642,8 @@ class testUrlUserPermissions extends CWebTest {
 				]
 			]],
 			[[
-				'url' => 'authentication.php',
-				'title' =>	'Configuration of authentication',
+				'url' => 'zabbix.php?action=authentication.edit',
+				'title' =>	'Authentication',
 				'users' => [
 					'guest' => false,
 					'user-zabbix' => false,
@@ -661,7 +660,7 @@ class testUrlUserPermissions extends CWebTest {
 				]
 			]],
 			[[
-				'url' => 'users.php',
+				'url' => 'zabbix.php?action=user.list',
 				'title' =>	'Configuration of users',
 				'users' => [
 					'guest' => false,
@@ -698,7 +697,7 @@ class testUrlUserPermissions extends CWebTest {
 			]],
 			// Misc
 			[[
-				'url' => 'search.php?search=server',
+				'url' => 'zabbix.php?action=search&search=server',
 				'title' =>	'Search',
 				'header' => 'Search: server',
 				'users' => [
@@ -708,7 +707,7 @@ class testUrlUserPermissions extends CWebTest {
 				]
 			]],
 			[[
-				'url' => 'profile.php',
+				'url' => 'zabbix.php?action=userprofile.edit',
 				'title' =>	'User profile',
 				'header' => 'User profile: ',
 				'users' => [
@@ -745,30 +744,26 @@ class testUrlUserPermissions extends CWebTest {
 			if ($user && !array_key_exists('no_permissions_to_object', $data)) {
 				$this->zbxTestOpen($data['url']);
 				$this->zbxTestCheckTitle($data['title']);
-				if ($data['url'] == 'profile.php') {
+				if ($data['url'] === 'zabbix.php?action=userprofile.edit') {
 					$this->zbxTestCheckHeader($data['header'].$alias);
 				}
 				else {
 					$this->zbxTestCheckHeader($data['header']);
 				}
-				$this->zbxTestCheckFatalErrors();
-				$this->webDriver->manage()->deleteAllcookies();
 			}
 			elseif ($user && array_key_exists('no_permissions_to_object', $data) ) {
 				$this->zbxTestOpen($data['url']);
 				$this->zbxTestCheckTitle($data['title']);
 				$this->zbxTestWaitUntilMessageTextPresent('msg-bad', 'No permissions to referred object or it does not exist!');
-				$this->zbxTestCheckFatalErrors();
-				$this->webDriver->manage()->deleteAllcookies();
 			}
 			else {
 				$this->zbxTestOpen($data['url']);
 				$this->zbxTestWaitUntilMessageTextPresent('msg-bad', 'Access denied');
 				$this->zbxTestAssertElementText("//ul/li[1]", 'You are logged in as "'.$alias.'". You have no permissions to access this page.');
 				$this->zbxTestAssertElementText("//ul/li[2]", 'If you think this message is wrong, please consult your administrators about getting the necessary permissions.');
-				$this->zbxTestCheckFatalErrors();
-				$this->webDriver->manage()->deleteAllcookies();
 			}
+
+			$this->webDriver->manage()->deleteAllCookies();
 		}
 	}
 

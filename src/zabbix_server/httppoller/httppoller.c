@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -37,16 +37,12 @@ extern int		server_num, process_num;
  *                                                                            *
  * Purpose: calculate when we have to process earliest httptest               *
  *                                                                            *
- * Parameters: now - current timestamp (not used)                             *
- *                                                                            *
  * Return value: timestamp of earliest check or -1 if not found               *
  *                                                                            *
  * Author: Alexei Vladishev                                                   *
  *                                                                            *
- * Comments:                                                                  *
- *                                                                            *
  ******************************************************************************/
-static int	get_minnextcheck(int now)
+static int	get_minnextcheck(void)
 {
 	DB_RESULT	result;
 	DB_ROW		row;
@@ -115,9 +111,10 @@ ZBX_THREAD_ENTRY(httppoller_thread, args)
 
 	DBconnect(ZBX_DB_CONNECT_NORMAL);
 
-	for (;;)
+	while (ZBX_IS_RUNNING())
 	{
-		zbx_handle_log();
+		sec = zbx_time();
+		zbx_update_env(sec);
 
 		if (0 != sleeptime)
 		{
@@ -127,11 +124,10 @@ ZBX_THREAD_ENTRY(httppoller_thread, args)
 		}
 
 		now = time(NULL);
-		sec = zbx_time();
 		httptests_count += process_httptests(process_num, now);
 		total_sec += zbx_time() - sec;
 
-		nextcheck = get_minnextcheck(now);
+		nextcheck = get_minnextcheck();
 		sleeptime = calculate_sleeptime(nextcheck, POLLER_DELAY);
 
 		if (0 != sleeptime || STAT_INTERVAL <= time(NULL) - last_stat_time)
@@ -158,5 +154,9 @@ ZBX_THREAD_ENTRY(httppoller_thread, args)
 		zbx_sleep_loop(sleeptime);
 	}
 
+	zbx_setproctitle("%s #%d [terminated]", get_process_type_string(process_type), process_num);
+
+	while (1)
+		zbx_sleep(SEC_PER_MIN);
 #undef STAT_INTERVAL
 }

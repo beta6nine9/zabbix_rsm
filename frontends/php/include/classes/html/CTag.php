@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -45,6 +45,13 @@ class CTag extends CObject {
 	 */
 	protected $attrEncStrategy = self::ENC_ALL;
 
+	/**
+	 * Hint element for the current CTag.
+	 *
+	 * @var CSpan
+	 */
+	protected $hint = null;
+
 	public function __construct($tagname, $paired = false, $body = null) {
 		parent::__construct();
 
@@ -58,7 +65,7 @@ class CTag extends CObject {
 	}
 
 	// do not put new line symbol (\n) before or after html tags, it adds spaces in unwanted places
-	public function startToString() {
+	protected function startToString() {
 		$res = '<'.$this->tagname;
 		foreach ($this->attributes as $key => $value) {
 			if ($value === null) {
@@ -76,11 +83,11 @@ class CTag extends CObject {
 		return $res;
 	}
 
-	public function bodyToString() {
+	protected function bodyToString() {
 		return parent::toString(false);
 	}
 
-	public function endToString() {
+	protected function endToString() {
 		$res = ($this->paired) ? '</'.$this->tagname.'>' : '';
 
 		return $res;
@@ -90,6 +97,11 @@ class CTag extends CObject {
 		$res = $this->startToString();
 		$res .= $this->bodyToString();
 		$res .= $this->endToString();
+
+		if ($this->hint !== null) {
+			$res .= $this->hint->toString();
+		}
+
 		if ($destroy) {
 			$this->destroy();
 		}
@@ -169,22 +181,20 @@ class CTag extends CObject {
 	 * @return CTag
 	 */
 	public function setHint($text, $span_class = '', $freeze_on_click = true, $styles = '') {
-		$id = uniqid('hintbox_');
+		$this->hint = (new CDiv($text))
+			->addClass('hint-box')
+			->setAttribute('style', 'display: none;');
 
-		$this->addItem(
-			(new CSpan(
-				(new CSpan($text))->setId($id)
-			))->setAttribute('style', 'display: none;')
-		);
+		$this->setAttribute('data-hintbox', '1');
 
-		$this->onMouseover(
-			'hintBox.HintWraper(event, this, jQuery("#'.$id.'").html(), "'.$span_class.'", "'.$styles.'");'
-		);
-
+		if ($span_class !== '') {
+			$this->setAttribute('data-hintbox-class', $span_class);
+		}
+		if ($styles !== '') {
+			$this->setAttribute('data-hintbox-style', $styles);
+		}
 		if ($freeze_on_click) {
-			$this->onClick(
-				'hintBox.showStaticHint(event, this, jQuery("#'.$id.'").html(), "'.$span_class.'", false, "'.$styles.'");'
-			);
+			$this->setAttribute('data-hintbox-static', '1');
 		}
 
 		return $this;
@@ -217,6 +227,11 @@ class CTag extends CObject {
 
 	public function onMouseout($script) {
 		$this->addAction('onmouseout', $script);
+		return $this;
+	}
+
+	public function onKeyup($script) {
+		$this->addAction('onkeyup', $script);
 		return $this;
 	}
 
@@ -259,6 +274,17 @@ class CTag extends CObject {
 	}
 
 	/**
+	 * Remove ID attribute from tag.
+	 *
+	 * @return CTag
+	 */
+	public function removeId() {
+		$this->removeAttribute('id');
+
+		return $this;
+	}
+
+	/**
 	 * Sanitizes a string according to the given strategy before outputting it to the browser.
 	 *
 	 * @param string	$value
@@ -290,5 +316,23 @@ class CTag extends CObject {
 	 */
 	public function getEncStrategy() {
 		return $this->encStrategy;
+	}
+
+	/**
+	 * Set or reset element 'aria-required' attribute.
+	 *
+	 * @param bool $is_required  Define aria-required attribute for element.
+	 *
+	 * @return CTag
+	 */
+	public function setAriaRequired($is_required = true) {
+		if ($is_required) {
+			$this->setAttribute('aria-required', 'true');
+		}
+		else {
+			$this->removeAttribute('aria-required');
+		}
+
+		return $this;
 	}
 }

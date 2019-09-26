@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -26,9 +26,9 @@
 class CFrontendSetup {
 
 	const MIN_PHP_VERSION = '5.4.0';
-	const MIN_PHP_MEMORY_LIMIT = 134217728; // 128*1024*1024
-	const MIN_PHP_POST_MAX_SIZE = 16777216; // 16*1024*1024
-	const MIN_PHP_UPLOAD_MAX_FILESIZE = 2097152; // 2*1024*1024
+	const MIN_PHP_MEMORY_LIMIT = '134217728'; // 128 * ZBX_MEBIBYTE;
+	const MIN_PHP_POST_MAX_SIZE = '16777216'; // 16 * ZBX_MEBIBYTE;
+	const MIN_PHP_UPLOAD_MAX_FILESIZE = '2097152'; // 2 * ZBX_MEBIBYTE;
 	const MIN_PHP_MAX_EXECUTION_TIME = 300;
 	const MIN_PHP_MAX_INPUT_TIME = 300;
 	const MIN_PHP_GD_VERSION = '2.0';
@@ -80,6 +80,7 @@ class CFrontendSetup {
 		$result[] = $this->checkPhpGd();
 		$result[] = $this->checkPhpGdPng();
 		$result[] = $this->checkPhpGdJpeg();
+		$result[] = $this->checkPhpGdGif();
 		$result[] = $this->checkPhpGdFreeType();
 		$result[] = $this->checkPhpLibxml();
 		$result[] = $this->checkPhpXmlWriter();
@@ -125,7 +126,8 @@ class CFrontendSetup {
 			'current' => $current,
 			'required' => mem2str(self::MIN_PHP_MEMORY_LIMIT),
 			'result' => $check ? self::CHECK_OK : self::CHECK_FATAL,
-			'error' => _s('Minimum required PHP memory limit is %s (configuration option "memory_limit").', mem2str(self::MIN_PHP_MEMORY_LIMIT))
+			'error' => _s('Minimum required PHP memory limit is %s (configuration option "memory_limit").',
+				mem2str(self::MIN_PHP_MEMORY_LIMIT))
 		];
 	}
 
@@ -142,7 +144,8 @@ class CFrontendSetup {
 			'current' => $current,
 			'required' => mem2str(self::MIN_PHP_POST_MAX_SIZE),
 			'result' => (str2mem($current) >= self::MIN_PHP_POST_MAX_SIZE) ? self::CHECK_OK : self::CHECK_FATAL,
-			'error' => _s('Minimum required size of PHP post is %s (configuration option "post_max_size").', mem2str(self::MIN_PHP_POST_MAX_SIZE))
+			'error' => _s('Minimum required size of PHP post is %s (configuration option "post_max_size").',
+				mem2str(self::MIN_PHP_POST_MAX_SIZE))
 		];
 	}
 
@@ -159,7 +162,8 @@ class CFrontendSetup {
 			'current' => $current,
 			'required' => mem2str(self::MIN_PHP_UPLOAD_MAX_FILESIZE),
 			'result' => (str2mem($current) >= self::MIN_PHP_UPLOAD_MAX_FILESIZE) ? self::CHECK_OK : self::CHECK_FATAL,
-			'error' => _s('Minimum required PHP upload filesize is %s (configuration option "upload_max_filesize").', mem2str(self::MIN_PHP_UPLOAD_MAX_FILESIZE))
+			'error' => _s('Minimum required PHP upload filesize is %s (configuration option "upload_max_filesize").',
+				mem2str(self::MIN_PHP_UPLOAD_MAX_FILESIZE))
 		];
 	}
 
@@ -249,7 +253,7 @@ class CFrontendSetup {
 			'current' => empty($current) ? _('off') : new CSpan($current),
 			'required' => null,
 			'result' => $current ? self::CHECK_OK : self::CHECK_FATAL,
-			'error' => _('At least one of MySQL, PostgreSQL, Oracle, SQLite3 or IBM DB2 should be supported.')
+			'error' => _('At least one of MySQL, PostgreSQL, Oracle or IBM DB2 should be supported.')
 		];
 	}
 
@@ -281,11 +285,6 @@ class CFrontendSetup {
 				'db2_connect', 'db2_escape_string', 'db2_execute', 'db2_fetch_assoc', 'db2_free_result', 'db2_prepare',
 				'db2_rollback', 'db2_set_option', 'db2_stmt_errormsg'])) {
 			$allowed_db[ZBX_DB_DB2] = 'IBM DB2';
-		}
-
-		// Semaphore related functions are checked elsewhere. The 'false' is to prevent autoloading of the SQLite3 class.
-		if (class_exists('SQLite3', false) && zbx_is_callable(['ftok', 'sem_acquire', 'sem_get', 'sem_release'])) {
-			$allowed_db[ZBX_DB_SQLITE3] = 'SQLite3';
 		}
 
 		return $allowed_db;
@@ -467,6 +466,23 @@ class CFrontendSetup {
 	}
 
 	/**
+	 * Checks for PHP GD GIF support.
+	 *
+	 * @return array
+	 */
+	public function checkPhpGdGif() {
+		$supported = (is_callable('imagetypes') && imagetypes() & IMG_GIF);
+
+		return [
+			'name' => _('PHP gd GIF support'),
+			'current' => $supported ? _('on') : _('off'),
+			'required' => null,
+			'result' => $supported ? self::CHECK_OK : self::CHECK_WARNING,
+			'error' => _('PHP gd GIF image support missing.')
+		];
+	}
+
+	/**
 	 * Checks for PHP GD FreeType support.
 	 *
 	 * @return array
@@ -552,9 +568,7 @@ class CFrontendSetup {
 	 * @return array
 	 */
 	public function checkPhpLdapModule() {
-		$current = function_exists('ldap_connect') && function_exists('ldap_set_option') && function_exists('ldap_bind')
-				&& function_exists('ldap_search') && function_exists('ldap_get_entries')
-				&& function_exists('ldap_free_result') && function_exists('ldap_start_tls');
+		$current = (new CLdap())->error !== CLdap::ERR_PHP_EXTENSION;
 
 		return [
 			'name' => _('PHP LDAP'),

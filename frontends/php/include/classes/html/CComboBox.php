@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -44,7 +44,7 @@ class CComboBox extends CTag {
 
 	public function addItems(array $items) {
 		foreach ($items as $value => $caption) {
-			$selected = (int) (strcmp($value, $this->value) == 0);
+			$selected = (strcmp($value, $this->value) == 0);
 			parent::addItem(new CComboItem($value, $caption, $selected));
 		}
 		return $this;
@@ -53,7 +53,7 @@ class CComboBox extends CTag {
 	public function addItemsInGroup($label, $items) {
 		$group = new COptGroup($label);
 		foreach ($items as $value => $caption) {
-			$selected = (int) (strcmp($value, $this->value) == 0);
+			$selected = (strcmp($value, $this->value) == 0);
 			$group->addItem(new CComboItem($value, $caption, $selected));
 		}
 		parent::addItem($group);
@@ -66,18 +66,18 @@ class CComboBox extends CTag {
 		}
 		else {
 			if (is_null($selected)) {
-				$selected = 'no';
+				$selected = false;
 				if (is_array($this->value)) {
 					if (str_in_array($value, $this->value)) {
-						$selected = 'yes';
+						$selected = true;
 					}
 				}
 				elseif (strcmp($value, $this->value) == 0) {
-					$selected = 'yes';
+					$selected = true;
 				}
 			}
 			else {
-				$selected = 'yes';
+				$selected = true;
 			}
 
 			$citem = new CComboItem($value, $caption, $selected, $enabled);
@@ -88,6 +88,24 @@ class CComboBox extends CTag {
 
 			parent::addItem($citem);
 		}
+		return $this;
+	}
+
+	/**
+	 * Enable or disable readonly mode for the element.
+	 *
+	 * @param bool $value
+	 *
+	 * @return CComboBox
+	 */
+	public function setReadonly($value) {
+		if ($value) {
+			$this->setAttribute('readonly', 'readonly');
+		}
+		else {
+			$this->removeAttribute('readonly');
+		}
+
 		return $this;
 	}
 
@@ -103,6 +121,19 @@ class CComboBox extends CTag {
 		else {
 			$this->setAttribute('disabled', 'disabled');
 		}
+		return $this;
+	}
+
+	/**
+	 * Set with of the combo box.
+	 *
+	 * @param int $value  Width in pixels of the element.
+	 *
+	 * @return CComboBox
+	 */
+	public function setWidth($value) {
+		$this->addStyle('width: '.$value.'px;');
+
 		return $this;
 	}
 }

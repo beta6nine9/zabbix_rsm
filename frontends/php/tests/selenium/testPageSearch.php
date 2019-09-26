@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -18,14 +18,13 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-require_once dirname(__FILE__).'/../include/class.cwebtest.php';
+require_once dirname(__FILE__).'/../include/CLegacyWebTest.php';
 
-class testPageSearch extends CWebTest {
-
+class testPageSearch extends CLegacyWebTest {
 	public function testPageSearch_FindZabbixServer() {
 		$this->zbxTestLogin('zabbix.php?action=dashboard.view');
 		$this->zbxTestInputTypeWait('search', 'ЗАББИКС Сервер');
-		$this->webDriver->getKeyboard()->pressKey(WebDriverKeys::ENTER);
+		$this->zbxTestClickXpath('//button[@class="btn-search"]');
 		$this->zbxTestCheckTitle('Search');
 		$this->zbxTestCheckHeader('Search: ЗАББИКС Сервер');
 		$this->zbxTestTextPresent(['Hosts', 'Host groups', 'Templates']);
@@ -34,18 +33,36 @@ class testPageSearch extends CWebTest {
 		$this->zbxTestTextPresent('ЗАББИКС Сервер');
 		$this->zbxTestTextNotPresent('Zabbix server');
 		$this->zbxTestTextPresent('127.0.0.1');
-		$this->zbxTestTextPresent(['Latest data', 'Triggers', 'Applications', 'Items', 'Triggers', 'Graphs', 'Events']);
+		$this->zbxTestTextPresent(['Latest data', 'Triggers', 'Applications', 'Items', 'Triggers', 'Graphs', 'Problems']);
 	}
 
-	public function testPageSearch_FindNone() {
+	public function testPageSearch_FindNotExistingHost() {
 		$this->zbxTestLogin('zabbix.php?action=dashboard.view');
-		$this->zbxTestInputTypeWait('search', ' ');
-		$this->webDriver->getKeyboard()->pressKey(WebDriverKeys::ENTER);
+		$this->zbxTestInputTypeWait('search', 'Not existing host');
+		$this->zbxTestClickXpath('//button[@class="btn-search"]');
 		$this->zbxTestCheckTitle('Search');
-		$this->zbxTestCheckHeader('Search: Search pattern is empty');
+		$this->zbxTestCheckHeader('Search: Not existing host');
 		$this->zbxTestTextPresent('Displaying 0 of 0 found');
 		$this->zbxTestTextPresent('No data found.');
 		$this->zbxTestTextNotPresent('Zabbix server');
 	}
 
+	/**
+	 * Test if the global search form is not being submitted with empty search string.
+	 */
+	public function testPageSearch_FindEmptyString() {
+		$this->zbxTestLogin('zabbix.php?action=dashboard.view');
+
+		// Do not search if the search field is empty.
+		$this->zbxTestInputTypeWait('search', '');
+		$this->zbxTestClickXpath('//button[@class="btn-search"]');
+		$this->zbxTestCheckTitle('Dashboard');
+		$this->zbxTestCheckHeader('Global view');
+
+		// Do not search if search string consists only of whitespace characters.
+		$this->zbxTestInputTypeWait('search', '   ');
+		$this->zbxTestClickXpath('//button[@class="btn-search"]');
+		$this->zbxTestCheckTitle('Dashboard');
+		$this->zbxTestCheckHeader('Global view');
+	}
 }

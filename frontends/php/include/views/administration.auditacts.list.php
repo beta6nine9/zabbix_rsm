@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -21,20 +21,31 @@
 $auditWidget = (new CWidget())->setTitle(_('Action log'));
 
 // create filter
-$filterForm = new CFilter('web.auditacts.filter.state');
-
 $filterColumn = new CFormList();
 $filterColumn->addRow(_('Recipient'), [
-	(new CTextBox('alias', $this->data['alias']))->setWidth(ZBX_TEXTAREA_FILTER_STANDARD_WIDTH),
+	(new CTextBox('alias', $this->data['alias']))
+		->setWidth(ZBX_TEXTAREA_FILTER_STANDARD_WIDTH)
+		->setAttribute('autofocus', 'autofocus'),
 	(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
 	(new CButton('btn1', _('Select')))
 		->addClass(ZBX_STYLE_BTN_GREY)
-		->onClick('return PopUp("popup.php?dstfrm=zbx_filter&dstfld1=alias&srctbl=users&srcfld1=alias");')
+		->onClick('return PopUp("popup.generic",'.
+			CJs::encodeJson([
+				'srctbl' => 'users',
+				'srcfld1' => 'alias',
+				'dstfrm' => 'zbx_filter',
+				'dstfld1' => 'alias'
+			]).', null, this);'
+		)
 ]);
 
-$filterForm->addColumn($filterColumn);
-$filterForm->addNavigator();
-$auditWidget->addItem($filterForm);
+$auditWidget->addItem(
+	(new CFilter(new CUrl('auditacts.php')))
+		->setProfile($data['timeline']['profileIdx'])
+		->setActiveTab($data['active_tab'])
+		->addTimeSelector($data['timeline']['from'], $data['timeline']['to'])
+		->addFilterTab(_('Filter'), [$filterColumn])
+);
 
 // create form
 $auditForm = (new CForm('get'))->setName('auditForm');
@@ -45,7 +56,7 @@ $auditTable = (new CTableInfo())
 		_('Time'),
 		_('Action'),
 		_('Type'),
-		_('Recipient(s)'),
+		_('Recipient'),
 		_('Message'),
 		_('Status'),
 		_('Info')
@@ -59,15 +70,15 @@ foreach ($this->data['alerts'] as $alert) {
 			? (new CSpan(_('Sent')))->addClass(ZBX_STYLE_GREEN)
 			: (new CSpan(_('Executed')))->addClass(ZBX_STYLE_GREEN);
 	}
-	elseif ($alert['status'] == ALERT_STATUS_NOT_SENT) {
+	elseif ($alert['status'] == ALERT_STATUS_NOT_SENT || $alert['status'] == ALERT_STATUS_NEW) {
 		$status = (new CSpan([
 			_('In progress').':',
 			BR(),
-			_n('%1$s retry left', '%1$s retries left', ALERT_MAX_RETRIES - $alert['retries']),
+			_n('%1$s retry left', '%1$s retries left', $mediatype['maxattempts'] - $alert['retries']),
 		]))->addClass(ZBX_STYLE_YELLOW);
 	}
 	else {
-		$status = (new CSpan(_('Not sent')))->addClass(ZBX_STYLE_RED);
+		$status = (new CSpan(_('Failed')))->addClass(ZBX_STYLE_RED);
 	}
 
 	$message = ($alert['alerttype'] == ALERT_TYPE_MESSAGE)
@@ -87,25 +98,23 @@ foreach ($this->data['alerts'] as $alert) {
 			zbx_nl2br($alert['message'])
 		];
 
-	if (zbx_empty($alert['error'])) {
-		$info = '';
-	}
-	else {
-		$info = makeErrorIcon($alert['error']);
+	$info_icons = [];
+	if ($alert['error'] !== '') {
+		$info_icons[] = makeErrorIcon($alert['error']);
 	}
 
 	$recipient = (isset($alert['userid']) && $alert['userid'])
-		? [bold(getUserFullname($this->data['users'][$alert['userid']])), BR(), $alert['sendto']]
-		: $alert['sendto'];
+		? makeEventDetailsTableUser($alert + ['action_type' => ZBX_EVENT_HISTORY_ALERT], $data['users'])
+		: zbx_nl2br($alert['sendto']);
 
 	$auditTable->addRow([
 		zbx_date2str(DATE_TIME_FORMAT_SECONDS, $alert['clock']),
 		$this->data['actions'][$alert['actionid']]['name'],
-		($mediatype) ? $mediatype['description'] : '',
+		($mediatype) ? $mediatype['name'] : '',
 		$recipient,
 		$message,
 		$status,
-		$info
+		makeInformationList($info_icons)
 	]);
 }
 
@@ -118,11 +127,8 @@ $objData = [
 	'domid' => 'events',
 	'loadSBox' => 0,
 	'loadImage' => 0,
-	'loadScroll' => 1,
 	'dynamic' => 0,
-	'mainObject' => 1,
-	'periodFixed' => CProfile::get('web.auditacts.timelinefixed', 1),
-	'sliderMaximumTimePeriod' => ZBX_MAX_PERIOD
+	'mainObject' => 1
 ];
 zbx_add_post_js('timeControl.addObject("events", '.zbx_jsvalue($data['timeline']).', '.zbx_jsvalue($objData).');');
 zbx_add_post_js('timeControl.processObjects();');

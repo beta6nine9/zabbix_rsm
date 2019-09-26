@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -54,6 +54,7 @@ class CMacroParser extends CParser {
 	 * Array of strings to search for.
 	 *
 	 * @param array $macros		the list of macros, for example ['{ITEM.VALUE}', '{HOST.HOST}']
+	 * @param array $options
 	 */
 	public function __construct(array $macros, array $options = []) {
 		$this->set_parser = new CSetParser(array_map(function($macro) { return substr($macro, 1, -1); }, $macros));

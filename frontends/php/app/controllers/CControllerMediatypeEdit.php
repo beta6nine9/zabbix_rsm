@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -31,7 +31,7 @@ class CControllerMediatypeEdit extends CController {
 		$fields = [
 			'mediatypeid' =>			'db media_type.mediatypeid',
 			'type' =>					'db media_type.type|in '.implode(',', array_keys(media_type2str())),
-			'description' =>			'db media_type.description',
+			'name' =>					'db media_type.name',
 			'smtp_server' =>			'db media_type.smtp_server',
 			'smtp_port' =>				'db media_type.smtp_port',
 			'smtp_helo' =>				'db media_type.smtp_helo',
@@ -41,18 +41,29 @@ class CControllerMediatypeEdit extends CController {
 			'smtp_verify_host' =>		'db media_type.smtp_verify_host|in 0,1',
 			'smtp_authentication' =>	'db media_type.smtp_authentication|in '.SMTP_AUTHENTICATION_NONE.','.SMTP_AUTHENTICATION_NORMAL,
 			'exec_path' =>				'db media_type.exec_path',
-			'eztext_limit' =>			'in '.EZ_TEXTING_LIMIT_USA.','.EZ_TEXTING_LIMIT_CANADA,
-			'exec_params' =>			'array media_type.exec_params',
-			'exec_params_count' =>		'int32',
+			'exec_params' =>			'array',
 			'gsm_modem' =>				'db media_type.gsm_modem',
-			'jabber_username' =>		'db media_type.username',
-			'eztext_username' =>		'db media_type.username',
 			'smtp_username' =>			'db media_type.username',
 			'passwd' =>					'db media_type.passwd',
-			'status' =>					'db media_type.status|in '.MEDIA_TYPE_STATUS_ACTIVE.','.MEDIA_TYPE_STATUS_DISABLED
+			'status' =>					'db media_type.status|in '.MEDIA_TYPE_STATUS_ACTIVE.','.MEDIA_TYPE_STATUS_DISABLED,
+			'maxsessions' =>			'db media_type.maxsessions',
+			'maxattempts' =>			'db media_type.maxattempts',
+			'attempt_interval' =>		'db media_type.attempt_interval',
+			'form_refresh' =>			'int32',
+			'content_type' =>			'db media_type.content_type|in '.SMTP_MESSAGE_FORMAT_PLAIN_TEXT.','.SMTP_MESSAGE_FORMAT_HTML
 		];
 
 		$ret = $this->validateInput($fields);
+
+		if ($ret && $this->hasInput('exec_params')) {
+			foreach ($this->getInput('exec_params') as $exec_param) {
+				if (count($exec_param) != 1
+						|| !array_key_exists('exec_param', $exec_param) || !is_string($exec_param['exec_param'])) {
+					$ret = false;
+					break;
+				}
+			}
+		}
 
 		if (!$ret) {
 			$this->setResponse(new CControllerResponseFatal());
@@ -68,9 +79,10 @@ class CControllerMediatypeEdit extends CController {
 
 		if ($this->hasInput('mediatypeid')) {
 			$mediatypes = API::Mediatype()->get([
-				'output' => ['mediatypeid', 'type', 'description', 'smtp_server', 'smtp_port', 'smtp_helo',
-					'smtp_email', 'exec_path', 'gsm_modem', 'username', 'passwd', 'status', 'smtp_security',
-					'smtp_verify_peer', 'smtp_verify_host', 'smtp_authentication', 'exec_params'
+				'output' => ['mediatypeid', 'type', 'name', 'smtp_server', 'smtp_port', 'smtp_helo', 'smtp_email',
+					'exec_path', 'gsm_modem', 'username', 'passwd', 'status', 'smtp_security', 'smtp_verify_peer',
+					'smtp_verify_host', 'smtp_authentication', 'exec_params', 'maxsessions', 'maxattempts',
+					'attempt_interval', 'content_type'
 				],
 				'mediatypeids' => $this->getInput('mediatypeid'),
 				'editable' => true
@@ -88,36 +100,39 @@ class CControllerMediatypeEdit extends CController {
 
 	protected function doAction() {
 		// default values
+		$db_defaults = DB::getDefaults('media_type');
 		$data = [
 			'sid' => $this->getUserSID(),
 			'mediatypeid' => 0,
 			'type' => MEDIA_TYPE_EMAIL,
-			'description' => '',
-			'smtp_server' => 'localhost',
-			'smtp_port' => '25',
-			'smtp_helo' => 'localhost',
-			'smtp_email' => 'zabbix@localhost',
-			'smtp_security' => '0',
-			'smtp_verify_peer' => '0',
-			'smtp_verify_host' => '0',
-			'smtp_authentication' => '0',
+			'name' => '',
+			'smtp_server' => 'mail.example.com',
+			'smtp_port' => $db_defaults['smtp_port'],
+			'smtp_helo' => 'example.com',
+			'smtp_email' => 'zabbix@example.com',
+			'smtp_security' => $db_defaults['smtp_security'],
+			'smtp_verify_peer' => $db_defaults['smtp_verify_peer'],
+			'smtp_verify_host' => $db_defaults['smtp_verify_host'],
+			'smtp_authentication' => $db_defaults['smtp_authentication'],
 			'exec_params' => [],
-			'exec_params_count' => '0',
 			'exec_path' => '',
 			'gsm_modem' => '/dev/ttyS0',
-			'jabber_username' => 'user@server',
-			'eztext_username' => '',
-			'eztext_limit' => EZ_TEXTING_LIMIT_USA,
 			'smtp_username' => '',
 			'passwd' => '',
-			'status' => MEDIA_TYPE_STATUS_ACTIVE
+			'status' => MEDIA_TYPE_STATUS_ACTIVE,
+			'change_passwd' => true,
+			'maxsessions' => $db_defaults['maxsessions'],
+			'maxattempts' => $db_defaults['maxattempts'],
+			'attempt_interval' => $db_defaults['attempt_interval'],
+			'form_refresh' => 0,
+			'content_type' => $db_defaults['content_type']
 		];
 
 		// get values from the dabatase
 		if ($this->hasInput('mediatypeid')) {
 			$data['mediatypeid'] = $this->mediatype['mediatypeid'];
 			$data['type'] = $this->mediatype['type'];
-			$data['description'] = $this->mediatype['description'];
+			$data['name'] = $this->mediatype['name'];
 			$data['smtp_server'] = $this->mediatype['smtp_server'];
 			$data['smtp_port'] = $this->mediatype['smtp_port'];
 			$data['smtp_helo'] = $this->mediatype['smtp_helo'];
@@ -127,6 +142,7 @@ class CControllerMediatypeEdit extends CController {
 			$data['smtp_verify_host'] = $this->mediatype['smtp_verify_host'];
 			$data['smtp_authentication'] = $this->mediatype['smtp_authentication'];
 			$data['exec_path'] = $this->mediatype['exec_path'];
+			$data['content_type'] = $this->mediatype['content_type'];
 
 			$this->mediatype['exec_params'] = explode("\n", $this->mediatype['exec_params']);
 			foreach ($this->mediatype['exec_params'] as $exec_param) {
@@ -135,50 +151,31 @@ class CControllerMediatypeEdit extends CController {
 			// Remove last empty new line param.
 			array_pop($data['exec_params']);
 
-			$data['exec_params_count'] = count($data['exec_params']);
-
 			$data['gsm_modem'] = $this->mediatype['gsm_modem'];
 			$data['passwd'] = $this->mediatype['passwd'];
 			$data['status'] = $this->mediatype['status'];
+			$data['maxsessions'] = $this->mediatype['maxsessions'];
+			$data['maxattempts'] = $this->mediatype['maxattempts'];
+			$data['attempt_interval'] = $this->mediatype['attempt_interval'];
 
 			switch ($data['type']) {
 				case MEDIA_TYPE_EMAIL:
 					$data['smtp_username'] = $this->mediatype['username'];
 					break;
 
-				case MEDIA_TYPE_JABBER:
-					$data['jabber_username'] = $this->mediatype['username'];
-					break;
-
-				case MEDIA_TYPE_EZ_TEXTING:
-					$data['eztext_username'] = $this->mediatype['username'];
-					$data['eztext_limit'] = $this->mediatype['exec_path'];
+				case MEDIA_TYPE_SMS:
+					$data['maxsessions'] = 1;
 					break;
 			}
+
+			$data['change_passwd'] = $this->hasInput('passwd');
 		}
 
 		// overwrite with input variables
-		$this->getInputs($data, [
-			'type',
-			'description',
-			'smtp_server',
-			'smtp_port',
-			'smtp_helo',
-			'smtp_email',
-			'smtp_security',
-			'smtp_verify_peer',
-			'smtp_verify_host',
-			'smtp_authentication',
-			'exec_params',
-			'exec_params_count',
-			'exec_path',
-			'eztext_limit',
-			'gsm_modem',
-			'jabber_username',
-			'eztext_username',
-			'smtp_username',
-			'passwd',
-			'status'
+		$this->getInputs($data, ['type', 'name', 'smtp_server', 'smtp_port', 'smtp_helo', 'smtp_email', 'smtp_security',
+			'smtp_verify_peer', 'smtp_verify_host', 'smtp_authentication', 'exec_params', 'exec_path', 'gsm_modem',
+			'smtp_username', 'passwd', 'status', 'maxsessions', 'maxattempts', 'attempt_interval', 'maxsessionsType',
+			'form_refresh', 'content_type'
 		]);
 
 		$response = new CControllerResponseData($data);

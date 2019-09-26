@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -33,6 +33,8 @@ int	SYSTEM_SW_ARCH(AGENT_REQUEST *request, AGENT_RESULT *result)
 {
 	struct utsname	name;
 
+	ZBX_UNUSED(request);
+
 	if (-1 == uname(&name))
 	{
 		SET_MSG_RESULT(result, zbx_dsprintf(NULL, "Cannot obtain system information: %s", zbx_strerror(errno)));
@@ -46,8 +48,8 @@ int	SYSTEM_SW_ARCH(AGENT_REQUEST *request, AGENT_RESULT *result)
 
 int     SYSTEM_SW_OS(AGENT_REQUEST *request, AGENT_RESULT *result)
 {
-	char	*type, line[MAX_STRING_LEN];
-	int	ret = SYSINFO_RET_FAIL;
+	char	*type, line[MAX_STRING_LEN], tmp_line[MAX_STRING_LEN];
+	int	ret = SYSINFO_RET_FAIL, line_read = FAIL;
 	FILE	*f = NULL;
 
 	if (1 < request->nparam)
@@ -78,7 +80,26 @@ int     SYSTEM_SW_OS(AGENT_REQUEST *request, AGENT_RESULT *result)
 	}
 	else if (0 == strcmp(type, "name"))
 	{
-		if (NULL == (f = fopen(SW_OS_NAME, "r")))
+		/* firstly need to check option PRETTY_NAME in /etc/os-release */
+		/* if cannot find it, get value from /etc/issue.net            */
+		if (NULL != (f = fopen(SW_OS_NAME_RELEASE, "r")))
+		{
+			while (NULL != fgets(tmp_line, sizeof(tmp_line), f))
+			{
+				if (0 != strncmp(tmp_line, SW_OS_OPTION_PRETTY_NAME,
+						ZBX_CONST_STRLEN(SW_OS_OPTION_PRETTY_NAME)))
+					continue;
+
+				if (1 == sscanf(tmp_line, SW_OS_OPTION_PRETTY_NAME "=\"%[^\"]", line))
+				{
+					line_read = SUCCEED;
+					break;
+				}
+			}
+			zbx_fclose(f);
+		}
+
+		if (FAIL == line_read && NULL == (f = fopen(SW_OS_NAME, "r")))
 		{
 			SET_MSG_RESULT(result, zbx_dsprintf(NULL, "Cannot open " SW_OS_NAME ": %s",
 					zbx_strerror(errno)));
@@ -91,7 +112,7 @@ int     SYSTEM_SW_OS(AGENT_REQUEST *request, AGENT_RESULT *result)
 		return ret;
 	}
 
-	if (NULL != fgets(line, sizeof(line), f))
+	if (SUCCEED == line_read || NULL != fgets(line, sizeof(line), f))
 	{
 		ret = SYSINFO_RET_OK;
 		zbx_rtrim(line, ZBX_WHITESPACE);
@@ -154,7 +175,7 @@ static ZBX_PACKAGE_MANAGER	package_managers[] =
 	{NULL}
 };
 
-int     SYSTEM_SW_PACKAGES(AGENT_REQUEST *request, AGENT_RESULT *result)
+int	SYSTEM_SW_PACKAGES(AGENT_REQUEST *request, AGENT_RESULT *result)
 {
 	size_t			offset = 0;
 	int			ret = SYSINFO_RET_FAIL, show_pm, i, check_regex, check_manager;
@@ -196,11 +217,15 @@ int     SYSTEM_SW_PACKAGES(AGENT_REQUEST *request, AGENT_RESULT *result)
 		if (1 == check_manager && 0 != strcmp(manager, mng->name))
 			continue;
 
-		if (SUCCEED == zbx_execute(mng->test_cmd, &buf, tmp, sizeof(tmp), CONFIG_TIMEOUT) &&
+		if (SUCCEED == zbx_execute(mng->test_cmd, &buf, tmp, sizeof(tmp), CONFIG_TIMEOUT,
+				ZBX_EXIT_CODE_CHECKS_DISABLED) &&
 				'\0' != *buf)	/* consider PMS present, if test_cmd outputs anything to stdout */
 		{
-			if (SUCCEED != zbx_execute(mng->list_cmd, &buf, tmp, sizeof(tmp), CONFIG_TIMEOUT))
+			if (SUCCEED != zbx_execute(mng->list_cmd, &buf, tmp, sizeof(tmp), CONFIG_TIMEOUT,
+					ZBX_EXIT_CODE_CHECKS_DISABLED))
+			{
 				continue;
+			}
 
 			ret = SYSINFO_RET_OK;
 
@@ -229,7 +254,7 @@ next:
 				offset += print_packages(buffer + offset, sizeof(buffer) - offset, &packages, mng->name);
 				offset += zbx_snprintf(buffer + offset, sizeof(buffer) - offset, "\n");
 
-				zbx_vector_str_clear_ext(&packages, zbx_ptr_free);
+				zbx_vector_str_clear_ext(&packages, zbx_str_free);
 			}
 		}
 	}
@@ -238,9 +263,9 @@ next:
 
 	if (0 == show_pm)
 	{
-		offset += print_packages(buffer + offset, sizeof(buffer) - offset, &packages, NULL);
+		print_packages(buffer + offset, sizeof(buffer) - offset, &packages, NULL);
 
-		zbx_vector_str_clear_ext(&packages, zbx_ptr_free);
+		zbx_vector_str_clear_ext(&packages, zbx_str_free);
 	}
 	else if (0 != offset)
 		buffer[--offset] = '\0';

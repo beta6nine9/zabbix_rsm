@@ -2,21 +2,26 @@
 	jQuery(function($) {
 		// proxy mode: active or passive
 		$('#status').change(function() {
-			if ($(this).val() == <?= HOST_STATUS_PROXY_ACTIVE ?>) {
-				$('#ip').closest('li').hide();
-			}
-			else {
-				$('#ip').closest('li').show();
-			}
+			$('#ip').closest('li').toggle($('input[name=status]:checked').val() == <?= HOST_STATUS_PROXY_PASSIVE ?>);
+			$('#proxy_address')
+				.closest('li')
+				.toggle($('input[name=status]:checked').val() == <?= HOST_STATUS_PROXY_ACTIVE ?>);
 
 			toggleEncryptionFields();
+		});
+
+		$(':radio[name=useip]').change(function() {
+			$(':text[name=ip],:text[name=dns]')
+				.removeAttr('aria-required')
+				.filter(($(this).val() == <?= INTERFACE_USE_IP ?>) ? '[name=ip]' : '[name=dns]')
+				.attr('aria-required', 'true');
 		});
 
 		// clone button, special processing because of list of hosts
 		$('#clone').click(function() {
 			var url = new Curl('zabbix.php?action=proxy.edit');
 			url.setArgument('host', $('#host').val());
-			url.setArgument('status', $('#status').val());
+			url.setArgument('status', $('input[name=status]:checked').val());
 			url.setArgument('description', $('#description').val());
 			url.setArgument('ip', $('#ip').val());
 			url.setArgument('dns', $('#dns').val());
@@ -56,7 +61,7 @@
 		});
 
 		// Refresh field visibility on document load.
-		$('#status').trigger('change');
+		$('#status,[name=useip]:checked').trigger('change');
 
 		$('#tls_connect, #tls_in_psk, #tls_in_cert').change(function() {
 			displayAdditionalEncryptionFields();
@@ -68,7 +73,7 @@
 		 *  if proxy is active, "Connections to proxy" field is disabled and "Connections from proxy" is enabled.
 		 */
 		function toggleEncryptionFields() {
-			if ($('#status').val() == <?= HOST_STATUS_PROXY_ACTIVE ?>) {
+			if ($('input[name=status]:checked').val() == <?= HOST_STATUS_PROXY_ACTIVE ?>) {
 				$('input[name=tls_connect]').prop('disabled', true);
 				$('#tls_in_none, #tls_in_psk, #tls_in_cert').prop('disabled', false);
 			}
@@ -101,9 +106,9 @@
 			}
 
 			if (($('input[name=tls_connect]:checked').val() == <?= HOST_ENCRYPTION_CERTIFICATE ?>
-					&& $('#status').val() == <?= HOST_STATUS_PROXY_PASSIVE ?>)
+					&& $('input[name=status]:checked').val() == <?= HOST_STATUS_PROXY_PASSIVE ?>)
 					|| ($('#tls_in_cert').is(':checked')
-					&& $('#status').val() == <?= HOST_STATUS_PROXY_ACTIVE ?>)) {
+					&& $('input[name=status]:checked').val() == <?= HOST_STATUS_PROXY_ACTIVE ?>)) {
 				$('#tls_issuer, #tls_subject').prop('disabled', false);
 			}
 			else {
@@ -120,9 +125,9 @@
 			}
 
 			if (($('input[name=tls_connect]:checked').val() == <?= HOST_ENCRYPTION_PSK ?>
-					&& $('#status').val() == <?= HOST_STATUS_PROXY_PASSIVE ?>)
+					&& $('input[name=status]:checked').val() == <?= HOST_STATUS_PROXY_PASSIVE ?>)
 					|| ($('#tls_in_psk').is(':checked')
-					&& $('#status').val() == <?= HOST_STATUS_PROXY_ACTIVE ?>)) {
+					&& $('input[name=status]:checked').val() == <?= HOST_STATUS_PROXY_ACTIVE ?>)) {
 				$('#tls_psk, #tls_psk_identity').prop('disabled', false);
 			}
 			else {

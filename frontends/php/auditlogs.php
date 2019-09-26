@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -26,37 +26,41 @@ require_once dirname(__FILE__).'/include/users.inc.php';
 
 $page['title'] = _('Audit log');
 $page['file'] = 'auditlogs.php';
-$page['scripts'] = ['class.calendar.js', 'gtlc.js'];
+$page['scripts'] = ['class.calendar.js', 'gtlc.js', 'flickerfreescreen.js'];
 $page['type'] = detect_page_type(PAGE_TYPE_HTML);
 
 require_once dirname(__FILE__).'/include/page_header.php';
 
+$action = [-1, AUDIT_ACTION_ADD, AUDIT_ACTION_UPDATE, AUDIT_ACTION_DELETE, AUDIT_ACTION_LOGIN, AUDIT_ACTION_LOGOUT,
+	AUDIT_ACTION_ENABLE, AUDIT_ACTION_DISABLE
+];
+$resourcetype = [-1, AUDIT_RESOURCE_USER, AUDIT_RESOURCE_ZABBIX_CONFIG, AUDIT_RESOURCE_MEDIA_TYPE, AUDIT_RESOURCE_HOST,
+	AUDIT_RESOURCE_ACTION, AUDIT_RESOURCE_GRAPH, AUDIT_RESOURCE_GRAPH_ELEMENT, AUDIT_RESOURCE_USER_GROUP,
+	AUDIT_RESOURCE_APPLICATION, AUDIT_RESOURCE_TRIGGER, AUDIT_RESOURCE_HOST_GROUP, AUDIT_RESOURCE_ITEM,
+	AUDIT_RESOURCE_IMAGE, AUDIT_RESOURCE_VALUE_MAP, AUDIT_RESOURCE_IT_SERVICE, AUDIT_RESOURCE_MAP,
+	AUDIT_RESOURCE_SCREEN, AUDIT_RESOURCE_SCENARIO, AUDIT_RESOURCE_DISCOVERY_RULE, AUDIT_RESOURCE_SLIDESHOW,
+	AUDIT_RESOURCE_SCRIPT, AUDIT_RESOURCE_PROXY, AUDIT_RESOURCE_MAINTENANCE, AUDIT_RESOURCE_REGEXP,
+	AUDIT_RESOURCE_MACRO, AUDIT_RESOURCE_TEMPLATE, AUDIT_RESOURCE_TRIGGER_PROTOTYPE, AUDIT_RESOURCE_ICON_MAP,
+	AUDIT_RESOURCE_DASHBOARD, AUDIT_RESOURCE_CORRELATION, AUDIT_RESOURCE_GRAPH_PROTOTYPE, AUDIT_RESOURCE_ITEM_PROTOTYPE,
+	AUDIT_RESOURCE_HOST_PROTOTYPE, AUDIT_RESOURCE_AUTOREGISTRATION
+];
+
 // VAR	TYPE	OPTIONAL	FLAGS	VALIDATION	EXCEPTION
 $fields = [
-	'action' =>			[T_ZBX_INT, O_OPT, P_SYS,	BETWEEN(-1, 6), null],
-	'resourcetype' =>	[T_ZBX_INT, O_OPT, P_SYS,	BETWEEN(-1, 32), null],
-	'filter_rst' =>		[T_ZBX_STR, O_OPT, P_SYS,	null,	null],
-	'filter_set' =>		[T_ZBX_STR, O_OPT, P_SYS,	null,	null],
-	'alias' =>			[T_ZBX_STR, O_OPT, P_SYS,	null,	null],
-	'period' =>			[T_ZBX_INT, O_OPT, null,	null,	null],
-	'stime' =>			[T_ZBX_STR, O_OPT, null,	null,	null],
-	// ajax
-	'favobj' =>			[T_ZBX_STR, O_OPT, P_ACT,	null,	null],
-	'favid' =>			[T_ZBX_INT, O_OPT, P_ACT,	null,	null]
+	'action' =>			[T_ZBX_INT,			O_OPT, P_SYS,	IN($action), null],
+	'resourcetype' =>	[T_ZBX_INT,			O_OPT, P_SYS,	IN($resourcetype), null],
+	'filter_rst' =>		[T_ZBX_STR,			O_OPT, P_SYS,	null,	null],
+	'filter_set' =>		[T_ZBX_STR,			O_OPT, P_SYS,	null,	null],
+	'alias' =>			[T_ZBX_STR,			O_OPT, P_SYS,	null,	null],
+	'from' =>			[T_ZBX_RANGE_TIME,	O_OPT, P_SYS,	null,	null],
+	'to' =>				[T_ZBX_RANGE_TIME,	O_OPT, P_SYS,	null,	null]
 ];
 check_fields($fields);
+validateTimeSelectorPeriod(getRequest('from'), getRequest('to'));
 
 /*
  * Ajax
  */
-if (isset($_REQUEST['favobj'])) {
-	// saving fixed/dynamic setting to profile
-	if ($_REQUEST['favobj'] == 'timelinefixedperiod') {
-		if (isset($_REQUEST['favid'])) {
-			CProfile::update('web.auditlogs.timelinefixed', $_REQUEST['favid'], PROFILE_TYPE_INT);
-		}
-	}
-}
 if ($page['type'] == PAGE_TYPE_JS || $page['type'] == PAGE_TYPE_HTML_BLOCK) {
 	require_once dirname(__FILE__).'/include/page_footer.php';
 	exit;
@@ -81,17 +85,22 @@ elseif (hasRequest('filter_rst')) {
 /*
  * Display
  */
-$effectivePeriod = navigation_bar_calc('web.auditlogs.timeline', 0, true);
+$timeselector_options = [
+	'profileIdx' => 'web.auditlogs.filter',
+	'profileIdx2' => 0,
+	'from' => getRequest('from'),
+	'to' => getRequest('to')
+];
+updateTimeSelectorPeriod($timeselector_options);
+
 $data = [
-	'stime' => getRequest('stime'),
 	'actions' => [],
 	'action' => CProfile::get('web.auditlogs.filter.action', -1),
 	'resourcetype' => CProfile::get('web.auditlogs.filter.resourcetype', -1),
-	'alias' => CProfile::get('web.auditlogs.filter.alias', '')
+	'alias' => CProfile::get('web.auditlogs.filter.alias', ''),
+	'timeline' => getTimeSelectorPeriod($timeselector_options),
+	'active_tab' => CProfile::get('web.auditlogs.filter.active', 1)
 ];
-
-$from = zbxDateToTime($data['stime']);
-$till = $from + $effectivePeriod;
 
 // get audit
 $config = select_config();
@@ -106,13 +115,12 @@ if ($data['action'] > -1) {
 if ($data['resourcetype'] > -1) {
 	$sqlWhere['resourcetype'] = ' AND a.resourcetype='.zbx_dbstr($data['resourcetype']);
 }
-$sqlWhere['from'] = ' AND a.clock>'.zbx_dbstr($from);
-$sqlWhere['till'] = ' AND a.clock<'.zbx_dbstr($till);
 
 $sql = 'SELECT a.auditid,a.clock,u.alias,a.ip,a.resourcetype,a.action,a.resourceid,a.resourcename,a.details'.
 		' FROM auditlog a,users u'.
 		' WHERE a.userid=u.userid'.
 			implode('', $sqlWhere).
+			' AND a.clock BETWEEN '.zbx_dbstr($data['timeline']['from_ts']).' AND '.zbx_dbstr($data['timeline']['to_ts']).
 		' ORDER BY a.clock DESC';
 $dbAudit = DBselect($sql, $config['search_limit'] + 1);
 while ($audit = DBfetch($dbAudit)) {
@@ -158,22 +166,7 @@ if (!empty($data['actions'])) {
 }
 
 // get paging
-$data['paging'] = getPagingLine($data['actions'], ZBX_SORT_DOWN, new CUrl('auditlogs.php'));
-
-// get timeline
-unset($sqlWhere['from'], $sqlWhere['till']);
-
-$sql = 'SELECT MIN(a.clock) AS clock'.
-		' FROM auditlog a,users u'.
-		' WHERE a.userid=u.userid'.
-			implode('', $sqlWhere);
-$firstAudit = DBfetch(DBselect($sql, $config['search_limit'] + 1));
-
-$data['timeline'] = [
-	'period' => $effectivePeriod,
-	'starttime' => date(TIMESTAMP_FORMAT, $firstAudit ? $firstAudit['clock'] : null),
-	'usertime' => isset($_REQUEST['stime']) ? date(TIMESTAMP_FORMAT, zbxDateToTime($data['stime']) + $effectivePeriod) : null
-];
+$data['paging'] = getPagingLine($data['actions'], ZBX_SORT_UP, new CUrl('auditlogs.php'));
 
 // render view
 $auditView = new CView('administration.auditlogs.list', $data);

@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -29,7 +29,6 @@ class CMapImporter extends CImporter {
 	public function import(array $maps) {
 		$maps = zbx_toHash($maps, 'name');
 
-		$this->checkCircularMapReferences($maps);
 		$maps = $this->resolveMapElementReferences($maps);
 
 		/*
@@ -77,6 +76,8 @@ class CMapImporter extends CImporter {
 					$map = [
 						'sysmapid' => $maps[$mapItem['name']]['sysmapid'],
 						'name' => $mapItem['name'],
+						'shapes' => $maps[$mapItem['name']]['shapes'],
+						'lines' => $maps[$mapItem['name']]['lines'],
 						'selements' => $maps[$mapItem['name']]['selements'],
 						'links' => $maps[$mapItem['name']]['links']
 					];
@@ -92,77 +93,6 @@ class CMapImporter extends CImporter {
 		if ($mapsToUpdate) {
 			API::Map()->update($mapsToUpdate);
 		}
-	}
-
-	/**
-	 * Check if map elements have circular references.
-	 * Circular references can be only in map elements that represent another map.
-	 *
-	 * @see checkCircularRecursive
-	 *
-	 * @throws Exception if circular reference found.
-	 *
-	 * @param array $maps
-	 */
-	protected function checkCircularMapReferences(array $maps) {
-		foreach ($maps as $mapName => $map) {
-			if (empty($map['selements'])) {
-				continue;
-			}
-
-			foreach ($map['selements'] as $selement) {
-				$checked = [$mapName];
-				if ($circMaps = $this->checkCircularRecursive($selement, $maps, $checked)) {
-					throw new Exception(_s('Circular reference in maps: %1$s.', implode(' - ', $circMaps)));
-				}
-			}
-		}
-	}
-
-	/**
-	 * Recursive function for searching for circular map references.
-	 * If circular reference exist it return array with map elements with circular reference.
-	 *
-	 * @param array $element	Map element to inspect on current recursive loop.
-	 * @param array $maps		All maps where circular references should be searched.
-	 * @param array $checked	Map names that already were processed, should contain unique values
-	 *							if no circular references exist.
-	 *
-	 * @return array|bool
-	 */
-	protected function checkCircularRecursive(array $element, array $maps, array $checked) {
-		// If element is not a map element, recursive reference cannot happen.
-		if ($element['elementtype'] != SYSMAP_ELEMENT_TYPE_MAP) {
-			return false;
-		}
-
-		$elementMapName = $element['element']['name'];
-
-		// If current element map name is already in list of checked map names, circular reference exists.
-		if (in_array($elementMapName, $checked)) {
-			/*
-			 * To have a nice result containing only maps that have circular reference,
-			 * remove everything that was added before repeated map name.
-			 */
-			$checked = array_slice($checked, array_search($elementMapName, $checked));
-
-			// Add repeated name to have nice loop like m1->m2->m3->m1.
-			$checked[] = $elementMapName;
-
-			return $checked;
-		}
-		else {
-			$checked[] = $elementMapName;
-		}
-
-		// Find maps that reference the current element, and if one has selements, check all of them recursively.
-		if (!empty($maps[$elementMapName]['selements'])) {
-			foreach ($maps[$elementMapName]['selements'] as $selement) {
-				return $this->checkCircularRecursive($selement, $maps, $checked);
-			}
-		}
-
-		return false;
 	}
 
 	/**
@@ -200,44 +130,56 @@ class CMapImporter extends CImporter {
 			foreach ($map['selements'] as &$selement) {
 				switch ($selement['elementtype']) {
 					case SYSMAP_ELEMENT_TYPE_MAP:
-						$selement['elementid'] = $this->referencer->resolveMap($selement['element']['name']);
-						if (!$selement['elementid']) {
+						$selement['elements'][0]['sysmapid'] = $this->referencer->resolveMap($selement['elements'][0]['name']);
+						if (!$selement['elements'][0]['sysmapid']) {
 							throw new Exception(_s('Cannot find map "%1$s" used in map "%2$s".',
-								$selement['element']['name'], $map['name']));
+								$selement['elements'][0]['name'], $map['name']));
 						}
+
+						unset($selement['elements'][0]['name']);
 						break;
 
 					case SYSMAP_ELEMENT_TYPE_HOST_GROUP:
-						$selement['elementid'] = $this->referencer->resolveGroup($selement['element']['name']);
-						if (!$selement['elementid']) {
+						$selement['elements'][0]['groupid'] = $this->referencer->resolveGroup($selement['elements'][0]['name']);
+						if (!$selement['elements'][0]['groupid']) {
 							throw new Exception(_s('Cannot find group "%1$s" used in map "%2$s".',
-								$selement['element']['name'], $map['name']));
+								$selement['elements'][0]['name'], $map['name']));
 						}
+
+						unset($selement['elements'][0]['name']);
 						break;
 
 					case SYSMAP_ELEMENT_TYPE_HOST:
-						$selement['elementid'] = $this->referencer->resolveHost($selement['element']['host']);
-						if (!$selement['elementid']) {
+						$selement['elements'][0]['hostid'] = $this->referencer->resolveHost($selement['elements'][0]['host']);
+						if (!$selement['elements'][0]['hostid']) {
 							throw new Exception(_s('Cannot find host "%1$s" used in map "%2$s".',
-								$selement['element']['host'], $map['name']));
+								$selement['elements'][0]['host'], $map['name']));
 						}
+
+						unset($selement['elements'][0]['host']);
 						break;
 
 					case SYSMAP_ELEMENT_TYPE_TRIGGER:
-						$el = $selement['element'];
-						$selement['elementid'] = $this->referencer->resolveTrigger($el['description'], $el['expression']);
+						foreach ($selement['elements'] as &$element) {
+							$element['triggerid'] = $this->referencer->resolveTrigger($element['description'],
+								$element['expression'], $element['recovery_expression']
+							);
 
-						if (!$selement['elementid']) {
-							throw new Exception(_s(
-								'Cannot find trigger "%1$s" used in map "%2$s".',
-								$selement['element']['description'],
-								$map['name']
-							));
+							if (!$element['triggerid']) {
+								throw new Exception(_s(
+									'Cannot find trigger "%1$s" used in map "%2$s".',
+									$element['description'],
+									$map['name']
+								));
+							}
+
+							unset($element['description'], $element['expression'], $element['recovery_expression']);
 						}
+						unset($element);
 						break;
 
 					case SYSMAP_ELEMENT_TYPE_IMAGE:
-						$selement['elementid'] = 0;
+						unset($selement['elements']);
 						break;
 				}
 
@@ -270,7 +212,9 @@ class CMapImporter extends CImporter {
 
 				foreach ($link['linktriggers'] as &$linkTrigger) {
 					$trigger = $linkTrigger['trigger'];
-					$triggerId = $this->referencer->resolveTrigger($trigger['description'], $trigger['expression']);
+					$triggerId = $this->referencer->resolveTrigger($trigger['description'], $trigger['expression'],
+						$trigger['recovery_expression']
+					);
 
 					if (!$triggerId) {
 						throw new Exception(_s(

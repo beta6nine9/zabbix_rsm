@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -89,7 +89,7 @@ function graph_item_calc_fnc2str($calc_fnc) {
 function getGraphDims($graphid = null) {
 	$graphDims = [];
 
-	$graphDims['shiftYtop'] = 35;
+	$graphDims['shiftYtop'] = CGraphDraw::DEFAULT_HEADER_PADDING_TOP;
 	if (is_null($graphid)) {
 		$graphDims['graphHeight'] = 200;
 		$graphDims['graphtype'] = 0;
@@ -106,7 +106,7 @@ function getGraphDims($graphid = null) {
 		return $graphDims;
 	}
 
-	// zoom featers
+	// Select graph's type and height as well as which Y axes are used by graph items.
 	$dbGraphs = DBselect(
 		'SELECT MAX(g.graphtype) AS graphtype,MIN(gi.yaxisside) AS yaxissidel,MAX(gi.yaxisside) AS yaxissider,MAX(g.height) AS height'.
 		' FROM graphs g,graphs_items gi'.
@@ -119,7 +119,7 @@ function getGraphDims($graphid = null) {
 
 		$graphDims['yaxis'] = $yaxis;
 		$graphDims['graphtype'] = $graph['graphtype'];
-		$graphDims['graphHeight'] = $graph['height'];
+		$graphDims['graphHeight'] = (int) $graph['height'];
 	}
 
 	if ($yaxis == 2) {
@@ -135,144 +135,9 @@ function getGraphDims($graphid = null) {
 		$graphDims['shiftXright'] = 85;
 	}
 
+	$graphDims['graphHeight']++;
+
 	return $graphDims;
-}
-
-function get_realhosts_by_graphid($graphid) {
-	$graph = getGraphByGraphId($graphid);
-	if (!empty($graph['templateid'])) {
-		return get_realhosts_by_graphid($graph['templateid']);
-	}
-	return get_hosts_by_graphid($graphid);
-}
-
-function get_hosts_by_graphid($graphid) {
-	return DBselect(
-		'SELECT DISTINCT h.*'.
-		' FROM graphs_items gi,items i,hosts h'.
-		' WHERE h.hostid=i.hostid'.
-			' AND gi.itemid=i.itemid'.
-			' AND gi.graphid='.zbx_dbstr($graphid)
-	);
-}
-
-/**
- * Description:
- *	Return the time of the 1st appearance of items included in graph in trends
- * Comment:
- *	sql is split to many sql's to optimize search on history tables
- */
-function get_min_itemclock_by_graphid($graphid) {
-	$itemids = [];
-	$dbItems = DBselect(
-		'SELECT DISTINCT gi.itemid'.
-		' FROM graphs_items gi'.
-		' WHERE gi.graphid='.zbx_dbstr($graphid)
-	);
-	while ($item = DBfetch($dbItems)) {
-		$itemids[$item['itemid']] = $item['itemid'];
-	}
-
-	return get_min_itemclock_by_itemid($itemids);
-}
-
-/**
- * Return the time of the 1st appearance of item in trends.
- *
- * @param array $itemIds
- *
- * @return int (unixtime)
- */
-function get_min_itemclock_by_itemid($itemIds) {
-	zbx_value2array($itemIds);
-
-	$min = null;
-	$result = time() - SEC_PER_YEAR;
-
-	$itemTypes = [
-		ITEM_VALUE_TYPE_FLOAT => [],
-		ITEM_VALUE_TYPE_STR => [],
-		ITEM_VALUE_TYPE_LOG => [],
-		ITEM_VALUE_TYPE_UINT64 => [],
-		ITEM_VALUE_TYPE_TEXT => []
-	];
-
-	$dbItems = DBselect(
-		'SELECT i.itemid,i.value_type'.
-		' FROM items i'.
-		' WHERE '.dbConditionInt('i.itemid', $itemIds)
-	);
-
-	while ($item = DBfetch($dbItems)) {
-		$itemTypes[$item['value_type']][$item['itemid']] = $item['itemid'];
-	}
-
-	// data for ITEM_VALUE_TYPE_FLOAT and ITEM_VALUE_TYPE_UINT64 can be stored in trends tables or history table
-	// get max trends and history values for such type items to find out in what tables to look for data
-	$sqlFrom = 'history';
-	$sqlFromNum = '';
-
-	if (!empty($itemTypes[ITEM_VALUE_TYPE_FLOAT]) || !empty($itemTypes[ITEM_VALUE_TYPE_UINT64])) {
-		$itemIdsNumeric = zbx_array_merge($itemTypes[ITEM_VALUE_TYPE_FLOAT], $itemTypes[ITEM_VALUE_TYPE_UINT64]);
-
-		$sql = 'SELECT MAX(i.history) AS history,MAX(i.trends) AS trends'.
-				' FROM items i'.
-				' WHERE '.dbConditionInt('i.itemid', $itemIdsNumeric);
-		if ($tableForNumeric = DBfetch(DBselect($sql))) {
-			// look for data in one of the tables
-			$sqlFromNum = ($tableForNumeric['history'] > $tableForNumeric['trends']) ? 'history' : 'trends';
-
-			$result = time() - (SEC_PER_DAY * max($tableForNumeric['history'], $tableForNumeric['trends']));
-
-			/*
-			 * In case history storage exceeds the maximum time difference between current year and minimum 1970
-			 * (for example year 2014 - 200 years < year 1970), correct year to 1970 (unix time timestamp 0).
-			 */
-			if ($result < 0) {
-				$result = 0;
-			}
-		}
-	}
-
-	foreach ($itemTypes as $type => $items) {
-		if (empty($items)) {
-			continue;
-		}
-
-		switch ($type) {
-			case ITEM_VALUE_TYPE_FLOAT:
-				$sqlFrom = $sqlFromNum;
-				break;
-			case ITEM_VALUE_TYPE_STR:
-				$sqlFrom = 'history_str';
-				break;
-			case ITEM_VALUE_TYPE_LOG:
-				$sqlFrom = 'history_log';
-				break;
-			case ITEM_VALUE_TYPE_UINT64:
-				$sqlFrom = $sqlFromNum.'_uint';
-				break;
-			case ITEM_VALUE_TYPE_TEXT:
-				$sqlFrom = 'history_text';
-				break;
-			default:
-				$sqlFrom = 'history';
-		}
-
-		foreach ($itemIds as $itemId) {
-			$sqlUnions[] = 'SELECT MIN(ht.clock) AS c FROM '.$sqlFrom.' ht WHERE ht.itemid='.zbx_dbstr($itemId);
-		}
-
-		$dbMin = DBfetch(DBselect(
-			'SELECT MIN(ht.c) AS min_clock'.
-			' FROM ('.implode(' UNION ALL ', $sqlUnions).') ht'
-		));
-
-		$min = $min ? min($min, $dbMin['min_clock']) : $dbMin['min_clock'];
-	}
-
-	// in case DB clock column is corrupted having negative numbers, return min clock from max possible history storage
-	return ($min > 0) ? $min : $result;
 }
 
 function getGraphByGraphId($graphId) {
@@ -285,6 +150,217 @@ function getGraphByGraphId($graphId) {
 	error(_s('No graph item with graphid "%s".', $graphId));
 
 	return false;
+}
+
+/**
+ * Get parent templates for each given graph.
+ *
+ * @param $array $graphs                  An array of graphs.
+ * @param string $graphs[]['graphid']     ID of a graph.
+ * @param string $graphs[]['templateid']  ID of parent template graph.
+ * @param int    $flag                    Origin of the graph (ZBX_FLAG_DISCOVERY_NORMAL or
+ *                                        ZBX_FLAG_DISCOVERY_PROTOTYPE).
+ *
+ * @return array
+ */
+function getGraphParentTemplates(array $graphs, $flag) {
+	$parent_graphids = [];
+	$data = [
+		'links' => [],
+		'templates' => []
+	];
+
+	foreach ($graphs as $graph) {
+		if ($graph['templateid'] != 0) {
+			$parent_graphids[$graph['templateid']] = true;
+			$data['links'][$graph['graphid']] = ['graphid' => $graph['templateid']];
+		}
+	}
+
+	if (!$parent_graphids) {
+		return $data;
+	}
+
+	$all_parent_graphids = [];
+	$hostids = [];
+	if ($flag == ZBX_FLAG_DISCOVERY_PROTOTYPE) {
+		$lld_ruleids = [];
+	}
+
+	do {
+		if ($flag == ZBX_FLAG_DISCOVERY_PROTOTYPE) {
+			$db_graphs = API::GraphPrototype()->get([
+				'output' => ['graphid', 'templateid'],
+				'selectHosts' => ['hostid'],
+				'selectDiscoveryRule' => ['itemid'],
+				'graphids' => array_keys($parent_graphids)
+			]);
+		}
+		// ZBX_FLAG_DISCOVERY_NORMAL
+		else {
+			$db_graphs = API::Graph()->get([
+				'output' => ['graphid', 'templateid'],
+				'selectHosts' => ['hostid'],
+				'graphids' => array_keys($parent_graphids)
+			]);
+		}
+
+		$all_parent_graphids += $parent_graphids;
+		$parent_graphids = [];
+
+		foreach ($db_graphs as $db_graph) {
+			$data['templates'][$db_graph['hosts'][0]['hostid']] = [];
+			$hostids[$db_graph['graphid']] = $db_graph['hosts'][0]['hostid'];
+
+			if ($flag == ZBX_FLAG_DISCOVERY_PROTOTYPE) {
+				$lld_ruleids[$db_graph['graphid']] = $db_graph['discoveryRule']['itemid'];
+			}
+
+			if ($db_graph['templateid'] != 0) {
+				if (!array_key_exists($db_graph['templateid'], $all_parent_graphids)) {
+					$parent_graphids[$db_graph['templateid']] = true;
+				}
+
+				$data['links'][$db_graph['graphid']] = ['graphid' => $db_graph['templateid']];
+			}
+		}
+	}
+	while ($parent_graphids);
+
+	foreach ($data['links'] as &$parent_graph) {
+		$parent_graph['hostid'] = array_key_exists($parent_graph['graphid'], $hostids)
+			? $hostids[$parent_graph['graphid']]
+			: 0;
+
+		if ($flag == ZBX_FLAG_DISCOVERY_PROTOTYPE) {
+			$parent_graph['lld_ruleid'] = array_key_exists($parent_graph['graphid'], $lld_ruleids)
+				? $lld_ruleids[$parent_graph['graphid']]
+				: 0;
+		}
+	}
+	unset($parent_graph);
+
+	$db_templates = $data['templates']
+		? API::Template()->get([
+			'output' => ['name'],
+			'templateids' => array_keys($data['templates']),
+			'preservekeys' => true
+		])
+		: [];
+
+	$rw_templates = $db_templates
+		? API::Template()->get([
+			'output' => [],
+			'templateids' => array_keys($db_templates),
+			'editable' => true,
+			'preservekeys' => true
+		])
+		: [];
+
+	$data['templates'][0] = [];
+
+	foreach ($data['templates'] as $hostid => &$template) {
+		$template = array_key_exists($hostid, $db_templates)
+			? [
+				'hostid' => $hostid,
+				'name' => $db_templates[$hostid]['name'],
+				'permission' => array_key_exists($hostid, $rw_templates) ? PERM_READ_WRITE : PERM_READ
+			]
+			: [
+				'hostid' => $hostid,
+				'name' => _('Inaccessible template'),
+				'permission' => PERM_DENY
+			];
+	}
+	unset($template);
+
+	return $data;
+}
+
+/**
+ * Returns a template prefix for selected graph.
+ *
+ * @param string $graphid
+ * @param array  $parent_templates  The list of the templates, prepared by getGraphParentTemplates() function.
+ * @param int    $flag              Origin of the graph (ZBX_FLAG_DISCOVERY_NORMAL or ZBX_FLAG_DISCOVERY_PROTOTYPE).
+ *
+ * @return array|null
+ */
+function makeGraphTemplatePrefix($graphid, array $parent_templates, $flag) {
+	if (!array_key_exists($graphid, $parent_templates['links'])) {
+		return null;
+	}
+
+	while (array_key_exists($parent_templates['links'][$graphid]['graphid'], $parent_templates['links'])) {
+		$graphid = $parent_templates['links'][$graphid]['graphid'];
+	}
+
+	$template = $parent_templates['templates'][$parent_templates['links'][$graphid]['hostid']];
+
+	if ($template['permission'] == PERM_READ_WRITE) {
+		$url = (new CUrl('graphs.php'));
+
+		if ($flag == ZBX_FLAG_DISCOVERY_PROTOTYPE) {
+			$url->setArgument('parent_discoveryid', $parent_templates['links'][$graphid]['lld_ruleid']);
+		}
+		// ZBX_FLAG_DISCOVERY_NORMAL
+		else {
+			$url->setArgument('hostid', $template['hostid']);
+		}
+
+		$name = (new CLink(CHtml::encode($template['name']), $url))->addClass(ZBX_STYLE_LINK_ALT);
+	}
+	else {
+		$name = new CSpan(CHtml::encode($template['name']));
+	}
+
+	return [$name->addClass(ZBX_STYLE_GREY), NAME_DELIMITER];
+}
+
+/**
+ * Returns a list of graph templates.
+ *
+ * @param string $graphid
+ * @param array  $parent_templates  The list of the templates, prepared by getGraphParentTemplates() function.
+ * @param int    $flag              Origin of the item (ZBX_FLAG_DISCOVERY_NORMAL or ZBX_FLAG_DISCOVERY_PROTOTYPE).
+ *
+ * @return array
+ */
+function makeGraphTemplatesHtml($graphid, array $parent_templates, $flag) {
+	$list = [];
+
+	while (array_key_exists($graphid, $parent_templates['links'])) {
+		$template = $parent_templates['templates'][$parent_templates['links'][$graphid]['hostid']];
+
+		if ($template['permission'] == PERM_READ_WRITE) {
+			$url = (new CUrl('graphs.php'))->setArgument('form', 'update');
+
+			if ($flag == ZBX_FLAG_DISCOVERY_PROTOTYPE) {
+				$url->setArgument('parent_discoveryid', $parent_templates['links'][$graphid]['lld_ruleid']);
+			}
+
+			$url->setArgument('graphid', $parent_templates['links'][$graphid]['graphid']);
+
+			if ($flag == ZBX_FLAG_DISCOVERY_NORMAL) {
+				$url->setArgument('hostid', $template['hostid']);
+			}
+
+			$name = new CLink(CHtml::encode($template['name']), $url);
+		}
+		else {
+			$name = (new CSpan(CHtml::encode($template['name'])))->addClass(ZBX_STYLE_GREY);
+		}
+
+		array_unshift($list, $name, '&nbsp;&rArr;&nbsp;');
+
+		$graphid = $parent_templates['links'][$graphid]['graphid'];
+	}
+
+	if ($list) {
+		array_pop($list);
+	}
+
+	return $list;
 }
 
 /**
@@ -337,36 +413,39 @@ function getSameGraphItemsForHost($gitems, $destinationHostId, $error = true, ar
 /**
  * Copy specified graph to specified host.
  *
- * @param string $graphId
- * @param string $hostId
+ * @param string $graphid
+ * @param string $hostid
  *
  * @return array
  */
-function copyGraphToHost($graphId, $hostId) {
+function copyGraphToHost($graphid, $hostid) {
 	$graphs = API::Graph()->get([
-		'graphids' => $graphId,
-		'output' => API_OUTPUT_EXTEND,
+		'output' => ['graphid', 'name', 'width', 'height', 'yaxismin', 'yaxismax', 'show_work_period', 'show_triggers',
+			'graphtype', 'show_legend', 'show_3d', 'percent_left', 'percent_right', 'ymin_type', 'ymax_type',
+			'ymin_itemid', 'ymax_itemid'
+		],
+		'selectGraphItems' => ['itemid', 'drawtype', 'sortorder', 'color', 'yaxisside', 'calc_fnc', 'type'],
 		'selectHosts' => ['hostid', 'name'],
-		'selectGraphItems' => API_OUTPUT_EXTEND
+		'graphids' => $graphid
 	]);
 	$graph = reset($graphs);
-	$graphHost = reset($graph['hosts']);
+	$host = reset($graph['hosts']);
 
-	if ($graphHost['hostid'] == $hostId) {
-		error(_s('Graph "%1$s" already exists on "%2$s".', $graph['name'], $graphHost['name']));
+	if ($host['hostid'] == $hostid) {
+		error(_s('Graph "%1$s" already exists on "%2$s".', $graph['name'], $host['name']));
 
 		return false;
 	}
 
 	$graph['gitems'] = getSameGraphItemsForHost(
 		$graph['gitems'],
-		$hostId,
+		$hostid,
 		true,
 		[ZBX_FLAG_DISCOVERY_NORMAL, ZBX_FLAG_DISCOVERY_CREATED]
 	);
 
 	if (!$graph['gitems']) {
-		$host = get_host_by_hostid($hostId);
+		$host = get_host_by_hostid($hostid);
 
 		info(_s('Skipped copying of graph "%1$s" to host "%2$s".', $graph['name'], $host['host']));
 
@@ -374,62 +453,15 @@ function copyGraphToHost($graphId, $hostId) {
 	}
 
 	// retrieve actual ymax_itemid and ymin_itemid
-	if ($graph['ymax_itemid'] && $itemId = get_same_item_for_host($graph['ymax_itemid'], $hostId)) {
-		$graph['ymax_itemid'] = $itemId;
+	if ($graph['ymax_itemid'] && $itemid = get_same_item_for_host($graph['ymax_itemid'], $hostid)) {
+		$graph['ymax_itemid'] = $itemid;
 	}
 
-	if ($graph['ymin_itemid'] && $itemId = get_same_item_for_host($graph['ymin_itemid'], $hostId)) {
-		$graph['ymin_itemid'] = $itemId;
+	if ($graph['ymin_itemid'] && $itemid = get_same_item_for_host($graph['ymin_itemid'], $hostid)) {
+		$graph['ymin_itemid'] = $itemid;
 	}
-
-	unset($graph['templateid']);
 
 	return API::Graph()->create($graph);
-}
-
-function navigation_bar_calc($idx = null, $idx2 = 0, $update = false) {
-	if (!empty($idx)) {
-		if ($update) {
-			if (!empty($_REQUEST['period']) && $_REQUEST['period'] >= ZBX_MIN_PERIOD) {
-				CProfile::update($idx.'.period', $_REQUEST['period'], PROFILE_TYPE_INT, $idx2);
-			}
-			if (!empty($_REQUEST['stime'])) {
-				CProfile::update($idx.'.stime', $_REQUEST['stime'], PROFILE_TYPE_STR, $idx2);
-			}
-		}
-		$_REQUEST['period'] = getRequest('period', CProfile::get($idx.'.period', ZBX_PERIOD_DEFAULT, $idx2));
-		$_REQUEST['stime'] = getRequest('stime', CProfile::get($idx.'.stime', null, $idx2));
-	}
-
-	$_REQUEST['period'] = getRequest('period', ZBX_PERIOD_DEFAULT);
-	$_REQUEST['stime'] = getRequest('stime');
-
-	if ($_REQUEST['period'] < ZBX_MIN_PERIOD) {
-		show_error_message(_n('Minimum time period to display is %1$s minute.',
-			'Minimum time period to display is %1$s minutes.',
-			(int) ZBX_MIN_PERIOD / SEC_PER_MIN
-		));
-		$_REQUEST['period'] = ZBX_MIN_PERIOD;
-	}
-	elseif ($_REQUEST['period'] > ZBX_MAX_PERIOD) {
-		show_error_message(_n('Maximum time period to display is %1$s day.',
-			'Maximum time period to display is %1$s days.',
-			(int) ZBX_MAX_PERIOD / SEC_PER_DAY
-		));
-		$_REQUEST['period'] = ZBX_MAX_PERIOD;
-	}
-
-	if (!empty($_REQUEST['stime'])) {
-		$time = zbxDateToTime($_REQUEST['stime']);
-		if (($time + $_REQUEST['period']) > time()) {
-			$_REQUEST['stime'] = date(TIMESTAMP_FORMAT, time() - $_REQUEST['period']);
-		}
-	}
-	else {
-		$_REQUEST['stime'] = date(TIMESTAMP_FORMAT, time() - $_REQUEST['period']);
-	}
-
-	return $_REQUEST['period'];
 }
 
 function get_next_color($palettetype = 0) {
@@ -815,18 +847,14 @@ function find_period_end($periods, $time, $max_time) {
 /**
  * Converts Base1000 values to Base1024 and calculate pow
  * Example:
- * 	204800 (200 KBytes) with '1024' step convert to 209715,2 (0.2MB (204.8 KBytes))
+ *  204800 (200 KBytes) with '1024' step convert to 209715,2 (0.2MB (204.8 KBytes))
  *
- * @param string   $value
- * @param bool|int $step
+ * @param string|int $value
+ * @param string $step
  *
  * @return array
  */
-function convertToBase1024($value, $step = false) {
-	if (!$step) {
-		$step = 1000;
-	}
-
+function convertToBase1024($value, $step = '1000') {
 	if ($value < 0) {
 		$abs = bcmul($value, '-1');
 	}
@@ -855,7 +883,7 @@ function convertToBase1024($value, $step = false) {
 			$valData['value'] = bcdiv(sprintf('%.10f',$value), sprintf('%.10f', $valData['value']),
 				ZBX_PRECISION_10);
 
-			$valData['value'] = sprintf('%.10f', round(bcmul($valData['value'], bcpow(1024, $valData['pow'])),
+			$valData['value'] = sprintf('%.10f', round(bcmul($valData['value'], bcpow(ZBX_KIBIBYTE, $valData['pow'])),
 				ZBX_PRECISION_10));
 		}
 	}

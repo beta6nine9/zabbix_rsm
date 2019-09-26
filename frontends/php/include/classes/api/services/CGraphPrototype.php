@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -21,8 +21,6 @@
 
 /**
  * Class containing methods for operations with graph prototypes.
- *
- * @package API
  */
 class CGraphPrototype extends CGraphGeneral {
 
@@ -39,7 +37,6 @@ class CGraphPrototype extends CGraphGeneral {
 			self::ERROR_MISSING_GRAPH_NAME => _('Missing "name" field for graph prototype.'),
 			self::ERROR_MISSING_GRAPH_ITEMS => _('Missing items for graph prototype "%1$s".'),
 			self::ERROR_MISSING_REQUIRED_VALUE => _('No "%1$s" given for graph prototype.'),
-			self::ERROR_TEMPLATED_ID => _('Cannot update "templateid" for graph prototype "%1$s".'),
 			self::ERROR_GRAPH_SUM => _('Cannot add more than one item with type "Graph sum" on graph prototype "%1$s".')
 		]);
 	}
@@ -52,8 +49,6 @@ class CGraphPrototype extends CGraphGeneral {
 	 */
 	public function get($options = []) {
 		$result = [];
-		$userType = self::$userData['type'];
-		$userid = self::$userData['userid'];
 
 		$sqlParts = [
 			'select'	=> ['graphs' => 'g.graphid'],
@@ -73,14 +68,14 @@ class CGraphPrototype extends CGraphGeneral {
 			'discoveryids'				=> null,
 			'templated'					=> null,
 			'inherited'					=> null,
-			'editable'					=> null,
+			'editable'					=> false,
 			'nopermissions'				=> null,
 			// filter
 			'filter'					=> null,
 			'search'					=> null,
 			'searchByAny'				=> null,
-			'startSearch'				=> null,
-			'excludeSearch'				=> null,
+			'startSearch'				=> false,
+			'excludeSearch'				=> false,
 			'searchWildcardsEnabled'	=> null,
 			// output
 			'output'					=> API_OUTPUT_EXTEND,
@@ -90,9 +85,9 @@ class CGraphPrototype extends CGraphGeneral {
 			'selectItems'				=> null,
 			'selectGraphItems'			=> null,
 			'selectDiscoveryRule'		=> null,
-			'countOutput'				=> null,
-			'groupCount'				=> null,
-			'preservekeys'				=> null,
+			'countOutput'				=> false,
+			'groupCount'				=> false,
+			'preservekeys'				=> false,
 			'sortfield'					=> '',
 			'sortorder'					=> '',
 			'limit'						=> null
@@ -100,10 +95,9 @@ class CGraphPrototype extends CGraphGeneral {
 		$options = zbx_array_merge($defOptions, $options);
 
 		// editable + PERMISSION CHECK
-		if ($userType != USER_TYPE_SUPER_ADMIN && !$options['nopermissions']) {
+		if (self::$userData['type'] != USER_TYPE_SUPER_ADMIN && !$options['nopermissions']) {
 			$permission = $options['editable'] ? PERM_READ_WRITE : PERM_READ;
-
-			$userGroups = getUserGroupsByUserId($userid);
+			$userGroups = getUserGroupsByUserId(self::$userData['userid']);
 
 			// check permissions by graph items
 			$sqlParts['where'][] = 'NOT EXISTS ('.
@@ -165,7 +159,7 @@ class CGraphPrototype extends CGraphGeneral {
 			$sqlParts['where']['igi'] = 'i.itemid=gi.itemid';
 			$sqlParts['where']['hgi'] = 'hg.hostid=i.hostid';
 
-			if (!is_null($options['groupCount'])) {
+			if ($options['groupCount']) {
 				$sqlParts['group']['hg'] = 'hg.groupid';
 			}
 		}
@@ -193,7 +187,7 @@ class CGraphPrototype extends CGraphGeneral {
 			$sqlParts['where']['gig'] = 'gi.graphid=g.graphid';
 			$sqlParts['where']['igi'] = 'i.itemid=gi.itemid';
 
-			if (!is_null($options['groupCount'])) {
+			if ($options['groupCount']) {
 				$sqlParts['group']['i'] = 'i.hostid';
 			}
 		}
@@ -213,7 +207,7 @@ class CGraphPrototype extends CGraphGeneral {
 			$sqlParts['where']['gig'] = 'gi.graphid=g.graphid';
 			$sqlParts['where'][] = dbConditionInt('gi.itemid', $options['itemids']);
 
-			if (!is_null($options['groupCount'])) {
+			if ($options['groupCount']) {
 				$sqlParts['group']['gi'] = 'gi.itemid';
 			}
 		}
@@ -228,7 +222,7 @@ class CGraphPrototype extends CGraphGeneral {
 			$sqlParts['where']['giid'] = 'gi.itemid=id.itemid';
 			$sqlParts['where'][] = dbConditionInt('id.parent_itemid', $options['discoveryids']);
 
-			if (!is_null($options['groupCount'])) {
+			if ($options['groupCount']) {
 				$sqlParts['group']['id'] = 'id.parent_itemid';
 			}
 		}
@@ -301,8 +295,8 @@ class CGraphPrototype extends CGraphGeneral {
 		$sqlParts = $this->applyQuerySortOptions($this->tableName(), $this->tableAlias(), $options, $sqlParts);
 		$dbRes = DBselect($this->createSelectQueryFromParts($sqlParts), $sqlParts['limit']);
 		while ($graph = DBfetch($dbRes)) {
-			if (!is_null($options['countOutput'])) {
-				if (!is_null($options['groupCount'])) {
+			if ($options['countOutput']) {
+				if ($options['groupCount']) {
 					$result[] = $graph;
 				}
 				else {
@@ -314,7 +308,7 @@ class CGraphPrototype extends CGraphGeneral {
 			}
 		}
 
-		if (!is_null($options['countOutput'])) {
+		if ($options['countOutput']) {
 			return $result;
 		}
 
@@ -323,7 +317,7 @@ class CGraphPrototype extends CGraphGeneral {
 		}
 
 		// removing keys (hash -> array)
-		if (is_null($options['preservekeys'])) {
+		if (!$options['preservekeys']) {
 			$result = zbx_cleanHashes($result);
 		}
 
@@ -536,69 +530,51 @@ class CGraphPrototype extends CGraphGeneral {
 	 * Delete GraphPrototype.
 	 *
 	 * @param array $graphids
-	 * @param bool  $nopermissions
 	 *
 	 * @return array
 	 */
-	public function delete(array $graphids, $nopermissions = false) {
-		if (empty($graphids)) {
-			self::exception(ZBX_API_ERROR_PARAMETERS, _('Empty input parameter.'));
+	public function delete(array $graphids) {
+		$this->validateDelete($graphids, $db_graphs);
+
+		CGraphPrototypeManager::delete($graphids);
+
+		$this->addAuditBulk(AUDIT_ACTION_DELETE, AUDIT_RESOURCE_GRAPH_PROTOTYPE, $db_graphs);
+
+		return ['graphids' => $graphids];
+	}
+
+	/**
+	 * Validates the input parameters for the delete() method.
+	 *
+	 * @param array $graphids   [IN/OUT]
+	 * @param array $db_graphs  [OUT]
+	 *
+	 * @throws APIException if the input is invalid.
+	 */
+	private function validateDelete(array &$graphids, array &$db_graphs = null) {
+		$api_input_rules = ['type' => API_IDS, 'flags' => API_NOT_EMPTY, 'uniq' => true];
+		if (!CApiInputValidator::validate($api_input_rules, $graphids, '/', $error)) {
+			self::exception(ZBX_API_ERROR_PARAMETERS, $error);
 		}
 
-		$delGraphs = $this->get([
+		$db_graphs = $this->get([
+			'output' => ['graphid', 'name', 'templateid'],
 			'graphids' => $graphids,
 			'editable' => true,
-			'output' => API_OUTPUT_EXTEND,
 			'preservekeys' => true
 		]);
 
-		if (!$nopermissions) {
-			foreach ($graphids as $graphid) {
-				if (!isset($delGraphs[$graphid])) {
-					self::exception(ZBX_API_ERROR_PERMISSIONS, _('You do not have permission to perform this operation.'));
-				}
-				if ($delGraphs[$graphid]['templateid'] != 0) {
-					self::exception(ZBX_API_ERROR_PERMISSIONS, _('Cannot delete templated graphs.'));
-				}
+		foreach ($graphids as $graphid) {
+			if (!array_key_exists($graphid, $db_graphs)) {
+				self::exception(ZBX_API_ERROR_PERMISSIONS,
+					_('No permissions to referred object or it does not exist!')
+				);
+			}
+
+			if ($db_graphs[$graphid]['templateid'] != 0) {
+				self::exception(ZBX_API_ERROR_PARAMETERS, _('Cannot delete templated graph prototype.'));
 			}
 		}
-
-		$parentGraphids = $graphids;
-		do {
-			$dbGraphs = DBselect('SELECT g.graphid FROM graphs g WHERE '.dbConditionInt('g.templateid', $parentGraphids));
-			$parentGraphids = [];
-			while ($dbGraph = DBfetch($dbGraphs)) {
-				$parentGraphids[] = $dbGraph['graphid'];
-				$graphids[] = $dbGraph['graphid'];
-			}
-		} while (!empty($parentGraphids));
-
-		$graphids = array_unique($graphids);
-		$createdGraphs = [];
-
-		$dbGraphs = DBselect('SELECT gd.graphid FROM graph_discovery gd WHERE '.dbConditionInt('gd.parent_graphid', $graphids));
-		while ($graph = DBfetch($dbGraphs)) {
-			$createdGraphs[$graph['graphid']] = $graph['graphid'];
-		}
-		if (!empty($createdGraphs)) {
-			$result = API::Graph()->delete($createdGraphs, true);
-			if (!$result) {
-				self::exception(ZBX_API_ERROR_PARAMETERS, _('Cannot delete graphs created by low level discovery.'));
-			}
-		}
-
-		DB::delete('screens_items', [
-			'resourceid' => $graphids,
-			'resourcetype' => SCREEN_RESOURCE_LLD_GRAPH
-		]);
-
-		DB::delete('graphs', ['graphid' => $graphids]);
-
-		foreach ($delGraphs as $graph) {
-			info(_s('Graph prototype "%s" deleted.', $graph['name']));
-		}
-
-		return ['graphids' => $graphids];
 	}
 
 	protected function createReal($graph) {

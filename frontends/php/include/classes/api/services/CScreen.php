@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -57,33 +57,33 @@ class CScreen extends CApiService {
 			'screenids'					=> null,
 			'userids'					=> null,
 			'screenitemids'				=> null,
-			'editable'					=> null,
+			'editable'					=> false,
 			'nopermissions'				=> null,
 			// filter
 			'filter'					=> null,
 			'search'					=> null,
 			'searchByAny'				=> null,
-			'startSearch'				=> null,
-			'excludeSearch'				=> null,
+			'startSearch'				=> false,
+			'excludeSearch'				=> false,
 			'searchWildcardsEnabled'	=> null,
 			// output
 			'output'					=> API_OUTPUT_EXTEND,
 			'selectScreenItems'			=> null,
 			'selectUsers'				=> null,
 			'selectUserGroups'			=> null,
-			'countOutput'				=> null,
-			'groupCount'				=> null,
-			'preservekeys'				=> null,
+			'countOutput'				=> false,
+			'groupCount'				=> false,
+			'preservekeys'				=> false,
 			'sortfield'					=> '',
 			'sortorder'					=> '',
 			'limit'						=> null
 		];
 		$options = zbx_array_merge($defOptions, $options);
 
-		if ($options['countOutput'] !== null) {
+		if ($options['countOutput']) {
 			$count_output = true;
 			$options['output'] = ['screenid'];
-			$options['countOutput'] = null;
+			$options['countOutput'] = false;
 			$options['limit'] = null;
 		}
 		else {
@@ -177,10 +177,10 @@ class CScreen extends CApiService {
 				' FROM screens_items si'.
 				' WHERE '.dbConditionInt('si.screenid', array_keys($screenids)).
 					' AND '.dbConditionInt('si.resourcetype', [
-						SCREEN_RESOURCE_HOSTS_INFO, SCREEN_RESOURCE_TRIGGERS_INFO, SCREEN_RESOURCE_TRIGGERS_OVERVIEW,
+						SCREEN_RESOURCE_HOST_INFO, SCREEN_RESOURCE_TRIGGER_INFO, SCREEN_RESOURCE_TRIGGER_OVERVIEW,
 						SCREEN_RESOURCE_DATA_OVERVIEW, SCREEN_RESOURCE_HOSTGROUP_TRIGGERS,
 						SCREEN_RESOURCE_HOST_TRIGGERS, SCREEN_RESOURCE_GRAPH, SCREEN_RESOURCE_SIMPLE_GRAPH,
-						SCREEN_RESOURCE_PLAIN_TEXT, SCREEN_RESOURCE_CLOCK, SCREEN_RESOURCE_MAP, SCREEN_RESOURCE_SCREEN
+						SCREEN_RESOURCE_PLAIN_TEXT, SCREEN_RESOURCE_CLOCK, SCREEN_RESOURCE_MAP
 					]).
 					' AND si.resourceid<>0'
 			);
@@ -190,14 +190,14 @@ class CScreen extends CApiService {
 			while ($db_screen_item = DBfetch($db_screen_items)) {
 				if (!array_key_exists($db_screen_item['screenid'], $screens)) {
 					$screens[$db_screen_item['screenid']] = [
-						'groups' => [], 'hosts' => [], 'graphs' => [], 'items' => [], 'maps' => [], 'screens' => []
+						'groups' => [], 'hosts' => [], 'graphs' => [], 'items' => [], 'maps' => []
 					];
 				}
 
 				switch ($db_screen_item['resourcetype']) {
-					case SCREEN_RESOURCE_HOSTS_INFO:
-					case SCREEN_RESOURCE_TRIGGERS_INFO:
-					case SCREEN_RESOURCE_TRIGGERS_OVERVIEW:
+					case SCREEN_RESOURCE_HOST_INFO:
+					case SCREEN_RESOURCE_TRIGGER_INFO:
+					case SCREEN_RESOURCE_TRIGGER_OVERVIEW:
 					case SCREEN_RESOURCE_DATA_OVERVIEW:
 					case SCREEN_RESOURCE_HOSTGROUP_TRIGGERS:
 						$screens[$db_screen_item['screenid']]['groups'][$db_screen_item['resourceid']] = true;
@@ -224,10 +224,6 @@ class CScreen extends CApiService {
 
 					case SCREEN_RESOURCE_MAP:
 						$screens[$db_screen_item['screenid']]['maps'][$db_screen_item['resourceid']] = true;
-						break;
-
-					case SCREEN_RESOURCE_SCREEN:
-						$screens[$db_screen_item['screenid']]['screens'][$db_screen_item['resourceid']] = true;
 						break;
 				}
 			}
@@ -357,40 +353,14 @@ class CScreen extends CApiService {
 					}
 				}
 			}
-
-			// screens
-			$_screens = [];
-
-			foreach ($screens as $screenid => $resources) {
-				foreach ($resources['screens'] as $_screenid => $foo) {
-					$_screens[$_screenid][$screenid] = true;
-				}
-			}
-
-			if ($_screens) {
-				$db_screens = API::Screen()->get([
-					'output' => [],
-					'screenids' => array_keys($_screens),
-					'preservekeys' => true
-				]);
-
-				foreach ($_screens as $_screenid => $resources) {
-					if (!array_key_exists($_screenid, $db_screens)) {
-						foreach ($resources as $screenid => $foo) {
-							unset($screens[$screenid], $result[$screenid]);
-						}
-					}
-				}
-			}
 		}
 
 		if ($count_output) {
-			if ($options['groupCount'] !== null) {
+			if ($options['groupCount']) {
 				return [['rowscount' => count($result)]];
 			}
-			else {
-				return count($result);
-			}
+
+			return (string) count($result);
 		}
 
 		if ($result) {
@@ -398,7 +368,7 @@ class CScreen extends CApiService {
 		}
 
 		// removing keys (hash -> array)
-		if ($options['preservekeys'] === null) {
+		if (!$options['preservekeys']) {
 			$result = zbx_cleanHashes($result);
 		}
 
@@ -1051,6 +1021,7 @@ class CScreen extends CApiService {
 	 */
 	protected function updateReal(array $screens, array $db_screens) {
 		$update_screens = [];
+		CArrayHelper::sort($screens, ['screenid']);
 
 		foreach ($screens as $screen) {
 			$screenid = $screen['screenid'];
@@ -1252,7 +1223,6 @@ class CScreen extends CApiService {
 		$this->validateDelete($screenids);
 
 		DB::delete('screens_items', ['screenid' => $screenids]);
-		DB::delete('screens_items', ['resourceid' => $screenids, 'resourcetype' => SCREEN_RESOURCE_SCREEN]);
 		DB::delete('slides', ['screenid' => $screenids]);
 		DB::delete('screens', ['screenid' => $screenids]);
 		DB::delete('profiles', [

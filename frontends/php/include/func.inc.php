@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -101,7 +101,7 @@ function get_cookie($name, $default_value = null) {
 }
 
 function zbx_setcookie($name, $value, $time = null) {
-	setcookie($name, $value, isset($time) ? $time : 0, null, null, HTTPS);
+	setcookie($name, $value, isset($time) ? $time : 0, null, null, HTTPS, true);
 	$_COOKIE[$name] = $value;
 }
 
@@ -293,14 +293,18 @@ function zbx_date2str($format, $value = null) {
 	return $prefix.$output;
 }
 
-// calculate and convert timestamp to string representation
-function zbx_date2age($startDate, $endDate = 0, $utime = false) {
-	if (!$utime) {
-		$startDate = date('U', $startDate);
-		$endDate = $endDate ? date('U', $endDate) : time();
-	}
+/**
+ * Calculates and converts timestamp to string represenation.
+ *
+ * @param int|string $start_date  Start date timestamp.
+ * @param int|string $end_date    End date timestamp.
+ *
+ * @return string
+ */
+function zbx_date2age($start_date, $end_date = 0) {
+	$end_date = ($end_date != 0) ? $end_date : time();
 
-	return convertUnitsS(abs($endDate - $startDate));
+	return convertUnitsS($end_date - $start_date);
 }
 
 function zbxDateToTime($strdate) {
@@ -331,6 +335,17 @@ function zbxAddSecondsToUnixtime($sec, $unixtime) {
 }
 
 /*************** CONVERTING ******************/
+/**
+ * Convert the Windows new line (CR+LF) to Linux style line feed (LF).
+ *
+ * @param string $string  Input string that will be converted.
+ *
+ * @return string
+ */
+function CRLFtoLF($string) {
+	return str_replace("\r\n", "\n", $string);
+}
+
 function rgb2hex($color) {
 	$HEX = [
 		dechex($color[0]),
@@ -364,6 +379,40 @@ function hex2rgb($color) {
 	return [hexdec($r), hexdec($g), hexdec($b)];
 }
 
+function getColorVariations($color, $variations_requested = 1) {
+	if ($variations_requested <= 1) {
+		return [$color];
+	}
+
+	$change = hex2rgb('#ffffff'); // Color which is increased/decreased in variations.
+	$max = 50;
+
+	$color = hex2rgb($color);
+	$variations = [];
+
+	$range = range(-1 * $max, $max, $max * 2 / $variations_requested);
+
+	// Remove redundant values.
+	while (count($range) > $variations_requested) {
+		(count($range) % 2) ? array_shift($range) : array_pop($range);
+	}
+
+	// Calculate colors.
+	foreach ($range as $var) {
+		$r = $color[0] + ($change[0] / 100 * $var);
+		$g = $color[1] + ($change[1] / 100 * $var);
+		$b = $color[2] + ($change[2] / 100 * $var);
+
+		$variations[] = '#' . rgb2hex([
+			$r < 0 ? 0 : ($r > 255 ? 255 : (int) $r),
+			$g < 0 ? 0 : ($g > 255 ? 255 : (int) $g),
+			$b < 0 ? 0 : ($b > 255 ? 255 : (int) $b)
+		]);
+	}
+
+	return $variations;
+}
+
 function zbx_num2bitstr($num, $rev = false) {
 	if (!is_numeric($num)) {
 		return 0;
@@ -373,7 +422,7 @@ function zbx_num2bitstr($num, $rev = false) {
 	$strbin = '';
 
 	$len = 32;
-	if ($num > 2147483647) {
+	if (bccomp($num, ZBX_MAX_INT32) > 0) {
 		$len = 64;
 	}
 
@@ -392,7 +441,7 @@ function zbx_num2bitstr($num, $rev = false) {
 }
 
 /**
- * Converts strings like 2M or 5k to bytes
+ * Converts strings like 2M or 5k to bytes.
  *
  * @param string $val
  *
@@ -405,30 +454,38 @@ function str2mem($val) {
 
 	switch ($last) {
 		case 'g':
-			$val *= 1024;
-			/* falls through */
+			$val *= ZBX_GIBIBYTE;
+			break;
 		case 'm':
-			$val *= 1024;
-			/* falls through */
+			$val *= ZBX_MEBIBYTE;
+			break;
 		case 'k':
-			$val *= 1024;
+			$val *= ZBX_KIBIBYTE;
+			break;
 	}
 
 	return $val;
 }
 
+/**
+ * Converts bytes into human-readable form.
+ *
+ * @param string|int $size
+ *
+ * @return string
+ */
 function mem2str($size) {
 	$prefix = 'B';
-	if ($size > 1048576) {
-		$size = $size / 1048576;
+	if ($size > ZBX_MEBIBYTE) {
+		$size = $size / ZBX_MEBIBYTE;
 		$prefix = 'M';
 	}
-	elseif ($size > 1024) {
-		$size = $size / 1024;
+	elseif ($size > ZBX_KIBIBYTE) {
+		$size = $size / ZBX_KIBIBYTE;
 		$prefix = 'K';
 	}
 
-	return round($size, 6).$prefix;
+	return round($size, ZBX_UNITS_ROUNDOFF_LOWER_LIMIT).$prefix;
 }
 
 function convertUnitsUptime($value) {
@@ -467,8 +524,8 @@ function convertUnitsUptime($value) {
  * If some value is equal to zero, it is omitted. For example, if the period is 1y 0m 4d, it will be displayed as
  * 1y 4d, not 1y 0m 4d or 1y 4d #h.
  *
- * @param int $value	time period in seconds
- * @param bool $ignore_millisec	without ms (1s 200 ms = 1.2s)
+ * @param int  $value            Time period in seconds.
+ * @param bool $ignore_millisec  Without ms (1s 200 ms = 1.2s).
  *
  * @return string
  */
@@ -559,15 +616,21 @@ function convertUnitsS($value, $ignore_millisec = false) {
 		}
 	}
 
-	$str .= isset($values['y']) ? $values['y']._x('y', 'year short').' ' : '';
-	$str .= isset($values['m']) ? $values['m']._x('m', 'month short').' ' : '';
-	$str .= isset($values['d']) ? $values['d']._x('d', 'day short').' ' : '';
-	$str .= isset($values['h']) ? $values['h']._x('h', 'hour short').' ' : '';
-	$str .= isset($values['mm']) ? $values['mm']._x('m', 'minute short').' ' : '';
-	$str .= isset($values['s']) ? $values['s']._x('s', 'second short').' ' : '';
-	$str .= isset($values['ms']) ? $values['ms']._x('ms', 'millisecond short') : '';
+	$units = [
+		'y' => _x('y', 'year short'),
+		'm' => _x('m', 'month short'),
+		'd' => _x('d', 'day short'),
+		'h' => _x('h', 'hour short'),
+		'mm' => _x('m', 'minute short'),
+		's' => _x('s', 'second short'),
+		'ms' => _x('ms', 'millisecond short')
+	];
 
-	return $str ? rtrim($str) : '0';
+	foreach (array_filter($values) as $unit => $value) {
+		$str .= ' '.$value.$units[$unit];
+	}
+
+	return $str ? trim($str) : '0';
 }
 
 /**
@@ -614,16 +677,24 @@ function convert_units($options = []) {
 		return convertUnitsS($options['value'], $options['ignoreMillisec']);
 	}
 
-	// any other unit
 	// black list of units that should have no multiplier prefix (K, M, G etc) applied
 	$blackList = ['%', 'ms', 'rpm', 'RPM'];
 
+	// add to the blacklist if unit is prefixed with '!'
+	if ($options['units'] !== null && $options['units'] !== '' && $options['units'][0] === '!') {
+		$options['units'] = substr($options['units'], 1);
+		$blackList[] = $options['units'];
+	}
+
+	// any other unit
 	if (in_array($options['units'], $blackList) || (zbx_empty($options['units'])
 			&& ($options['convert'] == ITEM_CONVERT_WITH_UNITS))) {
-		if (abs($options['value']) >= ZBX_UNITS_ROUNDOFF_THRESHOLD) {
-			$options['value'] = round($options['value'], ZBX_UNITS_ROUNDOFF_UPPER_LIMIT);
+		if (preg_match('/\.\d+$/', $options['value'])) {
+			$format = (abs($options['value']) >= ZBX_UNITS_ROUNDOFF_THRESHOLD)
+				? '%.'.ZBX_UNITS_ROUNDOFF_MIDDLE_LIMIT.'f'
+				: '%.'.ZBX_UNITS_ROUNDOFF_LOWER_LIMIT.'f';
+			$options['value'] = sprintf($format, $options['value']);
 		}
-		$options['value'] = sprintf('%.'.ZBX_UNITS_ROUNDOFF_LOWER_LIMIT.'f', $options['value']);
 		$options['value'] = preg_replace('/^([\-0-9]+)(\.)([0-9]*)[0]+$/U', '$1$2$3', $options['value']);
 		$options['value'] = rtrim($options['value'], '.');
 
@@ -632,13 +703,13 @@ function convert_units($options = []) {
 
 	// if one or more items is B or Bps, then Y-scale use base 8 and calculated in bytes
 	if ($options['byteStep']) {
-		$step = 1024;
+		$step = ZBX_KIBIBYTE;
 	}
 	else {
 		switch ($options['units']) {
 			case 'Bps':
 			case 'B':
-				$step = 1024;
+				$step = ZBX_KIBIBYTE;
 				$options['convert'] = $options['convert'] ? $options['convert'] : ITEM_CONVERT_NO_UNITS;
 				break;
 			case 'b':
@@ -740,50 +811,101 @@ function convert_units($options = []) {
 }
 
 /**
+ * Convert time format with suffixes to seconds.
+ * Examples:
+ *		10m = 600
+ *		3d = 10800
+ *		-10m = -600
+ *
+ * @param string $time
+ *
+ * @return null|string
+ */
+function timeUnitToSeconds($time) {
+	preg_match('/^(?<sign>[\-+])?(?<number>(\d)+)(?<suffix>['.ZBX_TIME_SUFFIXES.'])?$/', $time, $matches);
+
+	$is_negative = (array_key_exists('sign', $matches) && $matches['sign'] === '-');
+
+	if (!array_key_exists('number', $matches)) {
+		return null;
+	}
+
+	if (array_key_exists('suffix', $matches)) {
+		$time = $matches['number'];
+
+		switch ($matches['suffix']) {
+			case 's':
+				$sec = $time;
+				break;
+			case 'm':
+				$sec = bcmul($time, SEC_PER_MIN);
+				break;
+			case 'h':
+				$sec = bcmul($time, SEC_PER_HOUR);
+				break;
+			case 'd':
+				$sec = bcmul($time, SEC_PER_DAY);
+				break;
+			case 'w':
+				$sec = bcmul($time, SEC_PER_WEEK);
+				break;
+		}
+	}
+	else {
+		$sec = $matches['number'];
+	}
+
+	return $is_negative ? bcmul($sec, -1) : $sec;
+}
+
+/**
  * Converts value with suffix to actual value.
  * Supported time suffixes: s, m, h, d, w
  * Supported metric suffixes: K, M, G, T
  *
  * @param string $value
+ * @param int    $scale  The number of digits after the decimal place in the result.
  *
  * @return string
  */
-function convertFunctionValue($value) {
-	$suffix = $value[strlen($value) - 1];
-	if (!ctype_digit($suffix)) {
-		$value = substr($value, 0, strlen($value) - 1);
+function convertFunctionValue($value, $scale = 0) {
+	$suffix = substr($value, -1);
 
-		switch ($suffix) {
-			case 's':
-				break;
-			case 'm':
-				$value = bcmul($value, '60');
-				break;
-			case 'h':
-				$value = bcmul($value, '3600');
-				break;
-			case 'd':
-				$value = bcmul($value, '86400');
-				break;
-			case 'w':
-				$value = bcmul($value, '604800');
-				break;
-			case 'K':
-				$value = bcmul($value, '1024');
-				break;
-			case 'M':
-				$value = bcmul($value, '1048576');
-				break;
-			case 'G':
-				$value = bcmul($value, '1073741824');
-				break;
-			case 'T':
-				$value = bcmul($value, '1099511627776');
-				break;
-		}
+	if (ctype_digit($suffix)) {
+		return $value;
 	}
 
-	return $value;
+	$value = substr($value, 0, -1);
+
+	switch ($suffix) {
+		case 'm':
+			return bcmul($value, '60', $scale);
+
+		case 'h':
+			return bcmul($value, '3600', $scale);
+
+		case 'd':
+			return bcmul($value, '86400', $scale);
+
+		case 'w':
+			return bcmul($value, '604800', $scale);
+
+		case 'K':
+			return bcmul($value, ZBX_KIBIBYTE, $scale);
+
+		case 'M':
+			return bcmul($value, ZBX_MEBIBYTE, $scale);
+
+		case 'G':
+			return bcmul($value, ZBX_GIBIBYTE, $scale);
+
+		case 'T':
+			return bcmul($value, '1099511627776', $scale);
+
+		case 's':
+		default:
+			return $value;
+	}
 }
 
 /************* ZBX MISC *************/
@@ -810,7 +932,13 @@ function zbx_avg($values) {
 	return bcdiv($sum, count($values));
 }
 
-// accepts parameter as integer either
+/**
+ * Check if every character in given string value is a decimal digit.
+ *
+ * @param string | int   $x Value to check.
+ *
+ * @return boolean
+ */
 function zbx_ctype_digit($x) {
 	return ctype_digit(strval($x));
 }
@@ -958,42 +1086,6 @@ function zbx_formatDomId($value) {
 	return str_replace(['[', ']'], ['_', ''], $value);
 }
 
-/**
- * Sort an array of objects so that the objects whose $column value matches $pattern are at the top.
- * Return the first $limit objects.
- *
- * @param array 	$table		array of objects to sort
- * @param string 	$column		name of the $column to search
- * @param string 	$pattern	string to match the value of $column against
- * @param int		$limit		number of objects to return
- *
- * @return array
- */
-function selectByPattern(array $table, $column, $pattern, $limit) {
-	$chunk_size = $limit;
-
-	$rsTable = [];
-	foreach ($table as $num => $row) {
-		if (mb_strtolower($row[$column]) === mb_strtolower($pattern)) {
-			$rsTable = [$num => $row] + $rsTable;
-		}
-		elseif ($limit > 0) {
-			$rsTable[$num] = $row;
-		}
-		else {
-			continue;
-		}
-		$limit--;
-	}
-
-	if (!empty($rsTable)) {
-		$rsTable = array_chunk($rsTable, $chunk_size, true);
-		$rsTable = $rsTable[0];
-	}
-
-	return $rsTable;
-}
-
 /************* SORT *************/
 function natksort(&$array) {
 	$keys = array_keys($array);
@@ -1008,17 +1100,6 @@ function natksort(&$array) {
 	$array = $new_array;
 
 	return true;
-}
-
-function asort_by_key(&$array, $key) {
-	if (!is_array($array)) {
-		error(_('Incorrect type of asort_by_key.'));
-		return [];
-	}
-	$key = htmlspecialchars($key);
-	uasort($array, create_function('$a,$b', 'return $a[\''.$key.'\'] - $b[\''.$key.'\'];'));
-
-	return $array;
 }
 
 // recursively sort an array by key
@@ -1217,15 +1298,17 @@ function zbx_toHash($value, $field = null) {
  * key.
  *
  * E.g:
- * zbx_toObject(array(1, 2), 'hostid')  // returns array(array('hostid' => 1), array('hostid' => 2))
- * zbx_toObject(3, 'hostid')            // returns array(array('hostid' => 3))
+ * zbx_toObject(array(1, 2), 'hostid')            // returns array(array('hostid' => 1), array('hostid' => 2))
+ * zbx_toObject(3, 'hostid')                      // returns array(array('hostid' => 3))
+ * zbx_toObject(array('a' => 1), 'hostid', true)  // returns array('a' => array('hostid' => 1))
  *
  * @param $value
  * @param $field
+ * @param $preserve_keys
  *
  * @return array
  */
-function zbx_toObject($value, $field) {
+function zbx_toObject($value, $field, $preserve_keys = false) {
 	if (is_null($value)) {
 		return $value;
 	}
@@ -1236,10 +1319,14 @@ function zbx_toObject($value, $field) {
 		$result = [[$field => $value]];
 	}
 	elseif (!isset($value[$field])) {
-		foreach ($value as $val) {
+		foreach ($value as $key => $val) {
 			if (!is_array($val)) {
-				$result[] = [$field => $val];
+				$result[$key] = [$field => $val];
 			}
+		}
+
+		if (!$preserve_keys) {
+			$result = array_values($result);
 		}
 	}
 
@@ -1370,17 +1457,27 @@ function zbx_str2links($text) {
 	foreach (explode("\n", $text) as $line) {
 		$line = rtrim($line, "\r ");
 
-		preg_match_all('#https?://[^\n\t\r ]+#u', $line, $matches, PREG_OFFSET_CAPTURE);
+		preg_match_all('#https?://[^\n\t\r ]+#u', $line, $matches);
 
 		$start = 0;
+
 		foreach ($matches[0] as $match) {
-			$result[] = mb_substr($line, $start, $match[1] - $start);
-			$result[] = new CLink($match[0], $match[0]);
-			$start = $match[1] + mb_strlen($match[0]);
+			if (($pos = mb_strpos($line, $match, $start)) !== false) {
+				if ($pos != $start) {
+					$result[] = mb_substr($line, $start, $pos - $start);
+				}
+				$result[] = new CLink(CHTML::encode($match), $match);
+				$start = $pos + mb_strlen($match);
+			}
 		}
-		$result[] = mb_substr($line, $start);
+
+		if (mb_strlen($line) != $start) {
+			$result[] = mb_substr($line, $start);
+		}
+
 		$result[] = BR();
 	}
+
 	array_pop($result);
 
 	return $result;
@@ -1674,6 +1771,16 @@ function access_deny($mode = ACCESS_DENY_OBJECT) {
 	else {
 		// url to redirect the user to after he logs in
 		$url = (new CUrl(!empty($_REQUEST['request']) ? $_REQUEST['request'] : ''))->removeArgument('sid');
+		$config = select_config();
+
+		if ($config['http_login_form'] == ZBX_AUTH_FORM_HTTP && $config['http_auth_enabled'] == ZBX_AUTH_HTTP_ENABLED
+				&& (!CWebUser::isLoggedIn() || CWebUser::isGuest())) {
+			$redirect_to = (new CUrl('index_http.php'))->setArgument('request', $url->toString());
+			redirect($redirect_to->toString());
+
+			exit;
+		}
+
 		$url = urlencode($url->toString());
 
 		// if the user is logged in - render the access denied message
@@ -1711,7 +1818,12 @@ function access_deny($mode = ACCESS_DENY_OBJECT) {
 
 		$data['theme'] = getUserTheme(CWebUser::$data);
 
-		(new CView('general.warning', $data))->render();
+		if (detect_page_type() == PAGE_TYPE_JS) {
+			(new CView('layout.json', ['main_block' => json_encode(['error' => $data['header']])]))->render();
+		}
+		else {
+			(new CView('general.warning', $data))->render();
+		}
 		exit;
 	}
 }
@@ -1742,16 +1854,25 @@ function detect_page_type($default = PAGE_TYPE_HTML) {
 function makeMessageBox($good, array $messages, $title = null, $show_close_box = true, $show_details = false)
 {
 	$class = $good ? ZBX_STYLE_MSG_GOOD : ZBX_STYLE_MSG_BAD;
-	$msg_box = (new CDiv($title))->addClass($class);
+	$msg_details = null;
+	$link_details = null;
 
 	if ($messages) {
-		$msg_details = (new CDiv())->addClass(ZBX_STYLE_MSG_DETAILS);
-
 		if ($title !== null) {
-			$link = (new CSpan(_('Details')))
-				->addClass(ZBX_STYLE_LINK_ACTION)
-				->onClick('javascript: showHide($(this).next(\'.'.ZBX_STYLE_MSG_DETAILS_BORDER.'\'));');
-			$msg_details->addItem($link);
+			$link_details = (new CLinkAction())
+				->addItem(_('Details'))
+				->addItem(' ') // space
+				->addItem((new CSpan())
+					->setId('details-arrow')
+					->addClass($show_details ? ZBX_STYLE_ARROW_UP : ZBX_STYLE_ARROW_DOWN)
+				)
+				->setAttribute('aria-expanded', $show_details ? 'true' : 'false')
+				->onClick('javascript: '.
+					'showHide(jQuery(this).siblings(\'.'.ZBX_STYLE_MSG_DETAILS.'\')'.
+						'.find(\'.'.ZBX_STYLE_MSG_DETAILS_BORDER.'\'));'.
+					'jQuery("#details-arrow", $(this)).toggleClass("'.ZBX_STYLE_ARROW_UP.' '.ZBX_STYLE_ARROW_DOWN.'");'.
+					'jQuery(this).attr(\'aria-expanded\', jQuery(this).find(\'.'.ZBX_STYLE_ARROW_DOWN.'\').length == 0)'
+				);
 		}
 
 		$list = new CList();
@@ -1767,33 +1888,77 @@ function makeMessageBox($good, array $messages, $title = null, $show_close_box =
 				$list->addItem($message_part);
 			}
 		}
-		$msg_details->addItem($list);
-
-		$msg_box->addItem($msg_details);
+		$msg_details = (new CDiv())->addClass(ZBX_STYLE_MSG_DETAILS)->addItem($list);
 	}
+
+	if ($title !== null) {
+		$title = new CSpan($title);
+	}
+
+	// Details link should be in front of title.
+	$msg_box = (new CTag('output', true, [$link_details, $title, $msg_details]))
+		->addClass($class)
+		->setAttribute('role', 'contentinfo')
+		->setAttribute('aria-label', $good ? _('Success message') : _('Error message'));
 
 	if ($show_close_box) {
 		$msg_box->addItem((new CSimpleButton())
 			->addClass(ZBX_STYLE_OVERLAY_CLOSE_BTN)
 			->onClick('jQuery(this).closest(\'.'.$class.'\').remove();')
-			->setAttribute('title', _('Close')));
+			->setTitle(_('Close')));
 	}
 
 	return $msg_box;
 }
 
 /**
+ * Filters messages that can be displayed to user based on defines (see ZBX_SHOW_TECHNICAL_ERRORS) and user settings.
+ *
+ * @param array $messages	List of messages to filter.
+ *
+ * @return array
+ */
+function filter_messages(array $messages = []) {
+	if (!ZBX_SHOW_TECHNICAL_ERRORS && CWebUser::getType() != USER_TYPE_SUPER_ADMIN && !CWebUser::getDebugMode()) {
+		$filtered_messages = [];
+		$generic_exists = false;
+
+		foreach ($messages as $message) {
+			if (array_key_exists('src', $message) && ($message['src'] === 'sql' || $message['src'] === 'php')) {
+				if (!$generic_exists) {
+					$message['message'] = _('System error occurred. Please contact Zabbix administrator.');
+					$filtered_messages[] = $message;
+					$generic_exists = true;
+				}
+			}
+			else {
+				$filtered_messages[] = $message;
+			}
+		}
+		$messages = $filtered_messages;
+	}
+
+	return $messages;
+}
+
+/**
  * Returns the message box when messages are present; null otherwise
  *
- * @global array $ZBX_MESSAGES
+ * @param  bool    $good            Parameter passed to makeMessageBox to specify message box style.
+ * @param  string  $title           Message box title.
+ * @param  bool    $show_close_box  Show or hide close button in error message box.
+ * @global array   $ZBX_MESSAGES
  *
  * @return CDiv|null
  */
-function getMessages()
-{
+function getMessages($good = false, $title = null, $show_close_box = true) {
 	global $ZBX_MESSAGES;
 
-	$message_box = isset($ZBX_MESSAGES) && $ZBX_MESSAGES ? makeMessageBox(false, $ZBX_MESSAGES) : null;
+	$messages = (isset($ZBX_MESSAGES) && $ZBX_MESSAGES) ? filter_messages($ZBX_MESSAGES) : [];
+
+	$message_box = ($title || $messages)
+		? makeMessageBox($good, $messages, $title, $show_close_box)
+		: null;
 
 	$ZBX_MESSAGES = [];
 
@@ -1816,8 +1981,7 @@ function show_messages($good = false, $okmsg = null, $errmsg = null) {
 	$imageMessages = [];
 
 	$title = $good ? $okmsg : $errmsg;
-	$messages = isset($ZBX_MESSAGES) ? $ZBX_MESSAGES : [];
-
+	$messages = isset($ZBX_MESSAGES) ? filter_messages($ZBX_MESSAGES) : [];
 	$ZBX_MESSAGES = [];
 
 	switch ($page['type']) {
@@ -1916,7 +2080,13 @@ function info($msgs) {
 	}
 }
 
-function error($msgs) {
+/*
+ * Add an error to global message array.
+ *
+ * @param string | array $msg	Error message text.
+ * @param string		 $src	The source of error message.
+ */
+function error($msgs, $src = '') {
 	global $ZBX_MESSAGES;
 
 	if (!isset($ZBX_MESSAGES)) {
@@ -1926,7 +2096,24 @@ function error($msgs) {
 	$msgs = zbx_toArray($msgs);
 
 	foreach ($msgs as $msg) {
-		$ZBX_MESSAGES[] = ['type' => 'error', 'message' => $msg];
+		$ZBX_MESSAGES[] = [
+			'type' => 'error',
+			'message' => $msg,
+			'src' => $src
+		];
+	}
+}
+
+/**
+ * Add multiple errors under single header.
+ *
+ * @param array  $data
+ * @param string $data['header']  common header for all error messages
+ * @param array  $data['msgs']    array of error messages
+ */
+function error_group($data) {
+	foreach (zbx_toArray($data['msgs']) as $msg) {
+		error($data['header'] . ' ' . $msg);
 	}
 }
 
@@ -1945,7 +2132,7 @@ function clear_messages($count = null) {
 		$ZBX_MESSAGES = [];
 	}
 
-	return $result;
+	return $result ? filter_messages($result) : $result;
 }
 
 function fatal_error($msg) {
@@ -1956,25 +2143,30 @@ function fatal_error($msg) {
 
 function parse_period($str) {
 	$out = null;
-	$str = trim($str, ';');
-	$periods = explode(';', $str);
-	foreach ($periods as $period) {
-		if (!preg_match('/^([1-7])-([1-7]),([0-9]{1,2}):([0-9]{1,2})-([0-9]{1,2}):([0-9]{1,2})$/', $period, $arr)) {
+	$time_periods_parser = new CTimePeriodsParser();
+
+	if ($time_periods_parser->parse($str) != CParser::PARSE_SUCCESS) {
+		return null;
+	}
+
+	foreach ($time_periods_parser->getPeriods() as $period) {
+		if (!preg_match('/^([1-7])-([1-7]),([0-9]{1,2}):([0-9]{1,2})-([0-9]{1,2}):([0-9]{1,2})$/', $period, $matches)) {
 			return null;
 		}
 
-		for ($i = $arr[1]; $i <= $arr[2]; $i++) {
+		for ($i = $matches[1]; $i <= $matches[2]; $i++) {
 			if (!isset($out[$i])) {
 				$out[$i] = [];
 			}
 			array_push($out[$i], [
-				'start_h' => $arr[3],
-				'start_m' => $arr[4],
-				'end_h' => $arr[5],
-				'end_m' => $arr[6]
+				'start_h' => $matches[3],
+				'start_m' => $matches[4],
+				'end_h' => $matches[5],
+				'end_m' => $matches[6]
 			]);
 		}
 	}
+
 	return $out;
 }
 
@@ -1982,158 +2174,164 @@ function get_status() {
 	global $ZBX_SERVER, $ZBX_SERVER_PORT;
 
 	$status = [
-		'triggers_count' => 0,
-		'triggers_count_enabled' => 0,
+		'is_running' => false,
+		'has_status' => false
+	];
+
+	$server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT, ZBX_SOCKET_TIMEOUT, ZBX_SOCKET_BYTES_LIMIT);
+	$status['is_running'] = $server->isRunning(get_cookie(ZBX_SESSION_NAME));
+
+	if ($status['is_running'] === false) {
+		return $status;
+	}
+
+	$server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT, 15, ZBX_SOCKET_BYTES_LIMIT);
+	$server_status = $server->getStatus(get_cookie(ZBX_SESSION_NAME));
+	$status['has_status'] = (bool) $server_status;
+
+	if ($server_status === false) {
+		error($server->getError());
+		return $status;
+	}
+
+	$status += [
 		'triggers_count_disabled' => 0,
 		'triggers_count_off' => 0,
 		'triggers_count_on' => 0,
-		'items_count' => 0,
 		'items_count_monitored' => 0,
 		'items_count_disabled' => 0,
 		'items_count_not_supported' => 0,
-		'hosts_count' => 0,
 		'hosts_count_monitored' => 0,
 		'hosts_count_not_monitored' => 0,
 		'hosts_count_template' => 0,
-		'users_online' => 0,
-		'qps_total' => 0
+		'users_count' => 0,
+		'users_online' => 0
 	];
 
-	// server
-	$zabbixServer = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT, ZBX_SOCKET_TIMEOUT, 0);
-	$status['zabbix_server'] = $zabbixServer->isRunning() ? _('Yes') : _('No');
+	// hosts
+	foreach ($server_status['template stats'] as $stats) {
+		$status['hosts_count_template'] += $stats['count'];
+	}
+
+	foreach ($server_status['host stats'] as $stats) {
+		if ($stats['attributes']['proxyid'] == 0) {
+			switch ($stats['attributes']['status']) {
+				case HOST_STATUS_MONITORED:
+					$status['hosts_count_monitored'] += $stats['count'];
+					break;
+
+				case HOST_STATUS_NOT_MONITORED:
+					$status['hosts_count_not_monitored'] += $stats['count'];
+					break;
+			}
+		}
+	}
+	$status['hosts_count'] = $status['hosts_count_monitored'] + $status['hosts_count_not_monitored']
+			+ $status['hosts_count_template'];
+
+	// items
+	foreach ($server_status['item stats'] as $stats) {
+		if ($stats['attributes']['proxyid'] == 0) {
+			switch ($stats['attributes']['status']) {
+				case ITEM_STATUS_ACTIVE:
+					if (array_key_exists('state', $stats['attributes'])) {
+						switch ($stats['attributes']['state']) {
+							case ITEM_STATE_NORMAL:
+								$status['items_count_monitored'] += $stats['count'];
+								break;
+
+							case ITEM_STATE_NOTSUPPORTED:
+								$status['items_count_not_supported'] += $stats['count'];
+								break;
+						}
+					}
+					break;
+
+				case ITEM_STATUS_DISABLED:
+					$status['items_count_disabled'] += $stats['count'];
+					break;
+			}
+		}
+	}
+	$status['items_count'] = $status['items_count_monitored'] + $status['items_count_disabled']
+			+ $status['items_count_not_supported'];
 
 	// triggers
-	$dbTriggers = DBselect(
-		'SELECT COUNT(DISTINCT t.triggerid) AS cnt,t.status,t.value'.
-			' FROM triggers t'.
-			' WHERE NOT EXISTS ('.
-				'SELECT f.functionid FROM functions f'.
-					' JOIN items i ON f.itemid=i.itemid'.
-					' JOIN hosts h ON i.hostid=h.hostid'.
-					' WHERE f.triggerid=t.triggerid AND (i.status<>'.ITEM_STATUS_ACTIVE.' OR h.status<>'.HOST_STATUS_MONITORED.')'.
-				')'.
-			' AND t.flags IN ('.ZBX_FLAG_DISCOVERY_NORMAL.','.ZBX_FLAG_DISCOVERY_CREATED.')'.
-			' GROUP BY t.status,t.value'
-		);
-	while ($dbTrigger = DBfetch($dbTriggers)) {
-		switch ($dbTrigger['status']) {
+	foreach ($server_status['trigger stats'] as $stats) {
+		switch ($stats['attributes']['status']) {
 			case TRIGGER_STATUS_ENABLED:
-				switch ($dbTrigger['value']) {
-					case TRIGGER_VALUE_FALSE:
-						$status['triggers_count_off'] = $dbTrigger['cnt'];
-						break;
-					case TRIGGER_VALUE_TRUE:
-						$status['triggers_count_on'] = $dbTrigger['cnt'];
-						break;
+				if (array_key_exists('value', $stats['attributes'])) {
+					switch ($stats['attributes']['value']) {
+						case TRIGGER_VALUE_FALSE:
+							$status['triggers_count_off'] += $stats['count'];
+							break;
+
+						case TRIGGER_VALUE_TRUE:
+							$status['triggers_count_on'] += $stats['count'];
+							break;
+					}
 				}
 				break;
+
 			case TRIGGER_STATUS_DISABLED:
-				$status['triggers_count_disabled'] += $dbTrigger['cnt'];
+				$status['triggers_count_disabled'] += $stats['count'];
 				break;
 		}
 	}
 	$status['triggers_count_enabled'] = $status['triggers_count_off'] + $status['triggers_count_on'];
 	$status['triggers_count'] = $status['triggers_count_enabled'] + $status['triggers_count_disabled'];
 
-	// items
-	$dbItems = DBselect(
-		'SELECT COUNT(i.itemid) AS cnt,i.status,i.state'.
-				' FROM items i'.
-				' INNER JOIN hosts h ON i.hostid=h.hostid'.
-				' WHERE h.status='.HOST_STATUS_MONITORED.
-					' AND i.flags IN ('.ZBX_FLAG_DISCOVERY_NORMAL.','.ZBX_FLAG_DISCOVERY_CREATED.')'.
-					' AND i.type<>'.ITEM_TYPE_HTTPTEST.
-				' GROUP BY i.status,i.state');
-	while ($dbItem = DBfetch($dbItems)) {
-		if ($dbItem['status'] == ITEM_STATUS_ACTIVE) {
-			if ($dbItem['state'] == ITEM_STATE_NORMAL) {
-				$status['items_count_monitored'] = $dbItem['cnt'];
-			}
-			else {
-				$status['items_count_not_supported'] = $dbItem['cnt'];
-			}
-		}
-		elseif ($dbItem['status'] == ITEM_STATUS_DISABLED) {
-			$status['items_count_disabled'] += $dbItem['cnt'];
-		}
-	}
-	$status['items_count'] = $status['items_count_monitored'] + $status['items_count_disabled']
-			+ $status['items_count_not_supported'];
-
-	// hosts
-	$dbHosts = DBselect(
-		'SELECT COUNT(*) AS cnt,h.status'.
-		' FROM hosts h'.
-		' WHERE '.dbConditionInt('h.status', [
-				HOST_STATUS_MONITORED, HOST_STATUS_NOT_MONITORED, HOST_STATUS_TEMPLATE
-			]).
-			' AND '.dbConditionInt('h.flags', [ZBX_FLAG_DISCOVERY_NORMAL, ZBX_FLAG_DISCOVERY_CREATED]).
-		' GROUP BY h.status');
-	while ($dbHost = DBfetch($dbHosts)) {
-		switch ($dbHost['status']) {
-			case HOST_STATUS_MONITORED:
-				$status['hosts_count_monitored'] = $dbHost['cnt'];
-				break;
-			case HOST_STATUS_NOT_MONITORED:
-				$status['hosts_count_not_monitored'] = $dbHost['cnt'];
-				break;
-			case HOST_STATUS_TEMPLATE:
-				$status['hosts_count_template'] = $dbHost['cnt'];
-				break;
-		}
-	}
-	$status['hosts_count'] = $status['hosts_count_monitored'] + $status['hosts_count_not_monitored']
-			+ $status['hosts_count_template'];
-
 	// users
-	$row = DBfetch(DBselect('SELECT COUNT(*) AS usr_cnt FROM users u'));
+	foreach ($server_status['user stats'] as $stats) {
+		switch ($stats['attributes']['status']) {
+			case ZBX_SESSION_ACTIVE:
+				$status['users_online'] += $stats['count'];
+				break;
 
-	$status['users_count'] = $row['usr_cnt'];
-	$status['users_online'] = 0;
-
-	$db_sessions = DBselect(
-		'SELECT s.userid,s.status,MAX(s.lastaccess) AS lastaccess'.
-		' FROM sessions s'.
-		' WHERE s.status='.ZBX_SESSION_ACTIVE.
-		' GROUP BY s.userid,s.status'
-	);
-	while ($session = DBfetch($db_sessions)) {
-		if (($session['lastaccess'] + ZBX_USER_ONLINE_TIME) >= time()) {
-			$status['users_online']++;
+			case ZBX_SESSION_PASSIVE:
+				$status['users_count'] += $stats['count'];
+				break;
 		}
 	}
+	$status['users_count'] += $status['users_online'];
 
-	// comments: !!! Don't forget sync code with C !!!
-	$row = DBfetch(DBselect(
-		'SELECT SUM(CAST(1.0/i.delay AS DECIMAL(20,10))) AS qps'.
-		' FROM items i,hosts h'.
-		' WHERE i.status='.ITEM_STATUS_ACTIVE.
-		' AND i.hostid=h.hostid'.
-		' AND h.status='.HOST_STATUS_MONITORED.
-		' AND i.delay<>0'.
-		' AND i.flags<>'.ZBX_FLAG_DISCOVERY_PROTOTYPE
-	));
-	$status['qps_total'] = round($row['qps'], 2);
+	// performance
+	if (array_key_exists('required performance', $server_status)) {
+		$status['vps_total'] = 0;
+
+		foreach ($server_status['required performance'] as $stats) {
+			if ($stats['attributes']['proxyid'] == 0) {
+				$status['vps_total'] += $stats['count'];
+			}
+		}
+	}
 
 	return $status;
 }
 
+/**
+ * Set image header.
+ *
+ * @param integer $format    One of IMAGE_FORMAT_* constants. If not set global $IMAGE_FORMAT_DEFAULT will be used.
+ */
 function set_image_header($format = null) {
 	global $IMAGE_FORMAT_DEFAULT;
 
-	if (is_null($format)) {
-		$format = $IMAGE_FORMAT_DEFAULT;
-	}
+	switch ($format !== null ? $format : $IMAGE_FORMAT_DEFAULT) {
+		case IMAGE_FORMAT_JPEG:
+			header('Content-type: image/jpeg');
+			break;
 
-	if (IMAGE_FORMAT_JPEG == $format) {
-		header('Content-type: image/jpeg');
-	}
-	if (IMAGE_FORMAT_TEXT == $format) {
-		header('Content-type: text/html');
-	}
-	else {
-		header('Content-type: image/png');
+		case IMAGE_FORMAT_GIF:
+			header('Content-type: image/gif');
+			break;
+
+		case IMAGE_FORMAT_TEXT:
+			header('Content-type: text/html');
+			break;
+
+		default:
+			header('Content-type: image/png');
 	}
 
 	header('Expires: Mon, 17 Aug 1998 12:51:50 GMT');
@@ -2201,78 +2399,69 @@ function hasErrorMesssages() {
 /**
  * Clears table rows selection's cookies.
  *
- * @param string $cookieId		parent ID, is used as cookie suffix
+ * @param string $parentid  parent ID, is used as sessionStorage suffix
+ * @param array  $keepids   checked rows ids
  */
-function uncheckTableRows($cookieId = null) {
-	insert_js('cookie.eraseArray("cb_'.basename($_SERVER['SCRIPT_NAME'], '.php').
-		($cookieId === null ? '' : '_'.$cookieId).'")'
-	);
+function uncheckTableRows($parentid = null, $keepids = []) {
+	$key = implode('_', array_filter(['cb', basename($_SERVER['SCRIPT_NAME'], '.php'), $parentid]));
+
+	if ($keepids) {
+		// If $keepids will not have same key as value, it will create mess, when new checkbox will be checked.
+		$keepids = array_combine($keepids, $keepids);
+
+		insert_js('sessionStorage.setItem("'.$key.'", JSON.stringify('.CJs::encodeJson($keepids).'))');
+	}
+	else {
+		insert_js('sessionStorage.removeItem("'.$key.'")');
+	}
+}
+
+/**
+ * Trim each element of the script path. For example, " a / b / c d " => "a/b/c d"
+ *
+ * @param string $name
+ *
+ * @return string
+ */
+function trimPath($name) {
+	$path = splitPath($name);
+	$path = array_map('trim', $path);
+	$path = str_replace(['\\', '/'], ['\\\\', '\\/'], $path);
+	return implode('/', $path);
 }
 
 /**
  * Splitting string using slashes with escape backslash support and non-pair backslash cleanup.
  *
- * @param string $path					String path to parse.
- * @param bool   $stripSlashes			Remove escaped slashes from the path pieces.
- * @param bool   $cleanupBackslashes	Cleanup invalid backslash combinations.
+ * @param string $path
  *
  * @return array
  */
-function splitPath($path, $stripSlashes = true, $cleanupBackslashes = false) {
-	$position = 0;
-	$escapeCharacters = '';
-	$pathItemsArray = [];
-	$pathItemString = '';
+function splitPath($path) {
+	$path_items = [];
+	$path_item = '';
 
-	for ($stringLength = strlen($path); $position < $stringLength; ++$position) {
-		// Determine how many escape characters we already have in the backlog.
-		$escapeCharacterCount = strlen($escapeCharacters);
+	for ($i = 0; isset($path[$i]); $i++) {
+		switch ($path[$i]) {
+			case '/':
+				$path_items[] = $path_item;
+				$path_item = '';
+				break;
 
-		if ($path[$position] === '/') {
-			// If we have no escape chars previously - save item into the array and move on.
-			if ($escapeCharacterCount == 0) {
-				$pathItemsArray[] = $pathItemString;
-				$escapeCharacters = '';
-				$pathItemString = '';
-				continue;
-			}
+			case '\\':
+				if (isset($path[++$i])) {
+					$path_item .= $path[$i];
+				}
+				break;
 
-			// We have a backslash before the / - keep it as part of the item and clean escape char buffer.
-			$pathItemString .= $escapeCharacters.$path[$position];
-			$escapeCharacters = '';
-		}
-		elseif ($cleanupBackslashes && $path[$position] === '\\') {
-
-			/*
-			 * If we had a backslash before - this is an escaped backslash, keep it and empty char backlog. This way
-			 * we save only paired backslashes.
-			 */
-			if ($escapeCharacterCount == 1) {
-				$pathItemString .= $escapeCharacters.$path[$position];
-				$escapeCharacters = '';
-			}
-			else {
-				// It is a first backslash - add it to the backlog.
-				$escapeCharacters .= $path[$position];
-			}
-		}
-		else {
-			// A regular character - save it and move on. If previous char was a backslash - it is dropped.
-			$pathItemString .= $path[$position];
-			$escapeCharacters = '';
+			default:
+				$path_item .= $path[$i];
 		}
 	}
 
-	// Save the path tail.
-	if (strlen($pathItemString) != 0) {
-		$pathItemsArray[] = $pathItemString;
-	}
+	$path_items[] = $path_item;
 
-	if ($stripSlashes) {
-		$pathItemsArray = array_map('stripslashes', $pathItemsArray);
-	}
-
-	return $pathItemsArray;
+	return $path_items;
 }
 
 /**
@@ -2296,6 +2485,37 @@ function get_color($image, $color, $alpha = 0) {
 }
 
 /**
+ * Get graphic theme based on user configuration.
+ *
+ * @return array
+ */
+function getUserGraphTheme() {
+	$themes = DB::find('graph_theme', [
+		'theme' => getUserTheme(CWebUser::$data)
+	]);
+
+	if ($themes) {
+		return $themes[0];
+	}
+
+	return [
+		'theme' => 'blue-theme',
+		'textcolor' => '1F2C33',
+		'highlightcolor' => 'E33734',
+		'backgroundcolor' => 'FFFFFF',
+		'graphcolor' => 'FFFFFF',
+		'gridcolor' => 'CCD5D9',
+		'maingridcolor' => 'ACBBC2',
+		'gridbordercolor' => 'ACBBC2',
+		'nonworktimecolor' => 'EBEBEB',
+		'leftpercentilecolor' => '429E47',
+		'righttpercentilecolor' => 'E33734',
+		'colorpalette' => '1A7C11,F63100,2774A4,A54F10,FC6EA3,6C59DC,AC8C14,611F27,F230E0,5CCD18,BB2A02,5A2B57,'.
+			'89ABF8,7EC25C,274482,2B5429,8048B4,FD5434,790E1F,87AC4D,E89DF4'
+	];
+}
+
+/**
  * Custom error handler for PHP errors.
  *
  * @param int     $errno Level of the error raised.
@@ -2310,81 +2530,210 @@ function zbx_err_handler($errno, $errstr, $errfile, $errline) {
 	}
 
 	// Don't show the call to this handler function.
-	error($errstr.' ['.CProfiler::getInstance()->formatCallStack().']');
+	error($errstr.' ['.CProfiler::getInstance()->formatCallStack().']', 'php');
 }
 
 /**
- * Return current type of RSM monitoring.
+ * Creates an array with all possible variations of time units.
+ * For example: '14d' => ['1209600', '1209600s', '20160m', '336h', '14d', '2w']
  *
- * @return int
+ * @param string|array $values
+ *
+ * @return array
  */
-function get_rsm_monitoring_type() {
-	static $type;
+function getTimeUnitFilters($values) {
+	if (is_array($values)) {
+		$res = [];
 
-	if ($type === null) {
-		$db_macro = API::UserMacro()->get([
-			'output' => ['value'],
-			'filter' => ['macro' => RSM_MONITORING_TARGET],
-			'globalmacro' => true
-		]);
-
-		if ($db_macro) {
-			$type = $db_macro[0]['value'];
+		foreach ($values as $value) {
+			$res = array_merge($res, getTimeUnitFilters($value));
 		}
+
+		return array_unique($res, SORT_STRING);
 	}
 
-	return $type;
+	$simple_interval_parser = new CSimpleIntervalParser();
+
+	if ($simple_interval_parser->parse($values) != CParser::PARSE_SUCCESS) {
+		return [$values];
+	}
+
+	$sec = timeUnitToSeconds($values);
+
+	$res = [$sec, $sec.'s'];
+
+	if (bcmod($sec, SEC_PER_MIN) == 0) {
+		$res[] = bcdiv($sec, SEC_PER_MIN, 0).'m';
+	}
+
+	if (bcmod($sec, SEC_PER_HOUR) == 0) {
+		$res[] = bcdiv($sec, SEC_PER_HOUR, 0).'h';
+	}
+
+	if (bcmod($sec, SEC_PER_DAY) == 0) {
+		$res[] = bcdiv($sec, SEC_PER_DAY, 0).'d';
+	}
+
+	if (bcmod($sec, SEC_PER_WEEK) == 0) {
+		$res[] = bcdiv($sec, SEC_PER_WEEK, 0).'w';
+	}
+
+	return $res;
 }
 
 /**
- * Based on timestamp value stored in {$RSM.RDAP.STANDALONE}, check if RDAP at given time $timestamp is configured as
- * standalone service or as dependent sub-service of RDDS. It is expected that switch from RDAP as sub-service of RDDS
- * to RDAP as standalone service will be done only once and will never be switched back to initial state.
+ * Creates SQL filter to search all possible variations of time units.
  *
- * @param integer|string  $timestamp  Optional timestamp value.
- *
- * @return bool
- */
-function is_RDAP_standalone($timestamp = null) {
-	static $rsm_rdap_standalone_ts;
-
-	if (is_null($rsm_rdap_standalone_ts)) {
-		$db_macro = API::UserMacro()->get([
-			'output' => ['value'],
-			'filter' => ['macro' => RSM_RDAP_STANDALONE],
-			'globalmacro' => true
-		]);
-
-		$rsm_rdap_standalone_ts = $db_macro ? (int) $db_macro[0]['value'] : 0;
-	}
-
-	$timestamp = is_null($timestamp) ? time() : (int) $timestamp;
-
-	return ($rsm_rdap_standalone_ts > 0 && $rsm_rdap_standalone_ts <= $timestamp);
-}
-
-/**
- * Generate data to be displayed in details widget. The output is an array to be passed to CWidget::addItem().
- * Expects array of key/value pairs, each element is to be displayed on one line with key in bold style. The
- * value can be either string or an array of CTag objects.
- *
- * @param array
+ * @param string       $field_name
+ * @param string|array $values
  *
  * @return string
  */
-function gen_details_item(array $details) {
-	$output = [];
+function makeUpdateIntervalFilter($field_name, $values) {
+	$filters = [];
 
-	foreach ($details as $key => $value) {
-		$output[] = bold($key);
-		$output[] = ': ';
-		$output[] = $value;
-		$output[] = BR();
+	foreach (getTimeUnitFilters($values) as $filter) {
+		$filter = str_replace("!", "!!", $filter);
+		$filter = str_replace("%", "!%", $filter);
+		$filter = str_replace("_", "!_", $filter);
+
+		$filters[] = $field_name.' LIKE '.zbx_dbstr($filter).' ESCAPE '.zbx_dbstr('!');
+		$filters[] = $field_name.' LIKE '.zbx_dbstr($filter.';%').' ESCAPE '.zbx_dbstr('!');
 	}
 
-	if ($output) {
-		array_pop($output);
+	$res = $filters ? implode(' OR ', $filters) : '';
+
+	if (count($filters) > 1) {
+		$res = '('.$res.')';
 	}
 
-	return $output;
+	return $res;
+}
+
+/**
+ * Update profile with new time selector range.
+ *
+ * @param array       $options
+ * @param string      $options['profileIdx']
+ * @param int         $options['profileIdx2']
+ * @param string|null $options['from']
+ * @param string|null $options['to']
+ */
+function updateTimeSelectorPeriod(array $options) {
+	if ($options['from'] !== null && $options['to'] !== null) {
+		CProfile::update($options['profileIdx'].'.from', $options['from'], PROFILE_TYPE_STR, $options['profileIdx2']);
+		CProfile::update($options['profileIdx'].'.to', $options['to'], PROFILE_TYPE_STR, $options['profileIdx2']);
+	}
+}
+
+/**
+ * Get profile stored 'from' and 'to'. If profileIdx is null then default values will be returned. If one of fields
+ * not exist in $options array 'from' and 'to' value will be read from user profile. Calculates from_ts, to_ts.
+ *
+ * @param array $options  Array with period fields data: profileIdx, profileIdx2, from, to.
+ *
+ * @return array
+ */
+function getTimeSelectorPeriod(array $options) {
+	$profileIdx = array_key_exists('profileIdx', $options) ? $options['profileIdx'] : null;
+	$profileIdx2 = array_key_exists('profileIdx2', $options) ? $options['profileIdx2'] : null;
+
+	if ($profileIdx === null) {
+		$options['from'] = ZBX_PERIOD_DEFAULT_FROM;
+		$options['to'] = ZBX_PERIOD_DEFAULT_TO;
+	}
+	elseif (!array_key_exists('from', $options) || !array_key_exists('to', $options)
+			|| $options['from'] === null || $options['to'] === null) {
+		$options['from'] = CProfile::get($profileIdx.'.from', ZBX_PERIOD_DEFAULT_FROM, $profileIdx2);
+		$options['to'] = CProfile::get($profileIdx.'.to', ZBX_PERIOD_DEFAULT_TO, $profileIdx2);
+	}
+
+	$range_time_parser = new CRangeTimeParser();
+
+	$range_time_parser->parse($options['from']);
+	$options['from_ts'] = $range_time_parser->getDateTime(true)->getTimestamp();
+	$range_time_parser->parse($options['to']);
+	$options['to_ts'] = $range_time_parser->getDateTime(false)->getTimestamp();
+
+	return $options;
+}
+
+/**
+ * Convert relative date range string to translated string. Function does not check is passed date range correct.
+ *
+ * @param string $from     Start date of date range.
+ * @param string $to       End date of date range.
+ *
+ * @return string
+ */
+function relativeDateToText($from, $to) {
+	$key = $from.':'.$to;
+	$ranges = [
+		'now-1d/d:now-1d/d' => _('Yesterday'),
+		'now-2d/d:now-2d/d' => _('Day before yesterday'),
+		'now-1w/d:now-1w/d' => _('This day last week'),
+		'now-1w/w:now-1w/w' => _('Previous week'),
+		'now-1M/M:now-1M/M' => _('Previous month'),
+		'now-1y/y:now-1y/y' => _('Previous year'),
+		'now/d:now/d' => _('Today'),
+		'now/d:now' => _('Today so far'),
+		'now/w:now/w' => _('This week'),
+		'now/w:now' => _('This week so far'),
+		'now/M:now/M' => _('This month'),
+		'now/M:now' => _('This month so far'),
+		'now/y:now/y' => _('This year'),
+		'now/y:now' => _('This year so far')
+	];
+
+	if (array_key_exists($key, $ranges)) {
+		return $ranges[$key];
+	}
+
+	if ($to === 'now') {
+		$relative_time_parser = new CRelativeTimeParser();
+
+		if ($relative_time_parser->parse($from) == CParser::PARSE_SUCCESS) {
+			$tokens = $relative_time_parser->getTokens();
+
+			if (count($tokens) == 1 && $tokens[0]['type'] == CRelativeTimeParser::ZBX_TOKEN_OFFSET
+					&& $tokens[0]['sign'] === '-') {
+				$suffix = $tokens[0]['suffix'];
+				$value = (int) $tokens[0]['value'];
+
+				switch ($suffix) {
+					case 's':
+						if ($value < 60 || $value % 60 != 0) {
+							return _n('Last %1$d second', 'Last %1$d seconds', $value);
+						}
+						$value /= 60;
+						// break; is not missing here.
+
+					case 'm':
+						if ($value < 60 || $value % 60 != 0) {
+							return _n('Last %1$d minute', 'Last %1$d minutes', $value);
+						}
+						$value /= 60;
+						// break; is not missing here.
+
+					case 'h':
+						if ($value < 24 || $value % 24 != 0) {
+							return _n('Last %1$d hour', 'Last %1$d hours', $value);
+						}
+						$value /= 24;
+						// break; is not missing here.
+
+					case 'd':
+						return _n('Last %1$d day', 'Last %1$d days', $value);
+
+					case 'M':
+						return _n('Last %1$d month', 'Last %1$d months', $value);
+
+					case 'y':
+						return _n('Last %1$d year', 'Last %1$d years', $value);
+				}
+			}
+		}
+	}
+
+	return $from.' – '.$to;
 }

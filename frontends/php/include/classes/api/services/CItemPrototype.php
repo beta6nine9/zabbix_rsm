@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -21,14 +21,28 @@
 
 /**
  * Class containing methods for operations with item prototypes.
- *
- * @package API
  */
 class CItemPrototype extends CItemGeneral {
 
 	protected $tableName = 'items';
 	protected $tableAlias = 'i';
 	protected $sortColumns = ['itemid', 'name', 'key_', 'delay', 'history', 'trends', 'type', 'status'];
+
+	/**
+	 * Define a set of supported pre-processing rules.
+	 *
+	 * @var array
+	 *
+	 * 5.6 would allow this to be defined constant.
+	 */
+	public static $supported_preprocessing_types = [ZBX_PREPROC_REGSUB, ZBX_PREPROC_TRIM, ZBX_PREPROC_RTRIM,
+		ZBX_PREPROC_LTRIM, ZBX_PREPROC_XPATH, ZBX_PREPROC_JSONPATH, ZBX_PREPROC_MULTIPLIER, ZBX_PREPROC_DELTA_VALUE,
+		ZBX_PREPROC_DELTA_SPEED, ZBX_PREPROC_BOOL2DEC, ZBX_PREPROC_OCT2DEC, ZBX_PREPROC_HEX2DEC,
+		ZBX_PREPROC_VALIDATE_RANGE, ZBX_PREPROC_VALIDATE_REGEX, ZBX_PREPROC_VALIDATE_NOT_REGEX,
+		ZBX_PREPROC_ERROR_FIELD_JSON, ZBX_PREPROC_ERROR_FIELD_XML, ZBX_PREPROC_ERROR_FIELD_REGEX,
+		ZBX_PREPROC_THROTTLE_VALUE, ZBX_PREPROC_THROTTLE_TIMED_VALUE, ZBX_PREPROC_SCRIPT,
+		ZBX_PREPROC_PROMETHEUS_PATTERN, ZBX_PREPROC_PROMETHEUS_TO_JSON
+	];
 
 	public function __construct() {
 		parent::__construct();
@@ -41,12 +55,10 @@ class CItemPrototype extends CItemGeneral {
 	}
 
 	/**
-	 * Get Itemprototype data.
+	 * Get ItemPrototype data.
 	 */
 	public function get($options = []) {
 		$result = [];
-		$userType = self::$userData['type'];
-		$userid = self::$userData['userid'];
 
 		$sqlParts = [
 			'select'	=> ['items' => 'i.itemid'],
@@ -68,14 +80,14 @@ class CItemPrototype extends CItemGeneral {
 			'inherited'						=> null,
 			'templated'						=> null,
 			'monitored'						=> null,
-			'editable'						=> null,
+			'editable'						=> false,
 			'nopermissions'					=> null,
 			// filter
 			'filter'						=> null,
 			'search'						=> null,
 			'searchByAny'					=> null,
-			'startSearch'					=> null,
-			'excludeSearch'					=> null,
+			'startSearch'					=> false,
+			'excludeSearch'					=> false,
 			'searchWildcardsEnabled'		=> null,
 			// output
 			'output'						=> API_OUTPUT_EXTEND,
@@ -85,9 +97,10 @@ class CItemPrototype extends CItemGeneral {
 			'selectTriggers'				=> null,
 			'selectGraphs'					=> null,
 			'selectDiscoveryRule'			=> null,
-			'countOutput'					=> null,
-			'groupCount'					=> null,
-			'preservekeys'					=> null,
+			'selectPreprocessing'			=> null,
+			'countOutput'					=> false,
+			'groupCount'					=> false,
+			'preservekeys'					=> false,
 			'sortfield'						=> '',
 			'sortorder'						=> '',
 			'limit'							=> null,
@@ -96,10 +109,9 @@ class CItemPrototype extends CItemGeneral {
 		$options = zbx_array_merge($defOptions, $options);
 
 		// editable + PERMISSION CHECK
-		if ($userType != USER_TYPE_SUPER_ADMIN && !$options['nopermissions']) {
-			$permission = $options['editable']?PERM_READ_WRITE:PERM_READ;
-
-			$userGroups = getUserGroupsByUserId($userid);
+		if (self::$userData['type'] != USER_TYPE_SUPER_ADMIN && !$options['nopermissions']) {
+			$permission = $options['editable'] ? PERM_READ_WRITE : PERM_READ;
+			$userGroups = getUserGroupsByUserId(self::$userData['userid']);
 
 			$sqlParts['where'][] = 'EXISTS ('.
 					'SELECT NULL'.
@@ -114,7 +126,7 @@ class CItemPrototype extends CItemGeneral {
 					')';
 		}
 
-// templateids
+		// templateids
 		if (!is_null($options['templateids'])) {
 			zbx_value2array($options['templateids']);
 
@@ -127,25 +139,25 @@ class CItemPrototype extends CItemGeneral {
 			}
 		}
 
-// hostids
+		// hostids
 		if (!is_null($options['hostids'])) {
 			zbx_value2array($options['hostids']);
 
 			$sqlParts['where']['hostid'] = dbConditionInt('i.hostid', $options['hostids']);
 
-			if (!is_null($options['groupCount'])) {
+			if ($options['groupCount']) {
 				$sqlParts['group']['i'] = 'i.hostid';
 			}
 		}
 
-// itemids
+		// itemids
 		if (!is_null($options['itemids'])) {
 			zbx_value2array($options['itemids']);
 
 			$sqlParts['where']['itemid'] = dbConditionInt('i.itemid', $options['itemids']);
 		}
 
-// discoveryids
+		// discoveryids
 		if (!is_null($options['discoveryids'])) {
 			zbx_value2array($options['discoveryids']);
 
@@ -153,7 +165,7 @@ class CItemPrototype extends CItemGeneral {
 			$sqlParts['where'][] = dbConditionInt('id.parent_itemid', $options['discoveryids']);
 			$sqlParts['where']['idi'] = 'i.itemid=id.itemid';
 
-			if (!is_null($options['groupCount'])) {
+			if ($options['groupCount']) {
 				$sqlParts['group']['id'] = 'id.parent_itemid';
 			}
 		}
@@ -176,7 +188,7 @@ class CItemPrototype extends CItemGeneral {
 			$sqlParts['where']['igi'] = 'i.itemid=gi.itemid';
 		}
 
-// inherited
+		// inherited
 		if (!is_null($options['inherited'])) {
 			if ($options['inherited'])
 				$sqlParts['where'][] = 'i.templateid IS NOT NULL';
@@ -184,7 +196,7 @@ class CItemPrototype extends CItemGeneral {
 				$sqlParts['where'][] = 'i.templateid IS NULL';
 		}
 
-// templated
+		// templated
 		if (!is_null($options['templated'])) {
 			$sqlParts['from']['hosts'] = 'hosts h';
 			$sqlParts['where']['hi'] = 'h.hostid=i.hostid';
@@ -195,7 +207,7 @@ class CItemPrototype extends CItemGeneral {
 				$sqlParts['where'][] = 'h.status<>'.HOST_STATUS_TEMPLATE;
 		}
 
-// monitored
+		// monitored
 		if (!is_null($options['monitored'])) {
 			$sqlParts['from']['hosts'] = 'hosts h';
 			$sqlParts['where']['hi'] = 'h.hostid=i.hostid';
@@ -209,13 +221,26 @@ class CItemPrototype extends CItemGeneral {
 			}
 		}
 
-// search
+		// search
 		if (is_array($options['search'])) {
 			zbx_db_search('items i', $options, $sqlParts);
 		}
 
-// --- FILTER ---
+		// --- FILTER ---
 		if (is_array($options['filter'])) {
+			if (array_key_exists('delay', $options['filter']) && $options['filter']['delay'] !== null) {
+				$sqlParts['where'][] = makeUpdateIntervalFilter('i.delay', $options['filter']['delay']);
+				unset($options['filter']['delay']);
+			}
+
+			if (array_key_exists('history', $options['filter']) && $options['filter']['history'] !== null) {
+				$options['filter']['history'] = getTimeUnitFilters($options['filter']['history']);
+			}
+
+			if (array_key_exists('trends', $options['filter']) && $options['filter']['trends'] !== null) {
+				$options['filter']['trends'] = getTimeUnitFilters($options['filter']['trends']);
+			}
+
 			$this->dbFilter('items i', $options, $sqlParts);
 
 			if (isset($options['filter']['host'])) {
@@ -227,18 +252,18 @@ class CItemPrototype extends CItemGeneral {
 			}
 		}
 
-// limit
+		// limit
 		if (zbx_ctype_digit($options['limit']) && $options['limit']) {
 			$sqlParts['limit'] = $options['limit'];
 		}
-//----------
+		//----------
 
 		$sqlParts = $this->applyQueryOutputOptions($this->tableName(), $this->tableAlias(), $options, $sqlParts);
 		$sqlParts = $this->applyQuerySortOptions($this->tableName(), $this->tableAlias(), $options, $sqlParts);
 		$res = DBselect($this->createSelectQueryFromParts($sqlParts), $sqlParts['limit']);
 		while ($item = DBfetch($res)) {
-			if (!is_null($options['countOutput'])) {
-				if (!is_null($options['groupCount']))
+			if ($options['countOutput']) {
+				if ($options['groupCount'])
 					$result[] = $item;
 				else
 					$result = $item['rowscount'];
@@ -248,7 +273,7 @@ class CItemPrototype extends CItemGeneral {
 			}
 		}
 
-		if (!is_null($options['countOutput'])) {
+		if ($options['countOutput']) {
 			return $result;
 		}
 
@@ -258,7 +283,22 @@ class CItemPrototype extends CItemGeneral {
 			$result = $this->unsetExtraFields($result, ['hostid'], $options['output']);
 		}
 
-		if (is_null($options['preservekeys'])) {
+		// Decode ITEM_TYPE_HTTPAGENT encoded fields.
+		$json = new CJson();
+
+		foreach ($result as &$item) {
+			if (array_key_exists('query_fields', $item)) {
+				$query_fields = ($item['query_fields'] !== '') ? $json->decode($item['query_fields'], true) : [];
+				$item['query_fields'] = $json->hasError() ? [] : $query_fields;
+			}
+
+			if (array_key_exists('headers', $item)) {
+				$item['headers'] = $this->headersStringToArray($item['headers']);
+			}
+		}
+		unset($item);
+
+		if (!$options['preservekeys']) {
 			$result = zbx_cleanHashes($result);
 		}
 
@@ -279,11 +319,6 @@ class CItemPrototype extends CItemGeneral {
 		// set proper flags to divide normal and discovered items in future processing
 		foreach ($items as &$item) {
 			$item['flags'] = ZBX_FLAG_DISCOVERY_PROTOTYPE;
-
-			// set default formula value
-			if (!$update && !isset($item['formula'])) {
-				$item['formula'] = '1';
-			}
 
 			if (array_key_exists('applicationPrototypes', $item) && is_array($item['applicationPrototypes'])
 					&& $item['applicationPrototypes']) {
@@ -332,7 +367,39 @@ class CItemPrototype extends CItemGeneral {
 	 */
 	public function create($items) {
 		$items = zbx_toArray($items);
+
 		$this->checkInput($items);
+
+		foreach ($items as &$item) {
+			unset($item['itemid']);
+		}
+
+		$this->validateDependentItems($items);
+
+		$json = new CJson();
+
+		foreach ($items as &$item) {
+			if ($item['type'] == ITEM_TYPE_HTTPAGENT) {
+				if (array_key_exists('query_fields', $item)) {
+					$item['query_fields'] = $item['query_fields'] ? $json->encode($item['query_fields']) : '';
+				}
+
+				if (array_key_exists('headers', $item)) {
+					$item['headers'] = $this->headersArrayToString($item['headers']);
+				}
+
+				if (array_key_exists('request_method', $item) && $item['request_method'] == HTTPCHECK_REQUEST_HEAD
+						&& !array_key_exists('retrieve_mode', $item)) {
+					$item['retrieve_mode'] = HTTPTEST_STEP_RETRIEVE_MODE_HEADERS;
+				}
+			}
+			else {
+				$item['query_fields'] = '';
+				$item['headers'] = '';
+			}
+		}
+		unset($item);
+
 		$this->createReal($items);
 		$this->inherit($items);
 
@@ -340,6 +407,12 @@ class CItemPrototype extends CItemGeneral {
 	}
 
 	protected function createReal(&$items) {
+		foreach ($items as &$item) {
+			if ($item['type'] != ITEM_TYPE_DEPENDENT) {
+				$item['master_itemid'] = null;
+			}
+		}
+		unset($item);
 		$itemids = DB::insert('items', $items);
 
 		$itemApplications = $insertItemDiscovery = [];
@@ -363,10 +436,10 @@ class CItemPrototype extends CItemGeneral {
 			}
 		}
 
-		DB::insert('item_discovery', $insertItemDiscovery);
+		DB::insertBatch('item_discovery', $insertItemDiscovery);
 
-		if (!empty($itemApplications)) {
-			DB::insert('items_applications', $itemApplications);
+		if ($itemApplications) {
+			DB::insertBatch('items_applications', $itemApplications);
 		}
 
 		$item_application_prototypes = [];
@@ -403,7 +476,7 @@ class CItemPrototype extends CItemGeneral {
 				$new_ids = [];
 
 				if ($application_prototypes_to_create) {
-					$new_ids = DB::insert('application_prototype', $application_prototypes_to_create);
+					$new_ids = DB::insertBatch('application_prototype', $application_prototypes_to_create);
 				}
 
 				$ids = array_merge($new_ids, zbx_objectValues($db_application_prototypes, 'application_prototypeid'));
@@ -419,27 +492,17 @@ class CItemPrototype extends CItemGeneral {
 
 		// Link item prototypes to application prototypes.
 		if ($item_application_prototypes) {
-			DB::insert('item_application_prototype', $item_application_prototypes);
+			DB::insertBatch('item_application_prototype', $item_application_prototypes);
 		}
 
-// TODO: REMOVE info
-		$itemHosts = $this->get([
-			'itemids' => $itemids,
-			'output' => ['name'],
-			'selectHosts' => ['name'],
-			'nopermissions' => true
-		]);
-		foreach ($itemHosts as $item) {
-			$host = reset($item['hosts']);
-			info(_s('Created: Item prototype "%1$s" on "%2$s".', $item['name'], $host['name']));
-		}
+		$this->createItemPreprocessing($items);
 	}
 
-	protected function updateReal($items) {
-		$items = zbx_toArray($items);
+	protected function updateReal(array $items) {
+		CArrayHelper::sort($items, ['itemid']);
 
 		$data = [];
-		foreach ($items as $inum => $item) {
+		foreach ($items as $item) {
 			$data[] = ['values' => $item, 'where'=> ['itemid' => $item['itemid']]];
 		}
 
@@ -458,7 +521,7 @@ class CItemPrototype extends CItemGeneral {
 			}
 
 			$itemidsWithApplications[] = $item['itemid'];
-			foreach ($item['applications'] as $anum => $appid) {
+			foreach ($item['applications'] as $appid) {
 				$itemApplications[] = [
 					'applicationid' => $appid,
 					'itemid' => $item['itemid']
@@ -468,7 +531,7 @@ class CItemPrototype extends CItemGeneral {
 
 		if (!empty($itemidsWithApplications)) {
 			DB::delete('items_applications', ['itemid' => $itemidsWithApplications]);
-			DB::insert('items_applications', $itemApplications);
+			DB::insertBatch('items_applications', $itemApplications);
 		}
 
 		// application prototypes that are no longer linked to items will be deleted from database
@@ -608,7 +671,7 @@ class CItemPrototype extends CItemGeneral {
 
 				// Create new application prototypes, get new IDs.
 				if ($application_prototypes_to_create) {
-					$ids = DB::insert('application_prototype', $application_prototypes_to_create);
+					$ids = DB::insertBatch('application_prototype', $application_prototypes_to_create);
 
 					foreach ($ids as $id) {
 						$new_records[] = [
@@ -659,25 +722,14 @@ class CItemPrototype extends CItemGeneral {
 
 		// Find and delete application prototypes from database that are no longer linked to any item prototypes.
 		if ($application_prototypes_to_remove) {
-			$this->deleteApplicationPrototypes(array_keys($application_prototypes_to_remove));
+			CItemPrototypeManager::deleteUnusedApplicationPrototypes(array_keys($application_prototypes_to_remove));
 		}
 
-// TODO: REMOVE info
-		$itemHosts = $this->get([
-			'itemids' => $itemids,
-			'output' => ['name'],
-			'selectHosts' => ['name'],
-			'nopermissions' => true
-		]);
-
-		foreach ($itemHosts as $item) {
-			$host = reset($item['hosts']);
-			info(_s('Updated: Item prototype "%1$s" on "%2$s".', $item['name'], $host['name']));
-		}
+		$this->updateItemPreprocessing($items);
 	}
 
 	/**
-	 * Update Itemprototype.
+	 * Update ItemPrototype.
 	 *
 	 * @param array $items
 	 *
@@ -685,7 +737,104 @@ class CItemPrototype extends CItemGeneral {
 	 */
 	public function update($items) {
 		$items = zbx_toArray($items);
+
 		$this->checkInput($items, true);
+
+		$db_items = $this->get([
+			'output' => ['type', 'master_itemid', 'authtype', 'allow_traps', 'retrieve_mode'],
+			'itemids' => zbx_objectValues($items, 'itemid'),
+			'editable' => true,
+			'preservekeys' => true
+		]);
+
+		$items = $this->extendFromObjects(zbx_toHash($items, 'itemid'), $db_items, ['type', 'master_itemid']);
+
+		$this->validateDependentItems($items);
+
+		$defaults = DB::getDefaults('items');
+		$clean = [
+			ITEM_TYPE_HTTPAGENT => [
+				'url' => '',
+				'query_fields' => '',
+				'timeout' => $defaults['timeout'],
+				'status_codes' => '',
+				'follow_redirects' => $defaults['follow_redirects'],
+				'request_method' => $defaults['request_method'],
+				'allow_traps' => $defaults['allow_traps'],
+				'post_type' => $defaults['post_type'],
+				'http_proxy' => '',
+				'headers' => '',
+				'retrieve_mode' => $defaults['retrieve_mode'],
+				'output_format' => $defaults['output_format'],
+				'ssl_key_password' => '',
+				'verify_peer' => $defaults['verify_peer'],
+				'verify_host' => $defaults['verify_host'],
+				'ssl_cert_file' => '',
+				'ssl_key_file' => '',
+				'authtype' => $defaults['authtype'],
+				'username' => '',
+				'password' => '',
+				'posts' => ''
+			]
+		];
+
+		$json = new CJson();
+
+		foreach ($items as &$item) {
+			$type_change = ($item['type'] != $db_items[$item['itemid']]['type']);
+
+			if ($item['type'] != ITEM_TYPE_DEPENDENT && $db_items[$item['itemid']]['master_itemid'] != 0) {
+				$item['master_itemid'] = 0;
+			}
+
+			if ($type_change && $db_items[$item['itemid']]['type'] == ITEM_TYPE_HTTPAGENT) {
+				$item = array_merge($item, $clean[ITEM_TYPE_HTTPAGENT]);
+
+				if ($item['type'] != ITEM_TYPE_SSH) {
+					$item['authtype'] = $defaults['authtype'];
+					$item['username'] = '';
+					$item['password'] = '';
+				}
+
+				if ($item['type'] != ITEM_TYPE_TRAPPER) {
+					$item['trapper_hosts'] = '';
+				}
+			}
+
+			if ($item['type'] == ITEM_TYPE_HTTPAGENT) {
+				// Clean username and password on authtype change to HTTPTEST_AUTH_NONE.
+				if (array_key_exists('authtype', $item) && $item['authtype'] == HTTPTEST_AUTH_NONE
+						&& $item['authtype'] != $db_items[$item['itemid']]['authtype']) {
+					$item['username'] = '';
+					$item['password'] = '';
+				}
+
+				if (array_key_exists('allow_traps', $item) && $item['allow_traps'] == HTTPCHECK_ALLOW_TRAPS_OFF
+						&& $item['allow_traps'] != $db_items[$item['itemid']]['allow_traps']) {
+					$item['trapper_hosts'] = '';
+				}
+
+				if (array_key_exists('query_fields', $item) && is_array($item['query_fields'])) {
+					$item['query_fields'] = $item['query_fields'] ? $json->encode($item['query_fields']) : '';
+				}
+
+				if (array_key_exists('headers', $item) && is_array($item['headers'])) {
+					$item['headers'] = $this->headersArrayToString($item['headers']);
+				}
+
+				if (array_key_exists('request_method', $item) && $item['request_method'] == HTTPCHECK_REQUEST_HEAD
+						&& !array_key_exists('retrieve_mode', $item)
+						&& $db_items[$item['itemid']]['retrieve_mode'] != HTTPTEST_STEP_RETRIEVE_MODE_HEADERS) {
+					$item['retrieve_mode'] = HTTPTEST_STEP_RETRIEVE_MODE_HEADERS;
+				}
+			}
+			else {
+				$item['query_fields'] = '';
+				$item['headers'] = '';
+			}
+		}
+		unset($item);
+
 		$this->updateReal($items);
 		$this->inherit($items);
 
@@ -695,196 +844,52 @@ class CItemPrototype extends CItemGeneral {
 	/**
 	 * Delete Item prototypes.
 	 *
-	 * @param array $prototypeids
-	 * @param bool 	$nopermissions
+	 * @param array $itemids
 	 *
 	 * @return array
 	 */
-	public function delete(array $prototypeids, $nopermissions = false) {
-		if (empty($prototypeids)) {
-			self::exception(ZBX_API_ERROR_PARAMETERS, _('Empty input parameter.'));
-		}
+	public function delete(array $itemids) {
+		$this->validateDelete($itemids, $db_items);
 
-		$prototypeids = array_keys(array_flip($prototypeids));
+		CItemPrototypeManager::delete($itemids);
 
-		$options = [
-			'itemids' => $prototypeids,
-			'editable' => true,
-			'preservekeys' => true,
-			'output' => API_OUTPUT_EXTEND,
-			'selectHosts' => ['name']
-		];
-		$delItemPrototypes = $this->get($options);
+		$this->addAuditBulk(AUDIT_ACTION_DELETE, AUDIT_RESOURCE_ITEM_PROTOTYPE, $db_items);
 
-		// TODO: remove $nopermissions hack
-		if (!$nopermissions) {
-			foreach ($prototypeids as $prototypeid) {
-				if (!isset($delItemPrototypes[$prototypeid])) {
-					self::exception(ZBX_API_ERROR_PERMISSIONS, _('No permissions to referred object or it does not exist!'));
-				}
-				if ($delItemPrototypes[$prototypeid]['templateid'] != 0) {
-					self::exception(ZBX_API_ERROR_PARAMETERS, _('Cannot delete templated items'));
-				}
-			}
-		}
-
-		// first delete child items
-		$parentItemids = $prototypeids;
-		$childPrototypeids = [];
-		do {
-			$dbItems = DBselect('SELECT itemid FROM items WHERE '.dbConditionInt('templateid', $parentItemids));
-			$parentItemids = [];
-			while ($dbItem = DBfetch($dbItems)) {
-				$parentItemids[$dbItem['itemid']] = $dbItem['itemid'];
-				$childPrototypeids[$dbItem['itemid']] = $dbItem['itemid'];
-			}
-		} while ($parentItemids);
-
-		$options = [
-			'output' => API_OUTPUT_EXTEND,
-			'itemids' => $childPrototypeids,
-			'nopermissions' => true,
-			'preservekeys' => true,
-			'selectHosts' => ['name']
-		];
-		$delItemPrototypesChilds = $this->get($options);
-
-		$delItemPrototypes = array_merge($delItemPrototypes, $delItemPrototypesChilds);
-		$prototypeids = array_merge($prototypeids, $childPrototypeids);
-
-		// delete graphs with this item prototype
-		$delGraphPrototypes = API::GraphPrototype()->get([
-			'output' => [],
-			'itemids' => $prototypeids,
-			'nopermissions' => true,
-			'preservekeys' => true
-		]);
-		if ($delGraphPrototypes) {
-			API::GraphPrototype()->delete(array_keys($delGraphPrototypes), true);
-		}
-
-		// check if any graphs are referencing this item
-		$this->checkGraphReference($prototypeids);
-
-// CREATED ITEMS
-		$createdItems = [];
-		$sql = 'SELECT itemid FROM item_discovery WHERE '.dbConditionInt('parent_itemid', $prototypeids);
-		$dbItems = DBselect($sql);
-		while ($item = DBfetch($dbItems)) {
-			$createdItems[$item['itemid']] = $item['itemid'];
-		}
-		if ($createdItems) {
-			// This API call will also make sure that discovered applications are no longer linked to other items.
-			API::Item()->delete($createdItems, true);
-		}
-
-
-// TRIGGER PROTOTYPES
-		$delTriggerPrototypes = API::TriggerPrototype()->get([
-			'output' => [],
-			'itemids' => $prototypeids,
-			'nopermissions' => true,
-			'preservekeys' => true,
-		]);
-		if ($delTriggerPrototypes) {
-			API::TriggerPrototype()->delete(array_keys($delTriggerPrototypes), true);
-		}
-
-		// screen items
-		DB::delete('screens_items', [
-			'resourceid' => $prototypeids,
-			'resourcetype' => [SCREEN_RESOURCE_LLD_SIMPLE_GRAPH]
-		]);
-
-		// Unlink application prototypes and delete those who are no longer linked to any other item prototypes.
-		$db_item_application_prototypes = DBfetchArray(DBselect(
-			'SELECT iap.item_application_prototypeid,iap.application_prototypeid'.
-			' FROM item_application_prototype iap'.
-			' WHERE '.dbConditionInt('iap.itemid', $prototypeids)
-		));
-
-		if ($db_item_application_prototypes) {
-			DB::delete('item_application_prototype', [
-				'item_application_prototypeid' => zbx_objectValues($db_item_application_prototypes,
-					'item_application_prototypeid'
-				)
-			]);
-
-			$this->deleteApplicationPrototypes(zbx_objectValues($db_item_application_prototypes,
-				'application_prototypeid'
-			));
-		}
-
-// ITEM PROTOTYPES
-		DB::delete('items', ['itemid' => $prototypeids]);
-
-
-// TODO: remove info from API
-		foreach ($delItemPrototypes as $item) {
-			$host = reset($item['hosts']);
-			info(_s('Deleted: Item prototype "%1$s" on "%2$s".', $item['name'], $host['name']));
-		}
-
-		return ['prototypeids' => $prototypeids];
+		return ['prototypeids' => $itemids];
 	}
 
-	/*
-	 * Finds and deletes application prototypes by given IDs. Looks for discovered applications that were created from
-	 * prototypes and deletes them if they are not discovered by other rules.
+	/**
+	 * Validates the input parameters for the delete() method.
 	 *
-	 * @param array $application_prototypeids
+	 * @param array $itemids   [IN/OUT]
+	 * @param array $db_items  [OUT]
+	 *
+	 * @throws APIException if the input is invalid.
 	 */
-	protected function deleteApplicationPrototypes(array $application_prototypeids) {
-		$db_application_prototypes = DBfetchArray(DBselect(
-			'SELECT ap.application_prototypeid'.
-			' FROM application_prototype ap'.
-			' WHERE NOT EXISTS ('.
-				'SELECT NULL'.
-				' FROM item_application_prototype iap'.
-				' WHERE ap.application_prototypeid=iap.application_prototypeid'.
-			')'.
-			' AND '.dbConditionInt('ap.application_prototypeid', $application_prototypeids)
-		));
+	private function validateDelete(array &$itemids, array &$db_items = null) {
+		$api_input_rules = ['type' => API_IDS, 'flags' => API_NOT_EMPTY, 'uniq' => true];
+		if (!CApiInputValidator::validate($api_input_rules, $itemids, '/', $error)) {
+			self::exception(ZBX_API_ERROR_PARAMETERS, $error);
+		}
 
-		if ($db_application_prototypes) {
-			// Find discovered applications for deletable application prototypes.
-			$discovered_applications = DBfetchArray(DBselect(
-				'SELECT DISTINCT ad.applicationid'.
-				' FROM application_discovery ad'.
-				' WHERE '.dbConditionInt('ad.application_prototypeid', $application_prototypeids)
-			));
+		$db_items = $this->get([
+			'output' => ['itemid', 'name', 'templateid', 'flags'],
+			'itemids' => $itemids,
+			'editable' => true,
+			'preservekeys' => true
+		]);
 
-			$db_application_prototypeids = zbx_objectValues($db_application_prototypes, 'application_prototypeid');
-
-			// unlink templated application prototype
-			DB::update('application_prototype', [
-				'values' => ['templateid' => null],
-				'where' => ['templateid' => $db_application_prototypeids]
-			]);
-
-			DB::delete('application_prototype', ['application_prototypeid' => $db_application_prototypeids]);
-
-			/*
-			 * Deleting an application prototype will automatically delete the link in 'item_application_prototype',
-			 * but it will not delete the actual discovered application. When the link is gone,
-			 * delete the discoveted application. Link between a regular item does not matter any more.
-			 */
-			if ($discovered_applications) {
-				$discovered_applicationids = zbx_objectValues($discovered_applications, 'applicationid');
-
-				$discovered_applications_to_delete = DBfetchArray(DBselect(
-					'SELECT DISTINCT ad.applicationid'.
-					' FROM application_discovery ad'.
-					' WHERE '.dbConditionInt('ad.applicationid', $discovered_applicationids)
-				));
-
-				$applications_to_delete = array_diff($discovered_applicationids,
-					zbx_objectValues($discovered_applications_to_delete, 'applicationid')
+		foreach ($itemids as $itemid) {
+			if (!array_key_exists($itemid, $db_items)) {
+				self::exception(ZBX_API_ERROR_PERMISSIONS,
+					_('No permissions to referred object or it does not exist!')
 				);
+			}
 
-				if ($applications_to_delete) {
-					API::Application()->delete($applications_to_delete, true);
-				}
+			$db_item = $db_items[$itemid];
+
+			if ($db_item['templateid'] != 0) {
+				self::exception(ZBX_API_ERROR_PARAMETERS, _('Cannot delete templated item prototype.'));
 			}
 		}
 	}
@@ -893,88 +898,82 @@ class CItemPrototype extends CItemGeneral {
 		$data['templateids'] = zbx_toArray($data['templateids']);
 		$data['hostids'] = zbx_toArray($data['hostids']);
 
-		$selectFields = [];
-		foreach ($this->fieldRules as $key => $rules) {
-			if (!isset($rules['system']) && !isset($rules['host'])) {
-				$selectFields[] = $key;
+		$output = [];
+		foreach ($this->fieldRules as $field_name => $rules) {
+			if (!array_key_exists('system', $rules) && !array_key_exists('host', $rules)) {
+				$output[] = $field_name;
 			}
 		}
 
-		$items = $this->get([
-			'output' => $selectFields,
+		$tpl_items = $this->get([
+			'output' => $output,
 			'selectApplications' => ['applicationid'],
 			'selectApplicationPrototypes' => ['name'],
+			'selectPreprocessing' => ['type', 'params', 'error_handler', 'error_handler_params'],
 			'hostids' => $data['templateids'],
 			'preservekeys' => true
 		]);
 
-		foreach ($items as $inum => $item) {
-			$items[$inum]['applications'] = zbx_objectValues($item['applications'], 'applicationid');
-		}
+		$json = new CJson();
 
-		$this->inherit($items, $data['hostids']);
+		foreach ($tpl_items as &$tpl_item) {
+			$tpl_item['applications'] = zbx_objectValues($tpl_item['applications'], 'applicationid');
+
+			if ($tpl_item['type'] == ITEM_TYPE_HTTPAGENT) {
+				if (array_key_exists('query_fields', $tpl_item) && is_array($tpl_item['query_fields'])) {
+					$tpl_item['query_fields'] = $tpl_item['query_fields']
+						? $json->encode($tpl_item['query_fields'])
+						: '';
+				}
+
+				if (array_key_exists('headers', $tpl_item) && is_array($tpl_item['headers'])) {
+					$tpl_item['headers'] = $this->headersArrayToString($tpl_item['headers']);
+				}
+			}
+			else {
+				$tpl_item['query_fields'] = '';
+				$tpl_item['headers'] = '';
+			}
+		}
+		unset($tpl_item);
+
+		$this->inherit($tpl_items, $data['hostids']);
 
 		return true;
 	}
 
-	protected function inherit(array $items, array $hostids = null) {
-		if (!$items) {
-			return true;
+	/**
+	 * Check item prototype specific fields:
+	 *		- validate history and trends using simple interval parser, user macro parser and lld macro parser;
+	 *		- validate item preprocessing.
+	 *
+	 * @param array  $item    An array of single item data.
+	 * @param string $method  A string of "create" or "update" method.
+	 *
+	 * @throws APIException if the input is invalid.
+	 */
+	protected function checkSpecificFields(array $item, $method) {
+		if (array_key_exists('history', $item)
+				&& !validateTimeUnit($item['history'], SEC_PER_HOUR, 25 * SEC_PER_YEAR, true, $error,
+					['usermacros' => true, 'lldmacros' => true])) {
+			self::exception(ZBX_API_ERROR_PARAMETERS,
+				_s('Incorrect value for field "%1$s": %2$s.', 'history', $error)
+			);
 		}
 
-		// fetch the corresponding discovery rules for the child items
-		$ruleids = [];
-		$dbResult = DBselect(
-			'SELECT i.itemid AS ruleid,id.itemid,i.hostid'.
-			' FROM items i,item_discovery id'.
-			' WHERE i.templateid=id.parent_itemid'.
-				' AND '.dbConditionInt('id.itemid', zbx_objectValues($items, 'itemid'))
-		);
-		while ($rule = DBfetch($dbResult)) {
-			if (!isset($ruleids[$rule['itemid']])) {
-				$ruleids[$rule['itemid']] = [];
-			}
-			$ruleids[$rule['itemid']][$rule['hostid']] = $rule['ruleid'];
+		if (array_key_exists('trends', $item)
+				&& !validateTimeUnit($item['trends'], SEC_PER_DAY, 25 * SEC_PER_YEAR, true, $error,
+					['usermacros' => true, 'lldmacros' => true])) {
+			self::exception(ZBX_API_ERROR_PARAMETERS,
+				_s('Incorrect value for field "%1$s": %2$s.', 'trends', $error)
+			);
 		}
-
-		// prepare the child items
-		$newItems = $this->prepareInheritedItems($items, $hostids);
-		if (!$items) {
-			return true;
-		}
-
-		$insertItems = [];
-		$updateItems = [];
-		foreach ($newItems as $newItem) {
-			if (isset($newItem['itemid'])) {
-				unset($newItem['ruleid']);
-				$updateItems[] = $newItem;
-			}
-			else {
-				// set the corresponding discovery rule id for the new items
-				$newItem['ruleid'] = $ruleids[$newItem['templateid']][$newItem['hostid']];
-				$newItem['flags'] = ZBX_FLAG_DISCOVERY_PROTOTYPE;
-				$insertItems[] = $newItem;
-			}
-		}
-
-		// save the new items
-		if ($insertItems) {
-			$this->createReal($insertItems);
-		}
-
-		if ($updateItems) {
-			$this->updateReal($updateItems);
-		}
-
-		// propagate the inheritance to the children
-		$this->inherit(array_merge($insertItems, $updateItems));
 	}
 
 	protected function applyQueryOutputOptions($tableName, $tableAlias, array $options, array $sqlParts) {
 		$sqlParts = parent::applyQueryOutputOptions($tableName, $tableAlias, $options, $sqlParts);
 
-		if ($options['countOutput'] === null) {
+		if (!$options['countOutput']) {
 			if ($options['selectHosts'] !== null) {
 				$sqlParts = $this->addQuerySelect('i.hostid', $sqlParts);
 			}
@@ -1059,12 +1058,9 @@ class CItemPrototype extends CItemGeneral {
 				$triggers = zbx_toHash($triggers, 'itemid');
 
 				foreach ($result as $itemid => $item) {
-					if (isset($triggers[$itemid])) {
-						$result[$itemid]['triggers'] = $triggers[$itemid]['rowscount'];
-					}
-					else {
-						$result[$itemid]['triggers'] = 0;
-					}
+					$result[$itemid]['triggers'] = array_key_exists($itemid, $triggers)
+						? $triggers[$itemid]['rowscount']
+						: '0';
 				}
 			}
 		}
@@ -1093,12 +1089,9 @@ class CItemPrototype extends CItemGeneral {
 				$graphs = zbx_toHash($graphs, 'itemid');
 
 				foreach ($result as $itemid => $item) {
-					if (isset($graphs[$itemid])) {
-						$result[$itemid]['graphs'] = $graphs[$itemid]['rowscount'];
-					}
-					else {
-						$result[$itemid]['graphs'] = 0;
-					}
+					$result[$itemid]['graphs'] = array_key_exists($itemid, $graphs)
+						? $graphs[$itemid]['rowscount']
+						: '0';
 				}
 			}
 		}

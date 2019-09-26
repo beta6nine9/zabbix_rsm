@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -26,7 +26,7 @@ require_once dirname(__FILE__).'/include/users.inc.php';
 
 $page['title'] = _('Action log');
 $page['file'] = 'auditacts.php';
-$page['scripts'] = ['class.calendar.js', 'gtlc.js'];
+$page['scripts'] = ['class.calendar.js', 'gtlc.js', 'flickerfreescreen.js'];
 $page['type'] = detect_page_type(PAGE_TYPE_HTML);
 
 require_once dirname(__FILE__).'/include/page_header.php';
@@ -34,28 +34,14 @@ require_once dirname(__FILE__).'/include/page_header.php';
 // VAR	TYPE	OPTIONAL	FLAGS	VALIDATION	EXCEPTION
 $fields = [
 	// filter
-	'filter_rst' =>	[T_ZBX_STR, O_OPT, P_SYS,	null,	null],
-	'filter_set' =>	[T_ZBX_STR, O_OPT, P_SYS,	null,	null],
-	'alias' =>		[T_ZBX_STR, O_OPT, P_SYS,	null,	null],
-	'period' =>		[T_ZBX_INT, O_OPT, null,	null,	null],
-	'stime' =>		[T_ZBX_STR, O_OPT, null,	null,	null],
-	// ajax
-	'favobj' =>		[T_ZBX_STR, O_OPT, P_ACT,	null,	null],
-	'favid' =>		[T_ZBX_INT, O_OPT, P_ACT,	null,	null]
+	'filter_rst' =>	[T_ZBX_STR,			O_OPT, P_SYS,	null,	null],
+	'filter_set' =>	[T_ZBX_STR,			O_OPT, P_SYS,	null,	null],
+	'alias' =>		[T_ZBX_STR,			O_OPT, P_SYS,	null,	null],
+	'from' =>		[T_ZBX_RANGE_TIME,	O_OPT, P_SYS,	null,	null],
+	'to' =>			[T_ZBX_RANGE_TIME,	O_OPT, P_SYS,	null,	null]
 ];
 check_fields($fields);
-
-/*
- * Ajax
- */
-if (isset($_REQUEST['favobj'])) {
-	// saving fixed/dynamic setting to profile
-	if ($_REQUEST['favobj'] == 'timelinefixedperiod') {
-		if (isset($_REQUEST['favid'])) {
-			CProfile::update('web.auditacts.timelinefixed', $_REQUEST['favid'], PROFILE_TYPE_INT);
-		}
-	}
-}
+validateTimeSelectorPeriod(getRequest('from'), getRequest('to'));
 
 if ($page['type'] == PAGE_TYPE_JS || $page['type'] == PAGE_TYPE_HTML_BLOCK) {
 	require_once dirname(__FILE__).'/include/page_footer.php';
@@ -77,17 +63,24 @@ elseif (hasRequest('filter_rst')) {
 /*
  * Display
  */
-$effectivePeriod = navigation_bar_calc('web.auditacts.timeline', 0, true);
+$timeselector_options = [
+	'profileIdx' => 'web.auditacts.filter',
+	'profileIdx2' => 0,
+	'from' => getRequest('from'),
+	'to' => getRequest('to')
+];
+updateTimeSelectorPeriod($timeselector_options);
 
 $data = [
-	'stime' => getRequest('stime'),
 	'alias' => CProfile::get('web.auditacts.filter.alias', ''),
 	'users' => [],
 	'alerts' => [],
-	'paging' => null
+	'paging' => null,
+	'timeline' => getTimeSelectorPeriod($timeselector_options),
+	'active_tab' => CProfile::get('web.auditacts.filter.active', 1)
 ];
 
-$userId = null;
+$userid = null;
 
 if ($data['alias']) {
 	$data['users'] = API::User()->get([
@@ -99,14 +92,11 @@ if ($data['alias']) {
 	if ($data['users']) {
 		$user = reset($data['users']);
 
-		$userId = $user['userid'];
+		$userid = $user['userid'];
 	}
 }
 
 if (!$data['alias'] || $data['users']) {
-	$from = zbxDateToTime($data['stime']);
-	$till = $from + $effectivePeriod;
-
 	$config = select_config();
 
 	// fetch alerts for different objects and sources and combine them in a single stream
@@ -115,10 +105,11 @@ if (!$data['alias'] || $data['users']) {
 			'output' => ['alertid', 'actionid', 'userid', 'clock', 'sendto', 'subject', 'message', 'status',
 				'retries', 'error', 'alerttype'
 			],
-			'selectMediatypes' => ['mediatypeid', 'description'],
-			'userids' => $userId,
-			'time_from' => $from,
-			'time_till' => $till,
+			'selectMediatypes' => ['mediatypeid', 'name', 'maxattempts'],
+			'userids' => $userid,
+			// API::Alert operates with 'open' time interval therefore before call have to alter 'from' and 'to' values.
+			'time_from' => $data['timeline']['from_ts'] - 1,
+			'time_till' => $data['timeline']['to_ts'] + 1,
 			'eventsource' => $eventSource['source'],
 			'eventobject' => $eventSource['object'],
 			'sortfield' => 'alertid',
@@ -146,20 +137,6 @@ if (!$data['alias'] || $data['users']) {
 	}
 }
 
-// get first alert clock
-$firstAlert = null;
-if ($userId) {
-	$firstAlert = DBfetch(DBselect(
-		'SELECT MIN(a.clock) AS clock'.
-		' FROM alerts a'.
-		' WHERE a.userid='.zbx_dbstr($userId)
-	));
-}
-elseif ($data['alias'] === '') {
-	$firstAlert = DBfetch(DBselect('SELECT MIN(a.clock) AS clock FROM alerts a'));
-}
-$minStartTime = ($firstAlert) ? $firstAlert['clock'] : null;
-
 // get actions names
 if ($data['alerts']) {
 	$data['actions'] = API::Action()->get([
@@ -168,13 +145,6 @@ if ($data['alerts']) {
 		'preservekeys' => true
 	]);
 }
-
-// timeline
-$data['timeline'] = [
-	'period' => $effectivePeriod,
-	'starttime' => date(TIMESTAMP_FORMAT, $minStartTime),
-	'usertime' => $data['stime'] ? date(TIMESTAMP_FORMAT, zbxDateToTime($data['stime']) + $effectivePeriod) : null
-];
 
 // render view
 $auditView = new CView('administration.auditacts.list', $data);

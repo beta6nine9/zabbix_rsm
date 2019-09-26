@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -25,8 +25,10 @@ function audit_resource2str($resource_type = null) {
 		AUDIT_RESOURCE_ZABBIX_CONFIG => _('Configuration of Zabbix'),
 		AUDIT_RESOURCE_MEDIA_TYPE => _('Media type'),
 		AUDIT_RESOURCE_HOST => _('Host'),
+		AUDIT_RESOURCE_HOST_PROTOTYPE => _('Host prototype'),
 		AUDIT_RESOURCE_ACTION => _('Action'),
 		AUDIT_RESOURCE_GRAPH => _('Graph'),
+		AUDIT_RESOURCE_GRAPH_PROTOTYPE => _('Graph prototype'),
 		AUDIT_RESOURCE_GRAPH_ELEMENT => _('Graph element'),
 		AUDIT_RESOURCE_USER_GROUP => _('User group'),
 		AUDIT_RESOURCE_APPLICATION => _('Application'),
@@ -34,9 +36,10 @@ function audit_resource2str($resource_type = null) {
 		AUDIT_RESOURCE_TRIGGER_PROTOTYPE => _('Trigger prototype'),
 		AUDIT_RESOURCE_HOST_GROUP => _('Host group'),
 		AUDIT_RESOURCE_ITEM => _('Item'),
+		AUDIT_RESOURCE_ITEM_PROTOTYPE => _('Item prototype'),
 		AUDIT_RESOURCE_IMAGE => _('Image'),
 		AUDIT_RESOURCE_VALUE_MAP => _('Value map'),
-		AUDIT_RESOURCE_IT_SERVICE => _('IT service'),
+		AUDIT_RESOURCE_IT_SERVICE => _('Service'),
 		AUDIT_RESOURCE_MAP => _('Map'),
 		AUDIT_RESOURCE_SCREEN => _('Screen'),
 		AUDIT_RESOURCE_SCENARIO => _('Web scenario'),
@@ -48,7 +51,10 @@ function audit_resource2str($resource_type = null) {
 		AUDIT_RESOURCE_SCRIPT => _('Script'),
 		AUDIT_RESOURCE_MACRO => _('Macro'),
 		AUDIT_RESOURCE_TEMPLATE => _('Template'),
-		AUDIT_RESOURCE_INCIDENT => _('Incident')
+		AUDIT_RESOURCE_ICON_MAP => _('Icon mapping'),
+		AUDIT_RESOURCE_CORRELATION => _('Event correlation'),
+		AUDIT_RESOURCE_DASHBOARD => _('Dashboard'),
+		AUDIT_RESOURCE_AUTOREGISTRATION  => _('Auto registration')
 	];
 
 	if (is_null($resource_type)) {
@@ -106,9 +112,12 @@ function add_audit_ext($action, $resourcetype, $resourceid, $resourcename, $tabl
 		$resourcename = mb_substr($resourcename, 0, 252).'...';
 	}
 
+	// CWebUser is not initianized in CUser->login() method.
+	$userid = ($action == AUDIT_ACTION_LOGIN) ? $resourceid : CWebUser::$data['userid'];
+
 	$ip = !empty($_SERVER['HTTP_X_FORWARDED_FOR']) ? $_SERVER['HTTP_X_FORWARDED_FOR'] : $_SERVER['REMOTE_ADDR'];
 	$values = [
-		'userid' => CWebUser::$data['userid'],
+		'userid' => $userid,
 		'clock' => time(),
 		'ip' => substr($ip, 0, 39),
 		'action' => $action,

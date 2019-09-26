@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -21,8 +21,6 @@
 
 /**
  * Class containing methods for operations with images.
- *
- * @package API
  */
 class CImage extends CApiService {
 
@@ -33,18 +31,19 @@ class CImage extends CApiService {
 	/**
 	 * Get images data
 	 *
-	 * @param array $options
-	 * @param array $options['itemids']
-	 * @param array $options['hostids']
-	 * @param array $options['groupids']
-	 * @param array $options['triggerids']
-	 * @param array $options['imageids']
-	 * @param boolean $options['status']
-	 * @param boolean $options['editable']
-	 * @param boolean $options['count']
+	 * @param array  $options
+	 * @param array  $options['itemids']
+	 * @param array  $options['hostids']
+	 * @param array  $options['groupids']
+	 * @param array  $options['triggerids']
+	 * @param array  $options['imageids']
+	 * @param bool   $options['status']
+	 * @param bool   $options['editable']
+	 * @param bool   $options['count']
 	 * @param string $options['pattern']
-	 * @param int $options['limit']
+	 * @param int    $options['limit']
 	 * @param string $options['order']
+	 *
 	 * @return array|boolean image data as array or false if error
 	 */
 	public function get($options = []) {
@@ -65,15 +64,15 @@ class CImage extends CApiService {
 			'filter'					=> null,
 			'search'					=> null,
 			'searchByAny'				=> null,
-			'startSearch'				=> null,
-			'excludeSearch'				=> null,
+			'startSearch'				=> false,
+			'excludeSearch'				=> false,
 			'searchWildcardsEnabled'	=> null,
 			// output
 			'output'					=> API_OUTPUT_EXTEND,
 			'select_image'				=> null,
-			'editable'					=> null,
-			'countOutput'				=> null,
-			'preservekeys'				=> null,
+			'editable'					=> false,
+			'countOutput'				=> false,
+			'preservekeys'				=> false,
 			'sortfield'					=> '',
 			'sortorder'					=> '',
 			'limit'						=> null
@@ -81,9 +80,8 @@ class CImage extends CApiService {
 		$options = zbx_array_merge($defOptions, $options);
 
 		// editable + PERMISSION CHECK
-		if (!is_null($options['editable']) && self::$userData['type'] != USER_TYPE_ZABBIX_ADMIN
-				&& self::$userData['type'] != USER_TYPE_SUPER_ADMIN) {
-			return $result;
+		if ($options['editable'] && self::$userData['type'] < USER_TYPE_ZABBIX_ADMIN) {
+			return [];
 		}
 
 		// imageids
@@ -147,13 +145,13 @@ class CImage extends CApiService {
 		if (!is_null($options['select_image'])) {
 			$dbImg = DBselect('SELECT i.imageid,i.image FROM images i WHERE '.dbConditionInt('i.imageid', $imageids));
 			while ($img = DBfetch($dbImg)) {
-				// PostgreSQL and SQLite images are stored escaped in the DB
+				// PostgreSQL images are stored escaped in the DB
 				$img['image'] = zbx_unescape_image($img['image']);
 				$result[$img['imageid']]['image'] = base64_encode($img['image']);
 			}
 		}
 
-		if (is_null($options['preservekeys'])) {
+		if (!$options['preservekeys']) {
 			$result = zbx_cleanHashes($result);
 		}
 		return $result;
@@ -180,6 +178,13 @@ class CImage extends CApiService {
 
 			// validate image (size and format)
 			$this->checkImage($image['image']);
+
+			list(,, $img_type) = getimagesizefromstring($image['image']);
+
+			if (!in_array($img_type, [IMAGETYPE_GIF, IMAGETYPE_JPEG, IMAGETYPE_PNG])) {
+				// Converting to PNG all images except PNG, JPEG and GIF
+				$image['image'] = $this->convertToPng($image['image']);
+			}
 
 			$imageid = get_dbid('images', 'imageid');
 			$values = [
@@ -228,13 +233,6 @@ class CImage extends CApiService {
 					}
 					if (!db2_execute($stmt)) {
 						self::exception(ZBX_API_ERROR_PARAMETERS, db2_conn_errormsg($DB['DB']));
-					}
-				break;
-				case ZBX_DB_SQLITE3:
-					$values['image'] = zbx_dbstr(bin2hex($image['image']));
-					$sql = 'INSERT INTO images ('.implode(', ', array_keys($values)).') VALUES ('.implode(', ', $values).')';
-					if (!DBexecute($sql)) {
-						self::exception(ZBX_API_ERROR_PARAMETERS, 'DBerror');
 					}
 				break;
 				case ZBX_DB_MYSQL:
@@ -287,13 +285,16 @@ class CImage extends CApiService {
 				// validate image
 				$this->checkImage($image['image']);
 
+				list(,, $img_type) = getimagesizefromstring($image['image']);
+
+				if (!in_array($img_type, [IMAGETYPE_GIF, IMAGETYPE_JPEG, IMAGETYPE_PNG])) {
+					// Converting to PNG all images except PNG, JPEG and GIF
+					$image['image'] = $this->convertToPng($image['image']);
+				}
+
 				switch ($DB['TYPE']) {
 					case ZBX_DB_POSTGRESQL:
 						$values['image'] = "'".pg_escape_bytea($image['image'])."'";
-						break;
-
-					case ZBX_DB_SQLITE3:
-						$values['image'] = zbx_dbstr(bin2hex($image['image']));
 						break;
 
 					case ZBX_DB_MYSQL:
@@ -370,7 +371,7 @@ class CImage extends CApiService {
 			self::exception(ZBX_API_ERROR_PARAMETERS, _('Empty parameters'));
 		}
 
-		if (self::$userData['type'] != USER_TYPE_ZABBIX_ADMIN && self::$userData['type'] != USER_TYPE_SUPER_ADMIN) {
+		if (self::$userData['type'] < USER_TYPE_ZABBIX_ADMIN) {
 			self::exception(ZBX_API_ERROR_PERMISSIONS, _('No permissions to referred object or it does not exist!'));
 		}
 
@@ -440,14 +441,18 @@ class CImage extends CApiService {
 	 * @throws APIException if wrong fields are passed.
 	 * @throws APIException if image with same name already exists.
 	 */
-	protected function validateCreate(array $images) {
+	protected function validateCreate(array &$images) {
 		// validate permissions
-		if (self::$userData['type'] != USER_TYPE_ZABBIX_ADMIN && self::$userData['type'] != USER_TYPE_SUPER_ADMIN) {
+		if (self::$userData['type'] < USER_TYPE_ZABBIX_ADMIN) {
 			self::exception(ZBX_API_ERROR_PERMISSIONS, _('No permissions to referred object or it does not exist!'));
 		}
 
+		if (!$images) {
+			self::exception(ZBX_API_ERROR_PARAMETERS, _('Empty input parameter.'));
+		}
+
 		// check fields
-		foreach ($images as $image) {
+		foreach ($images as &$image) {
 			$imageDbFields = [
 				'name' => null,
 				'image' => null,
@@ -455,9 +460,10 @@ class CImage extends CApiService {
 			];
 
 			if (!check_db_fields($imageDbFields, $image)) {
-				self::exception(ZBX_API_ERROR_PARAMETERS, _s('Wrong fields for image "%1$s".', $image['name']));
+				self::exception(ZBX_API_ERROR_PARAMETERS, _('Incorrect input parameters.'));
 			}
 		}
+		unset($image);
 
 		// check host name duplicates
 		$collectionValidator = new CCollectionValidator([
@@ -489,7 +495,7 @@ class CImage extends CApiService {
 	 * @throws APIException if image with same name already exists.
 	 */
 	protected function validateUpdate(array $images) {
-		if (self::$userData['type'] != USER_TYPE_ZABBIX_ADMIN && self::$userData['type'] != USER_TYPE_SUPER_ADMIN) {
+		if (self::$userData['type'] < USER_TYPE_ZABBIX_ADMIN) {
 			self::exception(ZBX_API_ERROR_PERMISSIONS, _('No permissions to referred object or it does not exist!'));
 		}
 
@@ -554,8 +560,13 @@ class CImage extends CApiService {
 	 */
 	protected function checkImage($image) {
 		// check size
-		if (strlen($image) > ZBX_MAX_IMAGE_SIZE) {
-			self::exception(ZBX_API_ERROR_PARAMETERS, _('Image size must be less than 1MB.'));
+		if (bccomp(strlen($image), ZBX_MAX_IMAGE_SIZE) == 1) {
+			self::exception(ZBX_API_ERROR_PARAMETERS,
+				_s('Image size must be less than %s.', convert_units([
+					'value' => ZBX_MAX_IMAGE_SIZE,
+					'units' => 'B'
+				]))
+			);
 		}
 
 		// check file format
@@ -565,17 +576,17 @@ class CImage extends CApiService {
 	}
 
 	/**
-	 * Unset "image" field from output.
+	 * Unset "image" field from the output.
 	 *
-	 * @param string $tableName
-	 * @param string $tableAlias
+	 * @param string $table_name
+	 * @param string $table_alias
 	 * @param array  $options
-	 * @param array  $sqlParts
+	 * @param array  $sql_parts
 	 *
-	 * @return array				The resulting SQL parts array
+	 * @return array The resulting SQL parts array.
 	 */
-	protected function applyQueryOutputOptions($tableName, $tableAlias, array $options, array $sqlParts) {
-		if ($options['countOutput'] === null) {
+	protected function applyQueryOutputOptions($table_name, $table_alias, array $options, array $sql_parts) {
+		if (!$options['countOutput']) {
 			if ($options['output'] == API_OUTPUT_EXTEND) {
 				$options['output'] = ['imageid', 'imagetype', 'name'];
 			}
@@ -586,10 +597,26 @@ class CImage extends CApiService {
 					}
 				}
 			}
-
-			$sqlParts = parent::applyQueryOutputOptions($tableName, $tableAlias, $options, $sqlParts);
 		}
 
-		return $sqlParts;
+		return parent::applyQueryOutputOptions($table_name, $table_alias, $options, $sql_parts);
+	}
+
+	/**
+	 * Convert image body to PNG.
+	 *
+	 * @param string $image  Base64 encoded body of image.
+	 * @return string
+	 */
+	protected function convertToPng($image) {
+		$image = imagecreatefromstring($image);
+
+		ob_start();
+		imagealphablending($image, false);
+		imagesavealpha($image, true);
+		imagepng($image);
+		imagedestroy($image);
+
+		return ob_get_clean();
 	}
 }

@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -20,14 +20,35 @@
 
 
 if ($data['uncheck']) {
-	uncheckTableRows();
+	uncheckTableRows('proxy');
 }
 
 $widget = (new CWidget())
 	->setTitle(_('Proxies'))
-	->setControls((new CForm())
-		->cleanItems()
-		->addItem((new CList())->addItem(new CRedirectButton(_('Create proxy'), 'zabbix.php?action=proxy.edit')))
+	->setControls((new CTag('nav', true,
+		(new CList())
+			->addItem(new CRedirectButton(_('Create proxy'), 'zabbix.php?action=proxy.edit'))
+		))
+			->setAttribute('aria-label', _('Content controls'))
+	)
+	->addItem((new CFilter((new CUrl('zabbix.php'))->setArgument('action', 'proxy.list')))
+		->setProfile($data['profileIdx'])
+		->setActiveTab($data['active_tab'])
+		->addFilterTab(_('Filter'), [
+			(new CFormList())->addRow(_('Name'),
+				(new CTextBox('filter_name', $data['filter']['name']))
+					->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH)
+					->setAttribute('autofocus', 'autofocus')
+			),
+			(new CFormList())->addRow(_('Mode'),
+				(new CRadioButtonList('filter_status', (int) $data['filter']['status']))
+					->addValue(_('Any'), -1)
+					->addValue(_('Active'), HOST_STATUS_PROXY_ACTIVE)
+					->addValue(_('Passive'), HOST_STATUS_PROXY_PASSIVE)
+					->setModern(true)
+			)
+		])
+		->addVar('action', 'proxy.list')
 	);
 
 // create form
@@ -43,6 +64,7 @@ $proxyTable = (new CTableInfo())
 		make_sorting_header(_('Name'), 'host', $data['sort'], $data['sortorder']),
 		_('Mode'),
 		_('Encryption'),
+		_('Compression'),
 		_('Last seen (age)'),
 		_('Host count'),
 		_('Item count'),
@@ -118,12 +140,15 @@ foreach ($data['proxies'] as $proxy) {
 		(new CCol($name))->addClass(ZBX_STYLE_NOWRAP),
 		$proxy['status'] == HOST_STATUS_PROXY_ACTIVE ? _('Active') : _('Passive'),
 		$proxy['status'] == HOST_STATUS_PROXY_ACTIVE ? $out_encryption : $in_encryption,
-		$proxy['lastaccess'] == 0
+		($proxy['auto_compress'] == HOST_COMPRESSION_ON)
+			? (new CSpan(_('On')))->addClass(ZBX_STYLE_STATUS_GREEN)
+			: (new CSpan(_('Off')))->addClass(ZBX_STYLE_STATUS_GREY),
+		($proxy['lastaccess'] == 0)
 			? (new CSpan(_('Never')))->addClass(ZBX_STYLE_RED)
 			: zbx_date2age($proxy['lastaccess']),
-		count($proxy['hosts']),
-		array_key_exists('item_count', $proxy) ? $proxy['item_count'] : 0,
-		array_key_exists('perf', $proxy) ? $proxy['perf'] : '',
+		array_key_exists('host_count', $proxy) ? $proxy['host_count'] : '',
+		array_key_exists('item_count', $proxy) ? $proxy['item_count'] : '',
+		array_key_exists('vps_total', $proxy) ? $proxy['vps_total'] : '',
 		$hosts ? $hosts : ''
 	]);
 }
@@ -140,7 +165,7 @@ $proxyForm->addItem([
 			'confirm' => _('Disable hosts monitored by selected proxies?')
 		],
 		'proxy.delete' => ['name' => _('Delete'), 'confirm' => _('Delete selected proxies?')]
-	])
+	], 'proxy')
 ]);
 
 // append form to widget

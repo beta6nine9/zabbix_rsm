@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -20,16 +20,19 @@
 
 
 function getSounds() {
-	$fileList = [];
+	$file_list = [];
 	$dir = scandir('./audio');
+
 	foreach ($dir as $file) {
-		if (!preg_match('/^([\w\d_]+)\.(wav|ogg)$/i', $file)) {
+		if ('audio/' !== substr(mime_content_type('./audio/'.$file), 0, 6)) {
 			continue;
 		}
-		list($filename, $type) = explode('.', $file);
-		$fileList[$filename] = $file;
+
+		$filename = explode('.', $file)[0];
+		$file_list[$filename] = $file;
 	}
-	return $fileList;
+
+	return $file_list;
 }
 
 function getMessageSettings() {
@@ -50,13 +53,14 @@ function getMessageSettings() {
 		'triggers.severities' => null,
 		'sounds.mute' => 0,
 		'sounds.repeat' => 1,
-		'sounds.recovery' => 'alarm_ok.wav',
-		'sounds.'.TRIGGER_SEVERITY_NOT_CLASSIFIED => 'no_sound.wav',
-		'sounds.'.TRIGGER_SEVERITY_INFORMATION => 'alarm_information.wav',
-		'sounds.'.TRIGGER_SEVERITY_WARNING => 'alarm_warning.wav',
-		'sounds.'.TRIGGER_SEVERITY_AVERAGE => 'alarm_average.wav',
-		'sounds.'.TRIGGER_SEVERITY_HIGH => 'alarm_high.wav',
-		'sounds.'.TRIGGER_SEVERITY_DISASTER => 'alarm_disaster.wav'
+		'sounds.recovery' => 'alarm_ok.mp3',
+		'sounds.'.TRIGGER_SEVERITY_NOT_CLASSIFIED => 'no_sound.mp3',
+		'sounds.'.TRIGGER_SEVERITY_INFORMATION => 'alarm_information.mp3',
+		'sounds.'.TRIGGER_SEVERITY_WARNING => 'alarm_warning.mp3',
+		'sounds.'.TRIGGER_SEVERITY_AVERAGE => 'alarm_average.mp3',
+		'sounds.'.TRIGGER_SEVERITY_HIGH => 'alarm_high.mp3',
+		'sounds.'.TRIGGER_SEVERITY_DISASTER => 'alarm_disaster.mp3',
+		'show_suppressed' => 0
 	];
 
 	$dbProfiles = DBselect(
@@ -69,12 +73,13 @@ function getMessageSettings() {
 		$messages[$profile['source']] = $profile['value_str'];
 	}
 
-	if (is_null($messages['triggers.severities'])) {
+	if ($messages['triggers.severities'] === null) {
 		$messages['triggers.severities'] = $defSeverities;
 	}
 	else {
 		$messages['triggers.severities'] = unserialize($messages['triggers.severities']);
 	}
+
 	return $messages;
 }
 
@@ -83,7 +88,9 @@ function updateMessageSettings($messages) {
 		$messages['enabled'] = 0;
 	}
 	if (isset($messages['triggers.severities'])) {
-		$messages['triggers.severities'] = serialize($messages['triggers.severities']);
+		$messages['triggers.severities'] = serialize(array_filter($messages['triggers.severities'], function($v) {
+			return $v == 1;
+		}));
 	}
 
 	$dbProfiles = DBselect(
@@ -101,6 +108,12 @@ function updateMessageSettings($messages) {
 	$updates = [];
 
 	foreach ($messages as $key => $value) {
+		if ($key === 'timeout' && !validateTimeUnit($messages['timeout'], 30, SEC_PER_DAY, false, $error)) {
+			error(_s('Incorrect value for field "%1$s": %2$s.', 'timeout', $error));
+
+			return false;
+		}
+
 		$values = [
 			'userid' => CWebUser::$data['userid'],
 			'idx' => 'web.messages',
@@ -126,6 +139,9 @@ function updateMessageSettings($messages) {
 	}
 	catch (APIException $e) {
 		error($e->getMessage());
+
+		return false;
 	}
-	return $messages;
+
+	return true;
 }

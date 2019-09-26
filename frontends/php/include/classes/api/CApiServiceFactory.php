@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -31,7 +31,10 @@ class CApiServiceFactory extends CRegistryFactory {
 			'alert' => 'CAlert',
 			'apiinfo' => 'CAPIInfo',
 			'application' => 'CApplication',
+			'autoregistration' => 'CAutoregistration',
 			'configuration' => 'CConfiguration',
+			'correlation' => 'CCorrelation',
+			'dashboard' => 'CDashboard',
 			'dcheck' => 'CDCheck',
 			'dhost' => 'CDHost',
 			'discoveryrule' => 'CDiscoveryRule',
@@ -46,6 +49,7 @@ class CApiServiceFactory extends CRegistryFactory {
 			'hostprototype' => 'CHostPrototype',
 			'history' => 'CHistory',
 			'hostinterface' => 'CHostInterface',
+			'httptest' => 'CHttpTest',
 			'image' => 'CImage',
 			'iconmap' => 'CIconMap',
 			'item' => 'CItem',
@@ -53,11 +57,13 @@ class CApiServiceFactory extends CRegistryFactory {
 			'maintenance' => 'CMaintenance',
 			'map' => 'CMap',
 			'mediatype' => 'CMediatype',
+			'problem' => 'CProblem',
 			'proxy' => 'CProxy',
 			'service' => 'CService',
 			'screen' => 'CScreen',
 			'screenitem' => 'CScreenItem',
 			'script' => 'CScript',
+			'task' => 'CTask',
 			'template' => 'CTemplate',
 			'templatescreen' => 'CTemplateScreen',
 			'templatescreenitem' => 'CTemplateScreenItem',
@@ -67,9 +73,7 @@ class CApiServiceFactory extends CRegistryFactory {
 			'user' => 'CUser',
 			'usergroup' => 'CUserGroup',
 			'usermacro' => 'CUserMacro',
-			'usermedia' => 'CUserMedia',
-			'valuemap' => 'CValueMap',
-			'httptest' => 'CHttpTest'
+			'valuemap' => 'CValueMap'
 		], $objects));
 	}
 }

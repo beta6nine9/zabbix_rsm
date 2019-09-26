@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -21,7 +21,6 @@
 #include "stats.h"
 #include "log.h"
 #include "zbxconf.h"
-#include "zbxself.h"
 
 #ifndef _WINDOWS
 #	include "diskdevices.h"
@@ -46,7 +45,7 @@ extern ZBX_THREAD_LOCAL int		server_num, process_num;
 static int		shm_id;
 int 			my_diskstat_shmid = ZBX_NONEXISTENT_SHMID;
 ZBX_DISKDEVICES_DATA	*diskdevices = NULL;
-ZBX_MUTEX		diskstats_lock = ZBX_MUTEX_NULL;
+zbx_mutex_t		diskstats_lock = ZBX_MUTEX_NULL;
 #endif
 
 /******************************************************************************
@@ -61,14 +60,34 @@ ZBX_MUTEX		diskstats_lock = ZBX_MUTEX_NULL;
  * Author: Eugene Grigorjev                                                   *
  *                                                                            *
  ******************************************************************************/
-static int	zbx_get_cpu_num()
+static int	zbx_get_cpu_num(void)
 {
 #if defined(_WINDOWS)
+	/* Define a function pointer type for the GetActiveProcessorCount API */
+	typedef DWORD (WINAPI *GETACTIVEPC) (WORD);
+
+	GETACTIVEPC	get_act;
 	SYSTEM_INFO	sysInfo;
 
-	GetSystemInfo(&sysInfo);
+	/* The rationale for checking dynamically if the GetActiveProcessorCount is implemented */
+	/* in kernel32.lib, is because the function is implemented only on 64 bit versions of Windows */
+	/* from Windows 7 onward. Windows Vista 64 bit doesn't have it and also Windows XP does */
+	/* not. We can't resolve this using conditional compilation unless we release multiple agents */
+	/* targeting different sets of Windows APIs. */
+	get_act = (GETACTIVEPC)GetProcAddress(GetModuleHandle(TEXT("kernel32.dll")), "GetActiveProcessorCount");
 
-	return (int)sysInfo.dwNumberOfProcessors;
+	if (NULL != get_act)
+	{
+		return (int)get_act(ALL_PROCESSOR_GROUPS);
+	}
+	else
+	{
+		zabbix_log(LOG_LEVEL_DEBUG, "Cannot find address of GetActiveProcessorCount function");
+
+		GetNativeSystemInfo(&sysInfo);
+
+		return (int)sysInfo.dwNumberOfProcessors;
+	}
 #elif defined(HAVE_SYS_PSTAT_H)
 	struct pst_dynamic	psd;
 
@@ -79,6 +98,7 @@ static int	zbx_get_cpu_num()
 #elif defined(_SC_NPROCESSORS_CONF)
 	/* FreeBSD 7.0 x86 */
 	/* Solaris 10 x86 */
+	/* AIX 6.1 */
 	int	ncpu;
 
 	if (-1 == (ncpu = sysconf(_SC_NPROCESSORS_CONF)))
@@ -117,14 +137,6 @@ static int	zbx_get_cpu_num()
 		goto return_one;
 
 	return ncpu;
-#elif defined(HAVE_LIBPERFSTAT)
-	/* AIX 6.1 */
-	perfstat_cpu_total_t	ps_cpu_total;
-
-	if (-1 == perfstat_cpu_total(NULL, &ps_cpu_total, sizeof(ps_cpu_total), 1))
-		goto return_one;
-
-	return (int)ps_cpu_total.ncpus;
 #endif
 
 #ifndef _WINDOWS
@@ -145,47 +157,47 @@ return_one:
  * Comments: Unix version allocates memory as shared.                         *
  *                                                                            *
  ******************************************************************************/
-void	init_collector_data()
+int	init_collector_data(char **error)
 {
-	const char	*__function_name = "init_collector_data";
-	int		cpu_count;
-	size_t		sz, sz_cpu;
-#ifndef _WINDOWS
-	key_t		shm_key;
-#endif
+	int	cpu_count, ret = FAIL;
+	size_t	sz, sz_cpu;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
 	cpu_count = zbx_get_cpu_num();
 	sz = ZBX_SIZE_T_ALIGN8(sizeof(ZBX_COLLECTOR_DATA));
 
 #ifdef _WINDOWS
-	sz_cpu = sizeof(PERF_COUNTER_DATA *) * (cpu_count + 1);
+
+	ZBX_UNUSED(error);
+
+	sz_cpu = sizeof(zbx_perf_counter_data_t *) * (cpu_count + 1);
 
 	collector = zbx_malloc(collector, sz + sz_cpu);
 	memset(collector, 0, sz + sz_cpu);
 
-	collector->cpus.cpu_counter = (PERF_COUNTER_DATA **)((char *)collector + sz);
+	collector->cpus.cpu_counter = (zbx_perf_counter_data_t **)((char *)collector + sz);
 	collector->cpus.count = cpu_count;
 #else
 	sz_cpu = sizeof(ZBX_SINGLE_CPU_STAT_DATA) * (cpu_count + 1);
 
-	if (-1 == (shm_key = zbx_ftok(CONFIG_FILE, ZBX_IPC_COLLECTOR_ID)))
+	if (-1 == (shm_id = zbx_shm_create(sz + sz_cpu)))
 	{
-		zabbix_log(LOG_LEVEL_CRIT, "cannot create IPC key for collector");
-		exit(EXIT_FAILURE);
+		*error = zbx_strdup(*error, "cannot allocate shared memory for collector");
+		goto out;
 	}
 
-	if (-1 == (shm_id = zbx_shmget(shm_key, sz + sz_cpu)))
+	if ((void *)(-1) == (collector = (ZBX_COLLECTOR_DATA *)shmat(shm_id, NULL, 0)))
 	{
-		zabbix_log(LOG_LEVEL_CRIT, "cannot allocate shared memory for collector");
-		exit(EXIT_FAILURE);
+		*error = zbx_dsprintf(*error, "cannot attach shared memory for collector: %s", zbx_strerror(errno));
+		goto out;
 	}
 
-	if ((void *)(-1) == (collector = shmat(shm_id, NULL, 0)))
+	/* Immediately mark the new shared memory for destruction after attaching to it */
+	if (-1 == zbx_shm_destroy(shm_id))
 	{
-		zabbix_log(LOG_LEVEL_CRIT, "cannot attach shared memory for collector: %s", zbx_strerror(errno));
-		exit(EXIT_FAILURE);
+		*error = zbx_strdup(*error, "cannot mark the new shared memory for destruction.");
+		goto out;
 	}
 
 	collector->cpus.cpu = (ZBX_SINGLE_CPU_STAT_DATA *)((char *)collector + sz);
@@ -196,17 +208,20 @@ void	init_collector_data()
 	zbx_procstat_init();
 #endif
 
-	if (FAIL == zbx_mutex_create_force(&diskstats_lock, ZBX_MUTEX_DISKSTATS))
-	{
-		zbx_error("cannot create mutex for disk statistics collector");
-		exit(EXIT_FAILURE);
-	}
+	if (SUCCEED != zbx_mutex_create(&diskstats_lock, ZBX_MUTEX_DISKSTATS, error))
+		goto out;
 #endif
 
 #ifdef _AIX
 	memset(&collector->vmstat, 0, sizeof(collector->vmstat));
 #endif
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __function_name);
+	ret = SUCCEED;
+#ifndef _WINDOWS
+out:
+#endif
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
+
+	return ret;
 }
 
 /******************************************************************************
@@ -220,7 +235,7 @@ void	init_collector_data()
  * Comments: Unix version allocated memory as shared.                         *
  *                                                                            *
  ******************************************************************************/
-void	free_collector_data()
+void	free_collector_data(void)
 {
 #ifdef _WINDOWS
 	zbx_free(collector);
@@ -256,28 +271,21 @@ void	free_collector_data()
  * Purpose: Allocate shared memory for collecting disk statistics             *
  *                                                                            *
  ******************************************************************************/
-void	diskstat_shm_init()
+void	diskstat_shm_init(void)
 {
 #ifndef _WINDOWS
-	key_t	shm_key;
 	size_t	shm_size;
 
 	/* initially allocate memory for collecting statistics for only 1 disk */
 	shm_size = sizeof(ZBX_DISKDEVICES_DATA);
 
-	if (-1 == (shm_key = zbx_ftok(CONFIG_FILE, ZBX_IPC_COLLECTOR_DISKSTAT)))
-	{
-		zabbix_log(LOG_LEVEL_CRIT, "cannot create IPC key for disk statistics collector");
-		exit(EXIT_FAILURE);
-	}
-
-	if (-1 == (collector->diskstat_shmid = zbx_shmget(shm_key, shm_size)))
+	if (-1 == (collector->diskstat_shmid = zbx_shm_create(shm_size)))
 	{
 		zabbix_log(LOG_LEVEL_CRIT, "cannot allocate shared memory for disk statistics collector");
 		exit(EXIT_FAILURE);
 	}
 
-	if ((void *)(-1) == (diskdevices = shmat(collector->diskstat_shmid, NULL, 0)))
+	if ((void *)(-1) == (diskdevices = (ZBX_DISKDEVICES_DATA *)shmat(collector->diskstat_shmid, NULL, 0)))
 	{
 		zabbix_log(LOG_LEVEL_CRIT, "cannot attach shared memory for disk statistics collector: %s",
 				zbx_strerror(errno));
@@ -300,7 +308,7 @@ void	diskstat_shm_init()
  * Purpose: If necessary, reattach to disk statistics shared memory segment.  *
  *                                                                            *
  ******************************************************************************/
-void	diskstat_shm_reattach()
+void	diskstat_shm_reattach(void)
 {
 #ifndef _WINDOWS
 	if (my_diskstat_shmid != collector->diskstat_shmid)
@@ -321,7 +329,7 @@ void	diskstat_shm_reattach()
 			my_diskstat_shmid = ZBX_NONEXISTENT_SHMID;
 		}
 
-		if ((void *)(-1) == (diskdevices = shmat(collector->diskstat_shmid, NULL, 0)))
+		if ((void *)(-1) == (diskdevices = (ZBX_DISKDEVICES_DATA *)shmat(collector->diskstat_shmid, NULL, 0)))
 		{
 			zabbix_log(LOG_LEVEL_CRIT, "cannot attach shared memory for disk statistics collector: %s",
 					zbx_strerror(errno));
@@ -343,18 +351,16 @@ void	diskstat_shm_reattach()
  *          copy data from the old one.                                       *
  *                                                                            *
  ******************************************************************************/
-void	diskstat_shm_extend()
+void	diskstat_shm_extend(void)
 {
 #ifndef _WINDOWS
-	const char		*__function_name = "diskstat_shm_extend";
-	key_t			shm_key;
 	size_t			old_shm_size, new_shm_size;
 	int			old_shmid, new_shmid, old_max, new_max;
 	ZBX_DISKDEVICES_DATA	*new_diskdevices;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
-	/* caclulate the size of the new shared memory segment */
+	/* calculate the size of the new shared memory segment */
 	old_max = diskdevices->max_diskdev;
 
 	if (old_max < 4)
@@ -367,25 +373,13 @@ void	diskstat_shm_extend()
 	old_shm_size = sizeof(ZBX_DISKDEVICES_DATA) + sizeof(ZBX_SINGLE_DISKDEVICE_DATA) * (old_max - 1);
 	new_shm_size = sizeof(ZBX_DISKDEVICES_DATA) + sizeof(ZBX_SINGLE_DISKDEVICE_DATA) * (new_max - 1);
 
-	/* Create the new shared memory segment. The same key is used. */
-	if (-1 == (shm_key = zbx_ftok(CONFIG_FILE, ZBX_IPC_COLLECTOR_DISKSTAT)))
-	{
-		zabbix_log(LOG_LEVEL_CRIT, "cannot create IPC key for extending disk statistics collector");
-		exit(EXIT_FAILURE);
-	}
-
-	/* zbx_shmget() will:                                                 */
-	/*	- see that a shared memory segment with this key exists       */
-	/*	- mark it for deletion                                        */
-	/*	- create a new segment with this key, but with a different id */
-
-	if (-1 == (new_shmid = zbx_shmget(shm_key, new_shm_size)))
+	if (-1 == (new_shmid = zbx_shm_create(new_shm_size)))
 	{
 		zabbix_log(LOG_LEVEL_CRIT, "cannot allocate shared memory for extending disk statistics collector");
 		exit(EXIT_FAILURE);
 	}
 
-	if ((void *)(-1) == (new_diskdevices = shmat(new_shmid, NULL, 0)))
+	if ((void *)(-1) == (new_diskdevices = (ZBX_DISKDEVICES_DATA *)shmat(new_shmid, NULL, 0)))
 	{
 		zabbix_log(LOG_LEVEL_CRIT, "cannot attach shared memory for extending disk statistics collector: %s",
 				zbx_strerror(errno));
@@ -403,15 +397,22 @@ void	diskstat_shm_extend()
 		exit(EXIT_FAILURE);
 	}
 
+	if (-1 == zbx_shm_destroy(collector->diskstat_shmid))
+	{
+		zabbix_log(LOG_LEVEL_CRIT, "cannot destroy old disk statistics collector shared memory");
+		exit(EXIT_FAILURE);
+	}
+
 	/* switch to the new segment */
 	old_shmid = collector->diskstat_shmid;
 	collector->diskstat_shmid = new_shmid;
 	my_diskstat_shmid = collector->diskstat_shmid;
 	diskdevices = new_diskdevices;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s() extended diskstat shared memory: old_max:%d new_max:%d old_size:%d"
-			" new_size:%d old_shmid:%d new_shmid:%d", __function_name, old_max, new_max, old_shm_size,
-			new_shm_size, old_shmid, collector->diskstat_shmid);
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s() extended diskstat shared memory: old_max:%d new_max:%d old_size:"
+			ZBX_FS_SIZE_T " new_size:" ZBX_FS_SIZE_T " old_shmid:%d new_shmid:%d", __func__, old_max,
+			new_max, (zbx_fs_size_t)old_shm_size, (zbx_fs_size_t)new_shm_size, old_shmid,
+			collector->diskstat_shmid);
 #endif
 }
 
@@ -446,7 +447,7 @@ ZBX_THREAD_ENTRY(collector_thread, args)
 
 	while (ZBX_IS_RUNNING())
 	{
-		zbx_handle_log();
+		zbx_update_env(zbx_time());
 
 		zbx_setproctitle("collector [processing data]");
 #ifdef _WINDOWS
@@ -478,5 +479,10 @@ ZBX_THREAD_ENTRY(collector_thread, args)
 	ZBX_DO_EXIT();
 
 	zbx_thread_exit(EXIT_SUCCESS);
+#else
+	zbx_setproctitle("%s #%d [terminated]", get_process_type_string(process_type), process_num);
+
+	while (1)
+		zbx_sleep(SEC_PER_MIN);
 #endif
 }

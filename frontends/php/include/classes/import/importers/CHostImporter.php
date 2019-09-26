@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -36,6 +36,7 @@ class CHostImporter extends CImporter {
 	public function import(array $hosts) {
 		$hostsToCreate = [];
 		$hostsToUpdate = [];
+		$templateLinkage = [];
 
 		foreach ($hosts as $host) {
 			// preserve host related templates to massAdd them later
@@ -50,18 +51,20 @@ class CHostImporter extends CImporter {
 			}
 			unset($host['templates']);
 
-
 			$host = $this->resolveHostReferences($host);
 
-			if (isset($host['hostid'])) {
+			if (array_key_exists('hostid', $host) && ($this->options['hosts']['updateExisting']
+					|| $this->options['process_hosts'])) {
 				$hostsToUpdate[] = $host;
 			}
-			else {
+			else if ($this->options['hosts']['createMissing']) {
+				if (array_key_exists('hostid', $host)) {
+					throw new Exception(_s('Host "%1$s" already exists.', $host['host']));
+				}
+
 				$hostsToCreate[] = $host;
 			}
 		}
-
-		$hostsToUpdate = $this->addInterfaceIds($hostsToUpdate);
 
 		// create/update hosts
 		if ($this->options['hosts']['createMissing'] && $hostsToCreate) {
@@ -81,8 +84,13 @@ class CHostImporter extends CImporter {
 			}
 		}
 
-		if ($this->options['hosts']['updateExisting'] && $hostsToUpdate) {
-			API::Host()->update($hostsToUpdate);
+		if ($hostsToUpdate) {
+			if ($this->options['hosts']['updateExisting']) {
+				$hostsToUpdate = $this->addInterfaceIds($hostsToUpdate);
+
+				API::Host()->update($hostsToUpdate);
+			}
+
 			foreach ($hostsToUpdate as $host) {
 				$this->processedHostIds[$host['host']] = $host['hostid'];
 

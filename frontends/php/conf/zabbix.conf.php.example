@@ -1,6 +1,6 @@
 <?php
 // Zabbix GUI configuration file.
-global $DB;
+global $DB, $HISTORY;
 
 $DB['TYPE']				= 'MYSQL';
 $DB['SERVER']			= 'localhost';
@@ -10,14 +10,6 @@ $DB['USER']				= 'zabbix';
 $DB['PASSWORD']			= '';
 // Schema name. Used for IBM DB2 and PostgreSQL.
 $DB['SCHEMA']			= '';
-// TLS parameters. Used only for MySQL. Optional.
-// $DB['DB_KEY_FILE']		= null;
-// $DB['DB_CERT_FILE']		= null;
-// $DB['DB_CA_FILE']		= null;
-// $DB['DB_CA_PATH']		= null;
-// $DB['DB_CA_CIPHER']		= null;
-// Connection timeout for each DB of multi-server MySQL installation.
-$DB['DB_CONN_TIMEOUT']	= 5;
 
 $ZBX_SERVER				= 'localhost';
 $ZBX_SERVER_PORT		= '10051';
@@ -25,21 +17,11 @@ $ZBX_SERVER_NAME		= '';
 
 $IMAGE_FORMAT_DEFAULT	= IMAGE_FORMAT_PNG;
 
-$DB['SERVERS'] = [
-	[
-		'NR' => '1',
-		'NAME' => '',
-		'SERVER' => 'localhost',
-		'PORT' => '0',
-		'DATABASE' => 'zabbix',
-		'USER' => 'zabbix',
-		'PASSWORD' => '',
-		'SCHEMA' => '',
-		'URL' => 'http://localhost/zabbix/',
-//		'DB_KEY_FILE' => null,
-//		'DB_CERT_FILE' => null,
-//		'DB_CA_FILE' => null,
-//		'DB_CA_PATH' => null,
-//		'DB_CA_CIPHER' => null
-	]
-];
+// Uncomment this block only if you are using Elasticsearch.
+// Elasticsearch url (can be string if same url is used for all types).
+//$HISTORY['url']   = [
+//		'uint' => 'http://localhost:9200',
+//		'text' => 'http://localhost:9200'
+//];
+// Value types stored in Elasticsearch.
+//$HISTORY['types'] = ['uint', 'text'];

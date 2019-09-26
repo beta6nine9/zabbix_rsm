@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -38,7 +38,6 @@ class CAjaxResponse {
 	 * Add error to ajax response. All errors are returned as array in 'errors' part of response.
 	 *
 	 * @param string $error error text
-	 * @return void
 	 */
 	public function error($error) {
 		$this->_result = false;
@@ -50,7 +49,6 @@ class CAjaxResponse {
 	 * If any error was added previously, this method does nothing.
 	 *
 	 * @param array $data
-	 * @return void
 	 */
 	public function success(array $data) {
 		if ($this->_result) {
@@ -60,8 +58,6 @@ class CAjaxResponse {
 
 	/**
 	 * Output ajax response. If any error was added, 'result' is false, otherwise true.
-	 *
-	 * @return void
 	 */
 	public function send() {
 		$json = new CJson();

@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -23,11 +23,16 @@ require_once dirname(__FILE__).'/include/config.inc.php';
 require_once dirname(__FILE__).'/include/triggers.inc.php';
 require_once dirname(__FILE__).'/include/services.inc.php';
 
-$page['title'] = _('IT services');
+$page['title'] = _('Services');
 $page['file'] = 'srv_status.php';
+$page['scripts'] = ['layout.mode.js'];
 
 define('ZBX_PAGE_DO_REFRESH', 1);
 
+if (!getRequest('serviceid') || !getRequest('showgraph')) {
+	CView::$has_web_layout_mode = true;
+	$page['web_layout_mode'] = CView::getLayoutMode();
+}
 require_once dirname(__FILE__).'/include/page_header.php';
 
 $periods = [
@@ -41,13 +46,11 @@ $periods = [
 	24 * DAY_IN_YEAR => _('Last 365 days')
 ];
 
-
 // VAR	TYPE	OPTIONAL	FLAGS	VALIDATION	EXCEPTION
 $fields = [
 	'serviceid' =>	[T_ZBX_INT, O_OPT, P_SYS|P_NZERO, DB_ID,	null],
 	'showgraph' =>	[T_ZBX_INT, O_OPT, P_SYS,	IN('1'),		'isset({serviceid})'],
-	'period' =>		[T_ZBX_STR, O_OPT, P_SYS,	IN('"'.implode('","', array_keys($periods)).'"'),	null],
-	'fullscreen' => [T_ZBX_INT, O_OPT, P_SYS,	IN('0,1'),		null]
+	'period' =>		[T_ZBX_STR, O_OPT, P_SYS,	IN('"'.implode('","', array_keys($periods)).'"'),	null]
 ];
 check_fields($fields);
 
@@ -96,14 +99,14 @@ else {
 
 	// fetch services
 	$services = API::Service()->get([
-		'output' => ['name', 'serviceid', 'showsla', 'goodsla', 'algorithm'],
+		'output' => ['name', 'serviceid', 'showsla', 'goodsla', 'algorithm', 'sortorder'],
 		'selectParent' => ['serviceid'],
 		'selectDependencies' => ['servicedownid', 'soft', 'linkid'],
 		'selectTrigger' => ['description', 'triggerid', 'expression'],
-		'preservekeys' => true,
-		'sortfield' => 'sortorder',
-		'sortorder' => ZBX_SORT_UP
+		'preservekeys' => true
 	]);
+
+	sortServices($services);
 
 	// expand trigger descriptions
 	$triggers = zbx_objectValues(
@@ -144,7 +147,7 @@ else {
 			'reason' => _('Reason'),
 			'sla' => (new CColHeader(_('Problem time')))->setColSpan(2),
 			'sla2' => null,
-			'sla3' => nbsp(_('SLA').' / '._('Acceptable SLA'))
+			'sla3' => _('SLA').' / '._('Acceptable SLA')
 		]
 	);
 
@@ -155,21 +158,22 @@ else {
 			$period_combo->addItem($key, $val);
 		}
 
-		$srv_wdgt = (new CWidget())
-			->setTitle(_('IT services'))
-			->setControls((new CForm('get'))
-				->cleanItems()
-				->addVar('fullscreen', $_REQUEST['fullscreen'])
-				->addItem((new CList())
-					->addItem([
-						new CLabel(_('Period'), 'period'),
-						(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
-						$period_combo
-					])
-					->addItem(get_icon('fullscreen', ['fullscreen' => $_REQUEST['fullscreen']]))
-				)
-			)
-			->addItem(BR())
+		(new CWidget())
+			->setTitle(_('Services'))
+			->setWebLayoutMode($page['web_layout_mode'])
+			->setControls(new CList([
+				(new CForm('get'))
+					->cleanItems()
+					->setAttribute('aria-label', _('Main filter'))
+					->addItem((new CList())
+						->addItem([
+							new CLabel(_('Period'), 'period'),
+							(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
+							$period_combo
+						])
+					),
+				(new CTag('nav', true, get_icon('fullscreen')))->setAttribute('aria-label', _('Content controls'))
+			]))
 			->addItem($tree->getHTML())
 			->show();
 	}

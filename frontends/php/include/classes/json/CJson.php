@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -115,48 +115,58 @@ class CJson {
 	}
 
 	/**
-	 *
 	 * Default destructor; does nothing other than provide a safe fallback
 	 * for calls to parent::__destruct().
-	 *
-	 * @return void
-	 *
 	 */
 	public function __destruct() {
 	}
 
-	// used for fallback _json_encode
-	private static $forceObject = null;
+	/**
+	 * Used for fallback _json_encode().
+	 * If true then non-associative array is encoded as object.
+	 *
+	 * @var bool
+	 */
+	private $force_object = false;
 
 	/**
+	 * Used for fallback _json_encode().
+	 * If true then forward slashes are escaped.
 	 *
+	 * @var bool
+	 */
+	private $escape_slashes = true;
+
+	/**
 	 * Encodes the mixed $valueToEncode into JSON format.
 	 *
-	 * @param mixed $valueToEncode Value to be encoded into JSON format
-	 *
-	 * @param array $deQuote Array of keys whose values should **not** be
-	 * quoted in encoded string.
-	 *
-	 * @param bool $forceObject force all arrays to objects
+	 * @param mixed  $valueToEncode    Value to be encoded into JSON format.
+	 * @param array  $deQuote          Array of keys whose values should **not** be quoted in encoded string.
+	 * @param bool   $force_object     Force all arrays to objects.
+	 * @param bool   $escape_slashes
 	 *
 	 * @return string JSON encoded value
-	 *
 	 */
-	public function encode($valueToEncode, $deQuote = [], $forceObject = false) {
-		if (!$this->_config['bypass_ext'] && function_exists('json_encode') && defined('JSON_FORCE_OBJECT')) {
+	public function encode($valueToEncode, $deQuote = [], $force_object = false, $escape_slashes = true) {
+		if (!$this->_config['bypass_ext'] && function_exists('json_encode') && defined('JSON_FORCE_OBJECT')
+				&& defined('JSON_UNESCAPED_SLASHES')) {
 			if ($this->_config['noerror']) {
 				$old_errlevel = error_reporting(E_ERROR ^ E_WARNING);
 			}
 
-			$encoded = json_encode($valueToEncode, $forceObject ? JSON_FORCE_OBJECT : null);
+			$encoded = json_encode($valueToEncode,
+				($escape_slashes ? 0 : JSON_UNESCAPED_SLASHES) | ($force_object ? JSON_FORCE_OBJECT : 0)
+			);
 
 			if ($this->_config['noerror']) {
 				error_reporting($old_errlevel);
 			}
 		}
 		else {
-			// fall back to php-only method
-			self::$forceObject = $forceObject ? true : null;
+			// Fall back to php-only method.
+
+			$this->force_object = $force_object;
+			$this->escape_slashes = $escape_slashes;
 			$encoded = $this->_json_encode($valueToEncode);
 		}
 
@@ -324,7 +334,9 @@ class CJson {
 							$ascii .= '\r';
 							break;
 						case $ord_var_c == 0x22:
-						case $ord_var_c == 0x2F:
+							// falls through
+						case ($ord_var_c == 0x2F && $this->escape_slashes):
+							// falls through
 						case $ord_var_c == 0x5C:
 							// double quote, slash, slosh
 							$ascii .= '\\'.$var{$c};
@@ -405,7 +417,8 @@ class CJson {
 				 */
 
 				// treat as a JSON object
-				if (self::$forceObject || is_array($var) && count($var) && array_keys($var) !== range(0, sizeof($var) - 1)) {
+				if ($this->force_object || is_array($var) && count($var)
+						&& array_keys($var) !== range(0, sizeof($var) - 1)) {
 					$properties = array_map([$this, '_name_value'], array_keys($var), array_values($var));
 					return '{' . join(',', $properties) . '}';
 				}
@@ -1038,8 +1051,6 @@ class CJson {
 	/**
 	 * Map the 128 ASCII characters into the 32 character classes.
 	 * The remaining Unicode characters should be mapped to S_ETC.
-	 *
-	 * @return void
 	 */
 	protected function _mapAscii() {
 		$this->_ascii_class = [
@@ -1070,8 +1081,6 @@ class CJson {
 	 * and returns either a new state or an action. A new state is a number between
 	 * 0 and 29. An action is a negative number between -1 and -9. A JSON text is
 	 * accepted if the end of the text is in state 9 and mode is MODE_DONE.
-	 *
-	 * @return void;
 	 */
 	protected function _setStateTransitionTable() {
 		$this->_state_transition_table = [

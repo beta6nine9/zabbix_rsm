@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -47,33 +47,20 @@ class CScreenPlainText extends CScreenBase {
 		$items = CMacrosResolverHelper::resolveItemNames([get_item_by_itemid($this->screenitem['resourceid'])]);
 		$item = reset($items);
 
-		switch ($item['value_type']) {
-			case ITEM_VALUE_TYPE_TEXT:
-			case ITEM_VALUE_TYPE_LOG:
-				$orderField = 'id';
-				break;
-			case ITEM_VALUE_TYPE_FLOAT:
-			case ITEM_VALUE_TYPE_UINT64:
-			default:
-				$orderField = ['itemid', 'clock'];
-		}
-
 		$host = get_host_by_itemid($this->screenitem['resourceid']);
 
 		$table = (new CTableInfo())
 			->setHeader([_('Timestamp'), _('Value')]);
-
-		$stime = zbxDateToTime($this->timeline['stime']);
 
 		$histories = API::History()->get([
 			'history' => $item['value_type'],
 			'itemids' => $this->screenitem['resourceid'],
 			'output' => API_OUTPUT_EXTEND,
 			'sortorder' => ZBX_SORT_DOWN,
-			'sortfield' => $orderField,
+			'sortfield' => ['itemid', 'clock'],
 			'limit' => $this->screenitem['elements'],
-			'time_from' => $stime,
-			'time_till' => $stime + $this->timeline['period']
+			'time_from' => $this->timeline['from_ts'],
+			'time_till' => $this->timeline['to_ts']
 		]);
 		foreach ($histories as $history) {
 			switch ($item['value_type']) {

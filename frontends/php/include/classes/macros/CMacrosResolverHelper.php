@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -207,9 +207,33 @@ class CMacrosResolverHelper {
 		self::init();
 
 		return self::$macrosResolver->resolveTriggerNames($triggers, [
-			'references_only' => $references_only,
-			'events' => false
+			'references_only' => $references_only
 		]);
+	}
+
+	/**
+	 * Resolve macros in trigger operational data.
+	 *
+	 * @static
+	 *
+	 * @param array  $trigger
+	 * @param string $trigger['expression']
+	 * @param string $trigger['opdata']
+	 * @param int    $trigger['clock']       (optional)
+	 * @param int    $trigger['ns']          (optional)
+	 * @param array  $options
+	 * @param bool   $options['events']      (optional) Resolve {ITEM.VALUE} macro using 'clock' and 'ns' fields.
+	 *                                       Default: false.
+	 * @param bool   $options['html']        (optional) Default: false.
+	 *
+	 * @return string
+	 */
+	public static function resolveTriggerOpdata(array $trigger, array $options = []) {
+		$triggers = self::resolveTriggerDescriptions([$trigger['triggerid'] => $trigger],
+			$options + ['sources' => ['opdata']]
+		);
+
+		return $triggers[$trigger['triggerid']]['opdata'];
 	}
 
 	/**
@@ -217,29 +241,53 @@ class CMacrosResolverHelper {
 	 *
 	 * @static
 	 *
-	 * @param array $trigger
+	 * @param array  $trigger
+	 * @param string $trigger['expression']
+	 * @param string $trigger['comments']
+	 * @param int    $trigger['clock']       (optional)
+	 * @param int    $trigger['ns']          (optional)
+	 * @param array  $options
+	 * @param bool   $options['events']      (optional) Resolve {ITEM.VALUE} macro using 'clock' and 'ns' fields.
+	 *                                       Default: false.
+	 * @param bool   $options['html']        (optional) Default: false.
 	 *
 	 * @return string
 	 */
-	public static function resolveTriggerDescription(array $trigger) {
-		$triggers = self::resolveTriggerDescriptions([$trigger['triggerid'] => $trigger]);
+	public static function resolveTriggerDescription(array $trigger, array $options = []) {
+		$triggers = self::resolveTriggerDescriptions([$trigger['triggerid'] => $trigger],
+			$options + ['sources' => ['comments']]
+		);
 
 		return $triggers[$trigger['triggerid']]['comments'];
 	}
 
 	/**
-	 * Resolve macros in trigger descriptions.
+	 * Resolve macros in trigger descriptions and operational data.
 	 *
 	 * @static
 	 *
-	 * @param array $triggers
+	 * @param array  $triggers
+	 * @param string $triggers[$triggerid]['expression']
+	 * @param string $triggers[$triggerid][<sources>]     See $options['sources'].
+	 * @param int    $triggers[$triggerid]['clock']       (optional)
+	 * @param int    $triggers[$triggerid]['ns']          (optional)
+	 * @param array  $options
+	 * @param bool   $options['events']                   (optional) Resolve {ITEM.VALUE} macro using 'clock' and 'ns'
+	 *                                                    fields. Default: false.
+	 * @param bool   $options['html']                     (optional) Default: false.
+	 * @param array  $options['sources']                  An array of trigger field names: 'comments', 'opdata'.
 	 *
 	 * @return array
 	 */
-	public static function resolveTriggerDescriptions(array $triggers) {
+	public static function resolveTriggerDescriptions(array $triggers, array $options = []) {
 		self::init();
 
-		return self::$macrosResolver->resolveTriggerDescriptions($triggers);
+		$options += [
+			'events' => false,
+			'html' => false
+		];
+
+		return self::$macrosResolver->resolveTriggerDescriptions($triggers, $options);
 	}
 
 	/**
@@ -260,52 +308,12 @@ class CMacrosResolverHelper {
 	}
 
 	/**
-	 * Get trigger by id and resolve macros in trigger name.
-	 *
-	 * @static
-	 *
-	 * @param int $triggerId
-	 *
-	 * @return string
-	 */
-	public static function resolveTriggerNameById($triggerId) {
-		$macros = self::resolveTriggerNameByIds([$triggerId]);
-		$macros = reset($macros);
-
-		return $macros['description'];
-	}
-
-	/**
-	 * Get triggers by ids and resolve macros in trigger names.
-	 *
-	 * @static
-	 *
-	 * @param array $triggerIds
-	 *
-	 * @return array
-	 */
-	public static function resolveTriggerNameByIds(array $triggerIds) {
-		self::init();
-
-		$triggers = DBfetchArray(DBselect(
-			'SELECT DISTINCT t.description,t.expression,t.triggerid'.
-			' FROM triggers t'.
-			' WHERE '.dbConditionInt('t.triggerid', $triggerIds)
-		));
-
-		return self::$macrosResolver->resolveTriggerNames(zbx_toHash($triggers, 'triggerid'), [
-			'references_only' => false,
-			'events' => false
-		]);
-	}
-
-	/**
 	 * Resolve macros in trigger expression.
 	 *
 	 * @static
 	 *
 	 * @param string $expression
-	 * @param array  $options		see resolveTriggerExpressions() for more details
+	 * @param array  $options		see resolveTriggerExpressions() for more details ('sources' is not supported here)
 	 *
 	 * @return string
 	 */
@@ -315,7 +323,8 @@ class CMacrosResolverHelper {
 		return self::$macrosResolver->resolveTriggerExpressions([['expression' => $expression]], [
 			'html' => array_key_exists('html', $options) && $options['html'],
 			'resolve_usermacros' => array_key_exists('resolve_usermacros', $options) && $options['resolve_usermacros'],
-			'resolve_macros' => array_key_exists('resolve_macros', $options) && $options['resolve_macros']
+			'resolve_macros' => array_key_exists('resolve_macros', $options) && $options['resolve_macros'],
+			'sources' => ['expression']
 		])[0]['expression'];
 	}
 
@@ -330,6 +339,7 @@ class CMacrosResolverHelper {
 	 * @param bool   $options['html']				(optional) returns formatted trigger expression
 	 * @param bool   $options['resolve_usermacros']	(optional) resolve user macros
 	 * @param bool   $options['resolve_macros']		(optional) resolve macros in item keys and functions
+	 * @param array  $options['sources']			(optional) an array of the field names; default ['expression']
 	 *
 	 * @return array
 	 */
@@ -339,7 +349,8 @@ class CMacrosResolverHelper {
 		return self::$macrosResolver->resolveTriggerExpressions($triggers, [
 			'html' => array_key_exists('html', $options) && $options['html'],
 			'resolve_usermacros' => array_key_exists('resolve_usermacros', $options) && $options['resolve_usermacros'],
-			'resolve_macros' => array_key_exists('resolve_macros', $options) && $options['resolve_macros']
+			'resolve_macros' => array_key_exists('resolve_macros', $options) && $options['resolve_macros'],
+			'sources' => array_key_exists('sources', $options) ? $options['sources'] : ['expression']
 		]);
 	}
 
@@ -361,26 +372,6 @@ class CMacrosResolverHelper {
 		$trigger = reset($triggers);
 
 		return $trigger['expression'];
-	}
-
-	/**
-	 * Resolve macros in event description.
-	 *
-	 * @static
-	 *
-	 * @param array $event
-	 *
-	 * @return string
-	 */
-	public static function resolveEventDescription(array $event) {
-		self::init();
-
-		$events = self::$macrosResolver->resolveTriggerNames([$event['triggerid'] => $event], [
-			'references_only' => false,
-			'events' => true
-		]);
-
-		return $events[$event['triggerid']]['description'];
 	}
 
 	/**
@@ -538,46 +529,106 @@ class CMacrosResolverHelper {
 	}
 
 	/**
-	 * Resolve all kinds of macros in map labels.
+	 * Resolve macros in dashboard widget URL.
 	 *
 	 * @static
 	 *
-	 * @param array  $selement
-	 * @param string $selement['label']						label to expand
-	 * @param int    $selement['elementtype']				element type
-	 * @param int    $selement['elementid']					element id
-	 * @param string $selement['elementExpressionTrigger']	if type is trigger, then trigger expression
+	 * @param array $widget
 	 *
 	 * @return string
 	 */
-	public static function resolveMapLabelMacrosAll(array $selement) {
-		self::init();
-
-		return self::$macrosResolver->resolveMapLabelMacrosAll($selement);
-	}
-
-	/**
-	 * Resolve macros in screen element URL.
-	 *
-	 * @static
-	 *
-	 * @param array $screenElement
-	 *
-	 * @return string
-	 */
-	public static function resolveScreenElementURL(array $screenElement) {
+	public static function resolveWidgetURL(array $widget) {
 		self::init();
 
 		$macros = self::$macrosResolver->resolve([
-			'config' => $screenElement['config'],
+			'config' => $widget['config'],
 			'data' => [
-				$screenElement['hostid'] => [
-					'url' => $screenElement['url']
+				$widget['hostid'] => [
+					'url' => $widget['url']
 				]
 			]
 		]);
 		$macros = reset($macros);
 
 		return $macros['url'];
+	}
+
+	/**
+	 * Resolve time unit macros.
+	 *
+	 * @static
+	 *
+	 * @param array $data
+	 * @param array $field_names
+	 *
+	 * @return string
+	 */
+	public static function resolveTimeUnitMacros(array $data, array $field_names) {
+		self::init();
+
+		return self::$macrosResolver->resolveTimeUnitMacros($data, ['sources' => $field_names]);
+	}
+
+	/**
+	 * Resolve supported macros used in map element label as well as in URL names and values.
+	 *
+	 * @static
+	 *
+	 * @param array        $selements[]
+	 * @param int          $selements[]['elementtype']          Map element type.
+	 * @param int          $selements[]['elementsubtype']       Map element subtype.
+	 * @param string       $selements[]['label']                Map element label.
+	 * @param array        $selements[]['urls']                 Map element urls.
+	 * @param string       $selements[]['urls'][]['name']       Map element url name.
+	 * @param string       $selements[]['urls'][]['url']        Map element url value.
+	 * @param int | array  $selements[]['elementid']            Element id linked to map element.
+	 * @param array        $options
+	 * @param bool         $options['resolve_element_urls']     Resolve macros in map element url name and value.
+	 * @param bool         $options['resolve_element_label']    Resolve macros in map element label.
+	 *
+	 * @return array
+	 */
+	public static function resolveMacrosInMapElements(array $selements, array $options) {
+		self::init();
+
+		return self::$macrosResolver->resolveMacrosInMapElements($selements, $options);
+	}
+
+	/**
+	 * Set every trigger items array elements order by item usage order in trigger expression and recovery expression.
+	 *
+	 * @static
+	 *
+	 * @param array  $triggers                            Array of triggers.
+	 * @param string $triggers[]['expression']            Trigger expression used to define order of trigger items.
+	 * @param string $triggers[]['recovery_expression']   Trigger expression used to define order of trigger items.
+	 * @param array  $triggers[]['items]                  Items to be sorted.
+	 * @param string $triggers[]['items][]['itemid']      Item id.
+	 *
+	 * @return array
+	 */
+	public static function sortItemsByExpressionOrder(array $triggers) {
+		self::init();
+
+		return self::$macrosResolver->sortItemsByExpressionOrder($triggers);
+	}
+
+	/**
+	 * Extract macros from properties used for preprocessing step test and find effective values.
+	 *
+	 * @param array  $data
+	 * @param string $data['steps']                              Preprocessing steps details.
+	 * @param string $data['steps'][]['params']                  Preprocessing step parameters.
+	 * @param string $data['steps'][]['error_handler_params]     Preprocessing steps error handle parameters.
+	 * @param string $data['delay']                              Update interval value.
+	 * @param string $data['hostids']                            Hostid for which tested item belongs to.
+	 * @param bool   $support_lldmacros                          Enable or disable LLD macro selection.
+	 *
+	 * @return array
+	 */
+	public static function extractMacrosFromPreprocessingSteps(array $data, $support_lldmacros) {
+		self::init();
+
+		return self::$macrosResolver->extractMacrosFromPreprocessingSteps($data, $support_lldmacros);
 	}
 }

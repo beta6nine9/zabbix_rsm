@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -86,6 +86,7 @@ do									\
 	if ((res)->type & AR_LOG)					\
 	{								\
 		zbx_log_free((res)->log);				\
+		(res)->log = NULL;					\
 		(res)->type &= ~AR_LOG;					\
 	}								\
 }									\
@@ -125,7 +126,7 @@ while (0)
 #define GET_LOG_RESULT(res)	((zbx_log_t *)get_result_value_by_type(res, AR_LOG))
 #define GET_MSG_RESULT(res)	((char **)get_result_value_by_type(res, AR_MESSAGE))
 
-void    *get_result_value_by_type(AGENT_RESULT *result, int require_type);
+void	*get_result_value_by_type(AGENT_RESULT *result, int require_type);
 
 #define ZBX_FLOAT_PRECISION	0.0001
 
@@ -160,6 +161,8 @@ extern int	CONFIG_UNSAFE_USER_PARAMETERS;
 #define ZBX_PROC_STAT_RUN	1
 #define ZBX_PROC_STAT_SLEEP	2
 #define ZBX_PROC_STAT_ZOMB	3
+#define ZBX_PROC_STAT_DISK	4
+#define ZBX_PROC_STAT_TRACE	5
 
 #define ZBX_DO_SUM		0
 #define ZBX_DO_MAX		1
@@ -189,15 +192,15 @@ int	get_diskstat(const char *devname, zbx_uint64_t *dstat);
 #define PROCESS_MODULE_COMMAND	0x2
 #define PROCESS_WITH_ALIAS	0x4
 
-void	init_metrics();
+void	init_metrics(void);
 int	add_metric(ZBX_METRIC *metric, char *error, size_t max_error_len);
-void	free_metrics();
+void	free_metrics(void);
 
 int	process(const char *in_command, unsigned flags, AGENT_RESULT *result);
 
 int	add_user_parameter(const char *key, char *command, char *error, size_t max_error_len);
-int	add_user_module(const char *key, int (*function)());
-void	test_parameters();
+int	add_user_module(const char *key, int (*function)(void));
+void	test_parameters(void);
 void	test_parameter(const char *key);
 
 void	init_result(AGENT_RESULT *result);
@@ -212,7 +215,7 @@ int	parse_item_key(const char *itemkey, AGENT_REQUEST *request);
 void	unquote_key_param(char *param);
 int	quote_key_param(char **param, int forced);
 
-int	set_result_type(AGENT_RESULT *result, int value_type, int data_type, char *c);
+int	set_result_type(AGENT_RESULT *result, int value_type, char *c);
 void	set_result_meta(AGENT_RESULT *result, zbx_uint64_t lastlogsize, int mtime);
 
 #ifdef HAVE_KSTAT_H
@@ -260,6 +263,7 @@ int	SYSTEM_UNAME(AGENT_REQUEST *request, AGENT_RESULT *result);
 int	SYSTEM_BOOTTIME(AGENT_REQUEST *request, AGENT_RESULT *result);
 int	VFS_DEV_READ(AGENT_REQUEST *request, AGENT_RESULT *result);
 int	VFS_DEV_WRITE(AGENT_REQUEST *request, AGENT_RESULT *result);
+int	VFS_DEV_DISCOVERY(AGENT_REQUEST *request, AGENT_RESULT *result);
 int	VFS_FS_INODE(AGENT_REQUEST *request, AGENT_RESULT *result);
 int	VFS_FS_SIZE(AGENT_REQUEST *request, AGENT_RESULT *result);
 int	VFS_FS_DISCOVERY(AGENT_REQUEST *request, AGENT_RESULT *result);
@@ -268,6 +272,7 @@ int	VM_MEMORY_SIZE(AGENT_REQUEST *request, AGENT_RESULT *result);
 #ifdef _WINDOWS
 int	USER_PERF_COUNTER(AGENT_REQUEST *request, AGENT_RESULT *result);
 int	PERF_COUNTER(AGENT_REQUEST *request, AGENT_RESULT *result);
+int	PERF_COUNTER_EN(AGENT_REQUEST *request, AGENT_RESULT *result);
 int	SERVICE_DISCOVERY(AGENT_REQUEST *request, AGENT_RESULT *result);
 int	SERVICE_INFO(AGENT_REQUEST *request, AGENT_RESULT *result);
 int	SERVICE_STATE(AGENT_REQUEST *request, AGENT_RESULT *result);
@@ -275,6 +280,7 @@ int	SERVICES(AGENT_REQUEST *request, AGENT_RESULT *result);
 int	PROC_INFO(AGENT_REQUEST *request, AGENT_RESULT *result);
 int	NET_IF_LIST(AGENT_REQUEST *request, AGENT_RESULT *result);
 int	WMI_GET(AGENT_REQUEST *request, AGENT_RESULT *result);
+int	WMI_GETALL(AGENT_REQUEST *request, AGENT_RESULT *result);
 int	VM_VMEMORY_SIZE(AGENT_REQUEST *request, AGENT_RESULT *result);
 #endif
 
@@ -282,12 +288,16 @@ int	VM_VMEMORY_SIZE(AGENT_REQUEST *request, AGENT_RESULT *result);
 int	SYSTEM_STAT(AGENT_REQUEST *request, AGENT_RESULT *result);
 #endif
 
+#ifdef _WINDOWS
+typedef int (*zbx_metric_func_t)(AGENT_REQUEST *request, AGENT_RESULT *result, HANDLE timeout_event);
+#else
 typedef int (*zbx_metric_func_t)(AGENT_REQUEST *request, AGENT_RESULT *result);
+#endif
 
 typedef struct
 {
 	const char	*mode;
-	int		(*function)();
+	int		(*function)(const char *devname, AGENT_RESULT *result);
 }
 MODE_FUNCTION;
 
@@ -299,5 +309,12 @@ int	zbx_execute_threaded_metric(zbx_metric_func_t metric_func, AGENT_REQUEST *re
 #define ZBX_SYSINFO_PROC_NAME		0x0002
 #define ZBX_SYSINFO_PROC_CMDLINE	0x0004
 #define ZBX_SYSINFO_PROC_USER		0x0008
+
+#ifdef _WINDOWS
+#define ZBX_MUTEX_ALL_ALLOW		0
+#define ZBX_MUTEX_THREAD_DENIED		1
+#define ZBX_MUTEX_LOGGING_DENIED	2
+zbx_uint32_t get_thread_global_mutex_flag(void);
+#endif
 
 #endif

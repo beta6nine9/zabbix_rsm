@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -18,16 +18,16 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-require_once dirname(__FILE__).'/../include/class.cwebtest.php';
+require_once dirname(__FILE__).'/../include/CLegacyWebTest.php';
 
-class testPageScreens extends CWebTest {
+class testPageScreens extends CLegacyWebTest {
 
 	public static function allScreens() {
-		return DBdata('SELECT screenid,name FROM screens WHERE templateid IS NULL ORDER BY screenid');
+		return CDBHelper::getDataProvider('SELECT screenid,name FROM screens WHERE templateid IS NULL ORDER BY screenid');
 	}
 
 	public function testPageScreens_CheckLayout() {
-		$screens = DBfetchArray(DBSelect('SELECT name FROM screens WHERE templateid IS NULL'));
+		$screens = CDBHelper::getAll('SELECT name FROM screens WHERE templateid IS NULL');
 
 		$this->zbxTestLogin('screenconf.php');
 		$this->zbxTestCheckTitle('Configuration of screens');
@@ -46,8 +46,9 @@ class testPageScreens extends CWebTest {
 	}
 
 	/**
-	* @dataProvider allScreens
-	*/
+	 * @dataProvider allScreens
+	 * @ignore-browser-errors
+	 */
 	public function testPageScreens_SimpleEdit($screen) {
 		$this->zbxTestLogin('screenconf.php');
 		$this->zbxTestCheckTitle('Configuration of screens');
@@ -59,13 +60,14 @@ class testPageScreens extends CWebTest {
 	}
 
 	/**
-	* @dataProvider allScreens
-	*/
+	 * @dataProvider allScreens
+	 * @ignore-browser-errors
+	 */
 	public function testPageScreens_SimpleUpdate($screen) {
 		$sqlScreen = 'SELECT * FROM screens WHERE screenid='.$screen['screenid'];
-		$oldHashScreen = DBhash($sqlScreen);
+		$oldHashScreen = CDBHelper::getHash($sqlScreen);
 		$sqlScreenItems = 'SELECT * FROM screens_items WHERE screenid='.$screen['screenid'].' ORDER BY screenitemid';
-		$oldHashScreenItems = DBhash($sqlScreenItems);
+		$oldHashScreenItems = CDBHelper::getHash($sqlScreenItems);
 
 		$this->zbxTestLogin('screenconf.php');
 		$this->zbxTestCheckTitle('Configuration of screens');
@@ -80,14 +82,14 @@ class testPageScreens extends CWebTest {
 		$this->zbxTestCheckTitle('Configuration of screens');
 		$this->zbxTestTextPresent('Screen updated');
 
-		$this->assertEquals($oldHashScreen, DBhash($sqlScreen));
-		$this->assertEquals($oldHashScreenItems, DBhash($sqlScreenItems));
+		$this->assertEquals($oldHashScreen, CDBHelper::getHash($sqlScreen));
+		$this->assertEquals($oldHashScreenItems, CDBHelper::getHash($sqlScreenItems));
 	}
 
 	public function testPageScreens_Create() {
 		$this->zbxTestLogin('screenconf.php');
 		$this->zbxTestCheckTitle('Configuration of screens');
-		$this->zbxTestClickWait('form');
+		$this->zbxTestClickButtonText('Create screen');
 
 		$this->zbxTestCheckTitle('Configuration of screens');
 		$this->zbxTestTextPresent(['Owner', 'Name', 'Columns', 'Rows']);
@@ -98,33 +100,26 @@ class testPageScreens extends CWebTest {
 		$this->zbxTestTextNotPresent(['Owner', 'Columns', 'Rows']);
 	}
 
-	public function testPageScreens_backup() {
-		DBsave_tables('screens');
-	}
-
 	/**
-	* @dataProvider allScreens
-	*/
+	 * @dataProvider allScreens
+	 * @backup-once screens
+	 */
 	public function testPageScreens_MassDelete($screen) {
 		$this->zbxTestLogin('screenconf.php');
 		$this->zbxTestCheckTitle('Configuration of screens');
 		$this->zbxTestCheckboxSelect('screens_'.$screen['screenid']);
 		$this->zbxTestClickButton('screen.massdelete');
-		$this->webDriver->switchTo()->alert()->accept();
+		$this->zbxTestAcceptAlert();
 
 		$this->zbxTestCheckTitle('Configuration of screens');
 		$this->zbxTestTextPresent('Screen deleted');
 		$this->zbxTestCheckHeader('Screens');
 
 		$sql = 'SELECT NULL FROM screens WHERE screenid='.$screen['screenid'];
-		$this->assertEquals(0, DBcount($sql));
+		$this->assertEquals(0, CDBHelper::getCount($sql));
 		$sql = 'SELECT NULL FROM screens_items WHERE screenid='.$screen['screenid'];
-		$this->assertEquals(0, DBcount($sql));
+		$this->assertEquals(0, CDBHelper::getCount($sql));
 		$sql = 'SELECT NULL FROM slides WHERE screenid='.$screen['screenid'];
-		$this->assertEquals(0, DBcount($sql));
-	}
-
-	public function testPageScreens_restore() {
-		DBrestore_tables('screens');
+		$this->assertEquals(0, CDBHelper::getCount($sql));
 	}
 }

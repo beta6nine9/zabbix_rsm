@@ -1,119 +1,157 @@
 <script type="text/x-jquery-tmpl" id="dcheckRowTPL">
 	<?= (new CRow([
 			(new CCol(
-				new CSpan('#{name}')
+				(new CDiv('#{name}'))->addClass(ZBX_STYLE_WORDWRAP)
 			))->setId('dcheckCell_#{dcheckid}'),
-			new CHorList([
+			(new CHorList([
 				(new CButton(null, _('Edit')))
 					->addClass(ZBX_STYLE_BTN_LINK)
 					->onClick("javascript: showNewCheckForm(null, '#{dcheckid}');"),
 				(new CButton(null, _('Remove')))
 					->addClass(ZBX_STYLE_BTN_LINK)
 					->onClick("javascript: removeDCheckRow('#{dcheckid}');")
-			])
+			]))->addClass(ZBX_STYLE_NOWRAP)
 		]))
 			->setId('dcheckRow_#{dcheckid}')
 			->toString()
 	?>
 </script>
 <script type="text/x-jquery-tmpl" id="uniqRowTPL">
-	<?=	(new CListItem(
-			(new CLabel(
-				[
-					(new CInput('radio', 'uniqueness_criteria', '#{dcheckid}'))
-						->setId('uniqueness_criteria_#{dcheckid}'),
-					'#{name}'
-				],
-				'uniqueness_criteria_#{dcheckid}'
-			))
-		))
+	<?=	(new CListItem([
+			(new CInput('radio', 'uniqueness_criteria', '#{dcheckid}'))
+				->addClass(ZBX_STYLE_CHECKBOX_RADIO)
+				->setId('uniqueness_criteria_#{dcheckid}'),
+			(new CLabel([new CSpan(), '#{name}'], 'uniqueness_criteria_#{dcheckid}'))
+				->addClass(ZBX_STYLE_WORDWRAP)
+		]))
 			->setId('uniqueness_criteria_row_#{dcheckid}')
 			->toString()
 	?>
 </script>
+<script type="text/x-jquery-tmpl" id="hostSourceRowTPL">
+	<?=	(new CListItem([
+			(new CInput('radio', 'host_source', '_#{dcheckid}'))
+				->addClass(ZBX_STYLE_CHECKBOX_RADIO)
+				->setAttribute('data-id', '#{dcheckid}')
+				->setId('host_source_#{dcheckid}'),
+			new CLabel([new CSpan(), '#{name}'], 'host_source_#{dcheckid}')
+		]))
+			->setId('host_source_row_#{dcheckid}')
+			->toString()
+	?>
+</script>
+<script type="text/x-jquery-tmpl" id="nameSourceRowTPL">
+	<?=	(new CListItem([
+			(new CInput('radio', 'name_source', '_#{dcheckid}'))
+				->addClass(ZBX_STYLE_CHECKBOX_RADIO)
+				->setAttribute('data-id', '#{dcheckid}')
+				->setId('name_source_#{dcheckid}'),
+			new CLabel([new CSpan(), '#{name}'], 'name_source_#{dcheckid}')
+		]))
+			->setId('name_source_row_#{dcheckid}')
+			->toString()
+	?>
+</script>
 <script type="text/x-jquery-tmpl" id="newDCheckTPL">
-	<div id="new_check_form">
-		<div class="<?= ZBX_STYLE_TABLE_FORMS_SEPARATOR ?>" style="min-width: <?= ZBX_TEXTAREA_STANDARD_WIDTH ?>px;">
-			<table>
-				<tbody>
-				<tr>
-					<td><label for="type"><?= _('Check type') ?></label></td>
-					<td><select id="type" name="type"></select></td>
-				</tr>
-				<tr id="newCheckPortsRow">
-					<td><label for="ports"><?= _('Port range') ?></label></td>
-					<td>
-						<input type="text" id="ports" name="ports" value="" style="width: <?= ZBX_TEXTAREA_SMALL_WIDTH ?>px" maxlength="255">
-					</td>
-				</tr>
-				<tr id="newCheckCommunityRow">
-					<td><label for="snmp_community"><?= _('SNMP community') ?></label></td>
-					<td><input type="text" id="snmp_community" name="snmp_community" value=""
-							style="width: <?= ZBX_TEXTAREA_MEDIUM_WIDTH ?>px" maxlength="255"></td>
-				</tr>
-				<tr id="newCheckKeyRow">
-					<td><label for="key_"><?= _('SNMP Key') ?></label></td>
-					<td>
-						<input type="text" id="key_" name="key_" value="" style="width: <?= ZBX_TEXTAREA_MEDIUM_WIDTH ?>px" maxlength="255">
-					</td>
-				</tr>
-				<tr id="newCheckContextRow">
-					<td><label for="snmpv3_contextname"><?= _('Context name') ?></label></td>
-					<td>
-						<input type="text" id="snmpv3_contextname" name="snmpv3_contextname" value="" style="width: <?= ZBX_TEXTAREA_MEDIUM_WIDTH ?>px" maxlength="255">
-					</td>
-				</tr>
-				<tr id="newCheckSecNameRow">
-					<td><label for="snmpv3_securityname"><?= _('Security name') ?></label></td>
-					<td><input type="text" id="snmpv3_securityname" name="snmpv3_securityname" value="" style="width: <?= ZBX_TEXTAREA_MEDIUM_WIDTH ?>px" maxlength="64"></td>
-				</tr>
-				<tr id="newCheckSecLevRow">
-					<td><label for="snmpv3_securitylevel"><?= _('Security level') ?></label></td>
-					<td>
-						<select id="snmpv3_securitylevel" name="snmpv3_securitylevel">
-							<option value="0"><?= 'noAuthNoPriv' ?> </option>
-							<option value="1"><?= 'authNoPriv' ?> </option>
-							<option value="2"><?= 'authPriv' ?> </option>
-						</select>
-					</td>
-				</tr>
-				<?= (new CRow([
-						_('Authentication protocol'),
-						(new CRadioButtonList('snmpv3_authprotocol', ITEM_AUTHPROTOCOL_MD5))
-							->addValue(_('MD5'), ITEM_AUTHPROTOCOL_MD5, 'snmpv3_authprotocol_'.ITEM_AUTHPROTOCOL_MD5)
-							->addValue(_('SHA'), ITEM_AUTHPROTOCOL_SHA, 'snmpv3_authprotocol_'.ITEM_AUTHPROTOCOL_SHA)
-							->setModern(true)
-					]))
-						->setId('newCheckAuthProtocolRow')
-						->toString()
-				?>
-				<tr id="newCheckAuthPassRow">
-					<td><label for="snmpv3_authpassphrase"><?= _('Authentication passphrase') ?></label></td>
-					<td><input type="text" id="snmpv3_authpassphrase" name="snmpv3_authpassphrase" value="" style="width: <?= ZBX_TEXTAREA_MEDIUM_WIDTH ?>px" maxlength="64"></td>
-				</tr>
-				<?= (new CRow([
-						_('Privacy protocol'),
-						(new CRadioButtonList('snmpv3_privprotocol', ITEM_PRIVPROTOCOL_DES))
-							->addValue(_('DES'), ITEM_PRIVPROTOCOL_DES, 'snmpv3_privprotocol_'.ITEM_PRIVPROTOCOL_DES)
-							->addValue(_('AES'), ITEM_PRIVPROTOCOL_AES, 'snmpv3_privprotocol_'.ITEM_PRIVPROTOCOL_AES)
-							->setModern(true)
-					]))
-						->setId('newCheckPrivProtocolRow')
-						->toString()
-				?>
-				<tr id="newCheckPrivPassRow">
-					<td><label for="snmpv3_privpassphrase"><?= _('Privacy passphrase') ?></label></td>
-					<td><input type="text" id="snmpv3_privpassphrase" name="snmpv3_privpassphrase" value="" style="width: <?= ZBX_TEXTAREA_MEDIUM_WIDTH ?>px" maxlength="64"></td>
-				</tr>
-				</tbody>
-			</table>
-			<?= (new CHorList([
-					(new CButton('add_new_dcheck', _('Add')))->addClass(ZBX_STYLE_BTN_LINK),
-					(new CButton('cancel_new_dcheck', _('Cancel')))->addClass(ZBX_STYLE_BTN_LINK)
-				]))->toString()
-			?>
-		</div>
-	</div>
+<?=
+	(new CDiv(
+		(new CDiv([
+			(new CFormList())
+				->addRow(
+					(new CLabel(_('Check type'), 'type')),
+					(new CComboBox('type'))
+				)
+				->addRow(
+					(new CLabel(_('Port range'), 'ports'))->setAsteriskMark(),
+					(new CTextBox('ports'))
+						->setWidth(ZBX_TEXTAREA_SMALL_WIDTH)
+						->setAriaRequired(),
+					'newCheckPortsRow'
+				)
+				->addRow(
+					(new CLabel(_('SNMP community'), 'snmp_community'))->setAsteriskMark(),
+					(new CTextBox('snmp_community'))
+						->setWidth(ZBX_TEXTAREA_MEDIUM_WIDTH)
+						->setAriaRequired(),
+					'newCheckCommunityRow'
+				)
+				->addRow(
+					(new CLabel(_('Key'), 'key_'))->setAsteriskMark(),
+					(new CTextBox('key_'))
+						->setWidth(ZBX_TEXTAREA_MEDIUM_WIDTH)
+						->setAriaRequired(),
+					'newCheckKeyRow'
+				)
+				->addRow(
+					(new CLabel(_('SNMP OID'), 'snmp_oid'))->setAsteriskMark(),
+					(new CTextBox('snmp_oid'))
+						->setWidth(ZBX_TEXTAREA_MEDIUM_WIDTH)
+						->setAriaRequired()
+						->setAttribute('maxlength', 512),
+					'new_check_snmp_oid_row'
+				)
+				->addRow(
+					(new CLabel(_('Context name'), 'snmpv3_contextname')),
+					(new CTextBox('snmpv3_contextname'))
+						->setWidth(ZBX_TEXTAREA_MEDIUM_WIDTH),
+					'newCheckContextRow'
+				)
+				->addRow(
+					(new CLabel(_('Security name'), 'snmpv3_securityname')),
+					(new CTextBox('snmpv3_securityname'))
+						->setWidth(ZBX_TEXTAREA_MEDIUM_WIDTH)
+						->setAttribute('maxlength', 64),
+					'newCheckSecNameRow'
+				)
+				->addRow(
+					new CLabel(_('Security level'), 'snmpv3_securitylevel'),
+					new CComboBox('snmpv3_securitylevel', null, null, [
+						ITEM_SNMPV3_SECURITYLEVEL_NOAUTHNOPRIV => 'noAuthNoPriv',
+						ITEM_SNMPV3_SECURITYLEVEL_AUTHNOPRIV => 'authNoPriv',
+						ITEM_SNMPV3_SECURITYLEVEL_AUTHPRIV => 'authPriv'
+					]),
+					'newCheckSecLevRow'
+				)
+				->addRow(
+					(new CLabel(_('Authentication protocol'), 'snmpv3_authprotocol')),
+					(new CRadioButtonList('snmpv3_authprotocol', ITEM_AUTHPROTOCOL_MD5))
+						->addValue(_('MD5'), ITEM_AUTHPROTOCOL_MD5, 'snmpv3_authprotocol_'.ITEM_AUTHPROTOCOL_MD5)
+						->addValue(_('SHA'), ITEM_AUTHPROTOCOL_SHA, 'snmpv3_authprotocol_'.ITEM_AUTHPROTOCOL_SHA)
+						->setModern(true),
+					'newCheckAuthProtocolRow'
+				)
+				->addRow(
+					(new CLabel(_('Authentication passphrase'), 'snmpv3_authpassphrase')),
+					(new CTextBox('snmpv3_authpassphrase'))
+						->setWidth(ZBX_TEXTAREA_MEDIUM_WIDTH)
+						->setAttribute('maxlength', 64),
+					'newCheckAuthPassRow'
+				)
+				->addRow(
+					(new CLabel(_('Privacy protocol'), 'snmpv3_privprotocol')),
+					(new CRadioButtonList('snmpv3_privprotocol', ITEM_PRIVPROTOCOL_DES))
+						->addValue(_('DES'), ITEM_PRIVPROTOCOL_DES, 'snmpv3_privprotocol_'.ITEM_PRIVPROTOCOL_DES)
+						->addValue(_('AES'), ITEM_PRIVPROTOCOL_AES, 'snmpv3_privprotocol_'.ITEM_PRIVPROTOCOL_AES)
+						->setModern(true),
+					'newCheckPrivProtocolRow'
+				)
+				->addRow(
+					(new CLabel(_('Privacy passphrase'), 'snmpv3_privpassphrase'))->setAsteriskMark(),
+					(new CTextBox('snmpv3_privpassphrase'))
+						->setWidth(ZBX_TEXTAREA_MEDIUM_WIDTH)
+						->setAriaRequired()
+						->setAttribute('maxlength', 64),
+					'newCheckPrivPassRow'
+				),
+			(new CHorList([
+				(new CButton('add_new_dcheck', _('Add')))->addClass(ZBX_STYLE_BTN_LINK),
+				(new CButton('cancel_new_dcheck', _('Cancel')))->addClass(ZBX_STYLE_BTN_LINK)
+			]))
+		]))
+			->addClass(ZBX_STYLE_TABLE_FORMS_SEPARATOR)
+			->addStyle('width: '.ZBX_TEXTAREA_STANDARD_WIDTH.'px')
+	))->setId('new_check_form')
+?>
 </script>
 <script type="text/javascript">
 	var ZBX_SVC = {
@@ -189,6 +227,22 @@
 		return isset(svcPort, defPorts) ? defPorts[svcPort] : <?= CJs::encodeJson(_('Unknown')) ?>;
 	}
 
+	/**
+	 * Checks if type of SNMP.
+	 *
+	 * @param integer type
+	 *
+	 * @return bool
+	 */
+	function typeOfSnmp(type) {
+		var types = {};
+		types[ZBX_SVC.snmpv1] = true;
+		types[ZBX_SVC.snmpv2] = true;
+		types[ZBX_SVC.snmpv3] = true;
+
+		return (typeof types[type] != 'undefined');
+	}
+
 	function toggleInputs(id, state) {
 		jQuery('#' + id).toggle(state);
 
@@ -206,7 +260,9 @@
 	function addPopupValues(list) {
 		// templates
 		var dcheckRowTpl = new Template(jQuery('#dcheckRowTPL').html()),
-			uniqRowTpl = new Template(jQuery('#uniqRowTPL').html());
+			uniqRowTpl = new Template(jQuery('#uniqRowTPL').html()),
+			hostSourceRowTPL = new Template(jQuery('#hostSourceRowTPL').html()),
+			nameSourceRowTPL = new Template(jQuery('#nameSourceRowTPL').html());
 
 		for (var i = 0; i < list.length; i++) {
 			if (empty(list[i])) {
@@ -277,31 +333,37 @@
 				}
 
 				// update check name
-				jQuery('#dcheckCell_' + value.dcheckid + ' span').text(value['name']);
+				jQuery('#dcheckCell_' + value.dcheckid + ' .wordwrap').text(value['name']);
 			}
 
-			// update device uniqueness criteria
 			var availableDeviceTypes = [ZBX_SVC.agent, ZBX_SVC.snmpv1, ZBX_SVC.snmpv2, ZBX_SVC.snmpv3],
-				uniquenessCriteria = jQuery('#uniqueness_criteria_row_' + value.dcheckid);
+				elements = {
+					uniqueness_criteria: ['ip', uniqRowTpl.evaluate(value)],
+					host_source: ['chk_dns', hostSourceRowTPL.evaluate(value)],
+					name_source: ['chk_host', nameSourceRowTPL.evaluate(value)]
+				};
 
-			if (jQuery.inArray(parseInt(value.type, 10), availableDeviceTypes) > -1) {
-				var new_uniqueness_criteria = uniqRowTpl.evaluate(value);
-				if (uniquenessCriteria.length) {
-					var checked_id = jQuery('input:radio[name=uniqueness_criteria]:checked').attr('id');
-					uniquenessCriteria.replaceWith(new_uniqueness_criteria);
-					jQuery('#' + checked_id).prop('checked', true);
+			jQuery.each(elements, function(key, param) {
+				var	obj = jQuery('#' + key + '_row_' + value.dcheckid);
+
+				if (jQuery.inArray(parseInt(value.type, 10), availableDeviceTypes) > -1) {
+					var new_obj = param[1];
+					if (obj.length) {
+						var checked_id = jQuery('input:radio[name=' + key + ']:checked').attr('id');
+						obj.replaceWith(new_obj);
+						jQuery('#' + checked_id).prop('checked', true);
+					}
+					else {
+						jQuery('#' + key).append(new_obj);
+					}
 				}
 				else {
-					jQuery('#uniqueness_criteria').append(new_uniqueness_criteria);
+					if (obj.length) {
+						obj.remove();
+						jQuery('#' + key + '_' + param[0]).prop('checked', true);
+					}
 				}
-			}
-			else {
-				if (uniquenessCriteria.length) {
-					uniquenessCriteria.remove();
-
-					selectUniquenessCriteriaDefault();
-				}
-			}
+			});
 		}
 	}
 
@@ -310,16 +372,23 @@
 
 		delete(ZBX_CHECKLIST[dcheckid]);
 
-		// remove uniqueness criteria
-		var obj = jQuery('#uniqueness_criteria_' + dcheckid);
+		var elements = {
+			uniqueness_criteria_: 'ip',
+			host_source_: 'chk_dns',
+			name_source_: 'chk_host'
+		};
 
-		if (obj.length) {
-			if (obj.is(':checked')) {
-				selectUniquenessCriteriaDefault();
+		jQuery.each(elements, function(key, def) {
+			var obj = jQuery('#' + key + dcheckid);
+
+			if (obj.length) {
+				if (obj.is(':checked')) {
+					jQuery('#' + key + def).prop('checked', true);
+				}
+				jQuery('#' + key + 'row_' + dcheckid).remove();
 			}
+		});
 
-			jQuery('#uniqueness_criteria_row_' + dcheckid).remove();
-		}
 	}
 
 	function showNewCheckForm(e, dcheckId) {
@@ -380,7 +449,10 @@
 
 		// restore form values
 		if (isUpdate) {
-			jQuery('#dcheckCell_' + dcheckId + ' input').each(function(i, item) {
+			var dcheck_inputs = jQuery('#dcheckCell_' + dcheckId + ' input'),
+				check_type = dcheck_inputs.filter('[name="dchecks[' + dcheckId + '][type]"]').val();
+
+			dcheck_inputs.each(function(i, item) {
 				var itemObj = jQuery(item);
 
 				var name = itemObj.attr('name').replace('dchecks[' + dcheckId + '][', '');
@@ -388,7 +460,17 @@
 
 				// ignore "name" value because it is virtual
 				if (name !== 'name') {
-					jQuery('#' + name).val(itemObj.val());
+					if (name == 'key_' && typeOfSnmp(check_type)) {
+						// Use key_ value in snmp_oid input.
+
+						jQuery('#snmp_oid').val(itemObj.val());
+					}
+					else if (name === 'host_source' || name === 'name_source') {
+						return true;
+					}
+					else {
+						jQuery('#' + name).val(itemObj.val());
+					}
 
 					// set radio button value
 					var radioObj = jQuery('input[name=' + name + ']');
@@ -408,12 +490,6 @@
 	function updateNewDCheckType(dcheckId) {
 		var dcheckType = parseInt(jQuery('#type').val(), 10);
 
-		var keyRowTypes = {};
-		keyRowTypes[ZBX_SVC.agent] = true;
-		keyRowTypes[ZBX_SVC.snmpv1] = true;
-		keyRowTypes[ZBX_SVC.snmpv2] = true;
-		keyRowTypes[ZBX_SVC.snmpv3] = true;
-
 		var comRowTypes = {};
 		comRowTypes[ZBX_SVC.snmpv1] = true;
 		comRowTypes[ZBX_SVC.snmpv2] = true;
@@ -422,16 +498,8 @@
 		secNameRowTypes[ZBX_SVC.snmpv3] = true;
 
 		toggleInputs('newCheckPortsRow', (ZBX_SVC.icmp != dcheckType));
-		toggleInputs('newCheckKeyRow', isset(dcheckType, keyRowTypes));
-
-		if (isset(dcheckType, keyRowTypes)) {
-			var caption = (dcheckType == ZBX_SVC.agent)
-				? <?= CJs::encodeJson(_('Key')) ?>
-				: <?= CJs::encodeJson(_('SNMP OID')) ?>;
-
-			jQuery('#newCheckKeyRow label').text(caption);
-		}
-
+		toggleInputs('newCheckKeyRow', dcheckType == ZBX_SVC.agent);
+		toggleInputs('new_check_snmp_oid_row', typeOfSnmp(dcheckType));
 		toggleInputs('newCheckCommunityRow', isset(dcheckType, comRowTypes));
 		toggleInputs('newCheckSecNameRow', isset(dcheckType, secNameRowTypes));
 		toggleInputs('newCheckSecLevRow', isset(dcheckType, secNameRowTypes));
@@ -499,6 +567,10 @@
 
 	function saveNewDCheckForm(dcheckId) {
 		var dCheck = jQuery('#new_check_form :input:enabled').serializeJSON();
+		if (typeof dCheck.snmp_oid != 'undefined') {
+			dCheck.key_ = dCheck.snmp_oid;
+			delete dCheck.snmp_oid;
+		}
 
 		// get check id
 		dCheck.dcheckid = (typeof dcheckId === 'undefined') ? getUniqueId() : dcheckId;
@@ -529,11 +601,11 @@
 							|| ZBX_CHECKLIST[zbxDcheckId]['snmpv3_contextname'] === dCheck['snmpv3_contextname'])) {
 
 					overlayDialogue({
-						'title': '<?= _('Discovery check error') ?>',
-						'content': jQuery('<span>').text('<?= _('Check already exists.') ?>'),
+						'title': <?= CJs::encodeJson(_('Discovery check error')) ?>,
+						'content': jQuery('<span>').text(<?= CJs::encodeJson(_('Check already exists.')) ?>),
 						'buttons': [
 							{
-								'title': '<?= _('Cancel') ?>',
+								'title': <?= CJs::encodeJson(_('Cancel')) ?>,
 								'cancel': true,
 								'focused': true,
 								'action': function() {}
@@ -598,13 +670,13 @@
 				},
 				error: function() {
 					overlayDialogue({
-						'title': '<?= _('Discovery check error') ?>',
+						'title': <?= CJs::encodeJson(_('Discovery check error')) ?>,
 						'content': jQuery('<span>').text(<?= CJs::encodeJson(
 							_('Cannot validate discovery check: invalid request or connection to Zabbix server failed.')
 						) ?>),
 						'buttons': [
 							{
-								'title': '<?= _('Cancel') ?>',
+								'title': <?= CJs::encodeJson(_('Cancel')) ?>,
 								'cancel': true,
 								'focused': true,
 								'action': function() {}
@@ -630,11 +702,11 @@
 				}
 
 				overlayDialogue({
-					'title': '<?= _('Discovery check error') ?>',
+					'title': <?= CJs::encodeJson(_('Discovery check error')) ?>,
 					'content': content,
 					'buttons': [
 						{
-							'title': '<?= _('Cancel') ?>',
+							'title': <?= CJs::encodeJson(_('Cancel')) ?>,
 							'cancel': true,
 							'focused': true,
 							'action': function() {}
@@ -652,6 +724,11 @@
 					dCheck.name += ' "' + dCheck.key_ + '"';
 				}
 
+				dCheck.host_source = jQuery('[name=host_source]:checked:not([data-id])').val()
+					|| '<?= ZBX_DISCOVERY_DNS ?>';
+				dCheck.name_source = jQuery('[name=name_source]:checked:not([data-id])').val()
+					|| '<?= ZBX_DISCOVERY_UNSPEC ?>';
+
 				addPopupValues([dCheck]);
 
 				jQuery('#new_check_form').remove();
@@ -659,14 +736,12 @@
 		});
 	}
 
-	function selectUniquenessCriteriaDefault() {
-		jQuery('#uniqueness_criteria_ip').prop('checked', true);
-	}
-
 	jQuery(document).ready(function() {
 		addPopupValues(<?= zbx_jsvalue(array_values($this->data['drule']['dchecks'])) ?>);
 
 		jQuery("input:radio[name='uniqueness_criteria'][value=<?= zbx_jsvalue($this->data['drule']['uniqueness_criteria']) ?>]").attr('checked', 'checked');
+		jQuery("input:radio[name='host_source'][value=<?= zbx_jsvalue($this->data['drule']['host_source']) ?>]").attr('checked', 'checked');
+		jQuery("input:radio[name='name_source'][value=<?= zbx_jsvalue($this->data['drule']['name_source']) ?>]").attr('checked', 'checked');
 
 		jQuery('#newCheck').click(showNewCheckForm);
 		jQuery('#clone').click(function() {
@@ -677,17 +752,19 @@
 			jQuery('#form').val('clone');
 			jQuery('#name').focus();
 		});
+
+		jQuery('#host_source,#name_source').on('change', 'input', function() {
+			var elm = jQuery(this),
+				name = elm.attr('name');
+
+			if (elm.data('id')) {
+				jQuery('[name^=dchecks][name$="[' + name + ']"]')
+					.val((name === 'name_source') ? <?= ZBX_DISCOVERY_UNSPEC ?> : <?= ZBX_DISCOVERY_DNS ?>);
+				jQuery('[name="dchecks[' + elm.data('id') + '][' + name + ']"]').val(<?= ZBX_DISCOVERY_VALUE ?>);
+			}
+			else {
+				jQuery('[name^=dchecks][name$="[' + name + ']"]').val(elm.val());
+			}
+		});
 	});
-
-	(function($) {
-		$.fn.serializeJSON = function() {
-			var json = {};
-
-			jQuery.map($(this).serializeArray(), function(n, i) {
-				json[n['name']] = n['value'];
-			});
-
-			return json;
-		};
-	})(jQuery);
 </script>

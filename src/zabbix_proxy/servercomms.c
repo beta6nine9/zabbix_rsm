@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -26,6 +26,7 @@
 
 #include "comms.h"
 #include "servercomms.h"
+#include "daemon.h"
 
 extern unsigned int	configured_tls_connect_mode;
 
@@ -80,12 +81,13 @@ int	connect_to_server(zbx_socket_t *sock, int timeout, int retry_interval)
 
 			lastlogtime = (int)time(NULL);
 
-			while (FAIL == (res = zbx_tcp_connect(sock, CONFIG_SOURCE_IP, CONFIG_SERVER, CONFIG_SERVER_PORT,
-					timeout, configured_tls_connect_mode, tls_arg1, tls_arg2)))
+			while (ZBX_IS_RUNNING() && FAIL == (res = zbx_tcp_connect(sock, CONFIG_SOURCE_IP,
+					CONFIG_SERVER, CONFIG_SERVER_PORT, timeout, configured_tls_connect_mode,
+					tls_arg1, tls_arg2)))
 			{
 				now = (int)time(NULL);
 
-				if (60 <= now - lastlogtime)
+				if (LOG_ENTRY_INTERVAL_DELAY <= now - lastlogtime)
 				{
 					zabbix_log(LOG_LEVEL_WARNING, "Still unable to connect...");
 					lastlogtime = now;
@@ -94,7 +96,8 @@ int	connect_to_server(zbx_socket_t *sock, int timeout, int retry_interval)
 				sleep(retry_interval);
 			}
 
-			zabbix_log(LOG_LEVEL_WARNING, "Connection restored.");
+			if (FAIL != res)
+				zabbix_log(LOG_LEVEL_WARNING, "Connection restored.");
 		}
 	}
 
@@ -118,18 +121,17 @@ void	disconnect_server(zbx_socket_t *sock)
  ******************************************************************************/
 int	get_data_from_server(zbx_socket_t *sock, const char *request, char **error)
 {
-	const char	*__function_name = "get_data_from_server";
-
 	int		ret = FAIL;
 	struct zbx_json	j;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() request:'%s'", __function_name, request);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() request:'%s'", __func__, request);
 
 	zbx_json_init(&j, 128);
 	zbx_json_addstring(&j, "request", request, ZBX_JSON_TYPE_STRING);
 	zbx_json_addstring(&j, "host", CONFIG_HOSTNAME, ZBX_JSON_TYPE_STRING);
+	zbx_json_addstring(&j, ZBX_PROTO_TAG_VERSION, ZABBIX_VERSION, ZBX_JSON_TYPE_STRING);
 
-	if (SUCCEED != zbx_tcp_send(sock, j.buffer))
+	if (SUCCEED != zbx_tcp_send_ext(sock, j.buffer, strlen(j.buffer), ZBX_TCP_PROTOCOL | ZBX_TCP_COMPRESS, 0))
 	{
 		*error = zbx_strdup(*error, zbx_socket_strerror());
 		goto exit;
@@ -147,7 +149,7 @@ int	get_data_from_server(zbx_socket_t *sock, const char *request, char **error)
 exit:
 	zbx_json_free(&j);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __function_name, zbx_result_string(ret));
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
 
 	return ret;
 }
@@ -164,13 +166,11 @@ exit:
  ******************************************************************************/
 int	put_data_to_server(zbx_socket_t *sock, struct zbx_json *j, char **error)
 {
-	const char	*__function_name = "put_data_to_server";
+	int	ret = FAIL;
 
-	int		ret = FAIL;
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() datalen:" ZBX_FS_SIZE_T, __func__, (zbx_fs_size_t)j->buffer_size);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() datalen:" ZBX_FS_SIZE_T, __function_name, (zbx_fs_size_t)j->buffer_size);
-
-	if (SUCCEED != zbx_tcp_send(sock, j->buffer))
+	if (SUCCEED != zbx_tcp_send_ext(sock, j->buffer, strlen(j->buffer), ZBX_TCP_PROTOCOL | ZBX_TCP_COMPRESS, 0))
 	{
 		*error = zbx_strdup(*error, zbx_socket_strerror());
 		goto out;
@@ -181,7 +181,7 @@ int	put_data_to_server(zbx_socket_t *sock, struct zbx_json *j, char **error)
 
 	ret = SUCCEED;
 out:
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __function_name, zbx_result_string(ret));
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
 
 	return ret;
 }

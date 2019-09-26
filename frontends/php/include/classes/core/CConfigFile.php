@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -30,8 +30,7 @@ class CConfigFile {
 		ZBX_DB_DB2 => true,
 		ZBX_DB_MYSQL => true,
 		ZBX_DB_ORACLE => true,
-		ZBX_DB_POSTGRESQL => true,
-		ZBX_DB_SQLITE3 => true
+		ZBX_DB_POSTGRESQL => true
 	];
 
 	public $configFile = null;
@@ -77,10 +76,11 @@ class CConfigFile {
 			);
 		}
 
-		if (!array_key_exists($DB['TYPE'], CFrontendSetup::getSupportedDatabases())) {
-			self::exception(
-				'DB type "'.$DB['TYPE'].'" is not supported by current setup. Possible values '.
-				implode(', ', array_keys(CFrontendSetup::getSupportedDatabases())).'.'
+		$php_supported_db = array_keys(CFrontendSetup::getSupportedDatabases());
+
+		if (!in_array($DB['TYPE'], $php_supported_db)) {
+			self::exception('DB type "'.$DB['TYPE'].'" is not supported by current setup.'.
+				($php_supported_db ? ' Possible values '.implode(', ', $php_supported_db).'.' : '')
 			);
 		}
 
@@ -112,17 +112,6 @@ class CConfigFile {
 		if (isset($DB['SCHEMA'])) {
 			$this->config['DB']['SCHEMA'] = $DB['SCHEMA'];
 		}
-
-		if (isset($DB['SERVERS'])) {
-			$this->config['DB']['SERVERS'] = $DB['SERVERS'];
-		}
-
-		$db_tls_options = array('DB_KEY_FILE', 'DB_CERT_FILE', 'DB_CA_FILE', 'DB_CA_PATH', 'DB_CA_CIPHER');
-		foreach ($db_tls_options as $db_tls_option) {
-			$this->config['DB'][$db_tls_option] = array_key_exists($db_tls_option, $DB) ? $DB[$db_tls_option] : null;
-		}
-
-		$this->config['DB']['DB_CONN_TIMEOUT'] = array_key_exists('DB_CONN_TIMEOUT', $DB) ? $DB['DB_CONN_TIMEOUT'] : null;
 
 		if (isset($ZBX_SERVER)) {
 			$this->config['ZBX_SERVER'] = $ZBX_SERVER;

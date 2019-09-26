@@ -3,7 +3,7 @@
 		// type change
 		jQuery('#type')
 			.change(function() {
-				var type = jQuery(this).val(),
+				var type = jQuery('input[name=type]:checked').val(),
 					command_ipmi = jQuery('#commandipmi'),
 					command = jQuery('#command');
 
@@ -48,7 +48,7 @@
 			.change(function() {
 				if (this.checked) {
 					jQuery('#confirmation')
-						.removeAttr('disabled')
+						.prop('disabled', false)
 						.keyup();
 				}
 				else {
@@ -59,7 +59,7 @@
 
 		// test confirmation button
 		jQuery('#testConfirmation').click(function() {
-			executeScript(null, null, jQuery('#confirmation').val());
+			executeScript(null, null, jQuery('#confirmation').val(), this);
 		});
 
 		// host group selection

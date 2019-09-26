@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -90,7 +90,7 @@ class CScreenHostsInfo extends CScreenBase {
 		$total = new CCol($total.'  '._('Total'));
 
 		$header = (new CDiv([
-			new CTag('h4', true, _('Hosts info'))
+			new CTag('h4', true, _('Host info'))
 		]))->addClass(ZBX_STYLE_DASHBRD_WIDGET_HEAD);
 
 		if ($this->screenitem['resourceid'] != 0) {

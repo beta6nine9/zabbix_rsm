@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -154,7 +154,7 @@ class CHelpItems {
 				],
 				[
 					'key' => 'proc_info[process,<attribute>,<type>]',
-					'description' => _('Different information about specific process(es). Returns float')
+					'description' => _('Various information about specific process(es). Returns float')
 				],
 				[
 					'key' => 'sensor[device,sensor,<mode>]',
@@ -269,6 +269,14 @@ class CHelpItems {
 					'description' => _('Disk write statistics. Returns integer with type in sectors, operations, bytes; float with type in sps, ops, bps')
 				],
 				[
+					'key' => 'vfs.dir.count[dir,<regex_incl>,<regex_excl>,<types_incl>,<types_excl>,<max_depth>,<min_size>,<max_size>,<min_age>,<max_age>,<regex_excl_dir>]',
+					'description' => _('Count of directory entries, recursively. Returns integer')
+				],
+				[
+					'key' => 'vfs.dir.size[dir,<regex_incl>,<regex_excl>,<mode>,<max_depth>,<regex_excl_dir>]',
+					'description' => _('Directory size (in bytes). Returns integer')
+				],
+				[
 					'key' => 'vfs.file.cksum[file]',
 					'description' => _('File checksum, calculated by the UNIX cksum algorithm. Returns integer')
 				],
@@ -325,12 +333,24 @@ class CHelpItems {
 					'description' => _('Loading time of full web page (in seconds). Returns float')
 				],
 				[
-					'key' => 'web.page.regexp[host,<path>,<port>,<regexp>,<length>,<output>]',
+					'key' => 'web.page.regexp[host,<path>,<port>,regexp,<length>,<output>]',
 					'description' => _('Find string on a web page. Returns the matched string, or as specified by the optional output parameter')
 				],
 				[
 					'key' => 'wmi.get[<namespace>,<query>]',
 					'description' => _('Execute WMI query and return the first selected object. Returns integer, float, string or text (depending on the request)')
+				],
+				[
+					'key' => 'wmi.getall[<namespace>,<query>]',
+					'description' => _('Execute WMI query and return the json document with all selected objects')
+				],
+				[
+					'key' => 'zabbix.stats[<ip>,<port>]',
+					'description' => _('Returns a JSON object containing Zabbix server or proxy internal metrics.')
+				],
+				[
+					'key' => 'zabbix.stats[<ip>,<port>,queue,<from>,<to>]',
+					'description' => _('Number of items in the queue which are delayed in Zabbix server or proxy by "from" till "to" seconds, inclusive.')
 				]
 			],
 			ITEM_TYPE_ZABBIX_ACTIVE => [
@@ -359,12 +379,20 @@ class CHelpItems {
 					'description' => _('Maximum number of processes supported by OS. Returns integer')
 				],
 				[
-					'key' => 'log[file,<regexp>,<encoding>,<maxlines>,<mode>,<output>]',
+					'key' => 'log[file,<regexp>,<encoding>,<maxlines>,<mode>,<output>,<maxdelay>]',
 					'description' => _('Log file monitoring. Returns log')
 				],
 				[
-					'key' => 'logrt[file_regexp,<regexp>,<encoding>,<maxlines>,<mode>,<output>]',
+					'key' => 'log.count[file,<regexp>,<encoding>,<maxproclines>,<mode>,<maxdelay>]',
+					'description' => _('Count of matched lines in log file monitoring. Returns integer')
+				],
+				[
+					'key' => 'logrt[file_regexp,<regexp>,<encoding>,<maxlines>,<mode>,<output>,<maxdelay>,<options>]',
 					'description' => _('Log file monitoring with log rotation support. Returns log')
+				],
+				[
+					'key' => 'logrt.count[file_regexp,<regexp>,<encoding>,<maxproclines>,<mode>,<maxdelay>,<options>]',
+					'description' => _('Count of matched lines in log file monitoring with log rotation support. Returns integer')
 				],
 				[
 					'key' => 'net.dns[<ip>,name,<type>,<timeout>,<count>,<protocol>]',
@@ -440,7 +468,7 @@ class CHelpItems {
 				],
 				[
 					'key' => 'proc_info[process,<attribute>,<type>]',
-					'description' => _('Different information about specific process(es). Returns float')
+					'description' => _('Various information about specific process(es). Returns float')
 				],
 				[
 					'key' => 'sensor[device,sensor,<mode>]',
@@ -555,6 +583,14 @@ class CHelpItems {
 					'description' => _('Disk write statistics. Returns integer with type in sectors, operations, bytes; float with type in sps, ops, bps')
 				],
 				[
+					'key' => 'vfs.dir.count[dir,<regex_incl>,<regex_excl>,<types_incl>,<types_excl>,<max_depth>,<min_size>,<max_size>,<min_age>,<max_age>,<regex_excl_dir>]',
+					'description' => _('Count of directory entries, recursively. Returns integer')
+				],
+				[
+					'key' => 'vfs.dir.size[dir,<regex_incl>,<regex_excl>,<mode>,<max_depth>,<regex_excl_dir>]',
+					'description' => _('Directory size (in bytes). Returns integer')
+				],
+				[
 					'key' => 'vfs.file.cksum[file]',
 					'description' => _('File checksum, calculated by the UNIX cksum algorithm. Returns integer')
 				],
@@ -611,12 +647,20 @@ class CHelpItems {
 					'description' => _('Loading time of full web page (in seconds). Returns float')
 				],
 				[
-					'key' => 'web.page.regexp[host,<path>,<port>,<regexp>,<length>,<output>]',
+					'key' => 'web.page.regexp[host,<path>,<port>,regexp,<length>,<output>]',
 					'description' => _('Find string on a web page. Returns the matched string, or as specified by the optional output parameter')
 				],
 				[
 					'key' => 'wmi.get[<namespace>,<query>]',
 					'description' => _('Execute WMI query and return the first selected object. Returns integer, float, string or text (depending on the request)')
+				],
+				[
+					'key' => 'zabbix.stats[<ip>,<port>]',
+					'description' => _('Returns a JSON object containing Zabbix server or proxy internal metrics.')
+				],
+				[
+					'key' => 'zabbix.stats[<ip>,<port>,queue,<from>,<to>]',
+					'description' => _('Number of items in the queue which are delayed in Zabbix server or proxy by "from" till "to" seconds, inclusive.')
 				]
 			],
 			ITEM_TYPE_AGGREGATE => [
@@ -659,12 +703,28 @@ class CHelpItems {
 					'description' => _('VMware cluster status, <url> - VMware service URL, <name> - VMware cluster name')
 				],
 				[
-					'key' => 'vmware.eventlog[<url>]',
-					'description' => _('VMware event log, <url> - VMware service URL')
+					'key' => 'vmware.eventlog[<url>,<mode>]',
+					'description' => _('VMware event log, <url> - VMware service URL, <mode> - all (default), skip - skip processing of older data')
 				],
 				[
 					'key' => 'vmware.fullname[<url>]',
 					'description' => _('VMware service full name, <url> - VMware service URL')
+				],
+				[
+					'key' => 'vmware.datastore.read[<url>,<datastore>,<mode>]',
+					'description' => _('VMware datastore read statistics, <url> - VMware service URL, <datastore> - datastore name, <mode> - latency/maxlatency - average or maximum')
+				],
+				[
+					'key' => 'vmware.datastore.size[<url>,<datastore>,<mode>]',
+					'description' => _('VMware datastore capacity statistics in bytes or in percentage from total. Returns integer for bytes; float for percentage')
+				],
+				[
+					'key' => 'vmware.datastore.write[<url>,<datastore>,<mode>]',
+					'description' => _('VMware datastore write statistics, <url> - VMware service URL, <datastore> - datastore name, <mode> - latency/maxlatency - average or maximum')
+				],
+				[
+					'key' => 'vmware.datastore.hv.list[<url>,<datastore>]',
+					'description' => _('VMware datastore hypervisors list, <url> - VMware service URL, <datastore> - datastore name')
 				],
 				[
 					'key' => 'vmware.hv.cluster.name[<url>,<uuid>]',
@@ -685,6 +745,10 @@ class CHelpItems {
 				[
 					'key' => 'vmware.hv.datastore.write[<url>,<uuid>,<datastore>,<mode>]',
 					'description' => _('VMware hypervisor datastore write statistics, <url> - VMware service URL, <uuid> - VMware hypervisor host name, <datastore> - datastore name, <mode> - latency')
+				],
+				[
+					'key' => 'vmware.hv.datastore.list[<url>,<uuid>]',
+					'description' => _('VMware hypervisor datastores list, <url> - VMware service URL, <uuid> - VMware hypervisor host name')
 				],
 				[
 					'key' => 'vmware.hv.full.name[<url>,<uuid>]',
@@ -907,6 +971,10 @@ class CHelpItems {
 					'description' => _('Returns current maintenance status of the host.')
 				],
 				[
+					'key' => 'zabbix[host,discovery,interfaces]',
+					'description' => _('Returns a JSON array describing the host network interfaces configured in Zabbix. Can be used for LLD.')
+				],
+				[
 					'key' => 'zabbix[host,<type>,available]',
 					'description' => _('Returns availability of a particular type of checks on the host. Value of this item corresponds to availability icons in the host list. Valid types are: agent, snmp, ipmi, jmx.')
 				],
@@ -927,8 +995,8 @@ class CHelpItems {
 					'description' => _('Returns information associated with Zabbix Java gateway. Valid params are: ping, version.')
 				],
 				[
-					'key' => 'zabbix[process,<type>,<num>,<state>]',
-					'description' => _('Time a particular Zabbix process or a group of processes (identified by <type> and <num>) spent in <state> in percentage.')
+					'key' => 'zabbix[process,<type>,<mode>,<state>]',
+					'description' => _('Time a particular Zabbix process or a group of processes (identified by <type> and <mode>) spent in <state> in percentage.')
 				],
 				[
 					'key' => 'zabbix[proxy,<name>,<param>]',
@@ -949,6 +1017,14 @@ class CHelpItems {
 				[
 					'key' => 'zabbix[requiredperformance]',
 					'description' => _('Required performance of the Zabbix server, in new values per second expected.')
+				],
+				[
+					'key' => 'zabbix[stats,<ip>,<port>]',
+					'description' => _('Returns a JSON object containing Zabbix server or proxy internal metrics.')
+				],
+				[
+					'key' => 'zabbix[stats,<ip>,<port>,queue,<from>,<to>]',
+					'description' => _('Number of items in the queue which are delayed in Zabbix server or proxy by "from" till "to" seconds, inclusive.')
 				],
 				[
 					'key' => 'zabbix[trends]',
@@ -985,12 +1061,30 @@ class CHelpItems {
 			],
 			ITEM_TYPE_DB_MONITOR => [
 				[
-					'key' => 'db.odbc.select[<unique short description>,<dsn>]',
+					'key' => 'db.odbc.select[<unique short description>,dsn]',
 					'description' => _('Return first column of the first row of the SQL query result.')
 				],
 				[
-					'key' => 'db.odbc.discovery[<unique short description>,<dsn>]',
-					'description' => _('Transform SQL query result into a JSON object for low-level discovery.')
+					'key' => 'db.odbc.discovery[<unique short description>,dsn]',
+					'description' => _('Transform SQL query result into a JSON array for low-level discovery.')
+				],
+				[
+					'key' => 'db.odbc.get[<unique short description>,dsn]',
+					'description' => _('Transform SQL query result into a JSON array.')
+				]
+			],
+			ITEM_TYPE_JMX => [
+				[
+					'key' => 'jmx[object_name,attribute_name]',
+					'description' => _('Return value of an attribute of MBean object.')
+				],
+				[
+					'key' => 'jmx.discovery[<discovery mode>,<object name>]',
+					'description' => _('Return a JSON array with LLD macros describing the MBean objects or their attributes. Can be used for LLD.')
+				],
+				[
+					'key' => 'jmx.get[<discovery mode>,<object name>]',
+					'description' => _('Return a JSON array with MBean objects or their attributes. Compared to jmx.discovery it does not define LLD macros. Can be used for LLD.')
 				]
 			]
 		];

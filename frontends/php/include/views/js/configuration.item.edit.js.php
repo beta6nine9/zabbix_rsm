@@ -1,19 +1,14 @@
 <?php
-
 include dirname(__FILE__).'/common.item.edit.js.php';
+include dirname(__FILE__).'/item.preprocessing.js.php';
+include dirname(__FILE__).'/editabletable.js.php';
 
 $this->data['valueTypeVisibility'] = [];
-zbx_subarray_push($this->data['valueTypeVisibility'], ITEM_VALUE_TYPE_UINT64, 'data_type');
-zbx_subarray_push($this->data['valueTypeVisibility'], ITEM_VALUE_TYPE_UINT64, 'row_data_type');
+zbx_subarray_push($this->data['valueTypeVisibility'], ITEM_VALUE_TYPE_UINT64, 'units');
+zbx_subarray_push($this->data['valueTypeVisibility'], ITEM_VALUE_TYPE_UINT64, 'row_units');
 zbx_subarray_push($this->data['valueTypeVisibility'], ITEM_VALUE_TYPE_FLOAT, 'units');
 zbx_subarray_push($this->data['valueTypeVisibility'], ITEM_VALUE_TYPE_FLOAT, 'row_units');
-zbx_subarray_push($this->data['valueTypeVisibility'], ITEM_VALUE_TYPE_FLOAT, 'multiplier');
-zbx_subarray_push($this->data['valueTypeVisibility'], ITEM_VALUE_TYPE_FLOAT, 'row_multiplier');
-zbx_subarray_push($this->data['valueTypeVisibility'], ITEM_VALUE_TYPE_FLOAT, 'delta');
-zbx_subarray_push($this->data['valueTypeVisibility'], ITEM_VALUE_TYPE_FLOAT, 'row_delta');
-zbx_subarray_push($this->data['valueTypeVisibility'], ITEM_VALUE_TYPE_FLOAT, 'trends');
 zbx_subarray_push($this->data['valueTypeVisibility'], ITEM_VALUE_TYPE_FLOAT, 'row_trends');
-zbx_subarray_push($this->data['valueTypeVisibility'], ITEM_VALUE_TYPE_UINT64, 'trends');
 zbx_subarray_push($this->data['valueTypeVisibility'], ITEM_VALUE_TYPE_UINT64, 'row_trends');
 zbx_subarray_push($this->data['valueTypeVisibility'], ITEM_VALUE_TYPE_LOG, 'logtimefmt');
 zbx_subarray_push($this->data['valueTypeVisibility'], ITEM_VALUE_TYPE_LOG, 'row_logtimefmt');
@@ -34,82 +29,108 @@ zbx_subarray_push($this->data['valueTypeVisibility'], ITEM_VALUE_TYPE_FLOAT, 'in
 zbx_subarray_push($this->data['valueTypeVisibility'], ITEM_VALUE_TYPE_FLOAT, 'row_inventory_link');
 zbx_subarray_push($this->data['valueTypeVisibility'], ITEM_VALUE_TYPE_UINT64, 'inventory_link');
 zbx_subarray_push($this->data['valueTypeVisibility'], ITEM_VALUE_TYPE_UINT64, 'row_inventory_link');
-
-$this->data['dataTypeVisibility'] = [];
-zbx_subarray_push($this->data['dataTypeVisibility'], ITEM_DATA_TYPE_DECIMAL, 'units');
-zbx_subarray_push($this->data['dataTypeVisibility'], ITEM_DATA_TYPE_DECIMAL, 'row_units');
-zbx_subarray_push($this->data['dataTypeVisibility'], ITEM_DATA_TYPE_OCTAL, 'units');
-zbx_subarray_push($this->data['dataTypeVisibility'], ITEM_DATA_TYPE_OCTAL, 'row_units');
-zbx_subarray_push($this->data['dataTypeVisibility'], ITEM_DATA_TYPE_HEXADECIMAL, 'units');
-zbx_subarray_push($this->data['dataTypeVisibility'], ITEM_DATA_TYPE_HEXADECIMAL, 'row_units');
-zbx_subarray_push($this->data['dataTypeVisibility'], ITEM_DATA_TYPE_DECIMAL, 'multiplier');
-zbx_subarray_push($this->data['dataTypeVisibility'], ITEM_DATA_TYPE_DECIMAL, 'row_multiplier');
-zbx_subarray_push($this->data['dataTypeVisibility'], ITEM_DATA_TYPE_OCTAL, 'multiplier');
-zbx_subarray_push($this->data['dataTypeVisibility'], ITEM_DATA_TYPE_OCTAL, 'row_multiplier');
-zbx_subarray_push($this->data['dataTypeVisibility'], ITEM_DATA_TYPE_HEXADECIMAL, 'multiplier');
-zbx_subarray_push($this->data['dataTypeVisibility'], ITEM_DATA_TYPE_HEXADECIMAL, 'row_multiplier');
-zbx_subarray_push($this->data['dataTypeVisibility'], ITEM_DATA_TYPE_DECIMAL, 'delta');
-zbx_subarray_push($this->data['dataTypeVisibility'], ITEM_DATA_TYPE_DECIMAL, 'row_delta');
-zbx_subarray_push($this->data['dataTypeVisibility'], ITEM_DATA_TYPE_OCTAL, 'delta');
-zbx_subarray_push($this->data['dataTypeVisibility'], ITEM_DATA_TYPE_OCTAL, 'row_delta');
-zbx_subarray_push($this->data['dataTypeVisibility'], ITEM_DATA_TYPE_HEXADECIMAL, 'delta');
-zbx_subarray_push($this->data['dataTypeVisibility'], ITEM_DATA_TYPE_HEXADECIMAL, 'row_delta');
-
 ?>
 <script type="text/javascript">
-	function displayKeyButton() {
-		// selected item type
-		var type = parseInt(jQuery('#type').val());
+	jQuery(document).ready(function($) {
+		function typeChangeHandler() {
+			// selected item type
+			var type = parseInt($('#type').val()),
+				asterisk = '<?= ZBX_STYLE_FIELD_LABEL_ASTERISK ?>';
 
-		jQuery('#keyButton').prop('disabled',
-			type != <?php echo ITEM_TYPE_ZABBIX; ?>
-				&& type != <?php echo ITEM_TYPE_ZABBIX_ACTIVE; ?>
-				&& type != <?php echo ITEM_TYPE_SIMPLE; ?>
-				&& type != <?php echo ITEM_TYPE_INTERNAL; ?>
-				&& type != <?php echo ITEM_TYPE_AGGREGATE; ?>
-				&& type != <?php echo ITEM_TYPE_DB_MONITOR; ?>
-				&& type != <?php echo ITEM_TYPE_SNMPTRAP; ?>
-		)
-	}
+			$('#keyButton').prop('disabled',
+				type != <?= ITEM_TYPE_ZABBIX ?>
+					&& type != <?= ITEM_TYPE_ZABBIX_ACTIVE ?>
+					&& type != <?= ITEM_TYPE_SIMPLE ?>
+					&& type != <?= ITEM_TYPE_INTERNAL ?>
+					&& type != <?= ITEM_TYPE_AGGREGATE ?>
+					&& type != <?= ITEM_TYPE_DB_MONITOR ?>
+					&& type != <?= ITEM_TYPE_SNMPTRAP ?>
+					&& type != <?= ITEM_TYPE_JMX ?>
+			)
 
-	jQuery(document).ready(function() {
+			if ((type == <?= ITEM_TYPE_SSH ?> || type == <?= ITEM_TYPE_TELNET ?>)) {
+				$('label[for=username]').addClass(asterisk);
+				$('input[name=username]').attr('aria-required', 'true');
+			}
+			else {
+				$('label[for=username]').removeClass(asterisk);
+				$('input[name=username]').removeAttr('aria-required');
+			}
+		}
+
 		// field switchers
-		<?php if (!empty($this->data['dataTypeVisibility'])) { ?>
-		var dataTypeSwitcher = new CViewSwitcher('data_type', 'change',
-			<?php echo zbx_jsvalue($this->data['dataTypeVisibility'], true); ?>);
-		<?php } ?>
 		<?php
 		if (!empty($this->data['valueTypeVisibility'])) { ?>
 			var valueTypeSwitcher = new CViewSwitcher('value_type', 'change',
-				<?php echo zbx_jsvalue($this->data['valueTypeVisibility'], true); ?>);
+				<?= zbx_jsvalue($this->data['valueTypeVisibility'], true) ?>);
 		<?php } ?>
 
-		// multiplier
-		var multpStat = document.getElementById('multiplier');
+		var old_value,
+			value_type = $('#value_type');
 
-		if (multpStat && multpStat.onclick) {
-			multpStat.onclick();
-		}
+		$('#type').change(function() {
+				typeChangeHandler();
 
-		jQuery('#type').change(function() {
-				displayKeyButton();
+				var type = $(this).val();
+				old_value = value_type.val();
+
+				if (type == <?= ITEM_TYPE_AGGREGATE ?> || type == <?= ITEM_TYPE_CALCULATED ?>) {
+					if (!(old_value == <?= ITEM_VALUE_TYPE_UINT64 ?> || old_value == <?= ITEM_VALUE_TYPE_FLOAT ?>)) {
+						value_type.val(<?= ITEM_VALUE_TYPE_UINT64 ?>);
+					}
+
+					value_type.trigger('change');
+				}
 			})
 			.trigger('change');
 
 		// Whenever non-numeric type is changed back to numeric type, set the default value in "trends" field.
-		jQuery('#value_type').on('focus', function () {
-			old_value = jQuery(this).val();
-		}).change(function() {
-			var new_value = jQuery(this).val(),
-				trends = jQuery('#trends');
+		value_type
+			.change(function() {
+				old_value = $(this).data('old-value');
 
-			if ((old_value == <?= ITEM_VALUE_TYPE_STR ?> || old_value == <?= ITEM_VALUE_TYPE_LOG ?>
-					|| old_value == <?= ITEM_VALUE_TYPE_TEXT ?>)
-					&& ((new_value == <?= ITEM_VALUE_TYPE_FLOAT ?>
-					|| new_value == <?= ITEM_VALUE_TYPE_UINT64 ?>)
-					&& trends.val() == 0)) {
-				trends.val(<?= DAY_IN_YEAR ?>);
-			}
-		});
+				var new_value = $(this).val(),
+					trends = $('#trends');
+
+				if ((old_value == <?= ITEM_VALUE_TYPE_STR ?> || old_value == <?= ITEM_VALUE_TYPE_LOG ?>
+						|| old_value == <?= ITEM_VALUE_TYPE_TEXT ?>)
+						&& (new_value == <?= ITEM_VALUE_TYPE_FLOAT ?>
+						|| new_value == <?= ITEM_VALUE_TYPE_UINT64 ?>)) {
+					if (trends.val() == 0) {
+						trends.val('<?= $this->data['trends_default'] ?>');
+					}
+					$('#trends_mode_1').prop('checked', true);
+				}
+
+				$('#trends_mode').trigger('change');
+				$(this).data('old-value', new_value);
+			})
+			.data('old-value', value_type.val());
+
+		$('#history_mode')
+			.change(function() {
+				if ($('[name="history_mode"][value=' + <?= ITEM_STORAGE_OFF ?> + ']').is(':checked')) {
+					$('#history').prop('disabled', true).hide();
+					$('#history_mode_hint').hide();
+				}
+				else {
+					$('#history').prop('disabled', false).show();
+					$('#history_mode_hint').show();
+				}
+			})
+			.trigger('change');
+
+		$('#trends_mode')
+			.change(function() {
+				if ($('[name="trends_mode"][value=' + <?= ITEM_STORAGE_OFF ?> + ']').is(':checked')) {
+					$('#trends').prop('disabled', true).hide();
+					$('#trends_mode_hint').hide();
+				}
+				else {
+					$('#trends').prop('disabled', false).show();
+					$('#trends_mode_hint').show();
+				}
+			})
+			.trigger('change');
 	});
 </script>

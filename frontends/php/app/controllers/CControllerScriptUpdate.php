@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -26,11 +26,11 @@ class CControllerScriptUpdate extends CController {
 			'scriptid' =>				'fatal|required|db scripts.scriptid',
 			'name' =>					'               db scripts.name',
 			'type' =>					'               db scripts.type        |in '.ZBX_SCRIPT_TYPE_CUSTOM_SCRIPT.','.ZBX_SCRIPT_TYPE_IPMI,
-			'execute_on' =>				'               db scripts.execute_on  |in '.ZBX_SCRIPT_EXECUTE_ON_AGENT.','.ZBX_SCRIPT_EXECUTE_ON_SERVER,
-			'command' =>				'               db scripts.command',
-			'commandipmi' =>			'               db scripts.command',
+			'execute_on' =>				'               db scripts.execute_on  |in '.ZBX_SCRIPT_EXECUTE_ON_AGENT.','.ZBX_SCRIPT_EXECUTE_ON_SERVER.','.ZBX_SCRIPT_EXECUTE_ON_PROXY,
+			'command' =>				'               db scripts.command     |flags '.P_CRLF,
+			'commandipmi' =>			'               db scripts.command     |flags '.P_CRLF,
 			'description' =>			'               db scripts.description',
-			'host_access' =>			'               db scripts.host_access |in 0,1,2,3',
+			'host_access' =>			'               db scripts.host_access |in '.PERM_READ.','.PERM_READ_WRITE,
 			'groupid' =>				'               db scripts.groupid',
 			'usrgrpid' =>				'               db scripts.usrgrpid',
 			'hgstype' =>				'                                       in 0,1',
@@ -72,32 +72,24 @@ class CControllerScriptUpdate extends CController {
 	protected function doAction() {
 		$script = [];
 
-		$this->getInputs($script, ['scriptid', 'name', 'type', 'execute_on', 'command', 'description', 'usrgrpid',
-			'groupid', 'host_access'
-		]);
+		$this->getInputs($script, ['scriptid', 'command', 'description', 'usrgrpid', 'groupid', 'host_access']);
+		$script['name'] = trimPath($this->getInput('name', ''));
+		$script['type'] = $this->getInput('type', ZBX_SCRIPT_TYPE_CUSTOM_SCRIPT);
+		$script['execute_on'] = $this->getInput('execute_on', ZBX_SCRIPT_EXECUTE_ON_SERVER);
 		$script['confirmation'] = $this->getInput('confirmation', '');
 
-		if ($this->getInput('type', ZBX_SCRIPT_TYPE_CUSTOM_SCRIPT) == ZBX_SCRIPT_TYPE_IPMI
-				&& $this->hasInput('commandipmi')) {
-			$script['command'] = $this->getInput('commandipmi');
+		if ($script['type'] == ZBX_SCRIPT_TYPE_IPMI) {
+			if ($this->hasInput('commandipmi')) {
+				$script['command'] = $this->getInput('commandipmi');
+			}
+			$script['execute_on'] = ZBX_SCRIPT_EXECUTE_ON_SERVER;
 		}
 
 		if ($this->getInput('hgstype', 1) == 0) {
 			$script['groupid'] = 0;
 		}
 
-		DBstart();
-
-		$result = API::Script()->update($script);
-
-		if ($result) {
-			$scriptId = reset($result['scriptids']);
-			add_audit(AUDIT_ACTION_UPDATE, AUDIT_RESOURCE_SCRIPT,
-				'Name ['.$this->getInput('name', '').'] id ['.$scriptId.']'
-			);
-		}
-
-		$result = DBend($result);
+		$result = (bool) API::Script()->update($script);
 
 		if ($result) {
 			$response = new CControllerResponseRedirect('zabbix.php?action=script.list&uncheck=1');

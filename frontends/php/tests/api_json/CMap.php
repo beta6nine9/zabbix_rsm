@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -19,9 +19,9 @@
 **/
 
 
-require_once dirname(__FILE__).'/../include/class.czabbixtest.php';
+require_once dirname(__FILE__).'/../include/CAPITest.php';
 
-class API_JSON_Map extends CZabbixTest {
+class API_JSON_Map extends CAPITest {
 
 	public static function map_data() {
 		return [
@@ -31,17 +31,17 @@ class API_JSON_Map extends CZabbixTest {
 					'width' => 600,
 					'height' => 800,
 					'backgroundid' => 0,
-					'highlight' => 0,
 					'label_type' => 0,
 					'label_location' => 0,
 					'grid_size' => 100,
 					'grid_show' => 1,
 					'grid_align' => 0,
 					'highlight' => 0,
-					'expandproblem' => 0,
+					'expandproblem' => 1,
 					'markelements' => 0,
 					'show_unack' => 0,
 					'severity_min' => 0,
+					'show_suppressed' => 0,
 					'selements' => []
 				]],
 			],

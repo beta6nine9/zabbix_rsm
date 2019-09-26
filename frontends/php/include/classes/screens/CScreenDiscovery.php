@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -53,39 +53,28 @@ class CScreenDiscovery extends CScreenBase {
 
 		$sort_field = $this->data['sort'];
 		$sort_order = $this->data['sortorder'];
-		$druleid = $this->data['druleid'];
 
-		// discovery rules
-		$options = [
+		$drules = API::DRule()->get([
 			'output' => ['druleid', 'name'],
 			'selectDHosts' => ['dhostid', 'status', 'lastup', 'lastdown'],
-			'filter' => ['status' => DRULE_STATUS_ACTIVE]
-		];
+			'druleids' => (array_key_exists('filter_druleids', $this->data) && $this->data['filter_druleids'])
+				? $this->data['filter_druleids']
+				: null,
+			'filter' => ['status' => DRULE_STATUS_ACTIVE],
+			'preservekeys' => true
+		]);
 
-		if ($druleid > 0) {
-			$options['druleids'] = $druleid; // set selected discovery rule id
-		}
+		order_result($drules, 'name');
 
-		$drules = API::DRule()->get($options);
-		if ($drules) {
-			order_result($drules, 'name');
-		}
-
-		// discovery services
-		$options = [
+		$dservices = API::DService()->get([
+			'output' => ['dserviceid', 'port', 'status', 'lastup', 'lastdown', 'dcheckid', 'ip', 'dns'],
 			'selectHosts' => ['hostid', 'name', 'status'],
-			'output' => ['dserviceid', 'type', 'key_', 'port', 'status', 'lastup', 'lastdown', 'ip', 'dns'],
+			'druleids' => array_keys($drules),
 			'sortfield' => $sort_field,
 			'sortorder' => $sort_order,
-			'limitSelects' => 1
-		];
-		if ($druleid > 0) {
-			$options['druleids'] = $druleid;
-		}
-		else {
-			$options['druleids'] = zbx_objectValues($drules, 'druleid');
-		}
-		$dservices = API::DService()->get($options);
+			'limitSelects' => 1,
+			'preservekeys' => true
+		]);
 
 		// user macros
 		$macros = API::UserMacro()->get([
@@ -94,32 +83,34 @@ class CScreenDiscovery extends CScreenBase {
 		]);
 		$macros = zbx_toHash($macros, 'macro');
 
+		$dchecks = API::DCheck()->get([
+			'output' => ['type', 'key_'],
+			'dserviceids' => array_keys($dservices),
+			'preservekeys' => true
+		]);
+
 		// services
 		$services = [];
 		foreach ($dservices as $dservice) {
-			$key_ = $dservice['key_'];
+			$key_ = $dchecks[$dservice['dcheckid']]['key_'];
 			if ($key_ !== '') {
 				if (array_key_exists($key_, $macros)) {
 					$key_ = $macros[$key_]['value'];
 				}
 				$key_ = ': '.$key_;
 			}
-			$service_name = discovery_check_type2str($dservice['type']).
-				discovery_port2str($dservice['type'], $dservice['port']).$key_;
+			$service_name = discovery_check_type2str($dchecks[$dservice['dcheckid']]['type']).
+				discovery_port2str($dchecks[$dservice['dcheckid']]['type'], $dservice['port']).$key_;
 			$services[$service_name] = 1;
 		}
 		ksort($services);
 
-		// discovery services to hash
-		$dservices = zbx_toHash($dservices, 'dserviceid');
-
-		// discovery hosts
 		$dhosts = API::DHost()->get([
-			'druleids' => zbx_objectValues($drules, 'druleid'),
-			'selectDServices' => ['dserviceid', 'ip', 'dns', 'type', 'status', 'key_'],
-			'output' => ['dhostid', 'lastdown', 'lastup', 'druleid']
+			'output' => ['dhostid'],
+			'selectDServices' => ['dserviceid'],
+			'druleids' => array_keys($drules),
+			'preservekeys' => true
 		]);
-		$dhosts = zbx_toHash($dhosts, 'dhostid');
 
 		$header = [
 			make_sorting_header(_('Discovered device'), 'ip', $sort_field, $sort_order,
@@ -130,7 +121,9 @@ class CScreenDiscovery extends CScreenBase {
 		];
 
 		foreach ($services as $name => $foo) {
-			$header[] = (new CColHeader($name))->addClass('vertical_rotation');
+			$header[] = (new CColHeader($name))
+				->addClass('vertical_rotation')
+				->setTitle($name);
 		}
 
 		// create table
@@ -184,7 +177,7 @@ class CScreenDiscovery extends CScreenBase {
 							'type' => $htype,
 							'class' => $hclass,
 							'host' => $hostName,
-							'time' => $htime,
+							'time' => $htime
 						];
 					}
 
@@ -193,11 +186,11 @@ class CScreenDiscovery extends CScreenBase {
 						$time = 'lastdown';
 					}
 					else {
-						$class = ZBX_STYLE_ACTIVE_BG;
+						$class = null;
 						$time = 'lastup';
 					}
 
-					$key_ = $dservice['key_'];
+					$key_ = $dchecks[$dservice['dcheckid']]['key_'];
 					if ($key_ !== '') {
 						if (array_key_exists($key_, $macros)) {
 							$key_ = $macros[$key_]['value'];
@@ -205,8 +198,8 @@ class CScreenDiscovery extends CScreenBase {
 						$key_ = NAME_DELIMITER.$key_;
 					}
 
-					$service_name = discovery_check_type2str($dservice['type']).
-						discovery_port2str($dservice['type'], $dservice['port']).$key_;
+					$service_name = discovery_check_type2str($dchecks[$dservice['dcheckid']]['type']).
+						discovery_port2str($dchecks[$dservice['dcheckid']]['type'], $dservice['port']).$key_;
 
 					$discovery_info[$dservice['ip']]['services'][$service_name] = [
 						'class' => $class,
@@ -215,7 +208,7 @@ class CScreenDiscovery extends CScreenBase {
 				}
 			}
 
-			if ($druleid == 0 && $discovery_info) {
+			if ($discovery_info) {
 				$col = new CCol(
 					[bold($drule['name']), SPACE.'('._n('%d device', '%d devices', count($discovery_info)).')']
 				);
@@ -226,9 +219,9 @@ class CScreenDiscovery extends CScreenBase {
 			order_result($discovery_info, $sort_field, $sort_order);
 
 			foreach ($discovery_info as $ip => $h_data) {
-				$dns = $h_data['dns'] == '' ? '' : ' ('.$h_data['dns'].')';
+				$dns = ($h_data['dns'] === '') ? '' : ' ('.$h_data['dns'].')';
 				$row = [
-					$h_data['type'] == 'primary'
+					($h_data['type'] === 'primary')
 						? (new CSpan($ip.$dns))->addClass($h_data['class'])
 						: new CSpan(SPACE.SPACE.$ip.$dns),
 					new CSpan(array_key_exists('host', $h_data) ? $h_data['host'] : ''),
@@ -240,33 +233,10 @@ class CScreenDiscovery extends CScreenBase {
 				];
 
 				foreach ($services as $name => $foo) {
-					$class = null;
-					$time = SPACE;
-					$hint = (new CDiv(SPACE))->addClass($class);
-
-					$hint_table = null;
-					if (array_key_exists($name, $h_data['services'])) {
-						$class = $h_data['services'][$name]['class'];
-						$time = $h_data['services'][$name]['time'];
-
-						$hint_table = (new CTableInfo())->setAttribute('style', 'width: auto;');
-
-						if ($class == ZBX_STYLE_ACTIVE_BG) {
-							$hint_table->setHeader(_('Uptime'));
-						}
-						else {
-							$hint_table->setHeader(_('Downtime'));
-						}
-
-						$hint_table->addRow(
-							(new CCol(zbx_date2age($h_data['services'][$name]['time'])))->addClass($class)
-						);
-					}
-					$column = (new CCol($hint))->addClass($class);
-					if (!is_null($hint_table)) {
-						$column->setHint($hint_table);
-					}
-					$row[] = $column;
+					$row[] = array_key_exists($name, $h_data['services'])
+						? (new CCol(zbx_date2age($h_data['services'][$name]['time'])))
+							->addClass($h_data['services'][$name]['class'])
+						: '';
 				}
 				$table->addRow($row);
 			}

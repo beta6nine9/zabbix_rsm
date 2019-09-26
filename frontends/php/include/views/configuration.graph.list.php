@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -22,39 +22,47 @@
 if (!empty($this->data['parent_discoveryid'])) {
 	$widget = (new CWidget())
 		->setTitle(_('Graph prototypes'))
-		->setControls((new CForm('get'))
-			->cleanItems()
-			->addVar('parent_discoveryid', $this->data['parent_discoveryid'])
-			->addItem((new CList())->addItem(new CSubmit('form', _('Create graph prototype'))))
+		->setControls(
+			(new CTag('nav', true,
+				(new CList())->addItem(new CRedirectButton(_('Create graph prototype'),
+					(new CUrl('graphs.php'))
+						->setArgument('form', 'create')
+						->setArgument('parent_discoveryid', $data['parent_discoveryid'])
+						->getUrl()
+				))
+			))->setAttribute('aria-label', _('Content controls'))
 		)
 		->addItem(get_header_host_table('graphs', $this->data['hostid'], $this->data['parent_discoveryid']));
 }
 else {
-	if (!empty($this->data['hostid'])) {
-		$create_button = new CSubmit('form', _('Create graph'));
-	}
-	else {
-		$create_button = (new CSubmit('form', _('Create graph (select host first)')))->setEnabled(false);
-	}
-
 	$widget = (new CWidget())
 		->setTitle(_('Graphs'))
-		->setControls((new CForm('get'))
-			->cleanItems()
-			->addItem((new CList())
-				->addItem([
-					new CLabel(_('Group'), 'groupid'),
-					(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
-					$this->data['pageFilter']->getGroupsCB()
-				])
-				->addItem([
-					new CLabel(_('Host'), 'hostid'),
-					(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
-					$this->data['pageFilter']->getHostsCB()
-				])
-				->addItem($create_button)
-			)
-		);
+		->setControls(new CList([
+			(new CForm('get'))
+				->cleanItems()
+				->setAttribute('aria-label', _('Main filter'))
+				->addItem((new CList())
+					->addItem([
+						new CLabel(_('Group'), 'groupid'),
+						(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
+						$this->data['pageFilter']->getGroupsCB()
+					])
+					->addItem([
+						new CLabel(_('Host'), 'hostid'),
+						(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
+						$this->data['pageFilter']->getHostsCB()
+					])
+				),
+			(new CTag('nav', true, ($data['hostid'] == 0)
+				? (new CButton('form', _('Create graph (select host first)')))->setEnabled(false)
+				: new CRedirectButton(_('Create graph'), (new CUrl('graphs.php'))
+					->setArgument('hostid', $data['hostid'])
+					->setArgument('form', 'create')
+					->getUrl()
+				)
+			))
+				->setAttribute('aria-label', _('Content controls'))
+		]));
 
 	if (!empty($this->data['hostid'])) {
 		$widget->addItem(get_header_host_table('graphs', $this->data['hostid']));
@@ -82,7 +90,7 @@ $graphTable = (new CTableInfo())
 		make_sorting_header(_('Graph type'), 'graphtype', $this->data['sort'], $this->data['sortorder'])
 	]);
 
-foreach ($this->data['graphs'] as $graph) {
+foreach ($data['graphs'] as $graph) {
 	$graphid = $graph['graphid'];
 
 	$hostList = null;
@@ -98,67 +106,42 @@ foreach ($this->data['graphs'] as $graph) {
 		$hostList = implode(', ', $hostList);
 	}
 
-	$isCheckboxEnabled = true;
 	$name = [];
-	if (!empty($graph['templateid'])) {
-		$realHosts = get_realhosts_by_graphid($graph['templateid']);
-		$realHosts = DBfetch($realHosts);
-		$name[] = (new CLink($realHosts['name'], 'graphs.php?hostid='.$realHosts['hostid']))
+	$name[] = makeGraphTemplatePrefix($graphid, $data['parent_templates'], ($data['parent_discoveryid'] === null)
+		? ZBX_FLAG_DISCOVERY_NORMAL
+		: ZBX_FLAG_DISCOVERY_PROTOTYPE
+	);
+
+	if ($graph['discoveryRule'] && $data['parent_discoveryid'] === null) {
+		$name[] = (new CLink(CHtml::encode($graph['discoveryRule']['name']),
+			(new CUrl('host_discovery.php'))
+				->setArgument('form', 'update')
+				->setArgument('itemid', $graph['discoveryRule']['itemid'])
+		))
 			->addClass(ZBX_STYLE_LINK_ALT)
-			->addClass(ZBX_STYLE_GREY);
+			->addClass(ZBX_STYLE_ORANGE);
 		$name[] = NAME_DELIMITER;
-		$name[] = new CLink(
-			$graph['name'],
-			'graphs.php?'.
-				'form=update'.
-				'&graphid='.$graphid.url_param('parent_discoveryid').
-				'&hostid='.$this->data['hostid']
-		);
-
-		if ($graph['discoveryRule']) {
-			$isCheckboxEnabled = false;
-		}
-	}
-	elseif (!empty($graph['discoveryRule']) && empty($this->data['parent_discoveryid'])) {
-		$name[] = (new CLink(
-			$graph['discoveryRule']['name'],
-			'host_discovery.php?form=update&itemid='.$graph['discoveryRule']['itemid'])
-			)
-				->addClass(ZBX_STYLE_LINK_ALT)
-				->addClass(ZBX_STYLE_ORANGE);
-		$name[] = NAME_DELIMITER;
-		$name[] = new CSpan($graph['name']);
-
-		$isCheckboxEnabled = false;
-	}
-	else {
-		$name[] = new CLink(
-			$graph['name'],
-			'graphs.php?'.
-				'form=update'.
-				'&graphid='.$graphid.url_param('parent_discoveryid').
-				'&hostid='.$this->data['hostid']
-		);
 	}
 
-	$checkBox = (new CCheckBox('group_graphid['.$graphid.']', $graphid))
-		->setEnabled($isCheckboxEnabled);
+	$url = (new CUrl('graphs.php'))
+		->setArgument('form', 'update')
+		->setArgument('parent_discoveryid', $data['parent_discoveryid'])
+		->setArgument('graphid', $graphid);
+
+	if ($data['parent_discoveryid'] === null) {
+		$url->setArgument('hostid', $this->data['hostid']);
+	}
+
+	$name[] = new CLink(CHtml::encode($graph['name']), $url);
 
 	$graphTable->addRow([
-		$checkBox,
+		new CCheckBox('group_graphid['.$graphid.']', $graphid),
 		$hostList,
 		$name,
 		$graph['width'],
 		$graph['height'],
 		$graph['graphtype']
 	]);
-}
-
-if ($this->data['parent_discoveryid']) {
-	zbx_add_post_js('cookie.prefix = "'.$this->data['parent_discoveryid'].'";');
-}
-else {
-	zbx_add_post_js('cookie.prefix = "'.$this->data['hostid'].'";');
 }
 
 // buttons
@@ -176,7 +159,9 @@ $graphForm->addItem([
 	$graphTable,
 	$this->data['paging'],
 	new CActionButtonList('action', 'group_graphid', $buttonsArray,
-		$this->data['parent_discoveryid'] ? $this->data['parent_discoveryid'] : $this->data['hostid']
+		$this->data['parent_discoveryid']
+			? $this->data['parent_discoveryid']
+			: $this->data['hostid']
 	)
 ]);
 

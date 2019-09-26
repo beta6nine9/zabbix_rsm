@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -133,6 +133,10 @@ class CTriggerExpressionTest extends PHPUnit_Framework_TestCase {
 			['-not 1', null, false],
 			['- not1', null, false],
 			['-not1', null, false],
+			['1 not 1', null, false],
+			['(1) not 1', null, false],
+			['1not1', null, false],
+			['(1)not1', null, false],
 
 			// operator cases
 			['Not 1', null, false],
@@ -157,7 +161,7 @@ class CTriggerExpressionTest extends PHPUnit_Framework_TestCase {
 			['{host:key[こんにちは、世界].str(こんにちは、世界)}', null, true],
 
 			['{host:key[a,,"b",,[c,d,,"e",],,[f]].count(1,,"b",3)}', null, true],
-			['{host:key[a,,"b",,[[c,d,,"e"],[]],,[f]].count(1,,"b",3)}', null, true],
+			['{host:key[a,,"b",,[[c,d,,"e"],[]],,[f]].count(1,,"b",3)}', null, false],
 			['{host:key[a,,"b",,[c,d,,"e",,,[f]].count(1,,"b",3)}', null, false],
 			['{host:key[a,,"b",,[c,d,,"e",],,f]].count(1,,"b",3)}', null, false],
 
@@ -1793,8 +1797,8 @@ class CTriggerExpressionTest extends PHPUnit_Framework_TestCase {
 			['host:key.str()}', null, false],
 			[' {host:key.str()}', null, true],
 			['{host:key.str()} ', null, true],
-			['{ host:key.str()}', null, true],
-			['{host :key.str()}', null, true],
+			['{ host:key.str()}', null, false],
+			['{host :key.str()}', null, false],
 			['{host:key.str(-5)}', null, true],
 			['{host:key.str(+5)}', null, true],
 			['{host:key.str([-5)}', null, true],
@@ -3180,32 +3184,56 @@ class CTriggerExpressionTest extends PHPUnit_Framework_TestCase {
 			["{host:key.count(\n1,\"\")}=0", null, true],
 			["{host:key.count(\r\n1,\"\")}=0", null, true],
 			["{host:key.count(\t1,\"\")}=0", null, true],
+
+			// Simple trigger expressions.
+			["{host:last()}=0", null, false, ['allow_func_only' => true]],
+			["{item.last()}=0", null, false, ['allow_func_only' => true]],
+			["{.last()}=0", null, false, ['allow_func_only' => true]],
+			["{str(last())}=0", null, false, ['allow_func_only' => true]],
+
+			["{last()}=0", null, true, ['allow_func_only' => true]],
+			['{last()}={$USERMACRO: "host:item.macrocontext"}', null, true, ['allow_func_only' => true]],
+			['{last()}={$USERMACRO: "{host:item.last()}"}', null, true, ['allow_func_only' => true]],
+			['{str("last()")}=0', null, true, ['allow_func_only' => true]],
+			['{str("host:item.last()")}=0', null, true, ['allow_func_only' => true]],
+			['{str("{host:item.last()}")}=0', null, true, ['allow_func_only' => true]],
+
+			["{last(#5)}={#LLDMACRO}", null, false],
+			["{last(#5)}={#LLDMACRO}", null, false, ['lldmacros' => false]],
+			["{last(#5)}={#LLDMACRO}", null, true, ['allow_func_only' => true]]
 		];
 	}
 
 	/**
 	 * @dataProvider provider
+	 *
+	 * @param string      $expression
+	 * @param array|null  $result
+	 * @param bool        $rc
+	 * @param array       $options
+	 * @param bool        $options['lldmacros']
+	 * @param bool        $options['allow_func_only']
 	 */
-	public function test_parse($expression, $result, $rc) {
-		$expressionData = new CTriggerExpression();
+	public function testParseExpression($expression, $result, $rc, array $options = []) {
+		$expression_data = new CTriggerExpression($options);
 
-		if ($expressionData->parse($expression)) {
+		if ($expression_data->parse($expression)) {
 			$this->assertEquals($rc, true);
-			$this->assertEquals($rc, $expressionData->isValid);
+			$this->assertEquals($rc, $expression_data->isValid);
 
 			if (isset($result)) {
-				$this->assertEquals($result['error'], $expressionData->error);
-				$this->assertEquals($result['expressions'], $expressionData->expressions);
+				$this->assertEquals($result['error'], $expression_data->error);
+				$this->assertEquals($result['expressions'], $expression_data->expressions);
 			}
 		}
 		else {
-			$this->assertEquals($rc, false, "\nError with expression $expression: ".$expressionData->error);
+			$this->assertEquals($rc, false, "\nError with expression $expression: ".$expression_data->error);
 		}
 	}
 
-
 	public function testTokens() {
-		$exp = '((-12 + {host:item.str(ГУГЛ)} or {$USERMACRO} and not {TRIGGER.VALUE} or {#LLD} or 10m))';
+		$exp = '((-12 + {host:item.str(ГУГЛ)} or {$USERMACRO} and not {TRIGGER.VALUE} or {#LLD} or'.
+				' {{#LLD}.regsub("^([0-9]+)", "{#LLD}: \1")} or 10m))';
 		$tokens = [
 			[
 				'type' => CTriggerExpressionParserResult::TOKEN_TYPE_OPEN_BRACE,
@@ -3314,9 +3342,23 @@ class CTriggerExpressionTest extends PHPUnit_Framework_TestCase {
 				'length' => 2
 			],
 			[
+				'type' => CTriggerExpressionParserResult::TOKEN_TYPE_LLD_MACRO,
+				'value' => '{{#LLD}.regsub("^([0-9]+)", "{#LLD}: \1")}',
+				'data' => null,
+				'pos' => 87,
+				'length' => 42
+			],
+			[
+				'type' => CTriggerExpressionParserResult::TOKEN_TYPE_OPERATOR,
+				'value' => 'or',
+				'data' => null,
+				'pos' => 130,
+				'length' => 2
+			],
+			[
 				'type' => CTriggerExpressionParserResult::TOKEN_TYPE_NUMBER,
 				'value' => '10m',
-				'pos' => 87,
+				'pos' => 133,
 				'length' => 3,
 				'data' => [
 					'suffix' => 'm'
@@ -3326,14 +3368,14 @@ class CTriggerExpressionTest extends PHPUnit_Framework_TestCase {
 				'type' => CTriggerExpressionParserResult::TOKEN_TYPE_CLOSE_BRACE,
 				'value' => ')',
 				'data' => null,
-				'pos' => 90,
+				'pos' => 136,
 				'length' => 1
 			],
 			[
 				'type' => CTriggerExpressionParserResult::TOKEN_TYPE_CLOSE_BRACE,
 				'value' => ')',
 				'data' => null,
-				'pos' => 91,
+				'pos' => 137,
 				'length' => 1
 			],
 		];

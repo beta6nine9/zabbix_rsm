@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -18,12 +18,14 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-require_once dirname(__FILE__).'/../include/class.cwebtest.php';
+require_once dirname(__FILE__).'/../include/CLegacyWebTest.php';
 
 /**
  * Test the creation of inheritance of new objects on a previously linked template.
+ *
+ * @backup graphs
  */
-class testFormGraphPrototype extends CWebTest {
+class testFormGraphPrototype extends CLegacyWebTest {
 
 	/**
 	 * The name of the test template created in the test data set.
@@ -115,14 +117,6 @@ class testFormGraphPrototype extends CWebTest {
 	 * @var int
 	 */
 	protected $yaxismax = 500;
-
-
-	/**
-	 * Backup the tables that will be modified during the tests.
-	 */
-	public function testFormGraphPrototype_Setup() {
-		DBsave_tables('graphs');
-	}
 
 	// Returns layout data
 	public static function layout() {
@@ -341,7 +335,7 @@ class testFormGraphPrototype extends CWebTest {
 			$this->zbxTestClickLinkTextWait($data['form']);
 		}
 		else {
-			$this->zbxTestClickWait('form');
+			$this->zbxTestContentControlButtonClickTextWait('Create graph prototype');
 		}
 
 		$this->zbxTestCheckTitle('Configuration of graph prototypes');
@@ -440,14 +434,14 @@ class testFormGraphPrototype extends CWebTest {
 		}
 
 		$this->zbxTestTextPresent('Show legend');
-		$this->zbxTestAssertVisibleId('show_legend');
+		$this->zbxTestAssertElementPresentId('show_legend');
 		if (!isset($data['form'])) {
 			$this->assertTrue($this->zbxTestCheckboxSelected('show_legend'));
 		}
 
 		if ($graphtype == 'Normal' || $graphtype == 'Stacked') {
 			$this->zbxTestTextPresent('Show working time');
-			$this->zbxTestAssertVisibleId('show_work_period');
+			$this->zbxTestAssertElementPresentId('show_work_period');
 
 			if (!isset($data['form'])) {
 				$this->assertTrue($this->zbxTestCheckboxSelected('show_work_period'));
@@ -467,7 +461,7 @@ class testFormGraphPrototype extends CWebTest {
 
 		if ($graphtype == 'Normal' || $graphtype == 'Stacked') {
 			$this->zbxTestTextPresent('Show triggers');
-			$this->zbxTestAssertVisibleId('show_triggers');
+			$this->zbxTestAssertElementPresentId('show_triggers');
 			if (!isset($data['form'])) {
 				$this->assertTrue($this->zbxTestCheckboxSelected('show_triggers'));
 			}
@@ -485,13 +479,13 @@ class testFormGraphPrototype extends CWebTest {
 
 		if ($graphtype == 'Normal') {
 			$this->zbxTestTextPresent('Percentile line (left)');
-			$this->zbxTestAssertVisibleId('visible_percent_left');
+			$this->zbxTestAssertElementPresentId('visible_percent_left');
 			if (isset($data['templatedHost'])) {
 				$this->zbxTestAssertAttribute("//input[@id='visible_percent_left']", 'disabled');
 				$this->zbxTestAssertAttribute("//input[@id='visible_percent_right']", 'disabled');
 			}
 			$this->zbxTestTextPresent('Percentile line (right)');
-			$this->zbxTestAssertVisibleId('visible_percent_right');
+			$this->zbxTestAssertElementPresentId('visible_percent_right');
 		}
 		else {
 			$this->zbxTestTextNotPresent('Percentile line (left)');
@@ -503,7 +497,7 @@ class testFormGraphPrototype extends CWebTest {
 
 		if ($graphtype == 'Pie' || $graphtype == 'Exploded') {
 			$this->zbxTestTextPresent('3D view');
-			$this->zbxTestAssertVisibleId('show_3d');
+			$this->zbxTestAssertElementPresentId('show_3d');
 			if (isset($data['templatedHost'])) {
 				$this->zbxTestAssertAttribute("//input[@id='show_3d']/@disabled", 'disabled');
 			}
@@ -518,7 +512,7 @@ class testFormGraphPrototype extends CWebTest {
 
 		if ($graphtype == 'Normal' || $graphtype == 'Stacked') {
 			$this->zbxTestTextPresent('Y axis MIN value');
-			$this->zbxTestAssertVisibleId('ymin_type');
+			$this->zbxTestAssertElementPresentId('ymin_type');
 			$this->zbxTestDropdownHasOptions('ymin_type', [
 				'Calculated',
 				'Fixed',
@@ -543,7 +537,7 @@ class testFormGraphPrototype extends CWebTest {
 			}
 
 			$this->zbxTestTextPresent('Y axis MAX value');
-			$this->zbxTestAssertVisibleId('ymax_type');
+			$this->zbxTestAssertElementPresentId('ymax_type');
 			$this->zbxTestDropdownHasOptions('ymax_type', [
 				'Calculated',
 				'Fixed',
@@ -594,21 +588,19 @@ class testFormGraphPrototype extends CWebTest {
 		}
 
 		if (!isset($data['form'])) {
-			$this->zbxTestLaunchPopup('add_item');
+			$this->zbxTestClick('add_item');
+			$this->zbxTestLaunchOverlayDialog('Items');
+
 			if (isset($data['host'])) {
-				$this->zbxTestWaitUntilElementVisible(WebDriverBy::id('groupid'));
 				$this->zbxTestDropdownSelect('groupid', 'Zabbix servers');
 				$this->zbxTestDropdownSelectWait('hostid', $this->host);
 
-				$this->zbxTestAssertElementPresentXpath("//a[text()='".$this->itemSimple."']");
-				$this->zbxTestClickLinkTextWait($this->itemSimple);
+				$this->zbxTestClickLinkText($this->itemSimple);
 			}
 
 			if (isset($data['template'])) {
-				$this->zbxTestClickLinkTextWait($this->itemInheritance);
+				$this->zbxTestClickLinkText($this->itemInheritance);
 			}
-
-			$this->zbxTestWaitWindowClose();
 		}
 
 		if (isset($data['templatedHost'])) {
@@ -619,16 +611,16 @@ class testFormGraphPrototype extends CWebTest {
 		}
 
 		if (!isset($data['form'])) {
-			$this->zbxTestLaunchPopup('add_protoitem');
+			$this->zbxTestClick('add_protoitem');
+			$this->zbxTestLaunchOverlayDialog('Item prototypes');
+
 			if (isset($data['host'])) {
-				$this->zbxTestClickLinkTextWait($this->item);
+				$this->zbxTestClickLinkText($this->item);
 			}
 
 			if (isset($data['template'])) {
-				$this->zbxTestClickLinkTextWait($this->itemDiscovery);
+				$this->zbxTestClickLinkText($this->itemDiscovery);
 			}
-
-			$this->zbxTestWaitWindowClose();
 		}
 
 		switch($ymin_type) {
@@ -745,7 +737,7 @@ class testFormGraphPrototype extends CWebTest {
 
 	// Returns update data
 	public static function update() {
-		return DBdata("select * from graphs where name LIKE 'testFormGraphPrototype%'");
+		return CDBHelper::getDataProvider("select * from graphs where name LIKE 'testFormGraphPrototype%'");
 	}
 
 	/**
@@ -753,7 +745,7 @@ class testFormGraphPrototype extends CWebTest {
 	 */
 	public function testFormGraphPrototype_SimpleUpdate($data) {
 		$sqlGraphs = "select * from graphs ORDER BY graphid";
-		$oldHashGraphs = DBhash($sqlGraphs);
+		$oldHashGraphs = CDBHelper::getHash($sqlGraphs);
 
 		$this->zbxTestLogin('graphs.php?form=update&graphid='.$data['graphid'].'&parent_discoveryid=33800&hostid=40001');
 		$this->zbxTestClickWait('update');
@@ -765,7 +757,7 @@ class testFormGraphPrototype extends CWebTest {
 			$data['name']
 		]);
 
-		$this->assertEquals($oldHashGraphs, DBhash($sqlGraphs));
+		$this->assertEquals($oldHashGraphs, CDBHelper::getHash($sqlGraphs));
 	}
 
 	// Returns create data
@@ -948,7 +940,7 @@ class testFormGraphPrototype extends CWebTest {
 				[
 					'expected' => TEST_BAD,
 					'graphName' => 'graphSimple',
-					'error-msg' => 'Cannot add graph',
+					'error-msg' => 'Cannot add graph prototype',
 					'errors' => [
 						'Graph with name "graphSimple" already exists in graphs or graph prototypes'
 					]
@@ -968,7 +960,7 @@ class testFormGraphPrototype extends CWebTest {
 					'expected' => TEST_BAD,
 					'graphName' => 'graphSaveCheck',
 					'noItem' => true,
-					'error-msg' => 'Cannot add graph',
+					'error-msg' => 'Cannot add graph prototype',
 					'errors' => [
 						'Missing items for graph prototype "graphSaveCheck".'
 					]
@@ -1000,9 +992,9 @@ class testFormGraphPrototype extends CWebTest {
 					'noAxisItem' => true,
 					'ymin_type' => 'Item',
 					'ymax_type' => 'Fixed',
-					'error-msg' => 'Cannot add graph',
+					'error-msg' => 'Cannot add graph prototype',
 					'errors' => [
-						'No permissions to referred object or it does not exist!'
+						'Invalid parameter "ymin_itemid": cannot be empty.'
 					]
 				]
 			],
@@ -1014,9 +1006,9 @@ class testFormGraphPrototype extends CWebTest {
 					'noAxisItem' => true,
 					'ymin_type' => 'Fixed',
 					'ymax_type' => 'Item',
-					'error-msg' => 'Cannot add graph',
+					'error-msg' => 'Cannot add graph prototype',
 					'errors' => [
-						'No permissions to referred object or it does not exist!'
+						'Invalid parameter "ymax_itemid": cannot be empty.'
 					]
 				]
 			],
@@ -1031,7 +1023,7 @@ class testFormGraphPrototype extends CWebTest {
 					'yaxismin' => 'name',
 					'ymax_type' => 'Fixed',
 					'yaxismax' => 'name',
-					'error-msg' => 'age received incorrect data',
+					'error-msg' => 'Page received incorrect data',
 					'errors' => [
 						'Incorrect value "0" for "Width" field: must be between 20 and 65535.',
 						'Incorrect value "0" for "Height" field: must be between 20 and 65535.',
@@ -1049,7 +1041,7 @@ class testFormGraphPrototype extends CWebTest {
 					'graphtype' => 'Stacked',
 					'ymin_type' => 'Fixed',
 					'ymax_type' => 'Fixed',
-					'error-msg' => 'age received incorrect data',
+					'error-msg' => 'Page received incorrect data',
 					'errors' => [
 						'Incorrect value "65536" for "Width" field: must be between 20 and 65535.',
 						'Incorrect value "-22" for "Height" field: must be between 20 and 65535.'
@@ -1084,17 +1076,17 @@ class testFormGraphPrototype extends CWebTest {
 		}
 
 		if (!isset($data['noItem'])) {
-			$this->zbxTestLaunchPopup('add_protoitem');
+			$this->zbxTestClick('add_protoitem');
+			$this->zbxTestLaunchOverlayDialog('Item prototypes');
 
-			$this->zbxTestClickLinkTextWait($this->item);
-			$this->zbxTestWaitWindowClose();
+			$this->zbxTestClickLinkText($this->item);
 
-			$this->zbxTestLaunchPopup('add_item');
+			$this->zbxTestClick('add_item');
+			$this->zbxTestLaunchOverlayDialog('Items');
 
-			$this->zbxTestWaitUntilElementPresent(webDriverBy::id('groupid'));
 			$this->zbxTestDropdownSelect('groupid', 'Zabbix servers');
 			$this->zbxTestDropdownSelectWait('hostid', $this->host);
-			$this->zbxTestClickLinkAndWaitWindowClose($this->itemSimple);
+			$this->zbxTestClickLinkText($this->itemSimple);
 
 			if (isset($data['removeItem'])) {
 				$this->zbxTestClickWait('items_0_remove');
@@ -1103,18 +1095,15 @@ class testFormGraphPrototype extends CWebTest {
 				$this->zbxTestClickWait('items_0_remove');
 				$this->zbxTestTextNotPresent($this->itemSimple);
 
-				$this->zbxTestClickWait('add_item');
-				$this->zbxTestSwitchToNewWindow();
-
-				$this->zbxTestWaitUntilElementPresent(webDriverBy::id('groupid'));
+				$this->zbxTestClick('add_item');
+				$this->zbxTestLaunchOverlayDialog('Items');
 				$this->zbxTestDropdownSelect('groupid', 'Zabbix servers');
 				$this->zbxTestDropdownSelectWait('hostid', $this->host);
-				$this->zbxTestClickLinkAndWaitWindowClose($this->itemSimple);
+				$this->zbxTestClickLinkText($this->itemSimple);
 
-				$this->zbxTestClickWait('add_protoitem');
-				$this->zbxTestSwitchToNewWindow();
-				$this->zbxTestClickLinkTextWait($this->item);
-				$this->zbxTestWaitWindowClose();
+				$this->zbxTestClick('add_protoitem');
+				$this->zbxTestLaunchOverlayDialog('Item prototypes');
+				$this->zbxTestClickLinkText($this->item);
 			}
 		}
 		if (isset($data['width'])) {
@@ -1144,9 +1133,9 @@ class testFormGraphPrototype extends CWebTest {
 					break;
 				case 'Item':
 					if (!isset($data['noAxisItem'])) {
-						$this->zbxTestLaunchPopup('yaxis_min_prototype', 'zbx_popup_item');
-						$this->zbxTestClickLinkTextWait($this->item);
-						$this->zbxTestWaitWindowClose();
+						$this->zbxTestClick('yaxis_min_prototype');
+						$this->zbxTestLaunchOverlayDialog('Item prototypes');
+						$this->zbxTestClickLinkText($this->item);
 					}
 					break;
 				case 'Calculated':
@@ -1159,9 +1148,9 @@ class testFormGraphPrototype extends CWebTest {
 					break;
 				case 'Item':
 					if (!isset($data['noAxisItem'])) {
-						$this->zbxTestLaunchPopup('yaxis_max_prototype', 'zbx_popup_item');
-						$this->zbxTestClickLinkTextWait($this->item);
-						$this->zbxTestWaitWindowClose();
+						$this->zbxTestClick('yaxis_max_prototype');
+						$this->zbxTestLaunchOverlayDialog('Item prototypes');
+						$this->zbxTestClickLinkText($this->item);
 					}
 					break;
 				case 'Calculated':
@@ -1221,19 +1210,12 @@ class testFormGraphPrototype extends CWebTest {
 			$this->zbxTestClickLinkTextWait($this->discoveryRule);
 			$this->zbxTestClickLinkTextWait('Graph prototypes');
 
-			$this->zbxTestCheckboxSelect("group_graphid_$graphid");
+			$this->zbxTestCheckboxSelect('group_graphid_'.$graphid);
 			$this->zbxTestClickButton('graph.massdelete');
 
-			$this->webDriver->switchTo()->alert()->accept();
+			$this->zbxTestAcceptAlert();
 			$this->zbxTestWaitUntilMessageTextPresent('msg-good', 'Graph prototypes deleted');
 			$this->zbxTestTextNotPresent($this->template.": $graphName");
 		}
-	}
-
-	/**
-	 * Restore the original tables.
-	 */
-	public function testFormGraphPrototype_Teardown() {
-		DBrestore_tables('graphs');
 	}
 }

@@ -1,7 +1,29 @@
+<?php
+/*
+** Zabbix
+** Copyright (C) 2001-2019 Zabbix SIA
+**
+** This program is free software; you can redistribute it and/or modify
+** it under the terms of the GNU General Public License as published by
+** the Free Software Foundation; either version 2 of the License, or
+** (at your option) any later version.
+**
+** This program is distributed in the hope that it will be useful,
+** but WITHOUT ANY WARRANTY; without even the implied warranty of
+** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+** GNU General Public License for more details.
+**
+** You should have received a copy of the GNU General Public License
+** along with this program; if not, write to the Free Software
+** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+**/
+
+
+?>
 <script type="text/x-jquery-tmpl" id="groupPrototypeRow">
 	<tr class="form_row">
 		<td>
-			<input name="group_prototypes[#{i}][name]" type="text" value="#{name}" style="width: <?= ZBX_TEXTAREA_STANDARD_WIDTH ?>px" placeholder="{#MACRO}">
+			<input name="group_prototypes[#{i}][name]" type="text" value="#{name}" style="width: <?= ZBX_TEXTAREA_STANDARD_WIDTH ?>px" placeholder="{#MACRO}" maxlength="255" />
 		</td>
 		<td class="<?= ZBX_STYLE_NOWRAP ?>">
 			<button class="<?= ZBX_STYLE_BTN_LINK ?> group-prototype-remove" type="button" name="remove"><?= _('Remove') ?></button>
@@ -32,7 +54,6 @@
 			jQuery(this).closest('.form_row').remove();
 		});
 
-
 		<?php if (!$hostPrototype['groupPrototypes']): ?>
 			addGroupPrototypeRow({'name': '', 'group_prototypeid': ''});
 		<?php endif ?>
@@ -44,7 +65,8 @@
 		<?php endforeach ?>
 
 		<?php if ($hostPrototype['templateid']): ?>
-			jQuery("#tbl_group_prototypes").find('input, .button').prop("disabled", "disabled");
+			jQuery('#tbl_group_prototypes').find('input').prop('readonly', true);
+			jQuery('#tbl_group_prototypes').find('button').prop('disabled', true);
 		<?php endif ?>
 	});
 </script>

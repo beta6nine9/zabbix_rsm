@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -130,15 +130,15 @@ int	VFS_FS_DISCOVERY(AGENT_REQUEST *request, AGENT_RESULT *result)
 	FILE		*f;
 	struct zbx_json	j;
 
+	ZBX_UNUSED(request);
+
 	if (NULL == (f = fopen("/proc/mounts", "r")))
 	{
 		SET_MSG_RESULT(result, zbx_dsprintf(NULL, "Cannot open /proc/mounts: %s", zbx_strerror(errno)));
 		return SYSINFO_RET_FAIL;
 	}
 
-	zbx_json_init(&j, ZBX_JSON_STAT_BUF_LEN);
-
-	zbx_json_addarray(&j, ZBX_PROTO_TAG_DATA);
+	zbx_json_initarray(&j, ZBX_JSON_STAT_BUF_LEN);
 
 	while (NULL != fgets(line, sizeof(line), f))
 	{

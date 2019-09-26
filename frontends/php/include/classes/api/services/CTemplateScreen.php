@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -21,8 +21,6 @@
 
 /**
  * Class containing methods for operations with template screens.
- *
- * @package API
  */
 class CTemplateScreen extends CScreen {
 
@@ -45,8 +43,6 @@ class CTemplateScreen extends CScreen {
 	 */
 	public function get($options = []) {
 		$result = [];
-		$userType = self::$userData['type'];
-		$userid = self::$userData['userid'];
 
 		$sqlParts = [
 			'select'	=> ['screens' => 's.screenid,s.templateid'],
@@ -62,34 +58,34 @@ class CTemplateScreen extends CScreen {
 			'screenitemids'				=> null,
 			'templateids'				=> null,
 			'hostids'					=> null,
-			'editable'					=> null,
+			'editable'					=> false,
 			'noInheritance'				=> null,
 			'nopermissions'				=> null,
 			// filter
 			'filter'					=> null,
 			'search'					=> null,
 			'searchByAny'				=> null,
-			'startSearch'				=> null,
-			'excludeSearch'				=> null,
+			'startSearch'				=> false,
+			'excludeSearch'				=> false,
 			'searchWildcardsEnabled'	=> null,
 			// output
 			'output'					=> API_OUTPUT_EXTEND,
 			'selectScreenItems'			=> null,
-			'countOutput'				=> null,
-			'groupCount'				=> null,
-			'preservekeys'				=> null,
+			'countOutput'				=> false,
+			'groupCount'				=> false,
+			'preservekeys'				=> false,
 			'sortfield'					=> '',
 			'sortorder'					=> '',
 			'limit'						=> null
 		];
 		$options = zbx_array_merge($defOptions, $options);
 
-		if (!is_null($options['editable']) || (is_null($options['hostids']) && is_null($options['templateids']))) {
+		if ($options['editable'] || (is_null($options['hostids']) && is_null($options['templateids']))) {
 			$options['noInheritance'] = 1;
 		}
 
 		// editable + PERMISSION CHECK
-		if ($userType != USER_TYPE_SUPER_ADMIN && !$options['nopermissions']) {
+		if (self::$userData['type'] != USER_TYPE_SUPER_ADMIN && !$options['nopermissions']) {
 			// TODO: think how we could combine templateids && hostids options
 			if (!is_null($options['templateids'])) {
 				unset($options['hostids']);
@@ -114,8 +110,7 @@ class CTemplateScreen extends CScreen {
 			else {
 				// TODO: get screen
 				$permission = $options['editable'] ? PERM_READ_WRITE : PERM_READ;
-
-				$userGroups = getUserGroupsByUserId($userid);
+				$userGroups = getUserGroupsByUserId(self::$userData['userid']);
 
 				$sqlParts['where'][] = 'EXISTS ('.
 						'SELECT NULL'.
@@ -182,7 +177,7 @@ class CTemplateScreen extends CScreen {
 					createParentToChildRelation($templatesChain, $link, 'templateid', 'hostid');
 				}
 			}
-			if (!is_null($options['groupCount'])) {
+			if ($options['groupCount']) {
 				$sqlParts['group']['templateid'] = 's.templateid';
 			}
 			$sqlParts['where']['templateid'] = dbConditionInt('s.templateid', $linkedTemplateids);
@@ -207,8 +202,8 @@ class CTemplateScreen extends CScreen {
 		$sqlParts = $this->applyQuerySortOptions($this->tableName(), $this->tableAlias(), $options, $sqlParts);
 		$res = DBselect($this->createSelectQueryFromParts($sqlParts), $sqlParts['limit']);
 		while ($screen = DBfetch($res)) {
-			if (!is_null($options['countOutput'])) {
-				if (!is_null($options['groupCount'])) {
+			if ($options['countOutput']) {
+				if ($options['groupCount']) {
 					$result[] = $screen;
 				}
 				else {
@@ -220,7 +215,7 @@ class CTemplateScreen extends CScreen {
 			}
 		}
 
-		if ($options['countOutput'] !== null && $options['groupCount'] === null) {
+		if ($options['countOutput'] && !$options['groupCount']) {
 			return $result;
 		}
 
@@ -336,6 +331,7 @@ class CTemplateScreen extends CScreen {
 				$tplItems = API::Item()->get([
 					'output' => ['itemid', 'key_', 'hostid'],
 					'itemids' => $itemids,
+					'webitems' => true,
 					'nopermissions' => true,
 					'preservekeys' => true
 				]);
@@ -344,6 +340,7 @@ class CTemplateScreen extends CScreen {
 					'output' => ['itemid', 'key_', 'hostid'],
 					'hostids' => $options['hostids'],
 					'filter' => ['key_' => zbx_objectValues($tplItems, 'key_')],
+					'webitems' => true,
 					'nopermissions' => true,
 					'preservekeys' => true
 				]);
@@ -388,8 +385,7 @@ class CTemplateScreen extends CScreen {
 
 		// hashing
 		$options['hostids'] = zbx_toHash($options['hostids']);
-		if (is_null($options['countOutput'])
-				|| (!is_null($options['countOutput']) && !is_null($options['groupCount']))) {
+		if (!$options['countOutput'] || ($options['countOutput'] && $options['groupCount'])) {
 			// creating copies of templated screens (inheritance)
 			// screenNum is needed due to we can't refer to screenid/hostid/templateid as they will repeat
 			$screenNum = 0;
@@ -445,7 +441,7 @@ class CTemplateScreen extends CScreen {
 			$result = array_values($vrtResult);
 		}
 
-		if (!is_null($options['countOutput'])) {
+		if ($options['countOutput']) {
 			return $result;
 		}
 
@@ -454,7 +450,7 @@ class CTemplateScreen extends CScreen {
 		}
 
 		// removing keys (hash -> array)
-		if (is_null($options['preservekeys'])) {
+		if (!$options['preservekeys']) {
 			$result = zbx_cleanHashes($result);
 		}
 		elseif (!is_null($options['noInheritance'])) {
@@ -750,8 +746,13 @@ class CTemplateScreen extends CScreen {
 			}
 		}
 
-		// check permissions on templates
-		if (!API::Template()->isWritable($templateIds)) {
+		$count = API::Template()->get([
+			'countOutput' => true,
+			'templateids' => $templateIds,
+			'editable' => true
+		]);
+
+		if ($count != count($templateIds)) {
 			self::exception(ZBX_API_ERROR_PERMISSIONS, _('No permissions to referred object or it does not exist!'));
 		}
 
@@ -782,7 +783,7 @@ class CTemplateScreen extends CScreen {
 	protected function applyQueryOutputOptions($tableName, $tableAlias, array $options, array $sqlParts) {
 		$sqlParts = parent::applyQueryOutputOptions($tableName, $tableAlias, $options, $sqlParts);
 
-		if ($options['countOutput'] === null) {
+		if (!$options['countOutput']) {
 			// request the templateid field for inheritance to work
 			$sqlParts = $this->addQuerySelect($this->fieldId('templateid'), $sqlParts);
 		}

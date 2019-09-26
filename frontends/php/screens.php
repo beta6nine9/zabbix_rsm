@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -26,8 +26,18 @@ require_once dirname(__FILE__).'/include/blocks.inc.php';
 
 $page['title'] = _('Custom screens');
 $page['file'] = 'screens.php';
-$page['scripts'] = ['class.calendar.js', 'gtlc.js', 'flickerfreescreen.js'];
+$page['scripts'] = [
+	'class.calendar.js',
+	'gtlc.js',
+	'flickerfreescreen.js',
+	'class.svg.canvas.js',
+	'class.svg.map.js',
+	'layout.mode.js'
+];
 $page['type'] = detect_page_type(PAGE_TYPE_HTML);
+
+CView::$has_web_layout_mode = true;
+$page['web_layout_mode'] = CView::getLayoutMode();
 
 define('ZBX_PAGE_DO_JS_REFRESH', 1);
 
@@ -36,56 +46,37 @@ require_once dirname(__FILE__).'/include/page_header.php';
 
 // VAR	TYPE	OPTIONAL	FLAGS	VALIDATION	EXCEPTION
 $fields = [
-	'groupid' =>	[T_ZBX_INT, O_OPT, P_SYS,	DB_ID,		null],
-	'hostid' =>		[T_ZBX_INT, O_OPT, P_SYS,	DB_ID,		null],
-	'tr_groupid' =>	[T_ZBX_INT, O_OPT, P_SYS,	DB_ID,		null],
-	'tr_hostid' =>	[T_ZBX_INT, O_OPT, P_SYS,	DB_ID,		null],
-	'elementid' =>	[T_ZBX_INT, O_OPT, P_SYS|P_NZERO, DB_ID, null],
-	'screenname' =>	[T_ZBX_STR, O_OPT, P_SYS,	null,		null],
-	'step' =>		[T_ZBX_INT, O_OPT, P_SYS,	BETWEEN(0, 65535), null],
-	'period' =>		[T_ZBX_INT, O_OPT, P_SYS,	null,		null],
-	'stime' =>		[T_ZBX_STR, O_OPT, P_SYS,	null,		null],
-	'reset' =>		[T_ZBX_STR, O_OPT, P_SYS,	IN('"reset"'), null],
-	'fullscreen' =>	[T_ZBX_INT, O_OPT, P_SYS,	IN('0,1'), null],
-	// ajax
-	'favobj' =>		[T_ZBX_STR, O_OPT, P_ACT,	null,		null],
-	'favid' =>		[T_ZBX_INT, O_OPT, P_ACT,	null,		null]
+	'groupid' =>	[T_ZBX_INT,			O_OPT, P_SYS,	DB_ID,		null],
+	'hostid' =>		[T_ZBX_INT,			O_OPT, P_SYS,	DB_ID,		null],
+	'tr_groupid' =>	[T_ZBX_INT,			O_OPT, P_SYS,	DB_ID,		null],
+	'tr_hostid' =>	[T_ZBX_INT,			O_OPT, P_SYS,	DB_ID,		null],
+	'elementid' =>	[T_ZBX_INT,			O_OPT, P_SYS|P_NZERO, DB_ID, null],
+	'screenname' =>	[T_ZBX_STR,			O_OPT, P_SYS,	null,		null],
+	'step' =>		[T_ZBX_INT,			O_OPT, P_SYS,	BETWEEN(0, 65535), null],
+	'from' =>		[T_ZBX_RANGE_TIME,	O_OPT, P_SYS,	null,		null],
+	'to' =>			[T_ZBX_RANGE_TIME,	O_OPT, P_SYS,	null,		null],
+	'reset' =>		[T_ZBX_STR,			O_OPT, P_SYS,	IN('"reset"'), null]
 ];
 check_fields($fields);
+validateTimeSelectorPeriod(getRequest('from'), getRequest('to'));
 
 /*
  * Permissions
  */
 // Validate group IDs.
-$validate_groupids = array_filter([
-	getRequest('groupid'),
-	getRequest('tr_groupid')
-]);
-if ($validate_groupids && !API::HostGroup()->isReadable($validate_groupids)) {
+if (getRequest('groupid') && !isReadableHostGroups([getRequest('groupid')])) {
+	access_deny();
+}
+if (getRequest('tr_groupid') && !isReadableHostGroups([getRequest('tr_groupid')])) {
 	access_deny();
 }
 
 // Validate host IDs.
-$validate_hostids = array_filter([
-	getRequest('hostid'),
-	getRequest('tr_hostid')
-]);
-if ($validate_hostids && !API::Host()->isReadable($validate_hostids)) {
+if (getRequest('hostid') && !isReadableHosts([getRequest('hostid')])) {
 	access_deny();
 }
-
-/*
- * Filter
- */
-if (isset($_REQUEST['favobj'])) {
-	if (getRequest('favobj') === 'timeline' && hasRequest('elementid') && hasRequest('period')) {
-		navigation_bar_calc('web.screens', $_REQUEST['elementid'], true);
-	}
-
-	// saving fixed/dynamic setting to profile
-	if ($_REQUEST['favobj'] == 'timelinefixedperiod' && isset($_REQUEST['favid'])) {
-		CProfile::update('web.screens.timelinefixed', $_REQUEST['favid'], PROFILE_TYPE_INT);
-	}
+if (getRequest('tr_hostid') && !isReadableHosts([getRequest('tr_hostid')])) {
+	access_deny();
 }
 
 if ($page['type'] == PAGE_TYPE_JS || $page['type'] == PAGE_TYPE_HTML_BLOCK) {
@@ -96,11 +87,7 @@ if ($page['type'] == PAGE_TYPE_JS || $page['type'] == PAGE_TYPE_HTML_BLOCK) {
 /*
  * Display
  */
-$data = [
-	'fullscreen' => $_REQUEST['fullscreen'],
-	'period' => getRequest('period'),
-	'stime' => getRequest('stime')
-];
+$data = [];
 
 $options = [
 	'output' => ['screenid', 'name']
@@ -139,6 +126,17 @@ else {
 		'screenids' => [$data['screen']['screenid']],
 		'editable' => true
 	]);
+	$data['active_tab'] = CProfile::get('web.screens.filter.active', 1);
+
+	$timeselector_options = [
+		'profileIdx' => 'web.screens.filter',
+		'profileIdx2' => $data['screen']['screenid'],
+		'from' => getRequest('from'),
+		'to' => getRequest('to')
+	];
+	updateTimeSelectorPeriod($timeselector_options);
+
+	$data += $timeselector_options;
 }
 ob_end_flush();
 

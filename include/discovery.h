@@ -1,7 +1,7 @@
 
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -21,10 +21,20 @@
 #ifndef ZABBIX_DISCOVERY_H
 #define ZABBIX_DISCOVERY_H
 
-#include "zbxjson.h"
 #include "comms.h"
 
-void	discovery_update_host(DB_DHOST *dhost, const char *ip, int status, int now);
-void	discovery_update_service(DB_DRULE *drule, DB_DCHECK *dcheck, DB_DHOST *dhost,
+typedef struct
+{
+	zbx_uint64_t	dcheckid;
+	unsigned short	port;
+	char		dns[INTERFACE_DNS_LEN_MAX];
+	char		value[MAX_DISCOVERED_VALUE_SIZE];
+	int		status;
+	time_t		itemtime;
+}
+zbx_service_t;
+
+void	discovery_update_host(DB_DHOST *dhost, int status, int now);
+void	discovery_update_service(const DB_DRULE *drule, zbx_uint64_t dcheckid, DB_DHOST *dhost,
 		const char *ip, const char *dns, int port, int status, const char *value, int now);
 #endif

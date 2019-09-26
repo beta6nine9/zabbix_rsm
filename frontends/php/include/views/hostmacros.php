@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -30,7 +30,9 @@ if ($data['readonly'] && !$data['macros']) {
 	$table = _('No macros found.');
 }
 else {
-	$table = (new CTable())->setId('tbl_macros');
+	$table = (new CTable())
+		->setId('tbl_macros')
+		->addClass(ZBX_STYLE_TEXTAREA_FLEXIBLE_CONTAINER);
 
 	$actions_col = $data['readonly'] ? null : '';
 	if ($data['show_inherited_macros']) {
@@ -52,12 +54,13 @@ else {
 
 	// fields
 	foreach ($data['macros'] as $i => $macro) {
-		$macro_input = (new CTextBox('macros['.$i.'][macro]', $macro['macro'], false, 255))
+		$macro_input = (new CTextAreaFlexible('macros['.$i.'][macro]', $macro['macro'], [
+			'readonly' => (
+				$data['readonly'] || ($data['show_inherited_macros'] && ($macro['type'] & ZBX_PROPERTY_INHERITED))
+			)
+		]))
 			->addClass('macro')
 			->setWidth(ZBX_TEXTAREA_MACRO_WIDTH)
-			->setReadOnly(
-				$data['readonly'] || ($data['show_inherited_macros'] && ($macro['type'] & MACRO_TYPE_INHERITED))
-			)
 			->setAttribute('placeholder', '{$MACRO}');
 
 		$macro_cell = [$macro_input];
@@ -66,7 +69,7 @@ else {
 				$macro_cell[] = new CVar('macros['.$i.'][hostmacroid]', $macro['hostmacroid']);
 			}
 
-			if ($data['show_inherited_macros'] && ($macro['type'] & MACRO_TYPE_INHERITED)) {
+			if ($data['show_inherited_macros'] && ($macro['type'] & ZBX_PROPERTY_INHERITED)) {
 				$macro_cell[] = new CVar('macros['.$i.'][inherited][value]',
 					array_key_exists('template', $macro) ? $macro['template']['value'] : $macro['global']['value']
 				);
@@ -77,27 +80,32 @@ else {
 			$macro_cell[] = new CVar('macros['.$i.'][type]', $macro['type']);
 		}
 
-		$value_input = (new CTextBox('macros['.$i.'][value]', $macro['value'], false, 65535))
-			->setWidth(ZBX_TEXTAREA_MACRO_VALUE_WIDTH)
-			->setReadOnly(
-				$data['readonly'] || ($data['show_inherited_macros'] && !($macro['type'] & MACRO_TYPE_HOSTMACRO))
+		$value_input = (new CTextAreaFlexible('macros['.$i.'][value]', $macro['value'], [
+			'readonly' => (
+				$data['readonly'] || ($data['show_inherited_macros'] && !($macro['type'] & ZBX_PROPERTY_OWN))
 			)
+		]))
+			->setWidth(ZBX_TEXTAREA_MACRO_VALUE_WIDTH)
 			->setAttribute('placeholder', _('value'));
 
-		$row = [$macro_cell, '&rArr;', $value_input];
+		$row = [
+			(new CCol($macro_cell))->addClass(ZBX_STYLE_TEXTAREA_FLEXIBLE_PARENT),
+			'&rArr;',
+			(new CCol($value_input))->addClass(ZBX_STYLE_TEXTAREA_FLEXIBLE_PARENT)
+		];
 
 		if (!$data['readonly']) {
 			if ($data['show_inherited_macros']) {
-				if (($macro['type'] & MACRO_TYPE_BOTH) == MACRO_TYPE_BOTH) {
+				if (($macro['type'] & ZBX_PROPERTY_BOTH) == ZBX_PROPERTY_BOTH) {
 					$row[] = (new CCol(
 						(new CButton('macros['.$i.'][change]', _('Remove')))
 							->addClass(ZBX_STYLE_BTN_LINK)
 							->addClass('element-table-change')
 					))->addClass(ZBX_STYLE_NOWRAP);
 				}
-				elseif ($macro['type'] & MACRO_TYPE_INHERITED) {
+				elseif ($macro['type'] & ZBX_PROPERTY_INHERITED) {
 					$row[] = (new CCol(
-						(new CButton('macros['.$i.'][change]', _('Change')))
+						(new CButton('macros['.$i.'][change]', _x('Change', 'verb')))
 							->addClass(ZBX_STYLE_BTN_LINK)
 							->addClass('element-table-change')
 					))->addClass(ZBX_STYLE_NOWRAP);

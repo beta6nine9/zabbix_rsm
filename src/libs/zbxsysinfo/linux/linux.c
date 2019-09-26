@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -21,7 +21,7 @@
 #include "sysinfo.h"
 #include "proc.h"
 
-ZBX_METRIC	parameters_specific[] =
+ZBX_METRIC parameters_specific[] =
 /*	KEY			FLAG		FUNCTION		TEST PARAMETERS */
 {
 	{"kernel.maxfiles",	0,		KERNEL_MAXFILES,	NULL},
@@ -33,6 +33,7 @@ ZBX_METRIC	parameters_specific[] =
 
 	{"vfs.dev.read",	CF_HAVEPARAMS,	VFS_DEV_READ,		"sda,operations"},
 	{"vfs.dev.write",	CF_HAVEPARAMS,	VFS_DEV_WRITE,		"sda,operations"},
+	{"vfs.dev.discovery",	0,		VFS_DEV_DISCOVERY,	NULL},
 
 	{"net.tcp.listen",	CF_HAVEPARAMS,	NET_TCP_LISTEN,		"80"},
 	{"net.udp.listen",	CF_HAVEPARAMS,	NET_UDP_LISTEN,		"68"},

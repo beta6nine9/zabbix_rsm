@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -29,20 +29,24 @@ typedef long	ssize_t;
 #endif
 
 #ifdef _WINDOWS
-#	define ZBX_TCP_WRITE(s, b, bl)	((ssize_t)send((s), (b), (bl), 0))
-#	define ZBX_TCP_READ(s, b, bl)	((ssize_t)recv((s), (b), (bl), 0))
-#	define zbx_socket_close(s)	if (ZBX_SOCKET_ERROR != (s)) closesocket(s)
-#	define zbx_socket_last_error()	WSAGetLastError()
+#	define ZBX_TCP_WRITE(s, b, bl)		((ssize_t)send((s), (b), (int)(bl), 0))
+#	define ZBX_TCP_READ(s, b, bl)		((ssize_t)recv((s), (b), (int)(bl), 0))
+#	define zbx_socket_close(s)		if (ZBX_SOCKET_ERROR != (s)) closesocket(s)
+#	define zbx_socket_last_error()		WSAGetLastError()
+#	define zbx_bind(s, a, l)		(bind((s), (a), (int)(l)))
+#	define zbx_sendto(fd, b, n, f, a, l)	(sendto((fd), (b), (int)(n), (f), (a), (l)))
 
-#	define ZBX_PROTO_AGAIN		WSAEINTR
-#	define ZBX_PROTO_ERROR		SOCKET_ERROR
-#	define ZBX_SOCKET_ERROR		INVALID_SOCKET
-#	define ZBX_SOCKET_TO_INT(s)	((int)(s))
+#	define ZBX_PROTO_AGAIN			WSAEINTR
+#	define ZBX_PROTO_ERROR			SOCKET_ERROR
+#	define ZBX_SOCKET_ERROR			INVALID_SOCKET
+#	define ZBX_SOCKET_TO_INT(s)		((int)(s))
 #else
-#	define ZBX_TCP_WRITE(s, b, bl)	((ssize_t)write((s), (b), (bl)))
-#	define ZBX_TCP_READ(s, b, bl)	((ssize_t)read((s), (b), (bl)))
-#	define zbx_socket_close(s)	if (ZBX_SOCKET_ERROR != (s)) close(s)
-#	define zbx_socket_last_error()	errno
+#	define ZBX_TCP_WRITE(s, b, bl)		((ssize_t)write((s), (b), (bl)))
+#	define ZBX_TCP_READ(s, b, bl)		((ssize_t)read((s), (b), (bl)))
+#	define zbx_socket_close(s)		if (ZBX_SOCKET_ERROR != (s)) close(s)
+#	define zbx_socket_last_error()		errno
+#	define zbx_bind(s, a, l)		(bind((s), (a), (l)))
+#	define zbx_sendto(fd, b, n, f, a, l)	(sendto((fd), (b), (n), (f), (a), (l)))
 
 #	define ZBX_PROTO_AGAIN		EINTR
 #	define ZBX_PROTO_ERROR		-1
@@ -56,6 +60,12 @@ typedef SOCKET	ZBX_SOCKET;
 typedef int	ZBX_SOCKET;
 #endif
 
+#if defined(HAVE_IPV6)
+#	define ZBX_SOCKADDR struct sockaddr_storage
+#else
+#	define ZBX_SOCKADDR struct sockaddr_in
+#endif
+
 typedef enum
 {
 	ZBX_BUF_TYPE_STAT = 0,
@@ -65,7 +75,6 @@ zbx_buf_type_t;
 
 #define ZBX_SOCKET_COUNT	256
 #define ZBX_STAT_BUF_LEN	2048
-#define ZBX_SOCKET_PEER_BUF_LEN	129
 
 #if defined(HAVE_POLARSSL) || defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
 typedef struct zbx_tls_context	zbx_tls_context_t;
@@ -90,9 +99,11 @@ typedef struct
 	int				num_socks;
 	ZBX_SOCKET			sockets[ZBX_SOCKET_COUNT];
 	char				buf_stat[ZBX_STAT_BUF_LEN];
-	/* Peer hostname or IP address for diagnostics (after TCP connection is established). */
+	ZBX_SOCKADDR			peer_info;		/* getpeername() result */
+	/* Peer host DNS name or IP address for diagnostics (after TCP connection is established). */
 	/* TLS connection may be shut down at any time and it will not be possible to get peer IP address anymore. */
-	char				peer[ZBX_SOCKET_PEER_BUF_LEN];
+	char				peer[MAX_ZBX_DNSNAME_LEN + 1];
+	int				protocol;
 }
 zbx_socket_t;
 
@@ -100,12 +111,14 @@ const char	*zbx_socket_strerror(void);
 
 #ifndef _WINDOWS
 void	zbx_gethost_by_ip(const char *ip, char *host, size_t hostlen);
+void	zbx_getip_by_host(const char *host, char *ip, size_t iplen);
 #endif
 
 int	zbx_tcp_connect(zbx_socket_t *s, const char *source_ip, const char *ip, unsigned short port, int timeout,
-		unsigned int tls_connect, char *tls_arg1, char *tls_arg2);
+		unsigned int tls_connect, const char *tls_arg1, const char *tls_arg2);
 
-#define ZBX_TCP_PROTOCOL	0x01
+#define ZBX_TCP_PROTOCOL		0x01
+#define ZBX_TCP_COMPRESS		0x02
 
 #define ZBX_TCP_SEC_UNENCRYPTED		1		/* do not use encryption with this socket */
 #define ZBX_TCP_SEC_TLS_PSK		2		/* use TLS with pre-shared key (PSK) with this socket */
@@ -136,13 +149,16 @@ void	zbx_tcp_unaccept(zbx_socket_t *s);
 
 #define ZBX_TCP_READ_UNTIL_CLOSE 0x01
 
-#define	zbx_tcp_recv(s) 		SUCCEED_OR_FAIL(zbx_tcp_recv_ext(s, 0, 0))
-#define	zbx_tcp_recv_to(s, timeout) 	SUCCEED_OR_FAIL(zbx_tcp_recv_ext(s, 0, timeout))
+#define	zbx_tcp_recv(s)			SUCCEED_OR_FAIL(zbx_tcp_recv_ext(s, 0))
+#define	zbx_tcp_recv_to(s, timeout)	SUCCEED_OR_FAIL(zbx_tcp_recv_ext(s, timeout))
+#define	zbx_tcp_recv_raw(s)		SUCCEED_OR_FAIL(zbx_tcp_recv_raw_ext(s, 0))
 
-ssize_t		zbx_tcp_recv_ext(zbx_socket_t *s, unsigned char flags, int timeout);
+ssize_t		zbx_tcp_recv_ext(zbx_socket_t *s, int timeout);
+ssize_t		zbx_tcp_recv_raw_ext(zbx_socket_t *s, int timeout);
 const char	*zbx_tcp_recv_line(zbx_socket_t *s);
 
-int	zbx_tcp_check_security(zbx_socket_t *s, const char *ip_list, int allow_if_empty);
+int	zbx_validate_peer_list(const char *peer_list, char **error);
+int	zbx_tcp_check_allowed_peers(const zbx_socket_t *s, const char *peer_list);
 
 int	zbx_udp_connect(zbx_socket_t *s, const char *source_ip, const char *ip, unsigned short port, int timeout);
 int	zbx_udp_send(zbx_socket_t *s, const char *data, size_t data_len, int timeout);
@@ -168,13 +184,14 @@ void	zbx_udp_close(zbx_socket_t *s);
 #define ZBX_DEFAULT_AGENT_PORT_STR	"10050"
 #define ZBX_DEFAULT_SERVER_PORT_STR	"10051"
 
-int	zbx_send_response_ext(zbx_socket_t *sock, int result, const char *info, int protocol, int timeout);
+int	zbx_send_response_ext(zbx_socket_t *sock, int result, const char *info, const char *version, int protocol,
+		int timeout);
 
 #define zbx_send_response(sock, result, info, timeout) \
-		zbx_send_response_ext(sock, result, info, ZBX_TCP_PROTOCOL, timeout)
+		zbx_send_response_ext(sock, result, info, NULL, ZBX_TCP_PROTOCOL, timeout)
 
-#define zbx_send_response_raw(sock, result, info, timeout) \
-		zbx_send_response_ext(sock, result, info, 0, timeout)
+#define zbx_send_proxy_response(sock, result, info, timeout) \
+		zbx_send_response_ext(sock, result, info, ZABBIX_VERSION, ZBX_TCP_PROTOCOL | ZBX_TCP_COMPRESS, timeout)
 
 int	zbx_recv_response(zbx_socket_t *sock, int timeout, char **error);
 
@@ -184,6 +201,10 @@ int	zbx_recv_response(zbx_socket_t *sock, int timeout, char **error);
 					sizeof(struct sockaddr_in) :		\
 					sizeof(struct sockaddr_in6),		\
 					host, hostlen, serv, servlen, flags)
+#endif
+
+#ifdef _WINDOWS
+int	zbx_socket_start(char **error);
 #endif
 
 #endif

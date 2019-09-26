@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -18,9 +18,9 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-require_once dirname(__FILE__).'/../include/class.cwebtest.php';
+require_once dirname(__FILE__).'/../include/CLegacyWebTest.php';
 
-class testFormLogin extends CWebTest {
+class testFormLogin extends CLegacyWebTest {
 
 	public static function data() {
 		return [
@@ -100,29 +100,29 @@ class testFormLogin extends CWebTest {
 		}
 
 		if ($data['success_expected']) {
-		$this->zbxTestTextNotPresent('Login name or password is incorrect.');
-		$this->zbxTestCheckHeader('Dashboard');
-		$this->zbxTestTextNotPresent('Password');
-		$this->zbxTestTextNotPresent('Username');
+			$this->zbxTestTextNotPresent('Login name or password is incorrect.');
+			$this->zbxTestCheckHeader('Global view');
+			$this->zbxTestTextNotPresent('Password');
+			$this->zbxTestTextNotPresent('Username');
 
-		$this->zbxTestClickXpathWait("//ul[@class='top-nav-icons']//a[@class='top-nav-signout']");
-		$this->zbxTestTextPresent('Username');
-		$this->zbxTestTextPresent('Password');
-		$this->zbxTestTextNotPresent('Dashboard');
-	}
+			$this->zbxTestClickXpathWait("//ul[@class='top-nav-icons']//a[@class='top-nav-signout']");
+			$this->zbxTestTextPresent('Username');
+			$this->zbxTestTextPresent('Password');
+			$this->zbxTestTextNotPresent('Dashboard');
+		}
 		elseif ($data['dbCheck']) {
 			$this->zbxTestAssertElementText("//form//div[@class='red']", 'Login name or password is incorrect.');
 			$this->zbxTestTextPresent(['Username', 'Password']);
-			$this->assertEquals(1, DBcount("SELECT * FROM users WHERE attempt_failed>0 AND alias='".$data['login']."'"));
-			$this->assertEquals(1, DBcount("SELECT * FROM users WHERE attempt_clock>0 AND alias='".$data['login']."'"));
-			$this->assertEquals(1, DBcount("SELECT * FROM users WHERE attempt_ip<>'' AND alias='".$data['login']."'"));
-	}
+			$this->assertEquals(1, CDBHelper::getCount("SELECT * FROM users WHERE attempt_failed>0 AND alias='".$data['login']."'"));
+			$this->assertEquals(1, CDBHelper::getCount("SELECT * FROM users WHERE attempt_clock>0 AND alias='".$data['login']."'"));
+			$this->assertEquals(1, CDBHelper::getCount("SELECT * FROM users WHERE attempt_ip<>'' AND alias='".$data['login']."'"));
 		}
+	}
 
 	public function testFormLogin_BlockAccountAndRecoverAfter30Seconds() {
 		$this->zbxTestOpen('index.php');
 
-		for ($i = 1; $i <= 5; $i++) {
+		for ($i = 1; $i < 5; $i++) {
 			$this->zbxTestInputTypeWait('name', 'user-for-blocking');
 			$this->zbxTestInputTypeWait('password', '!@$#%$&^*(\"\'\\*;:');
 			$this->zbxTestClickWait('enter');
@@ -131,11 +131,11 @@ class testFormLogin extends CWebTest {
 			$this->zbxTestTextPresent('Password');
 
 			$sql = 'SELECT * FROM users WHERE alias=\'user-for-blocking\' AND attempt_failed='.$i.'';
-			$this->assertEquals(1, DBcount($sql));
+			$this->assertEquals(1, CDBHelper::getCount($sql));
 			$sql = 'SELECT * FROM users WHERE alias=\'user-for-blocking\' AND attempt_clock>0';
-			$this->assertEquals(1, DBcount($sql));
+			$this->assertEquals(1, CDBHelper::getCount($sql));
 			$sql = "SELECT * FROM users WHERE alias='user-for-blocking' AND attempt_ip<>''";
-			$this->assertEquals(1, DBcount($sql));
+			$this->assertEquals(1, CDBHelper::getCount($sql));
 		}
 
 		$this->zbxTestInputType('name', 'user-for-blocking');
@@ -148,9 +148,44 @@ class testFormLogin extends CWebTest {
 		$this->zbxTestInputTypeWait('name', 'user-for-blocking');
 		$this->zbxTestInputTypeWait('password', 'zabbix');
 		$this->zbxTestClickWait('enter');
-		$this->zbxTestCheckHeader('Dashboard');
+		$this->zbxTestCheckHeader('Global view');
 		$this->zbxTestWaitUntilMessageTextPresent('msg-bad', '5 failed login attempts logged.');
 		$this->zbxTestTextNotPresent('Password');
 		$this->zbxTestTextNotPresent('Username');
 	}
+
+	public static function login_with_request() {
+		return [
+			[
+				[
+					'url' => 'index.php?request=hosts.php',
+					'login' => 'Admin',
+					'password' => 'zabbix',
+					'header' => 'Hosts'
+				]
+			],
+			[
+				[
+					'url' => 'index.php?request=zabbix.php%3Faction%3Dproxy.list',
+					'login' => 'Admin',
+					'password' => 'zabbix',
+					'header' => 'Proxies'
+				]
+			]
+		];
+	}
+
+	/**
+	 * @dataProvider login_with_request
+	 */
+	public function testFormLogin_LoginWithRequest($data) {
+		$this->zbxTestOpen($data['url']);
+		$this->zbxTestInputTypeOverwrite('name', $data['login']);
+		$this->zbxTestInputTypeOverwrite('password', $data['password']);
+		$this->zbxTestClickWait('enter');
+
+		// Test page title.
+		$this->zbxTestCheckHeader($data['header']);
+	}
+
 }

@@ -2,7 +2,9 @@
 	<?= (new CRow([
 			(new CComboBox('expressions[#{rowNum}][expression_type]', null, null, expression_type2str()))
 				->onChange('onChangeExpressionType(this, #{rowNum})'),
-			(new CTextBox('expressions[#{rowNum}][expression]', '', false, 255))->setWidth(ZBX_TEXTAREA_MEDIUM_WIDTH),
+			(new CTextBox('expressions[#{rowNum}][expression]', '', false, 255))
+				->setWidth(ZBX_TEXTAREA_MEDIUM_WIDTH)
+				->setAriaRequired(),
 			(new CComboBox('expressions[#{rowNum}][exp_delimiter]', null, null, expressionDelimiters()))
 				->addStyle('display: none;'),
 			new CCheckBox('expressions[#{rowNum}][case_sensitive]'),
@@ -71,8 +73,7 @@
 			 * @param {String} string Test string to test expression against
 			 */
 			testExpressions: function(string) {
-				var url = new Curl(),
-					ajaxData = {
+				var ajaxData = {
 						testString: string,
 						expressions: {}
 					};
@@ -90,8 +91,12 @@
 					}
 				});
 
+				var url = new Curl('adm.regexps.php');
+				url.setArgument('output', 'ajax');
+				url.setArgument('ajaxaction', 'test');
+
 				$.post(
-					'adm.regexps.php?output=ajax&ajaxaction=test&sid=' + url.getArgument('sid'),
+					url.getUrl(),
 					{ajaxdata: ajaxData},
 					$.proxy(this.showTestResults, this),
 					'json'

@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -38,7 +38,7 @@ catch (Exception $e) {
 
 // VAR	TYPE	OPTIONAL	FLAGS	VALIDATION	EXCEPTION
 $fields = [
-	'type' =>				[T_ZBX_STR, O_OPT, null,	IN('"'.ZBX_DB_MYSQL.'","'.ZBX_DB_POSTGRESQL.'","'.ZBX_DB_ORACLE.'","'.ZBX_DB_DB2.'","'.ZBX_DB_SQLITE3.'"'), null],
+	'type' =>				[T_ZBX_STR, O_OPT, null,	IN('"'.ZBX_DB_MYSQL.'","'.ZBX_DB_POSTGRESQL.'","'.ZBX_DB_ORACLE.'","'.ZBX_DB_DB2.'"'), null],
 	'server' =>				[T_ZBX_STR, O_OPT, null,	null,				null],
 	'port' =>				[T_ZBX_INT, O_OPT, null,	BETWEEN(0, 65535),	null, _('Database port')],
 	'database' =>			[T_ZBX_STR, O_OPT, null,	NOT_EMPTY,			null, _('Database name')],
@@ -99,9 +99,13 @@ if (!CWebUser::$data) {
 
 // page title
 (new CPageHeader(_('Installation')))
-	->addCssFile('styles/'.CHtml::encode($theme).'.css')
-	->addJsFile('js/browsers.js')
-	->addJsFile('jsLoader.php?ver='.ZABBIX_VERSION.'&amp;lang='.CWebUser::$data['lang'])
+	->addCssFile('assets/styles/'.CHtml::encode($theme).'.css')
+	->addJsFile((new CUrl('js/browsers.js'))->getUrl())
+	->addJsFile((new CUrl('jsLoader.php'))
+		->setArgument('ver', ZABBIX_VERSION)
+		->setArgument('lang', CWebUser::$data['lang'])
+		->getUrl()
+	)
 	->display();
 
 /*
@@ -113,7 +117,8 @@ $link = (new CLink('GPL v2', 'http://www.zabbix.com/license.php'))
 	->addClass(ZBX_STYLE_LINK_ALT);
 $sub_footer = (new CDiv(['Licensed under ', $link]))->addClass(ZBX_STYLE_SIGNIN_LINKS);
 
-(new CTag('body', true, [(new CDiv([$ZBX_SETUP_WIZARD, $sub_footer]))->addClass(ZBX_STYLE_ARTICLE), makePageFooter()]))
+(new CTag('body', true, [(new CTag('main', true, [$ZBX_SETUP_WIZARD, $sub_footer])), makePageFooter()]))
+	->setAttribute('lang', CWebUser::getLang())
 	->show();
 ?>
 </html>

@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -18,13 +18,13 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-require_once dirname(__FILE__).'/../include/class.cwebtest.php';
+require_once dirname(__FILE__).'/../include/CLegacyWebTest.php';
 
-class testPageItemPrototypes extends CWebTest {
+class testPageItemPrototypes extends CLegacyWebTest {
 
 	// Returns all item protos
 	public static function data() {
-		return DBdata(
+		return CDBHelper::getDataProvider(
 			'SELECT h.status,i.name,i.itemid,d.parent_itemid,h.hostid,di.name AS d_name'.
 			' FROM items i,item_discovery d,items di,hosts h'.
 			' WHERE i.itemid=d.itemid'.
@@ -55,24 +55,18 @@ class testPageItemPrototypes extends CWebTest {
 		}
 
 		$this->zbxTestTextPresent(
-			['Name', 'Key', 'Interval', 'History', 'Trends', 'Type', 'Applications', 'Status']
+			['Name', 'Key', 'Interval', 'History', 'Trends', 'Type', 'Applications', 'Create enabled']
 		);
 		$this->zbxTestTextNotPresent('Info');
 		// TODO someday should check that interval is not shown for trapper items, trends not shown for non-numeric items etc
 
-		$this->zbxTestTextPresent(['Enable', 'Disable', 'Delete']);
+		$this->zbxTestTextPresent(['Create disabled', 'Delete']);
 	}
 
 	/**
-	 * Backup the tables that will be modified during the tests.
+	 * @dataProvider data
+	 * @backup-once triggers
 	 */
-	public function testPageItemPrototypes_Setup() {
-		DBsave_tables('triggers');
-	}
-
-	/**
-	* @dataProvider data
-	*/
 	public function testPageItemPrototypes_SimpleDelete($data) {
 		$itemid = $data['itemid'];
 		$drule = $data['d_name'];
@@ -82,33 +76,19 @@ class testPageItemPrototypes extends CWebTest {
 		$this->zbxTestCheckboxSelect('group_itemid_'.$itemid);
 		$this->zbxTestClickButton('itemprototype.massdelete');
 
-		$this->webDriver->switchTo()->alert()->accept();
+		$this->zbxTestAcceptAlert();
 
 		$this->zbxTestCheckTitle('Configuration of item prototypes');
 		$this->zbxTestCheckHeader('Item prototypes');
 		$this->zbxTestTextPresent('Item prototypes deleted');
 
 		$sql = 'SELECT null FROM items WHERE itemid='.$itemid;
-		$this->assertEquals(0, DBcount($sql));
-	}
-
-	/**
-	 * Restore the original tables.
-	 */
-	public function testPageItemPrototypes_Teardown() {
-		DBrestore_tables('triggers');
-	}
-
-	/**
-	 * Backup the tables that will be modified during the tests.
-	 */
-	public function testPageItemPrototypes_SetupMass() {
-		DBsave_tables('triggers');
+		$this->assertEquals(0, CDBHelper::getCount($sql));
 	}
 
 	// Returns all discovery rules
 	public static function rule() {
-		return DBdata(
+		return CDBHelper::getDataProvider(
 			'SELECT h.status,i.name,i.itemid,d.parent_itemid,h.hostid,di.name AS d_name'.
 			' FROM items i,item_discovery d,items di,hosts h'.
 			' WHERE i.itemid=d.itemid'.
@@ -119,37 +99,30 @@ class testPageItemPrototypes extends CWebTest {
 	}
 
 	/**
-	* @dataProvider rule
-	*/
+	 * @dataProvider rule
+	 * @backup-once triggers
+	 */
 	public function testPageItemPrototypes_MassDelete($rule) {
 		$itemid = $rule['itemid'];
 		$druleid = $rule['parent_itemid'];
 		$drule = $rule['d_name'];
 		$hostid = $rule['hostid'];
 
-		$itemids = DBdata('select itemid from item_discovery where parent_itemid='.$druleid);
+		$itemids = CDBHelper::getAll('select itemid from item_discovery where parent_itemid='.$druleid);
 		$itemids = zbx_objectValues($itemids, 'itemid');
-
 
 		$this->zbxTestLogin('disc_prototypes.php?hostid='.$hostid.'&parent_discoveryid='.$druleid);
 		$this->zbxTestCheckTitle('Configuration of item prototypes');
 		$this->zbxTestCheckboxSelect('all_items');
 		$this->zbxTestClickButton('itemprototype.massdelete');
 
-		$this->webDriver->switchTo()->alert()->accept();
+		$this->zbxTestAcceptAlert();
 
 		$this->zbxTestCheckTitle('Configuration of item prototypes');
 		$this->zbxTestCheckHeader('Item prototypes');
 		$this->zbxTestTextPresent('Item prototypes deleted');
 
 		$sql = 'SELECT null FROM items WHERE '.dbConditionInt('itemid', $itemids);
-		$this->assertEquals(0, DBcount($sql));
-	}
-
-	/**
-	 * Restore the original tables.
-	 */
-	public function testPageItemPrototypes_TeardownMass() {
-		DBrestore_tables('triggers');
+		$this->assertEquals(0, CDBHelper::getCount($sql));
 	}
 }

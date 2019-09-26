@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -19,7 +19,6 @@
 
 #include "common.h"
 #include "db.h"
-#include "zbxdbupgrade.h"
 #include "dbupgrade.h"
 #include "sysinfo.h"
 #include "log.h"
@@ -128,28 +127,28 @@ static int	DBpatch_2050007(void)
 {
 	const ZBX_FIELD	field = {"error", "", NULL, NULL, 2048, ZBX_TYPE_CHAR, ZBX_NOTNULL, 0};
 
-	return DBmodify_field_type("hosts", &field);
+	return DBmodify_field_type("hosts", &field, NULL);
 }
 
 static int	DBpatch_2050008(void)
 {
 	const ZBX_FIELD	field = {"ipmi_error", "", NULL, NULL, 2048, ZBX_TYPE_CHAR, ZBX_NOTNULL, 0};
 
-	return DBmodify_field_type("hosts", &field);
+	return DBmodify_field_type("hosts", &field, NULL);
 }
 
 static int	DBpatch_2050009(void)
 {
 	const ZBX_FIELD	field = {"snmp_error", "", NULL, NULL, 2048, ZBX_TYPE_CHAR, ZBX_NOTNULL, 0};
 
-	return DBmodify_field_type("hosts", &field);
+	return DBmodify_field_type("hosts", &field, NULL);
 }
 
 static int	DBpatch_2050010(void)
 {
 	const ZBX_FIELD	field = {"jmx_error", "", NULL, NULL, 2048, ZBX_TYPE_CHAR, ZBX_NOTNULL, 0};
 
-	return DBmodify_field_type("hosts", &field);
+	return DBmodify_field_type("hosts", &field, NULL);
 }
 
 static int	DBpatch_2050011(void)
@@ -189,7 +188,8 @@ static int	DBpatch_2050012(void)
 
 		param = get_rparam(&request, 0);
 
-		if (0 != strcmp("service.ntp", param) && 0 != strcmp("ntp", param))
+		/* NULL check to silence static analyzer warning */
+		if (NULL == param || (0 != strcmp("service.ntp", param) && 0 != strcmp("ntp", param)))
 		{
 			free_request(&request);
 			continue;
@@ -251,7 +251,7 @@ static int	DBpatch_2050013(void)
 	return DBdrop_table("user_history");
 }
 
-static int      DBpatch_2050014(void)
+static int	DBpatch_2050014(void)
 {
 	if (ZBX_DB_OK <= DBexecute(
 		"update config"
@@ -266,7 +266,7 @@ static int      DBpatch_2050014(void)
 	return FAIL;
 }
 
-static int      DBpatch_2050015(void)
+static int	DBpatch_2050015(void)
 {
 	if (ZBX_DB_OK <= DBexecute(
 		"update users"
@@ -462,7 +462,7 @@ static int	DBpatch_2050051(void)
 {
 	const ZBX_FIELD	field = {"iprange", "", NULL, NULL, 2048, ZBX_TYPE_CHAR, ZBX_NOTNULL, 0};
 
-	return DBmodify_field_type("drules", &field);
+	return DBmodify_field_type("drules", &field, NULL);
 }
 
 static int	DBpatch_2050052(void)
@@ -637,75 +637,14 @@ static int	DBpatch_2050070(void)
 {
 	const ZBX_FIELD	field = {"macro", "", NULL, NULL, 255, ZBX_TYPE_CHAR, ZBX_NOTNULL, 0};
 
-	return DBmodify_field_type("globalmacro", &field);
+	return DBmodify_field_type("globalmacro", &field, NULL);
 }
 
 static int	DBpatch_2050071(void)
 {
 	const ZBX_FIELD	field = {"macro", "", NULL, NULL, 255, ZBX_TYPE_CHAR, ZBX_NOTNULL, 0};
 
-	return DBmodify_field_type("hostmacro", &field);
-}
-
-static int	DBpatch_2050072(void)
-{
-	return DBdrop_table("graph_theme");
-}
-
-static int	DBpatch_2050073(void)
-{
-	const ZBX_TABLE table =
-		{"graph_theme",	"graphthemeid",	0,
-			{
-				{"graphthemeid", NULL, NULL, NULL, 0, ZBX_TYPE_ID, ZBX_NOTNULL, 0},
-				{"theme", "", NULL, NULL, 64, ZBX_TYPE_CHAR, ZBX_NOTNULL, 0},
-				{"backgroundcolor", "", NULL, NULL, 6, ZBX_TYPE_CHAR, ZBX_NOTNULL, 0},
-				{"graphcolor", "", NULL, NULL, 6, ZBX_TYPE_CHAR, ZBX_NOTNULL, 0},
-				{"gridcolor", "", NULL, NULL, 6, ZBX_TYPE_CHAR, ZBX_NOTNULL, 0},
-				{"maingridcolor", "", NULL, NULL, 6, ZBX_TYPE_CHAR, ZBX_NOTNULL, 0},
-				{"gridbordercolor", "", NULL, NULL, 6, ZBX_TYPE_CHAR, ZBX_NOTNULL, 0},
-				{"textcolor", "", NULL, NULL, 6, ZBX_TYPE_CHAR, ZBX_NOTNULL, 0},
-				{"highlightcolor", "", NULL, NULL, 6, ZBX_TYPE_CHAR, ZBX_NOTNULL, 0},
-				{"leftpercentilecolor", "", NULL, NULL, 6, ZBX_TYPE_CHAR, ZBX_NOTNULL, 0},
-				{"rightpercentilecolor", "", NULL, NULL, 6, ZBX_TYPE_CHAR, ZBX_NOTNULL, 0},
-				{"nonworktimecolor", "", NULL, NULL, 6, ZBX_TYPE_CHAR, ZBX_NOTNULL, 0},
-				{0}
-			},
-			NULL
-		};
-
-	return DBcreate_table(&table);
-}
-
-static int	DBpatch_2050074(void)
-{
-	return DBcreate_index("graph_theme", "graph_theme_1", "theme", 1);
-}
-
-static int	DBpatch_2050075(void)
-{
-	if (ZBX_DB_OK <= DBexecute(
-			"insert into graph_theme"
-			" values (1,'blue-theme','FFFFFF','FFFFFF','CCD5D9','ACBBC2','ACBBC2','1F2C33','E33734',"
-				"'429E47','E33734','EBEBEB')"))
-	{
-		return SUCCEED;
-	}
-
-	return FAIL;
-}
-
-static int	DBpatch_2050076(void)
-{
-	if (ZBX_DB_OK <= DBexecute(
-			"insert into graph_theme"
-			" values (2,'dark-theme','2B2B2B','2B2B2B','454545','4F4F4F','4F4F4F','F2F2F2','E45959',"
-				"'59DB8F','E45959','333333')"))
-	{
-		return SUCCEED;
-	}
-
-	return FAIL;
+	return DBmodify_field_type("hostmacro", &field, NULL);
 }
 
 static int	DBpatch_2050077(void)
@@ -849,7 +788,7 @@ static int	DBpatch_2050092(void)
 	int		len, ret = FAIL, rc;
 	char		*url = NULL, *url_esc;
 	size_t		i, url_alloc = 0, url_offset;
-	char		*url_map[] = {
+	const char	*url_map[] = {
 				"dashboard.php", "dashboard.view",
 				"discovery.php", "discovery.view",
 				"maps.php", "map.view",
@@ -1242,11 +1181,6 @@ DBPATCH_ADD(2050068, 0, 1)
 DBPATCH_ADD(2050069, 0, 1)
 DBPATCH_ADD(2050070, 0, 1)
 DBPATCH_ADD(2050071, 0, 1)
-DBPATCH_ADD(2050072, 0, 1)
-DBPATCH_ADD(2050073, 0, 1)
-DBPATCH_ADD(2050074, 0, 1)
-DBPATCH_ADD(2050075, 0, 1)
-DBPATCH_ADD(2050076, 0, 1)
 DBPATCH_ADD(2050077, 0, 1)
 DBPATCH_ADD(2050078, 0, 1)
 DBPATCH_ADD(2050079, 0, 1)

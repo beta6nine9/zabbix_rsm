@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -32,24 +32,24 @@ class SocketProcessor implements Runnable
 
 	private Socket socket;
 
-	public SocketProcessor(Socket socket)
+	SocketProcessor(Socket socket)
 	{
 		this.socket = socket;
 	}
 
+	@Override
 	public void run()
 	{
 		logger.debug("starting to process incoming connection");
 
 		BinaryProtocolSpeaker speaker = null;
+		ItemChecker checker = null;
 
 		try
 		{
 			speaker = new BinaryProtocolSpeaker(socket);
 
 			JSONObject request = new JSONObject(speaker.getRequest());
-
-			ItemChecker checker;
 
 			if (request.getString(ItemChecker.JSON_TAG_REQUEST).equals(ItemChecker.JSON_REQUEST_INTERNAL))
 				checker = new InternalItemChecker(request);
@@ -69,19 +69,28 @@ class SocketProcessor implements Runnable
 		}
 		catch (Exception e1)
 		{
-			logger.warn("error processing request", e1);
+			String error = ZabbixException.getRootCauseMessage(e1);
+
+			// Display first item key to identify items with incorrect configuration, all items in batch have same configuration.
+			if (null == checker || null == checker.getFirstKey())
+				logger.warn("error processing request: {}", error);
+			else
+				logger.warn("error processing request, item \"{}\" failed: {}", checker.getFirstKey(), error);
+
+			logger.debug("error caused by", e1);
 
 			try
 			{
 				JSONObject response = new JSONObject();
 				response.put(ItemChecker.JSON_TAG_RESPONSE, ItemChecker.JSON_RESPONSE_FAILED);
-				response.put(ItemChecker.JSON_TAG_ERROR, e1.getMessage());
+				response.put(ItemChecker.JSON_TAG_ERROR, error);
 
 				speaker.sendResponse(response.toString());
 			}
 			catch (Exception e2)
 			{
-				logger.warn("error sending failure notification", e2);
+				logger.warn("error sending failure notification: {}", ZabbixException.getRootCauseMessage(e1));
+				logger.debug("error caused by", e2);
 			}
 		}
 		finally

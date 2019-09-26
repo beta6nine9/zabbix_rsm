@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -18,12 +18,14 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-require_once dirname(__FILE__).'/../include/class.cwebtest.php';
+require_once dirname(__FILE__).'/../include/CLegacyWebTest.php';
 
 /**
  * Test the creation of inheritance of new objects on a previously linked template.
+ *
+ * @backup triggers
  */
-class testInheritanceTriggerPrototype extends CWebTest {
+class testInheritanceTriggerPrototype extends CLegacyWebTest {
 
 	private $templateid = 15000;	// 'Inheritance test template'
 	private $template = 'Inheritance test template';
@@ -34,13 +36,9 @@ class testInheritanceTriggerPrototype extends CWebTest {
 	private $discoveryRuleId = 15011;	// 'testInheritanceDiscoveryRule'
 	private $discoveryRule = 'testInheritanceDiscoveryRule';
 
-	public function testInheritanceTriggerPrototype_backup() {
-		DBsave_tables('triggers');
-	}
-
 	// Returns update data
 	public static function update() {
-		return DBdata(
+		return CDBHelper::getDataProvider(
 			'SELECT DISTINCT t.triggerid,id.parent_itemid'.
 			' FROM triggers t,functions f,item_discovery id'.
 			' WHERE t.triggerid=f.triggerid'.
@@ -62,14 +60,14 @@ class testInheritanceTriggerPrototype extends CWebTest {
 	 */
 	public function testInheritanceTriggerPrototype_SimpleUpdate($data) {
 		$sqlTriggers = 'SELECT * FROM triggers ORDER BY triggerid';
-		$oldHashTriggers = DBhash($sqlTriggers);
+		$oldHashTriggers = CDBHelper::getHash($sqlTriggers);
 
 		$this->zbxTestLogin('trigger_prototypes.php?form=update&triggerid='.$data['triggerid'].'&parent_discoveryid='.$data['parent_itemid']);
 		$this->zbxTestClickWait('update');
 		$this->zbxTestCheckTitle('Configuration of trigger prototypes');
 		$this->zbxTestTextPresent('Trigger prototype updated');
 
-		$this->assertEquals($oldHashTriggers, DBhash($sqlTriggers));
+		$this->assertEquals($oldHashTriggers, CDBHelper::getHash($sqlTriggers));
 	}
 
 
@@ -103,7 +101,7 @@ class testInheritanceTriggerPrototype extends CWebTest {
 
 		$this->zbxTestLogin('trigger_prototypes.php?form=Create+trigger+prototype&parent_discoveryid='.$this->discoveryRuleId);
 
-		$this->zbxTestInputType('description', $data['description']);
+		$this->zbxTestInputTypeByXpath("//input[@name='description']", $data['description']);
 		$this->zbxTestInputType('expression', $data['expression']);
 
 		$this->zbxTestClickWait('add');
@@ -122,12 +120,5 @@ class testInheritanceTriggerPrototype extends CWebTest {
 				$this->zbxTestTextPresent($data['errors']);
 				break;
 		}
-	}
-
-	/**
-	 * Restore the original tables.
-	 */
-	public function testInheritanceTriggerPrototype_restore() {
-		DBrestore_tables('triggers');
 	}
 }

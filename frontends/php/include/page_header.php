@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -27,12 +27,13 @@ if (!isset($page['type'])) {
 if (!isset($page['file'])) {
 	$page['file'] = basename($_SERVER['PHP_SELF']);
 }
-$_REQUEST['fullscreen'] = getRequest('fullscreen', 0);
-if ($_REQUEST['fullscreen'] === '1') {
-	if (!defined('ZBX_PAGE_NO_MENU')) {
-		define('ZBX_PAGE_NO_MENU', 1);
-	}
-	define('ZBX_PAGE_FULLSCREEN', 1);
+
+if (!array_key_exists('web_layout_mode', $page)) {
+	$page['web_layout_mode'] = ZBX_LAYOUT_NORMAL;
+}
+
+if (!defined('ZBX_PAGE_NO_MENU') && in_array($page['web_layout_mode'], [ZBX_LAYOUT_FULLSCREEN, ZBX_LAYOUT_KIOSKMODE])) {
+	define('ZBX_PAGE_NO_MENU', true);
 }
 
 require_once dirname(__FILE__).'/menu.inc.php';
@@ -45,38 +46,38 @@ switch ($page['type']) {
 	case PAGE_TYPE_IMAGE:
 		set_image_header();
 		if (!defined('ZBX_PAGE_NO_MENU')) {
-			define('ZBX_PAGE_NO_MENU', 1);
+			define('ZBX_PAGE_NO_MENU', true);
 		}
 		break;
 	case PAGE_TYPE_XML:
 		header('Content-Type: text/xml');
 		header('Content-Disposition: attachment; filename="'.$page['file'].'"');
 		if (!defined('ZBX_PAGE_NO_MENU')) {
-			define('ZBX_PAGE_NO_MENU', 1);
+			define('ZBX_PAGE_NO_MENU', true);
 		}
 		break;
 	case PAGE_TYPE_JS:
 		header('Content-Type: application/javascript; charset=UTF-8');
 		if (!defined('ZBX_PAGE_NO_MENU')) {
-			define('ZBX_PAGE_NO_MENU', 1);
+			define('ZBX_PAGE_NO_MENU', true);
 		}
 		break;
 	case PAGE_TYPE_JSON:
 		header('Content-Type: application/json');
 		if (!defined('ZBX_PAGE_NO_MENU')) {
-			define('ZBX_PAGE_NO_MENU', 1);
+			define('ZBX_PAGE_NO_MENU', true);
 		}
 		break;
 	case PAGE_TYPE_JSON_RPC:
 		header('Content-Type: application/json-rpc');
 		if(!defined('ZBX_PAGE_NO_MENU')) {
-			define('ZBX_PAGE_NO_MENU', 1);
+			define('ZBX_PAGE_NO_MENU', true);
 		}
 		break;
 	case PAGE_TYPE_CSS:
 		header('Content-Type: text/css; charset=UTF-8');
 		if (!defined('ZBX_PAGE_NO_MENU')) {
-			define('ZBX_PAGE_NO_MENU', 1);
+			define('ZBX_PAGE_NO_MENU', true);
 		}
 		break;
 	case PAGE_TYPE_TEXT:
@@ -84,38 +85,51 @@ switch ($page['type']) {
 	case PAGE_TYPE_HTML_BLOCK:
 		header('Content-Type: text/plain; charset=UTF-8');
 		if (!defined('ZBX_PAGE_NO_MENU')) {
-			define('ZBX_PAGE_NO_MENU', 1);
+			define('ZBX_PAGE_NO_MENU', true);
 		}
 		break;
 	case PAGE_TYPE_TEXT_FILE:
 		header('Content-Type: text/plain; charset=UTF-8');
 		header('Content-Disposition: attachment; filename="'.$page['file'].'"');
 		if (!defined('ZBX_PAGE_NO_MENU')) {
-			define('ZBX_PAGE_NO_MENU', 1);
+			define('ZBX_PAGE_NO_MENU', true);
 		}
 		break;
 	case PAGE_TYPE_CSV:
 		header('Content-Type: text/csv; charset=UTF-8');
 		header('Content-Disposition: attachment; filename="'.$page['file'].'"');
 		if (!defined('ZBX_PAGE_NO_MENU')) {
-			define('ZBX_PAGE_NO_MENU', 1);
+			define('ZBX_PAGE_NO_MENU', true);
 		}
 		break;
 	case PAGE_TYPE_HTML:
 	default:
 		header('Content-Type: text/html; charset=UTF-8');
+		header('X-Content-Type-Options: nosniff');
+		header('X-XSS-Protection: 1; mode=block');
 
-		global $ZBX_SERVER_NAME;
+		if (X_FRAME_OPTIONS !== null) {
+			if (strcasecmp(X_FRAME_OPTIONS, 'SAMEORIGIN') == 0 || strcasecmp(X_FRAME_OPTIONS, 'DENY') == 0) {
+				$x_frame_options = X_FRAME_OPTIONS;
+			}
+			else {
+				$x_frame_options = 'SAMEORIGIN';
+				$allowed_urls = explode(',', X_FRAME_OPTIONS);
+				$url_to_check = array_key_exists('HTTP_REFERER', $_SERVER)
+					? parse_url($_SERVER['HTTP_REFERER'], PHP_URL_HOST)
+					: null;
 
-		// page title
-		$pageTitle = '';
-		if (isset($ZBX_SERVER_NAME) && $ZBX_SERVER_NAME !== '') {
-			$pageTitle = $ZBX_SERVER_NAME.NAME_DELIMITER;
-		}
-		$pageTitle .= isset($page['title']) ? $page['title'] : _('Zabbix');
+				if ($url_to_check) {
+					foreach ($allowed_urls as $allowed_url) {
+						if (strcasecmp(trim($allowed_url), $url_to_check) == 0) {
+							$x_frame_options = 'ALLOW-FROM '.$allowed_url;
+							break;
+						}
+					}
+				}
+			}
 
-		if ((defined('ZBX_PAGE_DO_REFRESH') || defined('ZBX_PAGE_DO_JS_REFRESH')) && CWebUser::$data['refresh']) {
-			$pageTitle .= ' ['._s('refreshed every %1$s sec.', CWebUser::$data['refresh']).']';
+			header('X-Frame-Options: '.$x_frame_options);
 		}
 		break;
 }
@@ -132,7 +146,22 @@ if ($denied_page_requested) {
 }
 
 if ($page['type'] == PAGE_TYPE_HTML) {
+	global $ZBX_SERVER_NAME;
+
+	// page title
+	$pageTitle = '';
+	if (isset($ZBX_SERVER_NAME) && $ZBX_SERVER_NAME !== '') {
+		$pageTitle = $ZBX_SERVER_NAME.NAME_DELIMITER;
+	}
+	$pageTitle .= isset($page['title']) ? $page['title'] : _('Zabbix');
+
+	if ((defined('ZBX_PAGE_DO_REFRESH') || defined('ZBX_PAGE_DO_JS_REFRESH')) && CWebUser::getRefresh() != 0) {
+		$pageTitle .= ' ['._s('refreshed every %1$s sec.', CWebUser::getRefresh()).']';
+	}
+
 	$pageHeader = new CPageHeader($pageTitle);
+	$is_standard_page = (!defined('ZBX_PAGE_NO_MENU')
+		|| in_array($page['web_layout_mode'], [ZBX_LAYOUT_FULLSCREEN, ZBX_LAYOUT_KIOSKMODE]));
 
 	$theme = ZBX_DEFAULT_THEME;
 	if (!ZBX_PAGE_NO_THEME) {
@@ -143,38 +172,50 @@ if ($page['type'] == PAGE_TYPE_HTML) {
 			$theme = getUserTheme(CWebUser::$data);
 
 			$pageHeader->addStyle(getTriggerSeverityCss($config));
+			$pageHeader->addStyle(getTriggerStatusCss($config));
 
 			// perform Zabbix server check only for standard pages
-			if ((!defined('ZBX_PAGE_NO_MENU') || defined('ZBX_PAGE_FULLSCREEN')) && $config['server_check_interval']
-					&& !empty($ZBX_SERVER) && !empty($ZBX_SERVER_PORT)) {
+			if ($is_standard_page && $config['server_check_interval'] && !empty($ZBX_SERVER) && !empty($ZBX_SERVER_PORT)) {
 				$page['scripts'][] = 'servercheck.js';
 			}
 		}
 	}
-	$pageHeader->addCssFile('styles/'.CHtml::encode($theme).'.css');
+	$pageHeader->addCssFile('assets/styles/'.CHtml::encode($theme).'.css');
 
 	if ($page['file'] == 'sysmap.php') {
 		$pageHeader->addCssFile('imgstore.php?css=1&output=css');
 	}
-	$pageHeader->addJsFile('js/browsers.js');
-	$pageHeader->addJsBeforeScripts('var PHP_TZ_OFFSET = '.date('Z').';');
 
-	// show GUI messages in pages with menus and in fullscreen mode
-	$showGuiMessaging = (!defined('ZBX_PAGE_NO_MENU') || $_REQUEST['fullscreen'] == 1) ? 1 : 0;
-	$path = 'jsLoader.php?ver='.ZABBIX_VERSION.'&amp;lang='.CWebUser::$data['lang'].'&showGuiMessaging='.$showGuiMessaging;
-	$pageHeader->addJsFile($path);
+	$pageHeader
+		->addJsFile((new CUrl('js/browsers.js'))->getUrl())
+		->addJsBeforeScripts(
+			'var PHP_TZ_OFFSET = '.date('Z').','.
+				'PHP_ZBX_FULL_DATE_TIME = "'.ZBX_FULL_DATE_TIME.'";'
+		);
 
-	if (!empty($page['scripts']) && is_array($page['scripts'])) {
-		foreach ($page['scripts'] as $script) {
-			$path .= '&amp;files[]='.$script;
+	// Show GUI messages in pages with menus and in fullscreen mode.
+	if (CView::$js_loader_disabled !== true) {
+		$pageHeader->addJsFile((new CUrl('jsLoader.php'))
+			->setArgument('ver', ZABBIX_VERSION)
+			->setArgument('lang', CWebUser::$data['lang'])
+			->setArgument('showGuiMessaging', ($is_standard_page && !CWebUser::isGuest()) ? 1 : null)
+			->getUrl()
+		);
+
+		if ($page['scripts']) {
+			$pageHeader->addJsFile((new CUrl('jsLoader.php'))
+				->setArgument('ver', ZABBIX_VERSION)
+				->setArgument('lang', CWebUser::$data['lang'])
+				->setArgument('files', $page['scripts'])
+				->getUrl()
+			);
 		}
-		$pageHeader->addJsFile($path);
 	}
 
 	$pageHeader->display();
 ?>
-<body>
-<div class="<?= ZBX_STYLE_MSG_BAD_GLOBAL ?>" id="msg-bad-global"></div>
+<body lang="<?= CWebUser::getLang() ?>">
+<output class="<?= ZBX_STYLE_MSG_GLOBAL_FOOTER.' '.ZBX_STYLE_MSG_WARNING ?>" id="msg-global-footer"></output>
 <?php
 }
 
@@ -209,18 +250,9 @@ if (CSession::keyExists('messageOk') || CSession::keyExists('messageError')) {
 	CSession::unsetValue(['messageOk', 'messageError']);
 }
 
-if (!defined('ZBX_PAGE_NO_MENU')) {
-	if (!array_key_exists('name', CWebUser::$data)) {
-		redirect('index.php');
-	}
-	$servers = new CComboBox('servers', null, 'window.location.href=this.value');
-	foreach ($DB['SERVERS'] as $server) {
-		$servers->addItem($server['URL'].'rsm.rollingweekstatus.php?sid='.CWebUser::getSessionCookie().'&set_sid=1',
-			$server['NAME'], ($ZBX_SERVER_NAME === $server['NAME']) ? 'no' : null);
-	}
-
+if (!defined('ZBX_PAGE_NO_MENU') && $page['web_layout_mode'] === ZBX_LAYOUT_NORMAL) {
 	$pageMenu = new CView('layout.htmlpage.menu', [
-		'server_name' => $servers,
+		'server_name' => isset($ZBX_SERVER_NAME) ? $ZBX_SERVER_NAME : '',
 		'menu' => [
 			'main_menu' => $main_menu,
 			'sub_menus' => $sub_menus,
@@ -231,27 +263,18 @@ if (!defined('ZBX_PAGE_NO_MENU')) {
 			'alias' => CWebUser::$data['alias'],
 			'name' => CWebUser::$data['name'],
 			'surname' => CWebUser::$data['surname']
-		]
+		],
+		'support_url' => getSupportUrl(CWebUser::getLang())
 	]);
 	echo $pageMenu->getOutput();
 }
 
 if ($page['type'] == PAGE_TYPE_HTML) {
-	echo '<div class="'.ZBX_STYLE_ARTICLE.'">';
+	echo '<main>';
 }
 
 // unset multiple variables
 unset($table, $top_page_row, $menu_table, $main_menu_row, $sub_menu_table, $sub_menu_rows);
-
-if ($page['type'] == PAGE_TYPE_HTML && $showGuiMessaging) {
-	zbx_add_post_js('initMessages({});');
-}
-
-// Show error message if unknown {$RSM.MONITORING.TARGET} is set.
-if (get_rsm_monitoring_type() !== MONITORING_TARGET_REGISTRY
-		&& get_rsm_monitoring_type() !== MONITORING_TARGET_REGISTRAR) {
-	error('Unknown monitoring target.');
-}
 
 // if a user logs in after several unsuccessful attempts, display a warning
 if ($failedAttempts = CProfile::get('web.login.attempt.failed', 0)) {

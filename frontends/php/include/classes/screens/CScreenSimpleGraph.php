@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -31,17 +31,15 @@ class CScreenSimpleGraph extends CScreenBase {
 		$resourceid = !empty($this->screenitem['real_resourceid']) ? $this->screenitem['real_resourceid'] : $this->screenitem['resourceid'];
 		$containerid = 'graph_container_'.$this->screenitem['screenitemid'].'_'.$this->screenitem['screenid'];
 		$graphDims = getGraphDims();
-		$graphDims['graphHeight'] = $this->screenitem['height'];
-		$graphDims['width'] = $this->screenitem['width'];
+		$graphDims['graphHeight'] = (int) $this->screenitem['height'];
+		$graphDims['width'] = (int) $this->screenitem['width'];
 
 		// get time control
 		$timeControlData = [
 			'id' => $this->getDataId(),
 			'containerid' => $containerid,
 			'objDims' => $graphDims,
-			'loadImage' => 1,
-			'periodFixed' => CProfile::get('web.screens.timelinefixed', 1),
-			'sliderMaximumTimePeriod' => ZBX_MAX_PERIOD
+			'loadImage' => 1
 		];
 
 		// host feature
@@ -51,8 +49,14 @@ class CScreenSimpleGraph extends CScreenBase {
 		}
 
 		if ($this->mode == SCREEN_MODE_PREVIEW && !empty($resourceid)) {
-			$this->action = 'history.php?action='.HISTORY_GRAPH.'&itemids[]='.$resourceid.'&period='.$this->timeline['period'].
-					'&stime='.$this->timeline['stimeNow'].$this->getProfileUrlParams();
+			$this->action = (new CUrl('history.php'))
+				->setArgument('action', HISTORY_GRAPH)
+				->setArgument('itemids', [$resourceid])
+				->setArgument('from', $this->timeline['from'])
+				->setArgument('to', $this->timeline['to'])
+				->setArgument('profileIdx', $this->profileIdx)
+				->setArgument('profileIdx2', $this->profileIdx2)
+				->getUrl();
 		}
 
 		if ($resourceid && $this->mode != SCREEN_MODE_EDIT) {
@@ -61,15 +65,32 @@ class CScreenSimpleGraph extends CScreenBase {
 			}
 		}
 
-		$timeControlData['src'] = $resourceid
-			? 'chart.php?itemids[]='.$resourceid.'&'.$this->screenitem['url'].'&width='.$this->screenitem['width'].'&height='.$this->screenitem['height']
-			: 'chart3.php?';
+		if ($resourceid) {
+			$src = (new CUrl('chart.php'))
+				->setArgument('itemids', [$resourceid])
+				->setArgument('width', $this->screenitem['width'])
+				->setArgument('height', $this->screenitem['height']);
+		}
+		else {
+			$src = new CUrl('chart3.php');
+		}
 
-		$timeControlData['src'] .= ($this->mode == SCREEN_MODE_EDIT)
-			? '&period=3600&stime='.date(TIMESTAMP_FORMAT, time())
-			: '&period='.$this->timeline['period'].'&stime='.$this->timeline['stimeNow'];
+		if ($this->mode == SCREEN_MODE_EDIT) {
+			$src
+				->setArgument('from', ZBX_PERIOD_DEFAULT_FROM)
+				->setArgument('to', ZBX_PERIOD_DEFAULT_TO);
+		}
+		else {
+			$src
+				->setArgument('from', $this->timeline['from'])
+				->setArgument('to', $this->timeline['to']);
+		}
 
-		$timeControlData['src'] .= $this->getProfileUrlParams();
+		$src
+			->setArgument('profileIdx', $this->profileIdx)
+			->setArgument('profileIdx2', $this->profileIdx2);
+
+		$timeControlData['src'] = $src->getUrl();
 
 		// output
 		if ($this->mode == SCREEN_MODE_JS) {
@@ -87,8 +108,13 @@ class CScreenSimpleGraph extends CScreenBase {
 				$item = new CDiv();
 			}
 			elseif ($this->mode == SCREEN_MODE_PREVIEW) {
-				$item = new CLink(null, 'history.php?action='.HISTORY_GRAPH.'&itemids[]='.$resourceid.'&period='.$this->timeline['period'].
-						'&stime='.$this->timeline['stimeNow']);
+				$item = new CLink(null, (new CUrl('history.php'))
+					->setArgument('action', HISTORY_GRAPH)
+					->setArgument('itemids', [$resourceid])
+					->setArgument('from', $this->timeline['from'])
+					->setArgument('to', $this->timeline['to'])
+					->getUrl()
+				);
 			}
 			$item->setId($containerid);
 

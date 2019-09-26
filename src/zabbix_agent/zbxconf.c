@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -29,52 +29,6 @@
 #endif
 #include "comms.h"
 
-char	*CONFIG_HOSTS_ALLOWED		= NULL;
-char	*CONFIG_HOSTNAME		= NULL;
-char	*CONFIG_HOSTNAME_ITEM		= NULL;
-char	*CONFIG_HOST_METADATA		= NULL;
-char	*CONFIG_HOST_METADATA_ITEM	= NULL;
-
-int	CONFIG_ENABLE_REMOTE_COMMANDS	= 0;
-int	CONFIG_LOG_REMOTE_COMMANDS	= 0;
-int	CONFIG_UNSAFE_USER_PARAMETERS	= 0;
-int	CONFIG_LISTEN_PORT		= ZBX_DEFAULT_AGENT_PORT;
-int	CONFIG_REFRESH_ACTIVE_CHECKS	= 120;
-char	*CONFIG_LISTEN_IP		= NULL;
-char	*CONFIG_SOURCE_IP		= NULL;
-int	CONFIG_LOG_LEVEL		= LOG_LEVEL_WARNING;
-
-int	CONFIG_BUFFER_SIZE		= 100;
-int	CONFIG_BUFFER_SEND		= 5;
-
-int	CONFIG_MAX_LINES_PER_SECOND	= 20;
-
-char	*CONFIG_LOAD_MODULE_PATH	= NULL;
-
-char	**CONFIG_ALIASES		= NULL;
-char	**CONFIG_LOAD_MODULE		= NULL;
-char	**CONFIG_USER_PARAMETERS	= NULL;
-#if defined(_WINDOWS)
-char	**CONFIG_PERF_COUNTERS		= NULL;
-#endif
-
-char	*CONFIG_USER			= NULL;
-
-/* TLS parameters */
-unsigned int	configured_tls_connect_mode = ZBX_TCP_SEC_UNENCRYPTED;
-unsigned int	configured_tls_accept_modes = ZBX_TCP_SEC_UNENCRYPTED;
-
-char	*CONFIG_TLS_CONNECT		= NULL;
-char	*CONFIG_TLS_ACCEPT		= NULL;
-char	*CONFIG_TLS_CA_FILE		= NULL;
-char	*CONFIG_TLS_CRL_FILE		= NULL;
-char	*CONFIG_TLS_SERVER_CERT_ISSUER	= NULL;
-char	*CONFIG_TLS_SERVER_CERT_SUBJECT	= NULL;
-char	*CONFIG_TLS_CERT_FILE		= NULL;
-char	*CONFIG_TLS_KEY_FILE		= NULL;
-char	*CONFIG_TLS_PSK_IDENTITY	= NULL;
-char	*CONFIG_TLS_PSK_FILE		= NULL;
-
 /******************************************************************************
  *                                                                            *
  * Function: load_aliases                                                     *
@@ -88,25 +42,26 @@ char	*CONFIG_TLS_PSK_FILE		= NULL;
  ******************************************************************************/
 void	load_aliases(char **lines)
 {
-	char	**pline, *r, *c;
+	char	**pline;
 
 	for (pline = lines; NULL != *pline; pline++)
 	{
-		r = *pline;
+		char		*c;
+		const char	*r = *pline;
 
 		if (SUCCEED != parse_key(&r) || ':' != *r)
 		{
-			zabbix_log(LOG_LEVEL_CRIT, "cannot add alias \"%s\": invalid character at position %ld",
-					*pline, (r - *pline) + 1);
+			zabbix_log(LOG_LEVEL_CRIT, "cannot add alias \"%s\": invalid character at position %d",
+					*pline, (int)((r - *pline) + 1));
 			exit(EXIT_FAILURE);
 		}
 
-		c = r++;
+		c = (char *)r++;
 
 		if (SUCCEED != parse_key(&r) || '\0' != *r)
 		{
-			zabbix_log(LOG_LEVEL_CRIT, "cannot add alias \"%s\": invalid character at position %ld",
-					*pline, (r - *pline) + 1);
+			zabbix_log(LOG_LEVEL_CRIT, "cannot add alias \"%s\": invalid character at position %d",
+					*pline, (int)((r - *pline) + 1));
 			exit(EXIT_FAILURE);
 		}
 
@@ -161,7 +116,8 @@ void	load_user_parameters(char **lines)
  *                                                                            *
  * Purpose: load performance counters from configuration                      *
  *                                                                            *
- * Parameters: lines - array of PerfCounter configuration entries             *
+ * Parameters: def_lines - array of PerfCounter configuration entries         *
+ *             eng_lines - array of PerfCounterEn configuration entries       *
  *                                                                            *
  * Return value:                                                              *
  *                                                                            *
@@ -170,77 +126,85 @@ void	load_user_parameters(char **lines)
  * Comments:                                                                  *
  *                                                                            *
  ******************************************************************************/
-void	load_perf_counters(const char **lines)
+void	load_perf_counters(const char **def_lines, const char **eng_lines)
 {
 	char		name[MAX_STRING_LEN], counterpath[PDH_MAX_COUNTER_PATH], interval[8];
-	const char	**pline;
+	const char	**pline, **lines;
 	char		*error = NULL;
 	LPTSTR		wcounterPath;
 	int		period;
 
-	for (pline = lines; NULL != *pline; pline++)
+	for (lines = def_lines;; lines = eng_lines)
 	{
-		if (3 < num_param(*pline))
+		zbx_perf_counter_lang_t lang = (lines == def_lines) ? PERF_COUNTER_LANG_DEFAULT : PERF_COUNTER_LANG_EN;
+
+		for (pline = lines; NULL != *pline; pline++)
 		{
-			error = zbx_strdup(error, "Required parameter missing.");
-			goto pc_fail;
+			if (3 < num_param(*pline))
+			{
+				error = zbx_strdup(error, "Required parameter missing.");
+				goto pc_fail;
+			}
+
+			if (0 != get_param(*pline, 1, name, sizeof(name)))
+			{
+				error = zbx_strdup(error, "Cannot parse key.");
+				goto pc_fail;
+			}
+
+			if (0 != get_param(*pline, 2, counterpath, sizeof(counterpath)))
+			{
+				error = zbx_strdup(error, "Cannot parse counter path.");
+				goto pc_fail;
+			}
+
+			if (0 != get_param(*pline, 3, interval, sizeof(interval)))
+			{
+				error = zbx_strdup(error, "Cannot parse interval.");
+				goto pc_fail;
+			}
+
+			wcounterPath = zbx_acp_to_unicode(counterpath);
+			zbx_unicode_to_utf8_static(wcounterPath, counterpath, PDH_MAX_COUNTER_PATH);
+			zbx_free(wcounterPath);
+
+			if (FAIL == check_counter_path(counterpath, lang == PERF_COUNTER_LANG_DEFAULT))
+			{
+				error = zbx_strdup(error, "Invalid counter path.");
+				goto pc_fail;
+			}
+
+			period = atoi(interval);
+
+			if (1 > period || MAX_COLLECTOR_PERIOD < period)
+			{
+				error = zbx_strdup(NULL, "Interval out of range.");
+				goto pc_fail;
+			}
+
+			if (NULL == add_perf_counter(name, counterpath, period, lang, &error))
+			{
+				if (NULL == error)
+					error = zbx_strdup(error, "Failed to add new performance counter.");
+				goto pc_fail;
+			}
+
+			continue;
+	pc_fail:
+			zabbix_log(LOG_LEVEL_CRIT, "cannot add performance counter \"%s\": %s", *pline, error);
+			zbx_free(error);
+
+			exit(EXIT_FAILURE);
 		}
 
-		if (0 != get_param(*pline, 1, name, sizeof(name)))
-		{
-			error = zbx_strdup(error, "Cannot parse key.");
-			goto pc_fail;
-		}
-
-		if (0 != get_param(*pline, 2, counterpath, sizeof(counterpath)))
-		{
-			error = zbx_strdup(error, "Cannot parse counter path.");
-			goto pc_fail;
-		}
-
-		if (0 != get_param(*pline, 3, interval, sizeof(interval)))
-		{
-			error = zbx_strdup(error, "Cannot parse interval.");
-			goto pc_fail;
-		}
-
-		wcounterPath = zbx_acp_to_unicode(counterpath);
-		zbx_unicode_to_utf8_static(wcounterPath, counterpath, PDH_MAX_COUNTER_PATH);
-		zbx_free(wcounterPath);
-
-		if (FAIL == check_counter_path(counterpath))
-		{
-			error = zbx_strdup(error, "Invalid counter path.");
-			goto pc_fail;
-		}
-
-		period = atoi(interval);
-
-		if (1 > period || MAX_COLLECTOR_PERIOD < period)
-		{
-			error = zbx_strdup(NULL, "Interval out of range.");
-			goto pc_fail;
-		}
-
-		if (NULL == add_perf_counter(name, counterpath, period, &error))
-		{
-			if (NULL == error)
-				error = zbx_strdup(error, "Failed to add new performance counter.");
-			goto pc_fail;
-		}
-
-		continue;
-pc_fail:
-		zabbix_log(LOG_LEVEL_CRIT, "cannot add performance counter \"%s\": %s", *pline, error);
-		zbx_free(error);
-
-		exit(EXIT_FAILURE);
+		if (lines == eng_lines)
+			break;
 	}
 }
 #endif	/* _WINDOWS */
 
 #ifdef _AIX
-void	tl_version()
+void	tl_version(void)
 {
 #ifdef _AIXVERSION_610
 #	define ZBX_AIX_TL	"6100 and above"

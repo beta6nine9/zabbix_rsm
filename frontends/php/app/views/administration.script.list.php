@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -20,14 +20,28 @@
 
 
 if ($data['uncheck']) {
-	uncheckTableRows();
+	uncheckTableRows('script');
 }
 
 $widget = (new CWidget())
 	->setTitle(_('Scripts'))
-	->setControls((new CForm())
-		->cleanItems()
-		->addItem((new CList())->addItem(new CRedirectButton(_('Create script'), 'zabbix.php?action=script.edit')))
+	->setControls((new CTag('nav', true,
+		(new CList())
+			->addItem(new CRedirectButton(_('Create script'), 'zabbix.php?action=script.edit'))
+		))
+			->setAttribute('aria-label', _('Content controls'))
+	)
+	->addItem((new CFilter((new CUrl('zabbix.php'))->setArgument('action', 'script.list')))
+		->setProfile($data['profileIdx'])
+		->setActiveTab($data['active_tab'])
+		->addFilterTab(_('Filter'), [
+			(new CFormList())->addRow(_('Name'),
+				(new CTextBox('filter_name', $data['filter']['name']))
+					->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH)
+					->setAttribute('autofocus', 'autofocus')
+			)
+		])
+		->addVar('action', 'script.list')
 	);
 
 $scriptsForm = (new CForm())
@@ -66,6 +80,9 @@ foreach ($data['scripts'] as $script) {
 			case ZBX_SCRIPT_EXECUTE_ON_SERVER:
 				$scriptExecuteOn = _('Server');
 				break;
+			case ZBX_SCRIPT_EXECUTE_ON_PROXY:
+				$scriptExecuteOn = _('Server (proxy)');
+				break;
 		}
 	}
 	else {
@@ -79,7 +96,9 @@ foreach ($data['scripts'] as $script) {
 		))->addClass(ZBX_STYLE_NOWRAP),
 		$scriptType,
 		$scriptExecuteOn,
-		zbx_nl2br(htmlspecialchars($script['command'], ENT_COMPAT, 'UTF-8')),
+		(new CCol(
+			zbx_nl2br(htmlspecialchars($script['command'], ENT_COMPAT, 'UTF-8'))
+		))->addClass(ZBX_STYLE_MONOSPACE_FONT),
 		($script['userGroupName'] === null) ? _('All') : $script['userGroupName'],
 		($script['hostGroupName'] === null) ? _('All') : $script['hostGroupName'],
 		($script['host_access'] == PERM_READ_WRITE) ? _('Write') : _('Read')
@@ -92,7 +111,7 @@ $scriptsForm->addItem([
 	$data['paging'],
 	new CActionButtonList('action', 'scriptids', [
 		'script.delete' => ['name' => _('Delete'), 'confirm' => _('Delete selected scripts?')]
-	])
+	], 'script')
 ]);
 
 // append form to widget

@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -118,6 +118,27 @@ class CValidationRuleTest extends PHPUnit_Framework_TestCase {
 					'json' => true
 				]
 			],
+			['array', '',
+				[
+					'array' => true
+				]
+			],
+			['ge -5', '',
+				[
+					'ge' => '-5'
+				]
+			],
+			['ge -5|le 10', '',
+				[
+					'ge' => '-5',
+					'le' => '10'
+				]
+			],
+			['range_time', '',
+				[
+					'range_time' => true
+				]
+			],
 			['array_id', '',
 				[
 					'array_id' => true
@@ -142,6 +163,7 @@ class CValidationRuleTest extends PHPUnit_Framework_TestCase {
 			['fatal|required2', 'Cannot parse validation rules "fatal|required2" at position 14.', false],
 			['fatal|require', 'Cannot parse validation rules "fatal|require" at position 6.', false],
 			['fatala', 'Cannot parse validation rules "fatala" at position 5.', false],
+			['ge ', 'Cannot parse validation rules "ge " at position 0.', false],
 			['fatal not_empty', 'Cannot parse validation rules "fatal not_empty" at position 6.', false],
 			['FATAL', 'Cannot parse validation rules "FATAL" at position 0.', false]
 		];
@@ -155,7 +177,7 @@ class CValidationRuleTest extends PHPUnit_Framework_TestCase {
 
 		$rc = $parser->parse($rule);
 
-		$this->assertEquals($rc, $result_expected);
-		$this->assertEquals($parser->getError(), $error_exprected);
+		$this->assertEquals($result_expected, $rc);
+		$this->assertEquals($error_exprected, $parser->getError());
 	}
 }

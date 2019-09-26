@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -21,8 +21,6 @@
 
 /**
  * Class containing methods for operations with template.
- *
- * @package API
  */
 class CTemplate extends CHostGeneral {
 
@@ -49,8 +47,6 @@ class CTemplate extends CHostGeneral {
 	 */
 	public function get($options = []) {
 		$result = [];
-		$userType = self::$userData['type'];
-		$userid = self::$userData['userid'];
 
 		$sqlParts = [
 			'select'	=> ['templates' => 'h.hostid'],
@@ -73,14 +69,16 @@ class CTemplate extends CHostGeneral {
 			'with_triggers'				=> null,
 			'with_graphs'				=> null,
 			'with_httptests'			=> null,
-			'editable'					=> null,
+			'editable'					=> false,
 			'nopermissions'				=> null,
 			// filter
+			'evaltype'					=> TAG_EVAL_TYPE_AND_OR,
+			'tags'						=> null,
 			'filter'					=> null,
 			'search'					=> '',
 			'searchByAny'				=> null,
-			'startSearch'				=> null,
-			'excludeSearch'				=> null,
+			'startSearch'				=> false,
+			'excludeSearch'				=> false,
 			'searchWildcardsEnabled'	=> null,
 			// output
 			'output'					=> API_OUTPUT_EXTEND,
@@ -96,9 +94,10 @@ class CTemplate extends CHostGeneral {
 			'selectMacros'				=> null,
 			'selectScreens'				=> null,
 			'selectHttpTests'			=> null,
-			'countOutput'				=> null,
-			'groupCount'				=> null,
-			'preservekeys'				=> null,
+			'selectTags'				=> null,
+			'countOutput'				=> false,
+			'groupCount'				=> false,
+			'preservekeys'				=> false,
 			'sortfield'					=> '',
 			'sortorder'					=> '',
 			'limit'						=> null,
@@ -107,10 +106,9 @@ class CTemplate extends CHostGeneral {
 		$options = zbx_array_merge($defOptions, $options);
 
 		// editable + PERMISSION CHECK
-		if ($userType != USER_TYPE_SUPER_ADMIN && !$options['nopermissions']) {
+		if (self::$userData['type'] != USER_TYPE_SUPER_ADMIN && !$options['nopermissions']) {
 			$permission = $options['editable'] ? PERM_READ_WRITE : PERM_READ;
-
-			$userGroups = getUserGroupsByUserId($userid);
+			$userGroups = getUserGroupsByUserId(self::$userData['userid']);
 
 			$sqlParts['where'][] = 'EXISTS ('.
 					'SELECT NULL'.
@@ -133,7 +131,7 @@ class CTemplate extends CHostGeneral {
 			$sqlParts['where'][] = dbConditionInt('hg.groupid', $options['groupids']);
 			$sqlParts['where']['hgh'] = 'hg.hostid=h.hostid';
 
-			if (!is_null($options['groupCount'])) {
+			if ($options['groupCount']) {
 				$sqlParts['group']['hg'] = 'hg.groupid';
 			}
 		}
@@ -153,7 +151,7 @@ class CTemplate extends CHostGeneral {
 			$sqlParts['where'][] = dbConditionInt('ht.templateid', $options['parentTemplateids']);
 			$sqlParts['where']['hht'] = 'h.hostid=ht.hostid';
 
-			if (!is_null($options['groupCount'])) {
+			if ($options['groupCount']) {
 				$sqlParts['group']['templateid'] = 'ht.templateid';
 			}
 		}
@@ -166,7 +164,7 @@ class CTemplate extends CHostGeneral {
 			$sqlParts['where'][] = dbConditionInt('ht.hostid', $options['hostids']);
 			$sqlParts['where']['hht'] = 'h.hostid=ht.templateid';
 
-			if (!is_null($options['groupCount'])) {
+			if ($options['groupCount']) {
 				$sqlParts['group']['ht'] = 'ht.hostid';
 			}
 		}
@@ -241,6 +239,13 @@ class CTemplate extends CHostGeneral {
 			$sqlParts['where'][] = 'EXISTS (SELECT ht.httptestid FROM httptest ht WHERE ht.hostid=h.hostid)';
 		}
 
+		// tags
+		if ($options['tags'] !== null && $options['tags']) {
+			$sqlParts['where'][] = CApiTagHelper::addWhereCondition($options['tags'], $options['evaltype'], 'h',
+				'host_tag', 'hostid'
+			);
+		}
+
 		// filter
 		if (is_array($options['filter'])) {
 			$this->dbFilter('hosts h', $options, $sqlParts);
@@ -260,11 +265,13 @@ class CTemplate extends CHostGeneral {
 		$sqlParts = $this->applyQuerySortOptions($this->tableName(), $this->tableAlias(), $options, $sqlParts);
 		$res = DBselect($this->createSelectQueryFromParts($sqlParts), $sqlParts['limit']);
 		while ($template = DBfetch($res)) {
-			if (!is_null($options['countOutput'])) {
-				if (!is_null($options['groupCount']))
+			if ($options['countOutput']) {
+				if ($options['groupCount']) {
 					$result[] = $template;
-				else
+				}
+				else {
 					$result = $template['rowscount'];
+				}
 			}
 			else{
 				$template['templateid'] = $template['hostid'];
@@ -275,7 +282,7 @@ class CTemplate extends CHostGeneral {
 
 		}
 
-		if (!is_null($options['countOutput'])) {
+		if ($options['countOutput']) {
 			return $result;
 		}
 
@@ -284,7 +291,7 @@ class CTemplate extends CHostGeneral {
 		}
 
 		// removing keys (hash -> array)
-		if (is_null($options['preservekeys'])) {
+		if (!$options['preservekeys']) {
 			$result = zbx_cleanHashes($result);
 		}
 
@@ -309,6 +316,7 @@ class CTemplate extends CHostGeneral {
 			$templates[$key]['groups'] = zbx_toArray($template['groups']);
 		}
 
+		$ins_tags = [];
 		foreach ($templates as $template) {
 			// if visible name is not given or empty it should be set to host name
 			if ((!isset($template['name']) || zbx_empty(trim($template['name']))) && isset($template['host'])) {
@@ -325,6 +333,12 @@ class CTemplate extends CHostGeneral {
 			$templateId = reset($newTemplateIds);
 
 			$templateIds[] = $templateId;
+
+			if (array_key_exists('tags', $template)) {
+				foreach ($template['tags'] as $tag) {
+					$ins_tags[] = ['hostid' => $templateId] + $tag;
+				}
+			}
 
 			foreach ($template['groups'] as $group) {
 				$hostGroupId = get_dbid('hosts_groups', 'hostgroupid');
@@ -353,6 +367,10 @@ class CTemplate extends CHostGeneral {
 			}
 		}
 
+		if ($ins_tags) {
+			DB::insert('host_tag', $ins_tags);
+		}
+
 		return ['templateids' => $templateIds];
 	}
 
@@ -360,6 +378,8 @@ class CTemplate extends CHostGeneral {
 	 * Validate create template.
 	 *
 	 * @param array $templates
+	 *
+	 * @throws APIException if the input is invalid.
 	 */
 	protected function validateCreate(array $templates) {
 		$groupIds = [];
@@ -394,6 +414,8 @@ class CTemplate extends CHostGeneral {
 
 		$templateDbFields = ['host' => null];
 
+		$host_name_parser = new CHostNameParser();
+
 		foreach ($templates as $template) {
 			// if visible name is not given or empty it should be set to host name
 			if ((!isset($template['name']) || zbx_empty(trim($template['name']))) && isset($template['host'])) {
@@ -404,11 +426,15 @@ class CTemplate extends CHostGeneral {
 				self::exception(ZBX_API_ERROR_PARAMETERS, _('Field "host" is mandatory.'));
 			}
 
-			if (!preg_match('/^'.ZBX_PREG_HOST_FORMAT.'$/', $template['host'])) {
-				self::exception(ZBX_API_ERROR_PARAMETERS, _s(
-					'Incorrect characters used for template name "%1$s".',
-					$template['host']
-				));
+			// Property 'auto_compress' is not supported for templates.
+			if (array_key_exists('auto_compress', $template)) {
+				self::exception(ZBX_API_ERROR_PARAMETERS, _('Incorrect input parameters.'));
+			}
+
+			if ($host_name_parser->parse($template['host']) != CParser::PARSE_SUCCESS) {
+				self::exception(ZBX_API_ERROR_PARAMETERS,
+					_s('Incorrect characters used for template name "%1$s".', $template['host'])
+				);
 			}
 
 			if (isset($template['host'])) {
@@ -460,6 +486,11 @@ class CTemplate extends CHostGeneral {
 					));
 				}
 			}
+
+			// Validate tags.
+			if (array_key_exists('tags', $template)) {
+				$this->validateTags($template);
+			}
 		}
 	}
 
@@ -506,6 +537,8 @@ class CTemplate extends CHostGeneral {
 			}
 		}
 
+		$this->updateTags($templates, 'templateid');
+
 		return ['templateids' => zbx_objectValues($templates, 'templateid')];
 	}
 
@@ -513,6 +546,8 @@ class CTemplate extends CHostGeneral {
 	 * Validate update template.
 	 *
 	 * @param array $templates
+	 *
+	 * @throws APIException if the input is invalid.
 	 */
 	protected function validateUpdate(array $templates) {
 		$dbTemplates = $this->get([
@@ -525,6 +560,16 @@ class CTemplate extends CHostGeneral {
 		foreach ($templates as $template) {
 			if (!isset($dbTemplates[$template['templateid']])) {
 				self::exception(ZBX_API_ERROR_PERMISSIONS, _('You do not have permission to perform this operation.'));
+			}
+
+			// Property 'auto_compress' is not supported for templates.
+			if (array_key_exists('auto_compress', $template)) {
+				self::exception(ZBX_API_ERROR_PARAMETERS, _('Incorrect input parameters.'));
+			}
+
+			// Validate tags.
+			if (array_key_exists('tags', $template)) {
+				$this->validateTags($template);
 			}
 		}
 	}
@@ -558,25 +603,25 @@ class CTemplate extends CHostGeneral {
 		API::Template()->unlink($templateids, null, true);
 
 		// delete the discovery rules first
-		$delRules = API::DiscoveryRule()->get([
-			'output' => ['itemid'],
+		$del_rules = API::DiscoveryRule()->get([
+			'output' => [],
 			'hostids' => $templateids,
 			'nopermissions' => true,
 			'preservekeys' => true
 		]);
-		if ($delRules) {
-			API::DiscoveryRule()->delete(array_keys($delRules), true);
+		if ($del_rules) {
+			API::DiscoveryRule()->delete(array_keys($del_rules), true);
 		}
 
 		// delete the items
-		$delItems = API::Item()->get([
+		$del_items = API::Item()->get([
+			'output' => [],
 			'templateids' => $templateids,
-			'output' => ['itemid'],
 			'nopermissions' => true,
 			'preservekeys' => true
 		]);
-		if ($delItems) {
-			API::Item()->delete(array_keys($delItems), true);
+		if ($del_items) {
+			CItemManager::delete(array_keys($del_items));
 		}
 
 		// delete host from maps
@@ -653,7 +698,7 @@ class CTemplate extends CHostGeneral {
 			'templateids' => $templateids,
 			'output' => ['httptestid'],
 			'nopermissions' => 1,
-			'preservekeys' => 1
+			'preservekeys' => true
 		]);
 		if (!empty($delHttpTests)) {
 			API::HttpTest()->delete(array_keys($delHttpTests), true);
@@ -664,7 +709,7 @@ class CTemplate extends CHostGeneral {
 			'templateids' => $templateids,
 			'output' => ['applicationid'],
 			'nopermissions' => 1,
-			'preservekeys' => 1
+			'preservekeys' => true
 		]);
 		if (!empty($delApplications)) {
 			API::Application()->delete(array_keys($delApplications), true);
@@ -675,9 +720,47 @@ class CTemplate extends CHostGeneral {
 		// TODO: remove info from API
 		foreach ($delTemplates as $template) {
 			info(_s('Deleted: Template "%1$s".', $template['name']));
+			add_audit_ext(AUDIT_ACTION_DELETE, AUDIT_RESOURCE_HOST, $template['templateid'], $template['host'], 'hosts', null, null);
 		}
 
 		return ['templateids' => $templateids];
+	}
+
+	/**
+	 * Checks if the current user has access to the given hosts and templates. Assumes the "hostid" field is valid.
+	 *
+	 * @param array $hostids    an array of host or template IDs
+	 *
+	 * @throws APIException if the user doesn't have write permissions for the given hosts.
+	 *
+	 * @return void
+	 */
+	protected function checkHostPermissions(array $hostids) {
+		if ($hostids) {
+			$hostids = array_unique($hostids);
+
+			$count = API::Host()->get([
+				'countOutput' => true,
+				'hostids' => $hostids,
+				'editable' => true
+			]);
+
+			if ($count == count($hostids)) {
+				return;
+			}
+
+			$count += $this->get([
+				'countOutput' => true,
+				'templateids' => $hostids,
+				'editable' => true
+			]);
+
+			if ($count != count($hostids)) {
+				self::exception(ZBX_API_ERROR_PERMISSIONS,
+					_('No permissions to referred object or it does not exist!')
+				);
+			}
+		}
 	}
 
 	/**
@@ -696,20 +779,13 @@ class CTemplate extends CHostGeneral {
 		$templates = isset($data['templates']) ? zbx_toArray($data['templates']) : [];
 		$templateIds = zbx_objectValues($templates, 'templateid');
 
-		// check permissions
-		if (!$this->isWritable($templateIds)) {
-			self::exception(ZBX_API_ERROR_PERMISSIONS, _('No permissions to referred object or it does not exist!'));
-		}
+		$this->checkPermissions($templateIds, _('No permissions to referred object or it does not exist!'));
 
 		// link hosts to the given templates
 		if (isset($data['hosts']) && !empty($data['hosts'])) {
 			$hostIds = zbx_objectValues($data['hosts'], 'hostid');
 
-			if (!API::Host()->isWritable($hostIds)) {
-				self::exception(ZBX_API_ERROR_PERMISSIONS,
-					_('No permissions to referred object or it does not exist!')
-				);
-			}
+			$this->checkHostPermissions($hostIds);
 
 			// check if any of the hosts are discovered
 			$this->checkValidator($hostIds, new CHostNormalValidator([
@@ -1019,11 +1095,12 @@ class CTemplate extends CHostGeneral {
 			}
 		}
 
-		if (isset($data['host']) && !preg_match('/^'.ZBX_PREG_HOST_FORMAT.'$/', $data['host'])) {
-			self::exception(ZBX_API_ERROR_PARAMETERS, _s(
-				'Incorrect characters used for template name "%1$s".',
-				$data['host']
-			));
+		$host_name_parser = new CHostNameParser();
+
+		if (array_key_exists('host', $data) && $host_name_parser->parse($data['host']) != CParser::PARSE_SUCCESS) {
+			self::exception(ZBX_API_ERROR_PARAMETERS,
+				_s('Incorrect characters used for template name "%1$s".', $data['host'])
+			);
 		}
 	}
 
@@ -1042,10 +1119,7 @@ class CTemplate extends CHostGeneral {
 	public function massRemove(array $data) {
 		$templateids = zbx_toArray($data['templateids']);
 
-		// check permissions
-		if (!$this->isWritable($templateids)) {
-			self::exception(ZBX_API_ERROR_PERMISSIONS, _('You do not have permission to perform this operation.'));
-		}
+		$this->checkPermissions($templateids, _('You do not have permission to perform this operation.'));
 
 		if (isset($data['hostids'])) {
 			// check if any of the hosts are discovered
@@ -1062,54 +1136,27 @@ class CTemplate extends CHostGeneral {
 	}
 
 	/**
-	 * Check if user has read permissions for templates.
-	 *
-	 * @param array $ids
-	 *
-	 * @return bool
-	 */
-	public function isReadable(array $ids) {
-		if (!is_array($ids)) {
-			return false;
-		}
-		if (empty($ids)) {
-			return true;
-		}
-
-		$ids = array_unique($ids);
-
-		$count = $this->get([
-			'templateids' => $ids,
-			'countOutput' => true
-		]);
-
-		return (count($ids) == $count);
-	}
-
-	/**
 	 * Check if user has write permissions for templates.
 	 *
-	 * @param array $ids
+	 * @param array  $templateids
+	 * @param string $error
 	 *
 	 * @return bool
 	 */
-	public function isWritable(array $ids) {
-		if (!is_array($ids)) {
-			return false;
+	private function checkPermissions(array $templateids, $error) {
+		if ($templateids) {
+			$templateids = array_unique($templateids);
+
+			$count = $this->get([
+				'countOutput' => true,
+				'templateids' => $templateids,
+				'editable' => true
+			]);
+
+			if ($count != count($templateids)) {
+				self::exception(ZBX_API_ERROR_PERMISSIONS, $error);
+			}
 		}
-		if (empty($ids)) {
-			return true;
-		}
-
-		$ids = array_unique($ids);
-
-		$count = $this->get([
-			'templateids' => $ids,
-			'editable' => true,
-			'countOutput' => true
-		]);
-
-		return (count($ids) == $count);
 	}
 
 	protected function addRelatedObjects(array $options, array $result) {
@@ -1139,10 +1186,9 @@ class CTemplate extends CHostGeneral {
 				]);
 				$templates = zbx_toHash($templates, 'templateid');
 				foreach ($result as $templateid => $template) {
-					if (isset($templates[$templateid]))
-						$result[$templateid]['templates'] = $templates[$templateid]['rowscount'];
-					else
-						$result[$templateid]['templates'] = 0;
+					$result[$templateid]['templates'] = array_key_exists($templateid, $templates)
+						? $templates[$templateid]['rowscount']
+						: '0';
 				}
 			}
 		}
@@ -1169,10 +1215,9 @@ class CTemplate extends CHostGeneral {
 				]);
 				$hosts = zbx_toHash($hosts, 'templateid');
 				foreach ($result as $templateid => $template) {
-					if (isset($hosts[$templateid]))
-						$result[$templateid]['hosts'] = $hosts[$templateid]['rowscount'];
-					else
-						$result[$templateid]['hosts'] = 0;
+					$result[$templateid]['hosts'] = array_key_exists($templateid, $hosts)
+						? $hosts[$templateid]['rowscount']
+						: '0';
 				}
 			}
 		}
@@ -1207,10 +1252,9 @@ class CTemplate extends CHostGeneral {
 				]);
 				$screens = zbx_toHash($screens, 'templateid');
 				foreach ($result as $templateid => $template) {
-					if (isset($screens[$templateid]))
-						$result[$templateid]['screens'] = $screens[$templateid]['rowscount'];
-					else
-						$result[$templateid]['screens'] = 0;
+					$result[$templateid]['screens'] = array_key_exists($templateid, $screens)
+						? $screens[$templateid]['rowscount']
+						: '0';
 				}
 			}
 		}

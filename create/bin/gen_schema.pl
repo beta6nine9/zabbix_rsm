@@ -1,7 +1,7 @@
-#!/usr/bin/perl -w
+#!/usr/bin/env perl
 #
 # Zabbix
-# Copyright (C) 2001-2017 Zabbix SIA
+# Copyright (C) 2001-2019 Zabbix SIA
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -30,7 +30,6 @@ my %c = (
 	"database"	=>	"",
 	"after"		=>	"\t{0}\n\n#undef ZBX_TYPE_LONGTEXT_LEN\n#undef ZBX_TYPE_SHORTTEXT_LEN\n\n};\n",
 	"t_bigint"	=>	"ZBX_TYPE_UINT",
-	"t_char"	=>	"ZBX_TYPE_CHAR",
 	"t_text"	=>	"ZBX_TYPE_TEXT",
 	"t_double"	=>	"ZBX_TYPE_FLOAT",
 	"t_id"		=>	"ZBX_TYPE_ID",
@@ -41,13 +40,12 @@ my %c = (
 	"t_serial"	=>	"ZBX_TYPE_UINT",
 	"t_shorttext"	=>	"ZBX_TYPE_SHORTTEXT",
 	"t_time"	=>	"ZBX_TYPE_INT",
-	"t_varchar"	=>	"ZBX_TYPE_CHAR",
-	"t_bigdouble"	=>	"ZBX_TYPE_FLOAT",
+	"t_varchar"	=>	"ZBX_TYPE_CHAR"
 );
 
 $c{"before"} = "/*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -92,7 +90,6 @@ my %ibm_db2 = (
 	"after"		=>	"",
 	"table_options"	=>	"",
 	"t_bigint"	=>	"bigint",
-	"t_char"	=>	"varchar",
 	"t_text"	=>	"varchar(2048)",
 	"t_double"	=>	"decfloat(16)",
 	"t_id"		=>	"bigint",
@@ -103,8 +100,7 @@ my %ibm_db2 = (
 	"t_serial"	=>	"bigint",
 	"t_shorttext"	=>	"varchar(2048)",
 	"t_time"	=>	"integer",
-	"t_varchar"	=>	"varchar",
-	"t_bigdouble"	=>	"decfloat(24)"
+	"t_varchar"	=>	"varchar"
 );
 
 my %mysql = (
@@ -114,7 +110,6 @@ my %mysql = (
 	"after"		=>	"",
 	"table_options"	=>	" ENGINE=InnoDB",
 	"t_bigint"	=>	"bigint unsigned",
-	"t_char"	=>	"char",
 	"t_text"	=>	"text",
 	"t_double"	=>	"double(16,4)",
 	"t_id"		=>	"bigint unsigned",
@@ -125,8 +120,7 @@ my %mysql = (
 	"t_serial"	=>	"bigint unsigned",
 	"t_shorttext"	=>	"text",
 	"t_time"	=>	"integer",
-	"t_varchar"	=>	"varchar",
-	"t_bigdouble"	=>	"double(24,4)"
+	"t_varchar"	=>	"varchar"
 );
 
 my %oracle = (
@@ -136,7 +130,6 @@ my %oracle = (
 	"after"		=>	"",
 	"table_options"	=>	"",
 	"t_bigint"	=>	"number(20)",
-	"t_char"	=>	"nvarchar2",
 	"t_text"	=>	"nclob",
 	"t_double"	=>	"number(20,4)",
 	"t_id"		=>	"number(20)",
@@ -147,8 +140,7 @@ my %oracle = (
 	"t_serial"	=>	"number(20)",
 	"t_shorttext"	=>	"nvarchar2(2048)",
 	"t_time"	=>	"number(10)",
-	"t_varchar"	=>	"nvarchar2",
-	"t_bigdouble"	=>	"number(24,4)"
+	"t_varchar"	=>	"nvarchar2"
 );
 
 my %postgresql = (
@@ -158,7 +150,6 @@ my %postgresql = (
 	"after"		=>	"",
 	"table_options"	=>	"",
 	"t_bigint"	=>	"numeric(20)",
-	"t_char"	=>	"char",
 	"t_text"	=>	"text",
 	"t_double"	=>	"numeric(16,4)",
 	"t_id"		=>	"bigint",
@@ -169,8 +160,7 @@ my %postgresql = (
 	"t_serial"	=>	"bigserial",
 	"t_shorttext"	=>	"text",
 	"t_time"	=>	"integer",
-	"t_varchar"	=>	"varchar",
-	"t_bigdouble"	=>	"numeric(24,4)"
+	"t_varchar"	=>	"varchar"
 );
 
 my %sqlite3 = (
@@ -180,7 +170,6 @@ my %sqlite3 = (
 	"after"		=>	"",
 	"table_options"	=>	"",
 	"t_bigint"	=>	"bigint",
-	"t_char"	=>	"char",
 	"t_text"	=>	"text",
 	"t_double"	=>	"double(16,4)",
 	"t_id"		=>	"bigint",
@@ -191,8 +180,7 @@ my %sqlite3 = (
 	"t_serial"	=>	"integer",
 	"t_shorttext"	=>	"text",
 	"t_time"	=>	"integer",
-	"t_varchar"	=>	"varchar",
-	"t_bigdouble"	=>	"double(24,4)"
+	"t_varchar"	=>	"varchar"
 );
 
 sub rtrim($)
@@ -252,8 +240,10 @@ sub process_table
 
 		for ($flags)
 		{
-			# do not output ZBX_DATA, remove it
+			# do not output ZBX_DATA ZBX_DASHBOARD and ZBX_TEMPLATE, remove it
 			s/ZBX_DATA//;
+			s/ZBX_TEMPLATE//;
+			s/ZBX_DASHBOARD//;
 			s/,+$//;
 			s/^,+//;
 			s/,+/ \| /g;
@@ -634,9 +624,26 @@ sub process_row
 	print "INSERT INTO $table_name VALUES $values;${eol}\n";
 }
 
+sub timescaledb
+{
+	for ("history", "history_uint", "history_log", "history_text", 
+			"history_str", "trends", "trends_uint")
+	{
+		print<<EOF
+SELECT create_hypertable('$_', 'clock', chunk_time_interval => 86400, migrate_data => true);
+EOF
+		;
+	}
+	print<<EOF
+UPDATE config SET db_extension='timescaledb',hk_history_global=1,hk_trends_global=1;
+EOF
+	;
+	exit;
+}
+
 sub usage
 {
-	print "Usage: $0 [c|ibm_db2|mysql|oracle|postgresql|sqlite3]\n";
+	print "Usage: $0 [c|ibm_db2|mysql|oracle|postgresql|sqlite3|timescaledb]\n";
 	print "The script generates Zabbix SQL schemas and C code for different database engines.\n";
 	exit;
 }
@@ -699,13 +706,14 @@ sub main
 	$fkeys_prefix = "";
 	$fkeys_suffix = "";
 
-	if ($format eq 'c')		{ %output = %c; }
-	elsif ($format eq 'ibm_db2')	{ %output = %ibm_db2; }
-	elsif ($format eq 'mysql')	{ %output = %mysql; }
-	elsif ($format eq 'oracle')	{ %output = %oracle; }
-	elsif ($format eq 'postgresql')	{ %output = %postgresql; }
-	elsif ($format eq 'sqlite3')	{ %output = %sqlite3; }
-	else				{ usage(); }
+	if ($format eq 'c')			{ %output = %c; }
+	elsif ($format eq 'ibm_db2')		{ %output = %ibm_db2; }
+	elsif ($format eq 'mysql')		{ %output = %mysql; }
+	elsif ($format eq 'oracle')		{ %output = %oracle; }
+	elsif ($format eq 'postgresql')		{ %output = %postgresql; }
+	elsif ($format eq 'sqlite3')		{ %output = %sqlite3; }
+	elsif ($format eq 'timescaledb')	{ timescaledb(); }
+	else					{ usage(); }
 
 	process();
 

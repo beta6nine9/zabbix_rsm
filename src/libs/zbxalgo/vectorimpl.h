@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -30,12 +30,12 @@ static void	__vector_ ## __id ## _ensure_free_space(zbx_vector_ ## __id ## _t *v
 	{													\
 		vector->values_num = 0;										\
 		vector->values_alloc = 32;									\
-		vector->values = vector->mem_malloc_func(NULL, vector->values_alloc * sizeof(__type));		\
+		vector->values = (__type *)vector->mem_malloc_func(NULL, vector->values_alloc * sizeof(__type));		\
 	}													\
 	else if (vector->values_num == vector->values_alloc)							\
 	{													\
 		vector->values_alloc = MAX(vector->values_alloc + 1, vector->values_alloc * ZBX_VECTOR_ARRAY_GROWTH_FACTOR); \
-		vector->values = vector->mem_realloc_func(vector->values, vector->values_alloc * sizeof(__type)); \
+		vector->values = (__type *)vector->mem_realloc_func(vector->values, vector->values_alloc * sizeof(__type)); \
 	}													\
 }														\
 														\
@@ -86,6 +86,14 @@ void	zbx_vector_ ## __id ## _append_ptr(zbx_vector_ ## __id ## _t *vector, __typ
 {														\
 	__vector_ ## __id ## _ensure_free_space(vector);							\
 	vector->values[vector->values_num++] = *value;								\
+}														\
+														\
+void	zbx_vector_ ## __id ## _append_array(zbx_vector_ ## __id ## _t *vector, __type const *values,		\
+									int values_num)				\
+{														\
+	zbx_vector_ ## __id ## _reserve(vector, vector->values_num + values_num);				\
+	memcpy(vector->values + vector->values_num, values, values_num * sizeof(__type));			\
+	vector->values_num = vector->values_num + values_num;							\
 }														\
 														\
 void	zbx_vector_ ## __id ## _remove_noorder(zbx_vector_ ## __id ## _t *vector, int index)			\
@@ -251,7 +259,7 @@ void	zbx_vector_ ## __id ## _reserve(zbx_vector_ ## __id ## _t *vector, size_t s
 	if ((int)size > vector->values_alloc)									\
 	{													\
 		vector->values_alloc = (int)size;								\
-		vector->values = vector->mem_realloc_func(vector->values, vector->values_alloc * sizeof(__type)); \
+		vector->values = (__type *)vector->mem_realloc_func(vector->values, vector->values_alloc * sizeof(__type)); \
 	}													\
 }														\
 														\
@@ -262,16 +270,16 @@ void	zbx_vector_ ## __id ## _clear(zbx_vector_ ## __id ## _t *vector)					\
 
 #define	ZBX_PTR_VECTOR_IMPL(__id, __type)									\
 														\
-ZBX_VECTOR_IMPL(__id, __type);											\
+ZBX_VECTOR_IMPL(__id, __type)											\
 														\
-void	zbx_vector_ ## __id ## _clear_ext(zbx_vector_ ## __id ## _t *vector, zbx_clean_func_t clean_func)	\
+void	zbx_vector_ ## __id ## _clear_ext(zbx_vector_ ## __id ## _t *vector, zbx_ ## __id ## _free_func_t free_func)	\
 {														\
 	if (0 != vector->values_num)										\
 	{													\
 		int	index;											\
 														\
 		for (index = 0; index < vector->values_num; index++)						\
-			clean_func(vector->values[index]);							\
+			free_func(vector->values[index]);							\
 														\
 		vector->values_num = 0;										\
 	}													\

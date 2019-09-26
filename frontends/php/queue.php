@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -52,7 +52,7 @@ $queueRequests = [
 	QUEUE_OVERVIEW_BY_PROXY => CZabbixServer::QUEUE_OVERVIEW_BY_PROXY,
 	QUEUE_DETAILS => CZabbixServer::QUEUE_DETAILS
 ];
-$queueData = $zabbixServer->getQueue($queueRequests[$config], get_cookie('zbx_sessionid'), QUEUE_DETAIL_ITEM_COUNT);
+$queueData = $zabbixServer->getQueue($queueRequests[$config], get_cookie(ZBX_SESSION_NAME), QUEUE_DETAIL_ITEM_COUNT);
 
 // check for errors error
 if ($zabbixServer->getError()) {
@@ -64,15 +64,20 @@ if ($zabbixServer->getError()) {
 
 $widget = (new CWidget())
 	->setTitle(_('Queue of items to be updated'))
-	->setControls((new CForm('get'))
-		->cleanItems()
-		->addItem((new CList())
-			->addItem((new CComboBox('config', $config, 'submit();', [
-				QUEUE_OVERVIEW => _('Overview'),
-				QUEUE_OVERVIEW_BY_PROXY => _('Overview by proxy'),
-				QUEUE_DETAILS => _('Details')
-			])))
-		)
+	->setControls((new CTag('nav', true, [
+		(new CForm('get'))
+			->cleanItems()
+			->addItem((new CList())
+				->addItem(
+					(new CComboBox('config', $config, 'submit();', [
+						QUEUE_OVERVIEW => _('Overview'),
+						QUEUE_OVERVIEW_BY_PROXY => _('Overview by proxy'),
+						QUEUE_DETAILS => _('Details')
+					]))->removeId()
+				)
+			)
+		]))
+			->setAttribute('aria-label', _('Content controls'))
 	);
 
 $table = new CTableInfo();
@@ -92,6 +97,7 @@ if ($config == QUEUE_OVERVIEW) {
 		ITEM_TYPE_AGGREGATE,
 		ITEM_TYPE_EXTERNAL,
 		ITEM_TYPE_DB_MONITOR,
+		ITEM_TYPE_HTTPAGENT,
 		ITEM_TYPE_IPMI,
 		ITEM_TYPE_SSH,
 		ITEM_TYPE_TELNET,
@@ -214,6 +220,15 @@ elseif ($config == QUEUE_DETAILS) {
 		'preservekeys' => true
 	]);
 
+	if (count($queueData) != count($items)) {
+		$items += API::DiscoveryRule()->get([
+			'output' => ['itemid', 'hostid', 'name', 'key_'],
+			'selectHosts' => ['name'],
+			'itemids' => array_diff(array_keys($queueData), array_keys($items)),
+			'preservekeys' => true
+		]);
+	}
+
 	$items = CMacrosResolverHelper::resolveItemNames($items);
 
 	// get hosts for queue items
@@ -234,6 +249,8 @@ elseif ($config == QUEUE_DETAILS) {
 		}
 	}
 
+	$proxies = [];
+
 	if ($proxyHostIds) {
 		$proxies = API::Proxy()->get([
 			'proxyids' => $proxyHostIds,
@@ -246,7 +263,8 @@ elseif ($config == QUEUE_DETAILS) {
 		_('Scheduled check'),
 		_('Delayed by'),
 		_('Host'),
-		_('Name')
+		_('Name'),
+		_('Proxy')
 	]);
 
 	$i = 0;
@@ -267,10 +285,11 @@ elseif ($config == QUEUE_DETAILS) {
 		$table->addRow([
 			zbx_date2str(DATE_TIME_FORMAT_SECONDS, $itemData['nextcheck']),
 			zbx_date2age($itemData['nextcheck']),
-			(isset($proxies[$hosts[$item['hostid']]['proxy_hostid']]))
-				? $proxies[$hosts[$item['hostid']]['proxy_hostid']]['host'].NAME_DELIMITER.$host['name']
-				: $host['name'],
-			$item['name_expanded']
+			$host['name'],
+			$item['name_expanded'],
+			array_key_exists($hosts[$item['hostid']]['proxy_hostid'], $proxies)
+				? $proxies[$hosts[$item['hostid']]['proxy_hostid']]['host']
+				: ''
 		]);
 	}
 }
@@ -280,14 +299,7 @@ if ($config == QUEUE_OVERVIEW_BY_PROXY) {
 	$total = _('Total').': '.$table->getNumRows();
 }
 elseif ($config == QUEUE_DETAILS) {
-	if (null !== $zabbixServer->getTotalCount()) {
-		$total = _s('Displaying %1$s of %2$s found', $table->getNumRows(), $zabbixServer->getTotalCount());
-	}
-	else {
-		// fallback to old solution
-		$total = _('Total').': '.$table->getNumRows().
-			(count($queueData) > QUEUE_DETAIL_ITEM_COUNT ? ' ('._('Truncated').')' : '');
-	}
+	$total = _s('Displaying %1$s of %2$s found', $table->getNumRows(), $zabbixServer->getTotalCount());
 }
 else {
 	$total = null;

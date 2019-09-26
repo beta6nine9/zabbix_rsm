@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -70,8 +70,6 @@ class CImageTextTable {
 	 *
 	 * @param int   $numrow
 	 * @param array $cell
-	 *
-	 * @return void
 	 */
 	public function addCell($numrow, array $cell) {
 		if ($numrow >= $this->numrows) {
@@ -140,8 +138,6 @@ class CImageTextTable {
 
 	/**
 	 * Calculates the size of each row and column.
-	 *
-	 * @return void
 	 */
 	private function calcRows() {
 		$rowHeight = 0;

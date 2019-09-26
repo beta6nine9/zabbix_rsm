@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -22,30 +22,28 @@
 
 #if defined(_WINDOWS)
 
-#	define _WIN32_WINNT	0x0500	/* Target MS Windows 2000 and later. */
-
 /* some definitions which are not available on older MS Windows versions */
 typedef enum {
-	FileIdInfo	= 18	/* we need only one value, the rest of enumerated values are omitted here */
-} FILE_INFO_BY_HANDLE_CLASS;
+	zbx_FileIdInfo	= 18	/* we need only one value, the rest of enumerated values are omitted here */
+} ZBX_FILE_INFO_BY_HANDLE_CLASS;
 
 typedef struct {
 	ULONGLONG	LowPart;
 	ULONGLONG	HighPart;
-} EXT_FILE_ID_128;
+} ZBX_EXT_FILE_ID_128;
 
 typedef struct {
-	ULONGLONG	VolumeSerialNumber;
-	EXT_FILE_ID_128	FileId;
-} FILE_ID_INFO;
+	ULONGLONG		VolumeSerialNumber;
+	ZBX_EXT_FILE_ID_128	FileId;
+} ZBX_FILE_ID_INFO;
 
 DWORD	(__stdcall *zbx_GetGuiResources)(HANDLE, DWORD);
 BOOL	(__stdcall *zbx_GetProcessIoCounters)(HANDLE, PIO_COUNTERS);
 BOOL	(__stdcall *zbx_GetPerformanceInfo)(PPERFORMANCE_INFORMATION, DWORD);
 BOOL	(__stdcall *zbx_GlobalMemoryStatusEx)(LPMEMORYSTATUSEX);
-BOOL	(__stdcall *zbx_GetFileInformationByHandleEx)(HANDLE, FILE_INFO_BY_HANDLE_CLASS, LPVOID, DWORD);
+BOOL	(__stdcall *zbx_GetFileInformationByHandleEx)(HANDLE, ZBX_FILE_INFO_BY_HANDLE_CLASS, LPVOID, DWORD);
 
-void	import_symbols();
+void	import_symbols(void);
 
 #else
 #	define import_symbols()

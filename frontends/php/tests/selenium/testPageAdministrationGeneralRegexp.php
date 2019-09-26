@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -18,9 +18,9 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-require_once dirname(__FILE__).'/../include/class.cwebtest.php';
+require_once dirname(__FILE__).'/../include/CLegacyWebTest.php';
 
-class testPageAdministrationGeneralRegexp extends CWebTest {
+class testPageAdministrationGeneralRegexp extends CLegacyWebTest {
 
 	private $sqlHashRegexps = '';
 	private $oldHashRegexps = '';
@@ -32,22 +32,22 @@ class testPageAdministrationGeneralRegexp extends CWebTest {
 			'SELECT * FROM regexps'.
 			($conditions ? ' WHERE '.$conditions : '').
 			' ORDER BY regexpid';
-		$this->oldHashRegexps = DBhash($this->sqlHashRegexps);
+		$this->oldHashRegexps = CDBHelper::getHash($this->sqlHashRegexps);
 
 		$this->sqlHashExpressions =
 			'SELECT * FROM expressions'.
 			($conditions ? ' WHERE '.$conditions : '').
 			' ORDER BY expressionid';
-		$this->oldHashExpressions = DBhash($this->sqlHashExpressions);
+		$this->oldHashExpressions = CDBHelper::getHash($this->sqlHashExpressions);
 	}
 
 	private function verifyHash() {
-		$this->assertEquals($this->oldHashRegexps, DBhash($this->sqlHashRegexps));
-		$this->assertEquals($this->oldHashExpressions, DBhash($this->sqlHashExpressions));
+		$this->assertEquals($this->oldHashRegexps, CDBHelper::getHash($this->sqlHashRegexps));
+		$this->assertEquals($this->oldHashExpressions, CDBHelper::getHash($this->sqlHashExpressions));
 	}
 
 	public static function allRegexps() {
-		return DBdata('SELECT regexpid FROM regexps');
+		return CDBHelper::getDataProvider('SELECT regexpid FROM regexps');
 	}
 
 	public function testPageAdministrationGeneralRegexp_CheckLayout() {
@@ -77,19 +77,16 @@ class testPageAdministrationGeneralRegexp extends CWebTest {
 		$this->zbxTestLogin('adm.regexps.php');
 		$this->zbxTestCheckboxSelect('all_regexps');
 		$this->zbxTestClickButton('regexp.massdelete');
-		$this->webDriver->switchTo()->alert()->dismiss();
+		$this->zbxTestDismissAlert();
 		$this->zbxTestCheckTitle('Configuration of regular expressions');
 		$this->zbxTestTextNotPresent(['Regular expression deleted', 'Regular expressions deleted']);
 
 		$this->verifyHash();
 	}
 
-	public function testPageAdministrationGeneralRegexp_backup_1() {
-		DBsave_tables('regexps');
-	}
-
 	/**
 	 * @dataProvider allRegexps
+	 * @backup-once regexps
 	 */
 	public function testPageAdministrationGeneralRegexp_MassDelete($regexp) {
 		$this->calculateHash('regexpid<>'.$regexp['regexpid']);
@@ -97,36 +94,26 @@ class testPageAdministrationGeneralRegexp extends CWebTest {
 		$this->zbxTestLogin('adm.regexps.php');
 		$this->zbxTestCheckboxSelect('regexpids_'.$regexp['regexpid']);
 		$this->zbxTestClickButton('regexp.massdelete');
-		$this->webDriver->switchTo()->alert()->accept();
+		$this->zbxTestAcceptAlert();
 		$this->zbxTestCheckTitle('Configuration of regular expressions');
 		$this->zbxTestTextPresent('Regular expression deleted');
 
-		$this->assertEquals(0, DBcount('SELECT NULL FROM regexps WHERE regexpid='.$regexp['regexpid']));
+		$this->assertEquals(0, CDBHelper::getCount('SELECT NULL FROM regexps WHERE regexpid='.$regexp['regexpid']));
 
 		$this->verifyHash();
 	}
 
-	public function testPageAdministrationGeneralRegexp_restore_1() {
-		DBrestore_tables('regexps');
-	}
-
-	public function testPageAdministrationGeneralRegexp_backup_2() {
-		DBsave_tables('regexps');
-	}
-
+	/**
+	 * @backup-once regexps
+	 */
 	public function testPageAdministrationGeneralRegexp_MassDeleteAll() {
 		$this->zbxTestLogin('adm.regexps.php');
 		$this->zbxTestCheckboxSelect('all_regexps');
 		$this->zbxTestClickButton('regexp.massdelete');
-		$this->webDriver->switchTo()->alert()->accept();
+		$this->zbxTestAcceptAlert();
 		$this->zbxTestCheckTitle('Configuration of regular expressions');
 		$this->zbxTestTextPresent('Regular expressions deleted');
 
-		$this->assertEquals(0, DBcount('SELECT NULL FROM regexps'));
+		$this->assertEquals(0, CDBHelper::getCount('SELECT NULL FROM regexps'));
 	}
-
-	public function testPageAdministrationGeneralRegexp_restore_2() {
-		DBrestore_tables('regexps');
-	}
-
 }

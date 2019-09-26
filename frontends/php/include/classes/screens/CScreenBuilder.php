@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -76,13 +76,6 @@ class CScreenBuilder {
 	public $profileIdx2;
 
 	/**
-	 * Is profile will be updated
-	 *
-	 * @var boolean
-	 */
-	public $updateProfile;
-
-	/**
 	 * Time control timeline
 	 *
 	 * @var array
@@ -98,11 +91,10 @@ class CScreenBuilder {
 	 * @param int		$options['mode']
 	 * @param int		$options['timestamp']
 	 * @param int		$options['hostid']
-	 * @param int		$options['period']
-	 * @param int		$options['stime']
-	 * @param string	$options['profileIdx']
-	 * @param int		$options['profileIdx2']
-	 * @param boolean	$options['updateProfile']
+	 * @param string	$options['profileIdx']      Profile idx value.
+	 * @param int		$options['profileIdx2']     Profile idx2 value.
+	 * @param string	$options['from']            Start time of selected time period.
+	 * @param string	$options['to']              End time of selected time period.
 	 * @param array		$options['screen']
 	 */
 	public function __construct(array $options = []) {
@@ -143,14 +135,12 @@ class CScreenBuilder {
 		// calculate time
 		$this->profileIdx = !empty($options['profileIdx']) ? $options['profileIdx'] : '';
 		$this->profileIdx2 = !empty($options['profileIdx2']) ? $options['profileIdx2'] : null;
-		$this->updateProfile = isset($options['updateProfile']) ? $options['updateProfile'] : true;
 
-		$this->timeline = CScreenBase::calculateTime([
+		$this->timeline = getTimeSelectorPeriod([
 			'profileIdx' => $this->profileIdx,
 			'profileIdx2' => $this->profileIdx2,
-			'updateProfile' => $this->updateProfile,
-			'period' => !empty($options['period']) ? $options['period'] : null,
-			'stime' => !empty($options['stime']) ? $options['stime'] : null
+			'from' => array_key_exists('from', $options) ? $options['from'] : null,
+			'to' => array_key_exists('to', $options) ? $options['to'] : null
 		]);
 	}
 
@@ -190,8 +180,12 @@ class CScreenBuilder {
 				$options['screenitem'] = reset($options['screenitem']);
 			}
 
-			if (array_key_exists('screenitem', $options) && array_key_exists('resourcetype', $options['screenitem'])) {
+			if (is_array($options['screenitem']) && array_key_exists('screenitem', $options)
+					&& array_key_exists('resourcetype', $options['screenitem'])) {
 				$options['resourcetype'] = $options['screenitem']['resourcetype'];
+			}
+			else {
+				return null;
 			}
 		}
 
@@ -213,10 +207,10 @@ class CScreenBuilder {
 			case SCREEN_RESOURCE_PLAIN_TEXT:
 				return new CScreenPlainText($options);
 
-			case SCREEN_RESOURCE_HOSTS_INFO:
+			case SCREEN_RESOURCE_HOST_INFO:
 				return new CScreenHostsInfo($options);
 
-			case SCREEN_RESOURCE_TRIGGERS_INFO:
+			case SCREEN_RESOURCE_TRIGGER_INFO:
 				return new CScreenTriggersInfo($options);
 
 			case SCREEN_RESOURCE_SERVER_INFO:
@@ -225,10 +219,7 @@ class CScreenBuilder {
 			case SCREEN_RESOURCE_CLOCK:
 				return new CScreenClock($options);
 
-			case SCREEN_RESOURCE_SCREEN:
-				return new CScreenScreen($options);
-
-			case SCREEN_RESOURCE_TRIGGERS_OVERVIEW:
+			case SCREEN_RESOURCE_TRIGGER_OVERVIEW:
 				return new CScreenTriggersOverview($options);
 
 			case SCREEN_RESOURCE_DATA_OVERVIEW:
@@ -275,6 +266,9 @@ class CScreenBuilder {
 
 			case SCREEN_RESOURCE_HTTPTEST:
 				return new CScreenHttpTest($options);
+
+			case SCREEN_RESOURCE_PROBLEM:
+				return new CScreenProblem($options);
 
 			default:
 				return null;
@@ -484,7 +478,6 @@ class CScreenBuilder {
 						'hostid' => $this->hostid,
 						'profileIdx' => $this->profileIdx,
 						'profileIdx2' => $this->profileIdx2,
-						'updateProfile' => $this->updateProfile,
 						'timeline' => $this->timeline,
 						'resourcetype' => $screenitem['resourcetype'],
 						'screenitem' => $screenitem
@@ -503,7 +496,7 @@ class CScreenBuilder {
 				elseif ($this->mode == SCREEN_MODE_EDIT) {
 					$item =[
 						(new CDiv(
-							(new CLink(_('Change'), $action))->addClass('empty_change_link')
+							(new CLink(_x('Change', 'verb'), $action))->addClass('empty_change_link')
 						))->addClass(ZBX_STYLE_CENTER)
 					];
 				}
@@ -632,23 +625,15 @@ class CScreenBuilder {
 	 *
 	 * @static
 	 *
-	 * @param array $options
-	 * @param array $options['timeline']
-	 * @param string $options['profileIdx']
+	 * @param array $timeline
 	 */
-	public static function insertScreenScrollJs(array $options = []) {
-		$options['timeline'] = empty($options['timeline']) ? '' : $options['timeline'];
-		$options['profileIdx'] = empty($options['profileIdx']) ? '' : $options['profileIdx'];
-
-		$timeControlData = [
+	private static function insertScreenScrollJs(array $timeline) {
+		$obj_data = [
 			'id' => 'scrollbar',
-			'loadScroll' => 1,
-			'mainObject' => 1,
-			'periodFixed' => CProfile::get($options['profileIdx'].'.timelinefixed', 1),
-			'sliderMaximumTimePeriod' => ZBX_MAX_PERIOD
+			'mainObject' => 1
 		];
 
-		zbx_add_post_js('timeControl.addObject("scrollbar", '.zbx_jsvalue($options['timeline']).', '.zbx_jsvalue($timeControlData).');');
+		zbx_add_post_js('timeControl.addObject("scrollbar", '.zbx_jsvalue($timeline).', '.zbx_jsvalue($obj_data).');');
 	}
 
 	/**
@@ -657,7 +642,7 @@ class CScreenBuilder {
 	 * @static
 	 */
 	public static function insertScreenRefreshTimeJs() {
-		zbx_add_post_js('timeControl.useTimeRefresh('.CWebUser::$data['refresh'].');');
+		zbx_add_post_js('timeControl.useTimeRefresh('.CWebUser::getRefresh().');');
 	}
 
 	/**
@@ -692,14 +677,12 @@ class CScreenBuilder {
 	/**
 	 * Insert javascript for standard screens.
 	 *
-	 * @param array $options
-	 * @param array $options['timeline']
-	 * @param string $options['profileIdx']
+	 * @param array $timeline
 	 *
 	 * @static
 	 */
-	public static function insertScreenStandardJs(array $options = []) {
-		CScreenBuilder::insertScreenScrollJs($options);
+	public static function insertScreenStandardJs(array $timeline) {
+		CScreenBuilder::insertScreenScrollJs($timeline);
 		CScreenBuilder::insertScreenRefreshTimeJs();
 		CScreenBuilder::insertProcessObjectsJs();
 	}

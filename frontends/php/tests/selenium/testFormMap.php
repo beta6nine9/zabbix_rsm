@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -18,9 +18,9 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-require_once dirname(__FILE__).'/../include/class.cwebtest.php';
+require_once dirname(__FILE__).'/../include/CLegacyWebTest.php';
 
-class testFormMap extends CWebTest {
+class testFormMap extends CLegacyWebTest {
 	/**
 	 * Possible combinations of grid settings
 	 * @return array
@@ -65,14 +65,13 @@ class testFormMap extends CWebTest {
 		$map_name = 'Test map 1';
 
 		// getting map options from DB as they are at the beginning of the test
-		$db_result = DBSelect("SELECT * FROM sysmaps WHERE name = '$map_name'");
-		$db_map = DBfetch($db_result);
+		$db_map = CDBHelper::getRow('SELECT * FROM sysmaps WHERE name='.zbx_dbstr($map_name));
 		$this->assertTrue(isset($db_map['sysmapid']));
 
 		$this->zbxTestLogin('sysmaps.php');
 		$this->zbxTestCheckTitle('Configuration of network maps');
 		$this->zbxTestClickLinkTextWait($map_name);
-		$this->zbxTestClickWait('edit');
+		$this->zbxTestContentControlButtonClickTextWait('Edit map');
 
 		// checking if appropriate value for grid size is selected
 		$this->assertTrue($this->zbxTestGetValue("//select[@id='gridsize']//option[@selected]") == $db_map['grid_size']);
@@ -109,8 +108,7 @@ class testFormMap extends CWebTest {
 
 		$this->zbxTestClickAndAcceptAlert('sysmap_update');
 
-		$db_result = DBSelect("SELECT * FROM sysmaps WHERE name = '$map_name'");
-		$db_map = DBfetch($db_result);
+		$db_map = CDBHelper::getRow('SELECT * FROM sysmaps WHERE name='.zbx_dbstr($map_name));
 		$this->assertTrue(isset($db_map['sysmapid']));
 
 		$this->assertTrue(
@@ -120,12 +118,12 @@ class testFormMap extends CWebTest {
 		);
 
 		$this->zbxTestClickLinkTextWait($map_name);
-		$this->zbxTestClickWait('edit');
+		$this->zbxTestContentControlButtonClickTextWait('Edit map');
 
 		// checking if all options remain as they were set
 		$this->assertTrue(
 			$this->zbxTestGetValue("//select[@id='gridsize']//option[@selected]") == substr($gridSize, 0, strpos($gridSize, 'x'))
-		);
+			);
 
 		if ($showGrid) {
 			$this->zbxTestTextPresent('Shown');

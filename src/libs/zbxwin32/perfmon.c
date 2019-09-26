@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -22,7 +22,7 @@
 #include "perfmon.h"
 #include "log.h"
 
-ZBX_THREAD_LOCAL static PERF_COUNTER_ID	*PerfCounterList = NULL;
+static ZBX_THREAD_LOCAL zbx_perf_counter_id_t	*PerfCounterList = NULL;
 
 PDH_STATUS	zbx_PdhMakeCounterPath(const char *function, PDH_COUNTER_PATH_ELEMENTS *cpe, char *counterpath)
 {
@@ -72,19 +72,52 @@ PDH_STATUS	zbx_PdhOpenQuery(const char *function, PDH_HQUERY query)
  *           do not call it for PERF_COUNTER_ACTIVE counters                  *
  *                                                                            *
  ******************************************************************************/
-PDH_STATUS	zbx_PdhAddCounter(const char *function, PERF_COUNTER_DATA *counter, PDH_HQUERY query,
-		const char *counterpath, PDH_HCOUNTER *handle)
+PDH_STATUS	zbx_PdhAddCounter(const char *function, zbx_perf_counter_data_t *counter, PDH_HQUERY query,
+		const char *counterpath, zbx_perf_counter_lang_t lang, PDH_HCOUNTER *handle)
 {
+	/* pointer type to PdhAddEnglishCounterW() */
+	typedef PDH_STATUS (WINAPI *ADD_ENG_COUNTER)(PDH_HQUERY, LPCWSTR, DWORD_PTR, PDH_HCOUNTER);
+
 	PDH_STATUS	pdh_status = ERROR_SUCCESS;
-	wchar_t		*wcounterPath;
+	wchar_t		*wcounterPath = NULL;
+	int		need_english;
 
-	wcounterPath = zbx_utf8_to_unicode(counterpath);
+	ZBX_THREAD_LOCAL static ADD_ENG_COUNTER add_eng_counter;
+	ZBX_THREAD_LOCAL static int 		first_call = 1;
 
-	if (NULL == *handle)
-		pdh_status = PdhAddCounter(query, wcounterPath, 0, handle);
+	need_english = PERF_COUNTER_LANG_DEFAULT != lang ||
+			(NULL != counter && PERF_COUNTER_LANG_DEFAULT != counter->lang);
+
+	/* PdhAddEnglishCounterW() is only available on Windows 2008/Vista and onwards, */
+	/* so we need to resolve it dynamically and fail if it's not available */
+	if (0 != first_call && 0 != need_english)
+	{
+		if (NULL == (add_eng_counter = (ADD_ENG_COUNTER)GetProcAddress(GetModuleHandle(L"PDH.DLL"),
+				"PdhAddEnglishCounterW")))
+		{
+			zabbix_log(LOG_LEVEL_WARNING, "PdhAddEnglishCounter() is not available, "
+					"perf_counter_en[] is not supported");
+		}
+
+		first_call = 0;
+	}
+
+	if (0 != need_english && NULL == add_eng_counter)
+	{
+		pdh_status = PDH_NOT_IMPLEMENTED;
+	}
 
 	if (ERROR_SUCCESS == pdh_status)
-		pdh_status = PdhValidatePath(wcounterPath);
+	{
+		wcounterPath = zbx_utf8_to_unicode(counterpath);
+	}
+
+	if (ERROR_SUCCESS == pdh_status && NULL == *handle)
+	{
+		pdh_status = need_english ?
+			add_eng_counter(query, wcounterPath, 0, handle) :
+			PdhAddCounter(query, wcounterPath, 0, handle);
+	}
 
 	if (ERROR_SUCCESS != pdh_status && NULL != *handle)
 	{
@@ -149,7 +182,8 @@ PDH_STATUS	zbx_PdhGetRawCounterValue(const char *function, const char *counterpa
  *           sleep 1 second to get the second raw value.                      *
  *                                                                            *
  ******************************************************************************/
-PDH_STATUS	calculate_counter_value(const char *function, const char *counterpath, double *value)
+PDH_STATUS	calculate_counter_value(const char *function, const char *counterpath,
+		zbx_perf_counter_lang_t lang, double *value)
 {
 	PDH_HQUERY		query;
 	PDH_HCOUNTER		handle = NULL;
@@ -160,7 +194,7 @@ PDH_STATUS	calculate_counter_value(const char *function, const char *counterpath
 	if (ERROR_SUCCESS != (pdh_status = zbx_PdhOpenQuery(function, &query)))
 		return pdh_status;
 
-	if (ERROR_SUCCESS != (pdh_status = zbx_PdhAddCounter(function, NULL, query, counterpath, &handle)))
+	if (ERROR_SUCCESS != (pdh_status = zbx_PdhAddCounter(function, NULL, query, counterpath, lang, &handle)))
 		goto close_query;
 
 	if (ERROR_SUCCESS != (pdh_status = zbx_PdhCollectQueryData(function, counterpath, query)))
@@ -209,12 +243,11 @@ close_query:
 
 wchar_t	*get_counter_name(DWORD pdhIndex)
 {
-	const char	*__function_name = "get_counter_name";
-	PERF_COUNTER_ID	*counterName;
-	DWORD		dwSize;
-	PDH_STATUS	pdh_status;
+	zbx_perf_counter_id_t	*counterName;
+	DWORD			dwSize;
+	PDH_STATUS		pdh_status;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() pdhIndex:%u", __function_name, pdhIndex);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() pdhIndex:%u", __func__, pdhIndex);
 
 	counterName = PerfCounterList;
 	while (NULL != counterName)
@@ -226,9 +259,9 @@ wchar_t	*get_counter_name(DWORD pdhIndex)
 
 	if (NULL == counterName)
 	{
-		counterName = (PERF_COUNTER_ID *)zbx_malloc(counterName, sizeof(PERF_COUNTER_ID));
+		counterName = (zbx_perf_counter_id_t *)zbx_malloc(counterName, sizeof(zbx_perf_counter_id_t));
 
-		memset(counterName, 0, sizeof(PERF_COUNTER_ID));
+		memset(counterName, 0, sizeof(zbx_perf_counter_id_t));
 		counterName->pdhIndex = pdhIndex;
 		counterName->next = PerfCounterList;
 
@@ -240,22 +273,21 @@ wchar_t	*get_counter_name(DWORD pdhIndex)
 			zabbix_log(LOG_LEVEL_ERR, "PdhLookupPerfNameByIndex() failed: %s",
 					strerror_from_module(pdh_status, L"PDH.DLL"));
 			zbx_free(counterName);
-			zabbix_log(LOG_LEVEL_DEBUG, "End of %s():FAIL", __function_name);
+			zabbix_log(LOG_LEVEL_DEBUG, "End of %s():FAIL", __func__);
 			return L"UnknownPerformanceCounter";
 		}
 	}
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():SUCCEED", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():SUCCEED", __func__);
 
 	return counterName->name;
 }
 
-int	check_counter_path(char *counterPath)
+int	check_counter_path(char *counterPath, int convert_from_numeric)
 {
-	const char			*__function_name = "check_counter_path";
 	PDH_COUNTER_PATH_ELEMENTS	*cpe = NULL;
 	PDH_STATUS			status;
-	int				is_numeric, ret = FAIL;
+	int				ret = FAIL;
 	DWORD				dwSize = 0;
 	wchar_t				*wcounterPath;
 
@@ -280,20 +312,23 @@ int	check_counter_path(char *counterPath)
 		goto clean;
 	}
 
-	is_numeric = (SUCCEED == _wis_uint(cpe->szObjectName) ? 0x01 : 0);
-	is_numeric |= (SUCCEED == _wis_uint(cpe->szCounterName) ? 0x02 : 0);
-
-	if (0 != is_numeric)
+	if (0 != convert_from_numeric)
 	{
-		if (0x01 & is_numeric)
-			cpe->szObjectName = get_counter_name(_wtoi(cpe->szObjectName));
-		if (0x02 & is_numeric)
-			cpe->szCounterName = get_counter_name(_wtoi(cpe->szCounterName));
+		int is_numeric = (SUCCEED == _wis_uint(cpe->szObjectName) ? 0x01 : 0);
+		is_numeric |= (SUCCEED == _wis_uint(cpe->szCounterName) ? 0x02 : 0);
 
-		if (ERROR_SUCCESS != zbx_PdhMakeCounterPath(__function_name, cpe, counterPath))
-			goto clean;
+		if (0 != is_numeric)
+		{
+			if (0x01 & is_numeric)
+				cpe->szObjectName = get_counter_name(_wtoi(cpe->szObjectName));
+			if (0x02 & is_numeric)
+				cpe->szCounterName = get_counter_name(_wtoi(cpe->szCounterName));
 
-		zabbix_log(LOG_LEVEL_DEBUG, "counter path converted to '%s'", counterPath);
+			if (ERROR_SUCCESS != zbx_PdhMakeCounterPath(__func__, cpe, counterPath))
+				goto clean;
+
+			zabbix_log(LOG_LEVEL_DEBUG, "counter path converted to '%s'", counterPath);
+		}
 	}
 
 	ret = SUCCEED;

@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -123,10 +123,31 @@ class API {
 	}
 
 	/**
+	 * @return CAutoregistration
+	 */
+	public static function Autoregistration() {
+		return self::getApi('autoregistration');
+	}
+
+	/**
 	 * @return CConfiguration
 	 */
 	public static function Configuration() {
 		return self::getApi('configuration');
+	}
+
+	/**
+	 * @return CCorrelation
+	 */
+	public static function Correlation() {
+		return self::getApi('correlation');
+	}
+
+	/**
+	 * @return CDashboard
+	 */
+	public static function Dashboard() {
+		return self::getApi('dashboard');
 	}
 
 	/**
@@ -277,6 +298,13 @@ class API {
 	}
 
 	/**
+	 * @return CProblem
+	 */
+	public static function Problem() {
+		return self::getApi('problem');
+	}
+
+	/**
 	 * @return CProxy
 	 */
 	public static function Proxy() {
@@ -309,6 +337,13 @@ class API {
 	 */
 	public static function Script() {
 		return self::getApi('script');
+	}
+
+	/**
+	 * @return CTask
+	 */
+	public static function Task() {
+		return self::getApi('task');
 	}
 
 	/**
@@ -372,13 +407,6 @@ class API {
 	 */
 	public static function UserMacro() {
 		return self::getApi('usermacro');
-	}
-
-	/**
-	 * @return CUserMedia
-	 */
-	public static function UserMedia() {
-		return self::getApi('usermedia');
 	}
 
 	/**

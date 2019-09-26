@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -22,31 +22,17 @@
 $this->includeJSfile('app/views/monitoring.acknowledge.edit.js.php');
 
 $form_list = (new CFormList())
-	->addRow(_('Message'),
-		(new CTextArea('message'))
+	->addRow(
+		new CLabel(_('Message'), 'message'),
+		(new CTextArea('message', $data['message']))
 			->setWidth(ZBX_TEXTAREA_BIG_WIDTH)
 			->setMaxLength(255)
 			->setAttribute('autofocus', 'autofocus')
 	);
 
-if (array_key_exists('event', $data)) {
-	$acknowledgesTable = (new CTable())
-		->setAttribute('style', 'width: 100%;')
-		->setHeader([_('Time'), _('User'), _('Message')]);
-
-	foreach ($data['event']['acknowledges'] as $acknowledge) {
-		$acknowledgesTable->addRow([
-			(new CCol(zbx_date2str(DATE_TIME_FORMAT_SECONDS, $acknowledge['clock'])))->addClass(ZBX_STYLE_NOWRAP),
-			(new CCol(array_key_exists('alias', $acknowledge)
-				? getUserFullname($acknowledge)
-				: _('Inaccessible user')
-			))->addClass(ZBX_STYLE_NOWRAP),
-			zbx_nl2br($acknowledge['message'])
-		]);
-	}
-
+if (array_key_exists('history', $data)) {
 	$form_list->addRow(_('History'),
-		(new CDiv($acknowledgesTable))
+		(new CDiv(makeEventHistoryTable($data['history'], $data['users'], $data['config'])))
 			->addClass(ZBX_STYLE_TABLE_FORMS_SEPARATOR)
 			->setAttribute('style', 'min-width: '.ZBX_TEXTAREA_BIG_WIDTH.'px;')
 	);
@@ -54,40 +40,60 @@ if (array_key_exists('event', $data)) {
 
 $selected_events = count($data['eventids']);
 
-$form_list->addRow(_('Acknowledge'),
-	(new CDiv(
-		(new CRadioButtonList('acknowledge_type', (int) $data['acknowledge_type']))
-			->makeVertical()
-			->addValue([
-				_n('Only selected event', 'Only selected events', $selected_events),
-				$selected_events > 1 ? (new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN) : null,
-				$selected_events > 1 ? new CSup(_n('%1$s event', '%1$s events', $selected_events)) : null
-			], ZBX_ACKNOWLEDGE_SELECTED)
-			->addValue([
-				_('Selected and all unacknowledged PROBLEM events'),
-				(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
-				new CSup(_n('%1$s event', '%1$s events', $data['unack_problem_events_count']))
-			], ZBX_ACKNOWLEDGE_PROBLEM)
-			->addValue([
-				_('Selected and all unacknowledged events'),
-				(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
-				new CSup(_n('%1$s event', '%1$s events', $data['unack_events_count']))
-			], ZBX_ACKNOWLEDGE_ALL)
-	))
-		->setAttribute('style', 'min-width: '.ZBX_TEXTAREA_BIG_WIDTH.'px;')
-		->addClass(ZBX_STYLE_TABLE_FORMS_SEPARATOR)
-);
+$form_list
+	->addRow(_x('Scope', 'selected problems'),
+		(new CDiv(
+			(new CRadioButtonList('scope', $data['scope']))
+				->makeVertical()
+				->addValue([
+					_n('Only selected problem', 'Only selected problems', $selected_events),
+					$selected_events > 1 ? (new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN) : null,
+					$selected_events > 1 ? new CSup(_n('%1$s event', '%1$s events', $selected_events)) : null
+				], ZBX_ACKNOWLEDGE_SELECTED)
+				->addValue([
+					_('Selected and all other problems of related triggers'),
+					(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
+					new CSup(_n('%1$s event', '%1$s events', $data['related_problems_count']))
+				], ZBX_ACKNOWLEDGE_PROBLEM)
+		))
+			->setAttribute('style', 'min-width: '.ZBX_TEXTAREA_BIG_WIDTH.'px;')
+			->addClass(ZBX_STYLE_TABLE_FORMS_SEPARATOR)
+	)
+	->addRow(_('Change severity'),
+		(new CList([
+			(new CCheckBox('change_severity', ZBX_PROBLEM_UPDATE_SEVERITY))
+				->onClick('javascript: jQuery("#severity input").attr("disabled", this.checked ? false : true)')
+				->setChecked($data['change_severity'])
+				->setEnabled($data['problem_severity_can_be_changed']),
+			(new CSeverity(['name' => 'severity', 'value' => $data['severity']], $data['change_severity']))
+		]))
+			->addClass('hor-list')
+	)
+	->addRow(_('Acknowledge'),
+		(new CCheckBox('acknowledge_problem', ZBX_PROBLEM_UPDATE_ACKNOWLEDGE))
+			->setChecked($data['acknowledge_problem'])
+			->setEnabled($data['problem_can_be_acknowledged'])
+	)
+	->addRow(_('Close problem'),
+		(new CCheckBox('close_problem', ZBX_PROBLEM_UPDATE_CLOSE))
+			->setChecked($data['close_problem'])
+			->setEnabled($data['problem_can_be_closed'])
+	)
+	->addRow('',
+		(new CDiv((new CLabel(_('At least one update operation or message must exist.')))->setAsteriskMark()))
+	);
 
 $footer_buttons = makeFormFooter(
-	new CSubmitButton(_('Acknowledge'), 'action', 'acknowledge.create'),
+	new CSubmitButton(_('Update'), 'action', 'acknowledge.create'),
 	[new CRedirectButton(_('Cancel'), $data['backurl'])]
 );
 
 (new CWidget())
-	->setTitle(_('Alarm acknowledgements'))
+	->setTitle(_('Update problem'))
 	->addItem(
 		(new CForm())
 			->setId('acknowledge_form')
+			->setAttribute('aria-labeledby', ZBX_STYLE_PAGE_TITLE)
 			->addVar('eventids', $data['eventids'])
 			->addVar('backurl', $data['backurl'])
 			->addItem(

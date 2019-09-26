@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -212,7 +212,7 @@ static int	get_value(const char *source_ip, const char *host, unsigned short por
 	zbx_socket_t	s;
 	int		ret;
 	ssize_t		bytes_received = -1;
-	char		*tls_arg1, *tls_arg2, *request;
+	char		*tls_arg1, *tls_arg2;
 
 	switch (configured_tls_connect_mode)
 	{
@@ -238,11 +238,9 @@ static int	get_value(const char *source_ip, const char *host, unsigned short por
 	if (SUCCEED == (ret = zbx_tcp_connect(&s, source_ip, host, port, GET_SENDER_TIMEOUT,
 			configured_tls_connect_mode, tls_arg1, tls_arg2)))
 	{
-		request = zbx_dsprintf(NULL, "%s\n", key);
-
-		if (SUCCEED == (ret = zbx_tcp_send_raw(&s, request)))
+		if (SUCCEED == (ret = zbx_tcp_send(&s, key)))
 		{
-			if (0 < (bytes_received = zbx_tcp_recv_ext(&s, ZBX_TCP_READ_UNTIL_CLOSE, 0)))
+			if (0 < (bytes_received = zbx_tcp_recv_ext(&s, 0)))
 			{
 				if (0 == strcmp(s.buffer, ZBX_NOTSUPPORTED) && sizeof(ZBX_NOTSUPPORTED) < s.read_bytes)
 				{
@@ -262,8 +260,6 @@ static int	get_value(const char *source_ip, const char *host, unsigned short por
 				ret = FAIL;
 			}
 		}
-
-		zbx_free(request);
 
 		zbx_tcp_close(&s);
 
@@ -297,6 +293,9 @@ int	main(int argc, char **argv)
 	int		i, ret = SUCCEED;
 	char		*host = NULL, *key = NULL, *source_ip = NULL, ch;
 	unsigned short	opt_count[256] = {0}, port = ZBX_DEFAULT_AGENT_PORT;
+#if defined(_WINDOWS)
+	char		*error = NULL;
+#endif
 
 #if !defined(_WINDOWS) && (defined(HAVE_POLARSSL) || defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL))
 	if (SUCCEED != zbx_coredump_disable())
@@ -387,6 +386,15 @@ int	main(int argc, char **argv)
 		}
 	}
 
+#if defined(_WINDOWS)
+	if (SUCCEED != zbx_socket_start(&error))
+	{
+		zbx_error(error);
+		zbx_free(error);
+		exit(EXIT_FAILURE);
+	}
+#endif
+
 	if (NULL == host || NULL == key)
 	{
 		usage();
@@ -447,9 +455,10 @@ int	main(int argc, char **argv)
 #endif
 	}
 #if !defined(_WINDOWS)
-	signal(SIGINT,  get_signal_handler);
-	signal(SIGTERM, get_signal_handler);
+	signal(SIGINT, get_signal_handler);
 	signal(SIGQUIT, get_signal_handler);
+	signal(SIGTERM, get_signal_handler);
+	signal(SIGHUP, get_signal_handler);
 	signal(SIGALRM, get_signal_handler);
 	signal(SIGPIPE, get_signal_handler);
 #endif
@@ -467,5 +476,10 @@ out:
 #endif
 	}
 #endif
+#if defined(_WINDOWS)
+	while (0 == WSACleanup())
+		;
+#endif
+
 	return SUCCEED == ret ? EXIT_SUCCESS : EXIT_FAILURE;
 }

@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2019 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -19,31 +19,34 @@
 **/
 
 
-if ($this->data['hostid'] == 0) {
-	$create_button = (new CSubmit('form', _('Create application (select host first)')))->setEnabled(false);
-}
-else {
-	$create_button = new CSubmit('form', _('Create application'));
-}
-
 $widget = (new CWidget())
 	->setTitle(_('Applications'))
-	->setControls((new CForm('get'))
-		->cleanItems()
-		->addItem((new CList())
-			->addItem([
-				new CLabel(_('Group'), 'groupid'),
-				(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
-				$this->data['pageFilter']->getGroupsCB()
-			])
-			->addItem([
-				new CLabel(_('Host'), 'hostid'),
-				(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
-				$this->data['pageFilter']->getHostsCB()
-			])
-			->addItem($create_button)
-		)
-	)
+	->setControls(new CList([
+		(new CForm('get'))
+			->cleanItems()
+			->setAttribute('aria-label', _('Main filter'))
+			->addItem((new CList())
+				->addItem([
+					new CLabel(_('Group'), 'groupid'),
+					(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
+					$this->data['pageFilter']->getGroupsCB()
+				])
+				->addItem([
+					new CLabel(_('Host'), 'hostid'),
+					(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
+					$this->data['pageFilter']->getHostsCB()
+				])
+			),
+		(new CTag('nav', true, ($data['hostid'] == 0)
+			? (new CButton('form', _('Create application (select host first)')))->setEnabled(false)
+			: new CRedirectButton(_('Create application'), (new CUrl('applications.php'))
+				->setArgument('form', 'create')
+				->setArgument('groupid', $data['pageFilter']->groupid)
+				->setArgument('hostid', $data['pageFilter']->hostid)
+				->getUrl()
+			)
+		))->setAttribute('aria-label', _('Content controls'))
+	]))
 	->addItem(get_header_host_table('applications', $this->data['hostid']));
 
 // create form
@@ -64,31 +67,13 @@ $applicationTable = (new CTableInfo())
 
 $current_time = time();
 
-foreach ($this->data['applications'] as $application) {
+foreach ($data['applications'] as $application) {
 	$info_icons = [];
 
 	// inherited app, display the template list
-	if ($application['templateids'] && !empty($application['sourceTemplates'])) {
-		$name = [];
-
-		CArrayHelper::sort($application['sourceTemplates'], ['name']);
-
-		foreach ($application['sourceTemplates'] as $template) {
-			if (array_key_exists($template['hostid'], $data['writable_templates'])) {
-				$name[] = (new CLink($template['name'], 'applications.php?hostid='.$template['hostid']))
-					->addClass(ZBX_STYLE_LINK_ALT)
-					->addClass(ZBX_STYLE_GREY);
-			}
-			else {
-				$name[] = (new CSpan($template['name']))->addClass(ZBX_STYLE_GREY);
-			}
-			$name[] = ', ';
-		}
-		array_pop($name);
-		$name[] = NAME_DELIMITER;
+	if ($application['templateids']) {
+		$name = makeApplicationTemplatePrefix($application['applicationid'], $data['parent_templates']);
 		$name[] = $application['name'];
-
-		$info_icons[] = '';
 	}
 	elseif ($application['flags'] == ZBX_FLAG_DISCOVERY_CREATED && $application['discoveryRule']) {
 		$name = [(new CLink(CHtml::encode($application['discoveryRule']['name']),
@@ -103,17 +88,12 @@ foreach ($this->data['applications'] as $application) {
 				$current_time, $application['applicationDiscovery']['ts_delete']
 			);
 		}
-		else {
-			$info_icons[] = '';
-		}
 	}
 	else {
 		$name = new CLink($application['name'],
 			'applications.php?form=update&applicationid='.$application['applicationid'].
 				'&hostid='.$application['hostid']
 		);
-
-		$info_icons[] = '';
 	}
 
 	$checkBox = new CCheckBox('applications['.$application['applicationid'].']', $application['applicationid']);
@@ -126,18 +106,16 @@ foreach ($this->data['applications'] as $application) {
 		[
 			new CLink(
 				_('Items'),
-				'items.php?'.
-					'hostid='.$application['hostid'].
-					'&filter_set=1'.
-					'&filter_application='.urlencode($application['name'])
+				(new CUrl('items.php'))
+					->setArgument('filter_set', '1')
+					->setArgument('filter_hostids', [$application['hostid']])
+					->setArgument('filter_application', $application['name'])
 			),
 			CViewHelper::showNum(count($application['items']))
 		],
-		$data['showInfoColumn'] ? $info_icons : null
+		$data['showInfoColumn'] ? makeInformationList($info_icons) : null
 	]);
 }
-
-zbx_add_post_js('cookie.prefix = "'.$this->data['hostid'].'";');
 
 // append table to form
 $form->addItem([
