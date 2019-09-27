@@ -114,7 +114,7 @@ $table
 				$data['slr_dns_udp_pfailed']
 			)
 		],
-		((100 - $data['slv_dns_udp_pfailed']) >= (100 - $data['slr_dns_udp_pfailed'])) ? 'red-bg' : null
+		($data['slv_dns_udp_pfailed'] < $data['slr_dns_udp_pfailed']) ? 'red-bg' : null
 	)->addRow([
 			_('DNS TCP Resolution RTT'),
 			'',
@@ -127,32 +127,44 @@ $table
 				$data['slr_dns_tcp_pfailed']
 			)
 		],
-		((100 - $data['slv_dns_tcp_pfailed']) >= (100 - $data['slr_dns_tcp_pfailed'])) ? 'red-bg' : null
+		($data['slv_dns_tcp_pfailed'] <  $data['slr_dns_tcp_pfailed']) ? 'red-bg' : null
 );
 
 // RDDS Service Availability and Query RTT.
-if (array_key_exists('slv_rdds_downtime', $data) && $data['slv_rdds_downtime'] !== 'disabled'
-		&& $data['slv_rdds_rtt_downtime'] !== 'disabled') {
+if (array_key_exists('slv_rdds_downtime', $data)) {
+	$disabled = ($data['slv_rdds_downtime'] === 'disabled' && $data['slv_rdds_rtt_downtime'] === 'disabled');
+
+	if ($disabled) {
+		$availability_class = 'disabled';
+		$rtt_class = 'disabled';
+	}
+	else {
+		$availability_class = ($data['slv_rdds_downtime'] > $data['slr_rdds_downtime']) ? 'red-bg' : null;
+		$rtt_class = ($data['slv_rdds_rtt_downtime'] < $data['slr_rdds_rtt_downtime']) ? 'red-bg' : null;
+	}
+
 	$table->addRow([
 			bold(_('RDDS Service Availability')),
 			'',
 			'',
 			'',
-			_s('%1$s (minutes of downtime)', $data['slv_rdds_downtime']),
-			_s('<= %1$s min of downtime', $data['slr_rdds_downtime'])
+			$disabled ? 'disabled' : _s('%1$s (minutes of downtime)', $data['slv_rdds_downtime']),
+			$disabled ? 'disabled' : _s('<= %1$s min of downtime',  $data['slr_rdds_downtime'])
 		],
-		($data['slv_rdds_downtime'] > $data['slr_rdds_downtime']) ? 'red-bg' : null
+		$availability_class
 	)->addRow([
 			_('RDDS Query RTT'),
 			'',
 			'',
 			'',
-			_s('%1$s %% (queries <= %2$s ms)', $data['slv_rdds_rtt_downtime'], $data['slr_rdds_rtt_downtime_ms']),
-			_s('<= %1$s ms, for at least %2$s %% of the queries', $data['slr_rdds_rtt_downtime_ms'],
-				$data['slr_rdds_rtt_downtime']
+			$disabled ? 'disabled' : _s('%1$s %% (queries <= %2$s ms)', $data['slv_rdds_rtt_downtime'],
+				$data['slr_rdds_rtt_downtime_ms']
+			),
+			$disabled ? 'disabled' : _s('<= %1$s ms, for at least %2$s %% of the queries',
+				$data['slr_rdds_rtt_downtime_ms'], $data['slr_rdds_rtt_downtime']
 			)
 		],
-		((100 - $data['slv_rdds_rtt_downtime']) >= (100 - $data['slr_rdds_rtt_downtime'])) ? 'red-bg' : null
+		$rtt_class
 	);
 }
 
