@@ -107,32 +107,32 @@ $table
 			'',
 			'',
 			'',
-			_s('%1$s %% (queries <= %2$s ms)', $data['slv_dns_udp_pfailed'],
-				$data['slr_dns_udp_pfailed_ms']
+			_s('%1$s %% (queries <= %2$s ms)', $data['slv_dns_udp_rtt_percentage'],
+				$data['slr_dns_udp_rtt_ms']
 			),
-			_s('<= %1$s ms, for at least %2$s %% of queries', $data['slr_dns_udp_pfailed_ms'],
-				$data['slr_dns_udp_pfailed']
+			_s('<= %1$s ms, for at least %2$s %% of queries', $data['slr_dns_udp_rtt_ms'],
+				$data['slr_dns_udp_rtt_percentage']
 			)
 		],
-		($data['slv_dns_udp_pfailed'] < $data['slr_dns_udp_pfailed']) ? 'red-bg' : null
+		($data['slv_dns_udp_rtt_percentage'] < $data['slr_dns_udp_rtt_percentage']) ? 'red-bg' : null
 	)->addRow([
 			_('DNS TCP Resolution RTT'),
 			'',
 			'',
 			'',
-			_s('%1$s %% (queries <= %2$s ms)', $data['slv_dns_tcp_pfailed'],
-				$data['slr_dns_tcp_pfailed_ms']
+			_s('%1$s %% (queries <= %2$s ms)', $data['slv_dns_tcp_rtt_percentage'],
+				$data['slr_dns_tcp_rtt_ms']
 			),
-			_s('<= %1$s ms, for at least %2$s %% of queries', $data['slr_dns_tcp_pfailed_ms'],
-				$data['slr_dns_tcp_pfailed']
+			_s('<= %1$s ms, for at least %2$s %% of queries', $data['slr_dns_tcp_rtt_ms'],
+				$data['slr_dns_tcp_rtt_percentage']
 			)
 		],
-		($data['slv_dns_tcp_pfailed'] <  $data['slr_dns_tcp_pfailed']) ? 'red-bg' : null
+		($data['slv_dns_tcp_rtt_percentage'] <  $data['slr_dns_tcp_rtt_percentage']) ? 'red-bg' : null
 );
 
 // RDDS Service Availability and Query RTT.
 if (array_key_exists('slv_rdds_downtime', $data)) {
-	$disabled = ($data['slv_rdds_downtime'] === 'disabled' && $data['slv_rdds_rtt_downtime'] === 'disabled');
+	$disabled = ($data['slv_rdds_downtime'] === 'disabled' && $data['slv_rdds_rtt_percentage'] === 'disabled');
 
 	if ($disabled) {
 		$availability_class = 'disabled';
@@ -140,7 +140,7 @@ if (array_key_exists('slv_rdds_downtime', $data)) {
 	}
 	else {
 		$availability_class = ($data['slv_rdds_downtime'] > $data['slr_rdds_downtime']) ? 'red-bg' : null;
-		$rtt_class = ($data['slv_rdds_rtt_downtime'] < $data['slr_rdds_rtt_downtime']) ? 'red-bg' : null;
+		$rtt_class = ($data['slv_rdds_rtt_percentage'] < $data['slr_rdds_rtt_percentage']) ? 'red-bg' : null;
 	}
 
 	$table->addRow([
@@ -157,11 +157,11 @@ if (array_key_exists('slv_rdds_downtime', $data)) {
 			'',
 			'',
 			'',
-			$disabled ? 'disabled' : _s('%1$s %% (queries <= %2$s ms)', $data['slv_rdds_rtt_downtime'],
-				$data['slr_rdds_rtt_downtime_ms']
+			$disabled ? 'disabled' : _s('%1$s %% (queries <= %2$s ms)', $data['slv_rdds_rtt_percentage'],
+				$data['slr_rdds_rtt_ms']
 			),
 			$disabled ? 'disabled' : _s('<= %1$s ms, for at least %2$s %% of the queries',
-				$data['slr_rdds_rtt_downtime_ms'], $data['slr_rdds_rtt_downtime']
+				$data['slr_rdds_rtt_ms'], $data['slr_rdds_rtt_percentage']
 			)
 		],
 		$rtt_class

@@ -173,23 +173,23 @@ if ($data['tld'] && $filter_valid) {
 				'to'		=> (int) $details->reportPeriodTo,
 				'generated'	=> (int) $details->generationDateTime
 			],
-			'slv_dns_downtime'			=> (string) $xml->DNS->serviceAvailability,
-			'slr_dns_downtime'			=> (string) $xml->DNS->serviceAvailability->attributes()->downtimeSLR,
+			'slv_dns_downtime'				=> (string) $xml->DNS->serviceAvailability,
+			'slr_dns_downtime'				=> (string) $xml->DNS->serviceAvailability->attributes()->downtimeSLR,
 
-			'slv_dns_tcp_pfailed'		=> (string) $xml->DNS->rttTCP,
-			'slr_dns_tcp_pfailed'		=> (String) $xml->DNS->rttTCP->attributes()->percentageSLR,
-			'slr_dns_tcp_pfailed_ms'	=> (string) $xml->DNS->rttTCP->attributes()->rttSLR,
+			'slv_dns_tcp_rtt_percentage'	=> (string) $xml->DNS->rttTCP,
+			'slr_dns_tcp_rtt_percentage'	=> (String) $xml->DNS->rttTCP->attributes()->percentageSLR,
+			'slr_dns_tcp_rtt_ms'			=> (string) $xml->DNS->rttTCP->attributes()->rttSLR,
 
-			'slv_dns_udp_pfailed'		=> (string) $xml->DNS->rttUDP,
-			'slr_dns_udp_pfailed'		=> (string) $xml->DNS->rttUDP->attributes()->percentageSLR,
-			'slr_dns_udp_pfailed_ms'	=> (string) $xml->DNS->rttUDP->attributes()->rttSLR,
+			'slv_dns_udp_rtt_percentage'	=> (string) $xml->DNS->rttUDP,
+			'slr_dns_udp_rtt_percentage'	=> (string) $xml->DNS->rttUDP->attributes()->percentageSLR,
+			'slr_dns_udp_rtt_ms'			=> (string) $xml->DNS->rttUDP->attributes()->rttSLR,
 
-			'slv_rdds_downtime'			=> (string) $xml->RDDS->serviceAvailability,
-			'slr_rdds_downtime'			=> (string) $xml->RDDS->serviceAvailability->attributes()->downtimeSLR,
+			'slv_rdds_downtime'				=> (string) $xml->RDDS->serviceAvailability,
+			'slr_rdds_downtime'				=> (string) $xml->RDDS->serviceAvailability->attributes()->downtimeSLR,
 
-			'slv_rdds_rtt_downtime'		=> (string) $xml->RDDS->rtt,
-			'slr_rdds_rtt_downtime'		=> (string) $xml->RDDS->rtt->attributes()->percentageSLR,
-			'slr_rdds_rtt_downtime_ms'	=> (string) $xml->RDDS->rtt->attributes()->rttSLR
+			'slv_rdds_rtt_percentage'		=> (string) $xml->RDDS->rtt,
+			'slr_rdds_rtt_percentage'		=> (string) $xml->RDDS->rtt->attributes()->percentageSLR,
+			'slr_rdds_rtt_ms'				=> (string) $xml->RDDS->rtt->attributes()->rttSLR
 		];
 
 		if ($data['tld']['host'] !== strval($details->id)) {
