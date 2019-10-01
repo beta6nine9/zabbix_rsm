@@ -2044,6 +2044,7 @@ void	process_mass_data(zbx_socket_t *sock, zbx_uint64_t proxy_hostid, AGENT_VALU
 	int			*lastclocks = NULL, *errcodes = NULL, *mtimes = NULL, *errcodes2 = NULL,
 				flag_host_allow = 0;
 	size_t			num = 0;
+	time_t			now;
 #if defined(HAVE_POLARSSL) || defined(HAVE_GNUTLS) || defined(HAVE_OPENSSL)
 	zbx_tls_conn_attr_t	attr;
 #endif
@@ -2078,6 +2079,8 @@ void	process_mass_data(zbx_socket_t *sock, zbx_uint64_t proxy_hostid, AGENT_VALU
 
 	DCconfig_get_items_by_keys(items, keys, errcodes, values_num);
 
+	now = time(NULL);
+
 	for (i = 0; i < values_num; i++)
 	{
 		if (SUCCEED != errcodes[i])
@@ -2109,6 +2112,18 @@ void	process_mass_data(zbx_socket_t *sock, zbx_uint64_t proxy_hostid, AGENT_VALU
 
 		if (0 == proxy_hostid && ITEM_TYPE_TRAPPER != items[i].type && ITEM_TYPE_ZABBIX_ACTIVE != items[i].type)
 			continue;
+
+		/* RSM specifics: ignore history data from proxy if it's older than 1.5 minutes */
+		if (0 != proxy_hostid && now - values[i].ts.sec > 90 && (
+				0 == strncmp(items[i].key_orig, "rsm", ZBX_CONST_STRLEN("rsm")) ||
+				0 == strncmp(items[i].key_orig, "rdap", ZBX_CONST_STRLEN("rdap")) ||
+				0 == strncmp(items[i].key_orig, "resolver", ZBX_CONST_STRLEN("resolver"))))
+		{
+			zabbix_log(LOG_LEVEL_WARNING, "skipping [%s] value [%s] bacause it is %d seconds old",
+					items[i].key_orig, values[i].value, now - values[i].ts.sec);
+
+			continue;
+		}
 
 		if (ITEM_TYPE_TRAPPER == items[i].type && 0 == proxy_hostid)
 		{
