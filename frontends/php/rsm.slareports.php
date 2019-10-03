@@ -183,16 +183,16 @@ if ($data['tld'] && $filter_valid) {
 			$data += [
 				'ns_items'	=> $ns_items,
 
-				'slv_dns_downtime'			=> (string) $xml->DNS->serviceAvailability,
-				'slr_dns_downtime'			=> (string) $xml->DNS->serviceAvailability->attributes()->downtimeSLR,
+				'slv_dns_downtime'				=> (string) $xml->DNS->serviceAvailability,
+				'slr_dns_downtime'				=> (string) $xml->DNS->serviceAvailability->attributes()->downtimeSLR,
 
-				'slv_dns_tcp_pfailed'		=> (string) $xml->DNS->rttTCP,
-				'slr_dns_tcp_pfailed'		=> (String) $xml->DNS->rttTCP->attributes()->percentageSLR,
-				'slr_dns_tcp_pfailed_ms'	=> (string) $xml->DNS->rttTCP->attributes()->rttSLR,
+				'slv_dns_tcp_rtt_percentage'	=> (string) $xml->DNS->rttTCP,
+				'slr_dns_tcp_rtt_percentage'	=> (String) $xml->DNS->rttTCP->attributes()->percentageSLR,
+				'slr_dns_tcp_rtt_ms'			=> (string) $xml->DNS->rttTCP->attributes()->rttSLR,
 
-				'slv_dns_udp_pfailed'		=> (string) $xml->DNS->rttUDP,
-				'slr_dns_udp_pfailed'		=> (string) $xml->DNS->rttUDP->attributes()->percentageSLR,
-				'slr_dns_udp_pfailed_ms'	=> (string) $xml->DNS->rttUDP->attributes()->rttSLR,
+				'slv_dns_udp_rtt_percentage'	=> (string) $xml->DNS->rttUDP,
+				'slr_dns_udp_rtt_percentage'	=> (string) $xml->DNS->rttUDP->attributes()->percentageSLR,
+				'slr_dns_udp_rtt_ms'			=> (string) $xml->DNS->rttUDP->attributes()->rttSLR,
 			];
 		}
 
@@ -203,12 +203,12 @@ if ($data['tld'] && $filter_valid) {
 				'generated'	=> (int) $details->generationDateTime
 			],
 
-			'slv_rdds_downtime'			=> (string) $xml->RDDS->serviceAvailability,
-			'slr_rdds_downtime'			=> (string) $xml->RDDS->serviceAvailability->attributes()->downtimeSLR,
+			'slv_rdds_downtime'				=> (string) $xml->RDDS->serviceAvailability,
+			'slr_rdds_downtime'				=> (string) $xml->RDDS->serviceAvailability->attributes()->downtimeSLR,
 
-			'slv_rdds_rtt_downtime'		=> (string) $xml->RDDS->rtt,
-			'slr_rdds_rtt_downtime'		=> (string) $xml->RDDS->rtt->attributes()->percentageSLR,
-			'slr_rdds_rtt_downtime_ms'	=> (string) $xml->RDDS->rtt->attributes()->rttSLR
+			'slv_rdds_rtt_percentage'		=> (string) $xml->RDDS->rtt,
+			'slr_rdds_rtt_percentage'		=> (string) $xml->RDDS->rtt->attributes()->percentageSLR,
+			'slr_rdds_rtt_ms'				=> (string) $xml->RDDS->rtt->attributes()->rttSLR
 		];
 
 		if (isset($xml->RDAP)) {
@@ -222,9 +222,9 @@ if ($data['tld'] && $filter_valid) {
 				'slv_rdap_downtime'			=> (string) $rdap->serviceAvailability,
 				'slr_rdap_downtime'			=> (string) $rdap->serviceAvailability->attributes()->downtimeSLR,
 
-				'slv_rdap_rtt_downtime'		=> (string) $rdap->rtt,
-				'slr_rdap_rtt_downtime'		=> (string) $rdap->rtt->attributes()->percentageSLR,
-				'slr_rdap_rtt_downtime_ms'	=> (string) $rdap->rtt->attributes()->rttSLR
+				'slv_rdap_rtt_percentage'	=> (string) $rdap->rtt,
+				'slr_rdap_rtt_percentage'	=> (string) $rdap->rtt->attributes()->percentageSLR,
+				'slr_rdap_rtt_ms'			=> (string) $rdap->rtt->attributes()->rttSLR
 			];
 		}
 		else if (is_RDAP_standalone($data['details']['from'])) {

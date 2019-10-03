@@ -393,14 +393,22 @@ sub process_tld_batch($$$$$$)
 		#                             'clock' => clock
 		#                         }
 		#                     }
+		#                     ...
+		#                     "" => {                            <-- empty probe is for *.avail (<TLD>) items
+		#                         itemid = {
+		#                             'key' => ,
+		#                             'value_type' => value_type,
+		#                             'clock' => clock
+		#                         }
+		#                     }
 		#                 }
 		#             }
 		#         }
 		#     }
 		# }
 		#
-		# NB! Besides results from probes we process Service Availability values, which
-		# are per TLD, for those we will use empty string ("") as probe.
+		# NB! Besides results from probes we cache Service Availability values, which
+		# are stored on a <TLD> host, for those we use empty string ("") as probe.
 
 		my $lastvalues_db = {'tlds' => {}};
 		get_lastvalues_from_db($lastvalues_db, $tld, \%delays);
@@ -675,6 +683,9 @@ sub cycles_to_calculate($$$$$$$$)
 	{
 		foreach my $itemid (keys(%{$lastvalues_db_tld->{$service}{'probes'}{$probe}}))
 		{
+			# empty probe is for *.avail (<TLD>) items, we calculate cycles based on those values
+			next unless ($probe eq "");
+
 			my $lastclock_db = $lastvalues_db_tld->{$service}{'probes'}{$probe}{$itemid}{'clock'};
 
 			my $lastclock;
@@ -989,6 +1000,7 @@ sub get_lastvalues_from_db($$$)
 
 		foreach my $service ($key_service eq 'dns' ? ('dns', 'dnssec') : ($key_service))
 		{
+			# empty probe is for *.avail (<TLD>) items
 			$lastvalues_db->{'tlds'}{$tld}{$service}{'probes'}{$probe // ""}{$itemid} = {
 				'key' => $key,
 				'value_type' => $value_type,
