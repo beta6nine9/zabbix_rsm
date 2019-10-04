@@ -144,6 +144,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		update_slv_rtt_monthly_stats
 		recalculate_downtime
 		generate_report
+		set_log_tld unset_log_tld
 		usage);
 
 # configuration, set in set_slv_config()
@@ -3913,6 +3914,8 @@ sub get_slv_rtt_monthly_items($$$$)
 
 	foreach my $tld (keys(%slv_items_by_tld))
 	{
+		set_log_tld($tld);
+
 		my %tld_items = %{$slv_items_by_tld{$tld}};
 
 		# if any item was found on TLD, then all items must exist
@@ -3946,6 +3949,8 @@ sub get_slv_rtt_monthly_items($$$$)
 				fail("Items '$slv_item_key_performed', '$slv_item_key_failed' and '$slv_item_key_pfailed' have different lastvalue clocks on TLD '$tld'");
 			}
 		}
+
+		unset_log_tld();
 	}
 
 	return \%slv_items_by_tld;
@@ -3978,6 +3983,8 @@ sub update_slv_rtt_monthly_stats($$$$$$$$)
 	TLD_LOOP:
 	foreach my $tld (keys(%{$slv_items}))
 	{
+		set_log_tld($tld);
+
 		my $last_clock           = $slv_items->{$tld}{$slv_item_key_performed}[0];
 		my $last_performed_value = $slv_items->{$tld}{$slv_item_key_performed}[1];
 		my $last_failed_value    = $slv_items->{$tld}{$slv_item_key_failed}[1];
@@ -4062,6 +4069,8 @@ sub update_slv_rtt_monthly_stats($$$$$$$$)
 
 			$last_clock = $cycle_start;
 		}
+
+		unset_tld_log();
 	}
 
 	send_values();
@@ -4156,6 +4165,18 @@ sub generate_report($$;$)
 	{
 		fail("failed to generate report, command $cmd exited with value " . ($? >> 8));
 	}
+}
+
+sub set_log_tld($)
+{
+	$tld = shift;
+
+	info("set_log_tld() tld set");
+}
+
+sub unset_log_tld()
+{
+	undef($tld);
 }
 
 sub usage

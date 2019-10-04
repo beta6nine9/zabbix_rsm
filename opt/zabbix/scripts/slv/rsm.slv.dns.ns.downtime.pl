@@ -45,7 +45,11 @@ sub process_values
 {
 	foreach my $tld (@{get_tlds_and_hostids(opt('tld') ? getopt('tld') : undef)})
 	{
+		set_log_tld($tld->[0]);
+
 		process_tld(@{$tld});
+
+		unset_log_tld();
 	}
 }
 
