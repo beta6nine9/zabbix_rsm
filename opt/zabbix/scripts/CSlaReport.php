@@ -201,6 +201,11 @@ class CSlaReport
 			}
 		}
 
+		if (count($tlds) === 0)
+		{
+			throw new Exception("Could not find any TLD(s)");
+		}
+
 		// get RDDS status (enabled/disabled)
 
 		$rows = self::getRddsStatus($tlds, $from, $till);
