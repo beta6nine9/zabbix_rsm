@@ -649,13 +649,13 @@ sub cycles_to_calculate($$$$$$$$)
 
 	my %cycles;
 
-	foreach my $probe (keys(%{$lastvalues_db_tld->{$service}{'probes'}}))
+	# empty probe is for *.avail (<TLD>) items, we calculate cycles based on those values
+	my $probe = "";
+
+	if (%{$lastvalues_db_tld->{$service}{'probes'}{$probe}})
 	{
 		foreach my $itemid (keys(%{$lastvalues_db_tld->{$service}{'probes'}{$probe}}))
 		{
-			# empty probe is for *.avail (<TLD>) items, we calculate cycles based on those values
-			next unless ($probe eq "");
-
 			my $lastclock_db = $lastvalues_db_tld->{$service}{'probes'}{$probe}{$itemid}{'clock'};
 
 			my $lastclock;
@@ -694,11 +694,9 @@ sub cycles_to_calculate($$$$$$$$)
 
 			if (opt('debug'))
 			{
-				my $key = substr($lastvalues_db_tld->{$service}{'probes'}{$probe}{$itemid}{'key'}, 0, SUBSTR_KEY_LEN);
-
-				$key = sprintf("%".SUBSTR_KEY_LEN."s", $key);
-
-				dbg("[$key] last ", ($lastclock ? ts_str($lastclock) :'NULL'), ", db ", ts_str($lastclock_db), ($probe ? $probe : ''));
+				dbg("[", $lastvalues_db_tld->{$service}{'probes'}{$probe}{$itemid}{'key'}, "] last ",
+					($lastclock ? ts_str($lastclock) :'NULL'), ", db ", ts_str($lastclock_db),
+					($probe ? $probe : ''));
 			}
 
 			add_cycles(
@@ -714,7 +712,6 @@ sub cycles_to_calculate($$$$$$$$)
 				$lastvalues_cache_tld,
 				$lastvalues_db_tld
 			);
-
 		}
 	}
 
