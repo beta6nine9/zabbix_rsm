@@ -869,6 +869,7 @@ sub tld_interface_enabled($$$)
 	$interface = lc($interface);
 
 	return 1 if ($interface eq 'dns');
+	return 0 if ($interface eq 'epp');
 
 	my $item_key = enabled_item_key_from_interface($interface);
 
