@@ -1,3 +1,9 @@
+Changes for rsm1.2.11
+
+Bug fixes:
+....I..... [538] generate recent measurement files only once, after service availability is calculated; drop monitoring data from proxy that is over 90 seconds old (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm1.2.10
 
 Bug fixes:
