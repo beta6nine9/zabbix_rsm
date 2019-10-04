@@ -1,3 +1,12 @@
+Changes for rsm1.3.0rc7
+
+Bug fixes:
+....I..... [572] fixed SQL error when no TLDs present in the system (dimir)
+
+New features:
+....I..... [576] added TLD prefix to SLV logs (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm1.3.0rc6
 
 New features:
