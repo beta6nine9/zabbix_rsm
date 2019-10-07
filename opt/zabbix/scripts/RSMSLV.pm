@@ -4196,8 +4196,6 @@ sub generate_report($$;$)
 sub set_log_tld($)
 {
 	$tld = shift;
-
-	info("set_log_tld() tld set");
 }
 
 sub unset_log_tld()
