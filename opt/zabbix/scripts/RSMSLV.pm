@@ -4180,7 +4180,7 @@ sub generate_report($$;$)
 
 	if ($out)
 	{
-		dbg("output of $cmd:\n" . $out);
+		info("output of $cmd:\n" . $out);
 	}
 
 	if ($? == -1)
