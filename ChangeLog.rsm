@@ -1,3 +1,11 @@
+Changes for rsm1.3.0rc8
+
+Bug fixes:
+....I..... [sub-576] removed debug print when setting TLD prefix of SLV logs (dimir)
+....I..... [577] added printing error message from sla-report.php when generating reports from Perl scripts (asitals)
+....I..... [573] always send ratio of failed rtts (asitals)
+
+--------------------------------------------------------------------------------
 Changes for rsm1.3.0rc7
 
 Bug fixes:
