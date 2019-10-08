@@ -4096,7 +4096,7 @@ sub update_slv_rtt_monthly_stats($$$$$$$$)
 			$last_clock = $cycle_start;
 		}
 
-		unset_tld_log();
+		unset_log_tld();
 	}
 
 	send_values();
