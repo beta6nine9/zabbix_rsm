@@ -54,7 +54,7 @@ foreach my $probe (keys(%$probes_ref))
 
 	my $status_str = "$probe is " . ($status == UP ? "Up" : "Down");
 
-	push_value("$probe - mon", PROBE_KEY_ONLINE, $value_ts, $status, $status_str);
+	push_value("$probe - mon", PROBE_KEY_ONLINE, $value_ts, $status, ITEM_VALUE_TYPE_UINT64, $status_str);
 }
 
 send_values();
