@@ -36,7 +36,7 @@ sub main()
 
 	my $slr = get_slrs();
 
-	my ($items, $itemids_float, $itemids_uint) = get_items($slr);
+	my ($items, $itemids_float, $itemids_uint) = get_items($slr, $from);
 
 	my $data_uint  = get_data($itemids_uint , "history_uint", $from, $till);
 	my $data_float = get_data($itemids_float, "history"     , $from, $till);
@@ -158,16 +158,18 @@ sub get_slrs()
 	return \%slr;
 }
 
-sub get_items($)
+sub get_items($$)
 {
-	my $slr = shift;
+	my $slr  = shift;
+	my $from = shift;
 
 	my $sql = "select items.itemid, items.key_, items.value_type, hosts.host" .
 		" from items" .
 			" left join hosts on hosts.hostid = items.hostid" .
 			" left join hosts_groups on hosts_groups.hostid = hosts.hostid" .
 		" where (items.key_ in (?, ?, ?, ?, ?) or items.key_ like ?) and" .
-			" hosts_groups.groupid = ?";
+			" hosts_groups.groupid = ? and" .
+			" hosts.created < ?";
 
 	my $params = [
 		SLV_ITEM_KEY_DNS_DOWNTIME,
@@ -176,7 +178,8 @@ sub get_items($)
 		SLV_ITEM_KEY_DNS_TCP_PFAILED,
 		SLV_ITEM_KEY_RDDS_PFAILED,
 		SLV_ITEM_KEY_DNS_NS_DOWNTIME,
-		TLDS_GROUPID
+		TLDS_GROUPID,
+		$from,
 	];
 
 	my $rows = db_select($sql, $params);
