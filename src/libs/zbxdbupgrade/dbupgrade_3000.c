@@ -4377,6 +4377,20 @@ static int	DBpatch_3000322(void)
 #undef CHECK
 }
 
+static int	DBpatch_3000323(void)
+{
+	/* patch for both server and proxy */
+
+	if (ZBX_DB_OK > DBexecute(
+			"alter table hosts"
+			" add column created int(11) not null default '0' after hostid"))
+	{
+		return FAIL;
+	}
+
+	return SUCCEED;
+}
+
 #endif
 
 DBPATCH_START(3000)
@@ -4485,5 +4499,6 @@ DBPATCH_ADD(3000319, 0, 0)	/* remove trailing spaces from "Ratio of failed month
 DBPATCH_ADD(3000320, 0, 1)	/* create rsmhost_dns_ns_log table */
 DBPATCH_ADD(3000321, 0, 0)	/* fill rsmhost_dns_ns_log table */
 DBPATCH_ADD(3000322, 0, 0)	/* fix delta field for 'rsm.slv.%.rtt.%' items */
+DBPATCH_ADD(3000323, 0, 1)	/* add 'created' field to the 'hosts' table */
 
 DBPATCH_END()
