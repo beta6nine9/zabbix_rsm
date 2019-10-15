@@ -652,7 +652,7 @@ sub cycles_to_calculate($$$$$$$$)
 	# empty probe is for *.avail (<TLD>) items, we calculate cycles based on those values
 	my $probe = "";
 
-	if (%{$lastvalues_db_tld->{$service}{'probes'}{$probe}})
+	if (%{$lastvalues_db_tld->{$service}{'probes'}{$probe} // {}})
 	{
 		foreach my $itemid (keys(%{$lastvalues_db_tld->{$service}{'probes'}{$probe}}))
 		{
