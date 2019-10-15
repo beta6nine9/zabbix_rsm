@@ -219,7 +219,7 @@ sub calculate_downtime_values
 
 		my $new_downtime_value = ($month_changed ? 0 : $downtime_value) + ($avail_value == DOWN ? 1 : 0);
 
-		push_value($tld, $downtime_key, $clock, $new_downtime_value);
+		push_value($tld, $downtime_key, $clock, $new_downtime_value, ITEM_VALUE_TYPE_UINT64);
 
 		$downtime_value = $new_downtime_value;
 	}

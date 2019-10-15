@@ -125,7 +125,7 @@ sub process_cycles # for a particular slv item
 
 		if ($online_probe_count < $cfg_minonline)
 		{
-			push_value($tld, $slv_itemkey, $from, UP_INCONCLUSIVE_NO_PROBES,
+			push_value($tld, $slv_itemkey, $from, UP_INCONCLUSIVE_NO_PROBES, ITEM_VALUE_TYPE_UINT64,
 				"Up (not enough probes online, $online_probe_count while $cfg_minonline required)");
 
 			next;
@@ -136,7 +136,7 @@ sub process_cycles # for a particular slv item
 
 		if ($probes_with_results < $cfg_minonline)
 		{
-			push_value($tld, $slv_itemkey, $from, UP_INCONCLUSIVE_NO_DATA,
+			push_value($tld, $slv_itemkey, $from, UP_INCONCLUSIVE_NO_DATA, ITEM_VALUE_TYPE_UINT64,
 				"Up (not enough probes with results, $probes_with_results while $cfg_minonline required)");
 
 			next;
@@ -155,7 +155,7 @@ sub process_cycles # for a particular slv item
 		my $probe_count = scalar(@{$rtt_itemids->{$tld}{$nsip}});
 		my $limit = (SLV_UNAVAILABILITY_LIMIT * 0.01) * $probe_count;
 
-		push_value($tld, $slv_itemkey, $from, ($down_rtt_count > $limit) ? DOWN : UP);
+		push_value($tld, $slv_itemkey, $from, ($down_rtt_count > $limit) ? DOWN : UP, ITEM_VALUE_TYPE_UINT64);
 	}
 }
 

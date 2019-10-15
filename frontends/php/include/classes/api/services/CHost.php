@@ -523,6 +523,9 @@ class CHost extends CHostGeneral {
 				$host['name'] = $host['host'];
 			}
 
+			// Store time when host was created.
+			$host['created'] = time();
+
 			$hostid = DB::insert('hosts', [$host]);
 			$hostid = reset($hostid);
 			$host['hostid'] = $hostid;

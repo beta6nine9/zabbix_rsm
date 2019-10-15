@@ -47,11 +47,11 @@ use constant DEFAULT_MAIN_INTERFACE	=> {
 	'port'	=> '10050'
 };
 
-use constant ITEM_VALUE_TYPE_FLOAT => 0;
-use constant ITEM_VALUE_TYPE_STR =>   1;
-use constant ITEM_VALUE_TYPE_LOG =>   2;
-use constant ITEM_VALUE_TYPE_UINT64=> 3;
-use constant ITEM_VALUE_TYPE_TEXT =>  4;
+use constant ITEM_VALUE_TYPE_FLOAT  => 0;
+use constant ITEM_VALUE_TYPE_STR    => 1;
+use constant ITEM_VALUE_TYPE_LOG    => 2;
+use constant ITEM_VALUE_TYPE_UINT64 => 3;
+use constant ITEM_VALUE_TYPE_TEXT   => 4;
 
 use constant ITEM_TYPE_ZABBIX =>             0;
 use constant ITEM_TYPE_TRAPPER =>            2;
