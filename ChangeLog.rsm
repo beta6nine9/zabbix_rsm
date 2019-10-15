@@ -76,6 +76,13 @@ New features:
 ..F.I..... [170] added support for Compliance SLA monitoring (dimir, yurii, asitals, miks, gcalenko)
 
 --------------------------------------------------------------------------------
+Changes for rsm1.2.12
+
+Bug fixes:
+....I..... [sub-538] fixed twice re-processing of last processed cycle in sla-api-recent.pl (asitals)
+....I..... [579] fixed de-referencing undefined value as a hash key in sla-api-recent.pl (asitals)
+
+--------------------------------------------------------------------------------
 Changes for rsm1.2.11
 
 Bug fixes:

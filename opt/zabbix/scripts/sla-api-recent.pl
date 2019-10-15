@@ -572,11 +572,11 @@ sub add_cycles($$$$$$$$$$$)
 
 	return if ($lastclock == $lastclock_db);	# we are up-to-date, according to cache
 
-	my $cycle_start = cycle_start($lastclock, $delay);
+	my $cycle_start = cycle_start($lastclock + $delay, $delay);
 
 	my $db_cycle_start = cycle_start($lastclock_db, $delay);
 
-	my $max_clock = cycle_end($cycle_start + $max_period, $delay);
+	my $max_clock = cycle_end($cycle_start - $delay + $max_period, $delay);
 
 	# issue #511
 	# Sometimes we get strange timestamp of cycle to calculate, e. g. 960 .
@@ -652,7 +652,7 @@ sub cycles_to_calculate($$$$$$$$)
 	# empty probe is for *.avail (<TLD>) items, we calculate cycles based on those values
 	my $probe = "";
 
-	if (%{$lastvalues_db_tld->{$service}{'probes'}{$probe}})
+	if (%{$lastvalues_db_tld->{$service}{'probes'}{$probe} // {}})
 	{
 		foreach my $itemid (keys(%{$lastvalues_db_tld->{$service}{'probes'}{$probe}}))
 		{
@@ -662,7 +662,7 @@ sub cycles_to_calculate($$$$$$$$)
 
 			if (opt('now'))
 			{
-				$lastclock = cycle_start(getopt('now'), $delay);
+				$lastclock = cycle_start(getopt('now') - $delay, $delay);
 
 				dbg("using specified last clock: ", ts_str($lastclock));
 			}
