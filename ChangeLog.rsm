@@ -76,6 +76,12 @@ New features:
 ..F.I..... [170] added support for Compliance SLA monitoring (dimir, yurii, asitals, miks, gcalenko)
 
 --------------------------------------------------------------------------------
+Changes for rsm1.2.13
+
+Bug fixes:
+....I..... [sub-538] fixed selecting cycles that need to be processed (asitals)
+
+--------------------------------------------------------------------------------
 Changes for rsm1.2.12
 
 Bug fixes:

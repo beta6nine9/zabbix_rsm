@@ -572,7 +572,9 @@ sub add_cycles($$$$$$$$$$$)
 
 	return if ($lastclock == $lastclock_db);	# we are up-to-date, according to cache
 
-	my $cycle_start = cycle_start($lastclock + $delay, $delay);
+	$lastclock += $delay; # don't process cycle that is already processed
+
+	my $cycle_start = cycle_start($lastclock, $delay);
 
 	my $db_cycle_start = cycle_start($lastclock_db, $delay);
 
