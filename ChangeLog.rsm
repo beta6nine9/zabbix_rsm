@@ -1,3 +1,9 @@
+Changes for rsm1.3.0rc10
+
+Bug fixes:
+....I..... [568] added code to ignore rmshosts added during previous month when generating monthly alerts and reports, wait until history syncers on Zabbix Server store pushed data into DB before exiting (asitals)
+
+--------------------------------------------------------------------------------
 Changes for rsm1.3.0rc9
 
 Bug fixes:
