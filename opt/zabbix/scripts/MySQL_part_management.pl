@@ -39,11 +39,11 @@ my $section = $config->{$server_key};
 
 my $db_schema = $section->{'db_name'};
 
-my $tables = {	'history' => { 'period' => 'day', 'keep_history' => '60'},
-		'history_log' => { 'period' => 'day', 'keep_history' => '60'},
-		'history_str' => { 'period' => 'day', 'keep_history' => '60'},
-		'history_text' => { 'period' => 'day', 'keep_history' => '60'},
-		'history_uint' => { 'period' => 'day', 'keep_history' => '60'},
+my $tables = {	'history' => { 'period' => 'day', 'keep_history' => '75'},
+		'history_log' => { 'period' => 'day', 'keep_history' => '75'},
+		'history_str' => { 'period' => 'day', 'keep_history' => '75'},
+		'history_text' => { 'period' => 'day', 'keep_history' => '75'},
+		'history_uint' => { 'period' => 'day', 'keep_history' => '75'},
 
 		'trends' => { 'period' => 'month', 'keep_history' => '9999'},
 		'trends_uint' => { 'period' => 'month', 'keep_history' => '9999'},

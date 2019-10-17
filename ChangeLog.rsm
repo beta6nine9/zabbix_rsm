@@ -1,3 +1,9 @@
+Changes for rsm1.3.0rc11
+
+Bug fixes:
+....I..... [580] changed default keep_history from 60 to 75 in MySQL partitioning script (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm1.3.0rc10
 
 Bug fixes:
