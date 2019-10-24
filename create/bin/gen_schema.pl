@@ -657,10 +657,18 @@ sub process
 	$sequences = "";
 	$uniq = "";
 	my ($type, $line);
+	my @lines;
 
-	open(INFO, $file);	# open the file
-	my @lines = <INFO>;	# read it into an array
-	close(INFO);		# close the file
+	if (-t STDIN)
+	{
+		open(INFO, $file);	# open the file
+		@lines = <INFO>;	# read it into an array
+		close(INFO);		# close the file
+	}
+	else
+	{
+		@lines = <>;
+	}
 
 	foreach $line (@lines)
 	{
@@ -693,7 +701,7 @@ sub main
 		usage();
 	}
 
-	my $format = $ARGV[0];
+	my $format = shift @ARGV;
 	$eol = "";
 	$fk_bol = "";
 	$fk_eol = ";";
