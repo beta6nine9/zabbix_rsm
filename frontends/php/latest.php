@@ -165,6 +165,10 @@ else {
 	$hosts = [];
 }
 
+// See comment in profile.php why it was introduced.
+$latest_data_search_limit = CProfile::get('web.'.$page['file'].'.search_limit', DEFAULT_LATEST_DATA_SEARCH_LIMIT);
+$table_stats = null;
+
 if ($hosts) {
 
 	foreach ($hosts as &$host) {
@@ -201,7 +205,8 @@ if ($hosts) {
 		'filter' => [
 			'status' => [ITEM_STATUS_ACTIVE]
 		],
-		'preservekeys' => true
+		'preservekeys' => true,
+		'limit' => $latest_data_search_limit + 1
 	]);
 
 	// if the applications haven't been loaded when filtering, load them based on the retrieved items to avoid
@@ -281,6 +286,12 @@ if ($items) {
 			array_push($sortFields, 'name', 'applicationid');
 			CArrayHelper::sort($applications, $sortFields);
 		}
+	}
+
+	if (count($items) > $latest_data_search_limit) {
+		$table_stats = (new CDiv())
+			->addClass(ZBX_STYLE_TABLE_STATS)
+			->addItem(_s('Displaying %1$s of %2$s found', $latest_data_search_limit, $latest_data_search_limit . '+'));
 	}
 }
 
@@ -431,12 +442,17 @@ else {
 $tab_rows = [];
 
 $config = select_config();
+$items_printed = 0;
 
 // Resolve delay, history and trend macros.
 $update_interval_parser = new CUpdateIntervalParser(['usermacros' => true]);
 $simple_interval_parser = new CSimpleIntervalParser();
 
 foreach ($items as &$item) {
+	if ($items_printed == $latest_data_search_limit) {
+		break;
+	}
+
 	if ($item['type'] == ITEM_TYPE_SNMPTRAP || $item['type'] == ITEM_TYPE_TRAPPER
 			|| $item['type'] == ITEM_TYPE_DEPENDENT) {
 		$item['delay'] = '';
@@ -483,10 +499,17 @@ foreach ($items as &$item) {
 	}
 
 	$item['show_link'] = ($keep_history != 0 || $keep_trends != 0);
+
+	$items_printed++;
 }
 unset($item);
 
+$items_printed = 0;
 foreach ($items as $key => $item) {
+	if ($items_printed == $latest_data_search_limit) {
+		break;
+	}
+
 	if (!$item['applications']) {
 		continue;
 	}
@@ -609,6 +632,8 @@ foreach ($items as $key => $item) {
 
 	// remove items with applications from the collection
 	unset($items[$key]);
+
+	$items_printed++;
 }
 
 foreach ($applications as $appid => $dbApp) {
@@ -651,6 +676,10 @@ foreach ($applications as $appid => $dbApp) {
  */
 $tab_rows = [];
 foreach ($items as $item) {
+	if ($items_printed == $latest_data_search_limit) {
+		break;
+	}
+
 	$lastHistory = isset($history[$item['itemid']][0]) ? $history[$item['itemid']][0] : null;
 	$prevHistory = isset($history[$item['itemid']][1]) ? $history[$item['itemid']][1] : null;
 
@@ -756,6 +785,8 @@ foreach ($items as $item) {
 
 	$hosts[$item['hostid']]['item_cnt']++;
 	$tab_rows[$item['hostid']][] = $row;
+
+	$items_printed++;
 }
 
 foreach ($hosts as $hostId => $dbHost) {
@@ -796,6 +827,7 @@ foreach ($hosts as $hostId => $dbHost) {
 
 $form->addItem([
 	$table,
+	$table_stats,
 	new CActionButtonList('graphtype', 'itemids', [
 		GRAPH_TYPE_STACKED => ['name' => _('Display stacked graph')],
 		GRAPH_TYPE_NORMAL => ['name' => _('Display graph')]
