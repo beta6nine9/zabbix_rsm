@@ -2728,3 +2728,53 @@ function relativeDateToText($from, $to) {
 
 	return $from.' – '.$to;
 }
+
+/**
+ * Return current type of RSM monitoring.
+ *
+ * @return int
+ */
+function get_rsm_monitoring_type() {
+	static $type;
+
+	if ($type === null) {
+		$db_macro = API::UserMacro()->get([
+			'output' => ['value'],
+			'filter' => ['macro' => RSM_MONITORING_TARGET],
+			'globalmacro' => true
+		]);
+
+		if ($db_macro) {
+			$type = $db_macro[0]['value'];
+		}
+	}
+
+	return $type;
+}
+
+/**
+ * Based on timestamp value stored in {$RSM.RDAP.STANDALONE}, check if RDAP at given time $timestamp is configured as
+ * standalone service or as dependent sub-service of RDDS. It is expected that switch from RDAP as sub-service of RDDS
+ * to RDAP as standalone service will be done only once and will never be switched back to initial state.
+ *
+ * @param integer|string  $timestamp  Optional timestamp value.
+ *
+ * @return bool
+ */
+function is_RDAP_standalone($timestamp = null) {
+	static $rsm_rdap_standalone_ts;
+
+	if (is_null($rsm_rdap_standalone_ts)) {
+		$db_macro = API::UserMacro()->get([
+			'output' => ['value'],
+			'filter' => ['macro' => RSM_RDAP_STANDALONE],
+			'globalmacro' => true
+		]);
+
+		$rsm_rdap_standalone_ts = $db_macro ? (int) $db_macro[0]['value'] : 0;
+	}
+
+	$timestamp = is_null($timestamp) ? time() : (int) $timestamp;
+
+	return ($rsm_rdap_standalone_ts > 0 && $rsm_rdap_standalone_ts <= $timestamp);
+}
