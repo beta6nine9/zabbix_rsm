@@ -775,6 +775,11 @@ define('SCREEN_SURROGATE_MAX_COLUMNS_MAX', 100);
 define('SCREEN_MIN_SIZE', 1);
 define('SCREEN_MAX_SIZE', 100);
 
+define('DEFAULT_LATEST_ISSUES_CNT', 20);
+
+// See comment in profile.php why it was introduced.
+define('DEFAULT_LATEST_DATA_SEARCH_LIMIT', 1000);
+
 // default, minimum and maximum number of lines for dashboard widgets
 define('ZBX_DEFAULT_WIDGET_LINES', 25);
 define('ZBX_MIN_WIDGET_LINES', 1);

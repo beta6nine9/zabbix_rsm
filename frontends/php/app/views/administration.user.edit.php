@@ -197,8 +197,17 @@ $user_form_list
 		(new CNumericBox('rows_per_page', $data['rows_per_page'], 6))
 			->setWidth(ZBX_TEXTAREA_NUMERIC_STANDARD_WIDTH)
 			->setAriaRequired()
-	)
-	->addRow(_('URL (after login)'),
+	);
+
+if (array_key_exists('search_limit_latest', $data)) {
+	$user_form_list->addRow(_('Latest data search limit'),
+		(new CNumericBox('search_limit_latest', $data['search_limit_latest'], 6))
+			->setWidth(ZBX_TEXTAREA_NUMERIC_STANDARD_WIDTH)
+			->setAriaRequired()
+	);
+}
+
+$user_form_list->addRow(_('URL (after login)'),
 		(new CTextBox('url', $data['url']))->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
 	);
 

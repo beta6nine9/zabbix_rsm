@@ -36,7 +36,9 @@ class CControllerUserList extends CController {
 			'filter_alias' =>		'string',
 			'filter_name' =>		'string',
 			'filter_surname' =>		'string',
-			'filter_type' =>		'in -1,'.USER_TYPE_ZABBIX_USER.','.USER_TYPE_ZABBIX_ADMIN.','.USER_TYPE_SUPER_ADMIN,
+			'filter_type' =>		'in -1,'.implode(',', [USER_TYPE_ZABBIX_USER, USER_TYPE_ZABBIX_ADMIN,
+										USER_TYPE_SUPER_ADMIN, USER_TYPE_READ_ONLY, USER_TYPE_POWER_USER,
+										USER_TYPE_COMPLIANCE]),
 			'page' =>				'ge 1'
 		];
 

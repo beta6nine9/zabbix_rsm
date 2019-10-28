@@ -49,7 +49,9 @@ class CControllerUserEdit extends CControllerUserEditGeneral {
 			'new_media' =>			'array',
 			'enable_media' =>		'int32',
 			'disable_media' =>		'int32',
-			'type' =>				'db users.type|in '.USER_TYPE_ZABBIX_USER.','.USER_TYPE_ZABBIX_ADMIN.','.USER_TYPE_SUPER_ADMIN,
+			'type' =>				'db users.type|in '.implode(',', [USER_TYPE_ZABBIX_USER, USER_TYPE_ZABBIX_ADMIN,
+										USER_TYPE_SUPER_ADMIN, USER_TYPE_READ_ONLY, USER_TYPE_POWER_USER,
+										USER_TYPE_COMPLIANCE]),
 			'form_refresh' =>		'int32'
 		];
 

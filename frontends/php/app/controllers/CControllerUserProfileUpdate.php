@@ -30,19 +30,20 @@ class CControllerUserProfileUpdate extends CControllerUserUpdateGeneral {
 		$themes[] = THEME_DEFAULT;
 
 		$fields = [
-			'userid' =>			'fatal|required|db users.userid',
-			'password1' =>		'db users.passwd',
-			'password2' =>		'db users.passwd',
-			'user_medias' =>	'array',
-			'lang' =>			'db users.lang|in '.implode(',', $locales),
-			'theme' =>			'db users.theme|in '.implode(',', $themes),
-			'autologin' =>		'db users.autologin|in 0,1',
-			'autologout' =>		'db users.autologout|not_empty',
-			'refresh' =>		'db users.refresh|not_empty',
-			'rows_per_page' =>	'db users.rows_per_page',
-			'url' =>			'db users.url',
-			'messages' =>		'array',
-			'form_refresh' =>	'int32'
+			'userid' =>					'fatal|required|db users.userid',
+			'password1' =>				'db users.passwd',
+			'password2' =>				'db users.passwd',
+			'user_medias' =>			'array',
+			'lang' =>					'db users.lang|in '.implode(',', $locales),
+			'theme' =>					'db users.theme|in '.implode(',', $themes),
+			'autologin' =>				'db users.autologin|in 0,1',
+			'autologout' =>				'db users.autologout|not_empty',
+			'refresh' =>				'db users.refresh|not_empty',
+			'rows_per_page' =>			'db users.rows_per_page',
+			'search_limit_latest' =>	'int32|ge 1|le 10000',
+			'url' =>					'db users.url',
+			'messages' =>				'array',
+			'form_refresh' =>			'int32'
 		];
 
 		$ret = $this->validateInput($fields);
@@ -107,6 +108,28 @@ class CControllerUserProfileUpdate extends CControllerUserUpdateGeneral {
 		DBstart();
 		$result = updateMessageSettings($this->getInput('messages', []));
 		$result = $result && (bool) API::User()->update($user);
+
+		if ($result) {
+			/**
+			 * This is introduced as part of ICA-425 to solve performance issue in latest data page. At the moment of
+			 * development there was ~640K items that script tried to fetch from database, making page unusable.
+			 *
+			 * To fix that, there is a new profile value introduced that serves only for latest data page as search
+			 * limit.
+			 *
+			 * Some aspects that was considered preferring this solution:
+			 * - Global search limit wasn't appropriate here because it was larger than recommended;
+			 * - New config field demands changes in database schema (new profile doesn't);
+			 * - Pagination is not appropriate in latest data since it requests items and than groups them for hosts.
+			 *   Pagination would distribute single host items between multiple pages, affecting usability in bad way.
+			 */
+			if (hasRequest('search_limit_latest')) {
+				CProfile::update('web.latest.php.search_limit', (int) getRequest('search_limit_latest'), PROFILE_TYPE_INT);
+				$result = CProfile::flush();
+			}
+
+		}
+
 		$result = DBend($result);
 
 		if ($result) {

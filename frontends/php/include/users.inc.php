@@ -51,9 +51,12 @@ function getUserTheme($userData) {
  */
 function user_type2str($userType = null) {
 	$userTypes = [
+		USER_TYPE_READ_ONLY => _('Read-only user'),
+		USER_TYPE_POWER_USER => _('Power user'),
 		USER_TYPE_ZABBIX_USER => _('Zabbix User'),
 		USER_TYPE_ZABBIX_ADMIN => _('Zabbix Admin'),
-		USER_TYPE_SUPER_ADMIN => _('Zabbix Super Admin')
+		USER_TYPE_SUPER_ADMIN => _('Zabbix Super Admin'),
+		USER_TYPE_COMPLIANCE => _('Compliance profile')
 	];
 
 	if ($userType === null) {
