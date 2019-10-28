@@ -838,12 +838,20 @@ define('ZBX_DISCOVERY_DNS',		1);
 define('ZBX_DISCOVERY_IP',		2);
 define('ZBX_DISCOVERY_VALUE',	3);
 
-define('USER_TYPE_ZABBIX_USER',		1);
-define('USER_TYPE_ZABBIX_ADMIN',	2);
-define('USER_TYPE_SUPER_ADMIN',		3);
+define('USER_TYPE_ZABBIX_GUEST',		0);
+define('USER_TYPE_ZABBIX_USER',			1);
+define('USER_TYPE_ZABBIX_ADMIN',		2);
+define('USER_TYPE_SUPER_ADMIN',			3);
+define('USER_TYPE_READ_ONLY',			4);
+define('USER_TYPE_POWER_USER',			5);
+define('USER_TYPE_COMPLIANCE',			6);
 
 define('ZBX_NOT_INTERNAL_GROUP',	0);
 define('ZBX_INTERNAL_GROUP',		1);
+
+define('RSM_MONITORING_TARGET', '{$RSM.MONITORING.TARGET}');
+define('MONITORING_TARGET_REGISTRY', 'registry');
+define('MONITORING_TARGET_REGISTRAR', 'registrar');
 
 define('GROUP_STATUS_DISABLED', 1);
 define('GROUP_STATUS_ENABLED',	0);
