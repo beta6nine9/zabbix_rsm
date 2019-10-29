@@ -2215,6 +2215,7 @@ sub check_sent_values()
 			if (Time::HiRes::time() - $lastvalue_changed_time >= $timeout)
 			{
 				wrn("lastvalue table hasn't changed for $timeout seconds");
+				last WAIT_FOR_LASTVALUE;
 			}
 
 			next WAIT_FOR_LASTVALUE;
@@ -2236,7 +2237,7 @@ sub check_sent_values()
 			}
 		}
 
-		last;
+		last WAIT_FOR_LASTVALUE;
 	}
 
 	dbg("get data from history tables");
