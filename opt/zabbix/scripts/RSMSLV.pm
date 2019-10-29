@@ -2053,26 +2053,52 @@ sub send_values
 		return;
 	}
 
-	my $total_values = scalar(@{$_sender_values->{'data'}});
-
-	if ($total_values == 0)
+	if (opt('fill-gap'))
 	{
-		dbg(__script(), ": no data collected, nothing to send");
-		return;
-	}
+		foreach my $sender_value (@{$_sender_values->{'data'}})
+		{
+			my $host  = $sender_value->{'data'}{'host'};
+			my $key   = $sender_value->{'data'}{'key'};
+			my $clock = $sender_value->{'data'}{'clock'};
+			my $value = $sender_value->{'data'}{'value'};
 
-	my $data = [map($_->{'data'}, @{$_sender_values->{'data'}})];
+			my $table = history_table($sender_value->{'value_type'});
 
-	if (opt('output-file'))
-	{
-		my $output_file = getopt('output-file');
-		dbg("writing $total_values values to $output_file");
-		write_file($output_file, Dumper($data));
+			my $sql = "insert into $table (itemid,clock,value,ns)" .
+				" select items.itemid,?,?,0" .
+				" from" .
+					" items" .
+					" left join hosts on hosts.hostid=items.hostid" .
+				" where" .
+					" hosts.host=? and" .
+					" items.key_=?";
+
+			db_exec($sql, [$clock, $value, $host, $key]);
+		}
 	}
 	else
 	{
-		dbg("sending $total_values values");	# send everything in one batch since server should be local
-		push_to_trapper($config->{'slv'}->{'zserver'}, $config->{'slv'}->{'zport'}, 10, 5, $data);
+		my $total_values = scalar(@{$_sender_values->{'data'}});
+
+		if ($total_values == 0)
+		{
+			dbg(__script(), ": no data collected, nothing to send");
+			return;
+		}
+
+		my $data = [map($_->{'data'}, @{$_sender_values->{'data'}})];
+
+		if (opt('output-file'))
+		{
+			my $output_file = getopt('output-file');
+			dbg("writing $total_values values to $output_file");
+			write_file($output_file, Dumper($data));
+		}
+		else
+		{
+			dbg("sending $total_values values");	# send everything in one batch since server should be local
+			push_to_trapper($config->{'slv'}->{'zserver'}, $config->{'slv'}->{'zport'}, 10, 5, $data);
+		}
 	}
 
 	# $tld is a global variable which is used in info()
@@ -2487,6 +2513,16 @@ sub collect_slv_cycles($$$$$$)
 			# new item
 			push(@{$cycles{$max_clock}}, $tld);
 
+			next;
+		}
+
+		if (opt('fill-gap'))
+		{
+			my $clock = cycle_start(getopt('fill-gap'), $delay);
+			if (!history_value_exists($value_type, $clock, $itemid))
+			{
+				push(@{$cycles{$clock}}, $tld);
+			}
 			next;
 		}
 
@@ -3887,7 +3923,7 @@ sub parse_slv_opts
 {
 	$POD2USAGE_FILE = '/opt/zabbix/scripts/slv/rsm.slv.usage';
 
-	parse_opts('tld=s', 'now=n', 'cycles=n', 'output-file=s');
+	parse_opts('tld=s', 'now=n', 'cycles=n', 'output-file=s', 'fill-gap=n');
 }
 
 sub opt
