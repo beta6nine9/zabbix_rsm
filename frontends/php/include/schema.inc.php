@@ -327,6 +327,18 @@ return [
 				'length' => 128,
 				'default' => '',
 			],
+			'info_1' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_CHAR,
+				'length' => 128,
+				'default' => '',
+			],
+			'info_2' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_CHAR,
+				'length' => 128,
+				'default' => '',
+			],
 			'flags' => [
 				'null' => false,
 				'type' => DB::FIELD_TYPE_INT,
@@ -3387,8 +3399,7 @@ return [
 			],
 			'value' => [
 				'null' => false,
-				'type' => DB::FIELD_TYPE_CHAR,
-				'length' => 255,
+				'type' => DB::FIELD_TYPE_TEXT,
 				'default' => '',
 			],
 			'description' => [
@@ -3421,8 +3432,7 @@ return [
 			],
 			'value' => [
 				'null' => false,
-				'type' => DB::FIELD_TYPE_CHAR,
-				'length' => 255,
+				'type' => DB::FIELD_TYPE_TEXT,
 				'default' => '',
 			],
 			'description' => [
@@ -3528,7 +3538,7 @@ return [
 			'newvalue' => [
 				'null' => false,
 				'type' => DB::FIELD_TYPE_CHAR,
-				'length' => 64,
+				'length' => 512,
 				'default' => '',
 			],
 		],
@@ -5018,6 +5028,12 @@ return [
 				'default' => '',
 			],
 			'severity' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_INT,
+				'length' => 10,
+				'default' => '0',
+			],
+			'false_positive' => [
 				'null' => false,
 				'type' => DB::FIELD_TYPE_INT,
 				'length' => 10,
@@ -7804,6 +7820,252 @@ return [
 				'type' => DB::FIELD_TYPE_INT,
 				'length' => 10,
 				'default' => '0',
+			],
+		],
+	],
+	'rsm_ip_version' => [
+		'key' => 'id',
+		'fields' => [
+			'id' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_UINT,
+				'length' => 20,
+			],
+			'name' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_CHAR,
+				'length' => 255,
+			],
+		],
+	],
+	'rsm_ns_ip' => [
+		'key' => 'id',
+		'fields' => [
+			'id' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_UINT,
+				'length' => 20,
+			],
+			'name' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_CHAR,
+				'length' => 255,
+			],
+		],
+	],
+	'rsm_ns_name' => [
+		'key' => 'id',
+		'fields' => [
+			'id' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_UINT,
+				'length' => 20,
+			],
+			'name' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_CHAR,
+				'length' => 255,
+			],
+		],
+	],
+	'rsm_probe' => [
+		'key' => 'id',
+		'fields' => [
+			'id' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_UINT,
+				'length' => 20,
+			],
+			'name' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_CHAR,
+				'length' => 255,
+			],
+		],
+	],
+	'rsm_service_category' => [
+		'key' => 'id',
+		'fields' => [
+			'id' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_UINT,
+				'length' => 20,
+			],
+			'name' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_CHAR,
+				'length' => 255,
+			],
+		],
+	],
+	'rsm_status_map' => [
+		'key' => 'id',
+		'fields' => [
+			'id' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_UINT,
+				'length' => 20,
+			],
+			'name' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_CHAR,
+				'length' => 255,
+			],
+		],
+	],
+	'rsm_test_type' => [
+		'key' => 'id',
+		'fields' => [
+			'id' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_UINT,
+				'length' => 20,
+			],
+			'name' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_CHAR,
+				'length' => 255,
+			],
+		],
+	],
+	'rsm_tld' => [
+		'key' => 'id',
+		'fields' => [
+			'id' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_UINT,
+				'length' => 20,
+			],
+			'name' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_CHAR,
+				'length' => 255,
+			],
+		],
+	],
+	'rsm_tld_type' => [
+		'key' => 'id',
+		'fields' => [
+			'id' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_UINT,
+				'length' => 20,
+			],
+			'name' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_CHAR,
+				'length' => 255,
+			],
+		],
+	],
+	'rsm_transport_protocol' => [
+		'key' => 'id',
+		'fields' => [
+			'id' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_UINT,
+				'length' => 20,
+			],
+			'name' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_CHAR,
+				'length' => 255,
+			],
+		],
+	],
+	'lastvalue' => [
+		'key' => 'itemid',
+		'fields' => [
+			'itemid' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_ID,
+				'length' => 20,
+				'ref_table' => 'items',
+				'ref_field' => 'itemid',
+			],
+			'clock' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_INT,
+				'length' => 10,
+				'default' => '0',
+			],
+			'value' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_FLOAT,
+				'length' => 16,
+				'default' => '0.0000',
+			],
+		],
+	],
+	'lastvalue_str' => [
+		'key' => 'itemid',
+		'fields' => [
+			'itemid' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_ID,
+				'length' => 20,
+				'ref_table' => 'items',
+				'ref_field' => 'itemid',
+			],
+			'clock' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_INT,
+				'length' => 10,
+				'default' => '0',
+			],
+			'value' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_CHAR,
+				'length' => 255,
+				'default' => '',
+			],
+		],
+	],
+	'sla_reports' => [
+		'key' => 'hostid,year,month',
+		'fields' => [
+			'hostid' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_ID,
+				'length' => 20,
+				'ref_table' => 'hosts',
+				'ref_field' => 'hostid',
+			],
+			'year' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_INT,
+				'length' => 10,
+			],
+			'month' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_INT,
+				'length' => 10,
+			],
+			'report' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_TEXT,
+			],
+		],
+	],
+	'rsmhost_dns_ns_log' => [
+		'key' => 'itemid,clock',
+		'fields' => [
+			'itemid' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_ID,
+				'length' => 20,
+				'ref_table' => 'items',
+				'ref_field' => 'itemid',
+			],
+			'clock' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_INT,
+				'length' => 10,
+			],
+			'action' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_INT,
+				'length' => 10,
 			],
 		],
 	],
