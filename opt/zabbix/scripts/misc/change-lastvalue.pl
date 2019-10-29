@@ -78,6 +78,12 @@ foreach my $service (keys(%keys))
 
 	# now that we know delay, adjust the clock
 	$clocks{$service} = cycle_start($clocks{$service}, $delays{$service});
+}
+
+# set starting points to previos cycle
+foreach my $service (keys(%keys))
+{
+	$clocks{$service} = $clocks{$service} - $delays{$service};
 
 	info(uc($service), "\t: ", scalar(localtime($clocks{$service})));
 }
@@ -161,7 +167,6 @@ foreach (@server_keys)
 			foreach my $itemid (keys(%itemids))
 			{
 				my $value_type = $itemids{$itemid}->{'value_type'};
-				my $default_value = $itemids{$itemid}->{'default_value'};
 
 				my $rows_ref = db_select(
 					"select clock,value".
@@ -188,25 +193,17 @@ foreach (@server_keys)
 					if (opt('force'))
 					{
 						# set the value for lastvalue table
-						$value = $default_value;
-
-						my $clock = $clocks{$service} - $delays{$service};
-
-						db_exec("delete from lastvalue where itemid=$itemid");
-
-						db_exec(
-							"insert into lastvalue (itemid,value,clock)".
-							" values ($itemid,$default_value,$clock)");
+						$value = $itemids{$itemid}->{'default_value'};
 					}
 					else
 					{
 						# set lastvalue
-						db_exec("update lastvalue set clock=" . ($clocks{$service} - $delays{$service}) . " where itemid=$itemid");
+						db_exec("update lastvalue set clock=" . $clocks{$service} . " where itemid=$itemid");
 
 						my $r = db_select("select key_ from items where itemid=$itemid");
 
 						fail("$service item ($itemid) is missing calculated cycle result at ", ts_full($clocks{$service}),
-							"\n\nrun: /opt/zabbix/scripts/slv/", $r->[0]->[0], ".pl --tld $tld --now ", $clocks{$service}, " --debug\n\nand run this script again");
+							"\n\nrun: /opt/zabbix/scripts/slv/", $r->[0]->[0], ".pl --tld $tld --now ", $clocks{$service}, "\n\nand run this script again");
 					}
 				}
 				elsif (scalar(@{$rows_ref}) != 1)
@@ -220,6 +217,9 @@ foreach (@server_keys)
 				}
 				else
 				{
+					# set the value for lastvalue table
+					$value = $rows_ref->[0]->[1];
+
 					if ($rows_ref->[0]->[0] != $clocks{$service})
 					{
 						wrn("fixing $service history value of item $itemid...");
@@ -232,7 +232,6 @@ foreach (@server_keys)
 				db_exec("delete from " . __table($value_type) . " where itemid=$itemid and clock>" . $clocks{$service});
 
 				# set lastvalue
-
 				db_exec("insert ignore into lastvalue (itemid,clock,value)".
 					" values ($itemid," . $clocks{$service} . ",$value)".
 					" on duplicate key update value=$value,clock=" . $clocks{$service});
