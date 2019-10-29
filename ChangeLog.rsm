@@ -1,3 +1,12 @@
+Changes for rsm1.3.0rc12
+
+Bug fixes:
+....I..... [575] added script misc/fill-data.pl to fill database with data for Compliance testing (dimir)
+....I..... [586] improved "dimir was wrong" error messages (asitals)
+....I..... [585] added --fill-gap option to SLV scripts (asitals)
+....I..... [587] fixed waiting for data to appear in lastvalue and history tables (asitals)
+
+--------------------------------------------------------------------------------
 Changes for rsm1.3.0rc11
 
 Bug fixes:
