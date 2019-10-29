@@ -299,8 +299,7 @@ sub get_rtt_low
 		}
 		else
 		{
-			fail("dimir was wrong, besides protocols ", PROTO_UDP, " and ", PROTO_TCP,
-				" there is also ", $proto);
+			fail("unhandled protocol: '$proto'";
 		}
 	}
 
@@ -314,8 +313,7 @@ sub get_rtt_low
 		return get_macro_epp_rtt_low($command);	# can be per TLD
 	}
 
-	fail("dimir was wrong, thinking the only known services are \"dns\", \"dnssec\", \"rdds\" and \"epp\",",
-		" there is also \"$service\"");
+	fail("unhandled service: '$service'");
 }
 
 sub get_slv_rtt($;$)
@@ -3184,7 +3182,19 @@ sub get_downtime
 
 			if (defined($prevclock) && $clock - $prevclock != $delay)
 			{
-				fail("dimir was wrong, one cycle can have missing or more than one availability value");
+				my $prevclock_ts = ts_full($prevclock);
+				my $clock_ts = ts_full($clock);
+
+				my $info = "itemid=$itemid, prevclock=$prevclock_ts, clock=$clock_ts, delay=$delay";
+
+				if ($clock - $prevclock > $delay)
+				{
+					fail("cycle is missing availability value ($info)");
+				}
+				else
+				{
+					fail("cycle has more than one availability value ($info)");
+				}
 			}
 
 			if ($value == DOWN)
@@ -3300,7 +3310,19 @@ sub get_downtime_execute
 		{
 			if (defined($prevclock) && $clock - $prevclock != $delay)
 			{
-				fail("dimir was wrong, one cycle can have missing or more than one availability value");
+				my $prevclock_ts = ts_full($prevclock);
+				my $clock_ts = ts_full($clock);
+
+				my $info = "itemid=$itemid, prevclock=$prevclock_ts, clock=$clock_ts, delay=$delay";
+
+				if ($clock - $prevclock > $delay)
+				{
+					fail("cycle is missing availability value ($info)");
+				}
+				else
+				{
+					fail("cycle has more than one availability value ($info)");
+				}
 			}
 
 			if ($value == DOWN)

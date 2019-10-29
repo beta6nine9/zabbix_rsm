@@ -676,7 +676,7 @@ sub cycles_to_calculate($$$$$$$$)
 
 				if ($lastclock > $lastclock_db)
 				{
-					fail("dimir was wrong, item ($itemid) clock ($lastclock) in cache can be newer than in database ($lastclock_db)");
+					fail("item ($itemid) clock ($lastclock) in cache is newer than in database ($lastclock_db)");
 				}
 			}
 			elsif ($sla_api_last_update)
@@ -772,7 +772,7 @@ sub get_historical_value_by_time($$)
 
 	$value = $last_value unless (defined($value));
 
-	fail("dimir was wrong: we can have 0 values in RTT LIMIT history") unless (defined($value));
+	fail("there are no values in RTT LIMIT history") unless (defined($value));
 
 	return $value;
 }
@@ -1302,11 +1302,11 @@ sub calculate_cycle($$$$$$$$$)
 
 				next unless ($key_service eq $service);
 
-				fail("dimir was wrong: $service status can be re-defined") if (defined($json->{'status'}));
+				fail("$service status is re-defined (status=$json->{'status'})") if (defined($json->{'status'}));
 
 				if (scalar(@{$values{$itemid}}) != 1)
 				{
-					my $msg = "dimir was wrong: item \"$key\" can contain more than 1 value ".
+					my $msg = "item \"$key\" contains more than 1 value ".
 						selected_period($from, $till) . ": " . join(',', @{$values{$itemid}}) . "\n";
 
 					my $sql =
@@ -1353,7 +1353,7 @@ sub calculate_cycle($$$$$$$$$)
 				}
 				else
 				{
-					fail("dimir was wrong: item \"$key\" can contain unexpected value \"", $values{$itemid}->[0] , "\"");
+					fail("item \"$key\" ($itemid) contains unexpected value \"", $values{$itemid}->[0] , "\"");
 				}
 			}
 			else

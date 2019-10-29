@@ -851,7 +851,7 @@ sub __save_csv_data
 
 	if (scalar(keys(%{$result})) > 1)
 	{
-		fail("dimir was wrong, result can contain more than 1 TLD in __save_csv_data()");
+		fail("result contains more than 1 TLD in __save_csv_data()");
 	}
 
 	dw_csv_init();
