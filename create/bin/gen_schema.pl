@@ -673,7 +673,7 @@ sub process
 	}
 	else
 	{
-		@lines = <>;
+		@lines = <STDIN>;
 	}
 
 	foreach $line (@lines)
@@ -707,7 +707,7 @@ sub main
 		usage();
 	}
 
-	my $format = shift @ARGV;
+	my $format = $ARGV[0];
 	$eol = "";
 	$fk_bol = "";
 	$fk_eol = ";";
