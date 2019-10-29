@@ -31,8 +31,10 @@ use constant SUBSTR_KEY_LEN => 20;	# for logging
 use constant DEFAULT_MAX_CHILDREN => 64;
 use constant DEFAULT_MAX_WAIT => 600;	# maximum seconds to wait befor terminating child process
 
-use constant DEFAULT_INCIDENT_MEASUREMENTS_LIMIT => 3600;	# seconds, maximum period back from current time to look
-								# back for recent measurement files for an incident
+use constant DEFAULT_INITIAL_MEASUREMENTS_LIMIT => 7200;	# seconds, if the metric is not in cache and
+								# no measurements within this period, start generating
+								# them from this period in the past back for recent
+								# measurement files for an incident
 
 sub main_process_signal_handler();
 sub process_server($);
@@ -40,7 +42,6 @@ sub process_tld_batch($$$$$$);
 sub process_tld($$$$$);
 sub cycles_to_calculate($$$$$$$$);
 sub get_lastvalues_from_db($$$);
-sub get_sla_api_last_update();
 sub calculate_cycle($$$$$$$$$);
 sub get_interfaces($$$);
 sub probe_online_at_init();
@@ -74,7 +75,7 @@ my $config = get_rsm_config();
 
 set_slv_config($config);
 
-my $incident_measurements_limit = $config->{'sla_api'}->{'incident_measurements_limit'} // DEFAULT_INCIDENT_MEASUREMENTS_LIMIT;
+my $initial_measurements_limit = $config->{'sla_api'}->{'initial_measurements_limit'} // DEFAULT_INITIAL_MEASUREMENTS_LIMIT;
 
 my @server_keys;
 
@@ -111,8 +112,8 @@ $delays{'dns'} = $delays{'dnssec'} = get_dns_udp_delay($now);
 $delays{'rdds'} = get_rdds_delay($now);
 
 my %clock_limits;
-$clock_limits{'dns'} = $clock_limits{'dnssec'} = cycle_start(time() - $incident_measurements_limit, $delays{'dnssec'});
-$clock_limits{'rdds'} = cycle_start(time() - $incident_measurements_limit, $delays{'rdds'});
+$clock_limits{'dns'} = $clock_limits{'dnssec'} = cycle_start($now - $initial_measurements_limit, $delays{'dnssec'});
+$clock_limits{'rdds'} = cycle_start($now - $initial_measurements_limit, $delays{'rdds'});
 
 db_disconnect();
 
@@ -121,9 +122,6 @@ my %service_keys = (
 	'dnssec' => 'rsm.slv.dnssec.avail',
 	'rdds' => 'rsm.slv.rdds.avail'
 );
-
-# keep to avoid reading multiple times
-my $sla_api_last_update = get_sla_api_last_update();
 
 my %rtt_limits;
 
@@ -512,50 +510,6 @@ sub process_tld($$$$$)
 	}
 }
 
-sub get_sla_api_last_update()
-{
-	my $continue_file = ah_continue_file_name(); # last_update.txt in SLA API directory
-	my $continue_file_lock;
-	my $error;
-	my $lastclock;
-
-	ah_lock_continue_file(\$continue_file_lock);
-
-	for (my $attempt = 1; $attempt <= 3; $attempt++)
-	{
-		if ($attempt > 1)
-		{
-			# sleep for 1.0 second
-			select(undef, undef, undef, 1.0);
-		}
-
-		if (read_file($continue_file, \$lastclock, \$error) != SUCCESS)
-		{
-			wrn("cannot read file '$continue_file': $error");
-			next;
-		}
-
-		while (chomp($lastclock)) {}
-
-		if (!$lastclock)
-		{
-			wrn("file '$continue_file' is empty");
-			next;
-		}
-
-		if ($attempt > 1)
-		{
-			inf("succeeded to read '$continue_file' on attempt #$attempt");
-		}
-
-		last;
-	}
-
-	ah_unlock_continue_file($continue_file_lock);
-
-	return $lastclock;
-}
-
 sub add_cycles($$$$$$$$$$$)
 {
 	my $tld = shift;
@@ -662,6 +616,8 @@ sub cycles_to_calculate($$$$$$$$)
 
 			my $lastclock;
 
+			my $ts;
+
 			if (opt('now'))
 			{
 				$lastclock = cycle_start(getopt('now') - $delay, $delay);
@@ -679,19 +635,25 @@ sub cycles_to_calculate($$$$$$$$)
 					fail("item ($itemid) clock ($lastclock) in cache is newer than in database ($lastclock_db)");
 				}
 			}
-			elsif ($sla_api_last_update)
+			elsif (ah_get_most_recent_measurement_ts(
+					ah_get_api_tld($tld),
+					$service,
+					$delay,
+					cycle_start($now, $delay),
+					$clock_limits{$service},
+					\$ts) == AH_SUCCESS)
 			{
-				$lastclock = cycle_start($sla_api_last_update, $delay);
+				$lastclock = $ts + $delay;
 
 				dbg("$service: itemid $itemid from probe \"$probe\" not in cache yet");
-				dbg("using last clock from SLA API directory: ", ts_str($lastclock));
+				dbg("using the time since most recent measurement file: ", ts_str($lastclock));
 			}
 			else
 			{
-				$lastclock = cycle_start($clock_limits{$service}, $delay);
+				$lastclock = $clock_limits{$service};
 
 				dbg("$service: itemid $itemid from probe \"$probe\" not in cache yet");
-				dbg("using last clock based on incident_measurements_limit: ", ts_str($lastclock));
+				dbg("using last clock based on initial_measurements_limit: ", ts_str($lastclock));
 			}
 
 			if (opt('debug'))
