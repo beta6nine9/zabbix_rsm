@@ -299,7 +299,7 @@ sub get_rtt_low
 		}
 		else
 		{
-			fail("unhandled protocol: '$proto'";
+			fail("unhandled protocol: '$proto'");
 		}
 	}
 
