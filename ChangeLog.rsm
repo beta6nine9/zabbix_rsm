@@ -1,7 +1,7 @@
 Changes for rsm1.2.14
 
 Bug fixes:
-....I..... [588] 588: when no cache, continue generating recent measurements from the most recent available, respecting new configuration option "initial_measurements_limit" with default value of 2 hours (dimir)
+....I..... [588] added code to continue generating recent measurements from the most recent available, respecting new configuration option "initial_measurements_limit" with default value of 2 hours (dimir)
 
 --------------------------------------------------------------------------------
 Changes for rsm1.2.13
@@ -20,7 +20,7 @@ Bug fixes:
 Changes for rsm1.2.11
 
 Bug fixes:
-....I..... [538] generate recent measurement files only once, after service availability is calculated; drop monitoring data from proxy that is over 90 seconds old (dimir)
+....I..... [538] added code to generate recent measurement files only once, after service availability is calculated; drop monitoring data from proxy that is over 90 seconds old (dimir)
 
 --------------------------------------------------------------------------------
 Changes for rsm1.2.10
