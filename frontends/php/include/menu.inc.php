@@ -138,27 +138,39 @@ function zbx_construct_menu(&$main_menu, &$sub_menus, &$page, $action = null) {
 			'default_page_id' => 0,
 			'pages' => [
 				[
-					'url' => 'zabbix.php',
-					'action' => 'rsm.rollingweekstatus',
-					'active_if' => ['rsm.rollingweekstatus'],
+					//'url' => 'zabbix.php',
+					'url' => 'rsm.rollingweekstatus.php',
+					//'action' => 'rsm.rollingweekstatus',
+					//'active_if' => ['rsm.rollingweekstatus'],
+					'active_if' => ['rsm.rollingweekstatus.php'],
 					'label' => _('Rolling week status')
 				],
 				[
-					'url' => 'zabbix.php',
-					'action' => 'rsm.incidents',
+					//'url' => 'zabbix.php',
+					'url' => 'rsm.incidents.php',
+					//'action' => 'rsm.incidents',
 					'label' => _('Incidents'),
-					'active_if' => [
+					/*'active_if' => [
 						'rsm.incidentdetails',
 						'rsm.tests',
 						'rsm.particulartests',
 						'rsm.particularproxys',
 						'rsm.aggregatedetails'
+					],*/
+					'active_if' => [
+						'rsm.incidentdetails.php',
+						'rsm.tests.php',
+						'rsm.particulartests.php',
+						'rsm.particularproxys.php',
+						'rsm.aggregatedetails.php'
 					]
 				],
 				[
-					'url' => 'zabbix.php',
-					'action' => 'rsm.slareports',
-					'active_if' => ['rsm.slareports'],
+					//'url' => 'zabbix.php',
+					'url' => 'rsm.slareports.php',
+					//'action' => 'rsm.slareports',
+					//'active_if' => ['rsm.slareports'],
+					'active_if' => ['rsm.slareports.php'],
 					'label' => _('SLA reports')
 				]
 			]

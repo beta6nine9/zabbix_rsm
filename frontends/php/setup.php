@@ -64,7 +64,7 @@ if (!CSession::keyExists('step')) {
 }
 
 // if a guest or a non-super admin user is logged in
-if (CWebUser::$data && CWebUser::getType() < USER_TYPE_SUPER_ADMIN) {
+if (CWebUser::$data && CWebUser::getType() != USER_TYPE_SUPER_ADMIN) {
 	// on the last step of the setup we always have a guest user logged in;
 	// when he presses the "Finish" button he must be redirected to the login screen
 	if (CWebUser::isGuest() && CSession::getValue('step') == 5 && hasRequest('finish')) {

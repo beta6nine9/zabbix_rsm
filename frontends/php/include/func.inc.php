@@ -2778,3 +2778,29 @@ function is_RDAP_standalone($timestamp = null) {
 
 	return ($rsm_rdap_standalone_ts > 0 && $rsm_rdap_standalone_ts <= $timestamp);
 }
+
+/**
+ * Generate data to be displayed in details widget. The output is an array to be passed to CWidget::addItem().
+ * Expects array of key/value pairs, each element is to be displayed on one line with key in bold style. The
+ * value can be either string or an array of CTag objects.
+ *
+ * @param array
+ *
+ * @return string
+ */
+function gen_details_item(array $details) {
+	$output = [];
+
+	foreach ($details as $key => $value) {
+		$output[] = bold($key);
+		$output[] = ': ';
+		$output[] = $value;
+		$output[] = BR();
+	}
+
+	if ($output) {
+		array_pop($output);
+	}
+
+	return $output;
+}

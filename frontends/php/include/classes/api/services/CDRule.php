@@ -73,7 +73,7 @@ class CDRule extends CApiService {
 		];
 		$options = zbx_array_merge($defOptions, $options);
 
-		if (self::$userData['type'] < USER_TYPE_ZABBIX_ADMIN) {
+		if (self::$userData['type'] != USER_TYPE_ZABBIX_ADMIN && self::$userData['type'] != USER_TYPE_SUPER_ADMIN) {
 			return [];
 		}
 
@@ -179,7 +179,7 @@ class CDRule extends CApiService {
 	 */
 	protected function validateCreate(array $drules) {
 		// Check permissions.
-		if (self::$userData['type'] == USER_TYPE_ZABBIX_USER) {
+		if (self::$userData['type'] != USER_TYPE_ZABBIX_ADMIN && self::$userData['type'] != USER_TYPE_SUPER_ADMIN) {
 			self::exception(ZBX_API_ERROR_PARAMETERS, _('No permissions to referred object or it does not exist!'));
 		}
 
@@ -305,7 +305,7 @@ class CDRule extends CApiService {
 	 */
 	protected function validateUpdate(array $drules) {
 		// Check permissions.
-		if (self::$userData['type'] == USER_TYPE_ZABBIX_USER) {
+		if (self::$userData['type'] != USER_TYPE_ZABBIX_ADMIN && self::$userData['type'] != USER_TYPE_SUPER_ADMIN) {
 			self::exception(ZBX_API_ERROR_PARAMETERS, _('No permissions to referred object or it does not exist!'));
 		}
 

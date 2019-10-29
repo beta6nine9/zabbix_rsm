@@ -71,15 +71,15 @@ class CControllerExportXml extends CController {
 		switch ($this->getInput('action')) {
 			case 'export.mediatypes.xml':
 			case 'export.valuemaps.xml':
-				return (CWebUser::$data['type'] >= USER_TYPE_SUPER_ADMIN);
+				return (CWebUser::$data['type'] == USER_TYPE_SUPER_ADMIN);
 
 			case 'export.hosts.xml':
 			case 'export.templates.xml':
-				return (CWebUser::$data['type'] >= USER_TYPE_ZABBIX_ADMIN);
+				return (CWebUser::$data['type'] == USER_TYPE_ZABBIX_ADMIN);
 
 			case 'export.screens.xml':
 			case 'export.sysmaps.xml':
-				return (CWebUser::$data['type'] >= USER_TYPE_ZABBIX_USER);
+				return (CWebUser::$data['type'] == USER_TYPE_ZABBIX_USER);
 
 			default:
 				return false;

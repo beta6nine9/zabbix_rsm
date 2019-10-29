@@ -27,7 +27,7 @@ $page_title = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR)
 $widget = (new CWidget())->setTitle($page_title);
 
 // filter
-$filter = (new CFilter('web.rsm.rollingweekstatus.filter.state'))
+$filter = (new CFilter((new CUrl('rsm.rollingweekstatus.php'))))
 	->addVar('filter_set', 1)
 	->addVar('checkAllServicesValue', 0)
 	->addVar('checkAllSubservicesValue', 0)
@@ -204,10 +204,7 @@ $filterColumn3 = (new CFormList())
 			->addItem(2, _('disabled'))
 	);
 
-$filter
-	->addColumn($filterColumn1)
-	->addColumn($filterColumn2)
-	->addColumn($filterColumn3);
+$filter->addFilterTab(_('Filter'), [$filterColumn1, $filterColumn2, $filterColumn3]);
 
 $widget->addItem($filter);
 

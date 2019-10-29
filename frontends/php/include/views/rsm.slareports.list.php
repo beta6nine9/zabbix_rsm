@@ -27,7 +27,7 @@ $years = range(SLA_MONITORING_START_YEAR, date('Y', time()));
 $object_label = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) ? _('Registrar ID') : _('TLD');
 
 $widget->addItem(
-	(new CFilter('web.rsm.slareports.filter.state'))->addColumn(
+	(new CFilter(new CUrl('rsm.slareports.php')))->addFilterTab(_('Filter'), 
 		(new CFormList())
 			->addVar('filter_set', 1)
 			->addRow($object_label, (new CTextBox('filter_search', $data['filter_search']))
@@ -42,6 +42,23 @@ $widget->addItem(
 			])
 	)
 );
+
+/*$widget->addItem(
+	(new CFilter('web.rsm.slareports.filter.state'))->addColumn(
+		(new CFormList())
+			->addVar('filter_set', 1)
+			->addRow($object_label, (new CTextBox('filter_search', $data['filter_search']))
+				->setWidth(ZBX_TEXTAREA_FILTER_STANDARD_WIDTH)
+				->setAttribute('autocomplete', 'off')
+			)
+			->addRow(_('Period'), [
+				new CComboBox('filter_month', $data['filter_month'], null, array_combine($months,
+					array_map('getMonthCaption', $months))),
+				SPACE,
+				new CComboBox('filter_year', $data['filter_year'], null, array_combine($years, $years))
+			])
+	)
+);*/
 
 $table = (new CTableInfo())->setHeader([
 	_('Service'),

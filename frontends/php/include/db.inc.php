@@ -1070,3 +1070,30 @@ function zbx_dbcast_2bigint($field) {
 			return false;
 	}
 }
+
+/**
+ * Create DB connection to other DB server.
+ *
+ * @param array  $server	Database server parameters
+ * @param string $error		returns a message in case of an error
+ *
+ * @return bool
+ */
+function multiDBconnect($server, &$error) {
+	global $DB;
+
+	unset($DB['DB']);
+	$DB['SERVER'] = $server['SERVER'];
+	$DB['PORT'] = $server['PORT'];
+	$DB['DATABASE'] = $server['DATABASE'];
+	$DB['USER'] = $server['USER'];
+	$DB['PASSWORD'] = $server['PASSWORD'];
+	$DB['SCHEMA'] = $server['SCHEMA'];
+
+	$db_tls_options = array('DB_KEY_FILE', 'DB_CERT_FILE', 'DB_CA_FILE', 'DB_CA_PATH', 'DB_CA_CIPHER');
+	foreach ($db_tls_options as $db_tls_option) {
+		$DB[$db_tls_option] = array_key_exists($db_tls_option, $server) ? $server[$db_tls_option] : null;
+	}
+
+	return DBconnect($error);
+}

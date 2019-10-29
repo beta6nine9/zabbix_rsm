@@ -18,6 +18,10 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
+
+// Load ICANN specific defines.
+require './local/icann.defines.inc.php';
+
 define('ZABBIX_VERSION',		'4.4.1rc1');
 define('ZABBIX_API_VERSION',	'4.4.1');
 define('ZABBIX_EXPORT_VERSION',	'4.4');
@@ -131,7 +135,7 @@ define('ZBX_DB_MAX_ID', '9223372036854775807');
 // maximum number of records for create() or update() API calls
 define('ZBX_DB_MAX_INSERTS', 10000);
 
-define('ZBX_SHOW_TECHNICAL_ERRORS', false);
+define('ZBX_SHOW_TECHNICAL_ERRORS', !false);
 
 define('PAGE_TYPE_HTML',				0);
 define('PAGE_TYPE_IMAGE',				1);
@@ -246,6 +250,7 @@ define('AUDIT_RESOURCE_GRAPH_PROTOTYPE',	35);
 define('AUDIT_RESOURCE_ITEM_PROTOTYPE',		36);
 define('AUDIT_RESOURCE_HOST_PROTOTYPE',		37);
 define('AUDIT_RESOURCE_AUTOREGISTRATION',	38);
+define('AUDIT_RESOURCE_INCIDENT',		   132);
 
 define('CONDITION_TYPE_HOST_GROUP',			0);
 define('CONDITION_TYPE_HOST',				1);
@@ -853,10 +858,6 @@ define('USER_TYPE_COMPLIANCE',			6);
 
 define('ZBX_NOT_INTERNAL_GROUP',	0);
 define('ZBX_INTERNAL_GROUP',		1);
-
-define('RSM_MONITORING_TARGET', '{$RSM.MONITORING.TARGET}');
-define('MONITORING_TARGET_REGISTRY', 'registry');
-define('MONITORING_TARGET_REGISTRAR', 'registrar');
 
 define('GROUP_STATUS_DISABLED', 1);
 define('GROUP_STATUS_ENABLED',	0);

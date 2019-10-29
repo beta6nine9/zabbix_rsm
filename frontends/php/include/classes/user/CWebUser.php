@@ -59,6 +59,8 @@ class CWebUser {
 	 * @return bool
 	 */
 	public static function login($login, $password) {
+		global $DB;
+
 		try {
 			self::setDefault();
 
@@ -92,6 +94,29 @@ class CWebUser {
 
 			if ($result) {
 				self::setSessionCookie(self::$data['sessionid']);
+				DBend();
+
+				$master = $DB;
+
+				foreach ($DB['SERVERS'] as $server) {
+					if (!multiDBconnect($server, $error)) {
+						continue;
+					}
+
+					$user_info = DBfetch(DBselect(
+						'SELECT u.userid'.
+						' FROM users u'.
+						' WHERE u.alias='.zbx_dbstr($login)
+					));
+
+					DBexecute('INSERT INTO sessions (sessionid,userid,lastaccess,status)'.
+						' VALUES ('.zbx_dbstr(self::$data['sessionid']).','.zbx_dbstr($user_info['userid']).','.time().','.ZBX_SESSION_ACTIVE.')'
+					);
+				}
+
+				unset($DB['DB']);
+				$DB = $master;
+				DBconnect($error);
 			}
 
 			return $result;

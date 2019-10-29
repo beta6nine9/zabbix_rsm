@@ -20,9 +20,9 @@
 
 var LCL_SUGGESTS = [];
 
-function createSuggest(oid) {
+function createSuggest(oid, tlds) {
 	var sid = LCL_SUGGESTS.length;
-	LCL_SUGGESTS[sid] = new CSuggest(sid, oid);
+	LCL_SUGGESTS[sid] = new CSuggest(sid, oid, tlds);
 
 	return sid;
 }
@@ -56,10 +56,11 @@ var CSuggest = Class.create({
 	'suggestCount':		0,		// suggests shown
 	'mouseOverSuggest':	false,	// indicates if mouse is over suggests
 
-	initialize: function(id, objid) {
+	initialize: function(id, objid, tlds) {
 		this.id = id;
 		this.cleanCache();
 		this.dom.input = $(objid);
+		this.tlds = tlds;
 
 		addListener(this.dom.input, 'keyup', this.keyPressed.bindAsEventListener(this));
 		addListener(this.dom.input, 'blur', this.suggestBlur.bindAsEventListener(this));
@@ -107,7 +108,8 @@ var CSuggest = Class.create({
 		var rpcRequest = {
 			'method': 'search',
 			'params': {
-				'search': needle
+				'search': needle,
+				'tlds': this.tlds
 			},
 			'onSuccess': this.serverRespond.bind(this, needle),
 			'onFailure': function() {

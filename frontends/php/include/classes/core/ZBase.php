@@ -303,8 +303,21 @@ class ZBase {
 	 * @throws DBException
 	 */
 	protected function initDB() {
+		global $DB;
+
 		$error = null;
 		if (!DBconnect($error)) {
+			$last_server = "*UNKNOWN*";
+			foreach ($DB['SERVERS'] as $server) {
+				$last_server = $server['SERVER'];
+				if (($DB['SERVER'] !== $server['SERVER'] || $DB['PORT'] !== $server['PORT']
+						|| $DB['DATABASE'] !== $server['DATABASE'] || $DB['USER'] !== $server['USER']
+						|| $DB['PASSWORD'] !== $server['PASSWORD']) && multiDBconnect($server, $error)) {
+					redirect($server['URL']);
+				}
+			}
+
+			$error = _('All servers are down') . ". Last error was on server \"$last_server\": $error";
 			throw new DBException($error);
 		}
 	}

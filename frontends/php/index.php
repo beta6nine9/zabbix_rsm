@@ -82,7 +82,17 @@ if (hasRequest('enter') && CWebUser::login(getRequest('name', ZBX_GUEST_USER), g
 }
 
 if (CWebUser::isLoggedIn() && !CWebUser::isGuest()) {
-	redirect(CWebUser::$data['url'] ? CWebUser::$data['url'] : ZBX_DEFAULT_URL);
+	
+	if (CWebUser::$data['type'] == USER_TYPE_READ_ONLY) {
+		$url = (new CUrl('zabbix.php'))
+			->setArgument('action', 'rsm.rollingweekstatus')
+			->getUrl();
+	}
+	else {
+		$url = CWebUser::$data['url'] ? CWebUser::$data['url'] : ZBX_DEFAULT_URL;
+	}
+
+	redirect($url);
 }
 
 $messages = clear_messages();

@@ -251,8 +251,17 @@ if (CSession::keyExists('messageOk') || CSession::keyExists('messageError')) {
 }
 
 if (!defined('ZBX_PAGE_NO_MENU') && $page['web_layout_mode'] === ZBX_LAYOUT_NORMAL) {
+	if (!array_key_exists('name', CWebUser::$data)) {
+		redirect('index.php');
+	}
+	$servers = new CComboBox('servers', null, 'window.location.href=this.value');
+	foreach ($DB['SERVERS'] as $server) {
+		$servers->addItem($server['URL'].'rsm.rollingweekstatus.php?sid='.CWebUser::getSessionCookie().'&set_sid=1',
+			$server['NAME'], ($ZBX_SERVER_NAME === $server['NAME']) ? 'no' : null);
+	}
+
 	$pageMenu = new CView('layout.htmlpage.menu', [
-		'server_name' => isset($ZBX_SERVER_NAME) ? $ZBX_SERVER_NAME : '',
+		'server_name' => $servers,
 		'menu' => [
 			'main_menu' => $main_menu,
 			'sub_menus' => $sub_menus,
@@ -275,6 +284,12 @@ if ($page['type'] == PAGE_TYPE_HTML) {
 
 // unset multiple variables
 unset($table, $top_page_row, $menu_table, $main_menu_row, $sub_menu_table, $sub_menu_rows);
+
+// Show error message if unknown {$RSM.MONITORING.TARGET} is set.
+if (get_rsm_monitoring_type() !== MONITORING_TARGET_REGISTRY
+		&& get_rsm_monitoring_type() !== MONITORING_TARGET_REGISTRAR) {
+	error('Unknown monitoring target.');
+}
 
 // if a user logs in after several unsuccessful attempts, display a warning
 if ($failedAttempts = CProfile::get('web.login.attempt.failed', 0)) {

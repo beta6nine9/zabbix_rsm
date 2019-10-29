@@ -228,6 +228,21 @@ $data['allowedGroups'] = [
 	RSM_TEST_GROUP => false
 ];
 
+global $DB;
+$DB['SERVERS'] = [
+	'1' => [
+		'SERVER' => $DB['SERVER'],
+		'PORT' => $DB['PORT'],
+		'USER' => $DB['USER'],
+		'DATABASE' => $DB['DATABASE'],
+		'PASSWORD' => $DB['PASSWORD'],
+		'NAME' => 'db1',
+		'URL' => 'http://zabbix.icann/',
+		'SCHEMA' => $DB['DATABASE'],
+		'NR' => 1
+	]
+];
+
 $master = $DB;
 $data['tld'] = [];
 

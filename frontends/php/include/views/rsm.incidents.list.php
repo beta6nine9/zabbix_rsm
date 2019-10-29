@@ -24,37 +24,43 @@ $widget = (new CWidget())->setTitle(_('Incidents'));
 $object_label = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) ? _('Registrar ID') : _('TLD');
 
 // filter
-$filter = (new CFilter('web.rsm.incidents.filter.state'))
+$filter = (new CFilter(new CUrl('rsm.incidents.php')))
 	->addVar('filter_set', 1)
 	->addVar('filter_from', zbxDateToTime($data['filter_from']))
 	->addVar('filter_to', zbxDateToTime($data['filter_to']));
 
-$filter
-	->addColumn(
-		(new CFormList())
-			->addRow($object_label, (new CTextBox('filter_search', $data['filter_search']))
-				->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH)
-				->setAttribute('autocomplete', 'off')
-			)
-	)
-	->addColumn(
-		(new CFormList())
-			->addRow(_('From'), createDateSelector('filter_from', zbxDateToTime($this->data['filter_from'])))
-	)
-	->addColumn(
-		(new CFormList())
-			->addRow(_('To'), createDateSelector('filter_to', zbxDateToTime($this->data['filter_to'])))
-	)
-	->addColumn(
-		(new CFormList())
-			->addRow((new CLink(_('Rolling week'),
+$column1 = (new CFormList())->addRow(
+	$object_label,
+	(new CTextBox('filter_search', $data['filter_search']))
+		->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH)
+		->setAttribute('autocomplete', 'off')
+);
+
+$column2 = (new CFormList())->addRow(_('From'));
+$column3 = (new CFormList())->addRow(_('To'));
+$column4 = (new CFormList())->addRow((new CLink(_('Rolling week'),
 					$this->data['url'].'rsm.incidents.php?incident_type='.$this->data['type'].'&filter_set=1'.
 					'&filter_search='.$this->data['filter_search'].'&filter_rolling_week=1&sid='.$this->data['sid'].
 					'&set_sid=1'
 				))
 					->addClass(ZBX_STYLE_BTN_LINK)
-			)
-	);
+			);
+$filter->addFilterTab(_('Filter'), $column1, $column2, $column3, $column4);
+
+/*
+
+$column2 = (new CFormList())->addRow(_('From'), createDateSelector('filter_from', zbxDateToTime($this->data['filter_from'])));
+$column3 = (new CFormList())->addRow(_('To'), createDateSelector('filter_to', zbxDateToTime($this->data['filter_to'])));
+$column4 = (new CFormList())->addRow((new CLink(_('Rolling week'),
+					$this->data['url'].'rsm.incidents.php?incident_type='.$this->data['type'].'&filter_set=1'.
+					'&filter_search='.$this->data['filter_search'].'&filter_rolling_week=1&sid='.$this->data['sid'].
+					'&set_sid=1'
+				))
+					->addClass(ZBX_STYLE_BTN_LINK)
+			);
+
+$filter->addFilterTab(_('Filter'), $column1, $column2, $column3, $column4);
+*/
 
 $widget->addItem($filter);
 

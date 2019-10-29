@@ -53,6 +53,7 @@ class CHost extends CHostGeneral {
 	 * @param bool			$options['selectApplications']			select Applications
 	 * @param bool			$options['selectMacros']				select Macros
 	 * @param bool|array	$options['selectInventory']				select Inventory
+	 * @param boolean		$options['tlds']						select only tlds
 	 * @param int			$options['count']						count Hosts, returned column name is rowscount
 	 * @param string		$options['pattern']						search hosts by pattern in Host name
 	 * @param string		$options['extendPattern']				search hosts by pattern in Host name, ip and DNS
@@ -102,6 +103,7 @@ class CHost extends CHostGeneral {
 			'with_graphs'						=> null,
 			'with_graph_prototypes'				=> null,
 			'with_applications'					=> null,
+			'tlds'								=> null,
 			'editable'							=> false,
 			'nopermissions'						=> null,
 			// filter
@@ -183,6 +185,17 @@ class CHost extends CHostGeneral {
 			zbx_value2array($options['proxyids']);
 
 			$sqlParts['where'][] = dbConditionId('h.proxy_hostid', $options['proxyids']);
+		}
+
+		// tlds		
+		if (!is_null($options['tlds'])) {
+			if (!array_key_exists('hosts_groups', $sqlParts['from'])) {
+				$sqlParts['from']['hosts_groups'] = 'hosts_groups hg';
+				$sqlParts['where']['hgh'] = 'hg.hostid=h.hostid';
+			}
+			$sqlParts['from']['groups'] = 'groups g';
+			$sqlParts['where'][] = 'g.name='.zbx_dbstr(RSM_TLDS_GROUP);
+			$sqlParts['where']['g'] = 'g.groupid=hg.groupid';
 		}
 
 		// templateids
@@ -581,6 +594,8 @@ class CHost extends CHostGeneral {
 	 * @param string $hosts[]['tls_psk']                    PSK (required if "PSK" type is set).
 	 * @param string $hosts[]['tls_issuer']                 Certificate issuer (optional).
 	 * @param string $hosts[]['tls_subject']                Certificate subject (optional).
+	 * @param string $hosts[]['info_1']                     Info field (optional).
+	 * @param string $hosts[]['info_2']                     Info field (optional).
 	 *
 	 * @return array
 	 */
@@ -704,6 +719,8 @@ class CHost extends CHostGeneral {
 	 * @param string $hosts[]['tls_psk']                          PSK (required if "PSK" type is set).
 	 * @param string $hosts[]['tls_issuer']                       Certificate issuer (optional).
 	 * @param string $hosts[]['tls_subject']                      Certificate subject (optional).
+	 * @param string $hosts[]['info_1']                           Info field (optional).
+	 * @param string $hosts[]['info_2']                           Info field (optional).
 	 *
 	 * @return array
 	 */

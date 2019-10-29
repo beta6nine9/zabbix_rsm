@@ -113,6 +113,17 @@ class CConfigFile {
 			$this->config['DB']['SCHEMA'] = $DB['SCHEMA'];
 		}
 
+		if (isset($DB['SERVERS'])) {
+			$this->config['DB']['SERVERS'] = $DB['SERVERS'];
+		}
+
+		$db_tls_options = array('DB_KEY_FILE', 'DB_CERT_FILE', 'DB_CA_FILE', 'DB_CA_PATH', 'DB_CA_CIPHER');
+		foreach ($db_tls_options as $db_tls_option) {
+			$this->config['DB'][$db_tls_option] = array_key_exists($db_tls_option, $DB) ? $DB[$db_tls_option] : null;
+		}
+
+		$this->config['DB']['DB_CONN_TIMEOUT'] = array_key_exists('DB_CONN_TIMEOUT', $DB) ? $DB['DB_CONN_TIMEOUT'] : null;
+
 		if (isset($ZBX_SERVER)) {
 			$this->config['ZBX_SERVER'] = $ZBX_SERVER;
 		}

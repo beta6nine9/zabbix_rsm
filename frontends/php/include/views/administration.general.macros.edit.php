@@ -51,7 +51,8 @@ foreach ($data['macros'] as $i => $macro) {
 
 	$value_input = (new CTextAreaFlexible('macros['.$i.'][value]', $macro['value']))
 		->setWidth(ZBX_TEXTAREA_MACRO_VALUE_WIDTH)
-		->setAttribute('placeholder', _('value'));
+		->setAttribute('placeholder', _('value'))
+		->setMaxlength(65535);
 
 	$description_input = (new CTextAreaFlexible('macros['.$i.'][description]', $macro['description']))
 		->setWidth(ZBX_TEXTAREA_MACRO_VALUE_WIDTH)

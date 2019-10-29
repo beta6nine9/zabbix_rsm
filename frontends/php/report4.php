@@ -283,7 +283,7 @@ else {
 
 		$links = [];
 		foreach ($media_types as $id => $name) {
-			$links[] = (CWebUser::getType() < USER_TYPE_SUPER_ADMIN)
+			$links[] = (CWebUser::getType() != USER_TYPE_SUPER_ADMIN)
 				? $name
 				: new CLink($name, 'zabbix.php?action=mediatype.edit&mediatypeid='.$id);
 			$links[] = SPACE.'/'.SPACE;

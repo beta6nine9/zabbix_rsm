@@ -95,7 +95,8 @@ else {
 			)
 		]))
 			->setWidth(ZBX_TEXTAREA_MACRO_VALUE_WIDTH)
-			->setAttribute('placeholder', _('value'));
+			->setAttribute('placeholder', _('value'))
+			->setMaxlength(65535);
 
 		$row = [
 			(new CCol($macro_cell))->addClass(ZBX_STYLE_TEXTAREA_FLEXIBLE_PARENT),

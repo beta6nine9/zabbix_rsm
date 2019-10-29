@@ -34,7 +34,7 @@ class CUser extends CApiService {
 	 * @param array  $options
 	 * @param array  $options['usrgrpids']		filter by UserGroup IDs
 	 * @param array  $options['userids']		filter by User IDs
-	 * @param bool   $options['type']			filter by User type [USER_TYPE_ZABBIX_USER: 1, USER_TYPE_ZABBIX_ADMIN: 2, USER_TYPE_SUPER_ADMIN: 3]
+	 * @param bool   $options['type']			filter by User type [USER_TYPE_ZABBIX_USER: 1, USER_TYPE_ZABBIX_ADMIN: 2, USER_TYPE_SUPER_ADMIN: 3, USER_TYPE_READ_ONLY: 4, USER_TYPE_POWER_USER: 5, USER_TYPE_COMPLIANCE: 6]
 	 * @param bool   $options['selectUsrgrps']	extend with UserGroups data for each User
 	 * @param bool   $options['getAccess']		extend with access data for each User
 	 * @param bool   $options['count']			output only count of objects in result. (result returned in property 'rowscount')
@@ -1110,34 +1110,47 @@ class CUser extends CApiService {
 	}
 
 	public function logout($user) {
+		global $DB;
+
 		$api_input_rules = ['type' => API_OBJECT, 'fields' => []];
 		if (!CApiInputValidator::validate($api_input_rules, $user, '/', $error)) {
 			self::exception(ZBX_API_ERROR_PARAMETERS, $error);
 		}
 
 		$sessionid = self::$userData['sessionid'];
+		$master = $DB;
 
-		$db_sessions = DB::select('sessions', [
-			'output' => ['userid'],
-			'filter' => [
-				'sessionid' => $sessionid,
-				'status' => ZBX_SESSION_ACTIVE
-			],
-			'limit' => 1
-		]);
+		foreach ($DB['SERVERS'] as $server) {
+			if (!multiDBconnect($server, $error)) {
+				continue;
+			}
 
-		if (!$db_sessions) {
-			self::exception(ZBX_API_ERROR_PARAMETERS, _('Cannot logout.'));
+			$db_sessions = DB::select('sessions', [
+				'output' => ['userid'],
+				'filter' => [
+					'sessionid' => $sessionid,
+					'status' => ZBX_SESSION_ACTIVE
+				],
+				'limit' => 1
+			]);
+
+			if (!$db_sessions) {
+				self::exception(ZBX_API_ERROR_PARAMETERS, _('Cannot logout.'));
+			}
+
+			DB::delete('sessions', [
+				'status' => ZBX_SESSION_PASSIVE,
+				'userid' => $db_sessions[0]['userid']
+			]);
+			DB::update('sessions', [
+				'values' => ['status' => ZBX_SESSION_PASSIVE],
+				'where' => ['sessionid' => $sessionid]
+			]);
 		}
 
-		DB::delete('sessions', [
-			'status' => ZBX_SESSION_PASSIVE,
-			'userid' => $db_sessions[0]['userid']
-		]);
-		DB::update('sessions', [
-			'values' => ['status' => ZBX_SESSION_PASSIVE],
-			'where' => ['sessionid' => $sessionid]
-		]);
+		unset($DB['DB']);
+		$DB = $master;
+		DBconnect($error);
 
 		$this->addAuditDetails(AUDIT_ACTION_LOGOUT, AUDIT_RESOURCE_USER);
 

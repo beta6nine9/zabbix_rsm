@@ -66,7 +66,7 @@ jQuery(function($) {
 	var $search = $('#search');
 
 	if ($search.length) {
-		createSuggest('search');
+		createSuggest('search', null);
 
 		$search.keyup(function() {
 			$search
