@@ -1,3 +1,9 @@
+Changes for rsm1.2.14
+
+Bug fixes:
+....I..... [588] 588: when no cache, continue generating recent measurements from the most recent available, respecting new configuration option "initial_measurements_limit" with default value of 2 hours (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm1.2.13
 
 Bug fixes:
