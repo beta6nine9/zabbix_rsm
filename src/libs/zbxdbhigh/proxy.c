@@ -3453,7 +3453,6 @@ static int	process_history_data_by_itemids(zbx_socket_t *sock, zbx_client_item_v
 
 				continue;
 			}
-			
 		}
 
 		processed_num += process_history_data(items, values, errcodes, values_num);

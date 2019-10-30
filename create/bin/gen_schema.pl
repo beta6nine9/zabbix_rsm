@@ -663,18 +663,10 @@ sub process
 	$sequences = "";
 	$uniq = "";
 	my ($type, $line);
-	my @lines;
 
-	if (-t STDIN)
-	{
-		open(INFO, $file);	# open the file
-		@lines = <INFO>;	# read it into an array
-		close(INFO);		# close the file
-	}
-	else
-	{
-		@lines = <STDIN>;
-	}
+	open(INFO, $file);	# open the file
+	my @lines = <INFO>;	# read it into an array
+	close(INFO);		# close the file
 
 	foreach $line (@lines)
 	{
