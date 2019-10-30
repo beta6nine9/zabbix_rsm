@@ -23,6 +23,13 @@ New features:
 ..F.I..... [510] added support for Registrar RDDS Monitoring (dimir, yurii, asitals, miks, gcalenko)
 
 --------------------------------------------------------------------------------
+Changes for rsm1.3.0rc6
+
+New features:
+....I..... [538] generate recent measurement files only once, after service availability is calculated; drop monitoring data from proxy that is over 90 seconds old (dimir)
+..F....... [569] added displaying of disabled services in gray color to SLA Reports page (dimir, gcalenko)
+
+--------------------------------------------------------------------------------
 Changes for rsm1.3.0rc5
 
 Bug fixes:
