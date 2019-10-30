@@ -59,6 +59,7 @@ our @EXPORT = qw(
 	ah_continue_file_name ah_lock_continue_file ah_unlock_continue_file
 	ah_get_api_tld ah_get_last_audit
 	ah_get_recent_measurement ah_save_recent_measurement ah_save_recent_cache ah_get_recent_cache
+	ah_get_most_recent_measurement_ts
 	ah_save_audit ah_save_continue_file ah_encode_pretty_json JSON_OBJECT_DISABLED_SERVICE
 	ah_get_dns_interface ah_get_rdds_interface ah_get_interface
 	AH_INTERFACE_DNS AH_INTERFACE_DNSSEC AH_INTERFACE_RDDS43 AH_INTERFACE_RDDS80 AH_INTERFACE_RDAP AH_INTERFACE_EPP
@@ -536,6 +537,26 @@ sub ah_save_measurement
 	return __write_file($json_path, __encode_json($json), $clock);
 }
 
+# Base path for recent measurement, e. g.
+#
+#   [base_dir]/example/monitoring/dns/measurements/2018/02/28
+#
+sub __gen_recent_measurement_base_path($$$)
+{
+	my $ah_tld = shift;
+	my $service = shift;
+	my $clock = shift;
+
+	my (undef, undef, undef, $mday, $mon, $year) = localtime($clock);
+
+	$year += 1900;
+	$mon++;
+
+	my $add_path = sprintf("measurements/%04d/%02d/%02d", $year, $mon, $mday);
+
+	return AH_SLA_API_RECENT_DIR . '/' . __gen_base_path($ah_tld, $service, $add_path);
+}
+
 # Generate path for recent measurement, e. g.
 #
 #   [base_dir]/example/monitoring/dns/measurements/2018/02/28/<measurement>.json
@@ -548,14 +569,7 @@ sub __gen_recent_measurement_path($$$$$)
 	my $path_buf = shift;	# pointer to result
 	my $create = shift;	# create missing directories
 
-	my (undef, undef, undef, $mday, $mon, $year) = localtime($clock);
-
-	$year += 1900;
-	$mon++;
-
-	my $add_path = sprintf("measurements/%04d/%02d/%02d", $year, $mon, $mday);
-
-	my $path = AH_SLA_API_RECENT_DIR . '/' . __gen_base_path($ah_tld, $service, $add_path);
+	my $path = __gen_recent_measurement_base_path($ah_tld, $service, $clock);
 
 	if ($create)
 	{
@@ -645,6 +659,46 @@ sub ah_get_recent_cache($$)
 	$$json_ref = decode_json($buf);
 
 	return AH_SUCCESS;
+}
+
+sub ah_get_most_recent_measurement_ts($$$$$$)
+{
+	my $ah_tld = shift;
+	my $service = shift;
+	my $delay = shift;		# use this delay to jump to the next possible file
+	my $newest_clock = shift;	# start searching from here
+	my $oldest_clock = shift;	# do not go further than this to the path
+	my $ts_buf = shift;		# pointer to result
+
+	if ($newest_clock < $oldest_clock)
+	{
+		__set_error("invalid time period: from $oldest_clock till $newest_clock");
+		return AH_FAIL;
+	}
+
+	my $clock = $newest_clock;
+
+	my %search_paths;
+
+	while ($clock > $oldest_clock)
+	{
+		my $path = __gen_recent_measurement_base_path($ah_tld, $service, $clock);
+
+		$search_paths{$path} = 1;
+
+		if (-f "$path/$clock.json")
+		{
+			$$ts_buf = $clock;
+			return AH_SUCCESS;
+		}
+
+		$clock -= $delay;
+	}
+
+	__set_error("no measurement files found between ", $oldest_clock, " and ", $newest_clock,
+		", search paths:\n    ", join("\n    ", keys(%search_paths)));
+
+	return AH_FAIL;
 }
 
 sub ah_continue_file_name()

@@ -34,6 +34,7 @@ UNIQUE		|2		|name
 
 TABLE|hosts|hostid|ZBX_DATA
 FIELD		|hostid		|t_id		|	|NOT NULL	|0
+FIELD		|created	|t_time		|'0'	|NOT NULL	|0
 FIELD		|proxy_hostid	|t_id		|	|NULL		|0			|1|hosts	|hostid		|RESTRICT
 FIELD		|host		|t_varchar(128)	|''	|NOT NULL	|ZBX_PROXY
 FIELD		|status		|t_integer	|'0'	|NOT NULL	|ZBX_PROXY

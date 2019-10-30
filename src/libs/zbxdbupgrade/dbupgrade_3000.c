@@ -4377,6 +4377,20 @@ static int	DBpatch_3000322(void)
 #undef CHECK
 }
 
+static int	DBpatch_3000323(void)
+{
+	/* patch for both server and proxy */
+
+	if (ZBX_DB_OK > DBexecute(
+			"alter table hosts"
+			" add column created int(11) not null default '0' after hostid"))
+	{
+		return FAIL;
+	}
+
+	return SUCCEED;
+}
+
 static int	DBpatch_3000400(void)
 {
 	return SUCCEED;
@@ -5068,6 +5082,7 @@ DBPATCH_ADD(3000319, 0, 0)	/* remove trailing spaces from "Ratio of failed month
 DBPATCH_ADD(3000320, 0, 1)	/* create rsmhost_dns_ns_log table */
 DBPATCH_ADD(3000321, 0, 0)	/* fill rsmhost_dns_ns_log table */
 DBPATCH_ADD(3000322, 0, 0)	/* fix delta field for 'rsm.slv.%.rtt.%' items */
+DBPATCH_ADD(3000323, 0, 1)	/* add 'created' field to the 'hosts' table */
 DBPATCH_ADD(3000400, 0, 0)	/* Phase 3, version 1.4.0 */
 DBPATCH_ADD(3000401, 0, 0)	/* add macro {$RSM.MONITORING.TARGET} with empty string as value (unknown) or "registry" */
 DBPATCH_ADD(3000402, 0, 0)	/* rename "EBERO users" user group to "Read-only user", "Technical services users" to "Power user" */

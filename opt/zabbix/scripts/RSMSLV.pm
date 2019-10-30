@@ -165,6 +165,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		update_slv_rtt_monthly_stats
 		recalculate_downtime
 		generate_report
+		set_log_tld unset_log_tld
 		usage);
 
 # configuration, set in set_slv_config()
@@ -337,8 +338,7 @@ sub get_rtt_low
 		}
 		else
 		{
-			fail("dimir was wrong, besides protocols ", PROTO_UDP, " and ", PROTO_TCP,
-				" there is also ", $proto);
+			fail("unhandled protocol: '$proto'");
 		}
 	}
 
@@ -357,8 +357,7 @@ sub get_rtt_low
 		return get_macro_epp_rtt_low($command);	# can be per TLD
 	}
 
-	fail("dimir was wrong, thinking the only known services are \"dns\", \"dnssec\", \"rdds\", \"rdap\" ",
-		"and \"epp\", there is also \"$service\"");
+	fail("unhandled service: '$service'");
 }
 
 sub get_slv_rtt($;$)
@@ -545,6 +544,51 @@ sub get_itemids_by_host_and_keypart
 		my $nsip = get_nsip_from_key($key);
 
 		$result->{$nsip} = $itemid;
+	}
+
+	return $result;
+}
+
+# input:
+# [
+#     [host, key],
+#     [host, key],
+#     ...
+# ]
+# output:
+# {
+#     host => {
+#         key => itemid,
+#         key => itemid,
+#     },
+#     ...
+# }
+sub get_itemids_by_hosts_and_keys($)
+{
+	my $filter = shift; # [[host, key], ...]
+
+	my $filter_string = join(" or ", ("(hosts.host = ? and items.key_ = ?)") x scalar(@{$filter}));
+	my $filter_params = [map(($_->[0], $_->[1]), @{$filter})];
+
+	my $sql = "select" .
+			" hosts.host," .
+			" items.key_," .
+			" items.itemid" .
+		" from" .
+			" hosts" .
+			" left join items on items.hostid = hosts.hostid" .
+		" where" .
+			" " . $filter_string;
+
+	my $rows = db_select($sql, $filter_params);
+
+	my $result = {};
+
+	foreach my $row (@{$rows})
+	{
+		my ($host, $key, $itemid) = @{$row};
+
+		$result->{$host}{$key} = $itemid;
 	}
 
 	return $result;
@@ -2153,10 +2197,11 @@ sub init_values
 
 sub push_value
 {
-	my $hostname = shift;
-	my $key = shift;
-	my $clock = shift;
-	my $value = shift;
+	my $hostname   = shift;
+	my $key        = shift;
+	my $clock      = shift;
+	my $value      = shift;
+	my $value_type = shift;
 
 	my $info = join('', @_);
 
@@ -2170,20 +2215,16 @@ sub push_value
 				'value' => "$value",
 				'clock' => $clock
 			},
+			'value_type' => $value_type,
 			'info' => $info,
 		});
 
 	if (opt('dry-run'))
 	{
-		my $hostlen = length($hostname);
-		my $keylen = length($key);
-		my $clocklen = length($clock);
-		my $valuelen = length($value);
-
-		$_sender_values->{'maxhost'} = $hostlen if (!$_sender_values->{'maxhost'} || $hostlen > $_sender_values->{'maxhost'});
-		$_sender_values->{'maxkey'} = $keylen if (!$_sender_values->{'maxkey'} || $keylen > $_sender_values->{'maxkey'});
-		$_sender_values->{'maxclock'} = $clocklen if (!$_sender_values->{'maxclock'} || $clocklen > $_sender_values->{'maxclock'});
-		$_sender_values->{'maxvalue'} = $valuelen if (!$_sender_values->{'maxvalue'} || $valuelen > $_sender_values->{'maxvalue'});
+		$_sender_values->{'maxhost'}  = max($_sender_values->{'maxhost'}  // 0, length($hostname));
+		$_sender_values->{'maxkey'}   = max($_sender_values->{'maxkey'}   // 0, length($key));
+		$_sender_values->{'maxclock'} = max($_sender_values->{'maxclock'} // 0, length($clock));
+		$_sender_values->{'maxvalue'} = max($_sender_values->{'maxvalue'} // 0, length($value));
 	}
 }
 
@@ -2223,31 +2264,52 @@ sub send_values
 		return;
 	}
 
-	my $total_values = scalar(@{$_sender_values->{'data'}});
-
-	if ($total_values == 0)
+	if (opt('fill-gap'))
 	{
-		dbg(__script(), ": no data collected, nothing to send");
-		return;
-	}
+		foreach my $sender_value (@{$_sender_values->{'data'}})
+		{
+			my $host  = $sender_value->{'data'}{'host'};
+			my $key   = $sender_value->{'data'}{'key'};
+			my $clock = $sender_value->{'data'}{'clock'};
+			my $value = $sender_value->{'data'}{'value'};
 
-	my $data = [];
+			my $table = history_table($sender_value->{'value_type'});
 
-	foreach my $sender_value (@{$_sender_values->{'data'}})
-	{
-		push(@{$data}, $sender_value->{'data'});
-	}
+			my $sql = "insert into $table (itemid,clock,value,ns)" .
+				" select items.itemid,?,?,0" .
+				" from" .
+					" items" .
+					" left join hosts on hosts.hostid=items.hostid" .
+				" where" .
+					" hosts.host=? and" .
+					" items.key_=?";
 
-	if (opt('output-file'))
-	{
-		my $output_file = getopt('output-file');
-		dbg("writing $total_values values to $output_file");
-		write_file($output_file, Dumper($data));
+			db_exec($sql, [$clock, $value, $host, $key]);
+		}
 	}
 	else
 	{
-		dbg("sending $total_values values");	# send everything in one batch since server should be local
-		push_to_trapper($config->{'slv'}->{'zserver'}, $config->{'slv'}->{'zport'}, 10, 5, $data);
+		my $total_values = scalar(@{$_sender_values->{'data'}});
+
+		if ($total_values == 0)
+		{
+			dbg(__script(), ": no data collected, nothing to send");
+			return;
+		}
+
+		my $data = [map($_->{'data'}, @{$_sender_values->{'data'}})];
+
+		if (opt('output-file'))
+		{
+			my $output_file = getopt('output-file');
+			dbg("writing $total_values values to $output_file");
+			write_file($output_file, Dumper($data));
+		}
+		else
+		{
+			dbg("sending $total_values values");	# send everything in one batch since server should be local
+			push_to_trapper($config->{'slv'}->{'zserver'}, $config->{'slv'}->{'zport'}, 10, 5, $data);
+		}
 	}
 
 	# $tld is a global variable which is used in info()
@@ -2263,6 +2325,233 @@ sub send_values
 				$h->{'info'}));
 	}
 	$tld = $saved_tld;
+
+	check_sent_values()
+}
+
+# Returns 0 if hashes are different.
+# Returns 1 if hashes are the same.
+sub compare_hashes($$)
+{
+	my $a = shift;
+	my $b = shift;
+
+	if (!defined($a) || !defined($b))
+	{
+		return 0;
+	}
+
+	if (keys(%{$a}) != keys(%{$b}))
+	{
+		return 0;
+	}
+
+	foreach my $key (keys(%{$a}))
+	{
+		if (!exists($b->{$key}))
+		{
+			return 0;
+		}
+		if ($a->{$key} ne $b->{$key})
+		{
+			return 0;
+		}
+	}
+
+	return 1;
+}
+
+# Wait until all pushed values are stored by history syncers on Zabbix Server.
+#
+# Note: Don't wait for too long, DB transactions on Zabbix Server may fail and
+# then data won't be synced. If this happens, warnings will be thrown.
+sub check_sent_values()
+{
+	my $data = [];
+
+	foreach my $sender_value (@{$_sender_values->{'data'}})
+	{
+		push(
+			@{$data},
+			{
+				'host'       => $sender_value->{'data'}{'host'},
+				'key'        => $sender_value->{'data'}{'key'},
+				'clock'      => $sender_value->{'data'}{'clock'},
+				'value'      => $sender_value->{'data'}{'value'},
+				'value_type' => $sender_value->{'value_type'},
+				'itemid'     => undef,
+			}
+		);
+	}
+
+	dbg("getting itemids of all pushed items");
+
+	my $host_key_pairs_hash = {};
+	my $host_key_pairs_list = [];
+
+	foreach my $value (@{$data})
+	{
+		my $host = $value->{'host'};
+		my $key  = $value->{'key'};
+
+		if (!exists($host_key_pairs_hash->{$host}{$key}))
+		{
+			$host_key_pairs_hash->{$host}{$key} = undef;
+			push(@{$host_key_pairs_list}, [$host, $key]);
+		}
+	}
+
+	my $itemids = get_itemids_by_hosts_and_keys($host_key_pairs_list);
+	my $itemids_list = [map(values(%{$_}), values(%{$itemids}))];
+
+	foreach my $value (@{$data})
+	{
+		my $host = $value->{'host'};
+		my $key  = $value->{'key'};
+
+		$value->{'itemid'} = $itemids->{$host}{$key};
+	}
+
+	dbg("getting max pushed clock for each item");
+
+	my $pushed_clocks = {};
+
+	foreach my $value (@{$data})
+	{
+		my $host   = $value->{'host'};
+		my $key    = $value->{'key'};
+		my $clock  = $value->{'clock'};
+		my $itemid = $value->{'itemid'};
+
+		$pushed_clocks->{$itemid} = max($pushed_clocks->{$itemid} // 0, $clock);
+	}
+
+	dbg("waiting until clocks in lastvalue reach pushed clocks");
+
+	# note(1): clocks in lastvalue table might be larger than pushed clocks if script is used for filling a gap
+	# note(2): clocks in lastvalue table might fail to reach pushed clocks if some DB transaction fails
+
+	my $itemids_placeholder = join(",", ("?") x scalar(@{$itemids_list}));
+	my $lastvalue_sql = "select itemid, clock from lastvalue where itemid in ($itemids_placeholder)";
+
+	my $lastvalue_clocks;
+	my $lastvalue_changed_time;
+
+	WAIT_FOR_LASTVALUE:
+	while (1)
+	{
+		select(undef, undef, undef, 0.25);
+
+		my $rows = db_select($lastvalue_sql, $itemids_list);
+		my $lastvalue_clocks_tmp = {map { $_->[0] => $_->[1] } @{$rows}};
+
+		if (compare_hashes($lastvalue_clocks_tmp, $lastvalue_clocks))
+		{
+			my $timeout = 30;
+
+			if (Time::HiRes::time() - $lastvalue_changed_time >= $timeout)
+			{
+				wrn("lastvalue table hasn't changed for $timeout seconds");
+				last WAIT_FOR_LASTVALUE;
+			}
+
+			next WAIT_FOR_LASTVALUE;
+		}
+
+		$lastvalue_clocks = $lastvalue_clocks_tmp;
+		$lastvalue_changed_time = Time::HiRes::time();
+
+		if (keys(%{$lastvalue_clocks}) != keys(%{$pushed_clocks}))
+		{
+			next WAIT_FOR_LASTVALUE;
+		}
+
+		foreach my $itemid (@{$itemids_list})
+		{
+			if ($lastvalue_clocks->{$itemid} < $pushed_clocks->{$itemid})
+			{
+				next WAIT_FOR_LASTVALUE;
+			}
+		}
+
+		last WAIT_FOR_LASTVALUE;
+	}
+
+	dbg("get data from history tables");
+
+	my $history_params = {};
+
+	foreach my $value (@{$data})
+	{
+		my $itemid = $value->{'itemid'};
+		my $clock  = $value->{'clock'};
+		my $table  = history_table($value->{'value_type'});
+
+		push(@{$history_params->{$table}}, $itemid, $clock);
+	}
+
+	my $history = {};
+
+	foreach my $table (keys(%{$history_params}))
+	{
+		# TODO: it might be needed to group entries by clock, i.e.,
+		# where (clock=? and itemid in (?,?,?)) or (clock=? and itemid in (?,?,?))
+
+		my $filter = join(" or ", ("(itemid=? and clock=?)") x (@{$history_params->{$table}} / 2));
+		my $sql = "select itemid,value,clock from $table where $filter";
+		my $rows = db_select($sql, $history_params->{$table});
+
+		foreach my $row (@{$rows})
+		{
+			my ($itemid, $value, $clock) = @{$row};
+
+			if (exists($history->{$itemid}{$clock}))
+			{
+				wrn("THIS SHOULD NOT HAPPEN, value for itemid=$itemid, clock=$clock exists in multiple history tables");
+			}
+
+			$history->{$itemid}{$clock} = $value;
+		}
+	}
+
+	dbg("checking that all pushed data exists in history tables");
+
+	foreach my $value (@{$data})
+	{
+		my $host          = $value->{'host'};
+		my $key           = $value->{'key'};
+		my $itemid        = $value->{'itemid'};
+		my $clock         = $value->{'clock'};
+		my $value_pushed  = $value->{'value'};
+		my $value_from_db = $history->{$itemid}{$clock};
+
+		if (!defined($value_from_db))
+		{
+			my $clock_str = ts_str($clock);
+
+			wrn("VALUE LOST! host=$host, key=$key, itemid=$itemid, clock=$clock_str, value=$value_pushed");
+		}
+		else
+		{
+			my $differs = 0;
+
+			if ($value->{'value_type'} == ITEM_VALUE_TYPE_FLOAT)
+			{
+				$differs = 1 if (abs($value_from_db - $value_pushed) > 0.0001);
+			}
+			else
+			{
+				$differs = 1 if ($value_from_db ne $value_pushed);
+			}
+
+			if ($differs)
+			{
+				my $clock_str = ts_str($clock);
+
+				wrn("VALUE DOES NOT MATCH! host=$host, key=$key, itemid=$itemid, clock=$clock_str, value=$value_pushed (got $value_from_db)");
+			}
+		}
+	}
 }
 
 # Get name server details (name, IP) from item key.
@@ -2442,6 +2731,16 @@ sub collect_slv_cycles($$$$$$)
 			next;
 		}
 
+		if (opt('fill-gap'))
+		{
+			my $clock = cycle_start(getopt('fill-gap'), $delay);
+			if (!history_value_exists($value_type, $clock, $itemid))
+			{
+				push(@{$cycles{$clock}}, $tld);
+			}
+			next;
+		}
+
 		next if (!opt('dry-run') && history_value_exists($value_type, $max_clock, $itemid));
 
 		my $cycles_added = 0;
@@ -2540,7 +2839,7 @@ sub process_slv_avail($$$$$$$$$$)
 
 	if ($online_probe_count < $cfg_minonline)
 	{
-		push_value($tld, $cfg_key_out, $value_ts, UP_INCONCLUSIVE_NO_PROBES,
+		push_value($tld, $cfg_key_out, $value_ts, UP_INCONCLUSIVE_NO_PROBES, ITEM_VALUE_TYPE_UINT64,
 				"Up (not enough probes online, $online_probe_count while $cfg_minonline required)");
 
 		if (alerts_enabled() == SUCCESS)
@@ -2571,7 +2870,7 @@ sub process_slv_avail($$$$$$$$$$)
 	my $probes_with_results = scalar(@{$values_ref});
 	if ($probes_with_results < $cfg_minonline)
 	{
-		push_value($tld, $cfg_key_out, $value_ts, UP_INCONCLUSIVE_NO_DATA,
+		push_value($tld, $cfg_key_out, $value_ts, UP_INCONCLUSIVE_NO_DATA, ITEM_VALUE_TYPE_UINT64,
 				"Up (not enough probes with results, $probes_with_results while $cfg_minonline required)");
 
 		if (alerts_enabled() == SUCCESS)
@@ -2601,11 +2900,11 @@ sub process_slv_avail($$$$$$$$$$)
 
 	if ($perc > SLV_UNAVAILABILITY_LIMIT)
 	{
-		push_value($tld, $cfg_key_out, $value_ts, UP, "Up ($detailed_info)");
+		push_value($tld, $cfg_key_out, $value_ts, UP, ITEM_VALUE_TYPE_UINT64, "Up ($detailed_info)");
 	}
 	else
 	{
-		push_value($tld, $cfg_key_out, $value_ts, DOWN, "Down ($detailed_info)");
+		push_value($tld, $cfg_key_out, $value_ts, DOWN, ITEM_VALUE_TYPE_UINT64, "Down ($detailed_info)");
 	}
 }
 
@@ -2643,7 +2942,7 @@ sub process_slv_rollweek_cycles($$$$$)
 			my $downtime = get_downtime($itemids{$tld}{'itemid_in'}, $from, $till, undef, undef, $delay);	# consider incidents
 			my $perc = sprintf("%.3f", $downtime * 100 / $cfg_sla);
 
-			push_value($tld, $cfg_key_out, $value_ts, $perc, "result: $perc% (down: $downtime minutes, sla: $cfg_sla)");
+			push_value($tld, $cfg_key_out, $value_ts, $perc, ITEM_VALUE_TYPE_FLOAT, "result: $perc% (down: $downtime minutes, sla: $cfg_sla)");
 		}
 
 		# unset TLD (for the logs)
@@ -2710,7 +3009,7 @@ sub process_slv_downtime_cycles($$$$)
 				$downtime = get_downtime_execute($sth, $itemids{$tld}{'itemid_in'}, $from, $till, 0, $delay);
 			}
 
-			push_value($tld, $cfg_key_out, $value_ts, $downtime, ts_str($from), " - ", ts_str($till));
+			push_value($tld, $cfg_key_out, $value_ts, $downtime, ITEM_VALUE_TYPE_UINT64, ts_str($from), " - ", ts_str($till));
 		}
 
 		# unset TLD (for the logs)
@@ -3100,7 +3399,19 @@ sub get_downtime
 
 			if (defined($prevclock) && $clock - $prevclock != $delay)
 			{
-				fail("dimir was wrong, one cycle can have missing or more than one availability value");
+				my $prevclock_ts = ts_full($prevclock);
+				my $clock_ts = ts_full($clock);
+
+				my $info = "itemid=$itemid, prevclock=$prevclock_ts, clock=$clock_ts, delay=$delay";
+
+				if ($clock - $prevclock > $delay)
+				{
+					fail("cycle is missing availability value ($info)");
+				}
+				else
+				{
+					fail("cycle has more than one availability value ($info)");
+				}
 			}
 
 			if ($value == DOWN)
@@ -3193,7 +3504,19 @@ sub get_downtime_execute
 		{
 			if (defined($prevclock) && $clock - $prevclock != $delay)
 			{
-				fail("dimir was wrong, one cycle can have missing or more than one availability value");
+				my $prevclock_ts = ts_full($prevclock);
+				my $clock_ts = ts_full($clock);
+
+				my $info = "itemid=$itemid, prevclock=$prevclock_ts, clock=$clock_ts, delay=$delay";
+
+				if ($clock - $prevclock > $delay)
+				{
+					fail("cycle is missing availability value ($info)");
+				}
+				else
+				{
+					fail("cycle has more than one availability value ($info)");
+				}
 			}
 
 			if ($value == DOWN)
@@ -3816,7 +4139,7 @@ sub parse_slv_opts
 {
 	$POD2USAGE_FILE = '/opt/zabbix/scripts/slv/rsm.slv.usage';
 
-	parse_opts('tld=s', 'now=n', 'cycles=n', 'output-file=s');
+	parse_opts('tld=s', 'now=n', 'cycles=n', 'output-file=s', 'fill-gap=n');
 }
 
 sub override_opts($)
@@ -4126,6 +4449,8 @@ sub get_slv_rtt_monthly_items($$$$)
 
 	foreach my $tld (keys(%slv_items_by_tld))
 	{
+		set_log_tld($tld);
+
 		my %tld_items = %{$slv_items_by_tld{$tld}};
 
 		# if any item was found on TLD, then all items must exist
@@ -4159,6 +4484,8 @@ sub get_slv_rtt_monthly_items($$$$)
 				fail("Items '$slv_item_key_performed', '$slv_item_key_failed' and '$slv_item_key_pfailed' have different lastvalue clocks on TLD '$tld'");
 			}
 		}
+
+		unset_log_tld();
 	}
 
 	return \%slv_items_by_tld;
@@ -4198,6 +4525,8 @@ sub update_slv_rtt_monthly_stats($$$$$$$$;$)
 	TLD_LOOP:
 	foreach my $tld (keys(%{$slv_items}))
 	{
+		set_log_tld($tld);
+
 		my $last_clock           = $slv_items->{$tld}{$slv_item_key_performed}[0];
 		my $last_performed_value = $slv_items->{$tld}{$slv_item_key_performed}[1];
 		my $last_failed_value    = $slv_items->{$tld}{$slv_item_key_failed}[1];
@@ -4296,12 +4625,14 @@ sub update_slv_rtt_monthly_stats($$$$$$$$;$)
 				$last_pfailed_value = 100 * $last_failed_value / $performed_with_expected;
 			}
 
-			push_value($tld, $slv_item_key_performed, $cycle_start, $last_performed_value);
-			push_value($tld, $slv_item_key_failed   , $cycle_start, $last_failed_value);
-			push_value($tld, $slv_item_key_pfailed  , $cycle_start, $last_pfailed_value);
+			push_value($tld, $slv_item_key_performed, $cycle_start, $last_performed_value, ITEM_VALUE_TYPE_UINT64);
+			push_value($tld, $slv_item_key_failed   , $cycle_start, $last_failed_value, ITEM_VALUE_TYPE_UINT64);
+			push_value($tld, $slv_item_key_pfailed  , $cycle_start, $last_pfailed_value, ITEM_VALUE_TYPE_FLOAT);
 
 			$last_clock = $cycle_start;
 		}
+
+		unset_log_tld();
 	}
 
 	send_values();
@@ -4385,7 +4716,7 @@ sub generate_report($$;$)
 
 	if ($out)
 	{
-		dbg("output of $cmd:\n" . $out);
+		info("output of $cmd:\n" . $out);
 	}
 
 	if ($? == -1)
@@ -4396,6 +4727,16 @@ sub generate_report($$;$)
 	{
 		fail("failed to generate report, command $cmd exited with value " . ($? >> 8));
 	}
+}
+
+sub set_log_tld($)
+{
+	$tld = shift;
+}
+
+sub unset_log_tld()
+{
+	undef($tld);
 }
 
 sub usage

@@ -31,8 +31,10 @@ use constant SUBSTR_KEY_LEN => 20;	# for logging
 use constant DEFAULT_MAX_CHILDREN => 64;
 use constant DEFAULT_MAX_WAIT => 600;	# maximum seconds to wait befor terminating child process
 
-use constant DEFAULT_INCIDENT_MEASUREMENTS_LIMIT => 3600;	# seconds, maximum period back from current time to look
-								# back for recent measurement files for an incident
+use constant DEFAULT_INITIAL_MEASUREMENTS_LIMIT => 7200;	# seconds, if the metric is not in cache and
+								# no measurements within this period, start generating
+								# them from this period in the past back for recent
+								# measurement files for an incident
 
 sub main_process_signal_handler();
 sub process_server($);
@@ -40,7 +42,6 @@ sub process_tld_batch($$$$$$);
 sub process_tld($$$$$);
 sub cycles_to_calculate($$$$$$$$);
 sub get_lastvalues_from_db($$$);
-sub get_sla_api_last_update();
 sub calculate_cycle($$$$$$$$$);
 sub get_interfaces($$$);
 sub probe_online_at_init();
@@ -74,7 +75,7 @@ my $config = get_rsm_config();
 
 set_slv_config($config);
 
-my $incident_measurements_limit = $config->{'sla_api'}->{'incident_measurements_limit'} // DEFAULT_INCIDENT_MEASUREMENTS_LIMIT;
+my $initial_measurements_limit = $config->{'sla_api'}->{'initial_measurements_limit'} // DEFAULT_INITIAL_MEASUREMENTS_LIMIT;
 
 my @server_keys;
 
@@ -115,9 +116,10 @@ $delays{'rdds'} = get_rdds_delay($now);
 $delays{'rdap'} = get_rdap_delay($now) if ($rdap_is_standalone);
 
 my %clock_limits;
-$clock_limits{'dns'} = $clock_limits{'dnssec'} = cycle_start($now - $incident_measurements_limit, $delays{'dnssec'});
-$clock_limits{'rdds'} = cycle_start($now - $incident_measurements_limit, $delays{'rdds'});
-$clock_limits{'rdap'} = cycle_start($now - $incident_measurements_limit, $delays{'rdap'}) if ($rdap_is_standalone);
+
+$clock_limits{'dns'} = $clock_limits{'dnssec'} = cycle_start($now - $initial_measurements_limit, $delays{'dnssec'});
+$clock_limits{'rdds'} = cycle_start($now - $initial_measurements_limit, $delays{'rdds'});
+$clock_limits{'rdap'} = cycle_start($now - $initial_measurements_limit, $delays{'rdap'}) if ($rdap_is_standalone);
 
 db_disconnect();
 
@@ -127,9 +129,6 @@ my %service_keys = (
 	'rdds'   => 'rsm.slv.rdds.avail',
 	'rdap'   => 'rsm.slv.rdap.avail',
 );
-
-# keep to avoid reading multiple times
-my $sla_api_last_update = get_sla_api_last_update();
 
 my %rtt_limits;
 
@@ -542,50 +541,6 @@ sub process_tld($$$$$)
 	}
 }
 
-sub get_sla_api_last_update()
-{
-	my $continue_file = ah_continue_file_name(); # last_update.txt in SLA API directory
-	my $continue_file_lock;
-	my $error;
-	my $lastclock;
-
-	ah_lock_continue_file(\$continue_file_lock);
-
-	for (my $attempt = 1; $attempt <= 3; $attempt++)
-	{
-		if ($attempt > 1)
-		{
-			# sleep for 1.0 second
-			select(undef, undef, undef, 1.0);
-		}
-
-		if (read_file($continue_file, \$lastclock, \$error) != SUCCESS)
-		{
-			wrn("cannot read file '$continue_file': $error");
-			next;
-		}
-
-		while (chomp($lastclock)) {}
-
-		if (!$lastclock)
-		{
-			wrn("file '$continue_file' is empty");
-			next;
-		}
-
-		if ($attempt > 1)
-		{
-			inf("succeeded to read '$continue_file' on attempt #$attempt");
-		}
-
-		last;
-	}
-
-	ah_unlock_continue_file($continue_file_lock);
-
-	return $lastclock;
-}
-
 sub add_cycles($$$$$$$$$$$)
 {
 	my $tld = shift;
@@ -602,11 +557,13 @@ sub add_cycles($$$$$$$$$$$)
 
 	return if ($lastclock == $lastclock_db);	# we are up-to-date, according to cache
 
+	$lastclock += $delay; # don't process cycle that is already processed
+
 	my $cycle_start = cycle_start($lastclock, $delay);
 
 	my $db_cycle_start = cycle_start($lastclock_db, $delay);
 
-	my $max_clock = cycle_end($cycle_start + $max_period, $delay);
+	my $max_clock = cycle_end($cycle_start - $delay + $max_period, $delay);
 
 	# issue #511
 	# Sometimes we get strange timestamp of cycle to calculate, e. g. 960 .
@@ -679,20 +636,22 @@ sub cycles_to_calculate($$$$$$$$)
 
 	my %cycles;
 
-	foreach my $probe (keys(%{$lastvalues_db_tld->{$service}{'probes'}}))
+	# empty probe is for *.avail (<TLD>) items, we calculate cycles based on those values
+	my $probe = "";
+
+	if (%{$lastvalues_db_tld->{$service}{'probes'}{$probe} // {}})
 	{
 		foreach my $itemid (keys(%{$lastvalues_db_tld->{$service}{'probes'}{$probe}}))
 		{
-			# empty probe is for *.avail (<TLD>) items, we calculate cycles based on those values
-			next unless ($probe eq "");
-
 			my $lastclock_db = $lastvalues_db_tld->{$service}{'probes'}{$probe}{$itemid}{'clock'};
 
 			my $lastclock;
 
+			my $ts;
+
 			if (opt('now'))
 			{
-				$lastclock = cycle_start(getopt('now'), $delay);
+				$lastclock = cycle_start(getopt('now') - $delay, $delay);
 
 				dbg("using specified last clock: ", ts_str($lastclock));
 			}
@@ -704,22 +663,28 @@ sub cycles_to_calculate($$$$$$$$)
 
 				if ($lastclock > $lastclock_db)
 				{
-					fail("dimir was wrong, item ($itemid) clock ($lastclock) in cache can be newer than in database ($lastclock_db)");
+					fail("item ($itemid) clock ($lastclock) in cache is newer than in database ($lastclock_db)");
 				}
 			}
-			elsif ($sla_api_last_update)
+			elsif (ah_get_most_recent_measurement_ts(
+					ah_get_api_tld($tld),
+					$service,
+					$delay,
+					cycle_start($now, $delay),
+					$clock_limits{$service},
+					\$ts) == AH_SUCCESS)
 			{
-				$lastclock = cycle_start($sla_api_last_update, $delay);
+				$lastclock = $ts + $delay;
 
 				dbg("$service: itemid $itemid from probe \"$probe\" not in cache yet");
-				dbg("using last clock from SLA API directory: ", ts_str($lastclock));
+				dbg("using the time since most recent measurement file: ", ts_str($lastclock));
 			}
 			else
 			{
-				$lastclock = cycle_start($clock_limits{$service}, $delay);
+				$lastclock = $clock_limits{$service};
 
 				dbg("$service: itemid $itemid from probe \"$probe\" not in cache yet");
-				dbg("using last clock based on incident_measurements_limit: ", ts_str($lastclock));
+				dbg("using last clock based on initial_measurements_limit: ", ts_str($lastclock));
 			}
 
 			# TODO: remove this after migrating to Standalone RDAP
@@ -735,11 +700,9 @@ sub cycles_to_calculate($$$$$$$$)
 
 			if (opt('debug'))
 			{
-				my $key = substr($lastvalues_db_tld->{$service}{'probes'}{$probe}{$itemid}{'key'}, 0, SUBSTR_KEY_LEN);
-
-				$key = sprintf("%".SUBSTR_KEY_LEN."s", $key);
-
-				dbg("[$key] last ", ($lastclock ? ts_str($lastclock) :'NULL'), ", db ", ts_str($lastclock_db), ($probe ? $probe : ''));
+				dbg("[", $lastvalues_db_tld->{$service}{'probes'}{$probe}{$itemid}{'key'}, "] last ",
+					($lastclock ? ts_str($lastclock) :'NULL'), ", db ", ts_str($lastclock_db),
+					($probe ? $probe : ''));
 			}
 
 			add_cycles(
@@ -755,7 +718,6 @@ sub cycles_to_calculate($$$$$$$$)
 				$lastvalues_cache_tld,
 				$lastvalues_db_tld
 			);
-
 		}
 	}
 
@@ -814,7 +776,7 @@ sub get_historical_value_by_time($$)
 
 	$value = $last_value unless (defined($value));
 
-	fail("dimir was wrong: we can have 0 values in RTT LIMIT history") unless (defined($value));
+	fail("there are no values in RTT LIMIT history") unless (defined($value));
 
 	return $value;
 }
@@ -1367,11 +1329,11 @@ sub calculate_cycle($$$$$$$$$)
 
 				next unless ($key_service eq $service);
 
-				fail("dimir was wrong: $service status can be re-defined") if (defined($json->{'status'}));
+				fail("$service status is re-defined (status=$json->{'status'})") if (defined($json->{'status'}));
 
 				if (scalar(@{$values{$itemid}}) != 1)
 				{
-					my $msg = "dimir was wrong: item \"$key\" can contain more than 1 value ".
+					my $msg = "item \"$key\" contains more than 1 value ".
 						selected_period($from, $till) . ": " . join(',', @{$values{$itemid}}) . "\n";
 
 					my $sql =
@@ -1418,7 +1380,7 @@ sub calculate_cycle($$$$$$$$$)
 				}
 				else
 				{
-					fail("dimir was wrong: item \"$key\" can contain unexpected value \"", $values{$itemid}->[0] , "\"");
+					fail("item \"$key\" ($itemid) contains unexpected value \"", $values{$itemid}->[0] , "\"");
 				}
 			}
 			else
