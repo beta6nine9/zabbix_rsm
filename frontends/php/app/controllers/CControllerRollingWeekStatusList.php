@@ -141,7 +141,8 @@ class CControllerRollingWeekStatusList extends CController {
 			'sort' => CProfile::get('web.rsm.rollingweekstatus.sort', 'name'),
 			'sortorder' => CProfile::get('web.rsm.rollingweekstatus.sortorder', 'ZBX_SORT_UP'),
 			'rsm_monitoring_mode' => get_rsm_monitoring_type(),
-			'sid' => CWebUser::getSessionCookie()
+			'sid' => CWebUser::getSessionCookie(),
+			'paging' => null
 		];
 
 		$data['title'] = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR)

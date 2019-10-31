@@ -568,7 +568,7 @@ if ($data['tld']) {
 $widget = (new CWidget())
 	->setTitle($data['title'])
 	->addItem(
-		(new CFilter(new CUrl('zabbix.php')))
+		(new CFilter((new CUrl('zabbix.php'))->setArgument('action', 'rsm.rollingweekstatus')))
 			->setProfile('web.rsm.rollingweekstatus.filter')
 			->setActiveTab($data['active_tab'])
 			->addFilterTab(_('Filter'), $filter_fields)
