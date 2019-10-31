@@ -20,6 +20,7 @@
 #include "common.h"
 #include "db.h"
 #include "dbupgrade.h"
+#include "log.h"
 
 extern unsigned char	program_type;
 
@@ -34,6 +35,13 @@ static int	DBpatch_4040000(void)
 	return SUCCEED;
 }
 
+static int	DBpatch_4040300(void)
+{
+	zabbix_log(LOG_LEVEL_CRIT, "There is no automatic database upgrade");
+
+	return FAIL;
+}
+
 #endif
 
 DBPATCH_START(4040)
@@ -41,5 +49,6 @@ DBPATCH_START(4040)
 /* version, duplicates flag, mandatory flag */
 
 DBPATCH_ADD(4040000, 0, 1)
+DBPATCH_ADD(4040300, 0, 1)	/* RSM FY20 */
 
 DBPATCH_END()

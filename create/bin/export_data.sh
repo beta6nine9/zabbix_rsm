@@ -2,16 +2,17 @@
 
 if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ] || [ -z "$4" ]; then
 	echo "Usage: 
-	./export_data.sh -uroot -p<password> <DB name> ZBX_DATA > ../src/data.tmpl
-	./export_data.sh -uroot -p<password> <DB name> ZBX_TEMPLATE > ../src/templates.tmpl
-	./export_data.sh -uroot -p<password> <DB name> ZBX_DASHBOARD > ../src/dashboards.tmpl
+	./export_data.sh -uroot -p<password> <DB name> ZBX_DATA [<schema_file>] > ../src/data.tmpl
+	./export_data.sh -uroot -p<password> <DB name> ZBX_TEMPLATE [<schema_file>] > ../src/templates.tmpl
+	./export_data.sh -uroot -p<password> <DB name> ZBX_DASHBOARD [<schema_file>] > ../src/dashboards.tmpl
 	The script generates data file out of existing MySQL database." && exit 1
 fi
 dblogin="$1 $2"
 dbname=$3
 dbflag=$4
+schema=$5
 basedir=`dirname "$0"`
-schema=$basedir/../src/schema.tmpl
+[ -z "$schema" ] && schema=$basedir/../src/schema.tmpl
 
 echo "--
 -- Zabbix

@@ -327,6 +327,18 @@ return [
 				'length' => 128,
 				'default' => '',
 			],
+			'info_1' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_CHAR,
+				'length' => 128,
+				'default' => '',
+			],
+			'info_2' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_CHAR,
+				'length' => 128,
+				'default' => '',
+			],
 			'flags' => [
 				'null' => false,
 				'type' => DB::FIELD_TYPE_INT,
@@ -8044,6 +8056,32 @@ return [
 				'null' => false,
 				'type' => DB::FIELD_TYPE_TEXT,
 			],
+<<<<<<< HEAD
 		],	
+=======
+		],
+	],
+	'rsmhost_dns_ns_log' => [
+		'key' => 'itemid,clock',
+		'fields' => [
+			'itemid' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_ID,
+				'length' => 20,
+				'ref_table' => 'items',
+				'ref_field' => 'itemid',
+			],
+			'clock' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_INT,
+				'length' => 10,
+			],
+			'action' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_INT,
+				'length' => 10,
+			],
+		],
+>>>>>>> 8ccc4b3ede9d20d5cd6a200798fd5b7c4fa9d58e
 	],
 ];

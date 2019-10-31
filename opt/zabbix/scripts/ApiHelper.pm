@@ -658,8 +658,8 @@ sub ah_lock_continue_file($)
 
 	my $lock_file = ah_continue_file_name() . '.lock';
 
-	open(${$handle_ref}, '>>', $lock_file) or fail("cannot open \"$lock_file\": $!");
-	flock(${$handle_ref}, LOCK_EX) or fail("cannot lock \"$lock_file\": $!");
+	open(${$handle_ref}, '>>', $lock_file) or RSMSLV::fail("cannot open \"$lock_file\": $!");
+	flock(${$handle_ref}, LOCK_EX) or RSMSLV::fail("cannot lock \"$lock_file\": $!");
 }
 
 sub ah_unlock_continue_file($)
@@ -668,8 +668,8 @@ sub ah_unlock_continue_file($)
 
 	my $lock_file = ah_continue_file_name() . '.lock';
 
-	flock($handle, LOCK_UN) or fail("cannot unlock \"$lock_file\": $!");
-	close($handle) or fail("cannot close '$lock_file': $!");
+	flock($handle, LOCK_UN) or RSMSLV::fail("cannot unlock \"$lock_file\": $!");
+	close($handle) or RSMSLV::fail("cannot close '$lock_file': $!");
 }
 
 sub ah_save_continue_file
@@ -723,7 +723,10 @@ sub ah_get_last_audit
 
 	if (-e $audit_file)
 	{
-		fail("cannot open last audit check file $audit_file\": $!") unless (open($handle, '<', $audit_file));
+		if (!open($handle, '<', $audit_file))
+		{
+			RSMSLV::fail("cannot open last audit check file $audit_file\": $!");
+		}
 
 		chomp(my @lines = <$handle>);
 

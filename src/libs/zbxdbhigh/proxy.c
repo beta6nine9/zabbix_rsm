@@ -3401,6 +3401,7 @@ static int	process_history_data_by_itemids(zbx_socket_t *sock, zbx_client_item_v
 	zbx_uint64_t		itemids[ZBX_HISTORY_VALUES_MAX];
 	zbx_agent_value_t	values[ZBX_HISTORY_VALUES_MAX];
 	zbx_timespec_t		unique_shift = {0, 0};
+	time_t			now;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
@@ -3413,6 +3414,8 @@ static int	process_history_data_by_itemids(zbx_socket_t *sock, zbx_client_item_v
 			&unique_shift, &error) && 0 != values_num)
 	{
 		DCconfig_get_items_by_itemids(items, itemids, errcodes, values_num);
+
+		now = time(NULL);
 
 		for (i = 0; i < values_num; i++)
 		{
@@ -3437,6 +3440,18 @@ static int	process_history_data_by_itemids(zbx_socket_t *sock, zbx_client_item_v
 
 				DCconfig_clean_items(&items[i], &errcodes[i], 1);
 				errcodes[i] = FAIL;
+			}
+
+			/* RSM specifics: ignore history data from proxy if it's older than 1.5 minutes */
+			if (now - values[i].ts.sec > 90 && (
+					0 == strncmp(items[i].key_orig, "rsm", ZBX_CONST_STRLEN("rsm")) ||
+					0 == strncmp(items[i].key_orig, "rdap", ZBX_CONST_STRLEN("rdap")) ||
+					0 == strncmp(items[i].key_orig, "resolver", ZBX_CONST_STRLEN("resolver"))))
+			{
+				zabbix_log(LOG_LEVEL_WARNING, "skipping [%s] value [%s] bacause it is %d seconds old",
+						items[i].key_orig, values[i].value, now - values[i].ts.sec);
+
+				continue;
 			}
 		}
 
