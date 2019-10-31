@@ -8056,10 +8056,7 @@ return [
 				'null' => false,
 				'type' => DB::FIELD_TYPE_TEXT,
 			],
-<<<<<<< HEAD
 		],	
-=======
-		],
 	],
 	'rsmhost_dns_ns_log' => [
 		'key' => 'itemid,clock',
@@ -8082,6 +8079,5 @@ return [
 				'length' => 10,
 			],
 		],
->>>>>>> 8ccc4b3ede9d20d5cd6a200798fd5b7c4fa9d58e
 	],
 ];
