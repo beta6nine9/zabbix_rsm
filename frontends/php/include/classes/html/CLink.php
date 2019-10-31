@@ -28,6 +28,10 @@ class CLink extends CTag {
 	public function __construct($item = null, $url = null) {
 		parent::__construct('a', true);
 
+		if ($url instanceof CUrl) {
+			$url = $url->getUrl();
+		}
+
 		if ($item !== null) {
 			$this->addItem($item);
 		}

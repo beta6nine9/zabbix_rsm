@@ -157,7 +157,8 @@ class CRouter {
 		'popup.triggerwizard'			=> ['CControllerPopupTriggerWizard',				'layout.json',			'popup.triggerwizard'],
 		'popup.mediatypetest.edit'		=> ['CControllerPopupMediatypeTestEdit',			'layout.json',			'popup.mediatypetest.edit'],
 		'popup.mediatypetest.send'		=> ['CControllerPopupMediatypeTestSend',			'layout.json',			null],
-		'search'						=> ['CControllerSearch',							'layout.htmlpage',		'search']
+		'search'						=> ['CControllerSearch',							'layout.htmlpage',		'search'],
+		'rsm.rollingweekstatus'			=> ['CControllerRollingWeekStatusList',				'layout.htmlpage',		'rsm.rollingweekstatus.list'],
 	];
 
 	public function __construct($action) {

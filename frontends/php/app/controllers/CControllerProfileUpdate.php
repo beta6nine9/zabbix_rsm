@@ -66,7 +66,7 @@ class CControllerProfileUpdate extends CController {
 				case 'web.usergroup.filter.active':
 				case 'web.dashbrd.filter.active':
 				case 'web.rsm.slareports.filter.state':
-				case 'web.rsm.rollingweekstatus.filter.state':
+				case 'web.rsm.rollingweekstatus.filter.active':
 				case 'web.search.hats.'.WIDGET_SEARCH_HOSTS.'.state':
 				case 'web.search.hats.'.WIDGET_SEARCH_TEMPLATES.'.state':
 				case 'web.search.hats.'.WIDGET_SEARCH_HOSTGROUP.'.state':
