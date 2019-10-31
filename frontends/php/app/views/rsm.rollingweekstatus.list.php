@@ -403,7 +403,7 @@ if ($data['tld']) {
 				: (new CSpan('0.000%'))->addClass('first-cell-value');
 
 			$rdds_graph = ($tld[RSM_RDDS]['lastvalue'] > 0)
-				? new CLink('graph', 
+				? new CLink('graph',
 					(new CUrl($tld['url'].'history.php'))
 						->setArgument('action', 'showgraph')
 						->setArgument('period', $data['rollWeekSeconds'])
@@ -478,7 +478,7 @@ if ($data['tld']) {
 				: (new CSpan('0.000%'))->addClass('first-cell-value');
 
 			$rdap_graph = ($tld[RSM_RDAP]['lastvalue'] > 0)
-				? new CLink('graph', 
+				? new CLink('graph',
 					(new CUrl($tld['url'].'history.php'))
 						->setArgument('action', 'showgraph')
 						->setArgument('period', $data['rollWeekSeconds'])
@@ -537,7 +537,7 @@ if ($data['tld']) {
 				: (new CSpan('0.000%'))->addClass('first-cell-value');
 
 			$epp_graph = ($tld[RSM_EPP]['lastvalue'] > 0)
-				? new CLink('graph', 
+				? new CLink('graph',
 					(new CUrl($tld['url'].'history.php'))
 						->setArgument('action', 'showgraph')
 						->setArgument('period', $data['rollWeekSeconds'])

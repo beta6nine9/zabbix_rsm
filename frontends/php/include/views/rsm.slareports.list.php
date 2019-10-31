@@ -27,7 +27,7 @@ $years = range(SLA_MONITORING_START_YEAR, date('Y', time()));
 $object_label = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) ? _('Registrar ID') : _('TLD');
 
 $widget->addItem(
-	(new CFilter(new CUrl('rsm.slareports.php')))->addFilterTab(_('Filter'), 
+	(new CFilter(new CUrl('rsm.slareports.php')))->addFilterTab(_('Filter'),
 		(new CFormList())
 			->addVar('filter_set', 1)
 			->addRow($object_label, (new CTextBox('filter_search', $data['filter_search']))

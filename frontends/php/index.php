@@ -82,7 +82,7 @@ if (hasRequest('enter') && CWebUser::login(getRequest('name', ZBX_GUEST_USER), g
 }
 
 if (CWebUser::isLoggedIn() && !CWebUser::isGuest()) {
-	
+
 	if (CWebUser::$data['type'] == USER_TYPE_READ_ONLY) {
 		$url = (new CUrl('zabbix.php'))
 			->setArgument('action', 'rsm.rollingweekstatus')

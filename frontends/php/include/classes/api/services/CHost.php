@@ -187,7 +187,7 @@ class CHost extends CHostGeneral {
 			$sqlParts['where'][] = dbConditionId('h.proxy_hostid', $options['proxyids']);
 		}
 
-		// tlds		
+		// tlds
 		if (!is_null($options['tlds'])) {
 			if (!array_key_exists('hosts_groups', $sqlParts['from'])) {
 				$sqlParts['from']['hosts_groups'] = 'hosts_groups hg';

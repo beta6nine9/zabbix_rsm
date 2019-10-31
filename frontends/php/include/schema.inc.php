@@ -8056,7 +8056,7 @@ return [
 				'null' => false,
 				'type' => DB::FIELD_TYPE_TEXT,
 			],
-		],	
+		],
 	],
 	'rsmhost_dns_ns_log' => [
 		'key' => 'itemid,clock',
