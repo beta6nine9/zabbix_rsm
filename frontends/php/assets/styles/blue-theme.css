@@ -5155,6 +5155,45 @@ ul.checkbox-list.col-3 > li {
 #expressions_list .ui-sortable-helper {
   display: table; }
 
+.service-icon {
+  display: inline-block;
+  vertical-align: middle;
+  height: 14px;
+  width: 14px;
+  background-repeat: no-repeat;
+  margin: 0 1px 3px 1px; }
+
+.iconrollingweekok {
+  background-image: url("../img/rolling_week_ok.png"); }
+
+.iconrollingweekfail {
+  background-image: url("../img/rolling_week_fail.png"); }
+
+.iconrollingweekdisabled {
+  background-image: url("../img/rolling_week_disabled.png"); }
+
+.incidents-info {
+  width: 100%; }
+
+.rolling-week-status {
+  font-size: 16px;
+  font-weight: bold;
+  float: right; }
+
+.rsm-date-time {
+  float: right; }
+
+.first-row-element {
+  width: 300px;
+  display: inline-block; }
+
+.first-cell-value {
+  width: 65px;
+  display: inline-block; }
+
+.disabled-service {
+  margin-left: 66px; }
+
 .range-control {
   position: relative;
   display: inline-block;

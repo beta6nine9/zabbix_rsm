@@ -144,23 +144,16 @@ function zbx_construct_menu(&$main_menu, &$sub_menus, &$page, $action = null) {
 					'label' => _('Rolling week status')
 				],
 				[
-					//'url' => 'zabbix.php',
-					'url' => 'rsm.incidents.php',
-					//'action' => 'rsm.incidents',
+					'url' => 'zabbix.php',
+					'action' => 'rsm.incidents',
 					'label' => _('Incidents'),
-					/*'active_if' => [
+					'active_if' => [
+						'rsm.incidents',
 						'rsm.incidentdetails',
 						'rsm.tests',
 						'rsm.particulartests',
 						'rsm.particularproxys',
 						'rsm.aggregatedetails'
-					],*/
-					'active_if' => [
-						'rsm.incidentdetails.php',
-						'rsm.tests.php',
-						'rsm.particulartests.php',
-						'rsm.particularproxys.php',
-						'rsm.aggregatedetails.php'
 					]
 				],
 				[

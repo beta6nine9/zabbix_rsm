@@ -159,6 +159,7 @@ class CRouter {
 		'popup.mediatypetest.send'		=> ['CControllerPopupMediatypeTestSend',			'layout.json',			null],
 		'search'						=> ['CControllerSearch',							'layout.htmlpage',		'search'],
 		'rsm.rollingweekstatus'			=> ['CControllerRollingWeekStatusList',				'layout.htmlpage',		'rsm.rollingweekstatus.list'],
+		'rsm.incidents'					=> ['CControllerIncidentsList',						'layout.htmlpage',		'rsm.incidents.list'],
 	];
 
 	public function __construct($action) {
