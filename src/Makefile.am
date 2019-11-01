@@ -9,6 +9,8 @@ DIST_SUBDIRS = \
 	zabbix_server \
 	zabbix_java
 
+DIST_SUBDIRS += tests zabbix_rsm
+
 if AGENT
 COMMON_SUBDIRS = libs
 else
@@ -64,7 +66,7 @@ PROXY_SUBDIRS = \
 	zabbix_server/scripts \
 	zabbix_server/preprocessor \
 	zabbix_proxy
-	
+
 endif
 endif
 
@@ -80,6 +82,8 @@ SUBDIRS = \
 	$(PROXY_SUBDIRS) \
 	$(JAVA_SUBDIRS)
 	
+
+SUBDIRS += zabbix_rsm
 
 ## "dist-hook" run after the distribution directory is filled, but before the actual tar (or shar) file is created.
 dist-hook:

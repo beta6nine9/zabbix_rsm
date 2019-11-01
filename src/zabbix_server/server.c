@@ -232,6 +232,13 @@ char	*CONFIG_DBPASSWORD		= NULL;
 char	*CONFIG_DBSOCKET		= NULL;
 char	*CONFIG_EXPORT_DIR		= NULL;
 int	CONFIG_DBPORT			= 0;
+#ifdef DBTLS
+char	*CONFIG_DB_KEY_FILE		= NULL;
+char	*CONFIG_DB_CERT_FILE		= NULL;
+char	*CONFIG_DB_CA_FILE		= NULL;
+char	*CONFIG_DB_CA_PATH		= NULL;
+char	*CONFIG_DB_CIPHER		= NULL;
+#endif
 int	CONFIG_ENABLE_REMOTE_COMMANDS	= 0;
 int	CONFIG_LOG_REMOTE_COMMANDS	= 0;
 int	CONFIG_UNSAFE_USER_PARAMETERS	= 0;
@@ -289,6 +296,9 @@ char	*CONFIG_HISTORY_STORAGE_OPTS		= NULL;
 int	CONFIG_HISTORY_STORAGE_PIPELINES	= 0;
 
 char	*CONFIG_STATS_ALLOWED_IP	= NULL;
+
+/* a passphrase for EPP data encryption used in proxy poller */
+char	epp_passphrase[128]		= "";
 
 int	get_process_info_by_thread(int local_server_num, unsigned char *local_process_type, int *local_process_num);
 
@@ -646,7 +656,7 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 		{"ValueCacheSize",		&CONFIG_VALUE_CACHE_SIZE,		TYPE_UINT64,
 			PARM_OPT,	0,			__UINT64_C(64) * ZBX_GIBIBYTE},
 		{"CacheUpdateFrequency",	&CONFIG_CONFSYNCER_FREQUENCY,		TYPE_INT,
-			PARM_OPT,	1,			SEC_PER_HOUR},
+			PARM_OPT,	0,			SEC_PER_HOUR},
 		{"HousekeepingFrequency",	&CONFIG_HOUSEKEEPING_FREQUENCY,		TYPE_INT,
 			PARM_OPT,	0,			24},
 		{"MaxHousekeeperDelete",	&CONFIG_MAX_HOUSEKEEPER_DELETE,		TYPE_INT,
@@ -701,6 +711,18 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	0,			0},
 		{"DBPort",			&CONFIG_DBPORT,				TYPE_INT,
 			PARM_OPT,	1024,			65535},
+#ifdef DBTLS
+		{"DBKeyFile",			&CONFIG_DB_KEY_FILE,			TYPE_STRING,
+			PARM_OPT,	0,			0},
+		{"DBCertFile",			&CONFIG_DB_CERT_FILE,			TYPE_STRING,
+			PARM_OPT,	0,			0},
+		{"DBCAFile",			&CONFIG_DB_CA_FILE,			TYPE_STRING,
+			PARM_OPT,	0,			0},
+		{"DBCAPath",			&CONFIG_DB_CA_PATH,			TYPE_STRING,
+			PARM_OPT,	0,			0},
+		{"DBCipher",			&CONFIG_DB_CIPHER,			TYPE_STRING,
+			PARM_OPT,	0,			0},
+#endif
 		{"SSHKeyLocation",		&CONFIG_SSH_KEY_LOCATION,		TYPE_STRING,
 			PARM_OPT,	0,			0},
 		{"LogSlowQueries",		&CONFIG_LOG_SLOW_QUERIES,		TYPE_INT,

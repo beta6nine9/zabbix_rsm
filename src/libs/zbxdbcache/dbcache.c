@@ -2087,6 +2087,10 @@ static int	DBmass_add_history(ZBX_DC_HISTORY *history, int history_num)
 {
 	int			i, ret = SUCCEED;
 	zbx_vector_ptr_t	history_values;
+	char			*lastvalue_sql = NULL;
+	char			*lastvalue_str_sql = NULL;
+	size_t			lastvalue_sql_alloc = 0, lastvalue_sql_offset;
+	size_t			lastvalue_str_sql_alloc = 0, lastvalue_str_sql_offset;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
@@ -2104,8 +2108,59 @@ static int	DBmass_add_history(ZBX_DC_HISTORY *history, int history_num)
 	}
 
 	if (0 != history_values.values_num)
-		ret = zbx_vc_add_values(&history_values);
+	{
+		if (SUCCEED != (ret = zbx_vc_add_values(&history_values)))
+			goto out;
+	}
 
+	/* RSM specifics: update lastvalue and lastvalue_str tables with fresh values for frontend */
+	for (i = 0; i < history_values.values_num; i++)
+	{
+		const ZBX_DC_HISTORY	*h = (ZBX_DC_HISTORY *)history_values.values[i];
+
+		if (ITEM_VALUE_TYPE_FLOAT == h->value_type)
+		{
+			zbx_snprintf_alloc(&lastvalue_sql, &lastvalue_sql_alloc, &lastvalue_sql_offset,
+					"%s(" ZBX_FS_UI64 ",%d," ZBX_FS_DBL ")",
+					NULL == lastvalue_sql ? "" : ",",
+					h->itemid, h->ts.sec, h->value.dbl);
+		}
+		else if (ITEM_VALUE_TYPE_UINT64 == h->value_type)
+		{
+			zbx_snprintf_alloc(&lastvalue_sql, &lastvalue_sql_alloc, &lastvalue_sql_offset,
+					"%s(" ZBX_FS_UI64 ",%d," ZBX_FS_UI64 ")",
+					NULL == lastvalue_sql ? "" : ",",
+					h->itemid, h->ts.sec, h->value.ui64);
+		}
+		else if (ITEM_VALUE_TYPE_STR == h->value_type)
+		{
+			zbx_snprintf_alloc(&lastvalue_str_sql, &lastvalue_str_sql_alloc, &lastvalue_str_sql_offset,
+					"%s(" ZBX_FS_UI64 ",%d,'%s')",
+					NULL == lastvalue_str_sql ? "" : ",",
+					h->itemid, h->ts.sec, h->value.str);
+		}
+	}
+
+	if (NULL != lastvalue_sql)
+	{
+		DBexecute("insert ignore into lastvalue (itemid,clock,value) values %s"
+				" on duplicate key update"
+					" value = if(values(clock) > clock, values(value), value)"
+					",clock = if(values(clock) > clock, values(clock), clock)",
+				lastvalue_sql
+		);
+	}
+
+	if (NULL != lastvalue_str_sql)
+	{
+		DBexecute("insert ignore into lastvalue_str (itemid,clock,value) values %s"
+				" on duplicate key update"
+					" value = if(values(clock) > clock, values(value), value)"
+					",clock = if(values(clock) > clock, values(clock), clock)",
+				lastvalue_str_sql
+		);
+	}
+out:
 	zbx_vector_ptr_destroy(&history_values);
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);

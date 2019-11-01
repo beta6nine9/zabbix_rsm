@@ -809,6 +809,10 @@ typedef struct
 	zbx_hashset_t		strpool;
 	char			autoreg_psk_identity[HOST_TLS_PSK_IDENTITY_LEN_MAX];	/* autoregistration PSK */
 	char			autoreg_psk[HOST_TLS_PSK_LEN_MAX];
+
+	time_t			probe_online_since;
+	char			probe_last_status;
+	zbx_uint64_t		rsm_errors;		/* counter of internal and local resolver errors during tests */
 }
 ZBX_DC_CONFIG;
 

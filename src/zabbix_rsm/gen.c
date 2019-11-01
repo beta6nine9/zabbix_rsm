@@ -8,6 +8,7 @@
 #include "common.h"
 #include "base64.h"
 #include "rsm.h"
+#include "missingconf.h"
 
 unsigned char	program_type = ZBX_PROGRAM_TYPE_GET;
 

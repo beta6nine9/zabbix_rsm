@@ -96,6 +96,8 @@ zabbix_server_LDADD = \
 	$(top_srcdir)/src/libs/zbxcompress/libzbxcompress.a \
 	$(top_srcdir)/src/libs/zbxserver/libzbxserver_server.a
 
+zabbix_server_LDADD += $(top_srcdir)/src/libs/zbxrsm/libzbxrsm.a
+
 if HAVE_IPMI
 zabbix_server_LDADD += ipmi/libipmi.a
 endif

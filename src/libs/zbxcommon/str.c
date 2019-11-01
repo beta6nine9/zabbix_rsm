@@ -1286,6 +1286,8 @@ const char	*get_program_type_string(unsigned char program_type)
 			return "sender";
 		case ZBX_PROGRAM_TYPE_GET:
 			return "get";
+		case ZBX_PROGRAM_TYPE_TEST:
+			return "test";
 		default:
 			return "unknown";
 	}

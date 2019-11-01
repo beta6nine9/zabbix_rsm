@@ -100,6 +100,9 @@ AC_DEFUN([AX_LIB_MYSQL],
                         	AC_MSG_ERROR([Not found $_lib_name library])
                         	])
                 ;;
+                    -lmariadb)
+                        _client_lib_name="mariadb"
+                ;;
                     -L*)
 
                         MYSQL_LDFLAGS="${MYSQL_LDFLAGS} $i"

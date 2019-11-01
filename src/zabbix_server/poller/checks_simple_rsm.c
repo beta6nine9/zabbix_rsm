@@ -1946,13 +1946,6 @@ static void	free_items(DC_ITEM *items, size_t items_num)
 
 			zbx_free(item->key);
 			zbx_free(item->params);
-			zbx_free(item->db_error);
-
-			if (ITEM_VALUE_TYPE_FLOAT == item->value_type || ITEM_VALUE_TYPE_UINT64 == item->value_type)
-			{
-				zbx_free(item->formula);
-				zbx_free(item->units);
-			}
 		}
 
 		zbx_free(items);
@@ -1982,7 +1975,8 @@ static size_t	zbx_get_dns_items(const char *keyname, DC_ITEM *item, const char *
 		ZBX_STRDUP(in_item->key, in_item->key_orig);
 		in_item->params = NULL;
 
-		if (SUCCEED != substitute_key_macros(&in_item->key, NULL, item, NULL, MACRO_TYPE_ITEM_KEY, NULL, 0))
+		if (SUCCEED != substitute_key_macros(&in_item->key, NULL, item,
+				NULL, NULL, MACRO_TYPE_ITEM_KEY, NULL, 0))
 		{
 			/* problem with key macros, skip it */
 			rsm_warnf(log_fd, "%s: cannot substitute key macros", in_item->key_orig);
@@ -2020,9 +2014,6 @@ static size_t	zbx_get_dns_items(const char *keyname, DC_ITEM *item, const char *
 		memcpy(&(*out_items)[out_items_num], in_item, sizeof(DC_ITEM));
 		in_item->key = NULL;
 		in_item->params = NULL;
-		in_item->db_error = NULL;
-		in_item->formula = NULL;
-		in_item->units = NULL;
 
 		out_items_num++;
 	}
@@ -2558,7 +2549,9 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 					continue;
 				}
 
-				if (0 > (pid = zbx_child_fork()))
+				zbx_child_fork(&pid);
+
+				if (0 > pid)
 				{
 					rsm_errf(log_fd, "cannot create process: %s", zbx_strerror(errno));
 
@@ -2791,7 +2784,8 @@ static size_t	zbx_get_rdds_items(const char *keyname, DC_ITEM *item, const char 
 		ZBX_STRDUP(in_item->key, in_item->key_orig);
 		in_item->params = NULL;
 
-		if (SUCCEED != substitute_key_macros(&in_item->key, NULL, item, NULL, MACRO_TYPE_ITEM_KEY, NULL, 0))
+		if (SUCCEED != substitute_key_macros(&in_item->key, NULL, item,
+				NULL, NULL, MACRO_TYPE_ITEM_KEY, NULL, 0))
 		{
 			/* problem with key macros, skip it */
 			rsm_warnf(log_fd, "%s: cannot substitute key macros", in_item->key_orig);
@@ -2832,9 +2826,6 @@ static size_t	zbx_get_rdds_items(const char *keyname, DC_ITEM *item, const char 
 		memcpy(&(*out_items)[out_items_num], in_item, sizeof(DC_ITEM));
 		in_item->key = NULL;
 		in_item->params = NULL;
-		in_item->db_error = NULL;
-		in_item->formula = NULL;
-		in_item->units = NULL;
 
 		out_items_num++;
 	}
@@ -2871,7 +2862,7 @@ static int	zbx_rdds43_test(const char *request, const char *ip, short port, int 
 		goto out;
 	}
 
-	if (FAIL == (nbytes = zbx_tcp_recv_ext(&s, ZBX_TCP_READ_UNTIL_CLOSE, 0)))	/* timeout is still "active" here */
+	if (FAIL == (nbytes = zbx_tcp_recv_ext(&s, 0)))	/* timeout is still "active" here */
 	{
 		*rtt = (SUCCEED == zbx_alarm_timed_out() ? ZBX_EC_RDDS43_TO : ZBX_EC_RDDS43_ECON);
 		zbx_snprintf(err, err_size, "cannot receive data: %s", zbx_socket_strerror());
@@ -3995,8 +3986,8 @@ static int	zbx_get_rdap_items(const char *host, DC_ITEM *ip_item, DC_ITEM *rtt_i
 #define ZBX_RDAP_ITEM_KEY_RTT	"rdap.rtt"
 
 	zbx_host_key_t		hosts_keys[ZBX_RDAP_ITEM_COUNT] = {
-					{host, ZBX_RDAP_ITEM_KEY_IP},
-					{host, ZBX_RDAP_ITEM_KEY_RTT}
+					{(char *)host, ZBX_RDAP_ITEM_KEY_IP},
+					{(char *)host, ZBX_RDAP_ITEM_KEY_RTT}
 				};
 	zbx_item_value_type_t	types[ZBX_RDAP_ITEM_COUNT] = {
 					ITEM_VALUE_TYPE_STR,
@@ -4837,7 +4828,8 @@ static size_t	zbx_get_epp_items(const char *keyname, DC_ITEM *item, const char *
 		ZBX_STRDUP(in_item->key, in_item->key_orig);
 		in_item->params = NULL;
 
-		if (SUCCEED != substitute_key_macros(&in_item->key, NULL, item, NULL, MACRO_TYPE_ITEM_KEY, NULL, 0))
+		if (SUCCEED != substitute_key_macros(&in_item->key, NULL, item,
+				NULL, NULL, MACRO_TYPE_ITEM_KEY, NULL, 0))
 		{
 			/* problem with key macros, skip it */
 			rsm_warnf(log_fd, "%s: cannot substitute key macros", in_item->key_orig);
@@ -4875,9 +4867,6 @@ static size_t	zbx_get_epp_items(const char *keyname, DC_ITEM *item, const char *
 		memcpy(&(*out_items)[out_items_num], in_item, sizeof(DC_ITEM));
 		in_item->key = NULL;
 		in_item->params = NULL;
-		in_item->db_error = NULL;
-		in_item->formula = NULL;
-		in_item->units = NULL;
 
 		out_items_num++;
 	}

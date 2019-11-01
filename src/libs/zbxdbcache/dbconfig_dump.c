@@ -1249,6 +1249,16 @@ static void	DCdump_maintenances(void)
 	zabbix_log(LOG_LEVEL_TRACE, "End of %s()", __func__);
 }
 
+static void	DCdump_probe(const ZBX_DC_CONFIG *config)
+{
+	const char	*__function_name = "DCdump_probe";
+
+	zabbix_log(LOG_LEVEL_TRACE, "In %s()", __function_name);
+	zabbix_log(LOG_LEVEL_TRACE, "probe_online_since:%d probe_last_status:%d", (int)config->probe_online_since, (int)config->probe_last_status);
+	zabbix_log(LOG_LEVEL_TRACE, "rsm_errors:" ZBX_FS_UI64, config->rsm_errors);
+	zabbix_log(LOG_LEVEL_TRACE, "End of %s()", __function_name);
+}
+
 void	DCdump_configuration(void)
 {
 	DCdump_config();
@@ -1275,4 +1285,5 @@ void	DCdump_configuration(void)
 	DCdump_host_groups();
 	DCdump_host_group_index();
 	DCdump_maintenances();
+	DCdump_probe(config);
 }
