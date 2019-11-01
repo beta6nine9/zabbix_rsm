@@ -2294,7 +2294,7 @@ sub check_sent_values()
 
 			if (exists($history->{$itemid}{$clock}))
 			{
-				wrn("THIS SHOULD NOT HAPPEN, value for itemid=$itemid, clock=$clock exists in multiple history tables");
+				wrn("THIS SHOULD NOT HAPPEN, value for itemid=$itemid, clock=$clock has duplicates or exists in multiple history tables");
 			}
 
 			$history->{$itemid}{$clock} = $value;
