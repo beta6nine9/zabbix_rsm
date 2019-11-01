@@ -209,11 +209,11 @@ class CControllerRollingWeekStatusList extends CController {
 		}
 
 		if (!array_key_exists('slv', $data)) {
-			show_error_message(_s('Macro "%1$s" doesn\'t not exist.', RSM_PAGE_SLV));
+			error(_s('Macro "%1$s" doesn\'t not exist.', RSM_PAGE_SLV));
 		}
 
 		if (!array_key_exists('rollWeekSeconds', $data)) {
-			show_error_message(_s('Macro "%1$s" doesn\'t not exist.', RSM_ROLLWEEK_SECONDS));
+			error(_s('Macro "%1$s" doesn\'t not exist.', RSM_ROLLWEEK_SECONDS));
 		}
 
 		return $data;
@@ -280,7 +280,9 @@ class CControllerRollingWeekStatusList extends CController {
 		return [$selected_groupids, $included_groupids];
 	}
 
-	protected function getTLDs(array $data, array $selected_groupids, array $included_groupids) {
+	protected function getTLDs(array $data, array $selected_groupids, array $included_groupids, $db_nr, $key) {
+		global $DB;
+
 		$tlds = [];
 		$where_host = [];
 		$hosts_table_alias = (CUser::$userData['type'] == USER_TYPE_SUPER_ADMIN) ? 'h' : 'hh';
@@ -412,7 +414,7 @@ class CControllerRollingWeekStatusList extends CController {
 					|| $DB['PASSWORD'] !== $DB['SERVERS'][$key]['PASSWORD']
 				) {
 					if (!multiDBconnect($DB['SERVERS'][$key], $error)) {
-						show_error_message(_($DB['SERVERS'][$key]['NAME'].': '.$error));
+						error(_($DB['SERVERS'][$key]['NAME'].': '.$error));
 						continue;
 					}
 				}
@@ -428,11 +430,11 @@ class CControllerRollingWeekStatusList extends CController {
 				list($selected_groupids, $included_groupids) = $this->getTLDGroups($data);
 
 				if (!$selected_groupids) {
-					show_error_message(_s('No permissions to referred "%1$s" group or it doesn\'t not exist.', RSM_TLDS_GROUP));
+					error(_s('No permissions to referred "%1$s" group or it doesn\'t not exist.', RSM_TLDS_GROUP));
 				}
 
 				// Use filter values to find matching hosts (TLDs/Registrars).
-				$data['tld'] = $this->getTLDs($data, $selected_groupids, $included_groupids);
+				$data['tld'] = $this->getTLDs($data, $selected_groupids, $included_groupids, $db_nr, $key);
 			}
 			else {
 				// Get "TLDs" groups.
@@ -444,6 +446,8 @@ class CControllerRollingWeekStatusList extends CController {
 	}
 
 	protected function selectTLDAttributes(array &$data) {
+		global $DB;
+
 		$tlds_by_server = [];
 		foreach ($data['tld'] as $tld) {
 			$tlds_by_server[$tld['db']][$tld['hostid']] = $tld['host'];
@@ -517,7 +521,7 @@ class CControllerRollingWeekStatusList extends CController {
 					],
 					'preservekeys' => true
 				]);
-
+				
 				if ($items) {
 					foreach ($items as $item) {
 						// service type filter
@@ -973,6 +977,7 @@ class CControllerRollingWeekStatusList extends CController {
 				|| $data['filter_dnssec'] || $data['filter_rdds'] || $data['filter_rdap'] || $data['filter_epp']);
 
 		$this->fetchData($data);
+		$this->selectTLDAttributes($data);
 
 		unset($DB['DB']);
 		$DB = $master;
