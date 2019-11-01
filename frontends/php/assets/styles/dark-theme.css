@@ -5188,13 +5188,13 @@ ul.checkbox-list.col-3 > li {
   margin: 0 1px 3px 1px; }
 
 .iconrollingweekok {
-  background-image: url("../images/general/rolling_week_ok.png"); }
+  background-image: url("../img/rolling_week_ok.png"); }
 
 .iconrollingweekfail {
-  background-image: url("../images/general/rolling_week_fail.png"); }
+  background-image: url("../img/rolling_week_fail.png"); }
 
 .iconrollingweekdisabled {
-  background-image: url("../images/general/rolling_week_disabled.png"); }
+  background-image: url("../img/rolling_week_disabled.png"); }
 
 .incidents-info {
   width: 100%; }
