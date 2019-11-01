@@ -24,6 +24,8 @@ EXTRA_DIST = \
 	sass \
 	go
 
+EXTRA_DIST += opt
+
 ## "dist-hook" run after the distribution directory is filled, but before the actual tar (or shar) file is created.
 dist-hook:
 # File revision number must be numeric (Git commit hash cannot be used).

@@ -32,6 +32,8 @@ DIST_SUBDIRS = \
 	zbxembed \
 	zbxprometheus
 
+DIST_SUBDIRS += zbxrsm
+
 if SERVER
 SERVER_SUBDIRS = \
 	zbxcommshigh \
@@ -50,6 +52,9 @@ SERVER_SUBDIRS = \
 	zbxcompress \
 	zbxembed \
 	zbxprometheus
+
+SERVER_SUBDIRS += zbxrsm
+
 else
 if PROXY
 PROXY_SUBDIRS = \
@@ -68,6 +73,9 @@ PROXY_SUBDIRS = \
 	zbxcompress \
 	zbxembed \
 	zbxprometheus
+
+PROXY_SUBDIRS += zbxrsm
+
 endif
 endif
 

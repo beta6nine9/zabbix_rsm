@@ -1299,6 +1299,14 @@ AM_CONDITIONAL([DBSCHEMA], [test -d create])
 
 AM_CONDITIONAL([ZBXCMOCKA], [(test -d tests/) && (test "x$server" = "xyes" || test "x$proxy" = "xyes" || test "x$agent" = "xyes")])
 
+AC_ARG_ENABLE(dbtls,[  --enable-dbtls          Turn on support of secure DB connections],
+[case "${enableval}" in
+  yes) dbtls=yes ;;
+  no)  dbtls=no ;;
+  *) AC_MSG_ERROR([bad value ${enableval} for --enable-dbtls]) ;;
+esac],
+[dbtls=no])
+
 have_db="no"
 have_unixodbc="no"
 have_web_monitoring="no"
@@ -1314,6 +1322,11 @@ if test "x$ipv6" = "xyes"; then
 	have_ipv6="yes"
 fi
 
+if test "x$dbtls" = "xyes"; then
+	AC_DEFINE(DBTLS,1,[Define to 1 if support for secure DB connections should be enabled.])
+	have_dbtls="yes"
+fi
+
 if test "x$server" = "xyes" || test "x$proxy" = "xyes"; then
 
 	have_multirow_insert="no"
@@ -1321,6 +1334,10 @@ if test "x$server" = "xyes" || test "x$proxy" = "xyes"; then
 	dnl Checking for IBM DB2 support
 	AX_LIB_IBM_DB2()
 	if test "x$want_ibm_db2" = "xyes"; then
+		if test "x$have_dbtls" = "xyes"; then
+			AC_MSG_ERROR([Secure connections are not supported for IBM DB2])
+		fi
+
 		if test "x$have_db" != "xno"; then
 			AC_MSG_ERROR([You can configure for only one database.])
 		fi
@@ -1351,6 +1368,10 @@ if test "x$server" = "xyes" || test "x$proxy" = "xyes"; then
 	dnl Checking for Oracle support
 	AX_LIB_ORACLE_OCI([10.0])
 	if test "x$want_oracle_oci" = "xyes"; then
+		if test "x$have_dbtls" = "xyes"; then
+			AC_MSG_ERROR([Secure connections are not supported for Oracle])
+		fi
+
 		if test "x$have_db" != "xno"; then
 			AC_MSG_ERROR([You can configure for only one database.])
 		fi
@@ -1371,6 +1392,10 @@ if test "x$server" = "xyes" || test "x$proxy" = "xyes"; then
 	dnl Checking for PostgreSQL support
 	AX_LIB_POSTGRESQL("8.1")
 	if test "x$want_postgresql" = "xyes"; then
+		if test "x$have_dbtls" = "xyes"; then
+			AC_MSG_ERROR([Secure connections are not supported for PostgreSQL])
+		fi
+
 		if test "x$have_db" != "xno"; then
 			AC_MSG_ERROR([You can configure for only one database.])
 		fi
@@ -1394,6 +1419,10 @@ if test "x$server" = "xyes" || test "x$proxy" = "xyes"; then
 	dnl Checking for SQLite3 support
 	AX_LIB_SQLITE3()
 	if test "x$want_sqlite3" = "xyes"; then
+		if test "x$have_dbtls" = "xyes"; then
+			AC_MSG_ERROR([Secure connections are not supported for SQLite3])
+		fi
+
 		if test "x$server" = "xyes"; then
 			AC_MSG_ERROR([SQLite is not supported as a main Zabbix database backend.])
 		fi
@@ -1741,6 +1770,9 @@ PROXY_LIBS="$PROXY_LIBS $LIBCURL_LIBS"
 
 AM_CONDITIONAL(HAVE_LIBCURL, test "x$found_curl" = "xyes")
 
+SERVER_LIBS="$SERVER_LIBS -lldns"
+PROXY_LIBS="$PROXY_LIBS -lldns"
+
 dnl Starting from 2.0 agent can do web monitoring
 AGENT_LDFLAGS="$AGENT_LDFLAGS $LIBCURL_LDFLAGS"
 AGENT_LIBS="$AGENT_LIBS $LIBCURL_LIBS"
@@ -1929,6 +1961,7 @@ AC_OUTPUT([
 	src/libs/zbxicmpping/Makefile
 	src/libs/zbxexec/Makefile
 	src/libs/zbxself/Makefile
+	src/libs/zbxrsm/Makefile
 	src/libs/zbxmodules/Makefile
 	src/libs/zbxregexp/Makefile
 	src/libs/zbxtasks/Makefile
@@ -1937,6 +1970,7 @@ AC_OUTPUT([
 	src/libs/zbxcompress/Makefile
 	src/libs/zbxembed/Makefile
 	src/libs/zbxprometheus/Makefile
+	src/tests/Makefile
 	src/zabbix_agent/Makefile
 	src/zabbix_agent/logfiles/Makefile
 	src/zabbix_get/Makefile
@@ -1970,6 +2004,7 @@ AC_OUTPUT([
 	src/zabbix_proxy/datasender/Makefile
 	src/zabbix_proxy/taskmanager/Makefile
 	src/zabbix_java/Makefile
+	src/zabbix_rsm/Makefile
 	man/Makefile
 	go/Makefile
 	go/src/Makefile
@@ -2114,6 +2149,7 @@ if test "x$server" != "xno"; then
 
 echo "  Server details:
     With database:         ${have_db}
+    Secure connections:    ${have_dbtls}
     WEB Monitoring:        ${have_web_monitoring}"
 
 if test "x$have_web_monitoring" = "xcURL"; then
@@ -2142,6 +2178,7 @@ if test "x$proxy" != "xno"; then
 
 echo "  Proxy details:
     With database:         ${have_db}
+    Secure connections:    ${have_dbtls}
     WEB Monitoring:        ${have_web_monitoring}"
 
 if test "x$have_web_monitoring" = "xcURL"; then

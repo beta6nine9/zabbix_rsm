@@ -29,4 +29,7 @@ extern char	*CONFIG_STATS_ALLOWED_IP;
 
 ZBX_THREAD_ENTRY(trapper_thread, args);
 
+void	init_proxy_history(void);
+void	free_proxy_history(void);
+
 #endif

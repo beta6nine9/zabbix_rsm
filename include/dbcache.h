@@ -949,4 +949,14 @@ int	zbx_lld_macro_paths_compare(const void *d1, const void *d2);
 
 void	zbx_dc_get_item_tags_by_functionids(const zbx_uint64_t *functionids, size_t functionids_num, zbx_vector_ptr_t *host_tags);
 
+size_t	DCconfig_get_host_items_by_keypart(DC_ITEM **items, zbx_uint64_t hostid, zbx_item_type_t type,
+		const char *keypart, size_t keypart_size);
+void	DCset_probe_online_since(time_t t);
+void	DCset_probe_last_status(char status);
+time_t	DCget_probe_online_since(void);
+char	DCget_probe_last_status(void);
+
+void		zbx_dc_rsm_errors_inc(void);
+zbx_uint64_t	zbx_dc_rsm_errors_get(void);
+
 #endif

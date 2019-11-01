@@ -17,7 +17,9 @@ libzbxpoller_a_SOURCES = \
 	checks_calculated.c checks_calculated.h \
 	checks_http.c checks_http.h \
 	poller.c poller.h
-	
+
+libzbxpoller_a_SOURCES += checks_simple_rsm.c checks_simple_rsm.h
+
 libzbxpoller_server_a_SOURCES = \
 	checks_internal_server.c checks_internal.h
 

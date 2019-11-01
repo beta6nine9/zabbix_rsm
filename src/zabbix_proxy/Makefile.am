@@ -77,6 +77,8 @@ zabbix_proxy_LDADD = \
 
 zabbix_proxy_LDADD += $(top_srcdir)/src/libs/zbxalgo/libzbxalgo.a
 
+zabbix_proxy_LDADD += $(top_srcdir)/src/libs/zbxrsm/libzbxrsm.a
+
 if HAVE_IPMI
 zabbix_proxy_LDADD += $(top_srcdir)/src/zabbix_server/ipmi/libipmi.a
 endif

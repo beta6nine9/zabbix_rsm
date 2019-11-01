@@ -59,6 +59,7 @@
 #include "../zabbix_server/preprocessor/preproc_manager.h"
 #include "../zabbix_server/preprocessor/preproc_worker.h"
 
+#include "rsm.h"	/* zbx_read_stdin() */
 
 #ifdef HAVE_OPENIPMI
 #include "../zabbix_server/ipmi/ipmi_manager.h"
@@ -71,6 +72,7 @@ const char	syslog_app_name[] = "zabbix_proxy";
 const char	*usage_message[] = {
 	"[-c config-file]", NULL,
 	"[-c config-file]", "-R runtime-option", NULL,
+	"-r", NULL,
 	"-h", NULL,
 	"-V", NULL,
 	NULL	/* end of text */
@@ -106,6 +108,7 @@ const char	*help_message[] = {
 	"        pid                      Process identifier, up to 65535. For larger",
 	"                                 values specify target as \"process-type,N\"",
 	"",
+	"  -r --rsm                       Enable Registry SLA Monitoring (RSM) support",
 	"  -h --help                      Display this help message",
 	"  -V --version                   Display version number",
 	"",
@@ -127,13 +130,14 @@ static struct zbx_option	longopts[] =
 	{"config",		1,	NULL,	'c'},
 	{"foreground",		0,	NULL,	'f'},
 	{"runtime-control",	1,	NULL,	'R'},
+	{"rsm",			0,	NULL,	'r'},
 	{"help",		0,	NULL,	'h'},
 	{"version",		0,	NULL,	'V'},
 	{NULL}
 };
 
 /* short options */
-static char	shortopts[] = "c:hVR:f";
+static char	shortopts[] = "c:rhVR:f";
 
 /* end of COMMAND LINE OPTIONS */
 
@@ -225,6 +229,13 @@ char	*CONFIG_DBPASSWORD		= NULL;
 char	*CONFIG_DBSOCKET		= NULL;
 char	*CONFIG_EXPORT_DIR		= NULL;
 int	CONFIG_DBPORT			= 0;
+#ifdef DBTLS
+char	*CONFIG_DB_KEY_FILE		= NULL;
+char	*CONFIG_DB_CERT_FILE		= NULL;
+char	*CONFIG_DB_CA_FILE		= NULL;
+char	*CONFIG_DB_CA_PATH		= NULL;
+char	*CONFIG_DB_CIPHER		= NULL;
+#endif
 int	CONFIG_ENABLE_REMOTE_COMMANDS	= 0;
 int	CONFIG_LOG_REMOTE_COMMANDS	= 0;
 int	CONFIG_UNSAFE_USER_PARAMETERS	= 0;
@@ -278,6 +289,9 @@ char	*CONFIG_HISTORY_STORAGE_OPTS		= NULL;
 int	CONFIG_HISTORY_STORAGE_PIPELINES	= 0;
 
 char	*CONFIG_STATS_ALLOWED_IP	= NULL;
+
+/* a passphrase for EPP data encryption used in proxy poller */
+char	epp_passphrase[128]		= "";
 
 int	get_process_info_by_thread(int local_server_num, unsigned char *local_process_type, int *local_process_num);
 
@@ -714,6 +728,18 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 			PARM_OPT,	0,			0},
 		{"DBPort",			&CONFIG_DBPORT,				TYPE_INT,
 			PARM_OPT,	1024,			65535},
+#ifdef DBTLS
+		{"DBKeyFile",			&CONFIG_DB_KEY_FILE,			TYPE_STRING,
+			PARM_OPT,	0,			0},
+		{"DBCertFile",			&CONFIG_DB_CERT_FILE,			TYPE_STRING,
+			PARM_OPT,	0,			0},
+		{"DBCAFile",			&CONFIG_DB_CA_FILE,			TYPE_STRING,
+			PARM_OPT,	0,			0},
+		{"DBCAPath",			&CONFIG_DB_CA_PATH,			TYPE_STRING,
+			PARM_OPT,	0,			0},
+		{"DBCipher",			&CONFIG_DB_CIPHER,			TYPE_STRING,
+			PARM_OPT,	0,			0},
+#endif
 		{"SSHKeyLocation",		&CONFIG_SSH_KEY_LOCATION,		TYPE_STRING,
 			PARM_OPT,	0,			0},
 		{"LogSlowQueries",		&CONFIG_LOG_SLOW_QUERIES,		TYPE_INT,
@@ -839,6 +865,14 @@ int	main(int argc, char **argv)
 					exit(EXIT_FAILURE);
 
 				t.task = ZBX_TASK_RUNTIME_CONTROL;
+				break;
+			case 'r':
+				if (SUCCEED != zbx_read_stdin("Enter a passphrase for EPP data encryption: ",
+						epp_passphrase, sizeof(epp_passphrase), NULL, 0))
+				{
+					printf("an error occured while requesting EPP passphrase\n");
+					exit(EXIT_FAILURE);
+				}
 				break;
 			case 'h':
 				help();
@@ -1103,6 +1137,12 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 		thread_args.server_num = i + 1;
 		thread_args.args = NULL;
 
+		if ('\0' != *epp_passphrase && ZBX_PROCESS_TYPE_POLLER != thread_args.process_type)
+		{
+			/* only poller needs EPP passphrase */
+			memset(epp_passphrase, 0, strlen(epp_passphrase));
+		}
+
 		switch (thread_args.process_type)
 		{
 			case ZBX_PROCESS_TYPE_CONFSYNCER:
@@ -1177,6 +1217,10 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 				break;
 		}
 	}
+
+	/* does not need EPP passphrase */
+	if ('\0' != *epp_passphrase)
+		memset(epp_passphrase, 0, strlen(epp_passphrase));
 
 	while (-1 == wait(&i))	/* wait for any child to exit */
 	{
