@@ -303,7 +303,7 @@ function get_window_opener($frame, $field, $value) {
  * Page filter
  */
 if (!empty($group)) {
-	$dbGroup = DBfetch(DBselect('SELECT g.groupid FROM groups g WHERE g.name='.zbx_dbstr($group)));
+	$dbGroup = DBfetch(DBselect('SELECT g.groupid FROM htsgrp g WHERE g.name='.zbx_dbstr($group)));
 	if (!empty($dbGroup) && !empty($dbGroup['groupid'])) {
 		$_REQUEST['groupid'] = $dbGroup['groupid'];
 	}

@@ -193,7 +193,7 @@ class CHost extends CHostGeneral {
 				$sqlParts['from']['hosts_groups'] = 'hosts_groups hg';
 				$sqlParts['where']['hgh'] = 'hg.hostid=h.hostid';
 			}
-			$sqlParts['from']['groups'] = 'groups g';
+			$sqlParts['from']['groups'] = 'hstgrp g';
 			$sqlParts['where'][] = 'g.name='.zbx_dbstr(RSM_TLDS_GROUP);
 			$sqlParts['where']['g'] = 'g.groupid=hg.groupid';
 		}
