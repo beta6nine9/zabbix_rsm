@@ -521,7 +521,7 @@ class CControllerRollingWeekStatusList extends CController {
 					],
 					'preservekeys' => true
 				]);
-				
+
 				if ($items) {
 					foreach ($items as $item) {
 						// service type filter
