@@ -7,6 +7,10 @@
 #define LOG_FILE1	"test1.log"
 #define LOG_FILE2	"test2.log"
 
+void	zbx_on_exit(int ret)
+{
+}
+
 void	exit_usage(const char *progname)
 {
 	fprintf(stderr, "usage: %s -t <tld> -n <ns> -i <ip> <[-4] [-6]> [-r <res_ip>] [-p <testprefix>] [-d] [-g] [-f] [-h]\n", progname);

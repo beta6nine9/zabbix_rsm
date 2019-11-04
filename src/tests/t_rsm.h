@@ -110,6 +110,14 @@ char	*CONFIG_TLS_PSK_IDENTITY;
 char	*CONFIG_TLS_SERVER_CERT_ISSUER;
 int	CONFIG_PASSIVE_FORKS;
 int	CONFIG_ACTIVE_FORKS;
+
+char	*CONFIG_HISTORY_STORAGE_URL;
+char	*CONFIG_HISTORY_STORAGE_OPTS;
+char	*CONFIG_HISTORY_STORAGE_PIPELINES;
+char	*CONFIG_EXPORT_DIR;
+
+zbx_uint64_t	*CONFIG_EXPORT_FILE_SIZE;
+
 unsigned int	configured_tls_connect_mode;
 unsigned int	configured_tls_accept_mode;
 unsigned int	configured_tls_connect_modes;
