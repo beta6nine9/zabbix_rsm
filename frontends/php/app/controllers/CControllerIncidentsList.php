@@ -28,7 +28,6 @@ class CControllerIncidentsList extends CController {
 
 	protected function init() {
 		$this->disableSIDValidation();
-		$this->errors = [];
 	}
 
 	protected function checkPermissions() {

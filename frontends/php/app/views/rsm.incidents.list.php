@@ -92,8 +92,9 @@ if ($data['tld']) {
 			$dns_table->addRow([
 				new CLink(
 					$event['eventid'],
-					(new CUrl($data['url'].'zabbix.php'))
-						->setArgument('action', 'rsm.incidentdetails')
+					(new CUrl($data['url'].'rsm.incidentdetails.php'))
+					/*(new CUrl($data['url'].'zabbix.php'))
+						->setArgument('action', 'rsm.incidentdetails')*/
 						->setArgument('host', $data['tld']['host'])
 						->setArgument('from', $data['from'])
 						->setArgument('to', $data['to'])
@@ -112,7 +113,9 @@ if ($data['tld']) {
 
 		$tests_down = new CLink(
 			$data['dns']['totalTests'],
-			(new CUrl($data['url'].'zabbix.php'))
+			(new CUrl($data['url'].'rsm.tests.php'))
+			/*(new CUrl($data['url'].'zabbix.php'))
+				->setArgument('action', 'rsm.tests')*/
 				->setArgument('from', $data['from'])
 				->setArgument('to', $data['to'])
 				->setArgument('filter_set', 1)
@@ -188,8 +191,9 @@ if ($data['tld']) {
 			$dnssec_table->addRow([
 				new CLink(
 					$event['eventid'],
-					(new CUrl($data['url'].'zabbix.php'))
-						->setArgument('action', 'rsm.incidentdetails')
+					(new CUrl($data['url'].'rsm.incidentdetails.php'))
+					/*(new CUrl($data['url'].'zabbix.php'))
+						->setArgument('action', 'rsm.incidentdetails')*/
 						->setArgument('host', $data['tld']['host'])
 						->setArgument('eventid', $event['eventid'])
 						->setArgument('slvItemId', $data['dnssec']['itemid'])
@@ -210,8 +214,9 @@ if ($data['tld']) {
 
 		$tests_down = new CLink(
 			$this->data['dnssec']['totalTests'],
-			(new CUrl($data['url'].'zabbix.php'))
-				->setArgument('action', 'rsm.tests')
+			(new CUrl($data['url'].'rsm.tests.php'))
+			/*(new CUrl($data['url'].'zabbix.php'))
+				->setArgument('action', 'rsm.tests')*/
 				->setArgument('from', $data['from'])
 				->setArgument('to', $data['to'])
 				->setArgument('filter_set', 1)
@@ -284,8 +289,9 @@ if ($data['tld']) {
 			$rdds_table->addRow([
 				new CLink(
 					$event['eventid'],
-					(new CUrl($data['url'].'zabbix.php'))
-						->setArgument('action', 'rsm.incidentdetails')
+					(new CUrl($data['url'].'rsm.incidentdetails.php'))
+					/*(new CUrl($data['url'].'zabbix.php'))
+						->setArgument('action', 'rsm.incidentdetails')*/
 						->setArgument('host', $data['tld']['host'])
 						->setArgument('eventid', $event['eventid'])
 						->setArgument('slvItemId', $data['rdds']['itemid'])
@@ -306,8 +312,9 @@ if ($data['tld']) {
 
 		$tests_down = new CLink(
 			$data['rdds']['totalTests'],
-			(new CUrl($data['url'].'zabbix.php'))
-				->setArgument('action', 'rsm.tests')
+			(new CUrl($data['url'].'rsm.tests.php'))
+			/*(new CUrl($data['url'].'zabbix.php'))
+				->setArgument('action', 'rsm.tests')*/
 				->setArgument('from', $data['from'])
 				->setArgument('to', $data['to'])
 				->setArgument('filter_set', 1)
@@ -387,8 +394,9 @@ if ($data['tld']) {
 			$rdap_table->addRow([
 				new CLink(
 					$event['eventid'],
-					(new CUrl($data['url'].'zabbix.php'))
-						->setArgument('action', 'rsm.incidentdetails')
+					(new CUrl($data['url'].'rsm.incidentdetails.php'))
+					/*(new CUrl($data['url'].'zabbix.php'))
+						->setArgument('action', 'rsm.incidentdetails')*/
 						->setArgument('host', $data['tld']['host'])
 						->setArgument('eventid', $event['eventid'])
 						->setArgument('slvItemId', $data['rdap']['itemid'])
@@ -409,8 +417,9 @@ if ($data['tld']) {
 
 		$tests_down = new CLink(
 			$data['rdap']['totalTests'],
-			(new CUrl($data['url'].'zabbix.php'))
-				->setArgument('action', 'rsm.tests')
+			(new CUrl($data['url'].'rsm.tests.php'))
+			/*(new CUrl($data['url'].'zabbix.php'))
+				->setArgument('action', 'rsm.tests')*/
 				->setArgument('filter_from', $data['filter_from'])
 				->setArgument('to', $data['to'])
 				->setArgument('filter_set', 1)
@@ -491,8 +500,9 @@ if ($data['tld']) {
 			$epp_table->addRow([
 				new CLink(
 					$event['eventid'],
-					(new CUrl($data['url'].'zabbix.php'))
-						->setArgument('action', 'rsm.incidentdetails')
+					(new CUrl($data['url'].'rsm.incidentdetails'))
+					/*(new CUrl($data['url'].'zabbix.php'))
+						->setArgument('action', 'rsm.incidentdetails')*/
 						->setArgument('host', $data['tld']['host'])
 						->setArgument('from', $data['from'])
 						->setArgument('to', $data['to'])
@@ -511,8 +521,9 @@ if ($data['tld']) {
 
 		$tests_down = new CLink(
 			$data['epp']['totalTests'],
-			(new CUrl($data['url'].'zabbix.php'))
-				->setArgument('action', 'rsm.tests')
+			(new CUrl($data['url'].'rsm.tests.php'))
+			/*(new CUrl($data['url'].'zabbix.php'))
+				->setArgument('action', 'rsm.tests')*/
 				->setArgument('from', $data['from'])
 				->setArgument('to', $data['to'])
 				->setArgument('filter_set', 1)
