@@ -58,7 +58,7 @@ sub main()
 			" events" .
 			" left join triggers on triggers.triggerid = events.objectid" .
 		" where" .
-			"events.eventid=?", [getopt('event-id')]);
+			" events.eventid=?", [getopt('event-id')]);
 
 
 	fail("event not found") if (@{$rows} == 0);
