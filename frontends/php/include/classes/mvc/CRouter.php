@@ -160,6 +160,7 @@ class CRouter {
 		'search'						=> ['CControllerSearch',							'layout.htmlpage',		'search'],
 		'rsm.rollingweekstatus'			=> ['CControllerRollingWeekStatusList',				'layout.htmlpage',		'rsm.rollingweekstatus.list'],
 		'rsm.incidents'					=> ['CControllerIncidentsList',						'layout.htmlpage',		'rsm.incidents.list'],
+		'rsm.slareports'				=> ['CControllerSlaReports',						'layout.htmlpage',		'rsm.slareports.list'],
 	];
 
 	public function __construct($action) {

@@ -157,11 +157,9 @@ function zbx_construct_menu(&$main_menu, &$sub_menus, &$page, $action = null) {
 					]
 				],
 				[
-					//'url' => 'zabbix.php',
-					'url' => 'rsm.slareports.php',
-					//'action' => 'rsm.slareports',
-					//'active_if' => ['rsm.slareports'],
-					'active_if' => ['rsm.slareports.php'],
+					'url' => 'zabbix.php',
+					'action' => 'rsm.slareports',
+					'active_if' => ['rsm.slareports'],
 					'label' => _('SLA reports')
 				]
 			]
