@@ -4393,6 +4393,10 @@ static int	DBpatch_3000323(void)
 
 static int	DBpatch_3000324(void)
 {
+	const char	*command = "/opt/zabbix/alertscripts/compliance-notification.pl --event-id \'{EVENT.ID}\'"
+					" 1>>/var/log/zabbix/compliance-notification.log"
+					" 2>&1";
+
 	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
 		return SUCCEED;
 
@@ -4414,7 +4418,7 @@ static int	DBpatch_3000324(void)
 	/* create custom script that needs to be executed on the server */
 	CHECK(DBexecute("insert into opcommand set operationid=130,type=0,scriptid=NULL,execute_on=1,port='',"
 			"authtype=0,username='',password='',publickey='',privatekey='',"
-			"command='/opt/zabbix/alertscripts/compliance-notification.pl --event-id \'{EVENT.ID}\''"));
+			"command='%s'", command));
 	CHECK(DBexecute("insert into opcommand_hst set opcommand_hstid=130,operationid=130,hostid=NULL"));
 
 	return SUCCEED;
