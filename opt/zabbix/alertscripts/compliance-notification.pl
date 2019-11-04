@@ -45,21 +45,20 @@ sub main()
 
 	my $rows;
 
-	$rows = db_select("
-		select
-			events.source,
-			events.object,
-			events.objectid,
-			events.clock,
-			events.ns,
-			events.value,
-			triggers.description
-		from
-			events
-			left join triggers on triggers.triggerid = events.objectid
-		where
-			events.eventid=?
-	", [getopt('event-id')]);
+	$rows = db_select(
+		"select" .
+			" events.source," .
+			"events.object," .
+			"events.objectid," .
+			"events.clock," .
+			"events.ns," .
+			"events.value," .
+			"triggers.description" .
+		" from" .
+			" events" .
+			" left join triggers on triggers.triggerid = events.objectid" .
+		" where" .
+			"events.eventid=?", [getopt('event-id')]);
 
 
 	fail("event not found") if (@{$rows} == 0);
@@ -76,19 +75,18 @@ sub main()
 	fail("itemid not found in trigger functions") if (@{$rows} == 0);
 	fail("multiple itemids found in trigger functions") if (@{$rows} > 1);
 
-	$rows = db_select("
-		select
-			items.itemid,
-			items.key_,
-			items.name,
-			hosts.hostid,
-			hosts.name
-		from
-			items
-			left join hosts on hosts.hostid = items.hostid
-		where
-			items.itemid=?
-	", [$rows->[0][0]]);
+	$rows = db_select(
+		"select" .
+			" items.itemid," .
+			"items.key_," .
+			"items.name," .
+			"hosts.hostid," .
+			"hosts.name" .
+		" from" .
+			" items" .
+			" left join hosts on hosts.hostid = items.hostid" .
+		" where" .
+			" items.itemid=?", [$rows->[0][0]]);
 
 	my ($item_id, $item_key, $item_name, $host_id, $host_name) = @{$rows->[0]};
 
