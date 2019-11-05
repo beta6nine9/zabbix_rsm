@@ -92,9 +92,8 @@ if ($data['tld']) {
 			$dns_table->addRow([
 				new CLink(
 					$event['eventid'],
-					(new CUrl($data['url'].'rsm.incidentdetails.php'))
-					/*(new CUrl($data['url'].'zabbix.php'))
-						->setArgument('action', 'rsm.incidentdetails')*/
+					(new CUrl($data['url'].'zabbix.php'))
+						->setArgument('action', 'rsm.incidentdetails')
 						->setArgument('host', $data['tld']['host'])
 						->setArgument('from', $data['from'])
 						->setArgument('to', $data['to'])
@@ -191,9 +190,8 @@ if ($data['tld']) {
 			$dnssec_table->addRow([
 				new CLink(
 					$event['eventid'],
-					(new CUrl($data['url'].'rsm.incidentdetails.php'))
-					/*(new CUrl($data['url'].'zabbix.php'))
-						->setArgument('action', 'rsm.incidentdetails')*/
+					(new CUrl($data['url'].'zabbix.php'))
+						->setArgument('action', 'rsm.incidentdetails')
 						->setArgument('host', $data['tld']['host'])
 						->setArgument('eventid', $event['eventid'])
 						->setArgument('slvItemId', $data['dnssec']['itemid'])
@@ -289,9 +287,8 @@ if ($data['tld']) {
 			$rdds_table->addRow([
 				new CLink(
 					$event['eventid'],
-					(new CUrl($data['url'].'rsm.incidentdetails.php'))
-					/*(new CUrl($data['url'].'zabbix.php'))
-						->setArgument('action', 'rsm.incidentdetails')*/
+					(new CUrl($data['url'].'zabbix.php'))
+						->setArgument('action', 'rsm.incidentdetails')
 						->setArgument('host', $data['tld']['host'])
 						->setArgument('eventid', $event['eventid'])
 						->setArgument('slvItemId', $data['rdds']['itemid'])
@@ -394,9 +391,8 @@ if ($data['tld']) {
 			$rdap_table->addRow([
 				new CLink(
 					$event['eventid'],
-					(new CUrl($data['url'].'rsm.incidentdetails.php'))
-					/*(new CUrl($data['url'].'zabbix.php'))
-						->setArgument('action', 'rsm.incidentdetails')*/
+					(new CUrl($data['url'].'zabbix.php'))
+						->setArgument('action', 'rsm.incidentdetails')
 						->setArgument('host', $data['tld']['host'])
 						->setArgument('eventid', $event['eventid'])
 						->setArgument('slvItemId', $data['rdap']['itemid'])

@@ -161,6 +161,7 @@ class CRouter {
 		'rsm.rollingweekstatus'			=> ['CControllerRollingWeekStatusList',				'layout.htmlpage',		'rsm.rollingweekstatus.list'],
 		'rsm.incidents'					=> ['CControllerIncidentsList',						'layout.htmlpage',		'rsm.incidents.list'],
 		'rsm.slareports'				=> ['CControllerSlaReports',						'layout.htmlpage',		'rsm.slareports.list'],
+		'rsm.incidentdetails'			=> ['CControllerIncidentDetails',					'layout.htmlpage',		'rsm.incidentdetails.list'],
 	];
 
 	public function __construct($action) {

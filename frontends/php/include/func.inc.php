@@ -2792,6 +2792,10 @@ function gen_details_item(array $details) {
 	$output = [];
 
 	foreach ($details as $key => $value) {
+		if (!$value) {
+			continue;
+		}
+
 		$output[] = bold($key);
 		$output[] = ': ';
 		$output[] = $value;
