@@ -48,7 +48,7 @@ foreach ($data['tests'] as $test) {
 		new CLink(
 			_('details'),
 			(new CUrl('zabbix.php'))
-				->setArgument('active', 'rsm.particulartests')
+				->setArgument('action', 'rsm.particulartests')
 				->setArgument('slvItemId', $data['slvItemId'])
 				->setArgument('host', $data['tld']['host'])
 				->setArgument('time', $test['clock'])
