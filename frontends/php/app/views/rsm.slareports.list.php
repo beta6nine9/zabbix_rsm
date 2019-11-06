@@ -245,6 +245,7 @@ $widget
 			->setArgument('filter_search', $data['filter_search'])
 			->setArgument('filter_year', $data['filter_year'])
 			->setArgument('filter_month', $data['filter_month'])
+			->getUrl()
 		))->addStyle('margin-top: 5px;')
 	])
 	->show();

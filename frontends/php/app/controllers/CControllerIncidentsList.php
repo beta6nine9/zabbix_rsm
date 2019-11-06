@@ -39,7 +39,7 @@ class CControllerIncidentsList extends CController {
 	protected function checkInput() {
 		$fields = [
 			'host'			=>	'db hosts.host',
-			'eventid'		=>	'db events.eventid',	
+			'eventid'		=>	'db events.eventid',
 			'type'			=>	'in '.implode(',', [RSM_DNS, RSM_DNSSEC, RSM_RDDS, RSM_RDAP, RSM_EPP]),
 			'filter_set'	=>	'in 1',
 			'filter_rst'	=>	'in 1',
