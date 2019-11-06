@@ -33,12 +33,11 @@ class CControllerSlaReports extends CController {
 
 	protected function checkInput() {
 		$fields = [
-			'export' =>			'in 1',
 			'filter_set' =>		'in 1',
-			'filter_search' =>	'string',
+			'filter_rst' =>		'in 1',
+			'filter_search' =>	'db hosts.host',
 			'filter_year' =>	'string',
-			'filter_month' =>	'string',
-			'filter_rst' =>		'in 1'
+			'filter_month' =>	'string'
 		];
 
 		$ret = $this->validateInput($fields);

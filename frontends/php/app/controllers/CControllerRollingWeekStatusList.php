@@ -29,27 +29,31 @@ class CControllerRollingWeekStatusList extends CController {
 	}
 
 	protected function checkInput() {
+		$sort_fields = ['name', 'type', 'server', 'dns_lastvalue', 'dnssec_lastvalue', 'rdds_lastvalue',
+			'rdap_lastvalue', 'epp_lastvalue', 'info_1', 'info_2', 'host'
+		];
+
 		$fields = [
 			'filter_set'				=> 'in 1',
 			'filter_rst'				=> 'in 1',
 			'filter_search'				=> 'string',
-			'filter_dns'				=> 'string',
-			'filter_dnssec'				=> '',
-			'filter_rdds'				=> '',
-			'filter_rdap'				=> '',
-			'filter_epp'				=> '',
-			'filter_slv'				=> '',
-			'filter_status'				=> '',
-			'filter_gtld_group'			=> '',
-			'filter_cctld_group'		=> '',
-			'filter_othertld_group'		=> '',
-			'filter_test_group'			=> '',
-			'filter_rdap_subgroup'		=> '',
-			'filter_rdds_subgroup'		=> '',
-			'filter_registrar_id'		=> '',
-			'filter_registrar_name'		=> '',
-			'filter_registrar_family'	=> '',
-			'sort'						=> 'in host,info_1,info_2,type,server,dns_lastvalue,dnssec_lastvalue,rdds_lastvalue,rdap_lastvalue,epp_lastvalue',
+			'filter_dns'				=> 'in 1',
+			'filter_dnssec'				=> 'in 1',
+			'filter_rdds'				=> 'in 1',
+			'filter_rdap'				=> 'in 1',
+			'filter_epp'				=> 'in 1',
+			'filter_slv'				=> 'string',
+			'filter_status'				=> 'in 0,1,2',
+			'filter_gtld_group'			=> 'in 1',
+			'filter_cctld_group'		=> 'in 1',
+			'filter_othertld_group'		=> 'in 1',
+			'filter_test_group'			=> 'in 1',
+			'filter_rdap_subgroup'		=> 'in 1',
+			'filter_rdds_subgroup'		=> 'in 1',
+			'filter_registrar_id'		=> 'string',
+			'filter_registrar_name'		=> 'string',
+			'filter_registrar_family'	=> 'string',
+			'sort'						=> 'in '.implode(',', $sort_fields),
 			'sortorder'					=> 'in '.implode(',', [ZBX_SORT_DOWN, ZBX_SORT_UP])
 		];
 
@@ -70,9 +74,11 @@ class CControllerRollingWeekStatusList extends CController {
 
 	protected function updateProfile() {
 		// Set/Reset filter.
+		DBStart();
+
 		if ($this->hasInput('filter_set')) {
-			CProfile::update('web.rsm.rollingweekstatus.sort', $this->getInput('sort_field', 'name'), PROFILE_TYPE_STR);
-			CProfile::update('web.rsm.rollingweekstatus.sortorder', $this->getInput('sort_order', ZBX_SORT_UP), PROFILE_TYPE_STR);
+			CProfile::update('web.rsm.rollingweekstatus.sort', $this->getInput('sort', 'name'), PROFILE_TYPE_STR);
+			CProfile::update('web.rsm.rollingweekstatus.sortorder', $this->getInput('sortorder', ZBX_SORT_UP), PROFILE_TYPE_STR);
 			CProfile::update('web.rsm.rollingweekstatus.filter_search', $this->getInput('filter_search', ''), PROFILE_TYPE_STR);
 			CProfile::update('web.rsm.rollingweekstatus.filter_dns', $this->getInput('filter_dns', 0), PROFILE_TYPE_INT);
 			CProfile::update('web.rsm.rollingweekstatus.filter_dnssec', $this->getInput('filter_dnssec', 0), PROFILE_TYPE_INT);
@@ -92,7 +98,6 @@ class CControllerRollingWeekStatusList extends CController {
 			CProfile::update('web.rsm.rollingweekstatus.filter_registrar_family', $this->getInput('filter_registrar_family', ''), PROFILE_TYPE_STR);
 		}
 		elseif (hasRequest('filter_rst')) {
-			DBStart();
 			CProfile::delete('web.rsm.rollingweekstatus.sort');
 			CProfile::delete('web.rsm.rollingweekstatus.sortorder');
 			CProfile::delete('web.rsm.rollingweekstatus.filter_search');
@@ -112,14 +117,14 @@ class CControllerRollingWeekStatusList extends CController {
 			CProfile::delete('web.rsm.rollingweekstatus.filter_registrar_id');
 			CProfile::delete('web.rsm.rollingweekstatus.filter_registrar_name');
 			CProfile::delete('web.rsm.rollingweekstatus.filter_registrar_family');
-			DBend();
 		}
+		DBend();
 	}
 
-	protected function readValues(&$data) {
-		$data = [
-			'sort_field' =>  $this->getInput('sort_field', 'name'),
-			'sort_order' =>  $this->getInput('sort_order', ZBX_SORT_UP),
+	protected function readValues(array &$data) {
+		$data += [
+			'sort_field' =>  $this->getInput('sort', 'name'),
+			'sort_order' =>  $this->getInput('sortorder', ZBX_SORT_UP),
 			'filter_search' => CProfile::get('web.rsm.rollingweekstatus.filter_search'),
 			'filter_dns' => CProfile::get('web.rsm.rollingweekstatus.filter_dns'),
 			'filter_dnssec' => CProfile::get('web.rsm.rollingweekstatus.filter_dnssec'),
@@ -140,14 +145,9 @@ class CControllerRollingWeekStatusList extends CController {
 			'active_tab' => CProfile::get('web.rsm.rollingweekstatus.filter.active', 1),
 			'sort' => CProfile::get('web.rsm.rollingweekstatus.sort', 'name'),
 			'sortorder' => CProfile::get('web.rsm.rollingweekstatus.sortorder', 'ZBX_SORT_UP'),
-			'rsm_monitoring_mode' => get_rsm_monitoring_type(),
 			'sid' => CWebUser::getSessionCookie(),
 			'paging' => null
 		];
-
-		$data['title'] = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR)
-			? _('Registrar rolling week status')
-			: _('TLD Rolling week status');
 
 		// Erase fields that are not supported in particular monitoring mode.
 		if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
@@ -190,7 +190,7 @@ class CControllerRollingWeekStatusList extends CController {
 		}
 	}
 
-	protected function readMacros(&$data) {
+	protected function readMacros(array &$data) {
 		$macros = API::UserMacro()->get([
 			'output' => ['macro', 'value'],
 			'filter' => [
@@ -215,11 +215,9 @@ class CControllerRollingWeekStatusList extends CController {
 		if (!array_key_exists('rollWeekSeconds', $data)) {
 			error(_s('Macro "%1$s" doesn\'t not exist.', RSM_ROLLWEEK_SECONDS));
 		}
-
-		return $data;
 	}
 
-	protected function getTLDGroups(&$data) {
+	protected function getTLDGroups(array &$data) {
 		$selected_groupids = [];
 		$included_groupids = []; // Groups selected in filter as TLD types. In case of registrar mode, there will be all available groups.
 
@@ -390,7 +388,7 @@ class CControllerRollingWeekStatusList extends CController {
 		return $tlds;
 	}
 
-	protected function fetchData(&$data) {
+	protected function fetchData(array &$data) {
 		global $DB;
 
 		$master = $DB;
@@ -967,6 +965,12 @@ class CControllerRollingWeekStatusList extends CController {
 
 	protected function doAction() {
 		global $DB;
+
+		$data = [];
+		$data['rsm_monitoring_mode'] = get_rsm_monitoring_type();
+		$data['title'] = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR)
+			? _('Registrar rolling week status')
+			: _('TLD Rolling week status');
 
 		$this->updateProfile();
 		$this->readValues($data);

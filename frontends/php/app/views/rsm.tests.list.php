@@ -96,25 +96,26 @@ $filter_url = (new CUrl('zabbix.php'))->setArgument('action', 'rsm.tests');
 		->addTimeSelector($data['from'], $data['to'])
 		->addVar('action', 'rsm.tests')
 	)
-	->additem((new CTable())
-		->addClass('incidents-info')
-		->addRow([[
-			$object_info,
-			BR(),
-			new CSpan([bold(_('Service')), ': ', '', $service_name])
-		]])
-		->addRow([[
-			[
-				(new CSpan([bold(_('Number of tests downtime')), ':', SPACE, $this->data['downTests']]))->addClass('first-row-element'),
-				new CSpan([bold(_('Number of mimutes downtime')), ':', SPACE, $this->data['downTimeMinutes']])
-			],
-			BR(),
-			[
-				(new CSpan([bold(_('Number of state changes')), ':', SPACE, $this->data['statusChanges']]))->addClass('first-row-element'),
-				new CSpan([bold(_('Total time within selected period')), ':', SPACE, convertUnitsS($this->data['downPeriod'])])
-			]
-		]])
-	)
+	->addItem((new CDiv(
+		(new CTable())
+			->addClass('incidents-info')
+			->addRow([[
+				$object_info,
+				BR(),
+				new CSpan([bold(_('Service')), ': ', '', $service_name])
+			]])
+			->addRow([[
+				[
+					(new CSpan([bold(_('Number of tests downtime')), ':', SPACE, $this->data['downTests']]))->addClass('first-row-element'),
+					new CSpan([bold(_('Number of mimutes downtime')), ':', SPACE, $this->data['downTimeMinutes']])
+				],
+				BR(),
+				[
+					(new CSpan([bold(_('Number of state changes')), ':', SPACE, $this->data['statusChanges']]))->addClass('first-row-element'),
+					new CSpan([bold(_('Total time within selected period')), ':', SPACE, convertUnitsS($this->data['downPeriod'])])
+				]
+			]])
+	))->addClass('table-forms-container'))
 	->addItem([$table, $data['paging']])
 	->show();
 

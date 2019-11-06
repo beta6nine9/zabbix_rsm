@@ -19,7 +19,6 @@
 **/
 
 
-//require_once dirname(__FILE__).'/include/config.inc.php';
 require_once './include/incidents.inc.php';
 require_once './include/incidentdetails.inc.php';
 
@@ -39,12 +38,12 @@ class CControllerIncidentsList extends CController {
 
 	protected function checkInput() {
 		$fields = [
-			'host'			=>	'string',
-			'eventid'		=>	'int32',
+			'host'			=>	'db hosts.host',
+			'eventid'		=>	'db events.eventid',	
 			'type'			=>	'in '.implode(',', [RSM_DNS, RSM_DNSSEC, RSM_RDDS, RSM_RDAP, RSM_EPP]),
 			'filter_set'	=>	'in 1',
 			'filter_rst'	=>	'in 1',
-			'filter_search' =>	'string',
+			'filter_search' =>	'db hosts.host',
 			'from'			=>	'string',
 			'to'			=>	'string'
 		];
@@ -58,9 +57,8 @@ class CControllerIncidentsList extends CController {
 		return $ret;
 	}
 
-	protected function readValues(&$data) {
-		$data = [
-			'title' => _('Incidents'),
+	protected function readValues(array &$data) {
+		$data += [
 			'type' => $this->getInput('type', get_cookie('ui-tabs-1', 0)),
 			'host' => $this->getInput('host', false),
 			'tld' => null,
@@ -360,13 +358,13 @@ class CControllerIncidentsList extends CController {
 			$incidents = [];
 			$last_event_value = [];
 
-			// data generation
+			// Data generation.
 			foreach ($events as $event) {
 				$event_triggerid = null;
 				$get_history = false;
 				$item_info = [];
 
-				// ignore event duplicates
+				// Ignore event duplicates.
 				$currentValue = ($event['value'] == TRIGGER_VALUE_FALSE) ? TRIGGER_VALUE_FALSE : $event['value'];
 				if (isset($last_event_value[$event['objectid']])
 						&& $last_event_value[$event['objectid']] == $currentValue) {
@@ -378,7 +376,7 @@ class CControllerIncidentsList extends CController {
 
 				if ($event['value'] == TRIGGER_VALUE_TRUE) {
 					if (isset($incidents[$i]) && $incidents[$i]['status'] == TRIGGER_VALUE_TRUE) {
-						// get event end time
+						// Get event end time.
 						$add_event = DBfetch(DBselect(
 							'SELECT e.clock,e.objectid,e.value'.
 							' FROM events e'.
@@ -524,7 +522,7 @@ class CControllerIncidentsList extends CController {
 					}
 					else {
 						$i++;
-						// get event start time
+						// Get event start time.
 						$add_event = API::Event()->get([
 							'output' => API_OUTPUT_EXTEND,
 							'objectids' => [$event['objectid']],
@@ -689,7 +687,7 @@ class CControllerIncidentsList extends CController {
 
 			if (isset($incidents[$i]) && $incidents[$i]['status'] == TRIGGER_VALUE_TRUE) {
 				$objectid = $incidents[$i]['objectid'];
-				// get event end time
+				// Get event end time.
 				$event = DBfetch(DBselect(
 					'SELECT e.clock'.
 					' FROM events e'.
@@ -807,10 +805,10 @@ class CControllerIncidentsList extends CController {
 				}
 			}
 
-			// input into rolling week calculation block
+			// Input into rolling week calculation block.
 			$services = [];
 
-			// get deleay items
+			// Get delay items.
 			$item_keys = [];
 			if (isset($data['dns']['events']) || isset($data['dnssec']['events'])) {
 				array_push($item_keys, CALCULATED_ITEM_DNS_DELAY, CALCULATED_DNS_ROLLWEEK_SLA);
@@ -832,7 +830,7 @@ class CControllerIncidentsList extends CController {
 			}
 
 			if ($item_keys) {
-				// get host with calculated items
+				// Get host with calculated items.
 				$rsm = API::Host()->get([
 					'output' => ['hostid'],
 					'filter' => [
@@ -845,11 +843,12 @@ class CControllerIncidentsList extends CController {
 				}
 				else {
 					error(_s('No permissions to referred host "%1$s" or it does not exist!', RSM_HOST));
+					return false;
 				}
 
 				$items = API::Item()->get([
-					'hostids' => $rsm['hostid'],
 					'output' => ['itemid', 'value_type', 'key_'],
+					'hostids' => $rsm['hostid'],
 					'filter' => [
 						'key_' => $item_keys
 					]
@@ -857,24 +856,21 @@ class CControllerIncidentsList extends CController {
 
 				if (count($item_keys) != count($items)) {
 					error(_s('Missing service configuration items at host "%1$s".', RSM_HOST));
+					return false;
 				}
 
-				// set rolling week time
-				//$week_time_from = $this->server_time - $rollWeekSeconds['value'];
-				//$week_time_till = $this->server_time;
-
-				// get SLA items
+				// Get SLA items.
 				foreach ($items as $item) {
 					if ($item['key_'] === CALCULATED_DNS_ROLLWEEK_SLA
 							|| $item['key_'] === CALCULATED_RDDS_ROLLWEEK_SLA
 							|| $item['key_'] === CALCULATED_RDAP_ROLLWEEK_SLA
 							|| $item['key_'] === CALCULATED_EPP_ROLLWEEK_SLA) {
-						// get last value
+						// Get last value.
 						$item_value = API::History()->get([
+							'output' => API_OUTPUT_EXTEND,
 							'itemids' => $item['itemid'],
 							'time_from' => $this->filter_time_from,
 							'history' => $item['value_type'],
-							'output' => API_OUTPUT_EXTEND,
 							'limit' => 1
 						]);
 
@@ -899,7 +895,7 @@ class CControllerIncidentsList extends CController {
 						}
 					}
 					else {
-						// get last value
+						// Get last value.
 						$item_value = API::History()->get([
 							'output' => API_OUTPUT_EXTEND,
 							'itemids' => $item['itemid'],
@@ -966,6 +962,10 @@ class CControllerIncidentsList extends CController {
 
 	protected function doAction() {
 		global $DB;
+
+		$data = [
+			'title' => _('Incidents'),
+		];
 
 		$this->readValues($data);
 

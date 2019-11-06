@@ -240,13 +240,11 @@ $widget
 	)
 	->addItem([
 		$table,
-		(new CDiv())
-			->addItem((new CForm())
-				->addVar('filter_search', $data['filter_search'])
-				->addVar('filter_year', $data['filter_year'])
-				->addVar('filter_month', $data['filter_month'])
-				->additem(new CSubmitButton(_('Download XML'), 'export', 1))
-			)
-			->addClass('action-buttons')
+		(new CRedirectButton('Download XML', (new CUrl('zabbix.php'))
+			->setArgument('action', 'export.rsm.slareports')
+			->setArgument('filter_search', $data['filter_search'])
+			->setArgument('filter_year', $data['filter_year'])
+			->setArgument('filter_month', $data['filter_month'])
+		))->addStyle('margin-top: 5px;')
 	])
 	->show();
