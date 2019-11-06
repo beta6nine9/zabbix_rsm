@@ -21,6 +21,9 @@ parse_opts('type=n', 'delay=n');
 usage() unless (__validate_input() == SUCCESS);
 
 my ($key_parts, $macro, $sql);
+
+db_connect();
+
 if (getopt('type') == 1)
 {
 	$key_parts = ['rsm.dns.udp[%'];
@@ -33,13 +36,26 @@ elsif (getopt('type') == 2)
 }
 elsif (getopt('type') == 3)
 {
-	$key_parts = ['rsm.rdds[%', 'rdap[%'];
+	$key_parts = is_rdap_standalone() ? ['rsm.rdds[%'] : ['rsm.rdds[%', 'rdap[%'];
 	$macro = '{$RSM.RDDS.DELAY}';
 }
 elsif (getopt('type') == 4)
 {
 	$key_parts = ['rsm.epp[%'];
 	$macro = '{$RSM.EPP.DELAY}';
+}
+elsif (getopt('type') == 5)
+{
+	if (is_rdap_standalone())
+	{
+		$key_parts = ['rdap[%'];
+		$macro = '{$RSM.RDAP.DELAY}';
+	}
+	else
+	{
+		print("RDAP is not standalone yet\n");
+		exit;
+	}
 }
 
 if (opt('dry-run'))
@@ -50,7 +66,6 @@ if (opt('dry-run'))
 }
 
 my $sth;
-db_connect();
 
 $sql = "update items set delay=? where type=".ITEM_TYPE_SIMPLE." and key_ like ?";
 
@@ -67,7 +82,7 @@ $sth->execute(getopt('delay'), $macro) or die $dbh->errstr;
 sub __validate_input
 {
 	return E_FAIL unless (getopt('type') and getopt('delay'));
-	return E_FAIL unless (getopt('type') >= 1 and getopt('type') <= 4);
+	return E_FAIL unless (getopt('type') >= 1 and getopt('type') <= 5);
 	return E_FAIL unless (getopt('delay') >= 60 and getopt('delay') <= 3600);
 
 	return SUCCESS;
@@ -81,7 +96,7 @@ change-delay.pl - change delay of a particular service
 
 =head1 SYNOPSIS
 
-change-delay.pl --type <1-4> --delay <60-3600> [--dry-run] [--debug] [--help]
+change-delay.pl --type <1-5> --delay <60-3600> [--dry-run] [--debug] [--help]
 
 =head1 OPTIONS
 
@@ -89,7 +104,7 @@ change-delay.pl --type <1-4> --delay <60-3600> [--dry-run] [--debug] [--help]
 
 =item B<--type> number
 
-Specify number of the service: 1 - DNS UDP, 2 - DNS TCP, 3 - RDDS, 4 - EPP .
+Specify number of the service: 1 - DNS UDP, 2 - DNS TCP, 3 - RDDS, 4 - EPP, 5 - RDAP (if RDAP is standalone).
 
 =item B<--delay> number
 
