@@ -3,13 +3,17 @@
 use strict;
 use warnings;
 
+use DBI;
+use Data::Dumper;
+use Devel::StackTrace;
+use Fcntl qw(:flock SEEK_END);
 use Getopt::Long qw(GetOptionsFromArray);
 use Pod::Usage;
-use DBI;
-use Devel::StackTrace;
-use Data::Dumper;
 
-use constant LOG_FILE                     => '/var/log/zabbix/compliance-notification.log';
+use constant MAX_EXECUTION_TIME           => 60;
+use constant HISTORY_RETRY_DELAY          => 5;
+
+use constant LOG_FILE                     => '/var/log/zabbix/tlds-notification.log';
 use constant ZABBIX_SERVER_CONF_FILE      => '/etc/zabbix/zabbix_server.conf';
 use constant EXTERNAL_NOTIFICATION_SCRIPT => '/opt/zabbix/alertscripts/script.py';
 
@@ -39,6 +43,18 @@ sub main()
 		dbg("command line: %s %s", $0, join(' ', map(index($_, ' ') == -1 ? $_ : "'$_'", @ARGV)));
 	}
 
+	process_event(getopt('send-to'), getopt('event-id'));
+
+	finalize();
+}
+
+sub process_event($)
+{
+	my $send_to  = shift;
+	my $event_id = shift;
+
+	info("event id: %d", $event_id);
+
 	my $rows;
 
 	$rows = db_select(
@@ -54,8 +70,7 @@ sub main()
 			" events" .
 			" left join triggers on triggers.triggerid = events.objectid" .
 		" where" .
-			" events.eventid=?", [getopt('event-id')]);
-
+			" events.eventid=?", [$event_id]);
 
 	fail("event not found") if (@{$rows} == 0);
 	fail("multiple events found") if (@{$rows} > 1);
@@ -66,6 +81,18 @@ sub main()
 	fail("unexpected event object") if ($event_object != EVENT_OBJECT_TRIGGER);
 	fail("unexpected event value") if ($event_value != TRIGGER_VALUE_FALSE && $event_value != TRIGGER_VALUE_TRUE);
 
+	if ($event_value == TRIGGER_VALUE_FALSE)
+	{
+		my $query = "select exists(select * from events where objectid=? and eventid<?)";
+		my $params = [$trigger_id, $event_id];
+
+		if (!db_select_value($query, $params))
+		{
+			info("skipping because this is the first OK event after creating new trigger");
+			return;
+		}
+	}
+
 	$rows = db_select("select distinct itemid from functions where triggerid=?", [$trigger_id]);
 
 	fail("itemid not found in trigger functions") if (@{$rows} == 0);
@@ -75,7 +102,6 @@ sub main()
 		"select" .
 			" items.itemid," .
 			"items.key_," .
-			"items.name," .
 			"hosts.hostid," .
 			"hosts.name" .
 		" from" .
@@ -84,15 +110,29 @@ sub main()
 		" where" .
 			" items.itemid=?", [$rows->[0][0]]);
 
-	my ($item_id, $item_key, $item_name, $host_id, $host_name) = @{$rows->[0]};
+	my ($item_id, $item_key, $host_id, $host_name) = @{$rows->[0]};
 
 	dbg("event_clock = %s", $event_clock // 'UNDEF');
+	dbg("event_ns    = %s", $event_ns    // 'UNDEF');
 	dbg("event_value = %s", $event_value // 'UNDEF');
 	dbg("description = %s", $description // 'UNDEF'); # e.g., "exceeded 10% of allowed", for extracting percentage
 	dbg("item_key    = %s", $item_key    // 'UNDEF'); # to find out what type of trigger it is
-	dbg("item_name   = %s", $item_name   // 'UNDEF'); # for old-style triggers, "tld#{TRIGGER.STATUS}#{HOST.NAME1}#{ITEM.NAME1}#{ITEM.VALUE1}"
 	dbg("host_id     = %s", $host_id     // 'UNDEF');
 	dbg("host_name   = %s", $host_name   // 'UNDEF');
+
+	my $data = get_trigger_data($event_clock, $event_ns, $description, $host_id, $item_id, $item_key);
+
+	notify($send_to, $event_value, $event_clock, $host_name, $data);
+}
+
+sub get_trigger_data()
+{
+	my $event_clock = shift;
+	my $event_ns    = shift;
+	my $description = shift;
+	my $host_id     = shift;
+	my $item_id     = shift;
+	my $item_key    = shift;
 
 	my $data;
 
@@ -153,34 +193,63 @@ sub main()
 	}
 	else
 	{
-		my $item_value_type = db_select_value("select value_type from items where itemid=?", [$item_id]);
+		my $row = db_select_row("select name,value_type,units,valuemapid from items where itemid=?", [$item_id]);
+
+		my ($item_name, $item_value_type, $item_units, $value_map_id) = @{$row};
 
 		my $history_table = {
 			ITEM_VALUE_TYPE_FLOAT , 'history',
 			ITEM_VALUE_TYPE_UINT64, 'history_uint',
 		}->{$item_value_type};
 
-		$data = [
-			$item_name,
-			get_history($history_table, $item_id, $event_clock, $event_ns),
-		];
+		my $value = get_history($history_table, $item_id, $event_clock, $event_ns);
+
+		if ($item_value_type == ITEM_VALUE_TYPE_FLOAT && $item_units eq '%')
+		{
+			$value = sprintf("%.2f", $value);
+			$value =~ s/\.?0+$//;
+			$value = sprintf("%s %%", $value);
+		}
+		elsif ($item_value_type == ITEM_VALUE_TYPE_UINT64 && defined($value_map_id))
+		{
+			my $query = "select newvalue from mappings where valuemapid=? and value=?";
+			my $params = [$value_map_id, $value];
+
+			my $new_value = db_select_value($query, $params);
+
+			$value = sprintf("%s (%s)", $new_value, $value);
+		}
+
+		$data = [$item_name, $value];
 	}
 
-	notify($event_value, $event_clock, $host_name, $data);
+	return $data;
+}
 
-	finalize();
+sub set_max_execution_time($)
+{
+	my $max_execution_time = shift;
+
+	$SIG{"ALRM"} = sub()
+	{
+		local *__ANON__ = 'SIGALRM-handler';
+
+		fail("received ALARM signal");
+	};
+
+	alarm($max_execution_time);
 }
 
 sub initialize()
 {
-	open_log();
+	set_max_execution_time(MAX_EXECUTION_TIME);
+	initialize_log(!opt('nolog') && !opt('dry-run'));
 	db_connect();
 }
 
 sub finalize()
 {
 	db_disconnect();
-	close_log();
 }
 
 sub get_history()
@@ -193,7 +262,24 @@ sub get_history()
 	my $query = "select value from $table where itemid=? and clock=? and ns=?";
 	my $params = [$item_id, $clock, $ns];
 
-	return db_select_value($query, $params);
+	my $value;
+
+	while (!defined($value))
+	{
+		my $data = db_select_col($query, $params);
+
+		if (@{$data})
+		{
+			$value = $data->[0];
+		}
+		else
+		{
+			info("didn't find data in history table (table:$table, itemid:$item_id, clock:$clock, ns:$ns), sleeping for ${\HISTORY_RETRY_DELAY} second(s)");
+			select(undef, undef, undef, HISTORY_RETRY_DELAY);
+		}
+	}
+
+	return $value;
 }
 
 sub get_item_id($$)
@@ -209,6 +295,7 @@ sub get_item_id($$)
 
 sub notify($$$$)
 {
+	my $send_to     = shift;
 	my $event_value = shift;
 	my $event_clock = shift;
 	my $host_name   = shift;
@@ -223,7 +310,7 @@ sub notify($$$$)
 	my $event_clock_str = sprintf("%.4d.%.2d.%.2d %.2d:%.2d:%.2d UTC", $year + 1900, $mon + 1, $mday, $hour, $min, $sec);
 
 	my @args = (
-		getopt('send-to'),
+		$send_to,
 		join('#', ('tld', $event_value_str, $host_name, @{$data})),
 		$event_clock_str,
 	);
@@ -269,8 +356,6 @@ use constant LOG_LEVEL_FAILURE => 4;
 
 my $log_time_str;
 my $log_time = 0;
-
-my $log_file_handle;
 
 my $log_debug_messages = 0;
 
@@ -320,10 +405,24 @@ sub log_debug_messages(;$)
 	return $log_debug_messages_tmp;
 }
 
+sub initialize_log($)
+{
+	my $use_log_file = shift;
+
+	if ($use_log_file)
+	{
+		close(STDOUT) or fail("cannot close STDOUT: $!");
+		close(STDERR) or fail("cannot close STDERR: $!");
+
+		open(STDOUT, '>>', LOG_FILE) or fail("cannot open ${\LOG_FILE}: $!");
+		open(STDERR, '>>', LOG_FILE) or fail("cannot open ${\LOG_FILE}: $!");
+	}
+}
+
 sub __log
 {
 	my $message_log_level = shift;
-	my $message = (@_ == 1 ? shift : sprintf(shift, @_)) . "\n";
+	my $message = (@_ <= 1 ? shift // "" : sprintf(shift, @_)) . "\n";
 
 	if ($message_log_level != LOG_LEVEL_DEBUG && $message_log_level != LOG_LEVEL_INFO)
 	{
@@ -355,37 +454,14 @@ sub __log
 
 	my $output_handle;
 
-	if (defined($log_file_handle))
-	{
-		$output_handle = $log_file_handle;
-	}
-	elsif ($message_log_level == LOG_LEVEL_DEBUG || $message_log_level == LOG_LEVEL_INFO)
-	{
-		$output_handle = *STDOUT;
-	}
-	elsif ($message_log_level == LOG_LEVEL_WARNING || $message_log_level == LOG_LEVEL_FAILURE)
-	{
-		$output_handle = *STDERR;
-	}
+	$output_handle = *STDOUT if ($message_log_level == LOG_LEVEL_DEBUG);
+	$output_handle = *STDOUT if ($message_log_level == LOG_LEVEL_INFO);
+	$output_handle = *STDERR if ($message_log_level == LOG_LEVEL_WARNING);
+	$output_handle = *STDERR if ($message_log_level == LOG_LEVEL_FAILURE);
 
+	flock($output_handle, LOCK_EX); # ignore errors, don't fail() to avoid recursion
 	print($output_handle $message =~ s/^/$message_prefix /mgr);
-}
-
-sub open_log()
-{
-	if (!opt('nolog') && !opt('dry-run'))
-	{
-		open($log_file_handle, '>>', LOG_FILE) or fail("cannot open ${\LOG_FILE}: $!");
-	}
-}
-
-sub close_log()
-{
-	if (defined($log_file_handle))
-	{
-		close($log_file_handle) or fail("cannot close ${\LOG_FILE}: $!");
-		undef($log_file_handle);
-	}
+	flock($output_handle, LOCK_UN); # ignore errors, don't fail() to avoid recursion
 }
 
 ################################################################################
