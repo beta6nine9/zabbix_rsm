@@ -19,8 +19,6 @@
 **/
 
 
-$widget = (new CWidget())->setTitle(_('Details of particular test'));
-
 // Create table header.
 $row_1 = (new CTag('tr', true))
 	->addItem((new CTag('th', true, _('Probe ID')))->setAttribute('rowspan', 3)
@@ -240,38 +238,44 @@ if ($data['type'] == RSM_DNS) {
 	$table->addRow($row);
 }
 
-// Construct details.
-$details = [
-	_('TLD') => $data['tld']['host'],
-	_('Service') => $data['slvItem']['name'],
-	_('Test time') => date(DATE_TIME_FORMAT_SECONDS, $data['time']),
-	_('Test result') => [$data['testResult'], ' ', _s('(calculated at %1$s)', date(DATE_TIME_FORMAT_SECONDS, $data['time'] + RSM_ROLLWEEK_SHIFT_BACK))],
-	_('Note') => _(
-		'The following table displays the data that has been received by the central node, some of'.
-		' the values may not have been available at the time of the calculation of the "Test result"'
+$test_result = new CSpan($data['testResultLabel']);
+if ($data['testResult'] === null) {
+	$test_result->addClass(ZBX_STYLE_GREY);
+}
+elseif ($data['testResult'] == PROBE_DOWN) {
+	$test_result->addClass(ZBX_STYLE_RED);
+}
+else {
+	$test_result->addClass(ZBX_STYLE_GREEN);
+}
+
+(new CWidget())
+	->setTitle($data['title'])
+	->additem((new CDiv())
+		->addClass(ZBX_STYLE_TABLE_FORMS_CONTAINER)
+		->addItem((new CTable())
+			->addClass('incidents-info')
+			->addRow([
+				gen_details_item([
+					_('TLD') => $data['tld']['host'],
+					_('Service') => $data['slvItem']['name'],
+					_('Test time') => date(DATE_TIME_FORMAT_SECONDS, $data['time']),
+					_('Test result') => [$test_result, ' ', _s('(calculated at %1$s)', date(DATE_TIME_FORMAT_SECONDS, $data['time'] + RSM_ROLLWEEK_SHIFT_BACK))],
+					_('Note') => _(
+						'The following table displays the data that has been received by the central node, some of'.
+						' the values may not have been available at the time of the calculation of the "Test result"'
+					)
+				]),
+				gen_details_item([
+					_('Probes total') => $data['totalProbes'],
+					_('Probes offline') => $offline_probes,
+					_('Probes with No Result') => $no_result_probes,
+					_('Probes with Result') => $data['totalProbes'] - $offline_probes - $no_result_probes,
+					_('Probes Up') => $data['totalProbes'] - $offline_probes - $no_result_probes - $down_probes,
+					_('Probes Down') => $down_probes,
+				]),
+			])
+		)
 	)
-];
-
-$right_details = [
-	_('Probes total') => $data['totalProbes'],
-	_('Probes offline') => $offline_probes,
-	_('Probes with No Result') => $no_result_probes,
-	_('Probes with Result') => $data['totalProbes'] - $offline_probes - $no_result_probes,
-	_('Probes Up') => $data['totalProbes'] - $offline_probes - $no_result_probes - $down_probes,
-	_('Probes Down') => $down_probes,
-];
-
-$widget->additem((new CDiv())
-	->addClass(ZBX_STYLE_TABLE_FORMS_CONTAINER)
-	->addItem((new CTable(null))
-		->addClass('incidents-info')
-		->addRow([
-			gen_details_item($details),
-			gen_details_item($right_details),
-		])
-	)
-);
-
-$widget->addItem($table);
-
-return $widget;
+	->addItem($table)
+	->show();

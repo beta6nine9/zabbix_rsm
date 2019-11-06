@@ -164,6 +164,7 @@ class CRouter {
 		'rsm.incidentdetails'			=> ['CControllerIncidentDetails',					'layout.htmlpage',		'rsm.incidentdetails.list'],
 		'rsm.tests'						=> ['CControllerTests',								'layout.htmlpage',		'rsm.tests.list'],
 		'rsm.particulartests'			=> ['CControllerParticularTests',					'layout.htmlpage',		'rsm.particulartests.list'],
+		'rsm.aggregatedetails'			=> ['CControllerAggregateDetails',					'layout.htmlpage',		'rsm.aggregatedetails.list.php'],
 	];
 
 	public function __construct($action) {
