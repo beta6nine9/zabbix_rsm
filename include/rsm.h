@@ -7,7 +7,7 @@
 #define RSM_EPP_SENSDATA_MAX	8192
 #define RSM_EPP_PASSPHRASE_MAX	64
 
-int	rsm_ssl_init();
+int	rsm_ssl_init(void);
 int	get_random(void *data, int bytes);
 void	zbx_ssl_get_error(char *err, size_t err_size);
 int	encrypt(const EVP_CIPHER *cipher, unsigned char *plaintext, int plaintext_len, unsigned char *key,

@@ -243,7 +243,7 @@ static void	rsm_logf(FILE *log_fd, int level, const char *fmt, ...)
 	if (NULL == log_fd)
 	{
 		zbx_vsnprintf(fmt_buf, sizeof(fmt_buf), fmt, args);
-		__zbx_zabbix_log(level, fmt_buf);
+		__zbx_zabbix_log(level, "%s", fmt_buf);
 		goto out;
 	}
 
@@ -283,7 +283,7 @@ static void	rsm_log(FILE *log_fd, int level, const char *text)
 	/* fall back to regular Zabbix log */
 	if (NULL == log_fd)
 	{
-		__zbx_zabbix_log(level, text);
+		__zbx_zabbix_log(level, "%s", text);
 		return;
 	}
 
@@ -666,32 +666,6 @@ static void	zbx_destroy_owners(zbx_vector_ptr_t *owners)
 #define ZBX_EC_DNS_UDP_INTERNAL_IP_UNSUP	ZBX_EC_DNS_UDP_INTERNAL_GENERAL
 #define ZBX_EC_DNS_TCP_INTERNAL_IP_UNSUP	ZBX_EC_DNS_TCP_INTERNAL_GENERAL
 #define ZBX_EC_EPP_INTERNAL_RES_CATCHALL	ZBX_EC_EPP_INTERNAL_GENERAL
-
-#define ZBX_DEFINE_INTERNAL_ERROR_TO(__interface)					\
-static int	zbx_internal_error_to_ ## __interface (zbx_internal_error_t err)	\
-{											\
-	switch (err)									\
-	{										\
-		case ZBX_INTERNAL_GENERAL:						\
-			return ZBX_EC_ ## __interface ## _INTERNAL_GENERAL;		\
-		case ZBX_INTERNAL_IP_UNSUP:						\
-			return ZBX_EC_ ## __interface ## _INTERNAL_IP_UNSUP;		\
-		case ZBX_INTERNAL_RES_CATCHALL:						\
-			return ZBX_EC_ ## __interface ## _INTERNAL_RES_CATCHALL;	\
-		default:								\
-			THIS_SHOULD_NEVER_HAPPEN;					\
-			return ZBX_EC_ ## __interface ## _INTERNAL_GENERAL;		\
-	}										\
-}
-
-ZBX_DEFINE_INTERNAL_ERROR_TO(DNS_UDP)
-ZBX_DEFINE_INTERNAL_ERROR_TO(DNS_TCP)
-ZBX_DEFINE_INTERNAL_ERROR_TO(RDDS43)
-ZBX_DEFINE_INTERNAL_ERROR_TO(RDDS80)
-ZBX_DEFINE_INTERNAL_ERROR_TO(RDAP)
-ZBX_DEFINE_INTERNAL_ERROR_TO(EPP)
-
-#undef ZBX_DEFINE_INTERNAL_ERROR_TO
 
 #define ZBX_EC_DNS_TCP_NS_NOREPLY	ZBX_EC_DNS_TCP_INTERNAL_GENERAL;	/* only UDP */
 #define ZBX_EC_DNS_UDP_NS_ECON		ZBX_EC_DNS_UDP_INTERNAL_GENERAL;	/* only TCP */
@@ -1090,10 +1064,10 @@ static int	zbx_verify_rrsigs(const ldns_pkt *pkt, ldns_rr_type covered_type, con
 					zbx_covered_to_str(covered_type),
 					owner_buf,
 					error_description,
-					ldns_rr_list_rr_count(rrset),
+					(unsigned int)ldns_rr_list_rr_count(rrset),
 					zbx_covered_to_str(covered_type),
-					ldns_rr_list_rr_count(rrsigs),
-					ldns_rr_list_rr_count(keys),
+					(unsigned int)ldns_rr_list_rr_count(rrsigs),
+					(unsigned int)ldns_rr_list_rr_count(keys),
 					ldns_get_errorstr_by_id(status));
 
 			goto out;
@@ -2284,7 +2258,7 @@ static FILE	*open_item_log(const char *host, const char *tld, const char *name, 
 	if (CONFIG_LOG_FILE == p)
 		file_name = zbx_strdup(NULL, RSM_DEFAULT_LOGDIR);
 	else
-		file_name = zbx_dsprintf(NULL, "%.*s", p - CONFIG_LOG_FILE, CONFIG_LOG_FILE);
+		file_name = zbx_dsprintf(NULL, "%.*s", (int)(p - CONFIG_LOG_FILE), CONFIG_LOG_FILE);
 
 	probe = get_probe_from_host(host);
 
@@ -3471,6 +3445,8 @@ static int	zbx_pre_status_error_to_ ## __interface (pre_status_error_t ec_pre_st
 		case ZBX_EC_PRE_STATUS_ERROR_EMAXREDIRECTS:					\
 			return ZBX_EC_ ## __interface ## _EMAXREDIRECTS;			\
 	}											\
+	THIS_SHOULD_NEVER_HAPPEN;								\
+	return 0;										\
 }
 
 ZBX_DEFINE_HTTP_PRE_STATUS_ERROR_TO(RDDS80)
@@ -3488,6 +3464,8 @@ static int	zbx_http_error_to_ ## __interface (zbx_http_error_t ec_http)						\
 		case HTTP_STATUS_ERROR:											\
 			return ZBX_EC_ ## __interface ## _HTTP_BASE - map_http_code(ec_http.error.response_code);	\
 	}														\
+	THIS_SHOULD_NEVER_HAPPEN;											\
+	return 0;													\
 }
 
 ZBX_DEFINE_HTTP_ERROR_TO(RDDS80)
@@ -3516,7 +3494,7 @@ static int	zbx_split_url(const char *url, char **proto, char **domain, int *port
 	}
 	else
 	{
-		zbx_snprintf(err, err_size, "unrecognized protocol in URL \"url\"", url);
+		zbx_snprintf(err, err_size, "unrecognized protocol in URL \"%s\"", url);
 		return FAIL;
 	}
 
@@ -3526,7 +3504,7 @@ static int	zbx_split_url(const char *url, char **proto, char **domain, int *port
 
 		if (0 == isdigit(*(tmp + 1)))
 		{
-			zbx_snprintf(err, err_size, "invalid port in URL \"url\"", url);
+			zbx_snprintf(err, err_size, "invalid port in URL \"%s\"", url);
 			return FAIL;
 		}
 
@@ -4614,7 +4592,7 @@ static int	command_update(const char *epp_commands, const char *name, SSL *ssl, 
 	}
 
 	time(&now);
-	zbx_snprintf(tsbuf, sizeof(tsbuf), "%llu", now);
+	zbx_snprintf(tsbuf, sizeof(tsbuf), "%llu", (unsigned long long)now);
 
 	zbx_snprintf(buf, sizeof(buf), "%s.%s", epp_testprefix, domain);
 
@@ -5751,7 +5729,7 @@ static int	zbx_check_dns_connection(const ldns_resolver *res, ldns_rdf *query_rd
 		goto out;
 	}
 
-	if (0 != (flags & CHECK_DNS_CONN_RTT) && ldns_pkt_querytime(pkt) > reply_ms)
+	if (0 != (flags & CHECK_DNS_CONN_RTT) && ldns_pkt_querytime(pkt) > (uint32_t)reply_ms)
 	{
 		zbx_snprintf(err, err_size, "query RTT %d over limit (%d)", ldns_pkt_querytime(pkt), reply_ms);
 		goto out;
@@ -5778,7 +5756,7 @@ int	check_rsm_probe_status(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RE
 	ldns_rdf		*query_rdf = NULL;
 	FILE			*log_fd = NULL;
 	unsigned int		extras = RESOLVER_EXTRAS_DNSSEC;
-	int			i, ipv4_enabled = 0, ipv6_enabled = 0, min_servers, reply_ms, online_delay, dns_res,
+	int			i, ipv4_enabled = 0, ipv6_enabled = 0, min_servers, reply_ms, online_delay,
 				ok_servers, ret, status = ZBX_EC_PROBE_UNSUPPORTED;
 
 	if (3 != request->nparam)
