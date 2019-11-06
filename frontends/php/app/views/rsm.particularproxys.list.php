@@ -19,36 +19,30 @@
 **/
 
 
-$widget = (new CWidget())->setTitle(_('Test result from particular proxy'));
+$particular_proxys_table = (new CTableInfo())
+	->setNoDataMessage(_('No particular proxy found.'))
+	->setHeader([
+		_('NS name'),
+		_('IP'),
+		_('Ms')
+	]);
 
-$headers = [
-	_('NS name'),
-	_('IP'),
-	_('Ms')
-];
-$noData = _('No particular proxy found.');
-
-$particularProxysInfoTable = (new CTable(null))->addClass('incidents-info');
-
-$particularProxysTable = new CTableInfo($noData);
-$particularProxysTable->setHeader($headers);
-
-// list generation
-$currentNs = null;
-foreach ($this->data['proxys'] as $proxy) {
-	// remove probe name from list
-	if ($proxy['ns'] === $currentNs) {
+// List generation.
+$current_ns = null;
+foreach ($data['proxys'] as $proxy) {
+	// Remove probe name from list.
+	if ($proxy['ns'] === $current_ns) {
 		$proxy['ns'] = SPACE;
 	}
 	else {
-		$currentNs = $proxy['ns'];
+		$current_ns = $proxy['ns'];
 	}
 
 	if ($proxy['ms']) {
-		if (!$this->data['minMs']) {
+		if (!$data['minMs']) {
 			$ms = $proxy['ms'];
 		}
-		elseif ($proxy['ms'] < $this->data['minMs']) {
+		elseif ($proxy['ms'] < $data['minMs']) {
 			$ms = (new CSpan($proxy['ms']))->addClass('green');
 		}
 		else {
@@ -58,59 +52,56 @@ foreach ($this->data['proxys'] as $proxy) {
 	else {
 		$ms = '-';
 	}
-	$row = [
+
+	$particular_proxys_table->addRow([
 		$proxy['ns'],
 		$proxy['ip'],
 		$ms
-	];
-	$particularProxysTable->addRow($row);
+	]);
 }
 
-$particularProxys = [
-	new CSpan([bold(_('TLD')), ':', SPACE, $this->data['tld']['name']]),
+$particular_proxys = [
+	new CSpan([bold(_('TLD')), ': ', $data['tld']['name']]),
 	BR(),
-	new CSpan([bold(_('Service')), ':', SPACE, $this->data['slvItem']['name']]),
+	new CSpan([bold(_('Service')), ': ', $data['slvItem']['name']]),
 	BR(),
-	new CSpan([bold(_('Test time')), ':', SPACE, date(DATE_TIME_FORMAT_SECONDS, $this->data['time'])]),
+	new CSpan([bold(_('Test time')), ': ', date(DATE_TIME_FORMAT_SECONDS, $data['time'])]),
 	BR(),
-	new CSpan([bold(_('Probe')), ':', SPACE, $this->data['probe']['name']]),
+	new CSpan([bold(_('Probe')), ': ', $data['probe']['name']]),
 ];
 
-if ($this->data['type'] == RSM_DNS) {
-	if ($this->data['testResult'] == true) {
-		$testResult = (new CSpan(_('Up')))->addClass('green');
+if ($data['type'] == RSM_DNS) {
+	if ($data['testResult'] == true) {
+		$test_result = (new CSpan(_('Up')))->addClass('green');
 	}
-	elseif ($this->data['testResult'] == false) {
-		$testResult = (new CSpan(_('Down')))->addClass('red');
+	elseif ($data['testResult'] == false) {
+		$test_result = (new CSpan(_('Down')))->addClass('red');
 	}
 	else {
-		$testResult = (new CSpan(_('No result')))->addClass('grey');
+		$test_result = (new CSpan(_('No result')))->addClass('grey');
 	}
-	array_push($particularProxys, [BR(),
+
+	array_push($particular_proxys, [BR(),
 		new CSpan([
 			bold(_('Test result')),
-			':',
-			SPACE,
-			$testResult
+			': ',
+			$test_result
 		])
 	]);
 }
 
-$particularProxysInfoTable->addRow(array($particularProxys));
-$particularProxysInfoTable->addRow(array(array(
-	new CSpan(array(bold(_('Total number of NS')), ':', SPACE, $this->data['totalNs']), 'first-row-element'),
-	BR(),
-	new CSpan(array(bold(_('Number of NS with positive result')), ':', SPACE, $this->data['positiveNs']),
-		'second-row-element'
-	),
-	BR(),
-	new CSpan(array(bold(_('Number of NS with negative result')), ':', SPACE,
-		$this->data['totalNs'] - $this->data['positiveNs']
-	))
-)));
-
-$widget->additem($particularProxysInfoTable);
-
-$widget->additem($particularProxysTable);
-
-return $widget;
+(new CWidget())
+	->setTitle($data['title'])
+	->additem((new CTable())
+		->addClass('incidents-info')
+		->addRow([$particular_proxys])
+		->addRow([[
+			new CSpan([bold(_('Total number of NS')), ': ', $data['totalNs']], 'first-row-element'),
+			BR(),
+			new CSpan([bold(_('Number of NS with positive result')), ': ', $data['positiveNs']], 'second-row-element'),
+			BR(),
+			new CSpan([bold(_('Number of NS with negative result')), ': ', $data['totalNs'] - $data['positiveNs']])
+		]])
+	)
+	->additem($particular_proxys_table)
+	->show();

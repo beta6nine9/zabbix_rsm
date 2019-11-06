@@ -19,290 +19,286 @@
 **/
 
 
-require_once dirname(__FILE__).'/include/config.inc.php';
-require_once dirname(__FILE__).'/include/incidentdetails.inc.php';
+require_once './include/config.inc.php';
+require_once './include/incidentdetails.inc.php';
 
-$page['title'] = _('Test result from particular proxy');
-$page['file'] = 'rsm.particularproxys.php';
-$page['hist_arg'] = ['groupid', 'hostid'];
+class CControllerParticularProxy extends CController {
 
-require_once dirname(__FILE__).'/include/page_header.php';
-
-//		VAR			TYPE	OPTIONAL FLAGS	VALIDATION	EXCEPTION
-$fields = array(
-	'host' =>		array(T_ZBX_STR, O_OPT,	P_SYS,	null,	null),
-	'type' =>		array(T_ZBX_INT, O_OPT,	null,	IN('0,1'),	null),
-	'probe' =>		array(T_ZBX_STR, O_OPT,	P_SYS,	null,	null),
-	'time' =>		array(T_ZBX_INT, O_OPT,	null,	null,	null),
-	'slvItemId' =>	array(T_ZBX_INT, O_OPT,	P_SYS,	DB_ID,	null)
-);
-check_fields($fields);
-
-// Report is not available in registrar mode.
-if (get_rsm_monitoring_type() === MONITORING_TARGET_REGISTRAR) {
-	redirect('rsm.particulartests.php?host='.getRequest('host', ''));
-}
-
-$data['proxys'] = [];
-$data['host'] = null;
-$data['time'] = null;
-$data['slvItemId'] = null;
-$data['type'] = null;
-$data['probe'] = null;
-
-if (getRequest('host') && getRequest('time') && getRequest('slvItemId') && getRequest('type') !== null
-		&& getRequest('probe')) {
-	$data['host'] = getRequest('host');
-	$data['time'] = getRequest('time');
-	$data['slvItemId'] = getRequest('slvItemId');
-	$data['type'] = getRequest('type');
-	$data['probe'] = getRequest('probe');
-	CProfile::update('web.rsm.particularproxys.host', $data['host'], PROFILE_TYPE_STR);
-	CProfile::update('web.rsm.particularproxys.time', $data['time'], PROFILE_TYPE_ID);
-	CProfile::update('web.rsm.particularproxys.slvItemId', $data['slvItemId'], PROFILE_TYPE_ID);
-	CProfile::update('web.rsm.particularproxys.type', $data['type'], PROFILE_TYPE_ID);
-	CProfile::update('web.rsm.particularproxys.probe', $data['probe'], PROFILE_TYPE_STR);
-}
-elseif (!getRequest('host') && !getRequest('time') && !getRequest('slvItemId') && getRequest('type') === null
-		&& !getRequest('probe')) {
-	$data['host'] = CProfile::get('web.rsm.particularproxys.host');
-	$data['time'] = CProfile::get('web.rsm.particularproxys.time');
-	$data['slvItemId'] = CProfile::get('web.rsm.particularproxys.slvItemId');
-	$data['type'] = CProfile::get('web.rsm.particularproxys.type');
-	$data['probe'] = CProfile::get('web.rsm.particularproxys.probe');
-}
-
-// check
-if ($data['host'] && $data['time'] && $data['slvItemId'] && $data['type'] !== null && $data['probe']) {
-	$testTimeFrom = mktime(
-		date('H', $data['time']),
-		date('i', $data['time']),
-		0,
-		date('n', $data['time']),
-		date('j', $data['time']),
-		date('Y', $data['time'])
-	);
-
-	// get TLD
-	$tld = API::Host()->get(array(
-		'tlds' => true,
-		'output' => array('hostid', 'host', 'name'),
-		'filter' => array(
-			'host' => $data['host']
-		)
-	));
-
-	if ($tld) {
-		$data['tld'] = reset($tld);
-	}
-	else {
-		access_deny();
+	protected function init() {
+		$this->disableSIDValidation();
 	}
 
-	// get slv item
-	$slvItems = API::Item()->get(array(
-		'itemids' => $data['slvItemId'],
-		'output' => array('name')
-	));
+	protected function checkPermissions() {
+		$valid_users = [USER_TYPE_READ_ONLY, USER_TYPE_ZABBIX_USER, USER_TYPE_POWER_USER, USER_TYPE_COMPLIANCE,
+			USER_TYPE_ZABBIX_ADMIN, USER_TYPE_SUPER_ADMIN];
 
-	if ($slvItems) {
-		$data['slvItem'] = reset($slvItems);
-	}
-	else {
-		access_deny();
+		return in_array($this->getUserType(), $valid_users);
 	}
 
-	// get probe
-	$probe = API::Host()->get(array(
-		'output' => array('hostid', 'host', 'name'),
-		'filter' => array(
-			'host' => $data['probe']
-		)
-	));
-
-	if ($probe) {
-		$data['probe'] = reset($probe);
-	}
-	else {
-		access_deny();
-	}
-
-	// get host with calculated items
-	$rsm = API::Host()->get(array(
-		'output' => array('hostid'),
-		'filter' => array(
-			'host' => RSM_HOST
-		)
-	));
-
-	if ($rsm) {
-		$rsm = reset($rsm);
-	}
-	else {
-		show_error_message(_s('No permissions to referred host "%1$s" or it does not exist!', RSM_HOST));
-		require_once dirname(__FILE__).'/include/page_footer.php';
-		exit;
-	}
-
-	$macroItemKey[] = CALCULATED_ITEM_DNS_UDP_RTT_HIGH;
-
-	if ($data['type'] == RSM_DNS) {
-		$macroItemKey[] = CALCULATED_ITEM_DNS_DELAY;
-		$macroItemKey[] = CALCULATED_ITEM_DNS_AVAIL_MINNS;
-	}
-	elseif ($data['type'] == RSM_DNSSEC) {
-		$macroItemKey[] = CALCULATED_ITEM_DNS_DELAY;
-	}
-	elseif ($data['type'] == RSM_RDDS) {
-		$macroItemKey[] = CALCULATED_ITEM_RDDS_DELAY;
-	}
-	else {
-		$macroItemKey[] = CALCULATED_ITEM_EPP_DELAY;
-	}
-
-	// get macros old value
-	$macroItems = API::Item()->get(array(
-		'hostids' => $rsm['hostid'],
-		'output' => array('itemid', 'value_type', 'key_'),
-		'filter' => array(
-			'key_' => $macroItemKey
-		)
-	));
-
-	// check items
-	if (count($macroItems) != count($macroItemKey)) {
-		show_error_message(_s('Missing calculated items at host "%1$s"!', RSM_HOST));
-		require_once dirname(__FILE__).'/include/page_footer.php';
-		exit;
-	}
-
-	// get time till
-	foreach ($macroItems as $key => $macroItem) {
-		if ($macroItem['key_'] == CALCULATED_ITEM_DNS_DELAY || $macroItem['key_'] == CALCULATED_ITEM_RDDS_DELAY
-				|| $macroItem['key_'] == CALCULATED_ITEM_EPP_DELAY) {
-			$macroItemValue = API::History()->get(array(
-				'output' => API_OUTPUT_EXTEND,
-				'itemids' => $macroItem['itemid'],
-				'time_from' => $testTimeFrom,
-				'history' => $macroItem['value_type'],
-				'limit' => 1
-			));
-
-			$macroItemValue = reset($macroItemValue);
-
-			$testTimeTill = $testTimeFrom + $macroItemValue['value'] - 1;
-
-			unset($macroItems[$key]);
-		}
-	}
-
-	foreach ($macroItems as $macroItem) {
-		$macroItemValue = API::History()->get(array(
-			'itemids' => $macroItem['itemid'],
-			'time_from' => $testTimeFrom,
-			'time_till' => $testTimeTill,
-			'history' => $macroItem['value_type'],
-			'output' => API_OUTPUT_EXTEND
-		));
-
-		$macroItemValue = reset($macroItemValue);
-
-		if ($macroItem['key_'] == CALCULATED_ITEM_DNS_UDP_RTT_HIGH) {
-			$dnsUdpRtt = $macroItemValue['value'];
-		}
-		else {
-			$minNs = $macroItemValue['value'];
-		}
-	}
-
-	// get test result for DNS service
-	if ($data['type'] == RSM_DNS) {
-		$probeResultItems = API::Item()->get(array(
-			'output' => array('itemid', 'value_type', 'key_'),
-			'hostids' => $data['probe']['hostid'],
-			'filter' => array(
-				'key_' => PROBE_DNS_UDP_ITEM
-			),
-			'monitored' => true
-		));
-
-		$probeResultItem = reset($probeResultItems);
-
-		$itemValue = API::History()->get(array(
-			'output' => API_OUTPUT_EXTEND,
-			'itemids' => $probeResultItem['itemid'],
-			'time_from' => $testTimeFrom,
-			'time_till' => $testTimeTill,
-			'history' => $probeResultItem['value_type']
-
-		));
-
-		if ($itemValue) {
-			$itemValue = reset($itemValue);
-			$data['testResult'] = ($itemValue['value'] >= $minNs) ? true : false;
-		}
-		else {
-			$data['testResult'] = null;
-		}
-	}
-
-	// get items
-	$probeItems = API::Item()->get(array(
-		'output' => array('itemid', 'key_', 'hostid', 'valuemapid', 'units', 'value_type'),
-		'hostids' => $data['probe']['hostid'],
-		'search' => array(
-			'key_' => PROBE_DNS_UDP_ITEM_RTT
-		),
-		'startSearch' => true,
-		'monitored' => true,
-		'preservekeys' => true
-	));
-
-	$totalNs = [];
-	$negativeNs = [];
-	foreach ($probeItems as $probeItem) {
-		preg_match('/^[^\[]+\[([^\]]+)]$/', $probeItem['key_'], $matches);
-		$nsValues = explode(',', $matches[1]);
-
-		// get NS values
-		$itemValue = API::History()->get(array(
-			'itemids' => $probeItem['itemid'],
-			'time_from' => $testTimeFrom,
-			'time_till' => $testTimeTill,
-			'history' => $probeItem['value_type'],
-			'output' => API_OUTPUT_EXTEND
-		));
-
-		$itemValue = reset($itemValue);
-
-		$ms = convert_units(['value' => $itemValue['value'], 'units' => $probeItem['units']]);
-		$ms = $itemValue ? applyValueMap($ms, $probeItem['valuemapid']) : null;
-
-		$data['proxys'][$probeItem['itemid']] = [
-			'ns' => $nsValues[1],
-			'ip' => $nsValues[2],
-			'ms' => $ms
+	protected function checkInput() {
+		$fields = [
+			'host' => 'required|string',
+			'type' => 'required|in 0,1',
+			'probe' => 'required|string',
+			'time' => 'required|int32',
+			'slvItemId' => 'required|int32'
 		];
 
-		$totalNs[$nsValues[1]] = true;
+		$ret = $this->validateInput($fields);
 
-		if (($itemValue['value'] < 0 || $itemValue['value'] > $dnsUdpRtt) && $itemValue['value'] !== null) {
-			$negativeNs[$nsValues[1]] = true;
+		if (!$ret) {
+			$this->setResponse(new CControllerResponseFatal());
 		}
+
+		return $ret;
 	}
 
-	$data['totalNs'] = count($totalNs);
-	$data['positiveNs'] = count($totalNs) - count($negativeNs);
+	protected function updateProfiles(array &$data) {
+		if ($data['host'] && $data['time'] && $data['slvItemId'] && $data['type'] !== null && $data['probe']) {
+			CProfile::update('web.rsm.particularproxys.host', $data['host'], PROFILE_TYPE_STR);
+			CProfile::update('web.rsm.particularproxys.time', $data['time'], PROFILE_TYPE_ID);
+			CProfile::update('web.rsm.particularproxys.slvItemId', $data['slvItemId'], PROFILE_TYPE_ID);
+			CProfile::update('web.rsm.particularproxys.type', $data['type'], PROFILE_TYPE_ID);
+			CProfile::update('web.rsm.particularproxys.probe', $data['probe'], PROFILE_TYPE_STR);
+		}
+		elseif (!$data['host'] && !$data['time'] && !$data['slvItemId'] && $data['type'] === null && !$data['probe']) {
+			$data['host'] = CProfile::get('web.rsm.particularproxys.host');
+			$data['time'] = CProfile::get('web.rsm.particularproxys.time');
+			$data['slvItemId'] = CProfile::get('web.rsm.particularproxys.slvItemId');
+			$data['type'] = CProfile::get('web.rsm.particularproxys.type');
+			$data['probe'] = CProfile::get('web.rsm.particularproxys.probe');
+		}		
+	}
 
-	$data['minMs'] = $dnsUdpRtt;
+	protected function getReportData(array &$data) {
+		$test_time_from = mktime(
+			date('H', $data['time']),
+			date('i', $data['time']),
+			0,
+			date('n', $data['time']),
+			date('j', $data['time']),
+			date('Y', $data['time'])
+		);
+
+		// Get TLD.
+		$tld = API::Host()->get(array(
+			'output' => ['hostid', 'host', 'name'],
+			'tlds' => true,
+			'filter' => [
+				'host' => $data['host']
+			]
+		));
+
+		// Get slv item.
+		$slv_items = API::Item()->get([
+			'output' => ['name'],
+			'itemids' => $data['slvItemId']
+		]);
+
+		// Get probe.
+		$probe = API::Host()->get(array(
+			'output' => ['hostid', 'host', 'name'],
+			'filter' => [
+				'host' => $data['probe']
+			]
+		));
+
+		// Get host with calculated items.
+		$rsm = API::Host()->get([
+			'output' => ['hostid'],
+			'filter' => [
+				'host' => RSM_HOST
+			]
+		]);
+
+		if (!$probe || !$slv_items || !$tld || !$rsm) {
+			if (!$rsm) {
+				error(_s('No permissions to referred host "%1$s" or it does not exist!', RSM_HOST));
+			}
+
+			return;
+		}
+
+		$data['probe'] = reset($probe);
+		$data['tld'] = reset($tld);
+		$data['slvItem'] = reset($slv_items);
+		$rsm = reset($rsm);
+
+		$macro_item_key[] = CALCULATED_ITEM_DNS_UDP_RTT_HIGH;
+		if ($data['type'] == RSM_DNS) {
+			$macro_item_key[] = CALCULATED_ITEM_DNS_DELAY;
+			$macro_item_key[] = CALCULATED_ITEM_DNS_AVAIL_MINNS;
+		}
+		elseif ($data['type'] == RSM_DNSSEC) {
+			$macro_item_key[] = CALCULATED_ITEM_DNS_DELAY;
+		}
+		elseif ($data['type'] == RSM_RDDS) {
+			$macro_item_key[] = CALCULATED_ITEM_RDDS_DELAY;
+		}
+		else {
+			$macro_item_key[] = CALCULATED_ITEM_EPP_DELAY;
+		}
+
+		// Get macros old value.
+		$macro_items = API::Item()->get([
+			'output' => ['itemid', 'value_type', 'key_'],
+			'hostids' => $rsm['hostid'],
+			'filter' => [
+				'key_' => $macro_item_key
+			]
+		]);
+
+		// Check items.
+		if (count($macro_items) != count($macro_item_key)) {
+			error(_s('Missing calculated items at host "%1$s"!', RSM_HOST));
+			return;
+		}
+
+		// Get time till.
+		foreach ($macro_items as $key => $macro_item) {
+			if (in_array($macro_item['key_'], [CALCULATED_ITEM_DNS_DELAY, CALCULATED_ITEM_RDDS_DELAY, CALCULATED_ITEM_EPP_DELAY])) {
+				$macro_item_value = API::History()->get([
+					'output' => API_OUTPUT_EXTEND,
+					'itemids' => $macro_item['itemid'],
+					'time_from' => $test_time_from,
+					'history' => $macro_item['value_type'],
+					'limit' => 1
+				]);
+
+				$macro_item_value = reset($macro_item_value);
+				$test_time_till = $test_time_from + $macro_item_value['value'] - 1;
+
+				unset($macro_items[$key]);
+			}
+		}
+
+		foreach ($macro_items as $macroItem) {
+			$macro_item_value = API::History()->get([
+				'output' => API_OUTPUT_EXTEND,
+				'itemids' => $macroItem['itemid'],
+				'time_from' => $test_time_from,
+				'time_till' => $test_time_till,
+				'history' => $macroItem['value_type']
+			]);
+
+			$macro_item_value = reset($macro_item_value);
+
+			if ($macroItem['key_'] == CALCULATED_ITEM_DNS_UDP_RTT_HIGH) {
+				$dns_udp_rtt = $macro_item_value['value'];
+			}
+			else {
+				$min_ns = $macro_item_value['value'];
+			}
+		}
+
+		// Get test result for DNS service.
+		if ($data['type'] == RSM_DNS) {
+			$probe_result_items = API::Item()->get([
+				'output' => ['itemid', 'value_type', 'key_'],
+				'hostids' => $data['probe']['hostid'],
+				'filter' => [
+					'key_' => PROBE_DNS_UDP_ITEM
+				],
+				'monitored' => true
+			]);
+
+			$probe_result_item = reset($probe_result_items);
+
+			$item_value = API::History()->get([
+				'output' => API_OUTPUT_EXTEND,
+				'itemids' => $probe_result_item['itemid'],
+				'time_from' => $test_time_from,
+				'time_till' => $test_time_till,
+				'history' => $probe_result_item['value_type']
+			]);
+
+			if ($item_value) {
+				$item_value = reset($item_value);
+				$data['testResult'] = ($item_value['value'] >= $min_ns);
+			}
+			else {
+				$data['testResult'] = null;
+			}
+		}
+
+		// Get items.
+		$probe_items = API::Item()->get([
+			'output' => ['itemid', 'key_', 'hostid', 'valuemapid', 'units', 'value_type'],
+			'hostids' => $data['probe']['hostid'],
+			'search' => [
+				'key_' => PROBE_DNS_UDP_ITEM_RTT
+			],
+			'startSearch' => true,
+			'monitored' => true,
+			'preservekeys' => true
+		]);
+
+		$total_ns = [];
+		$negative_ns = [];
+		foreach ($probe_items as $probe_item) {
+			preg_match('/^[^\[]+\[([^\]]+)]$/', $probe_item['key_'], $matches);
+			$ns_values = explode(',', $matches[1]);
+
+			// Get NS values.
+			$item_value = API::History()->get([
+				'output' => API_OUTPUT_EXTEND,
+				'itemids' => $probe_item['itemid'],
+				'time_from' => $test_time_from,
+				'time_till' => $test_time_till,
+				'history' => $probe_item['value_type']
+			]);
+
+			$item_value = reset($item_value);
+
+			$ms = convert_units(['value' => $item_value['value'], 'units' => $probe_item['units']]);
+			$ms = $item_value ? applyValueMap($ms, $probe_item['valuemapid']) : null;
+
+			$data['proxys'][$probe_item['itemid']] = [
+				'ns' => $ns_values[1],
+				'ip' => $ns_values[2],
+				'ms' => $ms
+			];
+
+			$total_ns[$ns_values[1]] = true;
+
+			if (($item_value['value'] < 0 || $item_value['value'] > $dns_udp_rtt) && $item_value['value'] !== null) {
+				$negative_ns[$ns_values[1]] = true;
+			}
+		}
+
+		$data['totalNs'] = count($total_ns);
+		$data['positiveNs'] = count($total_ns) - count($negative_ns);
+		$data['minMs'] = $dns_udp_rtt;
+	}
+
+	protected function doAction() {
+		// Report is not available in registrar mode.
+		if (get_rsm_monitoring_type() === MONITORING_TARGET_REGISTRAR) {
+			$this->setResponse(new CControllerResponseRedirect((new CUrl('zabbix.php'))
+				->setArgument('action', 'rsm.particulartests')
+				->setArgument('host', $this->getInput('host', ''))
+				->getUrl()
+			));
+		}
+
+		$data = [
+			'title' => _('Test result from particular proxy'),
+			'host' => $this->getInput('host', null),
+			'time' => $this->getInput('time', null),
+			'slvItemId' => $this->getInput('slvItemId', null),
+			'type' => $this->getInput('type', null),
+			'probe' => $this->getInput('probe', null),
+			'proxys' => []
+		];
+
+		$this->updateProfiles($data);
+
+		if ($data['host'] && $data['time'] && $data['slvItemId'] && $data['type'] !== null && $data['probe']) {
+			$this->getReportData($data);
+		}
+
+		$response = new CControllerResponseData($data);
+		$response->setTitle($data['title']);
+		$this->setResponse($response);
+	}
 }
-else {
-	access_deny();
-}
-
-$rsmView = new CView('rsm.particularproxys.list', $data);
-
-$rsmView->render();
-$rsmView->show();
-
-require_once dirname(__FILE__).'/include/page_footer.php';

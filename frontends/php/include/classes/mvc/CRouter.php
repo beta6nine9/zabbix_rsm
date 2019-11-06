@@ -164,7 +164,8 @@ class CRouter {
 		'rsm.incidentdetails'			=> ['CControllerIncidentDetails',					'layout.htmlpage',		'rsm.incidentdetails.list'],
 		'rsm.tests'						=> ['CControllerTests',								'layout.htmlpage',		'rsm.tests.list'],
 		'rsm.particulartests'			=> ['CControllerParticularTests',					'layout.htmlpage',		'rsm.particulartests.list'],
-		'rsm.aggregatedetails'			=> ['CControllerAggregateDetails',					'layout.htmlpage',		'rsm.aggregatedetails.list.php'],
+		'rsm.aggregatedetails'			=> ['CControllerAggregateDetails',					'layout.htmlpage',		'rsm.aggregatedetails.list'],
+		'rsm.particularproxys'			=> ['CControllerParticularProxy',					'layout.htmlpage',		'rsm.particularproxys.list'],
 	];
 
 	public function __construct($action) {

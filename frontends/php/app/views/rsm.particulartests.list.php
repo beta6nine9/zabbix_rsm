@@ -250,8 +250,13 @@ foreach ($data['probes'] as $probe) {
 
 				$link = (new CLink(
 					implode(', ', $values),
-					'rsm.particularproxys.php?slvItemId='.$data['slvItemId'].'&host='.$data['tld']['host'].
-						'&time='.$data['time'].'&probe='.$probe['host'].'&type='.$data['type']
+					(new CUrl('zabbix.php'))
+						->setArgument('action', 'rsm.particularproxys')
+						->setArgument('slvItemId', $data['slvItemId'])
+						->setArgument('host', $data['tld']['host'])
+						->setArgument('time', $data['time'])
+						->setArgument('probe', $probe['host'])
+						->setArgument('type', $data['type'])
 				))
 					->addClass($class);
 			}
