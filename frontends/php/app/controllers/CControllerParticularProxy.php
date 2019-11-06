@@ -67,7 +67,7 @@ class CControllerParticularProxy extends CController {
 			$data['slvItemId'] = CProfile::get('web.rsm.particularproxys.slvItemId');
 			$data['type'] = CProfile::get('web.rsm.particularproxys.type');
 			$data['probe'] = CProfile::get('web.rsm.particularproxys.probe');
-		}		
+		}
 	}
 
 	protected function getReportData(array &$data) {
