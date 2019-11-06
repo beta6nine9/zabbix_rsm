@@ -3448,8 +3448,8 @@ static int	process_history_data_by_itemids(zbx_socket_t *sock, zbx_client_item_v
 					0 == strncmp(items[i].key_orig, "rdap", ZBX_CONST_STRLEN("rdap")) ||
 					0 == strncmp(items[i].key_orig, "resolver", ZBX_CONST_STRLEN("resolver"))))
 			{
-				zabbix_log(LOG_LEVEL_WARNING, "skipping [%s] value [%s] bacause it is %d seconds old",
-						items[i].key_orig, values[i].value, now - values[i].ts.sec);
+				zabbix_log(LOG_LEVEL_WARNING, "skipping [%s] value [%s] bacause it is %lld seconds old",
+						items[i].key_orig, values[i].value, (long long)now - values[i].ts.sec);
 
 				continue;
 			}
