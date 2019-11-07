@@ -30,10 +30,10 @@ class CControllerIncidentDetails extends CController {
 
 	protected function checkInput() {
 		$fields = [
-			'host'					=>	'string',
-			'eventid'				=>	'int32',
-			'slvItemId'				=>	'int32',
-			'availItemId'			=>	'int32',
+			'host'					=>	'required|db hosts.host',
+			'eventid'				=>	'db events.eventid',
+			'slvItemId'				=>	'db items.itemid',
+			'availItemId'			=>	'required|db items.itemid',
 			'filter_failing_tests'	=>	'in 0,1',
 			'filter_set'			=>	'in 1',
 			'filter_rst'			=>	'in 1',
@@ -60,9 +60,9 @@ class CControllerIncidentDetails extends CController {
 	protected function updateProfile(array &$data = []) {
 		$data += [
 			'host' => $this->getInput('host', ''),
-			'eventid' => $this->getInput('eventid'),
-			'slvItemId' => $this->getInput('slvItemId'),
-			'availItemId' => $this->getInput('availItemId')
+			'eventid' =>  $this->hasInput('eventid') ? $this->getInput('eventid') : null,
+			'slvItemId' => $this->hasInput('slvItemId') ? $this->getInput('slvItemId') : null,
+			'availItemId' => $this->hasInput('availItemId') ? $this->getInput('availItemId') : null
 		];
 
 		if ($this->hasInput('filter_set')) {

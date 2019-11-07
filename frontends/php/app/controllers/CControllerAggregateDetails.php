@@ -108,7 +108,7 @@ class CControllerAggregateDetails extends CController {
 			$macro_item_value = API::History()->get([
 				'output' => API_OUTPUT_EXTEND,
 				'itemids' => $macro_item['itemid'],
-				'time_till' => $test_time_from,
+				'time_till' => $this->test_time_from,
 				'history' => $macro_item['value_type'],
 				'sortfield' => 'clock',
 				'sortorder' => 'DESC',
@@ -129,7 +129,7 @@ class CControllerAggregateDetails extends CController {
 		}
 
 		// Time calculation.
-		$test_time_till = $test_time_from + $macro_time;
+		$this->test_time_till = $this->test_time_from + $macro_time;
 
 		// Get TLD.
 		$tld = API::Host()->get([
@@ -180,8 +180,8 @@ class CControllerAggregateDetails extends CController {
 			$test_results = API::History()->get([
 				'output' => API_OUTPUT_EXTEND,
 				'itemids' => $avail_item['itemid'],
-				'time_from' => $test_time_from,
-				'time_till' => $test_time_till,
+				'time_from' => $this->test_time_from,
+				'time_till' => $this->test_time_till,
 				'history' => $avail_item['value_type'],
 				'limit' => 1
 			]);
@@ -237,8 +237,8 @@ class CControllerAggregateDetails extends CController {
 			$item_values = API::History()->get([
 				'output' => API_OUTPUT_EXTEND,
 				'itemids' => array_keys($probe_items),
-				'time_from' => $test_time_from,
-				'time_till' => $test_time_till
+				'time_from' => $this->test_time_from,
+				'time_till' => $this->test_time_till
 			]);
 
 			$items_utilized = [];
@@ -302,8 +302,8 @@ class CControllerAggregateDetails extends CController {
 			$item_values_db = API::History()->get([
 				'output' => API_OUTPUT_EXTEND,
 				'itemids' => zbx_objectValues($probes_udp_items, 'itemid'),
-				'time_from' => $test_time_from,
-				'time_till' => $test_time_till,
+				'time_from' => $this->test_time_from,
+				'time_till' => $this->test_time_till,
 				'history' => reset($probes_udp_items)['value_type']
 			]);
 
@@ -425,8 +425,8 @@ class CControllerAggregateDetails extends CController {
 			$item_values = API::History()->get([
 				'output' => API_OUTPUT_EXTEND,
 				'itemids' => array_keys($probe_items),
-				'time_from' => $test_time_from,
-				'time_till' => $test_time_till,
+				'time_from' => $this->test_time_from,
+				'time_till' => $this->test_time_till,
 				'history' => 3
 			]);
 			$items_utilized = [];
@@ -485,7 +485,7 @@ class CControllerAggregateDetails extends CController {
 		}
 
 		if ($data['tld_host'] && $data['time'] && $data['slvItemId'] && $data['type'] !== null) {
-			$test_time_from = mktime(
+			$this->test_time_from = mktime(
 				date('H', $data['time']),
 				date('i', $data['time']),
 				0,

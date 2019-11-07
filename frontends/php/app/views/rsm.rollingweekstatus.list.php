@@ -249,7 +249,7 @@ if ($data['tld']) {
 					$dns_status = new CLink(
 						(new CDiv())->addClass('service-icon status_icon_extra iconrollingweekfail cell-value pointer'),
 						(new CUrl($tld['url'].'zabbix.php'))
-							->setArgument('action', 'rsm.rollingweekstatus')
+							->setArgument('action', 'rsm.incidentdetails')
 							->setArgument('host', $tld['host'])
 							->setArgument('eventid', $tld[RSM_DNS]['incident'])
 							->setArgument('slvItemId', $tld[RSM_DNS]['itemid'])
@@ -310,6 +310,7 @@ if ($data['tld']) {
 					$dnssec_status = new CLink(
 						(new CDiv())->addClass('service-icon status_icon_extra iconrollingweekfail cell-value pointer'),
 						(new CUrl($tld['url'].'zabbix.php'))
+							->setArgument('action', 'rsm.incidentdetails')
 							->setArgument('host', $tld['host'])
 							->setArgument('eventid', $tld[RSM_DNSSEC]['incident'])
 							->setArgument('slvItemId', $tld[RSM_DNSSEC]['itemid'])
