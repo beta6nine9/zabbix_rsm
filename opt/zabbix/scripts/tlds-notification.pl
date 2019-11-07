@@ -63,7 +63,6 @@ sub process_event($$)
 			"events.object," .
 			"events.objectid," .
 			"events.clock," .
-			"events.ns," .
 			"events.value," .
 			"triggers.description" .
 		" from" .
@@ -75,7 +74,7 @@ sub process_event($$)
 	fail("event not found") if (@{$rows} == 0);
 	fail("multiple events found") if (@{$rows} > 1);
 
-	my ($event_source, $event_object, $trigger_id, $event_clock, $event_ns, $event_value, $description) = @{$rows->[0]};
+	my ($event_source, $event_object, $trigger_id, $event_clock, $event_value, $description) = @{$rows->[0]};
 
 	fail("unexpected event source") if ($event_source != EVENT_SOURCE_TRIGGERS);
 	fail("unexpected event object") if ($event_object != EVENT_OBJECT_TRIGGER);
@@ -113,22 +112,20 @@ sub process_event($$)
 	my ($item_id, $item_key, $host_id, $host_name) = @{$rows->[0]};
 
 	dbg("event_clock = %s", $event_clock // 'UNDEF');
-	dbg("event_ns    = %s", $event_ns    // 'UNDEF');
 	dbg("event_value = %s", $event_value // 'UNDEF');
 	dbg("description = %s", $description // 'UNDEF'); # e.g., "exceeded 10% of allowed", for extracting percentage
 	dbg("item_key    = %s", $item_key    // 'UNDEF'); # to find out what type of trigger it is
 	dbg("host_id     = %s", $host_id     // 'UNDEF');
 	dbg("host_name   = %s", $host_name   // 'UNDEF');
 
-	my $data = get_trigger_data($event_clock, $event_ns, $description, $host_id, $item_id, $item_key);
+	my $data = get_trigger_data($event_clock, $description, $host_id, $item_id, $item_key);
 
 	notify($send_to, $event_value, $event_clock, $host_name, $data);
 }
 
-sub get_trigger_data($$$$$$)
+sub get_trigger_data($$$$$)
 {
 	my $event_clock = shift;
-	my $event_ns    = shift;
 	my $description = shift;
 	my $host_id     = shift;
 	my $item_id     = shift;
@@ -140,7 +137,7 @@ sub get_trigger_data($$$$$$)
 	{
 		$data = [
 			'SLR_CURRENT_MONTH_DNS_service_availability',
-			get_history('history_uint', $item_id, $event_clock, $event_ns),
+			get_history('history_uint', $item_id, $event_clock),
 		];
 	}
 	elsif ($item_key =~ /^rsm.slv.dns.ns.downtime\[(.+),(.*)\]$/)
@@ -153,7 +150,7 @@ sub get_trigger_data($$$$$$)
 			$ns,
 			$ip,
 			$description =~ /(?:^|\s)(\d+%)(?:\s|$)/g, # percentage
-			get_history('history_uint', $item_id, $event_clock, $event_ns),
+			get_history('history_uint', $item_id, $event_clock),
 		];
 	}
 	elsif ($item_key eq 'rsm.slv.rdds.downtime')
@@ -161,7 +158,7 @@ sub get_trigger_data($$$$$$)
 		$data = [
 			'SLR_CURRENT_MONTH_RDDS_service_availability',
 			$description =~ /(?:^|\s)(\d+%)(?:\s|$)/g, # percentage
-			get_history('history_uint', $item_id, $event_clock, $event_ns),
+			get_history('history_uint', $item_id, $event_clock),
 		];
 	}
 	elsif ($item_key eq 'rsm.slv.dns.udp.rtt.pfailed')
@@ -169,8 +166,8 @@ sub get_trigger_data($$$$$$)
 		$data = [
 			'SLR_CURRENT_MONTH_DNS_UDP_RTT_availability',
 			$description =~ /(?:^|\s)(\d+%)(?:\s|$)/g, # percentage
-			get_history('history_uint', get_item_id($host_id, 'rsm.slv.dns.udp.rtt.performed'), $event_clock, $event_ns),
-			get_history('history_uint', get_item_id($host_id, 'rsm.slv.dns.udp.rtt.failed'), $event_clock, $event_ns),
+			get_history('history_uint', get_item_id($host_id, 'rsm.slv.dns.udp.rtt.performed'), $event_clock),
+			get_history('history_uint', get_item_id($host_id, 'rsm.slv.dns.udp.rtt.failed'), $event_clock),
 		];
 	}
 	elsif ($item_key eq 'rsm.slv.dns.tcp.rtt.pfailed')
@@ -178,8 +175,8 @@ sub get_trigger_data($$$$$$)
 		$data = [
 			'SLR_CURRENT_MONTH_DNS_TCP_RTT_availability',
 			$description =~ /(?:^|\s)(\d+%)(?:\s|$)/g, # percentage
-			get_history('history_uint', get_item_id($host_id, 'rsm.slv.dns.tcp.rtt.performed'), $event_clock, $event_ns),
-			get_history('history_uint', get_item_id($host_id, 'rsm.slv.dns.tcp.rtt.failed'), $event_clock, $event_ns),
+			get_history('history_uint', get_item_id($host_id, 'rsm.slv.dns.tcp.rtt.performed'), $event_clock),
+			get_history('history_uint', get_item_id($host_id, 'rsm.slv.dns.tcp.rtt.failed'), $event_clock),
 		];
 	}
 	elsif ($item_key eq 'rsm.slv.rdds.rtt.pfailed')
@@ -187,8 +184,8 @@ sub get_trigger_data($$$$$$)
 		$data = [
 			'SLR_CURRENT_MONTH_RDDS_RTT_service_availability',
 			$description =~ /(?:^|\s)(\d+%)(?:\s|$)/g, # percentage
-			get_history('history_uint', get_item_id($host_id, 'rsm.slv.rdds.rtt.performed'), $event_clock, $event_ns),
-			get_history('history_uint', get_item_id($host_id, 'rsm.slv.rdds.rtt.failed'), $event_clock, $event_ns),
+			get_history('history_uint', get_item_id($host_id, 'rsm.slv.rdds.rtt.performed'), $event_clock),
+			get_history('history_uint', get_item_id($host_id, 'rsm.slv.rdds.rtt.failed'), $event_clock),
 		];
 	}
 	else
@@ -202,7 +199,7 @@ sub get_trigger_data($$$$$$)
 			ITEM_VALUE_TYPE_UINT64, 'history_uint',
 		}->{$item_value_type};
 
-		my $value = get_history($history_table, $item_id, $event_clock, $event_ns);
+		my $value = get_history($history_table, $item_id, $event_clock);
 
 		if ($item_value_type == ITEM_VALUE_TYPE_FLOAT && $item_units eq '%')
 		{
@@ -252,15 +249,14 @@ sub finalize()
 	db_disconnect();
 }
 
-sub get_history($$$$)
+sub get_history($$$)
 {
 	my $table   = shift;
 	my $item_id = shift;
 	my $clock   = shift;
-	my $ns      = shift;
 
-	my $query = "select value from $table where itemid=? and clock=? and ns=?";
-	my $params = [$item_id, $clock, $ns];
+	my $query = "select value from $table where itemid=? and clock=?";
+	my $params = [$item_id, $clock];
 
 	my $value;
 
@@ -274,7 +270,7 @@ sub get_history($$$$)
 		}
 		else
 		{
-			info("didn't find data in history table (table:$table, itemid:$item_id, clock:$clock, ns:$ns), sleeping for ${\HISTORY_RETRY_DELAY} second(s)");
+			info("didn't find data in history table (table:$table, itemid:$item_id, clock:$clock), sleeping for ${\HISTORY_RETRY_DELAY} second(s)");
 			select(undef, undef, undef, HISTORY_RETRY_DELAY);
 		}
 	}
