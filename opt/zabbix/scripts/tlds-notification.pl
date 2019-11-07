@@ -140,7 +140,7 @@ sub get_trigger_data($$$$$)
 			get_history('history_uint', $item_id, $event_clock),
 		];
 	}
-	elsif ($item_key =~ /^rsm.slv.dns.ns.downtime\[(.+),(.*)\]$/)
+	elsif ($item_key =~ /^rsm\.slv\.dns\.ns\.downtime\[(.+),(.+)\]$/)
 	{
 		my $ns = $1;
 		my $ip = $2;
