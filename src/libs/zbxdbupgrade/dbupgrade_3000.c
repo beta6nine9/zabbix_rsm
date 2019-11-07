@@ -4416,7 +4416,6 @@ static int	DBpatch_3000324(void)
 	/* update operation type to "Remote command" */
 	CHECK(DBexecute("update operations set operationtype=1 where operationid=130"));
 
-
 	/* unset action's "recovery message", clear message subjects and bodies */
 	CHECK(DBexecute("update actions set def_shortdata='',def_longdata='',recovery_msg=0,r_shortdata='',r_longdata='' where actionid=130"));
 
