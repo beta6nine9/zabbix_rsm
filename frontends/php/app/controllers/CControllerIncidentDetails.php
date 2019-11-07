@@ -87,7 +87,7 @@ class CControllerIncidentDetails extends CController {
 		}
 		else {
 			$data['from'] = CProfile::get('web.rsm.incidentdetails.filter_from');
-			$data['to'] = CProfile::get('web.rsm.incidentdetails.filter_to', date('YmdHis', $serverTime));
+			$data['to'] = CProfile::get('web.rsm.incidentdetails.filter_to', date('YmdHis', $this->server_time));
 			$data['filter_failing_tests'] = CProfile::get('web.rsm.incidentdetails.filter_failing_tests');
 		}
 	}
@@ -306,7 +306,7 @@ class CControllerIncidentDetails extends CController {
 			}
 		}
 		else {
-			$to_time = $this->hasInput('filter_set') ? zbxDateToTime($data['to']) : $serverTime;
+			$to_time = $this->hasInput('filter_set') ? zbxDateToTime($data['to']) : $this->server_time;
 		}
 
 		// result generation
@@ -375,6 +375,7 @@ class CControllerIncidentDetails extends CController {
 
 	protected function doAction() {
 		$this->access_deny = false;
+		$this->server_time = time() - RSM_ROLLWEEK_SHIFT_BACK;
 
 		$data = [
 			'title' => _('Incidents details'),

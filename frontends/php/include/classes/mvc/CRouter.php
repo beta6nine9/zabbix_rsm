@@ -167,6 +167,7 @@ class CRouter {
 		'rsm.aggregatedetails'			=> ['CControllerAggregateDetails',					'layout.htmlpage',		'rsm.aggregatedetails.list'],
 		'rsm.particularproxys'			=> ['CControllerParticularProxy',					'layout.htmlpage',		'rsm.particularproxys.list'],
 		'export.rsm.slareports'			=> ['CControllerExportSlaReport',					null,					null],
+		'rsm.markincident'				=> ['CControllerMarkIncident',						null,					null],
 	];
 
 	public function __construct($action) {

@@ -104,11 +104,15 @@ else {
 }
 
 $mark_btn_on_click = (new CUrl('zabbix.php'))
-	->setArgument('action', 'rsm.incidentdetails')
-	->setArgument('mark_incident', $change_incident_type)
+	->setArgument('action', 'rsm.markincident')
+	->setArgument('mark_as', $change_incident_type)
 	->setArgument('eventid', $data['eventid'])
 	->setArgument('host', $data['tld']['host'])
 	->setArgument('type', $data['type'])
+	->setArgument('from', $data['from'])
+	->setArgument('to', $data['to'])
+	->setArgument('slvItemId', $data['slvItemId'])
+	->setArgument('availItemId', $data['availItemId'])
 	->getUrl();
 
 // Make info block.
@@ -180,7 +184,6 @@ $filter_url = (new CUrl('zabbix.php'))
 		in_array(CWebUser::getType(), [USER_TYPE_ZABBIX_ADMIN, USER_TYPE_SUPER_ADMIN, USER_TYPE_POWER_USER])
 			? (new CButton('mark_incident', $change_incident_type_label))
 				->onClick(sprintf('javascript: location.href = "%s";', $mark_btn_on_click))
-				->setEnabled(false) // TODO: make enabled and create controller for this action
 				->addStyle('margin-top: 5px;')
 			: null
 	)
