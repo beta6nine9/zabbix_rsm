@@ -4393,7 +4393,7 @@ static int	DBpatch_3000323(void)
 
 static int	DBpatch_3000324(void)
 {
-	const char	*command = "/opt/zabbix/alertscripts/tlds-notification.pl --send-to \\'zabbix alert\\' --event-id \\'{EVENT.ID}\\' &";
+	const char	*command = "/opt/zabbix/scripts/tlds-notification.pl --send-to \\'zabbix alert\\' --event-id \\'{EVENT.ID}\\' &";
 
 	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
 		return SUCCEED;
