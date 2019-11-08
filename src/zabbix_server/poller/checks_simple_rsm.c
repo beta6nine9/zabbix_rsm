@@ -2836,7 +2836,7 @@ static int	zbx_rdds43_test(const char *request, const char *ip, short port, int 
 		goto out;
 	}
 
-	if (FAIL == (nbytes = zbx_tcp_recv_ext(&s, 0)))	/* timeout is still "active" here */
+	if (FAIL == (nbytes = zbx_tcp_recv_raw_ext(&s, 0)))	/* timeout is still "active" here */
 	{
 		*rtt = (SUCCEED == zbx_alarm_timed_out() ? ZBX_EC_RDDS43_TO : ZBX_EC_RDDS43_ECON);
 		zbx_snprintf(err, err_size, "cannot receive data: %s", zbx_socket_strerror());
