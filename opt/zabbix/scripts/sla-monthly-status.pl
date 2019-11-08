@@ -40,9 +40,9 @@ sub main()
 
 	db_connect();
 
-	my $slr = get_slrs();
+	my $slrs = get_slrs();
 
-	my ($items, $itemids_float, $itemids_uint) = get_items($slr, $from);
+	my ($items, $itemids_float, $itemids_uint) = get_items($slrs, $from);
 
 	my $data_uint  = get_data($itemids_uint , "history_uint", $from, $till);
 	my $data_float = get_data($itemids_float, "history"     , $from, $till);
@@ -56,39 +56,64 @@ sub main()
 
 		if ($itemkey eq SLV_ITEM_KEY_DNS_DOWNTIME)
 		{
-			push(@{$hosts{$host}}, [$clock, "SLR_END_MONTH_DNS_service_availability", $value]);
+			push(@{$hosts{$host}}, [
+				$clock,
+				"SLR_END_MONTH_DNS_service_availability",
+				$value,
+			]);
 		}
 		elsif ($itemkey eq SLV_ITEM_KEY_RDDS_DOWNTIME)
 		{
-			push(@{$hosts{$host}}, [$clock, "SLR_END_MONTH_RDDS_service_availability", "100%", $value]);
+			push(@{$hosts{$host}}, [
+				$clock,
+				"SLR_END_MONTH_RDDS_service_availability",
+				format_float($value / $slrs->{'rdds_downtime'} * 100, '%'),
+				$value,
+			]);
 		}
 		elsif ($itemkey eq SLV_ITEM_KEY_DNS_UDP_PFAILED)
 		{
-			my $performed = get_history("history_uint", get_itemid_by_hostid($hostid, SLV_ITEM_KEY_DNS_UDP_PERFORMED), $clock);
-			my $failed    = get_history("history_uint", get_itemid_by_hostid($hostid, SLV_ITEM_KEY_DNS_UDP_FAILED), $clock);
-
-			push(@{$hosts{$host}}, [$clock, "SLR_END_MONTH_DNS_UDP_RTT_availability", "100%", $performed, $failed]);
+			push(@{$hosts{$host}}, [
+				$clock,
+				"SLR_END_MONTH_DNS_UDP_RTT_availability",
+				format_float($value / $slrs->{'dns_udp_rtt'} * 100, '%'),
+				get_history("history_uint", get_itemid_by_hostid($hostid, SLV_ITEM_KEY_DNS_UDP_PERFORMED), $clock),
+				get_history("history_uint", get_itemid_by_hostid($hostid, SLV_ITEM_KEY_DNS_UDP_FAILED), $clock),
+			]);
 		}
 		elsif ($itemkey eq SLV_ITEM_KEY_DNS_TCP_PFAILED)
 		{
-			my $performed = get_history("history_uint", get_itemid_by_hostid($hostid, SLV_ITEM_KEY_DNS_TCP_PERFORMED), $clock);
-			my $failed    = get_history("history_uint", get_itemid_by_hostid($hostid, SLV_ITEM_KEY_DNS_TCP_FAILED), $clock);
-
-			push(@{$hosts{$host}}, [$clock, "SLR_END_MONTH_DNS_TCP_RTT_availability", "100%", $performed, $failed]);
+			push(@{$hosts{$host}}, [
+				$clock,
+				"SLR_END_MONTH_DNS_TCP_RTT_availability",
+				format_float($value / $slrs->{'dns_tcp_rtt'} * 100, '%'),
+				get_history("history_uint", get_itemid_by_hostid($hostid, SLV_ITEM_KEY_DNS_TCP_PERFORMED), $clock),
+				get_history("history_uint", get_itemid_by_hostid($hostid, SLV_ITEM_KEY_DNS_TCP_FAILED), $clock),
+			]);
 		}
 		elsif ($itemkey eq SLV_ITEM_KEY_RDDS_PFAILED)
 		{
-			my $performed = get_history("history_uint", get_itemid_by_hostid($hostid, SLV_ITEM_KEY_RDDS_PERFORMED), $clock);
-			my $failed    = get_history("history_uint", get_itemid_by_hostid($hostid, SLV_ITEM_KEY_RDDS_FAILED), $clock);
-
-			push(@{$hosts{$host}}, [$clock, "SLR_END_MONTH_RDDS_RTT_service_availability", "100%", $performed, $failed]);
+			push(@{$hosts{$host}}, [
+				$clock,
+				"SLR_END_MONTH_RDDS_RTT_service_availability",
+				format_float($value / $slrs->{'rdds_rtt'} * 100, '%'),
+				get_history("history_uint", get_itemid_by_hostid($hostid, SLV_ITEM_KEY_RDDS_PERFORMED), $clock),
+				get_history("history_uint", get_itemid_by_hostid($hostid, SLV_ITEM_KEY_RDDS_FAILED), $clock),
+			]);
 		}
 		elsif ($itemkey =~ /^rsm\.slv\.dns\.ns\.downtime\[(.+),(.+)\]$/)
 		{
 			my $ns = $1;
 			my $ip = $2;
 
-			push(@{$hosts{$host}}, [$clock, "SLR_END_MONTH_NS_availability#$ns#$ip#100%", $value]);
+			push(@{$hosts{$host}}, [
+				$clock,
+				"SLR_END_MONTH_NS_availability",
+				$ns,
+				$ip,
+				format_float($value / $slrs->{'dns_ns_downtime'} * 100, '%'),
+				$value,
+			]);
 		}
 	}
 
@@ -140,7 +165,7 @@ sub get_time_limits()
 
 sub get_slrs()
 {
-	my %slr;
+	my %slrs;
 
 	my $sql = "select macro, value from globalmacro where macro in (?, ?, ?, ?, ?, ?)";
 	my $params = [
@@ -157,22 +182,22 @@ sub get_slrs()
 	{
 		my ($macro, $value) = @{$row};
 
-		$slr{'dns_downtime'}    = $value if ($macro eq '{$RSM.SLV.DNS.DOWNTIME}');
-		$slr{'dns_ns_downtime'} = $value if ($macro eq '{$RSM.SLV.NS.DOWNTIME}');
-		$slr{'dns_udp_rtt'}     = $value if ($macro eq '{$RSM.SLV.DNS.UDP.RTT}');
-		$slr{'dns_tcp_rtt'}     = $value if ($macro eq '{$RSM.SLV.DNS.TCP.RTT}');
-		$slr{'rdds_downtime'}   = $value if ($macro eq '{$RSM.SLV.RDDS.DOWNTIME}');
-		$slr{'rdds_rtt'}        = $value if ($macro eq '{$RSM.SLV.RDDS.RTT}');
+		$slrs{'dns_downtime'}    = $value if ($macro eq '{$RSM.SLV.DNS.DOWNTIME}');
+		$slrs{'dns_ns_downtime'} = $value if ($macro eq '{$RSM.SLV.NS.DOWNTIME}');
+		$slrs{'dns_udp_rtt'}     = $value if ($macro eq '{$RSM.SLV.DNS.UDP.RTT}');
+		$slrs{'dns_tcp_rtt'}     = $value if ($macro eq '{$RSM.SLV.DNS.TCP.RTT}');
+		$slrs{'rdds_downtime'}   = $value if ($macro eq '{$RSM.SLV.RDDS.DOWNTIME}');
+		$slrs{'rdds_rtt'}        = $value if ($macro eq '{$RSM.SLV.RDDS.RTT}');
 	}
 
-	fail('global macro {$RSM.SLV.DNS.DOWNTIME} was not found')  unless (exists($slr{'dns_downtime'}));
-	fail('global macro {$RSM.SLV.NS.DOWNTIME} was not found')   unless (exists($slr{'dns_ns_downtime'}));
-	fail('global macro {$RSM.SLV.DNS.UDP.RTT} was not found')   unless (exists($slr{'dns_udp_rtt'}));
-	fail('global macro {$RSM.SLV.DNS.TCP.RTT} was not found')   unless (exists($slr{'dns_tcp_rtt'}));
-	fail('global macro {$RSM.SLV.RDDS.DOWNTIME} was not found') unless (exists($slr{'rdds_downtime'}));
-	fail('global macro {$RSM.SLV.RDDS.RTT} was not found')      unless (exists($slr{'rdds_rtt'}));
+	fail('global macro {$RSM.SLV.DNS.DOWNTIME} was not found')  unless (exists($slrs{'dns_downtime'}));
+	fail('global macro {$RSM.SLV.NS.DOWNTIME} was not found')   unless (exists($slrs{'dns_ns_downtime'}));
+	fail('global macro {$RSM.SLV.DNS.UDP.RTT} was not found')   unless (exists($slrs{'dns_udp_rtt'}));
+	fail('global macro {$RSM.SLV.DNS.TCP.RTT} was not found')   unless (exists($slrs{'dns_tcp_rtt'}));
+	fail('global macro {$RSM.SLV.RDDS.DOWNTIME} was not found') unless (exists($slrs{'rdds_downtime'}));
+	fail('global macro {$RSM.SLV.RDDS.RTT} was not found')      unless (exists($slrs{'rdds_rtt'}));
 
-	return \%slr;
+	return \%slrs;
 }
 
 sub get_items($$)
@@ -301,6 +326,18 @@ sub get_history($$$)
 	my $params = [$item_id, $clock];
 
 	return db_select_value($query, $params);
+}
+
+sub format_float($$)
+{
+	my $value = shift;
+	my $unit  = shift;
+
+	$value = sprintf("%.2f", $value);
+	$value =~ s/\.?0+$//;
+	$value = sprintf("%s %s", $value, $unit) if ($unit);
+
+	return $value;
 }
 
 sub notify($$$$)
