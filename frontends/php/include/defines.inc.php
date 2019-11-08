@@ -25,7 +25,7 @@ require './local/icann.defines.inc.php';
 define('ZABBIX_VERSION',		'4.4.1rc1');
 define('ZABBIX_API_VERSION',	'4.4.1');
 define('ZABBIX_EXPORT_VERSION',	'4.4');
-define('ZABBIX_DB_VERSION',		4040300);
+define('ZABBIX_DB_VERSION',		4040304);
 
 define('ZABBIX_COPYRIGHT_FROM',	'2001');
 define('ZABBIX_COPYRIGHT_TO',	'2019');

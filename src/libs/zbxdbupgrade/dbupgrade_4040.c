@@ -42,6 +42,57 @@ static int	DBpatch_4040300(void)
 	return FAIL;
 }
 
+static int	DBpatch_4040301(void)
+{
+	if (ZBX_DB_OK > DBexecute(
+		"update items"
+		" set delay='{$RSM.DNS.UDP.DELAY}'"
+		" where key_ like 'rsm.dns.udp[%%'"))
+	{
+		return FAIL;
+	}
+
+	return SUCCEED;
+}
+
+static int	DBpatch_4040302(void)
+{
+	if (ZBX_DB_OK > DBexecute(
+		"update items"
+		" set delay='{$RSM.DNS.TCP.DELAY}'"
+		" where key_ like 'rsm.dns.tcp[%%'"))
+	{
+		return FAIL;
+	}
+
+	return SUCCEED;
+}
+
+static int	DBpatch_4040303(void)
+{
+	if (ZBX_DB_OK > DBexecute(
+		"update items"
+		" set delay='{$RSM.RDDS.DELAY}'"
+		" where key_ like 'rsm.rdds[%%'"))
+	{
+		return FAIL;
+	}
+
+	return SUCCEED;
+}
+
+static int	DBpatch_4040304(void)
+{
+	if (ZBX_DB_OK > DBexecute(
+		"update items"
+		" set delay='{$RSM.RDAP.DELAY}'"
+		" where key_ like 'rdap[%%'"))
+	{
+		return FAIL;
+	}
+	return SUCCEED;
+}
+
 #endif
 
 DBPATCH_START(4040)
@@ -50,5 +101,9 @@ DBPATCH_START(4040)
 
 DBPATCH_ADD(4040000, 0, 1)
 DBPATCH_ADD(4040300, 0, 1)	/* RSM FY20 */
+DBPATCH_ADD(4040301, 0, 1)
+DBPATCH_ADD(4040302, 0, 1)
+DBPATCH_ADD(4040303, 0, 1)
+DBPATCH_ADD(4040304, 0, 1)
 
 DBPATCH_END()
