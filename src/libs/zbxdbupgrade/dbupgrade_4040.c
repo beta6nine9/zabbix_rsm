@@ -44,10 +44,12 @@ static int	DBpatch_4040300(void)
 
 static int	DBpatch_4040301(void)
 {
+	/* type=3 -> type=simple check */
 	if (ZBX_DB_OK > DBexecute(
 		"update items"
 		" set delay='{$RSM.DNS.UDP.DELAY}'"
-		" where key_ like 'rsm.dns.udp[%%'"))
+		" where key_ like 'rsm.dns.udp[%%'"
+		" and type=3"))
 	{
 		return FAIL;
 	}
@@ -57,10 +59,12 @@ static int	DBpatch_4040301(void)
 
 static int	DBpatch_4040302(void)
 {
+	/* type=3 -> type=simple check */
 	if (ZBX_DB_OK > DBexecute(
 		"update items"
 		" set delay='{$RSM.DNS.TCP.DELAY}'"
-		" where key_ like 'rsm.dns.tcp[%%'"))
+		" where key_ like 'rsm.dns.tcp[%%'"
+		" and type=3"))
 	{
 		return FAIL;
 	}
@@ -70,10 +74,12 @@ static int	DBpatch_4040302(void)
 
 static int	DBpatch_4040303(void)
 {
+	/* type=3 -> type=simple check */
 	if (ZBX_DB_OK > DBexecute(
 		"update items"
 		" set delay='{$RSM.RDDS.DELAY}'"
-		" where key_ like 'rsm.rdds[%%'"))
+		" where key_ like 'rsm.rdds[%%'"
+		" and type=3"))
 	{
 		return FAIL;
 	}
@@ -83,10 +89,12 @@ static int	DBpatch_4040303(void)
 
 static int	DBpatch_4040304(void)
 {
+	/* type=3 -> type=simple check */
 	if (ZBX_DB_OK > DBexecute(
 		"update items"
 		" set delay='{$RSM.RDAP.DELAY}'"
-		" where key_ like 'rdap[%%'"))
+		" where key_ like 'rdap[%%'"
+		" and type=3"))
 	{
 		return FAIL;
 	}
