@@ -775,7 +775,7 @@ sub get_history_by_itemid($$$)
 	# we need previous value to have at the time of @timestamp_from
 	my $rows_ref = db_select("select delay from items where itemid=$itemid");
 
-	$timestamp_from -= $rows_ref->[0]->[0];
+	$timestamp_from -= convert_suffixed_number($rows_ref->[0]->[0]);
 
 	return db_select(
 			"select clock,value" .

@@ -165,6 +165,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		update_slv_rtt_monthly_stats
 		recalculate_downtime
 		generate_report
+		convert_suffixed_number
 		usage);
 
 # configuration, set in set_slv_config()
@@ -936,7 +937,7 @@ sub tld_exists_locally($)
 
 	my $rows_ref = db_select(
 		"select 1".
-		" from hosts h,hosts_groups hg,groups g".
+		" from hosts h,hosts_groups hg,hstgrp g".
 		" where h.hostid=hg.hostid".
 			" and hg.groupid=g.groupid".
 			" and g.name='TLDs'".
@@ -4994,6 +4995,30 @@ sub __fp_get_oldest_clock($$)
 	my $params = [$rsmhost];
 
 	return db_select_value($sql, $params);
+}
+
+sub convert_suffixed_number($)
+{
+	my $number = shift;
+
+	my %suffix_map = (
+		"k" => 1024,
+		"M" => 1048576,
+		"G" => 1073741824,
+		"T" => 1099511627776,
+		"s" => 1,
+		"m" => 60,
+		"h" => 3600,
+		"d" => 86400,
+		"w" => 7*86400
+	);
+	my $suffix = substr($number, -1);
+
+	return $number unless (exists($suffix_map{$suffix}));
+
+	substr($number, -1) = '';
+
+	return $number * $suffix_map{$suffix};
 }
 
 #################

@@ -1322,7 +1322,7 @@ sub __get_tld_type
 
 	my $rows_ref = db_select(
 		"select g.name".
-		" from hosts_groups hg,groups g,hosts h".
+		" from hosts_groups hg,hstgrp g,hosts h".
 		" where hg.groupid=g.groupid".
 			" and hg.hostid=h.hostid".
 			" and g.name like '%TLD'".
