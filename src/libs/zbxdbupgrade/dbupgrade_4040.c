@@ -101,6 +101,20 @@ static int	DBpatch_4040304(void)
 	return SUCCEED;
 }
 
+static int	DBpatch_4040305(void)
+{
+	/* type=3 -> type=simple check */
+	if (ZBX_DB_OK > DBexecute(
+		"update items"
+		" set delay='{$RSM.EPP.DELAY}'"
+		" where key_ like 'rsm.epp[%%'"
+		" and type=3"))
+	{
+		return FAIL;
+	}
+	return SUCCEED;
+}
+
 #endif
 
 DBPATCH_START(4040)
@@ -113,5 +127,6 @@ DBPATCH_ADD(4040301, 0, 1)
 DBPATCH_ADD(4040302, 0, 1)
 DBPATCH_ADD(4040303, 0, 1)
 DBPATCH_ADD(4040304, 0, 1)
+DBPATCH_ADD(4040305, 0, 1)
 
 DBPATCH_END()
