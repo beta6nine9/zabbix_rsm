@@ -9,11 +9,12 @@
 
 void	zbx_on_exit(int ret)
 {
+	(void)ret;
 }
 
-void	exit_usage(const char *progname)
+void	exit_usage(const char *program)
 {
-	fprintf(stderr, "usage: %s -t <tld> -n <ns> -i <ip> <[-4] [-6]> [-r <res_ip>] [-p <testprefix>] [-d] [-g] [-f] [-h]\n", progname);
+	fprintf(stderr, "usage: %s -t <tld> -n <ns> -i <ip> <[-4] [-6]> [-r <res_ip>] [-p <testprefix>] [-d] [-g] [-f] [-h]\n", program);
 	fprintf(stderr, "       -t <tld>          TLD to test\n");
 	fprintf(stderr, "       -n <ns>           Name Server to test\n");
 	fprintf(stderr, "       -i <ip>           IP address of the Name Server to test\n");
@@ -81,6 +82,7 @@ int	main(int argc, char *argv[])
 				break;
 			case 'h':
 				exit_usage(argv[0]);
+				/* fall through */
 			case '?':
 				if (optopt == 't' || optopt == 'n' || optopt == 'i' || optopt == 'r' || optopt == 'p')
 					fprintf(stderr, "Option -%c requires an argument.\n", optopt);

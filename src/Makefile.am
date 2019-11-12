@@ -80,7 +80,8 @@ SUBDIRS = \
 	$(AGENT_SUBDIRS) \
 	$(SERVER_SUBDIRS) \
 	$(PROXY_SUBDIRS) \
-	$(JAVA_SUBDIRS)
+	$(JAVA_SUBDIRS) \
+	tests
 	
 
 SUBDIRS += zabbix_rsm
