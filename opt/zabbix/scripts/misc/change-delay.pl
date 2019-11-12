@@ -15,7 +15,7 @@ set_slv_config(get_rsm_config());
 parse_opts('type=n', 'delay=n');
 usage() unless (__validate_input() == SUCCESS);
 
-my ($macro, $sql);
+my ($macro, $sql, $sth);
 my %macros = (
 	1 => '{$RSM.DNS.UDP.DELAY}',
 	2 => '{$RSM.DNS.TCP.DELAY}',
@@ -36,12 +36,9 @@ $macro = $macros{getopt('type')};
 
 if (opt('dry-run'))
 {
-	print("would set delay ", getopt('delay'), " for items with type ".ITEM_TYPE_SIMPLE."\n");
-	print("would set macro $macro to ", getopt('delay'), "\n");
+	print("would set delay ", getopt('delay'), " for macro $macro\n");
 	exit;
 }
-
-my $sth;
 
 $sql = "update globalmacro set value=? where macro=?";
 $sth = $dbh->prepare($sql) or die $dbh->errstr;
