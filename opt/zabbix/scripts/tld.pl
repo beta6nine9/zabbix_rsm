@@ -1250,7 +1250,7 @@ sub create_items_dns($)
 		'applications' => [get_application_id('DNS (' . $proto_uc . ')', $templateid)],
 		'type'         => ITEM_TYPE_SIMPLE,
 		'value_type'   => ITEM_VALUE_TYPE_UINT64,
-		'delay'        => $cfg_global_macros->{'{$RSM.DNS.TCP.DELAY}'}
+		'delay'        => '{$RSM.DNS.TCP.DELAY}'
 	}));
 
 	$proto = 'udp';
@@ -1265,7 +1265,7 @@ sub create_items_dns($)
 		'applications' => [get_application_id('DNS (' . $proto_uc . ')', $templateid)],
 		'type'         => ITEM_TYPE_SIMPLE,
 		'value_type'   => ITEM_VALUE_TYPE_UINT64,
-		'delay'        => $cfg_global_macros->{'{$RSM.DNS.UDP.DELAY}'}
+		'delay'        => '{$RSM.DNS.UDP.DELAY}'
 	}));
 
 	# this item is added in any case
@@ -1371,7 +1371,7 @@ sub create_items_rdds($)
 			'applications' => [get_application_id('RDDS', $templateid)],
 			'type'         => ITEM_TYPE_SIMPLE,
 			'value_type'   => ITEM_VALUE_TYPE_UINT64,
-			'delay'        => $cfg_global_macros->{'{$RSM.RDDS.DELAY}'},
+			'delay'        => '{$RSM.RDDS.DELAY}',
 			'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_rdds_result'}
 		}));
 	}
@@ -1403,7 +1403,7 @@ sub create_items_epp($)
 		'applications' => [$applicationid],
 		'type'         => ITEM_TYPE_SIMPLE,
 		'value_type'   => ITEM_VALUE_TYPE_UINT64,
-		'delay'        => $cfg_global_macros->{'{$RSM.EPP.DELAY}'},
+		'delay'        => '{$RSM.EPP.DELAY}',
 		'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_epp_result'}
 	}));
 
