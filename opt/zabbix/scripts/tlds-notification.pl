@@ -844,11 +844,11 @@ __END__
 
 =head1 NAME
 
-compliance-notification.pl - calls script.py.
+tlds-notification.pl - calls script.py.
 
 =head1 SYNOPSIS
 
-compliance-notification.pl --send-to <receiver> --event-id <event-id> [--nolog] [--dry-run] [--debug] [--help]
+tlds-notification.pl --send-to <receiver> --event-id <event-id> [--nolog] [--dry-run] [--debug] [--help]
 
 =head1 OPTIONS
 
