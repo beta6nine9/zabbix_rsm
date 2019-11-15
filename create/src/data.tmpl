@@ -24,31 +24,33 @@ ROW   |2     |guest      |Default|User         |d41d8cd98f00b204e9800998ecf8427e
 ROW   |100   |tld-monitor|tld    |monitor      |fedcba9876543210fedcba9876543210|    |1        |0         |en_GB|30s    |1   |default|50           |
 
 TABLE |hstgrp
-FIELDS|groupid|name                  |internal|flags|
-ROW   |1      |Templates             |0       |0    |
-ROW   |5      |Discovered hosts      |1       |0    |
-ROW   |100    |Global macro history  |0       |0    |
-ROW   |110    |Mon                   |0       |0    |
-ROW   |120    |Probes                |0       |0    |
-ROW   |130    |Probes - Mon          |0       |0    |
-ROW   |140    |TLDs                  |0       |0    |
-ROW   |150    |gTLD                  |0       |0    |
-ROW   |160    |ccTLD                 |0       |0    |
-ROW   |170    |testTLD               |0       |0    |
-ROW   |180    |otherTLD              |0       |0    |
-ROW   |190    |TLD Probe results     |0       |0    |
-ROW   |200    |gTLD Probe results    |0       |0    |
-ROW   |210    |ccTLD Probe results   |0       |0    |
-ROW   |220    |testTLD Probe results |0       |0    |
-ROW   |230    |otherTLD Probe results|0       |0    |
-ROW   |240    |Templates - TLD       |0       |0    |
+FIELDS|groupid|name                       |internal|flags|
+ROW   |1      |Templates                  |0       |0    |
+ROW   |5      |Discovered hosts           |1       |0    |
+ROW   |100    |Global macro history       |0       |0    |
+ROW   |110    |Mon                        |0       |0    |
+ROW   |120    |Probes                     |0       |0    |
+ROW   |130    |Probes - Mon               |0       |0    |
+ROW   |140    |TLDs                       |0       |0    |
+ROW   |150    |gTLD                       |0       |0    |
+ROW   |160    |ccTLD                      |0       |0    |
+ROW   |170    |testTLD                    |0       |0    |
+ROW   |180    |otherTLD                   |0       |0    |
+ROW   |190    |TLD Probe results          |0       |0    |
+ROW   |200    |gTLD Probe results         |0       |0    |
+ROW   |210    |ccTLD Probe results        |0       |0    |
+ROW   |220    |testTLD Probe results      |0       |0    |
+ROW   |230    |otherTLD Probe results     |0       |0    |
+ROW   |240    |Templates - TLD            |0       |0    |
+ROW   |241    |Templates/Modules          |0       |0    |
+ROW   |242    |Templates/Operating systems|0       |0    |
+ROW   |243    |Templates/Applications     |0       |0    |
 
 TABLE |media_type
-FIELDS|mediatypeid|type|name  |smtp_server     |smtp_helo  |smtp_email        |exec_path|gsm_modem |username|passwd|status|smtp_port|smtp_security|smtp_verify_peer|smtp_verify_host|smtp_authentication|exec_params                                                   |maxsessions|maxattempts|attempt_interval|content_type|script|timeout|process_tags|show_event_menu|event_menu_url|event_menu_name|description|
-ROW   |1          |0   |Email |mail.company.com|company.com|zabbix@company.com|         |          |        |      |0     |25       |0            |0               |0               |0                  |                                                              |1          |3          |10s             |0           |      |30s    |0           |0              |              |               |           |
-ROW   |2          |1   |Jabber|                |           |                  |dummy.sh |          |        |      |0     |25       |0            |0               |0               |0                  |-username&bsn;jabber@company.com&bsn;-password&bsn;zabbix&bsn;|1          |3          |10s             |0           |      |30s    |0           |0              |              |               |           |
-ROW   |3          |2   |SMS   |                |           |                  |         |/dev/ttyS0|        |      |0     |25       |0            |0               |0               |0                  |                                                              |1          |3          |10s             |0           |      |30s    |0           |0              |              |               |           |
-ROW   |10         |1   |Script|                |           |                  |script.py|          |        |      |0     |25       |0            |0               |0               |0                  |{ALERT.SENDTO}&bsn;{ALERT.SUBJECT}&bsn;{ALERT.MESSAGE}&bsn;   |1          |3          |10s             |0           |      |30s    |0           |0              |              |               |           |
+FIELDS|mediatypeid|type|name  |smtp_server     |smtp_helo  |smtp_email        |exec_path|gsm_modem |username|passwd|status|smtp_port|smtp_security|smtp_verify_peer|smtp_verify_host|smtp_authentication|exec_params                                                |maxsessions|maxattempts|attempt_interval|content_type|script|timeout|process_tags|show_event_menu|event_menu_url|event_menu_name|description|
+ROW   |1          |0   |Email |mail.company.com|company.com|zabbix@company.com|         |          |        |      |0     |25       |0            |0               |0               |0                  |                                                           |1          |3          |10s             |0           |      |30s    |0           |0              |              |               |           |
+ROW   |3          |2   |SMS   |                |           |                  |         |/dev/ttyS0|        |      |0     |25       |0            |0               |0               |0                  |                                                           |1          |3          |10s             |0           |      |30s    |0           |0              |              |               |           |
+ROW   |10         |1   |Script|                |           |                  |script.py|          |        |      |0     |25       |0            |0               |0               |0                  |{ALERT.SENDTO}&bsn;{ALERT.SUBJECT}&bsn;{ALERT.MESSAGE}&bsn;|1          |3          |10s             |0           |      |30s    |0           |0              |              |               |           |
 
 TABLE |usrgrp
 FIELDS|usrgrpid|name                     |gui_access|users_status|debug_mode|
