@@ -4391,6 +4391,45 @@ static int	DBpatch_3000323(void)
 	return SUCCEED;
 }
 
+static int	DBpatch_3000324(void)
+{
+	const char	*command = "/opt/zabbix/scripts/tlds-notification.pl --send-to \\'zabbix alert\\' --event-id \\'{EVENT.ID}\\' &";
+
+	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
+		return SUCCEED;
+
+#define CHECK(CODE) do {                \
+	int result = (CODE);            \
+	if (ZBX_DB_OK > result)         \
+	{                               \
+		return FAIL;            \
+	}                               \
+} while (0)
+
+	/* delete action condition "Trigger value = PROBLEM" */
+	CHECK(DBexecute("delete from conditions where conditionid=131"));
+
+	/* delete data of current "Send message" operation type */
+	CHECK(DBexecute("delete from opmessage_usr where operationid=130"));
+	CHECK(DBexecute("delete from opmessage where operationid=130"));
+
+	/* update operation type to "Remote command" */
+	CHECK(DBexecute("update operations set operationtype=1 where operationid=130"));
+
+	/* unset action's "recovery message", clear message subjects and bodies */
+	CHECK(DBexecute("update actions set def_shortdata='',def_longdata='',recovery_msg=0,r_shortdata='',r_longdata='' where actionid=130"));
+
+	/* create custom script that needs to be executed on the server */
+	CHECK(DBexecute("insert into opcommand set operationid=130,type=0,scriptid=NULL,execute_on=1,port='',"
+			"authtype=0,username='',password='',publickey='',privatekey='',"
+			"command='%s'", command));
+	CHECK(DBexecute("insert into opcommand_hst set opcommand_hstid=130,operationid=130,hostid=NULL"));
+
+	return SUCCEED;
+
+#undef CHECK
+}
+
 #endif
 
 DBPATCH_START(3000)
@@ -4500,5 +4539,6 @@ DBPATCH_ADD(3000320, 0, 1)	/* create rsmhost_dns_ns_log table */
 DBPATCH_ADD(3000321, 0, 0)	/* fill rsmhost_dns_ns_log table */
 DBPATCH_ADD(3000322, 0, 0)	/* fix delta field for 'rsm.slv.%.rtt.%' items */
 DBPATCH_ADD(3000323, 0, 1)	/* add 'created' field to the 'hosts' table */
+DBPATCH_ADD(3000324, 0, 0)	/* changed "TLDs" action to a remote commnad that calls tlds-notification.pl */
 
 DBPATCH_END()
