@@ -561,39 +561,61 @@ class CSlaReport
 
 	private static function getRddsStatus($tlds, $from, $till)
 	{
-		$tlds_subquery = "";
-		foreach ($tlds as $tld)
+		# get itemids of rdap.enabled and rdds.enabled for each TLD
+
+		$tlds_filter = substr(str_repeat("hosts.host like concat(?,' %') or ", count($tlds)), 0, -4);
+		$sql = "select" .
+					" items.itemid," .
+					" hosts.host" .
+				" from" .
+					" items" .
+					" left join hosts on hosts.hostid=items.hostid" .
+					" left join hosts_groups on hosts_groups.hostid=hosts.hostid" .
+				" where" .
+					" items.key_ in ('rdap.enabled','rdds.enabled') and" .
+					" ({$tlds_filter}) and" .
+					" hosts_groups.groupid=190";
+		$rows = self::dbSelect($sql, $tlds);
+
+		$tld_to_itemids = [];
+
+		foreach ($rows as $row)
 		{
-			if ($tlds_subquery === "")
+			list($itemid, $host) = $row;
+
+			$host = explode(" ", $host, 2)[0];
+
+			if (array_key_exists($host, $tld_to_itemids))
 			{
-				$tlds_subquery .= "select ? as tld";
+				array_push($tld_to_itemids[$host], $itemid);
 			}
 			else
 			{
-				$tlds_subquery .= " union all select ?";
+				$tld_to_itemids[$host] = [$itemid];
 			}
 		}
 
-		$sql = "select" .
-				" tlds.tld," .
-				" exists (" .
-					"select * from" .
-						" items" .
-						" left join hosts on hosts.hostid=items.hostid" .
-						" left join hosts_groups on hosts_groups.hostid=hosts.hostid" .
-						" left join history_uint on history_uint.itemid=items.itemid" .
+		# get RDDS status for each TLD
+
+		$status = [];
+
+		foreach ($tld_to_itemids as $tld => $itemids)
+		{
+			$itemids_placeholder = substr(str_repeat("?,", count($itemids)), 0, -1);
+			$sql = "select exists(" .
+					"select *" .
+					" from history_uint" .
 					" where" .
-						" items.key_ in ('rdap.enabled','rdds.enabled') and" .
-						" hosts.host like concat(tlds.tld,' %') and" .
-						" hosts_groups.groupid=190 and" .
-						" history_uint.clock between ? and ? and" .
-						" history_uint.value=1" .
-				") as status" .
-			" from ({$tlds_subquery}) as tlds";
+						" clock between ? and ?" .
+						" and itemid in ({$itemids_placeholder}) and" .
+						" value = 1" .
+				") as status";
+			$params = array_merge([$from, $till], $itemids);
+			$rows = self::dbSelect($sql, $params);
+			array_push($status, [$tld, $rows[0][0]]);
+		}
 
-		$params = array_merge([$from, $till], $tlds);
-
-		return self::dbSelect($sql, $params);
+		return $status;
 	}
 
 	private static function getTldHostIds($tlds, $from)
