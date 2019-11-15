@@ -10,7 +10,7 @@ use constant false => 0;
 use constant MONITORING_TARGET_REGISTRY  => "registry";
 use constant MONITORING_TARGET_REGISTRAR => "registrar";
 
-use constant LINUX_TEMPLATEID			=> 10001;	# Template "Template OS Linux"
+use constant LINUX_TEMPLATEID			=> 10001;	# Template "Template OS Linux by Zabbix agent"
 use constant APP_ZABBIX_PROXY_TEMPLATEID	=> 10058;	# Template "Template App Zabbix Proxy"
 use constant PROBE_ERRORS_TEMPLATEID		=> 99990;	# Template "Template Probe Errors"
 use constant RDAP_TEMPLATEID			=> 99980;	# Template "Template RDAP"
