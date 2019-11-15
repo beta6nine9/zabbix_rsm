@@ -601,18 +601,28 @@ class CSlaReport
 
 		foreach ($tld_to_itemids as $tld => $itemids)
 		{
-			$itemids_placeholder = substr(str_repeat("?,", count($itemids)), 0, -1);
-			$sql = "select exists(" .
-					"select *" .
-					" from history_uint" .
-					" where" .
-						" clock between ? and ?" .
-						" and itemid in ({$itemids_placeholder}) and" .
-						" value = 1" .
-				") as status";
-			$params = array_merge([$from, $till], $itemids);
-			$rows = self::dbSelect($sql, $params);
-			array_push($status, [$tld, $rows[0][0]]);
+			$tld_status = 0;
+
+			foreach ($itemids as $itemid)
+			{
+				$sql = "select exists(" .
+						"select *" .
+						" from history_uint" .
+						" where" .
+							" clock between ? and ?" .
+							" and itemid=? and" .
+							" value=1" .
+					") as status";
+				$rows = self::dbSelect($sql, [$from, $till, $itemid]);
+
+				if ($rows[0][0])
+				{
+					$tld_status = 1;
+					break;
+				}
+			}
+
+			array_push($status, [$tld, $tld_status]);
 		}
 
 		return $status;
