@@ -37,9 +37,9 @@ static int	DBpatch_4040000(void)
 
 static int	DBpatch_4040300(void)
 {
-	zabbix_log(LOG_LEVEL_CRIT, "There is no automatic database upgrade");
+	/* this patch begins RSM FY20 upgrade sequence and has been intentionally left blank */
 
-	return FAIL;
+	return SUCCEED;
 }
 
 static int	DBpatch_4040301(void)
