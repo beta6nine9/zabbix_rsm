@@ -1,3 +1,10 @@
+Changes for rsm1.3.0rc14
+
+Bug fixes:
+........S. [619] updated "insert into history" queries to ignore dupicate entries (asitals)
+....I..... [617] divided long-running queries into thousands of tiny queries in sla-monthly-status.pl to avoid DB connection timeouts (asitals)
+
+--------------------------------------------------------------------------------
 Changes for rsm1.3.0rc13
 
 Bug fixes:
