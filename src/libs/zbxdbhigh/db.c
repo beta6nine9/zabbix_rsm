@@ -2612,7 +2612,23 @@ retry_oracle:
 		if (',' == sql[sql_offset - 1])
 		{
 			sql_offset--;
-			zbx_strcpy_alloc(&sql, &sql_alloc, &sql_offset, ";\n");
+
+			if (0 == strcmp(self->table->table, "history") ||
+					0 == strcmp(self->table->table, "history_uint") ||
+					0 == strcmp(self->table->table, "history_str") ||
+					0 == strcmp(self->table->table, "history_text") ||
+					0 == strcmp(self->table->table, "history_log"))
+			{
+#if ZABBIX_VERSION_MAJOR != 3
+#error "This is needed only for Zabbix Server 3.x, see issue #619"
+#endif
+				zbx_strcpy_alloc(&sql, &sql_alloc, &sql_offset,
+						" on duplicate key update clock=clock;\n");
+			}
+			else
+			{
+				zbx_strcpy_alloc(&sql, &sql_alloc, &sql_offset, ";\n");
+			}
 		}
 #	endif
 		DBend_multiple_update(sql, sql_alloc, sql_offset);
