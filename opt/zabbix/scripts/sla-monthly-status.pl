@@ -278,42 +278,33 @@ sub get_data($$$$)
 	my $from          = shift; # timestamp
 	my $till          = shift; # timestamp
 
-	my @itemids_params = (); # all itemids for use in subquery
-	my @filter_params = ();  # [<itemid1, itemid2, ..., slr>, <itemid3, ..., slr>, ...]
-	my $filter_sql = "";
+	my $query  = "select value,clock" .
+			" from $history_table" .
+			" where itemid=? and clock between ? and ?" .
+			" order by clock desc" .
+			" limit 1";
+
+	my $result = [];
 
 	foreach my $slr (keys(%{$itemids}))
 	{
-		if ($filter_sql)
+		foreach my $itemid (@{$itemids->{$slr}})
 		{
-			$filter_sql .= " or ";
+			my $rows = db_select($query, [$itemid, $from, $till]);
+
+			if (@{$rows})
+			{
+				my ($value, $clock) = @{$rows->[0]};
+
+				if ($value > $slr)
+				{
+					push(@{$result}, [$itemid, $value, $clock]);
+				}
+			}
 		}
-
-		my $itemids_placeholder = join(",", ("?") x scalar(@{$itemids->{$slr}}));
-		$filter_sql .= "($history_table.itemid in ($itemids_placeholder) and value > ?)";
-
-		push(@itemids_params, @{$itemids->{$slr}});
-		push(@filter_params, @{$itemids->{$slr}});
-		push(@filter_params, $slr);
 	}
 
-	my $itemids_placeholder = join(",", ("?") x scalar(@itemids_params));
-	my $sql = "select $history_table.itemid, $history_table.value, $history_table.clock" .
-		" from $history_table," .
-			" (" .
-				"select itemid, max(clock) as max_clock" .
-				" from $history_table" .
-				" where clock between ? and ? and" .
-					" itemid in ($itemids_placeholder)" .
-				" group by itemid" .
-			") as history_max_clock" .
-		" where $history_table.itemid = history_max_clock.itemid and" .
-			" $history_table.clock = history_max_clock.max_clock and" .
-			" ($filter_sql)";
-
-	my @params = ($from, $till, @itemids_params, @filter_params);
-
-	return db_select($sql, \@params);
+	return $result;
 }
 
 sub get_history($$$)
