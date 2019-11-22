@@ -237,6 +237,9 @@ sub add_probe($$$$$$$$$$$)
 					'templateid'	=> $main_templateid
 				},
 				{
+					'templateid'	=> DNS_TEMPLATEID
+				},
+				{
 					'templateid'	=> RDAP_TEMPLATEID
 				},
 				{

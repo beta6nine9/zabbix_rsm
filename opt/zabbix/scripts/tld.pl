@@ -1029,6 +1029,8 @@ sub create_main_template($$)
 		}));
 	}
 
+	my $name_servers_list = '';
+
 	foreach my $ns_name (sort keys %{$ns_servers})
 	{
 		print $ns_name . "\n";
@@ -1041,10 +1043,8 @@ sub create_main_template($$)
 			next unless defined $ipv4[$i_ipv4];
 			print("	--v4     $ipv4[$i_ipv4]\n");
 
-			if (opt('epp-servers'))
-			{
-				create_item_dns_udp_upd($ns_name, $ipv4[$i_ipv4], $templateid);
-			}
+			$name_servers_list .= " " unless ($name_servers_list eq '');
+			$name_servers_list .= "$ns_name,$ipv4[$i_ipv4]";
 		}
 
 		for (my $i_ipv6 = 0; $i_ipv6 <= $#ipv6; $i_ipv6++)
@@ -1052,12 +1052,12 @@ sub create_main_template($$)
 			next unless defined $ipv6[$i_ipv6];
 			print("	--v6     $ipv6[$i_ipv6]\n");
 
-			if (opt('epp-servers'))
-			{
-				create_item_dns_udp_upd($ns_name, $ipv6[$i_ipv6], $templateid);
-			}
+			$name_servers_list .= " " unless ($name_servers_list eq '');
+			$name_servers_list .= "$ns_name,$ipv6[$i_ipv6]";
 		}
 	}
+
+	really(create_macro('{$RSM.DNS.NAME.SERVERS}', $name_servers_list, $templateid, 1));
 
 	create_items_rdds($templateid);
 	create_items_epp($templateid) if (opt('epp-servers'));
@@ -1176,26 +1176,6 @@ sub create_slv_item($$$$$;$)
 	}
 
 	pfail("Unknown value type $value_type.");
-}
-
-sub create_item_dns_udp_upd($$$)
-{
-	my $ns_name       = shift;
-	my $ip            = shift;
-	my $templateid    = shift;
-
-	my $proto_uc = 'UDP';
-
-	return really(create_item({
-		'name'         => 'DNS update time of $2 ($3)',
-		'key_'         => 'rsm.dns.udp.upd[{$RSM.TLD},' . $ns_name . ',' . $ip . ']',
-		'status'       => (opt('epp-servers') ? ITEM_STATUS_ACTIVE : ITEM_STATUS_DISABLED),
-		'hostid'       => $templateid,
-		'applications' => [get_application_id('DNS RTT (' . $proto_uc . ')', $templateid)],
-		'type'         => ITEM_TYPE_TRAPPER,
-		'value_type'   => ITEM_VALUE_TYPE_FLOAT,
-		'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_dns_rtt'}
-	}));
 }
 
 sub create_items_rdds($)
@@ -1929,6 +1909,7 @@ sub create_tld_hosts_on_probes($$$$)
 			],
 			'templates' => [
 				{'templateid' => $main_templateid},
+				{'templateid' => DNS_TEMPLATEID},
 				{'templateid' => RDAP_TEMPLATEID},
 				{'templateid' => $probe_templateid}
 			],
