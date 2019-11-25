@@ -60,7 +60,8 @@
 #define UNEXPECTED_LDNS_ERROR		"unexpected LDNS error"
 #define UNEXPECTED_LDNS_MEM_ERROR	UNEXPECTED_LDNS_ERROR " (out of memory?)"
 
-#define LDNS_EDNS_NSID 3
+#define LDNS_EDNS_NSID		3
+#define LDNS_QUERY_FLAGS	0
 
 extern const char	*CONFIG_LOG_FILE;
 extern const char	epp_passphrase[128];
@@ -1227,71 +1228,114 @@ static int	zbx_dns_in_a_query(ldns_pkt **pkt, ldns_resolver *res, const ldns_rdf
 	ldns_status	status;
 	char		is_tcp = ldns_resolver_usevc(res);
 	double		sec;
-	ldns_pkt        *query = NULL;
-	ldns_rdf        *recv_nsid = NULL;
-	ldns_rdf        *send_nsid = NULL;
-	ldns_buffer     *opt_buf = ldns_buffer_new(4);
+	ldns_pkt	*query = NULL;
+	ldns_rdf	*recv_nsid = NULL;
+	ldns_rdf	*send_nsid = NULL;
+	uint16_t	opt_code, opt_len;
+	size_t		opt_code_size = sizeof(opt_code);
+	size_t		opt_len_size = sizeof(opt_len);
+	size_t		opt_code_and_opt_len_size = opt_code_size + opt_len_size;
+	ldns_buffer	*opt_buf = ldns_buffer_new(opt_code_and_opt_len_size);
+	int		resume_ldns_processing = 1;
 
-	if (!opt_buf)
+	if (NULL == opt_buf)
 	{
 		zbx_snprintf(err, err_size, "Memory error");
 		return FAIL;
 	}
 
-	ldns_buffer_write_u16(opt_buf, LDNS_EDNS_NSID); /* Option code */
-	ldns_buffer_write_u16(opt_buf, 0);		/* Option size */
+	ldns_buffer_write_u16(opt_buf, LDNS_EDNS_NSID);	/* option code */
+	ldns_buffer_write_u16(opt_buf, 0);		/* option size */
 
 	sec = zbx_time();
 
-	if ((status = ldns_resolver_prepare_query_pkt(&query, res, testname_rdf, LDNS_RR_TYPE_A, LDNS_RR_CLASS_IN,
-			0 /* query flags */)))
+	status = ldns_resolver_prepare_query_pkt(&query, res, testname_rdf, LDNS_RR_TYPE_A, LDNS_RR_CLASS_IN,
+			LDNS_QUERY_FLAGS);
+
+	if (LDNS_STATUS_OK != status)
+	{
 		zbx_snprintf(err, err_size, "Could not create query packet");
-	else if (!(send_nsid = ldns_rdf_new_frm_data(LDNS_RDF_TYPE_NONE, ldns_buffer_position(opt_buf),
-			ldns_buffer_begin(opt_buf))))
-		zbx_snprintf(err, err_size, "Could not create EDNS option");
-	else if ((ldns_pkt_set_edns_data(query, send_nsid)), 0)
-		; /* pass */
-	else if ((status = ldns_resolver_send_pkt(pkt, res, query)))
-		zbx_snprintf(err, err_size, "Could not send query");
-	else if (!(recv_nsid = ldns_pkt_edns_data(*pkt)))
-		zbx_snprintf(err, err_size, "Could not get EDNS data");
-	else
+		resume_ldns_processing = 0;
+	}
+
+	if (0 != resume_ldns_processing)
+	{
+		send_nsid = ldns_rdf_new_frm_data(LDNS_RDF_TYPE_NONE, ldns_buffer_position(opt_buf),
+				ldns_buffer_begin(opt_buf));
+
+		if (NULL == send_nsid)
+		{
+			zbx_snprintf(err, err_size, "Could not create EDNS option");
+			resume_ldns_processing = 0;
+		}
+	}
+
+	if (0 != resume_ldns_processing)
+	{
+		ldns_pkt_set_edns_data(query, send_nsid);
+	}
+
+	if (0 != resume_ldns_processing)
+	{
+		status = ldns_resolver_send_pkt(pkt, res, query);
+
+		if (LDNS_STATUS_OK != status)
+		{
+			zbx_snprintf(err, err_size, "Could not send query");
+			resume_ldns_processing = 0;
+		}
+	}
+
+	if (0 != resume_ldns_processing)
+	{
+		recv_nsid = ldns_pkt_edns_data(*pkt);
+
+		if (NULL == recv_nsid)
+		{
+			zbx_snprintf(err, err_size, "Could not get EDNS data");
+			resume_ldns_processing = 0;
+		}
+	}
+
+	if (0 != resume_ldns_processing)
 	{
 		uint8_t *data = ldns_rdf_data(recv_nsid);
 		size_t   size = ldns_rdf_size(recv_nsid);
-		uint16_t opt_code, opt_len;
 
-		while (size >= 4 /* number of bytes in uint16_t data for both opt_code and opt_len */)
+		while (size >= opt_code_and_opt_len_size)
 		{
-			/* Read option code */
+			/* read option code */
 			opt_code = ldns_read_uint16(data);
-			size -= 2; data += 2;
+			size -= opt_code_size; data += opt_code_size;
 
-			/* Read option length */
-			opt_len  = ldns_read_uint16(data);
-			size -= 2; data += 2;
+			/* read option length */
+			opt_len = ldns_read_uint16(data);
+			size -= opt_len_size; data += opt_len_size;
 
-			if (opt_code == LDNS_EDNS_NSID)
+			if (LDNS_EDNS_NSID == opt_code)
 			{
-				/* printf(", returned NSID: \"%.*s\"\n", (int)opt_len, data); */
+				rsm_infof(NULL, ", returned NSID: \"%.*s\"\n", (int)opt_len, data);
 				break;
 			}
-			/* Next option */
+
+			/* next option */
 			size = opt_len > size ? 0 : size - opt_len;
 		}
 
-		if (!size)
+		if (0 == size)
 			zbx_snprintf(err, err_size, "No EDNS NSID option was returned");
 	}
 
-	if (opt_buf)
+	if (NULL != opt_buf)
 		ldns_buffer_free(opt_buf);
-	if (query)
+	if (NULL != query)
 		ldns_pkt_free(query);
 
 	sec = zbx_time() - sec;
 
-	if (LDNS_STATUS_OK == status)
+	/* NSID is optional for a nameserver, so it is not a failure if it was not returned (null recv_nsid). */
+	/* Not constructing EDNS option (null send_nsid) is still a failure. */
+	if (LDNS_STATUS_OK == status && send_nsid)
 		return SUCCEED;
 
 	zbx_snprintf(err, err_size, "cannot connect to nameserver: %s", ldns_get_errorstr_by_id(status));
