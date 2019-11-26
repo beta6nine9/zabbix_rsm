@@ -1243,12 +1243,12 @@ static int	zbx_dns_in_a_query(ldns_pkt **pkt, ldns_resolver *res, const ldns_rdf
 	size_t		opt_len_size = sizeof(opt_len);
 	size_t		opt_code_and_opt_len_size = opt_code_size + opt_len_size;
 	ldns_buffer	*opt_buf = ldns_buffer_new(opt_code_and_opt_len_size);
-	int		resume_ldns_processing = 1;
+	int		ret = FAIL;
 
 	if (NULL == opt_buf)
 	{
-		zbx_snprintf(err, err_size, "Memory error");
-		return FAIL;
+		zabbix_log(LOG_LEVEL_CRIT, "ldns_buffer_new memory error at %s", __func__);
+		exit(EXIT_FAILURE);
 	}
 
 	ldns_buffer_write_u16(opt_buf, LDNS_EDNS_NSID);	/* option code */
@@ -1261,86 +1261,72 @@ static int	zbx_dns_in_a_query(ldns_pkt **pkt, ldns_resolver *res, const ldns_rdf
 	if (LDNS_STATUS_OK != status)
 	{
 		zbx_snprintf(err, err_size, "Could not create query packet");
-		resume_ldns_processing = 0;
+		goto err;
 	}
 
-	if (0 != resume_ldns_processing)
-	{
-		send_nsid = ldns_rdf_new_frm_data(LDNS_RDF_TYPE_NONE, ldns_buffer_position(opt_buf),
-				ldns_buffer_begin(opt_buf));
+	send_nsid = ldns_rdf_new_frm_data(LDNS_RDF_TYPE_NONE, ldns_buffer_position(opt_buf),
+			ldns_buffer_begin(opt_buf));
 
-		if (NULL == send_nsid)
+	if (NULL == send_nsid)
+	{
+		zabbix_log(LOG_LEVEL_CRIT, "ldns_rdf_new_from_data memory error at %s", __func__);
+		exit(EXIT_FAILURE);
+	}
+
+	ldns_pkt_set_edns_data(query, send_nsid);
+
+	status = ldns_resolver_send_pkt(pkt, res, query);
+
+	if (LDNS_STATUS_OK != status)
+	{
+		zbx_snprintf(err, err_size, "Could not send query");
+		goto err;
+	}
+
+	recv_nsid = ldns_pkt_edns_data(*pkt);
+
+	if (NULL == recv_nsid)
+	{
+		rsm_infof(NULL, " Could not get EDNS data\n");
+		if (LDNS_STATUS_OK == status)
 		{
-			zbx_snprintf(err, err_size, "Could not create EDNS option");
-			resume_ldns_processing = 0;
+			ret = SUCCEED;
+			goto out;
 		}
 	}
 
-	if (0 != resume_ldns_processing)
-	{
-		ldns_pkt_set_edns_data(query, send_nsid);
-	}
+	uint8_t	*data = ldns_rdf_data(recv_nsid);
+	size_t	size = ldns_rdf_size(recv_nsid);
 
-	if (0 != resume_ldns_processing)
+	while (size >= opt_code_and_opt_len_size)
 	{
-		status = ldns_resolver_send_pkt(pkt, res, query);
+		opt_code = ldns_read_uint16(data);
+		size -= opt_code_size; data += opt_code_size;
 
-		if (LDNS_STATUS_OK != status)
+		opt_len = ldns_read_uint16(data);
+		size -= opt_len_size; data += opt_len_size;
+
+		if (LDNS_EDNS_NSID == opt_code)
 		{
-			zbx_snprintf(err, err_size, "Could not send query");
-			resume_ldns_processing = 0;
-		}
-	}
-
-	if (0 != resume_ldns_processing)
-	{
-		recv_nsid = ldns_pkt_edns_data(*pkt);
-
-		if (NULL == recv_nsid)
-		{
-			zbx_snprintf(err, err_size, "Could not get EDNS data");
-			resume_ldns_processing = 0;
-		}
-	}
-
-	if (0 != resume_ldns_processing)
-	{
-		uint8_t	*data = ldns_rdf_data(recv_nsid);
-		size_t	size = ldns_rdf_size(recv_nsid);
-
-		while (size >= opt_code_and_opt_len_size)
-		{
-			opt_code = ldns_read_uint16(data);
-			size -= opt_code_size; data += opt_code_size;
-
-			opt_len = ldns_read_uint16(data);
-			size -= opt_len_size; data += opt_len_size;
-
-			if (LDNS_EDNS_NSID == opt_code)
-			{
-				rsm_infof(NULL, ", returned NSID: \"%.*s\"\n", (int)opt_len, data);
-				break;
-			}
-
-			/* next option */
-			size = opt_len > size ? 0 : size - opt_len;
+			rsm_infof(NULL, ", returned NSID: \"%.*s\"\n", (int)opt_len, data);
+			break;
 		}
 
-		if (0 == size)
-			zbx_snprintf(err, err_size, "No EDNS NSID option was returned");
+		/* next option */
+		size = opt_len > size ? 0 : size - opt_len;
 	}
 
-	if (NULL != opt_buf)
-		ldns_buffer_free(opt_buf);
-	if (NULL != query)
-		ldns_pkt_free(query);
+	if (0 == size)
+		zbx_snprintf(err, err_size, "No EDNS NSID option was returned");
 
+	if (LDNS_STATUS_OK == status)
+	{
+		ret = SUCCEED;
+		goto out;
+	}
+
+err:
 	sec = zbx_time() - sec;
-
-	/* NSID is optional for a nameserver, so it is not a failure if it was not returned (null recv_nsid). */
-	/* Not constructing EDNS option (null send_nsid) is still a failure. */
-	if (LDNS_STATUS_OK == status && send_nsid)
-		return SUCCEED;
 
 	zbx_snprintf(err, err_size, "cannot connect to nameserver: %s", ldns_get_errorstr_by_id(status));
 
@@ -1377,7 +1363,13 @@ static int	zbx_dns_in_a_query(ldns_pkt **pkt, ldns_resolver *res, const ldns_rdf
 			*ec = ZBX_NS_QUERY_CATCHALL;
 	}
 
-	return FAIL;
+out:
+	if (NULL != opt_buf)
+		ldns_buffer_free(opt_buf);
+	if (NULL != query)
+		ldns_pkt_free(query);
+
+	return ret;
 }
 
 /* Check every RR in rr_set, return  */
