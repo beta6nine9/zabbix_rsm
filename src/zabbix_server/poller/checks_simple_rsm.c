@@ -1260,7 +1260,7 @@ static int	zbx_dns_in_a_query(ldns_pkt **pkt, ldns_resolver *res, const ldns_rdf
 
 	if (LDNS_STATUS_OK != status)
 	{
-		zbx_snprintf(err, err_size, "Could not create query packet");
+		zbx_snprintf(err, err_size, "Could not create query packet: %s", ldns_get_errorstr_by_id(status));
 		goto err;
 	}
 
@@ -1279,8 +1279,12 @@ static int	zbx_dns_in_a_query(ldns_pkt **pkt, ldns_resolver *res, const ldns_rdf
 
 	if (LDNS_STATUS_OK != status)
 	{
-		zbx_snprintf(err, err_size, "Could not send query");
+		zbx_snprintf(err, err_size, "Could not send query: %s", ldns_get_errorstr_by_id(status));
 		goto err;
+	}
+	else
+	{
+		ret = SUCCEED;
 	}
 
 	recv_nsid = ldns_pkt_edns_data(*pkt);
@@ -1288,11 +1292,7 @@ static int	zbx_dns_in_a_query(ldns_pkt **pkt, ldns_resolver *res, const ldns_rdf
 	if (NULL == recv_nsid)
 	{
 		rsm_infof(NULL, " Could not get EDNS data\n");
-		if (LDNS_STATUS_OK == status)
-		{
-			ret = SUCCEED;
-			goto out;
-		}
+		goto out;
 	}
 
 	uint8_t	*data = ldns_rdf_data(recv_nsid);
@@ -1308,7 +1308,7 @@ static int	zbx_dns_in_a_query(ldns_pkt **pkt, ldns_resolver *res, const ldns_rdf
 
 		if (LDNS_EDNS_NSID == opt_code)
 		{
-			rsm_infof(NULL, ", returned NSID: \"%.*s\"\n", (int)opt_len, data);
+			rsm_infof(NULL, "Returned NSID: \"%.*s\"\n", (int)opt_len, data);
 			break;
 		}
 
@@ -1317,18 +1317,12 @@ static int	zbx_dns_in_a_query(ldns_pkt **pkt, ldns_resolver *res, const ldns_rdf
 	}
 
 	if (0 == size)
-		zbx_snprintf(err, err_size, "No EDNS NSID option was returned");
+		rsm_infof(NULL, "No EDNS NSID option was returned \n");
 
-	if (LDNS_STATUS_OK == status)
-	{
-		ret = SUCCEED;
-		goto out;
-	}
+	goto out;
 
 err:
 	sec = zbx_time() - sec;
-
-	zbx_snprintf(err, err_size, "cannot connect to nameserver: %s", ldns_get_errorstr_by_id(status));
 
 	switch (status)
 	{
