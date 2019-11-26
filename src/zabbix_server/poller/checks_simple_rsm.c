@@ -61,7 +61,6 @@
 #define UNEXPECTED_LDNS_MEM_ERROR	UNEXPECTED_LDNS_ERROR " (out of memory?)"
 
 #define LDNS_EDNS_NSID		3
-#define LDNS_QUERY_FLAGS	0
 
 extern const char	*CONFIG_LOG_FILE;
 extern const char	epp_passphrase[128];
@@ -1257,8 +1256,7 @@ static int	zbx_dns_in_a_query(ldns_pkt **pkt, ldns_resolver *res, const ldns_rdf
 
 	sec = zbx_time();
 
-	status = ldns_resolver_prepare_query_pkt(&query, res, testname_rdf, LDNS_RR_TYPE_A, LDNS_RR_CLASS_IN,
-			LDNS_QUERY_FLAGS);
+	status = ldns_resolver_prepare_query_pkt(&query, res, testname_rdf, LDNS_RR_TYPE_A, LDNS_RR_CLASS_IN, 0);
 
 	if (LDNS_STATUS_OK != status)
 	{
@@ -1307,16 +1305,14 @@ static int	zbx_dns_in_a_query(ldns_pkt **pkt, ldns_resolver *res, const ldns_rdf
 
 	if (0 != resume_ldns_processing)
 	{
-		uint8_t *data = ldns_rdf_data(recv_nsid);
-		size_t   size = ldns_rdf_size(recv_nsid);
+		uint8_t	*data = ldns_rdf_data(recv_nsid);
+		size_t	size = ldns_rdf_size(recv_nsid);
 
 		while (size >= opt_code_and_opt_len_size)
 		{
-			/* read option code */
 			opt_code = ldns_read_uint16(data);
 			size -= opt_code_size; data += opt_code_size;
 
-			/* read option length */
 			opt_len = ldns_read_uint16(data);
 			size -= opt_len_size; data += opt_len_size;
 
