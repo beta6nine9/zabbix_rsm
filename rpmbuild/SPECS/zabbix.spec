@@ -108,6 +108,9 @@ Requires(preun):	/sbin/service
 Requires(postun):	/sbin/service
 %endif
 Requires:		ldns >= 1.6.17
+Requires:		perl-Data-Dumper
+Requires:		perl-DBD-MySQL
+Requires:		perl-Devel-StackTrace
 Provides:		zabbix-server = %{version}-%{release}
 Provides:		zabbix-server-implementation = %{version}-%{release}
 Obsoletes:		zabbix

@@ -17,6 +17,73 @@ New features:
 ..F.I..... [510] added support for Registrar RDDS Monitoring (dimir, yurii, asitals, miks, gcalenko)
 
 --------------------------------------------------------------------------------
+Changes for rsm1.3.0rc15
+
+Bug fixes:
+....I..... [622] added missing module in maintenance-api-data.pl (asitals)
+....I..... [620] fixed uninitialized value warning in list-tlds.pl script (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.3.0rc14
+
+Bug fixes:
+........S. [619] updated "insert into history" queries to ignore dupicate entries (asitals)
+....I..... [617] divided long-running queries into thousands of tiny queries in sla-monthly-status.pl to avoid DB connection timeouts (asitals)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.3.0rc13
+
+Bug fixes:
+....I..... [598] added redirection of output of MySQL_part_management.pl script to a logfile (asitals)
+....I..... [528] created tlds-notification.pl scripts for customizing alerts (asitals)
+....I..... [610] improved performance of generating XML reports (asitals)
+....I..... [607] added script for finding gaps (and duplicates, as a side effect) in SLV calculations (asitals)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.3.0rc12
+
+Bug fixes:
+....I..... [575] added script misc/fill-data.pl to fill database with data for Compliance testing (dimir)
+....I..... [586] improved "dimir was wrong" error messages (asitals)
+....I..... [585] added --fill-gap option to SLV scripts (asitals)
+....I..... [587] fixed waiting for data to appear in lastvalue and history tables (asitals)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.3.0rc11
+
+Bug fixes:
+....I..... [580] changed default keep_history from 60 to 75 in MySQL partitioning script (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.3.0rc10
+
+Bug fixes:
+....I..... [568] added code to ignore rmshosts added during previous month when generating monthly alerts and reports, wait until history syncers on Zabbix Server store pushed data into DB before exiting (asitals)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.3.0rc9
+
+Bug fixes:
+....I..... [sub-576] fixed function call unset_log_tld() (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.3.0rc8
+
+Bug fixes:
+....I..... [sub-576] removed debug print when setting TLD prefix of SLV logs (dimir)
+....I..... [577] added printing error message from sla-report.php when generating reports from Perl scripts (asitals)
+....I..... [573] always send ratio of failed rtts (asitals)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.3.0rc7
+
+Bug fixes:
+....I..... [572] fixed SQL error when no TLDs present in the system (dimir)
+
+New features:
+....I..... [576] added TLD prefix to SLV logs (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm1.3.0rc6
 
 New features:
@@ -70,6 +137,37 @@ Changes for rsm1.3.0rc1
 
 New features:
 ..F.I..... [170] added support for Compliance SLA monitoring (dimir, yurii, asitals, miks, gcalenko)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.2.14
+
+Bug fixes:
+....I..... [588] added code to continue generating recent measurements from the most recent available, respecting new configuration option "initial_measurements_limit" with default value of 2 hours (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.2.13
+
+Bug fixes:
+....I..... [sub-538] fixed selecting cycles that need to be processed (asitals)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.2.12
+
+Bug fixes:
+....I..... [sub-538] fixed twice re-processing of last processed cycle in sla-api-recent.pl (asitals)
+....I..... [579] fixed de-referencing undefined value as a hash key in sla-api-recent.pl (asitals)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.2.11
+
+Bug fixes:
+....I..... [538] added code to generate recent measurement files only once, after service availability is calculated; drop monitoring data from proxy that is over 90 seconds old (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.2.10
+
+Bug fixes:
+....I..... [537] added locking of last_update.txt, removed reading lastclock from history tables in sla-api-recent.pl (asitals)
 
 --------------------------------------------------------------------------------
 Changes for rsm1.2.9
