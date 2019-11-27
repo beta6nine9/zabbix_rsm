@@ -4404,7 +4404,7 @@ sub convert_suffixed_number($)
 	my $number = shift;
 
 	my %suffix_map = (
-		"k" => 1024,
+		"K" => 1024,
 		"M" => 1048576,
 		"G" => 1073741824,
 		"T" => 1099511627776,
