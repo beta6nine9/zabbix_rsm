@@ -2502,7 +2502,7 @@ sub process_slv_avail_cycles($$$$$$$$$)
 				{
 					# fail("cannot get input keys for Service availability calculation");
 
-					# We used to fail here but not anymore because rsm.rdds items can be 
+					# We used to fail here but not anymore because rsm.rdds items can be
 					# disabled after switch to RDAP standalone. So some of TLDs may not have
 					# RDDS checks thus making SLV calculations for rsm.slv.rdds.* useless
 
@@ -4399,6 +4399,30 @@ sub generate_report($$;$)
 	}
 }
 
+sub convert_suffixed_number($)
+{
+	my $number = shift;
+
+	my %suffix_map = (
+		"k" => 1024,
+		"M" => 1048576,
+		"G" => 1073741824,
+		"T" => 1099511627776,
+		"s" => 1,
+		"m" => 60,
+		"h" => 3600,
+		"d" => 86400,
+		"w" => 7*86400
+	);
+	my $suffix = substr($number, -1);
+
+	return $number unless (exists($suffix_map{$suffix}));
+
+	substr($number, -1) = '';
+
+	return $number * $suffix_map{$suffix};
+}
+
 sub usage
 {
 	pod2usage(shift);
@@ -4995,30 +5019,6 @@ sub __fp_get_oldest_clock($$)
 	my $params = [$rsmhost];
 
 	return db_select_value($sql, $params);
-}
-
-sub convert_suffixed_number($)
-{
-	my $number = shift;
-
-	my %suffix_map = (
-		"k" => 1024,
-		"M" => 1048576,
-		"G" => 1073741824,
-		"T" => 1099511627776,
-		"s" => 1,
-		"m" => 60,
-		"h" => 3600,
-		"d" => 86400,
-		"w" => 7*86400
-	);
-	my $suffix = substr($number, -1);
-
-	return $number unless (exists($suffix_map{$suffix}));
-
-	substr($number, -1) = '';
-
-	return $number * $suffix_map{$suffix};
 }
 
 #################
