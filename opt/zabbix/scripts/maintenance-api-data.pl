@@ -12,6 +12,7 @@ use warnings;
 use Path::Tiny qw(path);
 use ApiHelper;
 use RSM;
+use RSMSLV; # required for ApiHelper
 
 my $error = rsm_targets_prepare(AH_SLA_API_TMP_DIR, AH_SLA_API_DIR);
 
