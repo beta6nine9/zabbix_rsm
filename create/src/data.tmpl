@@ -402,7 +402,7 @@ ROW   |100     |Probes-Critical|3600      |system-critical#{TRIGGER.STATUS}#{HOS
 ROW   |110     |Probes-Mon     |3600      |probes#{TRIGGER.STATUS}#{HOST.NAME1}#{ITEM.NAME1}#{ITEM.VALUE1}         |{EVENT.DATE} {EVENT.TIME} UTC|1           |probes#{TRIGGER.STATUS}#{HOST.NAME1}#{ITEM.NAME1}#{ITEM.VALUE1}         |{EVENT.RECOVERY.DATE} {EVENT.RECOVERY.TIME} UTC|
 ROW   |115     |Probes         |3600      |probes#{TRIGGER.STATUS}#{HOST.NAME1}#{ITEM.NAME1}#{ITEM.VALUE1}         |{EVENT.DATE} {EVENT.TIME} UTC|1           |probes#{TRIGGER.STATUS}#{HOST.NAME1}#{ITEM.NAME1}#{ITEM.VALUE1}         |{EVENT.RECOVERY.DATE} {EVENT.RECOVERY.TIME} UTC|
 ROW   |120     |Central-Server |3600      |system#{TRIGGER.STATUS}#{HOST.NAME1}#{ITEM.NAME1}#{ITEM.VALUE1}         |{EVENT.DATE} {EVENT.TIME} UTC|1           |system#{TRIGGER.STATUS}#{HOST.NAME1}#{ITEM.NAME1}#{ITEM.VALUE1}         |{EVENT.RECOVERY.DATE} {EVENT.RECOVERY.TIME} UTC|
-ROW   |130     |TLDs           |3600      |tld#{TRIGGER.STATUS}#{HOST.NAME1}#{ITEM.NAME1}#{ITEM.VALUE1}            |{EVENT.DATE} {EVENT.TIME} UTC|1           |tld#{TRIGGER.STATUS}#{HOST.NAME1}#{ITEM.NAME1}#{ITEM.VALUE1}            |{EVENT.RECOVERY.DATE} {EVENT.RECOVERY.TIME} UTC|
+ROW   |130     |TLDs           |3600      |                                                                        |                             |0           |                                                                        |                                               |
 ROW   |140     |Probes-Knockout|3600      |probes#{TRIGGER.STATUS}#{HOST.NAME1}#{ITEM.NAME1}#{ITEM.VALUE1}         |{EVENT.DATE} {EVENT.TIME} UTC|1           |probes#{TRIGGER.STATUS}#{HOST.NAME1}#{ITEM.NAME1}#{ITEM.VALUE1}         |{EVENT.RECOVERY.DATE} {EVENT.RECOVERY.TIME} UTC|
 
 TABLE |operations
@@ -411,7 +411,7 @@ ROW   |100        |100     |0            |
 ROW   |110        |110     |0            |
 ROW   |115        |115     |0            |
 ROW   |120        |120     |0            |
-ROW   |130        |130     |0            |
+ROW   |130        |130     |1            |
 ROW   |140        |140     |1            |
 
 TABLE |opmessage
@@ -420,7 +420,6 @@ ROW   |100        |1          |       |       |10         |
 ROW   |110        |1          |       |       |10         |
 ROW   |115        |1          |       |       |10         |
 ROW   |120        |1          |       |       |10         |
-ROW   |130        |1          |       |       |10         |
 
 TABLE |opmessage_usr
 FIELDS|opmessage_usrid|operationid|userid|
@@ -428,14 +427,15 @@ ROW   |100            |100        |100   |
 ROW   |110            |110        |100   |
 ROW   |115            |115        |100   |
 ROW   |120            |120        |100   |
-ROW   |130            |130        |100   |
 
 TABLE |opcommand
-FIELDS|operationid|type|scriptid|execute_on|port|authtype|username|password|publickey|privatekey|command                                                          |
-ROW   |140        |0   |NULL    |1         |    |0       |        |        |         |          |/opt/zabbix/scripts/probe-manual.pl --probe '{HOST.HOST}' --set 0|
+FIELDS|operationid|type|scriptid|execute_on|port|authtype|username|password|publickey|privatekey|command                                                                                    |
+ROW   |130        |0   |NULL    |1         |    |0       |        |        |         |          |/opt/zabbix/scripts/tlds-notification.pl --send-to 'zabbix alert' --event-id '{EVENT.ID}' &|
+ROW   |140        |0   |NULL    |1         |    |0       |        |        |         |          |/opt/zabbix/scripts/probe-manual.pl --probe '{HOST.HOST}' --set 0                          |
 
 TABLE |opcommand_hst
 FIELDS|opcommand_hstid|operationid|hostid|
+ROW   |130            |130        |NULL  |
 ROW   |140            |140        |NULL  |
 
 TABLE |conditions
@@ -457,7 +457,6 @@ ROW   |121        |120     |5            |0       |1     |
 ROW   |122        |120     |4            |5       |2     |
 ROW   |123        |120     |0            |0       |110   |
 ROW   |130        |130     |16           |7       |      |
-ROW   |131        |130     |5            |0       |1     |
 ROW   |132        |130     |0            |0       |140   |
 ROW   |140        |140     |16           |7       |      |
 ROW   |141        |140     |5            |0       |1     |

@@ -720,39 +720,71 @@ class CSlaReport
 
 	private static function getServiceStatus($tlds, $from, $till, $service)
 	{
-		$tlds_subquery = "";
-		foreach ($tlds as $tld)
+		# get itemids of <service>.enabled for each TLD
+
+		$tlds_filter = substr(str_repeat("hosts.host like concat(?,' %') or ", count($tlds)), 0, -4);
+		$sql = "select" .
+					" items.itemid," .
+					" hosts.host" .
+				" from" .
+					" items" .
+					" left join hosts on hosts.hostid=items.hostid" .
+					" left join hosts_groups on hosts_groups.hostid=hosts.hostid" .
+				" where" .
+					" items.key_=? and" .
+					" ({$tlds_filter}) and" .
+					" hosts_groups.groupid=190";
+		$rows = self::dbSelect($sql, array_merge(["{$service}.enabled"], $tlds));
+
+		$tld_to_itemids = [];
+
+		foreach ($rows as $row)
 		{
-			if ($tlds_subquery === "")
+			list($itemid, $host) = $row;
+
+			$host = explode(" ", $host, 2)[0];
+
+			if (array_key_exists($host, $tld_to_itemids))
 			{
-				$tlds_subquery .= "select ? as tld";
+				array_push($tld_to_itemids[$host], $itemid);
 			}
 			else
 			{
-				$tlds_subquery .= " union all select ?";
+				$tld_to_itemids[$host] = [$itemid];
 			}
 		}
 
-		$sql = "select" .
-				" tlds.tld," .
-				" exists (" .
-					"select * from" .
-						" items" .
-						" left join hosts on hosts.hostid=items.hostid" .
-						" left join hosts_groups on hosts_groups.hostid=hosts.hostid" .
-						" left join history_uint on history_uint.itemid=items.itemid" .
-					" where" .
-						" items.key_ = ? and" .
-						" hosts.host like concat(tlds.tld,' %') and" .
-						" hosts_groups.groupid=190 and" .
-						" history_uint.clock between ? and ? and" .
-						" history_uint.value=1" .
-				") as status" .
-			" from ({$tlds_subquery}) as tlds";
+		# get <service> status for each TLD
 
-		$params = array_merge(["{$service}.enabled", $from, $till], $tlds);
+		$status = [];
 
-		return self::dbSelect($sql, $params);
+		foreach ($tld_to_itemids as $tld => $itemids)
+		{
+			$tld_status = 0;
+
+			foreach ($itemids as $itemid)
+			{
+				$sql = "select exists(" .
+						"select *" .
+						" from history_uint" .
+						" where" .
+							" clock between ? and ?" .
+							" and itemid=? and" .
+							" value=1" .
+					") as status";
+				$rows = self::dbSelect($sql, [$from, $till, $itemid]);
+
+				if ($rows[0][0])
+				{
+					$tld_status = 1;
+					break;
+				}
+			}
+
+			array_push($status, [$tld, $tld_status]);
+		}
+
+		return $status;
 	}
 
 	private static function getTldHostIds($tlds, $from)
@@ -946,6 +978,8 @@ class CSlaReport
 				'RSM.RDAP.RTT.LOW'		=> 'rdap-rtt',				// ms
 		];
 
+		// create list of item keys
+
 		$items = [];
 
 		foreach (array_keys($macro_names) as $macro_name)
@@ -953,16 +987,38 @@ class CSlaReport
 			array_push($items, "rsm.configvalue[{$macro_name}]");
 		}
 
-		$items_placeholder = substr(str_repeat("?,", count($items)), 0, -1);
-		$sql = "select i.key_,hi.value" .
-			" from history_uint hi,items i,hosts ho" .
-			" where ho.hostid=i.hostid" .
-				" and i.itemid=hi.itemid" .
-				" and ho.host=?" .
-				" and hi.clock between ? and ?" .
-				" and i.key_ in ({$items_placeholder})";
+		// get itemids
 
-		$params = array_merge(['Global macro history', $from, $from + 59], $items);
+		$items_placeholder = substr(str_repeat("?,", count($items)), 0, -1);
+		$sql = "select" .
+				" items.itemid," .
+				" items.key_" .
+			" from" .
+				" items" .
+				" left join hosts on hosts.hostid=items.hostid" .
+			" where" .
+				" hosts.host=? and" .
+				" items.key_ in ({$items_placeholder})";
+
+		$params = array_merge(['Global macro history'], $items);
+
+		$rows = self::dbSelect($sql, $params);
+
+		$itemid_to_key = [];
+
+		foreach ($rows as $row)
+		{
+			list($itemid, $key) = $row;
+
+			$itemid_to_key[$itemid] = $key;
+		}
+
+		// get SLRs
+
+		$items_placeholder = substr(str_repeat("?,", count($items)), 0, -1);
+		$sql = "select itemid,value from history_uint where clock between ? and ? and itemid in ({$items_placeholder})";
+
+		$params = array_merge([$from, $from + 59], array_keys($itemid_to_key));
 
 		$rows = self::dbSelect($sql, $params);
 
@@ -970,9 +1026,9 @@ class CSlaReport
 
 		foreach ($rows as $row)
 		{
-			list($item, $value) = $row;
+			list($itemid, $value) = $row;
 
-			$macro_name = substr($item, strlen("rsm.configvalue["), -1);
+			$macro_name = substr($itemid_to_key[$itemid], strlen("rsm.configvalue["), -1);
 			$slr_name = $macro_names[$macro_name];
 
 			// TODO: fix percentage SLR in the database and remove this code!
@@ -999,10 +1055,10 @@ class CSlaReport
 				{
 					if (defined("DEBUG") && DEBUG === true)
 					{
-						printf("(DEBUG) %s() macro $macro_name not found\n", __method__);
+						printf("(DEBUG) %s() macro {$macro_name} not found\n", __method__);
 					}
 
-					throw new Exception("no SLR value for $slr_name");
+					throw new Exception("no SLR value for {$slr_name}");
 				}
 
 				$value = $rows[0][0];
@@ -1079,14 +1135,18 @@ class CSlaReport
 
 	public static function dbSelect($sql, $input_parameters = NULL)
 	{
-		if (defined("DEBUG") && DEBUG === true)
+		$explain = substr($sql, 0, 8) == "explain ";
+
+		if (!$explain && defined("DEBUG") && DEBUG === true)
 		{
 			$params = is_null($input_parameters) ? "NULL" : "[" . implode(", ", $input_parameters) . "]";
 			printf("(DEBUG) %s() query  - %s\n", __method__, $sql);
 			printf("(DEBUG) %s() params - %s\n", __method__, $params);
+
+			print(self::dbExplain($sql, $input_parameters));
 		}
 
-		if (defined("STATS") && STATS === true)
+		if (!$explain && defined("STATS") && STATS === true)
 		{
 			$time = microtime(true);
 		}
@@ -1095,19 +1155,74 @@ class CSlaReport
 		$sth->execute($input_parameters);
 		$rows = $sth->fetchAll();
 
-		if (defined("STATS") && STATS === true)
+		if (!$explain && defined("STATS") && STATS === true)
 		{
 			self::$sql_time += microtime(true) - $time;
 			self::$sql_count++;
 		}
 
-		if (defined("DEBUG") && DEBUG === true)
+		if (!$explain && defined("DEBUG") && DEBUG === true)
 		{
 			$result = count($rows) === 1 ? "[" . implode(", ", $rows[0]) . "]" : count($rows) . " row(s)";
 			printf("(DEBUG) %s() result - %s\n", __method__, $result);
 		}
 
 		return $rows;
+	}
+
+	public static function dbExplain($sql, $input_parameters = NULL)
+	{
+		// get output of "explain"
+
+		$rows = array_merge(
+			[[
+				"id",
+				"select_type",
+				"table",
+				"type",
+				"possible_keys",
+				"key",
+				"key_len",
+				"ref",
+				"rows",
+				"Extra",
+			]],
+			self::dbSelect("explain " . $sql, $input_parameters)
+		);
+
+		// determine column widths
+
+		$col_widths = [];
+		foreach ($rows as $row)
+		{
+			foreach ($row as $i => $value)
+			{
+				$col_widths[$i] = isset($col_widths[$i]) ? max($col_widths[$i], strlen($value)) : strlen($value);
+			}
+		}
+
+		// generate output
+
+		$output = "";
+		$line =	str_repeat("-", array_sum($col_widths) + count(array_filter($col_widths)) * 3 + 1);
+
+		$output .= $line . "\n";
+		foreach ($rows as $row_num => $row)
+		{
+			if ($row_num === 1)
+			{
+				$output .= $line . "\n";
+			}
+			$output .= "|";
+			foreach ($row as $i => $value)
+			{
+				$output .= sprintf(" %-{$col_widths[$i]}s |", $value);
+			}
+			$output .= "\n";
+		}
+		$output .= $line . "\n";
+
+		return $output;
 	}
 
 	public static function dbExecute($sql, $input_parameters = NULL)

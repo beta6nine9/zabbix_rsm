@@ -128,6 +128,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		validate_tld validate_service
 		get_templated_nsips db_exec tld_interface_enabled
 		tld_interface_enabled_create_cache tld_interface_enabled_delete_cache
+		db_handler_read_status_start db_handler_read_status_end
 		db_select db_select_col db_select_row db_select_value db_select_binds db_explain
 		set_slv_config get_cycle_bounds get_rollweek_bounds get_downtime_bounds
 		current_month_first_cycle month_start
@@ -1562,6 +1563,57 @@ sub db_disconnect
 	}
 }
 
+# Variable for storing DB session's status variables like 'Handler_read_%'.
+#
+# Use db_handler_read_status_start() and db_handler_read_status_end()
+# to compare different ways of getting data from the DB.
+#
+# https://dev.mysql.com/doc/refman/5.6/en/server-status-variables.html#statvar_Handler_read_first
+my $handler_read_status = {};
+
+sub db_handler_read_status_start()
+{
+	foreach (@{db_select("show session status like 'Handler_read_%'")})
+	{
+		$handler_read_status->{$_->[0]} = -$_->[1];
+	}
+}
+
+sub db_handler_read_status_end()
+{
+	foreach (@{db_select("show session status like 'Handler_read_%'")})
+	{
+		$handler_read_status->{$_->[0]} += $_->[1];
+	}
+
+	my @cols = (
+		"Handler_read_first",
+		"Handler_read_key",
+		"Handler_read_last",
+		"Handler_read_next",
+		"Handler_read_prev",
+		"Handler_read_rnd",
+		"Handler_read_rnd_next",
+	);
+
+	my $head = "|";
+	my $data = "|";
+
+	foreach my $col (@cols)
+	{
+		$head .= $col . " |";
+		$data .= sprintf("%-*s |", length($col), $handler_read_status->{$col});
+	}
+
+	my $line = "-" x length($head);
+
+	info($line);
+	info($head);
+	info($line);
+	info($data);
+	info($line);
+}
+
 sub db_get_stats()
 {
 	if (!defined($dbh) || !defined($dbh->{'Profile'}))
@@ -1678,20 +1730,17 @@ sub db_explain($;$)
 
 	my $rows = db_select("explain $sql", $bind_values);
 
-	my @header = (
-		"id",
-		"select_type",
-		"table",
-		"partitions",
-		"type",
-		"possible_keys",
-		"key",
-		"key_len",
-		"ref",
-		"rows",
-		"filtered",
-		"Extra"
-	);
+	my @header;
+	if (@{$rows->[0]} == 10)
+	{
+		# MariaDB version - 10.2.24-MariaDB-log
+		@header = ("id", "select_type", "table", "type", "possible_keys", "key", "key_len", "ref", "rows", "Extra");
+	}
+	elsif (@{$rows->[0]} == 12)
+	{
+		# MySQL version - 5.7.27-0ubuntu0.18.04.1
+		@header = ("id", "select_type", "table", "partitions", "type", "possible_keys", "key", "key_len", "ref", "rows", "filtered", "Extra");
+	}
 
 	my @col_widths = map(length, @header);
 
@@ -2507,7 +2556,7 @@ sub check_sent_values()
 
 			if (exists($history->{$itemid}{$clock}))
 			{
-				wrn("THIS SHOULD NOT HAPPEN, value for itemid=$itemid, clock=$clock exists in multiple history tables");
+				wrn("THIS SHOULD NOT HAPPEN, value for itemid=$itemid, clock=$clock has duplicates or exists in multiple history tables");
 			}
 
 			$history->{$itemid}{$clock} = $value;
