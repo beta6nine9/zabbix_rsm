@@ -142,22 +142,22 @@ use constant TLD_TYPE_PROBE_RESULTS_GROUPIDS	=> {
 };
 
 use constant CFG_MACRO_DESCRIPTION => {
-	'{$RSM.RDDS.NS.STRING}' => 'What to look for in RDDS output, e.g. "Name Server:"',
-	'{$RSM.TLD}' => 'Name of this TLD, e.g. "zabbix"',
 	'{$RSM.RDDS.TESTPREFIX}' => 'Prefix for RDDS tests of this TLD, e.g. "whois"',
-	'{$RSM.IP4.ENABLED}' => 'Indicates whether the probe supports IPv4',
-	'{$RSM.IP6.ENABLED}' => 'Indicates whether the probe supports IPv6',
-	'{$RSM.RDAP.ENABLED}' => 'Indicates whether the probe supports RDAP protocol',
-	'{$RSM.DNS.TESTPREFIX}' => 'Prefix for DNS tests, e.g. nonexistent',
-	'{$RSM.RESOLVER}' => 'DNS resolver used by the probe',
-	'{$RDAP.TEST.DOMAIN}' => 'Test domain for RDAP queries, e.g. whois.zabbix',
+	'{$RSM.TLD}' => 'Name of this TLD, e.g. "zabbix"',
 	'{$RSM.TLD.RDDS.ENABLED}' => 'Indicates whether RDDS is enabled for this TLD',
-	'{$RSM.EPP.ENABLED}' => 'Indicates whether EPP is enabled on probe',
-	'{$RDAP.BASE.URL}' => 'Base URL for RDAP queries, e.g. http://whois.zabbix ',
-	'{$RSM.TLD.EPP.ENABLED}' => 'Indicates whether EPP is enabled for this TLD',
+	'{$RDAP.TEST.DOMAIN}' => 'Test domain for RDAP queries, e.g. whois.zabbix',
+	'{$RSM.RDDS.NS.STRING}' => 'What to look for in RDDS output, e.g. "Name Server:"',
+	'{$RDAP.BASE.URL}' => 'Base URL for RDAP queries, e.g. http://whois.zabbix',
+	'{$RSM.TLD.DNSSEC.ENABLED}' => 'Indicates whether DNSSEC is enabled for this TLD',
 	'{$RSM.RDDS.ENABLED}' => 'Indicates whether the probe supports RDDS protocol',
 	'{$RDAP.TLD.ENABLED}' => 'Indicates whether RDAP is enabled for this TLD',
-	'{$RSM.TLD.DNSSEC.ENABLED}' => 'Indicates whether DNSSEC is enabled for this TLD',
+	'{$RSM.IP4.ENABLED}' => 'Indicates whether the probe supports IPv4',
+	'{$RSM.TLD.EPP.ENABLED}' => 'Indicates whether EPP is enabled for this TLD',
+	'{$RSM.RDAP.ENABLED}' => 'Indicates whether the probe supports RDAP protocol',
+	'{$RSM.RESOLVER}' => 'DNS resolver used by the probe',
+	'{$RSM.IP6.ENABLED}' => 'Indicates whether the probe supports IPv6',
+	'{$RSM.EPP.ENABLED}' => 'Indicates whether EPP is enabled on probe',
+	'{$RSM.DNS.TESTPREFIX}' => 'Prefix for DNS tests, e.g. nonexistent',
 };
 
 our @EXPORT_OK = qw(

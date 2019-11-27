@@ -131,7 +131,6 @@ static int	DBpatch_4040305(void)
 
 	return SUCCEED;
 }
-
 typedef struct
 {
 	const char *const macro;
@@ -146,14 +145,246 @@ static int	DBpatch_4040306(void)
 	static macro_descr_t macro_descr[] =
 	{
 		{
+			"{$RSM.EPP.INFO.RTT.LOW}",
+			"Consider EPP-Query RTT unsuccessful if it is over specified time."
+			" This parameter is used by scripts later when processing collecte"
+			"d data."
+		},
+		{
+			"{$RSM.DNS.TCP.RTT.LOW}",
+			"Consider DNS TCP RTT unsuccessful if it is over specified time. T"
+			"his parameter is used by scripts later when processing collected "
+			"data."
+		},
+		{
+			"{$RSM.EPP.ROLLWEEK.SLA}",
+			"Maximum (100%%) EPP rolling week threshold."
+		},
+		{
+			"{$RSM.EPP.PROBE.ONLINE}",
+			"Consider EPP Service availability at a particular time unconditio"
+			"nally UP, if there was less than specified number of EPP-enabled "
+			"online probes at the time of the test cycle."
+		},
+		{
+			"{$RSM.EPP.LOGIN.RTT.HIGH}",
+			"When performing particular EPP-Session test on a Probe node consi"
+			"der the target down if RTT was over specified time."
+		},
+		{
+			"{$RSM.SLV.RDDS80.RTT}",
+			"Maximum allowed ratio of RDDS80 queries with RTT above {$RSM.RDDS"
+			".RTT.LOW}"
+		},
+		{
+			"{$RSM.DNS.TCP.RTT.HIGH}",
+			"When performing particular DNS TCP test on a Probe node consider "
+			"Name Server down if RTT was over specified time."
+		},
+		{
+			"{$RSM.DNS.UPDATE.TIME}",
+			"Maximum DNS update time to consider it successful."
+		},
+		{
+			"{$RSM.IP4.ROOTSERVERS1}",
+			"List of IPv4 root servers for getting automatic Probe status (Onl"
+			"ine/Offline)."
+		},
+		{
+			"{$RESOLVER.STATUS.TIMEOUT}",
+			"Timeout when getting resolver status, used in item resolver.statu"
+			"s[{$RSM.RESOLVER},{$RESOLVER.STATUS.TIMEOUT},{$RESOLVER.STATUS.TR"
+			"IES},{$RSM.IP4.ENABLED},{$RSM.IP6.ENABLED}]"
+		},
+		{
+			"{$RSM.DNS.UDP.DELAY}",
+			"NB! This must be checked before adding first TLD! DNS UDP test cy"
+			"cle period (Update interval of item rsm.dns.udp[{$RSM.TLD}])."
+		},
+		{
+			"{$RSM.MONITORING.TARGET}",
+			"* empty string - unknown; * \"registry\" - Monitoring target is T"
+			"LD; * \"registrar\" - Monitoring target is Registrar;"
+		},
+		{
+			"{$RSM.RDDS.RTT.LOW}",
+			"Consider RDDS RTT unsuccessful if it is over specified time. This"
+			" parameter is used by scripts later when processing collected dat"
+			"a."
+		},
+		{
+			"{$RSM.IP6.REPLY.MS}",
+			"When testing Probe status consider IPv6 server successful if RTT "
+			"is below specified time, otherwise unsuccessful, if Probe support"
+			"s IPv6."
+		},
+		{
+			"{$RSM.DNS.ROLLWEEK.SLA}",
+			"Maximum (100%%) DNS/DNSSEC rolling week threshold."
+		},
+		{
+			"{$RSM.INCIDENT.RDDS.RECOVER}",
+			"Number of subsequently successful RDDS Availability tests to clos"
+			"e an incident."
+		},
+		{
+			"{$RSM.SLV.RDAP.RTT}",
+			"Maximum allowed ratio of RDAP queries with RTT above {$RSM.RDAP.R"
+			"TT.LOW}"
+		},
+		{
+			"{$RSM.INCIDENT.DNS.FAIL}",
+			"Number of subsequently failed DNS Availability tests to start an "
+			"incident."
+		},
+		{
+			"{$RSM.SLV.RDAP.DOWNTIME}",
+			"Maximum allowed downtime of RDAP service per month"
+		},
+		{
+			"{$RSM.INCIDENT.DNSSEC.FAIL}",
+			"Number of subsequently failed DNSSEC Availability tests to start "
+			"an incident."
+		},
+		{
+			"{$RSM.EPP.KEYSALT}",
+			"EPP Key Salt"
+		},
+		{
+			"{$RSM.RDAP.RTT.HIGH}",
+			"When performing particular RDAP test on a Probe node consider the"
+			" target down if RTT was over specified time."
+		},
+		{
+			"{$RSM.SLV.DNS.TCP.RTT}",
+			"Maximum allowed ratio of DNS TCP queries with RTT above {$RSM.DNS"
+			".TCP.RTT.LOW}"
+		},
+		{
 			"{$RSM.INCIDENT.EPP.RECOVER}",
 			"Number of subsequently successful EPP Availability tests to close"
 			" an incident."
 		},
 		{
+			"{$RSM.IP4.REPLY.MS}",
+			"When testing Probe status consider IPv4 server successful if RTT "
+			"is below specified time, otherwise unsuccessful."
+		},
+		{
+			"{$RSM.DNS.PROBE.ONLINE}",
+			"Consider DNS/DNSSEC Service availability at a particular time unc"
+			"onditionally UP, if there was less than specified number of onlin"
+			"e probes at the time of the test cycle."
+		},
+		{
+			"{$RSM.RDDS.ROLLWEEK.SLA}",
+			"Maximum (100%%) RDDS rolling week threshold."
+		},
+		{
+			"{$RSM.IP4.MIN.PROBE.ONLINE}",
+			"Fire a trigger if system contains less than specified number of I"
+			"Pv4 online Probe nodes."
+		},
+		{
+			"{$RSM.RDAP.RTT.LOW}",
+			"Consider RDAP RTT unsuccessful if it is over specified time. This"
+			" parameter is used by scripts later when processing collected dat"
+			"a."
+		},
+		{
+			"{$RSM.SLV.DNS.NS.UPD}",
+			"Part of Comp-liance, part of Phase 2."
+		},
+		{
+			"{$RSM.SLV.RDDS.RTT}",
+			"Maximum allowed ratio of RDDS43 and RDDS80 queries with RTT above"
+			" {$RSM.RDDS.RTT.LOW}"
+		},
+		{
+			"{$RSM.DNS.UDP.RTT.HIGH}",
+			"When performing particular DNS UDP test on a Probe node consider "
+			"Name Server down if RTT was over specified time."
+		},
+		{
+			"{$RSM.INCIDENT.EPP.FAIL}",
+			"Number of subsequently failed EPP Availability tests to start an "
+			"incident."
+		},
+		{
+			"{$RSM.IP6.MIN.SERVERS}",
+			"When testing Probe status consider it Offline if number of succes"
+			"sfully tested IPv6 servers was less than specified, if Probe supp"
+			"orts IPv6."
+		},
+		{
+			"{$RSM.EPP.UPDATE.RTT.HIGH}",
+			"When performing particular EPP-Transform test on a Probe node con"
+			"sider the target down if RTT was over specified time."
+		},
+		{
+			"{$RSM.IP4.MIN.SERVERS}",
+			"When testing Probe status consider it Offline if number of succes"
+			"sfully tested IPv4 servers was less than specified."
+		},
+		{
+			"{$RSM.RDAP.PROBE.ONLINE}",
+			"Consider RDAP Service availability at a particular time unconditi"
+			"onally UP, if there was less than specified number of RDAP-enable"
+			"d online probes at the time of the test cycle."
+		},
+		{
+			"{$RSM.SLV.DNS.DOWNTIME}",
+			"Maximum allowed downtime of DNS service per month"
+		},
+		{
 			"{$RSM.EPP.DELAY}",
 			"NB! This must be checked before adding first TLD! EPP test cycle "
 			"period (Update interval of item rsm.epp[{$RSM.TLD},])."
+		},
+		{
+			"{$RSM.RDDS.MAXREDIRS}",
+			"Maximum redirects to perform on the Probe node during RDDS80 test"
+			" (cURL option CURLOPT_MAXREDIRS)."
+		},
+		{
+			"{$RSM.RDDS.UPDATE.TIME}",
+			"Maximum RDDS update time to consider it successful."
+		},
+		{
+			"{$RSM.SLV.RDDS.DOWNTIME}",
+			"Maximum allowed downtime of RDDS service per month"
+		},
+		{
+			"{$RSM.RDDS.DELAY}",
+			"NB! This must be checked before adding first TLD! RDDS test cycle"
+			" period (Update interval of item rsm.rdds[{$RSM.TLD},,])."
+		},
+		{
+			"{$RSM.RDAP.MAXREDIRS}",
+			"Maximum redirects to perform on the Probe node during RDAP test ("
+			"cURL option CURLOPT_MAXREDIRS)"
+		},
+		{
+			"{$RSM.INCIDENT.RDAP.RECOVER}",
+			"Number of subsequently successful RDAP Availability tests to clos"
+			"e an incident."
+		},
+		{
+			"{$RSM.DNS.AVAIL.MINNS}",
+			"Consider DNS Service availability at a particular time UP if duri"
+			"ng DNS test more than specified number of Name Servers replied su"
+			"ccessfully."
+		},
+		{
+			"{$RSM.INCIDENT.DNS.RECOVER}",
+			"Number of subsequently successful DNS Availability tests to close"
+			" an incident."
+		},
+		{
+			"{$RSM.EPP.UPDATE.RTT.LOW}",
+			"Consider EPP-Transform RTT unsuccessful if it is over specified t"
+			"ime. This parameter is used by scripts later when processing coll"
+			"ected data."
 		},
 		{
 			"{$RSM.PROBE.AVAIL.LIMIT}",
@@ -163,84 +394,14 @@ static int	DBpatch_4040306(void)
 			"ccess] item."
 		},
 		{
-			"{$RSM.INCIDENT.DNS.FAIL}",
-			"Number of subsequently failed DNS Availability tests to start an "
-			"incident."
+			"{$RSM.EPP.INFO.RTT.HIGH}",
+			"When performing particular EPP-Query test on a Probe node conside"
+			"r the target down if RTT was over specified time."
 		},
 		{
-			"{$RSM.EPP.PROBE.ONLINE}",
-			"Consider EPP Service availability at a particular time unconditio"
-			"nally UP, if there was less than specified number of EPP-enabled "
-			"online probes at the time of the test cycle."
-		},
-		{
-			"{$RSM.DNS.UDP.RTT.HIGH}",
-			"When performing particular DNS UDP test on a Probe node consider "
-			"Name Server down if RTT was over specified time."
-		},
-		{
-			"{$RSM.EPP.ROLLWEEK.SLA}",
-			"Maximum (100%%) EPP rolling week threshold."
-		},
-		{
-			"{$RSM.EPP.INFO.RTT.LOW}",
-			"Consider EPP-Query RTT unsuccessful if it is over specified time."
-			" This parameter is used by scripts later when processing collecte"
-			"d data."
-		},
-		{
-			"{$RSM.SLV.RDDS.RTT}",
-			"Maximum allowed ratio of RDDS43 and RDDS80 queries with RTT above"
-			" {$RSM.RDDS.RTT.LOW}"
-		},
-		{
-			"{$RSM.RDAP.PROBE.ONLINE}",
-			"Consider RDAP Service availability at a particular time unconditi"
-			"onally UP, if there was less than specified number of RDAP-enable"
-			"d online probes at the time of the test cycle."
-		},
-		{
-			"{$RSM.DNS.ROLLWEEK.SLA}",
-			"Maximum (100%%) DNS/DNSSEC rolling week threshold."
-		},
-		{
-			"{$RSM.DNS.TCP.RTT.LOW}",
-			"Consider DNS TCP RTT unsuccessful if it is over specified time. T"
-			"his parameter is used by scripts later when processing collected "
-			"data."
-		},
-		{
-			"{$RSM.SLV.DNS.DOWNTIME}",
-			"Maximum allowed downtime of DNS service per month"
-		},
-		{
-			"{$RSM.EPP.LOGIN.RTT.HIGH}",
-			"When performing particular EPP-Session test on a Probe node consi"
-			"der the target down if RTT was over specified time."
-		},
-		{
-			"{$RSM.IP4.MIN.SERVERS}",
-			"When testing Probe status consider it Offline if number of succes"
-			"sfully tested IPv4 servers was less than specified."
-		},
-		{
-			"{$RSM.INCIDENT.DNSSEC.RECOVER}",
-			"Number of subsequently successful DNSSEC Availability tests to cl"
-			"ose an incident."
-		},
-		{
-			"{$RSM.RDAP.MAXREDIRS}",
-			"Maximum redirects to perform on the Probe node during RDAP test ("
-			"cURL option CURLOPT_MAXREDIRS)"
-		},
-		{
-			"{$RSM.INCIDENT.RDDS.FAIL}",
-			"Number of subsequently failed RDDS Availability tests to start an"
-			" incident."
-		},
-		{
-			"{$RSM.SLV.NS.DOWNTIME}",
-			"Maximum allowed downtime of DNS NS per month"
+			"{$RSM.DNS.TCP.DELAY}",
+			"DNS TCP test cycle period (Update interval of item rsm.dns.tcp[{$"
+			"RSM.TLD}]). NB! This must be checked before adding first TLD!"
 		},
 		{
 			"{$RSM.IP6.MIN.PROBE.ONLINE}",
@@ -248,153 +409,13 @@ static int	DBpatch_4040306(void)
 			"Pv6 online Probe nodes."
 		},
 		{
-			"{$RSM.SLV.DNS.TCP.RTT}",
-			"Maximum allowed ratio of DNS TCP queries with RTT above {$RSM.DNS"
-			".TCP.RTT.LOW}"
+			"{$RSM.ROLLWEEK.THRESHOLDS}",
+			"Thresholds for the SLA Monitoring->Rolling week status->Exceeding"
+			" or equal to drop-down."
 		},
 		{
-			"{$RSM.INCIDENT.DNSSEC.FAIL}",
-			"Number of subsequently failed DNSSEC Availability tests to start "
-			"an incident."
-		},
-		{
-			"{$RSM.IP4.MIN.PROBE.ONLINE}",
-			"Fire a trigger if system contains less than specified number of I"
-			"Pv4 online Probe nodes."
-		},
-		{
-			"{$RSM.RDDS.ROLLWEEK.SLA}",
-			"Maximum (100%%) RDDS rolling week threshold."
-		},
-		{
-			"{$RSM.SLV.RDDS.DOWNTIME}",
-			"Maximum allowed downtime of RDDS service per month"
-		},
-		{
-			"{$RSM.EPP.INFO.RTT.HIGH}",
-			"When performing particular EPP-Query test on a Probe node conside"
-			"r the target down if RTT was over specified time."
-		},
-		{
-			"{$RSM.SLV.DNS.UDP.RTT}",
-			"Maximum allowed ratio of DNS UDP queries with RTT above {$RSM.DNS"
-			".UDP.RTT.LOW}"
-		},
-		{
-			"{$RSM.SLV.RDDS43.RTT}",
-			"Maximum allowed ratio of RDDS43 queries with RTT above {$RSM.RDDS"
-			".RTT.LOW}"
-		},
-		{
-			"{$RSM.EPP.UPDATE.RTT.LOW}",
-			"Consider EPP-Transform RTT unsuccessful if it is over specified t"
-			"ime. This parameter is used by scripts later when processing coll"
-			"ected data."
-		},
-		{
-			"{$RSM.IP6.MIN.SERVERS}",
-			"When testing Probe status consider it Offline if number of succes"
-			"sfully tested IPv6 servers was less than specified, if Probe supp"
-			"orts IPv6."
-		},
-		{
-			"{$RSM.RDAP.RTT.LOW}",
-			"Consider RDAP RTT unsuccessful if it is over specified time. This"
-			" parameter is used by scripts later when processing collected dat"
-			"a."
-		},
-		{
-			"{$RSM.IP4.ROOTSERVERS1}",
-			"List of IPv4 root servers for getting automatic Probe status (Onl"
-			"ine/Offline)."
-		},
-		{
-			"{$RSM.INCIDENT.RDAP.RECOVER}",
-			"Number of subsequently successful RDAP Availability tests to clos"
-			"e an incident."
-		},
-		{
-			"{$RSM.IP6.REPLY.MS}",
-			"When testing Probe status consider IPv6 server successful if RTT "
-			"is below specified time, otherwise unsuccessful, if Probe support"
-			"s IPv6."
-		},
-		{
-			"{$RSM.INCIDENT.RDDS.RECOVER}",
-			"Number of subsequently successful RDDS Availability tests to clos"
-			"e an incident."
-		},
-		{
-			"{$RSM.PROBE.MAX.OFFLINE}",
-			"Fire a trigger if Probe has been manually disabled for more than "
-			"specified time."
-		},
-		{
-			"{$RSM.DNS.TCP.DELAY}",
-			"DNS TCP test cycle period (Update interval of item rsm.dns.tcp[{$"
-			"RSM.TLD}]). NB! This must be checked before adding first TLD! "
-		},
-		{
-			"{$RSM.SLV.RDAP.DOWNTIME}",
-			"Maximum allowed downtime of RDAP service per month"
-		},
-		{
-			"{$RSM.INCIDENT.DNS.RECOVER}",
-			"Number of subsequently successful DNS Availability tests to close"
-			" an incident."
-		},
-		{
-			"{$RSM.RDDS.MAXREDIRS}",
-			"Maximum redirects to perform on the Probe node during RDDS80 test"
-			" (cURL option CURLOPT_MAXREDIRS)."
-		},
-		{
-			"{$RSM.RDDS.RTT.LOW}",
-			"Consider RDDS RTT unsuccessful if it is over specified time. This"
-			" parameter is used by scripts later when processing collected dat"
-			"a."
-		},
-		{
-			"{$RSM.DNS.PROBE.ONLINE}",
-			"Consider DNS/DNSSEC Service availability at a particular time unc"
-			"onditionally UP, if there was less than specified number of onlin"
-			"e probes at the time of the test cycle."
-		},
-		{
-			"{$RSM.RDDS.UPDATE.TIME}",
-			"Maximum RDDS update time to consider it successful."
-		},
-		{
-			"{$RSM.DNS.UPDATE.TIME}",
-			"Maximum DNS update time to consider it successful."
-		},
-		{
-			"{$RSM.DNS.AVAIL.MINNS}",
-			"Consider DNS Service availability at a particular time UP if duri"
-			"ng DNS test more than specified number of Name Servers replied su"
-			"ccessfully."
-		},
-		{
-			"{$RSM.RDDS.PROBE.ONLINE}",
-			"Consider RDDS Service availability at a particular time unconditi"
-			"onally UP, if there was less than specified number of RDDS-enable"
-			"d online probes at the time of the test cycle."
-		},
-		{
-			"{$RSM.PROBE.ONLINE.DELAY}",
-			"How many seconds the check rsm.probe.status[automatic,\"{$RSM.IP4"
-			".ROOTSERVERS1}\",\"{$RSM.IP6.ROOTSERVERS1}\"] must be successful "
-			"in order to switch from OFFLINE to ONLINE."
-		},
-		{
-			"{$RSM.SLV.RDDS80.RTT}",
-			"Maximum allowed ratio of RDDS80 queries with RTT above {$RSM.RDDS"
-			".RTT.LOW}"
-		},
-		{
-			"{$RSM.RDAP.RTT.HIGH}",
-			"When performing particular RDAP test on a Probe node consider the"
-			" target down if RTT was over specified time."
+			"{$RSM.SLV.NS.DOWNTIME}",
+			"Maximum allowed downtime of DNS NS per month"
 		},
 		{
 			"{$RSM.RDAP.STANDALONE}",
@@ -403,25 +424,10 @@ static int	DBpatch_4040306(void)
 			"RDAP to be part of RDDS service."
 		},
 		{
-			"{$RSM.DNS.UDP.DELAY}",
-			"NB! This must be checked before adding first TLD! DNS UDP test cy"
-			"cle period (Update interval of item rsm.dns.udp[{$RSM.TLD}])."
-		},
-		{
-			"{$RSM.RDDS.DELAY}",
-			"NB! This must be checked before adding first TLD! RDDS test cycle"
-			" period (Update interval of item rsm.rdds[{$RSM.TLD},,])."
-		},
-		{
-			"{$RSM.RDDS.RTT.HIGH}",
-			"When performing particular RDDS test on a Probe node consider the"
-			" target down if RTT was over specified time."
-		},
-		{
-			"{$RSM.EPP.LOGIN.RTT.LOW}",
-			"Consider EPP-Session RTT unsuccessful if it is over specified tim"
-			"e. This parameter is used by scripts later when processing collec"
-			"ted data."
+			"{$RSM.PROBE.ONLINE.DELAY}",
+			"How many seconds the check rsm.probe.status[automatic,\"{$RSM.IP4"
+			".ROOTSERVERS1}\",\"{$RSM.IP6.ROOTSERVERS1}\"] must be successful "
+			"in order to switch from OFFLINE to ONLINE."
 		},
 		{
 			"{$RSM.INCIDENT.RDAP.FAIL}",
@@ -429,62 +435,40 @@ static int	DBpatch_4040306(void)
 			" incident."
 		},
 		{
-			"{$RESOLVER.STATUS.TIMEOUT}",
-			"Timeout when getting resolver status, used in item resolver.statu"
-			"s[{$RSM.RESOLVER},{$RESOLVER.STATUS.TIMEOUT},{$RESOLVER.STATUS.TR"
-			"IES},{$RSM.IP4.ENABLED},{$RSM.IP6.ENABLED}]"
+			"{$RSM.INCIDENT.DNSSEC.RECOVER}",
+			"Number of subsequently successful DNSSEC Availability tests to cl"
+			"ose an incident."
 		},
 		{
-			"{$RSM.SLV.RDAP.RTT}",
-			"Maximum allowed ratio of RDAP queries with RTT above {$RSM.RDAP.R"
-			"TT.LOW}"
+			"{$RSM.RDAP.ROLLWEEK.SLA}",
+			"Maximum (100%%) RDAP rolling week threshold."
 		},
 		{
-			"{$RSM.IP6.ROOTSERVERS1}",
-			"List of IPv6 root servers for getting automatic Probe status (Onl"
-			"ine/Offline), if Probe supports IPv6."
-		},
-		{
-			"{$RSM.IP4.REPLY.MS}",
-			"When testing Probe status consider IPv4 server successful if RTT "
-			"is below specified time, otherwise unsuccessful."
-		},
-		{
-			"{$RSM.DNS.TCP.RTT.HIGH}",
-			"When performing particular DNS TCP test on a Probe node consider "
-			"Name Server down if RTT was over specified time."
-		},
-		{
-			"{$RSM.ROLLWEEK.THRESHOLDS}",
-			"Thresholds for the SLA Monitoring->Rolling week status->Exceeding"
-			" or equal to drop-down."
-		},
-		{
-			"{$RSM.RDAP.DELAY}",
-			"RDAP test cycle period (Update interval of item rdap[{$RSM.TLD},{"
-			"$RDAP.TEST.DOMAIN},{$RDAP.BASE.URL},{$RSM.RDDS.MAXREDIRS},{$RSM.R"
-			"DDS.RTT.HIGH},{$RDAP.TLD.ENABLED},{$RSM.RDAP.ENABLED},{$RSM.IP4.E"
-			"NABLED},{$RSM.IP6.ENABLED},{$RSM.RESOLVER}])"
-		},
-		{
-			"{$RSM.INCIDENT.EPP.FAIL}",
-			"Number of subsequently failed EPP Availability tests to start an "
-			"incident."
-		},
-		{
-			"{$RSM.EPP.KEYSALT}",
-			"EPP Key Salt"
-		},
-		{
-			"{$RSM.MONITORING.TARGET}",
-			"* empty string - unknown; * \"registry\" - Monitoring target is T"
-			"LD; * \"registrar\" - Monitoring target is Registrar; "
+			"{$RSM.PROBE.MAX.OFFLINE}",
+			"Fire a trigger if Probe has been manually disabled for more than "
+			"specified time."
 		},
 		{
 			"{$RESOLVER.STATUS.TRIES}",
 			"Maximum number of tries when checking resolver status, used in it"
 			"em resolver.status[{$RSM.RESOLVER},{$RESOLVER.STATUS.TIMEOUT},{$R"
 			"ESOLVER.STATUS.TRIES},{$RSM.IP4.ENABLED},{$RSM.IP6.ENABLED}]"
+		},
+		{
+			"{$RSM.RDDS.RTT.HIGH}",
+			"When performing particular RDDS test on a Probe node consider the"
+			" target down if RTT was over specified time."
+		},
+		{
+			"{$RSM.SLV.RDDS43.RTT}",
+			"Maximum allowed ratio of RDDS43 queries with RTT above {$RSM.RDDS"
+			".RTT.LOW}"
+		},
+		{
+			"{$RSM.DNS.UDP.RTT.LOW}",
+			"Consider DNS UDP RTT unsuccessful if it is over specified time. T"
+			"his parameter is used by scripts later when processing collected "
+			"data."
 		},
 		{
 			"{$PROBE.INTERNAL.ERROR.INTERVAL}",
@@ -498,15 +482,20 @@ static int	DBpatch_4040306(void)
 			"weeks)."
 		},
 		{
-			"{$RSM.EPP.UPDATE.RTT.HIGH}",
-			"When performing particular EPP-Transform test on a Probe node con"
-			"sider the target down if RTT was over specified time."
+			"{$RSM.INCIDENT.RDDS.FAIL}",
+			"Number of subsequently failed RDDS Availability tests to start an"
+			" incident."
 		},
 		{
-			"{$RSM.DNS.UDP.RTT.LOW}",
-			"Consider DNS UDP RTT unsuccessful if it is over specified time. T"
-			"his parameter is used by scripts later when processing collected "
-			"data."
+			"{$RSM.RDDS.PROBE.ONLINE}",
+			"Consider RDDS Service availability at a particular time unconditi"
+			"onally UP, if there was less than specified number of RDDS-enable"
+			"d online probes at the time of the test cycle."
+		},
+		{
+			"{$RSM.IP6.ROOTSERVERS1}",
+			"List of IPv6 root servers for getting automatic Probe status (Onl"
+			"ine/Offline), if Probe supports IPv6."
 		},
 		{
 			"{$RSM.ROLLWEEK.SECONDS}",
@@ -514,12 +503,22 @@ static int	DBpatch_4040306(void)
 			"ses."
 		},
 		{
-			"{$RSM.RDAP.ROLLWEEK.SLA}",
-			"Maximum (100%%) RDAP rolling week threshold."
+			"{$RSM.EPP.LOGIN.RTT.LOW}",
+			"Consider EPP-Session RTT unsuccessful if it is over specified tim"
+			"e. This parameter is used by scripts later when processing collec"
+			"ted data."
 		},
 		{
-			"{$RSM.SLV.DNS.NS.UPD}",
-			"Part of Comp-liance, part of Phase 2."
+			"{$RSM.SLV.DNS.UDP.RTT}",
+			"Maximum allowed ratio of DNS UDP queries with RTT above {$RSM.DNS"
+			".UDP.RTT.LOW}"
+		},
+		{
+			"{$RSM.RDAP.DELAY}",
+			"RDAP test cycle period (Update interval of item rdap[{$RSM.TLD},{"
+			"$RDAP.TEST.DOMAIN},{$RDAP.BASE.URL},{$RSM.RDDS.MAXREDIRS},{$RSM.R"
+			"DDS.RTT.HIGH},{$RDAP.TLD.ENABLED},{$RSM.RDAP.ENABLED},{$RSM.IP4.E"
+			"NABLED},{$RSM.IP6.ENABLED},{$RSM.RESOLVER}])"
 		},
 		{ NULL }
 	};
@@ -541,75 +540,75 @@ static int	DBpatch_4040306(void)
 	return SUCCEED;
 }
 
-static int	DBpatch_4040307(void)
+static int	DBpatch_40403xx(void)
 {
 	/* this patch function has been generated automatically by extract_macros.pl */
 
 	static macro_descr_t macro_descr[] =
 	{
 		{
-			"{$RSM.RESOLVER}",
-			"DNS resolver used by the probe"
-		},
-		{
-			"{$RDAP.TEST.DOMAIN}",
-			"Test domain for RDAP queries, e.g. whois.zabbix"
-		},
-		{
-			"{$RSM.DNS.TESTPREFIX}",
-			"Prefix for DNS tests, e.g. nonexistent"
-		},
-		{
-			"{$RSM.EPP.ENABLED}",
-			"Indicates whether EPP is enabled on probe"
-		},
-		{
-			"{$RSM.TLD.RDDS.ENABLED}",
-			"Indicates whether RDDS is enabled for this TLD"
-		},
-		{
-			"{$RSM.IP6.ENABLED}",
-			"Indicates whether the probe supports IPv6"
-		},
-		{
-			"{$RSM.RDDS.ENABLED}",
-			"Indicates whether the probe supports RDDS protocol"
-		},
-		{
 			"{$RDAP.TLD.ENABLED}",
 			"Indicates whether RDAP is enabled for this TLD"
-		},
-		{
-			"{$RSM.IP4.ENABLED}",
-			"Indicates whether the probe supports IPv4"
-		},
-		{
-			"{$RSM.RDDS.NS.STRING}",
-			"What to look for in RDDS output, e.g. \"Name Server:\""
-		},
-		{
-			"{$RSM.TLD}",
-			"Name of this TLD, e.g. \"zabbix\""
-		},
-		{
-			"{$RDAP.BASE.URL}",
-			"Base URL for RDAP queries, e.g. http://whois.zabbix "
-		},
-		{
-			"{$RSM.RDDS.TESTPREFIX}",
-			"Prefix for RDDS tests of this TLD, e.g. \"whois\""
-		},
-		{
-			"{$RSM.TLD.DNSSEC.ENABLED}",
-			"Indicates whether DNSSEC is enabled for this TLD"
 		},
 		{
 			"{$RSM.TLD.EPP.ENABLED}",
 			"Indicates whether EPP is enabled for this TLD"
 		},
 		{
+			"{$RSM.RDDS.NS.STRING}",
+			"What to look for in RDDS output, e.g. \"Name Server:\""
+		},
+		{
+			"{$RSM.DNS.TESTPREFIX}",
+			"Prefix for DNS tests, e.g. nonexistent"
+		},
+		{
+			"{$RSM.RDDS.ENABLED}",
+			"Indicates whether the probe supports RDDS protocol"
+		},
+		{
+			"{$RDAP.TEST.DOMAIN}",
+			"Test domain for RDAP queries, e.g. whois.zabbix"
+		},
+		{
+			"{$RSM.TLD.RDDS.ENABLED}",
+			"Indicates whether RDDS is enabled for this TLD"
+		},
+		{
+			"{$RSM.EPP.ENABLED}",
+			"Indicates whether EPP is enabled on probe"
+		},
+		{
+			"{$RSM.TLD.DNSSEC.ENABLED}",
+			"Indicates whether DNSSEC is enabled for this TLD"
+		},
+		{
 			"{$RSM.RDAP.ENABLED}",
 			"Indicates whether the probe supports RDAP protocol"
+		},
+		{
+			"{$RSM.TLD}",
+			"Name of this TLD, e.g. \"zabbix\""
+		},
+		{
+			"{$RSM.RESOLVER}",
+			"DNS resolver used by the probe"
+		},
+		{
+			"{$RDAP.BASE.URL}",
+			"Base URL for RDAP queries, e.g. http://whois.zabbix"
+		},
+		{
+			"{$RSM.IP6.ENABLED}",
+			"Indicates whether the probe supports IPv6"
+		},
+		{
+			"{$RSM.RDDS.TESTPREFIX}",
+			"Prefix for RDDS tests of this TLD, e.g. \"whois\""
+		},
+		{
+			"{$RSM.IP4.ENABLED}",
+			"Indicates whether the probe supports IPv4"
 		},
 		{ NULL }
 	};
@@ -627,57 +626,12 @@ static int	DBpatch_4040307(void)
 
 		if (ZBX_DB_OK > ret)
 			zabbix_log(LOG_LEVEL_WARNING, "did not update template macro '%s'", macro_descr[i].macro);
+
 	}
 
 	return SUCCEED;
 }
 
-static int	DBpatch_4040308(void)
-{
-	static const char *macros[] =
-	{
-		"{$RSM.SLV.EPP.INFO}",
-		"{$RSM.SLV.EPP.UPDATE}",
-		"{$RSM.SLV.EPP.LOGIN}",
-		"{$MAX_CPU_LOAD}",
-		"{$MAX_PROCESSES}",
-		"{$MIN_FREE_MEMORY}",
-		"{$MAX_RUN_PROCESSES}",
-		"{$MIN_SWAP_PFREE}",
-		"{$FREE_DISK_INODES}",
-		"{$FREE_DISK_SPACE}",
-		"{$MAX_CPU_IOWAIT}",
-		"{$RSM.SLV.RDDS.UPD}",
-		NULL
-	};
-	int	ret;
-
-	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
-		return SUCCEED;
-
-	for (const char **m = macros; *m != NULL; m++)
-	{
-		ret = DBexecute("delete from globalmacro where macro = '%s' and not exists ("
-				"select 1 from items where"
-				"    key_ like '%%%s%%' or delay like '%%%s%%' or "
-				"    history like '%%%s%%' or trends like '%%%s%%' or "
-				"delay like '%%%s%%' or params like '%%%s%%' or "
-				"formula like '%%%s%%' "
-				"union all "
-				"select 1 from triggers where expression like '%%%s%%' "
-				"union all "
-				"select 1 from functions where parameter like '%%%s%%' )",
-				*m, *m, *m, *m, *m, *m, *m, *m, *m, *m
-		);
-
-		if (ZBX_DB_OK > ret)
-			return FAIL;
-		else
-			zabbix_log(LOG_LEVEL_DEBUG, "affected rows %d", ret);
-	}
-
-	return SUCCEED;
-}
 
 #endif
 
@@ -694,6 +648,5 @@ DBPATCH_ADD(4040304, 0, 1)
 DBPATCH_ADD(4040305, 0, 1)
 DBPATCH_ADD(4040306, 0, 0)
 DBPATCH_ADD(4040307, 0, 0)
-DBPATCH_ADD(4040308, 0, 0)
 
 DBPATCH_END()
