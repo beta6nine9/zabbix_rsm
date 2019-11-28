@@ -142,6 +142,25 @@ use constant TLD_TYPE_PROBE_RESULTS_GROUPIDS	=> {
 	TLD_TYPE_OTHER,	230	# Host group "otherTLD Probe results"
 };
 
+use constant CFG_MACRO_DESCRIPTION => {
+	'{$RSM.RDDS.TESTPREFIX}' => 'Prefix for RDDS tests of this TLD, e.g. "whois"',
+	'{$RSM.TLD}' => 'Name of this TLD, e.g. "zabbix"',
+	'{$RSM.TLD.RDDS.ENABLED}' => 'Indicates whether RDDS is enabled for this TLD',
+	'{$RDAP.TEST.DOMAIN}' => 'Test domain for RDAP queries, e.g. whois.zabbix',
+	'{$RSM.RDDS.NS.STRING}' => 'What to look for in RDDS output, e.g. "Name Server:"',
+	'{$RDAP.BASE.URL}' => 'Base URL for RDAP queries, e.g. http://whois.zabbix',
+	'{$RSM.TLD.DNSSEC.ENABLED}' => 'Indicates whether DNSSEC is enabled for this TLD',
+	'{$RSM.RDDS.ENABLED}' => 'Indicates whether the probe supports RDDS protocol',
+	'{$RDAP.TLD.ENABLED}' => 'Indicates whether RDAP is enabled for this TLD',
+	'{$RSM.IP4.ENABLED}' => 'Indicates whether the probe supports IPv4',
+	'{$RSM.TLD.EPP.ENABLED}' => 'Indicates whether EPP is enabled for this TLD',
+	'{$RSM.RDAP.ENABLED}' => 'Indicates whether the probe supports RDAP protocol',
+	'{$RSM.RESOLVER}' => 'DNS resolver used by the probe',
+	'{$RSM.IP6.ENABLED}' => 'Indicates whether the probe supports IPv6',
+	'{$RSM.EPP.ENABLED}' => 'Indicates whether EPP is enabled on probe',
+	'{$RSM.DNS.TESTPREFIX}' => 'Prefix for DNS tests, e.g. nonexistent',
+};
+
 our @EXPORT_OK = qw(
 	true
 	false
@@ -177,7 +196,7 @@ our @EXPORT_OK = qw(
 	ITEM_VALUE_TYPE_FLOAT ITEM_VALUE_TYPE_STR ITEM_VALUE_TYPE_LOG ITEM_VALUE_TYPE_UINT64 ITEM_VALUE_TYPE_TEXT
 	ITEM_TYPE_ZABBIX ITEM_TYPE_TRAPPER ITEM_TYPE_SIMPLE ITEM_TYPE_INTERNAL ITEM_TYPE_ZABBIX_ACTIVE ITEM_TYPE_AGGREGATE ITEM_TYPE_EXTERNAL ITEM_TYPE_CALCULATED
 	APP_SLV_MONTHLY APP_SLV_ROLLWEEK APP_SLV_PARTTEST APP_SLV_CURMON TLD_TYPE_G TLD_TYPE_CC TLD_TYPE_OTHER TLD_TYPE_TEST
-	RDDS_DOWN RDDS_UP RDDS_43_ONLY RDDS_80_ONLY AUDIT_RESOURCE_INCIDENT
+	RDDS_DOWN RDDS_UP RDDS_43_ONLY RDDS_80_ONLY AUDIT_RESOURCE_INCIDENT CFG_MACRO_DESCRIPTION
 );
 
 our %EXPORT_TAGS = (
@@ -214,7 +233,7 @@ our %EXPORT_TAGS = (
 			MONITORING_TARGET_REGISTRY MONITORING_TARGET_REGISTRAR)],
 	config => [ qw(CFG_PROBE_STATUS_DELAY CFG_DEFAULT_RDDS_NS_STRING RSM_VALUE_MAPPINGS RSM_TRIGGER_THRESHOLDS
 			CFG_GLOBAL_MACROS TLD_TYPE_G TLD_TYPE_CC TLD_TYPE_OTHER TLD_TYPE_TEST
-			RDDS_DOWN RDDS_UP RDDS_43_ONLY RDDS_80_ONLY AUDIT_RESOURCE_INCIDENT) ],
+			RDDS_DOWN RDDS_UP RDDS_43_ONLY RDDS_80_ONLY AUDIT_RESOURCE_INCIDENT CFG_MACRO_DESCRIPTION) ],
 	slv => [ qw(APP_SLV_MONTHLY APP_SLV_ROLLWEEK APP_SLV_PARTTEST APP_SLV_CURMON) ],
 	tls => [ qw(HOST_ENCRYPTION_PSK) ]
 );

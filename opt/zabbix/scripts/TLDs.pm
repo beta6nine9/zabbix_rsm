@@ -725,7 +725,10 @@ sub create_macro
 		}
 		else
 		{
-			$result = $zabbix->create('usermacro', {'hostid' => $templateid, 'macro' => $name, 'value' => $value});
+			my $params = {'hostid' => $templateid, 'macro' => $name, 'value' => $value};
+
+			$params->{'description'} = CFG_MACRO_DESCRIPTION->{$name} if (defined(CFG_MACRO_DESCRIPTION->{$name}));
+			$result = $zabbix->create('usermacro', $params);
 		}
 
 		return $result->{'hostmacroids'}[0];
