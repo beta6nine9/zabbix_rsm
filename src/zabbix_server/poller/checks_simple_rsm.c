@@ -474,7 +474,15 @@ static int      zbx_get_ts_from_host(const char *host, time_t *ts)
 	return SUCCEED;
 }
 
-static int	zbx_random(int max)
+/***************************************************************/
+/* max_values - maximum possible values starting from 0, e. g. */
+/*                                                             */
+/* max_values | possible values                                */
+/* ----------------------------                                */
+/*          2 | 0, 1                                           */
+/*          5 | 0, 1, 2, 3, 4                                  */
+/***************************************************************/
+static int	zbx_random(int max_values)
 {
 	zbx_timespec_t	timespec;
 
@@ -482,7 +490,7 @@ static int	zbx_random(int max)
 
 	srand(timespec.sec + timespec.ns);
 
-	return rand() % max;
+	return rand() % max_values;
 }
 
 /***************************************/
@@ -1662,69 +1670,6 @@ static void	zbx_add_value_str(const DC_ITEM *item, int ts, const char *value)
 	zbx_add_value(item, &result, ts);
 }
 
-static void	zbx_set_dns_values(const char *item_ns, const char *item_ip, int rtt, int upd, int value_ts,
-		size_t keypart_size, const DC_ITEM *items, size_t items_num)
-{
-	size_t		i;
-	const char	*p;
-	const DC_ITEM	*item;
-	char		rtt_set = 0, upd_set = 0, *ns, *ip;
-	AGENT_REQUEST	request;
-
-	if (ZBX_NO_VALUE == upd)
-		upd_set = 1;
-
-	for (i = 0; i < items_num; i++)
-	{
-		init_request(&request);
-
-		item = &items[i];
-		p = item->key + keypart_size;	/* skip "rsm.dns.<tcp|udp>." part */
-
-		if (0 == rtt_set && 0 == strncmp(p, "rtt[", 4))
-		{
-			if (SUCCEED != parse_item_key(item->key, &request))
-			{
-				THIS_SHOULD_NEVER_HAPPEN;
-				goto next;
-			}
-
-			ns = get_rparam(&request, 1);
-			ip = get_rparam(&request, 2);
-
-			if (0 == strcmp(ns, item_ns) && 0 == strcmp(ip, item_ip))
-			{
-				zbx_add_value_dbl(item, value_ts, rtt);
-
-				rtt_set = 1;
-			}
-		}
-		else if (0 == upd_set && 0 == strncmp(p, "upd[", 4))
-		{
-			if (SUCCEED != parse_item_key(item->key, &request))
-			{
-				THIS_SHOULD_NEVER_HAPPEN;
-				goto next;
-			}
-
-			ns = get_rparam(&request, 1);
-			ip = get_rparam(&request, 2);
-
-			if (0 == strcmp(ns, item_ns) && 0 == strcmp(ip, item_ip))
-			{
-				zbx_add_value_dbl(item, value_ts, upd);
-
-				upd_set = 1;
-			}
-		}
-next:
-		free_request(&request);
-
-		if (0 != rtt_set && 0 != upd_set)
-			return;
-	}
-}
-
 static int	zbx_get_dnskeys(ldns_resolver *res, const char *domain, const char *resolver,
 		ldns_rr_list **keys, FILE *pkt_file, zbx_dnskeys_error_t *ec, char *err, size_t err_size)
 {
@@ -1926,122 +1871,49 @@ static void	free_items(DC_ITEM *items, size_t items_num)
 	}
 }
 
-static size_t	zbx_get_dns_items(const char *keyname, DC_ITEM *item, const char *domain, DC_ITEM **out_items,
-		FILE *log_fd)
+/******************************************************************************
+ *                                                                            *
+ * Function: zbx_get_nameservers                                              *
+ *                                                                            *
+ * Purpose: Parse string "<NS>,<IP> ..." and return list of Name Servers with *
+ *          their IPs in zbx_ns_t structure.                                  *
+ *                                                                            *
+ ******************************************************************************/
+static int	zbx_get_nameservers(char *name_servers_list, zbx_ns_t **nss, size_t *nss_num, char ipv4_enabled,
+		char ipv6_enabled, FILE *log_fd, char *err, size_t err_size)
 {
-	char		*keypart, host[ZBX_HOST_BUF_SIZE];
-	const char	*p;
-	DC_ITEM		*in_items = NULL, *in_item;
-	size_t		i, in_items_num, out_items_num = 0, out_items_alloc = 8, keypart_size;
-
-	/* get items from config cache */
-	keypart = zbx_dsprintf(NULL, "%s.", keyname);
-	keypart_size = strlen(keypart);
-	in_items_num = DCconfig_get_host_items_by_keypart(&in_items, item->host.hostid, ITEM_TYPE_TRAPPER, keypart,
-			keypart_size);
-	zbx_free(keypart);
-
-	/* filter out invalid items */
-	for (i = 0; i < in_items_num; i++)
-	{
-		in_item = &in_items[i];
-
-		ZBX_STRDUP(in_item->key, in_item->key_orig);
-		in_item->params = NULL;
-
-		if (SUCCEED != substitute_key_macros(&in_item->key, NULL, item,
-				NULL, NULL, MACRO_TYPE_ITEM_KEY, NULL, 0))
-		{
-			/* problem with key macros, skip it */
-			rsm_warnf(log_fd, "%s: cannot substitute key macros", in_item->key_orig);
-			continue;
-		}
-
-		if (SUCCEED != zbx_parse_dns_item(in_item, host, sizeof(host)))
-		{
-			/* unexpected item key syntax, skip it */
-			rsm_warnf(log_fd, "%s: unexpected key syntax", in_item->key);
-			continue;
-		}
-
-		if (0 != strcmp(host, domain))
-		{
-			/* first parameter does not match expected domain name, skip it */
-			rsm_warnf(log_fd, "%s: first parameter does not match host %s", in_item->key, domain);
-			continue;
-		}
-
-		p = in_item->key + keypart_size;
-		if (0 != strncmp(p, "rtt[", 4) && 0 != strncmp(p, "upd[", 4))
-			continue;
-
-		if (0 == out_items_num)
-		{
-			*out_items = zbx_malloc(*out_items, out_items_alloc * sizeof(DC_ITEM));
-		}
-		else if (out_items_num == out_items_alloc)
-		{
-			out_items_alloc += 8;
-			*out_items = zbx_realloc(*out_items, out_items_alloc * sizeof(DC_ITEM));
-		}
-
-		memcpy(&(*out_items)[out_items_num], in_item, sizeof(DC_ITEM));
-		in_item->key = NULL;
-		in_item->params = NULL;
-
-		out_items_num++;
-	}
-
-	free_items(in_items, in_items_num);
-
-	return out_items_num;
-}
-
-static size_t	zbx_get_nameservers(const DC_ITEM *items, size_t items_num, zbx_ns_t **nss, char ipv4_enabled,
-		char ipv6_enabled, FILE *log_fd)
-{
-	char		*ns, *ip, ns_found, ip_found;
-	size_t		i, j, j2, nss_num = 0, nss_alloc = 8;
+	char		*ns, *ip, ns_found, *ns_next;
+	size_t		i, j, j2, nss_alloc = 8;
 	zbx_ns_t	*ns_entry;
-	const DC_ITEM	*item;
-	AGENT_REQUEST	request;
 
-	for (i = 0; i < items_num; i++)
+	*nss_num = 0;
+	ns = name_servers_list;
+
+	do
 	{
-		init_request(&request);
+		if (NULL != (ns_next = strchr(ns, ' ')))
+			*ns_next = '\0';
 
-		item = &items[i];
-		ns_found = ip_found = 0;
-
-		if (SUCCEED != parse_item_key(item->key, &request))
+		if (NULL == (ip = strchr(ns, ',')))
 		{
-			rsm_errf(log_fd, "%s: item key %s is incorrectly formatted", item->host.host,
-					item->key_orig);
-			goto next;
+			zbx_snprintf(err, err_size, "invalid entry \"%s\" in macro \"" ZBX_MACRO_DNS_NAME_SERVERS
+					"\" value, expected \"<NS>,<IP>\"", ns);
+			return FAIL;
 		}
 
-		if (NULL == (ns = get_rparam(&request, 1)) || '\0' == *ns)
-		{
-			rsm_errf(log_fd, "%s: cannot get Name Server from item %s (itemid:" ZBX_FS_UI64 ")",
-					item->host.host, item->key_orig, item->itemid);
-			goto next;
-		}
+		*ip = '\0';
+		ip++;
 
-		if (NULL == (ip = get_rparam(&request, 2)) || '\0' == *ip)
-		{
-			rsm_errf(log_fd, "%s: cannot get IP address from item %s (itemid:" ZBX_FS_UI64 ")",
-					item->host.host, item->key_orig, item->itemid);
-			goto next;
-		}
+		ns_found = 0;
 
-		if (0 == nss_num)
+		if (0 == *nss_num)
 		{
 			*nss = zbx_malloc(*nss, nss_alloc * sizeof(zbx_ns_t));
 		}
 		else
 		{
 			/* check if need to add NS */
-			for (j = 0; j < nss_num; j++)
+			for (j = 0; j < *nss_num; j++)
 			{
 				ns_entry = &(*nss)[j];
 
@@ -2053,20 +1925,14 @@ static size_t	zbx_get_nameservers(const DC_ITEM *items, size_t items_num, zbx_ns
 				for (j2 = 0; j2 < ns_entry->ips_num; j2++)
 				{
 					if (0 == strcmp(ns_entry->ips[j2].ip, ip))
-					{
-						ip_found = 1;
-						break;
-					}
+						goto next;
 				}
 
 				break;
 			}
-
-			if (0 != ip_found)
-				goto next;
 		}
 
-		if (nss_num == nss_alloc)
+		if (*nss_num == nss_alloc)
 		{
 			nss_alloc += 8;
 			*nss = zbx_realloc(*nss, nss_alloc * sizeof(zbx_ns_t));
@@ -2075,19 +1941,23 @@ static size_t	zbx_get_nameservers(const DC_ITEM *items, size_t items_num, zbx_ns
 		/* add NS here */
 		if (0 == ns_found)
 		{
-			ns_entry = &(*nss)[nss_num];
+			ns_entry = &(*nss)[*nss_num];
 
 			ns_entry->name = zbx_strdup(NULL, ns);
 			ns_entry->result = SUCCEED;	/* by default Name Server is considered working */
 			ns_entry->ips_num = 0;
 
-			nss_num++;
+			(*nss_num)++;
 		}
 		else
 			ns_entry = &(*nss)[j];
 
 		if (SUCCEED != zbx_validate_ip(ip, ipv4_enabled, ipv6_enabled, NULL, NULL))
+		{
+			rsm_warnf(log_fd, "unsupported IP address \"%s\" in macro \"" ZBX_MACRO_DNS_NAME_SERVERS
+					"\", ignored", ip);
 			goto next;
+		}
 
 		/* add IP here */
 		if (0 == ns_entry->ips_num)
@@ -2100,10 +1970,11 @@ static size_t	zbx_get_nameservers(const DC_ITEM *items, size_t items_num, zbx_ns
 
 		ns_entry->ips_num++;
 next:
-		free_request(&request);
+		ns = ns_next + 1;
 	}
+	while (NULL != ns_next);
 
-	return nss_num;
+	return SUCCEED;
 }
 
 static void	zbx_clean_nss(zbx_ns_t *nss, size_t nss_num)
@@ -2291,7 +2162,7 @@ static char	*zbx_get_rr_tld(const char *self, char *err, size_t err_size)
 
 	zbx_vector_uint64_create(&hostids);
 
-	DBget_hostids_by_item(&hostids, "rsm.dns.udp[{$RSM.TLD}]");	/* every monitored host has this item */
+	DBget_hostids_by_item(&hostids, "rsm.dns[{$RSM.TLD}]");	/* every monitored host has this item */
 
 	if (2 > hostids.values_num)	/* skip self */
 	{
@@ -2336,17 +2207,67 @@ out:
 	return tld;
 }
 
-int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *result, char proto)
+static void	create_rsm_dns_json(struct zbx_json *json, zbx_ns_t *nss, size_t nss_num, int rtt_limit, char proto)
 {
-	char			err[ZBX_ERR_BUF_SIZE], *domain, ok_nss_num = 0, *res_ip = NULL, *testprefix = NULL;
+	size_t	i, j;
+	char	nssok = 0;
+
+	zbx_json_init(json, 2 * ZBX_KIBIBYTE);
+
+	zbx_json_addarray(json, "nsips");
+
+	for (i = 0; i < nss_num; i++)
+	{
+		for (j = 0; j < nss[i].ips_num; j++)
+		{
+			zbx_json_addobject(json, NULL);
+			zbx_json_addstring(json, "ns", nss[i].name, ZBX_JSON_TYPE_STRING);
+			zbx_json_addstring(json, "ip", nss[i].ips[j].ip, ZBX_JSON_TYPE_STRING);
+			zbx_json_addstring(json, "protocol", (proto == RSM_UDP ? "udp" : "tcp"), ZBX_JSON_TYPE_STRING);
+			zbx_json_addint64(json, "rtt", nss[i].ips[j].rtt);
+			zbx_json_close(json);
+
+			/* if a single IP of the Name Server fails, consider the whole Name Server down */
+			if (ZBX_SUBTEST_SUCCESS != zbx_subtest_result(nss[i].ips[j].rtt, rtt_limit))
+				nss[i].result = FAIL;
+		}
+	}
+
+	zbx_json_close(json);
+
+	zbx_json_addarray(json, "nss");
+
+	for (i = 0; i < nss_num; i++)
+	{
+		zbx_json_addobject(json, NULL);
+		zbx_json_addstring(json, "ns", nss[i].name, ZBX_JSON_TYPE_STRING);
+		zbx_json_adduint64(json, "status", (SUCCEED == nss[i].result ? 1 : 0));
+		zbx_json_close(json);
+
+		if (SUCCEED == nss[i].result)
+			nssok++;
+	}
+
+	zbx_json_close(json);
+
+	zbx_json_adduint64(json, "nssok", nssok);
+
+	zbx_json_close(json);
+}
+
+int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *result)
+{
+	char			err[ZBX_ERR_BUF_SIZE], *domain, *res_ip = NULL, *testprefix = NULL, proto,
+				*name_servers_list = NULL;
 	zbx_dnskeys_error_t	ec_dnskeys;
 	ldns_resolver		*res = NULL;
 	ldns_rr_list		*keys = NULL;
 	FILE			*log_fd;
 	DC_ITEM			*items = NULL;
 	zbx_ns_t		*nss = NULL;
-	size_t			i, j, items_num = 0, nss_num = 0;
+	size_t			i, j, nss_num = 0;
 	unsigned int		extras;
+	struct zbx_json		json;
 	int			ipv4_enabled, ipv6_enabled, dnssec_enabled, epp_enabled, rdds_enabled, rtt_limit,
 				ret = SYSINFO_RET_FAIL;
 
@@ -2364,9 +2285,12 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 		return SYSINFO_RET_FAIL;
 	}
 
+	/* TODO: fix for DNS Reboot */
+	proto = (zbx_random(2) ? RSM_UDP : RSM_TCP);
+
 	/* open log file */
-	if (NULL == (log_fd = open_item_log(item->host.host, domain, ZBX_DNS_LOG_PREFIX, (RSM_UDP == proto ? "udp" : "tcp"),
-			err, sizeof(err))))
+	if (NULL == (log_fd = open_item_log(item->host.host, domain, ZBX_DNS_LOG_PREFIX,
+			(RSM_UDP == proto ? "udp" : "tcp"), err, sizeof(err))))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
 		return SYSINFO_RET_FAIL;
@@ -2443,19 +2367,24 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 		goto out;
 	}
 
-	/* get rsm items */
-	if (0 == (items_num = zbx_get_dns_items(request->key, item, domain, &items, log_fd)))
+	if (SUCCEED != zbx_conf_str(&item->host.hostid, ZBX_MACRO_DNS_NAME_SERVERS, &name_servers_list,
+			err, sizeof(err)))
 	{
-		SET_MSG_RESULT(result, zbx_dsprintf(NULL, "no trapper %s.* items found", request->key));
+		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
+		goto out;
+	}
+
+	/* get list of Name Servers and IPs, by default it will set every Name Server */
+	/* as working so if we have no IPs the result of Name Server will be SUCCEED  */
+	if (SUCCEED != zbx_get_nameservers(name_servers_list, &nss, &nss_num, ipv4_enabled, ipv6_enabled, log_fd,
+			err, sizeof(err)))
+	{
+		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
 		goto out;
 	}
 
 	/* from this point item will not become NOTSUPPORTED */
 	ret = SYSINFO_RET_OK;
-
-	/* get list of Name Servers and IPs, by default it will set every Name Server */
-	/* as working so if we have no IPs the result of Name Server will be SUCCEED  */
-	nss_num = zbx_get_nameservers(items, items_num, &nss, ipv4_enabled, ipv6_enabled, log_fd);
 
 	if (0 != dnssec_enabled && SUCCEED != zbx_get_dnskeys(res, domain, res_ip, &keys, log_fd, &ec_dnskeys,
 			err, sizeof(err)))
@@ -2638,29 +2567,13 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 		zbx_free(threads);
 	}
 
-	for (i = 0; i < nss_num; i++)
-	{
-		for (j = 0; j < nss[i].ips_num; j++)
-		{
-			zbx_set_dns_values(nss[i].name, nss[i].ips[j].ip, nss[i].ips[j].rtt, nss[i].ips[j].upd,
-					item->nextcheck, strlen(request->key) + 1, items, items_num);
+	create_rsm_dns_json(&json, nss, nss_num, rtt_limit, proto);
 
-			/* if a single IP of the Name Server fails, consider the whole Name Server down */
-			if (ZBX_SUBTEST_SUCCESS != zbx_subtest_result(nss[i].ips[j].rtt, rtt_limit))
-				nss[i].result = FAIL;
-		}
-	}
+	SET_STR_RESULT(result, zbx_strdup(NULL, json.buffer));
 
-	free_items(items, items_num);
+	rsm_infof(log_fd, "%s", json.buffer);
 
-	for (i = 0; i < nss_num; i++)
-	{
-		if (SUCCEED == nss[i].result)
-			ok_nss_num++;
-	}
-
-	/* set the value of our simple check item itself */
-	zbx_add_value_uint(item, item->nextcheck, ok_nss_num);
+	zbx_json_free(&json);
 out:
 	if (0 != ISSET_MSG(result))
 		rsm_err(log_fd, result->msg);
@@ -2684,6 +2597,7 @@ out:
 			ldns_resolver_free(res);
 	}
 
+	zbx_free(name_servers_list);
 	zbx_free(testprefix);
 	zbx_free(res_ip);
 

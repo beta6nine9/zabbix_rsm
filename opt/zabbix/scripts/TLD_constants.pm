@@ -13,6 +13,7 @@ use constant MONITORING_TARGET_REGISTRAR => "registrar";
 use constant LINUX_TEMPLATEID			=> 10001;	# Template "Template OS Linux by Zabbix agent"
 use constant APP_ZABBIX_PROXY_TEMPLATEID	=> 10058;	# Template "Template App Zabbix Proxy"
 use constant PROBE_ERRORS_TEMPLATEID		=> 99990;	# Template "Template Probe Errors"
+use constant DNS_TEMPLATEID			=> 99970;	# Template "Template DNS"
 use constant RDAP_TEMPLATEID			=> 99980;	# Template "Template RDAP"
 
 use constant TEMPLATES_TLD_GROUPID		=> 240;		# Host group "Templates - TLD"
@@ -168,6 +169,7 @@ our @EXPORT_OK = qw(
 	LINUX_TEMPLATEID
 	APP_ZABBIX_PROXY_TEMPLATEID
 	PROBE_ERRORS_TEMPLATEID
+	DNS_TEMPLATEID
 	RDAP_TEMPLATEID
 	CONFIGVALUE_DNS_UDP_RTT_HIGH_ITEMID
 	TEMPLATES_TLD_GROUPID
@@ -203,6 +205,7 @@ our %EXPORT_TAGS = (
 			LINUX_TEMPLATEID
 			APP_ZABBIX_PROXY_TEMPLATEID
 			PROBE_ERRORS_TEMPLATEID
+			DNS_TEMPLATEID
 			RDAP_TEMPLATEID) ],
 	groups => [ qw(
 			TEMPLATES_TLD_GROUPID

@@ -151,6 +151,12 @@ return [
 				'type' => DB::FIELD_TYPE_ID,
 				'length' => 20,
 			],
+			'created' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_INT,
+				'length' => 10,
+				'default' => '0',
+			],
 			'proxy_hostid' => [
 				'null' => true,
 				'type' => DB::FIELD_TYPE_ID,

@@ -214,6 +214,7 @@
 #define ZBX_MACRO_DNS_TESTPREFIX	"{$RSM.DNS.TESTPREFIX}"
 #define ZBX_MACRO_DNS_UDP_RTT		"{$RSM.DNS.UDP.RTT.HIGH}"
 #define ZBX_MACRO_DNS_TCP_RTT		"{$RSM.DNS.TCP.RTT.HIGH}"
+#define ZBX_MACRO_DNS_NAME_SERVERS	"{$RSM.DNS.NAME.SERVERS}"
 #define ZBX_MACRO_RDDS_TESTPREFIX	"{$RSM.RDDS.TESTPREFIX}"
 #define ZBX_MACRO_RDDS_RTT		"{$RSM.RDDS.RTT.HIGH}"
 #define ZBX_MACRO_RDDS_NS_STRING	"{$RSM.RDDS.NS.STRING}"
@@ -256,7 +257,7 @@
 #define ZBX_PROBESTATUS_LOG_PREFIX	"probestatus"		/* file will be <LOGDIR>/<PROBE>-probestatus.log */
 #define ZBX_RESOLVERSTATUS_LOG_PREFIX	"resolverstatus"	/* file will be <LOGDIR>/<PROBE>-ZBX_RESOLVERSTATUS_LOG_PREFIX.log */
 
-int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *result, char proto);
+int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *result);
 int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *result);
 int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *result);
 int	check_rsm_epp(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *result);

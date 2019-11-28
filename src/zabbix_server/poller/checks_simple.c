@@ -166,14 +166,9 @@ int	get_value_simple(DC_ITEM *item, AGENT_RESULT *result, zbx_vector_ptr_t *add_
 
 	request.lastlogsize = item->lastlogsize;
 
-	if (0 == strcmp(request.key, "rsm.dns.udp"))
+	if (0 == strcmp(request.key, "rsm.dns"))
 	{
-		if (SYSINFO_RET_OK == check_rsm_dns(item, &request, result, RSM_UDP))
-			ret = SUCCEED;
-	}
-	else if (0 == strcmp(request.key, "rsm.dns.tcp"))
-	{
-		if (SYSINFO_RET_OK == check_rsm_dns(item, &request, result, RSM_TCP))
+		if (SYSINFO_RET_OK == check_rsm_dns(item, &request, result))
 			ret = SUCCEED;
 	}
 	else if (0 == strcmp(request.key, "rsm.rdds"))

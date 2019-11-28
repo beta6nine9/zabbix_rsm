@@ -4,7 +4,8 @@ rsm.slv.*.pl - scripts to calculate different service status results and save to
 
 =head1 SYNOPSIS
 
-rsm.slv.*.pl [--now <timestamp>] [--cycles <cycles>] [--dry-run] [--warnslow <seconds>] [--debug] [--help]
+rsm.slv.*.pl [--now <timestamp>] [--fill-gap <timestamp>] [--cycles <cycles>] [--dry-run] [--warnslow <seconds>]
+[--debug] [--help]
 
 =head1 OPTIONS
 
@@ -13,6 +14,11 @@ rsm.slv.*.pl [--now <timestamp>] [--cycles <cycles>] [--dry-run] [--warnslow <se
 =item B<--now> timestamp
 
 Specify Unix timestamp within cycle that needs to be calculated.
+
+=item B<--fill-gap> timestamp
+
+Specify Unix timestamp for a cycle that is missing (e.g., because of failed DB transaction) and needs to be
+recalculated.
 
 =item B<--cycles> cycles
 

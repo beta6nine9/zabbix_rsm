@@ -665,9 +665,6 @@ sub add_new_ns($)
 
 			$proto=~s/v(\d)/$1/;
 
-			create_item_dns_rtt($ns, $ip, $main_templateid, 'tcp', $proto);
-			create_item_dns_rtt($ns, $ip, $main_templateid, 'udp', $proto);
-
 			create_all_slv_ns_items($ns, $ip, $main_hostid, $TLD);
 		}
 	}
@@ -1032,6 +1029,8 @@ sub create_main_template($$)
 		}));
 	}
 
+	my $name_servers_list = '';
+
 	foreach my $ns_name (sort keys %{$ns_servers})
 	{
 		print $ns_name . "\n";
@@ -1044,12 +1043,8 @@ sub create_main_template($$)
 			next unless defined $ipv4[$i_ipv4];
 			print("	--v4     $ipv4[$i_ipv4]\n");
 
-			create_item_dns_rtt($ns_name, $ipv4[$i_ipv4], $templateid, "tcp", '4');
-			create_item_dns_rtt($ns_name, $ipv4[$i_ipv4], $templateid, "udp", '4');
-			if (opt('epp-servers'))
-			{
-				create_item_dns_udp_upd($ns_name, $ipv4[$i_ipv4], $templateid);
-			}
+			$name_servers_list .= " " unless ($name_servers_list eq '');
+			$name_servers_list .= "$ns_name,$ipv4[$i_ipv4]";
 		}
 
 		for (my $i_ipv6 = 0; $i_ipv6 <= $#ipv6; $i_ipv6++)
@@ -1057,16 +1052,13 @@ sub create_main_template($$)
 			next unless defined $ipv6[$i_ipv6];
 			print("	--v6     $ipv6[$i_ipv6]\n");
 
-			create_item_dns_rtt($ns_name, $ipv6[$i_ipv6], $templateid, "tcp", '6');
-			create_item_dns_rtt($ns_name, $ipv6[$i_ipv6], $templateid, "udp", '6');
-			if (opt('epp-servers'))
-			{
-				create_item_dns_udp_upd($ns_name, $ipv6[$i_ipv6], $templateid);
-			}
+			$name_servers_list .= " " unless ($name_servers_list eq '');
+			$name_servers_list .= "$ns_name,$ipv6[$i_ipv6]";
 		}
 	}
 
-	create_items_dns($templateid);
+	really(create_macro('{$RSM.DNS.NAME.SERVERS}', $name_servers_list, $templateid, 1));
+
 	create_items_rdds($templateid);
 	create_items_epp($templateid) if (opt('epp-servers'));
 
@@ -1131,34 +1123,6 @@ sub create_main_template($$)
 	return $templateid;
 }
 
-sub create_item_dns_rtt($$$$$)
-{
-	my $ns_name       = shift;
-	my $ip            = shift;
-	my $templateid    = shift;
-	my $proto         = shift;
-	my $ipv           = shift;
-
-	pfail("undefined template ID passed to create_item_dns_rtt()") unless ($templateid);
-	pfail("no protocol parameter specified to create_item_dns_rtt()") unless ($proto);
-
-	my $proto_lc = lc($proto);
-	my $proto_uc = uc($proto);
-
-	my $item_key = 'rsm.dns.' . $proto_lc . '.rtt[{$RSM.TLD},' . $ns_name . ',' . $ip . ']';
-
-	really(create_item({
-		'name'         => 'DNS RTT of $2 ($3) (' . $proto_uc . ')',
-		'key_'         => $item_key,
-		'status'       => ITEM_STATUS_ACTIVE,
-		'hostid'       => $templateid,
-		'applications' => [get_application_id('DNS RTT (' . $proto_uc . ')', $templateid)],
-		'type'         => ITEM_TYPE_TRAPPER,
-		'value_type'   => ITEM_VALUE_TYPE_FLOAT,
-		'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_dns_rtt'}
-	}));
-}
-
 sub create_slv_item($$$$$;$)
 {
 	my $name           = shift;
@@ -1212,73 +1176,6 @@ sub create_slv_item($$$$$;$)
 	}
 
 	pfail("Unknown value type $value_type.");
-}
-
-sub create_item_dns_udp_upd($$$)
-{
-	my $ns_name       = shift;
-	my $ip            = shift;
-	my $templateid    = shift;
-
-	my $proto_uc = 'UDP';
-
-	return really(create_item({
-		'name'         => 'DNS update time of $2 ($3)',
-		'key_'         => 'rsm.dns.udp.upd[{$RSM.TLD},' . $ns_name . ',' . $ip . ']',
-		'status'       => (opt('epp-servers') ? ITEM_STATUS_ACTIVE : ITEM_STATUS_DISABLED),
-		'hostid'       => $templateid,
-		'applications' => [get_application_id('DNS RTT (' . $proto_uc . ')', $templateid)],
-		'type'         => ITEM_TYPE_TRAPPER,
-		'value_type'   => ITEM_VALUE_TYPE_FLOAT,
-		'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_dns_rtt'}
-	}));
-}
-
-sub create_items_dns($)
-{
-	my $templateid    = shift;
-
-	my $proto = 'tcp';
-	my $proto_uc = uc($proto);
-	my $item_key = 'rsm.dns.' . $proto . '[{$RSM.TLD}]';
-
-	really(create_item({
-		'name'         => 'Number of working DNS Name Servers of $1 (' . $proto_uc . ')',
-		'key_'         => $item_key,
-		'status'       => ITEM_STATUS_ACTIVE,
-		'hostid'       => $templateid,
-		'applications' => [get_application_id('DNS (' . $proto_uc . ')', $templateid)],
-		'type'         => ITEM_TYPE_SIMPLE,
-		'value_type'   => ITEM_VALUE_TYPE_UINT64,
-		'delay'        => '{$RSM.DNS.TCP.DELAY}'
-	}));
-
-	$proto = 'udp';
-	$proto_uc = uc($proto);
-	$item_key = 'rsm.dns.' . $proto . '[{$RSM.TLD}]';
-
-	really(create_item({
-		'name'         => 'Number of working DNS Name Servers of $1 (' . $proto_uc . ')',
-		'key_'         => $item_key,
-		'status'       => ITEM_STATUS_ACTIVE,
-		'hostid'       => $templateid,
-		'applications' => [get_application_id('DNS (' . $proto_uc . ')', $templateid)],
-		'type'         => ITEM_TYPE_SIMPLE,
-		'value_type'   => ITEM_VALUE_TYPE_UINT64,
-		'delay'        => '{$RSM.DNS.UDP.DELAY}'
-	}));
-
-	# this item is added in any case
-	really(create_item({
-		'name'       => 'DNSSEC enabled/disabled',
-		'key_'       => 'dnssec.enabled',
-		'status'     => ITEM_STATUS_ACTIVE,
-		'hostid'     => $templateid,
-		'params'     => '{$RSM.TLD.DNSSEC.ENABLED}',
-		'delay'      => 60,
-		'type'       => ITEM_TYPE_CALCULATED,
-		'value_type' => ITEM_VALUE_TYPE_UINT64
-	}));
 }
 
 sub create_items_rdds($)
@@ -2012,6 +1909,7 @@ sub create_tld_hosts_on_probes($$$$)
 			],
 			'templates' => [
 				{'templateid' => $main_templateid},
+				{'templateid' => DNS_TEMPLATEID},
 				{'templateid' => RDAP_TEMPLATEID},
 				{'templateid' => $probe_templateid}
 			],
