@@ -630,7 +630,6 @@ static int	DBpatch_4040307(void)
 	return SUCCEED;
 }
 
-
 #endif
 
 DBPATCH_START(4040)
