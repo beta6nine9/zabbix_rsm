@@ -1233,106 +1233,98 @@ static int	zbx_dns_in_a_query(ldns_pkt **pkt, ldns_resolver *res, const ldns_rdf
 		zbx_ns_query_error_t *ec, char *err, size_t err_size)
 {
 	ldns_status	status;
-	char		is_tcp = ldns_resolver_usevc(res);
 	double		sec;
 	ldns_pkt	*query = NULL;
 	ldns_rdf	*recv_nsid = NULL;
 	ldns_rdf	*send_nsid = NULL;
 	uint16_t	opt_code, opt_len;
-	size_t		opt_code_size = sizeof(opt_code);
-	size_t		opt_len_size = sizeof(opt_len);
-	size_t		opt_code_and_opt_len_size = opt_code_size + opt_len_size;
-	ldns_buffer	*opt_buf = ldns_buffer_new(opt_code_and_opt_len_size);
+	ldns_buffer	*opt_buf;
 	int		ret = FAIL;
+
+	opt_buf = ldns_buffer_new(sizeof(opt_code) + sizeof(opt_len));
 
 	if (NULL == opt_buf)
 	{
-		zabbix_log(LOG_LEVEL_CRIT, "ldns_buffer_new memory error at %s", __func__);
-		exit(EXIT_FAILURE);
+		zbx_snprintf(err, err_size, "memory error in ldns_buffer_new()");
+		*ec = ZBX_NS_QUERY_INTERNAL;
+		goto out;
 	}
 
 	ldns_buffer_write_u16(opt_buf, LDNS_EDNS_NSID);	/* option code */
 	ldns_buffer_write_u16(opt_buf, 0);		/* option size */
-
-	sec = zbx_time();
-
-	status = ldns_resolver_prepare_query_pkt(&query, res, testname_rdf, LDNS_RR_TYPE_A, LDNS_RR_CLASS_IN, 0);
-
-	if (LDNS_STATUS_OK != status)
-	{
-		zbx_snprintf(err, err_size, "Could not create query packet: %s", ldns_get_errorstr_by_id(status));
-		goto err;
-	}
 
 	send_nsid = ldns_rdf_new_frm_data(LDNS_RDF_TYPE_NONE, ldns_buffer_position(opt_buf),
 			ldns_buffer_begin(opt_buf));
 
 	if (NULL == send_nsid)
 	{
-		zabbix_log(LOG_LEVEL_CRIT, "ldns_rdf_new_from_data memory error at %s", __func__);
-		exit(EXIT_FAILURE);
+		zbx_snprintf(err, err_size, "memory error in ldns_rdf_new_frm_data()");
+		*ec = ZBX_NS_QUERY_INTERNAL;
+		goto out;
+	}
+
+	status = ldns_resolver_prepare_query_pkt(&query, res, testname_rdf, LDNS_RR_TYPE_A, LDNS_RR_CLASS_IN, 0);
+
+	if (LDNS_STATUS_OK != status)
+	{
+		zbx_snprintf(err, err_size, "cannot create query packet: %s", ldns_get_errorstr_by_id(status));
+		goto err;
 	}
 
 	ldns_pkt_set_edns_data(query, send_nsid);
+
+	sec = zbx_time();
 
 	status = ldns_resolver_send_pkt(pkt, res, query);
 
 	if (LDNS_STATUS_OK != status)
 	{
-		zbx_snprintf(err, err_size, "Could not send query: %s", ldns_get_errorstr_by_id(status));
+		zbx_snprintf(err, err_size, "cannot send query: %s", ldns_get_errorstr_by_id(status));
 		goto err;
-	}
-	else
-	{
-		ret = SUCCEED;
 	}
 
 	recv_nsid = ldns_pkt_edns_data(*pkt);
 
-	if (NULL == recv_nsid)
+	if (NULL != recv_nsid)
 	{
-		rsm_infof(NULL, " Could not get EDNS data\n");
-		goto out;
-	}
+		uint8_t	*data = ldns_rdf_data(recv_nsid);
+		size_t	size = ldns_rdf_size(recv_nsid);
 
-	uint8_t	*data = ldns_rdf_data(recv_nsid);
-	size_t	size = ldns_rdf_size(recv_nsid);
-
-	while (size >= opt_code_and_opt_len_size)
-	{
-		opt_code = ldns_read_uint16(data);
-		size -= opt_code_size; data += opt_code_size;
-
-		opt_len = ldns_read_uint16(data);
-		size -= opt_len_size; data += opt_len_size;
-
-		if (LDNS_EDNS_NSID == opt_code)
+		while (size >= sizeof(opt_code) + sizeof(opt_len))
 		{
-			rsm_infof(NULL, "Returned NSID: \"%.*s\"\n", (int)opt_len, data);
-			break;
-		}
+			opt_code = ldns_read_uint16(data);
+			size -= sizeof(opt_code);
+			data += sizeof(opt_code);
 
-		/* next option */
-		size = opt_len > size ? 0 : size - opt_len;
+			opt_len = ldns_read_uint16(data);
+			size -= sizeof(opt_len);
+			data += sizeof(opt_len);
+
+			if (LDNS_EDNS_NSID == opt_code)
+			{
+				/* TODO: replace next line with storing NSID */
+				rsm_infof(NULL, "Returned NSID: \"%.*s\"\n", (int)opt_len, data);
+				break;
+			}
+
+			size = opt_len > size ? 0 : size - opt_len;
+		}
 	}
 
-	if (0 == size)
-		rsm_infof(NULL, "No EDNS NSID option was returned \n");
+	ret = SUCCEED;
 
 	goto out;
 
 err:
-	sec = zbx_time() - sec;
-
 	switch (status)
 	{
 		case LDNS_STATUS_ERR:
 		case LDNS_STATUS_NETWORK_ERR:
 			/* UDP */
-			if (!is_tcp)
+			if (!ldns_resolver_usevc(res))
 				*ec = ZBX_NS_QUERY_NOREPLY;
 			/* TCP */
-			else if (sec >= RSM_TCP_TIMEOUT * RSM_TCP_RETRY)
+			else if (zbx_time() - sec >= RSM_TCP_TIMEOUT * RSM_TCP_RETRY)
 				*ec = ZBX_NS_QUERY_TO;
 			else
 				*ec = ZBX_NS_QUERY_ECON;
