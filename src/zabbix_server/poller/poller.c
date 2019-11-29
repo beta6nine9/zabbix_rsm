@@ -338,7 +338,7 @@ static void	free_result_ptr(AGENT_RESULT *result)
 	zbx_free(result);
 }
 
-static int	get_value(DC_ITEM *item, AGENT_RESULT *result, zbx_vector_ptr_t *add_results)
+static int	get_value(DC_ITEM *item, AGENT_RESULT *result, zbx_vector_ptr_t *add_results, zbx_timespec_t *ts)
 {
 	int	res = FAIL;
 
@@ -354,6 +354,9 @@ static int	get_value(DC_ITEM *item, AGENT_RESULT *result, zbx_vector_ptr_t *add_
 		case ITEM_TYPE_SIMPLE:
 			/* simple checks use their own timeouts */
 			res = get_value_simple(item, result, add_results);
+
+			/* RSM specifics: we need rsm values to stay in correct time period (cycle) */
+			ts->sec = item->nextcheck;
 			break;
 		case ITEM_TYPE_INTERNAL:
 			res = get_value_internal(item, result);
@@ -501,7 +504,7 @@ static int	get_values(unsigned char poller_type, int *nextcheck)
 	DC_ITEM			items[MAX_POLLER_ITEMS];
 	AGENT_RESULT		results[MAX_POLLER_ITEMS];
 	int			errcodes[MAX_POLLER_ITEMS];
-	zbx_timespec_t		timespec;
+	zbx_timespec_t		timespec = {.sec = 0, .ns = 0};
 	char			*port = NULL, error[ITEM_ERROR_LEN_MAX];
 	int			i, num, last_available = HOST_AVAILABLE_UNKNOWN;
 	zbx_vector_ptr_t	add_results;
@@ -725,12 +728,13 @@ static int	get_values(unsigned char poller_type, int *nextcheck)
 	else if (1 == num)
 	{
 		if (SUCCEED == errcodes[0])
-			errcodes[0] = get_value(&items[0], &results[0], &add_results);
+			errcodes[0] = get_value(&items[0], &results[0], &add_results, &timespec);
 	}
 	else
 		THIS_SHOULD_NEVER_HAPPEN;
 
-	zbx_timespec(&timespec);
+	if (timespec.sec == 0)
+		zbx_timespec(&timespec);
 
 	/* process item values */
 	for (i = 0; i < num; i++)
