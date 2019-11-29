@@ -2223,6 +2223,7 @@ static void	create_rsm_dns_json(struct zbx_json *json, zbx_ns_t *nss, size_t nss
 			zbx_json_addobject(json, NULL);
 			zbx_json_addstring(json, "ns", nss[i].name, ZBX_JSON_TYPE_STRING);
 			zbx_json_addstring(json, "ip", nss[i].ips[j].ip, ZBX_JSON_TYPE_STRING);
+			zbx_json_addstring(json, "nsid", "N/A", ZBX_JSON_TYPE_STRING);
 			zbx_json_addstring(json, "protocol", (proto == RSM_UDP ? "udp" : "tcp"), ZBX_JSON_TYPE_STRING);
 			zbx_json_addint64(json, "rtt", nss[i].ips[j].rtt);
 			zbx_json_close(json);
