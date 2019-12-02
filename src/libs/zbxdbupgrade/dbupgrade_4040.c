@@ -630,16 +630,16 @@ static int	DBpatch_4040307(void)
 	return SUCCEED;
 }
 
-static int	DBpatch_4040308_create_application(zbx_uint64_t hostgroupid, zbx_uint64_t hostid, zbx_uint64_t groupid)
+static int	DBpatch_4040308_create_application(zbx_uint64_t applicationid, zbx_uint64_t hostid, const char *name)
 {
-	return DBexecute("insert into hosts_groups set hostgroupid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ","
-			"groupid=" ZBX_FS_UI64,
-			hostgroupid, hostid, groupid);
+	return DBexecute("insert into applications set applicationid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",name='%s',"
+			"flags=0",
+			applicationid, hostid, name);
 }
 
 static int	DBpatch_4040308_create_item(zbx_uint64_t itemid, int type, zbx_uint64_t hostid, const char *name,
 		const char *key_, const char *delay, const char *history, const char *trends, int value_type,
-		zbx_uint64_t *valuemapid, const char *params, int flags, const char* description, const char *lifetime,
+		zbx_uint64_t valuemapid, const char *params, int flags, const char* description, const char *lifetime,
 		zbx_uint64_t master_itemid)
 {
 	return DBexecute("insert into items set itemid=" ZBX_FS_UI64 ",type=%d,snmp_community='',snmp_oid='',"
@@ -675,7 +675,7 @@ static int	DBpatch_4040308_item_discovery(zbx_uint64_t itemdiscoveryid, zbx_uint
 static int	DBpatch_4040308_item_preproc(zbx_uint64_t item_preprocid, zbx_uint64_t itemid, const char *params,
 		int error_handler)
 {
-	return DBexecute("insert into item_preproc set item_preprocid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ",step=1,",
+	return DBexecute("insert into item_preproc set item_preprocid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ",step=1,"
 			"type=12,params='%s',error_handler=%d,error_handler_params=''",
 			item_preprocid, itemid, params, error_handler);
 }
@@ -691,8 +691,6 @@ static int	DBpatch_4040308_lld_macro_path(zbx_uint64_t lld_macro_pathid, zbx_uin
 static int	DBpatch_4040308(void)
 {
 	int		ret = FAIL;
-	DB_RESULT	result;
-	DB_ROW		row;
 
 	zbx_uint64_t	groupid_templates;			/* groupid of "Templates" host group */
 	zbx_uint64_t	hostid_template_dns;			/* hostid of "Template DNS" template */
@@ -714,7 +712,7 @@ static int	DBpatch_4040308(void)
 	zbx_uint64_t	itemid_rsm_dns_rtt_udp;			/* itemid of "RTT of $1,$2 using $3" item prototype in "Template DNS" template */
 	zbx_uint64_t	itemid_rsm_dns_nsid;			/* itemid of "NSID of $1,$2" item prototype in "Template DNS" template */
 
-	zbx_uint64_t	itemappid_next
+	zbx_uint64_t	itemappid_next;
 	zbx_uint64_t	itemappid_dnssec_enabled;		/* itemappid of "DNSSEC enabled/disabled" item */
 	zbx_uint64_t	itemappid_rsm_dns;			/* itemappid of "DNS availability" item */
 	zbx_uint64_t	itemappid_rsm_dns_nssok;		/* itemappid of "Number of working Name Servers" item */
@@ -737,6 +735,11 @@ static int	DBpatch_4040308(void)
 	zbx_uint64_t	item_preprocid_rsm_dns_rtt_tcp;		/* item_preprocid of "RTT of $1,$2 using $3" item prototype*/
 	zbx_uint64_t	item_preprocid_rsm_dns_rtt_udp;		/* item_preprocid of "RTT of $1,$2 using $3" item prototype*/
 	zbx_uint64_t	item_preprocid_rsm_dns_nsid;		/* item_preprocid of "NSID of $1,$2" item prototype */
+
+	zbx_uint64_t	lld_macro_pathid_next;
+	zbx_uint64_t	lld_macro_pathid_rsm_dns_ns_discovery_ns;	/* lld_macro_pathid of {#NS} in "Name Servers discovery" item */
+	zbx_uint64_t	lld_macro_pathid_rsm_dns_nsip_discovery_ip;	/* lld_macro_pathid of {#IP} in "NS-IP pairs discovery" item */
+	zbx_uint64_t	lld_macro_pathid_rsm_dns_nsip_discovery_ns;	/* lld_macro_pathid of {#NS} in "NS-IP pairs discovery" item */
 
 	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
 		return SUCCEED;
