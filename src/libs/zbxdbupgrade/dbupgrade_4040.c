@@ -860,22 +860,23 @@ static int	DBpatch_4040308(void)
 	CHECK(DBpatch_4040308_create_item(itemid_rsm_dns_ns_status, ITEM_TYPE_DEPENDENT, hostid_template_dns,
 			"Status of $1", "rsm.dns.ns.status[{#NS}]", "0", "90d", "365d",
 			ITEM_VALUE_TYPE_UINT64, valuemapid_rsm_service_availability, "", ZBX_FLAG_DISCOVERY_PROTOTYPE,
-			"",
+			"Status of Name Server: Up (1) or Down (0)."
+			" The Name Server is considered to be up if all its IPs returned successful RTTs.",
 			"30d", itemid_rsm_dns));
 	CHECK(DBpatch_4040308_create_item(itemid_rsm_dns_rtt_tcp, ITEM_TYPE_DEPENDENT, hostid_template_dns,
 			"RTT of $1,$2 using $3", "rsm.dns.rtt[{#NS},{#IP},tcp]", "0", "90d", "365d",
 			ITEM_VALUE_TYPE_FLOAT, 0, "", ZBX_FLAG_DISCOVERY_PROTOTYPE,
-			"",
+			"The Round-Time Trip returned when testing specific IP of Name Server using TCP protocol.",
 			"30d", itemid_rsm_dns));
 	CHECK(DBpatch_4040308_create_item(itemid_rsm_dns_rtt_udp, ITEM_TYPE_DEPENDENT, hostid_template_dns,
 			"RTT of $1,$2 using $3", "rsm.dns.rtt[{#NS},{#IP},udp]", "0", "90d", "365d",
 			ITEM_VALUE_TYPE_FLOAT, 0, "", ZBX_FLAG_DISCOVERY_PROTOTYPE,
-			"",
+			"The Round-Time Trip returned when testing specific IP of Name Server using UDP protocol.",
 			"30d", itemid_rsm_dns));
 	CHECK(DBpatch_4040308_create_item(itemid_rsm_dns_nsid, ITEM_TYPE_DEPENDENT, hostid_template_dns,
 			"NSID of $1,$2", "rsm.dns.nsid[{#NS},{#IP}]", "0", "90d", "0",
 			ITEM_VALUE_TYPE_STR, 0, "", ZBX_FLAG_DISCOVERY_PROTOTYPE,
-			"",
+			"DNS Name Server Identifier of the target Name Server that was tested.",
 			"30d", itemid_rsm_dns));
 
 	CHECK(DBpatch_4040308_item_to_app(itemappid_dnssec_enabled   , applicationid_dnssec, itemid_dnssec_enabled));
