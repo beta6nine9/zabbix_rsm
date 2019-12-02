@@ -51,7 +51,7 @@ static int	DBpatch_4040301(void)
 		"update items"
 		" set delay='{$RSM.DNS.UDP.DELAY}'"
 		" where key_ like 'rsm.dns.udp[%%'"
-		" and type=%d",
+			" and type=%d",
 		ITEM_TYPE_SIMPLE))
 	{
 		return FAIL;
@@ -69,7 +69,7 @@ static int	DBpatch_4040302(void)
 		"update items"
 		" set delay='{$RSM.DNS.TCP.DELAY}'"
 		" where key_ like 'rsm.dns.tcp[%%'"
-		" and type=%d",
+			" and type=%d",
 		ITEM_TYPE_SIMPLE))
 	{
 		return FAIL;
@@ -87,7 +87,7 @@ static int	DBpatch_4040303(void)
 		"update items"
 		" set delay='{$RSM.RDDS.DELAY}'"
 		" where key_ like 'rsm.rdds[%%'"
-		" and type=%d",
+			" and type=%d",
 		ITEM_TYPE_SIMPLE))
 	{
 		return FAIL;
@@ -105,7 +105,7 @@ static int	DBpatch_4040304(void)
 		"update items"
 		" set delay='{$RSM.RDAP.DELAY}'"
 		" where key_ like 'rdap[%%'"
-		" and type=%d",
+			" and type=%d",
 		ITEM_TYPE_SIMPLE))
 	{
 		return FAIL;
@@ -123,7 +123,7 @@ static int	DBpatch_4040305(void)
 		"update items"
 		" set delay='{$RSM.EPP.DELAY}'"
 		" where key_ like 'rsm.epp[%%'"
-		" and type=%d",
+			" and type=%d",
 		ITEM_TYPE_SIMPLE))
 	{
 		return FAIL;
@@ -131,6 +131,7 @@ static int	DBpatch_4040305(void)
 
 	return SUCCEED;
 }
+
 typedef struct
 {
 	const char *const	macro;
@@ -943,13 +944,13 @@ DBPATCH_START(4040)
 
 DBPATCH_ADD(4040000, 0, 1)
 DBPATCH_ADD(4040300, 0, 1)	/* RSM FY20 */
-DBPATCH_ADD(4040301, 0, 1)
-DBPATCH_ADD(4040302, 0, 1)
-DBPATCH_ADD(4040303, 0, 1)
-DBPATCH_ADD(4040304, 0, 1)
-DBPATCH_ADD(4040305, 0, 1)
-DBPATCH_ADD(4040306, 0, 0)
-DBPATCH_ADD(4040307, 0, 0)
+DBPATCH_ADD(4040301, 0, 1)	/* set delay as macro for rsm.dns.udp* items */
+DBPATCH_ADD(4040302, 0, 1)	/* set delay as macro for rsm.dns.tcp* items */
+DBPATCH_ADD(4040303, 0, 1)	/* set delay as macro for rsm.rdds* items */
+DBPATCH_ADD(4040304, 0, 1)	/* set delay as macro for rsm.rdap* items */
+DBPATCH_ADD(4040305, 0, 1)	/* set delay as macro for rsm.epp* items */
+DBPATCH_ADD(4040306, 0, 0)	/* set macro descriptions (part I) */
+DBPATCH_ADD(4040307, 0, 0)	/* set macro descriptions (part II) */
 DBPATCH_ADD(4040308, 0, 0)	/* add "Template DNS" template */
 
 DBPATCH_END()
