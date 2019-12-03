@@ -32,9 +32,9 @@ void	exit_usage(const char *program)
 
 int	main(int argc, char *argv[])
 {
-	char		err[256], *res_ip = DEFAULT_RES_IP, *tld = NULL, *ns = NULL, *ns_ip = NULL, proto = RSM_UDP,
-			ipv4_enabled = 0, ipv6_enabled = 0, *testprefix = DEFAULT_TESTPREFIX, dnssec_enabled = 0,
-			ignore_err = 0, log_to_file = 0;
+	char		err[ZBX_NSID_BUF_SIZE], pack_buf[2048], *res_ip = DEFAULT_RES_IP, *tld = NULL, *ns = NULL,
+			*ns_ip = NULL, proto = RSM_UDP, * nsid = 0, ipv4_enabled = 0, ipv6_enabled = 0,
+			*testprefix = DEFAULT_TESTPREFIX, dnssec_enabled = 0, ignore_err = 0, log_to_file = 0;
 	int		c, index, rtt;
 	ldns_resolver	*res = NULL;
 	ldns_rr_list	*keys = NULL;
@@ -173,16 +173,31 @@ int	main(int argc, char *argv[])
 		}
 	}
 
-	if (SUCCEED != zbx_get_ns_ip_values(res, ns, ns_ip, keys, testprefix, tld, log_fd, &rtt, NULL, ipv4_enabled,
-					ipv6_enabled, 0, err, sizeof(err)))
+	if (SUCCEED != zbx_get_ns_ip_values(res, ns, ns_ip, keys, testprefix, tld, log_fd, &rtt, &nsid, NULL,
+			ipv4_enabled, ipv6_enabled, 0, err, sizeof(err)))
 	{
 		rsm_err(stderr, err);
 		if (0 == ignore_err)
 			goto out;
 	}
 
-	printf("OK (RTT:%d)\n", rtt);
-out:
+	/* we have nsid, lets also test that it works with packing/unpacking */
+	pack_values(0, 0, rtt, 0, nsid, pack_buf, sizeof(pack_buf));
+
+	size_t i,j;
+	int rtt_unpacked,upd_unpacked;
+	char nsid_unpacked[ZBX_NSID_BUF_SIZE];
+
+	if (PACK_NUM_VARS == unpack_values(&i, &j, &rtt_unpacked, &upd_unpacked, nsid_unpacked, pack_buf))
+	{
+		printf("OK (RTT:%d)\n", rtt_unpacked);
+		printf("OK (NSID:%s)\n", nsid_unpacked);
+	}
+	else
+		rsm_errf(stderr, "unpack_values failure");
+ out:
+
+
 	if (log_to_file != 0)
 	{
 		if (0 != fclose(log_fd))
@@ -199,6 +214,9 @@ out:
 		else
 			ldns_resolver_free(res);
 	}
+
+	if (NULL != nsid)
+		free(nsid);
 
 	exit(EXIT_SUCCESS);
 }
