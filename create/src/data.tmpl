@@ -24,27 +24,24 @@ ROW   |2     |guest      |Default|User         |d41d8cd98f00b204e9800998ecf8427e
 ROW   |100   |tld-monitor|tld    |monitor      |fedcba9876543210fedcba9876543210|    |1        |0         |en_GB|30s    |1   |default|50           |
 
 TABLE |hstgrp
-FIELDS|groupid|name                       |internal|flags|
-ROW   |1      |Templates                  |0       |0    |
-ROW   |5      |Discovered hosts           |1       |0    |
-ROW   |100    |Global macro history       |0       |0    |
-ROW   |110    |Mon                        |0       |0    |
-ROW   |120    |Probes                     |0       |0    |
-ROW   |130    |Probes - Mon               |0       |0    |
-ROW   |140    |TLDs                       |0       |0    |
-ROW   |150    |gTLD                       |0       |0    |
-ROW   |160    |ccTLD                      |0       |0    |
-ROW   |170    |testTLD                    |0       |0    |
-ROW   |180    |otherTLD                   |0       |0    |
-ROW   |190    |TLD Probe results          |0       |0    |
-ROW   |200    |gTLD Probe results         |0       |0    |
-ROW   |210    |ccTLD Probe results        |0       |0    |
-ROW   |220    |testTLD Probe results      |0       |0    |
-ROW   |230    |otherTLD Probe results     |0       |0    |
-ROW   |240    |Templates - TLD            |0       |0    |
-ROW   |241    |Templates/Modules          |0       |0    |
-ROW   |242    |Templates/Applications     |0       |0    |
-ROW   |243    |Templates/Operating systems|0       |0    |
+FIELDS|groupid|name                  |internal|flags|
+ROW   |1      |Templates             |0       |0    |
+ROW   |5      |Discovered hosts      |1       |0    |
+ROW   |100    |Global macro history  |0       |0    |
+ROW   |110    |Mon                   |0       |0    |
+ROW   |120    |Probes                |0       |0    |
+ROW   |130    |Probes - Mon          |0       |0    |
+ROW   |140    |TLDs                  |0       |0    |
+ROW   |150    |gTLD                  |0       |0    |
+ROW   |160    |ccTLD                 |0       |0    |
+ROW   |170    |testTLD               |0       |0    |
+ROW   |180    |otherTLD              |0       |0    |
+ROW   |190    |TLD Probe results     |0       |0    |
+ROW   |200    |gTLD Probe results    |0       |0    |
+ROW   |210    |ccTLD Probe results   |0       |0    |
+ROW   |220    |testTLD Probe results |0       |0    |
+ROW   |230    |otherTLD Probe results|0       |0    |
+ROW   |240    |Templates - TLD       |0       |0    |
 
 TABLE |media_type
 FIELDS|mediatypeid|type|name  |smtp_server     |smtp_helo  |smtp_email        |exec_path|gsm_modem |username|passwd|status|smtp_port|smtp_security|smtp_verify_peer|smtp_verify_host|smtp_authentication|exec_params                                                |maxsessions|maxattempts|attempt_interval|content_type|script|timeout|process_tags|show_event_menu|event_menu_url|event_menu_name|description|
@@ -154,7 +151,7 @@ ROW   |3           |hc-light  |FFFFFF         |FFFFFF    |555555   |000000      
 ROW   |4           |hc-dark   |000000         |000000    |666666   |888888       |4F4F4F         |FFFFFF   |FFFFFF        |FFFFFF             |FFFFFF              |333333          |199C0D,F63100,2774A4,F7941D,FC6EA3,6C59DC,C7A72D,BA2A5D,F230E0,5CCD18,BB2A02,AC41A5,89ABF8,7EC25C,3165D5,79A277,AA73DE,FD5434,F21C3E,87AC4D,E89DF4|
 
 TABLE |globalmacro
-FIELDS|globalmacroid|macro                           |value              |description|
+FIELDS|globalmacroid|macro                           |value              |description                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 ROW   |1            |{$RSM.IP4.MIN.PROBE.ONLINE}     |22                 |Fire a trigger if system contains less than specified number of IPv4 online Probe nodes.                                                                                                                                                                                                                                                                                                                                                                       |
 ROW   |2            |{$RSM.IP6.MIN.PROBE.ONLINE}     |20                 |Fire a trigger if system contains less than specified number of IPv6 online Probe nodes.                                                                                                                                                                                                                                                                                                                                                                       |
 ROW   |3            |{$RSM.PROBE.MAX.OFFLINE}        |1h                 |Fire a trigger if Probe has been manually disabled for more than specified time.                                                                                                                                                                                                                                                                                                                                                                               |
