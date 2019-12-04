@@ -693,106 +693,51 @@ static int	DBpatch_4040308(void)
 {
 	int		ret = FAIL;
 
-	zbx_uint64_t	groupid_templates;			/* groupid of "Templates" host group */
-	zbx_uint64_t	hostid_template_dns;			/* hostid of "Template DNS" template */
-	zbx_uint64_t	hostgroupid_template_dns;		/* hostgroupid of "Template DNS" template in "Templates" host group */
-	zbx_uint64_t	valuemapid_rsm_service_availability;	/* valuemapid of "RSM Service Availability" */
+	zbx_uint64_t	hostid_template_dns                        = 99500;	/* hostid of "Template DNS" template */
+	zbx_uint64_t	groupid_templates                          = 1;		/* groupid of "Templates" host group */
+	zbx_uint64_t	hostgroupid_template_dns                   = 59;	/* hostgroupid of "Template DNS" template in "Templates" host group */
+	zbx_uint64_t	valuemapid_rsm_service_availability        = 110;	/* valuemapid of "RSM Service Availability" */
 
-	zbx_uint64_t	applicationid_next;
-	zbx_uint64_t	applicationid_dns;			/* applicationid of "DNS" application in "Template DNS" template */
-	zbx_uint64_t	applicationid_dnssec;			/* applicationid of "DNSSEC" application in "Template DNS" template */
+	zbx_uint64_t	applicationid_dns                          = 227;	/* applicationid of "DNS" application in "Template DNS" template */
+	zbx_uint64_t	applicationid_dnssec                       = 228;	/* applicationid of "DNSSEC" application in "Template DNS" template */
 
-	zbx_uint64_t	itemid_next;
-	zbx_uint64_t	itemid_dnssec_enabled;			/* itemid of "DNSSEC enabled/disabled" item in "Template DNS" template */
-	zbx_uint64_t	itemid_rsm_dns;				/* itemid of "DNS availability" item in "Template DNS" template */
-	zbx_uint64_t	itemid_rsm_dns_nssok;			/* itemid of "Number of working Name Servers" item in "Template DNS" template */
-	zbx_uint64_t	itemid_rsm_dns_ns_discovery;		/* itemid of "Name Servers discovery" item in "Template DNS" template */
-	zbx_uint64_t	itemid_rsm_dns_nsip_discovery;		/* itemid of "NS-IP pairs discovery" item in "Template DNS" template */
-	zbx_uint64_t	itemid_rsm_dns_ns_status;		/* itemid of "Status of $1" item prototype in "Template DNS" template */
-	zbx_uint64_t	itemid_rsm_dns_rtt_tcp;			/* itemid of "RTT of $1,$2 using $3" item prototype in "Template DNS" template */
-	zbx_uint64_t	itemid_rsm_dns_rtt_udp;			/* itemid of "RTT of $1,$2 using $3" item prototype in "Template DNS" template */
-	zbx_uint64_t	itemid_rsm_dns_nsid;			/* itemid of "NSID of $1,$2" item prototype in "Template DNS" template */
+	zbx_uint64_t	itemid_dnssec_enabled                      = 99500;	/* itemid of "DNSSEC enabled/disabled" item in "Template DNS" template */
+	zbx_uint64_t	itemid_rsm_dns                             = 99501;	/* itemid of "DNS availability" item in "Template DNS" template */
+	zbx_uint64_t	itemid_rsm_dns_nssok                       = 99502;	/* itemid of "Number of working Name Servers" item in "Template DNS" template */
+	zbx_uint64_t	itemid_rsm_dns_ns_discovery                = 99503;	/* itemid of "Name Servers discovery" item in "Template DNS" template */
+	zbx_uint64_t	itemid_rsm_dns_nsip_discovery              = 99504;	/* itemid of "NS-IP pairs discovery" item in "Template DNS" template */
+	zbx_uint64_t	itemid_rsm_dns_ns_status                   = 99505;	/* itemid of "Status of $1" item prototype in "Template DNS" template */
+	zbx_uint64_t	itemid_rsm_dns_rtt_tcp                     = 99506;	/* itemid of "RTT of $1,$2 using $3" item prototype in "Template DNS" template */
+	zbx_uint64_t	itemid_rsm_dns_rtt_udp                     = 99507;	/* itemid of "RTT of $1,$2 using $3" item prototype in "Template DNS" template */
+	zbx_uint64_t	itemid_rsm_dns_nsid                        = 99508;	/* itemid of "NSID of $1,$2" item prototype in "Template DNS" template */
 
-	zbx_uint64_t	itemappid_next;
-	zbx_uint64_t	itemappid_dnssec_enabled;		/* itemappid of "DNSSEC enabled/disabled" item */
-	zbx_uint64_t	itemappid_rsm_dns;			/* itemappid of "DNS availability" item */
-	zbx_uint64_t	itemappid_rsm_dns_nssok;		/* itemappid of "Number of working Name Servers" item */
-	zbx_uint64_t	itemappid_rsm_dns_ns_status;		/* itemappid of "Status of $1" item prototype */
-	zbx_uint64_t	itemappid_rsm_dns_rtt_tcp;		/* itemappid of "RTT of $1,$2 using $3" item prototype */
-	zbx_uint64_t	itemappid_rsm_dns_rtt_udp;		/* itemappid of "RTT of $1,$2 using $3" item prototype */
-	zbx_uint64_t	itemappid_rsm_dns_nsid;			/* itemappid of "NSID of $1,$2" item prototype */
+	zbx_uint64_t	itemappid_dnssec_enabled                   = 99500;	/* itemappid of "DNSSEC enabled/disabled" item */
+	zbx_uint64_t	itemappid_rsm_dns                          = 99501;	/* itemappid of "DNS availability" item */
+	zbx_uint64_t	itemappid_rsm_dns_nssok                    = 99502;	/* itemappid of "Number of working Name Servers" item */
+	zbx_uint64_t	itemappid_rsm_dns_ns_status                = 99503;	/* itemappid of "Status of $1" item prototype */
+	zbx_uint64_t	itemappid_rsm_dns_rtt_tcp                  = 99504;	/* itemappid of "RTT of $1,$2 using $3" item prototype */
+	zbx_uint64_t	itemappid_rsm_dns_rtt_udp                  = 99505;	/* itemappid of "RTT of $1,$2 using $3" item prototype */
+	zbx_uint64_t	itemappid_rsm_dns_nsid                     = 99506;	/* itemappid of "NSID of $1,$2" item prototype */
 
-	zbx_uint64_t	itemdiscoveryid_next;
-	zbx_uint64_t	itemdiscoveryid_rsm_dns_ns_status;	/* itemdiscoveryid of "Status of $1" item prototype*/
-	zbx_uint64_t	itemdiscoveryid_rsm_dns_rtt_tcp;	/* itemdiscoveryid of "RTT of $1,$2 using $3" item prototype*/
-	zbx_uint64_t	itemdiscoveryid_rsm_dns_rtt_udp;	/* itemdiscoveryid of "RTT of $1,$2 using $3" item prototype*/
-	zbx_uint64_t	itemdiscoveryid_rsm_dns_nsid;		/* itemdiscoveryid of "NSID of $1,$2" item prototype */
+	zbx_uint64_t	itemdiscoveryid_rsm_dns_ns_status          = 99500;	/* itemdiscoveryid of "Status of $1" item prototype*/
+	zbx_uint64_t	itemdiscoveryid_rsm_dns_rtt_tcp            = 99501;	/* itemdiscoveryid of "RTT of $1,$2 using $3" item prototype*/
+	zbx_uint64_t	itemdiscoveryid_rsm_dns_rtt_udp            = 99502;	/* itemdiscoveryid of "RTT of $1,$2 using $3" item prototype*/
+	zbx_uint64_t	itemdiscoveryid_rsm_dns_nsid               = 99503;	/* itemdiscoveryid of "NSID of $1,$2" item prototype */
 
-	zbx_uint64_t	item_preprocid_next;
-	zbx_uint64_t	item_preprocid_rsm_dns_nssok;		/* item_preprocid of "Number of working Name Servers" item */
-	zbx_uint64_t	item_preprocid_rsm_dns_ns_discovery;	/* item_preprocid of "Name Servers discovery" item*/
-	zbx_uint64_t	item_preprocid_rsm_dns_nsip_discovery;	/* item_preprocid of "NS-IP pairs discovery" item*/
-	zbx_uint64_t	item_preprocid_rsm_dns_ns_status;	/* item_preprocid of "Status of $1" item prototype*/
-	zbx_uint64_t	item_preprocid_rsm_dns_rtt_tcp;		/* item_preprocid of "RTT of $1,$2 using $3" item prototype*/
-	zbx_uint64_t	item_preprocid_rsm_dns_rtt_udp;		/* item_preprocid of "RTT of $1,$2 using $3" item prototype*/
-	zbx_uint64_t	item_preprocid_rsm_dns_nsid;		/* item_preprocid of "NSID of $1,$2" item prototype */
+	zbx_uint64_t	item_preprocid_rsm_dns_nssok               = 99500;	/* item_preprocid of "Number of working Name Servers" item */
+	zbx_uint64_t	item_preprocid_rsm_dns_ns_discovery        = 99501;	/* item_preprocid of "Name Servers discovery" item*/
+	zbx_uint64_t	item_preprocid_rsm_dns_nsip_discovery      = 99502;	/* item_preprocid of "NS-IP pairs discovery" item*/
+	zbx_uint64_t	item_preprocid_rsm_dns_ns_status           = 99503;	/* item_preprocid of "Status of $1" item prototype*/
+	zbx_uint64_t	item_preprocid_rsm_dns_rtt_tcp             = 99504;	/* item_preprocid of "RTT of $1,$2 using $3" item prototype*/
+	zbx_uint64_t	item_preprocid_rsm_dns_rtt_udp             = 99505;	/* item_preprocid of "RTT of $1,$2 using $3" item prototype*/
+	zbx_uint64_t	item_preprocid_rsm_dns_nsid                = 99506;	/* item_preprocid of "NSID of $1,$2" item prototype */
 
-	zbx_uint64_t	lld_macro_pathid_next;
-	zbx_uint64_t	lld_macro_pathid_rsm_dns_ns_discovery_ns;	/* lld_macro_pathid of {#NS} in "Name Servers discovery" item */
-	zbx_uint64_t	lld_macro_pathid_rsm_dns_nsip_discovery_ip;	/* lld_macro_pathid of {#IP} in "NS-IP pairs discovery" item */
-	zbx_uint64_t	lld_macro_pathid_rsm_dns_nsip_discovery_ns;	/* lld_macro_pathid of {#NS} in "NS-IP pairs discovery" item */
+	zbx_uint64_t	lld_macro_pathid_rsm_dns_ns_discovery_ns   = 99500;	/* lld_macro_pathid of {#NS} in "Name Servers discovery" item */
+	zbx_uint64_t	lld_macro_pathid_rsm_dns_nsip_discovery_ip = 99501;	/* lld_macro_pathid of {#IP} in "NS-IP pairs discovery" item */
+	zbx_uint64_t	lld_macro_pathid_rsm_dns_nsip_discovery_ns = 99502;	/* lld_macro_pathid of {#NS} in "NS-IP pairs discovery" item */
 
 	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
 		return SUCCEED;
-
-	groupid_templates                           = 1;
-	hostid_template_dns                         = 99970;
-	hostgroupid_template_dns                    = DBget_maxid_num("hosts_groups", 1);
-	valuemapid_rsm_service_availability         = 110;
-
-	applicationid_next                          = DBget_maxid_num("applications", 2);
-	applicationid_dns                           = applicationid_next++;
-	applicationid_dnssec                        = applicationid_next++;
-
-	itemid_next                                 = DBget_maxid_num("items", 9);
-	itemid_dnssec_enabled                       = itemid_next++;
-	itemid_rsm_dns                              = itemid_next++;
-	itemid_rsm_dns_nssok                        = itemid_next++;
-	itemid_rsm_dns_ns_discovery                 = itemid_next++;
-	itemid_rsm_dns_nsip_discovery               = itemid_next++;
-	itemid_rsm_dns_ns_status                    = itemid_next++;
-	itemid_rsm_dns_rtt_tcp                      = itemid_next++;
-	itemid_rsm_dns_rtt_udp                      = itemid_next++;
-	itemid_rsm_dns_nsid                         = itemid_next++;
-
-	itemappid_next                              = DBget_maxid_num("items_applications", 7);
-	itemappid_dnssec_enabled                    = itemappid_next++;
-	itemappid_rsm_dns                           = itemappid_next++;
-	itemappid_rsm_dns_nssok                     = itemappid_next++;
-	itemappid_rsm_dns_ns_status                 = itemappid_next++;
-	itemappid_rsm_dns_rtt_tcp                   = itemappid_next++;
-	itemappid_rsm_dns_rtt_udp                   = itemappid_next++;
-	itemappid_rsm_dns_nsid                      = itemappid_next++;
-
-	itemdiscoveryid_next                        = DBget_maxid_num("item_discovery", 4);
-	itemdiscoveryid_rsm_dns_ns_status           = itemdiscoveryid_next++;
-	itemdiscoveryid_rsm_dns_rtt_tcp             = itemdiscoveryid_next++;
-	itemdiscoveryid_rsm_dns_rtt_udp             = itemdiscoveryid_next++;
-	itemdiscoveryid_rsm_dns_nsid                = itemdiscoveryid_next++;
-
-	item_preprocid_next                         = DBget_maxid_num("item_preproc", 7);
-	item_preprocid_rsm_dns_nssok                = item_preprocid_next++;
-	item_preprocid_rsm_dns_ns_discovery         = item_preprocid_next++;
-	item_preprocid_rsm_dns_nsip_discovery       = item_preprocid_next++;
-	item_preprocid_rsm_dns_ns_status            = item_preprocid_next++;
-	item_preprocid_rsm_dns_rtt_tcp              = item_preprocid_next++;
-	item_preprocid_rsm_dns_rtt_udp              = item_preprocid_next++;
-	item_preprocid_rsm_dns_nsid                 = item_preprocid_next++;
-
-	lld_macro_pathid_next                       = DBget_maxid_num("lld_macro_path", 3);
-	lld_macro_pathid_rsm_dns_ns_discovery_ns    = lld_macro_pathid_next++;
-	lld_macro_pathid_rsm_dns_nsip_discovery_ip  = lld_macro_pathid_next++;
-	lld_macro_pathid_rsm_dns_nsip_discovery_ns  = lld_macro_pathid_next++;
 
 #define ITEM_TYPE_SIMPLE		3
 #define ITEM_TYPE_CALCULATED		15
