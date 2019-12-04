@@ -2645,7 +2645,7 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 				char nsid[ZBX_NSID_BUF_SIZE];
 				if (PACK_NUM_VARS == (rv = unpack_values(&i, &j, &rtt, &upd, nsid, buf)))
 				{
-				  	nss[i].ips[j].rtt = rtt;
+					nss[i].ips[j].rtt = rtt;
 					nss[i].ips[j].upd = upd;
 					nss[i].ips[j].nsid = zbx_strdup(NULL, nsid);
 				}

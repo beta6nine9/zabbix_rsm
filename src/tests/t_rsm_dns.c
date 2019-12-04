@@ -195,9 +195,7 @@ int	main(int argc, char *argv[])
 	}
 	else
 		rsm_errf(stderr, "unpack_values failure");
- out:
-
-
+out:
 	if (log_to_file != 0)
 	{
 		if (0 != fclose(log_fd))
