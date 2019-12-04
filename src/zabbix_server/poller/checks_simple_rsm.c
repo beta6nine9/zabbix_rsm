@@ -1765,59 +1765,6 @@ static void	copy_params(const AGENT_REQUEST *request, DC_ITEM *item)
 	}
 }
 
-static int	zbx_parse_dns_item(DC_ITEM *item, char *host, size_t host_size)
-{
-	char		*tmp;
-	AGENT_REQUEST	request;
-	int		ret = FAIL;
-
-	init_request(&request);
-
-	if (SUCCEED != parse_item_key(item->key, &request))
-	{
-		/* unexpected key syntax */
-		goto out;
-	}
-
-	if (3 != request.nparam)
-	{
-		/* unexpected key syntax */
-		goto out;
-	}
-
-	zbx_strlcpy(host, get_rparam(&request, 0), host_size);
-
-	if ('\0' == *host)
-	{
-		/* first parameter missing */
-		goto out;
-	}
-
-	tmp = get_rparam(&request, 1);
-
-	if ('\0' == *tmp)
-	{
-		/* second parameter missing */
-		goto out;
-	}
-
-	tmp = get_rparam(&request, 2);
-
-	if ('\0' == *tmp)
-	{
-		/* third parameter missing */
-		goto out;
-	}
-
-	copy_params(&request, item);
-
-	ret = SUCCEED;
-out:
-	free_request(&request);
-
-	return ret;
-}
-
 static int	zbx_parse_rdds_item(DC_ITEM *item, char *host, size_t host_size)
 {
 	AGENT_REQUEST	request;
@@ -1882,8 +1829,8 @@ static void	free_items(DC_ITEM *items, size_t items_num)
 static int	zbx_get_nameservers(char *name_servers_list, zbx_ns_t **nss, size_t *nss_num, char ipv4_enabled,
 		char ipv6_enabled, FILE *log_fd, char *err, size_t err_size)
 {
-	char		*ns, *ip, ns_found, *ns_next;
-	size_t		i, j, j2, nss_alloc = 8;
+	char		*ns, *ip, *ns_next;
+	size_t		i, j, nss_alloc = 8;
 	zbx_ns_t	*ns_entry;
 
 	*nss_num = 0;
@@ -1904,7 +1851,7 @@ static int	zbx_get_nameservers(char *name_servers_list, zbx_ns_t **nss, size_t *
 		*ip = '\0';
 		ip++;
 
-		ns_found = 0;
+		ns_entry = NULL;
 
 		if (0 == *nss_num)
 		{
@@ -1913,18 +1860,16 @@ static int	zbx_get_nameservers(char *name_servers_list, zbx_ns_t **nss, size_t *
 		else
 		{
 			/* check if need to add NS */
-			for (j = 0; j < *nss_num; j++)
+			for (i = 0; i < *nss_num; i++)
 			{
-				ns_entry = &(*nss)[j];
+				ns_entry = &(*nss)[i];
 
 				if (0 != strcmp(ns_entry->name, ns))
 					continue;
 
-				ns_found = 1;
-
-				for (j2 = 0; j2 < ns_entry->ips_num; j2++)
+				for (j = 0; j < ns_entry->ips_num; j++)
 				{
-					if (0 == strcmp(ns_entry->ips[j2].ip, ip))
+					if (0 == strcmp(ns_entry->ips[j].ip, ip))
 						goto next;
 				}
 
@@ -1939,7 +1884,7 @@ static int	zbx_get_nameservers(char *name_servers_list, zbx_ns_t **nss, size_t *
 		}
 
 		/* add NS here */
-		if (0 == ns_found)
+		if (NULL == ns_entry)
 		{
 			ns_entry = &(*nss)[*nss_num];
 
@@ -1949,8 +1894,6 @@ static int	zbx_get_nameservers(char *name_servers_list, zbx_ns_t **nss, size_t *
 
 			(*nss_num)++;
 		}
-		else
-			ns_entry = &(*nss)[j];
 
 		if (SUCCEED != zbx_validate_ip(ip, ipv4_enabled, ipv6_enabled, NULL, NULL))
 		{
@@ -2264,7 +2207,6 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 	ldns_resolver		*res = NULL;
 	ldns_rr_list		*keys = NULL;
 	FILE			*log_fd;
-	DC_ITEM			*items = NULL;
 	zbx_ns_t		*nss = NULL;
 	size_t			i, j, nss_num = 0;
 	unsigned int		extras;
