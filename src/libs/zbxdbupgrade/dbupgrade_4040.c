@@ -937,6 +937,22 @@ out:
 	return ret;
 }
 
+static int	DBpatch_4040309(void)
+{
+	int	ret;
+
+	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
+		return SUCCEED;
+
+	ret = DBexecute("update items set status=%d where key_ like 'zabbix[process,db watchdog,%%' "
+			"and type=%d", ITEM_STATUS_DISABLED, ITEM_TYPE_INTERNAL);
+
+	if (ZBX_DB_OK <= ret)
+		zabbix_log(LOG_LEVEL_WARNING, "disabled %d db watchdog items", ret);
+
+	return SUCCEED;
+}
+
 #endif
 
 DBPATCH_START(4040)
@@ -953,5 +969,6 @@ DBPATCH_ADD(4040305, 0, 1)	/* set delay as macro for rsm.epp* items */
 DBPATCH_ADD(4040306, 0, 0)	/* set macro descriptions (part I) */
 DBPATCH_ADD(4040307, 0, 0)	/* set macro descriptions (part II) */
 DBPATCH_ADD(4040308, 0, 0)	/* add "Template DNS" template */
+DBPATCH_ADD(4040309, 0, 0)	/* disable "db watchdog" internal items */
 
 DBPATCH_END()
