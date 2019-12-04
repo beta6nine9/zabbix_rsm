@@ -1258,17 +1258,9 @@ static void extract_nsid(ldns_pkt *pkt, zbx_nsid_opt_t *nsid_opt, char ** nsid)
 
 			if (LDNS_EDNS_NSID == nsid_opt->opt_code)
 			{
-				rsm_infof(NULL,"BADGER STRATA: %d \n",(int)nsid_opt->opt_len);
-
 				int nsid_size = (int)nsid_opt->opt_len + 1;
-				*nsid = (char*) malloc(nsid_size);
-
+				*nsid = (char*)zbx_malloc(*nsid, nsid_size);
 				zbx_strlcpy(*nsid, data, nsid_size);
-
-				rsm_infof(NULL, "Returned NSID: \"%.*s\"\n", (int)nsid_opt->opt_len, data);
-				rsm_infof(NULL,"BAD33: %s \n",*nsid);
-				rsm_infof (NULL, "Hello world999");
-
 				break;
 			}
 			size = nsid_opt->opt_len > size ? 0 : size - nsid_opt->opt_len;
@@ -2632,6 +2624,7 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 				}
 			}
 		}
+
 		for (th_num = 0; th_num < threads_num; th_num++)
 		{
 			int	bytes;
@@ -2642,10 +2635,11 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 			if (-1 != read(threads[th_num].fd, buf, sizeof(buf)))
 			{
 				int	rv, rtt, upd;
-				char nsid[ZBX_NSID_BUF_SIZE];
+				char	nsid[ZBX_NSID_BUF_SIZE];
+
 				if (PACK_NUM_VARS == (rv = unpack_values(&i, &j, &rtt, &upd, nsid, buf)))
 				{
-				  	nss[i].ips[j].rtt = rtt;
+					nss[i].ips[j].rtt = rtt;
 					nss[i].ips[j].upd = upd;
 					nss[i].ips[j].nsid = zbx_strdup(NULL, nsid);
 				}
