@@ -62,6 +62,7 @@
 
 #define LDNS_EDNS_NSID		3
 #define ZBX_NSID_BUF_SIZE	256
+#define ZBX_CODED_NSID_BUF_SIZE	1024
 
 extern const char	*CONFIG_LOG_FILE;
 extern const char	epp_passphrase[128];
@@ -78,12 +79,6 @@ typedef struct
 	ldns_rr_type	rr_type;
 }
 zbx_ipv_t;
-
-typedef struct
-{
-	uint16_t	opt_code, opt_len;
-}
-zbx_nsid_opt_t;
 
 static const zbx_ipv_t	ipvs[] =
 {
@@ -1237,33 +1232,37 @@ out:
 	return ret;
 }
 
-static void extract_nsid(ldns_pkt *pkt, zbx_nsid_opt_t *nsid_opt, char ** nsid)
+static void extract_nsid(ldns_pkt *pkt, char ** nsid)
 {
 	ldns_rdf	*recv_nsid = ldns_pkt_edns_data(pkt);
+	uint16_t	opt_code, opt_len;
+	int		nsid_size;
 
 	if (NULL != recv_nsid)
 	{
 		uint8_t	*data = ldns_rdf_data(recv_nsid);
 		size_t	size = ldns_rdf_size(recv_nsid);
 
-		while (size >= sizeof(nsid_opt->opt_code) + sizeof(nsid_opt->opt_len))
+		while (0 != size)
 		{
-			nsid_opt->opt_code = ldns_read_uint16(data);
-			size -= sizeof(nsid_opt->opt_code);
-			data += sizeof(nsid_opt->opt_code);
+			opt_code = ldns_read_uint16(data);
+			size -= sizeof(opt_code);
+			data += sizeof(opt_code);
 
-			nsid_opt->opt_len = ldns_read_uint16(data);
-			size -= sizeof(nsid_opt->opt_len);
-			data += sizeof(nsid_opt->opt_len);
+			opt_len = ldns_read_uint16(data);
+			size -= sizeof(opt_len);
+			data += sizeof(opt_len);
 
-			if (LDNS_EDNS_NSID == nsid_opt->opt_code)
+			if (LDNS_EDNS_NSID == opt_code)
 			{
-				int nsid_size = (int)nsid_opt->opt_len + 1;
+				nsid_size = (int)opt_len + 1;
 				*nsid = (char*)zbx_malloc(*nsid, nsid_size);
 				zbx_strlcpy(*nsid, data, nsid_size);
 				break;
 			}
-			size = nsid_opt->opt_len > size ? 0 : size - nsid_opt->opt_len;
+
+			size = opt_len > size ? 0 : size - opt_len;
+			data += opt_len;
 		}
 	}
 }
@@ -1275,11 +1274,8 @@ static int	zbx_dns_in_a_query(ldns_pkt **pkt, ldns_resolver *res, const ldns_rdf
 	double		sec;
 	ldns_pkt	*query = NULL;
 	ldns_rdf	*send_nsid = NULL;
-	zbx_nsid_opt_t  nsid_opt;
-	ldns_buffer	*opt_buf;
+	ldns_buffer	*opt_buf = ldns_buffer_new(4);	/* size of opt_code and opt_len */
 	int		ret = FAIL;
-
-	opt_buf = ldns_buffer_new(sizeof(nsid_opt.opt_code) + sizeof(nsid_opt.opt_len));
 
 	if (NULL == opt_buf)
 	{
@@ -1321,7 +1317,7 @@ static int	zbx_dns_in_a_query(ldns_pkt **pkt, ldns_resolver *res, const ldns_rdf
 		goto err;
 	}
 
-	extract_nsid(*pkt, &nsid_opt, nsid);
+	extract_nsid(*pkt, nsid);
 
 	ret = SUCCEED;
 
@@ -1518,9 +1514,8 @@ static int	zbx_check_dnssec_no_epp(const ldns_pkt *pkt, const ldns_rr_list *keys
 }
 
 static int	zbx_get_ns_ip_values(ldns_resolver *res, const char *ns, const char *ip, const ldns_rr_list *keys,
-		const char *testprefix, const char *domain, FILE *log_fd, int *rtt, char ** nsid, int *upd, char ipv4_enabled,
-		char ipv6_enabled, char epp_enabled,
-		char *err, size_t err_size)
+		const char *testprefix, const char *domain, FILE *log_fd, int *rtt, char ** nsid, int *upd,
+		char ipv4_enabled, char ipv6_enabled, char epp_enabled, char *err, size_t err_size)
 {
 	char			testname[ZBX_HOST_BUF_SIZE], *host, *last_label = NULL;
 	ldns_rdf		*testname_rdf = NULL, *last_label_rdf = NULL;
@@ -2057,7 +2052,6 @@ static int	zbx_get_nameservers(char *name_servers_list, zbx_ns_t **nss, size_t *
 		ns_entry->ips[ns_entry->ips_num].ip = zbx_strdup(NULL, ip);
 		ns_entry->ips[ns_entry->ips_num].upd = ZBX_NO_VALUE;
 		ns_entry->ips[ns_entry->ips_num].nsid = NULL;
-
 		ns_entry->ips_num++;
 next:
 		ns = ns_next + 1;
@@ -2313,8 +2307,7 @@ static void	create_rsm_dns_json(struct zbx_json *json, zbx_ns_t *nss, size_t nss
 			zbx_json_addobject(json, NULL);
 			zbx_json_addstring(json, "ns", nss[i].name, ZBX_JSON_TYPE_STRING);
 			zbx_json_addstring(json, "ip", nss[i].ips[j].ip, ZBX_JSON_TYPE_STRING);
-			zbx_json_addstring(json, "nsid", 0 != strcmp("(null)", nss[i].ips[j].nsid) ?
-					nss[i].ips[j].nsid : "", ZBX_JSON_TYPE_STRING);
+			zbx_json_addstring(json, "nsid", nss[i].ips[j].nsid, ZBX_JSON_TYPE_STRING);
 			zbx_json_addstring(json, "protocol", (proto == RSM_UDP ? "udp" : "tcp"), ZBX_JSON_TYPE_STRING);
 			zbx_json_addint64(json, "rtt", nss[i].ips[j].rtt);
 			zbx_json_close(json);
@@ -2492,11 +2485,14 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 		for (i = 0; i < nss_num; i++)
 		{
 			for (j = 0; j < nss[i].ips_num; j++)
+			{
 				nss[i].ips[j].rtt = res_ec;
+			}
 		}
 	}
 	else
 	{
+
 		int		th_num = 0, threads_num = 0, status, last_test_failed = 0;
 		char		buf[2048];
 		pid_t		pid;
@@ -2598,7 +2594,15 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 						rsm_err(th_log_fd, err);
 					}
 
-					pack_values(i, j, nss[i].ips[j].rtt, nss[i].ips[j].upd, nss[i].ips[j].nsid,
+					char nsid_b64_buf_encoded[ZBX_CODED_NSID_BUF_SIZE];
+
+					if (NULL != nss[i].ips[j].nsid && 0 != strlen(nss[i].ips[j].nsid))
+						str_base64_encode(nss[i].ips[j].nsid, nsid_b64_buf_encoded,
+								strlen(nss[i].ips[j].nsid));
+					else
+						nsid_b64_buf_encoded[0] = '\0';
+
+					pack_values(i, j, nss[i].ips[j].rtt, nss[i].ips[j].upd, nsid_b64_buf_encoded,
 							buf, sizeof(buf));
 					if (-1 == write(fd[1], buf, strlen(buf) + 1))
 						rsm_errf(th_log_fd, "cannot write to pipe: %s", zbx_strerror(errno));
@@ -2634,14 +2638,35 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 
 			if (-1 != read(threads[th_num].fd, buf, sizeof(buf)))
 			{
-				int	rv, rtt, upd;
+				int	rtt, upd, size_nsid_decoded;
 				char	nsid[ZBX_NSID_BUF_SIZE];
+				char	nsid_b64_buf_encoded[ZBX_CODED_NSID_BUF_SIZE];
+				int	rv = unpack_values(&i, &j, &rtt, &upd, nsid_b64_buf_encoded, buf);
 
-				if (PACK_NUM_VARS == (rv = unpack_values(&i, &j, &rtt, &upd, nsid, buf)))
+				if (PACK_NUM_VARS == rv || PACK_NUM_VARS == rv + 1)
 				{
+					if (PACK_NUM_VARS == rv)
+					{
+						zbx_free(nss[i].ips[j].nsid);
+						nss[i].ips[j].nsid = (char*)zbx_malloc(nss[i].ips[j].nsid,
+								ZBX_NSID_BUF_SIZE);
+						str_base64_decode(nsid_b64_buf_encoded, nss[i].ips[j].nsid,
+								ZBX_NSID_BUF_SIZE, &size_nsid_decoded);
+						nss[i].ips[j].nsid[size_nsid_decoded] = '\0';
+					}
+					else if (PACK_NUM_VARS == rv + 1)
+					{
+						/* empty nsid string is not counted as var during the unpack_values() */
+						if (NULL != nss[i].ips[j].nsid)
+						{
+							zbx_free(nss[i].ips[j].nsid);
+						}
+						nss[i].ips[j].nsid = (char*)zbx_malloc(nss[i].ips[j].nsid, 1);
+						nss[i].ips[j].nsid[0] = '\0';
+					}
+
 					nss[i].ips[j].rtt = rtt;
 					nss[i].ips[j].upd = upd;
-					nss[i].ips[j].nsid = zbx_strdup(NULL, nsid);
 				}
 				else
 				{

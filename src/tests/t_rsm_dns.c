@@ -32,14 +32,16 @@ void	exit_usage(const char *program)
 
 int	main(int argc, char *argv[])
 {
-	char		err[ZBX_NSID_BUF_SIZE], pack_buf[2048], *res_ip = DEFAULT_RES_IP, *tld = NULL, *ns = NULL,
-			*ns_ip = NULL, proto = RSM_UDP, * nsid = 0, ipv4_enabled = 0, ipv6_enabled = 0,
+	char		err[256], pack_buf[2048], nsid_b64_buf_coded_before_pack[ZBX_CODED_NSID_BUF_SIZE],
+			nsid_b64_buf_coded_after_pack[ZBX_CODED_NSID_BUF_SIZE], *res_ip = DEFAULT_RES_IP, *tld = NULL,
+			*ns = NULL, *ns_ip = NULL, proto = RSM_UDP, *nsid = NULL, ipv4_enabled = 0, ipv6_enabled = 0,
 			*testprefix = DEFAULT_TESTPREFIX, dnssec_enabled = 0, ignore_err = 0, log_to_file = 0;
-	int		c, index, rtt;
+	int		c, index, rtt, rtt_unpacked, upd_unpacked, unpacked_values_num, size_nsid_decoded;
 	ldns_resolver	*res = NULL;
 	ldns_rr_list	*keys = NULL;
 	FILE		*log_fd = stdout;
 	unsigned int	extras;
+	size_t		size_one_unpacked, size_two_unpacked;
 
 	opterr = 0;
 
@@ -182,19 +184,43 @@ int	main(int argc, char *argv[])
 	}
 
 	/* we have nsid, lets also test that it works with packing/unpacking */
-	pack_values(0, 0, rtt, 0, nsid, pack_buf, sizeof(pack_buf));
+	if (NULL != nsid && 0 != strlen(nsid))
+		str_base64_encode(nsid, nsid_b64_buf_coded_before_pack, strlen(nsid));
+	else
+		nsid_b64_buf_coded_before_pack[0] = '\0';
 
-	size_t i,j;
-	int rtt_unpacked,upd_unpacked;
-	char nsid_unpacked[ZBX_NSID_BUF_SIZE];
+	pack_values(0, 0, rtt, 0, nsid_b64_buf_coded_before_pack, pack_buf, sizeof(pack_buf));
 
-	if (PACK_NUM_VARS == unpack_values(&i, &j, &rtt_unpacked, &upd_unpacked, nsid_unpacked, pack_buf))
+	unpacked_values_num = unpack_values(&size_one_unpacked, &size_two_unpacked, &rtt_unpacked, &upd_unpacked,
+			nsid_b64_buf_coded_after_pack, pack_buf);
+
+	if (PACK_NUM_VARS == unpacked_values_num)
 	{
-		printf("OK (RTT:%d)\n", rtt_unpacked);
-		printf("OK (NSID:%s)\n", nsid_unpacked);
+		zbx_free(nsid);
+		nsid = (char*)zbx_malloc(nsid, ZBX_NSID_BUF_SIZE);
+		str_base64_decode(nsid_b64_buf_coded_after_pack, nsid, ZBX_NSID_BUF_SIZE, &size_nsid_decoded);
+		nsid[size_nsid_decoded] = '\0';
+	}
+	else if (PACK_NUM_VARS == unpacked_values_num + 1)
+	{
+		if (NULL != nsid)
+			zbx_free(nsid);
+
+		nsid = (char*)zbx_malloc(nsid, 1);
+		nsid[0] = '\0';
 	}
 	else
-		rsm_errf(stderr, "unpack_values() failure");
+	{
+		rsm_errf(stderr, "unpack_values() failure, expected: %d, received: %d", PACK_NUM_VARS,
+				unpacked_values_num);
+		goto out;
+	}
+
+	printf("OK (RTT:%d)\n", rtt_unpacked);
+	if (nsid)
+		printf("OK (NSID:%s)\n", nsid);
+	else
+		printf("OK (NSID:)\n");
 out:
 	if (log_to_file != 0)
 	{
@@ -213,8 +239,7 @@ out:
 			ldns_resolver_free(res);
 	}
 
-	if (NULL != nsid)
-		free(nsid);
+	zbx_free(nsid);
 
 	exit(EXIT_SUCCESS);
 }
