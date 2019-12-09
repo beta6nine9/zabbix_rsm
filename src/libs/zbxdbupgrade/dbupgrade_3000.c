@@ -5151,7 +5151,7 @@ DBPATCH_ADD(3000324, 0, 0)	/* changed "TLDs" action to a remote commnad that cal
 DBPATCH_ADD(3000400, 0, 0)	/* Phase 3, version 1.4.0 */
 DBPATCH_ADD(3000401, 0, 0)	/* add macro {$RSM.MONITORING.TARGET} with empty string as value (unknown) or "registry" */
 DBPATCH_ADD(3000402, 0, 0)	/* rename "EBERO users" user group to "Read-only user", "Technical services users" to "Power user" */
-DBPATCH_ADD(3000403, 0, 0)	/* add columns "info_1" and "info_2" to the "hosts" table */
+DBPATCH_ADD(3000403, 0, 1)	/* add columns "info_1" and "info_2" to the "hosts" table */
 DBPATCH_ADD(3000500, 0, 0)	/* Phase 4, version 2.0.0 */
 DBPATCH_ADD(3000501, 0, 0)	/* add macros, items and triggers for Standalone RDAP */
 DBPATCH_ADD(3000502, 0, 0)	/* add {$RSM.RDAP.ENABLED} macro on probes */
