@@ -217,6 +217,7 @@ int	main(int argc, char *argv[])
 	}
 
 	printf("OK (RTT:%d)\n", rtt_unpacked);
+
 	if (nsid)
 		printf("OK (NSID:%s)\n", nsid);
 	else

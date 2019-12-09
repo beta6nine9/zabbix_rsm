@@ -2052,6 +2052,7 @@ static int	zbx_get_nameservers(char *name_servers_list, zbx_ns_t **nss, size_t *
 		ns_entry->ips[ns_entry->ips_num].ip = zbx_strdup(NULL, ip);
 		ns_entry->ips[ns_entry->ips_num].upd = ZBX_NO_VALUE;
 		ns_entry->ips[ns_entry->ips_num].nsid = NULL;
+
 		ns_entry->ips_num++;
 next:
 		ns = ns_next + 1;
@@ -2485,14 +2486,11 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 		for (i = 0; i < nss_num; i++)
 		{
 			for (j = 0; j < nss[i].ips_num; j++)
-			{
 				nss[i].ips[j].rtt = res_ec;
-			}
 		}
 	}
 	else
 	{
-
 		int		th_num = 0, threads_num = 0, status, last_test_failed = 0;
 		char		buf[2048];
 		pid_t		pid;
@@ -2658,9 +2656,8 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 					{
 						/* empty nsid string is not counted as var during the unpack_values() */
 						if (NULL != nss[i].ips[j].nsid)
-						{
 							zbx_free(nss[i].ips[j].nsid);
-						}
+
 						nss[i].ips[j].nsid = (char*)zbx_malloc(nss[i].ips[j].nsid, 1);
 						nss[i].ips[j].nsid[0] = '\0';
 					}
