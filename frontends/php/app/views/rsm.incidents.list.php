@@ -414,7 +414,7 @@ if ($data['tld']) {
 			$data['rdap']['totalTests'],
 			(new CUrl($data['url'].'zabbix.php'))
 				->setArgument('action', 'rsm.tests')
-				->setArgument('filter_from', $data['filter_from'])
+				->setArgument('filter_from', $data['from'])
 				->setArgument('to', $data['to'])
 				->setArgument('filter_set', 1)
 				->setArgument('host', $data['tld']['host'])
