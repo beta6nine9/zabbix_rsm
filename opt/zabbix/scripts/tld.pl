@@ -274,6 +274,12 @@ sub validate_input($)
 		{
 			setopt('dns');
 		}
+		elsif (!opt('dns') && !opt('dns-tcp') && !opt('dns-udp'))
+		{
+			setopt('dns');
+			setopt('dns-tcp');
+			setopt('dns-udp');
+		}
 	}
 
 	setopt('dns'    , 0) unless opt('dns');
