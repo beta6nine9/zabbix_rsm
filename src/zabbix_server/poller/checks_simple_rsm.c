@@ -1232,50 +1232,63 @@ out:
 	return ret;
 }
 
-static void extract_nsid(ldns_pkt *pkt, char ** nsid)
+static void extract_nsid(ldns_rdf *edns_data, char **nsid)
 {
-	ldns_rdf	*recv_nsid = ldns_pkt_edns_data(pkt);
-	uint16_t	opt_code, opt_len;
-	int		nsid_size;
+	uint8_t	*rdf_data;
+	size_t	rdf_size;
 
-	if (NULL != recv_nsid)
+	if (NULL != edns_data)
+		goto out;
+
+	rdf_data = ldns_rdf_data(edns_data);
+	rdf_size = ldns_rdf_size(edns_data);
+
+	while (4 < rdf_size)	/* 2 bytes for option code, 2 bytes for option length */
 	{
-		uint8_t	*data = ldns_rdf_data(recv_nsid);
-		size_t	size = ldns_rdf_size(recv_nsid);
+		uint16_t	opt_code;
+		uint16_t	opt_len;
 
-		while (0 != size)
+		opt_code = ldns_read_uint16(rdf_data);
+		rdf_size -= sizeof(opt_code);
+		rdf_data += sizeof(opt_code);
+
+		opt_len = ldns_read_uint16(rdf_data);
+		rdf_size -= sizeof(opt_len);
+		rdf_data += sizeof(opt_len);
+
+		if (LDNS_EDNS_NSID == opt_code)
 		{
-			opt_code = ldns_read_uint16(data);
-			size -= sizeof(opt_code);
-			data += sizeof(opt_code);
+			size_t	nsid_size = (size_t)opt_len + 1;	/* +1 for terminating null character */
 
-			opt_len = ldns_read_uint16(data);
-			size -= sizeof(opt_len);
-			data += sizeof(opt_len);
+			if (ZBX_NSID_BUF_SIZE < nsid_size)
+				nsid_size > ZBX_NSID_BUF_SIZE;
 
-			if (LDNS_EDNS_NSID == opt_code)
-			{
-				nsid_size = (int)opt_len + 1;
-				*nsid = (char*)zbx_malloc(*nsid, nsid_size);
-				zbx_strlcpy(*nsid, data, nsid_size);
-				break;
-			}
-
-			size = opt_len > size ? 0 : size - opt_len;
-			data += opt_len;
+			*nsid = (char *)zbx_malloc(*nsid, nsid_size);
+			zbx_strlcpy(*nsid, (char *)rdf_data, nsid_size);
+			break;
 		}
+
+		rdf_size = opt_len > rdf_size ? 0 : rdf_size - opt_len;
+		rdf_data += opt_len;
+	}
+out:
+	if (NULL == *nsid)
+	{
+		*nsid = zbx_strdup(NULL, "");
 	}
 }
 
-static int	zbx_dns_in_a_query(ldns_pkt **pkt, ldns_resolver *res, const ldns_rdf *testname_rdf, char** nsid,
+static int	zbx_dns_in_a_query(ldns_pkt **pkt, ldns_resolver *res, const ldns_rdf *testname_rdf, char **nsid,
 		zbx_ns_query_error_t *ec, char *err, size_t err_size)
 {
 	ldns_status	status;
 	double		sec;
 	ldns_pkt	*query = NULL;
-	ldns_rdf	*send_nsid = NULL;
-	ldns_buffer	*opt_buf = ldns_buffer_new(4);	/* size of opt_code and opt_len */
+	ldns_rdf	*send_nsid;
+	ldns_buffer	*opt_buf;
 	int		ret = FAIL;
+
+	opt_buf = ldns_buffer_new(4);	/* size of option code and option size */
 
 	if (NULL == opt_buf)
 	{
@@ -1317,12 +1330,11 @@ static int	zbx_dns_in_a_query(ldns_pkt **pkt, ldns_resolver *res, const ldns_rdf
 		goto err;
 	}
 
-	extract_nsid(*pkt, nsid);
+	extract_nsid(ldns_pkt_edns_data(*pkt), nsid);
 
 	ret = SUCCEED;
 
 	goto out;
-
 err:
 	switch (status)
 	{
@@ -1356,10 +1368,10 @@ err:
 		default:
 			*ec = ZBX_NS_QUERY_CATCHALL;
 	}
-
 out:
 	if (NULL != opt_buf)
 		ldns_buffer_free(opt_buf);
+
 	if (NULL != query)
 		ldns_pkt_free(query);
 
@@ -1514,7 +1526,7 @@ static int	zbx_check_dnssec_no_epp(const ldns_pkt *pkt, const ldns_rr_list *keys
 }
 
 static int	zbx_get_ns_ip_values(ldns_resolver *res, const char *ns, const char *ip, const ldns_rr_list *keys,
-		const char *testprefix, const char *domain, FILE *log_fd, int *rtt, char ** nsid, int *upd,
+		const char *testprefix, const char *domain, FILE *log_fd, int *rtt, char **nsid, int *upd,
 		char ipv4_enabled, char ipv6_enabled, char epp_enabled, char *err, size_t err_size)
 {
 	char			testname[ZBX_HOST_BUF_SIZE], *host, *last_label = NULL;
@@ -2071,7 +2083,10 @@ static void	zbx_clean_nss(zbx_ns_t *nss, size_t nss_num)
 		if (0 != nss[i].ips_num)
 		{
 			for (j = 0; j < nss[i].ips_num; j++)
+			{
 				zbx_free(nss[i].ips[j].ip);
+				zbx_free(nss[i].ips[j].nsid);
+			}
 
 			zbx_free(nss[i].ips);
 		}
@@ -2559,6 +2574,7 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 					/* child */
 
 					FILE	*th_log_fd;
+					char nsid_b64_buf_encoded[ZBX_CODED_NSID_BUF_SIZE];
 
 					close(fd[0]);		/* child does not need data reader fd */
 					close(log_pipe[0]);	/* child does not need log reader fd */
@@ -2592,16 +2608,12 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 						rsm_err(th_log_fd, err);
 					}
 
-					char nsid_b64_buf_encoded[ZBX_CODED_NSID_BUF_SIZE];
-
-					if (NULL != nss[i].ips[j].nsid && 0 != strlen(nss[i].ips[j].nsid))
-						str_base64_encode(nss[i].ips[j].nsid, nsid_b64_buf_encoded,
-								strlen(nss[i].ips[j].nsid));
-					else
-						nsid_b64_buf_encoded[0] = '\0';
+					str_base64_encode(nss[i].ips[j].nsid, nsid_b64_buf_encoded,
+							strlen(nss[i].ips[j].nsid) + 1);
 
 					pack_values(i, j, nss[i].ips[j].rtt, nss[i].ips[j].upd, nsid_b64_buf_encoded,
 							buf, sizeof(buf));
+
 					if (-1 == write(fd[1], buf, strlen(buf) + 1))
 						rsm_errf(th_log_fd, "cannot write to pipe: %s", zbx_strerror(errno));
 
@@ -2636,34 +2648,22 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 
 			if (-1 != read(threads[th_num].fd, buf, sizeof(buf)))
 			{
-				int	rtt, upd, size_nsid_decoded;
-				char	nsid[ZBX_NSID_BUF_SIZE];
+				int	rtt, upd;
 				char	nsid_b64_buf_encoded[ZBX_CODED_NSID_BUF_SIZE];
-				int	rv = unpack_values(&i, &j, &rtt, &upd, nsid_b64_buf_encoded, buf);
+				int	rv;
 
-				if (PACK_NUM_VARS == rv || PACK_NUM_VARS == rv + 1)
+				rv = unpack_values(&i, &j, &rtt, &upd, nsid_b64_buf_encoded, buf);
+
+				if (PACK_NUM_VARS == rv)
 				{
-					if (PACK_NUM_VARS == rv)
-					{
-						zbx_free(nss[i].ips[j].nsid);
-						nss[i].ips[j].nsid = (char*)zbx_malloc(nss[i].ips[j].nsid,
-								ZBX_NSID_BUF_SIZE);
-						str_base64_decode(nsid_b64_buf_encoded, nss[i].ips[j].nsid,
-								ZBX_NSID_BUF_SIZE, &size_nsid_decoded);
-						nss[i].ips[j].nsid[size_nsid_decoded] = '\0';
-					}
-					else if (PACK_NUM_VARS == rv + 1)
-					{
-						/* empty nsid string is not counted as var during the unpack_values() */
-						if (NULL != nss[i].ips[j].nsid)
-							zbx_free(nss[i].ips[j].nsid);
-
-						nss[i].ips[j].nsid = (char*)zbx_malloc(nss[i].ips[j].nsid, 1);
-						nss[i].ips[j].nsid[0] = '\0';
-					}
+					int	size_nsid_decoded;
 
 					nss[i].ips[j].rtt = rtt;
 					nss[i].ips[j].upd = upd;
+
+					nss[i].ips[j].nsid = (char *)zbx_malloc(nss[i].ips[j].nsid, ZBX_NSID_BUF_SIZE);
+					str_base64_decode(nsid_b64_buf_encoded, nss[i].ips[j].nsid, ZBX_NSID_BUF_SIZE,
+							&size_nsid_decoded);
 				}
 				else
 				{
