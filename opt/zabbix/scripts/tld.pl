@@ -92,13 +92,13 @@ sub main()
 	}
 	elsif (opt('delete'))
 	{
-		manage_tld_objects('delete', getopt('tld'), getopt('dns'), getopt('dnssec'),
-				getopt('epp'), getopt('rdds'), getopt('rdap'));
+		manage_tld_objects('delete', getopt('tld'), getopt('dns'), getopt('dns-udp'), getopt('dns-tcp'),
+				getopt('dnssec'), getopt('epp'), getopt('rdds'), getopt('rdap'));
 	}
 	elsif (opt('disable'))
 	{
-		manage_tld_objects('disable', getopt('tld'), getopt('dns'), getopt('dnssec'),
-				getopt('epp'), getopt('rdds'), getopt('rdap'));
+		manage_tld_objects('disable', getopt('tld'), getopt('dns'), getopt('dns-udp'), getopt('dns-tcp'),
+				getopt('dnssec'), getopt('epp'), getopt('rdds'), getopt('rdap'));
 	}
 	else
 	{
@@ -126,6 +126,8 @@ sub init_cli_opts($)
 			"ipv4!",
 			"ipv6!",
 			"dns!",
+			"dns-tcp|dnstcp",
+			"dns-udp|dnsudp",
 			"epp!",
 			"rdds!",
 			"rdap!",
@@ -224,6 +226,16 @@ sub validate_input($)
 		}
 	}
 
+	if (opt('delete') && (opt('dns-tcp') || opt('dns-udp')))
+	{
+		$msg .= "--dns-tcp, --dns-udp are not compatible with --delete\n";
+	}
+
+	if (opt('disable') && opt('dns-tcp') && opt('dns-udp'))
+	{
+		$msg .= "only one of --dns-tcp, --dns-udp can be used with --disable\n";
+	}
+
 	if ((opt('rdds43-servers') && !opt('rdds80-servers')) ||
 			(opt('rdds80-servers') && !opt('rdds43-servers')))
 	{
@@ -251,15 +263,26 @@ sub validate_input($)
 		$msg .= "EPP Server certificate file must be specified (--epp-servercert)\n" unless (getopt('epp-servercert'));
 	}
 
-	# why on Earth? Do not do this.
-	#getopt('ipv4') = 0 if (opt('update-nsservers'));
-	#getopt('ipv6') = 0 if (opt('update-nsservers'));
+	if (!opt('delete') && !opt('disable'))
+	{
+		if (opt('dns') && !opt('dns-tcp') && !opt('dns-udp'))
+		{
+			setopt('dns-tcp');
+			setopt('dns-udp');
+		}
+		elsif (opt('dns-tcp') || opt('dns-udp'))
+		{
+			setopt('dns');
+		}
+	}
 
-	setopt('dns'   , 0) unless opt('dns');
-	setopt('dnssec', 0) unless opt('dnssec');
-	setopt('rdds'  , 0) unless opt('rdds');
-	setopt('epp'   , 0) unless opt('epp');
-	setopt('rdap'  , 0) unless opt('rdap');
+	setopt('dns'    , 0) unless opt('dns');
+	setopt('dnssec' , 0) unless opt('dnssec');
+	setopt('rdds'   , 0) unless opt('rdds');
+	setopt('epp'    , 0) unless opt('epp');
+	setopt('rdap'   , 0) unless opt('rdap');
+	setopt('dns-udp', 0) unless opt('dns-udp');
+	setopt('dns-tcp', 0) unless opt('dns-tcp');
 
 	if ($msg)
 	{
@@ -733,16 +756,20 @@ sub manage_tld_objects($$$$$$$)
 	my $action = shift;
 	my $tld    = shift;
 	my $dns    = shift;
+	my $dnsudp = shift;
+	my $dnstcp = shift;
 	my $dnssec = shift;
 	my $epp    = shift;
 	my $rdds   = shift;
 	my $rdap   = shift;
 
 	my $types = {
-		'dns'    => $dns,
-		'dnssec' => $dnssec,
-		'epp'    => $epp,
-		'rdds'   => $rdds
+		'dns'		=> $dns,
+		'dns-udp'	=> $dnsudp,
+		'dns-tcp'	=> $dnstcp,
+		'dnssec'	=> $dnssec,
+		'epp'		=> $epp,
+		'rdds'		=> $rdds
 	};
 
 	my $main_templateid;
@@ -763,7 +790,7 @@ sub manage_tld_objects($$$$$$$)
 	}
 
 	print("Getting main template of the TLD: ");
-	my $tld_template = get_template(TEMPLATE_RSMHOST_CONFIG_PREFIX . $tld, false, true);
+	my $tld_template = get_template(TEMPLATE_RSMHOST_CONFIG_PREFIX . $tld, true, true);
 
 	if (scalar(%{$tld_template}))
 	{
@@ -854,7 +881,25 @@ sub manage_tld_objects($$$$$$$)
 
 		if ($type eq 'dnssec')
 		{
-			really(create_macro('{$RSM.TLD.DNSSEC.ENABLED}', 0, $main_templateid, true)) if ($types->{$type} eq true);
+			really(create_macro('{$RSM.TLD.DNSSEC.ENABLED}', 0, $main_templateid, true));
+			next;
+		}
+		elsif ($type eq 'dns-udp')
+		{
+			if (get_macro_value_by_template_struct($tld_template, '{$RSM.TLD.DNS.TCP.ENABLED}') eq "0")
+			{
+				pfail("cannot disable DNS UDP because DNS TCP is already disabled");
+			}
+			really(create_macro('{$RSM.TLD.DNS.UDP.ENABLED}', 0, $main_templateid, true));
+			next;
+		}
+		elsif ($type eq 'dns-tcp')
+		{
+			if (get_macro_value_by_template_struct($tld_template, '{$RSM.TLD.DNS.UDP.ENABLED}') eq "0")
+			{
+				pfail("cannot disable DNS TCP because DNS UDP is already disabled");
+			}
+			really(create_macro('{$RSM.TLD.DNS.TCP.ENABLED}', 0, $main_templateid, true));
 			next;
 		}
 
@@ -1067,6 +1112,8 @@ sub create_main_template($$)
 	really(create_macro('{$RSM.DNS.TESTPREFIX}', getopt('dns-test-prefix'), $templateid, 1));
 	really(create_macro('{$RSM.RDDS.TESTPREFIX}', getopt('rdds-test-prefix'), $templateid, 1)) if (opt('rdds-test-prefix'));
 	really(create_macro('{$RSM.RDDS.NS.STRING}', opt('rdds-ns-string') ? getopt('rdds-ns-string') : CFG_DEFAULT_RDDS_NS_STRING, $templateid, 1));
+	really(create_macro('{$RSM.TLD.DNS.UDP.ENABLED}', getopt('dns-udp'), $templateid, 1));
+	really(create_macro('{$RSM.TLD.DNS.TCP.ENABLED}', getopt('dns-tcp'), $templateid, 1));
 	really(create_macro('{$RSM.TLD.DNSSEC.ENABLED}', getopt('dnssec'), $templateid, 1));
 	really(create_macro('{$RSM.TLD.RDDS.ENABLED}', opt('rdds43-servers') ? 1 : 0, $templateid, 1));
 	really(create_macro('{$RSM.TLD.EPP.ENABLED}', opt('epp-servers') ? 1 : 0, $templateid, 1));
@@ -2074,6 +2121,12 @@ Other options
         --dns
                 Action with DNS
                 (default: no)
+        --dns-udp
+                Action with DNS UDP
+                (default: no; this option is mutually exclusive with --dns-tcp when used with --disable)
+        --dns-tcp
+                Action with DNS TCP
+                (default: no; this option is mutually exclusive with --dns-udp when used with --disable)
         --rdds
                 Action with RDDS
                 (default: no)

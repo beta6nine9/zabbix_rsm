@@ -161,6 +161,8 @@ use constant CFG_MACRO_DESCRIPTION => {
 	'{$RSM.IP6.ENABLED}' => 'Indicates whether the probe supports IPv6',
 	'{$RSM.EPP.ENABLED}' => 'Indicates whether EPP is enabled on probe',
 	'{$RSM.DNS.TESTPREFIX}' => 'Prefix for DNS tests, e.g. nonexistent',
+	'{$RSM.TLD.DNS.UDP.ENABLED}' => 'Indicates whether DNS UDP enabled for this TLD',
+	'{$RSM.TLD.DNS.TCP.ENABLED}' => 'Indicates whether DNS TCP enabled for this TLD',
 };
 
 our @EXPORT_OK = qw(

@@ -22,7 +22,7 @@ our @EXPORT = qw(zbx_connect check_api_error get_proxies_list
 		enable_items
 		disable_items disable_triggers
 		rename_host rename_proxy rename_template rename_hostgroup
-		macro_value get_global_macro_value get_host_macro
+		macro_value get_global_macro_value get_host_macro get_macro_value_by_template_struct
 		set_proxy_status
 		get_application_id get_items_like set_tld_type get_triggers_by_items
 		add_dependency
@@ -770,6 +770,18 @@ sub get_host_macro
 	$result = $zabbix->get('usermacro', {'hostids' => $templateid, 'output' => 'extend', 'filter' => {'macro' => $name}});
 
 	return $result;
+}
+
+# locates and returns host macro value from template structure (as returned by API)
+
+sub get_macro_value_by_template_struct($$)
+{
+	my $template = shift;
+	my $macro    = shift;
+
+	my $macro_hash_ref = (grep { $_->{'macro'} eq $macro } @{$template->{'macros'}})[0];
+
+	return $macro_hash_ref->{'value'};
 }
 
 sub create_passive_proxy($$$$$)
