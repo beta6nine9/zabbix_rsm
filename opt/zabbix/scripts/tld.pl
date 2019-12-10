@@ -384,7 +384,7 @@ sub list_services($;$)
 		push(@row, map($services->{$_} // "", @columns));
 
 		# obtain rsm.rdds[] item key and extract RDDS(43|80).SERVERS strings
-		my $template = get_template("Template $rsmhost", 0, 0);
+		my $template = get_template(TEMPLATE_RSMHOST_CONFIG_PREFIX . $rsmhost, 0, 0);
 		my $items = get_items_like($template->{'templateid'}, 'rsm.rdds[', true);
 
 		my $key;
@@ -434,7 +434,7 @@ sub get_services($$)
 
 	my $result;
 
-	my $main_templateid = get_template('Template ' . $tld, false, false);
+	my $main_templateid = get_template(TEMPLATE_RSMHOST_CONFIG_PREFIX . $tld, false, false);
 
 	pfail("TLD \"$tld\" does not exist on \"$server_key\"") unless ($main_templateid->{'templateid'});
 
@@ -763,7 +763,7 @@ sub manage_tld_objects($$$$$$$)
 	}
 
 	print("Getting main template of the TLD: ");
-	my $tld_template = get_template('Template ' . $tld, false, true);
+	my $tld_template = get_template(TEMPLATE_RSMHOST_CONFIG_PREFIX . $tld, false, true);
 
 	if (scalar(%{$tld_template}))
 	{
@@ -772,7 +772,7 @@ sub manage_tld_objects($$$$$$$)
 	}
 	else
 	{
-		pfail("cannot find template \"Template .$tld\"");
+		pfail("cannot find template \"" . TEMPLATE_RSMHOST_CONFIG_PREFIX . "$tld\"");
 	}
 
 	my @tld_hostids;
@@ -812,7 +812,8 @@ sub manage_tld_objects($$$$$$$)
 		my @tmp_hostids;
 		my @hostids_arr;
 
-		push(@tmp_hostids, {'hostid' => $main_hostid});
+		# note we don't delete or disable $main_hostid here explicitly anymore
+		# because now it's present in @tld_hostids
 
 		foreach my $hostid (@tld_hostids)
 		{
@@ -837,12 +838,12 @@ sub manage_tld_objects($$$$$$$)
 		if ($action eq 'delete')
 		{
 			remove_hosts(\@hostids_arr);
-			remove_hosts([$main_hostid]);
 			remove_templates([$main_templateid]);
 
 			my $hostgroupid = get_host_group('TLD ' . $tld, false, false);
 			$hostgroupid = $hostgroupid->{'groupid'};
 			remove_hostgroups([$hostgroupid]);
+
 			return;
 		}
 	}
@@ -934,7 +935,7 @@ sub add_new_tld()
 
 	my $rsmhost_groupid = really(create_group('TLD ' . getopt('tld')));
 
-	create_rsmhost();
+	create_rsmhost($main_templateid);
 
 	my $proxy_mon_templateid = create_probe_health_tmpl();
 
@@ -1009,7 +1010,7 @@ sub create_main_template($$)
 	my $tld        = shift;
 	my $ns_servers = shift;
 
-	my $templateid = really(create_template('Template ' . $tld));
+	my $templateid = really(create_template(TEMPLATE_RSMHOST_CONFIG_PREFIX . $tld));
 
 	my $delay = 300;
 	my $appid = get_application_id('Configuration', $templateid);
@@ -1635,6 +1636,8 @@ sub create_slv_items($$$)
 
 sub create_rsmhost()
 {
+	my $main_templateid = shift;
+
 	my $tld_name = getopt('tld');
 	my $tld_type = getopt('type');
 
@@ -1642,6 +1645,9 @@ sub create_rsmhost()
 		'groups'     => [
 			{'groupid' => TLDS_GROUPID},
 			{'groupid' => TLD_TYPE_GROUPIDS->{$tld_type}}
+		],
+		'templates' => [
+			{'templateid' => $main_templateid}
 		],
 		'host'       => $tld_name,
 		'status'     => HOST_STATUS_MONITORED,
@@ -1936,7 +1942,7 @@ sub set_linked_items_enabled($$$)
 	my $tld     = shift;
 	my $enabled = shift;
 
-	my $template = 'Template ' . $tld;
+	my $template = TEMPLATE_RSMHOST_CONFIG_PREFIX . $tld;
 	my $result = get_template($template, false, true);	# do not select macros, select hosts
 
 	pfail("$tld template \"$template\" does not exist") if (keys(%{$result}) == 0);

@@ -11,7 +11,7 @@ use Pod::Usage;
 use Exporter qw(import);
 use Zabbix;
 use Alerts;
-use TLD_constants qw(:api :items :ec :groups :config);
+use TLD_constants qw(:api :items :ec :groups :config :templates);
 use File::Pid;
 use POSIX qw(floor);
 use Sys::Syslog;
@@ -1302,7 +1302,7 @@ sub tld_interface_enabled($$$)
 
 	# try the Template macro
 
-	my $host = "Template $tld";
+	my $host = TEMPLATE_RSMHOST_CONFIG_PREFIX . $tld;
 
 	my $macro;
 
@@ -2714,14 +2714,14 @@ sub is_service_error_desc
 
 sub get_templated_items_like
 {
-	my $tld = shift;
+	my $service = shift;
 	my $key_in = shift;
 
 	# TODO: this function could benefit from some caching because it's called
 	# on every cycle during rsm.slv*.pl calculation even though list of items
 	# is not likely to change
 
-	my $hostid = get_hostid("Template $tld");
+	my $hostid = get_hostid("Template $service");
 
 	my $items_ref = db_select(
 		"select key_".

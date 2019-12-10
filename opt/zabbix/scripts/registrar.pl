@@ -298,7 +298,7 @@ sub list_services($;$)
 		push(@row, map($services->{$_} // "", @columns));
 
 		# obtain rsm.rdds[] item key and extract RDDS(43|80).SERVERS strings
-		my $template = get_template("Template $rsmhost", 0, 0);
+		my $template = get_template(TEMPLATE_RSMHOST_CONFIG_PREFIX . $rsmhost, 0, 0);
 		my $items = get_items_like($template->{'templateid'}, 'rsm.rdds[', true);
 
 		my $key;
@@ -361,7 +361,7 @@ sub get_services($$)
 
 	my $result;
 
-	my $main_templateid = get_template('Template ' . $tld, false, false);
+	my $main_templateid = get_template(TEMPLATE_RSMHOST_CONFIG_PREFIX . $tld, false, false);
 
 	pfail("Registrar \"$tld\" does not exist on \"$server_key\"") unless ($main_templateid->{'templateid'});
 
@@ -422,8 +422,8 @@ sub manage_registrar($$$$)
 	my $main_host = get_host($rsmhost, false);
 	pfail("cannot find host \"$rsmhost\"") unless %{$main_host};
 
-	my $rsmhost_template = get_template('Template ' . $rsmhost, false, true);
-	pfail("cannot find template \"Template $rsmhost\"") unless %{$rsmhost_template};
+	my $rsmhost_template = get_template(TEMPLATE_RSMHOST_CONFIG_PREFIX . $rsmhost, false, true);
+	pfail("cannot find template \"" . TEMPLATE_RSMHOST_CONFIG_PREFIX . "$rsmhost\"") unless %{$rsmhost_template};
 
 	my $main_hostid = $main_host->{'hostid'};
 	my $main_templateid = $rsmhost_template->{'templateid'};
@@ -562,7 +562,7 @@ sub add_new_registrar()
 
 	my $rsmhost_groupid = really(create_group('TLD ' . getopt('rr-id')));
 
-	create_rsmhost();
+	create_rsmhost($main_templateid;
 
 	my $proxy_mon_templateid = create_probe_health_tmpl();
 
@@ -573,7 +573,7 @@ sub create_main_template($)
 {
 	my $rsmhost = shift;
 
-	my $template_name = 'Template ' . $rsmhost;
+	my $template_name = TEMPLATE_RSMHOST_CONFIG_PREFIX . $rsmhost;
 
 	my $templateid = really(create_template($template_name));
 
@@ -709,6 +709,8 @@ sub create_items_rdds($$)
 
 sub create_rsmhost()
 {
+	my $main_templateid = shift;
+
 	my $rr_id     = getopt('rr-id');
 	my $rr_name   = getopt('rr-name');
 	my $rr_family = getopt('rr-family'); # TODO: save family
@@ -717,6 +719,9 @@ sub create_rsmhost()
 		'groups'     => [
 			{'groupid' => TLDS_GROUPID},
 			{'groupid' => TLD_TYPE_GROUPIDS->{${\TLD_TYPE_G}}}
+		],
+		'templates' => [
+			{'templateid' => $main_templateid}
 		],
 		'host'       => $rr_id,
 		'info_1'     => $rr_name,
@@ -1095,7 +1100,7 @@ sub set_linked_items_enabled($$$)
 	my $tld     = shift;
 	my $enabled = shift;
 
-	my $template = 'Template ' . $tld;
+	my $template = TEMPLATE_RSMHOST_CONFIG_PREFIX . $tld;
 	my $result = get_template($template, false, true);	# do not select macros, select hosts
 
 	pfail("$tld template \"$template\" does not exist") if (keys(%{$result}) == 0);
