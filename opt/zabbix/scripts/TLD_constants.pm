@@ -15,6 +15,7 @@ use constant APP_ZABBIX_PROXY_TEMPLATEID	=> 10058;	# Template "Template App Zabb
 use constant PROBE_ERRORS_TEMPLATEID		=> 99990;	# Template "Template Probe Errors"
 use constant DNS_TEMPLATEID			=> 99500;	# Template "Template DNS"
 use constant RDAP_TEMPLATEID			=> 99980;	# Template "Template RDAP"
+use constant CONFIG_HISTORY_TEMPLATEID		=> 100002;	# Template "Template Config History"
 
 use constant TEMPLATES_TLD_GROUPID		=> 240;		# Host group "Templates - TLD"
 use constant PROBES_GROUPID			=> 120;		# Host group "Probes"
@@ -175,6 +176,7 @@ our @EXPORT_OK = qw(
 	PROBE_ERRORS_TEMPLATEID
 	DNS_TEMPLATEID
 	RDAP_TEMPLATEID
+	CONFIG_HISTORY_TEMPLATEID
 	TEMPLATE_RSMHOST_CONFIG_PREFIX
 	CONFIGVALUE_DNS_UDP_RTT_HIGH_ITEMID
 	TEMPLATES_TLD_GROUPID
@@ -212,6 +214,7 @@ our %EXPORT_TAGS = (
 			PROBE_ERRORS_TEMPLATEID
 			DNS_TEMPLATEID
 			RDAP_TEMPLATEID
+			CONFIG_HISTORY_TEMPLATEID
 			TEMPLATE_RSMHOST_CONFIG_PREFIX) ],
 	groups => [ qw(
 			TEMPLATES_TLD_GROUPID

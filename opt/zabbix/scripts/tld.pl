@@ -1326,18 +1326,6 @@ sub create_items_rdds($)
 			'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_rdds_result'}
 		}));
 	}
-
-	# this item is added in any case
-	really(create_item({
-		'name'       => 'RDDS enabled/disabled',
-		'key_'       => 'rdds.enabled',
-		'status'     => ITEM_STATUS_ACTIVE,
-		'hostid'     => $templateid,
-		'params'     => '{$RSM.TLD.RDDS.ENABLED}',
-		'delay'      => 60,
-		'type'       => ITEM_TYPE_CALCULATED,
-		'value_type' => ITEM_VALUE_TYPE_UINT64
-	}));
 }
 
 sub create_items_epp($)
@@ -1700,7 +1688,8 @@ sub create_rsmhost()
 			{'groupid' => TLD_TYPE_GROUPIDS->{$tld_type}}
 		],
 		'templates' => [
-			{'templateid' => $main_templateid}
+			{'templateid' => $main_templateid},
+			{'templateid' => CONFIG_HISTORY_TEMPLATEID}
 		],
 		'host'       => $tld_name,
 		'status'     => HOST_STATUS_MONITORED,
