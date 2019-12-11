@@ -1263,7 +1263,7 @@ static void extract_nsid(ldns_rdf *edns_data, char **nsid)
 			if (NSID_MAX_LENGTH < opt_len)
 				opt_len = NSID_MAX_LENGTH;
 
-			*nsid = (char *)zbx_malloc(*nsid, NSID_MAX_LENGTH * 2 + 1);
+			*nsid = (char *)zbx_malloc(*nsid, opt_len * 2 + 1);
 
 			for (i = 0; i < opt_len; i++)
 			{
@@ -1703,7 +1703,7 @@ out:
 	if (NULL != upd)
 		rsm_infof(log_fd, "RSM DNS \"%s\" (%s) RTT:%d UPD:%d NSID:%s", ns, ip, *rtt, *upd, *nsid);
 	else
-		rsm_infof(log_fd, "RSM DNS \"%s\" (%s) RTT:%d NSID:$s", ns, ip, *rtt, *nsid);
+		rsm_infof(log_fd, "RSM DNS \"%s\" (%s) RTT:%d NSID:%s", ns, ip, *rtt, *nsid);
 
 	if (NULL != nsset)
 		ldns_rr_list_deep_free(nsset);
@@ -2662,11 +2662,11 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 
 				if (PACK_NUM_VARS == rv)
 				{
-					nss[i].ips[j].nsid = zbx_strdup(NULL, nsid);
+					nss[i].ips[j].nsid = zbx_strdup(nss[i].ips[j].nsid, nsid);
 				}
 				else if (PACK_NUM_VARS == rv + 1)
 				{
-					nss[i].ips[j].nsid = zbx_strdup(NULL, "");
+					nss[i].ips[j].nsid = zbx_strdup(nss[i].ips[j].nsid, "");
 				}
 				else
 				{
