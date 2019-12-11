@@ -32,14 +32,16 @@ void	exit_usage(const char *program)
 
 int	main(int argc, char *argv[])
 {
-	char		err[256], *res_ip = DEFAULT_RES_IP, *tld = NULL, *ns = NULL, *ns_ip = NULL, proto = RSM_UDP,
-			ipv4_enabled = 0, ipv6_enabled = 0, *testprefix = DEFAULT_TESTPREFIX, dnssec_enabled = 0,
-			ignore_err = 0, log_to_file = 0;
-	int		c, index, rtt;
+	char		err[256], pack_buf[2048], nsid_unpacked[NSID_MAX_LENGTH * 2 + 1], *res_ip = DEFAULT_RES_IP,
+			*tld = NULL, *ns = NULL, *ns_ip = NULL, proto = RSM_UDP, *nsid = NULL, ipv4_enabled = 0,
+			ipv6_enabled = 0, *testprefix = DEFAULT_TESTPREFIX, dnssec_enabled = 0, ignore_err = 0,
+			log_to_file = 0;
+	int		c, index, rtt, rtt_unpacked, upd_unpacked, unpacked_values_num, size_nsid_decoded;
 	ldns_resolver	*res = NULL;
 	ldns_rr_list	*keys = NULL;
 	FILE		*log_fd = stdout;
 	unsigned int	extras;
+	size_t		size_one_unpacked, size_two_unpacked;
 
 	opterr = 0;
 
@@ -173,15 +175,38 @@ int	main(int argc, char *argv[])
 		}
 	}
 
-	if (SUCCEED != zbx_get_ns_ip_values(res, ns, ns_ip, keys, testprefix, tld, log_fd, &rtt, NULL, ipv4_enabled,
-					ipv6_enabled, 0, err, sizeof(err)))
+	if (SUCCEED != zbx_get_ns_ip_values(res, ns, ns_ip, keys, testprefix, tld, log_fd, &rtt, &nsid, NULL,
+			ipv4_enabled, ipv6_enabled, 0, err, sizeof(err)))
 	{
 		rsm_err(stderr, err);
 		if (0 == ignore_err)
 			goto out;
 	}
 
-	printf("OK (RTT:%d)\n", rtt);
+	/* we have nsid, lets also test that it works with packing/unpacking */
+
+	pack_values(0, 0, rtt, 0, nsid, pack_buf, sizeof(pack_buf));
+
+	unpacked_values_num = unpack_values(&size_one_unpacked, &size_two_unpacked, &rtt_unpacked, &upd_unpacked,
+			nsid_unpacked, pack_buf);
+
+	if (PACK_NUM_VARS == unpacked_values_num)
+	{
+		nsid = zbx_strdup(nsid, nsid_unpacked);
+	}
+	else if (PACK_NUM_VARS == unpacked_values_num + 1)
+	{
+		nsid = zbx_strdup(nsid, "");
+	}
+	else
+	{
+		rsm_errf(stderr, "unpack_values() failure, expected: %d, received: %d", PACK_NUM_VARS,
+				unpacked_values_num);
+		goto out;
+	}
+
+	printf("OK (RTT:%d)\n", rtt_unpacked);
+	printf("OK (NSID:%s)\n", nsid);
 out:
 	if (log_to_file != 0)
 	{
@@ -199,6 +224,8 @@ out:
 		else
 			ldns_resolver_free(res);
 	}
+
+	zbx_free(nsid);
 
 	exit(EXIT_SUCCESS);
 }
