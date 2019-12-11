@@ -32,10 +32,10 @@ void	exit_usage(const char *program)
 
 int	main(int argc, char *argv[])
 {
-	char		err[256], pack_buf[2048], nsid_b64_buf_coded_before_pack[ZBX_CODED_NSID_BUF_SIZE],
-			nsid_b64_buf_coded_after_pack[ZBX_CODED_NSID_BUF_SIZE], *res_ip = DEFAULT_RES_IP, *tld = NULL,
-			*ns = NULL, *ns_ip = NULL, proto = RSM_UDP, *nsid = NULL, ipv4_enabled = 0, ipv6_enabled = 0,
-			*testprefix = DEFAULT_TESTPREFIX, dnssec_enabled = 0, ignore_err = 0, log_to_file = 0;
+	char		err[256], pack_buf[2048], nsid_unpacked[NSID_MAX_LENGTH * 2 + 1], *res_ip = DEFAULT_RES_IP,
+			*tld = NULL, *ns = NULL, *ns_ip = NULL, proto = RSM_UDP, *nsid = NULL, ipv4_enabled = 0,
+			ipv6_enabled = 0, *testprefix = DEFAULT_TESTPREFIX, dnssec_enabled = 0, ignore_err = 0,
+			log_to_file = 0;
 	int		c, index, rtt, rtt_unpacked, upd_unpacked, unpacked_values_num, size_nsid_decoded;
 	ldns_resolver	*res = NULL;
 	ldns_rr_list	*keys = NULL;
@@ -184,30 +184,19 @@ int	main(int argc, char *argv[])
 	}
 
 	/* we have nsid, lets also test that it works with packing/unpacking */
-	if (NULL != nsid && 0 != strlen(nsid))
-		str_base64_encode(nsid, nsid_b64_buf_coded_before_pack, strlen(nsid));
-	else
-		nsid_b64_buf_coded_before_pack[0] = '\0';
 
-	pack_values(0, 0, rtt, 0, nsid_b64_buf_coded_before_pack, pack_buf, sizeof(pack_buf));
+	pack_values(0, 0, rtt, 0, nsid, pack_buf, sizeof(pack_buf));
 
 	unpacked_values_num = unpack_values(&size_one_unpacked, &size_two_unpacked, &rtt_unpacked, &upd_unpacked,
-			nsid_b64_buf_coded_after_pack, pack_buf);
+			nsid_unpacked, pack_buf);
 
 	if (PACK_NUM_VARS == unpacked_values_num)
 	{
-		zbx_free(nsid);
-		nsid = (char*)zbx_malloc(nsid, ZBX_NSID_BUF_SIZE);
-		str_base64_decode(nsid_b64_buf_coded_after_pack, nsid, ZBX_NSID_BUF_SIZE, &size_nsid_decoded);
-		nsid[size_nsid_decoded] = '\0';
+		nsid = zbx_strdup(nsid, nsid_unpacked);
 	}
 	else if (PACK_NUM_VARS == unpacked_values_num + 1)
 	{
-		if (NULL != nsid)
-			zbx_free(nsid);
-
-		nsid = (char*)zbx_malloc(nsid, 1);
-		nsid[0] = '\0';
+		nsid = zbx_strdup(nsid, "");
 	}
 	else
 	{

@@ -60,9 +60,8 @@
 #define UNEXPECTED_LDNS_ERROR		"unexpected LDNS error"
 #define UNEXPECTED_LDNS_MEM_ERROR	UNEXPECTED_LDNS_ERROR " (out of memory?)"
 
-#define LDNS_EDNS_NSID		3
-#define ZBX_NSID_BUF_SIZE	256
-#define ZBX_CODED_NSID_BUF_SIZE	1024
+#define LDNS_EDNS_NSID		3	/* NSID option code, from RFC5001 */
+#define NSID_MAX_LENGTH		127	/* hex representation of NSID must fit into 255 characters */
 
 extern const char	*CONFIG_LOG_FILE;
 extern const char	epp_passphrase[128];
@@ -1237,7 +1236,7 @@ static void extract_nsid(ldns_rdf *edns_data, char **nsid)
 	uint8_t	*rdf_data;
 	size_t	rdf_size;
 
-	if (NULL != edns_data)
+	if (NULL == edns_data)
 		goto out;
 
 	rdf_data = ldns_rdf_data(edns_data);
@@ -1258,13 +1257,21 @@ static void extract_nsid(ldns_rdf *edns_data, char **nsid)
 
 		if (LDNS_EDNS_NSID == opt_code)
 		{
-			size_t	nsid_size = (size_t)opt_len + 1;	/* +1 for terminating null character */
+			const char	*hex = "0123456789abcdef";
+			uint16_t	i;
 
-			if (ZBX_NSID_BUF_SIZE < nsid_size)
-				nsid_size > ZBX_NSID_BUF_SIZE;
+			if (NSID_MAX_LENGTH < opt_len)
+				opt_len = NSID_MAX_LENGTH;
 
-			*nsid = (char *)zbx_malloc(*nsid, nsid_size);
-			zbx_strlcpy(*nsid, (char *)rdf_data, nsid_size);
+			*nsid = (char *)zbx_malloc(*nsid, NSID_MAX_LENGTH * 2 + 1);
+
+			for (i = 0; i < opt_len; i++)
+			{
+				(*nsid)[i * 2 + 0] = hex[rdf_data[i] >> 4];
+				(*nsid)[i * 2 + 1] = hex[rdf_data[i] & 15];
+			}
+
+			(*nsid)[opt_len * 2] = '\0';
 			break;
 		}
 
@@ -1274,7 +1281,7 @@ static void extract_nsid(ldns_rdf *edns_data, char **nsid)
 out:
 	if (NULL == *nsid)
 	{
-		*nsid = zbx_strdup(NULL, "");
+		*nsid = zbx_strdup(*nsid, "");
 	}
 }
 
@@ -2574,7 +2581,6 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 					/* child */
 
 					FILE	*th_log_fd;
-					char nsid_b64_buf_encoded[ZBX_CODED_NSID_BUF_SIZE];
 
 					close(fd[0]);		/* child does not need data reader fd */
 					close(log_pipe[0]);	/* child does not need log reader fd */
@@ -2608,10 +2614,7 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 						rsm_err(th_log_fd, err);
 					}
 
-					str_base64_encode(nss[i].ips[j].nsid, nsid_b64_buf_encoded,
-							strlen(nss[i].ips[j].nsid) + 1);
-
-					pack_values(i, j, nss[i].ips[j].rtt, nss[i].ips[j].upd, nsid_b64_buf_encoded,
+					pack_values(i, j, nss[i].ips[j].rtt, nss[i].ips[j].upd, nss[i].ips[j].nsid,
 							buf, sizeof(buf));
 
 					if (-1 == write(fd[1], buf, strlen(buf) + 1))
@@ -2649,21 +2652,21 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 			if (-1 != read(threads[th_num].fd, buf, sizeof(buf)))
 			{
 				int	rtt, upd;
-				char	nsid_b64_buf_encoded[ZBX_CODED_NSID_BUF_SIZE];
+				char	nsid[NSID_MAX_LENGTH * 2 + 1];	/* hex representation + terminating null char */
 				int	rv;
 
-				rv = unpack_values(&i, &j, &rtt, &upd, nsid_b64_buf_encoded, buf);
+				rv = unpack_values(&i, &j, &rtt, &upd, nsid, buf);
+
+				nss[i].ips[j].rtt = rtt;
+				nss[i].ips[j].upd = upd;
 
 				if (PACK_NUM_VARS == rv)
 				{
-					int	size_nsid_decoded;
-
-					nss[i].ips[j].rtt = rtt;
-					nss[i].ips[j].upd = upd;
-
-					nss[i].ips[j].nsid = (char *)zbx_malloc(nss[i].ips[j].nsid, ZBX_NSID_BUF_SIZE);
-					str_base64_decode(nsid_b64_buf_encoded, nss[i].ips[j].nsid, ZBX_NSID_BUF_SIZE,
-							&size_nsid_decoded);
+					nss[i].ips[j].nsid = zbx_strdup(NULL, nsid);
+				}
+				else if (PACK_NUM_VARS == rv + 1)
+				{
+					nss[i].ips[j].nsid = zbx_strdup(NULL, "");
 				}
 				else
 				{
