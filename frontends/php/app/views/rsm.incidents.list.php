@@ -39,14 +39,11 @@ if ($data['tld']) {
 
 	$details += [
 		_('Period') => implode(' - ', [
-			date(DATE_TIME_FORMAT, zbxDateToTime($data['from'])),
-			date(DATE_TIME_FORMAT, zbxDateToTime($data['to']))
+			date(DATE_TIME_FORMAT, zbxDateToTime($data['from_ts'])),
+			date(DATE_TIME_FORMAT, zbxDateToTime($data['to_ts']))
 		]),
 		_('Server') => new CLink($data['server'],
-			(new CUrl($data['url'].'zabbix.php'))
-				->setArgument('action', 'rsm.rollingweekstatus')
-				->setArgument('sid', $data['sid'])
-				->setArgument('set_sid', 1)
+			(new CUrl($data['url'].'zabbix.php'))->setArgument('action', 'rsm.rollingweekstatus')
 		)
 	];
 
@@ -97,12 +94,10 @@ if ($data['tld']) {
 						->setArgument('eventid', $event['eventid'])
 						->setArgument('slvItemId', $data['dns']['itemid'])
 						->setArgument('eventid', $event['eventid'])
-						->setArgument('from', $data['from'])
-						->setArgument('to', $data['to'])
+						->setArgument('from', $start_time)
+						->setArgument('to', array_key_exists('endTime', $event) ? $end_time : 'now')
 						->setArgument('availItemId', $data['dns']['availItemId'])
 						->setArgument('filter_set', 1)
-						->setArgument('sid', $data['sid'])
-						->setArgument('set_sid', 1)
 				),
 				$incident_status,
 				$start_time,
@@ -122,8 +117,6 @@ if ($data['tld']) {
 				->setArgument('host', $data['tld']['host'])
 				->setArgument('type', RSM_DNS)
 				->setArgument('slvItemId', $data['dns']['itemid'])
-				->setArgument('sid', $data['sid'])
-				->setArgument('set_sid', 1)
 		);
 
 		$tests_info = [
@@ -196,12 +189,10 @@ if ($data['tld']) {
 						->setArgument('host', $data['tld']['host'])
 						->setArgument('eventid', $event['eventid'])
 						->setArgument('slvItemId', $data['dnssec']['itemid'])
-						->setArgument('from', $data['from'])
-						->setArgument('to', $data['to'])
+						->setArgument('from', $start_time)
+						->setArgument('to', array_key_exists('endTime', $event) ? $end_time : 'now')
 						->setArgument('availItemId', $data['dnssec']['availItemId'])
 						->setArgument('filter_set', 1)
-						->setArgument('sid', $data['sid'])
-						->setArgument('set_sid', 1)
 				),
 				$incident_status,
 				$start_time,
@@ -221,8 +212,6 @@ if ($data['tld']) {
 				->setArgument('host', $data['tld']['host'])
 				->setArgument('type', RSM_DNSSEC)
 				->setArgument('slvItemId', $data['dnssec']['itemid'])
-				->setArgument('sid', $data['sid'])
-				->setArgument('set_sid', 1)
 		);
 
 		$tests_info = [
@@ -292,12 +281,10 @@ if ($data['tld']) {
 						->setArgument('host', $data['tld']['host'])
 						->setArgument('eventid', $event['eventid'])
 						->setArgument('slvItemId', $data['rdds']['itemid'])
-						->setArgument('from', $data['from'])
-						->setArgument('to', $data['to'])
+						->setArgument('from', $start_time)
+						->setArgument('to', array_key_exists('endTime', $event) ? $end_time : 'now')
 						->setArgument('availItemId', $data['rdds']['availItemId'])
 						->setArgument('filter_set', 1)
-						->setArgument('sid', $data['sid'])
-						->setArgument('set_sid', 1)
 				),
 				$incident_status,
 				$start_time,
@@ -317,8 +304,6 @@ if ($data['tld']) {
 				->setArgument('host', $data['tld']['host'])
 				->setArgument('type', RSM_RDDS)
 				->setArgument('slvItemId', $data['rdds']['itemid'])
-				->setArgument('sid', $data['sid'])
-				->setArgument('set_sid', 1)
 		);
 
 		$tests_info = [
@@ -395,12 +380,10 @@ if ($data['tld']) {
 						->setArgument('host', $data['tld']['host'])
 						->setArgument('eventid', $event['eventid'])
 						->setArgument('slvItemId', $data['rdap']['itemid'])
-						->setArgument('from', $data['from'])
-						->setArgument('to', $data['to'])
+						->setArgument('from', $start_time)
+						->setArgument('to', array_key_exists('endTime', $event) ? $end_time : 'now')
 						->setArgument('availItemId', $data['rdap']['availItemId'])
 						->setArgument('filter_set', 1)
-						->setArgument('sid', $data['sid'])
-						->setArgument('set_sid', 1)
 				),
 				$incident_status,
 				$start_time,
@@ -420,8 +403,6 @@ if ($data['tld']) {
 				->setArgument('host', $data['tld']['host'])
 				->setArgument('type', RSM_RDAP)
 				->setArgument('slvItemId', $data['rdap']['itemid'])
-				->setArgument('sid', $data['sid'])
-				->setArgument('set_sid', 1)
 		);
 
 		$tests_info = [
@@ -494,16 +475,13 @@ if ($data['tld']) {
 			$epp_table->addRow([
 				new CLink(
 					$event['eventid'],
-					(new CUrl($data['url'].'rsm.incidentdetails'))
-					/*(new CUrl($data['url'].'zabbix.php'))
-						->setArgument('action', 'rsm.incidentdetails')*/
+					(new CUrl($data['url'].'zabbix.php'))
+						->setArgument('action', 'rsm.incidentdetails')
 						->setArgument('host', $data['tld']['host'])
-						->setArgument('from', $data['from'])
-						->setArgument('to', $data['to'])
+						->setArgument('from', $start_time)
+						->setArgument('to', array_key_exists('endTime', $event) ? $end_time : 'now')
 						->setArgument('availItemId', $data['epp']['availItemId'])
 						->setArgument('filter_set', 1)
-						->setArgument('sid', $data['sid'])
-						->setArgument('set_sid', 1)
 				),
 				$incident_status,
 				$start_time,
@@ -523,8 +501,6 @@ if ($data['tld']) {
 				->setArgument('host', $data['tld']['host'])
 				->setArgument('type', RSM_EPP)
 				->setArgument('slvItemId', $data['epp']['itemid'])
-				->setArgument('sid', $data['sid'])
-				->setArgument('set_sid', 1)
 		);
 
 		$tests_info = [

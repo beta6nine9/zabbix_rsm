@@ -574,7 +574,7 @@ class CControllerRollingWeekStatusList extends CController {
 					if (array_key_exists($hostid_key, $data['tld'])) {
 						$data['tld'][$hostid_key][$itemkey_type[$item['key_']]] = [
 							'itemid' => $item['itemid'],
-							'lastvalue' => sprintf('%.3f', $item['lastvalue']),
+							'lastvalue' => is_null($item['lastvalue']) ? null : sprintf('%.3f', $item['lastvalue']),
 							'trigger' => false
 						];
 					}
@@ -734,7 +734,7 @@ class CControllerRollingWeekStatusList extends CController {
 						$hostid = $DB['SERVERS'][$key]['NR'].$items[$tritem]['hostid'];
 
 						if (array_key_exists($hostid, $data['tld'])) {
-							$type = $avail_type[$items[$trItem]['key_']];
+							$type = $avail_type[$items[$tritem]['key_']];
 							$data['tld'][$hostid][$type]['incident'] = $trigger['triggerid'];
 							$data['tld'][$hostid][$type]['trigger'] = (bool) $trigger['triggerid'];
 						}
