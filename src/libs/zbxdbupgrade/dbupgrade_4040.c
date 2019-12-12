@@ -898,6 +898,41 @@ static int	DBpatch_4040309(void)
 	return SUCCEED;
 }
 
+static int	DBpatch_4040310(void)
+{
+	int		ret = FAIL;
+	const char	*command = "/opt/zabbix/scripts/tlds-notification.pl --send-to \\'zabbix alert\\' --event-id \\'{EVENT.RECOVERY.ID}\\' &";
+
+	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
+		return SUCCEED;
+
+#define CHECK(CODE) do {                \
+	int result = (CODE);            \
+	if (ZBX_DB_OK > result)         \
+	{                               \
+		goto out;               \
+	}                               \
+} while (0)
+
+	/* enable "TLDs" action */
+
+	CHECK(DBexecute("update actions set status=0 where actionid=130"));
+
+	/* add recovery operation */
+
+	CHECK(DBexecute("insert into operations set operationid=131,actionid=130,operationtype=1,esc_period='0',"
+			"esc_step_from=1,esc_step_to=1,evaltype=0,recovery=1"));
+	CHECK(DBexecute("insert into opcommand set operationid=131,type=0,scriptid=NULL,execute_on=1,port='',"
+			"authtype=0,username='',password='',publickey='',privatekey='',command='%s'", command));
+	CHECK(DBexecute("insert into opcommand_hst set opcommand_hstid=131,operationid=131,hostid=NULL"));
+
+#undef CHECK
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
 #endif
 
 DBPATCH_START(4040)
@@ -911,9 +946,10 @@ DBPATCH_ADD(4040302, 0, 1)	/* set delay as macro for rsm.dns.tcp* items */
 DBPATCH_ADD(4040303, 0, 1)	/* set delay as macro for rsm.rdds* items */
 DBPATCH_ADD(4040304, 0, 1)	/* set delay as macro for rsm.rdap* items */
 DBPATCH_ADD(4040305, 0, 1)	/* set delay as macro for rsm.epp* items */
-DBPATCH_ADD(4040306, 0, 0)	/* set macro descriptions (part I) */
-DBPATCH_ADD(4040307, 0, 0)	/* set macro descriptions (part II) */
+DBPATCH_ADD(4040306, 0, 0)	/* set global macro descriptions */
+DBPATCH_ADD(4040307, 0, 0)	/* set host macro descriptions */
 DBPATCH_ADD(4040308, 0, 0)	/* add "Template DNS" template */
 DBPATCH_ADD(4040309, 0, 0)	/* disable "db watchdog" internal items */
+DBPATCH_ADD(4040310, 0, 0)	/* upgrade "TLDs" action (upgrade process to Zabbix 4.x failed to upgrade it) */
 
 DBPATCH_END()
