@@ -557,6 +557,7 @@ if ($data['tld']) {
 				->setHint('EPP is disabled.', '', 'on');
 
 			$row[] = new CLink($tld['server'],(new CUrl($tld['url'].'zabbix.php'))
+				->setArgument('action', 'rsm.rollingweekstatus')
 				->setArgument('sid', $data['sid'])
 				->setArgument('set_sid', 1)
 			);

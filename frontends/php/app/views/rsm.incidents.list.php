@@ -98,6 +98,8 @@ if ($data['tld']) {
 						->setArgument('to', array_key_exists('endTime', $event) ? $end_time : 'now')
 						->setArgument('availItemId', $data['dns']['availItemId'])
 						->setArgument('filter_set', 1)
+						->setArgument('sid', $data['sid'])
+						->setArgument('set_sid', 1)
 				),
 				$incident_status,
 				$start_time,
@@ -117,6 +119,10 @@ if ($data['tld']) {
 				->setArgument('host', $data['tld']['host'])
 				->setArgument('type', RSM_DNS)
 				->setArgument('slvItemId', $data['dns']['itemid'])
+				->setArgument('sid', $data['sid'])
+				->setArgument('set_sid', 1)
+				->setArgument('sid', $data['sid'])
+				->setArgument('set_sid', 1)
 		);
 
 		$tests_info = [
@@ -193,6 +199,8 @@ if ($data['tld']) {
 						->setArgument('to', array_key_exists('endTime', $event) ? $end_time : 'now')
 						->setArgument('availItemId', $data['dnssec']['availItemId'])
 						->setArgument('filter_set', 1)
+						->setArgument('sid', $data['sid'])
+						->setArgument('set_sid', 1)
 				),
 				$incident_status,
 				$start_time,
@@ -212,6 +220,8 @@ if ($data['tld']) {
 				->setArgument('host', $data['tld']['host'])
 				->setArgument('type', RSM_DNSSEC)
 				->setArgument('slvItemId', $data['dnssec']['itemid'])
+				->setArgument('sid', $data['sid'])
+				->setArgument('set_sid', 1)
 		);
 
 		$tests_info = [
@@ -285,6 +295,8 @@ if ($data['tld']) {
 						->setArgument('to', array_key_exists('endTime', $event) ? $end_time : 'now')
 						->setArgument('availItemId', $data['rdds']['availItemId'])
 						->setArgument('filter_set', 1)
+						->setArgument('sid', $data['sid'])
+						->setArgument('set_sid', 1)
 				),
 				$incident_status,
 				$start_time,
@@ -304,6 +316,8 @@ if ($data['tld']) {
 				->setArgument('host', $data['tld']['host'])
 				->setArgument('type', RSM_RDDS)
 				->setArgument('slvItemId', $data['rdds']['itemid'])
+				->setArgument('sid', $data['sid'])
+				->setArgument('set_sid', 1)
 		);
 
 		$tests_info = [
@@ -384,6 +398,8 @@ if ($data['tld']) {
 						->setArgument('to', array_key_exists('endTime', $event) ? $end_time : 'now')
 						->setArgument('availItemId', $data['rdap']['availItemId'])
 						->setArgument('filter_set', 1)
+						->setArgument('sid', $data['sid'])
+						->setArgument('set_sid', 1)
 				),
 				$incident_status,
 				$start_time,
@@ -403,6 +419,8 @@ if ($data['tld']) {
 				->setArgument('host', $data['tld']['host'])
 				->setArgument('type', RSM_RDAP)
 				->setArgument('slvItemId', $data['rdap']['itemid'])
+				->setArgument('sid', $data['sid'])
+				->setArgument('set_sid', 1)
 		);
 
 		$tests_info = [
@@ -482,6 +500,8 @@ if ($data['tld']) {
 						->setArgument('to', array_key_exists('endTime', $event) ? $end_time : 'now')
 						->setArgument('availItemId', $data['epp']['availItemId'])
 						->setArgument('filter_set', 1)
+						->setArgument('sid', $data['sid'])
+						->setArgument('set_sid', 1)
 				),
 				$incident_status,
 				$start_time,
@@ -501,6 +521,8 @@ if ($data['tld']) {
 				->setArgument('host', $data['tld']['host'])
 				->setArgument('type', RSM_EPP)
 				->setArgument('slvItemId', $data['epp']['itemid'])
+				->setArgument('sid', $data['sid'])
+				->setArgument('set_sid', 1)
 		);
 
 		$tests_info = [

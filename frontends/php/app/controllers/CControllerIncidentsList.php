@@ -954,7 +954,8 @@ class CControllerIncidentsList extends CController {
 			'profileIdx2' => 0,
 			'from' => $this->hasInput('from') ? $this->getInput('from') : null,
 			'to' => $this->hasInput('to') ? $this->getInput('to') : null,
-			'active_tab' => CProfile::get('web.rsm.incidents.filter.active', 1)
+			'active_tab' => CProfile::get('web.rsm.incidents.filter.active', 1),
+			'sid' => CWebUser::getSessionCookie()
 		];
 
 		$this->readValues($data);
@@ -972,12 +973,14 @@ class CControllerIncidentsList extends CController {
 					continue;
 				}
 
+				if (!$this->fetchData($data)) {
+					continue;
+				}
+
 				// Update profile.
-				if ($this->fetchData($data)) {
-					if ($data['host'] && $data['filter_search'] != $data['tld']['host']) {
-						$data['filter_search'] = $data['tld']['host'];
-						CProfile::update('web.rsm.incidents.filter.search', $data['tld']['host'], PROFILE_TYPE_STR);
-					}
+				if ($data['host'] && $data['filter_search'] != $data['tld']['host']) {
+					$data['filter_search'] = $data['tld']['host'];
+					CProfile::update('web.rsm.incidents.filter.search', $data['tld']['host'], PROFILE_TYPE_STR);
 				}
 
 				$data['url'] = $server['URL'];
