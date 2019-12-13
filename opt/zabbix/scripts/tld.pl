@@ -126,8 +126,8 @@ sub init_cli_opts($)
 			"ipv4!",
 			"ipv6!",
 			"dns!",
-			"dns-tcp|dnstcp",
-			"dns-udp|dnsudp",
+			"dns-tcp",
+			"dns-udp",
 			"epp!",
 			"rdds!",
 			"rdap!",
@@ -759,20 +759,20 @@ sub disable_old_ns($)
 
 sub manage_tld_objects($$$$$$$)
 {
-	my $action = shift;
-	my $tld    = shift;
-	my $dns    = shift;
-	my $dnsudp = shift;
-	my $dnstcp = shift;
-	my $dnssec = shift;
-	my $epp    = shift;
-	my $rdds   = shift;
-	my $rdap   = shift;
+	my $action  = shift;
+	my $tld     = shift;
+	my $dns     = shift;
+	my $dns_udp = shift;
+	my $dns_tcp = shift;
+	my $dnssec  = shift;
+	my $epp     = shift;
+	my $rdds    = shift;
+	my $rdap    = shift;
 
 	my $types = {
 		'dns'		=> $dns,
-		'dns-udp'	=> $dnsudp,
-		'dns-tcp'	=> $dnstcp,
+		'dns-udp'	=> $dns_udp,
+		'dns-tcp'	=> $dns_tcp,
 		'dnssec'	=> $dnssec,
 		'epp'		=> $epp,
 		'rdds'		=> $rdds
@@ -844,9 +844,6 @@ sub manage_tld_objects($$$$$$$)
 	{
 		my @tmp_hostids;
 		my @hostids_arr;
-
-		# note we don't delete or disable $main_hostid here explicitly anymore
-		# because now it's present in @tld_hostids
 
 		foreach my $hostid (@tld_hostids)
 		{
@@ -1675,7 +1672,7 @@ sub create_slv_items($$$)
 	}
 }
 
-sub create_rsmhost()
+sub create_rsmhost($)
 {
 	my $main_templateid = shift;
 

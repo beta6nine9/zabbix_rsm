@@ -695,7 +695,7 @@ sub create_items_rdds($$)
 	}
 }
 
-sub create_rsmhost()
+sub create_rsmhost($)
 {
 	my $main_templateid = shift;
 
