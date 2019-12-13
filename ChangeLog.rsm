@@ -4,7 +4,7 @@ New features:
 ..F.I..... [518] added support for Standalone RDAP service (asitals, dimir, gcalenko, miks, yurii)
 
 Bug fixes:
-..F....... [534] made rolling week status table sortable by name column (miks)
+..F....... [634] made rolling week status table sortable by name column (miks)
 ..F....... [635] fixed syntax error (miks)
 
 --------------------------------------------------------------------------------
