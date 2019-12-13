@@ -1,11 +1,14 @@
-Changes for rsm2.0.0rc1
-
-New features:
-..F.I..... [518] added support for Standalone RDAP service (asitals, dimir, gcalenko, miks, yurii)
+Changes for rsm2.0.0rc2
 
 Bug fixes:
 ..F....... [634] made rolling week status table sortable by name column (miks)
 ..F....... [635] fixed syntax error (miks)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.0.0rc1
+
+New features:
+..F.I..... [518] added support for Standalone RDAP service (asitals, dimir, gcalenko, miks, yurii)
 
 --------------------------------------------------------------------------------
 Changes for rsm1.4.0rc2
