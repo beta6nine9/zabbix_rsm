@@ -112,12 +112,11 @@ class CControllerSlaReports extends CController {
 				error(_('Report is not generated for requested month.'));
 			}
 		}
-		elseif (!file_exists('./include/classes/services/CSlaReport.php')) {
+		elseif (!class_exists('CSlaReport', true)) {
 			error(_('SLA Report generation file is missing.'));
 		}
 		else {
-			include './include/classes/services/CSlaReport.php';
-
+			// CSlaReport class file path: ./include/classes/services/CSlaReport.php
 			$report_row = CSlaReport::generate($data['server_nr'], [$data['tld']['host']], $data['filter_year'],
 				$data['filter_month']
 			);
