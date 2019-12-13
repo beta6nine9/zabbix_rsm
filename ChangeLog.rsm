@@ -5,7 +5,6 @@ New features:
 
 Bug fixes:
 ..F....... [534] made rolling week status table sortable by name column (miks)
-..F....... [635] fixed syntax error (miks)
 
 --------------------------------------------------------------------------------
 Changes for rsm1.4.0rc2
