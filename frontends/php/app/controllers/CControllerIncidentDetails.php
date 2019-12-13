@@ -425,7 +425,5 @@ class CControllerIncidentDetails extends CController {
 		$response = new CControllerResponseData($data);
 		$response->setTitle($data['title']);
 		$this->setResponse($response);
-
-
 	}
 }
