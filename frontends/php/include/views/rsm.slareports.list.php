@@ -183,7 +183,7 @@ if (array_key_exists('slv_rdds_downtime', $data)) {
 }
 
 // RDAP Service Availability and Query RTT.
-if (array_key_exists('slv_rdap_downtime', $data) {
+if (array_key_exists('slv_rdap_downtime', $data)) {
 	$disabled = ($data['slv_rdap_downtime'] === 'disabled' && $data['slv_rdap_rtt_percentage'] === 'disabled');
 
 	if ($disabled) {
