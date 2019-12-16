@@ -121,8 +121,6 @@ if ($data['tld']) {
 				->setArgument('slvItemId', $data['dns']['itemid'])
 				->setArgument('sid', $data['sid'])
 				->setArgument('set_sid', 1)
-				->setArgument('sid', $data['sid'])
-				->setArgument('set_sid', 1)
 		);
 
 		$tests_info = [

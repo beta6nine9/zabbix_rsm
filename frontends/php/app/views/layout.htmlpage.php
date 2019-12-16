@@ -80,8 +80,15 @@ function local_generateHeader($data) {
 
 		$servers = new CComboBox('servers', null, 'window.location.href=this.value');
 		foreach ($DB['SERVERS'] as $server) {
-			$servers->addItem($server['URL'].'zabbix.php?action=rsm.rollingweekstatus&sid='.CWebUser::getSessionCookie().'&set_sid=1',
-				$server['NAME'], ($ZBX_SERVER_NAME === $server['NAME']) ? 'no' : null);
+			$servers->addItem(
+				(new CUrl($server['URL'].'zabbix.php'))
+					->setArgument('action', 'rsm.rollingweekstatus')
+					->setArgument('sid', CWebUser::getSessionCookie())
+					->setArgument('set_sid', 1)
+					->getUrl(),
+				$server['NAME'],
+				($ZBX_SERVER_NAME === $server['NAME']) ? 'no' : null
+			);
 		}
 
 		$pageMenu = new CView('layout.htmlpage.menu', [
