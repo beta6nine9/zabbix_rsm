@@ -534,14 +534,16 @@ class CControllerRollingWeekStatusList extends CController {
 				}
 			}
 
-			$avail_items = API::Item()->get([
-				'output' => ['itemid', 'hostid', 'key_'],
-				'hostids' => array_keys($hosts),
-				'filter' => [
-					'key_' => $avail_items
-				],
-				'preservekeys' => true
-			]);
+			if ($avail_items) {
+				$avail_items = API::Item()->get([
+					'output' => ['itemid', 'hostid', 'key_'],
+					'hostids' => array_keys($hosts),
+					'filter' => [
+						'key_' => $avail_items
+					],
+					'preservekeys' => true
+				]);
+			}
 
 			if ($items) {
 				foreach ($items as $item) {
