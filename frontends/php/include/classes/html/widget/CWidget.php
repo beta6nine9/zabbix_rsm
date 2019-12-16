@@ -115,7 +115,6 @@ class CWidget {
 		}
 
 		return (new CDiv($divs))
-			->addClass(ZBX_STYLE_HEADER_TITLE)
-			->addClass(ZBX_STYLE_TABLE);
+			->addClass(ZBX_STYLE_HEADER_TITLE);
 	}
 }
