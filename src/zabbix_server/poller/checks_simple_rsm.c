@@ -1972,10 +1972,10 @@ static int	zbx_get_nameservers(char *name_servers_list, zbx_ns_t **nss, size_t *
 			/* check if need to add NS */
 			for (i = 0; i < *nss_num; i++)
 			{
-				ns_entry = &(*nss)[i];
-
-				if (0 != strcmp(ns_entry->name, ns))
+				if (0 != strcmp(((*nss)[i]).name, ns))
 					continue;
+
+				ns_entry = &(*nss)[i];
 
 				for (j = 0; j < ns_entry->ips_num; j++)
 				{
