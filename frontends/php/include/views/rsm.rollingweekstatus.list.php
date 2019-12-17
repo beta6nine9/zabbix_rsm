@@ -222,7 +222,8 @@ if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
 			make_sorting_header(_('Registrar name'), 'info_1', $data['sort'], $data['sortorder']),
 			make_sorting_header(_('Registrar family'), 'info_2', $data['sort'], $data['sortorder']),
 			make_sorting_header(_('RDDS (24Hrs)'), 'rdds_lastvalue', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('RDAP (24Hrs)'), 'rdap_lastvalue', $data['sort'], $data['sortorder'])
+			make_sorting_header(_('RDAP (24Hrs)'), 'rdap_lastvalue', $data['sort'], $data['sortorder']),
+			make_sorting_header(_('Server'), 'server', $data['sort'], $data['sortorder'])
 		];
 	}
 	else {
@@ -230,7 +231,8 @@ if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
 			make_sorting_header(_('Registrar ID'), 'host', $data['sort'], $data['sortorder']),
 			make_sorting_header(_('Registrar name'), 'info_1', $data['sort'], $data['sortorder']),
 			make_sorting_header(_('Registrar family'), 'info_2', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('RDDS (24Hrs)'), 'rdds_lastvalue', $data['sort'], $data['sortorder'])
+			make_sorting_header(_('RDDS (24Hrs)'), 'rdds_lastvalue', $data['sort'], $data['sortorder']),
+			make_sorting_header(_('Server'), 'server', $data['sort'], $data['sortorder'])
 		];
 	}
 }
@@ -518,9 +520,9 @@ if ($data['tld']) {
 			$row[] = (new CDiv(null))
 				->addClass('service-icon status_icon_extra iconrollingweekdisabled disabled-service')
 				->setHint('EPP is disabled.', '', 'on');
-
-			$row[] = new CLink($tld['server'], $tld['url'].'rsm.rollingweekstatus.php?sid='.$data['sid'].'&set_sid=1');
 		}
+
+		$row[] = new CLink($tld['server'], $tld['url'].'rsm.rollingweekstatus.php?sid='.$data['sid'].'&set_sid=1');
 
 		$table->addRow($row);
 	}
