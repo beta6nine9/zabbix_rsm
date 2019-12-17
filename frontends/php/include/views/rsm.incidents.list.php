@@ -101,7 +101,11 @@ $eppTab = new CDiv();
 if (isset($this->data['tld'])) {
 	$incidentPage = new CTabView(['remember' => true]);
 	if (hasRequest('type')) {
-		$incidentPage->setSelected($this->data['type']);
+		$tabs_map = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR)
+		? [RSM_RDDS, RSM_RDAP]
+		: [RSM_DNS, RSM_DNSSEC, RSM_RDDS, RSM_EPP, RSM_RDAP];
+
+		$incidentPage->setSelected(array_search($this->data['type'], $tabs_map));
 	}
 
 	// DNS
