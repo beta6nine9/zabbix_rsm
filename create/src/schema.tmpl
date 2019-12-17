@@ -304,7 +304,7 @@ FIELD		|snmp_community	|t_varchar(64)	|''	|NOT NULL	|ZBX_PROXY
 FIELD		|snmp_oid	|t_varchar(512)	|''	|NOT NULL	|ZBX_PROXY
 FIELD		|hostid		|t_id		|	|NOT NULL	|ZBX_PROXY		|1|hosts
 FIELD		|name		|t_varchar(255)	|''	|NOT NULL	|0
-FIELD		|key_		|t_varchar(255)	|''	|NOT NULL	|ZBX_PROXY
+FIELD		|key_		|t_varchar(512)	|''	|NOT NULL	|ZBX_PROXY
 FIELD		|delay		|t_varchar(1024)|'0'	|NOT NULL	|ZBX_PROXY
 FIELD		|history	|t_varchar(255)	|'90d'	|NOT NULL	|0
 FIELD		|trends		|t_varchar(255)	|'365d'	|NOT NULL	|0
@@ -1330,7 +1330,7 @@ TABLE|item_discovery|itemdiscoveryid|ZBX_TEMPLATE
 FIELD		|itemdiscoveryid|t_id		|	|NOT NULL	|0
 FIELD		|itemid		|t_id		|	|NOT NULL	|0			|1|items
 FIELD		|parent_itemid	|t_id		|	|NOT NULL	|0			|2|items	|itemid
-FIELD		|key_		|t_varchar(255)	|''	|NOT NULL	|ZBX_NODATA
+FIELD		|key_		|t_varchar(512)	|''	|NOT NULL	|ZBX_NODATA
 FIELD		|lastcheck	|t_integer	|'0'	|NOT NULL	|ZBX_NODATA
 FIELD		|ts_delete	|t_time		|'0'	|NOT NULL	|ZBX_NODATA
 UNIQUE		|1		|itemid,parent_itemid
