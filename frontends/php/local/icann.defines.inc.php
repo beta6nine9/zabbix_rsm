@@ -102,6 +102,7 @@ define('RSM_SLV_RDDS_AVAIL',				'rsm.slv.rdds.avail');
 define('RSM_SLV_RDAP_AVAIL',				'rsm.slv.rdap.avail');
 define('RSM_SLV_EPP_AVAIL',					'rsm.slv.epp.avail');
 define('RSM_SLV_DNSSEC_AVAIL',				'rsm.slv.dnssec.avail');
+define('RSM_SLV_KEY_DNS_NSID',				'rsm.dns.nsid[{#NS},{#IP}]');
 
 // RDAP standalone.
 define('RSM_RDAP_STANDALONE', '{$RSM.RDAP.STANDALONE}');

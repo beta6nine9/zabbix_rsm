@@ -355,6 +355,63 @@ class CControllerAggregateDetails extends CController {
 			}
 		}
 
+		/**
+		 * Collects NSID item values for all probe name servers and ips. NSID unique values will be stored in
+		 * $data['nsids] with key having incremental index and value NSID value. Additionaly probe ns+ip NSID results
+		 * will be stored in 'results_nsid' property of $data['probes'][{PROBE_ID}] array as incremental index
+		 * pointing to value in $data['nsids'].
+		 *
+		 * $data['probes'][{PROBE_ID}]['results_nsid'][{NAME_SERVER_NAME}][{NAME_SERVER_IP}] = NSID value index.
+		 */
+		$nsid_item_keys = [];
+
+		foreach ($data['dns_udp_nameservers'] as $ns_name => $ips) {
+			$ips = array_reduce($ips, 'array_merge', []);
+
+			foreach (array_keys($ips) as $ip) {
+				$nsid_item_keys[] = strtr(RSM_SLV_KEY_DNS_NSID, [
+					'{#NS}' => $ns_name,
+					'{#IP}' => $ip
+				]);
+			}
+		}
+
+		$nsid_items = API::Item()->get([
+			'output' => ['key_', 'type', 'hostid'],
+			'hostids' => array_keys($data['probes']),
+			'filter' => ['key_' => $nsid_item_keys],
+			'preservekeys' => true
+		]);
+
+		$nsid_values = API::History()->get([
+			'output' => ['itemid', 'value'],
+			'itemids' => zbx_objectValues($nsid_items, 'itemid'),
+			'time_from' => $data['time'],
+			'time_till' => $data['time'],
+			'history' => 4,	// value type text
+		]);
+
+		$parser = new CItemKey;
+		$data['nsids'] = array_unique(zbx_objectValues($nsid_values, 'value'));
+		sort($data['nsids'], SORT_LOCALE_STRING|SORT_NATURAL|SORT_FLAG_CASE);
+
+		foreach ($nsid_values as $nsid_value) {
+			$nsid_item = $nsid_items[$nsid_value['itemid']];
+			$parser->parse($nsid_item['key_']);
+			$params = $parser->getParamsRaw();
+
+			if (!isset($params[0]['parameters'])) {
+				error(_s('Unexpected item key "%1$s".', $nsid_item['key_']));
+				continue;
+			}
+
+			$ns_name = $params[0]['parameters'][0]['raw'];
+			$ns_ip = $params[0]['parameters'][1]['raw'];
+			$data['probes'][$nsid_item['hostid']]['results_nsid'][$ns_name][$ns_ip] = array_search($nsid_value['value'],
+				$data['nsids']
+			);
+		}
+
 		// Sort errors.
 		krsort($data['errors']);
 
@@ -400,7 +457,7 @@ class CControllerAggregateDetails extends CController {
 				}
 				unset($ipvs);
 
-				$probe['udp_ns_up'] = count($nameservers_up);
+				$probe['udp_ns_up'] = count($nameservers_up); // TODO: get value from 'item rms.dns.nssok'
 			}
 		}
 		unset($probe);
@@ -415,7 +472,7 @@ class CControllerAggregateDetails extends CController {
 			'output' => ['hostid', 'key_'],
 			'hostids' => array_keys($tld_probes),
 			'filter' => [
-				'key_' => PROBE_DNS_UDP_ITEM
+				'key_' => PROBE_DNS_UDP_ITEM // TODO: change to 'rsm.dns.nssok', this item contains number of name servers UP!
 			],
 			'monitored' => true,
 			'preservekeys' => true

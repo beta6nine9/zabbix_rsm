@@ -35,15 +35,13 @@ $row_3 = [_('UP'), _('DOWN')];
 if (array_key_exists('dns_udp_nameservers', $data)) {
 	foreach ($data['dns_udp_nameservers'] as $ns_name => $ns_ips) {
 		$row_3[] = [_('Status')];
-		$cols_cnt = 1;
+		$ips = [];
 
 		if (array_key_exists('ipv4', $ns_ips)) {
-			$cols_cnt += count($ns_ips['ipv4']);
-			$row_3 = array_merge($row_3, array_keys($ns_ips['ipv4']));
+			$ips = $ns_ips['ipv4'];
 		}
-		if (array_key_exists('ipv6', $ns_ips)) {
-			$cols_cnt += count($ns_ips['ipv6']);
 
+		if (array_key_exists('ipv6', $ns_ips)) {
 			// Compress IPv6 address to save space in table header.
 			$ipv6_ips = array_keys($ns_ips['ipv6']);
 			foreach ($ipv6_ips as &$ipv6) {
@@ -51,11 +49,18 @@ if (array_key_exists('dns_udp_nameservers', $data)) {
 			}
 			unset($ipv6);
 
-			$row_3 = array_merge($row_3, $ipv6_ips);
+			$ips = array_merge($ips, $ipv6_ips);
 		}
 
-		$row_2->addItem((new CTag('th', true, $ns_name))
-			->setAttribute('colspan', $cols_cnt)
+		foreach (array_keys($ips) as $ip) {
+			$row_3[] = $ip;
+			$row_3[] = _('NSID');
+		}
+
+
+		$row_2
+			->addItem((new CTag('th', true, $ns_name))
+			->setAttribute('colspan', 1 + count($ips) * 2)
 			->setAttribute('class', 'center'));
 	}
 }
@@ -150,9 +155,18 @@ foreach ($data['probes'] as $probe) {
 									$row[] = (new CSpan($result))
 										->setAttribute('class', ZBX_STYLE_GREEN);
 								}
+
+								if (isset($probe['results_nsid'][$dns_udp_ns][$ip])) {
+									$nsid_index = $probe['results_nsid'][$dns_udp_ns][$ip];
+									$row[] = (new CDiv($nsid_index + 1))->setHint($data['nsids'][$nsid_index]);
+								}
+								else {
+									$row[] = (new CDiv('-'))->setHint(_('No value.'), '', false);
+								}
 							}
 							else {
 								$row[] = '-';
+								$row[] = '';
 							}
 						}
 					}
@@ -168,7 +182,7 @@ foreach ($data['probes'] as $probe) {
 						}
 
 						$row[] = ($cell_cnt > 1)
-							? (new CCol('-'))->setColSpan($cell_cnt)
+							? (new CCol('-'))->setColSpan($cell_cnt * 2)
 							: ($cell_cnt ? '-' : null);
 					}
 				}
@@ -177,7 +191,7 @@ foreach ($data['probes'] as $probe) {
 				$cell_cnt = 1;
 				$cell_cnt += array_key_exists('ipv4', $ipvs) ? count($ipvs['ipv4']) : 0;
 				$cell_cnt += array_key_exists('ipv6', $ipvs) ? count($ipvs['ipv6']) : 0;
-				$row[] = ($cell_cnt > 1) ? (new CCol('-'))->setColSpan($cell_cnt) : '-';
+				$row[] = ($cell_cnt > 1) ? (new CCol('-'))->setColSpan($cell_cnt * 2) : '-';
 			}
 		}
 	}
@@ -198,6 +212,7 @@ foreach ($data['errors'] as $error_code => $errors) {
 				foreach (array_keys($ns_ips['ipv4']) as $ip) {
 					$error_key = 'udp_'.$ns_name.'_ipv4_'.$ip;
 					$row[] = array_key_exists($error_key, $errors) ? $errors[$error_key] : '';
+					$row[] = '';
 				}
 			}
 
@@ -205,6 +220,7 @@ foreach ($data['errors'] as $error_code => $errors) {
 				foreach (array_keys($ns_ips['ipv6']) as $ip) {
 					$error_key = 'udp_'.$ns_name.'_ipv6_'.$ip;
 					$row[] = array_key_exists($error_key, $errors) ? $errors[$error_key] : '';
+					$row[] = '';
 				}
 			}
 		}
@@ -224,6 +240,7 @@ if ($data['type'] == RSM_DNS) {
 				foreach (array_keys($ns_ips['ipv4']) as $ipv => $ip) {
 					$error_key = 'udp_'.$ns_name.'_ipv4_'.$ip;
 					$row[] = array_key_exists($error_key, $data['probes_above_max_rtt']) ? $data['probes_above_max_rtt'][$error_key] : '0';
+					$row[] = '';
 				}
 			}
 
@@ -231,6 +248,7 @@ if ($data['type'] == RSM_DNS) {
 				foreach (array_keys($ns_ips['ipv6']) as $ipv => $ip) {
 					$error_key = 'udp_'.$ns_name.'_ipv6_'.$ip;
 					$row[] = array_key_exists($error_key, $data['probes_above_max_rtt']) ? $data['probes_above_max_rtt'][$error_key] : '0';
+					$row[] = '';
 				}
 			}
 		}
@@ -247,6 +265,21 @@ elseif ($data['testResult'] == PROBE_DOWN) {
 }
 else {
 	$test_result->addClass(ZBX_STYLE_GREEN);
+}
+
+// NSID index/value table
+$nsids_table = null;
+
+if ($data['nsids']) {
+	$nsids_table = (new CTable())
+		->setHeader([(new CColHeader(_('Numeric NSID')))->setWidth('1%'), _('Real NSID')])
+		->setAttribute('class', ZBX_STYLE_LIST_TABLE);
+
+	foreach ($data['nsids'] as $index => $value) {
+		$nsids_table->addRow([(new CCol($index + 1))->addClass(ZBX_STYLE_CENTER), $value]);
+	}
+
+	$table = [new CTag('p', true, $table), $nsids_table];
 }
 
 (new CWidget())
