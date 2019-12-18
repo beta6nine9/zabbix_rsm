@@ -18,8 +18,9 @@ db_connect();
 
 slv_exit(SUCCESS) if (get_monitoring_target() ne MONITORING_TARGET_REGISTRY);
 
-my $slv_item_key_pattern = 'rsm.slv.dns.ns.avail';
-my $rtt_item_key_pattern = 'rsm.dns.udp.rtt';
+my $cfg_keys_out_pattern = 'rsm.slv.dns.ns.avail';
+my $cfg_keys_in_pattern = 'rsm.dns.ns.status';
+
 
 my $now;
 
@@ -32,13 +33,12 @@ else
 	$now = time();
 }
 
-
 my $max_cycles = (opt('cycles') ? getopt('cycles') : slv_max_cycles('dns'));
+# we use ns status values, but take the delay value from the udp macro
 my $cycle_delay = get_dns_udp_delay();
 my $current_month_latest_cycle = current_month_latest_cycle();
 my $cfg_minonline = get_macro_dns_probe_online();
-my $dns_rtt_low = get_rtt_low('dns', PROTO_UDP);
-my $rtt_itemids = get_all_dns_udp_rtt_itemids();
+my $probes = get_probes('DNS');
 
 init_values();
 process_values();
@@ -51,9 +51,7 @@ sub process_values
 	foreach my $tld (@{get_tlds_and_hostids(opt('tld') ? getopt('tld') : undef)})
 	{
 		set_log_tld($tld->[0]);
-
 		process_tld(@{$tld});
-
 		unset_log_tld();
 	}
 }
@@ -63,26 +61,38 @@ sub process_tld
 	my $tld = shift;
 	my $hostid = shift;
 
-	foreach (@{get_slv_dns_ns_avail_items($hostid)})
+	foreach (@{get_ns_avail_items($hostid)})
 	{
 		process_slv_item($tld, @$_);
 	}
 }
 
-sub get_slv_dns_ns_avail_items
+sub get_ns_avail_items
 {
 	my $hostid = shift;
 
-	return db_select("select itemid,key_ from items where hostid=$hostid and key_ like '$slv_item_key_pattern\[%' and status=${\ITEM_STATUS_ACTIVE}");
+	return db_select("select itemid,key_ from items where hostid=$hostid".
+			 " and key_ like '$cfg_keys_out_pattern\[%'".
+			 " and status=${\ITEM_STATUS_ACTIVE}");
+}
+
+sub get_ns_status_items
+{
+	my $hostid = shift;
+	my $nsname = shift;
+
+	return db_select("select itemid from items where hostid=$hostid".
+				" and key_ like '$cfg_keys_in_pattern\[$nsname\]'".
+				" and status=${\ITEM_STATUS_ACTIVE}");
 }
 
 sub process_slv_item
 {
 	my $tld = shift;
 	my $slv_itemid = shift;
-	my $slv_itemkey = shift;
+	my $slv_itemkey = shift; # rsm.slv.dns.ns.avail[ns1.longrow,172.19.0.3]
 
-	if ($slv_itemkey =~ /\[(.+,.+)\]$/)
+	if ($slv_itemkey =~ /\[(.+),(.+)\]$/)
 	{
 		process_cycles($tld, $slv_itemid, $slv_itemkey, $1);
 	}
@@ -97,7 +107,7 @@ sub process_cycles # for a particular slv item
 	my $tld = shift;
 	my $slv_itemid = shift;
 	my $slv_itemkey = shift;
-	my $nsip = shift;
+	my $nsname = shift;
 
 	my $slv_clock;
 
@@ -111,7 +121,8 @@ sub process_cycles # for a particular slv item
 		}
 		else
 		{
-			$slv_clock = current_month_first_cycle(); #start from beginning of the current month if no slv data
+			#start from beginning of the current month if no slv data
+			$slv_clock = current_month_first_cycle();
 		}
 
 		if ($slv_clock >= $current_month_latest_cycle)
@@ -133,8 +144,9 @@ sub process_cycles # for a particular slv item
 			next;
 		}
 
-		my $rtt_values = get_rtt_values($from, $till, $rtt_itemids->{$tld}{$nsip});
-		my $probes_with_results = scalar(@{$rtt_values});
+		my $tld_ns_status_itemids = get_all_tld_ns_status_itemids($tld, $nsname);
+		my $ns_status_values = get_ns_status_values($from, $till, $tld_ns_status_itemids->{$tld}{$nsname});
+		my $probes_with_results = scalar(@{$ns_status_values});
 
 		if ($probes_with_results < $cfg_minonline)
 		{
@@ -144,48 +156,98 @@ sub process_cycles # for a particular slv item
 			next;
 		}
 
-		my $down_rtt_count = 0;
+		my $total_ns_status_items_count = 0;
+		my $down_ns_status_items_count = 0;
 
-		foreach my $rtt_value (@{$rtt_values})
+		foreach  my $x( ${ns_status_values} )
 		{
-			if (is_service_error('dns', $rtt_value, $dns_rtt_low))
+			foreach my $xx(@{$x})
 			{
-				$down_rtt_count++;
+				if ($xx == 0) # ns status 0 means it is down
+				{
+					$down_ns_status_items_count++;
+				}
+
+				$total_ns_status_items_count++;
 			}
 		}
 
-		my $probe_count = scalar(@{$rtt_itemids->{$tld}{$nsip}});
-		my $limit = (SLV_UNAVAILABILITY_LIMIT * 0.01) * $probe_count;
-
-		push_value($tld, $slv_itemkey, $from, ($down_rtt_count > $limit) ? DOWN : UP, ITEM_VALUE_TYPE_UINT64);
+		my $down_ns_status_items_limit = (SLV_UNAVAILABILITY_LIMIT * 0.01) * $total_ns_status_items_count;
+		push_value($tld,
+				$slv_itemkey,
+				$from,
+				($down_ns_status_items_count > $down_ns_status_items_limit) ? DOWN : UP,
+				ITEM_VALUE_TYPE_UINT64);
 	}
 }
 
-sub get_all_dns_udp_rtt_itemids
+sub get_all_tld_ns_status_itemids
 {
-	my $rows = db_select(
-		"select substring_index(hosts.host,' ',1),items.itemid,items.key_" .
-		" from" .
-			" items" .
-			" left join hosts on hosts.hostid = items.hostid" .
-		" where" .
-			" items.key_ like '$rtt_item_key_pattern\[%,%,%\]' and" .
-			" items.templateid is not null and" .
-			" hosts.host like '% %'"
-	);
-
 	my $itemids = {};
+	my $tld = shift;
+	my $nsname = shift;
 
-	foreach my $row (@{$rows})
-	{
-		my $tld    = $row->[0];
-		my $itemid = $row->[1];
-		my $key    = $row->[2];
-		my $nsip   = $key =~ s/^.+\[.+,(.+,.+)\]$/$1/r;
-		push(@{$itemids->{$tld}{$nsip}}, $itemid);
+	foreach my $probename( keys %{$probes} ) {
+		my $res = db_select(
+			"select hostid from hosts where host='$tld $probename'".
+			" and status=${\ITEM_STATUS_ACTIVE}");
+		my $ns_status_items = get_ns_status_items($res->[0]->[0], $nsname);
+		push(@{$itemids->{$tld}{$nsname}{$res->[0]->[0]}}, \@{$ns_status_items});
 	}
 
-	return $itemids;
+	my $res = {};
+	my @tld_items = ();
+
+	#
+	# flatten the result:
+	#
+	#      tld             tld ns          hostid (probe)   itemid
+	#
+	# { 'hazelburn' => {
+	#                  'ns1.hazelburn' => {
+	#                                       '100023' => [
+	#                                                     [
+	#                                                       [
+	#                                                         100561
+	#                                                       ]
+	#                                                     ]
+	#                                                   ],
+	#                                       '100024' => [
+	#                                                     [
+	#                                                       [
+	#                                                         100569
+	#                                                       ]
+	#                                                     ]
+	#                                                   ]
+	#                                     }
+	#                }
+	# }
+	#
+	# into:
+	#
+	#   { 'hazelburn' => {
+	#                    'ns1.hazelburn' => [
+	#                                         100569,
+	#                                         100561
+	#                                       ]
+	#                  }
+	# };
+	foreach my $x(values %{$itemids->{$tld}{$nsname}})
+	{
+		foreach my $xx(@{$x})
+		{
+		    foreach my $xxx(@{$xx})
+		    {
+			foreach my $xxxx(@{$xxx})
+			{
+				push @tld_items , $xxxx;
+			}
+		}
+		}
+		$res->{$tld}{$nsname} = \@tld_items;
+	}
+
+	return $res;
 }
 
 my $online_probe_count_cache = {};
@@ -198,23 +260,22 @@ sub get_online_probe_count
 
 	if (!defined($online_probe_count_cache->{$key}))
 	{
-		$online_probe_count_cache->{$key} = scalar(keys(%{get_probe_times($from, $till, get_probes('DNS'))}));
+		$online_probe_count_cache->{$key} = scalar(keys(%{get_probe_times($from, $till, $probes)}));
 	}
 
 	return $online_probe_count_cache->{$key};
 }
 
-sub get_rtt_values
+sub get_ns_status_values
 {
 	my $from = shift;
 	my $till = shift;
 	my $rtt_itemids = shift;
-
 	my $itemids_placeholder = join(",", ("?") x scalar(@{$rtt_itemids}));
 
 	return db_select_col(
 		"select value" .
-		" from history" .
+		" from history_uint" .
 		" where itemid in ($itemids_placeholder) and clock between ? and ?",
 		[@{$rtt_itemids}, $from, $till]
 	);
