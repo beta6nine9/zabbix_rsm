@@ -185,23 +185,11 @@ int	main(int argc, char *argv[])
 
 	/* we have nsid, lets also test that it works with packing/unpacking */
 
-	pack_values(0, 0, rtt, 0, nsid, pack_buf, sizeof(pack_buf));
+	pack_values(0, 0, rtt, 0, &nsid, pack_buf, sizeof(pack_buf));
 
-	unpacked_values_num = unpack_values(&size_one_unpacked, &size_two_unpacked, &rtt_unpacked, &upd_unpacked,
-			nsid_unpacked, pack_buf);
-
-	if (PACK_NUM_VARS == unpacked_values_num)
+	if (SUCCEED != unpack_values(&size_one_unpacked, &size_two_unpacked, &rtt_unpacked, &upd_unpacked,
+			&nsid_unpacked, pack_buf, stderr))
 	{
-		nsid = zbx_strdup(nsid, nsid_unpacked);
-	}
-	else if (PACK_NUM_VARS == unpacked_values_num + 1)
-	{
-		nsid = zbx_strdup(nsid, "");
-	}
-	else
-	{
-		rsm_errf(stderr, "unpack_values() failure, expected: %d, received: %d", PACK_NUM_VARS,
-				unpacked_values_num);
 		goto out;
 	}
 

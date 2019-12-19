@@ -216,16 +216,6 @@ writer_thread_t;
 #define PACK_NUM_VARS	5
 #define PACK_FORMAT	ZBX_FS_SIZE_T "|" ZBX_FS_SIZE_T "|%d|%d|%s"
 
-static int	pack_values(size_t v1, size_t v2, int v3, int v4, char* nsid, char *buf, size_t buf_size)
-{
-	return zbx_snprintf(buf, buf_size, PACK_FORMAT, v1, v2, v3, v4, nsid);
-}
-
-static int	unpack_values(size_t *v1, size_t *v2, int *v3, int *v4, char* nsid, char *buf)
-{
-	return sscanf(buf, PACK_FORMAT, v1, v2, v3, v4, nsid);
-}
-
 static char	*rsm_log_prefixes[] = { "Empty", "Fatal", "Error", "Warning", "Info", "Debug" };
 
 #define rsm_dump(log_fd, fmt, ...)	fprintf(log_fd, ZBX_CONST_STRING(fmt), ##__VA_ARGS__)
@@ -310,6 +300,36 @@ static void	rsm_log(FILE *log_fd, int level, const char *text)
 			rsm_log_prefixes[level],
 			text);
 }
+
+static int	pack_values(size_t v1, size_t v2, int v3, int v4, char** nsid, char *buf, size_t buf_size)
+{
+	if (NULL == *nsid)
+	{
+		*nsid = zbx_strdup(NULL, "");
+	}
+
+	return zbx_snprintf(buf, buf_size, PACK_FORMAT, v1, v2, v3, v4, *nsid);
+}
+
+static int	unpack_values(size_t *v1, size_t *v2, int *v3, int *v4, char (*nsid)[NSID_MAX_LENGTH * 2 + 1],
+		char *buf, FILE *log_fd)
+{
+	int rv = sscanf(buf, PACK_FORMAT, v1, v2, v3, v4, *nsid);
+
+	if (PACK_NUM_VARS == rv + 1)
+	{
+		(*nsid)[0] = '\0';
+	}
+	else if (PACK_NUM_VARS != rv)
+	{
+		rsm_errf(log_fd, "cannot unpack values (unpacked %d, need %d)", rv, PACK_NUM_VARS);
+
+		return FAIL;
+	}
+
+	return SUCCEED;
+}
+
 
 static int	zbx_validate_ip(const char *ip, char ipv4_enabled, char ipv6_enabled, ldns_rdf **ip_rdf_out,
 		char *is_ipv4)
@@ -1237,7 +1257,7 @@ static void extract_nsid(ldns_rdf *edns_data, char **nsid)
 	size_t	rdf_size;
 
 	if (NULL == edns_data)
-		goto out;
+		return;
 
 	rdf_data = ldns_rdf_data(edns_data);
 	rdf_size = ldns_rdf_size(edns_data);
@@ -1277,11 +1297,6 @@ static void extract_nsid(ldns_rdf *edns_data, char **nsid)
 
 		rdf_size = opt_len > rdf_size ? 0 : rdf_size - opt_len;
 		rdf_data += opt_len;
-	}
-out:
-	if (NULL == *nsid)
-	{
-		*nsid = zbx_strdup(*nsid, "");
 	}
 }
 
@@ -1701,9 +1716,9 @@ static int	zbx_get_ns_ip_values(ldns_resolver *res, const char *ns, const char *
 	ret = SUCCEED;
 out:
 	if (NULL != upd)
-		rsm_infof(log_fd, "RSM DNS \"%s\" (%s) RTT:%d UPD:%d NSID:%s", ns, ip, *rtt, *upd, *nsid);
+		rsm_infof(log_fd, "RSM DNS \"%s\" (%s) RTT:%d UPD:%d", ns, ip, *rtt, *upd);
 	else
-		rsm_infof(log_fd, "RSM DNS \"%s\" (%s) RTT:%d NSID:%s", ns, ip, *rtt, *nsid);
+		rsm_infof(log_fd, "RSM DNS \"%s\" (%s) RTT:%d", ns, ip, *rtt);
 
 	if (NULL != nsset)
 		ldns_rr_list_deep_free(nsset);
@@ -2273,8 +2288,7 @@ static void	create_rsm_dns_json(struct zbx_json *json, zbx_ns_t *nss, size_t nss
 			zbx_json_addobject(json, NULL);
 			zbx_json_addstring(json, "ns", nss[i].name, ZBX_JSON_TYPE_STRING);
 			zbx_json_addstring(json, "ip", nss[i].ips[j].ip, ZBX_JSON_TYPE_STRING);
-			zbx_json_addstring(json, "nsid", (0 == strcmp("(null)", nss[i].ips[j].nsid)) ? "" :
-					nss[i].ips[j].nsid, ZBX_JSON_TYPE_STRING);
+			zbx_json_addstring(json, "nsid", nss[i].ips[j].nsid, ZBX_JSON_TYPE_STRING);
 			zbx_json_addstring(json, "protocol", (proto == RSM_UDP ? "udp" : "tcp"), ZBX_JSON_TYPE_STRING);
 			zbx_json_addint64(json, "rtt", nss[i].ips[j].rtt);
 			zbx_json_close(json);
@@ -2557,7 +2571,7 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 						rsm_err(th_log_fd, err);
 					}
 
-					pack_values(i, j, nss[i].ips[j].rtt, nss[i].ips[j].upd, nss[i].ips[j].nsid,
+					pack_values(i, j, nss[i].ips[j].rtt, nss[i].ips[j].upd, &nss[i].ips[j].nsid,
 							buf, sizeof(buf));
 
 					if (-1 == write(fd[1], buf, strlen(buf) + 1))
@@ -2596,26 +2610,12 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 			{
 				int	rtt, upd;
 				char	nsid[NSID_MAX_LENGTH * 2 + 1];	/* hex representation + terminating null char */
-				int	rv;
 
-				rv = unpack_values(&i, &j, &rtt, &upd, nsid, buf);
+				unpack_values(&i, &j, &rtt, &upd, &nsid, buf, log_fd);
 
 				nss[i].ips[j].rtt = rtt;
 				nss[i].ips[j].upd = upd;
-
-				if (PACK_NUM_VARS == rv)
-				{
-					nss[i].ips[j].nsid = zbx_strdup(nss[i].ips[j].nsid, nsid);
-				}
-				else if (PACK_NUM_VARS == rv + 1)
-				{
-					nss[i].ips[j].nsid = zbx_strdup(nss[i].ips[j].nsid, "");
-				}
-				else
-				{
-					rsm_errf(log_fd, "cannot unpack values (unpacked %d, need %d)", rv,
-							PACK_NUM_VARS);
-				}
+				nss[i].ips[j].nsid = zbx_strdup(nss[i].ips[j].nsid, nsid);
 			}
 			else
 				rsm_errf(log_fd, "cannot read from pipe: %s", zbx_strerror(errno));
