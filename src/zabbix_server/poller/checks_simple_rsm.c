@@ -1954,6 +1954,13 @@ static int	zbx_get_nameservers(char *name_servers_list, zbx_ns_t **nss, size_t *
 		*ip = '\0';
 		ip++;
 
+		if (SUCCEED != zbx_validate_ip(ip, ipv4_enabled, ipv6_enabled, NULL, NULL))
+		{
+			rsm_warnf(log_fd, "unsupported IP address \"%s\" in macro \"" ZBX_MACRO_DNS_NAME_SERVERS
+					"\", ignored", ip);
+			goto next_ns;
+		}
+
 		ns_entry = NULL;
 
 		if (0 == *nss_num)
@@ -1965,15 +1972,15 @@ static int	zbx_get_nameservers(char *name_servers_list, zbx_ns_t **nss, size_t *
 			/* check if need to add NS */
 			for (i = 0; i < *nss_num; i++)
 			{
-				ns_entry = &(*nss)[i];
-
-				if (0 != strcmp(ns_entry->name, ns))
+				if (0 != strcmp(((*nss)[i]).name, ns))
 					continue;
+
+				ns_entry = &(*nss)[i];
 
 				for (j = 0; j < ns_entry->ips_num; j++)
 				{
 					if (0 == strcmp(ns_entry->ips[j].ip, ip))
-						goto next;
+						goto next_ns;
 				}
 
 				break;
@@ -1998,13 +2005,6 @@ static int	zbx_get_nameservers(char *name_servers_list, zbx_ns_t **nss, size_t *
 			(*nss_num)++;
 		}
 
-		if (SUCCEED != zbx_validate_ip(ip, ipv4_enabled, ipv6_enabled, NULL, NULL))
-		{
-			rsm_warnf(log_fd, "unsupported IP address \"%s\" in macro \"" ZBX_MACRO_DNS_NAME_SERVERS
-					"\", ignored", ip);
-			goto next;
-		}
-
 		/* add IP here */
 		if (0 == ns_entry->ips_num)
 			ns_entry->ips = zbx_malloc(NULL, sizeof(zbx_ns_ip_t));
@@ -2016,7 +2016,7 @@ static int	zbx_get_nameservers(char *name_servers_list, zbx_ns_t **nss, size_t *
 		ns_entry->ips[ns_entry->ips_num].nsid = NULL;
 
 		ns_entry->ips_num++;
-next:
+next_ns:
 		ns = ns_next + 1;
 	}
 	while (NULL != ns_next);

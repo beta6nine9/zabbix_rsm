@@ -52,6 +52,7 @@ $show_gui_messaging = (!defined('ZBX_PAGE_NO_MENU')
 
 $pageHeader
 	->addCssFile('assets/styles/'.CHtml::encode($theme).'.css')
+	->addCssFile('assets/styles/icann.css')
 	->addJsBeforeScripts(
 		'var PHP_TZ_OFFSET = '.date('Z').','.
 			'PHP_ZBX_FULL_DATE_TIME = "'.ZBX_FULL_DATE_TIME.'";'
