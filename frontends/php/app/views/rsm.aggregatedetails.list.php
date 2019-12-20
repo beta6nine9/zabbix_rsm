@@ -23,6 +23,7 @@
 $row_2 = (new CRow(null, true))
 	->addItem((new CColHeader(_('Probe ID')))->setRowSpan(2))
 	->addItem((new CColHeader(_('Status')))->setRowSpan(2))
+	->addItem((new CColHeader(_('Transport')))->setRowSpan(2))
 	->addItem((new CColHeader(_('Name Servers')))->setColSpan(2));
 
 $row_3 = [_('UP'), _('DOWN')];
@@ -95,8 +96,9 @@ foreach ($data['probes'] as $probe) {
 	$row = [
 		(new CSpan($probe['name']))->addClass($probe_status_color),
 		$udp_status,
-		$probe_disabled ? '-' : $probe['udp_ns_up'],
-		$probe_disabled ? '-' : $probe['udp_ns_down']
+		isset($probe['transport']) ? $probe['transport'] : '?',
+		$probe_disabled ? '-' : $probe['ns_up'],
+		$probe_disabled ? '-' : $probe['ns_down']
 	];
 
 	if (array_key_exists('dns_udp_nameservers', $data)) {

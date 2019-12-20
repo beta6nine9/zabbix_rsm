@@ -19,7 +19,7 @@
 **/
 
 
-require_once './include/config.inc.php';
+require_once './local/icann.func.inc.php';
 require_once './include/incidentdetails.inc.php';
 
 class CControllerAggregateDetails extends CController {
@@ -388,7 +388,7 @@ class CControllerAggregateDetails extends CController {
 			'itemids' => zbx_objectValues($nsid_items, 'itemid'),
 			'time_from' => $data['time'],
 			'time_till' => $data['time'],
-			'history' => 4,	// value type text
+			'history' => ITEM_VALUE_TYPE_TEXT
 		]);
 
 		$parser = new CItemKey;
@@ -414,13 +414,43 @@ class CControllerAggregateDetails extends CController {
 
 		// Sort errors.
 		krsort($data['errors']);
+		$probe_protocol = [];
+		$protocol_type = rsmGetValueMappingByName('Transport protocol');
 
-		foreach ($data['probes'] as &$probe) {
-			$probe['udp_ns_down'] = 0;
-			$probe['udp_ns_up'] = 0;
+		if (is_null($protocol_type)) {
+			error(_('Value mapping for "Transport protocol" is not found.'));
+		}
+		else {
+			$protocol_items = API::Item()->get([
+				'output' => ['itemid', 'hostid'],
+				'hostids' => array_keys($data['probes']),
+				'filter' => ['key_' => RSM_SLV_KEY_DNS_PROTOCOL],
+				'preservekeys' => true
+			]);
+			$protocol_items_data = API::History()->get([
+				'output' => ['itemid', 'value'],
+				'itemids' => array_column($protocol_items, 'itemid'),
+				'time_from' => $data['time'],
+				'time_till' => $data['time'],
+				'history' => ITEM_VALUE_TYPE_UINT64
+			]);
 
+			foreach ($protocol_items_data as $protocol_item_data) {
+				$protocol_item = $protocol_items[$protocol_item_data['itemid']];
+				$probe_protocol[$protocol_item['hostid']] = $protocol_type[$protocol_item_data['value']];
+			}
+		}
+
+		foreach ($data['probes'] as $probeid => &$probe) {
+			$probe['ns_up'] = 0;
+			$probe['ns_down'] = 0;
+			// $probe['udp_ns_down'] = 0;
+			// $probe['udp_ns_up'] = 0;
+
+			// TODO: ICA-605 remove start.
 			if (array_key_exists('results_udp', $probe)) {
 				$nameservers_up = [];
+				$probe['transport'] = $protocol_type[0];// UDP
 
 				/**
 				 * NameServer is considered as Down once at least one of its IP addresses is either negative value (error
@@ -433,7 +463,7 @@ class CControllerAggregateDetails extends CController {
 								if ($item_value !== null
 										&& ($item_value > $data['udp_rtt'] || isServiceErrorCode($item_value, $data['type']))) {
 									$ipvs['status'] = NAMESERVER_DOWN;
-									$probe['udp_ns_down']++;
+									$probe['ns_down']++;
 									unset($nameservers_up[$ns]);
 									break(2);
 								}
@@ -457,8 +487,13 @@ class CControllerAggregateDetails extends CController {
 				}
 				unset($ipvs);
 
-				$probe['udp_ns_up'] = count($nameservers_up); // TODO: get value from 'item rms.dns.nssok'
+				$probe['ns_up'] = count($nameservers_up); // TODO: get value from 'item rms.dns.nssok'
+				continue;
 			}
+			// TODO: ICA-605 remove end.
+
+			$probe['transport'] = $probe_protocol[$probeid];
+			// get value of 'rsm.dns.nssok' RSM_SLV_KEY_DNS_NSSOK
 		}
 		unset($probe);
 
