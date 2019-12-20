@@ -20,57 +20,34 @@
 
 
 // Create table header.
-$row_1 = (new CTag('tr', true))
-	->addItem((new CTag('th', true, _('Probe ID')))->setAttribute('rowspan', 3)
-		->setAttribute('style', 'border-left: 0px;'));
-
-$row_2 = (new CTag('tr', true))
-	->addItem((new CTag('th', true, _('Status')))->setAttribute('rowspan', 2))
-	->addItem((new CTag('th', true, _('Name Servers')))
-		->setAttribute('colspan', 2)
-		->setAttribute('class', 'center'));
+$row_2 = (new CRow(null, true))
+	->addItem((new CColHeader(_('Probe ID')))->setRowSpan(2))
+	->addItem((new CColHeader(_('Status')))->setRowSpan(2))
+	->addItem((new CColHeader(_('Name Servers')))->setColSpan(2));
 
 $row_3 = [_('UP'), _('DOWN')];
 
 if (array_key_exists('dns_udp_nameservers', $data)) {
 	foreach ($data['dns_udp_nameservers'] as $ns_name => $ns_ips) {
-		$row_3[] = [_('Status')];
-		$ips = [];
-
-		if (array_key_exists('ipv4', $ns_ips)) {
-			$ips = $ns_ips['ipv4'];
-		}
+		$ips = array_key_exists('ipv4', $ns_ips) ? array_keys($ns_ips['ipv4']): [];
 
 		if (array_key_exists('ipv6', $ns_ips)) {
 			// Compress IPv6 address to save space in table header.
-			$ipv6_ips = array_keys($ns_ips['ipv6']);
-			foreach ($ipv6_ips as &$ipv6) {
-				$ipv6 = inet_ntop(inet_pton($ipv6));
-			}
-			unset($ipv6);
-
-			$ips = array_merge($ips, $ipv6_ips);
+			$ips = array_merge($ips, array_map('inet_ntop', array_map('inet_pton', array_keys($ns_ips['ipv6']))));
 		}
 
-		foreach (array_keys($ips) as $ip) {
+		foreach ($ips as $ip) {
+			$row_3[] = _('Status');
 			$row_3[] = $ip;
 			$row_3[] = _('NSID');
 		}
 
-
-		$row_2
-			->addItem((new CTag('th', true, $ns_name))
-			->setAttribute('colspan', 1 + count($ips) * 2)
-			->setAttribute('class', 'center'));
+		$row_2->addItem((new CColHeader($ns_name))->setColSpan(1 + count($ips) * 2)->addClass('center'));
 	}
 }
 
-$row_1->addItem((new CTag('th', true, _('DNS UDP')))
-	->setAttribute('colspan', count($row_3) + 1)
-	->setAttribute('class', 'center'));
-
 $table = (new CTableInfo())
-	->setMultirowHeader([$row_1, $row_2, new CRowHeader($row_3)], count($row_3) + 4)
+	->setMultirowHeader([$row_2, new CRowHeader($row_3)], count($row_3) + 4)
 	->setAttribute('class', 'list-table table-bordered-head');
 
 $down = (new CSpan(_('Down')))->addClass(ZBX_STYLE_RED);
