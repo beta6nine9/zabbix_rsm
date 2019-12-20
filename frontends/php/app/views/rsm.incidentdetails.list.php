@@ -146,7 +146,7 @@ $filter_url = (new CUrl('zabbix.php'))
 		->setProfile($data['profileIdx'])
 		->setActiveTab($data['active_tab'])
 		->addTimeSelector($data['from'], $data['to'])
-		->addFilterTab(_('Filter'), [(new CFormList())->addRow($object_label,
+		->addFilterTab(_('Filter'), [(new CFormList())->addRow('',
 			(new CRadioButtonList('filter_failing_tests', (int) $data['filter_failing_tests']))
 				->addValue(_('Only failing tests'), 1)
 				->addValue(_('Show all'), 0)
