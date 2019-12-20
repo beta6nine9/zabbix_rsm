@@ -330,7 +330,6 @@ static int	unpack_values(size_t *v1, size_t *v2, int *v3, int *v4, char (*nsid)[
 	return SUCCEED;
 }
 
-
 static int	zbx_validate_ip(const char *ip, char ipv4_enabled, char ipv6_enabled, ldns_rdf **ip_rdf_out,
 		char *is_ipv4)
 {
