@@ -24,40 +24,132 @@
 
 extern unsigned char	program_type;
 
-#define ONLY_SERVER()								\
-										\
-do										\
-{										\
-	if (0 == (program_type & ZBX_PROGRAM_TYPE_SERVER))			\
-	{									\
-		return SUCCEED;							\
-	}									\
-}										\
+/*
+ * NOTE FOR FUTURE OURSELVES
+ *
+ * Originally our custom patches went into dbupgrade_4040.c.
+ * It was agreed to move them to dbupgrade_4050.c during upgrading to Zabbix 4.5.
+ * It was also agreed to move them to dbupgrade_5000.c when we move to Zabbix 5.0.
+ *
+ * When these patches are moved to dbupgrade_5000.c, this reminder should be removed.
+ */
+
+/*
+ * Some common helpers that can be used as one-liners in patches to avoid copy-pasting.
+ *
+ * Be careful when implementing new helpers - they have to be generic.
+ * If some code is needed only 1-2 times, it doesn't fit here.
+ * If some code depends on stuff that is likely to change, it doesn't fit here.
+ *
+ * If more specific helper is needed, it must be implemented close to the patch that needs it. Specific
+ * helpers can be implemented either as functions right before DBpatch_4040xxx(), or as macros inside
+ * the DBpatch_4040xxx(). If they're implemented as macros, don't forget to #undef them.
+ */
+
+/* checks if this is server; used for skipping patches when running on proxy */
+#define ONLY_SERVER()													\
+															\
+do															\
+{															\
+	if (0 == (program_type & ZBX_PROGRAM_TYPE_SERVER))								\
+	{														\
+		return SUCCEED;												\
+	}														\
+}															\
 while (0)
 
-#define CHECK_RESULT(CODE)							\
-										\
-do										\
-{										\
-	int result = (CODE);							\
-	if (SUCCEED != result)							\
-	{									\
-		goto out;							\
-	}									\
-}										\
+/* checks result of function that returns SUCCEED or FAIL */
+#define CHECK_RESULT(CODE)												\
+															\
+do															\
+{															\
+	int result = (CODE);												\
+	if (SUCCEED != result)												\
+	{														\
+		goto out;												\
+	}														\
+}															\
 while (0)
 
-#define CHECK(CODE)								\
-										\
-do										\
-{										\
-	int result = (CODE);							\
-	if (ZBX_DB_OK > result)							\
-	{									\
-		goto out;							\
-	}									\
-}										\
+/* checks result of DBexecute() */
+#define CHECK(CODE)													\
+															\
+do															\
+{															\
+	int result = (CODE);												\
+	if (ZBX_DB_OK > result)												\
+	{														\
+		goto out;												\
+	}														\
+}															\
 while (0)
+
+/* selects single value of zbx_uint64_t type from the database */
+#define SELECT_VALUE_UINT64(target_variable, query, ...)								\
+															\
+do															\
+{															\
+	DB_RESULT	result;												\
+	DB_ROW		row;												\
+															\
+	result = DBselect(query, __VA_ARGS__);										\
+															\
+	/* check for errors */												\
+	if (NULL == result)												\
+	{														\
+		goto out;												\
+	}														\
+															\
+	row = DBfetch(result);												\
+															\
+	/* check if there's at least one row in the resultset */							\
+	if (NULL == row)												\
+	{														\
+		DBfree_result(result);											\
+		goto out;												\
+	}														\
+															\
+	ZBX_STR2UINT64(target_variable, row[0]);									\
+															\
+	row = DBfetch(result);												\
+															\
+	/* check that there are no more rows in the resultset */							\
+	if (NULL != row)												\
+	{														\
+		DBfree_result(result);											\
+		goto out;												\
+	}														\
+															\
+	DBfree_result(result);												\
+}															\
+while (0)
+
+/* gets hostid of the template; status=3 = HOST_STATUS_TEMPLATE */
+#define GET_TEMPLATE_ID(hostid, template_host)										\
+		SELECT_VALUE_UINT64(hostid, "select hostid from hosts where host='%s' and status=3", template_host)
+
+/* gets itemid of the template's item, status=3 = HOST_STATUS_TEMPLATE */
+#define GET_TEMPLATE_ITEM_ID(itemid, template_host, item_key)								\
+		SELECT_VALUE_UINT64(											\
+				itemid,											\
+				"select"										\
+					" itemid"									\
+				" from"											\
+					" items"									\
+					" left join hosts on hosts.hostid=items.hostid"					\
+				" where"										\
+					" hosts.host='%s' and"								\
+					" hosts.status=3 and"								\
+					" items.key_='%s'",								\
+				template_host, item_key)
+
+/* gets valuemapid of the value map */
+#define GET_VALUE_MAP_ID(valuemapid, name)										\
+		SELECT_VALUE_UINT64(valuemapid, "select valuemapid from valuemaps where name='%s'", name)
+
+/* gets groupid of the host group */
+#define GET_HOST_GROUP_ID(groupid, name)										\
+		SELECT_VALUE_UINT64(groupid, "select groupid from hstgrp where name='%s'", name)
 
 /*
  * 4.4 maintenance database patches
@@ -593,41 +685,87 @@ static int	DBpatch_4040303(void)
 	return SUCCEED;
 }
 
-static int	DBpatch_4040304_create_application(zbx_uint64_t applicationid, zbx_uint64_t hostid, const char *name)
+static int	DBpatch_4040304(void)
+{
+	int	ret = FAIL;
+
+	zbx_uint64_t	valuemapid_next;
+	zbx_uint64_t	valuemapid_dns_test_mode;		/* valuemapid of "DNS test mode" */
+	zbx_uint64_t	valuemapid_transport_protocol;		/* valuemapid of "Transport protocol" */
+
+	zbx_uint64_t	mappingid_next;
+	zbx_uint64_t	mappingid_dns_test_mode_normal;		/* mappingid of "Normal" value in "DNS test mode" mapping */
+	zbx_uint64_t	mappingid_dns_test_mode_critical;	/* mappingid of "Critical" value in "DNS test mode" mapping */
+	zbx_uint64_t	mappingid_transport_protocol_udp;	/* mappingid of "UDP" value in "Transport protocol" mapping */
+	zbx_uint64_t	mappingid_transport_protocol_tcp;	/* mappingid of "TCP" value in "Transport protocol" mapping */
+
+	ONLY_SERVER();
+
+	valuemapid_next                  = DBget_maxid_num("valuemaps", 2);
+	valuemapid_dns_test_mode         = valuemapid_next++;
+	valuemapid_transport_protocol    = valuemapid_next++;
+
+	mappingid_next                   = DBget_maxid_num("mappings", 4);
+	mappingid_dns_test_mode_normal   = mappingid_next++;
+	mappingid_dns_test_mode_critical = mappingid_next++;
+	mappingid_transport_protocol_udp = mappingid_next++;
+	mappingid_transport_protocol_tcp = mappingid_next++;
+
+#define INSERT_INTO_VALUEMAPS	"insert into valuemaps set valuemapid=" ZBX_FS_UI64 ",name='%s'"
+#define INSERT_INTO_MAPPINGS	"insert into mappings set mappingid=" ZBX_FS_UI64 ",valuemapid=" ZBX_FS_UI64 ",value='%s',newvalue='%s'"
+
+	CHECK(DBexecute(INSERT_INTO_VALUEMAPS, valuemapid_dns_test_mode, "DNS test mode"));
+	CHECK(DBexecute(INSERT_INTO_VALUEMAPS, valuemapid_transport_protocol, "Transport protocol"));
+
+	CHECK(DBexecute(INSERT_INTO_MAPPINGS, mappingid_dns_test_mode_normal, valuemapid_dns_test_mode, "0", "Normal"));
+	CHECK(DBexecute(INSERT_INTO_MAPPINGS, mappingid_dns_test_mode_critical, valuemapid_dns_test_mode, "1", "Critical"));
+	CHECK(DBexecute(INSERT_INTO_MAPPINGS, mappingid_transport_protocol_udp, valuemapid_transport_protocol, "0", "UDP"));
+	CHECK(DBexecute(INSERT_INTO_MAPPINGS, mappingid_transport_protocol_tcp, valuemapid_transport_protocol, "1", "TCP"));
+
+#undef INSERT_INTO_VALUEMAPS
+#undef INSERT_INTO_MAPPINGS
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
+static int	DBpatch_4040305_create_application(zbx_uint64_t applicationid, zbx_uint64_t hostid, const char *name)
 {
 	return DBexecute("insert into applications set applicationid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",name='%s',"
 			"flags=0",
 			applicationid, hostid, name);
 }
 
-static int	DBpatch_4040304_create_item(zbx_uint64_t itemid, int type, zbx_uint64_t hostid, const char *name,
+static int	DBpatch_4040305_create_item(zbx_uint64_t itemid, int type, zbx_uint64_t hostid, const char *name,
 		const char *key_, const char *delay, const char *history, const char *trends, int value_type,
-		zbx_uint64_t valuemapid, const char *params, int flags, const char* description, const char *lifetime,
+		zbx_uint64_t valuemapid, const char *params, int flags, const char *description, const char *lifetime,
 		zbx_uint64_t master_itemid)
 {
 	return DBexecute("insert into items set itemid=" ZBX_FS_UI64 ",type=%d,snmp_community='',snmp_oid='',"
 			"hostid=" ZBX_FS_UI64 ",name='%s',key_='%s',delay='%s',history='%s',trends='%s',status=0,"
 			"value_type=%d,trapper_hosts='',units='',snmpv3_securityname='',snmpv3_securitylevel=0,"
 			"snmpv3_authpassphrase='',snmpv3_privpassphrase='',formula='',logtimefmt='',templateid=NULL,"
-			"valuemapid=nullif(" ZBX_FS_UI64 ",0),params='%s',ipmi_sensor='',authtype=0,username='',password='',publickey='',"
-			"privatekey='',flags=%d,interfaceid=NULL,port='',description='%s',inventory_link=0,"
-			"lifetime='%s',snmpv3_authprotocol=0,snmpv3_privprotocol=0,snmpv3_contextname='',evaltype=0,"
-			"jmx_endpoint='',master_itemid=nullif(" ZBX_FS_UI64 ",0),timeout='3s',url='',query_fields='',"
-			"posts='',status_codes='200',follow_redirects=1,post_type=0,http_proxy='',headers='',"
-			"retrieve_mode=0,request_method=0,output_format=0,ssl_cert_file='',ssl_key_file='',"
-			"ssl_key_password='',verify_peer=0,verify_host=0,allow_traps=0",
+			"valuemapid=nullif(" ZBX_FS_UI64 ",0),params='%s',ipmi_sensor='',authtype=0,username='',"
+			"password='',publickey='',privatekey='',flags=%d,interfaceid=NULL,port='',description='%s',"
+			"inventory_link=0,lifetime='%s',snmpv3_authprotocol=0,snmpv3_privprotocol=0,"
+			"snmpv3_contextname='',evaltype=0,jmx_endpoint='',master_itemid=nullif(" ZBX_FS_UI64 ",0),"
+			"timeout='3s',url='',query_fields='',posts='',status_codes='200',follow_redirects=1,"
+			"post_type=0,http_proxy='',headers='',retrieve_mode=0,request_method=0,output_format=0,"
+			"ssl_cert_file='',ssl_key_file='',ssl_key_password='',verify_peer=0,verify_host=0,"
+			"allow_traps=0",
 			itemid, type, hostid, name, key_, delay, history, trends, value_type, valuemapid, params, flags,
 			description, lifetime, master_itemid);
 }
 
-static int	DBpatch_4040304_item_to_app(zbx_uint64_t itemappid, zbx_uint64_t applicationid, zbx_uint64_t itemid)
+static int	DBpatch_4040305_item_to_app(zbx_uint64_t itemappid, zbx_uint64_t applicationid, zbx_uint64_t itemid)
 {
 	return DBexecute("insert into items_applications set itemappid=" ZBX_FS_UI64 ",applicationid=" ZBX_FS_UI64 ","
 			"itemid=" ZBX_FS_UI64,
 			itemappid, applicationid, itemid);
 }
 
-static int	DBpatch_4040304_item_discovery(zbx_uint64_t itemdiscoveryid, zbx_uint64_t itemid,
+static int	DBpatch_4040305_item_discovery(zbx_uint64_t itemdiscoveryid, zbx_uint64_t itemid,
 		zbx_uint64_t parent_itemid)
 {
 	return DBexecute("insert into item_discovery set itemdiscoveryid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ","
@@ -635,7 +773,7 @@ static int	DBpatch_4040304_item_discovery(zbx_uint64_t itemdiscoveryid, zbx_uint
 			itemdiscoveryid, itemid, parent_itemid);
 }
 
-static int	DBpatch_4040304_item_preproc(zbx_uint64_t item_preprocid, zbx_uint64_t itemid, const char *params,
+static int	DBpatch_4040305_item_preproc(zbx_uint64_t item_preprocid, zbx_uint64_t itemid, const char *params,
 		int error_handler)
 {
 	return DBexecute("insert into item_preproc set item_preprocid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ",step=1,"
@@ -643,7 +781,7 @@ static int	DBpatch_4040304_item_preproc(zbx_uint64_t item_preprocid, zbx_uint64_
 			item_preprocid, itemid, params, error_handler);
 }
 
-static int	DBpatch_4040304_lld_macro_path(zbx_uint64_t lld_macro_pathid, zbx_uint64_t itemid,
+static int	DBpatch_4040305_lld_macro_path(zbx_uint64_t lld_macro_pathid, zbx_uint64_t itemid,
 		const char *lld_macro, const char *path)
 {
 	return DBexecute("insert into lld_macro_path set lld_macro_pathid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ","
@@ -651,54 +789,130 @@ static int	DBpatch_4040304_lld_macro_path(zbx_uint64_t lld_macro_pathid, zbx_uin
 			lld_macro_pathid, itemid, lld_macro, path);
 }
 
-static int	DBpatch_4040304(void)
+static int	DBpatch_4040305(void)
 {
 	int		ret = FAIL;
 
-	zbx_uint64_t	hostid_template_dns                        = 99500;	/* hostid of "Template DNS" template */
-	zbx_uint64_t	groupid_templates                          = 1;		/* groupid of "Templates" host group */
-	zbx_uint64_t	hostgroupid_template_dns                   = 59;	/* hostgroupid of "Template DNS" template in "Templates" host group */
-	zbx_uint64_t	valuemapid_rsm_service_availability        = 110;	/* valuemapid of "RSM Service Availability" */
+	zbx_uint64_t	groupid_templates;				/* groupid of "Templates" host group */
 
-	zbx_uint64_t	applicationid_dns                          = 227;	/* applicationid of "DNS" application in "Template DNS" template */
-	zbx_uint64_t	applicationid_dnssec                       = 228;	/* applicationid of "DNSSEC" application in "Template DNS" template */
+	zbx_uint64_t	valuemapid_rsm_service_availability;		/* valuemapid of "RSM Service Availability" */
+	zbx_uint64_t	valuemapid_dns_test_mode;			/* valuemapid of "DNS test mode" */
+	zbx_uint64_t	valuemapid_transport_protocol;			/* valuemapid of "Transport protocol" */
 
-	zbx_uint64_t	itemid_dnssec_enabled                      = 99500;	/* itemid of "DNSSEC enabled/disabled" item in "Template DNS" template */
-	zbx_uint64_t	itemid_rsm_dns                             = 99501;	/* itemid of "DNS availability" item in "Template DNS" template */
-	zbx_uint64_t	itemid_rsm_dns_nssok                       = 99502;	/* itemid of "Number of working Name Servers" item in "Template DNS" template */
-	zbx_uint64_t	itemid_rsm_dns_ns_discovery                = 99503;	/* itemid of "Name Servers discovery" item in "Template DNS" template */
-	zbx_uint64_t	itemid_rsm_dns_nsip_discovery              = 99504;	/* itemid of "NS-IP pairs discovery" item in "Template DNS" template */
-	zbx_uint64_t	itemid_rsm_dns_ns_status                   = 99505;	/* itemid of "Status of $1" item prototype in "Template DNS" template */
-	zbx_uint64_t	itemid_rsm_dns_rtt_tcp                     = 99506;	/* itemid of "RTT of $1,$2 using $3" item prototype in "Template DNS" template */
-	zbx_uint64_t	itemid_rsm_dns_rtt_udp                     = 99507;	/* itemid of "RTT of $1,$2 using $3" item prototype in "Template DNS" template */
-	zbx_uint64_t	itemid_rsm_dns_nsid                        = 99508;	/* itemid of "NSID of $1,$2" item prototype in "Template DNS" template */
+	zbx_uint64_t	hostid_template_dns;				/* hostid of "Template DNS Test" template */
+	zbx_uint64_t	hostgroupid_template_dns;			/* hostgroupid of "Template DNS Test" template in "Templates" host group */
 
-	zbx_uint64_t	itemappid_dnssec_enabled                   = 99500;	/* itemappid of "DNSSEC enabled/disabled" item */
-	zbx_uint64_t	itemappid_rsm_dns                          = 99501;	/* itemappid of "DNS availability" item */
-	zbx_uint64_t	itemappid_rsm_dns_nssok                    = 99502;	/* itemappid of "Number of working Name Servers" item */
-	zbx_uint64_t	itemappid_rsm_dns_ns_status                = 99503;	/* itemappid of "Status of $1" item prototype */
-	zbx_uint64_t	itemappid_rsm_dns_rtt_tcp                  = 99504;	/* itemappid of "RTT of $1,$2 using $3" item prototype */
-	zbx_uint64_t	itemappid_rsm_dns_rtt_udp                  = 99505;	/* itemappid of "RTT of $1,$2 using $3" item prototype */
-	zbx_uint64_t	itemappid_rsm_dns_nsid                     = 99506;	/* itemappid of "NSID of $1,$2" item prototype */
+	zbx_uint64_t	applicationid_next;
+	zbx_uint64_t	applicationid_dns;				/* applicationid of "DNS" application in "Template DNS Test" template */
+	zbx_uint64_t	applicationid_dnssec;				/* applicationid of "DNSSEC" application in "Template DNS Test" template */
 
-	zbx_uint64_t	itemdiscoveryid_rsm_dns_ns_status          = 99500;	/* itemdiscoveryid of "Status of $1" item prototype*/
-	zbx_uint64_t	itemdiscoveryid_rsm_dns_rtt_tcp            = 99501;	/* itemdiscoveryid of "RTT of $1,$2 using $3" item prototype*/
-	zbx_uint64_t	itemdiscoveryid_rsm_dns_rtt_udp            = 99502;	/* itemdiscoveryid of "RTT of $1,$2 using $3" item prototype*/
-	zbx_uint64_t	itemdiscoveryid_rsm_dns_nsid               = 99503;	/* itemdiscoveryid of "NSID of $1,$2" item prototype */
+	zbx_uint64_t	itemid_next;
+	zbx_uint64_t	itemid_dnssec_enabled;				/* itemid of "DNSSEC enabled/disabled" item in "Template DNS Test" template */
+	zbx_uint64_t	itemid_rsm_dns;					/* itemid of "DNS Test" item in "Template DNS Test" template */
+	zbx_uint64_t	itemid_rsm_dns_nssok;				/* itemid of "Number of working Name Servers" item in "Template DNS Test" template */
+	zbx_uint64_t	itemid_rsm_dns_ns_discovery;			/* itemid of "Name Servers discovery" item in "Template DNS Test" template */
+	zbx_uint64_t	itemid_rsm_dns_nsip_discovery;			/* itemid of "NS-IP pairs discovery" item in "Template DNS Test" template */
+	zbx_uint64_t	itemid_rsm_dns_ns_status;			/* itemid of "Status of $1" item prototype in "Template DNS Test" template */
+	zbx_uint64_t	itemid_rsm_dns_rtt_tcp;				/* itemid of "RTT of $1,$2 using $3" item prototype in "Template DNS Test" template */
+	zbx_uint64_t	itemid_rsm_dns_rtt_udp;				/* itemid of "RTT of $1,$2 using $3" item prototype in "Template DNS Test" template */
+	zbx_uint64_t	itemid_rsm_dns_nsid;				/* itemid of "NSID of $1,$2" item prototype in "Template DNS Test" template */
+	zbx_uint64_t	itemid_rsm_dns_mode;				/* itemid of "The mode of the Test" item prototype in "Template DNS Test" template */
+	zbx_uint64_t	itemid_rsm_dns_protocol;			/* itemid of "Transport protocol of the Test" item prototype in "Template DNS Test" template */
 
-	zbx_uint64_t	item_preprocid_rsm_dns_nssok               = 99500;	/* item_preprocid of "Number of working Name Servers" item */
-	zbx_uint64_t	item_preprocid_rsm_dns_ns_discovery        = 99501;	/* item_preprocid of "Name Servers discovery" item*/
-	zbx_uint64_t	item_preprocid_rsm_dns_nsip_discovery      = 99502;	/* item_preprocid of "NS-IP pairs discovery" item*/
-	zbx_uint64_t	item_preprocid_rsm_dns_ns_status           = 99503;	/* item_preprocid of "Status of $1" item prototype*/
-	zbx_uint64_t	item_preprocid_rsm_dns_rtt_tcp             = 99504;	/* item_preprocid of "RTT of $1,$2 using $3" item prototype*/
-	zbx_uint64_t	item_preprocid_rsm_dns_rtt_udp             = 99505;	/* item_preprocid of "RTT of $1,$2 using $3" item prototype*/
-	zbx_uint64_t	item_preprocid_rsm_dns_nsid                = 99506;	/* item_preprocid of "NSID of $1,$2" item prototype */
+	zbx_uint64_t	itemappid_next;
+	zbx_uint64_t	itemappid_dnssec_enabled;			/* itemappid of "DNSSEC enabled/disabled" item */
+	zbx_uint64_t	itemappid_rsm_dns;				/* itemappid of "DNS availability" item */
+	zbx_uint64_t	itemappid_rsm_dns_nssok;			/* itemappid of "Number of working Name Servers" item */
+	zbx_uint64_t	itemappid_rsm_dns_ns_status;			/* itemappid of "Status of $1" item prototype */
+	zbx_uint64_t	itemappid_rsm_dns_rtt_tcp;			/* itemappid of "RTT of $1,$2 using $3" item prototype */
+	zbx_uint64_t	itemappid_rsm_dns_rtt_udp;			/* itemappid of "RTT of $1,$2 using $3" item prototype */
+	zbx_uint64_t	itemappid_rsm_dns_nsid;				/* itemappid of "NSID of $1,$2" item prototype */
+	zbx_uint64_t	itemappid_rsm_dns_mode;				/* itemappid of "The mode of the Test" item prototype */
+	zbx_uint64_t	itemappid_rsm_dns_protocol;			/* itemappid of "Transport protocol of the Test" item prototype */
 
-	zbx_uint64_t	lld_macro_pathid_rsm_dns_ns_discovery_ns   = 99500;	/* lld_macro_pathid of {#NS} in "Name Servers discovery" item */
-	zbx_uint64_t	lld_macro_pathid_rsm_dns_nsip_discovery_ip = 99501;	/* lld_macro_pathid of {#IP} in "NS-IP pairs discovery" item */
-	zbx_uint64_t	lld_macro_pathid_rsm_dns_nsip_discovery_ns = 99502;	/* lld_macro_pathid of {#NS} in "NS-IP pairs discovery" item */
+	zbx_uint64_t	itemdiscoveryid_next;
+	zbx_uint64_t	itemdiscoveryid_rsm_dns_ns_status;		/* itemdiscoveryid of "Status of $1" item prototype*/
+	zbx_uint64_t	itemdiscoveryid_rsm_dns_rtt_tcp;		/* itemdiscoveryid of "RTT of $1,$2 using $3" item prototype*/
+	zbx_uint64_t	itemdiscoveryid_rsm_dns_rtt_udp;		/* itemdiscoveryid of "RTT of $1,$2 using $3" item prototype*/
+	zbx_uint64_t	itemdiscoveryid_rsm_dns_nsid;			/* itemdiscoveryid of "NSID of $1,$2" item prototype */
+
+	zbx_uint64_t	item_preprocid_next;
+	zbx_uint64_t	item_preprocid_rsm_dns_nssok;			/* item_preprocid of "Number of working Name Servers" item */
+	zbx_uint64_t	item_preprocid_rsm_dns_ns_discovery;		/* item_preprocid of "Name Servers discovery" item*/
+	zbx_uint64_t	item_preprocid_rsm_dns_nsip_discovery;		/* item_preprocid of "NS-IP pairs discovery" item*/
+	zbx_uint64_t	item_preprocid_rsm_dns_ns_status;		/* item_preprocid of "Status of $1" item prototype*/
+	zbx_uint64_t	item_preprocid_rsm_dns_rtt_tcp;			/* item_preprocid of "RTT of $1,$2 using $3" item prototype*/
+	zbx_uint64_t	item_preprocid_rsm_dns_rtt_udp;			/* item_preprocid of "RTT of $1,$2 using $3" item prototype*/
+	zbx_uint64_t	item_preprocid_rsm_dns_nsid;			/* item_preprocid of "NSID of $1,$2" item prototype */
+	zbx_uint64_t	item_preprocid_rsm_dns_mode;			/* item_preprocid of "The mode of the Test" item prototype */
+	zbx_uint64_t	item_preprocid_rsm_dns_protocol;		/* item_preprocid of "Transport protocol of the Test" item prototype */
+
+	zbx_uint64_t	lld_macro_pathid_next;
+	zbx_uint64_t	lld_macro_pathid_rsm_dns_ns_discovery_ns;	/* lld_macro_pathid of {#NS} in "Name Servers discovery" item */
+	zbx_uint64_t	lld_macro_pathid_rsm_dns_nsip_discovery_ip;	/* lld_macro_pathid of {#IP} in "NS-IP pairs discovery" item */
+	zbx_uint64_t	lld_macro_pathid_rsm_dns_nsip_discovery_ns;	/* lld_macro_pathid of {#NS} in "NS-IP pairs discovery" item */
 
 	ONLY_SERVER();
+
+	GET_HOST_GROUP_ID(groupid_templates, "Templates");
+
+	GET_VALUE_MAP_ID(valuemapid_rsm_service_availability, "RSM Service Availability");
+	GET_VALUE_MAP_ID(valuemapid_dns_test_mode, "DNS test mode");
+	GET_VALUE_MAP_ID(valuemapid_transport_protocol, "Transport protocol");
+
+	hostid_template_dns                        = DBget_maxid_num("hosts", 1);
+
+	hostgroupid_template_dns                   = DBget_maxid_num("hosts_groups", 1);
+
+	applicationid_next                         = DBget_maxid_num("applications", 2);
+	applicationid_dns                          = applicationid_next++;
+	applicationid_dnssec                       = applicationid_next++;
+
+	itemid_next                                = DBget_maxid_num("items", 11);
+	itemid_dnssec_enabled                      = itemid_next++;
+	itemid_rsm_dns                             = itemid_next++;
+	itemid_rsm_dns_nssok                       = itemid_next++;
+	itemid_rsm_dns_ns_discovery                = itemid_next++;
+	itemid_rsm_dns_nsip_discovery              = itemid_next++;
+	itemid_rsm_dns_ns_status                   = itemid_next++;
+	itemid_rsm_dns_rtt_tcp                     = itemid_next++;
+	itemid_rsm_dns_rtt_udp                     = itemid_next++;
+	itemid_rsm_dns_nsid                        = itemid_next++;
+	itemid_rsm_dns_mode                        = itemid_next++;
+	itemid_rsm_dns_protocol                    = itemid_next++;
+
+	itemappid_next                             = DBget_maxid_num("items_applications", 9);
+	itemappid_dnssec_enabled                   = itemappid_next++;
+	itemappid_rsm_dns                          = itemappid_next++;
+	itemappid_rsm_dns_nssok                    = itemappid_next++;
+	itemappid_rsm_dns_ns_status                = itemappid_next++;
+	itemappid_rsm_dns_rtt_tcp                  = itemappid_next++;
+	itemappid_rsm_dns_rtt_udp                  = itemappid_next++;
+	itemappid_rsm_dns_nsid                     = itemappid_next++;
+	itemappid_rsm_dns_mode                     = itemappid_next++;
+	itemappid_rsm_dns_protocol                 = itemappid_next++;
+
+	itemdiscoveryid_next                       = DBget_maxid_num("item_discovery", 4);
+	itemdiscoveryid_rsm_dns_ns_status          = itemdiscoveryid_next++;
+	itemdiscoveryid_rsm_dns_rtt_tcp            = itemdiscoveryid_next++;
+	itemdiscoveryid_rsm_dns_rtt_udp            = itemdiscoveryid_next++;
+	itemdiscoveryid_rsm_dns_nsid               = itemdiscoveryid_next++;
+
+	item_preprocid_next                        = DBget_maxid_num("item_preproc", 9);
+	item_preprocid_rsm_dns_nssok               = item_preprocid_next++;
+	item_preprocid_rsm_dns_ns_discovery        = item_preprocid_next++;
+	item_preprocid_rsm_dns_nsip_discovery      = item_preprocid_next++;
+	item_preprocid_rsm_dns_ns_status           = item_preprocid_next++;
+	item_preprocid_rsm_dns_rtt_tcp             = item_preprocid_next++;
+	item_preprocid_rsm_dns_rtt_udp             = item_preprocid_next++;
+	item_preprocid_rsm_dns_nsid                = item_preprocid_next++;
+	item_preprocid_rsm_dns_mode                = item_preprocid_next++;
+	item_preprocid_rsm_dns_protocol            = item_preprocid_next++;
+
+	lld_macro_pathid_next                      = DBget_maxid_num("lld_macro_path", 3);
+	lld_macro_pathid_rsm_dns_ns_discovery_ns   = lld_macro_pathid_next++;
+	lld_macro_pathid_rsm_dns_nsip_discovery_ip = lld_macro_pathid_next++;
+	lld_macro_pathid_rsm_dns_nsip_discovery_ns = lld_macro_pathid_next++;
 
 #define ITEM_TYPE_SIMPLE		3
 #define ITEM_TYPE_CALCULATED		15
@@ -720,100 +934,121 @@ static int	DBpatch_4040304(void)
 			"snmp_error='',jmx_disable_until=0,jmx_available=0,jmx_errors_from=0,jmx_error='',name='%s',"
 			"info_1='',info_2='',flags=0,templateid=NULL,description='',tls_connect=1,tls_accept=1,"
 			"tls_issuer='',tls_subject='',tls_psk_identity='',tls_psk='',proxy_address='',auto_compress=1",
-			hostid_template_dns, "Template DNS", "Template DNS"));
+			hostid_template_dns, "Template DNS Test", "Template DNS Test"));
 
 	CHECK(DBexecute("insert into hosts_groups set hostgroupid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ","
 			"groupid=" ZBX_FS_UI64,
 			hostgroupid_template_dns, hostid_template_dns, groupid_templates));
 
-	CHECK(DBpatch_4040304_create_application(applicationid_dns, hostid_template_dns, "DNS"));
-	CHECK(DBpatch_4040304_create_application(applicationid_dnssec, hostid_template_dns, "DNSSEC"));
+	CHECK(DBpatch_4040305_create_application(applicationid_dns, hostid_template_dns, "DNS"));
+	CHECK(DBpatch_4040305_create_application(applicationid_dnssec, hostid_template_dns, "DNSSEC"));
 
-	CHECK(DBpatch_4040304_create_item(itemid_dnssec_enabled, ITEM_TYPE_CALCULATED, hostid_template_dns,
+	CHECK(DBpatch_4040305_create_item(itemid_dnssec_enabled, ITEM_TYPE_CALCULATED, hostid_template_dns,
 			"DNSSEC enabled/disabled", "dnssec.enabled", "60", "90d", "365d",
 			ITEM_VALUE_TYPE_UINT64, 0, "{$RSM.TLD.DNSSEC.ENABLED}", 0,
 			"History of DNSSEC being enabled or disabled.",
 			"30d", 0));
-	CHECK(DBpatch_4040304_create_item(itemid_rsm_dns, ITEM_TYPE_SIMPLE, hostid_template_dns,
-			"DNS availability", "rsm.dns[{$RSM.TLD}]", "{$RSM.DNS.UDP.DELAY}", "0", "0",
+	CHECK(DBpatch_4040305_create_item(itemid_rsm_dns, ITEM_TYPE_SIMPLE, hostid_template_dns,
+			"DNS Test",
+			"rsm.dns[{$RSM.TLD},{$RSM.DNS.TESTPREFIX},{$RSM.DNS.NAME.SERVERS},{$RSM.TLD.DNSSEC.ENABLED},"
+				"{$RSM.TLD.RDDS.ENABLED},{$RSM.TLD.EPP.ENABLED},{$RSM.TLD.DNS.UDP.ENABLED},"
+				"{$RSM.TLD.DNS.TCP.ENABLED},{$RSM.IP4.ENABLED},{$RSM.IP6.ENABLED},{$RSM.RESOLVER},"
+				"{$RSM.DNS.UDP.RTT.HIGH},{$RSM.DNS.TCP.RTT.HIGH}]",
+			"{$RSM.DNS.UDP.DELAY}", "0", "0",
 			ITEM_VALUE_TYPE_TEXT, 0, "", 0,
 			"Master item that performs the test and generates JSON with results."
 			" This JSON will be parsed by dependent items. History must be disabled.",
 			"30d", 0));
-	CHECK(DBpatch_4040304_create_item(itemid_rsm_dns_nssok, ITEM_TYPE_DEPENDENT, hostid_template_dns,
+	CHECK(DBpatch_4040305_create_item(itemid_rsm_dns_nssok, ITEM_TYPE_DEPENDENT, hostid_template_dns,
 			"Number of working Name Servers", "rsm.dns.nssok", "0", "90d", "365d",
 			ITEM_VALUE_TYPE_UINT64, 0, "", 0,
 			"Number of Name Servers that returned successful results out of those used in the test.",
 			"30d", itemid_rsm_dns));
-	CHECK(DBpatch_4040304_create_item(itemid_rsm_dns_ns_discovery, ITEM_TYPE_DEPENDENT, hostid_template_dns,
+	CHECK(DBpatch_4040305_create_item(itemid_rsm_dns_ns_discovery, ITEM_TYPE_DEPENDENT, hostid_template_dns,
 			"Name Servers discovery", "rsm.dns.ns.discovery", "0", "90d", "0",
 			ITEM_VALUE_TYPE_TEXT, 0, "", ZBX_FLAG_DISCOVERY,
 			"Discovers Name Servers that were used in DNS test.",
 			"1000d", itemid_rsm_dns));
-	CHECK(DBpatch_4040304_create_item(itemid_rsm_dns_nsip_discovery, ITEM_TYPE_DEPENDENT, hostid_template_dns,
+	CHECK(DBpatch_4040305_create_item(itemid_rsm_dns_nsip_discovery, ITEM_TYPE_DEPENDENT, hostid_template_dns,
 			"NS-IP pairs discovery", "rsm.dns.nsip.discovery", "0", "90d", "0",
 			ITEM_VALUE_TYPE_TEXT, 0, "", ZBX_FLAG_DISCOVERY,
 			"Discovers Name Servers (NS-IP pairs) that were used in DNS test.",
 			"1000d", itemid_rsm_dns));
-	CHECK(DBpatch_4040304_create_item(itemid_rsm_dns_ns_status, ITEM_TYPE_DEPENDENT, hostid_template_dns,
+	CHECK(DBpatch_4040305_create_item(itemid_rsm_dns_ns_status, ITEM_TYPE_DEPENDENT, hostid_template_dns,
 			"Status of $1", "rsm.dns.ns.status[{#NS}]", "0", "90d", "365d",
 			ITEM_VALUE_TYPE_UINT64, valuemapid_rsm_service_availability, "", ZBX_FLAG_DISCOVERY_PROTOTYPE,
 			"Status of Name Server: Up (1) or Down (0)."
 			" The Name Server is considered to be up if all its IPs returned successful RTTs.",
 			"30d", itemid_rsm_dns));
-	CHECK(DBpatch_4040304_create_item(itemid_rsm_dns_rtt_tcp, ITEM_TYPE_DEPENDENT, hostid_template_dns,
+	CHECK(DBpatch_4040305_create_item(itemid_rsm_dns_rtt_tcp, ITEM_TYPE_DEPENDENT, hostid_template_dns,
 			"RTT of $1,$2 using $3", "rsm.dns.rtt[{#NS},{#IP},tcp]", "0", "90d", "365d",
 			ITEM_VALUE_TYPE_FLOAT, 0, "", ZBX_FLAG_DISCOVERY_PROTOTYPE,
 			"The Round-Time Trip returned when testing specific IP of Name Server using TCP protocol.",
 			"30d", itemid_rsm_dns));
-	CHECK(DBpatch_4040304_create_item(itemid_rsm_dns_rtt_udp, ITEM_TYPE_DEPENDENT, hostid_template_dns,
+	CHECK(DBpatch_4040305_create_item(itemid_rsm_dns_rtt_udp, ITEM_TYPE_DEPENDENT, hostid_template_dns,
 			"RTT of $1,$2 using $3", "rsm.dns.rtt[{#NS},{#IP},udp]", "0", "90d", "365d",
 			ITEM_VALUE_TYPE_FLOAT, 0, "", ZBX_FLAG_DISCOVERY_PROTOTYPE,
 			"The Round-Time Trip returned when testing specific IP of Name Server using UDP protocol.",
 			"30d", itemid_rsm_dns));
-	CHECK(DBpatch_4040304_create_item(itemid_rsm_dns_nsid, ITEM_TYPE_DEPENDENT, hostid_template_dns,
+	CHECK(DBpatch_4040305_create_item(itemid_rsm_dns_nsid, ITEM_TYPE_DEPENDENT, hostid_template_dns,
 			"NSID of $1,$2", "rsm.dns.nsid[{#NS},{#IP}]", "0", "90d", "0",
 			ITEM_VALUE_TYPE_STR, 0, "", ZBX_FLAG_DISCOVERY_PROTOTYPE,
 			"DNS Name Server Identifier of the target Name Server that was tested.",
 			"30d", itemid_rsm_dns));
+	CHECK(DBpatch_4040305_create_item(itemid_rsm_dns_mode, ITEM_TYPE_DEPENDENT, hostid_template_dns,
+			"The mode of the Test", "rsm.dns.mode", "0", "90d", "365d",
+			ITEM_VALUE_TYPE_UINT64, valuemapid_dns_test_mode, "", 0,
+			"The mode (normal or critical) in which the test was performed.",
+			"30d", itemid_rsm_dns));
+	CHECK(DBpatch_4040305_create_item(itemid_rsm_dns_protocol, ITEM_TYPE_DEPENDENT, hostid_template_dns,
+			"Transport protocol of the Test", "rsm.dns.protocol", "0", "90d", "365d",
+			ITEM_VALUE_TYPE_UINT64, valuemapid_transport_protocol, "", 0,
+			"Transport protocol (UDP or TCP) that was used during the test.",
+			"30d", itemid_rsm_dns));
 
-	CHECK(DBpatch_4040304_item_to_app(itemappid_dnssec_enabled   , applicationid_dnssec, itemid_dnssec_enabled));
-	CHECK(DBpatch_4040304_item_to_app(itemappid_rsm_dns          , applicationid_dns   , itemid_rsm_dns));
-	CHECK(DBpatch_4040304_item_to_app(itemappid_rsm_dns_nssok    , applicationid_dns   , itemid_rsm_dns_nssok));
-	CHECK(DBpatch_4040304_item_to_app(itemappid_rsm_dns_ns_status, applicationid_dns   , itemid_rsm_dns_ns_status));
-	CHECK(DBpatch_4040304_item_to_app(itemappid_rsm_dns_rtt_tcp  , applicationid_dns   , itemid_rsm_dns_rtt_tcp));
-	CHECK(DBpatch_4040304_item_to_app(itemappid_rsm_dns_rtt_udp  , applicationid_dns   , itemid_rsm_dns_rtt_udp));
-	CHECK(DBpatch_4040304_item_to_app(itemappid_rsm_dns_nsid     , applicationid_dns   , itemid_rsm_dns_nsid));
+	CHECK(DBpatch_4040305_item_to_app(itemappid_dnssec_enabled   , applicationid_dnssec, itemid_dnssec_enabled));
+	CHECK(DBpatch_4040305_item_to_app(itemappid_rsm_dns          , applicationid_dns   , itemid_rsm_dns));
+	CHECK(DBpatch_4040305_item_to_app(itemappid_rsm_dns_nssok    , applicationid_dns   , itemid_rsm_dns_nssok));
+	CHECK(DBpatch_4040305_item_to_app(itemappid_rsm_dns_ns_status, applicationid_dns   , itemid_rsm_dns_ns_status));
+	CHECK(DBpatch_4040305_item_to_app(itemappid_rsm_dns_rtt_tcp  , applicationid_dns   , itemid_rsm_dns_rtt_tcp));
+	CHECK(DBpatch_4040305_item_to_app(itemappid_rsm_dns_rtt_udp  , applicationid_dns   , itemid_rsm_dns_rtt_udp));
+	CHECK(DBpatch_4040305_item_to_app(itemappid_rsm_dns_nsid     , applicationid_dns   , itemid_rsm_dns_nsid));
+	CHECK(DBpatch_4040305_item_to_app(itemappid_rsm_dns_mode     , applicationid_dns   , itemid_rsm_dns_mode));
+	CHECK(DBpatch_4040305_item_to_app(itemappid_rsm_dns_protocol , applicationid_dns   , itemid_rsm_dns_protocol));
 
-	CHECK(DBpatch_4040304_item_discovery(itemdiscoveryid_rsm_dns_ns_status, itemid_rsm_dns_ns_status,
+	CHECK(DBpatch_4040305_item_discovery(itemdiscoveryid_rsm_dns_ns_status, itemid_rsm_dns_ns_status,
 			itemid_rsm_dns_ns_discovery));
-	CHECK(DBpatch_4040304_item_discovery(itemdiscoveryid_rsm_dns_rtt_tcp, itemid_rsm_dns_rtt_tcp,
+	CHECK(DBpatch_4040305_item_discovery(itemdiscoveryid_rsm_dns_rtt_tcp, itemid_rsm_dns_rtt_tcp,
 			itemid_rsm_dns_nsip_discovery));
-	CHECK(DBpatch_4040304_item_discovery(itemdiscoveryid_rsm_dns_rtt_udp, itemid_rsm_dns_rtt_udp,
+	CHECK(DBpatch_4040305_item_discovery(itemdiscoveryid_rsm_dns_rtt_udp, itemid_rsm_dns_rtt_udp,
 			itemid_rsm_dns_nsip_discovery));
-	CHECK(DBpatch_4040304_item_discovery(itemdiscoveryid_rsm_dns_nsid, itemid_rsm_dns_nsid,
+	CHECK(DBpatch_4040305_item_discovery(itemdiscoveryid_rsm_dns_nsid, itemid_rsm_dns_nsid,
 			itemid_rsm_dns_nsip_discovery));
 
-	CHECK(DBpatch_4040304_item_preproc(item_preprocid_rsm_dns_nssok, itemid_rsm_dns_nssok,
+	CHECK(DBpatch_4040305_item_preproc(item_preprocid_rsm_dns_nssok, itemid_rsm_dns_nssok,
 			"$.nssok", 0));
-	CHECK(DBpatch_4040304_item_preproc(item_preprocid_rsm_dns_ns_discovery, itemid_rsm_dns_ns_discovery,
+	CHECK(DBpatch_4040305_item_preproc(item_preprocid_rsm_dns_ns_discovery, itemid_rsm_dns_ns_discovery,
 			"$.nss", 0));
-	CHECK(DBpatch_4040304_item_preproc(item_preprocid_rsm_dns_nsip_discovery, itemid_rsm_dns_nsip_discovery,
+	CHECK(DBpatch_4040305_item_preproc(item_preprocid_rsm_dns_nsip_discovery, itemid_rsm_dns_nsip_discovery,
 			"$.nsips", 0));
-	CHECK(DBpatch_4040304_item_preproc(item_preprocid_rsm_dns_ns_status, itemid_rsm_dns_ns_status,
+	CHECK(DBpatch_4040305_item_preproc(item_preprocid_rsm_dns_ns_status, itemid_rsm_dns_ns_status,
 			"$.nss[?(@.[''ns''] == ''{#NS}'')].status.first()", 0));
-	CHECK(DBpatch_4040304_item_preproc(item_preprocid_rsm_dns_rtt_tcp, itemid_rsm_dns_rtt_tcp,
+	CHECK(DBpatch_4040305_item_preproc(item_preprocid_rsm_dns_rtt_tcp, itemid_rsm_dns_rtt_tcp,
 			"$.nsips[?(@.[''ns''] == ''{#NS}'' && @.[''ip''] == ''{#IP}'' && @.[''protocol''] == ''tcp'')].rtt.first()", 1));
-	CHECK(DBpatch_4040304_item_preproc(item_preprocid_rsm_dns_rtt_udp, itemid_rsm_dns_rtt_udp,
+	CHECK(DBpatch_4040305_item_preproc(item_preprocid_rsm_dns_rtt_udp, itemid_rsm_dns_rtt_udp,
 			"$.nsips[?(@.[''ns''] == ''{#NS}'' && @.[''ip''] == ''{#IP}'' && @.[''protocol''] == ''udp'')].rtt.first()", 1));
-	CHECK(DBpatch_4040304_item_preproc(item_preprocid_rsm_dns_nsid, itemid_rsm_dns_nsid,
+	CHECK(DBpatch_4040305_item_preproc(item_preprocid_rsm_dns_nsid, itemid_rsm_dns_nsid,
 			"$.nsips[?(@.[''ns''] == ''{#NS}'' && @.[''ip''] == ''{#IP}'')].nsid.first()", 0));
+	CHECK(DBpatch_4040305_item_preproc(item_preprocid_rsm_dns_mode, itemid_rsm_dns_mode,
+			"$.mode", 0));
+	CHECK(DBpatch_4040305_item_preproc(item_preprocid_rsm_dns_protocol, itemid_rsm_dns_protocol,
+			"$.protocol", 0));
 
-	CHECK(DBpatch_4040304_lld_macro_path(lld_macro_pathid_rsm_dns_ns_discovery_ns,
+	CHECK(DBpatch_4040305_lld_macro_path(lld_macro_pathid_rsm_dns_ns_discovery_ns,
 			itemid_rsm_dns_ns_discovery, "{#NS}", "$.ns"));
-	CHECK(DBpatch_4040304_lld_macro_path(lld_macro_pathid_rsm_dns_nsip_discovery_ip,
+	CHECK(DBpatch_4040305_lld_macro_path(lld_macro_pathid_rsm_dns_nsip_discovery_ip,
 			itemid_rsm_dns_nsip_discovery, "{#IP}", "$.ip"));
-	CHECK(DBpatch_4040304_lld_macro_path(lld_macro_pathid_rsm_dns_nsip_discovery_ns,
+	CHECK(DBpatch_4040305_lld_macro_path(lld_macro_pathid_rsm_dns_nsip_discovery_ns,
 			itemid_rsm_dns_nsip_discovery, "{#NS}", "$.ns"));
 
 #undef ITEM_TYPE_SIMPLE
@@ -833,7 +1068,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_4040305(void)
+static int	DBpatch_4040306(void)
 {
 	int	ret;
 
@@ -859,7 +1094,8 @@ DBPATCH_ADD(4040300, 0, 1)	/* RSM FY20 */
 DBPATCH_ADD(4040301, 0, 1)	/* set delay as macro for rsm.dns.*, rsm.rdds*, rsm.rdap* and rsm.epp* items items */
 DBPATCH_ADD(4040302, 0, 0)	/* set macro descriptions (part I) */
 DBPATCH_ADD(4040303, 0, 0)	/* set macro descriptions (part II) */
-DBPATCH_ADD(4040304, 0, 0)	/* add "Template DNS" template */
-DBPATCH_ADD(4040305, 0, 0)	/* disable "db watchdog" internal items */
+DBPATCH_ADD(4040304, 0, 0)	/* add "DNS test mode" and "Transport protocol" value mappings */
+DBPATCH_ADD(4040305, 0, 0)	/* add "Template DNS Test" template */
+DBPATCH_ADD(4040306, 0, 0)	/* disable "db watchdog" internal items */
 
 DBPATCH_END()
