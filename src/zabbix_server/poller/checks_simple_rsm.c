@@ -2302,14 +2302,18 @@ static void	create_rsm_dns_json(struct zbx_json *json, zbx_ns_t *nss, size_t nss
 	zbx_json_close(json);
 
 	zbx_json_adduint64(json, "nssok", nssok);
+	zbx_json_adduint64(json, "mode", 0);
+	zbx_json_adduint64(json, "protocol", (proto == RSM_UDP ? 0 : 1));
 
 	zbx_json_close(json);
 }
 
 int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *result)
 {
-	char			err[ZBX_ERR_BUF_SIZE], *domain, *res_ip = NULL, *testprefix = NULL, proto,
-				*name_servers_list = NULL;
+	char			err[ZBX_ERR_BUF_SIZE], proto,
+				*domain, *testprefix, *name_servers_list, *dnssec_enabled_str, *rdds_enabled_str,
+				*epp_enabled_str, *udp_enabled_str, *tcp_enabled_str, *ipv4_enabled_str,
+				*ipv6_enabled_str, *res_ip, *udp_rtt_limit_str, *tcp_rtt_limit_str;
 	zbx_dnskeys_error_t	ec_dnskeys;
 	ldns_resolver		*res = NULL;
 	ldns_rr_list		*keys = NULL;
@@ -2318,25 +2322,113 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 	size_t			i, j, nss_num = 0;
 	unsigned int		extras;
 	struct zbx_json		json;
-	int			ipv4_enabled, ipv6_enabled, dnssec_enabled, epp_enabled, rdds_enabled, rtt_limit,
+	int			dnssec_enabled, rdds_enabled, epp_enabled, udp_enabled, tcp_enabled, ipv4_enabled,
+				ipv6_enabled, udp_rtt_limit, tcp_rtt_limit, rtt_limit,
 				ret = SYSINFO_RET_FAIL;
 
-	if (1 != request->nparam)
+	if (13 != request->nparam)
 	{
-		SET_MSG_RESULT(result, zbx_strdup(NULL, "item must contain only 1 parameter"));
+		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid number of parameters"));
 		return SYSINFO_RET_FAIL;
 	}
 
-	domain = get_rparam(request, 0);
+	/* TLD goes first, then DNS specific parameters, then TLD options, probe options and global settings */
+	domain = get_rparam(request, 0);		/* TLD for log file name, e.g. ".cz" */
+	testprefix = get_rparam(request, 1);		/* TLD prefix to use when quering non-existent domain */
+	name_servers_list = get_rparam(request, 2);	/* list of name servers to test */
+	dnssec_enabled_str = get_rparam(request, 3);	/* DNSSEC enabled on a TLD */
+	rdds_enabled_str = get_rparam(request, 4);	/* RDDS enabled on a TLD */
+	epp_enabled_str = get_rparam(request, 5);	/* EPP enabled on a TLD */
+	udp_enabled_str = get_rparam(request, 6);	/* DNS UDP enabled */
+	tcp_enabled_str = get_rparam(request, 7);	/* DNS TCP enabled */
+	ipv4_enabled_str = get_rparam(request, 8);	/* IPv4 enabled */
+	ipv6_enabled_str = get_rparam(request, 9);	/* IPv6 enabled */
+	res_ip = get_rparam(request, 10);		/* local resolver IP, e.g. "127.0.0.1" */
+	udp_rtt_limit_str = get_rparam(request, 11);	/* maximum allowed UDP RTT in milliseconds */
+	tcp_rtt_limit_str = get_rparam(request, 12);	/* maximum allowed TCP RTT in milliseconds */
 
 	if ('\0' == *domain)
 	{
-		SET_MSG_RESULT(result, zbx_strdup(NULL, "first parameter missing"));
-		return SYSINFO_RET_FAIL;
+		SET_MSG_RESULT(result, zbx_strdup(NULL, "TLD cannot be empty."));
+		return ret;
+	}
+
+	if ('\0' == *testprefix)
+	{
+		SET_MSG_RESULT(result, zbx_strdup(NULL, "Test prefix cannot be empty."));
+		return ret;
+	}
+
+	if ('\0' == *name_servers_list)
+	{
+		SET_MSG_RESULT(result, zbx_strdup(NULL, "List of Name Servers cannot be empty."));
+		return ret;
+	}
+
+	if (SUCCEED != is_uint31(dnssec_enabled_str, &dnssec_enabled))
+	{
+		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid fourth parameter."));
+		return ret;
+	}
+
+	if (SUCCEED != is_uint31(rdds_enabled_str, &rdds_enabled))
+	{
+		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid fifth parameter."));
+		return ret;
+	}
+
+	if (SUCCEED != is_uint31(epp_enabled_str, &epp_enabled))
+	{
+		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid sixth parameter."));
+		return ret;
+	}
+
+	if (SUCCEED != is_uint31(udp_enabled_str, &udp_enabled))
+	{
+		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid seventh parameter."));
+		return ret;
+	}
+
+	if (SUCCEED != is_uint31(tcp_enabled_str, &tcp_enabled))
+	{
+		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid eighth parameter."));
+		return ret;
+	}
+
+	if (SUCCEED != is_uint31(ipv4_enabled_str, &ipv4_enabled))
+	{
+		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid ninth parameter."));
+		return ret;
+	}
+
+	if (SUCCEED != is_uint31(ipv6_enabled_str, &ipv6_enabled))
+	{
+		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid tenth parameter."));
+		return ret;
+	}
+
+	if (SUCCEED != is_uint31(udp_rtt_limit_str, &udp_rtt_limit))
+	{
+		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid eleventh parameter."));
+		return ret;
+	}
+
+	if (SUCCEED != is_uint31(tcp_rtt_limit_str, &tcp_rtt_limit))
+	{
+		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid twelfth parameter."));
+		return ret;
+	}
+
+	if ('\0' == *res_ip)
+	{
+		SET_MSG_RESULT(result, zbx_strdup(NULL, "IP address of local resolver cannot be empty."));
+		return ret;
 	}
 
 	/* TODO: fix for DNS Reboot */
 	proto = (zbx_random(2) ? RSM_UDP : RSM_TCP);
+
+	rtt_limit = (proto == RSM_UDP ? udp_rtt_limit : tcp_rtt_limit);
 
 	/* open log file */
 	if (NULL == (log_fd = open_item_log(item->host.host, domain, ZBX_DNS_LOG_PREFIX,
@@ -2348,62 +2440,16 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 
 	rsm_info(log_fd, "START TEST");
 
-	if (SUCCEED != zbx_conf_int(&item->host.hostid, ZBX_MACRO_TLD_DNSSEC_ENABLED, &dnssec_enabled, 0,
-			err, sizeof(err)))
-	{
-		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
-		goto out;
-	}
-
-	if (SUCCEED != zbx_conf_int(&item->host.hostid, ZBX_MACRO_TLD_RDDS_ENABLED, &rdds_enabled, 0,
-			err, sizeof(err)))
-	{
-		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
-		goto out;
-	}
-
-	if (SUCCEED != zbx_conf_int(&item->host.hostid, ZBX_MACRO_TLD_EPP_ENABLED, &epp_enabled, 0,
-			err, sizeof(err)))
-	{
-		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
-		goto out;
-	}
-
-	if (SUCCEED != zbx_conf_str(&item->host.hostid, ZBX_MACRO_DNS_RESOLVER, &res_ip, err, sizeof(err)))
-	{
-		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
-		goto out;
-	}
-
-	if (SUCCEED != zbx_conf_str(&item->host.hostid, ZBX_MACRO_DNS_TESTPREFIX, &testprefix, err, sizeof(err)))
-	{
-		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
-		goto out;
-	}
-
 	if (0 == strcmp(testprefix, "*randomtld*"))
 	{
-		zbx_free(testprefix);
-
 		if (NULL == (testprefix = zbx_get_rr_tld(domain, err, sizeof(err))))
 		{
 			SET_MSG_RESULT(result, zbx_strdup(NULL, err));
 			goto out;
 		}
 	}
-
-	if (SUCCEED != zbx_conf_int(&item->host.hostid, RSM_UDP == proto ? ZBX_MACRO_DNS_UDP_RTT :
-			ZBX_MACRO_DNS_TCP_RTT, &rtt_limit, 1, err, sizeof(err)))
-	{
-		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
-		goto out;
-	}
-
-	if (SUCCEED != zbx_conf_ip_support(&item->host.hostid, &ipv4_enabled, &ipv6_enabled, err, sizeof(err)))
-	{
-		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
-		goto out;
-	}
+	else
+		testprefix = zbx_strdup(NULL, testprefix);
 
 	extras = (dnssec_enabled ? RESOLVER_EXTRAS_DNSSEC : RESOLVER_EXTRAS_NONE);
 
@@ -2414,13 +2460,6 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 			log_fd, err, sizeof(err)))
 	{
 		SET_MSG_RESULT(result, zbx_dsprintf(NULL, "cannot create resolver: %s", err));
-		goto out;
-	}
-
-	if (SUCCEED != zbx_conf_str(&item->host.hostid, ZBX_MACRO_DNS_NAME_SERVERS, &name_servers_list,
-			err, sizeof(err)))
-	{
-		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
 		goto out;
 	}
 
@@ -2670,9 +2709,7 @@ out:
 			ldns_resolver_free(res);
 	}
 
-	zbx_free(name_servers_list);
 	zbx_free(testprefix);
-	zbx_free(res_ip);
 
 	if (NULL != log_fd)
 		fclose(log_fd);
@@ -4216,7 +4253,7 @@ int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 		goto out;
 	}
 
-	if (SUCCEED != zbx_json_value_by_name_dyn(&jp, "ldhName", &value_str, &value_alloc))
+	if (SUCCEED != zbx_json_value_by_name_dyn(&jp, "ldhName", &value_str, &value_alloc, NULL))
 	{
 		rtt = ZBX_EC_RDAP_NONAME;
 		rsm_errf(log_fd, "ldhName member not found in response of \"%s\" (%s)", base_url, ip);
