@@ -212,7 +212,7 @@ class CRouter {
 		'widget.url.view'				=> ['CControllerWidgetUrlView',						'layout.widget',		'monitoring.widget.url.view'],
 		'widget.web.view'				=> ['CControllerWidgetWebView',						'layout.widget',		'monitoring.widget.web.view'],
 		'workingtime.edit'				=> ['CControllerWorkingTimeEdit',					'layout.htmlpage',		'administration.workingtime.edit'],
-		'workingtime.update'			=> ['CControllerWorkingTimeUpdate',					null,					null]
+		'workingtime.update'			=> ['CControllerWorkingTimeUpdate',					null,					null],
 		'rsm.rollingweekstatus'			=> ['CControllerRollingWeekStatusList',				'layout.htmlpage',		'rsm.rollingweekstatus.list'],
 		'rsm.incidents'					=> ['CControllerIncidentsList',						'layout.htmlpage',		'rsm.incidents.list'],
 		'rsm.slareports'				=> ['CControllerSlaReports',						'layout.htmlpage',		'rsm.slareports.list'],
