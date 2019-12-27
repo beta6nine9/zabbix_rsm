@@ -122,7 +122,9 @@ class CControllerAggregateDetails extends RSMControllerBase {
 			if ($probe_host) {
 				$this->probes[$probe['hostid']] = [
 					'host' => $probe_host,
-					'hostid' => $probe['hostid']
+					'hostid' => $probe['hostid'],
+					'ns_up' => 0,
+					'ns_down' => 0
 				];
 			}
 			else {
@@ -134,6 +136,7 @@ class CControllerAggregateDetails extends RSMControllerBase {
 	}
 
 	protected function getReportData(array &$data, $time_from, $time_till) {
+		$key_parser = new CItemKey;
 		$probe_items = API::Item()->get([
 			'output' => ['itemid', 'key_', 'hostid'],
 			'hostids' => array_keys($this->probes),
@@ -146,7 +149,7 @@ class CControllerAggregateDetails extends RSMControllerBase {
 
 		if ($probe_items) {
 			$item_values = API::History()->get([
-				'output' => API_OUTPUT_EXTEND,
+				'output' => ['itemid', 'value'],
 				'itemids' => array_keys($probe_items),
 				'time_from' => $time_from,
 				'time_till' => $time_till
@@ -217,7 +220,6 @@ class CControllerAggregateDetails extends RSMControllerBase {
 			]);
 			$item_values = array_column($item_values_db, 'value', 'itemid');
 			$dns_nameservers = [];
-			$key_parser = new CItemKey;
 			$key_parser->parse(RSM_SLV_KEY_DNS_RTT);
 			$params_count = 3; // $key_parser->getParamsNum();
 
@@ -297,22 +299,22 @@ class CControllerAggregateDetails extends RSMControllerBase {
 			'history' => ITEM_VALUE_TYPE_TEXT
 		]);
 
-		$parser = new CItemKey;
+		$key_parser->parse(RSM_SLV_KEY_DNS_NSID);
+		$params_count = $key_parser->getParamsNum();
 		$data['nsids'] = array_unique(zbx_objectValues($nsid_values, 'value'));
 		sort($data['nsids'], SORT_LOCALE_STRING|SORT_NATURAL|SORT_FLAG_CASE);
 
 		foreach ($nsid_values as $nsid_value) {
 			$nsid_item = $nsid_items[$nsid_value['itemid']];
-			$parser->parse($nsid_item['key_']);
-			$params = $parser->getParamsRaw();
+			$key_parser->parse($nsid_item['key_']);
 
-			if (!isset($params[0]['parameters'])) {
+			if ($key_parser->getParamsNum() != $params_count) {
 				error(_s('Unexpected item key "%1$s".', $nsid_item['key_']));
 				continue;
 			}
 
-			$ns_name = $params[0]['parameters'][0]['raw'];
-			$ns_ip = $params[0]['parameters'][1]['raw'];
+			$ns_name = $key_parser->getParam(0);
+			$ns_ip = $key_parser->getParam(1);
 			$this->probes[$nsid_item['hostid']]['results_nsid'][$ns_name][$ns_ip] = array_search($nsid_value['value'],
 				$data['nsids']
 			);
@@ -341,18 +343,16 @@ class CControllerAggregateDetails extends RSMControllerBase {
 
 			foreach ($protocol_items_data as $protocol_item_data) {
 				$protocol_item = $protocol_items[$protocol_item_data['itemid']];
-				$probe_protocol[$protocol_item['hostid']] = $protocol_type[$protocol_item_data['value']];
+				$this->probes[$protocol_item['hostid']]['transport'] = $protocol_type[$protocol_item_data['value']];
 			}
 		}
 
 		foreach ($this->probes as $probeid => &$probe) {
-			$probe['ns_up'] = 0;
-			$probe['ns_down'] = 0;
-
 			// TODO: ICA-605 remove start.
 			if (array_key_exists('results_udp', $probe)) {
 				$nameservers_up = [];
-				$probe['transport'] = reset($protocol_type);// UDP
+				// Always 'UDP'.
+				$probe['transport'] = reset($protocol_type);
 
 				/**
 				 * NameServer is considered as Down once at least one of its IP addresses is either negative value (error
@@ -389,17 +389,14 @@ class CControllerAggregateDetails extends RSMControllerBase {
 				}
 				unset($ipvs);
 
-				$probe['ns_up'] = count($nameservers_up); // TODO: get value from 'item rms.dns.nssok'
+				$probe['ns_up'] = count($nameservers_up);
 				continue;
 			}
 			// TODO: ICA-605 remove end.
 
-			$probe['transport'] = $probe_protocol[$probeid];
 			// get value of 'rsm.dns.nssok' RSM_SLV_KEY_DNS_NSSOK
 		}
 		unset($probe);
-
-		// Get status for each TLD probe (displayed in column 'DNS UDP' -> 'Status').
 
 		/**
 		 * If probe is not offline we should check values of additional item PROBE_DNS_UDP_ITEM and compare selected
