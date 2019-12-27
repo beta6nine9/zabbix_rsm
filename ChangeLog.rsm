@@ -1,6 +1,7 @@
 Changes for rsm2.0.0rc2
 
 Bug fixes:
+..F....... [648] made info bubbles visible on mouse over in TLD rolling week status page (miks)
 ..F....... [640] fixed tab indexing in incidents page (miks)
 ..F....... [638] added 'server' column in rolling week status list (miks)
 ..F....... [634] made rolling week status table sortable by name column (miks)
