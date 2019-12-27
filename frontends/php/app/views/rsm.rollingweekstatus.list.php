@@ -175,46 +175,46 @@ $filter_fields[] = (new CFormList())
 if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
 	if (is_RDAP_standalone()) {
 		$header_columns = [
-			make_sorting_header(_('Registrar ID'), 'host', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('Registrar name'), 'info_1', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('Registrar family'), 'info_2', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('RDDS (24Hrs)'), 'rdds_lastvalue', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('RDAP (24Hrs)'), 'rdap_lastvalue', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('Server'), 'server', $data['sort'], $data['sortorder'])
+			make_sorting_header(_('Registrar ID'), 'host', $data['sort_field'], $data['sort_order']),
+			make_sorting_header(_('Registrar name'), 'info_1', $data['sort_field'], $data['sort_order']),
+			make_sorting_header(_('Registrar family'), 'info_2', $data['sort_field'], $data['sort_order']),
+			make_sorting_header(_('RDDS (24Hrs)'), 'rdds_lastvalue', $data['sort_field'], $data['sort_order']),
+			make_sorting_header(_('RDAP (24Hrs)'), 'rdap_lastvalue', $data['sort_field'], $data['sort_order']),
+			make_sorting_header(_('Server'), 'server', $data['sort_field'], $data['sort_order'])
 		];
 	}
 	else {
 		$header_columns = [
-			make_sorting_header(_('Registrar ID'), 'host', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('Registrar name'), 'info_1', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('Registrar family'), 'info_2', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('RDDS (24Hrs)'), 'rdds_lastvalue', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('Server'), 'server', $data['sort'], $data['sortorder'])
+			make_sorting_header(_('Registrar ID'), 'host', $data['sort_field'], $data['sort_order']),
+			make_sorting_header(_('Registrar name'), 'info_1', $data['sort_field'], $data['sort_order']),
+			make_sorting_header(_('Registrar family'), 'info_2', $data['sort_field'], $data['sort_order']),
+			make_sorting_header(_('RDDS (24Hrs)'), 'rdds_lastvalue', $data['sort_field'], $data['sort_order']),
+			make_sorting_header(_('Server'), 'server', $data['sort_field'], $data['sort_order'])
 		];
 	}
 }
 else {
 	if (is_RDAP_standalone()) {
 		$header_columns = [
-			make_sorting_header(_('TLD'), 'name', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('Type'), 'type', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('DNS (4Hrs)'), 'dns_lastvalue', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('DNSSEC (4Hrs)'), 'dnssec_lastvalue', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('RDDS (24Hrs)'), 'rdds_lastvalue', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('RDAP (24Hrs)'), 'rdap_lastvalue', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('EPP (24Hrs)'), 'epp_lastvalue', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('Server'), 'server', $data['sort'], $data['sortorder'])
+			make_sorting_header(_('TLD'), 'host', $data['sort_field'], $data['sort_order']),
+			make_sorting_header(_('Type'), 'type', $data['sort_field'], $data['sort_order']),
+			make_sorting_header(_('DNS (4Hrs)'), 'dns_lastvalue', $data['sort_field'], $data['sort_order']),
+			make_sorting_header(_('DNSSEC (4Hrs)'), 'dnssec_lastvalue', $data['sort_field'], $data['sort_order']),
+			make_sorting_header(_('RDDS (24Hrs)'), 'rdds_lastvalue', $data['sort_field'], $data['sort_order']),
+			make_sorting_header(_('RDAP (24Hrs)'), 'rdap_lastvalue', $data['sort_field'], $data['sort_order']),
+			make_sorting_header(_('EPP (24Hrs)'), 'epp_lastvalue', $data['sort_field'], $data['sort_order']),
+			make_sorting_header(_('Server'), 'server', $data['sort_field'], $data['sort_order'])
 		];
 	}
 	else {
 		$header_columns = [
-			make_sorting_header(_('TLD'), 'name', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('Type'), 'type', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('DNS (4Hrs)'), 'dns_lastvalue', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('DNSSEC (4Hrs)'), 'dnssec_lastvalue', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('RDDS (24Hrs)'), 'rdds_lastvalue', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('EPP (24Hrs)'), 'epp_lastvalue', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('Server'), 'server', $data['sort'], $data['sortorder'])
+			make_sorting_header(_('TLD'), 'host', $data['sort_field'], $data['sort_order']),
+			make_sorting_header(_('Type'), 'type', $data['sort_field'], $data['sort_order']),
+			make_sorting_header(_('DNS (4Hrs)'), 'dns_lastvalue', $data['sort_field'], $data['sort_order']),
+			make_sorting_header(_('DNSSEC (4Hrs)'), 'dnssec_lastvalue', $data['sort_field'], $data['sort_order']),
+			make_sorting_header(_('RDDS (24Hrs)'), 'rdds_lastvalue', $data['sort_field'], $data['sort_order']),
+			make_sorting_header(_('EPP (24Hrs)'), 'epp_lastvalue', $data['sort_field'], $data['sort_order']),
+			make_sorting_header(_('Server'), 'server', $data['sort_field'], $data['sort_order'])
 		];
 	}
 }
