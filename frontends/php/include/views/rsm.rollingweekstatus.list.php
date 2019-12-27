@@ -239,7 +239,7 @@ if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
 else {
 	if (is_RDAP_standalone()) {
 		$header_columns = [
-			make_sorting_header(_('TLD'), 'name', $data['sort'], $data['sortorder']),
+			make_sorting_header(_('TLD'), 'host', $data['sort'], $data['sortorder']),
 			make_sorting_header(_('Type'), 'type', $data['sort'], $data['sortorder']),
 			make_sorting_header(_('DNS (4Hrs)'), 'dns_lastvalue', $data['sort'], $data['sortorder']),
 			make_sorting_header(_('DNSSEC (4Hrs)'), 'dnssec_lastvalue', $data['sort'], $data['sortorder']),
