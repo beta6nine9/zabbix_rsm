@@ -102,7 +102,8 @@ define('RSM_SLV_RDDS_AVAIL',				'rsm.slv.rdds.avail');
 define('RSM_SLV_RDAP_AVAIL',				'rsm.slv.rdap.avail');
 define('RSM_SLV_EPP_AVAIL',					'rsm.slv.epp.avail');
 define('RSM_SLV_DNSSEC_AVAIL',				'rsm.slv.dnssec.avail');
-define('RSM_SLV_KEY_DNS_NSID',				'rsm.dns.nsid[{#NS},{#IP}]');
+define('RSM_SLV_KEY_DNS_RTT',				'rsm.dns.rtt[{$RSM.TLD},<NS>,<IP>,<udp|tcp>]');
+define('RSM_SLV_KEY_DNS_NSID',				'rsm.dns.nsid[<NS>,<IP>]');
 define('RSM_SLV_KEY_DNS_PROTOCOL',			'rsm.dns.protocol');
 define('RSM_SLV_KEY_DNS_NSSOK',				'rsm.dns.nssok');
 
@@ -241,6 +242,7 @@ define('RSM_RDDS_SUBSERVICE_RDAP', 'RDAP');
 
 define('PROBES_MON_GROUPID',	130);
 define('RSM_SERVICE_AVAIL_VALUE_MAP', 110);
+define('RSM_DNS_TRANSPORT_PROTOCOL_VALUE_MAP', 161);
 define('RSM_DNS_RTT_ERRORS_VALUE_MAP', 120);
 define('RSM_RDDS_RTT_ERRORS_VALUE_MAP', 130);
 

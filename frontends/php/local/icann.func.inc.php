@@ -19,24 +19,4 @@
 **/
 
 
-/**
- * Get value mapping values as associative array. Key is mapping value, value is label.
- *
- * @param string    Value mapping name.
- * @return array|null
- */
-function rsmGetValueMappingByName($name) {
-	static $cache = [];
 
-	if (!array_key_exists($name, $cache)) {
-		$mapping = API::ValueMap()->get([
-			'output' => [],
-			'selectMappings' => ['value', 'newvalue'],
-			'filter' => compact('name')
-		]);
-
-		$cache[$name] = $mapping ? array_column($mapping[0]['mappings'], 'newvalue', 'value') : null;
-	}
-
-	return $cache[$name];
-}

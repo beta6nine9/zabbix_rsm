@@ -22,28 +22,38 @@
 require_once './local/icann.func.inc.php';
 require_once './include/incidentdetails.inc.php';
 
-class CControllerAggregateDetails extends CController {
+class CControllerAggregateDetails extends RSMControllerBase {
 
-	protected function init() {
-		$this->disableSIDValidation();
-	}
+	private $tld = [];
 
-	protected function checkPermissions() {
-		$valid_users = [USER_TYPE_READ_ONLY, USER_TYPE_ZABBIX_USER, USER_TYPE_POWER_USER, USER_TYPE_COMPLIANCE,
-			USER_TYPE_ZABBIX_ADMIN, USER_TYPE_SUPER_ADMIN];
+	private $slv_item = [];
 
-		return in_array($this->getUserType(), $valid_users);
-	}
+	private $availability_item = [];
+
+	private $probes = [];
+
+	private $probe_errors = [];
 
 	protected function checkInput() {
 		$fields = [
-			'tld_host'	=> 'string',
+			'tld_host'	=> 'required|string',
 			'type'		=> 'required|in '.implode(',', [RSM_DNS, RSM_DNSSEC]),
-			'time'		=> 'int32',
-			'slvItemId' => 'int32'
+			'time'		=> 'required|int32',
+			'slv_itemid' => 'required|int32'
 		];
 
-		$ret = $this->validateInput($fields);
+		$ret = $this->validateInput($fields) && $this->initAdditionalInput();
+
+		if (get_rsm_monitoring_type() === MONITORING_TARGET_REGISTRAR) {
+			// Report is not available in registrar mode.
+			$this->setResponse(new CControllerResponseRedirect((new CUrl('zabbix.php'))
+				->setArgument('action', 'rsm.incidentdetails')
+				->setArgument('host', $this->getInput('tld_host', ''))
+				->getUrl()
+			));
+
+			return false;
+		}
 
 		if (!$ret) {
 			$this->setResponse(new CControllerResponseFatal());
@@ -52,180 +62,81 @@ class CControllerAggregateDetails extends CController {
 		return $ret;
 	}
 
-	protected function updateProfiles(array &$data) {
-		if ($data['tld_host'] && $data['time'] && $data['slvItemId'] && $data['type'] !== null) {
-			CProfile::update('web.rsm.aggregatedresults.tld_host', $data['tld_host'], PROFILE_TYPE_STR);
-			CProfile::update('web.rsm.aggregatedresults.time', $data['time'], PROFILE_TYPE_INT);
-			CProfile::update('web.rsm.aggregatedresults.slvItemId', $data['slvItemId'], PROFILE_TYPE_ID);
-			CProfile::update('web.rsm.aggregatedresults.type', $data['type'], PROFILE_TYPE_INT);
-		}
-		elseif (!$data['tld_host'] && !$data['time'] && !$data['slvItemId'] && $data['type'] === null) {
-			$data['tld_host'] = CProfile::get('web.rsm.aggregatedresults.tld_host');
-			$data['time'] = CProfile::get('web.rsm.aggregatedresults.time');
-			$data['slvItemId'] = CProfile::get('web.rsm.aggregatedresults.slvItemId');
-			$data['type'] = CProfile::get('web.rsm.aggregatedresults.type');
-		}
-	}
-
-	protected function getReportData(array &$data) {
-		// Get host with calculated items.
-		$rsm = API::Host()->get([
-			'output' => ['hostid'],
-			'filter' => [
-				'host' => RSM_HOST
-			]
-		]);
-
-		if ($rsm) {
-			$rsm = reset($rsm);
-		}
-		else {
-			error(_s('No permissions to referred host "%1$s" or it does not exist!', RSM_HOST));
-			return;
-		}
-
-		// Get macros old value.
-		$macro_items = API::Item()->get([
-			'output' => ['itemid', 'key_', 'value_type'],
-			'hostids' => $rsm['hostid'],
-			'filter' => [
-				'key_' => [
-					CALCULATED_ITEM_DNS_DELAY,
-					CALCULATED_ITEM_DNS_AVAIL_MINNS,
-					CALCULATED_ITEM_DNS_UDP_RTT_HIGH
-				]
-			]
-		]);
-
-		foreach ($macro_items as $macro_item) {
-			/**
-			 * To get value that actually was current at the time when data was collected, we need to get history record
-			 * that was newest at the moment of requested time.
-			 *
-			 * In other words:
-			 * SELECT * FROM history_uint WHERE itemid=<itemid> AND <test_time_from> >= clock ORDER BY clock DESC LIMIT 1
-			 */
-			$macro_item_value = API::History()->get([
-				'output' => API_OUTPUT_EXTEND,
-				'itemids' => $macro_item['itemid'],
-				'time_till' => $this->test_time_from,
-				'history' => $macro_item['value_type'],
-				'sortfield' => 'clock',
-				'sortorder' => 'DESC',
-				'limit' => 1
-			]);
-
-			$macro_item_value = reset($macro_item_value);
-
-			if ($macro_item['key_'] === CALCULATED_ITEM_DNS_AVAIL_MINNS) {
-				$min_dns_count = $macro_item_value['value'];
-			}
-			elseif ($macro_item['key_'] === CALCULATED_ITEM_DNS_UDP_RTT_HIGH) {
-				$data['udp_rtt'] = $macro_item_value['value'];
-			}
-			else {
-				$macro_time = $macro_item_value['value'] - 1;
-			}
-		}
-
-		// Time calculation.
-		$this->test_time_till = $this->test_time_from + $macro_time;
-
-		// Get TLD.
+	/**
+	 * Check is requested tld_host and slv_itemid exists. Initializes properties:
+	 *   'tld', 'slv_item', 'availability_item', 'probes'.
+	 *
+	 * @return bool
+	 */
+	protected function initAdditionalInput() {
+		// tld
 		$tld = API::Host()->get([
 			'output' => ['hostid', 'host', 'name'],
 			'tlds' => true,
 			'filter' => [
-				'host' => $data['tld_host']
+				'host' => $this->getInput('tld_host')
 			]
 		]);
+		$this->tld = reset($tld);
 
-		if ($tld) {
-			$data['tld'] = reset($tld);
-		}
-		else {
+		if (!$this->tld) {
 			error(_('No permissions to referred TLD or it does not exist!'));
-			return;
+			return false;
 		}
 
-		// Get slv item.
+		// slv_item
 		$slv_items = API::Item()->get([
 			'output' => ['name'],
-			'itemids' => $data['slvItemId']
+			'itemids' => $this->getInput('slv_itemid')
 		]);
+		$this->slv_item = reset($slv_items);
 
-		if ($slv_items) {
-			$data['slvItem'] = reset($slv_items);
-		}
-		else {
+		if (!$this->slv_item) {
 			error(_('No permissions to referred SLV item or it does not exist!'));
-			return;
+			return false;
 		}
 
-		// Get test result.
-		$key = ($data['type'] == RSM_DNS) ? RSM_SLV_DNS_AVAIL : RSM_SLV_DNSSEC_AVAIL;
-
-		// Get items.
-		$avail_items = API::Item()->get([
+		// availability_item
+		$key = $this->getInput('type') == RSM_DNS ? RSM_SLV_DNS_AVAIL : RSM_SLV_DNSSEC_AVAIL;
+		$avail_item = API::Item()->get([
 			'output' => ['itemid', 'value_type'],
-			'hostids' => $data['tld']['hostid'],
-			'filter' => [
-				'key_' => $key
-			]
+			'hostids' => $this->tld['hostid'],
+			'filter' => ['key_' => $key]
 		]);
+		$this->availability_item = reset($avail_item);
 
-		if ($avail_items) {
-			$avail_item = reset($avail_items);
-
-			$test_results = API::History()->get([
-				'output' => API_OUTPUT_EXTEND,
-				'itemids' => $avail_item['itemid'],
-				'time_from' => $this->test_time_from,
-				'time_till' => $this->test_time_till,
-				'history' => $avail_item['value_type'],
-				'limit' => 1
-			]);
-
-			if (($test_result = reset($test_results)) !== false) {
-				$data['testResult'] = $test_result['value'];
-			}
-		}
-		else {
+		if (!$this->availability_item) {
 			error(_s('Item with key "%1$s" not exist on TLD!', $key));
-			return;
+			return false;
 		}
 
-		// Get probes.
-		$probes = API::Host()->get([
+		// probes
+		$db_probes = API::Host()->get([
 			'output' => ['hostid', 'host'],
-			'groupids' => PROBES_MON_GROUPID,
-			'preservekeys' => true
+			'groupids' => PROBES_MON_GROUPID
 		]);
 
-		$tld_probe_names = [];
-		foreach ($probes as $probe) {
-			$pos = strrpos($probe['host'], ' - mon');
-			if ($pos === false) {
-				error(_s('Unexpected host name "%1$s" among probe hosts.', $probe['host']));
-				continue;
+		foreach ($db_probes as $probe) {
+			$probe_host = substr($probe['host'], 0, strrpos($probe['host'], ' - mon'));
+
+			if ($probe_host) {
+				$this->probes[$probe['hostid']] = [
+					'host' => $probe_host,
+					'hostid' => $probe['hostid']
+				];
 			}
-
-			$tld_probe_name = substr($probe['host'], 0, $pos);
-
-			$data['probes'][$probe['hostid']] = [
-				'host' => $tld_probe_name,
-				'name' => $tld_probe_name
-			];
-
-			$tld_probe_names[$data['tld']['host'] . ' ' . $tld_probe_name] = $probe['hostid'];
+			else {
+				error(_s('Unexpected host name "%1$s" among probe hosts.', $probe['host']));
+			}
 		}
 
-		// Get total number of probes for summary block before results table.
-		$data['totalProbes'] = count($data['probes']);
+		return true;
+	}
 
+	protected function getReportData(array &$data, $time_from, $time_till) {
 		$probe_items = API::Item()->get([
 			'output' => ['itemid', 'key_', 'hostid'],
-			'hostids' => array_keys($data['probes']),
+			'hostids' => array_keys($this->probes),
 			'filter' => [
 				'key_' => PROBE_KEY_ONLINE
 			],
@@ -237,29 +148,26 @@ class CControllerAggregateDetails extends CController {
 			$item_values = API::History()->get([
 				'output' => API_OUTPUT_EXTEND,
 				'itemids' => array_keys($probe_items),
-				'time_from' => $this->test_time_from,
-				'time_till' => $this->test_time_till
+				'time_from' => $time_from,
+				'time_till' => $time_till
 			]);
 
-			$items_utilized = [];
-
 			foreach ($item_values as $item_value) {
-				if (array_key_exists($item_value['itemid'], $items_utilized)) {
-					continue;
-				}
-
 				$probe_hostid = $probe_items[$item_value['itemid']]['hostid'];
-				$items_utilized[$item_value['itemid']] = true;
 
 				/**
 				 * Value of probe item PROBE_KEY_ONLINE == PROBE_DOWN means that both DNS UDP and DNS TCP are offline.
-				 * Support for TCP will be added in phase 3.
 				 */
-				if ($item_value['value'] == PROBE_DOWN) {
-					$data['probes'][$probe_hostid]['status_udp'] = PROBE_OFFLINE;
+				if (!isset($this->probes[$probe_hostid]['online_status']) && $item_value['value'] == PROBE_DOWN) {
+					$this->probes[$probe_hostid]['online_status'] = PROBE_OFFLINE;
 				}
 			}
-			unset($items_utilized);
+		}
+
+		$tld_probe_names = [];
+
+		foreach ($this->probes as $probe) {
+			$tld_probe_names[$this->tld['host'].' '.$probe['host']] = $probe['hostid'];
 		}
 
 		// Get probes for specific TLD.
@@ -272,6 +180,7 @@ class CControllerAggregateDetails extends CController {
 		]);
 
 		$data['probes_status'] = [];
+
 		foreach ($tld_probes as $tld_probe) {
 			$probe_name = substr($tld_probe['host'], strlen($data['tld_host']) + 1);
 			$data['probes_status'][$probe_name] = $tld_probe['status'];
@@ -301,52 +210,47 @@ class CControllerAggregateDetails extends CController {
 		if ($probes_udp_items) {
 			$item_values_db = API::History()->get([
 				'output' => API_OUTPUT_EXTEND,
-				'itemids' => zbx_objectValues($probes_udp_items, 'itemid'),
-				'time_from' => $this->test_time_from,
-				'time_till' => $this->test_time_till,
+				'itemids' => array_keys($probes_udp_items),
+				'time_from' => $time_from,
+				'time_till' => $time_till,
 				'history' => reset($probes_udp_items)['value_type']
 			]);
-
-			$item_values = [];
-			foreach ($item_values_db as $item_value_db) {
-				$item_values[$item_value_db['itemid']] = $item_value_db['value'];
-			}
-			unset($item_values_db);
+			$item_values = array_column($item_values_db, 'value', 'itemid');
+			$dns_nameservers = [];
+			$key_parser = new CItemKey;
+			$key_parser->parse(RSM_SLV_KEY_DNS_RTT);
+			$params_count = 3; // $key_parser->getParamsNum();
 
 			foreach ($probes_udp_items as $probes_item) {
 				$probeid = $tld_probe_names[reset($probes_item['hosts'])['host']];
-				$item_value = !array_key_exists('status_udp', $data['probes'][$probeid])	// Skip offline probes
+				$item_value = !array_key_exists('online_status', $this->probes[$probeid])	// Skip offline probes
 						&& array_key_exists($probes_item['itemid'], $item_values)
 					? (int) $item_values[$probes_item['itemid']]
 					: null;
+				$key_parser->parse($probes_item['key_']);
+				$ns = $key_parser->getParam(1);
+				$ip = $key_parser->getParam(2);
+				$protocol = $key_parser->getParam(3);
 
-				preg_match('/^[^\[]+\[([^\]]+)]$/', $probes_item['key_'], $matches);
-				if (!$matches) {
-					show_error_message(_s('Unexpected item key "%1$s".', $probes_item['key_']));
+				if ($key_parser->getParamsNum() != $params_count) {
+					error(_s('Unexpected item key "%1$s".', $probes_item['key_']));
 					continue;
 				}
 
-				$matches = explode(',', $matches[1]);
-				$ipv = filter_var($matches[2], FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) ? 'ipv4' : 'ipv6';
+				$ipv = filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) ? 'ipv4' : 'ipv6';
+				$dns_nameservers[$ns][$ipv][$ip] = true;
+				$this->probes[$probeid]['results_udp'][$ns][$ipv][$ip] = $item_value;
+				$error_key = implode('_', ['udp', $ns, $ipv, $ip]);
 
-				$data['dns_udp_nameservers'][$matches[1]][$ipv][$matches[2]] = true;
-				$data['probes'][$probeid]['results_udp'][$matches[1]][$ipv][$matches[2]] = $item_value;
-
-				$error_key = 'udp_'.$matches[1].'_'.$ipv.'_'.$matches[2];
-
-				if (0 > $item_value) {
-					if (!array_key_exists($item_value, $data['errors'])) {
-						$data['errors'][$item_value] = [];
+				if ($item_value < 0) {
+					if (!isset($this->probe_errors[$item_value][$error_key])) {
+						$this->probe_errors[$item_value][$error_key] = 0;
 					}
 
-					if (!array_key_exists($error_key, $data['errors'][$item_value])) {
-						$data['errors'][$item_value][$error_key] = 0;
-					}
-
-					$data['errors'][$item_value][$error_key]++;
+					$this->probe_errors[$item_value][$error_key]++;
 				}
 				elseif ($item_value > $data['udp_rtt'] && $data['type'] == RSM_DNS) {
-					if (!array_key_exists($error_key, $data['probes_above_max_rtt'])) {
+					if (!isset($data['probes_above_max_rtt'][$error_key])) {
 						$data['probes_above_max_rtt'][$error_key] = 0;
 					}
 
@@ -355,37 +259,39 @@ class CControllerAggregateDetails extends CController {
 			}
 		}
 
+		$data['dns_nameservers'] = $dns_nameservers;
+
 		/**
 		 * Collects NSID item values for all probe name servers and ips. NSID unique values will be stored in
 		 * $data['nsids] with key having incremental index and value NSID value. Additionaly probe ns+ip NSID results
-		 * will be stored in 'results_nsid' property of $data['probes'][{PROBE_ID}] array as incremental index
+		 * will be stored in 'results_nsid' property of $this->probes[{PROBE_ID}] array as incremental index
 		 * pointing to value in $data['nsids'].
 		 *
-		 * $data['probes'][{PROBE_ID}]['results_nsid'][{NAME_SERVER_NAME}][{NAME_SERVER_IP}] = NSID value index.
+		 * $this->probes[{PROBE_ID}]['results_nsid'][{NAME_SERVER_NAME}][{NAME_SERVER_IP}] = NSID value index.
 		 */
 		$nsid_item_keys = [];
 
-		foreach ($data['dns_udp_nameservers'] as $ns_name => $ips) {
+		foreach ($dns_nameservers as $ns_name => $ips) {
 			$ips = array_reduce($ips, 'array_merge', []);
 
 			foreach (array_keys($ips) as $ip) {
 				$nsid_item_keys[] = strtr(RSM_SLV_KEY_DNS_NSID, [
-					'{#NS}' => $ns_name,
-					'{#IP}' => $ip
+					'<NS>' => $ns_name,
+					'<IP>' => $ip
 				]);
 			}
 		}
 
 		$nsid_items = API::Item()->get([
 			'output' => ['key_', 'type', 'hostid'],
-			'hostids' => array_keys($data['probes']),
+			'hostids' => array_keys($this->probes),
 			'filter' => ['key_' => $nsid_item_keys],
 			'preservekeys' => true
 		]);
 
 		$nsid_values = API::History()->get([
 			'output' => ['itemid', 'value'],
-			'itemids' => zbx_objectValues($nsid_items, 'itemid'),
+			'itemids' => array_keys($nsid_items),
 			'time_from' => $data['time'],
 			'time_till' => $data['time'],
 			'history' => ITEM_VALUE_TYPE_TEXT
@@ -407,29 +313,27 @@ class CControllerAggregateDetails extends CController {
 
 			$ns_name = $params[0]['parameters'][0]['raw'];
 			$ns_ip = $params[0]['parameters'][1]['raw'];
-			$data['probes'][$nsid_item['hostid']]['results_nsid'][$ns_name][$ns_ip] = array_search($nsid_value['value'],
+			$this->probes[$nsid_item['hostid']]['results_nsid'][$ns_name][$ns_ip] = array_search($nsid_value['value'],
 				$data['nsids']
 			);
 		}
 
-		// Sort errors.
-		krsort($data['errors']);
 		$probe_protocol = [];
-		$protocol_type = rsmGetValueMappingByName('Transport protocol');
+		$protocol_type = $this->getValueMapping(RSM_DNS_TRANSPORT_PROTOCOL_VALUE_MAP);
 
-		if (is_null($protocol_type)) {
+		if (!$protocol_type) {
 			error(_('Value mapping for "Transport protocol" is not found.'));
 		}
 		else {
 			$protocol_items = API::Item()->get([
 				'output' => ['itemid', 'hostid'],
-				'hostids' => array_keys($data['probes']),
+				'hostids' => array_keys($this->probes),
 				'filter' => ['key_' => RSM_SLV_KEY_DNS_PROTOCOL],
 				'preservekeys' => true
 			]);
 			$protocol_items_data = API::History()->get([
 				'output' => ['itemid', 'value'],
-				'itemids' => array_column($protocol_items, 'itemid'),
+				'itemids' => array_keys($protocol_items),
 				'time_from' => $data['time'],
 				'time_till' => $data['time'],
 				'history' => ITEM_VALUE_TYPE_UINT64
@@ -441,16 +345,14 @@ class CControllerAggregateDetails extends CController {
 			}
 		}
 
-		foreach ($data['probes'] as $probeid => &$probe) {
+		foreach ($this->probes as $probeid => &$probe) {
 			$probe['ns_up'] = 0;
 			$probe['ns_down'] = 0;
-			// $probe['udp_ns_down'] = 0;
-			// $probe['udp_ns_up'] = 0;
 
 			// TODO: ICA-605 remove start.
 			if (array_key_exists('results_udp', $probe)) {
 				$nameservers_up = [];
-				$probe['transport'] = $protocol_type[0];// UDP
+				$probe['transport'] = reset($protocol_type);// UDP
 
 				/**
 				 * NameServer is considered as Down once at least one of its IP addresses is either negative value (error
@@ -517,99 +419,72 @@ class CControllerAggregateDetails extends CController {
 			$item_values = API::History()->get([
 				'output' => API_OUTPUT_EXTEND,
 				'itemids' => array_keys($probe_items),
-				'time_from' => $this->test_time_from,
-				'time_till' => $this->test_time_till,
-				'history' => 3
+				'time_from' => $time_from,
+				'time_till' => $time_till,
+				'history' => ITEM_VALUE_TYPE_UINT64
 			]);
-			$items_utilized = [];
 
 			foreach ($item_values as $item_value) {
-				if (array_key_exists($item_value['itemid'], $items_utilized)) {
-					continue;
-				}
-
 				$probe_item = $probe_items[$item_value['itemid']];
 				$probe_hostid = $tld_probe_names[$tld_probes[$probe_item['hostid']]['name']];
-				$items_utilized[$item_value['itemid']] = true;
 
-				if (array_key_exists('status_udp', $data['probes'][$probe_hostid])) {
-					continue;
+				if (!isset($this->probes[$probe_hostid]['online_status'])) {
+					/**
+					 * DNS is considered to be UP if selected value is greater or equal to
+					 * rsm.configvalue[RSM.DNS.AVAIL.MINNS] value of <RSM_HOST> at given time.
+					 */
+					$this->probes[$probe_hostid]['online_status'] = ($item_value['value'] >= $data['min_dns_count'])
+						? PROBE_UP
+						: PROBE_DOWN;
 				}
-
-				/**
-				 * DNS is considered to be UP if selected value is greater than rsm.configvalue[RSM.DNS.AVAIL.MINNS]
-				 * for <RSM_HOST> at given time;
-				 */
-				$data['probes'][$probe_hostid]['status_udp'] = ($item_value['value'] >= $min_dns_count)
-					? PROBE_UP
-					: PROBE_DOWN;
 			}
-			unset($items_utilized);
 		}
 
-		CArrayHelper::sort($data['probes'], ['name']);
+		CArrayHelper::sort($this->probes, ['host']);
 	}
 
 	protected function doAction() {
-		// Report is not available in registrar mode.
-		if (get_rsm_monitoring_type() === MONITORING_TARGET_REGISTRAR) {
-			$this->setResponse(new CControllerResponseRedirect((new CUrl('zabbix.php'))
-				->setArgument('action', 'rsm.incidentdetails')
-				->setArgument('host', $this->getInput('tld_host', ''))
-				->getUrl()
-			));
-		}
-
+		$time_from = strtotime(date('Y-m-d H:i:0', $this->getInput('time')));
+		$macro = $this->getHistoryMacroValue([
+			CALCULATED_ITEM_DNS_DELAY,
+			CALCULATED_ITEM_DNS_AVAIL_MINNS,
+			CALCULATED_ITEM_DNS_UDP_RTT_HIGH
+		], $time_from);
 		$data = [
 			'title' => _('Details of particular test'),
-			'tld_host' => $this->getInput('tld_host', null),
-			'time' => $this->getInput('time', null),
-			'slvItemId' => $this->getInput('slvItemId', null),
-			'type' => $this->getInput('type', null),
-			'probes' => [],
-			'errors' => []
+			'tld_host' => $this->tld['host'],
+			'slv_item_name' => $this->slv_item['name'],
+			'type' => $this->getInput('type'),
+			'time' => $time_from,
+			'min_dns_count' => $macro[CALCULATED_ITEM_DNS_AVAIL_MINNS],
+			'udp_rtt' => $macro[CALCULATED_ITEM_DNS_UDP_RTT_HIGH],
+			'test_error_message' => $this->getValueMapping(RSM_DNS_RTT_ERRORS_VALUE_MAP),
+			'test_status_message' => $this->getValueMapping(RSM_SERVICE_AVAIL_VALUE_MAP)
 		];
-
-		$this->updateProfiles($data);
+		$time_till = $time_from + ($macro[CALCULATED_ITEM_DNS_DELAY] - 1);
 
 		if ($data['type'] == RSM_DNS) {
 			$data['probes_above_max_rtt'] = [];
 		}
 
-		if ($data['tld_host'] && $data['time'] && $data['slvItemId'] && $data['type'] !== null) {
-			$this->test_time_from = mktime(
-				date('H', $data['time']),
-				date('i', $data['time']),
-				0,
-				date('n', $data['time']),
-				date('j', $data['time']),
-				date('Y', $data['time'])
-			);
+		$test_result = API::History()->get([
+			'output' => ['value'],
+			'itemids' => $this->availability_item['itemid'],
+			'time_from' => $time_from,
+			'time_till' => $time_till,
+			'history' => $this->availability_item['value_type'],
+			'limit' => 1
+		]);
+		$test_result = reset($test_result);
 
-			$data['testResult'] = null;
-			$data['totalProbes'] = 0;
-
-			$this->getReportData($data);
-
-			// Get value maps for error messages.
-			$error_msg_value_map = API::ValueMap()->get([
-				'output' => [],
-				'selectMappings' => ['value', 'newvalue'],
-				'valuemapids' => [RSM_DNS_RTT_ERRORS_VALUE_MAP]
-			]);
-
-			if ($error_msg_value_map) {
-				foreach ($error_msg_value_map[0]['mappings'] as $val) {
-					$data['error_msgs'][$val['value']] = $val['newvalue'];
-				}
-			}
-
-			// Get mapped value for test result.
-			$data['testResultLabel'] = getMappedValue($data['testResult'], RSM_SERVICE_AVAIL_VALUE_MAP);
-			if (!$data['testResultLabel']) {
-				$data['testResultLabel'] = _('No result');
-			}
+		if ($test_result) {
+			$data['test_result'] = $test_result['value'];
 		}
+
+		$this->getReportData($data, $time_from, $time_till);
+		$data['probes'] = $this->probes;
+		$data['errors'] = $this->probe_errors;
+		krsort($data['errors']);
 
 		$response = new CControllerResponseData($data);
 		$response->setTitle($data['title']);
