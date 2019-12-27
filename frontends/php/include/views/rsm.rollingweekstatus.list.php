@@ -328,7 +328,7 @@ if ($data['tld']) {
 		elseif ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY) {
 			$row[] = (new CDiv(null))
 				->addClass('service-icon status_icon_extra iconrollingweekdisabled disabled-service')
-				->setHint('Incorrect TLD configuration.', '', 'on');
+				->setHint('Incorrect TLD configuration.', '', false);
 		}
 
 		// DNSSEC
@@ -373,7 +373,7 @@ if ($data['tld']) {
 		elseif ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY) {
 			$row[] = (new CDiv(null))
 				->addClass('service-icon status_icon_extra iconrollingweekdisabled disabled-service')
-				->setHint('DNSSEC is disabled.', '', 'on');
+				->setHint('DNSSEC is disabled.', '', false);
 		}
 
 		// RDDS
@@ -431,7 +431,7 @@ if ($data['tld']) {
 		else {
 			$row[] = (new CDiv(null))
 				->addClass('service-icon status_icon_extra iconrollingweekdisabled disabled-service')
-				->setHint('RDDS is disabled.', '', 'on');
+				->setHint('RDDS is disabled.', '', false);
 		}
 
 		// RDAP
@@ -474,7 +474,7 @@ if ($data['tld']) {
 		elseif (is_RDAP_standalone()) {
 			$row[] = (new CDiv(null))
 				->addClass('service-icon status_icon_extra iconrollingweekdisabled disabled-service')
-				->setHint('RDAP is disabled.', '', 'on');
+				->setHint('RDAP is disabled.', '', false);
 		}
 
 		// EPP
@@ -519,7 +519,7 @@ if ($data['tld']) {
 		elseif ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY) {
 			$row[] = (new CDiv(null))
 				->addClass('service-icon status_icon_extra iconrollingweekdisabled disabled-service')
-				->setHint('EPP is disabled.', '', 'on');
+				->setHint('EPP is disabled.', '', false);
 		}
 
 		$row[] = new CLink($tld['server'], $tld['url'].'rsm.rollingweekstatus.php?sid='.$data['sid'].'&set_sid=1');
