@@ -15,12 +15,15 @@ use constant APP_ZABBIX_PROXY_TEMPLATEID	=> 10058;	# Template "Template App Zabb
 use constant PROBE_ERRORS_TEMPLATEID		=> 99990;	# Template "Template Probe Errors"
 use constant DNS_TEMPLATEID			=> 99500;	# Template "Template DNS"
 use constant RDAP_TEMPLATEID			=> 99980;	# Template "Template RDAP"
+use constant CONFIG_HISTORY_TEMPLATEID		=> 100002;	# Template "Template Config History"
 
 use constant TEMPLATES_TLD_GROUPID		=> 240;		# Host group "Templates - TLD"
 use constant PROBES_GROUPID			=> 120;		# Host group "Probes"
 use constant PROBES_MON_GROUPID			=> 130;		# Host group "Probes - Mon"
 use constant TLDS_GROUPID			=> 140;		# Host group "TLDs"
 use constant TLD_PROBE_RESULTS_GROUPID		=> 190;		# Host group "TLD Probe results"
+
+use constant TEMPLATE_RSMHOST_CONFIG_PREFIX	=> 'Template Rsmhost Config ';
 
 use constant VALUE_TYPE_AVAIL => 0;
 use constant VALUE_TYPE_PERC  => 1;
@@ -159,6 +162,8 @@ use constant CFG_MACRO_DESCRIPTION => {
 	'{$RSM.IP6.ENABLED}' => 'Indicates whether the probe supports IPv6',
 	'{$RSM.EPP.ENABLED}' => 'Indicates whether EPP is enabled on probe',
 	'{$RSM.DNS.TESTPREFIX}' => 'Prefix for DNS tests, e.g. nonexistent',
+	'{$RSM.TLD.DNS.UDP.ENABLED}' => 'Indicates whether DNS UDP enabled for this TLD',
+	'{$RSM.TLD.DNS.TCP.ENABLED}' => 'Indicates whether DNS TCP enabled for this TLD',
 };
 
 our @EXPORT_OK = qw(
@@ -171,6 +176,8 @@ our @EXPORT_OK = qw(
 	PROBE_ERRORS_TEMPLATEID
 	DNS_TEMPLATEID
 	RDAP_TEMPLATEID
+	CONFIG_HISTORY_TEMPLATEID
+	TEMPLATE_RSMHOST_CONFIG_PREFIX
 	CONFIGVALUE_DNS_UDP_RTT_HIGH_ITEMID
 	TEMPLATES_TLD_GROUPID
 	PROBES_GROUPID
@@ -206,7 +213,9 @@ our %EXPORT_TAGS = (
 			APP_ZABBIX_PROXY_TEMPLATEID
 			PROBE_ERRORS_TEMPLATEID
 			DNS_TEMPLATEID
-			RDAP_TEMPLATEID) ],
+			RDAP_TEMPLATEID
+			CONFIG_HISTORY_TEMPLATEID
+			TEMPLATE_RSMHOST_CONFIG_PREFIX) ],
 	groups => [ qw(
 			TEMPLATES_TLD_GROUPID
 			PROBES_GROUPID

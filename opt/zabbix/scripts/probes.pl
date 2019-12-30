@@ -213,7 +213,7 @@ sub add_probe($$$$$$$$$$$)
 		my $tld_groupid = create_group("TLD $tld_name");
 		my $tld_type = $tld->{'type'};
 
-		my $main_templateid = create_template("Template $tld_name");
+		my $main_templateid = create_template(TEMPLATE_RSMHOST_CONFIG_PREFIX . $tld_name);
 
 		print("Creating '$tld_name $probe_name' host for '$tld_name' TLD: ");
 
