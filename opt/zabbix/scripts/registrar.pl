@@ -595,12 +595,12 @@ sub create_main_template($)
 		}));
 	}
 
-	create_items_rdds($templateid, $template_name);
-
 	really(create_macro('{$RSM.TLD}', $rsmhost, $templateid));
 	really(create_macro('{$RSM.RDDS.TESTPREFIX}', getopt('rdds-test-prefix'), $templateid, 1)) if (opt('rdds-test-prefix'));
 	really(create_macro('{$RSM.RDDS.NS.STRING}', opt('rdds-ns-string') ? getopt('rdds-ns-string') : CFG_DEFAULT_RDDS_NS_STRING, $templateid, 1));
 	really(create_macro('{$RSM.TLD.RDDS.ENABLED}', opt('rdds43-servers') ? 1 : 0, $templateid, 1));
+	really(create_macro('{$RSM.TLD.RDDS.43.SERVERS}', getopt('rdds43-servers') // '', $templateid, 1));
+	really(create_macro('{$RSM.TLD.RDDS.80.SERVERS}', getopt('rdds80-servers') // '', $templateid, 1));
 	really(create_macro('{$RSM.TLD.EPP.ENABLED}', 0, $templateid)); # required by rsm.rdds[] metric
 
 	if (opt('rdap-base-url') && opt('rdap-test-domain'))
@@ -615,84 +615,6 @@ sub create_main_template($)
 	}
 
 	return $templateid;
-}
-
-sub create_items_rdds($$)
-{
-	my $templateid    = shift;
-	my $template_name = shift;
-
-	if (opt('rdds43-servers'))
-	{
-		my $applicationid = get_application_id('RDDS43', $templateid);
-
-		really(create_item({
-			'name'         => 'RDDS43 IP of $1',
-			'key_'         => 'rsm.rdds.43.ip[{$RSM.TLD}]',
-			'status'       => ITEM_STATUS_ACTIVE,
-			'hostid'       => $templateid,
-			'applications' => [$applicationid],
-			'type'         => ITEM_TYPE_TRAPPER,
-			'value_type'   => ITEM_VALUE_TYPE_STR
-		}));
-
-		really(create_item({
-			'name'         => 'RDDS43 RTT of $1',
-			'key_'         => 'rsm.rdds.43.rtt[{$RSM.TLD}]',
-			'status'       => ITEM_STATUS_ACTIVE,
-			'hostid'       => $templateid,
-			'applications' => [$applicationid],
-			'type'         => ITEM_TYPE_TRAPPER,
-			'value_type'   => ITEM_VALUE_TYPE_FLOAT,
-			'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_rdds_rtt'}
-		}));
-	}
-
-	if (opt('rdds80-servers'))
-	{
-		my $applicationid = get_application_id('RDDS80', $templateid);
-
-		really(create_item({
-			'name'         => 'RDDS80 IP of $1',
-			'key_'         => 'rsm.rdds.80.ip[{$RSM.TLD}]',
-			'status'       => ITEM_STATUS_ACTIVE,
-			'hostid'       => $templateid,
-			'applications' => [$applicationid],
-			'type'         => ITEM_TYPE_TRAPPER,
-			'value_type'   => ITEM_VALUE_TYPE_STR
-		}));
-
-		really(create_item({
-			'name'         => 'RDDS80 RTT of $1',
-			'key_'         => 'rsm.rdds.80.rtt[{$RSM.TLD}]',
-			'status'       => ITEM_STATUS_ACTIVE,
-			'hostid'       => $templateid,
-			'applications' => [$applicationid],
-			'type'         => ITEM_TYPE_TRAPPER,
-			'value_type'   => ITEM_VALUE_TYPE_FLOAT,
-			'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_rdds_rtt'}
-		}));
-	}
-
-	if (opt('rdds43-servers') || opt('rdds80-servers'))
-	{
-		# disable old items to keep the history, if value of rdds43-servers and/or rdds80-servers has changed
-		my @old_rdds_availability_items = keys(%{get_items_like($templateid, 'rsm.rdds[', true)});
-		disable_items(\@old_rdds_availability_items);
-
-		# create new item (or update/enable existing item)
-		really(create_item({
-			'name'         => 'RDDS availability',
-			'key_'         => 'rsm.rdds[{$RSM.TLD},"' . getopt('rdds43-servers') . '","' . getopt('rdds80-servers') . '"]',
-			'status'       => ITEM_STATUS_ACTIVE,
-			'hostid'       => $templateid,
-			'applications' => [get_application_id('RDDS', $templateid)],
-			'type'         => ITEM_TYPE_SIMPLE,
-			'value_type'   => ITEM_VALUE_TYPE_UINT64,
-			'delay'        => '{$RSM.RDDS.DELAY}',
-			'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_rdds_result'}
-		}));
-	}
 }
 
 sub create_rsmhost($)

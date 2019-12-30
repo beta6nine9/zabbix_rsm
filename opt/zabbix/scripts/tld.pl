@@ -1108,7 +1108,6 @@ sub create_main_template($$)
 
 	really(create_macro('{$RSM.DNS.NAME.SERVERS}', $name_servers_list, $templateid, 1));
 
-	create_items_rdds($templateid);
 	create_items_epp($templateid) if (opt('epp-servers'));
 
 	really(create_macro('{$RSM.TLD}', $tld, $templateid));
@@ -1119,6 +1118,8 @@ sub create_main_template($$)
 	really(create_macro('{$RSM.TLD.DNS.TCP.ENABLED}', getopt('dns-tcp'), $templateid, 1));
 	really(create_macro('{$RSM.TLD.DNSSEC.ENABLED}', getopt('dnssec'), $templateid, 1));
 	really(create_macro('{$RSM.TLD.RDDS.ENABLED}', opt('rdds43-servers') ? 1 : 0, $templateid, 1));
+	really(create_macro('{$RSM.TLD.RDDS.43.SERVERS}', getopt('rdds43-servers') // '', $templateid, 1));
+	really(create_macro('{$RSM.TLD.RDDS.80.SERVERS}', getopt('rdds80-servers') // '', $templateid, 1));
 	really(create_macro('{$RSM.TLD.EPP.ENABLED}', opt('epp-servers') ? 1 : 0, $templateid, 1));
 
 	if (opt('rdap-base-url') && opt('rdap-test-domain'))
@@ -1227,102 +1228,6 @@ sub create_slv_item($$$$$;$)
 	}
 
 	pfail("Unknown value type $value_type.");
-}
-
-sub create_items_rdds($)
-{
-	my $templateid    = shift;
-
-	if (opt('rdds43-servers'))
-	{
-		my $applicationid_43 = get_application_id('RDDS43', $templateid);
-		my $applicationid_80 = get_application_id('RDDS80', $templateid);
-
-		my $item_key = 'rsm.rdds.43.ip[{$RSM.TLD}]';
-
-		really(create_item({
-			'name'         => 'RDDS43 IP of $1',
-			'key_'         => $item_key,
-			'status'       => ITEM_STATUS_ACTIVE,
-			'hostid'       => $templateid,
-			'applications' => [$applicationid_43],
-			'type'         => ITEM_TYPE_TRAPPER,
-			'value_type'   => ITEM_VALUE_TYPE_STR
-		}));
-
-		$item_key = 'rsm.rdds.43.rtt[{$RSM.TLD}]';
-
-		really(create_item({
-			'name'         => 'RDDS43 RTT of $1',
-			'key_'         => $item_key,
-			'status'       => ITEM_STATUS_ACTIVE,
-			'hostid'       => $templateid,
-			'applications' => [$applicationid_43],
-			'type'         => ITEM_TYPE_TRAPPER,
-			'value_type'   => ITEM_VALUE_TYPE_FLOAT,
-			'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_rdds_rtt'}
-		}));
-
-		if (opt('epp-servers'))
-		{
-			$item_key = 'rsm.rdds.43.upd[{$RSM.TLD}]';
-
-			really(create_item({
-				'name'         => 'RDDS43 update time of $1',
-				'key_'         => $item_key,
-				'status'       => ITEM_STATUS_ACTIVE,
-				'hostid'       => $templateid,
-				'applications' => [$applicationid_43],
-				'type'         => ITEM_TYPE_TRAPPER,
-				'value_type'   => ITEM_VALUE_TYPE_FLOAT,
-				'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_rdds_rtt'}
-			}));
-		}
-
-		$item_key = 'rsm.rdds.80.ip[{$RSM.TLD}]';
-
-		really(create_item({
-			'name'         => 'RDDS80 IP of $1',
-			'key_'         => $item_key,
-			'status'       => ITEM_STATUS_ACTIVE,
-			'hostid'       => $templateid,
-			'applications' => [$applicationid_80],
-			'type'         => ITEM_TYPE_TRAPPER,
-			'value_type'   => ITEM_VALUE_TYPE_STR
-		}));
-
-		$item_key = 'rsm.rdds.80.rtt[{$RSM.TLD}]';
-
-		really(create_item({
-			'name'         => 'RDDS80 RTT of $1',
-			'key_'         => $item_key,
-			'status'       => ITEM_STATUS_ACTIVE,
-			'hostid'       => $templateid,
-			'applications' => [$applicationid_80],
-			'type'         => ITEM_TYPE_TRAPPER,
-			'value_type'   => ITEM_VALUE_TYPE_FLOAT,
-			'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_rdds_rtt'}
-		}));
-
-		$item_key = 'rsm.rdds[{$RSM.TLD},"' . getopt('rdds43-servers') . '","' . getopt('rdds80-servers') . '"]';
-
-		# disable old items to keep the history, if value of rdds43-servers and/or rdds80-servers has changed
-		my @old_rdds_availability_items = keys(%{get_items_like($templateid, 'rsm.rdds[', true)});
-		disable_items(\@old_rdds_availability_items);
-
-		# create new item (or update/enable existing item)
-		really(create_item({
-			'name'         => 'RDDS availability',
-			'key_'         => $item_key,
-			'status'       => ITEM_STATUS_ACTIVE,
-			'hostid'       => $templateid,
-			'applications' => [get_application_id('RDDS', $templateid)],
-			'type'         => ITEM_TYPE_SIMPLE,
-			'value_type'   => ITEM_VALUE_TYPE_UINT64,
-			'delay'        => '{$RSM.RDDS.DELAY}',
-			'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_rdds_result'}
-		}));
-	}
 }
 
 sub create_items_epp($)

@@ -107,39 +107,39 @@ sub add_probe($$$$$$$$$$$)
 	print("Trying to add '$probe_name' probe...\n");
 	print "The probe with name '$probe_name' already exists! Trying to enable it\n" if (probe_exists($probe_name));
 
-    ###### Checking and creating required groups and templates
+	###### Checking and creating required groups and templates
 
 	print("Getting 'Template Proxy Health' template: ");
 	my $probe_tmpl_health = create_probe_health_tmpl();
 	is_not_empty($probe_tmpl_health, true);
 
-    ########## Creating new Probe
+	########## Creating new Probe
 
 	print("Creating '$probe_name' with interface $probe_ip:$probe_port ");
 	my $probe = create_passive_proxy($probe_name, $probe_ip, $probe_port, $psk_identity, $psk);
 	is_not_empty($probe, true);
 
-    ########## Creating new Host Group
+	########## Creating new Host Group
 
 	print("Creating '$probe_name' host group: ");
 	my $probe_groupid = create_group($probe_name);
 	is_not_empty($probe_groupid, true);
 
-    ########## Creating Probe template
+	########## Creating Probe template
 
 	print("Creating '$probe_name' template: ");
 	my $probe_tmpl = create_probe_template($probe_name, $epp, $ipv4, $ipv6, $rdds, $rdap, $resolver);
 	is_not_empty($probe_tmpl, true);
 
 
-    ########## Creating Probe status template
+	########## Creating Probe status template
 
 	print("Creating '$probe_name' probe status template: ");
 	my $root_servers_macros = update_root_servers();
 	my $probe_status_templateid = create_probe_status_template($probe_name, $probe_tmpl, $root_servers_macros);
 	is_not_empty($probe_status_templateid, true);
 
-    ########## Creating Probe host
+	########## Creating Probe host
 
 	print("Creating '$probe_name' host: ");
 	my $probe_host = create_host({
@@ -169,7 +169,7 @@ sub add_probe($$$$$$$$$$$)
 
 	is_not_empty($probe_host, true);
 
-    ########## Creating Probe monitoring host
+	########## Creating Probe monitoring host
 
 	print("Creating Probe monitoring host: ");
 	my $probe_host_mon = create_host({
@@ -201,7 +201,7 @@ sub add_probe($$$$$$$$$$$)
 
 	create_macro('{$RSM.PROXY_NAME}', $probe_name, $probe_host_mon, true);
 
-    ########## Creating TLD hosts for the Probe
+	########## Creating TLD hosts for the Probe
 
 	my $tld_list = get_host_group('TLDs', true, true);
 
@@ -213,7 +213,16 @@ sub add_probe($$$$$$$$$$$)
 		my $tld_groupid = create_group("TLD $tld_name");
 		my $tld_type = $tld->{'type'};
 
-		my $main_templateid = create_template(TEMPLATE_RSMHOST_CONFIG_PREFIX . $tld_name);
+		my $main_templatename = TEMPLATE_RSMHOST_CONFIG_PREFIX . $tld_name;
+		my $main_templateid = get_template($main_templatename, false, false);
+		pfail("$main_templatename does not exist") unless ($main_templateid->{'templateid'});
+		$main_templateid = $main_templateid->{'templateid'};
+
+		my $rdds_templateid = get_template(TEMPLATE_RDDS_TEST, false, false);
+		pfail(TEMPLATE_RDDS_TEST . " does not exist") unless ($rdds_templateid->{'templateid'});
+		$rdds_templateid = $rdds_templateid->{'templateid'};
+
+		print "RDDS template id $rdds_templateid\n";
 
 		print("Creating '$tld_name $probe_name' host for '$tld_name' TLD: ");
 
@@ -243,6 +252,9 @@ sub add_probe($$$$$$$$$$$)
 					'templateid'	=> RDAP_TEMPLATEID
 				},
 				{
+					'templateid'	=> $rdds_templateid
+				},
+				{
 					'templateid'	=> $probe_tmpl
 				}
 			],
@@ -257,20 +269,19 @@ sub add_probe($$$$$$$$$$$)
 		is_not_empty($tld_host, false);
 	}
 
-    ########## Updating RDAP items status
+	########## Updating RDAP items status
 
 	print("Updating RDAP items status...\n");
 
-	if ($rdap)
-	{
-		update_rdap_items($probe_name, 1);
-	}
-	else
-	{
-		update_rdap_items($probe_name, 0);
-	}
+	update_probe_items($probe_name, 'rdap', $rdap);
 
-    ##########
+	########## Updating RDDS items status
+
+	print("Updating RDDS items status...\n");
+
+	update_probe_items($probe_name, 'rdds', $rdds);
+
+	##########
 
 	print("The probe has been added successfully\n");
 }
@@ -609,10 +620,18 @@ sub is_not_empty($$) {
 
 ##############
 
-sub update_rdap_items($$)
+sub update_probe_items($$$)
 {
 	my $probe = shift;
+	my $service = shift;
 	my $enable = shift;
+
+	my %item_key = (
+		'rdap' => 'rdap[',
+		'rdds' => 'rsm.rdds'
+	);
+
+	pfail("invalid service \"$service\"") if (!exists($item_key{$service}));
 
 	my $template = 'Template ' . $probe;
 	my $result = get_template($template, false, true);	# do not select macros, select hosts
@@ -623,7 +642,7 @@ sub update_rdap_items($$)
 	{
 		my $hostid = $host_ref->{'hostid'};
 
-		my $result2 = get_items_like($hostid, 'rdap[', false);	# not a template
+		my $result2 = get_items_like($hostid, $item_key{$service}, false);	# not a template
 
 		my @items = keys(%{$result2});
 
