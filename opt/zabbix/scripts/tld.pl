@@ -396,7 +396,9 @@ sub list_services($;$)
 		'{$RSM.TLD.RDDS.ENABLED}',
 		'{$RDAP.TLD.ENABLED}',
 		'{$RDAP.BASE.URL}',
-		'{$RDAP.TEST.DOMAIN}'
+		'{$RDAP.TEST.DOMAIN}',
+		'{$RSM.TLD.RDDS.43.SERVERS}',
+		'{$RSM.TLD.RDDS.80.SERVERS}',
 	);
 
 	my @rsmhosts = ($rsmhost // get_tld_list());
@@ -406,38 +408,10 @@ sub list_services($;$)
 	foreach my $rsmhost (sort(@rsmhosts))
 	{
 		my @row = ();
-
-		my $services = get_services($server_key, $rsmhost);
+		my $services = get_rsmhost_config($server_key, $rsmhost);
 
 		push(@row, $rsmhost);
 		push(@row, map($services->{$_} // "", @columns));
-
-		# obtain rsm.rdds[] item key and extract RDDS(43|80).SERVERS strings
-		my $template = get_template(TEMPLATE_RSMHOST_CONFIG_PREFIX . $rsmhost, 0, 0);
-		my $items = get_items_like($template->{'templateid'}, 'rsm.rdds[', true);
-
-		my $key;
-		foreach my $k (keys(%{$items}))	# assuming that only one rsm.rdds[] item is enabled at a time
-		{
-			if ($items->{$k}{'status'} == 0)
-			{
-				$key = $items->{$k}{'key_'};
-				last;
-			}
-		}
-
-		if (!defined($key))
-		{
-			push(@row, ("", ""));
-		}
-		else
-		{
-			$key =~ /,"(\S+)","(\S+)"]/;
-
-			push(@row, "$1");
-			push(@row, "$2");
-		}
-
 		push(@rows, \@row);
 	}
 
@@ -454,7 +428,7 @@ sub get_tld_list()
 	return map($_->{'host'}, @{$tlds->{'hosts'}});
 }
 
-sub get_services($$)
+sub get_rsmhost_config($$)
 {
 	my $server_key = shift;
 	my $tld        = shift;
@@ -1861,7 +1835,8 @@ sub create_tld_hosts_on_probes($$$$)
 				{'templateid' => $main_templateid},
 				{'templateid' => DNS_TEMPLATEID},
 				{'templateid' => RDAP_TEMPLATEID},
-				{'templateid' => $probe_templateid}
+				{'templateid' => $probe_templateid},
+				{'templateid' => RDDS_TEMPLATEID}
 			],
 			'host'         => getopt('tld') . ' ' . $probe_name,
 			'status'       => $status,

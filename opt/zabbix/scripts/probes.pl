@@ -218,12 +218,6 @@ sub add_probe($$$$$$$$$$$)
 		pfail("$main_templatename does not exist") unless ($main_templateid->{'templateid'});
 		$main_templateid = $main_templateid->{'templateid'};
 
-		my $rdds_templateid = get_template(TEMPLATE_RDDS_TEST, false, false);
-		pfail(TEMPLATE_RDDS_TEST . " does not exist") unless ($rdds_templateid->{'templateid'});
-		$rdds_templateid = $rdds_templateid->{'templateid'};
-
-		print "RDDS template id $rdds_templateid\n";
-
 		print("Creating '$tld_name $probe_name' host for '$tld_name' TLD: ");
 
 		my $tld_host = create_host({
@@ -252,7 +246,7 @@ sub add_probe($$$$$$$$$$$)
 					'templateid'	=> RDAP_TEMPLATEID
 				},
 				{
-					'templateid'	=> $rdds_templateid
+					'templateid'	=> RDDS_TEMPLATEID
 				},
 				{
 					'templateid'	=> $probe_tmpl

@@ -1868,40 +1868,6 @@ static void	copy_params(const AGENT_REQUEST *request, DC_ITEM *item)
 	}
 }
 
-static int	zbx_parse_rdds_item(DC_ITEM *item, char *host, size_t host_size)
-{
-	AGENT_REQUEST	request;
-	int		ret = FAIL;
-
-	init_request(&request);
-
-	if (SUCCEED != parse_item_key(item->key, &request))
-	{
-		/* unexpected key syntax */
-		goto out;
-	}
-
-	if (1 != request.nparam)
-	{
-		/* unexpected key syntax */
-		goto out;
-	}
-
-	zbx_strlcpy(host, get_rparam(&request, 0), host_size);
-
-	if ('\0' == *host)
-	{
-		/* first parameter missing */
-		goto out;
-	}
-
-	ret = SUCCEED;
-out:
-	free_request(&request);
-
-	return ret;
-}
-
 static void	free_items(DC_ITEM *items, size_t items_num)
 {
 	if (0 != items_num)
@@ -2997,31 +2963,6 @@ static void	zbx_get_strings_from_list(zbx_vector_str_t *strings, char *list, cha
 	while (NULL != p_end);
 }
 
-static void	zbx_set_rdds_values(const char *ip43, int rtt43, int upd43, const char *ip80, int rtt80,
-		int value_ts, size_t keypart_size, const DC_ITEM *items, size_t items_num)
-{
-	size_t		i;
-	const DC_ITEM	*item;
-	const char	*p;
-
-	for (i = 0; i < items_num; i++)
-	{
-		item = &items[i];
-		p = item->key + keypart_size + 1;	/* skip "rsm.rdds." part */
-
-		if (NULL != ip43 && 0 == strncmp(p, "43.ip[", 6))
-			zbx_add_value_str(item, value_ts, ip43);
-		else if (0 == strncmp(p, "43.rtt[", 7))
-			zbx_add_value_dbl(item, value_ts, rtt43);
-		else if (ZBX_NO_VALUE != upd43 && 0 == strncmp(p, "43.upd[", 7))
-			zbx_add_value_dbl(item, value_ts, upd43);
-		else if (NULL != ip80 && 0 == strncmp(p, "80.ip[", 6))
-			zbx_add_value_str(item, value_ts, ip80);
-		else if (ZBX_NO_VALUE != rtt80 && 0 == strncmp(p, "80.rtt[", 7))
-			zbx_add_value_dbl(item, value_ts, rtt80);
-	}
-}
-
 /* maps HTTP status codes ommitting status 200 and unassigned according to   */
 /* http://www.iana.org/assignments/http-status-codes/http-status-codes.xhtml */
 static int	map_http_code(long http_code)
@@ -3523,7 +3464,6 @@ int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	zbx_resolver_error_t	ec_res;
 	size_t			i;
 	time_t			ts, now;
-	unsigned int		extras;
 	zbx_http_error_t	ec_http;
 	int			rtt43 = ZBX_NO_VALUE, upd43 = ZBX_NO_VALUE, rtt80 = ZBX_NO_VALUE, rtt_limit,
 				ipv4_enabled, ipv6_enabled, ipv_flags = 0, rdds_enabled, probe_rdds_enabled,
@@ -3570,6 +3510,7 @@ int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 
 	if (SUCCEED != zbx_validate_host_list(value_str, ','))
 	{
+		rsm_infof(log_fd, "param[1]=%s", value_str);
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "invalid character in RDDS43 host list"));
 		goto out;
 	}
@@ -3604,15 +3545,15 @@ int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 		goto out;
 	}
 
-	res_ip = zbx_strdup(NULL, request->params[3]);				/* DNS resolver */
-	testprefix = zbx_strdup(NULL, request->params[4]);			/* RDDS test prefix */
+	res_ip = request->params[3];						/* DNS resolver */
+	testprefix = request->params[4];					/* RDDS test prefix */
 	probe_rdds_enabled = atoi(request->params[5]);				/* Probe RDDS enabled */
 	rdds_enabled = probe_rdds_enabled ? atoi(request->params[6]) : 0;	/* TLD RDDS enabled */
 	probe_epp_enabled = atoi(request->params[7]);				/* Probe EPP enabled */
 	epp_enabled = probe_epp_enabled ? atoi(request->params[8]) : 0;		/* TLD EPP enabled */
 	ipv4_enabled = atoi(request->params[9]);				/* Probe IPv4 enabled */
 	ipv6_enabled = atoi(request->params[10]);				/* Probe IPv6 enabled */
-	rdds_ns_string = zbx_strdup(NULL, request->params[11]);			/* RDDS ns string */
+	rdds_ns_string = request->params[11];					/* RDDS ns string */
 	rtt_limit = atoi(request->params[12]);					/* RTT limit */
 	maxredirs = atoi(request->params[13]);					/* RDDS max redirects */
 
@@ -3625,7 +3566,7 @@ int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 
 	if (0 == rdds_enabled)
 	{
-		rsm_info(log_fd, "RDDS disabled on this RSM Host");
+		rsm_info(log_fd, "RDDS disabled on this RSM host");
 		ret = SYSINFO_RET_OK;
 		goto out;
 	}
@@ -3646,11 +3587,9 @@ int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	if (0 != ipv6_enabled)
 		ipv_flags |= ZBX_FLAG_IPV6_ENABLED;
 
-	extras = RESOLVER_EXTRAS_NONE;
-
 	/* create resolver */
-	if (SUCCEED != zbx_create_resolver(&res, "resolver", res_ip, RSM_TCP, ipv4_enabled, ipv6_enabled, extras,
-			RSM_TCP_TIMEOUT, RSM_TCP_RETRY, log_fd, err, sizeof(err)))
+	if (SUCCEED != zbx_create_resolver(&res, "resolver", res_ip, RSM_TCP, ipv4_enabled, ipv6_enabled,
+			RESOLVER_EXTRAS_NONE, RSM_TCP_TIMEOUT, RSM_TCP_RETRY, log_fd, err, sizeof(err)))
 	{
 		SET_MSG_RESULT(result, zbx_dsprintf(NULL, "cannot create resolver: %s", err));
 		goto out;
@@ -3862,9 +3801,6 @@ out:
 	}
 
 	zbx_free(answer);
-	zbx_free(rdds_ns_string);
-	zbx_free(testprefix);
-	zbx_free(res_ip);
 	zbx_free(value_str);
 
 	zbx_vector_str_clean_and_destroy(&nss);

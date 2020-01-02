@@ -290,7 +290,7 @@ sub list_services($;$)
 	{
 		my @row = ();
 
-		my $services = get_services($server_key, $rsmhost);
+		my $services = get_rsmhost_config($server_key, $rsmhost);
 
 		push(@row, $rsmhost);                      # Registrar ID
 		push(@row, $rsmhosts{$rsmhost}{'name'});   # Registrar name
@@ -352,7 +352,7 @@ sub get_registrar_list()
 	return %result;
 }
 
-sub get_services($$)
+sub get_rsmhost_config($$)
 {
 	my $server_key = shift;
 	my $tld        = shift;
