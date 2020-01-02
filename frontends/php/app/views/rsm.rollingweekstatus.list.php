@@ -95,7 +95,7 @@ else {
 			new CSpan([
 				// ccTLD's group
 				(new CCheckBox('filter_cctld_group'))
-					->setAttribute('disabled', !$data['allowedGroups'][RSM_CC_TLD_GROUP])
+					->setEnabled($data['allowedGroups'][RSM_CC_TLD_GROUP])
 					->setChecked($data['filter_cctld_group']),
 				SPACE,
 				_(RSM_CC_TLD_GROUP)
@@ -104,7 +104,7 @@ else {
 			new CSpan([
 				// gTLD's group
 				(new CCheckBox('filter_gtld_group'))
-					->setAttribute('disabled', !$data['allowedGroups'][RSM_G_TLD_GROUP])
+					->setEnabled($data['allowedGroups'][RSM_G_TLD_GROUP])
 					->setChecked($data['filter_gtld_group']),
 				SPACE,
 				_(RSM_G_TLD_GROUP)
@@ -113,7 +113,7 @@ else {
 			new CSpan([
 				// other TLD's group
 				(new CCheckBox('filter_othertld_group'))
-					->setAttribute('disabled', !$data['allowedGroups'][RSM_OTHER_TLD_GROUP])
+					->setEnabled($data['allowedGroups'][RSM_OTHER_TLD_GROUP])
 					->setChecked($data['filter_othertld_group']),
 				SPACE,
 				_(RSM_OTHER_TLD_GROUP)
@@ -122,7 +122,7 @@ else {
 			new CSpan([
 				// test TLD's group
 				(new CCheckBox('filter_test_group'))
-					->setAttribute('disabled', !$data['allowedGroups'][RSM_TEST_GROUP])
+					->setEnabled($data['allowedGroups'][RSM_TEST_GROUP])
 					->setChecked($data['filter_test_group']),
 				SPACE,
 				_(RSM_TEST_GROUP)
