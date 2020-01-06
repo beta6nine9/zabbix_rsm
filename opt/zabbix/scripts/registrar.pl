@@ -471,60 +471,25 @@ sub manage_registrar($$$$)
 	}
 
 	my $service = $rdds ? 'rdds' : 'rdap';
-	my $template_items = get_items_like($main_templateid, $service, true);
-	my $host_items = get_items_like($main_hostid, $service, false);
 
-	if ($rdds)
+	my $macro = $service eq 'rdap' ? '{$RDAP.TLD.ENABLED}' : '{$RSM.TLD.' . uc($service) . '.ENABLED}';
+
+	create_macro($macro, 0, $main_templateid, true);
+
+	my $items = get_items_like($main_hostid, $service, false);
+	my @itemids = map { $items->{$_}->{'key_'} ne "$service.enabled" ? $_ : () } keys(%{$items});
+
+	if (scalar(@itemids) > 0)
 	{
-		my $service_enabled_itemkey = "$service.enabled";
-
-		my @service_enabled_itemid = grep { $template_items->{$_}{'key_'} eq $service_enabled_itemkey } keys(%{$template_items});
-		if (!@service_enabled_itemid)
-		{
-			pfail("failed to find $service_enabled_itemkey item");
-		}
-
-		delete($template_items->{$service_enabled_itemid[0]});
+		$action eq 'disable' ? disable_items(\@itemids) : remove_items(\@itemids);
+	}
+	else
+	{
+		print("Could not find $service items on host $rsmhost ($main_hostid)\n");
 	}
 
-	my $template_item_ids = [keys(%{$template_items})];
-	my $host_items_ids = [keys(%{$host_items})];
-
-	if (scalar(@{$template_item_ids}) == 0 && $service ne 'rdap') # RDAP doesn't have items in "Template $tld"
-	{
-		print("Could not find $service related items on the template level\n");
-	}
-
-	if (scalar(@{$host_items_ids}) == 0)
-	{
-		print("Could not find $service related items on host level\n");
-	}
-
-	my @itemids = (@{$template_item_ids}, @{$host_items_ids});
-
-	# print(Dumper(\@itemids));
-	# print(Dumper($host_items_ids));
-
-	if (scalar(@itemids))
-	{
-		my $macro = $service eq 'rdap' ? '{$RDAP.TLD.ENABLED}' : '{$RSM.TLD.' . uc($service) . '.ENABLED}';
-
-		create_macro($macro, 0, $main_templateid, true);
-
-		if ($action eq 'disable')
-		{
-			disable_items(\@itemids);
-		}
-		else # $action is 'delete'
-		{
-			remove_items(\@itemids);
-		}
-	}
-
-	if ($action eq 'disable' && $service eq 'rdap')
-	{
-		set_linked_items_enabled('rdap[', $rsmhost, 0);
-	}
+	set_linked_items_status($service eq 'rdap' ? 'rdap[' : 'rsm.rdds[', $rsmhost, 0) if ($action eq 'disable');
+	set_linked_items_status('rdap[', $tld, 0) if (!__is_rdap_standalone() && $action eq 'disable');
 }
 
 sub compare_arrays($$)
@@ -562,7 +527,7 @@ sub add_new_registrar()
 
 	my $rsmhost_groupid = really(create_group('TLD ' . getopt('rr-id')));
 
-	create_rsmhost($main_templateid;
+	create_rsmhost($main_templateid);
 
 	my $proxy_mon_templateid = create_probe_health_tmpl();
 
@@ -673,7 +638,8 @@ sub create_rdds_or_rdap_slv_items($$$;$)
 
 sub __is_rdap_standalone()
 {
-	return time() > $cfg_global_macros->{'{$RSM.RDAP.STANDALONE}'};
+	return $cfg_global_macros->{'{$RSM.RDAP.STANDALONE}'} != 0 &&
+			time() >= $cfg_global_macros->{'{$RSM.RDAP.STANDALONE}'};
 }
 
 sub create_slv_items($$)
@@ -993,18 +959,12 @@ sub create_tld_hosts_on_probes($$$$)
 			'interfaces'   => [DEFAULT_MAIN_INTERFACE]
 		}));
 
-		if (opt('rdap-base-url') && opt('rdap-test-domain'))
-		{
-			set_linked_items_enabled('rdap[', getopt('rr-id'), 1);
-		}
-		else
-		{
-			set_linked_items_enabled('rdap[', getopt('rr-id'), 0);
-		}
+		set_linked_items_status('rdap[', getopt('rr-id'), opt('rdap-base-url') && opt('rdap-test-domain'));
+		set_linked_items_status('rsm.rdds[', getopt('tld'), opt('rdds43-servers'));
 	}
 }
 
-sub set_linked_items_enabled($$$)
+sub set_linked_items_status($$$)
 {
 	my $like    = shift;
 	my $tld     = shift;

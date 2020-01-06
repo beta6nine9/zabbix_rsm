@@ -896,8 +896,8 @@ sub manage_tld_objects($$$$$$$)
 			print("Could not find $type items on host $tld ($main_hostid)\n");
 		}
 
-		set_linked_items_status($type eq "rdds" ? "rsm.rdds[" : "rdap[", $tld, 0) if ($action eq 'disable');
-		set_linked_items_status("rdap[", $tld, 0) if (!__is_rdap_standalone() && $action eq 'disable');
+		set_linked_items_status($type eq 'rdds' ? 'rsm.rdds[' : 'rdap[', $tld, 0) if ($action eq 'disable');
+		set_linked_items_status('rdap[', $tld, 0) if (!__is_rdap_standalone() && $action eq 'disable');
 	}
 }
 
