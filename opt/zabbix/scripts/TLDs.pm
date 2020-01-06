@@ -1013,11 +1013,28 @@ sub get_items_like($$$)
 
 	if (!defined($is_template) || $is_template == false)
 	{
-		$result = $zabbix->get('item', {'hostids' => [$hostid], 'output' => ['itemid', 'name', 'hostid', 'key_', 'status'], 'search' => {'key_' => $like}, 'preservekeys' => true});
+		$result = $zabbix->get(
+			'item',
+			{
+				'hostids' => [$hostid],
+				'output' => ['itemid', 'name', 'hostid', 'key_', 'status'],
+				'search' => {'key_' => $like},
+				'preservekeys' => true
+			}
+		);
+
 		return $result;
 	}
 
-	$result = $zabbix->get('item', {'templateids' => [$hostid], 'output' => ['itemid', 'name', 'hostid', 'key_', 'status'], 'search' => {'key_' => $like}, 'preservekeys' => true});
+	$result = $zabbix->get(
+		'item',
+		{
+			'templateids' => [$hostid],
+			'output' => ['itemid', 'name', 'hostid', 'key_', 'status'],
+			'search' => {'key_' => $like},
+			'preservekeys' => true
+		}
+	);
 
 	return $result;
 }
