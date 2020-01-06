@@ -105,75 +105,73 @@ foreach ($data['probes'] as $probe) {
 		$probe_disabled ? '-' : $probe['ns_down']
 	];
 
-	if (array_key_exists('dns_nameservers', $data)) {
-		foreach ($data['dns_nameservers'] as $dns_udp_ns => $ipvs) {
-			if (array_key_exists('results_udp', $probe) && array_key_exists($dns_udp_ns, $probe['results_udp'])) {
-				if (array_key_exists('status', $probe['results_udp'][$dns_udp_ns])) {
-					$row[] = ($probe['results_udp'][$dns_udp_ns]['status'] == NAMESERVER_DOWN) ? $down : $up;
-				}
-				else {
-					$row[] = '-';
-				}
-
-				foreach (['ipv4', 'ipv6'] as $ipv) {
-					if (array_key_exists($ipv, $probe['results_udp'][$dns_udp_ns])) {
-						foreach (array_keys($ipvs[$ipv]) as $ip) {
-							if (array_key_exists($ip, $probe['results_udp'][$dns_udp_ns][$ipv])) {
-								$result = $probe['results_udp'][$dns_udp_ns][$ipv][$ip];
-								$is_dns_error = isServiceErrorCode($result, $data['type']);
-
-								if ($result == 0) {
-									$row[] = '-';
-								}
-								elseif (0 > $result) {
-									$row[] = (new CSpan($result))
-										->setHint($data['test_error_message'][$result])
-										->setAttribute('class', $is_dns_error ? ZBX_STYLE_RED : ZBX_STYLE_GREEN);
-								}
-								elseif ($result > $data['udp_rtt']) {
-									$row[] = (new CSpan($result))->setAttribute('class', ZBX_STYLE_RED);
-								}
-								else {
-									$row[] = (new CSpan($result))->setAttribute('class', ZBX_STYLE_GREEN);
-								}
-
-								if (isset($probe['results_nsid'][$dns_udp_ns][$ip])) {
-									$nsid_index = $probe['results_nsid'][$dns_udp_ns][$ip];
-									$row[] = (new CDiv($nsid_index + 1))->setHint($data['nsids'][$nsid_index]);
-								}
-								else {
-									$row[] = (new CDiv('-'))->setHint(_('No value.'), '', false);
-								}
-							}
-							else {
-								$row[] = '-';
-								$row[] = '';
-							}
-						}
-					}
-					else {
-						if (array_key_exists($ipv, $ipvs)) {
-							$cell_cnt = count($ipvs[$ipv]);
-						}
-						elseif (array_key_exists($ipv, $ns_ips)) {
-							$cell_cnt = count($ns_ips[$ipv]);
-						}
-						else {
-							$cell_cnt = 0;
-						}
-
-						$row[] = ($cell_cnt > 1)
-							? (new CCol('-'))->setColSpan($cell_cnt * 2)
-							: ($cell_cnt ? '-' : null);
-					}
-				}
+	foreach ($data['dns_nameservers'] as $dns_udp_ns => $ipvs) {
+		if (array_key_exists('results_udp', $probe) && array_key_exists($dns_udp_ns, $probe['results_udp'])) {
+			if (array_key_exists('status', $probe['results_udp'][$dns_udp_ns])) {
+				$row[] = ($probe['results_udp'][$dns_udp_ns]['status'] == NAMESERVER_DOWN) ? $down : $up;
 			}
 			else {
-				$cell_cnt = 1;
-				$cell_cnt += array_key_exists('ipv4', $ipvs) ? count($ipvs['ipv4']) : 0;
-				$cell_cnt += array_key_exists('ipv6', $ipvs) ? count($ipvs['ipv6']) : 0;
-				$row[] = ($cell_cnt > 1) ? (new CCol('-'))->setColSpan($cell_cnt * 2) : '-';
+				$row[] = '-';
 			}
+
+			foreach (['ipv4', 'ipv6'] as $ipv) {
+				if (array_key_exists($ipv, $probe['results_udp'][$dns_udp_ns])) {
+					foreach (array_keys($ipvs[$ipv]) as $ip) {
+						if (array_key_exists($ip, $probe['results_udp'][$dns_udp_ns][$ipv])) {
+							$result = $probe['results_udp'][$dns_udp_ns][$ipv][$ip];
+							$is_dns_error = isServiceErrorCode($result, $data['type']);
+
+							if ($result == 0) {
+								$row[] = '-';
+							}
+							elseif (0 > $result) {
+								$row[] = (new CSpan($result))
+									->setHint($data['test_error_message'][$result])
+									->setAttribute('class', $is_dns_error ? ZBX_STYLE_RED : ZBX_STYLE_GREEN);
+							}
+							elseif ($result > $data['udp_rtt']) {
+								$row[] = (new CSpan($result))->setAttribute('class', ZBX_STYLE_RED);
+							}
+							else {
+								$row[] = (new CSpan($result))->setAttribute('class', ZBX_STYLE_GREEN);
+							}
+
+							if (isset($probe['results_nsid'][$dns_udp_ns][$ip])) {
+								$nsid_index = $probe['results_nsid'][$dns_udp_ns][$ip];
+								$row[] = (new CDiv($nsid_index + 1))->setHint($data['nsids'][$nsid_index]);
+							}
+							else {
+								$row[] = (new CDiv('-'))->setHint(_('No value.'), '', false);
+							}
+						}
+						else {
+							$row[] = '-';
+							$row[] = '';
+						}
+					}
+				}
+				else {
+					if (array_key_exists($ipv, $ipvs)) {
+						$cell_cnt = count($ipvs[$ipv]);
+					}
+					elseif (array_key_exists($ipv, $ns_ips)) {
+						$cell_cnt = count($ns_ips[$ipv]);
+					}
+					else {
+						$cell_cnt = 0;
+					}
+
+					$row[] = ($cell_cnt > 1)
+						? (new CCol('-'))->setColSpan($cell_cnt * 2)
+						: ($cell_cnt ? '-' : null);
+				}
+			}
+		}
+		else {
+			$cell_cnt = 1;
+			$cell_cnt += array_key_exists('ipv4', $ipvs) ? count($ipvs['ipv4']) : 0;
+			$cell_cnt += array_key_exists('ipv6', $ipvs) ? count($ipvs['ipv6']) : 0;
+			$row[] = ($cell_cnt > 1) ? (new CCol('-'))->setColSpan($cell_cnt * 2) : '-';
 		}
 	}
 

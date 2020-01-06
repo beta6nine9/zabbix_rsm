@@ -209,6 +209,7 @@ class CControllerAggregateDetails extends RSMControllerBase {
 			'monitored' => true,
 			'preservekeys' => true
 		]);
+		$dns_nameservers = [];
 
 		if ($probes_udp_items) {
 			$item_values_db = API::History()->get([
@@ -219,7 +220,6 @@ class CControllerAggregateDetails extends RSMControllerBase {
 				'history' => reset($probes_udp_items)['value_type']
 			]);
 			$item_values = array_column($item_values_db, 'value', 'itemid');
-			$dns_nameservers = [];
 			$key_parser->parse(RSM_SLV_KEY_DNS_RTT);
 			$params_count = 3; // $key_parser->getParamsNum();
 
@@ -262,64 +262,7 @@ class CControllerAggregateDetails extends RSMControllerBase {
 		}
 
 		$data['dns_nameservers'] = $dns_nameservers;
-
-		/**
-		 * Collects NSID item values for all probe name servers and ips. NSID unique values will be stored in
-		 * $data['nsids] with key having incremental index and value NSID value. Additionaly probe ns+ip NSID results
-		 * will be stored in 'results_nsid' property of $this->probes[{PROBE_ID}] array as incremental index
-		 * pointing to value in $data['nsids'].
-		 *
-		 * $this->probes[{PROBE_ID}]['results_nsid'][{NAME_SERVER_NAME}][{NAME_SERVER_IP}] = NSID value index.
-		 */
-		$nsid_item_keys = [];
-
-		foreach ($dns_nameservers as $ns_name => $ips) {
-			$ips = array_reduce($ips, 'array_merge', []);
-
-			foreach (array_keys($ips) as $ip) {
-				$nsid_item_keys[] = strtr(RSM_SLV_KEY_DNS_NSID, [
-					'<NS>' => $ns_name,
-					'<IP>' => $ip
-				]);
-			}
-		}
-
-		$nsid_items = API::Item()->get([
-			'output' => ['key_', 'type', 'hostid'],
-			'hostids' => array_keys($this->probes),
-			'filter' => ['key_' => $nsid_item_keys],
-			'preservekeys' => true
-		]);
-
-		$nsid_values = API::History()->get([
-			'output' => ['itemid', 'value'],
-			'itemids' => array_keys($nsid_items),
-			'time_from' => $data['time'],
-			'time_till' => $data['time'],
-			'history' => ITEM_VALUE_TYPE_TEXT
-		]);
-
-		$key_parser->parse(RSM_SLV_KEY_DNS_NSID);
-		$params_count = $key_parser->getParamsNum();
-		$data['nsids'] = array_unique(zbx_objectValues($nsid_values, 'value'));
-		sort($data['nsids'], SORT_LOCALE_STRING|SORT_NATURAL|SORT_FLAG_CASE);
-
-		foreach ($nsid_values as $nsid_value) {
-			$nsid_item = $nsid_items[$nsid_value['itemid']];
-			$key_parser->parse($nsid_item['key_']);
-
-			if ($key_parser->getParamsNum() != $params_count) {
-				error(_s('Unexpected item key "%1$s".', $nsid_item['key_']));
-				continue;
-			}
-
-			$ns_name = $key_parser->getParam(0);
-			$ns_ip = $key_parser->getParam(1);
-			$this->probes[$nsid_item['hostid']]['results_nsid'][$ns_name][$ns_ip] = array_search($nsid_value['value'],
-				$data['nsids']
-			);
-		}
-
+		$data['nsids'] = $this->getNSIDdata($dns_nameservers, $data['time']);
 		$probe_protocol = [];
 		$protocol_type = $this->getValueMapping(RSM_DNS_TRANSPORT_PROTOCOL_VALUE_MAP);
 
@@ -438,6 +381,83 @@ class CControllerAggregateDetails extends RSMControllerBase {
 		}
 
 		CArrayHelper::sort($this->probes, ['host']);
+	}
+
+	/**
+	 * Collects NSID item values for all probe name servers and ips. NSID unique values will be stored in
+	 * $data['nsids] with key having incremental index and value NSID value. Additionaly probe ns+ip NSID results
+	 * will be stored in 'results_nsid' property of $this->probes[{PROBE_ID}] array as incremental index
+	 * pointing to value in $data['nsids'].
+	 *
+	 * $this->probes[{PROBE_ID}]['results_nsid'][{NAME_SERVER_NAME}][{NAME_SERVER_IP}] = NSID value index.
+	 *
+	 * Return array of unique NSID values found.
+	 *
+	 * @param array $dns_nameservers    DNS nameservers array with 'ipv4' and 'ipv6' sub arrays.
+	 * @param int   $time               NSID values timestamp.
+	 * @return array
+	 */
+	protected function getNSIDdata(array $dns_nameservers, $time) {
+		$key_parser = new CItemKey;
+		$nsid_item_keys = [];
+		$nsids = [];
+
+		foreach ($dns_nameservers as $ns_name => $ips) {
+			$ips = array_reduce($ips, 'array_merge', []);
+
+			foreach (array_keys($ips) as $ip) {
+				$nsid_item_keys[] = strtr(RSM_SLV_KEY_DNS_NSID, [
+					'<NS>' => $ns_name,
+					'<IP>' => $ip
+				]);
+			}
+		}
+
+		if (!$nsid_item_keys) {
+			return $nsids;
+		}
+
+		$nsid_items = API::Item()->get([
+			'output' => ['key_', 'type', 'hostid'],
+			'hostids' => array_keys($this->probes),
+			'filter' => ['key_' => $nsid_item_keys],
+			'preservekeys' => true
+		]);
+
+		if (!$nsid_items) {
+			return $nsids;
+		}
+
+		$nsid_values = API::History()->get([
+			'output' => ['itemid', 'value'],
+			'itemids' => array_keys($nsid_items),
+			'time_from' => $time,
+			'time_till' => $time,
+			'history' => ITEM_VALUE_TYPE_TEXT
+		]);
+
+		$key_parser->parse(RSM_SLV_KEY_DNS_NSID);
+		$params_count = $key_parser->getParamsNum();
+		$nsids = array_unique(zbx_objectValues($nsid_values, 'value'));
+		sort($nsids, SORT_LOCALE_STRING|SORT_NATURAL|SORT_FLAG_CASE);
+
+		foreach ($nsid_values as $nsid_value) {
+			$nsid_item = $nsid_items[$nsid_value['itemid']];
+			$key_parser->parse($nsid_item['key_']);
+
+			if ($key_parser->getParamsNum() != $params_count) {
+				error(_s('Unexpected item key "%1$s".', $nsid_item['key_']));
+				continue;
+			}
+
+			$ns_name = $key_parser->getParam(0);
+			$ns_ip = $key_parser->getParam(1);
+			$this->probes[$nsid_item['hostid']]['results_nsid'][$ns_name][$ns_ip] = array_search($nsid_value['value'],
+				$nsids
+			);
+		}
+
+		return $nsids;
 	}
 
 	protected function doAction() {
