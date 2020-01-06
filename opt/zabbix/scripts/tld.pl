@@ -918,7 +918,7 @@ sub add_new_tld()
 
 	my $rsmhost_groupid = really(create_group('TLD ' . getopt('tld')));
 
-	create_rsmhost($main_templateid);
+	create_rsmhost($main_templateid, getopt('tld'), getopt('type'));
 
 	my $proxy_mon_templateid = create_probe_health_tmpl();
 
@@ -1513,12 +1513,11 @@ sub create_slv_items($$$)
 	}
 }
 
-sub create_rsmhost($)
+sub create_rsmhost($$$)
 {
 	my $main_templateid = shift;
-
-	my $tld_name = getopt('tld');
-	my $tld_type = getopt('type');
+	my $tld_name        = shift;
+	my $tld_type        = shift;
 
 	my $tld_hostid = really(create_host({
 		'groups'     => [
@@ -1830,14 +1829,7 @@ sub set_linked_items_status($$$)
 
 		my @items = keys(%{$result2});
 
-		if ($enabled)
-		{
-			enable_items(\@items);
-		}
-		else
-		{
-			disable_items(\@items);
-		}
+		$enabled ? enable_items(\@items) : disable_items(\@items);
 	}
 }
 

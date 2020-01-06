@@ -527,7 +527,7 @@ sub add_new_registrar()
 
 	my $rsmhost_groupid = really(create_group('TLD ' . getopt('rr-id')));
 
-	create_rsmhost($main_templateid);
+	create_rsmhost($main_templateid, getopt('rr-id'), getopt('rr-name'), getopt('rr-family'));
 
 	my $proxy_mon_templateid = create_probe_health_tmpl();
 
@@ -582,13 +582,12 @@ sub create_main_template($)
 	return $templateid;
 }
 
-sub create_rsmhost($)
+sub create_rsmhost($$$$)
 {
 	my $main_templateid = shift;
-
-	my $rr_id     = getopt('rr-id');
-	my $rr_name   = getopt('rr-name');
-	my $rr_family = getopt('rr-family'); # TODO: save family
+	my $rr_id           = shift;
+	my $rr_name         = shift;
+	my $rr_family       = shift;	# TODO: save family
 
 	my $rsmhostid = really(create_host({
 		'groups'     => [
@@ -596,7 +595,8 @@ sub create_rsmhost($)
 			{'groupid' => TLD_TYPE_GROUPIDS->{${\TLD_TYPE_G}}}
 		],
 		'templates' => [
-			{'templateid' => $main_templateid}
+			{'templateid' => $main_templateid},
+			{'templateid' => CONFIG_HISTORY_TEMPLATEID}
 		],
 		'host'       => $rr_id,
 		'info_1'     => $rr_name,
@@ -981,14 +981,7 @@ sub set_linked_items_status($$$)
 
 		my @items = keys(%{$result2});
 
-		if ($enabled)
-		{
-			enable_items(\@items);
-		}
-		else
-		{
-			disable_items(\@items);
-		}
+		$enabled ? enable_items(\@items) : disable_items(\@items);
 	}
 }
 
