@@ -766,7 +766,7 @@ sub create_slv_items($$)
 	my $hostid    = shift;
 	my $host_name = shift;
 
-	if (!is_standalone_rdap_active()) # we haven't switched to RDAP yet
+	if (!__is_rdap_standalone()) # we haven't switched to RDAP yet
 	{
 		# create RDDS items which may also include RDAP check results
 		create_rdds_or_rdap_slv_items($hostid, $host_name, "RDDS");
