@@ -102,10 +102,13 @@ define('RSM_SLV_RDDS_AVAIL',				'rsm.slv.rdds.avail');
 define('RSM_SLV_RDAP_AVAIL',				'rsm.slv.rdap.avail');
 define('RSM_SLV_EPP_AVAIL',					'rsm.slv.epp.avail');
 define('RSM_SLV_DNSSEC_AVAIL',				'rsm.slv.dnssec.avail');
-define('RSM_SLV_KEY_DNS_RTT',				'rsm.dns.rtt[{$RSM.TLD},<NS>,<IP>,<udp|tcp>]');
-define('RSM_SLV_KEY_DNS_NSID',				'rsm.dns.nsid[<NS>,<IP>]');
+define('RSM_SLV_KEY_DNS_TCP_RTT',			'rsm.dns.rtt[{#NS},{#IP},tcp]');
+define('RSM_SLV_KEY_DNS_UDP_RTT',			'rsm.dns.rtt[{#NS},{#IP},udp]');
+define('RSM_SLV_KEY_DNS_NSID',				'rsm.dns.nsid[{#NS},{#IP}]');
 define('RSM_SLV_KEY_DNS_PROTOCOL',			'rsm.dns.protocol');
 define('RSM_SLV_KEY_DNS_NSSOK',				'rsm.dns.nssok');
+define('RSM_SLV_KEY_DNS_NS_STATUS',			'rsm.dns.ns.status[{#NS}]');
+define('RSM_SLV_KEY_DNS_TEST',				'rsm.dns[{$RSM.TLD},{$RSM.DNS.TESTPREFIX},{$RSM.DNS.NAME.SERVERS},{$RSM.TLD.DNSSEC.ENABLED},{$RSM.TLD.RDDS.ENABLED},{$RSM.TLD.EPP.ENABLED},{$RSM.TLD.DNS.UDP.ENABLED},{$RSM.TLD.DNS.TCP.ENABLED},{$RSM.IP4.ENABLED},{$RSM.IP6.ENABLED},{$RSM.RESOLVER},{$RSM.DNS.UDP.RTT.HIGH},{$RSM.DNS.TCP.RTT.HIGH}]');
 
 // RDAP standalone.
 define('RSM_RDAP_STANDALONE', '{$RSM.RDAP.STANDALONE}');
@@ -172,6 +175,7 @@ define('CALCULATED_ITEM_RDAP_DELAY',			'rsm.configvalue[RSM.RDAP.DELAY]');
 define('CALCULATED_ITEM_EPP_DELAY',				'rsm.configvalue[RSM.EPP.DELAY]');
 define('CALCULATED_ITEM_DNS_AVAIL_MINNS',		'rsm.configvalue[RSM.DNS.AVAIL.MINNS]');
 define('CALCULATED_ITEM_DNS_UDP_RTT_HIGH',		'rsm.configvalue[RSM.DNS.UDP.RTT.HIGH]');
+define('CALCULATED_ITEM_DNS_TCP_RTT_HIGH',		'rsm.configvalue[RSM.DNS.TCP.RTT.HIGH');
 define('CALCULATED_ITEM_SLV_DNS_NS_RTT_UDP',	'rsm.configvalue[RSM.SLV.DNS.UDP.RTT]');
 define('CALCULATED_ITEM_SLV_DNS_NS_RTT_TCP',	'rsm.configvalue[RSM.SLV.DNS.TCP.RTT]');
 define('CALCULATED_ITEM_SLV_DNS_NS_UPD',		'rsm.configvalue[RSM.SLV.DNS.NS.UPD]');
@@ -193,8 +197,8 @@ define('DISPLAY_CYCLES_BEFORE_RECOVERY',	3);
 
 // SLA monitoring probe status items keys
 define('PROBE_KEY_ONLINE',			'rsm.probe.online');
-define('PROBE_DNS_UDP_ITEM',		'rsm.dns.udp[{$RSM.TLD}]');
-define('PROBE_DNS_UDP_ITEM_RTT',	'rsm.dns.udp.rtt[');
+define('PROBE_DNS_UDP_ITEM',		'rsm.dns.udp[{$RSM.TLD}]');// todo: remove
+define('PROBE_DNS_UDP_ITEM_RTT',	'rsm.dns.udp.rtt[');// todo: remove
 define('PROBE_RDDS_ITEM',			'rsm.rdds[');
 define('PROBE_EPP_RESULT',			'rsm.epp[');
 define('PROBE_EPP_IP',				'rsm.epp.ip[{$RSM.TLD}]');

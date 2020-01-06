@@ -135,38 +135,158 @@ class CControllerAggregateDetails extends RSMControllerBase {
 		return true;
 	}
 
-	protected function getReportData(array &$data, $time_from, $time_till) {
+	protected function getReportDataNew(array &$data, $time_from, $time_till) {
 		$key_parser = new CItemKey;
-		$probe_items = API::Item()->get([
-			'output' => ['itemid', 'key_', 'hostid'],
-			'hostids' => array_keys($this->probes),
+		$tld_probe_names = [];
+
+		foreach ($this->probes as $probe) {
+			$tld_probe_names[$this->tld['host'].' '.$probe['host']] = $probe['hostid'];
+		}
+
+		$tld_probes = API::Host()->get([
+			'output' => ['hostid', 'host', 'name', 'status'],
 			'filter' => [
-				'key_' => PROBE_KEY_ONLINE
+				'host' => array_keys($tld_probe_names)
 			],
-			'monitored' => true,
 			'preservekeys' => true
 		]);
 
-		if ($probe_items) {
-			$item_values = API::History()->get([
-				'output' => ['itemid', 'value'],
-				'itemids' => array_keys($probe_items),
+		$data['probes_status'] = [];
+
+		foreach ($tld_probes as $tld_probe) {
+			$probe_name = substr($tld_probe['host'], strlen($data['tld_host']) + 1);
+			$data['probes_status'][$probe_name] = $tld_probe['status'];
+		}
+
+		// Keys for RSM_SLV_KEY_DNS_UDP_RTT and RSM_SLV_KEY_DNS_TCP_RTT differs only by last parameter value.
+		$key_parser->parse(RSM_SLV_KEY_DNS_UDP_RTT);
+		$dns_rtt_key = $key_parser->getKey();
+		$rtt_items = API::Item()->get([
+			'output' => ['key_', 'itemid', 'value_type'],
+			'selectHosts' => ['hostid'],
+			'hostids' => array_keys($tld_probes),
+			'search' => [
+				'key_' => $dns_rtt_key.'['
+			],
+			'startSearch' => true,
+			'monitored' => true
+		]);
+
+		if ($rtt_items) {
+			$rtt_values = API::History()->get([
+				'output' => API_OUTPUT_EXTEND,
+				'itemids' => array_keys($rtt_items),
 				'time_from' => $time_from,
-				'time_till' => $time_till
+				'time_till' => $time_till,
+				'history' => reset($rtt_items)['value_type']
 			]);
+			$rtt_values = array_column($rtt_values, 'value', 'itemid');
+		}
 
-			foreach ($item_values as $item_value) {
-				$probe_hostid = $probe_items[$item_value['itemid']]['hostid'];
+		foreach ($rtt_items as $rtt_item) {
+			$probeid = reset($rtt_item['hosts'])['hostid'];
+			$item_value = !array_key_exists('online_status', $this->probes[$probeid])	// Skip offline probes
+					&& array_key_exists($rtt_item['itemid'], $rtt_values)
+				? (int) $rtt_values[$rtt_item['itemid']]
+				: null;
 
-				/**
-				 * Value of probe item PROBE_KEY_ONLINE == PROBE_DOWN means that both DNS UDP and DNS TCP are offline.
-				 */
-				if (!isset($this->probes[$probe_hostid]['online_status']) && $item_value['value'] == PROBE_DOWN) {
-					$this->probes[$probe_hostid]['online_status'] = PROBE_OFFLINE;
+			if ($key_parser->parse($rtt_item['key_']) != CItemKey::PARSE_SUCCESS || $key_parser->getParamsNum() != 4) {
+				error(_s('Unexpected item key "%1$s".', $rtt_item['key_']));
+				continue;
+			}
+
+			$ns = $key_parser->getParam(1);
+			$ip = $key_parser->getParam(2);
+			$trasport = $key_parser->getParam(3);
+			$ipv = filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) ? 'ipv4' : 'ipv6';
+			$dns_nameservers[$ns][$ipv][$ip] = true;
+			$rtt_max = ($transport == 'udp') ? $data['udp_rtt'] : $data['tcp_rtt'];
+
+			if (strtolower($this->probes[$probeid]['transport']) == $trasport) {
+				$this->probes[$probeid]['results'][$ns][$ipv][$ip] = $item_value;
+				$error_key = $ns.$ip;
+
+				if ($item_value < 0) {
+					if (!isset($this->probe_errors[$item_value][$error_key])) {
+						$this->probe_errors[$item_value][$error_key] = 0;
+					}
+
+					$this->probe_errors[$item_value][$error_key]++;
 				}
+				elseif ($item_value > $rtt_max && $data['type'] == RSM_DNS) {
+					if (!isset($data['probes_above_max_rtt'][$error_key])) {
+						$data['probes_above_max_rtt'][$error_key] = 0;
+					}
+
+					$data['probes_above_max_rtt'][$error_key]++;
+				}
+			}
+			else if (array_key_exists($rtt_item['itemid'], $rtt_values)) {
+				error(_s('Item transport value and probe transport value mismatch found for probe "%s" item "%s"',
+					$this->probe[$probeid]['host'], $rtt_item['key_']
+				));
 			}
 		}
 
+		$data['dns_nameservers'] = $dns_nameservers;
+		$data['nsids'] = $this->getNSIDdata($dns_nameservers, $data['time']);
+
+		$key_parser->parse(RSM_SLV_KEY_DNS_NSSOK);
+		$nssok_key = $key_parser->getKey();
+		$key_parser->parse(RSM_SLV_KEY_DNS_NS_STATUS);
+		$ns_status_key = $key_parser->getKey();
+
+		$ns_items = API::Item()->get([
+			'output' => ['key_', 'itemid', 'value_type'],
+			'selectHosts' => ['hostid'],
+			'hostids' => array_keys($tld_probes),
+			'search' => [
+				'key_' => [$nssok_key.'[', $ns_status_key.'[']
+			],
+			'startSearch' => true,
+			'monitored' => true
+		]);
+
+		if ($ns_items) {
+			$ns_values = API::History()->get([
+				'output' => API_OUTPUT_EXTEND,
+				'itemids' => array_keys($ns_items),
+				'time_from' => $time_from,
+				'time_till' => $time_till,
+				'history' => reset($ns_items)['value_type']
+			]);
+			$ns_values = array_column($ns_values, 'value', 'itemid');
+		}
+
+		foreach ($ns_items as $ns_item) {
+			$probeid = reset($rtt_item['hosts'])['hostid'];
+			$value = array_key_exists($ns_item['itemid'], $ns_values) ? $ns_values[$ns_item['itemid']] : null;
+
+			switch ($key_parser->getKey()) {
+				case $nssok_key:
+					// Set Name servers up count.
+					$this->probes[$probeid]['ns_up'] = $value;
+					$this->probes[$probeid]['online_status'] = ($value >= $data['min_dns_count'])
+						? PROBE_UP
+						: PROBE_DOWN;
+					break;
+
+				case $ns_status_key:
+					// Set Name server status.
+					$this->probes[$probeid]['results'][$key_parser->getParam(0)]['status'] = $value;
+					break;
+			}
+		}
+
+		CArrayHelper::sort($this->probes, ['host']);
+	}
+
+	/**
+	 * This method can be removed after 3 months. For details/explanation see ICA-605.
+	 *
+	 */
+	protected function getReportData(array &$data, $time_from, $time_till) {
+		$key_parser = new CItemKey;
 		$tld_probe_names = [];
 
 		foreach ($this->probes as $probe) {
@@ -220,8 +340,6 @@ class CControllerAggregateDetails extends RSMControllerBase {
 				'history' => reset($probes_udp_items)['value_type']
 			]);
 			$item_values = array_column($item_values_db, 'value', 'itemid');
-			$key_parser->parse(RSM_SLV_KEY_DNS_RTT);
-			$params_count = 3; // $key_parser->getParamsNum();
 
 			foreach ($probes_udp_items as $probes_item) {
 				$probeid = $tld_probe_names[reset($probes_item['hosts'])['host']];
@@ -229,20 +347,20 @@ class CControllerAggregateDetails extends RSMControllerBase {
 						&& array_key_exists($probes_item['itemid'], $item_values)
 					? (int) $item_values[$probes_item['itemid']]
 					: null;
-				$key_parser->parse($probes_item['key_']);
-				$ns = $key_parser->getParam(1);
-				$ip = $key_parser->getParam(2);
-				$protocol = $key_parser->getParam(3);
+				;
 
-				if ($key_parser->getParamsNum() != $params_count) {
+				if ($key_parser->parse($probes_item['key_']) != CItemKey::PARSE_SUCCESS
+						|| $key_parser->getParamsNum() != 3) {
 					error(_s('Unexpected item key "%1$s".', $probes_item['key_']));
 					continue;
 				}
 
+				$ns = $key_parser->getParam(1);
+				$ip = $key_parser->getParam(2);
 				$ipv = filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) ? 'ipv4' : 'ipv6';
 				$dns_nameservers[$ns][$ipv][$ip] = true;
-				$this->probes[$probeid]['results_udp'][$ns][$ipv][$ip] = $item_value;
-				$error_key = implode('_', ['udp', $ns, $ipv, $ip]);
+				$this->probes[$probeid]['results'][$ns][$ipv][$ip] = $item_value;
+				$error_key = $ns.$ip;
 
 				if ($item_value < 0) {
 					if (!isset($this->probe_errors[$item_value][$error_key])) {
@@ -263,81 +381,51 @@ class CControllerAggregateDetails extends RSMControllerBase {
 
 		$data['dns_nameservers'] = $dns_nameservers;
 		$data['nsids'] = $this->getNSIDdata($dns_nameservers, $data['time']);
-		$probe_protocol = [];
-		$protocol_type = $this->getValueMapping(RSM_DNS_TRANSPORT_PROTOCOL_VALUE_MAP);
-
-		if (!$protocol_type) {
-			error(_('Value mapping for "Transport protocol" is not found.'));
-		}
-		else {
-			$protocol_items = API::Item()->get([
-				'output' => ['itemid', 'hostid'],
-				'hostids' => array_keys($this->probes),
-				'filter' => ['key_' => RSM_SLV_KEY_DNS_PROTOCOL],
-				'preservekeys' => true
-			]);
-			$protocol_items_data = API::History()->get([
-				'output' => ['itemid', 'value'],
-				'itemids' => array_keys($protocol_items),
-				'time_from' => $data['time'],
-				'time_till' => $data['time'],
-				'history' => ITEM_VALUE_TYPE_UINT64
-			]);
-
-			foreach ($protocol_items_data as $protocol_item_data) {
-				$protocol_item = $protocol_items[$protocol_item_data['itemid']];
-				$this->probes[$protocol_item['hostid']]['transport'] = $protocol_type[$protocol_item_data['value']];
-			}
-		}
 
 		foreach ($this->probes as $probeid => &$probe) {
-			// TODO: ICA-605 remove start.
-			if (array_key_exists('results_udp', $probe)) {
-				$nameservers_up = [];
-				// Always 'UDP'.
-				$probe['transport'] = reset($protocol_type);
+			if (!array_key_exists('results', $probe)) {
+				continue;
+			}
 
-				/**
-				 * NameServer is considered as Down once at least one of its IP addresses is either negative value (error
-				 * code) or its RTT is higher then CALCULATED_ITEM_DNS_UDP_RTT_HIGH.
-				 */
-				foreach ($probe['results_udp'] as $ns => &$ipvs) {
-					foreach (['ipv4', 'ipv6'] as $ipv) {
-						if (array_key_exists($ipv, $ipvs)) {
-							foreach ($ipvs[$ipv] as $item_value) {
-								if ($item_value !== null
-										&& ($item_value > $data['udp_rtt'] || isServiceErrorCode($item_value, $data['type']))) {
-									$ipvs['status'] = NAMESERVER_DOWN;
-									$probe['ns_down']++;
-									unset($nameservers_up[$ns]);
-									break(2);
-								}
-								elseif ($item_value !== null) {
-									$nameservers_up[$ns] = true;
-									$ipvs['status'] = NAMESERVER_UP;
-									/**
-									 * Break is no missed here. If value is positive, we still continue to search for negative
-									 * values to change the status to NAMESERVER_DOWN once found.
-									 *
-									 * It is opposite with negative values. Once negative value is found, NameServer is marked
-									 * as NAMESERVER_DOWN and cannot be turned back to NAMESERVER_UP.
-									 *
-									 * In fact, NAMESERVER_UP means that there are some items with values for particular
-									 * NameServer and non of them is in the range of error codes.
-									 */
-								}
+			$nameservers_up = [];
+			$probe['transport'] = 'UDP';
+
+			/**
+			 * NameServer is considered as Down once at least one of its IP addresses is either negative value (error
+			 * code) or its RTT is higher then CALCULATED_ITEM_DNS_UDP_RTT_HIGH.
+			 */
+			foreach ($probe['results'] as $ns => &$ipvs) {
+				foreach (['ipv4', 'ipv6'] as $ipv) {
+					if (array_key_exists($ipv, $ipvs)) {
+						foreach ($ipvs[$ipv] as $item_value) {
+							if ($item_value !== null
+									&& ($item_value > $data['udp_rtt'] || isServiceErrorCode($item_value, $data['type']))) {
+								$ipvs['status'] = NAMESERVER_DOWN;
+								$probe['ns_down']++;
+								unset($nameservers_up[$ns]);
+								break(2);
+							}
+							elseif ($item_value !== null) {
+								$nameservers_up[$ns] = true;
+								$ipvs['status'] = NAMESERVER_UP;
+								/**
+								 * Break is no missed here. If value is positive, we still continue to search for negative
+								 * values to change the status to NAMESERVER_DOWN once found.
+								 *
+								 * It is opposite with negative values. Once negative value is found, NameServer is marked
+								 * as NAMESERVER_DOWN and cannot be turned back to NAMESERVER_UP.
+								 *
+								 * In fact, NAMESERVER_UP means that there are some items with values for particular
+								 * NameServer and non of them is in the range of error codes.
+								 */
 							}
 						}
 					}
 				}
-				unset($ipvs);
-
-				$probe['ns_up'] = count($nameservers_up);
-				continue;
 			}
-			// TODO: ICA-605 remove end.
+			unset($ipvs);
 
-			// get value of 'rsm.dns.nssok' RSM_SLV_KEY_DNS_NSSOK
+			$probe['ns_up'] = count($nameservers_up);
 		}
 		unset($probe);
 
@@ -349,7 +437,7 @@ class CControllerAggregateDetails extends RSMControllerBase {
 			'output' => ['hostid', 'key_'],
 			'hostids' => array_keys($tld_probes),
 			'filter' => [
-				'key_' => PROBE_DNS_UDP_ITEM // TODO: change to 'rsm.dns.nssok', this item contains number of name servers UP!
+				'key_' => PROBE_DNS_UDP_ITEM
 			],
 			'monitored' => true,
 			'preservekeys' => true
@@ -383,6 +471,144 @@ class CControllerAggregateDetails extends RSMControllerBase {
 		CArrayHelper::sort($this->probes, ['host']);
 	}
 
+	protected function doAction() {
+		$time_from = strtotime(date('Y-m-d H:i:0', $this->getInput('time')));
+		$defaults = [
+			CALCULATED_ITEM_DNS_DELAY => null,
+			CALCULATED_ITEM_DNS_AVAIL_MINNS => null,
+			CALCULATED_ITEM_DNS_UDP_RTT_HIGH => null,
+			CALCULATED_ITEM_DNS_TCP_RTT_HIGH => null
+		];
+		$macro = $this->getHistoryMacroValue(array_keys($defaults), $time_from) + $defaults;
+		$data = [
+			'title' => _('Details of particular test'),
+			'tld_host' => $this->tld['host'],
+			'slv_item_name' => $this->slv_item['name'],
+			'type' => $this->getInput('type'),
+			'time' => $time_from,
+			'min_dns_count' => $macro[CALCULATED_ITEM_DNS_AVAIL_MINNS],
+			'udp_rtt' => $macro[CALCULATED_ITEM_DNS_UDP_RTT_HIGH],
+			'tcp_rtt' => $macro[CALCULATED_ITEM_DNS_TCP_RTT_HIGH],
+			'test_error_message' => $this->getValueMapping(RSM_DNS_RTT_ERRORS_VALUE_MAP),
+			'test_status_message' => $this->getValueMapping(RSM_SERVICE_AVAIL_VALUE_MAP)
+		];
+		$time_till = $time_from + ($macro[CALCULATED_ITEM_DNS_DELAY] - 1);
+
+		if ($data['type'] == RSM_DNS) {
+			$data['probes_above_max_rtt'] = [];
+		}
+
+		$test_result = API::History()->get([
+			'output' => ['value'],
+			'itemids' => $this->availability_item['itemid'],
+			'time_from' => $time_from,
+			'time_till' => $time_till,
+			'history' => $this->availability_item['value_type'],
+			'limit' => 1
+		]);
+		$test_result = reset($test_result);
+
+		if ($test_result) {
+			$data['test_result'] = $test_result['value'];
+		}
+
+		$probe_items = API::Item()->get([
+			'output' => ['itemid', 'key_', 'hostid'],
+			'hostids' => array_keys($this->probes),
+			'filter' => [
+				'key_' => PROBE_KEY_ONLINE
+			],
+			'monitored' => true,
+			'preservekeys' => true
+		]);
+
+		// Initialize probes data for probes with offline status.
+		if ($probe_items) {
+			$item_values = API::History()->get([
+				'output' => ['itemid', 'value'],
+				'itemids' => array_keys($probe_items),
+				'time_from' => $time_from,
+				'time_till' => $time_till
+			]);
+
+			foreach ($item_values as $item_value) {
+				$probe_hostid = $probe_items[$item_value['itemid']]['hostid'];
+
+				/**
+				 * Value of probe item PROBE_KEY_ONLINE == PROBE_DOWN means that both DNS UDP and DNS TCP are offline.
+				 */
+				if (!isset($this->probes[$probe_hostid]['online_status']) && $item_value['value'] == PROBE_DOWN) {
+					$this->probes[$probe_hostid]['online_status'] = PROBE_OFFLINE;
+				}
+			}
+		}
+
+		// Set probes test trasport.
+		$protocol_type = $this->getValueMapping(RSM_DNS_TRANSPORT_PROTOCOL_VALUE_MAP);
+
+		if (!$protocol_type) {
+			error(_('Value mapping for "Transport protocol" is not found.'));
+		}
+		else {
+			$protocol_items = API::Item()->get([
+				'output' => ['itemid', 'hostid'],
+				'hostids' => array_keys($this->probes),
+				'filter' => ['key_' => RSM_SLV_KEY_DNS_PROTOCOL],
+				'preservekeys' => true
+			]);
+			$protocol_items_data = API::History()->get([
+				'output' => ['itemid', 'value'],
+				'itemids' => array_keys($protocol_items),
+				'time_from' => $time_from,
+				'time_till' => $time_from,
+				'history' => ITEM_VALUE_TYPE_UINT64
+			]);
+
+			foreach ($protocol_items_data as $protocol_item_data) {
+				$protocol_item = $protocol_items[$protocol_item_data['itemid']];
+				$this->probes[$protocol_item['hostid']]['transport'] = $protocol_type[$protocol_item_data['value']];
+			}
+		}
+
+		// Detect old or new format (ICA-605) and envoke getReportData or getReportDataNew.
+		$key_parser = new CItemKey;
+		$key_parser->parse(RSM_SLV_KEY_DNS_TEST);
+		$dns_test_item = API::Item()->get([
+			'output' => ['value_type'],
+			'hostids' => array_keys($this->probes),
+			'filter' => ['key_' => $key_parser->getKey().'[']
+		]);
+		$old_format = true;
+
+		if ($dns_test_item) {
+			$dns_test_item_value = API::History()->get([
+				'output' => ['itemid', 'value'],
+				'itemids' => array_keys($dns_test_item),
+				'time_from' => $time_from,
+				'time_till' => $time_from,
+				'history' => reset($dns_test_item)['value_type']
+			]);
+
+			$old_format = !$dns_test_item_value;
+		}
+
+		if ($old_format) {
+			$this->getReportData($data, $time_from, $time_till);
+		}
+		else {
+			$this->getReportDataNew($data, $time_from, $time_till);
+		}
+
+		$data['probes'] = $this->probes;
+		$data['errors'] = $this->probe_errors;
+		krsort($data['errors']);
+
+		$response = new CControllerResponseData($data);
+		$response->setTitle($data['title']);
+		$this->setResponse($response);
+	}
+
+
 	/**
 	 * Collects NSID item values for all probe name servers and ips. NSID unique values will be stored in
 	 * $data['nsids] with key having incremental index and value NSID value. Additionaly probe ns+ip NSID results
@@ -403,12 +629,13 @@ class CControllerAggregateDetails extends RSMControllerBase {
 		$nsids = [];
 
 		foreach ($dns_nameservers as $ns_name => $ips) {
+			// Merge 'ivp4' and 'ipv6' arrays.
 			$ips = array_reduce($ips, 'array_merge', []);
 
 			foreach (array_keys($ips) as $ip) {
 				$nsid_item_keys[] = strtr(RSM_SLV_KEY_DNS_NSID, [
-					'<NS>' => $ns_name,
-					'<IP>' => $ip
+					'{#NS}' => $ns_name,
+					'{#IP}' => $ip
 				]);
 			}
 		}
@@ -458,53 +685,5 @@ class CControllerAggregateDetails extends RSMControllerBase {
 		}
 
 		return $nsids;
-	}
-
-	protected function doAction() {
-		$time_from = strtotime(date('Y-m-d H:i:0', $this->getInput('time')));
-		$macro = $this->getHistoryMacroValue([
-			CALCULATED_ITEM_DNS_DELAY,
-			CALCULATED_ITEM_DNS_AVAIL_MINNS,
-			CALCULATED_ITEM_DNS_UDP_RTT_HIGH
-		], $time_from);
-		$data = [
-			'title' => _('Details of particular test'),
-			'tld_host' => $this->tld['host'],
-			'slv_item_name' => $this->slv_item['name'],
-			'type' => $this->getInput('type'),
-			'time' => $time_from,
-			'min_dns_count' => $macro[CALCULATED_ITEM_DNS_AVAIL_MINNS],
-			'udp_rtt' => $macro[CALCULATED_ITEM_DNS_UDP_RTT_HIGH],
-			'test_error_message' => $this->getValueMapping(RSM_DNS_RTT_ERRORS_VALUE_MAP),
-			'test_status_message' => $this->getValueMapping(RSM_SERVICE_AVAIL_VALUE_MAP)
-		];
-		$time_till = $time_from + ($macro[CALCULATED_ITEM_DNS_DELAY] - 1);
-
-		if ($data['type'] == RSM_DNS) {
-			$data['probes_above_max_rtt'] = [];
-		}
-
-		$test_result = API::History()->get([
-			'output' => ['value'],
-			'itemids' => $this->availability_item['itemid'],
-			'time_from' => $time_from,
-			'time_till' => $time_till,
-			'history' => $this->availability_item['value_type'],
-			'limit' => 1
-		]);
-		$test_result = reset($test_result);
-
-		if ($test_result) {
-			$data['test_result'] = $test_result['value'];
-		}
-
-		$this->getReportData($data, $time_from, $time_till);
-		$data['probes'] = $this->probes;
-		$data['errors'] = $this->probe_errors;
-		krsort($data['errors']);
-
-		$response = new CControllerResponseData($data);
-		$response->setTitle($data['title']);
-		$this->setResponse($response);
 	}
 }
