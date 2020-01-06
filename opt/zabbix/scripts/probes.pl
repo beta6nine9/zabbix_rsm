@@ -619,7 +619,7 @@ sub update_probe_items($$$)
 
 	my %item_key = (
 		'rdap' => 'rdap[',
-		'rdds' => 'rsm.rdds'
+		'rdds' => 'rsm.rdds',
 	);
 
 	pfail("invalid service \"$service\"") if (!exists($item_key{$service}));
@@ -637,14 +637,7 @@ sub update_probe_items($$$)
 
 		my @items = keys(%{$result2});
 
-		if ($enable)
-		{
-			enable_items(\@items);
-		}
-		else
-		{
-			disable_items(\@items);
-		}
+		$enable ? enable_items(\@items) : disable_items(\@items);
 	}
 }
 
