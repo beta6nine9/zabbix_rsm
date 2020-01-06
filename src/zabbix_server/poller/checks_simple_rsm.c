@@ -3981,45 +3981,13 @@ out:
 	return ret;
 }
 
-static int	zbx_get_rdap_items(const char *host, DC_ITEM *ip_item, DC_ITEM *rtt_item)
+static void create_rsm_rdap_json(struct zbx_json *json, const char** ip, int rtt, int result)
 {
-#define ZBX_RDAP_ITEM_COUNT	2
-#define ZBX_RDAP_ITEM_KEY_IP	"rdap.ip"
-#define ZBX_RDAP_ITEM_KEY_RTT	"rdap.rtt"
-
-	zbx_host_key_t		hosts_keys[ZBX_RDAP_ITEM_COUNT] = {
-					{(char *)host, ZBX_RDAP_ITEM_KEY_IP},
-					{(char *)host, ZBX_RDAP_ITEM_KEY_RTT}
-				};
-	zbx_item_value_type_t	types[ZBX_RDAP_ITEM_COUNT] = {
-					ITEM_VALUE_TYPE_STR,
-					ITEM_VALUE_TYPE_FLOAT
-				};
-	DC_ITEM			*destinations[ZBX_RDAP_ITEM_COUNT] = {
-					ip_item,
-					rtt_item
-				};
-	DC_ITEM			items[ZBX_RDAP_ITEM_COUNT];
-	int			errcodes[ZBX_RDAP_ITEM_COUNT], i;
-
-	DCconfig_get_items_by_keys(items, hosts_keys, errcodes, ZBX_RDAP_ITEM_COUNT);
-
-	for (i = 0; ZBX_RDAP_ITEM_COUNT > i; i++)
-	{
-		if (SUCCEED != errcodes[i] || ITEM_TYPE_TRAPPER != items[i].type || types[i] != items[i].value_type)
-		{
-			DCconfig_clean_items(items, errcodes, ZBX_RDAP_ITEM_COUNT);
-			return FAIL;
-		}
-
-		memcpy(destinations[i], &items[i], sizeof(DC_ITEM));
-	}
-
-	return SUCCEED;
-
-#undef ZBX_RDAP_ITEM_COUNT
-#undef ZBX_RDAP_ITEM_KEY_IP
-#undef ZBX_RDAP_ITEM_KEY_RTT
+	zbx_json_init(json, 2 * ZBX_KIBIBYTE);
+	zbx_json_addstring(json, "ip", *ip, ZBX_JSON_TYPE_STRING);
+	zbx_json_addint64(json, "rtt", rtt);
+	zbx_json_addint64(json, "result", result);
+	zbx_json_close(json);
 }
 
 int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *result)
@@ -4030,14 +3998,12 @@ int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	zbx_vector_str_t	ips;
 	struct zbx_json_parse	jp;
 	FILE			*log_fd;
-	DC_ITEM			ip_item, rtt_item;
 	char			*domain, *test_domain, *base_url, *maxredirs_str, *rtt_limit_str, *tld_enabled_str,
 				*probe_enabled_str, *ipv4_enabled_str, *ipv6_enabled_str, *res_ip, *proto = NULL,
 				*domain_part = NULL, *prefix = NULL, *full_url = NULL, *value_str = NULL,
 				err[ZBX_ERR_BUF_SIZE], is_ipv4, rdap_prefix[64];
 	const char		*ip = NULL;
 	size_t			value_alloc = 0;
-	unsigned int		extras;
 	zbx_http_error_t	ec_http;
 	int			maxredirs, rtt_limit, tld_enabled, probe_enabled, ipv4_enabled, ipv6_enabled,
 				ipv_flags = 0, curl_flags = 0, port, rtt = ZBX_NO_VALUE, ret = SYSINFO_RET_FAIL;
@@ -4131,13 +4097,6 @@ int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 
 	rsm_info(log_fd, "START TEST");
 
-	/* get items */
-	if (SUCCEED != zbx_get_rdap_items(item->host.host, &ip_item, &rtt_item))
-	{
-		SET_MSG_RESULT(result, zbx_strdup(NULL, "Cannot find items to store IP and RTT."));
-		goto out;
-	}
-
 	if (0 == probe_enabled)
 	{
 		rsm_info(log_fd, "RDAP disabled on this probe");
@@ -4152,11 +4111,9 @@ int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 		goto out;
 	}
 
-	extras = RESOLVER_EXTRAS_DNSSEC;
-
 	/* create resolver */
-	if (SUCCEED != zbx_create_resolver(&res, "resolver", res_ip, RSM_TCP, ipv4_enabled, ipv6_enabled, extras,
-			RSM_TCP_TIMEOUT, RSM_TCP_RETRY, log_fd, err, sizeof(err)))
+	if (SUCCEED != zbx_create_resolver(&res, "resolver", res_ip, RSM_TCP, ipv4_enabled, ipv6_enabled,
+			RESOLVER_EXTRAS_DNSSEC, RSM_TCP_TIMEOUT, RSM_TCP_RETRY, log_fd, err, sizeof(err)))
 	{
 		SET_MSG_RESULT(result, zbx_dsprintf(NULL, "Cannot create resolver: %s.", err));
 		goto out;
@@ -4276,24 +4233,22 @@ out:
 
 	if (SYSINFO_RET_OK == ret && ZBX_NO_VALUE != rtt)
 	{
-		/* set values for RTT and IP */
-		if (NULL != ip)
-			zbx_add_value_str(&ip_item, item->nextcheck, ip);
-		zbx_add_value_dbl(&rtt_item, item->nextcheck, rtt);
-
-		/* set the value of our item itself */
+		int res = 0;
 		switch (zbx_subtest_result(rtt, rtt_limit))
 		{
 			case ZBX_SUBTEST_SUCCESS:
-				zbx_add_value_uint(item, item->nextcheck, 1);	/* Up */
+				res = 1; /* Up */
 				break;
 			case ZBX_SUBTEST_FAIL:
-				zbx_add_value_uint(item, item->nextcheck, 0);	/* Down */
+				res = 0; /* Down */
 		}
-	}
 
-	DCconfig_clean_items(&ip_item, NULL, 1);
-	DCconfig_clean_items(&rtt_item, NULL, 1);
+		struct zbx_json		json;
+		create_rsm_rdap_json(&json, &ip, rtt, res);
+		SET_STR_RESULT(result, zbx_strdup(NULL, json.buffer));
+
+		zbx_json_free(&json);
+	}
 
 	if (NULL != res)
 	{

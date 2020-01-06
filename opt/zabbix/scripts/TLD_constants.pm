@@ -13,8 +13,8 @@ use constant MONITORING_TARGET_REGISTRAR => "registrar";
 use constant LINUX_TEMPLATEID			=> 10001;	# Template "Template OS Linux by Zabbix agent"
 use constant APP_ZABBIX_PROXY_TEMPLATEID	=> 10058;	# Template "Template App Zabbix Proxy"
 use constant PROBE_ERRORS_TEMPLATEID		=> 99990;	# Template "Template Probe Errors"
-use constant DNS_TEMPLATEID			=> 99500;	# Template "Template DNS"
-use constant RDAP_TEMPLATEID			=> 99980;	# Template "Template RDAP"
+use constant DNS_TEMPLATEID			=> 99500;	# Template "Template DNS Test"
+use constant RDAP_TEMPLATEID			=> 99980;	# Template "Template RDAP Test"
 
 use constant TEMPLATES_TLD_GROUPID		=> 240;		# Host group "Templates - TLD"
 use constant PROBES_GROUPID			=> 120;		# Host group "Probes"

@@ -1181,6 +1181,106 @@ static int	DBpatch_4050506(void)
 	return SUCCEED;
 }
 
+static int	DBpatch_4050507(void)
+{
+	int	ret = FAIL;
+
+	CHECK(DBexecute("update hosts set host='Template RDAP Test', name='Template RDAP Test' "
+		"where host = 'Template RDAP' "));
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
+static int	DBpatch_4050508(void)
+{
+	int	ret = FAIL;
+
+	CHECK(DBexecute("update items set value_type='4' where key_ like 'rdap[%%'"));
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
+static int	DBpatch_4050509(void)
+{
+	int	ret = FAIL;
+
+	CHECK(DBexecute("update items as i1 inner join items as i2 on i1.hostid=i2.hostid set"
+			" i1.type='18', i1.master_itemid=i2.itemid where i1.key_ in ('rdap.ip','rdap.rtt') and"
+			" i2.key_ like 'rdap[%%'"));
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
+static int db_insert_rdap_item_preproc(const char* item_key, const char* item_preproc_param)
+{
+	DB_RESULT		result;
+	DB_ROW			row;
+	zbx_vector_uint64_t	rdap_itemids;
+	int			i, ret = FAIL;
+	zbx_uint64_t		item_preprocid_next, count;
+
+	ONLY_SERVER();
+
+	zbx_vector_uint64_create(&rdap_itemids);
+	zbx_vector_uint64_reserve(&rdap_itemids, 1);
+
+	result = DBselect("select count(*) from item_preproc where params='%s'",item_preproc_param);
+	if (NULL != (row = DBfetch(result)))
+	{
+		ZBX_STR2UINT64(count, row[0]);
+		zabbix_log(LOG_LEVEL_WARNING,"VALJ COUNT:  %d \n",count);
+	}
+
+	DBfree_result(result);
+
+	if (0 < count)
+	{
+		ret = SUCCEED;
+		goto out;
+	}
+
+	result = DBselect("select itemid from items where key_ ='%s' ",item_key);
+
+	while (NULL != (row = DBfetch(result)))
+	{
+		zbx_uint64_t	rdap_itemid;
+		ZBX_STR2UINT64(rdap_itemid, row[0]);
+		zbx_vector_uint64_append(&rdap_itemids, rdap_itemid);
+	}
+
+	DBfree_result(result);
+
+	item_preprocid_next = DBget_maxid_num("item_preproc", rdap_itemids.values_num);
+
+	for (i = 0; i < rdap_itemids.values_num; ++i)
+	{
+		CHECK(DBexecute("insert into item_preproc set item_preprocid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ","
+				" step=1, type=12,params='%s',error_handler='0'", item_preprocid_next,
+				rdap_itemids.values[i],item_preproc_param));
+		item_preprocid_next++;
+	}
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
+static int	DBpatch_4050510(void)
+{
+	return db_insert_rdap_item_preproc("rdap.ip", "$.ip");
+}
+
+static int	DBpatch_4050511(void)
+{
+	return db_insert_rdap_item_preproc("rdap.rtt", "$.rtt");
+}
+
 #endif
 
 DBPATCH_START(4050)
@@ -1204,5 +1304,10 @@ DBPATCH_ADD(4050503, 0, 0)	/* set macro descriptions (part II) */
 DBPATCH_ADD(4050504, 0, 0)	/* add "DNS test mode" and "Transport protocol" value mappings */
 DBPATCH_ADD(4050505, 0, 0)	/* add "Template DNS Test" template */
 DBPATCH_ADD(4050506, 0, 0)	/* disable "db watchdog" internal items */
+DBPATCH_ADD(4050507, 0, 0)	/* Rename RDAP Template */
+DBPATCH_ADD(4050508, 0, 0)	/* set RDAP master item value_type to the text type */
+DBPATCH_ADD(4050509, 0, 0)	/* set RDAP calculated items to be dependant items */
+DBPATCH_ADD(4050510, 0, 0)	/* add item_preproc to RDAP ip items */
+DBPATCH_ADD(4050511, 0, 0)	/* add item_preproc to RDAP rtt items */
 
 DBPATCH_END()

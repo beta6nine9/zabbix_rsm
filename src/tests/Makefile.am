@@ -1,9 +1,10 @@
 ## Process this file with automake to produce Makefile.in
 
-sbin_PROGRAMS = t_rsm_dns t_rsm_rdds
+sbin_PROGRAMS = t_rsm_dns t_rsm_rdds t_rsm_rdap
 
 t_rsm_dns_SOURCES = t_rsm_dns.c t_rsm.h
 t_rsm_rdds_SOURCES = t_rsm_rdds.c t_rsm.h
+t_rsm_rdap_SOURCES = t_rsm_rdap.c t_rsm.h
 
 COMMON_OBJS = \
 	$(top_srcdir)/src/zabbix_server/poller/libzbxpoller.a \
@@ -40,3 +41,6 @@ t_rsm_dns_LDFLAGS = @SERVER_LDFLAGS@
 
 t_rsm_rdds_LDADD = $(COMMON_OBJS) @SERVER_LIBS@
 t_rsm_rdds_LDFLAGS = @SERVER_LDFLAGS@
+
+t_rsm_rdap_LDADD = $(COMMON_OBJS) @SERVER_LIBS@
+t_rsm_rdap_LDFLAGS = @SERVER_LDFLAGS@
