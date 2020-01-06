@@ -2000,7 +2000,7 @@ Other options
                 list services of each TLD, the output is comma-separated list:
                 <TLD>,<TLD-TYPE>,<TLD-STATUS>,<RDDS.DNS.TESTPREFIX>,<RDDS.NS.STRING>,<RDDS.TESTPREFIX>,
                 <TLD.DNSSEC.ENABLED>,<TLD.EPP.ENABLED>,<TLD.RDDS.ENABLED>,<TLD.RDAP.ENABLED>,
-                <RDAP.BASE.URL>,<RDP.TEST.DOMAIN>,<RDDS43.SERVERS>,<RDDS80.SERVERS>
+                <RDAP.BASE.URL>,<RDAP.TEST.DOMAIN>,<RDDS43.SERVERS>,<RDDS80.SERVERS>
         --get-nsservers-list
                 CSV formatted list of NS + IP server pairs for specified TLD:
                 <TLD>,<IP-VERSION>,<NAME-SERVER>,<IP>

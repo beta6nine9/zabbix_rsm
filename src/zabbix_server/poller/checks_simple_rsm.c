@@ -4233,7 +4233,9 @@ out:
 
 	if (SYSINFO_RET_OK == ret && ZBX_NO_VALUE != rtt)
 	{
-		int res = 0;
+		int		res = 0;
+		struct zbx_json	json;
+
 		switch (zbx_subtest_result(rtt, rtt_limit))
 		{
 			case ZBX_SUBTEST_SUCCESS:
@@ -4243,7 +4245,6 @@ out:
 				res = 0; /* Down */
 		}
 
-		struct zbx_json		json;
 		create_rsm_rdap_json(&json, &ip, rtt, res);
 		SET_STR_RESULT(result, zbx_strdup(NULL, json.buffer));
 

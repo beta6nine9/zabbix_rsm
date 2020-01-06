@@ -1,8 +1,6 @@
 #include "t_rsm.h"
 #include "../zabbix_server/poller/checks_simple_rsm.c"
 
-#define DEFAULT_TESTPREFIX	"www.zz--rsm-monitoring"
-
 void	zbx_on_exit(int ret)
 {
 	(void)ret;
@@ -23,18 +21,14 @@ int	main(int argc, char *argv[])
 	zbx_resolver_error_t	ec_res;
 	curl_data_t		data = {NULL, 0, 0};
 	zbx_http_error_t	ec_http;
-
-	int rtt = ZBX_NO_VALUE;
-	int c,index, ipv_flags,port,maxredirs,curl_flags,rtt_limit;
-	struct zbx_json		json;
+	int			c, index, ipv_flags, port, maxredirs, curl_flags, rtt_limit, rtt = ZBX_NO_VALUE,
+				ipv4_enabled=1, ipv6_enabled=1;
+	struct zbx_json	json;
 	struct zbx_json_parse	jp;
 	ldns_resolver		*res = NULL;
-	int ipv4_enabled=1, ipv6_enabled=1;
-
 	char			*test_domain, *base_url, *maxredirs_str, *res_ip, *proto = NULL,
 				*domain_part = NULL, *prefix = NULL, *full_url = NULL, *value_str = NULL,
 				err[ZBX_ERR_BUF_SIZE], is_ipv4, rdap_prefix[64];
-
 	const char		*ip = NULL;
 	size_t			value_alloc = 0;
 
@@ -165,6 +159,7 @@ int	main(int argc, char *argv[])
 
 	/* base_url example: http://whois.springbank */
 	/* full_url example: http://172.19.0.2:80/domain/whois.springbank */
+
 	rsm_infof(stderr, "the domain in base URL \"%s\" was resolved to %s, using full URL \"%s\".",
 			base_url, ip, full_url);
 
@@ -203,7 +198,9 @@ int	main(int argc, char *argv[])
 out:
 	if (ZBX_NO_VALUE != rtt)
 	{
-		int res = 0;
+		int		res = 0;
+		struct zbx_json	json;
+
 		switch (zbx_subtest_result(rtt, rtt_limit))
 		{
 			case ZBX_SUBTEST_SUCCESS:
@@ -212,8 +209,8 @@ out:
 			case ZBX_SUBTEST_FAIL:
 				res = 0;
 		}
-		struct zbx_json	json;
-		create_rsm_rdap_json(&json,&ip,rtt,res);
+
+		create_rsm_rdap_json(&json, &ip, rtt, res);
 		zbx_json_free(&json);
 	}
 

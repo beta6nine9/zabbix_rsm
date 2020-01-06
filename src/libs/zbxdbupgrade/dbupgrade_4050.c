@@ -1185,6 +1185,8 @@ static int	DBpatch_4050507(void)
 {
 	int	ret = FAIL;
 
+	ONLY_SERVER();
+
 	CHECK(DBexecute("update hosts set host='Template RDAP Test', name='Template RDAP Test' "
 		"where host = 'Template RDAP' "));
 
@@ -1197,6 +1199,8 @@ static int	DBpatch_4050508(void)
 {
 	int	ret = FAIL;
 
+	ONLY_SERVER();
+
 	CHECK(DBexecute("update items set value_type='4' where key_ like 'rdap[%%'"));
 
 	ret = SUCCEED;
@@ -1208,9 +1212,11 @@ static int	DBpatch_4050509(void)
 {
 	int	ret = FAIL;
 
-	CHECK(DBexecute("update items as i1 inner join items as i2 on i1.hostid=i2.hostid set"
-			" i1.type='18', i1.master_itemid=i2.itemid where i1.key_ in ('rdap.ip','rdap.rtt') and"
-			" i2.key_ like 'rdap[%%'"));
+	ONLY_SERVER();
+
+	CHECK(DBexecute("update items as i1 inner join items as i2 on i1.hostid=i2.hostid set "
+			"i1.type='18', i1.master_itemid=i2.itemid where i1.key_ in ('rdap.ip','rdap.rtt') and "
+			"i2.key_ like 'rdap[%%'"));
 
 	ret = SUCCEED;
 out:
@@ -1225,16 +1231,13 @@ static int db_insert_rdap_item_preproc(const char* item_key, const char* item_pr
 	int			i, ret = FAIL;
 	zbx_uint64_t		item_preprocid_next, count;
 
-	ONLY_SERVER();
-
 	zbx_vector_uint64_create(&rdap_itemids);
 	zbx_vector_uint64_reserve(&rdap_itemids, 1);
 
-	result = DBselect("select count(*) from item_preproc where params='%s'",item_preproc_param);
+	result = DBselect("select count(*) from item_preproc where params='%s'", item_preproc_param);
 	if (NULL != (row = DBfetch(result)))
 	{
 		ZBX_STR2UINT64(count, row[0]);
-		zabbix_log(LOG_LEVEL_WARNING,"VALJ COUNT:  %d \n",count);
 	}
 
 	DBfree_result(result);
@@ -1245,11 +1248,12 @@ static int db_insert_rdap_item_preproc(const char* item_key, const char* item_pr
 		goto out;
 	}
 
-	result = DBselect("select itemid from items where key_ ='%s' ",item_key);
+	result = DBselect("select itemid from items where key_ ='%s' ", item_key);
 
 	while (NULL != (row = DBfetch(result)))
 	{
 		zbx_uint64_t	rdap_itemid;
+
 		ZBX_STR2UINT64(rdap_itemid, row[0]);
 		zbx_vector_uint64_append(&rdap_itemids, rdap_itemid);
 	}
@@ -1260,9 +1264,9 @@ static int db_insert_rdap_item_preproc(const char* item_key, const char* item_pr
 
 	for (i = 0; i < rdap_itemids.values_num; ++i)
 	{
-		CHECK(DBexecute("insert into item_preproc set item_preprocid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ","
-				" step=1, type=12,params='%s',error_handler='0'", item_preprocid_next,
-				rdap_itemids.values[i],item_preproc_param));
+		CHECK(DBexecute("insert into item_preproc set item_preprocid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ", "
+				"step=1, type=12,params='%s',error_handler='0'", item_preprocid_next,
+				rdap_itemids.values[i], item_preproc_param));
 		item_preprocid_next++;
 	}
 
@@ -1273,11 +1277,15 @@ out:
 
 static int	DBpatch_4050510(void)
 {
+	ONLY_SERVER();
+
 	return db_insert_rdap_item_preproc("rdap.ip", "$.ip");
 }
 
 static int	DBpatch_4050511(void)
 {
+	ONLY_SERVER();
+
 	return db_insert_rdap_item_preproc("rdap.rtt", "$.rtt");
 }
 
