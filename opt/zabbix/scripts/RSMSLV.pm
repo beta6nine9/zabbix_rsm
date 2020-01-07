@@ -2714,14 +2714,14 @@ sub is_service_error_desc
 
 sub get_templated_items_like
 {
-	my $service = shift;
+	my $tld = shift;
 	my $key_in = shift;
 
 	# TODO: this function could benefit from some caching because it's called
 	# on every cycle during rsm.slv*.pl calculation even though list of items
 	# is not likely to change
 
-	my $hostid = get_hostid("Template $service");
+	my $hostid = get_hostid("Template $tld");
 
 	my $items_ref = db_select(
 		"select key_".
