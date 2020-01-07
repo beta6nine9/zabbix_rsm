@@ -408,10 +408,10 @@ sub list_services($;$)
 	foreach my $rsmhost (sort(@rsmhosts))
 	{
 		my @row = ();
-		my $services = get_rsmhost_config($server_key, $rsmhost);
+		my $config = get_rsmhost_config($server_key, $rsmhost);
 
 		push(@row, $rsmhost);
-		push(@row, map($services->{$_} // "", @columns));
+		push(@row, map($config->{$_} // "", @columns));
 		push(@rows, \@row);
 	}
 
@@ -434,15 +434,10 @@ sub get_rsmhost_config($$)
 	my $tld        = shift;
 
 	my @tld_types = (TLD_TYPE_G, TLD_TYPE_CC, TLD_TYPE_OTHER, TLD_TYPE_TEST);
-
 	my $result;
 
-	my $main_templateid = get_template(TEMPLATE_RSMHOST_CONFIG_PREFIX . $tld, false, false);
-
-	pfail("TLD \"$tld\" does not exist on \"$server_key\"") unless ($main_templateid->{'templateid'});
-
+	my $main_templateid = get_template_id(TEMPLATE_RSMHOST_CONFIG_PREFIX . $tld);
 	my $macros = get_host_macro($main_templateid, undef);
-
 	my $tld_host = get_host($tld, true);
 
 	$result->{'tld_status'} = $tld_host->{'status'};
