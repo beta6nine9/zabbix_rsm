@@ -190,14 +190,14 @@ class CControllerAggregateDetails extends RSMControllerBase {
 				? (int) $rtt_values[$rtt_item['itemid']]
 				: null;
 
-			if ($key_parser->parse($rtt_item['key_']) != CItemKey::PARSE_SUCCESS || $key_parser->getParamsNum() != 4) {
+			if ($key_parser->parse($rtt_item['key_']) != CItemKey::PARSE_SUCCESS || $key_parser->getParamsNum() != 3) {
 				error(_s('Unexpected item key "%1$s".', $rtt_item['key_']));
 				continue;
 			}
 
-			$ns = $key_parser->getParam(1);
-			$ip = $key_parser->getParam(2);
-			$trasport = $key_parser->getParam(3);
+			$ns = $key_parser->getParam(0);
+			$ip = $key_parser->getParam(1);
+			$trasport = $key_parser->getParam(2);
 			$ipv = filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) ? 'ipv4' : 'ipv6';
 			$dns_nameservers[$ns][$ipv][$ip] = true;
 			$rtt_max = ($transport == 'udp') ? $data['udp_rtt'] : $data['tcp_rtt'];
@@ -230,13 +230,12 @@ class CControllerAggregateDetails extends RSMControllerBase {
 
 		$data['dns_nameservers'] = $dns_nameservers;
 		$data['nsids'] = $this->getNSIDdata($dns_nameservers, $data['time']);
-
 		$key_parser->parse(RSM_SLV_KEY_DNS_NSSOK);
 		$nssok_key = $key_parser->getKey();
 		$key_parser->parse(RSM_SLV_KEY_DNS_NS_STATUS);
 		$ns_status_key = $key_parser->getKey();
 
-		$ns_items = API::Item()->get([
+		$ns_items = $this->getItemsHistoryValue([
 			'output' => ['key_', 'itemid', 'value_type'],
 			'selectHosts' => ['hostid'],
 			'hostids' => array_keys($tld_probes),
@@ -244,23 +243,15 @@ class CControllerAggregateDetails extends RSMControllerBase {
 				'key_' => [$nssok_key.'[', $ns_status_key.'[']
 			],
 			'startSearch' => true,
-			'monitored' => true
+			'monitored' => true,
+			'time_from' => $time_from,
+			'time_till' => $time_till,
+			'history' => ITEM_VALUE_TYPE_UINT64
 		]);
 
-		if ($ns_items) {
-			$ns_values = API::History()->get([
-				'output' => API_OUTPUT_EXTEND,
-				'itemids' => array_keys($ns_items),
-				'time_from' => $time_from,
-				'time_till' => $time_till,
-				'history' => reset($ns_items)['value_type']
-			]);
-			$ns_values = array_column($ns_values, 'value', 'itemid');
-		}
-
 		foreach ($ns_items as $ns_item) {
-			$probeid = reset($rtt_item['hosts'])['hostid'];
-			$value = array_key_exists($ns_item['itemid'], $ns_values) ? $ns_values[$ns_item['itemid']] : null;
+			$probeid = reset($ns_item['hosts'])['hostid'];
+			$value = array_key_exists('history_value', $ns_item) ? $ns_item['history_value'] : null;
 
 			switch ($key_parser->getKey()) {
 				case $nssok_key:
@@ -363,6 +354,10 @@ class CControllerAggregateDetails extends RSMControllerBase {
 				$error_key = $ns.$ip;
 
 				if ($item_value < 0) {
+					if (isServiceErrorCode($item_value, $data['type'])) {
+						$this->probes[$probeid]['dns_error'][$error_key] = true;
+					}
+
 					if (!isset($this->probe_errors[$item_value][$error_key])) {
 						$this->probe_errors[$item_value][$error_key] = 0;
 					}
@@ -370,6 +365,8 @@ class CControllerAggregateDetails extends RSMControllerBase {
 					$this->probe_errors[$item_value][$error_key]++;
 				}
 				elseif ($item_value > $data['udp_rtt'] && $data['type'] == RSM_DNS) {
+					$this->probes[$probeid]['above_max_rtt'][$error_key] = true;
+
 					if (!isset($data['probes_above_max_rtt'][$error_key])) {
 						$data['probes_above_max_rtt'][$error_key] = 0;
 					}
@@ -512,34 +509,26 @@ class CControllerAggregateDetails extends RSMControllerBase {
 			$data['test_result'] = $test_result['value'];
 		}
 
-		$probe_items = API::Item()->get([
+		// Initialize probes data for probes with offline status.
+		$probes = $this->getItemsHistoryValue([
 			'output' => ['itemid', 'key_', 'hostid'],
 			'hostids' => array_keys($this->probes),
 			'filter' => [
 				'key_' => PROBE_KEY_ONLINE
 			],
 			'monitored' => true,
-			'preservekeys' => true
+			'time_from' => $time_from,
+			'time_till' => $time_till,
+			'history' => ITEM_VALUE_TYPE_UINT64
 		]);
 
-		// Initialize probes data for probes with offline status.
-		if ($probe_items) {
-			$item_values = API::History()->get([
-				'output' => ['itemid', 'value'],
-				'itemids' => array_keys($probe_items),
-				'time_from' => $time_from,
-				'time_till' => $time_till
-			]);
-
-			foreach ($item_values as $item_value) {
-				$probe_hostid = $probe_items[$item_value['itemid']]['hostid'];
-
-				/**
-				 * Value of probe item PROBE_KEY_ONLINE == PROBE_DOWN means that both DNS UDP and DNS TCP are offline.
-				 */
-				if (!isset($this->probes[$probe_hostid]['online_status']) && $item_value['value'] == PROBE_DOWN) {
-					$this->probes[$probe_hostid]['online_status'] = PROBE_OFFLINE;
-				}
+		foreach ($probes as $probe) {
+			/**
+			 * Value of probe item PROBE_KEY_ONLINE == PROBE_DOWN means that both DNS UDP and DNS TCP are offline.
+			 */
+			if (isset($probe['history_value']) && !isset($this->probes[$probe['hostid']]['online_status'])
+					&& $probe['history_value'] == PROBE_DOWN) {
+				$this->probes[$probe['hostid']]['online_status'] = PROBE_OFFLINE;
 			}
 		}
 
@@ -550,29 +539,26 @@ class CControllerAggregateDetails extends RSMControllerBase {
 			error(_('Value mapping for "Transport protocol" is not found.'));
 		}
 		else {
-			$protocol_items = API::Item()->get([
+			$probes = $this->getItemsHistoryValue([
 				'output' => ['itemid', 'hostid'],
 				'hostids' => array_keys($this->probes),
 				'filter' => ['key_' => RSM_SLV_KEY_DNS_PROTOCOL],
-				'preservekeys' => true
-			]);
-			$protocol_items_data = API::History()->get([
-				'output' => ['itemid', 'value'],
-				'itemids' => array_keys($protocol_items),
 				'time_from' => $time_from,
 				'time_till' => $time_from,
 				'history' => ITEM_VALUE_TYPE_UINT64
 			]);
 
-			foreach ($protocol_items_data as $protocol_item_data) {
-				$protocol_item = $protocol_items[$protocol_item_data['itemid']];
-				$this->probes[$protocol_item['hostid']]['transport'] = $protocol_type[$protocol_item_data['value']];
+			foreach ($probes as $probe) {
+				if (isset($probe['history_value'])) {
+					$this->probes[$probe['hostid']]['transport'] = $protocol_type[$probe['history_value']];
+				}
 			}
 		}
 
 		// Detect old or new format (ICA-605) and envoke getReportData or getReportDataNew.
 		$key_parser = new CItemKey;
 		$key_parser->parse(RSM_SLV_KEY_DNS_TEST);
+		// TODO: use $this->getItemsHistoryValue
 		$dns_test_item = API::Item()->get([
 			'output' => ['value_type'],
 			'hostids' => array_keys($this->probes),
@@ -644,20 +630,10 @@ class CControllerAggregateDetails extends RSMControllerBase {
 			return $nsids;
 		}
 
-		$nsid_items = API::Item()->get([
+		$nsid_items = $this->getItemsHistoryValue([
 			'output' => ['key_', 'type', 'hostid'],
 			'hostids' => array_keys($this->probes),
 			'filter' => ['key_' => $nsid_item_keys],
-			'preservekeys' => true
-		]);
-
-		if (!$nsid_items) {
-			return $nsids;
-		}
-
-		$nsid_values = API::History()->get([
-			'output' => ['itemid', 'value'],
-			'itemids' => array_keys($nsid_items),
 			'time_from' => $time,
 			'time_till' => $time,
 			'history' => ITEM_VALUE_TYPE_TEXT
@@ -665,11 +641,10 @@ class CControllerAggregateDetails extends RSMControllerBase {
 
 		$key_parser->parse(RSM_SLV_KEY_DNS_NSID);
 		$params_count = $key_parser->getParamsNum();
-		$nsids = array_unique(zbx_objectValues($nsid_values, 'value'));
+		$nsids = array_unique(array_column($nsid_items, 'history_value'));
 		sort($nsids, SORT_LOCALE_STRING|SORT_NATURAL|SORT_FLAG_CASE);
 
-		foreach ($nsid_values as $nsid_value) {
-			$nsid_item = $nsid_items[$nsid_value['itemid']];
+		foreach ($nsid_items as $nsid_item) {
 			$key_parser->parse($nsid_item['key_']);
 
 			if ($key_parser->getParamsNum() != $params_count) {
@@ -677,11 +652,13 @@ class CControllerAggregateDetails extends RSMControllerBase {
 				continue;
 			}
 
-			$ns_name = $key_parser->getParam(0);
-			$ns_ip = $key_parser->getParam(1);
-			$this->probes[$nsid_item['hostid']]['results_nsid'][$ns_name][$ns_ip] = array_search($nsid_value['value'],
-				$nsids
-			);
+			if (isset($nsid_item['history_value'])) {
+				$name = $key_parser->getParam(0);
+				$ip = $key_parser->getParam(1);
+				$this->probes[$nsid_item['hostid']]['results_nsid'][$name][$ip] = array_search(
+					$nsid_item['history_value'], $nsids
+				);
+			}
 		}
 
 		return $nsids;

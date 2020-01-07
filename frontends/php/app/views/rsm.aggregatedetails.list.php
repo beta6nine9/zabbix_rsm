@@ -119,21 +119,23 @@ foreach ($data['probes'] as $probe) {
 					foreach (array_keys($ipvs[$ipv]) as $ip) {
 						if (array_key_exists($ip, $probe['results'][$dns_udp_ns][$ipv])) {
 							$result = $probe['results'][$dns_udp_ns][$ipv][$ip];
-							$is_dns_error = isServiceErrorCode($result, $data['type']);
 
 							if ($result == 0) {
 								$row[] = '-';
 							}
-							elseif (0 > $result) {
-								$row[] = (new CSpan($result))
-									->setHint($data['test_error_message'][$result])
-									->setAttribute('class', $is_dns_error ? ZBX_STYLE_RED : ZBX_STYLE_GREEN);
-							}
-							elseif ($result > $data['udp_rtt']) {
-								$row[] = (new CSpan($result))->setAttribute('class', ZBX_STYLE_RED);
-							}
 							else {
-								$row[] = (new CSpan($result))->setAttribute('class', ZBX_STYLE_GREEN);
+								$nskey = $dns_udp_ns.$ip;
+								$span = (new CSpan($result == 0 ? '-' : $result));
+								$class = isset($probe['above_max_rtt'][$nskey]) ? ZBX_STYLE_RED : ZBX_STYLE_GREEN;
+
+								if ($result < 0) {
+									$class = ($class == ZBX_STYLE_GREEN && !isset($probe['dns_error'][$nskey]))
+										? ZBX_STYLE_GREEN : ZBX_STYLE_RED;
+									$span->setHint($data['test_error_message'][$result]);
+								}
+
+								$span->addClass($class);
+								$row[] = $span;
 							}
 
 							if (isset($probe['results_nsid'][$dns_udp_ns][$ip])) {
@@ -141,7 +143,7 @@ foreach ($data['probes'] as $probe) {
 								$row[] = (new CDiv($nsid_index + 1))->setHint($data['nsids'][$nsid_index]);
 							}
 							else {
-								$row[] = (new CDiv('-'))->setHint(_('No value.'), '', false);
+								$row[] = '';
 							}
 						}
 						else {

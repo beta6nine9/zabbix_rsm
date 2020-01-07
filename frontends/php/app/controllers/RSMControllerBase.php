@@ -142,6 +142,40 @@ class RSMControllerBase extends CController {
 	}
 
 	/**
+	 * Get item history value. Return array of items with history value as value of 'history_value' key. Key will be
+	 * set only for items having value in desirec period. When multiple values exists for single item first value
+	 * will be set.
+	 *
+	 * @param int $options['time_from']  Interval start time to retrieve value of item.
+	 * @param int $options['time_till']  Interval end time to retrvieve value of item.
+	 * @param int $options['history']    Item value type.
+	 * @return array
+	 */
+	protected function getItemsHistoryValue(array $options) {
+		$options += [
+			'output' => ['itemid', 'hostid'],
+			'preservekeys' => true
+		];
+
+		$items = API::Item()->get($options);
+
+		if ($items) {
+			$values = API::History()->get([
+				'output' => ['itemid', 'value'],
+				'itemids' => array_keys($items),
+				'time_from' => $options['time_from'],
+				'time_till' => $options['time_till'],
+				'history' => $options['history']
+			]);
+
+			foreach ($values as $value) {
+				$items[$value['itemid']] += ['history_value' => $value['value']];
+			}
+		}
+
+		return $items;
+	}
+	/**
 	 * Generic permissions check for ICANN.
 	 *
 	 * @return bool
