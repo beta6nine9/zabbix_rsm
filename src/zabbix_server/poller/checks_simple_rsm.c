@@ -4177,7 +4177,7 @@ int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 		goto out;
 	}
 
-	if (prefix[strlen(prefix) - 1] == '/')
+	if (0 != strlen(prefix) && prefix[strlen(prefix) - 1] == '/')
 		zbx_strlcpy(rdap_prefix, "domain", sizeof(rdap_prefix));
 	else
 		zbx_strlcpy(rdap_prefix, "/domain", sizeof(rdap_prefix));
