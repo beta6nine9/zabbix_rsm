@@ -3753,7 +3753,7 @@ out:
 
 	rsm_info(log_fd, "END TEST");
 
-	if (SYSINFO_RET_OK == ret)
+	if (SYSINFO_RET_OK == ret && 0 != rdds_enabled)
 	{
 		int	rdds_result, rdds43, rdds80;
 
