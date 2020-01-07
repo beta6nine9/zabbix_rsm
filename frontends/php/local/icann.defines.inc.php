@@ -190,6 +190,8 @@ define('CALCULATED_DNS_ROLLWEEK_SLA',			'rsm.configvalue[RSM.DNS.ROLLWEEK.SLA]')
 define('CALCULATED_RDDS_ROLLWEEK_SLA',			'rsm.configvalue[RSM.RDDS.ROLLWEEK.SLA]');
 define('CALCULATED_RDAP_ROLLWEEK_SLA',			'rsm.configvalue[RSM.RDAP.ROLLWEEK.SLA]');
 define('CALCULATED_EPP_ROLLWEEK_SLA',			'rsm.configvalue[RSM.EPP.ROLLWEEK.SLA]');
+define('CALCULATED_PROBE_RSM_IP4_ENABLED',		'probe.configvalue[RSM.IP4.ENABLED]');
+define('CALCULATED_PROBE_RSM_IP6_ENABLED',		'probe.configvalue[RSM.IP6.ENABLED]');
 
 // Number of test cycles to show before and after incident recovery event.
 define('DISPLAY_CYCLES_AFTER_RECOVERY',		6); // (including recovery event)

@@ -142,8 +142,8 @@ class RSMControllerBase extends CController {
 	}
 
 	/**
-	 * Get item history value. Return array of items with history value as value of 'history_value' key. Key will be
-	 * set only for items having value in desirec period. When multiple values exists for single item first value
+	 * Get item history value. Return array of items with history value in 'history_value' key. Key will be
+	 * set only for items having value in desired period. When multiple values exists for single item first value
 	 * will be set.
 	 *
 	 * @param int $options['time_from']  Interval start time to retrieve value of item.

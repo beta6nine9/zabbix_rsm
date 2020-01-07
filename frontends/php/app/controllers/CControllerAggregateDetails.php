@@ -123,6 +123,8 @@ class CControllerAggregateDetails extends RSMControllerBase {
 				$this->probes[$probe['hostid']] = [
 					'host' => $probe_host,
 					'hostid' => $probe['hostid'],
+					'ipv4' => 0,
+					'ipv6' => 0,
 					'ns_up' => 0,
 					'ns_down' => 0
 				];
@@ -207,6 +209,10 @@ class CControllerAggregateDetails extends RSMControllerBase {
 				$error_key = $ns.$ip;
 
 				if ($item_value < 0) {
+					if (isServiceErrorCode($item_value, $data['type'])) {
+						$this->probes[$probeid]['dns_error'][$error_key] = true;
+					}
+
 					if (!isset($this->probe_errors[$item_value][$error_key])) {
 						$this->probe_errors[$item_value][$error_key] = 0;
 					}
@@ -214,6 +220,8 @@ class CControllerAggregateDetails extends RSMControllerBase {
 					$this->probe_errors[$item_value][$error_key]++;
 				}
 				elseif ($item_value > $rtt_max && $data['type'] == RSM_DNS) {
+					$this->probes[$probeid]['above_max_rtt'][$error_key] = true;
+
 					if (!isset($data['probes_above_max_rtt'][$error_key])) {
 						$data['probes_above_max_rtt'][$error_key] = 0;
 					}
@@ -235,12 +243,17 @@ class CControllerAggregateDetails extends RSMControllerBase {
 		$key_parser->parse(RSM_SLV_KEY_DNS_NS_STATUS);
 		$ns_status_key = $key_parser->getKey();
 
-		$ns_items = $this->getItemsHistoryValue([
-			'output' => ['key_', 'itemid', 'value_type'],
+		$probes_items = $this->getItemsHistoryValue([
+			'output' => ['key_', 'itemid'],
 			'selectHosts' => ['hostid'],
 			'hostids' => array_keys($tld_probes),
 			'search' => [
-				'key_' => [$nssok_key.'[', $ns_status_key.'[']
+				'key_' => [
+					$nssok_key.'[',
+					$ns_status_key.'[',
+					CALCULATED_PROBE_RSM_IP4_ENABLED,
+					CALCULATED_PROBE_RSM_IP6_ENABLED
+				]
 			],
 			'startSearch' => true,
 			'monitored' => true,
@@ -249,9 +262,9 @@ class CControllerAggregateDetails extends RSMControllerBase {
 			'history' => ITEM_VALUE_TYPE_UINT64
 		]);
 
-		foreach ($ns_items as $ns_item) {
-			$probeid = reset($ns_item['hosts'])['hostid'];
-			$value = array_key_exists('history_value', $ns_item) ? $ns_item['history_value'] : null;
+		foreach ($probes_items as $probe_item) {
+			$probeid = reset($probe_item['hosts'])['hostid'];
+			$value = array_key_exists('history_value', $probe_item) ? $probe_item['history_value'] : null;
 
 			switch ($key_parser->getKey()) {
 				case $nssok_key:
@@ -265,6 +278,14 @@ class CControllerAggregateDetails extends RSMControllerBase {
 				case $ns_status_key:
 					// Set Name server status.
 					$this->probes[$probeid]['results'][$key_parser->getParam(0)]['status'] = $value;
+					break;
+
+				case CALCULATED_PROBE_RSM_IP4_ENABLED:
+					$this->probes[$probeid]['ipv4'] = $value;
+					break;
+
+				case CALCULATED_PROBE_RSM_IP6_ENABLED:
+					$this->probes[$probeid]['ipv6'] = $value;
 					break;
 			}
 		}
@@ -386,6 +407,8 @@ class CControllerAggregateDetails extends RSMControllerBase {
 
 			$nameservers_up = [];
 			$probe['transport'] = 'UDP';
+			$probe['ipv4'] = 1;
+			$probe['ipv6'] = 1;
 
 			/**
 			 * NameServer is considered as Down once at least one of its IP addresses is either negative value (error
