@@ -727,6 +727,17 @@ sub disable_old_ns($)
 	}
 }
 
+# locates and returns macro value from the result as returned by API
+sub __get_macro_value_from_result($$)
+{
+	my $result = shift;
+	my $macro  = shift;
+
+	my $macro_hash_ref = (grep { $_->{'macro'} eq $macro } @{$result->{'macros'}})[0];
+
+	return $macro_hash_ref->{'value'};
+}
+
 ################################################################################
 # delete or disable RSMHOST or its objects
 ################################################################################
@@ -863,7 +874,7 @@ sub manage_tld_objects($$$$$$$)
 		}
 		elsif ($type eq 'dns-udp')
 		{
-			if (get_macro_value_by_template_struct($tld_template, '{$RSM.TLD.DNS.TCP.ENABLED}') eq "0")
+			if (__get_macro_value_from_result($tld_template, '{$RSM.TLD.DNS.TCP.ENABLED}') eq "0")
 			{
 				pfail("cannot disable DNS UDP because DNS TCP is already disabled");
 			}
@@ -872,7 +883,7 @@ sub manage_tld_objects($$$$$$$)
 		}
 		elsif ($type eq 'dns-tcp')
 		{
-			if (get_macro_value_by_template_struct($tld_template, '{$RSM.TLD.DNS.UDP.ENABLED}') eq "0")
+			if (__get_macro_value_from_result($tld_template, '{$RSM.TLD.DNS.UDP.ENABLED}') eq "0")
 			{
 				pfail("cannot disable DNS TCP because DNS UDP is already disabled");
 			}
