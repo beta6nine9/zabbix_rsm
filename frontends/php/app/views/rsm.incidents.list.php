@@ -66,7 +66,11 @@ $headers = [
 ];
 
 if ($data['tld']) {
-	$incident_page = (new CTabView(['remember' => true]))->setSelected($data['type']);
+	$tabs_map = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR)
+		? [RSM_RDDS, RSM_RDAP]
+		: [RSM_DNS, RSM_DNSSEC, RSM_RDDS, RSM_EPP, RSM_RDAP];
+
+	$incident_page = (new CTabView(['remember' => true]))->setSelected(array_search($data['type'], $tabs_map));
 
 	// DNS
 	if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
@@ -119,8 +123,6 @@ if ($data['tld']) {
 				->setArgument('host', $data['tld']['host'])
 				->setArgument('type', RSM_DNS)
 				->setArgument('slvItemId', $data['dns']['itemid'])
-				->setArgument('sid', $data['sid'])
-				->setArgument('set_sid', 1)
 				->setArgument('sid', $data['sid'])
 				->setArgument('set_sid', 1)
 		);
