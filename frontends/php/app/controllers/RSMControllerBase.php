@@ -92,7 +92,7 @@ class RSMControllerBase extends CController {
 	 * @param int   $time_till         Timestamp untill time when newest macro value will be get.
 	 * @return array
 	 */
-	protected function getHistoryMacroValue(array $macro, $time_till) {
+	protected function getMacroHistoryValue(array $macro, $time_till) {
 		static $rsm_hostid;
 		$values = [];
 

@@ -123,8 +123,8 @@ class CControllerAggregateDetails extends RSMControllerBase {
 				$this->probes[$probe['hostid']] = [
 					'host' => $probe_host,
 					'hostid' => $probe['hostid'],
-					'ipv4' => 0,
-					'ipv6' => 0,
+					'ipv4' => 1,
+					'ipv6' => 1,
 					'ns_up' => 0,
 					'ns_down' => 0
 				];
@@ -407,8 +407,6 @@ class CControllerAggregateDetails extends RSMControllerBase {
 
 			$nameservers_up = [];
 			$probe['transport'] = 'UDP';
-			$probe['ipv4'] = 1;
-			$probe['ipv6'] = 1;
 
 			/**
 			 * NameServer is considered as Down once at least one of its IP addresses is either negative value (error
@@ -499,7 +497,7 @@ class CControllerAggregateDetails extends RSMControllerBase {
 			CALCULATED_ITEM_DNS_UDP_RTT_HIGH => null,
 			CALCULATED_ITEM_DNS_TCP_RTT_HIGH => null
 		];
-		$macro = $this->getHistoryMacroValue(array_keys($defaults), $time_from) + $defaults;
+		$macro = $this->getMacroHistoryValue(array_keys($defaults), $time_from) + $defaults;
 		$data = [
 			'title' => _('Details of particular test'),
 			'tld_host' => $this->tld['host'],
