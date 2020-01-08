@@ -52,7 +52,7 @@ foreach ($data['tests'] as $test) {
 			_('aggregate details'),
 			(new CUrl('zabbix.php'))
 				->setArgument('action', 'rsm.aggregatedetails')
-				->setArgument('slvItemId', $data['slvItemId'])
+				->setArgument('slv_itemid', $data['slvItemId'])
 				->setArgument('tld_host', $data['tld']['host'])
 				->setArgument('time', $test['clock'])
 				->setArgument('type', $data['type'])
