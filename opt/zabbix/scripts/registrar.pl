@@ -272,6 +272,8 @@ sub list_services($;$)
 		'{$RDAP.TLD.ENABLED}',
 		'{$RDAP.BASE.URL}',
 		'{$RDAP.TEST.DOMAIN}',
+		'{$RSM.TLD.RDDS.43.SERVERS}',
+		'{$RSM.TLD.RDDS.80.SERVERS}',
 	);
 
 	my %rsmhosts = get_registrar_list();
@@ -308,18 +310,6 @@ sub list_services($;$)
 			}
 		}
 
-		if (!defined($key))
-		{
-			push(@row, ("", ""));
-		}
-		else
-		{
-			$key =~ /,"(\S+)","(\S+)"]/;
-
-			push(@row, "$1");
-			push(@row, "$2");
-		}
-
 		push(@rows, \@row);
 	}
 
@@ -352,29 +342,15 @@ sub get_registrar_list()
 sub get_rsmhost_config($$)
 {
 	my $server_key = shift;
-	my $tld        = shift;
+	my $rsmhost    = shift;
 
-	my @tld_types = (TLD_TYPE_G, TLD_TYPE_CC, TLD_TYPE_OTHER, TLD_TYPE_TEST);
 	my $result;
 
-	my $main_templateid = get_template_id(TEMPLATE_RSMHOST_CONFIG_PREFIX);
+	my $main_templateid = get_template_id(TEMPLATE_RSMHOST_CONFIG_PREFIX . $rsmhost);
 	my $macros = get_host_macro($main_templateid, undef);
-	my $tld_host = get_host($tld, true);
+	my $rsmhost_host = get_host($rsmhost, true);
 
-	$result->{'status'} = $tld_host->{'status'};
-
-	foreach my $group (@{$tld_host->{'groups'}})
-	{
-		my $name = $group->{'name'};
-		foreach my $tld_type (@tld_types)
-		{
-			if ($name eq $tld_type)
-			{
-				$result->{'tld_type'} = $name;
-				last;
-			}
-		}
-	}
+	$result->{'status'} = $rsmhost_host->{'status'};
 
 	foreach my $macro (@{$macros})
 	{
@@ -481,7 +457,7 @@ sub manage_registrar($$$$)
 	}
 
 	set_linked_items_status($service eq 'rdap' ? 'rdap[' : 'rsm.rdds[', $rsmhost, 0) if ($action eq 'disable');
-	set_linked_items_status('rdap[', $tld, 0) if (!__is_rdap_standalone() && $action eq 'disable');
+	set_linked_items_status('rdap[', $rsmhost, 0) if (!__is_rdap_standalone() && $action eq 'disable');
 }
 
 sub compare_arrays($$)
@@ -952,20 +928,20 @@ sub create_tld_hosts_on_probes($$$$)
 		}));
 
 		set_linked_items_status('rdap[', getopt('rr-id'), opt('rdap-base-url') && opt('rdap-test-domain'));
-		set_linked_items_status('rsm.rdds[', getopt('tld'), opt('rdds43-servers'));
+		set_linked_items_status('rsm.rdds[', getopt('rr-id'), opt('rdds43-servers'));
 	}
 }
 
 sub set_linked_items_status($$$)
 {
 	my $like    = shift;
-	my $tld     = shift;
+	my $rsmhost = shift;
 	my $enabled = shift;
 
-	my $template = TEMPLATE_RSMHOST_CONFIG_PREFIX . $tld;
+	my $template = TEMPLATE_RSMHOST_CONFIG_PREFIX . $rsmhost;
 	my $result = get_template($template, false, true);	# do not select macros, select hosts
 
-	pfail("$tld template \"$template\" does not exist") if (keys(%{$result}) == 0);
+	pfail("$rsmhost template \"$template\" does not exist") if (keys(%{$result}) == 0);
 
 	foreach my $host_ref (@{$result->{'hosts'}})
 	{
