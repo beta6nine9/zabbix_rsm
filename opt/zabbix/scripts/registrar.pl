@@ -265,16 +265,13 @@ sub list_services($;$)
 
 	# NB! Keep @columns in sync with __usage()!
 	my @columns = (
-		'rr_id',
-		'rr_name',
-		'rr_family',
-		'rr_status',
+		'status',
 		'{$RSM.RDDS.NS.STRING}',
 		'{$RSM.RDDS.TESTPREFIX}',
 		'{$RSM.TLD.RDDS.ENABLED}',
 		'{$RDAP.TLD.ENABLED}',
 		'{$RDAP.BASE.URL}',
-		'{$RDAP.TEST.DOMAIN}'
+		'{$RDAP.TEST.DOMAIN}',
 	);
 
 	my %rsmhosts = get_registrar_list();
@@ -364,7 +361,7 @@ sub get_rsmhost_config($$)
 	my $macros = get_host_macro($main_templateid, undef);
 	my $tld_host = get_host($tld, true);
 
-	$result->{'tld_status'} = $tld_host->{'status'};
+	$result->{'status'} = $tld_host->{'status'};
 
 	foreach my $group (@{$tld_host->{'groups'}})
 	{
