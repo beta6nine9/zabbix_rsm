@@ -508,7 +508,13 @@ class CControllerAggregateDetails extends RSMControllerBase {
 			CALCULATED_ITEM_DNS_UDP_RTT_HIGH => null,
 			CALCULATED_ITEM_DNS_TCP_RTT_HIGH => null
 		];
-		$macro = $this->getMacroHistoryValue(array_keys($defaults), $time_from) + $defaults;
+		$macro = $this->getMacroHistoryValue(array_keys($defaults), $time_from);
+
+		foreach (array_diff_key($defaults, $macro) as $key => $val) {
+			error(_s('Macro "%s" value not found.', $key));
+		}
+
+		$macro += $defaults;
 		$data = [
 			'title' => _('Details of particular test'),
 			'tld_host' => $this->tld['host'],
