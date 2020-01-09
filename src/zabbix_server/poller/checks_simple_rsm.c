@@ -271,6 +271,7 @@ static void	rsm_logf(FILE *log_fd, int level, const char *fmt, ...)
 			fmt);
 
 	vfprintf(log_fd, fmt_buf, args);
+	fflush(log_fd);
 out:
 	va_end(args);
 }
@@ -2381,7 +2382,7 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 
 	if (SUCCEED != is_uint31(tcp_rtt_limit_str, &tcp_rtt_limit))
 	{
-		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid twelfth parameter."));
+		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid twelveth parameter."));
 		return ret;
 	}
 
@@ -3453,10 +3454,63 @@ static void	create_rsm_rdds_json(struct zbx_json *json, const char *ip43, int rt
 	zbx_json_addint64(json, "result", rdds_result);
 }
 
+#define VALIDATE_PARAM_HOST_LIST(var_tpl, str_tpl)							\
+													\
+do													\
+{													\
+	if ('\0' == *var_tpl ## _str)									\
+	{												\
+		SET_MSG_RESULT(result, zbx_strdup(NULL, str_tpl " cannot be empty."));			\
+		goto out;										\
+	}												\
+													\
+	if (SUCCEED != zbx_validate_host_list(var_tpl ## _str, ','))					\
+	{												\
+		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid character in " str_tpl));		\
+		goto out;										\
+	}												\
+													\
+	zbx_get_strings_from_list(&var_tpl, var_tpl ## _str, ',');					\
+													\
+	if (0 == var_tpl.values_num)									\
+	{												\
+		SET_MSG_RESULT(result, zbx_strdup(NULL, "Cannot get " str_tpl " from key parameter"));	\
+		goto out;										\
+	}												\
+}													\
+while (0)
+
+#define VALIDATE_PARAM_EMPTY(var_tpl, str_tpl)						\
+											\
+do 											\
+{											\
+	if ('\0' == *var_tpl)								\
+	{										\
+		SET_MSG_RESULT(result, zbx_strdup(NULL, str_tpl " cannot be empty."));	\
+		goto out;								\
+	}										\
+} 											\
+while (0)
+
+#define VALIDATE_PARAM_UINT(var_tpl, str_tpl, descr_tpl)							\
+														\
+do														\
+{														\
+	if (SUCCEED != is_uint31(var_tpl ## _str, &var_tpl))							\
+	{													\
+		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid " str_tpl "parameter (" descr_tpl ")."));	\
+		goto out;											\
+	}													\
+}														\
+while (0)
+
 int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *result)
 {
-	char			*domain, *value_str = NULL, *res_ip = NULL, *testprefix = NULL, *rdds_ns_string = NULL,
-				*answer = NULL, testname[ZBX_HOST_BUF_SIZE], is_ipv4, err[ZBX_ERR_BUF_SIZE];
+	char			*domain, *res_ip, *testprefix, *rdds_ns_string,
+				*answer = NULL, testname[ZBX_HOST_BUF_SIZE], is_ipv4, err[ZBX_ERR_BUF_SIZE],
+				*probe_rdds_enabled_str, *rdds_enabled_str, *probe_epp_enabled_str, *epp_enabled_str,
+				*ipv4_enabled_str, *ipv6_enabled_str, *rtt_limit_str, *hosts43_str, *hosts80_str,
+				*maxredirs_str;
 	const char		*random_host, *ip43 = NULL, *ip80 = NULL;
 	zbx_vector_str_t	hosts43, hosts80, ips43, ips80, nss;
 	FILE			*log_fd = NULL;
@@ -3473,16 +3527,44 @@ int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	if (14 != request->nparam)
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "item must contain 14 parameters"));
-		return SYSINFO_RET_FAIL;
+		return ret;
 	}
 
-	domain = get_rparam(request, 0);
+	domain = get_rparam(request, 0);			/* TLD for log file name, e.g. ".cz" */
+	hosts43_str = get_rparam(request, 1);			/* List of RDDS43 hosts */
+	hosts80_str = get_rparam(request, 2);			/* List of RDDS80 hosts */
+	res_ip = get_rparam(request, 3);			/* Local resolver IP, e.g. "127.0.0.1" */
+	testprefix = get_rparam(request, 4);			/* TLD prefix to use when quering non-existent domain */
+	probe_rdds_enabled_str = get_rparam(request, 5);	/* RDDS enabled on probe */
+	rdds_enabled_str = get_rparam(request, 6);		/* RDDS enabled on TLD */
+	probe_epp_enabled_str = get_rparam(request, 7);		/* EPP enabled on probe */
+	epp_enabled_str = get_rparam(request, 8);		/* EPP enabled on TLD */
+	ipv4_enabled_str = get_rparam(request, 9);		/* IPv4 enabled */
+	ipv6_enabled_str = get_rparam(request, 10);		/* IPv4 enabled */
+	rdds_ns_string = get_rparam(request, 11);		/* RDDS ns string */
+	rtt_limit_str = get_rparam(request, 12);		/* RTT limit */
+	maxredirs_str = get_rparam(request, 13);		/* RDDS max redirects */
 
-	if ('\0' == *domain)
-	{
-		SET_MSG_RESULT(result, zbx_strdup(NULL, "first parameter (rsmhost) missing"));
-		return SYSINFO_RET_FAIL;
-	}
+	zbx_vector_str_create(&hosts43);
+	zbx_vector_str_create(&hosts80);
+	zbx_vector_str_create(&ips43);
+	zbx_vector_str_create(&ips80);
+	zbx_vector_str_create(&nss);
+
+	VALIDATE_PARAM_EMPTY(domain, "TLD");
+	VALIDATE_PARAM_HOST_LIST(hosts43, "RDDS43 host list");
+	VALIDATE_PARAM_HOST_LIST(hosts80, "RDDS80 host list");
+	VALIDATE_PARAM_EMPTY(res_ip, "IP address of local resolver");
+	VALIDATE_PARAM_EMPTY(testprefix, "Test prefix");
+	VALIDATE_PARAM_UINT(probe_rdds_enabled, "sixth", "probe rdds enabled");
+	VALIDATE_PARAM_UINT(rdds_enabled, "seventh", "rdds enabled");
+	VALIDATE_PARAM_UINT(probe_epp_enabled, "eighth", "probe epp enabled");
+	VALIDATE_PARAM_UINT(epp_enabled, "nineth", "epp enabled");
+	VALIDATE_PARAM_UINT(ipv4_enabled, "tenth", "ipv4 enabled");
+	VALIDATE_PARAM_UINT(ipv6_enabled, "eleventh", "ipv6 enabled");
+	VALIDATE_PARAM_EMPTY(rdds_ns_string, "RDDS ns string");
+	VALIDATE_PARAM_UINT(rtt_limit, "thirteenth", "rtt limit");
+	VALIDATE_PARAM_UINT(maxredirs, "fourteenth", "max redirects");
 
 	/* open log file */
 	if (NULL == (log_fd = open_item_log(item->host.host, domain, ZBX_RDDS_LOG_PREFIX, NULL, err, sizeof(err))))
@@ -3491,75 +3573,12 @@ int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 		return SYSINFO_RET_FAIL;
 	}
 
-	zbx_vector_str_create(&hosts43);
-	zbx_vector_str_create(&hosts80);
-	zbx_vector_str_create(&ips43);
-	zbx_vector_str_create(&ips80);
-	zbx_vector_str_create(&nss);
-
 	rsm_info(log_fd, "START TEST");
-
-	/* read rest of key parameters */
-	value_str = zbx_strdup(value_str, get_rparam(request, 1));
-
-	if ('\0' == *value_str)
-	{
-		SET_MSG_RESULT(result, zbx_strdup(NULL, "second parameter (RDDS43 host list) missing"));
-		goto out;
-	}
-
-	if (SUCCEED != zbx_validate_host_list(value_str, ','))
-	{
-		rsm_infof(log_fd, "param[1]=%s", value_str);
-		SET_MSG_RESULT(result, zbx_strdup(NULL, "invalid character in RDDS43 host list"));
-		goto out;
-	}
-
-	zbx_get_strings_from_list(&hosts43, value_str, ',');
-
-	if (0 == hosts43.values_num)
-	{
-		SET_MSG_RESULT(result, zbx_strdup(NULL, "cannot get RDDS43 hosts from key parameter"));
-		goto out;
-	}
-
-	value_str = zbx_strdup(value_str, get_rparam(request, 2));
-
-	if ('\0' == *value_str)
-	{
-		SET_MSG_RESULT(result, zbx_strdup(NULL, "third parameter (RDDS80 host list) missing"));
-		goto out;
-	}
-
-	if (SUCCEED != zbx_validate_host_list(value_str, ','))
-	{
-		SET_MSG_RESULT(result, zbx_strdup(NULL, "invalid character in RDDS80 host list"));
-		goto out;
-	}
-
-	zbx_get_strings_from_list(&hosts80, value_str, ',');
-
-	if (0 == hosts80.values_num)
-	{
-		SET_MSG_RESULT(result, zbx_strdup(NULL, "cannot get RDDS80 hosts from key parameter"));
-		goto out;
-	}
-
-	res_ip = request->params[3];						/* DNS resolver */
-	testprefix = request->params[4];					/* RDDS test prefix */
-	probe_rdds_enabled = atoi(request->params[5]);				/* Probe RDDS enabled */
-	rdds_enabled = probe_rdds_enabled ? atoi(request->params[6]) : 0;	/* TLD RDDS enabled */
-	probe_epp_enabled = atoi(request->params[7]);				/* Probe EPP enabled */
-	epp_enabled = probe_epp_enabled ? atoi(request->params[8]) : 0;		/* TLD EPP enabled */
-	ipv4_enabled = atoi(request->params[9]);				/* Probe IPv4 enabled */
-	ipv6_enabled = atoi(request->params[10]);				/* Probe IPv6 enabled */
-	rdds_ns_string = request->params[11];					/* RDDS ns string */
-	rtt_limit = atoi(request->params[12]);					/* RTT limit */
-	maxredirs = atoi(request->params[13]);					/* RDDS max redirects */
 
 	if (0 == probe_rdds_enabled)
 	{
 		rsm_info(log_fd, "RDDS disabled on this probe");
+		rdds_enabled = 0;
 		ret = SYSINFO_RET_OK;
 		goto out;
 	}
@@ -3573,8 +3592,6 @@ int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 
 	if (0 == strcmp(testprefix, "*RANDOMTLD*"))
 	{
-		zbx_free(testprefix);
-
 		if (NULL == (testprefix = zbx_get_rr_tld(domain, err, sizeof(err))))
 		{
 			SET_MSG_RESULT(result, zbx_strdup(NULL, err));
@@ -3801,7 +3818,6 @@ out:
 	}
 
 	zbx_free(answer);
-	zbx_free(value_str);
 
 	zbx_vector_str_clean_and_destroy(&nss);
 	zbx_vector_str_clean_and_destroy(&ips80);
