@@ -271,7 +271,6 @@ static void	rsm_logf(FILE *log_fd, int level, const char *fmt, ...)
 			fmt);
 
 	vfprintf(log_fd, fmt_buf, args);
-	fflush(log_fd);
 out:
 	va_end(args);
 }
@@ -3441,14 +3440,22 @@ static void	create_rsm_rdds_json(struct zbx_json *json, const char *ip43, int rt
 	zbx_json_init(json, 2 * ZBX_KIBIBYTE);
 
 	zbx_json_addobject(json, "rdds43");
-	zbx_json_addstring(json, "ip", ip43, ZBX_JSON_TYPE_STRING);
+
 	zbx_json_addint64(json, "rtt", rtt43);
-	zbx_json_addint64(json, "upd", upd43);
+	if (NULL != ip43)
+		zbx_json_addstring(json, "ip", ip43, ZBX_JSON_TYPE_STRING);
+	if (ZBX_NO_VALUE != upd43)
+		zbx_json_addint64(json, "upd", upd43);
+
 	zbx_json_close(json);
 
 	zbx_json_addobject(json, "rdds80");
-	zbx_json_addstring(json, "ip", ip80, ZBX_JSON_TYPE_STRING);
-	zbx_json_addint64(json, "rtt", rtt80);
+
+	if (NULL != ip80)
+		zbx_json_addstring(json, "ip", ip80, ZBX_JSON_TYPE_STRING);
+	if (ZBX_NO_VALUE != rtt80)
+		zbx_json_addint64(json, "rtt", rtt80);
+
 	zbx_json_close(json);
 
 	zbx_json_addint64(json, "result", rdds_result);
@@ -3533,15 +3540,15 @@ int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	domain = get_rparam(request, 0);			/* TLD for log file name, e.g. ".cz" */
 	hosts43_str = get_rparam(request, 1);			/* List of RDDS43 hosts */
 	hosts80_str = get_rparam(request, 2);			/* List of RDDS80 hosts */
-	res_ip = get_rparam(request, 3);			/* Local resolver IP, e.g. "127.0.0.1" */
-	testprefix = get_rparam(request, 4);			/* TLD prefix to use when quering non-existent domain */
+	testprefix = get_rparam(request, 3);			/* TLD prefix to use when quering non-existent domain */
+	rdds_ns_string = get_rparam(request, 4);		/* RDDS ns string */
 	probe_rdds_enabled_str = get_rparam(request, 5);	/* RDDS enabled on probe */
 	rdds_enabled_str = get_rparam(request, 6);		/* RDDS enabled on TLD */
 	probe_epp_enabled_str = get_rparam(request, 7);		/* EPP enabled on probe */
 	epp_enabled_str = get_rparam(request, 8);		/* EPP enabled on TLD */
 	ipv4_enabled_str = get_rparam(request, 9);		/* IPv4 enabled */
 	ipv6_enabled_str = get_rparam(request, 10);		/* IPv4 enabled */
-	rdds_ns_string = get_rparam(request, 11);		/* RDDS ns string */
+	res_ip = get_rparam(request, 11);			/* Local resolver IP, e.g. "127.0.0.1" */
 	rtt_limit_str = get_rparam(request, 12);		/* RTT limit */
 	maxredirs_str = get_rparam(request, 13);		/* RDDS max redirects */
 
@@ -3554,15 +3561,15 @@ int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	VALIDATE_PARAM_EMPTY(domain, "TLD");
 	VALIDATE_PARAM_HOST_LIST(hosts43, "RDDS43 host list");
 	VALIDATE_PARAM_HOST_LIST(hosts80, "RDDS80 host list");
-	VALIDATE_PARAM_EMPTY(res_ip, "IP address of local resolver");
 	VALIDATE_PARAM_EMPTY(testprefix, "Test prefix");
-	VALIDATE_PARAM_UINT(probe_rdds_enabled, "sixth", "probe rdds enabled");
-	VALIDATE_PARAM_UINT(rdds_enabled, "seventh", "rdds enabled");
-	VALIDATE_PARAM_UINT(probe_epp_enabled, "eighth", "probe epp enabled");
-	VALIDATE_PARAM_UINT(epp_enabled, "nineth", "epp enabled");
-	VALIDATE_PARAM_UINT(ipv4_enabled, "tenth", "ipv4 enabled");
-	VALIDATE_PARAM_UINT(ipv6_enabled, "eleventh", "ipv6 enabled");
+	VALIDATE_PARAM_UINT(probe_rdds_enabled, "fifth", "probe rdds enabled");
+	VALIDATE_PARAM_UINT(rdds_enabled, "sixth", "rdds enabled");
+	VALIDATE_PARAM_UINT(probe_epp_enabled, "seventh", "probe epp enabled");
+	VALIDATE_PARAM_UINT(epp_enabled, "eighth", "epp enabled");
+	VALIDATE_PARAM_UINT(ipv4_enabled, "nineth", "ipv4 enabled");
+	VALIDATE_PARAM_UINT(ipv6_enabled, "tenth", "ipv6 enabled");
 	VALIDATE_PARAM_EMPTY(rdds_ns_string, "RDDS ns string");
+	VALIDATE_PARAM_EMPTY(res_ip, "IP address of local resolver");
 	VALIDATE_PARAM_UINT(rtt_limit, "thirteenth", "rtt limit");
 	VALIDATE_PARAM_UINT(maxredirs, "fourteenth", "max redirects");
 
