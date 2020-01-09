@@ -11,12 +11,13 @@
 
 void	zbx_on_exit(int ret)
 {
+	ZBX_UNUSED(ret);
 }
 
-void	exit_usage(const char *progname)
+void	exit_usage(const char *program)
 {
 	fprintf(stderr, "usage: %s -t <tld> -w <whois_server> <[-4] [-6]> [-r <res_ip>] [-p <testprefix>] [-m <maxredirs80>] [-g]"
-			" [-f] [-h]\n", progname);
+			" [-f] [-h]\n", program);
 	fprintf(stderr, "       -t <tld>          TLD to test\n");
 	fprintf(stderr, "       -w <whos_server>  WHOIS server to use for RDDS43 test\n");
 	fprintf(stderr, "       -4                enable IPv4\n");
@@ -40,9 +41,8 @@ int	main(int argc, char *argv[])
 				ignore_err = 0, testname[ZBX_HOST_BUF_SIZE], testurl[1024], *answer = NULL;
 	ldns_resolver		*res = NULL;
 	zbx_resolver_error_t	ec_res;
-	int			c, index, rtt43 = -1, rtt80 = -1, maxredirs = DEFAULT_MAXREDIRS, log_to_file = 0,
+	int			c, index, i, rtt43 = -1, rtt80 = -1, maxredirs = DEFAULT_MAXREDIRS, log_to_file = 0,
 				ipv_flags = 0, curl_flags = 0;
-	size_t			i;
 	zbx_vector_str_t	ips43, nss;
 	zbx_http_error_t	ec_http;
 	FILE			*log_fd = stdout;
@@ -86,6 +86,7 @@ int	main(int argc, char *argv[])
 				break;
 			case 'h':
 				exit_usage(argv[0]);
+				break;
 			case '?':
 				if (optopt == 't' || optopt == 'r' || optopt == 'w' || optopt == 'p' || optopt == 'm')
 				{

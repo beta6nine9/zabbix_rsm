@@ -1289,7 +1289,7 @@ static int	zbx_dns_in_a_query(ldns_pkt **pkt, ldns_resolver *res, const ldns_rdf
 		zbx_ns_query_error_t *ec, char *err, size_t err_size)
 {
 	ldns_status	status;
-	double		sec;
+	double		sec = -1;
 	ldns_pkt	*query = NULL;
 	ldns_rdf	*send_nsid;
 	ldns_buffer	*opt_buf;
@@ -1351,7 +1351,7 @@ err:
 			if (!ldns_resolver_usevc(res))
 				*ec = ZBX_NS_QUERY_NOREPLY;
 			/* TCP */
-			else if (zbx_time() - sec >= RSM_TCP_TIMEOUT * RSM_TCP_RETRY)
+			else if (-1 != sec && zbx_time() - sec >= RSM_TCP_TIMEOUT * RSM_TCP_RETRY)
 				*ec = ZBX_NS_QUERY_TO;
 			else
 				*ec = ZBX_NS_QUERY_ECON;
@@ -3936,6 +3936,10 @@ out:
 						break;
 					case ZBX_SUBTEST_FAIL:
 						rdds_result = RDDS_ONLY43;
+						break;
+					default:
+						THIS_SHOULD_NEVER_HAPPEN;
+						exit(EXIT_FAILURE);
 				}
 				break;
 			case ZBX_SUBTEST_FAIL:
@@ -3946,7 +3950,15 @@ out:
 						break;
 					case ZBX_SUBTEST_FAIL:
 						rdds_result = RDDS_DOWN;
+						break;
+					default:
+						THIS_SHOULD_NEVER_HAPPEN;
+						exit(EXIT_FAILURE);
 				}
+				break;
+			default:
+				THIS_SHOULD_NEVER_HAPPEN;
+				exit(EXIT_FAILURE);
 		}
 
 		/* set the value of our item itself */
@@ -4233,19 +4245,19 @@ out:
 
 	if (SYSINFO_RET_OK == ret && ZBX_NO_VALUE != rtt)
 	{
-		int		res = 0;
+		int		subtest_result = 0;
 		struct zbx_json	json;
 
 		switch (zbx_subtest_result(rtt, rtt_limit))
 		{
 			case ZBX_SUBTEST_SUCCESS:
-				res = 1; /* Up */
+				subtest_result = 1; /* Up */
 				break;
 			case ZBX_SUBTEST_FAIL:
-				res = 0; /* Down */
+				subtest_result = 0; /* Down */
 		}
 
-		create_rsm_rdap_json(&json, &ip, rtt, res);
+		create_rsm_rdap_json(&json, &ip, rtt, subtest_result);
 		SET_STR_RESULT(result, zbx_strdup(NULL, json.buffer));
 
 		zbx_json_free(&json);

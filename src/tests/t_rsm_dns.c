@@ -9,7 +9,7 @@
 
 void	zbx_on_exit(int ret)
 {
-	(void)ret;
+	ZBX_UNUSED(ret);
 }
 
 void	exit_usage(const char *program)
@@ -36,7 +36,7 @@ int	main(int argc, char *argv[])
 			*tld = NULL, *ns = NULL, *ns_ip = NULL, proto = RSM_UDP, *nsid = NULL, ipv4_enabled = 0,
 			ipv6_enabled = 0, *testprefix = DEFAULT_TESTPREFIX, dnssec_enabled = 0, ignore_err = 0,
 			log_to_file = 0;
-	int		c, index, rtt, rtt_unpacked, upd_unpacked, unpacked_values_num, size_nsid_decoded;
+	int		c, index, rtt, rtt_unpacked, upd_unpacked, unpacked_values_num;
 	ldns_resolver	*res = NULL;
 	ldns_rr_list	*keys = NULL;
 	FILE		*log_fd = stdout;

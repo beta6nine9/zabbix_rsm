@@ -1,9 +1,12 @@
 #include "t_rsm.h"
 #include "../zabbix_server/poller/checks_simple_rsm.c"
 
+#define DEFAULT_MAXREDIRS	10
+#define DEFAULT_RTT_LIMIT	20
+
 void	zbx_on_exit(int ret)
 {
-	(void)ret;
+	ZBX_UNUSED(ret);
 }
 
 void	exit_usage(const char *program)
@@ -21,14 +24,13 @@ int	main(int argc, char *argv[])
 	zbx_resolver_error_t	ec_res;
 	curl_data_t		data = {NULL, 0, 0};
 	zbx_http_error_t	ec_http;
-	int			c, index, ipv_flags, port, maxredirs, curl_flags, rtt_limit, rtt = ZBX_NO_VALUE,
-				ipv4_enabled=1, ipv6_enabled=1;
-	struct zbx_json	json;
+	int			c, index, port, rtt_limit = DEFAULT_RTT_LIMIT, rtt = ZBX_NO_VALUE, ipv4_enabled = 1,
+				ipv6_enabled = 1, maxredirs = DEFAULT_MAXREDIRS, ipv_flags = 0, curl_flags = 0;
 	struct zbx_json_parse	jp;
 	ldns_resolver		*res = NULL;
-	char			*test_domain, *base_url, *maxredirs_str, *res_ip, *proto = NULL,
+	char			*test_domain, *base_url, is_ipv4,  rdap_prefix[64], *res_ip = NULL, *proto = NULL,
 				*domain_part = NULL, *prefix = NULL, *full_url = NULL, *value_str = NULL,
-				err[ZBX_ERR_BUF_SIZE], is_ipv4, rdap_prefix[64];
+				err[ZBX_ERR_BUF_SIZE];
 	const char		*ip = NULL;
 	size_t			value_alloc = 0;
 
@@ -198,19 +200,19 @@ int	main(int argc, char *argv[])
 out:
 	if (ZBX_NO_VALUE != rtt)
 	{
-		int		res = 0;
+		int		subtest_result = 0;
 		struct zbx_json	json;
 
 		switch (zbx_subtest_result(rtt, rtt_limit))
 		{
 			case ZBX_SUBTEST_SUCCESS:
-				res = 1;
+				subtest_result = 1;
 				break;
 			case ZBX_SUBTEST_FAIL:
-				res = 0;
+				subtest_result = 0;
 		}
 
-		create_rsm_rdap_json(&json, &ip, rtt, res);
+		create_rsm_rdap_json(&json, &ip, rtt, subtest_result);
 		zbx_json_free(&json);
 	}
 
