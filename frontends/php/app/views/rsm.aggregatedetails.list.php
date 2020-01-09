@@ -115,7 +115,7 @@ foreach ($data['probes'] as $probe) {
 			}
 
 			foreach (['ipv4', 'ipv6'] as $ipv) {
-				if (array_key_exists($ipv, $probe['results'][$dns_udp_ns]) && $probe[$ipv]) {
+				if (array_key_exists($ipv, $probe['results'][$dns_udp_ns]) && $probe['results'][$dns_udp_ns][$ipv]) {
 					foreach (array_keys($ipvs[$ipv]) as $ip) {
 						if (array_key_exists($ip, $probe['results'][$dns_udp_ns][$ipv])) {
 							$result = $probe['results'][$dns_udp_ns][$ipv][$ip];
@@ -125,7 +125,7 @@ foreach ($data['probes'] as $probe) {
 							}
 							else {
 								$nskey = $dns_udp_ns.$ip;
-								$span = (new CSpan($result == 0 ? '-' : $result));
+								$span = new CSpan($result);
 								$class = isset($probe['above_max_rtt'][$nskey]) ? ZBX_STYLE_RED : ZBX_STYLE_GREEN;
 
 								if ($result < 0) {
@@ -228,6 +228,8 @@ if ($data['nsids']) {
 		->setAttribute('class', ZBX_STYLE_LIST_TABLE);
 
 	foreach ($data['nsids'] as $index => $value) {
+		// Show NSID value in similar dig syntax.
+		$value = chunk_split(bin2hex($value), 2, ' ').'("'.$value.'")';
 		$nsids_table->addRow([(new CCol($index + 1))->addClass(ZBX_STYLE_CENTER), $value]);
 	}
 

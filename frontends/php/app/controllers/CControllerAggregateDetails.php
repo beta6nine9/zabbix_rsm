@@ -111,6 +111,7 @@ class CControllerAggregateDetails extends RSMControllerBase {
 		}
 
 		// probes
+		$tld_probe_names = [];
 		$db_probes = API::Host()->get([
 			'output' => ['hostid', 'host'],
 			'groupids' => PROBES_MON_GROUPID
@@ -120,11 +121,13 @@ class CControllerAggregateDetails extends RSMControllerBase {
 			$probe_host = substr($probe['host'], 0, strrpos($probe['host'], ' - mon'));
 
 			if ($probe_host) {
+				// tld: "longrow", probe: "Dufftown - mon" will result in "longrow Dufftown".
+				$tld_probe_names[$this->tld['host'].' '.$probe_host] = $probe['hostid'];
 				$this->probes[$probe['hostid']] = [
 					'host' => $probe_host,
 					'hostid' => $probe['hostid'],
-					'ipv4' => 1,
-					'ipv6' => 1,
+					'ipv4' => 0,
+					'ipv6' => 0,
 					'ns_up' => 0,
 					'ns_down' => 0
 				];
@@ -134,39 +137,39 @@ class CControllerAggregateDetails extends RSMControllerBase {
 			}
 		}
 
+		if ($tld_probe_names) {
+			$tld_probes = API::Host()->get([
+				'output' => ['hostid', 'host', 'name', 'status'],
+				'filter' => [
+					'host' => array_keys($tld_probe_names)
+				]
+			]);
+
+			foreach ($tld_probes as $tld_probe) {
+				$probeid = $tld_probe_names[$tld_probe['host']];
+				$this->probes[$probeid] += [
+					'tldprobe_hostid' => $tld_probe['hostid'],
+					'tldprobe_host' => $tld_probe['host'],
+					'tldprobe_name' => $tld_probe['name'],
+					'tldprobe_status' => $tld_probe['status'],
+				];
+			}
+		}
+
 		return true;
 	}
 
 	protected function getReportDataNew(array &$data, $time_from, $time_till) {
 		$key_parser = new CItemKey;
-		$tld_probe_names = [];
-
-		foreach ($this->probes as $probe) {
-			$tld_probe_names[$this->tld['host'].' '.$probe['host']] = $probe['hostid'];
-		}
-
-		$tld_probes = API::Host()->get([
-			'output' => ['hostid', 'host', 'name', 'status'],
-			'filter' => [
-				'host' => array_keys($tld_probe_names)
-			],
-			'preservekeys' => true
-		]);
-
-		$data['probes_status'] = [];
-
-		foreach ($tld_probes as $tld_probe) {
-			$probe_name = substr($tld_probe['host'], strlen($data['tld_host']) + 1);
-			$data['probes_status'][$probe_name] = $tld_probe['status'];
-		}
+		$tldprobeid_probeid = array_combine(array_column($this->probes, 'tldprobe_hostid'), array_keys($this->probes));
+		$data['probes_status'] = array_column($this->probes, 'tldprobe_status', 'host');
 
 		// Keys for RSM_SLV_KEY_DNS_UDP_RTT and RSM_SLV_KEY_DNS_TCP_RTT differs only by last parameter value.
 		$key_parser->parse(RSM_SLV_KEY_DNS_UDP_RTT);
 		$dns_rtt_key = $key_parser->getKey();
 		$rtt_items = API::Item()->get([
-			'output' => ['key_', 'itemid', 'value_type'],
-			'selectHosts' => ['hostid'],
-			'hostids' => array_keys($tld_probes),
+			'output' => ['key_', 'itemid', 'hostid'],
+			'hostids' => array_column($this->probes, 'tldprobe_hostid'),
 			'search' => [
 				'key_' => $dns_rtt_key.'['
 			],
@@ -177,16 +180,21 @@ class CControllerAggregateDetails extends RSMControllerBase {
 		if ($rtt_items) {
 			$rtt_values = API::History()->get([
 				'output' => API_OUTPUT_EXTEND,
-				'itemids' => array_keys($rtt_items),
+				'itemids' => array_column($rtt_items, 'itemid'),
 				'time_from' => $time_from,
 				'time_till' => $time_till,
-				'history' => reset($rtt_items)['value_type']
+				'history' => ITEM_VALUE_TYPE_FLOAT
 			]);
 			$rtt_values = array_column($rtt_values, 'value', 'itemid');
 		}
 
 		foreach ($rtt_items as $rtt_item) {
-			$probeid = reset($rtt_item['hosts'])['hostid'];
+			if (!array_key_exists($rtt_item['itemid'], $rtt_values)) {
+				continue;
+			}
+
+			$tldprobeid = $rtt_item['hostid'];
+			$probeid = $tldprobeid_probeid[$tldprobeid];
 			$item_value = !array_key_exists('online_status', $this->probes[$probeid])	// Skip offline probes
 					&& array_key_exists($rtt_item['itemid'], $rtt_values)
 				? (int) $rtt_values[$rtt_item['itemid']]
@@ -199,75 +207,74 @@ class CControllerAggregateDetails extends RSMControllerBase {
 
 			$ns = $key_parser->getParam(0);
 			$ip = $key_parser->getParam(1);
-			$trasport = $key_parser->getParam(2);
+			$transport = $key_parser->getParam(2);
 			$ipv = filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) ? 'ipv4' : 'ipv6';
 			$dns_nameservers[$ns][$ipv][$ip] = true;
 			$rtt_max = ($transport == 'udp') ? $data['udp_rtt'] : $data['tcp_rtt'];
 
-			if (strtolower($this->probes[$probeid]['transport']) == $trasport) {
-				$this->probes[$probeid]['results'][$ns][$ipv][$ip] = $item_value;
-				$error_key = $ns.$ip;
-
-				if ($item_value < 0) {
-					if (isServiceErrorCode($item_value, $data['type'])) {
-						$this->probes[$probeid]['dns_error'][$error_key] = true;
-					}
-
-					if (!isset($this->probe_errors[$item_value][$error_key])) {
-						$this->probe_errors[$item_value][$error_key] = 0;
-					}
-
-					$this->probe_errors[$item_value][$error_key]++;
-				}
-				elseif ($item_value > $rtt_max && $data['type'] == RSM_DNS) {
-					$this->probes[$probeid]['above_max_rtt'][$error_key] = true;
-
-					if (!isset($data['probes_above_max_rtt'][$error_key])) {
-						$data['probes_above_max_rtt'][$error_key] = 0;
-					}
-
-					$data['probes_above_max_rtt'][$error_key]++;
-				}
-			}
-			else if (array_key_exists($rtt_item['itemid'], $rtt_values)) {
+			if (strtolower($this->probes[$probeid]['transport']) != $transport) {
 				error(_s('Item transport value and probe transport value mismatch found for probe "%s" item "%s"',
-					$this->probe[$probeid]['host'], $rtt_item['key_']
+					$this->probes[$probeid]['host'], $rtt_item['key_']
 				));
+			}
+
+			$this->probes[$probeid]['results'][$ns][$ipv][$ip] = $item_value;
+			$error_key = $ns.$ip;
+
+			if ($item_value < 0) {
+				if (isServiceErrorCode($item_value, $data['type'])) {
+					$this->probes[$probeid]['dns_error'][$error_key] = true;
+				}
+
+				if (!isset($this->probe_errors[$item_value][$error_key])) {
+					$this->probe_errors[$item_value][$error_key] = 0;
+				}
+
+				$this->probe_errors[$item_value][$error_key]++;
+			}
+			elseif ($item_value > $rtt_max && $data['type'] == RSM_DNS) {
+				$this->probes[$probeid]['above_max_rtt'][$error_key] = true;
+
+				if (!isset($data['probes_above_max_rtt'][$error_key])) {
+					$data['probes_above_max_rtt'][$error_key] = 0;
+				}
+
+				$data['probes_above_max_rtt'][$error_key]++;
 			}
 		}
 
 		$data['dns_nameservers'] = $dns_nameservers;
 		$data['nsids'] = $this->getNSIDdata($dns_nameservers, $data['time']);
-		$key_parser->parse(RSM_SLV_KEY_DNS_NSSOK);
-		$nssok_key = $key_parser->getKey();
 		$key_parser->parse(RSM_SLV_KEY_DNS_NS_STATUS);
 		$ns_status_key = $key_parser->getKey();
-
-		$probes_items = $this->getItemsHistoryValue([
-			'output' => ['key_', 'itemid'],
-			'selectHosts' => ['hostid'],
-			'hostids' => array_keys($tld_probes),
+		$tldprobes_items = $this->getItemsHistoryValue([
+			'output' => ['key_', 'itemid', 'hostid'],
+			'hostids' => array_column($this->probes, 'tldprobe_hostid'),
 			'search' => [
 				'key_' => [
-					$nssok_key.'[',
 					$ns_status_key.'[',
+					RSM_SLV_KEY_DNS_NSSOK,
 					CALCULATED_PROBE_RSM_IP4_ENABLED,
 					CALCULATED_PROBE_RSM_IP6_ENABLED
 				]
 			],
 			'startSearch' => true,
+			'searchByAny' => true,
 			'monitored' => true,
 			'time_from' => $time_from,
 			'time_till' => $time_till,
 			'history' => ITEM_VALUE_TYPE_UINT64
 		]);
+		$probe_nscount = [];
 
-		foreach ($probes_items as $probe_item) {
-			$probeid = reset($probe_item['hosts'])['hostid'];
-			$value = array_key_exists('history_value', $probe_item) ? $probe_item['history_value'] : null;
+		foreach ($tldprobes_items as $tldprobe_item) {
+			$key_parser->parse($tldprobe_item['key_']);
+			$key = $key_parser->getKey();
+			$probeid = $tldprobeid_probeid[$tldprobe_item['hostid']];
+			$value = array_key_exists('history_value', $tldprobe_item) ? $tldprobe_item['history_value'] : null;
 
 			switch ($key_parser->getKey()) {
-				case $nssok_key:
+				case RSM_SLV_KEY_DNS_NSSOK:
 					// Set Name servers up count.
 					$this->probes[$probeid]['ns_up'] = $value;
 					$this->probes[$probeid]['online_status'] = ($value >= $data['min_dns_count'])
@@ -278,16 +285,20 @@ class CControllerAggregateDetails extends RSMControllerBase {
 				case $ns_status_key:
 					// Set Name server status.
 					$this->probes[$probeid]['results'][$key_parser->getParam(0)]['status'] = $value;
+					$probe_nscount[$probeid] = isset($probe_nscount[$probeid]) ? $probe_nscount[$probeid] + 1 : 1;
 					break;
 
-				case CALCULATED_PROBE_RSM_IP4_ENABLED:
-					$this->probes[$probeid]['ipv4'] = $value;
-					break;
-
-				case CALCULATED_PROBE_RSM_IP6_ENABLED:
-					$this->probes[$probeid]['ipv6'] = $value;
+				case 'probe.configvalue':
+					$ipv = ($tldprobe_item['key_'] == CALCULATED_PROBE_RSM_IP4_ENABLED) ? 'ipv4' : 'ipv6';
+					$this->probes[$probeid][$ipv] = $value;
 					break;
 			}
+		}
+
+		// Calculate Name servers down value for tld probe.
+		foreach ($probe_nscount as $probeid => $count) {
+			$nssok = isset($this->probes[$probeid]['ns_up']) ? $this->probes[$probeid]['ns_up'] : 0;
+			$this->probes[$probeid]['ns_down'] = $count - $nssok;
 		}
 
 		CArrayHelper::sort($this->probes, ['host']);
@@ -560,18 +571,21 @@ class CControllerAggregateDetails extends RSMControllerBase {
 			error(_('Value mapping for "Transport protocol" is not found.'));
 		}
 		else {
-			$probes = $this->getItemsHistoryValue([
+			$tldprobeid_probeid = array_combine(array_column($this->probes, 'tldprobe_hostid'), array_keys($this->probes));
+			$tldprobes_items = $this->getItemsHistoryValue([
 				'output' => ['itemid', 'hostid'],
-				'hostids' => array_keys($this->probes),
+				'hostids' => array_column($this->probes, 'tldprobe_hostid'),
 				'filter' => ['key_' => RSM_SLV_KEY_DNS_PROTOCOL],
 				'time_from' => $time_from,
-				'time_till' => $time_from,
+				'time_till' => $time_till,
 				'history' => ITEM_VALUE_TYPE_UINT64
 			]);
 
-			foreach ($probes as $probe) {
-				if (isset($probe['history_value'])) {
-					$this->probes[$probe['hostid']]['transport'] = $protocol_type[$probe['history_value']];
+			foreach ($tldprobes_items as $tldprobe_item) {
+				if (isset($tldprobe_item['history_value'])) {
+					$tldprobeid = $tldprobe_item['hostid'];
+					$probeid = $tldprobeid_probeid[$tldprobeid];
+					$this->probes[$probeid]['transport'] = $protocol_type[$probe['history_value']];
 				}
 			}
 		}
@@ -579,27 +593,16 @@ class CControllerAggregateDetails extends RSMControllerBase {
 		// Detect old or new format (ICA-605) and envoke getReportData or getReportDataNew.
 		$key_parser = new CItemKey;
 		$key_parser->parse(RSM_SLV_KEY_DNS_TEST);
-		// TODO: use $this->getItemsHistoryValue
 		$dns_test_item = API::Item()->get([
 			'output' => ['value_type'],
-			'hostids' => array_keys($this->probes),
-			'filter' => ['key_' => $key_parser->getKey().'[']
+			'hostids' => array_column($this->probes, 'tldprobe_hostid'),
+			'filter' => ['key_' => $key_parser->getKey().'['],
+			'time_from' => $time_from,
+			'time_till' => $time_from,
+			'history' => ITEM_VALUE_TYPE_TEXT
 		]);
-		$old_format = true;
 
 		if ($dns_test_item) {
-			$dns_test_item_value = API::History()->get([
-				'output' => ['itemid', 'value'],
-				'itemids' => array_keys($dns_test_item),
-				'time_from' => $time_from,
-				'time_till' => $time_from,
-				'history' => reset($dns_test_item)['value_type']
-			]);
-
-			$old_format = !$dns_test_item_value;
-		}
-
-		if ($old_format) {
 			$this->getReportData($data, $time_from, $time_till);
 		}
 		else {
@@ -651,19 +654,22 @@ class CControllerAggregateDetails extends RSMControllerBase {
 			return $nsids;
 		}
 
+		$time = 1578315410;
 		$nsid_items = $this->getItemsHistoryValue([
 			'output' => ['key_', 'type', 'hostid'],
-			'hostids' => array_keys($this->probes),
+			'hostids' => array_column($this->probes, 'tldprobe_hostid'),
 			'filter' => ['key_' => $nsid_item_keys],
 			'time_from' => $time,
 			'time_till' => $time,
-			'history' => ITEM_VALUE_TYPE_TEXT
+			'history' => ITEM_VALUE_TYPE_STR
 		]);
 
 		$key_parser->parse(RSM_SLV_KEY_DNS_NSID);
 		$params_count = $key_parser->getParamsNum();
 		$nsids = array_unique(array_column($nsid_items, 'history_value'));
+		$nsids = array_filter($nsids, 'strlen');
 		sort($nsids, SORT_LOCALE_STRING|SORT_NATURAL|SORT_FLAG_CASE);
+		$tldprobeid_probeid = array_combine(array_column($this->probes, 'tldprobe_hostid'), array_keys($this->probes));
 
 		foreach ($nsid_items as $nsid_item) {
 			$key_parser->parse($nsid_item['key_']);
@@ -676,7 +682,8 @@ class CControllerAggregateDetails extends RSMControllerBase {
 			if (isset($nsid_item['history_value'])) {
 				$name = $key_parser->getParam(0);
 				$ip = $key_parser->getParam(1);
-				$this->probes[$nsid_item['hostid']]['results_nsid'][$name][$ip] = array_search(
+				$probeid = $tldprobeid_probeid[$nsid_item['hostid']];
+				$this->probes[$probeid]['results_nsid'][$name][$ip] = array_search(
 					$nsid_item['history_value'], $nsids
 				);
 			}
