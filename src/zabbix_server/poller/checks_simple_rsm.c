@@ -2381,7 +2381,7 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 
 	if (SUCCEED != is_uint31(tcp_rtt_limit_str, &tcp_rtt_limit))
 	{
-		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid twelveth parameter."));
+		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid twelfth parameter."));
 		return ret;
 	}
 
