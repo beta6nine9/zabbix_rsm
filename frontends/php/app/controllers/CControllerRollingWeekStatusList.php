@@ -600,8 +600,9 @@ class CControllerRollingWeekStatusList extends CController {
 					// disabled services check
 					$templateName = [];
 					foreach ($hosts as $hostid => $host) {
-						$templateName[$hostid] = 'Template '.$host;
-						$hostIdByTemplateName['Template '.$host] = $hostid;
+						$name = sprintf(TEMPLATE_NAME_TLD_CONFIG, $host);
+						$templateName[$hostid] = $name;
+						$hostIdByTemplateName[$name] = $hostid;
 					}
 
 					$templates = API::Template()->get([
