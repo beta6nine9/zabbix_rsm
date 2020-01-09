@@ -62,7 +62,7 @@ $fields = [
 	'favref' =>					[T_ZBX_STR, O_OPT, P_ACT,  NOT_EMPTY,	'isset({favobj})'],
 	'favstate' =>				[T_ZBX_INT, O_OPT, P_ACT,  NOT_EMPTY,	'isset({favobj})&&("filter"=={favobj})'],
 	// sort and sortorder
-	'sort' =>			[T_ZBX_STR, O_OPT, P_SYS, IN('"host","name","info_1","info_2","type","server","dns_lastvalue","dnssec_lastvalue","rdds_lastvalue","rdap_lastvalue","epp_lastvalue"'),	null],
+	'sort' =>			[T_ZBX_STR, O_OPT, P_SYS, IN('"host","info_1","info_2","type","server","dns_lastvalue","dnssec_lastvalue","rdds_lastvalue","rdap_lastvalue","epp_lastvalue"'),	null],
 	'sortorder' =>		[T_ZBX_STR, O_OPT, P_SYS, IN('"'.ZBX_SORT_DOWN.'","'.ZBX_SORT_UP.'"'),	null]
 ];
 
