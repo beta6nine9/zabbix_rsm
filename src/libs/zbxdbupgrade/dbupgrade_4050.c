@@ -896,6 +896,7 @@ static int	DBpatch_4050505(void)
 	zbx_uint64_t	valuemapid_rsm_service_availability;		/* valuemapid of "RSM Service Availability" */
 	zbx_uint64_t	valuemapid_dns_test_mode;			/* valuemapid of "DNS test mode" */
 	zbx_uint64_t	valuemapid_transport_protocol;			/* valuemapid of "Transport protocol" */
+	zbx_uint64_t	valuemapid_rsm_dns_rtt;				/* valuemapid of "RSM DNS rtt" */
 
 	zbx_uint64_t	hostid_template_dns;				/* hostid of "Template DNS Test" template */
 	zbx_uint64_t	hostgroupid_template_dns;			/* hostgroupid of "Template DNS Test" template in "Templates" host group */
@@ -957,6 +958,7 @@ static int	DBpatch_4050505(void)
 	GET_VALUE_MAP_ID(valuemapid_rsm_service_availability, "RSM Service Availability");
 	GET_VALUE_MAP_ID(valuemapid_dns_test_mode, "DNS test mode");
 	GET_VALUE_MAP_ID(valuemapid_transport_protocol, "Transport protocol");
+	GET_VALUE_MAP_ID(valuemapid_rsm_dns_rtt, "RSM DNS rtt");
 
 	hostid_template_dns                        = DBget_maxid_num("hosts", 1);
 
@@ -1080,12 +1082,12 @@ static int	DBpatch_4050505(void)
 			"30d", itemid_rsm_dns));
 	CHECK(DBpatch_4050505_create_item(itemid_rsm_dns_rtt_tcp, ITEM_TYPE_DEPENDENT, hostid_template_dns,
 			"RTT of $1,$2 using $3", "rsm.dns.rtt[{#NS},{#IP},tcp]", "0", "90d", "365d",
-			ITEM_VALUE_TYPE_FLOAT, 0, "", ZBX_FLAG_DISCOVERY_PROTOTYPE,
+			ITEM_VALUE_TYPE_FLOAT, valuemapid_rsm_dns_rtt, "", ZBX_FLAG_DISCOVERY_PROTOTYPE,
 			"The Round-Time Trip returned when testing specific IP of Name Server using TCP protocol.",
 			"30d", itemid_rsm_dns));
 	CHECK(DBpatch_4050505_create_item(itemid_rsm_dns_rtt_udp, ITEM_TYPE_DEPENDENT, hostid_template_dns,
 			"RTT of $1,$2 using $3", "rsm.dns.rtt[{#NS},{#IP},udp]", "0", "90d", "365d",
-			ITEM_VALUE_TYPE_FLOAT, 0, "", ZBX_FLAG_DISCOVERY_PROTOTYPE,
+			ITEM_VALUE_TYPE_FLOAT, valuemapid_rsm_dns_rtt, "", ZBX_FLAG_DISCOVERY_PROTOTYPE,
 			"The Round-Time Trip returned when testing specific IP of Name Server using UDP protocol.",
 			"30d", itemid_rsm_dns));
 	CHECK(DBpatch_4050505_create_item(itemid_rsm_dns_nsid, ITEM_TYPE_DEPENDENT, hostid_template_dns,

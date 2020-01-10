@@ -86,7 +86,7 @@ int	main(int argc, char *argv[])
 		exit_usage(argv[0]);
 	}
 
-	printf("IP: %sm, URL: %sm , Test domain: %sm\n", res_ip, base_url, test_domain);
+	printf("IP: %s, URL: %s , Test domain: %s\n", res_ip, base_url, test_domain);
 
 	if (SUCCEED != zbx_create_resolver(&res, "resolver", res_ip, RSM_TCP, ipv4_enabled, ipv6_enabled,
 			RESOLVER_EXTRAS_DNSSEC, RSM_TCP_TIMEOUT, RSM_TCP_RETRY, stderr, err, sizeof(err)))

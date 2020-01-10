@@ -46,7 +46,7 @@ foreach ($data['tests'] as $test) {
 		date(DATE_TIME_FORMAT_SECONDS, $test['clock']),
 		$affects_rolling_week,
 		new CLink(
-			_('details'),
+			_('Details'),
 			(new CUrl('zabbix.php'))
 				->setArgument('action', 'rsm.particulartests')
 				->setArgument('slvItemId', $data['slvItemId'])

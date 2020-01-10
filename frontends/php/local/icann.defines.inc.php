@@ -72,6 +72,9 @@ define('RSM_SLV_RDDS_ROLLWEEK',		'rsm.slv.rdds.rollweek');
 define('RSM_SLV_RDAP_ROLLWEEK',		'rsm.slv.rdap.rollweek');
 define('RSM_SLV_EPP_ROLLWEEK',		'rsm.slv.epp.rollweek');
 
+// Template names
+define('TEMPLATE_NAME_TLD_CONFIG', 'Template Rsmhost Config %s');
+
 // SLA monitoring availability items keys
 define('RSM_SLV_DNS_AVAIL',					'rsm.slv.dns.avail');
 define('RSM_SLV_DNS_NS_DOWNTIME',			'rsm.slv.dns.ns.downtime');

@@ -265,16 +265,15 @@ sub list_services($;$)
 
 	# NB! Keep @columns in sync with __usage()!
 	my @columns = (
-		'rr_id',
-		'rr_name',
-		'rr_family',
-		'rr_status',
+		'status',
 		'{$RSM.RDDS.NS.STRING}',
 		'{$RSM.RDDS.TESTPREFIX}',
 		'{$RSM.TLD.RDDS.ENABLED}',
 		'{$RDAP.TLD.ENABLED}',
 		'{$RDAP.BASE.URL}',
-		'{$RDAP.TEST.DOMAIN}'
+		'{$RDAP.TEST.DOMAIN}',
+		'{$RSM.TLD.RDDS.43.SERVERS}',
+		'{$RSM.TLD.RDDS.80.SERVERS}',
 	);
 
 	my %rsmhosts = get_registrar_list();
@@ -290,16 +289,16 @@ sub list_services($;$)
 	{
 		my @row = ();
 
-		my $services = get_services($server_key, $rsmhost);
+		my $config = get_rsmhost_config($server_key, $rsmhost);
 
 		push(@row, $rsmhost);                      # Registrar ID
 		push(@row, $rsmhosts{$rsmhost}{'name'});   # Registrar name
 		push(@row, $rsmhosts{$rsmhost}{'family'}); # Registrar family
-		push(@row, map($services->{$_} // "", @columns));
+		push(@row, map($config->{$_} // "", @columns));
 
 		# obtain rsm.rdds[] item key and extract RDDS(43|80).SERVERS strings
-		my $template = get_template("Template $rsmhost", 0, 0);
-		my $items = get_items_like($template->{'templateid'}, 'rsm.rdds[', true);
+		my $items = get_items_like(get_template_id(TEMPLATE_RSMHOST_CONFIG_PREFIX . $rsmhost),
+				'rsm.rdds[', true);
 
 		my $key;
 		foreach my $k (keys(%{$items}))	# assuming that only one rsm.rdds[] item is enabled at a time
@@ -309,18 +308,6 @@ sub list_services($;$)
 				$key = $items->{$k}{'key_'};
 				last;
 			}
-		}
-
-		if (!defined($key))
-		{
-			push(@row, ("", ""));
-		}
-		else
-		{
-			$key =~ /,"(\S+)","(\S+)"]/;
-
-			push(@row, "$1");
-			push(@row, "$2");
 		}
 
 		push(@rows, \@row);
@@ -352,37 +339,18 @@ sub get_registrar_list()
 	return %result;
 }
 
-sub get_services($$)
+sub get_rsmhost_config($$)
 {
 	my $server_key = shift;
-	my $tld        = shift;
-
-	my @tld_types = (TLD_TYPE_G, TLD_TYPE_CC, TLD_TYPE_OTHER, TLD_TYPE_TEST);
+	my $rsmhost    = shift;
 
 	my $result;
 
-	my $main_templateid = get_template('Template ' . $tld, false, false);
-
-	pfail("Registrar \"$tld\" does not exist on \"$server_key\"") unless ($main_templateid->{'templateid'});
-
+	my $main_templateid = get_template_id(TEMPLATE_RSMHOST_CONFIG_PREFIX . $rsmhost);
 	my $macros = get_host_macro($main_templateid, undef);
+	my $rsmhost_host = get_host($rsmhost, true);
 
-	my $tld_host = get_host($tld, true);
-
-	$result->{'tld_status'} = $tld_host->{'status'};
-
-	foreach my $group (@{$tld_host->{'groups'}})
-	{
-		my $name = $group->{'name'};
-		foreach my $tld_type (@tld_types)
-		{
-			if ($name eq $tld_type)
-			{
-				$result->{'tld_type'} = $name;
-				last;
-			}
-		}
-	}
+	$result->{'status'} = $rsmhost_host->{'status'};
 
 	foreach my $macro (@{$macros})
 	{
@@ -422,8 +390,8 @@ sub manage_registrar($$$$)
 	my $main_host = get_host($rsmhost, false);
 	pfail("cannot find host \"$rsmhost\"") unless %{$main_host};
 
-	my $rsmhost_template = get_template('Template ' . $rsmhost, false, true);
-	pfail("cannot find template \"Template $rsmhost\"") unless %{$rsmhost_template};
+	my $rsmhost_template = get_template(TEMPLATE_RSMHOST_CONFIG_PREFIX . $rsmhost, false, true);
+	pfail("cannot find template \"" . TEMPLATE_RSMHOST_CONFIG_PREFIX . "$rsmhost\"") unless %{$rsmhost_template};
 
 	my $main_hostid = $main_host->{'hostid'};
 	my $main_templateid = $rsmhost_template->{'templateid'};
@@ -471,60 +439,25 @@ sub manage_registrar($$$$)
 	}
 
 	my $service = $rdds ? 'rdds' : 'rdap';
-	my $template_items = get_items_like($main_templateid, $service, true);
-	my $host_items = get_items_like($main_hostid, $service, false);
 
-	if ($rdds)
+	my $macro = $service eq 'rdap' ? '{$RDAP.TLD.ENABLED}' : '{$RSM.TLD.' . uc($service) . '.ENABLED}';
+
+	create_macro($macro, 0, $main_templateid, true);
+
+	my $items = get_items_like($main_hostid, $service, false);
+	my @itemids = map { $items->{$_}->{'key_'} ne "$service.enabled" ? $_ : () } keys(%{$items});
+
+	if (scalar(@itemids) > 0)
 	{
-		my $service_enabled_itemkey = "$service.enabled";
-
-		my @service_enabled_itemid = grep { $template_items->{$_}{'key_'} eq $service_enabled_itemkey } keys(%{$template_items});
-		if (!@service_enabled_itemid)
-		{
-			pfail("failed to find $service_enabled_itemkey item");
-		}
-
-		delete($template_items->{$service_enabled_itemid[0]});
+		$action eq 'disable' ? disable_items(\@itemids) : remove_items(\@itemids);
+	}
+	else
+	{
+		print("Could not find $service items on host $rsmhost ($main_hostid)\n");
 	}
 
-	my $template_item_ids = [keys(%{$template_items})];
-	my $host_items_ids = [keys(%{$host_items})];
-
-	if (scalar(@{$template_item_ids}) == 0 && $service ne 'rdap') # RDAP doesn't have items in "Template $tld"
-	{
-		print("Could not find $service related items on the template level\n");
-	}
-
-	if (scalar(@{$host_items_ids}) == 0)
-	{
-		print("Could not find $service related items on host level\n");
-	}
-
-	my @itemids = (@{$template_item_ids}, @{$host_items_ids});
-
-	# print(Dumper(\@itemids));
-	# print(Dumper($host_items_ids));
-
-	if (scalar(@itemids))
-	{
-		my $macro = $service eq 'rdap' ? '{$RDAP.TLD.ENABLED}' : '{$RSM.TLD.' . uc($service) . '.ENABLED}';
-
-		create_macro($macro, 0, $main_templateid, true);
-
-		if ($action eq 'disable')
-		{
-			disable_items(\@itemids);
-		}
-		else # $action is 'delete'
-		{
-			remove_items(\@itemids);
-		}
-	}
-
-	if ($action eq 'disable' && $service eq 'rdap')
-	{
-		set_linked_items_enabled('rdap[', $rsmhost, 0);
-	}
+	set_linked_items_status($service eq 'rdap' ? 'rdap[' : 'rsm.rdds[', $rsmhost, 0) if ($action eq 'disable');
+	set_linked_items_status('rdap[', $rsmhost, 0) if (!__is_rdap_standalone() && $action eq 'disable');
 }
 
 sub compare_arrays($$)
@@ -562,7 +495,7 @@ sub add_new_registrar()
 
 	my $rsmhost_groupid = really(create_group('TLD ' . getopt('rr-id')));
 
-	create_rsmhost();
+	create_rsmhost($main_templateid, getopt('rr-id'), getopt('rr-name'), getopt('rr-family'));
 
 	my $proxy_mon_templateid = create_probe_health_tmpl();
 
@@ -573,7 +506,7 @@ sub create_main_template($)
 {
 	my $rsmhost = shift;
 
-	my $template_name = 'Template ' . $rsmhost;
+	my $template_name = TEMPLATE_RSMHOST_CONFIG_PREFIX . $rsmhost;
 
 	my $templateid = really(create_template($template_name));
 
@@ -595,12 +528,12 @@ sub create_main_template($)
 		}));
 	}
 
-	create_items_rdds($templateid, $template_name);
-
 	really(create_macro('{$RSM.TLD}', $rsmhost, $templateid));
 	really(create_macro('{$RSM.RDDS.TESTPREFIX}', getopt('rdds-test-prefix'), $templateid, 1)) if (opt('rdds-test-prefix'));
 	really(create_macro('{$RSM.RDDS.NS.STRING}', opt('rdds-ns-string') ? getopt('rdds-ns-string') : CFG_DEFAULT_RDDS_NS_STRING, $templateid, 1));
 	really(create_macro('{$RSM.TLD.RDDS.ENABLED}', opt('rdds43-servers') ? 1 : 0, $templateid, 1));
+	really(create_macro('{$RSM.TLD.RDDS.43.SERVERS}', getopt('rdds43-servers') // '', $templateid, 1));
+	really(create_macro('{$RSM.TLD.RDDS.80.SERVERS}', getopt('rdds80-servers') // '', $templateid, 1));
 	really(create_macro('{$RSM.TLD.EPP.ENABLED}', 0, $templateid)); # required by rsm.rdds[] metric
 
 	if (opt('rdap-base-url') && opt('rdap-test-domain'))
@@ -617,106 +550,21 @@ sub create_main_template($)
 	return $templateid;
 }
 
-sub create_items_rdds($$)
+sub create_rsmhost($$$$)
 {
-	my $templateid    = shift;
-	my $template_name = shift;
-
-	if (opt('rdds43-servers'))
-	{
-		my $applicationid = get_application_id('RDDS43', $templateid);
-
-		really(create_item({
-			'name'         => 'RDDS43 IP of $1',
-			'key_'         => 'rsm.rdds.43.ip[{$RSM.TLD}]',
-			'status'       => ITEM_STATUS_ACTIVE,
-			'hostid'       => $templateid,
-			'applications' => [$applicationid],
-			'type'         => ITEM_TYPE_TRAPPER,
-			'value_type'   => ITEM_VALUE_TYPE_STR
-		}));
-
-		really(create_item({
-			'name'         => 'RDDS43 RTT of $1',
-			'key_'         => 'rsm.rdds.43.rtt[{$RSM.TLD}]',
-			'status'       => ITEM_STATUS_ACTIVE,
-			'hostid'       => $templateid,
-			'applications' => [$applicationid],
-			'type'         => ITEM_TYPE_TRAPPER,
-			'value_type'   => ITEM_VALUE_TYPE_FLOAT,
-			'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_rdds_rtt'}
-		}));
-	}
-
-	if (opt('rdds80-servers'))
-	{
-		my $applicationid = get_application_id('RDDS80', $templateid);
-
-		really(create_item({
-			'name'         => 'RDDS80 IP of $1',
-			'key_'         => 'rsm.rdds.80.ip[{$RSM.TLD}]',
-			'status'       => ITEM_STATUS_ACTIVE,
-			'hostid'       => $templateid,
-			'applications' => [$applicationid],
-			'type'         => ITEM_TYPE_TRAPPER,
-			'value_type'   => ITEM_VALUE_TYPE_STR
-		}));
-
-		really(create_item({
-			'name'         => 'RDDS80 RTT of $1',
-			'key_'         => 'rsm.rdds.80.rtt[{$RSM.TLD}]',
-			'status'       => ITEM_STATUS_ACTIVE,
-			'hostid'       => $templateid,
-			'applications' => [$applicationid],
-			'type'         => ITEM_TYPE_TRAPPER,
-			'value_type'   => ITEM_VALUE_TYPE_FLOAT,
-			'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_rdds_rtt'}
-		}));
-	}
-
-	if (opt('rdds43-servers') || opt('rdds80-servers'))
-	{
-		# disable old items to keep the history, if value of rdds43-servers and/or rdds80-servers has changed
-		my @old_rdds_availability_items = keys(%{get_items_like($templateid, 'rsm.rdds[', true)});
-		disable_items(\@old_rdds_availability_items);
-
-		# create new item (or update/enable existing item)
-		really(create_item({
-			'name'         => 'RDDS availability',
-			'key_'         => 'rsm.rdds[{$RSM.TLD},"' . getopt('rdds43-servers') . '","' . getopt('rdds80-servers') . '"]',
-			'status'       => ITEM_STATUS_ACTIVE,
-			'hostid'       => $templateid,
-			'applications' => [get_application_id('RDDS', $templateid)],
-			'type'         => ITEM_TYPE_SIMPLE,
-			'value_type'   => ITEM_VALUE_TYPE_UINT64,
-			'delay'        => '{$RSM.RDDS.DELAY}',
-			'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_rdds_result'}
-		}));
-	}
-
-	# this item is added in any case
-	really(create_item({
-		'name'       => 'RDDS enabled/disabled',
-		'key_'       => 'rdds.enabled',
-		'status'     => ITEM_STATUS_ACTIVE,
-		'hostid'     => $templateid,
-		'params'     => '{$RSM.TLD.RDDS.ENABLED}',
-		'delay'      => 60,
-		'type'       => ITEM_TYPE_CALCULATED,
-		'value_type' => ITEM_VALUE_TYPE_UINT64
-	}));
-}
-
-sub create_rsmhost()
-{
-	my $rr_id     = getopt('rr-id');
-	my $rr_name   = getopt('rr-name');
-	my $rr_family = getopt('rr-family'); # TODO: save family
+	my $main_templateid = shift;
+	my $rr_id           = shift;
+	my $rr_name         = shift;
+	my $rr_family       = shift;	# TODO: save family
 
 	my $rsmhostid = really(create_host({
 		'groups'     => [
 			{'groupid' => TLDS_GROUPID},
 			{'groupid' => TLD_TYPE_GROUPIDS->{${\TLD_TYPE_G}}}
+		],
+		'templates' => [
+			{'templateid' => $main_templateid},
+			{'templateid' => CONFIG_HISTORY_TEMPLATEID}
 		],
 		'host'       => $rr_id,
 		'info_1'     => $rr_name,
@@ -758,7 +606,8 @@ sub create_rdds_or_rdap_slv_items($$$;$)
 
 sub __is_rdap_standalone()
 {
-	return time() > $cfg_global_macros->{'{$RSM.RDAP.STANDALONE}'};
+	return $cfg_global_macros->{'{$RSM.RDAP.STANDALONE}'} != 0 &&
+			time() >= $cfg_global_macros->{'{$RSM.RDAP.STANDALONE}'};
 }
 
 sub create_slv_items($$)
@@ -1078,27 +927,21 @@ sub create_tld_hosts_on_probes($$$$)
 			'interfaces'   => [DEFAULT_MAIN_INTERFACE]
 		}));
 
-		if (opt('rdap-base-url') && opt('rdap-test-domain'))
-		{
-			set_linked_items_enabled('rdap[', getopt('rr-id'), 1);
-		}
-		else
-		{
-			set_linked_items_enabled('rdap[', getopt('rr-id'), 0);
-		}
+		set_linked_items_status('rdap[', getopt('rr-id'), opt('rdap-base-url') && opt('rdap-test-domain'));
+		set_linked_items_status('rsm.rdds[', getopt('rr-id'), opt('rdds43-servers'));
 	}
 }
 
-sub set_linked_items_enabled($$$)
+sub set_linked_items_status($$$)
 {
 	my $like    = shift;
-	my $tld     = shift;
+	my $rsmhost = shift;
 	my $enabled = shift;
 
-	my $template = 'Template ' . $tld;
+	my $template = TEMPLATE_RSMHOST_CONFIG_PREFIX . $rsmhost;
 	my $result = get_template($template, false, true);	# do not select macros, select hosts
 
-	pfail("$tld template \"$template\" does not exist") if (keys(%{$result}) == 0);
+	pfail("$rsmhost template \"$template\" does not exist") if (keys(%{$result}) == 0);
 
 	foreach my $host_ref (@{$result->{'hosts'}})
 	{
@@ -1106,14 +949,7 @@ sub set_linked_items_enabled($$$)
 
 		my @items = keys(%{$result2});
 
-		if ($enabled)
-		{
-			enable_items(\@items);
-		}
-		else
-		{
-			disable_items(\@items);
-		}
+		$enabled ? enable_items(\@items) : disable_items(\@items);
 	}
 }
 
