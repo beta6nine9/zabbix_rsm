@@ -1749,14 +1749,12 @@ sub create_tld_hosts_on_probes($$$$)
 			$status = HOST_STATUS_MONITORED;
 		}
 
-		my $probe_status_templateid = create_probe_status_template($probe_name, $probe_templateid, $root_servers_macros);
-
 		really(create_host({
 			'groups' => [
 				{'groupid' => PROBES_GROUPID}
 			],
 			'templates' => [
-				{'templateid' => $probe_status_templateid},
+				{'templateid' => PROBE_STATUS_TEMPLATEID},
 				{'templateid' => APP_ZABBIX_PROXY_TEMPLATEID}
 			],
 			'host'         => $probe_name,
