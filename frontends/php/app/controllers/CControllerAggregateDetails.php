@@ -660,7 +660,6 @@ class CControllerAggregateDetails extends RSMControllerBase {
 			return $nsids;
 		}
 
-		$time = 1578315410;
 		$nsid_items = $this->getItemsHistoryValue([
 			'output' => ['key_', 'type', 'hostid'],
 			'hostids' => array_column($this->probes, 'tldprobe_hostid'),
