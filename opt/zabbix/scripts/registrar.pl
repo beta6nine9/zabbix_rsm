@@ -902,8 +902,7 @@ sub create_tld_hosts_on_probes($$$$)
 			],
 			'templates' => [
 				{'templateid' => $probe_status_templateid},
-				{'templateid' => APP_ZABBIX_PROXY_TEMPLATEID},
-				{'templateid' => PROBE_ERRORS_TEMPLATEID}
+				{'templateid' => APP_ZABBIX_PROXY_TEMPLATEID}
 			],
 			'host'         => $probe_name,
 			'status'       => $status,

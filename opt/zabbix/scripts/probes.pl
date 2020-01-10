@@ -154,9 +154,6 @@ sub add_probe($$$$$$$$$$$)
 			},
 			{
 				'templateid'	=> APP_ZABBIX_PROXY_TEMPLATEID
-			},
-			{
-				'templateid'	=> PROBE_ERRORS_TEMPLATEID
 			}
 		],
 		'host'		=> $probe_name,

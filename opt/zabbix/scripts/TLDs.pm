@@ -897,7 +897,7 @@ sub create_probe_template
 	my $rdap      = shift;
 	my $resolver  = shift;
 
-	my $templateid = create_template('Template ' . $root_name);
+	my $templateid = create_template(TEMPLATE_PROBE_CONFIG_PREFIX . $root_name);
 
 	create_macro('{$RSM.IP4.ENABLED}' , defined($ipv4)     ? $ipv4     : '1'        , $templateid, defined($ipv4)     ? 1 : undef);
 	create_macro('{$RSM.IP6.ENABLED}' , defined($ipv6)     ? $ipv6     : '1'        , $templateid, defined($ipv6)     ? 1 : undef);
