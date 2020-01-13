@@ -4735,6 +4735,7 @@ static size_t	zbx_get_epp_items(const char *keyname, DC_ITEM *item, const char *
 	return out_items_num;
 }
 
+/* TODO: this code should be rewritten, the values should not be set using dc_add_history()! */
 static void	zbx_set_epp_values(const char *ip, int rtt1, int rtt2, int rtt3, int value_ts, size_t keypart_size,
 		const DC_ITEM *items, size_t items_num)
 {
@@ -5874,7 +5875,7 @@ out:
 			}
 		}
 
-		zbx_add_value_uint(item, item->nextcheck, status);
+		SET_UI64_RESULT(result, status);
 	}
 	else
 	{
@@ -6012,7 +6013,7 @@ out:
 
 		rsm_info(log_fd, "END TEST");
 
-		zbx_add_value_uint(item, item->nextcheck, status);
+		SET_UI64_RESULT(result, status);
 
 		/* probe knock-down if local resolver non-functional */
 		if (0 == status)
