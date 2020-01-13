@@ -130,7 +130,6 @@ sub add_probe($$$$$$$$$$$)
 	print("Creating '$probe_name' config template: ");
 	my $probe_tmpl_id = create_probe_template($probe_name, $epp, $ipv4, $ipv6, $rdds, $rdap, $resolver);
 	is_not_empty($probe_tmpl_id, true);
-	print("DEBUG: template_id $probe_tmpl_id\n");
 
 	########## Creating Probe host
 
