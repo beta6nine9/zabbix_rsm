@@ -92,13 +92,13 @@ sub main()
 	}
 	elsif (opt('delete'))
 	{
-		manage_tld_objects('delete', getopt('tld'), getopt('dns'), getopt('dnssec'),
-				getopt('epp'), getopt('rdds'), getopt('rdap'));
+		manage_tld_objects('delete', getopt('tld'), getopt('dns'), getopt('dns-udp'), getopt('dns-tcp'),
+				getopt('dnssec'), getopt('epp'), getopt('rdds'), getopt('rdap'));
 	}
 	elsif (opt('disable'))
 	{
-		manage_tld_objects('disable', getopt('tld'), getopt('dns'), getopt('dnssec'),
-				getopt('epp'), getopt('rdds'), getopt('rdap'));
+		manage_tld_objects('disable', getopt('tld'), getopt('dns'), getopt('dns-udp'), getopt('dns-tcp'),
+				getopt('dnssec'), getopt('epp'), getopt('rdds'), getopt('rdap'));
 	}
 	else
 	{
@@ -126,6 +126,8 @@ sub init_cli_opts($)
 			"ipv4!",
 			"ipv6!",
 			"dns!",
+			"dns-tcp",
+			"dns-udp",
 			"epp!",
 			"rdds!",
 			"rdap!",
@@ -224,6 +226,16 @@ sub validate_input($)
 		}
 	}
 
+	if (opt('delete') && (opt('dns-tcp') || opt('dns-udp')))
+	{
+		$msg .= "--dns-tcp, --dns-udp are not compatible with --delete\n";
+	}
+
+	if (opt('disable') && opt('dns-tcp') && opt('dns-udp'))
+	{
+		$msg .= "only one of --dns-tcp, --dns-udp can be used with --disable\n";
+	}
+
 	if ((opt('rdds43-servers') && !opt('rdds80-servers')) ||
 			(opt('rdds80-servers') && !opt('rdds43-servers')))
 	{
@@ -251,15 +263,32 @@ sub validate_input($)
 		$msg .= "EPP Server certificate file must be specified (--epp-servercert)\n" unless (getopt('epp-servercert'));
 	}
 
-	# why on Earth? Do not do this.
-	#getopt('ipv4') = 0 if (opt('update-nsservers'));
-	#getopt('ipv6') = 0 if (opt('update-nsservers'));
+	if (!opt('delete') && !opt('disable'))
+	{
+		if (opt('dns') && !opt('dns-tcp') && !opt('dns-udp'))
+		{
+			setopt('dns-tcp');
+			setopt('dns-udp');
+		}
+		elsif (opt('dns-tcp') || opt('dns-udp'))
+		{
+			setopt('dns');
+		}
+		elsif (!opt('dns') && !opt('dns-tcp') && !opt('dns-udp'))
+		{
+			setopt('dns');
+			setopt('dns-tcp');
+			setopt('dns-udp');
+		}
+	}
 
-	setopt('dns'   , 0) unless opt('dns');
-	setopt('dnssec', 0) unless opt('dnssec');
-	setopt('rdds'  , 0) unless opt('rdds');
-	setopt('epp'   , 0) unless opt('epp');
-	setopt('rdap'  , 0) unless opt('rdap');
+	setopt('dns'    , 0) unless opt('dns');
+	setopt('dnssec' , 0) unless opt('dnssec');
+	setopt('rdds'   , 0) unless opt('rdds');
+	setopt('epp'    , 0) unless opt('epp');
+	setopt('rdap'   , 0) unless opt('rdap');
+	setopt('dns-udp', 0) unless opt('dns-udp');
+	setopt('dns-tcp', 0) unless opt('dns-tcp');
 
 	if ($msg)
 	{
@@ -357,8 +386,8 @@ sub list_services($;$)
 
 	# NB! Keep @columns in sync with __usage()!
 	my @columns = (
-		'tld_type',
-		'tld_status',
+		'type',
+		'status',
 		'{$RSM.DNS.TESTPREFIX}',
 		'{$RSM.RDDS.NS.STRING}',
 		'{$RSM.RDDS.TESTPREFIX}',
@@ -367,7 +396,9 @@ sub list_services($;$)
 		'{$RSM.TLD.RDDS.ENABLED}',
 		'{$RDAP.TLD.ENABLED}',
 		'{$RDAP.BASE.URL}',
-		'{$RDAP.TEST.DOMAIN}'
+		'{$RDAP.TEST.DOMAIN}',
+		'{$RSM.TLD.RDDS.43.SERVERS}',
+		'{$RSM.TLD.RDDS.80.SERVERS}',
 	);
 
 	my @rsmhosts = ($rsmhost // get_tld_list());
@@ -377,38 +408,10 @@ sub list_services($;$)
 	foreach my $rsmhost (sort(@rsmhosts))
 	{
 		my @row = ();
-
-		my $services = get_services($server_key, $rsmhost);
+		my $config = get_rsmhost_config($server_key, $rsmhost);
 
 		push(@row, $rsmhost);
-		push(@row, map($services->{$_} // "", @columns));
-
-		# obtain rsm.rdds[] item key and extract RDDS(43|80).SERVERS strings
-		my $template = get_template("Template $rsmhost", 0, 0);
-		my $items = get_items_like($template->{'templateid'}, 'rsm.rdds[', true);
-
-		my $key;
-		foreach my $k (keys(%{$items}))	# assuming that only one rsm.rdds[] item is enabled at a time
-		{
-			if ($items->{$k}{'status'} == 0)
-			{
-				$key = $items->{$k}{'key_'};
-				last;
-			}
-		}
-
-		if (!defined($key))
-		{
-			push(@row, ("", ""));
-		}
-		else
-		{
-			$key =~ /,"(\S+)","(\S+)"]/;
-
-			push(@row, "$1");
-			push(@row, "$2");
-		}
-
+		push(@row, map($config->{$_} // "", @columns));
 		push(@rows, \@row);
 	}
 
@@ -425,24 +428,19 @@ sub get_tld_list()
 	return map($_->{'host'}, @{$tlds->{'hosts'}});
 }
 
-sub get_services($$)
+sub get_rsmhost_config($$)
 {
 	my $server_key = shift;
 	my $tld        = shift;
 
 	my @tld_types = (TLD_TYPE_G, TLD_TYPE_CC, TLD_TYPE_OTHER, TLD_TYPE_TEST);
-
 	my $result;
 
-	my $main_templateid = get_template('Template ' . $tld, false, false);
-
-	pfail("TLD \"$tld\" does not exist on \"$server_key\"") unless ($main_templateid->{'templateid'});
-
+	my $main_templateid = get_template_id(TEMPLATE_RSMHOST_CONFIG_PREFIX . $tld);
 	my $macros = get_host_macro($main_templateid, undef);
-
 	my $tld_host = get_host($tld, true);
 
-	$result->{'tld_status'} = $tld_host->{'status'};
+	$result->{'status'} = $tld_host->{'status'};
 
 	foreach my $group (@{$tld_host->{'groups'}})
 	{
@@ -451,7 +449,7 @@ sub get_services($$)
 		{
 			if ($name eq $tld_type)
 			{
-				$result->{'tld_type'} = $name;
+				$result->{'type'} = $name;
 				last;
 			}
 		}
@@ -724,25 +722,40 @@ sub disable_old_ns($)
 	}
 }
 
+# locates and returns macro value from the result as returned by API
+sub __get_macro_value_from_result($$)
+{
+	my $result = shift;
+	my $macro  = shift;
+
+	my $macro_hash_ref = (grep { $_->{'macro'} eq $macro } @{$result->{'macros'}})[0];
+
+	return $macro_hash_ref->{'value'};
+}
+
 ################################################################################
 # delete or disable RSMHOST or its objects
 ################################################################################
 
 sub manage_tld_objects($$$$$$$)
 {
-	my $action = shift;
-	my $tld    = shift;
-	my $dns    = shift;
-	my $dnssec = shift;
-	my $epp    = shift;
-	my $rdds   = shift;
-	my $rdap   = shift;
+	my $action  = shift;
+	my $tld     = shift;
+	my $dns     = shift;
+	my $dns_udp = shift;
+	my $dns_tcp = shift;
+	my $dnssec  = shift;
+	my $epp     = shift;
+	my $rdds    = shift;
+	my $rdap    = shift;
 
 	my $types = {
-		'dns'    => $dns,
-		'dnssec' => $dnssec,
-		'epp'    => $epp,
-		'rdds'   => $rdds
+		'dns'		=> $dns,
+		'dns-udp'	=> $dns_udp,
+		'dns-tcp'	=> $dns_tcp,
+		'dnssec'	=> $dnssec,
+		'epp'		=> $epp,
+		'rdds'		=> $rdds
 	};
 
 	my $main_templateid;
@@ -763,7 +776,7 @@ sub manage_tld_objects($$$$$$$)
 	}
 
 	print("Getting main template of the TLD: ");
-	my $tld_template = get_template('Template ' . $tld, false, true);
+	my $tld_template = get_template(TEMPLATE_RSMHOST_CONFIG_PREFIX . $tld, true, true);
 
 	if (scalar(%{$tld_template}))
 	{
@@ -772,7 +785,7 @@ sub manage_tld_objects($$$$$$$)
 	}
 	else
 	{
-		pfail("cannot find template \"Template .$tld\"");
+		pfail("cannot find template \"" . TEMPLATE_RSMHOST_CONFIG_PREFIX . "$tld\"");
 	}
 
 	my @tld_hostids;
@@ -812,8 +825,6 @@ sub manage_tld_objects($$$$$$$)
 		my @tmp_hostids;
 		my @hostids_arr;
 
-		push(@tmp_hostids, {'hostid' => $main_hostid});
-
 		foreach my $hostid (@tld_hostids)
 		{
 			push(@tmp_hostids, {'hostid' => $hostid});
@@ -837,12 +848,12 @@ sub manage_tld_objects($$$$$$$)
 		if ($action eq 'delete')
 		{
 			remove_hosts(\@hostids_arr);
-			remove_hosts([$main_hostid]);
 			remove_templates([$main_templateid]);
 
 			my $hostgroupid = get_host_group('TLD ' . $tld, false, false);
 			$hostgroupid = $hostgroupid->{'groupid'};
 			remove_hostgroups([$hostgroupid]);
+
 			return;
 		}
 	}
@@ -853,67 +864,46 @@ sub manage_tld_objects($$$$$$$)
 
 		if ($type eq 'dnssec')
 		{
-			really(create_macro('{$RSM.TLD.DNSSEC.ENABLED}', 0, $main_templateid, true)) if ($types->{$type} eq true);
+			really(create_macro('{$RSM.TLD.DNSSEC.ENABLED}', 0, $main_templateid, true));
+			next;
+		}
+		elsif ($type eq 'dns-udp')
+		{
+			if (__get_macro_value_from_result($tld_template, '{$RSM.TLD.DNS.TCP.ENABLED}') eq "0")
+			{
+				pfail("cannot disable DNS UDP because DNS TCP is already disabled");
+			}
+			really(create_macro('{$RSM.TLD.DNS.UDP.ENABLED}', 0, $main_templateid, true));
+			next;
+		}
+		elsif ($type eq 'dns-tcp')
+		{
+			if (__get_macro_value_from_result($tld_template, '{$RSM.TLD.DNS.UDP.ENABLED}') eq "0")
+			{
+				pfail("cannot disable DNS TCP because DNS UDP is already disabled");
+			}
+			really(create_macro('{$RSM.TLD.DNS.TCP.ENABLED}', 0, $main_templateid, true));
 			next;
 		}
 
-		my @itemids;
+		my $macro = $type eq 'rdap' ? '{$RDAP.TLD.ENABLED}' : '{$RSM.TLD.' . uc($type) . '.ENABLED}';
 
-		my $template_items = get_items_like($main_templateid, $type, true);
-		my $host_items = get_items_like($main_hostid, $type, false);
+		create_macro($macro, 0, $main_templateid, true);
 
-		if ($type eq 'rdds')
+		my $items = get_items_like($main_hostid, $type, false);
+		my @itemids = map { $items->{$_}->{'key_'} ne "$type.enabled" ? $_ : () } keys(%{$items});
+
+		if (scalar(@itemids) > 0)
 		{
-			my $service_enabled_itemkey = "$type.enabled";
-
-			my @service_enabled_itemid = grep { $template_items->{$_}{'key_'} eq $service_enabled_itemkey } keys(%{$template_items});
-			if (!@service_enabled_itemid)
-			{
-				pfail("failed to find $service_enabled_itemkey item");
-			}
-
-			delete($template_items->{$service_enabled_itemid[0]});
-		}
-
-		if (scalar(keys(%{$template_items})))
-		{
-			push(@itemids, keys(%{$template_items}));
-		}
-		elsif ($type ne 'rdap') # RDAP doesn't have items in "Template $tld"
-		{
-			print("Could not find $type related items on the template level\n");
-		}
-
-		if (scalar(keys(%{$host_items})))
-		{
-			push(@itemids, keys(%{$host_items}));
+			$action eq 'disable' ? disable_items(\@itemids) : remove_items(\@itemids);
 		}
 		else
 		{
-			print("Could not find $type related items on host level\n");
+			print("Could not find $type items on host $tld ($main_hostid)\n");
 		}
 
-		if (scalar(@itemids))
-		{
-			my $macro = $type eq 'rdap' ? '{$RDAP.TLD.ENABLED}' : '{$RSM.TLD.' . uc($type) . '.ENABLED}';
-
-			create_macro($macro, 0, $main_templateid, true);
-
-			if ($action eq 'disable')
-			{
-				disable_items(\@itemids);
-			}
-			else # $action is 'delete'
-			{
-				remove_items(\@itemids);
-				# remove_applications_by_items(\@itemids);
-			}
-		}
-
-		if ($action eq 'disable' && $type eq 'rdap')
-		{
-			set_linked_items_enabled('rdap[', $tld, 0);
-		}
+		set_linked_items_status($type eq 'rdds' ? 'rsm.rdds[' : 'rdap[', $tld, 0) if ($action eq 'disable');
+		set_linked_items_status('rdap[', $tld, 0) if (!__is_rdap_standalone() && $action eq 'disable');
 	}
 }
 
@@ -934,7 +924,7 @@ sub add_new_tld()
 
 	my $rsmhost_groupid = really(create_group('TLD ' . getopt('tld')));
 
-	create_rsmhost();
+	create_rsmhost($main_templateid, getopt('tld'), getopt('type'));
 
 	my $proxy_mon_templateid = create_probe_health_tmpl();
 
@@ -1009,7 +999,7 @@ sub create_main_template($$)
 	my $tld        = shift;
 	my $ns_servers = shift;
 
-	my $templateid = really(create_template('Template ' . $tld));
+	my $templateid = really(create_template(TEMPLATE_RSMHOST_CONFIG_PREFIX . $tld));
 
 	my $delay = 300;
 	my $appid = get_application_id('Configuration', $templateid);
@@ -1059,15 +1049,18 @@ sub create_main_template($$)
 
 	really(create_macro('{$RSM.DNS.NAME.SERVERS}', $name_servers_list, $templateid, 1));
 
-	create_items_rdds($templateid);
 	create_items_epp($templateid) if (opt('epp-servers'));
 
 	really(create_macro('{$RSM.TLD}', $tld, $templateid));
 	really(create_macro('{$RSM.DNS.TESTPREFIX}', getopt('dns-test-prefix'), $templateid, 1));
 	really(create_macro('{$RSM.RDDS.TESTPREFIX}', getopt('rdds-test-prefix'), $templateid, 1)) if (opt('rdds-test-prefix'));
 	really(create_macro('{$RSM.RDDS.NS.STRING}', opt('rdds-ns-string') ? getopt('rdds-ns-string') : CFG_DEFAULT_RDDS_NS_STRING, $templateid, 1));
+	really(create_macro('{$RSM.TLD.DNS.UDP.ENABLED}', getopt('dns-udp'), $templateid, 1));
+	really(create_macro('{$RSM.TLD.DNS.TCP.ENABLED}', getopt('dns-tcp'), $templateid, 1));
 	really(create_macro('{$RSM.TLD.DNSSEC.ENABLED}', getopt('dnssec'), $templateid, 1));
 	really(create_macro('{$RSM.TLD.RDDS.ENABLED}', opt('rdds43-servers') ? 1 : 0, $templateid, 1));
+	really(create_macro('{$RSM.TLD.RDDS.43.SERVERS}', getopt('rdds43-servers') // '', $templateid, 1));
+	really(create_macro('{$RSM.TLD.RDDS.80.SERVERS}', getopt('rdds80-servers') // '', $templateid, 1));
 	really(create_macro('{$RSM.TLD.EPP.ENABLED}', opt('epp-servers') ? 1 : 0, $templateid, 1));
 
 	if (opt('rdap-base-url') && opt('rdap-test-domain'))
@@ -1176,114 +1169,6 @@ sub create_slv_item($$$$$;$)
 	}
 
 	pfail("Unknown value type $value_type.");
-}
-
-sub create_items_rdds($)
-{
-	my $templateid    = shift;
-
-	if (opt('rdds43-servers'))
-	{
-		my $applicationid_43 = get_application_id('RDDS43', $templateid);
-		my $applicationid_80 = get_application_id('RDDS80', $templateid);
-
-		my $item_key = 'rsm.rdds.43.ip[{$RSM.TLD}]';
-
-		really(create_item({
-			'name'         => 'RDDS43 IP of $1',
-			'key_'         => $item_key,
-			'status'       => ITEM_STATUS_ACTIVE,
-			'hostid'       => $templateid,
-			'applications' => [$applicationid_43],
-			'type'         => ITEM_TYPE_TRAPPER,
-			'value_type'   => ITEM_VALUE_TYPE_STR
-		}));
-
-		$item_key = 'rsm.rdds.43.rtt[{$RSM.TLD}]';
-
-		really(create_item({
-			'name'         => 'RDDS43 RTT of $1',
-			'key_'         => $item_key,
-			'status'       => ITEM_STATUS_ACTIVE,
-			'hostid'       => $templateid,
-			'applications' => [$applicationid_43],
-			'type'         => ITEM_TYPE_TRAPPER,
-			'value_type'   => ITEM_VALUE_TYPE_FLOAT,
-			'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_rdds_rtt'}
-		}));
-
-		if (opt('epp-servers'))
-		{
-			$item_key = 'rsm.rdds.43.upd[{$RSM.TLD}]';
-
-			really(create_item({
-				'name'         => 'RDDS43 update time of $1',
-				'key_'         => $item_key,
-				'status'       => ITEM_STATUS_ACTIVE,
-				'hostid'       => $templateid,
-				'applications' => [$applicationid_43],
-				'type'         => ITEM_TYPE_TRAPPER,
-				'value_type'   => ITEM_VALUE_TYPE_FLOAT,
-				'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_rdds_rtt'}
-			}));
-		}
-
-		$item_key = 'rsm.rdds.80.ip[{$RSM.TLD}]';
-
-		really(create_item({
-			'name'         => 'RDDS80 IP of $1',
-			'key_'         => $item_key,
-			'status'       => ITEM_STATUS_ACTIVE,
-			'hostid'       => $templateid,
-			'applications' => [$applicationid_80],
-			'type'         => ITEM_TYPE_TRAPPER,
-			'value_type'   => ITEM_VALUE_TYPE_STR
-		}));
-
-		$item_key = 'rsm.rdds.80.rtt[{$RSM.TLD}]';
-
-		really(create_item({
-			'name'         => 'RDDS80 RTT of $1',
-			'key_'         => $item_key,
-			'status'       => ITEM_STATUS_ACTIVE,
-			'hostid'       => $templateid,
-			'applications' => [$applicationid_80],
-			'type'         => ITEM_TYPE_TRAPPER,
-			'value_type'   => ITEM_VALUE_TYPE_FLOAT,
-			'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_rdds_rtt'}
-		}));
-
-		$item_key = 'rsm.rdds[{$RSM.TLD},"' . getopt('rdds43-servers') . '","' . getopt('rdds80-servers') . '"]';
-
-		# disable old items to keep the history, if value of rdds43-servers and/or rdds80-servers has changed
-		my @old_rdds_availability_items = keys(%{get_items_like($templateid, 'rsm.rdds[', true)});
-		disable_items(\@old_rdds_availability_items);
-
-		# create new item (or update/enable existing item)
-		really(create_item({
-			'name'         => 'RDDS availability',
-			'key_'         => $item_key,
-			'status'       => ITEM_STATUS_ACTIVE,
-			'hostid'       => $templateid,
-			'applications' => [get_application_id('RDDS', $templateid)],
-			'type'         => ITEM_TYPE_SIMPLE,
-			'value_type'   => ITEM_VALUE_TYPE_UINT64,
-			'delay'        => '{$RSM.RDDS.DELAY}',
-			'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_rdds_result'}
-		}));
-	}
-
-	# this item is added in any case
-	really(create_item({
-		'name'       => 'RDDS enabled/disabled',
-		'key_'       => 'rdds.enabled',
-		'status'     => ITEM_STATUS_ACTIVE,
-		'hostid'     => $templateid,
-		'params'     => '{$RSM.TLD.RDDS.ENABLED}',
-		'delay'      => 60,
-		'type'       => ITEM_TYPE_CALCULATED,
-		'value_type' => ITEM_VALUE_TYPE_UINT64
-	}));
 }
 
 sub create_items_epp($)
@@ -1566,7 +1451,8 @@ sub create_rdds_or_rdap_slv_items($$$;$)
 
 sub __is_rdap_standalone()
 {
-	return time() >= $cfg_global_macros->{'{$RSM.RDAP.STANDALONE}'};
+	return $cfg_global_macros->{'{$RSM.RDAP.STANDALONE}'} != 0 &&
+			time() >= $cfg_global_macros->{'{$RSM.RDAP.STANDALONE}'};
 }
 
 sub create_slv_items($$$)
@@ -1633,15 +1519,20 @@ sub create_slv_items($$$)
 	}
 }
 
-sub create_rsmhost()
+sub create_rsmhost($$$)
 {
-	my $tld_name = getopt('tld');
-	my $tld_type = getopt('type');
+	my $main_templateid = shift;
+	my $tld_name        = shift;
+	my $tld_type        = shift;
 
 	my $tld_hostid = really(create_host({
 		'groups'     => [
 			{'groupid' => TLDS_GROUPID},
 			{'groupid' => TLD_TYPE_GROUPIDS->{$tld_type}}
+		],
+		'templates' => [
+			{'templateid' => $main_templateid},
+			{'templateid' => CONFIG_HISTORY_TEMPLATEID}
 		],
 		'host'       => $tld_name,
 		'status'     => HOST_STATUS_MONITORED,
@@ -1911,7 +1802,8 @@ sub create_tld_hosts_on_probes($$$$)
 				{'templateid' => $main_templateid},
 				{'templateid' => DNS_TEMPLATEID},
 				{'templateid' => RDAP_TEMPLATEID},
-				{'templateid' => $probe_templateid}
+				{'templateid' => $probe_templateid},
+				{'templateid' => RDDS_TEMPLATEID}
 			],
 			'host'         => getopt('tld') . ' ' . $probe_name,
 			'status'       => $status,
@@ -1919,24 +1811,18 @@ sub create_tld_hosts_on_probes($$$$)
 			'interfaces'   => [DEFAULT_MAIN_INTERFACE]
 		}));
 
-		if (opt('rdap-base-url') && opt('rdap-test-domain'))
-		{
-			set_linked_items_enabled('rdap[', getopt('tld'), 1);
-		}
-		else
-		{
-			set_linked_items_enabled('rdap[', getopt('tld'), 0);
-		}
+		set_linked_items_status('rdap[', getopt('tld'), opt('rdap-base-url') && opt('rdap-test-domain'));
+		set_linked_items_status('rsm.rdds[', getopt('tld'), opt('rdds43-servers'));
 	}
 }
 
-sub set_linked_items_enabled($$$)
+sub set_linked_items_status($$$)
 {
 	my $like    = shift;
 	my $tld     = shift;
 	my $enabled = shift;
 
-	my $template = 'Template ' . $tld;
+	my $template = TEMPLATE_RSMHOST_CONFIG_PREFIX . $tld;
 	my $result = get_template($template, false, true);	# do not select macros, select hosts
 
 	pfail("$tld template \"$template\" does not exist") if (keys(%{$result}) == 0);
@@ -1949,14 +1835,7 @@ sub set_linked_items_enabled($$$)
 
 		my @items = keys(%{$result2});
 
-		if ($enabled)
-		{
-			enable_items(\@items);
-		}
-		else
-		{
-			disable_items(\@items);
-		}
+		$enabled ? enable_items(\@items) : disable_items(\@items);
 	}
 }
 
@@ -2068,6 +1947,12 @@ Other options
         --dns
                 Action with DNS
                 (default: no)
+        --dns-udp
+                Action with DNS UDP
+                (default: no; this option is mutually exclusive with --dns-tcp when used with --disable)
+        --dns-tcp
+                Action with DNS TCP
+                (default: no; this option is mutually exclusive with --dns-udp when used with --disable)
         --rdds
                 Action with RDDS
                 (default: no)

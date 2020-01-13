@@ -95,7 +95,7 @@ else {
 			new CSpan([
 				// ccTLD's group
 				(new CCheckBox('filter_cctld_group'))
-					->setAttribute('disabled', !$data['allowedGroups'][RSM_CC_TLD_GROUP])
+					->setEnabled($data['allowedGroups'][RSM_CC_TLD_GROUP])
 					->setChecked($data['filter_cctld_group']),
 				SPACE,
 				_(RSM_CC_TLD_GROUP)
@@ -104,7 +104,7 @@ else {
 			new CSpan([
 				// gTLD's group
 				(new CCheckBox('filter_gtld_group'))
-					->setAttribute('disabled', !$data['allowedGroups'][RSM_G_TLD_GROUP])
+					->setEnabled($data['allowedGroups'][RSM_G_TLD_GROUP])
 					->setChecked($data['filter_gtld_group']),
 				SPACE,
 				_(RSM_G_TLD_GROUP)
@@ -113,7 +113,7 @@ else {
 			new CSpan([
 				// other TLD's group
 				(new CCheckBox('filter_othertld_group'))
-					->setAttribute('disabled', !$data['allowedGroups'][RSM_OTHER_TLD_GROUP])
+					->setEnabled($data['allowedGroups'][RSM_OTHER_TLD_GROUP])
 					->setChecked($data['filter_othertld_group']),
 				SPACE,
 				_(RSM_OTHER_TLD_GROUP)
@@ -122,7 +122,7 @@ else {
 			new CSpan([
 				// test TLD's group
 				(new CCheckBox('filter_test_group'))
-					->setAttribute('disabled', !$data['allowedGroups'][RSM_TEST_GROUP])
+					->setEnabled($data['allowedGroups'][RSM_TEST_GROUP])
 					->setChecked($data['filter_test_group']),
 				SPACE,
 				_(RSM_TEST_GROUP)
@@ -175,46 +175,46 @@ $filter_fields[] = (new CFormList())
 if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
 	if (is_RDAP_standalone()) {
 		$header_columns = [
-			make_sorting_header(_('Registrar ID'), 'host', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('Registrar name'), 'info_1', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('Registrar family'), 'info_2', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('RDDS (24Hrs)'), 'rdds_lastvalue', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('RDAP (24Hrs)'), 'rdap_lastvalue', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('Server'), 'server', $data['sort'], $data['sortorder'])
+			make_sorting_header(_('Registrar ID'), 'host', $data['sort_field'], $data['sort_order']),
+			make_sorting_header(_('Registrar name'), 'info_1', $data['sort_field'], $data['sort_order']),
+			make_sorting_header(_('Registrar family'), 'info_2', $data['sort_field'], $data['sort_order']),
+			make_sorting_header(_('RDDS (24Hrs)'), 'rdds_lastvalue', $data['sort_field'], $data['sort_order']),
+			make_sorting_header(_('RDAP (24Hrs)'), 'rdap_lastvalue', $data['sort_field'], $data['sort_order']),
+			make_sorting_header(_('Server'), 'server', $data['sort_field'], $data['sort_order'])
 		];
 	}
 	else {
 		$header_columns = [
-			make_sorting_header(_('Registrar ID'), 'host', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('Registrar name'), 'info_1', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('Registrar family'), 'info_2', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('RDDS (24Hrs)'), 'rdds_lastvalue', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('Server'), 'server', $data['sort'], $data['sortorder'])
+			make_sorting_header(_('Registrar ID'), 'host', $data['sort_field'], $data['sort_order']),
+			make_sorting_header(_('Registrar name'), 'info_1', $data['sort_field'], $data['sort_order']),
+			make_sorting_header(_('Registrar family'), 'info_2', $data['sort_field'], $data['sort_order']),
+			make_sorting_header(_('RDDS (24Hrs)'), 'rdds_lastvalue', $data['sort_field'], $data['sort_order']),
+			make_sorting_header(_('Server'), 'server', $data['sort_field'], $data['sort_order'])
 		];
 	}
 }
 else {
 	if (is_RDAP_standalone()) {
 		$header_columns = [
-			make_sorting_header(_('TLD'), 'name', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('Type'), 'type', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('DNS (4Hrs)'), 'dns_lastvalue', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('DNSSEC (4Hrs)'), 'dnssec_lastvalue', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('RDDS (24Hrs)'), 'rdds_lastvalue', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('RDAP (24Hrs)'), 'rdap_lastvalue', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('EPP (24Hrs)'), 'epp_lastvalue', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('Server'), 'server', $data['sort'], $data['sortorder'])
+			make_sorting_header(_('TLD'), 'host', $data['sort_field'], $data['sort_order']),
+			make_sorting_header(_('Type'), 'type', $data['sort_field'], $data['sort_order']),
+			make_sorting_header(_('DNS (4Hrs)'), 'dns_lastvalue', $data['sort_field'], $data['sort_order']),
+			make_sorting_header(_('DNSSEC (4Hrs)'), 'dnssec_lastvalue', $data['sort_field'], $data['sort_order']),
+			make_sorting_header(_('RDDS (24Hrs)'), 'rdds_lastvalue', $data['sort_field'], $data['sort_order']),
+			make_sorting_header(_('RDAP (24Hrs)'), 'rdap_lastvalue', $data['sort_field'], $data['sort_order']),
+			make_sorting_header(_('EPP (24Hrs)'), 'epp_lastvalue', $data['sort_field'], $data['sort_order']),
+			make_sorting_header(_('Server'), 'server', $data['sort_field'], $data['sort_order'])
 		];
 	}
 	else {
 		$header_columns = [
-			make_sorting_header(_('TLD'), 'name', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('Type'), 'type', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('DNS (4Hrs)'), 'dns_lastvalue', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('DNSSEC (4Hrs)'), 'dnssec_lastvalue', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('RDDS (24Hrs)'), 'rdds_lastvalue', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('EPP (24Hrs)'), 'epp_lastvalue', $data['sort'], $data['sortorder']),
-			make_sorting_header(_('Server'), 'server', $data['sort'], $data['sortorder'])
+			make_sorting_header(_('TLD'), 'host', $data['sort_field'], $data['sort_order']),
+			make_sorting_header(_('Type'), 'type', $data['sort_field'], $data['sort_order']),
+			make_sorting_header(_('DNS (4Hrs)'), 'dns_lastvalue', $data['sort_field'], $data['sort_order']),
+			make_sorting_header(_('DNSSEC (4Hrs)'), 'dnssec_lastvalue', $data['sort_field'], $data['sort_order']),
+			make_sorting_header(_('RDDS (24Hrs)'), 'rdds_lastvalue', $data['sort_field'], $data['sort_order']),
+			make_sorting_header(_('EPP (24Hrs)'), 'epp_lastvalue', $data['sort_field'], $data['sort_order']),
+			make_sorting_header(_('Server'), 'server', $data['sort_field'], $data['sort_order'])
 		];
 	}
 }
@@ -301,7 +301,7 @@ if ($data['tld']) {
 		elseif ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY) {
 			$row[] = (new CDiv())
 				->addClass('service-icon status_icon_extra iconrollingweekdisabled disabled-service')
-				->setHint(_('Incorrect TLD configuration.'), '', 'on');
+				->setHint(_('Incorrect TLD configuration.'), '', false);
 		}
 
 		// DNSSEC
@@ -360,7 +360,7 @@ if ($data['tld']) {
 		elseif ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY) {
 			$row[] = (new CDiv(null))
 				->addClass('service-icon status_icon_extra iconrollingweekdisabled disabled-service')
-				->setHint('DNSSEC is disabled.', '', 'on');
+				->setHint('DNSSEC is disabled.', '', false);
 		}
 
 		// RDDS
@@ -436,7 +436,7 @@ if ($data['tld']) {
 		else {
 			$row[] = (new CDiv(null))
 				->addClass('service-icon status_icon_extra iconrollingweekdisabled disabled-service')
-				->setHint('RDDS is disabled.', '', 'on');
+				->setHint('RDDS is disabled.', '', false);
 		}
 
 		// RDAP
@@ -494,7 +494,7 @@ if ($data['tld']) {
 		elseif (is_RDAP_standalone()) {
 			$row[] = (new CDiv())
 				->addClass('service-icon status_icon_extra iconrollingweekdisabled disabled-service')
-				->setHint('RDAP is disabled.', '', 'on');
+				->setHint('RDAP is disabled.', '', false);
 		}
 
 		// EPP
@@ -556,7 +556,7 @@ if ($data['tld']) {
 		elseif ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY) {
 			$row[] = (new CDiv(null))
 				->addClass('service-icon status_icon_extra iconrollingweekdisabled disabled-service')
-				->setHint('EPP is disabled.', '', 'on');
+				->setHint('EPP is disabled.', '', false);
 		}
 
 		$row[] = new CLink($tld['server'],(new CUrl($tld['url'].'zabbix.php'))
