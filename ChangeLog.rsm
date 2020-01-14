@@ -1,3 +1,9 @@
+Changes for rsm1.2.15
+
+Bug fixes:
+....I..... [649] fixed incorrect handling of zero RTT during RDDS43 test (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm1.2.14
 
 Bug fixes:
