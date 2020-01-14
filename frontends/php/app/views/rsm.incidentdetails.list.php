@@ -49,7 +49,7 @@ foreach ($data['tests'] as $test) {
 
 	if ($data['type'] == RSM_DNS || $data['type'] == RSM_DNSSEC) {
 		$details_link = new CLink(
-			_('aggregate details'),
+			_('Details'),
 			(new CUrl('zabbix.php'))
 				->setArgument('action', 'rsm.aggregatedetails')
 				->setArgument('slvItemId', $data['slvItemId'])
@@ -60,7 +60,7 @@ foreach ($data['tests'] as $test) {
 	}
 	else {
 		$details_link = new CLink(
-			_('details'),
+			_('Details'),
 			(new CUrl('zabbix.php'))
 				->setArgument('action', 'rsm.particulartests')
 				->setArgument('slvItemId', $data['slvItemId'])
@@ -146,7 +146,7 @@ $filter_url = (new CUrl('zabbix.php'))
 		->setProfile($data['profileIdx'])
 		->setActiveTab($data['active_tab'])
 		->addTimeSelector($data['from'], $data['to'])
-		->addFilterTab(_('Filter'), [(new CFormList())->addRow($object_label,
+		->addFilterTab(_('Filter'), [(new CFormList())->addRow('',
 			(new CRadioButtonList('filter_failing_tests', (int) $data['filter_failing_tests']))
 				->addValue(_('Only failing tests'), 1)
 				->addValue(_('Show all'), 0)

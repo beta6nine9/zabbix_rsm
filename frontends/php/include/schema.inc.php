@@ -29,7 +29,7 @@ return [
 			'passwd' => [
 				'null' => false,
 				'type' => DB::FIELD_TYPE_CHAR,
-				'length' => 32,
+				'length' => 60,
 				'default' => '',
 			],
 			'url' => [
@@ -955,7 +955,7 @@ return [
 			'key_' => [
 				'null' => false,
 				'type' => DB::FIELD_TYPE_CHAR,
-				'length' => 512,
+				'length' => 2048,
 				'default' => '',
 			],
 			'snmp_community' => [
@@ -1375,7 +1375,7 @@ return [
 			'key_' => [
 				'null' => false,
 				'type' => DB::FIELD_TYPE_CHAR,
-				'length' => 255,
+				'length' => 2048,
 				'default' => '',
 			],
 			'delay' => [
@@ -6158,7 +6158,7 @@ return [
 			'key_' => [
 				'null' => false,
 				'type' => DB::FIELD_TYPE_CHAR,
-				'length' => 255,
+				'length' => 2048,
 				'default' => '',
 			],
 			'lastcheck' => [

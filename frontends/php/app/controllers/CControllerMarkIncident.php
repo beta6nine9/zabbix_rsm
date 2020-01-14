@@ -107,7 +107,7 @@ Class CControllerMarkIncident extends CController {
 				}
 			}
 			else {
-				$eventids = array($this->event['eventid']);
+				$eventids = [$this->event['eventid']];
 			}
 
 			DBstart();

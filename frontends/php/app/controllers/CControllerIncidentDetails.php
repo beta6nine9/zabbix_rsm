@@ -67,29 +67,21 @@ class CControllerIncidentDetails extends CController {
 
 		if ($this->hasInput('filter_set')) {
 			$data['filter_failing_tests'] = $this->getInput('filter_failing_tests', 0);
-			$data['from'] = $this->getInput('from', ZBX_PERIOD_DEFAULT_FROM);
-			$data['to'] = $this->getInput('to', ZBX_PERIOD_DEFAULT_TO);
-
-			CProfile::update('web.rsm.incidentdetails.filter_from', $data['from'], PROFILE_TYPE_STR);
-			CProfile::update('web.rsm.incidentdetails.filter_to', $data['to'], PROFILE_TYPE_STR);
+			updateTimeSelectorPeriod($data);
 			CProfile::update('web.rsm.incidentdetails.filter_failing_tests', $data['filter_failing_tests'], PROFILE_TYPE_INT);
 		}
 		elseif ($this->hasInput('filter_rst')) {
-			$data = [
-				'filter_failing_tests' => 0,
-				'from' => ZBX_PERIOD_DEFAULT_FROM,
-				'to' => ZBX_PERIOD_DEFAULT_TO
-			];
-
-			CProfile::delete('web.rsm.incidentdetails.filter_from');
-			CProfile::delete('web.rsm.incidentdetails.filter_to');
+			$data['filter_failing_tests'] = 0;
+			$data['from'] = ZBX_PERIOD_DEFAULT_FROM;
+			$data['to'] = ZBX_PERIOD_DEFAULT_TO;
+			updateTimeSelectorPeriod($data);
 			CProfile::delete('web.rsm.incidentdetails.filter_failing_tests');
 		}
 		else {
-			$data['from'] = CProfile::get('web.rsm.incidentdetails.filter_from');
-			$data['to'] = CProfile::get('web.rsm.incidentdetails.filter_to', date('YmdHis', $this->server_time));
 			$data['filter_failing_tests'] = CProfile::get('web.rsm.incidentdetails.filter_failing_tests');
 		}
+
+		$data = getTimeSelectorPeriod($data);
 	}
 
 	protected function getTLD(array &$data) {
@@ -294,19 +286,14 @@ class CControllerIncidentDetails extends CController {
 			1
 		));
 
+		$to_time = $this->hasInput('filter_set') ? $data['to_ts'] : $this->server_time;
+
 		if ($end_event) {
-			$end_event_to_time = $end_event['clock'] - ($end_event['clock'] % $delay_time) + (DISPLAY_CYCLES_AFTER_RECOVERY * $delay_time);
-			if ($this->hasInput('filter_set')) {
-				$to_time = ($end_event_to_time >= zbxDateToTime($data['to']))
-					? zbxDateToTime($data['to'])
-					: $end_event_to_time;
+			$to_time = $end_event['clock'] - ($end_event['clock'] % $delay_time) + (DISPLAY_CYCLES_AFTER_RECOVERY * $delay_time);
+
+			if ($this->hasInput('filter_set') && $to_time >= $data['to_ts']) {
+				$to_time = $data['to_ts'];
 			}
-			else {
-				$to_time = $end_event_to_time;
-			}
-		}
-		else {
-			$to_time = $this->hasInput('filter_set') ? zbxDateToTime($data['to']) : $this->server_time;
 		}
 
 		// result generation
@@ -380,24 +367,18 @@ class CControllerIncidentDetails extends CController {
 		$data = [
 			'title' => _('Incidents details'),
 			'profileIdx' => 'web.rsm.incidentsdetails.filter',
+			'profileIdx2' => 0,
+			'from' => $this->getInput('from', ZBX_PERIOD_DEFAULT_FROM),
+			'to' => $this->getInput('to', ZBX_PERIOD_DEFAULT_TO),
 			'active_tab' => CProfile::get('web.rsm.incidentsdetails.filter.active', 1),
-			'from' => '',
-			'to' => '',
 			'filter_failing_tests' => 0,
 			'rsm_monitoring_mode' => get_rsm_monitoring_type(),
 			'tests' => [],
 			'sid' => CWebUser::getSessionCookie()
 		];
 
+		$this->getInputs($data, ['from', 'to']);
 		$this->updateProfile($data);
-		$timeline = getTimeSelectorPeriod([
-			'profileIdx' => $data['profileIdx'],
-			'profileIdx2' => 0
-		]);
-		$data += [
-			'from_ts' => $timeline['from_ts'],
-			'to_ts' => $timeline['to_ts']
-		];
 		$this->getTLD($data);
 		$this->getSLV($data);
 		$this->getMainEvent($data);
@@ -425,7 +406,5 @@ class CControllerIncidentDetails extends CController {
 		$response = new CControllerResponseData($data);
 		$response->setTitle($data['title']);
 		$this->setResponse($response);
-
-
 	}
 }

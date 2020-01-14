@@ -67,9 +67,6 @@ class DB {
 				case ZBX_DB_ORACLE:
 					self::$dbBackend = new OracleDbBackend();
 					break;
-				case ZBX_DB_DB2:
-					self::$dbBackend = new Db2DbBackend();
-					break;
 			}
 		}
 
@@ -271,7 +268,7 @@ class DB {
 		$schema = self::getSchema($table_name);
 
 		if ($schema['fields'][$field_name]['type'] == self::FIELD_TYPE_TEXT) {
-			return ($DB['TYPE'] == ZBX_DB_DB2 || $DB['TYPE'] == ZBX_DB_ORACLE) ? 2048 : 65535;
+			return ($DB['TYPE'] == ZBX_DB_ORACLE) ? 2048 : 65535;
 		}
 
 		return $schema['fields'][$field_name]['length'];
@@ -383,7 +380,7 @@ class DB {
 						$values[$field] = zbx_dbstr($values[$field]);
 						break;
 					case self::FIELD_TYPE_TEXT:
-						if ($DB['TYPE'] == ZBX_DB_DB2 || $DB['TYPE'] == ZBX_DB_ORACLE) {
+						if ($DB['TYPE'] == ZBX_DB_ORACLE) {
 							$length = mb_strlen($values[$field]);
 
 							if ($length > 2048) {

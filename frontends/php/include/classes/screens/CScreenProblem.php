@@ -789,7 +789,9 @@ class CScreenProblem extends CScreenBase {
 		$data = self::getData($this->data['filter'], $this->config, true);
 		$data = self::sortData($data, $this->config, $this->data['sort'], $this->data['sortorder']);
 
-		$paging = getPagingLine($data['problems'], ZBX_SORT_UP, clone $url);
+		if ($this->data['action'] === 'problem.view') {
+			$paging = getPagingLine($data['problems'], ZBX_SORT_UP, clone $url);
+		}
 
 		$data = self::makeData($data, $this->data['filter'], true);
 
@@ -1096,11 +1098,11 @@ class CScreenProblem extends CScreenBase {
 					$description[] = BR();
 
 					if ($trigger['recovery_mode'] == ZBX_RECOVERY_MODE_RECOVERY_EXPRESSION) {
-						$description[] = [_('Problem'), ': ', $trigger['expression_html'], BR()];
-						$description[] = [_('Recovery'), ': ', $trigger['recovery_expression_html']];
+						$description[] = [_('Problem'), ': ', (new CDiv($trigger['expression_html']))->addClass(ZBX_STYLE_WORDWRAP), BR()];
+						$description[] = [_('Recovery'), ': ', (new CDiv($trigger['recovery_expression_html']))->addClass(ZBX_STYLE_WORDWRAP)];
 					}
 					else {
-						$description[] = $trigger['expression_html'];
+						$description[] = (new CDiv($trigger['expression_html']))->addClass(ZBX_STYLE_WORDWRAP);
 					}
 				}
 
@@ -1167,6 +1169,12 @@ class CScreenProblem extends CScreenBase {
 
 			return $this->getOutput($form->addItem([$table, $paging, $footer]), true, $this->data);
 		}
+
+		/*
+		 * Search limit performs +1 selection to know if limit was exceeded, this will assure that csv has
+		 * "search_limit" records at most.
+		 */
+		array_splice($data['problems'], $this->config['search_limit']);
 
 		$csv = [];
 

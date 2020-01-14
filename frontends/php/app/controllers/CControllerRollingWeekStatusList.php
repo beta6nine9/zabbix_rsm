@@ -29,7 +29,7 @@ class CControllerRollingWeekStatusList extends CController {
 	}
 
 	protected function checkInput() {
-		$sort_fields = ['name', 'type', 'server', 'dns_lastvalue', 'dnssec_lastvalue', 'rdds_lastvalue',
+		$sort_fields = ['type', 'server', 'dns_lastvalue', 'dnssec_lastvalue', 'rdds_lastvalue',
 			'rdap_lastvalue', 'epp_lastvalue', 'info_1', 'info_2', 'host'
 		];
 
@@ -77,7 +77,7 @@ class CControllerRollingWeekStatusList extends CController {
 		DBStart();
 
 		if ($this->hasInput('filter_set')) {
-			CProfile::update('web.rsm.rollingweekstatus.sort', $this->getInput('sort', 'name'), PROFILE_TYPE_STR);
+			CProfile::update('web.rsm.rollingweekstatus.sort', $this->getInput('sort', 'host'), PROFILE_TYPE_STR);
 			CProfile::update('web.rsm.rollingweekstatus.sortorder', $this->getInput('sortorder', ZBX_SORT_UP), PROFILE_TYPE_STR);
 			CProfile::update('web.rsm.rollingweekstatus.filter_search', $this->getInput('filter_search', ''), PROFILE_TYPE_STR);
 			CProfile::update('web.rsm.rollingweekstatus.filter_dns', $this->getInput('filter_dns', 0), PROFILE_TYPE_INT);
@@ -123,7 +123,7 @@ class CControllerRollingWeekStatusList extends CController {
 
 	protected function readValues(array &$data) {
 		$data += [
-			'sort_field' =>  $this->getInput('sort', 'name'),
+			'sort_field' =>  $this->getInput('sort', 'host'),
 			'sort_order' =>  $this->getInput('sortorder', ZBX_SORT_UP),
 			'filter_search' => CProfile::get('web.rsm.rollingweekstatus.filter_search'),
 			'filter_dns' => CProfile::get('web.rsm.rollingweekstatus.filter_dns'),
@@ -143,8 +143,6 @@ class CControllerRollingWeekStatusList extends CController {
 			'filter_registrar_name' => CProfile::get('web.rsm.rollingweekstatus.filter_registrar_name'),
 			'filter_registrar_family' => CProfile::get('web.rsm.rollingweekstatus.filter_registrar_family'),
 			'active_tab' => CProfile::get('web.rsm.rollingweekstatus.filter.active', 1),
-			'sort' => CProfile::get('web.rsm.rollingweekstatus.sort', 'name'),
-			'sortorder' => CProfile::get('web.rsm.rollingweekstatus.sortorder', 'ZBX_SORT_UP'),
 			'sid' => CWebUser::getSessionCookie(),
 			'paging' => null
 		];
@@ -440,7 +438,7 @@ class CControllerRollingWeekStatusList extends CController {
 			}
 		}
 
-		order_result($data['tld'], 'name');
+		order_result($data['tld'], $data['sort_field'], $data['sort_order']);
 	}
 
 	protected function selectTLDAttributes(array &$data) {
@@ -534,14 +532,16 @@ class CControllerRollingWeekStatusList extends CController {
 				}
 			}
 
-			$avail_items = API::Item()->get([
-				'output' => ['itemid', 'hostid', 'key_'],
-				'hostids' => array_keys($hosts),
-				'filter' => [
-					'key_' => $avail_items
-				],
-				'preservekeys' => true
-			]);
+			if ($avail_items) {
+				$avail_items = API::Item()->get([
+					'output' => ['itemid', 'hostid', 'key_'],
+					'hostids' => array_keys($hosts),
+					'filter' => [
+						'key_' => $avail_items
+					],
+					'preservekeys' => true
+				]);
+			}
 
 			if ($items) {
 				foreach ($items as $item) {
@@ -574,7 +574,7 @@ class CControllerRollingWeekStatusList extends CController {
 					if (array_key_exists($hostid_key, $data['tld'])) {
 						$data['tld'][$hostid_key][$itemkey_type[$item['key_']]] = [
 							'itemid' => $item['itemid'],
-							'lastvalue' => sprintf('%.3f', $item['lastvalue']),
+							'lastvalue' => is_null($item['lastvalue']) ? null : sprintf('%.3f', $item['lastvalue']),
 							'trigger' => false
 						];
 					}
@@ -600,8 +600,9 @@ class CControllerRollingWeekStatusList extends CController {
 					// disabled services check
 					$templateName = [];
 					foreach ($hosts as $hostid => $host) {
-						$templateName[$hostid] = 'Template '.$host;
-						$hostIdByTemplateName['Template '.$host] = $hostid;
+						$name = sprintf(TEMPLATE_NAME_TLD_CONFIG, $host);
+						$templateName[$hostid] = $name;
+						$hostIdByTemplateName[$name] = $hostid;
 					}
 
 					$templates = API::Template()->get([
@@ -734,7 +735,7 @@ class CControllerRollingWeekStatusList extends CController {
 						$hostid = $DB['SERVERS'][$key]['NR'].$items[$tritem]['hostid'];
 
 						if (array_key_exists($hostid, $data['tld'])) {
-							$type = $avail_type[$items[$trItem]['key_']];
+							$type = $avail_type[$items[$tritem]['key_']];
 							$data['tld'][$hostid][$type]['incident'] = $trigger['triggerid'];
 							$data['tld'][$hostid][$type]['trigger'] = (bool) $trigger['triggerid'];
 						}

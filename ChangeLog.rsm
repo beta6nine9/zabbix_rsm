@@ -4,6 +4,18 @@ New features:
 ..F.I..PS. [554] upgraded Zabbix to 4.X.Y (asitals, dimir, gcalenko, kalimulin, miks)
 
 --------------------------------------------------------------------------------
+Changes for rsm2.0.0rc2
+
+Bug fixes:
+....I..... [sub-506] fixed --list-services option in registrar.pl (dimir)
+..F....... [648] made info bubbles visible on mouse over in TLD rolling week status page (miks)
+..F....... [640] fixed tab indexing in incidents page (miks)
+..F....... [638] added 'server' column in rolling week status list (miks)
+..F....... [634] made rolling week status table sortable by name column (miks)
+..F....... [635] fixed syntax error (miks)
+....I..... [637] fixed call to undefined function in registrar.pl (asitals)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.0.0rc1
 
 New features:

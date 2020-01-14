@@ -81,13 +81,13 @@ class CControllerParticularProxy extends CController {
 		);
 
 		// Get TLD.
-		$tld = API::Host()->get(array(
+		$tld = API::Host()->get([
 			'output' => ['hostid', 'host', 'name'],
 			'tlds' => true,
 			'filter' => [
 				'host' => $data['host']
 			]
-		));
+		]);
 
 		// Get slv item.
 		$slv_items = API::Item()->get([
@@ -96,12 +96,12 @@ class CControllerParticularProxy extends CController {
 		]);
 
 		// Get probe.
-		$probe = API::Host()->get(array(
+		$probe = API::Host()->get([
 			'output' => ['hostid', 'host', 'name'],
 			'filter' => [
 				'host' => $data['probe']
 			]
-		));
+		]);
 
 		// Get host with calculated items.
 		$rsm = API::Host()->get([

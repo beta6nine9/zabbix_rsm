@@ -47,10 +47,11 @@ class CMapHelper {
 			],
 			'selectSelements' => ['selementid', 'elements', 'elementtype', 'iconid_off', 'iconid_on', 'label',
 				'label_location', 'x', 'y', 'iconid_disabled', 'iconid_maintenance', 'elementsubtype', 'areatype',
-				'width', 'height', 'viewtype', 'use_iconmap', 'application', 'permission'
+				'width', 'height', 'viewtype', 'use_iconmap', 'application', 'urls', 'permission'
 			],
 			'selectLinks' => ['linkid', 'selementid1', 'selementid2', 'drawtype', 'color', 'label', 'linktriggers',
-				'permission'],
+				'permission'
+			],
 			'sysmapids' => $sysmapids,
 			'preservekeys' => true
 		]);
@@ -252,7 +253,7 @@ class CMapHelper {
 		$labels = getMapLabels($sysmap, $map_info);
 		$highlights = getMapHighligts($sysmap, $map_info);
 		$actions = getActionsBySysmap($sysmap, $options);
-		$linktrigger_info = getMapLinktriggerInfo($sysmap, $options);
+		$linktrigger_info = getMapLinkTriggerInfo($sysmap, $options);
 
 		$problems_total = 0;
 		$status_problems = [];

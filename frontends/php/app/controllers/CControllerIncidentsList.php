@@ -58,23 +58,9 @@ class CControllerIncidentsList extends CController {
 	}
 
 	protected function readValues(array &$data) {
-		$data += [
-			'type' => $this->getInput('type', get_cookie('ui-tabs-1', 0)),
-			'host' => $this->getInput('host', false),
-			'tld' => null,
-			'url' => ''
-		];
-
 		if ($this->hasInput('filter_set')) {
-			$data += [
-				'filter_search' => $this->getInput('filter_search', ''),
-				'from' => $this->getInput('from', ZBX_PERIOD_DEFAULT_FROM),
-				'to' => $this->getInput('to', ZBX_PERIOD_DEFAULT_TO)
-			];
-
-			CProfile::update('web.rsm.incidents.filter_search', $data['filter_search'], PROFILE_TYPE_STR);
-			CProfile::update('web.rsm.incidents.filter_from', $data['from'], PROFILE_TYPE_STR);
-			CProfile::update('web.rsm.incidents.filter_to', $data['to'], PROFILE_TYPE_STR);
+			$data['filter_search'] = $this->getInput('filter_search', '');
+			CProfile::update('web.rsm.incidents.filter.search', $data['filter_search'], PROFILE_TYPE_STR);
 		}
 		elseif ($this->hasInput('filter_rst')) {
 			$data += [
@@ -83,25 +69,18 @@ class CControllerIncidentsList extends CController {
 				'to' => ZBX_PERIOD_DEFAULT_TO
 			];
 
-			CProfile::delete('web.rsm.incidents.filter_search');
-			CProfile::delete('web.rsm.incidents.filter_from');
-			CProfile::delete('web.rsm.incidents.filter_to');
+			CProfile::delete('web.rsm.incidents.filter.search');
+			CProfile::delete('web.rsm.incidents.filter.from');
+			CProfile::delete('web.rsm.incidents.filter.to');
+			CProfile::delete('web.rsm.incidents.filter.active');
 		}
 		else {
 			$data += [
-				'filter_search' => CProfile::get('web.rsm.incidents.filter_search', ''),
-				'from' => CProfile::get('web.rsm.incidents.filter.from', ZBX_PERIOD_DEFAULT_FROM),
-				'to' => CProfile::get('web.rsm.incidents.filter.to', ZBX_PERIOD_DEFAULT_TO)
+				'filter_search' => CProfile::get('web.rsm.incidents.filter.search', ''),
 			];
 		}
 
-		$data += [
-			'rdap_standalone_start_ts' => 0,
-			'rsm_monitoring_mode' => get_rsm_monitoring_type(),
-			'profileIdx' => 'web.rsm.incidents.filter',
-			'active_tab' => CProfile::get('web.rsm.incidents.filter.active', 1),
-			'sid' => CWebUser::getSessionCookie()
-		];
+		$data = getTimeSelectorPeriod($data);
 	}
 
 	protected function fetchItems(array &$data) {
@@ -965,19 +944,24 @@ class CControllerIncidentsList extends CController {
 
 		$data = [
 			'title' => _('Incidents'),
+			'type' => $this->getInput('type', get_cookie('ui-tabs-1', 0)),
+			'host' => $this->getInput('host', false),
+			'tld' => null,
+			'url' => '',
+			'rdap_standalone_start_ts' => 0,
+			'rsm_monitoring_mode' => get_rsm_monitoring_type(),
+			'profileIdx' => 'web.rsm.incidents.filter',
+			'profileIdx2' => 0,
+			'from' => $this->hasInput('from') ? $this->getInput('from') : null,
+			'to' => $this->hasInput('to') ? $this->getInput('to') : null,
+			'active_tab' => CProfile::get('web.rsm.incidents.filter.active', 1),
+			'sid' => CWebUser::getSessionCookie()
 		];
 
 		$this->readValues($data);
 
-		$timeline = getTimeSelectorPeriod([
-			'profileIdx' => $data['profileIdx'],
-			'profileIdx2' => 0
-		]);
-
-		$data['from_ts'] = $timeline['from_ts'];
-		$data['to_ts'] = $timeline['to_ts'];
-		$this->filter_time_from = $timeline['from_ts'];
-		$this->filter_time_till = $timeline['to_ts'];
+		$this->filter_time_from = $data['from_ts'];
+		$this->filter_time_till = $data['to_ts'];
 
 		// Get data about incidents.
 		if ($data['host'] || $data['filter_search']) {
@@ -989,12 +973,14 @@ class CControllerIncidentsList extends CController {
 					continue;
 				}
 
+				if (!$this->fetchData($data)) {
+					continue;
+				}
+
 				// Update profile.
-				if ($this->fetchData($data)) {
-					if ($data['host'] && $data['filter_search'] != $data['tld']['host']) {
-						$data['filter_search'] = $data['tld']['host'];
-						CProfile::update('web.rsm.incidents.filter_search', $data['tld']['host'], PROFILE_TYPE_STR);
-					}
+				if ($data['host'] && $data['filter_search'] != $data['tld']['host']) {
+					$data['filter_search'] = $data['tld']['host'];
+					CProfile::update('web.rsm.incidents.filter.search', $data['tld']['host'], PROFILE_TYPE_STR);
 				}
 
 				$data['url'] = $server['URL'];

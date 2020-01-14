@@ -88,9 +88,8 @@ class CControllerExportSlaReport extends CController {
 
 			$report_row = reset($report_row);
 		}
-		elseif (file_exists('./include/classes/services/CSlaReport.php')) {
-			include './include/classes/services/CSlaReport.php';
-
+		elseif (class_exists('CSlaReport', true)) {
+			// Class CSlaReport file path: ./include/classes/services/CSlaReport.php
 			$report_row = CSlaReport::generate($data['server_nr'], [$data['tld']['host']], $data['filter_year'],
 				$data['filter_month']
 			);
