@@ -13,7 +13,6 @@ use warnings;
 use RSM;
 use RSMSLV;
 use TLD_constants qw(:ec :api);
-use Data::Dumper;
 
 my $cfg_keys_in_pattern = 'rsm.dns.rtt[';
 my $cfg_key_out = 'rsm.slv.dnssec.avail';

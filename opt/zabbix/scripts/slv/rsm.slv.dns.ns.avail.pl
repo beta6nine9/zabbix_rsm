@@ -9,7 +9,6 @@ use warnings;
 use RSM;
 use RSMSLV;
 use TLD_constants qw(:groups :api);
-use Data::Dumper;
 
 parse_slv_opts();
 fail_if_running();

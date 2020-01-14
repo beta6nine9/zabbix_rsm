@@ -13,7 +13,6 @@ use warnings;
 use RSM;
 use RSMSLV;
 use TLD_constants qw(:api);
-use Data::Dumper;
 
 my $cfg_keys_in = ['rsm.dns.nssok'];
 my $cfg_key_out = 'rsm.slv.dns.avail';
@@ -29,7 +28,6 @@ db_connect();
 slv_exit(SUCCESS) if (get_monitoring_target() ne MONITORING_TARGET_REGISTRY);
 
 # we don't know the rollweek bounds yet so we assume it ends at least few minutes back
-# we use nssok values, but take the delay value from the udp macro
 my $delay = get_dns_udp_delay(getopt('now') // time() - AVAIL_SHIFT_BACK);
 
 my (undef, undef, $max_clock) = get_cycle_bounds($delay, getopt('now'));
