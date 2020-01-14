@@ -301,24 +301,18 @@ static void	rsm_log(FILE *log_fd, int level, const char *text)
 			text);
 }
 
-static int	pack_values(size_t v1, size_t v2, int v3, int v4, char** nsid, char *buf, size_t buf_size)
+static int	pack_values(size_t v1, size_t v2, int v3, int v4, char **nsid, char *buf, size_t buf_size)
 {
-	if (NULL == *nsid)
-	{
-		*nsid = zbx_strdup(NULL, "");
-	}
-
-	return zbx_snprintf(buf, buf_size, PACK_FORMAT, v1, v2, v3, v4, *nsid);
+	return zbx_snprintf(buf, buf_size, PACK_FORMAT, v1, v2, v3, v4, (NULL == *nsid) ? "" : *nsid);
 }
 
-static int	unpack_values(size_t *v1, size_t *v2, int *v3, int *v4, char (*nsid)[NSID_MAX_LENGTH * 2 + 1],
-		char *buf, FILE *log_fd)
+static int	unpack_values(size_t *v1, size_t *v2, int *v3, int *v4, char *nsid, char *buf, FILE *log_fd)
 {
-	int rv = sscanf(buf, PACK_FORMAT, v1, v2, v3, v4, *nsid);
+	int rv = sscanf(buf, PACK_FORMAT, v1, v2, v3, v4, nsid);
 
 	if (PACK_NUM_VARS == rv + 1)
 	{
-		(*nsid)[0] = '\0';
+		nsid[0] = '\0';
 	}
 	else if (PACK_NUM_VARS != rv)
 	{
@@ -1715,9 +1709,9 @@ static int	zbx_get_ns_ip_values(ldns_resolver *res, const char *ns, const char *
 	ret = SUCCEED;
 out:
 	if (NULL != upd)
-		rsm_infof(log_fd, "RSM DNS \"%s\" (%s) RTT:%d UPD:%d", ns, ip, *rtt, *upd);
+		rsm_infof(log_fd, "RSM DNS \"%s\" (%s) RTT:%d UPD:%d NSID:%s", ns, ip, *rtt, *upd, *nsid);
 	else
-		rsm_infof(log_fd, "RSM DNS \"%s\" (%s) RTT:%d", ns, ip, *rtt);
+		rsm_infof(log_fd, "RSM DNS \"%s\" (%s) RTT:%d NSID:%s", ns, ip, *rtt, *nsid);
 
 	if (NULL != nsset)
 		ldns_rr_list_deep_free(nsset);
@@ -2610,7 +2604,7 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 				int	rtt, upd;
 				char	nsid[NSID_MAX_LENGTH * 2 + 1];	/* hex representation + terminating null char */
 
-				unpack_values(&i, &j, &rtt, &upd, &nsid, buf, log_fd);
+				unpack_values(&i, &j, &rtt, &upd, nsid, buf, log_fd);
 
 				nss[i].ips[j].rtt = rtt;
 				nss[i].ips[j].upd = upd;

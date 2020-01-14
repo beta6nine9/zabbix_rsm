@@ -188,7 +188,7 @@ int	main(int argc, char *argv[])
 	pack_values(0, 0, rtt, 0, &nsid, pack_buf, sizeof(pack_buf));
 
 	if (SUCCEED != unpack_values(&size_one_unpacked, &size_two_unpacked, &rtt_unpacked, &upd_unpacked,
-			&nsid_unpacked, pack_buf, stderr))
+			nsid_unpacked, pack_buf, stderr))
 	{
 		goto out;
 	}
