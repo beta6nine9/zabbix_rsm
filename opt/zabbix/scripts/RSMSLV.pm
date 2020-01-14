@@ -11,7 +11,7 @@ use Pod::Usage;
 use Exporter qw(import);
 use Zabbix;
 use Alerts;
-use TLD_constants qw(:api :items :ec :groups :config);
+use TLD_constants qw(:api :items :ec :groups :config :templates);
 use File::Pid;
 use POSIX qw(floor);
 use Sys::Syslog;
@@ -1302,7 +1302,7 @@ sub tld_interface_enabled($$$)
 
 	# try the Template macro
 
-	my $host = "Template $tld";
+	my $host = TEMPLATE_RSMHOST_CONFIG_PREFIX . $tld;
 
 	my $macro;
 

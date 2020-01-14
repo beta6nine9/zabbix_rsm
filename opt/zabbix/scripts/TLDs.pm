@@ -15,8 +15,10 @@ use constant RSMHOST_DNS_NS_LOG_ACTION_DISABLE => 2;
 
 our @EXPORT = qw(zbx_connect check_api_error get_proxies_list
 		get_api_error zbx_need_relogin
-		create_probe_template create_probe_status_template create_host create_group create_template create_item create_trigger create_macro update_root_servers
-		create_passive_proxy probe_exists get_host_group get_template get_probe get_host
+		RDDS_TEMPLATEID
+		create_probe_template create_probe_status_template create_host create_group create_template
+		create_item create_trigger create_macro update_root_servers
+		create_passive_proxy probe_exists get_host_group get_template get_template_id get_probe get_host
 		remove_templates remove_hosts remove_hostgroups remove_probes remove_items
 		disable_host disable_hosts
 		enable_items
@@ -197,6 +199,27 @@ sub get_template($$$)
 	my $result = $zabbix->get('template', $options);
 
 	return $result;
+}
+
+my %_saved_template_ids = ();
+
+sub get_template_id($)
+{
+	my $template_name = shift;
+
+	if (!exists($_saved_template_ids{$template_name}))
+	{
+		my $result = get_template($template_name, false, false);
+		pfail("'" . $template_name . "' does not exist") unless ($result->{'templateid'});
+		$_saved_template_ids{$template_name} = $result->{'templateid'};
+	}
+
+	return $_saved_template_ids{$template_name};
+}
+
+sub RDDS_TEMPLATEID
+{
+	return get_template_id(TEMPLATE_RDDS_TEST);
 }
 
 sub remove_templates($)
@@ -978,11 +1001,28 @@ sub get_items_like($$$)
 
 	if (!defined($is_template) || $is_template == false)
 	{
-		$result = $zabbix->get('item', {'hostids' => [$hostid], 'output' => ['itemid', 'name', 'hostid', 'key_', 'status'], 'search' => {'key_' => $like}, 'preservekeys' => true});
+		$result = $zabbix->get(
+			'item',
+			{
+				'hostids' => [$hostid],
+				'output' => ['itemid', 'name', 'hostid', 'key_', 'status'],
+				'search' => {'key_' => $like},
+				'preservekeys' => true
+			}
+		);
+
 		return $result;
 	}
 
-	$result = $zabbix->get('item', {'templateids' => [$hostid], 'output' => ['itemid', 'name', 'hostid', 'key_', 'status'], 'search' => {'key_' => $like}, 'preservekeys' => true});
+	$result = $zabbix->get(
+		'item',
+		{
+			'templateids' => [$hostid],
+			'output' => ['itemid', 'name', 'hostid', 'key_', 'status'],
+			'search' => {'key_' => $like},
+			'preservekeys' => true
+		}
+	);
 
 	return $result;
 }
