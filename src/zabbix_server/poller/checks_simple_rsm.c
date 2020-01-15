@@ -3541,7 +3541,7 @@ int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	probe_epp_enabled_str = get_rparam(request, 7);		/* EPP enabled on probe */
 	epp_enabled_str = get_rparam(request, 8);		/* EPP enabled on TLD */
 	ipv4_enabled_str = get_rparam(request, 9);		/* IPv4 enabled */
-	ipv6_enabled_str = get_rparam(request, 10);		/* IPv4 enabled */
+	ipv6_enabled_str = get_rparam(request, 10);		/* IPv6 enabled */
 	res_ip = get_rparam(request, 11);			/* Local resolver IP, e.g. "127.0.0.1" */
 	rtt_limit_str = get_rparam(request, 12);		/* RTT limit */
 	maxredirs_str = get_rparam(request, 13);		/* RDDS max redirects */
