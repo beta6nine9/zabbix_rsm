@@ -120,23 +120,18 @@ foreach ($data['probes'] as $probe) {
 						if (array_key_exists($ip, $probe['results'][$dns_udp_ns][$ipv])) {
 							$result = $probe['results'][$dns_udp_ns][$ipv][$ip];
 
-							if ($result == 0) {
-								$row[] = '-';
-							}
-							else {
-								$nskey = $dns_udp_ns.$ip;
-								$span = new CSpan($result);
-								$class = isset($probe['above_max_rtt'][$nskey]) ? ZBX_STYLE_RED : ZBX_STYLE_GREEN;
+							$nskey = $dns_udp_ns.$ip;
+							$span = new CSpan($result);
+							$class = isset($probe['above_max_rtt'][$nskey]) ? ZBX_STYLE_RED : ZBX_STYLE_GREEN;
 
-								if ($result < 0) {
-									$class = ($class == ZBX_STYLE_GREEN && !isset($probe['dns_error'][$nskey]))
-										? ZBX_STYLE_GREEN : ZBX_STYLE_RED;
-									$span->setHint($data['test_error_message'][$result]);
-								}
-
-								$span->addClass($class);
-								$row[] = $span;
+							if ($result < 0) {
+								$class = ($class == ZBX_STYLE_GREEN && !isset($probe['dns_error'][$nskey]))
+									? ZBX_STYLE_GREEN : ZBX_STYLE_RED;
+								$span->setHint($data['test_error_message'][$result]);
 							}
+
+							$span->addClass($class);
+							$row[] = $span;
 
 							if (isset($probe['results_nsid'][$dns_udp_ns][$ip])) {
 								$nsid_index = $probe['results_nsid'][$dns_udp_ns][$ip];
