@@ -5,6 +5,7 @@
 #define DEFAULT_TESTPREFIX	"whois.nic"
 #define DEFAULT_MAXREDIRS	10
 #define DEFAULT_RDDS_NS_STRING	"Name Server:"
+#define DEFAULT_RTT_LIMIT	20
 
 #define LOG_FILE1	"test1.log"
 #define LOG_FILE2	"test2.log"
@@ -16,10 +17,10 @@ void	zbx_on_exit(int ret)
 
 void	exit_usage(const char *program)
 {
-	fprintf(stderr, "usage: %s -t <tld> -w <whois_server> <[-4] [-6]> [-r <res_ip>] [-p <testprefix>] [-m <maxredirs80>] [-g]"
-			" [-f] [-h]\n", program);
+	fprintf(stderr, "usage: %s -t <tld> -w <whois_server> <[-4] [-6]> [-r <res_ip>] [-p <testprefix>] "
+			"[-m <maxredirs80>] [-g] [-f] [-h]\n", program);
 	fprintf(stderr, "       -t <tld>          TLD to test\n");
-	fprintf(stderr, "       -w <whos_server>  WHOIS server to use for RDDS43 test\n");
+	fprintf(stderr, "       -w <whois_server> WHOIS server to use for RDDS43 test\n");
 	fprintf(stderr, "       -4                enable IPv4\n");
 	fprintf(stderr, "       -6                enable IPv6\n");
 	fprintf(stderr, "       -r <res_ip>       IP address of resolver to use (default: %s)\n", DEFAULT_RES_IP);
@@ -28,8 +29,10 @@ void	exit_usage(const char *program)
 	fprintf(stderr, "       -m <maxredirs80>  maximum redirections to use in RDDS80 test (default: %d)\n",
 			DEFAULT_MAXREDIRS);
 	fprintf(stderr, "       -g                ignore errors, try to finish the test (default: off)\n");
-	fprintf(stderr, "       -f                log packets to files (%s, %s) (default: stdout)\n", LOG_FILE1, LOG_FILE2);
-	fprintf(stderr, "       -v                enable CURLOPT_VERBOSE when performing HTTP request (default: off)\n");
+	fprintf(stderr, "       -f                log packets to files (%s, %s) (default: stdout)\n",
+			LOG_FILE1, LOG_FILE2);
+	fprintf(stderr, "       -v                enable CURLOPT_VERBOSE when performing HTTP request "
+			"(default: off)\n");
 	fprintf(stderr, "       -h                show this message and quit\n");
 	exit(EXIT_FAILURE);
 }
@@ -41,12 +44,13 @@ int	main(int argc, char *argv[])
 				ignore_err = 0, testname[ZBX_HOST_BUF_SIZE], testurl[1024], *answer = NULL;
 	ldns_resolver		*res = NULL;
 	zbx_resolver_error_t	ec_res;
-	int			c, index, i, rtt43 = -1, rtt80 = -1, maxredirs = DEFAULT_MAXREDIRS, log_to_file = 0,
-				ipv_flags = 0, curl_flags = 0;
+	int			c, index, i, rtt43 = ZBX_NO_VALUE, rtt80 = ZBX_NO_VALUE, upd43 = ZBX_NO_VALUE,
+				maxredirs = DEFAULT_MAXREDIRS, log_to_file = 0, ipv_flags = 0, curl_flags = 0;
 	zbx_vector_str_t	ips43, nss;
 	zbx_http_error_t	ec_http;
 	FILE			*log_fd = stdout;
 	unsigned int		extras = RESOLVER_EXTRAS_NONE;
+	struct zbx_json		json;
 
 	opterr = 0;
 
@@ -86,7 +90,7 @@ int	main(int argc, char *argv[])
 				break;
 			case 'h':
 				exit_usage(argv[0]);
-				break;
+				/* fall through */
 			case '?':
 				if (optopt == 't' || optopt == 'r' || optopt == 'w' || optopt == 'p' || optopt == 'm')
 				{
@@ -241,7 +245,13 @@ int	main(int argc, char *argv[])
 			goto out;
 	}
 
+	create_rsm_rdds_json(&json, ip43, rtt43, upd43, ip80, rtt80, get_rdds_result(rtt43, rtt80, DEFAULT_RTT_LIMIT));
+
 	printf("OK (RTT43:%d RTT80:%d)\n", rtt43, rtt80);
+	printf("OK, json: %s\n", json.buffer);
+
+	zbx_json_free(&json);
+
 out:
 	if (log_to_file != 0)
 	{

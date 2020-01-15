@@ -11,9 +11,10 @@ void	zbx_on_exit(int ret)
 
 void	exit_usage(const char *program)
 {
-	fprintf(stderr, "usage: %s -i <ip> -u <url> [-h]\n", program);
-	fprintf(stderr, "       -i <tld>          resolver ip\n");
-	fprintf(stderr, "       -u <ns>           base url\n");
+	fprintf(stderr, "usage: %s -r <ip> -u <base_url> -d <test_domain> [-h]\n", program);
+	fprintf(stderr, "       -r <res_ip>       local resolver IP\n");
+	fprintf(stderr, "       -u <base_url>     RDAP service endpoint\n");
+	fprintf(stderr, "       -d <test_domain>  testing domain to make RDAP query\n");
 	fprintf(stderr, "       -h                show this message and quit\n");
 	exit(EXIT_FAILURE);
 }
@@ -36,11 +37,11 @@ int	main(int argc, char *argv[])
 
 	zbx_vector_str_create(&ips);
 
-	while ((c = getopt (argc, argv, "i:u:d:h")) != -1)
+	while ((c = getopt (argc, argv, "r:u:d:h")) != -1)
 	{
 		switch (c)
 		{
-			case 'i':
+			case 'r':
 				res_ip = optarg;
 				break;
 			case 'u':
@@ -49,11 +50,11 @@ int	main(int argc, char *argv[])
 			case 'd':
 				test_domain = optarg;
 				break;
-		case 'h':
+			case 'h':
 				exit_usage(argv[0]);
 				/* fall through */
 			case '?':
-				if (optopt == 'i' || optopt == 'u' || optopt == 'd')
+				if (optopt == 'r' || optopt == 'u' || optopt == 'd')
 					fprintf(stderr, "Option -%c requires an argument.\n", optopt);
 				else if (isprint (optopt))
 					fprintf(stderr, "Unknown option `-%c'.\n", optopt);
@@ -70,7 +71,7 @@ int	main(int argc, char *argv[])
 
 	if (NULL == res_ip || '\0' == *res_ip)
 	{
-		fprintf(stderr, "Name Server IP [-i] must be specified\n");
+		fprintf(stderr, "Name Server IP [-r] must be specified\n");
 		exit_usage(argv[0]);
 	}
 
@@ -157,7 +158,9 @@ int	main(int argc, char *argv[])
 				test_domain);
 	}
 	else
+	{
 		full_url = zbx_dsprintf(full_url, "%s%s:%d%s%s/%s", proto, ip, port, prefix, rdap_prefix, test_domain);
+	}
 
 	/* base_url example: http://whois.springbank */
 	/* full_url example: http://172.19.0.2:80/domain/whois.springbank */
@@ -178,7 +181,7 @@ int	main(int argc, char *argv[])
 	if (NULL == data.buf || '\0' == *data.buf || SUCCEED != zbx_json_open(data.buf, &jp))
 	{
 		rtt = ZBX_EC_RDAP_EJSON;
-		rsm_errf(stderr, "Invalid JSON format in response of \"%s\" (%s)", base_url, ip);
+		rsm_errf(stderr, "invalid JSON format in response of \"%s\" (%s)", base_url, ip);
 		goto out;
 	}
 
@@ -213,6 +216,7 @@ out:
 		}
 
 		create_rsm_rdap_json(&json, &ip, rtt, subtest_result);
+		printf("OK, json: %s\n", json.buffer);
 		zbx_json_free(&json);
 	}
 

@@ -91,6 +91,7 @@ src/libs/zbxcunit/cu_modules.h
 src/libs/zbxdbhigh/dbschema.c
 src/tests/t_rsm_dns
 src/tests/t_rsm_rdds
+src/tests/t_rsm_rdap
 src/zabbix_agent/zabbix_agent
 src/zabbix_agent/zabbix_agentd
 src/zabbix_get/zabbix_get

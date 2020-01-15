@@ -1351,7 +1351,7 @@ err:
 			if (!ldns_resolver_usevc(res))
 				*ec = ZBX_NS_QUERY_NOREPLY;
 			/* TCP */
-			else if (-1 != sec && zbx_time() - sec >= RSM_TCP_TIMEOUT * RSM_TCP_RETRY)
+			else if (0 <= sec && zbx_time() - sec >= RSM_TCP_TIMEOUT * RSM_TCP_RETRY)
 				*ec = ZBX_NS_QUERY_TO;
 			else
 				*ec = ZBX_NS_QUERY_ECON;
@@ -3511,6 +3511,31 @@ do														\
 }														\
 while (0)
 
+int	get_rdds_result(int rtt43, int rtt80, int rtt_limit)
+{
+	int	rdds_result, rdds43, rdds80;
+
+	rdds43 = zbx_subtest_result(rtt43, rtt_limit);
+	rdds80 = zbx_subtest_result(rtt80, rtt_limit);
+
+	if (ZBX_SUBTEST_SUCCESS == rdds43)
+	{
+		if (ZBX_SUBTEST_SUCCESS == rdds80)
+			rdds_result = RDDS_UP;
+		else
+			rdds_result = RDDS_ONLY43;
+	}
+	else
+	{
+		if (ZBX_SUBTEST_SUCCESS == rdds80)
+			rdds_result = RDDS_ONLY80;
+		else
+			rdds_result = RDDS_DOWN;
+	}
+
+	return rdds_result;
+}
+
 int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *result)
 {
 	char			*domain, *res_ip, *testprefix, *rdds_ns_string,
@@ -3779,47 +3804,7 @@ out:
 
 	if (SYSINFO_RET_OK == ret && 0 != rdds_enabled)
 	{
-		int	rdds_result, rdds43, rdds80;
-
-		rdds43 = zbx_subtest_result(rtt43, rtt_limit);
-		rdds80 = zbx_subtest_result(rtt80, rtt_limit);
-
-		switch (rdds43)
-		{
-			case ZBX_SUBTEST_SUCCESS:
-				switch (rdds80)
-				{
-					case ZBX_SUBTEST_SUCCESS:
-						rdds_result = RDDS_UP;
-						break;
-					case ZBX_SUBTEST_FAIL:
-						rdds_result = RDDS_ONLY43;
-						break;
-					default:
-						THIS_SHOULD_NEVER_HAPPEN;
-						exit(EXIT_FAILURE);
-				}
-				break;
-			case ZBX_SUBTEST_FAIL:
-				switch (rdds80)
-				{
-					case ZBX_SUBTEST_SUCCESS:
-						rdds_result = RDDS_ONLY80;
-						break;
-					case ZBX_SUBTEST_FAIL:
-						rdds_result = RDDS_DOWN;
-						break;
-					default:
-						THIS_SHOULD_NEVER_HAPPEN;
-						exit(EXIT_FAILURE);
-				}
-				break;
-			default:
-				THIS_SHOULD_NEVER_HAPPEN;
-				exit(EXIT_FAILURE);
-		}
-
-		create_rsm_rdds_json(&json, ip43, rtt43, upd43, ip80, rtt80, rdds_result);
+		create_rsm_rdds_json(&json, ip43, rtt43, upd43, ip80, rtt80, get_rdds_result(rtt43, rtt80, rtt_limit));
 
 		SET_STR_RESULT(result, zbx_strdup(NULL, json.buffer));
 
@@ -3850,12 +3835,18 @@ out:
 	return ret;
 }
 
-static void create_rsm_rdap_json(struct zbx_json *json, const char** ip, int rtt, int result)
+static void	create_rsm_rdap_json(struct zbx_json *json, const char **ip, int rtt, int result)
 {
 	zbx_json_init(json, 2 * ZBX_KIBIBYTE);
+
+	zbx_json_addobject(json, "rdap");
+
 	zbx_json_addstring(json, "ip", *ip, ZBX_JSON_TYPE_STRING);
 	zbx_json_addint64(json, "rtt", rtt);
 	zbx_json_addint64(json, "result", result);
+
+	zbx_json_close(json);
+
 	zbx_json_close(json);
 }
 
@@ -4057,7 +4048,9 @@ int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 				test_domain);
 	}
 	else
+	{
 		full_url = zbx_dsprintf(full_url, "%s%s:%d%s%s/%s", proto, ip, port, prefix, rdap_prefix, test_domain);
+	}
 
 	rsm_infof(log_fd, "the domain in base URL \"%s\" was resolved to %s, using full URL \"%s\".",
 			base_url, ip, full_url);
@@ -4075,7 +4068,7 @@ int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	if (NULL == data.buf || '\0' == *data.buf || SUCCEED != zbx_json_open(data.buf, &jp))
 	{
 		rtt = ZBX_EC_RDAP_EJSON;
-		rsm_errf(log_fd, "Invalid JSON format in response of \"%s\" (%s)", base_url, ip);
+		rsm_errf(log_fd, "invalid JSON format in response of \"%s\" (%s)", base_url, ip);
 		goto out;
 	}
 
@@ -4108,10 +4101,10 @@ out:
 		switch (zbx_subtest_result(rtt, rtt_limit))
 		{
 			case ZBX_SUBTEST_SUCCESS:
-				subtest_result = 1; /* Up */
+				subtest_result = 1;	/* up */
 				break;
 			case ZBX_SUBTEST_FAIL:
-				subtest_result = 0; /* Down */
+				subtest_result = 0;	/* down */
 		}
 
 		create_rsm_rdap_json(&json, &ip, rtt, subtest_result);

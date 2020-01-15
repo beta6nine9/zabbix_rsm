@@ -3,6 +3,8 @@
 
 #define DEFAULT_RES_IP		"127.0.0.1"
 #define DEFAULT_TESTPREFIX	"www.zz--rsm-monitoring"
+#define DEFAULT_RTT_LIMIT	20
+#define EXPECTED_NSS_NUM	1
 
 #define LOG_FILE1	"test1.log"
 #define LOG_FILE2	"test2.log"
@@ -33,15 +35,17 @@ void	exit_usage(const char *program)
 int	main(int argc, char *argv[])
 {
 	char		err[256], pack_buf[2048], nsid_unpacked[NSID_MAX_LENGTH * 2 + 1], *res_ip = DEFAULT_RES_IP,
-			*tld = NULL, *ns = NULL, *ns_ip = NULL, proto = RSM_UDP, *nsid = NULL, ipv4_enabled = 0,
-			ipv6_enabled = 0, *testprefix = DEFAULT_TESTPREFIX, dnssec_enabled = 0, ignore_err = 0,
-			log_to_file = 0;
+			*tld = NULL, *ns = NULL, *ns_ip = NULL, proto = RSM_UDP, *nsid = NULL, *ns_with_ip = NULL,
+			ipv4_enabled = 0, ipv6_enabled = 0, *testprefix = DEFAULT_TESTPREFIX, dnssec_enabled = 0,
+			ignore_err = 0, log_to_file = 0;
 	int		c, index, rtt, rtt_unpacked, upd_unpacked, unpacked_values_num;
 	ldns_resolver	*res = NULL;
 	ldns_rr_list	*keys = NULL;
 	FILE		*log_fd = stdout;
 	unsigned int	extras;
-	size_t		size_one_unpacked, size_two_unpacked;
+	size_t		size_one_unpacked, size_two_unpacked, nss_num = 0;
+	zbx_ns_t	*nss = NULL;
+	struct zbx_json	json;
 
 	opterr = 0;
 
@@ -139,6 +143,23 @@ int	main(int argc, char *argv[])
 		goto out;
 	}
 
+	ns_with_ip = zbx_malloc(NULL, strlen(ns) + 1 + strlen(ns_ip) + 1);
+	zbx_strlcpy(ns_with_ip, ns, sizeof(ns_with_ip));
+	strcat(ns_with_ip, ",");
+	strcat(ns_with_ip, ns_ip);
+
+	if (SUCCEED != zbx_get_nameservers(ns_with_ip, &nss, &nss_num, ipv4_enabled, ipv6_enabled, log_fd, err,
+			sizeof(err)))
+	{
+		rsm_errf(stderr, "cannot get namservers: %s", err);
+		goto out;
+	}
+
+	if (EXPECTED_NSS_NUM != nss_num)
+	{
+		rsm_errf(stderr, "unexpected number of nameservers: %d", nss_num);
+	}
+
 	if (0 != dnssec_enabled)
 	{
 		zbx_dnskeys_error_t	dnskeys_ec;
@@ -183,7 +204,7 @@ int	main(int argc, char *argv[])
 			goto out;
 	}
 
-	/* we have nsid, lets also test that it works with packing/unpacking */
+	/* we have nsid, now test that it works with packing/unpacking */
 
 	pack_values(0, 0, rtt, 0, nsid, pack_buf, sizeof(pack_buf));
 
@@ -205,8 +226,19 @@ int	main(int argc, char *argv[])
 		goto out;
 	}
 
+	/* test json */
+	nss[0].ips[0].rtt = rtt_unpacked;
+	nss[0].ips[0].nsid = zbx_strdup(NULL, nsid);
+	nss[0].ips[0].upd = upd_unpacked;
+
+	create_rsm_dns_json(&json, nss, nss_num, DEFAULT_RTT_LIMIT, proto);
+
 	printf("OK (RTT:%d)\n", rtt_unpacked);
 	printf("OK (NSID:%s)\n", nsid);
+	printf("OK, json: %s\n", json.buffer);
+
+	zbx_json_free(&json);
+
 out:
 	if (log_to_file != 0)
 	{
@@ -225,6 +257,13 @@ out:
 			ldns_resolver_free(res);
 	}
 
+	if (0 != nss_num)
+	{
+		zbx_clean_nss(nss, nss_num);
+		zbx_free(nss);
+	}
+
+	zbx_free(ns_with_ip);
 	zbx_free(nsid);
 
 	exit(EXIT_SUCCESS);
