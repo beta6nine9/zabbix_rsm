@@ -12,7 +12,6 @@ use constant MONITORING_TARGET_REGISTRAR => "registrar";
 
 use constant LINUX_TEMPLATEID			=> 10001;	# Template "Template OS Linux by Zabbix agent"
 use constant APP_ZABBIX_PROXY_TEMPLATEID	=> 10058;	# Template "Template App Zabbix Proxy"
-use constant PROBE_ERRORS_TEMPLATEID		=> 99990;	# Template "Template Probe Errors"
 
 use constant TEMPLATES_TLD_GROUPID		=> 240;		# Host group "Templates - TLD"
 use constant PROBES_GROUPID			=> 120;		# Host group "Probes"
@@ -24,6 +23,8 @@ use constant TEMPLATE_RSMHOST_CONFIG_PREFIX	=> 'Template Rsmhost Config ';
 use constant TEMPLATE_CONFIG_HISTORY		=> 'Template Config History';
 use constant TEMPLATE_DNS_TEST			=> 'Template DNS Test';
 use constant TEMPLATE_RDDS_TEST			=> 'Template RDDS Test';
+use constant TEMPLATE_PROBE_CONFIG_PREFIX	=> 'Template Probe Config ';
+use constant TEMPLATE_PROBE_STATUS		=> 'Template Probe Status';
 use constant TEMPLATE_RDAP_TEST			=> 'Template RDAP Test';
 
 use constant VALUE_TYPE_AVAIL => 0;
@@ -174,7 +175,6 @@ our @EXPORT_OK = qw(
 	MONITORING_TARGET_REGISTRAR
 	LINUX_TEMPLATEID
 	APP_ZABBIX_PROXY_TEMPLATEID
-	PROBE_ERRORS_TEMPLATEID
 	CONFIGVALUE_DNS_UDP_RTT_HIGH_ITEMID
 	TEMPLATES_TLD_GROUPID
 	PROBES_GROUPID
@@ -188,6 +188,8 @@ our @EXPORT_OK = qw(
 	TEMPLATE_DNS_TEST
 	TEMPLATE_RDDS_TEST
 	TEMPLATE_RDAP_TEST
+	TEMPLATE_PROBE_CONFIG_PREFIX
+	TEMPLATE_PROBE_STATUS
 	VALUE_TYPE_AVAIL
 	VALUE_TYPE_PERC
 	VALUE_TYPE_NUM
@@ -213,8 +215,9 @@ our %EXPORT_TAGS = (
 	templates => [ qw(
 			LINUX_TEMPLATEID
 			APP_ZABBIX_PROXY_TEMPLATEID
-			PROBE_ERRORS_TEMPLATEID
 			TEMPLATE_RSMHOST_CONFIG_PREFIX
+			TEMPLATE_PROBE_CONFIG_PREFIX
+			TEMPLATE_PROBE_STATUS
 			TEMPLATE_CONFIG_HISTORY
 			TEMPLATE_DNS_TEST
 			TEMPLATE_RDDS_TEST

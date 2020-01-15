@@ -19,6 +19,7 @@ our @EXPORT = qw(zbx_connect check_api_error get_proxies_list
 		DNS_TEMPLATEID
 		RDDS_TEMPLATEID
 		RDAP_TEMPLATEID
+		PROBE_STATUS_TEMPLATEID
 		create_probe_template create_probe_status_template create_host create_group create_template
 		create_item create_trigger create_macro update_root_servers
 		create_passive_proxy probe_exists get_host_group get_template get_template_id get_probe get_host
@@ -238,6 +239,11 @@ sub RDDS_TEMPLATEID
 sub RDAP_TEMPLATEID
 {
 	return get_template_id(TEMPLATE_RDAP_TEST);
+}
+
+sub PROBE_STATUS_TEMPLATEID
+{
+	return get_template_id(TEMPLATE_PROBE_STATUS);
 }
 
 sub remove_templates($)
@@ -915,7 +921,7 @@ sub create_probe_template
 	my $rdap      = shift;
 	my $resolver  = shift;
 
-	my $templateid = create_template('Template ' . $root_name);
+	my $templateid = create_template(TEMPLATE_PROBE_CONFIG_PREFIX . $root_name);
 
 	create_macro('{$RSM.IP4.ENABLED}' , defined($ipv4)     ? $ipv4     : '1'        , $templateid, defined($ipv4)     ? 1 : undef);
 	create_macro('{$RSM.IP6.ENABLED}' , defined($ipv6)     ? $ipv6     : '1'        , $templateid, defined($ipv6)     ? 1 : undef);
