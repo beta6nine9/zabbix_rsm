@@ -185,7 +185,7 @@ int	main(int argc, char *argv[])
 
 	/* we have nsid, lets also test that it works with packing/unpacking */
 
-	pack_values(0, 0, rtt, 0, &nsid, pack_buf, sizeof(pack_buf));
+	pack_values(0, 0, rtt, 0, nsid, pack_buf, sizeof(pack_buf));
 
 	if (SUCCEED != unpack_values(&size_one_unpacked, &size_two_unpacked, &rtt_unpacked, &upd_unpacked,
 			nsid_unpacked, pack_buf, stderr))

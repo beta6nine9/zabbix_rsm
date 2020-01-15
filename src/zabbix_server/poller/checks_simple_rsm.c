@@ -301,9 +301,9 @@ static void	rsm_log(FILE *log_fd, int level, const char *text)
 			text);
 }
 
-static int	pack_values(size_t v1, size_t v2, int v3, int v4, char **nsid, char *buf, size_t buf_size)
+static int	pack_values(size_t v1, size_t v2, int v3, int v4, char *nsid, char *buf, size_t buf_size)
 {
-	return zbx_snprintf(buf, buf_size, PACK_FORMAT, v1, v2, v3, v4, (NULL == *nsid) ? "" : *nsid);
+	return zbx_snprintf(buf, buf_size, PACK_FORMAT, v1, v2, v3, v4, (NULL == nsid) ? "" : nsid);
 }
 
 static int	unpack_values(size_t *v1, size_t *v2, int *v3, int *v4, char *nsid, char *buf, FILE *log_fd)
@@ -2564,7 +2564,7 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 						rsm_err(th_log_fd, err);
 					}
 
-					pack_values(i, j, nss[i].ips[j].rtt, nss[i].ips[j].upd, &nss[i].ips[j].nsid,
+					pack_values(i, j, nss[i].ips[j].rtt, nss[i].ips[j].upd, nss[i].ips[j].nsid,
 							buf, sizeof(buf));
 
 					if (-1 == write(fd[1], buf, strlen(buf) + 1))
