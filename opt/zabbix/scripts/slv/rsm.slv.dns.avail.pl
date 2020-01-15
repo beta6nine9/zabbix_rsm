@@ -14,7 +14,7 @@ use RSM;
 use RSMSLV;
 use TLD_constants qw(:api);
 
-my $cfg_keys_in = ['rsm.dns.udp[{$RSM.TLD}]'];
+my $cfg_keys_in = ['rsm.dns.nssok'];
 my $cfg_key_out = 'rsm.slv.dns.avail';
 my $cfg_value_type = ITEM_VALUE_TYPE_UINT64;
 
