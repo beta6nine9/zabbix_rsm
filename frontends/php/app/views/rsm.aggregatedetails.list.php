@@ -224,7 +224,7 @@ if ($data['nsids']) {
 
 	foreach ($data['nsids'] as $index => $value) {
 		// Show NSID value in similar dig syntax.
-		$value = chunk_split(bin2hex($value), 2, ' ').'("'.$value.'")';
+		$value = chunk_split($value, 2, ' ').' ("'.hex2bin($value).'")';
 		$nsids_table->addRow([(new CCol($index + 1))->addClass(ZBX_STYLE_CENTER), $value]);
 	}
 
