@@ -386,8 +386,8 @@ sub list_services($;$)
 
 	# NB! Keep @columns in sync with __usage()!
 	my @columns = (
-		'tld_type',
-		'tld_status',
+		'type',
+		'status',
 		'{$RSM.DNS.TESTPREFIX}',
 		'{$RSM.RDDS.NS.STRING}',
 		'{$RSM.RDDS.TESTPREFIX}',
@@ -440,7 +440,7 @@ sub get_rsmhost_config($$)
 	my $macros = get_host_macro($main_templateid, undef);
 	my $tld_host = get_host($tld, true);
 
-	$result->{'tld_status'} = $tld_host->{'status'};
+	$result->{'status'} = $tld_host->{'status'};
 
 	foreach my $group (@{$tld_host->{'groups'}})
 	{
@@ -449,7 +449,7 @@ sub get_rsmhost_config($$)
 		{
 			if ($name eq $tld_type)
 			{
-				$result->{'tld_type'} = $name;
+				$result->{'type'} = $name;
 				last;
 			}
 		}
