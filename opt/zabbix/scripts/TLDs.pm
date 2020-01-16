@@ -17,14 +17,17 @@ our @EXPORT = qw(zbx_connect check_api_error get_proxies_list
 		get_api_error zbx_need_relogin
 		CONFIG_HISTORY_TEMPLATEID
 		DNS_TEMPLATEID
+		DNSSEC_STATUS_TEMPLATEID
 		RDDS_TEMPLATEID
+		RDDS_STATUS_TEMPLATEID
 		RDAP_TEMPLATEID
+		RDAP_STATUS_TEMPLATEID
 		PROBE_STATUS_TEMPLATEID
 		create_probe_template create_probe_status_template create_host create_group create_template
 		create_item create_trigger create_macro update_root_servers
 		create_passive_proxy probe_exists get_host_group get_template get_template_id get_probe get_host
 		remove_templates remove_hosts remove_hostgroups remove_probes remove_items
-		disable_host disable_hosts
+		disable_host disable_hosts link_template_to_host
 		enable_items
 		disable_items disable_triggers
 		rename_host rename_proxy rename_template rename_hostgroup
@@ -33,6 +36,7 @@ our @EXPORT = qw(zbx_connect check_api_error get_proxies_list
 		get_application_id get_items_like set_tld_type get_triggers_by_items
 		add_dependency
 		create_cron_jobs
+		test_tpl
 		create_probe_health_tmpl
 		pfail);
 
@@ -231,14 +235,29 @@ sub DNS_TEMPLATEID
 	return get_template_id(TEMPLATE_DNS_TEST);
 }
 
+sub DNSSEC_STATUS_TEMPLATEID
+{
+	return get_template_id(TEMPLATE_DNSSEC_STATUS);
+}
+
 sub RDDS_TEMPLATEID
 {
 	return get_template_id(TEMPLATE_RDDS_TEST);
 }
 
+sub RDDS_STATUS_TEMPLATEID
+{
+	return get_template_id(TEMPLATE_RDDS_STATUS);
+}
+
 sub RDAP_TEMPLATEID
 {
 	return get_template_id(TEMPLATE_RDAP_TEST);
+}
+
+sub RDAP_STATUS_TEMPLATEID
+{
+	return get_template_id(TEMPLATE_RDAP_STATUS);
 }
 
 sub PROBE_STATUS_TEMPLATEID
@@ -286,6 +305,44 @@ sub disable_hosts($)
 	my $result = $zabbix->massupdate('host', {'hosts' => @hosts, 'status' => HOST_STATUS_NOT_MONITORED});
 
 	return $result;
+}
+
+# This function returns reference to array of hash references with all host's
+# template ids. This reference can be used for subsequent calls as third parameter.
+sub link_template_to_host($$;$)
+{
+	my $hostid         = shift;
+	my $new_templateid = shift;
+	my $all_templates  = shift;
+
+	my $options;
+	my $result;
+
+	if (!defined($all_templates))
+	{
+		$options = {
+			'output'                => [],
+			'filter'                => {'hostid' => $hostid},
+			'selectParentTemplates' => ['templateid']
+		};
+
+		$result = $zabbix->get('host', $options);
+
+		return undef unless (%{$result});
+
+		$all_templates = $result->{'parentTemplates'};
+	}
+
+	push @{$all_templates}, {'templateid' => $new_templateid};
+
+	$options = {
+		'hostid'    => $hostid,
+		'templates' => $all_templates
+	};
+
+	$result = $zabbix->update('host', $options);
+
+	return keys(%{$result}) ? $all_templates : undef;
 }
 
 sub remove_hostgroups($)
