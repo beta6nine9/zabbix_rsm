@@ -2162,7 +2162,7 @@ static void	zbx_clean_nss(zbx_ns_t *nss, size_t nss_num)
 static zbx_subtest_result_t	zbx_subtest_result(int rtt, int rtt_limit)
 {
 	if (ZBX_NO_VALUE == rtt)
-			return ZBX_SUBTEST_SUCCESS;
+		return ZBX_SUBTEST_SUCCESS;
 
 	/* probe knock-down on -1 */
 	if (ZBX_EC_DNS_UDP_INTERNAL_GENERAL == rtt)
@@ -3435,7 +3435,7 @@ out:
 
 static int	zbx_ec_noerror(int ec)
 {
-	if (0 < ec || ZBX_NO_VALUE == ec)
+	if (0 <= ec || ZBX_NO_VALUE == ec)
 		return SUCCEED;
 
 	return FAIL;
