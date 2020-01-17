@@ -4104,6 +4104,8 @@ out:
 		create_rsm_rdap_json(&json, ip, rtt, subtest_result);
 		SET_STR_RESULT(result, zbx_strdup(NULL, json.buffer));
 
+		rsm_infof(log_fd, "%s", json.buffer);
+
 		zbx_json_free(&json);
 	}
 
