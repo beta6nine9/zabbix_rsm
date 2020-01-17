@@ -1,7 +1,7 @@
 Changes for rsm1.3.0rc16
 
 Bug fixes:
-....I..... [649] fixed incorrect handling of zero RTT during RDDS43 test (dimir)
+.......PS. [649] fixed incorrect handling of zero RTT during RDDS43 test (dimir)
 
 --------------------------------------------------------------------------------
 Changes for rsm1.3.0rc15
@@ -129,7 +129,7 @@ New features:
 Changes for rsm1.2.15
 
 Bug fixes:
-....I..... [649] fixed incorrect handling of zero RTT during RDDS43 test (dimir)
+.......PS. [649] fixed incorrect handling of zero RTT during RDDS43 test (dimir)
 
 --------------------------------------------------------------------------------
 Changes for rsm1.2.14
