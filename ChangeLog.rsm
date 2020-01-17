@@ -1,6 +1,7 @@
 Changes for rsm2.0.0rc2
 
 Bug fixes:
+.......PS. [649] fixed incorrect handling of zero RTT during RDDS43 test (dimir)
 ....I..... [sub-506] fixed --list-services option in registrar.pl (dimir)
 ..F....... [648] made info bubbles visible on mouse over in TLD rolling week status page (miks)
 ..F....... [640] fixed tab indexing in incidents page (miks)
@@ -28,6 +29,12 @@ Changes for rsm1.4.0rc1
 
 New features:
 ..F.I..... [510] added support for Registrar RDDS Monitoring (dimir, yurii, asitals, miks, gcalenko)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.3.0rc16
+
+Bug fixes:
+.......PS. [649] fixed incorrect handling of zero RTT during RDDS43 test (dimir)
 
 --------------------------------------------------------------------------------
 Changes for rsm1.3.0rc15
@@ -150,6 +157,12 @@ Changes for rsm1.3.0rc1
 
 New features:
 ..F.I..... [170] added support for Compliance SLA monitoring (dimir, yurii, asitals, miks, gcalenko)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.2.15
+
+Bug fixes:
+.......PS. [649] fixed incorrect handling of zero RTT during RDDS43 test (dimir)
 
 --------------------------------------------------------------------------------
 Changes for rsm1.2.14
