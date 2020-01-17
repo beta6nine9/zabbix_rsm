@@ -36,7 +36,6 @@ our @EXPORT = qw(zbx_connect check_api_error get_proxies_list
 		get_application_id get_items_like set_tld_type get_triggers_by_items
 		add_dependency
 		create_cron_jobs
-		test_tpl
 		create_probe_health_tmpl
 		pfail);
 
