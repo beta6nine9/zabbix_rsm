@@ -215,7 +215,7 @@ out:
 				subtest_result = 0;
 		}
 
-		create_rsm_rdap_json(&json, &ip, rtt, subtest_result);
+		create_rsm_rdap_json(&json, ip, rtt, subtest_result);
 		printf("OK, json: %s\n", json.buffer);
 		zbx_json_free(&json);
 	}

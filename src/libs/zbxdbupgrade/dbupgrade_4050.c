@@ -1189,8 +1189,8 @@ static int	DBpatch_4050507(void)
 
 	ONLY_SERVER();
 
-	CHECK(DBexecute("update hosts set host='Template RDAP Test',name='Template RDAP Test' "
-		"where host = 'Template RDAP' "));
+	CHECK(DBexecute("update hosts set host='Template RDAP Test',name='Template RDAP Test'"
+			" where host = 'Template RDAP'"));
 
 	ret = SUCCEED;
 out:
@@ -1204,7 +1204,6 @@ static int	DBpatch_4050508(void)
 	ONLY_SERVER();
 
 	/* 4 = ITEM_VALUE_TYPE_TEXT */
-
 	CHECK(DBexecute("update items set value_type='4' where key_ like 'rdap[%%'"));
 
 	ret = SUCCEED;
@@ -1219,10 +1218,9 @@ static int	DBpatch_4050509(void)
 	ONLY_SERVER();
 
 	/* 18 = ITEM_TYPE_DEPENDENT */
-
-	CHECK(DBexecute("update items as i1 inner join items as i2 on i1.hostid=i2.hostid set "
-			"i1.type='18',i1.master_itemid=i2.itemid where i1.key_ in ('rdap.ip','rdap.rtt') and "
-			"i2.key_ like 'rdap[%%'"));
+	CHECK(DBexecute("update items as i1 inner join items as i2 on i1.hostid=i2.hostid set"
+			" i1.type='18',i1.master_itemid=i2.itemid where i1.key_ in ('rdap.ip','rdap.rtt') and"
+			" i2.key_ like 'rdap[%%'"));
 
 	ret = SUCCEED;
 out:
@@ -1241,10 +1239,13 @@ static int db_insert_rdap_item_preproc(const char* item_key, const char* item_pr
 	zbx_vector_uint64_reserve(&rdap_itemids, 1);
 
 	result = DBselect("select count(*) from item_preproc where params='%s'", item_preproc_param);
-	if (NULL != (row = DBfetch(result)))
+	if (NULL == (row = DBfetch(result)))
 	{
-		ZBX_STR2UINT64(count, row[0]);
+		DBfree_result(result);
+		goto out;
 	}
+
+	ZBX_STR2UINT64(count, row[0]);
 
 	DBfree_result(result);
 
@@ -1254,7 +1255,7 @@ static int db_insert_rdap_item_preproc(const char* item_key, const char* item_pr
 		goto out;
 	}
 
-	result = DBselect("select itemid from items where key_ ='%s' ", item_key);
+	result = DBselect("select itemid from items where key_='%s'", item_key);
 
 	while (NULL != (row = DBfetch(result)))
 	{
@@ -1268,10 +1269,9 @@ static int db_insert_rdap_item_preproc(const char* item_key, const char* item_pr
 
 	item_preprocid_next = DBget_maxid_num("item_preproc", rdap_itemids.values_num);
 
-	/* 12 = ZBX_PREPROC_JSONPATH */
-
 	for (i = 0; i < rdap_itemids.values_num; ++i)
 	{
+		/* 12 = ZBX_PREPROC_JSONPATH */
 		CHECK(DBexecute("insert into item_preproc set item_preprocid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ","
 				"step=1,type=12,params='%s',error_handler='0'", item_preprocid_next,
 				rdap_itemids.values[i], item_preproc_param));
@@ -1281,6 +1281,7 @@ static int db_insert_rdap_item_preproc(const char* item_key, const char* item_pr
 	ret = SUCCEED;
 out:
 	zbx_vector_uint64_destroy(&rdap_itemids);
+
 	return ret;
 }
 

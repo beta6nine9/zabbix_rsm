@@ -3829,13 +3829,13 @@ out:
 	return ret;
 }
 
-static void	create_rsm_rdap_json(struct zbx_json *json, const char **ip, int rtt, int result)
+static void	create_rsm_rdap_json(struct zbx_json *json, const char *ip, int rtt, int result)
 {
 	zbx_json_init(json, 2 * ZBX_KIBIBYTE);
 
 	zbx_json_addobject(json, "rdap");
 
-	zbx_json_addstring(json, "ip", *ip, ZBX_JSON_TYPE_STRING);
+	zbx_json_addstring(json, "ip", ip, ZBX_JSON_TYPE_STRING);
 	zbx_json_addint64(json, "rtt", rtt);
 	zbx_json_addint64(json, "result", result);
 
@@ -4101,7 +4101,7 @@ out:
 				subtest_result = 0;	/* down */
 		}
 
-		create_rsm_rdap_json(&json, &ip, rtt, subtest_result);
+		create_rsm_rdap_json(&json, ip, rtt, subtest_result);
 		SET_STR_RESULT(result, zbx_strdup(NULL, json.buffer));
 
 		zbx_json_free(&json);
