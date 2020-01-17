@@ -1,3 +1,9 @@
+Changes for rsm1.3.0rc16
+
+Bug fixes:
+....I..... [649] fixed incorrect handling of zero RTT during RDDS43 test (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm1.3.0rc15
 
 Bug fixes:
@@ -118,6 +124,12 @@ Changes for rsm1.3.0rc1
 
 New features:
 ..F.I..... [170] added support for Compliance SLA monitoring (dimir, yurii, asitals, miks, gcalenko)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.2.15
+
+Bug fixes:
+....I..... [649] fixed incorrect handling of zero RTT during RDDS43 test (dimir)
 
 --------------------------------------------------------------------------------
 Changes for rsm1.2.14
