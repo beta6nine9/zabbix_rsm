@@ -141,6 +141,21 @@ while (0)
 					" items.key_='%s'",								\
 				template_host, item_key)
 
+/* gets itemid of the template's item, status=3 = HOST_STATUS_TEMPLATE */
+#define GET_TEMPLATE_ITEM_ID_BY_PATTERN(itemid, template_host, item_key_pattern)					\
+		SELECT_VALUE_UINT64(											\
+				itemid,											\
+				"select"										\
+					" itemid"									\
+				" from"											\
+					" items"									\
+					" left join hosts on hosts.hostid=items.hostid"					\
+				" where"										\
+					" hosts.host='%s' and"								\
+					" hosts.status=3 and"								\
+					" items.key_ like '%s'",							\
+				template_host, item_key_pattern)
+
 /* gets valuemapid of the value map */
 #define GET_VALUE_MAP_ID(valuemapid, name)										\
 		SELECT_VALUE_UINT64(valuemapid, "select valuemapid from valuemaps where name='%s'", name)
@@ -1168,7 +1183,533 @@ out:
 	return ret;
 }
 
+static int	DBpatch_4050506_create_application(zbx_uint64_t *applicationid, zbx_uint64_t template_applicationid,
+		zbx_uint64_t hostid, const char *name)
+{
+	int	ret = FAIL;
+
+	*applicationid = DBget_maxid_num("applications", 1);
+
+	CHECK(DBexecute("insert into applications set"
+				" applicationid=" ZBX_FS_UI64 ","
+				" hostid=" ZBX_FS_UI64 ","
+				" name='%s',"
+				" flags=0",
+			*applicationid, hostid, name));
+
+	CHECK(DBexecute("insert into application_template set"
+				" application_templateid=" ZBX_FS_UI64 ","
+				" applicationid=" ZBX_FS_UI64 ","
+				" templateid=" ZBX_FS_UI64,
+			DBget_maxid_num("application_template", 1), *applicationid, template_applicationid));
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
+static int	DBpatch_4050506_copy_preproc(zbx_uint64_t src_itemid, zbx_uint64_t dst_itemid,
+		const char *replacements[][2])
+{
+	int		ret = FAIL;
+	DB_RESULT	result;
+	DB_ROW		row;
+
+	result = DBselect("select step,type,params,error_handler,error_handler_params from item_preproc"
+				" where itemid=" ZBX_FS_UI64 " order by item_preprocid", src_itemid);
+
+	if (NULL == result)
+		goto out;
+
+	while (NULL != (row = DBfetch(result)))
+	{
+		CHECK(DBexecute("insert into item_preproc set item_preprocid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ","
+					"step=%s,type=%s,params=\"%s\",error_handler=%s,error_handler_params='%s'",
+				DBget_maxid_num("item_preproc", 1), dst_itemid, row[0], row[1], row[2], row[3],
+				row[4]));
+	}
+
+	DBfree_result(result);
+	result = NULL;
+
+	if (NULL != replacements)
+	{
+		size_t	i;
+
+		for (i = 0; NULL != replacements[i][0]; i++)
+		{
+			CHECK(DBexecute("update item_preproc set params=replace(params,'%s','%s')"
+					" where itemid=" ZBX_FS_UI64,
+					replacements[i][0], replacements[i][1], dst_itemid));
+		}
+	}
+
+	ret = SUCCEED;
+out:
+	if (NULL != result)
+		DBfree_result(result);
+
+	return ret;
+}
+
+static int	DBpatch_4050506_copy_lld_macros(zbx_uint64_t src_itemid, zbx_uint64_t dst_itemid)
+{
+	int		ret = FAIL;
+	DB_RESULT	result;
+	DB_ROW		row;
+
+	result = DBselect("select lld_macro,path from lld_macro_path"
+				" where itemid=" ZBX_FS_UI64 " order by lld_macro_pathid", src_itemid);
+
+	if (NULL == result)
+		goto out;
+
+	while (NULL != (row = DBfetch(result)))
+	{
+		CHECK(DBexecute("insert into lld_macro_path set lld_macro_pathid=" ZBX_FS_UI64 ","
+					"itemid=" ZBX_FS_UI64 ",lld_macro='%s',path='%s'",
+				DBget_maxid_num("lld_macro_path", 1), dst_itemid, row[0], row[1]));
+	}
+
+	ret = SUCCEED;
+out:
+	DBfree_result(result);
+
+	return ret;
+}
+
+static int	DBpatch_4050506_create_item(zbx_uint64_t *new_itemid, zbx_uint64_t templateid, zbx_uint64_t hostid,
+		zbx_uint64_t interfaceid, zbx_uint64_t master_itemid, zbx_uint64_t applicationid)
+{
+	int		ret = FAIL;
+	zbx_uint64_t	itemid;
+
+	itemid = DBget_maxid_num("items", 1);
+
+	CHECK(DBexecute("insert into items (itemid,type,snmp_community,snmp_oid,hostid,name,key_,delay,history,"
+				"trends,status,value_type,trapper_hosts,units,snmpv3_securityname,snmpv3_securitylevel,"
+				"snmpv3_authpassphrase,snmpv3_privpassphrase,formula,logtimefmt,templateid,"
+				"valuemapid,params,ipmi_sensor,authtype,username,password,publickey,privatekey,flags,"
+				"interfaceid,port,description,inventory_link,lifetime,"
+				"snmpv3_authprotocol,snmpv3_privprotocol,snmpv3_contextname,evaltype,jmx_endpoint,"
+				"master_itemid,timeout,url,query_fields,posts,status_codes,"
+				"follow_redirects,post_type,http_proxy,headers,retrieve_mode,request_method,"
+				"output_format,ssl_cert_file,ssl_key_file,ssl_key_password,verify_peer,verify_host,"
+				"allow_traps)"
+			"select"
+				" " ZBX_FS_UI64 ",type,snmp_community,snmp_oid," ZBX_FS_UI64 ",name,key_,delay,history,"
+				"trends,status,value_type,trapper_hosts,units,snmpv3_securityname,snmpv3_securitylevel,"
+				"snmpv3_authpassphrase,snmpv3_privpassphrase,formula,logtimefmt," ZBX_FS_UI64 ","
+				"valuemapid,params,ipmi_sensor,authtype,username,password,publickey,privatekey,flags,"
+				"nullif(" ZBX_FS_UI64 ",0),port,description,inventory_link,lifetime,"
+				"snmpv3_authprotocol,snmpv3_privprotocol,snmpv3_contextname,evaltype,jmx_endpoint,"
+				"nullif(" ZBX_FS_UI64 ",0),timeout,url,query_fields,posts,status_codes,"
+				"follow_redirects,post_type,http_proxy,headers,retrieve_mode,request_method,"
+				"output_format,ssl_cert_file,ssl_key_file,ssl_key_password,verify_peer,verify_host,"
+				"allow_traps"
+			" from items"
+			" where itemid=" ZBX_FS_UI64,
+			itemid, hostid, templateid, interfaceid, master_itemid, templateid));
+
+	if (0 != applicationid)
+	{
+		CHECK(DBexecute("insert into items_applications set"
+				" itemappid=" ZBX_FS_UI64 ",applicationid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64,
+				DBget_maxid_num("items_applications", 1), applicationid, itemid));
+	}
+
+	CHECK_RESULT(DBpatch_4050506_copy_preproc(templateid, itemid, NULL));
+
+	CHECK_RESULT(DBpatch_4050506_copy_lld_macros(templateid, itemid));
+
+	if (NULL != new_itemid)
+	{
+		*new_itemid = itemid;
+	}
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
+static int	DBpatch_4050506_convert_item(zbx_uint64_t *itemid, zbx_uint64_t hostid, const char *key,
+		zbx_uint64_t master_itemid, zbx_uint64_t template_itemid, zbx_uint64_t applicationid)
+{
+	int	ret = FAIL;
+
+	SELECT_VALUE_UINT64(*itemid, "select itemid from items where hostid=" ZBX_FS_UI64 " and key_='%s'", hostid, key);
+
+	CHECK(DBexecute("update"
+				" items,"
+				" items as template"
+			" set"
+				" items.type=template.type,"
+				" items.name=template.name,"
+				" items.key_=template.key_,"
+				" items.delay=template.delay,"
+				" items.templateid=template.itemid,"
+				" items.interfaceid=null,"
+				" items.description=template.description,"
+				" items.master_itemid=nullif(" ZBX_FS_UI64 ",0),"
+				" items.request_method=template.request_method"
+			" where"
+				" items.itemid=" ZBX_FS_UI64 " and"
+				" template.itemid=" ZBX_FS_UI64,
+			master_itemid, *itemid, template_itemid));
+
+	CHECK(DBexecute("delete from items_applications where itemid=" ZBX_FS_UI64, *itemid));
+
+	CHECK(DBexecute("insert into items_applications set"
+			" itemappid=" ZBX_FS_UI64 ",applicationid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64,
+			DBget_maxid_num("items_applications", 1), applicationid, *itemid));
+
+	CHECK_RESULT(DBpatch_4050506_copy_preproc(template_itemid, *itemid, NULL));
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
+static int	DBpatch_4050506_create_item_prototype(zbx_uint64_t *new_itemid, zbx_uint64_t templateid,
+		zbx_uint64_t hostid, zbx_uint64_t interfaceid, zbx_uint64_t master_itemid, zbx_uint64_t applicationid,
+		zbx_uint64_t parent_itemid)
+{
+	int		ret = FAIL;
+
+	CHECK_RESULT(DBpatch_4050506_create_item(new_itemid, templateid, hostid, interfaceid, master_itemid,
+			applicationid));
+
+	CHECK(DBexecute("insert into item_discovery set"
+				" itemdiscoveryid=" ZBX_FS_UI64 ","
+				" itemid=" ZBX_FS_UI64 ","
+				" parent_itemid=" ZBX_FS_UI64 ","
+				" key_='',"
+				" lastcheck=0,"
+				" ts_delete=0",
+			DBget_maxid_num("item_discovery", 1), *new_itemid, parent_itemid));
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
+static int	DBpatch_4050506_create_item_lld(zbx_uint64_t *new_itemid, const char *key,
+		zbx_uint64_t prototype_itemid, zbx_uint64_t applicationid, const char *preproc_replacements[][2])
+{
+	int	ret = FAIL;
+
+	*new_itemid = DBget_maxid_num("items", 1);
+
+	/* non-default values - templateid=NULL, flags=ZBX_FLAG_DISCOVERY_CREATED, interfaceid=NULL */
+	CHECK(DBexecute("insert into items (itemid,type,snmp_community,snmp_oid,hostid,name,key_,delay,history,trends,"
+				"status,value_type,trapper_hosts,units,snmpv3_securityname,snmpv3_securitylevel,"
+				"snmpv3_authpassphrase,snmpv3_privpassphrase,formula,logtimefmt,templateid,valuemapid,"
+				"params,ipmi_sensor,authtype,username,password,publickey,privatekey,flags,interfaceid,"
+				"port,description,inventory_link,lifetime,snmpv3_authprotocol,snmpv3_privprotocol,"
+				"snmpv3_contextname,evaltype,jmx_endpoint,master_itemid,timeout,url,query_fields,posts,"
+				"status_codes,follow_redirects,post_type,http_proxy,headers,retrieve_mode,"
+				"request_method,output_format,ssl_cert_file,ssl_key_file,ssl_key_password,verify_peer,"
+				"verify_host,allow_traps)"
+			" select"
+				" " ZBX_FS_UI64 ",type,snmp_community,snmp_oid,hostid,name,'%s',delay,history,trends,"
+				"status,value_type,trapper_hosts,units,snmpv3_securityname,snmpv3_securitylevel,"
+				"snmpv3_authpassphrase,snmpv3_privpassphrase,formula,logtimefmt,null,valuemapid,"
+				"params,ipmi_sensor,authtype,username,password,publickey,privatekey,4,null,"
+				"port,description,inventory_link,lifetime,snmpv3_authprotocol,snmpv3_privprotocol,"
+				"snmpv3_contextname,evaltype,jmx_endpoint,master_itemid,timeout,url,query_fields,posts,"
+				"status_codes,follow_redirects,post_type,http_proxy,headers,retrieve_mode,"
+				"request_method,output_format,ssl_cert_file,ssl_key_file,ssl_key_password,verify_peer,"
+				"verify_host,allow_traps"
+			" from items"
+			" where itemid=" ZBX_FS_UI64,
+			*new_itemid, key, prototype_itemid));
+
+	CHECK(DBexecute("insert into items_applications set"
+			" itemappid=" ZBX_FS_UI64 ",applicationid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64,
+			DBget_maxid_num("items_applications", 1), applicationid, *new_itemid));
+
+	CHECK_RESULT(DBpatch_4050506_copy_preproc(prototype_itemid, *new_itemid, preproc_replacements));
+
+	CHECK(DBexecute("insert into item_discovery (itemdiscoveryid,itemid,parent_itemid,key_,lastcheck,ts_delete)"
+			" select " ZBX_FS_UI64 "," ZBX_FS_UI64 ",itemid,key_,0,0 from items where itemid=" ZBX_FS_UI64,
+			DBget_maxid_num("item_discovery", 1), *new_itemid, prototype_itemid));
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
+static int	DBpatch_4050506_convert_item_lld(zbx_uint64_t *itemid, zbx_uint64_t hostid, const char *old_key,
+		const char *new_key, zbx_uint64_t prototype_itemid, zbx_uint64_t applicationid,
+		const char *preproc_replacements[][2])
+{
+	int	ret = FAIL;
+
+	SELECT_VALUE_UINT64(*itemid, "select itemid from items where hostid=" ZBX_FS_UI64 " and key_='%s'", hostid, old_key);
+
+	CHECK(DBexecute("update"
+				" items,"
+				" items as prototype"
+			" set"
+				" items.type=prototype.type,"
+				" items.name=prototype.name,"
+				" items.key_='%s',"
+				" items.templateid=null,"
+				" items.flags=4,"
+				" items.description=prototype.description,"
+				" items.master_itemid=prototype.master_itemid,"
+				" items.request_method=prototype.request_method"
+			" where"
+				" items.itemid=" ZBX_FS_UI64 " and"
+				" prototype.itemid=" ZBX_FS_UI64,
+			new_key, *itemid, prototype_itemid));
+
+	CHECK(DBexecute("delete from items_applications where itemid=" ZBX_FS_UI64, *itemid));
+
+	CHECK(DBexecute("insert into items_applications set"
+			" itemappid=" ZBX_FS_UI64 ",applicationid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64,
+			DBget_maxid_num("items_applications", 1), applicationid, *itemid));
+
+	CHECK_RESULT(DBpatch_4050506_copy_preproc(prototype_itemid, *itemid, preproc_replacements));
+
+	CHECK(DBexecute("insert into item_discovery (itemdiscoveryid,itemid,parent_itemid,key_,lastcheck,ts_delete)"
+			" select " ZBX_FS_UI64 "," ZBX_FS_UI64 ",itemid,key_,0,0 from items where itemid=" ZBX_FS_UI64,
+			DBget_maxid_num("item_discovery", 1), *itemid, prototype_itemid));
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
 static int	DBpatch_4050506(void)
+{
+	int		ret = FAIL;
+
+	DB_RESULT	result_hostid;
+	DB_RESULT	result;
+	DB_ROW		row_hostid;
+	DB_ROW		row;
+
+	zbx_uint64_t	groupid_tld_probe_resluts;			/* groupid of "TLD Probe results" host group */
+	zbx_uint64_t	hostid_template_dns_test;			/* hostid of "Template DNS Test" template */
+
+	zbx_uint64_t	template_applicationid_dns;			/* applicationid of "DNS" application in "Template DNS Test" template */
+	zbx_uint64_t	template_applicationid_dnssec;			/* applicationid of "DNSSEC" application in "Template DNS Test" template */
+
+	zbx_uint64_t	template_itemid_dnssec_enabled;			/* itemid of "DNSSEC enabled/disabled" item in "Template DNS Test" template */
+	zbx_uint64_t	template_itemid_rsm_dns;			/* itemid of "DNS Test" item in "Template DNS Test" template */
+	zbx_uint64_t	template_itemid_rsm_dns_nssok;			/* itemid of "Number of working Name Servers" item in "Template DNS Test" template */
+	zbx_uint64_t	template_itemid_rsm_dns_ns_discovery;		/* itemid of "Name Servers discovery" item in "Template DNS Test" template */
+	zbx_uint64_t	template_itemid_rsm_dns_nsip_discovery;		/* itemid of "NS-IP pairs discovery" item in "Template DNS Test" template */
+	zbx_uint64_t	template_itemid_rsm_dns_ns_status;		/* itemid of "Status of $1" item prototype in "Template DNS Test" template */
+	zbx_uint64_t	template_itemid_rsm_dns_nsid;			/* itemid of "NSID of $1,$2" item prototype in "Template DNS Test" template */
+	zbx_uint64_t	template_itemid_rsm_dns_rtt_tcp;		/* itemid of "RTT of $1,$2 using $3" item prototype in "Template DNS Test" template */
+	zbx_uint64_t	template_itemid_rsm_dns_rtt_udp;		/* itemid of "RTT of $1,$2 using $3" item prototype in "Template DNS Test" template */
+	zbx_uint64_t	template_itemid_rsm_dns_mode;			/* itemid of "The mode of the Test" item prototype in "Template DNS Test" template */
+	zbx_uint64_t	template_itemid_rsm_dns_protocol;		/* itemid of "Transport protocol of the Test" item prototype in "Template DNS Test" template */
+
+	ONLY_SERVER();
+
+	GET_HOST_GROUP_ID(groupid_tld_probe_resluts, "TLD Probe results");
+	GET_TEMPLATE_ID(hostid_template_dns_test, "Template DNS Test");
+
+	SELECT_VALUE_UINT64(template_applicationid_dns,
+			"select applicationid from applications where hostid=" ZBX_FS_UI64 " and name='DNS'",
+			hostid_template_dns_test);
+	SELECT_VALUE_UINT64(template_applicationid_dnssec,
+			"select applicationid from applications where hostid=" ZBX_FS_UI64 " and name='DNSSEC'",
+			hostid_template_dns_test);
+
+	GET_TEMPLATE_ITEM_ID(template_itemid_dnssec_enabled        , "Template DNS Test", "dnssec.enabled");
+	GET_TEMPLATE_ITEM_ID_BY_PATTERN(template_itemid_rsm_dns    , "Template DNS Test", "rsm.dns[%]");
+	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_dns_nssok         , "Template DNS Test", "rsm.dns.nssok");
+	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_dns_ns_discovery  , "Template DNS Test", "rsm.dns.ns.discovery");
+	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_dns_nsip_discovery, "Template DNS Test", "rsm.dns.nsip.discovery");
+	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_dns_ns_status     , "Template DNS Test", "rsm.dns.ns.status[{#NS}]");
+	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_dns_nsid          , "Template DNS Test", "rsm.dns.nsid[{#NS},{#IP}]");
+	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_dns_rtt_tcp       , "Template DNS Test", "rsm.dns.rtt[{#NS},{#IP},tcp]");
+	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_dns_rtt_udp       , "Template DNS Test", "rsm.dns.rtt[{#NS},{#IP},udp]");
+	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_dns_mode          , "Template DNS Test", "rsm.dns.mode");
+	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_dns_protocol      , "Template DNS Test", "rsm.dns.protocol");
+
+	result_hostid = DBselect("select hostid from hosts_groups where groupid=" ZBX_FS_UI64, groupid_tld_probe_resluts);
+
+	if (NULL == result_hostid)
+		goto out;
+
+	while (NULL != (row_hostid = DBfetch(result_hostid)))
+	{
+		zbx_uint64_t	hostid;					/* hostid of "<rsmhost> <probe>" host */
+		zbx_uint64_t	interfaceid;				/* interfaceid for items in "<rsmhost> <probe>" host */
+
+		zbx_uint64_t	applicationid_dns;			/* applicationid of "DNS" application */
+		zbx_uint64_t	applicationid_dnssec;			/* applicationid of "DNSSEC" application */
+
+		zbx_uint64_t	itemid_dnssec_enabled;			/* itemid of "DNSSEC enabled/disabled" item in "Template DNS Test" template */
+		zbx_uint64_t	itemid_rsm_dns;				/* itemid of "DNS Test" item in "Template DNS Test" template */
+		zbx_uint64_t	itemid_rsm_dns_ns_discovery;		/* itemid of "Name Servers discovery" item in "Template DNS Test" template */
+		zbx_uint64_t	itemid_rsm_dns_nsip_discovery;		/* itemid of "NS-IP pairs discovery" item in "Template DNS Test" template */
+		zbx_uint64_t	prototype_itemid_rsm_dns_ns_status;	/* itemid of "Status of $1" item prototype in "Template DNS Test" template */
+		zbx_uint64_t	prototype_itemid_rsm_dns_nsid;		/* itemid of "NSID of $1,$2" item prototype in "Template DNS Test" template */
+		zbx_uint64_t	prototype_itemid_rsm_dns_rtt_tcp;	/* itemid of "RTT of $1,$2 using $3" item prototype in "Template DNS Test" template */
+		zbx_uint64_t	prototype_itemid_rsm_dns_rtt_udp;	/* itemid of "RTT of $1,$2 using $3" item prototype in "Template DNS Test" template */
+		zbx_uint64_t	itemid_rsm_dns_mode;			/* itemid of "The mode of the Test" item prototype in "Template DNS Test" template */
+		zbx_uint64_t	itemid_rsm_dns_protocol;		/* itemid of "Transport protocol of the Test" item prototype in "Template DNS Test" template */
+		zbx_uint64_t	itemid_rsm_dns_nssok;			/* itemid of "Number of working Name Servers" item in "Template DNS Test" template */
+
+		ZBX_STR2UINT64(hostid, row_hostid[0]);
+
+		/* main=INTERFACE_PRIMARY, type=INTERFACE_TYPE_AGENT */
+		SELECT_VALUE_UINT64(interfaceid, "select interfaceid from interface"
+				" where hostid=" ZBX_FS_UI64 " and main=1 and type=1", hostid);
+
+		/* link "Template DNS Test" template to the host */
+		CHECK(DBexecute("insert into hosts_templates set"
+				" hosttemplateid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",templateid=" ZBX_FS_UI64,
+				DBget_maxid_num("hosts_templates", 1), hostid, hostid_template_dns_test));
+
+		/* create applications */
+		CHECK_RESULT(DBpatch_4050506_create_application(&applicationid_dns   , template_applicationid_dns   , hostid, "DNS"));
+		CHECK_RESULT(DBpatch_4050506_create_application(&applicationid_dnssec, template_applicationid_dnssec, hostid, "DNSSEC"));
+
+		/* update dnssec.enabled item */
+		CHECK_RESULT(DBpatch_4050506_convert_item(&itemid_dnssec_enabled, hostid, "dnssec.enabled",
+				0, template_itemid_dnssec_enabled, applicationid_dnssec));
+
+		/* create "DNS Test" (rsm.dns[...]) master item */
+		CHECK_RESULT(DBpatch_4050506_create_item(&itemid_rsm_dns,
+				template_itemid_rsm_dns, hostid, interfaceid, 0, applicationid_dns));
+
+		/* create "Name Servers discovery" (rsm.dns.ns.discovery) discovery rule */
+		CHECK_RESULT(DBpatch_4050506_create_item(&itemid_rsm_dns_ns_discovery,
+				template_itemid_rsm_dns_ns_discovery, hostid, 0, itemid_rsm_dns, 0));
+
+		/* create "NS-IP pairs discovery" (rsm.dns.nsip.discovery) discovery rule */
+		CHECK_RESULT(DBpatch_4050506_create_item(&itemid_rsm_dns_nsip_discovery,
+				template_itemid_rsm_dns_nsip_discovery, hostid, 0, itemid_rsm_dns, 0));
+
+		/* create "Status of {#NS}" (rsm.dns.ns.status[{#NS}]) item prototype */
+		CHECK_RESULT(DBpatch_4050506_create_item_prototype(&prototype_itemid_rsm_dns_ns_status,
+				template_itemid_rsm_dns_ns_status, hostid, 0, itemid_rsm_dns, applicationid_dns,
+				itemid_rsm_dns_ns_discovery));
+
+		/* create "NSID of {#NS},{#IP}" (rsm.dns.nsid[{#NS},{#IP}]) item prototype */
+		CHECK_RESULT(DBpatch_4050506_create_item_prototype(&prototype_itemid_rsm_dns_nsid,
+				template_itemid_rsm_dns_nsid, hostid, 0, itemid_rsm_dns, applicationid_dns,
+				itemid_rsm_dns_nsip_discovery));
+
+		/* create "RTT of {#NS},{#IP} using tcp" (rsm.dns.rtt[{#NS},{#IP},tcp]) item prototype */
+		CHECK_RESULT(DBpatch_4050506_create_item_prototype(&prototype_itemid_rsm_dns_rtt_tcp,
+				template_itemid_rsm_dns_rtt_tcp, hostid, 0, itemid_rsm_dns, applicationid_dns,
+				itemid_rsm_dns_nsip_discovery));
+
+		/* create "RTT of {#NS},{#IP} using udp" (rsm.dns.rtt[{#NS},{#IP},udp]) item prototype */
+		CHECK_RESULT(DBpatch_4050506_create_item_prototype(&prototype_itemid_rsm_dns_rtt_udp,
+				template_itemid_rsm_dns_rtt_udp, hostid, 0, itemid_rsm_dns, applicationid_dns,
+				itemid_rsm_dns_nsip_discovery));
+
+		/* create "The mode of the Test" (rsm.dns.mode) item */
+		CHECK_RESULT(DBpatch_4050506_create_item(&itemid_rsm_dns_mode,
+				template_itemid_rsm_dns_mode, hostid, 0, itemid_rsm_dns, applicationid_dns));
+
+		/* create "Transport protocol of the Test" rsm.dns.protocol */
+		CHECK_RESULT(DBpatch_4050506_create_item(&itemid_rsm_dns_protocol,
+				template_itemid_rsm_dns_protocol, hostid, 0, itemid_rsm_dns, applicationid_dns));
+
+		/* delete rsm.dns.tcp[{$RSM.TLD}] item */
+		CHECK(DBexecute("delete from items where key_='rsm.dns.tcp[{$RSM.TLD}]' and hostid=" ZBX_FS_UI64, hostid));
+
+		/* convert rsm.dns.udp[{$RSM.TLD}] item into rsm.dns.nssok */
+		CHECK_RESULT(DBpatch_4050506_convert_item(&itemid_rsm_dns_nssok, hostid, "rsm.dns.udp[{$RSM.TLD}]",
+				itemid_rsm_dns, template_itemid_rsm_dns_nssok, applicationid_dns));
+
+		/* update <ns> items */
+
+		result = DBselect("select distinct substring_index(substring_index(key_,',',-2),',',1) from items"
+					" where hostid=" ZBX_FS_UI64 " and key_ like 'rsm.dns.udp.rtt[%%]'", hostid);
+
+		if (NULL == result)
+			goto out;
+
+		while (NULL != (row = DBfetch(result)))
+		{
+			char		key[MAX_STRING_LEN];
+			zbx_uint64_t	itemid;
+
+			const char	*preproc_replacements[][2] = {
+				{"{#NS}", row[0]},
+				{NULL}
+			};
+
+			/* create "Status of <ns>" (rsm.dns.ns.status[<ns>]) items */
+			zbx_snprintf(key, sizeof(key), "rsm.dns.ns.status[%s]", row[0]);
+			CHECK_RESULT(DBpatch_4050506_create_item_lld(&itemid, key, prototype_itemid_rsm_dns_ns_status,
+					applicationid_dns, preproc_replacements));
+		}
+
+		DBfree_result(result);
+		result = NULL;
+
+		/* update <ns>,<ip> items */
+
+		result = DBselect("select distinct"
+					" substring_index(substring_index(key_,',',-2),',',1),"
+					" substring_index(substring_index(key_,',',-1),']',1)"
+				" from items where hostid=" ZBX_FS_UI64 " and key_ like 'rsm.dns.udp.rtt[%%]'",
+				hostid);
+
+		if (NULL == result)
+			goto out;
+
+		while (NULL != (row = DBfetch(result)))
+		{
+			char		old_key[MAX_STRING_LEN];
+			char		new_key[MAX_STRING_LEN];
+			zbx_uint64_t	itemid;
+
+			const char	*preproc_replacements[][2] = {
+				{"{#NS}", row[0]},
+				{"{#IP}", row[1]},
+				{NULL}
+			};
+
+			/* create "NSID of <ns>,<ip>" (rsm.dns.nsid[<ns>,<ip>]) item */
+			zbx_snprintf(new_key, sizeof(new_key), "rsm.dns.nsid[%s,%s]", row[0], row[1]);
+			CHECK_RESULT(DBpatch_4050506_create_item_lld(&itemid, new_key,
+					prototype_itemid_rsm_dns_nsid, applicationid_dns, preproc_replacements));
+
+			/* convert "RTT of <ns>,<ip> using tcp" (rsm.dns.rtt[<ns>,<ip>,tcp]) item */
+			zbx_snprintf(old_key, sizeof(old_key), "rsm.dns.tcp.rtt[{$RSM.TLD},%s,%s]", row[0], row[1]);
+			zbx_snprintf(new_key, sizeof(new_key), "rsm.dns.rtt[%s,%s,tcp]", row[0], row[1]);
+			CHECK_RESULT(DBpatch_4050506_convert_item_lld(&itemid, hostid, old_key, new_key,
+					prototype_itemid_rsm_dns_rtt_tcp, applicationid_dns, preproc_replacements));
+
+			/* convert "RTT of <ns>,<ip> using udp" (rsm.dns.rtt[<ns>,<ip>,udp]) item */
+			zbx_snprintf(old_key, sizeof(old_key), "rsm.dns.udp.rtt[{$RSM.TLD},%s,%s]", row[0], row[1]);
+			zbx_snprintf(new_key, sizeof(new_key), "rsm.dns.rtt[%s,%s,udp]", row[0], row[1]);
+			CHECK_RESULT(DBpatch_4050506_convert_item_lld(&itemid, hostid, old_key, new_key,
+					prototype_itemid_rsm_dns_rtt_udp, applicationid_dns, preproc_replacements));
+		}
+
+		DBfree_result(result);
+		result = NULL;
+
+		/* remove old applications */
+		CHECK(DBexecute("delete from applications where"
+					" hostid=" ZBX_FS_UI64 " and"
+					" name in ('DNS (TCP)', 'DNS (UDP)', 'DNS RTT (TCP)', 'DNS RTT (UDP)')",
+				hostid));
+	}
+
+	ret = SUCCEED;
+out:
+	DBfree_result(result);
+	DBfree_result(result_hostid);
+
+	return ret;
+}
+
+static int	DBpatch_4050507(void)
 {
 	int	ret;
 
@@ -1205,6 +1746,7 @@ DBPATCH_ADD(4050502, 0, 0)	/* set macro descriptions (part I) */
 DBPATCH_ADD(4050503, 0, 0)	/* set macro descriptions (part II) */
 DBPATCH_ADD(4050504, 0, 0)	/* add "DNS test mode" and "Transport protocol" value mappings */
 DBPATCH_ADD(4050505, 0, 0)	/* add "Template DNS Test" template */
-DBPATCH_ADD(4050506, 0, 0)	/* disable "db watchdog" internal items */
+DBPATCH_ADD(4050506, 0, 0)	/* convert hosts to use "Template DNS Test" template */
+DBPATCH_ADD(4050507, 0, 0)	/* disable "db watchdog" internal items */
 
 DBPATCH_END()
