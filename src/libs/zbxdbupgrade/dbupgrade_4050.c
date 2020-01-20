@@ -1233,7 +1233,7 @@ static int db_insert_rdap_item_preproc(const char *item_key, const char *item_pr
 	DB_ROW			row;
 	zbx_vector_uint64_t	rdap_itemids;
 	int			i, ret = FAIL;
-	zbx_uint64_t		item_preprocid_next /*, count*/;
+	zbx_uint64_t		item_preprocid_next;
 
 	zbx_vector_uint64_create(&rdap_itemids);
 
