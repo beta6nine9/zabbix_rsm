@@ -194,8 +194,8 @@ define('DISPLAY_CYCLES_BEFORE_RECOVERY',	3);
 
 // SLA monitoring probe status items keys
 define('PROBE_KEY_ONLINE',			'rsm.probe.online');
-define('PROBE_DNS_UDP_ITEM',		'rsm.dns.udp[{$RSM.TLD}]');// todo: remove
-define('PROBE_DNS_UDP_ITEM_RTT',	'rsm.dns.udp.rtt[');// todo: remove
+define('PROBE_DNS_UDP_ITEM',		'rsm.dns.udp[{$RSM.TLD}]');
+define('PROBE_DNS_UDP_ITEM_RTT',	'rsm.dns.udp.rtt[');
 define('PROBE_DNS_TEST',			'rsm.dns[{$RSM.TLD},{$RSM.DNS.TESTPREFIX},{$RSM.DNS.NAME.SERVERS},{$RSM.TLD.DNSSEC.ENABLED},{$RSM.TLD.RDDS.ENABLED},{$RSM.TLD.EPP.ENABLED},{$RSM.TLD.DNS.UDP.ENABLED},{$RSM.TLD.DNS.TCP.ENABLED},{$RSM.IP4.ENABLED},{$RSM.IP6.ENABLED},{$RSM.RESOLVER},{$RSM.DNS.UDP.RTT.HIGH},{$RSM.DNS.TCP.RTT.HIGH}]');
 define('PROBE_DNS_TCP_RTT',			'rsm.dns.rtt[{#NS},{#IP},tcp]');
 define('PROBE_DNS_UDP_RTT',			'rsm.dns.rtt[{#NS},{#IP},udp]');
@@ -248,6 +248,7 @@ define('RSM_TEST_GROUP',		'testTLD');
 define('RSM_RDDS_SUBSERVICE_RDDS', 'RDDS43/80');
 define('RSM_RDDS_SUBSERVICE_RDAP', 'RDAP');
 
+// Value maps used for special purpose.
 define('PROBES_MON_GROUPID',	130);
 define('RSM_SERVICE_AVAIL_VALUE_MAP', 110);
 define('RSM_DNS_TRANSPORT_PROTOCOL_VALUE_MAP', 162);

@@ -20,9 +20,13 @@
 
 
 /**
- * Base controller for ICANN mvc controllers.
+ * Base controller for ICANN MVC controllers.
  */
 class RSMControllerBase extends CController {
+
+	protected function init() {
+		$this->disableSIDvalidation();
+	}
 
 	/**
 	 * Get profile data value for key $key.
@@ -93,10 +97,10 @@ class RSMControllerBase extends CController {
 	 * @return array
 	 */
 	protected function getMacroHistoryValue(array $macro, $time_till) {
-		static $rsm_hostid;
+		static $rsm;
 		$values = [];
 
-		if (!$rsm_hostid) {
+		if (!$rsm) {
 			$rsm = API::Host()->get([
 				'output' => ['hostid'],
 				'filter' => ['host' => RSM_HOST]
@@ -118,11 +122,12 @@ class RSMControllerBase extends CController {
 
 			foreach ($macro_items as $macro_item) {
 				/**
-				 * To get value that actually was current at the time when data was collected, we need to get history record
-				 * that was newest at the moment of requested time.
+				 * To get value that actually was current at the time when data was collected, we need to get history
+				 * record that was newest at the moment of requested time.
 				 *
 				 * In other words:
-				 * SELECT * FROM history_uint WHERE itemid=<itemid> AND <test_time_from> >= clock ORDER BY clock DESC LIMIT 1
+				 * SELECT * FROM history_uint WHERE itemid=<itemid> AND <test_time_from> >= clock ORDER BY clock DESC
+				 * LIMIT 1
 				 */
 				$macro_item_value = API::History()->get([
 					'output' => ['value'],
@@ -147,7 +152,7 @@ class RSMControllerBase extends CController {
 	 * will be set.
 	 *
 	 * @param int $options['time_from']  Interval start time to retrieve value of item.
-	 * @param int $options['time_till']  Interval end time to retrvieve value of item.
+	 * @param int $options['time_till']  Interval end time to retrieve value of item.
 	 * @param int $options['history']    Item value type.
 	 * @return array
 	 */
@@ -175,6 +180,7 @@ class RSMControllerBase extends CController {
 
 		return $items;
 	}
+
 	/**
 	 * Generic permissions check for ICANN.
 	 *
@@ -187,16 +193,31 @@ class RSMControllerBase extends CController {
 		return in_array($this->getUserType(), $valid_users);
 	}
 
-	protected function checkSID() {
-		return true;
-	}
-
+	/**
+	 * Method should normally have a controller level successor method to specify specific controller validation rules.
+	 *
+	 * @return boolean
+	 */
 	protected function checkInput() {
 		return true;
 	}
 
+	/**
+	 * Method should be overwritten by controller level method.
+	 */
 	protected function doAction() {
 		error(_s('%s doAction is not implemented', get_class($this)));
 		$this->setResponse(new CControllerResponseFatal());
+	}
+
+	/**
+	 * Exception method.
+	 *
+	 * @static
+	 *
+	 * @param string $error
+	 */
+	protected static function exception($error = '') {
+		throw new APIException($code, $error);
 	}
 }

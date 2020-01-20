@@ -42,10 +42,8 @@ class CControllerAggregateDetails extends RSMControllerBase {
 			'slv_itemid' => 'required|int32'
 		];
 
-		$ret = $this->validateInput($fields) && $this->initAdditionalInput();
-
+		// Report is not available in registrar mode.
 		if (get_rsm_monitoring_type() === MONITORING_TARGET_REGISTRAR) {
-			// Report is not available in registrar mode.
 			$this->setResponse(new CControllerResponseRedirect((new CUrl('zabbix.php'))
 				->setArgument('action', 'rsm.incidentdetails')
 				->setArgument('host', $this->getInput('tld_host', ''))
@@ -55,6 +53,7 @@ class CControllerAggregateDetails extends RSMControllerBase {
 			return false;
 		}
 
+		$ret = $this->validateInput($fields);
 		if (!$ret) {
 			$this->setResponse(new CControllerResponseFatal());
 		}
@@ -63,8 +62,19 @@ class CControllerAggregateDetails extends RSMControllerBase {
 	}
 
 	/**
-	 * Check is requested tld_host and slv_itemid exists. Initializes properties:
-	 *   'tld', 'slv_item', 'availability_item', 'probes'.
+	 * Check if user has enough permissions to all requested resources.
+	 *
+	 * @throws Exception if no access to requested resources.
+	 *
+	 * @return boolean
+	 */
+	protected function checkPermissions() {
+		return (parent::checkPermissions() && $this->initAdditionalInput());
+	}
+
+	/**
+	 * Check is requested tld_host and slv_itemid exists.
+	 * Initializes properties: 'tld', 'slv_item', 'availability_item', 'probes'.
 	 *
 	 * @return bool
 	 */
@@ -80,8 +90,7 @@ class CControllerAggregateDetails extends RSMControllerBase {
 		$this->tld = reset($tld);
 
 		if (!$this->tld) {
-			error(_('No permissions to referred TLD or it does not exist!'));
-			return false;
+			self::exception(_('No permissions to referred TLD or it does not exist!'));
 		}
 
 		// slv_item
@@ -92,8 +101,7 @@ class CControllerAggregateDetails extends RSMControllerBase {
 		$this->slv_item = reset($slv_items);
 
 		if (!$this->slv_item) {
-			error(_('No permissions to referred SLV item or it does not exist!'));
-			return false;
+			self::exception(_('No permissions to referred SLV item or it does not exist!'));
 		}
 
 		// availability_item
@@ -106,8 +114,7 @@ class CControllerAggregateDetails extends RSMControllerBase {
 		$this->availability_item = reset($avail_item);
 
 		if (!$this->availability_item) {
-			error(_s('Item with key "%1$s" not exist on TLD!', $key));
-			return false;
+			self::exception(_s('Item with key "%1$s" not exist on TLD!', $key));
 		}
 
 		// probes
@@ -507,7 +514,7 @@ class CControllerAggregateDetails extends RSMControllerBase {
 			CALCULATED_ITEM_DNS_DELAY => null,
 			CALCULATED_ITEM_DNS_AVAIL_MINNS => null,
 			CALCULATED_ITEM_DNS_UDP_RTT_LOW => 500,
-			CALCULATED_ITEM_DNS_TCP_RTT_LOW => 1500,
+			CALCULATED_ITEM_DNS_TCP_RTT_LOW => 1500
 		];
 		$macro = $this->getMacroHistoryValue(array_keys($defaults), $time_from);
 
@@ -526,7 +533,7 @@ class CControllerAggregateDetails extends RSMControllerBase {
 			'udp_rtt' => $macro[CALCULATED_ITEM_DNS_UDP_RTT_LOW],
 			'tcp_rtt' => $macro[CALCULATED_ITEM_DNS_TCP_RTT_LOW],
 			'test_error_message' => $this->getValueMapping(RSM_DNS_RTT_ERRORS_VALUE_MAP),
-			'test_status_message' => $this->getValueMapping(RSM_SERVICE_AVAIL_VALUE_MAP),
+			'test_status_message' => $this->getValueMapping(RSM_SERVICE_AVAIL_VALUE_MAP)
 		];
 		$time_till = $time_from + ($macro[CALCULATED_ITEM_DNS_DELAY] - 1);
 

@@ -100,7 +100,7 @@ foreach ($data['probes'] as $probe) {
 	$row = [
 		(new CSpan($probe['host']))->addClass($probe_status_color),
 		$probe_status,
-		$probe['transport'],
+		isset($probe['transport']) ? $probe['transport'] : '-',
 		$probe_disabled ? '-' : $probe['ns_up'],
 		$probe_disabled ? '-' : $probe['ns_down']
 	];
