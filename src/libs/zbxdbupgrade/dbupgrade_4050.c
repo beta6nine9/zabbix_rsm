@@ -1204,7 +1204,7 @@ static int	DBpatch_4050508(void)
 	ONLY_SERVER();
 
 	/* 4 = ITEM_VALUE_TYPE_TEXT */
-	CHECK(DBexecute("update items set value_type='4' where key_ like 'rdap[%%'"));
+	CHECK(DBexecute("update items set name='RDAP Test',value_type='4',history='0' where key_ like 'rdap[%%'"));
 
 	ret = SUCCEED;
 out:
@@ -1227,33 +1227,15 @@ out:
 	return ret;
 }
 
-static int db_insert_rdap_item_preproc(const char* item_key, const char* item_preproc_param)
+static int db_insert_rdap_item_preproc(const char *item_key, const char *item_preproc_param)
 {
 	DB_RESULT		result;
 	DB_ROW			row;
 	zbx_vector_uint64_t	rdap_itemids;
 	int			i, ret = FAIL;
-	zbx_uint64_t		item_preprocid_next, count;
+	zbx_uint64_t		item_preprocid_next /*, count*/;
 
 	zbx_vector_uint64_create(&rdap_itemids);
-	zbx_vector_uint64_reserve(&rdap_itemids, 1);
-
-	result = DBselect("select count(*) from item_preproc where params='%s'", item_preproc_param);
-	if (NULL == (row = DBfetch(result)))
-	{
-		DBfree_result(result);
-		goto out;
-	}
-
-	ZBX_STR2UINT64(count, row[0]);
-
-	DBfree_result(result);
-
-	if (0 < count)
-	{
-		ret = SUCCEED;
-		goto out;
-	}
 
 	result = DBselect("select itemid from items where key_='%s'", item_key);
 
