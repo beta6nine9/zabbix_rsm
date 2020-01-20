@@ -61,8 +61,8 @@ while (0)
 															\
 do															\
 {															\
-	int result = (CODE);												\
-	if (SUCCEED != result)												\
+	int __result = (CODE);												\
+	if (SUCCEED != __result)											\
 	{														\
 		goto out;												\
 	}														\
@@ -74,8 +74,8 @@ while (0)
 															\
 do															\
 {															\
-	int result = (CODE);												\
-	if (ZBX_DB_OK > result)												\
+	int __result = (CODE);												\
+	if (ZBX_DB_OK > __result)											\
 	{														\
 		goto out;												\
 	}														\
@@ -87,38 +87,38 @@ while (0)
 															\
 do															\
 {															\
-	DB_RESULT	result;												\
-	DB_ROW		row;												\
+	DB_RESULT	__result;											\
+	DB_ROW		__row;												\
 															\
-	result = DBselect(query, __VA_ARGS__);										\
+	__result = DBselect(query, __VA_ARGS__);									\
 															\
 	/* check for errors */												\
-	if (NULL == result)												\
+	if (NULL == __result)												\
 	{														\
 		goto out;												\
 	}														\
 															\
-	row = DBfetch(result);												\
+	__row = DBfetch(__result);											\
 															\
 	/* check if there's at least one row in the resultset */							\
-	if (NULL == row)												\
+	if (NULL == __row)												\
 	{														\
-		DBfree_result(result);											\
+		DBfree_result(__result);										\
 		goto out;												\
 	}														\
 															\
-	ZBX_STR2UINT64(target_variable, row[0]);									\
+	ZBX_STR2UINT64(target_variable, __row[0]);									\
 															\
-	row = DBfetch(result);												\
+	__row = DBfetch(__result);											\
 															\
 	/* check that there are no more rows in the resultset */							\
-	if (NULL != row)												\
+	if (NULL != __row)												\
 	{														\
-		DBfree_result(result);											\
+		DBfree_result(__result);										\
 		goto out;												\
 	}														\
 															\
-	DBfree_result(result);												\
+	DBfree_result(__result);											\
 }															\
 while (0)
 
@@ -898,7 +898,7 @@ static int	DBpatch_4050505(void)
 	zbx_uint64_t	valuemapid_transport_protocol;			/* valuemapid of "Transport protocol" */
 	zbx_uint64_t	valuemapid_rsm_dns_rtt;				/* valuemapid of "RSM DNS rtt" */
 
-	zbx_uint64_t	hostid_template_dns;				/* hostid of "Template DNS Test" template */
+	zbx_uint64_t	hostid_template_dns_test;			/* hostid of "Template DNS Test" template */
 	zbx_uint64_t	hostgroupid_template_dns;			/* hostgroupid of "Template DNS Test" template in "Templates" host group */
 
 	zbx_uint64_t	applicationid_next;
@@ -960,7 +960,7 @@ static int	DBpatch_4050505(void)
 	GET_VALUE_MAP_ID(valuemapid_transport_protocol, "Transport protocol");
 	GET_VALUE_MAP_ID(valuemapid_rsm_dns_rtt, "RSM DNS rtt");
 
-	hostid_template_dns                        = DBget_maxid_num("hosts", 1);
+	hostid_template_dns_test                   = DBget_maxid_num("hosts", 1);
 
 	hostgroupid_template_dns                   = DBget_maxid_num("hosts_groups", 1);
 
@@ -1034,21 +1034,21 @@ static int	DBpatch_4050505(void)
 			"snmp_error='',jmx_disable_until=0,jmx_available=0,jmx_errors_from=0,jmx_error='',name='%s',"
 			"info_1='',info_2='',flags=0,templateid=NULL,description='',tls_connect=1,tls_accept=1,"
 			"tls_issuer='',tls_subject='',tls_psk_identity='',tls_psk='',proxy_address='',auto_compress=1",
-			hostid_template_dns, "Template DNS Test", "Template DNS Test"));
+			hostid_template_dns_test, "Template DNS Test", "Template DNS Test"));
 
 	CHECK(DBexecute("insert into hosts_groups set hostgroupid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ","
 			"groupid=" ZBX_FS_UI64,
-			hostgroupid_template_dns, hostid_template_dns, groupid_templates));
+			hostgroupid_template_dns, hostid_template_dns_test, groupid_templates));
 
-	CHECK(DBpatch_4050505_create_application(applicationid_dns, hostid_template_dns, "DNS"));
-	CHECK(DBpatch_4050505_create_application(applicationid_dnssec, hostid_template_dns, "DNSSEC"));
+	CHECK(DBpatch_4050505_create_application(applicationid_dns, hostid_template_dns_test, "DNS"));
+	CHECK(DBpatch_4050505_create_application(applicationid_dnssec, hostid_template_dns_test, "DNSSEC"));
 
-	CHECK(DBpatch_4050505_create_item(itemid_dnssec_enabled, ITEM_TYPE_CALCULATED, hostid_template_dns,
+	CHECK(DBpatch_4050505_create_item(itemid_dnssec_enabled, ITEM_TYPE_CALCULATED, hostid_template_dns_test,
 			"DNSSEC enabled/disabled", "dnssec.enabled", "60", "90d", "365d",
 			ITEM_VALUE_TYPE_UINT64, 0, "{$RSM.TLD.DNSSEC.ENABLED}", 0,
 			"History of DNSSEC being enabled or disabled.",
 			"30d", 0));
-	CHECK(DBpatch_4050505_create_item(itemid_rsm_dns, ITEM_TYPE_SIMPLE, hostid_template_dns,
+	CHECK(DBpatch_4050505_create_item(itemid_rsm_dns, ITEM_TYPE_SIMPLE, hostid_template_dns_test,
 			"DNS Test",
 			"rsm.dns[{$RSM.TLD},{$RSM.DNS.TESTPREFIX},{$RSM.DNS.NAME.SERVERS},{$RSM.TLD.DNSSEC.ENABLED},"
 				"{$RSM.TLD.RDDS.ENABLED},{$RSM.TLD.EPP.ENABLED},{$RSM.TLD.DNS.UDP.ENABLED},"
@@ -1059,48 +1059,48 @@ static int	DBpatch_4050505(void)
 			"Master item that performs the test and generates JSON with results."
 			" This JSON will be parsed by dependent items. History must be disabled.",
 			"30d", 0));
-	CHECK(DBpatch_4050505_create_item(itemid_rsm_dns_nssok, ITEM_TYPE_DEPENDENT, hostid_template_dns,
+	CHECK(DBpatch_4050505_create_item(itemid_rsm_dns_nssok, ITEM_TYPE_DEPENDENT, hostid_template_dns_test,
 			"Number of working Name Servers", "rsm.dns.nssok", "0", "90d", "365d",
 			ITEM_VALUE_TYPE_UINT64, 0, "", 0,
 			"Number of Name Servers that returned successful results out of those used in the test.",
 			"30d", itemid_rsm_dns));
-	CHECK(DBpatch_4050505_create_item(itemid_rsm_dns_ns_discovery, ITEM_TYPE_DEPENDENT, hostid_template_dns,
+	CHECK(DBpatch_4050505_create_item(itemid_rsm_dns_ns_discovery, ITEM_TYPE_DEPENDENT, hostid_template_dns_test,
 			"Name Servers discovery", "rsm.dns.ns.discovery", "0", "90d", "0",
 			ITEM_VALUE_TYPE_TEXT, 0, "", ZBX_FLAG_DISCOVERY,
 			"Discovers Name Servers that were used in DNS test.",
 			"1000d", itemid_rsm_dns));
-	CHECK(DBpatch_4050505_create_item(itemid_rsm_dns_nsip_discovery, ITEM_TYPE_DEPENDENT, hostid_template_dns,
+	CHECK(DBpatch_4050505_create_item(itemid_rsm_dns_nsip_discovery, ITEM_TYPE_DEPENDENT, hostid_template_dns_test,
 			"NS-IP pairs discovery", "rsm.dns.nsip.discovery", "0", "90d", "0",
 			ITEM_VALUE_TYPE_TEXT, 0, "", ZBX_FLAG_DISCOVERY,
 			"Discovers Name Servers (NS-IP pairs) that were used in DNS test.",
 			"1000d", itemid_rsm_dns));
-	CHECK(DBpatch_4050505_create_item(itemid_rsm_dns_ns_status, ITEM_TYPE_DEPENDENT, hostid_template_dns,
+	CHECK(DBpatch_4050505_create_item(itemid_rsm_dns_ns_status, ITEM_TYPE_DEPENDENT, hostid_template_dns_test,
 			"Status of $1", "rsm.dns.ns.status[{#NS}]", "0", "90d", "365d",
 			ITEM_VALUE_TYPE_UINT64, valuemapid_rsm_service_availability, "", ZBX_FLAG_DISCOVERY_PROTOTYPE,
 			"Status of Name Server: Up (1) or Down (0)."
 			" The Name Server is considered to be up if all its IPs returned successful RTTs.",
 			"30d", itemid_rsm_dns));
-	CHECK(DBpatch_4050505_create_item(itemid_rsm_dns_rtt_tcp, ITEM_TYPE_DEPENDENT, hostid_template_dns,
+	CHECK(DBpatch_4050505_create_item(itemid_rsm_dns_rtt_tcp, ITEM_TYPE_DEPENDENT, hostid_template_dns_test,
 			"RTT of $1,$2 using $3", "rsm.dns.rtt[{#NS},{#IP},tcp]", "0", "90d", "365d",
 			ITEM_VALUE_TYPE_FLOAT, valuemapid_rsm_dns_rtt, "", ZBX_FLAG_DISCOVERY_PROTOTYPE,
 			"The Round-Time Trip returned when testing specific IP of Name Server using TCP protocol.",
 			"30d", itemid_rsm_dns));
-	CHECK(DBpatch_4050505_create_item(itemid_rsm_dns_rtt_udp, ITEM_TYPE_DEPENDENT, hostid_template_dns,
+	CHECK(DBpatch_4050505_create_item(itemid_rsm_dns_rtt_udp, ITEM_TYPE_DEPENDENT, hostid_template_dns_test,
 			"RTT of $1,$2 using $3", "rsm.dns.rtt[{#NS},{#IP},udp]", "0", "90d", "365d",
 			ITEM_VALUE_TYPE_FLOAT, valuemapid_rsm_dns_rtt, "", ZBX_FLAG_DISCOVERY_PROTOTYPE,
 			"The Round-Time Trip returned when testing specific IP of Name Server using UDP protocol.",
 			"30d", itemid_rsm_dns));
-	CHECK(DBpatch_4050505_create_item(itemid_rsm_dns_nsid, ITEM_TYPE_DEPENDENT, hostid_template_dns,
+	CHECK(DBpatch_4050505_create_item(itemid_rsm_dns_nsid, ITEM_TYPE_DEPENDENT, hostid_template_dns_test,
 			"NSID of $1,$2", "rsm.dns.nsid[{#NS},{#IP}]", "0", "90d", "0",
 			ITEM_VALUE_TYPE_STR, 0, "", ZBX_FLAG_DISCOVERY_PROTOTYPE,
 			"DNS Name Server Identifier of the target Name Server that was tested.",
 			"30d", itemid_rsm_dns));
-	CHECK(DBpatch_4050505_create_item(itemid_rsm_dns_mode, ITEM_TYPE_DEPENDENT, hostid_template_dns,
+	CHECK(DBpatch_4050505_create_item(itemid_rsm_dns_mode, ITEM_TYPE_DEPENDENT, hostid_template_dns_test,
 			"The mode of the Test", "rsm.dns.mode", "0", "90d", "365d",
 			ITEM_VALUE_TYPE_UINT64, valuemapid_dns_test_mode, "", 0,
 			"The mode (normal or critical) in which the test was performed.",
 			"30d", itemid_rsm_dns));
-	CHECK(DBpatch_4050505_create_item(itemid_rsm_dns_protocol, ITEM_TYPE_DEPENDENT, hostid_template_dns,
+	CHECK(DBpatch_4050505_create_item(itemid_rsm_dns_protocol, ITEM_TYPE_DEPENDENT, hostid_template_dns_test,
 			"Transport protocol of the Test", "rsm.dns.protocol", "0", "90d", "365d",
 			ITEM_VALUE_TYPE_UINT64, valuemapid_transport_protocol, "", 0,
 			"Transport protocol (UDP or TCP) that was used during the test.",
