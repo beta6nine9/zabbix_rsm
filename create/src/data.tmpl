@@ -72,7 +72,7 @@ ROW   |100     |Probes-Critical|0          |0       |0     |1h        |system-cr
 ROW   |110     |Probes-Mon     |0          |0       |0     |1h        |probes#{TRIGGER.STATUS}#{HOST.NAME1}#{ITEM.NAME1}#{ITEM.VALUE1}         |{EVENT.DATE} {EVENT.TIME} UTC|probes#{TRIGGER.STATUS}#{HOST.NAME1}#{ITEM.NAME1}#{ITEM.VALUE1}         |{EVENT.RECOVERY.DATE} {EVENT.RECOVERY.TIME} UTC|       |1               |Acknowledged: {EVENT.NAME}|{USER.FULLNAME} acknowledged problem at {ACK.DATE} {ACK.TIME} with the following message:&eol;{ACK.MESSAGE}&eol;&eol;Current problem status is {EVENT.STATUS}|
 ROW   |115     |Probes         |0          |0       |0     |1h        |probes#{TRIGGER.STATUS}#{HOST.NAME1}#{ITEM.NAME1}#{ITEM.VALUE1}         |{EVENT.DATE} {EVENT.TIME} UTC|probes#{TRIGGER.STATUS}#{HOST.NAME1}#{ITEM.NAME1}#{ITEM.VALUE1}         |{EVENT.RECOVERY.DATE} {EVENT.RECOVERY.TIME} UTC|       |1               |Acknowledged: {EVENT.NAME}|{USER.FULLNAME} acknowledged problem at {ACK.DATE} {ACK.TIME} with the following message:&eol;{ACK.MESSAGE}&eol;&eol;Current problem status is {EVENT.STATUS}|
 ROW   |120     |Central-Server |0          |0       |0     |1h        |system#{TRIGGER.STATUS}#{HOST.NAME1}#{ITEM.NAME1}#{ITEM.VALUE1}         |{EVENT.DATE} {EVENT.TIME} UTC|system#{TRIGGER.STATUS}#{HOST.NAME1}#{ITEM.NAME1}#{ITEM.VALUE1}         |{EVENT.RECOVERY.DATE} {EVENT.RECOVERY.TIME} UTC|       |1               |Acknowledged: {EVENT.NAME}|{USER.FULLNAME} acknowledged problem at {ACK.DATE} {ACK.TIME} with the following message:&eol;{ACK.MESSAGE}&eol;&eol;Current problem status is {EVENT.STATUS}|
-ROW   |130     |TLDs           |0          |0       |1     |1h        |                                                                        |                             |                                                                        |                                               |       |1               |Acknowledged: {EVENT.NAME}|{USER.FULLNAME} acknowledged problem at {ACK.DATE} {ACK.TIME} with the following message:&eol;{ACK.MESSAGE}&eol;&eol;Current problem status is {EVENT.STATUS}|
+ROW   |130     |TLDs           |0          |0       |0     |1h        |                                                                        |                             |                                                                        |                                               |       |1               |Acknowledged: {EVENT.NAME}|{USER.FULLNAME} acknowledged problem at {ACK.DATE} {ACK.TIME} with the following message:&eol;{ACK.MESSAGE}&eol;&eol;Current problem status is {EVENT.STATUS}|
 ROW   |140     |Probes-Knockout|0          |0       |0     |1h        |probes#{TRIGGER.STATUS}#{HOST.NAME1}#{ITEM.NAME1}#{ITEM.VALUE1}         |{EVENT.DATE} {EVENT.TIME} UTC|probes#{TRIGGER.STATUS}#{HOST.NAME1}#{ITEM.NAME1}#{ITEM.VALUE1}         |{EVENT.RECOVERY.DATE} {EVENT.RECOVERY.TIME} UTC|       |1               |Acknowledged: {EVENT.NAME}|{USER.FULLNAME} acknowledged problem at {ACK.DATE} {ACK.TIME} with the following message:&eol;{ACK.MESSAGE}&eol;&eol;Current problem status is {EVENT.STATUS}|
 
 TABLE |operations
@@ -82,6 +82,7 @@ ROW   |110        |110     |0            |0         |1            |1          |0
 ROW   |115        |115     |0            |0         |1            |1          |0       |0       |
 ROW   |120        |120     |0            |0         |1            |1          |0       |0       |
 ROW   |130        |130     |1            |0         |1            |1          |0       |0       |
+ROW   |131        |130     |1            |0         |1            |1          |0       |1       |
 ROW   |140        |140     |1            |0         |1            |1          |0       |0       |
 ROW   |141        |100     |11           |0         |1            |1          |0       |1       |
 ROW   |142        |110     |11           |0         |1            |1          |0       |1       |
@@ -109,13 +110,15 @@ ROW   |115            |115        |100   |
 ROW   |120            |120        |100   |
 
 TABLE |opcommand
-FIELDS|operationid|type|scriptid|execute_on|port|authtype|username|password|publickey|privatekey|command                                                                                    |
-ROW   |130        |0   |NULL    |1         |    |0       |        |        |         |          |/opt/zabbix/scripts/tlds-notification.pl --send-to 'zabbix alert' --event-id '{EVENT.ID}' &|
-ROW   |140        |0   |NULL    |1         |    |0       |        |        |         |          |/opt/zabbix/scripts/probe-manual.pl --probe '{HOST.HOST}' --set 0                          |
+FIELDS|operationid|type|scriptid|execute_on|port|authtype|username|password|publickey|privatekey|command                                                                                             |
+ROW   |130        |0   |NULL    |1         |    |0       |        |        |         |          |/opt/zabbix/scripts/tlds-notification.pl --send-to 'zabbix alert' --event-id '{EVENT.ID}' &         |
+ROW   |131        |0   |NULL    |1         |    |0       |        |        |         |          |/opt/zabbix/scripts/tlds-notification.pl --send-to 'zabbix alert' --event-id '{EVENT.RECOVERY.ID}' &|
+ROW   |140        |0   |NULL    |1         |    |0       |        |        |         |          |/opt/zabbix/scripts/probe-manual.pl --probe '{HOST.HOST}' --set 0                                   |
 
 TABLE |opcommand_hst
 FIELDS|opcommand_hstid|operationid|hostid|
 ROW   |130            |130        |NULL  |
+ROW   |131            |131        |NULL  |
 ROW   |140            |140        |NULL  |
 
 TABLE |conditions

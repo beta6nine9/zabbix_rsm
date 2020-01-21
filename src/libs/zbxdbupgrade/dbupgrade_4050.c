@@ -1724,6 +1724,30 @@ static int	DBpatch_4050507(void)
 	return SUCCEED;
 }
 
+static int    DBpatch_4050508(void)
+{
+	int		ret = FAIL;
+	const char	*command = "/opt/zabbix/scripts/tlds-notification.pl --send-to \\'zabbix alert\\' --event-id \\'{EVENT.RECOVERY.ID}\\' &";
+
+	ONLY_SERVER();
+
+	/* enable "TLDs" action */
+
+	CHECK(DBexecute("update actions set status=0 where actionid=130"));
+
+	/* add recovery operation */
+
+	CHECK(DBexecute("insert into operations set operationid=131,actionid=130,operationtype=1,esc_period='0',"
+			"esc_step_from=1,esc_step_to=1,evaltype=0,recovery=1"));
+	CHECK(DBexecute("insert into opcommand set operationid=131,type=0,scriptid=NULL,execute_on=1,port='',"
+			"authtype=0,username='',password='',publickey='',privatekey='',command='%s'", command));
+	CHECK(DBexecute("insert into opcommand_hst set opcommand_hstid=131,operationid=131,hostid=NULL"));
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
 #endif
 
 DBPATCH_START(4050)
@@ -1742,11 +1766,12 @@ DBPATCH_ADD(4050011, 0, 1)
 DBPATCH_ADD(4050012, 0, 1)
 DBPATCH_ADD(4050500, 0, 1)	/* RSM FY20 */
 DBPATCH_ADD(4050501, 0, 1)	/* set delay as macro for rsm.dns.*, rsm.rdds*, rsm.rdap* and rsm.epp* items items */
-DBPATCH_ADD(4050502, 0, 0)	/* set macro descriptions (part I) */
-DBPATCH_ADD(4050503, 0, 0)	/* set macro descriptions (part II) */
+DBPATCH_ADD(4050502, 0, 0)	/* set global macro descriptions */
+DBPATCH_ADD(4050503, 0, 0)	/* set host macro descriptions */
 DBPATCH_ADD(4050504, 0, 0)	/* add "DNS test mode" and "Transport protocol" value mappings */
 DBPATCH_ADD(4050505, 0, 0)	/* add "Template DNS Test" template */
 DBPATCH_ADD(4050506, 0, 0)	/* convert hosts to use "Template DNS Test" template */
 DBPATCH_ADD(4050507, 0, 0)	/* disable "db watchdog" internal items */
+DBPATCH_ADD(4050508, 0, 0)	/* upgrade "TLDs" action (upgrade process to Zabbix 4.x failed to upgrade it) */
 
 DBPATCH_END()
