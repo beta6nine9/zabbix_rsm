@@ -4173,7 +4173,6 @@ int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	ret = SYSINFO_RET_OK;
 
 	/* skip the test itself in case of two special values in RDAP base URL parameter */
-
 	if (0 == strcmp(base_url, "not listed"))
 	{
 		rsm_err(log_fd, "The TLD is not listed in the Bootstrap Service Registry for Domain Name Space");
