@@ -125,19 +125,11 @@ sub add_probe($$$$$$$$$$$)
 	my $probe_groupid = create_group($probe_name);
 	is_not_empty($probe_groupid, true);
 
-	########## Creating Probe template
+	########## Creating Probe Config template
 
-	print("Creating '$probe_name' template: ");
-	my $probe_tmpl = create_probe_template($probe_name, $epp, $ipv4, $ipv6, $rdds, $rdap, $resolver);
-	is_not_empty($probe_tmpl, true);
-
-
-	########## Creating Probe status template
-
-	print("Creating '$probe_name' probe status template: ");
-	my $root_servers_macros = update_root_servers();
-	my $probe_status_templateid = create_probe_status_template($probe_name, $probe_tmpl, $root_servers_macros);
-	is_not_empty($probe_status_templateid, true);
+	print("Creating '$probe_name' config template: ");
+	my $probe_tmpl_id = create_probe_template($probe_name, $epp, $ipv4, $ipv6, $rdds, $rdap, $resolver);
+	is_not_empty($probe_tmpl_id, true);
 
 	########## Creating Probe host
 
@@ -150,13 +142,13 @@ sub add_probe($$$$$$$$$$$)
 		],
 		'templates'	=> [
 			{
-				'templateid'	=> $probe_status_templateid
+				'templateid'	=> $probe_tmpl_id
+			},
+			{
+				'templateid'	=> PROBE_STATUS_TEMPLATEID
 			},
 			{
 				'templateid'	=> APP_ZABBIX_PROXY_TEMPLATEID
-			},
-			{
-				'templateid'	=> PROBE_ERRORS_TEMPLATEID
 			}
 		],
 		'host'		=> $probe_name,
@@ -246,7 +238,7 @@ sub add_probe($$$$$$$$$$$)
 					'templateid'	=> RDDS_TEMPLATEID
 				},
 				{
-					'templateid'	=> $probe_tmpl
+					'templateid'	=> $probe_tmpl_id
 				}
 			],
 			'host'		=> "$tld_name $probe_name",
@@ -280,7 +272,7 @@ sub add_probe($$$$$$$$$$$)
 sub delete_probe($) {
     my $probe_name = shift;
 
-    my ($probe, $probe_hostgroup, $probe_host, $probe_host_mon, $probe_tmpl, $probe_tmpl_status);
+    my ($probe, $probe_hostgroup, $probe_host, $probe_host_mon, $probe_tmpl);
 
     my ($result);
 
@@ -298,13 +290,10 @@ sub delete_probe($) {
 
     check_probe_data($probe_host_mon, "Probe monitoring host with name '$probe_name - mon' is not found", false);
 
-    $probe_tmpl = get_template('Template '.$probe_name, true, false);
+    $probe_tmpl = get_template(TEMPLATE_PROBE_CONFIG_PREFIX . $probe_name, true, false);
 
-    check_probe_data($probe_tmpl, "Probe monitoring template with name 'Template $probe_name' is not found", false);
-
-    $probe_tmpl_status = get_template('Template '.$probe_name.' Status', false, false);
-
-    check_probe_data($probe_tmpl_status, "Probe Status monitoring template with name 'Template $probe_name Status' is not found", false);
+    check_probe_data($probe_tmpl, "Probe monitoring template with name '" . TEMPLATE_PROBE_CONFIG_PREFIX .
+		"$probe_name' is not found", false);
 
     $probe_hostgroup = get_host_group($probe_name, false, false);
 
@@ -321,30 +310,6 @@ sub delete_probe($) {
 
 	is_not_empty($result->{'templateids'}, false);
     }
-
-    ########## Deleting probe template status
-    if (keys %{$probe_tmpl_status}) {
-	my $templateid = $probe_tmpl_status->{'templateid'};
-        my $template_name = $probe_tmpl_status->{'host'};
-
-	print "Trying to remove '$template_name' probe template status: ";
-
-	$result = remove_templates([ $templateid ]);
-
-	is_not_empty($result->{'templateids'}, false);
-    }
-
-    ########## Deleting probe host
-#    if (keys %{$probe_host}) {
-#        my $hostid = $probe_host->{'hostid'};
-#        my $host_name = $probe_host->{'host'};
-#
-#        print "Trying to remove '$host_name' probe host: ";
-#
-#        $result = remove_hosts( [ $hostid ] );
-#
-#	is_not_empty($result->{'hostids'}, false);
-#    }
 
     ########## Deleting TLDs and probe host linked to the Probe
     foreach my $host (@{$probe->{'hosts'}}) {
@@ -396,7 +361,7 @@ sub delete_probe($) {
 sub disable_probe($) {
     my $probe_name = shift;
 
-    my ($probe, $probe_hostgroup, $probe_host, $probe_host_mon, $probe_tmpl, $probe_tmpl_status);
+    my ($probe, $probe_hostgroup, $probe_host, $probe_host_mon, $probe_tmpl);
 
     my ($result);
 
@@ -414,14 +379,10 @@ sub disable_probe($) {
 
     check_probe_data($probe_host_mon, "Probe monitoring host with name '$probe_name - mon' is not found", false);
 
-    $probe_tmpl = get_template('Template '.$probe_name, true, false);
+    $probe_tmpl = get_template(TEMPLATE_PROBE_CONFIG_PREFIX . $probe_name, true, false);
 
-    check_probe_data($probe_tmpl, "Probe monitoring template with name 'Template $probe_name' is not found", false);
-
-    $probe_tmpl_status = get_template('Template '.$probe_name.' Status', false, false);
-
-    check_probe_data($probe_tmpl_status, "Probe Status monitoring template with name 'Template $probe_name Status' is not found", false);
-
+    check_probe_data($probe_tmpl, "Probe monitoring template with name '" . TEMPLATE_PROBE_CONFIG_PREFIX .
+		"$probe_name' is not found", false);
 
     ########## Disabling TLDs linked to the probe and Probe monitoring host
 
@@ -508,13 +469,10 @@ sub rename_probe($$) {
     check_probe_data($probe_host_mon, "Probe monitoring host with name '$old_name - mon' is not found", false);
 
 # check arguments
-    $probe_tmpl = get_template('Template '.$old_name, false, false);
+    $probe_tmpl = get_template(TEMPLATE_PROBE_CONFIG_PREFIX . $old_name, true, false);
 
-    check_probe_data($probe_tmpl, "Probe monitoring template with name 'Template $old_name' is not found", false);
-
-    $probe_tmpl_status = get_template('Template '.$old_name.' Status', false, false);
-
-    check_probe_data($probe_tmpl_status, "Probe Status monitoring template with name 'Template $old_name Status' is not found", false);
+    check_probe_data($probe_tmpl, "Probe monitoring template with name '" . TEMPLATE_PROBE_CONFIG_PREFIX .
+		"$old_name' is not found", false);
 
     $probe_hostgroup = get_host_group($old_name, false, false);
 
@@ -561,12 +519,7 @@ sub rename_probe($$) {
 
     my $template_name = $probe_tmpl->{'host'};
     print "Trying to rename '$template_name' template: ";
-    $result = rename_template($probe_tmpl->{'templateid'}, 'Template '.$new_name);
-    is_not_empty($result->{'templateids'}, false);
-
-    $template_name = $probe_tmpl_status->{'host'};
-    print "Trying to rename '$template_name' template: ";
-    $result = rename_template($probe_tmpl_status->{'templateid'}, 'Template '.$new_name.' Status');
+    $result = rename_template($probe_tmpl->{'templateid'}, TEMPLATE_PROBE_CONFIG_PREFIX . $new_name);
     is_not_empty($result->{'templateids'}, false);
 
     print "Trying to rename '$old_name' host group: ";
@@ -624,7 +577,7 @@ sub update_probe_items($$$)
 
 	pfail("invalid service \"$service\"") if (!exists($item_key{$service}));
 
-	my $template = 'Template ' . $probe;
+	my $template = TEMPLATE_PROBE_CONFIG_PREFIX . $probe;
 	my $result = get_template($template, false, true);	# do not select macros, select hosts
 
 	pfail("$probe template \"$template\" does not exist") if (keys(%{$result}) == 0);

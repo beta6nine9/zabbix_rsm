@@ -782,9 +782,8 @@ sub __get_probes($)
 		"select hosts.hostid,hosts.host,hostmacro.macro,hostmacro.value,hosts.status" .
 		" from hosts" .
 			" left join hosts_groups on hosts_groups.hostid=hosts.hostid" .
-			" left join hosts_templates as hosts_templates_1 on hosts_templates_1.hostid=hosts.hostid" .
-			" left join hosts_templates as hosts_templates_2 on hosts_templates_2.hostid=hosts_templates_1.templateid" .
-			" left join hostmacro on hostmacro.hostid=hosts_templates_2.templateid" .
+			" left join hosts_templates on hosts_templates.hostid=hosts.hostid" .
+			" left join hostmacro on hostmacro.hostid=hosts_templates.templateid" .
 		" where $name_condition" .
 			" hosts_groups.groupid=" . PROBES_GROUPID . " and" .
 			" hostmacro.macro in ('{\$RSM.IP4.ENABLED}','{\$RSM.IP6.ENABLED}','{\$RSM.RDDS.ENABLED}','{\$RSM.RDAP.ENABLED}')");

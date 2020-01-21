@@ -1421,34 +1421,6 @@ sub create_slv_ns_items($$$)
 	}
 }
 
-sub create_rdds_or_rdap_slv_items($$$;$)
-{
-	my $hostid       = shift;
-	my $host_name    = shift;
-	my $service      = shift;
-	my $item_status  = shift;
-
-	$item_status = ITEM_STATUS_ACTIVE unless (defined($item_status));
-
-	pfail("Internal error, invalid service '$service', expected RDDS or RDAP") unless ($service eq "RDDS" || $service eq "RDAP");
-
-	my $service_lc = lc($service);
-
-	create_slv_item("$service availability"         , "rsm.slv.$service_lc.avail"   , $hostid, VALUE_TYPE_AVAIL, [get_application_id(APP_SLV_PARTTEST, $hostid)]);
-	create_slv_item("$service minutes of downtime"  , "rsm.slv.$service_lc.downtime", $hostid, VALUE_TYPE_NUM  , [get_application_id(APP_SLV_CURMON, $hostid)]);
-	create_slv_item("$service weekly unavailability", "rsm.slv.$service_lc.rollweek", $hostid, VALUE_TYPE_PERC , [get_application_id(APP_SLV_ROLLWEEK, $hostid)]);
-
-	create_avail_trigger($service, $host_name);
-	create_dependent_trigger_chain($host_name, $service, \&create_downtime_trigger, $trigger_thresholds);
-	create_dependent_trigger_chain($host_name, $service, \&create_rollweek_trigger, $trigger_thresholds);
-
-	create_slv_item("Number of performed monthly $service queries", "rsm.slv.$service_lc.rtt.performed", $hostid, VALUE_TYPE_NUM , [get_application_id(APP_SLV_CURMON, $hostid)]);
-	create_slv_item("Number of failed monthly $service queries"   , "rsm.slv.$service_lc.rtt.failed"   , $hostid, VALUE_TYPE_NUM , [get_application_id(APP_SLV_CURMON, $hostid)]);
-	create_slv_item("Ratio of failed monthly $service queries"    , "rsm.slv.$service_lc.rtt.pfailed"  , $hostid, VALUE_TYPE_PERC, [get_application_id(APP_SLV_CURMON, $hostid)]);
-
-	create_dependent_trigger_chain($host_name, $service, \&create_ratio_of_failed_tests_trigger, $trigger_thresholds);
-}
-
 sub __is_rdap_standalone()
 {
 	return $cfg_global_macros->{'{$RSM.RDAP.STANDALONE}'} != 0 &&
@@ -1460,6 +1432,8 @@ sub create_slv_items($$$)
 	my $ns_servers = shift;
 	my $hostid     = shift;
 	my $host_name  = shift;
+
+	my $all_templates;
 
 	create_slv_ns_items($ns_servers, $hostid, $host_name);
 
@@ -1473,11 +1447,7 @@ sub create_slv_items($$$)
 
 	if (opt('dnssec'))
 	{
-		create_slv_item('DNSSEC availability', 'rsm.slv.dnssec.avail', $hostid, VALUE_TYPE_AVAIL, [get_application_id(APP_SLV_PARTTEST, $hostid)]);
-		create_slv_item('DNSSEC weekly unavailability', 'rsm.slv.dnssec.rollweek', $hostid, VALUE_TYPE_PERC, [get_application_id(APP_SLV_ROLLWEEK, $hostid)]);
-
-		create_avail_trigger('DNSSEC', $host_name);
-		create_dependent_trigger_chain($host_name, 'DNSSEC', \&create_rollweek_trigger, $trigger_thresholds);
+		$all_templates = link_template_to_host($hostid, DNSSEC_STATUS_TEMPLATEID);
 	}
 
 	if (opt('epp-servers'))
@@ -1504,17 +1474,27 @@ sub create_slv_items($$$)
 	{
 		if (!__is_rdap_standalone())
 		{
-			# we haven't switched to RDAP yet, create RDDS items which may also include RDAP check results
-			create_rdds_or_rdap_slv_items($hostid, $host_name, "RDDS");
+			# we haven't switched to RDAP yet, link RDDS template
+			$all_templates = link_template_to_host($hostid, RDDS_STATUS_TEMPLATEID, $all_templates);
 
-			# create future RDAP items, it's ok for them to be active
-			create_rdds_or_rdap_slv_items($hostid, $host_name, "RDAP") if (opt('rdap-base-url'));
+			# link RDAP template in advance
+			if (opt('rdap-base-url'))
+			{
+				$all_templates = link_template_to_host($hostid, RDAP_STATUS_TEMPLATEID, $all_templates);
+			}
 		}
 		else
 		{
-			# after the switch, RDDS and RDAP item sets are opt-in
-			create_rdds_or_rdap_slv_items($hostid, $host_name, "RDAP") if (opt('rdap-base-url'));
-			create_rdds_or_rdap_slv_items($hostid, $host_name, "RDDS") if (opt('rdds43-servers') || opt('rdds80-servers'));
+			# after the switch, RDDS and RDAP are opt-in
+			if (opt('rdap-base-url'))
+			{
+				$all_templates = link_template_to_host($hostid, RDAP_STATUS_TEMPLATEID, $all_templates);
+			}
+
+			if (opt('rdds43-servers') || opt('rdds80-servers'))
+			{
+				$all_templates = link_template_to_host($hostid, RDDS_STATUS_TEMPLATEID, $all_templates);
+			}
 		}
 	}
 }
@@ -1749,16 +1729,14 @@ sub create_tld_hosts_on_probes($$$$)
 			$status = HOST_STATUS_MONITORED;
 		}
 
-		my $probe_status_templateid = create_probe_status_template($probe_name, $probe_templateid, $root_servers_macros);
-
 		really(create_host({
 			'groups' => [
 				{'groupid' => PROBES_GROUPID}
 			],
 			'templates' => [
-				{'templateid' => $probe_status_templateid},
+				{'templateid' => PROBE_STATUS_TEMPLATEID},
 				{'templateid' => APP_ZABBIX_PROXY_TEMPLATEID},
-				{'templateid' => PROBE_ERRORS_TEMPLATEID}
+				{'templateid' => $probe_templateid}
 			],
 			'host'         => $probe_name,
 			'status'       => $status,
