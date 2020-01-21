@@ -1724,7 +1724,7 @@ static int	DBpatch_4050507(void)
 	return SUCCEED;
 }
 
-static int    DBpatch_4050508(void)
+static int	DBpatch_4050508(void)
 {
 	int		ret = FAIL;
 	const char	*command = "/opt/zabbix/scripts/tlds-notification.pl --send-to \\'zabbix alert\\' --event-id \\'{EVENT.RECOVERY.ID}\\' &";
