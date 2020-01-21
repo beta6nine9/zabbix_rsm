@@ -77,11 +77,11 @@ foreach my $service (keys(%services))
 		$services{$service}{'delay'} = get_rdds_delay();
 		$services{$service}{'valuemaps'} = get_valuemaps($service);
 		$services{$service}{'key_status'} = 'rsm.rdds[{$RSM.TLD}'; # 0 - down, 1 - up, 2 - only 43, 3 - only 80
-		$services{$service}{'key_43_rtt'} = 'rsm.rdds.43.rtt[{$RSM.TLD}]';
-		$services{$service}{'key_43_ip'} = 'rsm.rdds.43.ip[{$RSM.TLD}]';
-		$services{$service}{'key_43_upd'} = 'rsm.rdds.43.upd[{$RSM.TLD}]';
-		$services{$service}{'key_80_rtt'} = 'rsm.rdds.80.rtt[{$RSM.TLD}]';
-		$services{$service}{'key_80_ip'} = 'rsm.rdds.80.ip[{$RSM.TLD}]';
+		$services{$service}{'key_43_rtt'} = 'rsm.rdds.43.rtt';
+		$services{$service}{'key_43_ip'} = 'rsm.rdds.43.ip';
+		$services{$service}{'key_43_upd'} = 'rsm.rdds.43.upd';
+		$services{$service}{'key_80_rtt'} = 'rsm.rdds.80.rtt';
+		$services{$service}{'key_80_ip'} = 'rsm.rdds.80.ip';
 
 	}
 
