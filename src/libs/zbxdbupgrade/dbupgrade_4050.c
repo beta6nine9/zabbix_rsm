@@ -1147,13 +1147,13 @@ static int	DBpatch_4050505(void)
 	CHECK(DBpatch_4050505_item_preproc(item_preprocid_rsm_dns_nsip_discovery, itemid_rsm_dns_nsip_discovery,
 			"$.nsips", 0));
 	CHECK(DBpatch_4050505_item_preproc(item_preprocid_rsm_dns_ns_status, itemid_rsm_dns_ns_status,
-			"$.nss[?(@.[''ns''] == ''{#NS}'')].status.first()", 0));
+			"$.nss[?(@.[''ns''] == ''{#NS}'')].status.first()", 1));
 	CHECK(DBpatch_4050505_item_preproc(item_preprocid_rsm_dns_rtt_tcp, itemid_rsm_dns_rtt_tcp,
 			"$.nsips[?(@.[''ns''] == ''{#NS}'' && @.[''ip''] == ''{#IP}'' && @.[''protocol''] == ''tcp'')].rtt.first()", 1));
 	CHECK(DBpatch_4050505_item_preproc(item_preprocid_rsm_dns_rtt_udp, itemid_rsm_dns_rtt_udp,
 			"$.nsips[?(@.[''ns''] == ''{#NS}'' && @.[''ip''] == ''{#IP}'' && @.[''protocol''] == ''udp'')].rtt.first()", 1));
 	CHECK(DBpatch_4050505_item_preproc(item_preprocid_rsm_dns_nsid, itemid_rsm_dns_nsid,
-			"$.nsips[?(@.[''ns''] == ''{#NS}'' && @.[''ip''] == ''{#IP}'')].nsid.first()", 0));
+			"$.nsips[?(@.[''ns''] == ''{#NS}'' && @.[''ip''] == ''{#IP}'')].nsid.first()", 1));
 	CHECK(DBpatch_4050505_item_preproc(item_preprocid_rsm_dns_mode, itemid_rsm_dns_mode,
 			"$.mode", 0));
 	CHECK(DBpatch_4050505_item_preproc(item_preprocid_rsm_dns_protocol, itemid_rsm_dns_protocol,
