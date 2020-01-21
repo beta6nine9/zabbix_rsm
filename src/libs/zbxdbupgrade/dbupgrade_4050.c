@@ -1768,7 +1768,7 @@ out:
 	return ret;
 }
 
-static int db_insert_rdap_item_preproc(const char *item_key, const char *item_preproc_param)
+static int	db_insert_rdap_item_preproc(const char *item_key, const char *item_preproc_param)
 {
 	DB_RESULT		result;
 	DB_ROW			row;
