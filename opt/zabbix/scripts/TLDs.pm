@@ -15,7 +15,10 @@ use constant RSMHOST_DNS_NS_LOG_ACTION_DISABLE => 2;
 
 our @EXPORT = qw(zbx_connect check_api_error get_proxies_list
 		get_api_error zbx_need_relogin
+		CONFIG_HISTORY_TEMPLATEID
+		DNS_TEMPLATEID
 		RDDS_TEMPLATEID
+		RDAP_TEMPLATEID
 		create_probe_template create_probe_status_template create_host create_group create_template
 		create_item create_trigger create_macro update_root_servers
 		create_passive_proxy probe_exists get_host_group get_template get_template_id get_probe get_host
@@ -217,9 +220,24 @@ sub get_template_id($)
 	return $_saved_template_ids{$template_name};
 }
 
+sub CONFIG_HISTORY_TEMPLATEID
+{
+	return get_template_id(TEMPLATE_CONFIG_HISTORY);
+}
+
+sub DNS_TEMPLATEID
+{
+	return get_template_id(TEMPLATE_DNS_TEST);
+}
+
 sub RDDS_TEMPLATEID
 {
 	return get_template_id(TEMPLATE_RDDS_TEST);
+}
+
+sub RDAP_TEMPLATEID
+{
+	return get_template_id(TEMPLATE_RDAP_TEST);
 }
 
 sub remove_templates($)

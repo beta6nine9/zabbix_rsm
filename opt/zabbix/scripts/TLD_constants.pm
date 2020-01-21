@@ -13,9 +13,6 @@ use constant MONITORING_TARGET_REGISTRAR => "registrar";
 use constant LINUX_TEMPLATEID			=> 10001;	# Template "Template OS Linux by Zabbix agent"
 use constant APP_ZABBIX_PROXY_TEMPLATEID	=> 10058;	# Template "Template App Zabbix Proxy"
 use constant PROBE_ERRORS_TEMPLATEID		=> 99990;	# Template "Template Probe Errors"
-use constant DNS_TEMPLATEID			=> 99500;	# Template "Template DNS"
-use constant RDAP_TEMPLATEID			=> 99980;	# Template "Template RDAP"
-use constant CONFIG_HISTORY_TEMPLATEID		=> 100002;	# Template "Template Config History"
 
 use constant TEMPLATES_TLD_GROUPID		=> 240;		# Host group "Templates - TLD"
 use constant PROBES_GROUPID			=> 120;		# Host group "Probes"
@@ -24,7 +21,10 @@ use constant TLDS_GROUPID			=> 140;		# Host group "TLDs"
 use constant TLD_PROBE_RESULTS_GROUPID		=> 190;		# Host group "TLD Probe results"
 
 use constant TEMPLATE_RSMHOST_CONFIG_PREFIX	=> 'Template Rsmhost Config ';
+use constant TEMPLATE_CONFIG_HISTORY		=> 'Template Config History';
+use constant TEMPLATE_DNS_TEST			=> 'Template DNS Test';
 use constant TEMPLATE_RDDS_TEST			=> 'Template RDDS Test';
+use constant TEMPLATE_RDAP_TEST			=> 'Template RDAP Test';
 
 use constant VALUE_TYPE_AVAIL => 0;
 use constant VALUE_TYPE_PERC  => 1;
@@ -113,10 +113,10 @@ use constant RSM_TRIGGER_THRESHOLDS => {
 };
 
 use constant CFG_GLOBAL_MACROS => {
-	'{$RSM.DNS.UDP.DELAY}' => '', 
-	'{$RSM.DNS.TCP.DELAY}' => '', 
-	'{$RSM.RDDS.DELAY}' => '', 
-	'{$RSM.EPP.DELAY}' => '',
+	'{$RSM.DNS.UDP.DELAY}'   => '',
+	'{$RSM.DNS.TCP.DELAY}'   => '',
+	'{$RSM.RDDS.DELAY}'      => '',
+	'{$RSM.EPP.DELAY}'       => '',
 	'{$RSM.RDAP.STANDALONE}' => ''
 };
 
@@ -175,9 +175,6 @@ our @EXPORT_OK = qw(
 	LINUX_TEMPLATEID
 	APP_ZABBIX_PROXY_TEMPLATEID
 	PROBE_ERRORS_TEMPLATEID
-	DNS_TEMPLATEID
-	RDAP_TEMPLATEID
-	CONFIG_HISTORY_TEMPLATEID
 	CONFIGVALUE_DNS_UDP_RTT_HIGH_ITEMID
 	TEMPLATES_TLD_GROUPID
 	PROBES_GROUPID
@@ -187,7 +184,10 @@ our @EXPORT_OK = qw(
 	TLD_TYPE_GROUPIDS
 	TLD_TYPE_PROBE_RESULTS_GROUPIDS
 	TEMPLATE_RSMHOST_CONFIG_PREFIX
+	TEMPLATE_CONFIG_HISTORY
+	TEMPLATE_DNS_TEST
 	TEMPLATE_RDDS_TEST
+	TEMPLATE_RDAP_TEST
 	VALUE_TYPE_AVAIL
 	VALUE_TYPE_PERC
 	VALUE_TYPE_NUM
@@ -214,11 +214,11 @@ our %EXPORT_TAGS = (
 			LINUX_TEMPLATEID
 			APP_ZABBIX_PROXY_TEMPLATEID
 			PROBE_ERRORS_TEMPLATEID
-			DNS_TEMPLATEID
-			RDAP_TEMPLATEID
-			CONFIG_HISTORY_TEMPLATEID
 			TEMPLATE_RSMHOST_CONFIG_PREFIX
-			TEMPLATE_RDDS_TEST) ],
+			TEMPLATE_CONFIG_HISTORY
+			TEMPLATE_DNS_TEST
+			TEMPLATE_RDDS_TEST
+			TEMPLATE_RDAP_TEST) ],
 	groups => [ qw(
 			TEMPLATES_TLD_GROUPID
 			PROBES_GROUPID
