@@ -1748,7 +1748,109 @@ out:
 	return ret;
 }
 
-static int	DBpatch_4050509(void)
+static int    DBpatch_4050509(void)
+{
+	int		ret = FAIL;
+
+	zbx_uint64_t	groupid_templates;		/* groupid of "Templates" host group */
+
+	zbx_uint64_t	hostid;				/* hostid of "Template Config History" template */
+
+	zbx_uint64_t	applicationid_next;
+	zbx_uint64_t	applicationid_dns;		/* applicationid of "DNS" application */
+	zbx_uint64_t	applicationid_dnssec;		/* applicationid of "DNSSEC" application */
+	zbx_uint64_t	applicationid_rdap;		/* applicationid of "RDAP" application */
+	zbx_uint64_t	applicationid_rdds;		/* applicationid of "RDDS" application */
+
+	zbx_uint64_t	itemid_next;
+	zbx_uint64_t	itemid_dns_tcp_enabled;		/* itemid of "dns.tcp.enabled" item */
+	zbx_uint64_t	itemid_dns_udp_enabled;		/* itemid of "dns.udp.enabled" item */
+	zbx_uint64_t	itemid_dnssec_enabled;		/* itemid of "dnssec.enabled" item */
+	zbx_uint64_t	itemid_rdap_enabled;		/* itemid of "rdap.enabled" item */
+	zbx_uint64_t	itemid_rdds_enabled;		/* itemid of "rdds.enabled" item */
+
+	ONLY_SERVER();
+
+	GET_HOST_GROUP_ID(groupid_templates, "Templates");
+
+	hostid = DBget_maxid_num("hosts", 1);
+
+	applicationid_next   = DBget_maxid_num("applications", 4);
+	applicationid_dns    = applicationid_next++;
+	applicationid_dnssec = applicationid_next++;
+	applicationid_rdap   = applicationid_next++;
+	applicationid_rdds   = applicationid_next++;
+
+	itemid_next            = DBget_maxid_num("items", 5);
+	itemid_dns_tcp_enabled = itemid_next++;
+	itemid_dns_udp_enabled = itemid_next++;
+	itemid_dnssec_enabled  = itemid_next++;
+	itemid_rdap_enabled    = itemid_next++;
+	itemid_rdds_enabled    = itemid_next++;
+
+	/* status 3 = HOST_STATUS_TEMPLATE */
+	CHECK(DBexecute("insert into hosts set"
+				" hostid=" ZBX_FS_UI64 ",created=0,proxy_hostid=NULL,host='%s',status=%d,"
+				"disable_until=0,error='',available=0,errors_from=0,lastaccess=0,ipmi_authtype=-1,"
+				"ipmi_privilege=2,ipmi_username='',ipmi_password='',ipmi_disable_until=0,"
+				"ipmi_available=0,snmp_disable_until=0,snmp_available=0,maintenanceid=NULL,"
+				"maintenance_status=0,maintenance_type=0,maintenance_from=0,ipmi_errors_from=0,"
+				"snmp_errors_from=0,ipmi_error='',snmp_error='',jmx_disable_until=0,jmx_available=0,"
+				"jmx_errors_from=0,jmx_error='',name='%s',info_1='',info_2='',flags=0,templateid=NULL,"
+				"description='',tls_connect=1,tls_accept=1,tls_issuer='',tls_subject='',"
+				"tls_psk_identity='',tls_psk='',proxy_address='',auto_compress=1",
+			hostid, "Template Config History", HOST_STATUS_TEMPLATE, "Template Config History"));
+
+	CHECK(DBexecute("insert into hosts_groups"
+				" set hostgroupid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",groupid=" ZBX_FS_UI64,
+			DBget_maxid_num("hosts_groups", 1), hostid, groupid_templates));
+
+#define SQL "insert into applications set applicationid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",name='%s',flags=0"
+	CHECK(DBexecute(SQL, applicationid_dns   , hostid, "DNS"));
+	CHECK(DBexecute(SQL, applicationid_dnssec, hostid, "DNSSEC"));
+	CHECK(DBexecute(SQL, applicationid_rdap  , hostid, "RDAP"));
+	CHECK(DBexecute(SQL, applicationid_rdds  , hostid, "RDDS"));
+#undef SQL
+
+/* type 15 = ITEM_TYPE_CALCULATED */
+/* value_type 3 = ITEM_VALUE_TYPE_UINT64 */
+#define SQL "insert into items set itemid=" ZBX_FS_UI64 ",type=%d,snmp_community='',snmp_oid='',"			\
+		"hostid=" ZBX_FS_UI64 ",name='%s',key_='%s',delay='%s',history='90d',trends='365d',status=0,"		\
+		"value_type=%d,trapper_hosts='',units='',snmpv3_securityname='',snmpv3_securitylevel=0,"		\
+		"snmpv3_authpassphrase='',snmpv3_privpassphrase='',formula='',logtimefmt='',templateid=NULL,"		\
+		"valuemapid=NULL,params='%s',ipmi_sensor='',authtype=0,username='',password='',publickey='',"		\
+		"privatekey='',flags=0,interfaceid=NULL,port='',description='%s',inventory_link=0,lifetime='30d',"	\
+		"snmpv3_authprotocol=0,snmpv3_privprotocol=0,snmpv3_contextname='',evaltype=0,jmx_endpoint='',"		\
+		"master_itemid=NULL,timeout='3s',url='',query_fields='',posts='',status_codes='200',"			\
+		"follow_redirects=1,post_type=0,http_proxy='',headers='',retrieve_mode=0,request_method=0,"		\
+		"output_format=0,ssl_cert_file='',ssl_key_file='',ssl_key_password='',verify_peer=0,verify_host=0,"	\
+		"allow_traps=0"
+	CHECK(DBexecute(SQL, itemid_dns_tcp_enabled, 15, hostid, "DNS TCP enabled/disabled", "dns.tcp.enabled", "1m",
+			3, "{$RSM.TLD.DNS.TCP.ENABLED}", "History of DNS TCP being enabled or disabled."));
+	CHECK(DBexecute(SQL, itemid_dns_udp_enabled, 15, hostid, "DNS UDP enabled/disabled", "dns.udp.enabled", "1m",
+			3, "{$RSM.TLD.DNS.UDP.ENABLED}", "History of DNS UDP being enabled or disabled."));
+	CHECK(DBexecute(SQL, itemid_dnssec_enabled , 15, hostid, "DNSSEC enabled/disabled" , "dnssec.enabled" , "1m",
+			3, "{$RSM.TLD.DNSSEC.ENABLED}" , "History of DNSSEC being enabled or disabled."));
+	CHECK(DBexecute(SQL, itemid_rdap_enabled   , 15, hostid, "RDAP enabled/disabled"   , "rdap.enabled"   , "1m",
+			3, "{$RDAP.TLD.ENABLED}"       , "History of RDAP being enabled or disabled."));
+	CHECK(DBexecute(SQL, itemid_rdds_enabled   , 15, hostid, "RDDS enabled/disabled"   , "rdds.enabled"   , "1m",
+			3, "{$RSM.TLD.RDDS.ENABLED}"   , "History of RDDS being enabled or disabled."));
+#undef SQL
+
+#define SQL "insert into items_applications set itemappid=" ZBX_FS_UI64 ",applicationid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64
+	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_dns   , itemid_dns_tcp_enabled));
+	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_dns   , itemid_dns_udp_enabled));
+	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_dnssec, itemid_dnssec_enabled));
+	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdap  , itemid_rdap_enabled));
+	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds  , itemid_rdds_enabled));
+#undef SQL
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
+static int	DBpatch_4050510(void)
 {
 	int	ret = FAIL;
 
@@ -1762,7 +1864,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_4050510(void)
+static int	DBpatch_4050511(void)
 {
 	int	ret = FAIL;
 
@@ -1776,7 +1878,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_4050511(void)
+static int	DBpatch_4050512(void)
 {
 	int	ret = FAIL;
 
@@ -1832,7 +1934,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_4050512(void)
+static int	DBpatch_4050513(void)
 {
 
 	int	ret = FAIL;
@@ -1846,7 +1948,6 @@ static int	DBpatch_4050512(void)
 
 	return ret;
 }
-
 
 #endif
 
@@ -1873,8 +1974,10 @@ DBPATCH_ADD(4050505, 0, 0)	/* add "Template DNS Test" template */
 DBPATCH_ADD(4050506, 0, 0)	/* convert hosts to use "Template DNS Test" template */
 DBPATCH_ADD(4050507, 0, 0)	/* disable "db watchdog" internal items */
 DBPATCH_ADD(4050508, 0, 0)	/* upgrade "TLDs" action (upgrade process to Zabbix 4.x failed to upgrade it) */
-DBPATCH_ADD(4050509, 0, 0)	/* Rename RDAP Template */
-DBPATCH_ADD(4050510, 0, 0)	/* set RDAP master item value_type to the text type */
-DBPATCH_ADD(4050511, 0, 0)	/* set RDAP calculated items to be dependent items */
-DBPATCH_ADD(4050512, 0, 0)	/* add item_preproc to RDAP ip and rtt items */
+DBPATCH_ADD(4050509, 0, 0)	/* add "Template Config History" template */
+DBPATCH_ADD(4050510, 0, 0)	/* Rename RDAP Template */
+DBPATCH_ADD(4050511, 0, 0)	/* set RDAP master item value_type to the text type */
+DBPATCH_ADD(4050512, 0, 0)	/* set RDAP calculated items to be dependent items */
+DBPATCH_ADD(4050513, 0, 0)	/* add item_preproc to RDAP ip and rtt items */
+
 DBPATCH_END()

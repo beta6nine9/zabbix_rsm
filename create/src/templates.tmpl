@@ -30,8 +30,7 @@ ROW   |10056 |0      |NULL        |Template App Agentless    |3     |0          
 ROW   |10057 |0      |NULL        |Zabbix Server             |0     |-1           |2             |             |             |Zabbix Server             |      |      |0    |NULL      |           |1          |1         |          |           |                |       |             |1            |
 ROW   |10058 |0      |NULL        |Template App Zabbix Proxy |3     |0            |2             |             |             |Template App Zabbix Proxy |      |      |0    |NULL      |           |1          |1         |          |           |                |       |             |1            |
 ROW   |99500 |0      |NULL        |Template DNS Test         |3     |-1           |2             |             |             |Template DNS Test         |      |      |0    |NULL      |           |1          |1         |          |           |                |       |             |1            |
-ROW   |99980 |0      |NULL        |Template RDAP Test        |3     |0            |2             |             |             |Template RDAP Test        |      |      |0    |NULL      |           |1          |1         |          |           |                |       |             |1            |
-ROW   |99990 |0      |NULL        |Template Probe Errors     |3     |0            |2             |             |             |Template Probe Errors     |      |      |0    |NULL      |           |1          |1         |          |           |                |       |             |1            |
+ROW   |99980 |0      |NULL        |Template RDAP             |3     |0            |2             |             |             |Template RDAP             |      |      |0    |NULL      |           |1          |1         |          |           |                |       |             |1            |
 
 TABLE |screens
 FIELDS|screenid|name                |hsize|vsize|templateid|userid|private|
@@ -85,7 +84,6 @@ ROW   |226          |10058 |Zabbix proxy      |0    |
 ROW   |227          |99500 |DNS               |0    |
 ROW   |228          |99500 |DNSSEC            |0    |
 ROW   |998          |99980 |RDAP              |0    |
-ROW   |999          |99990 |Internal errors   |0    |
 ROW   |1000         |100000|Configuration     |0    |
 ROW   |1001         |100001|Probe availability|0    |
 ROW   |1002         |100002|DNS               |0    |
@@ -303,7 +301,6 @@ ROW   |99980 |3   |              |        |99980 |RDAP Test                     
 ROW   |99981 |18  |              |        |99980 |RDAP IP                                     |rdap.ip                                                                                                                                                                                                                                                                                                       |0                   |1w     |365d  |0     |1         |             |        |                   |0                   |                     |                     |       |          |NULL      |NULL      |                              |           |0       |        |        |         |          |0    |NULL       |    |IP address of Registration Data Access Protocol service provider domain used to perform the test.                                              |0             |0       |0                  |0                  |                  |0       |            |99980        |3s     |    |            |     |200         |1               |0        |       |0            |1             |0            |0          |0          |0          |
 ROW   |99982 |18  |              |        |99980 |RDAP RTT                                    |rdap.rtt                                                                                                                                                                                                                                                                                                      |0                   |1w     |365d  |0     |0         |             |        |                   |0                   |                     |                     |       |          |NULL      |135       |                              |           |0       |        |        |         |          |0    |NULL       |    |Round-Trip Time of Registration Data Access Protocol service test.                                                                             |0             |0       |0                  |0                  |                  |0       |            |99980        |3s     |    |            |     |200         |1               |0        |       |0            |1             |0            |0          |0          |0          |
 ROW   |99983 |15  |              |        |99980 |RDAP enabled/disabled                       |rdap.enabled                                                                                                                                                                                                                                                                                                  |1m                  |1w     |365d  |0     |3         |             |        |                   |0                   |                     |                     |       |          |NULL      |NULL      |{$RDAP.TLD.ENABLED}           |           |0       |        |        |         |          |0    |NULL       |    |History of Registration Data Access Protocol being enabled or disabled.                                                                        |0             |0       |0                  |0                  |                  |0       |            |NULL         |3s     |    |            |     |200         |1               |0        |       |0            |1             |0            |0          |0          |0          |
-ROW   |99990 |3   |              |        |99990 |Internal error rate                         |rsm.errors                                                                                                                                                                                                                                                                                                    |1m                  |90d    |365d  |0     |0         |             |        |                   |0                   |                     |                     |       |          |NULL      |NULL      |                              |           |0       |        |        |         |          |0    |NULL       |    |                                                                                                                                               |0             |30d     |0                  |0                  |                  |0       |            |NULL         |3s     |    |            |     |200         |1               |0        |       |0            |1             |0            |0          |0          |0          |
 ROW   |10020 |5   |              |        |10001 |Agent availability                          |zabbix[host,agent,available]                                                                                                                                                                                                                                                                                  |30s                 |1w     |365d  |0     |3         |             |        |                   |0                   |                     |                     |       |          |22232     |1         |                              |           |0       |        |        |         |          |0    |NULL       |    |                                                                                                                                               |0             |0       |0                  |0                  |                  |0       |            |NULL         |3s     |    |            |     |200         |1               |0        |       |0            |1             |0            |0          |0          |0          |
 ROW   |10059 |0   |              |        |10001 |Version of zabbix_agent(d) running          |agent.version                                                                                                                                                                                                                                                                                                 |1d                  |1w     |0     |0     |1         |             |        |                   |0                   |                     |                     |       |          |22231     |NULL      |                              |           |0       |        |        |         |          |0    |NULL       |    |                                                                                                                                               |0             |0       |0                  |0                  |                  |0       |            |NULL         |3s     |    |            |     |200         |1               |0        |       |0            |1             |0            |0          |0          |0          |
 ROW   |23319 |0   |              |        |10001 |Host name of zabbix_agentd running          |agent.hostname                                                                                                                                                                                                                                                                                                |1h                  |1w     |0     |0     |1         |             |        |                   |0                   |                     |                     |       |          |23318     |NULL      |                              |           |0       |        |        |         |          |0    |NULL       |    |                                                                                                                                               |0             |30d     |0                  |0                  |                  |0       |            |NULL         |3s     |    |            |     |200         |1               |0        |       |0            |1             |0            |0          |0          |0          |
@@ -462,8 +459,6 @@ ROW   |13621    |({TRIGGER.VALUE}=0 and {13050}>75) or ({TRIGGER.VALUE}=1 and {1
 ROW   |13622    |({TRIGGER.VALUE}=0 and {13051}>75) or ({TRIGGER.VALUE}=1 and {13051}>65)|Zabbix snmp trapper processes more than 75% busy                |    |0     |3       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
 ROW   |13623    |({TRIGGER.VALUE}=0 and {13052}>75) or ({TRIGGER.VALUE}=1 and {13052}>65)|Zabbix trapper processes more than 75% busy                     |    |0     |3       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
 ROW   |13624    |({TRIGGER.VALUE}=0 and {13053}>75) or ({TRIGGER.VALUE}=1 and {13053}>65)|Zabbix unreachable poller processes more than 75% busy          |    |0     |3       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
-ROW   |99990    |{99990}>0                                                               |Internal errors happening for {$PROBE.INTERNAL.ERROR.INTERVAL}  |    |0     |4       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
-ROW   |99991    |{99991}>0                                                               |Internal errors happening                                       |    |0     |2       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
 ROW   |10045    |{12927}>0                                                               |Version of zabbix_agent(d) was changed on {HOST.NAME}           |    |1     |1       |                                                                                                                                      |13026     |0   |0    |0            |                   |0               |               |0           |      |
 ROW   |10047    |{12550}=0                                                               |Zabbix agent on {HOST.NAME} is unreachable                      |    |0     |3       |                                                                                                                                      |13025     |0   |0    |0            |                   |0               |               |0           |      |
 ROW   |13508    |{12937}>0                                                               |Host name of zabbix_agentd was changed on {HOST.NAME}           |    |1     |1       |                                                                                                                                      |13507     |0   |0    |0            |                   |0               |               |0           |      |
@@ -512,141 +507,135 @@ ROW   |13603    |({TRIGGER.VALUE}=0 and {13032}>75) or ({TRIGGER.VALUE}=1 and {1
 ROW   |13604    |{13033}=1                                                               |Zabbix value cache working in low memory mode                   |    |0     |4       |                                                                                                                                      |13577     |0   |0    |0            |                   |0               |               |0           |      |
 ROW   |13605    |({TRIGGER.VALUE}=0 and {13034}>75) or ({TRIGGER.VALUE}=1 and {13034}>65)|Zabbix vmware collector processes more than 75% busy            |    |0     |3       |                                                                                                                                      |13578     |0   |0    |0            |                   |0               |               |0           |      |
 
-TABLE |trigger_depends
-FIELDS|triggerdepid|triggerid_down|triggerid_up|
-ROW   |1           |99991         |99990       |
-
 TABLE |functions
-FIELDS|functionid|itemid|triggerid|name     |parameter                       |
-ROW   |10199     |10019 |10016    |diff     |0                               |
-ROW   |10204     |10055 |10041    |last     |0                               |
-ROW   |10207     |10058 |10044    |diff     |0                               |
-ROW   |10208     |10057 |10043    |diff     |0                               |
-ROW   |10233     |10009 |10190    |last     |0                               |
-ROW   |12144     |22182 |13000    |avg      |#3                              |
-ROW   |12333     |22550 |13134    |last     |0                               |
-ROW   |12334     |22549 |13135    |last     |0                               |
-ROW   |12335     |22551 |13136    |last     |0                               |
-ROW   |12336     |22552 |13137    |last     |0                               |
-ROW   |12345     |22553 |13138    |last     |0                               |
-ROW   |12549     |22232 |13025    |max      |#3                              |
-ROW   |12550     |10020 |10047    |max      |#3                              |
-ROW   |12553     |10056 |10042    |last     |0                               |
-ROW   |12555     |10013 |10011    |last     |0                               |
-ROW   |12580     |17350 |10012    |last     |0                               |
-ROW   |12583     |10025 |10021    |change   |0                               |
-ROW   |12586     |10010 |10010    |last     |0                               |
-ROW   |12589     |17362 |13243    |last     |0                               |
-ROW   |12592     |22686 |13266    |last     |0                               |
-ROW   |12598     |22454 |13272    |last     |0                               |
-ROW   |12657     |22554 |13139    |last     |0                               |
-ROW   |12659     |22696 |13277    |last     |0                               |
-ROW   |12661     |22691 |13133    |last     |0                               |
-ROW   |12663     |22694 |13279    |last     |0                               |
-ROW   |12665     |22692 |13281    |last     |0                               |
-ROW   |12667     |22548 |13283    |last     |0                               |
-ROW   |12669     |22698 |13285    |last     |0                               |
-ROW   |12926     |22231 |13026    |diff     |0                               |
-ROW   |12927     |10059 |10045    |diff     |0                               |
-ROW   |12936     |23318 |13507    |diff     |0                               |
-ROW   |12937     |23319 |13508    |diff     |0                               |
-ROW   |12938     |17352 |13509    |fuzzytime|10s                             |
-ROW   |12963     |23355 |13534    |diff     |0                               |
-ROW   |12964     |23356 |13535    |max      |#3                              |
-ROW   |12965     |23357 |13536    |diff     |0                               |
-ROW   |12966     |23358 |13537    |last     |0                               |
-ROW   |12967     |23359 |13538    |last     |0                               |
-ROW   |12968     |23360 |13539    |last     |0                               |
-ROW   |12969     |23361 |13540    |last     |0                               |
-ROW   |12970     |23365 |13541    |last     |0                               |
-ROW   |12971     |23370 |13542    |last     |0                               |
-ROW   |12972     |23376 |13543    |diff     |0                               |
-ROW   |12973     |23377 |13544    |fuzzytime|10s                             |
-ROW   |12974     |23379 |13545    |last     |0                               |
-ROW   |12975     |23381 |13546    |diff     |0                               |
-ROW   |12976     |23382 |13547    |change   |0                               |
-ROW   |12977     |23384 |13548    |diff     |0                               |
-ROW   |12978     |23331 |13549    |avg      |#3                              |
-ROW   |12979     |23350 |13550    |last     |0                               |
-ROW   |12980     |23352 |13551    |last     |0                               |
-ROW   |12981     |23388 |13552    |min      |10m                             |
-ROW   |12982     |22189 |13553    |min      |10m                             |
-ROW   |12983     |22183 |13554    |min      |10m                             |
-ROW   |12984     |23393 |13555    |min      |10m                             |
-ROW   |12985     |22185 |13556    |min      |10m                             |
-ROW   |12986     |23392 |13557    |min      |10m                             |
-ROW   |12987     |22219 |13558    |min      |10m                             |
-ROW   |12988     |22424 |13559    |avg      |10m                             |
-ROW   |12989     |22412 |13560    |avg      |10m                             |
-ROW   |12991     |22430 |13562    |avg      |10m                             |
-ROW   |12992     |22422 |13563    |avg      |10m                             |
-ROW   |12993     |22406 |13564    |avg      |10m                             |
-ROW   |12994     |22408 |13565    |avg      |30m                             |
-ROW   |12995     |22402 |13566    |avg      |10m                             |
-ROW   |12996     |22418 |13567    |avg      |10m                             |
-ROW   |12997     |22416 |13568    |avg      |10m                             |
-ROW   |12998     |22689 |13569    |avg      |10m                             |
-ROW   |12999     |22399 |13570    |avg      |10m                             |
-ROW   |13000     |22420 |13571    |avg      |10m                             |
-ROW   |13001     |22414 |13572    |min      |10m                             |
-ROW   |13002     |23171 |13573    |avg      |10m                             |
-ROW   |13003     |22426 |13574    |avg      |10m                             |
-ROW   |13004     |22404 |13575    |avg      |10m                             |
-ROW   |13005     |22400 |13576    |avg      |10m                             |
-ROW   |13006     |23391 |13577    |last     |                                |
-ROW   |13007     |23387 |13578    |avg      |10m                             |
-ROW   |13008     |23395 |13579    |min      |10m                             |
-ROW   |13009     |23341 |13580    |min      |10m                             |
-ROW   |13010     |23342 |13581    |min      |10m                             |
-ROW   |13011     |23400 |13582    |min      |10m                             |
-ROW   |13012     |23344 |13583    |min      |10m                             |
-ROW   |13013     |23399 |13584    |min      |10m                             |
-ROW   |13014     |23339 |13585    |min      |10m                             |
-ROW   |13015     |23320 |13586    |avg      |10m                             |
-ROW   |13016     |23321 |13587    |avg      |10m                             |
-ROW   |13018     |23323 |13589    |avg      |10m                             |
-ROW   |13019     |23324 |13590    |avg      |10m                             |
-ROW   |13020     |23325 |13591    |avg      |10m                             |
-ROW   |13021     |23326 |13592    |avg      |30m                             |
-ROW   |13022     |23327 |13593    |avg      |10m                             |
-ROW   |13023     |23328 |13594    |avg      |10m                             |
-ROW   |13024     |23329 |13595    |avg      |10m                             |
-ROW   |13025     |23330 |13596    |avg      |10m                             |
-ROW   |13026     |23332 |13597    |avg      |10m                             |
-ROW   |13027     |23333 |13598    |avg      |10m                             |
-ROW   |13028     |23334 |13599    |min      |10m                             |
-ROW   |13029     |23335 |13600    |avg      |10m                             |
-ROW   |13030     |23336 |13601    |avg      |10m                             |
-ROW   |13031     |23337 |13602    |avg      |10m                             |
-ROW   |13032     |23338 |13603    |avg      |10m                             |
-ROW   |13033     |23398 |13604    |last     |                                |
-ROW   |13034     |23394 |13605    |avg      |10m                             |
-ROW   |13035     |23418 |13606    |min      |10m                             |
-ROW   |13036     |23419 |13607    |min      |10m                             |
-ROW   |13037     |23420 |13608    |min      |10m                             |
-ROW   |13038     |23416 |13609    |min      |10m                             |
-ROW   |13039     |23401 |13610    |avg      |10m                             |
-ROW   |13040     |23402 |13611    |avg      |10m                             |
-ROW   |13041     |23403 |13612    |avg      |10m                             |
-ROW   |13042     |23404 |13613    |avg      |10m                             |
-ROW   |13043     |23405 |13614    |avg      |10m                             |
-ROW   |13044     |23406 |13615    |avg      |30m                             |
-ROW   |13045     |23407 |13616    |avg      |10m                             |
-ROW   |13046     |23408 |13617    |avg      |10m                             |
-ROW   |13047     |23409 |13618    |avg      |10m                             |
-ROW   |13048     |23410 |13619    |avg      |10m                             |
-ROW   |13049     |23411 |13620    |avg      |10m                             |
-ROW   |13050     |23412 |13621    |avg      |10m                             |
-ROW   |13051     |23413 |13622    |avg      |10m                             |
-ROW   |13052     |23414 |13623    |avg      |10m                             |
-ROW   |13053     |23415 |13624    |avg      |10m                             |
-ROW   |99990     |99990 |99990    |min      |{$PROBE.INTERNAL.ERROR.INTERVAL}|
-ROW   |99991     |99990 |99991    |last     |                                |
-ROW   |100100    |100100|100100   |last     |                                |
-ROW   |100101    |100101|100101   |last     |                                |
-ROW   |100102    |100102|100102   |last     |                                |
-ROW   |100103    |100103|100103   |last     |                                |
-ROW   |100104    |100104|100104   |last     |                                |
+FIELDS|functionid|itemid|triggerid|name     |parameter|
+ROW   |10199     |10019 |10016    |diff     |0        |
+ROW   |10204     |10055 |10041    |last     |0        |
+ROW   |10207     |10058 |10044    |diff     |0        |
+ROW   |10208     |10057 |10043    |diff     |0        |
+ROW   |10233     |10009 |10190    |last     |0        |
+ROW   |12144     |22182 |13000    |avg      |#3       |
+ROW   |12333     |22550 |13134    |last     |0        |
+ROW   |12334     |22549 |13135    |last     |0        |
+ROW   |12335     |22551 |13136    |last     |0        |
+ROW   |12336     |22552 |13137    |last     |0        |
+ROW   |12345     |22553 |13138    |last     |0        |
+ROW   |12549     |22232 |13025    |max      |#3       |
+ROW   |12550     |10020 |10047    |max      |#3       |
+ROW   |12553     |10056 |10042    |last     |0        |
+ROW   |12555     |10013 |10011    |last     |0        |
+ROW   |12580     |17350 |10012    |last     |0        |
+ROW   |12583     |10025 |10021    |change   |0        |
+ROW   |12586     |10010 |10010    |last     |0        |
+ROW   |12589     |17362 |13243    |last     |0        |
+ROW   |12592     |22686 |13266    |last     |0        |
+ROW   |12598     |22454 |13272    |last     |0        |
+ROW   |12657     |22554 |13139    |last     |0        |
+ROW   |12659     |22696 |13277    |last     |0        |
+ROW   |12661     |22691 |13133    |last     |0        |
+ROW   |12663     |22694 |13279    |last     |0        |
+ROW   |12665     |22692 |13281    |last     |0        |
+ROW   |12667     |22548 |13283    |last     |0        |
+ROW   |12669     |22698 |13285    |last     |0        |
+ROW   |12926     |22231 |13026    |diff     |0        |
+ROW   |12927     |10059 |10045    |diff     |0        |
+ROW   |12936     |23318 |13507    |diff     |0        |
+ROW   |12937     |23319 |13508    |diff     |0        |
+ROW   |12938     |17352 |13509    |fuzzytime|10s      |
+ROW   |12963     |23355 |13534    |diff     |0        |
+ROW   |12964     |23356 |13535    |max      |#3       |
+ROW   |12965     |23357 |13536    |diff     |0        |
+ROW   |12966     |23358 |13537    |last     |0        |
+ROW   |12967     |23359 |13538    |last     |0        |
+ROW   |12968     |23360 |13539    |last     |0        |
+ROW   |12969     |23361 |13540    |last     |0        |
+ROW   |12970     |23365 |13541    |last     |0        |
+ROW   |12971     |23370 |13542    |last     |0        |
+ROW   |12972     |23376 |13543    |diff     |0        |
+ROW   |12973     |23377 |13544    |fuzzytime|10s      |
+ROW   |12974     |23379 |13545    |last     |0        |
+ROW   |12975     |23381 |13546    |diff     |0        |
+ROW   |12976     |23382 |13547    |change   |0        |
+ROW   |12977     |23384 |13548    |diff     |0        |
+ROW   |12978     |23331 |13549    |avg      |#3       |
+ROW   |12979     |23350 |13550    |last     |0        |
+ROW   |12980     |23352 |13551    |last     |0        |
+ROW   |12981     |23388 |13552    |min      |10m      |
+ROW   |12982     |22189 |13553    |min      |10m      |
+ROW   |12983     |22183 |13554    |min      |10m      |
+ROW   |12984     |23393 |13555    |min      |10m      |
+ROW   |12985     |22185 |13556    |min      |10m      |
+ROW   |12986     |23392 |13557    |min      |10m      |
+ROW   |12987     |22219 |13558    |min      |10m      |
+ROW   |12988     |22424 |13559    |avg      |10m      |
+ROW   |12989     |22412 |13560    |avg      |10m      |
+ROW   |12991     |22430 |13562    |avg      |10m      |
+ROW   |12992     |22422 |13563    |avg      |10m      |
+ROW   |12993     |22406 |13564    |avg      |10m      |
+ROW   |12994     |22408 |13565    |avg      |30m      |
+ROW   |12995     |22402 |13566    |avg      |10m      |
+ROW   |12996     |22418 |13567    |avg      |10m      |
+ROW   |12997     |22416 |13568    |avg      |10m      |
+ROW   |12998     |22689 |13569    |avg      |10m      |
+ROW   |12999     |22399 |13570    |avg      |10m      |
+ROW   |13000     |22420 |13571    |avg      |10m      |
+ROW   |13001     |22414 |13572    |min      |10m      |
+ROW   |13002     |23171 |13573    |avg      |10m      |
+ROW   |13003     |22426 |13574    |avg      |10m      |
+ROW   |13004     |22404 |13575    |avg      |10m      |
+ROW   |13005     |22400 |13576    |avg      |10m      |
+ROW   |13006     |23391 |13577    |last     |         |
+ROW   |13007     |23387 |13578    |avg      |10m      |
+ROW   |13008     |23395 |13579    |min      |10m      |
+ROW   |13009     |23341 |13580    |min      |10m      |
+ROW   |13010     |23342 |13581    |min      |10m      |
+ROW   |13011     |23400 |13582    |min      |10m      |
+ROW   |13012     |23344 |13583    |min      |10m      |
+ROW   |13013     |23399 |13584    |min      |10m      |
+ROW   |13014     |23339 |13585    |min      |10m      |
+ROW   |13015     |23320 |13586    |avg      |10m      |
+ROW   |13016     |23321 |13587    |avg      |10m      |
+ROW   |13018     |23323 |13589    |avg      |10m      |
+ROW   |13019     |23324 |13590    |avg      |10m      |
+ROW   |13020     |23325 |13591    |avg      |10m      |
+ROW   |13021     |23326 |13592    |avg      |30m      |
+ROW   |13022     |23327 |13593    |avg      |10m      |
+ROW   |13023     |23328 |13594    |avg      |10m      |
+ROW   |13024     |23329 |13595    |avg      |10m      |
+ROW   |13025     |23330 |13596    |avg      |10m      |
+ROW   |13026     |23332 |13597    |avg      |10m      |
+ROW   |13027     |23333 |13598    |avg      |10m      |
+ROW   |13028     |23334 |13599    |min      |10m      |
+ROW   |13029     |23335 |13600    |avg      |10m      |
+ROW   |13030     |23336 |13601    |avg      |10m      |
+ROW   |13031     |23337 |13602    |avg      |10m      |
+ROW   |13032     |23338 |13603    |avg      |10m      |
+ROW   |13033     |23398 |13604    |last     |         |
+ROW   |13034     |23394 |13605    |avg      |10m      |
+ROW   |13035     |23418 |13606    |min      |10m      |
+ROW   |13036     |23419 |13607    |min      |10m      |
+ROW   |13037     |23420 |13608    |min      |10m      |
+ROW   |13038     |23416 |13609    |min      |10m      |
+ROW   |13039     |23401 |13610    |avg      |10m      |
+ROW   |13040     |23402 |13611    |avg      |10m      |
+ROW   |13041     |23403 |13612    |avg      |10m      |
+ROW   |13042     |23404 |13613    |avg      |10m      |
+ROW   |13043     |23405 |13614    |avg      |10m      |
+ROW   |13044     |23406 |13615    |avg      |30m      |
+ROW   |13045     |23407 |13616    |avg      |10m      |
+ROW   |13046     |23408 |13617    |avg      |10m      |
+ROW   |13047     |23409 |13618    |avg      |10m      |
+ROW   |13048     |23410 |13619    |avg      |10m      |
+ROW   |13049     |23411 |13620    |avg      |10m      |
+ROW   |13050     |23412 |13621    |avg      |10m      |
+ROW   |13051     |23413 |13622    |avg      |10m      |
+ROW   |13052     |23414 |13623    |avg      |10m      |
+ROW   |13053     |23415 |13624    |avg      |10m      |
+ROW   |100100    |100100|100100   |last     |         |
+ROW   |100101    |100101|100101   |last     |         |
+ROW   |100102    |100102|100102   |last     |         |
+ROW   |100103    |100103|100103   |last     |         |
+ROW   |100104    |100104|100104   |last     |         |
 
 TABLE |graphs
 FIELDS|graphid|name                                |width|height|yaxismin|yaxismax|templateid|show_work_period|show_triggers|graphtype|show_legend|show_3d|percent_left|percent_right|ymin_type|ymax_type|ymin_itemid|ymax_itemid|flags|
@@ -810,7 +799,6 @@ ROW   |57         |10057 |110    |
 ROW   |58         |10058 |1      |
 ROW   |59         |99500 |1      |
 ROW   |998        |99980 |1      |
-ROW   |999        |99990 |1      |
 ROW   |1000       |100000|100    |
 ROW   |1001       |100001|110    |
 ROW   |1002       |100002|1      |
@@ -1051,7 +1039,6 @@ ROW   |99980    |998          |99980 |
 ROW   |99981    |998          |99981 |
 ROW   |99982    |998          |99982 |
 ROW   |99983    |998          |99983 |
-ROW   |99990    |999          |99990 |
 ROW   |100000   |1000         |100000|
 ROW   |100001   |1000         |100001|
 ROW   |100002   |1000         |100002|
@@ -1606,7 +1593,6 @@ ROW   |16            |23390 |1   |10  |                                         
 ROW   |17            |23396 |1   |10  |                                                                                             |0            |                    |
 ROW   |18            |23397 |1   |10  |                                                                                             |0            |                    |
 ROW   |19            |23421 |1   |10  |                                                                                             |0            |                    |
-ROW   |20            |99990 |1   |10  |                                                                                             |0            |                    |
 ROW   |99500         |99502 |1   |12  |$.nssok                                                                                      |0            |                    |
 ROW   |99501         |99503 |1   |12  |$.nss                                                                                        |0            |                    |
 ROW   |99502         |99504 |1   |12  |$.nsips                                                                                      |0            |                    |
