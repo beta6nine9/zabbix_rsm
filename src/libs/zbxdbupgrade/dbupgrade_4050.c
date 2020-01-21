@@ -1147,13 +1147,13 @@ static int	DBpatch_4050505(void)
 	CHECK(DBpatch_4050505_item_preproc(item_preprocid_rsm_dns_nsip_discovery, itemid_rsm_dns_nsip_discovery,
 			"$.nsips", 0));
 	CHECK(DBpatch_4050505_item_preproc(item_preprocid_rsm_dns_ns_status, itemid_rsm_dns_ns_status,
-			"$.nss[?(@.[''ns''] == ''{#NS}'')].status.first()", 0));
+			"$.nss[?(@.[''ns''] == ''{#NS}'')].status.first()", 1));
 	CHECK(DBpatch_4050505_item_preproc(item_preprocid_rsm_dns_rtt_tcp, itemid_rsm_dns_rtt_tcp,
 			"$.nsips[?(@.[''ns''] == ''{#NS}'' && @.[''ip''] == ''{#IP}'' && @.[''protocol''] == ''tcp'')].rtt.first()", 1));
 	CHECK(DBpatch_4050505_item_preproc(item_preprocid_rsm_dns_rtt_udp, itemid_rsm_dns_rtt_udp,
 			"$.nsips[?(@.[''ns''] == ''{#NS}'' && @.[''ip''] == ''{#IP}'' && @.[''protocol''] == ''udp'')].rtt.first()", 1));
 	CHECK(DBpatch_4050505_item_preproc(item_preprocid_rsm_dns_nsid, itemid_rsm_dns_nsid,
-			"$.nsips[?(@.[''ns''] == ''{#NS}'' && @.[''ip''] == ''{#IP}'')].nsid.first()", 0));
+			"$.nsips[?(@.[''ns''] == ''{#NS}'' && @.[''ip''] == ''{#IP}'')].nsid.first()", 1));
 	CHECK(DBpatch_4050505_item_preproc(item_preprocid_rsm_dns_mode, itemid_rsm_dns_mode,
 			"$.mode", 0));
 	CHECK(DBpatch_4050505_item_preproc(item_preprocid_rsm_dns_protocol, itemid_rsm_dns_protocol,
@@ -1724,7 +1724,31 @@ static int	DBpatch_4050507(void)
 	return SUCCEED;
 }
 
-static int	DBpatch_4050508(void)
+static int    DBpatch_4050508(void)
+{
+	int		ret = FAIL;
+	const char	*command = "/opt/zabbix/scripts/tlds-notification.pl --send-to \\'zabbix alert\\' --event-id \\'{EVENT.RECOVERY.ID}\\' &";
+
+	ONLY_SERVER();
+
+	/* enable "TLDs" action */
+
+	CHECK(DBexecute("update actions set status=0 where actionid=130"));
+
+	/* add recovery operation */
+
+	CHECK(DBexecute("insert into operations set operationid=131,actionid=130,operationtype=1,esc_period='0',"
+			"esc_step_from=1,esc_step_to=1,evaltype=0,recovery=1"));
+	CHECK(DBexecute("insert into opcommand set operationid=131,type=0,scriptid=NULL,execute_on=1,port='',"
+			"authtype=0,username='',password='',publickey='',privatekey='',command='%s'", command));
+	CHECK(DBexecute("insert into opcommand_hst set opcommand_hstid=131,operationid=131,hostid=NULL"));
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
+static int	DBpatch_4050509(void)
 {
 	int	ret = FAIL;
 
@@ -1738,7 +1762,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_4050509(void)
+static int	DBpatch_4050510(void)
 {
 	int	ret = FAIL;
 
@@ -1752,7 +1776,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_4050510(void)
+static int	DBpatch_4050511(void)
 {
 	int	ret = FAIL;
 
@@ -1808,7 +1832,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_4050511(void)
+static int	DBpatch_4050512(void)
 {
 
 	int	ret = FAIL;
@@ -1822,6 +1846,7 @@ static int	DBpatch_4050511(void)
 
 	return ret;
 }
+
 
 #endif
 
@@ -1841,14 +1866,15 @@ DBPATCH_ADD(4050011, 0, 1)
 DBPATCH_ADD(4050012, 0, 1)
 DBPATCH_ADD(4050500, 0, 1)	/* RSM FY20 */
 DBPATCH_ADD(4050501, 0, 1)	/* set delay as macro for rsm.dns.*, rsm.rdds*, rsm.rdap* and rsm.epp* items items */
-DBPATCH_ADD(4050502, 0, 0)	/* set macro descriptions (part I) */
-DBPATCH_ADD(4050503, 0, 0)	/* set macro descriptions (part II) */
+DBPATCH_ADD(4050502, 0, 0)	/* set global macro descriptions */
+DBPATCH_ADD(4050503, 0, 0)	/* set host macro descriptions */
 DBPATCH_ADD(4050504, 0, 0)	/* add "DNS test mode" and "Transport protocol" value mappings */
 DBPATCH_ADD(4050505, 0, 0)	/* add "Template DNS Test" template */
 DBPATCH_ADD(4050506, 0, 0)	/* convert hosts to use "Template DNS Test" template */
 DBPATCH_ADD(4050507, 0, 0)	/* disable "db watchdog" internal items */
-DBPATCH_ADD(4050508, 0, 0)	/* Rename RDAP Template */
-DBPATCH_ADD(4050509, 0, 0)	/* set RDAP master item value_type to the text type */
-DBPATCH_ADD(4050510, 0, 0)	/* set RDAP calculated items to be dependent items */
-DBPATCH_ADD(4050511, 0, 0)	/* add item_preproc to RDAP ip and rtt items */
+DBPATCH_ADD(4050508, 0, 0)	/* upgrade "TLDs" action (upgrade process to Zabbix 4.x failed to upgrade it) */
+DBPATCH_ADD(4050509, 0, 0)	/* Rename RDAP Template */
+DBPATCH_ADD(4050510, 0, 0)	/* set RDAP master item value_type to the text type */
+DBPATCH_ADD(4050511, 0, 0)	/* set RDAP calculated items to be dependent items */
+DBPATCH_ADD(4050512, 0, 0)	/* add item_preproc to RDAP ip and rtt items */
 DBPATCH_END()
