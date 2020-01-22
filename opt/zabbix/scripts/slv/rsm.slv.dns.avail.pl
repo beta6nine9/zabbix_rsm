@@ -96,14 +96,13 @@ sub check_probe_values
 	if (1 > $cfg_minns)
 	{
 		wrn("number of required working Name Servers is configured as $cfg_minns");
-
 		return SUCCESS;
 	}
 
 	# stay on the safe side: if more than one value in cycle, use the positive one
-	foreach my $nssoks (values(%{$values_ref}))
+	foreach my $values (values(%{$values_ref}))
 	{
-		foreach (@{$nssoks})
+		foreach (@{$values})
 		{
 			return SUCCESS if ($_ >= $cfg_minns);
 		}
