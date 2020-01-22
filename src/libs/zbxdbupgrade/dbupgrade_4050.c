@@ -942,8 +942,8 @@ static int	DBpatch_4050505(void)
 #define ITEM_VALUE_TYPE_UINT64		3
 #define ITEM_VALUE_TYPE_TEXT		4
 
-#define ZBX_FLAG_DISCOVERY		0x01 /* Discovery rule */
-#define ZBX_FLAG_DISCOVERY_PROTOTYPE	0x02 /* Item prototype */
+#define ZBX_FLAG_DISCOVERY		0x01	/* Discovery rule */
+#define ZBX_FLAG_DISCOVERY_PROTOTYPE	0x02	/* Item prototype */
 
 	/* CHECK(DBexecute(SQL, itemid, type, hostid,		*/
 	/* 		name, key_, delay, history, trends,	*/
@@ -1631,11 +1631,9 @@ static int	DBpatch_4050508(void)
 	ONLY_SERVER();
 
 	/* enable "TLDs" action */
-
 	CHECK(DBexecute("update actions set status=0 where actionid=130"));
 
 	/* add recovery operation */
-
 	CHECK(DBexecute("insert into operations set operationid=131,actionid=130,operationtype=1,esc_period='0',"
 			"esc_step_from=1,esc_step_to=1,evaltype=0,recovery=1"));
 	CHECK(DBexecute("insert into opcommand set operationid=131,type=0,scriptid=NULL,execute_on=1,port='',"
@@ -1895,6 +1893,190 @@ out:
 	return ret;
 }
 
+static int	DBpatch_4050511(void)
+{
+	int		ret = FAIL;
+
+	zbx_uint64_t	groupid_templates;				/* groupid of "Templates" host group */
+	zbx_uint64_t	valuemapid_service_state;			/* valuemapid of "Service state" value map */
+	zbx_uint64_t	valuemapid_rsm_probe_status;			/* valuemapid of "RSM Probe status" value map */
+
+	zbx_uint64_t	hostid;						/* hostid of "Template Probe Status" template */
+
+	zbx_uint64_t	applicationid_next;
+	zbx_uint64_t	applicationid_configuration;			/* applicationid of "Configuration" application */
+	zbx_uint64_t	applicationid_internal_errors;			/* applicationid of "Internal errors" application */
+	zbx_uint64_t	applicationid_probe_status;			/* applicationid of "Probe status" application */
+
+	zbx_uint64_t	itemid_next;
+	zbx_uint64_t	itemid_probe_configvalue_rsm_ip4_enabled;	/* itemid of "probe.configvalue[RSM.IP4.ENABLED]" item */
+	zbx_uint64_t	itemid_probe_configvalue_rsm_ip6_enabled;	/* itemid of "probe.configvalue[RSM.IP6.ENABLED]" item */
+	zbx_uint64_t	itemid_resolver_status;				/* itemid of "resolver.status[...]" item */
+	zbx_uint64_t	itemid_rsm_errors;				/* itemid of "rsm.errors" item */
+	zbx_uint64_t	itemid_rsm_probe_status_automatic;		/* itemid of "rsm.probe.status[automatic,...]" item */
+	zbx_uint64_t	itemid_rsm_probe_status_manual;			/* itemid of "rsm.probe.status[manual]" item */
+
+	zbx_uint64_t	triggerid_next;
+	zbx_uint64_t	triggerid_int_err_1;				/* triggerid of "Internal errors happening" trigger */
+	zbx_uint64_t	triggerid_int_err_2;				/* triggerid of "Internal errors happening for ..." trigger */
+	zbx_uint64_t	triggerid_probe_disabled_1;			/* triggerid of "Probe <host> has been disabled by tests" trigger */
+	zbx_uint64_t	triggerid_probe_disabled_2;			/* triggerid of "Probe <host> has been disabled for more than ..." trigger */
+	zbx_uint64_t	triggerid_probe_knocked_out;			/* triggerid of "Probe <host> has been knocked out" trigger */
+
+	zbx_uint64_t	functionid_next;
+	zbx_uint64_t	functionid_int_err_1;				/* functiond of function for "Internal errors happening" trigger */
+	zbx_uint64_t	functionid_int_err_2;				/* functiond of function for "Internal errors happening for ..." trigger */
+	zbx_uint64_t	functionid_probe_disabled_1;			/* functiond of function for "Probe <host> has been disabled by tests" trigger */
+	zbx_uint64_t	functionid_probe_disabled_2;			/* functiond of function for "Probe <host> has been disabled for more than ..." trigger */
+	zbx_uint64_t	functionid_probe_knocked_out;			/* functiond of function for "Probe <host> has been knocked out" trigger */
+
+	ONLY_SERVER();
+
+	GET_HOST_GROUP_ID(groupid_templates, "Templates");
+	GET_VALUE_MAP_ID(valuemapid_service_state, "Service state");
+	GET_VALUE_MAP_ID(valuemapid_rsm_probe_status, "RSM Probe status");
+
+	hostid = DBget_maxid_num("hosts", 1);
+
+	applicationid_next            = DBget_maxid_num("applications", 3);
+	applicationid_configuration   = applicationid_next++;
+	applicationid_internal_errors = applicationid_next++;
+	applicationid_probe_status    = applicationid_next++;
+
+	itemid_next                              = DBget_maxid_num("items", 6);
+	itemid_probe_configvalue_rsm_ip4_enabled = itemid_next++;
+	itemid_probe_configvalue_rsm_ip6_enabled = itemid_next++;
+	itemid_resolver_status                   = itemid_next++;
+	itemid_rsm_errors                        = itemid_next++;
+	itemid_rsm_probe_status_automatic        = itemid_next++;
+	itemid_rsm_probe_status_manual           = itemid_next++;
+
+	triggerid_next              = DBget_maxid_num("triggers", 5);
+	triggerid_int_err_1         = triggerid_next++;
+	triggerid_int_err_2         = triggerid_next++;
+	triggerid_probe_disabled_1  = triggerid_next++;
+	triggerid_probe_disabled_2  = triggerid_next++;
+	triggerid_probe_knocked_out = triggerid_next++;
+
+	functionid_next              = DBget_maxid_num("functions", 5);
+	functionid_int_err_1         = functionid_next++;
+	functionid_int_err_2         = functionid_next++;
+	functionid_probe_disabled_1  = functionid_next++;
+	functionid_probe_disabled_2  = functionid_next++;
+	functionid_probe_knocked_out = functionid_next++;
+
+	/* status 3 = HOST_STATUS_TEMPLATE*/
+	CHECK(DBexecute("insert into hosts set hostid=" ZBX_FS_UI64 ",created=0,proxy_hostid=NULL,host='%s',status=%d,"
+				"disable_until=0,error='',available=0,errors_from=0,lastaccess=0,ipmi_authtype=-1,"
+				"ipmi_privilege=2,ipmi_username='',ipmi_password='',ipmi_disable_until=0,"
+				"ipmi_available=0,snmp_disable_until=0,snmp_available=0,maintenanceid=NULL,"
+				"maintenance_status=0,maintenance_type=0,maintenance_from=0,ipmi_errors_from=0,"
+				"snmp_errors_from=0,ipmi_error='',snmp_error='',jmx_disable_until=0,jmx_available=0,"
+				"jmx_errors_from=0,jmx_error='',name='%s',info_1='',info_2='',flags=0,templateid=NULL,"
+				"description='',tls_connect=1,tls_accept=1,tls_issuer='',tls_subject='',"
+				"tls_psk_identity='',tls_psk='',proxy_address='',auto_compress=1",
+			hostid, "Template Probe Status", 3, "Template Probe Status"));
+
+	CHECK(DBexecute("insert into hosts_groups set"
+				" hostgroupid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",groupid=" ZBX_FS_UI64,
+			DBget_maxid_num("hosts_groups", 1), hostid, groupid_templates));
+
+#define SQL	"insert into applications set applicationid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",name='%s',flags=0"
+	CHECK(DBexecute(SQL, applicationid_configuration  , hostid, "Configuration"));
+	CHECK(DBexecute(SQL, applicationid_internal_errors, hostid, "Internal errors"));
+	CHECK(DBexecute(SQL, applicationid_probe_status   , hostid, "Probe status"));
+#undef SQL
+
+#define SQL	"insert into items set itemid=" ZBX_FS_UI64 ",type=%d,snmp_community='',snmp_oid='',"			\
+		"hostid=" ZBX_FS_UI64 ",name='%s',key_='%s',delay='%s',history='90d',trends='365d',status=0,"		\
+		"value_type=%d,trapper_hosts='',units='',snmpv3_securityname='',snmpv3_securitylevel=0,"		\
+		"snmpv3_authpassphrase='',snmpv3_privpassphrase='',formula='',logtimefmt='',templateid=NULL,"		\
+		"valuemapid=nullif(" ZBX_FS_UI64 ",0),params='%s',ipmi_sensor='',authtype=0,username='',password='',"	\
+		"publickey='',privatekey='',flags=0,interfaceid=NULL,port='',description='',inventory_link=0,"		\
+		"lifetime='30d',snmpv3_authprotocol=0,snmpv3_privprotocol=0,snmpv3_contextname='',evaltype=0,"		\
+		"jmx_endpoint='',master_itemid=NULL,timeout='3s',url='',query_fields='',posts='',status_codes='200',"	\
+		"follow_redirects=1,post_type=0,http_proxy='',headers='',retrieve_mode=0,request_method=0,"		\
+		"output_format=0,ssl_cert_file='',ssl_key_file='',ssl_key_password='',verify_peer=0,verify_host=0,"	\
+		"allow_traps=0"
+	/* type 2 = ITEM_TYPE_TRAPPER */
+	/* type 3 = ITEM_TYPE_SIMPLE */
+	/* type 15 = ITEM_TYPE_CALCULATED */
+	/* value_type 0 = ITEM_VALUE_TYPE_FLOAT */
+	/* value_type 3 = ITEM_VALUE_TYPE_UINT64 */
+	/* CHECK(DBexecute(SQL, itemid, type, hostid, name,		*/
+	/* 		key_,						*/
+	/* 		delay, value_type, valuemapid, params));	*/
+	CHECK(DBexecute(SQL, itemid_probe_configvalue_rsm_ip4_enabled, 15, hostid, "Value of $1 variable",
+			"probe.configvalue[RSM.IP4.ENABLED]",
+			"300", 3, (zbx_uint64_t)0, "{$RSM.IP4.ENABLED}"));
+	CHECK(DBexecute(SQL, itemid_probe_configvalue_rsm_ip6_enabled, 15, hostid, "Value of $1 variable",
+			"probe.configvalue[RSM.IP6.ENABLED]",
+			"300", 3, (zbx_uint64_t)0, "{$RSM.IP6.ENABLED}"));
+	CHECK(DBexecute(SQL, itemid_resolver_status, 3, hostid, "Local resolver status ($1)",
+			"resolver.status[{$RSM.RESOLVER},{$RESOLVER.STATUS.TIMEOUT},{$RESOLVER.STATUS.TRIES},"
+				"{$RSM.IP4.ENABLED},{$RSM.IP6.ENABLED}]",
+			"60", 3, valuemapid_service_state, ""));
+	CHECK(DBexecute(SQL, itemid_rsm_errors, 3, hostid, "Internal error rate",
+			"rsm.errors",
+			"60", 0, (zbx_uint64_t)0, ""));
+	CHECK(DBexecute(SQL, itemid_rsm_probe_status_automatic, 3, hostid, "Probe status ($1)",
+			"rsm.probe.status[automatic,\"{$RSM.IP4.ROOTSERVERS1}\",\"{$RSM.IP6.ROOTSERVERS1}\"]",
+			"60", 3, valuemapid_rsm_probe_status, ""));
+	CHECK(DBexecute(SQL, itemid_rsm_probe_status_manual, 2, hostid, "Probe status ($1)",
+			"rsm.probe.status[manual]",
+			"0", 3, valuemapid_rsm_probe_status, ""));
+#undef SQL
+
+#define SQL	"insert into items_applications set itemappid=" ZBX_FS_UI64 ",applicationid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64
+	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_configuration  , itemid_probe_configvalue_rsm_ip4_enabled));
+	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_configuration  , itemid_probe_configvalue_rsm_ip6_enabled));
+	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_probe_status   , itemid_resolver_status));
+	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_internal_errors, itemid_rsm_errors));
+	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_probe_status   , itemid_rsm_probe_status_automatic));
+	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_probe_status   , itemid_rsm_probe_status_manual));
+#undef SQL
+
+#define SQL	"insert into triggers set triggerid=" ZBX_FS_UI64 ",expression=concat('{'," ZBX_FS_UI64 ",'}','%s'),"	\
+		"description='%s',url='',status=0,value=0,priority=%d,lastchange=0,comments='',error='',"		\
+		"templateid=NULL,type=0,state=0,flags=0,recovery_mode=0,recovery_expression='',correlation_mode=0,"	\
+		"correlation_tag='',manual_close=0,opdata=''"
+	/* priority 2 = TRIGGER_SEVERITY_WARNING */
+	/* priority 3 = TRIGGER_SEVERITY_AVERAGE */
+	/* priority 4 = TRIGGER_SEVERITY_HIGH */
+	CHECK(DBexecute(SQL, triggerid_int_err_1, functionid_int_err_1, ">0",
+			"Internal errors happening", 2));
+	CHECK(DBexecute(SQL, triggerid_int_err_2, functionid_int_err_2, ">0",
+			"Internal errors happening for {$PROBE.INTERNAL.ERROR.INTERVAL}", 4));
+	CHECK(DBexecute(SQL, triggerid_probe_disabled_1, functionid_probe_disabled_1, "=0",
+			"Probe {HOST.NAME} has been disabled by tests", 4));
+	CHECK(DBexecute(SQL, triggerid_probe_disabled_2, functionid_probe_disabled_2, "=0",
+			"Probe {HOST.NAME} has been disabled for more than {$RSM.PROBE.MAX.OFFLINE}", 3));
+	CHECK(DBexecute(SQL, triggerid_probe_knocked_out, functionid_probe_knocked_out, "=0",
+			"Probe {HOST.NAME} has been knocked out", 4));
+#undef SQL
+
+#define SQL	"insert into functions set functionid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ",triggerid=" ZBX_FS_UI64 ",name='%s',parameter='%s'"
+	CHECK(DBexecute(SQL, functionid_int_err_1, itemid_rsm_errors, triggerid_int_err_1,
+			"last", ""));
+	CHECK(DBexecute(SQL, functionid_int_err_2, itemid_rsm_errors, triggerid_int_err_2,
+			"min", "{$PROBE.INTERNAL.ERROR.INTERVAL}"));
+	CHECK(DBexecute(SQL, functionid_probe_disabled_1, itemid_rsm_probe_status_automatic, triggerid_probe_disabled_1,
+			"last", "0"));
+	CHECK(DBexecute(SQL, functionid_probe_disabled_2, itemid_rsm_probe_status_manual, triggerid_probe_disabled_2,
+			"max", "{$RSM.PROBE.MAX.OFFLINE}"));
+	CHECK(DBexecute(SQL, functionid_probe_knocked_out, itemid_rsm_probe_status_manual, triggerid_probe_knocked_out,
+			"last", "0"));
+#undef SQL
+
+	CHECK(DBexecute("insert into trigger_depends set"
+				" triggerdepid=" ZBX_FS_UI64 ",triggerid_down=" ZBX_FS_UI64 ",triggerid_up=" ZBX_FS_UI64,
+			DBget_maxid_num("trigger_depends", 1), triggerid_int_err_1, triggerid_int_err_2));
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
 #endif
 
 DBPATCH_START(4050)
@@ -1922,5 +2104,6 @@ DBPATCH_ADD(4050507, 0, 0)	/* disable "db watchdog" internal items */
 DBPATCH_ADD(4050508, 0, 0)	/* upgrade "TLDs" action (upgrade process to Zabbix 4.x failed to upgrade it) */
 DBPATCH_ADD(4050509, 0, 0)	/* add "Template Config History" template */
 DBPATCH_ADD(4050510, 0, 0)	/* add "Template RDDS Test" template */
+DBPATCH_ADD(4050511, 0, 0)	/* add "Template Probe Status" template */
 
 DBPATCH_END()
