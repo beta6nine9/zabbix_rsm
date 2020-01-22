@@ -1724,7 +1724,7 @@ static int	DBpatch_4050507(void)
 	return SUCCEED;
 }
 
-static int    DBpatch_4050508(void)
+static int	DBpatch_4050508(void)
 {
 	int		ret = FAIL;
 	const char	*command = "/opt/zabbix/scripts/tlds-notification.pl --send-to \\'zabbix alert\\' --event-id \\'{EVENT.RECOVERY.ID}\\' &";
@@ -1748,7 +1748,7 @@ out:
 	return ret;
 }
 
-static int    DBpatch_4050509(void)
+static int	DBpatch_4050509(void)
 {
 	int		ret = FAIL;
 
@@ -1801,8 +1801,8 @@ static int    DBpatch_4050509(void)
 				"tls_psk_identity='',tls_psk='',proxy_address='',auto_compress=1",
 			hostid, "Template Config History", HOST_STATUS_TEMPLATE, "Template Config History"));
 
-	CHECK(DBexecute("insert into hosts_groups"
-				" set hostgroupid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",groupid=" ZBX_FS_UI64,
+	CHECK(DBexecute("insert into hosts_groups set"
+				" hostgroupid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",groupid=" ZBX_FS_UI64,
 			DBget_maxid_num("hosts_groups", 1), hostid, groupid_templates));
 
 #define SQL "insert into applications set applicationid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",name='%s',flags=0"
@@ -1812,8 +1812,6 @@ static int    DBpatch_4050509(void)
 	CHECK(DBexecute(SQL, applicationid_rdds  , hostid, "RDDS"));
 #undef SQL
 
-/* type 15 = ITEM_TYPE_CALCULATED */
-/* value_type 3 = ITEM_VALUE_TYPE_UINT64 */
 #define SQL "insert into items set itemid=" ZBX_FS_UI64 ",type=%d,snmp_community='',snmp_oid='',"			\
 		"hostid=" ZBX_FS_UI64 ",name='%s',key_='%s',delay='%s',history='90d',trends='365d',status=0,"		\
 		"value_type=%d,trapper_hosts='',units='',snmpv3_securityname='',snmpv3_securitylevel=0,"		\
@@ -1825,6 +1823,8 @@ static int    DBpatch_4050509(void)
 		"follow_redirects=1,post_type=0,http_proxy='',headers='',retrieve_mode=0,request_method=0,"		\
 		"output_format=0,ssl_cert_file='',ssl_key_file='',ssl_key_password='',verify_peer=0,verify_host=0,"	\
 		"allow_traps=0"
+	/* type 15 = ITEM_TYPE_CALCULATED */
+	/* value_type 3 = ITEM_VALUE_TYPE_UINT64 */
 	CHECK(DBexecute(SQL, itemid_dns_tcp_enabled, 15, hostid, "DNS TCP enabled/disabled", "dns.tcp.enabled", "1m",
 			3, "{$RSM.TLD.DNS.TCP.ENABLED}", "History of DNS TCP being enabled or disabled."));
 	CHECK(DBexecute(SQL, itemid_dns_udp_enabled, 15, hostid, "DNS UDP enabled/disabled", "dns.udp.enabled", "1m",
@@ -1843,6 +1843,153 @@ static int    DBpatch_4050509(void)
 	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_dnssec, itemid_dnssec_enabled));
 	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdap  , itemid_rdap_enabled));
 	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds  , itemid_rdds_enabled));
+#undef SQL
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
+static int	DBpatch_4050509(void)
+{
+	int		ret = FAIL;
+
+	zbx_uint64_t	groupid_templates;		/* groupid of "Templates" host group */
+	zbx_uint64_t	valuemapid_rsm_rdds_rtt;	/* valuemapid of "RSM RDDS rtt" value map */
+
+	zbx_uint64_t	hostid;				/* hostid of "Template RDDS Test" template */
+
+	zbx_uint64_t	applicationid_next;
+	zbx_uint64_t	applicationid_rdds;		/* applicationid of "RDDS" application */
+	zbx_uint64_t	applicationid_rdds43;		/* applicationid of "RDDS43" application */
+	zbx_uint64_t	applicationid_rdds80;		/* applicationid of "RDDS80" application */
+
+	zbx_uint64_t	itemid_next;
+	zbx_uint64_t	itemid_rsm_rdds;		/* itemid of "rsm.rdds[]" item */
+	zbx_uint64_t	itemid_rsm_rdds_43_ip;		/* itemid of "rsm.rdds.43.ip" item */
+	zbx_uint64_t	itemid_rsm_rdds_43_rtt;		/* itemid of "rsm.rdds.43.rtt" item */
+	zbx_uint64_t	itemid_rsm_rdds_43_upd;		/* itemid of "rsm.rdds.43.upd" item */
+	zbx_uint64_t	itemid_rsm_rdds_80_ip;		/* itemid of "rsm.rdds.80.ip" item */
+	zbx_uint64_t	itemid_rsm_rdds_80_rtt;		/* itemid of "rsm.rdds.80.rtt" item */
+
+	ONLY_SERVER();
+
+	GET_HOST_GROUP_ID(groupid_templates, "Templates");
+	GET_VALUE_MAP_ID(valuemapid_rsm_rdds_rtt, "RSM RDDS rtt");
+
+	hostid = DBget_maxid_num("hosts", 1);
+
+	applicationid_next   = DBget_maxid_num("applications", 3);
+	applicationid_rdds   = applicationid_next++;
+	applicationid_rdds43 = applicationid_next++;
+	applicationid_rdds80 = applicationid_next++;
+
+	itemid_next            = DBget_maxid_num("items", 6);
+	itemid_rsm_rdds        = itemid_next++;
+	itemid_rsm_rdds_43_ip  = itemid_next++;
+	itemid_rsm_rdds_43_rtt = itemid_next++;
+	itemid_rsm_rdds_43_upd = itemid_next++;
+	itemid_rsm_rdds_80_ip  = itemid_next++;
+	itemid_rsm_rdds_80_rtt = itemid_next++;
+
+	/* status 3 = HOST_STATUS_TEMPLATE*/
+	CHECK(DBexecute("insert into hosts set hostid=" ZBX_FS_UI64 ",created=0,proxy_hostid=NULL,host='%s',status=%d,"
+				"disable_until=0,error='',available=0,errors_from=0,lastaccess=0,ipmi_authtype=-1,"
+				"ipmi_privilege=2,ipmi_username='',ipmi_password='',ipmi_disable_until=0,"
+				"ipmi_available=0,snmp_disable_until=0,snmp_available=0,maintenanceid=NULL,"
+				"maintenance_status=0,maintenance_type=0,maintenance_from=0,ipmi_errors_from=0,"
+				"snmp_errors_from=0,ipmi_error='',snmp_error='',jmx_disable_until=0,jmx_available=0,"
+				"jmx_errors_from=0,jmx_error='',name='%s',info_1='',info_2='',flags=0,templateid=NULL,"
+				"description='',tls_connect=1,tls_accept=1,tls_issuer='',tls_subject='',"
+				"tls_psk_identity='',tls_psk='',proxy_address='',auto_compress=1",
+			hostid, "Template RDDS Test", 3, "Template RDDS Test"));
+
+	CHECK(DBexecute("insert into hosts_groups set"
+				" hostgroupid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",groupid=" ZBX_FS_UI64,
+			DBget_maxid_num("hosts_groups", 1), hostid, groupid_templates));
+
+#define SQL "insert into applications set applicationid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",name='%s',flags=0"
+	CHECK(DBexecute(SQL, applicationid_rdds  , hostid, "RDDS"));
+	CHECK(DBexecute(SQL, applicationid_rdds43, hostid, "RDDS43"));
+	CHECK(DBexecute(SQL, applicationid_rdds80, hostid, "RDDS80"));
+#undef SQL
+
+
+#define SQL "insert into items set itemid=" ZBX_FS_UI64 ",type=%d,snmp_community='',snmp_oid='',"			\
+		"hostid=" ZBX_FS_UI64 ",name='%s',key_='%s',delay='%s',history='%s',trends='%s',status=0,"		\
+		"value_type=%d,trapper_hosts='',units='',snmpv3_securityname='',snmpv3_securitylevel=0,"		\
+		"snmpv3_authpassphrase='',snmpv3_privpassphrase='',formula='',logtimefmt='',templateid=NULL,"		\
+		"valuemapid=nullif(" ZBX_FS_UI64 ",0),params='',ipmi_sensor='',authtype=0,username='',password='',"	\
+		"publickey='',privatekey='',flags=0,interfaceid=NULL,port='',description='%s',inventory_link=0,"	\
+		"lifetime='30d',snmpv3_authprotocol=0,snmpv3_privprotocol=0,snmpv3_contextname='',evaltype=0,"		\
+		"jmx_endpoint='',master_itemid=nullif(" ZBX_FS_UI64 ",0),timeout='3s',url='',query_fields='',posts='',"	\
+		"status_codes='200',follow_redirects=1,post_type=0,http_proxy='',headers='',retrieve_mode=0,"		\
+		"request_method=0,output_format=0,ssl_cert_file='',ssl_key_file='',ssl_key_password='',verify_peer=0,"	\
+		"verify_host=0,allow_traps=0"
+	/* type 3 = ITEM_TYPE_SIMPLE */
+	/* type 18 = ITEM_TYPE_DEPENDENT */
+	/* value_type 0 = ITEM_VALUE_TYPE_FLOAT */
+	/* value_type 1 = ITEM_VALUE_TYPE_STR */
+	/* value_type 4 = ITEM_VALUE_TYPE_TEXT */
+	/* CHECK(DBexecute(SQL, itemid, type, hostid, name,		*/
+	/* 		key,						*/
+	/* 		delay, history, trends, value_type, valuemapid,	*/
+	/* 		description,					*/
+	/* 		master_itemid));				*/
+	CHECK(DBexecute(SQL, itemid_rsm_rdds, 3, hostid, "RDDS Test",
+			"rsm.rdds[{$RSM.TLD},{$RSM.TLD.RDDS.43.SERVERS},{$RSM.TLD.RDDS.80.SERVERS},"
+				"{$RSM.RDDS.TESTPREFIX},{$RSM.RDDS.NS.STRING},{$RSM.RDDS.ENABLED},"
+				"{$RSM.TLD.RDDS.ENABLED},{$RSM.EPP.ENABLED},{$RSM.TLD.EPP.ENABLED},{$RSM.IP4.ENABLED},"
+				"{$RSM.IP6.ENABLED},{$RSM.RESOLVER},{$RSM.RDDS.RTT.HIGH},{$RSM.RDDS.MAXREDIRS}]",
+			"1m", "0", "0", 4, 0,
+			"Master item that performs the RDDS test and generates JSON with results. This JSON will be"
+				" parsed by dependent items. History must be disabled.",
+			0));
+	CHECK(DBexecute(SQL, itemid_rsm_rdds_43_ip, 18, hostid, "RDDS43 IP",
+			"rsm.rdds.43.ip",
+			"0", "90d", "0", 1, 0,
+			"IP address for RDDS43 test",
+			itemid_rsm_rdds));
+	CHECK(DBexecute(SQL, itemid_rsm_rdds_43_rtt, 18, hostid, "RDDS43 RTT",
+			"rsm.rdds.43.rtt",
+			"0", "90d", "365d", 0, valuemapid_rsm_rdds_rtt,
+			"RTT value for RDDS43 test",
+			itemid_rsm_rdds));
+	CHECK(DBexecute(SQL, itemid_rsm_rdds_43_upd, 18, hostid, "RDDS43 update time",
+			"rsm.rdds.43.upd",
+			"0", "90d", "365d", 0, 0,
+			"Update time for RDDS43 test",
+			itemid_rsm_rdds));
+	CHECK(DBexecute(SQL, itemid_rsm_rdds_80_ip, 18, hostid, "RDDS80 IP",
+			"rsm.rdds.80.ip",
+			"0", "90d", "0", 1, 0,
+			"IP address for RDDS80 test",
+			itemid_rsm_rdds));
+	CHECK(DBexecute(SQL, itemid_rsm_rdds_80_rtt, 18, hostid, "RDDS80 RTT",
+			"rsm.rdds.80.rtt",
+			"0", "90d", "365d", 0, valuemapid_rsm_rdds_rtt,
+			"RTT value for RDDS80 test",
+			itemid_rsm_rdds));
+#undef SQL
+
+#define SQL "insert into items_applications set itemappid=" ZBX_FS_UI64 ",applicationid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64
+	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds  , itemid_rsm_rdds));
+	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds43, itemid_rsm_rdds_43_ip));
+	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds43, itemid_rsm_rdds_43_rtt));
+	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds43, itemid_rsm_rdds_43_upd));
+	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds80, itemid_rsm_rdds_80_ip));
+	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds80, itemid_rsm_rdds_80_rtt));
+#undef SQL
+
+#define SQL "insert into item_preproc set"										\
+		" item_preprocid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ",step=%d,""type=%d,params='%s',"			\
+		"error_handler=%d,error_handler_params=''"
+	/* type 12 = ZBX_PREPROC_JSONPATH */
+	CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_rdds_43_ip , 1, 12, "$.rdds43.ip" , 1));
+	CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_rdds_43_rtt, 1, 12, "$.rdds43.rtt", 1));
+	CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_rdds_43_upd, 1, 12, "$.rdds43.upd", 1));
+	CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_rdds_80_ip , 1, 12, "$.rdds80.ip" , 1));
+	CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_rdds_80_rtt, 1, 12, "$.rdds80.rtt", 1));
 #undef SQL
 
 	ret = SUCCEED;
@@ -1876,5 +2023,6 @@ DBPATCH_ADD(4050506, 0, 0)	/* convert hosts to use "Template DNS Test" template 
 DBPATCH_ADD(4050507, 0, 0)	/* disable "db watchdog" internal items */
 DBPATCH_ADD(4050508, 0, 0)	/* upgrade "TLDs" action (upgrade process to Zabbix 4.x failed to upgrade it) */
 DBPATCH_ADD(4050509, 0, 0)	/* add "Template Config History" template */
+DBPATCH_ADD(4050510, 0, 0)	/* add "Template RDDS Test" template */
 
 DBPATCH_END()
