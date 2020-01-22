@@ -2077,6 +2077,105 @@ out:
 	return ret;
 }
 
+static int	DBpatch_4050512(void)
+{
+	int	ret = FAIL;
+
+	ONLY_SERVER();
+
+	CHECK(DBexecute("update hosts set host='Template RDAP Test',name='Template RDAP Test'"
+			" where host = 'Template RDAP'"));
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
+static int	DBpatch_4050513(void)
+{
+	int	ret = FAIL;
+
+	ONLY_SERVER();
+
+	/* 4 = ITEM_VALUE_TYPE_TEXT */
+	CHECK(DBexecute("update items set name='RDAP Test',value_type='4',history='0' where key_ like 'rdap[%%'"));
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
+static int	DBpatch_4050514(void)
+{
+	int	ret = FAIL;
+
+	ONLY_SERVER();
+
+	/* 18 = ITEM_TYPE_DEPENDENT */
+	CHECK(DBexecute("update items as i1 inner join items as i2 on i1.hostid=i2.hostid set"
+			" i1.type='18',i1.master_itemid=i2.itemid where i1.key_ in ('rdap.ip','rdap.rtt') and"
+			" i2.key_ like 'rdap[%%'"));
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
+static int	db_insert_rdap_item_preproc(const char *item_key, const char *item_preproc_param)
+{
+	DB_RESULT		result;
+	DB_ROW			row;
+	zbx_vector_uint64_t	rdap_itemids;
+	int			i, ret = FAIL;
+	zbx_uint64_t		item_preprocid_next;
+
+	zbx_vector_uint64_create(&rdap_itemids);
+
+	result = DBselect("select itemid from items where key_='%s'", item_key);
+
+	while (NULL != (row = DBfetch(result)))
+	{
+		zbx_uint64_t	rdap_itemid;
+
+		ZBX_STR2UINT64(rdap_itemid, row[0]);
+		zbx_vector_uint64_append(&rdap_itemids, rdap_itemid);
+	}
+
+	DBfree_result(result);
+
+	item_preprocid_next = DBget_maxid_num("item_preproc", rdap_itemids.values_num);
+
+	for (i = 0; i < rdap_itemids.values_num; ++i)
+	{
+		/* 12 = ZBX_PREPROC_JSONPATH */
+		CHECK(DBexecute("insert into item_preproc set item_preprocid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ","
+				"step=1,type=12,params='%s',error_handler='0'", item_preprocid_next,
+				rdap_itemids.values[i], item_preproc_param));
+		item_preprocid_next++;
+	}
+
+	ret = SUCCEED;
+out:
+	zbx_vector_uint64_destroy(&rdap_itemids);
+
+	return ret;
+}
+
+static int	DBpatch_4050515(void)
+{
+
+	int	ret = FAIL;
+
+	ONLY_SERVER();
+
+	ret = db_insert_rdap_item_preproc("rdap.ip", "$.rdap.ip");
+
+	if (SUCCEED == ret)
+		ret = db_insert_rdap_item_preproc("rdap.rtt", "$.rdap.rtt");
+
+	return ret;
+}
+
 #endif
 
 DBPATCH_START(4050)
@@ -2105,5 +2204,9 @@ DBPATCH_ADD(4050508, 0, 0)	/* upgrade "TLDs" action (upgrade process to Zabbix 4
 DBPATCH_ADD(4050509, 0, 0)	/* add "Template Config History" template */
 DBPATCH_ADD(4050510, 0, 0)	/* add "Template RDDS Test" template */
 DBPATCH_ADD(4050511, 0, 0)	/* add "Template Probe Status" template */
+DBPATCH_ADD(4050512, 0, 0)	/* Rename RDAP Template */
+DBPATCH_ADD(4050513, 0, 0)	/* set RDAP master item value_type to the text type */
+DBPATCH_ADD(4050514, 0, 0)	/* set RDAP calculated items to be dependent items */
+DBPATCH_ADD(4050515, 0, 0)	/* add item_preproc to RDAP ip and rtt items */
 
 DBPATCH_END()
