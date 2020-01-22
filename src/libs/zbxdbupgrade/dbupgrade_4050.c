@@ -40,8 +40,8 @@
  * If some code depends on stuff that is likely to change, it doesn't fit here.
  *
  * If more specific helper is needed, it must be implemented close to the patch that needs it. Specific
- * helpers can be implemented either as functions right before DBpatch_4040xxx(), or as macros inside
- * the DBpatch_4040xxx(). If they're implemented as macros, don't forget to #undef them.
+ * helpers can be implemented either as functions right before DBpatch_4050xxx(), or as macros inside
+ * the DBpatch_4050xxx(). If they're implemented as macros, don't forget to #undef them.
  */
 
 /* checks if this is server; used for skipping patches when running on proxy */
@@ -824,82 +824,21 @@ static int	DBpatch_4050504(void)
 	mappingid_transport_protocol_udp = mappingid_next++;
 	mappingid_transport_protocol_tcp = mappingid_next++;
 
-#define INSERT_INTO_VALUEMAPS	"insert into valuemaps set valuemapid=" ZBX_FS_UI64 ",name='%s'"
-#define INSERT_INTO_MAPPINGS	"insert into mappings set mappingid=" ZBX_FS_UI64 ",valuemapid=" ZBX_FS_UI64 ",value='%s',newvalue='%s'"
+#define SQL	"insert into valuemaps set valuemapid=" ZBX_FS_UI64 ",name='%s'"
+	CHECK(DBexecute(SQL, valuemapid_dns_test_mode, "DNS test mode"));
+	CHECK(DBexecute(SQL, valuemapid_transport_protocol, "Transport protocol"));
+#undef SQL
 
-	CHECK(DBexecute(INSERT_INTO_VALUEMAPS, valuemapid_dns_test_mode, "DNS test mode"));
-	CHECK(DBexecute(INSERT_INTO_VALUEMAPS, valuemapid_transport_protocol, "Transport protocol"));
-
-	CHECK(DBexecute(INSERT_INTO_MAPPINGS, mappingid_dns_test_mode_normal, valuemapid_dns_test_mode, "0", "Normal"));
-	CHECK(DBexecute(INSERT_INTO_MAPPINGS, mappingid_dns_test_mode_critical, valuemapid_dns_test_mode, "1", "Critical"));
-	CHECK(DBexecute(INSERT_INTO_MAPPINGS, mappingid_transport_protocol_udp, valuemapid_transport_protocol, "0", "UDP"));
-	CHECK(DBexecute(INSERT_INTO_MAPPINGS, mappingid_transport_protocol_tcp, valuemapid_transport_protocol, "1", "TCP"));
-
-#undef INSERT_INTO_VALUEMAPS
-#undef INSERT_INTO_MAPPINGS
+#define SQL	"insert into mappings set mappingid=" ZBX_FS_UI64 ",valuemapid=" ZBX_FS_UI64 ",value='%s',newvalue='%s'"
+	CHECK(DBexecute(SQL, mappingid_dns_test_mode_normal, valuemapid_dns_test_mode, "0", "Normal"));
+	CHECK(DBexecute(SQL, mappingid_dns_test_mode_critical, valuemapid_dns_test_mode, "1", "Critical"));
+	CHECK(DBexecute(SQL, mappingid_transport_protocol_udp, valuemapid_transport_protocol, "0", "UDP"));
+	CHECK(DBexecute(SQL, mappingid_transport_protocol_tcp, valuemapid_transport_protocol, "1", "TCP"));
+#undef SQL
 
 	ret = SUCCEED;
 out:
 	return ret;
-}
-
-static int	DBpatch_4050505_create_application(zbx_uint64_t applicationid, zbx_uint64_t hostid, const char *name)
-{
-	return DBexecute("insert into applications set applicationid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",name='%s',"
-			"flags=0",
-			applicationid, hostid, name);
-}
-
-static int	DBpatch_4050505_create_item(zbx_uint64_t itemid, int type, zbx_uint64_t hostid, const char *name,
-		const char *key_, const char *delay, const char *history, const char *trends, int value_type,
-		zbx_uint64_t valuemapid, const char *params, int flags, const char *description, const char *lifetime,
-		zbx_uint64_t master_itemid)
-{
-	return DBexecute("insert into items set itemid=" ZBX_FS_UI64 ",type=%d,snmp_community='',snmp_oid='',"
-			"hostid=" ZBX_FS_UI64 ",name='%s',key_='%s',delay='%s',history='%s',trends='%s',status=0,"
-			"value_type=%d,trapper_hosts='',units='',snmpv3_securityname='',snmpv3_securitylevel=0,"
-			"snmpv3_authpassphrase='',snmpv3_privpassphrase='',formula='',logtimefmt='',templateid=NULL,"
-			"valuemapid=nullif(" ZBX_FS_UI64 ",0),params='%s',ipmi_sensor='',authtype=0,username='',"
-			"password='',publickey='',privatekey='',flags=%d,interfaceid=NULL,port='',description='%s',"
-			"inventory_link=0,lifetime='%s',snmpv3_authprotocol=0,snmpv3_privprotocol=0,"
-			"snmpv3_contextname='',evaltype=0,jmx_endpoint='',master_itemid=nullif(" ZBX_FS_UI64 ",0),"
-			"timeout='3s',url='',query_fields='',posts='',status_codes='200',follow_redirects=1,"
-			"post_type=0,http_proxy='',headers='',retrieve_mode=0,request_method=0,output_format=0,"
-			"ssl_cert_file='',ssl_key_file='',ssl_key_password='',verify_peer=0,verify_host=0,"
-			"allow_traps=0",
-			itemid, type, hostid, name, key_, delay, history, trends, value_type, valuemapid, params, flags,
-			description, lifetime, master_itemid);
-}
-
-static int	DBpatch_4050505_item_to_app(zbx_uint64_t itemappid, zbx_uint64_t applicationid, zbx_uint64_t itemid)
-{
-	return DBexecute("insert into items_applications set itemappid=" ZBX_FS_UI64 ",applicationid=" ZBX_FS_UI64 ","
-			"itemid=" ZBX_FS_UI64,
-			itemappid, applicationid, itemid);
-}
-
-static int	DBpatch_4050505_item_discovery(zbx_uint64_t itemdiscoveryid, zbx_uint64_t itemid,
-		zbx_uint64_t parent_itemid)
-{
-	return DBexecute("insert into item_discovery set itemdiscoveryid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ","
-			"parent_itemid=" ZBX_FS_UI64 ",key_='',lastcheck=0,ts_delete=0",
-			itemdiscoveryid, itemid, parent_itemid);
-}
-
-static int	DBpatch_4050505_item_preproc(zbx_uint64_t item_preprocid, zbx_uint64_t itemid, const char *params,
-		int error_handler)
-{
-	return DBexecute("insert into item_preproc set item_preprocid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ",step=1,"
-			"type=12,params='%s',error_handler=%d,error_handler_params=''",
-			item_preprocid, itemid, params, error_handler);
-}
-
-static int	DBpatch_4050505_lld_macro_path(zbx_uint64_t lld_macro_pathid, zbx_uint64_t itemid,
-		const char *lld_macro, const char *path)
-{
-	return DBexecute("insert into lld_macro_path set lld_macro_pathid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ","
-			"lld_macro='%s',path='%s'",
-			lld_macro_pathid, itemid, lld_macro, path);
 }
 
 static int	DBpatch_4050505(void)
@@ -933,39 +872,6 @@ static int	DBpatch_4050505(void)
 	zbx_uint64_t	itemid_rsm_dns_mode;				/* itemid of "The mode of the Test" item prototype in "Template DNS Test" template */
 	zbx_uint64_t	itemid_rsm_dns_protocol;			/* itemid of "Transport protocol of the Test" item prototype in "Template DNS Test" template */
 
-	zbx_uint64_t	itemappid_next;
-	zbx_uint64_t	itemappid_dnssec_enabled;			/* itemappid of "DNSSEC enabled/disabled" item */
-	zbx_uint64_t	itemappid_rsm_dns;				/* itemappid of "DNS availability" item */
-	zbx_uint64_t	itemappid_rsm_dns_nssok;			/* itemappid of "Number of working Name Servers" item */
-	zbx_uint64_t	itemappid_rsm_dns_ns_status;			/* itemappid of "Status of $1" item prototype */
-	zbx_uint64_t	itemappid_rsm_dns_rtt_tcp;			/* itemappid of "RTT of $1,$2 using $3" item prototype */
-	zbx_uint64_t	itemappid_rsm_dns_rtt_udp;			/* itemappid of "RTT of $1,$2 using $3" item prototype */
-	zbx_uint64_t	itemappid_rsm_dns_nsid;				/* itemappid of "NSID of $1,$2" item prototype */
-	zbx_uint64_t	itemappid_rsm_dns_mode;				/* itemappid of "The mode of the Test" item prototype */
-	zbx_uint64_t	itemappid_rsm_dns_protocol;			/* itemappid of "Transport protocol of the Test" item prototype */
-
-	zbx_uint64_t	itemdiscoveryid_next;
-	zbx_uint64_t	itemdiscoveryid_rsm_dns_ns_status;		/* itemdiscoveryid of "Status of $1" item prototype*/
-	zbx_uint64_t	itemdiscoveryid_rsm_dns_rtt_tcp;		/* itemdiscoveryid of "RTT of $1,$2 using $3" item prototype*/
-	zbx_uint64_t	itemdiscoveryid_rsm_dns_rtt_udp;		/* itemdiscoveryid of "RTT of $1,$2 using $3" item prototype*/
-	zbx_uint64_t	itemdiscoveryid_rsm_dns_nsid;			/* itemdiscoveryid of "NSID of $1,$2" item prototype */
-
-	zbx_uint64_t	item_preprocid_next;
-	zbx_uint64_t	item_preprocid_rsm_dns_nssok;			/* item_preprocid of "Number of working Name Servers" item */
-	zbx_uint64_t	item_preprocid_rsm_dns_ns_discovery;		/* item_preprocid of "Name Servers discovery" item*/
-	zbx_uint64_t	item_preprocid_rsm_dns_nsip_discovery;		/* item_preprocid of "NS-IP pairs discovery" item*/
-	zbx_uint64_t	item_preprocid_rsm_dns_ns_status;		/* item_preprocid of "Status of $1" item prototype*/
-	zbx_uint64_t	item_preprocid_rsm_dns_rtt_tcp;			/* item_preprocid of "RTT of $1,$2 using $3" item prototype*/
-	zbx_uint64_t	item_preprocid_rsm_dns_rtt_udp;			/* item_preprocid of "RTT of $1,$2 using $3" item prototype*/
-	zbx_uint64_t	item_preprocid_rsm_dns_nsid;			/* item_preprocid of "NSID of $1,$2" item prototype */
-	zbx_uint64_t	item_preprocid_rsm_dns_mode;			/* item_preprocid of "The mode of the Test" item prototype */
-	zbx_uint64_t	item_preprocid_rsm_dns_protocol;		/* item_preprocid of "Transport protocol of the Test" item prototype */
-
-	zbx_uint64_t	lld_macro_pathid_next;
-	zbx_uint64_t	lld_macro_pathid_rsm_dns_ns_discovery_ns;	/* lld_macro_pathid of {#NS} in "Name Servers discovery" item */
-	zbx_uint64_t	lld_macro_pathid_rsm_dns_nsip_discovery_ip;	/* lld_macro_pathid of {#IP} in "NS-IP pairs discovery" item */
-	zbx_uint64_t	lld_macro_pathid_rsm_dns_nsip_discovery_ns;	/* lld_macro_pathid of {#NS} in "NS-IP pairs discovery" item */
-
 	ONLY_SERVER();
 
 	GET_HOST_GROUP_ID(groupid_templates, "Templates");
@@ -996,51 +902,6 @@ static int	DBpatch_4050505(void)
 	itemid_rsm_dns_mode                        = itemid_next++;
 	itemid_rsm_dns_protocol                    = itemid_next++;
 
-	itemappid_next                             = DBget_maxid_num("items_applications", 9);
-	itemappid_dnssec_enabled                   = itemappid_next++;
-	itemappid_rsm_dns                          = itemappid_next++;
-	itemappid_rsm_dns_nssok                    = itemappid_next++;
-	itemappid_rsm_dns_ns_status                = itemappid_next++;
-	itemappid_rsm_dns_rtt_tcp                  = itemappid_next++;
-	itemappid_rsm_dns_rtt_udp                  = itemappid_next++;
-	itemappid_rsm_dns_nsid                     = itemappid_next++;
-	itemappid_rsm_dns_mode                     = itemappid_next++;
-	itemappid_rsm_dns_protocol                 = itemappid_next++;
-
-	itemdiscoveryid_next                       = DBget_maxid_num("item_discovery", 4);
-	itemdiscoveryid_rsm_dns_ns_status          = itemdiscoveryid_next++;
-	itemdiscoveryid_rsm_dns_rtt_tcp            = itemdiscoveryid_next++;
-	itemdiscoveryid_rsm_dns_rtt_udp            = itemdiscoveryid_next++;
-	itemdiscoveryid_rsm_dns_nsid               = itemdiscoveryid_next++;
-
-	item_preprocid_next                        = DBget_maxid_num("item_preproc", 9);
-	item_preprocid_rsm_dns_nssok               = item_preprocid_next++;
-	item_preprocid_rsm_dns_ns_discovery        = item_preprocid_next++;
-	item_preprocid_rsm_dns_nsip_discovery      = item_preprocid_next++;
-	item_preprocid_rsm_dns_ns_status           = item_preprocid_next++;
-	item_preprocid_rsm_dns_rtt_tcp             = item_preprocid_next++;
-	item_preprocid_rsm_dns_rtt_udp             = item_preprocid_next++;
-	item_preprocid_rsm_dns_nsid                = item_preprocid_next++;
-	item_preprocid_rsm_dns_mode                = item_preprocid_next++;
-	item_preprocid_rsm_dns_protocol            = item_preprocid_next++;
-
-	lld_macro_pathid_next                      = DBget_maxid_num("lld_macro_path", 3);
-	lld_macro_pathid_rsm_dns_ns_discovery_ns   = lld_macro_pathid_next++;
-	lld_macro_pathid_rsm_dns_nsip_discovery_ip = lld_macro_pathid_next++;
-	lld_macro_pathid_rsm_dns_nsip_discovery_ns = lld_macro_pathid_next++;
-
-#define ITEM_TYPE_SIMPLE		3
-#define ITEM_TYPE_CALCULATED		15
-#define ITEM_TYPE_DEPENDENT		18
-
-#define ITEM_VALUE_TYPE_FLOAT		0
-#define ITEM_VALUE_TYPE_STR		1
-#define ITEM_VALUE_TYPE_UINT64		3
-#define ITEM_VALUE_TYPE_TEXT		4
-
-#define ZBX_FLAG_DISCOVERY		0x01 /* Discovery rule */
-#define ZBX_FLAG_DISCOVERY_PROTOTYPE	0x02 /* Item prototype */
-
 	CHECK(DBexecute("insert into hosts set hostid=" ZBX_FS_UI64 ",created=0,proxy_hostid=NULL,host='%s',status=3,"
 			"disable_until=0,error='',available=0,errors_from=0,lastaccess=0,ipmi_authtype=-1,"
 			"ipmi_privilege=2,ipmi_username='',ipmi_password='',ipmi_disable_until=0,ipmi_available=0,"
@@ -1055,116 +916,102 @@ static int	DBpatch_4050505(void)
 			"groupid=" ZBX_FS_UI64,
 			hostgroupid_template_dns, hostid_template_dns_test, groupid_templates));
 
-	CHECK(DBpatch_4050505_create_application(applicationid_dns, hostid_template_dns_test, "DNS"));
-	CHECK(DBpatch_4050505_create_application(applicationid_dnssec, hostid_template_dns_test, "DNSSEC"));
+#define SQL	"insert into applications set applicationid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",name='%s',flags=0"
+	CHECK(DBexecute(SQL, applicationid_dns   , hostid_template_dns_test, "DNS"));
+	CHECK(DBexecute(SQL, applicationid_dnssec, hostid_template_dns_test, "DNSSEC"));
+#undef SQL
 
-	CHECK(DBpatch_4050505_create_item(itemid_dnssec_enabled, ITEM_TYPE_CALCULATED, hostid_template_dns_test,
+#define SQL	"insert into items set itemid=" ZBX_FS_UI64 ",type=%d,snmp_community='',snmp_oid='',"			\
+		"hostid=" ZBX_FS_UI64 ",name='%s',key_='%s',delay='%s',history='%s',trends='%s',status=0,"		\
+		"value_type=%d,trapper_hosts='',units='',snmpv3_securityname='',snmpv3_securitylevel=0,"		\
+		"snmpv3_authpassphrase='',snmpv3_privpassphrase='',formula='',logtimefmt='',templateid=NULL,"		\
+		"valuemapid=nullif(" ZBX_FS_UI64 ",0),params='%s',ipmi_sensor='',authtype=0,username='',password='',"	\
+		"publickey='',privatekey='',flags=%d,interfaceid=NULL,port='',description='%s',inventory_link=0,"	\
+		"lifetime='%s',snmpv3_authprotocol=0,snmpv3_privprotocol=0,snmpv3_contextname='',evaltype=0,"		\
+		"jmx_endpoint='',master_itemid=nullif(" ZBX_FS_UI64 ",0),timeout='3s',url='',query_fields='',posts='',"	\
+		"status_codes='200',follow_redirects=1,post_type=0,http_proxy='',headers='',retrieve_mode=0,"		\
+		"request_method=0,output_format=0,ssl_cert_file='',ssl_key_file='',ssl_key_password='',verify_peer=0,"	\
+		"verify_host=0,allow_traps=0"
+
+#define ITEM_TYPE_SIMPLE		3
+#define ITEM_TYPE_CALCULATED		15
+#define ITEM_TYPE_DEPENDENT		18
+
+#define ITEM_VALUE_TYPE_FLOAT		0
+#define ITEM_VALUE_TYPE_STR		1
+#define ITEM_VALUE_TYPE_UINT64		3
+#define ITEM_VALUE_TYPE_TEXT		4
+
+#define ZBX_FLAG_DISCOVERY		0x01 /* Discovery rule */
+#define ZBX_FLAG_DISCOVERY_PROTOTYPE	0x02 /* Item prototype */
+
+	/* CHECK(DBexecute(SQL, itemid, type, hostid,		*/
+	/* 		name, key_, delay, history, trends,	*/
+	/* 		value_type, valuemapid, params, flags,	*/
+	/* 		description,				*/
+	/* 		lifetime, master_itemid));		*/
+	CHECK(DBexecute(SQL, itemid_dnssec_enabled, ITEM_TYPE_CALCULATED, hostid_template_dns_test,
 			"DNSSEC enabled/disabled", "dnssec.enabled", "60", "90d", "365d",
-			ITEM_VALUE_TYPE_UINT64, 0, "{$RSM.TLD.DNSSEC.ENABLED}", 0,
+			ITEM_VALUE_TYPE_UINT64, (zbx_uint64_t)0, "{$RSM.TLD.DNSSEC.ENABLED}", 0,
 			"History of DNSSEC being enabled or disabled.",
-			"30d", 0));
-	CHECK(DBpatch_4050505_create_item(itemid_rsm_dns, ITEM_TYPE_SIMPLE, hostid_template_dns_test,
+			"30d", (zbx_uint64_t)0));
+	CHECK(DBexecute(SQL, itemid_rsm_dns, ITEM_TYPE_SIMPLE, hostid_template_dns_test,
 			"DNS Test",
 			"rsm.dns[{$RSM.TLD},{$RSM.DNS.TESTPREFIX},{$RSM.DNS.NAME.SERVERS},{$RSM.TLD.DNSSEC.ENABLED},"
 				"{$RSM.TLD.RDDS.ENABLED},{$RSM.TLD.EPP.ENABLED},{$RSM.TLD.DNS.UDP.ENABLED},"
 				"{$RSM.TLD.DNS.TCP.ENABLED},{$RSM.IP4.ENABLED},{$RSM.IP6.ENABLED},{$RSM.RESOLVER},"
 				"{$RSM.DNS.UDP.RTT.HIGH},{$RSM.DNS.TCP.RTT.HIGH}]",
 			"{$RSM.DNS.UDP.DELAY}", "0", "0",
-			ITEM_VALUE_TYPE_TEXT, 0, "", 0,
+			ITEM_VALUE_TYPE_TEXT, (zbx_uint64_t)0, "", 0,
 			"Master item that performs the test and generates JSON with results."
-			" This JSON will be parsed by dependent items. History must be disabled.",
-			"30d", 0));
-	CHECK(DBpatch_4050505_create_item(itemid_rsm_dns_nssok, ITEM_TYPE_DEPENDENT, hostid_template_dns_test,
+				" This JSON will be parsed by dependent items. History must be disabled.",
+			"30d", (zbx_uint64_t)0));
+	CHECK(DBexecute(SQL, itemid_rsm_dns_nssok, ITEM_TYPE_DEPENDENT, hostid_template_dns_test,
 			"Number of working Name Servers", "rsm.dns.nssok", "0", "90d", "365d",
-			ITEM_VALUE_TYPE_UINT64, 0, "", 0,
+			ITEM_VALUE_TYPE_UINT64, (zbx_uint64_t)0, "", 0,
 			"Number of Name Servers that returned successful results out of those used in the test.",
 			"30d", itemid_rsm_dns));
-	CHECK(DBpatch_4050505_create_item(itemid_rsm_dns_ns_discovery, ITEM_TYPE_DEPENDENT, hostid_template_dns_test,
+	CHECK(DBexecute(SQL, itemid_rsm_dns_ns_discovery, ITEM_TYPE_DEPENDENT, hostid_template_dns_test,
 			"Name Servers discovery", "rsm.dns.ns.discovery", "0", "90d", "0",
-			ITEM_VALUE_TYPE_TEXT, 0, "", ZBX_FLAG_DISCOVERY,
+			ITEM_VALUE_TYPE_TEXT, (zbx_uint64_t)0, "", ZBX_FLAG_DISCOVERY,
 			"Discovers Name Servers that were used in DNS test.",
 			"1000d", itemid_rsm_dns));
-	CHECK(DBpatch_4050505_create_item(itemid_rsm_dns_nsip_discovery, ITEM_TYPE_DEPENDENT, hostid_template_dns_test,
+	CHECK(DBexecute(SQL, itemid_rsm_dns_nsip_discovery, ITEM_TYPE_DEPENDENT, hostid_template_dns_test,
 			"NS-IP pairs discovery", "rsm.dns.nsip.discovery", "0", "90d", "0",
-			ITEM_VALUE_TYPE_TEXT, 0, "", ZBX_FLAG_DISCOVERY,
+			ITEM_VALUE_TYPE_TEXT, (zbx_uint64_t)0, "", ZBX_FLAG_DISCOVERY,
 			"Discovers Name Servers (NS-IP pairs) that were used in DNS test.",
 			"1000d", itemid_rsm_dns));
-	CHECK(DBpatch_4050505_create_item(itemid_rsm_dns_ns_status, ITEM_TYPE_DEPENDENT, hostid_template_dns_test,
+	CHECK(DBexecute(SQL, itemid_rsm_dns_ns_status, ITEM_TYPE_DEPENDENT, hostid_template_dns_test,
 			"Status of $1", "rsm.dns.ns.status[{#NS}]", "0", "90d", "365d",
 			ITEM_VALUE_TYPE_UINT64, valuemapid_rsm_service_availability, "", ZBX_FLAG_DISCOVERY_PROTOTYPE,
 			"Status of Name Server: Up (1) or Down (0)."
-			" The Name Server is considered to be up if all its IPs returned successful RTTs.",
+				" The Name Server is considered to be up if all its IPs returned successful RTTs.",
 			"30d", itemid_rsm_dns));
-	CHECK(DBpatch_4050505_create_item(itemid_rsm_dns_rtt_tcp, ITEM_TYPE_DEPENDENT, hostid_template_dns_test,
+	CHECK(DBexecute(SQL, itemid_rsm_dns_rtt_tcp, ITEM_TYPE_DEPENDENT, hostid_template_dns_test,
 			"RTT of $1,$2 using $3", "rsm.dns.rtt[{#NS},{#IP},tcp]", "0", "90d", "365d",
 			ITEM_VALUE_TYPE_FLOAT, valuemapid_rsm_dns_rtt, "", ZBX_FLAG_DISCOVERY_PROTOTYPE,
 			"The Round-Time Trip returned when testing specific IP of Name Server using TCP protocol.",
 			"30d", itemid_rsm_dns));
-	CHECK(DBpatch_4050505_create_item(itemid_rsm_dns_rtt_udp, ITEM_TYPE_DEPENDENT, hostid_template_dns_test,
+	CHECK(DBexecute(SQL, itemid_rsm_dns_rtt_udp, ITEM_TYPE_DEPENDENT, hostid_template_dns_test,
 			"RTT of $1,$2 using $3", "rsm.dns.rtt[{#NS},{#IP},udp]", "0", "90d", "365d",
 			ITEM_VALUE_TYPE_FLOAT, valuemapid_rsm_dns_rtt, "", ZBX_FLAG_DISCOVERY_PROTOTYPE,
 			"The Round-Time Trip returned when testing specific IP of Name Server using UDP protocol.",
 			"30d", itemid_rsm_dns));
-	CHECK(DBpatch_4050505_create_item(itemid_rsm_dns_nsid, ITEM_TYPE_DEPENDENT, hostid_template_dns_test,
+	CHECK(DBexecute(SQL, itemid_rsm_dns_nsid, ITEM_TYPE_DEPENDENT, hostid_template_dns_test,
 			"NSID of $1,$2", "rsm.dns.nsid[{#NS},{#IP}]", "0", "90d", "0",
-			ITEM_VALUE_TYPE_STR, 0, "", ZBX_FLAG_DISCOVERY_PROTOTYPE,
+			ITEM_VALUE_TYPE_STR, (zbx_uint64_t)0, "", ZBX_FLAG_DISCOVERY_PROTOTYPE,
 			"DNS Name Server Identifier of the target Name Server that was tested.",
 			"30d", itemid_rsm_dns));
-	CHECK(DBpatch_4050505_create_item(itemid_rsm_dns_mode, ITEM_TYPE_DEPENDENT, hostid_template_dns_test,
+	CHECK(DBexecute(SQL, itemid_rsm_dns_mode, ITEM_TYPE_DEPENDENT, hostid_template_dns_test,
 			"The mode of the Test", "rsm.dns.mode", "0", "90d", "365d",
 			ITEM_VALUE_TYPE_UINT64, valuemapid_dns_test_mode, "", 0,
 			"The mode (normal or critical) in which the test was performed.",
 			"30d", itemid_rsm_dns));
-	CHECK(DBpatch_4050505_create_item(itemid_rsm_dns_protocol, ITEM_TYPE_DEPENDENT, hostid_template_dns_test,
+	CHECK(DBexecute(SQL, itemid_rsm_dns_protocol, ITEM_TYPE_DEPENDENT, hostid_template_dns_test,
 			"Transport protocol of the Test", "rsm.dns.protocol", "0", "90d", "365d",
 			ITEM_VALUE_TYPE_UINT64, valuemapid_transport_protocol, "", 0,
 			"Transport protocol (UDP or TCP) that was used during the test.",
 			"30d", itemid_rsm_dns));
-
-	CHECK(DBpatch_4050505_item_to_app(itemappid_dnssec_enabled   , applicationid_dnssec, itemid_dnssec_enabled));
-	CHECK(DBpatch_4050505_item_to_app(itemappid_rsm_dns          , applicationid_dns   , itemid_rsm_dns));
-	CHECK(DBpatch_4050505_item_to_app(itemappid_rsm_dns_nssok    , applicationid_dns   , itemid_rsm_dns_nssok));
-	CHECK(DBpatch_4050505_item_to_app(itemappid_rsm_dns_ns_status, applicationid_dns   , itemid_rsm_dns_ns_status));
-	CHECK(DBpatch_4050505_item_to_app(itemappid_rsm_dns_rtt_tcp  , applicationid_dns   , itemid_rsm_dns_rtt_tcp));
-	CHECK(DBpatch_4050505_item_to_app(itemappid_rsm_dns_rtt_udp  , applicationid_dns   , itemid_rsm_dns_rtt_udp));
-	CHECK(DBpatch_4050505_item_to_app(itemappid_rsm_dns_nsid     , applicationid_dns   , itemid_rsm_dns_nsid));
-	CHECK(DBpatch_4050505_item_to_app(itemappid_rsm_dns_mode     , applicationid_dns   , itemid_rsm_dns_mode));
-	CHECK(DBpatch_4050505_item_to_app(itemappid_rsm_dns_protocol , applicationid_dns   , itemid_rsm_dns_protocol));
-
-	CHECK(DBpatch_4050505_item_discovery(itemdiscoveryid_rsm_dns_ns_status, itemid_rsm_dns_ns_status,
-			itemid_rsm_dns_ns_discovery));
-	CHECK(DBpatch_4050505_item_discovery(itemdiscoveryid_rsm_dns_rtt_tcp, itemid_rsm_dns_rtt_tcp,
-			itemid_rsm_dns_nsip_discovery));
-	CHECK(DBpatch_4050505_item_discovery(itemdiscoveryid_rsm_dns_rtt_udp, itemid_rsm_dns_rtt_udp,
-			itemid_rsm_dns_nsip_discovery));
-	CHECK(DBpatch_4050505_item_discovery(itemdiscoveryid_rsm_dns_nsid, itemid_rsm_dns_nsid,
-			itemid_rsm_dns_nsip_discovery));
-
-	CHECK(DBpatch_4050505_item_preproc(item_preprocid_rsm_dns_nssok, itemid_rsm_dns_nssok,
-			"$.nssok", 0));
-	CHECK(DBpatch_4050505_item_preproc(item_preprocid_rsm_dns_ns_discovery, itemid_rsm_dns_ns_discovery,
-			"$.nss", 0));
-	CHECK(DBpatch_4050505_item_preproc(item_preprocid_rsm_dns_nsip_discovery, itemid_rsm_dns_nsip_discovery,
-			"$.nsips", 0));
-	CHECK(DBpatch_4050505_item_preproc(item_preprocid_rsm_dns_ns_status, itemid_rsm_dns_ns_status,
-			"$.nss[?(@.[''ns''] == ''{#NS}'')].status.first()", 1));
-	CHECK(DBpatch_4050505_item_preproc(item_preprocid_rsm_dns_rtt_tcp, itemid_rsm_dns_rtt_tcp,
-			"$.nsips[?(@.[''ns''] == ''{#NS}'' && @.[''ip''] == ''{#IP}'' && @.[''protocol''] == ''tcp'')].rtt.first()", 1));
-	CHECK(DBpatch_4050505_item_preproc(item_preprocid_rsm_dns_rtt_udp, itemid_rsm_dns_rtt_udp,
-			"$.nsips[?(@.[''ns''] == ''{#NS}'' && @.[''ip''] == ''{#IP}'' && @.[''protocol''] == ''udp'')].rtt.first()", 1));
-	CHECK(DBpatch_4050505_item_preproc(item_preprocid_rsm_dns_nsid, itemid_rsm_dns_nsid,
-			"$.nsips[?(@.[''ns''] == ''{#NS}'' && @.[''ip''] == ''{#IP}'')].nsid.first()", 1));
-	CHECK(DBpatch_4050505_item_preproc(item_preprocid_rsm_dns_mode, itemid_rsm_dns_mode,
-			"$.mode", 0));
-	CHECK(DBpatch_4050505_item_preproc(item_preprocid_rsm_dns_protocol, itemid_rsm_dns_protocol,
-			"$.protocol", 0));
-
-	CHECK(DBpatch_4050505_lld_macro_path(lld_macro_pathid_rsm_dns_ns_discovery_ns,
-			itemid_rsm_dns_ns_discovery, "{#NS}", "$.ns"));
-	CHECK(DBpatch_4050505_lld_macro_path(lld_macro_pathid_rsm_dns_nsip_discovery_ip,
-			itemid_rsm_dns_nsip_discovery, "{#IP}", "$.ip"));
-	CHECK(DBpatch_4050505_lld_macro_path(lld_macro_pathid_rsm_dns_nsip_discovery_ns,
-			itemid_rsm_dns_nsip_discovery, "{#NS}", "$.ns"));
 
 #undef ITEM_TYPE_SIMPLE
 #undef ITEM_TYPE_CALCULATED
@@ -1177,6 +1024,58 @@ static int	DBpatch_4050505(void)
 
 #undef ZBX_FLAG_DISCOVERY
 #undef ZBX_FLAG_DISCOVERY_PROTOTYPE
+
+#undef SQL
+
+#define SQL	"insert into items_applications set itemappid=" ZBX_FS_UI64 ",applicationid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64
+	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_dnssec, itemid_dnssec_enabled));
+	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_dns   , itemid_rsm_dns));
+	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_dns   , itemid_rsm_dns_nssok));
+	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_dns   , itemid_rsm_dns_ns_status));
+	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_dns   , itemid_rsm_dns_rtt_tcp));
+	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_dns   , itemid_rsm_dns_rtt_udp));
+	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_dns   , itemid_rsm_dns_nsid));
+	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_dns   , itemid_rsm_dns_mode));
+	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_dns   , itemid_rsm_dns_protocol));
+#undef SQL
+
+#define SQL	"insert into item_discovery set itemdiscoveryid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ","		\
+		"parent_itemid=" ZBX_FS_UI64 ",key_='',lastcheck=0,ts_delete=0"
+	CHECK(DBexecute(SQL, DBget_maxid_num("item_discovery", 1), itemid_rsm_dns_ns_status, itemid_rsm_dns_ns_discovery));
+	CHECK(DBexecute(SQL, DBget_maxid_num("item_discovery", 1), itemid_rsm_dns_rtt_tcp  , itemid_rsm_dns_nsip_discovery));
+	CHECK(DBexecute(SQL, DBget_maxid_num("item_discovery", 1), itemid_rsm_dns_rtt_udp  , itemid_rsm_dns_nsip_discovery));
+	CHECK(DBexecute(SQL, DBget_maxid_num("item_discovery", 1), itemid_rsm_dns_nsid     , itemid_rsm_dns_nsip_discovery));
+#undef SQL
+
+#define SQL	"insert into item_preproc set"										\
+		" item_preprocid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ",step=%d,type=%d,params='%s',"			\
+		"error_handler=%d,error_handler_params=''"
+	/* type 12 = ZBX_PREPROC_JSONPATH */
+	CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_dns_nssok, 1, 12,
+			"$.nssok", 0));
+	CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_dns_ns_discovery, 1, 12,
+			"$.nss", 0));
+	CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_dns_nsip_discovery, 1, 12,
+			"$.nsips", 0));
+	CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_dns_ns_status, 1, 12,
+			"$.nss[?(@.[''ns''] == ''{#NS}'')].status.first()", 1));
+	CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_dns_rtt_tcp, 1, 12,
+			"$.nsips[?(@.[''ns''] == ''{#NS}'' && @.[''ip''] == ''{#IP}'' && @.[''protocol''] == ''tcp'')].rtt.first()", 1));
+	CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_dns_rtt_udp, 1, 12,
+			"$.nsips[?(@.[''ns''] == ''{#NS}'' && @.[''ip''] == ''{#IP}'' && @.[''protocol''] == ''udp'')].rtt.first()", 1));
+	CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_dns_nsid, 1, 12,
+			"$.nsips[?(@.[''ns''] == ''{#NS}'' && @.[''ip''] == ''{#IP}'')].nsid.first()", 1));
+	CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_dns_mode, 1, 12,
+			"$.mode", 0));
+	CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_dns_protocol, 1, 12,
+			"$.protocol", 0));
+#undef SQL
+
+#define SQL	"insert into lld_macro_path set lld_macro_pathid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ",lld_macro='%s',path='%s'"
+	CHECK(DBexecute(SQL, DBget_maxid_num("lld_macro_path", 1), itemid_rsm_dns_ns_discovery  , "{#NS}", "$.ns"));
+	CHECK(DBexecute(SQL, DBget_maxid_num("lld_macro_path", 1), itemid_rsm_dns_nsip_discovery, "{#IP}", "$.ip"));
+	CHECK(DBexecute(SQL, DBget_maxid_num("lld_macro_path", 1), itemid_rsm_dns_nsip_discovery, "{#NS}", "$.ns"));
+#undef SQL
 
 	ret = SUCCEED;
 out:
@@ -1805,14 +1704,14 @@ static int	DBpatch_4050509(void)
 				" hostgroupid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",groupid=" ZBX_FS_UI64,
 			DBget_maxid_num("hosts_groups", 1), hostid, groupid_templates));
 
-#define SQL "insert into applications set applicationid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",name='%s',flags=0"
+#define SQL	"insert into applications set applicationid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",name='%s',flags=0"
 	CHECK(DBexecute(SQL, applicationid_dns   , hostid, "DNS"));
 	CHECK(DBexecute(SQL, applicationid_dnssec, hostid, "DNSSEC"));
 	CHECK(DBexecute(SQL, applicationid_rdap  , hostid, "RDAP"));
 	CHECK(DBexecute(SQL, applicationid_rdds  , hostid, "RDDS"));
 #undef SQL
 
-#define SQL "insert into items set itemid=" ZBX_FS_UI64 ",type=%d,snmp_community='',snmp_oid='',"			\
+#define SQL	"insert into items set itemid=" ZBX_FS_UI64 ",type=%d,snmp_community='',snmp_oid='',"			\
 		"hostid=" ZBX_FS_UI64 ",name='%s',key_='%s',delay='%s',history='90d',trends='365d',status=0,"		\
 		"value_type=%d,trapper_hosts='',units='',snmpv3_securityname='',snmpv3_securitylevel=0,"		\
 		"snmpv3_authpassphrase='',snmpv3_privpassphrase='',formula='',logtimefmt='',templateid=NULL,"		\
@@ -1837,7 +1736,7 @@ static int	DBpatch_4050509(void)
 			3, "{$RSM.TLD.RDDS.ENABLED}"   , "History of RDDS being enabled or disabled."));
 #undef SQL
 
-#define SQL "insert into items_applications set itemappid=" ZBX_FS_UI64 ",applicationid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64
+#define SQL	"insert into items_applications set itemappid=" ZBX_FS_UI64 ",applicationid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64
 	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_dns   , itemid_dns_tcp_enabled));
 	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_dns   , itemid_dns_udp_enabled));
 	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_dnssec, itemid_dnssec_enabled));
@@ -1850,7 +1749,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_4050509(void)
+static int	DBpatch_4050510(void)
 {
 	int		ret = FAIL;
 
@@ -1908,14 +1807,13 @@ static int	DBpatch_4050509(void)
 				" hostgroupid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",groupid=" ZBX_FS_UI64,
 			DBget_maxid_num("hosts_groups", 1), hostid, groupid_templates));
 
-#define SQL "insert into applications set applicationid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",name='%s',flags=0"
+#define SQL	"insert into applications set applicationid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",name='%s',flags=0"
 	CHECK(DBexecute(SQL, applicationid_rdds  , hostid, "RDDS"));
 	CHECK(DBexecute(SQL, applicationid_rdds43, hostid, "RDDS43"));
 	CHECK(DBexecute(SQL, applicationid_rdds80, hostid, "RDDS80"));
 #undef SQL
 
-
-#define SQL "insert into items set itemid=" ZBX_FS_UI64 ",type=%d,snmp_community='',snmp_oid='',"			\
+#define SQL	"insert into items set itemid=" ZBX_FS_UI64 ",type=%d,snmp_community='',snmp_oid='',"			\
 		"hostid=" ZBX_FS_UI64 ",name='%s',key_='%s',delay='%s',history='%s',trends='%s',status=0,"		\
 		"value_type=%d,trapper_hosts='',units='',snmpv3_securityname='',snmpv3_securitylevel=0,"		\
 		"snmpv3_authpassphrase='',snmpv3_privpassphrase='',formula='',logtimefmt='',templateid=NULL,"		\
@@ -1941,13 +1839,13 @@ static int	DBpatch_4050509(void)
 				"{$RSM.RDDS.TESTPREFIX},{$RSM.RDDS.NS.STRING},{$RSM.RDDS.ENABLED},"
 				"{$RSM.TLD.RDDS.ENABLED},{$RSM.EPP.ENABLED},{$RSM.TLD.EPP.ENABLED},{$RSM.IP4.ENABLED},"
 				"{$RSM.IP6.ENABLED},{$RSM.RESOLVER},{$RSM.RDDS.RTT.HIGH},{$RSM.RDDS.MAXREDIRS}]",
-			"1m", "0", "0", 4, 0,
+			"1m", "0", "0", 4, (zbx_uint64_t)0,
 			"Master item that performs the RDDS test and generates JSON with results. This JSON will be"
 				" parsed by dependent items. History must be disabled.",
-			0));
+			(zbx_uint64_t)0));
 	CHECK(DBexecute(SQL, itemid_rsm_rdds_43_ip, 18, hostid, "RDDS43 IP",
 			"rsm.rdds.43.ip",
-			"0", "90d", "0", 1, 0,
+			"0", "90d", "0", 1, (zbx_uint64_t)0,
 			"IP address for RDDS43 test",
 			itemid_rsm_rdds));
 	CHECK(DBexecute(SQL, itemid_rsm_rdds_43_rtt, 18, hostid, "RDDS43 RTT",
@@ -1957,12 +1855,12 @@ static int	DBpatch_4050509(void)
 			itemid_rsm_rdds));
 	CHECK(DBexecute(SQL, itemid_rsm_rdds_43_upd, 18, hostid, "RDDS43 update time",
 			"rsm.rdds.43.upd",
-			"0", "90d", "365d", 0, 0,
+			"0", "90d", "365d", 0, (zbx_uint64_t)0,
 			"Update time for RDDS43 test",
 			itemid_rsm_rdds));
 	CHECK(DBexecute(SQL, itemid_rsm_rdds_80_ip, 18, hostid, "RDDS80 IP",
 			"rsm.rdds.80.ip",
-			"0", "90d", "0", 1, 0,
+			"0", "90d", "0", 1, (zbx_uint64_t)0,
 			"IP address for RDDS80 test",
 			itemid_rsm_rdds));
 	CHECK(DBexecute(SQL, itemid_rsm_rdds_80_rtt, 18, hostid, "RDDS80 RTT",
@@ -1972,7 +1870,7 @@ static int	DBpatch_4050509(void)
 			itemid_rsm_rdds));
 #undef SQL
 
-#define SQL "insert into items_applications set itemappid=" ZBX_FS_UI64 ",applicationid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64
+#define SQL	"insert into items_applications set itemappid=" ZBX_FS_UI64 ",applicationid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64
 	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds  , itemid_rsm_rdds));
 	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds43, itemid_rsm_rdds_43_ip));
 	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds43, itemid_rsm_rdds_43_rtt));
@@ -1981,8 +1879,8 @@ static int	DBpatch_4050509(void)
 	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds80, itemid_rsm_rdds_80_rtt));
 #undef SQL
 
-#define SQL "insert into item_preproc set"										\
-		" item_preprocid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ",step=%d,""type=%d,params='%s',"			\
+#define SQL	"insert into item_preproc set"										\
+		" item_preprocid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ",step=%d,type=%d,params='%s',"			\
 		"error_handler=%d,error_handler_params=''"
 	/* type 12 = ZBX_PREPROC_JSONPATH */
 	CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_rdds_43_ip , 1, 12, "$.rdds43.ip" , 1));
