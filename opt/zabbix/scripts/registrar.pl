@@ -510,24 +510,6 @@ sub create_main_template($)
 
 	my $templateid = really(create_template($template_name));
 
-	my $delay = 300;
-	my $appid = get_application_id('Configuration', $templateid);
-
-	foreach my $m ('RSM.IP4.ENABLED', 'RSM.IP6.ENABLED')
-	{
-		really(create_item({
-			'name'         => 'Value of $1 variable',
-			'key_'         => 'probe.configvalue[' . $m . ']',
-			'status'       => ITEM_STATUS_ACTIVE,
-			'hostid'       => $templateid,
-			'applications' => [$appid],
-			'params'       => '{$' . $m . '}',
-			'delay'        => $delay,
-			'type'         => ITEM_TYPE_CALCULATED,
-			'value_type'   => ITEM_VALUE_TYPE_UINT64
-		}));
-	}
-
 	really(create_macro('{$RSM.TLD}', $rsmhost, $templateid));
 	really(create_macro('{$RSM.RDDS.TESTPREFIX}', getopt('rdds-test-prefix'), $templateid, 1)) if (opt('rdds-test-prefix'));
 	really(create_macro('{$RSM.RDDS.NS.STRING}', opt('rdds-ns-string') ? getopt('rdds-ns-string') : CFG_DEFAULT_RDDS_NS_STRING, $templateid, 1));

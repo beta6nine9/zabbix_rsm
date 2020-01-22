@@ -1001,24 +1001,6 @@ sub create_main_template($$)
 
 	my $templateid = really(create_template(TEMPLATE_RSMHOST_CONFIG_PREFIX . $tld));
 
-	my $delay = 300;
-	my $appid = get_application_id('Configuration', $templateid);
-
-	foreach my $m ('RSM.IP4.ENABLED', 'RSM.IP6.ENABLED')
-	{
-		really(create_item({
-			'name'         => 'Value of $1 variable',
-			'key_'         => 'probe.configvalue[' . $m . ']',
-			'status'       => ITEM_STATUS_ACTIVE,
-			'hostid'       => $templateid,
-			'applications' => [$appid],
-			'params'       => '{$' . $m . '}',
-			'delay'        => $delay,
-			'type'         => ITEM_TYPE_CALCULATED,
-			'value_type'   => ITEM_VALUE_TYPE_UINT64
-		}));
-	}
-
 	my $name_servers_list = '';
 
 	foreach my $ns_name (sort keys %{$ns_servers})
