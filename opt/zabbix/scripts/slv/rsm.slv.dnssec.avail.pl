@@ -84,24 +84,22 @@ sub cfg_keys_in_cb($)
 	return get_items_like($tld, $cfg_keys_in_pattern);
 }
 
-sub get_items_like
+sub get_items_like($$)
 {
 	my $tld = shift;
 	my $key_in = shift;
+	my $params = ["$key_in%","$tld %"];
 
-	my $items_ref = db_select(
-		"select key_".
-		" from items".
-		" where key_ like '$key_in%$tld%'".
-			" and status<>".ITEM_STATUS_DISABLED);
+	my $result = db_select_col(
+		"select i.key_".
+		" from items i,hosts h".
+		" where i.key_ like ?".
+		" and h.host like ?".
+		" and i.templateid is NULL".
+		" and i.hostid=h.hostid".
+		" and i.status<>".ITEM_STATUS_DISABLED, $params);
 
-	my @result;
-	foreach my $item_ref (@{$items_ref})
-	{
-		push(@result, $item_ref->[0]);
-	}
-
-	return \@result;
+	return $result;
 }
 
 # SUCCESS - more than or equal to $cfg_minns Name Servers returned no DNSSEC errors
