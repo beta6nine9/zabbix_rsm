@@ -852,8 +852,7 @@ static int	DBpatch_4050505(void)
 	zbx_uint64_t	valuemapid_transport_protocol;			/* valuemapid of "Transport protocol" */
 	zbx_uint64_t	valuemapid_rsm_dns_rtt;				/* valuemapid of "RSM DNS rtt" */
 
-	zbx_uint64_t	hostid_template_dns_test;			/* hostid of "Template DNS Test" template */
-	zbx_uint64_t	hostgroupid_template_dns;			/* hostgroupid of "Template DNS Test" template in "Templates" host group */
+	zbx_uint64_t	hostid;						/* hostid of "Template DNS Test" template */
 
 	zbx_uint64_t	applicationid_next;
 	zbx_uint64_t	applicationid_dns;				/* applicationid of "DNS" application in "Template DNS Test" template */
@@ -881,28 +880,27 @@ static int	DBpatch_4050505(void)
 	GET_VALUE_MAP_ID(valuemapid_transport_protocol, "Transport protocol");
 	GET_VALUE_MAP_ID(valuemapid_rsm_dns_rtt, "RSM DNS rtt");
 
-	hostid_template_dns_test                   = DBget_maxid_num("hosts", 1);
+	hostid = DBget_maxid_num("hosts", 1);
 
-	hostgroupid_template_dns                   = DBget_maxid_num("hosts_groups", 1);
+	applicationid_next   = DBget_maxid_num("applications", 2);
+	applicationid_dns    = applicationid_next++;
+	applicationid_dnssec = applicationid_next++;
 
-	applicationid_next                         = DBget_maxid_num("applications", 2);
-	applicationid_dns                          = applicationid_next++;
-	applicationid_dnssec                       = applicationid_next++;
+	itemid_next                   = DBget_maxid_num("items", 11);
+	itemid_dnssec_enabled         = itemid_next++;
+	itemid_rsm_dns                = itemid_next++;
+	itemid_rsm_dns_nssok          = itemid_next++;
+	itemid_rsm_dns_ns_discovery   = itemid_next++;
+	itemid_rsm_dns_nsip_discovery = itemid_next++;
+	itemid_rsm_dns_ns_status      = itemid_next++;
+	itemid_rsm_dns_rtt_tcp        = itemid_next++;
+	itemid_rsm_dns_rtt_udp        = itemid_next++;
+	itemid_rsm_dns_nsid           = itemid_next++;
+	itemid_rsm_dns_mode           = itemid_next++;
+	itemid_rsm_dns_protocol       = itemid_next++;
 
-	itemid_next                                = DBget_maxid_num("items", 11);
-	itemid_dnssec_enabled                      = itemid_next++;
-	itemid_rsm_dns                             = itemid_next++;
-	itemid_rsm_dns_nssok                       = itemid_next++;
-	itemid_rsm_dns_ns_discovery                = itemid_next++;
-	itemid_rsm_dns_nsip_discovery              = itemid_next++;
-	itemid_rsm_dns_ns_status                   = itemid_next++;
-	itemid_rsm_dns_rtt_tcp                     = itemid_next++;
-	itemid_rsm_dns_rtt_udp                     = itemid_next++;
-	itemid_rsm_dns_nsid                        = itemid_next++;
-	itemid_rsm_dns_mode                        = itemid_next++;
-	itemid_rsm_dns_protocol                    = itemid_next++;
-
-	CHECK(DBexecute("insert into hosts set hostid=" ZBX_FS_UI64 ",created=0,proxy_hostid=NULL,host='%s',status=3,"
+	/* status 3 = HOST_STATUS_TEMPLATE */
+	CHECK(DBexecute("insert into hosts set hostid=" ZBX_FS_UI64 ",created=0,proxy_hostid=NULL,host='%s',status=%d,"
 			"disable_until=0,error='',available=0,errors_from=0,lastaccess=0,ipmi_authtype=-1,"
 			"ipmi_privilege=2,ipmi_username='',ipmi_password='',ipmi_disable_until=0,ipmi_available=0,"
 			"snmp_disable_until=0,snmp_available=0,maintenanceid=NULL,maintenance_status=0,"
@@ -910,15 +908,15 @@ static int	DBpatch_4050505(void)
 			"snmp_error='',jmx_disable_until=0,jmx_available=0,jmx_errors_from=0,jmx_error='',name='%s',"
 			"info_1='',info_2='',flags=0,templateid=NULL,description='',tls_connect=1,tls_accept=1,"
 			"tls_issuer='',tls_subject='',tls_psk_identity='',tls_psk='',proxy_address='',auto_compress=1",
-			hostid_template_dns_test, "Template DNS Test", "Template DNS Test"));
+			hostid, "Template DNS Test", 3, "Template DNS Test"));
 
-	CHECK(DBexecute("insert into hosts_groups set hostgroupid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ","
-			"groupid=" ZBX_FS_UI64,
-			hostgroupid_template_dns, hostid_template_dns_test, groupid_templates));
+	CHECK(DBexecute("insert into hosts_groups set"
+				" hostgroupid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",groupid=" ZBX_FS_UI64,
+			DBget_maxid_num("hosts_groups", 1), hostid, groupid_templates));
 
 #define SQL	"insert into applications set applicationid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",name='%s',flags=0"
-	CHECK(DBexecute(SQL, applicationid_dns   , hostid_template_dns_test, "DNS"));
-	CHECK(DBexecute(SQL, applicationid_dnssec, hostid_template_dns_test, "DNSSEC"));
+	CHECK(DBexecute(SQL, applicationid_dns   , hostid, "DNS"));
+	CHECK(DBexecute(SQL, applicationid_dnssec, hostid, "DNSSEC"));
 #undef SQL
 
 #define SQL	"insert into items set itemid=" ZBX_FS_UI64 ",type=%d,snmp_community='',snmp_oid='',"			\
@@ -950,12 +948,12 @@ static int	DBpatch_4050505(void)
 	/* 		value_type, valuemapid, params, flags,	*/
 	/* 		description,				*/
 	/* 		lifetime, master_itemid));		*/
-	CHECK(DBexecute(SQL, itemid_dnssec_enabled, ITEM_TYPE_CALCULATED, hostid_template_dns_test,
+	CHECK(DBexecute(SQL, itemid_dnssec_enabled, ITEM_TYPE_CALCULATED, hostid,
 			"DNSSEC enabled/disabled", "dnssec.enabled", "60", "90d", "365d",
 			ITEM_VALUE_TYPE_UINT64, (zbx_uint64_t)0, "{$RSM.TLD.DNSSEC.ENABLED}", 0,
 			"History of DNSSEC being enabled or disabled.",
 			"30d", (zbx_uint64_t)0));
-	CHECK(DBexecute(SQL, itemid_rsm_dns, ITEM_TYPE_SIMPLE, hostid_template_dns_test,
+	CHECK(DBexecute(SQL, itemid_rsm_dns, ITEM_TYPE_SIMPLE, hostid,
 			"DNS Test",
 			"rsm.dns[{$RSM.TLD},{$RSM.DNS.TESTPREFIX},{$RSM.DNS.NAME.SERVERS},{$RSM.TLD.DNSSEC.ENABLED},"
 				"{$RSM.TLD.RDDS.ENABLED},{$RSM.TLD.EPP.ENABLED},{$RSM.TLD.DNS.UDP.ENABLED},"
@@ -966,48 +964,48 @@ static int	DBpatch_4050505(void)
 			"Master item that performs the test and generates JSON with results."
 				" This JSON will be parsed by dependent items. History must be disabled.",
 			"30d", (zbx_uint64_t)0));
-	CHECK(DBexecute(SQL, itemid_rsm_dns_nssok, ITEM_TYPE_DEPENDENT, hostid_template_dns_test,
+	CHECK(DBexecute(SQL, itemid_rsm_dns_nssok, ITEM_TYPE_DEPENDENT, hostid,
 			"Number of working Name Servers", "rsm.dns.nssok", "0", "90d", "365d",
 			ITEM_VALUE_TYPE_UINT64, (zbx_uint64_t)0, "", 0,
 			"Number of Name Servers that returned successful results out of those used in the test.",
 			"30d", itemid_rsm_dns));
-	CHECK(DBexecute(SQL, itemid_rsm_dns_ns_discovery, ITEM_TYPE_DEPENDENT, hostid_template_dns_test,
+	CHECK(DBexecute(SQL, itemid_rsm_dns_ns_discovery, ITEM_TYPE_DEPENDENT, hostid,
 			"Name Servers discovery", "rsm.dns.ns.discovery", "0", "90d", "0",
 			ITEM_VALUE_TYPE_TEXT, (zbx_uint64_t)0, "", ZBX_FLAG_DISCOVERY,
 			"Discovers Name Servers that were used in DNS test.",
 			"1000d", itemid_rsm_dns));
-	CHECK(DBexecute(SQL, itemid_rsm_dns_nsip_discovery, ITEM_TYPE_DEPENDENT, hostid_template_dns_test,
+	CHECK(DBexecute(SQL, itemid_rsm_dns_nsip_discovery, ITEM_TYPE_DEPENDENT, hostid,
 			"NS-IP pairs discovery", "rsm.dns.nsip.discovery", "0", "90d", "0",
 			ITEM_VALUE_TYPE_TEXT, (zbx_uint64_t)0, "", ZBX_FLAG_DISCOVERY,
 			"Discovers Name Servers (NS-IP pairs) that were used in DNS test.",
 			"1000d", itemid_rsm_dns));
-	CHECK(DBexecute(SQL, itemid_rsm_dns_ns_status, ITEM_TYPE_DEPENDENT, hostid_template_dns_test,
+	CHECK(DBexecute(SQL, itemid_rsm_dns_ns_status, ITEM_TYPE_DEPENDENT, hostid,
 			"Status of $1", "rsm.dns.ns.status[{#NS}]", "0", "90d", "365d",
 			ITEM_VALUE_TYPE_UINT64, valuemapid_rsm_service_availability, "", ZBX_FLAG_DISCOVERY_PROTOTYPE,
 			"Status of Name Server: Up (1) or Down (0)."
 				" The Name Server is considered to be up if all its IPs returned successful RTTs.",
 			"30d", itemid_rsm_dns));
-	CHECK(DBexecute(SQL, itemid_rsm_dns_rtt_tcp, ITEM_TYPE_DEPENDENT, hostid_template_dns_test,
+	CHECK(DBexecute(SQL, itemid_rsm_dns_rtt_tcp, ITEM_TYPE_DEPENDENT, hostid,
 			"RTT of $1,$2 using $3", "rsm.dns.rtt[{#NS},{#IP},tcp]", "0", "90d", "365d",
 			ITEM_VALUE_TYPE_FLOAT, valuemapid_rsm_dns_rtt, "", ZBX_FLAG_DISCOVERY_PROTOTYPE,
 			"The Round-Time Trip returned when testing specific IP of Name Server using TCP protocol.",
 			"30d", itemid_rsm_dns));
-	CHECK(DBexecute(SQL, itemid_rsm_dns_rtt_udp, ITEM_TYPE_DEPENDENT, hostid_template_dns_test,
+	CHECK(DBexecute(SQL, itemid_rsm_dns_rtt_udp, ITEM_TYPE_DEPENDENT, hostid,
 			"RTT of $1,$2 using $3", "rsm.dns.rtt[{#NS},{#IP},udp]", "0", "90d", "365d",
 			ITEM_VALUE_TYPE_FLOAT, valuemapid_rsm_dns_rtt, "", ZBX_FLAG_DISCOVERY_PROTOTYPE,
 			"The Round-Time Trip returned when testing specific IP of Name Server using UDP protocol.",
 			"30d", itemid_rsm_dns));
-	CHECK(DBexecute(SQL, itemid_rsm_dns_nsid, ITEM_TYPE_DEPENDENT, hostid_template_dns_test,
+	CHECK(DBexecute(SQL, itemid_rsm_dns_nsid, ITEM_TYPE_DEPENDENT, hostid,
 			"NSID of $1,$2", "rsm.dns.nsid[{#NS},{#IP}]", "0", "90d", "0",
 			ITEM_VALUE_TYPE_STR, (zbx_uint64_t)0, "", ZBX_FLAG_DISCOVERY_PROTOTYPE,
 			"DNS Name Server Identifier of the target Name Server that was tested.",
 			"30d", itemid_rsm_dns));
-	CHECK(DBexecute(SQL, itemid_rsm_dns_mode, ITEM_TYPE_DEPENDENT, hostid_template_dns_test,
+	CHECK(DBexecute(SQL, itemid_rsm_dns_mode, ITEM_TYPE_DEPENDENT, hostid,
 			"The mode of the Test", "rsm.dns.mode", "0", "90d", "365d",
 			ITEM_VALUE_TYPE_UINT64, valuemapid_dns_test_mode, "", 0,
 			"The mode (normal or critical) in which the test was performed.",
 			"30d", itemid_rsm_dns));
-	CHECK(DBexecute(SQL, itemid_rsm_dns_protocol, ITEM_TYPE_DEPENDENT, hostid_template_dns_test,
+	CHECK(DBexecute(SQL, itemid_rsm_dns_protocol, ITEM_TYPE_DEPENDENT, hostid,
 			"Transport protocol of the Test", "rsm.dns.protocol", "0", "90d", "365d",
 			ITEM_VALUE_TYPE_UINT64, valuemapid_transport_protocol, "", 0,
 			"Transport protocol (UDP or TCP) that was used during the test.",
@@ -1696,7 +1694,7 @@ static int	DBpatch_4050509(void)
 				"jmx_errors_from=0,jmx_error='',name='%s',info_1='',info_2='',flags=0,templateid=NULL,"
 				"description='',tls_connect=1,tls_accept=1,tls_issuer='',tls_subject='',"
 				"tls_psk_identity='',tls_psk='',proxy_address='',auto_compress=1",
-			hostid, "Template Config History", HOST_STATUS_TEMPLATE, "Template Config History"));
+			hostid, "Template Config History", 3, "Template Config History"));
 
 	CHECK(DBexecute("insert into hosts_groups set"
 				" hostgroupid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",groupid=" ZBX_FS_UI64,
@@ -1789,7 +1787,7 @@ static int	DBpatch_4050510(void)
 	itemid_rsm_rdds_80_ip  = itemid_next++;
 	itemid_rsm_rdds_80_rtt = itemid_next++;
 
-	/* status 3 = HOST_STATUS_TEMPLATE*/
+	/* status 3 = HOST_STATUS_TEMPLATE */
 	CHECK(DBexecute("insert into hosts set hostid=" ZBX_FS_UI64 ",created=0,proxy_hostid=NULL,host='%s',status=%d,"
 				"disable_until=0,error='',available=0,errors_from=0,lastaccess=0,ipmi_authtype=-1,"
 				"ipmi_privilege=2,ipmi_username='',ipmi_password='',ipmi_disable_until=0,"
@@ -1924,11 +1922,11 @@ static int	DBpatch_4050511(void)
 	zbx_uint64_t	triggerid_probe_knocked_out;			/* triggerid of "Probe <host> has been knocked out" trigger */
 
 	zbx_uint64_t	functionid_next;
-	zbx_uint64_t	functionid_int_err_1;				/* functiond of function for "Internal errors happening" trigger */
-	zbx_uint64_t	functionid_int_err_2;				/* functiond of function for "Internal errors happening for ..." trigger */
-	zbx_uint64_t	functionid_probe_disabled_1;			/* functiond of function for "Probe <host> has been disabled by tests" trigger */
-	zbx_uint64_t	functionid_probe_disabled_2;			/* functiond of function for "Probe <host> has been disabled for more than ..." trigger */
-	zbx_uint64_t	functionid_probe_knocked_out;			/* functiond of function for "Probe <host> has been knocked out" trigger */
+	zbx_uint64_t	functionid_int_err_1;				/* functiond for "Internal errors happening" trigger */
+	zbx_uint64_t	functionid_int_err_2;				/* functiond for "Internal errors happening for ..." trigger */
+	zbx_uint64_t	functionid_probe_disabled_1;			/* functiond for "Probe <host> has been disabled by tests" trigger */
+	zbx_uint64_t	functionid_probe_disabled_2;			/* functiond for "Probe <host> has been disabled for more than ..." trigger */
+	zbx_uint64_t	functionid_probe_knocked_out;			/* functiond for "Probe <host> has been knocked out" trigger */
 
 	ONLY_SERVER();
 
@@ -1965,7 +1963,7 @@ static int	DBpatch_4050511(void)
 	functionid_probe_disabled_2  = functionid_next++;
 	functionid_probe_knocked_out = functionid_next++;
 
-	/* status 3 = HOST_STATUS_TEMPLATE*/
+	/* status 3 = HOST_STATUS_TEMPLATE */
 	CHECK(DBexecute("insert into hosts set hostid=" ZBX_FS_UI64 ",created=0,proxy_hostid=NULL,host='%s',status=%d,"
 				"disable_until=0,error='',available=0,errors_from=0,lastaccess=0,ipmi_authtype=-1,"
 				"ipmi_privilege=2,ipmi_username='',ipmi_password='',ipmi_disable_until=0,"
@@ -2036,10 +2034,10 @@ static int	DBpatch_4050511(void)
 	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_probe_status   , itemid_rsm_probe_status_manual));
 #undef SQL
 
-#define SQL	"insert into triggers set triggerid=" ZBX_FS_UI64 ",expression=concat('{'," ZBX_FS_UI64 ",'}','%s'),"	\
-		"description='%s',url='',status=0,value=0,priority=%d,lastchange=0,comments='',error='',"		\
-		"templateid=NULL,type=0,state=0,flags=0,recovery_mode=0,recovery_expression='',correlation_mode=0,"	\
-		"correlation_tag='',manual_close=0,opdata=''"
+#define SQL	"insert into triggers set triggerid=" ZBX_FS_UI64 ",expression='{" ZBX_FS_UI64 "}%s',description='%s',"	\
+			"url='',status=0,value=0,priority=%d,lastchange=0,comments='',error='',templateid=NULL,type=0,"	\
+			"state=0,flags=0,recovery_mode=0,recovery_expression='',correlation_mode=0,correlation_tag='',"	\
+			"manual_close=0,opdata=''"
 	/* priority 2 = TRIGGER_SEVERITY_WARNING */
 	/* priority 3 = TRIGGER_SEVERITY_AVERAGE */
 	/* priority 4 = TRIGGER_SEVERITY_HIGH */
@@ -2178,6 +2176,610 @@ static int	DBpatch_4050515(void)
 
 #endif
 
+static int	DBpatch_4050516(void)
+{
+	int		ret = FAIL;
+
+	zbx_uint64_t	groupid_templates;				/* groupid of "Templates" host group */
+	zbx_uint64_t	valuemapid_rsm_service_availability;		/* valuemapid of "RSM Service Availability" value map */
+
+	zbx_uint64_t	hostid;						/* hostid of "Template DNSSEC Status" template */
+
+	zbx_uint64_t	itemid_next;
+	zbx_uint64_t	itemid_avail;					/* itemid of ""DNSSEC availability" item */
+	zbx_uint64_t	itemid_rollweek;				/* itemid of ""DNSSEC weekly unavailability" item */
+
+	zbx_uint64_t	triggerid_next;
+	zbx_uint64_t	triggerid_service_down;				/* triggerid of "DNSSEC service is down" trigger */
+	zbx_uint64_t	triggerid_rollweek_over_10;			/* triggerid of "DNSSEC rolling week is over 10%" trigger */
+	zbx_uint64_t	triggerid_rollweek_over_25;			/* triggerid of "DNSSEC rolling week is over 25%" trigger */
+	zbx_uint64_t	triggerid_rollweek_over_50;			/* triggerid of "DNSSEC rolling week is over 50%" trigger */
+	zbx_uint64_t	triggerid_rollweek_over_75;			/* triggerid of "DNSSEC rolling week is over 75%" trigger */
+	zbx_uint64_t	triggerid_rollweek_over_100;			/* triggerid of "DNSSEC rolling week is over 100%" trigger */
+
+	zbx_uint64_t	functionid_next;
+	zbx_uint64_t	functionid_service_down_1;			/* functionid for "DNSSEC service is down" trigger */
+	zbx_uint64_t	functionid_service_down_2;			/* functionid for "DNSSEC service is down" trigger */
+	zbx_uint64_t	functionid_rollweek_over_10;			/* functionid for "DNSSEC rolling week is over 10%" trigger */
+	zbx_uint64_t	functionid_rollweek_over_25;			/* functionid for "DNSSEC rolling week is over 25%" trigger */
+	zbx_uint64_t	functionid_rollweek_over_50;			/* functionid for "DNSSEC rolling week is over 50%" trigger */
+	zbx_uint64_t	functionid_rollweek_over_75;			/* functionid for "DNSSEC rolling week is over 75%" trigger */
+	zbx_uint64_t	functionid_rollweek_over_100;			/* functionid for "DNSSEC rolling week is over 100%" trigger */
+
+	ONLY_SERVER();
+
+	GET_HOST_GROUP_ID(groupid_templates, "Templates");
+	GET_VALUE_MAP_ID(valuemapid_rsm_service_availability, "RSM Service Availability");
+
+	hostid = DBget_maxid_num("hosts", 1);
+
+	itemid_next     = DBget_maxid_num("items", 2);
+	itemid_avail    = itemid_next++;
+	itemid_rollweek = itemid_next++;
+
+	triggerid_next              = DBget_maxid_num("triggers", 6);
+	triggerid_service_down      = triggerid_next++;
+	triggerid_rollweek_over_10  = triggerid_next++;
+	triggerid_rollweek_over_25  = triggerid_next++;
+	triggerid_rollweek_over_50  = triggerid_next++;
+	triggerid_rollweek_over_75  = triggerid_next++;
+	triggerid_rollweek_over_100 = triggerid_next++;
+
+	functionid_next              = DBget_maxid_num("functions", 7);
+	functionid_service_down_1    = functionid_next++;
+	functionid_service_down_2    = functionid_next++;
+	functionid_rollweek_over_10  = functionid_next++;
+	functionid_rollweek_over_25  = functionid_next++;
+	functionid_rollweek_over_50  = functionid_next++;
+	functionid_rollweek_over_75  = functionid_next++;
+	functionid_rollweek_over_100 = functionid_next++;
+
+	/* status 3 = HOST_STATUS_TEMPLATE */
+	CHECK(DBexecute("insert into hosts set hostid=" ZBX_FS_UI64 ",created=0,proxy_hostid=NULL,host='%s',status=%d,"
+				"disable_until=0,error='',available=0,errors_from=0,lastaccess=0,ipmi_authtype=-1,"
+				"ipmi_privilege=2,ipmi_username='',ipmi_password='',ipmi_disable_until=0,"
+				"ipmi_available=0,snmp_disable_until=0,snmp_available=0,maintenanceid=NULL,"
+				"maintenance_status=0,maintenance_type=0,maintenance_from=0,ipmi_errors_from=0,"
+				"snmp_errors_from=0,ipmi_error='',snmp_error='',jmx_disable_until=0,jmx_available=0,"
+				"jmx_errors_from=0,jmx_error='',name='%s',info_1='',info_2='',flags=0,templateid=NULL,"
+				"description='%s',tls_connect=1,tls_accept=1,tls_issuer='',tls_subject='',"
+				"tls_psk_identity='',tls_psk='',proxy_address='',auto_compress=1",
+			hostid, "Template DNSSEC Status", 3, "Template DNSSEC Status",
+			"DNSSEC SLV items and triggers for linking to <RSMHOST> hosts"));
+
+	CHECK(DBexecute("insert into hosts_groups set"
+				" hostgroupid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",groupid=" ZBX_FS_UI64,
+			DBget_maxid_num("hosts_groups", 1), hostid, groupid_templates));
+
+#define SQL	"insert into items set itemid=" ZBX_FS_UI64 ",type=%d,snmp_community='',snmp_oid='',"			\
+			"hostid=" ZBX_FS_UI64 ",name='%s',key_='%s',delay='0',history='90d',trends='365d',status=0,"	\
+			"value_type=%d,trapper_hosts='',units='%s',snmpv3_securityname='',snmpv3_securitylevel=0,"	\
+			"snmpv3_authpassphrase='',snmpv3_privpassphrase='',formula='',logtimefmt='',templateid=NULL,"	\
+			"valuemapid=nullif(" ZBX_FS_UI64 ",0),params='',ipmi_sensor='',authtype=0,username='',"		\
+			"password='',publickey='',privatekey='',flags=0,interfaceid=NULL,port='',description='',"	\
+			"inventory_link=0,lifetime='30d',snmpv3_authprotocol=0,snmpv3_privprotocol=0,"			\
+			"snmpv3_contextname='',evaltype=0,jmx_endpoint='',master_itemid=NULL,timeout='3s',url='',"	\
+			"query_fields='',posts='',status_codes='200',follow_redirects=1,post_type=0,http_proxy='',"	\
+			"headers='',retrieve_mode=0,request_method=0,output_format=0,ssl_cert_file='',ssl_key_file='',"	\
+			"ssl_key_password='',verify_peer=0,verify_host=0,allow_traps=0"
+	/* type 2 = ITEM_TYPE_TRAPPER */
+	/* value_type 0 = ITEM_VALUE_TYPE_FLOAT */
+	/* value_type 3 = ITEM_VALUE_TYPE_UINT64 */
+	CHECK(DBexecute(SQL, itemid_avail, 2, hostid, "DNSSEC availability", "rsm.slv.dnssec.avail", 3, "" , valuemapid_rsm_service_availability));
+	CHECK(DBexecute(SQL, itemid_rollweek, 2, hostid, "DNSSEC weekly unavailability", "rsm.slv.dnssec.rollweek", 0, "%", (zbx_uint64_t)0));
+#undef SQL
+
+	/* priority 0 = TRIGGER_SEVERITY_NOT_CLASSIFIED */
+	CHECK(DBexecute("insert into triggers set triggerid=" ZBX_FS_UI64 ","
+				"expression='({TRIGGER.VALUE}=0 and {" ZBX_FS_UI64 "}=0) or ({TRIGGER.VALUE}=1 and {" ZBX_FS_UI64 "}>0)',"
+				"description='%s',url='',status=0,value=0,priority=%d,lastchange=0,comments='',"
+				"error='',templateid=NULL,type=0,state=0,flags=0,recovery_mode=0,"
+				"recovery_expression='',correlation_mode=0,correlation_tag='',manual_close=0,opdata=''",
+			triggerid_service_down, functionid_service_down_1, functionid_service_down_2, "DNSSEC service is down", 0));
+
+#define SQL	"insert into triggers set triggerid=" ZBX_FS_UI64 ",expression='{" ZBX_FS_UI64 "}%s',description='%s',"	\
+			"url='',status=0,value=0,priority=%d,lastchange=0,comments='',error='',templateid=NULL,type=0,"	\
+			"state=0,flags=0,recovery_mode=0,recovery_expression='',correlation_mode=0,correlation_tag='',"	\
+			"manual_close=0,opdata=''"
+	/* priority 2 = TRIGGER_SEVERITY_WARNING */
+	/* priority 3 = TRIGGER_SEVERITY_AVERAGE */
+	/* priority 4 = TRIGGER_SEVERITY_HIGH */
+	/* priority 5 = TRIGGER_SEVERITY_DISASTER */
+	CHECK(DBexecute(SQL, triggerid_rollweek_over_10 , functionid_rollweek_over_10 , ">=10" , "DNSSEC rolling week is over 10%" , 2));
+	CHECK(DBexecute(SQL, triggerid_rollweek_over_25 , functionid_rollweek_over_25 , ">=25" , "DNSSEC rolling week is over 25%" , 3));
+	CHECK(DBexecute(SQL, triggerid_rollweek_over_50 , functionid_rollweek_over_50 , ">=50" , "DNSSEC rolling week is over 50%" , 3));
+	CHECK(DBexecute(SQL, triggerid_rollweek_over_75 , functionid_rollweek_over_75 , ">=75" , "DNSSEC rolling week is over 75%" , 4));
+	CHECK(DBexecute(SQL, triggerid_rollweek_over_100, functionid_rollweek_over_100, ">=100", "DNSSEC rolling week is over 100%", 5));
+#undef SQL
+
+#define SQL	"insert into functions set functionid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ",triggerid=" ZBX_FS_UI64 ",name='%s',parameter='%s'"
+	CHECK(DBexecute(SQL, functionid_service_down_1   , itemid_avail   , triggerid_service_down     , "max"  , "#{$RSM.INCIDENT.DNSSEC.FAIL}"));
+	CHECK(DBexecute(SQL, functionid_service_down_2   , itemid_avail   , triggerid_service_down     , "count", "#{$RSM.INCIDENT.DNSSEC.RECOVER},0,\"eq\""));
+	CHECK(DBexecute(SQL, functionid_rollweek_over_10 , itemid_rollweek, triggerid_rollweek_over_10 , "last" , "0"));
+	CHECK(DBexecute(SQL, functionid_rollweek_over_25 , itemid_rollweek, triggerid_rollweek_over_25 , "last" , "0"));
+	CHECK(DBexecute(SQL, functionid_rollweek_over_50 , itemid_rollweek, triggerid_rollweek_over_50 , "last" , "0"));
+	CHECK(DBexecute(SQL, functionid_rollweek_over_75 , itemid_rollweek, triggerid_rollweek_over_75 , "last" , "0"));
+	CHECK(DBexecute(SQL, functionid_rollweek_over_100, itemid_rollweek, triggerid_rollweek_over_100, "last" , "0"));
+#undef SQL
+
+#define SQL	"insert into trigger_depends set triggerdepid=" ZBX_FS_UI64 ",triggerid_down=" ZBX_FS_UI64 ",triggerid_up=" ZBX_FS_UI64
+	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rollweek_over_10, triggerid_rollweek_over_25));
+	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rollweek_over_25, triggerid_rollweek_over_50));
+	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rollweek_over_50, triggerid_rollweek_over_75));
+	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rollweek_over_75, triggerid_rollweek_over_100));
+#undef SQL
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
+static int	DBpatch_4050517(void)
+{
+	int		ret = FAIL;
+
+	zbx_uint64_t	groupid_templates;				/* groupid of "Templates" host group */
+	zbx_uint64_t	valuemapid_rsm_service_availability;		/* valuemapid of "RSM Service Availability" value map */
+
+	zbx_uint64_t	hostid;						/* hostid of "Template RDAP Status" template */
+
+	zbx_uint64_t	itemid_next;
+	zbx_uint64_t	itemid_avail;					/* itemid of "RDAP availability" item */
+	zbx_uint64_t	itemid_downtime;				/* itemid of "RDAP minutes of downtime" item */
+	zbx_uint64_t	itemid_rollweek;				/* itemid of "RDAP weekly unavailability" item */
+	zbx_uint64_t	itemid_rtt_failed;				/* itemid of "Number of failed monthly RDAP queries" item */
+	zbx_uint64_t	itemid_rtt_performed;				/* itemid of "Number of performed monthly RDAP queries" item */
+	zbx_uint64_t	itemid_rtt_pfailed;				/* itemid of "Ratio of failed monthly RDAP queries" item */
+
+	zbx_uint64_t	triggerid_next;
+	zbx_uint64_t	triggerid_service_down;				/* triggerid of "RDAP service is down" trigger */
+	zbx_uint64_t	triggerid_downtime_over_10;			/* triggerid of "RDAP service was unavailable for 10% of allowed $1 minutes" trigger */
+	zbx_uint64_t	triggerid_downtime_over_25;			/* triggerid of "RDAP service was unavailable for 25% of allowed $1 minutes" trigger */
+	zbx_uint64_t	triggerid_downtime_over_50;			/* triggerid of "RDAP service was unavailable for 50% of allowed $1 minutes" trigger */
+	zbx_uint64_t	triggerid_downtime_over_75;			/* triggerid of "RDAP service was unavailable for 75% of allowed $1 minutes" trigger */
+	zbx_uint64_t	triggerid_downtime_over_100;			/* triggerid of "RDAP service was unavailable for 100% of allowed $1 minutes" trigger */
+	zbx_uint64_t	triggerid_rollweek_over_10;			/* triggerid of "RDAP rolling week is over 10%" trigger */
+	zbx_uint64_t	triggerid_rollweek_over_25;			/* triggerid of "RDAP rolling week is over 25%" trigger */
+	zbx_uint64_t	triggerid_rollweek_over_50;			/* triggerid of "RDAP rolling week is over 50%" trigger */
+	zbx_uint64_t	triggerid_rollweek_over_75;			/* triggerid of "RDAP rolling week is over 75%" trigger */
+	zbx_uint64_t	triggerid_rollweek_over_100;			/* triggerid of "RDAP rolling week is over 100%" trigger */
+	zbx_uint64_t	triggerid_rtt_pfailed_over_10;			/* triggerid of "Ratio of failed RDAP tests exceeded 10% of allowed $1%" trigger */
+	zbx_uint64_t	triggerid_rtt_pfailed_over_25;			/* triggerid of "Ratio of failed RDAP tests exceeded 25% of allowed $1%" trigger */
+	zbx_uint64_t	triggerid_rtt_pfailed_over_50;			/* triggerid of "Ratio of failed RDAP tests exceeded 50% of allowed $1%" trigger */
+	zbx_uint64_t	triggerid_rtt_pfailed_over_75;			/* triggerid of "Ratio of failed RDAP tests exceeded 75% of allowed $1%" trigger */
+	zbx_uint64_t	triggerid_rtt_pfailed_over_100;			/* triggerid of "Ratio of failed RDAP tests exceeded 100% of allowed $1%" trigger */
+
+	zbx_uint64_t	functionid_next;
+	zbx_uint64_t	functionid_service_down_1;			/* functionid for "RDAP service is down" trigger */
+	zbx_uint64_t	functionid_service_down_2;			/* functionid for "RDAP service is down" trigger */
+	zbx_uint64_t	functionid_downtime_over_10;			/* functionid for "RDAP service was unavailable for 10% of allowed $1 minutes" trigger */
+	zbx_uint64_t	functionid_downtime_over_25;			/* functionid for "RDAP service was unavailable for 25% of allowed $1 minutes" trigger */
+	zbx_uint64_t	functionid_downtime_over_50;			/* functionid for "RDAP service was unavailable for 50% of allowed $1 minutes" trigger */
+	zbx_uint64_t	functionid_downtime_over_75;			/* functionid for "RDAP service was unavailable for 75% of allowed $1 minutes" trigger */
+	zbx_uint64_t	functionid_downtime_over_100;			/* functionid for "RDAP service was unavailable for 100% of allowed $1 minutes" trigger */
+	zbx_uint64_t	functionid_rollweek_over_10;			/* functionid for "RDAP rolling week is over 10%" trigger */
+	zbx_uint64_t	functionid_rollweek_over_25;			/* functionid for "RDAP rolling week is over 25%" trigger */
+	zbx_uint64_t	functionid_rollweek_over_50;			/* functionid for "RDAP rolling week is over 50%" trigger */
+	zbx_uint64_t	functionid_rollweek_over_75;			/* functionid for "RDAP rolling week is over 75%" trigger */
+	zbx_uint64_t	functionid_rollweek_over_100;			/* functionid for "RDAP rolling week is over 100%" trigger */
+	zbx_uint64_t	functionid_rtt_pfailed_over_10;			/* functionid for "Ratio of failed RDAP tests exceeded 10% of allowed $1%" trigger */
+	zbx_uint64_t	functionid_rtt_pfailed_over_25;			/* functionid for "Ratio of failed RDAP tests exceeded 25% of allowed $1%" trigger */
+	zbx_uint64_t	functionid_rtt_pfailed_over_50;			/* functionid for "Ratio of failed RDAP tests exceeded 50% of allowed $1%" trigger */
+	zbx_uint64_t	functionid_rtt_pfailed_over_75;			/* functionid for "Ratio of failed RDAP tests exceeded 75% of allowed $1%" trigger */
+	zbx_uint64_t	functionid_rtt_pfailed_over_100;		/* functionid for "Ratio of failed RDAP tests exceeded 100% of allowed $1%" trigger */
+
+	ONLY_SERVER();
+
+	GET_HOST_GROUP_ID(groupid_templates, "Templates");
+	GET_VALUE_MAP_ID(valuemapid_rsm_service_availability, "RSM Service Availability");
+
+	hostid = DBget_maxid_num("hosts", 1);
+
+	itemid_next          = DBget_maxid_num("items", 6);
+	itemid_avail         = itemid_next++;
+	itemid_downtime      = itemid_next++;
+	itemid_rollweek      = itemid_next++;
+	itemid_rtt_failed    = itemid_next++;
+	itemid_rtt_performed = itemid_next++;
+	itemid_rtt_pfailed   = itemid_next++;
+
+	triggerid_next                 = DBget_maxid_num("triggers", 16);
+	triggerid_service_down         = triggerid_next++;
+	triggerid_downtime_over_10     = triggerid_next++;
+	triggerid_downtime_over_25     = triggerid_next++;
+	triggerid_downtime_over_50     = triggerid_next++;
+	triggerid_downtime_over_75     = triggerid_next++;
+	triggerid_downtime_over_100    = triggerid_next++;
+	triggerid_rollweek_over_10     = triggerid_next++;
+	triggerid_rollweek_over_25     = triggerid_next++;
+	triggerid_rollweek_over_50     = triggerid_next++;
+	triggerid_rollweek_over_75     = triggerid_next++;
+	triggerid_rollweek_over_100    = triggerid_next++;
+	triggerid_rtt_pfailed_over_10  = triggerid_next++;
+	triggerid_rtt_pfailed_over_25  = triggerid_next++;
+	triggerid_rtt_pfailed_over_50  = triggerid_next++;
+	triggerid_rtt_pfailed_over_75  = triggerid_next++;
+	triggerid_rtt_pfailed_over_100 = triggerid_next++;
+
+	functionid_next                 = DBget_maxid_num("functions", 17);
+	functionid_service_down_1       = functionid_next++;
+	functionid_service_down_2       = functionid_next++;
+	functionid_downtime_over_10     = functionid_next++;
+	functionid_downtime_over_25     = functionid_next++;
+	functionid_downtime_over_50     = functionid_next++;
+	functionid_downtime_over_75     = functionid_next++;
+	functionid_downtime_over_100    = functionid_next++;
+	functionid_rollweek_over_10     = functionid_next++;
+	functionid_rollweek_over_25     = functionid_next++;
+	functionid_rollweek_over_50     = functionid_next++;
+	functionid_rollweek_over_75     = functionid_next++;
+	functionid_rollweek_over_100    = functionid_next++;
+	functionid_rtt_pfailed_over_10  = functionid_next++;
+	functionid_rtt_pfailed_over_25  = functionid_next++;
+	functionid_rtt_pfailed_over_50  = functionid_next++;
+	functionid_rtt_pfailed_over_75  = functionid_next++;
+	functionid_rtt_pfailed_over_100 = functionid_next++;
+
+	/* status 3 = HOST_STATUS_TEMPLATE */
+	CHECK(DBexecute("insert into hosts set hostid=" ZBX_FS_UI64 ",created=0,proxy_hostid=NULL,host='%s',status=%d,"
+				"disable_until=0,error='',available=0,errors_from=0,lastaccess=0,ipmi_authtype=-1,"
+				"ipmi_privilege=2,ipmi_username='',ipmi_password='',ipmi_disable_until=0,"
+				"ipmi_available=0,snmp_disable_until=0,snmp_available=0,maintenanceid=NULL,"
+				"maintenance_status=0,maintenance_type=0,maintenance_from=0,ipmi_errors_from=0,"
+				"snmp_errors_from=0,ipmi_error='',snmp_error='',jmx_disable_until=0,jmx_available=0,"
+				"jmx_errors_from=0,jmx_error='',name='%s',info_1='',info_2='',flags=0,templateid=NULL,"
+				"description='%s',tls_connect=1,tls_accept=1,tls_issuer='',tls_subject='',"
+				"tls_psk_identity='',tls_psk='',proxy_address='',auto_compress=1",
+			hostid, "Template RDAP Status", 3, "Template RDAP Status",
+			"RDAP SLV items and triggers for linking to <RSMHOST> hosts"));
+
+	CHECK(DBexecute("insert into hosts_groups set"
+				" hostgroupid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",groupid=" ZBX_FS_UI64,
+			DBget_maxid_num("hosts_groups", 1), hostid, groupid_templates));
+
+#define SQL	"insert into items set itemid=" ZBX_FS_UI64 ",type=%d,snmp_community='',snmp_oid='',"			\
+			"hostid=" ZBX_FS_UI64 ",name='%s',key_='%s',delay='0',history='90d',trends='365d',status=0,"	\
+			"value_type=%d,trapper_hosts='',units='%s',snmpv3_securityname='',snmpv3_securitylevel=0,"	\
+			"snmpv3_authpassphrase='',snmpv3_privpassphrase='',formula='',logtimefmt='',templateid=NULL,"	\
+			"valuemapid=nullif(" ZBX_FS_UI64 ",0),params='',ipmi_sensor='',authtype=0,username='',"		\
+			"password='',publickey='',privatekey='',flags=0,interfaceid=NULL,port='',description='',"	\
+			"inventory_link=0,lifetime='30d',snmpv3_authprotocol=0,snmpv3_privprotocol=0,"			\
+			"snmpv3_contextname='',evaltype=0,jmx_endpoint='',master_itemid=NULL,timeout='3s',url='',"	\
+			"query_fields='',posts='',status_codes='200',follow_redirects=1,post_type=0,http_proxy='',"	\
+			"headers='',retrieve_mode=0,request_method=0,output_format=0,ssl_cert_file='',ssl_key_file='',"	\
+			"ssl_key_password='',verify_peer=0,verify_host=0,allow_traps=0"
+	/* type 2 = ITEM_TYPE_TRAPPER */
+	/* value_type 0 = ITEM_VALUE_TYPE_FLOAT */
+	/* value_type 3 = ITEM_VALUE_TYPE_UINT64 */
+	CHECK(DBexecute(SQL, itemid_avail, 2, hostid, "RDAP availability", "rsm.slv.rdap.avail", 3, "" , valuemapid_rsm_service_availability));
+	CHECK(DBexecute(SQL, itemid_downtime, 2, hostid, "RDAP minutes of downtime", "rsm.slv.rdap.downtime", 3, "" , (zbx_uint64_t)0));
+	CHECK(DBexecute(SQL, itemid_rollweek, 2, hostid, "RDAP weekly unavailability", "rsm.slv.rdap.rollweek", 0, "%", (zbx_uint64_t)0));
+	CHECK(DBexecute(SQL, itemid_rtt_failed, 2, hostid, "Number of failed monthly RDAP queries", "rsm.slv.rdap.rtt.failed", 3, "" , (zbx_uint64_t)0));
+	CHECK(DBexecute(SQL, itemid_rtt_performed, 2, hostid, "Number of performed monthly RDAP queries", "rsm.slv.rdap.rtt.performed", 3, "" , (zbx_uint64_t)0));
+	CHECK(DBexecute(SQL, itemid_rtt_pfailed, 2, hostid, "Ratio of failed monthly RDAP queries", "rsm.slv.rdap.rtt.pfailed", 0, "%", (zbx_uint64_t)0));
+#undef SQL
+
+	/* priority 0 = TRIGGER_SEVERITY_NOT_CLASSIFIED */
+	CHECK(DBexecute("insert into triggers set triggerid=" ZBX_FS_UI64 ","
+				"expression='({TRIGGER.VALUE}=0 and {" ZBX_FS_UI64 "}=0) or ({TRIGGER.VALUE}=1 and {" ZBX_FS_UI64 "}>0)',"
+				"description='%s',url='',status=0,value=0,priority=%d,lastchange=0,comments='',"
+				"error='',templateid=NULL,type=0,state=0,flags=0,recovery_mode=0,"
+				"recovery_expression='',correlation_mode=0,correlation_tag='',manual_close=0,opdata=''",
+			triggerid_service_down, functionid_service_down_1, functionid_service_down_2, "RDAP service is down", 0));
+
+#define SQL	"insert into triggers set triggerid=" ZBX_FS_UI64 ",expression='{" ZBX_FS_UI64 "}%s',description='%s',"	\
+			"url='',status=0,value=0,priority=%d,lastchange=0,comments='',error='',templateid=NULL,type=0,"	\
+			"state=0,flags=0,recovery_mode=0,recovery_expression='',correlation_mode=0,correlation_tag='',"	\
+			"manual_close=0,opdata=''"
+	/* priority 2 = TRIGGER_SEVERITY_WARNING */
+	/* priority 3 = TRIGGER_SEVERITY_AVERAGE */
+	/* priority 4 = TRIGGER_SEVERITY_HIGH */
+	/* priority 5 = TRIGGER_SEVERITY_DISASTER */
+	CHECK(DBexecute(SQL, triggerid_downtime_over_10, functionid_downtime_over_10, ">={$RSM.SLV.RDAP.DOWNTIME}*0.1",
+				"RDAP service was unavailable for 10% of allowed $1 minutes", 2));
+	CHECK(DBexecute(SQL, triggerid_downtime_over_25, functionid_downtime_over_25, ">={$RSM.SLV.RDAP.DOWNTIME}*0.25",
+				"RDAP service was unavailable for 25% of allowed $1 minutes", 3));
+	CHECK(DBexecute(SQL, triggerid_downtime_over_50, functionid_downtime_over_50, ">={$RSM.SLV.RDAP.DOWNTIME}*0.5",
+			"RDAP service was unavailable for 50% of allowed $1 minutes", 3));
+	CHECK(DBexecute(SQL, triggerid_downtime_over_75, functionid_downtime_over_75, ">={$RSM.SLV.RDAP.DOWNTIME}*0.75",
+			"RDAP service was unavailable for 75% of allowed $1 minutes", 4));
+	CHECK(DBexecute(SQL, triggerid_downtime_over_100, functionid_downtime_over_100, ">={$RSM.SLV.RDAP.DOWNTIME}",
+			"RDAP service was unavailable for 100% of allowed $1 minutes", 5));
+	CHECK(DBexecute(SQL, triggerid_rollweek_over_10, functionid_rollweek_over_10, ">=10",
+			"RDAP rolling week is over 10%", 2));
+	CHECK(DBexecute(SQL, triggerid_rollweek_over_25, functionid_rollweek_over_25, ">=25",
+			"RDAP rolling week is over 25%", 3));
+	CHECK(DBexecute(SQL, triggerid_rollweek_over_50, functionid_rollweek_over_50, ">=50",
+			"RDAP rolling week is over 50%", 3));
+	CHECK(DBexecute(SQL, triggerid_rollweek_over_75, functionid_rollweek_over_75, ">=75",
+			"RDAP rolling week is over 75%", 4));
+	CHECK(DBexecute(SQL, triggerid_rollweek_over_100, functionid_rollweek_over_100, ">=100",
+			"RDAP rolling week is over 100%", 5));
+	CHECK(DBexecute(SQL, triggerid_rtt_pfailed_over_10, functionid_rtt_pfailed_over_10, ">{$RSM.SLV.RDAP.RTT}*0.1",
+			"Ratio of failed RDAP tests exceeded 10% of allowed $1%", 2));
+	CHECK(DBexecute(SQL, triggerid_rtt_pfailed_over_25, functionid_rtt_pfailed_over_25, ">{$RSM.SLV.RDAP.RTT}*0.25",
+			"Ratio of failed RDAP tests exceeded 25% of allowed $1%", 3));
+	CHECK(DBexecute(SQL, triggerid_rtt_pfailed_over_50, functionid_rtt_pfailed_over_50, ">{$RSM.SLV.RDAP.RTT}*0.5",
+			"Ratio of failed RDAP tests exceeded 50% of allowed $1%", 3));
+	CHECK(DBexecute(SQL, triggerid_rtt_pfailed_over_75, functionid_rtt_pfailed_over_75, ">{$RSM.SLV.RDAP.RTT}*0.75",
+			"Ratio of failed RDAP tests exceeded 75% of allowed $1%", 4));
+	CHECK(DBexecute(SQL, triggerid_rtt_pfailed_over_100, functionid_rtt_pfailed_over_100, ">{$RSM.SLV.RDAP.RTT}",
+			"Ratio of failed RDAP tests exceeded 100% of allowed $1%", 5));
+#undef SQL
+
+#define SQL	"insert into functions set functionid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ",triggerid=" ZBX_FS_UI64 ",name='%s',parameter='%s'"
+	CHECK(DBexecute(SQL, functionid_service_down_1      , itemid_avail      , triggerid_service_down        , "max"  , "#{$RSM.INCIDENT.RDAP.FAIL}"));
+	CHECK(DBexecute(SQL, functionid_service_down_2      , itemid_avail      , triggerid_service_down        , "count", "#{$RSM.INCIDENT.RDAP.RECOVER},0,\"eq\""));
+	CHECK(DBexecute(SQL, functionid_downtime_over_10    , itemid_downtime   , triggerid_downtime_over_10    , "last" , "0"));
+	CHECK(DBexecute(SQL, functionid_downtime_over_25    , itemid_downtime   , triggerid_downtime_over_25    , "last" , "0"));
+	CHECK(DBexecute(SQL, functionid_downtime_over_50    , itemid_downtime   , triggerid_downtime_over_50    , "last" , "0"));
+	CHECK(DBexecute(SQL, functionid_downtime_over_75    , itemid_downtime   , triggerid_downtime_over_75    , "last" , "0"));
+	CHECK(DBexecute(SQL, functionid_downtime_over_100   , itemid_downtime   , triggerid_downtime_over_100   , "last" , "0"));
+	CHECK(DBexecute(SQL, functionid_rollweek_over_10    , itemid_rollweek   , triggerid_rollweek_over_10    , "last" , "0"));
+	CHECK(DBexecute(SQL, functionid_rollweek_over_25    , itemid_rollweek   , triggerid_rollweek_over_25    , "last" , "0"));
+	CHECK(DBexecute(SQL, functionid_rollweek_over_50    , itemid_rollweek   , triggerid_rollweek_over_50    , "last" , "0"));
+	CHECK(DBexecute(SQL, functionid_rollweek_over_75    , itemid_rollweek   , triggerid_rollweek_over_75    , "last" , "0"));
+	CHECK(DBexecute(SQL, functionid_rollweek_over_100   , itemid_rollweek   , triggerid_rollweek_over_100   , "last" , "0"));
+	CHECK(DBexecute(SQL, functionid_rtt_pfailed_over_10 , itemid_rtt_pfailed, triggerid_rtt_pfailed_over_10 , "last" , ""));
+	CHECK(DBexecute(SQL, functionid_rtt_pfailed_over_25 , itemid_rtt_pfailed, triggerid_rtt_pfailed_over_25 , "last" , ""));
+	CHECK(DBexecute(SQL, functionid_rtt_pfailed_over_50 , itemid_rtt_pfailed, triggerid_rtt_pfailed_over_50 , "last" , ""));
+	CHECK(DBexecute(SQL, functionid_rtt_pfailed_over_75 , itemid_rtt_pfailed, triggerid_rtt_pfailed_over_75 , "last" , ""));
+	CHECK(DBexecute(SQL, functionid_rtt_pfailed_over_100, itemid_rtt_pfailed, triggerid_rtt_pfailed_over_100, "last" , ""));
+#undef SQL
+
+#define SQL	"insert into trigger_depends set triggerdepid=" ZBX_FS_UI64 ",triggerid_down=" ZBX_FS_UI64 ",triggerid_up=" ZBX_FS_UI64
+	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_downtime_over_10   , triggerid_downtime_over_25));
+	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_downtime_over_25   , triggerid_downtime_over_50));
+	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_downtime_over_50   , triggerid_downtime_over_75));
+	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_downtime_over_75   , triggerid_downtime_over_100));
+	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rollweek_over_10   , triggerid_rollweek_over_25));
+	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rollweek_over_25   , triggerid_rollweek_over_50));
+	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rollweek_over_50   , triggerid_rollweek_over_75));
+	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rollweek_over_75   , triggerid_rollweek_over_100));
+	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rtt_pfailed_over_10, triggerid_rtt_pfailed_over_25));
+	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rtt_pfailed_over_25, triggerid_rtt_pfailed_over_50));
+	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rtt_pfailed_over_50, triggerid_rtt_pfailed_over_75));
+	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rtt_pfailed_over_75, triggerid_rtt_pfailed_over_100));
+#undef SQL
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
+static int	DBpatch_4050518(void)
+{
+	int		ret = FAIL;
+
+	zbx_uint64_t	groupid_templates;				/* groupid of "Templates" host group */
+	zbx_uint64_t	valuemapid_rsm_service_availability;		/* valuemapid of "RSM Service Availability" value map */
+
+	zbx_uint64_t	hostid;						/* hostid of "Template RDDS Status" template */
+
+	zbx_uint64_t	itemid_next;
+	zbx_uint64_t	itemid_avail;					/* itemid of "RDDS availability" item */
+	zbx_uint64_t	itemid_downtime;				/* itemid of "RDDS minutes of downtime" item */
+	zbx_uint64_t	itemid_rollweek;				/* itemid of "RDDS weekly unavailability" item */
+	zbx_uint64_t	itemid_rtt_failed;				/* itemid of "Number of failed monthly RDDS queries" item */
+	zbx_uint64_t	itemid_rtt_performed;				/* itemid of "Number of performed monthly RDDS queries" item */
+	zbx_uint64_t	itemid_rtt_pfailed;				/* itemid of "Ratio of failed monthly RDDS queries" item */
+
+	zbx_uint64_t	triggerid_next;
+	zbx_uint64_t	triggerid_service_down;				/* triggerid of "RDDS service is down" trigger */
+	zbx_uint64_t	triggerid_downtime_over_10;			/* triggerid of "RDDS service was unavailable for 10% of allowed $1 minutes" trigger */
+	zbx_uint64_t	triggerid_downtime_over_25;			/* triggerid of "RDDS service was unavailable for 25% of allowed $1 minutes" trigger */
+	zbx_uint64_t	triggerid_downtime_over_50;			/* triggerid of "RDDS service was unavailable for 50% of allowed $1 minutes" trigger */
+	zbx_uint64_t	triggerid_downtime_over_75;			/* triggerid of "RDDS service was unavailable for 75% of allowed $1 minutes" trigger */
+	zbx_uint64_t	triggerid_downtime_over_100;			/* triggerid of "RDDS service was unavailable for 100% of allowed $1 minutes" trigger */
+	zbx_uint64_t	triggerid_rollweek_over_10;			/* triggerid of "RDDS rolling week is over 10%" trigger */
+	zbx_uint64_t	triggerid_rollweek_over_25;			/* triggerid of "RDDS rolling week is over 25%" trigger */
+	zbx_uint64_t	triggerid_rollweek_over_50;			/* triggerid of "RDDS rolling week is over 50%" trigger */
+	zbx_uint64_t	triggerid_rollweek_over_75;			/* triggerid of "RDDS rolling week is over 75%" trigger */
+	zbx_uint64_t	triggerid_rollweek_over_100;			/* triggerid of "RDDS rolling week is over 100%" trigger */
+	zbx_uint64_t	triggerid_rtt_pfailed_over_10;			/* triggerid of "Ratio of failed RDDS tests exceeded 10% of allowed $1%" trigger */
+	zbx_uint64_t	triggerid_rtt_pfailed_over_25;			/* triggerid of "Ratio of failed RDDS tests exceeded 25% of allowed $1%" trigger */
+	zbx_uint64_t	triggerid_rtt_pfailed_over_50;			/* triggerid of "Ratio of failed RDDS tests exceeded 50% of allowed $1%" trigger */
+	zbx_uint64_t	triggerid_rtt_pfailed_over_75;			/* triggerid of "Ratio of failed RDDS tests exceeded 75% of allowed $1%" trigger */
+	zbx_uint64_t	triggerid_rtt_pfailed_over_100;			/* triggerid of "Ratio of failed RDDS tests exceeded 100% of allowed $1%" trigger */
+
+	zbx_uint64_t	functionid_next;
+	zbx_uint64_t	functionid_service_down_1;			/* functionid for "RDDS service is down" trigger */
+	zbx_uint64_t	functionid_service_down_2;			/* functionid for "RDDS service is down" trigger */
+	zbx_uint64_t	functionid_downtime_over_10;			/* functionid for "RDDS service was unavailable for 10% of allowed $1 minutes" trigger */
+	zbx_uint64_t	functionid_downtime_over_25;			/* functionid for "RDDS service was unavailable for 25% of allowed $1 minutes" trigger */
+	zbx_uint64_t	functionid_downtime_over_50;			/* functionid for "RDDS service was unavailable for 50% of allowed $1 minutes" trigger */
+	zbx_uint64_t	functionid_downtime_over_75;			/* functionid for "RDDS service was unavailable for 75% of allowed $1 minutes" trigger */
+	zbx_uint64_t	functionid_downtime_over_100;			/* functionid for "RDDS service was unavailable for 100% of allowed $1 minutes" trigger */
+	zbx_uint64_t	functionid_rollweek_over_10;			/* functionid for "RDDS rolling week is over 10%" trigger */
+	zbx_uint64_t	functionid_rollweek_over_25;			/* functionid for "RDDS rolling week is over 25%" trigger */
+	zbx_uint64_t	functionid_rollweek_over_50;			/* functionid for "RDDS rolling week is over 50%" trigger */
+	zbx_uint64_t	functionid_rollweek_over_75;			/* functionid for "RDDS rolling week is over 75%" trigger */
+	zbx_uint64_t	functionid_rollweek_over_100;			/* functionid for "RDDS rolling week is over 100%" trigger */
+	zbx_uint64_t	functionid_rtt_pfailed_over_10;			/* functionid for "Ratio of failed RDDS tests exceeded 10% of allowed $1%" trigger */
+	zbx_uint64_t	functionid_rtt_pfailed_over_25;			/* functionid for "Ratio of failed RDDS tests exceeded 25% of allowed $1%" trigger */
+	zbx_uint64_t	functionid_rtt_pfailed_over_50;			/* functionid for "Ratio of failed RDDS tests exceeded 50% of allowed $1%" trigger */
+	zbx_uint64_t	functionid_rtt_pfailed_over_75;			/* functionid for "Ratio of failed RDDS tests exceeded 75% of allowed $1%" trigger */
+	zbx_uint64_t	functionid_rtt_pfailed_over_100;		/* functionid for "Ratio of failed RDDS tests exceeded 100% of allowed $1%" trigger */
+
+	ONLY_SERVER();
+
+	GET_HOST_GROUP_ID(groupid_templates, "Templates");
+	GET_VALUE_MAP_ID(valuemapid_rsm_service_availability, "RSM Service Availability");
+
+	hostid = DBget_maxid_num("hosts", 1);
+
+	itemid_next          = DBget_maxid_num("items", 6);
+	itemid_avail         = itemid_next++;
+	itemid_downtime      = itemid_next++;
+	itemid_rollweek      = itemid_next++;
+	itemid_rtt_failed    = itemid_next++;
+	itemid_rtt_performed = itemid_next++;
+	itemid_rtt_pfailed   = itemid_next++;
+
+	triggerid_next                 = DBget_maxid_num("triggers", 16);
+	triggerid_service_down         = triggerid_next++;
+	triggerid_downtime_over_10     = triggerid_next++;
+	triggerid_downtime_over_25     = triggerid_next++;
+	triggerid_downtime_over_50     = triggerid_next++;
+	triggerid_downtime_over_75     = triggerid_next++;
+	triggerid_downtime_over_100    = triggerid_next++;
+	triggerid_rollweek_over_10     = triggerid_next++;
+	triggerid_rollweek_over_25     = triggerid_next++;
+	triggerid_rollweek_over_50     = triggerid_next++;
+	triggerid_rollweek_over_75     = triggerid_next++;
+	triggerid_rollweek_over_100    = triggerid_next++;
+	triggerid_rtt_pfailed_over_10  = triggerid_next++;
+	triggerid_rtt_pfailed_over_25  = triggerid_next++;
+	triggerid_rtt_pfailed_over_50  = triggerid_next++;
+	triggerid_rtt_pfailed_over_75  = triggerid_next++;
+	triggerid_rtt_pfailed_over_100 = triggerid_next++;
+
+	functionid_next                 = DBget_maxid_num("functions", 17);
+	functionid_service_down_1       = functionid_next++;
+	functionid_service_down_2       = functionid_next++;
+	functionid_downtime_over_10     = functionid_next++;
+	functionid_downtime_over_25     = functionid_next++;
+	functionid_downtime_over_50     = functionid_next++;
+	functionid_downtime_over_75     = functionid_next++;
+	functionid_downtime_over_100    = functionid_next++;
+	functionid_rollweek_over_10     = functionid_next++;
+	functionid_rollweek_over_25     = functionid_next++;
+	functionid_rollweek_over_50     = functionid_next++;
+	functionid_rollweek_over_75     = functionid_next++;
+	functionid_rollweek_over_100    = functionid_next++;
+	functionid_rtt_pfailed_over_10  = functionid_next++;
+	functionid_rtt_pfailed_over_25  = functionid_next++;
+	functionid_rtt_pfailed_over_50  = functionid_next++;
+	functionid_rtt_pfailed_over_75  = functionid_next++;
+	functionid_rtt_pfailed_over_100 = functionid_next++;
+
+	/* status 3 = HOST_STATUS_TEMPLATE */
+	CHECK(DBexecute("insert into hosts set hostid=" ZBX_FS_UI64 ",created=0,proxy_hostid=NULL,host='%s',status=%d,"
+				"disable_until=0,error='',available=0,errors_from=0,lastaccess=0,ipmi_authtype=-1,"
+				"ipmi_privilege=2,ipmi_username='',ipmi_password='',ipmi_disable_until=0,"
+				"ipmi_available=0,snmp_disable_until=0,snmp_available=0,maintenanceid=NULL,"
+				"maintenance_status=0,maintenance_type=0,maintenance_from=0,ipmi_errors_from=0,"
+				"snmp_errors_from=0,ipmi_error='',snmp_error='',jmx_disable_until=0,jmx_available=0,"
+				"jmx_errors_from=0,jmx_error='',name='%s',info_1='',info_2='',flags=0,templateid=NULL,"
+				"description='%s',tls_connect=1,tls_accept=1,tls_issuer='',tls_subject='',"
+				"tls_psk_identity='',tls_psk='',proxy_address='',auto_compress=1",
+			hostid, "Template RDDS Status", 3, "Template RDDS Status",
+			"RDDS SLV items and triggers for linking to <RSMHOST> hosts"));
+
+	CHECK(DBexecute("insert into hosts_groups set"
+				" hostgroupid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",groupid=" ZBX_FS_UI64,
+			DBget_maxid_num("hosts_groups", 1), hostid, groupid_templates));
+
+#define SQL	"insert into items set itemid=" ZBX_FS_UI64 ",type=%d,snmp_community='',snmp_oid='',"			\
+			"hostid=" ZBX_FS_UI64 ",name='%s',key_='%s',delay='0',history='90d',trends='365d',status=0,"	\
+			"value_type=%d,trapper_hosts='',units='%s',snmpv3_securityname='',snmpv3_securitylevel=0,"	\
+			"snmpv3_authpassphrase='',snmpv3_privpassphrase='',formula='',logtimefmt='',templateid=NULL,"	\
+			"valuemapid=nullif(" ZBX_FS_UI64 ",0),params='',ipmi_sensor='',authtype=0,username='',"		\
+			"password='',publickey='',privatekey='',flags=0,interfaceid=NULL,port='',description='',"	\
+			"inventory_link=0,lifetime='30d',snmpv3_authprotocol=0,snmpv3_privprotocol=0,"			\
+			"snmpv3_contextname='',evaltype=0,jmx_endpoint='',master_itemid=NULL,timeout='3s',url='',"	\
+			"query_fields='',posts='',status_codes='200',follow_redirects=1,post_type=0,http_proxy='',"	\
+			"headers='',retrieve_mode=0,request_method=0,output_format=0,ssl_cert_file='',ssl_key_file='',"	\
+			"ssl_key_password='',verify_peer=0,verify_host=0,allow_traps=0"
+	/* type 2 = ITEM_TYPE_TRAPPER */
+	/* value_type 0 = ITEM_VALUE_TYPE_FLOAT */
+	/* value_type 3 = ITEM_VALUE_TYPE_UINT64 */
+	CHECK(DBexecute(SQL, itemid_avail, 2, hostid, "RDDS availability", "rsm.slv.rdds.avail", 3, "", valuemapid_rsm_service_availability));
+	CHECK(DBexecute(SQL, itemid_downtime, 2, hostid, "RDDS minutes of downtime", "rsm.slv.rdds.downtime", 3, "", (zbx_uint64_t)0));
+	CHECK(DBexecute(SQL, itemid_rollweek, 2, hostid, "RDDS weekly unavailability", "rsm.slv.rdds.rollweek", 0, "%", (zbx_uint64_t)0));
+	CHECK(DBexecute(SQL, itemid_rtt_failed, 2, hostid, "Number of failed monthly RDDS queries", "rsm.slv.rdds.rtt.failed", 3, "", (zbx_uint64_t)0));
+	CHECK(DBexecute(SQL, itemid_rtt_performed, 2, hostid, "Number of performed monthly RDDS queries", "rsm.slv.rdds.rtt.performed", 3, "", (zbx_uint64_t)0));
+	CHECK(DBexecute(SQL, itemid_rtt_pfailed, 2, hostid, "Ratio of failed monthly RDDS queries", "rsm.slv.rdds.rtt.pfailed", 0, "%", (zbx_uint64_t)0));
+#undef SQL
+
+	/* priority 0 = TRIGGER_SEVERITY_NOT_CLASSIFIED */
+	CHECK(DBexecute("insert into triggers set triggerid=" ZBX_FS_UI64 ","
+				"expression='({TRIGGER.VALUE}=0 and {" ZBX_FS_UI64 "}=0) or ({TRIGGER.VALUE}=1 and {" ZBX_FS_UI64 "}>0)',"
+				"description='%s',url='',status=0,value=0,priority=%d,lastchange=0,comments='',"
+				"error='',templateid=NULL,type=0,state=0,flags=0,recovery_mode=0,"
+				"recovery_expression='',correlation_mode=0,correlation_tag='',manual_close=0,opdata=''",
+			triggerid_service_down, functionid_service_down_1, functionid_service_down_2, "RDDS service is down", 0));
+
+#define SQL	"insert into triggers set triggerid=" ZBX_FS_UI64 ",expression='{" ZBX_FS_UI64 "}%s',description='%s',"	\
+			"url='',status=0,value=0,priority=%d,lastchange=0,comments='',error='',templateid=NULL,type=0,"	\
+			"state=0,flags=0,recovery_mode=0,recovery_expression='',correlation_mode=0,correlation_tag='',"	\
+			"manual_close=0,opdata=''"
+	/* priority 2 = TRIGGER_SEVERITY_WARNING */
+	/* priority 3 = TRIGGER_SEVERITY_AVERAGE */
+	/* priority 4 = TRIGGER_SEVERITY_HIGH */
+	/* priority 5 = TRIGGER_SEVERITY_DISASTER */
+	CHECK(DBexecute(SQL, triggerid_downtime_over_10, functionid_downtime_over_10, ">={$RSM.SLV.RDDS.DOWNTIME}*0.1",
+			"RDDS service was unavailable for 10% of allowed $1 minutes", 2));
+	CHECK(DBexecute(SQL, triggerid_downtime_over_25, functionid_downtime_over_25, ">={$RSM.SLV.RDDS.DOWNTIME}*0.25",
+			"RDDS service was unavailable for 25% of allowed $1 minutes", 3));
+	CHECK(DBexecute(SQL, triggerid_downtime_over_50, functionid_downtime_over_50, ">={$RSM.SLV.RDDS.DOWNTIME}*0.5",
+			"RDDS service was unavailable for 50% of allowed $1 minutes", 3));
+	CHECK(DBexecute(SQL, triggerid_downtime_over_75, functionid_downtime_over_75, ">={$RSM.SLV.RDDS.DOWNTIME}*0.75",
+			"RDDS service was unavailable for 75% of allowed $1 minutes", 4));
+	CHECK(DBexecute(SQL, triggerid_downtime_over_100, functionid_downtime_over_100, ">={$RSM.SLV.RDDS.DOWNTIME}",
+			"RDDS service was unavailable for 100% of allowed $1 minutes", 5));
+	CHECK(DBexecute(SQL, triggerid_rollweek_over_10, functionid_rollweek_over_10, ">=10",
+			"RDDS rolling week is over 10%", 2));
+	CHECK(DBexecute(SQL, triggerid_rollweek_over_25, functionid_rollweek_over_25, ">=25",
+			"RDDS rolling week is over 25%", 3));
+	CHECK(DBexecute(SQL, triggerid_rollweek_over_50, functionid_rollweek_over_50, ">=50",
+			"RDDS rolling week is over 50%", 3));
+	CHECK(DBexecute(SQL, triggerid_rollweek_over_75, functionid_rollweek_over_75, ">=75",
+			"RDDS rolling week is over 75%", 4));
+	CHECK(DBexecute(SQL, triggerid_rollweek_over_100, functionid_rollweek_over_100, ">=100",
+			"RDDS rolling week is over 100%", 5));
+	CHECK(DBexecute(SQL, triggerid_rtt_pfailed_over_10, functionid_rtt_pfailed_over_10, ">{$RSM.SLV.RDDS.RTT}*0.1",
+			"Ratio of failed RDDS tests exceeded 10% of allowed $1%", 2));
+	CHECK(DBexecute(SQL, triggerid_rtt_pfailed_over_25, functionid_rtt_pfailed_over_25, ">{$RSM.SLV.RDDS.RTT}*0.25",
+			"Ratio of failed RDDS tests exceeded 25% of allowed $1%", 3));
+	CHECK(DBexecute(SQL, triggerid_rtt_pfailed_over_50, functionid_rtt_pfailed_over_50, ">{$RSM.SLV.RDDS.RTT}*0.5",
+			"Ratio of failed RDDS tests exceeded 50% of allowed $1%", 3));
+	CHECK(DBexecute(SQL, triggerid_rtt_pfailed_over_75, functionid_rtt_pfailed_over_75, ">{$RSM.SLV.RDDS.RTT}*0.75",
+			"Ratio of failed RDDS tests exceeded 75% of allowed $1%", 4));
+	CHECK(DBexecute(SQL, triggerid_rtt_pfailed_over_100, functionid_rtt_pfailed_over_100, ">{$RSM.SLV.RDDS.RTT}",
+			"Ratio of failed RDDS tests exceeded 100% of allowed $1%", 5));
+#undef SQL
+
+#define SQL	"insert into functions set functionid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ",triggerid=" ZBX_FS_UI64 ",name='%s',parameter='%s'"
+	CHECK(DBexecute(SQL, functionid_service_down_1      , itemid_avail      , triggerid_service_down        , "max"  , "#{$RSM.INCIDENT.RDDS.FAIL}"));
+	CHECK(DBexecute(SQL, functionid_service_down_2      , itemid_avail      , triggerid_service_down        , "count", "#{$RSM.INCIDENT.RDDS.RECOVER},0,\"eq\""));
+	CHECK(DBexecute(SQL, functionid_downtime_over_10    , itemid_downtime   , triggerid_downtime_over_10    , "last" , "0"));
+	CHECK(DBexecute(SQL, functionid_downtime_over_25    , itemid_downtime   , triggerid_downtime_over_25    , "last" , "0"));
+	CHECK(DBexecute(SQL, functionid_downtime_over_50    , itemid_downtime   , triggerid_downtime_over_50    , "last" , "0"));
+	CHECK(DBexecute(SQL, functionid_downtime_over_75    , itemid_downtime   , triggerid_downtime_over_75    , "last" , "0"));
+	CHECK(DBexecute(SQL, functionid_downtime_over_100   , itemid_downtime   , triggerid_downtime_over_100   , "last" , "0"));
+	CHECK(DBexecute(SQL, functionid_rollweek_over_10    , itemid_rollweek   , triggerid_rollweek_over_10    , "last" , "0"));
+	CHECK(DBexecute(SQL, functionid_rollweek_over_25    , itemid_rollweek   , triggerid_rollweek_over_25    , "last" , "0"));
+	CHECK(DBexecute(SQL, functionid_rollweek_over_50    , itemid_rollweek   , triggerid_rollweek_over_50    , "last" , "0"));
+	CHECK(DBexecute(SQL, functionid_rollweek_over_75    , itemid_rollweek   , triggerid_rollweek_over_75    , "last" , "0"));
+	CHECK(DBexecute(SQL, functionid_rollweek_over_100   , itemid_rollweek   , triggerid_rollweek_over_100   , "last" , "0"));
+	CHECK(DBexecute(SQL, functionid_rtt_pfailed_over_10 , itemid_rtt_pfailed, triggerid_rtt_pfailed_over_10 , "last" , ""));
+	CHECK(DBexecute(SQL, functionid_rtt_pfailed_over_25 , itemid_rtt_pfailed, triggerid_rtt_pfailed_over_25 , "last" , ""));
+	CHECK(DBexecute(SQL, functionid_rtt_pfailed_over_50 , itemid_rtt_pfailed, triggerid_rtt_pfailed_over_50 , "last" , ""));
+	CHECK(DBexecute(SQL, functionid_rtt_pfailed_over_75 , itemid_rtt_pfailed, triggerid_rtt_pfailed_over_75 , "last" , ""));
+	CHECK(DBexecute(SQL, functionid_rtt_pfailed_over_100, itemid_rtt_pfailed, triggerid_rtt_pfailed_over_100, "last" , ""));
+#undef SQL
+
+#define SQL	"insert into trigger_depends set triggerdepid=" ZBX_FS_UI64 ",triggerid_down=" ZBX_FS_UI64 ",triggerid_up=" ZBX_FS_UI64
+	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_downtime_over_10   , triggerid_downtime_over_25));
+	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_downtime_over_25   , triggerid_downtime_over_50));
+	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_downtime_over_50   , triggerid_downtime_over_75));
+	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_downtime_over_75   , triggerid_downtime_over_100));
+	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rollweek_over_10   , triggerid_rollweek_over_25));
+	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rollweek_over_25   , triggerid_rollweek_over_50));
+	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rollweek_over_50   , triggerid_rollweek_over_75));
+	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rollweek_over_75   , triggerid_rollweek_over_100));
+	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rtt_pfailed_over_10, triggerid_rtt_pfailed_over_25));
+	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rtt_pfailed_over_25, triggerid_rtt_pfailed_over_50));
+	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rtt_pfailed_over_50, triggerid_rtt_pfailed_over_75));
+	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rtt_pfailed_over_75, triggerid_rtt_pfailed_over_100));
+#undef SQL
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
 DBPATCH_START(4050)
 
 /* version, duplicates flag, mandatory flag */
@@ -2208,5 +2810,8 @@ DBPATCH_ADD(4050512, 0, 0)	/* Rename RDAP Template */
 DBPATCH_ADD(4050513, 0, 0)	/* set RDAP master item value_type to the text type */
 DBPATCH_ADD(4050514, 0, 0)	/* set RDAP calculated items to be dependent items */
 DBPATCH_ADD(4050515, 0, 0)	/* add item_preproc to RDAP ip and rtt items */
+DBPATCH_ADD(4050516, 0, 0)	/* add "Template DNSSEC Status" template */
+DBPATCH_ADD(4050517, 0, 0)	/* add "Template RDAP Status" template */
+DBPATCH_ADD(4050518, 0, 0)	/* add "Template RDDS Status" template */
 
 DBPATCH_END()
