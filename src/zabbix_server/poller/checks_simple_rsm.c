@@ -1899,7 +1899,7 @@ out:
 	return ret;
 }
 
-static int	zbx_parse_rdds_item(DC_ITEM *item, char *host, size_t host_size)
+static int	zbx_parse_rdds_item(DC_ITEM *item)
 {
 	AGENT_REQUEST	request;
 	int		ret = FAIL;
@@ -1909,20 +1909,6 @@ static int	zbx_parse_rdds_item(DC_ITEM *item, char *host, size_t host_size)
 	if (SUCCEED != parse_item_key(item->key, &request))
 	{
 		/* unexpected key syntax */
-		goto out;
-	}
-
-	if (1 != request.nparam)
-	{
-		/* unexpected key syntax */
-		goto out;
-	}
-
-	zbx_strlcpy(host, get_rparam(&request, 0), host_size);
-
-	if ('\0' == *host)
-	{
-		/* first parameter missing */
 		goto out;
 	}
 
@@ -2771,7 +2757,7 @@ static void	zbx_get_rdds43_nss(zbx_vector_str_t *nss, const char *recv_buf, cons
 static size_t	zbx_get_rdds_items(const char *keyname, DC_ITEM *item, const char *domain, DC_ITEM **out_items,
 		FILE *log_fd)
 {
-	char		*keypart, host[ZBX_HOST_BUF_SIZE];
+	char		*keypart;
 	const char	*p;
 	DC_ITEM		*in_items = NULL, *in_item;
 	size_t		i, in_items_num, out_items_num = 0, out_items_alloc = 8, keypart_size;
@@ -2798,23 +2784,19 @@ static size_t	zbx_get_rdds_items(const char *keyname, DC_ITEM *item, const char 
 			continue;
 		}
 
-		if (SUCCEED != zbx_parse_rdds_item(in_item, host, sizeof(host)))
+		if (SUCCEED != zbx_parse_rdds_item(in_item))
 		{
 			/* unexpected item key syntax, skip it */
 			rsm_warnf(log_fd, "%s: unexpected key syntax", in_item->key);
 			continue;
 		}
 
-		if (0 != strcmp(host, domain))
-		{
-			/* first parameter does not match expected domain name, skip it */
-			rsm_warnf(log_fd, "%s: first parameter does not match host %s", in_item->key, domain);
-			continue;
-		}
-
 		p = in_item->key + keypart_size;
 		if (0 != strncmp(p, "43.ip[", 6) && 0 != strncmp(p, "43.rtt[", 7) && 0 != strncmp(p, "43.upd[", 7) &&
-				0 != strncmp(p, "80.ip[", 6) && 0 != strncmp(p, "80.rtt[", 7))
+				0 != strncmp(p, "80.ip[", 6) && 0 != strncmp(p, "80.rtt[", 7) &&
+				0 != strncmp(p, "43.target", 9) &&
+				0 != strncmp(p, "43.testedname", 13) &&
+				0 != strncmp(p, "80.target", 9))
 		{
 			continue;
 		}
@@ -3080,6 +3062,26 @@ static void	zbx_get_strings_from_list(zbx_vector_str_t *strings, char *list, cha
 		}
 	}
 	while (NULL != p_end);
+}
+
+static void	zbx_set_rdds_value_by_pattern(const char *value, int value_ts, size_t keypart_size, const char *pattern,
+		size_t pattern_size, const DC_ITEM *items, size_t items_num)
+{
+	size_t		i;
+	const DC_ITEM	*item;
+	const char	*p;
+
+	for (i = 0; i < items_num; i++)
+	{
+		item = &items[i];
+		p = item->key + keypart_size + 1;	/* skip "rsm.rdds." part */
+
+		if (0 == strncmp(p, pattern, pattern_size))
+		{
+			zbx_add_value_str(item, value_ts, value);
+			return;
+		}
+	}
 }
 
 static void	zbx_set_rdds_values(const char *ip43, int rtt43, int upd43, const char *ip80, int rtt80,
@@ -3772,6 +3774,10 @@ int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	i = zbx_random(hosts43.values_num);
 	random_host = hosts43.values[i];
 
+	/* set RDDS43 target */
+	zbx_set_rdds_value_by_pattern(random_host, item->nextcheck, strlen(request->key), "43.target",
+			strlen("43.target"), items, items_num);
+
 	/* start RDDS43 test, resolve host to ips */
 	if (SUCCEED != zbx_resolver_resolve_host(res, random_host, &ips43, ipv_flags, log_fd, &ec_res, err, sizeof(err)))
 	{
@@ -3801,6 +3807,10 @@ int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 			zbx_snprintf(testname, sizeof(testname), "%s.%s", testprefix, domain);
 		else
 			zbx_strlcpy(testname, testprefix, sizeof(testname));
+
+		/* set RDDS43 testedName */
+		zbx_set_rdds_value_by_pattern(testname, item->nextcheck, strlen(request->key), "43.testedname",
+				strlen("43.testedname"), items, items_num);
 
 		rsm_infof(log_fd, "start RDDS43 test (ip %s, request \"%s\", expected prefix \"%s\")",
 				ip43, testname, rdds_ns_string);
@@ -3875,6 +3885,10 @@ int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	/* choose random host */
 	i = zbx_random(hosts80.values_num);
 	random_host = hosts80.values[i];
+
+	/* set RDDS80 target */
+	zbx_set_rdds_value_by_pattern(random_host, item->nextcheck, strlen(request->key), "80.target",
+			strlen("80.target"), items, items_num);
 
 	rsm_infof(log_fd, "start RDDS80 test (host %s)", random_host);
 
@@ -3988,23 +4002,32 @@ out:
 	return ret;
 }
 
-static int	zbx_get_rdap_items(const char *host, DC_ITEM *ip_item, DC_ITEM *rtt_item)
+static int	zbx_get_rdap_items(const char *host, DC_ITEM *ip_item, DC_ITEM *rtt_item, DC_ITEM *target_item,
+		DC_ITEM *testedname_item)
 {
-#define ZBX_RDAP_ITEM_COUNT	2
-#define ZBX_RDAP_ITEM_KEY_IP	"rdap.ip"
-#define ZBX_RDAP_ITEM_KEY_RTT	"rdap.rtt"
+#define ZBX_RDAP_ITEM_COUNT		4
+#define ZBX_RDAP_ITEM_KEY_IP		"rdap.ip"
+#define ZBX_RDAP_ITEM_KEY_RTT		"rdap.rtt"
+#define ZBX_RDAP_ITEM_KEY_TARGET	"rdap.target"
+#define ZBX_RDAP_ITEM_KEY_TESTEDNAME	"rdap.testedname"
 
 	zbx_host_key_t		hosts_keys[ZBX_RDAP_ITEM_COUNT] = {
 					{host, ZBX_RDAP_ITEM_KEY_IP},
-					{host, ZBX_RDAP_ITEM_KEY_RTT}
+					{host, ZBX_RDAP_ITEM_KEY_RTT},
+					{host, ZBX_RDAP_ITEM_KEY_TARGET},
+					{host, ZBX_RDAP_ITEM_KEY_TESTEDNAME}
 				};
 	zbx_item_value_type_t	types[ZBX_RDAP_ITEM_COUNT] = {
 					ITEM_VALUE_TYPE_STR,
-					ITEM_VALUE_TYPE_FLOAT
+					ITEM_VALUE_TYPE_FLOAT,
+					ITEM_VALUE_TYPE_STR,
+					ITEM_VALUE_TYPE_STR
 				};
 	DC_ITEM			*destinations[ZBX_RDAP_ITEM_COUNT] = {
 					ip_item,
-					rtt_item
+					rtt_item,
+					target_item,
+					testedname_item
 				};
 	DC_ITEM			items[ZBX_RDAP_ITEM_COUNT];
 	int			errcodes[ZBX_RDAP_ITEM_COUNT], i;
@@ -4027,6 +4050,8 @@ static int	zbx_get_rdap_items(const char *host, DC_ITEM *ip_item, DC_ITEM *rtt_i
 #undef ZBX_RDAP_ITEM_COUNT
 #undef ZBX_RDAP_ITEM_KEY_IP
 #undef ZBX_RDAP_ITEM_KEY_RTT
+#undef ZBX_RDAP_ITEM_KEY_TARGET
+#undef ZBX_RDAP_ITEM_KEY_TESTEDNAME
 }
 
 int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *result)
@@ -4037,7 +4062,7 @@ int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	zbx_vector_str_t	ips;
 	struct zbx_json_parse	jp;
 	FILE			*log_fd;
-	DC_ITEM			ip_item, rtt_item;
+	DC_ITEM			ip_item, rtt_item, target_item, testedname_item;
 	char			*domain, *test_domain, *base_url, *maxredirs_str, *rtt_limit_str, *tld_enabled_str,
 				*probe_enabled_str, *ipv4_enabled_str, *ipv6_enabled_str, *res_ip, *proto = NULL,
 				*domain_part = NULL, *prefix = NULL, *full_url = NULL, *value_str = NULL,
@@ -4139,7 +4164,7 @@ int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	rsm_info(log_fd, "START TEST");
 
 	/* get items */
-	if (SUCCEED != zbx_get_rdap_items(item->host.host, &ip_item, &rtt_item))
+	if (SUCCEED != zbx_get_rdap_items(item->host.host, &ip_item, &rtt_item, &target_item, &testedname_item))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Cannot find items to store IP and RTT."));
 		goto out;
@@ -4171,6 +4196,12 @@ int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 
 	/* from this point item will not become NOTSUPPORTED */
 	ret = SYSINFO_RET_OK;
+
+	/* set RDAP target */
+	zbx_add_value_str(&target_item, item->nextcheck, base_url);
+
+	/* set RDAP testedName */
+	zbx_add_value_str(&testedname_item, item->nextcheck, test_domain);
 
 	/* skip the test itself in case of two special values in RDAP base URL parameter */
 

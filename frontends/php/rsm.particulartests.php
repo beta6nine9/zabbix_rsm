@@ -540,14 +540,19 @@ if ($data['host'] && $data['time'] && $data['slvItemId'] && $data['type'] !== nu
 				&& !is_RDAP_standalone($test_time_from)) {
 			$items_to_check[] = PROBE_RDAP_IP;
 			$items_to_check[] = PROBE_RDAP_RTT;
+			$items_to_check[] = PROBE_RDAP_TARGET;
+			$items_to_check[] = PROBE_RDAP_TESTEDNAME;
 			$probeItemKey[] = 'i.key_ LIKE ('.zbx_dbstr(PROBE_RDAP_ITEM.'%').')';
 		}
 
 		if (!isset($data['tld']['macros'][RSM_TLD_RDDS_ENABLED]) || $data['tld']['macros'][RSM_TLD_RDDS_ENABLED] != 0) {
 			$items_to_check[] = PROBE_RDDS43_IP;
 			$items_to_check[] = PROBE_RDDS43_RTT;
+			$items_to_check[] = PROBE_RDDS43_TARGET;
+			$items_to_check[] = PROBE_RDDS43_TESTEDNAME;
 			$items_to_check[] = PROBE_RDDS80_IP;
 			$items_to_check[] = PROBE_RDDS80_RTT;
+			$items_to_check[] = PROBE_RDDS80_TARGET;
 			$probeItemKey[] = 'i.key_ LIKE ('.zbx_dbstr(PROBE_RDDS_ITEM.'%').')';
 		}
 
@@ -638,6 +643,12 @@ if ($data['host'] && $data['time'] && $data['slvItemId'] && $data['type'] !== nu
 						];
 					}
 				}
+				elseif ($item['key_'] == PROBE_RDDS43_TARGET) {
+					$hosts[$item['hostid']]['rdds43']['target'] = $itemValue['value'];
+				}
+				elseif ($item['key_'] == PROBE_RDDS43_TESTEDNAME) {
+					$hosts[$item['hostid']]['rdds43']['testedname'] = $itemValue['value'];
+				}
 				elseif ($item['key_'] == PROBE_RDDS80_IP) {
 					$hosts[$item['hostid']]['rdds80']['ip'] = $itemValue['value'];
 				}
@@ -650,6 +661,9 @@ if ($data['host'] && $data['time'] && $data['slvItemId'] && $data['type'] !== nu
 							'value' => $rtt_value
 						];
 					}
+				}
+				elseif ($item['key_'] == PROBE_RDDS80_TARGET) {
+					$hosts[$item['hostid']]['rdds80']['target'] = $itemValue['value'];
 				}
 				elseif ($item['key_'] == PROBE_RDAP_IP) {
 					$hosts[$item['hostid']]['rdap']['ip'] = $itemValue['value'];
@@ -678,6 +692,12 @@ if ($data['host'] && $data['time'] && $data['slvItemId'] && $data['type'] !== nu
 					}
 
 					$hosts[$item['hostid']]['value'] = $itemValue['value'];
+				}
+				elseif ($item['key_'] == PROBE_RDAP_TARGET) {
+					$hosts[$item['hostid']]['rdap']['target'] = $itemValue['value'];
+				}
+				elseif ($item['key_'] == PROBE_RDAP_TESTEDNAME) {
+					$hosts[$item['hostid']]['rdap']['testedname'] = $itemValue['value'];
 				}
 
 				// Count result for table bottom summary rows.
