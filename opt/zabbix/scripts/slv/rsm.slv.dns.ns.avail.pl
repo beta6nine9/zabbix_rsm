@@ -17,8 +17,8 @@ db_connect();
 
 slv_exit(SUCCESS) if (get_monitoring_target() ne MONITORING_TARGET_REGISTRY);
 
-my $slv_item_key_pattern = 'rsm.slv.dns.ns.avail';
-my $rtt_item_key_pattern = 'rsm.dns.rtt';
+my $cfg_key_in_pattern = 'rsm.dns.rtt[%,%,%]';		# <NS>,<IP>,<PROTOCOL>
+my $cfg_key_out_pattern = 'rsm.slv.dns.ns.avail[%,%]';	# <NS>,<IP>
 
 my $now;
 
@@ -72,19 +72,24 @@ sub get_slv_dns_ns_avail_items
 {
 	my $hostid = shift;
 
-	return db_select("select itemid,key_ from items where hostid=$hostid" .
-		" and key_ like '$slv_item_key_pattern\[%' and status=${\ITEM_STATUS_ACTIVE}");
+	return db_select(
+		"select itemid,key_".
+		" from items".
+		" where hostid=$hostid" .
+			" and key_ like '$cfg_key_out_pattern'".
+			" and status<>" . ITEM_STATUS_DISABLED
+	);
 }
 
 sub process_slv_item
 {
 	my $tld = shift;
 	my $slv_itemid = shift;
-	my $slv_itemkey = shift; # rsm.slv.dns.ns.avail[ns1.example,ip_example]
+	my $slv_itemkey = shift;	# rsm.slv.dns.ns.avail[<NS>,<IP>]
 
-	if ($slv_itemkey =~ /\[(.+),(.+)\]$/)
+	if ($slv_itemkey =~ /\[(.+,.+)\]$/)
 	{
-		process_cycles($tld, $slv_itemid, $slv_itemkey, $1, $2);
+		process_cycles($tld, $slv_itemid, $slv_itemkey, $1);
 	}
 	else
 	{
@@ -92,13 +97,14 @@ sub process_slv_item
 	}
 }
 
-sub process_cycles # for a particular slv item
+# process cycles of a particular NS-IP pair
+sub process_cycles
 {
 	my $tld = shift;
 	my $slv_itemid = shift;
 	my $slv_itemkey = shift;
-	my $nsname = shift;
 	my $nsip = shift;
+
 	my $slv_clock;
 
 	get_lastvalue($slv_itemid, ITEM_VALUE_TYPE_UINT64, undef, \$slv_clock);
@@ -111,7 +117,7 @@ sub process_cycles # for a particular slv item
 		}
 		else
 		{
-			#start from beginning of the current month if no slv data
+			# start from beginning of the current month if no slv data
 			$slv_clock = current_month_first_cycle();
 		}
 
@@ -135,8 +141,8 @@ sub process_cycles # for a particular slv item
 			next;
 		}
 
-		my $udp_rtt_values = get_rtt_values($from, $till, $rtt_itemids->{$nsname}{$nsip}{"udp"});
-		my $tcp_rtt_values = get_rtt_values($from, $till, $rtt_itemids->{$nsname}{$nsip}{"tcp"});
+		my $udp_rtt_values = get_rtt_values($from, $till, $rtt_itemids->{$nsip}{"udp"});
+		my $tcp_rtt_values = get_rtt_values($from, $till, $rtt_itemids->{$nsip}{"tcp"});
 		my $probes_with_results = scalar(@{$udp_rtt_values}) + scalar(@{$tcp_rtt_values});
 
 		if ($probes_with_results < $cfg_minonline)
@@ -180,7 +186,7 @@ sub get_all_dns_rtt_itemids
 			" items" .
 			" left join hosts on hosts.hostid = items.hostid" .
 		" where" .
-			" items.key_ like '$rtt_item_key_pattern\[%,%,%\]' and" .
+			" items.key_ like '$cfg_key_in_pattern' and" .
 			" hosts.host like '% %'"
 	);
 
@@ -193,12 +199,11 @@ sub get_all_dns_rtt_itemids
 		my $itemid = $row->[1];
 		my $key    = $row->[2];
 
-		$key =~ s/^.+\[(.+),(.+),(.+)\]$//;
-		my $nsname = $1;
-		my $nsip = $2;
-		my $protocol = $3;
+		$key =~ s/^.+\[(.+,.+),(.+)\]$//;
+		my $nsip = $1;
+		my $protocol = $2;
 
-		push(@{$itemids->{$nsname}{$nsip}{$protocol}}, $itemid);
+		push(@{$itemids->{$nsip}{$protocol}}, $itemid);
 	}
 
 	return $itemids;
