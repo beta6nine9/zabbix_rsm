@@ -61,7 +61,7 @@ while (0)
 															\
 do															\
 {															\
-	int __result = (CODE);												\
+	int	__result = (CODE);												\
 	if (SUCCEED != __result)											\
 	{														\
 		goto out;												\
@@ -74,7 +74,7 @@ while (0)
 															\
 do															\
 {															\
-	int __result = (CODE);												\
+	int	__result = (CODE);												\
 	if (ZBX_DB_OK > __result)											\
 	{														\
 		goto out;												\
@@ -2082,7 +2082,7 @@ static int	DBpatch_4050512(void)
 	ONLY_SERVER();
 
 	CHECK(DBexecute("update hosts set host='Template RDAP Test',name='Template RDAP Test'"
-			" where host = 'Template RDAP'"));
+			" where host='Template RDAP'"));
 
 	ret = SUCCEED;
 out:
@@ -2096,7 +2096,8 @@ static int	DBpatch_4050513(void)
 	ONLY_SERVER();
 
 	/* 4 = ITEM_VALUE_TYPE_TEXT */
-	CHECK(DBexecute("update items set name='RDAP Test',value_type='4',history='0' where key_ like 'rdap[%%'"));
+	CHECK(DBexecute("update items set name='RDAP Test',value_type='4',history='0',trends='0'"
+			" where key_ like 'rdap[%%'"));
 
 	ret = SUCCEED;
 out:
@@ -2111,7 +2112,7 @@ static int	DBpatch_4050514(void)
 
 	/* 18 = ITEM_TYPE_DEPENDENT */
 	CHECK(DBexecute("update items as i1 inner join items as i2 on i1.hostid=i2.hostid set"
-			" i1.type='18',i1.master_itemid=i2.itemid where i1.key_ in ('rdap.ip','rdap.rtt') and"
+			" i1.type=18,i1.master_itemid=i2.itemid where i1.key_ in ('rdap.ip','rdap.rtt') and"
 			" i2.key_ like 'rdap[%%'"));
 
 	ret = SUCCEED;
@@ -2143,12 +2144,12 @@ static int	db_insert_rdap_item_preproc(const char *item_key, const char *item_pr
 
 	item_preprocid_next = DBget_maxid_num("item_preproc", rdap_itemids.values_num);
 
-	for (i = 0; i < rdap_itemids.values_num; ++i)
+	for (i = 0; i < rdap_itemids.values_num; i++)
 	{
 		/* 12 = ZBX_PREPROC_JSONPATH */
 		CHECK(DBexecute("insert into item_preproc set item_preprocid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ","
-				"step=1,type=12,params='%s',error_handler='0'", item_preprocid_next,
-				rdap_itemids.values[i], item_preproc_param));
+				"step=1,type=12,params='%s',error_handler='0'",
+				item_preprocid_next, rdap_itemids.values[i], item_preproc_param));
 		item_preprocid_next++;
 	}
 
@@ -2166,11 +2167,11 @@ static int	DBpatch_4050515(void)
 
 	ONLY_SERVER();
 
-	ret = db_insert_rdap_item_preproc("rdap.ip", "$.rdap.ip");
+	CHECK_RESULT(db_insert_rdap_item_preproc("rdap.ip", "$.rdap.ip"));
+	CHECK_RESULT(db_insert_rdap_item_preproc("rdap.rtt", "$.rdap.rtt"));
 
-	if (SUCCEED == ret)
-		ret = db_insert_rdap_item_preproc("rdap.rtt", "$.rdap.rtt");
-
+	ret = SUCCEED;
+out:
 	return ret;
 }
 
@@ -2476,9 +2477,9 @@ static int	DBpatch_4050517(void)
 	/* priority 4 = TRIGGER_SEVERITY_HIGH */
 	/* priority 5 = TRIGGER_SEVERITY_DISASTER */
 	CHECK(DBexecute(SQL, triggerid_downtime_over_10, functionid_downtime_over_10, ">={$RSM.SLV.RDAP.DOWNTIME}*0.1",
-				"RDAP service was unavailable for 10% of allowed $1 minutes", 2));
+			"RDAP service was unavailable for 10% of allowed $1 minutes", 2));
 	CHECK(DBexecute(SQL, triggerid_downtime_over_25, functionid_downtime_over_25, ">={$RSM.SLV.RDAP.DOWNTIME}*0.25",
-				"RDAP service was unavailable for 25% of allowed $1 minutes", 3));
+			"RDAP service was unavailable for 25% of allowed $1 minutes", 3));
 	CHECK(DBexecute(SQL, triggerid_downtime_over_50, functionid_downtime_over_50, ">={$RSM.SLV.RDAP.DOWNTIME}*0.5",
 			"RDAP service was unavailable for 50% of allowed $1 minutes", 3));
 	CHECK(DBexecute(SQL, triggerid_downtime_over_75, functionid_downtime_over_75, ">={$RSM.SLV.RDAP.DOWNTIME}*0.75",
@@ -2806,7 +2807,7 @@ DBPATCH_ADD(4050508, 0, 0)	/* upgrade "TLDs" action (upgrade process to Zabbix 4
 DBPATCH_ADD(4050509, 0, 0)	/* add "Template Config History" template */
 DBPATCH_ADD(4050510, 0, 0)	/* add "Template RDDS Test" template */
 DBPATCH_ADD(4050511, 0, 0)	/* add "Template Probe Status" template */
-DBPATCH_ADD(4050512, 0, 0)	/* Rename RDAP Template */
+DBPATCH_ADD(4050512, 0, 0)	/* rename RDAP Template */
 DBPATCH_ADD(4050513, 0, 0)	/* set RDAP master item value_type to the text type */
 DBPATCH_ADD(4050514, 0, 0)	/* set RDAP calculated items to be dependent items */
 DBPATCH_ADD(4050515, 0, 0)	/* add item_preproc to RDAP ip and rtt items */
