@@ -14,7 +14,7 @@ use RSM;
 use RSMSLV;
 use TLD_constants qw(:ec :api);
 
-my $cfg_keys_in_pattern = 'rsm.dns.rtt[';
+my $cfg_keys_in_pattern = 'rsm.dns.rtt[%,%,%]';
 my $cfg_key_out = 'rsm.slv.dnssec.avail';
 my $cfg_value_type = ITEM_VALUE_TYPE_FLOAT;
 
@@ -81,26 +81,14 @@ sub cfg_keys_in_cb($)
 {
 	my $tld = shift;
 
-	return get_items_like($tld, $cfg_keys_in_pattern);
-}
-
-sub get_items_like($$)
-{
-	my $tld = shift;
-	my $key_in = shift;
-
-	my $params = ["$key_in%","$tld %"];
-
-	my $result = db_select_col(
+	return db_select_col(
 		"select i.key_".
 		" from items i,hosts h".
 		" where i.key_ like ?".
 		" and h.host like ?".
 		" and i.templateid is NULL".
 		" and i.hostid=h.hostid".
-		" and i.status<>".ITEM_STATUS_DISABLED, $params);
-
-	return $result;
+		" and i.status<>".ITEM_STATUS_DISABLED, [$cfg_keys_in_pattern, "$tld %"]);
 }
 
 # SUCCESS - more than or equal to $cfg_minns Name Servers returned no DNSSEC errors
