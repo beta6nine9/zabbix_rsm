@@ -88,6 +88,7 @@ sub get_items_like($$)
 {
 	my $tld = shift;
 	my $key_in = shift;
+
 	my $params = ["$key_in%","$tld %"];
 
 	my $result = db_select_col(
