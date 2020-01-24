@@ -102,8 +102,8 @@ sub check_probe_values
 	# E. g.:
 	#
 	# {
-	#	rsm.dns.rtt[ns1.hazelburn,172.19.0.4,tcp] => [1]
-	#	rsm.dns.rtt[ns1.hazelburn,172.19.0.4,udp] => [-650]
+	#	rsm.dns.rtt[ns1.example.com,172.19.0.4,tcp] => [1]
+	#	rsm.dns.rtt[ns1.example.com,172.19.0.4,udp] => [-650]
 	# }
 
 	if (scalar(keys(%{$values_ref})) == 0)
