@@ -85,10 +85,12 @@ sub cfg_keys_in_cb($)
 		"select i.key_".
 		" from items i,hosts h".
 		" where i.key_ like ?".
-		" and h.host like ?".
-		" and i.templateid is NULL".
-		" and i.hostid=h.hostid".
-		" and i.status<>".ITEM_STATUS_DISABLED, [$cfg_keys_in_pattern, "$tld %"]);
+			" and h.host like ?".
+			" and i.templateid is NULL".
+			" and i.hostid=h.hostid".
+			" and i.status<>" . ITEM_STATUS_DISABLED,
+		[$cfg_keys_in_pattern, "$tld %"]
+	);
 }
 
 # SUCCESS - more than or equal to $cfg_minns Name Servers returned no DNSSEC errors
@@ -112,7 +114,6 @@ sub check_probe_values
 	if (1 > $cfg_minns)
 	{
 		wrn("number of required working Name Servers is configured as $cfg_minns");
-
 		return SUCCESS;
 	}
 
