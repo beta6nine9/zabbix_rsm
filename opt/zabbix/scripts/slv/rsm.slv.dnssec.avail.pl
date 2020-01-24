@@ -14,7 +14,7 @@ use RSM;
 use RSMSLV;
 use TLD_constants qw(:ec :api);
 
-my $cfg_keys_in_pattern = 'rsm.dns.udp.rtt[';
+my $cfg_keys_in_pattern = 'rsm.dns.rtt[%,%,%]';
 my $cfg_key_out = 'rsm.slv.dnssec.avail';
 my $cfg_value_type = ITEM_VALUE_TYPE_FLOAT;
 
@@ -28,6 +28,7 @@ db_connect();
 slv_exit(SUCCESS) if (get_monitoring_target() ne MONITORING_TARGET_REGISTRY);
 
 # we don't know the rollweek bounds yet so we assume it ends at least few minutes back
+# we use both tcp and udp rtt values, but take the delay value from the udp macro only
 my $delay = get_dns_udp_delay(getopt('now') // time() - AVAIL_SHIFT_BACK);
 
 my (undef, undef, $max_clock) = get_cycle_bounds($delay, getopt('now'));
@@ -38,13 +39,13 @@ my $cfg_minns = get_macro_minns();
 my $tlds_ref;
 if (opt('tld'))
 {
-        fail("TLD ", getopt('tld'), " does not exist.") if (tld_exists(getopt('tld')) == 0);
+	fail("TLD ", getopt('tld'), " does not exist.") if (tld_exists(getopt('tld')) == 0);
 
-        $tlds_ref = [ getopt('tld') ];
+	$tlds_ref = [ getopt('tld') ];
 }
 else
 {
-        $tlds_ref = get_tlds('DNSSEC', $max_clock);
+	$tlds_ref = get_tlds('DNSSEC', $max_clock);
 }
 
 slv_exit(SUCCESS) if (scalar(@{$tlds_ref}) == 0);
@@ -80,7 +81,16 @@ sub cfg_keys_in_cb($)
 {
 	my $tld = shift;
 
-	return get_templated_items_like($tld, $cfg_keys_in_pattern);
+	return db_select_col(
+		"select i.key_".
+		" from items i,hosts h".
+		" where i.key_ like ?".
+			" and h.host like ?".
+			" and i.templateid is NULL".
+			" and i.hostid=h.hostid".
+			" and i.status<>" . ITEM_STATUS_DISABLED,
+		[$cfg_keys_in_pattern, "$tld %"]
+	);
 }
 
 # SUCCESS - more than or equal to $cfg_minns Name Servers returned no DNSSEC errors
@@ -92,10 +102,8 @@ sub check_probe_values
 	# E. g.:
 	#
 	# {
-	# 	rsm.dns.udp.rtt[{$RSM.TLD},ns1.foo.com,1.2.3.4] => [3],
-	# 	rsm.dns.udp.rtt[{$RSM.TLD},ns1.foo.com,12ff::20::10::] => [-204],
-	# 	rsm.dns.udp.rtt[{$RSM.TLD},ns2.foo.com,5.6.7.8] => [5],
-	# 	rsm.dns.udp.rtt[{$RSM.TLD},ns3.foo.com,10.11.12.13] => [-206]
+	#	rsm.dns.rtt[ns1.example.com,172.19.0.4,tcp] => [1]
+	#	rsm.dns.rtt[ns1.example.com,172.19.0.4,udp] => [-650]
 	# }
 
 	if (scalar(keys(%{$values_ref})) == 0)

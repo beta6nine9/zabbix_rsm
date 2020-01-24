@@ -38,13 +38,13 @@ my $cfg_minns = get_macro_minns();
 my $tlds_ref;
 if (opt('tld'))
 {
-        fail("TLD ", getopt('tld'), " does not exist.") if (tld_exists(getopt('tld')) == 0);
+	fail("TLD ", getopt('tld'), " does not exist.") if (tld_exists(getopt('tld')) == 0);
 
-        $tlds_ref = [ getopt('tld') ];
+	$tlds_ref = [ getopt('tld') ];
 }
 else
 {
-        $tlds_ref = get_tlds('DNS', $max_clock);
+	$tlds_ref = get_tlds('DNS', $max_clock);
 }
 
 slv_exit(SUCCESS) if (scalar(@{$tlds_ref}) == 0);
@@ -85,7 +85,7 @@ sub check_probe_values
 	# E. g.:
 	#
 	# {
-	#	'rsm.dns.udp[{$RSM.TLD}]' => [3]
+	#	'rsm.dns.nssok' => [1]
 	# }
 
 	if (scalar(keys(%{$values_ref})) == 0)
@@ -100,9 +100,9 @@ sub check_probe_values
 	}
 
 	# stay on the safe side: if more than one value in cycle, use the positive one
-	foreach my $rtts (values(%{$values_ref}))
+	foreach my $values (values(%{$values_ref}))
 	{
-		foreach (@{$rtts})
+		foreach (@{$values})
 		{
 			return SUCCESS if ($_ >= $cfg_minns);
 		}
