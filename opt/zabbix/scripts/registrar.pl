@@ -643,6 +643,26 @@ sub create_items_rdds($$)
 			'value_type'   => ITEM_VALUE_TYPE_FLOAT,
 			'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_rdds_rtt'}
 		}));
+
+		really(create_item({
+			'name'         => 'RDDS43 target',
+			'key_'         => 'rsm.rdds.43.target',
+			'status'       => ITEM_STATUS_ACTIVE,
+			'hostid'       => $templateid,
+			'applications' => [$applicationid],
+			'type'         => ITEM_TYPE_TRAPPER,
+			'value_type'   => ITEM_VALUE_TYPE_STR
+		}));
+
+		really(create_item({
+			'name'         => 'RDDS43 tested name',
+			'key_'         => 'rsm.rdds.43.testedname',
+			'status'       => ITEM_STATUS_ACTIVE,
+			'hostid'       => $templateid,
+			'applications' => [$applicationid],
+			'type'         => ITEM_TYPE_TRAPPER,
+			'value_type'   => ITEM_VALUE_TYPE_STR
+		}));
 	}
 
 	if (opt('rdds80-servers'))
@@ -668,6 +688,16 @@ sub create_items_rdds($$)
 			'type'         => ITEM_TYPE_TRAPPER,
 			'value_type'   => ITEM_VALUE_TYPE_FLOAT,
 			'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_rdds_rtt'}
+		}));
+
+		really(create_item({
+			'name'         => 'RDDS80 target',
+			'key_'         => 'rsm.rdds.80.target',
+			'status'       => ITEM_STATUS_ACTIVE,
+			'hostid'       => $templateid,
+			'applications' => [$applicationid],
+			'type'         => ITEM_TYPE_TRAPPER,
+			'value_type'   => ITEM_VALUE_TYPE_STR
 		}));
 	}
 
