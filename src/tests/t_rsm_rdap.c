@@ -162,8 +162,8 @@ int	main(int argc, char *argv[])
 		full_url = zbx_dsprintf(full_url, "%s%s:%d%s%s/%s", proto, ip, port, prefix, rdap_prefix, test_domain);
 	}
 
-	/* base_url example: http://whois.springbank */
-	/* full_url example: http://172.19.0.2:80/domain/whois.springbank */
+	/* base_url example: http://whois.example */
+	/* full_url example: http://172.19.0.2:80/domain/whois.example */
 
 	rsm_infof(stderr, "the domain in base URL \"%s\" was resolved to %s, using full URL \"%s\".",
 			base_url, ip, full_url);
