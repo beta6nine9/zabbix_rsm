@@ -5133,18 +5133,18 @@ static int	DBpatch_3000506(void)
 } while (0)
 
 #define SQL	"insert into items set itemid=" ZBX_FS_UI64 ",type=%d,snmp_community='',snmp_oid='',"			\
-		"hostid=" ZBX_FS_UI64 ",name='%s',key_='%s',delay=0,history=90,trends=365,status=%d,value_type=%d,"	\
+		"hostid=" ZBX_FS_UI64 ",name='%s',key_='%s',delay=0,history=90,trends=%d,status=%d,value_type=%d,"	\
 		"trapper_hosts='',units='',multiplier=0,delta=0,snmpv3_securityname='',snmpv3_securitylevel=0,"		\
-		"snmpv3_authpassphrase='',snmpv3_privpassphrase='',formula='',error='',lastlogsize=0,logtimefmt='',"	\
+		"snmpv3_authpassphrase='',snmpv3_privpassphrase='',formula='%s',error='',lastlogsize=0,logtimefmt='',"	\
 		"templateid=NULL,valuemapid=NULL,delay_flex='',params='',ipmi_sensor='',data_type=0,authtype=0,"	\
 		"username='',password='',publickey='',privatekey='',mtime=0,flags=0,interfaceid=NULL,port='',"		\
 		"description='',inventory_link=0,lifetime='30',snmpv3_authprotocol=0,snmpv3_privprotocol=0,state=0,"	\
 		"snmpv3_contextname='',evaltype=0"
 		/* type 2 = ITEM_TYPE_TRAPPER */
 		/* value_type 1 = ITEM_VALUE_TYPE_STR */
-		CHECK(DBexecute(SQL, itemid_rdds43_target    , 2, hostid, "RDDS43 target"     , "rsm.rdds.43.target"    , status, 1));
-		CHECK(DBexecute(SQL, itemid_rdds43_testedname, 2, hostid, "RDDS43 tested name", "rsm.rdds.43.testedname", status, 1));
-		CHECK(DBexecute(SQL, itemid_rdds80_target    , 2, hostid, "RDDS80 target"     , "rsm.rdds.80.target"    , status, 1));
+		CHECK(DBexecute(SQL, itemid_rdds43_target    , 2, hostid, "RDDS43 target"     , "rsm.rdds.43.target"    , 0, status, 1, "1"));
+		CHECK(DBexecute(SQL, itemid_rdds43_testedname, 2, hostid, "RDDS43 tested name", "rsm.rdds.43.testedname", 0, status, 1, "1"));
+		CHECK(DBexecute(SQL, itemid_rdds80_target    , 2, hostid, "RDDS80 target"     , "rsm.rdds.80.target"    , 0, status, 1, "1"));
 #undef SQL
 
 #define SQL	"insert into items_applications set itemappid=" ZBX_FS_UI64 ",applicationid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64
@@ -5178,18 +5178,14 @@ static int	DBpatch_3000507(void)
 
 	result = DBselect("select"
 				" hosts.hostid,"
-				"interface.interfaceid,"
 				"applications.applicationid"
 			" from"
 				" hosts"
 				" left join hosts_templates on hosts_templates.hostid=hosts.hostid"
-				" left join interface on interface.hostid=hosts.hostid"
 				" left join applications on applications.hostid=hosts.hostid"
 				" left join application_template on application_template.applicationid=applications.applicationid"
 			" where"
 				" hosts_templates.templateid=" ZBX_FS_UI64 " and"
-				" interface.main=1 and"
-				" interface.type=1 and"
 				" application_template.templateid=" ZBX_FS_UI64,
 			templateid_template_rdap, template_applicationid_rdap);
 
@@ -5199,15 +5195,13 @@ static int	DBpatch_3000507(void)
 	while (NULL != (row = DBfetch(result)))
 	{
 		zbx_uint64_t	hostid;
-		zbx_uint64_t	interfaceid;
 		zbx_uint64_t	applicationid;
 		zbx_uint64_t	itemid_next;
 		zbx_uint64_t	itemid_rdap_target;
 		zbx_uint64_t	itemid_rdap_testedname;
 
 		ZBX_STR2UINT64(hostid, row[0]);
-		ZBX_STR2UINT64(interfaceid, row[1]);
-		ZBX_STR2UINT64(applicationid, row[2]);
+		ZBX_STR2UINT64(applicationid, row[1]);
 
 		itemid_next            = DBget_maxid_num("items", 2);
 		itemid_rdap_target     = itemid_next++;
@@ -5233,14 +5227,14 @@ static int	DBpatch_3000507(void)
 			"status,value_type,trapper_hosts,units,multiplier,delta,snmpv3_securityname,"			\
 			"snmpv3_securitylevel,snmpv3_authpassphrase,snmpv3_privpassphrase,formula,error,lastlogsize,"	\
 			"logtimefmt," ZBX_FS_UI64 ",valuemapid,delay_flex,params,ipmi_sensor,data_type,authtype,"	\
-			"username,password,publickey,privatekey,mtime,flags," ZBX_FS_UI64 ",port,description,"		\
+			"username,password,publickey,privatekey,mtime,flags,interfaceid,port,description,"		\
 			"inventory_link,lifetime,snmpv3_authprotocol,snmpv3_privprotocol,state,snmpv3_contextname,"	\
 			"evaltype"											\
 		" from items"												\
 		" where itemid=" ZBX_FS_UI64
-		CHECK(DBexecute(SQL, itemid_rdap_target, hostid, template_itemid_rdap_target, interfaceid,
+		CHECK(DBexecute(SQL, itemid_rdap_target, hostid, template_itemid_rdap_target,
 				template_itemid_rdap_target));
-		CHECK(DBexecute(SQL, itemid_rdap_testedname, hostid, template_itemid_rdap_testedname, interfaceid,
+		CHECK(DBexecute(SQL, itemid_rdap_testedname, hostid, template_itemid_rdap_testedname,
 				template_itemid_rdap_testedname));
 #undef SQL
 
@@ -5302,19 +5296,15 @@ static int	DBpatch_3000508(void)
 
 		result2 = DBselect("select"
 					" hosts.hostid,"
-					"interface.interfaceid,"
 					"app_rdds43.applicationid,"
 					"app_rdds80.applicationid"
 				" from"
 					" hosts"
 					" left join hosts_templates on hosts_templates.hostid=hosts.hostid"
-					" left join interface on interface.hostid=hosts.hostid"
 					" left join applications as app_rdds43 on app_rdds43.hostid=hosts.hostid"
 					" left join applications as app_rdds80 on app_rdds80.hostid=hosts.hostid"
 				" where"
 					" hosts_templates.templateid=" ZBX_FS_UI64 " and"
-					" interface.main=1 and"
-					" interface.type=1 and"
 					" app_rdds43.name='RDDS43' and"
 					" app_rdds80.name='RDDS80'",
 				template_hostid);
@@ -5325,7 +5315,6 @@ static int	DBpatch_3000508(void)
 		while (NULL != (row = DBfetch(result2)))
 		{
 			zbx_uint64_t	hostid;
-			zbx_uint64_t	interfaceid;
 			zbx_uint64_t	applicationid_rdds43;
 			zbx_uint64_t	applicationid_rdds80;
 			zbx_uint64_t	itemid_next;
@@ -5334,9 +5323,8 @@ static int	DBpatch_3000508(void)
 			zbx_uint64_t	itemid_rdds80_target;
 
 			ZBX_STR2UINT64(hostid, row[0]);
-			ZBX_STR2UINT64(interfaceid, row[1]);
-			ZBX_STR2UINT64(applicationid_rdds43, row[2]);
-			ZBX_STR2UINT64(applicationid_rdds80, row[3]);
+			ZBX_STR2UINT64(applicationid_rdds43, row[1]);
+			ZBX_STR2UINT64(applicationid_rdds80, row[2]);
 
 			itemid_next              = DBget_maxid_num("items", 3);
 			itemid_rdds43_target     = itemid_next++;
@@ -5363,16 +5351,16 @@ static int	DBpatch_3000508(void)
 			"status,value_type,trapper_hosts,units,multiplier,delta,snmpv3_securityname,"			\
 			"snmpv3_securitylevel,snmpv3_authpassphrase,snmpv3_privpassphrase,formula,error,lastlogsize,"	\
 			"logtimefmt," ZBX_FS_UI64 ",valuemapid,delay_flex,params,ipmi_sensor,data_type,authtype,"	\
-			"username,password,publickey,privatekey,mtime,flags," ZBX_FS_UI64 ",port,description,"		\
+			"username,password,publickey,privatekey,mtime,flags,interfaceid,port,description,"		\
 			"inventory_link,lifetime,snmpv3_authprotocol,snmpv3_privprotocol,state,snmpv3_contextname,"	\
 			"evaltype"											\
 		" from items"												\
 		" where itemid=" ZBX_FS_UI64
-		CHECK(DBexecute(SQL, itemid_rdds43_target, hostid, template_itemid_rdds43_target, interfaceid,
+		CHECK(DBexecute(SQL, itemid_rdds43_target, hostid, template_itemid_rdds43_target,
 				template_itemid_rdds43_target));
-		CHECK(DBexecute(SQL, itemid_rdds43_testedname, hostid, template_itemid_rdds43_testedname, interfaceid,
+		CHECK(DBexecute(SQL, itemid_rdds43_testedname, hostid, template_itemid_rdds43_testedname,
 				template_itemid_rdds43_testedname));
-		CHECK(DBexecute(SQL, itemid_rdds80_target, hostid, template_itemid_rdds80_target, interfaceid,
+		CHECK(DBexecute(SQL, itemid_rdds80_target, hostid, template_itemid_rdds80_target,
 				template_itemid_rdds80_target));
 #undef SQL
 
