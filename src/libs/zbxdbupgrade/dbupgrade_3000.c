@@ -5159,6 +5159,7 @@ static int	DBpatch_3000506(void)
 	ret = SUCCEED;
 out:
 	DBfree_result(result);
+
 	return ret;
 }
 
@@ -5248,6 +5249,8 @@ static int	DBpatch_3000507(void)
 
 	ret = SUCCEED;
 out:
+	DBfree_result(result);
+
 	return ret;
 }
 
@@ -5379,8 +5382,8 @@ static int	DBpatch_3000508(void)
 
 	ret = SUCCEED;
 out:
-	DBfree_result(result);
 	DBfree_result(result2);
+	DBfree_result(result);
 	return ret;
 }
 
