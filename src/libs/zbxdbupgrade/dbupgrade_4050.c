@@ -1835,7 +1835,7 @@ static int	DBpatch_4050510(void)
 				"{$RSM.RDDS.TESTPREFIX},{$RSM.RDDS.NS.STRING},{$RSM.RDDS.ENABLED},"
 				"{$RSM.TLD.RDDS.ENABLED},{$RSM.EPP.ENABLED},{$RSM.TLD.EPP.ENABLED},{$RSM.IP4.ENABLED},"
 				"{$RSM.IP6.ENABLED},{$RSM.RESOLVER},{$RSM.RDDS.RTT.HIGH},{$RSM.RDDS.MAXREDIRS}]",
-			"1m", "0", "0", 4, (zbx_uint64_t)0,
+			"{$RSM.RDDS.DELAY}", "0", "0", 4, (zbx_uint64_t)0,
 			"Master item that performs the RDDS test and generates JSON with results. This JSON will be"
 				" parsed by dependent items. History must be disabled.",
 			(zbx_uint64_t)0));
