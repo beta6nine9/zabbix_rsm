@@ -3445,10 +3445,9 @@ static void	create_rsm_rdds_json(struct zbx_json *json, const char *ip43, int rt
 
 	zbx_json_addobject(json, "rdds80");
 
+	zbx_json_addint64(json, "rtt", rtt80);
 	if (NULL != ip80)
 		zbx_json_addstring(json, "ip", ip80, ZBX_JSON_TYPE_STRING);
-	if (ZBX_NO_VALUE != rtt80)
-		zbx_json_addint64(json, "rtt", rtt80);
 
 	zbx_json_close(json);
 
@@ -3553,7 +3552,7 @@ int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	if (14 != request->nparam)
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "item must contain 14 parameters"));
-		return ret;
+		return SYSINFO_RET_FAIL;
 	}
 
 	domain = get_rparam(request, 0);			/* TLD for log file name, e.g. ".cz" */
