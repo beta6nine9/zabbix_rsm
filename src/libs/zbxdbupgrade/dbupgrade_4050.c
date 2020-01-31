@@ -61,9 +61,10 @@ while (0)
 															\
 do															\
 {															\
-	int	__result = (CODE);												\
+	int	__result = (CODE);											\
 	if (SUCCEED != __result)											\
 	{														\
+		zabbix_log(LOG_LEVEL_CRIT, "%s() on line %d: got unexpected result", __func__, __LINE__);		\
 		goto out;												\
 	}														\
 }															\
@@ -74,9 +75,10 @@ while (0)
 															\
 do															\
 {															\
-	int	__result = (CODE);												\
+	int	__result = (CODE);											\
 	if (ZBX_DB_OK > __result)											\
 	{														\
+		zabbix_log(LOG_LEVEL_CRIT, "%s() on line %d: got unexpected result", __func__, __LINE__);		\
 		goto out;												\
 	}														\
 }															\
@@ -95,6 +97,7 @@ do															\
 	/* check for errors */												\
 	if (NULL == __result)												\
 	{														\
+		zabbix_log(LOG_LEVEL_CRIT, "%s() on line %d: query failed", __func__, __LINE__);			\
 		goto out;												\
 	}														\
 															\
@@ -103,6 +106,7 @@ do															\
 	/* check if there's at least one row in the resultset */							\
 	if (NULL == __row)												\
 	{														\
+		zabbix_log(LOG_LEVEL_CRIT, "%s() on line %d: query did not return any rows", __func__, __LINE__);	\
 		DBfree_result(__result);										\
 		goto out;												\
 	}														\
@@ -114,6 +118,7 @@ do															\
 	/* check that there are no more rows in the resultset */							\
 	if (NULL != __row)												\
 	{														\
+		zabbix_log(LOG_LEVEL_CRIT, "%s() on line %d: query returned more than one row", __func__, __LINE__);	\
 		DBfree_result(__result);										\
 		goto out;												\
 	}														\
@@ -126,12 +131,40 @@ while (0)
 #define GET_TEMPLATE_ID(hostid, template_host)										\
 		SELECT_VALUE_UINT64(hostid, "select hostid from hosts where host='%s' and status=3", template_host)
 
-/* gets itemid of the template's item, status=3 = HOST_STATUS_TEMPLATE */
+/* gets applicationid of the template's application, host.status=3 = HOST_STATUS_TEMPLATE */
+#define GET_TEMPLATE_APPLICATION_ID(applicationid, template_host, application_name)					\
+		SELECT_VALUE_UINT64(											\
+				applicationid,										\
+				"select"										\
+					" applications.applicationid"							\
+				" from"											\
+					" applications"									\
+					" left join hosts on hosts.hostid=applications.hostid"				\
+				" where"										\
+					" hosts.host='%s' and"								\
+					" hosts.status=3 and"								\
+					" applications.name='%s'",							\
+				template_host, application_name)							\
+
+/* gets applicationid of the host's application */
+#define GET_HOST_APPLICATION_ID(applicationid, host_id, application_name)						\
+		SELECT_VALUE_UINT64(											\
+				applicationid,										\
+				"select"										\
+					" applicationid"								\
+				" from"											\
+					" applications"									\
+				" where"										\
+					" hostid=" ZBX_FS_UI64 " and"							\
+					" name='%s'",									\
+				host_id, application_name)								\
+
+/* gets itemid of the template's item, host.status=3 = HOST_STATUS_TEMPLATE */
 #define GET_TEMPLATE_ITEM_ID(itemid, template_host, item_key)								\
 		SELECT_VALUE_UINT64(											\
 				itemid,											\
 				"select"										\
-					" itemid"									\
+					" items.itemid"									\
 				" from"											\
 					" items"									\
 					" left join hosts on hosts.hostid=items.hostid"					\
@@ -141,12 +174,12 @@ while (0)
 					" items.key_='%s'",								\
 				template_host, item_key)
 
-/* gets itemid of the template's item, status=3 = HOST_STATUS_TEMPLATE */
+/* gets itemid of the template's item, host.status=3 = HOST_STATUS_TEMPLATE */
 #define GET_TEMPLATE_ITEM_ID_BY_PATTERN(itemid, template_host, item_key_pattern)					\
 		SELECT_VALUE_UINT64(											\
 				itemid,											\
 				"select"										\
-					" itemid"									\
+					" items.itemid"									\
 				" from"											\
 					" items"									\
 					" left join hosts on hosts.hostid=items.hostid"					\
@@ -155,6 +188,32 @@ while (0)
 					" hosts.status=3 and"								\
 					" items.key_ like '%s'",							\
 				template_host, item_key_pattern)
+
+/* gets itemid of the host's item */
+#define GET_HOST_ITEM_ID(itemid, host_id, item_key)									\
+		SELECT_VALUE_UINT64(											\
+				itemid,											\
+				"select"										\
+					" itemid"									\
+				" from"											\
+					" items"									\
+				" where"										\
+					" hostid=" ZBX_FS_UI64 " and"							\
+					" key_='%s'",									\
+				host_id, item_key)
+
+/* gets itemid of the host's item */
+#define GET_HOST_ITEM_ID_BY_PATTERN(itemid, host_id, item_key_pattern)							\
+		SELECT_VALUE_UINT64(											\
+				itemid,											\
+				"select"										\
+					" itemid"									\
+				" from"											\
+					" items"									\
+				" where"										\
+					" hostid=" ZBX_FS_UI64 " and"							\
+					" key_ like '%s'",									\
+				host_id, item_key_pattern)
 
 /* gets valuemapid of the value map */
 #define GET_VALUE_MAP_ID(valuemapid, name)										\
@@ -1179,9 +1238,8 @@ static int	DBpatch_4050506_create_item(zbx_uint64_t *new_itemid, zbx_uint64_t te
 		zbx_uint64_t interfaceid, zbx_uint64_t master_itemid, zbx_uint64_t applicationid)
 {
 	int		ret = FAIL;
-	zbx_uint64_t	itemid;
 
-	itemid = DBget_maxid_num("items", 1);
+	*new_itemid = DBget_maxid_num("items", 1);
 
 	CHECK(DBexecute("insert into items (itemid,type,snmp_community,snmp_oid,hostid,name,key_,delay,history,"
 				"trends,status,value_type,trapper_hosts,units,snmpv3_securityname,snmpv3_securitylevel,"
@@ -1206,23 +1264,18 @@ static int	DBpatch_4050506_create_item(zbx_uint64_t *new_itemid, zbx_uint64_t te
 				"allow_traps"
 			" from items"
 			" where itemid=" ZBX_FS_UI64,
-			itemid, hostid, templateid, interfaceid, master_itemid, templateid));
+			*new_itemid, hostid, templateid, interfaceid, master_itemid, templateid));
 
 	if (0 != applicationid)
 	{
 		CHECK(DBexecute("insert into items_applications set"
 				" itemappid=" ZBX_FS_UI64 ",applicationid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64,
-				DBget_maxid_num("items_applications", 1), applicationid, itemid));
+				DBget_maxid_num("items_applications", 1), applicationid, *new_itemid));
 	}
 
-	CHECK_RESULT(DBpatch_4050506_copy_preproc(templateid, itemid, NULL));
+	CHECK_RESULT(DBpatch_4050506_copy_preproc(templateid, *new_itemid, NULL));
 
-	CHECK_RESULT(DBpatch_4050506_copy_lld_macros(templateid, itemid));
-
-	if (NULL != new_itemid)
-	{
-		*new_itemid = itemid;
-	}
+	CHECK_RESULT(DBpatch_4050506_copy_lld_macros(templateid, *new_itemid));
 
 	ret = SUCCEED;
 out:
@@ -1382,9 +1435,8 @@ static int	DBpatch_4050506(void)
 {
 	int		ret = FAIL;
 
-	DB_RESULT	result_hostid;
-	DB_RESULT	result;
-	DB_ROW		row_hostid;
+	DB_RESULT	result_hostid = NULL;
+	DB_RESULT	result = NULL;
 	DB_ROW		row;
 
 	zbx_uint64_t	groupid_tld_probe_resluts;			/* groupid of "TLD Probe results" host group */
@@ -1410,12 +1462,8 @@ static int	DBpatch_4050506(void)
 	GET_HOST_GROUP_ID(groupid_tld_probe_resluts, "TLD Probe results");
 	GET_TEMPLATE_ID(hostid_template_dns_test, "Template DNS Test");
 
-	SELECT_VALUE_UINT64(template_applicationid_dns,
-			"select applicationid from applications where hostid=" ZBX_FS_UI64 " and name='DNS'",
-			hostid_template_dns_test);
-	SELECT_VALUE_UINT64(template_applicationid_dnssec,
-			"select applicationid from applications where hostid=" ZBX_FS_UI64 " and name='DNSSEC'",
-			hostid_template_dns_test);
+	GET_TEMPLATE_APPLICATION_ID(template_applicationid_dns   , "Template DNS Test", "DNS");
+	GET_TEMPLATE_APPLICATION_ID(template_applicationid_dnssec, "Template DNS Test", "DNSSEC");
 
 	GET_TEMPLATE_ITEM_ID(template_itemid_dnssec_enabled        , "Template DNS Test", "dnssec.enabled");
 	GET_TEMPLATE_ITEM_ID_BY_PATTERN(template_itemid_rsm_dns    , "Template DNS Test", "rsm.dns[%]");
@@ -1429,12 +1477,22 @@ static int	DBpatch_4050506(void)
 	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_dns_mode          , "Template DNS Test", "rsm.dns.mode");
 	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_dns_protocol      , "Template DNS Test", "rsm.dns.protocol");
 
-	result_hostid = DBselect("select hostid from hosts_groups where groupid=" ZBX_FS_UI64, groupid_tld_probe_resluts);
+	result_hostid = DBselect("select"
+				" hosts_groups.hostid,"
+				"interface.interfaceid"
+			" from"
+				" hosts_groups"
+				" left join interface on interface.hostid=hosts_groups.hostid"
+			" where"
+				" hosts_groups.groupid=" ZBX_FS_UI64 " and"
+				" interface.main=1 and"			/* INTERFACE_PRIMARY */
+				" interface.type=1",			/* INTERFACE_TYPE_AGENT */
+			groupid_tld_probe_resluts);
 
 	if (NULL == result_hostid)
 		goto out;
 
-	while (NULL != (row_hostid = DBfetch(result_hostid)))
+	while (NULL != (row = DBfetch(result_hostid)))
 	{
 		zbx_uint64_t	hostid;					/* hostid of "<rsmhost> <probe>" host */
 		zbx_uint64_t	interfaceid;				/* interfaceid for items in "<rsmhost> <probe>" host */
@@ -1442,23 +1500,20 @@ static int	DBpatch_4050506(void)
 		zbx_uint64_t	applicationid_dns;			/* applicationid of "DNS" application */
 		zbx_uint64_t	applicationid_dnssec;			/* applicationid of "DNSSEC" application */
 
-		zbx_uint64_t	itemid_dnssec_enabled;			/* itemid of "DNSSEC enabled/disabled" item in "Template DNS Test" template */
-		zbx_uint64_t	itemid_rsm_dns;				/* itemid of "DNS Test" item in "Template DNS Test" template */
-		zbx_uint64_t	itemid_rsm_dns_ns_discovery;		/* itemid of "Name Servers discovery" item in "Template DNS Test" template */
-		zbx_uint64_t	itemid_rsm_dns_nsip_discovery;		/* itemid of "NS-IP pairs discovery" item in "Template DNS Test" template */
-		zbx_uint64_t	prototype_itemid_rsm_dns_ns_status;	/* itemid of "Status of $1" item prototype in "Template DNS Test" template */
-		zbx_uint64_t	prototype_itemid_rsm_dns_nsid;		/* itemid of "NSID of $1,$2" item prototype in "Template DNS Test" template */
-		zbx_uint64_t	prototype_itemid_rsm_dns_rtt_tcp;	/* itemid of "RTT of $1,$2 using $3" item prototype in "Template DNS Test" template */
-		zbx_uint64_t	prototype_itemid_rsm_dns_rtt_udp;	/* itemid of "RTT of $1,$2 using $3" item prototype in "Template DNS Test" template */
-		zbx_uint64_t	itemid_rsm_dns_mode;			/* itemid of "The mode of the Test" item prototype in "Template DNS Test" template */
-		zbx_uint64_t	itemid_rsm_dns_protocol;		/* itemid of "Transport protocol of the Test" item prototype in "Template DNS Test" template */
-		zbx_uint64_t	itemid_rsm_dns_nssok;			/* itemid of "Number of working Name Servers" item in "Template DNS Test" template */
+		zbx_uint64_t	itemid_dnssec_enabled;			/* itemid of "DNSSEC enabled/disabled" item */
+		zbx_uint64_t	itemid_rsm_dns;				/* itemid of "DNS Test" item */
+		zbx_uint64_t	itemid_rsm_dns_ns_discovery;		/* itemid of "Name Servers discovery" item */
+		zbx_uint64_t	itemid_rsm_dns_nsip_discovery;		/* itemid of "NS-IP pairs discovery" item */
+		zbx_uint64_t	prototype_itemid_rsm_dns_ns_status;	/* itemid of "Status of $1" item prototype */
+		zbx_uint64_t	prototype_itemid_rsm_dns_nsid;		/* itemid of "NSID of $1,$2" item prototype */
+		zbx_uint64_t	prototype_itemid_rsm_dns_rtt_tcp;	/* itemid of "RTT of $1,$2 using $3" item prototype */
+		zbx_uint64_t	prototype_itemid_rsm_dns_rtt_udp;	/* itemid of "RTT of $1,$2 using $3" item prototype */
+		zbx_uint64_t	itemid_rsm_dns_mode;			/* itemid of "The mode of the Test" item prototype */
+		zbx_uint64_t	itemid_rsm_dns_protocol;		/* itemid of "Transport protocol of the Test" item prototype */
+		zbx_uint64_t	itemid_rsm_dns_nssok;			/* itemid of "Number of working Name Servers" item */
 
-		ZBX_STR2UINT64(hostid, row_hostid[0]);
-
-		/* main=INTERFACE_PRIMARY, type=INTERFACE_TYPE_AGENT */
-		SELECT_VALUE_UINT64(interfaceid, "select interfaceid from interface"
-				" where hostid=" ZBX_FS_UI64 " and main=1 and type=1", hostid);
+		ZBX_STR2UINT64(hostid, row[0]);
+		ZBX_STR2UINT64(interfaceid, row[1]);
 
 		/* link "Template DNS Test" template to the host */
 		CHECK(DBexecute("insert into hosts_templates set"
@@ -1751,6 +1806,7 @@ static int	DBpatch_4050510(void)
 
 	zbx_uint64_t	groupid_templates;		/* groupid of "Templates" host group */
 	zbx_uint64_t	valuemapid_rsm_rdds_rtt;	/* valuemapid of "RSM RDDS rtt" value map */
+	zbx_uint64_t	valuemapid_rsm_rdds_result;	/* valuemapid of "RSM RDDS result" value map */                 /* TODO: check the name of the valuemap */
 
 	zbx_uint64_t	hostid;				/* hostid of "Template RDDS Test" template */
 
@@ -1761,16 +1817,17 @@ static int	DBpatch_4050510(void)
 
 	zbx_uint64_t	itemid_next;
 	zbx_uint64_t	itemid_rsm_rdds;		/* itemid of "rsm.rdds[]" item */
-	zbx_uint64_t	itemid_rsm_rdds_43_ip;		/* itemid of "rsm.rdds.43.ip" item */
-	zbx_uint64_t	itemid_rsm_rdds_43_rtt;		/* itemid of "rsm.rdds.43.rtt" item */
-	zbx_uint64_t	itemid_rsm_rdds_43_upd;		/* itemid of "rsm.rdds.43.upd" item */
-	zbx_uint64_t	itemid_rsm_rdds_80_ip;		/* itemid of "rsm.rdds.80.ip" item */
-	zbx_uint64_t	itemid_rsm_rdds_80_rtt;		/* itemid of "rsm.rdds.80.rtt" item */
+	zbx_uint64_t	itemid_rsm_rdds_status;		/* itemid of "rsm.rdds.status" item */                          /* TODO: check key, variable's name */
+	zbx_uint64_t	itemid_rsm_rdds43_ip;		/* itemid of "rsm.rdds.43.ip" item */
+	zbx_uint64_t	itemid_rsm_rdds43_rtt;		/* itemid of "rsm.rdds.43.rtt" item */
+	zbx_uint64_t	itemid_rsm_rdds80_ip;		/* itemid of "rsm.rdds.80.ip" item */
+	zbx_uint64_t	itemid_rsm_rdds80_rtt;		/* itemid of "rsm.rdds.80.rtt" item */
 
 	ONLY_SERVER();
 
 	GET_HOST_GROUP_ID(groupid_templates, "Templates");
 	GET_VALUE_MAP_ID(valuemapid_rsm_rdds_rtt, "RSM RDDS rtt");
+	GET_VALUE_MAP_ID(valuemapid_rsm_rdds_result, "RSM RDDS result");                                                /* TODO: check the name of the valuemap */
 
 	hostid = DBget_maxid_num("hosts", 1);
 
@@ -1781,11 +1838,11 @@ static int	DBpatch_4050510(void)
 
 	itemid_next            = DBget_maxid_num("items", 6);
 	itemid_rsm_rdds        = itemid_next++;
-	itemid_rsm_rdds_43_ip  = itemid_next++;
-	itemid_rsm_rdds_43_rtt = itemid_next++;
-	itemid_rsm_rdds_43_upd = itemid_next++;
-	itemid_rsm_rdds_80_ip  = itemid_next++;
-	itemid_rsm_rdds_80_rtt = itemid_next++;
+	itemid_rsm_rdds_status = itemid_next++;
+	itemid_rsm_rdds43_ip   = itemid_next++;
+	itemid_rsm_rdds43_rtt  = itemid_next++;
+	itemid_rsm_rdds80_ip   = itemid_next++;
+	itemid_rsm_rdds80_rtt  = itemid_next++;
 
 	/* status 3 = HOST_STATUS_TEMPLATE */
 	CHECK(DBexecute("insert into hosts set hostid=" ZBX_FS_UI64 ",created=0,proxy_hostid=NULL,host='%s',status=%d,"
@@ -1824,6 +1881,7 @@ static int	DBpatch_4050510(void)
 	/* type 18 = ITEM_TYPE_DEPENDENT */
 	/* value_type 0 = ITEM_VALUE_TYPE_FLOAT */
 	/* value_type 1 = ITEM_VALUE_TYPE_STR */
+	/* value_type 3 = ITEM_VALUE_TYPE_UINT64 */
 	/* value_type 4 = ITEM_VALUE_TYPE_TEXT */
 	/* CHECK(DBexecute(SQL, itemid, type, hostid, name,		*/
 	/* 		key,						*/
@@ -1839,27 +1897,27 @@ static int	DBpatch_4050510(void)
 			"Master item that performs the RDDS test and generates JSON with results. This JSON will be"
 				" parsed by dependent items. History must be disabled.",
 			(zbx_uint64_t)0));
-	CHECK(DBexecute(SQL, itemid_rsm_rdds_43_ip, 18, hostid, "RDDS43 IP",
+	CHECK(DBexecute(SQL, itemid_rsm_rdds_status, 18, hostid, "RDDS status",                                         /* TODO: check values */
+			"rsm.rdds.status",                                                                              /* TODO: check values */
+			"0", "90d", "0", 3, valuemapid_rsm_rdds_result,                                                 /* TODO: check values */
+			"Status of the RDDS",                                                                           /* TODO: check values */
+			itemid_rsm_rdds));                                                                              /* TODO: check values */
+	CHECK(DBexecute(SQL, itemid_rsm_rdds43_ip, 18, hostid, "RDDS43 IP",
 			"rsm.rdds.43.ip",
 			"0", "90d", "0", 1, (zbx_uint64_t)0,
 			"IP address for RDDS43 test",
 			itemid_rsm_rdds));
-	CHECK(DBexecute(SQL, itemid_rsm_rdds_43_rtt, 18, hostid, "RDDS43 RTT",
+	CHECK(DBexecute(SQL, itemid_rsm_rdds43_rtt, 18, hostid, "RDDS43 RTT",
 			"rsm.rdds.43.rtt",
 			"0", "90d", "365d", 0, valuemapid_rsm_rdds_rtt,
 			"RTT value for RDDS43 test",
 			itemid_rsm_rdds));
-	CHECK(DBexecute(SQL, itemid_rsm_rdds_43_upd, 18, hostid, "RDDS43 update time",
-			"rsm.rdds.43.upd",
-			"0", "90d", "365d", 0, (zbx_uint64_t)0,
-			"Update time for RDDS43 test",
-			itemid_rsm_rdds));
-	CHECK(DBexecute(SQL, itemid_rsm_rdds_80_ip, 18, hostid, "RDDS80 IP",
+	CHECK(DBexecute(SQL, itemid_rsm_rdds80_ip, 18, hostid, "RDDS80 IP",
 			"rsm.rdds.80.ip",
 			"0", "90d", "0", 1, (zbx_uint64_t)0,
 			"IP address for RDDS80 test",
 			itemid_rsm_rdds));
-	CHECK(DBexecute(SQL, itemid_rsm_rdds_80_rtt, 18, hostid, "RDDS80 RTT",
+	CHECK(DBexecute(SQL, itemid_rsm_rdds80_rtt, 18, hostid, "RDDS80 RTT",
 			"rsm.rdds.80.rtt",
 			"0", "90d", "365d", 0, valuemapid_rsm_rdds_rtt,
 			"RTT value for RDDS80 test",
@@ -1868,22 +1926,22 @@ static int	DBpatch_4050510(void)
 
 #define SQL	"insert into items_applications set itemappid=" ZBX_FS_UI64 ",applicationid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64
 	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds  , itemid_rsm_rdds));
-	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds43, itemid_rsm_rdds_43_ip));
-	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds43, itemid_rsm_rdds_43_rtt));
-	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds43, itemid_rsm_rdds_43_upd));
-	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds80, itemid_rsm_rdds_80_ip));
-	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds80, itemid_rsm_rdds_80_rtt));
+	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds  , itemid_rsm_rdds_status));  /* TODO: check applicationid */
+	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds43, itemid_rsm_rdds43_ip));
+	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds43, itemid_rsm_rdds43_rtt));
+	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds80, itemid_rsm_rdds80_ip));
+	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds80, itemid_rsm_rdds80_rtt));
 #undef SQL
 
 #define SQL	"insert into item_preproc set"										\
 		" item_preprocid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ",step=%d,type=%d,params='%s',"			\
 		"error_handler=%d,error_handler_params=''"
 	/* type 12 = ZBX_PREPROC_JSONPATH */
-	CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_rdds_43_ip , 1, 12, "$.rdds43.ip" , 1));
-	CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_rdds_43_rtt, 1, 12, "$.rdds43.rtt", 1));
-	CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_rdds_43_upd, 1, 12, "$.rdds43.upd", 1));
-	CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_rdds_80_ip , 1, 12, "$.rdds80.ip" , 1));
-	CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_rdds_80_rtt, 1, 12, "$.rdds80.rtt", 1));
+	CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_rdds_status, 1, 12, "$.status"    , 0));    /* TODO: check values */
+	CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_rdds43_ip  , 1, 12, "$.rdds43.ip" , 1));
+	CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_rdds43_rtt , 1, 12, "$.rdds43.rtt", 0));
+	CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_rdds80_ip  , 1, 12, "$.rdds80.ip" , 1));
+	CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_rdds80_rtt , 1, 12, "$.rdds80.rtt", 0));
 #undef SQL
 
 	ret = SUCCEED;
@@ -2096,7 +2154,7 @@ static int	DBpatch_4050513(void)
 	ONLY_SERVER();
 
 	/* 4 = ITEM_VALUE_TYPE_TEXT */
-	CHECK(DBexecute("update items set name='RDAP Test',value_type='4',history='0',trends='0'"
+	CHECK(DBexecute("update items set name='RDAP Test',value_type=4,history='0',trends='0'"
 			" where key_ like 'rdap[%%'"));
 
 	ret = SUCCEED;
@@ -2148,7 +2206,7 @@ static int	db_insert_rdap_item_preproc(const char *item_key, const char *item_pr
 	{
 		/* 12 = ZBX_PREPROC_JSONPATH */
 		CHECK(DBexecute("insert into item_preproc set item_preprocid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ","
-				"step=1,type=12,params='%s',error_handler='0'",
+				"step=1,type=12,params='%s',error_handler=0",
 				item_preprocid_next, rdap_itemids.values[i], item_preproc_param));
 		item_preprocid_next++;
 	}
@@ -2781,6 +2839,180 @@ out:
 	return ret;
 }
 
+static int	DBpatch_4050519(void)
+{
+	int		ret = FAIL;
+
+	DB_RESULT	result = NULL;
+	DB_ROW		row;
+
+	zbx_uint64_t	groupid_tld_probe_resluts;			/* groupid of "TLD Probe results" host group */
+	zbx_uint64_t	hostid_template_rdds_test;			/* hostid of "Template RDDS Test" template */
+
+	zbx_uint64_t	template_applicationid_rdds;			/* applicationid of "RDDS" application in "Template RDDS Test" template */
+	zbx_uint64_t	template_applicationid_rdds43;			/* applicationid of "RDDS43" application in "Template RDDS Test" template */
+	zbx_uint64_t	template_applicationid_rdds80;			/* applicationid of "RDDS80" application in "Template RDDS Test" template */
+
+	zbx_uint64_t	template_itemid_rsm_rdds;			/* itemid of "RDDS Test" item in "Template RDDS Test" template */
+	zbx_uint64_t	template_itemid_rsm_rdds_status;		/* itemid of "RDDS Status" item in "Template RDDS Test" template */            /* TODO: check item's name */
+	zbx_uint64_t	template_itemid_rsm_rdds43_ip;			/* itemid of "RDDS43 IP" item in "Template RDDS Test" template */
+	zbx_uint64_t	template_itemid_rsm_rdds43_rtt;			/* itemid of "RDDS43 RTT" item in "Template RDDS Test" template */
+	zbx_uint64_t	template_itemid_rsm_rdds80_ip;			/* itemid of "RDDS80 IP" item in "Template RDDS Test" template */
+	zbx_uint64_t	template_itemid_rsm_rdds80_rtt;			/* itemid of "RDDS80 RTT" item in "Template RDDS Test" template */
+
+	ONLY_SERVER();
+
+	GET_HOST_GROUP_ID(groupid_tld_probe_resluts, "TLD Probe results");
+	GET_TEMPLATE_ID(hostid_template_rdds_test, "Template RDDS Test");
+
+	GET_TEMPLATE_APPLICATION_ID(template_applicationid_rdds  , "Template RDDS Test", "RDDS");
+	GET_TEMPLATE_APPLICATION_ID(template_applicationid_rdds43, "Template RDDS Test", "RDDS43");
+	GET_TEMPLATE_APPLICATION_ID(template_applicationid_rdds80, "Template RDDS Test", "RDDS80");
+
+	GET_TEMPLATE_ITEM_ID_BY_PATTERN(template_itemid_rsm_rdds, "Template RDDS Test", "rsm.rdds[%]");
+	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_rdds_status, "Template RDDS Test", "rsm.rdds.status");                 /* TODO: check values */
+	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_rdds43_ip  , "Template RDDS Test", "rsm.rdds.43.ip");
+	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_rdds43_rtt , "Template RDDS Test", "rsm.rdds.43.rtt");
+	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_rdds80_ip  , "Template RDDS Test", "rsm.rdds.80.ip");
+	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_rdds80_rtt , "Template RDDS Test", "rsm.rdds.80.rtt");
+
+	result = DBselect("select"
+				" hosts_groups.hostid,"
+				"interface.interfaceid,"
+				"items.status"
+			" from"
+				" hosts_groups"
+				" left join interface on interface.hostid=hosts_groups.hostid"
+				" left join items on items.hostid=hosts_groups.hostid"
+			" where"
+				" hosts_groups.groupid=" ZBX_FS_UI64 " and"
+				" interface.main=1 and"			/* INTERFACE_PRIMARY */
+				" interface.type=1 and"			/* INTERFACE_TYPE_AGENT */
+				" items.key_ like 'rsm.rdds[%%]'",
+			groupid_tld_probe_resluts);
+
+	if (NULL == result)
+		goto out;
+
+	while (NULL != (row = DBfetch(result)))
+	{
+		zbx_uint64_t	hostid;					/* hostid of "<rsmhost> <probe>" host */
+		zbx_uint64_t	interfaceid;				/* interfaceid for items in "<rsmhost> <probe>" host */
+		const char	*status;				/* status of the tests (enabled/disabled) */
+
+		zbx_uint64_t	applicationid_rdds;			/* applicationid of "RDDS" aplication */
+		zbx_uint64_t	applicationid_rdds43;			/* applicationid of "RDDS43" application */
+		zbx_uint64_t	applicationid_rdds80;			/* applicationid of "RDDS80" application */
+
+		zbx_uint64_t	itemid_rsm_rdds;			/* itemid of "RDDS Test" item */
+		zbx_uint64_t	itemid_rsm_rdds_status;			/* itemid of "RDDS Status" item */              /* TODO: check item's name */
+		zbx_uint64_t	itemid_rsm_rdds43_ip;			/* itemid of "RDDS43 IP" item */
+		zbx_uint64_t	itemid_rsm_rdds43_rtt;			/* itemid of "RDDS43 RTT" item */
+		zbx_uint64_t	itemid_rsm_rdds80_ip;			/* itemid of "RDDS80 IP" item */
+		zbx_uint64_t	itemid_rsm_rdds80_rtt;			/* itemid of "RDDS80 RTT" item */
+
+		ZBX_STR2UINT64(hostid, row[0]);
+		ZBX_STR2UINT64(interfaceid, row[1]);
+		status = row[2];
+
+		GET_HOST_APPLICATION_ID(applicationid_rdds  , hostid, "RDDS");
+		GET_HOST_APPLICATION_ID(applicationid_rdds43, hostid, "RDDS43");
+		GET_HOST_APPLICATION_ID(applicationid_rdds80, hostid, "RDDS80");
+
+		GET_HOST_ITEM_ID_BY_PATTERN(itemid_rsm_rdds_status, hostid, "rsm.rdds[%]");
+		GET_HOST_ITEM_ID(itemid_rsm_rdds43_ip , hostid, "rsm.rdds.43.ip[{$RSM.TLD}]");
+		GET_HOST_ITEM_ID(itemid_rsm_rdds43_rtt, hostid, "rsm.rdds.43.rtt[{$RSM.TLD}]");
+		GET_HOST_ITEM_ID(itemid_rsm_rdds80_ip , hostid, "rsm.rdds.80.ip[{$RSM.TLD}]");
+		GET_HOST_ITEM_ID(itemid_rsm_rdds80_rtt, hostid, "rsm.rdds.80.rtt[{$RSM.TLD}]");
+
+		/* link "Template RDDS Test" template to the host */
+		CHECK(DBexecute("insert into hosts_templates set"
+				" hosttemplateid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",templateid=" ZBX_FS_UI64,
+				DBget_maxid_num("hosts_templates", 1), hostid, hostid_template_rdds_test));
+
+		/* link applications to the template */
+#define SQL	"insert into application_template set"									\
+		" application_templateid=" ZBX_FS_UI64 ",applicationid=" ZBX_FS_UI64 ",templateid=" ZBX_FS_UI64
+		CHECK(DBexecute(SQL, DBget_maxid_num("application_template", 1), applicationid_rdds  , template_applicationid_rdds));
+		CHECK(DBexecute(SQL, DBget_maxid_num("application_template", 1), applicationid_rdds43, template_applicationid_rdds43));
+		CHECK(DBexecute(SQL, DBget_maxid_num("application_template", 1), applicationid_rdds80, template_applicationid_rdds80));
+#undef SQL
+
+		itemid_rsm_rdds = DBget_maxid_num("items", 1);
+
+		CHECK(DBexecute("insert into items (itemid,type,snmp_community,snmp_oid,hostid,name,key_,delay,"
+					"history,trends,status,value_type,trapper_hosts,units,snmpv3_securityname,"
+					"snmpv3_securitylevel,snmpv3_authpassphrase,snmpv3_privpassphrase,formula,"
+					"logtimefmt,templateid,valuemapid,params,ipmi_sensor,authtype,username,"
+					"password,publickey,privatekey,flags,interfaceid,port,description,"
+					"inventory_link,lifetime,snmpv3_authprotocol,snmpv3_privprotocol,"
+					"snmpv3_contextname,evaltype,jmx_endpoint,master_itemid,timeout,url,"
+					"query_fields,posts,status_codes,follow_redirects,post_type,http_proxy,headers,"
+					"retrieve_mode,request_method,output_format,ssl_cert_file,ssl_key_file,"
+					"ssl_key_password,verify_peer,verify_host,allow_traps)"
+				" select"
+					" " ZBX_FS_UI64 ",type,snmp_community,snmp_oid," ZBX_FS_UI64 ",name,key_,delay,"
+					"history,trends,%s,value_type,trapper_hosts,units,snmpv3_securityname,"
+					"snmpv3_securitylevel,snmpv3_authpassphrase,snmpv3_privpassphrase,formula,"
+					"logtimefmt," ZBX_FS_UI64 ",valuemapid,params,ipmi_sensor,authtype,username,"
+					"password,publickey,privatekey,flags," ZBX_FS_UI64 ",port,description,"
+					"inventory_link,lifetime,snmpv3_authprotocol,snmpv3_privprotocol,"
+					"snmpv3_contextname,evaltype,jmx_endpoint,master_itemid,timeout,url,"
+					"query_fields,posts,status_codes,follow_redirects,post_type,http_proxy,headers,"
+					"retrieve_mode,request_method,output_format,ssl_cert_file,ssl_key_file,"
+					"ssl_key_password,verify_peer,verify_host,allow_traps"
+				" from items"
+				" where itemid=" ZBX_FS_UI64,
+				itemid_rsm_rdds, hostid, status, template_itemid_rsm_rdds, interfaceid, template_itemid_rsm_rdds));
+
+		CHECK(DBexecute("insert into items_applications set"
+					" itemappid=" ZBX_FS_UI64 ",applicationid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64,
+					DBget_maxid_num("items_applications", 1), applicationid_rdds, itemid_rsm_rdds));
+
+#define SQL	"update"												\
+			" items,"											\
+			"items as template"										\
+		" set"													\
+			" items.type=template.type,"									\
+			"items.name=template.name,"									\
+			"items.key_=template.key_,"									\
+			"items.delay=template.delay,"									\
+			"items.trends=template.trends,"									\
+			"items.templateid=template.itemid,"								\
+			"items.valuemapid=template.valuemapid,"								\
+			"items.interfaceid=template.interfaceid,"							\
+			"items.description=template.description,"							\
+			"items.master_itemid=" ZBX_FS_UI64 ","								\
+			"items.request_method=template.request_method"							\
+		" where"												\
+			" items.itemid=" ZBX_FS_UI64 " and"								\
+			" template.itemid=" ZBX_FS_UI64
+		CHECK(DBexecute(SQL, itemid_rsm_rdds, itemid_rsm_rdds_status, template_itemid_rsm_rdds_status));
+		CHECK(DBexecute(SQL, itemid_rsm_rdds, itemid_rsm_rdds43_ip  , template_itemid_rsm_rdds43_ip));
+		CHECK(DBexecute(SQL, itemid_rsm_rdds, itemid_rsm_rdds43_rtt , template_itemid_rsm_rdds43_rtt));
+		CHECK(DBexecute(SQL, itemid_rsm_rdds, itemid_rsm_rdds80_ip  , template_itemid_rsm_rdds80_ip));
+		CHECK(DBexecute(SQL, itemid_rsm_rdds, itemid_rsm_rdds80_rtt , template_itemid_rsm_rdds80_rtt));
+#undef SQL
+
+#define SQL	"insert into item_preproc (item_preprocid,itemid,step,type,params,error_handler,error_handler_params)"	\
+		"select " ZBX_FS_UI64 "," ZBX_FS_UI64 ",step,type,params,error_handler,error_handler_params"		\
+		" from item_preproc where itemid=" ZBX_FS_UI64
+		CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_rdds       , template_itemid_rsm_rdds));
+		CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_rdds_status, template_itemid_rsm_rdds_status));
+		CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_rdds43_ip  , template_itemid_rsm_rdds43_ip));
+		CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_rdds43_rtt , template_itemid_rsm_rdds43_rtt));
+		CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_rdds80_ip  , template_itemid_rsm_rdds80_ip));
+		CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_rdds80_rtt , template_itemid_rsm_rdds80_rtt));
+#undef SQL
+	}
+
+	ret = SUCCEED;
+out:
+	DBfree_result(result);
+
+	return ret;
+}
+
 DBPATCH_START(4050)
 
 /* version, duplicates flag, mandatory flag */
@@ -2814,5 +3046,6 @@ DBPATCH_ADD(4050515, 0, 0)	/* add item_preproc to RDAP ip and rtt items */
 DBPATCH_ADD(4050516, 0, 0)	/* add "Template DNSSEC Status" template */
 DBPATCH_ADD(4050517, 0, 0)	/* add "Template RDAP Status" template */
 DBPATCH_ADD(4050518, 0, 0)	/* add "Template RDDS Status" template */
+DBPATCH_ADD(4050519, 0, 0)	/* convert hosts to use "Template RDDS Test" template */
 
 DBPATCH_END()
