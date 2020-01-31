@@ -57,7 +57,7 @@ do															\
 while (0)
 
 /* checks result of function that returns SUCCEED or FAIL */
-#define CHECK_RESULT(CODE)												\
+#define CHECK(CODE)												\
 															\
 do															\
 {															\
@@ -71,11 +71,11 @@ do															\
 while (0)
 
 /* checks result of DBexecute() */
-#define CHECK(CODE)													\
+#define DB_EXEC(...)													\
 															\
 do															\
 {															\
-	int	__result = (CODE);											\
+	int	__result = DBexecute(__VA_ARGS__);									\
 	if (ZBX_DB_OK > __result)											\
 	{														\
 		zabbix_log(LOG_LEVEL_CRIT, "%s() on line %d: got unexpected result", __func__, __LINE__);		\
@@ -349,11 +349,11 @@ static int	DBpatch_4050501(void)
 
 	/* 3 = ITEM_TYPE_SIMPLE */
 
-	CHECK(DBexecute("update items set delay='{$RSM.DNS.UDP.DELAY}' where key_ like 'rsm.dns.udp[%%' and type=3"));
-	CHECK(DBexecute("update items set delay='{$RSM.DNS.TCP.DELAY}' where key_ like 'rsm.dns.tcp[%%' and type=3"));
-	CHECK(DBexecute("update items set delay='{$RSM.RDDS.DELAY}' where key_ like 'rsm.rdds[%%' and type=3"));
-	CHECK(DBexecute("update items set delay='{$RSM.RDAP.DELAY}' where key_ like 'rdap[%%' and type=3"));
-	CHECK(DBexecute("update items set delay='{$RSM.EPP.DELAY}' where key_ like 'rsm.epp[%%' and type=3"));
+	DB_EXEC("update items set delay='{$RSM.DNS.UDP.DELAY}' where key_ like 'rsm.dns.udp[%%' and type=3");
+	DB_EXEC("update items set delay='{$RSM.DNS.TCP.DELAY}' where key_ like 'rsm.dns.tcp[%%' and type=3");
+	DB_EXEC("update items set delay='{$RSM.RDDS.DELAY}' where key_ like 'rsm.rdds[%%' and type=3");
+	DB_EXEC("update items set delay='{$RSM.RDAP.DELAY}' where key_ like 'rdap[%%' and type=3");
+	DB_EXEC("update items set delay='{$RSM.EPP.DELAY}' where key_ like 'rsm.epp[%%' and type=3");
 
 	ret = SUCCEED;
 out:
@@ -884,15 +884,15 @@ static int	DBpatch_4050504(void)
 	mappingid_transport_protocol_tcp = mappingid_next++;
 
 #define SQL	"insert into valuemaps set valuemapid=" ZBX_FS_UI64 ",name='%s'"
-	CHECK(DBexecute(SQL, valuemapid_dns_test_mode, "DNS test mode"));
-	CHECK(DBexecute(SQL, valuemapid_transport_protocol, "Transport protocol"));
+	DB_EXEC(SQL, valuemapid_dns_test_mode, "DNS test mode");
+	DB_EXEC(SQL, valuemapid_transport_protocol, "Transport protocol");
 #undef SQL
 
 #define SQL	"insert into mappings set mappingid=" ZBX_FS_UI64 ",valuemapid=" ZBX_FS_UI64 ",value='%s',newvalue='%s'"
-	CHECK(DBexecute(SQL, mappingid_dns_test_mode_normal, valuemapid_dns_test_mode, "0", "Normal"));
-	CHECK(DBexecute(SQL, mappingid_dns_test_mode_critical, valuemapid_dns_test_mode, "1", "Critical"));
-	CHECK(DBexecute(SQL, mappingid_transport_protocol_udp, valuemapid_transport_protocol, "0", "UDP"));
-	CHECK(DBexecute(SQL, mappingid_transport_protocol_tcp, valuemapid_transport_protocol, "1", "TCP"));
+	DB_EXEC(SQL, mappingid_dns_test_mode_normal, valuemapid_dns_test_mode, "0", "Normal");
+	DB_EXEC(SQL, mappingid_dns_test_mode_critical, valuemapid_dns_test_mode, "1", "Critical");
+	DB_EXEC(SQL, mappingid_transport_protocol_udp, valuemapid_transport_protocol, "0", "UDP");
+	DB_EXEC(SQL, mappingid_transport_protocol_tcp, valuemapid_transport_protocol, "1", "TCP");
 #undef SQL
 
 	ret = SUCCEED;
@@ -959,7 +959,7 @@ static int	DBpatch_4050505(void)
 	itemid_rsm_dns_protocol       = itemid_next++;
 
 	/* status 3 = HOST_STATUS_TEMPLATE */
-	CHECK(DBexecute("insert into hosts set hostid=" ZBX_FS_UI64 ",created=0,proxy_hostid=NULL,host='%s',status=%d,"
+	DB_EXEC("insert into hosts set hostid=" ZBX_FS_UI64 ",created=0,proxy_hostid=NULL,host='%s',status=%d,"
 			"disable_until=0,error='',available=0,errors_from=0,lastaccess=0,ipmi_authtype=-1,"
 			"ipmi_privilege=2,ipmi_username='',ipmi_password='',ipmi_disable_until=0,ipmi_available=0,"
 			"snmp_disable_until=0,snmp_available=0,maintenanceid=NULL,maintenance_status=0,"
@@ -967,15 +967,14 @@ static int	DBpatch_4050505(void)
 			"snmp_error='',jmx_disable_until=0,jmx_available=0,jmx_errors_from=0,jmx_error='',name='%s',"
 			"info_1='',info_2='',flags=0,templateid=NULL,description='',tls_connect=1,tls_accept=1,"
 			"tls_issuer='',tls_subject='',tls_psk_identity='',tls_psk='',proxy_address='',auto_compress=1",
-			hostid, "Template DNS Test", 3, "Template DNS Test"));
+		hostid, "Template DNS Test", 3, "Template DNS Test");
 
-	CHECK(DBexecute("insert into hosts_groups set"
-				" hostgroupid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",groupid=" ZBX_FS_UI64,
-			DBget_maxid_num("hosts_groups", 1), hostid, groupid_templates));
+	DB_EXEC("insert into hosts_groups set hostgroupid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",groupid=" ZBX_FS_UI64,
+		DBget_maxid_num("hosts_groups", 1), hostid, groupid_templates);
 
 #define SQL	"insert into applications set applicationid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",name='%s',flags=0"
-	CHECK(DBexecute(SQL, applicationid_dns   , hostid, "DNS"));
-	CHECK(DBexecute(SQL, applicationid_dnssec, hostid, "DNSSEC"));
+	DB_EXEC(SQL, applicationid_dns   , hostid, "DNS");
+	DB_EXEC(SQL, applicationid_dnssec, hostid, "DNSSEC");
 #undef SQL
 
 #define SQL	"insert into items set itemid=" ZBX_FS_UI64 ",type=%d,snmp_community='',snmp_oid='',"			\
@@ -1002,73 +1001,73 @@ static int	DBpatch_4050505(void)
 #define ZBX_FLAG_DISCOVERY		0x01	/* Discovery rule */
 #define ZBX_FLAG_DISCOVERY_PROTOTYPE	0x02	/* Item prototype */
 
-	/* CHECK(DBexecute(SQL, itemid, type, hostid,		*/
+	/* DB_EXEC(SQL, itemid, type, hostid,			*/
 	/* 		name, key_, delay, history, trends,	*/
 	/* 		value_type, valuemapid, params, flags,	*/
 	/* 		description,				*/
-	/* 		lifetime, master_itemid));		*/
-	CHECK(DBexecute(SQL, itemid_dnssec_enabled, ITEM_TYPE_CALCULATED, hostid,
-			"DNSSEC enabled/disabled", "dnssec.enabled", "60", "90d", "365d",
-			ITEM_VALUE_TYPE_UINT64, (zbx_uint64_t)0, "{$RSM.TLD.DNSSEC.ENABLED}", 0,
-			"History of DNSSEC being enabled or disabled.",
-			"30d", (zbx_uint64_t)0));
-	CHECK(DBexecute(SQL, itemid_rsm_dns, ITEM_TYPE_SIMPLE, hostid,
-			"DNS Test",
-			"rsm.dns[{$RSM.TLD},{$RSM.DNS.TESTPREFIX},{$RSM.DNS.NAME.SERVERS},{$RSM.TLD.DNSSEC.ENABLED},"
-				"{$RSM.TLD.RDDS.ENABLED},{$RSM.TLD.EPP.ENABLED},{$RSM.TLD.DNS.UDP.ENABLED},"
-				"{$RSM.TLD.DNS.TCP.ENABLED},{$RSM.IP4.ENABLED},{$RSM.IP6.ENABLED},{$RSM.RESOLVER},"
-				"{$RSM.DNS.UDP.RTT.HIGH},{$RSM.DNS.TCP.RTT.HIGH}]",
-			"{$RSM.DNS.UDP.DELAY}", "0", "0",
-			ITEM_VALUE_TYPE_TEXT, (zbx_uint64_t)0, "", 0,
-			"Master item that performs the test and generates JSON with results."
-				" This JSON will be parsed by dependent items. History must be disabled.",
-			"30d", (zbx_uint64_t)0));
-	CHECK(DBexecute(SQL, itemid_rsm_dns_nssok, ITEM_TYPE_DEPENDENT, hostid,
-			"Number of working Name Servers", "rsm.dns.nssok", "0", "90d", "365d",
-			ITEM_VALUE_TYPE_UINT64, (zbx_uint64_t)0, "", 0,
-			"Number of Name Servers that returned successful results out of those used in the test.",
-			"30d", itemid_rsm_dns));
-	CHECK(DBexecute(SQL, itemid_rsm_dns_ns_discovery, ITEM_TYPE_DEPENDENT, hostid,
-			"Name Servers discovery", "rsm.dns.ns.discovery", "0", "90d", "0",
-			ITEM_VALUE_TYPE_TEXT, (zbx_uint64_t)0, "", ZBX_FLAG_DISCOVERY,
-			"Discovers Name Servers that were used in DNS test.",
-			"1000d", itemid_rsm_dns));
-	CHECK(DBexecute(SQL, itemid_rsm_dns_nsip_discovery, ITEM_TYPE_DEPENDENT, hostid,
-			"NS-IP pairs discovery", "rsm.dns.nsip.discovery", "0", "90d", "0",
-			ITEM_VALUE_TYPE_TEXT, (zbx_uint64_t)0, "", ZBX_FLAG_DISCOVERY,
-			"Discovers Name Servers (NS-IP pairs) that were used in DNS test.",
-			"1000d", itemid_rsm_dns));
-	CHECK(DBexecute(SQL, itemid_rsm_dns_ns_status, ITEM_TYPE_DEPENDENT, hostid,
-			"Status of $1", "rsm.dns.ns.status[{#NS}]", "0", "90d", "365d",
-			ITEM_VALUE_TYPE_UINT64, valuemapid_rsm_service_availability, "", ZBX_FLAG_DISCOVERY_PROTOTYPE,
-			"Status of Name Server: Up (1) or Down (0)."
-				" The Name Server is considered to be up if all its IPs returned successful RTTs.",
-			"30d", itemid_rsm_dns));
-	CHECK(DBexecute(SQL, itemid_rsm_dns_rtt_tcp, ITEM_TYPE_DEPENDENT, hostid,
-			"RTT of $1,$2 using $3", "rsm.dns.rtt[{#NS},{#IP},tcp]", "0", "90d", "365d",
-			ITEM_VALUE_TYPE_FLOAT, valuemapid_rsm_dns_rtt, "", ZBX_FLAG_DISCOVERY_PROTOTYPE,
-			"The Round-Time Trip returned when testing specific IP of Name Server using TCP protocol.",
-			"30d", itemid_rsm_dns));
-	CHECK(DBexecute(SQL, itemid_rsm_dns_rtt_udp, ITEM_TYPE_DEPENDENT, hostid,
-			"RTT of $1,$2 using $3", "rsm.dns.rtt[{#NS},{#IP},udp]", "0", "90d", "365d",
-			ITEM_VALUE_TYPE_FLOAT, valuemapid_rsm_dns_rtt, "", ZBX_FLAG_DISCOVERY_PROTOTYPE,
-			"The Round-Time Trip returned when testing specific IP of Name Server using UDP protocol.",
-			"30d", itemid_rsm_dns));
-	CHECK(DBexecute(SQL, itemid_rsm_dns_nsid, ITEM_TYPE_DEPENDENT, hostid,
-			"NSID of $1,$2", "rsm.dns.nsid[{#NS},{#IP}]", "0", "90d", "0",
-			ITEM_VALUE_TYPE_STR, (zbx_uint64_t)0, "", ZBX_FLAG_DISCOVERY_PROTOTYPE,
-			"DNS Name Server Identifier of the target Name Server that was tested.",
-			"30d", itemid_rsm_dns));
-	CHECK(DBexecute(SQL, itemid_rsm_dns_mode, ITEM_TYPE_DEPENDENT, hostid,
-			"The mode of the Test", "rsm.dns.mode", "0", "90d", "365d",
-			ITEM_VALUE_TYPE_UINT64, valuemapid_dns_test_mode, "", 0,
-			"The mode (normal or critical) in which the test was performed.",
-			"30d", itemid_rsm_dns));
-	CHECK(DBexecute(SQL, itemid_rsm_dns_protocol, ITEM_TYPE_DEPENDENT, hostid,
-			"Transport protocol of the Test", "rsm.dns.protocol", "0", "90d", "365d",
-			ITEM_VALUE_TYPE_UINT64, valuemapid_transport_protocol, "", 0,
-			"Transport protocol (UDP or TCP) that was used during the test.",
-			"30d", itemid_rsm_dns));
+	/* 		lifetime, master_itemid);		*/
+	DB_EXEC(SQL, itemid_dnssec_enabled, ITEM_TYPE_CALCULATED, hostid,
+		"DNSSEC enabled/disabled", "dnssec.enabled", "60", "90d", "365d",
+		ITEM_VALUE_TYPE_UINT64, (zbx_uint64_t)0, "{$RSM.TLD.DNSSEC.ENABLED}", 0,
+		"History of DNSSEC being enabled or disabled.",
+		"30d", (zbx_uint64_t)0);
+	DB_EXEC(SQL, itemid_rsm_dns, ITEM_TYPE_SIMPLE, hostid,
+		"DNS Test",
+		"rsm.dns[{$RSM.TLD},{$RSM.DNS.TESTPREFIX},{$RSM.DNS.NAME.SERVERS},{$RSM.TLD.DNSSEC.ENABLED},"
+			"{$RSM.TLD.RDDS.ENABLED},{$RSM.TLD.EPP.ENABLED},{$RSM.TLD.DNS.UDP.ENABLED},"
+			"{$RSM.TLD.DNS.TCP.ENABLED},{$RSM.IP4.ENABLED},{$RSM.IP6.ENABLED},{$RSM.RESOLVER},"
+			"{$RSM.DNS.UDP.RTT.HIGH},{$RSM.DNS.TCP.RTT.HIGH}]",
+		"{$RSM.DNS.UDP.DELAY}", "0", "0",
+		ITEM_VALUE_TYPE_TEXT, (zbx_uint64_t)0, "", 0,
+		"Master item that performs the test and generates JSON with results."
+			" This JSON will be parsed by dependent items. History must be disabled.",
+		"30d", (zbx_uint64_t)0);
+	DB_EXEC(SQL, itemid_rsm_dns_nssok, ITEM_TYPE_DEPENDENT, hostid,
+		"Number of working Name Servers", "rsm.dns.nssok", "0", "90d", "365d",
+		ITEM_VALUE_TYPE_UINT64, (zbx_uint64_t)0, "", 0,
+		"Number of Name Servers that returned successful results out of those used in the test.",
+		"30d", itemid_rsm_dns);
+	DB_EXEC(SQL, itemid_rsm_dns_ns_discovery, ITEM_TYPE_DEPENDENT, hostid,
+		"Name Servers discovery", "rsm.dns.ns.discovery", "0", "90d", "0",
+		ITEM_VALUE_TYPE_TEXT, (zbx_uint64_t)0, "", ZBX_FLAG_DISCOVERY,
+		"Discovers Name Servers that were used in DNS test.",
+		"1000d", itemid_rsm_dns);
+	DB_EXEC(SQL, itemid_rsm_dns_nsip_discovery, ITEM_TYPE_DEPENDENT, hostid,
+		"NS-IP pairs discovery", "rsm.dns.nsip.discovery", "0", "90d", "0",
+		ITEM_VALUE_TYPE_TEXT, (zbx_uint64_t)0, "", ZBX_FLAG_DISCOVERY,
+		"Discovers Name Servers (NS-IP pairs) that were used in DNS test.",
+		"1000d", itemid_rsm_dns);
+	DB_EXEC(SQL, itemid_rsm_dns_ns_status, ITEM_TYPE_DEPENDENT, hostid,
+		"Status of $1", "rsm.dns.ns.status[{#NS}]", "0", "90d", "365d",
+		ITEM_VALUE_TYPE_UINT64, valuemapid_rsm_service_availability, "", ZBX_FLAG_DISCOVERY_PROTOTYPE,
+		"Status of Name Server: Up (1) or Down (0)."
+			" The Name Server is considered to be up if all its IPs returned successful RTTs.",
+		"30d", itemid_rsm_dns);
+	DB_EXEC(SQL, itemid_rsm_dns_rtt_tcp, ITEM_TYPE_DEPENDENT, hostid,
+		"RTT of $1,$2 using $3", "rsm.dns.rtt[{#NS},{#IP},tcp]", "0", "90d", "365d",
+		ITEM_VALUE_TYPE_FLOAT, valuemapid_rsm_dns_rtt, "", ZBX_FLAG_DISCOVERY_PROTOTYPE,
+		"The Round-Time Trip returned when testing specific IP of Name Server using TCP protocol.",
+		"30d", itemid_rsm_dns);
+	DB_EXEC(SQL, itemid_rsm_dns_rtt_udp, ITEM_TYPE_DEPENDENT, hostid,
+		"RTT of $1,$2 using $3", "rsm.dns.rtt[{#NS},{#IP},udp]", "0", "90d", "365d",
+		ITEM_VALUE_TYPE_FLOAT, valuemapid_rsm_dns_rtt, "", ZBX_FLAG_DISCOVERY_PROTOTYPE,
+		"The Round-Time Trip returned when testing specific IP of Name Server using UDP protocol.",
+		"30d", itemid_rsm_dns);
+	DB_EXEC(SQL, itemid_rsm_dns_nsid, ITEM_TYPE_DEPENDENT, hostid,
+		"NSID of $1,$2", "rsm.dns.nsid[{#NS},{#IP}]", "0", "90d", "0",
+		ITEM_VALUE_TYPE_STR, (zbx_uint64_t)0, "", ZBX_FLAG_DISCOVERY_PROTOTYPE,
+		"DNS Name Server Identifier of the target Name Server that was tested.",
+		"30d", itemid_rsm_dns);
+	DB_EXEC(SQL, itemid_rsm_dns_mode, ITEM_TYPE_DEPENDENT, hostid,
+		"The mode of the Test", "rsm.dns.mode", "0", "90d", "365d",
+		ITEM_VALUE_TYPE_UINT64, valuemapid_dns_test_mode, "", 0,
+		"The mode (normal or critical) in which the test was performed.",
+		"30d", itemid_rsm_dns);
+	DB_EXEC(SQL, itemid_rsm_dns_protocol, ITEM_TYPE_DEPENDENT, hostid,
+		"Transport protocol of the Test", "rsm.dns.protocol", "0", "90d", "365d",
+		ITEM_VALUE_TYPE_UINT64, valuemapid_transport_protocol, "", 0,
+		"Transport protocol (UDP or TCP) that was used during the test.",
+		"30d", itemid_rsm_dns);
 
 #undef ITEM_TYPE_SIMPLE
 #undef ITEM_TYPE_CALCULATED
@@ -1085,53 +1084,53 @@ static int	DBpatch_4050505(void)
 #undef SQL
 
 #define SQL	"insert into items_applications set itemappid=" ZBX_FS_UI64 ",applicationid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64
-	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_dnssec, itemid_dnssec_enabled));
-	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_dns   , itemid_rsm_dns));
-	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_dns   , itemid_rsm_dns_nssok));
-	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_dns   , itemid_rsm_dns_ns_status));
-	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_dns   , itemid_rsm_dns_rtt_tcp));
-	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_dns   , itemid_rsm_dns_rtt_udp));
-	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_dns   , itemid_rsm_dns_nsid));
-	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_dns   , itemid_rsm_dns_mode));
-	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_dns   , itemid_rsm_dns_protocol));
+	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicationid_dnssec, itemid_dnssec_enabled);
+	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicationid_dns   , itemid_rsm_dns);
+	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicationid_dns   , itemid_rsm_dns_nssok);
+	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicationid_dns   , itemid_rsm_dns_ns_status);
+	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicationid_dns   , itemid_rsm_dns_rtt_tcp);
+	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicationid_dns   , itemid_rsm_dns_rtt_udp);
+	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicationid_dns   , itemid_rsm_dns_nsid);
+	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicationid_dns   , itemid_rsm_dns_mode);
+	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicationid_dns   , itemid_rsm_dns_protocol);
 #undef SQL
 
 #define SQL	"insert into item_discovery set itemdiscoveryid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ","		\
 		"parent_itemid=" ZBX_FS_UI64 ",key_='',lastcheck=0,ts_delete=0"
-	CHECK(DBexecute(SQL, DBget_maxid_num("item_discovery", 1), itemid_rsm_dns_ns_status, itemid_rsm_dns_ns_discovery));
-	CHECK(DBexecute(SQL, DBget_maxid_num("item_discovery", 1), itemid_rsm_dns_rtt_tcp  , itemid_rsm_dns_nsip_discovery));
-	CHECK(DBexecute(SQL, DBget_maxid_num("item_discovery", 1), itemid_rsm_dns_rtt_udp  , itemid_rsm_dns_nsip_discovery));
-	CHECK(DBexecute(SQL, DBget_maxid_num("item_discovery", 1), itemid_rsm_dns_nsid     , itemid_rsm_dns_nsip_discovery));
+	DB_EXEC(SQL, DBget_maxid_num("item_discovery", 1), itemid_rsm_dns_ns_status, itemid_rsm_dns_ns_discovery);
+	DB_EXEC(SQL, DBget_maxid_num("item_discovery", 1), itemid_rsm_dns_rtt_tcp  , itemid_rsm_dns_nsip_discovery);
+	DB_EXEC(SQL, DBget_maxid_num("item_discovery", 1), itemid_rsm_dns_rtt_udp  , itemid_rsm_dns_nsip_discovery);
+	DB_EXEC(SQL, DBget_maxid_num("item_discovery", 1), itemid_rsm_dns_nsid     , itemid_rsm_dns_nsip_discovery);
 #undef SQL
 
 #define SQL	"insert into item_preproc set"										\
 		" item_preprocid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ",step=%d,type=%d,params='%s',"			\
 		"error_handler=%d,error_handler_params=''"
 	/* type 12 = ZBX_PREPROC_JSONPATH */
-	CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_dns_nssok, 1, 12,
-			"$.nssok", 0));
-	CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_dns_ns_discovery, 1, 12,
-			"$.nss", 0));
-	CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_dns_nsip_discovery, 1, 12,
-			"$.nsips", 0));
-	CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_dns_ns_status, 1, 12,
-			"$.nss[?(@.[''ns''] == ''{#NS}'')].status.first()", 1));
-	CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_dns_rtt_tcp, 1, 12,
-			"$.nsips[?(@.[''ns''] == ''{#NS}'' && @.[''ip''] == ''{#IP}'' && @.[''protocol''] == ''tcp'')].rtt.first()", 1));
-	CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_dns_rtt_udp, 1, 12,
-			"$.nsips[?(@.[''ns''] == ''{#NS}'' && @.[''ip''] == ''{#IP}'' && @.[''protocol''] == ''udp'')].rtt.first()", 1));
-	CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_dns_nsid, 1, 12,
-			"$.nsips[?(@.[''ns''] == ''{#NS}'' && @.[''ip''] == ''{#IP}'')].nsid.first()", 1));
-	CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_dns_mode, 1, 12,
-			"$.mode", 0));
-	CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_dns_protocol, 1, 12,
-			"$.protocol", 0));
+	DB_EXEC(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_dns_nssok, 1, 12,
+			"$.nssok", 0);
+	DB_EXEC(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_dns_ns_discovery, 1, 12,
+			"$.nss", 0);
+	DB_EXEC(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_dns_nsip_discovery, 1, 12,
+			"$.nsips", 0);
+	DB_EXEC(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_dns_ns_status, 1, 12,
+			"$.nss[?(@.[''ns''] == ''{#NS}'')].status.first()", 1);
+	DB_EXEC(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_dns_rtt_tcp, 1, 12,
+			"$.nsips[?(@.[''ns''] == ''{#NS}'' && @.[''ip''] == ''{#IP}'' && @.[''protocol''] == ''tcp'')].rtt.first()", 1);
+	DB_EXEC(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_dns_rtt_udp, 1, 12,
+			"$.nsips[?(@.[''ns''] == ''{#NS}'' && @.[''ip''] == ''{#IP}'' && @.[''protocol''] == ''udp'')].rtt.first()", 1);
+	DB_EXEC(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_dns_nsid, 1, 12,
+			"$.nsips[?(@.[''ns''] == ''{#NS}'' && @.[''ip''] == ''{#IP}'')].nsid.first()", 1);
+	DB_EXEC(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_dns_mode, 1, 12,
+			"$.mode", 0);
+	DB_EXEC(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_dns_protocol, 1, 12,
+			"$.protocol", 0);
 #undef SQL
 
 #define SQL	"insert into lld_macro_path set lld_macro_pathid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ",lld_macro='%s',path='%s'"
-	CHECK(DBexecute(SQL, DBget_maxid_num("lld_macro_path", 1), itemid_rsm_dns_ns_discovery  , "{#NS}", "$.ns"));
-	CHECK(DBexecute(SQL, DBget_maxid_num("lld_macro_path", 1), itemid_rsm_dns_nsip_discovery, "{#IP}", "$.ip"));
-	CHECK(DBexecute(SQL, DBget_maxid_num("lld_macro_path", 1), itemid_rsm_dns_nsip_discovery, "{#NS}", "$.ns"));
+	DB_EXEC(SQL, DBget_maxid_num("lld_macro_path", 1), itemid_rsm_dns_ns_discovery  , "{#NS}", "$.ns");
+	DB_EXEC(SQL, DBget_maxid_num("lld_macro_path", 1), itemid_rsm_dns_nsip_discovery, "{#IP}", "$.ip");
+	DB_EXEC(SQL, DBget_maxid_num("lld_macro_path", 1), itemid_rsm_dns_nsip_discovery, "{#NS}", "$.ns");
 #undef SQL
 
 	ret = SUCCEED;
@@ -1146,18 +1145,14 @@ static int	DBpatch_4050506_create_application(zbx_uint64_t *applicationid, zbx_u
 
 	*applicationid = DBget_maxid_num("applications", 1);
 
-	CHECK(DBexecute("insert into applications set"
-				" applicationid=" ZBX_FS_UI64 ","
-				" hostid=" ZBX_FS_UI64 ","
-				" name='%s',"
-				" flags=0",
-			*applicationid, hostid, name));
+	DB_EXEC("insert into applications set applicationid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",name='%s',flags=0",
+		*applicationid, hostid, name);
 
-	CHECK(DBexecute("insert into application_template set"
-				" application_templateid=" ZBX_FS_UI64 ","
-				" applicationid=" ZBX_FS_UI64 ","
-				" templateid=" ZBX_FS_UI64,
-			DBget_maxid_num("application_template", 1), *applicationid, template_applicationid));
+	DB_EXEC("insert into application_template set"
+			" application_templateid=" ZBX_FS_UI64 ","
+			"applicationid=" ZBX_FS_UI64 ","
+			"templateid=" ZBX_FS_UI64,
+		DBget_maxid_num("application_template", 1), *applicationid, template_applicationid);
 
 	ret = SUCCEED;
 out:
@@ -1179,10 +1174,10 @@ static int	DBpatch_4050506_copy_preproc(zbx_uint64_t src_itemid, zbx_uint64_t ds
 
 	while (NULL != (row = DBfetch(result)))
 	{
-		CHECK(DBexecute("insert into item_preproc set item_preprocid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ","
-					"step=%s,type=%s,params=\"%s\",error_handler=%s,error_handler_params='%s'",
-				DBget_maxid_num("item_preproc", 1), dst_itemid, row[0], row[1], row[2], row[3],
-				row[4]));
+		DB_EXEC("insert into item_preproc set item_preprocid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ",step=%s,"
+				"type=%s,params=\"%s\",error_handler=%s,error_handler_params='%s'",
+			DBget_maxid_num("item_preproc", 1), dst_itemid, row[0], row[1], row[2], row[3],
+			row[4]);
 	}
 
 	DBfree_result(result);
@@ -1194,9 +1189,8 @@ static int	DBpatch_4050506_copy_preproc(zbx_uint64_t src_itemid, zbx_uint64_t ds
 
 		for (i = 0; NULL != replacements[i][0]; i++)
 		{
-			CHECK(DBexecute("update item_preproc set params=replace(params,'%s','%s')"
-					" where itemid=" ZBX_FS_UI64,
-					replacements[i][0], replacements[i][1], dst_itemid));
+			DB_EXEC("update item_preproc set params=replace(params,'%s','%s') where itemid=" ZBX_FS_UI64,
+				replacements[i][0], replacements[i][1], dst_itemid);
 		}
 	}
 
@@ -1222,9 +1216,9 @@ static int	DBpatch_4050506_copy_lld_macros(zbx_uint64_t src_itemid, zbx_uint64_t
 
 	while (NULL != (row = DBfetch(result)))
 	{
-		CHECK(DBexecute("insert into lld_macro_path set lld_macro_pathid=" ZBX_FS_UI64 ","
-					"itemid=" ZBX_FS_UI64 ",lld_macro='%s',path='%s'",
-				DBget_maxid_num("lld_macro_path", 1), dst_itemid, row[0], row[1]));
+		DB_EXEC("insert into lld_macro_path set"
+				" lld_macro_pathid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ",lld_macro='%s',path='%s'",
+			DBget_maxid_num("lld_macro_path", 1), dst_itemid, row[0], row[1]);
 	}
 
 	ret = SUCCEED;
@@ -1241,41 +1235,39 @@ static int	DBpatch_4050506_create_item(zbx_uint64_t *new_itemid, zbx_uint64_t te
 
 	*new_itemid = DBget_maxid_num("items", 1);
 
-	CHECK(DBexecute("insert into items (itemid,type,snmp_community,snmp_oid,hostid,name,key_,delay,history,"
-				"trends,status,value_type,trapper_hosts,units,snmpv3_securityname,snmpv3_securitylevel,"
-				"snmpv3_authpassphrase,snmpv3_privpassphrase,formula,logtimefmt,templateid,"
-				"valuemapid,params,ipmi_sensor,authtype,username,password,publickey,privatekey,flags,"
-				"interfaceid,port,description,inventory_link,lifetime,"
-				"snmpv3_authprotocol,snmpv3_privprotocol,snmpv3_contextname,evaltype,jmx_endpoint,"
-				"master_itemid,timeout,url,query_fields,posts,status_codes,"
-				"follow_redirects,post_type,http_proxy,headers,retrieve_mode,request_method,"
-				"output_format,ssl_cert_file,ssl_key_file,ssl_key_password,verify_peer,verify_host,"
-				"allow_traps)"
-			"select"
-				" " ZBX_FS_UI64 ",type,snmp_community,snmp_oid," ZBX_FS_UI64 ",name,key_,delay,history,"
-				"trends,status,value_type,trapper_hosts,units,snmpv3_securityname,snmpv3_securitylevel,"
-				"snmpv3_authpassphrase,snmpv3_privpassphrase,formula,logtimefmt," ZBX_FS_UI64 ","
-				"valuemapid,params,ipmi_sensor,authtype,username,password,publickey,privatekey,flags,"
-				"nullif(" ZBX_FS_UI64 ",0),port,description,inventory_link,lifetime,"
-				"snmpv3_authprotocol,snmpv3_privprotocol,snmpv3_contextname,evaltype,jmx_endpoint,"
-				"nullif(" ZBX_FS_UI64 ",0),timeout,url,query_fields,posts,status_codes,"
-				"follow_redirects,post_type,http_proxy,headers,retrieve_mode,request_method,"
-				"output_format,ssl_cert_file,ssl_key_file,ssl_key_password,verify_peer,verify_host,"
-				"allow_traps"
-			" from items"
-			" where itemid=" ZBX_FS_UI64,
-			*new_itemid, hostid, templateid, interfaceid, master_itemid, templateid));
+	DB_EXEC("insert into items (itemid,type,snmp_community,snmp_oid,hostid,name,key_,delay,history,trends,"
+			"status,value_type,trapper_hosts,units,snmpv3_securityname,snmpv3_securitylevel,"
+			"snmpv3_authpassphrase,snmpv3_privpassphrase,formula,logtimefmt,templateid,valuemapid,"
+			"params,ipmi_sensor,authtype,username,password,publickey,privatekey,flags,"
+			"interfaceid,port,description,inventory_link,lifetime,snmpv3_authprotocol,"
+			"snmpv3_privprotocol,snmpv3_contextname,evaltype,jmx_endpoint,master_itemid,"
+			"timeout,url,query_fields,posts,status_codes,follow_redirects,post_type,http_proxy,headers,"
+			"retrieve_mode,request_method,output_format,ssl_cert_file,ssl_key_file,ssl_key_password,"
+			"verify_peer,verify_host,allow_traps)"
+		"select"
+			" " ZBX_FS_UI64 ",type,snmp_community,snmp_oid," ZBX_FS_UI64 ",name,key_,delay,history,trends,"
+			"status,value_type,trapper_hosts,units,snmpv3_securityname,snmpv3_securitylevel,"
+			"snmpv3_authpassphrase,snmpv3_privpassphrase,formula,logtimefmt," ZBX_FS_UI64 ",valuemapid,"
+			"params,ipmi_sensor,authtype,username,password,publickey,privatekey,flags,"
+			"nullif(" ZBX_FS_UI64 ",0),port,description,inventory_link,lifetime,snmpv3_authprotocol,"
+			"snmpv3_privprotocol,snmpv3_contextname,evaltype,jmx_endpoint,nullif(" ZBX_FS_UI64 ",0),"
+			"timeout,url,query_fields,posts,status_codes,follow_redirects,post_type,http_proxy,headers,"
+			"retrieve_mode,request_method,output_format,ssl_cert_file,ssl_key_file,ssl_key_password,"
+			"verify_peer,verify_host,allow_traps"
+		" from items"
+		" where itemid=" ZBX_FS_UI64,
+		*new_itemid, hostid, templateid, interfaceid, master_itemid, templateid);
 
 	if (0 != applicationid)
 	{
-		CHECK(DBexecute("insert into items_applications set"
+		DB_EXEC("insert into items_applications set"
 				" itemappid=" ZBX_FS_UI64 ",applicationid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64,
-				DBget_maxid_num("items_applications", 1), applicationid, *new_itemid));
+			DBget_maxid_num("items_applications", 1), applicationid, *new_itemid);
 	}
 
-	CHECK_RESULT(DBpatch_4050506_copy_preproc(templateid, *new_itemid, NULL));
+	CHECK(DBpatch_4050506_copy_preproc(templateid, *new_itemid, NULL));
 
-	CHECK_RESULT(DBpatch_4050506_copy_lld_macros(templateid, *new_itemid));
+	CHECK(DBpatch_4050506_copy_lld_macros(templateid, *new_itemid));
 
 	ret = SUCCEED;
 out:
@@ -1289,31 +1281,31 @@ static int	DBpatch_4050506_convert_item(zbx_uint64_t *itemid, zbx_uint64_t hosti
 
 	SELECT_VALUE_UINT64(*itemid, "select itemid from items where hostid=" ZBX_FS_UI64 " and key_='%s'", hostid, key);
 
-	CHECK(DBexecute("update"
-				" items,"
-				" items as template"
-			" set"
-				" items.type=template.type,"
-				" items.name=template.name,"
-				" items.key_=template.key_,"
-				" items.delay=template.delay,"
-				" items.templateid=template.itemid,"
-				" items.interfaceid=null,"
-				" items.description=template.description,"
-				" items.master_itemid=nullif(" ZBX_FS_UI64 ",0),"
-				" items.request_method=template.request_method"
-			" where"
-				" items.itemid=" ZBX_FS_UI64 " and"
-				" template.itemid=" ZBX_FS_UI64,
-			master_itemid, *itemid, template_itemid));
+	DB_EXEC("update"
+			" items,"
+			"items as template"
+		" set"
+			" items.type=template.type,"
+			"items.name=template.name,"
+			"items.key_=template.key_,"
+			"items.delay=template.delay,"
+			"items.templateid=template.itemid,"
+			"items.interfaceid=null,"
+			"items.description=template.description,"
+			"items.master_itemid=nullif(" ZBX_FS_UI64 ",0),"
+			"items.request_method=template.request_method"
+		" where"
+			" items.itemid=" ZBX_FS_UI64 " and"
+			" template.itemid=" ZBX_FS_UI64,
+		master_itemid, *itemid, template_itemid);
 
-	CHECK(DBexecute("delete from items_applications where itemid=" ZBX_FS_UI64, *itemid));
+	DB_EXEC("delete from items_applications where itemid=" ZBX_FS_UI64, *itemid);
 
-	CHECK(DBexecute("insert into items_applications set"
+	DB_EXEC("insert into items_applications set"
 			" itemappid=" ZBX_FS_UI64 ",applicationid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64,
-			DBget_maxid_num("items_applications", 1), applicationid, *itemid));
+		DBget_maxid_num("items_applications", 1), applicationid, *itemid);
 
-	CHECK_RESULT(DBpatch_4050506_copy_preproc(template_itemid, *itemid, NULL));
+	CHECK(DBpatch_4050506_copy_preproc(template_itemid, *itemid, NULL));
 
 	ret = SUCCEED;
 out:
@@ -1326,17 +1318,17 @@ static int	DBpatch_4050506_create_item_prototype(zbx_uint64_t *new_itemid, zbx_u
 {
 	int		ret = FAIL;
 
-	CHECK_RESULT(DBpatch_4050506_create_item(new_itemid, templateid, hostid, interfaceid, master_itemid,
+	CHECK(DBpatch_4050506_create_item(new_itemid, templateid, hostid, interfaceid, master_itemid,
 			applicationid));
 
-	CHECK(DBexecute("insert into item_discovery set"
-				" itemdiscoveryid=" ZBX_FS_UI64 ","
-				" itemid=" ZBX_FS_UI64 ","
-				" parent_itemid=" ZBX_FS_UI64 ","
-				" key_='',"
-				" lastcheck=0,"
-				" ts_delete=0",
-			DBget_maxid_num("item_discovery", 1), *new_itemid, parent_itemid));
+	DB_EXEC("insert into item_discovery set"
+			" itemdiscoveryid=" ZBX_FS_UI64 ","
+			"itemid=" ZBX_FS_UI64 ","
+			"parent_itemid=" ZBX_FS_UI64 ","
+			"key_='',"
+			"lastcheck=0,"
+			"ts_delete=0",
+		DBget_maxid_num("item_discovery", 1), *new_itemid, parent_itemid);
 
 	ret = SUCCEED;
 out:
@@ -1351,38 +1343,36 @@ static int	DBpatch_4050506_create_item_lld(zbx_uint64_t *new_itemid, const char 
 	*new_itemid = DBget_maxid_num("items", 1);
 
 	/* non-default values - templateid=NULL, flags=ZBX_FLAG_DISCOVERY_CREATED, interfaceid=NULL */
-	CHECK(DBexecute("insert into items (itemid,type,snmp_community,snmp_oid,hostid,name,key_,delay,history,trends,"
-				"status,value_type,trapper_hosts,units,snmpv3_securityname,snmpv3_securitylevel,"
-				"snmpv3_authpassphrase,snmpv3_privpassphrase,formula,logtimefmt,templateid,valuemapid,"
-				"params,ipmi_sensor,authtype,username,password,publickey,privatekey,flags,interfaceid,"
-				"port,description,inventory_link,lifetime,snmpv3_authprotocol,snmpv3_privprotocol,"
-				"snmpv3_contextname,evaltype,jmx_endpoint,master_itemid,timeout,url,query_fields,posts,"
-				"status_codes,follow_redirects,post_type,http_proxy,headers,retrieve_mode,"
-				"request_method,output_format,ssl_cert_file,ssl_key_file,ssl_key_password,verify_peer,"
-				"verify_host,allow_traps)"
-			" select"
-				" " ZBX_FS_UI64 ",type,snmp_community,snmp_oid,hostid,name,'%s',delay,history,trends,"
-				"status,value_type,trapper_hosts,units,snmpv3_securityname,snmpv3_securitylevel,"
-				"snmpv3_authpassphrase,snmpv3_privpassphrase,formula,logtimefmt,null,valuemapid,"
-				"params,ipmi_sensor,authtype,username,password,publickey,privatekey,4,null,"
-				"port,description,inventory_link,lifetime,snmpv3_authprotocol,snmpv3_privprotocol,"
-				"snmpv3_contextname,evaltype,jmx_endpoint,master_itemid,timeout,url,query_fields,posts,"
-				"status_codes,follow_redirects,post_type,http_proxy,headers,retrieve_mode,"
-				"request_method,output_format,ssl_cert_file,ssl_key_file,ssl_key_password,verify_peer,"
-				"verify_host,allow_traps"
-			" from items"
-			" where itemid=" ZBX_FS_UI64,
-			*new_itemid, key, prototype_itemid));
+	DB_EXEC("insert into items (itemid,type,snmp_community,snmp_oid,hostid,name,key_,delay,history,trends,status,"
+			"value_type,trapper_hosts,units,snmpv3_securityname,snmpv3_securitylevel,snmpv3_authpassphrase,"
+			"snmpv3_privpassphrase,formula,logtimefmt,templateid,valuemapid,params,ipmi_sensor,authtype,"
+			"username,password,publickey,privatekey,flags,interfaceid,port,description,inventory_link,"
+			"lifetime,snmpv3_authprotocol,snmpv3_privprotocol,snmpv3_contextname,evaltype,jmx_endpoint,"
+			"master_itemid,timeout,url,query_fields,posts,status_codes,follow_redirects,post_type,"
+			"http_proxy,headers,retrieve_mode,request_method,output_format,ssl_cert_file,ssl_key_file,"
+			"ssl_key_password,verify_peer,verify_host,allow_traps)"
+		" select"
+			" " ZBX_FS_UI64 ",type,snmp_community,snmp_oid,hostid,name,'%s',delay,history,trends,status,"
+			"value_type,trapper_hosts,units,snmpv3_securityname,snmpv3_securitylevel,snmpv3_authpassphrase,"
+			"snmpv3_privpassphrase,formula,logtimefmt,null,valuemapid,params,ipmi_sensor,authtype,"
+			"username,password,publickey,privatekey,4,null,port,description,inventory_link,"
+			"lifetime,snmpv3_authprotocol,snmpv3_privprotocol,snmpv3_contextname,evaltype,jmx_endpoint,"
+			"master_itemid,timeout,url,query_fields,posts,status_codes,follow_redirects,post_type,"
+			"http_proxy,headers,retrieve_mode,request_method,output_format,ssl_cert_file,ssl_key_file,"
+			"ssl_key_password,verify_peer,verify_host,allow_traps"
+		" from items"
+		" where itemid=" ZBX_FS_UI64,
+		*new_itemid, key, prototype_itemid);
 
-	CHECK(DBexecute("insert into items_applications set"
+	DB_EXEC("insert into items_applications set"
 			" itemappid=" ZBX_FS_UI64 ",applicationid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64,
-			DBget_maxid_num("items_applications", 1), applicationid, *new_itemid));
+		DBget_maxid_num("items_applications", 1), applicationid, *new_itemid);
 
-	CHECK_RESULT(DBpatch_4050506_copy_preproc(prototype_itemid, *new_itemid, preproc_replacements));
+	CHECK(DBpatch_4050506_copy_preproc(prototype_itemid, *new_itemid, preproc_replacements));
 
-	CHECK(DBexecute("insert into item_discovery (itemdiscoveryid,itemid,parent_itemid,key_,lastcheck,ts_delete)"
+	DB_EXEC("insert into item_discovery (itemdiscoveryid,itemid,parent_itemid,key_,lastcheck,ts_delete)"
 			" select " ZBX_FS_UI64 "," ZBX_FS_UI64 ",itemid,key_,0,0 from items where itemid=" ZBX_FS_UI64,
-			DBget_maxid_num("item_discovery", 1), *new_itemid, prototype_itemid));
+		DBget_maxid_num("item_discovery", 1), *new_itemid, prototype_itemid);
 
 	ret = SUCCEED;
 out:
@@ -1397,34 +1387,34 @@ static int	DBpatch_4050506_convert_item_lld(zbx_uint64_t *itemid, zbx_uint64_t h
 
 	SELECT_VALUE_UINT64(*itemid, "select itemid from items where hostid=" ZBX_FS_UI64 " and key_='%s'", hostid, old_key);
 
-	CHECK(DBexecute("update"
-				" items,"
-				" items as prototype"
-			" set"
-				" items.type=prototype.type,"
-				" items.name=prototype.name,"
-				" items.key_='%s',"
-				" items.templateid=null,"
-				" items.flags=4,"
-				" items.description=prototype.description,"
-				" items.master_itemid=prototype.master_itemid,"
-				" items.request_method=prototype.request_method"
-			" where"
-				" items.itemid=" ZBX_FS_UI64 " and"
-				" prototype.itemid=" ZBX_FS_UI64,
-			new_key, *itemid, prototype_itemid));
+	DB_EXEC("update"
+			" items,"
+			"items as prototype"
+		" set"
+			" items.type=prototype.type,"
+			"items.name=prototype.name,"
+			"items.key_='%s',"
+			"items.templateid=null,"
+			"items.flags=4,"
+			"items.description=prototype.description,"
+			"items.master_itemid=prototype.master_itemid,"
+			"items.request_method=prototype.request_method"
+		" where"
+			" items.itemid=" ZBX_FS_UI64 " and"
+			" prototype.itemid=" ZBX_FS_UI64,
+		new_key, *itemid, prototype_itemid);
 
-	CHECK(DBexecute("delete from items_applications where itemid=" ZBX_FS_UI64, *itemid));
+	DB_EXEC("delete from items_applications where itemid=" ZBX_FS_UI64, *itemid);
 
-	CHECK(DBexecute("insert into items_applications set"
+	DB_EXEC("insert into items_applications set"
 			" itemappid=" ZBX_FS_UI64 ",applicationid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64,
-			DBget_maxid_num("items_applications", 1), applicationid, *itemid));
+		DBget_maxid_num("items_applications", 1), applicationid, *itemid);
 
-	CHECK_RESULT(DBpatch_4050506_copy_preproc(prototype_itemid, *itemid, preproc_replacements));
+	CHECK(DBpatch_4050506_copy_preproc(prototype_itemid, *itemid, preproc_replacements));
 
-	CHECK(DBexecute("insert into item_discovery (itemdiscoveryid,itemid,parent_itemid,key_,lastcheck,ts_delete)"
+	DB_EXEC("insert into item_discovery (itemdiscoveryid,itemid,parent_itemid,key_,lastcheck,ts_delete)"
 			" select " ZBX_FS_UI64 "," ZBX_FS_UI64 ",itemid,key_,0,0 from items where itemid=" ZBX_FS_UI64,
-			DBget_maxid_num("item_discovery", 1), *itemid, prototype_itemid));
+		DBget_maxid_num("item_discovery", 1), *itemid, prototype_itemid);
 
 	ret = SUCCEED;
 out:
@@ -1516,63 +1506,63 @@ static int	DBpatch_4050506(void)
 		ZBX_STR2UINT64(interfaceid, row[1]);
 
 		/* link "Template DNS Test" template to the host */
-		CHECK(DBexecute("insert into hosts_templates set"
+		DB_EXEC("insert into hosts_templates set"
 				" hosttemplateid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",templateid=" ZBX_FS_UI64,
-				DBget_maxid_num("hosts_templates", 1), hostid, hostid_template_dns_test));
+			DBget_maxid_num("hosts_templates", 1), hostid, hostid_template_dns_test);
 
 		/* create applications */
-		CHECK_RESULT(DBpatch_4050506_create_application(&applicationid_dns   , template_applicationid_dns   , hostid, "DNS"));
-		CHECK_RESULT(DBpatch_4050506_create_application(&applicationid_dnssec, template_applicationid_dnssec, hostid, "DNSSEC"));
+		CHECK(DBpatch_4050506_create_application(&applicationid_dns   , template_applicationid_dns   , hostid, "DNS"));
+		CHECK(DBpatch_4050506_create_application(&applicationid_dnssec, template_applicationid_dnssec, hostid, "DNSSEC"));
 
 		/* update dnssec.enabled item */
-		CHECK_RESULT(DBpatch_4050506_convert_item(&itemid_dnssec_enabled, hostid, "dnssec.enabled",
+		CHECK(DBpatch_4050506_convert_item(&itemid_dnssec_enabled, hostid, "dnssec.enabled",
 				0, template_itemid_dnssec_enabled, applicationid_dnssec));
 
 		/* create "DNS Test" (rsm.dns[...]) master item */
-		CHECK_RESULT(DBpatch_4050506_create_item(&itemid_rsm_dns,
+		CHECK(DBpatch_4050506_create_item(&itemid_rsm_dns,
 				template_itemid_rsm_dns, hostid, interfaceid, 0, applicationid_dns));
 
 		/* create "Name Servers discovery" (rsm.dns.ns.discovery) discovery rule */
-		CHECK_RESULT(DBpatch_4050506_create_item(&itemid_rsm_dns_ns_discovery,
+		CHECK(DBpatch_4050506_create_item(&itemid_rsm_dns_ns_discovery,
 				template_itemid_rsm_dns_ns_discovery, hostid, 0, itemid_rsm_dns, 0));
 
 		/* create "NS-IP pairs discovery" (rsm.dns.nsip.discovery) discovery rule */
-		CHECK_RESULT(DBpatch_4050506_create_item(&itemid_rsm_dns_nsip_discovery,
+		CHECK(DBpatch_4050506_create_item(&itemid_rsm_dns_nsip_discovery,
 				template_itemid_rsm_dns_nsip_discovery, hostid, 0, itemid_rsm_dns, 0));
 
 		/* create "Status of {#NS}" (rsm.dns.ns.status[{#NS}]) item prototype */
-		CHECK_RESULT(DBpatch_4050506_create_item_prototype(&prototype_itemid_rsm_dns_ns_status,
+		CHECK(DBpatch_4050506_create_item_prototype(&prototype_itemid_rsm_dns_ns_status,
 				template_itemid_rsm_dns_ns_status, hostid, 0, itemid_rsm_dns, applicationid_dns,
 				itemid_rsm_dns_ns_discovery));
 
 		/* create "NSID of {#NS},{#IP}" (rsm.dns.nsid[{#NS},{#IP}]) item prototype */
-		CHECK_RESULT(DBpatch_4050506_create_item_prototype(&prototype_itemid_rsm_dns_nsid,
+		CHECK(DBpatch_4050506_create_item_prototype(&prototype_itemid_rsm_dns_nsid,
 				template_itemid_rsm_dns_nsid, hostid, 0, itemid_rsm_dns, applicationid_dns,
 				itemid_rsm_dns_nsip_discovery));
 
 		/* create "RTT of {#NS},{#IP} using tcp" (rsm.dns.rtt[{#NS},{#IP},tcp]) item prototype */
-		CHECK_RESULT(DBpatch_4050506_create_item_prototype(&prototype_itemid_rsm_dns_rtt_tcp,
+		CHECK(DBpatch_4050506_create_item_prototype(&prototype_itemid_rsm_dns_rtt_tcp,
 				template_itemid_rsm_dns_rtt_tcp, hostid, 0, itemid_rsm_dns, applicationid_dns,
 				itemid_rsm_dns_nsip_discovery));
 
 		/* create "RTT of {#NS},{#IP} using udp" (rsm.dns.rtt[{#NS},{#IP},udp]) item prototype */
-		CHECK_RESULT(DBpatch_4050506_create_item_prototype(&prototype_itemid_rsm_dns_rtt_udp,
+		CHECK(DBpatch_4050506_create_item_prototype(&prototype_itemid_rsm_dns_rtt_udp,
 				template_itemid_rsm_dns_rtt_udp, hostid, 0, itemid_rsm_dns, applicationid_dns,
 				itemid_rsm_dns_nsip_discovery));
 
 		/* create "The mode of the Test" (rsm.dns.mode) item */
-		CHECK_RESULT(DBpatch_4050506_create_item(&itemid_rsm_dns_mode,
+		CHECK(DBpatch_4050506_create_item(&itemid_rsm_dns_mode,
 				template_itemid_rsm_dns_mode, hostid, 0, itemid_rsm_dns, applicationid_dns));
 
 		/* create "Transport protocol of the Test" rsm.dns.protocol */
-		CHECK_RESULT(DBpatch_4050506_create_item(&itemid_rsm_dns_protocol,
+		CHECK(DBpatch_4050506_create_item(&itemid_rsm_dns_protocol,
 				template_itemid_rsm_dns_protocol, hostid, 0, itemid_rsm_dns, applicationid_dns));
 
 		/* delete rsm.dns.tcp[{$RSM.TLD}] item */
-		CHECK(DBexecute("delete from items where key_='rsm.dns.tcp[{$RSM.TLD}]' and hostid=" ZBX_FS_UI64, hostid));
+		DB_EXEC("delete from items where key_='rsm.dns.tcp[{$RSM.TLD}]' and hostid=" ZBX_FS_UI64, hostid);
 
 		/* convert rsm.dns.udp[{$RSM.TLD}] item into rsm.dns.nssok */
-		CHECK_RESULT(DBpatch_4050506_convert_item(&itemid_rsm_dns_nssok, hostid, "rsm.dns.udp[{$RSM.TLD}]",
+		CHECK(DBpatch_4050506_convert_item(&itemid_rsm_dns_nssok, hostid, "rsm.dns.udp[{$RSM.TLD}]",
 				itemid_rsm_dns, template_itemid_rsm_dns_nssok, applicationid_dns));
 
 		/* update <ns> items */
@@ -1595,7 +1585,7 @@ static int	DBpatch_4050506(void)
 
 			/* create "Status of <ns>" (rsm.dns.ns.status[<ns>]) items */
 			zbx_snprintf(key, sizeof(key), "rsm.dns.ns.status[%s]", row[0]);
-			CHECK_RESULT(DBpatch_4050506_create_item_lld(&itemid, key, prototype_itemid_rsm_dns_ns_status,
+			CHECK(DBpatch_4050506_create_item_lld(&itemid, key, prototype_itemid_rsm_dns_ns_status,
 					applicationid_dns, preproc_replacements));
 		}
 
@@ -1627,19 +1617,19 @@ static int	DBpatch_4050506(void)
 
 			/* create "NSID of <ns>,<ip>" (rsm.dns.nsid[<ns>,<ip>]) item */
 			zbx_snprintf(new_key, sizeof(new_key), "rsm.dns.nsid[%s,%s]", row[0], row[1]);
-			CHECK_RESULT(DBpatch_4050506_create_item_lld(&itemid, new_key,
+			CHECK(DBpatch_4050506_create_item_lld(&itemid, new_key,
 					prototype_itemid_rsm_dns_nsid, applicationid_dns, preproc_replacements));
 
 			/* convert "RTT of <ns>,<ip> using tcp" (rsm.dns.rtt[<ns>,<ip>,tcp]) item */
 			zbx_snprintf(old_key, sizeof(old_key), "rsm.dns.tcp.rtt[{$RSM.TLD},%s,%s]", row[0], row[1]);
 			zbx_snprintf(new_key, sizeof(new_key), "rsm.dns.rtt[%s,%s,tcp]", row[0], row[1]);
-			CHECK_RESULT(DBpatch_4050506_convert_item_lld(&itemid, hostid, old_key, new_key,
+			CHECK(DBpatch_4050506_convert_item_lld(&itemid, hostid, old_key, new_key,
 					prototype_itemid_rsm_dns_rtt_tcp, applicationid_dns, preproc_replacements));
 
 			/* convert "RTT of <ns>,<ip> using udp" (rsm.dns.rtt[<ns>,<ip>,udp]) item */
 			zbx_snprintf(old_key, sizeof(old_key), "rsm.dns.udp.rtt[{$RSM.TLD},%s,%s]", row[0], row[1]);
 			zbx_snprintf(new_key, sizeof(new_key), "rsm.dns.rtt[%s,%s,udp]", row[0], row[1]);
-			CHECK_RESULT(DBpatch_4050506_convert_item_lld(&itemid, hostid, old_key, new_key,
+			CHECK(DBpatch_4050506_convert_item_lld(&itemid, hostid, old_key, new_key,
 					prototype_itemid_rsm_dns_rtt_udp, applicationid_dns, preproc_replacements));
 		}
 
@@ -1647,10 +1637,10 @@ static int	DBpatch_4050506(void)
 		result = NULL;
 
 		/* remove old applications */
-		CHECK(DBexecute("delete from applications where"
-					" hostid=" ZBX_FS_UI64 " and"
-					" name in ('DNS (TCP)', 'DNS (UDP)', 'DNS RTT (TCP)', 'DNS RTT (UDP)')",
-				hostid));
+		DB_EXEC("delete from applications where"
+				" hostid=" ZBX_FS_UI64 " and"
+				" name in ('DNS (TCP)', 'DNS (UDP)', 'DNS RTT (TCP)', 'DNS RTT (UDP)')",
+			hostid);
 	}
 
 	ret = SUCCEED;
@@ -1684,14 +1674,14 @@ static int	DBpatch_4050508(void)
 	ONLY_SERVER();
 
 	/* enable "TLDs" action */
-	CHECK(DBexecute("update actions set status=0 where actionid=130"));
+	DB_EXEC("update actions set status=0 where actionid=130");
 
 	/* add recovery operation */
-	CHECK(DBexecute("insert into operations set operationid=131,actionid=130,operationtype=1,esc_period='0',"
-			"esc_step_from=1,esc_step_to=1,evaltype=0,recovery=1"));
-	CHECK(DBexecute("insert into opcommand set operationid=131,type=0,scriptid=NULL,execute_on=1,port='',"
-			"authtype=0,username='',password='',publickey='',privatekey='',command='%s'", command));
-	CHECK(DBexecute("insert into opcommand_hst set opcommand_hstid=131,operationid=131,hostid=NULL"));
+	DB_EXEC("insert into operations set operationid=131,actionid=130,operationtype=1,esc_period='0',"
+			"esc_step_from=1,esc_step_to=1,evaltype=0,recovery=1");
+	DB_EXEC("insert into opcommand set operationid=131,type=0,scriptid=NULL,execute_on=1,port='',"
+			"authtype=0,username='',password='',publickey='',privatekey='',command='%s'", command);
+	DB_EXEC("insert into opcommand_hst set opcommand_hstid=131,operationid=131,hostid=NULL");
 
 	ret = SUCCEED;
 out:
@@ -1739,27 +1729,25 @@ static int	DBpatch_4050509(void)
 	itemid_rdds_enabled    = itemid_next++;
 
 	/* status 3 = HOST_STATUS_TEMPLATE */
-	CHECK(DBexecute("insert into hosts set"
-				" hostid=" ZBX_FS_UI64 ",created=0,proxy_hostid=NULL,host='%s',status=%d,"
-				"disable_until=0,error='',available=0,errors_from=0,lastaccess=0,ipmi_authtype=-1,"
-				"ipmi_privilege=2,ipmi_username='',ipmi_password='',ipmi_disable_until=0,"
-				"ipmi_available=0,snmp_disable_until=0,snmp_available=0,maintenanceid=NULL,"
-				"maintenance_status=0,maintenance_type=0,maintenance_from=0,ipmi_errors_from=0,"
-				"snmp_errors_from=0,ipmi_error='',snmp_error='',jmx_disable_until=0,jmx_available=0,"
-				"jmx_errors_from=0,jmx_error='',name='%s',info_1='',info_2='',flags=0,templateid=NULL,"
-				"description='',tls_connect=1,tls_accept=1,tls_issuer='',tls_subject='',"
-				"tls_psk_identity='',tls_psk='',proxy_address='',auto_compress=1",
-			hostid, "Template Config History", 3, "Template Config History"));
+	DB_EXEC("insert into hosts set"
+			" hostid=" ZBX_FS_UI64 ",created=0,proxy_hostid=NULL,host='%s',status=%d,disable_until=0,"
+			"error='',available=0,errors_from=0,lastaccess=0,ipmi_authtype=-1,ipmi_privilege=2,"
+			"ipmi_username='',ipmi_password='',ipmi_disable_until=0,ipmi_available=0,snmp_disable_until=0,"
+			"snmp_available=0,maintenanceid=NULL,maintenance_status=0,maintenance_type=0,"
+			"maintenance_from=0,ipmi_errors_from=0,snmp_errors_from=0,ipmi_error='',snmp_error='',"
+			"jmx_disable_until=0,jmx_available=0,jmx_errors_from=0,jmx_error='',name='%s',info_1='',"
+			"info_2='',flags=0,templateid=NULL,description='',tls_connect=1,tls_accept=1,tls_issuer='',"
+			"tls_subject='',tls_psk_identity='',tls_psk='',proxy_address='',auto_compress=1",
+		hostid, "Template Config History", 3, "Template Config History");
 
-	CHECK(DBexecute("insert into hosts_groups set"
-				" hostgroupid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",groupid=" ZBX_FS_UI64,
-			DBget_maxid_num("hosts_groups", 1), hostid, groupid_templates));
+	DB_EXEC("insert into hosts_groups set hostgroupid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",groupid=" ZBX_FS_UI64,
+		DBget_maxid_num("hosts_groups", 1), hostid, groupid_templates);
 
 #define SQL	"insert into applications set applicationid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",name='%s',flags=0"
-	CHECK(DBexecute(SQL, applicationid_dns   , hostid, "DNS"));
-	CHECK(DBexecute(SQL, applicationid_dnssec, hostid, "DNSSEC"));
-	CHECK(DBexecute(SQL, applicationid_rdap  , hostid, "RDAP"));
-	CHECK(DBexecute(SQL, applicationid_rdds  , hostid, "RDDS"));
+	DB_EXEC(SQL, applicationid_dns   , hostid, "DNS");
+	DB_EXEC(SQL, applicationid_dnssec, hostid, "DNSSEC");
+	DB_EXEC(SQL, applicationid_rdap  , hostid, "RDAP");
+	DB_EXEC(SQL, applicationid_rdds  , hostid, "RDDS");
 #undef SQL
 
 #define SQL	"insert into items set itemid=" ZBX_FS_UI64 ",type=%d,snmp_community='',snmp_oid='',"			\
@@ -1775,24 +1763,24 @@ static int	DBpatch_4050509(void)
 		"allow_traps=0"
 	/* type 15 = ITEM_TYPE_CALCULATED */
 	/* value_type 3 = ITEM_VALUE_TYPE_UINT64 */
-	CHECK(DBexecute(SQL, itemid_dns_tcp_enabled, 15, hostid, "DNS TCP enabled/disabled", "dns.tcp.enabled", "1m",
-			3, "{$RSM.TLD.DNS.TCP.ENABLED}", "History of DNS TCP being enabled or disabled."));
-	CHECK(DBexecute(SQL, itemid_dns_udp_enabled, 15, hostid, "DNS UDP enabled/disabled", "dns.udp.enabled", "1m",
-			3, "{$RSM.TLD.DNS.UDP.ENABLED}", "History of DNS UDP being enabled or disabled."));
-	CHECK(DBexecute(SQL, itemid_dnssec_enabled , 15, hostid, "DNSSEC enabled/disabled" , "dnssec.enabled" , "1m",
-			3, "{$RSM.TLD.DNSSEC.ENABLED}" , "History of DNSSEC being enabled or disabled."));
-	CHECK(DBexecute(SQL, itemid_rdap_enabled   , 15, hostid, "RDAP enabled/disabled"   , "rdap.enabled"   , "1m",
-			3, "{$RDAP.TLD.ENABLED}"       , "History of RDAP being enabled or disabled."));
-	CHECK(DBexecute(SQL, itemid_rdds_enabled   , 15, hostid, "RDDS enabled/disabled"   , "rdds.enabled"   , "1m",
-			3, "{$RSM.TLD.RDDS.ENABLED}"   , "History of RDDS being enabled or disabled."));
+	DB_EXEC(SQL, itemid_dns_tcp_enabled, 15, hostid, "DNS TCP enabled/disabled", "dns.tcp.enabled", "1m",
+		3, "{$RSM.TLD.DNS.TCP.ENABLED}", "History of DNS TCP being enabled or disabled.");
+	DB_EXEC(SQL, itemid_dns_udp_enabled, 15, hostid, "DNS UDP enabled/disabled", "dns.udp.enabled", "1m",
+		3, "{$RSM.TLD.DNS.UDP.ENABLED}", "History of DNS UDP being enabled or disabled.");
+	DB_EXEC(SQL, itemid_dnssec_enabled , 15, hostid, "DNSSEC enabled/disabled" , "dnssec.enabled" , "1m",
+		3, "{$RSM.TLD.DNSSEC.ENABLED}" , "History of DNSSEC being enabled or disabled.");
+	DB_EXEC(SQL, itemid_rdap_enabled   , 15, hostid, "RDAP enabled/disabled"   , "rdap.enabled"   , "1m",
+		3, "{$RDAP.TLD.ENABLED}"       , "History of RDAP being enabled or disabled.");
+	DB_EXEC(SQL, itemid_rdds_enabled   , 15, hostid, "RDDS enabled/disabled"   , "rdds.enabled"   , "1m",
+		3, "{$RSM.TLD.RDDS.ENABLED}"   , "History of RDDS being enabled or disabled.");
 #undef SQL
 
 #define SQL	"insert into items_applications set itemappid=" ZBX_FS_UI64 ",applicationid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64
-	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_dns   , itemid_dns_tcp_enabled));
-	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_dns   , itemid_dns_udp_enabled));
-	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_dnssec, itemid_dnssec_enabled));
-	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdap  , itemid_rdap_enabled));
-	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds  , itemid_rdds_enabled));
+	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicationid_dns   , itemid_dns_tcp_enabled);
+	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicationid_dns   , itemid_dns_udp_enabled);
+	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicationid_dnssec, itemid_dnssec_enabled);
+	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdap  , itemid_rdap_enabled);
+	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds  , itemid_rdds_enabled);
 #undef SQL
 
 	ret = SUCCEED;
@@ -1845,25 +1833,23 @@ static int	DBpatch_4050510(void)
 	itemid_rsm_rdds80_rtt  = itemid_next++;
 
 	/* status 3 = HOST_STATUS_TEMPLATE */
-	CHECK(DBexecute("insert into hosts set hostid=" ZBX_FS_UI64 ",created=0,proxy_hostid=NULL,host='%s',status=%d,"
-				"disable_until=0,error='',available=0,errors_from=0,lastaccess=0,ipmi_authtype=-1,"
-				"ipmi_privilege=2,ipmi_username='',ipmi_password='',ipmi_disable_until=0,"
-				"ipmi_available=0,snmp_disable_until=0,snmp_available=0,maintenanceid=NULL,"
-				"maintenance_status=0,maintenance_type=0,maintenance_from=0,ipmi_errors_from=0,"
-				"snmp_errors_from=0,ipmi_error='',snmp_error='',jmx_disable_until=0,jmx_available=0,"
-				"jmx_errors_from=0,jmx_error='',name='%s',info_1='',info_2='',flags=0,templateid=NULL,"
-				"description='',tls_connect=1,tls_accept=1,tls_issuer='',tls_subject='',"
-				"tls_psk_identity='',tls_psk='',proxy_address='',auto_compress=1",
-			hostid, "Template RDDS Test", 3, "Template RDDS Test"));
+	DB_EXEC("insert into hosts set hostid=" ZBX_FS_UI64 ",created=0,proxy_hostid=NULL,host='%s',status=%d,"
+			"disable_until=0,error='',available=0,errors_from=0,lastaccess=0,ipmi_authtype=-1,"
+			"ipmi_privilege=2,ipmi_username='',ipmi_password='',ipmi_disable_until=0,ipmi_available=0,"
+			"snmp_disable_until=0,snmp_available=0,maintenanceid=NULL,maintenance_status=0,"
+			"maintenance_type=0,maintenance_from=0,ipmi_errors_from=0,snmp_errors_from=0,ipmi_error='',"
+			"snmp_error='',jmx_disable_until=0,jmx_available=0,jmx_errors_from=0,jmx_error='',name='%s',"
+			"info_1='',info_2='',flags=0,templateid=NULL,description='',tls_connect=1,tls_accept=1,"
+			"tls_issuer='',tls_subject='',tls_psk_identity='',tls_psk='',proxy_address='',auto_compress=1",
+		hostid, "Template RDDS Test", 3, "Template RDDS Test");
 
-	CHECK(DBexecute("insert into hosts_groups set"
-				" hostgroupid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",groupid=" ZBX_FS_UI64,
-			DBget_maxid_num("hosts_groups", 1), hostid, groupid_templates));
+	DB_EXEC("insert into hosts_groups set hostgroupid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",groupid=" ZBX_FS_UI64,
+		DBget_maxid_num("hosts_groups", 1), hostid, groupid_templates);
 
 #define SQL	"insert into applications set applicationid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",name='%s',flags=0"
-	CHECK(DBexecute(SQL, applicationid_rdds  , hostid, "RDDS"));
-	CHECK(DBexecute(SQL, applicationid_rdds43, hostid, "RDDS43"));
-	CHECK(DBexecute(SQL, applicationid_rdds80, hostid, "RDDS80"));
+	DB_EXEC(SQL, applicationid_rdds  , hostid, "RDDS");
+	DB_EXEC(SQL, applicationid_rdds43, hostid, "RDDS43");
+	DB_EXEC(SQL, applicationid_rdds80, hostid, "RDDS80");
 #undef SQL
 
 #define SQL	"insert into items set itemid=" ZBX_FS_UI64 ",type=%d,snmp_community='',snmp_oid='',"			\
@@ -1883,65 +1869,65 @@ static int	DBpatch_4050510(void)
 	/* value_type 1 = ITEM_VALUE_TYPE_STR */
 	/* value_type 3 = ITEM_VALUE_TYPE_UINT64 */
 	/* value_type 4 = ITEM_VALUE_TYPE_TEXT */
-	/* CHECK(DBexecute(SQL, itemid, type, hostid, name,		*/
+	/* DB_EXEC(SQL, itemid, type, hostid, name,			*/
 	/* 		key,						*/
 	/* 		delay, history, trends, value_type, valuemapid,	*/
 	/* 		description,					*/
-	/* 		master_itemid));				*/
-	CHECK(DBexecute(SQL, itemid_rsm_rdds, 3, hostid, "RDDS Test",
-			"rsm.rdds[{$RSM.TLD},{$RSM.TLD.RDDS.43.SERVERS},{$RSM.TLD.RDDS.80.SERVERS},"
-				"{$RSM.RDDS.TESTPREFIX},{$RSM.RDDS.NS.STRING},{$RSM.RDDS.ENABLED},"
-				"{$RSM.TLD.RDDS.ENABLED},{$RSM.EPP.ENABLED},{$RSM.TLD.EPP.ENABLED},{$RSM.IP4.ENABLED},"
-				"{$RSM.IP6.ENABLED},{$RSM.RESOLVER},{$RSM.RDDS.RTT.HIGH},{$RSM.RDDS.MAXREDIRS}]",
-			"{$RSM.RDDS.DELAY}", "0", "0", 4, (zbx_uint64_t)0,
-			"Master item that performs the RDDS test and generates JSON with results. This JSON will be"
-				" parsed by dependent items. History must be disabled.",
-			(zbx_uint64_t)0));
-	CHECK(DBexecute(SQL, itemid_rsm_rdds_status, 18, hostid, "RDDS status",                                         /* TODO: check values */
-			"rsm.rdds.status",                                                                              /* TODO: check values */
-			"0", "90d", "0", 3, valuemapid_rsm_rdds_result,                                                 /* TODO: check values */
-			"Status of the RDDS",                                                                           /* TODO: check values */
-			itemid_rsm_rdds));                                                                              /* TODO: check values */
-	CHECK(DBexecute(SQL, itemid_rsm_rdds43_ip, 18, hostid, "RDDS43 IP",
-			"rsm.rdds.43.ip",
-			"0", "90d", "0", 1, (zbx_uint64_t)0,
-			"IP address for RDDS43 test",
-			itemid_rsm_rdds));
-	CHECK(DBexecute(SQL, itemid_rsm_rdds43_rtt, 18, hostid, "RDDS43 RTT",
-			"rsm.rdds.43.rtt",
-			"0", "90d", "365d", 0, valuemapid_rsm_rdds_rtt,
-			"RTT value for RDDS43 test",
-			itemid_rsm_rdds));
-	CHECK(DBexecute(SQL, itemid_rsm_rdds80_ip, 18, hostid, "RDDS80 IP",
-			"rsm.rdds.80.ip",
-			"0", "90d", "0", 1, (zbx_uint64_t)0,
-			"IP address for RDDS80 test",
-			itemid_rsm_rdds));
-	CHECK(DBexecute(SQL, itemid_rsm_rdds80_rtt, 18, hostid, "RDDS80 RTT",
-			"rsm.rdds.80.rtt",
-			"0", "90d", "365d", 0, valuemapid_rsm_rdds_rtt,
-			"RTT value for RDDS80 test",
-			itemid_rsm_rdds));
+	/* 		master_itemid);					*/
+	DB_EXEC(SQL, itemid_rsm_rdds, 3, hostid, "RDDS Test",
+		"rsm.rdds[{$RSM.TLD},{$RSM.TLD.RDDS.43.SERVERS},{$RSM.TLD.RDDS.80.SERVERS},"
+			"{$RSM.RDDS.TESTPREFIX},{$RSM.RDDS.NS.STRING},{$RSM.RDDS.ENABLED},"
+			"{$RSM.TLD.RDDS.ENABLED},{$RSM.EPP.ENABLED},{$RSM.TLD.EPP.ENABLED},{$RSM.IP4.ENABLED},"
+			"{$RSM.IP6.ENABLED},{$RSM.RESOLVER},{$RSM.RDDS.RTT.HIGH},{$RSM.RDDS.MAXREDIRS}]",
+		"{$RSM.RDDS.DELAY}", "0", "0", 4, (zbx_uint64_t)0,
+		"Master item that performs the RDDS test and generates JSON with results. This JSON will be"
+			" parsed by dependent items. History must be disabled.",
+		(zbx_uint64_t)0);
+	DB_EXEC(SQL, itemid_rsm_rdds_status, 18, hostid, "RDDS status",                                                 /* TODO: check values */
+		"rsm.rdds.status",                                                                                      /* TODO: check values */
+		"0", "90d", "0", 3, valuemapid_rsm_rdds_result,                                                         /* TODO: check values */
+		"Status of the RDDS",                                                                                   /* TODO: check values */
+		itemid_rsm_rdds);                                                                                       /* TODO: check values */
+	DB_EXEC(SQL, itemid_rsm_rdds43_ip, 18, hostid, "RDDS43 IP",
+		"rsm.rdds.43.ip",
+		"0", "90d", "0", 1, (zbx_uint64_t)0,
+		"IP address for RDDS43 test",
+		itemid_rsm_rdds);
+	DB_EXEC(SQL, itemid_rsm_rdds43_rtt, 18, hostid, "RDDS43 RTT",
+		"rsm.rdds.43.rtt",
+		"0", "90d", "365d", 0, valuemapid_rsm_rdds_rtt,
+		"RTT value for RDDS43 test",
+		itemid_rsm_rdds);
+	DB_EXEC(SQL, itemid_rsm_rdds80_ip, 18, hostid, "RDDS80 IP",
+		"rsm.rdds.80.ip",
+		"0", "90d", "0", 1, (zbx_uint64_t)0,
+		"IP address for RDDS80 test",
+		itemid_rsm_rdds);
+	DB_EXEC(SQL, itemid_rsm_rdds80_rtt, 18, hostid, "RDDS80 RTT",
+		"rsm.rdds.80.rtt",
+		"0", "90d", "365d", 0, valuemapid_rsm_rdds_rtt,
+		"RTT value for RDDS80 test",
+		itemid_rsm_rdds);
 #undef SQL
 
 #define SQL	"insert into items_applications set itemappid=" ZBX_FS_UI64 ",applicationid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64
-	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds  , itemid_rsm_rdds));
-	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds  , itemid_rsm_rdds_status));  /* TODO: check applicationid */
-	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds43, itemid_rsm_rdds43_ip));
-	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds43, itemid_rsm_rdds43_rtt));
-	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds80, itemid_rsm_rdds80_ip));
-	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds80, itemid_rsm_rdds80_rtt));
+	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds  , itemid_rsm_rdds);
+	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds  , itemid_rsm_rdds_status);           /* TODO: check applicationid */
+	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds43, itemid_rsm_rdds43_ip);
+	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds43, itemid_rsm_rdds43_rtt);
+	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds80, itemid_rsm_rdds80_ip);
+	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds80, itemid_rsm_rdds80_rtt);
 #undef SQL
 
 #define SQL	"insert into item_preproc set"										\
 		" item_preprocid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ",step=%d,type=%d,params='%s',"			\
 		"error_handler=%d,error_handler_params=''"
 	/* type 12 = ZBX_PREPROC_JSONPATH */
-	CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_rdds_status, 1, 12, "$.status"    , 0));    /* TODO: check values */
-	CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_rdds43_ip  , 1, 12, "$.rdds43.ip" , 1));
-	CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_rdds43_rtt , 1, 12, "$.rdds43.rtt", 0));
-	CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_rdds80_ip  , 1, 12, "$.rdds80.ip" , 1));
-	CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_rdds80_rtt , 1, 12, "$.rdds80.rtt", 0));
+	DB_EXEC(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_rdds_status, 1, 12, "$.status"    , 0);             /* TODO: check values */
+	DB_EXEC(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_rdds43_ip  , 1, 12, "$.rdds43.ip" , 1);
+	DB_EXEC(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_rdds43_rtt , 1, 12, "$.rdds43.rtt", 0);
+	DB_EXEC(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_rdds80_ip  , 1, 12, "$.rdds80.ip" , 1);
+	DB_EXEC(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_rdds80_rtt , 1, 12, "$.rdds80.rtt", 0);
 #undef SQL
 
 	ret = SUCCEED;
@@ -2022,25 +2008,23 @@ static int	DBpatch_4050511(void)
 	functionid_probe_knocked_out = functionid_next++;
 
 	/* status 3 = HOST_STATUS_TEMPLATE */
-	CHECK(DBexecute("insert into hosts set hostid=" ZBX_FS_UI64 ",created=0,proxy_hostid=NULL,host='%s',status=%d,"
-				"disable_until=0,error='',available=0,errors_from=0,lastaccess=0,ipmi_authtype=-1,"
-				"ipmi_privilege=2,ipmi_username='',ipmi_password='',ipmi_disable_until=0,"
-				"ipmi_available=0,snmp_disable_until=0,snmp_available=0,maintenanceid=NULL,"
-				"maintenance_status=0,maintenance_type=0,maintenance_from=0,ipmi_errors_from=0,"
-				"snmp_errors_from=0,ipmi_error='',snmp_error='',jmx_disable_until=0,jmx_available=0,"
-				"jmx_errors_from=0,jmx_error='',name='%s',info_1='',info_2='',flags=0,templateid=NULL,"
-				"description='',tls_connect=1,tls_accept=1,tls_issuer='',tls_subject='',"
-				"tls_psk_identity='',tls_psk='',proxy_address='',auto_compress=1",
-			hostid, "Template Probe Status", 3, "Template Probe Status"));
+	DB_EXEC("insert into hosts set hostid=" ZBX_FS_UI64 ",created=0,proxy_hostid=NULL,host='%s',status=%d,"
+			"disable_until=0,error='',available=0,errors_from=0,lastaccess=0,ipmi_authtype=-1,"
+			"ipmi_privilege=2,ipmi_username='',ipmi_password='',ipmi_disable_until=0,ipmi_available=0,"
+			"snmp_disable_until=0,snmp_available=0,maintenanceid=NULL,maintenance_status=0,"
+			"maintenance_type=0,maintenance_from=0,ipmi_errors_from=0,snmp_errors_from=0,ipmi_error='',"
+			"snmp_error='',jmx_disable_until=0,jmx_available=0,jmx_errors_from=0,jmx_error='',name='%s',"
+			"info_1='',info_2='',flags=0,templateid=NULL,description='',tls_connect=1,tls_accept=1,"
+			"tls_issuer='',tls_subject='',tls_psk_identity='',tls_psk='',proxy_address='',auto_compress=1",
+		hostid, "Template Probe Status", 3, "Template Probe Status");
 
-	CHECK(DBexecute("insert into hosts_groups set"
-				" hostgroupid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",groupid=" ZBX_FS_UI64,
-			DBget_maxid_num("hosts_groups", 1), hostid, groupid_templates));
+	DB_EXEC("insert into hosts_groups set hostgroupid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",groupid=" ZBX_FS_UI64,
+		DBget_maxid_num("hosts_groups", 1), hostid, groupid_templates);
 
 #define SQL	"insert into applications set applicationid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",name='%s',flags=0"
-	CHECK(DBexecute(SQL, applicationid_configuration  , hostid, "Configuration"));
-	CHECK(DBexecute(SQL, applicationid_internal_errors, hostid, "Internal errors"));
-	CHECK(DBexecute(SQL, applicationid_probe_status   , hostid, "Probe status"));
+	DB_EXEC(SQL, applicationid_configuration  , hostid, "Configuration");
+	DB_EXEC(SQL, applicationid_internal_errors, hostid, "Internal errors");
+	DB_EXEC(SQL, applicationid_probe_status   , hostid, "Probe status");
 #undef SQL
 
 #define SQL	"insert into items set itemid=" ZBX_FS_UI64 ",type=%d,snmp_community='',snmp_oid='',"			\
@@ -2059,37 +2043,37 @@ static int	DBpatch_4050511(void)
 	/* type 15 = ITEM_TYPE_CALCULATED */
 	/* value_type 0 = ITEM_VALUE_TYPE_FLOAT */
 	/* value_type 3 = ITEM_VALUE_TYPE_UINT64 */
-	/* CHECK(DBexecute(SQL, itemid, type, hostid, name,		*/
+	/* DB_EXEC(SQL, itemid, type, hostid, name,			*/
 	/* 		key_,						*/
-	/* 		delay, value_type, valuemapid, params));	*/
-	CHECK(DBexecute(SQL, itemid_probe_configvalue_rsm_ip4_enabled, 15, hostid, "Value of $1 variable",
-			"probe.configvalue[RSM.IP4.ENABLED]",
-			"300", 3, (zbx_uint64_t)0, "{$RSM.IP4.ENABLED}"));
-	CHECK(DBexecute(SQL, itemid_probe_configvalue_rsm_ip6_enabled, 15, hostid, "Value of $1 variable",
-			"probe.configvalue[RSM.IP6.ENABLED]",
-			"300", 3, (zbx_uint64_t)0, "{$RSM.IP6.ENABLED}"));
-	CHECK(DBexecute(SQL, itemid_resolver_status, 3, hostid, "Local resolver status ($1)",
-			"resolver.status[{$RSM.RESOLVER},{$RESOLVER.STATUS.TIMEOUT},{$RESOLVER.STATUS.TRIES},"
-				"{$RSM.IP4.ENABLED},{$RSM.IP6.ENABLED}]",
-			"60", 3, valuemapid_service_state, ""));
-	CHECK(DBexecute(SQL, itemid_rsm_errors, 3, hostid, "Internal error rate",
-			"rsm.errors",
-			"60", 0, (zbx_uint64_t)0, ""));
-	CHECK(DBexecute(SQL, itemid_rsm_probe_status_automatic, 3, hostid, "Probe status ($1)",
-			"rsm.probe.status[automatic,\"{$RSM.IP4.ROOTSERVERS1}\",\"{$RSM.IP6.ROOTSERVERS1}\"]",
-			"60", 3, valuemapid_rsm_probe_status, ""));
-	CHECK(DBexecute(SQL, itemid_rsm_probe_status_manual, 2, hostid, "Probe status ($1)",
-			"rsm.probe.status[manual]",
-			"0", 3, valuemapid_rsm_probe_status, ""));
+	/* 		delay, value_type, valuemapid, params);		*/
+	DB_EXEC(SQL, itemid_probe_configvalue_rsm_ip4_enabled, 15, hostid, "Value of $1 variable",
+		"probe.configvalue[RSM.IP4.ENABLED]",
+		"300", 3, (zbx_uint64_t)0, "{$RSM.IP4.ENABLED}");
+	DB_EXEC(SQL, itemid_probe_configvalue_rsm_ip6_enabled, 15, hostid, "Value of $1 variable",
+		"probe.configvalue[RSM.IP6.ENABLED]",
+		"300", 3, (zbx_uint64_t)0, "{$RSM.IP6.ENABLED}");
+	DB_EXEC(SQL, itemid_resolver_status, 3, hostid, "Local resolver status ($1)",
+		"resolver.status[{$RSM.RESOLVER},{$RESOLVER.STATUS.TIMEOUT},{$RESOLVER.STATUS.TRIES},"
+			"{$RSM.IP4.ENABLED},{$RSM.IP6.ENABLED}]",
+		"60", 3, valuemapid_service_state, "");
+	DB_EXEC(SQL, itemid_rsm_errors, 3, hostid, "Internal error rate",
+		"rsm.errors",
+		"60", 0, (zbx_uint64_t)0, "");
+	DB_EXEC(SQL, itemid_rsm_probe_status_automatic, 3, hostid, "Probe status ($1)",
+		"rsm.probe.status[automatic,\"{$RSM.IP4.ROOTSERVERS1}\",\"{$RSM.IP6.ROOTSERVERS1}\"]",
+		"60", 3, valuemapid_rsm_probe_status, "");
+	DB_EXEC(SQL, itemid_rsm_probe_status_manual, 2, hostid, "Probe status ($1)",
+		"rsm.probe.status[manual]",
+		"0", 3, valuemapid_rsm_probe_status, "");
 #undef SQL
 
 #define SQL	"insert into items_applications set itemappid=" ZBX_FS_UI64 ",applicationid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64
-	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_configuration  , itemid_probe_configvalue_rsm_ip4_enabled));
-	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_configuration  , itemid_probe_configvalue_rsm_ip6_enabled));
-	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_probe_status   , itemid_resolver_status));
-	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_internal_errors, itemid_rsm_errors));
-	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_probe_status   , itemid_rsm_probe_status_automatic));
-	CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_probe_status   , itemid_rsm_probe_status_manual));
+	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicationid_configuration  , itemid_probe_configvalue_rsm_ip4_enabled);
+	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicationid_configuration  , itemid_probe_configvalue_rsm_ip6_enabled);
+	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicationid_probe_status   , itemid_resolver_status);
+	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicationid_internal_errors, itemid_rsm_errors);
+	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicationid_probe_status   , itemid_rsm_probe_status_automatic);
+	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicationid_probe_status   , itemid_rsm_probe_status_manual);
 #undef SQL
 
 #define SQL	"insert into triggers set triggerid=" ZBX_FS_UI64 ",expression='{" ZBX_FS_UI64 "}%s',description='%s',"	\
@@ -2099,34 +2083,34 @@ static int	DBpatch_4050511(void)
 	/* priority 2 = TRIGGER_SEVERITY_WARNING */
 	/* priority 3 = TRIGGER_SEVERITY_AVERAGE */
 	/* priority 4 = TRIGGER_SEVERITY_HIGH */
-	CHECK(DBexecute(SQL, triggerid_int_err_1, functionid_int_err_1, ">0",
-			"Internal errors happening", 2));
-	CHECK(DBexecute(SQL, triggerid_int_err_2, functionid_int_err_2, ">0",
-			"Internal errors happening for {$PROBE.INTERNAL.ERROR.INTERVAL}", 4));
-	CHECK(DBexecute(SQL, triggerid_probe_disabled_1, functionid_probe_disabled_1, "=0",
-			"Probe {HOST.NAME} has been disabled by tests", 4));
-	CHECK(DBexecute(SQL, triggerid_probe_disabled_2, functionid_probe_disabled_2, "=0",
-			"Probe {HOST.NAME} has been disabled for more than {$RSM.PROBE.MAX.OFFLINE}", 3));
-	CHECK(DBexecute(SQL, triggerid_probe_knocked_out, functionid_probe_knocked_out, "=0",
-			"Probe {HOST.NAME} has been knocked out", 4));
+	DB_EXEC(SQL, triggerid_int_err_1, functionid_int_err_1, ">0",
+		"Internal errors happening", 2);
+	DB_EXEC(SQL, triggerid_int_err_2, functionid_int_err_2, ">0",
+		"Internal errors happening for {$PROBE.INTERNAL.ERROR.INTERVAL}", 4);
+	DB_EXEC(SQL, triggerid_probe_disabled_1, functionid_probe_disabled_1, "=0",
+		"Probe {HOST.NAME} has been disabled by tests", 4);
+	DB_EXEC(SQL, triggerid_probe_disabled_2, functionid_probe_disabled_2, "=0",
+		"Probe {HOST.NAME} has been disabled for more than {$RSM.PROBE.MAX.OFFLINE}", 3);
+	DB_EXEC(SQL, triggerid_probe_knocked_out, functionid_probe_knocked_out, "=0",
+		"Probe {HOST.NAME} has been knocked out", 4);
 #undef SQL
 
 #define SQL	"insert into functions set functionid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ",triggerid=" ZBX_FS_UI64 ",name='%s',parameter='%s'"
-	CHECK(DBexecute(SQL, functionid_int_err_1, itemid_rsm_errors, triggerid_int_err_1,
-			"last", ""));
-	CHECK(DBexecute(SQL, functionid_int_err_2, itemid_rsm_errors, triggerid_int_err_2,
-			"min", "{$PROBE.INTERNAL.ERROR.INTERVAL}"));
-	CHECK(DBexecute(SQL, functionid_probe_disabled_1, itemid_rsm_probe_status_automatic, triggerid_probe_disabled_1,
-			"last", "0"));
-	CHECK(DBexecute(SQL, functionid_probe_disabled_2, itemid_rsm_probe_status_manual, triggerid_probe_disabled_2,
-			"max", "{$RSM.PROBE.MAX.OFFLINE}"));
-	CHECK(DBexecute(SQL, functionid_probe_knocked_out, itemid_rsm_probe_status_manual, triggerid_probe_knocked_out,
-			"last", "0"));
+	DB_EXEC(SQL, functionid_int_err_1, itemid_rsm_errors, triggerid_int_err_1,
+		"last", "");
+	DB_EXEC(SQL, functionid_int_err_2, itemid_rsm_errors, triggerid_int_err_2,
+		"min", "{$PROBE.INTERNAL.ERROR.INTERVAL}");
+	DB_EXEC(SQL, functionid_probe_disabled_1, itemid_rsm_probe_status_automatic, triggerid_probe_disabled_1,
+		"last", "0");
+	DB_EXEC(SQL, functionid_probe_disabled_2, itemid_rsm_probe_status_manual, triggerid_probe_disabled_2,
+		"max", "{$RSM.PROBE.MAX.OFFLINE}");
+	DB_EXEC(SQL, functionid_probe_knocked_out, itemid_rsm_probe_status_manual, triggerid_probe_knocked_out,
+		"last", "0");
 #undef SQL
 
-	CHECK(DBexecute("insert into trigger_depends set"
-				" triggerdepid=" ZBX_FS_UI64 ",triggerid_down=" ZBX_FS_UI64 ",triggerid_up=" ZBX_FS_UI64,
-			DBget_maxid_num("trigger_depends", 1), triggerid_int_err_1, triggerid_int_err_2));
+	DB_EXEC("insert into trigger_depends set"
+			" triggerdepid=" ZBX_FS_UI64 ",triggerid_down=" ZBX_FS_UI64 ",triggerid_up=" ZBX_FS_UI64,
+		DBget_maxid_num("trigger_depends", 1), triggerid_int_err_1, triggerid_int_err_2);
 
 	ret = SUCCEED;
 out:
@@ -2139,8 +2123,7 @@ static int	DBpatch_4050512(void)
 
 	ONLY_SERVER();
 
-	CHECK(DBexecute("update hosts set host='Template RDAP Test',name='Template RDAP Test'"
-			" where host='Template RDAP'"));
+	DB_EXEC("update hosts set host='Template RDAP Test',name='Template RDAP Test' where host='Template RDAP'");
 
 	ret = SUCCEED;
 out:
@@ -2154,8 +2137,7 @@ static int	DBpatch_4050513(void)
 	ONLY_SERVER();
 
 	/* 4 = ITEM_VALUE_TYPE_TEXT */
-	CHECK(DBexecute("update items set name='RDAP Test',value_type=4,history='0',trends='0'"
-			" where key_ like 'rdap[%%'"));
+	DB_EXEC("update items set name='RDAP Test',value_type=4,history='0',trends='0' where key_ like 'rdap[%%'");
 
 	ret = SUCCEED;
 out:
@@ -2169,9 +2151,9 @@ static int	DBpatch_4050514(void)
 	ONLY_SERVER();
 
 	/* 18 = ITEM_TYPE_DEPENDENT */
-	CHECK(DBexecute("update items as i1 inner join items as i2 on i1.hostid=i2.hostid set"
+	DB_EXEC("update items as i1 inner join items as i2 on i1.hostid=i2.hostid set"
 			" i1.type=18,i1.master_itemid=i2.itemid where i1.key_ in ('rdap.ip','rdap.rtt') and"
-			" i2.key_ like 'rdap[%%'"));
+			" i2.key_ like 'rdap[%%'");
 
 	ret = SUCCEED;
 out:
@@ -2205,9 +2187,9 @@ static int	db_insert_rdap_item_preproc(const char *item_key, const char *item_pr
 	for (i = 0; i < rdap_itemids.values_num; i++)
 	{
 		/* 12 = ZBX_PREPROC_JSONPATH */
-		CHECK(DBexecute("insert into item_preproc set item_preprocid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ","
-				"step=1,type=12,params='%s',error_handler=0",
-				item_preprocid_next, rdap_itemids.values[i], item_preproc_param));
+		DB_EXEC("insert into item_preproc set item_preprocid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ",step=1,"
+				"type=12,params='%s',error_handler=0",
+			item_preprocid_next, rdap_itemids.values[i], item_preproc_param);
 		item_preprocid_next++;
 	}
 
@@ -2225,8 +2207,8 @@ static int	DBpatch_4050515(void)
 
 	ONLY_SERVER();
 
-	CHECK_RESULT(db_insert_rdap_item_preproc("rdap.ip", "$.rdap.ip"));
-	CHECK_RESULT(db_insert_rdap_item_preproc("rdap.rtt", "$.rdap.rtt"));
+	CHECK(db_insert_rdap_item_preproc("rdap.ip", "$.rdap.ip"));
+	CHECK(db_insert_rdap_item_preproc("rdap.rtt", "$.rdap.rtt"));
 
 	ret = SUCCEED;
 out:
@@ -2294,21 +2276,19 @@ static int	DBpatch_4050516(void)
 	functionid_rollweek_over_100 = functionid_next++;
 
 	/* status 3 = HOST_STATUS_TEMPLATE */
-	CHECK(DBexecute("insert into hosts set hostid=" ZBX_FS_UI64 ",created=0,proxy_hostid=NULL,host='%s',status=%d,"
-				"disable_until=0,error='',available=0,errors_from=0,lastaccess=0,ipmi_authtype=-1,"
-				"ipmi_privilege=2,ipmi_username='',ipmi_password='',ipmi_disable_until=0,"
-				"ipmi_available=0,snmp_disable_until=0,snmp_available=0,maintenanceid=NULL,"
-				"maintenance_status=0,maintenance_type=0,maintenance_from=0,ipmi_errors_from=0,"
-				"snmp_errors_from=0,ipmi_error='',snmp_error='',jmx_disable_until=0,jmx_available=0,"
-				"jmx_errors_from=0,jmx_error='',name='%s',info_1='',info_2='',flags=0,templateid=NULL,"
-				"description='%s',tls_connect=1,tls_accept=1,tls_issuer='',tls_subject='',"
-				"tls_psk_identity='',tls_psk='',proxy_address='',auto_compress=1",
-			hostid, "Template DNSSEC Status", 3, "Template DNSSEC Status",
-			"DNSSEC SLV items and triggers for linking to <RSMHOST> hosts"));
+	DB_EXEC("insert into hosts set hostid=" ZBX_FS_UI64 ",created=0,proxy_hostid=NULL,host='%s',status=%d,"
+			"disable_until=0,error='',available=0,errors_from=0,lastaccess=0,ipmi_authtype=-1,"
+			"ipmi_privilege=2,ipmi_username='',ipmi_password='',ipmi_disable_until=0,ipmi_available=0,"
+			"snmp_disable_until=0,snmp_available=0,maintenanceid=NULL,maintenance_status=0,"
+			"maintenance_type=0,maintenance_from=0,ipmi_errors_from=0,snmp_errors_from=0,ipmi_error='',"
+			"snmp_error='',jmx_disable_until=0,jmx_available=0,jmx_errors_from=0,jmx_error='',name='%s',"
+			"info_1='',info_2='',flags=0,templateid=NULL,description='%s',tls_connect=1,tls_accept=1,"
+			"tls_issuer='',tls_subject='',tls_psk_identity='',tls_psk='',proxy_address='',auto_compress=1",
+		hostid, "Template DNSSEC Status", 3, "Template DNSSEC Status",
+		"DNSSEC SLV items and triggers for linking to <RSMHOST> hosts");
 
-	CHECK(DBexecute("insert into hosts_groups set"
-				" hostgroupid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",groupid=" ZBX_FS_UI64,
-			DBget_maxid_num("hosts_groups", 1), hostid, groupid_templates));
+	DB_EXEC("insert into hosts_groups set hostgroupid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",groupid=" ZBX_FS_UI64,
+		DBget_maxid_num("hosts_groups", 1), hostid, groupid_templates);
 
 #define SQL	"insert into items set itemid=" ZBX_FS_UI64 ",type=%d,snmp_community='',snmp_oid='',"			\
 			"hostid=" ZBX_FS_UI64 ",name='%s',key_='%s',delay='0',history='90d',trends='365d',status=0,"	\
@@ -2324,17 +2304,17 @@ static int	DBpatch_4050516(void)
 	/* type 2 = ITEM_TYPE_TRAPPER */
 	/* value_type 0 = ITEM_VALUE_TYPE_FLOAT */
 	/* value_type 3 = ITEM_VALUE_TYPE_UINT64 */
-	CHECK(DBexecute(SQL, itemid_avail, 2, hostid, "DNSSEC availability", "rsm.slv.dnssec.avail", 3, "" , valuemapid_rsm_service_availability));
-	CHECK(DBexecute(SQL, itemid_rollweek, 2, hostid, "DNSSEC weekly unavailability", "rsm.slv.dnssec.rollweek", 0, "%", (zbx_uint64_t)0));
+	DB_EXEC(SQL, itemid_avail, 2, hostid, "DNSSEC availability", "rsm.slv.dnssec.avail", 3, "" , valuemapid_rsm_service_availability);
+	DB_EXEC(SQL, itemid_rollweek, 2, hostid, "DNSSEC weekly unavailability", "rsm.slv.dnssec.rollweek", 0, "%", (zbx_uint64_t)0);
 #undef SQL
 
 	/* priority 0 = TRIGGER_SEVERITY_NOT_CLASSIFIED */
-	CHECK(DBexecute("insert into triggers set triggerid=" ZBX_FS_UI64 ","
-				"expression='({TRIGGER.VALUE}=0 and {" ZBX_FS_UI64 "}=0) or ({TRIGGER.VALUE}=1 and {" ZBX_FS_UI64 "}>0)',"
-				"description='%s',url='',status=0,value=0,priority=%d,lastchange=0,comments='',"
-				"error='',templateid=NULL,type=0,state=0,flags=0,recovery_mode=0,"
-				"recovery_expression='',correlation_mode=0,correlation_tag='',manual_close=0,opdata=''",
-			triggerid_service_down, functionid_service_down_1, functionid_service_down_2, "DNSSEC service is down", 0));
+	DB_EXEC("insert into triggers set triggerid=" ZBX_FS_UI64 ","
+			"expression='({TRIGGER.VALUE}=0 and {" ZBX_FS_UI64 "}=0) or ({TRIGGER.VALUE}=1 and {" ZBX_FS_UI64 "}>0)',"
+			"description='%s',url='',status=0,value=0,priority=%d,lastchange=0,comments='',error='',"
+			"templateid=NULL,type=0,state=0,flags=0,recovery_mode=0,recovery_expression='',"
+			"correlation_mode=0,correlation_tag='',manual_close=0,opdata=''",
+		triggerid_service_down, functionid_service_down_1, functionid_service_down_2, "DNSSEC service is down", 0);
 
 #define SQL	"insert into triggers set triggerid=" ZBX_FS_UI64 ",expression='{" ZBX_FS_UI64 "}%s',description='%s',"	\
 			"url='',status=0,value=0,priority=%d,lastchange=0,comments='',error='',templateid=NULL,type=0,"	\
@@ -2344,28 +2324,28 @@ static int	DBpatch_4050516(void)
 	/* priority 3 = TRIGGER_SEVERITY_AVERAGE */
 	/* priority 4 = TRIGGER_SEVERITY_HIGH */
 	/* priority 5 = TRIGGER_SEVERITY_DISASTER */
-	CHECK(DBexecute(SQL, triggerid_rollweek_over_10 , functionid_rollweek_over_10 , ">=10" , "DNSSEC rolling week is over 10%" , 2));
-	CHECK(DBexecute(SQL, triggerid_rollweek_over_25 , functionid_rollweek_over_25 , ">=25" , "DNSSEC rolling week is over 25%" , 3));
-	CHECK(DBexecute(SQL, triggerid_rollweek_over_50 , functionid_rollweek_over_50 , ">=50" , "DNSSEC rolling week is over 50%" , 3));
-	CHECK(DBexecute(SQL, triggerid_rollweek_over_75 , functionid_rollweek_over_75 , ">=75" , "DNSSEC rolling week is over 75%" , 4));
-	CHECK(DBexecute(SQL, triggerid_rollweek_over_100, functionid_rollweek_over_100, ">=100", "DNSSEC rolling week is over 100%", 5));
+	DB_EXEC(SQL, triggerid_rollweek_over_10 , functionid_rollweek_over_10 , ">=10" , "DNSSEC rolling week is over 10%" , 2);
+	DB_EXEC(SQL, triggerid_rollweek_over_25 , functionid_rollweek_over_25 , ">=25" , "DNSSEC rolling week is over 25%" , 3);
+	DB_EXEC(SQL, triggerid_rollweek_over_50 , functionid_rollweek_over_50 , ">=50" , "DNSSEC rolling week is over 50%" , 3);
+	DB_EXEC(SQL, triggerid_rollweek_over_75 , functionid_rollweek_over_75 , ">=75" , "DNSSEC rolling week is over 75%" , 4);
+	DB_EXEC(SQL, triggerid_rollweek_over_100, functionid_rollweek_over_100, ">=100", "DNSSEC rolling week is over 100%", 5);
 #undef SQL
 
 #define SQL	"insert into functions set functionid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ",triggerid=" ZBX_FS_UI64 ",name='%s',parameter='%s'"
-	CHECK(DBexecute(SQL, functionid_service_down_1   , itemid_avail   , triggerid_service_down     , "max"  , "#{$RSM.INCIDENT.DNSSEC.FAIL}"));
-	CHECK(DBexecute(SQL, functionid_service_down_2   , itemid_avail   , triggerid_service_down     , "count", "#{$RSM.INCIDENT.DNSSEC.RECOVER},0,\"eq\""));
-	CHECK(DBexecute(SQL, functionid_rollweek_over_10 , itemid_rollweek, triggerid_rollweek_over_10 , "last" , "0"));
-	CHECK(DBexecute(SQL, functionid_rollweek_over_25 , itemid_rollweek, triggerid_rollweek_over_25 , "last" , "0"));
-	CHECK(DBexecute(SQL, functionid_rollweek_over_50 , itemid_rollweek, triggerid_rollweek_over_50 , "last" , "0"));
-	CHECK(DBexecute(SQL, functionid_rollweek_over_75 , itemid_rollweek, triggerid_rollweek_over_75 , "last" , "0"));
-	CHECK(DBexecute(SQL, functionid_rollweek_over_100, itemid_rollweek, triggerid_rollweek_over_100, "last" , "0"));
+	DB_EXEC(SQL, functionid_service_down_1   , itemid_avail   , triggerid_service_down     , "max"  , "#{$RSM.INCIDENT.DNSSEC.FAIL}");
+	DB_EXEC(SQL, functionid_service_down_2   , itemid_avail   , triggerid_service_down     , "count", "#{$RSM.INCIDENT.DNSSEC.RECOVER},0,\"eq\"");
+	DB_EXEC(SQL, functionid_rollweek_over_10 , itemid_rollweek, triggerid_rollweek_over_10 , "last" , "0");
+	DB_EXEC(SQL, functionid_rollweek_over_25 , itemid_rollweek, triggerid_rollweek_over_25 , "last" , "0");
+	DB_EXEC(SQL, functionid_rollweek_over_50 , itemid_rollweek, triggerid_rollweek_over_50 , "last" , "0");
+	DB_EXEC(SQL, functionid_rollweek_over_75 , itemid_rollweek, triggerid_rollweek_over_75 , "last" , "0");
+	DB_EXEC(SQL, functionid_rollweek_over_100, itemid_rollweek, triggerid_rollweek_over_100, "last" , "0");
 #undef SQL
 
 #define SQL	"insert into trigger_depends set triggerdepid=" ZBX_FS_UI64 ",triggerid_down=" ZBX_FS_UI64 ",triggerid_up=" ZBX_FS_UI64
-	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rollweek_over_10, triggerid_rollweek_over_25));
-	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rollweek_over_25, triggerid_rollweek_over_50));
-	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rollweek_over_50, triggerid_rollweek_over_75));
-	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rollweek_over_75, triggerid_rollweek_over_100));
+	DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rollweek_over_10, triggerid_rollweek_over_25);
+	DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rollweek_over_25, triggerid_rollweek_over_50);
+	DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rollweek_over_50, triggerid_rollweek_over_75);
+	DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rollweek_over_75, triggerid_rollweek_over_100);
 #undef SQL
 
 	ret = SUCCEED;
@@ -2480,21 +2460,19 @@ static int	DBpatch_4050517(void)
 	functionid_rtt_pfailed_over_100 = functionid_next++;
 
 	/* status 3 = HOST_STATUS_TEMPLATE */
-	CHECK(DBexecute("insert into hosts set hostid=" ZBX_FS_UI64 ",created=0,proxy_hostid=NULL,host='%s',status=%d,"
-				"disable_until=0,error='',available=0,errors_from=0,lastaccess=0,ipmi_authtype=-1,"
-				"ipmi_privilege=2,ipmi_username='',ipmi_password='',ipmi_disable_until=0,"
-				"ipmi_available=0,snmp_disable_until=0,snmp_available=0,maintenanceid=NULL,"
-				"maintenance_status=0,maintenance_type=0,maintenance_from=0,ipmi_errors_from=0,"
-				"snmp_errors_from=0,ipmi_error='',snmp_error='',jmx_disable_until=0,jmx_available=0,"
-				"jmx_errors_from=0,jmx_error='',name='%s',info_1='',info_2='',flags=0,templateid=NULL,"
-				"description='%s',tls_connect=1,tls_accept=1,tls_issuer='',tls_subject='',"
-				"tls_psk_identity='',tls_psk='',proxy_address='',auto_compress=1",
-			hostid, "Template RDAP Status", 3, "Template RDAP Status",
-			"RDAP SLV items and triggers for linking to <RSMHOST> hosts"));
+	DB_EXEC("insert into hosts set hostid=" ZBX_FS_UI64 ",created=0,proxy_hostid=NULL,host='%s',status=%d,"
+			"disable_until=0,error='',available=0,errors_from=0,lastaccess=0,ipmi_authtype=-1,"
+			"ipmi_privilege=2,ipmi_username='',ipmi_password='',ipmi_disable_until=0,ipmi_available=0,"
+			"snmp_disable_until=0,snmp_available=0,maintenanceid=NULL,maintenance_status=0,"
+			"maintenance_type=0,maintenance_from=0,ipmi_errors_from=0,snmp_errors_from=0,ipmi_error='',"
+			"snmp_error='',jmx_disable_until=0,jmx_available=0,jmx_errors_from=0,jmx_error='',name='%s',"
+			"info_1='',info_2='',flags=0,templateid=NULL,description='%s',tls_connect=1,tls_accept=1,"
+			"tls_issuer='',tls_subject='',tls_psk_identity='',tls_psk='',proxy_address='',auto_compress=1",
+		hostid, "Template RDAP Status", 3, "Template RDAP Status",
+		"RDAP SLV items and triggers for linking to <RSMHOST> hosts");
 
-	CHECK(DBexecute("insert into hosts_groups set"
-				" hostgroupid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",groupid=" ZBX_FS_UI64,
-			DBget_maxid_num("hosts_groups", 1), hostid, groupid_templates));
+	DB_EXEC("insert into hosts_groups set hostgroupid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",groupid=" ZBX_FS_UI64,
+		DBget_maxid_num("hosts_groups", 1), hostid, groupid_templates);
 
 #define SQL	"insert into items set itemid=" ZBX_FS_UI64 ",type=%d,snmp_community='',snmp_oid='',"			\
 			"hostid=" ZBX_FS_UI64 ",name='%s',key_='%s',delay='0',history='90d',trends='365d',status=0,"	\
@@ -2510,21 +2488,21 @@ static int	DBpatch_4050517(void)
 	/* type 2 = ITEM_TYPE_TRAPPER */
 	/* value_type 0 = ITEM_VALUE_TYPE_FLOAT */
 	/* value_type 3 = ITEM_VALUE_TYPE_UINT64 */
-	CHECK(DBexecute(SQL, itemid_avail, 2, hostid, "RDAP availability", "rsm.slv.rdap.avail", 3, "" , valuemapid_rsm_service_availability));
-	CHECK(DBexecute(SQL, itemid_downtime, 2, hostid, "RDAP minutes of downtime", "rsm.slv.rdap.downtime", 3, "" , (zbx_uint64_t)0));
-	CHECK(DBexecute(SQL, itemid_rollweek, 2, hostid, "RDAP weekly unavailability", "rsm.slv.rdap.rollweek", 0, "%", (zbx_uint64_t)0));
-	CHECK(DBexecute(SQL, itemid_rtt_failed, 2, hostid, "Number of failed monthly RDAP queries", "rsm.slv.rdap.rtt.failed", 3, "" , (zbx_uint64_t)0));
-	CHECK(DBexecute(SQL, itemid_rtt_performed, 2, hostid, "Number of performed monthly RDAP queries", "rsm.slv.rdap.rtt.performed", 3, "" , (zbx_uint64_t)0));
-	CHECK(DBexecute(SQL, itemid_rtt_pfailed, 2, hostid, "Ratio of failed monthly RDAP queries", "rsm.slv.rdap.rtt.pfailed", 0, "%", (zbx_uint64_t)0));
+	DB_EXEC(SQL, itemid_avail, 2, hostid, "RDAP availability", "rsm.slv.rdap.avail", 3, "" , valuemapid_rsm_service_availability);
+	DB_EXEC(SQL, itemid_downtime, 2, hostid, "RDAP minutes of downtime", "rsm.slv.rdap.downtime", 3, "" , (zbx_uint64_t)0);
+	DB_EXEC(SQL, itemid_rollweek, 2, hostid, "RDAP weekly unavailability", "rsm.slv.rdap.rollweek", 0, "%", (zbx_uint64_t)0);
+	DB_EXEC(SQL, itemid_rtt_failed, 2, hostid, "Number of failed monthly RDAP queries", "rsm.slv.rdap.rtt.failed", 3, "" , (zbx_uint64_t)0);
+	DB_EXEC(SQL, itemid_rtt_performed, 2, hostid, "Number of performed monthly RDAP queries", "rsm.slv.rdap.rtt.performed", 3, "" , (zbx_uint64_t)0);
+	DB_EXEC(SQL, itemid_rtt_pfailed, 2, hostid, "Ratio of failed monthly RDAP queries", "rsm.slv.rdap.rtt.pfailed", 0, "%", (zbx_uint64_t)0);
 #undef SQL
 
 	/* priority 0 = TRIGGER_SEVERITY_NOT_CLASSIFIED */
-	CHECK(DBexecute("insert into triggers set triggerid=" ZBX_FS_UI64 ","
-				"expression='({TRIGGER.VALUE}=0 and {" ZBX_FS_UI64 "}=0) or ({TRIGGER.VALUE}=1 and {" ZBX_FS_UI64 "}>0)',"
-				"description='%s',url='',status=0,value=0,priority=%d,lastchange=0,comments='',"
-				"error='',templateid=NULL,type=0,state=0,flags=0,recovery_mode=0,"
-				"recovery_expression='',correlation_mode=0,correlation_tag='',manual_close=0,opdata=''",
-			triggerid_service_down, functionid_service_down_1, functionid_service_down_2, "RDAP service is down", 0));
+	DB_EXEC("insert into triggers set triggerid=" ZBX_FS_UI64 ","
+			"expression='({TRIGGER.VALUE}=0 and {" ZBX_FS_UI64 "}=0) or ({TRIGGER.VALUE}=1 and {" ZBX_FS_UI64 "}>0)',"
+			"description='%s',url='',status=0,value=0,priority=%d,lastchange=0,comments='',error='',"
+			"templateid=NULL,type=0,state=0,flags=0,recovery_mode=0,recovery_expression='',"
+			"correlation_mode=0,correlation_tag='',manual_close=0,opdata=''",
+		triggerid_service_down, functionid_service_down_1, functionid_service_down_2, "RDAP service is down", 0);
 
 #define SQL	"insert into triggers set triggerid=" ZBX_FS_UI64 ",expression='{" ZBX_FS_UI64 "}%s',description='%s',"	\
 			"url='',status=0,value=0,priority=%d,lastchange=0,comments='',error='',templateid=NULL,type=0,"	\
@@ -2534,71 +2512,71 @@ static int	DBpatch_4050517(void)
 	/* priority 3 = TRIGGER_SEVERITY_AVERAGE */
 	/* priority 4 = TRIGGER_SEVERITY_HIGH */
 	/* priority 5 = TRIGGER_SEVERITY_DISASTER */
-	CHECK(DBexecute(SQL, triggerid_downtime_over_10, functionid_downtime_over_10, ">={$RSM.SLV.RDAP.DOWNTIME}*0.1",
-			"RDAP service was unavailable for 10% of allowed $1 minutes", 2));
-	CHECK(DBexecute(SQL, triggerid_downtime_over_25, functionid_downtime_over_25, ">={$RSM.SLV.RDAP.DOWNTIME}*0.25",
-			"RDAP service was unavailable for 25% of allowed $1 minutes", 3));
-	CHECK(DBexecute(SQL, triggerid_downtime_over_50, functionid_downtime_over_50, ">={$RSM.SLV.RDAP.DOWNTIME}*0.5",
-			"RDAP service was unavailable for 50% of allowed $1 minutes", 3));
-	CHECK(DBexecute(SQL, triggerid_downtime_over_75, functionid_downtime_over_75, ">={$RSM.SLV.RDAP.DOWNTIME}*0.75",
-			"RDAP service was unavailable for 75% of allowed $1 minutes", 4));
-	CHECK(DBexecute(SQL, triggerid_downtime_over_100, functionid_downtime_over_100, ">={$RSM.SLV.RDAP.DOWNTIME}",
-			"RDAP service was unavailable for 100% of allowed $1 minutes", 5));
-	CHECK(DBexecute(SQL, triggerid_rollweek_over_10, functionid_rollweek_over_10, ">=10",
-			"RDAP rolling week is over 10%", 2));
-	CHECK(DBexecute(SQL, triggerid_rollweek_over_25, functionid_rollweek_over_25, ">=25",
-			"RDAP rolling week is over 25%", 3));
-	CHECK(DBexecute(SQL, triggerid_rollweek_over_50, functionid_rollweek_over_50, ">=50",
-			"RDAP rolling week is over 50%", 3));
-	CHECK(DBexecute(SQL, triggerid_rollweek_over_75, functionid_rollweek_over_75, ">=75",
-			"RDAP rolling week is over 75%", 4));
-	CHECK(DBexecute(SQL, triggerid_rollweek_over_100, functionid_rollweek_over_100, ">=100",
-			"RDAP rolling week is over 100%", 5));
-	CHECK(DBexecute(SQL, triggerid_rtt_pfailed_over_10, functionid_rtt_pfailed_over_10, ">{$RSM.SLV.RDAP.RTT}*0.1",
-			"Ratio of failed RDAP tests exceeded 10% of allowed $1%", 2));
-	CHECK(DBexecute(SQL, triggerid_rtt_pfailed_over_25, functionid_rtt_pfailed_over_25, ">{$RSM.SLV.RDAP.RTT}*0.25",
-			"Ratio of failed RDAP tests exceeded 25% of allowed $1%", 3));
-	CHECK(DBexecute(SQL, triggerid_rtt_pfailed_over_50, functionid_rtt_pfailed_over_50, ">{$RSM.SLV.RDAP.RTT}*0.5",
-			"Ratio of failed RDAP tests exceeded 50% of allowed $1%", 3));
-	CHECK(DBexecute(SQL, triggerid_rtt_pfailed_over_75, functionid_rtt_pfailed_over_75, ">{$RSM.SLV.RDAP.RTT}*0.75",
-			"Ratio of failed RDAP tests exceeded 75% of allowed $1%", 4));
-	CHECK(DBexecute(SQL, triggerid_rtt_pfailed_over_100, functionid_rtt_pfailed_over_100, ">{$RSM.SLV.RDAP.RTT}",
-			"Ratio of failed RDAP tests exceeded 100% of allowed $1%", 5));
+	DB_EXEC(SQL, triggerid_downtime_over_10, functionid_downtime_over_10, ">={$RSM.SLV.RDAP.DOWNTIME}*0.1",
+		"RDAP service was unavailable for 10% of allowed $1 minutes", 2);
+	DB_EXEC(SQL, triggerid_downtime_over_25, functionid_downtime_over_25, ">={$RSM.SLV.RDAP.DOWNTIME}*0.25",
+		"RDAP service was unavailable for 25% of allowed $1 minutes", 3);
+	DB_EXEC(SQL, triggerid_downtime_over_50, functionid_downtime_over_50, ">={$RSM.SLV.RDAP.DOWNTIME}*0.5",
+		"RDAP service was unavailable for 50% of allowed $1 minutes", 3);
+	DB_EXEC(SQL, triggerid_downtime_over_75, functionid_downtime_over_75, ">={$RSM.SLV.RDAP.DOWNTIME}*0.75",
+		"RDAP service was unavailable for 75% of allowed $1 minutes", 4);
+	DB_EXEC(SQL, triggerid_downtime_over_100, functionid_downtime_over_100, ">={$RSM.SLV.RDAP.DOWNTIME}",
+		"RDAP service was unavailable for 100% of allowed $1 minutes", 5);
+	DB_EXEC(SQL, triggerid_rollweek_over_10, functionid_rollweek_over_10, ">=10",
+		"RDAP rolling week is over 10%", 2);
+	DB_EXEC(SQL, triggerid_rollweek_over_25, functionid_rollweek_over_25, ">=25",
+		"RDAP rolling week is over 25%", 3);
+	DB_EXEC(SQL, triggerid_rollweek_over_50, functionid_rollweek_over_50, ">=50",
+		"RDAP rolling week is over 50%", 3);
+	DB_EXEC(SQL, triggerid_rollweek_over_75, functionid_rollweek_over_75, ">=75",
+		"RDAP rolling week is over 75%", 4);
+	DB_EXEC(SQL, triggerid_rollweek_over_100, functionid_rollweek_over_100, ">=100",
+		"RDAP rolling week is over 100%", 5);
+	DB_EXEC(SQL, triggerid_rtt_pfailed_over_10, functionid_rtt_pfailed_over_10, ">{$RSM.SLV.RDAP.RTT}*0.1",
+		"Ratio of failed RDAP tests exceeded 10% of allowed $1%", 2);
+	DB_EXEC(SQL, triggerid_rtt_pfailed_over_25, functionid_rtt_pfailed_over_25, ">{$RSM.SLV.RDAP.RTT}*0.25",
+		"Ratio of failed RDAP tests exceeded 25% of allowed $1%", 3);
+	DB_EXEC(SQL, triggerid_rtt_pfailed_over_50, functionid_rtt_pfailed_over_50, ">{$RSM.SLV.RDAP.RTT}*0.5",
+		"Ratio of failed RDAP tests exceeded 50% of allowed $1%", 3);
+	DB_EXEC(SQL, triggerid_rtt_pfailed_over_75, functionid_rtt_pfailed_over_75, ">{$RSM.SLV.RDAP.RTT}*0.75",
+		"Ratio of failed RDAP tests exceeded 75% of allowed $1%", 4);
+	DB_EXEC(SQL, triggerid_rtt_pfailed_over_100, functionid_rtt_pfailed_over_100, ">{$RSM.SLV.RDAP.RTT}",
+		"Ratio of failed RDAP tests exceeded 100% of allowed $1%", 5);
 #undef SQL
 
 #define SQL	"insert into functions set functionid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ",triggerid=" ZBX_FS_UI64 ",name='%s',parameter='%s'"
-	CHECK(DBexecute(SQL, functionid_service_down_1      , itemid_avail      , triggerid_service_down        , "max"  , "#{$RSM.INCIDENT.RDAP.FAIL}"));
-	CHECK(DBexecute(SQL, functionid_service_down_2      , itemid_avail      , triggerid_service_down        , "count", "#{$RSM.INCIDENT.RDAP.RECOVER},0,\"eq\""));
-	CHECK(DBexecute(SQL, functionid_downtime_over_10    , itemid_downtime   , triggerid_downtime_over_10    , "last" , "0"));
-	CHECK(DBexecute(SQL, functionid_downtime_over_25    , itemid_downtime   , triggerid_downtime_over_25    , "last" , "0"));
-	CHECK(DBexecute(SQL, functionid_downtime_over_50    , itemid_downtime   , triggerid_downtime_over_50    , "last" , "0"));
-	CHECK(DBexecute(SQL, functionid_downtime_over_75    , itemid_downtime   , triggerid_downtime_over_75    , "last" , "0"));
-	CHECK(DBexecute(SQL, functionid_downtime_over_100   , itemid_downtime   , triggerid_downtime_over_100   , "last" , "0"));
-	CHECK(DBexecute(SQL, functionid_rollweek_over_10    , itemid_rollweek   , triggerid_rollweek_over_10    , "last" , "0"));
-	CHECK(DBexecute(SQL, functionid_rollweek_over_25    , itemid_rollweek   , triggerid_rollweek_over_25    , "last" , "0"));
-	CHECK(DBexecute(SQL, functionid_rollweek_over_50    , itemid_rollweek   , triggerid_rollweek_over_50    , "last" , "0"));
-	CHECK(DBexecute(SQL, functionid_rollweek_over_75    , itemid_rollweek   , triggerid_rollweek_over_75    , "last" , "0"));
-	CHECK(DBexecute(SQL, functionid_rollweek_over_100   , itemid_rollweek   , triggerid_rollweek_over_100   , "last" , "0"));
-	CHECK(DBexecute(SQL, functionid_rtt_pfailed_over_10 , itemid_rtt_pfailed, triggerid_rtt_pfailed_over_10 , "last" , ""));
-	CHECK(DBexecute(SQL, functionid_rtt_pfailed_over_25 , itemid_rtt_pfailed, triggerid_rtt_pfailed_over_25 , "last" , ""));
-	CHECK(DBexecute(SQL, functionid_rtt_pfailed_over_50 , itemid_rtt_pfailed, triggerid_rtt_pfailed_over_50 , "last" , ""));
-	CHECK(DBexecute(SQL, functionid_rtt_pfailed_over_75 , itemid_rtt_pfailed, triggerid_rtt_pfailed_over_75 , "last" , ""));
-	CHECK(DBexecute(SQL, functionid_rtt_pfailed_over_100, itemid_rtt_pfailed, triggerid_rtt_pfailed_over_100, "last" , ""));
+	DB_EXEC(SQL, functionid_service_down_1      , itemid_avail      , triggerid_service_down        , "max"  , "#{$RSM.INCIDENT.RDAP.FAIL}");
+	DB_EXEC(SQL, functionid_service_down_2      , itemid_avail      , triggerid_service_down        , "count", "#{$RSM.INCIDENT.RDAP.RECOVER},0,\"eq\"");
+	DB_EXEC(SQL, functionid_downtime_over_10    , itemid_downtime   , triggerid_downtime_over_10    , "last" , "0");
+	DB_EXEC(SQL, functionid_downtime_over_25    , itemid_downtime   , triggerid_downtime_over_25    , "last" , "0");
+	DB_EXEC(SQL, functionid_downtime_over_50    , itemid_downtime   , triggerid_downtime_over_50    , "last" , "0");
+	DB_EXEC(SQL, functionid_downtime_over_75    , itemid_downtime   , triggerid_downtime_over_75    , "last" , "0");
+	DB_EXEC(SQL, functionid_downtime_over_100   , itemid_downtime   , triggerid_downtime_over_100   , "last" , "0");
+	DB_EXEC(SQL, functionid_rollweek_over_10    , itemid_rollweek   , triggerid_rollweek_over_10    , "last" , "0");
+	DB_EXEC(SQL, functionid_rollweek_over_25    , itemid_rollweek   , triggerid_rollweek_over_25    , "last" , "0");
+	DB_EXEC(SQL, functionid_rollweek_over_50    , itemid_rollweek   , triggerid_rollweek_over_50    , "last" , "0");
+	DB_EXEC(SQL, functionid_rollweek_over_75    , itemid_rollweek   , triggerid_rollweek_over_75    , "last" , "0");
+	DB_EXEC(SQL, functionid_rollweek_over_100   , itemid_rollweek   , triggerid_rollweek_over_100   , "last" , "0");
+	DB_EXEC(SQL, functionid_rtt_pfailed_over_10 , itemid_rtt_pfailed, triggerid_rtt_pfailed_over_10 , "last" , "");
+	DB_EXEC(SQL, functionid_rtt_pfailed_over_25 , itemid_rtt_pfailed, triggerid_rtt_pfailed_over_25 , "last" , "");
+	DB_EXEC(SQL, functionid_rtt_pfailed_over_50 , itemid_rtt_pfailed, triggerid_rtt_pfailed_over_50 , "last" , "");
+	DB_EXEC(SQL, functionid_rtt_pfailed_over_75 , itemid_rtt_pfailed, triggerid_rtt_pfailed_over_75 , "last" , "");
+	DB_EXEC(SQL, functionid_rtt_pfailed_over_100, itemid_rtt_pfailed, triggerid_rtt_pfailed_over_100, "last" , "");
 #undef SQL
 
 #define SQL	"insert into trigger_depends set triggerdepid=" ZBX_FS_UI64 ",triggerid_down=" ZBX_FS_UI64 ",triggerid_up=" ZBX_FS_UI64
-	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_downtime_over_10   , triggerid_downtime_over_25));
-	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_downtime_over_25   , triggerid_downtime_over_50));
-	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_downtime_over_50   , triggerid_downtime_over_75));
-	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_downtime_over_75   , triggerid_downtime_over_100));
-	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rollweek_over_10   , triggerid_rollweek_over_25));
-	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rollweek_over_25   , triggerid_rollweek_over_50));
-	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rollweek_over_50   , triggerid_rollweek_over_75));
-	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rollweek_over_75   , triggerid_rollweek_over_100));
-	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rtt_pfailed_over_10, triggerid_rtt_pfailed_over_25));
-	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rtt_pfailed_over_25, triggerid_rtt_pfailed_over_50));
-	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rtt_pfailed_over_50, triggerid_rtt_pfailed_over_75));
-	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rtt_pfailed_over_75, triggerid_rtt_pfailed_over_100));
+	DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_downtime_over_10   , triggerid_downtime_over_25);
+	DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_downtime_over_25   , triggerid_downtime_over_50);
+	DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_downtime_over_50   , triggerid_downtime_over_75);
+	DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_downtime_over_75   , triggerid_downtime_over_100);
+	DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rollweek_over_10   , triggerid_rollweek_over_25);
+	DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rollweek_over_25   , triggerid_rollweek_over_50);
+	DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rollweek_over_50   , triggerid_rollweek_over_75);
+	DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rollweek_over_75   , triggerid_rollweek_over_100);
+	DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rtt_pfailed_over_10, triggerid_rtt_pfailed_over_25);
+	DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rtt_pfailed_over_25, triggerid_rtt_pfailed_over_50);
+	DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rtt_pfailed_over_50, triggerid_rtt_pfailed_over_75);
+	DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rtt_pfailed_over_75, triggerid_rtt_pfailed_over_100);
 #undef SQL
 
 	ret = SUCCEED;
@@ -2713,21 +2691,19 @@ static int	DBpatch_4050518(void)
 	functionid_rtt_pfailed_over_100 = functionid_next++;
 
 	/* status 3 = HOST_STATUS_TEMPLATE */
-	CHECK(DBexecute("insert into hosts set hostid=" ZBX_FS_UI64 ",created=0,proxy_hostid=NULL,host='%s',status=%d,"
-				"disable_until=0,error='',available=0,errors_from=0,lastaccess=0,ipmi_authtype=-1,"
-				"ipmi_privilege=2,ipmi_username='',ipmi_password='',ipmi_disable_until=0,"
-				"ipmi_available=0,snmp_disable_until=0,snmp_available=0,maintenanceid=NULL,"
-				"maintenance_status=0,maintenance_type=0,maintenance_from=0,ipmi_errors_from=0,"
-				"snmp_errors_from=0,ipmi_error='',snmp_error='',jmx_disable_until=0,jmx_available=0,"
-				"jmx_errors_from=0,jmx_error='',name='%s',info_1='',info_2='',flags=0,templateid=NULL,"
-				"description='%s',tls_connect=1,tls_accept=1,tls_issuer='',tls_subject='',"
-				"tls_psk_identity='',tls_psk='',proxy_address='',auto_compress=1",
-			hostid, "Template RDDS Status", 3, "Template RDDS Status",
-			"RDDS SLV items and triggers for linking to <RSMHOST> hosts"));
+	DB_EXEC("insert into hosts set hostid=" ZBX_FS_UI64 ",created=0,proxy_hostid=NULL,host='%s',status=%d,"
+			"disable_until=0,error='',available=0,errors_from=0,lastaccess=0,ipmi_authtype=-1,"
+			"ipmi_privilege=2,ipmi_username='',ipmi_password='',ipmi_disable_until=0,ipmi_available=0,"
+			"snmp_disable_until=0,snmp_available=0,maintenanceid=NULL,maintenance_status=0,"
+			"maintenance_type=0,maintenance_from=0,ipmi_errors_from=0,snmp_errors_from=0,ipmi_error='',"
+			"snmp_error='',jmx_disable_until=0,jmx_available=0,jmx_errors_from=0,jmx_error='',name='%s',"
+			"info_1='',info_2='',flags=0,templateid=NULL,description='%s',tls_connect=1,tls_accept=1,"
+			"tls_issuer='',tls_subject='',tls_psk_identity='',tls_psk='',proxy_address='',auto_compress=1",
+		hostid, "Template RDDS Status", 3, "Template RDDS Status",
+		"RDDS SLV items and triggers for linking to <RSMHOST> hosts");
 
-	CHECK(DBexecute("insert into hosts_groups set"
-				" hostgroupid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",groupid=" ZBX_FS_UI64,
-			DBget_maxid_num("hosts_groups", 1), hostid, groupid_templates));
+	DB_EXEC("insert into hosts_groups set hostgroupid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",groupid=" ZBX_FS_UI64,
+			DBget_maxid_num("hosts_groups", 1), hostid, groupid_templates);
 
 #define SQL	"insert into items set itemid=" ZBX_FS_UI64 ",type=%d,snmp_community='',snmp_oid='',"			\
 			"hostid=" ZBX_FS_UI64 ",name='%s',key_='%s',delay='0',history='90d',trends='365d',status=0,"	\
@@ -2743,21 +2719,21 @@ static int	DBpatch_4050518(void)
 	/* type 2 = ITEM_TYPE_TRAPPER */
 	/* value_type 0 = ITEM_VALUE_TYPE_FLOAT */
 	/* value_type 3 = ITEM_VALUE_TYPE_UINT64 */
-	CHECK(DBexecute(SQL, itemid_avail, 2, hostid, "RDDS availability", "rsm.slv.rdds.avail", 3, "", valuemapid_rsm_service_availability));
-	CHECK(DBexecute(SQL, itemid_downtime, 2, hostid, "RDDS minutes of downtime", "rsm.slv.rdds.downtime", 3, "", (zbx_uint64_t)0));
-	CHECK(DBexecute(SQL, itemid_rollweek, 2, hostid, "RDDS weekly unavailability", "rsm.slv.rdds.rollweek", 0, "%", (zbx_uint64_t)0));
-	CHECK(DBexecute(SQL, itemid_rtt_failed, 2, hostid, "Number of failed monthly RDDS queries", "rsm.slv.rdds.rtt.failed", 3, "", (zbx_uint64_t)0));
-	CHECK(DBexecute(SQL, itemid_rtt_performed, 2, hostid, "Number of performed monthly RDDS queries", "rsm.slv.rdds.rtt.performed", 3, "", (zbx_uint64_t)0));
-	CHECK(DBexecute(SQL, itemid_rtt_pfailed, 2, hostid, "Ratio of failed monthly RDDS queries", "rsm.slv.rdds.rtt.pfailed", 0, "%", (zbx_uint64_t)0));
+	DB_EXEC(SQL, itemid_avail, 2, hostid, "RDDS availability", "rsm.slv.rdds.avail", 3, "", valuemapid_rsm_service_availability);
+	DB_EXEC(SQL, itemid_downtime, 2, hostid, "RDDS minutes of downtime", "rsm.slv.rdds.downtime", 3, "", (zbx_uint64_t)0);
+	DB_EXEC(SQL, itemid_rollweek, 2, hostid, "RDDS weekly unavailability", "rsm.slv.rdds.rollweek", 0, "%", (zbx_uint64_t)0);
+	DB_EXEC(SQL, itemid_rtt_failed, 2, hostid, "Number of failed monthly RDDS queries", "rsm.slv.rdds.rtt.failed", 3, "", (zbx_uint64_t)0);
+	DB_EXEC(SQL, itemid_rtt_performed, 2, hostid, "Number of performed monthly RDDS queries", "rsm.slv.rdds.rtt.performed", 3, "", (zbx_uint64_t)0);
+	DB_EXEC(SQL, itemid_rtt_pfailed, 2, hostid, "Ratio of failed monthly RDDS queries", "rsm.slv.rdds.rtt.pfailed", 0, "%", (zbx_uint64_t)0);
 #undef SQL
 
 	/* priority 0 = TRIGGER_SEVERITY_NOT_CLASSIFIED */
-	CHECK(DBexecute("insert into triggers set triggerid=" ZBX_FS_UI64 ","
-				"expression='({TRIGGER.VALUE}=0 and {" ZBX_FS_UI64 "}=0) or ({TRIGGER.VALUE}=1 and {" ZBX_FS_UI64 "}>0)',"
-				"description='%s',url='',status=0,value=0,priority=%d,lastchange=0,comments='',"
-				"error='',templateid=NULL,type=0,state=0,flags=0,recovery_mode=0,"
-				"recovery_expression='',correlation_mode=0,correlation_tag='',manual_close=0,opdata=''",
-			triggerid_service_down, functionid_service_down_1, functionid_service_down_2, "RDDS service is down", 0));
+	DB_EXEC("insert into triggers set triggerid=" ZBX_FS_UI64 ","
+			"expression='({TRIGGER.VALUE}=0 and {" ZBX_FS_UI64 "}=0) or ({TRIGGER.VALUE}=1 and {" ZBX_FS_UI64 "}>0)',"
+			"description='%s',url='',status=0,value=0,priority=%d,lastchange=0,comments='',error='',"
+			"templateid=NULL,type=0,state=0,flags=0,recovery_mode=0,recovery_expression='',"
+			"correlation_mode=0,correlation_tag='',manual_close=0,opdata=''",
+		triggerid_service_down, functionid_service_down_1, functionid_service_down_2, "RDDS service is down", 0);
 
 #define SQL	"insert into triggers set triggerid=" ZBX_FS_UI64 ",expression='{" ZBX_FS_UI64 "}%s',description='%s',"	\
 			"url='',status=0,value=0,priority=%d,lastchange=0,comments='',error='',templateid=NULL,type=0,"	\
@@ -2767,71 +2743,71 @@ static int	DBpatch_4050518(void)
 	/* priority 3 = TRIGGER_SEVERITY_AVERAGE */
 	/* priority 4 = TRIGGER_SEVERITY_HIGH */
 	/* priority 5 = TRIGGER_SEVERITY_DISASTER */
-	CHECK(DBexecute(SQL, triggerid_downtime_over_10, functionid_downtime_over_10, ">={$RSM.SLV.RDDS.DOWNTIME}*0.1",
-			"RDDS service was unavailable for 10% of allowed $1 minutes", 2));
-	CHECK(DBexecute(SQL, triggerid_downtime_over_25, functionid_downtime_over_25, ">={$RSM.SLV.RDDS.DOWNTIME}*0.25",
-			"RDDS service was unavailable for 25% of allowed $1 minutes", 3));
-	CHECK(DBexecute(SQL, triggerid_downtime_over_50, functionid_downtime_over_50, ">={$RSM.SLV.RDDS.DOWNTIME}*0.5",
-			"RDDS service was unavailable for 50% of allowed $1 minutes", 3));
-	CHECK(DBexecute(SQL, triggerid_downtime_over_75, functionid_downtime_over_75, ">={$RSM.SLV.RDDS.DOWNTIME}*0.75",
-			"RDDS service was unavailable for 75% of allowed $1 minutes", 4));
-	CHECK(DBexecute(SQL, triggerid_downtime_over_100, functionid_downtime_over_100, ">={$RSM.SLV.RDDS.DOWNTIME}",
-			"RDDS service was unavailable for 100% of allowed $1 minutes", 5));
-	CHECK(DBexecute(SQL, triggerid_rollweek_over_10, functionid_rollweek_over_10, ">=10",
-			"RDDS rolling week is over 10%", 2));
-	CHECK(DBexecute(SQL, triggerid_rollweek_over_25, functionid_rollweek_over_25, ">=25",
-			"RDDS rolling week is over 25%", 3));
-	CHECK(DBexecute(SQL, triggerid_rollweek_over_50, functionid_rollweek_over_50, ">=50",
-			"RDDS rolling week is over 50%", 3));
-	CHECK(DBexecute(SQL, triggerid_rollweek_over_75, functionid_rollweek_over_75, ">=75",
-			"RDDS rolling week is over 75%", 4));
-	CHECK(DBexecute(SQL, triggerid_rollweek_over_100, functionid_rollweek_over_100, ">=100",
-			"RDDS rolling week is over 100%", 5));
-	CHECK(DBexecute(SQL, triggerid_rtt_pfailed_over_10, functionid_rtt_pfailed_over_10, ">{$RSM.SLV.RDDS.RTT}*0.1",
-			"Ratio of failed RDDS tests exceeded 10% of allowed $1%", 2));
-	CHECK(DBexecute(SQL, triggerid_rtt_pfailed_over_25, functionid_rtt_pfailed_over_25, ">{$RSM.SLV.RDDS.RTT}*0.25",
-			"Ratio of failed RDDS tests exceeded 25% of allowed $1%", 3));
-	CHECK(DBexecute(SQL, triggerid_rtt_pfailed_over_50, functionid_rtt_pfailed_over_50, ">{$RSM.SLV.RDDS.RTT}*0.5",
-			"Ratio of failed RDDS tests exceeded 50% of allowed $1%", 3));
-	CHECK(DBexecute(SQL, triggerid_rtt_pfailed_over_75, functionid_rtt_pfailed_over_75, ">{$RSM.SLV.RDDS.RTT}*0.75",
-			"Ratio of failed RDDS tests exceeded 75% of allowed $1%", 4));
-	CHECK(DBexecute(SQL, triggerid_rtt_pfailed_over_100, functionid_rtt_pfailed_over_100, ">{$RSM.SLV.RDDS.RTT}",
-			"Ratio of failed RDDS tests exceeded 100% of allowed $1%", 5));
+	DB_EXEC(SQL, triggerid_downtime_over_10, functionid_downtime_over_10, ">={$RSM.SLV.RDDS.DOWNTIME}*0.1",
+		"RDDS service was unavailable for 10% of allowed $1 minutes", 2);
+	DB_EXEC(SQL, triggerid_downtime_over_25, functionid_downtime_over_25, ">={$RSM.SLV.RDDS.DOWNTIME}*0.25",
+		"RDDS service was unavailable for 25% of allowed $1 minutes", 3);
+	DB_EXEC(SQL, triggerid_downtime_over_50, functionid_downtime_over_50, ">={$RSM.SLV.RDDS.DOWNTIME}*0.5",
+		"RDDS service was unavailable for 50% of allowed $1 minutes", 3);
+	DB_EXEC(SQL, triggerid_downtime_over_75, functionid_downtime_over_75, ">={$RSM.SLV.RDDS.DOWNTIME}*0.75",
+		"RDDS service was unavailable for 75% of allowed $1 minutes", 4);
+	DB_EXEC(SQL, triggerid_downtime_over_100, functionid_downtime_over_100, ">={$RSM.SLV.RDDS.DOWNTIME}",
+		"RDDS service was unavailable for 100% of allowed $1 minutes", 5);
+	DB_EXEC(SQL, triggerid_rollweek_over_10, functionid_rollweek_over_10, ">=10",
+		"RDDS rolling week is over 10%", 2);
+	DB_EXEC(SQL, triggerid_rollweek_over_25, functionid_rollweek_over_25, ">=25",
+		"RDDS rolling week is over 25%", 3);
+	DB_EXEC(SQL, triggerid_rollweek_over_50, functionid_rollweek_over_50, ">=50",
+		"RDDS rolling week is over 50%", 3);
+	DB_EXEC(SQL, triggerid_rollweek_over_75, functionid_rollweek_over_75, ">=75",
+		"RDDS rolling week is over 75%", 4);
+	DB_EXEC(SQL, triggerid_rollweek_over_100, functionid_rollweek_over_100, ">=100",
+		"RDDS rolling week is over 100%", 5);
+	DB_EXEC(SQL, triggerid_rtt_pfailed_over_10, functionid_rtt_pfailed_over_10, ">{$RSM.SLV.RDDS.RTT}*0.1",
+		"Ratio of failed RDDS tests exceeded 10% of allowed $1%", 2);
+	DB_EXEC(SQL, triggerid_rtt_pfailed_over_25, functionid_rtt_pfailed_over_25, ">{$RSM.SLV.RDDS.RTT}*0.25",
+		"Ratio of failed RDDS tests exceeded 25% of allowed $1%", 3);
+	DB_EXEC(SQL, triggerid_rtt_pfailed_over_50, functionid_rtt_pfailed_over_50, ">{$RSM.SLV.RDDS.RTT}*0.5",
+		"Ratio of failed RDDS tests exceeded 50% of allowed $1%", 3);
+	DB_EXEC(SQL, triggerid_rtt_pfailed_over_75, functionid_rtt_pfailed_over_75, ">{$RSM.SLV.RDDS.RTT}*0.75",
+		"Ratio of failed RDDS tests exceeded 75% of allowed $1%", 4);
+	DB_EXEC(SQL, triggerid_rtt_pfailed_over_100, functionid_rtt_pfailed_over_100, ">{$RSM.SLV.RDDS.RTT}",
+		"Ratio of failed RDDS tests exceeded 100% of allowed $1%", 5);
 #undef SQL
 
 #define SQL	"insert into functions set functionid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ",triggerid=" ZBX_FS_UI64 ",name='%s',parameter='%s'"
-	CHECK(DBexecute(SQL, functionid_service_down_1      , itemid_avail      , triggerid_service_down        , "max"  , "#{$RSM.INCIDENT.RDDS.FAIL}"));
-	CHECK(DBexecute(SQL, functionid_service_down_2      , itemid_avail      , triggerid_service_down        , "count", "#{$RSM.INCIDENT.RDDS.RECOVER},0,\"eq\""));
-	CHECK(DBexecute(SQL, functionid_downtime_over_10    , itemid_downtime   , triggerid_downtime_over_10    , "last" , "0"));
-	CHECK(DBexecute(SQL, functionid_downtime_over_25    , itemid_downtime   , triggerid_downtime_over_25    , "last" , "0"));
-	CHECK(DBexecute(SQL, functionid_downtime_over_50    , itemid_downtime   , triggerid_downtime_over_50    , "last" , "0"));
-	CHECK(DBexecute(SQL, functionid_downtime_over_75    , itemid_downtime   , triggerid_downtime_over_75    , "last" , "0"));
-	CHECK(DBexecute(SQL, functionid_downtime_over_100   , itemid_downtime   , triggerid_downtime_over_100   , "last" , "0"));
-	CHECK(DBexecute(SQL, functionid_rollweek_over_10    , itemid_rollweek   , triggerid_rollweek_over_10    , "last" , "0"));
-	CHECK(DBexecute(SQL, functionid_rollweek_over_25    , itemid_rollweek   , triggerid_rollweek_over_25    , "last" , "0"));
-	CHECK(DBexecute(SQL, functionid_rollweek_over_50    , itemid_rollweek   , triggerid_rollweek_over_50    , "last" , "0"));
-	CHECK(DBexecute(SQL, functionid_rollweek_over_75    , itemid_rollweek   , triggerid_rollweek_over_75    , "last" , "0"));
-	CHECK(DBexecute(SQL, functionid_rollweek_over_100   , itemid_rollweek   , triggerid_rollweek_over_100   , "last" , "0"));
-	CHECK(DBexecute(SQL, functionid_rtt_pfailed_over_10 , itemid_rtt_pfailed, triggerid_rtt_pfailed_over_10 , "last" , ""));
-	CHECK(DBexecute(SQL, functionid_rtt_pfailed_over_25 , itemid_rtt_pfailed, triggerid_rtt_pfailed_over_25 , "last" , ""));
-	CHECK(DBexecute(SQL, functionid_rtt_pfailed_over_50 , itemid_rtt_pfailed, triggerid_rtt_pfailed_over_50 , "last" , ""));
-	CHECK(DBexecute(SQL, functionid_rtt_pfailed_over_75 , itemid_rtt_pfailed, triggerid_rtt_pfailed_over_75 , "last" , ""));
-	CHECK(DBexecute(SQL, functionid_rtt_pfailed_over_100, itemid_rtt_pfailed, triggerid_rtt_pfailed_over_100, "last" , ""));
+	DB_EXEC(SQL, functionid_service_down_1      , itemid_avail      , triggerid_service_down        , "max"  , "#{$RSM.INCIDENT.RDDS.FAIL}");
+	DB_EXEC(SQL, functionid_service_down_2      , itemid_avail      , triggerid_service_down        , "count", "#{$RSM.INCIDENT.RDDS.RECOVER},0,\"eq\"");
+	DB_EXEC(SQL, functionid_downtime_over_10    , itemid_downtime   , triggerid_downtime_over_10    , "last" , "0");
+	DB_EXEC(SQL, functionid_downtime_over_25    , itemid_downtime   , triggerid_downtime_over_25    , "last" , "0");
+	DB_EXEC(SQL, functionid_downtime_over_50    , itemid_downtime   , triggerid_downtime_over_50    , "last" , "0");
+	DB_EXEC(SQL, functionid_downtime_over_75    , itemid_downtime   , triggerid_downtime_over_75    , "last" , "0");
+	DB_EXEC(SQL, functionid_downtime_over_100   , itemid_downtime   , triggerid_downtime_over_100   , "last" , "0");
+	DB_EXEC(SQL, functionid_rollweek_over_10    , itemid_rollweek   , triggerid_rollweek_over_10    , "last" , "0");
+	DB_EXEC(SQL, functionid_rollweek_over_25    , itemid_rollweek   , triggerid_rollweek_over_25    , "last" , "0");
+	DB_EXEC(SQL, functionid_rollweek_over_50    , itemid_rollweek   , triggerid_rollweek_over_50    , "last" , "0");
+	DB_EXEC(SQL, functionid_rollweek_over_75    , itemid_rollweek   , triggerid_rollweek_over_75    , "last" , "0");
+	DB_EXEC(SQL, functionid_rollweek_over_100   , itemid_rollweek   , triggerid_rollweek_over_100   , "last" , "0");
+	DB_EXEC(SQL, functionid_rtt_pfailed_over_10 , itemid_rtt_pfailed, triggerid_rtt_pfailed_over_10 , "last" , "");
+	DB_EXEC(SQL, functionid_rtt_pfailed_over_25 , itemid_rtt_pfailed, triggerid_rtt_pfailed_over_25 , "last" , "");
+	DB_EXEC(SQL, functionid_rtt_pfailed_over_50 , itemid_rtt_pfailed, triggerid_rtt_pfailed_over_50 , "last" , "");
+	DB_EXEC(SQL, functionid_rtt_pfailed_over_75 , itemid_rtt_pfailed, triggerid_rtt_pfailed_over_75 , "last" , "");
+	DB_EXEC(SQL, functionid_rtt_pfailed_over_100, itemid_rtt_pfailed, triggerid_rtt_pfailed_over_100, "last" , "");
 #undef SQL
 
 #define SQL	"insert into trigger_depends set triggerdepid=" ZBX_FS_UI64 ",triggerid_down=" ZBX_FS_UI64 ",triggerid_up=" ZBX_FS_UI64
-	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_downtime_over_10   , triggerid_downtime_over_25));
-	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_downtime_over_25   , triggerid_downtime_over_50));
-	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_downtime_over_50   , triggerid_downtime_over_75));
-	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_downtime_over_75   , triggerid_downtime_over_100));
-	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rollweek_over_10   , triggerid_rollweek_over_25));
-	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rollweek_over_25   , triggerid_rollweek_over_50));
-	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rollweek_over_50   , triggerid_rollweek_over_75));
-	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rollweek_over_75   , triggerid_rollweek_over_100));
-	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rtt_pfailed_over_10, triggerid_rtt_pfailed_over_25));
-	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rtt_pfailed_over_25, triggerid_rtt_pfailed_over_50));
-	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rtt_pfailed_over_50, triggerid_rtt_pfailed_over_75));
-	CHECK(DBexecute(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rtt_pfailed_over_75, triggerid_rtt_pfailed_over_100));
+	DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_downtime_over_10   , triggerid_downtime_over_25);
+	DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_downtime_over_25   , triggerid_downtime_over_50);
+	DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_downtime_over_50   , triggerid_downtime_over_75);
+	DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_downtime_over_75   , triggerid_downtime_over_100);
+	DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rollweek_over_10   , triggerid_rollweek_over_25);
+	DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rollweek_over_25   , triggerid_rollweek_over_50);
+	DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rollweek_over_50   , triggerid_rollweek_over_75);
+	DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rollweek_over_75   , triggerid_rollweek_over_100);
+	DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rtt_pfailed_over_10, triggerid_rtt_pfailed_over_25);
+	DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rtt_pfailed_over_25, triggerid_rtt_pfailed_over_50);
+	DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rtt_pfailed_over_50, triggerid_rtt_pfailed_over_75);
+	DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rtt_pfailed_over_75, triggerid_rtt_pfailed_over_100);
 #undef SQL
 
 	ret = SUCCEED;
@@ -2926,48 +2902,46 @@ static int	DBpatch_4050519(void)
 		GET_HOST_ITEM_ID(itemid_rsm_rdds80_rtt, hostid, "rsm.rdds.80.rtt[{$RSM.TLD}]");
 
 		/* link "Template RDDS Test" template to the host */
-		CHECK(DBexecute("insert into hosts_templates set"
+		DB_EXEC("insert into hosts_templates set"
 				" hosttemplateid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",templateid=" ZBX_FS_UI64,
-				DBget_maxid_num("hosts_templates", 1), hostid, hostid_template_rdds_test));
+			DBget_maxid_num("hosts_templates", 1), hostid, hostid_template_rdds_test);
 
 		/* link applications to the template */
 #define SQL	"insert into application_template set"									\
 		" application_templateid=" ZBX_FS_UI64 ",applicationid=" ZBX_FS_UI64 ",templateid=" ZBX_FS_UI64
-		CHECK(DBexecute(SQL, DBget_maxid_num("application_template", 1), applicationid_rdds  , template_applicationid_rdds));
-		CHECK(DBexecute(SQL, DBget_maxid_num("application_template", 1), applicationid_rdds43, template_applicationid_rdds43));
-		CHECK(DBexecute(SQL, DBget_maxid_num("application_template", 1), applicationid_rdds80, template_applicationid_rdds80));
+		DB_EXEC(SQL, DBget_maxid_num("application_template", 1), applicationid_rdds  , template_applicationid_rdds);
+		DB_EXEC(SQL, DBget_maxid_num("application_template", 1), applicationid_rdds43, template_applicationid_rdds43);
+		DB_EXEC(SQL, DBget_maxid_num("application_template", 1), applicationid_rdds80, template_applicationid_rdds80);
 #undef SQL
 
 		itemid_rsm_rdds = DBget_maxid_num("items", 1);
 
-		CHECK(DBexecute("insert into items (itemid,type,snmp_community,snmp_oid,hostid,name,key_,delay,"
-					"history,trends,status,value_type,trapper_hosts,units,snmpv3_securityname,"
-					"snmpv3_securitylevel,snmpv3_authpassphrase,snmpv3_privpassphrase,formula,"
-					"logtimefmt,templateid,valuemapid,params,ipmi_sensor,authtype,username,"
-					"password,publickey,privatekey,flags,interfaceid,port,description,"
-					"inventory_link,lifetime,snmpv3_authprotocol,snmpv3_privprotocol,"
-					"snmpv3_contextname,evaltype,jmx_endpoint,master_itemid,timeout,url,"
-					"query_fields,posts,status_codes,follow_redirects,post_type,http_proxy,headers,"
-					"retrieve_mode,request_method,output_format,ssl_cert_file,ssl_key_file,"
-					"ssl_key_password,verify_peer,verify_host,allow_traps)"
-				" select"
-					" " ZBX_FS_UI64 ",type,snmp_community,snmp_oid," ZBX_FS_UI64 ",name,key_,delay,"
-					"history,trends,%s,value_type,trapper_hosts,units,snmpv3_securityname,"
-					"snmpv3_securitylevel,snmpv3_authpassphrase,snmpv3_privpassphrase,formula,"
-					"logtimefmt," ZBX_FS_UI64 ",valuemapid,params,ipmi_sensor,authtype,username,"
-					"password,publickey,privatekey,flags," ZBX_FS_UI64 ",port,description,"
-					"inventory_link,lifetime,snmpv3_authprotocol,snmpv3_privprotocol,"
-					"snmpv3_contextname,evaltype,jmx_endpoint,master_itemid,timeout,url,"
-					"query_fields,posts,status_codes,follow_redirects,post_type,http_proxy,headers,"
-					"retrieve_mode,request_method,output_format,ssl_cert_file,ssl_key_file,"
-					"ssl_key_password,verify_peer,verify_host,allow_traps"
-				" from items"
-				" where itemid=" ZBX_FS_UI64,
-				itemid_rsm_rdds, hostid, status, template_itemid_rsm_rdds, interfaceid, template_itemid_rsm_rdds));
+		DB_EXEC("insert into items (itemid,type,snmp_community,snmp_oid,hostid,name,key_,delay,history,"
+				"trends,status,value_type,trapper_hosts,units,snmpv3_securityname,snmpv3_securitylevel,"
+				"snmpv3_authpassphrase,snmpv3_privpassphrase,formula,logtimefmt,templateid,"
+				"valuemapid,params,ipmi_sensor,authtype,username,password,publickey,privatekey,flags,"
+				"interfaceid,port,description,inventory_link,lifetime,snmpv3_authprotocol,"
+				"snmpv3_privprotocol,snmpv3_contextname,evaltype,jmx_endpoint,master_itemid,timeout,"
+				"url,query_fields,posts,status_codes,follow_redirects,post_type,http_proxy,headers,"
+				"retrieve_mode,request_method,output_format,ssl_cert_file,ssl_key_file,"
+				"ssl_key_password,verify_peer,verify_host,allow_traps)"
+			" select"
+				" " ZBX_FS_UI64 ",type,snmp_community,snmp_oid," ZBX_FS_UI64 ",name,key_,delay,history,"
+				"trends,%s,value_type,trapper_hosts,units,snmpv3_securityname,snmpv3_securitylevel,"
+				"snmpv3_authpassphrase,snmpv3_privpassphrase,formula,logtimefmt," ZBX_FS_UI64 ","
+				"valuemapid,params,ipmi_sensor,authtype,username,password,publickey,privatekey,flags,"
+				ZBX_FS_UI64 ",port,description,inventory_link,lifetime,snmpv3_authprotocol,"
+				"snmpv3_privprotocol,snmpv3_contextname,evaltype,jmx_endpoint,master_itemid,timeout,"
+				"url,query_fields,posts,status_codes,follow_redirects,post_type,http_proxy,headers,"
+				"retrieve_mode,request_method,output_format,ssl_cert_file,ssl_key_file,"
+				"ssl_key_password,verify_peer,verify_host,allow_traps"
+			" from items"
+			" where itemid=" ZBX_FS_UI64,
+			itemid_rsm_rdds, hostid, status, template_itemid_rsm_rdds, interfaceid, template_itemid_rsm_rdds);
 
-		CHECK(DBexecute("insert into items_applications set"
+		DB_EXEC("insert into items_applications set"
 					" itemappid=" ZBX_FS_UI64 ",applicationid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64,
-					DBget_maxid_num("items_applications", 1), applicationid_rdds, itemid_rsm_rdds));
+				DBget_maxid_num("items_applications", 1), applicationid_rdds, itemid_rsm_rdds);
 
 #define SQL	"update"												\
 			" items,"											\
@@ -2987,22 +2961,22 @@ static int	DBpatch_4050519(void)
 		" where"												\
 			" items.itemid=" ZBX_FS_UI64 " and"								\
 			" template.itemid=" ZBX_FS_UI64
-		CHECK(DBexecute(SQL, itemid_rsm_rdds, itemid_rsm_rdds_status, template_itemid_rsm_rdds_status));
-		CHECK(DBexecute(SQL, itemid_rsm_rdds, itemid_rsm_rdds43_ip  , template_itemid_rsm_rdds43_ip));
-		CHECK(DBexecute(SQL, itemid_rsm_rdds, itemid_rsm_rdds43_rtt , template_itemid_rsm_rdds43_rtt));
-		CHECK(DBexecute(SQL, itemid_rsm_rdds, itemid_rsm_rdds80_ip  , template_itemid_rsm_rdds80_ip));
-		CHECK(DBexecute(SQL, itemid_rsm_rdds, itemid_rsm_rdds80_rtt , template_itemid_rsm_rdds80_rtt));
+		DB_EXEC(SQL, itemid_rsm_rdds, itemid_rsm_rdds_status, template_itemid_rsm_rdds_status);
+		DB_EXEC(SQL, itemid_rsm_rdds, itemid_rsm_rdds43_ip  , template_itemid_rsm_rdds43_ip);
+		DB_EXEC(SQL, itemid_rsm_rdds, itemid_rsm_rdds43_rtt , template_itemid_rsm_rdds43_rtt);
+		DB_EXEC(SQL, itemid_rsm_rdds, itemid_rsm_rdds80_ip  , template_itemid_rsm_rdds80_ip);
+		DB_EXEC(SQL, itemid_rsm_rdds, itemid_rsm_rdds80_rtt , template_itemid_rsm_rdds80_rtt);
 #undef SQL
 
 #define SQL	"insert into item_preproc (item_preprocid,itemid,step,type,params,error_handler,error_handler_params)"	\
 		"select " ZBX_FS_UI64 "," ZBX_FS_UI64 ",step,type,params,error_handler,error_handler_params"		\
 		" from item_preproc where itemid=" ZBX_FS_UI64
-		CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_rdds       , template_itemid_rsm_rdds));
-		CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_rdds_status, template_itemid_rsm_rdds_status));
-		CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_rdds43_ip  , template_itemid_rsm_rdds43_ip));
-		CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_rdds43_rtt , template_itemid_rsm_rdds43_rtt));
-		CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_rdds80_ip  , template_itemid_rsm_rdds80_ip));
-		CHECK(DBexecute(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_rdds80_rtt , template_itemid_rsm_rdds80_rtt));
+		DB_EXEC(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_rdds       , template_itemid_rsm_rdds);
+		DB_EXEC(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_rdds_status, template_itemid_rsm_rdds_status);
+		DB_EXEC(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_rdds43_ip  , template_itemid_rsm_rdds43_ip);
+		DB_EXEC(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_rdds43_rtt , template_itemid_rsm_rdds43_rtt);
+		DB_EXEC(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_rdds80_ip  , template_itemid_rsm_rdds80_ip);
+		DB_EXEC(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_rdds80_rtt , template_itemid_rsm_rdds80_rtt);
 #undef SQL
 	}
 
