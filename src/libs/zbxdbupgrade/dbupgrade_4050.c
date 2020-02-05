@@ -2987,6 +2987,158 @@ out:
 	return ret;
 }
 
+static int	DBpatch_4050520(void)
+{
+	int		ret = FAIL;
+
+	DB_RESULT	result = NULL;
+	DB_ROW		row;
+
+	zbx_uint64_t	probes_groupid;
+	zbx_uint64_t	template_hostid;
+	zbx_uint64_t	template_applicationid_internal_errors;
+	zbx_uint64_t	template_applicationid_probe_status;
+	zbx_uint64_t	template_applicationid_configuration;
+	zbx_uint64_t	template_itemid_probe_configvalue_rsm_ip4_enabled;
+	zbx_uint64_t	template_itemid_probe_configvalue_rsm_ip6_enabled;
+
+	ONLY_SERVER();
+
+	GET_HOST_GROUP_ID(probes_groupid, "Probes");
+	GET_TEMPLATE_ID(template_hostid, "Template Probe Status");
+
+	GET_TEMPLATE_APPLICATION_ID(template_applicationid_internal_errors, "Template Probe Status", "Internal errors");
+	GET_TEMPLATE_APPLICATION_ID(template_applicationid_probe_status   , "Template Probe Status", "Probe status");
+	GET_TEMPLATE_APPLICATION_ID(template_applicationid_configuration  , "Template Probe Status", "Configuration");
+
+	GET_TEMPLATE_ITEM_ID(template_itemid_probe_configvalue_rsm_ip4_enabled, "Template Probe Status", "probe.configvalue[RSM.IP4.ENABLED]");
+	GET_TEMPLATE_ITEM_ID(template_itemid_probe_configvalue_rsm_ip6_enabled, "Template Probe Status", "probe.configvalue[RSM.IP6.ENABLED]");
+
+	/* get hostid and host of all <probe> hosts */
+	result = DBselect("select"
+				" hosts.hostid,"
+				"hosts.host"
+			" from"
+				" hosts"
+				" left join hosts_groups on hosts_groups.hostid=hosts.hostid"
+			" where"
+				" hosts_groups.groupid=" ZBX_FS_UI64,
+			probes_groupid);
+
+	if (NULL == result)
+		goto out;
+
+	while (NULL != (row = DBfetch(result)))
+	{
+		zbx_uint64_t	probe_hostid;
+		const char	*probe_host;
+		zbx_uint64_t	applicationid_internal_errors;
+		zbx_uint64_t	applicationid_probe_status;
+		zbx_uint64_t	applicationid_configuration;
+		zbx_uint64_t	itemid;					/* itemid of "probe.configvalue[..]" items */
+
+		ZBX_STR2UINT64(probe_hostid, row[0]);
+		probe_host = row[1];
+
+		/* <probe> hosts already have these applications */
+		GET_HOST_APPLICATION_ID(applicationid_internal_errors, probe_hostid, "Internal errors");
+		GET_HOST_APPLICATION_ID(applicationid_probe_status   , probe_hostid, "Probe status");
+
+		/* create "Configuration" application on <probe> host */
+		applicationid_configuration = DBget_maxid_num("applications", 1);
+		DB_EXEC("insert into applications"
+				" set applicationid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",name='%s',flags=0",
+			applicationid_configuration, probe_hostid, "Configuration");
+
+		/* link "Template Probe Status" to the <probe> host */
+		DB_EXEC("insert into hosts_templates set"
+				" hosttemplateid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",templateid=" ZBX_FS_UI64,
+			DBget_maxid_num("hosts_templates", 1), probe_hostid, template_hostid);
+
+		/* link host's applications with template's applications */
+#define SQL	"insert into application_template set"									\
+		" application_templateid=" ZBX_FS_UI64 ",applicationid=" ZBX_FS_UI64 ",templateid=" ZBX_FS_UI64
+		DB_EXEC(SQL, DBget_maxid_num("application_template", 1), applicationid_internal_errors, template_applicationid_internal_errors);
+		DB_EXEC(SQL, DBget_maxid_num("application_template", 1), applicationid_probe_status   , template_applicationid_probe_status);
+		DB_EXEC(SQL, DBget_maxid_num("application_template", 1), applicationid_configuration  , template_applicationid_configuration);
+#undef SQL
+
+		/* move probe.configvalue[..] items from one "<tld> <probe>" host to "<probe>" host, keep the history */
+#define MIGRATE(key, template_itemid)											\
+		/* hosts.status 0 = HOST_STATUS_MONITORED */								\
+		/* hosts.status 1 = HOST_STATUS_NOT_MONITORED */							\
+		SELECT_VALUE_UINT64(											\
+			itemid,												\
+			"select"											\
+				" items.itemid"										\
+			" from"												\
+				" items"										\
+				" left join hosts on hosts.hostid=items.hostid"						\
+			" where"											\
+				" items.templateid is not null and"							\
+				" items.key_='%s' and"									\
+				" hosts.status in (0,1) and"								\
+				" hosts.host like '%% %s'"								\
+			" order by"											\
+				" hosts.status asc"									\
+			" limit 1",											\
+			key, probe_host);										\
+															\
+		DB_EXEC("update items set hostid=" ZBX_FS_UI64 " where itemid=" ZBX_FS_UI64, probe_hostid, itemid);	\
+															\
+		DB_EXEC("update items_applications set applicationid=" ZBX_FS_UI64 " where itemid=" ZBX_FS_UI64,	\
+			applicationid_configuration, itemid);								\
+															\
+		DB_EXEC("update"											\
+				" items as item,"									\
+				"items as template"									\
+			" set"												\
+				" item.delay=template.delay,"								\
+				"item.templateid=template.itemid,"							\
+				"item.request_method=template.request_method"						\
+			" where"											\
+				" item.itemid=" ZBX_FS_UI64 " and"							\
+				" template.itemid=" ZBX_FS_UI64,							\
+			itemid, template_itemid);
+		MIGRATE("probe.configvalue[RSM.IP4.ENABLED]", template_itemid_probe_configvalue_rsm_ip4_enabled);
+		MIGRATE("probe.configvalue[RSM.IP6.ENABLED]", template_itemid_probe_configvalue_rsm_ip6_enabled);
+#undef MIGRATE
+	}
+
+	/* delete probe.confivalue[..] items from "<tld> <probe>" hosts, leave those that were moved to "<probe>" hosts */
+#define SQL	"delete from items where key_='%s' and hostid<>" ZBX_FS_UI64 " and templateid<>" ZBX_FS_UI64
+	DB_EXEC(SQL, "probe.configvalue[RSM.IP4.ENABLED]", template_hostid, template_itemid_probe_configvalue_rsm_ip4_enabled);
+	DB_EXEC(SQL, "probe.configvalue[RSM.IP6.ENABLED]", template_hostid, template_itemid_probe_configvalue_rsm_ip6_enabled);
+#undef SQL
+
+	/* link rest of the items to the "Template Probe Status" template */
+#define SQL	"update"												\
+			" items as item,"										\
+			"items as template"										\
+		" set"													\
+			" item.delay=template.delay,"									\
+			"item.templateid=template.itemid,"								\
+			"item.request_method=template.request_method"							\
+		" where"												\
+			" item.templateid is not null and"								\
+			" item.key_='%s' and"										\
+			" template.hostid=" ZBX_FS_UI64 " and"								\
+			" template.key_='%s'"
+#define MIGRATE(key)	DB_EXEC(SQL, key, template_hostid, key)
+	MIGRATE("resolver.status[{$RSM.RESOLVER},{$RESOLVER.STATUS.TIMEOUT},{$RESOLVER.STATUS.TRIES},{$RSM.IP4.ENABLED},{$RSM.IP6.ENABLED}]");
+	MIGRATE("rsm.probe.status[automatic,\"{$RSM.IP4.ROOTSERVERS1}\",\"{$RSM.IP6.ROOTSERVERS1}\"]");
+	MIGRATE("rsm.probe.status[manual]");
+	MIGRATE("rsm.errors");
+#undef MIGRATE
+#undef SQL
+
+	ret = SUCCEED;
+out:
+	DBfree_result(result);
+
+	return ret;
+}
+
 DBPATCH_START(4050)
 
 /* version, duplicates flag, mandatory flag */
@@ -3020,6 +3172,7 @@ DBPATCH_ADD(4050515, 0, 0)	/* add item_preproc to RDAP ip and rtt items */
 DBPATCH_ADD(4050516, 0, 0)	/* add "Template DNSSEC Status" template */
 DBPATCH_ADD(4050517, 0, 0)	/* add "Template RDAP Status" template */
 DBPATCH_ADD(4050518, 0, 0)	/* add "Template RDDS Status" template */
-DBPATCH_ADD(4050519, 0, 0)	/* convert hosts to use "Template RDDS Test" template */
+DBPATCH_ADD(4050519, 0, 0)	/* convert "<rsmhost> <probe>" hosts to use "Template RDDS Test" template */
+DBPATCH_ADD(4050520, 0, 0)	/* convert "<probe>" hosts to use "Template Probe Status" template */
 
 DBPATCH_END()
