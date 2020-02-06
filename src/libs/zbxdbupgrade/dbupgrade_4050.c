@@ -3139,6 +3139,361 @@ out:
 	return ret;
 }
 
+static int	DBpatch_4050521(void)
+{
+	int		ret = FAIL;
+
+	zbx_uint64_t	groupid_templates;				/* groupid of "Templates" host group */
+	zbx_uint64_t	valuemapid_rsm_service_availability;		/* valuemapid of "RSM Service Availability" value map */
+
+	zbx_uint64_t	hostid;						/* hostid of "Template DNS Status" template */
+
+	zbx_uint64_t	applicationid_next;
+	zbx_uint64_t	applicatinoid_slv_current_month;		/* applicationid of "SLV current month" application */
+	zbx_uint64_t	applicatinoid_slv_particular_test;		/* applicationid of "SLV particular test" application */
+	zbx_uint64_t	applicatinoid_slv_rolling_week;			/* applicationid of "SLV rolling week" application */
+
+	zbx_uint64_t	itemid_next;
+	zbx_uint64_t	itemid_rsm_slv_dns_avail;			/* itemid of "DNS availability" item */
+	zbx_uint64_t	itemid_rsm_slv_dns_downtime;			/* itemid of "DNS minutes of downtime" item */
+	zbx_uint64_t	itemid_rsm_slv_dns_rollweek;			/* itemid of "DNS weekly unavailability" item */
+	zbx_uint64_t	itemid_rsm_slv_dns_tcp_rtt_failed;		/* itemid of "Number of failed monthly DNS TCP tests" item */
+	zbx_uint64_t	itemid_rsm_slv_dns_tcp_rtt_performed;		/* itemid of "Number of performed monthly DNS TCP tests" item */
+	zbx_uint64_t	itemid_rsm_slv_dns_tcp_rtt_pfailed;		/* itemid of "Ratio of failed monthly DNS TCP tests" item */
+	zbx_uint64_t	itemid_rsm_slv_dns_udp_rtt_failed;		/* itemid of "Number of failed monthly DNS UDP tests" item */
+	zbx_uint64_t	itemid_rsm_slv_dns_udp_rtt_performed;		/* itemid of "Number of performed monthly DNS UDP tests" item */
+	zbx_uint64_t	itemid_rsm_slv_dns_udp_rtt_pfailed;		/* itemid of "Ratio of failed monthly DNS UDP tests" item */
+	zbx_uint64_t	itemid_rsm_dns_nsip_discovery;			/* itemid of "NS-IP pairs discovery" item */
+	zbx_uint64_t	itemid_rsm_slv_dns_ns_avail_ns_ip;		/* itemid of "DNS NS $1 ($2) availability" item */
+	zbx_uint64_t	itemid_rsm_slv_dns_ns_downtime_ns_ip;		/* itemid of "DNS minutes of $1 ($2) downtime" item */
+
+	zbx_uint64_t	triggerid_next;
+	zbx_uint64_t	triggerid_service_down;				/* triggerid of "DNS service is down" trigger */
+	zbx_uint64_t	triggerid_downtime_over_100;			/* triggerid of "DNS service was unavailable for at least {ITEM.VALUE1}m" trigger */
+	zbx_uint64_t	triggerid_rollweek_over_10;			/* triggerid of "DNS rolling week is over 10%" trigger */
+	zbx_uint64_t	triggerid_rollweek_over_25;			/* triggerid of "DNS rolling week is over 25%" trigger */
+	zbx_uint64_t	triggerid_rollweek_over_50;			/* triggerid of "DNS rolling week is over 50%" trigger */
+	zbx_uint64_t	triggerid_rollweek_over_75;			/* triggerid of "DNS rolling week is over 75%" trigger */
+	zbx_uint64_t	triggerid_rollweek_over_100;			/* triggerid of "DNS rolling week is over 100%" trigger */
+	zbx_uint64_t	triggerid_tcp_rtt_pfailed_over_10;		/* triggerid of "Ratio of failed DNS TCP tests exceeded 10% of allowed $1%" trigger */
+	zbx_uint64_t	triggerid_tcp_rtt_pfailed_over_25;		/* triggerid of "Ratio of failed DNS TCP tests exceeded 25% of allowed $1%" trigger */
+	zbx_uint64_t	triggerid_tcp_rtt_pfailed_over_50;		/* triggerid of "Ratio of failed DNS TCP tests exceeded 50% of allowed $1%" trigger */
+	zbx_uint64_t	triggerid_tcp_rtt_pfailed_over_75;		/* triggerid of "Ratio of failed DNS TCP tests exceeded 75% of allowed $1%" trigger */
+	zbx_uint64_t	triggerid_tcp_rtt_pfailed_over_100;		/* triggerid of "Ratio of failed DNS TCP tests exceeded 100% of allowed $1%" trigger */
+	zbx_uint64_t	triggerid_udp_rtt_pfailed_over_10;		/* triggerid of "Ratio of failed DNS UDP tests exceeded 10% of allowed $1%" trigger */
+	zbx_uint64_t	triggerid_udp_rtt_pfailed_over_25;		/* triggerid of "Ratio of failed DNS UDP tests exceeded 25% of allowed $1%" trigger */
+	zbx_uint64_t	triggerid_udp_rtt_pfailed_over_50;		/* triggerid of "Ratio of failed DNS UDP tests exceeded 50% of allowed $1%" trigger */
+	zbx_uint64_t	triggerid_udp_rtt_pfailed_over_75;		/* triggerid of "Ratio of failed DNS UDP tests exceeded 75% of allowed $1%" trigger */
+	zbx_uint64_t	triggerid_udp_rtt_pfailed_over_100;		/* triggerid of "Ratio of failed DNS UDP tests exceeded 100% of allowed $1%" trigger */
+	zbx_uint64_t	triggerid_ns_ip_downtime_over_10;		/* triggerid of "DNS {#NS} ({#IP}) downtime exceeded 10% of allowed $1 minutes" trigger */
+	zbx_uint64_t	triggerid_ns_ip_downtime_over_25;		/* triggerid of "DNS {#NS} ({#IP}) downtime exceeded 25% of allowed $1 minutes" trigger */
+	zbx_uint64_t	triggerid_ns_ip_downtime_over_50;		/* triggerid of "DNS {#NS} ({#IP}) downtime exceeded 50% of allowed $1 minutes" trigger */
+	zbx_uint64_t	triggerid_ns_ip_downtime_over_75;		/* triggerid of "DNS {#NS} ({#IP}) downtime exceeded 75% of allowed $1 minutes" trigger */
+	zbx_uint64_t	triggerid_ns_ip_downtime_over_100;		/* triggerid of "DNS {#NS} ({#IP}) downtime exceeded 100% of allowed $1 minutes" trigger */
+
+	zbx_uint64_t	functionid_next;
+	zbx_uint64_t	functionid_service_down_1;			/* functionid for "DNS service is down" trigger */
+	zbx_uint64_t	functionid_service_down_2;			/* functionid for "DNS service is down" trigger */
+	zbx_uint64_t	functionid_downtime_over_100;			/* functionid for "DNS service was unavailable for at least {ITEM.VALUE1}m" trigger */
+	zbx_uint64_t	functionid_rollweek_over_10;			/* functionid for "DNS rolling week is over 10%" trigger */
+	zbx_uint64_t	functionid_rollweek_over_25;			/* functionid for "DNS rolling week is over 25%" trigger */
+	zbx_uint64_t	functionid_rollweek_over_50;			/* functionid for "DNS rolling week is over 50%" trigger */
+	zbx_uint64_t	functionid_rollweek_over_75;			/* functionid for "DNS rolling week is over 75%" trigger */
+	zbx_uint64_t	functionid_rollweek_over_100;			/* functionid for "DNS rolling week is over 100%" trigger */
+	zbx_uint64_t	functionid_tcp_rtt_pfailed_over_10;		/* functionid for "Ratio of failed DNS TCP tests exceeded 10% of allowed $1%" trigger */
+	zbx_uint64_t	functionid_tcp_rtt_pfailed_over_25;		/* functionid for "Ratio of failed DNS TCP tests exceeded 25% of allowed $1%" trigger */
+	zbx_uint64_t	functionid_tcp_rtt_pfailed_over_50;		/* functionid for "Ratio of failed DNS TCP tests exceeded 50% of allowed $1%" trigger */
+	zbx_uint64_t	functionid_tcp_rtt_pfailed_over_75;		/* functionid for "Ratio of failed DNS TCP tests exceeded 75% of allowed $1%" trigger */
+	zbx_uint64_t	functionid_tcp_rtt_pfailed_over_100;		/* functionid for "Ratio of failed DNS TCP tests exceeded 100% of allowed $1%" trigger */
+	zbx_uint64_t	functionid_udp_rtt_pfailed_over_10;		/* functionid for "Ratio of failed DNS UDP tests exceeded 10% of allowed $1%" trigger */
+	zbx_uint64_t	functionid_udp_rtt_pfailed_over_25;		/* functionid for "Ratio of failed DNS UDP tests exceeded 25% of allowed $1%" trigger */
+	zbx_uint64_t	functionid_udp_rtt_pfailed_over_50;		/* functionid for "Ratio of failed DNS UDP tests exceeded 50% of allowed $1%" trigger */
+	zbx_uint64_t	functionid_udp_rtt_pfailed_over_75;		/* functionid for "Ratio of failed DNS UDP tests exceeded 75% of allowed $1%" trigger */
+	zbx_uint64_t	functionid_udp_rtt_pfailed_over_100;		/* functionid for "Ratio of failed DNS UDP tests exceeded 100% of allowed $1%" trigger */
+	zbx_uint64_t	functionid_ns_ip_downtime_over_10;		/* functionid for "DNS {#NS} ({#IP}) downtime exceeded 10% of allowed $1 minutes" trigger */
+	zbx_uint64_t	functionid_ns_ip_downtime_over_25;		/* functionid for "DNS {#NS} ({#IP}) downtime exceeded 25% of allowed $1 minutes" trigger */
+	zbx_uint64_t	functionid_ns_ip_downtime_over_50;		/* functionid for "DNS {#NS} ({#IP}) downtime exceeded 50% of allowed $1 minutes" trigger */
+	zbx_uint64_t	functionid_ns_ip_downtime_over_75;		/* functionid for "DNS {#NS} ({#IP}) downtime exceeded 75% of allowed $1 minutes" trigger */
+	zbx_uint64_t	functionid_ns_ip_downtime_over_100;		/* functionid for "DNS {#NS} ({#IP}) downtime exceeded 100% of allowed $1 minutes" trigger */
+
+	ONLY_SERVER();
+
+	GET_HOST_GROUP_ID(groupid_templates, "Templates");
+	GET_VALUE_MAP_ID(valuemapid_rsm_service_availability, "RSM Service Availability");
+
+	hostid = DBget_maxid_num("hosts", 1);
+
+	applicationid_next                = DBget_maxid_num("applications", 3);
+	applicatinoid_slv_current_month   = applicationid_next++;
+	applicatinoid_slv_particular_test = applicationid_next++;
+	applicatinoid_slv_rolling_week    = applicationid_next++;
+
+	itemid_next                          = DBget_maxid_num("items", 12);
+	itemid_rsm_slv_dns_avail             = itemid_next++;
+	itemid_rsm_slv_dns_downtime          = itemid_next++;
+	itemid_rsm_slv_dns_rollweek          = itemid_next++;
+	itemid_rsm_slv_dns_tcp_rtt_failed    = itemid_next++;
+	itemid_rsm_slv_dns_tcp_rtt_performed = itemid_next++;
+	itemid_rsm_slv_dns_tcp_rtt_pfailed   = itemid_next++;
+	itemid_rsm_slv_dns_udp_rtt_failed    = itemid_next++;
+	itemid_rsm_slv_dns_udp_rtt_performed = itemid_next++;
+	itemid_rsm_slv_dns_udp_rtt_pfailed   = itemid_next++;
+	itemid_rsm_dns_nsip_discovery        = itemid_next++;
+	itemid_rsm_slv_dns_ns_avail_ns_ip    = itemid_next++;
+	itemid_rsm_slv_dns_ns_downtime_ns_ip = itemid_next++;
+
+	triggerid_next                     = DBget_maxid_num("triggers", 22);
+	triggerid_service_down             = triggerid_next++;
+	triggerid_downtime_over_100        = triggerid_next++;
+	triggerid_rollweek_over_10         = triggerid_next++;
+	triggerid_rollweek_over_25         = triggerid_next++;
+	triggerid_rollweek_over_50         = triggerid_next++;
+	triggerid_rollweek_over_75         = triggerid_next++;
+	triggerid_rollweek_over_100        = triggerid_next++;
+	triggerid_tcp_rtt_pfailed_over_10  = triggerid_next++;
+	triggerid_tcp_rtt_pfailed_over_25  = triggerid_next++;
+	triggerid_tcp_rtt_pfailed_over_50  = triggerid_next++;
+	triggerid_tcp_rtt_pfailed_over_75  = triggerid_next++;
+	triggerid_tcp_rtt_pfailed_over_100 = triggerid_next++;
+	triggerid_udp_rtt_pfailed_over_10  = triggerid_next++;
+	triggerid_udp_rtt_pfailed_over_25  = triggerid_next++;
+	triggerid_udp_rtt_pfailed_over_50  = triggerid_next++;
+	triggerid_udp_rtt_pfailed_over_75  = triggerid_next++;
+	triggerid_udp_rtt_pfailed_over_100 = triggerid_next++;
+	triggerid_ns_ip_downtime_over_10   = triggerid_next++;
+	triggerid_ns_ip_downtime_over_25   = triggerid_next++;
+	triggerid_ns_ip_downtime_over_50   = triggerid_next++;
+	triggerid_ns_ip_downtime_over_75   = triggerid_next++;
+	triggerid_ns_ip_downtime_over_100  = triggerid_next++;
+
+	functionid_next                     = DBget_maxid_num("functions", 23);
+	functionid_service_down_1           = functionid_next++;
+	functionid_service_down_2           = functionid_next++;
+	functionid_downtime_over_100        = functionid_next++;
+	functionid_rollweek_over_10         = functionid_next++;
+	functionid_rollweek_over_25         = functionid_next++;
+	functionid_rollweek_over_50         = functionid_next++;
+	functionid_rollweek_over_75         = functionid_next++;
+	functionid_rollweek_over_100        = functionid_next++;
+	functionid_tcp_rtt_pfailed_over_10  = functionid_next++;
+	functionid_tcp_rtt_pfailed_over_25  = functionid_next++;
+	functionid_tcp_rtt_pfailed_over_50  = functionid_next++;
+	functionid_tcp_rtt_pfailed_over_75  = functionid_next++;
+	functionid_tcp_rtt_pfailed_over_100 = functionid_next++;
+	functionid_udp_rtt_pfailed_over_10  = functionid_next++;
+	functionid_udp_rtt_pfailed_over_25  = functionid_next++;
+	functionid_udp_rtt_pfailed_over_50  = functionid_next++;
+	functionid_udp_rtt_pfailed_over_75  = functionid_next++;
+	functionid_udp_rtt_pfailed_over_100 = functionid_next++;
+	functionid_ns_ip_downtime_over_10   = functionid_next++;
+	functionid_ns_ip_downtime_over_25   = functionid_next++;
+	functionid_ns_ip_downtime_over_50   = functionid_next++;
+	functionid_ns_ip_downtime_over_75   = functionid_next++;
+	functionid_ns_ip_downtime_over_100  = functionid_next++;
+
+#define SQL	"insert into hosts set hostid=" ZBX_FS_UI64 ",created=0,proxy_hostid=NULL,host='%s',status=%d,"		\
+		"disable_until=0,error='',available=0,errors_from=0,lastaccess=0,ipmi_authtype=-1,ipmi_privilege=2,"	\
+		"ipmi_username='',ipmi_password='',ipmi_disable_until=0,ipmi_available=0,snmp_disable_until=0,"		\
+		"snmp_available=0,maintenanceid=NULL,maintenance_status=0,maintenance_type=0,maintenance_from=0,"	\
+		"ipmi_errors_from=0,snmp_errors_from=0,ipmi_error='',snmp_error='',jmx_disable_until=0,"		\
+		"jmx_available=0,jmx_errors_from=0,jmx_error='',name='%s',info_1='',info_2='',flags=0,templateid=NULL,"	\
+		"description='%s',tls_connect=1,tls_accept=1,tls_issuer='',tls_subject='',tls_psk_identity='',"		\
+		"tls_psk='',proxy_address='',auto_compress=1"
+	/* status 3 = HOST_STATUS_TEMPLATE */
+	DB_EXEC(SQL, hostid, "Template DNS Status", 3, "Template DNS Status", "DNS SLV items and triggers for linking to <RSMHOST> hosts");
+#undef SQL
+
+#define SQL	"insert into hosts_groups set hostgroupid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",groupid=" ZBX_FS_UI64
+	DB_EXEC(SQL, DBget_maxid_num("hosts_groups", 1), hostid, groupid_templates);
+#undef SQL
+
+#define SQL	"insert into applications set applicationid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",name='%s',flags=0"
+	DB_EXEC(SQL, applicatinoid_slv_current_month  , hostid, "SLV current month");
+	DB_EXEC(SQL, applicatinoid_slv_particular_test, hostid, "SLV particular test");
+	DB_EXEC(SQL, applicatinoid_slv_rolling_week   , hostid, "SLV rolling week");
+#undef SQL
+
+#define SQL	"insert into items set itemid=" ZBX_FS_UI64 ",type=%d,snmp_community='',snmp_oid='',"			\
+		"hostid=" ZBX_FS_UI64 ",name='%s',key_='%s',delay='0',history='90d',trends='%s',status=0,"		\
+		"value_type=%d,trapper_hosts='',units='%s',snmpv3_securityname='',snmpv3_securitylevel=0,"		\
+		"snmpv3_authpassphrase='',snmpv3_privpassphrase='',formula='',logtimefmt='',templateid=NULL,"		\
+		"valuemapid=nullif(" ZBX_FS_UI64 ",0),params='',ipmi_sensor='',authtype=0,username='',password='',"	\
+		"publickey='',privatekey='',flags=%d,interfaceid=NULL,port='',description='%s',inventory_link=0,"	\
+		"lifetime='%s',snmpv3_authprotocol=0,snmpv3_privprotocol=0,snmpv3_contextname='',evaltype=0,"		\
+		"jmx_endpoint='',master_itemid=NULL,timeout='3s',url='',query_fields='',posts='',status_codes='200',"	\
+		"follow_redirects=1,post_type=0,http_proxy='',headers='',retrieve_mode=0,request_method=0,"		\
+		"output_format=0,ssl_cert_file='',ssl_key_file='',ssl_key_password='',verify_peer=0,verify_host=0,"	\
+		"allow_traps=0"
+	/* type 2 = ITEM_TYPE_TRAPPER */
+	/* value_type 0 = ITEM_VALUE_TYPE_FLOAT */
+	/* value_type 3 = ITEM_VALUE_TYPE_UINT64 */
+	/* value_type 4 = ITEM_VALUE_TYPE_TEXT */
+	/* flags 0 = ZBX_FLAG_DISCOVERY_NORMAL */
+	/* flags 1 = ZBX_FLAG_DISCOVERY */
+	/* flags 2 = ZBX_FLAG_DISCOVERY_PROTOTYPE */
+	/* DB_EXEC(SQL, itemid, type, hostid, name,						*/
+	/*	key_, trends, value_type, units, valuemapid, flags, description, lifetime);	*/
+	DB_EXEC(SQL, itemid_rsm_slv_dns_avail, 2, hostid, "DNS availability",
+		"rsm.slv.dns.avail", "365d", 3, "", valuemapid_rsm_service_availability, 0, "", "30d");
+	DB_EXEC(SQL, itemid_rsm_slv_dns_downtime, 2, hostid, "DNS minutes of downtime",
+		"rsm.slv.dns.downtime", "365d", 3, "", (zbx_uint64_t)0, 0, "", "30d");
+	DB_EXEC(SQL, itemid_rsm_slv_dns_rollweek, 2, hostid, "DNS weekly unavailability",
+		"rsm.slv.dns.rollweek", "365d", 0, "%", (zbx_uint64_t)0, 0, "", "30d");
+	DB_EXEC(SQL, itemid_rsm_slv_dns_tcp_rtt_failed, 2, hostid, "Number of failed monthly DNS TCP tests",
+		"rsm.slv.dns.tcp.rtt.failed", "365d", 3, "", (zbx_uint64_t)0, 0, "", "30d");
+	DB_EXEC(SQL, itemid_rsm_slv_dns_tcp_rtt_performed, 2, hostid, "Number of performed monthly DNS TCP tests",
+		"rsm.slv.dns.tcp.rtt.performed", "365d", 3, "", (zbx_uint64_t)0, 0, "", "30d");
+	DB_EXEC(SQL, itemid_rsm_slv_dns_tcp_rtt_pfailed, 2, hostid, "Ratio of failed monthly DNS TCP tests",
+		"rsm.slv.dns.tcp.rtt.pfailed", "365d", 0, "%", (zbx_uint64_t)0, 0, "", "30d");
+	DB_EXEC(SQL, itemid_rsm_slv_dns_udp_rtt_failed, 2, hostid, "Number of failed monthly DNS UDP tests",
+		"rsm.slv.dns.udp.rtt.failed", "365d", 3, "", (zbx_uint64_t)0, 0, "", "30d");
+	DB_EXEC(SQL, itemid_rsm_slv_dns_udp_rtt_performed, 2, hostid, "Number of performed monthly DNS UDP tests",
+		"rsm.slv.dns.udp.rtt.performed", "365d", 3, "", (zbx_uint64_t)0, 0, "", "30d");
+	DB_EXEC(SQL, itemid_rsm_slv_dns_udp_rtt_pfailed, 2, hostid, "Ratio of failed monthly DNS UDP tests",
+		"rsm.slv.dns.udp.rtt.pfailed", "365d", 0, "%", (zbx_uint64_t)0, 0, "", "30d");
+	DB_EXEC(SQL, itemid_rsm_dns_nsip_discovery, 2, hostid, "NS-IP pairs discovery",
+		"rsm.dns.nsip.discovery", "0", 4, "", (zbx_uint64_t)0, 1, "Discovers Name Servers (NS-IP pairs).", "1000d");
+	DB_EXEC(SQL, itemid_rsm_slv_dns_ns_avail_ns_ip, 2, hostid, "DNS NS $1 ($2) availability",
+		"rsm.slv.dns.ns.avail[{#NS},{#IP}]", "365d", 3, "", valuemapid_rsm_service_availability, 2, "", "30d");
+	DB_EXEC(SQL, itemid_rsm_slv_dns_ns_downtime_ns_ip, 2, hostid, "DNS minutes of $1 ($2) downtime",
+		"rsm.slv.dns.ns.downtime[{#NS},{#IP}]", "365d", 3, "", (zbx_uint64_t)0, 2, "", "30d");
+#undef SQL
+
+#define SQL	"insert into items_applications set itemappid=" ZBX_FS_UI64 ",applicationid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64
+	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicatinoid_slv_particular_test, itemid_rsm_slv_dns_avail);
+	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicatinoid_slv_current_month  , itemid_rsm_slv_dns_downtime);
+	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicatinoid_slv_rolling_week   , itemid_rsm_slv_dns_rollweek);
+	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicatinoid_slv_current_month  , itemid_rsm_slv_dns_tcp_rtt_failed);
+	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicatinoid_slv_current_month  , itemid_rsm_slv_dns_tcp_rtt_performed);
+	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicatinoid_slv_current_month  , itemid_rsm_slv_dns_tcp_rtt_pfailed);
+	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicatinoid_slv_current_month  , itemid_rsm_slv_dns_udp_rtt_failed);
+	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicatinoid_slv_current_month  , itemid_rsm_slv_dns_udp_rtt_performed);
+	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicatinoid_slv_current_month  , itemid_rsm_slv_dns_udp_rtt_pfailed);
+	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicatinoid_slv_particular_test, itemid_rsm_slv_dns_ns_avail_ns_ip);
+	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicatinoid_slv_current_month  , itemid_rsm_slv_dns_ns_downtime_ns_ip);
+#undef SQL
+
+#define SQL	"insert into item_discovery set itemdiscoveryid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ",parent_itemid=" ZBX_FS_UI64 ",key_='',lastcheck=0,ts_delete=0"
+	DB_EXEC(SQL, DBget_maxid_num("item_discovery", 1), itemid_rsm_slv_dns_ns_avail_ns_ip   , itemid_rsm_dns_nsip_discovery);
+	DB_EXEC(SQL, DBget_maxid_num("item_discovery", 1), itemid_rsm_slv_dns_ns_downtime_ns_ip, itemid_rsm_dns_nsip_discovery);
+#undef SQL
+
+#define SQL	"insert into triggers set triggerid=" ZBX_FS_UI64 ","								\
+		"expression='({TRIGGER.VALUE}=0 and {" ZBX_FS_UI64 "}=0) or ({TRIGGER.VALUE}=1 and {" ZBX_FS_UI64 "}>0)',"	\
+		"description='%s',url='',status=0,value=0,priority=%d,lastchange=0,comments='',error='',"			\
+		"templateid=NULL,type=0,state=0,flags=%d,recovery_mode=0,recovery_expression='',correlation_mode=0,"		\
+		"correlation_tag='',manual_close=0,opdata=''"
+	/* priority 0 = TRIGGER_SEVERITY_NOT_CLASSIFIED */
+	/* flags 0x00 = ZBX_FLAG_DISCOVERY_NORMAL */
+	DB_EXEC(SQL, triggerid_service_down, functionid_service_down_1, functionid_service_down_2, "DNS service is down", 0, 0);
+#undef SQL
+
+#define SQL	"insert into triggers set triggerid=" ZBX_FS_UI64 ","							\
+		"expression='{" ZBX_FS_UI64 "}%s',"									\
+		"description='%s',url='',status=0,value=0,priority=%d,lastchange=0,comments='',error='',"		\
+		"templateid=NULL,type=0,state=0,flags=%d,recovery_mode=0,recovery_expression='',correlation_mode=0,"	\
+		"correlation_tag='',manual_close=0,opdata=''"
+	/* priority 0 = TRIGGER_SEVERITY_NOT_CLASSIFIED */
+	/* priority 2 = TRIGGER_SEVERITY_WARNING */
+	/* priority 3 = TRIGGER_SEVERITY_AVERAGE */
+	/* priority 4 = TRIGGER_SEVERITY_HIGH */
+	/* priority 5 = TRIGGER_SEVERITY_DISASTER */
+	/* flags 0x00 = ZBX_FLAG_DISCOVERY_NORMAL */
+	/* flags 0x02 = ZBX_FLAG_DISCOVERY_CHILD */
+	DB_EXEC(SQL, triggerid_downtime_over_100, functionid_downtime_over_100, ">{$RSM.SLV.DNS.DOWNTIME}",
+		"DNS service was unavailable for at least {ITEM.VALUE1}m", 5, 0);
+	DB_EXEC(SQL, triggerid_rollweek_over_10, functionid_rollweek_over_10, ">=10",
+		"DNS rolling week is over 10%", 2, 0);
+	DB_EXEC(SQL, triggerid_rollweek_over_25, functionid_rollweek_over_25, ">=25",
+		"DNS rolling week is over 25%", 3, 0);
+	DB_EXEC(SQL, triggerid_rollweek_over_50, functionid_rollweek_over_50, ">=50",
+		"DNS rolling week is over 50%", 3, 0);
+	DB_EXEC(SQL, triggerid_rollweek_over_75, functionid_rollweek_over_75, ">=75",
+		"DNS rolling week is over 75%", 4, 0);
+	DB_EXEC(SQL, triggerid_rollweek_over_100, functionid_rollweek_over_100, ">=100",
+		"DNS rolling week is over 100%", 5, 0);
+	DB_EXEC(SQL, triggerid_tcp_rtt_pfailed_over_10, functionid_tcp_rtt_pfailed_over_10, ">{$RSM.SLV.DNS.TCP.RTT}*0.1",
+		"Ratio of failed DNS TCP tests exceeded 10% of allowed $1%", 2, 0);
+	DB_EXEC(SQL, triggerid_tcp_rtt_pfailed_over_25, functionid_tcp_rtt_pfailed_over_25, ">{$RSM.SLV.DNS.TCP.RTT}*0.25",
+		"Ratio of failed DNS TCP tests exceeded 25% of allowed $1%", 3, 0);
+	DB_EXEC(SQL, triggerid_tcp_rtt_pfailed_over_50, functionid_tcp_rtt_pfailed_over_50, ">{$RSM.SLV.DNS.TCP.RTT}*0.5",
+		"Ratio of failed DNS TCP tests exceeded 50% of allowed $1%", 3, 0);
+	DB_EXEC(SQL, triggerid_tcp_rtt_pfailed_over_75, functionid_tcp_rtt_pfailed_over_75, ">{$RSM.SLV.DNS.TCP.RTT}*0.75",
+		"Ratio of failed DNS TCP tests exceeded 75% of allowed $1%", 4, 0);
+	DB_EXEC(SQL, triggerid_tcp_rtt_pfailed_over_100, functionid_tcp_rtt_pfailed_over_100, ">{$RSM.SLV.DNS.TCP.RTT}",
+		"Ratio of failed DNS TCP tests exceeded 100% of allowed $1%", 5, 0);
+	DB_EXEC(SQL, triggerid_udp_rtt_pfailed_over_10, functionid_udp_rtt_pfailed_over_10, ">{$RSM.SLV.DNS.UDP.RTT}*0.1",
+		"Ratio of failed DNS UDP tests exceeded 10% of allowed $1%", 2, 0);
+	DB_EXEC(SQL, triggerid_udp_rtt_pfailed_over_25, functionid_udp_rtt_pfailed_over_25, ">{$RSM.SLV.DNS.UDP.RTT}*0.25",
+		"Ratio of failed DNS UDP tests exceeded 25% of allowed $1%", 3, 0);
+	DB_EXEC(SQL, triggerid_udp_rtt_pfailed_over_50, functionid_udp_rtt_pfailed_over_50, ">{$RSM.SLV.DNS.UDP.RTT}*0.5",
+		"Ratio of failed DNS UDP tests exceeded 50% of allowed $1%", 3, 0);
+	DB_EXEC(SQL, triggerid_udp_rtt_pfailed_over_75, functionid_udp_rtt_pfailed_over_75, ">{$RSM.SLV.DNS.UDP.RTT}*0.75",
+		"Ratio of failed DNS UDP tests exceeded 75% of allowed $1%", 4, 0);
+	DB_EXEC(SQL, triggerid_udp_rtt_pfailed_over_100, functionid_udp_rtt_pfailed_over_100, ">{$RSM.SLV.DNS.UDP.RTT}",
+		"Ratio of failed DNS UDP tests exceeded 100% of allowed $1%", 5, 0);
+	DB_EXEC(SQL, triggerid_ns_ip_downtime_over_10, functionid_ns_ip_downtime_over_10, ">{$RSM.SLV.NS.DOWNTIME}*0.1",
+		"DNS {#NS} ({#IP}) downtime exceeded 10% of allowed $1 minutes", 2, 2);
+	DB_EXEC(SQL, triggerid_ns_ip_downtime_over_25, functionid_ns_ip_downtime_over_25, ">{$RSM.SLV.NS.DOWNTIME}*0.25",
+		"DNS {#NS} ({#IP}) downtime exceeded 25% of allowed $1 minutes", 3, 2);
+	DB_EXEC(SQL, triggerid_ns_ip_downtime_over_50, functionid_ns_ip_downtime_over_50, ">{$RSM.SLV.NS.DOWNTIME}*0.5",
+		"DNS {#NS} ({#IP}) downtime exceeded 50% of allowed $1 minutes", 3, 2);
+	DB_EXEC(SQL, triggerid_ns_ip_downtime_over_75, functionid_ns_ip_downtime_over_75, ">{$RSM.SLV.NS.DOWNTIME}*0.75",
+		"DNS {#NS} ({#IP}) downtime exceeded 75% of allowed $1 minutes", 4, 2);
+	DB_EXEC(SQL, triggerid_ns_ip_downtime_over_100, functionid_ns_ip_downtime_over_100, ">{$RSM.SLV.NS.DOWNTIME}",
+		"DNS {#NS} ({#IP}) downtime exceeded 100% of allowed $1 minutes", 5, 2);
+#undef SQL
+
+#define SQL	"insert into functions set functionid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ",triggerid=" ZBX_FS_UI64 ",name='%s',parameter='%s'"
+	DB_EXEC(SQL, functionid_service_down_1          , itemid_rsm_slv_dns_avail            , triggerid_service_down            , "max"  , "#{$RSM.INCIDENT.DNS.FAIL}");
+	DB_EXEC(SQL, functionid_service_down_2          , itemid_rsm_slv_dns_avail            , triggerid_service_down            , "count", "#{$RSM.INCIDENT.DNS.RECOVER},0,\"eq\"");
+	DB_EXEC(SQL, functionid_downtime_over_100       , itemid_rsm_slv_dns_downtime         , triggerid_downtime_over_100       , "last" , "0");
+	DB_EXEC(SQL, functionid_rollweek_over_10        , itemid_rsm_slv_dns_rollweek         , triggerid_rollweek_over_10        , "last" , "0");
+	DB_EXEC(SQL, functionid_rollweek_over_25        , itemid_rsm_slv_dns_rollweek         , triggerid_rollweek_over_25        , "last" , "0");
+	DB_EXEC(SQL, functionid_rollweek_over_50        , itemid_rsm_slv_dns_rollweek         , triggerid_rollweek_over_50        , "last" , "0");
+	DB_EXEC(SQL, functionid_rollweek_over_75        , itemid_rsm_slv_dns_rollweek         , triggerid_rollweek_over_75        , "last" , "0");
+	DB_EXEC(SQL, functionid_rollweek_over_100       , itemid_rsm_slv_dns_rollweek         , triggerid_rollweek_over_100       , "last" , "0");
+	DB_EXEC(SQL, functionid_tcp_rtt_pfailed_over_10 , itemid_rsm_slv_dns_tcp_rtt_pfailed  , triggerid_tcp_rtt_pfailed_over_10 , "last" , "");
+	DB_EXEC(SQL, functionid_tcp_rtt_pfailed_over_25 , itemid_rsm_slv_dns_tcp_rtt_pfailed  , triggerid_tcp_rtt_pfailed_over_25 , "last" , "");
+	DB_EXEC(SQL, functionid_tcp_rtt_pfailed_over_50 , itemid_rsm_slv_dns_tcp_rtt_pfailed  , triggerid_tcp_rtt_pfailed_over_50 , "last" , "");
+	DB_EXEC(SQL, functionid_tcp_rtt_pfailed_over_75 , itemid_rsm_slv_dns_tcp_rtt_pfailed  , triggerid_tcp_rtt_pfailed_over_75 , "last" , "");
+	DB_EXEC(SQL, functionid_tcp_rtt_pfailed_over_100, itemid_rsm_slv_dns_tcp_rtt_pfailed  , triggerid_tcp_rtt_pfailed_over_100, "last" , "");
+	DB_EXEC(SQL, functionid_udp_rtt_pfailed_over_10 , itemid_rsm_slv_dns_udp_rtt_pfailed  , triggerid_udp_rtt_pfailed_over_10 , "last" , "");
+	DB_EXEC(SQL, functionid_udp_rtt_pfailed_over_25 , itemid_rsm_slv_dns_udp_rtt_pfailed  , triggerid_udp_rtt_pfailed_over_25 , "last" , "");
+	DB_EXEC(SQL, functionid_udp_rtt_pfailed_over_50 , itemid_rsm_slv_dns_udp_rtt_pfailed  , triggerid_udp_rtt_pfailed_over_50 , "last" , "");
+	DB_EXEC(SQL, functionid_udp_rtt_pfailed_over_75 , itemid_rsm_slv_dns_udp_rtt_pfailed  , triggerid_udp_rtt_pfailed_over_75 , "last" , "");
+	DB_EXEC(SQL, functionid_udp_rtt_pfailed_over_100, itemid_rsm_slv_dns_udp_rtt_pfailed  , triggerid_udp_rtt_pfailed_over_100, "last" , "");
+	DB_EXEC(SQL, functionid_ns_ip_downtime_over_10  , itemid_rsm_slv_dns_ns_downtime_ns_ip, triggerid_ns_ip_downtime_over_10  , "last" , "");
+	DB_EXEC(SQL, functionid_ns_ip_downtime_over_25  , itemid_rsm_slv_dns_ns_downtime_ns_ip, triggerid_ns_ip_downtime_over_25  , "last" , "");
+	DB_EXEC(SQL, functionid_ns_ip_downtime_over_50  , itemid_rsm_slv_dns_ns_downtime_ns_ip, triggerid_ns_ip_downtime_over_50  , "last" , "");
+	DB_EXEC(SQL, functionid_ns_ip_downtime_over_75  , itemid_rsm_slv_dns_ns_downtime_ns_ip, triggerid_ns_ip_downtime_over_75  , "last" , "");
+	DB_EXEC(SQL, functionid_ns_ip_downtime_over_100 , itemid_rsm_slv_dns_ns_downtime_ns_ip, triggerid_ns_ip_downtime_over_100 , "last" , "");
+#undef SQL
+
+#define SQL "insert into trigger_depends set triggerdepid=" ZBX_FS_UI64 ",triggerid_down=" ZBX_FS_UI64 ",triggerid_up=" ZBX_FS_UI64
+	DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rollweek_over_10       , triggerid_rollweek_over_25);
+	DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rollweek_over_25       , triggerid_rollweek_over_50);
+	DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rollweek_over_50       , triggerid_rollweek_over_75);
+	DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_rollweek_over_75       , triggerid_rollweek_over_100);
+	DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_tcp_rtt_pfailed_over_10, triggerid_tcp_rtt_pfailed_over_25);
+	DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_tcp_rtt_pfailed_over_25, triggerid_tcp_rtt_pfailed_over_50);
+	DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_tcp_rtt_pfailed_over_50, triggerid_tcp_rtt_pfailed_over_75);
+	DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_tcp_rtt_pfailed_over_75, triggerid_tcp_rtt_pfailed_over_100);
+	DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_udp_rtt_pfailed_over_10, triggerid_udp_rtt_pfailed_over_25);
+	DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_udp_rtt_pfailed_over_25, triggerid_udp_rtt_pfailed_over_50);
+	DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_udp_rtt_pfailed_over_50, triggerid_udp_rtt_pfailed_over_75);
+	DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_udp_rtt_pfailed_over_75, triggerid_udp_rtt_pfailed_over_100);
+	DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_ns_ip_downtime_over_10 , triggerid_ns_ip_downtime_over_25);
+	DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_ns_ip_downtime_over_25 , triggerid_ns_ip_downtime_over_50);
+	DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_ns_ip_downtime_over_50 , triggerid_ns_ip_downtime_over_75);
+	DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_ns_ip_downtime_over_75 , triggerid_ns_ip_downtime_over_100);
+#undef SQL
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
 DBPATCH_START(4050)
 
 /* version, duplicates flag, mandatory flag */
@@ -3174,5 +3529,6 @@ DBPATCH_ADD(4050517, 0, 0)	/* add "Template RDAP Status" template */
 DBPATCH_ADD(4050518, 0, 0)	/* add "Template RDDS Status" template */
 DBPATCH_ADD(4050519, 0, 0)	/* convert "<rsmhost> <probe>" hosts to use "Template RDDS Test" template */
 DBPATCH_ADD(4050520, 0, 0)	/* convert "<probe>" hosts to use "Template Probe Status" template */
+DBPATCH_ADD(4050521, 0, 0)	/* add "Template DNS Status" template */
 
 DBPATCH_END()
