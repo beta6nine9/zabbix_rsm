@@ -22,6 +22,7 @@ use constant TLD_PROBE_RESULTS_GROUPID		=> 190;		# Host group "TLD Probe results
 use constant TEMPLATE_RSMHOST_CONFIG_PREFIX	=> 'Template Rsmhost Config ';
 use constant TEMPLATE_CONFIG_HISTORY		=> 'Template Config History';
 use constant TEMPLATE_DNS_TEST			=> 'Template DNS Test';
+use constant TEMPLATE_DNS_STATUS		=> 'Template DNS Status';
 use constant TEMPLATE_DNSSEC_STATUS		=> 'Template DNSSEC Status';
 use constant TEMPLATE_RDDS_TEST			=> 'Template RDDS Test';
 use constant TEMPLATE_RDDS_STATUS		=> 'Template RDDS Status';
@@ -158,6 +159,8 @@ use constant CFG_MACRO_DESCRIPTION => {
 	'{$RSM.RDDS.NS.STRING}' => 'What to look for in RDDS output, e.g. "Name Server:"',
 	'{$RDAP.BASE.URL}' => 'Base URL for RDAP queries, e.g. http://whois.zabbix',
 	'{$RSM.TLD.DNSSEC.ENABLED}' => 'Indicates whether DNSSEC is enabled for this TLD',
+	'{$RSM.TLD.RDDS.43.SERVERS}' => 'List of RDDS43 server host names as candidates for a test',
+	'{$RSM.TLD.RDDS.80.SERVERS}' => 'List of Web Whois server host names as candidates for a test',
 	'{$RSM.RDDS.ENABLED}' => 'Indicates whether the probe supports RDDS protocol',
 	'{$RDAP.TLD.ENABLED}' => 'Indicates whether RDAP is enabled for this TLD',
 	'{$RSM.IP4.ENABLED}' => 'Indicates whether the probe supports IPv4',
@@ -167,6 +170,7 @@ use constant CFG_MACRO_DESCRIPTION => {
 	'{$RSM.IP6.ENABLED}' => 'Indicates whether the probe supports IPv6',
 	'{$RSM.EPP.ENABLED}' => 'Indicates whether EPP is enabled on probe',
 	'{$RSM.DNS.TESTPREFIX}' => 'Prefix for DNS tests, e.g. nonexistent',
+	'{$RSM.DNS.NAME.SERVERS}' => 'List of Name Server (name, IP pairs) to monitor',
 	'{$RSM.TLD.DNS.UDP.ENABLED}' => 'Indicates whether DNS UDP enabled for this TLD',
 	'{$RSM.TLD.DNS.TCP.ENABLED}' => 'Indicates whether DNS TCP enabled for this TLD',
 };
@@ -189,6 +193,7 @@ our @EXPORT_OK = qw(
 	TEMPLATE_RSMHOST_CONFIG_PREFIX
 	TEMPLATE_CONFIG_HISTORY
 	TEMPLATE_DNS_TEST
+	TEMPLATE_DNS_STATUS
 	TEMPLATE_DNSSEC_STATUS
 	TEMPLATE_RDDS_TEST
 	TEMPLATE_RDDS_STATUS
@@ -226,6 +231,7 @@ our %EXPORT_TAGS = (
 			TEMPLATE_PROBE_STATUS
 			TEMPLATE_CONFIG_HISTORY
 			TEMPLATE_DNS_TEST
+			TEMPLATE_DNS_STATUS
 			TEMPLATE_DNSSEC_STATUS
 			TEMPLATE_RDDS_TEST
 			TEMPLATE_RDDS_STATUS

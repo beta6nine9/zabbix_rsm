@@ -16,15 +16,16 @@ use constant RSMHOST_DNS_NS_LOG_ACTION_DISABLE => 2;
 our @EXPORT = qw(zbx_connect check_api_error get_proxies_list
 		get_api_error zbx_need_relogin
 		CONFIG_HISTORY_TEMPLATEID
-		DNS_TEMPLATEID
+		DNS_TEST_TEMPLATEID
+		DNS_STATUS_TEMPLATEID
 		DNSSEC_STATUS_TEMPLATEID
-		RDDS_TEMPLATEID
+		RDDS_TEST_TEMPLATEID
 		RDDS_STATUS_TEMPLATEID
-		RDAP_TEMPLATEID
+		RDAP_TEST_TEMPLATEID
 		RDAP_STATUS_TEMPLATEID
 		PROBE_STATUS_TEMPLATEID
 		create_probe_template create_probe_status_template create_host create_group create_template
-		create_item create_trigger create_macro update_root_servers
+		create_item create_trigger create_macro update_root_server_macros
 		create_passive_proxy probe_exists get_host_group get_template get_template_id get_probe get_host
 		remove_templates remove_hosts remove_hostgroups remove_probes remove_items
 		disable_host disable_hosts link_template_to_host
@@ -229,9 +230,14 @@ sub CONFIG_HISTORY_TEMPLATEID
 	return get_template_id(TEMPLATE_CONFIG_HISTORY);
 }
 
-sub DNS_TEMPLATEID
+sub DNS_TEST_TEMPLATEID
 {
 	return get_template_id(TEMPLATE_DNS_TEST);
+}
+
+sub DNS_STATUS_TEMPLATEID
+{
+	return get_template_id(TEMPLATE_DNS_STATUS);
 }
 
 sub DNSSEC_STATUS_TEMPLATEID
@@ -239,7 +245,7 @@ sub DNSSEC_STATUS_TEMPLATEID
 	return get_template_id(TEMPLATE_DNSSEC_STATUS);
 }
 
-sub RDDS_TEMPLATEID
+sub RDDS_TEST_TEMPLATEID
 {
 	return get_template_id(TEMPLATE_RDDS_TEST);
 }
@@ -249,7 +255,7 @@ sub RDDS_STATUS_TEMPLATEID
 	return get_template_id(TEMPLATE_RDDS_STATUS);
 }
 
-sub RDAP_TEMPLATEID
+sub RDAP_TEST_TEMPLATEID
 {
 	return get_template_id(TEMPLATE_RDAP_TEST);
 }
@@ -597,22 +603,17 @@ sub get_global_macro_value($)
 	return $result->{'value'}; # may be undef
 }
 
-sub update_root_servers(;$)
+sub update_root_server_macros(;$)
 {
 	my $root_servers = shift;
 
-	my $macro_value_v4 = "";
-	my $macro_value_v6 = "";
-
 	if ($root_servers)
 	{
-		($macro_value_v4, $macro_value_v6)  = split(';', $root_servers);
+		my ($macro_value_v4, $macro_value_v6)  = split(';', $root_servers);
 
 		create_macro('{$RSM.IP4.ROOTSERVERS1}', $macro_value_v4, undef, 1); # global, force
 		create_macro('{$RSM.IP6.ROOTSERVERS1}', $macro_value_v6, undef, 1); # global, force
 	}
-
-	return '"{$RSM.IP4.ROOTSERVERS1}","{$RSM.IP6.ROOTSERVERS1}"';
 }
 
 sub create_host
@@ -806,31 +807,49 @@ sub create_trigger
 	return $result;
 }
 
-sub create_macro
+sub create_macro($$;$$)
 {
 	my $name         = shift;
 	my $value        = shift;
 	my $templateid   = shift;
 	my $force_update = shift;
 
-	my $result;
-	my $error;
+	my ($result, $params, $error);
 
 	if (defined($templateid))
 	{
-		if ($zabbix->get('usermacro', {'countOutput' => 1, 'hostids' => $templateid, 'filter' => {'macro' => $name}}))
+		$params = {'countOutput' => 1, 'hostids' => $templateid, 'filter' => {'macro' => $name}};
+
+		$result = $zabbix->get('usermacro', $params);
+
+		if ($result)
 		{
-			$result = $zabbix->get('usermacro', {'output' => 'hostmacroid', 'hostids' => $templateid, 'filter' => {'macro' => $name}});
+			$params = {
+				'output' => 'hostmacroid',
+				'hostids' => $templateid,
+				'filter' => {'macro' => $name},
+			};
+
+			$result = $zabbix->get('usermacro', $params);
+
 			if (defined($result->{'hostmacroid'}) && defined($force_update))
 			{
-				$zabbix->update('usermacro', {'hostmacroid' => $result->{'hostmacroid'}, 'value' => $value});
+				$params = {
+					'hostmacroid' => $result->{'hostmacroid'},
+					'value' => $value,
+				};
+
+				$zabbix->update('usermacro', $params);
 			}
 		}
 		else
 		{
-			my $params = {'hostid' => $templateid, 'macro' => $name, 'value' => $value};
+			my $description = CFG_MACRO_DESCRIPTION->{$name};
 
-			$params->{'description'} = CFG_MACRO_DESCRIPTION->{$name} if (defined(CFG_MACRO_DESCRIPTION->{$name}));
+			$params = {'hostid' => $templateid, 'macro' => $name, 'value' => $value};
+
+			$params->{'description'} = $description if (defined($description));
+
 			$result = $zabbix->create('usermacro', $params);
 		}
 
@@ -838,7 +857,9 @@ sub create_macro
 	}
 	else
 	{
-		$result = $zabbix->get('usermacro', {'countOutput' => 1, 'globalmacro' => 1, 'filter' => {'macro' => $name}});
+		$params = {'countOutput' => 1, 'globalmacro' => 1, 'filter' => {'macro' => $name}};
+
+		$result = $zabbix->get('usermacro', $params);
 
 		if (check_api_error($result) eq true)
 		{

@@ -5,6 +5,7 @@ use warnings;
 
 use IO::Socket;
 use JSON::XS qw(decode_json encode_json);
+use Carp;
 
 use base 'Exporter';
 

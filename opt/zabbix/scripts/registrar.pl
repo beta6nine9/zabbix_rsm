@@ -346,8 +346,8 @@ sub get_rsmhost_config($$)
 
 	my $result;
 
-	my $main_templateid = get_template_id(TEMPLATE_RSMHOST_CONFIG_PREFIX . $rsmhost);
-	my $macros = get_host_macro($main_templateid, undef);
+	my $config_templateid = get_template_id(TEMPLATE_RSMHOST_CONFIG_PREFIX . $rsmhost);
+	my $macros = get_host_macro($config_templateid, undef);
 	my $rsmhost_host = get_host($rsmhost, true);
 
 	$result->{'status'} = $rsmhost_host->{'status'};
@@ -394,11 +394,11 @@ sub manage_registrar($$$$)
 	pfail("cannot find template \"" . TEMPLATE_RSMHOST_CONFIG_PREFIX . "$rsmhost\"") unless %{$rsmhost_template};
 
 	my $main_hostid = $main_host->{'hostid'};
-	my $main_templateid = $rsmhost_template->{'templateid'};
+	my $config_templateid = $rsmhost_template->{'templateid'};
 
 	print("Requested to $action '$rsmhost'\n");
 	print("Main hostid of the Registrar: $main_hostid\n");
-	print("Main templateid of the Registrar: $main_templateid\n");
+	print("Main templateid of the Registrar: $config_templateid\n");
 
 	my @hostids = (
 		$main_hostid,
@@ -428,7 +428,7 @@ sub manage_registrar($$$$)
 		elsif ($action eq 'delete')
 		{
 			remove_hosts(\@hostids);
-			remove_templates([$main_templateid]);
+			remove_templates([$config_templateid]);
 
 			my $hostgroupid = get_host_group('TLD ' . $rsmhost, false, false);
 			$hostgroupid = $hostgroupid->{'groupid'};
@@ -442,7 +442,7 @@ sub manage_registrar($$$$)
 
 	my $macro = $service eq 'rdap' ? '{$RDAP.TLD.ENABLED}' : '{$RSM.TLD.' . uc($service) . '.ENABLED}';
 
-	create_macro($macro, 0, $main_templateid, true);
+	create_macro($macro, 0, $config_templateid, true);
 
 	my $items = get_items_like($main_hostid, $service, false);
 	my @itemids = map { $items->{$_}->{'key_'} ne "$service.enabled" ? $_ : () } keys(%{$items});
@@ -487,19 +487,20 @@ sub compare_arrays($$)
 
 sub add_new_registrar()
 {
-	my $root_servers_macros = update_root_servers(getopt('root-servers'));
-	print("Could not retrive list of root servers or create global macros\n") unless (defined($root_servers_macros));
+	my $proxies = get_proxies_list();
 
-	my $main_templateid = create_main_template(getopt('rr-id'));
-	pfail("Main templateid is not defined") unless defined $main_templateid;
+	pfail("please add at least one probe first using probes.pl script") unless (%{$proxies});
 
+	update_root_server_macros(getopt('root-servers'));
+
+	my $config_templateid = create_main_template(getopt('rr-id'));
 	my $rsmhost_groupid = really(create_group('TLD ' . getopt('rr-id')));
 
-	create_rsmhost($main_templateid, getopt('rr-id'), getopt('rr-name'), getopt('rr-family'));
+	create_rsmhost($config_templateid, getopt('rr-id'), getopt('rr-name'), getopt('rr-family'));
 
 	my $proxy_mon_templateid = create_probe_health_tmpl();
 
-	create_tld_hosts_on_probes($root_servers_macros, $proxy_mon_templateid, $rsmhost_groupid, $main_templateid);
+	create_rsmhosts_on_probes($proxy_mon_templateid, $rsmhost_groupid, $config_templateid, $proxies);
 }
 
 sub create_main_template($)
@@ -534,10 +535,10 @@ sub create_main_template($)
 
 sub create_rsmhost($$$$)
 {
-	my $main_templateid = shift;
-	my $rr_id           = shift;
-	my $rr_name         = shift;
-	my $rr_family       = shift;	# TODO: save family
+	my $config_templateid = shift;
+	my $rr_id             = shift;
+	my $rr_name           = shift;
+	my $rr_family         = shift;	# TODO: save family
 
 	my $rsmhostid = really(create_host({
 		'groups'     => [
@@ -545,7 +546,7 @@ sub create_rsmhost($$$$)
 			{'groupid' => TLD_TYPE_GROUPIDS->{${\TLD_TYPE_G}}}
 		],
 		'templates' => [
-			{'templateid' => $main_templateid},
+			{'templateid' => $config_templateid},
 			{'templateid' => CONFIG_HISTORY_TEMPLATEID}
 		],
 		'host'       => $rr_id,
@@ -555,7 +556,7 @@ sub create_rsmhost($$$$)
 		'interfaces' => [DEFAULT_MAIN_INTERFACE]
 	}));
 
-	create_slv_items($rsmhostid, $rr_id);
+	link_status_templates($rsmhostid, $rr_id);
 }
 
 sub __is_rdap_standalone()
@@ -564,7 +565,7 @@ sub __is_rdap_standalone()
 			time() >= $cfg_global_macros->{'{$RSM.RDAP.STANDALONE}'};
 }
 
-sub create_slv_items($$)
+sub link_status_templates($$)
 {
 	my $hostid    = shift;
 	my $host_name = shift;
@@ -596,212 +597,12 @@ sub create_slv_items($$)
 	}
 }
 
-sub create_slv_item($$$$$)
+sub create_rsmhosts_on_probes($$$)
 {
-	my $name           = shift;
-	my $key            = shift;
-	my $hostid         = shift;
-	my $value_type     = shift;
-	my $applicationids = shift;
-
-	if ($value_type == VALUE_TYPE_AVAIL)
-	{
-		return really(create_item({
-			'name'         => $name,
-			'key_'         => $key,
-			'status'       => ITEM_STATUS_ACTIVE,
-			'hostid'       => $hostid,
-			'type'         => ITEM_TYPE_TRAPPER,
-			'value_type'   => ITEM_VALUE_TYPE_UINT64,
-			'applications' => $applicationids,
-			'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_avail'}
-		}));
-	}
-
-	if ($value_type == VALUE_TYPE_NUM)
-	{
-		return really(create_item({
-			'name'         => $name,
-			'key_'         => $key,
-			'status'       => ITEM_STATUS_ACTIVE,
-			'hostid'       => $hostid,
-			'type'         => ITEM_TYPE_TRAPPER,
-			'value_type'   => ITEM_VALUE_TYPE_UINT64,
-			'applications' => $applicationids
-		}));
-	}
-
-	if ($value_type == VALUE_TYPE_PERC)
-	{
-		return really(create_item({
-			'name'         => $name,
-			'key_'         => $key,
-			'status'       => ITEM_STATUS_ACTIVE,
-			'hostid'       => $hostid,
-			'type'         => ITEM_TYPE_TRAPPER,
-			'value_type'   => ITEM_VALUE_TYPE_FLOAT,
-			'applications' => $applicationids,
-			'units'        => '%'
-		}));
-	}
-
-	pfail("Unknown value type $value_type.");
-}
-
-sub create_avail_trigger($$)
-{
-	my $service   = shift;
-	my $host_name = shift;
-
-	my $service_lc = lc($service);
-	my $expression = '';
-
-	$expression .= "({TRIGGER.VALUE}=0 and ";
-	$expression .= "{$host_name:rsm.slv.$service_lc.avail.max(#{\$RSM.INCIDENT.$service.FAIL})}=" . DOWN . ") or ";
-	$expression .= "({TRIGGER.VALUE}=1 and ";
-	$expression .= "{$host_name:rsm.slv.$service_lc.avail.count(#{\$RSM.INCIDENT.$service.RECOVER}," . DOWN . ",\"eq\")}>0)";
-
-	# NB! Configuration trigger that is used in PHP and C code to detect incident!
-	# priority must be set to 0!
-	my $options = {
-		'description' => "$service service is down",
-		'expression'  => $expression,
-		'priority'    => 0
-	};
-
-	really(create_trigger($options, $host_name));
-}
-
-sub create_dependent_trigger_chain($$$$)
-{
-	my $host_name       = shift;
-	my $service_or_nsip = shift;
-	my $fun             = shift;
-	my $thresholds_ref  = shift;
-
-	my $depend_down;
-	my $created;
-
-	foreach my $k (sort keys %{$thresholds_ref})
-	{
-		my $threshold = $thresholds_ref->{$k}{'threshold'};
-		my $priority = $thresholds_ref->{$k}{'priority'};
-		next if ($threshold eq 0);
-
-		my $result = &$fun($service_or_nsip, $host_name, $threshold, $priority, \$created);
-
-		my $triggerid = $result->{'triggerids'}[0];
-
-		if ($created && defined($depend_down))
-		{
-			add_dependency($triggerid, $depend_down);
-		}
-
-		$depend_down = $triggerid;
-	}
-}
-
-sub create_downtime_trigger($$$$$)
-{
-	my $service     = shift;
-	my $host_name   = shift;
-	my $threshold   = shift;
-	my $priority    = shift;
-	my $created_ref = shift;
-
-	my $service_lc = lc($service);
-
-	my $threshold_str = '';
-
-	if ($threshold < 100)
-	{
-		$threshold_str = "*" . ($threshold * 0.01);
-	}
-
-	my $options = {
-		'description' => $service . ' service was unavailable for ' . $threshold . '% of allowed $1 minutes',
-		'expression'  => '{' . $host_name . ':rsm.slv.' . $service_lc . '.downtime.last(0)}>={$RSM.SLV.' . $service . '.DOWNTIME}' . $threshold_str,
-		'priority'    => $priority
-	};
-
-	really(create_trigger($options, $host_name, $created_ref));
-}
-
-sub create_rollweek_trigger($$$$$)
-{
-	my $service     = shift;
-	my $host_name   = shift;
-	my $threshold   = shift;
-	my $priority    = shift;
-	my $created_ref = shift;
-
-	my $service_lc = lc($service);
-
-	my $options = {
-		'description' => $service . ' rolling week is over ' . $threshold . '%',
-		'expression'  => '{' . $host_name . ':rsm.slv.' . $service_lc . '.rollweek.last(0)}>=' . $threshold,
-		'priority'    => $priority
-	};
-
-	really(create_trigger($options, $host_name, $created_ref));
-}
-
-sub create_ratio_of_failed_tests_trigger($$$$$)
-{
-	my $service     = shift;
-	my $host_name   = shift;
-	my $threshold   = shift;
-	my $priority    = shift;
-	my $created_ref = shift;
-
-	my $item_key;
-	my $macro;
-
-	if ($service eq 'RDDS')
-	{
-		$item_key = 'rsm.slv.rdds.rtt.pfailed';
-		$macro = '{$RSM.SLV.RDDS.RTT}';
-	}
-	elsif ($service eq 'RDAP')
-	{
-		$item_key = 'rsm.slv.rdap.rtt.pfailed';
-		$macro = '{$RSM.SLV.RDAP.RTT}';
-	}
-	else
-	{
-		fail("Unknown service '$service'");
-	}
-
-	my $expression;
-
-	if ($threshold == 100)
-	{
-		$expression = "{$host_name:$item_key.last()}>$macro";
-	}
-	else
-	{
-		my $threshold_perc = $threshold / 100;
-		$expression = "{$host_name:$item_key.last()}>$macro*$threshold_perc";
-	}
-
-	my $options = {
-		'description' => "Ratio of failed $service tests exceeded $threshold% of allowed \$1%",
-		'expression'  => $expression,
-		'priority'    => $priority
-	};
-
-	really(create_trigger($options, $host_name, $created_ref));
-}
-
-sub create_tld_hosts_on_probes($$$$)
-{
-	my $root_servers_macros  = shift;
 	my $proxy_mon_templateid = shift;
 	my $rsmhost_groupid      = shift;
-	my $main_templateid      = shift;
-
-	my $proxies = get_proxies_list();
-	pfail("Cannot find existing proxies") unless (%{$proxies});
+	my $config_templateid    = shift;
+	my $proxies              = shift;
 
 	# TODO: Revise this part because it is creating entities (e.g. "<Probe>", "<Probe> - mon" hosts) which should
 	# have been created already by preceeding probes.pl execution. At least move the code to one place and reuse it.
@@ -819,16 +620,8 @@ sub create_tld_hosts_on_probes($$$$)
 		my $probe_templateid;
 		my $status;
 
-		if ($proxies->{$proxyid}{'status'} == HOST_STATUS_PROXY_ACTIVE)	# probe is "disabled"
-		{
-			$probe_templateid = create_probe_template($probe_name, 0, 0, 0, 0);
-			$status = HOST_STATUS_NOT_MONITORED;
-		}
-		else
-		{
-			$probe_templateid = create_probe_template($probe_name);
-			$status = HOST_STATUS_MONITORED;
-		}
+		$probe_templateid = create_probe_template($probe_name);
+		$status = HOST_STATUS_MONITORED;
 
 		really(create_host({
 			'groups' => [
@@ -878,8 +671,8 @@ sub create_tld_hosts_on_probes($$$$)
 				{'groupid' => TLD_TYPE_PROBE_RESULTS_GROUPIDS->{${\TLD_TYPE_G}}}
 			],
 			'templates' => [
-				{'templateid' => $main_templateid},
-				{'templateid' => RDAP_TEMPLATEID},
+				{'templateid' => $config_templateid},
+				{'templateid' => RDAP_TEST_TEMPLATEID},
 				{'templateid' => $probe_templateid}
 			],
 			'host'         => getopt('rr-id') . ' ' . $probe_name,
@@ -975,7 +768,6 @@ Other options
                 (default: "${\CFG_DEFAULT_RDDS_NS_STRING}")
         --root-servers=STRING
                 list of IPv4 and IPv6 root servers separated by comma and semicolon: "v4IP1[,v4IP2,...][;v6IP1[,v6IP2,...]]"
-                (default: taken from DNS)
         --rdds-test-prefix=STRING
                 domain test prefix for RDDS monitoring (needed only if rdds servers specified)
         --rdds

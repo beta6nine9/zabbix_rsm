@@ -205,7 +205,7 @@ sub add_probe($$$$$$$$$$$)
 		my $tld_groupid = create_group("TLD $tld_name");
 		my $tld_type = $tld->{'type'};
 
-		my $main_templateid = get_template_id(TEMPLATE_RSMHOST_CONFIG_PREFIX . $tld_name);
+		my $config_templateid = get_template_id(TEMPLATE_RSMHOST_CONFIG_PREFIX . $tld_name);
 
 		print("Creating '$tld_name $probe_name' host for '$tld_name' TLD: ");
 
@@ -226,16 +226,16 @@ sub add_probe($$$$$$$$$$$)
 			],
 			'templates'	=> [
 				{
-					'templateid'	=> $main_templateid
+					'templateid'	=> $config_templateid
 				},
 				{
-					'templateid'	=> DNS_TEMPLATEID
+					'templateid'	=> DNS_TEST_TEMPLATEID
 				},
 				{
-					'templateid'	=> RDAP_TEMPLATEID
+					'templateid'	=> RDAP_TEST_TEMPLATEID
 				},
 				{
-					'templateid'	=> RDDS_TEMPLATEID
+					'templateid'	=> RDDS_TEST_TEMPLATEID
 				},
 				{
 					'templateid'	=> $probe_tmpl_id
