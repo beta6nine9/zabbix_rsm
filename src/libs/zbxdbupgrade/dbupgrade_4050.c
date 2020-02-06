@@ -3520,7 +3520,7 @@ DBPATCH_ADD(4050508, 0, 0)	/* upgrade "TLDs" action (upgrade process to Zabbix 4
 DBPATCH_ADD(4050509, 0, 0)	/* add "Template Config History" template */
 DBPATCH_ADD(4050510, 0, 0)	/* add "Template RDDS Test" template */
 DBPATCH_ADD(4050511, 0, 0)	/* add "Template Probe Status" template */
-DBPATCH_ADD(4050512, 0, 0)	/* rename RDAP Template */
+DBPATCH_ADD(4050512, 0, 0)	/* rename "Template RDAP" to "Template RDAP Test" */
 DBPATCH_ADD(4050513, 0, 0)	/* set RDAP master item value_type to the text type */
 DBPATCH_ADD(4050514, 0, 0)	/* set RDAP calculated items to be dependent items */
 DBPATCH_ADD(4050515, 0, 0)	/* add item_preproc to RDAP ip and rtt items */
