@@ -43,10 +43,23 @@ abstract class DbBackend {
 			return false;
 		}
 
-		$version = DBfetch(DBselect('SELECT dv.mandatory,dv.optional FROM dbversion dv'));
-		if ($version['mandatory'] != ZABBIX_DB_VERSION) {
-			$this->setError(_s('The frontend does not match Zabbix database. Current database version (mandatory/optional): %d/%d. Required mandatory version: %d. Contact your system administrator.',
-				$version['mandatory'], $version['optional'], ZABBIX_DB_VERSION));
+		$version = DBfetch(DBselect('SELECT mandatory,optional FROM dbversion'));
+		$mandatory = $version['mandatory'];
+		$mandatory_rsm = 0;
+		$optional = $version['optional'];
+		$optional_rsm = 0;
+
+		if ($mandatory >= 4050000) {
+			$version = DBfetch(DBselect('SELECT mandatory_rsm,optional_rsm FROM dbversion'));
+			$mandatory_rsm = $version['mandatory_rsm'];
+			$optional_rsm = $version['optional_rsm'];
+		}
+
+		if ($mandatory != ZABBIX_DB_VERSION || $mandatory_rsm != ZABBIX_DB_VERSION_RSM) {
+			$this->setError(_s('The frontend does not match Zabbix database.' .
+								' Current database version (mandatory/optional): %d.%d/%d.%d.' .
+								' Required mandatory version: %d.%d. Contact your system administrator.',
+				$mandatory, $mandatory_rsm, $optional, $optional_rsm, ZABBIX_DB_VERSION, ZABBIX_DB_VERSION_rsm));
 			return false;
 		}
 

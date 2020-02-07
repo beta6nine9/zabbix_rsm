@@ -24,23 +24,26 @@ typedef struct
 {
 	int		(*function)(void);
 	int		version;
+	int		version_rsm;
 	int		duplicates;
 	unsigned char	mandatory;
 }
 zbx_dbpatch_t;
 
-#define DBPATCH_VERSION(zabbix_version)			zbx_dbpatches_##zabbix_version
+#define DBPATCH_VERSION(zabbix_version)				zbx_dbpatches_##zabbix_version
 
-#define DBPATCH_START(zabbix_version)			zbx_dbpatch_t	DBPATCH_VERSION(zabbix_version)[] = {
-#define DBPATCH_END()					{NULL}};
+#define DBPATCH_START(zabbix_version)				zbx_dbpatch_t	DBPATCH_VERSION(zabbix_version)[] = {
+#define DBPATCH_END()						{NULL}};
 
 #ifdef HAVE_SQLITE3
 
-#define DBPATCH_ADD(version, duplicates, mandatory)	{NULL, version, duplicates, mandatory},
+#define DBPATCH_ADD(version, duplicates, mandatory)		{NULL, version, 0, duplicates, mandatory},
+#define DBPATCH_RSM(version, rsm, duplicates, mandatory)	{NULL, version, rsm, duplicates, mandatory},
 
 #else
 
-#define DBPATCH_ADD(version, duplicates, mandatory)	{DBpatch_##version, version, duplicates, mandatory},
+#define DBPATCH_ADD(version, duplicates, mandatory)		{DBpatch_##version, version, 0, duplicates, mandatory},
+#define DBPATCH_RSM(version, rsm, duplicates, mandatory)	{DBpatch_##version##_##rsm, version, rsm, duplicates, mandatory},
 
 #ifdef HAVE_MYSQL
 #define ZBX_FS_SQL_NAME "`%s`"
