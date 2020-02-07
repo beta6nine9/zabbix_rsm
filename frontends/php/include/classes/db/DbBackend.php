@@ -59,7 +59,7 @@ abstract class DbBackend {
 			$this->setError(_s('The frontend does not match Zabbix database.' .
 								' Current database version (mandatory/optional): %d.%d/%d.%d.' .
 								' Required mandatory version: %d.%d. Contact your system administrator.',
-				$mandatory, $mandatory_rsm, $optional, $optional_rsm, ZABBIX_DB_VERSION, ZABBIX_DB_VERSION_rsm));
+				$mandatory, $mandatory_rsm, $optional, $optional_rsm, ZABBIX_DB_VERSION, ZABBIX_DB_VERSION_RSM));
 			return false;
 		}
 
