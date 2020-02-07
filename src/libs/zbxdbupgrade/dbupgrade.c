@@ -709,17 +709,40 @@ static int	DBcreate_dbversion_table(void)
 	return DBend(ret);
 }
 
-static int	DBset_version(int version, unsigned char mandatory)
+static int	DBset_version(int version, int version_rsm, unsigned char mandatory)
 {
-	char	sql[64];
-	size_t	offset;
+	const char	*sql;
+	int		result;
 
-	offset = zbx_snprintf(sql, sizeof(sql),  "update dbversion set ");
-	if (0 != mandatory)
-		offset += zbx_snprintf(sql + offset, sizeof(sql) - offset, "mandatory=%d,", version);
-	zbx_snprintf(sql + offset, sizeof(sql) - offset, "optional=%d", version);
+	/* DBpatch_4050000 added mandatory_rsm and optional_rsm fields */
+	if (4050000 > version)
+	{
+		if (0 == mandatory)
+		{
+			sql = "update dbversion set optional=%d";
+			result = DBexecute(sql, version);
+		}
+		else
+		{
+			sql = "update dbversion set mandatory=%d,optional=%d";
+			result = DBexecute(sql, version, version);
+		}
+	}
+	else
+	{
+		if (0 == mandatory)
+		{
+			sql = "update dbversion set optional=%d,optional_rsm=%d";
+			result = DBexecute(sql, version, version_rsm);
+		}
+		else
+		{
+			sql = "update dbversion set mandatory=%d,mandatory_rsm=%d,optional=%d,optional_rsm=%d";
+			result = DBexecute(sql, version, version_rsm, version, version_rsm);
+		}
+	}
 
-	if (ZBX_DB_OK <= DBexecute("%s", sql))
+	if (ZBX_DB_OK <= result)
 		return SUCCEED;
 
 	return FAIL;
@@ -766,13 +789,15 @@ static zbx_db_version_t dbversions[] = {
 	{NULL}
 };
 
-static void	DBget_version(int *mandatory, int *optional)
+static void	DBget_version(int *mandatory, int *mandatory_rsm, int *optional, int *optional_rsm)
 {
 	DB_RESULT	result;
 	DB_ROW		row;
 
 	*mandatory = -1;
+	*mandatory_rsm = -1;
 	*optional = -1;
+	*optional_rsm = -1;
 
 	result = DBselect("select mandatory,optional from dbversion");
 
@@ -788,12 +813,37 @@ static void	DBget_version(int *mandatory, int *optional)
 		zabbix_log(LOG_LEVEL_CRIT, "Cannot get the database version. Exiting ...");
 		exit(EXIT_FAILURE);
 	}
+
+	/* DBpatch_4050000 added mandatory_rsm and optional_rsm fields */
+	if (4050000 > *mandatory)
+	{
+		*mandatory_rsm = 0;
+		*optional_rsm = 0;
+	}
+	else
+	{
+		result = DBselect("select mandatory_rsm,optional_rsm from dbversion");
+
+		if (NULL != (row = DBfetch(result)))
+		{
+			*mandatory_rsm = atoi(row[0]);
+			*optional_rsm = atoi(row[1]);
+		}
+		DBfree_result(result);
+
+		if (-1 == *mandatory_rsm)
+		{
+			zabbix_log(LOG_LEVEL_CRIT, "Cannot get the database version (rsm). Exiting ...");
+			exit(EXIT_FAILURE);
+		}
+	}
 }
 
 int	DBcheck_version(void)
 {
 	const char		*dbversion_table_name = "dbversion";
-	int			db_mandatory, db_optional, required, ret = FAIL, i;
+	int			db_mandatory, db_mandatory_rsm, db_optional, db_optional_rsm, required, required_rsm;
+	int			ret = FAIL, i;
 	zbx_db_version_t	*dbversion;
 	zbx_dbpatch_t		*patches;
 
@@ -803,6 +853,7 @@ int	DBcheck_version(void)
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
 	required = ZBX_FIRST_DB_VERSION;
+	required_rsm = -1;
 
 	/* find out the required version number by getting the last mandatory version */
 	/* of the last version patch array                                            */
@@ -814,7 +865,10 @@ int	DBcheck_version(void)
 	for (i = 0; 0 != patches[i].version; i++)
 	{
 		if (0 != patches[i].mandatory)
-			required = patches[i].version;
+		{
+			required     = patches[i].version;
+			required_rsm = patches[i].version_rsm;
+		}
 	}
 
 	DBconnect(ZBX_DB_CONNECT_NORMAL);
@@ -844,7 +898,7 @@ int	DBcheck_version(void)
 #endif
 	}
 
-	DBget_version(&db_mandatory, &db_optional);
+	DBget_version(&db_mandatory, &db_mandatory_rsm, &db_optional, &db_optional_rsm);
 
 #ifndef HAVE_SQLITE3
 	for (dbversion = dbversions; NULL != (patches = dbversion->patches); dbversion++)
@@ -856,30 +910,32 @@ int	DBcheck_version(void)
 			else
 				optional_num++;
 
-			if (db_optional < patches[i].version)
+			if (db_optional < patches[i].version ||
+					(db_optional == patches[i].version && db_optional_rsm < patches[i].version_rsm))
 				total++;
 		}
 	}
 
-	if (required < db_mandatory)
+	if (required < db_mandatory || (required == db_mandatory && required_rsm < db_mandatory_rsm))
 #else
-	if (required != db_mandatory)
+	if (required != db_mandatory || required_rsm != db_mandatory_rsm)
 #endif
 	{
 		zabbix_log(LOG_LEVEL_CRIT, "The %s does not match Zabbix database."
-				" Current database version (mandatory/optional): %08d/%08d."
-				" Required mandatory version: %08d.",
-				get_program_type_string(program_type), db_mandatory, db_optional, required);
+				" Current database version (mandatory/optional): %08d.%d/%08d.%d."
+				" Required mandatory version: %08d.%d.",
+				get_program_type_string(program_type),
+				db_mandatory, db_mandatory_rsm, db_optional, db_optional_rsm, required, required_rsm);
 #ifdef HAVE_SQLITE3
-		if (required > db_mandatory)
+		if (required > db_mandatory || (required == db_mandatory && required_rsm > db_mandatory_rsm))
 			zabbix_log(LOG_LEVEL_CRIT, "Zabbix does not support SQLite3 database upgrade.");
 #endif
 		goto out;
 	}
 
-	zabbix_log(LOG_LEVEL_INFORMATION, "current database version (mandatory/optional): %08d/%08d",
-			db_mandatory, db_optional);
-	zabbix_log(LOG_LEVEL_INFORMATION, "required mandatory version: %08d", required);
+	zabbix_log(LOG_LEVEL_INFORMATION, "current database version (mandatory/optional): %08d.%d/%08d.%d",
+			db_mandatory, db_mandatory_rsm, db_optional, db_optional_rsm);
+	zabbix_log(LOG_LEVEL_INFORMATION, "required mandatory version: %08d.%d", required, required_rsm);
 
 	ret = SUCCEED;
 
@@ -900,7 +956,8 @@ int	DBcheck_version(void)
 		{
 			static sigset_t	orig_mask, mask;
 
-			if (db_optional >= patches[i].version)
+			if (db_optional > patches[i].version ||
+					(db_optional == patches[i].version && db_optional_rsm >= patches[i].version_rsm))
 				continue;
 
 			/* block signals to prevent interruption of statements that cause an implicit commit */
@@ -918,7 +975,7 @@ int	DBcheck_version(void)
 			if ((0 != patches[i].duplicates && patches[i].duplicates <= db_optional) ||
 					SUCCEED == (ret = patches[i].function()))
 			{
-				ret = DBset_version(patches[i].version, patches[i].mandatory);
+				ret = DBset_version(patches[i].version, patches[i].version_rsm, patches[i].mandatory);
 			}
 
 			ret = DBend(ret);
