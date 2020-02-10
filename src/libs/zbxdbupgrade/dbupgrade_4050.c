@@ -3297,55 +3297,44 @@ out:
 	return ret;
 }
 
-static int	db_insert_rdap_item_preproc(const char *item_key, const char *item_preproc_param)
+static int	DBpatch_4050012_21_insert_item_preproc(const char *item_key, const char *item_preproc_param)
 {
-	DB_RESULT		result;
-	DB_ROW			row;
-	zbx_vector_uint64_t	rdap_itemids;
-	int			i, ret = FAIL;
-	zbx_uint64_t		item_preprocid_next;
-
-	zbx_vector_uint64_create(&rdap_itemids);
+	int		ret = FAIL;
+	DB_RESULT	result;
+	DB_ROW		row;
 
 	result = DBselect("select itemid from items where key_='%s'", item_key);
 
+	if (NULL == result)
+		goto out;
+
 	while (NULL != (row = DBfetch(result)))
 	{
-		zbx_uint64_t	rdap_itemid;
+		zbx_uint64_t	itemid;
 
-		ZBX_STR2UINT64(rdap_itemid, row[0]);
-		zbx_vector_uint64_append(&rdap_itemids, rdap_itemid);
-	}
+		ZBX_STR2UINT64(itemid, row[0]);
 
-	DBfree_result(result);
-
-	item_preprocid_next = DBget_maxid_num("item_preproc", rdap_itemids.values_num);
-
-	for (i = 0; i < rdap_itemids.values_num; i++)
-	{
 		/* 12 = ZBX_PREPROC_JSONPATH */
 		DB_EXEC("insert into item_preproc set item_preprocid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ",step=1,"
 				"type=12,params='%s',error_handler=0",
-			item_preprocid_next, rdap_itemids.values[i], item_preproc_param);
-		item_preprocid_next++;
+			DBget_maxid_num("item_preproc", 1), itemid, item_preproc_param);
 	}
 
 	ret = SUCCEED;
 out:
-	zbx_vector_uint64_destroy(&rdap_itemids);
+	DBfree_result(result);
 
 	return ret;
 }
 
 static int	DBpatch_4050012_21(void)
 {
-
 	int	ret = FAIL;
 
 	ONLY_SERVER();
 
-	CHECK(db_insert_rdap_item_preproc("rdap.ip", "$.rdap.ip"));
-	CHECK(db_insert_rdap_item_preproc("rdap.rtt", "$.rdap.rtt"));
+	CHECK(DBpatch_4050012_21_insert_item_preproc("rdap.ip", "$.rdap.ip"));
+	CHECK(DBpatch_4050012_21_insert_item_preproc("rdap.rtt", "$.rdap.rtt"));
 
 	ret = SUCCEED;
 out:
