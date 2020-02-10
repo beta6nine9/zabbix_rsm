@@ -38,7 +38,7 @@ sub main()
 {
 	my $config = get_rsm_config();
 
-	pfail("Could not find 'path' in 'slv' section of rsm.conf .") unless defined $config->{'slv'}{'path'};
+	pfail("cannot find 'path' in 'slv' section of rsm config file") unless defined $config->{'slv'}{'path'};
 
 	init_cli_opts(get_rsm_local_id($config));
 
@@ -62,8 +62,11 @@ sub main()
 
 	if ($target ne MONITORING_TARGET_REGISTRY)
 	{
-		pfail("expected monitoring target \"${\MONITORING_TARGET_REGISTRY}\", but got \"$target\", if you'd like to change it, please run:".
-			"\n\n/opt/zabbix/scripts/change-macro.pl --macro '{\$RSM.MONITORING.TARGET}' --value '${\MONITORING_TARGET_REGISTRY}'");
+		pfail("expected monitoring target \"${\MONITORING_TARGET_REGISTRY}\", but got \"$target\",".
+			" if you'd like to change it, please run:".
+			"\n\n/opt/zabbix/scripts/change-macro.pl".
+			" --macro '{\$RSM.MONITORING.TARGET}'".
+			" --value '${\MONITORING_TARGET_REGISTRY}'");
 	}
 
 	# get global macros required by this script
@@ -329,9 +332,9 @@ sub init_zabbix_api($$)
 
 	my $section = $config->{$server_key};
 
-	pfail("Zabbix API URL is not specified. Please check configuration file") unless defined $section->{'za_url'};
-	pfail("Username for Zabbix API is not specified. Please check configuration file") unless defined $section->{'za_user'};
-	pfail("Password for Zabbix API is not specified. Please check configuration file") unless defined $section->{'za_password'};
+	pfail("no 'za_url' in '$server_key' section of rsm config file") unless defined $section->{'za_url'};
+	pfail("no 'za_user' in '$server_key' section of rsm config file") unless defined $section->{'za_user'};
+	pfail("no 'za_password' in '$server_key' section of rsm config file") unless defined $section->{'za_password'};
 
 	my $attempts = 3;
 	my $result;
@@ -342,7 +345,7 @@ sub init_zabbix_api($$)
 
 	if ($result ne true)
 	{
-		pfail("Could not connect to Zabbix API. " . $result->{'data'});
+		pfail("cannot connect to Zabbix API. " . $result->{'data'});
 	}
 
 	# make sure we re-login in case of session invalidation
@@ -504,8 +507,8 @@ sub list_ns_servers(;$)
 
 sub print_ns_changes($$)
 {
-	my $config_templateid     = shift;
-	my $opt_ns_servers = shift;
+	my $config_templateid = shift;
+	my $opt_ns_servers    = shift;
 
 	my $ns_servers = get_ns_servers($config_templateid);
 
@@ -714,7 +717,7 @@ sub manage_tld_objects($$$$$$$)
 
 			if (!$result || !%{$result})
 			{
-				pfail("an error occurred while disabling hosts!");
+				pfail("an error occurred while disabling hosts");
 			}
 
 			exit;
@@ -792,7 +795,7 @@ sub add_new_tld($)
 
 	my $proxies = get_proxies_list();
 
-	pfail("please add at least one probe first using probes.pl script") unless (%{$proxies});
+	pfail("please add at least one probe first using probes.pl") unless (%{$proxies});
 
 	update_root_server_macros(getopt('root-servers'));
 
