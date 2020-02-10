@@ -869,9 +869,9 @@ sub getopt_ns_servers()
 
 sub update_ns_servers($$$)
 {
-	my $config_templateid     = shift;
-	my $opt_ns_servers = shift;
-	my $config         = shift;
+	my $config_templateid = shift;
+	my $opt_ns_servers    = shift;
+	my $config            = shift;
 
 	my $macro_value = '';
 	my $data = [];
@@ -908,16 +908,12 @@ sub update_ns_servers($$$)
 
 	really(create_macro('{$RSM.DNS.NAME.SERVERS}', $macro_value, $config_templateid, 1));
 
-	my $value = encode_json($data);
-
-	my $json = [
-		{
-			'host' => 'zabbix.dev',
-			'key' => 'rsm.dns.nsip.discovery',
-			'clock' => time(),
-			'value' => $value,
-		}
-	];
+	my $json = [{
+		'host'  => getopt('tld'),
+		'key'   => 'rsm.dns.nsip.discovery',
+		'clock' => time(),
+		'value' => encode_json($data),
+	}];
 
 	# timeout = 10, attempts = 5
 	push_to_trapper($config->{'slv'}{'zserver'}, $config->{'slv'}{'zport'}, 10, 5, $json);
