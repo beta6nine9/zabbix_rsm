@@ -3097,91 +3097,6 @@ out:
 
 static int	DBpatch_4050012_18(void)
 {
-	int	ret = FAIL;
-
-	ONLY_SERVER();
-
-	/* 4 = ITEM_VALUE_TYPE_TEXT */
-	DB_EXEC("update items set name='RDAP Test',value_type=4,history='0',trends='0' where key_ like 'rdap[%%'");
-
-	ret = SUCCEED;
-out:
-	return ret;
-}
-
-static int	DBpatch_4050012_19(void)
-{
-	int	ret = FAIL;
-
-	ONLY_SERVER();
-
-	/* 18 = ITEM_TYPE_DEPENDENT */
-	DB_EXEC("update items as i1 inner join items as i2 on i1.hostid=i2.hostid set"
-			" i1.type=18,i1.master_itemid=i2.itemid where i1.key_ in ('rdap.ip','rdap.rtt') and"
-			" i2.key_ like 'rdap[%%'");
-
-	ret = SUCCEED;
-out:
-	return ret;
-}
-
-static int	db_insert_rdap_item_preproc(const char *item_key, const char *item_preproc_param)
-{
-	DB_RESULT		result;
-	DB_ROW			row;
-	zbx_vector_uint64_t	rdap_itemids;
-	int			i, ret = FAIL;
-	zbx_uint64_t		item_preprocid_next;
-
-	zbx_vector_uint64_create(&rdap_itemids);
-
-	result = DBselect("select itemid from items where key_='%s'", item_key);
-
-	while (NULL != (row = DBfetch(result)))
-	{
-		zbx_uint64_t	rdap_itemid;
-
-		ZBX_STR2UINT64(rdap_itemid, row[0]);
-		zbx_vector_uint64_append(&rdap_itemids, rdap_itemid);
-	}
-
-	DBfree_result(result);
-
-	item_preprocid_next = DBget_maxid_num("item_preproc", rdap_itemids.values_num);
-
-	for (i = 0; i < rdap_itemids.values_num; i++)
-	{
-		/* 12 = ZBX_PREPROC_JSONPATH */
-		DB_EXEC("insert into item_preproc set item_preprocid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ",step=1,"
-				"type=12,params='%s',error_handler=0",
-			item_preprocid_next, rdap_itemids.values[i], item_preproc_param);
-		item_preprocid_next++;
-	}
-
-	ret = SUCCEED;
-out:
-	zbx_vector_uint64_destroy(&rdap_itemids);
-
-	return ret;
-}
-
-static int	DBpatch_4050012_20(void)
-{
-
-	int	ret = FAIL;
-
-	ONLY_SERVER();
-
-	CHECK(db_insert_rdap_item_preproc("rdap.ip", "$.rdap.ip"));
-	CHECK(db_insert_rdap_item_preproc("rdap.rtt", "$.rdap.rtt"));
-
-	ret = SUCCEED;
-out:
-	return ret;
-}
-
-static int	DBpatch_4050012_21(void)
-{
 	int		ret = FAIL;
 
 	DB_RESULT	result = NULL;
@@ -3349,6 +3264,91 @@ static int	DBpatch_4050012_21(void)
 out:
 	DBfree_result(result);
 
+	return ret;
+}
+
+static int	DBpatch_4050012_19(void)
+{
+	int	ret = FAIL;
+
+	ONLY_SERVER();
+
+	/* 4 = ITEM_VALUE_TYPE_TEXT */
+	DB_EXEC("update items set name='RDAP Test',value_type=4,history='0',trends='0' where key_ like 'rdap[%%'");
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
+static int	DBpatch_4050012_20(void)
+{
+	int	ret = FAIL;
+
+	ONLY_SERVER();
+
+	/* 18 = ITEM_TYPE_DEPENDENT */
+	DB_EXEC("update items as i1 inner join items as i2 on i1.hostid=i2.hostid set"
+			" i1.type=18,i1.master_itemid=i2.itemid where i1.key_ in ('rdap.ip','rdap.rtt') and"
+			" i2.key_ like 'rdap[%%'");
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
+static int	db_insert_rdap_item_preproc(const char *item_key, const char *item_preproc_param)
+{
+	DB_RESULT		result;
+	DB_ROW			row;
+	zbx_vector_uint64_t	rdap_itemids;
+	int			i, ret = FAIL;
+	zbx_uint64_t		item_preprocid_next;
+
+	zbx_vector_uint64_create(&rdap_itemids);
+
+	result = DBselect("select itemid from items where key_='%s'", item_key);
+
+	while (NULL != (row = DBfetch(result)))
+	{
+		zbx_uint64_t	rdap_itemid;
+
+		ZBX_STR2UINT64(rdap_itemid, row[0]);
+		zbx_vector_uint64_append(&rdap_itemids, rdap_itemid);
+	}
+
+	DBfree_result(result);
+
+	item_preprocid_next = DBget_maxid_num("item_preproc", rdap_itemids.values_num);
+
+	for (i = 0; i < rdap_itemids.values_num; i++)
+	{
+		/* 12 = ZBX_PREPROC_JSONPATH */
+		DB_EXEC("insert into item_preproc set item_preprocid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ",step=1,"
+				"type=12,params='%s',error_handler=0",
+			item_preprocid_next, rdap_itemids.values[i], item_preproc_param);
+		item_preprocid_next++;
+	}
+
+	ret = SUCCEED;
+out:
+	zbx_vector_uint64_destroy(&rdap_itemids);
+
+	return ret;
+}
+
+static int	DBpatch_4050012_21(void)
+{
+
+	int	ret = FAIL;
+
+	ONLY_SERVER();
+
+	CHECK(db_insert_rdap_item_preproc("rdap.ip", "$.rdap.ip"));
+	CHECK(db_insert_rdap_item_preproc("rdap.rtt", "$.rdap.rtt"));
+
+	ret = SUCCEED;
+out:
 	return ret;
 }
 
@@ -3538,10 +3538,10 @@ DBPATCH_RSM(4050012, 14, 0, 0)	/* add "Template RDDS Status" template */
 DBPATCH_RSM(4050012, 15, 0, 0)	/* add "Template Probe Status" template */
 DBPATCH_RSM(4050012, 16, 0, 0)	/* add "Template Config History" template */
 DBPATCH_RSM(4050012, 17, 0, 0)	/* convert hosts to use "Template DNS Test" template */
-DBPATCH_RSM(4050012, 18, 0, 0)	/* set RDAP master item value_type to the text type */
-DBPATCH_RSM(4050012, 19, 0, 0)	/* set RDAP calculated items to be dependent items */
-DBPATCH_RSM(4050012, 20, 0, 0)	/* add item_preproc to RDAP ip and rtt items */
-DBPATCH_RSM(4050012, 21, 0, 0)	/* convert "<rsmhost> <probe>" hosts to use "Template RDDS Test" template */
+DBPATCH_RSM(4050012, 18, 0, 0)	/* convert hosts to use "Template RDDS Test" template */
+DBPATCH_RSM(4050012, 19, 0, 0)	/* set RDAP master item value_type to the text type */
+DBPATCH_RSM(4050012, 20, 0, 0)	/* set RDAP calculated items to be dependent items */
+DBPATCH_RSM(4050012, 21, 0, 0)	/* add item_preproc to RDAP ip and rtt items */
 DBPATCH_RSM(4050012, 22, 0, 0)	/* convert "<probe>" hosts to use "Template Probe Status" template */
 
 DBPATCH_END()
