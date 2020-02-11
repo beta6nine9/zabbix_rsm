@@ -44,7 +44,7 @@ sub main()
 {
 	my $config = get_rsm_config();
 
-	pfail("SLV scripts path is not specified. Please check configuration file") unless defined $config->{'slv'}{'path'};
+	pfail("cannot find 'path' in 'slv' section of rsm config file") unless defined $config->{'slv'}{'path'};
 
 	init_cli_opts(get_rsm_local_id($config));
 
@@ -198,8 +198,11 @@ sub init_macros_and_validate_env()
 
 	if ($target ne MONITORING_TARGET_REGISTRAR)
 	{
-		pfail("expected monitoring target \"${\MONITORING_TARGET_REGISTRAR}\", but got \"$target\", if you'd like to change it, please run:".
-			"\n\n/opt/zabbix/scripts/change-macro.pl --macro '{\$RSM.MONITORING.TARGET}' --value '${\MONITORING_TARGET_REGISTRAR}'");
+		pfail("expected monitoring target \"${\MONITORING_TARGET_REGISTRAR}\", but got \"$target\",".
+			" if you'd like to change it, please run:".
+			"\n\n/opt/zabbix/scripts/change-macro.pl".
+			" --macro '{\$RSM.MONITORING.TARGET}'".
+			" --value '${\MONITORING_TARGET_REGISTRAR}'");
 	}
 
 	# get global macros related to this script
@@ -222,9 +225,9 @@ sub init_zabbix_api($$)
 
 	my $section = $config->{$server_key};
 
-	pfail("Zabbix API URL is not specified. Please check configuration file") unless defined $section->{'za_url'};
-	pfail("Username for Zabbix API is not specified. Please check configuration file") unless defined $section->{'za_user'};
-	pfail("Password for Zabbix API is not specified. Please check configuration file") unless defined $section->{'za_password'};
+	pfail("no 'za_url' in '$server_key' section of rsm config file") unless defined $section->{'za_url'};
+	pfail("no 'za_user' in '$server_key' section of rsm config file") unless defined $section->{'za_user'};
+	pfail("no 'za_password' in '$server_key' section of rsm config file") unless defined $section->{'za_password'};
 
 	my $attempts = 3;
 	my $result;
@@ -235,7 +238,7 @@ sub init_zabbix_api($$)
 
 	if ($result ne true)
 	{
-		pfail("Could not connect to Zabbix API. " . $result->{'data'});
+		pfail("cannot connect to Zabbix API. " . $result->{'data'});
 	}
 
 	# make sure we re-login in case of session invalidation
@@ -453,7 +456,7 @@ sub manage_registrar($$$$)
 	}
 	else
 	{
-		print("Could not find $service items on host $rsmhost ($main_hostid)\n");
+		print("cannot find $service items on host $rsmhost ($main_hostid)\n");
 	}
 
 	set_linked_items_status($service eq 'rdap' ? 'rdap[' : 'rsm.rdds[', $rsmhost, 0) if ($action eq 'disable');
@@ -489,7 +492,7 @@ sub add_new_registrar()
 {
 	my $proxies = get_proxies_list();
 
-	pfail("please add at least one probe first using probes.pl script") unless (%{$proxies});
+	pfail("please add at least one probe first using probes.pl") unless (%{$proxies});
 
 	update_root_server_macros(getopt('root-servers'));
 
