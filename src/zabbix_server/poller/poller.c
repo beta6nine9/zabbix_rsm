@@ -733,6 +733,7 @@ static int	get_values(unsigned char poller_type, int *nextcheck)
 	else
 		THIS_SHOULD_NEVER_HAPPEN;
 
+	/* RSM specifics: keep nextcheck as value timestamp */
 	if (timespec.sec == 0)
 		zbx_timespec(&timespec);
 

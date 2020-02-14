@@ -38,7 +38,7 @@ int	main(int argc, char *argv[])
 			*tld = NULL, *ns = NULL, *ns_ip = NULL, proto = RSM_UDP, *nsid = NULL, *ns_with_ip = NULL,
 			ipv4_enabled = 0, ipv6_enabled = 0, *testprefix = DEFAULT_TESTPREFIX, dnssec_enabled = 0,
 			ignore_err = 0, log_to_file = 0;
-	int		c, index, rtt, rtt_unpacked, upd_unpacked, unpacked_values_num;
+	int		c, index, rtt, rtt_unpacked, upd_unpacked, unpacked_values_num, nssok, test_status;
 	ldns_resolver	*res = NULL;
 	ldns_rr_list	*keys = NULL;
 	FILE		*log_fd = stdout;
@@ -219,7 +219,9 @@ int	main(int argc, char *argv[])
 	nss[0].ips[0].nsid = zbx_strdup(NULL, nsid);
 	nss[0].ips[0].upd = upd_unpacked;
 
-	create_rsm_dns_json(&json, nss, nss_num, DEFAULT_RTT_LIMIT, proto);
+	set_nss_results(nss, nss_num, DEFAULT_RTT_LIMIT, 2, &nssok, &test_status);
+
+	create_rsm_dns_json(&json, nss, nss_num, CURRENT_MODE_NORMAL, nssok, test_status, proto);
 
 	printf("OK (RTT:%d)\n", rtt_unpacked);
 	printf("OK (NSID:%s)\n", nsid);

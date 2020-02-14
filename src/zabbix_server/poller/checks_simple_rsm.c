@@ -71,6 +71,8 @@ extern const char	epp_passphrase[128];
 
 #define ZBX_EC_EPP_NOT_IMPLEMENTED	ZBX_EC_EPP_INTERNAL_GENERAL
 
+#define METADATA_FILE_PREFIX	"/tmp/test-metadata"	/* /tmp/test-metadata-<TLD>.bin */
+
 typedef struct
 {
 	const char	*name;
@@ -399,7 +401,7 @@ static int	zbx_change_resolver(ldns_resolver *res, const char *name, const char 
 	return zbx_set_resolver_ns(res, name, ip, ipv4_enabled, ipv6_enabled, log_fd, err, err_size);
 }
 
-static int	zbx_create_resolver(ldns_resolver **res, const char *name, const char *ip, char proto,
+static int	zbx_create_resolver(ldns_resolver **res, const char *name, const char *ip, char protocol,
 		char ipv4_enabled, char ipv6_enabled, unsigned int extras, int timeout, int tries, FILE *log_fd,
 		char *err, size_t err_size)
 {
@@ -435,7 +437,7 @@ static int	zbx_create_resolver(ldns_resolver **res, const char *name, const char
 	ldns_resolver_set_dnssec_cd(*res, false);
 
 	/* use TCP or UDP */
-	ldns_resolver_set_usevc(*res, (RSM_UDP == proto ? false : true));
+	ldns_resolver_set_usevc(*res, (RSM_UDP == protocol ? false : true));
 
 	/* set IP version support */
 	ldns_resolver_set_ip6(*res, ip_support(ipv4_enabled, ipv6_enabled));
@@ -1709,9 +1711,9 @@ static int	zbx_get_ns_ip_values(ldns_resolver *res, const char *ns, const char *
 	ret = SUCCEED;
 out:
 	if (NULL != upd)
-		rsm_infof(log_fd, "RSM DNS \"%s\" (%s) RTT:%d UPD:%d NSID:%s", ns, ip, *rtt, *upd, *nsid);
+		rsm_infof(log_fd, "RSM DNS \"%s\" (%s) RTT:%d UPD:%d NSID:%s", ns, ip, *rtt, *upd, ZBX_NULL2STR(*nsid));
 	else
-		rsm_infof(log_fd, "RSM DNS \"%s\" (%s) RTT:%d NSID:%s", ns, ip, *rtt, *nsid);
+		rsm_infof(log_fd, "RSM DNS \"%s\" (%s) RTT:%d NSID:%s", ns, ip, *rtt, ZBX_NULL2STR(*nsid));
 
 	if (NULL != nsset)
 		ldns_rr_list_deep_free(nsset);
@@ -2125,15 +2127,13 @@ static const char	*get_probe_from_host(const char *host)
  * Parameters: host     - [IN]  name of the host: <Probe> or <TLD Probe>      *
  *             tld      - [IN]  NULL in case of probestatus check             *
  *             name     - [IN]  name of the test: dns, rdds, epp, probestatus *
- *             protocol - [IN]  protocol of dns test, NULL for other tests    *
  *             err      - [OUT] buffer for error message                      *
  *             err_size - [IN]  size of err buffer                            *
  *                                                                            *
  * Return value: file descriptor in case of success, NULL otherwise           *
  *                                                                            *
  ******************************************************************************/
-static FILE	*open_item_log(const char *host, const char *tld, const char *name, const char *protocol, char *err,
-		size_t err_size)
+static FILE	*open_item_log(const char *host, const char *tld, const char *name, char *err, size_t err_size)
 {
 	FILE		*fd;
 	char		*file_name;
@@ -2159,10 +2159,7 @@ static FILE	*open_item_log(const char *host, const char *tld, const char *name, 
 
 	if (NULL != tld)
 	{
-		if (NULL != protocol)
-			file_name = zbx_strdcatf(file_name, "/%s-%s-%s-%s.log", probe, tld, name, protocol);
-		else
-			file_name = zbx_strdcatf(file_name, "/%s-%s-%s.log", probe, tld, name);
+		file_name = zbx_strdcatf(file_name, "/%s-%s-%s.log", probe, tld, name);
 	}
 	else
 		file_name = zbx_strdcatf(file_name, "/%s-%s.log", probe, name);
@@ -2231,10 +2228,32 @@ out:
 	return tld;
 }
 
-static void	create_rsm_dns_json(struct zbx_json *json, zbx_ns_t *nss, size_t nss_num, int rtt_limit, char proto)
+static int	set_nss_results(zbx_ns_t *nss, size_t nss_num, int rtt_limit, int minns, int *nssok, int *status)
 {
 	size_t	i, j;
-	char	nssok = 0;
+
+	*nssok = 0;
+
+	for (i = 0; i < nss_num; i++)
+	{
+		for (j = 0; j < nss[i].ips_num; j++)
+		{
+			/* if a single IP of the Name Server fails, consider the whole Name Server down */
+			if (ZBX_SUBTEST_SUCCESS != zbx_subtest_result(nss[i].ips[j].rtt, rtt_limit))
+				nss[i].result = FAIL;
+		}
+
+		if (SUCCEED == nss[i].result)
+			(*nssok)++;
+	}
+
+	*status = (*nssok >= minns ? 1 : 0);
+}
+
+static void	create_rsm_dns_json(struct zbx_json *json, zbx_ns_t *nss, size_t nss_num, int current_mode, int nssok,
+		int status, char protocol)
+{
+	size_t	i, j;
 
 	zbx_json_init(json, 2 * ZBX_KIBIBYTE);
 
@@ -2248,13 +2267,10 @@ static void	create_rsm_dns_json(struct zbx_json *json, zbx_ns_t *nss, size_t nss
 			zbx_json_addstring(json, "ns", nss[i].name, ZBX_JSON_TYPE_STRING);
 			zbx_json_addstring(json, "ip", nss[i].ips[j].ip, ZBX_JSON_TYPE_STRING);
 			zbx_json_addstring(json, "nsid", nss[i].ips[j].nsid, ZBX_JSON_TYPE_STRING);
-			zbx_json_addstring(json, "protocol", (proto == RSM_UDP ? "udp" : "tcp"), ZBX_JSON_TYPE_STRING);
+			zbx_json_addstring(json, "protocol", (protocol == RSM_UDP ? "udp" : "tcp"),
+					ZBX_JSON_TYPE_STRING);
 			zbx_json_addint64(json, "rtt", nss[i].ips[j].rtt);
 			zbx_json_close(json);
-
-			/* if a single IP of the Name Server fails, consider the whole Name Server down */
-			if (ZBX_SUBTEST_SUCCESS != zbx_subtest_result(nss[i].ips[j].rtt, rtt_limit))
-				nss[i].result = FAIL;
 		}
 	}
 
@@ -2268,26 +2284,160 @@ static void	create_rsm_dns_json(struct zbx_json *json, zbx_ns_t *nss, size_t nss
 		zbx_json_addstring(json, "ns", nss[i].name, ZBX_JSON_TYPE_STRING);
 		zbx_json_adduint64(json, "status", (SUCCEED == nss[i].result ? 1 : 0));
 		zbx_json_close(json);
-
-		if (SUCCEED == nss[i].result)
-			nssok++;
 	}
 
 	zbx_json_close(json);
 
 	zbx_json_adduint64(json, "nssok", nssok);
-	zbx_json_adduint64(json, "mode", 0);
-	zbx_json_adduint64(json, "protocol", (proto == RSM_UDP ? 0 : 1));
+	zbx_json_adduint64(json, "mode", current_mode);
+	zbx_json_adduint64(json, "status", status);
+	zbx_json_adduint64(json, "protocol", (protocol == RSM_UDP ? 0 : 1));
 
 	zbx_json_close(json);
 }
 
+int	metadata_file_exists(const char *host, int *file_exists, char *err, size_t err_size)
+{
+	char		*file;
+	FILE		*f;
+	zbx_stat_t	buf;
+	int		ret = SUCCEED;
+
+	file = zbx_dsprintf(NULL, "%s-%s.bin", METADATA_FILE_PREFIX, host);
+
+	if (0 == zbx_stat(file, &buf))
+	{
+		*file_exists = S_ISREG(buf.st_mode) ? 1 : 0;
+	}
+	else if (errno == ENOENT)
+	{
+		*file_exists = 0;
+	}
+	else
+	{
+		zbx_snprintf(err, err_size, "cannot access file \"%s\": %s", file, strerror(errno));
+		goto out;
+	}
+
+	ret = SUCCEED;
+out:
+	zbx_free(file);
+
+	return ret;
+}
+
+int	write_metadata(const char *host, int current_mode, int successful_tests, char *err, size_t err_size)
+{
+	char	*file;
+	FILE	*f;
+	int	ret = FAIL;
+
+	file = zbx_dsprintf(NULL, "%s-%s.bin", METADATA_FILE_PREFIX, host);
+
+	if (NULL == (f = fopen(file, "wb")))	/* w for write, b for binary */
+	{
+		zbx_snprintf(err, err_size, "cannot open metadata file \"%s\": %s", file, strerror(errno));
+		goto out;
+	}
+
+	if (1 > fwrite(&current_mode, sizeof(current_mode), 1, f) ||
+			1 > fwrite(&successful_tests, sizeof(successful_tests), 1, f))
+	{
+		zbx_snprintf(err, err_size, "cannot write metadata to file \"%s\"", file);
+		goto out;
+	}
+
+	ret = SUCCEED;
+out:
+	if (NULL != f)
+		fclose(f);
+
+	zbx_free(file);
+
+	return ret;
+}
+
+int	read_metadata(const char *host, int *current_mode, int *successful_tests, char *err, size_t err_size)
+{
+	char	*file;
+	FILE	*f;
+	int	ret = FAIL;
+
+	file = zbx_dsprintf(NULL, "%s-%s.bin", METADATA_FILE_PREFIX, host);
+
+	if (NULL == (f = fopen(file, "rb")))	/* r for read, b for binary */
+	{
+		zbx_snprintf(err, err_size, "cannot open metadata file \"%s\": %s", file, strerror(errno));
+		goto out;
+	}
+
+	if (1 > fread(current_mode, sizeof(*current_mode), 1, f) ||
+			1 > fread(successful_tests, sizeof(*successful_tests), 1, f))
+	{
+		zbx_snprintf(err, err_size, "cannot read metadata from file \"%s\"", file);
+		goto out;
+	}
+
+	ret = SUCCEED;
+out:
+	if (NULL != f)
+		fclose(f);
+
+	zbx_free(file);
+
+	return ret;
+}
+
+#define CURRENT_MODE_NORMAL		0
+#define CURRENT_MODE_CRITICAL_UDP	1
+#define CURRENT_MODE_CRITICAL_TCP	2
+
+void	update_metadata(int test_status, int test_recover, char protocol, int *current_mode, int *successful_tests,
+		FILE *log_fd)
+{
+
+	if (1 == test_status)
+	{
+		/* test successful */
+		if (CURRENT_MODE_NORMAL != *current_mode)
+		{
+			/* currently we are in critical mode */
+			(*successful_tests)++;
+
+			if (*successful_tests == test_recover)
+			{
+				/* switch to normal */
+				*successful_tests = 0;
+				*current_mode = CURRENT_MODE_NORMAL;
+
+				rsm_infof(log_fd, "mode changed from critical to normal");
+			}
+		}
+	}
+	else
+	{
+		/* test failed */
+		*successful_tests = 0;
+
+		if (CURRENT_MODE_NORMAL == *current_mode)
+		{
+			*current_mode = (RSM_UDP == protocol
+					? CURRENT_MODE_CRITICAL_UDP
+					: CURRENT_MODE_CRITICAL_TCP);
+
+			rsm_infof(log_fd, "mode changed from normal to critical, will continue using %s protocol",
+					(RSM_UDP == protocol ? "UDP" : "TCP"));
+		}
+	}
+}
+
 int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *result)
 {
-	char			err[ZBX_ERR_BUF_SIZE], proto,
+	char			err[ZBX_ERR_BUF_SIZE], protocol,
 				*domain, *testprefix, *name_servers_list, *dnssec_enabled_str, *rdds_enabled_str,
 				*epp_enabled_str, *udp_enabled_str, *tcp_enabled_str, *ipv4_enabled_str,
-				*ipv6_enabled_str, *res_ip, *udp_rtt_limit_str, *tcp_rtt_limit_str;
+				*ipv6_enabled_str, *res_ip, *udp_rtt_limit_str, *tcp_rtt_limit_str, *tcp_ratio_str,
+				*test_recover_str, *minns_str;
 	zbx_dnskeys_error_t	ec_dnskeys;
 	ldns_resolver		*res = NULL;
 	ldns_rr_list		*keys = NULL;
@@ -2297,17 +2447,17 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 	unsigned int		extras;
 	struct zbx_json		json;
 	int			dnssec_enabled, rdds_enabled, epp_enabled, udp_enabled, tcp_enabled, ipv4_enabled,
-				ipv6_enabled, udp_rtt_limit, tcp_rtt_limit, rtt_limit,
-				ret = SYSINFO_RET_FAIL;
+				ipv6_enabled, udp_rtt_limit, tcp_rtt_limit, rtt_limit, current_mode, successful_tests,
+				file_exists, nssok, test_status, tcp_ratio, test_recover, minns, ret = SYSINFO_RET_FAIL;
 
-	if (13 != request->nparam)
+	if (16 != request->nparam)
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid number of parameters"));
 		return SYSINFO_RET_FAIL;
 	}
 
 	/* TLD goes first, then DNS specific parameters, then TLD options, probe options and global settings */
-	domain = get_rparam(request, 0);		/* TLD for log file name, e.g. ".cz" */
+	domain = get_rparam(request, 0);		/* TLD for log file name, e.g. "cz" */
 	testprefix = get_rparam(request, 1);		/* TLD prefix to use when quering non-existent domain */
 	name_servers_list = get_rparam(request, 2);	/* list of name servers to test */
 	dnssec_enabled_str = get_rparam(request, 3);	/* DNSSEC enabled on a TLD */
@@ -2320,6 +2470,9 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 	res_ip = get_rparam(request, 10);		/* local resolver IP, e.g. "127.0.0.1" */
 	udp_rtt_limit_str = get_rparam(request, 11);	/* maximum allowed UDP RTT in milliseconds */
 	tcp_rtt_limit_str = get_rparam(request, 12);	/* maximum allowed TCP RTT in milliseconds */
+	tcp_ratio_str = get_rparam(request, 13);	/* TCP ratio against UDP to use in the test */
+	test_recover_str = get_rparam(request, 14);	/* successful tests to recover from critical mode */
+	minns_str = get_rparam(request, 15);		/* required working name servers */
 
 	if ('\0' == *domain)
 	{
@@ -2393,26 +2546,72 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 		return ret;
 	}
 
+	if (SUCCEED != is_uint31(tcp_ratio_str, &tcp_ratio))
+	{
+		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid thirteenth parameter."));
+		return ret;
+	}
+
+	if (SUCCEED != is_uint31(test_recover_str, &test_recover))
+	{
+		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid fourteenth parameter."));
+		return ret;
+	}
+
+	if (SUCCEED != is_uint31(minns_str, &minns))
+	{
+		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid fifteenth parameter."));
+		return ret;
+	}
+
 	if ('\0' == *res_ip)
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "IP address of local resolver cannot be empty."));
 		return ret;
 	}
 
-	/* TODO: fix for DNS Reboot */
-	proto = (zbx_random(2) ? RSM_UDP : RSM_TCP);
+	if (SUCCEED != metadata_file_exists(domain, &file_exists, err, sizeof(err)))
+	{
+		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
+		return ret;
+	}
 
-	rtt_limit = (proto == RSM_UDP ? udp_rtt_limit : tcp_rtt_limit);
+	if (0 == file_exists)
+	{
+		current_mode = CURRENT_MODE_NORMAL;
+		successful_tests = 0;
+	}
+	else if (SUCCEED != read_metadata(domain, &current_mode, &successful_tests, err, sizeof(err)))
+	{
+		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
+		return ret;
+	}
+
+	if (CURRENT_MODE_NORMAL == current_mode)
+	{
+		protocol = ((item->nextcheck / 60) % tcp_ratio) == 0 ? RSM_TCP : RSM_UDP;
+	}
+
+	rtt_limit = (protocol == RSM_UDP ? udp_rtt_limit : tcp_rtt_limit);
 
 	/* open log file */
-	if (NULL == (log_fd = open_item_log(item->host.host, domain, ZBX_DNS_LOG_PREFIX,
-			(RSM_UDP == proto ? "udp" : "tcp"), err, sizeof(err))))
+	if (NULL == (log_fd = open_item_log(item->host.host, domain, ZBX_DNS_LOG_PREFIX, err, sizeof(err))))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
 		return SYSINFO_RET_FAIL;
 	}
 
 	rsm_info(log_fd, "START TEST");
+
+	rsm_infof(log_fd, "mode: %s, protocol: %s, rtt limit: %d, tcp ratio: %d, minns: %d"
+			" (for critical mode: successful: %d, required for recovery: %d)",
+			(CURRENT_MODE_NORMAL == current_mode ? "normal" : "critical"),
+			(protocol == RSM_UDP ? "UDP" : "TCP"),
+			rtt_limit,
+			tcp_ratio,
+			minns,
+			successful_tests,
+			test_recover);
 
 	if (0 == strcmp(testprefix, "*randomtld*"))
 	{
@@ -2428,9 +2627,9 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 	extras = (dnssec_enabled ? RESOLVER_EXTRAS_DNSSEC : RESOLVER_EXTRAS_NONE);
 
 	/* create resolver */
-	if (SUCCEED != zbx_create_resolver(&res, "resolver", res_ip, proto, ipv4_enabled, ipv6_enabled, extras,
-			(RSM_UDP == proto ? RSM_UDP_TIMEOUT : RSM_TCP_TIMEOUT),
-			(RSM_UDP == proto ? RSM_UDP_RETRY : RSM_TCP_RETRY),
+	if (SUCCEED != zbx_create_resolver(&res, "resolver", res_ip, protocol, ipv4_enabled, ipv6_enabled, extras,
+			(RSM_UDP == protocol ? RSM_UDP_TIMEOUT : RSM_TCP_TIMEOUT),
+			(RSM_UDP == protocol ? RSM_UDP_RETRY : RSM_TCP_RETRY),
 			log_fd, err, sizeof(err)))
 	{
 		SET_MSG_RESULT(result, zbx_dsprintf(NULL, "cannot create resolver: %s", err));
@@ -2558,7 +2757,7 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 							th_log_fd,
 							&nss[i].ips[j].rtt,
 							&nss[i].ips[j].nsid,
-							(RSM_UDP == proto &&
+							(RSM_UDP == protocol &&
 									0 != rdds_enabled ? &nss[i].ips[j].upd : NULL),
 							ipv4_enabled,
 							ipv6_enabled,
@@ -2639,11 +2838,20 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 		zbx_free(threads);
 	}
 
-	create_rsm_dns_json(&json, nss, nss_num, rtt_limit, proto);
+	set_nss_results(nss, nss_num, rtt_limit, minns, &nssok, &test_status);
+
+	create_rsm_dns_json(&json, nss, nss_num, current_mode, nssok, test_status, protocol);
+
+	update_metadata(test_status, test_recover, protocol, &current_mode, &successful_tests, log_fd);
+
+	if (SUCCEED != write_metadata(domain, current_mode, successful_tests, err, sizeof(err)))
+	{
+		rsm_errf(log_fd, "internal error: %s", err);
+	}
 
 	SET_STR_RESULT(result, zbx_strdup(NULL, json.buffer));
 
-	rsm_infof(log_fd, "%s", json.buffer);
+	rsm_infof(log_fd, "test result %s", json.buffer);
 
 	zbx_json_free(&json);
 out:
@@ -3555,7 +3763,7 @@ int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 		return SYSINFO_RET_FAIL;
 	}
 
-	domain = get_rparam(request, 0);			/* TLD for log file name, e.g. ".cz" */
+	domain = get_rparam(request, 0);			/* TLD for log file name, e.g. "cz" */
 	hosts43_str = get_rparam(request, 1);			/* List of RDDS43 hosts */
 	hosts80_str = get_rparam(request, 2);			/* List of RDDS80 hosts */
 	testprefix = get_rparam(request, 3);			/* TLD prefix to use when quering non-existent domain */
@@ -3592,7 +3800,7 @@ int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	VALIDATE_PARAM_UINT(maxredirs, "fourteenth", "max redirects");
 
 	/* open log file */
-	if (NULL == (log_fd = open_item_log(item->host.host, domain, ZBX_RDDS_LOG_PREFIX, NULL, err, sizeof(err))))
+	if (NULL == (log_fd = open_item_log(item->host.host, domain, ZBX_RDDS_LOG_PREFIX, err, sizeof(err))))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
 		return SYSINFO_RET_FAIL;
@@ -3868,7 +4076,7 @@ int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	}
 
 	/* TLD goes first, then RDAP specific parameters, then TLD options, probe options and global settings */
-	domain = get_rparam(request, 0);		/* TLD for log file name, e.g. ".cz" */
+	domain = get_rparam(request, 0);		/* TLD for log file name, e.g. "cz" */
 	test_domain = get_rparam(request, 1);		/* testing domain to make RDAP query for, e.g. "nic.cz" */
 	base_url = get_rparam(request, 2);		/* RDAP service endpoint, e.g. "http://rdap.nic.cz" */
 	maxredirs_str = get_rparam(request, 3);		/* maximal number of redirections allowed */
@@ -3940,7 +4148,7 @@ int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	}
 
 	/* open log file */
-	if (NULL == (log_fd = open_item_log(item->host.host, domain, ZBX_RDAP_LOG_PREFIX, NULL, err, sizeof(err))))
+	if (NULL == (log_fd = open_item_log(item->host.host, domain, ZBX_RDAP_LOG_PREFIX, err, sizeof(err))))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
 		return ret;
@@ -5064,7 +5272,7 @@ int	check_rsm_epp(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 	}
 
 	/* open log file */
-	if (NULL == (log_fd = open_item_log(item->host.host, domain, ZBX_EPP_LOG_PREFIX, NULL, err, sizeof(err))))
+	if (NULL == (log_fd = open_item_log(item->host.host, domain, ZBX_EPP_LOG_PREFIX, err, sizeof(err))))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
 		return SYSINFO_RET_FAIL;
@@ -5610,7 +5818,7 @@ int	check_rsm_probe_status(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RE
 	}
 
 	/* open probestatus log file */
-	if (NULL == (log_fd = open_item_log(item->host.host, NULL, ZBX_PROBESTATUS_LOG_PREFIX, NULL, err, sizeof(err))))
+	if (NULL == (log_fd = open_item_log(item->host.host, NULL, ZBX_PROBESTATUS_LOG_PREFIX, err, sizeof(err))))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
 		return SYSINFO_RET_FAIL;
@@ -5921,8 +6129,7 @@ int	check_rsm_resolver_status(DC_ITEM *item, const AGENT_REQUEST *request, AGENT
 	}
 
 	/* open log file */
-	if (NULL == (log_fd = open_item_log(item->host.host, NULL, ZBX_RESOLVERSTATUS_LOG_PREFIX, NULL,
-			err, sizeof(err))))
+	if (NULL == (log_fd = open_item_log(item->host.host, NULL, ZBX_RESOLVERSTATUS_LOG_PREFIX, err, sizeof(err))))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
 		goto out;

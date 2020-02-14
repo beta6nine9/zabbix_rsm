@@ -73,11 +73,13 @@ sub get_slv_dns_ns_avail_items
 	my $hostid = shift;
 
 	return db_select(
-		"select itemid,key_".
-		" from items".
-		" where hostid=$hostid" .
-			" and key_ like '$cfg_key_out_pattern'".
-			" and status<>" . ITEM_STATUS_DISABLED
+		"select i.itemid,i.key_".
+		" from items i,item_discovery id".
+		" where i.hostid=$hostid".
+			" and id.itemid=i.itemid".
+			" and id.ts_delete=0".
+			" and i.key_ like '$cfg_key_out_pattern'".
+			" and i.status<>". ITEM_STATUS_DISABLED
 	);
 }
 
@@ -185,8 +187,10 @@ sub get_all_dns_rtt_itemids
 		" from" .
 			" items" .
 			" left join hosts on hosts.hostid = items.hostid" .
+			" left join item_discovery on item_discovery.itemid = items.itemid" .
 		" where" .
 			" items.key_ like '$cfg_key_in_pattern' and" .
+			" item_discovery.ts_delete = 0 and" .
 			" hosts.host like '% %'"
 	);
 
