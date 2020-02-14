@@ -124,7 +124,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		get_itemid_by_hostid get_itemid_like_by_hostid get_itemids_by_host_and_keypart get_lastclock
 		get_tlds get_tlds_and_hostids
 		get_oldest_clock
-		get_probes get_nsips get_nsip_items tld_exists tld_service_enabled db_connect db_disconnect
+		get_probes get_nsips tld_exists tld_service_enabled db_connect db_disconnect
 		validate_tld validate_service
 		get_templated_nsips db_exec tld_interface_enabled
 		tld_interface_enabled_create_cache tld_interface_enabled_delete_cache
@@ -866,49 +866,6 @@ sub get_templated_nsips
 	my $key = shift;
 
 	return get_nsips("Template $host", $key);
-}
-
-# return itemids grouped by hosts:
-#
-# {
-#    'hostid1' => {
-#         'itemid1' => 'ns2,2620:0:2d0:270::1:201',
-#         'itemid2' => 'ns1,192.0.34.201'
-#    },
-#    'hostid2' => {
-#         'itemid3' => 'ns2,2620:0:2d0:270::1:201',
-#         'itemid4' => 'ns1,192.0.34.201'
-#    }
-# }
-sub get_nsip_items
-{
-	my $nsips_ref = shift; # array reference of NS,IP pairs
-	my $cfg_key_in = shift;
-	my $tld = shift;
-
-	my @keys;
-	push(@keys, "'" . $cfg_key_in . $_ . "]'") foreach (@$nsips_ref);
-
-	my $keys_str = join(',', @keys);
-
-	my $rows_ref = db_select(
-		"select h.hostid,i.itemid,i.key_ ".
-		"from items i,hosts h ".
-		"where i.hostid=h.hostid".
-			" and h.host like '$tld %'".
-			" and i.templateid is not null".
-			" and i.key_ in ($keys_str)");
-
-	my $result = {};
-
-	foreach my $row_ref (@$rows_ref)
-	{
-		$result->{$row_ref->[0]}{$row_ref->[1]} = get_nsip_from_key($row_ref->[2]);
-	}
-
-	fail("cannot find items ($keys_str) at host ($tld *)") if (scalar(keys(%{$result})) == 0);
-
-	return $result;
 }
 
 # returns a reference to a hash:

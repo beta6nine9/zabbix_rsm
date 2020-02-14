@@ -12,6 +12,9 @@ use TLD_constants qw(:groups :api);
 use Data::Dumper;
 use DateTime;
 
+use constant AVAIL_KEY_PATTERN => 'rsm.slv.dns.ns.avail';
+use constant DOWNTIME_KEY_PATTERN => 'rsm.slv.dns.ns.downtime';
+
 parse_slv_opts();
 fail_if_running();
 set_slv_config(get_rsm_config());
@@ -30,9 +33,6 @@ if (!opt('dry-run'))
 		get_dns_udp_delay(getopt('now') // time() - AVAIL_SHIFT_BACK)
 	);
 }
-
-use constant AVAIL_KEY_PATTERN => 'rsm.slv.dns.ns.avail';
-use constant DOWNTIME_KEY_PATTERN => 'rsm.slv.dns.ns.downtime';
 
 my $max_cycles = (opt('cycles') ? getopt('cycles') : slv_max_cycles('dns'));
 my $cycle_delay = get_dns_udp_delay();
@@ -163,7 +163,8 @@ sub calculate_downtime_values
 
 	if (SUCCESS != get_lastvalue($avail_itemid, ITEM_VALUE_TYPE_UINT64, undef, \$avail_lastclock))
 	{
-		fail("cannot get lastvalue for avail item $avail_itemid");
+		info("no name server availability data yet");
+		return;
 	}
 
 	my $downtime_value;
@@ -175,7 +176,11 @@ sub calculate_downtime_values
 
 		$downtime_lastclock = db_select_value("select min(clock)-$cycle_delay from history_uint where itemid=?", [$avail_itemid]);
 
-		fail("no name server availability data yet") unless (defined($downtime_lastclock));
+		if (!defined($downtime_lastclock))
+		{
+			info("no name server availability data yet");
+			return;
+		}
 	}
 
 	if ($downtime_lastclock >= $avail_lastclock)
