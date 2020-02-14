@@ -174,7 +174,8 @@ sub calculate_downtime_values
 	{
 		$downtime_value = 0;
 
-		$downtime_lastclock = db_select_value("select min(clock)-$cycle_delay from history_uint where itemid=?", [$avail_itemid]);
+		$downtime_lastclock = db_select_value("select min(clock)-$cycle_delay from history_uint where itemid=?",
+			[$avail_itemid]);
 
 		if (!defined($downtime_lastclock))
 		{
@@ -217,7 +218,8 @@ sub calculate_downtime_values
 
 		if (!defined($avail_value))
 		{
-			dbg("no history value for avail item $avail_itemid at ", ts_full($clock), ", the data was probably removed");
+			dbg("no history value for avail item $avail_itemid at ", ts_full($clock),
+				", the data was probably removed");
 			$avail_value = UP;
 		}
 
