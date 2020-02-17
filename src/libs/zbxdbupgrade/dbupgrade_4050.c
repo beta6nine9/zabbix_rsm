@@ -3186,6 +3186,13 @@ static int	DBpatch_4050012_18(void)
 				" hosttemplateid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",templateid=" ZBX_FS_UI64,
 			DBget_maxid_num("hosts_templates", 1), hostid, hostid_template_rdds_test);
 
+		/* remove old links between host applications and template applications */
+#define SQL	"delete from application_template where applicationid=" ZBX_FS_UI64
+		DB_EXEC(SQL, applicationid_rdds);
+		DB_EXEC(SQL, applicationid_rdds43);
+		DB_EXEC(SQL, applicationid_rdds80);
+#undef SQL
+
 		/* link applications to the template */
 #define SQL	"insert into application_template set"									\
 		" application_templateid=" ZBX_FS_UI64 ",applicationid=" ZBX_FS_UI64 ",templateid=" ZBX_FS_UI64
@@ -3346,6 +3353,518 @@ static int	DBpatch_4050012_22(void)
 	int		ret = FAIL;
 
 	DB_RESULT	result = NULL;
+	DB_RESULT	result2 = NULL;
+	DB_ROW		row;
+
+	zbx_uint64_t	tlds_groupid;
+	zbx_uint64_t	template_hostid;
+
+	zbx_uint64_t	template_applicationid_slv_particular_test;	/* applicationid of "SLV particular test" application in "Template DNS Status" template */
+	zbx_uint64_t	template_applicationid_slv_current_month;	/* applicationid of "SLV current month" application in "Template DNS Status" template */
+	zbx_uint64_t	template_applicationid_slv_rolling_week;	/* applicationid of "SLV rolling week" application in "Template DNS Status" template */
+
+	zbx_uint64_t	template_itemid_rsm_slv_dns_avail;		/* itemid of "DNS availability" item in "Template DNS Status" template */
+	zbx_uint64_t	template_itemid_rsm_slv_dns_downtime;		/* itemid of "DNS minutes of downtime" item in "Template DNS Status" template */
+	zbx_uint64_t	template_itemid_rsm_slv_dns_rollweek;		/* itemid of "DNS weekly unavailability" item in "Template DNS Status" template */
+	zbx_uint64_t	template_itemid_rsm_slv_dns_udp_rtt_performed;	/* itemid of "Number of performed monthly DNS UDP tests" item in "Template DNS Status" template */
+	zbx_uint64_t	template_itemid_rsm_slv_dns_udp_rtt_failed;	/* itemid of "Number of failed monthly DNS UDP tests" item in "Template DNS Status" template */
+	zbx_uint64_t	template_itemid_rsm_slv_dns_udp_rtt_pfailed;	/* itemid of "Ratio of failed monthly DNS UDP tests" item in "Template DNS Status" template */
+	zbx_uint64_t	template_itemid_rsm_slv_dns_tcp_rtt_performed;	/* itemid of "Number of performed monthly DNS TCP tests" item in "Template DNS Status" template */
+	zbx_uint64_t	template_itemid_rsm_slv_dns_tcp_rtt_failed;	/* itemid of "Number of failed monthly DNS TCP tests" item in "Template DNS Status" template */
+	zbx_uint64_t	template_itemid_rsm_slv_dns_tcp_rtt_pfailed;	/* itemid of "Ratio of failed monthly DNS TCP tests" item in "Template DNS Status" template */
+	zbx_uint64_t	template_itemid_rsm_dns_nsip_discovery;		/* itemid of "NS-IP pairs discovery" discovery rule in "Template DNS Status" template */
+	zbx_uint64_t	template_itemid_rsm_slv_dns_ns_avail_ns_ip;	/* itemid of "DNS NS $1 ($2) availability" item prototype in "Template DNS Status" template */
+	zbx_uint64_t	template_itemid_rsm_slv_dns_ns_downtime_ns_ip;	/* itemid of "DNS minutes of $1 ($2) downtime" item prototype in "Template DNS Status" template */
+
+	zbx_uint64_t	temlpate_triggerid_downtime_over_10;		/* triggerid of "DNS {#NS} ({#IP}) downtime exceeded 10% of allowed $1 minutes" trigger prototype in "Template DNS Status" template */
+	zbx_uint64_t	temlpate_triggerid_downtime_over_25;		/* triggerid of "DNS {#NS} ({#IP}) downtime exceeded 25% of allowed $1 minutes" trigger prototype in "Template DNS Status" template */
+	zbx_uint64_t	temlpate_triggerid_downtime_over_50;		/* triggerid of "DNS {#NS} ({#IP}) downtime exceeded 50% of allowed $1 minutes" trigger prototype in "Template DNS Status" template */
+	zbx_uint64_t	temlpate_triggerid_downtime_over_75;		/* triggerid of "DNS {#NS} ({#IP}) downtime exceeded 75% of allowed $1 minutes" trigger prototype in "Template DNS Status" template */
+	zbx_uint64_t	temlpate_triggerid_downtime_over_100;		/* triggerid of "DNS {#NS} ({#IP}) downtime exceeded 100% of allowed $1 minutes" trigger prototype in "Template DNS Status" template */
+
+	ONLY_SERVER();
+
+	GET_HOST_GROUP_ID(tlds_groupid, "TLDs");
+	GET_TEMPLATE_ID(template_hostid, "Template DNS Status");
+
+	GET_TEMPLATE_APPLICATION_ID(template_applicationid_slv_particular_test, "Template DNS Status", "SLV particular test");
+	GET_TEMPLATE_APPLICATION_ID(template_applicationid_slv_current_month  , "Template DNS Status", "SLV current month");
+	GET_TEMPLATE_APPLICATION_ID(template_applicationid_slv_rolling_week   , "Template DNS Status", "SLV rolling week");
+
+	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_slv_dns_avail            , "Template DNS Status", "rsm.slv.dns.avail");
+	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_slv_dns_downtime         , "Template DNS Status", "rsm.slv.dns.downtime");
+	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_slv_dns_rollweek         , "Template DNS Status", "rsm.slv.dns.rollweek");
+	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_slv_dns_udp_rtt_performed, "Template DNS Status", "rsm.slv.dns.udp.rtt.performed");
+	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_slv_dns_udp_rtt_failed   , "Template DNS Status", "rsm.slv.dns.udp.rtt.failed");
+	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_slv_dns_udp_rtt_pfailed  , "Template DNS Status", "rsm.slv.dns.udp.rtt.pfailed");
+	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_slv_dns_tcp_rtt_performed, "Template DNS Status", "rsm.slv.dns.tcp.rtt.performed");
+	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_slv_dns_tcp_rtt_failed   , "Template DNS Status", "rsm.slv.dns.tcp.rtt.failed");
+	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_slv_dns_tcp_rtt_pfailed  , "Template DNS Status", "rsm.slv.dns.tcp.rtt.pfailed");
+	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_dns_nsip_discovery       , "Template DNS Status", "rsm.dns.nsip.discovery");
+	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_slv_dns_ns_avail_ns_ip   , "Template DNS Status", "rsm.slv.dns.ns.avail[{#NS},{#IP}]");
+	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_slv_dns_ns_downtime_ns_ip, "Template DNS Status", "rsm.slv.dns.ns.downtime[{#NS},{#IP}]");
+
+#define SQL	"select"												\
+			" triggers.triggerid"										\
+		" from"													\
+			" hosts"											\
+			" left join items on items.hostid=hosts.hostid"							\
+			" left join functions on functions.itemid=items.itemid"						\
+			" left join triggers on triggers.triggerid=functions.triggerid"					\
+		" where"												\
+			" hosts.host='Template DNS Status' and"								\
+			" triggers.expression like '%s'"
+	SELECT_VALUE_UINT64(temlpate_triggerid_downtime_over_10 , SQL, "{%}>{$RSM.SLV.NS.DOWNTIME}*0.1");
+	SELECT_VALUE_UINT64(temlpate_triggerid_downtime_over_25 , SQL, "{%}>{$RSM.SLV.NS.DOWNTIME}*0.25");
+	SELECT_VALUE_UINT64(temlpate_triggerid_downtime_over_50 , SQL, "{%}>{$RSM.SLV.NS.DOWNTIME}*0.5");
+	SELECT_VALUE_UINT64(temlpate_triggerid_downtime_over_75 , SQL, "{%}>{$RSM.SLV.NS.DOWNTIME}*0.75");
+	SELECT_VALUE_UINT64(temlpate_triggerid_downtime_over_100, SQL, "{%}>{$RSM.SLV.NS.DOWNTIME}");
+#undef SQL
+
+	/* get hostid of all <rsmhost> hosts */
+	result = DBselect("select hostid from hosts_groups where groupid=" ZBX_FS_UI64, tlds_groupid);
+
+	if (NULL == result)
+		goto out;
+
+	while (NULL != (row = DBfetch(result)))
+	{
+		zbx_uint64_t	hostid;
+
+		zbx_uint64_t	applicationid_slv_particular_test;		/* applicationid of "SLV particular test" application */
+		zbx_uint64_t	applicationid_slv_current_month;		/* applicationid of "SLV current month" application */
+		zbx_uint64_t	applicationid_slv_rolling_week;			/* applicationid of "SLV rolling week" application */
+
+		zbx_uint64_t	itemid_next;
+		zbx_uint64_t	itemid_rsm_dns_nsip_discovery;			/* itemid of "NS-IP pairs discovery" discovery rule */
+		zbx_uint64_t	itemid_rsm_slv_dns_ns_avail_ns_ip;		/* itemid of "DNS NS $1 ($2) availability" item prototype */
+		zbx_uint64_t	itemid_rsm_slv_dns_ns_downtime_ns_ip;		/* itemid of "DNS minutes of $1 ($2) downtime" item prototype */
+
+		zbx_uint64_t	triggerid_next;
+		zbx_uint64_t	triggerid_downtime_over_10;			/* triggerid of "DNS {#NS} ({#IP}) downtime exceeded 10% of allowed $1 minutes" trigger prototype */
+		zbx_uint64_t	triggerid_downtime_over_25;			/* triggerid of "DNS {#NS} ({#IP}) downtime exceeded 25% of allowed $1 minutes" trigger prototype */
+		zbx_uint64_t	triggerid_downtime_over_50;			/* triggerid of "DNS {#NS} ({#IP}) downtime exceeded 50% of allowed $1 minutes" trigger prototype */
+		zbx_uint64_t	triggerid_downtime_over_75;			/* triggerid of "DNS {#NS} ({#IP}) downtime exceeded 75% of allowed $1 minutes" trigger prototype */
+		zbx_uint64_t	triggerid_downtime_over_100;			/* triggerid of "DNS {#NS} ({#IP}) downtime exceeded 100% of allowed $1 minutes" trigger prototype */
+
+		zbx_uint64_t	functionid_next;
+		zbx_uint64_t	functionid_downtime_over_10;			/* functionid for "DNS {#NS} ({#IP}) downtime exceeded 10% of allowed $1 minutes" trigger prototype */
+		zbx_uint64_t	functionid_downtime_over_25;			/* functionid for "DNS {#NS} ({#IP}) downtime exceeded 25% of allowed $1 minutes" trigger prototype */
+		zbx_uint64_t	functionid_downtime_over_50;			/* functionid for "DNS {#NS} ({#IP}) downtime exceeded 50% of allowed $1 minutes" trigger prototype */
+		zbx_uint64_t	functionid_downtime_over_75;			/* functionid for "DNS {#NS} ({#IP}) downtime exceeded 75% of allowed $1 minutes" trigger prototype */
+		zbx_uint64_t	functionid_downtime_over_100;			/* functionid for "DNS {#NS} ({#IP}) downtime exceeded 100% of allowed $1 minutes" trigger prototype */
+
+		ZBX_STR2UINT64(hostid, row[0]);
+
+		GET_HOST_APPLICATION_ID(applicationid_slv_particular_test, hostid, "SLV particular test");
+		GET_HOST_APPLICATION_ID(applicationid_slv_current_month  , hostid, "SLV current month");
+		GET_HOST_APPLICATION_ID(applicationid_slv_rolling_week   , hostid, "SLV rolling week");
+
+		itemid_next                          = DBget_maxid_num("items", 3);
+		itemid_rsm_dns_nsip_discovery        = itemid_next++;
+		itemid_rsm_slv_dns_ns_avail_ns_ip    = itemid_next++;
+		itemid_rsm_slv_dns_ns_downtime_ns_ip = itemid_next++;
+
+		triggerid_next              = DBget_maxid_num("triggers", 5);
+		triggerid_downtime_over_10  = triggerid_next++;
+		triggerid_downtime_over_25  = triggerid_next++;
+		triggerid_downtime_over_50  = triggerid_next++;
+		triggerid_downtime_over_75  = triggerid_next++;
+		triggerid_downtime_over_100 = triggerid_next++;
+
+		functionid_next              = DBget_maxid_num("functions", 5);
+		functionid_downtime_over_10  = functionid_next++;
+		functionid_downtime_over_25  = functionid_next++;
+		functionid_downtime_over_50  = functionid_next++;
+		functionid_downtime_over_75  = functionid_next++;
+		functionid_downtime_over_100 = functionid_next++;
+
+#define SQL	"insert into hosts_templates set hosttemplateid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",templateid=" ZBX_FS_UI64
+		DB_EXEC(SQL, DBget_maxid_num("hosts_templates", 1), hostid, template_hostid);
+#undef SQL
+
+#define SQL	"insert into application_template set application_templateid=" ZBX_FS_UI64 ",applicationid=" ZBX_FS_UI64 ",templateid=" ZBX_FS_UI64
+		DB_EXEC(SQL, DBget_maxid_num("application_template", 1), applicationid_slv_particular_test, template_applicationid_slv_particular_test);
+		DB_EXEC(SQL, DBget_maxid_num("application_template", 1), applicationid_slv_current_month  , template_applicationid_slv_current_month);
+		DB_EXEC(SQL, DBget_maxid_num("application_template", 1), applicationid_slv_rolling_week   , template_applicationid_slv_rolling_week);
+#undef SQL
+
+#define SQL	"update items set templateid=" ZBX_FS_UI64 ",request_method=0 where hostid=" ZBX_FS_UI64 " and key_='%s'"
+		DB_EXEC(SQL, template_itemid_rsm_slv_dns_avail            , hostid, "rsm.slv.dns.avail");
+		DB_EXEC(SQL, template_itemid_rsm_slv_dns_downtime         , hostid, "rsm.slv.dns.downtime");
+		DB_EXEC(SQL, template_itemid_rsm_slv_dns_rollweek         , hostid, "rsm.slv.dns.rollweek");
+		DB_EXEC(SQL, template_itemid_rsm_slv_dns_udp_rtt_performed, hostid, "rsm.slv.dns.udp.rtt.performed");
+		DB_EXEC(SQL, template_itemid_rsm_slv_dns_udp_rtt_failed   , hostid, "rsm.slv.dns.udp.rtt.failed");
+		DB_EXEC(SQL, template_itemid_rsm_slv_dns_udp_rtt_pfailed  , hostid, "rsm.slv.dns.udp.rtt.pfailed");
+		DB_EXEC(SQL, template_itemid_rsm_slv_dns_tcp_rtt_performed, hostid, "rsm.slv.dns.tcp.rtt.performed");
+		DB_EXEC(SQL, template_itemid_rsm_slv_dns_tcp_rtt_failed   , hostid, "rsm.slv.dns.tcp.rtt.failed");
+		DB_EXEC(SQL, template_itemid_rsm_slv_dns_tcp_rtt_pfailed  , hostid, "rsm.slv.dns.tcp.rtt.pfailed");
+#undef SQL
+
+		/* LLD of NS-IP pairs: create items (discovery rule, item prototypes) */
+#define SQL	"insert into items (itemid,type,snmp_community,snmp_oid,hostid,name,key_,delay,history,trends,"		\
+			"status,value_type,trapper_hosts,units,snmpv3_securityname,snmpv3_securitylevel,"		\
+			"snmpv3_authpassphrase,snmpv3_privpassphrase,formula,logtimefmt,templateid,valuemapid,"		\
+			"params,ipmi_sensor,authtype,username,password,publickey,privatekey,flags,interfaceid,port,"	\
+			"description,inventory_link,lifetime,snmpv3_authprotocol,snmpv3_privprotocol,"			\
+			"snmpv3_contextname,evaltype,jmx_endpoint,master_itemid,timeout,url,query_fields,posts,"	\
+			"status_codes,follow_redirects,post_type,http_proxy,headers,retrieve_mode,request_method,"	\
+			"output_format,ssl_cert_file,ssl_key_file,ssl_key_password,verify_peer,verify_host,"		\
+			"allow_traps)"											\
+		" select"												\
+			" " ZBX_FS_UI64 ",type,snmp_community,snmp_oid," ZBX_FS_UI64 ",name,key_,delay,history,trends,"	\
+			"status,value_type,trapper_hosts,units,snmpv3_securityname,snmpv3_securitylevel,"		\
+			"snmpv3_authpassphrase,snmpv3_privpassphrase,formula,logtimefmt," ZBX_FS_UI64 ",valuemapid,"	\
+			"params,ipmi_sensor,authtype,username,password,publickey,privatekey,flags,interfaceid,port,"	\
+			"description,inventory_link,lifetime,snmpv3_authprotocol,snmpv3_privprotocol,"			\
+			"snmpv3_contextname,evaltype,jmx_endpoint,master_itemid,timeout,url,query_fields,posts,"	\
+			"status_codes,follow_redirects,post_type,http_proxy,headers,retrieve_mode,request_method,"	\
+			"output_format,ssl_cert_file,ssl_key_file,ssl_key_password,verify_peer,verify_host,"		\
+			"allow_traps"											\
+		" from items"												\
+		" where itemid=" ZBX_FS_UI64
+#define CREATE(itemid, templateid)	DB_EXEC(SQL, itemid, hostid, templateid, templateid)
+		CREATE(itemid_rsm_dns_nsip_discovery       , template_itemid_rsm_dns_nsip_discovery);
+		CREATE(itemid_rsm_slv_dns_ns_avail_ns_ip   , template_itemid_rsm_slv_dns_ns_avail_ns_ip);
+		CREATE(itemid_rsm_slv_dns_ns_downtime_ns_ip, template_itemid_rsm_slv_dns_ns_downtime_ns_ip);
+#undef CREATE
+#undef SQL
+
+		/* LLD of NS-IP pairs: link item prototypes to discovery rules */
+#define SQL	"insert into item_discovery set itemdiscoveryid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ","		\
+		"parent_itemid=" ZBX_FS_UI64 ",key_='',lastcheck=0,ts_delete=0"
+	DB_EXEC(SQL, DBget_maxid_num("item_discovery", 1), itemid_rsm_slv_dns_ns_avail_ns_ip   , itemid_rsm_dns_nsip_discovery);
+	DB_EXEC(SQL, DBget_maxid_num("item_discovery", 1), itemid_rsm_slv_dns_ns_downtime_ns_ip, itemid_rsm_dns_nsip_discovery);
+#undef SQL
+
+		/* LLD of NS-IP pairs: link items to their prototypes */
+#define MIGRATE(key_pattern, prototype_key, prototype_itemid)								\
+															\
+do															\
+{															\
+	/* flags 0x04 = ZBX_FLAG_DISCOVERY_CREATED */									\
+	DB_EXEC("update"												\
+			" items,"											\
+			" items as prototype"										\
+		" set"													\
+			" items.name=prototype.name,"									\
+			"items.templateid=null,"									\
+			"items.flags=4,"										\
+			"items.request_method=prototype.request_method"							\
+		" where"												\
+			" prototype.itemid=" ZBX_FS_UI64 " and"								\
+			" items.hostid=prototype.hostid and"								\
+			" items.itemid<>prototype.itemid and"								\
+			" items.key_ like '%s'",									\
+		prototype_itemid, key_pattern);										\
+															\
+	result2 = DBselect("select itemid"										\
+			" from items"											\
+			" where"											\
+				" hostid=" ZBX_FS_UI64 " and"								\
+				" itemid<>" ZBX_FS_UI64 " and"								\
+				" key_ like '%s'",									\
+			hostid, prototype_itemid, key_pattern);								\
+															\
+	if (NULL == result2)												\
+		goto out;												\
+															\
+	while (NULL != (row = DBfetch(result2)))									\
+	{														\
+		zbx_uint64_t	itemid;											\
+															\
+		ZBX_STR2UINT64(itemid, row[0]);										\
+															\
+		DB_EXEC("insert into item_discovery set"								\
+				" itemdiscoveryid=" ZBX_FS_UI64 ","							\
+				"itemid=" ZBX_FS_UI64 ","								\
+				"parent_itemid=" ZBX_FS_UI64 ","							\
+				"key_='%s',"										\
+				"lastcheck=0,"										\
+				"ts_delete=0",										\
+			DBget_maxid_num("item_discovery", 1), itemid, prototype_itemid, prototype_key);			\
+	}														\
+															\
+	DBfree_result(result2);												\
+	result2 = NULL;													\
+															\
+	/* TODO: handle disabled ns-ip pairs */										\
+}															\
+while (0)
+		MIGRATE("rsm.slv.dns.ns.avail[%,%]"   , "rsm.slv.dns.ns.avail[{#NS},{#IP}]"   , itemid_rsm_slv_dns_ns_avail_ns_ip);
+		MIGRATE("rsm.slv.dns.ns.downtime[%,%]", "rsm.slv.dns.ns.downtime[{#NS},{#IP}]", itemid_rsm_slv_dns_ns_downtime_ns_ip);
+#undef MIGRATE
+
+		/* LLD of NS-IP pairs: create trigger prototypes */
+#define SQL	"insert into triggers (triggerid,expression,description,url,status,value,priority,lastchange,"		\
+			"comments,error,templateid,type,state,flags,recovery_mode,recovery_expression,"			\
+			"correlation_mode,correlation_tag,manual_close,opdata)"						\
+		" select"												\
+			" " ZBX_FS_UI64 ",'{" ZBX_FS_UI64 "}%s',description,url,status,value,priority,lastchange,"	\
+			"comments,error," ZBX_FS_UI64 ",type,state,flags,recovery_mode,recovery_expression,"		\
+			"correlation_mode,correlation_tag,manual_close,opdata"						\
+		" from triggers"											\
+		" where triggerid=" ZBX_FS_UI64
+#define CREATE(triggerid, functionid, comparison, template_triggerid)							\
+		DB_EXEC(SQL, triggerid, functionid, comparison, template_triggerid, template_triggerid)
+		CREATE(triggerid_downtime_over_10 , functionid_downtime_over_10 , ">{$RSM.SLV.NS.DOWNTIME}*0.1" , temlpate_triggerid_downtime_over_10);
+		CREATE(triggerid_downtime_over_25 , functionid_downtime_over_25 , ">{$RSM.SLV.NS.DOWNTIME}*0.25", temlpate_triggerid_downtime_over_25);
+		CREATE(triggerid_downtime_over_50 , functionid_downtime_over_50 , ">{$RSM.SLV.NS.DOWNTIME}*0.5" , temlpate_triggerid_downtime_over_50);
+		CREATE(triggerid_downtime_over_75 , functionid_downtime_over_75 , ">{$RSM.SLV.NS.DOWNTIME}*0.75", temlpate_triggerid_downtime_over_75);
+		CREATE(triggerid_downtime_over_100, functionid_downtime_over_100, ">{$RSM.SLV.NS.DOWNTIME}"     , temlpate_triggerid_downtime_over_100);
+#undef CREATE
+#undef SQL
+
+		/* LLD of NS-IP pairs: create functions for trigger prototypes */
+#define SQL	"insert into functions set functionid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ",triggerid=" ZBX_FS_UI64 ",name='last',parameter=''"
+		DB_EXEC(SQL, functionid_downtime_over_10 , itemid_rsm_slv_dns_ns_downtime_ns_ip, triggerid_downtime_over_10);
+		DB_EXEC(SQL, functionid_downtime_over_25 , itemid_rsm_slv_dns_ns_downtime_ns_ip, triggerid_downtime_over_25);
+		DB_EXEC(SQL, functionid_downtime_over_50 , itemid_rsm_slv_dns_ns_downtime_ns_ip, triggerid_downtime_over_50);
+		DB_EXEC(SQL, functionid_downtime_over_75 , itemid_rsm_slv_dns_ns_downtime_ns_ip, triggerid_downtime_over_75);
+		DB_EXEC(SQL, functionid_downtime_over_100, itemid_rsm_slv_dns_ns_downtime_ns_ip, triggerid_downtime_over_100);
+#undef SQL
+
+		/* LLD of NS-IP pairs: create dependencies between trigger prototypes */
+#define SQL	"insert into trigger_depends set triggerdepid=" ZBX_FS_UI64 ",triggerid_down=" ZBX_FS_UI64 ",triggerid_up=" ZBX_FS_UI64
+		DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_downtime_over_10, triggerid_downtime_over_25);
+		DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_downtime_over_25, triggerid_downtime_over_50);
+		DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_downtime_over_50, triggerid_downtime_over_75);
+		DB_EXEC(SQL, DBget_maxid_num("trigger_depends", 1), triggerid_downtime_over_75, triggerid_downtime_over_100);
+#undef SQL
+
+		/* LLD of NS-IP pairs: link triggers to their prototypes */
+#define MIGRATE(expression_pattern, prototype_triggerid)								\
+															\
+do															\
+{															\
+	/* flags 0x00 = ZBX_FLAG_DISCOVERY_NORMAL */									\
+	result2 = DBselect("select"											\
+				" triggers.triggerid"									\
+			" from"												\
+				" triggers"										\
+				" left join functions on functions.triggerid=triggers.triggerid"			\
+				" left join items on items.itemid=functions.itemid"					\
+			" where"											\
+				" items.hostid=" ZBX_FS_UI64 " and"							\
+				" triggers.flags=0 and"									\
+				" triggers.expression like '%s'",							\
+			hostid, expression_pattern);									\
+															\
+	if (NULL == result2)												\
+		goto out;												\
+															\
+	while (NULL != (row = DBfetch(result2)))									\
+	{														\
+		zbx_uint64_t	triggerid;										\
+															\
+		ZBX_STR2UINT64(triggerid, row[0]);									\
+															\
+		/* flags 0x04 = ZBX_FLAG_DISCOVERY_CREATED */								\
+		DB_EXEC("update triggers set flags=4 where triggerid=" ZBX_FS_UI64, triggerid);				\
+															\
+		DB_EXEC("insert into trigger_discovery set triggerid=" ZBX_FS_UI64 ",parent_triggerid=" ZBX_FS_UI64,	\
+			triggerid, prototype_triggerid);								\
+	}														\
+															\
+	DBfree_result(result2);												\
+	result2 = NULL;													\
+}															\
+while (0)
+		MIGRATE("{%}>{$RSM.SLV.NS.DOWNTIME}*0.1" , triggerid_downtime_over_10);
+		MIGRATE("{%}>{$RSM.SLV.NS.DOWNTIME}*0.25", triggerid_downtime_over_25);
+		MIGRATE("{%}>{$RSM.SLV.NS.DOWNTIME}*0.5" , triggerid_downtime_over_50);
+		MIGRATE("{%}>{$RSM.SLV.NS.DOWNTIME}*0.75", triggerid_downtime_over_75);
+		MIGRATE("{%}>{$RSM.SLV.NS.DOWNTIME}"     , triggerid_downtime_over_100);
+#undef MIGRATE
+	}
+
+	ret = SUCCEED;
+out:
+	DBfree_result(result2);
+	DBfree_result(result);
+
+	return ret;
+}
+
+static int	DBpatch_4050012_23(void)
+{
+	int		ret = FAIL;
+
+	DB_RESULT	result = NULL;
+	DB_ROW		row;
+
+	zbx_uint64_t	tlds_groupid;
+	zbx_uint64_t	template_hostid;
+
+	zbx_uint64_t	template_itemid_rsm_slv_dnssec_avail;		/* itemid of "DNSSEC availability" item in "Template DNSSEC Status" template */
+	zbx_uint64_t	template_itemid_rsm_slv_dnssec_rollweek;	/* itemid of "DNSSEC weekly unavailability" item in "Template DNSSEC Status" template */
+
+	ONLY_SERVER();
+
+	GET_HOST_GROUP_ID(tlds_groupid, "TLDs");
+	GET_TEMPLATE_ID(template_hostid, "Template DNSSEC Status");
+
+	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_slv_dnssec_avail   , "Template DNSSEC Status", "rsm.slv.dnssec.avail");
+	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_slv_dnssec_rollweek, "Template DNSSEC Status", "rsm.slv.dnssec.rollweek");
+
+	/* get hostid of all <rsmhost> hosts */
+	result = DBselect("select hostid from hosts_groups where groupid=" ZBX_FS_UI64, tlds_groupid);
+
+	if (NULL == result)
+		goto out;
+
+	while (NULL != (row = DBfetch(result)))
+	{
+		zbx_uint64_t	hostid;
+
+		ZBX_STR2UINT64(hostid, row[0]);
+
+#define SQL	"insert into hosts_templates set hosttemplateid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",templateid=" ZBX_FS_UI64
+		DB_EXEC(SQL, DBget_maxid_num("hosts_templates", 1), hostid, template_hostid);
+#undef SQL
+
+#define SQL	"update items set templateid=" ZBX_FS_UI64 ",request_method=0 where hostid=" ZBX_FS_UI64 " and key_='%s'"
+		DB_EXEC(SQL, template_itemid_rsm_slv_dnssec_avail   , hostid, "rsm.slv.dnssec.avail");
+		DB_EXEC(SQL, template_itemid_rsm_slv_dnssec_rollweek, hostid, "rsm.slv.dnssec.rollweek");
+#undef SQL
+	}
+
+	ret = SUCCEED;
+out:
+	DBfree_result(result);
+
+	return ret;
+}
+
+static int	DBpatch_4050012_24(void)
+{
+	int		ret = FAIL;
+
+	DB_RESULT	result = NULL;
+	DB_ROW		row;
+
+	zbx_uint64_t	tlds_groupid;
+	zbx_uint64_t	template_hostid;
+
+	zbx_uint64_t	template_itemid_rsm_slv_rdap_avail;		/* itemid of "RDAP availability" item in "Template RDAP Status" template */
+	zbx_uint64_t	template_itemid_rsm_slv_rdap_downtime;		/* itemid of "RDAP minutes of downtime" item in "Template RDAP Status" template */
+	zbx_uint64_t	template_itemid_rsm_slv_rdap_rollweek;		/* itemid of "RDAP weekly unavailability" item in "Template RDAP Status" template */
+	zbx_uint64_t	template_itemid_rsm_slv_rdap_rtt_performed;	/* itemid of "Number of performed monthly RDAP queries" item in "Template RDAP Status" template */
+	zbx_uint64_t	template_itemid_rsm_slv_rdap_rtt_failed;	/* itemid of "Number of failed monthly RDAP queries" item in "Template RDAP Status" template */
+	zbx_uint64_t	template_itemid_rsm_slv_rdap_rtt_pfailed;	/* itemid of "Ratio of failed monthly RDAP queries" item in "Template RDAP Status" template */
+
+	ONLY_SERVER();
+
+	GET_HOST_GROUP_ID(tlds_groupid, "TLDs");
+	GET_TEMPLATE_ID(template_hostid, "Template RDAP Status");
+
+	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_slv_rdap_avail        , "Template RDAP Status", "rsm.slv.rdap.avail");
+	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_slv_rdap_downtime     , "Template RDAP Status", "rsm.slv.rdap.downtime");
+	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_slv_rdap_rollweek     , "Template RDAP Status", "rsm.slv.rdap.rollweek");
+	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_slv_rdap_rtt_performed, "Template RDAP Status", "rsm.slv.rdap.rtt.performed");
+	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_slv_rdap_rtt_failed   , "Template RDAP Status", "rsm.slv.rdap.rtt.failed");
+	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_slv_rdap_rtt_pfailed  , "Template RDAP Status", "rsm.slv.rdap.rtt.pfailed");
+
+	/* get hostid of all <rsmhost> hosts */
+	result = DBselect("select hostid from hosts_groups where groupid=" ZBX_FS_UI64, tlds_groupid);
+
+	if (NULL == result)
+		goto out;
+
+	while (NULL != (row = DBfetch(result)))
+	{
+		zbx_uint64_t	hostid;
+
+		ZBX_STR2UINT64(hostid, row[0]);
+
+#define SQL	"insert into hosts_templates set hosttemplateid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",templateid=" ZBX_FS_UI64
+		DB_EXEC(SQL, DBget_maxid_num("hosts_templates", 1), hostid, template_hostid);
+#undef SQL
+
+#define SQL	"update items set templateid=" ZBX_FS_UI64 ",request_method=0 where hostid=" ZBX_FS_UI64 " and key_='%s'"
+		DB_EXEC(SQL, template_itemid_rsm_slv_rdap_avail        , hostid, "rsm.slv.rdap.avail");
+		DB_EXEC(SQL, template_itemid_rsm_slv_rdap_downtime     , hostid, "rsm.slv.rdap.downtime");
+		DB_EXEC(SQL, template_itemid_rsm_slv_rdap_rollweek     , hostid, "rsm.slv.rdap.rollweek");
+		DB_EXEC(SQL, template_itemid_rsm_slv_rdap_rtt_performed, hostid, "rsm.slv.rdap.rtt.performed");
+		DB_EXEC(SQL, template_itemid_rsm_slv_rdap_rtt_failed   , hostid, "rsm.slv.rdap.rtt.failed");
+		DB_EXEC(SQL, template_itemid_rsm_slv_rdap_rtt_pfailed  , hostid, "rsm.slv.rdap.rtt.pfailed");
+#undef SQL
+	}
+
+	ret = SUCCEED;
+out:
+	DBfree_result(result);
+
+	return ret;
+}
+
+static int	DBpatch_4050012_25(void)
+{
+	int		ret = FAIL;
+
+	DB_RESULT	result = NULL;
+	DB_ROW		row;
+
+	zbx_uint64_t	tlds_groupid;
+	zbx_uint64_t	template_hostid;
+
+	zbx_uint64_t	template_itemid_rsm_slv_rdds_avail;		/* itemid of "RDDS availability" item in "Template RDDS Status" template */
+	zbx_uint64_t	template_itemid_rsm_slv_rdds_downtime;		/* itemid of "RDDS minutes of downtime" item in "Template RDDS Status" template */
+	zbx_uint64_t	template_itemid_rsm_slv_rdds_rollweek;		/* itemid of "RDDS weekly unavailability" item in "Template RDDS Status" template */
+	zbx_uint64_t	template_itemid_rsm_slv_rdds_rtt_performed;	/* itemid of "Number of performed monthly RDDS queries" item in "Template RDDS Status" template */
+	zbx_uint64_t	template_itemid_rsm_slv_rdds_rtt_failed;	/* itemid of "Number of failed monthly RDDS queries" item in "Template RDDS Status" template */
+	zbx_uint64_t	template_itemid_rsm_slv_rdds_rtt_pfailed;	/* itemid of "Ratio of failed monthly RDDS queries" item in "Template RDDS Status" template */
+
+	ONLY_SERVER();
+
+	GET_HOST_GROUP_ID(tlds_groupid, "TLDs");
+	GET_TEMPLATE_ID(template_hostid, "Template RDDS Status");
+
+	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_slv_rdds_avail        , "Template RDDS Status", "rsm.slv.rdds.avail");
+	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_slv_rdds_downtime     , "Template RDDS Status", "rsm.slv.rdds.downtime");
+	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_slv_rdds_rollweek     , "Template RDDS Status", "rsm.slv.rdds.rollweek");
+	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_slv_rdds_rtt_performed, "Template RDDS Status", "rsm.slv.rdds.rtt.performed");
+	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_slv_rdds_rtt_failed   , "Template RDDS Status", "rsm.slv.rdds.rtt.failed");
+	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_slv_rdds_rtt_pfailed  , "Template RDDS Status", "rsm.slv.rdds.rtt.pfailed");
+
+	/* get hostid of all <rsmhost> hosts */
+	result = DBselect("select hostid from hosts_groups where groupid=" ZBX_FS_UI64, tlds_groupid);
+
+	if (NULL == result)
+		goto out;
+
+	while (NULL != (row = DBfetch(result)))
+	{
+		zbx_uint64_t	hostid;
+
+		ZBX_STR2UINT64(hostid, row[0]);
+
+#define SQL	"insert into hosts_templates set hosttemplateid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",templateid=" ZBX_FS_UI64
+		DB_EXEC(SQL, DBget_maxid_num("hosts_templates", 1), hostid, template_hostid);
+#undef SQL
+
+#define SQL	"update items set templateid=" ZBX_FS_UI64 ",request_method=0 where hostid=" ZBX_FS_UI64 " and key_='%s'"
+		DB_EXEC(SQL, template_itemid_rsm_slv_rdds_avail        , hostid, "rsm.slv.rdds.avail");
+		DB_EXEC(SQL, template_itemid_rsm_slv_rdds_downtime     , hostid, "rsm.slv.rdds.downtime");
+		DB_EXEC(SQL, template_itemid_rsm_slv_rdds_rollweek     , hostid, "rsm.slv.rdds.rollweek");
+		DB_EXEC(SQL, template_itemid_rsm_slv_rdds_rtt_performed, hostid, "rsm.slv.rdds.rtt.performed");
+		DB_EXEC(SQL, template_itemid_rsm_slv_rdds_rtt_failed   , hostid, "rsm.slv.rdds.rtt.failed");
+		DB_EXEC(SQL, template_itemid_rsm_slv_rdds_rtt_pfailed  , hostid, "rsm.slv.rdds.rtt.pfailed");
+#undef SQL
+	}
+
+	ret = SUCCEED;
+out:
+	DBfree_result(result);
+
+	return ret;
+}
+
+static int	DBpatch_4050012_26(void)
+{
+	int		ret = FAIL;
+
+	DB_RESULT	result = NULL;
 	DB_ROW		row;
 
 	zbx_uint64_t	probes_groupid;
@@ -3355,6 +3874,8 @@ static int	DBpatch_4050012_22(void)
 	zbx_uint64_t	template_applicationid_configuration;
 	zbx_uint64_t	template_itemid_probe_configvalue_rsm_ip4_enabled;
 	zbx_uint64_t	template_itemid_probe_configvalue_rsm_ip6_enabled;
+
+	zbx_uint64_t	count;
 
 	ONLY_SERVER();
 
@@ -3417,8 +3938,11 @@ static int	DBpatch_4050012_22(void)
 		DB_EXEC(SQL, DBget_maxid_num("application_template", 1), applicationid_configuration  , template_applicationid_configuration);
 #undef SQL
 
-		/* move probe.configvalue[..] items from one "<tld> <probe>" host to "<probe>" host, keep the history */
+		/* move probe.configvalue[..] items from one "<rsmhost> <probe>" host to "<probe>" host, keep the history */
 #define MIGRATE(key, template_itemid)											\
+															\
+do															\
+{															\
 		/* hosts.status 0 = HOST_STATUS_MONITORED */								\
 		/* hosts.status 1 = HOST_STATUS_NOT_MONITORED */							\
 		SELECT_VALUE_UINT64(											\
@@ -3453,13 +3977,15 @@ static int	DBpatch_4050012_22(void)
 			" where"											\
 				" item.itemid=" ZBX_FS_UI64 " and"							\
 				" template.itemid=" ZBX_FS_UI64,							\
-			itemid, template_itemid);
+			itemid, template_itemid);									\
+}															\
+while (0)
 		MIGRATE("probe.configvalue[RSM.IP4.ENABLED]", template_itemid_probe_configvalue_rsm_ip4_enabled);
 		MIGRATE("probe.configvalue[RSM.IP6.ENABLED]", template_itemid_probe_configvalue_rsm_ip6_enabled);
 #undef MIGRATE
 	}
 
-	/* delete probe.confivalue[..] items from "<tld> <probe>" hosts, leave those that were moved to "<probe>" hosts */
+	/* delete probe.confivalue[..] items from "<rsmhost> <probe>" hosts, leave those that were moved to "<probe>" hosts */
 #define SQL	"delete from items where key_='%s' and hostid<>" ZBX_FS_UI64 " and templateid<>" ZBX_FS_UI64
 	DB_EXEC(SQL, "probe.configvalue[RSM.IP4.ENABLED]", template_hostid, template_itemid_probe_configvalue_rsm_ip4_enabled);
 	DB_EXEC(SQL, "probe.configvalue[RSM.IP6.ENABLED]", template_hostid, template_itemid_probe_configvalue_rsm_ip6_enabled);
@@ -3485,6 +4011,270 @@ static int	DBpatch_4050012_22(void)
 	MIGRATE("rsm.errors");
 #undef MIGRATE
 #undef SQL
+
+	/* make sure that "Configuration" application on "<rsmhost> <probe>" hosts isn't used anymore */
+	SELECT_VALUE_UINT64(
+		count,
+		"select"
+			" count(*)"
+		" from"
+			" items_applications"
+			" left join applications on applications.applicationid=items_applications.applicationid"
+			" left join hosts_groups on hosts_groups.hostid=applications.hostid"
+			" left join hstgrp on hstgrp.groupid=hosts_groups.groupid"
+		" where"
+			" applications.name='%s' and"
+			" hstgrp.name='%s'",
+		"Configuration", "TLD Probe results");	/* workaround for "requires at least one argument in a variadic macro" warning */
+
+	if (0 != count)
+	{
+		zabbix_log(LOG_LEVEL_CRIT, "%s() on line %d: found item(s) that are linked to the 'Configuration' application", __func__, __LINE__);
+		goto out;
+	}
+
+	/* remove "Configuration" application from "<rsmhost> <probe>" hosts */
+	DB_EXEC("delete"
+			" applications"
+		" from"
+			" applications"
+			" left join hosts_groups on hosts_groups.hostid=applications.hostid"
+			" left join hstgrp on hstgrp.groupid=hosts_groups.groupid"
+		" where"
+			" applications.name='Configuration' and"
+			" hstgrp.name='TLD Probe results'");
+
+	ret = SUCCEED;
+out:
+	DBfree_result(result);
+
+	return ret;
+}
+
+static int	DBpatch_4050012_27(void)
+{
+	int		ret = FAIL;
+
+	DB_RESULT	result = NULL;
+	DB_ROW		row;
+
+	zbx_uint64_t	tlds_groupid;
+	zbx_uint64_t	template_hostid;
+
+	zbx_uint64_t	template_itemid_dns_tcp_enabled;	/* itemid of "DNS TCP enabled/disabled" item in "Template Config History" template */
+	zbx_uint64_t	template_itemid_dns_udp_enabled;	/* itemid of "DNS UDP enabled/disabled" item in "Template Config History" template */
+	zbx_uint64_t	template_itemid_dnssec_enabled;		/* itemid of "DNSSEC enabled/disabled" item in "Template Config History" template */
+	zbx_uint64_t	template_itemid_rdap_enabled;		/* itemid of "RDAP enabled/disabled" item in "Template Config History" template */
+	zbx_uint64_t	template_itemid_rdds_enabled;		/* itemid of "RDDS enabled/disabled" item in "Template Config History" template */
+
+	ONLY_SERVER();
+
+	GET_HOST_GROUP_ID(tlds_groupid, "TLDs");
+	GET_TEMPLATE_ID(template_hostid, "Template Config History");
+
+	GET_TEMPLATE_ITEM_ID(template_itemid_dns_tcp_enabled, "Template Config History", "dns.tcp.enabled");
+	GET_TEMPLATE_ITEM_ID(template_itemid_dns_udp_enabled, "Template Config History", "dns.udp.enabled");
+	GET_TEMPLATE_ITEM_ID(template_itemid_dnssec_enabled , "Template Config History", "dnssec.enabled");
+	GET_TEMPLATE_ITEM_ID(template_itemid_rdap_enabled   , "Template Config History", "rdap.enabled");
+	GET_TEMPLATE_ITEM_ID(template_itemid_rdds_enabled   , "Template Config History", "rdds.enabled");
+
+	/* get hostid of all <rsmhost> hosts */
+	result = DBselect("select hostid from hosts_groups where groupid=" ZBX_FS_UI64, tlds_groupid);
+
+	if (NULL == result)
+		goto out;
+
+	while (NULL != (row = DBfetch(result)))
+	{
+		zbx_uint64_t	hostid;
+
+		ZBX_STR2UINT64(hostid, row[0]);
+
+#define SQL	"insert into hosts_templates set hosttemplateid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",templateid=" ZBX_FS_UI64
+		DB_EXEC(SQL, DBget_maxid_num("hosts_templates", 1), hostid, template_hostid);
+#undef SQL
+
+#define SQL	"insert into items (itemid,type,snmp_community,snmp_oid,hostid,name,key_,delay,history,trends,"		\
+			"status,value_type,trapper_hosts,units,snmpv3_securityname,snmpv3_securitylevel,"		\
+			"snmpv3_authpassphrase,snmpv3_privpassphrase,formula,logtimefmt,templateid,valuemapid,"		\
+			"params,ipmi_sensor,authtype,username,password,publickey,privatekey,flags,interfaceid,port,"	\
+			"description,inventory_link,lifetime,snmpv3_authprotocol,snmpv3_privprotocol,"			\
+			"snmpv3_contextname,evaltype,jmx_endpoint,master_itemid,timeout,url,query_fields,posts,"	\
+			"status_codes,follow_redirects,post_type,http_proxy,headers,retrieve_mode,request_method,"	\
+			"output_format,ssl_cert_file,ssl_key_file,ssl_key_password,verify_peer,verify_host,"		\
+			"allow_traps)"											\
+		" select"												\
+			" " ZBX_FS_UI64 ",type,snmp_community,snmp_oid," ZBX_FS_UI64 ",name,key_,delay,history,trends,"	\
+			"status,value_type,trapper_hosts,units,snmpv3_securityname,snmpv3_securitylevel,"		\
+			"snmpv3_authpassphrase,snmpv3_privpassphrase,formula,logtimefmt," ZBX_FS_UI64 ",valuemapid,"	\
+			"params,ipmi_sensor,authtype,username,password,publickey,privatekey,flags,interfaceid,port,"	\
+			"description,inventory_link,lifetime,snmpv3_authprotocol,snmpv3_privprotocol,"			\
+			"snmpv3_contextname,evaltype,jmx_endpoint,master_itemid,timeout,url,query_fields,posts,"	\
+			"status_codes,follow_redirects,post_type,http_proxy,headers,retrieve_mode,request_method,"	\
+			"output_format,ssl_cert_file,ssl_key_file,ssl_key_password,verify_peer,verify_host,"		\
+			"allow_traps"											\
+		" from items"												\
+		" where itemid=" ZBX_FS_UI64
+#define CREATE(templateid)	DB_EXEC(SQL, DBget_maxid_num("items", 1), hostid, templateid, templateid)
+		CREATE(template_itemid_dns_tcp_enabled);
+		CREATE(template_itemid_dns_udp_enabled);
+		CREATE(template_itemid_dnssec_enabled);
+		CREATE(template_itemid_rdap_enabled);
+		CREATE(template_itemid_rdds_enabled);
+#undef CREATE
+#undef SQL
+	}
+
+	ret = SUCCEED;
+out:
+	DBfree_result(result);
+
+	return ret;
+}
+
+static int	DBpatch_4050012_28(void)
+{
+	int		ret = FAIL;
+
+	DB_RESULT	result = NULL;
+	DB_ROW		row;
+
+	ONLY_SERVER();
+
+	/* status 0 = HOST_STATUS_MONITORED */
+	/* status 1 = HOST_STATUS_NOT_MONITORED */
+	/* status 3 = HOST_STATUS_TEMPLATE */
+	result = DBselect("select"
+				" rsmhosts.hostid,"
+				"rsmhosts.host,"
+				"templates.hostid,"
+				"nsip_items.nsip_list,"
+				"trim('\"' from substring_index(substring_index(rdds_items.key_,',',-2),',',1)) as rdds43_servers,"
+				"trim('\"' from substring_index(substring_index(rdds_items.key_,',',-1),']',1)) as rdds80_servers"
+			" from"
+				" hosts as rsmhosts"
+				" left join hosts_groups on hosts_groups.hostid=rsmhosts.hostid"
+				" left join hstgrp on hstgrp.groupid=hosts_groups.groupid"
+				","
+				" hosts as templates"
+				" left join ("
+					"select"
+						" hostid,"
+						"group_concat("
+							"substring_index(substring_index(key_,',',-2),']',1)"
+							" order by itemid asc"
+							" separator ' '"
+						") as nsip_list"
+					" from items"
+					" where key_ like 'rsm.dns.udp.rtt[%%,%%]'"
+					" group by hostid"
+				") as nsip_items on nsip_items.hostid=templates.hostid"
+				" left join items as rdds_items on rdds_items.hostid=templates.hostid and rdds_items.key_ like 'rsm.rdds[%%,%%,%%]'"
+			" where"
+				" hstgrp.name='TLDs' and"
+				" rsmhosts.status in (0,1) and"
+				" templates.status=3 and"
+				" templates.host=concat('Template ', rsmhosts.host)");
+
+	if (NULL == result)
+		goto out;
+
+	while (NULL != (row = DBfetch(result)))
+	{
+		zbx_uint64_t	rsmhost_hostid;
+		const char	*rsmhost_host;
+		zbx_uint64_t	template_hostid;
+		const char	*nsip_list;
+		const char	*rdds43_servers;
+		const char	*rdds80_servers;
+		zbx_uint64_t	count;
+
+		ZBX_STR2UINT64(rsmhost_hostid, row[0]);
+		rsmhost_host = row[1];
+		ZBX_STR2UINT64(template_hostid, row[2]);
+		nsip_list = row[3];
+		rdds43_servers = row[4];
+		rdds80_servers = row[5];
+
+		/* add missing macros */
+#define SQL	"insert into hostmacro set hostmacroid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",macro='%s',value='%s',description='%s'"
+		DB_EXEC(SQL, DBget_maxid_num("hostmacro", 1), template_hostid, "{$RSM.DNS.NAME.SERVERS}", nsip_list,
+			"List of Name Server (name, IP pairs) to monitor");
+		DB_EXEC(SQL, DBget_maxid_num("hostmacro", 1), template_hostid, "{$RSM.TLD.DNS.UDP.ENABLED}", "1",
+			"Indicates whether DNS UDP enabled for this TLD");
+		DB_EXEC(SQL, DBget_maxid_num("hostmacro", 1), template_hostid, "{$RSM.TLD.DNS.TCP.ENABLED}", "1",
+			"Indicates whether DNS TCP enabled for this TLD");
+		DB_EXEC(SQL, DBget_maxid_num("hostmacro", 1), template_hostid, "{$RSM.TLD.RDDS.43.SERVERS}", rdds43_servers,
+			"List of RDDS43 server host names as candidates for a test");
+		DB_EXEC(SQL, DBget_maxid_num("hostmacro", 1), template_hostid, "{$RSM.TLD.RDDS.80.SERVERS}", rdds80_servers,
+			"List of Web Whois server host names as candidates for a test");
+#undef SQL
+
+		/* delete "rdds.enabled" items from "<rsmhost> <probe>" hosts that are linked to a template */
+		DB_EXEC("delete"
+				" items"
+			" from"
+				" items"
+				" left join items as template_items on template_items.itemid=items.templateid"
+				" left join hosts as templates on templates.hostid=template_items.hostid"
+			" where"
+				" templates.hostid=" ZBX_FS_UI64 " and"
+				" template_items.key_='rdds.enabled'",
+			template_hostid);
+
+		/* make sure that there are no items that have not been migrated */
+		SELECT_VALUE_UINT64(
+			count,
+			"select"
+				" count(*)"
+			" from"
+				" items"
+				" left join items as template_items on template_items.itemid=items.templateid"
+			" where"
+				" template_items.hostid=" ZBX_FS_UI64,
+			template_hostid);
+
+		if (0 != count)
+		{
+			zabbix_log(LOG_LEVEL_CRIT, "%s() on line %d: found item(s) that are linked to the template", __func__, __LINE__);
+			goto out;
+		}
+
+		/* delete template's items */
+		DB_EXEC("delete from items where hostid=" ZBX_FS_UI64, template_hostid);
+
+		/* make sure that there are no applications that have not been migrated */
+		SELECT_VALUE_UINT64(
+			count,
+			"select"
+				" count(*)"
+			" from"
+				" applications"
+				" inner join application_template on application_template.templateid=applications.applicationid"
+			" where"
+				" applications.hostid=" ZBX_FS_UI64,
+			template_hostid);
+
+		if (0 != count)
+		{
+			zabbix_log(LOG_LEVEL_CRIT, "%s() on line %d: found application(s) that are linked to the template", __func__, __LINE__);
+			goto out;
+		}
+
+		/* delete template's applications */
+		DB_EXEC("delete from applications where applications.hostid=" ZBX_FS_UI64, template_hostid);
+
+		/* link template to <rsmhost> host */
+		DB_EXEC("insert into hosts_templates set hosttemplateid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",templateid=" ZBX_FS_UI64,
+			DBget_maxid_num("hosts_templates", 1), rsmhost_hostid, template_hostid);
+
+		/* rename the template */
+		DB_EXEC("update hosts set"
+				" host='Template Rsmhost Config %s',"
+				"name='Template Rsmhost Config %s'"
+			" where hostid=" ZBX_FS_UI64,
+			rsmhost_host, rsmhost_host, template_hostid);
+	}
 
 	ret = SUCCEED;
 out:
@@ -3526,11 +4316,17 @@ DBPATCH_RSM(4050012, 13, 0, 0)	/* add "Template RDAP Status" template */
 DBPATCH_RSM(4050012, 14, 0, 0)	/* add "Template RDDS Status" template */
 DBPATCH_RSM(4050012, 15, 0, 0)	/* add "Template Probe Status" template */
 DBPATCH_RSM(4050012, 16, 0, 0)	/* add "Template Config History" template */
-DBPATCH_RSM(4050012, 17, 0, 0)	/* convert hosts to use "Template DNS Test" template */
-DBPATCH_RSM(4050012, 18, 0, 0)	/* convert hosts to use "Template RDDS Test" template */
+DBPATCH_RSM(4050012, 17, 0, 0)	/* convert "<rshmost> <probe>" hosts to use "Template DNS Test" template */
+DBPATCH_RSM(4050012, 18, 0, 0)	/* convert "<rshmost> <probe>" hosts to use "Template RDDS Test" template */
 DBPATCH_RSM(4050012, 19, 0, 0)	/* set RDAP master item value_type to the text type */
 DBPATCH_RSM(4050012, 20, 0, 0)	/* set RDAP calculated items to be dependent items */
 DBPATCH_RSM(4050012, 21, 0, 0)	/* add item_preproc to RDAP ip and rtt items */
-DBPATCH_RSM(4050012, 22, 0, 0)	/* convert "<probe>" hosts to use "Template Probe Status" template */
+DBPATCH_RSM(4050012, 22, 0, 0)	/* convert "<rsmhost>" hosts to use "Template DNS Status" template */
+DBPATCH_RSM(4050012, 23, 0, 0)	/* convert "<rsmhost>" hosts to use "Template DNSSEC Status" template */
+DBPATCH_RSM(4050012, 24, 0, 0)	/* convert "<rsmhost>" hosts to use "Template RDAP Status" template */
+DBPATCH_RSM(4050012, 25, 0, 0)	/* convert "<rsmhost>" hosts to use "Template RDDS Status" template */
+DBPATCH_RSM(4050012, 26, 0, 0)	/* convert "<probe>" hosts to use "Template Probe Status" template */
+DBPATCH_RSM(4050012, 27, 0, 0)	/* convert "<rsmhost>" hosts to use "Template Config History" template */
+DBPATCH_RSM(4050012, 28, 0, 0)	/* convert "Template <rsmhost>" templates into "Template Rsmhost Config <rsmhost>", link to hosts */
 
 DBPATCH_END()
