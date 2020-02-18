@@ -3925,10 +3925,27 @@ static int	DBpatch_4050012_26(void)
 				" set applicationid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",name='%s',flags=0",
 			applicationid_configuration, probe_hostid, "Configuration");
 
+		/* unlink "Template <probe> Status" template from the probe host*/
+		DB_EXEC("delete"
+				" hosts_templates"
+			" from"
+				" hosts_templates"
+				" left join hosts as templates on templates.hostid=hosts_templates.templateid"
+			" where"
+				" hosts_templates.hostid=" ZBX_FS_UI64 " and"
+				" templates.host='Template %s Status'",
+			probe_hostid, probe_host);
+
 		/* link "Template Probe Status" to the <probe> host */
 		DB_EXEC("insert into hosts_templates set"
 				" hosttemplateid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",templateid=" ZBX_FS_UI64,
 			DBget_maxid_num("hosts_templates", 1), probe_hostid, template_hostid);
+
+		/* remove old links between host applications and template applications */
+#define SQL	"delete from application_template where applicationid=" ZBX_FS_UI64
+		DB_EXEC(SQL, applicationid_internal_errors);
+		DB_EXEC(SQL, applicationid_probe_status);
+#undef SQL
 
 		/* link host's applications with template's applications */
 #define SQL	"insert into application_template set"									\
@@ -4283,6 +4300,168 @@ out:
 	return ret;
 }
 
+static int	DBpatch_4050012_29_delete_probe(zbx_uint64_t template_hostid)
+{
+	int		ret = FAIL;
+	zbx_uint64_t	count;
+
+	/* make sure that there are no items that have not been migrated */
+	SELECT_VALUE_UINT64(
+		count,
+		"select"
+			" count(*)"
+		" from"
+			" items as probe_items"
+			" left join items as template_items on template_items.itemid=probe_items.templateid"
+		" where"
+			" template_items.hostid=" ZBX_FS_UI64,
+		template_hostid);
+
+	if (0 != count)
+	{
+		zabbix_log(LOG_LEVEL_CRIT, "%s() on line %d: found item(s) that are linked to the template", __func__, __LINE__);
+		goto out;
+	}
+
+	/* delete template's items */
+	DB_EXEC("delete from items where hostid=" ZBX_FS_UI64, template_hostid);
+
+	/* make sure that there are no applications that have not been migrated */
+	SELECT_VALUE_UINT64(
+		count,
+		"select"
+			" count(*)"
+		" from"
+			" applications"
+			" inner join application_template on application_template.templateid=applications.applicationid"
+		" where"
+			" applications.hostid=" ZBX_FS_UI64,
+		template_hostid);
+
+	/* delete template's applications */
+	DB_EXEC("delete from applications where applications.hostid=" ZBX_FS_UI64, template_hostid);
+
+	if (0 != count)
+	{
+		zabbix_log(LOG_LEVEL_CRIT, "%s() on line %d: found application(s) that are linked to the template", __func__, __LINE__);
+		goto out;
+	}
+
+	/* delete the template */
+	DB_EXEC("delete from hosts where hostid=" ZBX_FS_UI64, template_hostid);
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
+static int	DBpatch_4050012_29(void)
+{
+	int		ret = FAIL;
+
+	DB_RESULT	result = NULL;
+	DB_ROW		row;
+
+	ONLY_SERVER();
+
+	/* get hostid of "Template <probe> Status" templates */
+	result = DBselect("select"
+				" templates.hostid"
+			" from"
+				" hosts as probe_hosts"
+				" left join hosts_groups on hosts_groups.hostid=probe_hosts.hostid"
+				" left join hstgrp on hstgrp.groupid=hosts_groups.groupid"
+				" left join hosts as templates on templates.host=concat('Template ', probe_hosts.host, ' Status')"
+			" where "
+				" hstgrp.name='Probes'");
+
+	if (NULL == result)
+		goto out;
+
+	while (NULL != (row = DBfetch(result)))
+	{
+		zbx_uint64_t	template_hostid;
+
+		ZBX_STR2UINT64(template_hostid, row[0]);
+
+		CHECK(DBpatch_4050012_29_delete_probe(template_hostid));
+	}
+
+	ret = SUCCEED;
+out:
+	DBfree_result(result);
+
+	return ret;
+}
+
+static int	DBpatch_4050012_30(void)
+{
+	int		ret = FAIL;
+	zbx_uint64_t	template_hostid;
+
+	ONLY_SERVER();
+
+	GET_TEMPLATE_ID(template_hostid, "Template Probe Errors");
+
+	CHECK(DBpatch_4050012_29_delete_probe(template_hostid));
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
+static int	DBpatch_4050012_31(void)
+{
+	int		ret = FAIL;
+
+	DB_RESULT	result = NULL;
+	DB_ROW		row;
+
+	ONLY_SERVER();
+
+	/* get hostid of "Template <probe> Status" templates */
+	result = DBselect("select"
+				" templates.hostid,"
+				"probe_hosts.hostid,"
+				"probe_hosts.host"
+			" from"
+				" hosts as probe_hosts"
+				" left join hosts_groups on hosts_groups.hostid=probe_hosts.hostid"
+				" left join hstgrp on hstgrp.groupid=hosts_groups.groupid"
+				" left join hosts as templates on templates.host=concat('Template ', probe_hosts.host)"
+			" where "
+				" hstgrp.name='Probes'");
+
+	if (NULL == result)
+		goto out;
+
+	while (NULL != (row = DBfetch(result)))
+	{
+		zbx_uint64_t	template_hostid;
+		zbx_uint64_t	probe_hostid;
+		const char	*probe_host;
+
+		ZBX_STR2UINT64(template_hostid, row[0]);
+		ZBX_STR2UINT64(probe_hostid, row[1]);
+		probe_host = row[2];
+
+		DB_EXEC("update hosts set"
+				" host='Template Probe Config %s',"
+				"name='Template Probe Config %s'"
+			" where hostid=" ZBX_FS_UI64,
+			probe_host, probe_host, template_hostid);
+
+		DB_EXEC("insert into hosts_templates set hosttemplateid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",templateid=" ZBX_FS_UI64,
+			DBget_maxid_num("hosts_templates", 1), probe_hostid, template_hostid);
+	}
+
+	ret = SUCCEED;
+out:
+	DBfree_result(result);
+
+	return ret;
+}
+
 #endif
 
 DBPATCH_START(4050)
@@ -4327,6 +4506,9 @@ DBPATCH_RSM(4050012, 24, 0, 0)	/* convert "<rsmhost>" hosts to use "Template RDA
 DBPATCH_RSM(4050012, 25, 0, 0)	/* convert "<rsmhost>" hosts to use "Template RDDS Status" template */
 DBPATCH_RSM(4050012, 26, 0, 0)	/* convert "<probe>" hosts to use "Template Probe Status" template */
 DBPATCH_RSM(4050012, 27, 0, 0)	/* convert "<rsmhost>" hosts to use "Template Config History" template */
-DBPATCH_RSM(4050012, 28, 0, 0)	/* convert "Template <rsmhost>" templates into "Template Rsmhost Config <rsmhost>", link to hosts */
+DBPATCH_RSM(4050012, 28, 0, 0)	/* convert "Template <rsmhost>" templates into "Template Rsmhost Config <rsmhost>", link to "<rsmhost>" hosts */
+DBPATCH_RSM(4050012, 29, 0, 0)	/* delete "Template <probe> Status" templates */
+DBPATCH_RSM(4050012, 30, 0, 0)	/* delete "Template Probe Errors" templates */
+DBPATCH_RSM(4050012, 31, 0, 0)	/* rename "Template <probe>" template into "Template Probe Config <probe>", link to "<probe>" hosts */
 
 DBPATCH_END()
