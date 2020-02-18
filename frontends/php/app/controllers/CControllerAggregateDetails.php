@@ -313,7 +313,7 @@ class CControllerAggregateDetails extends RSMControllerBase {
 	}
 
 	/**
-	 * This method can be removed after 3 months. For details/explanation see ICA-605.
+	 * This method can be removed after 3 months. For details/explanation see 605.
 	 *
 	 */
 	protected function getReportDataOld(array &$data, $time_from, $time_till) {
@@ -599,7 +599,7 @@ class CControllerAggregateDetails extends RSMControllerBase {
 				if (isset($tldprobe_item['history_value'])) {
 					$tldprobeid = $tldprobe_item['hostid'];
 					$probeid = $tldprobeid_probeid[$tldprobeid];
-					$this->probes[$probeid]['transport'] = $protocol_type[$probe['history_value']];
+					$this->probes[$probeid]['transport'] = $protocol_type[$tldprobe_item['history_value']];
 				}
 			}
 		}
