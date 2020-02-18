@@ -171,6 +171,9 @@ define('CALCULATED_ITEM_RDAP_DELAY',			'rsm.configvalue[RSM.RDAP.DELAY]');
 define('CALCULATED_ITEM_EPP_DELAY',				'rsm.configvalue[RSM.EPP.DELAY]');
 define('CALCULATED_ITEM_DNS_AVAIL_MINNS',		'rsm.configvalue[RSM.DNS.AVAIL.MINNS]');
 define('CALCULATED_ITEM_DNS_UDP_RTT_HIGH',		'rsm.configvalue[RSM.DNS.UDP.RTT.HIGH]');
+define('CALCULATED_ITEM_DNS_TCP_RTT_HIGH',		'rsm.configvalue[RSM.DNS.TCP.RTT.HIGH]');
+define('CALCULATED_ITEM_DNS_UDP_RTT_LOW',		'rsm.configvalue[RSM.DNS.UDP.RTT.LOW]');
+define('CALCULATED_ITEM_DNS_TCP_RTT_LOW',		'rsm.configvalue[RSM.DNS.TCP.RTT.LOW]');
 define('CALCULATED_ITEM_SLV_DNS_NS_RTT_UDP',	'rsm.configvalue[RSM.SLV.DNS.UDP.RTT]');
 define('CALCULATED_ITEM_SLV_DNS_NS_RTT_TCP',	'rsm.configvalue[RSM.SLV.DNS.TCP.RTT]');
 define('CALCULATED_ITEM_SLV_DNS_NS_UPD',		'rsm.configvalue[RSM.SLV.DNS.NS.UPD]');
@@ -185,6 +188,8 @@ define('CALCULATED_DNS_ROLLWEEK_SLA',			'rsm.configvalue[RSM.DNS.ROLLWEEK.SLA]')
 define('CALCULATED_RDDS_ROLLWEEK_SLA',			'rsm.configvalue[RSM.RDDS.ROLLWEEK.SLA]');
 define('CALCULATED_RDAP_ROLLWEEK_SLA',			'rsm.configvalue[RSM.RDAP.ROLLWEEK.SLA]');
 define('CALCULATED_EPP_ROLLWEEK_SLA',			'rsm.configvalue[RSM.EPP.ROLLWEEK.SLA]');
+define('CALCULATED_PROBE_RSM_IP4_ENABLED',		'probe.configvalue[RSM.IP4.ENABLED]');
+define('CALCULATED_PROBE_RSM_IP6_ENABLED',		'probe.configvalue[RSM.IP6.ENABLED]');
 
 // Number of test cycles to show before and after incident recovery event.
 define('DISPLAY_CYCLES_AFTER_RECOVERY',		6); // (including recovery event)
@@ -194,6 +199,13 @@ define('DISPLAY_CYCLES_BEFORE_RECOVERY',	3);
 define('PROBE_KEY_ONLINE',			'rsm.probe.online');
 define('PROBE_DNS_UDP_ITEM',		'rsm.dns.udp[{$RSM.TLD}]');
 define('PROBE_DNS_UDP_ITEM_RTT',	'rsm.dns.udp.rtt[');
+define('PROBE_DNS_TEST',			'rsm.dns[{$RSM.TLD},{$RSM.DNS.TESTPREFIX},{$RSM.DNS.NAME.SERVERS},{$RSM.TLD.DNSSEC.ENABLED},{$RSM.TLD.RDDS.ENABLED},{$RSM.TLD.EPP.ENABLED},{$RSM.TLD.DNS.UDP.ENABLED},{$RSM.TLD.DNS.TCP.ENABLED},{$RSM.IP4.ENABLED},{$RSM.IP6.ENABLED},{$RSM.RESOLVER},{$RSM.DNS.UDP.RTT.HIGH},{$RSM.DNS.TCP.RTT.HIGH}]');
+define('PROBE_DNS_TCP_RTT',			'rsm.dns.rtt[{#NS},{#IP},tcp]');
+define('PROBE_DNS_UDP_RTT',			'rsm.dns.rtt[{#NS},{#IP},udp]');
+define('PROBE_DNS_NSID',			'rsm.dns.nsid[{#NS},{#IP}]');
+define('PROBE_DNS_PROTOCOL',		'rsm.dns.protocol');
+define('PROBE_DNS_NSSOK',			'rsm.dns.nssok');
+define('PROBE_DNS_NS_STATUS',		'rsm.dns.ns.status[{#NS}]');
 define('PROBE_RDDS_ITEM',			'rsm.rdds[');
 define('PROBE_EPP_RESULT',			'rsm.epp[');
 define('PROBE_EPP_IP',				'rsm.epp.ip[{$RSM.TLD}]');
@@ -239,8 +251,10 @@ define('RSM_TEST_GROUP',		'testTLD');
 define('RSM_RDDS_SUBSERVICE_RDDS', 'RDDS43/80');
 define('RSM_RDDS_SUBSERVICE_RDAP', 'RDAP');
 
+// Value maps used for special purpose.
 define('PROBES_MON_GROUPID',	130);
 define('RSM_SERVICE_AVAIL_VALUE_MAP', 110);
+define('RSM_DNS_TRANSPORT_PROTOCOL_VALUE_MAP', 162);
 define('RSM_DNS_RTT_ERRORS_VALUE_MAP', 120);
 define('RSM_RDDS_RTT_ERRORS_VALUE_MAP', 130);
 
