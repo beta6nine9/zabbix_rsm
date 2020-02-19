@@ -964,9 +964,9 @@ static int	DBpatch_4050012_8(void)
 	globalmacroid_rsm_dns_test_recover   = globalmacroid_next++;
 
 #define SQL	"insert into globalmacro set globalmacroid=" ZBX_FS_UI64 ",macro='%s',value='%s',description='%s'"
-	DB_EXEC(SQL, globalmacroid_rsm_dns_test_tcp_ratio, "{$RSM.DNS.TEST.TCP.RATIO}", 10,
+	DB_EXEC(SQL, globalmacroid_rsm_dns_test_tcp_ratio, "{$RSM.DNS.TEST.TCP.RATIO}", "10",
 		"The ratio (calculated against current time) of using TCP protocol instead of UDP when in normal mode of a DNS Test.");
-	DB_EXEC(SQL, globalmacroid_rsm_dns_test_recover, "{$RSM.DNS.TEST.RECOVER}", 3,
+	DB_EXEC(SQL, globalmacroid_rsm_dns_test_recover, "{$RSM.DNS.TEST.RECOVER}", "3",
 		"Number of subsequently successful DNS Test results to switch from critical to normal mode.");
 #undef SQL
 
