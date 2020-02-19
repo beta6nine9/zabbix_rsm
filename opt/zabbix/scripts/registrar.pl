@@ -1074,15 +1074,15 @@ sub create_tld_hosts_on_probes($$$$)
 			'proxy_hostid' => $proxyid,
 			'interfaces'   => [DEFAULT_MAIN_INTERFACE]
 		}));
+	}
 
-		if (opt('rdap-base-url') && opt('rdap-test-domain'))
-		{
-			set_linked_items_enabled('rdap[', getopt('rr-id'), 1);
-		}
-		else
-		{
-			set_linked_items_enabled('rdap[', getopt('rr-id'), 0);
-		}
+	if (opt('rdap-base-url') && opt('rdap-test-domain'))
+	{
+		set_linked_items_enabled('rdap[', getopt('rr-id'), 1);
+	}
+	else
+	{
+		set_linked_items_enabled('rdap[', getopt('rr-id'), 0);
 	}
 }
 
