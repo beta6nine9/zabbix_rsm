@@ -951,6 +951,32 @@ out:
 
 static int	DBpatch_4050012_8(void)
 {
+	int	ret = FAIL;
+
+	zbx_uint64_t	globalmacroid_next;
+	zbx_uint64_t	globalmacroid_rsm_dns_test_tcp_ratio;	/* globalmacroid of "{$RSM.DNS.TEST.TCP.RATIO}" global macro */
+	zbx_uint64_t	globalmacroid_rsm_dns_test_recover;	/* globalmacroid of "{$RSM.DNS.TEST.RECOVER}" global macro */
+
+	ONLY_SERVER();
+
+	globalmacroid_next                   = DBget_maxid_num("globalmacro", 2);
+	globalmacroid_rsm_dns_test_tcp_ratio = globalmacroid_next++;
+	globalmacroid_rsm_dns_test_recover   = globalmacroid_next++;
+
+#define SQL	"insert into globalmacro set globalmacroid=" ZBX_FS_UI64 ",macro='%s',value='%s',description='%s'"
+	DB_EXEC(SQL, globalmacroid_rsm_dns_test_tcp_ratio, "{$RSM.DNS.TEST.TCP.RATIO}", 10,
+		"The ratio (calculated against current time) of using TCP protocol instead of UDP when in normal mode of a DNS Test.");
+	DB_EXEC(SQL, globalmacroid_rsm_dns_test_recover, "{$RSM.DNS.TEST.RECOVER}", 3,
+		"Number of subsequently successful DNS Test results to switch from critical to normal mode.");
+#undef SQL
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
+static int	DBpatch_4050012_9(void)
+{
 	int		ret = FAIL;
 
 	zbx_uint64_t	groupid_templates;				/* groupid of "Templates" host group */
@@ -1187,7 +1213,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_4050012_9(void)
+static int	DBpatch_4050012_10(void)
 {
 	int		ret = FAIL;
 
@@ -1334,7 +1360,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_4050012_10(void)
+static int	DBpatch_4050012_11(void)
 {
 	int	ret = FAIL;
 
@@ -1347,7 +1373,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_4050012_11(void)
+static int	DBpatch_4050012_12(void)
 {
 	int		ret = FAIL;
 
@@ -1702,7 +1728,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_4050012_12(void)
+static int	DBpatch_4050012_13(void)
 {
 	int		ret = FAIL;
 
@@ -1838,7 +1864,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_4050012_13(void)
+static int	DBpatch_4050012_14(void)
 {
 	int		ret = FAIL;
 
@@ -2069,7 +2095,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_4050012_14(void)
+static int	DBpatch_4050012_15(void)
 {
 	int		ret = FAIL;
 
@@ -2300,7 +2326,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_4050012_15(void)
+static int	DBpatch_4050012_16(void)
 {
 	int		ret = FAIL;
 
@@ -2482,7 +2508,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_4050012_16(void)
+static int	DBpatch_4050012_17(void)
 {
 	int		ret = FAIL;
 
@@ -2582,7 +2608,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_4050012_17_create_application(zbx_uint64_t *applicationid, zbx_uint64_t template_applicationid,
+static int	DBpatch_4050012_18_create_application(zbx_uint64_t *applicationid, zbx_uint64_t template_applicationid,
 		zbx_uint64_t hostid, const char *name)
 {
 	int	ret = FAIL;
@@ -2603,7 +2629,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_4050012_17_copy_preproc(zbx_uint64_t src_itemid, zbx_uint64_t dst_itemid,
+static int	DBpatch_4050012_18_copy_preproc(zbx_uint64_t src_itemid, zbx_uint64_t dst_itemid,
 		const char *replacements[][2])
 {
 	int		ret = FAIL;
@@ -2646,7 +2672,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_4050012_17_copy_lld_macros(zbx_uint64_t src_itemid, zbx_uint64_t dst_itemid)
+static int	DBpatch_4050012_18_copy_lld_macros(zbx_uint64_t src_itemid, zbx_uint64_t dst_itemid)
 {
 	int		ret = FAIL;
 	DB_RESULT	result;
@@ -2672,7 +2698,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_4050012_17_create_item(zbx_uint64_t *new_itemid, zbx_uint64_t templateid, zbx_uint64_t hostid,
+static int	DBpatch_4050012_18_create_item(zbx_uint64_t *new_itemid, zbx_uint64_t templateid, zbx_uint64_t hostid,
 		zbx_uint64_t interfaceid, zbx_uint64_t master_itemid, zbx_uint64_t applicationid)
 {
 	int		ret = FAIL;
@@ -2709,16 +2735,16 @@ static int	DBpatch_4050012_17_create_item(zbx_uint64_t *new_itemid, zbx_uint64_t
 			DBget_maxid_num("items_applications", 1), applicationid, *new_itemid);
 	}
 
-	CHECK(DBpatch_4050012_17_copy_preproc(templateid, *new_itemid, NULL));
+	CHECK(DBpatch_4050012_18_copy_preproc(templateid, *new_itemid, NULL));
 
-	CHECK(DBpatch_4050012_17_copy_lld_macros(templateid, *new_itemid));
+	CHECK(DBpatch_4050012_18_copy_lld_macros(templateid, *new_itemid));
 
 	ret = SUCCEED;
 out:
 	return ret;
 }
 
-static int	DBpatch_4050012_17_convert_item(zbx_uint64_t *itemid, zbx_uint64_t hostid, const char *key,
+static int	DBpatch_4050012_18_convert_item(zbx_uint64_t *itemid, zbx_uint64_t hostid, const char *key,
 		zbx_uint64_t master_itemid, zbx_uint64_t template_itemid, zbx_uint64_t applicationid)
 {
 	int	ret = FAIL;
@@ -2749,20 +2775,20 @@ static int	DBpatch_4050012_17_convert_item(zbx_uint64_t *itemid, zbx_uint64_t ho
 			" itemappid=" ZBX_FS_UI64 ",applicationid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64,
 		DBget_maxid_num("items_applications", 1), applicationid, *itemid);
 
-	CHECK(DBpatch_4050012_17_copy_preproc(template_itemid, *itemid, NULL));
+	CHECK(DBpatch_4050012_18_copy_preproc(template_itemid, *itemid, NULL));
 
 	ret = SUCCEED;
 out:
 	return ret;
 }
 
-static int	DBpatch_4050012_17_create_item_prototype(zbx_uint64_t *new_itemid, zbx_uint64_t templateid,
+static int	DBpatch_4050012_18_create_item_prototype(zbx_uint64_t *new_itemid, zbx_uint64_t templateid,
 		zbx_uint64_t hostid, zbx_uint64_t interfaceid, zbx_uint64_t master_itemid, zbx_uint64_t applicationid,
 		zbx_uint64_t parent_itemid)
 {
 	int		ret = FAIL;
 
-	CHECK(DBpatch_4050012_17_create_item(new_itemid, templateid, hostid, interfaceid, master_itemid,
+	CHECK(DBpatch_4050012_18_create_item(new_itemid, templateid, hostid, interfaceid, master_itemid,
 			applicationid));
 
 	DB_EXEC("insert into item_discovery set"
@@ -2779,7 +2805,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_4050012_17_create_item_lld(zbx_uint64_t *new_itemid, const char *key,
+static int	DBpatch_4050012_18_create_item_lld(zbx_uint64_t *new_itemid, const char *key,
 		zbx_uint64_t prototype_itemid, zbx_uint64_t applicationid, const char *preproc_replacements[][2])
 {
 	int	ret = FAIL;
@@ -2812,7 +2838,7 @@ static int	DBpatch_4050012_17_create_item_lld(zbx_uint64_t *new_itemid, const ch
 			" itemappid=" ZBX_FS_UI64 ",applicationid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64,
 		DBget_maxid_num("items_applications", 1), applicationid, *new_itemid);
 
-	CHECK(DBpatch_4050012_17_copy_preproc(prototype_itemid, *new_itemid, preproc_replacements));
+	CHECK(DBpatch_4050012_18_copy_preproc(prototype_itemid, *new_itemid, preproc_replacements));
 
 	DB_EXEC("insert into item_discovery (itemdiscoveryid,itemid,parent_itemid,key_,lastcheck,ts_delete)"
 			" select " ZBX_FS_UI64 "," ZBX_FS_UI64 ",itemid,key_,0,0 from items where itemid=" ZBX_FS_UI64,
@@ -2823,7 +2849,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_4050012_17_convert_item_lld(zbx_uint64_t *itemid, zbx_uint64_t hostid, const char *old_key,
+static int	DBpatch_4050012_18_convert_item_lld(zbx_uint64_t *itemid, zbx_uint64_t hostid, const char *old_key,
 		const char *new_key, zbx_uint64_t prototype_itemid, zbx_uint64_t applicationid,
 		const char *preproc_replacements[][2])
 {
@@ -2854,7 +2880,7 @@ static int	DBpatch_4050012_17_convert_item_lld(zbx_uint64_t *itemid, zbx_uint64_
 			" itemappid=" ZBX_FS_UI64 ",applicationid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64,
 		DBget_maxid_num("items_applications", 1), applicationid, *itemid);
 
-	CHECK(DBpatch_4050012_17_copy_preproc(prototype_itemid, *itemid, preproc_replacements));
+	CHECK(DBpatch_4050012_18_copy_preproc(prototype_itemid, *itemid, preproc_replacements));
 
 	DB_EXEC("insert into item_discovery (itemdiscoveryid,itemid,parent_itemid,key_,lastcheck,ts_delete)"
 			" select " ZBX_FS_UI64 "," ZBX_FS_UI64 ",itemid,key_,0,0 from items where itemid=" ZBX_FS_UI64,
@@ -2865,7 +2891,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_4050012_17(void)
+static int	DBpatch_4050012_18(void)
 {
 	int		ret = FAIL;
 
@@ -2955,58 +2981,58 @@ static int	DBpatch_4050012_17(void)
 			DBget_maxid_num("hosts_templates", 1), hostid, hostid_template_dns_test);
 
 		/* create applications */
-		CHECK(DBpatch_4050012_17_create_application(&applicationid_dns   , template_applicationid_dns   , hostid, "DNS"));
-		CHECK(DBpatch_4050012_17_create_application(&applicationid_dnssec, template_applicationid_dnssec, hostid, "DNSSEC"));
+		CHECK(DBpatch_4050012_18_create_application(&applicationid_dns   , template_applicationid_dns   , hostid, "DNS"));
+		CHECK(DBpatch_4050012_18_create_application(&applicationid_dnssec, template_applicationid_dnssec, hostid, "DNSSEC"));
 
 		/* update dnssec.enabled item */
-		CHECK(DBpatch_4050012_17_convert_item(&itemid_dnssec_enabled, hostid, "dnssec.enabled",
+		CHECK(DBpatch_4050012_18_convert_item(&itemid_dnssec_enabled, hostid, "dnssec.enabled",
 				0, template_itemid_dnssec_enabled, applicationid_dnssec));
 
 		/* create "DNS Test" (rsm.dns[...]) master item */
-		CHECK(DBpatch_4050012_17_create_item(&itemid_rsm_dns,
+		CHECK(DBpatch_4050012_18_create_item(&itemid_rsm_dns,
 				template_itemid_rsm_dns, hostid, interfaceid, 0, applicationid_dns));
 
 		/* create "Name Servers discovery" (rsm.dns.ns.discovery) discovery rule */
-		CHECK(DBpatch_4050012_17_create_item(&itemid_rsm_dns_ns_discovery,
+		CHECK(DBpatch_4050012_18_create_item(&itemid_rsm_dns_ns_discovery,
 				template_itemid_rsm_dns_ns_discovery, hostid, 0, itemid_rsm_dns, 0));
 
 		/* create "NS-IP pairs discovery" (rsm.dns.nsip.discovery) discovery rule */
-		CHECK(DBpatch_4050012_17_create_item(&itemid_rsm_dns_nsip_discovery,
+		CHECK(DBpatch_4050012_18_create_item(&itemid_rsm_dns_nsip_discovery,
 				template_itemid_rsm_dns_nsip_discovery, hostid, 0, itemid_rsm_dns, 0));
 
 		/* create "Status of {#NS}" (rsm.dns.ns.status[{#NS}]) item prototype */
-		CHECK(DBpatch_4050012_17_create_item_prototype(&prototype_itemid_rsm_dns_ns_status,
+		CHECK(DBpatch_4050012_18_create_item_prototype(&prototype_itemid_rsm_dns_ns_status,
 				template_itemid_rsm_dns_ns_status, hostid, 0, itemid_rsm_dns, applicationid_dns,
 				itemid_rsm_dns_ns_discovery));
 
 		/* create "NSID of {#NS},{#IP}" (rsm.dns.nsid[{#NS},{#IP}]) item prototype */
-		CHECK(DBpatch_4050012_17_create_item_prototype(&prototype_itemid_rsm_dns_nsid,
+		CHECK(DBpatch_4050012_18_create_item_prototype(&prototype_itemid_rsm_dns_nsid,
 				template_itemid_rsm_dns_nsid, hostid, 0, itemid_rsm_dns, applicationid_dns,
 				itemid_rsm_dns_nsip_discovery));
 
 		/* create "RTT of {#NS},{#IP} using tcp" (rsm.dns.rtt[{#NS},{#IP},tcp]) item prototype */
-		CHECK(DBpatch_4050012_17_create_item_prototype(&prototype_itemid_rsm_dns_rtt_tcp,
+		CHECK(DBpatch_4050012_18_create_item_prototype(&prototype_itemid_rsm_dns_rtt_tcp,
 				template_itemid_rsm_dns_rtt_tcp, hostid, 0, itemid_rsm_dns, applicationid_dns,
 				itemid_rsm_dns_nsip_discovery));
 
 		/* create "RTT of {#NS},{#IP} using udp" (rsm.dns.rtt[{#NS},{#IP},udp]) item prototype */
-		CHECK(DBpatch_4050012_17_create_item_prototype(&prototype_itemid_rsm_dns_rtt_udp,
+		CHECK(DBpatch_4050012_18_create_item_prototype(&prototype_itemid_rsm_dns_rtt_udp,
 				template_itemid_rsm_dns_rtt_udp, hostid, 0, itemid_rsm_dns, applicationid_dns,
 				itemid_rsm_dns_nsip_discovery));
 
 		/* create "The mode of the Test" (rsm.dns.mode) item */
-		CHECK(DBpatch_4050012_17_create_item(&itemid_rsm_dns_mode,
+		CHECK(DBpatch_4050012_18_create_item(&itemid_rsm_dns_mode,
 				template_itemid_rsm_dns_mode, hostid, 0, itemid_rsm_dns, applicationid_dns));
 
 		/* create "Transport protocol of the Test" rsm.dns.protocol */
-		CHECK(DBpatch_4050012_17_create_item(&itemid_rsm_dns_protocol,
+		CHECK(DBpatch_4050012_18_create_item(&itemid_rsm_dns_protocol,
 				template_itemid_rsm_dns_protocol, hostid, 0, itemid_rsm_dns, applicationid_dns));
 
 		/* delete rsm.dns.tcp[{$RSM.TLD}] item */
 		DB_EXEC("delete from items where key_='rsm.dns.tcp[{$RSM.TLD}]' and hostid=" ZBX_FS_UI64, hostid);
 
 		/* convert rsm.dns.udp[{$RSM.TLD}] item into rsm.dns.nssok */
-		CHECK(DBpatch_4050012_17_convert_item(&itemid_rsm_dns_nssok, hostid, "rsm.dns.udp[{$RSM.TLD}]",
+		CHECK(DBpatch_4050012_18_convert_item(&itemid_rsm_dns_nssok, hostid, "rsm.dns.udp[{$RSM.TLD}]",
 				itemid_rsm_dns, template_itemid_rsm_dns_nssok, applicationid_dns));
 
 		/* update <ns> items */
@@ -3029,7 +3055,7 @@ static int	DBpatch_4050012_17(void)
 
 			/* create "Status of <ns>" (rsm.dns.ns.status[<ns>]) items */
 			zbx_snprintf(key, sizeof(key), "rsm.dns.ns.status[%s]", row[0]);
-			CHECK(DBpatch_4050012_17_create_item_lld(&itemid, key, prototype_itemid_rsm_dns_ns_status,
+			CHECK(DBpatch_4050012_18_create_item_lld(&itemid, key, prototype_itemid_rsm_dns_ns_status,
 					applicationid_dns, preproc_replacements));
 		}
 
@@ -3061,19 +3087,19 @@ static int	DBpatch_4050012_17(void)
 
 			/* create "NSID of <ns>,<ip>" (rsm.dns.nsid[<ns>,<ip>]) item */
 			zbx_snprintf(new_key, sizeof(new_key), "rsm.dns.nsid[%s,%s]", row[0], row[1]);
-			CHECK(DBpatch_4050012_17_create_item_lld(&itemid, new_key,
+			CHECK(DBpatch_4050012_18_create_item_lld(&itemid, new_key,
 					prototype_itemid_rsm_dns_nsid, applicationid_dns, preproc_replacements));
 
 			/* convert "RTT of <ns>,<ip> using tcp" (rsm.dns.rtt[<ns>,<ip>,tcp]) item */
 			zbx_snprintf(old_key, sizeof(old_key), "rsm.dns.tcp.rtt[{$RSM.TLD},%s,%s]", row[0], row[1]);
 			zbx_snprintf(new_key, sizeof(new_key), "rsm.dns.rtt[%s,%s,tcp]", row[0], row[1]);
-			CHECK(DBpatch_4050012_17_convert_item_lld(&itemid, hostid, old_key, new_key,
+			CHECK(DBpatch_4050012_18_convert_item_lld(&itemid, hostid, old_key, new_key,
 					prototype_itemid_rsm_dns_rtt_tcp, applicationid_dns, preproc_replacements));
 
 			/* convert "RTT of <ns>,<ip> using udp" (rsm.dns.rtt[<ns>,<ip>,udp]) item */
 			zbx_snprintf(old_key, sizeof(old_key), "rsm.dns.udp.rtt[{$RSM.TLD},%s,%s]", row[0], row[1]);
 			zbx_snprintf(new_key, sizeof(new_key), "rsm.dns.rtt[%s,%s,udp]", row[0], row[1]);
-			CHECK(DBpatch_4050012_17_convert_item_lld(&itemid, hostid, old_key, new_key,
+			CHECK(DBpatch_4050012_18_convert_item_lld(&itemid, hostid, old_key, new_key,
 					prototype_itemid_rsm_dns_rtt_udp, applicationid_dns, preproc_replacements));
 		}
 
@@ -3095,7 +3121,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_4050012_18(void)
+static int	DBpatch_4050012_19(void)
 {
 	int		ret = FAIL;
 
@@ -3274,7 +3300,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_4050012_19(void)
+static int	DBpatch_4050012_20(void)
 {
 	int	ret = FAIL;
 
@@ -3288,7 +3314,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_4050012_20(void)
+static int	DBpatch_4050012_21(void)
 {
 	int	ret = FAIL;
 
@@ -3304,7 +3330,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_4050012_21_insert_item_preproc(const char *item_key, const char *item_preproc_param)
+static int	DBpatch_4050012_22_insert_item_preproc(const char *item_key, const char *item_preproc_param)
 {
 	int		ret = FAIL;
 	DB_RESULT	result;
@@ -3334,21 +3360,21 @@ out:
 	return ret;
 }
 
-static int	DBpatch_4050012_21(void)
+static int	DBpatch_4050012_22(void)
 {
 	int	ret = FAIL;
 
 	ONLY_SERVER();
 
-	CHECK(DBpatch_4050012_21_insert_item_preproc("rdap.ip", "$.rdap.ip"));
-	CHECK(DBpatch_4050012_21_insert_item_preproc("rdap.rtt", "$.rdap.rtt"));
+	CHECK(DBpatch_4050012_22_insert_item_preproc("rdap.ip", "$.rdap.ip"));
+	CHECK(DBpatch_4050012_22_insert_item_preproc("rdap.rtt", "$.rdap.rtt"));
 
 	ret = SUCCEED;
 out:
 	return ret;
 }
 
-static int	DBpatch_4050012_22(void)
+static int	DBpatch_4050012_23(void)
 {
 	int		ret = FAIL;
 
@@ -3686,7 +3712,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_4050012_23(void)
+static int	DBpatch_4050012_24(void)
 {
 	int		ret = FAIL;
 
@@ -3736,7 +3762,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_4050012_24(void)
+static int	DBpatch_4050012_25(void)
 {
 	int		ret = FAIL;
 
@@ -3798,7 +3824,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_4050012_25(void)
+static int	DBpatch_4050012_26(void)
 {
 	int		ret = FAIL;
 
@@ -3860,7 +3886,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_4050012_26(void)
+static int	DBpatch_4050012_27(void)
 {
 	int		ret = FAIL;
 
@@ -4068,7 +4094,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_4050012_27(void)
+static int	DBpatch_4050012_28(void)
 {
 	int		ret = FAIL;
 
@@ -4149,7 +4175,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_4050012_28(void)
+static int	DBpatch_4050012_29(void)
 {
 	int		ret = FAIL;
 
@@ -4300,7 +4326,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_4050012_29_delete_probe(zbx_uint64_t template_hostid)
+static int	DBpatch_4050012_30_delete_probe(zbx_uint64_t template_hostid)
 {
 	int		ret = FAIL;
 	zbx_uint64_t	count;
@@ -4355,7 +4381,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_4050012_29(void)
+static int	DBpatch_4050012_30(void)
 {
 	int		ret = FAIL;
 
@@ -4384,7 +4410,7 @@ static int	DBpatch_4050012_29(void)
 
 		ZBX_STR2UINT64(template_hostid, row[0]);
 
-		CHECK(DBpatch_4050012_29_delete_probe(template_hostid));
+		CHECK(DBpatch_4050012_30_delete_probe(template_hostid));
 	}
 
 	ret = SUCCEED;
@@ -4394,7 +4420,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_4050012_30(void)
+static int	DBpatch_4050012_31(void)
 {
 	int		ret = FAIL;
 	zbx_uint64_t	template_hostid;
@@ -4403,14 +4429,14 @@ static int	DBpatch_4050012_30(void)
 
 	GET_TEMPLATE_ID(template_hostid, "Template Probe Errors");
 
-	CHECK(DBpatch_4050012_29_delete_probe(template_hostid));
+	CHECK(DBpatch_4050012_30_delete_probe(template_hostid));
 
 	ret = SUCCEED;
 out:
 	return ret;
 }
 
-static int	DBpatch_4050012_31(void)
+static int	DBpatch_4050012_32(void)
 {
 	int		ret = FAIL;
 
@@ -4486,29 +4512,30 @@ DBPATCH_RSM(4050012, 4, 0, 0)	/* set host macro descriptions */
 DBPATCH_RSM(4050012, 5, 0, 0)	/* disable "db watchdog" internal items */
 DBPATCH_RSM(4050012, 6, 0, 0)	/* upgrade "TLDs" action (upgrade process to Zabbix 4.x failed to upgrade it) */
 DBPATCH_RSM(4050012, 7, 0, 0)	/* add "DNS test mode" and "Transport protocol" value mappings */
-DBPATCH_RSM(4050012, 8, 0, 0)	/* add "Template DNS Test" template */
-DBPATCH_RSM(4050012, 9, 0, 0)	/* add "Template RDDS Test" template */
-DBPATCH_RSM(4050012, 10, 0, 0)	/* rename "Template RDAP" to "Template RDAP Test" */
-DBPATCH_RSM(4050012, 11, 0, 0)	/* add "Template DNS Status" template */
-DBPATCH_RSM(4050012, 12, 0, 0)	/* add "Template DNSSEC Status" template */
-DBPATCH_RSM(4050012, 13, 0, 0)	/* add "Template RDAP Status" template */
-DBPATCH_RSM(4050012, 14, 0, 0)	/* add "Template RDDS Status" template */
-DBPATCH_RSM(4050012, 15, 0, 0)	/* add "Template Probe Status" template */
-DBPATCH_RSM(4050012, 16, 0, 0)	/* add "Template Config History" template */
-DBPATCH_RSM(4050012, 17, 0, 0)	/* convert "<rshmost> <probe>" hosts to use "Template DNS Test" template */
-DBPATCH_RSM(4050012, 18, 0, 0)	/* convert "<rshmost> <probe>" hosts to use "Template RDDS Test" template */
-DBPATCH_RSM(4050012, 19, 0, 0)	/* set RDAP master item value_type to the text type */
-DBPATCH_RSM(4050012, 20, 0, 0)	/* set RDAP calculated items to be dependent items */
-DBPATCH_RSM(4050012, 21, 0, 0)	/* add item_preproc to RDAP ip and rtt items */
-DBPATCH_RSM(4050012, 22, 0, 0)	/* convert "<rsmhost>" hosts to use "Template DNS Status" template */
-DBPATCH_RSM(4050012, 23, 0, 0)	/* convert "<rsmhost>" hosts to use "Template DNSSEC Status" template */
-DBPATCH_RSM(4050012, 24, 0, 0)	/* convert "<rsmhost>" hosts to use "Template RDAP Status" template */
-DBPATCH_RSM(4050012, 25, 0, 0)	/* convert "<rsmhost>" hosts to use "Template RDDS Status" template */
-DBPATCH_RSM(4050012, 26, 0, 0)	/* convert "<probe>" hosts to use "Template Probe Status" template */
-DBPATCH_RSM(4050012, 27, 0, 0)	/* convert "<rsmhost>" hosts to use "Template Config History" template */
-DBPATCH_RSM(4050012, 28, 0, 0)	/* convert "Template <rsmhost>" templates into "Template Rsmhost Config <rsmhost>", link to "<rsmhost>" hosts */
-DBPATCH_RSM(4050012, 29, 0, 0)	/* delete "Template <probe> Status" templates */
-DBPATCH_RSM(4050012, 30, 0, 0)	/* delete "Template Probe Errors" templates */
-DBPATCH_RSM(4050012, 31, 0, 0)	/* rename "Template <probe>" template into "Template Probe Config <probe>", link to "<probe>" hosts */
+DBPATCH_RSM(4050012, 8, 0, 0)	/* add DNS test related global macros */
+DBPATCH_RSM(4050012, 9, 0, 0)	/* add "Template DNS Test" template */
+DBPATCH_RSM(4050012, 10, 0, 0)	/* add "Template RDDS Test" template */
+DBPATCH_RSM(4050012, 11, 0, 0)	/* rename "Template RDAP" to "Template RDAP Test" */
+DBPATCH_RSM(4050012, 12, 0, 0)	/* add "Template DNS Status" template */
+DBPATCH_RSM(4050012, 13, 0, 0)	/* add "Template DNSSEC Status" template */
+DBPATCH_RSM(4050012, 14, 0, 0)	/* add "Template RDAP Status" template */
+DBPATCH_RSM(4050012, 15, 0, 0)	/* add "Template RDDS Status" template */
+DBPATCH_RSM(4050012, 16, 0, 0)	/* add "Template Probe Status" template */
+DBPATCH_RSM(4050012, 17, 0, 0)	/* add "Template Config History" template */
+DBPATCH_RSM(4050012, 18, 0, 0)	/* convert "<rshmost> <probe>" hosts to use "Template DNS Test" template */
+DBPATCH_RSM(4050012, 19, 0, 0)	/* convert "<rshmost> <probe>" hosts to use "Template RDDS Test" template */
+DBPATCH_RSM(4050012, 20, 0, 0)	/* set RDAP master item value_type to the text type */
+DBPATCH_RSM(4050012, 21, 0, 0)	/* set RDAP calculated items to be dependent items */
+DBPATCH_RSM(4050012, 22, 0, 0)	/* add item_preproc to RDAP ip and rtt items */
+DBPATCH_RSM(4050012, 23, 0, 0)	/* convert "<rsmhost>" hosts to use "Template DNS Status" template */
+DBPATCH_RSM(4050012, 24, 0, 0)	/* convert "<rsmhost>" hosts to use "Template DNSSEC Status" template */
+DBPATCH_RSM(4050012, 25, 0, 0)	/* convert "<rsmhost>" hosts to use "Template RDAP Status" template */
+DBPATCH_RSM(4050012, 26, 0, 0)	/* convert "<rsmhost>" hosts to use "Template RDDS Status" template */
+DBPATCH_RSM(4050012, 27, 0, 0)	/* convert "<probe>" hosts to use "Template Probe Status" template */
+DBPATCH_RSM(4050012, 28, 0, 0)	/* convert "<rsmhost>" hosts to use "Template Config History" template */
+DBPATCH_RSM(4050012, 29, 0, 0)	/* convert "Template <rsmhost>" templates into "Template Rsmhost Config <rsmhost>", link to "<rsmhost>" hosts */
+DBPATCH_RSM(4050012, 30, 0, 0)	/* delete "Template <probe> Status" templates */
+DBPATCH_RSM(4050012, 31, 0, 0)	/* delete "Template Probe Errors" templates */
+DBPATCH_RSM(4050012, 32, 0, 0)	/* rename "Template <probe>" template into "Template Probe Config <probe>", link to "<probe>" hosts */
 
 DBPATCH_END()
