@@ -18,19 +18,23 @@
 --
 
 TABLE |hosts
-FIELDS|hostid|created|proxy_hostid|host                      |status|ipmi_authtype|ipmi_privilege|ipmi_username|ipmi_password|name                      |info_1|info_2|flags|templateid|description|tls_connect|tls_accept|tls_issuer|tls_subject|tls_psk_identity|tls_psk|proxy_address|auto_compress|
-ROW   |100000|0      |NULL        |Global macro history      |0     |-1           |2             |             |             |Global macro history      |      |      |0    |NULL      |           |1          |1         |          |           |                |       |             |1            |
-ROW   |100001|0      |NULL        |Probe statuses            |0     |-1           |2             |             |             |Probe statuses            |      |      |0    |NULL      |           |1          |1         |          |           |                |       |             |1            |
-ROW   |100002|0      |NULL        |Template Config History   |3     |-1           |2             |             |             |Template Config History   |      |      |0    |NULL      |           |1          |1         |          |           |                |       |             |1            |
-ROW   |100003|0      |NULL        |Template DNS Test         |3     |-1           |2             |             |             |Template DNS Test         |      |      |0    |NULL      |           |1          |1         |          |           |                |       |             |1            |
-ROW   |100004|0      |NULL        |Template RDDS Test        |3     |-1           |2             |             |             |Template RDDS Test        |      |      |0    |NULL      |           |1          |1         |          |           |                |       |             |1            |
-ROW   |10001 |0      |NULL        |Template OS Linux         |3     |0            |2             |             |             |Template OS Linux         |      |      |0    |NULL      |           |1          |1         |          |           |                |       |             |1            |
-ROW   |10047 |0      |NULL        |Template App Zabbix Server|3     |0            |2             |             |             |Template App Zabbix Server|      |      |0    |NULL      |           |1          |1         |          |           |                |       |             |1            |
-ROW   |10050 |0      |NULL        |Template App Zabbix Agent |3     |0            |2             |             |             |Template App Zabbix Agent |      |      |0    |NULL      |           |1          |1         |          |           |                |       |             |1            |
-ROW   |10056 |0      |NULL        |Template App Agentless    |3     |0            |2             |             |             |Template App Agentless    |      |      |0    |NULL      |           |1          |1         |          |           |                |       |             |1            |
-ROW   |10057 |0      |NULL        |Zabbix Server             |0     |-1           |2             |             |             |Zabbix Server             |      |      |0    |NULL      |           |1          |1         |          |           |                |       |             |1            |
-ROW   |10058 |0      |NULL        |Template App Zabbix Proxy |3     |0            |2             |             |             |Template App Zabbix Proxy |      |      |0    |NULL      |           |1          |1         |          |           |                |       |             |1            |
-ROW   |99980 |0      |NULL        |Template RDAP Test        |3     |0            |2             |             |             |Template RDAP Test        |      |      |0    |NULL      |           |1          |1         |          |           |                |       |             |1            |
+FIELDS|hostid|created|proxy_hostid|host                      |status|ipmi_authtype|ipmi_privilege|ipmi_username|ipmi_password|name                      |info_1|info_2|flags|templateid|description                                                 |tls_connect|tls_accept|tls_issuer|tls_subject|tls_psk_identity|tls_psk|proxy_address|auto_compress|
+ROW   |100000|0      |NULL        |Global macro history      |0     |-1           |2             |             |             |Global macro history      |      |      |0    |NULL      |                                                            |1          |1         |          |           |                |       |             |1            |
+ROW   |100001|0      |NULL        |Probe statuses            |0     |-1           |2             |             |             |Probe statuses            |      |      |0    |NULL      |                                                            |1          |1         |          |           |                |       |             |1            |
+ROW   |100002|0      |NULL        |Template Config History   |3     |-1           |2             |             |             |Template Config History   |      |      |0    |NULL      |                                                            |1          |1         |          |           |                |       |             |1            |
+ROW   |100003|0      |NULL        |Template DNS Test         |3     |-1           |2             |             |             |Template DNS Test         |      |      |0    |NULL      |                                                            |1          |1         |          |           |                |       |             |1            |
+ROW   |100004|0      |NULL        |Template RDDS Test        |3     |-1           |2             |             |             |Template RDDS Test        |      |      |0    |NULL      |                                                            |1          |1         |          |           |                |       |             |1            |
+ROW   |100005|0      |NULL        |Template DNS Status       |3     |-1           |2             |             |             |Template DNS Status       |      |      |0    |NULL      |DNS SLV items and triggers for linking to <RSMHOST> hosts   |1          |1         |          |           |                |       |             |1            |
+ROW   |100006|0      |NULL        |Template DNSSEC Status    |3     |-1           |2             |             |             |Template DNSSEC Status    |      |      |0    |NULL      |DNSSEC SLV items and triggers for linking to <RSMHOST> hosts|1          |1         |          |           |                |       |             |1            |
+ROW   |100007|0      |NULL        |Template RDAP Status      |3     |-1           |2             |             |             |Template RDAP Status      |      |      |0    |NULL      |RDAP SLV items and triggers for linking to <RSMHOST> hosts  |1          |1         |          |           |                |       |             |1            |
+ROW   |100008|0      |NULL        |Template RDDS Status      |3     |-1           |2             |             |             |Template RDDS Status      |      |      |0    |NULL      |RDDS SLV items and triggers for linking to <RSMHOST> hosts  |1          |1         |          |           |                |       |             |1            |
+ROW   |10001 |0      |NULL        |Template OS Linux         |3     |0            |2             |             |             |Template OS Linux         |      |      |0    |NULL      |                                                            |1          |1         |          |           |                |       |             |1            |
+ROW   |10047 |0      |NULL        |Template App Zabbix Server|3     |0            |2             |             |             |Template App Zabbix Server|      |      |0    |NULL      |                                                            |1          |1         |          |           |                |       |             |1            |
+ROW   |10050 |0      |NULL        |Template App Zabbix Agent |3     |0            |2             |             |             |Template App Zabbix Agent |      |      |0    |NULL      |                                                            |1          |1         |          |           |                |       |             |1            |
+ROW   |10056 |0      |NULL        |Template App Agentless    |3     |0            |2             |             |             |Template App Agentless    |      |      |0    |NULL      |                                                            |1          |1         |          |           |                |       |             |1            |
+ROW   |10057 |0      |NULL        |Zabbix Server             |0     |-1           |2             |             |             |Zabbix Server             |      |      |0    |NULL      |                                                            |1          |1         |          |           |                |       |             |1            |
+ROW   |10058 |0      |NULL        |Template App Zabbix Proxy |3     |0            |2             |             |             |Template App Zabbix Proxy |      |      |0    |NULL      |                                                            |1          |1         |          |           |                |       |             |1            |
+ROW   |99980 |0      |NULL        |Template RDAP Test        |3     |0            |2             |             |             |Template RDAP Test        |      |      |0    |NULL      |                                                            |1          |1         |          |           |                |       |             |1            |
 
 TABLE |screens
 FIELDS|screenid|name                |hsize|vsize|templateid|userid|private|
@@ -55,44 +59,47 @@ ROW   |31          |5       |0           |457       |500  |100   |0   |1   |1   
 ROW   |32          |5       |0           |455       |500  |128   |1   |1   |1      |1      |0       |1     |0     |0    |    |0      |0            |           |3          |
 
 TABLE |applications
-FIELDS|applicationid|hostid|name              |flags|
-ROW   |1            |10001 |OS                |0    |
-ROW   |5            |10001 |Filesystems       |0    |
-ROW   |7            |10001 |Network interfaces|0    |
-ROW   |9            |10001 |Processes         |0    |
-ROW   |13           |10001 |CPU               |0    |
-ROW   |15           |10001 |Memory            |0    |
-ROW   |17           |10001 |Performance       |0    |
-ROW   |21           |10001 |General           |0    |
-ROW   |23           |10001 |Security          |0    |
-ROW   |179          |10047 |Zabbix server     |0    |
-ROW   |206          |10050 |Zabbix agent      |0    |
-ROW   |207          |10001 |Zabbix agent      |0    |
-ROW   |214          |10056 |Services          |0    |
-ROW   |215          |10057 |Zabbix server     |0    |
-ROW   |216          |10057 |CPU               |0    |
-ROW   |217          |10057 |Filesystems       |0    |
-ROW   |218          |10057 |General           |0    |
-ROW   |219          |10057 |Memory            |0    |
-ROW   |220          |10057 |Network interfaces|0    |
-ROW   |221          |10057 |OS                |0    |
-ROW   |222          |10057 |Performance       |0    |
-ROW   |223          |10057 |Processes         |0    |
-ROW   |224          |10057 |Security          |0    |
-ROW   |225          |10057 |Zabbix agent      |0    |
-ROW   |226          |10058 |Zabbix proxy      |0    |
-ROW   |998          |99980 |RDAP              |0    |
-ROW   |1000         |100000|Configuration     |0    |
-ROW   |1001         |100001|Probe availability|0    |
-ROW   |1002         |100002|DNS               |0    |
-ROW   |1003         |100002|DNSSEC            |0    |
-ROW   |1004         |100002|RDAP              |0    |
-ROW   |1005         |100002|RDDS              |0    |
-ROW   |1006         |100003|DNS               |0    |
-ROW   |1007         |100003|DNSSEC            |0    |
-ROW   |1008         |100004|RDDS              |0    |
-ROW   |1009         |100004|RDDS43            |0    |
-ROW   |1010         |100004|RDDS80            |0    |
+FIELDS|applicationid|hostid|name               |flags|
+ROW   |1            |10001 |OS                 |0    |
+ROW   |5            |10001 |Filesystems        |0    |
+ROW   |7            |10001 |Network interfaces |0    |
+ROW   |9            |10001 |Processes          |0    |
+ROW   |13           |10001 |CPU                |0    |
+ROW   |15           |10001 |Memory             |0    |
+ROW   |17           |10001 |Performance        |0    |
+ROW   |21           |10001 |General            |0    |
+ROW   |23           |10001 |Security           |0    |
+ROW   |179          |10047 |Zabbix server      |0    |
+ROW   |206          |10050 |Zabbix agent       |0    |
+ROW   |207          |10001 |Zabbix agent       |0    |
+ROW   |214          |10056 |Services           |0    |
+ROW   |215          |10057 |Zabbix server      |0    |
+ROW   |216          |10057 |CPU                |0    |
+ROW   |217          |10057 |Filesystems        |0    |
+ROW   |218          |10057 |General            |0    |
+ROW   |219          |10057 |Memory             |0    |
+ROW   |220          |10057 |Network interfaces |0    |
+ROW   |221          |10057 |OS                 |0    |
+ROW   |222          |10057 |Performance        |0    |
+ROW   |223          |10057 |Processes          |0    |
+ROW   |224          |10057 |Security           |0    |
+ROW   |225          |10057 |Zabbix agent       |0    |
+ROW   |226          |10058 |Zabbix proxy       |0    |
+ROW   |998          |99980 |RDAP               |0    |
+ROW   |1000         |100000|Configuration      |0    |
+ROW   |1001         |100001|Probe availability |0    |
+ROW   |1002         |100002|DNS                |0    |
+ROW   |1003         |100002|DNSSEC             |0    |
+ROW   |1004         |100002|RDAP               |0    |
+ROW   |1005         |100002|RDDS               |0    |
+ROW   |1006         |100003|DNS                |0    |
+ROW   |1007         |100003|DNSSEC             |0    |
+ROW   |1008         |100004|RDDS               |0    |
+ROW   |1009         |100004|RDDS43             |0    |
+ROW   |1010         |100004|RDDS80             |0    |
+ROW   |1011         |100005|SLV current month  |0    |
+ROW   |1012         |100005|SLV particular test|0    |
+ROW   |1013         |100005|SLV rolling week   |0    |
 
 TABLE |interface
 FIELDS|interfaceid|hostid|main|type|useip|ip       |dns |port |bulk|
@@ -196,7 +203,33 @@ ROW   |10013 |0   |              |        |10001 |Number of running processes   
 ROW   |100130|18  |              |        |100004|RDDS43 update time                          |rsm.rdds.43.upd                                                                                                                                                                                                                                                                                                                                                                |0                   |90d    |365d  |0     |0         |             |        |                   |0                   |                     |                     |       |          |NULL      |NULL      |                              |           |0       |        |        |         |          |0    |NULL       |    |Update time for RDDS43 test                                                                                                                    |0             |30d     |0                  |0                  |                  |0       |            |100127       |3s     |    |            |     |200         |1               |0        |       |0            |0             |0            |0          |0          |0          |
 ROW   |100131|18  |              |        |100004|RDDS80 IP                                   |rsm.rdds.80.ip                                                                                                                                                                                                                                                                                                                                                                 |0                   |90d    |0     |0     |1         |             |        |                   |0                   |                     |                     |       |          |NULL      |NULL      |                              |           |0       |        |        |         |          |0    |NULL       |    |IP address for RDDS80 test                                                                                                                     |0             |30d     |0                  |0                  |                  |0       |            |100127       |3s     |    |            |     |200         |1               |0        |       |0            |0             |0            |0          |0          |0          |
 ROW   |100132|18  |              |        |100004|RDDS80 RTT                                  |rsm.rdds.80.rtt                                                                                                                                                                                                                                                                                                                                                                |0                   |90d    |365d  |0     |0         |             |        |                   |0                   |                     |                     |       |          |NULL      |130       |                              |           |0       |        |        |         |          |0    |NULL       |    |RTT value for RDDS80 test                                                                                                                      |0             |30d     |0                  |0                  |                  |0       |            |100127       |3s     |    |            |     |200         |1               |0        |       |0            |0             |0            |0          |0          |0          |
+ROW   |100133|2   |              |        |100005|DNS availability                            |rsm.slv.dns.avail                                                                                                                                                                                                                                                                                                                                                              |0                   |90d    |365d  |0     |3         |             |        |                   |0                   |                     |                     |       |          |NULL      |110       |                              |           |0       |        |        |         |          |0    |NULL       |    |                                                                                                                                               |0             |30d     |0                  |0                  |                  |0       |            |NULL         |3s     |    |            |     |200         |1               |0        |       |0            |0             |0            |0          |0          |0          |
+ROW   |100134|2   |              |        |100005|DNS minutes of downtime                     |rsm.slv.dns.downtime                                                                                                                                                                                                                                                                                                                                                           |0                   |90d    |365d  |0     |3         |             |        |                   |0                   |                     |                     |       |          |NULL      |NULL      |                              |           |0       |        |        |         |          |0    |NULL       |    |                                                                                                                                               |0             |30d     |0                  |0                  |                  |0       |            |NULL         |3s     |    |            |     |200         |1               |0        |       |0            |0             |0            |0          |0          |0          |
+ROW   |100135|2   |              |        |100005|DNS weekly unavailability                   |rsm.slv.dns.rollweek                                                                                                                                                                                                                                                                                                                                                           |0                   |90d    |365d  |0     |0         |             |%       |                   |0                   |                     |                     |       |          |NULL      |NULL      |                              |           |0       |        |        |         |          |0    |NULL       |    |                                                                                                                                               |0             |30d     |0                  |0                  |                  |0       |            |NULL         |3s     |    |            |     |200         |1               |0        |       |0            |0             |0            |0          |0          |0          |
+ROW   |100136|2   |              |        |100005|Number of failed monthly DNS TCP tests      |rsm.slv.dns.tcp.rtt.failed                                                                                                                                                                                                                                                                                                                                                     |0                   |90d    |365d  |0     |3         |             |        |                   |0                   |                     |                     |       |          |NULL      |NULL      |                              |           |0       |        |        |         |          |0    |NULL       |    |                                                                                                                                               |0             |30d     |0                  |0                  |                  |0       |            |NULL         |3s     |    |            |     |200         |1               |0        |       |0            |0             |0            |0          |0          |0          |
+ROW   |100137|2   |              |        |100005|Number of performed monthly DNS TCP tests   |rsm.slv.dns.tcp.rtt.performed                                                                                                                                                                                                                                                                                                                                                  |0                   |90d    |365d  |0     |3         |             |        |                   |0                   |                     |                     |       |          |NULL      |NULL      |                              |           |0       |        |        |         |          |0    |NULL       |    |                                                                                                                                               |0             |30d     |0                  |0                  |                  |0       |            |NULL         |3s     |    |            |     |200         |1               |0        |       |0            |0             |0            |0          |0          |0          |
+ROW   |100138|2   |              |        |100005|Ratio of failed monthly DNS TCP tests       |rsm.slv.dns.tcp.rtt.pfailed                                                                                                                                                                                                                                                                                                                                                    |0                   |90d    |365d  |0     |0         |             |%       |                   |0                   |                     |                     |       |          |NULL      |NULL      |                              |           |0       |        |        |         |          |0    |NULL       |    |                                                                                                                                               |0             |30d     |0                  |0                  |                  |0       |            |NULL         |3s     |    |            |     |200         |1               |0        |       |0            |0             |0            |0          |0          |0          |
+ROW   |100139|2   |              |        |100005|Number of failed monthly DNS UDP tests      |rsm.slv.dns.udp.rtt.failed                                                                                                                                                                                                                                                                                                                                                     |0                   |90d    |365d  |0     |3         |             |        |                   |0                   |                     |                     |       |          |NULL      |NULL      |                              |           |0       |        |        |         |          |0    |NULL       |    |                                                                                                                                               |0             |30d     |0                  |0                  |                  |0       |            |NULL         |3s     |    |            |     |200         |1               |0        |       |0            |0             |0            |0          |0          |0          |
 ROW   |10014 |0   |              |        |10001 |Free swap space                             |system.swap.size[,free]                                                                                                                                                                                                                                                                                                                                                        |1m                  |1w     |365d  |0     |3         |             |B       |                   |0                   |                     |                     |       |          |NULL      |NULL      |                              |           |0       |        |        |         |          |0    |NULL       |    |                                                                                                                                               |0             |0       |0                  |0                  |                  |0       |            |NULL         |3s     |    |            |     |200         |1               |0        |       |0            |1             |0            |0          |0          |0          |
+ROW   |100140|2   |              |        |100005|Number of performed monthly DNS UDP tests   |rsm.slv.dns.udp.rtt.performed                                                                                                                                                                                                                                                                                                                                                  |0                   |90d    |365d  |0     |3         |             |        |                   |0                   |                     |                     |       |          |NULL      |NULL      |                              |           |0       |        |        |         |          |0    |NULL       |    |                                                                                                                                               |0             |30d     |0                  |0                  |                  |0       |            |NULL         |3s     |    |            |     |200         |1               |0        |       |0            |0             |0            |0          |0          |0          |
+ROW   |100141|2   |              |        |100005|Ratio of failed monthly DNS UDP tests       |rsm.slv.dns.udp.rtt.pfailed                                                                                                                                                                                                                                                                                                                                                    |0                   |90d    |365d  |0     |0         |             |%       |                   |0                   |                     |                     |       |          |NULL      |NULL      |                              |           |0       |        |        |         |          |0    |NULL       |    |                                                                                                                                               |0             |30d     |0                  |0                  |                  |0       |            |NULL         |3s     |    |            |     |200         |1               |0        |       |0            |0             |0            |0          |0          |0          |
+ROW   |100142|2   |              |        |100005|NS-IP pairs discovery                       |rsm.dns.nsip.discovery                                                                                                                                                                                                                                                                                                                                                         |0                   |90d    |0     |0     |4         |             |        |                   |0                   |                     |                     |       |          |NULL      |NULL      |                              |           |0       |        |        |         |          |1    |NULL       |    |Discovers Name Servers (NS-IP pairs).                                                                                                          |0             |1000d   |0                  |0                  |                  |0       |            |NULL         |3s     |    |            |     |200         |1               |0        |       |0            |0             |0            |0          |0          |0          |
+ROW   |100143|2   |              |        |100005|DNS NS $1 ($2) availability                 |rsm.slv.dns.ns.avail[{#NS},{#IP}]                                                                                                                                                                                                                                                                                                                                              |0                   |90d    |365d  |0     |3         |             |        |                   |0                   |                     |                     |       |          |NULL      |110       |                              |           |0       |        |        |         |          |2    |NULL       |    |                                                                                                                                               |0             |30d     |0                  |0                  |                  |0       |            |NULL         |3s     |    |            |     |200         |1               |0        |       |0            |0             |0            |0          |0          |0          |
+ROW   |100144|2   |              |        |100005|DNS minutes of $1 ($2) downtime             |rsm.slv.dns.ns.downtime[{#NS},{#IP}]                                                                                                                                                                                                                                                                                                                                           |0                   |90d    |365d  |0     |3         |             |        |                   |0                   |                     |                     |       |          |NULL      |NULL      |                              |           |0       |        |        |         |          |2    |NULL       |    |                                                                                                                                               |0             |30d     |0                  |0                  |                  |0       |            |NULL         |3s     |    |            |     |200         |1               |0        |       |0            |0             |0            |0          |0          |0          |
+ROW   |100145|2   |              |        |100006|DNSSEC availability                         |rsm.slv.dnssec.avail                                                                                                                                                                                                                                                                                                                                                           |0                   |90d    |365d  |0     |3         |             |        |                   |0                   |                     |                     |       |          |NULL      |110       |                              |           |0       |        |        |         |          |0    |NULL       |    |                                                                                                                                               |0             |30d     |0                  |0                  |                  |0       |            |NULL         |3s     |    |            |     |200         |1               |0        |       |0            |0             |0            |0          |0          |0          |
+ROW   |100146|2   |              |        |100006|DNSSEC weekly unavailability                |rsm.slv.dnssec.rollweek                                                                                                                                                                                                                                                                                                                                                        |0                   |90d    |365d  |0     |0         |             |%       |                   |0                   |                     |                     |       |          |NULL      |NULL      |                              |           |0       |        |        |         |          |0    |NULL       |    |                                                                                                                                               |0             |30d     |0                  |0                  |                  |0       |            |NULL         |3s     |    |            |     |200         |1               |0        |       |0            |0             |0            |0          |0          |0          |
+ROW   |100147|2   |              |        |100007|RDAP availability                           |rsm.slv.rdap.avail                                                                                                                                                                                                                                                                                                                                                             |0                   |90d    |365d  |0     |3         |             |        |                   |0                   |                     |                     |       |          |NULL      |110       |                              |           |0       |        |        |         |          |0    |NULL       |    |                                                                                                                                               |0             |30d     |0                  |0                  |                  |0       |            |NULL         |3s     |    |            |     |200         |1               |0        |       |0            |0             |0            |0          |0          |0          |
+ROW   |100148|2   |              |        |100007|RDAP minutes of downtime                    |rsm.slv.rdap.downtime                                                                                                                                                                                                                                                                                                                                                          |0                   |90d    |365d  |0     |3         |             |        |                   |0                   |                     |                     |       |          |NULL      |NULL      |                              |           |0       |        |        |         |          |0    |NULL       |    |                                                                                                                                               |0             |30d     |0                  |0                  |                  |0       |            |NULL         |3s     |    |            |     |200         |1               |0        |       |0            |0             |0            |0          |0          |0          |
+ROW   |100149|2   |              |        |100007|RDAP weekly unavailability                  |rsm.slv.rdap.rollweek                                                                                                                                                                                                                                                                                                                                                          |0                   |90d    |365d  |0     |0         |             |%       |                   |0                   |                     |                     |       |          |NULL      |NULL      |                              |           |0       |        |        |         |          |0    |NULL       |    |                                                                                                                                               |0             |30d     |0                  |0                  |                  |0       |            |NULL         |3s     |    |            |     |200         |1               |0        |       |0            |0             |0            |0          |0          |0          |
+ROW   |100150|2   |              |        |100007|Number of failed monthly RDAP queries       |rsm.slv.rdap.rtt.failed                                                                                                                                                                                                                                                                                                                                                        |0                   |90d    |365d  |0     |3         |             |        |                   |0                   |                     |                     |       |          |NULL      |NULL      |                              |           |0       |        |        |         |          |0    |NULL       |    |                                                                                                                                               |0             |30d     |0                  |0                  |                  |0       |            |NULL         |3s     |    |            |     |200         |1               |0        |       |0            |0             |0            |0          |0          |0          |
+ROW   |100151|2   |              |        |100007|Number of performed monthly RDAP queries    |rsm.slv.rdap.rtt.performed                                                                                                                                                                                                                                                                                                                                                     |0                   |90d    |365d  |0     |3         |             |        |                   |0                   |                     |                     |       |          |NULL      |NULL      |                              |           |0       |        |        |         |          |0    |NULL       |    |                                                                                                                                               |0             |30d     |0                  |0                  |                  |0       |            |NULL         |3s     |    |            |     |200         |1               |0        |       |0            |0             |0            |0          |0          |0          |
+ROW   |100152|2   |              |        |100007|Ratio of failed monthly RDAP queries        |rsm.slv.rdap.rtt.pfailed                                                                                                                                                                                                                                                                                                                                                       |0                   |90d    |365d  |0     |0         |             |%       |                   |0                   |                     |                     |       |          |NULL      |NULL      |                              |           |0       |        |        |         |          |0    |NULL       |    |                                                                                                                                               |0             |30d     |0                  |0                  |                  |0       |            |NULL         |3s     |    |            |     |200         |1               |0        |       |0            |0             |0            |0          |0          |0          |
+ROW   |100153|2   |              |        |100008|RDDS availability                           |rsm.slv.rdds.avail                                                                                                                                                                                                                                                                                                                                                             |0                   |90d    |365d  |0     |3         |             |        |                   |0                   |                     |                     |       |          |NULL      |110       |                              |           |0       |        |        |         |          |0    |NULL       |    |                                                                                                                                               |0             |30d     |0                  |0                  |                  |0       |            |NULL         |3s     |    |            |     |200         |1               |0        |       |0            |0             |0            |0          |0          |0          |
+ROW   |100154|2   |              |        |100008|RDDS minutes of downtime                    |rsm.slv.rdds.downtime                                                                                                                                                                                                                                                                                                                                                          |0                   |90d    |365d  |0     |3         |             |        |                   |0                   |                     |                     |       |          |NULL      |NULL      |                              |           |0       |        |        |         |          |0    |NULL       |    |                                                                                                                                               |0             |30d     |0                  |0                  |                  |0       |            |NULL         |3s     |    |            |     |200         |1               |0        |       |0            |0             |0            |0          |0          |0          |
+ROW   |100155|2   |              |        |100008|RDDS weekly unavailability                  |rsm.slv.rdds.rollweek                                                                                                                                                                                                                                                                                                                                                          |0                   |90d    |365d  |0     |0         |             |%       |                   |0                   |                     |                     |       |          |NULL      |NULL      |                              |           |0       |        |        |         |          |0    |NULL       |    |                                                                                                                                               |0             |30d     |0                  |0                  |                  |0       |            |NULL         |3s     |    |            |     |200         |1               |0        |       |0            |0             |0            |0          |0          |0          |
+ROW   |100156|2   |              |        |100008|Number of failed monthly RDDS queries       |rsm.slv.rdds.rtt.failed                                                                                                                                                                                                                                                                                                                                                        |0                   |90d    |365d  |0     |3         |             |        |                   |0                   |                     |                     |       |          |NULL      |NULL      |                              |           |0       |        |        |         |          |0    |NULL       |    |                                                                                                                                               |0             |30d     |0                  |0                  |                  |0       |            |NULL         |3s     |    |            |     |200         |1               |0        |       |0            |0             |0            |0          |0          |0          |
+ROW   |100157|2   |              |        |100008|Number of performed monthly RDDS queries    |rsm.slv.rdds.rtt.performed                                                                                                                                                                                                                                                                                                                                                     |0                   |90d    |365d  |0     |3         |             |        |                   |0                   |                     |                     |       |          |NULL      |NULL      |                              |           |0       |        |        |         |          |0    |NULL       |    |                                                                                                                                               |0             |30d     |0                  |0                  |                  |0       |            |NULL         |3s     |    |            |     |200         |1               |0        |       |0            |0             |0            |0          |0          |0          |
+ROW   |100158|2   |              |        |100008|Ratio of failed monthly RDDS queries        |rsm.slv.rdds.rtt.pfailed                                                                                                                                                                                                                                                                                                                                                       |0                   |90d    |365d  |0     |0         |             |%       |                   |0                   |                     |                     |       |          |NULL      |NULL      |                              |           |0       |        |        |         |          |0    |NULL       |    |                                                                                                                                               |0             |30d     |0                  |0                  |                  |0       |            |NULL         |3s     |    |            |     |200         |1               |0        |       |0            |0             |0            |0          |0          |0          |
 ROW   |10016 |0   |              |        |10001 |Number of logged in users                   |system.users.num                                                                                                                                                                                                                                                                                                                                                               |1m                  |1w     |365d  |0     |3         |             |        |                   |0                   |                     |                     |       |          |NULL      |NULL      |                              |           |0       |        |        |         |          |0    |NULL       |    |Number of users who are currently logged in.                                                                                                   |0             |0       |0                  |0                  |                  |0       |            |NULL         |3s     |    |            |     |200         |1               |0        |       |0            |1             |0            |0          |0          |0          |
 ROW   |10019 |0   |              |        |10001 |Checksum of $1                              |vfs.file.cksum[/etc/passwd]                                                                                                                                                                                                                                                                                                                                                    |1h                  |1w     |365d  |0     |3         |             |        |                   |0                   |                     |                     |       |          |NULL      |NULL      |                              |           |0       |        |        |         |          |0    |NULL       |    |                                                                                                                                               |0             |0       |0                  |0                  |                  |0       |            |NULL         |3s     |    |            |     |200         |1               |0        |       |0            |1             |0            |0          |0          |0          |
 ROW   |10025 |0   |              |        |10001 |System uptime                               |system.uptime                                                                                                                                                                                                                                                                                                                                                                  |10m                 |1w     |365d  |0     |3         |             |uptime  |                   |0                   |                     |                     |       |          |NULL      |NULL      |                              |           |0       |        |        |         |          |0    |NULL       |    |                                                                                                                                               |0             |0       |0                  |0                  |                  |0       |            |NULL         |3s     |    |            |     |200         |1               |0        |       |0            |1             |0            |0          |0          |0          |
@@ -386,9 +419,69 @@ ROW   |100101   |{100101}<{$RSM.EPP.PROBE.ONLINE}                               
 ROW   |100102   |{100102}<{$RSM.IP4.MIN.PROBE.ONLINE}                                    |Number of IP4-enabled online probes is less than $1             |    |0     |5       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
 ROW   |100103   |{100103}<{$RSM.IP6.MIN.PROBE.ONLINE}                                    |Number of IP6-enabled online probes is less than $1             |    |0     |5       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
 ROW   |100104   |{100104}<{$RSM.RDDS.PROBE.ONLINE}                                       |Number of RDDS-enabled online probes is less than $1            |    |0     |5       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100105   |({TRIGGER.VALUE}=0 and {100105}=0) or ({TRIGGER.VALUE}=1 and {100106}>0)|DNS service is down                                             |    |0     |0       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100106   |{100107}>{$RSM.SLV.DNS.DOWNTIME}                                        |DNS service was unavailable for at least {ITEM.VALUE1}m         |    |0     |5       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100107   |{100108}>=10                                                            |DNS rolling week is over 10%                                    |    |0     |2       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100108   |{100109}>=25                                                            |DNS rolling week is over 25%                                    |    |0     |3       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100109   |{100110}>=50                                                            |DNS rolling week is over 50%                                    |    |0     |3       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
 ROW   |10011    |{12555}>{$MAX_RUN_PROCESSES}                                            |Too many processes running on {HOST.NAME}                       |    |0     |2       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100110   |{100111}>=75                                                            |DNS rolling week is over 75%                                    |    |0     |4       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100111   |{100112}>=100                                                           |DNS rolling week is over 100%                                   |    |0     |5       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100112   |{100113}>{$RSM.SLV.DNS.TCP.RTT}*0.1                                     |Ratio of failed DNS TCP tests exceeded 10% of allowed $1%       |    |0     |2       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100113   |{100114}>{$RSM.SLV.DNS.TCP.RTT}*0.25                                    |Ratio of failed DNS TCP tests exceeded 25% of allowed $1%       |    |0     |3       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100114   |{100115}>{$RSM.SLV.DNS.TCP.RTT}*0.5                                     |Ratio of failed DNS TCP tests exceeded 50% of allowed $1%       |    |0     |3       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100115   |{100116}>{$RSM.SLV.DNS.TCP.RTT}*0.75                                    |Ratio of failed DNS TCP tests exceeded 75% of allowed $1%       |    |0     |4       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100116   |{100117}>{$RSM.SLV.DNS.TCP.RTT}                                         |Ratio of failed DNS TCP tests exceeded 100% of allowed $1%      |    |0     |5       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100117   |{100118}>{$RSM.SLV.DNS.UDP.RTT}*0.1                                     |Ratio of failed DNS UDP tests exceeded 10% of allowed $1%       |    |0     |2       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100118   |{100119}>{$RSM.SLV.DNS.UDP.RTT}*0.25                                    |Ratio of failed DNS UDP tests exceeded 25% of allowed $1%       |    |0     |3       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100119   |{100120}>{$RSM.SLV.DNS.UDP.RTT}*0.5                                     |Ratio of failed DNS UDP tests exceeded 50% of allowed $1%       |    |0     |3       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
 ROW   |10012    |{12580}<{$MIN_SWAP_PFREE}                                               |Lack of free swap space on {HOST.NAME}                          |    |0     |2       |It probably means that the systems requires more physical memory.                                                                     |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100120   |{100121}>{$RSM.SLV.DNS.UDP.RTT}*0.75                                    |Ratio of failed DNS UDP tests exceeded 75% of allowed $1%       |    |0     |4       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100121   |{100122}>{$RSM.SLV.DNS.UDP.RTT}                                         |Ratio of failed DNS UDP tests exceeded 100% of allowed $1%      |    |0     |5       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100122   |{100123}>{$RSM.SLV.NS.DOWNTIME}*0.1                                     |DNS {#NS} ({#IP}) downtime exceeded 10% of allowed $1 minutes   |    |0     |2       |                                                                                                                                      |NULL      |0   |2    |0            |                   |0               |               |0           |      |
+ROW   |100123   |{100124}>{$RSM.SLV.NS.DOWNTIME}*0.25                                    |DNS {#NS} ({#IP}) downtime exceeded 25% of allowed $1 minutes   |    |0     |3       |                                                                                                                                      |NULL      |0   |2    |0            |                   |0               |               |0           |      |
+ROW   |100124   |{100125}>{$RSM.SLV.NS.DOWNTIME}*0.5                                     |DNS {#NS} ({#IP}) downtime exceeded 50% of allowed $1 minutes   |    |0     |3       |                                                                                                                                      |NULL      |0   |2    |0            |                   |0               |               |0           |      |
+ROW   |100125   |{100126}>{$RSM.SLV.NS.DOWNTIME}*0.75                                    |DNS {#NS} ({#IP}) downtime exceeded 75% of allowed $1 minutes   |    |0     |4       |                                                                                                                                      |NULL      |0   |2    |0            |                   |0               |               |0           |      |
+ROW   |100126   |{100127}>{$RSM.SLV.NS.DOWNTIME}                                         |DNS {#NS} ({#IP}) downtime exceeded 100% of allowed $1 minutes  |    |0     |5       |                                                                                                                                      |NULL      |0   |2    |0            |                   |0               |               |0           |      |
+ROW   |100127   |({TRIGGER.VALUE}=0 and {100128}=0) or ({TRIGGER.VALUE}=1 and {100129}>0)|DNSSEC service is down                                          |    |0     |0       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100128   |{100130}>=10                                                            |DNSSEC rolling week is over 10%                                 |    |0     |2       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100129   |{100131}>=25                                                            |DNSSEC rolling week is over 25%                                 |    |0     |3       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100130   |{100132}>=50                                                            |DNSSEC rolling week is over 50%                                 |    |0     |3       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100131   |{100133}>=75                                                            |DNSSEC rolling week is over 75%                                 |    |0     |4       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100132   |{100134}>=100                                                           |DNSSEC rolling week is over 100%                                |    |0     |5       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100133   |({TRIGGER.VALUE}=0 and {100135}=0) or ({TRIGGER.VALUE}=1 and {100136}>0)|RDAP service is down                                            |    |0     |0       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100134   |{100137}>={$RSM.SLV.RDAP.DOWNTIME}*0.1                                  |RDAP service was unavailable for 10% of allowed $1 minutes      |    |0     |2       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100135   |{100138}>={$RSM.SLV.RDAP.DOWNTIME}*0.25                                 |RDAP service was unavailable for 25% of allowed $1 minutes      |    |0     |3       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100136   |{100139}>={$RSM.SLV.RDAP.DOWNTIME}*0.5                                  |RDAP service was unavailable for 50% of allowed $1 minutes      |    |0     |3       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100137   |{100140}>={$RSM.SLV.RDAP.DOWNTIME}*0.75                                 |RDAP service was unavailable for 75% of allowed $1 minutes      |    |0     |4       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100138   |{100141}>={$RSM.SLV.RDAP.DOWNTIME}                                      |RDAP service was unavailable for 100% of allowed $1 minutes     |    |0     |5       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100139   |{100142}>=10                                                            |RDAP rolling week is over 10%                                   |    |0     |2       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100140   |{100143}>=25                                                            |RDAP rolling week is over 25%                                   |    |0     |3       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100141   |{100144}>=50                                                            |RDAP rolling week is over 50%                                   |    |0     |3       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100142   |{100145}>=75                                                            |RDAP rolling week is over 75%                                   |    |0     |4       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100143   |{100146}>=100                                                           |RDAP rolling week is over 100%                                  |    |0     |5       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100144   |{100147}>{$RSM.SLV.RDAP.RTT}*0.1                                        |Ratio of failed RDAP tests exceeded 10% of allowed $1%          |    |0     |2       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100145   |{100148}>{$RSM.SLV.RDAP.RTT}*0.25                                       |Ratio of failed RDAP tests exceeded 25% of allowed $1%          |    |0     |3       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100146   |{100149}>{$RSM.SLV.RDAP.RTT}*0.5                                        |Ratio of failed RDAP tests exceeded 50% of allowed $1%          |    |0     |3       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100147   |{100150}>{$RSM.SLV.RDAP.RTT}*0.75                                       |Ratio of failed RDAP tests exceeded 75% of allowed $1%          |    |0     |4       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100148   |{100151}>{$RSM.SLV.RDAP.RTT}                                            |Ratio of failed RDAP tests exceeded 100% of allowed $1%         |    |0     |5       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100149   |({TRIGGER.VALUE}=0 and {100152}=0) or ({TRIGGER.VALUE}=1 and {100153}>0)|RDDS service is down                                            |    |0     |0       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100150   |{100154}>={$RSM.SLV.RDDS.DOWNTIME}*0.1                                  |RDDS service was unavailable for 10% of allowed $1 minutes      |    |0     |2       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100151   |{100155}>={$RSM.SLV.RDDS.DOWNTIME}*0.25                                 |RDDS service was unavailable for 25% of allowed $1 minutes      |    |0     |3       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100152   |{100156}>={$RSM.SLV.RDDS.DOWNTIME}*0.5                                  |RDDS service was unavailable for 50% of allowed $1 minutes      |    |0     |3       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100153   |{100157}>={$RSM.SLV.RDDS.DOWNTIME}*0.75                                 |RDDS service was unavailable for 75% of allowed $1 minutes      |    |0     |4       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100154   |{100158}>={$RSM.SLV.RDDS.DOWNTIME}                                      |RDDS service was unavailable for 100% of allowed $1 minutes     |    |0     |5       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100155   |{100159}>=10                                                            |RDDS rolling week is over 10%                                   |    |0     |2       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100156   |{100160}>=25                                                            |RDDS rolling week is over 25%                                   |    |0     |3       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100157   |{100161}>=50                                                            |RDDS rolling week is over 50%                                   |    |0     |3       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100158   |{100162}>=75                                                            |RDDS rolling week is over 75%                                   |    |0     |4       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100159   |{100163}>=100                                                           |RDDS rolling week is over 100%                                  |    |0     |5       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
 ROW   |10016    |{10199}>0                                                               |/etc/passwd has been changed on {HOST.NAME}                     |    |1     |2       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100160   |{100164}>{$RSM.SLV.RDDS.RTT}*0.1                                        |Ratio of failed RDDS tests exceeded 10% of allowed $1%          |    |0     |2       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100161   |{100165}>{$RSM.SLV.RDDS.RTT}*0.25                                       |Ratio of failed RDDS tests exceeded 25% of allowed $1%          |    |0     |3       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100162   |{100166}>{$RSM.SLV.RDDS.RTT}*0.5                                        |Ratio of failed RDDS tests exceeded 50% of allowed $1%          |    |0     |3       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100163   |{100167}>{$RSM.SLV.RDDS.RTT}*0.75                                       |Ratio of failed RDDS tests exceeded 75% of allowed $1%          |    |0     |4       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100164   |{100168}>{$RSM.SLV.RDDS.RTT}                                            |Ratio of failed RDDS tests exceeded 100% of allowed $1%         |    |0     |5       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
 ROW   |10021    |{12583}<0                                                               |{HOST.NAME} has just been restarted                             |    |1     |1       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
 ROW   |10041    |{10204}<256                                                             |Configured max number of processes is too low on {HOST.NAME}    |    |1     |1       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
 ROW   |10042    |{12553}<1024                                                            |Configured max number of opened files is too low on {HOST.NAME} |    |1     |1       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
@@ -508,135 +601,246 @@ ROW   |13603    |({TRIGGER.VALUE}=0 and {13032}>75) or ({TRIGGER.VALUE}=1 and {1
 ROW   |13604    |{13033}=1                                                               |Zabbix value cache working in low memory mode                   |    |0     |4       |                                                                                                                                      |13577     |0   |0    |0            |                   |0               |               |0           |      |
 ROW   |13605    |({TRIGGER.VALUE}=0 and {13034}>75) or ({TRIGGER.VALUE}=1 and {13034}>65)|Zabbix vmware collector processes more than 75% busy            |    |0     |3       |                                                                                                                                      |13578     |0   |0    |0            |                   |0               |               |0           |      |
 
+TABLE |trigger_depends
+FIELDS|triggerdepid|triggerid_down|triggerid_up|
+ROW   |1           |100107        |100108      |
+ROW   |2           |100108        |100109      |
+ROW   |3           |100109        |100110      |
+ROW   |4           |100110        |100111      |
+ROW   |5           |100112        |100113      |
+ROW   |6           |100113        |100114      |
+ROW   |7           |100114        |100115      |
+ROW   |8           |100115        |100116      |
+ROW   |9           |100117        |100118      |
+ROW   |10          |100118        |100119      |
+ROW   |11          |100119        |100120      |
+ROW   |12          |100120        |100121      |
+ROW   |13          |100122        |100123      |
+ROW   |14          |100123        |100124      |
+ROW   |15          |100124        |100125      |
+ROW   |16          |100125        |100126      |
+ROW   |17          |100128        |100129      |
+ROW   |18          |100129        |100130      |
+ROW   |19          |100130        |100131      |
+ROW   |20          |100131        |100132      |
+ROW   |21          |100134        |100135      |
+ROW   |22          |100135        |100136      |
+ROW   |23          |100136        |100137      |
+ROW   |24          |100137        |100138      |
+ROW   |25          |100139        |100140      |
+ROW   |26          |100140        |100141      |
+ROW   |27          |100141        |100142      |
+ROW   |28          |100142        |100143      |
+ROW   |29          |100144        |100145      |
+ROW   |30          |100145        |100146      |
+ROW   |31          |100146        |100147      |
+ROW   |32          |100147        |100148      |
+ROW   |33          |100150        |100151      |
+ROW   |34          |100151        |100152      |
+ROW   |35          |100152        |100153      |
+ROW   |36          |100153        |100154      |
+ROW   |37          |100155        |100156      |
+ROW   |38          |100156        |100157      |
+ROW   |39          |100157        |100158      |
+ROW   |40          |100158        |100159      |
+ROW   |41          |100160        |100161      |
+ROW   |42          |100161        |100162      |
+ROW   |43          |100162        |100163      |
+ROW   |44          |100163        |100164      |
+
 TABLE |functions
-FIELDS|functionid|itemid|triggerid|name     |parameter|
-ROW   |10199     |10019 |10016    |diff     |0        |
-ROW   |10204     |10055 |10041    |last     |0        |
-ROW   |10207     |10058 |10044    |diff     |0        |
-ROW   |10208     |10057 |10043    |diff     |0        |
-ROW   |10233     |10009 |10190    |last     |0        |
-ROW   |12144     |22182 |13000    |avg      |#3       |
-ROW   |12333     |22550 |13134    |last     |0        |
-ROW   |12334     |22549 |13135    |last     |0        |
-ROW   |12335     |22551 |13136    |last     |0        |
-ROW   |12336     |22552 |13137    |last     |0        |
-ROW   |12345     |22553 |13138    |last     |0        |
-ROW   |12549     |22232 |13025    |max      |#3       |
-ROW   |12550     |10020 |10047    |max      |#3       |
-ROW   |12553     |10056 |10042    |last     |0        |
-ROW   |12555     |10013 |10011    |last     |0        |
-ROW   |12580     |17350 |10012    |last     |0        |
-ROW   |12583     |10025 |10021    |change   |0        |
-ROW   |12586     |10010 |10010    |last     |0        |
-ROW   |12589     |17362 |13243    |last     |0        |
-ROW   |12592     |22686 |13266    |last     |0        |
-ROW   |12598     |22454 |13272    |last     |0        |
-ROW   |12657     |22554 |13139    |last     |0        |
-ROW   |12659     |22696 |13277    |last     |0        |
-ROW   |12661     |22691 |13133    |last     |0        |
-ROW   |12663     |22694 |13279    |last     |0        |
-ROW   |12665     |22692 |13281    |last     |0        |
-ROW   |12667     |22548 |13283    |last     |0        |
-ROW   |12669     |22698 |13285    |last     |0        |
-ROW   |12926     |22231 |13026    |diff     |0        |
-ROW   |12927     |10059 |10045    |diff     |0        |
-ROW   |12936     |23318 |13507    |diff     |0        |
-ROW   |12937     |23319 |13508    |diff     |0        |
-ROW   |12938     |17352 |13509    |fuzzytime|10s      |
-ROW   |12963     |23355 |13534    |diff     |0        |
-ROW   |12964     |23356 |13535    |max      |#3       |
-ROW   |12965     |23357 |13536    |diff     |0        |
-ROW   |12966     |23358 |13537    |last     |0        |
-ROW   |12967     |23359 |13538    |last     |0        |
-ROW   |12968     |23360 |13539    |last     |0        |
-ROW   |12969     |23361 |13540    |last     |0        |
-ROW   |12970     |23365 |13541    |last     |0        |
-ROW   |12971     |23370 |13542    |last     |0        |
-ROW   |12972     |23376 |13543    |diff     |0        |
-ROW   |12973     |23377 |13544    |fuzzytime|10s      |
-ROW   |12974     |23379 |13545    |last     |0        |
-ROW   |12975     |23381 |13546    |diff     |0        |
-ROW   |12976     |23382 |13547    |change   |0        |
-ROW   |12977     |23384 |13548    |diff     |0        |
-ROW   |12978     |23331 |13549    |avg      |#3       |
-ROW   |12979     |23350 |13550    |last     |0        |
-ROW   |12980     |23352 |13551    |last     |0        |
-ROW   |12981     |23388 |13552    |min      |10m      |
-ROW   |12982     |22189 |13553    |min      |10m      |
-ROW   |12983     |22183 |13554    |min      |10m      |
-ROW   |12984     |23393 |13555    |min      |10m      |
-ROW   |12985     |22185 |13556    |min      |10m      |
-ROW   |12986     |23392 |13557    |min      |10m      |
-ROW   |12987     |22219 |13558    |min      |10m      |
-ROW   |12988     |22424 |13559    |avg      |10m      |
-ROW   |12989     |22412 |13560    |avg      |10m      |
-ROW   |12991     |22430 |13562    |avg      |10m      |
-ROW   |12992     |22422 |13563    |avg      |10m      |
-ROW   |12993     |22406 |13564    |avg      |10m      |
-ROW   |12994     |22408 |13565    |avg      |30m      |
-ROW   |12995     |22402 |13566    |avg      |10m      |
-ROW   |12996     |22418 |13567    |avg      |10m      |
-ROW   |12997     |22416 |13568    |avg      |10m      |
-ROW   |12998     |22689 |13569    |avg      |10m      |
-ROW   |12999     |22399 |13570    |avg      |10m      |
-ROW   |13000     |22420 |13571    |avg      |10m      |
-ROW   |13001     |22414 |13572    |min      |10m      |
-ROW   |13002     |23171 |13573    |avg      |10m      |
-ROW   |13003     |22426 |13574    |avg      |10m      |
-ROW   |13004     |22404 |13575    |avg      |10m      |
-ROW   |13005     |22400 |13576    |avg      |10m      |
-ROW   |13006     |23391 |13577    |last     |         |
-ROW   |13007     |23387 |13578    |avg      |10m      |
-ROW   |13008     |23395 |13579    |min      |10m      |
-ROW   |13009     |23341 |13580    |min      |10m      |
-ROW   |13010     |23342 |13581    |min      |10m      |
-ROW   |13011     |23400 |13582    |min      |10m      |
-ROW   |13012     |23344 |13583    |min      |10m      |
-ROW   |13013     |23399 |13584    |min      |10m      |
-ROW   |13014     |23339 |13585    |min      |10m      |
-ROW   |13015     |23320 |13586    |avg      |10m      |
-ROW   |13016     |23321 |13587    |avg      |10m      |
-ROW   |13018     |23323 |13589    |avg      |10m      |
-ROW   |13019     |23324 |13590    |avg      |10m      |
-ROW   |13020     |23325 |13591    |avg      |10m      |
-ROW   |13021     |23326 |13592    |avg      |30m      |
-ROW   |13022     |23327 |13593    |avg      |10m      |
-ROW   |13023     |23328 |13594    |avg      |10m      |
-ROW   |13024     |23329 |13595    |avg      |10m      |
-ROW   |13025     |23330 |13596    |avg      |10m      |
-ROW   |13026     |23332 |13597    |avg      |10m      |
-ROW   |13027     |23333 |13598    |avg      |10m      |
-ROW   |13028     |23334 |13599    |min      |10m      |
-ROW   |13029     |23335 |13600    |avg      |10m      |
-ROW   |13030     |23336 |13601    |avg      |10m      |
-ROW   |13031     |23337 |13602    |avg      |10m      |
-ROW   |13032     |23338 |13603    |avg      |10m      |
-ROW   |13033     |23398 |13604    |last     |         |
-ROW   |13034     |23394 |13605    |avg      |10m      |
-ROW   |13035     |23418 |13606    |min      |10m      |
-ROW   |13036     |23419 |13607    |min      |10m      |
-ROW   |13037     |23420 |13608    |min      |10m      |
-ROW   |13038     |23416 |13609    |min      |10m      |
-ROW   |13039     |23401 |13610    |avg      |10m      |
-ROW   |13040     |23402 |13611    |avg      |10m      |
-ROW   |13041     |23403 |13612    |avg      |10m      |
-ROW   |13042     |23404 |13613    |avg      |10m      |
-ROW   |13043     |23405 |13614    |avg      |10m      |
-ROW   |13044     |23406 |13615    |avg      |30m      |
-ROW   |13045     |23407 |13616    |avg      |10m      |
-ROW   |13046     |23408 |13617    |avg      |10m      |
-ROW   |13047     |23409 |13618    |avg      |10m      |
-ROW   |13048     |23410 |13619    |avg      |10m      |
-ROW   |13049     |23411 |13620    |avg      |10m      |
-ROW   |13050     |23412 |13621    |avg      |10m      |
-ROW   |13051     |23413 |13622    |avg      |10m      |
-ROW   |13052     |23414 |13623    |avg      |10m      |
-ROW   |13053     |23415 |13624    |avg      |10m      |
-ROW   |100100    |100100|100100   |last     |         |
-ROW   |100101    |100101|100101   |last     |         |
-ROW   |100102    |100102|100102   |last     |         |
-ROW   |100103    |100103|100103   |last     |         |
-ROW   |100104    |100104|100104   |last     |         |
+FIELDS|functionid|itemid|triggerid|name     |parameter                             |
+ROW   |10199     |10019 |10016    |diff     |0                                     |
+ROW   |10204     |10055 |10041    |last     |0                                     |
+ROW   |10207     |10058 |10044    |diff     |0                                     |
+ROW   |10208     |10057 |10043    |diff     |0                                     |
+ROW   |10233     |10009 |10190    |last     |0                                     |
+ROW   |12144     |22182 |13000    |avg      |#3                                    |
+ROW   |12333     |22550 |13134    |last     |0                                     |
+ROW   |12334     |22549 |13135    |last     |0                                     |
+ROW   |12335     |22551 |13136    |last     |0                                     |
+ROW   |12336     |22552 |13137    |last     |0                                     |
+ROW   |12345     |22553 |13138    |last     |0                                     |
+ROW   |12549     |22232 |13025    |max      |#3                                    |
+ROW   |12550     |10020 |10047    |max      |#3                                    |
+ROW   |12553     |10056 |10042    |last     |0                                     |
+ROW   |12555     |10013 |10011    |last     |0                                     |
+ROW   |12580     |17350 |10012    |last     |0                                     |
+ROW   |12583     |10025 |10021    |change   |0                                     |
+ROW   |12586     |10010 |10010    |last     |0                                     |
+ROW   |12589     |17362 |13243    |last     |0                                     |
+ROW   |12592     |22686 |13266    |last     |0                                     |
+ROW   |12598     |22454 |13272    |last     |0                                     |
+ROW   |12657     |22554 |13139    |last     |0                                     |
+ROW   |12659     |22696 |13277    |last     |0                                     |
+ROW   |12661     |22691 |13133    |last     |0                                     |
+ROW   |12663     |22694 |13279    |last     |0                                     |
+ROW   |12665     |22692 |13281    |last     |0                                     |
+ROW   |12667     |22548 |13283    |last     |0                                     |
+ROW   |12669     |22698 |13285    |last     |0                                     |
+ROW   |12926     |22231 |13026    |diff     |0                                     |
+ROW   |12927     |10059 |10045    |diff     |0                                     |
+ROW   |12936     |23318 |13507    |diff     |0                                     |
+ROW   |12937     |23319 |13508    |diff     |0                                     |
+ROW   |12938     |17352 |13509    |fuzzytime|10s                                   |
+ROW   |12963     |23355 |13534    |diff     |0                                     |
+ROW   |12964     |23356 |13535    |max      |#3                                    |
+ROW   |12965     |23357 |13536    |diff     |0                                     |
+ROW   |12966     |23358 |13537    |last     |0                                     |
+ROW   |12967     |23359 |13538    |last     |0                                     |
+ROW   |12968     |23360 |13539    |last     |0                                     |
+ROW   |12969     |23361 |13540    |last     |0                                     |
+ROW   |12970     |23365 |13541    |last     |0                                     |
+ROW   |12971     |23370 |13542    |last     |0                                     |
+ROW   |12972     |23376 |13543    |diff     |0                                     |
+ROW   |12973     |23377 |13544    |fuzzytime|10s                                   |
+ROW   |12974     |23379 |13545    |last     |0                                     |
+ROW   |12975     |23381 |13546    |diff     |0                                     |
+ROW   |12976     |23382 |13547    |change   |0                                     |
+ROW   |12977     |23384 |13548    |diff     |0                                     |
+ROW   |12978     |23331 |13549    |avg      |#3                                    |
+ROW   |12979     |23350 |13550    |last     |0                                     |
+ROW   |12980     |23352 |13551    |last     |0                                     |
+ROW   |12981     |23388 |13552    |min      |10m                                   |
+ROW   |12982     |22189 |13553    |min      |10m                                   |
+ROW   |12983     |22183 |13554    |min      |10m                                   |
+ROW   |12984     |23393 |13555    |min      |10m                                   |
+ROW   |12985     |22185 |13556    |min      |10m                                   |
+ROW   |12986     |23392 |13557    |min      |10m                                   |
+ROW   |12987     |22219 |13558    |min      |10m                                   |
+ROW   |12988     |22424 |13559    |avg      |10m                                   |
+ROW   |12989     |22412 |13560    |avg      |10m                                   |
+ROW   |12991     |22430 |13562    |avg      |10m                                   |
+ROW   |12992     |22422 |13563    |avg      |10m                                   |
+ROW   |12993     |22406 |13564    |avg      |10m                                   |
+ROW   |12994     |22408 |13565    |avg      |30m                                   |
+ROW   |12995     |22402 |13566    |avg      |10m                                   |
+ROW   |12996     |22418 |13567    |avg      |10m                                   |
+ROW   |12997     |22416 |13568    |avg      |10m                                   |
+ROW   |12998     |22689 |13569    |avg      |10m                                   |
+ROW   |12999     |22399 |13570    |avg      |10m                                   |
+ROW   |13000     |22420 |13571    |avg      |10m                                   |
+ROW   |13001     |22414 |13572    |min      |10m                                   |
+ROW   |13002     |23171 |13573    |avg      |10m                                   |
+ROW   |13003     |22426 |13574    |avg      |10m                                   |
+ROW   |13004     |22404 |13575    |avg      |10m                                   |
+ROW   |13005     |22400 |13576    |avg      |10m                                   |
+ROW   |13006     |23391 |13577    |last     |                                      |
+ROW   |13007     |23387 |13578    |avg      |10m                                   |
+ROW   |13008     |23395 |13579    |min      |10m                                   |
+ROW   |13009     |23341 |13580    |min      |10m                                   |
+ROW   |13010     |23342 |13581    |min      |10m                                   |
+ROW   |13011     |23400 |13582    |min      |10m                                   |
+ROW   |13012     |23344 |13583    |min      |10m                                   |
+ROW   |13013     |23399 |13584    |min      |10m                                   |
+ROW   |13014     |23339 |13585    |min      |10m                                   |
+ROW   |13015     |23320 |13586    |avg      |10m                                   |
+ROW   |13016     |23321 |13587    |avg      |10m                                   |
+ROW   |13018     |23323 |13589    |avg      |10m                                   |
+ROW   |13019     |23324 |13590    |avg      |10m                                   |
+ROW   |13020     |23325 |13591    |avg      |10m                                   |
+ROW   |13021     |23326 |13592    |avg      |30m                                   |
+ROW   |13022     |23327 |13593    |avg      |10m                                   |
+ROW   |13023     |23328 |13594    |avg      |10m                                   |
+ROW   |13024     |23329 |13595    |avg      |10m                                   |
+ROW   |13025     |23330 |13596    |avg      |10m                                   |
+ROW   |13026     |23332 |13597    |avg      |10m                                   |
+ROW   |13027     |23333 |13598    |avg      |10m                                   |
+ROW   |13028     |23334 |13599    |min      |10m                                   |
+ROW   |13029     |23335 |13600    |avg      |10m                                   |
+ROW   |13030     |23336 |13601    |avg      |10m                                   |
+ROW   |13031     |23337 |13602    |avg      |10m                                   |
+ROW   |13032     |23338 |13603    |avg      |10m                                   |
+ROW   |13033     |23398 |13604    |last     |                                      |
+ROW   |13034     |23394 |13605    |avg      |10m                                   |
+ROW   |13035     |23418 |13606    |min      |10m                                   |
+ROW   |13036     |23419 |13607    |min      |10m                                   |
+ROW   |13037     |23420 |13608    |min      |10m                                   |
+ROW   |13038     |23416 |13609    |min      |10m                                   |
+ROW   |13039     |23401 |13610    |avg      |10m                                   |
+ROW   |13040     |23402 |13611    |avg      |10m                                   |
+ROW   |13041     |23403 |13612    |avg      |10m                                   |
+ROW   |13042     |23404 |13613    |avg      |10m                                   |
+ROW   |13043     |23405 |13614    |avg      |10m                                   |
+ROW   |13044     |23406 |13615    |avg      |30m                                   |
+ROW   |13045     |23407 |13616    |avg      |10m                                   |
+ROW   |13046     |23408 |13617    |avg      |10m                                   |
+ROW   |13047     |23409 |13618    |avg      |10m                                   |
+ROW   |13048     |23410 |13619    |avg      |10m                                   |
+ROW   |13049     |23411 |13620    |avg      |10m                                   |
+ROW   |13050     |23412 |13621    |avg      |10m                                   |
+ROW   |13051     |23413 |13622    |avg      |10m                                   |
+ROW   |13052     |23414 |13623    |avg      |10m                                   |
+ROW   |13053     |23415 |13624    |avg      |10m                                   |
+ROW   |100100    |100100|100100   |last     |                                      |
+ROW   |100101    |100101|100101   |last     |                                      |
+ROW   |100102    |100102|100102   |last     |                                      |
+ROW   |100103    |100103|100103   |last     |                                      |
+ROW   |100104    |100104|100104   |last     |                                      |
+ROW   |100105    |100133|100105   |max      |#{$RSM.INCIDENT.DNS.FAIL}             |
+ROW   |100106    |100133|100105   |count    |#{$RSM.INCIDENT.DNS.RECOVER},0,"eq"   |
+ROW   |100107    |100134|100106   |last     |0                                     |
+ROW   |100108    |100135|100107   |last     |0                                     |
+ROW   |100109    |100135|100108   |last     |0                                     |
+ROW   |100110    |100135|100109   |last     |0                                     |
+ROW   |100111    |100135|100110   |last     |0                                     |
+ROW   |100112    |100135|100111   |last     |0                                     |
+ROW   |100113    |100138|100112   |last     |                                      |
+ROW   |100114    |100138|100113   |last     |                                      |
+ROW   |100115    |100138|100114   |last     |                                      |
+ROW   |100116    |100138|100115   |last     |                                      |
+ROW   |100117    |100138|100116   |last     |                                      |
+ROW   |100118    |100141|100117   |last     |                                      |
+ROW   |100119    |100141|100118   |last     |                                      |
+ROW   |100120    |100141|100119   |last     |                                      |
+ROW   |100121    |100141|100120   |last     |                                      |
+ROW   |100122    |100141|100121   |last     |                                      |
+ROW   |100123    |100144|100122   |last     |                                      |
+ROW   |100124    |100144|100123   |last     |                                      |
+ROW   |100125    |100144|100124   |last     |                                      |
+ROW   |100126    |100144|100125   |last     |                                      |
+ROW   |100127    |100144|100126   |last     |                                      |
+ROW   |100128    |100145|100127   |max      |#{$RSM.INCIDENT.DNSSEC.FAIL}          |
+ROW   |100129    |100145|100127   |count    |#{$RSM.INCIDENT.DNSSEC.RECOVER},0,"eq"|
+ROW   |100130    |100146|100128   |last     |0                                     |
+ROW   |100131    |100146|100129   |last     |0                                     |
+ROW   |100132    |100146|100130   |last     |0                                     |
+ROW   |100133    |100146|100131   |last     |0                                     |
+ROW   |100134    |100146|100132   |last     |0                                     |
+ROW   |100135    |100147|100133   |max      |#{$RSM.INCIDENT.RDAP.FAIL}            |
+ROW   |100136    |100147|100133   |count    |#{$RSM.INCIDENT.RDAP.RECOVER},0,"eq"  |
+ROW   |100137    |100148|100134   |last     |0                                     |
+ROW   |100138    |100148|100135   |last     |0                                     |
+ROW   |100139    |100148|100136   |last     |0                                     |
+ROW   |100140    |100148|100137   |last     |0                                     |
+ROW   |100141    |100148|100138   |last     |0                                     |
+ROW   |100142    |100149|100139   |last     |0                                     |
+ROW   |100143    |100149|100140   |last     |0                                     |
+ROW   |100144    |100149|100141   |last     |0                                     |
+ROW   |100145    |100149|100142   |last     |0                                     |
+ROW   |100146    |100149|100143   |last     |0                                     |
+ROW   |100147    |100152|100144   |last     |                                      |
+ROW   |100148    |100152|100145   |last     |                                      |
+ROW   |100149    |100152|100146   |last     |                                      |
+ROW   |100150    |100152|100147   |last     |                                      |
+ROW   |100151    |100152|100148   |last     |                                      |
+ROW   |100152    |100153|100149   |max      |#{$RSM.INCIDENT.RDDS.FAIL}            |
+ROW   |100153    |100153|100149   |count    |#{$RSM.INCIDENT.RDDS.RECOVER},0,"eq"  |
+ROW   |100154    |100154|100150   |last     |0                                     |
+ROW   |100155    |100154|100151   |last     |0                                     |
+ROW   |100156    |100154|100152   |last     |0                                     |
+ROW   |100157    |100154|100153   |last     |0                                     |
+ROW   |100158    |100154|100154   |last     |0                                     |
+ROW   |100159    |100155|100155   |last     |0                                     |
+ROW   |100160    |100155|100156   |last     |0                                     |
+ROW   |100161    |100155|100157   |last     |0                                     |
+ROW   |100162    |100155|100158   |last     |0                                     |
+ROW   |100163    |100155|100159   |last     |0                                     |
+ROW   |100164    |100158|100160   |last     |                                      |
+ROW   |100165    |100158|100161   |last     |                                      |
+ROW   |100166    |100158|100162   |last     |                                      |
+ROW   |100167    |100158|100163   |last     |                                      |
+ROW   |100168    |100158|100164   |last     |                                      |
 
 TABLE |graphs
 FIELDS|graphid|name                                |width|height|yaxismin|yaxismax|templateid|show_work_period|show_triggers|graphtype|show_legend|show_3d|percent_left|percent_right|ymin_type|ymax_type|ymin_itemid|ymax_itemid|flags|
@@ -804,6 +1008,10 @@ ROW   |1001       |100001|110    |
 ROW   |1002       |100002|1      |
 ROW   |1003       |100003|1      |
 ROW   |1004       |100004|1      |
+ROW   |1005       |100005|1      |
+ROW   |1006       |100006|1      |
+ROW   |1007       |100007|1      |
+ROW   |1008       |100008|1      |
 
 TABLE |hosts_templates
 FIELDS|hosttemplateid|hostid|templateid|
@@ -1104,6 +1312,17 @@ ROW   |100127   |1009         |100129|
 ROW   |100128   |1009         |100130|
 ROW   |100129   |1010         |100131|
 ROW   |100130   |1010         |100132|
+ROW   |100131   |1012         |100133|
+ROW   |100132   |1011         |100134|
+ROW   |100133   |1013         |100135|
+ROW   |100134   |1011         |100136|
+ROW   |100135   |1011         |100137|
+ROW   |100136   |1011         |100138|
+ROW   |100137   |1011         |100139|
+ROW   |100138   |1011         |100140|
+ROW   |100139   |1011         |100141|
+ROW   |100140   |1012         |100143|
+ROW   |100141   |1011         |100144|
 
 TABLE |mappings
 FIELDS|mappingid|valuemapid|value|newvalue                                                                                                |
@@ -1431,6 +1650,8 @@ ROW   |73             |100123|100121       |
 ROW   |74             |100124|100122       |
 ROW   |75             |100125|100122       |
 ROW   |76             |100126|100122       |
+ROW   |77             |100143|100142       |
+ROW   |78             |100144|100142       |
 
 TABLE |application_template
 FIELDS|application_templateid|applicationid|templateid|
