@@ -346,6 +346,7 @@ static int	DBpatch_4050012(void)
 	return DBmodify_field_type("users", &field, NULL);
 }
 
+/* 4050012, 1 - RSM FY20 */
 static int	DBpatch_4050012_1(void)
 {
 	/* this patch begins RSM FY20 upgrade sequence and has been intentionally left blank */
@@ -353,6 +354,7 @@ static int	DBpatch_4050012_1(void)
 	return SUCCEED;
 }
 
+/* 4050012, 2 - set delay as macro for rsm.dns.*, rsm.rdds*, rsm.rdap* and rsm.epp* items items */
 static int	DBpatch_4050012_2(void)
 {
 	int	ret = FAIL;
@@ -379,6 +381,7 @@ typedef struct
 }
 macro_descr_t;
 
+/* 4050012, 3 - set global macro descriptions */
 static int	DBpatch_4050012_3(void)
 {
 	/* this patch function has been generated automatically by extract_macros.pl */
@@ -779,6 +782,7 @@ static int	DBpatch_4050012_3(void)
 	return SUCCEED;
 }
 
+/* 4050012, 4 - set host macro descriptions */
 static int	DBpatch_4050012_4(void)
 {
 	/* this patch function has been generated automatically by extract_macros.pl */
@@ -869,6 +873,7 @@ static int	DBpatch_4050012_4(void)
 	return SUCCEED;
 }
 
+/* 4050012, 5 - disable "db watchdog" internal items */
 static int	DBpatch_4050012_5(void)
 {
 	int	ret;
@@ -884,6 +889,7 @@ static int	DBpatch_4050012_5(void)
 	return SUCCEED;
 }
 
+/* 4050012, 6 - upgrade "TLDs" action (upgrade process to Zabbix 4.x failed to upgrade it) */
 static int	DBpatch_4050012_6(void)
 {
 	int		ret = FAIL;
@@ -906,6 +912,7 @@ out:
 	return ret;
 }
 
+/* 4050012, 7 - add "DNS test mode" and "Transport protocol" value mappings */
 static int	DBpatch_4050012_7(void)
 {
 	int	ret = FAIL;
@@ -949,6 +956,7 @@ out:
 	return ret;
 }
 
+/* 4050012, 8 - add DNS test related global macros */
 static int	DBpatch_4050012_8(void)
 {
 	int	ret = FAIL;
@@ -975,12 +983,14 @@ out:
 	return ret;
 }
 
+/* 4050012, 9 - add "Template DNS Test" template */
 static int	DBpatch_4050012_9(void)
 {
 	int		ret = FAIL;
 
 	zbx_uint64_t	groupid_templates;				/* groupid of "Templates" host group */
 
+	zbx_uint64_t	valuemapid_service_state;			/* valuemapid of "Service state" */
 	zbx_uint64_t	valuemapid_rsm_service_availability;		/* valuemapid of "RSM Service Availability" */
 	zbx_uint64_t	valuemapid_dns_test_mode;			/* valuemapid of "DNS test mode" */
 	zbx_uint64_t	valuemapid_transport_protocol;			/* valuemapid of "Transport protocol" */
@@ -995,6 +1005,7 @@ static int	DBpatch_4050012_9(void)
 	zbx_uint64_t	itemid_next;
 	zbx_uint64_t	itemid_dnssec_enabled;				/* itemid of "DNSSEC enabled/disabled" item in "Template DNS Test" template */
 	zbx_uint64_t	itemid_rsm_dns;					/* itemid of "DNS Test" item in "Template DNS Test" template */
+	zbx_uint64_t	itemid_rsm_dns_status;				/* itemid of "Status of a DNS Test" item in "Template DNS Test" template */
 	zbx_uint64_t	itemid_rsm_dns_nssok;				/* itemid of "Number of working Name Servers" item in "Template DNS Test" template */
 	zbx_uint64_t	itemid_rsm_dns_ns_discovery;			/* itemid of "Name Servers discovery" item in "Template DNS Test" template */
 	zbx_uint64_t	itemid_rsm_dns_nsip_discovery;			/* itemid of "NS-IP pairs discovery" item in "Template DNS Test" template */
@@ -1009,6 +1020,7 @@ static int	DBpatch_4050012_9(void)
 
 	GET_HOST_GROUP_ID(groupid_templates, "Templates");
 
+	GET_VALUE_MAP_ID(valuemapid_service_state, "Service state");
 	GET_VALUE_MAP_ID(valuemapid_rsm_service_availability, "RSM Service Availability");
 	GET_VALUE_MAP_ID(valuemapid_dns_test_mode, "DNS test mode");
 	GET_VALUE_MAP_ID(valuemapid_transport_protocol, "Transport protocol");
@@ -1020,9 +1032,10 @@ static int	DBpatch_4050012_9(void)
 	applicationid_dns    = applicationid_next++;
 	applicationid_dnssec = applicationid_next++;
 
-	itemid_next                   = DBget_maxid_num("items", 11);
+	itemid_next                   = DBget_maxid_num("items", 12);
 	itemid_dnssec_enabled         = itemid_next++;
 	itemid_rsm_dns                = itemid_next++;
+	itemid_rsm_dns_status         = itemid_next++;
 	itemid_rsm_dns_nssok          = itemid_next++;
 	itemid_rsm_dns_ns_discovery   = itemid_next++;
 	itemid_rsm_dns_nsip_discovery = itemid_next++;
@@ -1091,12 +1104,18 @@ static int	DBpatch_4050012_9(void)
 		"rsm.dns[{$RSM.TLD},{$RSM.DNS.TESTPREFIX},{$RSM.DNS.NAME.SERVERS},{$RSM.TLD.DNSSEC.ENABLED},"
 			"{$RSM.TLD.RDDS.ENABLED},{$RSM.TLD.EPP.ENABLED},{$RSM.TLD.DNS.UDP.ENABLED},"
 			"{$RSM.TLD.DNS.TCP.ENABLED},{$RSM.IP4.ENABLED},{$RSM.IP6.ENABLED},{$RSM.RESOLVER},"
-			"{$RSM.DNS.UDP.RTT.HIGH},{$RSM.DNS.TCP.RTT.HIGH}]",
+			"{$RSM.DNS.UDP.RTT.HIGH},{$RSM.DNS.TCP.RTT.HIGH},{$RSM.DNS.TEST.TCP.RATIO},"
+			"{$RSM.DNS.TEST.RECOVER},{$RSM.DNS.AVAIL.MINNS}]",
 		"{$RSM.DNS.UDP.DELAY}", "0", "0",
 		ITEM_VALUE_TYPE_TEXT, (zbx_uint64_t)0, "", 0,
 		"Master item that performs the test and generates JSON with results."
 			" This JSON will be parsed by dependent items. History must be disabled.",
 		"30d", (zbx_uint64_t)0);
+	DB_EXEC(SQL, itemid_rsm_dns_status, ITEM_TYPE_DEPENDENT, hostid,
+		"Status of a DNS Test", "rsm.dns.status", "0", "90d", "365d",
+		ITEM_VALUE_TYPE_UINT64, valuemapid_service_state, "", 0,
+		"Status of a DNS Test, one of 1 (Up) or 0 (Down).",
+		"30d", itemid_rsm_dns);
 	DB_EXEC(SQL, itemid_rsm_dns_nssok, ITEM_TYPE_DEPENDENT, hostid,
 		"Number of working Name Servers", "rsm.dns.nssok", "0", "90d", "365d",
 		ITEM_VALUE_TYPE_UINT64, (zbx_uint64_t)0, "", 0,
@@ -1161,6 +1180,7 @@ static int	DBpatch_4050012_9(void)
 #define SQL	"insert into items_applications set itemappid=" ZBX_FS_UI64 ",applicationid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64
 	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicationid_dnssec, itemid_dnssec_enabled);
 	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicationid_dns   , itemid_rsm_dns);
+	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicationid_dns   , itemid_rsm_dns_status);
 	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicationid_dns   , itemid_rsm_dns_nssok);
 	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicationid_dns   , itemid_rsm_dns_ns_status);
 	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicationid_dns   , itemid_rsm_dns_rtt_tcp);
@@ -1182,6 +1202,8 @@ static int	DBpatch_4050012_9(void)
 		" item_preprocid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64 ",step=%d,type=%d,params='%s',"			\
 		"error_handler=%d,error_handler_params=''"
 	/* type 12 = ZBX_PREPROC_JSONPATH */
+	DB_EXEC(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_dns_status, 1, 12,
+			"$.status", 0);
 	DB_EXEC(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_dns_nssok, 1, 12,
 			"$.nssok", 0);
 	DB_EXEC(SQL, DBget_maxid_num("item_preproc", 1), itemid_rsm_dns_ns_discovery, 1, 12,
@@ -1213,6 +1235,7 @@ out:
 	return ret;
 }
 
+/* 4050012, 10 - add "Template RDDS Test" template */
 static int	DBpatch_4050012_10(void)
 {
 	int		ret = FAIL;
@@ -1360,6 +1383,7 @@ out:
 	return ret;
 }
 
+/* 4050012, 11 - rename "Template RDAP" to "Template RDAP Test" */
 static int	DBpatch_4050012_11(void)
 {
 	int	ret = FAIL;
@@ -1373,6 +1397,7 @@ out:
 	return ret;
 }
 
+/* 4050012, 12 - add "Template DNS Status" template */
 static int	DBpatch_4050012_12(void)
 {
 	int		ret = FAIL;
@@ -1728,6 +1753,7 @@ out:
 	return ret;
 }
 
+/* 4050012, 13 - add "Template DNSSEC Status" template */
 static int	DBpatch_4050012_13(void)
 {
 	int		ret = FAIL;
@@ -1864,6 +1890,7 @@ out:
 	return ret;
 }
 
+/* 4050012, 14 - add "Template RDAP Status" template */
 static int	DBpatch_4050012_14(void)
 {
 	int		ret = FAIL;
@@ -2095,6 +2122,7 @@ out:
 	return ret;
 }
 
+/* 4050012, 15 - add "Template RDDS Status" template */
 static int	DBpatch_4050012_15(void)
 {
 	int		ret = FAIL;
@@ -2326,6 +2354,7 @@ out:
 	return ret;
 }
 
+/* 4050012, 16 - add "Template Probe Status" template */
 static int	DBpatch_4050012_16(void)
 {
 	int		ret = FAIL;
@@ -2508,6 +2537,7 @@ out:
 	return ret;
 }
 
+/* 4050012, 17 - add "Template Config History" template */
 static int	DBpatch_4050012_17(void)
 {
 	int		ret = FAIL;
@@ -2891,6 +2921,7 @@ out:
 	return ret;
 }
 
+/* 4050012, 18 - convert "<rshmost> <probe>" hosts to use "Template DNS Test" template */
 static int	DBpatch_4050012_18(void)
 {
 	int		ret = FAIL;
@@ -2907,6 +2938,7 @@ static int	DBpatch_4050012_18(void)
 
 	zbx_uint64_t	template_itemid_dnssec_enabled;			/* itemid of "DNSSEC enabled/disabled" item in "Template DNS Test" template */
 	zbx_uint64_t	template_itemid_rsm_dns;			/* itemid of "DNS Test" item in "Template DNS Test" template */
+	zbx_uint64_t	template_itemid_rsm_dns_status;			/* itemid of "Status of a DNS Test" item in "Template DNS Test" template */
 	zbx_uint64_t	template_itemid_rsm_dns_nssok;			/* itemid of "Number of working Name Servers" item in "Template DNS Test" template */
 	zbx_uint64_t	template_itemid_rsm_dns_ns_discovery;		/* itemid of "Name Servers discovery" item in "Template DNS Test" template */
 	zbx_uint64_t	template_itemid_rsm_dns_nsip_discovery;		/* itemid of "NS-IP pairs discovery" item in "Template DNS Test" template */
@@ -2927,6 +2959,7 @@ static int	DBpatch_4050012_18(void)
 
 	GET_TEMPLATE_ITEM_ID(template_itemid_dnssec_enabled        , "Template DNS Test", "dnssec.enabled");
 	GET_TEMPLATE_ITEM_ID_BY_PATTERN(template_itemid_rsm_dns    , "Template DNS Test", "rsm.dns[%]");
+	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_dns_status        , "Template DNS Test", "rsm.dns.status");
 	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_dns_nssok         , "Template DNS Test", "rsm.dns.nssok");
 	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_dns_ns_discovery  , "Template DNS Test", "rsm.dns.ns.discovery");
 	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_dns_nsip_discovery, "Template DNS Test", "rsm.dns.nsip.discovery");
@@ -2970,6 +3003,7 @@ static int	DBpatch_4050012_18(void)
 		zbx_uint64_t	prototype_itemid_rsm_dns_rtt_udp;	/* itemid of "RTT of $1,$2 using $3" item prototype */
 		zbx_uint64_t	itemid_rsm_dns_mode;			/* itemid of "The mode of the Test" item prototype */
 		zbx_uint64_t	itemid_rsm_dns_protocol;		/* itemid of "Transport protocol of the Test" item prototype */
+		zbx_uint64_t	itemid_rsm_dns_status;			/* itemid of "Status of a DNS Test" item */
 		zbx_uint64_t	itemid_rsm_dns_nssok;			/* itemid of "Number of working Name Servers" item */
 
 		ZBX_STR2UINT64(hostid, row[0]);
@@ -3027,6 +3061,10 @@ static int	DBpatch_4050012_18(void)
 		/* create "Transport protocol of the Test" rsm.dns.protocol */
 		CHECK(DBpatch_4050012_18_create_item(&itemid_rsm_dns_protocol,
 				template_itemid_rsm_dns_protocol, hostid, 0, itemid_rsm_dns, applicationid_dns));
+
+		/* create "Status of a DNS Test" rsm.dns.status */
+		CHECK(DBpatch_4050012_18_create_item(&itemid_rsm_dns_status,
+				template_itemid_rsm_dns_status, hostid, 0, itemid_rsm_dns, applicationid_dns));
 
 		/* delete rsm.dns.tcp[{$RSM.TLD}] item */
 		DB_EXEC("delete from items where key_='rsm.dns.tcp[{$RSM.TLD}]' and hostid=" ZBX_FS_UI64, hostid);
@@ -3121,6 +3159,7 @@ out:
 	return ret;
 }
 
+/* 4050012, 19 - convert "<rshmost> <probe>" hosts to use "Template RDDS Test" template */
 static int	DBpatch_4050012_19(void)
 {
 	int		ret = FAIL;
@@ -3300,6 +3339,7 @@ out:
 	return ret;
 }
 
+/* 4050012, 20 - set RDAP master item value_type to the text type */
 static int	DBpatch_4050012_20(void)
 {
 	int	ret = FAIL;
@@ -3314,6 +3354,7 @@ out:
 	return ret;
 }
 
+/* 4050012, 21 - set RDAP calculated items to be dependent items */
 static int	DBpatch_4050012_21(void)
 {
 	int	ret = FAIL;
@@ -3360,6 +3401,7 @@ out:
 	return ret;
 }
 
+/* 4050012, 22 - add item_preproc to RDAP ip and rtt items */
 static int	DBpatch_4050012_22(void)
 {
 	int	ret = FAIL;
@@ -3374,6 +3416,7 @@ out:
 	return ret;
 }
 
+/* 4050012, 23 - convert "<rsmhost>" hosts to use "Template DNS Status" template */
 static int	DBpatch_4050012_23(void)
 {
 	int		ret = FAIL;
@@ -3712,6 +3755,7 @@ out:
 	return ret;
 }
 
+/* 4050012, 24 - convert "<rsmhost>" hosts to use "Template DNSSEC Status" template */
 static int	DBpatch_4050012_24(void)
 {
 	int		ret = FAIL;
@@ -3762,6 +3806,7 @@ out:
 	return ret;
 }
 
+/* 4050012, 25 - convert "<rsmhost>" hosts to use "Template RDAP Status" template */
 static int	DBpatch_4050012_25(void)
 {
 	int		ret = FAIL;
@@ -3824,6 +3869,7 @@ out:
 	return ret;
 }
 
+/* 4050012, 26 - convert "<rsmhost>" hosts to use "Template RDDS Status" template */
 static int	DBpatch_4050012_26(void)
 {
 	int		ret = FAIL;
@@ -3886,6 +3932,7 @@ out:
 	return ret;
 }
 
+/* 4050012, 27 - convert "<probe>" hosts to use "Template Probe Status" template */
 static int	DBpatch_4050012_27(void)
 {
 	int		ret = FAIL;
@@ -4094,6 +4141,7 @@ out:
 	return ret;
 }
 
+/* 4050012, 28 - convert "<rsmhost>" hosts to use "Template Config History" template */
 static int	DBpatch_4050012_28(void)
 {
 	int		ret = FAIL;
@@ -4175,6 +4223,7 @@ out:
 	return ret;
 }
 
+/* 4050012, 29 - convert "Template <rsmhost>" templates into "Template Rsmhost Config <rsmhost>", link to "<rsmhost>" hosts */
 static int	DBpatch_4050012_29(void)
 {
 	int		ret = FAIL;
@@ -4381,6 +4430,7 @@ out:
 	return ret;
 }
 
+/* 4050012, 30 - delete "Template <probe> Status" templates */
 static int	DBpatch_4050012_30(void)
 {
 	int		ret = FAIL;
@@ -4420,6 +4470,7 @@ out:
 	return ret;
 }
 
+/* 4050012, 31 - delete "Template Probe Errors" templates */
 static int	DBpatch_4050012_31(void)
 {
 	int		ret = FAIL;
@@ -4436,6 +4487,7 @@ out:
 	return ret;
 }
 
+/* 4050012, 32 - rename "Template <probe>" template into "Template Probe Config <probe>", link to "<probe>" hosts */
 static int	DBpatch_4050012_32(void)
 {
 	int		ret = FAIL;
