@@ -14,8 +14,8 @@ use RSM;
 use RSMSLV;
 use TLD_constants qw(:api);
 
-my $cfg_keys_in_pattern = 'rsm.rdds[{$RSM.TLD}';
-my $cfg_rdap_key_in = 'rdap[';
+my $keys_in = ['rsm.rdds.status', 'rdap.status'];
+my $rdap_standalone_keys_in = ['rsm.rdds.status'];
 my $cfg_key_out = 'rsm.slv.rdds.avail';
 my $cfg_value_type = ITEM_VALUE_TYPE_UINT64;
 
@@ -63,7 +63,7 @@ slv_exit(SUCCESS) if (keys(%{$cycles_ref}) == 0);
 # %cycles_rdap_standalone for timestamps that fall into period after switch standalone RDAP
 
 my %cycles_rdap_standalone = map {
-	is_rdap_standalone($_) ? ( $_ => delete ${$cycles_ref}{$_}) : ()
+	is_rdap_standalone($_) ? ($_ => delete ${$cycles_ref}{$_}) : ()
 } keys %{$cycles_ref};
 
 my $probes_ref = get_probes('RDDS');
@@ -76,8 +76,8 @@ if (keys(%{$cycles_ref}) > 0)
 		$cycles_ref,
 		$probes_ref,
 		$delay,
-		undef,			# input keys are unknown
-		\&cfg_keys_in_cb,	# callback to get input keys
+		$keys_in,		# input keys
+		undef,			# callback to get input keys is not needed
 		$cfg_key_out,
 		$cfg_minonline,
 		\&check_probe_values,
@@ -93,8 +93,8 @@ if (keys(%cycles_rdap_standalone) > 0)
 		\%cycles_rdap_standalone,
 		$probes_ref,
 		$delay,
-		undef,					# input keys are unknown
-		\&cfg_keys_in_cb_rdap_standalone,	# callback to get input keys
+		$rdap_standalone_keys_in,		# input keys
+		undef,					# callback to get input keys is not needed
 		$cfg_key_out,
 		$cfg_minonline,
 		\&check_probe_values,
@@ -103,30 +103,6 @@ if (keys(%cycles_rdap_standalone) > 0)
 }
 
 slv_exit(SUCCESS);
-
-my $rdap_items;
-
-sub cfg_keys_in_cb($)
-{
-	my $tld = shift;
-
-	$rdap_items = get_templated_items_like("RDAP", $cfg_rdap_key_in) unless (defined($rdap_items));
-
-	# get all RDDS rtt items
-	my $cfg_keys_in = get_templated_items_like($tld, $cfg_keys_in_pattern);
-
-	# add RDAP rtt items
-	push(@{$cfg_keys_in}, @{$rdap_items});
-
-	return $cfg_keys_in;
-}
-
-sub cfg_keys_in_cb_rdap_standalone($)
-{
-	my $tld = shift;
-
-	return get_templated_items_like($tld, $cfg_keys_in_pattern);
-}
 
 # SUCCESS - no values or at least one successful value
 # E_FAIL  - all values unsuccessful
@@ -137,8 +113,8 @@ sub check_probe_values
 	# E. g.:
 	#
 	# {
-	#       rsm.rdds[{$RSM.TLD},"rdds43.example.com","web.whois.example.com"] => [1],
-	#       rdap[...] => [0, 0],
+	#       rsm.rdds.status => [1],
+	#       rdap.status[...] => [0],
 	# }
 
 	if (scalar(keys(%{$values_ref})) == 0)

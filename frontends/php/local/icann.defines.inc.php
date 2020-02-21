@@ -42,7 +42,7 @@ define('RSM_RDAP',			4); // Standalone RDAP
 define('RSM_SLV_MACRO_EPP_AVAIL',	'{$RSM.SLV.EPP.AVAIL}');
 define('RSM_PAGE_SLV',				'{$RSM.ROLLWEEK.THRESHOLDS}');
 define('RSM_ROLLWEEK_SECONDS',		'{$RSM.ROLLWEEK.SECONDS}');
-define('RSM_MIN_DNS_COUNT',			'{$RSM.DNS.AVAIL.MINNS}');
+define('RSM_MIN_DNS_COUNT',			'{$RSM.DNS.AVAIL.MINNS}');	// TODO: remove 3 months after deployment
 define('RSM_DNS_UDP_DELAY',			'{$RSM.DNS.UDP.DELAY}');
 define('RSM_RDDS_DELAY',			'{$RSM.RDDS.DELAY}');
 define('RSM_RDDS_ENABLED',			'{$RSM.RDDS.ENABLED}');
@@ -169,7 +169,7 @@ define('CALCULATED_ITEM_DNS_DELAY',				'rsm.configvalue[RSM.DNS.UDP.DELAY]');
 define('CALCULATED_ITEM_RDDS_DELAY',			'rsm.configvalue[RSM.RDDS.DELAY]');
 define('CALCULATED_ITEM_RDAP_DELAY',			'rsm.configvalue[RSM.RDAP.DELAY]');
 define('CALCULATED_ITEM_EPP_DELAY',				'rsm.configvalue[RSM.EPP.DELAY]');
-define('CALCULATED_ITEM_DNS_AVAIL_MINNS',		'rsm.configvalue[RSM.DNS.AVAIL.MINNS]');
+define('CALCULATED_ITEM_DNS_AVAIL_MINNS',		'rsm.configvalue[RSM.DNS.AVAIL.MINNS]');	// TODO: remove 3 months after deployment
 define('CALCULATED_ITEM_DNS_UDP_RTT_HIGH',		'rsm.configvalue[RSM.DNS.UDP.RTT.HIGH]');
 define('CALCULATED_ITEM_DNS_TCP_RTT_HIGH',		'rsm.configvalue[RSM.DNS.TCP.RTT.HIGH]');
 define('CALCULATED_ITEM_DNS_UDP_RTT_LOW',		'rsm.configvalue[RSM.DNS.UDP.RTT.LOW]');
@@ -205,6 +205,7 @@ define('PROBE_DNS_UDP_RTT',			'rsm.dns.rtt[{#NS},{#IP},udp]');
 define('PROBE_DNS_NSID',			'rsm.dns.nsid[{#NS},{#IP}]');
 define('PROBE_DNS_PROTOCOL',		'rsm.dns.protocol');
 define('PROBE_DNS_NSSOK',			'rsm.dns.nssok');
+define('PROBE_DNS_STATUS',			'rsm.dns.status');
 define('PROBE_DNS_NS_STATUS',		'rsm.dns.ns.status[{#NS}]');
 define('PROBE_RDDS_ITEM',			'rsm.rdds[');
 define('PROBE_EPP_RESULT',			'rsm.epp[');

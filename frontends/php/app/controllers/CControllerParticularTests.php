@@ -108,7 +108,7 @@ class CControllerParticularTests extends CController {
 		}
 
 		if ($data['type'] == RSM_DNS) {
-			$calculated_item_key[] = CALCULATED_ITEM_DNS_AVAIL_MINNS;
+			$calculated_item_key[] = CALCULATED_ITEM_DNS_AVAIL_MINNS;	// TODO: remove 3 months after deployment
 			$calculated_item_key[] = CALCULATED_ITEM_DNS_UDP_RTT_HIGH;
 		}
 
@@ -149,8 +149,8 @@ class CControllerParticularTests extends CController {
 			$macro_item_value = reset($macro_item_value);
 
 			if ($data['type'] == RSM_DNS) {
-				if ($macro_item['key_'] == CALCULATED_ITEM_DNS_AVAIL_MINNS) {
-					$min_dns_count = $macro_item_value['value'];
+				if ($macro_item['key_'] == CALCULATED_ITEM_DNS_AVAIL_MINNS) {	// TODO: remove 3 months after deployment
+					$min_dns_count = $macro_item_value['value'];				// TODO: remove 3 months after deployment
 				}
 				elseif ($macro_item['key_'] == CALCULATED_ITEM_DNS_UDP_RTT_HIGH) {
 					$udp_rtt = $macro_item_value['value'];
@@ -753,7 +753,7 @@ class CControllerParticularTests extends CController {
 				}
 
 				// Calculate Down probes.
-				if (count($nss) - $hosts[$hostId]['value']['fail'] < $min_dns_count) {
+				if (count($nss) - $hosts[$hostId]['value']['fail'] < $min_dns_count) {	// TODO: remove 3 months after deployment
 					$data['downProbes']++;
 					$hosts[$hostId]['class'] = ZBX_STYLE_RED;
 				}

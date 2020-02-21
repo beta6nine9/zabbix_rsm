@@ -262,6 +262,7 @@ class CControllerAggregateDetails extends RSMControllerBase {
 				'key_' => [
 					$ns_status_key.'[',
 					PROBE_DNS_NSSOK,
+					PROBE_DNS_STATUS,
 					CALCULATED_PROBE_RSM_IP4_ENABLED,
 					CALCULATED_PROBE_RSM_IP6_ENABLED
 				]
@@ -285,9 +286,11 @@ class CControllerAggregateDetails extends RSMControllerBase {
 				case PROBE_DNS_NSSOK:
 					// Set Name servers up count.
 					$this->probes[$probeid]['ns_up'] = $value;
-					$this->probes[$probeid]['online_status'] = ($value >= $data['min_dns_count'])
-						? PROBE_UP
-						: PROBE_DOWN;
+					break;
+
+				case PROBE_DNS_STATUS:
+					// Set DNS Test status.
+					$this->probes[$probeid]['online_status'] = $value;
 					break;
 
 				case $ns_status_key:
@@ -313,7 +316,7 @@ class CControllerAggregateDetails extends RSMControllerBase {
 	}
 
 	/**
-	 * This method can be removed after 3 months. For details/explanation see 605.
+	 * This method can be removed 3 months after deployment. For details/explanation see issue 605.
 	 *
 	 */
 	protected function getReportDataOld(array &$data, $time_from, $time_till) {
@@ -498,7 +501,7 @@ class CControllerAggregateDetails extends RSMControllerBase {
 					 * DNS is considered to be UP if selected value is greater or equal to
 					 * rsm.configvalue[RSM.DNS.AVAIL.MINNS] value of <RSM_HOST> at given time.
 					 */
-					$this->probes[$probe_hostid]['online_status'] = ($item_value['value'] >= $data['min_dns_count'])
+					$this->probes[$probe_hostid]['online_status'] = ($item_value['value'] >= $data['min_dns_count'])	// TODO: remove 3 months after deployment
 						? PROBE_UP
 						: PROBE_DOWN;
 				}
@@ -512,7 +515,7 @@ class CControllerAggregateDetails extends RSMControllerBase {
 		$time_from = strtotime(date('Y-m-d H:i:0', $this->getInput('time')));
 		$defaults = [
 			CALCULATED_ITEM_DNS_DELAY => null,
-			CALCULATED_ITEM_DNS_AVAIL_MINNS => null,
+			CALCULATED_ITEM_DNS_AVAIL_MINNS => null,	// TODO: remove 3 months after deployment
 			CALCULATED_ITEM_DNS_UDP_RTT_LOW => 500,
 			CALCULATED_ITEM_DNS_TCP_RTT_LOW => 1500
 		];
@@ -529,7 +532,7 @@ class CControllerAggregateDetails extends RSMControllerBase {
 			'slv_item_name' => $this->slv_item['name'],
 			'type' => $this->getInput('type'),
 			'time' => $time_from,
-			'min_dns_count' => $macro[CALCULATED_ITEM_DNS_AVAIL_MINNS],
+			'min_dns_count' => $macro[CALCULATED_ITEM_DNS_AVAIL_MINNS],	// TODO: remove 3 months after deployment
 			'udp_rtt' => $macro[CALCULATED_ITEM_DNS_UDP_RTT_LOW],
 			'tcp_rtt' => $macro[CALCULATED_ITEM_DNS_TCP_RTT_LOW],
 			'test_error_message' => $this->getValueMapping(RSM_DNS_RTT_ERRORS_VALUE_MAP),
@@ -604,7 +607,7 @@ class CControllerAggregateDetails extends RSMControllerBase {
 			}
 		}
 
-		// Detect old or new format (ICA-605) and envoke getReportData or getReportDataNew.
+		// Detect old or new format (issue 605) and envoke getReportData or getReportDataNew.
 		$old_view = $this->getItemsHistoryValue([
 			'output' => [],
 			'hostids' => array_column($this->probes, 'tldprobe_hostid'),

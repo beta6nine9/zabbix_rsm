@@ -152,8 +152,8 @@ elseif (hasRequest('update')) {
 		updateMessageSettings($messages);
 
 		/**
-		 * This is introduced as part of ICA-425 to solve performance issue in latest data page. At the moment of
-		 * development there was ~640K items that script tried to fetch from database, making page unusable.
+		 * This is introduced as part of issue 425 to solve performance issue in latest data page. At the moment
+		 * of development there was ~640K items that script tried to fetch from database, making page unusable.
 		 *
 		 * To fix that, there is a new profile value introduced that serves only for latest data page as search limit.
 		 *

@@ -358,7 +358,7 @@ foreach ($data['probes'] as $probe) {
 			 * request values of related items. As the result, we cannot detect what is a reason why there are no
 			 * results for sub-service.
 			 *
-			 * See ICA-386 for more details.
+			 * See issue 386 for more details.
 			 */
 			if (!array_key_exists('rdds_43_base_url', $data) && $rdds43 === $no_result) {
 				$rdds43 = $disabled;

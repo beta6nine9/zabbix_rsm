@@ -3637,7 +3637,7 @@ static int	zbx_split_url(const char *url, char **proto, char **domain, int *port
 }
 
 static void	create_rsm_rdds_json(struct zbx_json *json, const char *ip43, int rtt43, int upd43, const char *ip80,
-		int rtt80, int rdds_result)
+		int rtt80, int status)
 {
 	zbx_json_init(json, 2 * ZBX_KIBIBYTE);
 
@@ -3659,7 +3659,7 @@ static void	create_rsm_rdds_json(struct zbx_json *json, const char *ip43, int rt
 
 	zbx_json_close(json);
 
-	zbx_json_addint64(json, "result", rdds_result);
+	zbx_json_addint64(json, "status", status);
 }
 
 #define VALIDATE_PARAM_HOST_LIST(var_tpl, str_tpl)							\
@@ -4036,17 +4036,13 @@ out:
 	return ret;
 }
 
-static void	create_rsm_rdap_json(struct zbx_json *json, const char *ip, int rtt, int result)
+static void	create_rsm_rdap_json(struct zbx_json *json, const char *ip, int rtt, int status)
 {
 	zbx_json_init(json, 2 * ZBX_KIBIBYTE);
 
-	zbx_json_addobject(json, "rdap");
-
 	zbx_json_addstring(json, "ip", ip, ZBX_JSON_TYPE_STRING);
 	zbx_json_addint64(json, "rtt", rtt);
-	zbx_json_addint64(json, "result", result);
-
-	zbx_json_close(json);
+	zbx_json_addint64(json, "status", status);
 
 	zbx_json_close(json);
 }

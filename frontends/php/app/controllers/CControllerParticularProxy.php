@@ -127,7 +127,7 @@ class CControllerParticularProxy extends CController {
 		$macro_item_key[] = CALCULATED_ITEM_DNS_UDP_RTT_HIGH;
 		if ($data['type'] == RSM_DNS) {
 			$macro_item_key[] = CALCULATED_ITEM_DNS_DELAY;
-			$macro_item_key[] = CALCULATED_ITEM_DNS_AVAIL_MINNS;
+			$macro_item_key[] = CALCULATED_ITEM_DNS_AVAIL_MINNS;	// TODO: remove 3 months after deployment
 		}
 		elseif ($data['type'] == RSM_DNSSEC) {
 			$macro_item_key[] = CALCULATED_ITEM_DNS_DELAY;
