@@ -23,16 +23,6 @@
 #include "log.h"
 
 /*
- * NOTE FOR FUTURE OURSELVES
- *
- * Originally our custom patches went into dbupgrade_4040.c.
- * It was agreed to move them to dbupgrade_4050.c during upgrading to Zabbix 4.5.
- * It was also agreed to move them to dbupgrade_5000.c when we move to Zabbix 5.0.
- *
- * When these patches are moved to dbupgrade_5000.c, this reminder should be removed.
- */
-
-/*
  * Some common helpers that can be used as one-liners in patches to avoid copy-pasting.
  *
  * Be careful when implementing new helpers - they have to be generic.
@@ -1343,7 +1333,7 @@ static int	DBpatch_4050012_11(void)
 
 	zbx_uint64_t	groupid_templates;		/* groupid of "Templates" host group */
 	zbx_uint64_t	valuemapid_rsm_rdds_rtt;	/* valuemapid of "RSM RDDS rtt" value map */
-	zbx_uint64_t	valuemapid_rsm_rdds_result;	/* valuemapid of "RSM RDDS result" value map */                 /* TODO: check the name of the valuemap */
+	zbx_uint64_t	valuemapid_rsm_rdds_result;	/* valuemapid of "RSM RDDS result" value map */
 
 	zbx_uint64_t	hostid;				/* hostid of "Template RDDS Test" template */
 
@@ -1356,7 +1346,7 @@ static int	DBpatch_4050012_11(void)
 	zbx_uint64_t	itemid_rsm_rdds;		/* itemid of "rsm.rdds[]" item */
 	zbx_uint64_t	itemid_rsm_rdds43_ip;		/* itemid of "rsm.rdds.43.ip" item */
 	zbx_uint64_t	itemid_rsm_rdds43_rtt;		/* itemid of "rsm.rdds.43.rtt" item */
-	zbx_uint64_t	itemid_rsm_rdds_status;		/* itemid of "rsm.rdds.status" item */                          /* TODO: check key, variable's name */
+	zbx_uint64_t	itemid_rsm_rdds_status;		/* itemid of "rsm.rdds.status" item */
 	zbx_uint64_t	itemid_rsm_rdds80_ip;		/* itemid of "rsm.rdds.80.ip" item */
 	zbx_uint64_t	itemid_rsm_rdds80_rtt;		/* itemid of "rsm.rdds.80.rtt" item */
 
@@ -1364,7 +1354,7 @@ static int	DBpatch_4050012_11(void)
 
 	GET_HOST_GROUP_ID(groupid_templates, "Templates");
 	GET_VALUE_MAP_ID(valuemapid_rsm_rdds_rtt, "RSM RDDS rtt");
-	GET_VALUE_MAP_ID(valuemapid_rsm_rdds_result, "RSM RDDS result");                                                /* TODO: check the name of the valuemap */
+	GET_VALUE_MAP_ID(valuemapid_rsm_rdds_result, "RSM RDDS result");
 
 	hostid = DBget_maxid_num("hosts", 1);
 
@@ -1444,7 +1434,7 @@ static int	DBpatch_4050012_11(void)
 		itemid_rsm_rdds);
 	DB_EXEC(SQL, itemid_rsm_rdds_status, 18, hostid, "Status of RDDS Test",
 		"rsm.rdds.status",
-		"0", "90d", "365d", 3, valuemapid_rsm_rdds_result,                                                      /* TODO: check values */
+		"0", "90d", "365d", 3, valuemapid_rsm_rdds_result,
 		"Status of RDDS Test: 0 (Down), 1 (Up), 2 (RDDS43 only) or 3 (RDDS80 only).",
 		itemid_rsm_rdds);
 	DB_EXEC(SQL, itemid_rsm_rdds80_ip, 18, hostid, "RDDS80 IP",
@@ -1463,7 +1453,7 @@ static int	DBpatch_4050012_11(void)
 	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds  , itemid_rsm_rdds);
 	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds43, itemid_rsm_rdds43_ip);
 	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds43, itemid_rsm_rdds43_rtt);
-	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds  , itemid_rsm_rdds_status);           /* TODO: check applicationid */
+	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds  , itemid_rsm_rdds_status);
 	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds80, itemid_rsm_rdds80_ip);
 	DB_EXEC(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds80, itemid_rsm_rdds80_rtt);
 #undef SQL
@@ -3175,7 +3165,7 @@ static int	DBpatch_4050012_19(void)
 	zbx_uint64_t	template_applicationid_rdds80;			/* applicationid of "RDDS80" application in "Template RDDS Test" template */
 
 	zbx_uint64_t	template_itemid_rsm_rdds;			/* itemid of "RDDS Test" item in "Template RDDS Test" template */
-	zbx_uint64_t	template_itemid_rsm_rdds_status;		/* itemid of "RDDS Status" item in "Template RDDS Test" template */            /* TODO: check item's name */
+	zbx_uint64_t	template_itemid_rsm_rdds_status;		/* itemid of "Status of RDDS Test" item in "Template RDDS Test" template */
 	zbx_uint64_t	template_itemid_rsm_rdds43_ip;			/* itemid of "RDDS43 IP" item in "Template RDDS Test" template */
 	zbx_uint64_t	template_itemid_rsm_rdds43_rtt;			/* itemid of "RDDS43 RTT" item in "Template RDDS Test" template */
 	zbx_uint64_t	template_itemid_rsm_rdds80_ip;			/* itemid of "RDDS80 IP" item in "Template RDDS Test" template */
@@ -3191,7 +3181,7 @@ static int	DBpatch_4050012_19(void)
 	GET_TEMPLATE_APPLICATION_ID(template_applicationid_rdds80, "Template RDDS Test", "RDDS80");
 
 	GET_TEMPLATE_ITEM_ID_BY_PATTERN(template_itemid_rsm_rdds, "Template RDDS Test", "rsm.rdds[%]");
-	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_rdds_status, "Template RDDS Test", "rsm.rdds.status");                 /* TODO: check values */
+	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_rdds_status, "Template RDDS Test", "rsm.rdds.status");
 	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_rdds43_ip  , "Template RDDS Test", "rsm.rdds.43.ip");
 	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_rdds43_rtt , "Template RDDS Test", "rsm.rdds.43.rtt");
 	GET_TEMPLATE_ITEM_ID(template_itemid_rsm_rdds80_ip  , "Template RDDS Test", "rsm.rdds.80.ip");
@@ -3226,7 +3216,7 @@ static int	DBpatch_4050012_19(void)
 		zbx_uint64_t	applicationid_rdds80;			/* applicationid of "RDDS80" application */
 
 		zbx_uint64_t	itemid_rsm_rdds;			/* itemid of "RDDS Test" item */
-		zbx_uint64_t	itemid_rsm_rdds_status;			/* itemid of "RDDS Status" item */              /* TODO: check item's name */
+		zbx_uint64_t	itemid_rsm_rdds_status;			/* itemid of "Status of RDDS Test" item */
 		zbx_uint64_t	itemid_rsm_rdds43_ip;			/* itemid of "RDDS43 IP" item */
 		zbx_uint64_t	itemid_rsm_rdds43_rtt;			/* itemid of "RDDS43 RTT" item */
 		zbx_uint64_t	itemid_rsm_rdds80_ip;			/* itemid of "RDDS80 IP" item */
