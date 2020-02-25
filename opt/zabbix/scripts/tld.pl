@@ -1285,10 +1285,10 @@ sub create_tld_hosts_on_probes($$$$)
 			'proxy_hostid' => $proxyid,
 			'interfaces'   => [DEFAULT_MAIN_INTERFACE]
 		}));
-
-		set_linked_items_status('rdap[', getopt('tld'), opt('rdap-base-url') && opt('rdap-test-domain'));
-		set_linked_items_status('rsm.rdds[', getopt('tld'), opt('rdds43-servers'));
 	}
+
+	set_linked_items_status('rdap[', getopt('tld'), opt('rdap-base-url') && opt('rdap-test-domain'));
+	set_linked_items_status('rsm.rdds[', getopt('tld'), opt('rdds43-servers'));
 }
 
 sub set_linked_items_status($$$)

@@ -683,10 +683,10 @@ sub create_rsmhosts_on_probes($$$)
 			'proxy_hostid' => $proxyid,
 			'interfaces'   => [DEFAULT_MAIN_INTERFACE]
 		}));
-
-		set_linked_items_status('rdap[', getopt('rr-id'), opt('rdap-base-url') && opt('rdap-test-domain'));
-		set_linked_items_status('rsm.rdds[', getopt('rr-id'), opt('rdds43-servers'));
 	}
+
+	set_linked_items_status('rdap[', getopt('rr-id'), opt('rdap-base-url') && opt('rdap-test-domain'));
+	set_linked_items_status('rsm.rdds[', getopt('rr-id'), opt('rdds43-servers'));
 }
 
 sub set_linked_items_status($$$)
