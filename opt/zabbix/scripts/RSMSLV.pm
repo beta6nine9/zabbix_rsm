@@ -254,9 +254,7 @@ sub get_dns_udp_delay
 
 	my $value = __get_configvalue(RSM_CONFIG_DNS_UDP_DELAY_ITEMID, $value_time);
 
-	return $value if (defined($value));
-
-	return __get_macro('{$RSM.DNS.UDP.DELAY}');
+	return $value // __get_macro('{$RSM.DNS.UDP.DELAY}');
 }
 
 sub get_dns_tcp_delay
@@ -4321,12 +4319,14 @@ sub get_month_bounds(;$)
 	return ($from, $till);
 }
 
-sub get_slv_rtt_cycle_stats($$$$)
+sub get_slv_rtt_cycle_stats($$$$$$)
 {
-	my $tld         = shift;
-	my $rtt_params  = shift;
-	my $cycle_start = shift;
-	my $cycle_end   = shift;
+	my $tld             = shift;
+	my $rtt_params      = shift;
+	my $cycle_start     = shift;
+	my $cycle_end       = shift;
+	my $now             = shift;
+	my $max_nodata_time = shift;
 
 	my $probes                  = $rtt_params->{'probes'};
 	my $rtt_item_key_pattern    = $rtt_params->{'rtt_item_key_pattern'};
@@ -4338,10 +4338,9 @@ sub get_slv_rtt_cycle_stats($$$$)
 		dbg("there are no probes that would be able to collect RTT stats for TLD '$tld', item '$rtt_item_key_pattern'");
 		return {
 			'expected'   => 0,
-			'total'      => 0,
 			'performed'  => 0,
 			'failed'     => 0,
-			'successful' => 0
+			'successful' => 0,
 		};
 	}
 
@@ -4354,10 +4353,9 @@ sub get_slv_rtt_cycle_stats($$$$)
 		dbg("items '$rtt_item_key_pattern' not found for for TLD '$tld'");
 		return {
 			'expected'   => 0,
-			'total'      => 0,
 			'performed'  => 0,
 			'failed'     => 0,
-			'successful' => 0
+			'successful' => 0,
 		};
 	}
 
@@ -4368,25 +4366,31 @@ sub get_slv_rtt_cycle_stats($$$$)
 			" from history" .
 			" where itemid in ($tld_itemids_str) and clock between $cycle_start and $cycle_end");
 
+	if ($rows->[0][0] < scalar(@{$tld_itemids}) && $cycle_end > $now - $max_nodata_time)
+	{
+		# not enough data, try again later
+		return undef;
+	}
+
 	return {
 		'expected'   => scalar(@{$tld_itemids}),        # number of expected tests, based on number of items and number of probes
-		'total'      => $rows->[0][0],                  # number of received values, including errors
 		'performed'  => $rows->[0][1] + $rows->[0][2],  # number of received values, excluding errors (timeout errors are valid values)
 		'failed'     => $rows->[0][1],                  # number of failed tests - timeout errors and successful queries over the time limit
-		'successful' => $rows->[0][2]                   # number of successful tests
+		'successful' => $rows->[0][2],                  # number of successful tests
 	};
 }
 
-sub get_slv_rtt_cycle_stats_aggregated($$$$)
+sub get_slv_rtt_cycle_stats_aggregated($$$$$$)
 {
 	my $rtt_params_list = shift; # array of hashes
 	my $cycle_start     = shift;
 	my $cycle_end       = shift;
 	my $tld             = shift;
+	my $now             = shift;
+	my $max_nodata_time = shift;
 
 	my %aggregated_stats = (
 		'expected'   => 0,
-		'total'      => 0,
 		'performed'  => 0,
 		'failed'     => 0,
 		'successful' => 0
@@ -4399,10 +4403,14 @@ sub get_slv_rtt_cycle_stats_aggregated($$$$)
 			next;
 		}
 
-		my $service_stats = get_slv_rtt_cycle_stats($tld, $rtt_params, $cycle_start, $cycle_end);
+		my $service_stats = get_slv_rtt_cycle_stats($tld, $rtt_params, $cycle_start, $cycle_end, $now, $max_nodata_time);
+
+		if (!defined($service_stats))
+		{
+			return undef;
+		}
 
 		$aggregated_stats{'expected'}   += $service_stats->{'expected'};
-		$aggregated_stats{'total'}      += $service_stats->{'total'};
 		$aggregated_stats{'performed'}  += $service_stats->{'performed'};
 		$aggregated_stats{'failed'}     += $service_stats->{'failed'};
 		$aggregated_stats{'successful'} += $service_stats->{'successful'};
@@ -4571,14 +4579,11 @@ sub update_slv_rtt_monthly_stats($$$$$$$$;$)
 				$params_list = $rdap_standalone_params_list;
 			}
 
-			my $rtt_stats = get_slv_rtt_cycle_stats_aggregated($params_list, $cycle_start, $cycle_end, $tld);
+			my $rtt_stats = get_slv_rtt_cycle_stats_aggregated($params_list, $cycle_start, $cycle_end, $tld, $now, $max_nodata_time);
 
-			if ($rtt_stats->{'total'} < $rtt_stats->{'expected'} && $cycle_end > $now - $max_nodata_time)
+			if (!defined($rtt_stats))
 			{
-				if (opt('debug'))
-				{
-					dbg("stopping updatig TLD '$tld' because of missing data, cycle from $cycle_start till $cycle_end");
-				}
+				dbg("stopping updatig TLD '$tld' because of missing data, cycle from $cycle_start till $cycle_end");
 				next TLD_LOOP;
 			}
 
@@ -4613,16 +4618,16 @@ sub update_slv_rtt_monthly_stats($$$$$$$$;$)
 
 				if ($last_pfailed_value > 0)
 				{
-					fail("unexpected last pfailed value:\n".
-						"\$i                        = $i\n".
-						"\$tld                      = $tld\n".
-						"\$cycles_till_end_of_month = $cycles_till_end_of_month\n".
-						"\$end_of_prev_month        = $end_of_prev_month\n".
-						"\$last_clock               = $last_clock\n".
-						"\$cycle_delay              = $cycle_delay\n".
-						"\$cycle_start              = $cycle_start\n".
-						"\$cycle_end                = $cycle_end\n".
-						"\$last_pfailed_value       = $last_pfailed_value\n".
+					fail("unexpected last pfailed value:\n" .
+						"\$i                        = $i\n" .
+						"\$tld                      = $tld\n" .
+						"\$cycles_till_end_of_month = $cycles_till_end_of_month\n" .
+						"\$end_of_prev_month        = $end_of_prev_month\n" .
+						"\$last_clock               = $last_clock\n" .
+						"\$cycle_delay              = $cycle_delay\n" .
+						"\$cycle_start              = $cycle_start\n" .
+						"\$cycle_end                = $cycle_end\n" .
+						"\$last_pfailed_value       = $last_pfailed_value\n" .
 						"\$rtt_stats->{'expected'}  = $rtt_stats->{'expected'}");
 				}
 			}
