@@ -4328,10 +4328,11 @@ sub get_slv_rtt_cycle_stats($$$$$$)
 	my $now             = shift;
 	my $max_nodata_time = shift;
 
-	my $probes                  = $rtt_params->{'probes'};
-	my $rtt_item_key_pattern    = $rtt_params->{'rtt_item_key_pattern'};
-	my $timeout_error_value     = $rtt_params->{'timeout_error_value'};
-	my $timeout_threshold_value = $rtt_params->{'timeout_threshold_value'};
+	my $probes                     = $rtt_params->{'probes'};
+	my $rtt_item_key_pattern       = $rtt_params->{'rtt_item_key_pattern'};
+	my $lastclock_control_item_key = $rtt_params->{'lastclock_control_item_key'};
+	my $timeout_error_value        = $rtt_params->{'timeout_error_value'};
+	my $timeout_threshold_value    = $rtt_params->{'timeout_threshold_value'};
 
 	if (scalar(keys(%{$probes})) == 0)
 	{
@@ -4359,24 +4360,43 @@ sub get_slv_rtt_cycle_stats($$$$$$)
 		};
 	}
 
-	my $rows = db_select(
+	my $row = db_select_row(
 			"select count(*)," .
 				" count(if(value=$timeout_error_value || value>$timeout_threshold_value,1,null))," .
 				" count(if(value between 0 and $timeout_threshold_value,1,null))" .
 			" from history" .
 			" where itemid in ($tld_itemids_str) and clock between $cycle_start and $cycle_end");
 
-	if ($rows->[0][0] < scalar(@{$tld_itemids}) && $cycle_end > $now - $max_nodata_time)
+	if ($row->[0] < scalar(@{$tld_itemids}) && $cycle_end > $now - $max_nodata_time)
 	{
-		# not enough data, try again later
-		return undef;
+		if (defined($lastclock_control_item_key))
+		{
+			# for DNS, it's not known into which item (i.e., TCP or UDP) RTT value for this cycle is being written;
+			# to check if RTT was already received, check the status of the "lastclock control item" that is being written on each cycle
+
+			my $itemids = get_itemids_by_key_pattern_and_hosts($lastclock_control_item_key, $tld_hosts, ITEM_STATUS_ACTIVE);
+			my $itemids_str = join(",", @{$itemids});
+
+			my $count = db_select_value("select count(*) from lastvalue where itemid in ($itemids_str) and clock>=$cycle_start");
+
+			if ($count < scalar(@{$tld_itemids}))
+			{
+				# not enough data, try again later
+				return undef;
+			}
+		}
+		else
+		{
+			# not enough data, try again later
+			return undef;
+		}
 	}
 
 	return {
-		'expected'   => scalar(@{$tld_itemids}),        # number of expected tests, based on number of items and number of probes
-		'performed'  => $rows->[0][1] + $rows->[0][2],  # number of received values, excluding errors (timeout errors are valid values)
-		'failed'     => $rows->[0][1],                  # number of failed tests - timeout errors and successful queries over the time limit
-		'successful' => $rows->[0][2],                  # number of successful tests
+		'expected'   => scalar(@{$tld_itemids}),  # number of expected tests, based on number of items and number of probes
+		'performed'  => $row->[1] + $row->[2],    # number of received values, excluding errors (timeout errors are valid values)
+		'failed'     => $row->[1],                # number of failed tests - timeout errors and successful queries over the time limit
+		'successful' => $row->[2],                # number of successful tests
 	};
 }
 
