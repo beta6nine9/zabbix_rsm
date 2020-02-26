@@ -43,7 +43,7 @@ define('RSM_SLV_MACRO_EPP_AVAIL',	'{$RSM.SLV.EPP.AVAIL}');
 define('RSM_PAGE_SLV',				'{$RSM.ROLLWEEK.THRESHOLDS}');
 define('RSM_ROLLWEEK_SECONDS',		'{$RSM.ROLLWEEK.SECONDS}');
 define('RSM_MIN_DNS_COUNT',			'{$RSM.DNS.AVAIL.MINNS}');	// TODO: remove 3 months after deployment
-define('RSM_DNS_UDP_DELAY',			'{$RSM.DNS.UDP.DELAY}');
+define('RSM_DNS_DELAY',				'{$RSM.DNS.DELAY}');
 define('RSM_RDDS_DELAY',			'{$RSM.RDDS.DELAY}');
 define('RSM_RDDS_ENABLED',			'{$RSM.RDDS.ENABLED}');
 define('RSM_RDAP_ENABLED',			'{$RSM.RDAP.ENABLED}');
@@ -165,7 +165,7 @@ define('CALCULATED_ITEM_DNSSEC_FAIL',			'rsm.configvalue[RSM.INCIDENT.DNSSEC.FAI
 define('CALCULATED_ITEM_RDDS_FAIL',				'rsm.configvalue[RSM.INCIDENT.RDDS.FAIL]');
 define('CALCULATED_ITEM_RDAP_FAIL',				'rsm.configvalue[RSM.INCIDENT.RDAP.FAIL]');
 define('CALCULATED_ITEM_EPP_FAIL',				'rsm.configvalue[RSM.INCIDENT.EPP.FAIL]');
-define('CALCULATED_ITEM_DNS_DELAY',				'rsm.configvalue[RSM.DNS.UDP.DELAY]');
+define('CALCULATED_ITEM_DNS_DELAY',				'rsm.configvalue[RSM.DNS.DELAY]');
 define('CALCULATED_ITEM_RDDS_DELAY',			'rsm.configvalue[RSM.RDDS.DELAY]');
 define('CALCULATED_ITEM_RDAP_DELAY',			'rsm.configvalue[RSM.RDAP.DELAY]');
 define('CALCULATED_ITEM_EPP_DELAY',				'rsm.configvalue[RSM.EPP.DELAY]');

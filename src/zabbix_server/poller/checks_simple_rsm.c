@@ -71,7 +71,7 @@ extern const char	epp_passphrase[128];
 
 #define ZBX_EC_EPP_NOT_IMPLEMENTED	ZBX_EC_EPP_INTERNAL_GENERAL
 
-#define METADATA_FILE_PREFIX	"/tmp/test-metadata"	/* /tmp/test-metadata-<TLD>.bin */
+#define METADATA_FILE_PREFIX	"/tmp/dns-test-metadata"	/* /tmp/dns-test-metadata-<TLD>.bin */
 
 typedef struct
 {
@@ -2296,14 +2296,14 @@ static void	create_rsm_dns_json(struct zbx_json *json, zbx_ns_t *nss, size_t nss
 	zbx_json_close(json);
 }
 
-int	metadata_file_exists(const char *host, int *file_exists, char *err, size_t err_size)
+static int	metadata_file_exists(const char *domain, int *file_exists, char *err, size_t err_size)
 {
 	char		*file;
 	FILE		*f;
 	zbx_stat_t	buf;
 	int		ret = SUCCEED;
 
-	file = zbx_dsprintf(NULL, "%s-%s.bin", METADATA_FILE_PREFIX, host);
+	file = zbx_dsprintf(NULL, "%s-%s.bin", METADATA_FILE_PREFIX, domain);
 
 	if (0 == zbx_stat(file, &buf))
 	{
@@ -2326,44 +2326,13 @@ out:
 	return ret;
 }
 
-int	write_metadata(const char *host, int current_mode, int successful_tests, char *err, size_t err_size)
+static int	read_metadata(const char *domain, int *current_mode, int *successful_tests, char *err, size_t err_size)
 {
 	char	*file;
 	FILE	*f;
 	int	ret = FAIL;
 
-	file = zbx_dsprintf(NULL, "%s-%s.bin", METADATA_FILE_PREFIX, host);
-
-	if (NULL == (f = fopen(file, "wb")))	/* w for write, b for binary */
-	{
-		zbx_snprintf(err, err_size, "cannot open metadata file \"%s\": %s", file, strerror(errno));
-		goto out;
-	}
-
-	if (1 > fwrite(&current_mode, sizeof(current_mode), 1, f) ||
-			1 > fwrite(&successful_tests, sizeof(successful_tests), 1, f))
-	{
-		zbx_snprintf(err, err_size, "cannot write metadata to file \"%s\"", file);
-		goto out;
-	}
-
-	ret = SUCCEED;
-out:
-	if (NULL != f)
-		fclose(f);
-
-	zbx_free(file);
-
-	return ret;
-}
-
-int	read_metadata(const char *host, int *current_mode, int *successful_tests, char *err, size_t err_size)
-{
-	char	*file;
-	FILE	*f;
-	int	ret = FAIL;
-
-	file = zbx_dsprintf(NULL, "%s-%s.bin", METADATA_FILE_PREFIX, host);
+	file = zbx_dsprintf(NULL, "%s-%s.bin", METADATA_FILE_PREFIX, domain);
 
 	if (NULL == (f = fopen(file, "rb")))	/* r for read, b for binary */
 	{
@@ -2388,14 +2357,65 @@ out:
 	return ret;
 }
 
+static int	write_metadata(const char *domain, int current_mode, int successful_tests, char *err, size_t err_size)
+{
+	char	*file;
+	FILE	*f;
+	int	ret = FAIL;
+
+	file = zbx_dsprintf(NULL, "%s-%s.bin", METADATA_FILE_PREFIX, domain);
+
+	if (NULL == (f = fopen(file, "wb")))	/* w for write, b for binary */
+	{
+		zbx_snprintf(err, err_size, "cannot open metadata file \"%s\": %s", file, strerror(errno));
+		goto out;
+	}
+
+	if (1 > fwrite(&current_mode, sizeof(current_mode), 1, f) ||
+			1 > fwrite(&successful_tests, sizeof(successful_tests), 1, f))
+	{
+		zbx_snprintf(err, err_size, "cannot write metadata to file \"%s\"", file);
+		goto out;
+	}
+
+	ret = SUCCEED;
+out:
+	if (NULL != f)
+		fclose(f);
+
+	zbx_free(file);
+
+	return ret;
+}
+
+static int	delete_metadata(const char *domain, char *err, size_t err_size)
+{
+	char	*file;
+	FILE	*f;
+	int	ret = FAIL;
+
+	file = zbx_dsprintf(NULL, "%s-%s.bin", METADATA_FILE_PREFIX, domain);
+
+	if (0 != unlink(file))
+	{
+		zbx_snprintf(err, err_size, "cannot delete metadata file \"%s\": %s", file, strerror(errno));
+		goto out;
+	}
+
+	ret = SUCCEED;
+out:
+	zbx_free(file);
+
+	return ret;
+}
+
 #define CURRENT_MODE_NORMAL		0
 #define CURRENT_MODE_CRITICAL_UDP	1
 #define CURRENT_MODE_CRITICAL_TCP	2
 
-void	update_metadata(int test_status, int test_recover, char protocol, int *current_mode, int *successful_tests,
-		FILE *log_fd)
+static int	update_metadata(int file_exists, const char *domain, int test_status, int test_recover, char protocol,
+		int *current_mode, int *successful_tests, FILE *log_fd, char *err, size_t err_size)
 {
-
 	if (1 == test_status)
 	{
 		/* test successful */
@@ -2429,6 +2449,16 @@ void	update_metadata(int test_status, int test_recover, char protocol, int *curr
 					(RSM_UDP == protocol ? "UDP" : "TCP"));
 		}
 	}
+
+	if (1 == file_exists && CURRENT_MODE_NORMAL == *current_mode)
+	{
+		/* delete the file */
+		rsm_info(log_fd, "removing the metadata file");
+
+		return delete_metadata(domain, err, err_size);
+	}
+
+	return write_metadata(domain, *current_mode, *successful_tests, err, err_size);
 }
 
 int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *result)
@@ -2587,9 +2617,14 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 		return ret;
 	}
 
+	/* choose test protocol */
 	if (CURRENT_MODE_NORMAL == current_mode)
 	{
 		protocol = ((item->nextcheck / 60) % tcp_ratio) == 0 ? RSM_TCP : RSM_UDP;
+	}
+	else
+	{
+		protocol = (current_mode == CURRENT_MODE_CRITICAL_TCP ? RSM_TCP : RSM_UDP);
 	}
 
 	rtt_limit = (protocol == RSM_UDP ? udp_rtt_limit : tcp_rtt_limit);
@@ -2842,9 +2877,8 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 
 	create_rsm_dns_json(&json, nss, nss_num, current_mode, nssok, test_status, protocol);
 
-	update_metadata(test_status, test_recover, protocol, &current_mode, &successful_tests, log_fd);
-
-	if (SUCCEED != write_metadata(domain, current_mode, successful_tests, err, sizeof(err)))
+	if (SUCCEED != update_metadata(file_exists, domain, test_status, test_recover, protocol, &current_mode,
+			&successful_tests, log_fd, err, sizeof(err)))
 	{
 		rsm_errf(log_fd, "internal error: %s", err);
 	}

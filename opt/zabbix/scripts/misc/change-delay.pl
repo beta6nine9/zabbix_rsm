@@ -17,16 +17,15 @@ usage() unless (__validate_input() == SUCCESS);
 
 my ($macro, $sql, $sth);
 my %macros = (
-	1 => '{$RSM.DNS.UDP.DELAY}',
-	2 => '{$RSM.DNS.TCP.DELAY}',
-	3 => '{$RSM.RDDS.DELAY}',
+	1 => '{$RSM.DNS.DELAY}',
+	2 => '{$RSM.RDDS.DELAY}',
+	3 => '{$RSM.RDAP.DELAY}',
 	4 => '{$RSM.EPP.DELAY}',
-	5 => '{$RSM.RDAP.DELAY}'
 );
 
 db_connect();
 
-if (getopt('type') == 5 && !is_rdap_standalone())
+if (getopt('type') == 3 && !is_rdap_standalone())
 {
 	print("RDAP is not standalone yet\n");
 	exit;
@@ -62,7 +61,7 @@ change-delay.pl - change delay of a particular service
 
 =head1 SYNOPSIS
 
-change-delay.pl --type <1-5> --delay <60-3600> [--dry-run] [--debug] [--help]
+change-delay.pl --type <1-4> --delay <60-3600> [--dry-run] [--debug] [--help]
 
 =head1 OPTIONS
 
@@ -70,7 +69,7 @@ change-delay.pl --type <1-5> --delay <60-3600> [--dry-run] [--debug] [--help]
 
 =item B<--type> number
 
-Specify number of the service: 1 - DNS UDP, 2 - DNS TCP, 3 - RDDS, 4 - EPP, 5 - RDAP (if RDAP is standalone).
+Specify number of the service: 1 - DNS, 2 - RDDS, 3 - RDAP (if RDAP is standalone), 4 - EPP.
 
 =item B<--delay> number
 
@@ -98,6 +97,6 @@ B<This program> will change the delay between particuar test in the system.
 
 ./change-delay.pl --type 2 --delay 120
 
-This will set the delay between DNS TCP tests to 120 seconds.
+This will set the the delay between RDDS tests to 120 seconds.
 
 =cut

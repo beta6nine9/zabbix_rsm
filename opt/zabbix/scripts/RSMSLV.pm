@@ -55,7 +55,7 @@ use constant PROBE_LASTACCESS_ITEM => 'zabbix[proxy,{$RSM.PROXY_NAME},lastaccess
 use constant PROBE_KEY_MANUAL => 'rsm.probe.status[manual]';
 use constant PROBE_KEY_AUTOMATIC => 'rsm.probe.status[automatic,%]'; # match all in SQL
 
-use constant RSM_CONFIG_DNS_UDP_DELAY_ITEMID => 100008;	# rsm.configvalue[RSM.DNS.UDP.DELAY]
+use constant RSM_CONFIG_DNS_DELAY_ITEMID => 100008;	# rsm.configvalue[RSM.DNS.DELAY]
 use constant RSM_CONFIG_RDDS_DELAY_ITEMID => 100009;	# rsm.configvalue[RSM.RDDS.DELAY]
 use constant RSM_CONFIG_EPP_DELAY_ITEMID => 100010;	# rsm.configvalue[RSM.EPP.DELAY]
 use constant RSM_CONFIG_RDAP_DELAY_ITEMID => 100034;	# rsm.configvalue[RSM.RDAP.DELAY]
@@ -102,8 +102,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		get_macro_dns_tcp_rtt_low
 		get_macro_rdds_rtt_low
 		get_macro_rdap_rtt_low
-		get_dns_udp_delay
-		get_dns_tcp_delay
+		get_dns_delay
 		get_rdds_delay
 		get_rdap_delay
 		get_epp_delay
@@ -248,26 +247,13 @@ sub get_macro_rdap_rtt_low
 	return __get_macro('{$RSM.RDAP.RTT.LOW}');
 }
 
-sub get_dns_udp_delay
+sub get_dns_delay
 {
 	my $value_time = (shift or time() - AVAIL_SHIFT_BACK);
 
-	my $value = __get_configvalue(RSM_CONFIG_DNS_UDP_DELAY_ITEMID, $value_time);
+	my $value = __get_configvalue(RSM_CONFIG_DNS_DELAY_ITEMID, $value_time);
 
-	return $value // __get_macro('{$RSM.DNS.UDP.DELAY}');
-}
-
-sub get_dns_tcp_delay
-{
-	my $value_time = (shift or time() - AVAIL_SHIFT_BACK);
-
-	# todo: Export DNS-TCP tests
-	# todo: if we really need DNS-TCP history the item must be added (to db schema and upgrade patch)
-#	my $value = __get_configvalue(RSM_CONFIG_DNS_TCP_DELAY_ITEMID, $value_time);
-#
-#	return $value if (defined($value));
-
-	return __get_macro('{$RSM.DNS.TCP.DELAY}');
+	return $value // __get_macro('{$RSM.DNS.DELAY}');
 }
 
 sub get_rdds_delay

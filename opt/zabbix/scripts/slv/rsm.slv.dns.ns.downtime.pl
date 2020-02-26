@@ -30,12 +30,12 @@ if (!opt('dry-run'))
 		"rsm.slv.dns.ns.downtime[%,%]",
 		1,
 		1,
-		get_dns_udp_delay(getopt('now') // time() - AVAIL_SHIFT_BACK)
+		get_dns_delay(getopt('now') // time() - AVAIL_SHIFT_BACK)
 	);
 }
 
 my $max_cycles = (opt('cycles') ? getopt('cycles') : slv_max_cycles('dns'));
-my $cycle_delay = get_dns_udp_delay();
+my $cycle_delay = get_dns_delay();
 
 init_values();
 process_values();

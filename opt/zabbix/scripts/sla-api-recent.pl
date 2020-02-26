@@ -111,7 +111,7 @@ my $cfg_minns = get_macro_minns();
 fail("number of required working Name Servers is configured as $cfg_minns") if (1 > $cfg_minns);
 
 my %delays;
-$delays{'dns'} = $delays{'dnssec'} = get_dns_udp_delay($now);
+$delays{'dns'} = $delays{'dnssec'} = get_dns_delay($now);
 $delays{'rdds'} = get_rdds_delay($now);
 $delays{'rdap'} = get_rdap_delay($now) if ($rdap_is_standalone);
 

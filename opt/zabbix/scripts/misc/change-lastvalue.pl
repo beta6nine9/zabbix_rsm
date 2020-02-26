@@ -55,12 +55,12 @@ foreach my $service (keys(%keys))
 	if ($service eq 'dns')
 	{
 		$clocks{$service} = getopt('dns-clock');
-		$delays{$service} = get_dns_udp_delay($clocks{$service});
+		$delays{$service} = get_dns_delay($clocks{$service});
 	}
 	elsif ($service eq 'dnssec')
 	{
 		$clocks{$service} = getopt('dns-clock');
-		$delays{$service} = get_dns_udp_delay($clocks{$service});
+		$delays{$service} = get_dns_delay($clocks{$service});
 	}
 	elsif ($service eq 'rdds')
 	{

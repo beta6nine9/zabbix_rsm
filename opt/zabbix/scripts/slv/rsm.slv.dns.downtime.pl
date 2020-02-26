@@ -34,12 +34,12 @@ if (!opt('dry-run'))
 		"rsm.slv.dns.downtime",
 		get_macro_incident_dns_fail(),
 		get_macro_incident_dns_recover(),
-		get_dns_udp_delay(getopt('now') // time() - AVAIL_SHIFT_BACK)
+		get_dns_delay(getopt('now') // time() - AVAIL_SHIFT_BACK)
 	);
 }
 
 # we don't know the cycle bounds yet so we assume it ends at least few minutes back
-my $delay = get_dns_udp_delay(getopt('now') // time() - AVAIL_SHIFT_BACK);
+my $delay = get_dns_delay(getopt('now') // time() - AVAIL_SHIFT_BACK);
 
 my (undef, undef, $max_clock) = get_cycle_bounds($delay, getopt('now'));
 

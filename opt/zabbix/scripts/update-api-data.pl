@@ -252,7 +252,7 @@ foreach my $service (keys(%services))
 	{
 		if (!$cfg_dns_delay)
 		{
-			$cfg_dns_delay = get_dns_udp_delay($check_from);
+			$cfg_dns_delay = get_dns_delay($check_from);
 			$cfg_dns_minns = get_macro_minns();
 			$cfg_dns_valuemaps = get_valuemaps('dns');
 		}

@@ -38,7 +38,7 @@ if (opt('service'))
 {
 	if (getopt('service') eq 'dns')
 	{
-		$delay = get_dns_udp_delay();
+		$delay = get_dns_delay();
 	}
 	elsif (getopt('service') eq 'rdds')
 	{

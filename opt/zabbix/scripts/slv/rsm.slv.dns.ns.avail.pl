@@ -32,7 +32,7 @@ else
 }
 
 my $max_cycles = (opt('cycles') ? getopt('cycles') : slv_max_cycles('dns'));
-my $cycle_delay = get_dns_udp_delay();
+my $cycle_delay = get_dns_delay();
 my $current_month_latest_cycle = current_month_latest_cycle();
 my $cfg_minonline = get_macro_dns_probe_online();
 my $udp_dns_rtt_low = get_rtt_low('dns', PROTO_UDP);
@@ -78,6 +78,7 @@ sub get_slv_dns_ns_avail_items
 		" where i.hostid=$hostid".
 			" and id.itemid=i.itemid".
 			" and id.ts_delete=0".
+			" and i.flags in (${\ZBX_FLAG_DISCOVERY_NORMAL},${\ZBX_FLAG_DISCOVERY_CREATED})".
 			" and i.key_ like '$cfg_key_out_pattern'".
 			" and i.status<>". ITEM_STATUS_DISABLED
 	);
@@ -190,6 +191,7 @@ sub get_all_dns_rtt_itemids
 			" left join item_discovery on item_discovery.itemid = items.itemid" .
 		" where" .
 			" items.key_ like '$cfg_key_in_pattern' and" .
+			" items.flags in (${\ZBX_FLAG_DISCOVERY_NORMAL},${\ZBX_FLAG_DISCOVERY_CREATED}) and" .
 			" item_discovery.ts_delete = 0 and" .
 			" hosts.host like '% %'"
 	);

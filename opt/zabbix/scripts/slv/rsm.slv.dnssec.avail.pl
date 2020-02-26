@@ -29,7 +29,7 @@ slv_exit(SUCCESS) if (get_monitoring_target() ne MONITORING_TARGET_REGISTRY);
 
 # we don't know the rollweek bounds yet so we assume it ends at least few minutes back
 # we use both tcp and udp rtt values, but take the delay value from the udp macro only
-my $delay = get_dns_udp_delay(getopt('now') // time() - AVAIL_SHIFT_BACK);
+my $delay = get_dns_delay(getopt('now') // time() - AVAIL_SHIFT_BACK);
 
 my (undef, undef, $max_clock) = get_cycle_bounds($delay, getopt('now'));
 

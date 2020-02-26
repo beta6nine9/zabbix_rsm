@@ -488,14 +488,14 @@ sub __get_delays
 		{
 			if (!$cfg_dns_delay)
 			{
-				$cfg_dns_delay = get_dns_udp_delay();
+				$cfg_dns_delay = get_dns_delay();
 			}
 
 			$services->{$service}->{'delay'} = $cfg_dns_delay;
 		}
 		elsif ($service eq SERVICE_DNS_TCP)	# Export DNS-TCP tests
 		{
-			$services->{$service}->{'delay'} = get_dns_tcp_delay();
+			$services->{$service}->{'delay'} = get_dns_delay();
 		}
 		elsif ($service eq 'rdds')
 		{
@@ -522,12 +522,12 @@ sub __get_keys
 	{
 		if ($service eq 'dns' || $service eq 'dnssec')
 		{
-			$services->{$service}->{'key_status'} = 'rsm.dns.udp[{$RSM.TLD}]';	# 0 - down, 1 - up
-			$services->{$service}->{'key_rtt'} = 'rsm.dns.udp.rtt[{$RSM.TLD},';
+			$services->{$service}->{'key_status'} = 'rsm.dns.status';	# 0 - down, 1 - up
+TODO			$services->{$service}->{'key_rtt'} = 'rsm.dns.udp.rtt[{$RSM.TLD},';
 		}
 		elsif ($service eq SERVICE_DNS_TCP)	# Export DNS-TCP tests
 		{
-			$services->{$service}->{'key_rtt'} = 'rsm.dns.tcp.rtt[{$RSM.TLD},';
+TODO			$services->{$service}->{'key_rtt'} = 'rsm.dns.tcp.rtt[{$RSM.TLD},';
 		}
 		elsif ($service eq 'rdds')
 		{
@@ -657,7 +657,7 @@ sub __get_test_data
 		{
 			if (!$nsips_ref)
 			{
-				$nsips_ref = get_templated_nsips($tld, $services->{$service}->{'key_rtt'}, 1);	# templated
+				$nsips_ref = get_templated_nsips($tld TODO, $services->{$service}->{'key_rtt'}, 1);	# templated
 			}
 
 			if (!$dns_items_ref)

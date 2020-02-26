@@ -35,7 +35,7 @@ my $till = getopt('till');
 my $tlds_ref = opt('tld') ? [ getopt('tld') ] : get_tlds(undef, $till);
 
 my $delays = {
-	'dns'	=> get_dns_udp_delay(),
+	'dns'	=> get_dns_delay(),
 	'rdds'	=> get_rdds_delay(),
 	'epp'	=> get_epp_delay()
 };

@@ -255,11 +255,11 @@ foreach (@server_keys)
 		{
 			if ($service eq 'dns-udp')
 			{
-				$delays{$service} = get_dns_udp_delay($source_from);
+				$delays{$service} = get_dns_delay($source_from);
 			}
 			elsif ($service eq 'dns-tcp')
 			{
-				$delays{$service} = get_dns_tcp_delay($source_from);
+				$delays{$service} = get_dns_delay($source_from);
 			}
 			elsif ($service eq 'rdds')
 			{

@@ -40,12 +40,12 @@ db_connect();
 if (getopt('service') eq 'dns')
 {
 	$key = 'rsm.slv.dns.avail';
-	$delay = get_dns_udp_delay(getopt('from'));
+	$delay = get_dns_delay(getopt('from'));
 }
 elsif (getopt('service') eq 'dns-ns')
 {
 	$key = 'rsm.slv.dns.ns.avail[';
-	$delay = get_dns_udp_delay(getopt('from'));
+	$delay = get_dns_delay(getopt('from'));
 }
 elsif (getopt('service') eq 'rdds')
 {

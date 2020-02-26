@@ -28,7 +28,7 @@ db_connect();
 slv_exit(SUCCESS) if (get_monitoring_target() ne MONITORING_TARGET_REGISTRY);
 
 # we don't know the rollweek bounds yet so we assume it ends at least few minutes back
-my $delay = get_dns_udp_delay(getopt('now') // time() - AVAIL_SHIFT_BACK);
+my $delay = get_dns_delay(getopt('now') // time() - AVAIL_SHIFT_BACK);
 
 my (undef, undef, $max_clock) = get_cycle_bounds($delay, getopt('now'));
 

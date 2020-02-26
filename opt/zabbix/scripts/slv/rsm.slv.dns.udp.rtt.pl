@@ -51,7 +51,7 @@ update_slv_rtt_monthly_stats(
 	SLV_ITEM_KEY_DNS_UDP_PERFORMED,
 	SLV_ITEM_KEY_DNS_UDP_FAILED,
 	SLV_ITEM_KEY_DNS_UDP_PFAILED,
-	get_dns_udp_delay(),
+	get_dns_delay(),
 	[
 		{
 			'probes'                     => get_probes("IP4"),
