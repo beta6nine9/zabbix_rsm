@@ -917,6 +917,10 @@ static int	DBpatch_4050012_7(void)
 	zbx_uint64_t	mappingid_transport_protocol_udp;	/* mappingid of "UDP" value in "Transport protocol" mapping */
 	zbx_uint64_t	mappingid_transport_protocol_tcp;	/* mappingid of "TCP" value in "Transport protocol" mapping */
 
+	/* It was decided to setup monitoring from scratch rather than upgrade all the configuration, */
+	/* therefore this patch may be obsolete and there's no guarantee that it works correctly.     */
+	goto out;
+
 	ONLY_SERVER();
 
 	valuemapid_next                  = DBget_maxid_num("valuemaps", 2);
@@ -954,6 +958,10 @@ static int	DBpatch_4050012_8(void)
 	zbx_uint64_t	globalmacroid_next;
 	zbx_uint64_t	globalmacroid_rsm_dns_test_tcp_ratio;	/* globalmacroid of "{$RSM.DNS.TEST.TCP.RATIO}" global macro */
 	zbx_uint64_t	globalmacroid_rsm_dns_test_recover;	/* globalmacroid of "{$RSM.DNS.TEST.RECOVER}" global macro */
+
+	/* It was decided to setup monitoring from scratch rather than upgrade all the configuration, */
+	/* therefore this patch may be obsolete and there's no guarantee that it works correctly.     */
+	goto out;
 
 	ONLY_SERVER();
 
@@ -994,6 +1002,10 @@ static int	DBpatch_4050012_9(void)
 	zbx_uint64_t	itemid_dnssec_enabled;		/* itemid of "dnssec.enabled" item */
 	zbx_uint64_t	itemid_rdap_enabled;		/* itemid of "rdap.enabled" item */
 	zbx_uint64_t	itemid_rdds_enabled;		/* itemid of "rdds.enabled" item */
+
+	/* It was decided to setup monitoring from scratch rather than upgrade all the configuration, */
+	/* therefore this patch may be obsolete and there's no guarantee that it works correctly.     */
+	goto out;
 
 	ONLY_SERVER();
 
@@ -1106,6 +1118,10 @@ static int	DBpatch_4050012_10(void)
 	zbx_uint64_t	itemid_rsm_dns_nsid;				/* itemid of "NSID of $1,$2" item prototype in "Template DNS Test" template */
 	zbx_uint64_t	itemid_rsm_dns_rtt_tcp;				/* itemid of "RTT of $1,$2 using $3" item prototype in "Template DNS Test" template */
 	zbx_uint64_t	itemid_rsm_dns_rtt_udp;				/* itemid of "RTT of $1,$2 using $3" item prototype in "Template DNS Test" template */
+
+	/* It was decided to setup monitoring from scratch rather than upgrade all the configuration, */
+	/* therefore this patch may be obsolete and there's no guarantee that it works correctly.     */
+	goto out;
 
 	ONLY_SERVER();
 
@@ -1350,6 +1366,10 @@ static int	DBpatch_4050012_11(void)
 	zbx_uint64_t	itemid_rsm_rdds80_ip;		/* itemid of "rsm.rdds.80.ip" item */
 	zbx_uint64_t	itemid_rsm_rdds80_rtt;		/* itemid of "rsm.rdds.80.rtt" item */
 
+	/* It was decided to setup monitoring from scratch rather than upgrade all the configuration, */
+	/* therefore this patch may be obsolete and there's no guarantee that it works correctly.     */
+	goto out;
+
 	ONLY_SERVER();
 
 	GET_HOST_GROUP_ID(groupid_templates, "Templates");
@@ -1479,6 +1499,10 @@ static int	DBpatch_4050012_12(void)
 {
 	int	ret = FAIL;
 
+	/* It was decided to setup monitoring from scratch rather than upgrade all the configuration, */
+	/* therefore this patch may be obsolete and there's no guarantee that it works correctly.     */
+	goto out;
+
 	ONLY_SERVER();
 
 	DB_EXEC("update hosts set host='Template RDAP Test',name='Template RDAP Test' where host='Template RDAP'");
@@ -1565,6 +1589,10 @@ static int	DBpatch_4050012_13(void)
 	zbx_uint64_t	functionid_ns_ip_downtime_over_50;		/* functionid for "DNS {#NS} ({#IP}) downtime exceeded 50% of allowed $1 minutes" trigger */
 	zbx_uint64_t	functionid_ns_ip_downtime_over_75;		/* functionid for "DNS {#NS} ({#IP}) downtime exceeded 75% of allowed $1 minutes" trigger */
 	zbx_uint64_t	functionid_ns_ip_downtime_over_100;		/* functionid for "DNS {#NS} ({#IP}) downtime exceeded 100% of allowed $1 minutes" trigger */
+
+	/* It was decided to setup monitoring from scratch rather than upgrade all the configuration, */
+	/* therefore this patch may be obsolete and there's no guarantee that it works correctly.     */
+	goto out;
 
 	ONLY_SERVER();
 
@@ -1875,6 +1903,10 @@ static int	DBpatch_4050012_14(void)
 	zbx_uint64_t	functionid_rollweek_over_75;			/* functionid for "DNSSEC rolling week is over 75%" trigger */
 	zbx_uint64_t	functionid_rollweek_over_100;			/* functionid for "DNSSEC rolling week is over 100%" trigger */
 
+	/* It was decided to setup monitoring from scratch rather than upgrade all the configuration, */
+	/* therefore this patch may be obsolete and there's no guarantee that it works correctly.     */
+	goto out;
+
 	ONLY_SERVER();
 
 	GET_HOST_GROUP_ID(groupid_templates, "Templates");
@@ -2035,6 +2067,10 @@ static int	DBpatch_4050012_15(void)
 	zbx_uint64_t	functionid_rtt_pfailed_over_50;			/* functionid for "Ratio of failed RDAP tests exceeded 50% of allowed $1%" trigger */
 	zbx_uint64_t	functionid_rtt_pfailed_over_75;			/* functionid for "Ratio of failed RDAP tests exceeded 75% of allowed $1%" trigger */
 	zbx_uint64_t	functionid_rtt_pfailed_over_100;		/* functionid for "Ratio of failed RDAP tests exceeded 100% of allowed $1%" trigger */
+
+	/* It was decided to setup monitoring from scratch rather than upgrade all the configuration, */
+	/* therefore this patch may be obsolete and there's no guarantee that it works correctly.     */
+	goto out;
 
 	ONLY_SERVER();
 
@@ -2268,6 +2304,10 @@ static int	DBpatch_4050012_16(void)
 	zbx_uint64_t	functionid_rtt_pfailed_over_75;			/* functionid for "Ratio of failed RDDS tests exceeded 75% of allowed $1%" trigger */
 	zbx_uint64_t	functionid_rtt_pfailed_over_100;		/* functionid for "Ratio of failed RDDS tests exceeded 100% of allowed $1%" trigger */
 
+	/* It was decided to setup monitoring from scratch rather than upgrade all the configuration, */
+	/* therefore this patch may be obsolete and there's no guarantee that it works correctly.     */
+	goto out;
+
 	ONLY_SERVER();
 
 	GET_HOST_GROUP_ID(groupid_templates, "Templates");
@@ -2482,6 +2522,10 @@ static int	DBpatch_4050012_17(void)
 	zbx_uint64_t	functionid_probe_disabled_1;			/* functiond for "Probe <host> has been disabled by tests" trigger */
 	zbx_uint64_t	functionid_probe_disabled_2;			/* functiond for "Probe <host> has been disabled for more than ..." trigger */
 	zbx_uint64_t	functionid_probe_knocked_out;			/* functiond for "Probe <host> has been knocked out" trigger */
+
+	/* It was decided to setup monitoring from scratch rather than upgrade all the configuration, */
+	/* therefore this patch may be obsolete and there's no guarantee that it works correctly.     */
+	goto out;
 
 	ONLY_SERVER();
 
@@ -2939,6 +2983,10 @@ static int	DBpatch_4050012_18(void)
 	zbx_uint64_t	template_itemid_rsm_dns_mode;			/* itemid of "The mode of the Test" item prototype in "Template DNS Test" template */
 	zbx_uint64_t	template_itemid_rsm_dns_protocol;		/* itemid of "Transport protocol of the Test" item prototype in "Template DNS Test" template */
 
+	/* It was decided to setup monitoring from scratch rather than upgrade all the configuration, */
+	/* therefore this patch may be obsolete and there's no guarantee that it works correctly.     */
+	goto out;
+
 	ONLY_SERVER();
 
 	GET_HOST_GROUP_ID(groupid_tld_probe_resluts, "TLD Probe results");
@@ -3171,6 +3219,10 @@ static int	DBpatch_4050012_19(void)
 	zbx_uint64_t	template_itemid_rsm_rdds80_ip;			/* itemid of "RDDS80 IP" item in "Template RDDS Test" template */
 	zbx_uint64_t	template_itemid_rsm_rdds80_rtt;			/* itemid of "RDDS80 RTT" item in "Template RDDS Test" template */
 
+	/* It was decided to setup monitoring from scratch rather than upgrade all the configuration, */
+	/* therefore this patch may be obsolete and there's no guarantee that it works correctly.     */
+	goto out;
+
 	ONLY_SERVER();
 
 	GET_HOST_GROUP_ID(groupid_tld_probe_resluts, "TLD Probe results");
@@ -3334,6 +3386,10 @@ static int	DBpatch_4050012_20(void)
 {
 	int	ret = FAIL;
 
+	/* It was decided to setup monitoring from scratch rather than upgrade all the configuration, */
+	/* therefore this patch may be obsolete and there's no guarantee that it works correctly.     */
+	goto out;
+
 	ONLY_SERVER();
 
 	/* 4 = ITEM_VALUE_TYPE_TEXT */
@@ -3348,6 +3404,10 @@ out:
 static int	DBpatch_4050012_21(void)
 {
 	int	ret = FAIL;
+
+	/* It was decided to setup monitoring from scratch rather than upgrade all the configuration, */
+	/* therefore this patch may be obsolete and there's no guarantee that it works correctly.     */
+	goto out;
 
 	ONLY_SERVER();
 
@@ -3396,6 +3456,10 @@ static int	DBpatch_4050012_22(void)
 {
 	int	ret = FAIL;
 
+	/* It was decided to setup monitoring from scratch rather than upgrade all the configuration, */
+	/* therefore this patch may be obsolete and there's no guarantee that it works correctly.     */
+	goto out;
+
 	ONLY_SERVER();
 
 	CHECK(DBpatch_4050012_22_insert_item_preproc("rdap.ip", "$.rdap.ip"));
@@ -3440,6 +3504,10 @@ static int	DBpatch_4050012_23(void)
 	zbx_uint64_t	temlpate_triggerid_downtime_over_50;		/* triggerid of "DNS {#NS} ({#IP}) downtime exceeded 50% of allowed $1 minutes" trigger prototype in "Template DNS Status" template */
 	zbx_uint64_t	temlpate_triggerid_downtime_over_75;		/* triggerid of "DNS {#NS} ({#IP}) downtime exceeded 75% of allowed $1 minutes" trigger prototype in "Template DNS Status" template */
 	zbx_uint64_t	temlpate_triggerid_downtime_over_100;		/* triggerid of "DNS {#NS} ({#IP}) downtime exceeded 100% of allowed $1 minutes" trigger prototype in "Template DNS Status" template */
+
+	/* It was decided to setup monitoring from scratch rather than upgrade all the configuration, */
+	/* therefore this patch may be obsolete and there's no guarantee that it works correctly.     */
+	goto out;
 
 	ONLY_SERVER();
 
@@ -3759,6 +3827,10 @@ static int	DBpatch_4050012_24(void)
 	zbx_uint64_t	template_itemid_rsm_slv_dnssec_avail;		/* itemid of "DNSSEC availability" item in "Template DNSSEC Status" template */
 	zbx_uint64_t	template_itemid_rsm_slv_dnssec_rollweek;	/* itemid of "DNSSEC weekly unavailability" item in "Template DNSSEC Status" template */
 
+	/* It was decided to setup monitoring from scratch rather than upgrade all the configuration, */
+	/* therefore this patch may be obsolete and there's no guarantee that it works correctly.     */
+	goto out;
+
 	ONLY_SERVER();
 
 	GET_HOST_GROUP_ID(tlds_groupid, "TLDs");
@@ -3813,6 +3885,10 @@ static int	DBpatch_4050012_25(void)
 	zbx_uint64_t	template_itemid_rsm_slv_rdap_rtt_performed;	/* itemid of "Number of performed monthly RDAP queries" item in "Template RDAP Status" template */
 	zbx_uint64_t	template_itemid_rsm_slv_rdap_rtt_failed;	/* itemid of "Number of failed monthly RDAP queries" item in "Template RDAP Status" template */
 	zbx_uint64_t	template_itemid_rsm_slv_rdap_rtt_pfailed;	/* itemid of "Ratio of failed monthly RDAP queries" item in "Template RDAP Status" template */
+
+	/* It was decided to setup monitoring from scratch rather than upgrade all the configuration, */
+	/* therefore this patch may be obsolete and there's no guarantee that it works correctly.     */
+	goto out;
 
 	ONLY_SERVER();
 
@@ -3877,6 +3953,10 @@ static int	DBpatch_4050012_26(void)
 	zbx_uint64_t	template_itemid_rsm_slv_rdds_rtt_failed;	/* itemid of "Number of failed monthly RDDS queries" item in "Template RDDS Status" template */
 	zbx_uint64_t	template_itemid_rsm_slv_rdds_rtt_pfailed;	/* itemid of "Ratio of failed monthly RDDS queries" item in "Template RDDS Status" template */
 
+	/* It was decided to setup monitoring from scratch rather than upgrade all the configuration, */
+	/* therefore this patch may be obsolete and there's no guarantee that it works correctly.     */
+	goto out;
+
 	ONLY_SERVER();
 
 	GET_HOST_GROUP_ID(tlds_groupid, "TLDs");
@@ -3939,6 +4019,10 @@ static int	DBpatch_4050012_27(void)
 	zbx_uint64_t	template_itemid_probe_configvalue_rsm_ip6_enabled;
 
 	zbx_uint64_t	count;
+
+	/* It was decided to setup monitoring from scratch rather than upgrade all the configuration, */
+	/* therefore this patch may be obsolete and there's no guarantee that it works correctly.     */
+	goto out;
 
 	ONLY_SERVER();
 
@@ -4148,6 +4232,10 @@ static int	DBpatch_4050012_28(void)
 	zbx_uint64_t	template_itemid_rdap_enabled;		/* itemid of "RDAP enabled/disabled" item in "Template Config History" template */
 	zbx_uint64_t	template_itemid_rdds_enabled;		/* itemid of "RDDS enabled/disabled" item in "Template Config History" template */
 
+	/* It was decided to setup monitoring from scratch rather than upgrade all the configuration, */
+	/* therefore this patch may be obsolete and there's no guarantee that it works correctly.     */
+	goto out;
+
 	ONLY_SERVER();
 
 	GET_HOST_GROUP_ID(tlds_groupid, "TLDs");
@@ -4220,6 +4308,10 @@ static int	DBpatch_4050012_29(void)
 
 	DB_RESULT	result = NULL;
 	DB_ROW		row;
+
+	/* It was decided to setup monitoring from scratch rather than upgrade all the configuration, */
+	/* therefore this patch may be obsolete and there's no guarantee that it works correctly.     */
+	goto out;
 
 	ONLY_SERVER();
 
@@ -4428,6 +4520,10 @@ static int	DBpatch_4050012_30(void)
 	DB_RESULT	result = NULL;
 	DB_ROW		row;
 
+	/* It was decided to setup monitoring from scratch rather than upgrade all the configuration, */
+	/* therefore this patch may be obsolete and there's no guarantee that it works correctly.     */
+	goto out;
+
 	ONLY_SERVER();
 
 	/* get hostid of "Template <probe> Status" templates */
@@ -4466,6 +4562,10 @@ static int	DBpatch_4050012_31(void)
 	int		ret = FAIL;
 	zbx_uint64_t	template_hostid;
 
+	/* It was decided to setup monitoring from scratch rather than upgrade all the configuration, */
+	/* therefore this patch may be obsolete and there's no guarantee that it works correctly.     */
+	goto out;
+
 	ONLY_SERVER();
 
 	GET_TEMPLATE_ID(template_hostid, "Template Probe Errors");
@@ -4494,6 +4594,10 @@ static int	DBpatch_4050012_32(void)
 
 	DB_RESULT	result = NULL;
 	DB_ROW		row;
+
+	/* It was decided to setup monitoring from scratch rather than upgrade all the configuration, */
+	/* therefore this patch may be obsolete and there's no guarantee that it works correctly.     */
+	goto out;
 
 	ONLY_SERVER();
 
