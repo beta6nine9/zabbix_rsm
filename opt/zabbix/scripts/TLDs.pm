@@ -24,7 +24,7 @@ our @EXPORT = qw(zbx_connect check_api_error get_proxies_list
 		RDAP_TEST_TEMPLATEID
 		RDAP_STATUS_TEMPLATEID
 		PROBE_STATUS_TEMPLATEID
-		create_probe_template create_probe_status_template create_host create_group create_template
+		create_probe_template create_host create_group create_template
 		create_item create_trigger create_macro update_root_server_macros
 		create_passive_proxy probe_exists get_host_group get_template get_template_id get_probe get_host
 		remove_templates remove_hosts remove_hostgroups remove_probes remove_items
@@ -1006,78 +1006,6 @@ sub create_probe_template
 	create_macro('{$RSM.RDDS.ENABLED}', defined($rdds)     ? $rdds     : '1'        , $templateid, defined($rdds)     ? 1 : undef);
 	create_macro('{$RSM.RDAP.ENABLED}', defined($rdap)     ? $rdap     : '1'        , $templateid, defined($rdap)     ? 1 : undef);
 	create_macro('{$RSM.EPP.ENABLED}' , defined($epp)      ? $epp      : '1'        , $templateid, defined($epp)      ? 1 : undef);
-
-	return $templateid;
-}
-
-sub create_probe_status_template
-{
-	my $probe_name          = shift;
-	my $child_templateid    = shift;
-	my $root_servers_macros = shift;
-
-	my $template_name = 'Template ' . $probe_name . ' Status';
-
-	my $templateid = create_template($template_name, $child_templateid);
-
-	create_item({
-		'name'         => 'Probe status ($1)',
-		'key_'         => 'rsm.probe.status[automatic,' . $root_servers_macros . ']',
-		'hostid'       => $templateid,
-		'applications' => [get_application_id('Probe status', $templateid)],
-		'type'         => ITEM_TYPE_SIMPLE,
-		'value_type'   => ITEM_VALUE_TYPE_UINT64,
-		'delay'        => CFG_PROBE_STATUS_DELAY,
-		'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_probe'}
-	});
-
-	create_item({
-		'name'         => 'Probe status ($1)',
-		'key_'         => 'rsm.probe.status[manual]',
-		'hostid'       => $templateid,
-		'applications' => [get_application_id('Probe status', $templateid)],
-		'type'         => ITEM_TYPE_TRAPPER,
-		'value_type'   => ITEM_VALUE_TYPE_UINT64,
-		'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_probe'}
-	});
-
-	create_item({
-		'name'         => 'Local resolver status ($1)',
-		'key_'         => 'resolver.status[{$RSM.RESOLVER},{$RESOLVER.STATUS.TIMEOUT},{$RESOLVER.STATUS.TRIES},{$RSM.IP4.ENABLED},{$RSM.IP6.ENABLED}]',
-		'hostid'       => $templateid,
-		'applications' => [get_application_id('Probe status', $templateid)],
-		'type'         => ITEM_TYPE_SIMPLE,
-		'value_type'   => ITEM_VALUE_TYPE_UINT64,
-		'delay'        => CFG_PROBE_STATUS_DELAY,
-		'valuemapid'   => RSM_VALUE_MAPPINGS->{'service_state'}
-	});
-
-	create_trigger(
-		{
-			'description' => 'Probe {HOST.NAME} has been knocked out',
-			'expression'  => '{' . $template_name . ':rsm.probe.status[manual].last(0)}=0',
-			'priority'    => '4',
-		},
-		$template_name
-	);
-
-	create_trigger(
-		{
-			'description' => 'Probe {HOST.NAME} has been disabled for more than {$RSM.PROBE.MAX.OFFLINE}',
-			'expression'  => '{' . $template_name . ':rsm.probe.status[manual].max({$RSM.PROBE.MAX.OFFLINE})}=0',
-			'priority'    => '3',
-		},
-		$template_name
-	);
-
-	create_trigger(
-		{
-			'description' => 'Probe {HOST.NAME} has been disabled by tests',
-			'expression'  => '{' . $template_name . ':rsm.probe.status[automatic,"{$RSM.IP4.ROOTSERVERS1}","{$RSM.IP6.ROOTSERVERS1}"].last(0)}=0',
-			'priority'    => '4',
-		},
-		$template_name
-	);
 
 	return $templateid;
 }
