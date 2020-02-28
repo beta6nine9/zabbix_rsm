@@ -412,7 +412,7 @@ ROW   |100101   |{100101}<{$RSM.EPP.PROBE.ONLINE}                               
 ROW   |100102   |{100102}<{$RSM.IP4.MIN.PROBE.ONLINE}                                    |Number of IP4-enabled online probes is less than $1                       |    |0     |5       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
 ROW   |100103   |{100103}<{$RSM.IP6.MIN.PROBE.ONLINE}                                    |Number of IP6-enabled online probes is less than $1                       |    |0     |5       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
 ROW   |100104   |{100104}<{$RSM.RDDS.PROBE.ONLINE}                                       |Number of RDDS-enabled online probes is less than $1                      |    |0     |5       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
-ROW   |100105   |({TRIGGER.VALUE}=0 and {100105}=0) or ({TRIGGER.VALUE}=1 and {100106}>0)|DNS service is down                                                       |    |0     |0       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100105   |{100174}=0                                                              |DNS service is down                                                       |    |0     |0       |                                                                                                                                      |NULL      |0   |0    |1            |{100175}>0         |0               |               |0           |      |
 ROW   |100106   |{100107}>{$RSM.SLV.DNS.DOWNTIME}                                        |DNS service was unavailable for at least {ITEM.VALUE1}m                   |    |0     |5       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
 ROW   |100107   |{100108}>=10                                                            |DNS rolling week is over 10%                                              |    |0     |2       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
 ROW   |100108   |{100109}>=25                                                            |DNS rolling week is over 25%                                              |    |0     |3       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
@@ -436,13 +436,13 @@ ROW   |100123   |{100124}>{$RSM.SLV.NS.DOWNTIME}*0.25                           
 ROW   |100124   |{100125}>{$RSM.SLV.NS.DOWNTIME}*0.5                                     |DNS {#NS} ({#IP}) downtime exceeded 50% of allowed $1 minutes             |    |0     |3       |                                                                                                                                      |NULL      |0   |2    |0            |                   |0               |               |0           |      |
 ROW   |100125   |{100126}>{$RSM.SLV.NS.DOWNTIME}*0.75                                    |DNS {#NS} ({#IP}) downtime exceeded 75% of allowed $1 minutes             |    |0     |4       |                                                                                                                                      |NULL      |0   |2    |0            |                   |0               |               |0           |      |
 ROW   |100126   |{100127}>{$RSM.SLV.NS.DOWNTIME}                                         |DNS {#NS} ({#IP}) downtime exceeded 100% of allowed $1 minutes            |    |0     |5       |                                                                                                                                      |NULL      |0   |2    |0            |                   |0               |               |0           |      |
-ROW   |100127   |({TRIGGER.VALUE}=0 and {100128}=0) or ({TRIGGER.VALUE}=1 and {100129}>0)|DNSSEC service is down                                                    |    |0     |0       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100127   |{100176}=0                                                              |DNSSEC service is down                                                    |    |0     |0       |                                                                                                                                      |NULL      |0   |0    |1            |{100177}>0         |0               |               |0           |      |
 ROW   |100128   |{100130}>=10                                                            |DNSSEC rolling week is over 10%                                           |    |0     |2       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
 ROW   |100129   |{100131}>=25                                                            |DNSSEC rolling week is over 25%                                           |    |0     |3       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
 ROW   |100130   |{100132}>=50                                                            |DNSSEC rolling week is over 50%                                           |    |0     |3       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
 ROW   |100131   |{100133}>=75                                                            |DNSSEC rolling week is over 75%                                           |    |0     |4       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
 ROW   |100132   |{100134}>=100                                                           |DNSSEC rolling week is over 100%                                          |    |0     |5       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
-ROW   |100133   |({TRIGGER.VALUE}=0 and {100135}=0) or ({TRIGGER.VALUE}=1 and {100136}>0)|RDAP service is down                                                      |    |0     |0       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100133   |{100180}=0                                                              |RDAP service is down                                                      |    |0     |0       |                                                                                                                                      |NULL      |0   |0    |1            |{100181}>0         |0               |               |0           |      |
 ROW   |100134   |{100137}>={$RSM.SLV.RDAP.DOWNTIME}*0.1                                  |RDAP service was unavailable for 10% of allowed $1 minutes                |    |0     |2       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
 ROW   |100135   |{100138}>={$RSM.SLV.RDAP.DOWNTIME}*0.25                                 |RDAP service was unavailable for 25% of allowed $1 minutes                |    |0     |3       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
 ROW   |100136   |{100139}>={$RSM.SLV.RDAP.DOWNTIME}*0.5                                  |RDAP service was unavailable for 50% of allowed $1 minutes                |    |0     |3       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
@@ -458,7 +458,7 @@ ROW   |100145   |{100148}>{$RSM.SLV.RDAP.RTT}*0.25                              
 ROW   |100146   |{100149}>{$RSM.SLV.RDAP.RTT}*0.5                                        |Ratio of failed RDAP tests exceeded 50% of allowed $1%                    |    |0     |3       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
 ROW   |100147   |{100150}>{$RSM.SLV.RDAP.RTT}*0.75                                       |Ratio of failed RDAP tests exceeded 75% of allowed $1%                    |    |0     |4       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
 ROW   |100148   |{100151}>{$RSM.SLV.RDAP.RTT}                                            |Ratio of failed RDAP tests exceeded 100% of allowed $1%                   |    |0     |5       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
-ROW   |100149   |({TRIGGER.VALUE}=0 and {100152}=0) or ({TRIGGER.VALUE}=1 and {100153}>0)|RDDS service is down                                                      |    |0     |0       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
+ROW   |100149   |{100178}=0                                                              |RDDS service is down                                                      |    |0     |0       |                                                                                                                                      |NULL      |0   |0    |1            |{100179}>0         |0               |               |0           |      |
 ROW   |100150   |{100154}>={$RSM.SLV.RDDS.DOWNTIME}*0.1                                  |RDDS service was unavailable for 10% of allowed $1 minutes                |    |0     |2       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
 ROW   |100151   |{100155}>={$RSM.SLV.RDDS.DOWNTIME}*0.25                                 |RDDS service was unavailable for 25% of allowed $1 minutes                |    |0     |3       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
 ROW   |100152   |{100156}>={$RSM.SLV.RDDS.DOWNTIME}*0.5                                  |RDDS service was unavailable for 50% of allowed $1 minutes                |    |0     |3       |                                                                                                                                      |NULL      |0   |0    |0            |                   |0               |               |0           |      |
@@ -648,203 +648,203 @@ ROW   |45          |100163        |100164      |
 ROW   |46          |100165        |100166      |
 
 TABLE |functions
-FIELDS|functionid|itemid|triggerid|name     |parameter                             |
-ROW   |10199     |10019 |10016    |diff     |0                                     |
-ROW   |10204     |10055 |10041    |last     |0                                     |
-ROW   |10207     |10058 |10044    |diff     |0                                     |
-ROW   |10208     |10057 |10043    |diff     |0                                     |
-ROW   |10233     |10009 |10190    |last     |0                                     |
-ROW   |12144     |22182 |13000    |avg      |#3                                    |
-ROW   |12333     |22550 |13134    |last     |0                                     |
-ROW   |12334     |22549 |13135    |last     |0                                     |
-ROW   |12335     |22551 |13136    |last     |0                                     |
-ROW   |12336     |22552 |13137    |last     |0                                     |
-ROW   |12345     |22553 |13138    |last     |0                                     |
-ROW   |12549     |22232 |13025    |max      |#3                                    |
-ROW   |12550     |10020 |10047    |max      |#3                                    |
-ROW   |12553     |10056 |10042    |last     |0                                     |
-ROW   |12555     |10013 |10011    |last     |0                                     |
-ROW   |12580     |17350 |10012    |last     |0                                     |
-ROW   |12583     |10025 |10021    |change   |0                                     |
-ROW   |12586     |10010 |10010    |last     |0                                     |
-ROW   |12589     |17362 |13243    |last     |0                                     |
-ROW   |12592     |22686 |13266    |last     |0                                     |
-ROW   |12598     |22454 |13272    |last     |0                                     |
-ROW   |12657     |22554 |13139    |last     |0                                     |
-ROW   |12659     |22696 |13277    |last     |0                                     |
-ROW   |12661     |22691 |13133    |last     |0                                     |
-ROW   |12663     |22694 |13279    |last     |0                                     |
-ROW   |12665     |22692 |13281    |last     |0                                     |
-ROW   |12667     |22548 |13283    |last     |0                                     |
-ROW   |12669     |22698 |13285    |last     |0                                     |
-ROW   |12926     |22231 |13026    |diff     |0                                     |
-ROW   |12927     |10059 |10045    |diff     |0                                     |
-ROW   |12936     |23318 |13507    |diff     |0                                     |
-ROW   |12937     |23319 |13508    |diff     |0                                     |
-ROW   |12938     |17352 |13509    |fuzzytime|10s                                   |
-ROW   |12963     |23355 |13534    |diff     |0                                     |
-ROW   |12964     |23356 |13535    |max      |#3                                    |
-ROW   |12965     |23357 |13536    |diff     |0                                     |
-ROW   |12966     |23358 |13537    |last     |0                                     |
-ROW   |12967     |23359 |13538    |last     |0                                     |
-ROW   |12968     |23360 |13539    |last     |0                                     |
-ROW   |12969     |23361 |13540    |last     |0                                     |
-ROW   |12970     |23365 |13541    |last     |0                                     |
-ROW   |12971     |23370 |13542    |last     |0                                     |
-ROW   |12972     |23376 |13543    |diff     |0                                     |
-ROW   |12973     |23377 |13544    |fuzzytime|10s                                   |
-ROW   |12974     |23379 |13545    |last     |0                                     |
-ROW   |12975     |23381 |13546    |diff     |0                                     |
-ROW   |12976     |23382 |13547    |change   |0                                     |
-ROW   |12977     |23384 |13548    |diff     |0                                     |
-ROW   |12978     |23331 |13549    |avg      |#3                                    |
-ROW   |12979     |23350 |13550    |last     |0                                     |
-ROW   |12980     |23352 |13551    |last     |0                                     |
-ROW   |12981     |23388 |13552    |min      |10m                                   |
-ROW   |12982     |22189 |13553    |min      |10m                                   |
-ROW   |12983     |22183 |13554    |min      |10m                                   |
-ROW   |12984     |23393 |13555    |min      |10m                                   |
-ROW   |12985     |22185 |13556    |min      |10m                                   |
-ROW   |12986     |23392 |13557    |min      |10m                                   |
-ROW   |12987     |22219 |13558    |min      |10m                                   |
-ROW   |12988     |22424 |13559    |avg      |10m                                   |
-ROW   |12989     |22412 |13560    |avg      |10m                                   |
-ROW   |12991     |22430 |13562    |avg      |10m                                   |
-ROW   |12992     |22422 |13563    |avg      |10m                                   |
-ROW   |12993     |22406 |13564    |avg      |10m                                   |
-ROW   |12994     |22408 |13565    |avg      |30m                                   |
-ROW   |12995     |22402 |13566    |avg      |10m                                   |
-ROW   |12996     |22418 |13567    |avg      |10m                                   |
-ROW   |12997     |22416 |13568    |avg      |10m                                   |
-ROW   |12998     |22689 |13569    |avg      |10m                                   |
-ROW   |12999     |22399 |13570    |avg      |10m                                   |
-ROW   |13000     |22420 |13571    |avg      |10m                                   |
-ROW   |13001     |22414 |13572    |min      |10m                                   |
-ROW   |13002     |23171 |13573    |avg      |10m                                   |
-ROW   |13003     |22426 |13574    |avg      |10m                                   |
-ROW   |13004     |22404 |13575    |avg      |10m                                   |
-ROW   |13005     |22400 |13576    |avg      |10m                                   |
-ROW   |13006     |23391 |13577    |last     |                                      |
-ROW   |13007     |23387 |13578    |avg      |10m                                   |
-ROW   |13008     |23395 |13579    |min      |10m                                   |
-ROW   |13009     |23341 |13580    |min      |10m                                   |
-ROW   |13010     |23342 |13581    |min      |10m                                   |
-ROW   |13011     |23400 |13582    |min      |10m                                   |
-ROW   |13012     |23344 |13583    |min      |10m                                   |
-ROW   |13013     |23399 |13584    |min      |10m                                   |
-ROW   |13014     |23339 |13585    |min      |10m                                   |
-ROW   |13015     |23320 |13586    |avg      |10m                                   |
-ROW   |13016     |23321 |13587    |avg      |10m                                   |
-ROW   |13018     |23323 |13589    |avg      |10m                                   |
-ROW   |13019     |23324 |13590    |avg      |10m                                   |
-ROW   |13020     |23325 |13591    |avg      |10m                                   |
-ROW   |13021     |23326 |13592    |avg      |30m                                   |
-ROW   |13022     |23327 |13593    |avg      |10m                                   |
-ROW   |13023     |23328 |13594    |avg      |10m                                   |
-ROW   |13024     |23329 |13595    |avg      |10m                                   |
-ROW   |13025     |23330 |13596    |avg      |10m                                   |
-ROW   |13026     |23332 |13597    |avg      |10m                                   |
-ROW   |13027     |23333 |13598    |avg      |10m                                   |
-ROW   |13028     |23334 |13599    |min      |10m                                   |
-ROW   |13029     |23335 |13600    |avg      |10m                                   |
-ROW   |13030     |23336 |13601    |avg      |10m                                   |
-ROW   |13031     |23337 |13602    |avg      |10m                                   |
-ROW   |13032     |23338 |13603    |avg      |10m                                   |
-ROW   |13033     |23398 |13604    |last     |                                      |
-ROW   |13034     |23394 |13605    |avg      |10m                                   |
-ROW   |13035     |23418 |13606    |min      |10m                                   |
-ROW   |13036     |23419 |13607    |min      |10m                                   |
-ROW   |13037     |23420 |13608    |min      |10m                                   |
-ROW   |13038     |23416 |13609    |min      |10m                                   |
-ROW   |13039     |23401 |13610    |avg      |10m                                   |
-ROW   |13040     |23402 |13611    |avg      |10m                                   |
-ROW   |13041     |23403 |13612    |avg      |10m                                   |
-ROW   |13042     |23404 |13613    |avg      |10m                                   |
-ROW   |13043     |23405 |13614    |avg      |10m                                   |
-ROW   |13044     |23406 |13615    |avg      |30m                                   |
-ROW   |13045     |23407 |13616    |avg      |10m                                   |
-ROW   |13046     |23408 |13617    |avg      |10m                                   |
-ROW   |13047     |23409 |13618    |avg      |10m                                   |
-ROW   |13048     |23410 |13619    |avg      |10m                                   |
-ROW   |13049     |23411 |13620    |avg      |10m                                   |
-ROW   |13050     |23412 |13621    |avg      |10m                                   |
-ROW   |13051     |23413 |13622    |avg      |10m                                   |
-ROW   |13052     |23414 |13623    |avg      |10m                                   |
-ROW   |13053     |23415 |13624    |avg      |10m                                   |
-ROW   |100100    |100100|100100   |last     |                                      |
-ROW   |100101    |100101|100101   |last     |                                      |
-ROW   |100102    |100102|100102   |last     |                                      |
-ROW   |100103    |100103|100103   |last     |                                      |
-ROW   |100104    |100104|100104   |last     |                                      |
-ROW   |100105    |100133|100105   |max      |#{$RSM.INCIDENT.DNS.FAIL}             |
-ROW   |100106    |100133|100105   |count    |#{$RSM.INCIDENT.DNS.RECOVER},0,"eq"   |
-ROW   |100107    |100134|100106   |last     |0                                     |
-ROW   |100108    |100135|100107   |last     |0                                     |
-ROW   |100109    |100135|100108   |last     |0                                     |
-ROW   |100110    |100135|100109   |last     |0                                     |
-ROW   |100111    |100135|100110   |last     |0                                     |
-ROW   |100112    |100135|100111   |last     |0                                     |
-ROW   |100113    |100138|100112   |last     |                                      |
-ROW   |100114    |100138|100113   |last     |                                      |
-ROW   |100115    |100138|100114   |last     |                                      |
-ROW   |100116    |100138|100115   |last     |                                      |
-ROW   |100117    |100138|100116   |last     |                                      |
-ROW   |100118    |100141|100117   |last     |                                      |
-ROW   |100119    |100141|100118   |last     |                                      |
-ROW   |100120    |100141|100119   |last     |                                      |
-ROW   |100121    |100141|100120   |last     |                                      |
-ROW   |100122    |100141|100121   |last     |                                      |
-ROW   |100123    |100144|100122   |last     |                                      |
-ROW   |100124    |100144|100123   |last     |                                      |
-ROW   |100125    |100144|100124   |last     |                                      |
-ROW   |100126    |100144|100125   |last     |                                      |
-ROW   |100127    |100144|100126   |last     |                                      |
-ROW   |100128    |100145|100127   |max      |#{$RSM.INCIDENT.DNSSEC.FAIL}          |
-ROW   |100129    |100145|100127   |count    |#{$RSM.INCIDENT.DNSSEC.RECOVER},0,"eq"|
-ROW   |100130    |100146|100128   |last     |0                                     |
-ROW   |100131    |100146|100129   |last     |0                                     |
-ROW   |100132    |100146|100130   |last     |0                                     |
-ROW   |100133    |100146|100131   |last     |0                                     |
-ROW   |100134    |100146|100132   |last     |0                                     |
-ROW   |100135    |100147|100133   |max      |#{$RSM.INCIDENT.RDAP.FAIL}            |
-ROW   |100136    |100147|100133   |count    |#{$RSM.INCIDENT.RDAP.RECOVER},0,"eq"  |
-ROW   |100137    |100148|100134   |last     |0                                     |
-ROW   |100138    |100148|100135   |last     |0                                     |
-ROW   |100139    |100148|100136   |last     |0                                     |
-ROW   |100140    |100148|100137   |last     |0                                     |
-ROW   |100141    |100148|100138   |last     |0                                     |
-ROW   |100142    |100149|100139   |last     |0                                     |
-ROW   |100143    |100149|100140   |last     |0                                     |
-ROW   |100144    |100149|100141   |last     |0                                     |
-ROW   |100145    |100149|100142   |last     |0                                     |
-ROW   |100146    |100149|100143   |last     |0                                     |
-ROW   |100147    |100152|100144   |last     |                                      |
-ROW   |100148    |100152|100145   |last     |                                      |
-ROW   |100149    |100152|100146   |last     |                                      |
-ROW   |100150    |100152|100147   |last     |                                      |
-ROW   |100151    |100152|100148   |last     |                                      |
-ROW   |100152    |100153|100149   |max      |#{$RSM.INCIDENT.RDDS.FAIL}            |
-ROW   |100153    |100153|100149   |count    |#{$RSM.INCIDENT.RDDS.RECOVER},0,"eq"  |
-ROW   |100154    |100154|100150   |last     |0                                     |
-ROW   |100155    |100154|100151   |last     |0                                     |
-ROW   |100156    |100154|100152   |last     |0                                     |
-ROW   |100157    |100154|100153   |last     |0                                     |
-ROW   |100158    |100154|100154   |last     |0                                     |
-ROW   |100159    |100155|100155   |last     |0                                     |
-ROW   |100160    |100155|100156   |last     |0                                     |
-ROW   |100161    |100155|100157   |last     |0                                     |
-ROW   |100162    |100155|100158   |last     |0                                     |
-ROW   |100163    |100155|100159   |last     |0                                     |
-ROW   |100164    |100158|100160   |last     |                                      |
-ROW   |100165    |100158|100161   |last     |                                      |
-ROW   |100166    |100158|100162   |last     |                                      |
-ROW   |100167    |100158|100163   |last     |                                      |
-ROW   |100168    |100158|100164   |last     |                                      |
-ROW   |100169    |100162|100165   |last     |                                      |
-ROW   |100170    |100162|100166   |min      |{$PROBE.INTERNAL.ERROR.INTERVAL}      |
-ROW   |100171    |100163|100167   |last     |0                                     |
-ROW   |100172    |100164|100168   |max      |{$RSM.PROBE.MAX.OFFLINE}              |
-ROW   |100173    |100164|100169   |last     |0                                     |
+FIELDS|functionid|itemid|triggerid|name     |parameter                       |
+ROW   |10199     |10019 |10016    |diff     |0                               |
+ROW   |10204     |10055 |10041    |last     |0                               |
+ROW   |10207     |10058 |10044    |diff     |0                               |
+ROW   |10208     |10057 |10043    |diff     |0                               |
+ROW   |10233     |10009 |10190    |last     |0                               |
+ROW   |12144     |22182 |13000    |avg      |#3                              |
+ROW   |12333     |22550 |13134    |last     |0                               |
+ROW   |12334     |22549 |13135    |last     |0                               |
+ROW   |12335     |22551 |13136    |last     |0                               |
+ROW   |12336     |22552 |13137    |last     |0                               |
+ROW   |12345     |22553 |13138    |last     |0                               |
+ROW   |12549     |22232 |13025    |max      |#3                              |
+ROW   |12550     |10020 |10047    |max      |#3                              |
+ROW   |12553     |10056 |10042    |last     |0                               |
+ROW   |12555     |10013 |10011    |last     |0                               |
+ROW   |12580     |17350 |10012    |last     |0                               |
+ROW   |12583     |10025 |10021    |change   |0                               |
+ROW   |12586     |10010 |10010    |last     |0                               |
+ROW   |12589     |17362 |13243    |last     |0                               |
+ROW   |12592     |22686 |13266    |last     |0                               |
+ROW   |12598     |22454 |13272    |last     |0                               |
+ROW   |12657     |22554 |13139    |last     |0                               |
+ROW   |12659     |22696 |13277    |last     |0                               |
+ROW   |12661     |22691 |13133    |last     |0                               |
+ROW   |12663     |22694 |13279    |last     |0                               |
+ROW   |12665     |22692 |13281    |last     |0                               |
+ROW   |12667     |22548 |13283    |last     |0                               |
+ROW   |12669     |22698 |13285    |last     |0                               |
+ROW   |12926     |22231 |13026    |diff     |0                               |
+ROW   |12927     |10059 |10045    |diff     |0                               |
+ROW   |12936     |23318 |13507    |diff     |0                               |
+ROW   |12937     |23319 |13508    |diff     |0                               |
+ROW   |12938     |17352 |13509    |fuzzytime|10s                             |
+ROW   |12963     |23355 |13534    |diff     |0                               |
+ROW   |12964     |23356 |13535    |max      |#3                              |
+ROW   |12965     |23357 |13536    |diff     |0                               |
+ROW   |12966     |23358 |13537    |last     |0                               |
+ROW   |12967     |23359 |13538    |last     |0                               |
+ROW   |12968     |23360 |13539    |last     |0                               |
+ROW   |12969     |23361 |13540    |last     |0                               |
+ROW   |12970     |23365 |13541    |last     |0                               |
+ROW   |12971     |23370 |13542    |last     |0                               |
+ROW   |12972     |23376 |13543    |diff     |0                               |
+ROW   |12973     |23377 |13544    |fuzzytime|10s                             |
+ROW   |12974     |23379 |13545    |last     |0                               |
+ROW   |12975     |23381 |13546    |diff     |0                               |
+ROW   |12976     |23382 |13547    |change   |0                               |
+ROW   |12977     |23384 |13548    |diff     |0                               |
+ROW   |12978     |23331 |13549    |avg      |#3                              |
+ROW   |12979     |23350 |13550    |last     |0                               |
+ROW   |12980     |23352 |13551    |last     |0                               |
+ROW   |12981     |23388 |13552    |min      |10m                             |
+ROW   |12982     |22189 |13553    |min      |10m                             |
+ROW   |12983     |22183 |13554    |min      |10m                             |
+ROW   |12984     |23393 |13555    |min      |10m                             |
+ROW   |12985     |22185 |13556    |min      |10m                             |
+ROW   |12986     |23392 |13557    |min      |10m                             |
+ROW   |12987     |22219 |13558    |min      |10m                             |
+ROW   |12988     |22424 |13559    |avg      |10m                             |
+ROW   |12989     |22412 |13560    |avg      |10m                             |
+ROW   |12991     |22430 |13562    |avg      |10m                             |
+ROW   |12992     |22422 |13563    |avg      |10m                             |
+ROW   |12993     |22406 |13564    |avg      |10m                             |
+ROW   |12994     |22408 |13565    |avg      |30m                             |
+ROW   |12995     |22402 |13566    |avg      |10m                             |
+ROW   |12996     |22418 |13567    |avg      |10m                             |
+ROW   |12997     |22416 |13568    |avg      |10m                             |
+ROW   |12998     |22689 |13569    |avg      |10m                             |
+ROW   |12999     |22399 |13570    |avg      |10m                             |
+ROW   |13000     |22420 |13571    |avg      |10m                             |
+ROW   |13001     |22414 |13572    |min      |10m                             |
+ROW   |13002     |23171 |13573    |avg      |10m                             |
+ROW   |13003     |22426 |13574    |avg      |10m                             |
+ROW   |13004     |22404 |13575    |avg      |10m                             |
+ROW   |13005     |22400 |13576    |avg      |10m                             |
+ROW   |13006     |23391 |13577    |last     |                                |
+ROW   |13007     |23387 |13578    |avg      |10m                             |
+ROW   |13008     |23395 |13579    |min      |10m                             |
+ROW   |13009     |23341 |13580    |min      |10m                             |
+ROW   |13010     |23342 |13581    |min      |10m                             |
+ROW   |13011     |23400 |13582    |min      |10m                             |
+ROW   |13012     |23344 |13583    |min      |10m                             |
+ROW   |13013     |23399 |13584    |min      |10m                             |
+ROW   |13014     |23339 |13585    |min      |10m                             |
+ROW   |13015     |23320 |13586    |avg      |10m                             |
+ROW   |13016     |23321 |13587    |avg      |10m                             |
+ROW   |13018     |23323 |13589    |avg      |10m                             |
+ROW   |13019     |23324 |13590    |avg      |10m                             |
+ROW   |13020     |23325 |13591    |avg      |10m                             |
+ROW   |13021     |23326 |13592    |avg      |30m                             |
+ROW   |13022     |23327 |13593    |avg      |10m                             |
+ROW   |13023     |23328 |13594    |avg      |10m                             |
+ROW   |13024     |23329 |13595    |avg      |10m                             |
+ROW   |13025     |23330 |13596    |avg      |10m                             |
+ROW   |13026     |23332 |13597    |avg      |10m                             |
+ROW   |13027     |23333 |13598    |avg      |10m                             |
+ROW   |13028     |23334 |13599    |min      |10m                             |
+ROW   |13029     |23335 |13600    |avg      |10m                             |
+ROW   |13030     |23336 |13601    |avg      |10m                             |
+ROW   |13031     |23337 |13602    |avg      |10m                             |
+ROW   |13032     |23338 |13603    |avg      |10m                             |
+ROW   |13033     |23398 |13604    |last     |                                |
+ROW   |13034     |23394 |13605    |avg      |10m                             |
+ROW   |13035     |23418 |13606    |min      |10m                             |
+ROW   |13036     |23419 |13607    |min      |10m                             |
+ROW   |13037     |23420 |13608    |min      |10m                             |
+ROW   |13038     |23416 |13609    |min      |10m                             |
+ROW   |13039     |23401 |13610    |avg      |10m                             |
+ROW   |13040     |23402 |13611    |avg      |10m                             |
+ROW   |13041     |23403 |13612    |avg      |10m                             |
+ROW   |13042     |23404 |13613    |avg      |10m                             |
+ROW   |13043     |23405 |13614    |avg      |10m                             |
+ROW   |13044     |23406 |13615    |avg      |30m                             |
+ROW   |13045     |23407 |13616    |avg      |10m                             |
+ROW   |13046     |23408 |13617    |avg      |10m                             |
+ROW   |13047     |23409 |13618    |avg      |10m                             |
+ROW   |13048     |23410 |13619    |avg      |10m                             |
+ROW   |13049     |23411 |13620    |avg      |10m                             |
+ROW   |13050     |23412 |13621    |avg      |10m                             |
+ROW   |13051     |23413 |13622    |avg      |10m                             |
+ROW   |13052     |23414 |13623    |avg      |10m                             |
+ROW   |13053     |23415 |13624    |avg      |10m                             |
+ROW   |100100    |100100|100100   |last     |                                |
+ROW   |100101    |100101|100101   |last     |                                |
+ROW   |100102    |100102|100102   |last     |                                |
+ROW   |100103    |100103|100103   |last     |                                |
+ROW   |100104    |100104|100104   |last     |                                |
+ROW   |100107    |100134|100106   |last     |0                               |
+ROW   |100108    |100135|100107   |last     |0                               |
+ROW   |100109    |100135|100108   |last     |0                               |
+ROW   |100110    |100135|100109   |last     |0                               |
+ROW   |100111    |100135|100110   |last     |0                               |
+ROW   |100112    |100135|100111   |last     |0                               |
+ROW   |100113    |100138|100112   |last     |                                |
+ROW   |100114    |100138|100113   |last     |                                |
+ROW   |100115    |100138|100114   |last     |                                |
+ROW   |100116    |100138|100115   |last     |                                |
+ROW   |100117    |100138|100116   |last     |                                |
+ROW   |100118    |100141|100117   |last     |                                |
+ROW   |100119    |100141|100118   |last     |                                |
+ROW   |100120    |100141|100119   |last     |                                |
+ROW   |100121    |100141|100120   |last     |                                |
+ROW   |100122    |100141|100121   |last     |                                |
+ROW   |100123    |100144|100122   |last     |                                |
+ROW   |100124    |100144|100123   |last     |                                |
+ROW   |100125    |100144|100124   |last     |                                |
+ROW   |100126    |100144|100125   |last     |                                |
+ROW   |100127    |100144|100126   |last     |                                |
+ROW   |100130    |100146|100128   |last     |0                               |
+ROW   |100131    |100146|100129   |last     |0                               |
+ROW   |100132    |100146|100130   |last     |0                               |
+ROW   |100133    |100146|100131   |last     |0                               |
+ROW   |100134    |100146|100132   |last     |0                               |
+ROW   |100137    |100148|100134   |last     |0                               |
+ROW   |100138    |100148|100135   |last     |0                               |
+ROW   |100139    |100148|100136   |last     |0                               |
+ROW   |100140    |100148|100137   |last     |0                               |
+ROW   |100141    |100148|100138   |last     |0                               |
+ROW   |100142    |100149|100139   |last     |0                               |
+ROW   |100143    |100149|100140   |last     |0                               |
+ROW   |100144    |100149|100141   |last     |0                               |
+ROW   |100145    |100149|100142   |last     |0                               |
+ROW   |100146    |100149|100143   |last     |0                               |
+ROW   |100147    |100152|100144   |last     |                                |
+ROW   |100148    |100152|100145   |last     |                                |
+ROW   |100149    |100152|100146   |last     |                                |
+ROW   |100150    |100152|100147   |last     |                                |
+ROW   |100151    |100152|100148   |last     |                                |
+ROW   |100154    |100154|100150   |last     |0                               |
+ROW   |100155    |100154|100151   |last     |0                               |
+ROW   |100156    |100154|100152   |last     |0                               |
+ROW   |100157    |100154|100153   |last     |0                               |
+ROW   |100158    |100154|100154   |last     |0                               |
+ROW   |100159    |100155|100155   |last     |0                               |
+ROW   |100160    |100155|100156   |last     |0                               |
+ROW   |100161    |100155|100157   |last     |0                               |
+ROW   |100162    |100155|100158   |last     |0                               |
+ROW   |100163    |100155|100159   |last     |0                               |
+ROW   |100164    |100158|100160   |last     |                                |
+ROW   |100165    |100158|100161   |last     |                                |
+ROW   |100166    |100158|100162   |last     |                                |
+ROW   |100167    |100158|100163   |last     |                                |
+ROW   |100168    |100158|100164   |last     |                                |
+ROW   |100169    |100162|100165   |last     |                                |
+ROW   |100170    |100162|100166   |min      |{$PROBE.INTERNAL.ERROR.INTERVAL}|
+ROW   |100171    |100163|100167   |last     |0                               |
+ROW   |100172    |100164|100168   |max      |{$RSM.PROBE.MAX.OFFLINE}        |
+ROW   |100173    |100164|100169   |last     |0                               |
+ROW   |100174    |100133|100105   |max      |#{$RSM.INCIDENT.DNS.FAIL}       |
+ROW   |100175    |100133|100105   |min      |#{$RSM.INCIDENT.DNS.RECOVER}    |
+ROW   |100176    |100145|100127   |max      |#{$RSM.INCIDENT.DNSSEC.FAIL}    |
+ROW   |100177    |100145|100127   |min      |#{$RSM.INCIDENT.DNSSEC.RECOVER} |
+ROW   |100178    |100153|100149   |max      |#{$RSM.INCIDENT.RDDS.FAIL}      |
+ROW   |100179    |100153|100149   |min      |#{$RSM.INCIDENT.RDDS.RECOVER}   |
+ROW   |100180    |100147|100133   |max      |#{$RSM.INCIDENT.RDAP.FAIL}      |
+ROW   |100181    |100147|100133   |min      |#{$RSM.INCIDENT.RDAP.RECOVER}   |
 
 TABLE |graphs
 FIELDS|graphid|name                                |width|height|yaxismin|yaxismax|templateid|show_work_period|show_triggers|graphtype|show_legend|show_3d|percent_left|percent_right|ymin_type|ymax_type|ymin_itemid|ymax_itemid|flags|
