@@ -189,12 +189,12 @@ class CControllerParticularTests extends CController {
 			$tld_templates = API::Template()->get([
 				'output' => [],
 				'filter' => [
-					'host' => ['Template '.$data['tld']['host']]
+					'host' => [sprintf(TEMPLATE_NAME_TLD_CONFIG, $data['tld']['host'])]
 				],
 				'preservekeys' => true
 			]);
 
-			$user_macros_filter = [RSM_TLD_RDDS_ENABLED];
+			$user_macros_filter = [RSM_TLD_RDDS_ENABLED, RSM_TLD_RDDS_43_SERVERS, RSM_TLD_RDDS_80_SERVERS];
 			if ($data['type'] == RSM_RDDS || is_RDAP_standalone($test_time_from)) {
 				$user_macros_filter = array_merge($user_macros_filter, [RDAP_BASE_URL, RSM_RDAP_TLD_ENABLED]);
 			}
@@ -667,17 +667,16 @@ class CControllerParticularTests extends CController {
 						$hosts[$item['hostid']]['value_rdap'] = $itemValue['value'];
 					}
 					elseif (substr($item['key_'], 0, strlen(PROBE_RDDS_ITEM)) === PROBE_RDDS_ITEM) {
-						if (!array_key_exists(RSM_TLD_RDDS_ENABLED, $data['tld']['macros'])
-								|| $data['tld']['macros'][RSM_TLD_RDDS_ENABLED] != 0) {
-							preg_match('/^[^\[]+\[([^\]]+)]$/', $item['key_'], $matches);
-							list($tld_macros, $rdds_43, $rdds_80) = explode(',', $matches[1]);
-
-							$data['rdds_43_base_url'] = trim($rdds_43, '"');
-							$data['rdds_80_base_url'] = trim($rdds_80, '"');
-						}
-
 						$hosts[$item['hostid']]['value'] = $itemValue['value'];
 					}
+
+					/* get base url from configuration template macro */
+					if (!array_key_exists(RSM_TLD_RDDS_ENABLED, $data['tld']['macros'])
+								|| $data['tld']['macros'][RSM_TLD_RDDS_ENABLED] != 0) {
+						$data['rdds_43_base_url'] = $data['tld']['macros'][RSM_TLD_RDDS_43_SERVERS];
+						$data['rdds_80_base_url'] = $data['tld']['macros'][RSM_TLD_RDDS_80_SERVERS];
+					}
+
 
 					// Count result for table bottom summary rows.
 					if ($item['key_'] == PROBE_RDAP_RTT && 0 > $itemValue['value']) {

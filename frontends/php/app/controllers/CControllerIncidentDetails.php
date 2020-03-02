@@ -190,12 +190,17 @@ class CControllerIncidentDetails extends CController {
 				$templates = API::Template()->get([
 					'output' => ['templateid'],
 					'filter' => [
-						'host' => 'Template '.$data['tld']['host']
+						'host' => sprintf(TEMPLATE_NAME_TLD_CONFIG, $data['tld']['host'])
 					],
 					'preservekeys' => true
 				]);
 
-				if (($template = reset($templates)) !== false) {
+				if (($template = reset($templates)) === false) {
+					error(_s('Cannot get configuration template!'));
+					$this->access_deny = true;
+					return;
+				}
+				else {
 					$ok_rdds_services = [];
 
 					$template_macros = API::UserMacro()->get([

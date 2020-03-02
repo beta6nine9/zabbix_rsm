@@ -52,6 +52,8 @@ define('RSM_TLD_EPP_ENABLED',		'{$RSM.TLD.EPP.ENABLED}');
 define('RSM_TLD_RDDS_ENABLED',		'{$RSM.TLD.RDDS.ENABLED}');
 define('RSM_TLD_RDDS43_ENABLED',	'{$RSM.TLD.RDDS43.ENABLED}');
 define('RSM_TLD_RDDS80_ENABLED',	'{$RSM.TLD.RDDS80.ENABLED}');
+define('RSM_TLD_RDDS_43_SERVERS',	'{$RSM.TLD.RDDS.43.SERVERS}');
+define('RSM_TLD_RDDS_80_SERVERS',	'{$RSM.TLD.RDDS.80.SERVERS}');
 define('RSM_RDAP_TLD_ENABLED',		'{$RDAP.TLD.ENABLED}');
 define('RSM_SLV_DNS_NS_UPD',		'{$RSM.SLV.DNS.NS.UPD}');
 define('RSM_DNS_UPDATE_TIME',		'{$RSM.DNS.UPDATE.TIME}');
@@ -155,9 +157,11 @@ define('INCIDENT_FLAG_NORMAL',			0);
 define('INCIDENT_FLAG_FALSE_POSITIVE',	1);
 
 // SLA monitoring incident status
-define('ZBX_EC_INTERNAL_LAST',		-199);
-define('ZBX_EC_DNS_UDP_RES_NOADBIT',	-401);
-define('ZBX_EC_DNS_UDP_DNSKEY_NONE',	-428);
+define('ZBX_EC_INTERNAL_LAST',			-199);
+define('ZBX_EC_DNS_UDP_DNSSEC_FIRST',	-401);	# DNS UDP - The TLD is configured as DNSSEC-enabled, but no DNSKEY was found in the apex
+define('ZBX_EC_DNS_UDP_DNSSEC_LAST',	-427);	# DNS UDP - Malformed DNSSEC response
+define('ZBX_EC_DNS_TCP_DNSSEC_FIRST',	-801);	# DNS TCP - The TLD is configured as DNSSEC-enabled, but no DNSKEY was found in the apex
+define('ZBX_EC_DNS_TCP_DNSSEC_LAST',	-827);	# DNS TCP - Malformed DNSSEC response
 
 // SLA monitoring calculated items keys
 define('CALCULATED_ITEM_DNS_FAIL',				'rsm.configvalue[RSM.INCIDENT.DNS.FAIL]');
@@ -207,16 +211,16 @@ define('PROBE_DNS_PROTOCOL',		'rsm.dns.protocol');
 define('PROBE_DNS_NSSOK',			'rsm.dns.nssok');
 define('PROBE_DNS_STATUS',			'rsm.dns.status');
 define('PROBE_DNS_NS_STATUS',		'rsm.dns.ns.status[{#NS}]');
-define('PROBE_RDDS_ITEM',			'rsm.rdds[');
 define('PROBE_EPP_RESULT',			'rsm.epp[');
 define('PROBE_EPP_IP',				'rsm.epp.ip[{$RSM.TLD}]');
 define('PROBE_EPP_UPDATE',			'rsm.epp.rtt[{$RSM.TLD},update]');
 define('PROBE_EPP_INFO',			'rsm.epp.rtt[{$RSM.TLD},info]');
 define('PROBE_EPP_LOGIN',			'rsm.epp.rtt[{$RSM.TLD},login]');
-define('PROBE_RDDS43_IP',			'rsm.rdds.43.ip[{$RSM.TLD}]');
-define('PROBE_RDDS43_RTT',			'rsm.rdds.43.rtt[{$RSM.TLD}]');
-define('PROBE_RDDS80_IP',			'rsm.rdds.80.ip[{$RSM.TLD}]');
-define('PROBE_RDDS80_RTT',			'rsm.rdds.80.rtt[{$RSM.TLD}]');
+define('PROBE_RDDS_ITEM',			'rsm.rdds.status');
+define('PROBE_RDDS43_IP',			'rsm.rdds.43.ip');
+define('PROBE_RDDS43_RTT',			'rsm.rdds.43.rtt');
+define('PROBE_RDDS80_IP',			'rsm.rdds.80.ip');
+define('PROBE_RDDS80_RTT',			'rsm.rdds.80.rtt');
 //define('PROBE_RDAP_IP',			'rsm.rdds.rdap.ip[{$RSM.TLD}]');  // deprecated
 //define('PROBE_RDAP_RTT',			'rsm.rdds.rdap.rtt[{$RSM.TLD}]'); // deprecated
 define('PROBE_RDAP_ITEM',			'rdap[');

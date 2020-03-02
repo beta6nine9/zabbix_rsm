@@ -49,7 +49,12 @@ function getFirstUintValue($itemId, $startTime) {
  */
 function isServiceErrorCode($item_value, $type) {
 	if ($type == RSM_DNSSEC) {
-		return (ZBX_EC_DNS_UDP_DNSKEY_NONE <= $item_value && $item_value <= ZBX_EC_DNS_UDP_RES_NOADBIT);
+		if (ZBX_EC_DNS_UDP_DNSSEC_FIRST >= $item_value && $item_value >= ZBX_EC_DNS_UDP_DNSSEC_LAST)
+			return true;
+		if (ZBX_EC_DNS_TCP_DNSSEC_FIRST >= $item_value && $item_value >= ZBX_EC_DNS_TCP_DNSSEC_LAST)
+			return true;
+
+		return false;
 	}
 	else {
 		return ($item_value < ZBX_EC_INTERNAL_LAST);

@@ -369,13 +369,14 @@ if ($data['tld']) {
 
 	// RDAP
 	if (isset($data['rdap']['events'])) {
+		$rdap_tab = new CDiv();
+
 		if ($data['rdap_standalone_start_ts'] > 0) {
 			$rdap_tab->additem(new CDiv(bold(_s('RDAP was not a standalone service before %s.',
 				date(DATE_TIME_FORMAT, $data['rdap_standalone_start_ts'])
 			))));
 		}
 
-		$rdap_tab = new CDiv();
 		$rdap_table = (new CTableInfo())
 			->setNoDataMessage(_('No incidents found.'))
 			->setHeader($headers);
