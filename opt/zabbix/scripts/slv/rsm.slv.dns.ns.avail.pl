@@ -74,11 +74,9 @@ sub get_slv_dns_ns_avail_items
 
 	return db_select(
 		"select i.itemid,i.key_".
-		" from items i,item_discovery id".
+		" from items i".
 		" where i.hostid=$hostid".
-			" and id.itemid=i.itemid".
-			" and id.ts_delete=0".
-			" and i.flags in (${\ZBX_FLAG_DISCOVERY_NORMAL},${\ZBX_FLAG_DISCOVERY_CREATED})".
+			" and i.flags=${\ZBX_FLAG_DISCOVERY_NORMAL}".
 			" and i.key_ like '$cfg_key_out_pattern'".
 			" and i.status<>". ITEM_STATUS_DISABLED
 	);
@@ -144,8 +142,8 @@ sub process_cycles
 			next;
 		}
 
-		my $udp_rtt_values = get_rtt_values($from, $till, $rtt_itemids->{$nsip}{"udp"});
-		my $tcp_rtt_values = get_rtt_values($from, $till, $rtt_itemids->{$nsip}{"tcp"});
+		my $udp_rtt_values = get_rtt_values($from, $till, $rtt_itemids->{$nsip}{"udp"} // []);
+		my $tcp_rtt_values = get_rtt_values($from, $till, $rtt_itemids->{$nsip}{"tcp"} // []);
 		my $probes_with_results = scalar(@{$udp_rtt_values}) + scalar(@{$tcp_rtt_values});
 
 		if ($probes_with_results < $cfg_minonline)
@@ -188,11 +186,10 @@ sub get_all_dns_rtt_itemids
 		" from" .
 			" items" .
 			" left join hosts on hosts.hostid = items.hostid" .
-			" left join item_discovery on item_discovery.itemid = items.itemid" .
 		" where" .
 			" items.key_ like '$cfg_key_in_pattern' and" .
-			" items.flags in (${\ZBX_FLAG_DISCOVERY_NORMAL},${\ZBX_FLAG_DISCOVERY_CREATED}) and" .
-			" item_discovery.ts_delete = 0 and" .
+			" items.flags=${\ZBX_FLAG_DISCOVERY_NORMAL} and" .
+			" items.status<>${\ITEM_STATUS_DISABLED} and" .
 			" hosts.host like '% %'"
 	);
 
@@ -236,6 +233,8 @@ sub get_rtt_values
 	my $from = shift;
 	my $till = shift;
 	my $rtt_itemids = shift;
+
+	return [] unless (scalar(@{$rtt_itemids}));
 
 	my $itemids_placeholder = join(",", ("?") x scalar(@{$rtt_itemids}));
 

@@ -380,17 +380,17 @@ sub remove_probes($)
 
 sub update_items_status($$)
 {
-	my $items  = shift;
-	my $status = shift;
+	my $itemids = shift;
+	my $status  = shift;
 
-	unless (scalar(@{$items}))
+	unless (scalar(@{$itemids}))
 	{
 		return;
 	}
 
 	my $result;
 
-	foreach my $itemid (@{$items})
+	foreach my $itemid (@{$itemids})
 	{
 		my $rsmhost_dns_ns_log_action;
 
@@ -414,16 +414,16 @@ sub update_items_status($$)
 
 sub enable_items($)
 {
-	my $items = shift;
+	my $itemids = shift;
 
-	return update_items_status($items, ITEM_STATUS_ACTIVE);
+	return update_items_status($itemids, ITEM_STATUS_ACTIVE);
 }
 
 sub disable_items($)
 {
-	my $items = shift;
+	my $itemids = shift;
 
-	return update_items_status($items, ITEM_STATUS_DISABLED);
+	return update_items_status($itemids, ITEM_STATUS_DISABLED);
 }
 
 sub disable_triggers($)
