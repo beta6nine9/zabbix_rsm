@@ -134,7 +134,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		get_probe_times probe_offline_at probes2tldhostids
 		slv_max_cycles
 		get_probe_online_key_itemid
-		init_values push_value send_values get_nsip_from_key is_service_error get_templated_items_like
+		init_values push_value send_values get_nsip_from_key is_service_error
 		is_service_error_desc
 		is_internal_error
 		is_internal_error_desc
@@ -2650,33 +2650,6 @@ sub is_service_error_desc
 	return 0 if ($desc eq "");
 
 	return is_service_error($service, get_value_from_desc($desc), $rtt_low);
-}
-
-sub get_templated_items_like
-{
-	my $tld = shift;
-	my $key_in = shift;
-
-	# TODO: this function could benefit from some caching because it's called
-	# on every cycle during rsm.slv*.pl calculation even though list of items
-	# is not likely to change
-
-	my $hostid = get_hostid("Template $tld");
-
-	my $items_ref = db_select(
-		"select key_".
-		" from items".
-		" where hostid=$hostid".
-			" and key_ like '$key_in%'".
-			" and status<>".ITEM_STATUS_DISABLED);
-
-	my @result;
-	foreach my $item_ref (@{$items_ref})
-	{
-		push(@result, $item_ref->[0]);
-	}
-
-	return \@result;
 }
 
 # Collect cycles that needs to be calculated in form:

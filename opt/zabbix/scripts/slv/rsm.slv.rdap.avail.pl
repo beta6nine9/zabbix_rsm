@@ -14,7 +14,8 @@ use RSM;
 use RSMSLV;
 use TLD_constants qw(:api);
 
-use constant SLV_ITEM_KEY_RDAP_AVAIL	=> 'rsm.slv.rdap.avail';
+my $keys_in = ['rdap.status'];
+my $cfg_key_out = 'rsm.slv.rdap.avail';
 
 my $cfg_value_type = ITEM_VALUE_TYPE_UINT64;
 
@@ -27,7 +28,7 @@ db_connect();
 
 slv_exit(SUCCESS) if (!is_rdap_standalone(getopt('now')));
 
-# get cycle length
+# we don't know the cycle bounds yet so we assume it ends at least few minutes back
 my $delay = get_rdap_delay(getopt('now') // time() - AVAIL_SHIFT_BACK);
 
 # get timestamp of the beginning of the latest cycle
@@ -52,7 +53,7 @@ slv_exit(SUCCESS) if (scalar(@{$tlds_ref}) == 0);
 my $cycles_ref = collect_slv_cycles(
 	$tlds_ref,
 	$delay,
-	SLV_ITEM_KEY_RDAP_AVAIL,
+	$cfg_key_out,
 	ITEM_VALUE_TYPE_UINT64,
 	$max_clock,
 	(opt('cycles') ? getopt('cycles') : slv_max_cycles('rdap'))
@@ -79,9 +80,9 @@ process_slv_avail_cycles(
 	$cycles_ref,
 	$probes_ref,
 	$delay,
-	get_templated_items_like('RDAP', 'rdap['),
-	undef,
-	SLV_ITEM_KEY_RDAP_AVAIL,
+	$keys_in,		# input keys
+	undef,			# callback to get input keys is not needed
+	$cfg_key_out,
 	$cfg_minonline,
 	\&check_probe_values,
 	$cfg_value_type
