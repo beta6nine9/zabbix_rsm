@@ -29,7 +29,7 @@ use constant DEFAULT_INCIDENT_MEASUREMENTS_LIMIT => 3600;	# seconds, maximum per
 use constant DEFAULT_ALLOW_MISSING_MEASUREMENTS => 60;		# seconds, maximum period back from current time to allow
 								# for missing measurement files before exiting with non-zero
 
-parse_opts('tld=s', 'service=s', 'period=n', 'from=n', 'continue!', 'print-period!', 'ignore-file=s', 'probe=s', 'limit=n', 'max-children=n', 'server-key=s');
+parse_opts('tld=s', 'service=s', 'period=i', 'from=i', 'continue', 'print-period', 'ignore-file=s', 'probe=s', 'limit=i', 'max-children=i', 'server-key=s');
 
 # do not write any logs
 setopt('nolog');

@@ -40,7 +40,7 @@ use constant USER_TYPES =>
 	}
 };
 
-parse_opts('add!', 'delete!', 'modify!', 'user=s', 'type=s', 'password=s', 'firstname=s', 'lastname=s', 'server-id=n');
+parse_opts('add', 'delete', 'modify', 'user=s', 'type=s', 'password=s', 'firstname=s', 'lastname=s', 'server-id=i');
 
 __validate_opts();
 

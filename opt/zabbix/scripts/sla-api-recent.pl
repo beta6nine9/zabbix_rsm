@@ -53,7 +53,7 @@ sub wait_for_children($);
 sub terminate_children($);
 sub get_swap_usage($);
 
-parse_opts('tld=s', 'service=s', 'server-id=i', 'now=i', 'period=i', 'print-period!', 'max-children=i', 'max-wait=i', 'debug2!');
+parse_opts('tld=s', 'service=s', 'server-id=i', 'now=i', 'period=i', 'print-period', 'max-children=i', 'max-wait=i', 'debug2');
 
 setopt('nolog');
 

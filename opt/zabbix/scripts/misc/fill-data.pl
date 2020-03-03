@@ -30,7 +30,7 @@ sub delete_tld_slv_data($);
 sub copy_data($$$);
 sub min($$);
 
-parse_opts('date=s', 'months=n', 'continue-tld=s', 'server-id=s', 'tld=s', 'delete-chunk=n');
+parse_opts('date=s', 'months=i', 'continue-tld=s', 'server-id=s', 'tld=s', 'delete-chunk=i');
 
 setopt('nolog');
 

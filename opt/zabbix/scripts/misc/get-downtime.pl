@@ -14,7 +14,7 @@ use warnings;
 use RSM;
 use RSMSLV;
 
-parse_opts('tld=s', 'from=n', 'till=n', 'service=s');
+parse_opts('tld=s', 'from=i', 'till=i', 'service=s');
 
 if (opt('debug'))
 {

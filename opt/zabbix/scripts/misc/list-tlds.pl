@@ -13,7 +13,7 @@ use warnings;
 use RSM;
 use RSMSLV;
 
-parse_opts('verbose!', 'service=s', 'server-id=i');
+parse_opts('verbose', 'service=s', 'server-id=i');
 
 setopt('nolog');
 setopt('dry-run');

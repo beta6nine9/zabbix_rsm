@@ -18,7 +18,7 @@ sub __table($);
 sub __get_tlds($$);
 sub __delete_events($$);
 
-parse_opts('dns-clock=n', 'rdds-clock=n', 'tld=s', 'force!');
+parse_opts('dns-clock=i', 'rdds-clock=i', 'tld=s', 'force');
 
 setopt('nolog');
 

@@ -15,7 +15,7 @@ use RSM;
 use RSMSLV;
 use Data::Dumper;
 
-parse_opts('from=n', 'period=n', 'service=s', 'probe=s');
+parse_opts('from=i', 'period=i', 'service=s', 'probe=s');
 
 # do not write any logs
 setopt('nolog');

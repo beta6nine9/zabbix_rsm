@@ -69,7 +69,7 @@ sub init_and_check_opts()
 {
 	my ($rsmhost_opt, $now, $config, $server_key);
 
-	parse_opts('rsmhost=s', 'now=n', 'server-id=s');
+	parse_opts('rsmhost=s', 'now=i', 'server-id=s');
 
 	fail_if_running();
 

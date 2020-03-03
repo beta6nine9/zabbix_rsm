@@ -12,7 +12,7 @@ use RSMSLV;
 
 set_slv_config(get_rsm_config());
 
-parse_opts('type=n', 'delay=n');
+parse_opts('type=i', 'delay=i');
 usage() unless (__validate_input() == SUCCESS);
 
 my ($macro, $sql, $sth);

@@ -14,7 +14,7 @@ use warnings;
 use RSM;
 use RSMSLV;
 
-parse_opts("tld=s", "from=n", "till=n");
+parse_opts("tld=s", "from=i", "till=i");
 
 # do not write any logs
 setopt('nolog');

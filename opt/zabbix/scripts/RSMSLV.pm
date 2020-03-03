@@ -4077,7 +4077,7 @@ sub trim
 
 sub parse_opts
 {
-	if (!GetOptions(\%OPTS, 'help!', 'dry-run!', 'warnslow=f', 'nolog!', 'debug!', 'stats!', @_))
+	if (!GetOptions(\%OPTS, 'help', 'dry-run', 'warnslow=f', 'nolog', 'debug', 'stats', @_))
 	{
 		pod2usage(-verbose => 0, -input => $POD2USAGE_FILE);
 	}
@@ -4102,7 +4102,7 @@ sub parse_slv_opts
 {
 	$POD2USAGE_FILE = '/opt/zabbix/scripts/slv/rsm.slv.usage';
 
-	parse_opts('tld=s', 'now=n', 'cycles=n', 'output-file=s', 'fill-gap=n');
+	parse_opts('tld=s', 'now=i', 'cycles=i', 'output-file=s', 'fill-gap=i');
 }
 
 sub override_opts($)

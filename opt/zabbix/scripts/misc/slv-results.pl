@@ -20,7 +20,7 @@ my @months = (
 	qw/Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec/
 );
 
-parse_opts('tld=s', 'service=s', 'from=n', 'till=n');
+parse_opts('tld=s', 'service=s', 'from=i', 'till=i');
 
 setopt('nolog');
 setopt('dry-run');

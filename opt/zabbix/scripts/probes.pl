@@ -33,10 +33,10 @@ sub usage;
 
 my %OPTS;
 my $rv = GetOptions(\%OPTS, "probe=s", "ip=s", "port=s", "new-name=s", "server-id=s",
-			    "epp!", "ipv4!", "ipv6!", "rdds!", "rdap!", "resolver=s",
-                	    "delete!", "disable!", "add!", "rename!",
+			    "epp", "ipv4", "ipv6", "rdds", "rdap", "resolver=s",
+                	    "delete", "disable", "add", "rename",
 			    "psk-identity=s", "psk=s",
-                	    "verbose!", "quiet!", "help|?");
+                	    "verbose", "quiet", "help|?");
 
 usage() if ($OPTS{'help'} or not $rv);
 

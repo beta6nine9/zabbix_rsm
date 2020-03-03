@@ -519,7 +519,7 @@ my %OPTS;
 
 sub parse_opts()
 {
-	my $rv = GetOptionsFromArray([@ARGV], \%OPTS, "send-to=s", "event-id=n", "nolog!", "dry-run!", "debug!", "help!");
+	my $rv = GetOptionsFromArray([@ARGV], \%OPTS, "send-to=s", "event-id=i", "nolog", "dry-run", "debug", "help");
 
 	if (!$rv || $OPTS{'help'})
 	{

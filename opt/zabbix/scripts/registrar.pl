@@ -79,11 +79,11 @@ sub init_cli_opts($)
 			"rr-name=s",
 			"rr-family=s",
 			"server-id=s",
-			"delete!",
-			"disable!",
-			"rdds!",
-			"rdap!",
-			"list-services!",
+			"delete",
+			"disable",
+			"rdds",
+			"rdap",
+			"list-services",
 			"rdds43-servers=s",
 			"rdds80-servers=s",
 			"rdap-base-url=s",
@@ -91,7 +91,7 @@ sub init_cli_opts($)
 			"rdds-ns-string=s",
 			"root-servers=s",
 			"rdds-test-prefix=s",
-			"verbose!",
+			"verbose",
 			"help|?");
 
 	if (!$rv || !%OPTS || $OPTS{'help'})

@@ -15,7 +15,7 @@ use TLD_constants qw(:api);
 use Data::Dumper;
 use Pusher qw(push_to_trapper);
 
-parse_opts('server-id=s', 'probe=s', 'set=n');
+parse_opts('server-id=s', 'probe=s', 'set=i');
 
 # do not write any logs
 setopt('nolog');

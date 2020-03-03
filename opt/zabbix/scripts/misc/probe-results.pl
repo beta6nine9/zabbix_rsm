@@ -13,7 +13,7 @@ use warnings;
 use RSM;
 use RSMSLV;
 
-parse_opts('tld=s', 'probe=s', 'from=n', 'till=n');
+parse_opts('tld=s', 'probe=s', 'from=i', 'till=i');
 
 setopt('nolog');
 setopt('dry-run');
