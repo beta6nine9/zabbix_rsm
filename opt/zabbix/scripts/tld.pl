@@ -36,8 +36,6 @@ sub main()
 {
 	my $config = get_rsm_config();
 
-	pfail("cannot find 'path' in 'slv' section of rsm config file") unless defined $config->{'slv'}{'path'};
-
 	init_cli_opts(get_rsm_local_id($config));
 
 	my $server_key = opt('server-id') ? get_rsm_server_key(getopt('server-id')) : get_rsm_local_key($config);
