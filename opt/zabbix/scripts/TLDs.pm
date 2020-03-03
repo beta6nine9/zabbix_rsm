@@ -34,7 +34,7 @@ our @EXPORT = qw(zbx_connect check_api_error get_proxies_list
 		rename_host rename_proxy rename_template rename_hostgroup
 		macro_value get_global_macro_value get_host_macro
 		set_proxy_status
-		get_application_id get_items_like set_tld_type get_triggers_by_items
+		get_items_like set_tld_type get_triggers_by_items
 		add_dependency
 		create_probe_health_tmpl
 		pfail);
@@ -971,22 +971,6 @@ sub create_passive_proxy($$$$$)
 	return;
 }
 
-sub get_application_id
-{
-	my $name       = shift;
-	my $templateid = shift;
-
-	my $applicationid;
-
-	unless ($applicationid = $zabbix->exist('application', {'filter' => {'name' => $name, 'hostid' => $templateid}}))
-	{
-		my $result = $zabbix->create('application', {'name' => $name, 'hostid' => $templateid});
-		return $result->{'applicationids'}[0];
-	}
-
-	return $applicationid;
-}
-
 sub create_probe_template
 {
 	my $root_name = shift;
@@ -1189,7 +1173,6 @@ sub create_probe_health_tmpl()
 		'key_'         => $item_key,
 		'status'       => ITEM_STATUS_ACTIVE,
 		'hostid'       => $templateid,
-		'applications' => [get_application_id('Probe Availability', $templateid)],
 		'type'         => ITEM_TYPE_INTERNAL,
 		'value_type'   => ITEM_VALUE_TYPE_UINT64,
 		'units'        => 'unixtime',
@@ -1215,7 +1198,6 @@ sub create_probe_health_tmpl()
 		'key_'         => PROBE_KEY_ONLINE,
 		'status'       => ITEM_STATUS_ACTIVE,
 		'hostid'       => $templateid,
-		'applications' => [get_application_id('Probe Availability', $templateid)],
 		'type'         => ITEM_TYPE_TRAPPER,
 		'value_type'   => ITEM_VALUE_TYPE_UINT64,
 		'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_probe'}

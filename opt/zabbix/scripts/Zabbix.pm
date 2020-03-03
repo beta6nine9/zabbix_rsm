@@ -245,7 +245,6 @@ my $objectids =
 	'host' => 'hostid',
 	'template' => 'templateid',
 	'hostgroup' => 'groupid',
-	'application' => 'applicationid'
 };
 
 sub exist {
