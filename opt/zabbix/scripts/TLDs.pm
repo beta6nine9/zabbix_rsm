@@ -36,7 +36,6 @@ our @EXPORT = qw(zbx_connect check_api_error get_proxies_list
 		set_proxy_status
 		get_application_id get_items_like set_tld_type get_triggers_by_items
 		add_dependency
-		create_cron_jobs
 		create_probe_health_tmpl
 		pfail);
 
@@ -1175,130 +1174,6 @@ sub __exec($)
 	unless ($? == 0)
 	{
 		pfail($err);
-	}
-}
-
-sub create_cron_jobs($)
-{
-	my $slv_path = shift;
-
-	my $errlog = '/var/log/zabbix/rsm.slv.err';
-
-	use constant CRON_D_PATH => '/etc/cron.d';
-	my $slv_file;
-
-	my $rv = opendir DIR, CRON_D_PATH;
-
-	unless ($rv)
-	{
-		pfail("cannot open " . CRON_D_PATH);
-	}
-
-	# first remove current entries
-	while (($slv_file = readdir DIR))
-	{
-		if ($slv_file !~ /^rsm.slv/ && $slv_file !~ /^rsm.probe/)
-		{
-			next;
-		}
-
-		$slv_file = CRON_D_PATH . "/$slv_file";
-
-		__exec("/bin/rm -f $slv_file");
-	}
-
-	my $avail_shift = 0;
-	my $avail_step = 1;
-	my $avail_limit = 5;
-	my $avail_cur = $avail_shift;
-
-	my $rollweek_shift = 3;
-	my $rollweek_step = 1;
-	my $rollweek_limit = 8;
-	my $rollweek_cur = $rollweek_shift;
-
-	my $downtime_shift = 6;
-	my $downtime_step = 1;
-	my $downtime_limit = 11;
-	my $downtime_cur = $downtime_shift;
-
-	my $rtt_shift = 10;
-	my $rtt_step = 1;
-	my $rtt_limit = 20;
-	my $rtt_cur = $rtt_shift;
-
-	$rv = opendir DIR, $slv_path;
-
-	unless ($rv)
-	{
-		pfail("cannot open $slv_path");
-	}
-
-	# set up what's needed
-	while (($slv_file = readdir DIR))
-	{
-		unless ($slv_file =~ /^rsm\..*\.pl$/)
-		{
-			next;
-		}
-
-		my $cron_file = $slv_file;
-		$cron_file =~ s/\./-/g;
-
-		my $err;
-
-		if ($slv_file =~ /\.slv\..*\.rtt\.pl$/)
-		{
-			# monthly RTT data
-			if (write_file(CRON_D_PATH . "/$cron_file", "* * * * * root sleep $rtt_cur; $slv_path/$slv_file >> $errlog 2>&1\n", \$err) != SUCCESS)
-			{
-				pfail($err);
-			}
-
-			$rtt_cur += $rtt_step;
-			$rtt_cur = $rtt_shift if ($rtt_cur >= $rtt_limit);
-		}
-		elsif ($slv_file =~ /\.slv\..*\.downtime\.pl$/)
-		{
-			# downtime
-			if (write_file(CRON_D_PATH . "/$cron_file", "* * * * * root sleep $downtime_cur; $slv_path/$slv_file >> $errlog 2>&1\n", \$err) != SUCCESS)
-			{
-				pfail($err);
-			}
-
-			$downtime_cur += $downtime_step;
-			$downtime_cur = $downtime_shift if ($downtime_cur >= $downtime_limit);
-		}
-		elsif ($slv_file =~ /\.slv\..*\.avail\.pl$/)
-		{
-			# service availability
-			if (write_file(CRON_D_PATH . "/$cron_file", "* * * * * root sleep $avail_cur; $slv_path/$slv_file >> $errlog 2>&1\n", \$err) != SUCCESS)
-			{
-				pfail($err);
-			}
-
-			$avail_cur += $avail_step;
-			$avail_cur = $avail_shift if ($avail_cur >= $avail_limit);
-		}
-		elsif ($slv_file =~ /\.slv\..*\.rollweek\.pl$/)
-		{
-			# rolling week
-			if (write_file(CRON_D_PATH . "/$cron_file", "* * * * * root sleep $rollweek_cur; $slv_path/$slv_file >> $errlog 2>&1\n", \$err) != SUCCESS)
-			{
-				pfail($err);
-			}
-
-			$rollweek_cur += $rollweek_step;
-			$rollweek_cur = $rollweek_shift if ($rollweek_cur >= $rollweek_limit);
-		}
-		else
-		{
-			# everything else
-			if (write_file(CRON_D_PATH . "/$cron_file", "* * * * * root $slv_path/$slv_file >> $errlog 2>&1\n", \$err) != SUCCESS)
-			{
-				pfail($err);
-			}
-		}
 	}
 }
 

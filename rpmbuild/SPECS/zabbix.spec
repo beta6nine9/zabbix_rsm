@@ -22,7 +22,6 @@ Source21:	zabbix_server.conf
 Source22:	zabbix_proxy_common.conf
 Source23:	zabbix_proxy_N.conf
 Source24:	zabbix-slv-logrotate
-Source25:	cron.d
 Patch0:		config.patch
 Patch1:		fonts-config.patch
 Patch2:		fping3-sourceip-option.patch
@@ -213,7 +212,6 @@ Zabbix scripts for RSM
 %endif
 
 cp -r %{SOURCE1}/ ./
-cp -r %{SOURCE25}/ ./
 
 # traceroute command path for global script
 sed -i -e 's|/usr/bin/traceroute|/bin/traceroute|' database/mysql/data.sql
@@ -379,9 +377,6 @@ install -m 0644 $MODULES \
 install -d $RPM_BUILD_ROOT/opt/zabbix
 install -d $RPM_BUILD_ROOT/opt/zabbix/data
 cp -r opt/zabbix/* $RPM_BUILD_ROOT/opt/zabbix/
-
-install -d $RPM_BUILD_ROOT%{_sysconfdir}/cron.d/
-cp -r cron.d/* $RPM_BUILD_ROOT%{_sysconfdir}/cron.d/
 
 install -Dm 0644 -p %{SOURCE24} $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/zabbix-slv
 
@@ -661,7 +656,6 @@ systemctl restart rsyslog
 %defattr(-,zabbix,zabbix,0755)
 /opt/zabbix/*
 %defattr(-,root,root,0755)
-/etc/cron.d/*
 %{_sysconfdir}/logrotate.d/zabbix-slv
 %{_sysconfdir}/rsyslog.d/rsm.slv.conf
 

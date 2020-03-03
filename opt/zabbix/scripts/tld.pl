@@ -40,14 +40,6 @@ sub main()
 
 	init_cli_opts(get_rsm_local_id($config));
 
-	if (opt('setup-cron'))
-	{
-		create_cron_jobs($config->{'slv'}{'path'});
-		print("cron jobs created successfully\n");
-
-		return;
-	}
-
 	my $server_key = opt('server-id') ? get_rsm_server_key(getopt('server-id')) : get_rsm_local_key($config);
 	init_zabbix_api($config, $server_key);
 
@@ -158,7 +150,6 @@ sub init_cli_opts($)
 			"get-nsservers-list!",
 			"update-nsservers!",
 			"list-services!",
-			"setup-cron!",
 			"verbose!",
 			"quiet!",
 			"help|?");
@@ -178,11 +169,6 @@ sub init_cli_opts($)
 sub validate_input($)
 {
 	my $default_server_id = shift;
-
-	if (opt('setup-cron'))
-	{
-		return;
-	}
 
 	my $msg = "";
 
@@ -1550,8 +1536,6 @@ Other options
                 ID of Zabbix server $default_server_id
         --rdds-test-prefix=STRING
                 domain test prefix for RDDS monitoring (needed only if rdds servers specified)
-        --setup-cron
-                create cron jobs and exit
         --epp
                 Action with EPP
                 (default: no)

@@ -1,1 +1,0 @@
-0 1 1 * * root /opt/zabbix/scripts/disable-rdds-for-rdap-hosts.pl >> /var/log/zabbix/disable-rdds-for-rdap-hosts.err 2>&1
