@@ -92,7 +92,7 @@ sub init_cli_opts($)
 			"rdap-test-domain=s",
 			"rdds-ns-string=s",
 			"root-servers=s",
-			"rdds-test-prefix=s",
+			"rdds-test-domain=s",
 			"verbose!",
 			"help|?");
 
@@ -161,10 +161,10 @@ sub validate_cli_opts($)
 		{
 			$msg .= "none or both --rdds43-servers and --rdds80-servers must be specified\n";
 		}
-		if (!opt('rdds-test-prefix'))
+		if (!opt('rdds-test-domain'))
 		{
 			# this might be needed only for RDDS43, but must be double-checked, if RDDS43 and RDDS80 are separated
-			$msg .= "--rdds-test-prefix must be specified\n";
+			$msg .= "--rdds-test-domain must be specified\n";
 		}
 	}
 
@@ -267,7 +267,7 @@ sub list_services($;$)
 	my @columns = (
 		'status',
 		'{$RSM.RDDS.NS.STRING}',
-		'{$RSM.RDDS.TESTPREFIX}',
+		'{$RSM.RDDS.TEST.DOMAIN}',
 		'{$RSM.TLD.RDDS.ENABLED}',
 		'{$RDAP.TLD.ENABLED}',
 		'{$RDAP.BASE.URL}',
@@ -595,7 +595,7 @@ sub create_main_template($)
 	create_items_rdds($templateid, $template_name);
 
 	really(create_macro('{$RSM.TLD}', $rsmhost, $templateid));
-	really(create_macro('{$RSM.RDDS.TESTPREFIX}', getopt('rdds-test-prefix'), $templateid, 1)) if (opt('rdds-test-prefix'));
+	really(create_macro('{$RSM.RDDS.TEST.DOMAIN}', getopt('rdds-test-domain'), $templateid, 1)) if (opt('rdds-test-domain'));
 	really(create_macro('{$RSM.RDDS.NS.STRING}', opt('rdds-ns-string') ? getopt('rdds-ns-string') : CFG_DEFAULT_RDDS_NS_STRING, $templateid, 1));
 	really(create_macro('{$RSM.TLD.RDDS.ENABLED}', opt('rdds43-servers') ? 1 : 0, $templateid, 1));
 	really(create_macro('{$RSM.TLD.EPP.ENABLED}', 0, $templateid)); # required by rsm.rdds[] metric
@@ -1157,7 +1157,7 @@ Other options
                 (services supported only after switch to Standalone RDAP)
         --list-services
                 list services of each Regstrar, the output is comma-separated list:
-                <RR-ID>,<RR-NAME>,<RR-FAMILY>,<RR-STATUS>,<RDDS.NS.STRING>,<RDDS.TESTPREFIX>,
+                <RR-ID>,<RR-NAME>,<RR-FAMILY>,<RR-STATUS>,<RDDS.NS.STRING>,<RDDS.TEST.DOMAIN>,
                 <RDDS.ENABLED>,<RDAP.ENABLED>,<RDAP.BASE.URL>,<RDAP.TEST.DOMAIN>,
 		<RDDS43.SERVERS>,<RDDS80.SERVERS>
         --rdds43-servers=STRING
@@ -1176,8 +1176,8 @@ Other options
         --root-servers=STRING
                 list of IPv4 and IPv6 root servers separated by comma and semicolon: "v4IP1[,v4IP2,...][;v6IP1[,v6IP2,...]]"
                 (default: taken from DNS)
-        --rdds-test-prefix=STRING
-                domain test prefix for RDDS monitoring (needed only if rdds servers specified)
+        --rdds-test-domain=STRING
+                test domain for RDDS monitoring (needed only if rdds servers specified)
         --rdds
                 Action with RDDS
                 (only effective after switch to Standalone RDAP, default: no)

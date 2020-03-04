@@ -123,6 +123,7 @@ sub init_cli_opts($)
 			"rdap-test-domain=s",
 			"dns-test-prefix=s",
 			"rdds-test-prefix=s",
+			"rdds-test-domain=s",
 			"ipv4!",
 			"ipv6!",
 			"dns!",
@@ -230,9 +231,16 @@ sub validate_input($)
 		$msg .= "none or both --rdds43-servers and --rdds80-servers must be specified\n";
 	}
 
-	if (opt('rdds43-servers') && !opt('rdds-test-prefix'))
+	if (opt('rdds43-servers'))
 	{
-		$msg .= "--rdds-test-prefix must be specified\n";
+		if (!opt('rdds-test-prefix') && !opt('rdds-test-domain'))
+		{
+			$msg .= "--rdds-test-prefix or --rdds-test-domain must be specified\n";
+		}
+		if (opt('rdds-test-prefix') && opt('rdds-test-domain'))
+		{
+			$msg .= "only one of --rdds-test-prefix and --rdds-test-domain must be specified\n";
+		}
 	}
 
 	if ((opt('rdap-base-url') && !opt('rdap-test-domain')) ||
@@ -361,7 +369,7 @@ sub list_services($;$)
 		'tld_status',
 		'{$RSM.DNS.TESTPREFIX}',
 		'{$RSM.RDDS.NS.STRING}',
-		'{$RSM.RDDS.TESTPREFIX}',
+		'{$RSM.RDDS.TEST.DOMAIN}',
 		'{$RSM.TLD.DNSSEC.ENABLED}',
 		'{$RSM.TLD.EPP.ENABLED}',
 		'{$RSM.TLD.RDDS.ENABLED}',
@@ -1070,9 +1078,19 @@ sub create_main_template($$)
 	create_items_rdds($templateid);
 	create_items_epp($templateid) if (opt('epp-servers'));
 
+	my $rdds_test_domain;
+	if (opt('rdds-test-prefix'))
+	{
+		$rdds_test_domain = sprintf('%s.%s', getopt('rdds-test-prefix'), getopt('tld'));
+	}
+	elsif (opt('rdds-test-domain'))
+	{
+		$rdds_test_domain = getopt('rdds-test-domain');
+	}
+
 	really(create_macro('{$RSM.TLD}', $tld, $templateid));
 	really(create_macro('{$RSM.DNS.TESTPREFIX}', getopt('dns-test-prefix'), $templateid, 1));
-	really(create_macro('{$RSM.RDDS.TESTPREFIX}', getopt('rdds-test-prefix'), $templateid, 1)) if (opt('rdds-test-prefix'));
+	really(create_macro('{$RSM.RDDS.TEST.DOMAIN}', $rdds_test_domain, $templateid, 1)) if (defined($rdds_test_domain));
 	really(create_macro('{$RSM.RDDS.NS.STRING}', opt('rdds-ns-string') ? getopt('rdds-ns-string') : CFG_DEFAULT_RDDS_NS_STRING, $templateid, 1));
 	really(create_macro('{$RSM.TLD.DNSSEC.ENABLED}', getopt('dnssec'), $templateid, 1));
 	really(create_macro('{$RSM.TLD.RDDS.ENABLED}', opt('rdds43-servers') ? 1 : 0, $templateid, 1));
@@ -2100,7 +2118,7 @@ Other options
                 if none or all services specified - will disable the whole TLD
         --list-services
                 list services of each TLD, the output is comma-separated list:
-                <TLD>,<TLD-TYPE>,<TLD-STATUS>,<RDDS.DNS.TESTPREFIX>,<RDDS.NS.STRING>,<RDDS.TESTPREFIX>,
+                <TLD>,<TLD-TYPE>,<TLD-STATUS>,<RDDS.DNS.TESTPREFIX>,<RDDS.NS.STRING>,<RDDS.TEST.DOMAIN>,
                 <TLD.DNSSEC.ENABLED>,<TLD.EPP.ENABLED>,<TLD.RDDS.ENABLED>,<TLD.RDAP.ENABLED>,
                 <RDAP.BASE.URL>,<RDAP.TEST.DOMAIN>,<RDDS43.SERVERS>,<RDDS80.SERVERS>
         --get-nsservers-list
@@ -2162,6 +2180,8 @@ Other options
                 ID of Zabbix server $default_server_id
         --rdds-test-prefix=STRING
                 domain test prefix for RDDS monitoring (needed only if rdds servers specified)
+        --rdds-test-domain=STRING
+                test domain for RDDS monitoring (needed only if rdds servers specified)
         --setup-cron
                 create cron jobs and exit
         --epp
