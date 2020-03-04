@@ -5013,6 +5013,29 @@ out:
 	return ret;
 }
 
+static int	DBpatch_3000505(void)
+{
+	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
+		return SUCCEED;
+
+#define SQL	"update"												\
+			" hostmacro"											\
+			" left join hostmacro as hostmacro2 on hostmacro2.hostid=hostmacro.hostid"			\
+		" set"													\
+			" hostmacro.macro='{$RSM.RDDS.TEST.DOMAIN}',"							\
+			"hostmacro.value=concat(hostmacro.value,'.',hostmacro2.value)"					\
+		" where"												\
+			" hostmacro.macro='{$RSM.RDDS.TESTPREFIX}' and"							\
+			" hostmacro2.macro='{$RSM.TLD}'"
+	if (ZBX_DB_OK > DBexecute(SQL))
+	{
+		return FAIL;
+	}
+#undef SQL
+
+	return SUCCEED;
+}
+
 #endif
 
 DBPATCH_START(3000)
@@ -5132,5 +5155,6 @@ DBPATCH_ADD(3000501, 0, 0)	/* add macros, items and triggers for Standalone RDAP
 DBPATCH_ADD(3000502, 0, 0)	/* add {$RSM.RDAP.ENABLED} macro on probes */
 DBPATCH_ADD(3000503, 0, 0)	/* replace {$RSM.RDDS.*} with {$RSM.RDAP.*} in rdap[] keys */
 DBPATCH_ADD(3000504, 0, 0)	/* add RDAP-related macros to Global macro history */
+DBPATCH_ADD(3000505, 0, 0)	/* rename {$RSM.RDDS.TESTPREFIX} to {$RSM.RDDS.TEST.DOMAIN} */
 
 DBPATCH_END()
