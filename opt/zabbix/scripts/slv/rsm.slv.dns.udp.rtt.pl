@@ -35,8 +35,8 @@ use constant SLV_ITEM_KEY_DNS_UDP_PERFORMED     => "rsm.slv.dns.udp.rtt.performe
 use constant SLV_ITEM_KEY_DNS_UDP_FAILED        => "rsm.slv.dns.udp.rtt.failed";
 use constant SLV_ITEM_KEY_DNS_UDP_PFAILED       => "rsm.slv.dns.udp.rtt.pfailed";
 
-use constant RTT_ITEM_KEY_PATTERN_DNS_UDP_IPV4  => 'rsm.dns.udp.rtt[{$RSM.TLD},%,%.%]';
-use constant RTT_ITEM_KEY_PATTERN_DNS_UDP_IPV6  => 'rsm.dns.udp.rtt[{$RSM.TLD},%,%:%]';
+use constant RTT_ITEM_KEY_PATTERN_DNS_UDP_IPV4  => 'rsm.dns.rtt[%,%.%,udp]';
+use constant RTT_ITEM_KEY_PATTERN_DNS_UDP_IPV6  => 'rsm.dns.rtt[%,%:%,udp]';
 
 use constant RTT_ITEM_KEY_LASTCLOCK_CONTROL     => 'rsm.dns.status';
 

@@ -35,8 +35,8 @@ use constant SLV_ITEM_KEY_DNS_TCP_PERFORMED     => "rsm.slv.dns.tcp.rtt.performe
 use constant SLV_ITEM_KEY_DNS_TCP_FAILED        => "rsm.slv.dns.tcp.rtt.failed";
 use constant SLV_ITEM_KEY_DNS_TCP_PFAILED       => "rsm.slv.dns.tcp.rtt.pfailed";
 
-use constant RTT_ITEM_KEY_PATTERN_DNS_TCP_IPV4  => 'rsm.dns.tcp.rtt[{$RSM.TLD},%,%.%]';
-use constant RTT_ITEM_KEY_PATTERN_DNS_TCP_IPV6  => 'rsm.dns.tcp.rtt[{$RSM.TLD},%,%:%]';
+use constant RTT_ITEM_KEY_PATTERN_DNS_TCP_IPV4  => 'rsm.dns.rtt[%,%.%,tcp]';
+use constant RTT_ITEM_KEY_PATTERN_DNS_TCP_IPV6  => 'rsm.dns.rtt[%,%:%,tcp]';
 
 use constant RTT_ITEM_KEY_LASTCLOCK_CONTROL     => 'rsm.dns.status';
 
