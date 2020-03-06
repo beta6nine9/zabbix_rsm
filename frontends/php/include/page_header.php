@@ -236,7 +236,7 @@ if (!defined('ZBX_PAGE_NO_MENU') && $page['web_layout_mode'] === ZBX_LAYOUT_NORM
 	}
 
 	$ZBX_SERVER_NAME = $servers;
-	
+
 	$page_menu = new CPartial('layout.htmlpage.menu', [
 		'server_name' => isset($ZBX_SERVER_NAME) ? $ZBX_SERVER_NAME : '',
 		'menu' => APP::Component()->get('menu.main'),

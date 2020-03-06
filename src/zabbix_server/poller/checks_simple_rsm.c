@@ -2450,7 +2450,7 @@ static int	update_metadata(int file_exists, const char *domain, int test_status,
 		}
 	}
 
-	if (CURRENT_MODE_NORMAL != *current_mode)
+	if (CURRENT_MODE_NORMAL == *current_mode)
 	{
 		if (1 == file_exists)
 		{
