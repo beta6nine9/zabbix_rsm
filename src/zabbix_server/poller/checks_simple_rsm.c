@@ -2413,8 +2413,9 @@ out:
 #define CURRENT_MODE_CRITICAL_UDP	1
 #define CURRENT_MODE_CRITICAL_TCP	2
 
-static int	update_metadata(int file_exists, const char *domain, int test_status, int test_recover, char protocol,
-		int *current_mode, int *successful_tests, FILE *log_fd, char *err, size_t err_size)
+static int	update_metadata(int file_exists, const char *domain, int test_status, int test_recover_udp,
+		int test_recover_tcp, char protocol, int *current_mode, int *successful_tests, FILE *log_fd, char *err,
+		size_t err_size)
 {
 	if (1 == test_status)
 	{
@@ -2424,7 +2425,8 @@ static int	update_metadata(int file_exists, const char *domain, int test_status,
 			/* currently we are in critical mode */
 			(*successful_tests)++;
 
-			if (*successful_tests == test_recover)
+			if ((CURRENT_MODE_CRITICAL_UDP == *current_mode && *successful_tests == test_recover_udp) ||
+					(CURRENT_MODE_CRITICAL_TCP == *current_mode && *successful_tests == test_recover_tcp))
 			{
 				/* switch to normal */
 				*successful_tests = 0;
@@ -2467,7 +2469,7 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 				*domain, *testprefix, *name_servers_list, *dnssec_enabled_str, *rdds_enabled_str,
 				*epp_enabled_str, *udp_enabled_str, *tcp_enabled_str, *ipv4_enabled_str,
 				*ipv6_enabled_str, *res_ip, *udp_rtt_limit_str, *tcp_rtt_limit_str, *tcp_ratio_str,
-				*test_recover_str, *minns_str;
+				*test_recover_udp_str, *test_recover_tcp_str, *minns_str;
 	zbx_dnskeys_error_t	ec_dnskeys;
 	ldns_resolver		*res = NULL;
 	ldns_rr_list		*keys = NULL;
@@ -2478,7 +2480,8 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 	struct zbx_json		json;
 	int			dnssec_enabled, rdds_enabled, epp_enabled, udp_enabled, tcp_enabled, ipv4_enabled,
 				ipv6_enabled, udp_rtt_limit, tcp_rtt_limit, rtt_limit, current_mode, successful_tests,
-				file_exists, nssok, test_status, tcp_ratio, test_recover, minns, ret = SYSINFO_RET_FAIL;
+				file_exists, nssok, test_status, tcp_ratio, test_recover_udp, test_recover_tcp, minns,
+				ret = SYSINFO_RET_FAIL;
 
 	if (16 != request->nparam)
 	{
@@ -2501,8 +2504,9 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 	udp_rtt_limit_str = get_rparam(request, 11);	/* maximum allowed UDP RTT in milliseconds */
 	tcp_rtt_limit_str = get_rparam(request, 12);	/* maximum allowed TCP RTT in milliseconds */
 	tcp_ratio_str = get_rparam(request, 13);	/* TCP ratio against UDP to use in the test */
-	test_recover_str = get_rparam(request, 14);	/* successful tests to recover from critical mode */
-	minns_str = get_rparam(request, 15);		/* required working name servers */
+	test_recover_udp_str = get_rparam(request, 14);	/* successful tests to recover from critical mode */
+	test_recover_tcp_str = get_rparam(request, 15);	/* successful tests to recover from critical mode */
+	minns_str = get_rparam(request, 16);		/* required working name servers */
 
 	if ('\0' == *domain)
 	{
@@ -2564,39 +2568,45 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 		return ret;
 	}
 
-	if (SUCCEED != is_uint31(udp_rtt_limit_str, &udp_rtt_limit))
+	if ('\0' == *res_ip)
 	{
-		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid eleventh parameter."));
+		SET_MSG_RESULT(result, zbx_strdup(NULL, "IP address of local resolver cannot be empty."));
 		return ret;
 	}
 
-	if (SUCCEED != is_uint31(tcp_rtt_limit_str, &tcp_rtt_limit))
+	if (SUCCEED != is_uint31(udp_rtt_limit_str, &udp_rtt_limit))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid twelfth parameter."));
 		return ret;
 	}
 
-	if (SUCCEED != is_uint31(tcp_ratio_str, &tcp_ratio))
+	if (SUCCEED != is_uint31(tcp_rtt_limit_str, &tcp_rtt_limit))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid thirteenth parameter."));
 		return ret;
 	}
 
-	if (SUCCEED != is_uint31(test_recover_str, &test_recover))
+	if (SUCCEED != is_uint31(tcp_ratio_str, &tcp_ratio))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid fourteenth parameter."));
 		return ret;
 	}
 
-	if (SUCCEED != is_uint31(minns_str, &minns))
+	if (SUCCEED != is_uint31(test_recover_udp_str, &test_recover_udp))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid fifteenth parameter."));
 		return ret;
 	}
 
-	if ('\0' == *res_ip)
+	if (SUCCEED != is_uint31(test_recover_tcp_str, &test_recover_tcp))
 	{
-		SET_MSG_RESULT(result, zbx_strdup(NULL, "IP address of local resolver cannot be empty."));
+		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid sixteenth parameter."));
+		return ret;
+	}
+
+	if (SUCCEED != is_uint31(minns_str, &minns))
+	{
+		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid seventeenth parameter."));
 		return ret;
 	}
 
@@ -2639,14 +2649,15 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 	rsm_info(log_fd, "START TEST");
 
 	rsm_infof(log_fd, "mode: %s, protocol: %s, rtt limit: %d, tcp ratio: %d, minns: %d"
-			" (for critical mode: successful: %d, required for recovery: %d)",
+			" (for critical mode: successful: %d, required for recovery: %d for udp, %d for tcp)",
 			(CURRENT_MODE_NORMAL == current_mode ? "normal" : "critical"),
 			(protocol == RSM_UDP ? "UDP" : "TCP"),
 			rtt_limit,
 			tcp_ratio,
 			minns,
 			successful_tests,
-			test_recover);
+			test_recover_udp,
+			test_recover_tcp);
 
 	if (0 == strcmp(testprefix, "*randomtld*"))
 	{
@@ -2877,8 +2888,8 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 
 	create_rsm_dns_json(&json, nss, nss_num, current_mode, nssok, test_status, protocol);
 
-	if (SUCCEED != update_metadata(file_exists, domain, test_status, test_recover, protocol, &current_mode,
-			&successful_tests, log_fd, err, sizeof(err)))
+	if (SUCCEED != update_metadata(file_exists, domain, test_status, test_recover_udp, test_recover_tcp, protocol,
+			&current_mode, &successful_tests, log_fd, err, sizeof(err)))
 	{
 		rsm_errf(log_fd, "internal error: %s", err);
 	}
@@ -2918,6 +2929,10 @@ out:
 
 	return ret;
 }
+
+#undef CURRENT_MODE_NORMAL
+#undef CURRENT_MODE_CRITICAL_UDP
+#undef CURRENT_MODE_CRITICAL_TCP
 
 static void	zbx_get_rdds43_nss(zbx_vector_str_t *nss, const char *recv_buf, const char *rdds_ns_string, FILE *log_fd)
 {

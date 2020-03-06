@@ -9,6 +9,8 @@
 #define LOG_FILE1	"test1.log"
 #define LOG_FILE2	"test2.log"
 
+#define CURRENT_MODE_NORMAL	0
+
 void	zbx_on_exit(int ret)
 {
 	ZBX_UNUSED(ret);
