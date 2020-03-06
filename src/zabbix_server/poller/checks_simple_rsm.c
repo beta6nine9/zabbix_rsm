@@ -2413,9 +2413,8 @@ out:
 #define CURRENT_MODE_CRITICAL_UDP	1
 #define CURRENT_MODE_CRITICAL_TCP	2
 
-static int	update_metadata(int file_exists, const char *domain, int test_status, int test_recover_udp,
-		int test_recover_tcp, char protocol, int *current_mode, int *successful_tests, FILE *log_fd, char *err,
-		size_t err_size)
+static int	update_metadata(int file_exists, const char *domain, int test_status, int test_recover, char protocol,
+		int *current_mode, int *successful_tests, FILE *log_fd, char *err, size_t err_size)
 {
 	if (1 == test_status)
 	{
@@ -2425,8 +2424,7 @@ static int	update_metadata(int file_exists, const char *domain, int test_status,
 			/* currently we are in critical mode */
 			(*successful_tests)++;
 
-			if ((CURRENT_MODE_CRITICAL_UDP == *current_mode && *successful_tests == test_recover_udp) ||
-					(CURRENT_MODE_CRITICAL_TCP == *current_mode && *successful_tests == test_recover_tcp))
+			if (*successful_tests == test_recover)
 			{
 				/* switch to normal */
 				*successful_tests = 0;
@@ -2452,15 +2450,24 @@ static int	update_metadata(int file_exists, const char *domain, int test_status,
 		}
 	}
 
-	if (1 == file_exists && CURRENT_MODE_NORMAL == *current_mode)
+	if (CURRENT_MODE_NORMAL != *current_mode)
 	{
-		/* delete the file */
-		rsm_info(log_fd, "removing the metadata file");
+		if (1 == file_exists)
+		{
+			/* delete the file */
+			rsm_info(log_fd, "removing the metadata file");
 
-		return delete_metadata(domain, err, err_size);
+			return delete_metadata(domain, err, err_size);
+		}
+		else
+		{
+			return SUCCEED;
+		}
 	}
-
-	return write_metadata(domain, *current_mode, *successful_tests, err, err_size);
+	else
+	{
+		return write_metadata(domain, *current_mode, *successful_tests, err, err_size);
+	}
 }
 
 int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *result)
@@ -2480,8 +2487,8 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 	struct zbx_json		json;
 	int			dnssec_enabled, rdds_enabled, epp_enabled, udp_enabled, tcp_enabled, ipv4_enabled,
 				ipv6_enabled, udp_rtt_limit, tcp_rtt_limit, rtt_limit, current_mode, successful_tests,
-				file_exists, nssok, test_status, tcp_ratio, test_recover_udp, test_recover_tcp, minns,
-				ret = SYSINFO_RET_FAIL;
+				file_exists, nssok, test_status, tcp_ratio, test_recover_udp, test_recover_tcp,
+				test_recover, minns, ret = SYSINFO_RET_FAIL;
 
 	if (17 != request->nparam)
 	{
@@ -2637,7 +2644,16 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 		protocol = (current_mode == CURRENT_MODE_CRITICAL_TCP ? RSM_TCP : RSM_UDP);
 	}
 
-	rtt_limit = (protocol == RSM_UDP ? udp_rtt_limit : tcp_rtt_limit);
+	if (RSM_UDP == protocol)
+	{
+		rtt_limit = udp_rtt_limit;
+		test_recover = test_recover_udp;
+	}
+	else
+	{
+		rtt_limit = tcp_rtt_limit;
+		test_recover = test_recover_tcp;
+	}
 
 	/* open log file */
 	if (NULL == (log_fd = open_item_log(item->host.host, domain, ZBX_DNS_LOG_PREFIX, err, sizeof(err))))
@@ -2656,8 +2672,7 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 			tcp_ratio,
 			minns,
 			successful_tests,
-			test_recover_udp,
-			test_recover_tcp);
+			test_recover);
 
 	if (0 == strcmp(testprefix, "*randomtld*"))
 	{
@@ -2888,8 +2903,8 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 
 	create_rsm_dns_json(&json, nss, nss_num, current_mode, nssok, test_status, protocol);
 
-	if (SUCCEED != update_metadata(file_exists, domain, test_status, test_recover_udp, test_recover_tcp, protocol,
-			&current_mode, &successful_tests, log_fd, err, sizeof(err)))
+	if (SUCCEED != update_metadata(file_exists, domain, test_status, test_recover, protocol, &current_mode,
+			&successful_tests, log_fd, err, sizeof(err)))
 	{
 		rsm_errf(log_fd, "internal error: %s", err);
 	}
