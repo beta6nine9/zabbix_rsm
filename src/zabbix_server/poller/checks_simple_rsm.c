@@ -2483,7 +2483,7 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 				file_exists, nssok, test_status, tcp_ratio, test_recover_udp, test_recover_tcp, minns,
 				ret = SYSINFO_RET_FAIL;
 
-	if (16 != request->nparam)
+	if (17 != request->nparam)
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid number of parameters"));
 		return SYSINFO_RET_FAIL;
