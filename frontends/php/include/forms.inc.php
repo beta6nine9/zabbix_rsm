@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -33,7 +33,7 @@ function prepareSubfilterOutput($label, $data, $subfilter, $subfilterName) {
 				(new CLinkAction($element['name']))
 					->onClick(CHtml::encode(
 						'javascript: create_var("zbx_filter", "subfilter_set", "1", false);'.
-						'create_var("zbx_filter", '.CJs::encodeJson($subfilterName.'['.$id.']').', null, true);'
+						'create_var("zbx_filter", '.json_encode($subfilterName.'['.$id.']').', null, true);'
 					)),
 				' ',
 				new CSup($element['count'])
@@ -57,8 +57,8 @@ function prepareSubfilterOutput($label, $data, $subfilter, $subfilterName) {
 					->onClick(CHtml::encode(
 						'javascript: create_var("zbx_filter", "subfilter_set", "1", false);'.
 						'create_var("zbx_filter", '.
-							CJs::encodeJson($subfilterName.'['.$id.']').', '.
-							CJs::encodeJson($id).', '.
+							json_encode($subfilterName.'['.$id.']').', '.
+							json_encode($id).', '.
 							'true'.
 						');'
 					));
@@ -257,7 +257,7 @@ function getItemFilterForm(&$items) {
 			(new CButton(null, _('Select')))
 				->addClass(ZBX_STYLE_BTN_GREY)
 				->onClick('return PopUp("popup.generic",jQuery.extend('.
-					CJs::encodeJson([
+					json_encode([
 						'srctbl' => 'applications',
 						'srcfld1' => 'name',
 						'dstfrm' => $filter->getName(),
@@ -822,7 +822,7 @@ function getItemFormData(array $item = [], array $options = []) {
 		'trends' => getRequest('trends', DB::getDefault('items', 'trends')),
 		'new_application' => getRequest('new_application', ''),
 		'applications' => getRequest('applications', []),
-		'delay_flex' => getRequest('delay_flex', []),
+		'delay_flex' => array_values(getRequest('delay_flex', [])),
 		'snmpv3_contextname' => getRequest('snmpv3_contextname', ''),
 		'snmpv3_securityname' => getRequest('snmpv3_securityname', ''),
 		'snmpv3_securitylevel' => getRequest('snmpv3_securitylevel', 0),
@@ -1752,7 +1752,7 @@ function getTriggerFormData(array $data) {
 
 		$data['limited'] = ($trigger['templateid'] != 0);
 
-		// select first host from triggers if gived not match
+		// Select first host from triggers if no matching value is given.
 		$hosts = $trigger['hosts'];
 		if (count($hosts) > 0 && !in_array(['hostid' => $data['hostid']], $hosts)) {
 			$host = reset($hosts);

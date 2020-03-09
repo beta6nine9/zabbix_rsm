@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -208,7 +208,7 @@ class CWebUser {
 			'alias' => ZBX_GUEST_USER,
 			'userid' => 0,
 			'lang' => 'en_gb',
-			'type' => '0',
+			'type' => 0,
 			'debug_mode' => false
 		];
 	}
@@ -221,7 +221,7 @@ class CWebUser {
 	 * @return int
 	 */
 	public static function getType() {
-		return self::$data['type'];
+		return self::$data ? self::$data['type'] : 0;
 	}
 
 	/**
@@ -230,7 +230,7 @@ class CWebUser {
 	 * @return bool
 	 */
 	public static function getDebugMode() {
-		return (self::$data['debug_mode']);
+		return (self::$data && self::$data['debug_mode']);
 	}
 
 	/**
@@ -239,7 +239,7 @@ class CWebUser {
 	 * @return bool
 	 */
 	public static function isLoggedIn() {
-		return (self::$data['userid']);
+		return (self::$data && self::$data['userid']);
 	}
 
 	/**
@@ -248,7 +248,7 @@ class CWebUser {
 	 * @return bool
 	 */
 	public static function isGuest() {
-		return (self::$data['alias'] == ZBX_GUEST_USER);
+		return (self::$data && self::$data['alias'] == ZBX_GUEST_USER);
 	}
 
 	/**

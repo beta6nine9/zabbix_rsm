@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -151,6 +151,33 @@ function getSeverityColor($severity, $value = TRIGGER_VALUE_TRUE) {
 	}
 
 	return $color;
+}
+
+/**
+ * Generate array with severities options.
+ *
+ * @param bool $style  True - include style option.
+ *
+ * @return array
+ */
+function getSeverities($style = false) {
+	$severities = [];
+	$config = select_config();
+
+	foreach (range(TRIGGER_SEVERITY_NOT_CLASSIFIED, TRIGGER_SEVERITY_COUNT - 1) as $severity) {
+		$options = [
+			'name' => getSeverityName($severity, $config),
+			'value' => $severity
+		];
+
+		if ($style) {
+			$options['style'] = getSeverityStyle($severity);
+		}
+
+		$severities[] = $options;
+	}
+
+	return $severities;
 }
 
 /**

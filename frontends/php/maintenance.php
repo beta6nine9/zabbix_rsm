@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -308,9 +308,7 @@ if (!empty($data['form'])) {
 	CArrayHelper::sort($data['groups_ms'], ['name']);
 
 	// render view
-	$maintenanceView = new CView('configuration.maintenance.edit', $data);
-	$maintenanceView->render();
-	$maintenanceView->show();
+	echo (new CView('configuration.maintenance.edit', $data))->getOutput();
 }
 else {
 	// get maintenances
@@ -389,17 +387,27 @@ else {
 
 	order_result($data['maintenances'], $sortField, $sortOrder);
 
-	$url = (new CUrl('maintenance.php'))
-		->setArgument('groupid', $pageFilter->groupid);
+	// pager
+	if (hasRequest('page')) {
+		$page_num = getRequest('page');
+	}
+	elseif (isRequestMethod('get') && !hasRequest('cancel')) {
+		$page_num = 1;
+	}
+	else {
+		$page_num = CPagerHelper::loadPage($page['file']);
+	}
 
-	$data['paging'] = getPagingLine($data['maintenances'], $sortOrder, $url);
+	CPagerHelper::savePage($page['file'], $page_num);
+
+	$data['paging'] = CPagerHelper::paginate($page_num, $data['maintenances'], $sortOrder,
+		(new CUrl('maintenance.php'))->setArgument('groupid', $pageFilter->groupid)
+	);
 
 	$data['pageFilter'] = $pageFilter;
 
 	// render view
-	$maintenanceView = new CView('configuration.maintenance.list', $data);
-	$maintenanceView->render();
-	$maintenanceView->show();
+	echo (new CView('configuration.maintenance.list', $data))->getOutput();
 }
 
 require_once dirname(__FILE__).'/include/page_footer.php';

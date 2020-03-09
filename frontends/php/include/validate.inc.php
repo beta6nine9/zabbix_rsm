@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -335,7 +335,7 @@ function invalid_url($msg = null) {
 
 	require_once dirname(__FILE__).'/page_header.php';
 
-	// rollback reseted messages
+	// Rollback reset messages.
 	$ZBX_MESSAGES = $temp;
 
 	unset_all();
@@ -423,14 +423,14 @@ function validateTimeSelectorPeriod($from, $to) {
 
 	if ($period < ZBX_MIN_PERIOD) {
 		error(_n('Minimum time period to display is %1$s minute.',
-			'Minimum time period to display is %1$s minutes.', (int) ZBX_MIN_PERIOD / SEC_PER_MIN
+			'Minimum time period to display is %1$s minutes.', (int) (ZBX_MIN_PERIOD / SEC_PER_MIN)
 		));
 
 		invalid_url();
 	}
 	elseif ($period > ZBX_MAX_PERIOD) {
 		error(_n('Maximum time period to display is %1$s day.',
-			'Maximum time period to display is %1$s days.', (int) ZBX_MAX_PERIOD / SEC_PER_DAY
+			'Maximum time period to display is %1$s days.', (int) (ZBX_MAX_PERIOD / SEC_PER_DAY)
 		));
 
 		invalid_url();
@@ -515,7 +515,7 @@ function validateDateInterval($year, $month, $day) {
  * If the value is incorrect, set an error.
  *
  * @param string $value                  Value to parse and validate.
- * @param int    $min                    Lowed bound.
+ * @param int    $min                    Lower bound.
  * @param int    $max                    Upper bound.
  * @param bool   $allow_zero             Set to "true" to allow value to be zero.
  * @param string $error
@@ -527,6 +527,7 @@ function validateDateInterval($year, $month, $day) {
  */
 function validateTimeUnit($value, $min, $max, $allow_zero, &$error, array $options = []) {
 	$simple_interval_parser = new CSimpleIntervalParser($options);
+	$value = (string) $value;
 
 	if ($simple_interval_parser->parse($value) == CParser::PARSE_SUCCESS) {
 		if ($value[0] !== '{') {

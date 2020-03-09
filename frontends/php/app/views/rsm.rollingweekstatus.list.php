@@ -19,7 +19,7 @@
 **/
 
 
-$this->includeJSfile('app/views/rsm.rollingweekstatus.list.js.php');
+$this->includeJSfile('rsm.rollingweekstatus.list.js.php');
 
 // Build filter.
 if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {

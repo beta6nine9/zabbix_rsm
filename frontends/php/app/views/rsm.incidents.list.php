@@ -631,7 +631,9 @@ $filter = [
 	'active_tab' => $data['active_tab']
 ];
 
-$this->addPostJS(
-	'timeControl.addObject("incidents", '.CJs::encodeJson($filter).', '.CJs::encodeJson($tc_obj_data).');'.
-	'timeControl.processObjects();'
-);
+(new CScriptTag(
+	'timeControl.addObject("incidents", '.json_encode($filter).', '.json_encode($tc_obj_data).');'.
+	'timeControl.processObjects();')
+)->show();
+
+

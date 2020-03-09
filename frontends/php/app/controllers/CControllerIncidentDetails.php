@@ -38,7 +38,8 @@ class CControllerIncidentDetails extends CController {
 			'filter_set'			=>	'in 1',
 			'filter_rst'			=>	'in 1',
 			'from'					=>	'string',
-			'to'					=>	'string'
+			'to'					=>	'string',
+			'page'					=>	'int32',
 		];
 
 		$ret = $this->validateInput($fields);
@@ -390,7 +391,7 @@ class CControllerIncidentDetails extends CController {
 		$this->getRSM($data);
 		$this->getData($data);
 
-		$data['paging'] = getPagingLine($data['tests'], ZBX_SORT_UP, new CUrl());
+		$data['paging'] = CPagerHelper::paginate($this->getInput('page', 1), $data['tests'], ZBX_SORT_UP, new CUrl());
 
 		if ($data['tests']) {
 			$data['test_value_mapping'] = [];

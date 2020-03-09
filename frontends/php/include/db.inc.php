@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -38,7 +38,7 @@ function DBconnect(&$error) {
 	$result = true;
 
 	$DB['DB'] = null; // global db handler
-	$DB['TRANSACTIONS'] = 0; // level of a nested transation
+	$DB['TRANSACTIONS'] = 0; // level of a nested transaction
 	$DB['TRANSACTION_NO_FAILED_SQLS'] = true; // true - if no statements failed in transaction, false - there are failed statements
 	$DB['SELECT_COUNT'] = 0; // stats
 	$DB['EXECUTE_COUNT'] = 0;
@@ -379,7 +379,7 @@ function DBselect($query, $limit = null, $offset = 0) {
  * SELECT a FROM tbl LIMIT 10 OFFSET 5
  *
  * Oracle:
- * SELECT a FROM tbe WHERE rownum < 15 // ONLY < 15
+ * SELECT a FROM tbl WHERE rownum < 15 // ONLY < 15
  * SELECT * FROM (SELECT * FROM tbl) WHERE rownum BETWEEN 6 AND 15
  *
  * @param $query
@@ -607,25 +607,30 @@ function zbx_db_search($table, $options, &$sql_parts) {
 	}
 
 	$start = $options['startSearch'] ? '' : '%';
-	$exclude = $options['excludeSearch'] ? ' NOT ' : '';
-	$glue = (!$options['searchByAny']) ? ' AND ' : ' OR ';
+	$exclude = $options['excludeSearch'] ? ' NOT' : '';
+	$glue = $options['searchByAny'] ? ' OR ' : ' AND ';
 
 	$search = [];
 	foreach ($options['search'] as $field => $patterns) {
-		if (!isset($tableSchema['fields'][$field]) || zbx_empty($patterns)) {
+		if (!isset($tableSchema['fields'][$field]) || $patterns === null) {
 			continue;
 		}
+
+		$patterns = array_filter((array)$patterns, function($pattern) {
+			return ($pattern !== '');
+		});
+
+		if (!$patterns) {
+			continue;
+		}
+
 		if ($tableSchema['fields'][$field]['type'] != DB::FIELD_TYPE_CHAR
 			&& $tableSchema['fields'][$field]['type'] != DB::FIELD_TYPE_TEXT) {
 			continue;
 		}
 
 		$fieldSearch = [];
-		foreach ((array) $patterns as $pattern) {
-			if (zbx_empty($pattern)) {
-				continue;
-			}
-
+		foreach ($patterns as $pattern) {
 			// escaping parameter that is about to be used in LIKE statement
 			$pattern = str_replace("!", "!!", $pattern);
 			$pattern = str_replace("%", "!%", $pattern);
@@ -633,7 +638,7 @@ function zbx_db_search($table, $options, &$sql_parts) {
 
 			if (!$options['searchWildcardsEnabled']) {
 				$fieldSearch[] =
-					' UPPER('.$tableShort.'.'.$field.') '.
+					'UPPER('.$tableShort.'.'.$field.')'.
 					$exclude.' LIKE '.
 					zbx_dbstr($start.mb_strtoupper($pattern).'%').
 					" ESCAPE '!'";
@@ -648,15 +653,15 @@ function zbx_db_search($table, $options, &$sql_parts) {
 			}
 		}
 
-		$search[$field] = '( '.implode($glue, $fieldSearch).' )';
+		$search[$field] = '('.implode($glue, $fieldSearch).')';
 	}
 
-	if (!empty($search)) {
+	if ($search) {
 		if (isset($sql_parts['where']['search'])) {
 			$search[] = $sql_parts['where']['search'];
 		}
 
-		$sql_parts['where']['search'] = '( '.implode($glue, $search).' )';
+		$sql_parts['where']['search'] = '('.implode($glue, $search).')';
 		return true;
 	}
 

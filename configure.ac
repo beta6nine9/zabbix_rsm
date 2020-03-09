@@ -1,6 +1,6 @@
 dnl
 dnl Zabbix
-dnl Copyright (C) 2001-2019 Zabbix SIA
+dnl Copyright (C) 2001-2020 Zabbix SIA
 dnl
 dnl This program is free software; you can redistribute it and/or modify
 dnl it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@ dnl
 
 dnl Process this file with autoconf to produce a configure script.
 
-AC_INIT([Zabbix],[5.0.0alpha1])
+AC_INIT([Zabbix],[5.0.0beta1])
 AC_CONFIG_SRCDIR(src/zabbix_server/server.c)
 AM_INIT_AUTOMAKE([subdir-objects filename-length-max=99])
 
@@ -62,7 +62,7 @@ AC_CHECK_HEADERS(stdio.h stdlib.h string.h unistd.h netdb.h signal.h \
   stdarg.h winsock2.h pdh.h psapi.h sys/sem.h sys/ipc.h sys/shm.h Winldap.h \
   Winber.h lber.h ws2tcpip.h inttypes.h sys/file.h grp.h \
   execinfo.h sys/systemcfg.h sys/mnttab.h mntent.h sys/times.h \
-  dlfcn.h sys/utsname.h sys/un.h sys/protosw.h stddef.h)
+  dlfcn.h sys/utsname.h sys/un.h sys/protosw.h stddef.h limits.h)
 AC_CHECK_HEADERS(resolv.h, [], [], [
 #ifdef HAVE_SYS_TYPES_H
 #  include <sys/types.h>
@@ -1179,6 +1179,7 @@ if test "x$ARCH" = "xsolaris"; then
 	AC_MSG_RESULT(yes),
 	CFLAGS="$saved_CFLAGS"
 	AC_MSG_RESULT(no))
+	CFLAGS="${CFLAGS} -DDUK_F_OLD_SOLARIS"
 fi
 
 if test "x$ARCH" = "xhpux"; then
@@ -1360,7 +1361,7 @@ have_web_monitoring="no"
 have_snmp="no"
 have_ipmi="no"
 have_ipv6="no"
-have_ssh2="no"
+have_ssh="no"
 have_tls="no"
 
 
@@ -1547,7 +1548,8 @@ if test "x$server" = "xyes" || test "x$proxy" = "xyes"; then
 	AC_SUBST(UNIXODBC_CFLAGS)
 
 	dnl Check for Net-SNMP [by default - skip]
-	LIBNETSNMP_CHECK_CONFIG([no])
+	LIBNETSNMP_CHECK_CONFIG([no], "5.3.0")
+
 	if test "x$want_netsnmp" = "xyes"; then
 		if test "x$found_netsnmp" != "xyes"; then
 			AC_MSG_ERROR([Invalid Net-SNMP directory - unable to find net-snmp-config])
@@ -1565,13 +1567,18 @@ if test "x$server" = "xyes" || test "x$proxy" = "xyes"; then
 
 	dnl Check for LIBSSH2 [by default - skip] at least of version 1.0.0.
 	LIBSSH2_CHECK_CONFIG([no])
+	LIBSSH_CHECK_CONFIG([no])
 	if test "x$want_ssh2" = "xyes"; then
+		if test "x$want_ssh" != "xno"; then
+			AC_MSG_ERROR([You can configure for only one SSH library (--with-ssh or --with-ssh2).])
+		fi
+
 		if test "x$found_ssh2" != "xyes"; then
 			AC_MSG_ERROR([SSH2 library not found])
 		elif test "x$accept_ssh2_version" != "xyes"; then
 			AC_MSG_ERROR([SSH2 library version requirement not met (>= 1.0.0)])
 		else
-			have_ssh2="yes"
+			have_ssh="yes (libssh2)"
 		fi
 	fi
 	SERVER_LDFLAGS="$SERVER_LDFLAGS $SSH2_LDFLAGS"
@@ -1579,8 +1586,26 @@ if test "x$server" = "xyes" || test "x$proxy" = "xyes"; then
 
 	PROXY_LDFLAGS="$PROXY_LDFLAGS $SSH2_LDFLAGS"
 	PROXY_LIBS="$PROXY_LIBS $SSH2_LIBS"
-
+	
 	AC_SUBST(SSH2_CFLAGS)
+
+	dnl Check for LIBSSH [by default - skip] at least of version 0.7.0.
+	if test "x$want_ssh" = "xyes"; then
+		if test "x$found_ssh" != "xyes"; then
+			AC_MSG_ERROR([SSH library not found])
+		elif test "x$accept_ssh_version" != "xyes"; then
+			AC_MSG_ERROR([SSH library version requirement not met (>= 0.6.0)])
+		else
+			have_ssh="yes (libssh)"
+		fi
+	fi
+	SERVER_LDFLAGS="$SERVER_LDFLAGS $SSH_LDFLAGS"
+	SERVER_LIBS="$SERVER_LIBS $SSH_LIBS"
+
+	PROXY_LDFLAGS="$PROXY_LDFLAGS $SSH_LDFLAGS"
+	PROXY_LIBS="$PROXY_LIBS $SSH_LIBS"
+	
+	AC_SUBST(SSH_CFLAGS)
 
 	found_openipmi="no"
 	dnl Check for libOpenIPMI [by default - skip]
@@ -1625,6 +1650,15 @@ PROXY_LIBS="$PROXY_LIBS $ZLIB_LIBS $LIBPTHREAD_LIBS"
 AGENT_LDFLAGS="$AGENT_LDFLAGS $ZLIB_LDFLAGS $LIBPTHREAD_LDFLAGS"
 AGENT_LIBS="$AGENT_LIBS $ZLIB_LIBS $LIBPTHREAD_LIBS"
 
+ZBXGET_LDFLAGS="$ZBXGET_LDFLAGS $ZLIB_LDFLAGS $LIBPTHREAD_LDFLAGS"
+ZBXGET_LIBS="$ZBXGET_LIBS $ZLIB_LIBS $LIBPTHREAD_LIBS"
+
+SENDER_LDFLAGS="$SENDER_LDFLAGS $ZLIB_LDFLAGS $LIBPTHREAD_LDFLAGS"
+SENDER_LIBS="$SENDER_LIBS $ZLIB_LIBS $LIBPTHREAD_LIBS"
+
+ZBXJS_LDFLAGS="$ZBXJS_LDFLAGS $ZLIB_LDFLAGS $LIBPTHREAD_LDFLAGS"
+ZBXJS_LIBS="$ZBXJS_LIBS $ZLIB_LIBS $LIBPTHREAD_LIBS"
+
 AM_CONDITIONAL(HAVE_IPMI, [test "x$have_ipmi" = "xyes"])
 AM_CONDITIONAL(HAVE_LIBXML2, test "x$have_libxml2" = "xyes")
 
@@ -1660,30 +1694,11 @@ if test "x$have_ipcservice" = "xyes"; then
 	PROXY_LIBS="$PROXY_LIBS $LIBEVENT_LIBS"
 fi
 
-dnl Check for mbed TLS (PolarSSL) libpolarssl [by default - skip]
-LIBMBEDTLS_CHECK_CONFIG([no])
-if test "x$want_mbedtls" = "xyes"; then
-	if test "x$have_tls" != "xno"; then
-		AC_MSG_ERROR([You can configure for only one TLS library (--with-mbedtls, --with-gnutls or --with-openssl).])
-	fi
-
-	if test "x$found_mbedtls" != "xyes"; then
-		AC_MSG_ERROR([mbed TLS (PolarSSL) library libpolarssl not found])
-	elif test "x$accept_mbedtls_version" != "xyes"; then
-		AC_MSG_ERROR([mbed TLS (PolarSSL) library version requirement not met (>= 1.3.9)])
-	else
-		have_tls="mbed TLS"
-	fi
-	TLS_CFLAGS="$MBEDTLS_CFLAGS"
-	TLS_LDFLAGS="$MBEDTLS_LDFLAGS"
-	TLS_LIBS="$MBEDTLS_LIBS"
-fi
-
 dnl Check for GnuTLS libgnutls [by default - skip]
 LIBGNUTLS_CHECK_CONFIG([no])
 if test "x$want_gnutls" = "xyes"; then
 	if test "x$have_tls" != "xno"; then
-		AC_MSG_ERROR([You can configure for only one TLS library (--with-mbedtls, --with-gnutls or --with-openssl).])
+		AC_MSG_ERROR([You can configure for only one TLS library (--with-gnutls or --with-openssl).])
 	fi
 
 	if test "x$found_gnutls" != "xyes"; then
@@ -1702,7 +1717,7 @@ dnl Check for OpenSSL libssl and libcrypto [by default - skip]
 LIBOPENSSL_CHECK_CONFIG([no])
 if test "x$want_openssl" = "xyes"; then
 	if test "x$have_tls" != "xno"; then
-		AC_MSG_ERROR([You can configure for only one TLS library (--with-mbedtls, --with-gnutls or --with-openssl).])
+		AC_MSG_ERROR([You can configure for only one TLS library (--with-gnutls or --with-openssl).])
 	fi
 
 	if test "x$found_openssl" != "xOpenSSL" -a "x$found_openssl" != "xOpenSSL (PSK not supported)"; then
@@ -1732,6 +1747,9 @@ ZBXGET_LIBS="$ZBXGET_LIBS $TLS_LIBS"
 
 SENDER_LDFLAGS="$SENDER_LDFLAGS $TLS_LDFLAGS"
 SENDER_LIBS="$SENDER_LIBS $TLS_LIBS"
+
+ZBXJS_LDFLAGS="$ZLIB_LDFLAGS $TLS_LDFLAGS"
+ZBXJS_LIBS="$ZBXJS_LIBS $TLS_LIBS"
 
 if test "x$agent2" = "xyes"; then
 	AC_CHECK_PROGS([GO], [go], [no])
@@ -1803,6 +1821,9 @@ ZBXGET_LIBS="$ZBXGET_LIBS $ZLIB_LIBS $LIBPTHREAD_LIBS"
 
 SENDER_LDFLAGS="$SENDER_LDFLAGS $ZLIB_LDFLAGS $LIBPTHREAD_LDFLAGS"
 SENDER_LIBS="$SENDER_LIBS $ZLIB_LIBS $LIBPTHREAD_LIBS"
+
+ZBXJS_LDFLAGS="$ZBXJS_LDFLAGS $LIBCURL_LDFLAGS"
+ZBXJS_LIBS="$ZBXJS_LIBS $LIBCURL_LIBS"
 
 dnl Check for libpcre, used by Zabbix for regular expressions
 if test "x$server" = "xyes" || test "x$proxy" = "xyes" || test "x$agent" = "xyes" || test "x$agent2" = "xyes"; then
@@ -1889,6 +1910,9 @@ AC_SUBST(ZBXGET_LIBS)
 
 AC_SUBST(SENDER_LDFLAGS)
 AC_SUBST(SENDER_LIBS)
+
+AC_SUBST(ZBXJS_LDFLAGS)
+AC_SUBST(ZBXJS_LIBS)
 
 AC_SUBST(SERVER_CONFIG_FILE)
 AC_SUBST(PROXY_CONFIG_FILE)
@@ -2002,6 +2026,7 @@ AC_OUTPUT([
 	src/zabbix_agent/Makefile
 	src/zabbix_agent/logfiles/Makefile
 	src/zabbix_get/Makefile
+	src/zabbix_js/Makefile
 	src/zabbix_sender/Makefile
 	src/zabbix_server/Makefile
 	src/zabbix_server/alerter/Makefile
@@ -2107,6 +2132,10 @@ if test "x$SSH2_CFLAGS" != "x"; then
 	echo "    libssh2:               ${SSH2_CFLAGS}"
 fi
 
+if test "x$SSH_CFLAGS" != "x"; then
+	echo "    libssh:                ${SSH_CFLAGS}"
+fi
+
 if test "x$TLS_CFLAGS" != "x"; then
 	echo "    TLS:                   ${TLS_CFLAGS}"
 fi
@@ -2140,7 +2169,7 @@ fi
 
 echo "    SNMP:                  ${have_snmp}
     IPMI:                  ${have_ipmi}
-    SSH:                   ${have_ssh2}
+    SSH:                   ${have_ssh}
     TLS:                   ${have_tls}
     ODBC:                  ${have_unixodbc}
     Linker flags:          ${SERVER_LDFLAGS} ${LDFLAGS}
@@ -2169,7 +2198,7 @@ fi
 
 echo "    SNMP:                  ${have_snmp}
     IPMI:                  ${have_ipmi}
-    SSH:                   ${have_ssh2}
+    SSH:                   ${have_ssh}
     TLS:                   ${have_tls}
     ODBC:                  ${have_unixodbc}
     Linker flags:          ${PROXY_LDFLAGS} ${LDFLAGS}

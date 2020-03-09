@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -415,10 +415,14 @@ static zbx_hash_t	lld_item_application_hash_func(const void *data)
 	const zbx_lld_item_application_t	*item_application = (zbx_lld_item_application_t *)data;
 	zbx_hash_t				hash;
 
-	hash = ZBX_DEFAULT_HASH_ALGO(&item_application->item_ref, sizeof(item_application->item_ref),
-			ZBX_DEFAULT_HASH_SEED);
-	return ZBX_DEFAULT_HASH_ALGO(&item_application->application_ref, sizeof(item_application->application_ref),
-			hash);
+	hash = ZBX_DEFAULT_HASH_ALGO(&item_application->item_ref.itemid, sizeof(item_application->item_ref.itemid),
+				ZBX_DEFAULT_HASH_SEED);
+	hash = ZBX_DEFAULT_HASH_ALGO(&item_application->item_ref.item, sizeof(item_application->item_ref.item), hash);
+
+	hash = ZBX_DEFAULT_HASH_ALGO(&item_application->application_ref.applicationid,
+			sizeof(item_application->application_ref.applicationid), hash);
+	return ZBX_DEFAULT_HASH_ALGO(&item_application->application_ref.application,
+			sizeof(item_application->application_ref.application), hash);
 }
 
 static int	lld_item_application_compare_func(const void *d1, const void *d2)
@@ -3216,18 +3220,20 @@ static void lld_item_discovery_prepare_update(const zbx_lld_item_prototype_t *it
 static int	lld_items_save(zbx_uint64_t hostid, const zbx_vector_ptr_t *item_prototypes, zbx_vector_ptr_t *items,
 		zbx_hashset_t *items_index, int *host_locked)
 {
-	int			ret = SUCCEED, i, new_items = 0, upd_items = 0;
-	zbx_lld_item_t		*item;
-	zbx_uint64_t		itemid, itemdiscoveryid;
-	zbx_db_insert_t		db_insert_items, db_insert_idiscovery, db_insert_irtdata;
-	zbx_lld_item_index_t	item_index_local;
-	zbx_vector_uint64_t	upd_keys;
-	char			*sql = NULL;
-	size_t			sql_alloc = 8 * ZBX_KIBIBYTE, sql_offset = 0;
+	int				ret = SUCCEED, i, new_items = 0, upd_items = 0;
+	zbx_lld_item_t			*item;
+	zbx_uint64_t			itemid, itemdiscoveryid;
+	zbx_db_insert_t			db_insert_items, db_insert_idiscovery, db_insert_irtdata;
+	zbx_lld_item_index_t		item_index_local;
+	zbx_vector_uint64_t		upd_keys, item_protoids;
+	char				*sql = NULL;
+	size_t				sql_alloc = 8 * ZBX_KIBIBYTE, sql_offset = 0;
+	zbx_lld_item_prototype_t	*item_prototype;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
 	zbx_vector_uint64_create(&upd_keys);
+	zbx_vector_uint64_create(&item_protoids);
 
 	if (0 == items->values_num)
 		goto out;
@@ -3264,6 +3270,19 @@ static int	lld_items_save(zbx_uint64_t hostid, const zbx_vector_ptr_t *item_prot
 		}
 
 		*host_locked = 1;
+	}
+
+	for (i = 0; i < item_prototypes->values_num; i++)
+	{
+		item_prototype = (zbx_lld_item_prototype_t *)item_prototypes->values[i];
+		zbx_vector_uint64_append(&item_protoids, item_prototype->itemid);
+	}
+
+	if (SUCCEED != DBlock_itemids(&item_protoids))
+	{
+		/* the item prototype was removed while processing lld rule */
+		ret = FAIL;
+		goto out;
 	}
 
 	if (0 != upd_items)
@@ -3356,8 +3375,7 @@ static int	lld_items_save(zbx_uint64_t hostid, const zbx_vector_ptr_t *item_prot
 
 	if (0 != upd_items)
 	{
-		zbx_lld_item_prototype_t	*item_prototype;
-		int				index;
+		int	index;
 
 		sql_offset = 0;
 
@@ -3392,6 +3410,7 @@ static int	lld_items_save(zbx_uint64_t hostid, const zbx_vector_ptr_t *item_prot
 	}
 out:
 	zbx_free(sql);
+	zbx_vector_uint64_destroy(&item_protoids);
 	zbx_vector_uint64_destroy(&upd_keys);
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 
@@ -3805,43 +3824,19 @@ out:
  *                                                                            *
  * Parameters: items_application - [IN] an item-application link to validate  *
  *             items             - [IN] the related items                     *
- *             applications      - [IN] the related applications              *
  *                                                                            *
  * Return value: SUCCEED - item-application link should not be removed        *
  *               FAIL    - item-application link should be removed            *
  *                                                                            *
- * Comments: Undiscovered item-application link must be removed if either the *
- *           application was not discovered or item was discovered.           *
- *           The only case when undiscovered item-application link is not     *
- *           removed is when we have valid application and undiscovered item. *
- *           In this case we leave item-application link untouched and it     *
- *           will 'expire' together with item.                                *
+ * Comments: Undiscovered item-application link must be removed if item was   *
+ *           discovered.                                                      *
  *                                                                            *
  ******************************************************************************/
 static int	lld_item_application_validate(const zbx_lld_item_application_t *item_application,
-		const zbx_vector_ptr_t *items, const zbx_vector_ptr_t *applications)
+		const zbx_vector_ptr_t *items)
 {
-	const zbx_lld_application_t	*application;
-	const zbx_lld_item_t		*item;
-	int				index;
+	int	index;
 
-	if (FAIL == (index = zbx_vector_ptr_bsearch(applications, &item_application->application_ref.applicationid,
-			ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC)))
-	{
-		/* Applications vector contains only discovered applications and  */
-		/* apparently the item was linked to a normal application.        */
-		/* Undiscovered item-application links to normal application must */
-		/* be removed if item has been also discovered - this means that  */
-		/* the item prototype - application link was removed by frontend. */
-		goto check_item;
-	}
-
-	application = (zbx_lld_application_t *)applications->values[index];
-
-	if (0 == (application->flags & ZBX_FLAG_LLD_APPLICATION_DISCOVERED))
-		return FAIL;
-
-check_item:
 	if (FAIL == (index = zbx_vector_ptr_bsearch(items, &item_application->item_ref.itemid,
 			ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC)))
 	{
@@ -3849,12 +3844,7 @@ check_item:
 		return FAIL;
 	}
 
-	item = (zbx_lld_item_t *)items->values[index];
-
-	if (0 != (item->flags & ZBX_FLAG_LLD_ITEM_DISCOVERED))
-		return FAIL;
-
-	return SUCCEED;
+	return 0 != (((zbx_lld_item_t *)items->values[index])->flags & ZBX_FLAG_LLD_ITEM_DISCOVERED) ? FAIL : SUCCEED;
 }
 
 /******************************************************************************
@@ -3864,8 +3854,7 @@ check_item:
  * Parameters: items_applications - [IN] item-application links               *
  *                                                                            *
  ******************************************************************************/
-static void	lld_items_applications_save(zbx_hashset_t *items_applications, const zbx_vector_ptr_t *items,
-		const zbx_vector_ptr_t *applications)
+static void	lld_items_applications_save(zbx_hashset_t *items_applications, const zbx_vector_ptr_t *items)
 {
 	zbx_hashset_iter_t		iter;
 	zbx_lld_item_application_t	*item_application;
@@ -3904,7 +3893,7 @@ static void	lld_items_applications_save(zbx_hashset_t *items_applications, const
 		{
 			/* add for removal the old links that aren't discovered and can be removed */
 			if (0 == (item_application->flags & ZBX_FLAG_LLD_ITEM_APPLICATION_DISCOVERED) &&
-					FAIL == lld_item_application_validate(item_application, items, applications))
+					FAIL == lld_item_application_validate(item_application, items))
 			{
 				zbx_vector_uint64_append(&del_itemappids, item_application->itemappid);
 			}
@@ -5311,7 +5300,7 @@ int	lld_update_items(zbx_uint64_t hostid, zbx_uint64_t lld_ruleid, zbx_vector_pt
 			SUCCEED == lld_applications_save(hostid, &applications, &application_prototypes,
 					&host_record_is_locked))
 	{
-		lld_items_applications_save(&items_applications, &items, &applications);
+		lld_items_applications_save(&items_applications, &items);
 
 		if (ZBX_DB_OK != DBcommit())
 		{

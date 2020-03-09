@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -39,9 +39,9 @@ class CControllerTimeSelectorUpdate extends CController {
 
 	protected function checkInput() {
 		$profiles = ['web.dashbrd.filter', 'web.screens.filter', 'web.graphs.filter', 'web.httpdetails.filter',
-			'web.problem.filter', 'web.auditlogs.filter', 'web.slides.filter', 'web.auditacts.filter',
-			'web.item.graph.filter', 'web.toptriggers.filter', 'web.avail_report.filter', 'web.rsm.incidents.filter',
-			'web.rsm.incidentsdetails.filter', 'web.rsm.tests.filter'
+			'web.problem.filter', 'web.auditlog.filter', 'web.slides.filter', 'web.auditacts.filter',
+			'web.item.graph.filter', 'web.toptriggers.filter', 'web.avail_report.filter',
+			'web.rsm.incidents.filter', 'web.rsm.incidentsdetails.filter', 'web.rsm.tests.filter'
 		];
 
 		$fields = [
@@ -65,7 +65,7 @@ class CControllerTimeSelectorUpdate extends CController {
 			global $ZBX_MESSAGES;
 
 			$this->setResponse(new CControllerResponseData([
-				'main_block' => CJs::encodeJson(['error' => $ZBX_MESSAGES[0]['message']])
+				'main_block' => json_encode(['error' => $ZBX_MESSAGES[0]['message']])
 			]));
 
 			return $ret;
@@ -79,7 +79,7 @@ class CControllerTimeSelectorUpdate extends CController {
 		}
 
 		if (!$ret) {
-			$this->setResponse(new CControllerResponseData(['main_block' => CJs::encodeJson($this->data)]));
+			$this->setResponse(new CControllerResponseData(['main_block' => json_encode($this->data)]));
 		}
 
 		return $ret;
@@ -188,7 +188,7 @@ class CControllerTimeSelectorUpdate extends CController {
 			'to' => $value['to']
 		]);
 
-		$this->setResponse(new CControllerResponseData(['main_block' => CJs::encodeJson([
+		$this->setResponse(new CControllerResponseData(['main_block' => json_encode([
 			'label' => relativeDateToText($value['from'], $value['to']),
 			'from' => $value['from'],
 			'from_ts' => $ts['from'],
@@ -235,12 +235,12 @@ class CControllerTimeSelectorUpdate extends CController {
 
 		if ($period < ZBX_MIN_PERIOD) {
 			$this->data['error']['from'] = _n('Minimum time period to display is %1$s minute.',
-				'Minimum time period to display is %1$s minutes.', (int) ZBX_MIN_PERIOD / SEC_PER_MIN
+				'Minimum time period to display is %1$s minutes.', (int) (ZBX_MIN_PERIOD / SEC_PER_MIN)
 			);
 		}
 		elseif ($period > ZBX_MAX_PERIOD) {
 			$this->data['error']['from'] = _n('Maximum time period to display is %1$s day.',
-				'Maximum time period to display is %1$s days.', (int) ZBX_MAX_PERIOD / SEC_PER_DAY
+				'Maximum time period to display is %1$s days.', (int) (ZBX_MAX_PERIOD / SEC_PER_DAY)
 			);
 		}
 

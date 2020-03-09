@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -66,7 +66,7 @@ $form_list->addRow(CWidgetHelper::getLabel($fields['problem']), CWidgetHelper::g
 // Severity.
 $form_list->addRow(
 	CWidgetHelper::getLabel($fields['severities']),
-	CWidgetHelper::getSeverities($fields['severities'], $data['config'])
+	CWidgetHelper::getSeverities($fields['severities'])
 );
 
 // Tags.

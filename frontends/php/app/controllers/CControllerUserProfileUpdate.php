@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -26,24 +26,24 @@ class CControllerUserProfileUpdate extends CControllerUserUpdateGeneral {
 
 	protected function checkInput() {
 		$locales = array_keys(getLocales());
-		$themes = array_keys(Z::getThemes());
+		$themes = array_keys(APP::getThemes());
 		$themes[] = THEME_DEFAULT;
 
 		$fields = [
-			'userid' =>					'fatal|required|db users.userid',
-			'password1' =>				'db users.passwd',
-			'password2' =>				'db users.passwd',
-			'user_medias' =>			'array',
-			'lang' =>					'db users.lang|in '.implode(',', $locales),
-			'theme' =>					'db users.theme|in '.implode(',', $themes),
-			'autologin' =>				'db users.autologin|in 0,1',
-			'autologout' =>				'db users.autologout|not_empty',
-			'refresh' =>				'db users.refresh|not_empty',
-			'rows_per_page' =>			'db users.rows_per_page',
+			'userid' =>			'fatal|required|db users.userid',
+			'password1' =>		'string',
+			'password2' =>		'string',
+			'user_medias' =>	'array',
+			'lang' =>			'db users.lang|in '.implode(',', $locales),
+			'theme' =>			'db users.theme|in '.implode(',', $themes),
+			'autologin' =>		'db users.autologin|in 0,1',
+			'autologout' =>		'db users.autologout|not_empty',
+			'refresh' =>		'db users.refresh|not_empty',
+			'rows_per_page' =>	'db users.rows_per_page',
+			'url' =>			'db users.url',
+			'messages' =>		'array',
+			'form_refresh' =>	'int32',
 			'search_limit_latest' =>	'int32|ge 1|le 10000',
-			'url' =>					'db users.url',
-			'messages' =>				'array',
-			'form_refresh' =>			'int32'
 		];
 
 		$ret = $this->validateInput($fields);

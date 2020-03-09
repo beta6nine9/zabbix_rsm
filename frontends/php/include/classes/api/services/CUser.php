@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -261,7 +261,7 @@ class CUser extends CApiService {
 		}
 
 		$locales = array_keys(getLocales());
-		$themes = THEME_DEFAULT.','.implode(',', array_keys(Z::getThemes()));
+		$themes = THEME_DEFAULT.','.implode(',', array_keys(APP::getThemes()));
 
 		$api_input_rules = ['type' => API_OBJECTS, 'flags' => API_NOT_EMPTY | API_NORMALIZE, 'uniq' => [['alias']], 'fields' => [
 			'alias' =>			['type' => API_STRING_UTF8, 'flags' => API_REQUIRED | API_NOT_EMPTY, 'length' => DB::getFieldLength('users', 'alias')],
@@ -369,7 +369,7 @@ class CUser extends CApiService {
 	 */
 	private function validateUpdate(array &$users, array &$db_users = null) {
 		$locales = array_keys(getLocales());
-		$themes = THEME_DEFAULT.','.implode(',', array_keys(Z::getThemes()));
+		$themes = THEME_DEFAULT.','.implode(',', array_keys(APP::getThemes()));
 
 		$api_input_rules = ['type' => API_OBJECTS, 'flags' => API_NOT_EMPTY | API_NORMALIZE, 'uniq' => [['userid'], ['alias']], 'fields' => [
 			'userid' =>			['type' => API_ID, 'flags' => API_REQUIRED],
@@ -634,7 +634,7 @@ class CUser extends CApiService {
 	 * @param array|string  $users[]['user_medias'][]['sendto']       Address where to send the alert.
 	 * @param array         $db_mediatypes                            List of available media types.
 	 *
-	 * @throws APIException if e-mail is not valid or exeeds maximum DB field length.
+	 * @throws APIException if e-mail is not valid or exceeds maximum DB field length.
 	 */
 	private function validateMediaRecipients(array $users, array $db_mediatypes) {
 		if ($db_mediatypes) {
@@ -678,7 +678,7 @@ class CUser extends CApiService {
 
 						/*
 						 * If media type is email, validate each given string against email pattern.
-						 * Additionally, total lenght of emails must be checked, because all media type emails are
+						 * Additionally, total length of emails must be checked, because all media type emails are
 						 * separated by newline and stored as a string in single database field. Newline characters
 						 * consumes extra space, so additional validation must be made.
 						 */

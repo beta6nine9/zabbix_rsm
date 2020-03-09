@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -528,6 +528,7 @@ static void am_remove_mediatype(zbx_am_t *manager, zbx_am_mediatype_t *mediatype
 	zbx_free(mediatype->passwd);
 	zbx_free(mediatype->script);
 	zbx_free(mediatype->script_bin);
+	zbx_free(mediatype->error);
 
 	zbx_binary_heap_destroy(&mediatype->queue);
 	zbx_hashset_remove_direct(&manager->mediatypes, mediatype);
@@ -1962,6 +1963,8 @@ ZBX_THREAD_ENTRY(alert_manager_thread, args)
 	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(program_type),
 			server_num, get_process_type_string(process_type), process_num);
 
+	update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
+
 	if (FAIL == am_init(&manager, &error))
 	{
 		zabbix_log(LOG_LEVEL_CRIT, "cannot initialize alert manager: %s", error);
@@ -1975,8 +1978,6 @@ ZBX_THREAD_ENTRY(alert_manager_thread, args)
 	time_stat = zbx_time();
 
 	zbx_setproctitle("%s #%d started", get_process_type_string(process_type), process_num);
-
-	update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
 
 	while (ZBX_IS_RUNNING())
 	{

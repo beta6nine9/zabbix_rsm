@@ -8,7 +8,8 @@ DIST_SUBDIRS = \
 	zabbix_sender \
 	zabbix_proxy \
 	zabbix_server \
-	zabbix_java
+	zabbix_java \
+	zabbix_js
 
 DIST_SUBDIRS += tests zabbix_rsm
 
@@ -45,7 +46,8 @@ endif
 
 if SERVER
 SERVER_SUBDIRS = \
-	zabbix_server
+	zabbix_server \
+	zabbix_js
 endif
 
 if PROXY
@@ -69,7 +71,8 @@ PROXY_SUBDIRS = \
 	zabbix_server/odbc \
 	zabbix_server/scripts \
 	zabbix_server/preprocessor \
-	zabbix_proxy
+	zabbix_proxy \
+	zabbix_js
 
 endif
 endif
@@ -85,11 +88,9 @@ SUBDIRS = \
 	$(AGENT2_SUBDIRS) \
 	$(SERVER_SUBDIRS) \
 	$(PROXY_SUBDIRS) \
-	$(JAVA_SUBDIRS) \
-	tests
-	
+	$(JAVA_SUBDIRS)
 
-SUBDIRS += zabbix_rsm
+SUBDIRS += tests zabbix_rsm
 
 ## "dist-hook" run after the distribution directory is filled, but before the actual tar (or shar) file is created.
 dist-hook:

@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -17,6 +17,11 @@
 ** along with this program; if not, write to the Free Software
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
+
+
+/**
+ * @var CView $this
+ */
 
 if ($data['uncheck']) {
 	uncheckTableRows();
@@ -49,7 +54,11 @@ $table = (new CTableInfo())
 			(new CCheckBox('all_valuemaps'))
 				->onClick("checkAll('".$form->getName()."', 'all_valuemaps', 'valuemapids');")
 		))->addClass(ZBX_STYLE_CELL_WIDTH),
-		make_sorting_header(_('Name'), 'name', $data['sort'], $data['sortorder']),
+		make_sorting_header(_('Name'), 'name', $data['sort'], $data['sortorder'],
+			(new CUrl('zabbix.php'))
+				->setArgument('action', 'valuemap.list')
+				->getUrl()
+		),
 		_('Value map'),
 		_('Used in items')
 	]);
@@ -83,7 +92,7 @@ $form->addItem([
 				->setArgument('action', 'export.valuemaps.xml')
 				->setArgument('backurl', (new CUrl('zabbix.php'))
 					->setArgument('action', 'valuemap.list')
-					->setArgument('page', getPageNumber())
+					->setArgument('page', $data['page'] == 1 ? null : $data['page'])
 					->getUrl())
 				->getUrl()
 		],

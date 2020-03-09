@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2019 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -421,7 +421,7 @@ class testGoAgentDataCollection extends CIntegrationTest {
 				'Hostname' => self::COMPONENT_AGENT2,
 				'ServerActive' => '127.0.0.1:'.self::getConfigurationValue(self::COMPONENT_SERVER, 'ListenPort'),
 				'ListenPort' => PHPUNIT_PORT_PREFIX.'53',
-				'Plugins.SystemRun.EnableRemoteCommands' => '1',
+				'DenyKey' => 'placeholder', // Override default DenyKey=system.run[*] rule
 				'Plugins.Uptime.Capacity' => '10'
 			]
 		];
@@ -525,18 +525,11 @@ class testGoAgentDataCollection extends CIntegrationTest {
 		switch ($item['valueType']) {
 			case ITEM_VALUE_TYPE_LOG:
 				$count = min([count($values[self::COMPONENT_AGENT]), count($values[self::COMPONENT_AGENT2])]);
-				for ($i = 0; $i < $count; $i++) {
-					$a = $values[self::COMPONENT_AGENT][$i];
-					$b = $values[self::COMPONENT_AGENT2][$i];
 
-					if (array_key_exists('treshold', $item) && $item['treshold'] !== 0) {
-						$a = substr($a, 0, $item['treshold']);
-						$b = substr($b, 0, $item['treshold']);
-					}
+				$values_a = array_slice($values[self::COMPONENT_AGENT], 0, $count);
+				$values_b = array_slice($values[self::COMPONENT_AGENT2], 0, $count);
 
-					$this->assertEquals($a, $b, 'Strings do not match for '.$item['key']);
-				}
-
+				$this->assertSame($values_a, $values_b, 'Strings do not match for '.$item['key']);
 				break;
 
 			case ITEM_VALUE_TYPE_TEXT:

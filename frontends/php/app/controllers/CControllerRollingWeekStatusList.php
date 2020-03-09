@@ -54,7 +54,8 @@ class CControllerRollingWeekStatusList extends CController {
 			'filter_registrar_name'		=> 'string',
 			'filter_registrar_family'	=> 'string',
 			'sort'						=> 'in '.implode(',', $sort_fields),
-			'sortorder'					=> 'in '.implode(',', [ZBX_SORT_DOWN, ZBX_SORT_UP])
+			'sortorder'					=> 'in '.implode(',', [ZBX_SORT_DOWN, ZBX_SORT_UP]),
+			'page'						=> 'int32',
 		];
 
 		$ret = $this->validateInput($fields);
@@ -862,7 +863,8 @@ class CControllerRollingWeekStatusList extends CController {
 
 		if (!$no_history) {
 			order_result($data['tld'], $data['sort_field'], $data['sort_order']);
-			$data['paging'] = getPagingLine($data['tld'], ZBX_SORT_UP, new CUrl());
+
+			$data['paging'] = CPagerHelper::paginate($this->getInput('page', 1), $data['tld'], ZBX_SORT_UP, new CUrl());
 		}
 
 		$response = new CControllerResponseData($data);
