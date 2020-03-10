@@ -29,15 +29,8 @@
 #include "log.h"
 #include "rsm.h"
 
-/* TODO revisit during EPP release */
-#ifndef ZBX_EC_EPP_RES_NOREPLY
-#	define ZBX_EC_EPP_RES_NOREPLY	ZBX_EC_EPP_NO_IP
-#endif
-
 #define ZBX_HOST_BUF_SIZE	128
-#define ZBX_IP_BUF_SIZE		64
 #define ZBX_ERR_BUF_SIZE	8192
-#define ZBX_LOGNAME_BUF_SIZE	128
 #define ZBX_SEND_BUF_SIZE	128
 #define ZBX_RDDS_PREVIEW_SIZE	100
 
@@ -46,7 +39,6 @@
 #define XML_PATH_SERVER_ID	0
 #define XML_PATH_RESULT_CODE	1
 
-#define COMMAND_BUF_SIZE	1024
 #define XML_VALUE_BUF_SIZE	512
 
 #define EPP_SUCCESS_CODE_GENERAL	"1000"
@@ -218,7 +210,7 @@ writer_thread_t;
 #define PACK_NUM_VARS	5
 #define PACK_FORMAT	ZBX_FS_SIZE_T "|" ZBX_FS_SIZE_T "|%d|%d|%s"
 
-static char	*rsm_log_prefixes[] = { "Empty", "Fatal", "Error", "Warning", "Info", "Debug" };
+static const char	*rsm_log_prefixes[] = { "Empty", "Fatal", "Error", "Warning", "Info", "Debug" };
 
 #define rsm_dump(log_fd, fmt, ...)	fprintf(log_fd, ZBX_CONST_STRING(fmt), ##__VA_ARGS__)
 #define rsm_errf(log_fd, fmt, ...)	rsm_logf(log_fd, LOG_LEVEL_ERR, ZBX_CONST_STRING(fmt), ##__VA_ARGS__)
@@ -303,7 +295,7 @@ static void	rsm_log(FILE *log_fd, int level, const char *text)
 			text);
 }
 
-static int	pack_values(size_t v1, size_t v2, int v3, int v4, char *nsid, char *buf, size_t buf_size)
+static size_t	pack_values(size_t v1, size_t v2, int v3, int v4, char *nsid, char *buf, size_t buf_size)
 {
 	return zbx_snprintf(buf, buf_size, PACK_FORMAT, v1, v2, v3, v4, (NULL == nsid) ? "" : nsid);
 }
@@ -326,7 +318,7 @@ static int	unpack_values(size_t *v1, size_t *v2, int *v3, int *v4, char *nsid, c
 	return SUCCEED;
 }
 
-static int	zbx_validate_ip(const char *ip, char ipv4_enabled, char ipv6_enabled, ldns_rdf **ip_rdf_out,
+static int	zbx_validate_ip(const char *ip, int ipv4_enabled, int ipv6_enabled, ldns_rdf **ip_rdf_out,
 		char *is_ipv4)
 {
 	ldns_rdf	*ip_rdf;
@@ -352,8 +344,8 @@ static int	zbx_validate_ip(const char *ip, char ipv4_enabled, char ipv6_enabled,
 	return SUCCEED;
 }
 
-static int	zbx_set_resolver_ns(ldns_resolver *res, const char *name, const char *ip, char ipv4_enabled,
-		char ipv6_enabled, FILE *log_fd, char *err, size_t err_size)
+static int	zbx_set_resolver_ns(ldns_resolver *res, const char *name, const char *ip, int ipv4_enabled,
+		int ipv6_enabled, FILE *log_fd, char *err, size_t err_size)
 {
 	ldns_rdf	*ip_rdf;
 	ldns_status	status;
@@ -378,7 +370,7 @@ static int	zbx_set_resolver_ns(ldns_resolver *res, const char *name, const char 
 	return SUCCEED;
 }
 
-static char	ip_support(char ipv4_enabled, char ipv6_enabled)
+static unsigned char	ip_support(int ipv4_enabled, int ipv6_enabled)
 {
 	if (0 == ipv4_enabled)
 		return 2;	/* IPv6 only, assuming ipv6_enabled and ipv4_enabled cannot be both 0 */
@@ -389,8 +381,8 @@ static char	ip_support(char ipv4_enabled, char ipv6_enabled)
 	return 0;	/* no preference */
 }
 
-static int	zbx_change_resolver(ldns_resolver *res, const char *name, const char *ip, char ipv4_enabled,
-		char ipv6_enabled, FILE *log_fd, char *err, size_t err_size)
+static int	zbx_change_resolver(ldns_resolver *res, const char *name, const char *ip, int ipv4_enabled,
+		int ipv6_enabled, FILE *log_fd, char *err, size_t err_size)
 {
 	ldns_rdf	*pop;
 
@@ -402,7 +394,7 @@ static int	zbx_change_resolver(ldns_resolver *res, const char *name, const char 
 }
 
 static int	zbx_create_resolver(ldns_resolver **res, const char *name, const char *ip, char protocol,
-		char ipv4_enabled, char ipv6_enabled, unsigned int extras, int timeout, int tries, FILE *log_fd,
+		int ipv4_enabled, int ipv6_enabled, unsigned int extras, int timeout, unsigned char tries, FILE *log_fd,
 		char *err, size_t err_size)
 {
 	struct timeval	tv = {.tv_usec = 0, .tv_sec = timeout};
@@ -501,15 +493,15 @@ static int      zbx_get_ts_from_host(const char *host, time_t *ts)
 /*          2 | 0, 1                                           */
 /*          5 | 0, 1, 2, 3, 4                                  */
 /***************************************************************/
-static int	zbx_random(int max_values)
+static size_t	zbx_random(size_t max_values)
 {
 	zbx_timespec_t	timespec;
 
 	zbx_timespec(&timespec);
 
-	srand(timespec.sec + timespec.ns);
+	srand((unsigned int)(timespec.sec + timespec.ns));
 
-	return rand() % max_values;
+	return (size_t)rand() % max_values;
 }
 
 /***************************************/
@@ -688,11 +680,6 @@ static void	zbx_destroy_owners(zbx_vector_ptr_t *owners)
 
 	zbx_vector_ptr_destroy(owners);
 }
-
-/* not available mappings */
-#define ZBX_EC_DNS_UDP_INTERNAL_IP_UNSUP	ZBX_EC_DNS_UDP_INTERNAL_GENERAL
-#define ZBX_EC_DNS_TCP_INTERNAL_IP_UNSUP	ZBX_EC_DNS_TCP_INTERNAL_GENERAL
-#define ZBX_EC_EPP_INTERNAL_RES_CATCHALL	ZBX_EC_EPP_INTERNAL_GENERAL
 
 #define ZBX_EC_DNS_TCP_NS_NOREPLY	ZBX_EC_DNS_TCP_INTERNAL_GENERAL;	/* only UDP */
 #define ZBX_EC_DNS_UDP_NS_ECON		ZBX_EC_DNS_UDP_INTERNAL_GENERAL;	/* only TCP */
@@ -1278,7 +1265,7 @@ static void extract_nsid(ldns_rdf *edns_data, char **nsid)
 			if (NSID_MAX_LENGTH < opt_len)
 				opt_len = NSID_MAX_LENGTH;
 
-			*nsid = (char *)zbx_malloc(*nsid, opt_len * 2 + 1);
+			*nsid = (char *)zbx_malloc(*nsid, (size_t)(opt_len * 2 + 1));
 
 			for (i = 0; i < opt_len; i++)
 			{
@@ -1407,7 +1394,7 @@ static int	zbx_verify_rr_class(const ldns_rr_list *rr_list, zbx_rr_class_error_t
 	for (i = 0; i < rr_count; i++)
 	{
 		ldns_rr		*rr;
-		ldns_rr_class	class;
+		ldns_rr_class	rr_class;
 
 		if (NULL == (rr = ldns_rr_list_rr(rr_list, i)))
 		{
@@ -1416,17 +1403,17 @@ static int	zbx_verify_rr_class(const ldns_rr_list *rr_list, zbx_rr_class_error_t
 			return FAIL;
 		}
 
-		if (LDNS_RR_CLASS_IN != (class = ldns_rr_get_class(rr)))
+		if (LDNS_RR_CLASS_IN != (rr_class = ldns_rr_get_class(rr)))
 		{
 			char	*class_str;
 
-			class_str = ldns_rr_class2str(class);
+			class_str = ldns_rr_class2str(rr_class);
 
 			zbx_snprintf(err, err_size, "unexpected RR class, expected IN got %s", class_str);
 
 			zbx_free(class_str);
 
-			switch (class)
+			switch (rr_class)
 			{
 				case LDNS_RR_CLASS_CH:
 					*ec = ZBX_EC_RR_CLASS_CHAOS;
@@ -1544,7 +1531,7 @@ static int	zbx_check_dnssec_no_epp(const ldns_pkt *pkt, const ldns_rr_list *keys
 
 static int	zbx_get_ns_ip_values(ldns_resolver *res, const char *ns, const char *ip, const ldns_rr_list *keys,
 		const char *testprefix, const char *domain, FILE *log_fd, int *rtt, char **nsid, int *upd,
-		char ipv4_enabled, char ipv6_enabled, char epp_enabled, char *err, size_t err_size)
+		int ipv4_enabled, int ipv6_enabled, int epp_enabled, char *err, size_t err_size)
 {
 	char			testname[ZBX_HOST_BUF_SIZE], *host, *last_label = NULL;
 	ldns_rdf		*testname_rdf = NULL, *last_label_rdf = NULL;
@@ -1682,7 +1669,7 @@ static int	zbx_get_ns_ip_values(ldns_resolver *res, const char *ns, const char *
 			zbx_free(host);
 
 			/* successful update time */
-			*upd = now - ts;
+			*upd = (int)(now - ts);
 		}
 
 		if (NULL != keys)	/* EPP enabled, DNSSEC enabled */
@@ -1705,7 +1692,7 @@ static int	zbx_get_ns_ip_values(ldns_resolver *res, const char *ns, const char *
 	}
 
 	/* successful rtt */
-	*rtt = ldns_pkt_querytime(pkt);
+	*rtt = (int)ldns_pkt_querytime(pkt);
 
 	/* no errors */
 	ret = SUCCEED;
@@ -1858,8 +1845,8 @@ static void	free_items(DC_ITEM *items, size_t items_num)
  *          their IPs in zbx_ns_t structure.                                  *
  *                                                                            *
  ******************************************************************************/
-static int	zbx_get_nameservers(char *name_servers_list, zbx_ns_t **nss, size_t *nss_num, char ipv4_enabled,
-		char ipv6_enabled, FILE *log_fd, char *err, size_t err_size)
+static int	zbx_get_nameservers(char *name_servers_list, zbx_ns_t **nss, size_t *nss_num, int ipv4_enabled,
+		int ipv6_enabled, FILE *log_fd, char *err, size_t err_size)
 {
 	char		*ns, *ip, *ns_next;
 	size_t		i, j, nss_alloc = 8;
@@ -1894,7 +1881,7 @@ static int	zbx_get_nameservers(char *name_servers_list, zbx_ns_t **nss, size_t *
 
 		if (0 == *nss_num)
 		{
-			*nss = zbx_malloc(*nss, nss_alloc * sizeof(zbx_ns_t));
+			*nss = (zbx_ns_t *)zbx_malloc(*nss, nss_alloc * sizeof(zbx_ns_t));
 		}
 		else
 		{
@@ -1919,7 +1906,7 @@ static int	zbx_get_nameservers(char *name_servers_list, zbx_ns_t **nss, size_t *
 		if (*nss_num == nss_alloc)
 		{
 			nss_alloc += 8;
-			*nss = zbx_realloc(*nss, nss_alloc * sizeof(zbx_ns_t));
+			*nss = (zbx_ns_t *)zbx_realloc(*nss, nss_alloc * sizeof(zbx_ns_t));
 		}
 
 		/* add NS here */
@@ -1936,9 +1923,9 @@ static int	zbx_get_nameservers(char *name_servers_list, zbx_ns_t **nss, size_t *
 
 		/* add IP here */
 		if (0 == ns_entry->ips_num)
-			ns_entry->ips = zbx_malloc(NULL, sizeof(zbx_ns_ip_t));
+			ns_entry->ips = (zbx_ns_ip_t *)zbx_malloc(NULL, sizeof(zbx_ns_ip_t));
 		else
-			ns_entry->ips = zbx_realloc(ns_entry->ips, (ns_entry->ips_num + 1) * sizeof(zbx_ns_ip_t));
+			ns_entry->ips = (zbx_ns_ip_t *)zbx_realloc(ns_entry->ips, (ns_entry->ips_num + 1) * sizeof(zbx_ns_ip_t));
 
 		ns_entry->ips[ns_entry->ips_num].ip = zbx_strdup(NULL, ip);
 		ns_entry->ips[ns_entry->ips_num].upd = ZBX_NO_VALUE;
@@ -2181,7 +2168,8 @@ out:
 	return tld;
 }
 
-static int	set_nss_results(zbx_ns_t *nss, size_t nss_num, int rtt_limit, int minns, int *nssok, int *status)
+static void	set_nss_results(zbx_ns_t *nss, size_t nss_num, int rtt_limit, size_t minns, size_t *nssok,
+		unsigned int *status)
 {
 	size_t	i, j;
 
@@ -2203,8 +2191,8 @@ static int	set_nss_results(zbx_ns_t *nss, size_t nss_num, int rtt_limit, int min
 	*status = (*nssok >= minns ? 1 : 0);
 }
 
-static void	create_rsm_dns_json(struct zbx_json *json, zbx_ns_t *nss, size_t nss_num, int current_mode, int nssok,
-		int status, char protocol)
+static void	create_rsm_dns_json(struct zbx_json *json, zbx_ns_t *nss, size_t nss_num, unsigned int current_mode,
+		size_t nssok, unsigned int status, char protocol)
 {
 	size_t	i, j;
 
@@ -2252,7 +2240,6 @@ static void	create_rsm_dns_json(struct zbx_json *json, zbx_ns_t *nss, size_t nss
 static int	metadata_file_exists(const char *domain, int *file_exists, char *err, size_t err_size)
 {
 	char		*file;
-	FILE		*f;
 	zbx_stat_t	buf;
 	int		ret = SUCCEED;
 
@@ -2279,7 +2266,8 @@ out:
 	return ret;
 }
 
-static int	read_metadata(const char *domain, int *current_mode, int *successful_tests, char *err, size_t err_size)
+static int	read_metadata(const char *domain, unsigned int *current_mode, int *successful_tests, char *err,
+		size_t err_size)
 {
 	char	*file;
 	FILE	*f;
@@ -2310,7 +2298,8 @@ out:
 	return ret;
 }
 
-static int	write_metadata(const char *domain, int current_mode, int successful_tests, char *err, size_t err_size)
+static int	write_metadata(const char *domain, unsigned int current_mode, int successful_tests, char *err,
+		size_t err_size)
 {
 	char	*file;
 	FILE	*f;
@@ -2344,7 +2333,6 @@ out:
 static int	delete_metadata(const char *domain, char *err, size_t err_size)
 {
 	char	*file;
-	FILE	*f;
 	int	ret = FAIL;
 
 	file = zbx_dsprintf(NULL, "%s-%s.bin", METADATA_FILE_PREFIX, domain);
@@ -2366,8 +2354,9 @@ out:
 #define CURRENT_MODE_CRITICAL_UDP	1
 #define CURRENT_MODE_CRITICAL_TCP	2
 
-static int	update_metadata(int file_exists, const char *domain, int test_status, int test_recover, char protocol,
-		int *current_mode, int *successful_tests, FILE *log_fd, char *err, size_t err_size)
+static int	update_metadata(int file_exists, const char *domain, unsigned int test_status, int test_recover,
+		char protocol, unsigned int *current_mode, int *successful_tests, FILE *log_fd, char *err,
+		size_t err_size)
 {
 	if (1 == test_status)
 	{
@@ -2383,7 +2372,7 @@ static int	update_metadata(int file_exists, const char *domain, int test_status,
 				*successful_tests = 0;
 				*current_mode = CURRENT_MODE_NORMAL;
 
-				rsm_infof(log_fd, "mode changed from critical to normal");
+				rsm_info(log_fd, "mode changed from critical to normal");
 			}
 		}
 	}
@@ -2435,13 +2424,12 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 	ldns_rr_list		*keys = NULL;
 	FILE			*log_fd;
 	zbx_ns_t		*nss = NULL;
-	size_t			i, j, nss_num = 0;
-	unsigned int		extras;
+	size_t			i, j, nss_num = 0, nssok, minns;
+	unsigned int		extras, current_mode, test_status;
 	struct zbx_json		json;
 	int			dnssec_enabled, rdds_enabled, epp_enabled, udp_enabled, tcp_enabled, ipv4_enabled,
-				ipv6_enabled, udp_rtt_limit, tcp_rtt_limit, rtt_limit, current_mode, successful_tests,
-				file_exists, nssok, test_status, tcp_ratio, test_recover_udp, test_recover_tcp,
-				test_recover, minns, ret = SYSINFO_RET_FAIL;
+				ipv6_enabled, udp_rtt_limit, tcp_rtt_limit, rtt_limit, successful_tests, file_exists,
+				tcp_ratio, test_recover_udp, test_recover_tcp, test_recover, ret = SYSINFO_RET_FAIL;
 
 	if (17 != request->nparam)
 	{
@@ -2681,7 +2669,8 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 	}
 	else
 	{
-		int		th_num = 0, threads_num = 0, status, last_test_failed = 0;
+		size_t		th_num = 0, threads_num = 0;
+		int		last_test_failed = 0;
 		char		buf[2048];
 		pid_t		pid;
 		writer_thread_t	*threads = NULL;
@@ -2692,7 +2681,7 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 				threads_num++;
 		}
 
-		threads = zbx_calloc(threads, threads_num, sizeof(*threads));
+		threads = (writer_thread_t *)zbx_calloc(threads, threads_num, sizeof(*threads));
 		memset(threads, 0, threads_num * sizeof(*threads));
 
 		fflush(log_fd);
@@ -2812,7 +2801,8 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 
 		for (th_num = 0; th_num < threads_num; th_num++)
 		{
-			int	bytes;
+			ssize_t	bytes;
+			int	status;
 
 			if (0 == threads[th_num].pid)
 				continue;
@@ -2839,7 +2829,7 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 					break;
 				}
 
-				rsm_dump(log_fd, "%.*s", bytes, buf);
+				rsm_dump(log_fd, "%.*s", (int)bytes, buf);
 			}
 
 			if (0 >= waitpid(threads[th_num].pid, &status, 0))
@@ -2944,7 +2934,7 @@ static void	zbx_get_rdds43_nss(zbx_vector_str_t *nss, const char *recv_buf, cons
 	}
 }
 
-static int	zbx_rdds43_test(const char *request, const char *ip, short port, int timeout, char **answer,
+static int	zbx_rdds43_test(const char *request, const char *ip, unsigned short port, int timeout, char **answer,
 		int *rtt, char *err, size_t err_size)
 {
 	zbx_socket_t	s;
@@ -3106,7 +3096,7 @@ out:
 	return ret;
 }
 
-static void	zbx_delete_unsupported_ips(zbx_vector_str_t *ips, char ipv4_enabled, char ipv6_enabled)
+static void	zbx_delete_unsupported_ips(zbx_vector_str_t *ips, int ipv4_enabled, int ipv6_enabled)
 {
 	int	i;
 	char	is_ipv4;
@@ -3484,7 +3474,7 @@ static int	zbx_http_test(const char *host, const char *url, long timeout, long m
 		goto out;
 	}
 
-	*rtt = total_time * 1000;	/* expected in ms */
+	*rtt = (int)(total_time * 1000);	/* expected in ms */
 
 	ret = SUCCEED;
 out:
@@ -3610,7 +3600,7 @@ static int	zbx_split_url(const char *url, char **proto, char **domain, int *port
 
 	if (NULL != (tmp = strchr(url, ':')))
 	{
-		size_t	len = tmp - url;
+		size_t	len = (size_t)(tmp - url);
 
 		if (0 == isdigit(*(tmp + 1)))
 		{
@@ -3619,7 +3609,7 @@ static int	zbx_split_url(const char *url, char **proto, char **domain, int *port
 		}
 
 		zbx_free(*domain);
-		*domain = zbx_malloc(*domain, len + 1);
+		*domain = (char *)zbx_malloc(*domain, len + 1);
 		memcpy(*domain, url, len);
 		(*domain)[len] = '\0';
 
@@ -3636,10 +3626,10 @@ static int	zbx_split_url(const char *url, char **proto, char **domain, int *port
 	}
 	else if (NULL != (tmp = strchr(url, '/')))
 	{
-		size_t	len = tmp - url;
+		size_t	len = (size_t)(tmp - url);
 
 		zbx_free(*domain);
-		*domain = zbx_malloc(*domain, len + 1);
+		*domain = (char *)zbx_malloc(*domain, len + 1);
 		memcpy(*domain, url, len);
 		(*domain)[len] = '\0';
 		*prefix = zbx_strdup(*prefix, tmp);
@@ -3729,7 +3719,7 @@ do														\
 }														\
 while (0)
 
-int	get_rdds_result(int rtt43, int rtt80, int rtt_limit)
+static int	get_rdds_result(int rtt43, int rtt80, int rtt_limit)
 {
 	int	rdds_result, rdds43, rdds80;
 
@@ -3766,7 +3756,6 @@ int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	FILE			*log_fd = NULL;
 	ldns_resolver		*res = NULL;
 	zbx_resolver_error_t	ec_res;
-	size_t			i;
 	time_t			ts, now;
 	zbx_http_error_t	ec_http;
 	int			rtt43 = ZBX_NO_VALUE, upd43 = ZBX_NO_VALUE, rtt80 = ZBX_NO_VALUE, rtt_limit,
@@ -3866,8 +3855,7 @@ int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	ret = SYSINFO_RET_OK;
 
 	/* choose random host */
-	i = zbx_random(hosts43.values_num);
-	random_host = hosts43.values[i];
+	random_host = hosts43.values[zbx_random((size_t)hosts43.values_num)];
 
 	/* start RDDS43 test, resolve host to ips */
 	if (SUCCEED != zbx_resolver_resolve_host(res, random_host, &ips43, ipv_flags, log_fd, &ec_res, err, sizeof(err)))
@@ -3891,8 +3879,7 @@ int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	if (SUCCEED == zbx_ec_noerror(rtt43))
 	{
 		/* choose random IP */
-		i = zbx_random(ips43.values_num);
-		ip43 = ips43.values[i];
+		ip43 = ips43.values[zbx_random((size_t)ips43.values_num)];
 
 		if (0 != strcmp(".", domain))
 			zbx_snprintf(testname, sizeof(testname), "%s.%s", testprefix, domain);
@@ -3930,8 +3917,7 @@ int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 			char	*random_ns;
 
 			/* choose random NS from the output */
-			i = zbx_random(nss.values_num);
-			random_ns = nss.values[i];
+			random_ns = nss.values[zbx_random((size_t)nss.values_num)];
 
 			rsm_infof(log_fd, "randomly selected Name Server server \"%s\"", random_ns);
 
@@ -3956,7 +3942,7 @@ int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 			if (upd43 == ZBX_NO_VALUE)
 			{
 				/* successful UPD */
-				upd43 = now - ts;
+				upd43 = (int)(now - ts);
 			}
 
 			rsm_infof(log_fd, "===>\n%.*s\n<=== end RDDS43 test (rtt:%d upd43:%d)",
@@ -3970,8 +3956,7 @@ int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	}
 
 	/* choose random host */
-	i = zbx_random(hosts80.values_num);
-	random_host = hosts80.values[i];
+	random_host = hosts80.values[zbx_random((size_t)hosts80.values_num)];
 
 	rsm_infof(log_fd, "start RDDS80 test (host %s)", random_host);
 
@@ -3991,8 +3976,7 @@ int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	}
 
 	/* choose random IP */
-	i = zbx_random(ips80.values_num);
-	ip80 = ips80.values[i];
+	ip80 = ips80.values[zbx_random((size_t)ips80.values_num)];
 
 	if (SUCCEED != zbx_validate_ip(ip80, ipv4_enabled, ipv6_enabled, NULL, &is_ipv4))
 	{
@@ -4242,7 +4226,7 @@ int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	}
 
 	/* choose random IP */
-	ip = ips.values[zbx_random(ips.values_num)];
+	ip = ips.values[zbx_random((size_t)ips.values_num)];
 
 	if (SUCCEED != zbx_validate_ip(ip, ipv4_enabled, ipv6_enabled, NULL, &is_ipv4))
 	{
@@ -4366,7 +4350,7 @@ static int	epp_recv_buf(SSL *ssl, void *buf, int num)
 		if (0 >= (read = SSL_read(ssl, p, num)))
 			goto out;
 
-		p += read;
+		p = (char *)p + read;
 		num -= read;
 	}
 
@@ -4377,7 +4361,8 @@ out:
 
 static int	epp_recv_message(SSL *ssl, char **data, size_t *data_len, FILE *log_fd)
 {
-	int	message_size, ret = FAIL;
+	unsigned int	message_size;
+	int		ret = FAIL;
 
 	if (NULL == data || NULL != *data)
 	{
@@ -4390,10 +4375,10 @@ static int	epp_recv_message(SSL *ssl, char **data, size_t *data_len, FILE *log_f
 		goto out;
 
 	*data_len = ntohl(message_size) - sizeof(message_size);
-	*data = malloc(*data_len);
+	*data = (char *)malloc(*data_len);
 
 	/* receive body */
-	if (SUCCEED != epp_recv_buf(ssl, *data, *data_len - 1))
+	if (SUCCEED != epp_recv_buf(ssl, *data, (int)*data_len - 1))
 		goto out;
 
 	(*data)[*data_len - 1] = '\0';
@@ -4426,7 +4411,7 @@ static int	epp_send_buf(SSL *ssl, const void *buf, int num)
 		if (0 >= (written = SSL_write(ssl, p, num)))
 			goto out;
 
-		p += written;
+		p = (const char *)p + written;
 		num -= written;
 	}
 
@@ -4435,18 +4420,19 @@ out:
 	return ret;
 }
 
-static int	epp_send_message(SSL *ssl, const char *data, int data_size, FILE *log_fd)
+static int	epp_send_message(SSL *ssl, const char *data, size_t data_size, FILE *log_fd)
 {
-	int	message_size, ret = FAIL;
+	int		ret = FAIL;
+	unsigned int	message_size;
 
-	message_size = htonl(data_size + sizeof(message_size));
+	message_size = htonl((unsigned int)(data_size + sizeof(message_size)));
 
 	/* send header */
 	if (SUCCEED != epp_send_buf(ssl, &message_size, sizeof(message_size)))
 		goto out;
 
 	/* send body */
-	if (SUCCEED != epp_send_buf(ssl, data, data_size))
+	if (SUCCEED != epp_send_buf(ssl, data, (int)data_size))
 		goto out;
 
 	rsm_infof(log_fd, "sent message ===>\n%s\n<===", data);
@@ -4484,7 +4470,7 @@ static int	get_xml_value(const char *data, int xml_path, char *xml_value, size_t
 	if (NULL == (p_end = zbx_strcasestr(p_start, end_tag)))
 		goto out;
 
-	zbx_strlcpy(xml_value, p_start, MIN(p_end - p_start + 1, xml_value_size));
+	zbx_strlcpy(xml_value, p_start, MIN((size_t)(p_end - p_start + 1), xml_value_size));
 
 	ret = SUCCEED;
 out:
@@ -4502,10 +4488,10 @@ static int	get_tmpl(const char *epp_commands, const char *command, char **tmpl)
 	if (-1 == (f = zbx_open(buf, O_RDONLY)))
 		goto out;
 
-	*tmpl = zbx_malloc(*tmpl, tmpl_alloc);
+	*tmpl = (char *)zbx_malloc(*tmpl, tmpl_alloc);
 
 	while (0 < (nbytes = zbx_read(f, buf, sizeof(buf), "")))
-		zbx_strncpy_alloc(tmpl, &tmpl_alloc, &tmpl_offset, buf, nbytes);
+		zbx_strncpy_alloc(tmpl, &tmpl_alloc, &tmpl_offset, buf, (size_t)nbytes);
 
 	if (-1 == nbytes)
 	{
@@ -4566,10 +4552,10 @@ static void	zbx_tmpl_replace(char **tmpl, const char *variable, const char *valu
 
 	while (NULL != (p = strstr(*tmpl, variable)))
 	{
-		l_pos = p - *tmpl;
+		l_pos = (size_t)(p - *tmpl);
 		r_pos = l_pos + variable_size - 1;
 
-		zbx_replace_string(tmpl, p - *tmpl, &r_pos, value);
+		zbx_replace_string(tmpl, (size_t)(p - *tmpl), &r_pos, value);
 	}
 }
 
@@ -4892,12 +4878,12 @@ static size_t	zbx_get_epp_items(const char *keyname, DC_ITEM *item, const char *
 
 		if (0 == out_items_num)
 		{
-			*out_items = zbx_malloc(*out_items, out_items_alloc * sizeof(DC_ITEM));
+			*out_items = (DC_ITEM *)zbx_malloc(*out_items, out_items_alloc * sizeof(DC_ITEM));
 		}
 		else if (out_items_num == out_items_alloc)
 		{
 			out_items_alloc += 8;
-			*out_items = zbx_realloc(*out_items, out_items_alloc * sizeof(DC_ITEM));
+			*out_items = (DC_ITEM *)zbx_realloc(*out_items, out_items_alloc * sizeof(DC_ITEM));
 		}
 
 		memcpy(&(*out_items)[out_items_num], in_item, sizeof(DC_ITEM));
@@ -4950,13 +4936,13 @@ out:
 	return ret;
 }
 
-static int	zbx_ssl_attach_privkey(SSL *ssl, char *privkey, int privkey_len, int *rtt, char *err, size_t err_size)
+static int	zbx_ssl_attach_privkey(SSL *ssl, char *privkey, size_t privkey_len, int *rtt, char *err, size_t err_size)
 {
 	BIO	*bio = NULL;
 	RSA	*rsa = NULL;
 	int	ret = FAIL;
 
-	if (NULL == (bio = BIO_new_mem_buf(privkey, privkey_len)))
+	if (NULL == (bio = BIO_new_mem_buf(privkey, (int)privkey_len)))
 	{
 		*rtt = ZBX_EC_EPP_INTERNAL_GENERAL;
 		zbx_strlcpy(err, "out of memory", err_size);
@@ -5006,7 +4992,7 @@ static char	*zbx_parse_time(char *str, size_t str_size, int *i)
 	c = *p_end;
 	*p_end = '\0';
 
-	rv = sscanf(str, "%u", i);
+	rv = sscanf(str, "%d", i);
 	*p_end = c;
 
 	if (1 != rv)
@@ -5024,7 +5010,7 @@ static int	zbx_parse_asn1time(ASN1_TIME *asn1time, time_t *time, char *err, size
 
 	if (V_ASN1_UTCTIME == asn1time->type && 13 == asn1time->length && 'Z' == asn1time->data[12])
 	{
-		memcpy(buf + 2, asn1time->data, asn1time->length - 1);
+		memcpy(buf + 2, asn1time->data, (size_t)asn1time->length - 1);
 
 		if ('5' <= asn1time->data[0])
 		{
@@ -5039,7 +5025,7 @@ static int	zbx_parse_asn1time(ASN1_TIME *asn1time, time_t *time, char *err, size
 	}
 	else if (V_ASN1_GENERALIZEDTIME == asn1time->type && 15 == asn1time->length && 'Z' == asn1time->data[14])
 	{
-		memcpy(buf, asn1time->data, asn1time->length-1);
+		memcpy(buf, asn1time->data, (size_t)asn1time->length - 1);
 	}
 	else
 	{
@@ -5107,10 +5093,11 @@ static int	zbx_get_cert_md5(X509 *cert, char **md5, char *err, size_t err_size)
 {
 	char		*data;
 	BIO		*bio;
-	size_t		len, sz;
+	long		len;
+	size_t		sz, i;
 	md5_state_t	state;
 	md5_byte_t	hash[MD5_DIGEST_SIZE];
-	int		i, ret = FAIL;
+	int		ret = FAIL;
 
 	if (NULL == (bio = BIO_new(BIO_s_mem())))
 	{
@@ -5127,11 +5114,11 @@ static int	zbx_get_cert_md5(X509 *cert, char **md5, char *err, size_t err_size)
 	len = BIO_get_mem_data(bio, &data);	/* "data" points to the cert data (no need to free), len - its length */
 
 	zbx_md5_init(&state);
-	zbx_md5_append(&state, (const md5_byte_t *)data, len);
+	zbx_md5_append(&state, (const md5_byte_t *)data, (int)len);
 	zbx_md5_finish(&state, hash);
 
 	sz = MD5_DIGEST_SIZE * 2 + 1;
-	*md5 = zbx_malloc(*md5, sz);
+	*md5 = (char *)zbx_malloc(*md5, sz);
 
 	for (i = 0; i < MD5_DIGEST_SIZE; i++)
 		zbx_snprintf(&(*md5)[i << 1], sz - (i << 1), "%02x", hash[i]);
@@ -5208,7 +5195,7 @@ int	check_rsm_epp(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 				*epp_user = NULL, *epp_passwd = NULL, *epp_privkey = NULL, *epp_cert_b64 = NULL,
 				*epp_cert = NULL, *epp_commands = NULL, *epp_serverid = NULL, *epp_testprefix = NULL,
 				*epp_servercertmd5 = NULL, *tmp;
-	short			epp_port = 700;
+	unsigned short		epp_port = 700;
 	X509			*epp_server_x509 = NULL;
 	const SSL_METHOD	*method;
 	const char		*ip = NULL, *random_host;
@@ -5220,7 +5207,7 @@ int	check_rsm_epp(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 	size_t			items_num = 0;
 	zbx_vector_str_t	epp_hosts, epp_ips;
 	unsigned int		extras;
-	int			rv, i, epp_enabled, epp_cert_size, rtt, rtt1 = ZBX_NO_VALUE, rtt2 = ZBX_NO_VALUE,
+	int			rv, epp_enabled, epp_cert_size, rtt, rtt1 = ZBX_NO_VALUE, rtt2 = ZBX_NO_VALUE,
 				rtt3 = ZBX_NO_VALUE, rtt1_limit, rtt2_limit, rtt3_limit, ipv4_enabled, ipv6_enabled,
 				ret = SYSINFO_RET_FAIL;
 
@@ -5482,8 +5469,7 @@ int	check_rsm_epp(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 	}
 
 	/* choose random host */
-	i = zbx_random(epp_hosts.values_num);
-	random_host = epp_hosts.values[i];
+	random_host = epp_hosts.values[zbx_random((size_t)epp_hosts.values_num)];
 
 	/* resolve host to ips: TODO! error handler functions not implemented (see NULLs below) */
 	if (SUCCEED != zbx_resolver_resolve_host(res, random_host, &epp_ips,
@@ -5505,8 +5491,7 @@ int	check_rsm_epp(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 	}
 
 	/* choose random IP */
-	i = zbx_random(epp_ips.values_num);
-	ip = epp_ips.values[i];
+	ip = epp_ips.values[zbx_random((size_t)epp_ips.values_num)];
 
 	/* make the underlying TCP socket connection */
 	if (SUCCEED != zbx_tcp_connect(&sock, NULL, ip, epp_port, RSM_TCP_TIMEOUT,
@@ -5525,7 +5510,7 @@ int	check_rsm_epp(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 		goto out;
 	}
 
-	str_base64_decode_dyn(epp_cert_b64, strlen(epp_cert_b64), &epp_cert, &epp_cert_size);
+	str_base64_decode_dyn(epp_cert_b64, (int)strlen(epp_cert_b64), &epp_cert, &epp_cert_size);
 
 	if (SUCCEED != zbx_ssl_attach_cert(ssl, epp_cert, epp_cert_size, &rtt, err, sizeof(err)))
 	{
@@ -5707,8 +5692,8 @@ out:
 #define	CHECK_DNS_CONN_RTT		0x2u
 #define	CHECK_DNS_CONN_RECURSIVE	0x4u
 
-static int	zbx_check_dns_connection(const ldns_resolver *res, ldns_rdf *query_rdf, int flags, int reply_ms,
-		FILE *log_fd, char *err, size_t err_size)
+static int	zbx_check_dns_connection(const ldns_resolver *res, ldns_rdf *query_rdf, unsigned int flags,
+		int reply_ms, FILE *log_fd, char *err, size_t err_size)
 {
 	ldns_pkt	*pkt = NULL;
 	ldns_rr_list	*rrset = NULL;
@@ -5770,7 +5755,8 @@ int	check_rsm_probe_status(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RE
 	FILE			*log_fd = NULL;
 	unsigned int		extras = RESOLVER_EXTRAS_DNSSEC;
 	int			i, ipv4_enabled = 0, ipv6_enabled = 0, min_servers, reply_ms, online_delay,
-				ok_servers, ret, status = ZBX_EC_PROBE_UNSUPPORTED;
+				ok_servers, ret;
+	char			status = ZBX_EC_PROBE_UNSUPPORTED;
 
 	if (3 != request->nparam)
 	{

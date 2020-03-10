@@ -160,9 +160,9 @@ out:
 	return ret;
 }
 
-int	encrypt_cleartext(const char *passphrase, int passphrase_len, const char *secretkey_enc_b64,
-		int secretkey_enc_b64_len, const char *secretkey_salt_b64, int secretkey_salt_b64_len,
-		const char *cleartext, int cleartext_len, char **cleartext_enc_b64, char **cleartext_salt_b64,
+int	encrypt_cleartext(const char *passphrase, size_t passphrase_len, const char *secretkey_enc_b64,
+		size_t secretkey_enc_b64_len, const char *secretkey_salt_b64, size_t secretkey_salt_b64_len,
+		const char *cleartext, size_t cleartext_len, char **cleartext_enc_b64, char **cleartext_salt_b64,
 		char *err, size_t err_size)
 {
 	const EVP_CIPHER	*cipher;
@@ -243,10 +243,10 @@ out:
 	return ret;
 }
 
-int	decrypt_ciphertext(const char *passphrase, int passphrase_len, const char *secretkey_enc_b64,
-		int secretkey_enc_b64_len, const char *secretkey_salt_b64, int secretkey_salt_b64_len,
-		const char *cleartext_enc_b64, int cleartext_enc_b64_len, const char *cleartext_salt_b64,
-		int cleartext_salt_b64_len, char **cleartext, char *err, size_t err_size)
+int	decrypt_ciphertext(const char *passphrase, size_t passphrase_len, const char *secretkey_enc_b64,
+		size_t secretkey_enc_b64_len, const char *secretkey_salt_b64, size_t secretkey_salt_b64_len,
+		const char *cleartext_enc_b64, size_t cleartext_enc_b64_len, const char *cleartext_salt_b64,
+		size_t cleartext_salt_b64_len, char **cleartext, char *err, size_t err_size)
 {
 	const EVP_CIPHER	*cipher;
 	const EVP_MD		*digest;
