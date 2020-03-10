@@ -663,7 +663,7 @@ out:
 
 static int	zbx_ldns_rdf_compare(const void *d1, const void *d2)
 {
-	return ldns_rdf_compare(*(const ldns_rdf **)d1, *(const ldns_rdf **)d2);
+	return ldns_rdf_compare((const ldns_rdf *)d1, (const ldns_rdf *)d2);
 }
 
 static void	zbx_get_owners(const ldns_rr_list *rr_list, zbx_vector_ptr_t *owners)
@@ -1734,53 +1734,6 @@ out:
 		zbx_free(last_label);
 
 	return ret;
-}
-
-/******************************************************************************
- *                                                                            *
- * Function: zbx_add_value                                                    *
- *                                                                            *
- * Purpose: Inject result directly into the cache because we want to specify  *
- *          the value timestamp (beginning of the test).                      *
- *                                                                            *
- * Author: Vladimir Levijev                                                   *
- *                                                                            *
- ******************************************************************************/
-static void	zbx_add_value(const DC_ITEM *item, AGENT_RESULT *result, int ts)
-{
-	zbx_timespec_t	timespec = {.sec = ts, .ns = 0};
-
-	dc_add_history(item->itemid, item->value_type, item->flags, result, &timespec, ITEM_STATUS_ACTIVE, NULL);
-}
-
-static void	zbx_add_value_uint(const DC_ITEM *item, int ts, int value)
-{
-	AGENT_RESULT	result;
-
-	result.type = 0;
-
-	SET_UI64_RESULT(&result, value);
-	zbx_add_value(item, &result, ts);
-}
-
-static void	zbx_add_value_dbl(const DC_ITEM *item, int ts, int value)
-{
-	AGENT_RESULT	result;
-
-	result.type = 0;
-
-	SET_DBL_RESULT(&result, value);
-	zbx_add_value(item, &result, ts);
-}
-
-static void	zbx_add_value_str(const DC_ITEM *item, int ts, const char *value)
-{
-	AGENT_RESULT	result;
-
-	result.type = 0;
-
-	SET_STR_RESULT(&result, value);
-	zbx_add_value(item, &result, ts);
 }
 
 static int	zbx_get_dnskeys(ldns_resolver *res, const char *domain, const char *resolver,
@@ -4959,49 +4912,6 @@ static size_t	zbx_get_epp_items(const char *keyname, DC_ITEM *item, const char *
 	return out_items_num;
 }
 
-/* TODO: this code should be rewritten, the values should not be set using dc_add_history()! */
-static void	zbx_set_epp_values(const char *ip, int rtt1, int rtt2, int rtt3, int value_ts, size_t keypart_size,
-		const DC_ITEM *items, size_t items_num)
-{
-	size_t		i;
-	const DC_ITEM	*item;
-	const char	*p;
-	char		*cmd;
-	AGENT_REQUEST	request;
-
-	for (i = 0; i < items_num; i++)
-	{
-		item = &items[i];
-		p = item->key + keypart_size + 1;	/* skip "rsm.epp." part */
-
-		if (NULL != ip && 0 == strncmp(p, "ip[", 3))
-			zbx_add_value_str(item, value_ts, ip);
-		else if ((ZBX_NO_VALUE != rtt1 || ZBX_NO_VALUE != rtt2 || ZBX_NO_VALUE != rtt3) &&
-				0 == strncmp(p, "rtt[", 4))
-		{
-			init_request(&request);
-
-			if (SUCCEED != parse_item_key(item->key, &request))
-			{
-				THIS_SHOULD_NEVER_HAPPEN;
-				goto next;
-			}
-
-			if (NULL != (cmd = get_rparam(&request, 1)) && '\0' != *cmd)
-			{
-				if (ZBX_NO_VALUE != rtt1 && 0 == strcmp("login", cmd))
-					zbx_add_value_dbl(item, value_ts, rtt1);
-				else if (ZBX_NO_VALUE != rtt2 && 0 == strcmp("update", cmd))
-					zbx_add_value_dbl(item, value_ts, rtt2);
-				else if (ZBX_NO_VALUE != rtt3 && 0 == strcmp("info", cmd))
-					zbx_add_value_dbl(item, value_ts, rtt3);
-			}
-next:
-			free_request(&request);
-		}
-	}
-}
-
 static int	zbx_ssl_attach_cert(SSL *ssl, char *cert, int cert_len, int *rtt, char *err, size_t err_size)
 {
 	BIO	*bio = NULL;
@@ -5733,8 +5643,7 @@ out:
 		/* set other EPP item values */
 		if (0 != items_num)
 		{
-			zbx_set_epp_values(ip, rtt1, rtt2, rtt3, item->nextcheck, strlen(request->key), items,
-					items_num);
+			/* result: ip, rtt1, rtt2, rtt3 */
 		}
 
 		/* set availability of EPP (up/down) */
@@ -5743,12 +5652,10 @@ out:
 				ZBX_SUBTEST_SUCCESS != zbx_subtest_result(rtt3, rtt3_limit))
 		{
 			/* down */
-			zbx_add_value_uint(item, item->nextcheck, 0);
 		}
 		else
 		{
 			/* up */
-			zbx_add_value_uint(item, item->nextcheck, 1);
 		}
 	}
 
