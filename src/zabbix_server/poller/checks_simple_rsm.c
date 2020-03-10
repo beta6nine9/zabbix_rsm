@@ -663,7 +663,7 @@ out:
 
 static int	zbx_ldns_rdf_compare(const void *d1, const void *d2)
 {
-	return ldns_rdf_compare((const ldns_rdf *)d1, (const ldns_rdf *)d2);
+	return ldns_rdf_compare(*(const ldns_rdf **)d1, *(const ldns_rdf **)d2);
 }
 
 static void	zbx_get_owners(const ldns_rr_list *rr_list, zbx_vector_ptr_t *owners)
