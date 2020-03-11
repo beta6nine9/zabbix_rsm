@@ -1081,7 +1081,14 @@ sub create_main_template($$)
 	my $rdds_test_domain;
 	if (opt('rdds-test-prefix'))
 	{
-		$rdds_test_domain = sprintf('%s.%s', getopt('rdds-test-prefix'), getopt('tld'));
+		if (getopt('tld') == ".")
+		{
+			$rdds_test_domain = getopt('rdds-test-prefix');
+		}
+		else
+		{
+			$rdds_test_domain = sprintf('%s.%s', getopt('rdds-test-prefix'), getopt('tld'));
+		}
 	}
 	elsif (opt('rdds-test-domain'))
 	{
