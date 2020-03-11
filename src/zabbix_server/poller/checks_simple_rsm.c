@@ -2176,62 +2176,6 @@ static FILE	*open_item_log(const char *host, const char *tld, const char *name, 
 	return fd;
 }
 
-/* rr - round robin */
-static char	*zbx_get_rr_tld(const char *self, char *err, size_t err_size)
-{
-	static int		index = 0;
-
-	zbx_vector_uint64_t	hostids;
-	char			*tld = NULL, *p;
-	DC_HOST			host;
-
-	zbx_vector_uint64_create(&hostids);
-
-	DBget_hostids_by_item(&hostids, "rsm.dns[{$RSM.TLD}]");	/* every monitored host has this item */
-
-	if (2 > hostids.values_num)	/* skip self */
-	{
-		zbx_strlcpy(err, "cannot get random TLD: no hosts found", err_size);
-		goto out;
-	}
-
-	do
-	{
-		if (index >= hostids.values_num)
-			index = 0;
-
-		if (1 < hostids.values_num)
-			zbx_vector_uint64_sort(&hostids, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
-
-		if (SUCCEED != DCget_host_by_hostid(&host, hostids.values[index]))
-		{
-			zbx_strlcpy(err, "cannot get random TLD: configuration cache error", err_size);
-			goto out;
-		}
-
-		tld = zbx_strdup(tld, host.host);
-
-		p = tld;
-		while ('\0' != *p && 0 == isspace(*p))
-			p++;
-
-		if (0 != isspace(*p))
-			*p = '\0';
-
-		index++;
-
-		if (0 == strcmp(self, tld))
-			zbx_free(tld);
-		else
-			break;
-	}
-	while (1);
-out:
-	zbx_vector_uint64_destroy(&hostids);
-
-	return tld;
-}
-
 static void	set_nss_results(zbx_ns_t *nss, size_t nss_num, int rtt_limit, size_t minns, size_t *nssok,
 		unsigned int *status)
 {
@@ -2572,17 +2516,6 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 			minns,
 			successful_tests,
 			test_recover);
-
-	if (0 == strcmp(testprefix, "*randomtld*"))
-	{
-		if (NULL == (testprefix = zbx_get_rr_tld(domain, err, sizeof(err))))
-		{
-			SET_MSG_RESULT(result, zbx_strdup(NULL, err));
-			goto end;
-		}
-	}
-	else
-		testprefix = zbx_strdup(NULL, testprefix);
 
 	extras = (dnssec_enabled ? RESOLVER_EXTRAS_DNSSEC : RESOLVER_EXTRAS_NONE);
 
@@ -3715,15 +3648,6 @@ int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 		rsm_info(log_fd, "RDDS disabled on this RSM host");
 		ret = SYSINFO_RET_OK;
 		goto end;
-	}
-
-	if (0 == strcmp(testprefix, "*RANDOMTLD*"))
-	{
-		if (NULL == (testprefix = zbx_get_rr_tld(domain, err, sizeof(err))))
-		{
-			SET_MSG_RESULT(result, zbx_strdup(NULL, err));
-			goto end;
-		}
 	}
 
 	if (0 != ipv4_enabled)
