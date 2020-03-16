@@ -4228,7 +4228,7 @@ int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	if (SUCCEED != zbx_split_url(base_url, &proto, &domain_part, &port, &prefix, err, sizeof(err)))
 	{
 		rtt = ZBX_EC_RDAP_INTERNAL_GENERAL;
-		rsm_errf(log_fd, "RDAP \"%s\": %s", base_url, err);
+		rsm_errf(log_fd, "\"%s\": %s", base_url, err);
 		goto out;
 	}
 
@@ -4236,15 +4236,14 @@ int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	if (SUCCEED != zbx_resolver_resolve_host(res, domain_part, &ips, ipv_flags, log_fd, &ec_res, err, sizeof(err)))
 	{
 		rtt = zbx_resolver_error_to_RDAP(ec_res);
-		rsm_errf(log_fd, "RDAP \"%s\": %s", base_url, err);
+		rsm_errf(log_fd, "trying to resolve \"%s\": %s", domain_part, err);
 		goto out;
 	}
 
 	if (0 == ips.values_num)
 	{
 		rtt = ZBX_EC_RDAP_INTERNAL_IP_UNSUP;
-		rsm_errf(log_fd, "RDAP \"%s\": IP address(es) of host \"%s\" are not supported by the Probe",
-				base_url, domain_part);
+		rsm_errf(log_fd, "IP address(es) of host \"%s\" are not supported on this Probe", domain_part);
 		goto out;
 	}
 
