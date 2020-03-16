@@ -1095,9 +1095,9 @@ sub tld_interface_enabled_create_cache
 			" from hosts h,hosts_groups hg".
 			" where h.hostid=hg.hostid".
 				" and h.status=0".
-				" and hg.groupid=".TLD_PROBE_RESULTS_GROUPID);
+				" and hg.groupid=".TLDS_GROUPID);
 
-		map {$enabled_hosts_cache{$_->[0]} = substr($_->[1], 0, index($_->[1], ' '))} (@{$rows_ref});
+		map {$enabled_hosts_cache{$_->[0]} = $_->[1]} (@{$rows_ref});
 
 		@tlds_cache = uniq(values(%enabled_hosts_cache)) if (scalar(@tlds_cache) == 0);
 	}
