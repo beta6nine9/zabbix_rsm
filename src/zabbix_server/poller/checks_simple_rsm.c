@@ -3988,23 +3988,32 @@ out:
 	return ret;
 }
 
-static int	zbx_get_rdap_items(const char *host, DC_ITEM *ip_item, DC_ITEM *rtt_item)
+static int	zbx_get_rdap_items(const char *host, DC_ITEM *ip_item, DC_ITEM *rtt_item, DC_ITEM *target_item,
+		DC_ITEM *testedname_item)
 {
-#define ZBX_RDAP_ITEM_COUNT	2
-#define ZBX_RDAP_ITEM_KEY_IP	"rdap.ip"
-#define ZBX_RDAP_ITEM_KEY_RTT	"rdap.rtt"
+#define ZBX_RDAP_ITEM_COUNT		4
+#define ZBX_RDAP_ITEM_KEY_IP		"rdap.ip"
+#define ZBX_RDAP_ITEM_KEY_RTT		"rdap.rtt"
+#define ZBX_RDAP_ITEM_KEY_TARGET	"rdap.target"
+#define ZBX_RDAP_ITEM_KEY_TESTEDNAME	"rdap.testedname"
 
 	zbx_host_key_t		hosts_keys[ZBX_RDAP_ITEM_COUNT] = {
 					{host, ZBX_RDAP_ITEM_KEY_IP},
-					{host, ZBX_RDAP_ITEM_KEY_RTT}
+					{host, ZBX_RDAP_ITEM_KEY_RTT},
+					{host, ZBX_RDAP_ITEM_KEY_TARGET},
+					{host, ZBX_RDAP_ITEM_KEY_TESTEDNAME}
 				};
 	zbx_item_value_type_t	types[ZBX_RDAP_ITEM_COUNT] = {
 					ITEM_VALUE_TYPE_STR,
-					ITEM_VALUE_TYPE_FLOAT
+					ITEM_VALUE_TYPE_FLOAT,
+					ITEM_VALUE_TYPE_STR,
+					ITEM_VALUE_TYPE_STR
 				};
 	DC_ITEM			*destinations[ZBX_RDAP_ITEM_COUNT] = {
 					ip_item,
-					rtt_item
+					rtt_item,
+					target_item,
+					testedname_item
 				};
 	DC_ITEM			items[ZBX_RDAP_ITEM_COUNT];
 	int			errcodes[ZBX_RDAP_ITEM_COUNT], i;
@@ -4027,6 +4036,8 @@ static int	zbx_get_rdap_items(const char *host, DC_ITEM *ip_item, DC_ITEM *rtt_i
 #undef ZBX_RDAP_ITEM_COUNT
 #undef ZBX_RDAP_ITEM_KEY_IP
 #undef ZBX_RDAP_ITEM_KEY_RTT
+#undef ZBX_RDAP_ITEM_KEY_TARGET
+#undef ZBX_RDAP_ITEM_KEY_TESTEDNAME
 }
 
 int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *result)
@@ -4037,10 +4048,10 @@ int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	zbx_vector_str_t	ips;
 	struct zbx_json_parse	jp;
 	FILE			*log_fd;
-	DC_ITEM			ip_item, rtt_item;
-	char			*domain, *test_domain, *base_url, *maxredirs_str, *rtt_limit_str, *tld_enabled_str,
+	DC_ITEM			ip_item, rtt_item, target_item, testedname_item;
+	char			*domain, *testedname, *base_url, *maxredirs_str, *rtt_limit_str, *tld_enabled_str,
 				*probe_enabled_str, *ipv4_enabled_str, *ipv6_enabled_str, *res_ip, *proto = NULL,
-				*domain_part = NULL, *prefix = NULL, *full_url = NULL, *value_str = NULL,
+				*target = NULL, *prefix = NULL, *full_url = NULL, *value_str = NULL,
 				err[ZBX_ERR_BUF_SIZE], is_ipv4, rdap_prefix[64];
 	const char		*ip = NULL;
 	size_t			value_alloc = 0;
@@ -4056,8 +4067,9 @@ int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	}
 
 	/* TLD goes first, then RDAP specific parameters, then TLD options, probe options and global settings */
+
 	domain = get_rparam(request, 0);		/* TLD for log file name, e.g. ".cz" */
-	test_domain = get_rparam(request, 1);		/* testing domain to make RDAP query for, e.g. "nic.cz" */
+	testedname = get_rparam(request, 1);		/* domain name to use in RDAP request, e.g. "example.com" */
 	base_url = get_rparam(request, 2);		/* RDAP service endpoint, e.g. "http://rdap.nic.cz" */
 	maxredirs_str = get_rparam(request, 3);		/* maximal number of redirections allowed */
 	rtt_limit_str = get_rparam(request, 4);		/* maximum allowed RTT in milliseconds */
@@ -4073,7 +4085,7 @@ int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 		return ret;
 	}
 
-	if ('\0' == *test_domain)
+	if ('\0' == *testedname)
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Test domain cannot be empty."));
 		return ret;
@@ -4139,7 +4151,7 @@ int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	rsm_info(log_fd, "START TEST");
 
 	/* get items */
-	if (SUCCEED != zbx_get_rdap_items(item->host.host, &ip_item, &rtt_item))
+	if (SUCCEED != zbx_get_rdap_items(item->host.host, &ip_item, &rtt_item, &target_item, &testedname_item))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Cannot find items to store IP and RTT."));
 		goto out;
@@ -4194,7 +4206,7 @@ int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	if (0 != ipv6_enabled)
 		ipv_flags |= ZBX_FLAG_IPV6_ENABLED;
 
-	if (SUCCEED != zbx_split_url(base_url, &proto, &domain_part, &port, &prefix, err, sizeof(err)))
+	if (SUCCEED != zbx_split_url(base_url, &proto, &target, &port, &prefix, err, sizeof(err)))
 	{
 		rtt = ZBX_EC_RDAP_INTERNAL_GENERAL;
 		rsm_errf(log_fd, "RDAP \"%s\": %s", base_url, err);
@@ -4202,18 +4214,26 @@ int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	}
 
 	/* resolve host to IPs */
-	if (SUCCEED != zbx_resolver_resolve_host(res, domain_part, &ips, ipv_flags, log_fd, &ec_res, err, sizeof(err)))
+	if (SUCCEED != zbx_resolver_resolve_host(res, target, &ips, ipv_flags, log_fd, &ec_res, err, sizeof(err)))
 	{
-		rtt = zbx_resolver_error_to_RDAP(ec_res);
-		rsm_errf(log_fd, "RDAP \"%s\": %s", base_url, err);
-		goto out;
+		if (1)
+		{
+			rsm_infof(log_fd, "DIMBUG: \"resolved\" \"%s\" to hard-coded IP", target);
+			zbx_vector_str_append(&ips, zbx_strdup(NULL, "192.168.6.85"));
+		}
+		else
+		{
+			rtt = zbx_resolver_error_to_RDAP(ec_res);
+			rsm_errf(log_fd, "RDAP \"%s\": cannot resolve host \"%s\": %s", base_url, target, err);
+			goto out;
+		}
 	}
 
 	if (0 == ips.values_num)
 	{
 		rtt = ZBX_EC_RDAP_INTERNAL_IP_UNSUP;
 		rsm_errf(log_fd, "RDAP \"%s\": IP address(es) of host \"%s\" are not supported by the Probe",
-				base_url, domain_part);
+				base_url, target);
 		goto out;
 	}
 
@@ -4223,7 +4243,7 @@ int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	if (SUCCEED != zbx_validate_ip(ip, ipv4_enabled, ipv6_enabled, NULL, &is_ipv4))
 	{
 		rtt = ZBX_EC_RDAP_INTERNAL_GENERAL;
-		rsm_errf(log_fd, "internal error, selected unsupported IP of \"%s\": \"%s\"", domain_part, ip);
+		rsm_errf(log_fd, "internal error, selected unsupported IP of \"%s\": \"%s\"", target, ip);
 		goto out;
 	}
 
@@ -4235,15 +4255,15 @@ int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	if (0 == is_ipv4)
 	{
 		full_url = zbx_dsprintf(full_url, "%s[%s]:%d%s%s/%s", proto, ip, port, prefix, rdap_prefix,
-				test_domain);
+				testedname);
 	}
 	else
-		full_url = zbx_dsprintf(full_url, "%s%s:%d%s%s/%s", proto, ip, port, prefix, rdap_prefix, test_domain);
+		full_url = zbx_dsprintf(full_url, "%s%s:%d%s%s/%s", proto, ip, port, prefix, rdap_prefix, testedname);
 
 	rsm_infof(log_fd, "the domain in base URL \"%s\" was resolved to %s, using full URL \"%s\".",
 			base_url, ip, full_url);
 
-	if (SUCCEED != zbx_http_test(domain_part, full_url, RSM_TCP_TIMEOUT, maxredirs, &ec_http, &rtt, &data,
+	if (SUCCEED != zbx_http_test(target, full_url, RSM_TCP_TIMEOUT, maxredirs, &ec_http, &rtt, &data,
 			curl_memory, curl_flags, err, sizeof(err)))
 	{
 		rtt = zbx_http_error_to_RDAP(ec_http);
@@ -4267,7 +4287,7 @@ int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 		goto out;
 	}
 
-	if (NULL == value_str || 0 != strcmp(value_str, test_domain))
+	if (NULL == value_str || 0 != strcmp(value_str, testedname))
 	{
 		rtt = ZBX_EC_RDAP_ENAME;
 		rsm_errf(log_fd, "ldhName member doesn't match query in response of \"%s\" (%s)", base_url, ip);
@@ -4285,7 +4305,17 @@ out:
 	{
 		/* set values for RTT and IP */
 		if (NULL != ip)
+		{
 			zbx_add_value_str(&ip_item, item->nextcheck, ip);
+		}
+
+		if (NULL != target)
+		{
+			/* no target in case of "not listed" or "no https" */
+			zbx_add_value_str(&target_item, item->nextcheck, target);
+		}
+
+		zbx_add_value_str(&testedname_item, item->nextcheck, testedname);
 		zbx_add_value_dbl(&rtt_item, item->nextcheck, rtt);
 
 		/* set the value of our item itself */
@@ -4311,7 +4341,7 @@ out:
 	}
 
 	zbx_free(proto);
-	zbx_free(domain_part);
+	zbx_free(target);
 	zbx_free(prefix);
 	zbx_free(full_url);
 	zbx_free(value_str);

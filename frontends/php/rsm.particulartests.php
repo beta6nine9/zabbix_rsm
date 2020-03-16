@@ -523,6 +523,7 @@ if ($data['host'] && $data['time'] && $data['slvItemId'] && $data['type'] !== nu
 		if (!isset($data['tld']['macros'][RSM_RDAP_TLD_ENABLED]) || $data['tld']['macros'][RSM_RDAP_TLD_ENABLED] != 0) {
 			$items_to_check[] = PROBE_RDAP_IP;
 			$items_to_check[] = PROBE_RDAP_RTT;
+			$items_to_check[] = PROBE_RDAP_TESTEDNAME;
 			$probeItemKey[] = 'i.key_ LIKE ('.zbx_dbstr(PROBE_RDAP_ITEM.'%').')';
 		}
 
@@ -546,6 +547,7 @@ if ($data['host'] && $data['time'] && $data['slvItemId'] && $data['type'] !== nu
 		if (!isset($data['tld']['macros'][RSM_TLD_RDDS_ENABLED]) || $data['tld']['macros'][RSM_TLD_RDDS_ENABLED] != 0) {
 			$items_to_check[] = PROBE_RDDS43_IP;
 			$items_to_check[] = PROBE_RDDS43_RTT;
+			$items_to_check[] = PROBE_RDDS43_TESTEDNAME;
 			$items_to_check[] = PROBE_RDDS80_IP;
 			$items_to_check[] = PROBE_RDDS80_RTT;
 			$probeItemKey[] = 'i.key_ LIKE ('.zbx_dbstr(PROBE_RDDS_ITEM.'%').')';

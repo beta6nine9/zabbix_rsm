@@ -5013,6 +5013,22 @@ out:
 	return ret;
 }
 
+static int	DBpatch_3000504(void)
+{
+	DB_RESULT	result = NULL;
+	DB_ROW		row;
+	int		ret = FAIL;
+
+	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
+		return SUCCEED;
+
+	TODO
+
+	ret = SUCCEED;
+out:
+	DBfree_result(result);
+}
+
 #endif
 
 DBPATCH_START(3000)
@@ -5132,5 +5148,6 @@ DBPATCH_ADD(3000501, 0, 0)	/* add macros, items and triggers for Standalone RDAP
 DBPATCH_ADD(3000502, 0, 0)	/* add {$RSM.RDAP.ENABLED} macro on probes */
 DBPATCH_ADD(3000503, 0, 0)	/* replace {$RSM.RDDS.*} with {$RSM.RDAP.*} in rdap[] keys */
 DBPATCH_ADD(3000504, 0, 0)	/* add RDAP-related macros to Global macro history */
+DBPATCH_ADD(3000505, 0, 0)	/* add "RDDS43 Tested name" items and "RDAP Tested name" items */
 
 DBPATCH_END()

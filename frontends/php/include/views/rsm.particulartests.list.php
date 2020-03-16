@@ -58,14 +58,15 @@ elseif ($this->data['type'] == RSM_RDAP) {
 					->setAttribute('style', 'border-left: 0px;')
 				)
 				->addItem((new CTag('th', true, [_('RDAP'), $rdap_base_url]))
-					->setAttribute('colspan', 3)
+					->setAttribute('colspan', 4)
 					->setAttribute('class', 'center')
 				),
 			(new CTag('tr', true))
 				->addItem((new CTag('th', true, _('Status'))))
 				->addItem((new CTag('th', true, _('IP'))))
+				->addItem((new CTag('th', true, _('Tested domain'))))
 				->addItem((new CTag('th', true, _('RTT'))))
-		], 4)
+		], 5)
 		->setAttribute('class', 'list-table table-bordered-head');
 }
 elseif ($this->data['type'] == RSM_RDDS) {
@@ -96,12 +97,13 @@ elseif ($this->data['type'] == RSM_RDDS) {
 
 	$row_1 = (new CTag('tr', true))
 		->addItem((new CTag('th', true, _('Probe ID')))->setAttribute('rowspan', 2)->setAttribute('style', 'border-left: 0px;'))
-		->addItem((new CTag('th', true, [_('RDDS43'), $rdds_43_base_url]))->setAttribute('colspan', 3)->setAttribute('class', 'center'))
+		->addItem((new CTag('th', true, [_('RDDS43'), $rdds_43_base_url]))->setAttribute('colspan', 4)->setAttribute('class', 'center'))
 		->addItem((new CTag('th', true, [_('RDDS80'), $rdds_80_base_url]))->setAttribute('colspan', 3)->setAttribute('class', 'center'));
 
 	$row_2 = (new CTag('tr', true))
 		->addItem((new CTag('th', true, _('Status'))))
 		->addItem((new CTag('th', true, _('IP'))))
+		->addItem((new CTag('th', true, _('Tested domain'))))
 		->addItem((new CTag('th', true, _('RTT'))))
 		->addItem((new CTag('th', true, _('Status'))))
 		->addItem((new CTag('th', true, _('IP'))))
@@ -110,22 +112,24 @@ elseif ($this->data['type'] == RSM_RDDS) {
 	if ($use_rdap) {
 		$row_1->addItem(
 			(new CTag('th', true, [_('RDAP'), $rdap_base_url]))
-				->setAttribute('colspan', 3)
+				->setAttribute('colspan', 4)
 				->setAttribute('class', 'center')
 		);
 
 		$row_2
 			->addItem((new CTag('th', true, _('Status'))))
 			->addItem((new CTag('th', true, _('IP'))))
+			->addItem((new CTag('th', true, _('Tested domain'))))
 			->addItem((new CTag('th', true, _('RTT'))));
 	}
 
-	$column_count = $use_rdap ? 10 : 7;
+	$column_count = $use_rdap ? 12 : 8;
 	$table = (new CTableInfo())
 		->setMultirowHeader([$row_1, $row_2], $column_count)
 		->setAttribute('class', 'list-table table-bordered-head');
 }
 else {
+	// EPP
 	$headers = [
 		_('Probe ID'),
 		_('Row result'),
@@ -455,6 +459,7 @@ foreach ($this->data['probes'] as $probe) {
 			(isset($probe['rdds43']['ip']) && $probe['rdds43']['ip'])
 				? (new CSpan($probe['rdds43']['ip']))->setAttribute('class', $rdds43 === $down ? ZBX_STYLE_RED : ZBX_STYLE_GREEN)
 				: '-',
+			$probe['rdds43']['testedname'],
 			$rdds43_rtt,
 			$rdds80,
 			(isset($probe['rdds80']['ip']) && $probe['rdds80']['ip'])
@@ -519,6 +524,7 @@ foreach ($this->data['probes'] as $probe) {
 		}
 	}
 	else {
+		// EPP
 		$row = [
 			$probe['name'],
 			$epp,

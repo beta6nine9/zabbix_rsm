@@ -1302,6 +1302,18 @@ sub create_items_rdds($)
 			'value_type'   => ITEM_VALUE_TYPE_STR
 		}));
 
+		my $item_key = 'rsm.rdds.43.testedname[{$RSM.TLD}]';
+
+		really(create_item({
+			'name'         => 'RDDS43 Tested name',
+			'key_'         => $item_key,
+			'status'       => ITEM_STATUS_ACTIVE,
+			'hostid'       => $templateid,
+			'applications' => [$applicationid_43],
+			'type'         => ITEM_TYPE_TRAPPER,
+			'value_type'   => ITEM_VALUE_TYPE_STR
+		}));
+
 		$item_key = 'rsm.rdds.43.rtt[{$RSM.TLD}]';
 
 		really(create_item({
