@@ -1302,18 +1302,6 @@ sub create_items_rdds($)
 			'value_type'   => ITEM_VALUE_TYPE_STR
 		}));
 
-		my $item_key = 'rsm.rdds.43.testedname[{$RSM.TLD}]';
-
-		really(create_item({
-			'name'         => 'RDDS43 Tested name',
-			'key_'         => $item_key,
-			'status'       => ITEM_STATUS_ACTIVE,
-			'hostid'       => $templateid,
-			'applications' => [$applicationid_43],
-			'type'         => ITEM_TYPE_TRAPPER,
-			'value_type'   => ITEM_VALUE_TYPE_STR
-		}));
-
 		$item_key = 'rsm.rdds.43.rtt[{$RSM.TLD}]';
 
 		really(create_item({
@@ -1343,6 +1331,26 @@ sub create_items_rdds($)
 			}));
 		}
 
+		really(create_item({
+			'name'         => 'RDDS43 target',
+			'key_'         => 'rsm.rdds.43.target',
+			'status'       => ITEM_STATUS_ACTIVE,
+			'hostid'       => $templateid,
+			'applications' => [$applicationid_43],
+			'type'         => ITEM_TYPE_TRAPPER,
+			'value_type'   => ITEM_VALUE_TYPE_STR
+		}));
+
+		really(create_item({
+			'name'         => 'RDDS43 tested name',
+			'key_'         => 'rsm.rdds.43.testedname',
+			'status'       => ITEM_STATUS_ACTIVE,
+			'hostid'       => $templateid,
+			'applications' => [$applicationid_43],
+			'type'         => ITEM_TYPE_TRAPPER,
+			'value_type'   => ITEM_VALUE_TYPE_STR
+		}));
+
 		$item_key = 'rsm.rdds.80.ip[{$RSM.TLD}]';
 
 		really(create_item({
@@ -1366,6 +1374,16 @@ sub create_items_rdds($)
 			'type'         => ITEM_TYPE_TRAPPER,
 			'value_type'   => ITEM_VALUE_TYPE_FLOAT,
 			'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_rdds_rtt'}
+		}));
+
+		really(create_item({
+			'name'         => 'RDDS80 target',
+			'key_'         => 'rsm.rdds.80.target',
+			'status'       => ITEM_STATUS_ACTIVE,
+			'hostid'       => $templateid,
+			'applications' => [$applicationid_80],
+			'type'         => ITEM_TYPE_TRAPPER,
+			'value_type'   => ITEM_VALUE_TYPE_STR
 		}));
 
 		$item_key = 'rsm.rdds[{$RSM.TLD},"' . getopt('rdds43-servers') . '","' . getopt('rdds80-servers') . '"]';
