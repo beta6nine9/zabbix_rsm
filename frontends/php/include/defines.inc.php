@@ -1443,13 +1443,18 @@ define('PROBE_EPP_INFO',			'rsm.epp.rtt[{$RSM.TLD},info]');
 define('PROBE_EPP_LOGIN',			'rsm.epp.rtt[{$RSM.TLD},login]');
 define('PROBE_RDDS43_IP',			'rsm.rdds.43.ip[{$RSM.TLD}]');
 define('PROBE_RDDS43_RTT',			'rsm.rdds.43.rtt[{$RSM.TLD}]');
+define('PROBE_RDDS43_TARGET',		'rsm.rdds.43.target');
+define('PROBE_RDDS43_TESTEDNAME',	'rsm.rdds.43.testedname');
 define('PROBE_RDDS80_IP',			'rsm.rdds.80.ip[{$RSM.TLD}]');
 define('PROBE_RDDS80_RTT',			'rsm.rdds.80.rtt[{$RSM.TLD}]');
+define('PROBE_RDDS80_TARGET',		'rsm.rdds.80.target');
 //define('PROBE_RDAP_IP',			'rsm.rdds.rdap.ip[{$RSM.TLD}]');  // deprecated
 //define('PROBE_RDAP_RTT',			'rsm.rdds.rdap.rtt[{$RSM.TLD}]'); // deprecated
 define('PROBE_RDAP_ITEM',			'rdap[');
 define('PROBE_RDAP_IP',				'rdap.ip');
 define('PROBE_RDAP_RTT',			'rdap.rtt');
+define('PROBE_RDAP_TARGET',			'rdap.target');
+define('PROBE_RDAP_TESTEDNAME',		'rdap.testedname');
 
 // SLA monitoring NS names
 define('NS_NO_RESULT',	0);
