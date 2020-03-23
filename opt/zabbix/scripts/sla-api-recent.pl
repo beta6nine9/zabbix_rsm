@@ -632,7 +632,7 @@ sub cycles_to_calculate($$$$$$$$)
 
 				if ($lastclock > $lastclock_db)
 				{
-					fail("dimir was wrong, item ($itemid) clock ($lastclock) in cache can be newer than in database ($lastclock_db)");
+					fail("item ($itemid) clock ($lastclock) in cache is newer than in database ($lastclock_db)");
 				}
 			}
 			elsif (ah_get_most_recent_measurement_ts(
@@ -734,7 +734,7 @@ sub get_historical_value_by_time($$)
 
 	$value = $last_value unless (defined($value));
 
-	fail("dimir was wrong: we can have 0 values in RTT LIMIT history") unless (defined($value));
+	fail("there are no values in RTT LIMIT history") unless (defined($value));
 
 	return $value;
 }
@@ -1264,12 +1264,37 @@ sub calculate_cycle($$$$$$$$$)
 
 				next unless ($key_service eq $service);
 
-				fail("dimir was wrong: $service status can be re-defined") if (defined($json->{'status'}));
+				fail("$service status is re-defined (status=$json->{'status'})") if (defined($json->{'status'}));
 
 				if (scalar(@{$values{$itemid}}) != 1)
 				{
-					fail("dimir was wrong: item \"$key\" can contain more than 1 value at ",
-						selected_period($from, $till), ": ", join(',', @{$values{$itemid}}));
+					my $msg = "item \"$key\" contains more than 1 value ".
+						selected_period($from, $till) . ": " . join(',', @{$values{$itemid}}) . "\n";
+
+					my $sql =
+						"select hi.itemid,hi.clock,hi.value,hi.ns".
+						" from history_uint hi,items i,hosts h".
+						" where hi.itemid=i.itemid".
+							" and i.hostid=h.hostid".
+							" and i.key_='$key'".
+							" and h.host='$tld'".
+							" and " . sql_time_condition($from, $till);
+
+					my $rows_ref = db_select($sql);
+
+					$msg .= "SQL: $sql\n";
+					$msg .= "---------------------\n";
+					$msg .= "itemid,clock,value,ns\n";
+					$msg .= "---------------------\n";
+
+					foreach (@{$rows_ref})
+					{
+						$msg .= join(',', @{$_}) . "\n";
+					}
+
+					chomp($msg);
+
+					fail($msg);
 				}
 
 				if ($values{$itemid}->[0] == UP)
@@ -1290,7 +1315,7 @@ sub calculate_cycle($$$$$$$$$)
 				}
 				else
 				{
-					fail("dimir was wrong: item \"$key\" can contain unexpected value \"", $values{$itemid}->[0] , "\"");
+					fail("item \"$key\" ($itemid) contains unexpected value \"", $values{$itemid}->[0] , "\"");
 				}
 			}
 			else

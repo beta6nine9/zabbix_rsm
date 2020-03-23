@@ -2,10 +2,16 @@ package TLDs;
 
 use strict;
 use warnings;
+use RSM;
+use RSMSLV;
 use Zabbix;
 use TLD_constants qw(:general :templates :groups :api :config :tls :items);
 use Data::Dumper;
 use base 'Exporter';
+
+use constant RSMHOST_DNS_NS_LOG_ACTION_CREATE  => 0;
+use constant RSMHOST_DNS_NS_LOG_ACTION_ENABLE  => 1;
+use constant RSMHOST_DNS_NS_LOG_ACTION_DISABLE => 2;
 
 our @EXPORT = qw(zbx_connect check_api_error get_proxies_list
 		get_api_error zbx_need_relogin
@@ -201,7 +207,19 @@ sub update_items_status($$) {
 	my $result;
 
 	foreach my $itemid (@{$items}) {
+		my $rsmhost_dns_ns_log_action;
+
+		my $item = $zabbix->get('item', {'itemids' => [$itemid], 'output' => ['key_', 'status']});
+		if ($item->{'key_'} =~ '^rsm\.slv\.dns\.ns\.downtime\[.*,.*\]$' && $item->{'status'} != $status) {
+			$rsmhost_dns_ns_log_action = RSMHOST_DNS_NS_LOG_ACTION_ENABLE  if $status == 0;
+			$rsmhost_dns_ns_log_action = RSMHOST_DNS_NS_LOG_ACTION_DISABLE if $status == 1;
+		}
+
 		$result->{$itemid} = $zabbix->update('item', {'itemid' => $itemid, 'status' => $status});
+
+		if (defined($rsmhost_dns_ns_log_action)) {
+			rsmhost_dns_ns_log($itemid, $rsmhost_dns_ns_log_action);
+		}
 	}
 
 	return $result;
@@ -432,12 +450,22 @@ sub create_template {
 sub create_item {
     my $options = shift;
     my ($result, $itemid);
+    my $rsmhost_dns_ns_log_action;
 
     if ($itemid = $zabbix->exist('item', {'filter' => {'hostid' => $options->{'hostid'}, 'key_' => $options->{'key_'}}})) {
 	$options->{'itemid'} = $itemid;
+	if ($options->{'key_'} =~ '^rsm\.slv\.dns\.ns\.downtime\[.*,.*\]$') {
+	    if ($zabbix->get('item', {'itemids' => [$itemid], 'output' => ['status']})->{'status'} != ITEM_STATUS_ACTIVE)
+	    {
+		$rsmhost_dns_ns_log_action = RSMHOST_DNS_NS_LOG_ACTION_ENABLE;
+	    }
+	}
 	$result = $zabbix->update('item', $options);
     }
     else {
+	if ($options->{'key_'} =~ '^rsm\.slv\.dns\.ns\.downtime\[.*,.*\]$') {
+	    $rsmhost_dns_ns_log_action = RSMHOST_DNS_NS_LOG_ACTION_CREATE;
+	}
         $result = $zabbix->create('item', $options);
     }
 
@@ -446,6 +474,10 @@ sub create_item {
     $result = ${$result->{'itemids'}}[0] if (defined(${$result->{'itemids'}}[0]));
 
 #    pfail("cannot create item:\n", Dumper($options)) if (ref($result) ne '' or $result eq '');
+
+    if (defined($rsmhost_dns_ns_log_action)) {
+	rsmhost_dns_ns_log($result, $rsmhost_dns_ns_log_action);
+    }
 
     return $result;
 }
@@ -790,92 +822,111 @@ sub set_tld_type($$$) {
 	return true;
 }
 
-sub create_cron_jobs($) {
-    my $slv_path = shift;
+sub __exec($)
+{
+	my $cmd = shift;
 
-    my $errlog = '/var/log/zabbix/rsm.slv.err';
+	my $err = `$cmd 2>&1 1>/dev/null`;
+	chomp($err);
 
-    my $slv_file;
+	pfail($err) unless ($? == 0);
+}
 
-    my $rv = opendir DIR, "/etc/cron.d";
+sub create_cron_jobs($)
+{
+	my $slv_path = shift;
 
-    pfail("cannot open /etc/cron.d") unless ($rv);
+	my $errlog = '/var/log/zabbix/rsm.slv.err';
 
-    # first remove current entries
-    while (($slv_file = readdir DIR))
-    {
-	    next if ($slv_file !~ /^rsm.slv/ && $slv_file !~ /^rsm.probe/);
+	use constant CRON_D_PATH => '/etc/cron.d';
+	my $slv_file;
 
-	    $slv_file = "/etc/cron.d/$slv_file";
+	my $rv = opendir DIR, CRON_D_PATH;
 
-	    system("/bin/rm -f $slv_file");
-    }
+	pfail("cannot open " . CRON_D_PATH) unless ($rv);
 
-    my $avail_shift = 0;
-    my $avail_step = 1;
-    my $avail_limit = 5;
-    my $avail_cur = $avail_shift;
-
-    my $rollweek_shift = 3;
-    my $rollweek_step = 1;
-    my $rollweek_limit = 8;
-    my $rollweek_cur = $rollweek_shift;
-
-    my $downtime_shift = 6;
-    my $downtime_step = 1;
-    my $downtime_limit = 11;
-    my $downtime_cur = $downtime_shift;
-
-    my $rtt_shift = 10;
-    my $rtt_step = 1;
-    my $rtt_limit = 20;
-    my $rtt_cur = $rtt_shift;
-
-    $rv = opendir DIR, $slv_path;
-
-    pfail("cannot open $slv_path") unless ($rv);
-
-    # set up what's needed
-    while (($slv_file = readdir DIR)) {
-	next unless ($slv_file =~ /^rsm\..*\.pl$/);
-
-	my $cron_file = $slv_file;
-	$cron_file =~ s/\./-/g;
-
-	if ($slv_file =~ /\.slv\..*\.rtt\.pl$/)
+	# first remove current entries
+	while (($slv_file = readdir DIR))
 	{
-	    # monthly RTT data
-	    system("echo '* * * * * root sleep $rtt_cur; $slv_path/$slv_file >> $errlog 2>&1' > /etc/cron.d/$cron_file");
-	    $rtt_cur += $rtt_step;
-	    $rtt_cur = $rtt_shift if ($rtt_cur >= $rtt_limit);
+		next if ($slv_file !~ /^rsm.slv/ && $slv_file !~ /^rsm.probe/);
+
+		$slv_file = CRON_D_PATH . "/$slv_file";
+
+		__exec("/bin/rm -f $slv_file");
 	}
-	elsif ($slv_file =~ /\.slv\..*\.downtime\.pl$/)
+
+	my $avail_shift = 0;
+	my $avail_step = 1;
+	my $avail_limit = 5;
+	my $avail_cur = $avail_shift;
+
+	my $rollweek_shift = 3;
+	my $rollweek_step = 1;
+	my $rollweek_limit = 8;
+	my $rollweek_cur = $rollweek_shift;
+
+	my $downtime_shift = 6;
+	my $downtime_step = 1;
+	my $downtime_limit = 11;
+	my $downtime_cur = $downtime_shift;
+
+	my $rtt_shift = 10;
+	my $rtt_step = 1;
+	my $rtt_limit = 20;
+	my $rtt_cur = $rtt_shift;
+
+	$rv = opendir DIR, $slv_path;
+
+	pfail("cannot open $slv_path") unless ($rv);
+
+	# set up what's needed
+	while (($slv_file = readdir DIR))
 	{
-	    # downtime
-	    system("echo '* * * * * root sleep $downtime_cur; $slv_path/$slv_file >> $errlog 2>&1' > /etc/cron.d/$cron_file");
-	    $downtime_cur += $downtime_step;
-	    $downtime_cur = $downtime_shift if ($downtime_cur >= $downtime_limit);
+		next unless ($slv_file =~ /^rsm\..*\.pl$/);
+
+		my $cron_file = $slv_file;
+		$cron_file =~ s/\./-/g;
+
+		my $err;
+
+		if ($slv_file =~ /\.slv\..*\.rtt\.pl$/)
+		{
+			# monthly RTT data
+			pfail($err) if (SUCCESS != write_file(CRON_D_PATH . "/$cron_file", "* * * * * root sleep $rtt_cur; $slv_path/$slv_file >> $errlog 2>&1\n", \$err));
+
+			$rtt_cur += $rtt_step;
+			$rtt_cur = $rtt_shift if ($rtt_cur >= $rtt_limit);
+		}
+		elsif ($slv_file =~ /\.slv\..*\.downtime\.pl$/)
+		{
+			# downtime
+			pfail($err) if (SUCCESS != write_file(CRON_D_PATH . "/$cron_file", "* * * * * root sleep $downtime_cur; $slv_path/$slv_file >> $errlog 2>&1\n", \$err));
+
+			$downtime_cur += $downtime_step;
+			$downtime_cur = $downtime_shift if ($downtime_cur >= $downtime_limit);
+		}
+		elsif ($slv_file =~ /\.slv\..*\.avail\.pl$/)
+		{
+			# service availability
+			pfail($err) if (SUCCESS != write_file(CRON_D_PATH . "/$cron_file", "* * * * * root sleep $avail_cur; $slv_path/$slv_file >> $errlog 2>&1\n", \$err));
+
+			$avail_cur += $avail_step;
+			$avail_cur = $avail_shift if ($avail_cur >= $avail_limit);
+		}
+		elsif ($slv_file =~ /\.slv\..*\.rollweek\.pl$/)
+		{
+			# rolling week
+			pfail($err) if (SUCCESS != write_file(CRON_D_PATH . "/$cron_file", "* * * * * root sleep $rollweek_cur; $slv_path/$slv_file >> $errlog 2>&1\n", \$err));
+
+			$rollweek_cur += $rollweek_step;
+			$rollweek_cur = $rollweek_shift if ($rollweek_cur >= $rollweek_limit);
+		}
+		else
+		{
+			# everything else
+			pfail($err) if (SUCCESS != write_file(CRON_D_PATH . "/$cron_file", "* * * * * root $slv_path/$slv_file >> $errlog 2>&1\n", \$err));
+		}
 	}
-	elsif ($slv_file =~ /\.slv\..*\.avail\.pl$/)
-	{
-	    # service availability
-	    system("echo '* * * * * root sleep $avail_cur; $slv_path/$slv_file >> $errlog 2>&1' > /etc/cron.d/$cron_file");
-	    $avail_cur += $avail_step;
-	    $avail_cur = $avail_shift if ($avail_cur >= $avail_limit);
-	}
-	elsif ($slv_file =~ /\.slv\..*\.rollweek\.pl$/)
-	{
-	    # rolling week
-	    system("echo '* * * * * root sleep $rollweek_cur; $slv_path/$slv_file >> $errlog 2>&1' > /etc/cron.d/$cron_file");
-	    $rollweek_cur += $rollweek_step;
-	    $rollweek_cur = $rollweek_shift if ($rollweek_cur >= $rollweek_limit);
-	}
-	else
-	{
-	    # everything else
-	    system("echo '* * * * * root $slv_path/$slv_file >> $errlog 2>&1' > /etc/cron.d/$cron_file");
-	}
-    }
 }
 
 sub create_probe_health_tmpl()
@@ -928,6 +979,24 @@ sub create_probe_health_tmpl()
 	});
 
 	return $templateid;
+}
+
+sub rsmhost_dns_ns_log($$)
+{
+	my $itemid = shift;
+	my $action = shift;
+
+	my $config = get_rsm_config();
+	set_slv_config($config);
+
+	my $server_key = opt('server-id') ? get_rsm_server_key(getopt('server-id')) : get_rsm_local_key($config);
+
+	my $sql = "insert into rsmhost_dns_ns_log (itemid,clock,action) values (?,?,?)";
+	my $params = [$itemid, time(), $action];
+
+	db_connect($server_key);
+	db_exec($sql, $params);
+	db_disconnect();
 }
 
 sub pfail {

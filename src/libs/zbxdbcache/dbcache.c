@@ -1504,7 +1504,10 @@ static void	dc_add_history_dbl(ZBX_DC_HISTORY *history, int history_num)
 	if (NULL != lastvalue_sql)
 	{
 		DBexecute("insert ignore into lastvalue (itemid,clock,value) values %s"
-				" on duplicate key update clock=values(clock),value=values(value)", lastvalue_sql);
+				" on duplicate key update"
+					" value = if(values(clock) > clock, values(value), value)"
+					",clock = if(values(clock) > clock, values(clock), clock)",
+				lastvalue_sql);
 
 		zbx_free(lastvalue_sql);
 	}
@@ -1553,7 +1556,10 @@ static void	dc_add_history_uint(ZBX_DC_HISTORY *history, int history_num)
 	if (NULL != lastvalue_sql)
 	{
 		DBexecute("insert ignore into lastvalue (itemid,clock,value) values %s"
-				" on duplicate key update clock=values(clock),value=values(value)", lastvalue_sql);
+				" on duplicate key update"
+					" value = if(values(clock) > clock, values(value), value)"
+					",clock = if(values(clock) > clock, values(clock), clock)",
+				lastvalue_sql);
 
 		zbx_free(lastvalue_sql);
 	}
@@ -1602,7 +1608,10 @@ static void	dc_add_history_str(ZBX_DC_HISTORY *history, int history_num)
 	if (NULL != lastvalue_sql)
 	{
 		DBexecute("insert ignore into lastvalue_str (itemid,clock,value) values %s"
-				" on duplicate key update clock=values(clock),value=values(value)", lastvalue_sql);
+				" on duplicate key update"
+					" value = if(values(clock) > clock, values(value), value)"
+					",clock = if(values(clock) > clock, values(clock), clock)",
+				lastvalue_sql);
 
 		zbx_free(lastvalue_sql);
 	}

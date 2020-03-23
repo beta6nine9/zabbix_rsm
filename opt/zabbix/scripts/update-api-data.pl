@@ -21,8 +21,6 @@ use constant JSON_VALUE_ALARMED_YES => 'Yes';
 use constant JSON_VALUE_ALARMED_NO => 'No';
 use constant JSON_VALUE_ALARMED_DISABLED => 'Disabled';
 
-use constant AUDIT_RESOURCE_INCIDENT => 32;
-
 use constant MAX_CONTINUE_PERIOD => 30;	# minutes (NB! make sure to update this number in the help message)
 
 use constant DEFAULT_INCIDENT_MEASUREMENTS_LIMIT => 3600;	# seconds, maximum period back from current time to look
@@ -1003,24 +1001,28 @@ sub __update_false_positives
 
 	# should we update false positiveness later? (incident state file does not exist yet)
 	my $later = 0;
-
+	# select resourceid,details,clock from auditlog where resourcetype=32 and clock>0 order by clock;
 	my $rows_ref = db_select(
-		"select details,max(clock)".
+		"select resourceid,details,clock".
 		" from auditlog".
 		" where resourcetype=".AUDIT_RESOURCE_INCIDENT.
 			" and clock>$last_audit".
-		" group by details");
+		" order by clock");
 
 	foreach my $row_ref (@$rows_ref)
 	{
-		my $details = $row_ref->[0];
-		my $clock = $row_ref->[1];
+		my $eventid = $row_ref->[0];
+		my $details = $row_ref->[1];
+		my $clock = $row_ref->[2];
 
 		# ignore old "details" format (dropped in December 2014)
 		next if ($details =~ '.*Incident \[.*\]');
 
-		my $eventid = $details;
-		$eventid =~ s/^([0-9]+): .*/$1/;
+		if ($eventid == 0)
+		{
+			$eventid = $details;
+			$eventid =~ s/^([0-9]+): .*/$1/;
+		}
 
 		$maxclock = $clock if ($clock > $maxclock);
 

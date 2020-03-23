@@ -1,3 +1,131 @@
+Changes for rsm1.3.0rc16
+
+Bug fixes:
+.......PS. [649] fixed incorrect handling of zero RTT during RDDS43 test (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.3.0rc15
+
+Bug fixes:
+....I..... [622] added missing module in maintenance-api-data.pl (asitals)
+....I..... [620] fixed uninitialized value warning in list-tlds.pl script (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.3.0rc14
+
+Bug fixes:
+........S. [619] updated "insert into history" queries to ignore dupicate entries (asitals)
+....I..... [617] divided long-running queries into thousands of tiny queries in sla-monthly-status.pl to avoid DB connection timeouts (asitals)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.3.0rc13
+
+Bug fixes:
+....I..... [598] added redirection of output of MySQL_part_management.pl script to a logfile (asitals)
+....I..... [528] created tlds-notification.pl scripts for customizing alerts (asitals)
+....I..... [610] improved performance of generating XML reports (asitals)
+....I..... [607] added script for finding gaps (and duplicates, as a side effect) in SLV calculations (asitals)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.3.0rc12
+
+Bug fixes:
+....I..... [575] added script misc/fill-data.pl to fill database with data for Compliance testing (dimir)
+....I..... [586] improved "dimir was wrong" error messages (asitals)
+....I..... [585] added --fill-gap option to SLV scripts (asitals)
+....I..... [587] fixed waiting for data to appear in lastvalue and history tables (asitals)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.3.0rc11
+
+Bug fixes:
+....I..... [580] changed default keep_history from 60 to 75 in MySQL partitioning script (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.3.0rc10
+
+Bug fixes:
+....I..... [568] added code to ignore rmshosts added during previous month when generating monthly alerts and reports, wait until history syncers on Zabbix Server store pushed data into DB before exiting (asitals)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.3.0rc9
+
+Bug fixes:
+....I..... [sub-576] fixed function call unset_log_tld() (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.3.0rc8
+
+Bug fixes:
+....I..... [sub-576] removed debug print when setting TLD prefix of SLV logs (dimir)
+....I..... [577] added printing error message from sla-report.php when generating reports from Perl scripts (asitals)
+....I..... [573] always send ratio of failed rtts (asitals)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.3.0rc7
+
+Bug fixes:
+....I..... [572] fixed SQL error when no TLDs present in the system (dimir)
+
+New features:
+....I..... [576] added TLD prefix to SLV logs (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.3.0rc6
+
+New features:
+....I..... [538] generate recent measurement files only once, after service availability is calculated; drop monitoring data from proxy that is over 90 seconds old (dimir)
+..F....... [569] added displaying of disabled services in gray color to SLA Reports page (dimir, gcalenko)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.3.0rc5
+
+Bug fixes:
+....I...S. [sub-567] fixed SQL query that updates lastvalue table (asitals, dimir)
+....I...S. [sub-564] fixed DB patch (asitals)
+....I...S. [sub-530] fixed DB patch (asitals)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.3.0rc4
+
+Bug fixes:
+........S. [567] added value timestamp checking when updating lastvalue and lastvalue_str tables (asitals, dimir)
+....I..... [564] fixed delta field for 'rsm.slv.%.rtt.%' items (asitals)
+....I..... [sub-516] added code to fail downtime SLV scripts while regenerating history because of false positives if DB was recreated, but state files were not deleted (asitals)
+....I..... [475] added code to no fail DNS RTT calculations when there are no items with IPv4 or IPv6 nameservers (asitals)
+....I..... [530] fixed storing data into rsmhost_dns_ns_log when tld.pl is called with --server-id, removed debug output (asitals)
+....I..... [552] added code to keep rdds.enabled item enabled when disabling rdds service (asitals)
+....I..... [473] added code to ignore disabled nameservers when calculating dns.ns.avail and dns.ns.downtime (asitals)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.3.0rc3
+
+Bug fixes:
+..F.I..... [530] fixed "from" and "to" Name Server values in SLA report, fixed XML report generation for disabled (and being disabled) TLDs (asitals, gcalenko, miks)
+....I..... [531] reset "DNS service was unavailable for at least 1m" triggers when month switches (asitals)
+....I..... [528] removed trailing spaces from "Ratio of failed monthly RDDS queries" item names (asitals)
+....I..... [533] added default arguments for sla-report.php; added monthly cronjob for sla-report.php (asitals)
+....I..... [516] fixed recalculating history after marking/unmarking incidents as false positive; added recalculation of DNS name server downtimes (asitals)
+..F....... [532] fixed date and time format in SLA report page, incorrect label formatting in incidents page and default value of selected hostids in latest data page (miks)
+..F....... [534] fixed reset button; made filter values to be stored in user profile (miks)
+..F....... [529] fixed coloring on SLA report page (miks)
+....I..... [527] fixed quoting arguments when calling script.py; fixed cron job that calls sla-monthly-status.pl (asitals)
+....I..... [525] fixed error reporting when disabling TLD with tld.pl (asitals)
+....I..... [526] added SLV items when adding new NS,IP pair with tld.pl --update-nsservers (asitals)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.3.0rc2
+
+Bug fixes:
+..F....... [517] deleted "From" and "To" fields where unneeded (miks)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.3.0rc1
+
+New features:
+..F.I..... [170] added support for Compliance SLA monitoring (dimir, yurii, asitals, miks, gcalenko)
+
+--------------------------------------------------------------------------------
 Changes for rsm1.2.15
 
 Bug fixes:
@@ -116,7 +244,7 @@ rsm1.2.0rc15 was released as rsm1.2.0 without any changes
 Changes for rsm1.2.0rc15
 
 Bug fixes:
-....I..... [493] fix handling of negative RTT without IP in recent measurements (dimir)
+....I..... [493] fixed handling of negative RTT without IP in recent measurements (dimir)
 
 --------------------------------------------------------------------------------
 Changes for rsm1.2.0rc14

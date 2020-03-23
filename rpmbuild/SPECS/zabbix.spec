@@ -108,6 +108,9 @@ Requires(preun):	/sbin/service
 Requires(postun):	/sbin/service
 %endif
 Requires:		ldns >= 1.6.17
+Requires:		perl-Data-Dumper
+Requires:		perl-DBD-MySQL
+Requires:		perl-Devel-StackTrace
 Provides:		zabbix-server = %{version}-%{release}
 Provides:		zabbix-server-implementation = %{version}-%{release}
 Obsoletes:		zabbix
@@ -193,6 +196,8 @@ Requires:			perl-Redis, perl-File-Pid, perl-DateTime-Format-RFC3339
 Requires:			perl-Text-CSV_XS, perl-Types-Serialiser
 Requires:			perl-Path-Tiny
 Requires:			perl-Parallel-ForkManager
+Requires:			perl-Devel-StackTrace
+Requires:			php-cli php-pdo php-mysqlnd php-xml
 %endif
 AutoReq:			no
 
@@ -301,6 +306,7 @@ mkdir $RPM_BUILD_ROOT%{_libdir}/zabbix/modules
 # install frontend files
 find frontends/php -name '*.orig' | xargs rm -f
 cp -a frontends/php/* $RPM_BUILD_ROOT%{_datadir}/zabbix
+cp opt/zabbix/scripts/CSlaReport.php $RPM_BUILD_ROOT%{_datadir}/zabbix/include/classes/services/CSlaReport.php
 mkdir -p $RPM_BUILD_ROOT%{_sharedstatedir}/php/session
 
 # install frontend configuration files
@@ -366,12 +372,13 @@ install -Dm 0644 -p %{SOURCE15} $RPM_BUILD_ROOT%{_prefix}/lib/tmpfiles.d/zabbix-
 # Install policy modules
 %_format MODULES selinux/$x.pp.bz2
 echo $MODULES
-install -d %{buildroot}%{_datadir}/selinux/packages
+install -d $RPM_BUILD_ROOT%{_datadir}/selinux/packages
 install -m 0644 $MODULES \
-    %{buildroot}%{_datadir}/selinux/packages
+    $RPM_BUILD_ROOT%{_datadir}/selinux/packages
 
-install -d %{buildroot}/opt/zabbix/
-cp -r opt/zabbix/* %{buildroot}/opt/zabbix/
+install -d $RPM_BUILD_ROOT/opt/zabbix
+install -d $RPM_BUILD_ROOT/opt/zabbix/data
+cp -r opt/zabbix/* $RPM_BUILD_ROOT/opt/zabbix/
 
 install -d $RPM_BUILD_ROOT%{_sysconfdir}/cron.d/
 cp -r cron.d/* $RPM_BUILD_ROOT%{_sysconfdir}/cron.d/

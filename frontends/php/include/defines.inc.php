@@ -22,7 +22,7 @@
 define('ZABBIX_VERSION',		'3.0.10');
 define('ZABBIX_API_VERSION',	'3.0.10');
 define('ZABBIX_EXPORT_VERSION',	'3.0');
-define('ZABBIX_DB_VERSION',		3000133);
+define('ZABBIX_DB_VERSION',		3000323);
 
 define('ZABBIX_COPYRIGHT_FROM',	'2001');
 define('ZABBIX_COPYRIGHT_TO',	'2017');
@@ -1278,8 +1278,6 @@ define('RSM_RDDS',			2);
 define('RSM_EPP',			3);
 
 // SLA monitoring macros
-define('RSM_SLV_MACRO_DNS_AVAIL',	'{$RSM.SLV.DNS.AVAIL}');
-define('RSM_SLV_MACRO_RDDS_AVAIL',	'{$RSM.SLV.RDDS.AVAIL}');
 define('RSM_SLV_MACRO_EPP_AVAIL',	'{$RSM.SLV.EPP.AVAIL}');
 define('RSM_PAGE_SLV',				'{$RSM.ROLLWEEK.THRESHOLDS}');
 define('RSM_ROLLWEEK_SECONDS',		'{$RSM.ROLLWEEK.SECONDS}');
@@ -1294,15 +1292,8 @@ define('RSM_TLD_RDDS43_ENABLED',	'{$RSM.TLD.RDDS43.ENABLED}');
 define('RSM_TLD_RDDS80_ENABLED',	'{$RSM.TLD.RDDS80.ENABLED}');
 define('RSM_RDAP_TLD_ENABLED',		'{$RDAP.TLD.ENABLED}');
 define('RSM_TLD_RDAP_ENABLED',		'{$RSM.TLD.RDAP.ENABLED}');
-define('RSM_SLV_NS_AVAIL',			'{$RSM.SLV.NS.AVAIL}');
-define('RSM_SLV_DNS_TCP_RTT',		'{$RSM.SLV.DNS.TCP.RTT}');
-define('RSM_DNS_TCP_RTT_LOW',		'{$RSM.DNS.TCP.RTT.LOW}');
-define('RSM_SLV_DNS_UDP_RTT',		'{$RSM.SLV.DNS.UDP.RTT}');
-define('RSM_DNS_UDP_RTT_LOW',		'{$RSM.DNS.UDP.RTT.LOW}');
 define('RSM_SLV_DNS_NS_UPD',		'{$RSM.SLV.DNS.NS.UPD}');
 define('RSM_DNS_UPDATE_TIME',		'{$RSM.DNS.UPDATE.TIME}');
-define('RSM_SLV_RDDS_UPD',			'{$RSM.SLV.RDDS.UPD}');
-define('RSM_RDDS_UPDATE_TIME',		'{$RSM.RDDS.UPDATE.TIME}');
 define('RSM_SLV_EPP_LOGIN',			'{$RSM.SLV.EPP.LOGIN}');
 define('RSM_EPP_LOGIN_RTT_LOW',		'{$RSM.EPP.LOGIN.RTT.LOW}');
 define('RSM_SLV_EPP_INFO',			'{$RSM.SLV.EPP.INFO}');
@@ -1321,7 +1312,6 @@ define('RSM_SLV_EPP_ROLLWEEK',		'rsm.slv.epp.rollweek');
 
 // SLA monitoring availability items keys
 define('RSM_SLV_DNS_AVAIL',					'rsm.slv.dns.avail');
-define('RSM_SLV_DNS_DOWNTIME',				'rsm.slv.dns.downtime');
 define('RSM_SLV_DNS_NS_DOWNTIME',			'rsm.slv.dns.ns.downtime');
 define('RSM_SLV_DNS_TCP_RTT_PFAILED',		'rsm.slv.dns.tcp.rtt.pfailed');
 define('RSM_SLV_DNS_TCP_RTT_FAILED',		'rsm.slv.dns.tcp.rtt.failed');
@@ -1333,7 +1323,7 @@ define('RSM_SLV_DNS_UDP_UPD_PFAILED',		'rsm.slv.dns.udp.upd.pfailed');
 define('RSM_SLV_DNS_UDP_UPD_FAILED',		'rsm.slv.dns.udp.upd.failed');
 define('RSM_SLV_DNS_UDP_UPD_MAX',			'rsm.slv.dns.udp.upd.max');
 define('RSM_SLV_RDDS_DOWNTIME',				'rsm.slv.rdds.downtime');
-define('RSM_SLV_RDDS_UPD_PFAILED',			'rsm.slv.rdds.upd.pfailed');
+define('RSM_SLV_RDDS_RTT_PFAILED',			'rsm.slv.rdds.rtt.pfailed');
 define('RSM_SLV_RDDS_UPD_FAILED',			'rsm.slv.rdds.upd.failed');
 define('RSM_SLV_RDDS_UPD_MAX',				'rsm.slv.rdds.upd.max');
 define('RSM_SLV_EPP_DOWNTIME',				'rsm.slv.epp.downtime');
@@ -1349,7 +1339,6 @@ define('RSM_SLV_EPP_RTT_UPDATE_MAX',		'rsm.slv.epp.rtt.update.max');
 define('RSM_SLV_RDDS_AVAIL',				'rsm.slv.rdds.avail');
 define('RSM_SLV_EPP_AVAIL',					'rsm.slv.epp.avail');
 define('RSM_SLV_DNSSEC_AVAIL',				'rsm.slv.dnssec.avail');
-define('RSM_SLV_RDDS_RTT',					'rsm.slv.rdds.rtt.pfailed');
 
 // "RSM Service Availability" value mapping:
 define('DOWN',	0);	// Down
@@ -1414,7 +1403,7 @@ define('CALCULATED_ITEM_DNS_UDP_RTT_HIGH',		'rsm.configvalue[RSM.DNS.UDP.RTT.HIG
 define('CALCULATED_ITEM_SLV_DNS_NS_RTT_UDP',	'rsm.configvalue[RSM.SLV.DNS.UDP.RTT]');
 define('CALCULATED_ITEM_SLV_DNS_NS_RTT_TCP',	'rsm.configvalue[RSM.SLV.DNS.TCP.RTT]');
 define('CALCULATED_ITEM_SLV_DNS_NS_UPD',		'rsm.configvalue[RSM.SLV.DNS.NS.UPD]');
-define('CALCULATED_ITEM_SLV_DNS_NS',			'rsm.configvalue[RSM.SLV.NS.AVAIL]');
+define('CALCULATED_ITEM_SLV_DNS_NS',			'rsm.configvalue[RSM.SLV.NS.DOWNTIME]');
 define('CALCULATED_ITEM_SLV_RDDS43_RTT',		'rsm.configvalue[RSM.SLV.RDDS43.RTT]');
 define('CALCULATED_ITEM_SLV_RDDS80_RTT',		'rsm.configvalue[RSM.SLV.RDDS80.RTT]');
 define('CALCULATED_ITEM_SLV_RDDS_UPD',			'rsm.configvalue[RSM.SLV.RDDS.UPD]');
@@ -1462,21 +1451,6 @@ define('PROBE_UP',		1);
 // NameServer status
 define('NAMESERVER_DOWN',	0);
 define('NAMESERVER_UP',		1);
-
-// SLA monitoring monthly reports item
-define('MONTHLY_REPORTS_APPLICATION',	'SLV monthly');
-
-// SLA monitoring monthly reports item keys
-define('MONTHLY_REPORTS_DNS_NS_RTT_UDP',	'rsm.slv.dns.ns.rtt.udp.month');
-define('MONTHLY_REPORTS_DNS_NS_RTT_TCP',	'rsm.slv.dns.ns.rtt.tcp.month');
-define('MONTHLY_REPORTS_DNS_NS_UPD',		'rsm.slv.dns.ns.upd.month');
-define('MONTHLY_REPORTS_DNS_NS',			'rsm.slv.dns.ns.month');
-define('MONTHLY_REPORTS_RDDS43_RTT',		'rsm.slv.rdds.43.rtt.month');
-define('MONTHLY_REPORTS_RDDS80_RTT',		'rsm.slv.rdds.80.rtt.month');
-define('MONTHLY_REPORTS_RDDS_UPD',			'rsm.slv.rdds.upd.month');
-define('MONTHLY_REPORTS_EPP_INFO',			'rsm.slv.epp.rtt.info.month');
-define('MONTHLY_REPORTS_EPP_LOGIN',			'rsm.slv.epp.rtt.login.month');
-define('MONTHLY_REPORTS_EPP_UPDATE',		'rsm.slv.epp.rtt.update.month');
 
 // SLA monitoring "rsm" host name
 define('RSM_HOST',	'Global macro history');

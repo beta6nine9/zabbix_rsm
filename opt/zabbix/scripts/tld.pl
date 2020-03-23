@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # - DNS availability test		(data collection)	rsm.dns.udp			(simple, every minute)
-#								rsm.dns.tcp			(simple, every 50 minutes)
+#								rsm.dns.tcp			(simple, every 60 minutes)
 #								rsm.dns.udp.rtt			(trapper, Proxy)
 #								rsm.dns.tcp.rtt			-|-
 #								rsm.dns.udp.upd			-|-
@@ -77,7 +77,7 @@ sub get_tld_list();
 sub get_services($);
 sub set_linked_items_enabled($$$);
 
-my $trigger_rollweek_thresholds = rsm_trigger_rollweek_thresholds;
+my $trigger_thresholds = rsm_trigger_thresholds;
 
 my $cfg_global_macros = cfg_global_macros;
 
@@ -125,6 +125,9 @@ my $rv = GetOptions(\%OPTS,
 		    "verbose!",
 		    "quiet!",
 		    "help|?");
+
+setopt('server-id', $OPTS{'server-id'}) if (defined($OPTS{'server-id'}));
+setopt('nolog');
 
 __usage() if ($OPTS{'help'} or not $rv);
 
@@ -203,7 +206,7 @@ if (defined($OPTS{'set-type'})) {
 #### Manage NS + IP server pairs ####
 if (defined($OPTS{'get-nsservers-list'}))
 {
-	# all fiels in a CSV must be double-quoted, even if empty
+	# all fields in a CSV must be double-quoted, even if empty
 	my $csv = Text::CSV_XS->new({binary => 1, auto_diag => 1, always_quote => 1, eol => "\n"});
 
 	my @tlds = ($OPTS{'tld'} // get_tld_list());
@@ -250,7 +253,7 @@ if (defined($OPTS{'list-services'}))
 
 	my @rows = ();
 
-	# all fiels in a CSV must be double-quoted, even if empty
+	# all fields in a CSV must be double-quoted, even if empty
 	my $csv = Text::CSV_XS->new({binary => 1, auto_diag => 1, always_quote => 1, eol => "\n"});
 
 	foreach my $tld (sort(@tlds))
@@ -1077,187 +1080,154 @@ sub create_main_template {
     return $templateid;
 }
 
-sub create_all_slv_ns_items {
-    my $ns_name = shift;
-    my $ip = shift;
-    my $hostid = shift;
-
-    create_slv_item('% of successful monthly DNS resolution RTT (UDP): $1 ($2)', 'rsm.slv.dns.ns.rtt.udp.month['.$ns_name.','.$ip.']', $hostid, VALUE_TYPE_PERC, [get_application_id(APP_SLV_MONTHLY, $hostid)]);
-    create_slv_item('% of successful monthly DNS resolution RTT (TCP): $1 ($2)', 'rsm.slv.dns.ns.rtt.tcp.month['.$ns_name.','.$ip.']', $hostid, VALUE_TYPE_PERC, [get_application_id(APP_SLV_MONTHLY, $hostid)]);
-    create_slv_item('% of successful monthly DNS update time: $1 ($2)', 'rsm.slv.dns.ns.upd.month['.$ns_name.','.$ip.']', $hostid, VALUE_TYPE_PERC, [get_application_id(APP_SLV_MONTHLY, $hostid)]) if (defined($OPTS{'epp-servers'}));
-    create_slv_item('DNS NS availability: $1 ($2)', 'rsm.slv.dns.ns.avail['.$ns_name.','.$ip.']', $hostid, VALUE_TYPE_AVAIL, [get_application_id(APP_SLV_PARTTEST, $hostid)]);
-    create_slv_item('DNS NS minutes of downtime: $1 ($2)', 'rsm.slv.dns.ns.downtime['.$ns_name.','.$ip.']', $hostid, VALUE_TYPE_NUM, [get_application_id(APP_SLV_CURMON, $hostid)]);
-    create_slv_item('DNS NS probes that returned results: $1 ($2)', 'rsm.slv.dns.ns.results['.$ns_name.','.$ip.']', $hostid, VALUE_TYPE_NUM, [get_application_id(APP_SLV_CURMON, $hostid)]);
-    create_slv_item('DNS NS probes that returned positive results: $1 ($2)', 'rsm.slv.dns.ns.positive['.$ns_name.','.$ip.']', $hostid, VALUE_TYPE_NUM, [get_application_id(APP_SLV_CURMON, $hostid)]);
-    create_slv_item('DNS NS positive results by SLA: $1 ($2)', 'rsm.slv.dns.ns.sla['.$ns_name.','.$ip.']', $hostid, VALUE_TYPE_NUM, [get_application_id(APP_SLV_CURMON, $hostid)]);
-    create_slv_item('% of monthly DNS NS availability: $1 ($2)', 'rsm.slv.dns.ns.month['.$ns_name.','.$ip.']', $hostid, VALUE_TYPE_PERC, [get_application_id(APP_SLV_MONTHLY, $hostid)]);
-}
-
-sub create_slv_ns_items {
-    my $ns_servers = shift;
-    my $hostid = shift;
-
-    foreach my $ns_name (sort keys %{$ns_servers}) {
-        my @ipv4 = defined($ns_servers->{$ns_name}{'v4'}) ? @{$ns_servers->{$ns_name}{'v4'}} : undef;
-	my @ipv6 = defined($ns_servers->{$ns_name}{'v6'}) ? @{$ns_servers->{$ns_name}{'v6'}} : undef;
-
-        foreach (my $i_ipv4 = 0; $i_ipv4 <= $#ipv4; $i_ipv4++) {
-	    next unless defined $ipv4[$i_ipv4];
-
-# DNS NS are not currently used
-#	    create_all_slv_ns_items($ns_name, $ipv4[$i_ipv4], $hostid);
-        }
-
-	foreach (my $i_ipv6 = 0; $i_ipv6 <= $#ipv6; $i_ipv6++) {
-	    next unless defined $ipv6[$i_ipv6];
-
-# DNS NS are not currently used
-#	    create_all_slv_ns_items($ns_name, $ipv6[$i_ipv6], $hostid);
-        }
-    }
-}
-
-sub has_rdds
+sub create_dependent_trigger_chain($$$$)
 {
-	return (defined($OPTS{'rdds43-servers'}) || defined($OPTS{'rdap-base-url'}));
+	my $host_name = shift;
+	my $service_or_nsip = shift;
+	my $fun = shift;
+	my $thresholds_ref = shift;
+
+	my $depend_down;
+	my $created;
+
+	foreach my $k (sort keys %{$thresholds_ref})
+	{
+		my $threshold = $thresholds_ref->{$k}->{'threshold'};
+		my $priority = $thresholds_ref->{$k}->{'priority'};
+		next if ($threshold eq 0);
+
+		my $result = &$fun($service_or_nsip, $host_name, $threshold, $priority, \$created);
+
+		my $triggerid = $result->{'triggerids'}[0];
+
+		if ($created && defined($depend_down))
+		{
+			add_dependency($triggerid, $depend_down);
+		}
+
+		$depend_down = $triggerid;
+	}
 }
 
-sub create_slv_items {
-    my $ns_servers = shift;
-    my $hostid = shift;
-    my $host_name = shift;
+sub create_all_slv_ns_items($$$$)
+{
+	my $ns_name = shift;
+	my $ip = shift;
+	my $hostid = shift;
+	my $host_name = shift;
 
-    create_slv_ns_items($ns_servers, $hostid);
+	create_slv_item("DNS NS $ns_name ($ip) availability", "rsm.slv.dns.ns.avail[$ns_name,$ip]",
+			$hostid, VALUE_TYPE_AVAIL, [get_application_id(APP_SLV_PARTTEST, $hostid)]);
 
-    create_slv_item('DNS availability', 'rsm.slv.dns.avail', $hostid, VALUE_TYPE_AVAIL, [get_application_id(APP_SLV_PARTTEST, $hostid)]);
-    create_slv_item('DNS minutes of downtime', 'rsm.slv.dns.downtime', $hostid, VALUE_TYPE_NUM, [get_application_id(APP_SLV_CURMON, $hostid)]);
+	create_slv_item("DNS minutes of $ns_name ($ip) downtime", "rsm.slv.dns.ns.downtime[$ns_name,$ip]",
+			$hostid, VALUE_TYPE_NUM, [get_application_id(APP_SLV_CURMON, $hostid)]);
 
-    my $options;
+	create_dependent_trigger_chain($host_name, "$ns_name,$ip", \&create_dns_ns_downtime_trigger, $trigger_thresholds);
 
-    create_avail_trigger('DNS', $host_name);
+# 	create_slv_item('% of successful monthly DNS resolution RTT (UDP): $1 ($2)', 'rsm.slv.dns.ns.rtt.udp.month['.$ns_name.','.$ip.']', $hostid, VALUE_TYPE_PERC, [get_application_id(APP_SLV_MONTHLY, $hostid)]);
+# 	create_slv_item('% of successful monthly DNS resolution RTT (TCP): $1 ($2)', 'rsm.slv.dns.ns.rtt.tcp.month['.$ns_name.','.$ip.']', $hostid, VALUE_TYPE_PERC, [get_application_id(APP_SLV_MONTHLY, $hostid)]);
+# 	create_slv_item('% of successful monthly DNS update time: $1 ($2)', 'rsm.slv.dns.ns.upd.month['.$ns_name.','.$ip.']', $hostid, VALUE_TYPE_PERC, [get_application_id(APP_SLV_MONTHLY, $hostid)]) if (defined($OPTS{'epp-servers'}));
+# 	create_slv_item('DNS NS availability: $1 ($2)', 'rsm.slv.dns.ns.avail['.$ns_name.','.$ip.']', $hostid, VALUE_TYPE_AVAIL, [get_application_id(APP_SLV_PARTTEST, $hostid)]);
+# 	create_slv_item('DNS NS minutes of downtime: $1 ($2)', 'rsm.slv.dns.ns.downtime['.$ns_name.','.$ip.']', $hostid, VALUE_TYPE_NUM, [get_application_id(APP_SLV_CURMON, $hostid)]);
+# 	create_slv_item('DNS NS probes that returned results: $1 ($2)', 'rsm.slv.dns.ns.results['.$ns_name.','.$ip.']', $hostid, VALUE_TYPE_NUM, [get_application_id(APP_SLV_CURMON, $hostid)]);
+# 	create_slv_item('DNS NS probes that returned positive results: $1 ($2)', 'rsm.slv.dns.ns.positive['.$ns_name.','.$ip.']', $hostid, VALUE_TYPE_NUM, [get_application_id(APP_SLV_CURMON, $hostid)]);
+# 	create_slv_item('DNS NS positive results by SLA: $1 ($2)', 'rsm.slv.dns.ns.sla['.$ns_name.','.$ip.']', $hostid, VALUE_TYPE_NUM, [get_application_id(APP_SLV_CURMON, $hostid)]);
+# 	create_slv_item('% of monthly DNS NS availability: $1 ($2)', 'rsm.slv.dns.ns.month['.$ns_name.','.$ip.']', $hostid, VALUE_TYPE_PERC, [get_application_id(APP_SLV_MONTHLY, $hostid)]);
+}
 
-    create_slv_item('DNS weekly unavailability', 'rsm.slv.dns.rollweek', $hostid, VALUE_TYPE_PERC, [get_application_id(APP_SLV_ROLLWEEK, $hostid)]);
+sub create_slv_ns_items($$$)
+{
+	my $ns_servers = shift;
+	my $hostid = shift;
+	my $host_name = shift;
 
-    my $depend_down;
-    my $created;
+	foreach my $ns_name (sort keys %{$ns_servers})
+	{
+		my @ipv4 = defined($ns_servers->{$ns_name}{'v4'}) ? @{$ns_servers->{$ns_name}{'v4'}} : undef;
+		my @ipv6 = defined($ns_servers->{$ns_name}{'v6'}) ? @{$ns_servers->{$ns_name}{'v6'}} : undef;
 
-    foreach my $position (sort keys %{$trigger_rollweek_thresholds}) {
-	my $threshold = $trigger_rollweek_thresholds->{$position}->{'threshold'};
-	my $priority = $trigger_rollweek_thresholds->{$position}->{'priority'};
-        next if ($threshold eq 0);
+		foreach (my $i_ipv4 = 0; $i_ipv4 <= $#ipv4; $i_ipv4++)
+		{
+			next unless defined $ipv4[$i_ipv4];
 
-        my $result = create_rollweek_trigger('DNS', $host_name, $threshold, $priority, \$created);
+			# DNS NS are not currently used
+			create_all_slv_ns_items($ns_name, $ipv4[$i_ipv4], $hostid, $host_name);
+		}
 
-	my $triggerid = $result->{'triggerids'}[0];
+		foreach (my $i_ipv6 = 0; $i_ipv6 <= $#ipv6; $i_ipv6++)
+		{
+			next unless defined $ipv6[$i_ipv6];
 
-        if ($created && defined($depend_down)) {
-            add_dependency($triggerid, $depend_down);
-        }
+			# DNS NS are not currently used
+			create_all_slv_ns_items($ns_name, $ipv6[$i_ipv6], $hostid, $host_name);
+		}
+	}
+}
 
-        $depend_down = $triggerid;
-    }
+sub create_slv_items($$$)
+{
+	my $ns_servers = shift;
+	my $hostid = shift;
+	my $host_name = shift;
 
-    undef($depend_down);
+	create_slv_ns_items($ns_servers, $hostid, $host_name);
 
-    if (defined($OPTS{'dnssec'})) {
-	create_slv_item('DNSSEC availability', 'rsm.slv.dnssec.avail', $hostid, VALUE_TYPE_AVAIL, [get_application_id(APP_SLV_PARTTEST, $hostid)]);
+	create_slv_item('DNS availability', 'rsm.slv.dns.avail', $hostid, VALUE_TYPE_AVAIL, [get_application_id(APP_SLV_PARTTEST, $hostid)]);
+	create_slv_item('DNS minutes of downtime', 'rsm.slv.dns.downtime', $hostid, VALUE_TYPE_NUM, [get_application_id(APP_SLV_CURMON, $hostid)]);
+	create_slv_item('DNS weekly unavailability', 'rsm.slv.dns.rollweek', $hostid, VALUE_TYPE_PERC, [get_application_id(APP_SLV_ROLLWEEK, $hostid)]);
 
-	create_avail_trigger('DNSSEC', $host_name);
+	create_avail_trigger('DNS', $host_name);
+	create_dns_downtime_trigger($host_name, 5);
+	create_dependent_trigger_chain($host_name, 'DNS', \&create_rollweek_trigger, $trigger_thresholds);
 
-	create_slv_item('DNSSEC weekly unavailability', 'rsm.slv.dnssec.rollweek', $hostid, VALUE_TYPE_PERC, [get_application_id(APP_SLV_ROLLWEEK, $hostid)]);
+	if (defined($OPTS{'dnssec'}))
+	{
+		create_slv_item('DNSSEC availability', 'rsm.slv.dnssec.avail', $hostid, VALUE_TYPE_AVAIL, [get_application_id(APP_SLV_PARTTEST, $hostid)]);
+		create_slv_item('DNSSEC weekly unavailability', 'rsm.slv.dnssec.rollweek', $hostid, VALUE_TYPE_PERC, [get_application_id(APP_SLV_ROLLWEEK, $hostid)]);
 
-        my $depend_down;
-	my $created;
+		create_avail_trigger('DNSSEC', $host_name);
+		create_dependent_trigger_chain($host_name, 'DNSSEC', \&create_rollweek_trigger, $trigger_thresholds);
+	}
 
-	foreach my $position (sort keys %{$trigger_rollweek_thresholds}) {
-    	    my $threshold = $trigger_rollweek_thresholds->{$position}->{'threshold'};
-    	    my $priority = $trigger_rollweek_thresholds->{$position}->{'priority'};
-    	    next if ($threshold eq 0);
+	if (defined($OPTS{'rdds43-servers'}) || defined($OPTS{'rdap-base-url'}))
+	{
+		create_slv_item('RDDS availability', 'rsm.slv.rdds.avail', $hostid, VALUE_TYPE_AVAIL, [get_application_id(APP_SLV_PARTTEST, $hostid)]);
+		create_slv_item('RDDS minutes of downtime', 'rsm.slv.rdds.downtime', $hostid, VALUE_TYPE_NUM, [get_application_id(APP_SLV_CURMON, $hostid)]);
+		create_slv_item('RDDS weekly unavailability', 'rsm.slv.rdds.rollweek', $hostid, VALUE_TYPE_PERC, [get_application_id(APP_SLV_ROLLWEEK, $hostid)]);
 
-	    my $result = create_rollweek_trigger('DNSSEC', $host_name, $threshold, $priority, \$created);
+		create_avail_trigger('RDDS', $host_name);
+		create_dependent_trigger_chain($host_name, 'RDDS', \&create_downtime_trigger, $trigger_thresholds);
+		create_dependent_trigger_chain($host_name, 'RDDS', \&create_rollweek_trigger, $trigger_thresholds);
+	}
 
-    	    my $triggerid = $result->{'triggerids'}[0];
+	if (defined($OPTS{'epp-servers'}))
+	{
+		create_slv_item('EPP availability', 'rsm.slv.epp.avail', $hostid, VALUE_TYPE_AVAIL, [get_application_id(APP_SLV_PARTTEST, $hostid)]);
+		create_slv_item('EPP minutes of downtime', 'rsm.slv.epp.downtime', $hostid, VALUE_TYPE_NUM, [get_application_id(APP_SLV_CURMON, $hostid)]);
+		create_slv_item('EPP weekly unavailability', 'rsm.slv.epp.rollweek', $hostid, VALUE_TYPE_PERC, [get_application_id(APP_SLV_ROLLWEEK, $hostid)]);
 
-	    if ($created && defined($depend_down)) {
-    	        add_dependency($triggerid, $depend_down);
-    	    }
+		create_avail_trigger('EPP', $host_name);
+# 		create_dependent_trigger_chain($host_name, 'EPP', \&create_downtime_trigger, $trigger_thresholds);
+	}
 
-    	    $depend_down = $triggerid;
-        }
+	create_slv_item('Number of performed monthly DNS UDP tests', 'rsm.slv.dns.udp.rtt.performed', $hostid, VALUE_TYPE_NUM , [get_application_id(APP_SLV_CURMON, $hostid)]);
+	create_slv_item('Number of failed monthly DNS UDP tests'   , 'rsm.slv.dns.udp.rtt.failed'   , $hostid, VALUE_TYPE_NUM , [get_application_id(APP_SLV_CURMON, $hostid)]);
+	create_slv_item('Ratio of failed monthly DNS UDP tests'    , 'rsm.slv.dns.udp.rtt.pfailed'  , $hostid, VALUE_TYPE_PERC, [get_application_id(APP_SLV_CURMON, $hostid)]);
+	create_slv_item('Number of performed monthly DNS TCP tests', 'rsm.slv.dns.tcp.rtt.performed', $hostid, VALUE_TYPE_NUM , [get_application_id(APP_SLV_CURMON, $hostid)]);
+	create_slv_item('Number of failed monthly DNS TCP tests'   , 'rsm.slv.dns.tcp.rtt.failed'   , $hostid, VALUE_TYPE_NUM , [get_application_id(APP_SLV_CURMON, $hostid)]);
+	create_slv_item('Ratio of failed monthly DNS TCP tests'    , 'rsm.slv.dns.tcp.rtt.pfailed'  , $hostid, VALUE_TYPE_PERC, [get_application_id(APP_SLV_CURMON, $hostid)]);
 
-	undef($depend_down);
-    }
+	create_dependent_trigger_chain($host_name, 'DNS UDP', \&create_ratio_of_failed_tests_trigger, $trigger_thresholds);
+	create_dependent_trigger_chain($host_name, 'DNS TCP', \&create_ratio_of_failed_tests_trigger, $trigger_thresholds);
 
-    if (has_rdds())
-    {
-	create_slv_item('RDDS availability', 'rsm.slv.rdds.avail', $hostid, VALUE_TYPE_AVAIL, [get_application_id(APP_SLV_PARTTEST, $hostid)]);
-	create_slv_item('RDDS minutes of downtime', 'rsm.slv.rdds.downtime', $hostid, VALUE_TYPE_NUM, [get_application_id(APP_SLV_CURMON, $hostid)]);
+	if (defined($OPTS{'rdds43-servers'}) || defined($OPTS{'rdds80-servers'}) || defined($OPTS{'rdap-base-url'}))
+	{
+		create_slv_item('Number of performed monthly RDDS queries', 'rsm.slv.rdds.rtt.performed', $hostid, VALUE_TYPE_NUM , [get_application_id(APP_SLV_CURMON, $hostid)]);
+		create_slv_item('Number of failed monthly RDDS queries'   , 'rsm.slv.rdds.rtt.failed'   , $hostid, VALUE_TYPE_NUM , [get_application_id(APP_SLV_CURMON, $hostid)]);
+		create_slv_item('Ratio of failed monthly RDDS queries'    , 'rsm.slv.rdds.rtt.pfailed'  , $hostid, VALUE_TYPE_PERC, [get_application_id(APP_SLV_CURMON, $hostid)]);
 
-	create_avail_trigger('RDDS', $host_name);
-
-	create_slv_item('RDDS weekly unavailability', 'rsm.slv.rdds.rollweek', $hostid, VALUE_TYPE_PERC, [get_application_id(APP_SLV_ROLLWEEK, $hostid)]);
-
-        my $depend_down;
-	my $created;
-
-	foreach my $position (sort keys %{$trigger_rollweek_thresholds}) {
-    	    my $threshold = $trigger_rollweek_thresholds->{$position}->{'threshold'};
-    	    my $priority = $trigger_rollweek_thresholds->{$position}->{'priority'};
-    	    next if ($threshold eq 0);
-
-	    my $result = create_rollweek_trigger('RDDS', $host_name, $threshold, $priority, \$created);
-
-    	    my $triggerid = $result->{'triggerids'}[0];
-
-	    if ($created && defined($depend_down)) {
-    	        add_dependency($triggerid, $depend_down);
-    	    }
-
-    	    $depend_down = $triggerid;
-        }
-
-	undef($depend_down);
-
-
-# DNS NS are not currently used
-#	create_slv_item('% of successful monthly RDDS43 resolution RTT', 'rsm.slv.rdds.43.rtt.month', $hostid, VALUE_TYPE_PERC, [get_application_id(APP_SLV_MONTHLY, $hostid)]);
-#	create_slv_item('% of successful monthly RDDS80 resolution RTT', 'rsm.slv.rdds.80.rtt.month', $hostid, VALUE_TYPE_PERC, [get_application_id(APP_SLV_MONTHLY, $hostid)]);
-#	create_slv_item('% of successful monthly RDDS update time', 'rsm.slv.rdds.upd.month', $hostid, VALUE_TYPE_PERC, [get_application_id(APP_SLV_MONTHLY, $hostid)]) if (defined($OPTS{'epp-servers'}));
-    }
-
-    if (defined($OPTS{'epp-servers'})) {
-	create_slv_item('EPP availability', 'rsm.slv.epp.avail', $hostid, VALUE_TYPE_AVAIL, [get_application_id(APP_SLV_PARTTEST, $hostid)]);
-	create_slv_item('EPP minutes of downtime', 'rsm.slv.epp.downtime', $hostid, VALUE_TYPE_NUM, [get_application_id(APP_SLV_CURMON, $hostid)]);
-	create_slv_item('EPP weekly unavailability', 'rsm.slv.epp.rollweek', $hostid, VALUE_TYPE_PERC, [get_application_id(APP_SLV_ROLLWEEK, $hostid)]);
-
-# DNS NS are not currently used
-#	create_slv_item('% of successful monthly EPP LOGIN resolution RTT', 'rsm.slv.epp.rtt.login.month', $hostid, VALUE_TYPE_PERC, [get_application_id(APP_SLV_MONTHLY, $hostid)]);
-#	create_slv_item('% of successful monthly EPP UPDATE resolution RTT', 'rsm.slv.epp.rtt.update.month', $hostid, VALUE_TYPE_PERC, [get_application_id(APP_SLV_MONTHLY, $hostid)]);
-#	create_slv_item('% of successful monthly EPP INFO resolution RTT', 'rsm.slv.epp.rtt.info.month', $hostid, VALUE_TYPE_PERC, [get_application_id(APP_SLV_MONTHLY, $hostid)]);
-
-	create_avail_trigger('EPP', $host_name);
-
-        my $depend_down;
-	my $created;
-
-	foreach my $position (sort keys %{$trigger_rollweek_thresholds}) {
-    	    my $threshold = $trigger_rollweek_thresholds->{$position}->{'threshold'};
-    	    my $priority = $trigger_rollweek_thresholds->{$position}->{'priority'};
-    	    next if ($threshold eq 0);
-
-	    my $result = create_rollweek_trigger('EPP', $host_name, $threshold, $priority, \$created);
-
-    	    my $triggerid = $result->{'triggerids'}[0];
-
-	    if ($created && defined($depend_down)) {
-    	        add_dependency($triggerid, $depend_down);
-    	    }
-
-    	    $depend_down = $triggerid;
-        }
-
-	undef($depend_down);
-    }
+		create_dependent_trigger_chain($host_name, 'RDDS', \&create_ratio_of_failed_tests_trigger, $trigger_thresholds);
+	}
 }
 
 sub __usage {
@@ -1556,11 +1526,13 @@ sub manage_tld_objects($$$$$$) {
         }
 
 	if ($action eq 'disable') {
+		generate_report($tld, time(), 1);
+
 	    my $result = disable_hosts(\@tmp_hostids);
 
 	    if (scalar(%{$result})) {
 		if (!compare_arrays([$main_hostid, @hostids_arr], \@{$result->{'hostids'}})) {
-			pfail("an error occurred while disabling hosts!");
+		    pfail("an error occurred while disabling hosts!");
 		}
 	    }
 	    else {
@@ -1582,7 +1554,8 @@ sub manage_tld_objects($$$$$$) {
 	}
     }
 
-    foreach my $type (keys %{$types}) {
+    foreach my $type (keys %{$types})
+    {
 	next if $types->{$type} eq false;
 
 	if ($type eq 'dnssec')
@@ -1596,32 +1569,45 @@ sub manage_tld_objects($$$$$$) {
 	my $template_items = get_items_like($main_templateid, $type, true);
 	my $host_items = get_items_like($main_hostid, $type, false);
 
-	if (scalar(keys(%{$template_items}))) {
-	    foreach my $itemid (keys(%{$template_items})) {
-		push @itemids, $itemid;
-	    }
-	}
-	else {
-	    print "Could not find $type related items on the template level\n";
+	if ($type eq 'rdds')
+	{
+		my $service_enabled_itemkey = "$type.enabled";
+
+		my @service_enabled_itemid = grep { $template_items->{$_}{'key_'} eq $service_enabled_itemkey } keys(%{$template_items});
+		if (!@service_enabled_itemid)
+		{
+			pfail("failed to find $service_enabled_itemkey item");
+		}
+
+		delete($template_items->{$service_enabled_itemid[0]});
 	}
 
-	if (scalar(keys(%{$host_items}))) {
-	    foreach my $itemid (keys(%{$host_items})) {
-		push @itemids, $itemid;
-	    }
+	if (scalar(keys(%{$template_items})))
+	{
+		push(@itemids, keys(%{$template_items}));
 	}
-	else {
-	    print "Could not find $type related items on host level\n";
+	else
+	{
+		print "Could not find $type related items on the template level\n";
+	}
+
+	if (scalar(keys(%{$host_items})))
+	{
+		push(@itemids, keys(%{$host_items}));
+	}
+	else
+	{
+		print "Could not find $type related items on host level\n";
 	}
 
 	if ($action eq 'disable' and scalar(@itemids)) {
-	    disable_items(\@itemids);
-	    create_macro('{$RSM.TLD.'.uc($type).'.ENABLED}', 0, $main_templateid, true);
+		disable_items(\@itemids);
+		create_macro('{$RSM.TLD.'.uc($type).'.ENABLED}', 0, $main_templateid, true);
 	}
 
 	if ($action eq 'delete' and scalar(@itemids)) {
-	    remove_items(\@itemids);
-#	    remove_applications_by_items(\@itemids);
+		remove_items(\@itemids);
+		# remove_applications_by_items(\@itemids);
 	}
     }
 }
@@ -1648,48 +1634,54 @@ sub compare_arrays($$)
 	return true;
 }
 
-sub get_tld_list() {
-    my $tlds = get_host_group('TLDs', true, false);
+sub get_tld_list()
+{
+	my $tlds = get_host_group('TLDs', true, false);
 
-    my @result;
+	my @result;
 
-    foreach my $tld (@{$tlds->{'hosts'}}) {
-	push @result, $tld->{'name'};
-    }
+	foreach my $tld (@{$tlds->{'hosts'}})
+	{
+		push @result, $tld->{'name'};
+	}
 
-    return @result;
+	return @result;
 }
 
-sub get_nsservers_list($) {
-    my $TLD = shift;
-    my $result;
+sub get_nsservers_list($)
+{
+	my $TLD = shift;
+	my $result;
 
-    my $templateid = get_template('Template '.$TLD, false, false);
+	my $templateid = get_template('Template '.$TLD, false, false);
 
-    pfail("TLD \"$TLD\" does not exist on \"$server_key\"") unless ($templateid->{'templateid'});
+	pfail("TLD \"$TLD\" does not exist on \"$server_key\"") unless ($templateid->{'templateid'});
 
-    $templateid = $templateid->{'templateid'};
+	$templateid = $templateid->{'templateid'};
 
-    my $items = get_items_like($templateid, 'rsm.dns.tcp.rtt', true);
+	my $items = get_items_like($templateid, 'rsm.dns.tcp.rtt', true);
 
-    foreach my $itemid (keys %{$items}) {
-	next if $items->{$itemid}->{'status'} == ITEM_STATUS_DISABLED;
+	foreach my $itemid (keys %{$items})
+	{
+		next if $items->{$itemid}->{'status'} == ITEM_STATUS_DISABLED;
 
-	my $name = $items->{$itemid}->{'key_'};
-	my $ip = $items->{$itemid}->{'key_'};
+		my $name = $items->{$itemid}->{'key_'};
+		my $ip = $items->{$itemid}->{'key_'};
 
-	$ip =~s/.+\,.+\,(.+)\]$/$1/;
-	$name =~s/.+\,(.+)\,.+\]$/$1/;
+		$ip =~ s/.+\,.+\,(.+)\]$/$1/;
+		$name =~ s/.+\,(.+)\,.+\]$/$1/;
 
-	if ($ip=~/\d*\.\d*\.\d*\.\d+/) {
-	    push @{$result->{'v4'}->{$name}}, $ip;
+		if ($ip=~/\d*\.\d*\.\d*\.\d+/)
+		{
+			push @{$result->{'v4'}->{$name}}, $ip;
+		}
+		else
+		{
+			push @{$result->{'v6'}->{$name}}, $ip;
+		}
 	}
-	else {
-	    push @{$result->{'v6'}->{$name}}, $ip;
-	}
-    }
 
-    return $result;
+	return $result;
 }
 
 sub update_nsservers($$) {
@@ -1802,8 +1794,7 @@ sub add_new_ns($) {
 	    create_item_dns_rtt($ns, $ip, $main_templateid, 'Template '.$TLD, 'tcp', $proto);
 	    create_item_dns_rtt($ns, $ip, $main_templateid, 'Template '.$TLD, 'udp', $proto);
 
-# DNS NS are not currently used
-#    	    create_all_slv_ns_items($ns, $ip, $main_hostid);
+	    create_all_slv_ns_items($ns, $ip, $main_hostid, $TLD);
 	}
     }
 }
@@ -1848,7 +1839,7 @@ sub disable_old_ns($) {
     }
 
     if (scalar(@itemids) > 0) {
-	my $triggers = get_triggers_by_items(\@itemids);
+	 my $triggers = get_triggers_by_items(\@itemids);
 
         my @triggerids = keys %{$triggers};
 
@@ -1897,7 +1888,8 @@ sub get_services($) {
     return $result;
 }
 
-sub create_avail_trigger($$) {
+sub create_avail_trigger($$)
+{
 	my $service = shift;
 	my $host_name = shift;
 
@@ -1921,7 +1913,27 @@ sub create_avail_trigger($$) {
 	really(create_trigger($options, $host_name));
 }
 
-sub create_rollweek_trigger($$$$$) {
+sub create_dns_downtime_trigger($$)
+{
+	my $host_name = shift;
+	my $priority = shift;
+
+	my $service_lc = lc('DNS');
+
+	my $options =
+	{
+		'description' => 'DNS service was unavailable for at least {ITEM.VALUE1}m',
+		'expression' => '{'.$host_name.':rsm.slv.'.$service_lc.'.downtime.last(0)}>{$RSM.SLV.DNS.DOWNTIME}',
+		'priority' => $priority
+	};
+
+	my $created_ref;
+
+	really(create_trigger($options, $host_name, $created_ref));
+}
+
+sub create_downtime_trigger($$$$$)
+{
 	my $service = shift;
 	my $host_name = shift;
 	my $threshold = shift;
@@ -1930,10 +1942,118 @@ sub create_rollweek_trigger($$$$$) {
 
 	my $service_lc = lc($service);
 
-        my $options =
+	my $threshold_str = '';
+
+	if ($threshold < 100)
+	{
+		$threshold_str = "*".($threshold * 0.01)
+	}
+
+	my $options =
+	{
+		'description' => $service.' service was unavailable for '.$threshold.'% of allowed $1 minutes',
+		'expression' => '{'.$host_name.':rsm.slv.'.$service_lc.'.downtime.last(0)}>={$RSM.SLV.'.$service.'.DOWNTIME}'.$threshold_str,
+		'priority' => $priority
+	};
+
+	really(create_trigger($options, $host_name, $created_ref));
+}
+
+sub create_dns_ns_downtime_trigger
+{
+	my $nsip = shift;
+	my $host_name = shift;
+	my $threshold = shift;
+	my $priority = shift;
+	my $created_ref = shift;
+
+	my $nsipname = $nsip;
+	$nsipname =~ s/,/ (/;
+	$nsipname .= ')';
+
+	my $threshold_str = '';
+
+	if ($threshold < 100)
+	{
+		$threshold_str = "*".($threshold * 0.01)
+	}
+
+	my $options =
+	{
+		'description' => 'DNS '.$nsipname.' downtime exceeded '.$threshold.'% of allowed $1 minutes',
+		'expression' => '{'.$host_name.':rsm.slv.dns.ns.downtime['.$nsip.'].last()}>{$RSM.SLV.NS.DOWNTIME}'.$threshold_str,
+		'priority' => $priority
+	};
+
+	really(create_trigger($options, $host_name, $created_ref));
+}
+
+sub create_rollweek_trigger($$$$$)
+{
+	my $service = shift;
+	my $host_name = shift;
+	my $threshold = shift;
+	my $priority = shift;
+	my $created_ref = shift;
+
+	my $service_lc = lc($service);
+
+	my $options =
 	{
 		'description' => $service.' rolling week is over '.$threshold.'%',
 		'expression' => '{'.$host_name.':rsm.slv.'.$service_lc.'.rollweek.last(0)}>='.$threshold,
+		'priority' => $priority
+	};
+
+	really(create_trigger($options, $host_name, $created_ref));
+}
+
+sub create_ratio_of_failed_tests_trigger($$$$$)
+{
+	my $service = shift;
+	my $host_name = shift;
+	my $threshold = shift;
+	my $priority = shift;
+	my $created_ref = shift;
+
+	my $item_key;
+	my $macro;
+
+	if ($service eq 'DNS UDP')
+	{
+		$item_key = 'rsm.slv.dns.udp.rtt.pfailed';
+		$macro = '{$RSM.SLV.DNS.UDP.RTT}';
+	}
+	elsif ($service eq 'DNS TCP')
+	{
+		$item_key = 'rsm.slv.dns.tcp.rtt.pfailed';
+		$macro = '{$RSM.SLV.DNS.TCP.RTT}';
+	}
+	elsif ($service eq 'RDDS')
+	{
+		$item_key = 'rsm.slv.rdds.rtt.pfailed';
+		$macro = '{$RSM.SLV.RDDS.RTT}';
+	}
+	else
+	{
+		fail("Unknown service '$service'");
+	}
+
+	my $expression;
+
+	if ($threshold == 100)
+	{
+		$expression = "{$host_name:$item_key.last()}>$macro"
+	}
+	else
+	{
+		my $threshold_perc = $threshold / 100;
+		$expression = "{$host_name:$item_key.last()}>$macro*$threshold_perc"
+	}
+
+	my $options = {
+		'description' => "Ratio of failed $service tests exceeded $threshold% of allowed \$1%",
+		'expression' => $expression,
 		'priority' => $priority
 	};
 

@@ -21,80 +21,161 @@
 
 $widget = (new CWidget())->setTitle(_('SLA report'));
 
-$filterForm = new CFilter('web.rsm.slareports.filter.state');
+$months = range(1, 12);
+$years = range(SLA_MONITORING_START_YEAR, date('Y', time()));
 
-$filterColumn = new CFormList();
-$filterColumn->addVar('filter_set', 1);
-$filterColumn->addRow(_('TLD'), (new CTextBox('filter_search', $this->data['filter_search']))
-	->setWidth(ZBX_TEXTAREA_FILTER_STANDARD_WIDTH)
-	->setAttribute('autocomplete', 'off')
+$widget->addItem(
+	(new CFilter('web.rsm.slareports.filter.state'))->addColumn(
+		(new CFormList())
+			->addVar('filter_set', 1)
+			->addRow(_('TLD'), (new CTextBox('filter_search', $data['filter_search']))
+				->setWidth(ZBX_TEXTAREA_FILTER_STANDARD_WIDTH)
+				->setAttribute('autocomplete', 'off')
+			)
+			->addRow(_('Period'), [
+				new CComboBox('filter_month', $data['filter_month'], null, array_combine($months,
+					array_map('getMonthCaption', $months))),
+				SPACE,
+				new CComboBox('filter_year', $data['filter_year'], null, array_combine($years, $years))
+			])
+	)
 );
 
-$months = [];
-for ($i = 1; $i <= 12; $i++) {
-	$months[$i] = getMonthCaption($i);
-}
-
-$years = [];
-for ($i = SLA_MONITORING_START_YEAR; $i <= date('Y', time()); $i++) {
-	$years[$i] = $i;
-}
-
-$filterColumn->addRow(_('Period'), [
-	new CComboBox('filter_month', $this->data['filter_month'], null, $months),
-	SPACE,
-	new CComboBox('filter_year', $this->data['filter_year'], null, $years)
+$table = (new CTableInfo())->setHeader([
+	_('Service'),
+	_('FQDN and IP'),
+	_('From'),
+	_('To'),
+	_('SLV'),
+	_('Monthly SLR')
 ]);
 
-$filterForm->addColumn($filterColumn);
+if (!array_key_exists('details', $data)) {
+	return $widget->addItem([
+		$table,
+		(new CDiv())
+			->addItem((new CButton('export', 'Download XML'))->setEnabled(false))
+			->addClass('action-buttons')
+	]);
+}
 
-$widget->addItem($filterForm);
+// TLD details.
+$date_from = date(DATE_TIME_FORMAT_SECONDS, zbxDateToTime($data['details']['from']));
+$date_till = date(DATE_TIME_FORMAT_SECONDS, zbxDateToTime($data['details']['to']));
+$date_generated = date(DATE_TIME_FORMAT_SECONDS, zbxDateToTime($data['details']['generated']));
 
-if ($data['tld']) {
-	$infoBlock = (new CTable(null, 'filter info-block'))
-		->addRow([[
-		bold(_('Month')), ':', SPACE, date('F', mktime(0, 0, 0, $data['filter_month'], 1, $data['filter_year'])), BR(),
-		bold(_('Generation time')), ':', SPACE, date('dS F Y, H:i:s e', time()), BR(),
-		bold(_('TLD')), ':', SPACE, $data['tld']['name'], BR(),
-		bold(_('Server')), ':', SPACE, new CLink($this->data['server'],
-			$this->data['url'].'rsm.rollingweekstatus.php?sid='.$this->data['sid'].'&set_sid=1'
+$widget->additem((new CDiv())
+	->addClass(ZBX_STYLE_TABLE_FORMS_CONTAINER)
+	->addItem([
+		bold(_s('Period: %1$s - %2$s', $date_from, $date_till)), BR(),
+		bold(_s('Generation time: %1$s', $date_generated)), BR(),
+		bold(_s('TLD: %1$s', $data['tld']['name'])), BR(),
+		bold(_('Server: ')), new CLink($data['server'], $data['rolling_week_url'])
+	])
+);
+
+// DNS Service Availability.
+$table->addRow([
+		bold(_('DNS Service Availability')),
+		'',
+		'',
+		'',
+		_s('%d (minutes of downtime)', $data['slv_dns_downtime']),
+		_s('%d (minutes of downtime)', $data['slr_dns_downtime'])
+	],
+	($data['slv_dns_downtime'] > $data['slr_dns_downtime']) ? 'red-bg' : null
+);
+
+// DNS Name Server Availability.
+foreach ($data['ns_items'] as $item) {
+	$table->addRow([
+			_('DNS Name Server Availability'),
+			implode(', ', array_filter([$item['host'], $item['ip']], 'strlen')),
+			date(DATE_TIME_FORMAT_SECONDS, zbxDateToTime($item['from'])),
+			date(DATE_TIME_FORMAT_SECONDS, zbxDateToTime($item['to'])),
+			_s('%1$s (minutes of downtime)', $item['slv']),
+			_s('%1$s (minutes of downtime)', $item['slr'])
+		],
+		($item['slv'] > $item['slr']) ? 'red-bg' : null
+	);
+}
+
+// DNS UDP/TCP Resolution RTT.
+$table
+	->addRow([
+			_('DNS UDP Resolution RTT'),
+			'',
+			'',
+			'',
+			_s('%1$s %% (queries <= %2$s ms)', $data['slv_dns_udp_rtt_percentage'],
+				$data['slr_dns_udp_rtt_ms']
+			),
+			_s('<= %1$s ms, for at least %2$s %% of queries', $data['slr_dns_udp_rtt_ms'],
+				$data['slr_dns_udp_rtt_percentage']
+			)
+		],
+		($data['slv_dns_udp_rtt_percentage'] < $data['slr_dns_udp_rtt_percentage']) ? 'red-bg' : null
+	)->addRow([
+			_('DNS TCP Resolution RTT'),
+			'',
+			'',
+			'',
+			_s('%1$s %% (queries <= %2$s ms)', $data['slv_dns_tcp_rtt_percentage'],
+				$data['slr_dns_tcp_rtt_ms']
+			),
+			_s('<= %1$s ms, for at least %2$s %% of queries', $data['slr_dns_tcp_rtt_ms'],
+				$data['slr_dns_tcp_rtt_percentage']
+			)
+		],
+		($data['slv_dns_tcp_rtt_percentage'] <  $data['slr_dns_tcp_rtt_percentage']) ? 'red-bg' : null
+);
+
+// RDDS Service Availability and Query RTT.
+if (array_key_exists('slv_rdds_downtime', $data)) {
+	$disabled = ($data['slv_rdds_downtime'] === 'disabled' && $data['slv_rdds_rtt_percentage'] === 'disabled');
+
+	if ($disabled) {
+		$availability_class = 'disabled';
+		$rtt_class = 'disabled';
+	}
+	else {
+		$availability_class = ($data['slv_rdds_downtime'] > $data['slr_rdds_downtime']) ? 'red-bg' : null;
+		$rtt_class = ($data['slv_rdds_rtt_percentage'] < $data['slr_rdds_rtt_percentage']) ? 'red-bg' : null;
+	}
+
+	$table->addRow([
+			bold(_('RDDS Service Availability')),
+			'',
+			'',
+			'',
+			$disabled ? 'disabled' : _s('%1$s (minutes of downtime)', $data['slv_rdds_downtime']),
+			$disabled ? 'disabled' : _s('<= %1$s min of downtime',  $data['slr_rdds_downtime'])
+		],
+		$availability_class
+	)->addRow([
+			_('RDDS Query RTT'),
+			'',
+			'',
+			'',
+			$disabled ? 'disabled' : _s('%1$s %% (queries <= %2$s ms)', $data['slv_rdds_rtt_percentage'],
+				$data['slr_rdds_rtt_ms']
+			),
+			$disabled ? 'disabled' : _s('<= %1$s ms, for at least %2$s %% of the queries',
+				$data['slr_rdds_rtt_ms'], $data['slr_rdds_rtt_percentage']
+			)
+		],
+		$rtt_class
+	);
+}
+
+return $widget->addItem([
+	$table,
+	(new CDiv())
+		->addItem((new CForm())
+			->addVar('filter_search', $data['filter_search'])
+			->addVar('filter_year', $data['filter_year'])
+			->addVar('filter_month', $data['filter_month'])
+			->additem(new CSubmitButton(_('Download XML'), 'export', 1))
 		)
-	]]);
-	$widget->additem($infoBlock);
-}
-
-// create form
-$form = (new CForm())
-	->setName('scenarios');
-
-$table = (new CTableInfo())
-	->setHeader([
-		_('Service'),
-		_('Detail'),
-		_('From'),
-		_('To'),
-		_('SLV'),
-		_('Monthly SLR'),
-		SPACE
+		->addClass('action-buttons')
 ]);
-
-
-foreach ($data['services'] as $name => $service) {
-	$table->addRow(array(
-		$service['main'] ? bold($service['name']) : $service['name'],
-		$service['details'],
-		$service['from'],
-		$service['to'],
-		$service['slv'],
-		$service['slr'],
-		$service['screen']
-	));
-}
-
-$form->addItem([
-	$table
-]);
-// append form to widget
-$widget->addItem($form);
-
-return $widget;

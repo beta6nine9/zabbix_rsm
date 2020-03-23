@@ -10,7 +10,7 @@ use Pod::Usage;
 use Exporter qw(import);
 use Zabbix;
 use Alerts;
-use TLD_constants qw(:api :items :ec :groups);
+use TLD_constants qw(:api :items :ec :groups :config);
 use File::Pid;
 use POSIX qw(floor);
 use Sys::Syslog;
@@ -19,9 +19,9 @@ use Time::HiRes;
 use Fcntl qw(:flock);	# for the LOCK_* constants, logging to stdout by multiple processes
 use RSM;
 use Pusher qw(push_to_trapper);
+use Fcntl qw(:flock);
+use List::Util qw(min max);
 
-use constant SUCCESS => 0;
-use constant E_FAIL => -1;	# be careful when changing this, some functions depend on current value
 use constant E_ID_NONEXIST => -2;
 use constant E_ID_MULTIPLE => -3;
 
@@ -74,31 +74,43 @@ use constant DETAILED_RESULT_DELIM => ', ';
 use constant DEFAULT_SLV_MAX_CYCLES => 10;	# maximum cycles to process by SLV scripts in 1 run, may be overriden
 						# by rsm.conf 'max_cycles_dns' and 'max_cycles_rdds'
 
+use constant USE_CACHE_FALSE => 0;
+use constant USE_CACHE_TRUE  => 1;
+
 our ($result, $dbh, $tld, $server_key);
 
 our %OPTS; # specified command-line options
 
 our @EXPORT = qw($result $dbh $tld $server_key
-		SUCCESS E_FAIL E_ID_NONEXIST E_ID_MULTIPLE UP DOWN SLV_UNAVAILABILITY_LIMIT MIN_LOGIN_ERROR
+		E_ID_NONEXIST E_ID_MULTIPLE UP DOWN SLV_UNAVAILABILITY_LIMIT MIN_LOGIN_ERROR
 		UP_INCONCLUSIVE_NO_PROBES
 		UP_INCONCLUSIVE_NO_DATA PROTO_UDP PROTO_TCP
 		MAX_LOGIN_ERROR MIN_INFO_ERROR MAX_INFO_ERROR PROBE_ONLINE_STR
 		AVAIL_SHIFT_BACK ROLLWEEK_SHIFT_BACK PROBE_ONLINE_SHIFT
 		PROBE_KEY_MANUAL
 		ONLINE OFFLINE
+		USE_CACHE_FALSE USE_CACHE_TRUE
 		get_macro_minns get_macro_dns_probe_online get_macro_rdds_probe_online get_macro_dns_rollweek_sla
 		get_macro_rdds_rollweek_sla get_macro_dns_udp_rtt_high get_macro_dns_udp_rtt_low
 		get_macro_dns_tcp_rtt_low get_macro_rdds_rtt_low get_dns_udp_delay get_dns_tcp_delay
 		get_rdds_delay get_epp_delay get_macro_epp_probe_online get_macro_epp_rollweek_sla
 		get_macro_dns_update_time get_macro_rdds_update_time get_tld_items get_hostid
 		get_rtt_low
-		get_macro_epp_rtt_low get_macro_probe_avail_limit get_itemid_by_key get_itemid_by_host
-		get_itemid_by_hostid get_itemid_like_by_hostid get_itemids_by_host_and_keypart get_lastclock get_tlds
+		get_macro_epp_rtt_low get_macro_probe_avail_limit
+		get_macro_incident_dns_fail get_macro_incident_dns_recover
+		get_macro_incident_rdds_fail get_macro_incident_rdds_recover
+		get_itemid_by_key get_itemid_by_host
+		get_itemid_by_hostid get_itemid_like_by_hostid get_itemids_by_host_and_keypart get_lastclock
+		get_tlds get_tlds_and_hostids
+		get_oldest_clock
 		get_probes get_nsips get_nsip_items tld_exists tld_service_enabled db_connect db_disconnect
 		validate_tld validate_service
 		get_templated_nsips db_exec tld_interface_enabled
 		tld_interface_enabled_create_cache tld_interface_enabled_delete_cache
-		db_select db_select_binds set_slv_config get_cycle_bounds get_rollweek_bounds get_downtime_bounds
+		db_handler_read_status_start db_handler_read_status_end
+		db_select db_select_col db_select_row db_select_value db_select_binds db_explain
+		set_slv_config get_cycle_bounds get_rollweek_bounds get_downtime_bounds
+		current_month_first_cycle month_start
 		get_probe_times probe_offline_at probes2tldhostids
 		slv_max_cycles
 		get_probe_online_key_itemid
@@ -113,9 +125,10 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		process_slv_downtime_cycles
 		uint_value_exists
 		float_value_exists
-		sql_time_condition get_incidents get_downtime get_downtime_prepare get_downtime_execute
+		sql_time_condition get_incidents get_downtime
 		history_table
-		get_lastvalue get_itemids_by_hostids get_nsip_values get_valuemaps get_statusmaps get_detailed_result
+		get_lastvalue get_lastvalues_by_itemids get_itemids_by_hostids get_nsip_values
+		get_valuemaps get_statusmaps get_detailed_result
 		get_avail_valuemaps
 		get_result_string get_tld_by_trigger truncate_from truncate_till alerts_enabled
 		get_real_services_period dbg info wrn fail set_on_fail
@@ -127,9 +140,12 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		trim
 		parse_opts parse_slv_opts
 		opt getopt setopt unsetopt optkeys ts_str ts_full selected_period
-		write_file read_file
 		cycle_start
 		cycle_end
+		update_slv_rtt_monthly_stats
+		recalculate_downtime
+		generate_report
+		set_log_tld unset_log_tld
 		usage);
 
 # configuration, set in set_slv_config()
@@ -284,8 +300,7 @@ sub get_rtt_low
 		}
 		else
 		{
-			fail("dimir was wrong, besides protocols ", PROTO_UDP, " and ", PROTO_TCP,
-				" there is also ", $proto);
+			fail("unhandled protocol: '$proto'");
 		}
 	}
 
@@ -299,8 +314,30 @@ sub get_rtt_low
 		return get_macro_epp_rtt_low($command);	# can be per TLD
 	}
 
-	fail("dimir was wrong, thinking the only known services are \"dns\", \"dnssec\", \"rdds\" and \"epp\",",
-		" there is also \"$service\"");
+	fail("unhandled service: '$service'");
+}
+
+sub get_slv_rtt($;$)
+{
+	my $service = shift;
+	my $proto = shift;	# for DNS
+
+	if ($service eq 'dns' || $service eq 'dnssec')
+	{
+		fail("internal error: get_slv_rtt() called for $service without specifying protocol")
+			unless (defined($proto));
+
+		return __get_macro('{$RSM.SLV.DNS.UDP.RTT}') if ($proto == PROTO_UDP);
+		return __get_macro('{$RSM.SLV.DNS.TCP.RTT}') if ($proto == PROTO_TCP);
+
+		fail("Unhandled protocol \"$proto\"");
+	}
+
+	return __get_macro('{$RSM.SLV.RDDS.RTT}')   if ($service eq 'rdds');
+	return __get_macro('{$RSM.SLV.RDDS43.RTT}') if ($service eq 'rdds43');
+	return __get_macro('{$RSM.SLV.RDDS80.RTT}') if ($service eq 'rdds80');
+
+	fail("Unhandled service \"$service\"");
 }
 
 sub get_macro_epp_rtt_low
@@ -311,6 +348,26 @@ sub get_macro_epp_rtt_low
 sub get_macro_probe_avail_limit
 {
 	return __get_macro('{$RSM.PROBE.AVAIL.LIMIT}');
+}
+
+sub get_macro_incident_dns_fail()
+{
+	return __get_macro('{$RSM.INCIDENT.DNS.FAIL}');
+}
+
+sub get_macro_incident_dns_recover()
+{
+	return __get_macro('{$RSM.INCIDENT.DNS.RECOVER}');
+}
+
+sub get_macro_incident_rdds_fail()
+{
+	return __get_macro('{$RSM.INCIDENT.RDDS.FAIL}');
+}
+
+sub get_macro_incident_rdds_recover()
+{
+	return __get_macro('{$RSM.INCIDENT.RDDS.RECOVER}');
 }
 
 sub get_itemid_by_key
@@ -402,6 +459,51 @@ sub get_itemids_by_host_and_keypart
 	return $result;
 }
 
+# input:
+# [
+#     [host, key],
+#     [host, key],
+#     ...
+# ]
+# output:
+# {
+#     host => {
+#         key => itemid,
+#         key => itemid,
+#     },
+#     ...
+# }
+sub get_itemids_by_hosts_and_keys($)
+{
+	my $filter = shift; # [[host, key], ...]
+
+	my $filter_string = join(" or ", ("(hosts.host = ? and items.key_ = ?)") x scalar(@{$filter}));
+	my $filter_params = [map(($_->[0], $_->[1]), @{$filter})];
+
+	my $sql = "select" .
+			" hosts.host," .
+			" items.key_," .
+			" items.itemid" .
+		" from" .
+			" hosts" .
+			" left join items on items.hostid = hosts.hostid" .
+		" where" .
+			" " . $filter_string;
+
+	my $rows = db_select($sql, $filter_params);
+
+	my $result = {};
+
+	foreach my $row (@{$rows})
+	{
+		my ($host, $key, $itemid) = @{$row};
+
+		$result->{$host}{$key} = $itemid;
+	}
+
+	return $result;
+}
+
 # returns:
 # E_FAIL - if item was not found
 #      0 - if lastclock is NULL
@@ -451,10 +553,58 @@ sub get_lastclock($$$)
 	return $lastclock;
 }
 
-sub get_tlds
+# returns:
+# E_FAIL - if item was not found
+# undef  - if history table is empty
+# *      - lastclock
+sub get_oldest_clock($$$$)
+{
+	my $host = shift;
+	my $key = shift;
+	my $value_type = shift;
+	my $clock_limit = shift;
+
+	my $rows_ref = db_select(
+		"select i.itemid".
+		" from items i,hosts h".
+		" where i.hostid=h.hostid".
+			" and i.status=0".
+			" and h.host='$host'".
+			" and i.key_='$key'"
+	);
+
+	return E_FAIL if (scalar(@$rows_ref) == 0);
+
+	my $itemid = $rows_ref->[0]->[0];
+
+	$rows_ref = db_select(
+		"select min(clock)".
+		" from " . history_table($value_type).
+		" where itemid=$itemid".
+			" and clock>$clock_limit"
+	);
+
+	return $rows_ref->[0]->[0];
+}
+
+# $tlds_cache{$server_key}{$service}{$clock} = ["tld1", "tld2", ...];
+my %tlds_cache = ();
+
+sub get_tlds(;$$$)
 {
 	my $service = shift;	# optionally specify service which must be enabled
-	my $till = shift;	# used only if $service is defined
+	my $clock = shift;	# used only if $service is defined
+	my $use_cache = shift // USE_CACHE_FALSE;
+
+	if ($use_cache != USE_CACHE_FALSE && $use_cache != USE_CACHE_TRUE)
+	{
+		fail("invalid value for \$use_cache argument - '$use_cache'");
+	}
+
+	if ($use_cache == USE_CACHE_TRUE && exists($tlds_cache{$server_key}{$service // ''}{$clock // 0}))
+	{
+		return $tlds_cache{$server_key}{$service // ''}{$clock // 0};
+	}
 
 	my $rows_ref = db_select(
 		"select distinct h.host".
@@ -471,58 +621,121 @@ sub get_tlds
 
 		if (defined($service))
 		{
-			next unless (tld_service_enabled($tld, $service, $till));
+			next unless (tld_service_enabled($tld, $service, $clock));
 		}
 
 		push(@tlds, $tld);
 	}
 
+	if ($use_cache == USE_CACHE_TRUE)
+	{
+		$tlds_cache{$server_key}{$service // ''}{$clock // 0} = \@tlds;
+	}
+
 	return \@tlds;
 }
 
-# Returns a reference to hash of all probes (host => hostid).
-sub get_probes
+# get all tlds and their hostids or a single tld with its hostid
+sub get_tlds_and_hostids(;$)
 {
-	my $service = shift;
-	my $name = shift;
+	my $tld = shift;
+	my $tld_cond = '';
 
-	$service = defined($service) ? uc($service) : 'DNS';
-
-	my $name_cond = "";
-
-	$name_cond = " and h.host='$name'" if ($name);
-
-	my $rows_ref = db_select(
-		"select h.host,h.hostid,h.status".
-		" from hosts h, hosts_groups hg".
-		" where h.hostid=hg.hostid".
-			$name_cond.
-			" and hg.groupid=".PROBES_GROUPID);
-
-	my $result = {};
-
-	foreach my $row_ref (@$rows_ref)
+	if (defined($tld))
 	{
-		my $host = $row_ref->[0];
-		my $hostid = $row_ref->[1];
-		my $status = $row_ref->[2];
-
-		if ($service ne 'DNS')
-		{
-			$rows_ref = db_select(
-				"select hm.value".
-				" from hosts h,hostmacro hm".
-				" where h.hostid=hm.hostid".
-					" and h.host='Template $host'".
-					" and hm.macro='{\$RSM.$service.ENABLED}'");
-
-			next if (scalar(@$rows_ref) != 0 and $rows_ref->[0]->[0] == 0);
-		}
-
-		$result->{$host} = {'hostid' => $hostid, 'status' => $status};
+		$tld_cond = " and h.host='$tld'";
 	}
 
-	return $result;
+	return db_select(
+		"select distinct h.host,h.hostid".
+		" from hosts h,hosts_groups hg".
+		" where h.hostid=hg.hostid".
+			" and hg.groupid=".TLDS_GROUPID.
+			" and h.status=0".
+			$tld_cond.
+		" order by h.host");
+}
+
+# $probes_cache{$server_key}{$name}{$service} = {$host => $hostid, ...}
+my %probes_cache = ();
+
+# Returns a reference to hash of all probes (host => {'hostid' => hostid, 'status' => status}).
+sub get_probes(;$$)
+{
+	my $service = shift; # "IP4", "IP6", "RDDS" or any other
+	my $name = shift;
+
+	$service = defined($service) ? uc($service) : "ALL";
+	$name //= "";
+
+	if ($service ne "IP4" && $service ne "IP6" && $service ne "RDDS")
+	{
+		$service = "ALL";
+	}
+
+	if (!exists($probes_cache{$server_key}{$name}))
+	{
+		$probes_cache{$server_key}{$name} = __get_probes($name);
+	}
+
+	return $probes_cache{$server_key}{$name}{$service};
+}
+sub __get_probes($)
+{
+	my $name = shift;
+
+	my $name_condition = ($name ? "name='$name' and" : "");
+
+	my $rows = db_select(
+		"select hosts.hostid,hosts.host,hostmacro.macro,hostmacro.value,hosts.status" .
+		" from hosts" .
+			" left join hosts_groups on hosts_groups.hostid=hosts.hostid" .
+			" left join hosts_templates as hosts_templates_1 on hosts_templates_1.hostid=hosts.hostid" .
+			" left join hosts_templates as hosts_templates_2 on hosts_templates_2.hostid=hosts_templates_1.templateid" .
+			" left join hostmacro on hostmacro.hostid=hosts_templates_2.templateid" .
+		" where $name_condition" .
+			" hosts_groups.groupid=" . PROBES_GROUPID . " and" .
+			" hostmacro.macro in ('{\$RSM.IP4.ENABLED}','{\$RSM.IP6.ENABLED}','{\$RSM.RDDS.ENABLED}')");
+
+	my %result = (
+		'ALL'  => {},
+		'IP4'  => {},
+		'IP6'  => {},
+		'RDDS' => {}
+	);
+
+	foreach my $row (@{$rows})
+	{
+		my ($hostid, $host, $macro, $value, $status) = @{$row};
+
+		if (!exists($result{'ALL'}{$host}))
+		{
+			$result{'ALL'}{$host} = {'hostid' => $hostid, 'status' => $status};
+		}
+
+		if ($macro eq '{$RSM.IP4.ENABLED}')
+		{
+			$result{'IP4'}{$host} = {'hostid' => $hostid, 'status' => $status} if ($value);
+		}
+		elsif ($macro eq '{$RSM.IP6.ENABLED}')
+		{
+			$result{'IP6'}{$host} = {'hostid' => $hostid, 'status' => $status} if ($value);
+		}
+		elsif ($macro eq '{$RSM.RDDS.ENABLED}')
+		{
+			$result{'RDDS'}{$host} = {'hostid' => $hostid, 'status' => $status} if ($value);
+		}
+	}
+
+	if (opt("debug"))
+	{
+		dbg("number of probes - " . scalar(keys(%{$result{'ALL'}})));
+		dbg("number of probes with IP4 support  - " . scalar(keys(%{$result{'IP4'}})));
+		dbg("number of probes with IP6 support  - " . scalar(keys(%{$result{'IP6'}})));
+		dbg("number of probes with RDDS support - " . scalar(keys(%{$result{'RDDS'}})));
+	}
+
+	return \%result;
 }
 
 # get array of key nameservers ('i.ns.se,130.239.5.114', ...)
@@ -720,13 +933,29 @@ sub validate_service($)
 	fail("service \"$service\" is unknown") if (!grep {/$service/} ('dns', 'dnssec', 'rdds', 'epp'));
 }
 
-sub tld_service_enabled
+my %tld_service_enabled_cache = ();
+
+sub tld_service_enabled($$$)
 {
-	my $tld = shift;
+	my $tld     = shift;
 	my $service = shift;
-	my $now = shift;
+	my $now     = shift;
 
 	$service = lc($service);
+
+	if (!defined($tld_service_enabled_cache{$server_key}{$tld}{$service}{$now}))
+	{
+		$tld_service_enabled_cache{$server_key}{$tld}{$service}{$now} = __tld_service_enabled($tld, $service, $now);
+	}
+
+	return $tld_service_enabled_cache{$server_key}{$tld}{$service}{$now};
+}
+
+sub __tld_service_enabled($$$)
+{
+	my $tld     = shift;
+	my $service = shift;
+	my $now     = shift;
 
 	return 1 if ($service eq 'dns');
 
@@ -898,10 +1127,10 @@ sub tld_interface_enabled($$$)
 		my $till = cycle_end($now, 60);
 
 		my @conditions = (
-			[$till - 0 * 3600 -  1 * 60 + 1, $till            , "clock desc"],	# go back 1 minute
-			[$till - 0 * 3600 - 30 * 60 + 1, $till            , "clock desc"],	# go back 30 minutes
-			[$till - 6 * 3600 -  0 * 60 + 1, $till            , "clock desc"],	# go back 6 hours
-			[$till + 1                     , $till + 24 * 3600, "clock asc"]	# go forward 1 day
+			[$till - 0 * 3600 -  1 * 60 + 1, $till            , "max(clock)"],	# go back 1 minute
+			[$till - 0 * 3600 - 30 * 60 + 1, $till            , "max(clock)"],	# go back 30 minutes
+			[$till - 6 * 3600 -  0 * 60 + 1, $till            , "max(clock)"],	# go back 6 hours
+			[$till + 1                     , $till + 24 * 3600, "min(clock)"]	# go forward 1 day
 		);
 
 		my $condition_index = 0;
@@ -910,16 +1139,23 @@ sub tld_interface_enabled($$$)
 		{
 			my $from = $conditions[$condition_index]->[0];
 			my $till = $conditions[$condition_index]->[1];
-			my $order = $conditions[$condition_index]->[2];
+			my $clock = $conditions[$condition_index]->[2];
 
-			my $rows_ref = db_select_binds(
-				"select value".
-				" from history_uint".
-				" where itemid=?".
-					" and " . sql_time_condition($from, $till).
-				" order by $order".
-				" limit 1",
-				$enabled_items_cache{$item_key}{$tld});
+			my $itemids_placeholder = join(",", ("?") x scalar(@{$enabled_items_cache{$item_key}{$tld}}));
+
+			my $rows_ref = db_select(
+				"select value" .
+				" from" .
+					" history_uint" .
+					" inner join (" .
+						" select itemid,$clock as clock" .
+						" from history_uint" .
+						" where" .
+							" clock between ? and ? and" .
+							" itemid in ($itemids_placeholder)" .
+						" group by itemid" .
+					" ) as history_clock on history_clock.itemid=history_uint.itemid and history_clock.clock=history_uint.clock",
+					[$from, $till, @{$enabled_items_cache{$item_key}{$tld}}]);
 
 			my $found = 0;
 
@@ -1066,11 +1302,61 @@ sub db_disconnect
 	}
 }
 
-sub db_select
+# Variable for storing DB session's status variables like 'Handler_read_%'.
+#
+# Use db_handler_read_status_start() and db_handler_read_status_end()
+# to compare different ways of getting data from the DB.
+#
+# https://dev.mysql.com/doc/refman/5.6/en/server-status-variables.html#statvar_Handler_read_first
+my $handler_read_status = {};
+
+sub db_handler_read_status_start()
+{
+	foreach (@{db_select("show session status like 'Handler_read_%'")})
+	{
+		$handler_read_status->{$_->[0]} = -$_->[1];
+	}
+}
+
+sub db_handler_read_status_end()
+{
+	foreach (@{db_select("show session status like 'Handler_read_%'")})
+	{
+		$handler_read_status->{$_->[0]} += $_->[1];
+	}
+
+	my @cols = (
+		"Handler_read_first",
+		"Handler_read_key",
+		"Handler_read_last",
+		"Handler_read_next",
+		"Handler_read_prev",
+		"Handler_read_rnd",
+		"Handler_read_rnd_next",
+	);
+
+	my $head = "|";
+	my $data = "|";
+
+	foreach my $col (@cols)
+	{
+		$head .= $col . " |";
+		$data .= sprintf("%-*s |", length($col), $handler_read_status->{$col});
+	}
+
+	my $line = "-" x length($head);
+
+	info($line);
+	info($head);
+	info($line);
+	info($data);
+	info($line);
+}
+
+sub db_select($;$)
 {
 	$_global_sql = shift;
-
-	undef($_global_sql_bind_values);
+	$_global_sql_bind_values = shift; # optional; reference to an array
 
 	if ($get_stats)
 	{
@@ -1085,10 +1371,20 @@ sub db_select
 	my $sth = $dbh->prepare($_global_sql)
 		or fail("cannot prepare [$_global_sql]: ", $dbh->errstr);
 
-	dbg("[$_global_sql]");
+	if (defined($_global_sql_bind_values))
+	{
+		dbg("[$_global_sql] ", join(',', @{$_global_sql_bind_values}));
 
-	$sth->execute()
-		or fail("cannot execute [$_global_sql]: ", $sth->errstr);
+		$sth->execute(@{$_global_sql_bind_values})
+			or fail("cannot execute [$_global_sql]: ", $sth->errstr);
+	}
+	else
+	{
+		dbg("[$_global_sql]");
+
+		$sth->execute()
+			or fail("cannot execute [$_global_sql]: ", $sth->errstr);
+	}
 
 	my $rows_ref = $sth->fetchall_arrayref();
 
@@ -1122,6 +1418,96 @@ sub db_select
 	}
 
 	return $rows_ref;
+}
+
+sub db_select_col($;$)
+{
+	my $sql = shift;
+	my $bind_values = shift; # optional; reference to an array
+
+	my $rows = db_select($sql, $bind_values);
+
+	fail("query returned more than one column") if (scalar(@{$rows}) > 0 && scalar(@{$rows->[0]}) > 1);
+
+	return [map($_->[0], @{$rows})];
+}
+
+sub db_select_row($;$)
+{
+	my $sql = shift;
+	my $bind_values = shift; # optional; reference to an array
+
+	my $rows = db_select($sql, $bind_values);
+
+	fail("query did not return any row") if (scalar(@{$rows}) == 0);
+	fail("query returned more than one row") if (scalar(@{$rows}) > 1);
+
+	return $rows->[0];
+}
+
+sub db_select_value($;$)
+{
+	my $sql = shift;
+	my $bind_values = shift; # optional; reference to an array
+
+	my $row = db_select_row($sql, $bind_values);
+
+	fail("query returned more than one value") if (scalar(@{$row}) > 1);
+
+	return $row->[0];
+}
+
+sub db_explain($;$)
+{
+	my $sql = shift;
+	my $bind_values = shift; # optional; reference to an array
+
+	my $rows = db_select("explain $sql", $bind_values);
+
+	my @header;
+	if (@{$rows->[0]} == 10)
+	{
+		# MariaDB version - 10.2.24-MariaDB-log
+		@header = ("id", "select_type", "table", "type", "possible_keys", "key", "key_len", "ref", "rows", "Extra");
+	}
+	elsif (@{$rows->[0]} == 12)
+	{
+		# MySQL version - 5.7.27-0ubuntu0.18.04.1
+		@header = ("id", "select_type", "table", "partitions", "type", "possible_keys", "key", "key_len", "ref", "rows", "filtered", "Extra");
+	}
+
+	my @col_widths = map(length, @header);
+
+	foreach my $row (@{$rows})
+	{
+		for (my $i = 0; $i < scalar(@{$row}); $i++)
+		{
+			$row->[$i] //= "NULL";
+			if ($col_widths[$i] < length($row->[$i]))
+			{
+				$col_widths[$i] = length($row->[$i]);
+			}
+		}
+	}
+
+	my $line_width = 0;
+	my $line_format = "";
+	for (my $i = 0; $i < scalar(@header); $i++)
+	{
+		$line_width += 2 + $col_widths[$i] + 1;
+		$line_format .= "| %-${col_widths[$i]}s ";
+	}
+	$line_width += 2;
+	$line_format .= " |\n";
+
+	print("-" x $line_width . "\n");
+	printf($line_format, @header);
+	print("-" x $line_width . "\n");
+	foreach my $row (@{$rows})
+	{
+		printf($line_format, @{$row});
+	}
+	print("-" x $line_width . "\n");
 }
 
 sub db_select_binds
@@ -1190,9 +1576,10 @@ sub db_select_binds
 	return \@rows;
 }
 
-sub db_exec
+sub db_exec($;$)
 {
 	$_global_sql = shift;
+	$_global_sql_bind_values = shift; # optional; reference to an array
 
 	if ($get_stats)
 	{
@@ -1207,12 +1594,20 @@ sub db_exec
 	my $sth = $dbh->prepare($_global_sql)
 		or fail("cannot prepare [$_global_sql]: ", $dbh->errstr);
 
-	dbg("[$_global_sql]");
+	if (defined($_global_sql_bind_values))
+	{
+		dbg("[$_global_sql] ", join(',', @{$_global_sql_bind_values}));
 
-	my ($total);
+		$sth->execute(@{$_global_sql_bind_values})
+			or fail("cannot execute [$_global_sql]: ", $sth->errstr);
+	}
+	else
+	{
+		dbg("[$_global_sql]");
 
-	$sth->execute()
-		or fail("cannot execute [$_global_sql]: ", $sth->errstr);
+		$sth->execute()
+			or fail("cannot execute [$_global_sql]: ", $sth->errstr);
+	}
 
 	if ($get_stats)
 	{
@@ -1234,9 +1629,119 @@ sub db_exec
 	return $sth->{mysql_insertid};
 }
 
+sub db_mass_update($$$$$)
+{
+	# Function for updating LOTS of rows (hundreds, thousands or even tens of thousands) in batches.
+	#
+	# Example usage:
+	#
+	# <code>
+	# db_mass_update(
+	# 	"history_uint",
+	# 	["clock", "value"],
+	# 	[[1546300800, 1], [1546300860, 2], [1546300920, 3]],
+	# 	["clock"],
+	# 	[["itemid", 10052]]
+	# );
+	# </code>
+	#
+	# Does all following updates, but in a single query:
+	#
+	# <code>
+	# update history_uint set value = 1 where itemid = 10052 and clock = 1546300800;
+	# update history_uint set value = 2 where itemid = 10052 and clock = 1546300860;
+	# update history_uint set value = 3 where itemid = 10052 and clock = 1546300920;
+	# </code>
+	#
+	# Following calls would have the same effect:
+	#
+	# <code>
+	# db_mass_update(
+	# 	"tbl",
+	# 	["col1", "col2", "col3"],
+	# 	[["val1", "val2", "val3"]],
+	# 	["col1", "col2"],
+	# 	[["col4", "val4"], ["col5", "val5"]]
+	# );
+	# </code>
+	#
+	# <code>
+	# update tbl set col3 = val3 where (col1 = val1 and col2 = val2) and (col4 = val4 and col5 = val5);
+	# </code>
+	#
+	# Fields from $values that are listed in $filter_fields are used for filtering.
+	# Fields from $values that are not listed in $filter_fields are updated.
+
+	my $table         = shift; # table name
+	my $fields        = shift; # names of fields that are present in $values
+	my $values        = shift; # values for filtering/updating
+	my $filter_fields = shift; # fields from $values that are used for filtering
+	my $filter_values = shift; # additional filter values; may be undef or empty array
+
+	my $update_fields = [];
+
+	foreach my $field (@{$fields})
+	{
+		push(@{$update_fields}, $field) if (!grep($field eq $_, @{$filter_fields}));
+	}
+
+	$dbh->begin_work() or fail($dbh->errstr);
+
+	while (my @values_batch = splice(@{$values}, 0, 1000))
+	{
+		my $subquery;
+
+		foreach (@values_batch)
+		{
+			if (!defined($subquery))
+			{
+				$subquery = "select " . join(",", map("? as $_", @{$fields}));
+			}
+			else
+			{
+				$subquery .= " union select " . join(",", map("?", @{$fields}));
+			}
+		}
+
+		my $sql = "update $table"
+			. " inner join ($subquery) as update_values on "
+			. join(" and ", map("$table.$_=update_values.$_", @{$filter_fields}))
+			. " set "
+			. join(",", map("$table.$_=update_values.$_", @{$update_fields}));
+
+		if (defined($filter_values) && scalar(@{$filter_values}) > 0)
+		{
+			$sql .= " where " . join(" and ", map($table . "." . $_->[0] . "=?", @{$filter_values}));
+		}
+
+		my @params = (
+			map(@{$_}, @values_batch),
+			map($_->[1], @{$filter_values})
+		);
+
+		db_exec($sql, \@params);
+	}
+
+	$dbh->commit() or fail($dbh->errstr);
+}
+
 sub set_slv_config
 {
 	$config = shift;
+}
+
+sub current_month_first_cycle
+{
+	return month_start(time());
+}
+
+sub month_start
+{
+	require DateTime;
+
+	my $dt = DateTime->from_epoch('epoch' => shift());
+	$dt->truncate('to' => 'month');
+	return $dt->epoch();
 }
 
 # Get time bounds of the last cycle guaranteed to have all probe results.
@@ -1528,10 +2033,11 @@ sub init_values
 
 sub push_value
 {
-	my $hostname = shift;
-	my $key = shift;
-	my $clock = shift;
-	my $value = shift;
+	my $hostname   = shift;
+	my $key        = shift;
+	my $clock      = shift;
+	my $value      = shift;
+	my $value_type = shift;
 
 	my $info = join('', @_);
 
@@ -1545,20 +2051,16 @@ sub push_value
 				'value' => "$value",
 				'clock' => $clock
 			},
+			'value_type' => $value_type,
 			'info' => $info,
 		});
 
 	if (opt('dry-run'))
 	{
-		my $hostlen = length($hostname);
-		my $keylen = length($key);
-		my $clocklen = length($clock);
-		my $valuelen = length($value);
-
-		$_sender_values->{'maxhost'} = $hostlen if (!$_sender_values->{'maxhost'} || $hostlen > $_sender_values->{'maxhost'});
-		$_sender_values->{'maxkey'} = $keylen if (!$_sender_values->{'maxkey'} || $keylen > $_sender_values->{'maxkey'});
-		$_sender_values->{'maxclock'} = $clocklen if (!$_sender_values->{'maxclock'} || $clocklen > $_sender_values->{'maxclock'});
-		$_sender_values->{'maxvalue'} = $valuelen if (!$_sender_values->{'maxvalue'} || $valuelen > $_sender_values->{'maxvalue'});
+		$_sender_values->{'maxhost'}  = max($_sender_values->{'maxhost'}  // 0, length($hostname));
+		$_sender_values->{'maxkey'}   = max($_sender_values->{'maxkey'}   // 0, length($key));
+		$_sender_values->{'maxclock'} = max($_sender_values->{'maxclock'} // 0, length($clock));
+		$_sender_values->{'maxvalue'} = max($_sender_values->{'maxvalue'} // 0, length($value));
 	}
 }
 
@@ -1598,23 +2100,53 @@ sub send_values
 		return;
 	}
 
-	my $total_values = scalar(@{$_sender_values->{'data'}});
-
-	if ($total_values == 0)
+	if (opt('fill-gap'))
 	{
-		dbg(__script(), ": no data collected, nothing to send");
-		return;
+		foreach my $sender_value (@{$_sender_values->{'data'}})
+		{
+			my $host  = $sender_value->{'data'}{'host'};
+			my $key   = $sender_value->{'data'}{'key'};
+			my $clock = $sender_value->{'data'}{'clock'};
+			my $value = $sender_value->{'data'}{'value'};
+
+			my $table = history_table($sender_value->{'value_type'});
+
+			my $sql = "insert into $table (itemid,clock,value,ns)" .
+				" select items.itemid,?,?,0" .
+				" from" .
+					" items" .
+					" left join hosts on hosts.hostid=items.hostid" .
+				" where" .
+					" hosts.host=? and" .
+					" items.key_=?";
+
+			db_exec($sql, [$clock, $value, $host, $key]);
+		}
 	}
-
-	my $data = [];
-
-	foreach my $sender_value (@{$_sender_values->{'data'}})
+	else
 	{
-		push(@{$data}, $sender_value->{'data'});
-	}
+		my $total_values = scalar(@{$_sender_values->{'data'}});
 
-	dbg("sending $total_values values");	# send everything in one batch since server should be local
-	push_to_trapper($config->{'slv'}->{'zserver'}, $config->{'slv'}->{'zport'}, 10, 5, $data);
+		if ($total_values == 0)
+		{
+			dbg(__script(), ": no data collected, nothing to send");
+			return;
+		}
+
+		my $data = [map($_->{'data'}, @{$_sender_values->{'data'}})];
+
+		if (opt('output-file'))
+		{
+			my $output_file = getopt('output-file');
+			dbg("writing $total_values values to $output_file");
+			write_file($output_file, Dumper($data));
+		}
+		else
+		{
+			dbg("sending $total_values values");	# send everything in one batch since server should be local
+			push_to_trapper($config->{'slv'}->{'zserver'}, $config->{'slv'}->{'zport'}, 10, 5, $data);
+		}
+	}
 
 	# $tld is a global variable which is used in info()
 	my $saved_tld = $tld;
@@ -1629,6 +2161,233 @@ sub send_values
 				$h->{'info'}));
 	}
 	$tld = $saved_tld;
+
+	check_sent_values()
+}
+
+# Returns 0 if hashes are different.
+# Returns 1 if hashes are the same.
+sub compare_hashes($$)
+{
+	my $a = shift;
+	my $b = shift;
+
+	if (!defined($a) || !defined($b))
+	{
+		return 0;
+	}
+
+	if (keys(%{$a}) != keys(%{$b}))
+	{
+		return 0;
+	}
+
+	foreach my $key (keys(%{$a}))
+	{
+		if (!exists($b->{$key}))
+		{
+			return 0;
+		}
+		if ($a->{$key} ne $b->{$key})
+		{
+			return 0;
+		}
+	}
+
+	return 1;
+}
+
+# Wait until all pushed values are stored by history syncers on Zabbix Server.
+#
+# Note: Don't wait for too long, DB transactions on Zabbix Server may fail and
+# then data won't be synced. If this happens, warnings will be thrown.
+sub check_sent_values()
+{
+	my $data = [];
+
+	foreach my $sender_value (@{$_sender_values->{'data'}})
+	{
+		push(
+			@{$data},
+			{
+				'host'       => $sender_value->{'data'}{'host'},
+				'key'        => $sender_value->{'data'}{'key'},
+				'clock'      => $sender_value->{'data'}{'clock'},
+				'value'      => $sender_value->{'data'}{'value'},
+				'value_type' => $sender_value->{'value_type'},
+				'itemid'     => undef,
+			}
+		);
+	}
+
+	dbg("getting itemids of all pushed items");
+
+	my $host_key_pairs_hash = {};
+	my $host_key_pairs_list = [];
+
+	foreach my $value (@{$data})
+	{
+		my $host = $value->{'host'};
+		my $key  = $value->{'key'};
+
+		if (!exists($host_key_pairs_hash->{$host}{$key}))
+		{
+			$host_key_pairs_hash->{$host}{$key} = undef;
+			push(@{$host_key_pairs_list}, [$host, $key]);
+		}
+	}
+
+	my $itemids = get_itemids_by_hosts_and_keys($host_key_pairs_list);
+	my $itemids_list = [map(values(%{$_}), values(%{$itemids}))];
+
+	foreach my $value (@{$data})
+	{
+		my $host = $value->{'host'};
+		my $key  = $value->{'key'};
+
+		$value->{'itemid'} = $itemids->{$host}{$key};
+	}
+
+	dbg("getting max pushed clock for each item");
+
+	my $pushed_clocks = {};
+
+	foreach my $value (@{$data})
+	{
+		my $host   = $value->{'host'};
+		my $key    = $value->{'key'};
+		my $clock  = $value->{'clock'};
+		my $itemid = $value->{'itemid'};
+
+		$pushed_clocks->{$itemid} = max($pushed_clocks->{$itemid} // 0, $clock);
+	}
+
+	dbg("waiting until clocks in lastvalue reach pushed clocks");
+
+	# note(1): clocks in lastvalue table might be larger than pushed clocks if script is used for filling a gap
+	# note(2): clocks in lastvalue table might fail to reach pushed clocks if some DB transaction fails
+
+	my $itemids_placeholder = join(",", ("?") x scalar(@{$itemids_list}));
+	my $lastvalue_sql = "select itemid, clock from lastvalue where itemid in ($itemids_placeholder)";
+
+	my $lastvalue_clocks;
+	my $lastvalue_changed_time;
+
+	WAIT_FOR_LASTVALUE:
+	while (1)
+	{
+		select(undef, undef, undef, 0.25);
+
+		my $rows = db_select($lastvalue_sql, $itemids_list);
+		my $lastvalue_clocks_tmp = {map { $_->[0] => $_->[1] } @{$rows}};
+
+		if (compare_hashes($lastvalue_clocks_tmp, $lastvalue_clocks))
+		{
+			my $timeout = 30;
+
+			if (Time::HiRes::time() - $lastvalue_changed_time >= $timeout)
+			{
+				wrn("lastvalue table hasn't changed for $timeout seconds");
+				last WAIT_FOR_LASTVALUE;
+			}
+
+			next WAIT_FOR_LASTVALUE;
+		}
+
+		$lastvalue_clocks = $lastvalue_clocks_tmp;
+		$lastvalue_changed_time = Time::HiRes::time();
+
+		if (keys(%{$lastvalue_clocks}) != keys(%{$pushed_clocks}))
+		{
+			next WAIT_FOR_LASTVALUE;
+		}
+
+		foreach my $itemid (@{$itemids_list})
+		{
+			if ($lastvalue_clocks->{$itemid} < $pushed_clocks->{$itemid})
+			{
+				next WAIT_FOR_LASTVALUE;
+			}
+		}
+
+		last WAIT_FOR_LASTVALUE;
+	}
+
+	dbg("get data from history tables");
+
+	my $history_params = {};
+
+	foreach my $value (@{$data})
+	{
+		my $itemid = $value->{'itemid'};
+		my $clock  = $value->{'clock'};
+		my $table  = history_table($value->{'value_type'});
+
+		push(@{$history_params->{$table}}, $itemid, $clock);
+	}
+
+	my $history = {};
+
+	foreach my $table (keys(%{$history_params}))
+	{
+		# TODO: it might be needed to group entries by clock, i.e.,
+		# where (clock=? and itemid in (?,?,?)) or (clock=? and itemid in (?,?,?))
+
+		my $filter = join(" or ", ("(itemid=? and clock=?)") x (@{$history_params->{$table}} / 2));
+		my $sql = "select itemid,value,clock from $table where $filter";
+		my $rows = db_select($sql, $history_params->{$table});
+
+		foreach my $row (@{$rows})
+		{
+			my ($itemid, $value, $clock) = @{$row};
+
+			if (exists($history->{$itemid}{$clock}))
+			{
+				wrn("THIS SHOULD NOT HAPPEN, value for itemid=$itemid, clock=$clock has duplicates or exists in multiple history tables");
+			}
+
+			$history->{$itemid}{$clock} = $value;
+		}
+	}
+
+	dbg("checking that all pushed data exists in history tables");
+
+	foreach my $value (@{$data})
+	{
+		my $host          = $value->{'host'};
+		my $key           = $value->{'key'};
+		my $itemid        = $value->{'itemid'};
+		my $clock         = $value->{'clock'};
+		my $value_pushed  = $value->{'value'};
+		my $value_from_db = $history->{$itemid}{$clock};
+
+		if (!defined($value_from_db))
+		{
+			my $clock_str = ts_str($clock);
+
+			wrn("VALUE LOST! host=$host, key=$key, itemid=$itemid, clock=$clock_str, value=$value_pushed");
+		}
+		else
+		{
+			my $differs = 0;
+
+			if ($value->{'value_type'} == ITEM_VALUE_TYPE_FLOAT)
+			{
+				$differs = 1 if (abs($value_from_db - $value_pushed) > 0.0001);
+			}
+			else
+			{
+				$differs = 1 if ($value_from_db ne $value_pushed);
+			}
+
+			if ($differs)
+			{
+				my $clock_str = ts_str($clock);
+
+				wrn("VALUE DOES NOT MATCH! host=$host, key=$key, itemid=$itemid, clock=$clock_str, value=$value_pushed (got $value_from_db)");
+			}
+		}
+	}
 }
 
 # Get name server details (name, IP) from item key.
@@ -1804,6 +2563,16 @@ sub collect_slv_cycles($$$$$$)
 			next;
 		}
 
+		if (opt('fill-gap'))
+		{
+			my $clock = cycle_start(getopt('fill-gap'), $delay);
+			if (!history_value_exists($value_type, $clock, $itemid))
+			{
+				push(@{$cycles{$clock}}, $tld);
+			}
+			next;
+		}
+
 		next if (!opt('dry-run') && history_value_exists($value_type, $max_clock, $itemid));
 
 		my $cycles_added = 0;
@@ -1902,7 +2671,7 @@ sub process_slv_avail($$$$$$$$$$)
 
 	if ($online_probe_count < $cfg_minonline)
 	{
-		push_value($tld, $cfg_key_out, $value_ts, UP_INCONCLUSIVE_NO_PROBES,
+		push_value($tld, $cfg_key_out, $value_ts, UP_INCONCLUSIVE_NO_PROBES, ITEM_VALUE_TYPE_UINT64,
 				"Up (not enough probes online, $online_probe_count while $cfg_minonline required)");
 
 		if (alerts_enabled() == SUCCESS)
@@ -1933,7 +2702,7 @@ sub process_slv_avail($$$$$$$$$$)
 	my $probes_with_results = scalar(@{$values_ref});
 	if ($probes_with_results < $cfg_minonline)
 	{
-		push_value($tld, $cfg_key_out, $value_ts, UP_INCONCLUSIVE_NO_DATA,
+		push_value($tld, $cfg_key_out, $value_ts, UP_INCONCLUSIVE_NO_DATA, ITEM_VALUE_TYPE_UINT64,
 				"Up (not enough probes with results, $probes_with_results while $cfg_minonline required)");
 
 		if (alerts_enabled() == SUCCESS)
@@ -1963,11 +2732,11 @@ sub process_slv_avail($$$$$$$$$$)
 
 	if ($perc > SLV_UNAVAILABILITY_LIMIT)
 	{
-		push_value($tld, $cfg_key_out, $value_ts, UP, "Up ($detailed_info)");
+		push_value($tld, $cfg_key_out, $value_ts, UP, ITEM_VALUE_TYPE_UINT64, "Up ($detailed_info)");
 	}
 	else
 	{
-		push_value($tld, $cfg_key_out, $value_ts, DOWN, "Down ($detailed_info)");
+		push_value($tld, $cfg_key_out, $value_ts, DOWN, ITEM_VALUE_TYPE_UINT64, "Down ($detailed_info)");
 	}
 }
 
@@ -2005,7 +2774,7 @@ sub process_slv_rollweek_cycles($$$$$)
 			my $downtime = get_downtime($itemids{$tld}{'itemid_in'}, $from, $till, undef, undef, $delay);	# consider incidents
 			my $perc = sprintf("%.3f", $downtime * 100 / $cfg_sla);
 
-			push_value($tld, $cfg_key_out, $value_ts, $perc, "result: $perc% (down: $downtime minutes, sla: $cfg_sla)");
+			push_value($tld, $cfg_key_out, $value_ts, $perc, ITEM_VALUE_TYPE_FLOAT, "result: $perc% (down: $downtime minutes, sla: $cfg_sla)");
 		}
 
 		# unset TLD (for the logs)
@@ -2047,9 +2816,32 @@ sub process_slv_downtime_cycles($$$$)
 			# skip calculation if Service Availability value is not yet there
 			next if (!opt('dry-run') && !uint_value_exists($value_ts, $itemids{$tld}{'itemid_in'}));
 
-			my $downtime = get_downtime_execute($sth, $itemids{$tld}{'itemid_in'}, $from, $till, 1, $delay);	# ignore incidents
+			my $downtime;
+			if ($cfg_key_out eq 'rsm.slv.dns.downtime' && $value_ts == $from)
+			{
+				# There's a trigger "DNS service was unavailable for at least 1m", it goes into PROBLEM state
+				# as soon as 'rsm.slv.dns.downtime' is larger than 0. Value of 'rsm.slv.dns.downtime' resets
+				# to 0 at the beginning of each month. This also changes the state of the trigger to OK state
+				# at the beginning of the month.
+				#
+				# If an incident is active when the month switches, then value of 'rsm.slv.dns.downtime'
+				# resets to 0 *and* increases by 1 on the first cycle, because DNS service is down. This
+				# prevents trigger from switching to OK state and then again to PROBLEM state. As a result,
+				# alerts aren't being sent when the month switches.
+				#
+				# Workaround - always store 0 minutes of downtime on the first cycle of the month. This
+				# will make sure that trigger switches to OK state. This must be compensated on the second
+				# cycle of the month (i.e., downtime on the second cycle must be 2 if incident is active
+				# and availability on both first and second cycle of the month is DOWN).
 
-			push_value($tld, $cfg_key_out, $value_ts, $downtime, ts_str($from), " - ", ts_str($till));
+				$downtime = 0;
+			}
+			else
+			{
+				$downtime = get_downtime_execute($sth, $itemids{$tld}{'itemid_in'}, $from, $till, 0, $delay);
+			}
+
+			push_value($tld, $cfg_key_out, $value_ts, $downtime, ITEM_VALUE_TYPE_UINT64, ts_str($from), " - ", ts_str($till));
 		}
 
 		# unset TLD (for the logs)
@@ -2439,7 +3231,19 @@ sub get_downtime
 
 			if (defined($prevclock) && $clock - $prevclock != $delay)
 			{
-				fail("dimir was wrong, one cycle can have missing or more than one availability value");
+				my $prevclock_ts = ts_full($prevclock);
+				my $clock_ts = ts_full($clock);
+
+				my $info = "itemid=$itemid, prevclock=$prevclock_ts, clock=$clock_ts, delay=$delay";
+
+				if ($clock - $prevclock > $delay)
+				{
+					fail("cycle is missing availability value ($info)");
+				}
+				else
+				{
+					fail("cycle has more than one availability value ($info)");
+				}
 			}
 
 			if ($value == DOWN)
@@ -2555,7 +3359,19 @@ sub get_downtime_execute
 		{
 			if (defined($prevclock) && $clock - $prevclock != $delay)
 			{
-				fail("dimir was wrong, one cycle can have missing or more than one availability value");
+				my $prevclock_ts = ts_full($prevclock);
+				my $clock_ts = ts_full($clock);
+
+				my $info = "itemid=$itemid, prevclock=$prevclock_ts, clock=$clock_ts, delay=$delay";
+
+				if ($clock - $prevclock > $delay)
+				{
+					fail("cycle is missing availability value ($info)");
+				}
+				else
+				{
+					fail("cycle has more than one availability value ($info)");
+				}
 			}
 
 			if ($value == DOWN)
@@ -2643,6 +3459,30 @@ sub get_itemids_by_hostids
 	}
 
 	return $result;
+}
+
+#
+# returns array of itemids: [itemid1, itemid2, ...]
+#
+sub get_itemids_by_key_pattern_and_hosts($$;$)
+{
+	my $key_pattern = shift; # pattern for 'items.key_ like ...' condition
+	my $hosts       = shift; # ref to array of hosts, e.g., ['tld1', 'tld2', ...]
+	my $item_status = shift; # optional; ITEM_STATUS_ACTIVE or ITEM_STATUS_DISABLED
+
+	my $hosts_placeholder = join(",", ("?") x scalar(@{$hosts}));
+
+	my $item_status_condition = defined($item_status) ? ("items.status=" . $item_status . " and") : "";
+
+	my $bind_values = [$key_pattern, @{$hosts}];
+	my $rows = db_select(
+		"select items.itemid" .
+		" from items left join hosts on hosts.hostid=items.hostid" .
+		" where $item_status_condition" .
+			" items.key_ like ? and" .
+			" hosts.host in ($hosts_placeholder)", $bind_values);
+
+	return [map($_->[0], @{$rows})];
 }
 
 # organize values from all probes grouped by nsip and return "nsip"->values hash
@@ -3154,7 +3994,7 @@ sub parse_slv_opts
 {
 	$POD2USAGE_FILE = '/opt/zabbix/scripts/slv/rsm.slv.usage';
 
-	parse_opts('tld=s', 'now=n', 'cycles=n');
+	parse_opts('tld=s', 'now=n', 'cycles=n', 'output-file=s', 'fill-gap=n');
 }
 
 sub opt
@@ -3206,6 +4046,26 @@ sub ts_full
 	return "$str ($ts)";
 }
 
+sub ts_ymd
+{
+	my $ts    = shift // time();
+	my $delim = shift // "-";
+
+	my (undef, undef, undef, $mday, $mon, $year) = localtime($ts);
+
+	return sprintf("%.4d%s%.2d%s%.2d", $year + 1900, $delim, $mon + 1, $delim, $mday);
+}
+
+sub ts_ym
+{
+	my $ts    = shift // time();
+	my $delim = shift // "-";
+
+	my (undef, undef, undef, undef, $mon, $year) = localtime($ts);
+
+	return sprintf("%.4d%s%.2d", $year + 1900, $delim, $mon + 1);
+}
+
 sub selected_period
 {
 	my $from = shift;
@@ -3218,49 +4078,7 @@ sub selected_period
 	return "any time";
 }
 
-sub write_file
-{
-	my $file = shift;
-	my $text = shift;
-
-	my $OUTFILE;
-
-	return E_FAIL unless (open($OUTFILE, '>', $file));
-
-	my $rv = print { $OUTFILE } $text;
-
-	close($OUTFILE);
-
-	return E_FAIL unless ($rv);
-
-	return SUCCESS;
-}
-
-sub read_file($$;$)
-{
-	my $file = shift;
-	my $buf = shift;
-	my $error_buf = shift;
-
-	my $contents = do
-	{
-		local $/ = undef;
-
-		if (!open my $fh, "<", $file)
-		{
-			$$error_buf = "$!" if ($error_buf);
-			return E_FAIL;
-		}
-
-		<$fh>;
-	};
-
-	$$buf = $contents;
-
-	return SUCCESS;
-}
-
-sub cycle_start
+sub cycle_start($$)
 {
 	my $now = shift;
 	my $delay = shift;
@@ -3268,7 +4086,7 @@ sub cycle_start
 	return $now - ($now % $delay);
 }
 
-sub cycle_end
+sub cycle_end($$)
 {
 	my $now = shift;
 	my $delay = shift;
@@ -3276,9 +4094,1082 @@ sub cycle_end
 	return cycle_start($now, $delay) + $delay - 1;
 }
 
+sub cycles_till_end_of_month($$)
+{
+	my $now = shift;
+	my $delay = shift;
+
+	my $end_of_month = get_end_of_month($now);
+	my $this_cycle_start = cycle_start($now, $delay);
+	my $last_cycle_end = cycle_end($end_of_month, $delay);
+	my $cycle_count = ($last_cycle_end + 1 - $this_cycle_start) / $delay;
+
+	if (opt('debug'))
+	{
+		require DateTime;
+
+		dbg('now              - ', DateTime->from_epoch('epoch' => $now));
+		dbg('this cycle start - ', DateTime->from_epoch('epoch' => $this_cycle_start));
+		dbg('end of month     - ', DateTime->from_epoch('epoch' => $end_of_month));
+		dbg('last cycle end   - ', DateTime->from_epoch('epoch' => $last_cycle_end));
+		dbg('delay            - ', $delay);
+		dbg('cycle count      - ', $cycle_count);
+	}
+
+	return $cycle_count;
+}
+
+sub get_end_of_month($)
+{
+	my $now = shift;
+
+	require DateTime;
+
+	my $dt = DateTime->from_epoch('epoch' => $now);
+	$dt->truncate('to' => 'month');
+	$dt->add('months' => 1);
+	$dt->subtract('seconds' => 1);
+	return $dt->epoch();
+}
+
+sub get_end_of_prev_month($)
+{
+	my $now = shift;
+
+	require DateTime;
+
+	my $dt = DateTime->from_epoch('epoch' => $now);
+	$dt->truncate('to' => 'month');
+	$dt->subtract('seconds' => 1);
+	return $dt->epoch();
+}
+
+sub get_month_bounds(;$)
+{
+	my $now = shift // time();
+
+	require DateTime;
+
+	my $from;
+	my $till;
+
+	my $dt = DateTime->from_epoch('epoch' => $now);
+	$dt->truncate('to' => 'month');
+	$from = $dt->epoch();
+	$dt->add('months' => 1);
+	$dt->subtract('seconds' => 1);
+	$till = $dt->epoch();
+
+	return ($from, $till);
+}
+
+sub get_slv_rtt_cycle_stats($$$$)
+{
+	my $tld         = shift;
+	my $rtt_params  = shift;
+	my $cycle_start = shift;
+	my $cycle_end   = shift;
+
+	my $probes                  = $rtt_params->{'probes'};
+	my $rtt_item_key_pattern    = $rtt_params->{'rtt_item_key_pattern'};
+	my $timeout_error_value     = $rtt_params->{'timeout_error_value'};
+	my $timeout_threshold_value = $rtt_params->{'timeout_threshold_value'};
+
+	if (scalar(keys(%{$probes})) == 0)
+	{
+		dbg("there are no probes that would be able to collect RTT stats for TLD '$tld', item '$rtt_item_key_pattern'");
+		return {
+			'expected'   => 0,
+			'total'      => 0,
+			'performed'  => 0,
+			'failed'     => 0,
+			'successful' => 0
+		};
+	}
+
+	my $tld_hosts = [map("$tld $_", keys(%{$probes}))];
+	my $tld_itemids = get_itemids_by_key_pattern_and_hosts($rtt_item_key_pattern, $tld_hosts, ITEM_STATUS_ACTIVE);
+	my $tld_itemids_str = join(",", @{$tld_itemids});
+
+	if (scalar(@{$tld_itemids}) == 0)
+	{
+		dbg("items '$rtt_item_key_pattern' not found for for TLD '$tld'");
+		return {
+			'expected'   => 0,
+			'total'      => 0,
+			'performed'  => 0,
+			'failed'     => 0,
+			'successful' => 0
+		};
+	}
+
+	my $rows = db_select(
+			"select count(*)," .
+				" count(if(value=$timeout_error_value || value>$timeout_threshold_value,1,null))," .
+				" count(if(value between 0 and $timeout_threshold_value,1,null))" .
+			" from history" .
+			" where itemid in ($tld_itemids_str) and clock between $cycle_start and $cycle_end");
+
+	return {
+		'expected'   => scalar(@{$tld_itemids}),        # number of expected tests, based on number of items and number of probes
+		'total'      => $rows->[0][0],                  # number of received values, including errors
+		'performed'  => $rows->[0][1] + $rows->[0][2],  # number of received values, excluding errors (timeout errors are valid values)
+		'failed'     => $rows->[0][1],                  # number of failed tests - timeout errors and successful queries over the time limit
+		'successful' => $rows->[0][2]                   # number of successful tests
+	};
+}
+
+sub get_slv_rtt_cycle_stats_aggregated($$$$)
+{
+	my $rtt_params_list = shift; # array of hashes
+	my $cycle_start     = shift;
+	my $cycle_end       = shift;
+	my $tld             = shift;
+
+	my %aggregated_stats = (
+		'expected'   => 0,
+		'total'      => 0,
+		'performed'  => 0,
+		'failed'     => 0,
+		'successful' => 0
+	);
+
+	foreach my $rtt_params (@{$rtt_params_list})
+	{
+		if (!tld_service_enabled($tld, $rtt_params->{'tlds_service'}, $cycle_end))
+		{
+			next;
+		}
+
+		my $service_stats = get_slv_rtt_cycle_stats($tld, $rtt_params, $cycle_start, $cycle_end);
+
+		$aggregated_stats{'expected'}   += $service_stats->{'expected'};
+		$aggregated_stats{'total'}      += $service_stats->{'total'};
+		$aggregated_stats{'performed'}  += $service_stats->{'performed'};
+		$aggregated_stats{'failed'}     += $service_stats->{'failed'};
+		$aggregated_stats{'successful'} += $service_stats->{'successful'};
+	}
+
+	return \%aggregated_stats;
+}
+
+sub get_slv_rtt_monthly_items($$$$)
+{
+	my $single_tld             = shift; # undef or name of TLD
+	my $slv_item_key_performed = shift;
+	my $slv_item_key_failed    = shift;
+	my $slv_item_key_pfailed   = shift;
+
+	my $host_condition = "";
+
+	my @bind_values = (
+		$slv_item_key_performed,
+		$slv_item_key_failed,
+		$slv_item_key_pfailed
+	);
+
+	if (defined($single_tld))
+	{
+		$host_condition = "hosts.host=? and";
+		push(@bind_values, $single_tld);
+	}
+
+	my $slv_items = db_select(
+			"select hosts.host,items.key_,lastvalue.clock,lastvalue.value" .
+			" from items" .
+				" left join hosts on hosts.hostid=items.hostid" .
+				" left join hosts_groups on hosts_groups.hostid=hosts.hostid" .
+				" left join lastvalue on lastvalue.itemid=items.itemid" .
+			" where items.status=" . ITEM_STATUS_ACTIVE . " and" .
+				" items.key_ in (?,?,?) and" .
+				" $host_condition" .
+				" hosts.status=" . HOST_STATUS_MONITORED . " and" .
+				" hosts_groups.groupid=" . TLDS_GROUPID, \@bind_values);
+
+	# contents: $slv_items_by_tld{$tld}{$item_key} = [$last_clock, $last_value];
+	my %slv_items_by_tld = ();
+
+	foreach my $slv_item (@{$slv_items})
+	{
+		my ($tld, $item_key, $last_clock, $last_value) = @{$slv_item};
+		$slv_items_by_tld{$tld}{$item_key} = [$last_clock, $last_value];
+	}
+
+	foreach my $tld (keys(%slv_items_by_tld))
+	{
+		set_log_tld($tld);
+
+		my %tld_items = %{$slv_items_by_tld{$tld}};
+
+		# if any item was found on TLD, then all items must exist
+		fail("Item '$slv_item_key_performed' not found for TLD '$tld'")
+				unless (exists($tld_items{$slv_item_key_performed}));
+		fail("Item '$slv_item_key_failed' not found for TLD '$tld'")
+				unless (exists($tld_items{$slv_item_key_failed}));
+		fail("Item '$slv_item_key_pfailed' not found for TLD '$tld'")
+				unless (exists($tld_items{$slv_item_key_pfailed}));
+
+		if (!defined($tld_items{$slv_item_key_performed}[0]) ||
+				!defined($tld_items{$slv_item_key_failed}[0]) ||
+				!defined($tld_items{$slv_item_key_pfailed}[0]))
+		{
+			# if any lastvalue on TLD is undefined, then all lastvalues must be undefined
+
+			fail("Item '$slv_item_key_performed' on TLD '$tld' has lastvalue while other related items don't")
+					if (defined($tld_items{$slv_item_key_performed}[0]));
+			fail("Item '$slv_item_key_failed' on TLD '$tld' has lastvalue while other related items don't")
+					if (defined($tld_items{$slv_item_key_failed}[0]));
+			fail("Item '$slv_item_key_pfailed' on TLD '$tld' has lastvalue while other related items don't")
+					if (defined($tld_items{$slv_item_key_pfailed}[0]));
+		}
+		else
+		{
+			# if all lastvalues on TLD are defined, their clock must be the same
+
+			if ($tld_items{$slv_item_key_performed}[0] != $tld_items{$slv_item_key_failed}[0] ||
+					$tld_items{$slv_item_key_performed}[0] != $tld_items{$slv_item_key_pfailed}[0])
+			{
+				fail("Items '$slv_item_key_performed', '$slv_item_key_failed' and '$slv_item_key_pfailed' have different lastvalue clocks on TLD '$tld'");
+			}
+		}
+
+		unset_log_tld();
+	}
+
+	return \%slv_items_by_tld;
+}
+
+sub update_slv_rtt_monthly_stats($$$$$$$$)
+{
+	my $now                    = shift;
+	my $max_cycles             = shift;
+	my $single_tld             = shift; # undef or name of TLD
+	my $slv_item_key_performed = shift;
+	my $slv_item_key_failed    = shift;
+	my $slv_item_key_pfailed   = shift;
+	my $cycle_delay            = shift;
+	my $rtt_params_list        = shift;
+
+	# how long to wait for data after $cycle_end if number of performed checks is smaller than expected checks
+	# TODO: $max_nodata_time = $cycle_delay * x?
+	# TODO: move to rsm.conf?
+	my $max_nodata_time = 300;
+
+	# contents: $slv_items->{$tld}{$item_key} = [$last_clock, $last_value];
+	my $slv_items = get_slv_rtt_monthly_items($single_tld, $slv_item_key_performed, $slv_item_key_failed, $slv_item_key_pfailed);
+
+	# starting time of the last cycle of the previous month
+	my $end_of_prev_month = cycle_start(get_end_of_prev_month($now), $cycle_delay);
+
+	init_values();
+
+	TLD_LOOP:
+	foreach my $tld (keys(%{$slv_items}))
+	{
+		set_log_tld($tld);
+
+		my $last_clock           = $slv_items->{$tld}{$slv_item_key_performed}[0];
+		my $last_performed_value = $slv_items->{$tld}{$slv_item_key_performed}[1];
+		my $last_failed_value    = $slv_items->{$tld}{$slv_item_key_failed}[1];
+		my $last_pfailed_value   = $slv_items->{$tld}{$slv_item_key_pfailed}[1];
+
+		# if there's no lastvalue, start collecting stats from the begining of the current month
+		if (!defined($last_clock))
+		{
+			$last_clock = $end_of_prev_month;
+		}
+
+		my $cycles_till_end_of_month = cycles_till_end_of_month($last_clock + $cycle_delay, $cycle_delay);
+
+		for (my $i = 0; $i < $max_cycles; $i++)
+		{
+			# if new month starts, reset the counters
+			if ($last_clock == $end_of_prev_month)
+			{
+				$cycles_till_end_of_month = cycles_till_end_of_month($last_clock + $cycle_delay, $cycle_delay);
+				$last_performed_value = 0;
+				$last_failed_value    = 0;
+				$last_pfailed_value   = 0;
+			}
+
+			my $cycle_start = cycle_start($last_clock + $cycle_delay, $cycle_delay);
+			my $cycle_end   = cycle_end($last_clock + $cycle_delay, $cycle_delay);
+
+			if ($cycle_start > $now)
+			{
+				next TLD_LOOP;
+			}
+
+			my $rtt_stats = get_slv_rtt_cycle_stats_aggregated($rtt_params_list, $cycle_start, $cycle_end, $tld);
+
+			if ($rtt_stats->{'total'} < $rtt_stats->{'expected'} && $cycle_end > $now - $max_nodata_time)
+			{
+				if (opt('debug'))
+				{
+					dbg("stopping updatig TLD '$tld' because of missing data, cycle from $cycle_start till $cycle_end");
+				}
+				next TLD_LOOP;
+			}
+
+			$cycles_till_end_of_month--;
+
+			if ($cycles_till_end_of_month < 0)
+			{
+				if (opt('debug'))
+				{
+					dbg("\$i                        = $i");
+					dbg("\$cycles_till_end_of_month = $cycles_till_end_of_month");
+					dbg("\$end_of_prev_month        = $end_of_prev_month");
+					dbg("\$last_clock               = $last_clock");
+					dbg("\$cycle_delay              = $cycle_delay");
+					dbg("\$cycle_start              = $cycle_start");
+					dbg("\$cycle_end                = $cycle_end");
+				}
+
+				fail("\$cycles_till_end_of_month must not be less than 0, perhaps last value clock is older than beginning of previous month");
+			}
+
+			$last_performed_value += $rtt_stats->{'performed'};
+			$last_failed_value    += $rtt_stats->{'failed'};
+
+			my $performed_with_expected = $last_performed_value + $cycles_till_end_of_month * $rtt_stats->{'expected'};
+
+			if ($performed_with_expected == 0)
+			{
+				wrn("performed ($last_performed_value)".
+					" + expected (cycles:$cycles_till_end_of_month * tests:$rtt_stats->{'expected'})".
+					" number of tests is zero");
+
+				if ($last_pfailed_value > 0)
+				{
+					fail("unexpected last pfailed value:\n".
+						"\$i                        = $i\n".
+						"\$tld                      = $tld\n".
+						"\$cycles_till_end_of_month = $cycles_till_end_of_month\n".
+						"\$end_of_prev_month        = $end_of_prev_month\n".
+						"\$last_clock               = $last_clock\n".
+						"\$cycle_delay              = $cycle_delay\n".
+						"\$cycle_start              = $cycle_start\n".
+						"\$cycle_end                = $cycle_end\n".
+						"\$last_pfailed_value       = $last_pfailed_value\n".
+						"\$rtt_stats->{'expected'}  = $rtt_stats->{'expected'}");
+				}
+			}
+			else
+			{
+				$last_pfailed_value = 100 * $last_failed_value / $performed_with_expected;
+			}
+
+			push_value($tld, $slv_item_key_performed, $cycle_start, $last_performed_value, ITEM_VALUE_TYPE_UINT64);
+			push_value($tld, $slv_item_key_failed   , $cycle_start, $last_failed_value, ITEM_VALUE_TYPE_UINT64);
+			push_value($tld, $slv_item_key_pfailed  , $cycle_start, $last_pfailed_value, ITEM_VALUE_TYPE_FLOAT);
+
+			$last_clock = $cycle_start;
+		}
+
+		unset_log_tld();
+	}
+
+	send_values();
+}
+
+sub recalculate_downtime($$$$$$)
+{
+	my $auditlog_log_file = shift;
+	my $item_key_avail    = shift; # exact key for rdds and dns, pattern for dns.ns
+	my $item_key_downtime = shift; # exact key for rdds and dns, undef for dns.ns
+	my $incident_fail     = shift; # how many cycles have to fail to start the incident
+	my $incident_recover  = shift; # how many cycles have to succeed to recover from the incident
+	my $delay             = shift;
+
+	fail("not supported when running in --dry-run mode") if (opt('dry-run'));
+
+	# get service from item's key ('RDDS', 'DNS', 'DNS.NS')
+	my $service = uc($item_key_avail =~ s/^rsm\.slv\.(.+)\.avail(?:\[.*\])?$/$1/r);
+
+	# get last auditid
+	my $last_auditlog_auditid = __fp_read_last_auditid($auditlog_log_file);
+	dbg("last_auditlog_auditid = $last_auditlog_auditid");
+
+	# get list of events.eventid (incidents) that changed their "false positive" state
+	my @eventids = __fp_get_updated_eventids(\$last_auditlog_auditid);
+
+	# process incidents
+	if (@eventids)
+	{
+		# my @report_updates = ([host, clock, incident, $false_positive], ...)
+		# One incident may start on one month, end on the next month.
+		# One incident may result in recalculating history of multiple items (downtime of DNS nameservers).
+		# In these cases, there will be more than 1 entry in @report_updates for an incident.
+		# __fp_regenerate_reports() must take care of removing "duplicates" from @report_updates.
+		my @report_updates = ();
+
+		foreach my $eventid (@eventids)
+		{
+			__fp_process_incident(
+				$service,
+				$eventid,
+				$item_key_avail,
+				$item_key_downtime,
+				$incident_fail,
+				$incident_recover,
+				$delay,
+				\@report_updates
+			);
+		}
+
+		__fp_regenerate_reports($service, \@report_updates);
+	}
+
+	# save last auditid (it may have changed even if @eventids is empty)
+	__fp_write_last_auditid($auditlog_log_file, $last_auditlog_auditid);
+}
+
+sub generate_report($$;$)
+{
+	my $tld   = shift;
+	my $ts    = shift;
+	my $force = shift;
+
+	my ($year, $month) = split("-", ts_ym($ts));
+
+	my $cmd = "/opt/zabbix/scripts/sla-report.php";
+	my @args = ();
+
+	push(@args, "--debug") if opt("debug");
+	push(@args, "--stats") if opt("stats");
+	push(@args, "--force") if $force;
+
+	push(@args, "--tld"      , $tld);
+	push(@args, "--year"     , int($year));
+	push(@args, "--month"    , int($month));
+
+	@args = map('"' . $_ . '"', @args);
+
+	dbg("executing $cmd @args");
+	my $out = qx($cmd @args 2>&1);
+
+	if ($out)
+	{
+		info("output of $cmd:\n" . $out);
+	}
+
+	if ($? == -1)
+	{
+		fail("failed to generate reports, failed to execute $cmd: $!");
+	}
+	if ($? != 0)
+	{
+		fail("failed to generate report, command $cmd exited with value " . ($? >> 8));
+	}
+}
+
+sub set_log_tld($)
+{
+	$tld = shift;
+}
+
+sub unset_log_tld()
+{
+	undef($tld);
+}
+
 sub usage
 {
 	pod2usage(shift);
+}
+
+#######################################################
+# Internal subs for handling false-positive incidents #
+#######################################################
+
+my $__fp_logfile = "/var/log/zabbix/false-positive.log";
+
+sub __fp_log($$$)
+{
+	my $host    = shift;
+	my $service = shift;
+	my $message = shift;
+
+	my $log_str = sprintf("[%s:%s] [%s] [%s] %s", $$, ts_str(), $host, $service, $message);
+
+	dbg($log_str);
+
+	open(my $fh, ">>", $__fp_logfile) or fail("cannot open file '$__fp_logfile'");
+	flock($fh, LOCK_EX)               or fail("cannot lock file '$__fp_logfile'");
+	print($fh $log_str . "\n")        or fail("cannot write to file '$__fp_logfile'");
+	close($fh)                        or fail("cannot close file '$__fp_logfile'");
+}
+
+sub __fp_read_last_auditid($)
+{
+	my $file = shift;
+
+	my $auditid = 0;
+
+	if (-e $file)
+	{
+		my $error;
+
+		if (read_file($file, \$auditid, \$error) != SUCCESS)
+		{
+			fail("cannot read file \"$file\": $error");
+		}
+	}
+
+	return $auditid;
+}
+
+sub __fp_write_last_auditid($$)
+{
+	my $file    = shift;
+	my $auditid = shift;
+
+	if (write_file($file, $auditid) != SUCCESS)
+	{
+		fail("cannot write file \"$file\"");
+	}
+}
+
+sub __fp_get_updated_eventids($)
+{
+	my $last_auditlog_auditid_ref = shift;
+
+	# check integrity
+
+	my $max_auditid = db_select_value("select max(auditid) from auditlog") // 0;
+	if (${$last_auditlog_auditid_ref} > $max_auditid)
+	{
+		fail("value of last processed auditlog.auditid (${$last_auditlog_auditid_ref}) is larger than max auditid in the database ($max_auditid)");
+	}
+
+	# get unprocessed auditlog entries
+
+	my $sql = "select if(resourcetype=?,resourceid,0) as auditlog_eventid,count(*),max(auditid)" .
+		" from auditlog" .
+		" where auditid > ?" .
+		" group by auditlog_eventid";
+
+	my $params = [AUDIT_RESOURCE_INCIDENT, ${$last_auditlog_auditid_ref}];
+	my $rows = db_select($sql, $params);
+
+	if (scalar(@{$rows}) == 0)
+	{
+		# all auditlog entries are processed already
+		return;
+	}
+
+	# get list of events.eventid (incidents) that changed their "false positive" state
+
+	my @eventids = ();
+
+	foreach my $row (@{$rows})
+	{
+		my ($eventid, $count, $max_auditid) = @{$row};
+
+		${$last_auditlog_auditid_ref} = max(${$last_auditlog_auditid_ref}, $max_auditid);
+
+		next if ($eventid == 0); # this is not AUDIT_RESOURCE_INCIDENT
+		next if ($count % 2 == 0); # marked + unmarked, no need to recalculate
+
+		push(@eventids, $eventid);
+	}
+
+	return sort { $a <=> $b } @eventids;
+}
+
+sub __fp_process_incident($$$$$$$)
+{
+	my $service            = shift;
+	my $eventid            = shift;
+	my $item_key_avail     = shift;
+	my $item_key_downtime  = shift;
+	my $incident_fail      = shift;
+	my $incident_recover   = shift;
+	my $delay              = shift;
+	my $report_updates_ref = shift;
+
+	dbg("processing incident #$eventid");
+
+	# get info about an incident that changed its false positiveness
+
+	my ($triggerid, $incident_from, $incident_till, $rsmhostid, $rsmhost, $itemid, $key, $false_positive) = __fp_get_incident_info($eventid);
+
+	# check incident's item key to make sure that $service is related to this incident
+
+	my $skip = 0;
+	$skip = 1 if ($service eq 'DNS.NS' && $key ne 'rsm.slv.dns.avail');
+	$skip = 1 if ($service ne 'DNS.NS' && $key ne $item_key_avail);
+	if ($skip)
+	{
+		dbg("skipping incident #$eventid (\$service = '$service', \$item_key_avail = '$item_key_avail', incident's \$key = '$key')");
+		return;
+	}
+
+	# get $itemid_avail => $itemid_downtime map of items that have to be recalculated
+
+	my %itemids_map = __fp_get_itemids_map($service, $rsmhostid, $item_key_avail, $item_key_downtime);
+
+	# process each item
+
+	while (my ($itemid_avail, $itemid_downtime) = each(%itemids_map))
+	{
+		# determine time interval that has to be recalculated
+
+		my $recalculate_from = cycle_start($incident_from, $delay);
+		my $recalculate_till = cycle_start(get_end_of_month($incident_till), $delay) if (defined($incident_till));
+
+		my $lastclock = db_select_value("select clock from lastvalue where itemid=?", [$itemid_downtime]);
+		$recalculate_till = defined($recalculate_till) ? min($recalculate_till, $lastclock) : $lastclock;
+
+		dbg("eventid          - ", $eventid);
+		dbg("triggerid        - ", $triggerid);
+		dbg("itemid_avail     - ", $itemid_avail);
+		dbg("itemid_downtime  - ", $itemid_downtime);
+		dbg("incident from    - ", defined($incident_from) ? ts_full($incident_from) : 'undef');
+		dbg("incident till    - ", defined($incident_till) ? ts_full($incident_till) : 'undef');
+		dbg("recalculate from - ", defined($recalculate_from) ? ts_full($recalculate_from) : 'undef');
+		dbg("recalculate till - ", defined($recalculate_till) ? ts_full($recalculate_till) : 'undef');
+
+		# get downtime clock & value right before the updated incident
+
+		dbg("getting last downtime data before the incident...");
+
+		my %downtime = __fp_get_history_values($itemid_downtime, $recalculate_from - $delay);
+
+		if (!%downtime)
+		{
+			dbg("skipping incident #$eventid for item #$itemid_downtime (was too long ago, not enough data for recalculating hitsory)");
+			next;
+		}
+
+		# get availability data
+
+		dbg("getting availability data...");
+
+		my %avail = __fp_get_history_values(
+			$itemid_avail,
+			$recalculate_from - $delay * ($incident_fail - 1),
+			$recalculate_till
+		);
+
+		for (my $clock = $recalculate_from - $delay * ($incident_fail - 1); $clock <= $recalculate_till; $clock += $delay)
+		{
+			if (!exists($avail{$clock}))
+			{
+				$clock = ts_full($clock);
+				fail("missing availability data (\$itemid = $itemid, \$clock = $clock)");
+			}
+		}
+
+		# update availability data, based on false positive incidents
+
+		dbg("getting time ranges of false positive incidents...");
+
+		my @fp_ranges = __fp_get_false_positive_ranges($triggerid, $recalculate_from, $recalculate_till);
+
+		foreach my $fp_range (@fp_ranges)
+		{
+			my ($fp_from, $fp_till) = @{$fp_range};
+
+			if (!defined($fp_till) || $fp_till > $recalculate_till)
+			{
+				$fp_till = $recalculate_till;
+			}
+
+			for (my $clock = $fp_from; $clock <= $fp_till; $clock += $delay)
+			{
+				$avail{$clock} = UP;
+			}
+		}
+
+		# recalculate downtime
+
+		my @downtime_values = ();
+
+		my $downtime_value = $downtime{$recalculate_from - $delay};
+		my $is_incident = $false_positive ? 0 : 1;
+		my $counter = 0;
+		my $beginning_of_next_month = cycle_start(get_end_of_month($recalculate_from - $delay), $delay) + $delay;
+
+		push(@{$report_updates_ref}, [$rsmhost, $recalculate_from, $eventid, $false_positive]);
+
+		dbg("recalculating downtime values...");
+
+		for (my $clock = $recalculate_from; $clock <= $recalculate_till; $clock += $delay)
+		{
+			if (!defined($avail{$clock}))
+			{
+				fail("failed to update history, missing availability data (itemid: $itemid_avail; clock: $clock)");
+			}
+
+			__fp_update_incident_state($incident_fail, $incident_recover, $avail{$clock}, \$counter, \$is_incident);
+
+			if ($clock == $beginning_of_next_month)
+			{
+				$downtime_value = 0;
+				$beginning_of_next_month = cycle_start(get_end_of_month($clock), $delay) + $delay;
+				push(@{$report_updates_ref}, [$rsmhost, $clock, $eventid, $false_positive]);
+			}
+
+			if ($is_incident && $avail{$clock} == DOWN)
+			{
+				$downtime_value += $delay / 60;
+			}
+
+			push(@downtime_values, [$clock, $downtime_value]);
+		}
+
+		# store new downtime values
+
+		dbg("updating downtime values...");
+
+		my $debug = opt('debug');
+		unsetopt('debug');
+
+		db_mass_update(
+			"history_uint",
+			["clock", "value"],
+			\@downtime_values,
+			["clock"],
+			[['itemid', $itemid_downtime]]
+		);
+
+		setopt('debug', 1) if ($debug);
+
+		# update lastvalue if necessary
+
+		if ($recalculate_till == $lastclock)
+		{
+			dbg("updating lastvalue of itemid $itemid_downtime...");
+			my $sql = "update" .
+					" lastvalue" .
+					" inner join history_uint on history_uint.itemid=lastvalue.itemid and history_uint.clock=lastvalue.clock" .
+				" set lastvalue.value=history_uint.value" .
+				" where lastvalue.itemid=?";
+			db_exec($sql, [$itemid_downtime]);
+		}
+	}
+}
+
+sub __fp_get_incident_info($)
+{
+	my $eventid = shift;
+
+	my $sql = "select " .
+			"events.source," .
+			"events.object," .
+			"events.value," .
+			"events.objectid," .
+			"events.false_positive," .
+			"events.clock," .
+			"(" .
+				"select clock" .
+				" from events as events_inner" .
+				" where" .
+					" events_inner.source=events.source and" .
+					" events_inner.object=events.object and" .
+					" events_inner.objectid=events.objectid and" .
+					" events_inner.value=? and" .
+					" events_inner.eventid>events.eventid" .
+				" order by events_inner.eventid asc" .
+				" limit 1" .
+			") as clock2," .
+			"function_items.hostid," .
+			"function_items.host," .
+			"function_items.itemid," .
+			"function_items.key_" .
+		" from" .
+			" events" .
+			" left join (" .
+				"select distinct" .
+					" functions.triggerid," .
+					"items.itemid," .
+					"items.key_," .
+					"hosts.hostid," .
+					"hosts.host" .
+				" from" .
+					" functions" .
+					" left join items on items.itemid=functions.itemid" .
+					" left join hosts on hosts.hostid=items.hostid" .
+			") as function_items on function_items.triggerid=events.objectid" .
+		" where" .
+			" events.eventid=?";
+	my $params = [TRIGGER_VALUE_FALSE, $eventid];
+	my $row = db_select_row($sql, $params);
+
+	my ($source, $object, $value, $triggerid, $false_positive, $from, $till, $rsmhostid, $rsmhost, $itemid, $key) = @{$row};
+
+	fail("unexpected value of events.source for incident #$eventid: $source") if ($source != EVENT_SOURCE_TRIGGERS);
+	fail("unexpected value of events.object for incident #$eventid: $object") if ($object != EVENT_OBJECT_TRIGGER);
+	fail("unexpected value of events.value for incident #$eventid: $object")  if ($value  != TRIGGER_VALUE_TRUE);
+
+	return ($triggerid, $from, $till, $rsmhostid, $rsmhost, $itemid, $key, $false_positive);
+}
+
+sub __fp_get_itemids_map($$$$)
+{
+	my $service           = shift;
+	my $rsmhostid         = shift;
+	my $item_key_avail    = shift;
+	my $item_key_downtime = shift;
+
+	my %itemids_map = (); # $itemid_avail => $itemid_downtime
+
+	if ($service eq 'DNS.NS')
+	{
+		my $sql = "select itemid, key_ from items where hostid=? and (key_ like ? or key_ like ?)";
+		my $params = [$rsmhostid, $item_key_avail, $item_key_downtime];
+		my $rows = db_select($sql, $params);
+
+		my %itemids_map_tmp = ();
+
+		foreach my $row (@{$rows})
+		{
+			my ($itemid, $key) = @{$row};
+
+			$key =~ /^rsm.slv.dns.ns.(\w+)\[(.+)\]$/; # $1 = 'avail' or 'downtime', $2 - ns,ip
+
+			$itemids_map_tmp{$2}{$1} = $itemid;
+		}
+
+		%itemids_map = map { $itemids_map_tmp{$_}{'avail'} => $itemids_map_tmp{$_}->{'downtime'} } keys(%itemids_map_tmp);
+	}
+	else
+	{
+		my $sql = "select itemid, key_ from items where hostid=? and key_ in (?,?)";
+		my $params = [$rsmhostid, $item_key_avail, $item_key_downtime];
+		my $rows = db_select($sql, $params);
+
+		fail("failed to get itemids of '$item_key_avail' and '$item_key_downtime'") if (scalar(@{$rows}) != 2);
+
+		my $itemid_avail;
+		my $itemid_downtime;
+
+		foreach my $row (@{$rows})
+		{
+			my ($itemid, $key) = @{$row};
+
+			$itemid_avail    = $itemid if ($key eq $item_key_avail);
+			$itemid_downtime = $itemid if ($key eq $item_key_downtime);
+		}
+
+		$itemids_map{$itemid_avail} = $itemid_downtime;
+	}
+
+	foreach my $itemid_avail (keys(%itemids_map))
+	{
+		if (!$itemid_avail || !$itemids_map{$itemid_avail})
+		{
+			dbg(Dumper(\%itemids_map));
+			fail("failed to get avail/downtime itemids");
+		}
+	}
+
+	return %itemids_map;
+}
+
+sub __fp_get_history_values($$;$)
+{
+	my $itemid = shift;
+	my $from   = shift;
+	my $till   = shift // $from;
+
+	my $sql = "select clock,value from history_uint where itemid=? and clock between ? and ?";
+	my $params = [$itemid, $from, $till];
+	my $rows = db_select($sql, $params);
+
+	return map { $_->[0] => $_->[1] } @{$rows};
+}
+
+sub __fp_get_false_positive_ranges($$$)
+{
+	my $triggerid = shift;
+	my $from      = shift;
+	my $till      = shift;
+
+	my $sql = "select" .
+		" events.eventid," .
+		"events.source," .
+		"events.object," .
+		"events.clock," .
+		"(" .
+			"select clock" .
+			" from events as events_inner" .
+			" where" .
+				" events_inner.source=events.source and" .
+				" events_inner.object=events.object and" .
+				" events_inner.objectid=events.objectid and" .
+				" events_inner.value=? and" .
+				" events_inner.eventid>events.eventid" .
+			" order by events_inner.eventid asc" .
+			" limit 1" .
+		") as clock2" .
+	" from" .
+		" events" .
+	" where" .
+		" events.objectid=? and" .
+		" events.value=? and" .
+		" events.clock between ? and ? and" .
+		" events.false_positive=?";
+
+	my $params = [
+		TRIGGER_VALUE_FALSE,
+		$triggerid,
+		TRIGGER_VALUE_TRUE,
+		$from,
+		$till,
+		1,
+	];
+
+	my $rows = db_select($sql, $params);
+
+	my @ranges = ();
+
+	for my $row (@{$rows})
+	{
+		my ($eventid, $source, $object, $from, $till) = @{$row};
+
+		fail("unexpected value of events.source for incident #$eventid: $source") if ($source != EVENT_SOURCE_TRIGGERS);
+		fail("unexpected value of events.object for incident #$eventid: $object") if ($object != EVENT_OBJECT_TRIGGER);
+
+		push(@ranges, [$from, $till]);
+	}
+
+	return @ranges;
+}
+
+sub __fp_update_incident_state($$$$$)
+{
+	my $incident_fail    = shift;
+	my $incident_recover = shift;
+	my $avail            = shift;
+	my $counter_ref      = shift;
+	my $is_incident_ref  = shift;
+
+	if (${$is_incident_ref})
+	{
+		if ($avail == DOWN)
+		{
+			${$counter_ref} = 0;
+		}
+		else
+		{
+			if (${$counter_ref} < $incident_recover - 1)
+			{
+				${$counter_ref}++;
+			}
+			else
+			{
+				${$counter_ref} = 0;
+				${$is_incident_ref} = 0;
+			}
+		}
+	}
+	else
+	{
+		if ($avail == DOWN)
+		{
+			if (${$counter_ref} < $incident_fail - 1)
+			{
+				${$counter_ref}++;
+			}
+			else
+			{
+				${$counter_ref} = 0;
+				${$is_incident_ref} = 1;
+			}
+		}
+		else
+		{
+			${$counter_ref} = 0;
+		}
+	}
+}
+
+sub __fp_regenerate_reports($$)
+{
+	my $service            = shift;
+	my $report_updates_ref = shift;
+
+	require DateTime;
+
+	my %report_updates = ();
+
+	my $curr_month = DateTime->now()->truncate('to' => 'month')->epoch();
+
+	foreach my $row (@{$report_updates_ref})
+	{
+		my ($rsmhost, $clock, $incidentid, $false_positive) = @{$row};
+
+		$clock = DateTime->from_epoch('epoch' => $clock)->truncate('to' => 'month')->epoch();
+
+		if ($clock < $curr_month)
+		{
+			$report_updates{$rsmhost}{$clock}{$incidentid} = $false_positive;
+		}
+	}
+
+	foreach my $rsmhost (sort(keys(%report_updates)))
+	{
+		foreach my $clock (sort {$a <=> $b} keys(%{$report_updates{$rsmhost}}))
+		{
+			my @incidents = ();
+			foreach my $incidentid (keys(%{$report_updates{$rsmhost}{$clock}}))
+			{
+				if ($report_updates{$rsmhost}{$clock}{$incidentid})
+				{
+					push(@incidents, "incident $incidentid was marked as false-positive");
+				}
+				else
+				{
+					push(@incidents, "incident $incidentid was unmarked as false-positive");
+				}
+			}
+
+			my $month = ts_ym($clock);
+			my $reason = join(", ", @incidents);
+
+			# To safely regenerate the repots, we may need data since the beginning of the month, e.g.,
+			# period when name servers were tested might be determined by reading min/max timestamps of RTT
+			# checks during the month. Therefore, it's important to check if we have the data since the
+			# beginning of the month before trying to regenerate the report.
+
+			my $oldest_clock = max(
+				__fp_get_oldest_clock($rsmhost, 'history'),
+				__fp_get_oldest_clock($rsmhost, 'history_uint')
+			);
+
+			if ($clock >= $oldest_clock)
+			{
+				generate_report($rsmhost, $clock);
+				__fp_log($rsmhost, $service, "regenerated report for $month ($reason)");
+			}
+			else
+			{
+				__fp_log($rsmhost, $service, "could not regenerate report for $month, not enough data in the database ($reason)");
+			}
+		}
+	}
+}
+
+sub __fp_get_oldest_clock($$)
+{
+	my $rsmhost = shift;
+	my $table   = shift;
+
+	my $sql = "select" .
+			" min(clock)" .
+		" from" .
+			" $table" .
+			" left join items on items.itemid=$table.itemid" .
+			" left join hosts on hosts.hostid=items.hostid" .
+		" where" .
+			" hosts.host=?";
+
+	my $params = [$rsmhost];
+
+	return db_select_value($sql, $params);
 }
 
 #################

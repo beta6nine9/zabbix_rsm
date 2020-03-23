@@ -18,11 +18,10 @@ use Data::Dumper;
 use Time::Local;
 use POSIX qw(floor);
 use Time::HiRes qw(time);
-use TLD_constants qw(:ec :api :general);
+use TLD_constants qw(:ec :api :general :config);
 use Parallel::ForkManager;
 
 use constant RDDS_SUBSERVICE => 'sub';
-use constant AUDIT_RESOURCE_INCIDENT => 32;
 
 use constant PROBE_STATUS_UP => 'Up';
 use constant PROBE_STATUS_DOWN => 'Down';
@@ -284,7 +283,7 @@ if (opt('tld'))
 }
 else
 {
-	$tlds_ref = get_tlds(undef, $from, $till);
+	$tlds_ref = get_tlds(undef, $from, USE_CACHE_TRUE);
 }
 
 # Prepare the cache for function tld_service_enabled(). Make sure this is called before creating child processes!
@@ -852,7 +851,7 @@ sub __save_csv_data
 
 	if (scalar(keys(%{$result})) > 1)
 	{
-		fail("dimir was wrong, result can contain more than 1 TLD in __save_csv_data()");
+		fail("result contains more than 1 TLD in __save_csv_data()");
 	}
 
 	dw_csv_init();
