@@ -361,7 +361,7 @@ if ($host || $data['filter_search']) {
 							$data['rdap']['itemid'] = $item['itemid'];
 							$data['rdap']['slv'] = sprintf('%.3f', $item['lastvalue']);
 							$data['rdap']['slvTestTime'] = $item['lastclock'];
-							$data['rdap']['events'] = [];							
+							$data['rdap']['events'] = [];
 							break;
 
 						case RSM_SLV_EPP_ROLLWEEK:
