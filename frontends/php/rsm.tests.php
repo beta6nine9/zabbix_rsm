@@ -33,7 +33,7 @@ require_once dirname(__FILE__).'/include/page_header.php';
 //		VAR			TYPE	OPTIONAL FLAGS	VALIDATION	EXCEPTION
 $fields = [
 	'host' =>					[T_ZBX_STR, O_OPT,		P_SYS,	null,			null],
-	'type' =>					[T_ZBX_INT, O_OPT,		null,	IN('0,1,2,3'),	null],
+	'type' =>					[T_ZBX_INT, O_OPT,		null,	IN('0,1,2,3,4'),	null],
 	'slvItemId' =>				[T_ZBX_INT, O_OPT,		P_SYS,	DB_ID,			null],
 	'original_from' =>			[T_ZBX_INT, O_OPT,		null,	null,			null],
 	'original_to' =>			[T_ZBX_INT, O_OPT,		null,	null,			null],
@@ -129,15 +129,16 @@ if (!$data['host'] || !$data['slvItemId'] || $data['type'] === null) {
 
 // get TLD
 $tld = API::Host()->get([
-	'tlds' => true,
-	'output' => ['hostid', 'host', 'name'],
+	'output' => ['hostid', 'host', 'info_1', 'info_2'],
 	'filter' => [
 		'host' => $data['host']
-	]
+	],
+	'tlds' => true
 ]);
 
 if ($tld) {
 	$data['tld'] = reset($tld);
+	$data['rsm_monitoring_mode'] = get_rsm_monitoring_type();
 }
 else {
 	show_error_message(_('No permissions to referred TLD or it does not exist!'));
@@ -154,6 +155,9 @@ elseif ($data['type'] == RSM_DNSSEC) {
 }
 elseif ($data['type'] == RSM_RDDS) {
 	$key = RSM_SLV_RDDS_AVAIL;
+}
+elseif ($data['type'] == RSM_RDAP) {
+	$key = RSM_SLV_RDAP_AVAIL;
 }
 else {
 	$key = RSM_SLV_EPP_AVAIL;
@@ -345,6 +349,9 @@ if ($items) {
 	}
 	elseif ($data['type'] == RSM_RDDS) {
 		$itemKey = CALCULATED_ITEM_RDDS_DELAY;
+	}
+	elseif ($data['type'] == RSM_RDAP) {
+		$itemKey = CALCULATED_ITEM_RDAP_DELAY;
 	}
 	else {
 		$itemKey = CALCULATED_ITEM_EPP_DELAY;

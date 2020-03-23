@@ -28,8 +28,8 @@ if (!opt('dry-run'))
 {
 	recalculate_downtime(
 		"/opt/zabbix/data/rsm.slv.rdds.downtime.auditlog.txt",
-		"rsm.slv.rdds.avail",
-		"rsm.slv.rdds.downtime",
+		$cfg_key_in,
+		$cfg_key_out,
 		get_macro_incident_rdds_fail(),
 		get_macro_incident_rdds_recover(),
 		get_rdds_delay(getopt('now') // time() - AVAIL_SHIFT_BACK)
@@ -44,9 +44,9 @@ my (undef, undef, $max_clock) = get_cycle_bounds($delay, getopt('now'));
 my $tlds_ref;
 if (opt('tld'))
 {
-        fail("TLD ", getopt('tld'), " does not exist.") if (tld_exists(getopt('tld')) == 0);
+	fail("TLD ", getopt('tld'), " does not exist.") if (tld_exists(getopt('tld')) == 0);
 
-        $tlds_ref = [ getopt('tld') ];
+	$tlds_ref = [ getopt('tld') ];
 }
 else
 {
@@ -64,7 +64,7 @@ my $cycles_ref = collect_slv_cycles(
 	(opt('cycles') ? getopt('cycles') : slv_max_cycles('rdds'))
 );
 
-slv_exit(SUCCESS) if (scalar(keys(%{$cycles_ref})) == 0);
+slv_exit(SUCCESS) if (keys(%{$cycles_ref}) == 0);
 
 process_slv_downtime_cycles($cycles_ref, $delay, $cfg_key_in, $cfg_key_out);
 

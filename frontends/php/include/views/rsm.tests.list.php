@@ -24,7 +24,7 @@ $widget = (new CWidget())->setTitle(_('Tests'));
 // filter
 $filter = (new CFilter('web.rsm.tests.filter.state'))
 	->addVar('filter_set', 1)
-	->addVar('host', $this->data['tld']['name'])
+	->addVar('host', $this->data['tld']['host'])
 	->addVar('type', $this->data['type'])
 	->addVar('slvItemId', $this->data['slvItemId'])
 	->addVar('filter_from', zbxDateToTime($data['filter_from']))
@@ -40,7 +40,7 @@ $filterColumn2
 $filterColumn3
 	->addRow((new CLink(_('Rolling week'),
 		'rsm.tests.php?type='.$this->data['type'].'&filter_set=1&filter_rolling_week=1'
-			.'&host='.$this->data['tld']['name'].'&slvItemId='.$this->data['slvItemId'])
+			.'&host='.$this->data['tld']['host'].'&slvItemId='.$this->data['slvItemId'])
 	)
 		->addClass(ZBX_STYLE_BTN_LINK));
 
@@ -91,14 +91,27 @@ elseif ($this->data['type'] == RSM_DNSSEC) {
 elseif ($this->data['type'] == RSM_RDDS) {
 	$serviceName = _('RDDS service availability');
 }
+elseif ($this->data['type'] == RSM_RDAP) {
+	$serviceName = _('RDAP service availability');
+}
 else {
 	$serviceName = _('EPP service availability');
 }
 
 $testsInfoTable = (new CTable(null))->addClass('incidents-info');
 
+$object_info = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR)
+	? [
+		new CSpan([bold(_('Registrar ID')), ':', SPACE, $data['tld']['host']]),
+		BR(),
+		new CSpan([bold(_('Registrar name')), ':', SPACE, $data['tld']['info_1']]),
+		BR(),
+		new CSpan([bold(_('Registrar family')), ':', SPACE, $data['tld']['info_2']])
+	]
+	: new CSpan([bold(_('TLD')), ':', SPACE, $data['tld']['host']]);
+
 $testsInfoTable->addRow([[
-	new CSpan([bold(_('TLD')), ':', SPACE, $this->data['tld']['name']]),
+	$object_info,
 	BR(),
 	new CSpan([bold(_('Service')), ':', SPACE, $serviceName])
 ]]);

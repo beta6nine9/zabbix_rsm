@@ -40,6 +40,8 @@ use constant JSON_TAG_TARGET_IP		=> 'targetIP';
 use constant JSON_TAG_CLOCK		=> 'clock';
 use constant JSON_TAG_DESCRIPTION	=> 'description';
 use constant JSON_TAG_UPD		=> 'upd';
+use constant JSON_TAG_TARGET		=> 'target';
+use constant JSON_TAG_TESTEDNAME	=> 'testedName';
 use constant JSON_INTERFACE_RDDS43	=> 'RDDS43';
 use constant JSON_INTERFACE_RDDS80	=> 'RDDS80';
 use constant JSON_INTERFACE_RDAP	=> 'RDAP';
@@ -95,10 +97,14 @@ if (opt('service'))
 }
 else
 {
-	foreach my $service ('dns', 'dnssec', SERVICE_DNS_TCP, 'rdds', 'epp')	# Export DNS-TCP tests
+	if (get_monitoring_target() eq MONITORING_TARGET_REGISTRY)
 	{
-		$services->{$service} = undef;
+		$services->{'dns'} = undef;
+		$services->{'dnssec'} = undef;
+		$services->{'epp'} = undef;
 	}
+	$services->{'rdds'} = undef;
+	$services->{'rdap'} = undef if (is_rdap_standalone());
 }
 
 my @interfaces;
@@ -106,7 +112,8 @@ foreach my $service (keys(%{$services}))
 {
 	if ($service eq 'rdds')
 	{
-		push(@interfaces, 'rdds43', 'rdds80', 'rdap');
+		push(@interfaces, 'rdds43', 'rdds80');
+		push(@interfaces, 'rdap') if (!is_rdap_standalone());
 	}
 	else
 	{
@@ -496,6 +503,10 @@ sub __get_delays
 		{
 			$services->{$service}->{'delay'} = get_rdds_delay();
 		}
+		elsif ($service eq 'rdap')
+		{
+			$services->{$service}->{'delay'} = get_rdap_delay();
+		}
 		elsif ($service eq 'epp')
 		{
 			$services->{$service}->{'delay'} = get_epp_delay();
@@ -514,29 +525,59 @@ sub __get_keys
 		if ($service eq 'dns' || $service eq 'dnssec')
 		{
 			$services->{$service}->{'key_status'} = 'rsm.dns.udp[{$RSM.TLD}]';	# 0 - down, 1 - up
-			$services->{$service}->{'key_rtt'} = 'rsm.dns.udp.rtt[{$RSM.TLD},';
+			$services->{$service}->{'key_search'} = 'rsm.dns.udp.rtt[{$RSM.TLD},';
 		}
 		elsif ($service eq SERVICE_DNS_TCP)	# Export DNS-TCP tests
 		{
-			$services->{$service}->{'key_rtt'} = 'rsm.dns.tcp.rtt[{$RSM.TLD},';
+			$services->{$service}->{'key_search'} = 'rsm.dns.tcp.rtt[{$RSM.TLD},';
 		}
 		elsif ($service eq 'rdds')
 		{
 			$services->{$service}->{'key_status'} = 'rsm.rdds[{$RSM.TLD}';	# 0 - down, 1 - up, 2 - only 43, 3 - only 80
-			$services->{$service}->{'key_43_rtt'} = 'rsm.rdds.43.rtt[{$RSM.TLD}]';
-			$services->{$service}->{'key_43_ip'} = 'rsm.rdds.43.ip[{$RSM.TLD}]';
-			$services->{$service}->{'key_43_upd'} = 'rsm.rdds.43.upd[{$RSM.TLD}]';
-			$services->{$service}->{'key_80_rtt'} = 'rsm.rdds.80.rtt[{$RSM.TLD}]';
-			$services->{$service}->{'key_80_ip'} = 'rsm.rdds.80.ip[{$RSM.TLD}]';
+			$services->{$service}->{'dbl_keys'} = [
+				'rsm.rdds.43.rtt[{$RSM.TLD}]',
+				'rsm.rdds.43.upd[{$RSM.TLD}]',
+				'rsm.rdds.80.rtt[{$RSM.TLD}]',
+			];
+			$services->{$service}->{'str_keys'} = [
+				'rsm.rdds.43.ip[{$RSM.TLD}]',
+				'rsm.rdds.43.target',
+				'rsm.rdds.43.testedname',
+				'rsm.rdds.80.ip[{$RSM.TLD}]',
+				'rsm.rdds.80.target',
+			];
 
-			$services->{$service}->{'key_rdap_rtt'} = 'rdap.rtt';
-			$services->{$service}->{'key_rdap_ip'} = 'rdap.ip';
+			if (!is_rdap_standalone())
+			{
+				push(@{$services->{$service}->{'dbl_keys'}}, [
+					'rdap.rtt',
+				]);
+				push(@{$services->{$service}->{'str_keys'}}, [
+					'rdap.ip',
+					'rdap.target',
+					'rdap.testedname',
+				]);
+			}
+		}
+		elsif ($service eq 'rdap')
+		{
+			$services->{$service}->{'dbl_keys'} = [
+				'rdap.rtt',
+			];
+			$services->{$service}->{'str_keys'} = [
+				'rdap.ip',
+				'rdap.target',
+				'rdap.testedname',
+			];
 		}
 		elsif ($service eq 'epp')
 		{
-			$services->{$service}->{'key_status'} = 'rsm.epp[{$RSM.TLD},';	# 0 - down, 1 - up
-			$services->{$service}->{'key_ip'} = 'rsm.epp.ip[{$RSM.TLD}]';
-			$services->{$service}->{'key_rtt'} = 'rsm.epp.rtt[{$RSM.TLD},';
+			$services->{$service}->{'dbl_keys'} = [
+				'PLACE-HOLDER',
+			];
+			$services->{$service}->{'str_keys'} = [
+				'PLACE-HOLDER',
+			];
 		}
 
 		if ($service ne SERVICE_DNS_TCP)	# Export DNS-TCP tests, they do not refer to Service Availability
@@ -593,8 +634,9 @@ sub __get_test_data
 	my $till = shift;
 	my $probe_times_ref = shift;
 
-	my ($nsips_ref, $dns_items_ref, $dns_tcp_items_ref, $rdds_dbl_items_ref, $rdds_str_items_ref, $epp_dbl_items_ref,
-		$epp_str_items_ref, $probe_dns_results_ref, $result);
+	my ($nsips_ref, $dns_items_ref, $dns_tcp_items_ref, $rdds_dbl_items_ref, $rdds_str_items_ref,
+		$epp_dbl_items_ref, $epp_str_items_ref, $rdap_dbl_items_ref, $rdap_str_items_ref,
+		$probe_dns_results_ref, $result);
 
 	foreach my $service (sort(keys(%{$services})))
 	{
@@ -639,37 +681,39 @@ sub __get_test_data
 		{
 			if (!$nsips_ref)
 			{
-				$nsips_ref = get_templated_nsips($tld, $services->{$service}->{'key_rtt'}, 1);	# templated
+				$nsips_ref = get_templated_nsips($tld, $services->{$service}->{'key_search'}, 1);	# templated
 			}
 
 			if (!$dns_items_ref)
 			{
-				$dns_items_ref = __get_dns_itemids($nsips_ref, $services->{$service}->{'key_rtt'}, $tld, getopt('probe'));
+				$dns_items_ref = __get_dns_itemids($nsips_ref, $services->{$service}->{'key_search'}, $tld, getopt('probe'));
 			}
 		}
 		elsif ($service eq SERVICE_DNS_TCP)	# Export DNS-TCP tests
 		{
 			if (!$nsips_ref)
 			{
-				$nsips_ref = get_templated_nsips($tld, $services->{$service}->{'key_rtt'}, 1);  # templated
+				$nsips_ref = get_templated_nsips($tld, $services->{$service}->{'key_search'}, 1);  # templated
 			}
-			$dns_tcp_items_ref = __get_dns_itemids($nsips_ref, $services->{$service}->{'key_rtt'}, $tld, getopt('probe'));
+			$dns_tcp_items_ref = __get_dns_itemids($nsips_ref, $services->{$service}->{'key_search'}, $tld, getopt('probe'));
 		}
 		elsif ($service eq 'rdds')
 		{
-			$rdds_dbl_items_ref = __get_rdds_dbl_itemids($tld, getopt('probe'),
-				$services->{$service}->{'key_43_rtt'},
-				$services->{$service}->{'key_80_rtt'},
-				$services->{$service}->{'key_43_upd'},
-				$services->{$service}->{'key_rdap_rtt'});
-			$rdds_str_items_ref = __get_rdds_str_itemids($tld, getopt('probe'),
-				$services->{$service}->{'key_43_ip'},
-				$services->{$service}->{'key_80_ip'},
-				$services->{$service}->{'key_rdap_ip'});
+			$rdds_dbl_items_ref = __get_itemids_by_complete_key($tld, getopt('probe'),
+				$services->{$service}->{'dbl_keys'});
+			$rdds_str_items_ref = __get_itemids_by_complete_key($tld, getopt('probe'),
+				$services->{$service}->{'str_keys'});
+		}
+		elsif ($service eq 'rdap')
+		{
+			$rdap_dbl_items_ref = __get_itemids_by_complete_key($tld, getopt('probe'),
+				$services->{$service}->{'dbl_keys'});
+			$rdap_str_items_ref = __get_itemids_by_complete_key($tld, getopt('probe'),
+				$services->{$service}->{'str_keys'});
 		}
 		elsif ($service eq 'epp')
 		{
-			$epp_dbl_items_ref = get_epp_dbl_itemids($tld, getopt('probe'), $services->{$service}->{'key_rtt'});
+			$epp_dbl_items_ref = get_epp_dbl_itemids($tld, getopt('probe'), $services->{$service}->{'key_search'});
 			$epp_str_items_ref = get_epp_str_itemids($tld, getopt('probe'), $services->{$service}->{'key_ip'});
 		}
 
@@ -775,7 +819,7 @@ sub __get_test_data
 
 		if ($service ne SERVICE_DNS_TCP && $cycles_count == 0)	# Export DNS-TCP tests, they do not refer to Service Availability
 		{
-			wrn("$service: no results");
+			wrn("$service: no results; will not process remaining services");
 			last;
 		}
 
@@ -793,7 +837,12 @@ sub __get_test_data
 		}
 		elsif ($service eq 'rdds')
 		{
-			$tests_ref = __get_rdds_test_values($rdds_dbl_items_ref, $rdds_str_items_ref,
+			$tests_ref = __get_rdds_or_rdap_test_values($rdds_dbl_items_ref, $rdds_str_items_ref,
+				$service_from, $service_till, $services->{$service}->{'valuemaps'}, $delay);
+		}
+		elsif ($service eq 'rdap')
+		{
+			$tests_ref = __get_rdds_or_rdap_test_values($rdap_dbl_items_ref, $rdap_str_items_ref,
 				$service_from, $service_till, $services->{$service}->{'valuemaps'}, $delay);
 		}
 		elsif ($service eq 'epp')
@@ -864,6 +913,7 @@ sub __save_csv_data
 	my $dnssec_service_category_id = dw_get_id(ID_SERVICE_CATEGORY, 'dnssec');
 	my $rdds_service_category_id = dw_get_id(ID_SERVICE_CATEGORY, 'rdds');
 	my $epp_service_category_id = dw_get_id(ID_SERVICE_CATEGORY, 'epp');
+	my $rdap_service_category_id = dw_get_id(ID_SERVICE_CATEGORY, 'rdap');
 	my $udp_protocol_id = dw_get_id(ID_TRANSPORT_PROTOCOL, 'udp');
 	my $tcp_protocol_id = dw_get_id(ID_TRANSPORT_PROTOCOL, 'tcp');
 
@@ -900,6 +950,12 @@ sub __save_csv_data
 		elsif ($service eq 'rdds')
 		{
 			$service_category_id = $rdds_service_category_id;
+			$protocol_id = $tcp_protocol_id;
+			$proto = PROTO_TCP;
+		}
+		elsif ($service eq 'rdap')
+		{
+			$service_category_id = $rdap_service_category_id;
 			$protocol_id = $tcp_protocol_id;
 			$proto = PROTO_TCP;
 		}
@@ -1291,8 +1347,9 @@ sub __get_itemids_by_complete_key
 {
 	my $tld = shift;
 	my $probe = shift;
+	my $keys_ref = shift;
 
-	my $keys_str = "'" . join("','", @_) . "'";
+	my $keys_str = "'" . join("','", @{$keys_ref}) . "'";
 
 	my $host_value = ($probe ? "$tld $probe" : "$tld %");
 
@@ -1994,36 +2051,13 @@ sub __get_probe_results
 	return \%result;
 }
 
-# todo: taken from RSMSLV.pm
-sub __get_rdds_dbl_itemids
-{
-	my $tld = shift;
-	my $probe = shift;
-	my $key_43_rtt = shift;
-	my $key_80_rtt = shift;
-	my $key_43_upd = shift;
-	my $key_rdap_rtt = shift;
 
-	return __get_itemids_by_complete_key($tld, $probe, $key_43_rtt, $key_80_rtt, $key_43_upd, $key_rdap_rtt);
-}
 
 # todo: taken from RSMSLV.pm
-sub __get_rdds_str_itemids
+sub __get_rdds_or_rdap_test_values($$$$$$)
 {
-	my $tld = shift;
-	my $probe = shift;
-	my $key_43_ip = shift;
-	my $key_80_ip = shift;
-	my $key_rdap_ip = shift;
-
-	return __get_itemids_by_complete_key($tld, $probe, $key_43_ip, $key_80_ip, $key_rdap_ip);
-}
-
-# todo: taken from RSMSLV.pm
-sub __get_rdds_test_values
-{
-	my $rdds_dbl_items_ref = shift;
-	my $rdds_str_items_ref = shift;
+	my $dbl_items_ref = shift;
+	my $str_items_ref = shift;
 	my $start = shift;
 	my $end = shift;
 	my $valuemaps = shift;
@@ -2031,21 +2065,15 @@ sub __get_rdds_test_values
 
 	# generate list of itemids
 	my @dbl_itemids;
-	foreach my $probe (keys(%$rdds_dbl_items_ref))
+	foreach my $probe (keys(%$dbl_items_ref))
 	{
-		foreach my $itemid (keys(%{$rdds_dbl_items_ref->{$probe}}))
-		{
-			push(@dbl_itemids, $itemid);
-		}
+		push(@dbl_itemids, keys(%{$dbl_items_ref->{$probe}}));
 	}
 
 	my @str_itemids;
-	foreach my $probe (keys(%$rdds_str_items_ref))
+	foreach my $probe (keys(%$str_items_ref))
 	{
-		foreach my $itemid (keys(%{$rdds_str_items_ref->{$probe}}))
-		{
-			push(@str_itemids, $itemid);
-		}
+		push(@str_itemids, keys(%{$str_items_ref->{$probe}}));
 	}
 
 	return undef if (scalar(@dbl_itemids) == 0 || scalar(@str_itemids) == 0);
@@ -2061,7 +2089,7 @@ sub __get_rdds_test_values
 		my $value = $row_ref->[1];
 		my $clock = $row_ref->[2];
 
-		my ($probe, $key) = __find_probe_key_by_itemid($itemid, $rdds_dbl_items_ref);
+		my ($probe, $key) = __find_probe_key_by_itemid($itemid, $dbl_items_ref);
 
 		fail("internal error: cannot get Probe-key pair by itemid:$itemid") unless (defined($probe) and defined($key));
 
@@ -2100,16 +2128,18 @@ sub __get_rdds_test_values
 		my $value = $row_ref->[1];
 		my $clock = $row_ref->[2];
 
-		my ($probe, $key) = __find_probe_key_by_itemid($itemid, $rdds_str_items_ref);
+		my ($probe, $key) = __find_probe_key_by_itemid($itemid, $str_items_ref);
 
 		fail("internal error: cannot get Probe-key pair by itemid:$itemid") unless (defined($probe) and defined($key));
 
 		my ($interface, $type) = __get_rdds_item_details($key);
 
-		fail("unknown RDDS interface in item $key (id:$itemid)") if (!defined($interface));
-		fail("unknown RDDS test type in item key $key (id:$itemid)") if (!defined($type));
+		fail("unknown RDDS/RDAP interface in item $key (id:$itemid)") if (!defined($interface));
+		fail("unknown RDDS/RDAP test type in item key $key (id:$itemid)") if (!defined($type));
 
-		if ($type ne JSON_TAG_TARGET_IP)
+		if ($type ne JSON_TAG_TARGET_IP &&
+				$type ne JSON_TAG_TARGET &&
+				$type ne JSON_TAG_TESTEDNAME)
 		{
 			fail("internal error: unknown item key (itemid:$itemid), expected item key representing the IP involved in $interface test");
 		}
@@ -2234,13 +2264,14 @@ sub __find_probe_key_by_itemid
 # todo: taken from RSMSLV.pm
 sub __get_rdds_item_details
 {
+	my @parts = split(/\./, shift());
+
 	my $interface;
 	my $type;
-	my @parts = split(/\./, shift());
 
 	return ($interface, $type) if (!defined($parts[0]) && !defined($parts[1]));
 
-	shift(@parts) if($parts[0] eq 'rsm');
+	shift(@parts) if ($parts[0] eq 'rsm');
 
 	if ($parts[0] eq 'rdap')
 	{
@@ -2282,6 +2313,14 @@ sub pick_rdds_item_type
 	elsif ($parts[0] eq 'upd')
 	{
 		return JSON_TAG_UPD;
+	}
+	elsif ($parts[0] eq 'target')
+	{
+		return JSON_TAG_TARGET;
+	}
+	elsif ($parts[0] eq 'testedname')
+	{
+		return JSON_TAG_TESTEDNAME;
 	}
 
 	return undef;

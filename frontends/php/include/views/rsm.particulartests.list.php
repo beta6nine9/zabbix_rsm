@@ -18,8 +18,11 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-
 $widget = (new CWidget())->setTitle(_('Details of particular test'));
+
+$object_label = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) ? _('Registrar ID') : _('TLD');
+
+$use_rdap = ($this->data['type'] == RSM_RDDS && !is_RDAP_standalone($data['test_time_from']));
 
 if ($this->data['type'] == RSM_DNS || $this->data['type'] == RSM_DNSSEC) {
 	$headers = [
@@ -29,51 +32,78 @@ if ($this->data['type'] == RSM_DNS || $this->data['type'] == RSM_DNSSEC) {
 
 	$table = (new CTableInfo())->setHeader($headers);
 }
+elseif ($this->data['type'] == RSM_RDAP) {
+	/**
+	 * If 'status' is not set, probe is UP. So, we need to check if all (length of $probes_status = 0) or
+	 * at least one (array_sum($probes_status) > 0) probe is UP.
+	 */
+	$probes_status = zbx_objectValues($this->data['probes'], 'status');
+
+	$table = (new CTableInfo())
+		->setMultirowHeader([
+			(new CTag('tr', true))
+				->addItem((new CTag('th', true, _('Probe ID')))
+					->setAttribute('rowspan', 2)
+					->setAttribute('style', 'border-left: 0px;')
+				)
+				->addItem((new CTag('th', true, _('RDAP')))
+					->setAttribute('colspan', 5)
+					->setAttribute('class', 'center')
+				),
+			(new CTag('tr', true))
+				->addItem((new CTag('th', true, _('Status'))))
+				->addItem((new CTag('th', true, _('IP'))))
+				->addItem((new CTag('th', true, _('Target'))))
+				->addItem((new CTag('th', true, _('Tested name'))))
+				->addItem((new CTag('th', true, _('RTT'))))
+		], 5)
+		->setAttribute('class', 'list-table table-bordered-head');
+}
 elseif ($this->data['type'] == RSM_RDDS) {
 	/**
 	 * If 'status' is not set, probe is UP. So, we need to check if all (length of $probes_status = 0) or
 	 * at least one (array_sum($probes_status) > 0) probe is UP.
-	 *
-	 * Do not show URL or 'disabled' label at header if probe 'status' == PROBE_DOWN.
 	 */
 	$probes_status = zbx_objectValues($this->data['probes'], 'status');
 
-	if (!$probes_status || array_sum($probes_status) > 0) {
-		$rdds_43_base_url = array_key_exists('rdds_43_base_url', $data) ? $data['rdds_43_base_url'] : _('disabled');
-		$rdds_80_base_url = array_key_exists('rdds_80_base_url', $data) ? $data['rdds_80_base_url'] : _('disabled');
-		$rdap_base_url = array_key_exists('rdap_base_url', $data) ? $data['rdap_base_url'] : _('disabled');
-		$rdds_43_base_url = ' ('.$rdds_43_base_url.')';
-		$rdds_80_base_url = ' ('.$rdds_80_base_url.')';
-		$rdap_base_url = ' ('.$rdap_base_url.')';
-	}
-	else {
-		$rdds_43_base_url = '';
-		$rdds_80_base_url = '';
-		$rdap_base_url = '';
-	}
-
 	$row_1 = (new CTag('tr', true))
 		->addItem((new CTag('th', true, _('Probe ID')))->setAttribute('rowspan', 2)->setAttribute('style', 'border-left: 0px;'))
-		->addItem((new CTag('th', true, [_('RDDS43'), $rdds_43_base_url]))->setAttribute('colspan', 3)->setAttribute('class', 'center'))
-		->addItem((new CTag('th', true, [_('RDDS80'), $rdds_80_base_url]))->setAttribute('colspan', 3)->setAttribute('class', 'center'))
-		->addItem((new CTag('th', true, [_('RDAP'), $rdap_base_url]))->setAttribute('colspan', 3)->setAttribute('class', 'center'));
+		->addItem((new CTag('th', true, _('RDDS43')))->setAttribute('colspan', 5)->setAttribute('class', 'center'))
+		->addItem((new CTag('th', true, _('RDDS80')))->setAttribute('colspan', 4)->setAttribute('class', 'center'));
 
 	$row_2 = (new CTag('tr', true))
 		->addItem((new CTag('th', true, _('Status'))))
 		->addItem((new CTag('th', true, _('IP'))))
+		->addItem((new CTag('th', true, _('Target'))))
+		->addItem((new CTag('th', true, _('Tested name'))))
 		->addItem((new CTag('th', true, _('RTT'))))
 		->addItem((new CTag('th', true, _('Status'))))
 		->addItem((new CTag('th', true, _('IP'))))
-		->addItem((new CTag('th', true, _('RTT'))))
-		->addItem((new CTag('th', true, _('Status'))))
-		->addItem((new CTag('th', true, _('IP'))))
+		->addItem((new CTag('th', true, _('Target'))))
 		->addItem((new CTag('th', true, _('RTT'))));
 
+	if ($use_rdap) {
+		$row_1->addItem(
+			(new CTag('th', true, _('RDAP')))
+				->setAttribute('colspan', 5)
+				->setAttribute('class', 'center')
+		);
+
+		$row_2
+			->addItem((new CTag('th', true, _('Status'))))
+			->addItem((new CTag('th', true, _('IP'))))
+			->addItem((new CTag('th', true, _('Target'))))
+			->addItem((new CTag('th', true, _('Tested name'))))
+			->addItem((new CTag('th', true, _('RTT'))));
+	}
+
+	$column_count = $use_rdap ? 12 : 8;
 	$table = (new CTableInfo())
-		->setMultirowHeader([$row_1, $row_2], 10)
+		->setMultirowHeader([$row_1, $row_2], $column_count)
 		->setAttribute('class', 'list-table table-bordered-head');
 }
 else {
+	// EPP
 	$headers = [
 		_('Probe ID'),
 		_('Row result'),
@@ -103,15 +133,19 @@ if ($this->data['type'] == RSM_DNSSEC) {
 	$testUp = 0;
 	$testDown = 0;
 }
-elseif ($this->data['type'] == RSM_RDDS || $this->data['type'] == RSM_EPP) {
+elseif ($this->data['type'] == RSM_RDDS || $this->data['type'] == RSM_RDAP || $this->data['type'] == RSM_EPP) {
 	$downProbes = 0;
 }
 
 foreach ($this->data['probes'] as $probe) {
 	$status = null;
+
 	if (isset($probe['status']) && $probe['status'] === PROBE_DOWN) {
 		if ($this->data['type'] == RSM_DNS || $this->data['type'] == RSM_DNSSEC) {
 			$link = $offline;
+		}
+		elseif ($this->data['type'] == RSM_RDAP) {
+			$rdap = $offline;
 		}
 		elseif ($this->data['type'] == RSM_RDDS) {
 			$rdds = ZBX_STYLE_GREY;
@@ -205,7 +239,7 @@ foreach ($this->data['probes'] as $probe) {
 				$link = (new CSpan(_('Not monitored')))->addClass(ZBX_STYLE_RED);
 			}
 		}
-		elseif ($this->data['type'] == RSM_RDDS) {
+		elseif ($this->data['type'] == RSM_RDDS || $this->data['type'] == RSM_RDAP) {
 			$probe_down = false;
 			$probe_no_result = false;
 
@@ -301,7 +335,7 @@ foreach ($this->data['probes'] as $probe) {
 			 *
 			 * See ICA-386 for more details.
 			 */
-			if (!array_key_exists('rdds_43_base_url', $data) && $rdds43 === $noResult) {
+			if ($data['tld_rdds_enabled'] == false && $rdds43 === $noResult) {
 				$rdds43 = $disabled;
 				$rdds80 = $disabled;
 				$probe_no_result = false;
@@ -319,9 +353,14 @@ foreach ($this->data['probes'] as $probe) {
 				$rdap = $disabled;
 			}
 
-			if (($rdds43 === $disabled || $rdds43 === $noResult)
-					&& ($rdds80 === $disabled || $rdds80 === $noResult)
-					&& ($rdap === $disabled || $rdap === $noResult)) {
+			if ($data['type'] == RSM_RDAP && ($rdap === $disabled || $rdap === $noResult)) {
+				$probe_no_result = true;
+				$probe_down = false;
+				$rdds = ZBX_STYLE_GREY;
+			}
+			elseif ((!$use_rdap || $rdap === $disabled || $rdap === $noResult)
+					&& ($rdds43 === $disabled || $rdds43 === $noResult)
+					&& ($rdds80 === $disabled || $rdds80 === $noResult)) {
 				$probe_no_result = true;
 				$probe_down = false;
 				$rdds = ZBX_STYLE_GREY;
@@ -357,6 +396,10 @@ foreach ($this->data['probes'] as $probe) {
 		];
 	}
 	elseif ($this->data['type'] == RSM_RDDS) {
+		$rdap_rtt = '';
+		$rdds43_rtt = '-';
+		$rdds80_rtt = '-';
+
 		if (isset($probe['rdds43']['rtt'])) {
 			$rdds43_rtt = (new CSpan($probe['rdds43']['rtt']['value']))
 				->setAttribute('class', $rdds43 === $down ? ZBX_STYLE_RED : ZBX_STYLE_GREEN);
@@ -364,9 +407,6 @@ foreach ($this->data['probes'] as $probe) {
 			if ($probe['rdds43']['rtt']['description']) {
 				$rdds43_rtt->setHint($probe['rdds43']['rtt']['description']);
 			}
-		}
-		else {
-			$rdds43_rtt = '-';
 		}
 
 		if (isset($probe['rdds80']['rtt'])) {
@@ -377,20 +417,14 @@ foreach ($this->data['probes'] as $probe) {
 				$rdds80_rtt->setHint($probe['rdds80']['rtt']['description']);
 			}
 		}
-		else {
-			$rdds80_rtt = '-';
-		}
 
-		if (isset($probe['rdap']['rtt'])) {
+		if ($use_rdap && isset($probe['rdap']['rtt'])) {
 			$rdap_rtt = (new CSpan($probe['rdap']['rtt']['value']))
 				->setAttribute('class', $rdap === $down ? ZBX_STYLE_RED : ZBX_STYLE_GREEN);
 
 			if ($probe['rdap']['rtt']['description']) {
 				$rdap_rtt->setHint($probe['rdap']['rtt']['description']);
 			}
-		}
-		else {
-			$rdap_rtt = '-';
 		}
 
 		$row = [
@@ -399,18 +433,38 @@ foreach ($this->data['probes'] as $probe) {
 			(isset($probe['rdds43']['ip']) && $probe['rdds43']['ip'])
 				? (new CSpan($probe['rdds43']['ip']))->setAttribute('class', $rdds43 === $down ? ZBX_STYLE_RED : ZBX_STYLE_GREEN)
 				: '-',
+			(isset($probe['rdds43']['target']) && $probe['rdds43']['target'])
+				? $probe['rdds43']['target']
+				: '',
+			(isset($probe['rdds43']['testedname']) && $probe['rdds43']['testedname'])
+				? $probe['rdds43']['testedname']
+				: '',
 			$rdds43_rtt,
 			$rdds80,
 			(isset($probe['rdds80']['ip']) && $probe['rdds80']['ip'])
 				? (new CSpan($probe['rdds80']['ip']))->setAttribute('class', $rdds80 === $down ? ZBX_STYLE_RED : ZBX_STYLE_GREEN)
 				: '-',
-			$rdds80_rtt,
-			$rdap,
-			(isset($probe['rdap']['ip']) && $probe['rdap']['ip'])
-				? (new CSpan($probe['rdap']['ip']))->setAttribute('class', $rdap === $down ? ZBX_STYLE_RED : ZBX_STYLE_GREEN)
-				: '-',
-			$rdap_rtt
+			(isset($probe['rdds80']['target']) && $probe['rdds80']['target'])
+				? $probe['rdds80']['target']
+				: '',
+			$rdds80_rtt
 		];
+
+		if ($use_rdap) {
+			$row = array_merge($row, [
+				$rdap,
+				(isset($probe['rdap']['ip']) && $probe['rdap']['ip'])
+					? (new CSpan($probe['rdap']['ip']))->setAttribute('class', $rdap === $down ? ZBX_STYLE_RED : ZBX_STYLE_GREEN)
+					: '-',
+				(isset($probe['rdap']['target']) && $probe['rdap']['target'])
+					? $probe['rdap']['target']
+					: '',
+				(isset($probe['rdap']['testedname']) && $probe['rdap']['testedname'])
+					? $probe['rdap']['testedname']
+					: '',
+				$rdap_rtt
+			]);
+		}
 
 		/**
 		 * If $rddsNN is DOWN and RTT is non-negative, it is considered as above max RTT.
@@ -428,11 +482,43 @@ foreach ($this->data['probes'] as $probe) {
 		if ($rdds43 === $down && isset($probe['rdds43']['rtt']) && $probe['rdds43']['rtt']['value'] > 0) {
 			$rdds43_above_max_rtt++;
 		}
+		if ($use_rdap && $rdap === $down && isset($probe['rdap']['rtt']) && $probe['rdap']['rtt']['value'] > 0) {
+			$rdap_above_max_rtt++;
+		}
+	}
+	elseif ($this->data['type'] == RSM_RDAP) {
+		$rdap_rtt = '';
+
+		if (isset($probe['rdap']['rtt'])) {
+			$rdap_rtt = (new CSpan($probe['rdap']['rtt']['value']))
+				->setAttribute('class', $rdap === $down ? ZBX_STYLE_RED : ZBX_STYLE_GREEN);
+
+			if ($probe['rdap']['rtt']['description']) {
+				$rdap_rtt->setHint($probe['rdap']['rtt']['description']);
+			}
+		}
+
+		$row = [
+			$probe['name'],
+			$rdap,
+			(isset($probe['rdap']['ip']) && $probe['rdap']['ip'])
+				? (new CSpan($probe['rdap']['ip']))->setAttribute('class', $rdap === $down ? ZBX_STYLE_RED : ZBX_STYLE_GREEN)
+				: '-',
+			(isset($probe['rdap']['target']) && $probe['rdap']['target'])
+				? $probe['rdap']['target']
+				: '',
+			(isset($probe['rdap']['testedname']) && $probe['rdap']['testedname'])
+				? $probe['rdap']['testedname']
+				: '',
+			$rdap_rtt
+		];
+
 		if ($rdap === $down && isset($probe['rdap']['rtt']) && $probe['rdap']['rtt']['value'] > 0) {
 			$rdap_above_max_rtt++;
 		}
 	}
 	else {
+		// EPP
 		$row = [
 			$probe['name'],
 			$epp,
@@ -447,37 +533,64 @@ foreach ($this->data['probes'] as $probe) {
 }
 
 // Add table footer rows:
-if ($data['type'] == RSM_RDDS) {
+if ($data['type'] == RSM_RDAP) {
 	foreach ($data['errors'] as $error_code => $error) {
 		$table->addRow([
 			(new CSpan(_('Total ') . $error_code))->setHint($error['description']),
 			'',
 			'',
-			array_key_exists('rdds43', $error) ? $error['rdds43'] : '',
-			'',
-			'',
-			array_key_exists('rdds80', $error) ? $error['rdds80'] : '',
 			'',
 			'',
 			array_key_exists('rdap', $error) ? $error['rdap'] : ''
 		]);
 	}
 
-	$table->addRow([
+	$table->addRow([_('Total above max. RTT'), '', '', '', '', $rdap_above_max_rtt]);
+}
+elseif ($data['type'] == RSM_RDDS) {
+	foreach ($data['errors'] as $error_code => $error) {
+		$row = [
+			(new CSpan(_('Total ') . $error_code))->setHint($error['description']),
+			'',
+			'',
+			'',
+			'',
+			array_key_exists('rdds43', $error) ? $error['rdds43'] : '',
+			'',
+			'',
+			'',
+			array_key_exists('rdds80', $error) ? $error['rdds80'] : ''
+		];
+
+		if ($use_rdap) {
+			$row = array_merge($row, ['', '', '', '', array_key_exists('rdap', $error) ? $error['rdap'] : '']);
+		}
+
+		$table->addRow($row);
+	}
+
+	$row = [
 		_('Total above max. RTT'),
+		'',
+		'',
 		'',
 		'',
 		$rdds43_above_max_rtt,
 		'',
 		'',
-		$rdds80_above_max_rtt,
 		'',
-		'',
-		$rdap_above_max_rtt
-	]);
+		$rdds80_above_max_rtt
+	];
+
+	if ($use_rdap) {
+		$row = array_merge($row, ['', '', '', '', $rdap_above_max_rtt]);
+	}
+
+	$table->addRow($row);
 }
 
-if ($this->data['type'] == RSM_DNS || $this->data['type'] == RSM_RDDS || $this->data['type'] == RSM_EPP) {
+if ($this->data['type'] == RSM_DNS || $this->data['type'] == RSM_RDDS || $this->data['type'] == RSM_RDAP
+		|| $this->data['type'] == RSM_EPP) {
 	$downProbes = $this->data['type'] == RSM_DNS ? $this->data['downProbes'] : $downProbes;
 
 	$additionInfo = [
@@ -518,7 +631,7 @@ elseif ($this->data['type'] == RSM_DNSSEC) {
 	];
 }
 
-if (in_array($this->data['type'], [RSM_DNS, RSM_DNSSEC, RSM_RDDS])) {
+if (in_array($this->data['type'], [RSM_DNS, RSM_DNSSEC, RSM_RDDS, RSM_RDAP])) {
 	$test_result = $this->data['testResult'];
 }
 else {
@@ -533,26 +646,58 @@ else {
 	}
 }
 
-$particularTests = [
-	new CSpan([bold(_('TLD')), ':', SPACE, $this->data['tld']['name']]),
-	BR(),
-	new CSpan([bold(_('Service')), ':', SPACE, $this->data['slvItem']['name']]),
-	BR(),
-	new CSpan([bold(_('Test time')), ':', SPACE, date(DATE_TIME_FORMAT_SECONDS, $this->data['time'])]),
-	BR(),
-	new CSpan([bold(_('Test result')), ':', SPACE, $test_result, SPACE,
-		_s('(calculated at %1$s)', date(DATE_TIME_FORMAT_SECONDS, $this->data['time'] + RSM_ROLLWEEK_SHIFT_BACK))
-	]),
-	BR(),
-	new CSpan([bold(_('Note')), ':', SPACE, _('The following table displays the data that has been received by '.
-		'the central node, some of the values may not have been available at the time of the calculation of the '.
-		'"Test result"')
-	])
-];
-$particularTestsInfoTable = (new CTable(null))->addClass('incidents-info');
-$particularTestsInfoTable->addRow([$particularTests, $additionInfo]);
+$details = [$object_label => $data['tld']['host']];
 
-$widget->addItem($particularTestsInfoTable);
+if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
+	$details += [
+		_('Registrar name') => $data['tld']['info_1'],
+		_('Registrar family') => $data['tld']['info_2']
+	];
+}
+
+$details += [
+	_('Service') => $data['slvItem']['name'],
+	_('Test time') => date(DATE_TIME_FORMAT_SECONDS, $data['time']),
+	_('Test result') => $test_result,
+	_('Note') => _(
+		'The following table displays the data that has been received by the central node, some of'.
+		' the values may not have been available at the time of the calculation of the "Test result"'
+	)
+];
+
+$right_details = [
+	_('Probes total') => $data['totalProbes'],
+	_('Probes offline') => $offlineProbes,
+	_('Probes with No Result') => $noResultProbes,
+	_('Probes with Result') => $data['totalProbes'] - $offlineProbes - $noResultProbes,
+];
+
+if ($this->data['type'] == RSM_DNSSEC) {
+	$right_details += [
+		_('Tests total') => $testTotal,
+		_('Tests Up') => $testUp,
+		_('Tests Down') => $testDown,
+	];
+}
+else {
+	$downProbes = $this->data['type'] == RSM_DNS ? $this->data['downProbes'] : $downProbes;
+
+	$right_details += [
+		_('Probes Up') => $data['totalProbes'] - $offlineProbes - $noResultProbes - $downProbes,
+		_('Probes Down') => $downProbes,
+	];
+}
+
+$widget->additem((new CDiv())
+	->addClass(ZBX_STYLE_TABLE_FORMS_CONTAINER)
+	->addItem((new CTable(null))
+		->addClass('incidents-info')
+		->addRow([
+			gen_details_item($details),
+			gen_details_item($right_details),
+		])
+	)
+);
 
 $widget->addItem($table);
 

@@ -137,16 +137,17 @@ if (!$data['eventid'] || !$data['slvItemId'] || !$data['availItemId'] || !$data[
 }
 
 // get TLD
-$tld = API::Host()->get(array(
-	'tlds' => true,
-	'output' => array('hostid', 'host', 'name'),
-	'filter' => array(
+$tld = API::Host()->get([
+	'output' => ['hostid', 'host', 'info_1', 'info_2'],
+	'filter' => [
 		'host' => $data['host']
-	)
-));
+	],
+	'tlds' => true
+]);
 
 if ($tld) {
 	$data['tld'] = reset($tld);
+	$data['rsm_monitoring_mode'] = get_rsm_monitoring_type();
 }
 else {
 	access_deny();
@@ -200,6 +201,10 @@ if ($mainEvent) {
 			$keys = array(CALCULATED_ITEM_DNSSEC_FAIL, CALCULATED_ITEM_DNS_DELAY);
 			$data['type'] = RSM_DNSSEC;
 			break;
+		case RSM_SLV_RDAP_ROLLWEEK:
+			$keys = array(CALCULATED_ITEM_RDAP_FAIL, CALCULATED_ITEM_RDAP_DELAY);
+			$data['type'] = RSM_RDAP;
+			break;
 		case RSM_SLV_RDDS_ROLLWEEK:
 			$keys = array(CALCULATED_ITEM_RDDS_FAIL, CALCULATED_ITEM_RDDS_DELAY);
 			$data['type'] = RSM_RDDS;
@@ -217,11 +222,11 @@ if ($mainEvent) {
 			$template_macros = API::UserMacro()->get(array(
 				'output' => API_OUTPUT_EXTEND,
 				'hostids' => $template['templateid'],
-				'filter' => array(
-					'macro' => array(RSM_TLD_RDDS43_ENABLED, RSM_TLD_RDDS80_ENABLED, RSM_TLD_RDAP_ENABLED,
-						RSM_RDAP_TLD_ENABLED, RSM_TLD_RDDS_ENABLED
-					)
-				)));
+				'filter' => [
+					'macro' => is_RDAP_standalone($mainEvent['clock'])
+						? [RSM_TLD_RDDS43_ENABLED, RSM_TLD_RDDS80_ENABLED, RSM_TLD_RDDS_ENABLED]
+						: [RSM_TLD_RDDS43_ENABLED, RSM_TLD_RDDS80_ENABLED, RSM_RDAP_TLD_ENABLED, RSM_RDAP_TLD_ENABLED, RSM_TLD_RDDS_ENABLED]
+				]));
 
 				$data['tld']['subservices'] = [];
 				$ok_rdds_services = [];
@@ -259,8 +264,11 @@ if ($mainEvent) {
 	}
 
 	foreach ($items as $item) {
-		if ($item['key_'] == CALCULATED_ITEM_DNS_FAIL || $item['key_'] == CALCULATED_ITEM_DNSSEC_FAIL
-				|| $item['key_'] == CALCULATED_ITEM_RDDS_FAIL || $item['key_'] == CALCULATED_ITEM_EPP_FAIL) {
+		if ($item['key_'] == CALCULATED_ITEM_DNS_FAIL
+				|| $item['key_'] == CALCULATED_ITEM_DNSSEC_FAIL
+				|| $item['key_'] == CALCULATED_ITEM_RDDS_FAIL
+				|| $item['key_'] == CALCULATED_ITEM_RDAP_FAIL
+				|| $item['key_'] == CALCULATED_ITEM_EPP_FAIL) {
 			$failCount = getFirstUintValue($item['itemid'], $mainEvent['clock']);
 		}
 		else {
@@ -314,7 +322,8 @@ if ($mainEvent) {
 
 	// result generation
 	$data['slv'] = sprintf('%.3f', $data['slvItem']['lastvalue']);
-	$data['slvTestTime'] = sprintf('%.3f', $data['slvItem']['lastclock']);
+	$data['slvTestTime'] = (int) $data['slvItem']['lastclock'];
+
 	if ($mainEvent['false_positive']) {
 		$data['incidentType'] = INCIDENT_FALSE_POSITIVE;
 	}

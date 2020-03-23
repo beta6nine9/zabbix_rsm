@@ -5,6 +5,7 @@ use warnings;
 
 use DBI;
 use DBI qw(:sql_types);
+use DBI::Profile;
 use Getopt::Long;
 use Pod::Usage;
 use Exporter qw(import);
@@ -21,6 +22,7 @@ use RSM;
 use Pusher qw(push_to_trapper);
 use Fcntl qw(:flock);
 use List::Util qw(min max);
+use Devel::StackTrace;
 
 use constant E_ID_NONEXIST => -2;
 use constant E_ID_MULTIPLE => -3;
@@ -56,6 +58,7 @@ use constant PROBE_KEY_AUTOMATIC => 'rsm.probe.status[automatic,%]'; # match all
 use constant RSM_CONFIG_DNS_UDP_DELAY_ITEMID => 100008;	# rsm.configvalue[RSM.DNS.UDP.DELAY]
 use constant RSM_CONFIG_RDDS_DELAY_ITEMID => 100009;	# rsm.configvalue[RSM.RDDS.DELAY]
 use constant RSM_CONFIG_EPP_DELAY_ITEMID => 100010;	# rsm.configvalue[RSM.EPP.DELAY]
+use constant RSM_CONFIG_RDAP_DELAY_ITEMID => 100034;	# rsm.configvalue[RSM.RDAP.DELAY]
 
 # In order to do the calculation we should wait till all the results
 # are available on the server (from proxies). We shift back 2 minutes
@@ -70,9 +73,6 @@ use constant ROLLWEEK_SHIFT_BACK	=> 180;	# seconds (must be divisible by 60) bac
 use constant PROBE_ONLINE_STR => 'Online';
 
 use constant DETAILED_RESULT_DELIM => ', ';
-
-use constant DEFAULT_SLV_MAX_CYCLES => 10;	# maximum cycles to process by SLV scripts in 1 run, may be overriden
-						# by rsm.conf 'max_cycles_dns' and 'max_cycles_rdds'
 
 use constant USE_CACHE_FALSE => 0;
 use constant USE_CACHE_TRUE  => 1;
@@ -90,15 +90,36 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		PROBE_KEY_MANUAL
 		ONLINE OFFLINE
 		USE_CACHE_FALSE USE_CACHE_TRUE
-		get_macro_minns get_macro_dns_probe_online get_macro_rdds_probe_online get_macro_dns_rollweek_sla
-		get_macro_rdds_rollweek_sla get_macro_dns_udp_rtt_high get_macro_dns_udp_rtt_low
-		get_macro_dns_tcp_rtt_low get_macro_rdds_rtt_low get_dns_udp_delay get_dns_tcp_delay
-		get_rdds_delay get_epp_delay get_macro_epp_probe_online get_macro_epp_rollweek_sla
-		get_macro_dns_update_time get_macro_rdds_update_time get_tld_items get_hostid
+		get_macro_minns
+		get_macro_dns_probe_online
+		get_macro_rdds_probe_online
+		get_macro_rdap_probe_online
+		get_macro_dns_rollweek_sla
+		get_macro_rdds_rollweek_sla
+		get_macro_rdap_rollweek_sla
+		get_macro_dns_udp_rtt_high
+		get_macro_dns_udp_rtt_low
+		get_macro_dns_tcp_rtt_low
+		get_macro_rdds_rtt_low
+		get_macro_rdap_rtt_low
+		get_dns_udp_delay
+		get_dns_tcp_delay
+		get_rdds_delay
+		get_rdap_delay
+		get_epp_delay
+		get_macro_epp_probe_online
+		get_macro_epp_rollweek_sla
+		get_macro_dns_update_time
+		get_macro_rdds_update_time
+		get_tld_items
+		get_hostid
 		get_rtt_low
 		get_macro_epp_rtt_low get_macro_probe_avail_limit
 		get_macro_incident_dns_fail get_macro_incident_dns_recover
 		get_macro_incident_rdds_fail get_macro_incident_rdds_recover
+		get_macro_incident_rdap_fail get_macro_incident_rdap_recover
+		get_monitoring_target
+		get_rdap_standalone_ts is_rdap_standalone
 		get_itemid_by_key get_itemid_by_host
 		get_itemid_by_hostid get_itemid_like_by_hostid get_itemids_by_host_and_keypart get_lastclock
 		get_tlds get_tlds_and_hostids
@@ -138,7 +159,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		fail_if_running
 		exit_if_running
 		trim
-		parse_opts parse_slv_opts
+		parse_opts parse_slv_opts override_opts
 		opt getopt setopt unsetopt optkeys ts_str ts_full selected_period
 		cycle_start
 		cycle_end
@@ -155,18 +176,16 @@ my $_sender_values;	# used to send values to Zabbix server
 
 my $POD2USAGE_FILE;	# usage message file
 
-my ($_global_sql, $_global_sql_bind_values, $_lock_fh);
+my $_lock_fh;
 
-my $get_stats = 0;
 my $start_time;
-my $sql_start;
-my $sql_end;
-my $sql_warnslow_start;
-my $sql_warnslow_end;
-my $sql_time = 0.0;
-my $sql_count = 0;
+my $total_sql_count = 0;
+my $total_sql_duration = 0.0;
 
 my $log_open = 0;
+
+my $monitoring_target; # see get_monitoring_target()
+my $rdap_standalone_ts; # see get_rdap_standalone_ts()
 
 sub get_macro_minns
 {
@@ -183,6 +202,11 @@ sub get_macro_rdds_probe_online
 	return __get_macro('{$RSM.RDDS.PROBE.ONLINE}');
 }
 
+sub get_macro_rdap_probe_online
+{
+	return __get_macro('{$RSM.RDAP.PROBE.ONLINE}');
+}
+
 sub get_macro_dns_rollweek_sla
 {
 	return __get_macro('{$RSM.DNS.ROLLWEEK.SLA}');
@@ -191,6 +215,11 @@ sub get_macro_dns_rollweek_sla
 sub get_macro_rdds_rollweek_sla
 {
 	return __get_macro('{$RSM.RDDS.ROLLWEEK.SLA}');
+}
+
+sub get_macro_rdap_rollweek_sla
+{
+	return __get_macro('{$RSM.RDAP.ROLLWEEK.SLA}');
 }
 
 sub get_macro_dns_udp_rtt_high
@@ -211,6 +240,11 @@ sub get_macro_dns_tcp_rtt_low
 sub get_macro_rdds_rtt_low
 {
 	return __get_macro('{$RSM.RDDS.RTT.LOW}');
+}
+
+sub get_macro_rdap_rtt_low
+{
+	return __get_macro('{$RSM.RDAP.RTT.LOW}');
 }
 
 sub get_dns_udp_delay
@@ -243,9 +277,16 @@ sub get_rdds_delay
 
 	my $value = __get_configvalue(RSM_CONFIG_RDDS_DELAY_ITEMID, $value_time);
 
-	return $value if (defined($value));
+	return $value // __get_macro('{$RSM.RDDS.DELAY}');
+}
 
-	return __get_macro('{$RSM.RDDS.DELAY}');
+sub get_rdap_delay
+{
+	my $value_time = (shift or time() - AVAIL_SHIFT_BACK);
+
+	my $value = __get_configvalue(RSM_CONFIG_RDAP_DELAY_ITEMID, $value_time);
+
+	return $value // __get_macro('{$RSM.RDAP.DELAY}');
 }
 
 sub get_epp_delay
@@ -254,9 +295,7 @@ sub get_epp_delay
 
 	my $value = __get_configvalue(RSM_CONFIG_EPP_DELAY_ITEMID, $value_time);
 
-	return $value if (defined($value));
-
-	return __get_macro('{$RSM.EPP.DELAY}');
+	return $value // __get_macro('{$RSM.EPP.DELAY}');
 }
 
 sub get_macro_dns_update_time
@@ -307,6 +346,11 @@ sub get_rtt_low
 	if ($service eq 'rdds')
 	{
 		return get_macro_rdds_rtt_low();
+	}
+
+	if ($service eq 'rdap')
+	{
+		return get_macro_rdap_rtt_low();
 	}
 
 	if ($service eq 'epp')
@@ -370,6 +414,53 @@ sub get_macro_incident_rdds_recover()
 	return __get_macro('{$RSM.INCIDENT.RDDS.RECOVER}');
 }
 
+sub get_macro_incident_rdap_fail()
+{
+	return __get_macro('{$RSM.INCIDENT.RDAP.FAIL}');
+}
+
+sub get_macro_incident_rdap_recover()
+{
+	return __get_macro('{$RSM.INCIDENT.RDAP.RECOVER}');
+}
+
+sub get_monitoring_target()
+{
+	if (!defined($monitoring_target))
+	{
+		$monitoring_target = __get_macro('{$RSM.MONITORING.TARGET}');
+
+		if ($monitoring_target ne MONITORING_TARGET_REGISTRY && $monitoring_target ne MONITORING_TARGET_REGISTRAR)
+		{
+			fail("{\$RSM.MONITORING.TARGET} has unexpected value: '$monitoring_target'");
+		}
+	}
+
+	return $monitoring_target;
+}
+
+# Returns timestamp, when treating RDAP as a standalone service has to be started, or undef
+sub get_rdap_standalone_ts()
+{
+	if (!defined($rdap_standalone_ts))
+	{
+		# NB! Don't store undef as cached value!
+		$rdap_standalone_ts = __get_macro('{$RSM.RDAP.STANDALONE}');
+	}
+
+	return $rdap_standalone_ts ? int($rdap_standalone_ts) : undef;
+}
+
+# Returns 1, if RDAP has to be treated as a standalone service, 0 otherwise
+sub is_rdap_standalone(;$)
+{
+	my $now = shift // time();
+
+	my $ts = get_rdap_standalone_ts();
+
+	return defined($ts) && $now >= $ts ? 1 : 0;
+}
+
 sub get_itemid_by_key
 {
 	my $key = shift;
@@ -386,12 +477,12 @@ sub get_itemid_by_host
 		"select i.itemid".
 		" from items i,hosts h".
 		" where i.hostid=h.hostid".
-	    		" and h.host='$host'".
+			" and h.host='$host'".
 			" and i.key_='$key'"
 	);
 
-	fail("item \"$key\" does not exist") if ($itemid == E_ID_NONEXIST);
-	fail("more than one item \"$key\" found") if ($itemid == E_ID_MULTIPLE);
+	fail("item \"$key\" does not exist for \"$host\"") if ($itemid == E_ID_NONEXIST);
+	fail("more than one item \"$key\" found for \"$host\"") if ($itemid == E_ID_MULTIPLE);
 
 	return $itemid;
 }
@@ -439,7 +530,7 @@ sub get_itemids_by_host_and_keypart
 		"select i.itemid,i.key_".
 		" from items i,hosts h".
 		" where i.hostid=h.hostid".
-	    		" and h.host='$host'".
+			" and h.host='$host'".
 			" and i.key_ like '$key_part%'");
 
 	fail("cannot find items ($key_part%) at host ($host)") if (scalar(@$rows_ref) == 0);
@@ -662,13 +753,13 @@ my %probes_cache = ();
 # Returns a reference to hash of all probes (host => {'hostid' => hostid, 'status' => status}).
 sub get_probes(;$$)
 {
-	my $service = shift; # "IP4", "IP6", "RDDS" or any other
+	my $service = shift; # "IP4", "IP6", "RDDS", "RDAP" or any other
 	my $name = shift;
 
 	$service = defined($service) ? uc($service) : "ALL";
 	$name //= "";
 
-	if ($service ne "IP4" && $service ne "IP6" && $service ne "RDDS")
+	if ($service ne "IP4" && $service ne "IP6" && $service ne "RDDS" && $service ne "RDAP")
 	{
 		$service = "ALL";
 	}
@@ -695,13 +786,14 @@ sub __get_probes($)
 			" left join hostmacro on hostmacro.hostid=hosts_templates_2.templateid" .
 		" where $name_condition" .
 			" hosts_groups.groupid=" . PROBES_GROUPID . " and" .
-			" hostmacro.macro in ('{\$RSM.IP4.ENABLED}','{\$RSM.IP6.ENABLED}','{\$RSM.RDDS.ENABLED}')");
+			" hostmacro.macro in ('{\$RSM.IP4.ENABLED}','{\$RSM.IP6.ENABLED}','{\$RSM.RDDS.ENABLED}','{\$RSM.RDAP.ENABLED}')");
 
 	my %result = (
 		'ALL'  => {},
 		'IP4'  => {},
 		'IP6'  => {},
-		'RDDS' => {}
+		'RDDS' => {},
+		'RDAP' => {},
 	);
 
 	foreach my $row (@{$rows})
@@ -725,6 +817,10 @@ sub __get_probes($)
 		{
 			$result{'RDDS'}{$host} = {'hostid' => $hostid, 'status' => $status} if ($value);
 		}
+		elsif ($macro eq '{$RSM.RDAP.ENABLED}')
+		{
+			$result{'RDAP'}{$host} = {'hostid' => $hostid, 'status' => $status} if ($value);
+		}
 	}
 
 	if (opt("debug"))
@@ -733,6 +829,7 @@ sub __get_probes($)
 		dbg("number of probes with IP4 support  - " . scalar(keys(%{$result{'IP4'}})));
 		dbg("number of probes with IP6 support  - " . scalar(keys(%{$result{'IP6'}})));
 		dbg("number of probes with RDDS support - " . scalar(keys(%{$result{'RDDS'}})));
+		dbg("number of probes with RDAP support - " . scalar(keys(%{$result{'RDAP'}})));
 	}
 
 	return \%result;
@@ -930,7 +1027,24 @@ sub validate_service($)
 {
 	my $service = shift;
 
-	fail("service \"$service\" is unknown") if (!grep {/$service/} ('dns', 'dnssec', 'rdds', 'epp'));
+	db_connect();
+
+	if (get_monitoring_target() eq MONITORING_TARGET_REGISTRY)
+	{
+		if (!grep {/$service/} ('dns', 'dnssec', 'rdds', 'rdap', 'epp'))
+		{
+			fail("service \"$service\" is unknown");
+		}
+	}
+	elsif (get_monitoring_target() eq MONITORING_TARGET_REGISTRAR)
+	{
+		if (!grep {/$service/} ('rdds', 'rdap'))
+		{
+			fail("service \"$service\" is unknown");
+		}
+	}
+
+	db_disconnect();
 }
 
 my %tld_service_enabled_cache = ();
@@ -957,16 +1071,16 @@ sub __tld_service_enabled($$$)
 	my $service = shift;
 	my $now     = shift;
 
-	return 1 if ($service eq 'dns');
-
 	if ($service eq 'rdds')
 	{
-		return 1 if tld_interface_enabled($tld, 'rdds43', $now);
-
-		return tld_interface_enabled($tld, 'rdap', $now);
+		return 1 if (tld_interface_enabled($tld, 'rdds43', $now));
+		return 1 if (tld_interface_enabled($tld, 'rdap', $now) && !is_rdap_standalone($now));
+		return 0;
 	}
-
-	return tld_interface_enabled($tld, $service, $now);
+	else
+	{
+		return tld_interface_enabled($tld, $service, $now);
+	}
 }
 
 sub enabled_item_key_from_interface
@@ -1097,8 +1211,19 @@ sub tld_interface_enabled($$$)
 
 	$interface = lc($interface);
 
-	return 1 if ($interface eq 'dns');
-	return 0 if ($interface eq 'epp');
+	if ($interface eq 'epp')
+	{
+		return 0;
+	}
+	elsif ($interface eq 'dns')
+	{
+		return 1 if (get_monitoring_target() eq MONITORING_TARGET_REGISTRY);
+		return 0 if (get_monitoring_target() eq MONITORING_TARGET_REGISTRAR);
+	}
+	elsif ($interface eq 'dnssec')
+	{
+		return 0 if (get_monitoring_target() eq MONITORING_TARGET_REGISTRAR);
+	}
 
 	my $item_key = enabled_item_key_from_interface($interface);
 
@@ -1134,14 +1259,13 @@ sub tld_interface_enabled($$$)
 		);
 
 		my $condition_index = 0;
+		my $itemids_placeholder = join(",", ("?") x scalar(@{$enabled_items_cache{$item_key}{$tld}}));
 
 		while ($condition_index < scalar(@conditions))
 		{
 			my $from = $conditions[$condition_index]->[0];
 			my $till = $conditions[$condition_index]->[1];
 			my $clock = $conditions[$condition_index]->[2];
-
-			my $itemids_placeholder = join(",", ("?") x scalar(@{$enabled_items_cache{$item_key}{$tld}}));
 
 			my $rows_ref = db_select(
 				"select value" .
@@ -1211,19 +1335,114 @@ sub tld_interface_enabled($$$)
 	return 0;
 }
 
-sub handle_db_error
+sub generate_db_error($$)
 {
-	my $msg = shift;
+	my $handle  = shift;
+	my $message = shift // $handle->errstr;
 
-	my $prefix = "";
+	my @message_parts = ();
 
-	$prefix = "[tld:$tld] " if ($tld);
+	if ($tld)
+	{
+		push(@message_parts, "[tld:$tld]");
+	}
 
-	my $bind_values_str = "";
+	push(@message_parts, 'database error:');
 
-	$bind_values_str = ' bind values: ' . join(',', @{$_global_sql_bind_values}) if (defined($_global_sql_bind_values));
+	push(@message_parts, $message);
 
-	fail($prefix . "database error: $msg (query was: [$_global_sql]$bind_values_str)");
+	if (defined($handle->{'Statement'}))
+	{
+		push(@message_parts, "(query: [$handle->{'Statement'}])");
+	}
+
+	if (defined($handle->{'ParamValues'}) && %{$handle->{'ParamValues'}})
+	{
+		my $params = join(',', values(%{$handle->{'ParamValues'}}));
+		push(@message_parts, "(params: [$params])");
+	}
+
+	if (defined($handle->{'ParamArrays'}) && %{$handle->{'ParamArrays'}})
+	{
+		my $params = join(',', values(%{$handle->{'ParamArrays'}}));
+		push(@message_parts, "(params 2: [$params])");
+	}
+
+	return join(' ', @message_parts);
+}
+
+sub handle_db_error($$$)
+{
+	my $message = shift;
+	my $handle  = shift;
+
+	fail(generate_db_error($handle, undef));
+}
+
+{
+	package RSMDBI;
+	use DBI;
+	use vars qw(@ISA);
+	@ISA = qw(DBI);
+
+	package RSMDBI::db;
+	use vars qw(@ISA);
+	@ISA = qw(DBI::db);
+
+	package RSMDBI::st;
+	use vars qw(@ISA);
+	@ISA = qw(DBI::st);
+
+	our $warn_duration;
+	our $warn_function;
+
+	sub query
+	{
+		my ($handle, $method, @args) = @_;
+
+		my $parent_method = "SUPER::$method";
+
+		my $result;
+		my @result;
+
+		my $start = Time::HiRes::time();
+
+		if (wantarray())
+		{
+			@result = $handle->$parent_method(@args);
+		}
+		else
+		{
+			$result = $handle->$parent_method(@args);
+		}
+
+		my $duration = Time::HiRes::time() - $start;
+
+		if ($duration > $warn_duration)
+		{
+			$warn_function->(sprintf("slow query: [%s] took %.3f seconds (%s)", $handle->{'Statement'}, $duration, $method));
+		}
+
+		return wantarray() ? @result : $result;
+	}
+
+	sub bind_param        { return query(shift, "bind_param"       , @_); }
+	sub bind_param_inout  { return query(shift, "bind_param_inout" , @_); }
+	sub bind_param_array  { return query(shift, "bind_param_array" , @_); }
+	sub execute           { return query(shift, "execute"          , @_); }
+	sub execute_array     { return query(shift, "execute_array"    , @_); }
+	sub execute_for_fetch { return query(shift, "execute_for_fetch", @_); }
+	sub last_insert_id    { return query(shift, "last_insert_id"   , @_); }
+	sub fetchrow_arrayref { return query(shift, "fetchrow_arrayref", @_); }
+	sub fetchrow_array    { return query(shift, "fetchrow_array"   , @_); }
+	sub fetchrow_hashref  { return query(shift, "fetchrow_hashref" , @_); }
+	sub fetchall_arrayref { return query(shift, "fetchall_arrayref", @_); }
+	sub fetchall_hashref  { return query(shift, "fetchall_hashref" , @_); }
+	sub finish            { return query(shift, "finish"           , @_); }
+	sub rows              { return query(shift, "rows"             , @_); }
+	sub bind_col          { return query(shift, "bind_col"         , @_); }
+	sub bind_columns      { return query(shift, "bind_columns"     , @_); }
+	sub dump_results      { return query(shift, "dump_results"     , @_); }
 }
 
 sub db_connect
@@ -1250,17 +1469,17 @@ sub db_connect
 
 	my $db_tls_settings = get_db_tls_settings($section);
 
-	$_global_sql = "DBI:mysql:database=$section->{'db_name'};host=$section->{'db_host'};$db_tls_settings";
+	my $data_source = "DBI:mysql:database=$section->{'db_name'};host=$section->{'db_host'};$db_tls_settings";
 
 	# NB! Timeouts have to be specified via DSN. To check if they're actually being used:
 	# $ export DBI_TRACE=2=dbitrace.log
 	# $ ./XXX.pl
 	# $ grep 'Setting' dbitrace.log
-	$_global_sql .= ';mysql_connect_timeout=' . ($section->{'db_connect_timeout'} // 30);
-	$_global_sql .= ';mysql_write_timeout='   . ($section->{'db_write_timeout'} // 30);
-	$_global_sql .= ';mysql_read_timeout='    . ($section->{'db_read_timeout'} // 30);
+	$data_source .= ';mysql_connect_timeout=' . ($section->{'db_connect_timeout'} // 30);
+	$data_source .= ';mysql_write_timeout='   . ($section->{'db_write_timeout'} // 30);
+	$data_source .= ';mysql_read_timeout='    . ($section->{'db_read_timeout'} // 30);
 
-	dbg($_global_sql);
+	dbg($data_source);
 
 	my $connect_opts = {
 		'PrintError'		=> 0,
@@ -1268,8 +1487,22 @@ sub db_connect
 		'mysql_auto_reconnect'	=> 1,
 	};
 
-	$dbh = DBI->connect($_global_sql, $section->{'db_user'}, $section->{'db_password'}, $connect_opts)
-		or handle_db_error(DBI->errstr);
+	if (opt('warnslow'))
+	{
+		$connect_opts->{'RootClass'} = 'RSMDBI';
+		$RSMDBI::st::warn_duration = getopt('warnslow');
+		$RSMDBI::st::warn_function = \&wrn;
+	}
+
+	if (opt('stats'))
+	{
+		$DBI::Profile::ON_DESTROY_DUMP = sub{};
+		$connect_opts->{'Profile'} = DBI::Profile->new(Path => ['!MethodName']);
+	}
+
+	# errors should be handled by handle_db_error() automatically, but lets call fail() as a fallback
+	$dbh = DBI->connect($data_source, $section->{'db_user'}, $section->{'db_password'}, $connect_opts)
+		or fail("database error: " . DBI->errstr . " (data source was: [$data_source])");
 
 	# verify that established database connection uses TLS if there was any hint that it is required in the config
 	unless ($db_tls_settings eq "mysql_ssl=0")
@@ -1297,6 +1530,34 @@ sub db_disconnect
 
 	if (defined($dbh))
 	{
+		if (opt('stats'))
+		{
+			my ($sql_count, $sql_duration) = db_get_stats();
+			$total_sql_count += $sql_count;
+			$total_sql_duration += $sql_duration;
+		}
+
+		my @active_handles = ();
+
+		foreach my $handle (@{$dbh->{'ChildHandles'}})
+		{
+			if (defined($handle) && $handle->{'Type'} eq 'st' && $handle->{'Active'})
+			{
+				push(@active_handles, $handle);
+			}
+		}
+
+		if (@active_handles)
+		{
+			wrn("called while having " . scalar(@active_handles) . " active statement handle(s)");
+
+			foreach my $handle (@active_handles)
+			{
+				wrn(generate_db_error($handle, 'active statement'));
+				$handle->finish();
+			}
+		}
+
 		$dbh->disconnect() || wrn($dbh->errstr);
 		undef($dbh);
 	}
@@ -1353,57 +1614,62 @@ sub db_handler_read_status_end()
 	info($line);
 }
 
+sub db_get_stats()
+{
+	if (!defined($dbh) || !defined($dbh->{'Profile'}))
+	{
+		return (undef, undef);
+	}
+
+	# check that all profiled DBI methods are "handled" while determining number of queries
+
+	my %allowed_method_names = map { $_ => 1 } (
+		'DESTROY',
+		'FETCH',
+		'FIRSTKEY',
+		'STORE',
+		'connected',
+		'disconnect',
+		'execute',
+		'fetchall_arrayref',
+		'fetchrow_array',
+		'prepare',
+	);
+	my @unhandled_method_names = grep(!exists($allowed_method_names{$_}), keys(%{$dbh->{'Profile'}{'Data'}}));
+	fail("Unhandled DBI methods: " . join(', ', @unhandled_method_names)) if (@unhandled_method_names);
+
+	# return number of queries and time spent in DBI
+
+	my $count = $dbh->{'Profile'}{'Data'}{'execute'}[0] if (exists($dbh->{'Profile'}{'Data'}{'execute'}));
+	my $duration = dbi_profile_merge_nodes(my $total = [], $dbh->{'Profile'}{'Data'});
+
+	return ($count // 0, $duration);
+}
+
 sub db_select($;$)
 {
-	$_global_sql = shift;
-	$_global_sql_bind_values = shift; # optional; reference to an array
+	my $sql = shift;
+	my $bind_values = shift; # optional; reference to an array
 
-	if ($get_stats)
+	my $sth = $dbh->prepare($sql)
+		or fail("cannot prepare [$sql]: ", $dbh->errstr);
+
+	if (defined($bind_values))
 	{
-		$sql_start = Time::HiRes::time();
-	}
+		dbg("[$sql] ", join(',', @{$bind_values}));
 
-	if (opt('warnslow'))
-	{
-		$sql_warnslow_start = Time::HiRes::time();
-	}
-
-	my $sth = $dbh->prepare($_global_sql)
-		or fail("cannot prepare [$_global_sql]: ", $dbh->errstr);
-
-	if (defined($_global_sql_bind_values))
-	{
-		dbg("[$_global_sql] ", join(',', @{$_global_sql_bind_values}));
-
-		$sth->execute(@{$_global_sql_bind_values})
-			or fail("cannot execute [$_global_sql]: ", $sth->errstr);
+		$sth->execute(@{$bind_values})
+			or fail("cannot execute [$sql]: ", $sth->errstr);
 	}
 	else
 	{
-		dbg("[$_global_sql]");
+		dbg("[$sql]");
 
 		$sth->execute()
-			or fail("cannot execute [$_global_sql]: ", $sth->errstr);
+			or fail("cannot execute [$sql]: ", $sth->errstr);
 	}
 
 	my $rows_ref = $sth->fetchall_arrayref();
-
-	if ($get_stats)
-	{
-		$sql_end = Time::HiRes::time();
-		$sql_time += ($sql_end - $sql_start);
-		$sql_count++;
-	}
-
-	if (opt('warnslow'))
-	{
-		$sql_warnslow_end = Time::HiRes::time();
-
-		if  ($sql_warnslow_end - $sql_warnslow_start > getopt('warnslow'))
-		{
-			wrn("slow query: [$_global_sql] took ", sprintf("%.3f seconds", $sql_warnslow_end - $sql_warnslow_start));
-		}
-	}
 
 	if (opt('debug'))
 	{
@@ -1512,52 +1778,25 @@ sub db_explain($;$)
 
 sub db_select_binds
 {
-	$_global_sql = shift;
-	$_global_sql_bind_values = shift;
+	my $sql = shift;
+	my $bind_values = shift;
 
-	my $sth = $dbh->prepare($_global_sql)
-		or fail("cannot prepare [$_global_sql]: ", $dbh->errstr);
+	my $sth = $dbh->prepare($sql)
+		or fail("cannot prepare [$sql]: ", $dbh->errstr);
 
-	dbg("[$_global_sql] ", join(',', @{$_global_sql_bind_values}));
+	dbg("[$sql] ", join(',', @{$bind_values}));
 
 	my ($total);
 
 	my @rows;
-	foreach my $bind_value (@{$_global_sql_bind_values})
+	foreach my $bind_value (@{$bind_values})
 	{
-		if (opt('stats'))
-		{
-			$sql_start = Time::HiRes::time();
-		}
-
-		if (opt('warnslow'))
-		{
-			$sql_warnslow_start = Time::HiRes::time();
-		}
-
 		$sth->execute($bind_value)
-			or fail("cannot execute [$_global_sql] bind_value:$bind_value: ", $sth->errstr);
+			or fail("cannot execute [$sql] bind_value:$bind_value: ", $sth->errstr);
 
 		while (my @row = $sth->fetchrow_array())
 		{
 			push(@rows, \@row);
-		}
-
-		if ($get_stats)
-		{
-			$sql_end = Time::HiRes::time();
-			$sql_time += ($sql_end - $sql_start);
-			$sql_count++;
-		}
-
-		if (opt('warnslow'))
-		{
-			$sql_warnslow_end = Time::HiRes::time();
-
-			if ($sql_warnslow_end - $sql_warnslow_start > getopt('warnslow'))
-			{
-				wrn("slow query: [$_global_sql] ($bind_value) took ", sprintf("%.3f seconds", $sql_warnslow_end - $sql_warnslow_start));
-			}
 		}
 	}
 
@@ -1578,55 +1817,28 @@ sub db_select_binds
 
 sub db_exec($;$)
 {
-	$_global_sql = shift;
-	$_global_sql_bind_values = shift; # optional; reference to an array
+	my $sql = shift;
+	my $bind_values = shift; # optional; reference to an array
 
-	if ($get_stats)
+	my $sth = $dbh->prepare($sql)
+		or fail("cannot prepare [$sql]: ", $dbh->errstr);
+
+	if (defined($bind_values))
 	{
-		$sql_start = Time::HiRes::time();
-	}
+		dbg("[$sql] ", join(',', @{$bind_values}));
 
-	if (opt('warnslow'))
-	{
-		$sql_warnslow_start = Time::HiRes::time();
-	}
-
-	my $sth = $dbh->prepare($_global_sql)
-		or fail("cannot prepare [$_global_sql]: ", $dbh->errstr);
-
-	if (defined($_global_sql_bind_values))
-	{
-		dbg("[$_global_sql] ", join(',', @{$_global_sql_bind_values}));
-
-		$sth->execute(@{$_global_sql_bind_values})
-			or fail("cannot execute [$_global_sql]: ", $sth->errstr);
+		$sth->execute(@{$bind_values})
+			or fail("cannot execute [$sql]: ", $sth->errstr);
 	}
 	else
 	{
-		dbg("[$_global_sql]");
+		dbg("[$sql]");
 
 		$sth->execute()
-			or fail("cannot execute [$_global_sql]: ", $sth->errstr);
+			or fail("cannot execute [$sql]: ", $sth->errstr);
 	}
 
-	if ($get_stats)
-	{
-		$sql_end = Time::HiRes::time();
-		$sql_time += ($sql_end - $sql_start);
-		$sql_count++;
-	}
-
-	if (opt('warnslow'))
-	{
-		$sql_warnslow_end = Time::HiRes::time();
-
-		if ($sql_warnslow_end - $sql_warnslow_start > getopt('warnslow'))
-		{
-			wrn("slow query: [$_global_sql] took ", sprintf("%.3f seconds", $sql_warnslow_end - $sql_warnslow_start));
-		}
-	}
-
-	return $sth->{mysql_insertid};
+	return $sth->{'mysql_insertid'};
 }
 
 sub db_mass_update($$$$$)
@@ -1791,22 +2003,23 @@ sub slv_max_cycles($)
 {
 	my $service = shift;
 
-	my $var;
-
-	if ($service eq 'dns' || $service eq 'dnssec')
+	if ($service ne 'dns' && $service ne 'dnssec' && $service ne 'rdap' && $service ne 'rdds')
 	{
-		$var = 'max_cycles_dns';
-	}
-	elsif ($service eq 'rdds')
-	{
-		$var = 'max_cycles_rdds';
-	}
-	else
-	{
-		return DEFAULT_SLV_MAX_CYCLES;
+		fail("unhandled service: '$service'");
 	}
 
-	return (defined($config) && defined($config->{'slv'}->{$var}) ? $config->{'slv'}->{$var} : DEFAULT_SLV_MAX_CYCLES);
+	my $var = 'max_cycles_' . $service;
+
+	if (!defined($config))
+	{
+		fail("missing config");
+	}
+	if (!defined($config->{'slv'}{$var}))
+	{
+		fail("missing config option: '$var'");
+	}
+
+	return $config->{'slv'}->{$var};
 }
 
 sub __print_probe_times
@@ -2503,6 +2716,10 @@ sub get_templated_items_like
 	my $tld = shift;
 	my $key_in = shift;
 
+	# TODO: this function could benefit from some caching because it's called
+	# on every cycle during rsm.slv*.pl calculation even though list of items
+	# is not likely to change
+
 	my $hostid = get_hostid("Template $tld");
 
 	my $items_ref = db_select(
@@ -2600,7 +2817,7 @@ sub process_slv_avail_cycles($$$$$$$$$)
 	my $probes_ref = shift;
 	my $delay = shift;
 	my $cfg_keys_in = shift;	# if input key(s) is/are known
-	my $cfg_keys_in_cb = shift;	# if input key(s) is/are unknown (DNSSEC, RDDS), call this function go get them
+	my $cfg_keys_in_cb = shift;	# if input key(s) is/are unknown (DNSSEC, RDDS), call this function to get them
 	my $cfg_key_out = shift;
 	my $cfg_minonline = shift;
 	my $check_probe_values_cb = shift;
@@ -2626,18 +2843,18 @@ sub process_slv_avail_cycles($$$$$$$$$)
 
 			if (!defined($keys_in{$tld}))
 			{
-				if (defined($cfg_keys_in))
-				{
-					$keys_in{$tld} = $cfg_keys_in;
-				}
-				else
-				{
-					$keys_in{$tld} = $cfg_keys_in_cb->($tld);
-				}
+				$keys_in{$tld} = $cfg_keys_in // $cfg_keys_in_cb->($tld);
 
 				if (!defined($keys_in{$tld}))
 				{
-					fail("cannot get input keys for Service availability calculation");
+					# fail("cannot get input keys for Service availability calculation");
+
+					# We used to fail here but not anymore because rsm.rdds items can be 
+					# disabled after switch to RDAP standalone. So some of TLDs may not have
+					# RDDS checks thus making SLV calculations for rsm.slv.rdds.* useless
+
+					wrn("no input keys for $tld, skipping");
+					next;
 				}
 			}
 
@@ -3268,19 +3485,8 @@ sub get_downtime_prepare
 			" and clock between ? and ?".
 		" order by clock";
 
-	if ($get_stats)
-	{
-		$sql_start = Time::HiRes::time();
-	}
-
 	my $sth = $dbh->prepare($query)
 		or fail("cannot prepare [$query]: ", $dbh->errstr);
-
-	if ($get_stats)
-	{
-		$sql_end = Time::HiRes::time();
-		$sql_time += ($sql_end - $sql_start);
-	}
 
 	dbg("[$query]");
 
@@ -3331,11 +3537,6 @@ sub get_downtime_execute
 
 		next if ($false_positive != 0);
 
-		if ($get_stats)
-		{
-			$sql_start = Time::HiRes::time();
-		}
-
 		$sth->bind_param(1, $itemid, SQL_INTEGER);
 		$sth->bind_param(2, $period_from, SQL_INTEGER);
 		$sth->bind_param(3, $period_till, SQL_INTEGER);
@@ -3345,13 +3546,6 @@ sub get_downtime_execute
 
 		my ($value, $clock);
 		$sth->bind_columns(\$value, \$clock);
-
-		if ($get_stats)
-		{
-			$sql_end = Time::HiRes::time();
-			$sql_time += ($sql_end - $sql_start);
-			$sql_count++;
-		}
 
 		my $prevclock;
 
@@ -3381,8 +3575,6 @@ sub get_downtime_execute
 
 			$prevclock = $clock;
 		}
-
-		$sql_count++;
 	}
 
 	# return minutes
@@ -3819,7 +4011,9 @@ sub format_stats_time
 sub init_process
 {
 	$log_open = 0;
-	__reset_stats();
+	$start_time = Time::HiRes::time();
+	$total_sql_count = 0;
+	$total_sql_duration = 0.0;
 }
 
 # this will be used for making sure only one copy of script runs (see function __is_already_running())
@@ -3842,15 +4036,12 @@ sub finalize_process
 
 	if (SUCCESS == $rv && opt('stats'))
 	{
-		my $prefix = $tld ? "$tld " : '';
-
-		my $sql_str = format_stats_time($sql_time);
-
-		$sql_str .= " ($sql_count queries)";
-
-		my $total_str = format_stats_time(Time::HiRes::time() - $start_time);
-
-		info($prefix, "PID ($$), total: $total_str, sql: $sql_str");
+		info(sprintf("%sPID (%d), total: %s, sql: %s (%d queries)",
+				$tld ? "$tld " : '',
+				$$,
+				format_stats_time(Time::HiRes::time() - $start_time),
+				format_stats_time($total_sql_duration),
+				$total_sql_count));
 	}
 
 	unlink($stdout_lock_file) if (defined($stdout_lock_file));
@@ -3863,6 +4054,11 @@ sub slv_exit
 	my $rv = shift;
 
 	finalize_process($rv);
+
+	if ($rv != SUCCESS)
+	{
+		map { __log('err', $_) } split("\n", Devel::StackTrace->new()->as_string());
+	}
 
 	exit($rv);
 }
@@ -3981,8 +4177,6 @@ sub parse_opts
 
 	$start_time = Time::HiRes::time() if (opt('stats'));
 
-	$get_stats = 1 if (opt('stats') || opt('warnslow'));
-
 	if (opt('debug'))
 	{
 		dbg("command-line parameters:");
@@ -3995,6 +4189,13 @@ sub parse_slv_opts
 	$POD2USAGE_FILE = '/opt/zabbix/scripts/slv/rsm.slv.usage';
 
 	parse_opts('tld=s', 'now=n', 'cycles=n', 'output-file=s', 'fill-gap=n');
+}
+
+sub override_opts($)
+{
+	my $new_opts = shift;
+
+	%OPTS = %{$new_opts};
 }
 
 sub opt
@@ -4339,16 +4540,23 @@ sub get_slv_rtt_monthly_items($$$$)
 	return \%slv_items_by_tld;
 }
 
-sub update_slv_rtt_monthly_stats($$$$$$$$)
+sub update_slv_rtt_monthly_stats($$$$$$$$;$)
 {
-	my $now                    = shift;
-	my $max_cycles             = shift;
-	my $single_tld             = shift; # undef or name of TLD
-	my $slv_item_key_performed = shift;
-	my $slv_item_key_failed    = shift;
-	my $slv_item_key_pfailed   = shift;
-	my $cycle_delay            = shift;
-	my $rtt_params_list        = shift;
+	my $now                         = shift;
+	my $max_cycles                  = shift;
+	my $single_tld                  = shift; # undef or name of TLD
+	my $slv_item_key_performed      = shift;
+	my $slv_item_key_failed         = shift;
+	my $slv_item_key_pfailed        = shift;
+	my $cycle_delay                 = shift;
+	my $rtt_params_list             = shift;
+	my $rdap_standalone_params_list = shift;
+
+	# $params_list - for RDDS, this is either $rtt_params_list (RDDS43, RRDS80 and RDAP) the migration to
+	# Standalone RDAP, or $rdap_standalone_params_list (RDDS43 and RDDS80) after migration to Standalone RDAP.
+	# For other services, $params_list is always $rtt_params_list.
+	# TODO: remove after migration to Standalone RDAP
+	my $params_list = $rtt_params_list;
 
 	# how long to wait for data after $cycle_end if number of performed checks is smaller than expected checks
 	# TODO: $max_nodata_time = $cycle_delay * x?
@@ -4400,7 +4608,13 @@ sub update_slv_rtt_monthly_stats($$$$$$$$)
 				next TLD_LOOP;
 			}
 
-			my $rtt_stats = get_slv_rtt_cycle_stats_aggregated($rtt_params_list, $cycle_start, $cycle_end, $tld);
+			if (defined($rdap_standalone_params_list) && is_rdap_standalone($cycle_start))
+			{
+				dbg("using parameters w/o RDAP, cycle_start=$cycle_start");
+				$params_list = $rdap_standalone_params_list;
+			}
+
+			my $rtt_stats = get_slv_rtt_cycle_stats_aggregated($params_list, $cycle_start, $cycle_end, $tld);
 
 			if ($rtt_stats->{'total'} < $rtt_stats->{'expected'} && $cycle_end > $now - $max_nodata_time)
 			{
@@ -4484,7 +4698,7 @@ sub recalculate_downtime($$$$$$)
 
 	fail("not supported when running in --dry-run mode") if (opt('dry-run'));
 
-	# get service from item's key ('RDDS', 'DNS', 'DNS.NS')
+	# get service from item's key ('DNS', 'DNS.NS', 'RDDS', 'RDAP')
 	my $service = uc($item_key_avail =~ s/^rsm\.slv\.(.+)\.avail(?:\[.*\])?$/$1/r);
 
 	# get last auditid
@@ -5323,13 +5537,6 @@ sub __get_pidfile
 	return PID_DIR . '/' . __script() . '.pid';
 }
 
-sub __reset_stats
-{
-	$start_time = Time::HiRes::time();
-	$sql_time = 0.0;
-	$sql_count = 0;
-}
-
 # Times when probe "lastaccess" within $probe_avail_limit.
 sub __get_reachable_times
 {
@@ -5369,8 +5576,8 @@ sub __get_reachable_times
 		"select clock,value".
 		" from history_uint".
 		" where itemid=$itemid".
-	    		" and clock between $from and $till".
-	    		" and value!=0".
+			" and clock between $from and $till".
+			" and value!=0".
 		" order by itemid,clock");
 
 	foreach my $row_ref (@$rows_ref)

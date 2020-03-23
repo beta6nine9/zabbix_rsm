@@ -283,6 +283,18 @@ return [
 				'length' => 512,
 				'default' => '',
 			],
+			'info_1' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_CHAR,
+				'length' => 128,
+				'default' => '',
+			],
+			'info_2' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_CHAR,
+				'length' => 128,
+				'default' => '',
+			],
 		],
 	],
 	'groups' => [

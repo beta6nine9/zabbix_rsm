@@ -23,7 +23,7 @@ require_once dirname(__FILE__).'/include/config.inc.php';
 require_once dirname(__FILE__).'/include/incidents.inc.php';
 require_once dirname(__FILE__).'/include/incidentdetails.inc.php';
 
-$page['title'] = _('TLD Rolling week status');
+$page['title'] = _('Incidents');
 $page['file'] = 'rsm.incidents.php';
 $page['hist_arg'] = array('groupid', 'hostid');
 $page['scripts'] = array('class.calendar.js');
@@ -34,7 +34,7 @@ require_once dirname(__FILE__).'/include/page_header.php';
 $fields = [
 	'host' =>					[T_ZBX_STR, O_OPT,	null,	null,			null],
 	'eventid' =>				[T_ZBX_INT, O_OPT,	P_SYS,	DB_ID,			null],
-	'type' =>					[T_ZBX_INT, O_OPT,	null,	IN('0,1,2,3'),	null],
+	'type' =>					[T_ZBX_INT, O_OPT,	null,	IN(implode(',', [RSM_DNS, RSM_DNSSEC, RSM_RDDS, RSM_RDAP, RSM_EPP])),null],
 	'mark_incident' =>			[T_ZBX_INT, O_OPT,	null,	null,			null],
 	'original_from' =>			[T_ZBX_INT, O_OPT, null,	null,			null],
 	'original_to' =>			[T_ZBX_INT, O_OPT, null,	null,			null],
@@ -66,7 +66,7 @@ if ((PAGE_TYPE_JS == $page['type']) || (PAGE_TYPE_HTML_BLOCK == $page['type'])) 
 $host = getRequest('host');
 
 if (isset($_REQUEST['mark_incident']) && (CWebUser::getType() == USER_TYPE_ZABBIX_ADMIN
-		|| CWebUser::getType() == USER_TYPE_SUPER_ADMIN || CWebUser::getType() == USER_TYPE_TEHNICAL_SERVICE)) {
+		|| CWebUser::getType() == USER_TYPE_SUPER_ADMIN || CWebUser::getType() == USER_TYPE_POWER_USER)) {
 	$event = API::Event()->get(array(
 		'eventids' => getRequest('eventid'),
 		'output' => ['eventid', 'objectid', 'clock', 'false_positive'],
@@ -145,22 +145,29 @@ if (isset($_REQUEST['mark_incident']) && (CWebUser::getType() == USER_TYPE_ZABBI
 $data = [];
 $data['url'] = '';
 $data['sid'] = CWebUser::getSessionCookie();
+$data['rsm_monitoring_mode'] = get_rsm_monitoring_type();
+$rollWeekSeconds = null;
 
-$macro = API::UserMacro()->get(array(
+$macros = API::UserMacro()->get([
 	'globalmacro' => true,
 	'output' => API_OUTPUT_EXTEND,
-	'filter' => array(
-		'macro' => RSM_ROLLWEEK_SECONDS
-	)
-));
+	'filter' => [
+		'macro' => [RSM_ROLLWEEK_SECONDS]
+	]
+]);
 
-if (!$macro) {
+foreach ($macros as $macro) {
+	if ($macro['macro'] === RSM_ROLLWEEK_SECONDS) {
+		$rollWeekSeconds = $macro;
+	}
+}
+
+if (!$rollWeekSeconds) {
 	show_error_message(_s('Macro "%1$s" doesn\'t not exist.', RSM_ROLLWEEK_SECONDS));
 	require_once dirname(__FILE__).'/include/page_footer.php';
 	exit;
 }
 
-$rollWeekSeconds = reset($macro);
 $serverTime = time() - RSM_ROLLWEEK_SHIFT_BACK;
 
 /*
@@ -168,6 +175,7 @@ $serverTime = time() - RSM_ROLLWEEK_SHIFT_BACK;
  */
 if (isset($_REQUEST['filter_set'])) {
 	$data['filter_search'] = getRequest('filter_search');
+
 	CProfile::update('web.rsm.incidents.filter_search', $data['filter_search'], PROFILE_TYPE_STR);
 }
 elseif (hasRequest('filter_rst')) {
@@ -213,6 +221,8 @@ else {
 $filterTimeFrom = zbxDateToTime($data['filter_from']);
 $filterTimeTill = zbxDateToTime($data['filter_to']);
 
+$data['tests_start_time'] = $filterTimeFrom;
+
 // get TLD
 if ($host || $data['filter_search']) {
 	$master = $DB;
@@ -223,33 +233,48 @@ if ($host || $data['filter_search']) {
 			continue;
 		}
 
-		$options = array(
-			'tlds' => true,
-			'output' => array('hostid', 'host', 'name')
-		);
+		$options = [
+			'output' => ['hostid', 'host', 'info_1', 'info_2'],
+			'tlds' => true
+		];
 
 		if ($host) {
-			$options['filter'] = array('host' => $host);
+			$options['filter'] = ['host' => $host];
 		}
 		else {
-			$options['filter'] = array('name' => $data['filter_search']);
+			$options['filter'] = ['host' => $data['filter_search']];
 		}
 
 		$tld = API::Host()->get($options);
 		$data['tld'] = reset($tld);
 
 		if (!$data['tld']) {
-			unset($data['tld']);
 			continue;
 		}
 		else {
-			if ($host && $data['filter_search'] != $data['tld']['name']) {
-				$data['filter_search'] = $data['tld']['name'];
-				CProfile::update('web.rsm.incidents.filter_search', $data['tld']['name'], PROFILE_TYPE_STR);
+			// Update profile.
+			if ($host && $data['filter_search'] != $data['tld']['host']) {
+				$data['filter_search'] = $data['tld']['host'];
+				CProfile::update('web.rsm.incidents.filter_search', $data['tld']['host'], PROFILE_TYPE_STR);
 			}
 
 			// get items
-			$item_keys = [RSM_SLV_DNS_ROLLWEEK, RSM_SLV_DNSSEC_ROLLWEEK, RSM_SLV_RDDS_ROLLWEEK, RSM_SLV_EPP_ROLLWEEK];
+			$item_keys = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR)
+				? [RSM_SLV_RDDS_ROLLWEEK]
+				: [RSM_SLV_DNSSEC_ROLLWEEK, RSM_SLV_RDDS_ROLLWEEK, RSM_SLV_EPP_ROLLWEEK];
+			$avail_item_keys = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR)
+				? [RSM_SLV_RDDS_AVAIL]
+				: [RSM_SLV_DNSSEC_AVAIL, RSM_SLV_RDDS_AVAIL, RSM_SLV_EPP_AVAIL];
+
+			if (is_RDAP_standalone($filterTimeFrom) || is_RDAP_standalone($filterTimeTill)) {
+				$avail_item_keys[] = RSM_SLV_RDAP_AVAIL;
+				$item_keys[] = RSM_SLV_RDAP_ROLLWEEK;
+			}
+
+			if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY) {
+				$item_keys[] = RSM_SLV_DNS_ROLLWEEK;
+				$avail_item_keys[] = RSM_SLV_DNS_AVAIL;
+			}
 
 			$items = [];
 			$db_items = DBselect(
@@ -285,16 +310,14 @@ if ($host || $data['filter_search']) {
 				}
 			}
 
-			$avail_items = API::Item()->get(array(
+			$avail_items = API::Item()->get([
+				'output' => ['itemid', 'hostid', 'key_'],
 				'hostids' => [$data['tld']['hostid']],
-				'filter' => array(
-					'key_' => array(
-						RSM_SLV_DNS_AVAIL, RSM_SLV_DNSSEC_AVAIL, RSM_SLV_RDDS_AVAIL, RSM_SLV_EPP_AVAIL
-					)
-				),
-				'output' => array('itemid', 'hostid', 'key_'),
+				'filter' => [
+					'key_' => $avail_item_keys
+				],
 				'preservekeys' => true
-			));
+			]);
 
 			$items += $avail_items;
 
@@ -302,10 +325,12 @@ if ($host || $data['filter_search']) {
 				$dnsItems = [];
 				$dnssecItems = [];
 				$rddsItems = [];
+				$rdapItems = [];
 				$eppItems = [];
 				$dnsAvailItem = [];
 				$dnssecAvailItem = [];
 				$rddsAvailItem = [];
+				$rdapAvailItem = [];
 				$eppAvailItem = [];
 				$itemIds = [];
 
@@ -314,45 +339,66 @@ if ($host || $data['filter_search']) {
 						case RSM_SLV_DNS_ROLLWEEK:
 							$data['dns']['itemid'] = $item['itemid'];
 							$data['dns']['slv'] = sprintf('%.3f', $item['lastvalue']);
-							$data['dns']['slvTestTime'] = sprintf('%.3f', $item['lastclock']);
+							$data['dns']['slvTestTime'] = $item['lastclock'];
 							$data['dns']['events'] = [];
 							break;
+
 						case RSM_SLV_DNSSEC_ROLLWEEK:
 							$data['dnssec']['itemid'] = $item['itemid'];
 							$data['dnssec']['slv'] = sprintf('%.3f', $item['lastvalue']);
-							$data['dnssec']['slvTestTime'] = sprintf('%.3f', $item['lastclock']);
+							$data['dnssec']['slvTestTime'] = $item['lastclock'];
 							$data['dnssec']['events'] = [];
 							break;
+
 						case RSM_SLV_RDDS_ROLLWEEK:
 							$data['rdds']['itemid'] = $item['itemid'];
 							$data['rdds']['slv'] = sprintf('%.3f', $item['lastvalue']);
-							$data['rdds']['slvTestTime'] = sprintf('%.3f', $item['lastclock']);
+							$data['rdds']['slvTestTime'] = $item['lastclock'];
 							$data['rdds']['events'] = [];
 							break;
+
+						case RSM_SLV_RDAP_ROLLWEEK:
+							$data['rdap']['itemid'] = $item['itemid'];
+							$data['rdap']['slv'] = sprintf('%.3f', $item['lastvalue']);
+							$data['rdap']['slvTestTime'] = $item['lastclock'];
+							$data['rdap']['events'] = [];							
+							break;
+
 						case RSM_SLV_EPP_ROLLWEEK:
 							$data['epp']['itemid'] = $item['itemid'];
 							$data['epp']['slv'] = sprintf('%.3f', $item['lastvalue']);
-							$data['epp']['slvTestTime'] = sprintf('%.3f', $item['lastclock']);
+							$data['epp']['slvTestTime'] = $item['lastclock'];
 							$data['epp']['events'] = [];
 							break;
+
 						case RSM_SLV_DNS_AVAIL:
 							$data['dns']['availItemId'] = $item['itemid'];
 							$dnsAvailItem = $item['itemid'];
 							$dnsItems[] = $item['itemid'];
 							$itemIds[] = $item['itemid'];
 							break;
+
 						case RSM_SLV_DNSSEC_AVAIL:
 							$data['dnssec']['availItemId'] = $item['itemid'];
 							$dnssecAvailItem = $item['itemid'];
 							$dnssecItems[] = $item['itemid'];
 							$itemIds[] = $item['itemid'];
 							break;
+
 						case RSM_SLV_RDDS_AVAIL:
 							$data['rdds']['availItemId'] = $item['itemid'];
 							$rddsAvailItem = $item['itemid'];
 							$rddsItems[] = $item['itemid'];
 							$itemIds[] = $item['itemid'];
 							break;
+
+						case RSM_SLV_RDAP_AVAIL:
+							$data['rdap']['availItemId'] = $item['itemid'];
+							$rdapAvailItem = $item['itemid'];
+							$rdapItems[] = $item['itemid'];
+							$itemIds[] = $item['itemid'];
+							break;
+
 						case RSM_SLV_EPP_AVAIL:
 							$data['epp']['availItemId'] = $item['itemid'];
 							$eppAvailItem = $item['itemid'];
@@ -363,21 +409,22 @@ if ($host || $data['filter_search']) {
 				}
 
 				// get triggers
-				$triggers = API::Trigger()->get(array(
+				$triggers = API::Trigger()->get([
 					'output' => ['triggerids'],
 					'selectItems' => ['itemid'],
 					'itemids' => $itemIds,
-					'filter' => array(
+					'filter' => [
 						'priority' => TRIGGER_SEVERITY_NOT_CLASSIFIED
-					),
+					],
 					'preservekeys' => true
-				));
+				]);
 
 				$triggerIds = array_keys($triggers);
 
 				$dnsTriggers = [];
 				$dnssecTriggers = [];
 				$rddsTriggers = [];
+				$rdapTriggers = [];
 				$eppTriggers = [];
 				foreach ($triggers as $trigger) {
 					$triggerItem = reset($trigger['items']);
@@ -387,6 +434,9 @@ if ($host || $data['filter_search']) {
 					}
 					elseif (in_array($triggerItem['itemid'], $dnssecItems)) {
 						$dnssecTriggers[] = $trigger['triggerid'];
+					}
+					elseif (in_array($triggerItem['itemid'], $rdapItems)) {
+						$rdapTriggers[] = $trigger['triggerid'];
 					}
 					elseif (in_array($triggerItem['itemid'], $rddsItems)) {
 						$rddsTriggers[] = $trigger['triggerid'];
@@ -484,6 +534,7 @@ if ($host || $data['filter_search']) {
 								if (in_array($eventTriggerId, $dnsTriggers)
 										|| in_array($eventTriggerId, $dnssecTriggers)
 										|| in_array($eventTriggerId, $rddsTriggers)
+										|| in_array($eventTriggerId, $rdapTriggers)
 										|| in_array($eventTriggerId, $eppTriggers)) {
 									if (in_array($eventTriggerId, $dnsTriggers)) {
 										unset($data['dns']['events'][$i]['status']);
@@ -505,6 +556,12 @@ if ($host || $data['filter_search']) {
 										$itemType = 'rdds';
 										$itemId = $rddsAvailItem;
 										$data['rdds']['events'][$i] = array_merge($data['rdds']['events'][$i], $newData[$i]);
+									}
+									elseif (in_array($eventTriggerId, $rdapTriggers)) {
+										unset($data['rdap']['events'][$i]['status']);
+										$itemType = 'rdap';
+										$itemId = $rdapAvailItem;
+										$data['rdap']['events'][$i] = array_merge($data['rdap']['events'][$i], $newData[$i]);
 									}
 									elseif (in_array($eventTriggerId, $eppTriggers)) {
 										unset($data['epp']['events'][$i]['status']);
@@ -531,28 +588,34 @@ if ($host || $data['filter_search']) {
 							}
 							else {
 								if (isset($data['dns']['events'][$i])) {
-									$itemInfo = array(
+									$itemInfo = [
 										'itemType' => 'dns',
 										'itemId' => $dnsAvailItem
-									);
+									];
 								}
 								elseif (isset($data['dnssec']['events'][$i])) {
-									$itemInfo = array(
+									$itemInfo = [
 										'itemType' => 'dnssec',
 										'itemId' => $dnssecAvailItem
-									);
+									];
 								}
 								elseif (isset($data['rdds']['events'][$i])) {
-									$itemInfo = array(
+									$itemInfo = [
 										'itemType' => 'rdds',
 										'itemId' => $rddsAvailItem
-									);
+									];
+								}
+								elseif (isset($data['rdap']['events'][$i])) {
+									$itemInfo = [
+										'itemType' => 'rdap',
+										'itemId' => $rdapAvailItem
+									];
 								}
 								elseif (isset($data['epp']['events'][$i])) {
-									$itemInfo = array(
+									$itemInfo = [
 										'itemType' => 'epp',
 										'itemId' => $eppAvailItem
-									);
+									];
 								}
 
 								if ($itemInfo) {
@@ -594,18 +657,18 @@ if ($host || $data['filter_search']) {
 						else {
 							$i++;
 							// get event start time
-							$addEvent = API::Event()->get(array(
+							$addEvent = API::Event()->get([
 								'output' => API_OUTPUT_EXTEND,
-								'objectids' => array($event['objectid']),
+								'objectids' => [$event['objectid']],
 								'source' => EVENT_SOURCE_TRIGGERS,
 								'object' => EVENT_OBJECT_TRIGGER,
 								'time_till' => $event['clock'] - 1,
-								'filter' => array(
+								'filter' => [
 									'value' => TRIGGER_VALUE_TRUE
-								),
+								],
 								'limit' => 1,
 								'sortorder' => ZBX_SORT_DOWN
-							));
+							]);
 
 							if ($addEvent) {
 								$addEvent = reset($addEvent);
@@ -621,12 +684,15 @@ if ($host || $data['filter_search']) {
 								elseif (in_array($eventTriggerId, $rddsTriggers)) {
 									$infoItemId = $rddsAvailItem;
 								}
+								elseif (in_array($eventTriggerId, $rdapTriggers)) {
+									$infoItemId = $rdapAvailItem;
+								}
 								elseif (in_array($eventTriggerId, $eppTriggers)) {
 									$infoItemId = $eppAvailItem;
 								}
 
 								if ($infoItemId) {
-									$incidents[$i] = array(
+									$incidents[$i] = [
 										'objectid' => $event['objectid'],
 										'eventid' => $addEvent['eventid'],
 										'status' => $event['value'],
@@ -646,7 +712,7 @@ if ($host || $data['filter_search']) {
 											$addEvent['clock'],
 											$event['clock']
 										)
-									);
+									];
 								}
 							}
 						}
@@ -700,6 +766,22 @@ if ($host || $data['filter_search']) {
 							}
 						}
 					}
+					elseif (in_array($eventTriggerId, $rdapTriggers)) {
+						if (isset($data['rdap']['events'][$i]) && $data['rdap']['events'][$i]) {
+							unset($data['rdap']['events'][$i]['status']);
+
+							$itemType = 'rdap';
+							$itemId = $rdapAvailItem;
+							$getHistory = true;
+
+							$data['rdap']['events'][$i] = array_merge($data['rdap']['events'][$i], $incidents[$i]);
+						}
+						else {
+							if (isset($incidents[$i])) {
+								$data['rdap']['events'][$i] = $incidents[$i];
+							}
+						}
+					}
 					elseif (in_array($eventTriggerId, $eppTriggers)) {
 						if (isset($data['epp']['events'][$i]) && $data['epp']['events'][$i]) {
 							unset($data['epp']['events'][$i]['status']);
@@ -738,11 +820,12 @@ if ($host || $data['filter_search']) {
 				}
 
 				if (isset($incidents[$i]) && $incidents[$i]['status'] == TRIGGER_VALUE_TRUE) {
+					$objectid = $incidents[$i]['objectid'];
 					// get event end time
-					$addEvent = DBfetch(DBselect(
-						'SELECT e.clock,e.objectid,e.value'.
+					$event = DBfetch(DBselect(
+						'SELECT e.clock'.
 						' FROM events e'.
-						' WHERE e.objectid='.$incidents[$i]['objectid'].
+						' WHERE e.objectid='.$objectid.
 							' AND e.clock>='.$filterTimeTill.
 							' AND e.object='.EVENT_OBJECT_TRIGGER.
 							' AND e.source='.EVENT_SOURCE_TRIGGERS.
@@ -751,113 +834,56 @@ if ($host || $data['filter_search']) {
 						1
 					));
 
-					if ($addEvent) {
-						$newData[$i] = array(
-							'status' => $addEvent['value'],
-							'endTime' => $addEvent['clock']
-						);
-
-						$eventTriggerId = $addEvent['objectid'];
-
-						if (in_array($eventTriggerId, $dnsTriggers)
-										|| in_array($eventTriggerId, $dnssecTriggers)
-										|| in_array($eventTriggerId, $rddsTriggers)
-										|| in_array($eventTriggerId, $eppTriggers)) {
-							if (in_array($eventTriggerId, $dnsTriggers)) {
-								unset($data['dns']['events'][$i]['status']);
-								$itemType = 'dns';
-								$itemId = $dnsAvailItem;
-								$data['dns']['events'][$i] = array_merge($data['dns']['events'][$i], $newData[$i]);
-							}
-							elseif (in_array($eventTriggerId, $dnssecTriggers)) {
-								unset($data['dnssec']['events'][$i]['status']);
-								$itemType = 'dnssec';
-								$itemId = $dnssecAvailItem;
-								$data['dnssec']['events'][$i] = array_merge(
-									$data['dnssec']['events'][$i],
-									$newData[$i]
-								);
-							}
-							elseif (in_array($eventTriggerId, $rddsTriggers)) {
-								unset($data['rdds']['events'][$i]['status']);
-								$itemType = 'rdds';
-								$itemId = $rddsAvailItem;
-								$data['rdds']['events'][$i] = array_merge($data['rdds']['events'][$i], $newData[$i]);
-							}
-							elseif (in_array($eventTriggerId, $eppTriggers)) {
-								unset($data['epp']['events'][$i]['status']);
-								$itemType = 'epp';
-								$itemId = $eppAvailItem;
-								$data['epp']['events'][$i] = array_merge($data['epp']['events'][$i], $newData[$i]);
-							}
-
-							$data[$itemType]['events'][$i]['incidentTotalTests'] = getTotalTestsCount(
-								$itemId,
-								$filterTimeFrom,
-								$filterTimeTill,
-								$data[$itemType]['events'][$i]['startTime'],
-								$data[$itemType]['events'][$i]['endTime']
-							);
-
-							$data[$itemType]['events'][$i]['incidentFailedTests'] = getFailedTestsCount(
-								$itemId,
-								$filterTimeTill,
-								$data[$itemType]['events'][$i]['startTime'],
-								$data[$itemType]['events'][$i]['endTime']
-							);
-						}
+					if (in_array($objectid, $dnsTriggers)) {
+						$item_type = 'dns';
+						$itemid = $dnsAvailItem;
 					}
-					else {
-						$itemInfo = [];
-						if (isset($data['dns']['events'][$i])) {
-							$itemInfo = array(
-								'itemType' => 'dns',
-								'itemId' => $dnsAvailItem
-							);
-						}
-						elseif (isset($data['dnssec']['events'][$i])) {
-							$itemInfo = array(
-								'itemType' => 'dnssec',
-								'itemId' => $dnssecAvailItem
-							);
-						}
-						elseif (isset($data['rdds']['events'][$i])) {
-							$itemInfo = array(
-								'itemType' => 'rdds',
-								'itemId' => $rddsAvailItem
-							);
-						}
-						elseif (isset($data['epp']['events'][$i])) {
-							$itemInfo = array(
-								'itemType' => 'epp',
-								'itemId' => $eppAvailItem
-							);
-						}
-
-						if ($itemInfo) {
-							$data[$itemInfo['itemType']]['events'][$i]['incidentTotalTests'] = getTotalTestsCount(
-								$itemInfo['itemId'],
-								$filterTimeFrom,
-								$filterTimeTill,
-								$data[$itemInfo['itemType']]['events'][$i]['startTime']
-							);
-
-							$data[$itemInfo['itemType']]['events'][$i]['incidentFailedTests'] = getFailedTestsCount(
-								$itemInfo['itemId'],
-								$filterTimeTill,
-								$data[$itemInfo['itemType']]['events'][$i]['startTime']
-							);
-						}
+					elseif (in_array($objectid, $dnssecTriggers)) {
+						$item_type = 'dnssec';
+						$itemid = $dnssecAvailItem;
 					}
+					elseif (in_array($objectid, $rddsTriggers)) {
+						$item_type = 'rdds';
+						$itemid = $rddsAvailItem;
+					}
+					elseif (in_array($objectid, $rdapTriggers)) {
+						$item_type = 'rdap';
+						$itemid = $rdapAvailItem;
+					}
+					elseif (in_array($objectid, $eppTriggers)) {
+						$item_type = 'epp';
+						$itemid = $eppAvailItem;
+					}
+
+					if ($event) {
+						$data[$item_type]['events'][$i]['status'] = TRIGGER_VALUE_FALSE;
+						$data[$item_type]['events'][$i]['endTime'] = $event['clock'];
+					}
+
+					$data[$item_type]['events'][$i]['incidentTotalTests'] = getTotalTestsCount(
+						$itemid,
+						$filterTimeFrom,
+						$filterTimeTill,
+						$data[$item_type]['events'][$i]['startTime'],
+						$event ? $event['clock'] : null
+					);
+					$data[$item_type]['events'][$i]['incidentFailedTests'] = getFailedTestsCount(
+						$itemid,
+						$filterTimeTill,
+						$data[$item_type]['events'][$i]['startTime'],
+						$event ? $event['clock'] : null
+					);
 				}
 
 				$data['dns']['totalTests'] = 0;
 				$data['dnssec']['totalTests'] = 0;
 				$data['rdds']['totalTests'] = 0;
+				$data['rdap']['totalTests'] = 0;
 				$data['epp']['totalTests'] = 0;
 				$data['dns']['inIncident'] = 0;
 				$data['dnssec']['inIncident'] = 0;
 				$data['rdds']['inIncident'] = 0;
+				$data['rdap']['inIncident'] = 0;
 				$data['epp']['inIncident'] = 0;
 
 				$availItems = [];
@@ -869,6 +895,9 @@ if ($host || $data['filter_search']) {
 				}
 				if ($rddsAvailItem) {
 					$availItems[] = $rddsAvailItem;
+				}
+				if ($rdapAvailItem) {
+					$availItems[] = $rdapAvailItem;
 				}
 				if ($eppAvailItem) {
 					$availItems[] = $eppAvailItem;
@@ -892,6 +921,9 @@ if ($host || $data['filter_search']) {
 					}
 					elseif ($itemsHistory['itemid'] == $rddsAvailItem) {
 						$type = 'rdds';
+					}
+					elseif ($itemsHistory['itemid'] == $rdapAvailItem) {
+						$type = 'rdap';
 					}
 					elseif ($itemsHistory['itemid'] == $eppAvailItem) {
 						$type = 'epp';
@@ -923,6 +955,9 @@ if ($host || $data['filter_search']) {
 				}
 				if (isset($data['rdds']['events'])) {
 					array_push($itemKeys, CALCULATED_ITEM_RDDS_DELAY, CALCULATED_RDDS_ROLLWEEK_SLA);
+				}
+				if (isset($data['rdap']['events'])) {
+					array_push($itemKeys, CALCULATED_ITEM_RDAP_DELAY, CALCULATED_RDAP_ROLLWEEK_SLA);
 				}
 				if (isset($data['epp']['events'])) {
 					array_push($itemKeys, CALCULATED_ITEM_EPP_DELAY, CALCULATED_EPP_ROLLWEEK_SLA);
@@ -966,7 +1001,9 @@ if ($host || $data['filter_search']) {
 
 					// get SLA items
 					foreach ($items as $item) {
-						if ($item['key_'] === CALCULATED_DNS_ROLLWEEK_SLA || $item['key_'] === CALCULATED_RDDS_ROLLWEEK_SLA
+						if ($item['key_'] === CALCULATED_DNS_ROLLWEEK_SLA
+								|| $item['key_'] === CALCULATED_RDDS_ROLLWEEK_SLA
+								|| $item['key_'] === CALCULATED_RDAP_ROLLWEEK_SLA
 								|| $item['key_'] === CALCULATED_EPP_ROLLWEEK_SLA) {
 							// get last value
 							$itemValue = API::History()->get(array(
@@ -989,6 +1026,9 @@ if ($host || $data['filter_search']) {
 							}
 							elseif ($item['key_'] === CALCULATED_RDDS_ROLLWEEK_SLA) {
 								$services['rdds']['slaValue'] = $itemValue['value'];
+							}
+							elseif ($item['key_'] === CALCULATED_RDAP_ROLLWEEK_SLA) {
+								$services['rdap']['slaValue'] = $itemValue['value'];
 							}
 							else {
 								$services['epp']['slaValue'] = $itemValue['value'];
@@ -1021,6 +1061,10 @@ if ($host || $data['filter_search']) {
 								$services['rdds']['delay'] = $itemValue['value'];
 								$services['rdds']['itemId'] = $rddsAvailItem;
 							}
+							elseif ($item['key_'] == CALCULATED_ITEM_RDAP_DELAY) {
+								$services['rdap']['delay'] = $itemValue['value'];
+								$services['rdap']['itemId'] = $rdapAvailItem;
+							}
 							elseif ($item['key_'] == CALCULATED_ITEM_EPP_DELAY) {
 								$services['epp']['delay'] = $itemValue['value'];
 								$services['epp']['itemId'] = $eppAvailItem;
@@ -1045,6 +1089,25 @@ if ($host || $data['filter_search']) {
 	DBconnect($error);
 }
 
+// Chceck if RDAP standalone service was enabled during the filtered period.
+$data['rdap_standalone_start_ts'] = 0;
+
+if (is_RDAP_standalone($filterTimeFrom) !== is_RDAP_standalone($filterTimeTill)) {
+	$rdap_standalone_ts = API::UserMacro()->get([
+		'output' => ['value'],
+		'filter' => ['macro' => RSM_RDAP_STANDALONE],
+		'globalmacro' => true
+	]);
+
+	$data['rdap_standalone_start_ts'] = $rdap_standalone_ts ? $rdap_standalone_ts[0]['value'] : 0;
+}
+
+// Show error if no matching hosts found.
+if ($data['filter_search'] && !$data['tld']) {
+	unset($data['tld']);
+	show_error_message(_s('Host "%s" doesn\'t exist or you don\'t have permissions to access it.', $data['filter_search']));
+}
+
 // data sorting
 if (isset($data['dns']['events'])) {
 	$data['dns']['events'] = array_reverse($data['dns']['events']);
@@ -1054,6 +1117,9 @@ if (isset($data['dnssec']['events'])) {
 }
 if (isset($data['rdds']['events'])) {
 	$data['rdds']['events'] = array_reverse($data['rdds']['events']);
+}
+if (isset($data['rdap']['events'])) {
+	$data['rdap']['events'] = array_reverse($data['rdap']['events']);
 }
 if (isset($data['epp']['events'])) {
 	$data['epp']['events'] = array_reverse($data['epp']['events']);

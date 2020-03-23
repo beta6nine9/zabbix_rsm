@@ -37,6 +37,11 @@ $fields = [
 ];
 check_fields($fields);
 
+// Report is not available in registrar mode.
+if (get_rsm_monitoring_type() === MONITORING_TARGET_REGISTRAR) {
+	redirect('rsm.incidentdetails.php?host='.getRequest('tld_host', ''));
+}
+
 $data['probes'] = [];
 $data['tld_host'] = null;
 $data['time'] = null;

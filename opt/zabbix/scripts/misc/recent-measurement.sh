@@ -42,7 +42,7 @@ while [ -n "$1" ]; do
 		-s)
 			shift
 			[ -z "$1" ] && usage
-			[[ $1 = "dns" || $1 = "dnssec" || $1 = "rdds" || $1 = "epp" ]] || usage "$1: unknown Service (expected: dns, dnssec, rdds or epp"
+			[[ $1 = "dns" || $1 = "dnssec" || $1 = "rdds" || $1 = "rdap" || $1 = "epp" ]] || usage "$1: unknown Service (expected: dns, dnssec, rdds, rdap or epp)"
 			service=$1
 			;;
 		-d)
@@ -99,5 +99,5 @@ fi
 
 for file in $files; do
 	ls -l $file
-	cat $file | jq -C '.testedInterface[0].probes[] | .city, .testData[].metrics[]'
+	cat $file | jq -SC .
 done

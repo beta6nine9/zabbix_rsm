@@ -42,38 +42,49 @@ use constant RTT_TIMEOUT_ERROR_RDDS80           => -255;
 use constant RTT_TIMEOUT_ERROR_RDAP             => -405;
 
 my $rtt_low_rdds = get_rtt_low("rdds");
+my $now = getopt('now') // time();
+my $rtt_params_list =
+[
+	{
+		'probes'                  => get_probes("RDDS"),
+		'tlds_service'            => "rdds43",
+		'rtt_item_key_pattern'    => RTT_ITEM_KEY_PATTERN_RDDS43,
+		'timeout_error_value'     => RTT_TIMEOUT_ERROR_RDDS43,
+		'timeout_threshold_value' => $rtt_low_rdds
+	},
+	{
+		'probes'                  => get_probes("RDDS"),
+		'tlds_service'            => "rdds43",
+		'rtt_item_key_pattern'    => RTT_ITEM_KEY_PATTERN_RDDS80,
+		'timeout_error_value'     => RTT_TIMEOUT_ERROR_RDDS80,
+		'timeout_threshold_value' => $rtt_low_rdds
+	},
+	{
+		'probes'                  => get_probes("RDAP"),
+		'tlds_service'            => "rdap",
+		'rtt_item_key_pattern'    => RTT_ITEM_KEY_PATTERN_RDAP,
+		'timeout_error_value'     => RTT_TIMEOUT_ERROR_RDAP,
+		'timeout_threshold_value' => $rtt_low_rdds
+	}
+];
+my $rdap_standalone_params_list;
 
+if (is_rdap_standalone($now))
+{
+	push(@{$rdap_standalone_params_list}, @{$rtt_params_list}[0,1]);
+}
+
+# TODO: remove $rdap_standalone_params_list after migration to Standalone RDAP
 update_slv_rtt_monthly_stats(
-	getopt('now') // time(),
+	$now,
 	opt('cycles') ? getopt('cycles') : slv_max_cycles('rdds'),
 	$single_tld,
 	SLV_ITEM_KEY_RDDS_PERFORMED,
 	SLV_ITEM_KEY_RDDS_FAILED,
 	SLV_ITEM_KEY_RDDS_PFAILED,
 	get_rdds_delay(),
-	[
-		{
-			'probes'                  => get_probes("RDDS"),
-			'tlds_service'            => "rdds43",
-			'rtt_item_key_pattern'    => RTT_ITEM_KEY_PATTERN_RDDS43,
-			'timeout_error_value'     => RTT_TIMEOUT_ERROR_RDDS43,
-			'timeout_threshold_value' => $rtt_low_rdds
-		},
-		{
-			'probes'                  => get_probes("RDDS"),
-			'tlds_service'            => "rdds43",
-			'rtt_item_key_pattern'    => RTT_ITEM_KEY_PATTERN_RDDS80,
-			'timeout_error_value'     => RTT_TIMEOUT_ERROR_RDDS80,
-			'timeout_threshold_value' => $rtt_low_rdds
-		},
-		{
-			'probes'                  => get_probes("RDDS"),
-			'tlds_service'            => "rdap",
-			'rtt_item_key_pattern'    => RTT_ITEM_KEY_PATTERN_RDAP,
-			'timeout_error_value'     => RTT_TIMEOUT_ERROR_RDAP,
-			'timeout_threshold_value' => $rtt_low_rdds
-		}
-	]
+	$rtt_params_list,
+	$rdap_standalone_params_list
 );
 
 slv_exit(SUCCESS);

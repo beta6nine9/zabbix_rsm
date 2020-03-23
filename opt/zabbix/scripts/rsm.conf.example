@@ -39,6 +39,8 @@ path = /opt/zabbix/scripts/slv
 zserver = 127.0.0.1
 zport = 10051
 max_cycles_dns = 20
+max_cycles_dnssec = 20
+max_cycles_rdap = 10
 max_cycles_rdds = 10
 
 [sla_api]

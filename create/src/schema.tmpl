@@ -64,6 +64,8 @@ FIELD		|jmx_available	|t_integer	|'0'	|NOT NULL	|ZBX_NODATA
 FIELD		|jmx_errors_from|t_integer	|'0'	|NOT NULL	|ZBX_NODATA
 FIELD		|jmx_error	|t_varchar(2048)|''	|NOT NULL	|ZBX_NODATA
 FIELD		|name		|t_varchar(128)	|''	|NOT NULL	|ZBX_PROXY
+FIELD		|info_1		|t_varchar(128)	|''	|NOT NULL	|ZBX_PROXY
+FIELD		|info_2		|t_varchar(128)	|''	|NOT NULL	|ZBX_PROXY
 FIELD		|flags		|t_integer	|'0'	|NOT NULL	|0
 FIELD		|templateid	|t_id		|	|NULL		|0			|3|hosts	|hostid
 FIELD		|description	|t_shorttext	|''	|NOT NULL	|0
@@ -1355,7 +1357,7 @@ FIELD		|inventory_mode	|t_integer	|'0'	|NOT NULL	|0
 TABLE|dbversion||
 FIELD		|mandatory	|t_integer	|'0'	|NOT NULL	|
 FIELD		|optional	|t_integer	|'0'	|NOT NULL	|
-ROW		|3000323	|3000324
+ROW		|3000403	|3000508
 
 TABLE|rsm_ip_version|id|0
 FIELD		|id		|t_serial	|	|NOT NULL	|0

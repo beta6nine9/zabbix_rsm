@@ -982,9 +982,9 @@ static int	DBpatch_3000134(void)
 
 static int	DBpatch_3000135(void)
 {
-#define RESERVE_GLOBALMACROID								\
-		"update globalmacro"							\
-		" set globalmacroid=(select nextid from ("				\
+#define RESERVE_GLOBALMACROID									\
+		"update globalmacro"								\
+		" set globalmacroid=(select nextid from ("					\
 			"select max(globalmacroid)+1 as nextid from globalmacro) as tmp)"	\
 		" where globalmacroid=" ZBX_FS_UI64
 
@@ -4430,6 +4430,963 @@ static int	DBpatch_3000324(void)
 #undef CHECK
 }
 
+static int	DBpatch_3000400(void)
+{
+	return SUCCEED;
+}
+
+static int	DBpatch_3000401(void)
+{
+#define RESERVE_GLOBALMACROID									\
+		"update globalmacro"								\
+		" set globalmacroid=(select nextid from ("					\
+			"select max(globalmacroid)+1 as nextid from globalmacro) as tmp)"	\
+		" where globalmacroid=" ZBX_FS_UI64
+
+	DB_RESULT	result;
+	DB_ROW		row;
+	char		*monitoring_target;
+
+	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
+		return SUCCEED;
+
+	if (ZBX_DB_OK > DBexecute(RESERVE_GLOBALMACROID, 105))
+		return FAIL;
+
+	/* get hostid of all hosts that have status = HOST_STATUS_MONITORED and are in "TLDs" group */
+	result = DBselect("select count(*) from hosts h,hosts_groups hg where hg.hostid=h.hostid and hg.groupid=140");
+
+	if (NULL == (row = DBfetch(result)))
+	{
+		/* this means the above SQL is faulty, which shouldn't happen */
+		monitoring_target = NULL;
+	}
+	else if (atoi(row[0]) == 0)
+	{
+		/* new or empty installation, monitoring target unknown */
+		monitoring_target = "";
+	}
+	else
+	{
+		/* existing installation, monitoring target is "Registry" */
+		monitoring_target = "registry";
+	}
+
+	DBfree_result(result);
+
+	if (NULL == monitoring_target)
+	{
+		zabbix_log(LOG_LEVEL_CRIT, "error while trying to list hosts of hostgroup with ID 140");
+		return FAIL;
+	}
+
+	if (ZBX_DB_OK > DBexecute(
+			"insert into globalmacro (globalmacroid,macro,value)"
+			" values (105,'{$RSM.MONITORING.TARGET}','%s')",
+			monitoring_target))
+	{
+		return FAIL;
+	}
+
+	return SUCCEED;
+
+#undef RESERVE_GLOBALMACROID
+}
+
+static int	DBpatch_3000402(void)
+{
+	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
+		return SUCCEED;
+
+	if (ZBX_DB_OK > DBexecute("update usrgrp set name = 'Read-only user' where usrgrpid = 100"))
+	{
+		return FAIL;
+	}
+	if (ZBX_DB_OK > DBexecute("update usrgrp set name = 'Power user' where usrgrpid = 110"))
+	{
+		return FAIL;
+	}
+
+	return SUCCEED;
+}
+
+static int	DBpatch_3000403(void)
+{
+	/* patch for both server and proxy */
+
+	if (ZBX_DB_OK > DBexecute(
+			"alter table hosts"
+			" add column info_1 varchar(128) collate utf8_bin not null default '' after name,"
+			" add column info_2 varchar(128) collate utf8_bin not null default '' after info_1"))
+	{
+		return FAIL;
+	}
+
+	return SUCCEED;
+}
+
+static zbx_uint64_t	get_applicationid(zbx_uint64_t hostid, const char *name)
+{
+	zbx_uint64_t	applicationid = 0;
+	DB_RESULT	result;
+	DB_ROW		row;
+
+	result = DBselect("select applicationid from applications where hostid=" ZBX_FS_UI64 " and name='%s'",
+			hostid, name);
+
+	if (NULL != (row = DBfetch(result)))
+	{
+		ZBX_STR2UINT64(applicationid, row[0]);
+	}
+
+	DBfree_result(result);
+
+	return applicationid;
+}
+
+static int	create_standalone_rdap_item(zbx_uint64_t itemid, zbx_uint64_t hostid, const char *name, const char *key,
+		int value_type, const char *units, zbx_uint64_t value_map_id,
+		zbx_uint64_t applicationid, zbx_uint64_t itemappid)
+{
+#define CHECK(CODE) do {                \
+	int result = (CODE);            \
+	if (ZBX_DB_OK > result)         \
+	{                               \
+		return FAIL;            \
+	}                               \
+} while (0)
+
+	char	value_map_id_str[ZBX_MAX_UINT64_LEN + 1];
+
+	if (0 == value_map_id)
+	{
+		zbx_snprintf(value_map_id_str, sizeof(value_map_id_str), "NULL");
+	}
+	else
+	{
+		zbx_snprintf(value_map_id_str, sizeof(value_map_id_str), ZBX_FS_UI64, value_map_id);
+	}
+
+	CHECK(DBexecute("insert into items (itemid,type,snmp_community,snmp_oid,hostid,name,key_,delay,history,trends,"
+				"status,value_type,trapper_hosts,units,multiplier,delta,"
+				"snmpv3_securityname,snmpv3_securitylevel,snmpv3_authpassphrase,snmpv3_privpassphrase,"
+				"formula,error,lastlogsize,logtimefmt,templateid,valuemapid,delay_flex,params,"
+				"ipmi_sensor,data_type,authtype,username,password,publickey,privatekey,mtime,flags,"
+				"interfaceid,port,description,inventory_link,lifetime,snmpv3_authprotocol,"
+				"snmpv3_privprotocol,state,snmpv3_contextname,evaltype)"
+			" values (" ZBX_FS_UI64 ",2,'',''," ZBX_FS_UI64 ",'%s','%s',0,90,365,"
+				"1,%d,'','%s',0,0,"
+				"'',0,'','',"
+				"'','',0,'',NULL,%s,'','',"
+				"'',0,0,'','','','',0,0,"
+				"NULL,'','',0,'30',0,"
+				"0,0,'',0)",
+			itemid, hostid, name, key, value_type, units, value_map_id_str));
+
+	CHECK(DBexecute("insert into items_applications (itemappid,applicationid,itemid)"
+			" values (" ZBX_FS_UI64 "," ZBX_FS_UI64 "," ZBX_FS_UI64 ")",
+			itemappid, applicationid, itemid));
+
+	return SUCCEED;
+
+#undef CHECK
+}
+
+static int	create_avail_trigger(zbx_uint64_t itemid, const char *service, const char *fail_macro, const char *recover_macro)
+{
+#define CHECK(CODE) do {                \
+	int result = (CODE);            \
+	if (ZBX_DB_OK > result)         \
+	{                               \
+		return FAIL;            \
+	}                               \
+} while (0)
+
+	zbx_uint64_t	triggerid    = DBget_maxid_num("triggers", 1);
+	zbx_uint64_t	functionid_1 = DBget_maxid_num("functions", 1);
+	zbx_uint64_t	functionid_2 = DBget_maxid_num("functions", 1);
+
+	char	expression[MAX_STRING_LEN];
+	char	description[MAX_STRING_LEN];
+	char	fail_param[MAX_STRING_LEN];
+	char	recover_param[MAX_STRING_LEN];
+
+	zbx_snprintf(expression, sizeof(expression),
+			"({TRIGGER.VALUE}=0 and {" ZBX_FS_UI64 "}=0) or"
+			" ({TRIGGER.VALUE}=1 and {" ZBX_FS_UI64 "}>0)",
+			functionid_1, functionid_2);
+	zbx_snprintf(description, sizeof(description), "%s service is down", service);
+	zbx_snprintf(fail_param, sizeof(fail_param), "#%s", fail_macro);
+	zbx_snprintf(recover_param, sizeof(recover_param), "#%s,0,\"eq\"", recover_macro);
+
+	CHECK(DBexecute("insert into triggers (triggerid,expression,description,url,status,value,"
+				"priority,lastchange,comments,error,templateid,type,state,flags)"
+			" values (" ZBX_FS_UI64 ",'%s','%s','',0,0,0,0,'','',NULL,0,0,0)",
+			triggerid, expression, description));
+	CHECK(DBexecute("insert into functions (functionid,itemid,triggerid,function,parameter)"
+			" values (" ZBX_FS_UI64 "," ZBX_FS_UI64 "," ZBX_FS_UI64 ",'%s','%s')",
+			functionid_1, itemid, triggerid, "max", fail_param));
+	CHECK(DBexecute("insert into functions (functionid,itemid,triggerid,function,parameter)"
+			" values (" ZBX_FS_UI64 "," ZBX_FS_UI64 "," ZBX_FS_UI64 ",'%s','%s')",
+			functionid_2, itemid, triggerid, "count", recover_param));
+
+	return SUCCEED;
+
+#undef CHECK
+}
+
+static int	create_downtime_triggers(zbx_uint64_t itemid, const char *service, const char *downtime_macro)
+{
+#define CHECK(CODE) do {                \
+	int result = (CODE);            \
+	if (ZBX_DB_OK > result)         \
+	{                               \
+		return FAIL;            \
+	}                               \
+} while (0)
+
+	size_t		i;
+	zbx_uint64_t	prev_triggerid = 0;
+
+	for (i = 0; i < sizeof(trigger_params) / sizeof(*trigger_params); i++)
+	{
+		const char	*percent     = trigger_params[i][0];
+		const char	*coefficient = trigger_params[i][1];
+		const char	*priority    = trigger_params[i][2];
+
+		zbx_uint64_t	triggerid  = DBget_maxid_num("triggers", 1);
+		zbx_uint64_t	functionid = DBget_maxid_num("functions", 1);
+		char		expression[MAX_STRING_LEN];
+		char		description[MAX_STRING_LEN];
+
+		zbx_snprintf(expression, sizeof(expression),
+				"{" ZBX_FS_UI64 "}>=%s%s", functionid, downtime_macro, coefficient);
+		zbx_snprintf(description, sizeof(description),
+				"%s service was unavailable for %s of allowed $1 minutes", service, percent);
+
+		CHECK(DBexecute("insert into triggers (triggerid,expression,description,url,status,value,"
+				"priority,lastchange,comments,error,templateid,type,state,flags)"
+				" values (" ZBX_FS_UI64 ",'%s','%s','',0,0,%s,0,'','',NULL,0,0,0)",
+				triggerid, expression, description, priority));
+		CHECK(DBexecute("insert into functions (functionid,itemid,triggerid,function,parameter)"
+				" values (" ZBX_FS_UI64 "," ZBX_FS_UI64 "," ZBX_FS_UI64 ",'%s','%s')",
+				functionid, itemid, triggerid, "last", "0"));
+
+		if (0 != prev_triggerid)
+		{
+			if (SUCCEED != create_trigger_dependency(triggerid, prev_triggerid))
+			{
+				return FAIL;
+			}
+		}
+
+		prev_triggerid = triggerid;
+	}
+
+	return SUCCEED;
+
+#undef CHECK
+}
+
+static int	create_rollweek_triggers(zbx_uint64_t itemid, const char *service)
+{
+#define CHECK(CODE) do {                \
+	int result = (CODE);            \
+	if (ZBX_DB_OK > result)         \
+	{                               \
+		return FAIL;            \
+	}                               \
+} while (0)
+
+	size_t		i;
+	zbx_uint64_t	prev_triggerid = 0;
+
+	for (i = 0; i < sizeof(trigger_params) / sizeof(*trigger_params); i++)
+	{
+		const char	*percent     = trigger_params[i][0];
+		const char	*priority    = trigger_params[i][2];
+
+		zbx_uint64_t	triggerid  = DBget_maxid_num("triggers", 1);
+		zbx_uint64_t	functionid = DBget_maxid_num("functions", 1);
+		char		expression[MAX_STRING_LEN];
+		char		description[MAX_STRING_LEN];
+
+		zbx_snprintf(expression, sizeof(expression), "{" ZBX_FS_UI64 "}>=%s", functionid, percent);
+		zbx_snprintf(description, sizeof(description), "%s rolling week is over %s", service, percent);
+
+		CHECK(DBexecute("insert into triggers (triggerid,expression,description,url,status,value,"
+				"priority,lastchange,comments,error,templateid,type,state,flags)"
+				" values (" ZBX_FS_UI64 ",'%s','%s','',0,0,%s,0,'','',NULL,0,0,0)",
+				triggerid, expression, description, priority));
+		CHECK(DBexecute("insert into functions (functionid,itemid,triggerid,function,parameter)"
+				" values (" ZBX_FS_UI64 "," ZBX_FS_UI64 "," ZBX_FS_UI64 ",'%s','%s')",
+				functionid, itemid, triggerid, "last", "0"));
+
+		if (0 != prev_triggerid)
+		{
+			if (SUCCEED != create_trigger_dependency(triggerid, prev_triggerid))
+			{
+				return FAIL;
+			}
+		}
+
+		prev_triggerid = triggerid;
+	}
+
+	return SUCCEED;
+
+#undef CHECK
+}
+
+static int	DBpatch_3000500(void)
+{
+	return SUCCEED;
+}
+
+static int	DBpatch_3000501(void)
+{
+	int		ret = FAIL;
+	DB_RESULT	hosts_result;
+	DB_ROW		hosts_row;
+
+	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
+		return SUCCEED;
+
+#define CREATE_GLOBALMACRO(globalmacroid, macro, value)                                 \
+do {                                                                                    \
+	if (ZBX_DB_OK > DBexecute(                                                      \
+			"update globalmacro set globalmacroid=("                        \
+				"select nextid from ("                                  \
+					"select max(globalmacroid)+1 as nextid"         \
+					" from globalmacro"                             \
+				") as tmp"                                              \
+			") where globalmacroid=" ZBX_FS_UI64, globalmacroid))           \
+	{                                                                               \
+		return FAIL;                                                            \
+	}                                                                               \
+	if (ZBX_DB_OK > DBexecute(                                                      \
+			"insert into globalmacro (globalmacroid,macro,value)"           \
+			" values (" ZBX_FS_UI64 ",'%s','%s')",                          \
+			globalmacroid, macro, value))                                   \
+	{                                                                               \
+		return FAIL;                                                            \
+	}                                                                               \
+} while (0)
+
+	CREATE_GLOBALMACRO(106, "{$RSM.INCIDENT.RDAP.FAIL}"   , "2");
+	CREATE_GLOBALMACRO(107, "{$RSM.INCIDENT.RDAP.RECOVER}", "2");
+	CREATE_GLOBALMACRO(108, "{$RSM.RDAP.DELAY}"           , "300");
+	CREATE_GLOBALMACRO(109, "{$RSM.RDAP.MAXREDIRS}"       , "10");
+	CREATE_GLOBALMACRO(110, "{$RSM.RDAP.PROBE.ONLINE}"    , "10");
+	CREATE_GLOBALMACRO(111, "{$RSM.RDAP.ROLLWEEK.SLA}"    , "1440");
+	CREATE_GLOBALMACRO(112, "{$RSM.RDAP.RTT.HIGH}"        , "10000");
+	CREATE_GLOBALMACRO(113, "{$RSM.RDAP.RTT.LOW}"         , "5000");
+	CREATE_GLOBALMACRO(114, "{$RSM.RDAP.STANDALONE}"      , "0");
+	CREATE_GLOBALMACRO(115, "{$RSM.SLV.RDAP.DOWNTIME}"    , "864");
+	CREATE_GLOBALMACRO(116, "{$RSM.SLV.RDAP.RTT}"         , "5");
+
+#undef CREATE_GLOBALMACRO
+
+	/* get hostid of all hosts that are in "TLDs" group */
+	hosts_result = DBselect(
+			"select hosts.hostid"
+			" from hosts"
+			" left join hosts_groups on hosts_groups.hostid=hosts.hostid"
+			" where hosts_groups.groupid=140");
+
+#define CHECK(CODE) do {                \
+	int result = (CODE);            \
+	if (SUCCEED != result)          \
+	{                               \
+		goto out;               \
+	}                               \
+} while (0)
+
+	while (NULL != (hosts_row = DBfetch(hosts_result)))
+	{
+		zbx_uint64_t	hostid;
+
+		zbx_uint64_t	appid_current_month;
+		zbx_uint64_t	appid_particular_test;
+		zbx_uint64_t	appid_rolling_week;
+
+		zbx_uint64_t	itemid_base;
+		zbx_uint64_t	itemid_avail;
+		zbx_uint64_t	itemid_downtime;
+		zbx_uint64_t	itemid_rollweek;
+		zbx_uint64_t	itemid_rtt_failed;
+		zbx_uint64_t	itemid_rtt_performed;
+		zbx_uint64_t	itemid_rtt_pfailed;
+
+		zbx_uint64_t	itemappid_base;
+		zbx_uint64_t	itemappid_avail;
+		zbx_uint64_t	itemappid_downtime;
+		zbx_uint64_t	itemappid_rollweek;
+		zbx_uint64_t	itemappid_rtt_failed;
+		zbx_uint64_t	itemappid_rtt_performed;
+		zbx_uint64_t	itemappid_rtt_pfailed;
+
+		ZBX_STR2UINT64(hostid, hosts_row[0]);
+
+		appid_current_month   = get_applicationid(hostid, "SLV current month");
+		appid_particular_test = get_applicationid(hostid, "SLV particular test");
+		appid_rolling_week    = get_applicationid(hostid, "SLV rolling week");
+
+		if (0 == appid_current_month || 0 == appid_particular_test || 0 == appid_rolling_week)
+		{
+			goto out;
+		}
+
+		itemid_base             = DBget_maxid_num("items", 6);
+		itemid_avail            = itemid_base++;
+		itemid_downtime         = itemid_base++;
+		itemid_rollweek         = itemid_base++;
+		itemid_rtt_failed       = itemid_base++;
+		itemid_rtt_performed    = itemid_base++;
+		itemid_rtt_pfailed      = itemid_base++;
+
+		itemappid_base          = DBget_maxid_num("items_applications", 6);
+		itemappid_avail         = itemappid_base++;
+		itemappid_downtime      = itemappid_base++;
+		itemappid_rollweek      = itemappid_base++;
+		itemappid_rtt_failed    = itemappid_base++;
+		itemappid_rtt_performed = itemappid_base++;
+		itemappid_rtt_pfailed   = itemappid_base++;
+
+		CHECK(create_standalone_rdap_item(itemid_avail, hostid,
+				"RDAP availability", "rsm.slv.rdap.avail", 3, "", 110,
+				appid_particular_test, itemappid_avail));
+		CHECK(create_standalone_rdap_item(itemid_downtime, hostid,
+				"RDAP minutes of downtime", "rsm.slv.rdap.downtime", 3, "", 0,
+				appid_current_month, itemappid_downtime));
+		CHECK(create_standalone_rdap_item(itemid_rollweek, hostid,
+				"RDAP weekly unavailability", "rsm.slv.rdap.rollweek", 0, "%", 0,
+				appid_rolling_week, itemappid_rollweek));
+		CHECK(create_standalone_rdap_item(itemid_rtt_failed, hostid,
+				"Number of failed monthly RDAP queries", "rsm.slv.rdap.rtt.failed", 3, "", 0,
+				appid_current_month, itemappid_rtt_failed));
+		CHECK(create_standalone_rdap_item(itemid_rtt_performed, hostid,
+				"Number of performed monthly RDAP queries", "rsm.slv.rdap.rtt.performed", 3, "", 0,
+				appid_current_month, itemappid_rtt_performed));
+		CHECK(create_standalone_rdap_item(itemid_rtt_pfailed, hostid,
+				"Ratio of failed monthly RDAP queries", "rsm.slv.rdap.rtt.pfailed", 0, "%", 0,
+				appid_current_month, itemappid_rtt_pfailed));
+
+		CHECK(create_avail_trigger(itemid_avail, "RDAP", "{$RSM.INCIDENT.RDAP.FAIL}", "{$RSM.INCIDENT.RDAP.RECOVER}"));
+		CHECK(create_downtime_triggers(itemid_downtime, "RDAP", "{$RSM.SLV.RDAP.DOWNTIME}"));
+		CHECK(create_rollweek_triggers(itemid_rollweek, "RDAP"));
+		CHECK(create_ratio_of_failed_tests_triggers(itemid_rtt_pfailed, "RDAP", "{$RSM.SLV.RDAP.RTT}"));
+	}
+
+#undef CHECK
+
+	ret = SUCCEED;
+out:
+	DBfree_result(hosts_result);
+
+	return ret;
+}
+
+static int	DBpatch_3000502(void)
+{
+	int		ret = FAIL;
+	DB_RESULT	result;
+	DB_ROW		row;
+
+	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
+		return SUCCEED;
+
+	result = DBselect("select hostid, value from hostmacro where macro = '{$RSM.RDDS.ENABLED}'");
+
+	while (NULL != (row = DBfetch(result)))
+	{
+		if (ZBX_DB_OK > DBexecute("insert into hostmacro (hostmacroid,hostid,macro,value)"
+				" values (" ZBX_FS_UI64 ",%s,'%s','%s')",
+				DBget_maxid_num("hostmacro", 1), row[0], "{$RSM.RDAP.ENABLED}", row[1]))
+		{
+			goto out;
+		}
+	}
+
+	ret = SUCCEED;
+out:
+	DBfree_result(result);
+
+	return ret;
+}
+
+static int	DBpatch_3000503(void)
+{
+	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
+		return SUCCEED;
+
+	if (ZBX_DB_OK > DBexecute("update items set"
+			" key_=replace(key_,'{$RSM.RDDS.','{$RSM.RDAP.')"
+			" where key_ like 'rdap[%]'"))
+	{
+		return FAIL;
+	}
+
+	return SUCCEED;
+}
+
+static int	DBpatch_3000504(void)
+{
+	DB_RESULT	result = NULL;
+	DB_ROW		row;
+	zbx_uint64_t	cat_id;
+	int		ret = FAIL;
+
+	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
+		return SUCCEED;
+
+	/* Add necessary extra RDAP macros. Constant IDs are from data.tmpl */
+
+	if (FAIL == add_global_macro_history_item(100032, 100032, "RSM.INCIDENT.RDAP.FAIL"))
+	{
+		goto out;
+	}
+	if (FAIL == add_global_macro_history_item(100033, 100033, "RSM.INCIDENT.RDAP.RECOVER"))
+	{
+		goto out;
+	}
+	if (FAIL == add_global_macro_history_item(100034, 100034, "RSM.RDAP.DELAY"))
+	{
+		goto out;
+	}
+	if (FAIL == add_global_macro_history_item(100035, 100035, "RSM.RDAP.MAXREDIRS"))
+	{
+		goto out;
+	}
+	if (FAIL == add_global_macro_history_item(100036, 100036, "RSM.RDAP.PROBE.ONLINE"))
+	{
+		goto out;
+	}
+	if (FAIL == add_global_macro_history_item(100037, 100037, "RSM.RDAP.ROLLWEEK.SLA"))
+	{
+		goto out;
+	}
+	if (FAIL == add_global_macro_history_item(100038, 100038, "RSM.RDAP.RTT.HIGH"))
+	{
+		goto out;
+	}
+	if (FAIL == add_global_macro_history_item(100039, 100039, "RSM.RDAP.RTT.LOW"))
+	{
+		goto out;
+	}
+	if (FAIL == add_global_macro_history_item(100040, 100040, "RSM.SLV.RDAP.DOWNTIME"))
+	{
+		goto out;
+	}
+	if (FAIL == add_global_macro_history_item(100041, 100041, "RSM.SLV.RDAP.RTT"))
+	{
+		goto out;
+	}
+
+	/* add 'rdap' service category for data export */
+
+	if (NULL == (result = DBselect("select id from rsm_service_category where name='rdap'")))
+	{
+		goto out;
+	}
+
+	if (NULL == (row = DBfetch(result)))
+	{
+		if (ZBX_DB_OK > DBexecute("insert into rsm_service_category values(6,'rdap')"))
+		{
+			goto out;
+		}
+	}
+	else
+	{
+		ZBX_STR2UINT64(cat_id, row[0]);
+		if (6 != cat_id)
+		{
+			zabbix_log(LOG_LEVEL_ERR, "'rdap' service category exists, but it's not 6");
+			goto out;
+		}
+	}
+
+	ret = SUCCEED;
+out:
+	DBfree_result(result);
+	return ret;
+}
+
+static int	DBpatch_3000505(void)
+{
+	int		ret = FAIL;
+
+	zbx_uint64_t	templateid_template_rdap  = 99980;
+	zbx_uint64_t	itemid_rdap_target        = 99984;
+	zbx_uint64_t	itemid_rdap_testedname    = 99985;
+	zbx_uint64_t	itemappid_rdap_target     = 99984;
+	zbx_uint64_t	itemappid_rdap_testedname = 99985;
+	zbx_uint64_t	applicationid_rdap        = 998;
+
+	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
+		return SUCCEED;
+
+#define CHECK(CODE) do {		\
+	int __result = (CODE);		\
+	if (ZBX_DB_OK > __result)	\
+	{				\
+		goto out;		\
+	}				\
+} while (0)
+
+#define SQL	"insert into items set itemid=" ZBX_FS_UI64 ",type=%d,snmp_community='',snmp_oid='',"			\
+		"hostid=" ZBX_FS_UI64 ",name='%s',key_='%s',delay=0,history=%d,trends=365,status=0,value_type=%d,"	\
+		"trapper_hosts='',units='',multiplier=0,delta=0,snmpv3_securityname='',snmpv3_securitylevel=0,"		\
+		"snmpv3_authpassphrase='',snmpv3_privpassphrase='',formula='%s',error='',lastlogsize=0,logtimefmt='',"	\
+		"templateid=NULL,valuemapid=NULL,delay_flex='',params='',ipmi_sensor='',data_type=0,authtype=0,"	\
+		"username='',password='',publickey='',privatekey='',mtime=0,flags=0,interfaceid=NULL,port='',"		\
+		"description='%s',inventory_link=0,lifetime='30',snmpv3_authprotocol=0,snmpv3_privprotocol=0,state=0,"	\
+		"snmpv3_contextname='',evaltype=0"
+	/* type 2 = ITEM_TYPE_TRAPPER */
+	/* value_type 1 = ITEM_VALUE_TYPE_STR */
+	CHECK(DBexecute(SQL, itemid_rdap_target, 2, templateid_template_rdap, "RDAP target", "rdap.target",
+			7, 1, "1", "The base URL used in Registration Data Access Protocol service provider test."));
+	CHECK(DBexecute(SQL, itemid_rdap_testedname, 2, templateid_template_rdap, "RDAP tested name", "rdap.testedname",
+			7, 1, "1", "The domain name used in Registration Data Access Protocol service provider test."));
+#undef SQL
+
+#define SQL	"insert into items_applications set itemappid=" ZBX_FS_UI64 ",applicationid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64
+	CHECK(DBexecute(SQL, itemappid_rdap_target, applicationid_rdap, itemid_rdap_target));
+	CHECK(DBexecute(SQL, itemappid_rdap_testedname, applicationid_rdap, itemid_rdap_testedname));
+#undef SQL
+
+#undef CHECK
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
+static int	DBpatch_3000506(void)
+{
+	DB_RESULT	result = NULL;
+	DB_ROW		row;
+	int		ret = FAIL;
+
+	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
+		return SUCCEED;
+
+	/* Loop through all "Template <RSMHOST>" templates that have RDDS43 and RDDS80 applications. */
+	/* Having these applications indicates that RSMHOST has had RDDS enabled at some point of time. */
+	/* status 3 = HOST_STATUS_TEMPLATE */
+	result = DBselect("select"
+				" hosts.hostid,"
+				"app_rdds43.applicationid,"
+				"app_rdds80.applicationid,"
+				"hostmacro.value"
+			" from"
+				" hosts"
+				" left join applications as app_rdds43 on app_rdds43.hostid=hosts.hostid"
+				" left join applications as app_rdds80 on app_rdds80.hostid=hosts.hostid"
+				" left join hostmacro on hostmacro.hostid=hosts.hostid"
+			" where"
+				" hosts.status=3 and"
+				" app_rdds43.name='RDDS43' and"
+				" app_rdds80.name='RDDS80' and"
+				" hostmacro.macro='{$RSM.TLD.RDDS.ENABLED}'");
+
+	if (NULL == result)
+		goto out;
+
+	while (NULL != (row = DBfetch(result)))
+	{
+		zbx_uint64_t	hostid;
+		zbx_uint64_t	applicationid_rdds43;
+		zbx_uint64_t	applicationid_rdds80;
+		int		status;
+		zbx_uint64_t	itemid_next;
+		zbx_uint64_t	itemid_rdds43_target;
+		zbx_uint64_t	itemid_rdds43_testedname;
+		zbx_uint64_t	itemid_rdds80_target;
+
+		ZBX_STR2UINT64(hostid, row[0]);
+		ZBX_STR2UINT64(applicationid_rdds43, row[1]);
+		ZBX_STR2UINT64(applicationid_rdds80, row[2]);
+
+		if (0 == strcmp(row[3], "0"))
+			/* ITEM_STATUS_DISABLED */
+			status = 1;
+		else if (0 == strcmp(row[3], "1"))
+			/* ITEM_STATUS_ACTIVE */
+			status = 0;
+		else
+			/* unexpected value of the macro */
+			goto out;
+
+		itemid_next              = DBget_maxid_num("items", 3);
+		itemid_rdds43_target     = itemid_next++;
+		itemid_rdds43_testedname = itemid_next++;
+		itemid_rdds80_target     = itemid_next++;
+
+#define CHECK(CODE) do {		\
+	int __result = (CODE);		\
+	if (ZBX_DB_OK > __result)	\
+	{				\
+		goto out;		\
+	}				\
+} while (0)
+
+#define SQL	"insert into items set itemid=" ZBX_FS_UI64 ",type=%d,snmp_community='',snmp_oid='',"			\
+		"hostid=" ZBX_FS_UI64 ",name='%s',key_='%s',delay=0,history=90,trends=%d,status=%d,value_type=%d,"	\
+		"trapper_hosts='',units='',multiplier=0,delta=0,snmpv3_securityname='',snmpv3_securitylevel=0,"		\
+		"snmpv3_authpassphrase='',snmpv3_privpassphrase='',formula='%s',error='',lastlogsize=0,logtimefmt='',"	\
+		"templateid=NULL,valuemapid=NULL,delay_flex='',params='',ipmi_sensor='',data_type=0,authtype=0,"	\
+		"username='',password='',publickey='',privatekey='',mtime=0,flags=0,interfaceid=NULL,port='',"		\
+		"description='',inventory_link=0,lifetime='30',snmpv3_authprotocol=0,snmpv3_privprotocol=0,state=0,"	\
+		"snmpv3_contextname='',evaltype=0"
+		/* type 2 = ITEM_TYPE_TRAPPER */
+		/* value_type 1 = ITEM_VALUE_TYPE_STR */
+		CHECK(DBexecute(SQL, itemid_rdds43_target    , 2, hostid, "RDDS43 target"     , "rsm.rdds.43.target"    , 0, status, 1, "1"));
+		CHECK(DBexecute(SQL, itemid_rdds43_testedname, 2, hostid, "RDDS43 tested name", "rsm.rdds.43.testedname", 0, status, 1, "1"));
+		CHECK(DBexecute(SQL, itemid_rdds80_target    , 2, hostid, "RDDS80 target"     , "rsm.rdds.80.target"    , 0, status, 1, "1"));
+#undef SQL
+
+#define SQL	"insert into items_applications set itemappid=" ZBX_FS_UI64 ",applicationid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64
+		CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds43, itemid_rdds43_target));
+		CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds43, itemid_rdds43_testedname));
+		CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds80, itemid_rdds80_target));
+#undef SQL
+
+#undef CHECK
+	}
+
+	ret = SUCCEED;
+out:
+	DBfree_result(result);
+
+	return ret;
+}
+
+static int	DBpatch_3000507(void)
+{
+	int		ret = FAIL;
+	DB_RESULT	result = NULL;
+	DB_ROW		row;
+
+	zbx_uint64_t	templateid_template_rdap        = 99980;
+	zbx_uint64_t	template_itemid_rdap_target     = 99984;
+	zbx_uint64_t	template_itemid_rdap_testedname = 99985;
+	zbx_uint64_t	template_applicationid_rdap     = 998;
+
+	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
+		return SUCCEED;
+
+	result = DBselect("select"
+				" hosts.hostid,"
+				"applications.applicationid"
+			" from"
+				" hosts"
+				" left join hosts_templates on hosts_templates.hostid=hosts.hostid"
+				" left join applications on applications.hostid=hosts.hostid"
+				" left join application_template on application_template.applicationid=applications.applicationid"
+			" where"
+				" hosts_templates.templateid=" ZBX_FS_UI64 " and"
+				" application_template.templateid=" ZBX_FS_UI64,
+			templateid_template_rdap, template_applicationid_rdap);
+
+	if (NULL == result)
+		goto out;
+
+	while (NULL != (row = DBfetch(result)))
+	{
+		zbx_uint64_t	hostid;
+		zbx_uint64_t	applicationid;
+		zbx_uint64_t	itemid_next;
+		zbx_uint64_t	itemid_rdap_target;
+		zbx_uint64_t	itemid_rdap_testedname;
+
+		ZBX_STR2UINT64(hostid, row[0]);
+		ZBX_STR2UINT64(applicationid, row[1]);
+
+		itemid_next            = DBget_maxid_num("items", 2);
+		itemid_rdap_target     = itemid_next++;
+		itemid_rdap_testedname = itemid_next++;
+
+#define CHECK(CODE) do {		\
+	int __result = (CODE);		\
+	if (ZBX_DB_OK > __result)	\
+	{				\
+		goto out;		\
+	}				\
+} while (0)
+
+#define SQL	"insert into items (itemid,type,snmp_community,snmp_oid,hostid,name,key_,delay,history,trends,"		\
+			"status,value_type,trapper_hosts,units,multiplier,delta,snmpv3_securityname,"			\
+			"snmpv3_securitylevel,snmpv3_authpassphrase,snmpv3_privpassphrase,formula,error,lastlogsize,"	\
+			"logtimefmt,templateid,valuemapid,delay_flex,params,ipmi_sensor,data_type,authtype,"		\
+			"username,password,publickey,privatekey,mtime,flags,interfaceid,port,description,"		\
+			"inventory_link,lifetime,snmpv3_authprotocol,snmpv3_privprotocol,state,snmpv3_contextname,"	\
+			"evaltype)"											\
+		" select"												\
+			" " ZBX_FS_UI64 ",type,snmp_community,snmp_oid," ZBX_FS_UI64 ",name,key_,delay,history,trends,"	\
+			"status,value_type,trapper_hosts,units,multiplier,delta,snmpv3_securityname,"			\
+			"snmpv3_securitylevel,snmpv3_authpassphrase,snmpv3_privpassphrase,formula,error,lastlogsize,"	\
+			"logtimefmt," ZBX_FS_UI64 ",valuemapid,delay_flex,params,ipmi_sensor,data_type,authtype,"	\
+			"username,password,publickey,privatekey,mtime,flags,interfaceid,port,description,"		\
+			"inventory_link,lifetime,snmpv3_authprotocol,snmpv3_privprotocol,state,snmpv3_contextname,"	\
+			"evaltype"											\
+		" from items"												\
+		" where itemid=" ZBX_FS_UI64
+		CHECK(DBexecute(SQL, itemid_rdap_target, hostid, template_itemid_rdap_target,
+				template_itemid_rdap_target));
+		CHECK(DBexecute(SQL, itemid_rdap_testedname, hostid, template_itemid_rdap_testedname,
+				template_itemid_rdap_testedname));
+#undef SQL
+
+#define SQL	"insert into items_applications set itemappid=" ZBX_FS_UI64 ",applicationid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64
+		CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid, itemid_rdap_target));
+		CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid, itemid_rdap_testedname));
+#undef SQL
+
+#undef CHECK
+	}
+
+	ret = SUCCEED;
+out:
+	DBfree_result(result);
+
+	return ret;
+}
+
+static int	DBpatch_3000508(void)
+{
+	DB_RESULT	result = NULL;
+	DB_RESULT	result2 = NULL;
+	DB_ROW		row;
+	int		ret = FAIL;
+
+	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
+		return SUCCEED;
+
+	/* loop through all "Template <RSMHOST>" templates that have listed items */
+	/* status 3 = HOST_STATUS_TEMPLATE */
+	result = DBselect("select"
+				" hosts.hostid,"
+				"items_rdds43_target.itemid,"
+				"items_rdds43_testedname.itemid,"
+				"items_rdds80_target.itemid"
+			" from"
+				" hosts"
+				" left join items as items_rdds43_target on items_rdds43_target.hostid=hosts.hostid"
+				" left join items as items_rdds43_testedname on items_rdds43_testedname.hostid=hosts.hostid"
+				" left join items as items_rdds80_target on items_rdds80_target.hostid=hosts.hostid"
+			" where"
+				" hosts.status=3 and"
+				" items_rdds43_target.key_='rsm.rdds.43.target' and"
+				" items_rdds43_testedname.key_='rsm.rdds.43.testedname' and"
+				" items_rdds80_target.key_='rsm.rdds.80.target'");
+
+	if (NULL == result)
+		goto out;
+
+	while (NULL != (row = DBfetch(result)))
+	{
+		zbx_uint64_t	template_hostid;
+		zbx_uint64_t	template_itemid_rdds43_target;
+		zbx_uint64_t	template_itemid_rdds43_testedname;
+		zbx_uint64_t	template_itemid_rdds80_target;
+
+		ZBX_STR2UINT64(template_hostid, row[0]);
+		ZBX_STR2UINT64(template_itemid_rdds43_target, row[1]);
+		ZBX_STR2UINT64(template_itemid_rdds43_testedname, row[2]);
+		ZBX_STR2UINT64(template_itemid_rdds80_target, row[3]);
+
+		result2 = DBselect("select"
+					" hosts.hostid,"
+					"app_rdds43.applicationid,"
+					"app_rdds80.applicationid"
+				" from"
+					" hosts"
+					" left join hosts_templates on hosts_templates.hostid=hosts.hostid"
+					" left join applications as app_rdds43 on app_rdds43.hostid=hosts.hostid"
+					" left join applications as app_rdds80 on app_rdds80.hostid=hosts.hostid"
+				" where"
+					" hosts_templates.templateid=" ZBX_FS_UI64 " and"
+					" app_rdds43.name='RDDS43' and"
+					" app_rdds80.name='RDDS80'",
+				template_hostid);
+
+		if (NULL == result2)
+			goto out;
+
+		while (NULL != (row = DBfetch(result2)))
+		{
+			zbx_uint64_t	hostid;
+			zbx_uint64_t	applicationid_rdds43;
+			zbx_uint64_t	applicationid_rdds80;
+			zbx_uint64_t	itemid_next;
+			zbx_uint64_t	itemid_rdds43_target;
+			zbx_uint64_t	itemid_rdds43_testedname;
+			zbx_uint64_t	itemid_rdds80_target;
+
+			ZBX_STR2UINT64(hostid, row[0]);
+			ZBX_STR2UINT64(applicationid_rdds43, row[1]);
+			ZBX_STR2UINT64(applicationid_rdds80, row[2]);
+
+			itemid_next              = DBget_maxid_num("items", 3);
+			itemid_rdds43_target     = itemid_next++;
+			itemid_rdds43_testedname = itemid_next++;
+			itemid_rdds80_target     = itemid_next++;
+
+#define CHECK(CODE) do {		\
+	int __result = (CODE);		\
+	if (ZBX_DB_OK > __result)	\
+	{				\
+		goto out;		\
+	}				\
+} while (0)
+
+#define SQL	"insert into items (itemid,type,snmp_community,snmp_oid,hostid,name,key_,delay,history,trends,"		\
+			"status,value_type,trapper_hosts,units,multiplier,delta,snmpv3_securityname,"			\
+			"snmpv3_securitylevel,snmpv3_authpassphrase,snmpv3_privpassphrase,formula,error,lastlogsize,"	\
+			"logtimefmt,templateid,valuemapid,delay_flex,params,ipmi_sensor,data_type,authtype,"		\
+			"username,password,publickey,privatekey,mtime,flags,interfaceid,port,description,"		\
+			"inventory_link,lifetime,snmpv3_authprotocol,snmpv3_privprotocol,state,snmpv3_contextname,"	\
+			"evaltype)"											\
+		" select"												\
+			" " ZBX_FS_UI64 ",type,snmp_community,snmp_oid," ZBX_FS_UI64 ",name,key_,delay,history,trends,"	\
+			"status,value_type,trapper_hosts,units,multiplier,delta,snmpv3_securityname,"			\
+			"snmpv3_securitylevel,snmpv3_authpassphrase,snmpv3_privpassphrase,formula,error,lastlogsize,"	\
+			"logtimefmt," ZBX_FS_UI64 ",valuemapid,delay_flex,params,ipmi_sensor,data_type,authtype,"	\
+			"username,password,publickey,privatekey,mtime,flags,interfaceid,port,description,"		\
+			"inventory_link,lifetime,snmpv3_authprotocol,snmpv3_privprotocol,state,snmpv3_contextname,"	\
+			"evaltype"											\
+		" from items"												\
+		" where itemid=" ZBX_FS_UI64
+		CHECK(DBexecute(SQL, itemid_rdds43_target, hostid, template_itemid_rdds43_target,
+				template_itemid_rdds43_target));
+		CHECK(DBexecute(SQL, itemid_rdds43_testedname, hostid, template_itemid_rdds43_testedname,
+				template_itemid_rdds43_testedname));
+		CHECK(DBexecute(SQL, itemid_rdds80_target, hostid, template_itemid_rdds80_target,
+				template_itemid_rdds80_target));
+#undef SQL
+
+#define SQL	"insert into items_applications set itemappid=" ZBX_FS_UI64 ",applicationid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64
+		CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds43, itemid_rdds43_target));
+		CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds43, itemid_rdds43_testedname));
+		CHECK(DBexecute(SQL, DBget_maxid_num("items_applications", 1), applicationid_rdds80, itemid_rdds80_target));
+#undef SQL
+
+#undef CHECK
+		}
+
+		DBfree_result(result2);
+		result2 = NULL;
+	}
+
+	ret = SUCCEED;
+out:
+	DBfree_result(result2);
+	DBfree_result(result);
+	return ret;
+}
+
 #endif
 
 DBPATCH_START(3000)
@@ -4540,5 +5497,18 @@ DBPATCH_ADD(3000321, 0, 0)	/* fill rsmhost_dns_ns_log table */
 DBPATCH_ADD(3000322, 0, 0)	/* fix delta field for 'rsm.slv.%.rtt.%' items */
 DBPATCH_ADD(3000323, 0, 1)	/* add 'created' field to the 'hosts' table */
 DBPATCH_ADD(3000324, 0, 0)	/* changed "TLDs" action to a remote commnad that calls tlds-notification.pl */
+DBPATCH_ADD(3000400, 0, 0)	/* Phase 3, version 1.4.0 */
+DBPATCH_ADD(3000401, 0, 0)	/* add macro {$RSM.MONITORING.TARGET} with empty string as value (unknown) or "registry" */
+DBPATCH_ADD(3000402, 0, 0)	/* rename "EBERO users" user group to "Read-only user", "Technical services users" to "Power user" */
+DBPATCH_ADD(3000403, 0, 1)	/* add columns "info_1" and "info_2" to the "hosts" table */
+DBPATCH_ADD(3000500, 0, 0)	/* Phase 4, version 2.0.0 */
+DBPATCH_ADD(3000501, 0, 0)	/* add macros, items and triggers for Standalone RDAP */
+DBPATCH_ADD(3000502, 0, 0)	/* add {$RSM.RDAP.ENABLED} macro on probes */
+DBPATCH_ADD(3000503, 0, 0)	/* replace {$RSM.RDDS.*} with {$RSM.RDAP.*} in rdap[] keys */
+DBPATCH_ADD(3000504, 0, 0)	/* add RDAP-related macros to Global macro history */
+DBPATCH_ADD(3000505, 0, 0)	/* add "rdap.target" and "rdap.testedname" items to "Template RDAP" template */
+DBPATCH_ADD(3000506, 0, 0)	/* add "rsm.rdds.43.target", "rsm.rdds.43.testedname" and "rsm.rdds.80.target" items to "Template <RSMHOST>" templates where needed */
+DBPATCH_ADD(3000507, 0, 0)	/* add "rdap.target" and "rdap.testedname" items to hosts that use "Template RDAP" template */
+DBPATCH_ADD(3000508, 0, 0)	/* add "rsm.rdds.43.target", "rsm.rdds.43.testedname" and "rsm.rdds.80.target" items to hosts that use "Template <RSMHOST>" */
 
 DBPATCH_END()

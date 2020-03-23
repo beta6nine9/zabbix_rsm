@@ -33,10 +33,13 @@
  *	'sub_pages' = collection of pages for displaying but not remembered as last visited.
  */
 function zbx_construct_menu(&$main_menu, &$sub_menus, &$page, $action = null) {
+	// Get current registrar and registry monitoring state.
+	$rsm_monitoring_type = get_rsm_monitoring_type();
+
 	$zbx_menu = [
 		'view' => [
 			'label' => _('Monitoring'),
-			'user_type'	=> [USER_TYPE_ZABBIX_USER, USER_TYPE_TEHNICAL_SERVICE, USER_TYPE_COMPLIANCE,
+			'user_type'	=> [USER_TYPE_ZABBIX_USER, USER_TYPE_POWER_USER, USER_TYPE_COMPLIANCE,
 				USER_TYPE_ZABBIX_ADMIN, USER_TYPE_SUPER_ADMIN
 			],
 			'default_page_id' => 0,
@@ -63,7 +66,7 @@ function zbx_construct_menu(&$main_menu, &$sub_menus, &$page, $action = null) {
 					'url' => 'latest.php',
 					'label' => _('Latest data'),
 					'sub_pages' => ['history.php', 'chart.php'],
-					'user_type'	=> [USER_TYPE_EBERO, USER_TYPE_ZABBIX_USER, USER_TYPE_TEHNICAL_SERVICE,
+					'user_type'	=> [USER_TYPE_READ_ONLY, USER_TYPE_ZABBIX_USER, USER_TYPE_POWER_USER,
 						USER_TYPE_COMPLIANCE, USER_TYPE_ZABBIX_ADMIN, USER_TYPE_SUPER_ADMIN
 					],
 				],
@@ -129,8 +132,10 @@ function zbx_construct_menu(&$main_menu, &$sub_menus, &$page, $action = null) {
 			]
 		],
 		'rsm' => array(
-			'label'				=> _('SLA monitoring'),
-			'user_type'			=> [USER_TYPE_EBERO, USER_TYPE_ZABBIX_USER, USER_TYPE_TEHNICAL_SERVICE,
+			'label'				=> ($rsm_monitoring_type === MONITORING_TARGET_REGISTRAR)
+				? _('Registrar monitoring')
+				: _('Registry monitoring'),
+			'user_type'			=> [USER_TYPE_READ_ONLY, USER_TYPE_ZABBIX_USER, USER_TYPE_POWER_USER,
 				USER_TYPE_COMPLIANCE, USER_TYPE_ZABBIX_ADMIN, USER_TYPE_SUPER_ADMIN
 			],
 			'default_page_id'	=> 0,
@@ -158,7 +163,7 @@ function zbx_construct_menu(&$main_menu, &$sub_menus, &$page, $action = null) {
 		),
 		'cm' => [
 			'label' => _('Inventory'),
-			'user_type' => [USER_TYPE_ZABBIX_USER, USER_TYPE_TEHNICAL_SERVICE, USER_TYPE_COMPLIANCE,
+			'user_type' => [USER_TYPE_ZABBIX_USER, USER_TYPE_POWER_USER, USER_TYPE_COMPLIANCE,
 				USER_TYPE_ZABBIX_ADMIN, USER_TYPE_SUPER_ADMIN
 			],
 			'default_page_id' => 0,
@@ -175,7 +180,7 @@ function zbx_construct_menu(&$main_menu, &$sub_menus, &$page, $action = null) {
 		],
 		'reports' => [
 			'label' => _('Reports'),
-			'user_type'	=> [USER_TYPE_ZABBIX_USER, USER_TYPE_TEHNICAL_SERVICE, USER_TYPE_COMPLIANCE,
+			'user_type'	=> [USER_TYPE_ZABBIX_USER, USER_TYPE_POWER_USER, USER_TYPE_COMPLIANCE,
 				USER_TYPE_ZABBIX_ADMIN, USER_TYPE_SUPER_ADMIN
 			],
 			'default_page_id' => 0,
@@ -337,7 +342,7 @@ function zbx_construct_menu(&$main_menu, &$sub_menus, &$page, $action = null) {
 		],
 		'login' => [
 			'label' => _('Login'),
-			'user_type'	=> [USER_TYPE_ZABBIX_GUEST, USER_TYPE_EBERO, USER_TYPE_ZABBIX_USER, USER_TYPE_TEHNICAL_SERVICE,
+			'user_type'	=> [USER_TYPE_ZABBIX_GUEST, USER_TYPE_READ_ONLY, USER_TYPE_ZABBIX_USER, USER_TYPE_POWER_USER,
 				USER_TYPE_COMPLIANCE, USER_TYPE_ZABBIX_ADMIN, USER_TYPE_SUPER_ADMIN
 			],
 			'default_page_id' => 0,
@@ -353,6 +358,11 @@ function zbx_construct_menu(&$main_menu, &$sub_menus, &$page, $action = null) {
 	$denied_page_requested = false;
 	$page_exists = false;
 	$deny = true;
+
+	// Don't show Registry/Registrar monitoring menu if none of both modes are enabled.
+	if ($rsm_monitoring_type !== MONITORING_TARGET_REGISTRY && $rsm_monitoring_type !== MONITORING_TARGET_REGISTRAR) {
+		unset($zbx_menu['rsm']);
+	}
 
 	foreach ($zbx_menu as $label => $menu) {
 		$show_menu = true;

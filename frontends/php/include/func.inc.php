@@ -2312,3 +2312,79 @@ function zbx_err_handler($errno, $errstr, $errfile, $errline) {
 	// Don't show the call to this handler function.
 	error($errstr.' ['.CProfiler::getInstance()->formatCallStack().']');
 }
+
+/**
+ * Return current type of RSM monitoring.
+ *
+ * @return int
+ */
+function get_rsm_monitoring_type() {
+	static $type;
+
+	if ($type === null) {
+		$db_macro = API::UserMacro()->get([
+			'output' => ['value'],
+			'filter' => ['macro' => RSM_MONITORING_TARGET],
+			'globalmacro' => true
+		]);
+
+		if ($db_macro) {
+			$type = $db_macro[0]['value'];
+		}
+	}
+
+	return $type;
+}
+
+/**
+ * Based on timestamp value stored in {$RSM.RDAP.STANDALONE}, check if RDAP at given time $timestamp is configured as
+ * standalone service or as dependent sub-service of RDDS. It is expected that switch from RDAP as sub-service of RDDS
+ * to RDAP as standalone service will be done only once and will never be switched back to initial state.
+ *
+ * @param integer|string  $timestamp  Optional timestamp value.
+ *
+ * @return bool
+ */
+function is_RDAP_standalone($timestamp = null) {
+	static $rsm_rdap_standalone_ts;
+
+	if (is_null($rsm_rdap_standalone_ts)) {
+		$db_macro = API::UserMacro()->get([
+			'output' => ['value'],
+			'filter' => ['macro' => RSM_RDAP_STANDALONE],
+			'globalmacro' => true
+		]);
+
+		$rsm_rdap_standalone_ts = $db_macro ? (int) $db_macro[0]['value'] : 0;
+	}
+
+	$timestamp = is_null($timestamp) ? time() : (int) $timestamp;
+
+	return ($rsm_rdap_standalone_ts > 0 && $rsm_rdap_standalone_ts <= $timestamp);
+}
+
+/**
+ * Generate data to be displayed in details widget. The output is an array to be passed to CWidget::addItem().
+ * Expects array of key/value pairs, each element is to be displayed on one line with key in bold style. The
+ * value can be either string or an array of CTag objects.
+ *
+ * @param array
+ *
+ * @return string
+ */
+function gen_details_item(array $details) {
+	$output = [];
+
+	foreach ($details as $key => $value) {
+		$output[] = bold($key);
+		$output[] = ': ';
+		$output[] = $value;
+		$output[] = BR();
+	}
+
+	if ($output) {
+		array_pop($output);
+	}
+
+	return $output;
+}

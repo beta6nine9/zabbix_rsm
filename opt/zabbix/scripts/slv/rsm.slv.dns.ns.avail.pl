@@ -16,6 +16,8 @@ fail_if_running();
 set_slv_config(get_rsm_config());
 db_connect();
 
+slv_exit(SUCCESS) if (get_monitoring_target() ne MONITORING_TARGET_REGISTRY);
+
 my $slv_item_key_pattern = 'rsm.slv.dns.ns.avail';
 my $rtt_item_key_pattern = 'rsm.dns.udp.rtt';
 

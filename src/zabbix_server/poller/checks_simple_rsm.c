@@ -222,17 +222,33 @@ static int	unpack_values(size_t *v1, size_t *v2, int *v3, int *v4, char *buf)
 	return sscanf(buf, PACK_FORMAT, v1, v2, v3, v4);
 }
 
+static char	*rsm_log_prefixes[] = { "Empty", "Fatal", "Error", "Warning", "Info", "Debug" };
+
 #define rsm_dump(log_fd, fmt, ...)	fprintf(log_fd, ZBX_CONST_STRING(fmt), ##__VA_ARGS__)
-#define rsm_errf(log_fd, fmt, ...)	rsm_logf(log_fd, "Error", ZBX_CONST_STRING(fmt), ##__VA_ARGS__)
-#define rsm_warnf(log_fd, fmt, ...)	rsm_logf(log_fd, "Warning", ZBX_CONST_STRING(fmt), ##__VA_ARGS__)
-#define rsm_infof(log_fd, fmt, ...)	rsm_logf(log_fd, "Info", ZBX_CONST_STRING(fmt), ##__VA_ARGS__)
-static void	rsm_logf(FILE *log_fd, const char *prefix, const char *fmt, ...)
+#define rsm_errf(log_fd, fmt, ...)	rsm_logf(log_fd, LOG_LEVEL_ERR, ZBX_CONST_STRING(fmt), ##__VA_ARGS__)
+#define rsm_warnf(log_fd, fmt, ...)	rsm_logf(log_fd, LOG_LEVEL_WARNING, ZBX_CONST_STRING(fmt), ##__VA_ARGS__)
+#define rsm_infof(log_fd, fmt, ...)	rsm_logf(log_fd, LOG_LEVEL_DEBUG, ZBX_CONST_STRING(fmt), ##__VA_ARGS__)
+
+static void	rsm_logf(FILE *log_fd, int level, const char *fmt, ...)
 {
 	va_list		args;
 	char		fmt_buf[ZBX_ERR_BUF_SIZE];
 	struct timeval	current_time;
 	struct tm	*tm;
 	long		ms;
+
+	va_start(args, fmt);
+
+	/* fall back to regular Zabbix log */
+	if (NULL == log_fd)
+	{
+		zbx_vsnprintf(fmt_buf, sizeof(fmt_buf), fmt, args);
+		__zbx_zabbix_log(level, fmt_buf);
+		goto out;
+	}
+
+	if (level > LOG_LEVEL_TRACE)
+		level = LOG_LEVEL_TRACE;
 
 	gettimeofday(&current_time, NULL);
 	tm = localtime(&current_time.tv_sec);
@@ -247,22 +263,32 @@ static void	rsm_logf(FILE *log_fd, const char *prefix, const char *fmt, ...)
 			tm->tm_min,
 			tm->tm_sec,
 			ms,
-			prefix,
+			rsm_log_prefixes[level],
 			fmt);
-	fmt = fmt_buf;
 
-	va_start(args, fmt);
-	vfprintf(log_fd, fmt, args);
+	vfprintf(log_fd, fmt_buf, args);
+out:
 	va_end(args);
 }
 
-#define rsm_err(log_fd, text)	rsm_log(log_fd, "Error", text)
-#define rsm_info(log_fd, text)	rsm_log(log_fd, "Info", text)
-static void	rsm_log(FILE *log_fd, const char *prefix, const char *text)
+#define rsm_err(log_fd, text)	rsm_log(log_fd, LOG_LEVEL_ERR, text)
+#define rsm_info(log_fd, text)	rsm_log(log_fd, LOG_LEVEL_DEBUG, text)
+
+static void	rsm_log(FILE *log_fd, int level, const char *text)
 {
 	struct timeval	current_time;
 	struct tm	*tm;
 	long		ms;
+
+	/* fall back to regular Zabbix log */
+	if (NULL == log_fd)
+	{
+		__zbx_zabbix_log(level, text);
+		return;
+	}
+
+	if (level > LOG_LEVEL_TRACE)
+		level = LOG_LEVEL_TRACE;
 
 	gettimeofday(&current_time, NULL);
 	tm = localtime(&current_time.tv_sec);
@@ -277,7 +303,7 @@ static void	rsm_log(FILE *log_fd, const char *prefix, const char *text)
 			tm->tm_min,
 			tm->tm_sec,
 			ms,
-			prefix,
+			rsm_log_prefixes[level],
 			text);
 }
 
@@ -1873,7 +1899,7 @@ out:
 	return ret;
 }
 
-static int	zbx_parse_rdds_item(DC_ITEM *item, char *host, size_t host_size)
+static int	zbx_parse_rdds_item(DC_ITEM *item)
 {
 	AGENT_REQUEST	request;
 	int		ret = FAIL;
@@ -1883,20 +1909,6 @@ static int	zbx_parse_rdds_item(DC_ITEM *item, char *host, size_t host_size)
 	if (SUCCEED != parse_item_key(item->key, &request))
 	{
 		/* unexpected key syntax */
-		goto out;
-	}
-
-	if (1 != request.nparam)
-	{
-		/* unexpected key syntax */
-		goto out;
-	}
-
-	zbx_strlcpy(host, get_rparam(&request, 0), host_size);
-
-	if ('\0' == *host)
-	{
-		/* first parameter missing */
 		goto out;
 	}
 
@@ -2745,7 +2757,7 @@ static void	zbx_get_rdds43_nss(zbx_vector_str_t *nss, const char *recv_buf, cons
 static size_t	zbx_get_rdds_items(const char *keyname, DC_ITEM *item, const char *domain, DC_ITEM **out_items,
 		FILE *log_fd)
 {
-	char		*keypart, host[ZBX_HOST_BUF_SIZE];
+	char		*keypart;
 	const char	*p;
 	DC_ITEM		*in_items = NULL, *in_item;
 	size_t		i, in_items_num, out_items_num = 0, out_items_alloc = 8, keypart_size;
@@ -2772,23 +2784,19 @@ static size_t	zbx_get_rdds_items(const char *keyname, DC_ITEM *item, const char 
 			continue;
 		}
 
-		if (SUCCEED != zbx_parse_rdds_item(in_item, host, sizeof(host)))
+		if (SUCCEED != zbx_parse_rdds_item(in_item))
 		{
 			/* unexpected item key syntax, skip it */
 			rsm_warnf(log_fd, "%s: unexpected key syntax", in_item->key);
 			continue;
 		}
 
-		if (0 != strcmp(host, domain))
-		{
-			/* first parameter does not match expected domain name, skip it */
-			rsm_warnf(log_fd, "%s: first parameter does not match host %s", in_item->key, domain);
-			continue;
-		}
-
 		p = in_item->key + keypart_size;
 		if (0 != strncmp(p, "43.ip[", 6) && 0 != strncmp(p, "43.rtt[", 7) && 0 != strncmp(p, "43.upd[", 7) &&
-				0 != strncmp(p, "80.ip[", 6) && 0 != strncmp(p, "80.rtt[", 7))
+				0 != strncmp(p, "80.ip[", 6) && 0 != strncmp(p, "80.rtt[", 7) &&
+				0 != strncmp(p, "43.target", 9) &&
+				0 != strncmp(p, "43.testedname", 13) &&
+				0 != strncmp(p, "80.target", 9))
 		{
 			continue;
 		}
@@ -3054,6 +3062,26 @@ static void	zbx_get_strings_from_list(zbx_vector_str_t *strings, char *list, cha
 		}
 	}
 	while (NULL != p_end);
+}
+
+static void	zbx_set_rdds_value_by_pattern(const char *value, int value_ts, size_t keypart_size, const char *pattern,
+		size_t pattern_size, const DC_ITEM *items, size_t items_num)
+{
+	size_t		i;
+	const DC_ITEM	*item;
+	const char	*p;
+
+	for (i = 0; i < items_num; i++)
+	{
+		item = &items[i];
+		p = item->key + keypart_size + 1;	/* skip "rsm.rdds." part */
+
+		if (0 == strncmp(p, pattern, pattern_size))
+		{
+			zbx_add_value_str(item, value_ts, value);
+			return;
+		}
+	}
 }
 
 static void	zbx_set_rdds_values(const char *ip43, int rtt43, int upd43, const char *ip80, int rtt80,
@@ -3746,6 +3774,10 @@ int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	i = zbx_random(hosts43.values_num);
 	random_host = hosts43.values[i];
 
+	/* set RDDS43 target */
+	zbx_set_rdds_value_by_pattern(random_host, item->nextcheck, strlen(request->key), "43.target",
+			strlen("43.target"), items, items_num);
+
 	/* start RDDS43 test, resolve host to ips */
 	if (SUCCEED != zbx_resolver_resolve_host(res, random_host, &ips43, ipv_flags, log_fd, &ec_res, err, sizeof(err)))
 	{
@@ -3775,6 +3807,10 @@ int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 			zbx_snprintf(testname, sizeof(testname), "%s.%s", testprefix, domain);
 		else
 			zbx_strlcpy(testname, testprefix, sizeof(testname));
+
+		/* set RDDS43 testedName */
+		zbx_set_rdds_value_by_pattern(testname, item->nextcheck, strlen(request->key), "43.testedname",
+				strlen("43.testedname"), items, items_num);
 
 		rsm_infof(log_fd, "start RDDS43 test (ip %s, request \"%s\", expected prefix \"%s\")",
 				ip43, testname, rdds_ns_string);
@@ -3849,6 +3885,10 @@ int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	/* choose random host */
 	i = zbx_random(hosts80.values_num);
 	random_host = hosts80.values[i];
+
+	/* set RDDS80 target */
+	zbx_set_rdds_value_by_pattern(random_host, item->nextcheck, strlen(request->key), "80.target",
+			strlen("80.target"), items, items_num);
 
 	rsm_infof(log_fd, "start RDDS80 test (host %s)", random_host);
 
@@ -3962,23 +4002,32 @@ out:
 	return ret;
 }
 
-static int	zbx_get_rdap_items(const char *host, DC_ITEM *ip_item, DC_ITEM *rtt_item)
+static int	zbx_get_rdap_items(const char *host, DC_ITEM *ip_item, DC_ITEM *rtt_item, DC_ITEM *target_item,
+		DC_ITEM *testedname_item)
 {
-#define ZBX_RDAP_ITEM_COUNT	2
-#define ZBX_RDAP_ITEM_KEY_IP	"rdap.ip"
-#define ZBX_RDAP_ITEM_KEY_RTT	"rdap.rtt"
+#define ZBX_RDAP_ITEM_COUNT		4
+#define ZBX_RDAP_ITEM_KEY_IP		"rdap.ip"
+#define ZBX_RDAP_ITEM_KEY_RTT		"rdap.rtt"
+#define ZBX_RDAP_ITEM_KEY_TARGET	"rdap.target"
+#define ZBX_RDAP_ITEM_KEY_TESTEDNAME	"rdap.testedname"
 
 	zbx_host_key_t		hosts_keys[ZBX_RDAP_ITEM_COUNT] = {
 					{host, ZBX_RDAP_ITEM_KEY_IP},
-					{host, ZBX_RDAP_ITEM_KEY_RTT}
+					{host, ZBX_RDAP_ITEM_KEY_RTT},
+					{host, ZBX_RDAP_ITEM_KEY_TARGET},
+					{host, ZBX_RDAP_ITEM_KEY_TESTEDNAME}
 				};
 	zbx_item_value_type_t	types[ZBX_RDAP_ITEM_COUNT] = {
 					ITEM_VALUE_TYPE_STR,
-					ITEM_VALUE_TYPE_FLOAT
+					ITEM_VALUE_TYPE_FLOAT,
+					ITEM_VALUE_TYPE_STR,
+					ITEM_VALUE_TYPE_STR
 				};
 	DC_ITEM			*destinations[ZBX_RDAP_ITEM_COUNT] = {
 					ip_item,
-					rtt_item
+					rtt_item,
+					target_item,
+					testedname_item
 				};
 	DC_ITEM			items[ZBX_RDAP_ITEM_COUNT];
 	int			errcodes[ZBX_RDAP_ITEM_COUNT], i;
@@ -4001,6 +4050,8 @@ static int	zbx_get_rdap_items(const char *host, DC_ITEM *ip_item, DC_ITEM *rtt_i
 #undef ZBX_RDAP_ITEM_COUNT
 #undef ZBX_RDAP_ITEM_KEY_IP
 #undef ZBX_RDAP_ITEM_KEY_RTT
+#undef ZBX_RDAP_ITEM_KEY_TARGET
+#undef ZBX_RDAP_ITEM_KEY_TESTEDNAME
 }
 
 int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *result)
@@ -4011,8 +4062,8 @@ int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	zbx_vector_str_t	ips;
 	struct zbx_json_parse	jp;
 	FILE			*log_fd;
-	DC_ITEM			ip_item, rtt_item;
-	char			*domain, *test_domain, *base_url, *maxredirs_str, *rtt_limit_str, *tld_enabled_str,
+	DC_ITEM			ip_item, rtt_item, target_item, testedname_item;
+	char			*domain, *testedname, *base_url, *maxredirs_str, *rtt_limit_str, *tld_enabled_str,
 				*probe_enabled_str, *ipv4_enabled_str, *ipv6_enabled_str, *res_ip, *proto = NULL,
 				*domain_part = NULL, *prefix = NULL, *full_url = NULL, *value_str = NULL,
 				err[ZBX_ERR_BUF_SIZE], is_ipv4, rdap_prefix[64];
@@ -4026,12 +4077,12 @@ int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	if (10 != request->nparam)
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid number of parameters."));
-		return ret;
+		return SYSINFO_RET_FAIL;
 	}
 
 	/* TLD goes first, then RDAP specific parameters, then TLD options, probe options and global settings */
 	domain = get_rparam(request, 0);		/* TLD for log file name, e.g. ".cz" */
-	test_domain = get_rparam(request, 1);		/* testing domain to make RDAP query for, e.g. "nic.cz" */
+	testedname = get_rparam(request, 1);		/* testing domain to make RDAP query for, e.g. "nic.cz" */
 	base_url = get_rparam(request, 2);		/* RDAP service endpoint, e.g. "http://rdap.nic.cz" */
 	maxredirs_str = get_rparam(request, 3);		/* maximal number of redirections allowed */
 	rtt_limit_str = get_rparam(request, 4);		/* maximum allowed RTT in milliseconds */
@@ -4044,68 +4095,68 @@ int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	if ('\0' == *domain)
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "TLD cannot be empty."));
-		return ret;
+		return SYSINFO_RET_FAIL;
 	}
 
-	if ('\0' == *test_domain)
+	if ('\0' == *testedname)
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Test domain cannot be empty."));
-		return ret;
+		return SYSINFO_RET_FAIL;
 	}
 
 	if ('\0' == *base_url)
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "RDAP service endpoint cannot be empty."));
-		return ret;
+		return SYSINFO_RET_FAIL;
 	}
 
 	if (SUCCEED != is_uint31(maxredirs_str, &maxredirs))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid fourth parameter."));
-		return ret;
+		return SYSINFO_RET_FAIL;
 	}
 
 	if (SUCCEED != is_uint31(rtt_limit_str, &rtt_limit))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid fifth parameter."));
-		return ret;
+		return SYSINFO_RET_FAIL;
 	}
 
 	if (SUCCEED != is_uint31(tld_enabled_str, &tld_enabled))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid sixth parameter."));
-		return ret;
+		return SYSINFO_RET_FAIL;
 	}
 
 	if (SUCCEED != is_uint31(probe_enabled_str, &probe_enabled))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid seventh parameter."));
-		return ret;
+		return SYSINFO_RET_FAIL;
 	}
 
 	if (SUCCEED != is_uint31(ipv4_enabled_str, &ipv4_enabled))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid eighth parameter."));
-		return ret;
+		return SYSINFO_RET_FAIL;
 	}
 
 	if (SUCCEED != is_uint31(ipv6_enabled_str, &ipv6_enabled))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid ninth parameter."));
-		return ret;
+		return SYSINFO_RET_FAIL;
 	}
 
 	if ('\0' == *res_ip)
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "IP address of local resolver cannot be empty."));
-		return ret;
+		return SYSINFO_RET_FAIL;
 	}
 
 	/* open log file */
 	if (NULL == (log_fd = open_item_log(item->host.host, domain, ZBX_RDAP_LOG_PREFIX, NULL, err, sizeof(err))))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
-		return ret;
+		return SYSINFO_RET_FAIL;
 	}
 
 	zbx_vector_str_create(&ips);
@@ -4113,7 +4164,7 @@ int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	rsm_info(log_fd, "START TEST");
 
 	/* get items */
-	if (SUCCEED != zbx_get_rdap_items(item->host.host, &ip_item, &rtt_item))
+	if (SUCCEED != zbx_get_rdap_items(item->host.host, &ip_item, &rtt_item, &target_item, &testedname_item))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Cannot find items to store IP and RTT."));
 		goto out;
@@ -4146,6 +4197,12 @@ int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	/* from this point item will not become NOTSUPPORTED */
 	ret = SYSINFO_RET_OK;
 
+	/* set RDAP target */
+	zbx_add_value_str(&target_item, item->nextcheck, base_url);
+
+	/* set RDAP testedName */
+	zbx_add_value_str(&testedname_item, item->nextcheck, testedname);
+
 	/* skip the test itself in case of two special values in RDAP base URL parameter */
 
 	if (0 == strcmp(base_url, "not listed"))
@@ -4171,7 +4228,7 @@ int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	if (SUCCEED != zbx_split_url(base_url, &proto, &domain_part, &port, &prefix, err, sizeof(err)))
 	{
 		rtt = ZBX_EC_RDAP_INTERNAL_GENERAL;
-		rsm_errf(log_fd, "RDAP \"%s\": %s", base_url, err);
+		rsm_errf(log_fd, "\"%s\": %s", base_url, err);
 		goto out;
 	}
 
@@ -4179,15 +4236,14 @@ int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	if (SUCCEED != zbx_resolver_resolve_host(res, domain_part, &ips, ipv_flags, log_fd, &ec_res, err, sizeof(err)))
 	{
 		rtt = zbx_resolver_error_to_RDAP(ec_res);
-		rsm_errf(log_fd, "RDAP \"%s\": %s", base_url, err);
+		rsm_errf(log_fd, "trying to resolve \"%s\": %s", domain_part, err);
 		goto out;
 	}
 
 	if (0 == ips.values_num)
 	{
 		rtt = ZBX_EC_RDAP_INTERNAL_IP_UNSUP;
-		rsm_errf(log_fd, "RDAP \"%s\": IP address(es) of host \"%s\" are not supported by the Probe",
-				base_url, domain_part);
+		rsm_errf(log_fd, "IP address(es) of host \"%s\" are not supported on this Probe", domain_part);
 		goto out;
 	}
 
@@ -4209,10 +4265,10 @@ int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	if (0 == is_ipv4)
 	{
 		full_url = zbx_dsprintf(full_url, "%s[%s]:%d%s%s/%s", proto, ip, port, prefix, rdap_prefix,
-				test_domain);
+				testedname);
 	}
 	else
-		full_url = zbx_dsprintf(full_url, "%s%s:%d%s%s/%s", proto, ip, port, prefix, rdap_prefix, test_domain);
+		full_url = zbx_dsprintf(full_url, "%s%s:%d%s%s/%s", proto, ip, port, prefix, rdap_prefix, testedname);
 
 	rsm_infof(log_fd, "the domain in base URL \"%s\" was resolved to %s, using full URL \"%s\".",
 			base_url, ip, full_url);
@@ -4241,7 +4297,7 @@ int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 		goto out;
 	}
 
-	if (NULL == value_str || 0 != strcmp(value_str, test_domain))
+	if (NULL == value_str || 0 != strcmp(value_str, testedname))
 	{
 		rtt = ZBX_EC_RDAP_ENAME;
 		rsm_errf(log_fd, "ldhName member doesn't match query in response of \"%s\" (%s)", base_url, ip);
@@ -4255,11 +4311,13 @@ out:
 
 	rsm_info(log_fd, "END TEST");
 
+	/* set RDAP IP */
+	if (NULL != ip)
+		zbx_add_value_str(&ip_item, item->nextcheck, ip);
+
 	if (SYSINFO_RET_OK == ret && ZBX_NO_VALUE != rtt)
 	{
 		/* set values for RTT and IP */
-		if (NULL != ip)
-			zbx_add_value_str(&ip_item, item->nextcheck, ip);
 		zbx_add_value_dbl(&rtt_item, item->nextcheck, rtt);
 
 		/* set the value of our item itself */
@@ -4275,6 +4333,8 @@ out:
 
 	DCconfig_clean_items(&ip_item, NULL, 1);
 	DCconfig_clean_items(&rtt_item, NULL, 1);
+	DCconfig_clean_items(&target_item, NULL, 1);
+	DCconfig_clean_items(&testedname_item, NULL, 1);
 
 	if (NULL != res)
 	{
@@ -6049,7 +6109,7 @@ int	check_rsm_resolver_status(DC_ITEM *item, const AGENT_REQUEST *request, AGENT
 	if (5 != request->nparam)
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid number of parameters."));
-		goto out;;
+		goto out;
 	}
 
 	/* TLD goes first, then RDAP specific parameters, then TLD options, probe options and global settings */
@@ -6062,31 +6122,31 @@ int	check_rsm_resolver_status(DC_ITEM *item, const AGENT_REQUEST *request, AGENT
 	if ('\0' == *res_ip)
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "IP address of local resolver cannot be empty."));
-		goto out;;
+		goto out;
 	}
 
 	if (SUCCEED != is_uint31(timeout_str, &timeout))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid second parameter."));
-		goto out;;
+		goto out;
 	}
 
 	if (SUCCEED != is_uint31(tries_str, &tries))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid third parameter."));
-		goto out;;
+		goto out;
 	}
 
 	if (SUCCEED != is_uint31(ipv4_enabled_str, &ipv4_enabled))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid fourth parameter."));
-		goto out;;
+		goto out;
 	}
 
 	if (SUCCEED != is_uint31(ipv6_enabled_str, &ipv6_enabled))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid fifth parameter."));
-		goto out;;
+		goto out;
 	}
 
 	/* open log file */
@@ -6094,7 +6154,7 @@ int	check_rsm_resolver_status(DC_ITEM *item, const AGENT_REQUEST *request, AGENT
 			err, sizeof(err))))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
-		goto out;;
+		goto out;
 	}
 
 	extras = RESOLVER_EXTRAS_DNSSEC;
