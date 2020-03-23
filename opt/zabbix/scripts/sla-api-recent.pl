@@ -1460,8 +1460,6 @@ sub get_probe_results($$$$)
 
 			$probe_data->{$clock}{$interface}{'rtt'} = $value;
 
-			print("DIMBUG: ", uc($interface), " $i->{'key'}\n");
-
 			if (substr($i->{'key'}, 0, length("rsm.dns.udp.rtt")) eq "rsm.dns.udp.rtt")
 			{
 				my ($target, $ip) = split(',', get_nsip_from_key($i->{'key'}));
@@ -1540,8 +1538,6 @@ sub get_probe_results($$$$)
 			{
 				fail("unknown $tld ($probe) item key: ", $i->{'key'});
 			}
-
-			print("DIMBUG: ", uc($interface), " $i->{'key'}=$value\n");
 
 			$probe_data->{$clock}{$interface}{$field} = $value;
 		}
