@@ -3532,8 +3532,9 @@ static int	zbx_split_url(const char *url, char **proto, char **domain, int *port
 	return SUCCEED;
 }
 
-static void	create_rsm_rdds_json(struct zbx_json *json, const char *ip43, int rtt43, int upd43, const char *ip80,
-		int rtt80, int status)
+static void	create_rsm_rdds_json(struct zbx_json *json, const char *ip43, int rtt43, int upd43,
+		const char *target43, const char *testedname43, const char *ip80, int rtt80, const char *target80,
+		int status)
 {
 	zbx_json_init(json, 2 * ZBX_KIBIBYTE);
 
@@ -3544,6 +3545,10 @@ static void	create_rsm_rdds_json(struct zbx_json *json, const char *ip43, int rt
 		zbx_json_addstring(json, "ip", ip43, ZBX_JSON_TYPE_STRING);
 	if (ZBX_NO_VALUE != upd43)
 		zbx_json_addint64(json, "upd", upd43);
+	if (NULL != target43)
+		zbx_json_addstring(json, "target", target43, ZBX_JSON_TYPE_STRING);
+	if (0 != strcmp(testedname43, ""))
+		zbx_json_addstring(json, "testedname", testedname43, ZBX_JSON_TYPE_STRING);
 
 	zbx_json_close(json);
 
@@ -3552,6 +3557,8 @@ static void	create_rsm_rdds_json(struct zbx_json *json, const char *ip43, int rt
 	zbx_json_addint64(json, "rtt", rtt80);
 	if (NULL != ip80)
 		zbx_json_addstring(json, "ip", ip80, ZBX_JSON_TYPE_STRING);
+	if (NULL != target80)
+		zbx_json_addstring(json, "target", target80, ZBX_JSON_TYPE_STRING);
 
 	zbx_json_close(json);
 
@@ -3586,8 +3593,9 @@ static int	get_rdds_result(int rtt43, int rtt80, int rtt_limit)
 int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *result)
 {
 	char			*domain, *res_ip, *testprefix, *rdds_ns_string, *answer = NULL,
-				testname[ZBX_HOST_BUF_SIZE], is_ipv4, err[ZBX_ERR_BUF_SIZE];
-	const char		*random_host, *ip43 = NULL, *ip80 = NULL;
+				testedname43[ZBX_HOST_BUF_SIZE] = "", url[ZBX_HOST_BUF_SIZE], is_ipv4,
+				err[ZBX_ERR_BUF_SIZE];
+	const char		*target43 = NULL, *target80 = NULL, *ip43 = NULL, *ip80 = NULL;
 	zbx_vector_str_t	hosts43, hosts80, ips43, ips80, nss;
 	FILE			*log_fd = NULL;
 	ldns_resolver		*res = NULL;
@@ -3667,13 +3675,13 @@ int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	ret = SYSINFO_RET_OK;
 
 	/* choose random host */
-	random_host = hosts43.values[zbx_random((size_t)hosts43.values_num)];
+	target43 = hosts43.values[zbx_random((size_t)hosts43.values_num)];
 
 	/* start RDDS43 test, resolve host to ips */
-	if (SUCCEED != zbx_resolver_resolve_host(res, random_host, &ips43, ipv_flags, log_fd, &ec_res, err, sizeof(err)))
+	if (SUCCEED != zbx_resolver_resolve_host(res, target43, &ips43, ipv_flags, log_fd, &ec_res, err, sizeof(err)))
 	{
 		rtt43 = zbx_resolver_error_to_RDDS43(ec_res);
-		rsm_errf(log_fd, "RDDS43 \"%s\": %s", random_host, err);
+		rsm_errf(log_fd, "RDDS43 \"%s\": %s", target43, err);
 	}
 
 	/* if RDDS43 fails we should still process RDDS80 */
@@ -3684,7 +3692,7 @@ int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 		{
 			rtt43 = ZBX_EC_RDDS43_INTERNAL_IP_UNSUP;
 			rsm_errf(log_fd, "RDDS43 \"%s\": IP address(es) of host not supported by the Probe",
-					random_host);
+					target43);
 		}
 	}
 
@@ -3694,17 +3702,17 @@ int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 		ip43 = ips43.values[zbx_random((size_t)ips43.values_num)];
 
 		if (0 != strcmp(".", domain))
-			zbx_snprintf(testname, sizeof(testname), "%s.%s", testprefix, domain);
+			zbx_snprintf(testedname43, sizeof(testedname43), "%s.%s", testprefix, domain);
 		else
-			zbx_strlcpy(testname, testprefix, sizeof(testname));
+			zbx_strlcpy(testedname43, testprefix, sizeof(testedname43));
 
 		rsm_infof(log_fd, "start RDDS43 test (ip %s, request \"%s\", expected prefix \"%s\")",
-				ip43, testname, rdds_ns_string);
+				ip43, testedname43, rdds_ns_string);
 
-		if (SUCCEED != zbx_rdds43_test(testname, ip43, 43, RSM_TCP_TIMEOUT, &answer, &rtt43,
+		if (SUCCEED != zbx_rdds43_test(testedname43, ip43, 43, RSM_TCP_TIMEOUT, &answer, &rtt43,
 				err, sizeof(err)))
 		{
-			rsm_errf(log_fd, "RDDS43 of \"%s\" (%s) failed: %s", random_host, ip43, err);
+			rsm_errf(log_fd, "RDDS43 of \"%s\" (%s) failed: %s", target43, ip43, err);
 		}
 	}
 
@@ -3717,7 +3725,7 @@ int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 			rtt43 = ZBX_EC_RDDS43_NONS;
 			rsm_errf(log_fd, "no Name Servers found in the output of RDDS43 server \"%s\""
 					" (%s) for query \"%s\" (expecting prefix \"%s\")",
-					random_host, ip43, testname, rdds_ns_string);
+					target43, ip43, testedname43, rdds_ns_string);
 		}
 	}
 
@@ -3768,22 +3776,22 @@ int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	}
 
 	/* choose random host */
-	random_host = hosts80.values[zbx_random((size_t)hosts80.values_num)];
+	target80 = hosts80.values[zbx_random((size_t)hosts80.values_num)];
 
-	rsm_infof(log_fd, "start RDDS80 test (host %s)", random_host);
+	rsm_infof(log_fd, "start RDDS80 test (host %s)", target80);
 
 	/* start RDDS80 test, resolve host to ips */
-	if (SUCCEED != zbx_resolver_resolve_host(res, random_host, &ips80, ipv_flags, log_fd, &ec_res, err, sizeof(err)))
+	if (SUCCEED != zbx_resolver_resolve_host(res, target80, &ips80, ipv_flags, log_fd, &ec_res, err, sizeof(err)))
 	{
 		rtt80 = zbx_resolver_error_to_RDDS80(ec_res);
-		rsm_errf(log_fd, "RDDS80 \"%s\": %s", random_host, err);
+		rsm_errf(log_fd, "RDDS80 \"%s\": %s", target80, err);
 		goto end;
 	}
 
 	if (0 == ips80.values_num)
 	{
 		rtt80 = ZBX_EC_RDDS80_INTERNAL_IP_UNSUP;
-		rsm_errf(log_fd, "RDDS80 \"%s\": IP address(es) of host not supported by the Probe", random_host);
+		rsm_errf(log_fd, "RDDS80 \"%s\": IP address(es) of host not supported by the Probe", target80);
 		goto end;
 	}
 
@@ -3793,20 +3801,20 @@ int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	if (SUCCEED != zbx_validate_ip(ip80, ipv4_enabled, ipv6_enabled, NULL, &is_ipv4))
 	{
 		rtt80 = ZBX_EC_RDDS80_INTERNAL_GENERAL;
-		rsm_errf(log_fd, "internal error, selected unsupported IP of \"%s\": \"%s\"", random_host, ip80);
+		rsm_errf(log_fd, "internal error, selected unsupported IP of \"%s\": \"%s\"", target80, ip80);
 		goto end;
 	}
 
 	if (0 != is_ipv4)
-		zbx_snprintf(testname, sizeof(testname), "http://%s", ip80);
+		zbx_snprintf(url, sizeof(url), "http://%s", ip80);
 	else
-		zbx_snprintf(testname, sizeof(testname), "http://[%s]", ip80);
+		zbx_snprintf(url, sizeof(url), "http://[%s]", ip80);
 
-	if (SUCCEED != zbx_http_test(random_host, testname, RSM_TCP_TIMEOUT, maxredirs, &ec_http, &rtt80, NULL,
+	if (SUCCEED != zbx_http_test(target80, url, RSM_TCP_TIMEOUT, maxredirs, &ec_http, &rtt80, NULL,
 			curl_devnull, curl_flags, err, sizeof(err)))
 	{
 		rtt80 = zbx_http_error_to_RDDS80(ec_http);
-		rsm_errf(log_fd, "RDDS80 of \"%s\" (%s) failed: %s (%d)", random_host, testname, err, rtt80);
+		rsm_errf(log_fd, "RDDS80 of \"%s\" (%s) failed: %s (%d)", target80, url, err, rtt80);
 	}
 
 	rsm_infof(log_fd, "end RDDS80 test (rtt:%d)", rtt80);
@@ -3818,7 +3826,8 @@ end:
 
 	if (SYSINFO_RET_OK == ret && 0 != rdds_enabled)
 	{
-		create_rsm_rdds_json(&json, ip43, rtt43, upd43, ip80, rtt80, get_rdds_result(rtt43, rtt80, rtt_limit));
+		create_rsm_rdds_json(&json, ip43, rtt43, upd43, target43, testedname43, ip80, rtt80, target80,
+				get_rdds_result(rtt43, rtt80, rtt_limit));
 
 		SET_STR_RESULT(result, zbx_strdup(NULL, json.buffer));
 
@@ -3849,12 +3858,15 @@ out:
 	return ret;
 }
 
-static void	create_rsm_rdap_json(struct zbx_json *json, const char *ip, int rtt, int status)
+static void	create_rsm_rdap_json(struct zbx_json *json, const char *ip, int rtt, const char *target,
+		const char *testedname, int status)
 {
 	zbx_json_init(json, 2 * ZBX_KIBIBYTE);
 
 	zbx_json_addstring(json, "ip", ip, ZBX_JSON_TYPE_STRING);
 	zbx_json_addint64(json, "rtt", rtt);
+	zbx_json_addstring(json, "target", target, ZBX_JSON_TYPE_STRING);
+	zbx_json_addstring(json, "testedname", testedname, ZBX_JSON_TYPE_STRING);
 	zbx_json_addint64(json, "status", status);
 
 	zbx_json_close(json);
@@ -3868,7 +3880,7 @@ int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	zbx_vector_str_t	ips;
 	struct zbx_json_parse	jp;
 	FILE			*log_fd;
-	char			*domain, *test_domain, *base_url, *res_ip, *proto = NULL,
+	char			*domain, *testedname, *base_url, *res_ip, *proto = NULL,
 				*domain_part = NULL, *prefix = NULL, *full_url = NULL, *value_str = NULL,
 				err[ZBX_ERR_BUF_SIZE], is_ipv4, rdap_prefix[64];
 	const char		*ip = NULL;
@@ -3880,12 +3892,12 @@ int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	if (10 != request->nparam)
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid number of parameters."));
-		return ret;
+		return SYSINFO_RET_FAIL;
 	}
 
 	/* TLD goes first, then RDAP specific parameters, then TLD options, probe options and global settings */
 	GET_PARAM_EMPTY(domain       , 0 , "TLD");
-	GET_PARAM_EMPTY(test_domain  , 1 , "Test domain");
+	GET_PARAM_EMPTY(testedname   , 1 , "Test domain");
 	GET_PARAM_EMPTY(base_url     , 2 , "RDAP service endpoint");
 	GET_PARAM_UINT (maxredirs    , 3 , "maximal number of redirections allowed");
 	GET_PARAM_UINT (rtt_limit    , 4 , "maximum allowed RTT");
@@ -3899,7 +3911,7 @@ int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	if (NULL == (log_fd = open_item_log(item->host.host, domain, ZBX_RDAP_LOG_PREFIX, err, sizeof(err))))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
-		return ret;
+		return SYSINFO_RET_FAIL;
 	}
 
 	zbx_vector_str_create(&ips);
@@ -3956,24 +3968,23 @@ int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	if (SUCCEED != zbx_split_url(base_url, &proto, &domain_part, &port, &prefix, err, sizeof(err)))
 	{
 		rtt = ZBX_EC_RDAP_INTERNAL_GENERAL;
-		rsm_errf(log_fd, "RDAP \"%s\": %s", base_url, err);
-		goto end;
+		rsm_errf(log_fd, "\"%s\": %s", base_url, err);
+		goto out;
 	}
 
 	/* resolve host to IPs */
 	if (SUCCEED != zbx_resolver_resolve_host(res, domain_part, &ips, ipv_flags, log_fd, &ec_res, err, sizeof(err)))
 	{
 		rtt = zbx_resolver_error_to_RDAP(ec_res);
-		rsm_errf(log_fd, "RDAP \"%s\": %s", base_url, err);
-		goto end;
+		rsm_errf(log_fd, "trying to resolve \"%s\": %s", domain_part, err);
+		goto out;
 	}
 
 	if (0 == ips.values_num)
 	{
 		rtt = ZBX_EC_RDAP_INTERNAL_IP_UNSUP;
-		rsm_errf(log_fd, "RDAP \"%s\": IP address(es) of host \"%s\" are not supported by the Probe",
-				base_url, domain_part);
-		goto end;
+		rsm_errf(log_fd, "IP address(es) of host \"%s\" are not supported on this Probe", domain_part);
+		goto out;
 	}
 
 	/* choose random IP */
@@ -3994,11 +4005,11 @@ int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	if (0 == is_ipv4)
 	{
 		full_url = zbx_dsprintf(full_url, "%s[%s]:%d%s%s/%s", proto, ip, port, prefix, rdap_prefix,
-				test_domain);
+				testedname);
 	}
 	else
 	{
-		full_url = zbx_dsprintf(full_url, "%s%s:%d%s%s/%s", proto, ip, port, prefix, rdap_prefix, test_domain);
+		full_url = zbx_dsprintf(full_url, "%s%s:%d%s%s/%s", proto, ip, port, prefix, rdap_prefix, testedname);
 	}
 
 	rsm_infof(log_fd, "the domain in base URL \"%s\" was resolved to %s, using full URL \"%s\".",
@@ -4028,7 +4039,7 @@ int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 		goto end;
 	}
 
-	if (NULL == value_str || 0 != strcmp(value_str, test_domain))
+	if (NULL == value_str || 0 != strcmp(value_str, testedname))
 	{
 		rtt = ZBX_EC_RDAP_ENAME;
 		rsm_errf(log_fd, "ldhName member doesn't match query in response of \"%s\" (%s)", base_url, ip);
@@ -4044,7 +4055,7 @@ end:
 
 	if (SYSINFO_RET_OK == ret && ZBX_NO_VALUE != rtt)
 	{
-		int		subtest_result = 0;
+		int		subtest_result;
 		struct zbx_json	json;
 
 		switch (zbx_subtest_result(rtt, rtt_limit))
@@ -4056,7 +4067,8 @@ end:
 				subtest_result = 0;	/* down */
 		}
 
-		create_rsm_rdap_json(&json, ip, rtt, subtest_result);
+		create_rsm_rdap_json(&json, ip, rtt, base_url, testedname, subtest_result);
+
 		SET_STR_RESULT(result, zbx_strdup(NULL, json.buffer));
 
 		rsm_infof(log_fd, "%s", json.buffer);

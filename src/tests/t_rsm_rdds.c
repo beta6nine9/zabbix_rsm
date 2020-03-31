@@ -17,10 +17,10 @@ void	zbx_on_exit(int ret)
 
 void	exit_usage(const char *program)
 {
-	fprintf(stderr, "usage: %s -t <tld> -w <whois_server> <[-4] [-6]> [-r <res_ip>] [-p <testprefix>] "
+	fprintf(stderr, "usage: %s -t <tld> -w <testedname43> <[-4] [-6]> [-r <res_ip>] [-p <testprefix>] "
 			"[-m <maxredirs80>] [-g] [-f] [-h]\n", program);
 	fprintf(stderr, "       -t <tld>          TLD to test\n");
-	fprintf(stderr, "       -w <whois_server> WHOIS server to use for RDDS43 test\n");
+	fprintf(stderr, "       -w <testedname43> WHOIS server to use for RDDS43 test\n");
 	fprintf(stderr, "       -4                enable IPv4\n");
 	fprintf(stderr, "       -6                enable IPv6\n");
 	fprintf(stderr, "       -r <res_ip>       IP address of resolver to use (default: %s)\n", DEFAULT_RES_IP);
@@ -39,9 +39,10 @@ void	exit_usage(const char *program)
 
 int	main(int argc, char *argv[])
 {
-	char			err[256], *tld = NULL, *whois_server = NULL, *res_ip = DEFAULT_RES_IP, ipv4_enabled = 0,
+	char			err[256], *tld = NULL, *testedname43 = NULL, *res_ip = DEFAULT_RES_IP, ipv4_enabled = 0,
 				ipv6_enabled = 0, *ip43 = NULL, *ip80 = NULL, *testprefix = DEFAULT_TESTPREFIX,
-				ignore_err = 0, testname[ZBX_HOST_BUF_SIZE], testurl[1024], *answer = NULL;
+				ignore_err = 0, target43[ZBX_HOST_BUF_SIZE] = "", target80[ZBX_HOST_BUF_SIZE] = "",
+				testurl[1024], *answer = NULL;
 	ldns_resolver		*res = NULL;
 	zbx_resolver_error_t	ec_res;
 	int			c, index, i, rtt43 = ZBX_NO_VALUE, rtt80 = ZBX_NO_VALUE, upd43 = ZBX_NO_VALUE,
@@ -62,7 +63,7 @@ int	main(int argc, char *argv[])
 				tld = optarg;
 				break;
 			case 'w':
-				whois_server = optarg;
+				testedname43 = optarg;
 				break;
 			case '4':
 				ipv4_enabled = 1;
@@ -118,7 +119,7 @@ int	main(int argc, char *argv[])
 		exit_usage(argv[0]);
 	}
 
-	if (NULL == whois_server)
+	if (NULL == testedname43)
 	{
 		fprintf(stderr, "WHOIS server [-w] must be specified\n");
 		exit_usage(argv[0]);
@@ -151,18 +152,18 @@ int	main(int argc, char *argv[])
 	}
 
 	if (0 == strcmp(".", tld) || 0 == strcmp("root", tld))
-		zbx_snprintf(testname, sizeof(testname), "%s", testprefix);
+		zbx_snprintf(target43, sizeof(target43), "%s", testprefix);
 	else
-		zbx_snprintf(testname, sizeof(testname), "%s.%s", testprefix, tld);
+		zbx_snprintf(target43, sizeof(target43), "%s.%s", testprefix, tld);
 
 	if (0 != ipv4_enabled)
 		ipv_flags |= ZBX_FLAG_IPV4_ENABLED;
 	if (0 != ipv6_enabled)
 		ipv_flags |= ZBX_FLAG_IPV6_ENABLED;
 
-	if (SUCCEED != zbx_resolver_resolve_host(res, testname, &ips43, ipv_flags, log_fd, &ec_res, err, sizeof(err)))
+	if (SUCCEED != zbx_resolver_resolve_host(res, target43, &ips43, ipv_flags, log_fd, &ec_res, err, sizeof(err)))
 	{
-		rsm_errf(stderr, "RDDS43 \"%s\": %s (%d)", testname, err, zbx_resolver_error_to_RDDS43(ec_res));
+		rsm_errf(stderr, "RDDS43 \"%s\": %s (%d)", target43, err, zbx_resolver_error_to_RDDS43(ec_res));
 		if (0 == ignore_err)
 			goto out;
 	}
@@ -171,7 +172,7 @@ int	main(int argc, char *argv[])
 
 	if (0 == ips43.values_num)
 	{
-		rsm_errf(stderr, "RDDS43 \"%s\": IP address(es) of host not supported by this probe", testname);
+		rsm_errf(stderr, "RDDS43 \"%s\": IP address(es) of host not supported by this probe", target43);
 		if (0 == ignore_err)
 			goto out;
 	}
@@ -185,12 +186,10 @@ int	main(int argc, char *argv[])
 
 	ip80 = ip43;
 
-	zbx_snprintf(testname, sizeof(testname), "%s", whois_server);
-
-	if (SUCCEED != zbx_rdds43_test(testname, ip43, 43, RSM_TCP_TIMEOUT, &answer, &rtt43,
+	if (SUCCEED != zbx_rdds43_test(testedname43, ip43, 43, RSM_TCP_TIMEOUT, &answer, &rtt43,
 				err, sizeof(err)))
 	{
-		rsm_errf(stderr, "RDDS43 of \"%s\" (%s) failed: %s", ip43, testname, err);
+		rsm_errf(stderr, "RDDS43 of \"%s\" (%s) failed: %s", ip43, testedname43, err);
 		if (0 == ignore_err)
 			goto out;
 	}
@@ -216,7 +215,7 @@ int	main(int argc, char *argv[])
 	{
 		rsm_errf(stderr, "no Name Servers found in the output of RDDS43 server \"%s\""
 				" for query \"%s\" (expecting prefix \"%s\")",
-				ip43, testname, DEFAULT_RDDS_NS_STRING);
+				ip43, testedname43, DEFAULT_RDDS_NS_STRING);
 		if (0 == ignore_err)
 			goto out;
 	}
@@ -225,27 +224,28 @@ int	main(int argc, char *argv[])
 		rsm_infof(stdout, "%s %s", DEFAULT_RDDS_NS_STRING, nss.values[i]);
 
 	if (0 == strcmp(".", tld) || 0 == strcmp("root", tld))
-		zbx_snprintf(testname, sizeof(testname), "%s", testprefix);
+		zbx_snprintf(target80, sizeof(target80), "%s", testprefix);
 	else
-		zbx_snprintf(testname, sizeof(testname), "%s.%s", testprefix, tld);
+		zbx_snprintf(target80, sizeof(target80), "%s.%s", testprefix, tld);
 
 	if (is_ip6(ip80) == SUCCEED)
 		zbx_snprintf(testurl, sizeof(testurl), "http://[%s]", ip80);
 	else
 		zbx_snprintf(testurl, sizeof(testurl), "http://%s", ip80);
 
-	rsm_infof(stdout, "RDDS80: host=%s url=%s", testname, testurl);
+	rsm_infof(stdout, "RDDS80: host=%s url=%s", target80, testurl);
 
-	if (SUCCEED != zbx_http_test(testname, testurl, RSM_TCP_TIMEOUT, maxredirs, &ec_http, &rtt80, NULL,
+	if (SUCCEED != zbx_http_test(target80, testurl, RSM_TCP_TIMEOUT, maxredirs, &ec_http, &rtt80, NULL,
 			curl_devnull, curl_flags, err, sizeof(err)))
 	{
 		rtt80 = zbx_http_error_to_RDDS80(ec_http);
-		rsm_errf(stderr, "RDDS80 of \"%s\" (%s) failed: %s (%d)", testname, testurl, err, rtt80);
+		rsm_errf(stderr, "RDDS80 of \"%s\" (%s) failed: %s (%d)", target80, testurl, err, rtt80);
 		if (0 == ignore_err)
 			goto out;
 	}
 
-	create_rsm_rdds_json(&json, ip43, rtt43, upd43, ip80, rtt80, get_rdds_result(rtt43, rtt80, DEFAULT_RTT_LIMIT));
+	create_rsm_rdds_json(&json, ip43, rtt43, upd43, target43, testedname43, ip80, rtt80, target80,
+			get_rdds_result(rtt43, rtt80, DEFAULT_RTT_LIMIT));
 
 	printf("OK (RTT43:%d RTT80:%d)\n", rtt43, rtt80);
 	printf("OK, json: %s\n", json.buffer);

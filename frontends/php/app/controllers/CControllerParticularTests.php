@@ -194,9 +194,9 @@ class CControllerParticularTests extends CController {
 				'preservekeys' => true
 			]);
 
-			$user_macros_filter = [RSM_TLD_RDDS_ENABLED, RSM_TLD_RDDS_43_SERVERS, RSM_TLD_RDDS_80_SERVERS];
+			$user_macros_filter = [RSM_TLD_RDDS_ENABLED];
 			if ($data['type'] == RSM_RDDS || is_RDAP_standalone($test_time_from)) {
-				$user_macros_filter = array_merge($user_macros_filter, [RDAP_BASE_URL, RSM_RDAP_TLD_ENABLED]);
+				$user_macros_filter = array_merge($user_macros_filter, [RSM_RDAP_TLD_ENABLED]);
 			}
 
 			$template_macros = API::UserMacro()->get([
@@ -411,14 +411,12 @@ class CControllerParticularTests extends CController {
 			}
 		}
 
-		/**
-		 * Since here we have obtained a final (historical) macros values, we can also check if there should be
-		 * RDAP base url be displayed.
-		 */
-		if (array_key_exists(RDAP_BASE_URL, $data['tld']['macros'])
-				&& (!array_key_exists(RSM_RDAP_TLD_ENABLED, $data['tld']['macros'])
-					|| $data['tld']['macros'][RSM_RDAP_TLD_ENABLED] != 0)) {
-			$data['rdap_base_url'] = $data['tld']['macros'][RDAP_BASE_URL];
+		if (array_key_exists(RSM_RDAP_TLD_ENABLED, $data['tld']['macros'])
+				&& $data['tld']['macros'][RSM_RDAP_TLD_ENABLED] != 0) {
+			$data['tld_rdap_enabled'] = true;
+		}
+		else {
+			$data['tld_rdap_enabled'] = false;
 		}
 
 		// Get probe status.
@@ -522,6 +520,8 @@ class CControllerParticularTests extends CController {
 			if (!isset($data['tld']['macros'][RSM_RDAP_TLD_ENABLED]) || $data['tld']['macros'][RSM_RDAP_TLD_ENABLED] != 0) {
 				$items_to_check[] = PROBE_RDAP_IP;
 				$items_to_check[] = PROBE_RDAP_RTT;
+				$items_to_check[] = PROBE_RDAP_TARGET;
+				$items_to_check[] = PROBE_RDAP_TESTEDNAME;
 				$probe_item_key[] = 'i.key_ LIKE ('.zbx_dbstr(PROBE_RDAP_ITEM.'%').')';
 			}
 
@@ -539,14 +539,19 @@ class CControllerParticularTests extends CController {
 					&& !is_RDAP_standalone($test_time_from)) {
 				$items_to_check[] = PROBE_RDAP_IP;
 				$items_to_check[] = PROBE_RDAP_RTT;
+				$items_to_check[] = PROBE_RDAP_TARGET;
+				$items_to_check[] = PROBE_RDAP_TESTEDNAME;
 				$probe_item_key[] = 'i.key_ LIKE ('.zbx_dbstr(PROBE_RDAP_ITEM.'%').')';
 			}
 
 			if (!isset($data['tld']['macros'][RSM_TLD_RDDS_ENABLED]) || $data['tld']['macros'][RSM_TLD_RDDS_ENABLED] != 0) {
 				$items_to_check[] = PROBE_RDDS43_IP;
 				$items_to_check[] = PROBE_RDDS43_RTT;
+				$items_to_check[] = PROBE_RDDS43_TARGET;
+				$items_to_check[] = PROBE_RDDS43_TESTEDNAME;
 				$items_to_check[] = PROBE_RDDS80_IP;
 				$items_to_check[] = PROBE_RDDS80_RTT;
+				$items_to_check[] = PROBE_RDDS80_TARGET;
 				$probe_item_key[] = 'i.key_ LIKE ('.zbx_dbstr(PROBE_RDDS_ITEM.'%').')';
 			}
 
@@ -670,13 +675,14 @@ class CControllerParticularTests extends CController {
 						$hosts[$item['hostid']]['value'] = $itemValue['value'];
 					}
 
-					/* get base url from configuration template macro */
-					if (!array_key_exists(RSM_TLD_RDDS_ENABLED, $data['tld']['macros'])
-								|| $data['tld']['macros'][RSM_TLD_RDDS_ENABLED] != 0) {
-						$data['rdds_43_base_url'] = $data['tld']['macros'][RSM_TLD_RDDS_43_SERVERS];
-						$data['rdds_80_base_url'] = $data['tld']['macros'][RSM_TLD_RDDS_80_SERVERS];
+					// Set if RDDS is enabled on a TLD level
+					if (array_key_exists(RSM_TLD_RDDS_ENABLED, $data['tld']['macros'])
+							&& $data['tld']['macros'][RSM_TLD_RDDS_ENABLED] != 0) {
+						$data['tld_rdds_enabled'] = true;
 					}
-
+					else {
+						$data['tld_rdds_enabled'] = false;
+					}
 
 					// Count result for table bottom summary rows.
 					if ($item['key_'] == PROBE_RDAP_RTT && 0 > $itemValue['value']) {

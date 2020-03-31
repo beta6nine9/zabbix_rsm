@@ -2731,7 +2731,7 @@ sub process_slv_avail_cycles($$$$$$$$$)
 	my $probes_ref = shift;
 	my $delay = shift;
 	my $cfg_keys_in = shift;	# if input key(s) is/are known
-	my $cfg_keys_in_cb = shift;	# if input key(s) is/are unknown (DNSSEC, RDDS), call this function go get them
+	my $cfg_keys_in_cb = shift;	# if input key(s) is/are unknown (DNSSEC, RDDS), call this function to get them
 	my $cfg_key_out = shift;
 	my $cfg_minonline = shift;
 	my $check_probe_values_cb = shift;

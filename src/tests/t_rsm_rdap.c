@@ -11,10 +11,10 @@ void	zbx_on_exit(int ret)
 
 void	exit_usage(const char *program)
 {
-	fprintf(stderr, "usage: %s -r <ip> -u <base_url> -d <test_domain> [-h]\n", program);
+	fprintf(stderr, "usage: %s -r <ip> -u <base_url> -d <testedname> [-h]\n", program);
 	fprintf(stderr, "       -r <res_ip>       local resolver IP\n");
 	fprintf(stderr, "       -u <base_url>     RDAP service endpoint\n");
-	fprintf(stderr, "       -d <test_domain>  testing domain to make RDAP query\n");
+	fprintf(stderr, "       -d <testedname>   domain name to use in RDAP query\n");
 	fprintf(stderr, "       -h                show this message and quit\n");
 	exit(EXIT_FAILURE);
 }
@@ -29,8 +29,8 @@ int	main(int argc, char *argv[])
 				ipv6_enabled = 1, maxredirs = DEFAULT_MAXREDIRS, ipv_flags = 0, curl_flags = 0;
 	struct zbx_json_parse	jp;
 	ldns_resolver		*res = NULL;
-	char			*test_domain, *base_url, is_ipv4,  rdap_prefix[64], *res_ip = NULL, *proto = NULL,
-				*domain_part = NULL, *prefix = NULL, *full_url = NULL, *value_str = NULL,
+	char			*testedname, *base_url, is_ipv4,  rdap_prefix[64], *res_ip = NULL, *proto = NULL,
+				*target = NULL, *prefix = NULL, *full_url = NULL, *value_str = NULL,
 				err[ZBX_ERR_BUF_SIZE];
 	const char		*ip = NULL;
 	size_t			value_alloc = 0;
@@ -48,7 +48,7 @@ int	main(int argc, char *argv[])
 				base_url = optarg;
 				break;
 			case 'd':
-				test_domain = optarg;
+				testedname = optarg;
 				break;
 			case 'h':
 				exit_usage(argv[0]);
@@ -81,13 +81,13 @@ int	main(int argc, char *argv[])
 		exit_usage(argv[0]);
 	}
 
-	if (NULL == test_domain || '\0' == *test_domain)
+	if (NULL == testedname || '\0' == *testedname)
 	{
 		fprintf(stderr, "Test domain [-d] must be specified\n");
 		exit_usage(argv[0]);
 	}
 
-	printf("IP: %s, URL: %s , Test domain: %s\n", res_ip, base_url, test_domain);
+	printf("IP: %s, URL: %s , Test domain: %s\n", res_ip, base_url, testedname);
 
 	if (SUCCEED != zbx_create_resolver(&res, "resolver", res_ip, RSM_TCP, ipv4_enabled, ipv6_enabled,
 			RESOLVER_EXTRAS_DNSSEC, RSM_TCP_TIMEOUT, RSM_TCP_RETRY, stderr, err, sizeof(err)))
@@ -114,7 +114,7 @@ int	main(int argc, char *argv[])
 	ipv_flags |= ZBX_FLAG_IPV4_ENABLED;
 	ipv_flags |= ZBX_FLAG_IPV6_ENABLED;
 
-	if (SUCCEED != zbx_split_url(base_url, &proto, &domain_part, &port, &prefix, err, sizeof(err)))
+	if (SUCCEED != zbx_split_url(base_url, &proto, &target, &port, &prefix, err, sizeof(err)))
 	{
 		rtt = ZBX_EC_RDAP_INTERNAL_GENERAL;
 		rsm_errf(stderr, "RDAP \"%s\": %s", base_url, err);
@@ -122,7 +122,7 @@ int	main(int argc, char *argv[])
 	}
 
 	/* resolve host to IPs */
-	if (SUCCEED != zbx_resolver_resolve_host(res, domain_part, &ips, ipv_flags, stderr, &ec_res, err, sizeof(err)))
+	if (SUCCEED != zbx_resolver_resolve_host(res, target, &ips, ipv_flags, stderr, &ec_res, err, sizeof(err)))
 	{
 		rtt = zbx_resolver_error_to_RDAP(ec_res);
 		rsm_errf(stderr, "RDAP \"%s\": %s", base_url, err);
@@ -133,7 +133,7 @@ int	main(int argc, char *argv[])
 	{
 		rtt = ZBX_EC_RDAP_INTERNAL_IP_UNSUP;
 		rsm_errf(stderr, "RDAP \"%s\": IP address(es) of host \"%s\" are not supported by the Probe",
-				base_url, domain_part);
+				base_url, target);
 		goto out;
 	}
 
@@ -143,7 +143,7 @@ int	main(int argc, char *argv[])
 	if (SUCCEED != zbx_validate_ip(ip, ipv4_enabled, ipv6_enabled, NULL, &is_ipv4))
 	{
 		rtt = ZBX_EC_RDAP_INTERNAL_GENERAL;
-		rsm_errf(stderr, "internal error, selected unsupported IP of \"%s\": \"%s\"", domain_part, ip);
+		rsm_errf(stderr, "internal error, selected unsupported IP of \"%s\": \"%s\"", target, ip);
 		goto out;
 	}
 
@@ -155,11 +155,11 @@ int	main(int argc, char *argv[])
 	if (0 == is_ipv4)
 	{
 		full_url = zbx_dsprintf(full_url, "%s[%s]:%d%s%s/%s", proto, ip, port, prefix, rdap_prefix,
-				test_domain);
+				testedname);
 	}
 	else
 	{
-		full_url = zbx_dsprintf(full_url, "%s%s:%d%s%s/%s", proto, ip, port, prefix, rdap_prefix, test_domain);
+		full_url = zbx_dsprintf(full_url, "%s%s:%d%s%s/%s", proto, ip, port, prefix, rdap_prefix, testedname);
 	}
 
 	/* base_url example: http://whois.example */
@@ -168,7 +168,7 @@ int	main(int argc, char *argv[])
 	rsm_infof(stderr, "the domain in base URL \"%s\" was resolved to %s, using full URL \"%s\".",
 			base_url, ip, full_url);
 
-	if (SUCCEED != zbx_http_test(domain_part, full_url, RSM_TCP_TIMEOUT, maxredirs, &ec_http, &rtt, &data,
+	if (SUCCEED != zbx_http_test(target, full_url, RSM_TCP_TIMEOUT, maxredirs, &ec_http, &rtt, &data,
 			curl_memory, curl_flags, err, sizeof(err)))
 	{
 		rtt = zbx_http_error_to_RDAP(ec_http);
@@ -192,7 +192,7 @@ int	main(int argc, char *argv[])
 		goto out;
 	}
 
-	if (NULL == value_str || 0 != strcmp(value_str, test_domain))
+	if (NULL == value_str || 0 != strcmp(value_str, testedname))
 	{
 		rtt = ZBX_EC_RDAP_ENAME;
 		rsm_errf(stderr, "ldhName member doesn't match query in response of \"%s\" (%s)", base_url, ip);
@@ -215,8 +215,10 @@ out:
 				subtest_result = 0;
 		}
 
-		create_rsm_rdap_json(&json, ip, rtt, subtest_result);
+		create_rsm_rdap_json(&json, ip, rtt, target, testedname, subtest_result);
+
 		printf("OK, json: %s\n", json.buffer);
+
 		zbx_json_free(&json);
 	}
 
@@ -229,7 +231,7 @@ out:
 	}
 
 	zbx_free(proto);
-	zbx_free(domain_part);
+	zbx_free(target);
 	zbx_free(prefix);
 	zbx_free(full_url);
 	zbx_free(value_str);
