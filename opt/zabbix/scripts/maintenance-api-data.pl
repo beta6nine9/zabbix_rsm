@@ -47,10 +47,6 @@ if ($OPTS{'ignore-file'})
 	}
 
 	map {$ignore{$_} = 1;} (split('\n', $buf));
-
-	use Data::Dumper;
-
-	print(Dumper(\%ignore));
 }
 
 my $error = rsm_targets_prepare(AH_SLA_API_TMP_DIR, AH_SLA_API_DIR);
