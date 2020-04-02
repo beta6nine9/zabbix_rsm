@@ -4719,7 +4719,14 @@ sub __fp_process_incident($$$$$$$)
 		my $recalculate_from = cycle_start($incident_from, $delay);
 		my $recalculate_till = cycle_start(get_end_of_month($incident_till), $delay) if (defined($incident_till));
 
-		my $lastclock = db_select_value("select clock from lastvalue where itemid=?", [$itemid_downtime]);
+		my $lastclock_rows = db_select("select clock from lastvalue where itemid=?", [$itemid_downtime]);
+		if (!@{$lastclock_rows})
+		{
+			dbg("skipping incident #$eventid for item #$itemid_downtime (new item without history)");
+			next;
+		}
+
+		my $lastclock = $lastclock_rows->[0][0];
 		$recalculate_till = defined($recalculate_till) ? min($recalculate_till, $lastclock) : $lastclock;
 
 		dbg("eventid          - ", $eventid);
