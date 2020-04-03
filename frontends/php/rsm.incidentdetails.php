@@ -175,6 +175,8 @@ $mainEvent = API::Event()->get(array(
 if ($mainEvent) {
 	$mainEvent = reset($mainEvent);
 
+	$data['is_rdap_standalone'] = is_RDAP_standalone($mainEvent['clock']);
+
 	// get host with calculated items
 	$rsm = API::Host()->get(array(
 		'output' => array('hostid'),
