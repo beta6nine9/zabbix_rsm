@@ -21,6 +21,7 @@ use RSM;
 use Pusher qw(push_to_trapper);
 use Fcntl qw(:flock);
 use List::Util qw(min max);
+use Devel::StackTrace;
 
 use constant E_ID_NONEXIST => -2;
 use constant E_ID_MULTIPLE => -3;
@@ -3863,6 +3864,11 @@ sub slv_exit
 	my $rv = shift;
 
 	finalize_process($rv);
+
+	if ($rv != SUCCESS)
+	{
+		map { __log('err', $_) } split("\n", Devel::StackTrace->new()->as_string());
+	}
 
 	exit($rv);
 }
