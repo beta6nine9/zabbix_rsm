@@ -2114,13 +2114,15 @@ void	process_mass_data(zbx_socket_t *sock, zbx_uint64_t proxy_hostid, AGENT_VALU
 			continue;
 
 		/* RSM specifics: ignore history data from proxy if it's older than 1.5 minutes */
-		if (0 != proxy_hostid && now - values[i].ts.sec > 90 && (
+		if (0 != proxy_hostid && 90 < now - values[i].ts.sec && (
 				0 == strncmp(items[i].key_orig, "rsm", ZBX_CONST_STRLEN("rsm")) ||
 				0 == strncmp(items[i].key_orig, "rdap", ZBX_CONST_STRLEN("rdap")) ||
 				0 == strncmp(items[i].key_orig, "resolver", ZBX_CONST_STRLEN("resolver"))))
 		{
-			zabbix_log(LOG_LEVEL_WARNING, "skipping [%s] value [%s] bacause it is %d seconds old",
-					items[i].key_orig, values[i].value, now - values[i].ts.sec);
+			zabbix_log(LOG_LEVEL_WARNING,
+					"skipping [" ZBX_FS_UI64 "; %s; %s] value [%s] bacause it is %d seconds old",
+					items[i].itemid, items[i].host.host, items[i].key_orig,
+					values[i].value, now - values[i].ts.sec);
 
 			continue;
 		}
