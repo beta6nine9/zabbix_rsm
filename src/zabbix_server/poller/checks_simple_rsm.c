@@ -3691,7 +3691,7 @@ int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 		goto out;
 	}
 
-	if (SUCCEED != zbx_conf_str(&item->host.hostid, ZBX_MACRO_RDDS_TEST_DOMAIN, &test_domain, err, sizeof(err)))
+	if (SUCCEED != zbx_conf_str(&item->host.hostid, ZBX_MACRO_RDDS43_TEST_DOMAIN, &test_domain, err, sizeof(err)))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
 		goto out;

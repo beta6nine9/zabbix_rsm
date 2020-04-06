@@ -5396,7 +5396,7 @@ static int	DBpatch_3000509(void)
 			" hostmacro"											\
 			" left join hostmacro as hostmacro2 on hostmacro2.hostid=hostmacro.hostid"			\
 		" set"													\
-			" hostmacro.macro='{$RSM.RDDS.TEST.DOMAIN}',"							\
+			" hostmacro.macro='{$RSM.RDDS43.TEST.DOMAIN}',"							\
 			"hostmacro.value=concat(hostmacro.value,'.',hostmacro2.value)"					\
 		" where"												\
 			" hostmacro.macro='{$RSM.RDDS.TESTPREFIX}' and"							\
@@ -5533,6 +5533,6 @@ DBPATCH_ADD(3000505, 0, 0)	/* add "rdap.target" and "rdap.testedname" items to "
 DBPATCH_ADD(3000506, 0, 0)	/* add "rsm.rdds.43.target", "rsm.rdds.43.testedname" and "rsm.rdds.80.target" items to "Template <RSMHOST>" templates where needed */
 DBPATCH_ADD(3000507, 0, 0)	/* add "rdap.target" and "rdap.testedname" items to hosts that use "Template RDAP" template */
 DBPATCH_ADD(3000508, 0, 0)	/* add "rsm.rdds.43.target", "rsm.rdds.43.testedname" and "rsm.rdds.80.target" items to hosts that use "Template <RSMHOST>" */
-DBPATCH_ADD(3000509, 0, 0)	/* rename {$RSM.RDDS.TESTPREFIX} to {$RSM.RDDS.TEST.DOMAIN} */
+DBPATCH_ADD(3000509, 0, 0)	/* rename {$RSM.RDDS.TESTPREFIX} to {$RSM.RDDS43.TEST.DOMAIN} */
 
 DBPATCH_END()
