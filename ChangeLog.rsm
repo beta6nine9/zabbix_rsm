@@ -21,7 +21,7 @@ New features:
 --------------------------------------------------------------------------------
 Changes for rsm1.4.0rc2
 
-Bug fixes
+Bug fixes:
 ..F....... [514] fixed unconsistent display of host technical and visual name in different pages; removed unused file (miks)
 ....I..... [549] fixed type of "Agent availability" item (asitals)
 
@@ -29,10 +29,10 @@ Bug fixes
 Changes for rsm1.4.0rc1
 
 New features:
-..F.I..... [510] added support for Registrar RDDS Monitoring (dimir, yurii, asitals, miks, gcalenko)
+..F.I..... [510] added support for Registrar RDDS Monitoring (asitals, dimir, gcalenko, miks, yurii)
 
 --------------------------------------------------------------------------------
-Changes for rsm1.3.0rc16
+Changes for rsm1.3.0
 
 Bug fixes:
 .......PS. [649] fixed incorrect handling of zero RTT during RDDS43 test (dimir)
@@ -157,7 +157,7 @@ Bug fixes:
 Changes for rsm1.3.0rc1
 
 New features:
-..F.I..... [170] added support for Compliance SLA monitoring (dimir, yurii, asitals, miks, gcalenko)
+..F.I..... [170] added support for Compliance SLA monitoring (asitals, dimir, gcalenko, miks, yurii)
 
 --------------------------------------------------------------------------------
 Changes for rsm1.2.15

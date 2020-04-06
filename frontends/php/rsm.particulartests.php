@@ -195,7 +195,7 @@ if ($data['host'] && $data['time'] && $data['slvItemId'] && $data['type'] !== nu
 
 		$user_macros_filter = [RSM_TLD_RDDS_ENABLED];
 		if ($data['type'] == RSM_RDDS || is_RDAP_standalone($test_time_from)) {
-			$user_macros_filter = array_merge($user_macros_filter, [RDAP_BASE_URL, RSM_RDAP_TLD_ENABLED]);
+			$user_macros_filter = array_merge($user_macros_filter, [RSM_RDAP_TLD_ENABLED]);
 		}
 
 		$template_macros = API::UserMacro()->get([
@@ -416,10 +416,12 @@ if ($data['host'] && $data['time'] && $data['slvItemId'] && $data['type'] !== nu
 	 * Since here we have obtained a final (historical) macros values, we can also check if there should be
 	 * RDAP base url be displayed.
 	 */
-	if (array_key_exists(RDAP_BASE_URL, $data['tld']['macros'])
-			&& (!array_key_exists(RSM_RDAP_TLD_ENABLED, $data['tld']['macros'])
-				|| $data['tld']['macros'][RSM_RDAP_TLD_ENABLED] != 0)) {
-		$data['rdap_base_url'] = $data['tld']['macros'][RDAP_BASE_URL];
+	if (array_key_exists(RSM_RDAP_TLD_ENABLED, $data['tld']['macros'])
+			&& $data['tld']['macros'][RSM_RDAP_TLD_ENABLED] != 0) {
+		$data['tld_rdap_enabled'] = true;
+	}
+	else {
+		$data['tld_rdap_enabled'] = false;
 	}
 
 	// Get probe status.
@@ -523,6 +525,8 @@ if ($data['host'] && $data['time'] && $data['slvItemId'] && $data['type'] !== nu
 		if (!isset($data['tld']['macros'][RSM_RDAP_TLD_ENABLED]) || $data['tld']['macros'][RSM_RDAP_TLD_ENABLED] != 0) {
 			$items_to_check[] = PROBE_RDAP_IP;
 			$items_to_check[] = PROBE_RDAP_RTT;
+			$items_to_check[] = PROBE_RDAP_TARGET;
+			$items_to_check[] = PROBE_RDAP_TESTEDNAME;
 			$probeItemKey[] = 'i.key_ LIKE ('.zbx_dbstr(PROBE_RDAP_ITEM.'%').')';
 		}
 
@@ -540,14 +544,19 @@ if ($data['host'] && $data['time'] && $data['slvItemId'] && $data['type'] !== nu
 				&& !is_RDAP_standalone($test_time_from)) {
 			$items_to_check[] = PROBE_RDAP_IP;
 			$items_to_check[] = PROBE_RDAP_RTT;
+			$items_to_check[] = PROBE_RDAP_TARGET;
+			$items_to_check[] = PROBE_RDAP_TESTEDNAME;
 			$probeItemKey[] = 'i.key_ LIKE ('.zbx_dbstr(PROBE_RDAP_ITEM.'%').')';
 		}
 
 		if (!isset($data['tld']['macros'][RSM_TLD_RDDS_ENABLED]) || $data['tld']['macros'][RSM_TLD_RDDS_ENABLED] != 0) {
 			$items_to_check[] = PROBE_RDDS43_IP;
 			$items_to_check[] = PROBE_RDDS43_RTT;
+			$items_to_check[] = PROBE_RDDS43_TARGET;
+			$items_to_check[] = PROBE_RDDS43_TESTEDNAME;
 			$items_to_check[] = PROBE_RDDS80_IP;
 			$items_to_check[] = PROBE_RDDS80_RTT;
+			$items_to_check[] = PROBE_RDDS80_TARGET;
 			$probeItemKey[] = 'i.key_ LIKE ('.zbx_dbstr(PROBE_RDDS_ITEM.'%').')';
 		}
 
@@ -638,6 +647,12 @@ if ($data['host'] && $data['time'] && $data['slvItemId'] && $data['type'] !== nu
 						];
 					}
 				}
+				elseif ($item['key_'] == PROBE_RDDS43_TARGET) {
+					$hosts[$item['hostid']]['rdds43']['target'] = $itemValue['value'];
+				}
+				elseif ($item['key_'] == PROBE_RDDS43_TESTEDNAME) {
+					$hosts[$item['hostid']]['rdds43']['testedname'] = $itemValue['value'];
+				}
 				elseif ($item['key_'] == PROBE_RDDS80_IP) {
 					$hosts[$item['hostid']]['rdds80']['ip'] = $itemValue['value'];
 				}
@@ -650,6 +665,9 @@ if ($data['host'] && $data['time'] && $data['slvItemId'] && $data['type'] !== nu
 							'value' => $rtt_value
 						];
 					}
+				}
+				elseif ($item['key_'] == PROBE_RDDS80_TARGET) {
+					$hosts[$item['hostid']]['rdds80']['target'] = $itemValue['value'];
 				}
 				elseif ($item['key_'] == PROBE_RDAP_IP) {
 					$hosts[$item['hostid']]['rdap']['ip'] = $itemValue['value'];
@@ -668,16 +686,22 @@ if ($data['host'] && $data['time'] && $data['slvItemId'] && $data['type'] !== nu
 					$hosts[$item['hostid']]['value_rdap'] = $itemValue['value'];
 				}
 				elseif (substr($item['key_'], 0, strlen(PROBE_RDDS_ITEM)) === PROBE_RDDS_ITEM) {
-					if (!array_key_exists(RSM_TLD_RDDS_ENABLED, $data['tld']['macros'])
-							|| $data['tld']['macros'][RSM_TLD_RDDS_ENABLED] != 0) {
-						preg_match('/^[^\[]+\[([^\]]+)]$/', $item['key_'], $matches);
-						list($tld_macros, $rdds_43, $rdds_80) = explode(',', $matches[1]);
-
-						$data['rdds_43_base_url'] = trim($rdds_43, '"');
-						$data['rdds_80_base_url'] = trim($rdds_80, '"');
-					}
-
 					$hosts[$item['hostid']]['value'] = $itemValue['value'];
+				}
+				elseif ($item['key_'] == PROBE_RDAP_TARGET) {
+					$hosts[$item['hostid']]['rdap']['target'] = $itemValue['value'];
+				}
+				elseif ($item['key_'] == PROBE_RDAP_TESTEDNAME) {
+					$hosts[$item['hostid']]['rdap']['testedname'] = $itemValue['value'];
+				}
+
+				// Set if RDDS is enabled on a TLD level
+				if (array_key_exists(RSM_TLD_RDDS_ENABLED, $data['tld']['macros'])
+						&& $data['tld']['macros'][RSM_TLD_RDDS_ENABLED] != 0) {
+					$data['tld_rdds_enabled'] = true;
+				}
+				else {
+					$data['tld_rdds_enabled'] = false;
 				}
 
 				// Count result for table bottom summary rows.

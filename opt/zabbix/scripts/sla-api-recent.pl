@@ -737,7 +737,7 @@ sub get_history_by_itemid($$$)
 	# we need previous value to have at the time of @timestamp_from
 	my $rows_ref = db_select("select delay from items where itemid=$itemid");
 
-	$timestamp_from -= $rows_ref->[0]->[0];
+	$timestamp_from -= convert_suffixed_number($rows_ref->[0]->[0]);
 
 	return db_select(
 			"select clock,value" .
@@ -937,10 +937,23 @@ sub get_lastvalues_from_db($$$)
 			next if (substr($key, 0, length("rsm.conf")) eq "rsm.conf");
 			next if (substr($key, 0, length("rsm.probe")) eq "rsm.probe");
 
+			# SLA API version 1: start
+			next if (substr($key, 0, length("rsm.rdds.43.target")) eq "rsm.rdds.43.target");
+			next if (substr($key, 0, length("rsm.rdds.43.testedname")) eq "rsm.rdds.43.testedname");
+			next if (substr($key, 0, length("rsm.rdds.80.target")) eq "rsm.rdds.80.target");
+			if (!is_rdap_standalone($clock))
+			{
+				next if (substr($key, 0, length("rdap.target")) eq "rdap.target");
+				next if (substr($key, 0, length("rdap.testedname")) eq "rdap.testedname");
+			}
+			# SLA API version 1: end
+
 			next unless (substr($key, 0, length("rsm.")) eq "rsm." ||
 				substr($key, 0, length("rdap[")) eq "rdap[" ||
 				substr($key, 0, length("rdap.ip")) eq "rdap.ip" ||
-				substr($key, 0, length("rdap.rtt")) eq "rdap.rtt");
+				substr($key, 0, length("rdap.rtt")) eq "rdap.rtt" ||
+				substr($key, 0, length("rdap.target")) eq "rdap.target" ||
+				substr($key, 0, length("rdap.testedname")) eq "rdap.testedname");
 
 			(undef, $probe) = split(" ", $host, 2);
 
@@ -1002,7 +1015,10 @@ sub fill_test_data($$$$)
 
 			my $metric = {
 				'testDateTime'	=> int($src_metric_ref->{'clock'}),
-				'targetIP'	=> $src_metric_ref->{'ip'}
+				'targetIP'	=> $src_metric_ref->{'ip'},
+				# SLA API version 1: start
+				#'testedName'	=> $src_metric_ref->{'testedName'},
+				# SLA API version 1: end
 			};
 
 			my $rtt = $src_metric_ref->{'rtt'};
@@ -1130,6 +1146,155 @@ sub probe_online_at($$)
 	return $probe_statuses{$probe}{'values'}{$clock};
 }
 
+#
+# Use clock as unique identifier of the metric set.
+#
+# {CLOCK}->{INTERFACE}->{"ip"}
+# {CLOCK}->{INTERFACE}->{"rtt"}
+# {CLOCK}->{INTERFACE}->{"target"}
+# {CLOCK}->{INTERFACE}->{"testedName"}
+#
+sub get_probe_results($$$$$$)
+{
+	my $service = shift;
+	my $itemids_float = shift;
+	my $itemids_str = shift;
+	my $probe_data = shift;
+	my $from = shift;
+	my $till = shift;
+
+	my $probe_results;
+
+	#
+	# Fetch RTT (Float) values (on Probe level).
+	#
+	# Note, for DNS service we will also collect target (Name Server) and IP
+	# because these are provided in RTT items, e. g.:
+	#
+	# rsm.dns.udp.rtt["ns1.example.com",1.2.3.4]
+	#
+	# For other services the IPs are located in separate items which we collect on the next run.
+	#
+
+	my $rows_ref = db_select(
+		"select itemid,value,clock".
+		" from " . history_table(ITEM_VALUE_TYPE_FLOAT).
+		" where itemid in (" . join(',', @{$itemids_float}) . ")".
+			" and " . sql_time_condition($from, $till)
+	);
+
+	foreach my $row_ref (@{$rows_ref})
+	{
+		my $itemid = $row_ref->[0];
+		my $value = $row_ref->[1];
+		my $clock = $row_ref->[2];
+
+		my $i = $probe_data->{$itemid};
+
+		my $interface;
+
+		if ($service eq 'dnssec')
+		{
+			$interface = AH_INTERFACE_DNSSEC;
+		}
+		else
+		{
+			$interface = ah_get_interface($i->{'key'});
+		}
+
+		$probe_results->{$clock}{$interface}{'rtt'} = $value;
+
+		if (substr($i->{'key'}, 0, length("rsm.dns.udp.rtt")) eq "rsm.dns.udp.rtt")
+		{
+			my ($target, $ip) = split(',', get_nsip_from_key($i->{'key'}));
+
+			$probe_results->{$clock}{$interface}{'target'} = $target;
+			$probe_results->{$clock}{$interface}{'ip'} = $ip;
+		}
+		# SLA API version 1: start
+		else
+		{
+			$probe_results->{$clock}{$interface}{'target'} = TARGET_PLACEHOLDER;
+		}
+		# SLA API version 1: end
+	}
+
+	#
+	# Fetch String values (IP, target, testedname) for non-DNS tests.
+	#
+	# Note, this is because only for non-DNS services there are special items like:
+	#
+	# rsm.rdds.43.ip
+	#
+
+	$rows_ref = db_select(
+		"select itemid,value,clock".
+		" from " . history_table(ITEM_VALUE_TYPE_STR).
+		" where itemid in (" . join(',', @{$itemids_str}) . ")".
+			" and " . sql_time_condition($from, $till)
+	);
+
+	foreach my $row_ref (@{$rows_ref})
+	{
+		my $itemid = $row_ref->[0];
+		my $value = $row_ref->[1];
+		my $clock = $row_ref->[2];
+
+		my $i = $probe_data->{$itemid};
+
+		my ($interface, $field);
+
+		if (substr($i->{'key'}, 0, length("rsm.rdds.43.ip")) eq 'rsm.rdds.43.ip')
+		{
+			$interface = AH_INTERFACE_RDDS43;
+			$field = 'ip';
+		}
+		elsif (substr($i->{'key'}, 0, length("rsm.rdds.43.target")) eq 'rsm.rdds.43.target')
+		{
+			$interface = AH_INTERFACE_RDDS43;
+			$field = 'target';
+		}
+		elsif (substr($i->{'key'}, 0, length("rsm.rdds.43.testedname")) eq 'rsm.rdds.43.testedname')
+		{
+			$interface = AH_INTERFACE_RDDS43;
+			$field = 'testedName';
+		}
+		elsif (substr($i->{'key'}, 0, length("rsm.rdds.80.ip")) eq 'rsm.rdds.80.ip')
+		{
+			$interface = AH_INTERFACE_RDDS80;
+			$field = 'ip';
+		}
+		elsif (substr($i->{'key'}, 0, length("rsm.rdds.80.target")) eq 'rsm.rdds.80.target')
+		{
+			$interface = AH_INTERFACE_RDDS80;
+			$field = 'target';
+		}
+		elsif (substr($i->{'key'}, 0, length("rdap.ip")) eq 'rdap.ip')
+		{
+			$interface = AH_INTERFACE_RDAP;
+			$field = 'ip';
+		}
+		elsif (substr($i->{'key'}, 0, length("rdap.target")) eq 'rdap.target')
+		{
+			$interface = AH_INTERFACE_RDAP;
+			$field = 'target';
+		}
+		elsif (substr($i->{'key'}, 0, length("rdap.testedname")) eq 'rdap.testedname')
+		{
+			$interface = AH_INTERFACE_RDAP;
+			$field = 'testedName';
+		}
+		else
+		{
+			fail("unknown item key: ", $i->{'key'});
+		}
+
+		$probe_results->{$clock}{$interface}{$field} = $value;
+	}
+
+	return $probe_results;
+}
+
 sub calculate_cycle($$$$$$$$$)
 {
 	$tld = shift;		# set globally
@@ -1191,6 +1356,8 @@ sub calculate_cycle($$$$$$$$$)
 		} (keys(%{$probes_data->{$probe}}));
 
 		next if (@itemids_uint == 0);
+		next if (@itemids_float == 0);
+		next if (@itemids_str == 0);
 
 		#
 		# Fetch availability (Integer) values (on a TLD level and Probe level):
@@ -1396,133 +1563,33 @@ sub calculate_cycle($$$$$$$$$)
 
 		$probes_with_results++;
 
-		next if (@itemids_float == 0);
-
-		#
-		# Fetch RTT (Float) values (on Probe level).
-		#
-		# Note, for DNS service we will also collect target (Name Server) and IP
-		# because these are provided in RTT items, e. g.:
-		#
-		# rsm.dns.udp.rtt["ns1.example.com",1.2.3.4]
-		#
-		# For other services the IPs are located in separate items which we collect on the next run.
-		#
-
-		$rows_ref = db_select(
-			"select itemid,value,clock".
-			" from " . history_table(ITEM_VALUE_TYPE_FLOAT).
-			" where itemid in (" . join(',', @itemids_float) . ")".
-				" and " . sql_time_condition($from, $till)
+		my $probe_results = get_probe_results(
+			$service,
+			\@itemids_float,
+			\@itemids_str,
+			$probes_data->{$probe},
+			$from,
+			$till
 		);
 
-		# for convenience convert the data to format:
-		#
-		# {
-		#     ITEMID => [
-		#         {
-		#             'value' => value (float: RTT),
-		#             'clock' => clock
-		#         }
-		#     ]
-		# }
-		%values = ();
-
-		map {push(@{$values{$_->[0]}}, {'value' => int($_->[1]), 'clock' => $_->[2]})} (@{$rows_ref});
-
-		foreach my $itemid (keys(%values))
+		foreach my $clock (keys(%{$probe_results}))
 		{
-			my $i = $probes_data->{$probe}{$itemid};
-
-			foreach my $value_ref (@{$values{$itemid}})
+			foreach my $interface (keys(%{$probe_results->{$clock}}))
 			{
-				my $interface;
+				my $target = $probe_results->{$clock}{$interface}{'target'};
 
-				if ($service eq 'dnssec')
-				{
-					$interface = AH_INTERFACE_DNSSEC;
-				}
-				else
-				{
-					$interface = ah_get_interface($i->{'key'});
-				}
+				my $h = {
+					'rtt'        => $probe_results->{$clock}{$interface}{'rtt'},
+					'ip'         => $probe_results->{$clock}{$interface}{'ip'},
+					'clock'      => $clock,
+				};
 
-				my ($target, $ip);
-				if (substr($i->{'key'}, 0, length("rsm.dns.udp.rtt")) eq "rsm.dns.udp.rtt")
+				if (exists($probe_results->{$clock}{$interface}{'testedName'}))
 				{
-					($target, $ip) = split(',', get_nsip_from_key($i->{'key'}));
-				}
-				else
-				{
-					# for non-DNS service "target" is NULL, but we
-					# can't use it as hash key so we use placeholder
-					$target = TARGET_PLACEHOLDER;
+					$h->{'testedName'} = $probe_results->{$clock}{$interface}{'testedName'};
 				}
 
-				dbg("found $service RTT: ", $value_ref->{'value'}, " IP: ", ($ip // 'UNDEF'), " (target: $target)");
-
-				push(@{$tested_interfaces{$interface}{$probe}{'testData'}{$target}}, {
-						'clock' => $value_ref->{'clock'},
-						'rtt' => $value_ref->{'value'},
-						'ip' => $ip
-					}
-				);
-			}
-		}
-
-		next if (@itemids_str == 0);
-
-		#
-		# Fetch IP (String) values (on Probe level) for non-DNS tests.
-		#
-		# Note, this is because only for non-DNS services there are special items for IP, e. g.:
-		#
-		# rsm.rdds.43.ip
-		#
-		# Note, targets (Name Servers) are unused in non-DNS services.
-		#
-
-		$rows_ref = db_select(
-			"select itemid,value,clock".
-			" from " . history_table(ITEM_VALUE_TYPE_STR).
-			" where itemid in (" . join(',', @itemids_str) . ")".
-				" and " . sql_time_condition($from, $till)
-		);
-
-		# for convenience convert the data to format:
-		#
-		# {
-		#     ITEMID => [
-		#         {
-		#             'value' => value (string: IP),
-		#             'clock' => clock
-		#         }
-		#     ]
-		# }
-		#
-		# Note, we only have non-DNS items here, for DNS we have collected everything above.
-		%values = ();
-
-		map {push(@{$values{$_->[0]}}, {'value' => $_->[1], 'clock' => $_->[2]})} (@{$rows_ref});
-
-		foreach my $itemid (keys(%values))
-		{
-			my $i = $probes_data->{$probe}{$itemid};
-
-			foreach my $value_ref (@{$values{$itemid}})
-			{
-				my $interface = ah_get_interface($i->{'key'});
-
-				# for non-DNS service "target" is NULL, but we
-				# can't use it as hash key so we use placeholder
-				my $target = TARGET_PLACEHOLDER;
-
-				dbg("found $service IP: ", $value_ref->{'value'}, " (target: $target)");
-
-				# For non-DNS we have only 1 metric, thus we refer to the first element of array.
-				# "clock" and "rtt" of this metric were already collected above.
-
-				$tested_interfaces{$interface}{$probe}{'testData'}{$target}->[0]->{'ip'} = $value_ref->{'value'};
+				push(@{$tested_interfaces{$interface}{$probe}{'testData'}{$target}}, $h);
 			}
 		}
 	}

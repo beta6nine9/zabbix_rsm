@@ -167,6 +167,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		recalculate_downtime
 		generate_report
 		set_log_tld unset_log_tld
+		convert_suffixed_number
 		usage);
 
 # configuration, set in set_slv_config()
@@ -2817,7 +2818,7 @@ sub process_slv_avail_cycles($$$$$$$$$)
 	my $probes_ref = shift;
 	my $delay = shift;
 	my $cfg_keys_in = shift;	# if input key(s) is/are known
-	my $cfg_keys_in_cb = shift;	# if input key(s) is/are unknown (DNSSEC, RDDS), call this function go get them
+	my $cfg_keys_in_cb = shift;	# if input key(s) is/are unknown (DNSSEC, RDDS), call this function to get them
 	my $cfg_key_out = shift;
 	my $cfg_minonline = shift;
 	my $check_probe_values_cb = shift;
@@ -4786,6 +4787,30 @@ sub set_log_tld($)
 sub unset_log_tld()
 {
 	undef($tld);
+}
+
+sub convert_suffixed_number($)
+{
+	my $number = shift;
+
+	my %suffix_map = (
+		"K" => 1024,
+		"M" => 1048576,
+		"G" => 1073741824,
+		"T" => 1099511627776,
+		"s" => 1,
+		"m" => 60,
+		"h" => 3600,
+		"d" => 86400,
+		"w" => 7*86400
+		);
+	my $suffix = substr($number, -1);
+
+	return $number unless (exists($suffix_map{$suffix}));
+
+	substr($number, -1) = '';
+
+	return $number * $suffix_map{$suffix};
 }
 
 sub usage
