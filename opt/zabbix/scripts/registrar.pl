@@ -272,6 +272,8 @@ sub list_services($;$)
 		'{$RDAP.TLD.ENABLED}',
 		'{$RDAP.BASE.URL}',
 		'{$RDAP.TEST.DOMAIN}',
+		'rdds43_servers',
+		'rdds80_servers',
 	);
 
 	my %rsmhosts = get_registrar_list();
@@ -285,40 +287,14 @@ sub list_services($;$)
 
 	foreach my $rsmhost (sort(keys(%rsmhosts)))
 	{
-		my @row = ();
-
 		my $services = get_services($server_key, $rsmhost);
+
+		my @row = ();
 
 		push(@row, $rsmhost);                      # Registrar ID
 		push(@row, $rsmhosts{$rsmhost}{'name'});   # Registrar name
 		push(@row, $rsmhosts{$rsmhost}{'family'}); # Registrar family
-		push(@row, map($services->{$_} // "", @columns));
-
-		# obtain rsm.rdds[] item key and extract RDDS(43|80).SERVERS strings
-		my $template = get_template("Template $rsmhost", 0, 0);
-		my $items = get_items_like($template->{'templateid'}, 'rsm.rdds[', true);
-
-		my $key;
-		foreach my $k (keys(%{$items}))	# assuming that only one rsm.rdds[] item is enabled at a time
-		{
-			if ($items->{$k}{'status'} == 0)
-			{
-				$key = $items->{$k}{'key_'};
-				last;
-			}
-		}
-
-		if (!defined($key))
-		{
-			push(@row, ("", ""));
-		}
-		else
-		{
-			$key =~ /,"(\S+)","(\S+)"]/;
-
-			push(@row, "$1");
-			push(@row, "$2");
-		}
+		push(@row, map($services->{$_}, @columns));
 
 		push(@rows, \@row);
 	}
@@ -352,41 +328,35 @@ sub get_registrar_list()
 sub get_services($$)
 {
 	my $server_key = shift;
-	my $tld        = shift;
-
-	my @tld_types = (TLD_TYPE_G, TLD_TYPE_CC, TLD_TYPE_OTHER, TLD_TYPE_TEST);
+	my $rsmhost    = shift;
 
 	my $result;
 
-	my $main_templateid = get_template('Template ' . $tld, false, false);
+	# get template id, list of macros
 
-	pfail("Registrar \"$tld\" does not exist on \"$server_key\"") unless ($main_templateid->{'templateid'});
+	my $template = get_template("Template $rsmhost", true, false);
+	pfail("Registrar \"$rsmhost\" does not exist on \"$server_key\"") unless ($template->{'templateid'});
 
-	my $macros = get_host_macro($main_templateid, undef);
+	# store macros
 
-	my $tld_host = get_host($tld, true);
+	map { $result->{$_->{'macro'}} = $_->{'value'} } @{$template->{'macros'}};
+
+	# get status (enabled, disabled)
+
+	my $tld_host = get_host($rsmhost, true);
 
 	$result->{'status'} = $tld_host->{'status'};
 
-	foreach my $group (@{$tld_host->{'groups'}})
-	{
-		my $name = $group->{'name'};
-		foreach my $tld_type (@tld_types)
-		{
-			if ($name eq $tld_type)
-			{
-				$result->{'tld_type'} = $name;
-				last;
-			}
-		}
-	}
+	# get RDDS43 and RDDS80 servers
 
-	foreach my $macro (@{$macros})
-	{
-		my $name = $macro->{'macro'};
-		my $value = $macro->{'value'};
+	my $items = get_items_like($template->{'templateid'}, 'rsm.rdds[', true);
 
-		$result->{$name} = $value;
+	if (%{$items} && (values(%{$items}))[0]{'status'} == 0)
+	{
+		(values(%{$items}))[0]{'key_'} =~ /,"(\S+)","(\S+)"]/;
+
+		$result->{'rdds43_servers'} = $1;
+		$result->{'rdds80_servers'} = $2;
 	}
 
 	return $result;
