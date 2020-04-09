@@ -156,7 +156,7 @@ $details += [
 	_('Incident type') => $incidentType
 ];
 
-if ($data['type'] == RSM_RDDS) {
+if ($data['type'] == RSM_RDDS && !$data['is_rdap_standalone']) {
 	$details += [
 		_('Current testing interface') => $data['testing_interfaces']
 	];

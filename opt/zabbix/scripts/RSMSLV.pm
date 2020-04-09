@@ -167,6 +167,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		recalculate_downtime
 		generate_report
 		set_log_tld unset_log_tld
+		convert_suffixed_number
 		usage);
 
 # configuration, set in set_slv_config()
@@ -4788,6 +4789,30 @@ sub unset_log_tld()
 	undef($tld);
 }
 
+sub convert_suffixed_number($)
+{
+	my $number = shift;
+
+	my %suffix_map = (
+		"K" => 1024,
+		"M" => 1048576,
+		"G" => 1073741824,
+		"T" => 1099511627776,
+		"s" => 1,
+		"m" => 60,
+		"h" => 3600,
+		"d" => 86400,
+		"w" => 7*86400
+		);
+	my $suffix = substr($number, -1);
+
+	return $number unless (exists($suffix_map{$suffix}));
+
+	substr($number, -1) = '';
+
+	return $number * $suffix_map{$suffix};
+}
+
 sub usage
 {
 	pod2usage(shift);
@@ -4933,7 +4958,14 @@ sub __fp_process_incident($$$$$$$)
 		my $recalculate_from = cycle_start($incident_from, $delay);
 		my $recalculate_till = cycle_start(get_end_of_month($incident_till), $delay) if (defined($incident_till));
 
-		my $lastclock = db_select_value("select clock from lastvalue where itemid=?", [$itemid_downtime]);
+		my $lastclock_rows = db_select("select clock from lastvalue where itemid=?", [$itemid_downtime]);
+		if (!@{$lastclock_rows})
+		{
+			dbg("skipping incident #$eventid for item #$itemid_downtime (new item without history)");
+			next;
+		}
+
+		my $lastclock = $lastclock_rows->[0][0];
 		$recalculate_till = defined($recalculate_till) ? min($recalculate_till, $lastclock) : $lastclock;
 
 		dbg("eventid          - ", $eventid);

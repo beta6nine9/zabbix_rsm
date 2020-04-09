@@ -1380,7 +1380,7 @@ class CSlaReport
 		$conf_string = file_get_contents($conf_file);
 		$conf_string = preg_replace("/^\s*#.*$/m", "", $conf_string);
 
-		$conf = parse_ini_string($conf_string, true);
+		$conf = parse_ini_string($conf_string, true, INI_SCANNER_RAW);
 
 		if ($conf === false)
 		{
