@@ -7,6 +7,7 @@ New features:
 Bug fixes:
 ....I..... [672] fixed handling false positives for newly added items (asitals)
 ....I..... [673] fixed parsing values with "=" symbol in rsm.conf when generating XML reports (asitals)
+........S. [676] improved warning messages about skipping old values from probes (asitals)
 
 --------------------------------------------------------------------------------
 Changes for rsm1.3.0
