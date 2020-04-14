@@ -72,10 +72,10 @@ function main($argv)
 					$report["hostid"],
 					$args["year"],
 					$args["month"],
-					$report["report"]["xml"],
-					$report["report"]["json"],
-					$report["report"]["xml"],
-					$report["report"]["json"],
+					$report["report"]["XML"],
+					$report["report"]["JSON"],
+					$report["report"]["XML"],
+					$report["report"]["JSON"],
 				];
 
 				CSlaReport::dbExecute($sql, $params);
