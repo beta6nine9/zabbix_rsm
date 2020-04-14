@@ -25,7 +25,7 @@ function main($argv)
 
 	printf("Generating reports (server-id: %d, year: %d, month: %d)\n", $args["server_id"], $args["year"], $args["month"]);
 
-	$reports = CSlaReport::generate($args["server_id"], $args["tlds"], $args["year"], $args["month"]);
+	$reports = CSlaReport::generate($args["server_id"], $args["tlds"], $args["year"], $args["month"], ["XML", "JSON"]);
 	if (is_null($reports))
 	{
 		fail(CSlaReport::$error);
@@ -36,7 +36,20 @@ function main($argv)
 		foreach ($reports as $report)
 		{
 			print(str_pad(" {$report["host"]} ", 120, "=", STR_PAD_BOTH) . "\n");
-			echo $report["report"];
+
+			if ($args["xml"] && $args["json"])
+			{
+				echo $report["report"]["XML"];
+				echo $report["report"]["JSON"] . "\n";
+			}
+			elseif ($args["xml"] || !$args["json"])
+			{
+				echo $report["report"]["XML"];
+			}
+			elseif ($args["json"])
+			{
+				echo json_encode(json_decode($report["report"]["JSON"]), JSON_PRETTY_PRINT) . "\n";
+			}
 		}
 		print(str_repeat("=", 120) . "\n");
 	}
@@ -50,7 +63,8 @@ function main($argv)
 
 			CSlaReport::dbBeginTransaction();
 
-			$sql = "insert into sla_reports (hostid, year, month, report) values (?,?,?,?) on duplicate key update report = ?";
+			$sql = "insert into sla_reports (hostid,year,month,report_xml,report_json) values (?,?,?,?,?)" .
+					" on duplicate key update report_xml=?,report_json=?";
 
 			foreach ($reports as $report)
 			{
@@ -58,8 +72,10 @@ function main($argv)
 					$report["hostid"],
 					$args["year"],
 					$args["month"],
-					$report["report"],
-					$report["report"],
+					$report["report"]["xml"],
+					$report["report"]["json"],
+					$report["report"]["xml"],
+					$report["report"]["json"],
 				];
 
 				CSlaReport::dbExecute($sql, $params);
@@ -98,6 +114,8 @@ function parseArgs($argv)
 {
 	$args = [
 		"dry_run"   => false,
+		"xml"       => false,
+		"json"      => false,
 		"server_id" => null,
 		"tlds"      => [],
 		"year"      => null,
@@ -175,6 +193,14 @@ function parseArgs($argv)
 				$args["dry_run"] = true;
 				break;
 
+			case "--xml":
+				$args["xml"] = true;
+				break;
+
+			case "--json":
+				$args["json"] = true;
+				break;
+
 			default:
 				usage($script, "Invalid argument: {$arg}");
 				break;
@@ -248,7 +274,7 @@ function usage($script, $error_message = NULL)
 	}
 
 	echo "Usage:\n";
-	echo "        {$script} [--help] [--debug] [--stats] [--dry-run] [--server-id <server_id>] [--tld <tld>] [--year <year>] [--month <month>] [--force]\n";
+	echo "        {$script} [--help] [--debug] [--stats] [--dry-run] [--xml] [--json] [--server-id <server_id>] [--tld <tld>] [--year <year>] [--month <month>] [--force]\n";
 	echo "\n";
 
 	echo "Options:\n";
@@ -263,6 +289,12 @@ function usage($script, $error_message = NULL)
 	echo "\n";
 	echo "        --dry-run\n";
 	echo "                Print data to the screen, do not write anything to the filesystem.\n";
+	echo "\n";
+	echo "        --xml\n";
+	echo "                When running with --dry-run, generate report in XML format (default when format is not specified).\n";
+	echo "\n";
+	echo "        --json\n";
+	echo "                When running with --dry-run, generate report in JSON format.\n";
 	echo "\n";
 	echo "        --server-id <server_id>\n";
 	echo "                Specify ID of Zabbix server.\n";
