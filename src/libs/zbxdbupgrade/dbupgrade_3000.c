@@ -5393,14 +5393,14 @@ static int	DBpatch_3000509(void)
 
 	if (ZBX_DB_OK > DBexecute(
 			"alter table sla_reports"
-			" change column report report_xml text collate utf8_bin not null"))
+			" change column report report_xml text collate utf8_bin not null default ''"))
 	{
 		return FAIL;
 	}
 
 	if (ZBX_DB_OK > DBexecute(
 			"alter table sla_reports"
-			" add column report_json text collate utf8_bin not null after report_xml"))
+			" add column report_json text collate utf8_bin not null default '' after report_xml"))
 	{
 		return FAIL;
 	}
