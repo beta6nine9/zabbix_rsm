@@ -5387,6 +5387,27 @@ out:
 	return ret;
 }
 
+static int	DBpatch_3000509(void)
+{
+	/* run on both server and proxy */
+
+	if (ZBX_DB_OK > DBexecute(
+			"alter table sla_reports"
+			" change column report report_xml text collate utf8_bin not null"))
+	{
+		return FAIL;
+	}
+
+	if (ZBX_DB_OK > DBexecute(
+			"alter table sla_reports"
+			" add column report_json text collate utf8_bin not null after report_xml"))
+	{
+		return FAIL;
+	}
+
+	return SUCCEED;
+}
+
 #endif
 
 DBPATCH_START(3000)
@@ -5510,5 +5531,6 @@ DBPATCH_ADD(3000505, 0, 0)	/* add "rdap.target" and "rdap.testedname" items to "
 DBPATCH_ADD(3000506, 0, 0)	/* add "rsm.rdds.43.target", "rsm.rdds.43.testedname" and "rsm.rdds.80.target" items to "Template <RSMHOST>" templates where needed */
 DBPATCH_ADD(3000507, 0, 0)	/* add "rdap.target" and "rdap.testedname" items to hosts that use "Template RDAP" template */
 DBPATCH_ADD(3000508, 0, 0)	/* add "rsm.rdds.43.target", "rsm.rdds.43.testedname" and "rsm.rdds.80.target" items to hosts that use "Template <RSMHOST>" */
+DBPATCH_ADD(3000509, 0, 0)	/* rename report column in sla_reports to report_xml, add report_json column */
 
 DBPATCH_END()
