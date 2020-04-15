@@ -715,10 +715,10 @@ class CSlaReport
 		{
 			$json = [
 				"$" => [
-					"id"                 => $tld["host"],
-					"generationDateTime" => $generationDateTime,
-					"reportPeriodFrom"   => $reportPeriodFrom,
-					"reportPeriodTo"     => $reportPeriodTo
+					"id"                 => (string)$tld["host"],
+					"generationDateTime" => (int)$generationDateTime,
+					"reportPeriodFrom"   => (int)$reportPeriodFrom,
+					"reportPeriodTo"     => (int)$reportPeriodTo
 				]
 			];
 
@@ -727,7 +727,7 @@ class CSlaReport
 				$json["DNS"] = [
 					"serviceAvailability" => [
 						"value" => (string)$tld["dns"]["availability"],
-						"$" => [
+						"$"     => [
 							"downtimeSLR" => (int)$slrs["dns-avail"]
 						]
 					],
@@ -735,16 +735,16 @@ class CSlaReport
 					],
 					"rttUDP" => [
 						"value" => (string)$tld["dns"]["rttUDP"],
-						"$" => [
-							"rttSLR" => (int)$slrs["dns-udp-rtt"],
-							"percentageSLR" => $slrs["dns-udp-percentage"]
+						"$"     => [
+							"rttSLR"        => (int)$slrs["dns-udp-rtt"],
+							"percentageSLR" => (int)$slrs["dns-udp-percentage"]
 						]
 					],
 					"rttTCP" => [
 						"value" => (string)$tld["dns"]["rttTCP"],
-						"$" => [
-							"rttSLR" => (int)$slrs["dns-tcp-rtt"],
-							"percentageSLR" => $slrs["dns-tcp-percentage"]
+						"$"     => [
+							"rttSLR"        => (int)$slrs["dns-tcp-rtt"],
+							"percentageSLR" => (int)$slrs["dns-tcp-percentage"]
 						]
 					]
 				];
@@ -755,11 +755,11 @@ class CSlaReport
 						$json["DNS"]["nsAvailability"],
 						[
 							"value" => (string)$ns["availability"],
-							"$" => [
-								"hostname"    => $ns["hostname"],
-								"ipAddress"   => $ns["ipAddress"],
-								"from"        => $ns["from"],
-								"to"          => $ns["to"],
+							"$"     => [
+								"hostname"    => (string)$ns["hostname"],
+								"ipAddress"   => (string)$ns["ipAddress"],
+								"from"        => (int)$ns["from"],
+								"to"          => (int)$ns["to"],
 								"downtimeSLR" => (int)$slrs["ns-avail"]
 							]
 						]
@@ -770,15 +770,15 @@ class CSlaReport
 			$json["RDDS"] = [
 				"serviceAvailability" => [
 					"value" => $tld["rdds"]["enabled"] ? (string)$tld["rdds"]["availability"] : "disabled",
-					"$" => [
+					"$"     => [
 						"downtimeSLR" => (int)$slrs["rdds-avail"]
 					]
 				],
 				"rtt" => [
 					"value" => $tld["rdds"]["enabled"] ? (string)$tld["rdds"]["rtt"] : "disabled",
-					"$" => [
-						"rttSLR" => (int)$slrs["rdds-rtt"],
-						"percentageSLR" => $slrs["rdds-percentage"]
+					"$"     => [
+						"rttSLR"        => (int)$slrs["rdds-rtt"],
+						"percentageSLR" => (int)$slrs["rdds-percentage"]
 					]
 				]
 			];
@@ -787,16 +787,16 @@ class CSlaReport
 			{
 				$json["RDAP"] = [
 					"serviceAvailability" => [
-					"value" => $tld["rdap"]["enabled"] ? (string)$tld["rdap"]["availability"] : "disabled",
-						"$" => [
+						"value" => $tld["rdap"]["enabled"] ? (string)$tld["rdap"]["availability"] : "disabled",
+						"$"     => [
 							"downtimeSLR" => (int)$slrs["rdap-avail"]
 						]
 					],
 					"rtt" => [
 						"value" => $tld["rdap"]["enabled"] ? (string)$tld["rdap"]["rtt"] : "disabled",
-						"$" => [
-							"rttSLR" => (int)$slrs["rdap-rtt"],
-							"percentageSLR" => $slrs["rdap-percentage"]
+						"$"     => [
+							"rttSLR"        => (int)$slrs["rdap-rtt"],
+							"percentageSLR" => (int)$slrs["rdap-percentage"]
 						]
 					]
 				];
