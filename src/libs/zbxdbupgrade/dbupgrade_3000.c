@@ -5387,6 +5387,58 @@ out:
 	return ret;
 }
 
+static int	DBpatch_3000509(void)
+{
+	const ZBX_TABLE table =
+			{"rsm_target", "id", 0,
+				{
+					{"id", NULL, NULL, NULL, 0, ZBX_TYPE_UINT, ZBX_NOTNULL, 0},
+					{"name", NULL, NULL, NULL, 255, ZBX_TYPE_CHAR, ZBX_NOTNULL, 0},
+					{0}
+				},
+				NULL
+			};
+
+	if (SUCCEED != DBcreate_table(&table))
+		return FAIL;
+
+	/* add auto_increment `id` */
+	if (ZBX_DB_OK > DBexecute(
+			"alter table `rsm_target`"
+			" modify `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT"))
+	{
+		return FAIL;
+	}
+
+	return SUCCEED;
+}
+
+static int	DBpatch_3000510(void)
+{
+	const ZBX_TABLE table =
+			{"rsm_testedname", "id", 0,
+				{
+					{"id", NULL, NULL, NULL, 0, ZBX_TYPE_UINT, ZBX_NOTNULL, 0},
+					{"name", NULL, NULL, NULL, 255, ZBX_TYPE_CHAR, ZBX_NOTNULL, 0},
+					{0}
+				},
+				NULL
+			};
+
+	if (SUCCEED != DBcreate_table(&table))
+		return FAIL;
+
+	/* add auto_increment `id` */
+	if (ZBX_DB_OK > DBexecute(
+			"alter table `rsm_testedname`"
+			" modify `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT"))
+	{
+		return FAIL;
+	}
+
+	return SUCCEED;
+}
+
 #endif
 
 DBPATCH_START(3000)
@@ -5510,5 +5562,7 @@ DBPATCH_ADD(3000505, 0, 0)	/* add "rdap.target" and "rdap.testedname" items to "
 DBPATCH_ADD(3000506, 0, 0)	/* add "rsm.rdds.43.target", "rsm.rdds.43.testedname" and "rsm.rdds.80.target" items to "Template <RSMHOST>" templates where needed */
 DBPATCH_ADD(3000507, 0, 0)	/* add "rdap.target" and "rdap.testedname" items to hosts that use "Template RDAP" template */
 DBPATCH_ADD(3000508, 0, 0)	/* add "rsm.rdds.43.target", "rsm.rdds.43.testedname" and "rsm.rdds.80.target" items to hosts that use "Template <RSMHOST>" */
+DBPATCH_ADD(3000509, 0, 0)	/* create table rsm_target for Data Export */
+DBPATCH_ADD(3000510, 0, 0)	/* create table rsm_testedname for Data Export */
 
 DBPATCH_END()

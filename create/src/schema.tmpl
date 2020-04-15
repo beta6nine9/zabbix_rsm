@@ -1357,7 +1357,7 @@ FIELD		|inventory_mode	|t_integer	|'0'	|NOT NULL	|0
 TABLE|dbversion||
 FIELD		|mandatory	|t_integer	|'0'	|NOT NULL	|
 FIELD		|optional	|t_integer	|'0'	|NOT NULL	|
-ROW		|3000403	|3000508
+ROW		|3000403	|3000510
 
 TABLE|rsm_ip_version|id|0
 FIELD		|id		|t_serial	|	|NOT NULL	|0
@@ -1396,6 +1396,14 @@ FIELD		|id		|t_serial	|	|NOT NULL	|0
 FIELD		|name		|t_varchar(255)	|	|NOT NULL	|ZBX_NODATA
 
 TABLE|rsm_transport_protocol|id|0
+FIELD		|id		|t_serial	|	|NOT NULL	|0
+FIELD		|name		|t_varchar(255)	|	|NOT NULL	|ZBX_NODATA
+
+TABLE|rsm_target|id|0
+FIELD		|id		|t_serial	|	|NOT NULL	|0
+FIELD		|name		|t_varchar(255)	|	|NOT NULL	|ZBX_NODATA
+
+TABLE|rsm_testedname|id|0
 FIELD		|id		|t_serial	|	|NOT NULL	|0
 FIELD		|name		|t_varchar(255)	|	|NOT NULL	|ZBX_NODATA
 

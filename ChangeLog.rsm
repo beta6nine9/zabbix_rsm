@@ -1,6 +1,8 @@
 Changes for rsm2.0.0rc2
 
 Bug fixes:
+..F....... [660] removed showing RDDS 'Current testing interface' label when RDAP is standalone (dimir)
+..F.I..... [642,643] fixed frontend, SLA API measurement files (version 1 and 2 for RDAP) and Data Export to store/display target and tested name (dimir)
 ....I..... [655] improved performance of onboarding TLDs and registrars (asitals)
 .......PS. [649] fixed incorrect handling of zero RTT during RDDS43 test (dimir)
 ....I..... [sub-506] fixed --list-services option in registrar.pl (dimir)
