@@ -24,12 +24,13 @@ class CSlaReport
 	 * @param array $tlds      array of TLD names; if empty, reports for all TLDs will be generated
 	 * @param int   $year      year
 	 * @param int   $month     month
+	 * @param array $formats   array of formats; supported formtas are: XML, JSON
 	 *
 	 * @static
 	 *
 	 * @return array|null Returns array of reports or NULL on error. Use CSlaReport::$error to get the erorr message.
 	 */
-	public static function generate($server_id, $tlds, $year, $month)
+	public static function generate($server_id, $tlds, $year, $month, $formats)
 	{
 		if (!is_int($server_id))
 		{
@@ -50,6 +51,10 @@ class CSlaReport
 		{
 			self::$error = "\$month must be integer";
 			return null;
+		}
+		if (!is_array($formats) || array_diff($formats, ["XML", "JSON"]))
+		{
+			self::$error = "\$formats must be array of supported formats (XML, JSON)";
 		}
 
 		$duplicate_tlds = array_keys(array_diff(array_count_values($tlds), array_count_values(array_unique($tlds))));
@@ -137,7 +142,36 @@ class CSlaReport
 
 			$slrs = self::getSlrValues($from);
 
-			$reports = self::generateXml($tlds, $data, $slrs, $time, $from, $till);
+			if (in_array("XML", $formats))
+			{
+				$reportsXml = self::generateXml($data, $slrs, $time, $from, $till);
+			}
+			if (in_array("JSON", $formats))
+			{
+				$reportsJson = self::generateJson($data, $slrs, $time, $from, $till);
+			}
+
+			$reports = array_fill_keys($tlds, null); // for sorting, based on $tlds
+			foreach ($data as $tldid => $tld)
+			{
+				$report = [];
+
+				if (in_array("XML", $formats))
+				{
+					$report["XML"] = $reportsXml[$tld["host"]];
+				}
+				if (in_array("JSON", $formats))
+				{
+					$report["JSON"] = $reportsJson[$tld["host"]];
+				}
+
+				$reports[$tld["host"]] = [
+					"hostid" => $tldid,
+					"host"   => $tld["host"],
+					"report" => $report,
+				];
+			}
+			$reports = array_values($reports);
 		}
 		catch (Exception $e)
 		{
@@ -595,13 +629,13 @@ class CSlaReport
 		}
 	}
 
-	private static function generateXml(&$tlds, &$data, &$slrs, $generationDateTime, $reportPeriodFrom, $reportPeriodTo)
+	private static function generateXml(&$data, &$slrs, $generationDateTime, $reportPeriodFrom, $reportPeriodTo)
 	{
-		$reports = array_fill_keys($tlds, null); // for sorting, based on $tlds
+		$reports = [];
 
 		foreach ($data as $tldid => $tld)
 		{
-			$xml = new SimpleXMLElement("<reportTLD/>");
+			$xml = new SimpleXMLElement("<reportSLA/>");
 			$xml->addAttribute("id", $tld["host"]);
 			$xml->addAttribute("generationDateTime", $generationDateTime);
 			$xml->addAttribute("reportPeriodFrom", $reportPeriodFrom);
@@ -667,14 +701,113 @@ class CSlaReport
 			$dom = dom_import_simplexml($xml)->ownerDocument;
 			$dom->formatOutput = true;
 
-			$reports[$tld["host"]] = [
-				"hostid" => $tldid,
-				"host"   => $tld["host"],
-				"report" => $dom->saveXML(),
-			];
+			$reports[$tld["host"]] = $dom->saveXML();
 		}
 
-		return array_values($reports);
+		return $reports;
+	}
+
+	private static function generateJson(&$data, &$slrs, $generationDateTime, $reportPeriodFrom, $reportPeriodTo)
+	{
+		$reports = [];
+
+		foreach ($data as $tldid => $tld)
+		{
+			$json = [
+				"$" => [
+					"id"                 => (string)$tld["host"],
+					"generationDateTime" => (int)$generationDateTime,
+					"reportPeriodFrom"   => (int)$reportPeriodFrom,
+					"reportPeriodTo"     => (int)$reportPeriodTo
+				]
+			];
+
+			if (self::getMonitoringTarget() == self::MONITORING_TARGET_REGISTRY)
+			{
+				$json["DNS"] = [
+					"serviceAvailability" => [
+						"value" => (string)$tld["dns"]["availability"],
+						"$"     => [
+							"downtimeSLR" => (int)$slrs["dns-avail"]
+						]
+					],
+					"nsAvailability" => [
+					],
+					"rttUDP" => [
+						"value" => (string)$tld["dns"]["rttUDP"],
+						"$"     => [
+							"rttSLR"        => (int)$slrs["dns-udp-rtt"],
+							"percentageSLR" => (int)$slrs["dns-udp-percentage"]
+						]
+					],
+					"rttTCP" => [
+						"value" => (string)$tld["dns"]["rttTCP"],
+						"$"     => [
+							"rttSLR"        => (int)$slrs["dns-tcp-rtt"],
+							"percentageSLR" => (int)$slrs["dns-tcp-percentage"]
+						]
+					]
+				];
+
+				foreach ($tld["dns"]["ns"] as $ns)
+				{
+					array_push(
+						$json["DNS"]["nsAvailability"],
+						[
+							"value" => (string)$ns["availability"],
+							"$"     => [
+								"hostname"    => (string)$ns["hostname"],
+								"ipAddress"   => (string)$ns["ipAddress"],
+								"from"        => (int)$ns["from"],
+								"to"          => (int)$ns["to"],
+								"downtimeSLR" => (int)$slrs["ns-avail"]
+							]
+						]
+					);
+				}
+			}
+
+			$json["RDDS"] = [
+				"serviceAvailability" => [
+					"value" => $tld["rdds"]["enabled"] ? (string)$tld["rdds"]["availability"] : "disabled",
+					"$"     => [
+						"downtimeSLR" => (int)$slrs["rdds-avail"]
+					]
+				],
+				"rtt" => [
+					"value" => $tld["rdds"]["enabled"] ? (string)$tld["rdds"]["rtt"] : "disabled",
+					"$"     => [
+						"rttSLR"        => (int)$slrs["rdds-rtt"],
+						"percentageSLR" => (int)$slrs["rdds-percentage"]
+					]
+				]
+			];
+
+			if (self::isRdapStandalone($reportPeriodFrom))
+			{
+				$json["RDAP"] = [
+					"serviceAvailability" => [
+						"value" => $tld["rdap"]["enabled"] ? (string)$tld["rdap"]["availability"] : "disabled",
+						"$"     => [
+							"downtimeSLR" => (int)$slrs["rdap-avail"]
+						]
+					],
+					"rtt" => [
+						"value" => $tld["rdap"]["enabled"] ? (string)$tld["rdap"]["rtt"] : "disabled",
+						"$"     => [
+							"rttSLR"        => (int)$slrs["rdap-rtt"],
+							"percentageSLR" => (int)$slrs["rdap-percentage"]
+						]
+					]
+				];
+			}
+
+			$json = ["reportSLA" => $json];
+
+			$reports[$tld["host"]] = json_encode($json);
+		}
+
+		return $reports;
 	}
 
 	################################################################################
@@ -797,7 +930,7 @@ class CSlaReport
 
 		if (count($tlds) === 0)
 		{
-			$sql .= " and hosts.created < ?";
+			$sql .= " and hosts.created<?";
 			$sql .= " order by hosts.host asc";
 			$params = array_merge($params, [$from]);
 		}
@@ -1270,6 +1403,11 @@ class CSlaReport
 	public static function dbCommit()
 	{
 		self::$dbh->commit();
+	}
+
+	public static function dbConnected()
+	{
+		return !is_null(self::$dbh);
 	}
 
 	public static function dbConnect($server_id)
