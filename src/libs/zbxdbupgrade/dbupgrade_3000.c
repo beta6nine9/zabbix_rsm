@@ -5439,6 +5439,29 @@ static int	DBpatch_3000510(void)
 	return SUCCEED;
 }
 
+static int	DBpatch_3000511(void)
+{
+	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
+		return SUCCEED;
+
+#define SQL	"update"												\
+			" hostmacro"											\
+			" left join hostmacro as hostmacro2 on hostmacro2.hostid=hostmacro.hostid"			\
+		" set"													\
+			" hostmacro.macro='{$RSM.RDDS43.TEST.DOMAIN}',"							\
+			"hostmacro.value=concat(hostmacro.value,'.',hostmacro2.value)"					\
+		" where"												\
+			" hostmacro.macro='{$RSM.RDDS.TESTPREFIX}' and"							\
+			" hostmacro2.macro='{$RSM.TLD}'"
+	if (ZBX_DB_OK > DBexecute(SQL))
+	{
+		return FAIL;
+	}
+#undef SQL
+
+	return SUCCEED;
+}
+
 #endif
 
 DBPATCH_START(3000)
@@ -5564,5 +5587,6 @@ DBPATCH_ADD(3000507, 0, 0)	/* add "rdap.target" and "rdap.testedname" items to h
 DBPATCH_ADD(3000508, 0, 0)	/* add "rsm.rdds.43.target", "rsm.rdds.43.testedname" and "rsm.rdds.80.target" items to hosts that use "Template <RSMHOST>" */
 DBPATCH_ADD(3000509, 0, 0)	/* create table rsm_target for Data Export */
 DBPATCH_ADD(3000510, 0, 0)	/* create table rsm_testedname for Data Export */
+DBPATCH_ADD(3000511, 0, 0)	/* rename {$RSM.RDDS.TESTPREFIX} to {$RSM.RDDS43.TEST.DOMAIN} */
 
 DBPATCH_END()

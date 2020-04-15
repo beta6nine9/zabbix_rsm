@@ -92,7 +92,7 @@ sub init_cli_opts($)
 			"rdap-test-domain=s",
 			"rdds-ns-string=s",
 			"root-servers=s",
-			"rdds-test-prefix=s",
+			"rdds43-test-domain=s",
 			"verbose!",
 			"help|?");
 
@@ -161,10 +161,10 @@ sub validate_cli_opts($)
 		{
 			$msg .= "none or both --rdds43-servers and --rdds80-servers must be specified\n";
 		}
-		if (!opt('rdds-test-prefix'))
+		if (!opt('rdds43-test-domain'))
 		{
 			# this might be needed only for RDDS43, but must be double-checked, if RDDS43 and RDDS80 are separated
-			$msg .= "--rdds-test-prefix must be specified\n";
+			$msg .= "--rdds43-test-domain must be specified\n";
 		}
 	}
 
@@ -267,11 +267,13 @@ sub list_services($;$)
 	my @columns = (
 		'status',
 		'{$RSM.RDDS.NS.STRING}',
-		'{$RSM.RDDS.TESTPREFIX}',
+		'{$RSM.RDDS43.TEST.DOMAIN}',
 		'{$RSM.TLD.RDDS.ENABLED}',
 		'{$RDAP.TLD.ENABLED}',
 		'{$RDAP.BASE.URL}',
 		'{$RDAP.TEST.DOMAIN}',
+		'rdds43_servers',
+		'rdds80_servers',
 	);
 
 	my %rsmhosts = get_registrar_list();
@@ -285,40 +287,14 @@ sub list_services($;$)
 
 	foreach my $rsmhost (sort(keys(%rsmhosts)))
 	{
-		my @row = ();
-
 		my $services = get_services($server_key, $rsmhost);
+
+		my @row = ();
 
 		push(@row, $rsmhost);                      # Registrar ID
 		push(@row, $rsmhosts{$rsmhost}{'name'});   # Registrar name
 		push(@row, $rsmhosts{$rsmhost}{'family'}); # Registrar family
-		push(@row, map($services->{$_} // "", @columns));
-
-		# obtain rsm.rdds[] item key and extract RDDS(43|80).SERVERS strings
-		my $template = get_template("Template $rsmhost", 0, 0);
-		my $items = get_items_like($template->{'templateid'}, 'rsm.rdds[', true);
-
-		my $key;
-		foreach my $k (keys(%{$items}))	# assuming that only one rsm.rdds[] item is enabled at a time
-		{
-			if ($items->{$k}{'status'} == 0)
-			{
-				$key = $items->{$k}{'key_'};
-				last;
-			}
-		}
-
-		if (!defined($key))
-		{
-			push(@row, ("", ""));
-		}
-		else
-		{
-			$key =~ /,"(\S+)","(\S+)"]/;
-
-			push(@row, "$1");
-			push(@row, "$2");
-		}
+		push(@row, map($services->{$_}, @columns));
 
 		push(@rows, \@row);
 	}
@@ -352,41 +328,35 @@ sub get_registrar_list()
 sub get_services($$)
 {
 	my $server_key = shift;
-	my $tld        = shift;
-
-	my @tld_types = (TLD_TYPE_G, TLD_TYPE_CC, TLD_TYPE_OTHER, TLD_TYPE_TEST);
+	my $rsmhost    = shift;
 
 	my $result;
 
-	my $main_templateid = get_template('Template ' . $tld, false, false);
+	# get template id, list of macros
 
-	pfail("Registrar \"$tld\" does not exist on \"$server_key\"") unless ($main_templateid->{'templateid'});
+	my $template = get_template("Template $rsmhost", true, false);
+	pfail("Registrar \"$rsmhost\" does not exist on \"$server_key\"") unless ($template->{'templateid'});
 
-	my $macros = get_host_macro($main_templateid, undef);
+	# store macros
 
-	my $tld_host = get_host($tld, true);
+	map { $result->{$_->{'macro'}} = $_->{'value'} } @{$template->{'macros'}};
+
+	# get status (enabled, disabled)
+
+	my $tld_host = get_host($rsmhost, true);
 
 	$result->{'status'} = $tld_host->{'status'};
 
-	foreach my $group (@{$tld_host->{'groups'}})
-	{
-		my $name = $group->{'name'};
-		foreach my $tld_type (@tld_types)
-		{
-			if ($name eq $tld_type)
-			{
-				$result->{'tld_type'} = $name;
-				last;
-			}
-		}
-	}
+	# get RDDS43 and RDDS80 servers
 
-	foreach my $macro (@{$macros})
-	{
-		my $name = $macro->{'macro'};
-		my $value = $macro->{'value'};
+	my $items = get_items_like($template->{'templateid'}, 'rsm.rdds[', true);
 
-		$result->{$name} = $value;
+	if (%{$items} && (values(%{$items}))[0]{'status'} == 0)
+	{
+		(values(%{$items}))[0]{'key_'} =~ /,"(\S+)","(\S+)"]/;
+
+		$result->{'rdds43_servers'} = $1;
+		$result->{'rdds80_servers'} = $2;
 	}
 
 	return $result;
@@ -595,7 +565,7 @@ sub create_main_template($)
 	create_items_rdds($templateid, $template_name);
 
 	really(create_macro('{$RSM.TLD}', $rsmhost, $templateid));
-	really(create_macro('{$RSM.RDDS.TESTPREFIX}', getopt('rdds-test-prefix'), $templateid, 1)) if (opt('rdds-test-prefix'));
+	really(create_macro('{$RSM.RDDS43.TEST.DOMAIN}', getopt('rdds43-test-domain'), $templateid, 1)) if (opt('rdds43-test-domain'));
 	really(create_macro('{$RSM.RDDS.NS.STRING}', opt('rdds-ns-string') ? getopt('rdds-ns-string') : CFG_DEFAULT_RDDS_NS_STRING, $templateid, 1));
 	really(create_macro('{$RSM.TLD.RDDS.ENABLED}', opt('rdds43-servers') ? 1 : 0, $templateid, 1));
 	really(create_macro('{$RSM.TLD.EPP.ENABLED}', 0, $templateid)); # required by rsm.rdds[] metric
@@ -1187,7 +1157,7 @@ Other options
                 (services supported only after switch to Standalone RDAP)
         --list-services
                 list services of each Regstrar, the output is comma-separated list:
-                <RR-ID>,<RR-NAME>,<RR-FAMILY>,<RR-STATUS>,<RDDS.NS.STRING>,<RDDS.TESTPREFIX>,
+                <RR-ID>,<RR-NAME>,<RR-FAMILY>,<RR-STATUS>,<RDDS.NS.STRING>,<RDDS43.TEST.DOMAIN>,
                 <RDDS.ENABLED>,<RDAP.ENABLED>,<RDAP.BASE.URL>,<RDAP.TEST.DOMAIN>,
 		<RDDS43.SERVERS>,<RDDS80.SERVERS>
         --rdds43-servers=STRING
@@ -1206,8 +1176,8 @@ Other options
         --root-servers=STRING
                 list of IPv4 and IPv6 root servers separated by comma and semicolon: "v4IP1[,v4IP2,...][;v6IP1[,v6IP2,...]]"
                 (default: taken from DNS)
-        --rdds-test-prefix=STRING
-                domain test prefix for RDDS monitoring (needed only if rdds servers specified)
+        --rdds43-test-domain=STRING
+                test domain for RDDS monitoring (needed only if rdds servers specified)
         --rdds
                 Action with RDDS
                 (only effective after switch to Standalone RDAP, default: no)
