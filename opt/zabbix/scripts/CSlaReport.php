@@ -1405,6 +1405,11 @@ class CSlaReport
 		self::$dbh->commit();
 	}
 
+	public static function dbConnected()
+	{
+		return !is_null(self::$dbh);
+	}
+
 	public static function dbConnect($server_id)
 	{
 		self::$sql_count = 0;
