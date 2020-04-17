@@ -1,6 +1,13 @@
+Changes for rsm2.0.0rc3
+
+Bug fixes:
+
+--------------------------------------------------------------------------------
 Changes for rsm2.0.0rc2
 
 Bug fixes:
+..F.I..... [671] added monthly reports in JSON format in addition to XML (asitals)
+....I..PS. [639] added possibility to specify full RDDS43 test domain when onboarding TLD or registrar (asitals)
 ..F....... [660] removed showing RDDS 'Current testing interface' label when RDAP is standalone (dimir)
 ..F.I..... [642,643] fixed frontend, SLA API measurement files (version 1 and 2 for RDAP) and Data Export to store/display target and tested name (dimir)
 ....I..... [655] improved performance of onboarding TLDs and registrars (asitals)
