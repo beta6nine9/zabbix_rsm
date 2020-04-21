@@ -1,7 +1,7 @@
 Changes for rsm2.0.0rc3
 
 Bug fixes:
-.......PS. [sub-642] fixed tested name that was incorrectly set in RDDS43 test (dimir)
+.......PS. [sub-643] fixed tested name that was incorrectly set in RDDS43 test (dimir)
 ....I..... [669] fix SQL syntax error in Service Availability scripts when service is disabled (dimir)
 
 --------------------------------------------------------------------------------
