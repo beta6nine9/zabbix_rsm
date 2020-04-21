@@ -3804,7 +3804,7 @@ int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 		ip43 = ips43.values[i];
 
 		/* set RDDS43 testedName */
-		zbx_set_rdds_value_by_pattern(testname, item->nextcheck, strlen(request->key), "43.testedname",
+		zbx_set_rdds_value_by_pattern(test_domain, item->nextcheck, strlen(request->key), "43.testedname",
 				strlen("43.testedname"), items, items_num);
 
 		rsm_infof(log_fd, "start RDDS43 test (ip %s, request \"%s\", expected prefix \"%s\")",
