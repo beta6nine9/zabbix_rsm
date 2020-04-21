@@ -62,6 +62,9 @@ send_values();
 
 slv_exit(SUCCESS);
 
+use constant PREV_VALUE => 0;
+use constant BETWEEN_VALUE => 1;
+
 sub __get_main_probe_status_times
 {
 	my $from = shift;
@@ -94,16 +97,16 @@ sub __get_main_probe_status_times
 
 		if (scalar(@$times_ref) != 0)
 		{
-			dbg("$probe reachable times: ", join(',', @$times_ref)) if (opt('debug'));
+			dbg("$probe lastaccess times: ", join(',', @$times_ref)) if (opt('debug'));
 
-			$times_ref = __get_probestatus_times($probe, $hostid, $times_ref, PROBE_KEY_MANUAL);
+			$times_ref = __get_probestatus_times($probe, $hostid, $times_ref, PROBE_KEY_MANUAL, PREV_VALUE);
 		}
 
 		if (scalar(@$times_ref) != 0)
 		{
 			dbg("$probe manual probestatus times: ", join(',', @$times_ref)) if (opt('debug'));
 
-			$times_ref = __get_probestatus_times($probe, $hostid, $times_ref, PROBE_KEY_AUTOMATIC);
+			$times_ref = __get_probestatus_times($probe, $hostid, $times_ref, PROBE_KEY_AUTOMATIC, BETWEEN_VALUE);
 		}
 
 		if (scalar(@$times_ref) != 0)
@@ -192,14 +195,13 @@ sub __get_lastaccess_times
 	return \@times;
 }
 
-sub __get_probestatus_times
+sub __get_probestatus_times($$$$$)
 {
 	my $probe = shift;
 	my $hostid = shift;
 	my $times_ref = shift; # input
 	my $key = shift;
-
-	my ($rows_ref, @times, $last_status);
+	my $time_spec = shift;
 
 	my $key_match = "i.key_";
 	$key_match .= ($key =~ m/%/) ? " like '$key'" : "='$key'";
@@ -220,61 +222,35 @@ sub __get_probestatus_times
 		return;
 	}
 
-	$rows_ref = db_select(
-		"select value".
-		" from history_uint".
-		" where itemid=$itemid".
-			" and clock<" . $times_ref->[0].
-		" order by clock desc".
-		" limit 1");
+	my $rows_ref;
 
-	$last_status = UP;
-	if (scalar(@$rows_ref) != 0)
+	if ($time_spec == PREV_VALUE)
 	{
-		my $value = $rows_ref->[0]->[0];
-
-		$last_status = DOWN if ($value == OFFLINE);
-	}
-
-	my $idx = 0;
-	my $times_count = scalar(@$times_ref);
-	while ($idx < $times_count)
-	{
-		my $from = $times_ref->[$idx++];
-		my $till = $times_ref->[$idx++];
-
 		$rows_ref = db_select(
-			"select clock,value".
+			"select value".
 			" from history_uint".
 			" where itemid=$itemid".
-				" and clock between $from and $till".
-			" order by itemid,clock");
-
-		push(@times, $from) if ($last_status == UP);
-
-		foreach my $row_ref (@$rows_ref)
-		{
-			my $clock = $row_ref->[0];
-			my $value = $row_ref->[1];
-
-			my $status = ($value == OFFLINE) ? DOWN : UP;
-
-			if ($last_status != $status)
-			{
-				push(@times, $clock);
-
-				dbg("clock:$clock value:$value");
-
-				$last_status = $status;
-			}
-		}
-
-		# push "till" to @times if it contains odd number of elements
-		if (scalar(@times) != 0)
-		{
-			push(@times, $till) if ($last_status == UP);
-		}
+				" and clock<" . $times_ref->[0].
+			" order by clock desc".
+			" limit 1");
+	}
+	elsif ($time_spec == BETWEEN_VALUE)
+	{
+		$rows_ref = db_select(
+			"select value".
+			" from history_uint".
+			" where itemid=$itemid".
+				" and clock between $times_ref->[0] and $times_ref->[1]");
+	}
+	else
+	{
+		fail("unknown time specification: $time_spec");
 	}
 
-	return \@times;
+	if (@{$rows_ref} && $rows_ref->[0]->[0] == OFFLINE)
+	{
+		return [];
+	}
+
+	return [$times_ref->[0], $times_ref->[1]];
 }

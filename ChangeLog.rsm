@@ -1,3 +1,9 @@
+Changes for rsm1.3.2
+
+Bug fixes:
+....I..... [666] fixed calculation of probe main status when automatic status is flapping (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm1.3.1
 
 New features:
