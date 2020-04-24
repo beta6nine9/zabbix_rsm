@@ -5483,6 +5483,91 @@ static int	DBpatch_3000512(void)
 	return SUCCEED;
 }
 
+static int	DBpatch_3000513(void)
+{
+	int		ret = FAIL;
+
+	zbx_uint64_t	hostid_probe_statuses            = 100001;
+	zbx_uint64_t	applicationid_probe_availability = 1001;
+
+	DB_RESULT	result;
+	DB_ROW		row;
+
+	zbx_uint64_t	itemid_rdap_online_probes;
+	zbx_uint64_t	itemid_rdap_total_probes;
+	zbx_uint64_t	itemappid_rdap_online_probes;
+	zbx_uint64_t	itemappid_rdap_total_probes;
+
+	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
+		return SUCCEED;
+
+	if (NULL == (result = DBselect("select max(itemid)+1 from items")))
+		return FAIL;
+
+	if (NULL == (row = DBfetch(result)))
+	{
+		THIS_SHOULD_NEVER_HAPPEN;	/* there is "Zabbix Server" host, 'interface' table can't be empty */
+		DBfree_result(result);
+		return FAIL;
+	}
+
+	ZBX_STR2UINT64(itemid_rdap_online_probes, row[0]);
+	DBfree_result(result);
+
+	if (NULL == (result = DBselect("select max(itemappid)+1 from items_applications")))
+		return FAIL;
+
+	if (NULL == (row = DBfetch(result)))
+	{
+		THIS_SHOULD_NEVER_HAPPEN;	/* there is "Zabbix Server" host, 'interface' table can't be empty */
+		DBfree_result(result);
+		return FAIL;
+	}
+
+	ZBX_STR2UINT64(itemappid_rdap_online_probes, row[0]);
+	DBfree_result(result);
+
+	itemid_rdap_total_probes     = itemid_rdap_online_probes + 1;
+	itemappid_rdap_total_probes  = itemappid_rdap_online_probes + 1;
+
+#define CHECK(CODE) do {		\
+	int __result = (CODE);		\
+	if (ZBX_DB_OK > __result)	\
+	{				\
+		goto out;		\
+	}				\
+} while (0)
+
+#define SQL	"insert into items set itemid=" ZBX_FS_UI64 ",type=%d,snmp_community='',snmp_oid='',"			\
+		"hostid=" ZBX_FS_UI64 ",name='%s',key_='%s',delay=%d,history=%d,trends=365,status=0,value_type=%d,"	\
+		"trapper_hosts='',units='',multiplier=0,delta=0,snmpv3_securityname='',snmpv3_securitylevel=0,"		\
+		"snmpv3_authpassphrase='',snmpv3_privpassphrase='',formula='%s',error='',lastlogsize=0,logtimefmt='',"	\
+		"templateid=NULL,valuemapid=NULL,delay_flex='',params='',ipmi_sensor='',data_type=0,authtype=0,"	\
+		"username='',password='',publickey='',privatekey='',mtime=0,flags=0,interfaceid=NULL,port='',"		\
+		"description='',inventory_link=0,lifetime='30',snmpv3_authprotocol=0,snmpv3_privprotocol=0,state=0,"	\
+		"snmpv3_contextname='',evaltype=0"
+	/* type 10 = ITEM_TYPE_EXTERNAL */
+	/* value_type 3 = ITEM_VALUE_TYPE_UINT64 */
+	CHECK(DBexecute(SQL, itemid_rdap_online_probes, 10, hostid_probe_statuses,
+			"Number of online probes for RDAP tests", "online.nodes.pl[online,rdap]", 60, 7, 3, "1"));
+	CHECK(DBexecute(SQL, itemid_rdap_total_probes, 10, hostid_probe_statuses,
+			"Total number of probes for RDAP tests", "online.nodes.pl[total,rdap]", 60, 7, 3, "1"));
+#undef SQL
+
+#define SQL	"insert into items_applications set itemappid=" ZBX_FS_UI64 ",applicationid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64
+	CHECK(DBexecute(SQL, itemappid_rdap_online_probes, applicationid_probe_availability, itemid_rdap_online_probes));
+	CHECK(DBexecute(SQL, itemappid_rdap_total_probes, applicationid_probe_availability, itemid_rdap_total_probes));
+#undef SQL
+
+	CHECK(DBexecute("delete from ids where table_name='items' or table_name='items_applications'"));
+
+#undef CHECK
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
 #endif
 
 DBPATCH_START(3000)
@@ -5610,5 +5695,6 @@ DBPATCH_ADD(3000509, 0, 0)	/* create table rsm_target for Data Export */
 DBPATCH_ADD(3000510, 0, 0)	/* create table rsm_testedname for Data Export */
 DBPATCH_ADD(3000511, 0, 0)	/* rename {$RSM.RDDS.TESTPREFIX} to {$RSM.RDDS43.TEST.DOMAIN} */
 DBPATCH_ADD(3000512, 0, 0)	/* rename report column in sla_reports to report_xml, add report_json column */
+DBPATCH_ADD(3000513, 0, 0)	/* add items for online/total probes with RDAP enabled to host "Probe statuses" */
 
 DBPATCH_END()

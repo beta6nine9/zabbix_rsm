@@ -21,8 +21,11 @@ use constant LOGFILE => '/tmp/online.nodes.debug.log';
 my $command = shift || 'total';
 my $type = shift || 'dns';
 
-die("$command: invalid command") if ($command ne 'total' and $command ne 'online');
-die("$type: invalid type") if ($type ne 'dns' and $type ne 'epp' and $type ne 'rdds' and $type ne 'ip4' and $type ne 'ip6');
+my %commands = map {$_ => undef} ('total', 'online');
+my %types = map {$_ => undef} ('dns', 'rdds', 'rdap', 'epp', 'ip4', 'ip6');
+
+die("$command: invalid command") unless (exists($commands{$command}));
+die("$type: invalid type") unless (exists($types{$type}));
 
 sub __dbg
 {
