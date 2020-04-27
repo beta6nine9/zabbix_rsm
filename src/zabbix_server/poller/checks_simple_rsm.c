@@ -1783,7 +1783,7 @@ static int	zbx_get_dnskeys(ldns_resolver *res, const char *domain, const char *r
 	ldns_pkt_print(pkt_file, pkt);
 
 	/* check the AD bit */
-	if (0 == ldns_pkt_ad(pkt) && 0 != strcmp("192.168.3.11", resolver))
+	if (0 == ldns_pkt_ad(pkt))
 	{
 		zbx_snprintf(err, err_size, "AD bit not present in the answer of \"%s\" from resolver \"%s\"",
 				domain, resolver);
@@ -1813,7 +1813,7 @@ static int	zbx_get_dnskeys(ldns_resolver *res, const char *domain, const char *r
 
 	/* get the DNSKEY records */
 	if (NULL == (*keys = ldns_pkt_rr_list_by_name_and_type(pkt, domain_rdf, LDNS_RR_TYPE_DNSKEY,
-							LDNS_SECTION_ANSWER)) && 0 != strcmp("192.168.3.11", resolver))
+			LDNS_SECTION_ANSWER)))
 	{
 		zbx_snprintf(err, err_size, "no DNSKEY records of domain \"%s\" from resolver \"%s\"", domain,
 				resolver);
@@ -2576,7 +2576,7 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 					}
 
 					if (NULL != th_log_fd && SUCCEED != zbx_get_ns_ip_values(res, nss[i].name,
-							nss[i].ips[j].ip, /*keys*/NULL, testprefix, domain, th_log_fd,
+							nss[i].ips[j].ip, keys, testprefix, domain, th_log_fd,
 							&nss[i].ips[j].rtt, (RSM_UDP == proto && 0 != rdds_enabled ?
 							&nss[i].ips[j].upd : NULL), ipv4_enabled, ipv6_enabled,
 							epp_enabled, err, sizeof(err)))

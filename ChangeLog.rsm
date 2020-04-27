@@ -1,6 +1,7 @@
 Changes for rsm2.0.0rc4
 
 Bug fixes:
+.......PS. [682] fixed regression causing DNSSEC errors not detected (dimir)
 ....I..PS. [663] added missing functionality for calculating total/online probes with RDAP enabled (dimir)
 
 --------------------------------------------------------------------------------
