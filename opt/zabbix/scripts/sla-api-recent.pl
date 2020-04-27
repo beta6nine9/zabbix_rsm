@@ -1014,7 +1014,7 @@ sub fill_test_data($$$$)
 			next if (!defined($src_metric_ref->{'rtt'}) || ($src_metric_ref->{'rtt'} >= 0 && !defined($src_metric_ref->{'ip'})));
 
 			my $metric = {
-				'testDateTime'	=> int($src_metric_ref->{'clock'}),
+				'testDateTime'	=> $src_metric_ref->{'clock'},
 				'targetIP'	=> $src_metric_ref->{'ip'},
 			};
 
@@ -1432,10 +1432,11 @@ sub calculate_cycle($$$$$$$$$)
 				{
 					foreach my $metric (@{$probe_results->{$clock}{$interface}{$target}})
 					{
+						# convert clock and rtt to integer
 						my $h = {
-							'rtt'        => $metric->{'rtt'},
+							'rtt'        => int($metric->{'rtt'}),
 							'ip'         => $metric->{'ip'},
-							'clock'      => $clock,
+							'clock'      => int($clock),
 						};
 
 						if (exists($metric->{'testedName'}))
