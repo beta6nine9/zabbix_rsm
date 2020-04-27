@@ -2850,18 +2850,18 @@ sub process_slv_avail_cycles($$$$$$$$$)
 			if (!defined($keys_in{$tld}))
 			{
 				$keys_in{$tld} = $cfg_keys_in // $cfg_keys_in_cb->($tld);
+			}
 
-				if (@{$keys_in{$tld}} == 0)
-				{
-					# fail("cannot get input keys for Service availability calculation");
+			if (@{$keys_in{$tld}} == 0)
+			{
+				# fail("cannot get input keys for Service availability calculation");
 
-					# We used to fail here but not anymore because rsm.rdds items can be 
-					# disabled after switch to RDAP standalone. So some of TLDs may not have
-					# RDDS checks thus making SLV calculations for rsm.slv.rdds.* useless
+				# We used to fail here but not anymore because rsm.rdds items can be 
+				# disabled after switch to RDAP standalone. So some of TLDs may not have
+				# RDDS checks thus making SLV calculations for rsm.slv.rdds.* useless
 
-					wrn("no input keys for $tld, considering service disabled");
-					next;
-				}
+				dbg("no input keys for $tld, considering service disabled");
+				next;
 			}
 
 			process_slv_avail($tld, $keys_in{$tld}, $cfg_key_out, $from, $till, $value_ts, $cfg_minonline,
