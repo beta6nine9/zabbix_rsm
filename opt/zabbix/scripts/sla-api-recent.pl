@@ -1016,12 +1016,13 @@ sub fill_test_data($$$$)
 			my $metric = {
 				'testDateTime'	=> int($src_metric_ref->{'clock'}),
 				'targetIP'	=> $src_metric_ref->{'ip'},
-				# SLA API version 1: start
-				#'testedName'	=> $src_metric_ref->{'testedName'},
-				# SLA API version 1: end
 			};
 
 			my $rtt = $src_metric_ref->{'rtt'};
+
+			# SLA API version 2: start
+			$metric->{'testedName'}	= $src_metric_ref->{'testedName'} if ($service eq 'rdap');
+			# SLA API version 2: end
 
 			if (!defined($rtt))
 			{

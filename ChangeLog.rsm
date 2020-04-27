@@ -1,3 +1,9 @@
+Changes for rsm2.0.0rc5
+
+Bug fixes:
+....I..... [sub-642] added RDAP tested name to SLA API measurements file (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.0.0rc4
 
 Bug fixes:
