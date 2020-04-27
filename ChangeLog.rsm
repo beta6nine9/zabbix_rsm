@@ -50,6 +50,12 @@ New features:
 ..F.I..... [510] added support for Registrar RDDS Monitoring (asitals, dimir, gcalenko, miks, yurii)
 
 --------------------------------------------------------------------------------
+Changes for rsm1.3.2
+
+Bug fixes:
+....I..... [666] fixed calculation of probe main status when automatic status is flapping (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm1.3.1
 
 New features:
@@ -59,6 +65,7 @@ New features:
 Bug fixes:
 ....I..... [672] fixed handling false positives for newly added items (asitals)
 ....I..... [673] fixed parsing values with "=" symbol in rsm.conf when generating XML reports (asitals)
+........S. [676] improved warning messages about skipping old values from probes (asitals)
 
 --------------------------------------------------------------------------------
 Changes for rsm1.3.0
