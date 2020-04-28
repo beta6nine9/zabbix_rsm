@@ -5401,6 +5401,187 @@ out:
 	return ret;
 }
 
+static int	DBpatch_3000509(void)
+{
+	const ZBX_TABLE table =
+			{"rsm_target", "id", 0,
+				{
+					{"id", NULL, NULL, NULL, 0, ZBX_TYPE_UINT, ZBX_NOTNULL, 0},
+					{"name", NULL, NULL, NULL, 255, ZBX_TYPE_CHAR, ZBX_NOTNULL, 0},
+					{0}
+				},
+				NULL
+			};
+
+	if (SUCCEED != DBcreate_table(&table))
+		return FAIL;
+
+	/* add auto_increment `id` */
+	if (ZBX_DB_OK > DBexecute(
+			"alter table `rsm_target`"
+			" modify `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT"))
+	{
+		return FAIL;
+	}
+
+	return SUCCEED;
+}
+
+static int	DBpatch_3000510(void)
+{
+	const ZBX_TABLE table =
+			{"rsm_testedname", "id", 0,
+				{
+					{"id", NULL, NULL, NULL, 0, ZBX_TYPE_UINT, ZBX_NOTNULL, 0},
+					{"name", NULL, NULL, NULL, 255, ZBX_TYPE_CHAR, ZBX_NOTNULL, 0},
+					{0}
+				},
+				NULL
+			};
+
+	if (SUCCEED != DBcreate_table(&table))
+		return FAIL;
+
+	/* add auto_increment `id` */
+	if (ZBX_DB_OK > DBexecute(
+			"alter table `rsm_testedname`"
+			" modify `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT"))
+	{
+		return FAIL;
+	}
+
+	return SUCCEED;
+}
+
+static int	DBpatch_3000511(void)
+{
+	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
+		return SUCCEED;
+
+#define SQL	"update"												\
+			" hostmacro"											\
+			" left join hostmacro as hostmacro2 on hostmacro2.hostid=hostmacro.hostid"			\
+		" set"													\
+			" hostmacro.macro='{$RSM.RDDS43.TEST.DOMAIN}',"							\
+			"hostmacro.value=concat(hostmacro.value,'.',hostmacro2.value)"					\
+		" where"												\
+			" hostmacro.macro='{$RSM.RDDS.TESTPREFIX}' and"							\
+			" hostmacro2.macro='{$RSM.TLD}'"
+	if (ZBX_DB_OK > DBexecute(SQL))
+	{
+		return FAIL;
+	}
+#undef SQL
+
+	return SUCCEED;
+}
+
+static int	DBpatch_3000512(void)
+{
+	/* run on both server and proxy */
+
+	if (ZBX_DB_OK > DBexecute(
+			"alter table sla_reports"
+			" change column report report_xml text collate utf8_bin not null default ''"))
+	{
+		return FAIL;
+	}
+
+	if (ZBX_DB_OK > DBexecute(
+			"alter table sla_reports"
+			" add column report_json text collate utf8_bin not null default '' after report_xml"))
+	{
+		return FAIL;
+	}
+
+	return SUCCEED;
+}
+
+static int	DBpatch_3000513(void)
+{
+	int		ret = FAIL;
+
+	zbx_uint64_t	hostid_probe_statuses            = 100001;
+	zbx_uint64_t	applicationid_probe_availability = 1001;
+
+	DB_RESULT	result;
+	DB_ROW		row;
+
+	zbx_uint64_t	itemid_rdap_online_probes;
+	zbx_uint64_t	itemid_rdap_total_probes;
+	zbx_uint64_t	itemappid_rdap_online_probes;
+	zbx_uint64_t	itemappid_rdap_total_probes;
+
+	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
+		return SUCCEED;
+
+	if (NULL == (result = DBselect("select max(itemid)+1 from items")))
+		return FAIL;
+
+	if (NULL == (row = DBfetch(result)))
+	{
+		THIS_SHOULD_NEVER_HAPPEN;	/* there is "Zabbix Server" host, 'interface' table can't be empty */
+		DBfree_result(result);
+		return FAIL;
+	}
+
+	ZBX_STR2UINT64(itemid_rdap_online_probes, row[0]);
+	DBfree_result(result);
+
+	if (NULL == (result = DBselect("select max(itemappid)+1 from items_applications")))
+		return FAIL;
+
+	if (NULL == (row = DBfetch(result)))
+	{
+		THIS_SHOULD_NEVER_HAPPEN;	/* there is "Zabbix Server" host, 'interface' table can't be empty */
+		DBfree_result(result);
+		return FAIL;
+	}
+
+	ZBX_STR2UINT64(itemappid_rdap_online_probes, row[0]);
+	DBfree_result(result);
+
+	itemid_rdap_total_probes     = itemid_rdap_online_probes + 1;
+	itemappid_rdap_total_probes  = itemappid_rdap_online_probes + 1;
+
+#define CHECK(CODE) do {		\
+	int __result = (CODE);		\
+	if (ZBX_DB_OK > __result)	\
+	{				\
+		goto out;		\
+	}				\
+} while (0)
+
+#define SQL	"insert into items set itemid=" ZBX_FS_UI64 ",type=%d,snmp_community='',snmp_oid='',"			\
+		"hostid=" ZBX_FS_UI64 ",name='%s',key_='%s',delay=%d,history=%d,trends=365,status=0,value_type=%d,"	\
+		"trapper_hosts='',units='',multiplier=0,delta=0,snmpv3_securityname='',snmpv3_securitylevel=0,"		\
+		"snmpv3_authpassphrase='',snmpv3_privpassphrase='',formula='%s',error='',lastlogsize=0,logtimefmt='',"	\
+		"templateid=NULL,valuemapid=NULL,delay_flex='',params='',ipmi_sensor='',data_type=0,authtype=0,"	\
+		"username='',password='',publickey='',privatekey='',mtime=0,flags=0,interfaceid=NULL,port='',"		\
+		"description='',inventory_link=0,lifetime='30',snmpv3_authprotocol=0,snmpv3_privprotocol=0,state=0,"	\
+		"snmpv3_contextname='',evaltype=0"
+	/* type 10 = ITEM_TYPE_EXTERNAL */
+	/* value_type 3 = ITEM_VALUE_TYPE_UINT64 */
+	CHECK(DBexecute(SQL, itemid_rdap_online_probes, 10, hostid_probe_statuses,
+			"Number of online probes for RDAP tests", "online.nodes.pl[online,rdap]", 60, 7, 3, "1"));
+	CHECK(DBexecute(SQL, itemid_rdap_total_probes, 10, hostid_probe_statuses,
+			"Total number of probes for RDAP tests", "online.nodes.pl[total,rdap]", 60, 7, 3, "1"));
+#undef SQL
+
+#define SQL	"insert into items_applications set itemappid=" ZBX_FS_UI64 ",applicationid=" ZBX_FS_UI64 ",itemid=" ZBX_FS_UI64
+	CHECK(DBexecute(SQL, itemappid_rdap_online_probes, applicationid_probe_availability, itemid_rdap_online_probes));
+	CHECK(DBexecute(SQL, itemappid_rdap_total_probes, applicationid_probe_availability, itemid_rdap_total_probes));
+#undef SQL
+
+	CHECK(DBexecute("delete from ids where table_name='items' or table_name='items_applications'"));
+
+#undef CHECK
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
 #endif
 
 DBPATCH_START(3000)
@@ -5525,5 +5706,10 @@ DBPATCH_ADD(3000506, 0, 0)	/* add "rdap.target" and "rdap.testedname" items to "
 DBPATCH_ADD(3000507, 0, 0)	/* add "rsm.rdds.43.target", "rsm.rdds.43.testedname" and "rsm.rdds.80.target" items to "Template <RSMHOST>" templates where needed */
 DBPATCH_ADD(3000508, 0, 0)	/* add "rdap.target" and "rdap.testedname" items to hosts that use "Template RDAP" template */
 DBPATCH_ADD(3000509, 0, 0)	/* add "rsm.rdds.43.target", "rsm.rdds.43.testedname" and "rsm.rdds.80.target" items to hosts that use "Template <RSMHOST>" */
+DBPATCH_ADD(3000509, 0, 0)	/* create table rsm_target for Data Export */
+DBPATCH_ADD(3000510, 0, 0)	/* create table rsm_testedname for Data Export */
+DBPATCH_ADD(3000511, 0, 0)	/* rename {$RSM.RDDS.TESTPREFIX} to {$RSM.RDDS43.TEST.DOMAIN} */
+DBPATCH_ADD(3000512, 0, 0)	/* rename report column in sla_reports to report_xml, add report_json column */
+DBPATCH_ADD(3000513, 0, 0)	/* add items for online/total probes with RDAP enabled to host "Probe statuses" */
 
 DBPATCH_END()

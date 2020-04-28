@@ -1,6 +1,37 @@
+Changes for rsm2.0.0rc6
+
+Bug fixes:
+....I..... [sub-669] fixed SQL syntax error in Service Availability scripts when service is disabled, previous fix was incorrect (dimir)
+....I..... [680] fixed invalid rtt data type (string) in recent measurements (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.0.0rc5
+
+Bug fixes:
+....I..... [sub-642] added RDAP tested name to SLA API measurements file (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.0.0rc4
+
+Bug fixes:
+.......PS. [682] fixed regression causing DNSSEC errors not detected (dimir)
+....I..PS. [663] added missing functionality for calculating total/online probes with RDAP enabled (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.0.0rc3
+
+Bug fixes:
+.......PS. [sub-643] fixed tested name that was incorrectly set in RDDS43 test (dimir)
+....I..... [669] fixed SQL syntax error in Service Availability scripts when service is disabled (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.0.0rc2
 
 Bug fixes:
+..F.I..... [671] added monthly reports in JSON format in addition to XML (asitals)
+....I..PS. [639] added possibility to specify full RDDS43 test domain when onboarding TLD or registrar (asitals)
+..F....... [660] removed showing RDDS 'Current testing interface' label when RDAP is standalone (dimir)
+..F.I..... [642,643] fixed frontend, SLA API measurement files (version 1 and 2 for RDAP) and Data Export to store/display target and tested name (dimir)
 ....I..... [655] improved performance of onboarding TLDs and registrars (asitals)
 .......PS. [649] fixed incorrect handling of zero RTT during RDDS43 test (dimir)
 ....I..... [sub-506] fixed --list-services option in registrar.pl (dimir)
@@ -32,6 +63,12 @@ New features:
 ..F.I..... [510] added support for Registrar RDDS Monitoring (asitals, dimir, gcalenko, miks, yurii)
 
 --------------------------------------------------------------------------------
+Changes for rsm1.3.2
+
+Bug fixes:
+....I..... [666] fixed calculation of probe main status when automatic status is flapping (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm1.3.1
 
 New features:
@@ -41,6 +78,7 @@ New features:
 Bug fixes:
 ....I..... [672] fixed handling false positives for newly added items (asitals)
 ....I..... [673] fixed parsing values with "=" symbol in rsm.conf when generating XML reports (asitals)
+........S. [676] improved warning messages about skipping old values from probes (asitals)
 
 --------------------------------------------------------------------------------
 Changes for rsm1.3.0

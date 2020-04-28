@@ -1030,11 +1030,17 @@ sub __save_csv_data
 					foreach my $target (keys(%{$cycle_ref->{'interfaces'}->{$interface}->{'probes'}->{$probe}->{'targets'}}))
 					{
 						my $target_status = $general_status_up;
+
+						my $ns_id = '';
 						my $target_id = '';
 
 						if ($interface eq 'DNS')
 						{
-							$target_id = dw_get_id(ID_NS_NAME, $target);
+							$ns_id = dw_get_id(ID_NS_NAME, $target);
+						}
+						elsif ($target && ($service eq 'rdds' || $service eq 'rdap'))
+						{
+							$target_id = dw_get_id(ID_TARGET, $target);
 						}
 
 						METRIC: foreach my $metric_ref (@{$cycle_ref->{'interfaces'}->{$interface}->{'probes'}->{$probe}->{'targets'}->{$target}})
@@ -1126,9 +1132,26 @@ sub __save_csv_data
 								$ip_version_id = '';
 							}
 
+							my $testedname_id = '';
+
+							if ($metric_ref->{JSON_TAG_TESTEDNAME()})
+							{
+								$testedname_id = dw_get_id(
+									ID_TESTEDNAME,
+									$metric_ref->{JSON_TAG_TESTEDNAME()}
+								);
+							}
+
+							my $cycle_id = dw_get_cycle_id(
+								$cycleclock,
+								$service_category_id,
+								$tld_id,
+								($ns_id ? $ns_id : $target_id),
+								$ip_id);
+
 							# TEST
 							__add_csv_test(
-								dw_get_cycle_id($cycleclock, $service_category_id, $tld_id, $target_id, $ip_id),
+								$cycle_id,
 								$probe_id,
 								$cycleclock,
 								$testclock,
@@ -1139,9 +1162,11 @@ sub __save_csv_data
 								$ip_version_id,
 								$ip_id,
 								dw_get_id(ID_TEST_TYPE, lc($interface)),
+								$ns_id,
+								$tld_type_id,
 								$target_id,
-								$tld_type_id
-								);
+								$testedname_id,
+							);
 
 							if ($ip)
 							{
@@ -1281,7 +1306,7 @@ sub __save_csv_data
 	$time_write_csv = time();
 }
 
-sub __add_csv_test
+sub __add_csv_test($$$$$$$$$$$$$$$)
 {
 	my $cycle_id = shift;
 	my $probe_id = shift;
@@ -1296,21 +1321,35 @@ sub __add_csv_test
 	my $test_type_id = shift;
 	my $ns_id = shift;
 	my $tld_type_id = shift;
+	my $target_id = shift;
+	my $testedname_id = shift;
 
 	dw_append_csv(DATA_TEST, [
-			      $probe_id,
-			      $cycleclock,
-			      $testclock,
-			      __format_rtt($rtt),
-			      $cycle_id,
-			      $tld_id,
-			      $protocol_id,
-			      $ip_version_id,
-			      $ip_id,
-			      $test_type_id,
-			      $ns_id,
-			      $tld_type_id
+			$probe_id,
+			$cycleclock,
+			$testclock,
+			__format_rtt($rtt),
+			$cycle_id,
+			$tld_id,
+			$protocol_id,
+			$ip_version_id,
+			$ip_id,
+			$test_type_id,
+			$ns_id,
+			$tld_type_id
+	]);
+
+	if ($target_id || $testedname_id)
+	{
+		dw_append_csv(DATA_TEST_DETAILS, [
+				$probe_id,
+				$cycleclock,
+				$service_category_id,
+				$test_type_id,
+				$target_id,
+				$testedname_id,
 		]);
+	}
 }
 
 sub __ip_version
@@ -2008,52 +2047,6 @@ sub __get_service_status_itemids
 }
 
 # todo: taken from RSMSLV.pm
-# NB! THIS IS FIXED VERSION WHICH MUST REPLACE EXISTING ONE
-# 1. Improves speed by using itemid -> probe hash.
-sub __get_probe_results
-{
-	my $itemids_ref = shift;
-	my $from = shift;
-	my $till = shift;
-
-	my %result;
-
-	# generate list if itemids
-	my %itemids;
-	foreach my $probe (keys(%$itemids_ref))
-	{
-		$itemids{$itemids_ref->{$probe}} = $probe;
-	}
-
-	if (scalar(keys(%itemids)) != 0)
-	{
-		my $rows_ref = db_select(
-			"select itemid,value,clock".
-			" from history_uint".
-			" where itemid in (".join(',', keys(%itemids)).")".
-				" and " . sql_time_condition($from, $till).
-			" order by clock");
-
-		foreach my $row_ref (@$rows_ref)
-		{
-			my $itemid = $row_ref->[0];
-			my $value = $row_ref->[1];
-			my $clock = $row_ref->[2];
-
-			my $probe = $itemids{$itemid};
-
-			fail("internal error: Probe of item (itemid:$itemid) not found") unless (defined($probe));
-
-			push(@{$result{$probe}}, {'value' => $value, 'clock' => $clock});
-		}
-	}
-
-	return \%result;
-}
-
-
-
-# todo: taken from RSMSLV.pm
 sub __get_rdds_or_rdap_test_values($$$$$$)
 {
 	my $dbl_items_ref = shift;
@@ -2078,8 +2071,7 @@ sub __get_rdds_or_rdap_test_values($$$$$$)
 
 	return undef if (scalar(@dbl_itemids) == 0 || scalar(@str_itemids) == 0);
 
-	my $result;
-	my $target = '';
+	my ($result, $metrics, $targets);
 
 	my $dbl_rows_ref = db_select_binds("select itemid,value,clock from history where itemid=? and " . sql_time_condition($start, $end), \@dbl_itemids);
 
@@ -2114,10 +2106,9 @@ sub __get_rdds_or_rdap_test_values($$$$$$)
 
 		my $cycleclock = cycle_start($clock, $delay);
 
-		# NB! Do not use references, that won't add data!
-		$result->{$cycleclock}->{$interface}->{$probe}->{$target}->[0]->{$type} = $value;
-		$result->{$cycleclock}->{$interface}->{$probe}->{$target}->[0]->{JSON_TAG_CLOCK()} = $clock;
-		$result->{$cycleclock}->{$interface}->{$probe}->{$target}->[0]->{JSON_TAG_DESCRIPTION()} = $description;
+		$metrics->{$cycleclock}{$interface}{$probe}{$type} = $value;
+		$metrics->{$cycleclock}{$interface}{$probe}{JSON_TAG_CLOCK()} = $clock;
+		$metrics->{$cycleclock}{$interface}{$probe}{JSON_TAG_DESCRIPTION()} = $description;
 	}
 
 	my $str_rows_ref = db_select_binds("select itemid,value,clock from history_str where itemid=? and " . sql_time_condition($start, $end), \@str_itemids);
@@ -2141,13 +2132,38 @@ sub __get_rdds_or_rdap_test_values($$$$$$)
 				$type ne JSON_TAG_TARGET &&
 				$type ne JSON_TAG_TESTEDNAME)
 		{
-			fail("internal error: unknown item key (itemid:$itemid), expected item key representing the IP involved in $interface test");
+			fail("internal error: unknown item key (itemid:$itemid), expected item key representing details of the $interface test");
 		}
 
 		my $cycleclock = cycle_start($clock, $delay);
 
-		# NB! Do not use references, that won't add data!
-		$result->{$cycleclock}->{$interface}->{$probe}->{$target}->[0]->{$type} = $value;
+		if ($type eq JSON_TAG_TARGET)
+		{
+			# collect targets separately to merge with metrics later
+			$targets->{$cycleclock}{$interface}{$probe} = $value;
+		}
+		else
+		{
+			$metrics->{$cycleclock}{$interface}{$probe}{$type} = $value;
+		}
+	}
+
+	# connect metrics with targets
+	foreach my $cycleclock (keys(%{$metrics}))
+	{
+		foreach my $interface (keys(%{$metrics->{$cycleclock}}))
+		{
+			foreach my $probe (keys(%{$metrics->{$cycleclock}{$interface}}))
+			{
+				foreach my $key (keys(%{$metrics->{$cycleclock}{$interface}{$probe}}))
+				{
+					my $target = $targets->{$cycleclock}{$interface}{$probe} // '';
+
+					$result->{$cycleclock}{$interface}{$probe}{$target}[0]{$key} =
+						$metrics->{$cycleclock}{$interface}{$probe}{$key};
+				}
+			}
+		}
 	}
 
 	return $result;

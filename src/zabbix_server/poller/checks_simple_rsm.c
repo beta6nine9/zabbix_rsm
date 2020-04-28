@@ -3578,7 +3578,7 @@ static int	zbx_split_url(const char *url, char **proto, char **domain, int *port
 
 int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *result)
 {
-	char			*domain, *value_str = NULL, *res_ip = NULL, *testprefix = NULL, *rdds_ns_string = NULL,
+	char			*domain, *value_str = NULL, *res_ip = NULL, *test_domain = NULL, *rdds_ns_string = NULL,
 				*answer = NULL, testname[ZBX_HOST_BUF_SIZE], is_ipv4, err[ZBX_ERR_BUF_SIZE];
 	const char		*random_host, *ip43 = NULL, *ip80 = NULL;
 	zbx_vector_str_t	hosts43, hosts80, ips43, ips80, nss;
@@ -3691,7 +3691,7 @@ int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 		goto out;
 	}
 
-	if (SUCCEED != zbx_conf_str(&item->host.hostid, ZBX_MACRO_RDDS_TESTPREFIX, &testprefix, err, sizeof(err)))
+	if (SUCCEED != zbx_conf_str(&item->host.hostid, ZBX_MACRO_RDDS43_TEST_DOMAIN, &test_domain, err, sizeof(err)))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
 		goto out;
@@ -3710,11 +3710,11 @@ int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 		goto out;
 	}
 
-	if (0 == strcmp(testprefix, "*RANDOMTLD*"))
+	if (0 == strcmp(test_domain, "*RANDOMTLD*"))
 	{
-		zbx_free(testprefix);
+		zbx_free(test_domain);
 
-		if (NULL == (testprefix = zbx_get_rr_tld(domain, err, sizeof(err))))
+		if (NULL == (test_domain = zbx_get_rr_tld(domain, err, sizeof(err))))
 		{
 			SET_MSG_RESULT(result, zbx_strdup(NULL, err));
 			goto out;
@@ -3803,19 +3803,14 @@ int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 		i = zbx_random(ips43.values_num);
 		ip43 = ips43.values[i];
 
-		if (0 != strcmp(".", domain))
-			zbx_snprintf(testname, sizeof(testname), "%s.%s", testprefix, domain);
-		else
-			zbx_strlcpy(testname, testprefix, sizeof(testname));
-
 		/* set RDDS43 testedName */
-		zbx_set_rdds_value_by_pattern(testname, item->nextcheck, strlen(request->key), "43.testedname",
+		zbx_set_rdds_value_by_pattern(test_domain, item->nextcheck, strlen(request->key), "43.testedname",
 				strlen("43.testedname"), items, items_num);
 
 		rsm_infof(log_fd, "start RDDS43 test (ip %s, request \"%s\", expected prefix \"%s\")",
-				ip43, testname, rdds_ns_string);
+				ip43, test_domain, rdds_ns_string);
 
-		if (SUCCEED != zbx_rdds43_test(testname, ip43, 43, RSM_TCP_TIMEOUT, &answer, &rtt43,
+		if (SUCCEED != zbx_rdds43_test(test_domain, ip43, 43, RSM_TCP_TIMEOUT, &answer, &rtt43,
 				err, sizeof(err)))
 		{
 			rsm_errf(log_fd, "RDDS43 of \"%s\" (%s) failed: %s", random_host, ip43, err);
@@ -3831,7 +3826,7 @@ int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 			rtt43 = ZBX_EC_RDDS43_NONS;
 			rsm_errf(log_fd, "no Name Servers found in the output of RDDS43 server \"%s\""
 					" (%s) for query \"%s\" (expecting prefix \"%s\")",
-					random_host, ip43, testname, rdds_ns_string);
+					random_host, ip43, test_domain, rdds_ns_string);
 		}
 	}
 
@@ -3986,7 +3981,7 @@ out:
 
 	zbx_free(answer);
 	zbx_free(rdds_ns_string);
-	zbx_free(testprefix);
+	zbx_free(test_domain);
 	zbx_free(res_ip);
 	zbx_free(value_str);
 

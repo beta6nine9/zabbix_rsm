@@ -77,6 +77,8 @@ use constant DETAILED_RESULT_DELIM => ', ';
 use constant USE_CACHE_FALSE => 0;
 use constant USE_CACHE_TRUE  => 1;
 
+use constant TARGET_PLACEHOLDER => 'TARGET_PLACEHOLDER';	# for non-DNS services, see get_probe_results()
+
 our ($result, $dbh, $tld, $server_key);
 
 our %OPTS; # specified command-line options
@@ -90,6 +92,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		PROBE_KEY_MANUAL
 		ONLINE OFFLINE
 		USE_CACHE_FALSE USE_CACHE_TRUE
+		TARGET_PLACEHOLDER
 		get_macro_minns
 		get_macro_dns_probe_online
 		get_macro_rdds_probe_online
@@ -166,6 +169,8 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		update_slv_rtt_monthly_stats
 		recalculate_downtime
 		generate_report
+		get_probe_history
+		get_probe_results
 		set_log_tld unset_log_tld
 		convert_suffixed_number
 		usage);
@@ -2845,18 +2850,18 @@ sub process_slv_avail_cycles($$$$$$$$$)
 			if (!defined($keys_in{$tld}))
 			{
 				$keys_in{$tld} = $cfg_keys_in // $cfg_keys_in_cb->($tld);
+			}
 
-				if (!defined($keys_in{$tld}))
-				{
-					# fail("cannot get input keys for Service availability calculation");
+			if (@{$keys_in{$tld}} == 0)
+			{
+				# fail("cannot get input keys for Service availability calculation");
 
-					# We used to fail here but not anymore because rsm.rdds items can be 
-					# disabled after switch to RDAP standalone. So some of TLDs may not have
-					# RDDS checks thus making SLV calculations for rsm.slv.rdds.* useless
+				# We used to fail here but not anymore because rsm.rdds items can be 
+				# disabled after switch to RDAP standalone. So some of TLDs may not have
+				# RDDS checks thus making SLV calculations for rsm.slv.rdds.* useless
 
-					wrn("no input keys for $tld, skipping");
-					next;
-				}
+				dbg("no input keys for $tld, considering service disabled");
+				next;
 			}
 
 			process_slv_avail($tld, $keys_in{$tld}, $cfg_key_out, $from, $till, $value_ts, $cfg_minonline,
@@ -2918,6 +2923,7 @@ sub process_slv_avail($$$$$$$$$$)
 	my $values_ref = __get_item_values($host_items_ref, $from, $till, $value_type);
 
 	my $probes_with_results = scalar(@{$values_ref});
+
 	if ($probes_with_results < $cfg_minonline)
 	{
 		push_value($tld, $cfg_key_out, $value_ts, UP_INCONCLUSIVE_NO_DATA, ITEM_VALUE_TYPE_UINT64,
@@ -4777,6 +4783,274 @@ sub generate_report($$;$)
 	{
 		fail("failed to generate report, command $cmd exited with value " . ($? >> 8));
 	}
+}
+
+#
+# Helper function for collecting data for SLA API and Data Export.
+#
+# The data is collected for specified period, specified items of type float and str. The data is to be used later
+# for calling get_probe_results().
+#
+sub get_probe_history($$$$$$)
+{
+	my $from = shift;
+	my $till = shift;
+	my $itemids_float = shift;
+	my $itemids_str = shift;
+	my $results_float_buf = shift; # output
+	my $results_str_buf = shift;   # output
+
+	if (@{$itemids_float} == 0)
+	{
+		$$results_float_buf = [];
+	}
+	else
+	{
+		$$results_float_buf = db_select(
+			"select itemid,value,clock".
+			" from " . history_table(ITEM_VALUE_TYPE_FLOAT).
+			" where itemid in (" . join(',', @{$itemids_float}) . ")".
+				" and " . sql_time_condition($from, $till)
+		);
+	}
+
+	if (@{$itemids_str} == 0)
+	{
+		$$results_str_buf = [];
+	}
+	else
+	{
+		$$results_str_buf = db_select(
+			"select itemid,value,clock".
+			" from " . history_table(ITEM_VALUE_TYPE_STR).
+			" where itemid in (" . join(',', @{$itemids_str}) . ")".
+				" and " . sql_time_condition($from, $till)
+		);
+
+	}
+}
+
+use constant INTERFACE_DNS    => 'dns';
+use constant INTERFACE_DNSSEC => 'dnssec';
+use constant INTERFACE_RDDS43 => 'rdds43';
+use constant INTERFACE_RDDS80 => 'rdds80';
+use constant INTERFACE_RDAP   => 'rdap';
+
+sub __get_interface($$)
+{
+	my $service = shift;
+	my $key = shift;
+
+	if ($service eq 'dns')
+	{
+		return INTERFACE_DNS;
+	}
+
+	if ($service eq 'dnssec')
+	{
+		return INTERFACE_DNSSEC;
+	}
+
+	if ($service eq 'rdap')
+	{
+		return INTERFACE_RDAP;
+	}
+
+	# RDDS service is the only having multiple interfaces
+
+	if (substr($key, 0, length("rsm.rdds.43")) eq "rsm.rdds.43")
+	{
+		return INTERFACE_RDDS43;
+	}
+
+	if (substr($key, 0, length("rsm.rdds.80")) eq "rsm.rdds.80")
+	{
+		return INTERFACE_RDDS80;
+	}
+
+	if (substr($key, 0, length("rdap")) eq "rdap")
+	{
+		return INTERFACE_RDAP;
+	}
+
+	fail("Cannot identify interface from $service key \"$key\"");
+}
+#
+# Format history data in a convenient way for SLA API and Data Export scripts. We need to group metrics by targets.
+# Targets are differently fetched in case for DNS/DNSSEC and RDDS/RDAP but formatted in the same way (see comments
+# in the code):
+#
+# {CLOCK}->{INTERFACE}->{TARGET} => [
+#     {
+#         'rtt'
+#         'ip'
+#     },
+#     {
+#         'rtt'
+#         'ip'
+#     }
+# ];
+# {CLOCK}->{INTERFACE}->{TARGET} => [
+#     {
+#         'rtt'
+#         'ip'
+#         'testedName'
+#     }
+# ];
+#
+sub get_probe_results($$$$)
+{
+	my $service = shift;
+	my $results_float = shift;
+	my $results_str = shift;
+	my $item_data = shift;
+
+	my ($rd_targets, $rd_metrics, $probe_results);	# for rdds/rdap we need to collect separately
+
+	#
+	# Fetch RTT (Float) values (on Probe level).
+	#
+	# Note, for DNS service we will also collect target (Name Server) and IP
+	# because these are provided in the item parameters, e. g.:
+	#
+	# rsm.dns.udp.rtt["ns1.example.com",1.2.3.4]
+	#
+	# For other services the IPs are located in separate items which we collect on the next run.
+	#
+
+	foreach my $row_ref (@{$results_float})
+	{
+		my $itemid = $row_ref->[0];
+		my $value = $row_ref->[1];
+		my $clock = $row_ref->[2];
+
+		my $i = $item_data->{$itemid};
+
+		my $interface = __get_interface($service, $i->{'key'});
+
+		# before Upgrade to 5.x DNS/DNSSEC were handled differently, since target and ip are in item parameters
+
+		if ($service eq 'dns' || $service eq 'dnssec')
+		{
+			if (substr($i->{'key'}, 0, length("rsm.dns.udp.rtt")) eq "rsm.dns.udp.rtt")
+			{
+				my ($target, $ip) = split(',', get_nsip_from_key($i->{'key'}));
+
+				push(@{$probe_results->{$clock}{$interface}{$target}},
+					{
+						'rtt' => $value,
+						'ip' => $ip,
+					}
+				);
+			}
+		}
+		else
+		{
+			$rd_metrics->{$clock}{$interface}{'rtt'} = $value;
+		}
+	}
+
+	# before Upgrade to 5.x DNS/DNSSEC were handled differently, since target and ip are in item parameters,
+	# so there are no "str" values in case of DNS/DNSSEC
+
+	if ($service eq 'dns' || $service eq 'dnssec')
+	{
+		return $probe_results;
+	}
+
+	#
+	# Fetch String values (IP, target, testedname) for non-DNS/DNSSEC tests.
+	#
+	# Note, this is because only for those there are items like:
+	#
+	# rsm.rdds.43.ip
+	# rsm.rdds.43.target
+	# rsm.rdds.43.testedName
+	#
+
+	foreach my $row_ref (@{$results_str})
+	{
+		my $itemid = $row_ref->[0];
+		my $value = $row_ref->[1];
+		my $clock = $row_ref->[2];
+
+		my $i = $item_data->{$itemid};
+
+		my $interface = __get_interface($service, $i->{'key'});
+
+		#
+		# Collect RDDS/RDAP targets.
+		#
+
+		if (substr($i->{'key'}, 0, length("rsm.rdds.43.target")) eq 'rsm.rdds.43.target')
+		{
+			$rd_targets->{$clock}{$interface} = $value;
+			next;
+		}
+
+		if (substr($i->{'key'}, 0, length("rsm.rdds.80.target")) eq 'rsm.rdds.80.target')
+		{
+			$rd_targets->{$clock}{$interface} = $value;
+			next;
+		}
+
+		if (substr($i->{'key'}, 0, length("rdap.target")) eq 'rdap.target')
+		{
+			$rd_targets->{$clock}{$interface} = $value;
+			next;
+		}
+
+		#
+		# Collect other metrics.
+		#
+
+		my $field;
+
+		if (substr($i->{'key'}, 0, length("rsm.rdds.43.ip")) eq 'rsm.rdds.43.ip')
+		{
+			$field = 'ip';
+		}
+		elsif (substr($i->{'key'}, 0, length("rsm.rdds.43.testedname")) eq 'rsm.rdds.43.testedname')
+		{
+			$field = 'testedName';
+		}
+		elsif (substr($i->{'key'}, 0, length("rsm.rdds.80.ip")) eq 'rsm.rdds.80.ip')
+		{
+			$field = 'ip';
+		}
+		elsif (substr($i->{'key'}, 0, length("rdap.ip")) eq 'rdap.ip')
+		{
+			$field = 'ip';
+		}
+		elsif (substr($i->{'key'}, 0, length("rdap.testedname")) eq 'rdap.testedname')
+		{
+			$field = 'testedName';
+		}
+		else
+		{
+			fail("unknown $service key: ", $i->{'key'});
+		}
+
+		$rd_metrics->{$clock}{$interface}{$field} = $value;
+	}
+
+	# Join targets with metrics. NB! We know for each RDDS43, RDDS80, RDAP interface there
+	# is always one metric per target (unkike DNS/DNSSEC), that's why array index 0.
+	foreach my $clock (keys(%{$rd_metrics}))
+	{
+		foreach my $interface (keys(%{$rd_metrics->{$clock}}))
+		{
+			foreach my $key (keys(%{$rd_metrics->{$clock}{$interface}}))
+			{
+				my $target = $rd_targets->{$clock}{$interface} // TARGET_PLACEHOLDER;
+
+				$probe_results->{$clock}{$interface}{$target}[0]{$key} =
+					$rd_metrics->{$clock}{$interface}{$key};
+			}
+		}
+	}
+
+	return $probe_results;
 }
 
 sub set_log_tld($)

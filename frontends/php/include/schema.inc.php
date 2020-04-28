@@ -6398,7 +6398,11 @@ return [
 				'type' => DB::FIELD_TYPE_INT,
 				'length' => 10,
 			],
-			'report' => [
+			'report_xml' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_TEXT,
+			],
+			'report_json' => [
 				'null' => false,
 				'type' => DB::FIELD_TYPE_TEXT,
 			],

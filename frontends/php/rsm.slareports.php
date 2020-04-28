@@ -126,7 +126,7 @@ if ($data['tld'] && $filter_valid) {
 		include './include/classes/services/CSlaReport.php';
 
 		$report_row = CSlaReport::generate($data['server_nr'], [$data['tld']['host']], $data['filter_year'],
-			$data['filter_month']
+			$data['filter_month'], ['XML']
 		);
 
 		if (!$report_row) {
@@ -139,6 +139,8 @@ if ($data['tld'] && $filter_valid) {
 			$report_row = reset($report_row);
 
 			$report_row += ['year' => $data['filter_year'], 'month' => $data['filter_month']];
+
+			$report_row['report_xml'] = &$report_row['report']['XML'];
 		}
 	}
 
@@ -149,15 +151,15 @@ if ($data['tld'] && $filter_valid) {
 			$data['tld']['host'], $report_row['year'], getMonthCaption($report_row['month']))
 		);
 
-		echo $report_row['report'];
+		echo $report_row['report_xml'];
 		exit;
 	}
 
 	$xml = null;
 
-	if ($report_row && array_key_exists('report', $report_row)) {
+	if ($report_row && array_key_exists('report_xml', $report_row)) {
 		try {
-			$xml = new SimpleXMLElement($report_row['report']);
+			$xml = new SimpleXMLElement($report_row['report_xml']);
 		} catch (Exception $x) {
 			show_error_message(_('Unable to parse XML report.'));
 		}
