@@ -284,7 +284,7 @@ sub __write_file
 	return AH_SUCCESS;
 }
 
-sub __get_json_file_version($)
+sub __get_version($)
 {
 	my $service = shift;
 
@@ -306,7 +306,7 @@ sub __save_inc_false_positive($$$$)
 		'updateTime' => ah_int_or_null($clock)
 	};
 
-	return __write_file($false_positive_path, __encode_json($json, __get_json_file_version($service)));
+	return __write_file($false_positive_path, __encode_json($json, __get_version($service)));
 }
 
 sub ah_state_file_json($$)
@@ -353,7 +353,7 @@ sub ah_save_alarmed
 
 	my $json = {'alarmed' => $status};
 
-	return __write_file($alarmed_path, __encode_json($json, __get_json_file_version($service)), $clock);
+	return __write_file($alarmed_path, __encode_json($json, __get_version($service)), $clock);
 }
 
 sub ah_save_downtime
@@ -371,7 +371,7 @@ sub ah_save_downtime
 
 	my $json = {'downtime' => $downtime};
 
-	return __write_file($alarmed_path, __encode_json($json, __get_json_file_version($service)), $clock);
+	return __write_file($alarmed_path, __encode_json($json, __get_version($service)), $clock);
 }
 
 sub ah_create_incident_json
@@ -400,7 +400,7 @@ sub __save_inc_state
 
 	my $inc_state_path = "$inc_path/" . AH_INCIDENT_STATE_FILE;
 
-	return __write_file($inc_state_path, __encode_json($json, __get_json_file_version($service)), $lastclock);
+	return __write_file($inc_state_path, __encode_json($json, __get_version($service)), $lastclock);
 }
 
 sub __read_inc_file($$$$$$);
@@ -546,7 +546,7 @@ sub ah_save_measurement
 
 	my $json_path = "$inc_path/$clock.$eventid.json";
 
-	return __write_file($json_path, __encode_json($json, __get_json_file_version($service)), $clock);
+	return __write_file($json_path, __encode_json($json, __get_version($service)), $clock);
 }
 
 # Base path for recent measurement, e. g.
@@ -624,7 +624,7 @@ sub ah_save_recent_measurement($$$$)
 	# force creation of missing directories
 	return AH_FAIL unless (__gen_recent_measurement_path($ah_tld, $service, $clock, \$path, 1) == AH_SUCCESS);
 
-	return __write_file($path, __encode_json($json, __get_json_file_version($service)), $clock);
+	return __write_file($path, __encode_json($json, __get_version($service)), $clock);
 }
 
 # Generate path for recent measurement cache, e. g.

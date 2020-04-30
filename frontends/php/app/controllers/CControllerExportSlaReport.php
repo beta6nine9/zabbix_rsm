@@ -129,7 +129,7 @@ class CControllerExportSlaReport extends CController {
 				$data['tld']['host'], $report_row['year'], getMonthCaption($report_row['month']))
 			);
 
-			echo $report_row['report'];
+			echo $report_row['report_xml'];
 			exit;
 		}
 	}

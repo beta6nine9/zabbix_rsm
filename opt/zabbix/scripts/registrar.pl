@@ -90,7 +90,7 @@ sub init_cli_opts($)
 			"rdap-test-domain=s",
 			"rdds-ns-string=s",
 			"root-servers=s",
-			"rdds-test-prefix=s",
+			"rdds43-test-domain=s",
 			"verbose",
 			"help|?");
 
@@ -159,10 +159,10 @@ sub validate_cli_opts($)
 		{
 			$msg .= "none or both --rdds43-servers and --rdds80-servers must be specified\n";
 		}
-		if (!opt('rdds-test-prefix'))
+		if (!opt('rdds43-test-domain'))
 		{
 			# this might be needed only for RDDS43, but must be double-checked, if RDDS43 and RDDS80 are separated
-			$msg .= "--rdds-test-prefix must be specified\n";
+			$msg .= "--rdds43-test-domain must be specified\n";
 		}
 	}
 
@@ -268,7 +268,7 @@ sub list_services($;$)
 	my @columns = (
 		'status',
 		'{$RSM.RDDS.NS.STRING}',
-		'{$RSM.RDDS.TESTPREFIX}',
+		'{$RSM.RDDS43.TEST.DOMAIN}',
 		'{$RSM.TLD.RDDS.ENABLED}',
 		'{$RDAP.TLD.ENABLED}',
 		'{$RDAP.BASE.URL}',
@@ -288,28 +288,15 @@ sub list_services($;$)
 
 	foreach my $rsmhost (sort(keys(%rsmhosts)))
 	{
-		my @row = ();
-
 		my $config = get_rsmhost_config($server_key, $rsmhost);
+
+		my @row = ();
 
 		push(@row, $rsmhost);                      # Registrar ID
 		push(@row, $rsmhosts{$rsmhost}{'name'});   # Registrar name
 		push(@row, $rsmhosts{$rsmhost}{'family'}); # Registrar family
+
 		push(@row, map($config->{$_} // "", @columns));
-
-		# obtain rsm.rdds[] item key and extract RDDS(43|80).SERVERS strings
-		my $items = get_items_like(get_template_id(TEMPLATE_RSMHOST_CONFIG_PREFIX . $rsmhost),
-				'rsm.rdds[', true);
-
-		my $key;
-		foreach my $k (keys(%{$items}))	# assuming that only one rsm.rdds[] item is enabled at a time
-		{
-			if ($items->{$k}{'status'} == 0)
-			{
-				$key = $items->{$k}{'key_'};
-				last;
-			}
-		}
 
 		push(@rows, \@row);
 	}
@@ -351,15 +338,11 @@ sub get_rsmhost_config($$)
 	my $macros = get_host_macro($config_templateid, undef);
 	my $rsmhost_host = get_host($rsmhost, true);
 
+	# save rsmhost status (enabled, disabled)
 	$result->{'status'} = $rsmhost_host->{'status'};
 
-	foreach my $macro (@{$macros})
-	{
-		my $name = $macro->{'macro'};
-		my $value = $macro->{'value'};
-
-		$result->{$name} = $value;
-	}
+	# and macros
+	map { $result->{$_->{'macro'}} = $_->{'value'} } @{$macros};
 
 	return $result;
 }
@@ -513,7 +496,7 @@ sub create_main_template($)
 	my $templateid = really(create_template($template_name));
 
 	really(create_macro('{$RSM.TLD}', $rsmhost, $templateid));
-	really(create_macro('{$RSM.RDDS.TESTPREFIX}', getopt('rdds-test-prefix'), $templateid, 1)) if (opt('rdds-test-prefix'));
+	really(create_macro('{$RSM.RDDS43.TEST.DOMAIN}', getopt('rdds43-test-domain'), $templateid, 1)) if (opt('rdds43-test-domain'));
 	really(create_macro('{$RSM.RDDS.NS.STRING}', opt('rdds-ns-string') ? getopt('rdds-ns-string') : CFG_DEFAULT_RDDS_NS_STRING, $templateid, 1));
 	really(create_macro('{$RSM.TLD.RDDS.ENABLED}', opt('rdds43-servers') ? 1 : 0, $templateid, 1));
 	really(create_macro('{$RSM.TLD.RDDS.43.SERVERS}', getopt('rdds43-servers') // '', $templateid, 1));
@@ -751,7 +734,7 @@ Other options
                 (services supported only after switch to Standalone RDAP)
         --list-services
                 list services of each Regstrar, the output is comma-separated list:
-                <RR-ID>,<RR-NAME>,<RR-FAMILY>,<RR-STATUS>,<RDDS.NS.STRING>,<RDDS.TESTPREFIX>,
+                <RR-ID>,<RR-NAME>,<RR-FAMILY>,<RR-STATUS>,<RDDS.NS.STRING>,<RDDS43.TEST.DOMAIN>,
                 <RDDS.ENABLED>,<RDAP.ENABLED>,<RDAP.BASE.URL>,<RDAP.TEST.DOMAIN>,
 		<RDDS43.SERVERS>,<RDDS80.SERVERS>
         --rdds43-servers=STRING
@@ -769,8 +752,8 @@ Other options
                 (default: "${\CFG_DEFAULT_RDDS_NS_STRING}")
         --root-servers=STRING
                 list of IPv4 and IPv6 root servers separated by comma and semicolon: "v4IP1[,v4IP2,...][;v6IP1[,v6IP2,...]]"
-        --rdds-test-prefix=STRING
-                domain test prefix for RDDS monitoring (needed only if rdds servers specified)
+        --rdds43-test-domain=STRING
+                test domain for RDDS monitoring (needed only if rdds servers specified)
         --rdds
                 Action with RDDS
                 (only effective after switch to Standalone RDAP, default: no)

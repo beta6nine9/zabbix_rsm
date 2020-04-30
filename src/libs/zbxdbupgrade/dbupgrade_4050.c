@@ -807,8 +807,8 @@ static int	DBpatch_4050012_4(void)
 			"Prefix for DNS tests, e.g. nonexistent"
 		},
 		{
-			"{$RSM.RDDS.TESTPREFIX}",
-			"Prefix for RDDS tests of this TLD, e.g. \"whois\""
+			"{$RSM.RDDS43.TEST.DOMAIN}",
+			"Domain name to use when querying RDDS43 server, e.g. \"whois.example\""
 		},
 		{
 			"{$RSM.RESOLVER}",
@@ -1410,7 +1410,7 @@ static int	DBpatch_4050012_11(void)
 	/* 		master_itemid);					*/
 	DB_EXEC(SQL, itemid_rsm_rdds, 3, hostid, "RDDS Test",
 		"rsm.rdds[{$RSM.TLD},{$RSM.TLD.RDDS.43.SERVERS},{$RSM.TLD.RDDS.80.SERVERS},"
-			"{$RSM.RDDS.TESTPREFIX},{$RSM.RDDS.NS.STRING},{$RSM.RDDS.ENABLED},"
+			"{$RSM.RDDS43.TEST.DOMAIN},{$RSM.RDDS.NS.STRING},{$RSM.RDDS.ENABLED},"
 			"{$RSM.TLD.RDDS.ENABLED},{$RSM.EPP.ENABLED},{$RSM.TLD.EPP.ENABLED},{$RSM.IP4.ENABLED},"
 			"{$RSM.IP6.ENABLED},{$RSM.RESOLVER},{$RSM.RDDS.RTT.HIGH},{$RSM.RDDS.MAXREDIRS}]",
 		"{$RSM.RDDS.DELAY}", "0", "0", 4, (zbx_uint64_t)0,

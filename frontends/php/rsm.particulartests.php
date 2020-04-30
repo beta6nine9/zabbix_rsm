@@ -421,7 +421,7 @@ if ($data['host'] && $data['time'] && $data['slvItemId'] && $data['type'] !== nu
 		$data['tld_rdap_enabled'] = true;
 	}
 	else {
-		$data['tld_rdap_enabled'] = true;
+		$data['tld_rdap_enabled'] = false;
 	}
 
 	// Get probe status.

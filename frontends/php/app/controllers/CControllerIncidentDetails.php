@@ -138,6 +138,8 @@ class CControllerIncidentDetails extends CController {
 
 		if ($main_event) {
 			$data['main_event'] = reset($main_event);
+
+			$data['is_rdap_standalone'] = is_RDAP_standalone($data['main_event']['clock']);
 		}
 	}
 
@@ -208,7 +210,7 @@ class CControllerIncidentDetails extends CController {
 						'output' => ['macro', 'value'],
 						'hostids' => $template['templateid'],
 						'filter' => [
-							'macro' => is_RDAP_standalone($data['main_event']['clock'])
+							'macro' => $data['is_rdap_standalone']
 								? [RSM_TLD_RDDS43_ENABLED, RSM_TLD_RDDS80_ENABLED, RSM_TLD_RDDS_ENABLED]
 								: [RSM_TLD_RDDS43_ENABLED, RSM_TLD_RDDS80_ENABLED, RSM_RDAP_TLD_ENABLED,
 										RSM_RDAP_TLD_ENABLED, RSM_TLD_RDDS_ENABLED]

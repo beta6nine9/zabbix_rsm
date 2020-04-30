@@ -1926,8 +1926,9 @@ static int	zbx_get_nameservers(char *name_servers_list, zbx_ns_t **nss, size_t *
 
 		if (NULL == (ip = strchr(ns, ',')))
 		{
-			zbx_snprintf(err, err_size, "invalid entry \"%s\" in macro \"" ZBX_MACRO_DNS_NAME_SERVERS
-					"\" value, expected \"<NS>,<IP>\"", ns);
+			zbx_snprintf(err, err_size, "invalid entry \"%s\" in list of name servers \"%s\""
+					", expected \"<NS>,<IP>\"",
+					ns, name_servers_list);
 			return FAIL;
 		}
 
@@ -1936,8 +1937,8 @@ static int	zbx_get_nameservers(char *name_servers_list, zbx_ns_t **nss, size_t *
 
 		if (SUCCEED != zbx_validate_ip(ip, ipv4_enabled, ipv6_enabled, NULL, NULL))
 		{
-			rsm_warnf(log_fd, "unsupported IP address \"%s\" in macro \"" ZBX_MACRO_DNS_NAME_SERVERS
-					"\", ignored", ip);
+			rsm_warnf(log_fd, "unsupported IP address \"%s\" in list of name servers \"%s\", ignored",
+					ip, name_servers_list);
 			goto next_ns;
 		}
 
@@ -2176,7 +2177,7 @@ static FILE	*open_item_log(const char *host, const char *tld, const char *name, 
 	return fd;
 }
 
-static void	set_nss_results(zbx_ns_t *nss, size_t nss_num, int rtt_limit, size_t minns, size_t *nssok,
+static void	set_nss_results(zbx_ns_t *nss, size_t nss_num, int rtt_limit, unsigned int minns, unsigned int *nssok,
 		unsigned int *status)
 {
 	size_t	i, j;
@@ -2200,7 +2201,7 @@ static void	set_nss_results(zbx_ns_t *nss, size_t nss_num, int rtt_limit, size_t
 }
 
 static void	create_rsm_dns_json(struct zbx_json *json, zbx_ns_t *nss, size_t nss_num, unsigned int current_mode,
-		size_t nssok, unsigned int status, char protocol)
+		unsigned int nssok, unsigned int status, char protocol)
 {
 	size_t	i, j;
 
@@ -2428,8 +2429,8 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 	ldns_rr_list		*keys = NULL;
 	FILE			*log_fd;
 	zbx_ns_t		*nss = NULL;
-	size_t			i, j, nss_num = 0, nssok, minns;
-	unsigned int		extras, current_mode, test_status;
+	size_t			i, j, nss_num = 0;
+	unsigned int		extras, current_mode, test_status, minns, nssok;
 	struct zbx_json		json;
 	int			dnssec_enabled, rdds_enabled, epp_enabled, udp_enabled, tcp_enabled, ipv4_enabled,
 				ipv6_enabled, udp_rtt_limit, tcp_rtt_limit, rtt_limit, successful_tests, file_exists,
@@ -2507,7 +2508,7 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 
 	rsm_info(log_fd, "START TEST");
 
-	rsm_infof(log_fd, "mode: %s, protocol: %s, rtt limit: %d, tcp ratio: %d, minns: %d"
+	rsm_infof(log_fd, "mode: %s, protocol: %s, rtt limit: %d, tcp ratio: %d, minns: %u"
 			" (for critical mode: successful: %d, required for recovery: %d for udp, %d for tcp)",
 			(CURRENT_MODE_NORMAL == current_mode ? "normal" : "critical"),
 			(protocol == RSM_UDP ? "UDP" : "TCP"),
@@ -3592,10 +3593,9 @@ static int	get_rdds_result(int rtt43, int rtt80, int rtt_limit)
 
 int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *result)
 {
-	char			*domain, *res_ip, *testprefix, *rdds_ns_string, *answer = NULL,
-				testedname43[ZBX_HOST_BUF_SIZE] = "", url[ZBX_HOST_BUF_SIZE], is_ipv4,
-				err[ZBX_ERR_BUF_SIZE];
-	const char		*target43 = NULL, *target80 = NULL, *ip43 = NULL, *ip80 = NULL;
+	char			*domain, *res_ip, *rdds_ns_string, *answer = NULL,
+				is_ipv4, rdds80_url[ZBX_HOST_BUF_SIZE], err[ZBX_ERR_BUF_SIZE];
+	const char		*testedname43 = NULL, *target43 = NULL, *target80 = NULL, *ip43 = NULL, *ip80 = NULL;
 	zbx_vector_str_t	hosts43, hosts80, ips43, ips80, nss;
 	FILE			*log_fd = NULL;
 	ldns_resolver		*res = NULL;
@@ -3622,7 +3622,7 @@ int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	GET_PARAM_EMPTY    (domain            , 0 , "TLD");
 	GET_PARAM_HOST_LIST(hosts43           , 1 , "RDDS43 host list");
 	GET_PARAM_HOST_LIST(hosts80           , 2 , "RDDS80 host list");
-	GET_PARAM_EMPTY    (testprefix        , 3 , "Test prefix");
+	GET_PARAM_EMPTY    (testedname43      , 3 , "Test domain");
 	GET_PARAM_EMPTY    (rdds_ns_string    , 4 , "RDDS ns string");
 	GET_PARAM_UINT     (probe_rdds_enabled, 5 , "RDDS enabled on probe");
 	GET_PARAM_UINT     (rdds_enabled      , 6 , "RDDS enabled on rsmhost");
@@ -3700,11 +3700,6 @@ int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	{
 		/* choose random IP */
 		ip43 = ips43.values[zbx_random((size_t)ips43.values_num)];
-
-		if (0 != strcmp(".", domain))
-			zbx_snprintf(testedname43, sizeof(testedname43), "%s.%s", testprefix, domain);
-		else
-			zbx_strlcpy(testedname43, testprefix, sizeof(testedname43));
 
 		rsm_infof(log_fd, "start RDDS43 test (ip %s, request \"%s\", expected prefix \"%s\")",
 				ip43, testedname43, rdds_ns_string);
@@ -3806,15 +3801,15 @@ int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	}
 
 	if (0 != is_ipv4)
-		zbx_snprintf(url, sizeof(url), "http://%s", ip80);
+		zbx_snprintf(rdds80_url, sizeof(rdds80_url), "http://%s", ip80);
 	else
-		zbx_snprintf(url, sizeof(url), "http://[%s]", ip80);
+		zbx_snprintf(rdds80_url, sizeof(rdds80_url), "http://[%s]", ip80);
 
-	if (SUCCEED != zbx_http_test(target80, url, RSM_TCP_TIMEOUT, maxredirs, &ec_http, &rtt80, NULL,
+	if (SUCCEED != zbx_http_test(target80, rdds80_url, RSM_TCP_TIMEOUT, maxredirs, &ec_http, &rtt80, NULL,
 			curl_devnull, curl_flags, err, sizeof(err)))
 	{
 		rtt80 = zbx_http_error_to_RDDS80(ec_http);
-		rsm_errf(log_fd, "RDDS80 of \"%s\" (%s) failed: %s (%d)", target80, url, err, rtt80);
+		rsm_errf(log_fd, "RDDS80 of \"%s\" (%s) failed: %s (%d)", target80, rdds80_url, err, rtt80);
 	}
 
 	rsm_infof(log_fd, "end RDDS80 test (rtt:%d)", rtt80);

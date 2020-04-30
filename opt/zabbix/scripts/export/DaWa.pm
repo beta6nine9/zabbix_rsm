@@ -21,6 +21,8 @@ use constant ID_SERVICE_CATEGORY => 'service_category';
 use constant ID_TLD_TYPE => 'tld_type';
 use constant ID_STATUS_MAP => 'status_map';
 use constant ID_IP_VERSION => 'ip_version';
+use constant ID_TARGET => 'target';
+use constant ID_TESTEDNAME => 'testedname';
 
 # data files
 use constant DATA_TEST => 'test';
@@ -30,6 +32,7 @@ use constant DATA_INCIDENT => 'incident';
 use constant DATA_INCIDENT_END => 'incidentEnd';
 use constant DATA_FALSE_POSITIVE => 'falsePositive';
 use constant DATA_PROBE_CHANGES => 'probeChanges';
+use constant DATA_TEST_DETAILS => 'testDetails';
 
 our %CATALOGS = (
 	ID_PROBE() => 'probeNames.csv',
@@ -41,7 +44,9 @@ our %CATALOGS = (
 	ID_SERVICE_CATEGORY() => 'serviceCategory.csv',
 	ID_TLD_TYPE() => 'tldTypes.csv',
 	ID_STATUS_MAP() => 'statusMaps.csv',
-	ID_IP_VERSION() => 'ipVersions.csv'
+	ID_IP_VERSION() => 'ipVersions.csv',
+	ID_TARGET() => 'target.csv',
+	ID_TESTEDNAME() => 'testedName.csv',
 );
 
 our %DATAFILES = (
@@ -51,15 +56,18 @@ our %DATAFILES = (
 	DATA_INCIDENT() => 'incidents.csv',
 	DATA_INCIDENT_END() => 'incidentsEndTime.csv',
 	DATA_FALSE_POSITIVE() => 'falsePositiveChanges.csv',
-	DATA_PROBE_CHANGES() => 'probeChanges.csv'
+	DATA_PROBE_CHANGES() => 'probeChanges.csv',
+	DATA_TEST_DETAILS() => 'testDetails.csv',
 );
 
 use base 'Exporter';
 
 our @EXPORT = qw(
 		ID_PROBE ID_TLD ID_NS_NAME ID_NS_IP ID_TRANSPORT_PROTOCOL ID_TEST_TYPE ID_SERVICE_CATEGORY
-		ID_TLD_TYPE ID_STATUS_MAP ID_IP_VERSION DATA_TEST DATA_NSTEST DATA_CYCLE DATA_INCIDENT DATA_INCIDENT_END
+		ID_TLD_TYPE ID_STATUS_MAP ID_IP_VERSION ID_TARGET ID_TESTEDNAME
+		DATA_TEST DATA_NSTEST DATA_CYCLE DATA_INCIDENT DATA_INCIDENT_END
 		DATA_FALSE_POSITIVE DATA_PROBE_CHANGES
+		DATA_TEST_DETAILS
 		%CATALOGS %DATAFILES
 		dw_csv_init dw_append_csv dw_load_ids_from_db dw_get_id dw_get_name dw_write_csv_files
 		dw_write_csv_catalogs dw_delete_csvs dw_get_cycle_id dw_translate_cycle_id dw_set_date
@@ -75,7 +83,9 @@ my %_MAX_IDS = (
 	ID_SERVICE_CATEGORY() => 127,
 	ID_TLD_TYPE() => 127,
 	ID_STATUS_MAP() => 127,
-	ID_IP_VERSION() => 127
+	ID_IP_VERSION() => 127,
+	ID_TARGET() => 32767,
+	ID_TESTEDNAME() => 32767,
 );
 
 # this is needed to construct Cycle ID
@@ -443,7 +453,21 @@ sub __write_csv_catalog
 
 	die("THIS_SHOULD_NEVER_HAPPEN: no ID type specified with __write_csv_catalog()") unless ($id_type);
 
-	return 1 if (opt('dry-run'));
+	if (opt('dry-run'))
+	{
+		print("** ", $id_type, " **\n");
+
+		foreach my $key (
+			sort {
+				$_csv_catalogs{$id_type}{$a} <=> $_csv_catalogs{$id_type}{$b}
+			} (keys(%{$_csv_catalogs{$id_type}}))
+		)
+		{
+			print($_csv_catalogs{$id_type}{$key}, ",$key\n");
+		}
+
+		return 1;
+	}
 
 	return 1 if (scalar(keys(%{$_csv_catalogs{$id_type}})) == 0);
 

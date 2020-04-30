@@ -79,9 +79,9 @@ use constant ZBX_EC_INTERNAL_FIRST => -1;
 use constant ZBX_EC_INTERNAL_LAST  => -199;
 
 # define ranges of DNSSEC error codes of DNS UDP/TCP
-use constant ZBX_EC_DNS_UDP_DNSSEC_FIRST => -401;	# DNS UDP - The TLD is configured as DNSSEC-enabled, but no DNSKEY was found in the apex
+use constant ZBX_EC_DNS_UDP_DNSSEC_FIRST => -401;	# DNS UDP - The rsmhost is configured as DNSSEC-enabled, but no DNSKEY was found in the apex
 use constant ZBX_EC_DNS_UDP_DNSSEC_LAST  => -427;	# DNS UDP - Malformed DNSSEC response
-use constant ZBX_EC_DNS_TCP_DNSSEC_FIRST => -801;	# DNS TCP - The TLD is configured as DNSSEC-enabled, but no DNSKEY was found in the apex
+use constant ZBX_EC_DNS_TCP_DNSSEC_FIRST => -801;	# DNS TCP - The rsmhost is configured as DNSSEC-enabled, but no DNSKEY was found in the apex
 use constant ZBX_EC_DNS_TCP_DNSSEC_LAST  => -827;	# DNS TCP - Malformed DNSSEC response
 
 use constant CFG_DEFAULT_RDDS_NS_STRING => 'Name Server:';
@@ -151,27 +151,27 @@ use constant TLD_TYPE_PROBE_RESULTS_GROUPIDS	=> {
 };
 
 use constant CFG_MACRO_DESCRIPTION => {
-	'{$RSM.RDDS.TESTPREFIX}' => 'Prefix for RDDS tests of this TLD, e.g. "whois"',
-	'{$RSM.TLD}' => 'Name of this TLD, e.g. "zabbix"',
-	'{$RSM.TLD.RDDS.ENABLED}' => 'Indicates whether RDDS is enabled for this TLD',
+	'{$RSM.RDDS43.TEST.DOMAIN}' => 'Domain name to use when querying RDDS43 server, e.g. "whois.example"',
+	'{$RSM.TLD}' => 'Name of the rsmhost, e. g. "example"',
+	'{$RSM.TLD.RDDS.ENABLED}' => 'Indicates whether RDDS is enabled on the rsmhost',
 	'{$RDAP.TEST.DOMAIN}' => 'Test domain for RDAP queries, e.g. whois.zabbix',
 	'{$RSM.RDDS.NS.STRING}' => 'What to look for in RDDS output, e.g. "Name Server:"',
 	'{$RDAP.BASE.URL}' => 'Base URL for RDAP queries, e.g. http://whois.zabbix',
-	'{$RSM.TLD.DNSSEC.ENABLED}' => 'Indicates whether DNSSEC is enabled for this TLD',
+	'{$RSM.TLD.DNSSEC.ENABLED}' => 'Indicates whether DNSSEC is enabled on the rsmhost',
 	'{$RSM.TLD.RDDS.43.SERVERS}' => 'List of RDDS43 server host names as candidates for a test',
 	'{$RSM.TLD.RDDS.80.SERVERS}' => 'List of Web Whois server host names as candidates for a test',
 	'{$RSM.RDDS.ENABLED}' => 'Indicates whether the probe supports RDDS protocol',
-	'{$RDAP.TLD.ENABLED}' => 'Indicates whether RDAP is enabled for this TLD',
+	'{$RDAP.TLD.ENABLED}' => 'Indicates whether RDAP is enabled on the rsmhost',
 	'{$RSM.IP4.ENABLED}' => 'Indicates whether the probe supports IPv4',
-	'{$RSM.TLD.EPP.ENABLED}' => 'Indicates whether EPP is enabled for this TLD',
+	'{$RSM.TLD.EPP.ENABLED}' => 'Indicates whether EPP is enabled on the rsmhost',
 	'{$RSM.RDAP.ENABLED}' => 'Indicates whether the probe supports RDAP protocol',
 	'{$RSM.RESOLVER}' => 'DNS resolver used by the probe',
 	'{$RSM.IP6.ENABLED}' => 'Indicates whether the probe supports IPv6',
 	'{$RSM.EPP.ENABLED}' => 'Indicates whether EPP is enabled on probe',
 	'{$RSM.DNS.TESTPREFIX}' => 'Prefix for DNS tests, e.g. nonexistent',
 	'{$RSM.DNS.NAME.SERVERS}' => 'List of Name Server (name, IP pairs) to monitor',
-	'{$RSM.TLD.DNS.UDP.ENABLED}' => 'Indicates whether DNS UDP enabled for this TLD',
-	'{$RSM.TLD.DNS.TCP.ENABLED}' => 'Indicates whether DNS TCP enabled for this TLD',
+	'{$RSM.TLD.DNS.UDP.ENABLED}' => 'Indicates whether DNS UDP enabled on the rsmhost',
+	'{$RSM.TLD.DNS.TCP.ENABLED}' => 'Indicates whether DNS TCP enabled on the rsmhost',
 };
 
 use constant ZBX_FLAG_DISCOVERY_NORMAL  => 0;

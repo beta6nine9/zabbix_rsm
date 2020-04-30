@@ -15,14 +15,13 @@ use RSMSLV;
 use TLD_constants qw(:api :config :groups :items);
 use ApiHelper;
 use File::Copy;
+use JSON::XS qw(decode_json encode_json);
 use sigtrap 'handler' => \&main_process_signal_handler, 'normal-signals';
 
 $Data::Dumper::Terse = 1;	# do not output names like "$VAR1 = "
-$Data::Dumper::Pair = " : ";	# use separator instead of " => "
+$Data::Dumper::Pair = ": ";	# use separator instead of " => "
 $Data::Dumper::Useqq = 1;	# use double quotes instead of single quotes
 $Data::Dumper::Indent = 1;	# 1 provides less indentation instead of 2
-
-use constant TARGET_PLACEHOLDER => 'TARGET_PLACEHOLDER';	# for non-DNS services
 
 use constant MAX_PERIOD => 30 * 60;	# 30 minutes
 
@@ -43,6 +42,7 @@ sub process_tld($$$$$);
 sub cycles_to_calculate($$$$$$$$);
 sub get_lastvalues_from_db($$$);
 sub calculate_cycle($$$$$$$$$);
+sub translate_interfaces($);
 sub get_interfaces($$$);
 sub probe_online_at_init();
 sub get_history_by_itemid($$$);
@@ -937,6 +937,17 @@ sub get_lastvalues_from_db($$$)
 			next if (substr($key, 0, length("rsm.conf")) eq "rsm.conf");
 			next if (substr($key, 0, length("rsm.probe")) eq "rsm.probe");
 
+			# SLA API version 1: start
+			next if (substr($key, 0, length("rsm.rdds.43.target")) eq "rsm.rdds.43.target");
+			next if (substr($key, 0, length("rsm.rdds.43.testedname")) eq "rsm.rdds.43.testedname");
+			next if (substr($key, 0, length("rsm.rdds.80.target")) eq "rsm.rdds.80.target");
+			if (!is_rdap_standalone($clock))
+			{
+				next if (substr($key, 0, length("rdap.target")) eq "rdap.target");
+				next if (substr($key, 0, length("rdap.testedname")) eq "rdap.testedname");
+			}
+			# SLA API version 1: end
+
 			next unless (substr($key, 0, length("rsm.")) eq "rsm." ||
 				substr($key, 0, length("rdap[")) eq "rdap[" ||
 				substr($key, 0, length("rdap.ip")) eq "rdap.ip" ||
@@ -1003,12 +1014,15 @@ sub fill_test_data($$$$)
 			next if (!defined($src_metric_ref->{'rtt'}) || ($src_metric_ref->{'rtt'} >= 0 && !defined($src_metric_ref->{'ip'})));
 
 			my $metric = {
-				'testDateTime'	=> int($src_metric_ref->{'clock'}),
+				'testDateTime'	=> $src_metric_ref->{'clock'},
 				'targetIP'	=> $src_metric_ref->{'ip'},
-				'testedName'	=> $src_metric_ref->{'testedName'},
 			};
 
 			my $rtt = $src_metric_ref->{'rtt'};
+
+			# SLA API version 2: start
+			$metric->{'testedName'}	= $src_metric_ref->{'testedName'} if ($service eq 'rdap');
+			# SLA API version 2: end
 
 			if (!defined($rtt))
 			{
@@ -1193,9 +1207,7 @@ sub calculate_cycle($$$$$$$$$)
 			}
 		} (keys(%{$probes_data->{$probe}}));
 
-		next if (@itemids_uint == 0);
-		next if (@itemids_float == 0);
-		next if (@itemids_str == 0);
+		next if (@itemids_uint == 0 || @itemids_float == 0);
 
 		#
 		# Fetch availability (Integer) values (on a TLD level and Probe level):
@@ -1401,161 +1413,40 @@ sub calculate_cycle($$$$$$$$$)
 
 		$probes_with_results++;
 
-#
-# Use clock as unique identifier of the metric set.
-#
-# {CLOCK}->{INTERFACE}->{"target"}
-# {CLOCK}->{INTERFACE}->{"rtt"}
-# {CLOCK}->{INTERFACE}->{"ip"}
-# {CLOCK}->{INTERFACE}->{"testedName"}
-#
-sub get_probe_results($$$$)
-{
-	my $dbl_items_ref = shift;
-	my $str_items_ref = shift;
-	my $start = shift;
-	my $end = shift;
+		my ($results_float, $results_str);
 
-	my $probe_data;
-}
-	my $probe_data;
+		get_probe_history($from, $till, \@itemids_float, \@itemids_str, \$results_float, \$results_str);
 
-
-		#
-		# Fetch RTT (Float) values (on Probe level).
-		#
-		# Note, for DNS service we will also collect target (Name Server) and IP
-		# because these are provided in RTT items, e. g.:
-		#
-		# rsm.dns.udp.rtt["ns1.example.com",1.2.3.4]
-		#
-		# For other services the IPs are located in separate items which we collect on the next run.
-		#
-
-		$rows_ref = db_select(
-			"select itemid,value,clock".
-			" from " . history_table(ITEM_VALUE_TYPE_FLOAT).
-			" where itemid in (" . join(',', @itemids_float) . ")".
-				" and " . sql_time_condition($from, $till)
+		my $probe_results = get_probe_results(
+			$service,
+			$results_float,
+			$results_str,
+			$probes_data->{$probe}
 		);
 
-		foreach my $row_ref (@{$rows_ref})
+		foreach my $clock (keys(%{$probe_results}))
 		{
-			my $itemid = $row_ref->[0];
-			my $value = $row_ref->[1];
-			my $clock = $row_ref->[2];
-
-			my $i = $probes_data->{$probe}{$itemid};
-
-			my $interface;
-
-			if ($service eq 'dnssec')
+			foreach my $interface (keys(%{$probe_results->{$clock}}))
 			{
-				$interface = AH_INTERFACE_DNSSEC;
-			}
-			else
-			{
-				$interface = ah_get_interface($i->{'key'});
-			}
+				foreach my $target (keys(%{$probe_results->{$clock}{$interface}}))
+				{
+					foreach my $metric (@{$probe_results->{$clock}{$interface}{$target}})
+					{
+						# convert clock and rtt to integer
+						my $h = {
+							'rtt'        => int($metric->{'rtt'}),
+							'ip'         => $metric->{'ip'},
+							'clock'      => int($clock),
+						};
 
-			$probe_data->{$clock}{$interface}{'rtt'} = $value;
+						if (exists($metric->{'testedName'}))
+						{
+							$h->{'testedName'} = $metric->{'testedName'};
+						}
 
-			if (substr($i->{'key'}, 0, length("rsm.dns.udp.rtt")) eq "rsm.dns.udp.rtt")
-			{
-				my ($target, $ip) = split(',', get_nsip_from_key($i->{'key'}));
-
-				$probe_data->{$clock}{$interface}{'target'} = $target;
-				$probe_data->{$clock}{$interface}{'ip'} = $ip;
-			}
-		}
-
-		#
-		# Fetch String values (IP, target, testedname) for non-DNS tests.
-		#
-		# Note, this is because only for non-DNS services there are special items like:
-		#
-		# rsm.rdds.43.ip
-		#
-
-		$rows_ref = db_select(
-			"select itemid,value,clock".
-			" from " . history_table(ITEM_VALUE_TYPE_STR).
-			" where itemid in (" . join(',', @itemids_str) . ")".
-				" and " . sql_time_condition($from, $till)
-		);
-
-		foreach my $row_ref (@{$rows_ref})
-		{
-			my $itemid = $row_ref->[0];
-			my $value = $row_ref->[1];
-			my $clock = $row_ref->[2];
-
-			my $i = $probes_data->{$probe}{$itemid};
-
-			my ($interface, $field);
-
-			if (substr($i->{'key'}, 0, length("rsm.rdds.43.ip")) eq 'rsm.rdds.43.ip')
-			{
-				$interface = AH_INTERFACE_RDDS43;
-				$field = 'ip';
-			}
-			elsif (substr($i->{'key'}, 0, length("rsm.rdds.43.target")) eq 'rsm.rdds.43.target')
-			{
-				$interface = AH_INTERFACE_RDDS43;
-				$field = 'target';
-			}
-			elsif (substr($i->{'key'}, 0, length("rsm.rdds.43.testedname")) eq 'rsm.rdds.43.testedname')
-			{
-				$interface = AH_INTERFACE_RDDS43;
-				$field = 'testedName';
-			}
-			elsif (substr($i->{'key'}, 0, length("rsm.rdds.80.ip")) eq 'rsm.rdds.80.ip')
-			{
-				$interface = AH_INTERFACE_RDDS80;
-				$field = 'ip';
-			}
-			elsif (substr($i->{'key'}, 0, length("rsm.rdds.80.target")) eq 'rsm.rdds.80.target')
-			{
-				$interface = AH_INTERFACE_RDDS80;
-				$field = 'target';
-			}
-			elsif (substr($i->{'key'}, 0, length("rdap.ip")) eq 'rdap.ip')
-			{
-				$interface = AH_INTERFACE_RDAP;
-				$field = 'ip';
-			}
-			elsif (substr($i->{'key'}, 0, length("rdap.target")) eq 'rdap.target')
-			{
-				$interface = AH_INTERFACE_RDAP;
-				$field = 'target';
-			}
-			elsif (substr($i->{'key'}, 0, length("rdap.testedname")) eq 'rdap.testedname')
-			{
-				$interface = AH_INTERFACE_RDAP;
-				$field = 'testedName';
-			}
-			else
-			{
-				fail("unknown $tld ($probe) item key: ", $i->{'key'});
-			}
-
-			$probe_data->{$clock}{$interface}{$field} = $value;
-		}
-
-		foreach my $clock (keys(%{$probe_data}))
-		{
-			foreach my $interface (keys(%{$probe_data->{$clock}}))
-			{
-				my $target = $probe_data->{$clock}{$interface}{'target'};
-
-				my $h = {
-					'rtt'        => $probe_data->{$clock}{$interface}{'rtt'},
-					'ip'         => $probe_data->{$clock}{$interface}{'ip'},
-					'testedName' => $probe_data->{$clock}{$interface}{'testedName'},
-					'clock'      => $clock,
-				};
-
-				push(@{$tested_interfaces{$interface}{$probe}{'testData'}{$target}}, $h);
+						push(@{$tested_interfaces{translate_interface($interface)}{$probe}{'testData'}{$target}}, $h);
+					}
+				}
 			}
 		}
 	}
@@ -1677,6 +1568,19 @@ sub get_probe_results($$$$)
 	{
 		fail("cannot save recent measurement: ", ah_get_error());
 	}
+}
+
+sub translate_interface($)
+{
+	my $interface = shift;
+
+	return AH_INTERFACE_DNS    if ($interface eq 'dns');
+	return AH_INTERFACE_DNSSEC if ($interface eq 'dnssec');
+	return AH_INTERFACE_RDDS43 if ($interface eq 'rdds43');
+	return AH_INTERFACE_RDDS80 if ($interface eq 'rdds80');
+	return AH_INTERFACE_RDAP   if ($interface eq 'rdap');
+
+	fail("$interface: unknown interface");
 }
 
 sub get_interfaces($$$)
