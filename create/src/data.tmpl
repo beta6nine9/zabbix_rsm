@@ -605,6 +605,7 @@ ROW   |100101   |{100101}<{$RSM.EPP.PROBE.ONLINE}                               
 ROW   |100102   |{100102}<{$RSM.IP4.MIN.PROBE.ONLINE}                                    |Number of IP4-enabled online probes is less than $1             |   |0     |5       |                                                                                                                                      |NULL      |0   |0    |
 ROW   |100103   |{100103}<{$RSM.IP6.MIN.PROBE.ONLINE}                                    |Number of IP6-enabled online probes is less than $1             |   |0     |5       |                                                                                                                                      |NULL      |0   |0    |
 ROW   |100104   |{100104}<{$RSM.RDDS.PROBE.ONLINE}                                       |Number of RDDS-enabled online probes is less than $1            |   |0     |5       |                                                                                                                                      |NULL      |0   |0    |
+ROW   |100110   |{100110}<{$RSM.RDAP.PROBE.ONLINE}                                       |Number of RDAP-enabled online probes is less than $1            |   |0     |5       |                                                                                                                                      |NULL      |0   |0    |
 
 TABLE |trigger_depends
 FIELDS|triggerdepid|triggerid_down|triggerid_up|
@@ -743,6 +744,7 @@ ROW   |100101    |100101|100101   |last     |         |
 ROW   |100102    |100102|100102   |last     |         |
 ROW   |100103    |100103|100103   |last     |         |
 ROW   |100104    |100104|100104   |last     |         |
+ROW   |100110    |100110|100110   |last     |         |
 
 TABLE |graphs
 FIELDS|graphid|name                                |width|height|yaxismin|yaxismax|templateid|show_work_period|show_triggers|graphtype|show_legend|show_3d|percent_left|percent_right|ymin_type|ymax_type|ymin_itemid|ymax_itemid|flags|
