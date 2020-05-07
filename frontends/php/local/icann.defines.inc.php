@@ -219,13 +219,18 @@ define('PROBE_EPP_LOGIN',			'rsm.epp.rtt[{$RSM.TLD},login]');
 define('PROBE_RDDS_ITEM',			'rsm.rdds.status');
 define('PROBE_RDDS43_IP',			'rsm.rdds.43.ip');
 define('PROBE_RDDS43_RTT',			'rsm.rdds.43.rtt');
+define('PROBE_RDDS43_TARGET',		'rsm.rdds.43.target');
+define('PROBE_RDDS43_TESTEDNAME',	'rsm.rdds.43.testedname');
 define('PROBE_RDDS80_IP',			'rsm.rdds.80.ip');
 define('PROBE_RDDS80_RTT',			'rsm.rdds.80.rtt');
+define('PROBE_RDDS80_TARGET',		'rsm.rdds.80.target');
 //define('PROBE_RDAP_IP',			'rsm.rdds.rdap.ip[{$RSM.TLD}]');  // deprecated
 //define('PROBE_RDAP_RTT',			'rsm.rdds.rdap.rtt[{$RSM.TLD}]'); // deprecated
 define('PROBE_RDAP_ITEM',			'rdap[');
 define('PROBE_RDAP_IP',				'rdap.ip');
 define('PROBE_RDAP_RTT',			'rdap.rtt');
+define('PROBE_RDAP_TARGET',			'rdap.target');
+define('PROBE_RDAP_TESTEDNAME',		'rdap.testedname');
 
 // SLA monitoring NS names
 define('NS_NO_RESULT',	0);
@@ -253,15 +258,15 @@ define('RSM_G_TLD_GROUP',		'gTLD');
 define('RSM_OTHER_TLD_GROUP',	'otherTLD');
 define('RSM_TEST_GROUP',		'testTLD');
 
-define('RSM_RDDS_SUBSERVICE_RDDS', 'RDDS43/80');
-define('RSM_RDDS_SUBSERVICE_RDAP', 'RDAP');
+define('RSM_RDDS_SUBSERVICE_RDDS',	'RDDS43/80');
+define('RSM_RDDS_SUBSERVICE_RDAP',	'RDAP');
 
 // Value maps used for special purpose.
-define('PROBES_MON_GROUPID',	130);
-define('RSM_SERVICE_AVAIL_VALUE_MAP', 110);
-define('RSM_DNS_TRANSPORT_PROTOCOL_VALUE_MAP', 162);
-define('RSM_DNS_RTT_ERRORS_VALUE_MAP', 120);
-define('RSM_RDDS_RTT_ERRORS_VALUE_MAP', 130);
+define('PROBES_MON_GROUPID',					130);
+define('RSM_SERVICE_AVAIL_VALUE_MAP',			110);
+define('RSM_DNS_TRANSPORT_PROTOCOL_VALUE_MAP',	162);
+define('RSM_DNS_RTT_ERRORS_VALUE_MAP',			120);
+define('RSM_RDDS_RTT_ERRORS_VALUE_MAP',			130);
 
 define('RSM_MONITORING_TARGET', '{$RSM.MONITORING.TARGET}');
 define('MONITORING_TARGET_REGISTRY', 'registry');
