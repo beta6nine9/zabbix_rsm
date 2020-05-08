@@ -418,8 +418,6 @@ foreach (@server_keys)
 		$all_probes_ref = get_probes();
 	}
 
-	my $probe_times_ref = get_probe_times($from, $till, $all_probes_ref);
-
 	my $tlds_processed = 0;
 
 	my $tlds_ref;

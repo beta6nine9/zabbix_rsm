@@ -1,6 +1,7 @@
 Changes for rsm2.0.0rc7
 
 Bug fixes:
+..F.I..... [665] fixed probe ONLINE status calculation for RDDS/RDAP cycles (dimir)
 ....I..... [sub-663] added missing trigger for number of total/online probes with RDAP enabled (dimir)
 
 --------------------------------------------------------------------------------
