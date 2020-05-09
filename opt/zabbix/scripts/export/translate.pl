@@ -104,6 +104,10 @@ while ($line = <$fh>)
 	{
 		__translate_probe_changes_line($line);
 	}
+	elsif ($data_type eq 'testDetails.csv')
+	{
+		__translate_test_details_line($line);
+	}
 	else
 	{
 		__usage("\"$data_type\" is not supported yet, currently supported are cycles.csv, tests.csv, incidents.csv, incidentsEndTime.csv");
@@ -260,4 +264,25 @@ sub __translate_probe_changes_line
 	printf("%-" . PRINT_RIGHT_SHIFT . "s%s\n", 'probeName', $probe_name);
 	printf("%-" . PRINT_RIGHT_SHIFT . "s%s\n", 'probeChangeDateTime', ts_full($probe_change_date_time));
 	printf("%-" . PRINT_RIGHT_SHIFT . "s%s\n", 'probeStatus', $probe_status);
+}
+
+sub __translate_test_details_line
+{
+	my $line = shift;
+
+	my @columns = split(',', $line);
+
+	my $probe_name = dw_get_name(ID_PROBE, $columns[0]);
+	my $cycle_date_minute = $columns[1];
+	my $service_category = dw_get_name(ID_SERVICE_CATEGORY, $columns[2]);
+	my $test_type = dw_get_name(ID_TEST_TYPE, $columns[3]);
+	my $target = dw_get_name(ID_TARGET, $columns[4]);
+	my $tested_name = dw_get_name(ID_TESTEDNAME, $columns[5]) // "";	# tested name is not used in RDDS80 test
+
+	printf("%-" . PRINT_RIGHT_SHIFT . "s%s\n", 'probeName', $probe_name);
+	printf("%-" . PRINT_RIGHT_SHIFT . "s%s\n", 'cycleDateMinute', ts_full($cycle_date_minute));
+	printf("%-" . PRINT_RIGHT_SHIFT . "s%s\n", 'serviceCategory', $service_category);
+	printf("%-" . PRINT_RIGHT_SHIFT . "s%s\n", 'testType', $test_type);
+	printf("%-" . PRINT_RIGHT_SHIFT . "s%s\n", 'target', $target);
+	printf("%-" . PRINT_RIGHT_SHIFT . "s%s\n", 'testedName', $tested_name);
 }

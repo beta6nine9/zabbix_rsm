@@ -1,6 +1,7 @@
 Changes for rsm2.0.0rc7
 
 Bug fixes:
+....I..... [sub-643] added support for translating new Data Export file testDetail.csv (dimir)
 ..F....... [584] added visual identification of disabled rsmhosts on the rolling week page (dimir)
 ....I..... [sub-669] changed behavior of registrar.pl to disable host when last enabled service is disabled (dimir)
 ..F.I..... [665] fixed probe ONLINE status calculation for RDDS/RDAP cycles (dimir)

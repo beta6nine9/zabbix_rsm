@@ -205,6 +205,9 @@ sub dw_get_name
 	my $id_type = shift;
 	my $id = shift;
 
+	# trim endline from last value if it's empty
+	chomp($id);
+
 	return undef unless(defined($id) && ($id ne ''));
 
 	my $found_name;
