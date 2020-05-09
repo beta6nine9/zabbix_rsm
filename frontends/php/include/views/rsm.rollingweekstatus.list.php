@@ -524,7 +524,10 @@ if ($data['tld']) {
 
 		$row[] = new CLink($tld['server'], $tld['url'].'rsm.rollingweekstatus.php?sid='.$data['sid'].'&set_sid=1');
 
-		$table->addRow($row);
+		if ($tld['status'] == HOST_STATUS_MONITORED)
+			$table->addRow($row);
+		else
+			$table->addRow($row, ZBX_STYLE_DISABLED);
 	}
 }
 
