@@ -58,13 +58,6 @@ function DBconnect(&$error) {
 					mysqli_options($DB['DB'], MYSQLI_OPT_CONNECT_TIMEOUT, $DB['DB_CONN_TIMEOUT']);
 				}
 
-				if ($DB['DB_KEY_FILE'] !== null || $DB['DB_CERT_FILE'] !== null || $DB['DB_CA_FILE'] !== null
-						|| $DB['DB_CA_PATH'] !== null || $DB['DB_CA_CIPHER'] !== null) {
-					mysqli_ssl_set($DB['DB'], $DB['DB_KEY_FILE'], $DB['DB_CERT_FILE'], $DB['DB_CA_FILE'],
-						$DB['DB_CA_PATH'], $DB['DB_CA_CIPHER']);
-					$ssl_connection = true;
-				}
-
 				if (!@mysqli_real_connect($DB['DB'], $DB['SERVER'], $DB['USER'], $DB['PASSWORD'], $DB['DATABASE'],
 						$DB['PORT'])) {
 					$error = 'Error connecting to database: '.trim(mysqli_connect_error());
@@ -76,15 +69,6 @@ function DBconnect(&$error) {
 				}
 				else {
 					DBexecute('SET NAMES utf8');
-				}
-
-				if ($result && $ssl_connection) {
-					$ssl = DBfetch(DBselect("SHOW STATUS LIKE 'Ssl_cipher'"));
-
-					if (!$ssl || $ssl['Value'] === '') {
-						$error = 'Established connection is not secure';
-						$result = false;
-					}
 				}
 
 				if ($result) {

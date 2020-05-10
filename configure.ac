@@ -1347,14 +1347,6 @@ AM_CONDITIONAL([DBSCHEMA], [test -d create])
 
 AM_CONDITIONAL([ZBXCMOCKA], [(test -d tests/) && (test "x$server" = "xyes" || test "x$proxy" = "xyes" || test "x$agent" = "xyes")])
 
-AC_ARG_ENABLE(dbtls,[  --enable-dbtls          Turn on support of secure DB connections],
-[case "${enableval}" in
-  yes) dbtls=yes ;;
-  no)  dbtls=no ;;
-  *) AC_MSG_ERROR([bad value ${enableval} for --enable-dbtls]) ;;
-esac],
-[dbtls=no])
-
 have_db="no"
 have_unixodbc="no"
 have_web_monitoring="no"
@@ -1368,11 +1360,6 @@ have_tls="no"
 if test "x$ipv6" = "xyes"; then
 	AC_DEFINE(HAVE_IPV6,1,[Define to 1 if IPv6 should be enabled.])
 	have_ipv6="yes"
-fi
-
-if test "x$dbtls" = "xyes"; then
-	AC_DEFINE(DBTLS,1,[Define to 1 if support for secure DB connections should be enabled.])
-	have_dbtls="yes"
 fi
 
 if test "x$server" = "xyes" || test "x$proxy" = "xyes"; then
@@ -1396,10 +1383,6 @@ if test "x$server" = "xyes" || test "x$proxy" = "xyes"; then
 	dnl Checking for Oracle support
 	AX_LIB_ORACLE_OCI([10.0])
 	if test "x$want_oracle_oci" = "xyes"; then
-		if test "x$have_dbtls" = "xyes"; then
-			AC_MSG_ERROR([Secure connections are not supported for Oracle])
-		fi
-
 		if test "x$have_db" != "xno"; then
 			AC_MSG_ERROR([You can configure for only one database.])
 		fi
@@ -1420,10 +1403,6 @@ if test "x$server" = "xyes" || test "x$proxy" = "xyes"; then
 	dnl Checking for PostgreSQL support
 	AX_LIB_POSTGRESQL("8.1")
 	if test "x$want_postgresql" = "xyes"; then
-		if test "x$have_dbtls" = "xyes"; then
-			AC_MSG_ERROR([Secure connections are not supported for PostgreSQL])
-		fi
-
 		if test "x$have_db" != "xno"; then
 			AC_MSG_ERROR([You can configure for only one database.])
 		fi
@@ -1447,10 +1426,6 @@ if test "x$server" = "xyes" || test "x$proxy" = "xyes"; then
 	dnl Checking for SQLite3 support
 	AX_LIB_SQLITE3()
 	if test "x$want_sqlite3" = "xyes"; then
-		if test "x$have_dbtls" = "xyes"; then
-			AC_MSG_ERROR([Secure connections are not supported for SQLite3])
-		fi
-
 		if test "x$server" = "xyes"; then
 			AC_MSG_ERROR([SQLite is not supported as a main Zabbix database backend.])
 		fi
@@ -2159,7 +2134,6 @@ if test "x$server" != "xno"; then
 
 echo "  Server details:
     With database:         ${have_db}
-    Secure connections:    ${have_dbtls}
     WEB Monitoring:        ${have_web_monitoring}"
 
 if test "x$have_web_monitoring" = "xcURL"; then
@@ -2188,7 +2162,6 @@ if test "x$proxy" != "xno"; then
 
 echo "  Proxy details:
     With database:         ${have_db}
-    Secure connections:    ${have_dbtls}
     WEB Monitoring:        ${have_web_monitoring}"
 
 if test "x$have_web_monitoring" = "xcURL"; then
