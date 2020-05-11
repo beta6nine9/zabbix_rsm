@@ -404,6 +404,24 @@ sub manage_registrar($$$$)
 		map($_->{'hostid'}, @{$rsmhost_template->{'hosts'}})
 	);
 
+	# get the list of currently enabled services
+	my %enabled_services;
+	foreach my $service ('rdds', 'rdap')
+	{
+		my $macro = $service eq 'rdap' ? '{$RDAP.TLD.ENABLED}' : '{$RSM.TLD.' . uc($service) . '.ENABLED}';
+
+		my $macro_value = get_host_macro($main_templateid, $macro);
+
+		$enabled_services{$service} = 1 if (defined($macro_value) && $macro_value->{'value'});
+	}
+
+	# filter out what's requested to be disabled, the host will be disabled later if no enabled services left
+	if ($action eq 'disable')
+	{
+		delete($enabled_services{'rdds'}) if ($rdds);
+		delete($enabled_services{'rdap'}) if ($rdap);
+	}
+
 	if ($rdds && $rdap)
 	{
 		if ($action eq 'disable')
@@ -491,6 +509,26 @@ sub manage_registrar($$$$)
 	if ($action eq 'disable' && $service eq 'rdap')
 	{
 		set_linked_items_enabled('rdap[', $rsmhost, 0);
+	}
+
+	# disable host if no enabled services left
+	if ($action eq 'disable' && scalar(keys(%enabled_services)) == 0)
+	{
+		my @hostids_for_api = map({'hostid' => $_}, @hostids);
+
+		my $result = disable_hosts(\@hostids_for_api);
+
+		if (%{$result})
+		{
+			if (!compare_arrays(\@hostids, \@{$result->{'hostids'}}))
+			{
+				pfail("en error occurred while disabling hosts!");
+			}
+		}
+		else
+		{
+			pfail("en error occurred while disabling hosts!");
+		}
 	}
 }
 

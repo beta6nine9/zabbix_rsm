@@ -5582,6 +5582,54 @@ out:
 	return ret;
 }
 
+static int	DBpatch_3000514(void)
+{
+	zbx_uint64_t	itemid, triggerid, functionid;
+	DB_RESULT	result;
+	DB_ROW		row;
+	int		ret = FAIL;
+
+	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
+		return SUCCEED;
+
+	triggerid = DBget_maxid("triggers");
+	functionid = DBget_maxid("functions");
+
+	result = DBselect("select itemid from items where hostid=100001 and key_='online.nodes.pl[online,rdap]'");
+
+	if (NULL == (row = DBfetch(result)))
+	{
+		zabbix_log(LOG_LEVEL_CRIT, "Zabbix configuration in the database is corrupted");
+		goto out;
+	}
+
+	ZBX_STR2UINT64(itemid, row[0]);	/* itemid of "<Probe>" */
+
+#define CHECK(CODE) do {		\
+	int __result = (CODE);		\
+	if (ZBX_DB_OK > __result)	\
+	{				\
+		goto out;		\
+	}				\
+} while (0)
+
+	CHECK(DBexecute("insert into triggers (triggerid,expression,description,url,status,value,"
+				"priority,lastchange,comments,error,templateid,type,state,flags)"
+			" values (" ZBX_FS_UI64 ",'{" ZBX_FS_UI64 "}<{$RSM.RDAP.PROBE.ONLINE}','%s',"
+				"'',0,0,5,0,'','',NULL,0,0,0)",
+			triggerid, functionid, "Number of RDAP-enabled online probes is less than $1"));
+	CHECK(DBexecute("insert into functions (functionid,itemid,triggerid,function,parameter)"
+			" values (" ZBX_FS_UI64 "," ZBX_FS_UI64 "," ZBX_FS_UI64 ",'%s','')",
+			functionid, itemid, triggerid, "last"));
+#undef CHECK
+
+	ret = SUCCEED;
+out:
+	DBfree_result(result);
+
+	return ret;
+}
+
 #endif
 
 DBPATCH_START(3000)
@@ -5711,5 +5759,6 @@ DBPATCH_ADD(3000510, 0, 0)	/* create table rsm_testedname for Data Export */
 DBPATCH_ADD(3000511, 0, 0)	/* rename {$RSM.RDDS.TESTPREFIX} to {$RSM.RDDS43.TEST.DOMAIN} */
 DBPATCH_ADD(3000512, 0, 0)	/* rename report column in sla_reports to report_xml, add report_json column */
 DBPATCH_ADD(3000513, 0, 0)	/* add items for online/total probes with RDAP enabled to host "Probe statuses" */
+DBPATCH_ADD(3000514, 0, 0)	/* add trigger for number of RDAP-enabled online probes to host "Probe statuses" */
 
 DBPATCH_END()

@@ -44,7 +44,6 @@ sub get_lastvalues_from_db($$$);
 sub calculate_cycle($$$$$$$$$);
 sub translate_interfaces($);
 sub get_interfaces($$$);
-sub probe_online_at_init();
 sub get_history_by_itemid($$$);
 sub child_error($$$$$);
 sub update_lastvalues_cache($);
@@ -272,9 +271,6 @@ sub process_server($)
 		dbg("there's no recent measurements cache file yet, but no worries");
 		$lastvalues_cache->{'tlds'} = {};
 	}
-
-	# initialize probe online cache
-	probe_online_at_init();
 
 	# probes available for every service
 	my %probes;
@@ -1090,63 +1086,6 @@ sub fill_test_data($$$$)
 	}
 }
 
-#
-# Probe status value cache. itemid - PROBE_KEY_ONLINE item
-#
-# {
-#     probe => {
-#         'itemid' => 1234,
-#         'values' => {
-#             'clock' => value,
-#             ...
-#         }
-#     }
-# }
-#
-my %probe_statuses;
-sub probe_online_at_init()
-{
-	%probe_statuses = ();
-}
-
-sub probe_online_at($$)
-{
-	my $probe = shift;
-	my $clock = shift;
-
-	if (!defined($probe_statuses{$probe}{'itemid'}))
-	{
-		my $host = "$probe - mon";
-
-		my $rows_ref = db_select(
-			"select i.itemid,i.key_,h.host".
-			" from items i,hosts h".
-			" where i.hostid=h.hostid".
-				" and h.host='$host'".
-				" and i.key_='".PROBE_KEY_ONLINE."'"
-		);
-
-		fail("internal error: no \"$host\" item " . PROBE_KEY_ONLINE) unless (defined($rows_ref->[0]));
-
-		$probe_statuses{$probe}{'itemid'} = $rows_ref->[0]->[0];
-	}
-
-	if (!defined($probe_statuses{$probe}{'values'}{$clock}))
-	{
-		my $rows_ref = db_select(
-			"select value".
-			" from " . history_table(ITEM_VALUE_TYPE_UINT64).
-			" where itemid=" . $probe_statuses{$probe}{'itemid'}.
-				" and clock=".$clock
-		);
-
-		# Online if no value in the database
-		$probe_statuses{$probe}{'values'}{$clock} = (defined($rows_ref->[0]) ? $rows_ref->[0]->[0] : 1);
-	}
-
-	return $probe_statuses{$probe}{'values'}{$clock};
-}
-
 sub calculate_cycle($$$$$$$$$)
 {
 	$tld = shift;		# set globally
@@ -1459,7 +1398,7 @@ sub calculate_cycle($$$$$$$$$)
 		if (defined($service_probes_ref->{$probe}) &&
 				$service_probes_ref->{$probe}->{'status'} == HOST_STATUS_MONITORED)
 		{
-			$probe_online = probe_online_at($probe, $from);
+			$probe_online = probe_online_at($probe, $from, $delay);
 		}
 		else
 		{

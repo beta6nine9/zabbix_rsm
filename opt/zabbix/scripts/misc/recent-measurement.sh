@@ -98,6 +98,12 @@ fi
 [ -n "$files" ] || die "directory $base is empty"
 
 for file in $files; do
+	ts=${file##*/}
+	ts=${ts%.json}
+
+	date="$(date '+%F %X' -d @$ts)"
+
+	echo -n "$date; "
 	ls -l $file
 	cat $file | jq -SC .
 done
