@@ -5401,7 +5401,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_3000509(void)
+static int	DBpatch_3000510(void)
 {
 	const ZBX_TABLE table =
 			{"rsm_target", "id", 0,
@@ -5427,7 +5427,7 @@ static int	DBpatch_3000509(void)
 	return SUCCEED;
 }
 
-static int	DBpatch_3000510(void)
+static int	DBpatch_3000511(void)
 {
 	const ZBX_TABLE table =
 			{"rsm_testedname", "id", 0,
@@ -5453,7 +5453,7 @@ static int	DBpatch_3000510(void)
 	return SUCCEED;
 }
 
-static int	DBpatch_3000511(void)
+static int	DBpatch_3000512(void)
 {
 	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
 		return SUCCEED;
@@ -5476,7 +5476,7 @@ static int	DBpatch_3000511(void)
 	return SUCCEED;
 }
 
-static int	DBpatch_3000512(void)
+static int	DBpatch_3000513(void)
 {
 	/* run on both server and proxy */
 
@@ -5497,7 +5497,7 @@ static int	DBpatch_3000512(void)
 	return SUCCEED;
 }
 
-static int	DBpatch_3000513(void)
+static int	DBpatch_3000514(void)
 {
 	int		ret = FAIL;
 
@@ -5582,7 +5582,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_3000514(void)
+static int	DBpatch_3000515(void)
 {
 	zbx_uint64_t	itemid, triggerid, functionid;
 	DB_RESULT	result;
@@ -5754,11 +5754,11 @@ DBPATCH_ADD(3000506, 0, 0)	/* add "rdap.target" and "rdap.testedname" items to "
 DBPATCH_ADD(3000507, 0, 0)	/* add "rsm.rdds.43.target", "rsm.rdds.43.testedname" and "rsm.rdds.80.target" items to "Template <RSMHOST>" templates where needed */
 DBPATCH_ADD(3000508, 0, 0)	/* add "rdap.target" and "rdap.testedname" items to hosts that use "Template RDAP" template */
 DBPATCH_ADD(3000509, 0, 0)	/* add "rsm.rdds.43.target", "rsm.rdds.43.testedname" and "rsm.rdds.80.target" items to hosts that use "Template <RSMHOST>" */
-DBPATCH_ADD(3000509, 0, 0)	/* create table rsm_target for Data Export */
-DBPATCH_ADD(3000510, 0, 0)	/* create table rsm_testedname for Data Export */
-DBPATCH_ADD(3000511, 0, 0)	/* rename {$RSM.RDDS.TESTPREFIX} to {$RSM.RDDS43.TEST.DOMAIN} */
-DBPATCH_ADD(3000512, 0, 0)	/* rename report column in sla_reports to report_xml, add report_json column */
-DBPATCH_ADD(3000513, 0, 0)	/* add items for online/total probes with RDAP enabled to host "Probe statuses" */
-DBPATCH_ADD(3000514, 0, 0)	/* add trigger for number of RDAP-enabled online probes to host "Probe statuses" */
+DBPATCH_ADD(3000510, 0, 0)	/* create table rsm_target for Data Export */
+DBPATCH_ADD(3000511, 0, 0)	/* create table rsm_testedname for Data Export */
+DBPATCH_ADD(3000512, 0, 0)	/* rename {$RSM.RDDS.TESTPREFIX} to {$RSM.RDDS43.TEST.DOMAIN} */
+DBPATCH_ADD(3000513, 0, 0)	/* rename report column in sla_reports to report_xml, add report_json column */
+DBPATCH_ADD(3000514, 0, 0)	/* add items for online/total probes with RDAP enabled to host "Probe statuses" */
+DBPATCH_ADD(3000515, 0, 0)	/* add trigger for number of RDAP-enabled online probes to host "Probe statuses" */
 
 DBPATCH_END()
