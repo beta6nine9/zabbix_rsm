@@ -1,3 +1,9 @@
+Changes for rsm1.3.3
+
+Bug fixes:
+....I..... [685] fixed generating reports when disabling TLD and specifying --server-id (asitals)
+
+--------------------------------------------------------------------------------
 Changes for rsm1.3.2
 
 Bug fixes:
