@@ -19,6 +19,10 @@
 **/
 
 
+/* RSM specifics: start */
+require_once './include/rsm.func.inc.php';
+/* RSM specifics: end */
+
 /**
  * Verify that function exists and can be called as a function.
  *
