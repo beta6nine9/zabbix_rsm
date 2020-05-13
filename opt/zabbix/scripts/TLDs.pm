@@ -824,7 +824,7 @@ sub create_macro($$;$$)
 		if ($result)
 		{
 			$params = {
-				'output' => 'hostmacroid',
+				'output' => ['hostmacroid'],
 				'hostids' => $templateid,
 				'filter' => {'macro' => $name},
 			};
