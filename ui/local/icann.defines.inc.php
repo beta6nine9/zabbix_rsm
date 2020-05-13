@@ -22,6 +22,9 @@
 /*
  * These numbers must be in sync with Backend!
  */
+// ICANN specific version.
+define('ZABBIX_DB_VERSION_RSM',    0);
+
 // server delay time in seconds.
 define('RSM_ROLLWEEK_SHIFT_BACK', 180);
 
