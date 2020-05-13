@@ -949,20 +949,3 @@ function zbx_dbcast_2bigint($field) {
 			return false;
 	}
 }
-
-/**
- * Create DB connection to other DB server.
- *
- * @param array  $server       Database server parameters
- * @param string $error                returns a message in case of an error
- *
- * @return bool
- */
-function multiDBconnect($server, &$error) {
-	global $DB;
-
-	unset($DB['DB']);
-	$DB = $server;
-
-	return DBconnect($error);
-}

@@ -18,8 +18,9 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
+
 /* RSM specifics: specific defines: start */
-require './local/icann.defines.inc.php';
+define('ZABBIX_DB_VERSION_RSM',    0);
 /* RSM specifics: specific defines: end */
 
 define('ZABBIX_VERSION',		'5.0.0rc1');

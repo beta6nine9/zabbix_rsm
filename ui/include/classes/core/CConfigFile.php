@@ -91,7 +91,6 @@ class CConfigFile {
 
 		/* RSM specifics: start */
 		$this->config['DB']['DB_CONN_TIMEOUT'] = array_key_exists('DB_CONN_TIMEOUT', $DB) ? $DB['DB_CONN_TIMEOUT'] : null;
-		$this->config['DB']['SERVERS'] = $DB['SERVERS'];
 		/* RSM specifics: end */
 
 		$this->config['DB']['TYPE'] = $DB['TYPE'];

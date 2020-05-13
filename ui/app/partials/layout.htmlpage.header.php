@@ -53,16 +53,6 @@ $show_gui_messaging = (!defined('ZBX_PAGE_NO_MENU') || $data['web_layout_mode'] 
 		? intval(!CWebUser::isGuest())
 		: null;
 
-/* RSM specifics: start */
-$pageHeader->addCssFile('assets/styles/icann.css');
-
-// Monitoring target must be set.
-if (get_rsm_monitoring_type() !== MONITORING_TARGET_REGISTRY
-		&& get_rsm_monitoring_type() !== MONITORING_TARGET_REGISTRAR) {
-	error('Unknown monitoring target.');
-}
-/* RSM specifics: end */
-
 $pageHeader
 	->addCssFile('assets/styles/'.CHtml::encode($theme).'.css')
 	->addJsBeforeScripts(

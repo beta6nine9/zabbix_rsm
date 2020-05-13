@@ -19,10 +19,6 @@
 **/
 
 
-/* RSM specifics: start */
-require './local/icann.menu.inc.php';
-/* RSM specifics: end */
-
 /**
  * @return CMenu
  */
