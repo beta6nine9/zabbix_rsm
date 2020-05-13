@@ -3917,14 +3917,14 @@ int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	{
 		rsm_info(log_fd, "RDAP disabled on this probe");
 		ret = SYSINFO_RET_OK;
-		goto end;
+		goto out;
 	}
 
 	if (0 == tld_enabled)
 	{
 		rsm_info(log_fd, "RDAP disabled on this TLD");
 		ret = SYSINFO_RET_OK;
-		goto end;
+		goto out;
 	}
 
 	/* create resolver */
@@ -3932,7 +3932,7 @@ int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 			RESOLVER_EXTRAS_DNSSEC, RSM_TCP_TIMEOUT, RSM_TCP_RETRY, log_fd, err, sizeof(err)))
 	{
 		SET_MSG_RESULT(result, zbx_dsprintf(NULL, "Cannot create resolver: %s.", err));
-		goto end;
+		goto out;
 	}
 
 	/* from this point item will not become NOTSUPPORTED */
@@ -3964,7 +3964,7 @@ int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	{
 		rtt = ZBX_EC_RDAP_INTERNAL_GENERAL;
 		rsm_errf(log_fd, "\"%s\": %s", base_url, err);
-		goto out;
+		goto end;
 	}
 
 	/* resolve host to IPs */
@@ -3972,14 +3972,14 @@ int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *re
 	{
 		rtt = zbx_resolver_error_to_RDAP(ec_res);
 		rsm_errf(log_fd, "trying to resolve \"%s\": %s", domain_part, err);
-		goto out;
+		goto end;
 	}
 
 	if (0 == ips.values_num)
 	{
 		rtt = ZBX_EC_RDAP_INTERNAL_IP_UNSUP;
 		rsm_errf(log_fd, "IP address(es) of host \"%s\" are not supported on this Probe", domain_part);
-		goto out;
+		goto end;
 	}
 
 	/* choose random IP */
