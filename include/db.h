@@ -31,6 +31,12 @@ extern char	*CONFIG_DBSCHEMA;
 extern char	*CONFIG_DBUSER;
 extern char	*CONFIG_DBPASSWORD;
 extern char	*CONFIG_DBSOCKET;
+extern char	*CONFIG_DB_TLS_CONNECT;
+extern char	*CONFIG_DB_TLS_CERT_FILE;
+extern char	*CONFIG_DB_TLS_KEY_FILE;
+extern char	*CONFIG_DB_TLS_CA_FILE;
+extern char	*CONFIG_DB_TLS_CIPHER;
+extern char	*CONFIG_DB_TLS_CIPHER_13;
 extern int	CONFIG_DBPORT;
 #ifdef DBTLS
 extern char	*CONFIG_DB_KEY_FILE;
@@ -483,6 +489,11 @@ void	DBdeinit(void);
 int	DBconnect(int flag);
 void	DBclose(void);
 
+int	zbx_db_validate_config_features(void);
+#if defined(HAVE_MYSQL) || defined(HAVE_POSTGRESQL)
+void	zbx_db_validate_config(void);
+#endif
+
 #ifdef HAVE_ORACLE
 void	DBstatement_prepare(const char *sql);
 #endif
@@ -502,6 +513,8 @@ const ZBX_TABLE	*DBget_table(const char *tablename);
 const ZBX_FIELD	*DBget_field(const ZBX_TABLE *table, const char *fieldname);
 #define DBget_maxid(table)	DBget_maxid_num(table, 1)
 zbx_uint64_t	DBget_maxid_num(const char *tablename, int num);
+
+void	DBcheck_capabilities(void);
 
 /******************************************************************************
  *                                                                            *
@@ -580,6 +593,7 @@ int	DBdelete_template_elements(zbx_uint64_t hostid, zbx_vector_uint64_t *del_tem
 
 void	DBdelete_items(zbx_vector_uint64_t *itemids);
 void	DBdelete_graphs(zbx_vector_uint64_t *graphids);
+void	DBdelete_triggers(zbx_vector_uint64_t *triggerids);
 void	DBdelete_hosts(zbx_vector_uint64_t *hostids);
 void	DBdelete_hosts_with_prototypes(zbx_vector_uint64_t *hostids);
 
@@ -627,6 +641,10 @@ zbx_conn_flags_t;
 
 zbx_uint64_t	DBadd_interface(zbx_uint64_t hostid, unsigned char type, unsigned char useip, const char *ip,
 		const char *dns, unsigned short port, zbx_conn_flags_t flags);
+void	DBadd_interface_snmp(const zbx_uint64_t interfaceid, const unsigned char type, const unsigned char bulk,
+		const char *community, const char *securityname, const unsigned char securitylevel,
+		const char *authpassphrase, const char *privpassphrase, const unsigned char authprotocol,
+		const unsigned char privprotocol, const char *contextname);
 
 const char	*DBget_inventory_field(unsigned char inventory_link);
 
@@ -767,20 +785,27 @@ void	zbx_db_trigger_clean(DB_TRIGGER *trigger);
 
 typedef struct
 {
-	zbx_uint64_t	hostid;
-	unsigned char	compress;
-	int		version;
-	int		lastaccess;
-	int		last_version_error_time;
+	zbx_uint64_t		hostid;
+	unsigned char		compress;
+	int			version;
+	int			lastaccess;
+	int			last_version_error_time;
+	int			proxy_delay;
+	int			more_data;
+	zbx_proxy_suppress_t	nodata_win;
 
 #define ZBX_FLAGS_PROXY_DIFF_UNSET				__UINT64_C(0x0000)
 #define ZBX_FLAGS_PROXY_DIFF_UPDATE_COMPRESS			__UINT64_C(0x0001)
 #define ZBX_FLAGS_PROXY_DIFF_UPDATE_VERSION			__UINT64_C(0x0002)
 #define ZBX_FLAGS_PROXY_DIFF_UPDATE_LASTACCESS			__UINT64_C(0x0004)
 #define ZBX_FLAGS_PROXY_DIFF_UPDATE_LASTERROR			__UINT64_C(0x0008)
+#define ZBX_FLAGS_PROXY_DIFF_UPDATE_PROXYDELAY			__UINT64_C(0x0010)
+#define ZBX_FLAGS_PROXY_DIFF_UPDATE_SUPPRESS_WIN		__UINT64_C(0x0020)
+#define ZBX_FLAGS_PROXY_DIFF_UPDATE_HEARTBEAT			__UINT64_C(0x0040)
+#define ZBX_FLAGS_PROXY_DIFF_UPDATE_CONFIG			__UINT64_C(0x0080)
 #define ZBX_FLAGS_PROXY_DIFF_UPDATE (			\
 		ZBX_FLAGS_PROXY_DIFF_UPDATE_COMPRESS |	\
-		ZBX_FLAGS_PROXY_DIFF_UPDATE_VERSION | 	\
+		ZBX_FLAGS_PROXY_DIFF_UPDATE_VERSION |	\
 		ZBX_FLAGS_PROXY_DIFF_UPDATE_LASTACCESS)
 	zbx_uint64_t	flags;
 }
@@ -803,4 +828,5 @@ zbx_db_mock_field_t;
 void	zbx_db_mock_field_init(zbx_db_mock_field_t *field, int field_type, int field_len);
 int	zbx_db_mock_field_append(zbx_db_mock_field_t *field, const char *text);
 
+int	zbx_db_check_instanceid(void);
 #endif
