@@ -13,5 +13,14 @@ char	*CONFIG_ACTIVE_FORKS = NULL;
 char	*CONFIG_PASSIVE_FORKS = NULL;
 char	*CONFIT_TIMEUOT = NULL;
 
+char	*CONFIG_TLS_CIPHER_CERT13	= NULL;
+char	*CONFIG_TLS_CIPHER_CERT		= NULL;
+char	*CONFIG_TLS_CIPHER_PSK13	= NULL;
+char	*CONFIG_TLS_CIPHER_PSK		= NULL;
+char	*CONFIG_TLS_CIPHER_ALL13	= NULL;
+char	*CONFIG_TLS_CIPHER_ALL		= NULL;
+char	*CONFIG_TLS_CIPHER_CMD13	= NULL;
+char	*CONFIG_TLS_CIPHER_CMD		= NULL;
+
 unsigned int	configured_tls_connect_mode;
 unsigned int	configured_tls_accept_modes;
