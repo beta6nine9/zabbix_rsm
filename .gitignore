@@ -196,7 +196,6 @@ tests/zabbix_server/preprocessor/item_preproc_csv_to_json
 tests/zabbix_server/preprocessor/item_preproc_xpath
 tests/zabbix_server/preprocessor/zbx_item_preproc
 tests/zabbix_server/trapper/zbx_trapper_preproc_test_run
-<<<<<<< HEAD
 /zabbix-*.tar.gz
 .vscode
 sbin/zabbix_agentd
@@ -231,7 +230,6 @@ etc/zabbix_agent2.conf
 bin/win32
 bin/win64
 opt/zabbix/scripts/rsm.conf
-=======
 ui/.buildpath
 ui/.htpasswd
 ui/.idea
@@ -246,4 +244,3 @@ ui/locale/frontend.pot
 ui/tests/bootstrap.php
 ui/tests/composer.*
 ui/tests/vendor
->>>>>>> zabbix/master

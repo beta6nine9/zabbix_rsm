@@ -1,7 +1,6 @@
-<?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -18,16 +17,29 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
+#include "common.h"
+#include "db.h"
+#include "dbupgrade.h"
 
-return (new CWidget())
-	->setTitle($data['name'])
-	->addItem(
-		(new CForm())
-			->addItem(
-				(new CTabView())->addTab('scriptTab', null,
-					(new CPre(
-						(new CList([bold($data['command']), SPACE, $data['message']]))
-					))
-				)
-			)
-	);
+extern unsigned char	program_type;
+
+/*
+ * 5.0 maintenance database patches
+ */
+
+#ifndef HAVE_SQLITE3
+
+static int	DBpatch_5000000(void)
+{
+	return SUCCEED;
+}
+
+#endif
+
+DBPATCH_START(5000)
+
+/* version, duplicates flag, mandatory flag */
+
+DBPATCH_ADD(5000000, 0, 1)
+
+DBPATCH_END()

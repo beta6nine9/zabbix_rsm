@@ -23,10 +23,10 @@
 define('ZABBIX_DB_VERSION_RSM',    0);
 /* RSM specifics: specific defines: end */
 
-define('ZABBIX_VERSION',		'5.0.0rc1');
+define('ZABBIX_VERSION',		'5.0.0');
 define('ZABBIX_API_VERSION',	'5.0.0');
 define('ZABBIX_EXPORT_VERSION',	'5.0');
-define('ZABBIX_DB_VERSION',		4050136);
+define('ZABBIX_DB_VERSION',		5000000);
 
 define('ZABBIX_COPYRIGHT_FROM',	'2001');
 define('ZABBIX_COPYRIGHT_TO',	'2020');
