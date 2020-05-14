@@ -1119,17 +1119,6 @@ class CUser extends CApiService {
 
 		$sessionid = self::$userData['sessionid'];
 
-		/* RSM specifics: start */
-		global $DB;
-
-		$savedDB = $DB;
-
-		foreach ($DB['SERVERS'] as $server) {
-			if (!multiDBconnect($server, $error)) {
-				continue;
-			}
-		/* RSM specifics: end */
-
 		$db_sessions = DB::select('sessions', [
 			'output' => ['userid'],
 			'filter' => [
@@ -1151,14 +1140,6 @@ class CUser extends CApiService {
 			'values' => ['status' => ZBX_SESSION_PASSIVE],
 			'where' => ['sessionid' => $sessionid]
 		]);
-
-		/* RSM specifics: start */
-		}
-
-		unset($DB['DB']);
-		$DB = $savedDB;
-		DBconnect($error);
-		/* RSM specifics: end */
 
 		$this->addAuditDetails(AUDIT_ACTION_LOGOUT, AUDIT_RESOURCE_USER);
 
