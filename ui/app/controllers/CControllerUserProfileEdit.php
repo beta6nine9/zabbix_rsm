@@ -41,8 +41,7 @@ class CControllerUserProfileEdit extends CControllerUserEditGeneral {
 			'rows_per_page' =>		'db users.rows_per_page',
 			'url' =>				'db users.url',
 			'messages' =>			'array',
-			'form_refresh' =>		'int32',
-			'search_limit_latest' =>	'int32',
+			'form_refresh' =>		'int32'
 		];
 
 		if (CWebUser::$data['type'] > USER_TYPE_ZABBIX_USER) {
@@ -108,7 +107,6 @@ class CControllerUserProfileEdit extends CControllerUserEditGeneral {
 			'autologout' => $this->user['autologout'],
 			'refresh' => $this->user['refresh'],
 			'rows_per_page' => $this->user['rows_per_page'],
-			'search_limit_latest' => CProfile::get('web.latest.php.search_limit', DEFAULT_LATEST_DATA_SEARCH_LIMIT),
 			'url' => $this->user['url'],
 			'messages' => $this->getInput('messages', []) + getMessageSettings(),
 			'config' => [
