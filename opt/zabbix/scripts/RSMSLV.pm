@@ -2723,11 +2723,6 @@ sub collect_slv_cycles($$$$$$)
 			$cycles_added++;
 		}
 
-		if (opt('dry-run') && $cycles_added == 0)
-		{
-			push(@{$cycles{$lastclock}}, $tld);
-		}
-
 		# unset TLD (for the logs)
 		$tld = undef;
 	}
