@@ -695,12 +695,16 @@ sub manage_tld_objects($$$$$$$)
 		'dns-tcp'	=> $dns_tcp,
 		'dnssec'	=> $dnssec,
 		'epp'		=> $epp,
-		'rdds'		=> $rdds
+		'rdds'		=> $rdds,
+		'rdap'		=> $rdap,
 	};
 
-	my $config_templateid;
+	if (!__is_rdap_standalone())
+	{
+		delete($types->{'rdap'});
+	}
 
-	$types->{'rdap'} = $rdap if (__is_rdap_standalone());
+	my $config_templateid;
 
 	print("Getting main host of the TLD: ");
 	my $main_hostid = get_host($tld, false);
@@ -805,6 +809,7 @@ sub manage_tld_objects($$$$$$$)
 		if ($type eq 'dnssec')
 		{
 			really(create_macro('{$RSM.TLD.DNSSEC.ENABLED}', 0, $config_templateid, true));
+			set_service_items_status(get_host_items($main_hostid), DNSSEC_STATUS_TEMPLATEID, 0);
 			next;
 		}
 		elsif ($type eq 'dns-udp')
@@ -830,20 +835,45 @@ sub manage_tld_objects($$$$$$$)
 
 		create_macro($macro, 0, $config_templateid, true);
 
-		my $items = get_items_like($main_hostid, $type, false);
-		my @itemids = map { $items->{$_}->{'key_'} ne "$type.enabled" ? $_ : () } keys(%{$items});
+		# get items on "<rsmhost>" host
+		my $rsmhost_items = get_host_items($main_hostid);
+		set_service_items_status($rsmhost_items, RDDS_STATUS_TEMPLATEID, 0);
+		set_service_items_status($rsmhost_items, RDAP_STATUS_TEMPLATEID, 0);
 
-		if (scalar(@itemids) > 0)
+		# get "<rsmhost> <probe>" hostids
+		my $probe_hostids = get_template(TEMPLATE_RSMHOST_CONFIG_PREFIX . $tld, false, true);
+		$probe_hostids = $probe_hostids->{'hosts'};
+		$probe_hostids = [grep($_->{'host'} ne $tld, @{$probe_hostids})];
+		$probe_hostids = [map($_->{'hostid'}, @{$probe_hostids})];
+
+		# get items on all "<rsmhost> <probe>" hosts
+		my $probe_items;
+		foreach my $hostid (@{$probe_hostids})
 		{
-			$action eq 'disable' ? disable_items(\@itemids) : remove_items(\@itemids);
+			push(@{$probe_items}, @{get_host_items($hostid)});
+		}
+
+		# disable RDDS and/or RDAP items
+		if (__is_rdap_standalone())
+		{
+			if ($type eq 'rdds')
+			{
+				set_service_items_status($rsmhost_items, RDDS_STATUS_TEMPLATEID, 0);
+				set_service_items_status($probe_items, RDDS_TEST_TEMPLATEID, 0);
+			}
+			if ($type eq 'rdap')
+			{
+				set_service_items_status($rsmhost_items, RDAP_STATUS_TEMPLATEID, 0);
+				set_service_items_status($probe_items, RDAP_TEST_TEMPLATEID, 0);
+			}
 		}
 		else
 		{
-			print("cannot find $type items on host $tld ($main_hostid)\n");
+			set_service_items_status($rsmhost_items, RDDS_STATUS_TEMPLATEID, 0);
+			set_service_items_status($rsmhost_items, RDAP_STATUS_TEMPLATEID, 0);
+			set_service_items_status($probe_items, RDDS_TEST_TEMPLATEID, 0);
+			set_service_items_status($probe_items, RDAP_TEST_TEMPLATEID, 0);
 		}
-
-		set_linked_items_status($type eq 'rdds' ? 'rsm.rdds[' : 'rdap[', $tld, 0) if ($action eq 'disable');
-		set_linked_items_status('rdap[', $tld, 0) if (!__is_rdap_standalone() && $action eq 'disable');
 	}
 }
 
@@ -1297,7 +1327,11 @@ sub create_rsmhost($$$$)
 		],
 		'templates' => [
 			{'templateid' => $config_templateid},
-			{'templateid' => CONFIG_HISTORY_TEMPLATEID}
+			{'templateid' => CONFIG_HISTORY_TEMPLATEID},
+			{'templateid' => DNS_STATUS_TEMPLATEID},
+			{'templateid' => DNSSEC_STATUS_TEMPLATEID},
+			{'templateid' => RDDS_STATUS_TEMPLATEID},
+			{'templateid' => RDAP_STATUS_TEMPLATEID},
 		],
 		'host'       => $tld_name,
 		'status'     => HOST_STATUS_MONITORED,
@@ -1307,48 +1341,24 @@ sub create_rsmhost($$$$)
 	update_ns_servers($config_templateid, $tld_hostid, $tld_name, $changes);
 #	fail("update_ns_servers() should have been called here!");
 
-	link_status_templates($tld_hostid, $tld_name);
+	my $rsmhost_items = get_host_items($tld_hostid);
 
-	return $tld_hostid;
-}
-
-sub link_status_templates($$)
-{
-	my $hostid    = shift;
-	my $host_name = shift;
-
-	my $all_templates;
-
-	if (!__is_rdap_standalone())	# we haven't switched to RDAP yet
+	if (__is_rdap_standalone())
 	{
-		$all_templates = link_template_to_host($hostid, RDDS_STATUS_TEMPLATEID, $all_templates);
-
-		# link RDAP template in advance
-		if (opt('rdap-base-url'))
-		{
-			$all_templates = link_template_to_host($hostid, RDAP_STATUS_TEMPLATEID, $all_templates);
-		}
+		set_service_items_status($rsmhost_items, DNS_STATUS_TEMPLATEID   , 1);
+		set_service_items_status($rsmhost_items, DNSSEC_STATUS_TEMPLATEID, opt('dnssec'));
+		set_service_items_status($rsmhost_items, RDDS_STATUS_TEMPLATEID  , opt('rdds43-servers') || opt('rdds80-servers'));
+		set_service_items_status($rsmhost_items, RDAP_STATUS_TEMPLATEID  , opt('rdap-base-url'));
 	}
 	else
 	{
-		# after the switch, RDDS and RDAP are opt-in
-		if (opt('rdap-base-url'))
-		{
-			$all_templates = link_template_to_host($hostid, RDAP_STATUS_TEMPLATEID, $all_templates);
-		}
-
-		if (opt('rdds43-servers') || opt('rdds80-servers'))
-		{
-			$all_templates = link_template_to_host($hostid, RDDS_STATUS_TEMPLATEID, $all_templates);
-		}
+		set_service_items_status($rsmhost_items, DNS_STATUS_TEMPLATEID   , 1);
+		set_service_items_status($rsmhost_items, DNSSEC_STATUS_TEMPLATEID, opt('dnssec'));
+		set_service_items_status($rsmhost_items, RDDS_STATUS_TEMPLATEID  , opt('rdds43-servers') || opt('rdds80-servers') || opt('rdap-base-url'));
+		set_service_items_status($rsmhost_items, RDAP_STATUS_TEMPLATEID  , 0);
 	}
 
-	$all_templates = link_template_to_host($hostid, DNS_STATUS_TEMPLATEID, $all_templates);
-
-	if (getopt('dnssec'))
-	{
-		$all_templates = link_template_to_host($hostid, DNSSEC_STATUS_TEMPLATEID, $all_templates);
-	}
+	return $tld_hostid;
 }
 
 sub create_tld_hosts_on_probes($$$$)
@@ -1417,7 +1427,7 @@ sub create_tld_hosts_on_probes($$$$)
 
 		#  TODO: add the host above to more host groups: "TLD Probe Results" and/or "gTLD Probe Results" and perhaps others
 
-		really(create_host({
+		my $rsmhost_probe_hostid = really(create_host({
 			'groups' => [
 				{'groupid' => $rsmhost_groupid},
 				{'groupid' => $probe_groupid},
@@ -1427,41 +1437,33 @@ sub create_tld_hosts_on_probes($$$$)
 			'templates' => [
 				{'templateid' => $config_templateid},
 				{'templateid' => DNS_TEST_TEMPLATEID},
+				{'templateid' => RDDS_TEST_TEMPLATEID}
 				{'templateid' => RDAP_TEST_TEMPLATEID},
 				{'templateid' => $probe_templateid},
-				{'templateid' => RDDS_TEST_TEMPLATEID}
 			],
 			'host'         => getopt('tld') . ' ' . $probe_name,
 			'status'       => $status,
 			'proxy_hostid' => $proxyid,
 			'interfaces'   => [DEFAULT_MAIN_INTERFACE]
 		}));
-	}
 
-	set_linked_items_status('rdap[', getopt('tld'), opt('rdap-base-url') && opt('rdap-test-domain'));
-	set_linked_items_status('rsm.rdds[', getopt('tld'), opt('rdds43-servers'));
-}
+		my $rsmhost_probe_items = get_host_items($rsmhost_probe_hostid);
 
-sub set_linked_items_status($$$)
-{
-	my $like    = shift;
-	my $tld     = shift;
-	my $enabled = shift;
+		if (opt('rdds43-servers') || opt('rdds80-servers') || opt('rdap-base-url'))
+		{
+			my $probe_config = get_template(TEMPLATE_PROBE_CONFIG_PREFIX . $proxies->{$proxyid}{'host'}, 1, 0);
+			my %probe_config_macros = map(($_->{'macro'} => $_->{'value'}), @{$probe_config->{'macros'}});
+			my $probe_rdds = $probe_config_macros{'{$RSM.RDDS.ENABLED}'};
+			my $probe_rdap = $probe_config_macros{'{$RSM.RDAP.ENABLED}'};
 
-	my $template = TEMPLATE_RSMHOST_CONFIG_PREFIX . $tld;
-	my $result = get_template($template, false, true);	# do not select macros, select hosts
-
-	pfail("$tld template \"$template\" does not exist") if (keys(%{$result}) == 0);
-
-	foreach my $host_ref (@{$result->{'hosts'}})
-	{
-		my $hostid = $host_ref->{'hostid'};
-
-		my $result2 = really(get_items_like($hostid, $like, false));	# not a template
-
-		my @itemids = keys(%{$result2});
-
-		$enabled ? enable_items(\@itemids) : disable_items(\@itemids);
+			set_service_items_status($rsmhost_probe_items, RDDS_TEST_TEMPLATEID, $probe_rdds && (opt('rdds43-servers') || opt('rdds80-servers')));
+			set_service_items_status($rsmhost_probe_items, RDAP_TEST_TEMPLATEID, $probe_rdap && opt('rdap-base-url'));
+		}
+		else
+		{
+			set_service_items_status($rsmhost_probe_items, RDDS_TEST_TEMPLATEID, 0);
+			set_service_items_status($rsmhost_probe_items, RDAP_TEST_TEMPLATEID, 0);
+		}
 	}
 }
 

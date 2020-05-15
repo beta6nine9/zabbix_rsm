@@ -29,12 +29,12 @@ our @EXPORT = qw(zbx_connect check_api_error get_proxies_list
 		create_passive_proxy probe_exists get_host_group get_template get_template_id get_probe get_host
 		remove_templates remove_hosts remove_hostgroups remove_probes remove_items
 		disable_host disable_hosts link_template_to_host
-		enable_items
-		disable_items disable_triggers
+		update_items_status enable_items disable_items set_service_items_status
+		disable_triggers
 		rename_host rename_proxy rename_template rename_hostgroup
 		macro_value get_global_macro_value get_host_macro
 		set_proxy_status
-		get_items_like set_tld_type get_triggers_by_items
+		get_items_like get_host_items set_tld_type get_triggers_by_items
 		add_dependency
 		create_probe_health_tmpl
 		pfail);
@@ -423,6 +423,49 @@ sub disable_items($)
 	my $itemids = shift;
 
 	return update_items_status($itemids, ITEM_STATUS_DISABLED);
+}
+
+sub set_service_items_status($$$)
+{
+	my $host_items     = shift; # list of {key, itemid, status} hashes, result of get_host_items($hostid)
+	my $template_id    = shift; # template id
+	my $service_status = shift; # 1 for "enable", 0 for "disable"
+
+	my $item_status = $service_status ? ITEM_STATUS_ACTIVE : ITEM_STATUS_DISABLED;
+
+	set_templated_items_status($host_items, $template_id, $item_status);
+}
+
+my %template_items_cache;
+
+sub set_templated_items_status($$$)
+{
+	my $host_items  = shift; # list of {key, itemid, status} hashes, result of get_host_items($hostid)
+	my $template_id = shift; # template id
+	my $status      = shift; # ITEM_STATUS_ACTIVE or ITEM_STATUS_DISABLED
+
+	if (!exists($template_items_cache{$template_id}))
+	{
+		my $items = get_items_like($template_id, undef, 1);
+		$template_items_cache{$template_id} = { map { $_->{'key_'} => undef } values(%{$items}) };
+	}
+
+	my $template_items = $template_items_cache{$template_id};
+
+	my $itemids = [];
+
+	foreach my $item (@{$host_items})
+	{
+		if ($item->{'status'} != $status && exists($template_items->{$item->{'key'}}))
+		{
+			push(@{$itemids}, $item->{'itemid'});
+		}
+	}
+
+	if (@{$itemids})
+	{
+		update_items_status($itemids, $status);
+	}
 }
 
 sub disable_triggers($)
@@ -1037,6 +1080,23 @@ sub get_items_like($$$)
 	);
 
 	return $result;
+}
+
+# returns list of hashes - [{'key' => $key, 'itemid' => $itemid, 'status' => $status}, ...]
+sub get_host_items($)
+{
+	my $hostid = shift;
+
+	my $items_ref = get_items_like($hostid, undef, 0);
+	my @items_arr = map {
+		{
+			'key'    => $_->{'key_'},
+			'itemid' => $_->{'itemid'},
+			'status' => $_->{'status'},
+		}
+	} values(%{$items_ref});
+
+	return \@items_arr;
 }
 
 sub get_triggers_by_items($)

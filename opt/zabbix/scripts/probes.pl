@@ -105,7 +105,11 @@ sub add_probe($$$$$$$$$$$)
 	my $resolver = shift;
 
 	print("Trying to add '$probe_name' probe...\n");
-	print "The probe with name '$probe_name' already exists! Trying to enable it\n" if (probe_exists($probe_name));
+
+	if (probe_exists($probe_name))
+	{
+		print("The probe with name '$probe_name' already exists! Trying to enable it\n");
+	}
 
 	###### Checking and creating required groups and templates
 
@@ -136,20 +140,12 @@ sub add_probe($$$$$$$$$$$)
 	print("Creating '$probe_name' host: ");
 	my $probe_host = create_host({
 		'groups'	=> [
-			{
-				'groupid'	=> PROBES_GROUPID
-			}
+			{ 'groupid' => PROBES_GROUPID },
 		],
 		'templates'	=> [
-			{
-				'templateid'	=> $probe_tmpl_id
-			},
-			{
-				'templateid'	=> PROBE_STATUS_TEMPLATEID
-			},
-			{
-				'templateid'	=> APP_ZABBIX_PROXY_TEMPLATEID
-			}
+			{ 'templateid' => $probe_tmpl_id },
+			{ 'templateid' => PROBE_STATUS_TEMPLATEID },
+			{ 'templateid' => APP_ZABBIX_PROXY_TEMPLATEID },
 		],
 		'host'		=> $probe_name,
 		'status'	=> HOST_STATUS_MONITORED,
@@ -166,14 +162,10 @@ sub add_probe($$$$$$$$$$$)
 	print("Creating Probe monitoring host: ");
 	my $probe_host_mon = create_host({
 		'groups'	=> [
-			{
-				'groupid'	=> PROBES_MON_GROUPID
-			}
+			{ 'groupid' => PROBES_MON_GROUPID },
 		],
 		'templates'	=> [
-			{
-				'templateid'	=> $probe_tmpl_health
-			}
+			{ 'templateid' => $probe_tmpl_health },
 		],
 		'host'		=> "$probe_name - mon",
 		'status'	=> HOST_STATUS_MONITORED,
@@ -205,42 +197,54 @@ sub add_probe($$$$$$$$$$$)
 		my $tld_groupid = create_group("TLD $tld_name");
 		my $tld_type = $tld->{'type'};
 
-		my $config_templateid = get_template_id(TEMPLATE_RSMHOST_CONFIG_PREFIX . $tld_name);
+		my $rsmhost_config = get_template(TEMPLATE_RSMHOST_CONFIG_PREFIX . $tld_name, 1, 0);
+
+		my %rsmhost_config_macros = map(($_->{'macro'} => $_->{'value'}), @{$rsmhost_config->{'macros'}});
+		my $rsmhost_rdds = $rsmhost_config_macros{'{$RSM.TLD.RDDS.ENABLED}'};
+		my $rsmhost_rdap = $rsmhost_config_macros{'{$RDAP.TLD.ENABLED}'};
 
 		print("Creating '$tld_name $probe_name' host for '$tld_name' TLD: ");
 
-		my $tld_host = create_host({
+		my $monitoring_target = get_global_macro_value('{$RSM.MONITORING.TARGET}');
+		if (!defined($monitoring_target))
+		{
+			pfail('cannot find global macro {$RSM.MONITORING.TARGET}');
+		}
+		if ($monitoring_target ne MONITORING_TARGET_REGISTRY && $monitoring_target ne MONITORING_TARGET_REGISTRAR)
+		{
+			pfail("unexpected monitoring target '{$monitoring_target}'");
+		}
+
+		my $rsmhost_probe_templates;
+
+		if ($monitoring_target eq MONITORING_TARGET_REGISTRY)
+		{
+			$rsmhost_probe_templates = [
+				{ 'templateid' => $rsmhost_config->{'templateid'} },
+				{ 'templateid' => DNS_TEST_TEMPLATEID },
+				{ 'templateid' => RDDS_TEST_TEMPLATEID },
+				{ 'templateid' => RDAP_TEST_TEMPLATEID },
+				{ 'templateid' => $probe_tmpl_id },
+			];
+		}
+		elsif ($monitoring_target eq MONITORING_TARGET_REGISTRAR)
+		{
+			$rsmhost_probe_templates = [
+				{ 'templateid' => $rsmhost_config->{'templateid'} },
+				{ 'templateid' => RDDS_TEST_TEMPLATEID },
+				{ 'templateid' => RDAP_TEST_TEMPLATEID },
+				{ 'templateid' => $probe_tmpl_id },
+			];
+		}
+
+		my $rsmhost_probe_id = create_host({
 			'groups'	=> [
-				{
-					'groupid'	=> $tld_groupid
-				},
-				{
-					'groupid'	=> $probe_groupid
-				},
-				{
-					'groupid'	=> TLD_PROBE_RESULTS_GROUPID
-				},
-				{
-					'groupid'	=> TLD_TYPE_PROBE_RESULTS_GROUPIDS->{$tld_type}
-				}
+				{ 'groupid' => $tld_groupid },
+				{ 'groupid' => $probe_groupid },
+				{ 'groupid' => TLD_PROBE_RESULTS_GROUPID },
+				{ 'groupid' => TLD_TYPE_PROBE_RESULTS_GROUPIDS->{$tld_type} },
 			],
-			'templates'	=> [
-				{
-					'templateid'	=> $config_templateid
-				},
-				{
-					'templateid'	=> DNS_TEST_TEMPLATEID
-				},
-				{
-					'templateid'	=> RDAP_TEST_TEMPLATEID
-				},
-				{
-					'templateid'	=> RDDS_TEST_TEMPLATEID
-				},
-				{
-					'templateid'	=> $probe_tmpl_id
-				}
-			],
+			'templates'	=> $rsmhost_probe_templates,
 			'host'		=> "$tld_name $probe_name",
 			'proxy_hostid'	=> $probe,
 			'status'	=> HOST_STATUS_MONITORED,
@@ -249,20 +253,12 @@ sub add_probe($$$$$$$$$$$)
 			]
 		});
 
-		is_not_empty($tld_host, false);
+		is_not_empty($rsmhost_probe_id, false);
+
+		my $rsmhost_probe_items = get_host_items($rsmhost_probe_id);
+		set_service_items_status($rsmhost_probe_items, RDDS_TEST_TEMPLATEID, $rdds && $rsmhost_rdds);
+		set_service_items_status($rsmhost_probe_items, RDAP_TEST_TEMPLATEID, $rdap && $rsmhost_rdap);
 	}
-
-	########## Updating RDAP items status
-
-	print("Updating RDAP items status...\n");
-
-	update_probe_items($probe_name, 'rdap', $rdap);
-
-	########## Updating RDDS items status
-
-	print("Updating RDDS items status...\n");
-
-	update_probe_items($probe_name, 'rdds', $rdds);
 
 	##########
 
@@ -560,38 +556,6 @@ sub is_not_empty($$) {
         print "failed\n";
         exit(1) unless ($do_exit == false);
     }
-}
-
-##############
-
-sub update_probe_items($$$)
-{
-	my $probe = shift;
-	my $service = shift;
-	my $enable = shift;
-
-	my %item_key = (
-		'rdap' => 'rdap[',
-		'rdds' => 'rsm.rdds',
-	);
-
-	pfail("invalid service \"$service\"") if (!exists($item_key{$service}));
-
-	my $template = TEMPLATE_PROBE_CONFIG_PREFIX . $probe;
-	my $result = get_template($template, false, true);	# do not select macros, select hosts
-
-	pfail("$probe template \"$template\" does not exist") if (keys(%{$result}) == 0);
-
-	foreach my $host_ref (@{$result->{'hosts'}})
-	{
-		my $hostid = $host_ref->{'hostid'};
-
-		my $result2 = get_items_like($hostid, $item_key{$service}, false);	# not a template
-
-		my @items = keys(%{$result2});
-
-		$enable ? enable_items(\@items) : disable_items(\@items);
-	}
 }
 
 sub usage {
