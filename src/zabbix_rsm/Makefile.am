@@ -2,9 +2,9 @@
 
 bin_PROGRAMS = rsm_epp_gen rsm_epp_enc rsm_epp_dec
 
-rsm_epp_gen_SOURCES = gen.c
-rsm_epp_enc_SOURCES = enc.c
-rsm_epp_dec_SOURCES = dec.c
+rsm_epp_gen_SOURCES = gen.c missingconf.h
+rsm_epp_enc_SOURCES = enc.c missingconf.h
+rsm_epp_dec_SOURCES = dec.c missingconf.h
 
 common_ldflags = \
 	-Wl,--start-group \

@@ -1,6 +1,6 @@
 ## Process this file with automake to produce Makefile.in
 
-sbin_PROGRAMS = t_rsm_dns t_rsm_rdds t_rsm_rdap
+bin_PROGRAMS = t_rsm_dns t_rsm_rdds t_rsm_rdap
 
 t_rsm_dns_SOURCES = t_rsm_dns.c t_rsm.h
 t_rsm_rdds_SOURCES = t_rsm_rdds.c t_rsm.h
