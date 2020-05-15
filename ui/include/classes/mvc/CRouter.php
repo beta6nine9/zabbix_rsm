@@ -55,20 +55,6 @@ class CRouter {
 	 */
 	private $routes = [
 		// action						controller											layout					view
-
-		/* RSM specifics: start */
-		'rsm.rollingweekstatus'			=> ['CControllerRollingWeekStatusList',				'layout.htmlpage',		'rsm.rollingweekstatus.list'],
-		'rsm.incidents'					=> ['CControllerIncidentsList',						'layout.htmlpage',		'rsm.incidents.list'],
-		'rsm.slareports'				=> ['CControllerSlaReports',						'layout.htmlpage',		'rsm.slareports.list'],
-		'rsm.incidentdetails'			=> ['CControllerIncidentDetails',					'layout.htmlpage',		'rsm.incidentdetails.list'],
-		'rsm.tests'						=> ['CControllerTests',								'layout.htmlpage',		'rsm.tests.list'],
-		'rsm.particulartests'			=> ['CControllerParticularTests',					'layout.htmlpage',		'rsm.particulartests.list'],
-		'rsm.aggregatedetails'			=> ['CControllerAggregateDetails',					'layout.htmlpage',		'rsm.aggregatedetails.list'],
-		'rsm.particularproxys'			=> ['CControllerParticularProxy',					'layout.htmlpage',		'rsm.particularproxys.list'],
-		'export.rsm.slareports'			=> ['CControllerExportSlaReport',					null,					null],
-		'rsm.markincident'				=> ['CControllerMarkIncident',						null,					null],
-		/* RSM specifics: start */
-
 		'auditlog.list'					=> ['CControllerAuditLogList',						'layout.htmlpage',		'reports.auditlog.list'],
 		'authentication.edit'			=> ['CControllerAuthenticationEdit',				'layout.htmlpage',		'administration.authentication.edit'],
 		'authentication.update'			=> ['CControllerAuthenticationUpdate',				null,					null],
