@@ -1437,7 +1437,7 @@ sub create_tld_hosts_on_probes($$$$)
 			'templates' => [
 				{'templateid' => $config_templateid},
 				{'templateid' => DNS_TEST_TEMPLATEID},
-				{'templateid' => RDDS_TEST_TEMPLATEID}
+				{'templateid' => RDDS_TEST_TEMPLATEID},
 				{'templateid' => RDAP_TEST_TEMPLATEID},
 				{'templateid' => $probe_templateid},
 			],
