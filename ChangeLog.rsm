@@ -1,3 +1,9 @@
+Changes for rsm2.0.0rc8
+
+Bug fixes:
+....I..... [sub-643] fixed Data Export script issue resulting in consuming exceeding amount of memory (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.0.0rc7
 
 Bug fixes:

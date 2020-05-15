@@ -2071,7 +2071,7 @@ sub probe_online_at($$$)
 		$_PROBESTATUSES{$probe}{'itemid'} = get_probe_online_key_itemid($probe);
 	}
 
-	my $clock_limit = $clock + $delay -1;
+	my $clock_limit = $clock + $delay - 1;
 
 	for (my $cl = $clock; $cl < $clock_limit; $cl += PROBE_DELAY)
 	{
