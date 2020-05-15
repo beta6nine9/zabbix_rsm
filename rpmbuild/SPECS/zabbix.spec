@@ -302,8 +302,8 @@ mkdir $RPM_BUILD_ROOT%{_libdir}/zabbix/modules
 
 %if 0%{?build_server}
 # install frontend files
-find frontends/php -name '*.orig' | xargs rm -f
-cp -a frontends/php/* $RPM_BUILD_ROOT%{_datadir}/zabbix
+find ui -name '*.orig' | xargs rm -f
+cp -a ui/* $RPM_BUILD_ROOT%{_datadir}/zabbix
 cp opt/zabbix/scripts/CSlaReport.php $RPM_BUILD_ROOT%{_datadir}/zabbix/include/classes/services/CSlaReport.php
 mkdir -p $RPM_BUILD_ROOT%{_sharedstatedir}/php/session
 

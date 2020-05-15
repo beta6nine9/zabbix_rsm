@@ -1,6 +1,6 @@
-diff -Nru zabbix-2.5.0.orig/frontends/php/include/defines.inc.php zabbix-2.5.0/frontends/php/include/defines.inc.php
---- zabbix-2.5.0.orig/frontends/php/include/defines.inc.php	2015-08-19 17:27:39.000000000 +0900
-+++ zabbix-2.5.0/frontends/php/include/defines.inc.php	2015-08-22 15:20:12.000000000 +0900
+diff -Nru zabbix-2.5.0.orig/ui/include/defines.inc.php zabbix-2.5.0/ui/include/defines.inc.php
+--- zabbix-2.5.0.orig/ui/include/defines.inc.php	2015-08-19 17:27:39.000000000 +0900
++++ zabbix-2.5.0/ui/include/defines.inc.php	2015-08-22 15:20:12.000000000 +0900
 @@ -42,7 +42,7 @@
  define('ZBX_WIDGET_ROWS', 20);
  

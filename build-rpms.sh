@@ -3,7 +3,7 @@
 RSM_VERSION="rsm2.1.0alpha1"	# MAJOR.PROD.QA
 RPMDIR="rpmbuild"
 SRV_VERSION_FILE="include/version.h"
-FE_VERSION_FILE="frontends/php/include/defines.inc.php"
+FE_VERSION_FILE="ui/include/defines.inc.php"
 AC_VERSION_FILE="configure.ac"
 SPEC="$RPMDIR/SPECS/zabbix.spec"
 FAILURE=1

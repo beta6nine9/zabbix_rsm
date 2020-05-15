@@ -1,6 +1,6 @@
-diff -Nru zabbix-3.0.0alpha3.orig/frontends/php/include/classes/core/CConfigFile.php zabbix-3.0.0alpha3/frontends/php/include/classes/core/CConfigFile.php
---- zabbix-3.0.0alpha3.orig/frontends/php/include/classes/core/CConfigFile.php	2015-10-16 00:57:05.000000000 +0900
-+++ zabbix-3.0.0alpha3/frontends/php/include/classes/core/CConfigFile.php	2015-10-20 00:25:54.000000000 +0900
+diff -Nru zabbix-3.0.0alpha3.orig/ui/include/classes/core/CConfigFile.php zabbix-3.0.0alpha3/ui/include/classes/core/CConfigFile.php
+--- zabbix-3.0.0alpha3.orig/ui/include/classes/core/CConfigFile.php	2015-10-16 00:57:05.000000000 +0900
++++ zabbix-3.0.0alpha3/ui/include/classes/core/CConfigFile.php	2015-10-20 00:25:54.000000000 +0900
 @@ -24,7 +24,7 @@
  	const CONFIG_NOT_FOUND = 1;
  	const CONFIG_ERROR = 2;
@@ -10,9 +10,9 @@ diff -Nru zabbix-3.0.0alpha3.orig/frontends/php/include/classes/core/CConfigFile
  
  	private static $supported_db_types = [
  		ZBX_DB_DB2 => true,
-diff -Nru zabbix-3.0.0alpha3.orig/frontends/php/include/classes/core/ZBase.php zabbix-3.0.0alpha3/frontends/php/include/classes/core/ZBase.php
---- zabbix-3.0.0alpha3.orig/frontends/php/include/classes/core/ZBase.php	2015-10-16 00:57:05.000000000 +0900
-+++ zabbix-3.0.0alpha3/frontends/php/include/classes/core/ZBase.php	2015-10-20 00:25:54.000000000 +0900
+diff -Nru zabbix-3.0.0alpha3.orig/ui/include/classes/core/ZBase.php zabbix-3.0.0alpha3/ui/include/classes/core/ZBase.php
+--- zabbix-3.0.0alpha3.orig/ui/include/classes/core/ZBase.php	2015-10-16 00:57:05.000000000 +0900
++++ zabbix-3.0.0alpha3/ui/include/classes/core/ZBase.php	2015-10-20 00:25:54.000000000 +0900
 @@ -303,7 +303,7 @@
  	 * @throws Exception
  	 */
@@ -31,9 +31,9 @@ diff -Nru zabbix-3.0.0alpha3.orig/frontends/php/include/classes/core/ZBase.php z
  		$config = new CConfigFile($configFile);
  		$this->config = $config->load();
  	}
-diff -Nru zabbix-3.0.0alpha3.orig/frontends/php/include/classes/setup/CSetupWizard.php zabbix-3.0.0alpha3/frontends/php/include/classes/setup/CSetupWizard.php
---- zabbix-3.0.0alpha3.orig/frontends/php/include/classes/setup/CSetupWizard.php	2015-10-16 00:57:05.000000000 +0900
-+++ zabbix-3.0.0alpha3/frontends/php/include/classes/setup/CSetupWizard.php	2015-10-20 00:25:54.000000000 +0900
+diff -Nru zabbix-3.0.0alpha3.orig/ui/include/classes/setup/CSetupWizard.php zabbix-3.0.0alpha3/ui/include/classes/setup/CSetupWizard.php
+--- zabbix-3.0.0alpha3.orig/ui/include/classes/setup/CSetupWizard.php	2015-10-16 00:57:05.000000000 +0900
++++ zabbix-3.0.0alpha3/ui/include/classes/setup/CSetupWizard.php	2015-10-20 00:25:54.000000000 +0900
 @@ -347,7 +347,7 @@
  	function stage5() {
  		$this->setConfig('ZBX_CONFIG_FILE_CORRECT', true);
