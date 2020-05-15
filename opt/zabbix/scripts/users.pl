@@ -75,7 +75,7 @@ foreach my $server_key (@server_keys)
 			'passwd' => getopt('password'),
 			'name' => getopt('firstname'),
 			'surname' => getopt('lastname'),
-			'usrgrps' => {'usrgrpid' => USER_TYPES->{getopt('type')}->{'usrgrpid'}}};
+			'usrgrps' => [{'usrgrpid' => USER_TYPES->{getopt('type')}->{'usrgrpid'}}]};
 
 		my $result = $zabbix->create('user', $options);
 
