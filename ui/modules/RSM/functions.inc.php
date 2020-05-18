@@ -72,20 +72,25 @@ function getFirstUintValue($itemId, $startTime) {
 }
 
 /**
- * Returned boolean indicates either passed value is valid DNS error code.
+ * Returned boolean indicates if the result of the test is to be treated as unsuccessful for service provider.
  *
- * @param int $item_value	Error code.
+ * @param int $rtt		Result of the test (Round-Time Trip in milliseconds or error code).
  * @param int $type		Type of service, e. g. RSM_DNS, RSM_DNSSEC etc.
  *
  * @return bool
  */
-function isServiceErrorCode($item_value, $type) {
+function isServiceErrorCode($rtt, $type) {
 	if ($type == RSM_DNSSEC) {
-		return (ZBX_EC_DNS_UDP_DNSKEY_NONE <= $item_value && $item_value <= ZBX_EC_DNS_UDP_RES_NOADBIT);
+		if (ZBX_EC_DNS_UDP_DNSSEC_FIRST >= $rtt && $rtt >= ZBX_EC_DNS_UDP_DNSSEC_LAST)
+			return true;
+
+		if (ZBX_EC_DNS_TCP_DNSSEC_FIRST >= $rtt && $rtt >= ZBX_EC_DNS_TCP_DNSSEC_LAST)
+			return true;
+
+		return false;
 	}
-	else {
-		return ($item_value < ZBX_EC_INTERNAL_LAST);
-	}
+
+	return ($rtt < ZBX_EC_INTERNAL_LAST);
 }
 
 /**
