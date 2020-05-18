@@ -47,7 +47,6 @@ function parse_schema($path) {
 						$length = 20;
 						break;
 					case 't_double':
-					case 't_bigdouble':
 						$type = 'DB::FIELD_TYPE_FLOAT';
 						$length = false;
 						break;

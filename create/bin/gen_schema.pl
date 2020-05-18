@@ -41,7 +41,6 @@ my %c = (
 	"t_shorttext"	=>	"ZBX_TYPE_SHORTTEXT",
 	"t_time"	=>	"ZBX_TYPE_INT",
 	"t_varchar"	=>	"ZBX_TYPE_CHAR",
-	"t_bigdouble"	=>	"ZBX_TYPE_FLOAT"
 );
 
 $c{"before"} = "/*
@@ -97,7 +96,6 @@ my %mysql = (
 	"t_shorttext"	=>	"text",
 	"t_time"	=>	"integer",
 	"t_varchar"	=>	"varchar",
-	"t_bigdouble"	 =>	"double(24,4)"
 );
 
 my %oracle = (
@@ -118,7 +116,6 @@ my %oracle = (
 	"t_shorttext"	=>	"nvarchar2(2048)",
 	"t_time"	=>	"number(10)",
 	"t_varchar"	=>	"nvarchar2",
-	"t_bigdouble"	=>	"number(24,4)"
 );
 
 my %postgresql = (
@@ -139,7 +136,6 @@ my %postgresql = (
 	"t_shorttext"	=>	"text",
 	"t_time"	=>	"integer",
 	"t_varchar"	=>	"varchar",
-	"t_bigdouble"	=>	"numeric(24,4)"
 );
 
 my %sqlite3 = (
@@ -160,7 +156,6 @@ my %sqlite3 = (
 	"t_shorttext"	=>	"text",
 	"t_time"	=>	"integer",
 	"t_varchar"	=>	"varchar",
-	"t_bigdouble"	=>	"double(24,4)"
 );
 
 sub rtrim($)
