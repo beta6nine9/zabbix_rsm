@@ -8604,7 +8604,6 @@ return [
 			'value' => [
 				'null' => false,
 				'type' => DB::FIELD_TYPE_FLOAT,
-				'length' => 10,
 				'default' => '0.0000',
 			],
 		],
