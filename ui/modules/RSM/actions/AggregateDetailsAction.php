@@ -260,7 +260,7 @@ class AggregateDetailsAction extends Action {
 		}
 
 		$data['dns_nameservers'] = $dns_nameservers;
-		$data['nsids'] = $this->getNSIDdata($dns_nameservers, $data['time']);
+		$data['nsids'] = $this->getNSIDdata($dns_nameservers, $time_from, $time_till);
 		$key_parser->parse(PROBE_DNS_NS_STATUS);
 		$ns_status_key = $key_parser->getKey();
 		$tldprobes_items = $this->getItemsHistoryValue([
@@ -446,7 +446,7 @@ class AggregateDetailsAction extends Action {
 	 * @param int   $time               NSID values timestamp.
 	 * @return array
 	 */
-	protected function getNSIDdata(array $dns_nameservers, $time) {
+	protected function getNSIDdata(array $dns_nameservers, $time_from, $time_till) {
 		$key_parser = new CItemKey;
 		$nsid_item_keys = [];
 		$nsids = [];
@@ -471,8 +471,8 @@ class AggregateDetailsAction extends Action {
 			'output' => ['key_', 'type', 'hostid'],
 			'hostids' => array_column($this->probes, 'tldprobe_hostid'),
 			'filter' => ['key_' => $nsid_item_keys],
-			'time_from' => $time,
-			'time_till' => $time,
+			'time_from' => $time_from,
+			'time_till' => $time_till,
 			'history' => ITEM_VALUE_TYPE_STR
 		]);
 
