@@ -123,13 +123,11 @@ class Module extends CModule {
 		global $DB, $ZBX_SERVER_NAME;
 
 		$list = [];
-		$params = [];
-		parse_str($_SERVER['QUERY_STRING'], $params);
 
 		foreach ($DB['SERVERS'] as $server) {
 			$list[] = [
 				'name' => $server['NAME'],
-				'url' => Url::getFor($server['URL'], basename($_SERVER['SCRIPT_NAME']).'?'.$_SERVER['QUERY_STRING'], []),
+				'url' => Url::getFor($server['URL'], 'rsm.rollingweekstatus', []),
 				'selected' => ($ZBX_SERVER_NAME == $server['NAME'])
 			];
 		}
