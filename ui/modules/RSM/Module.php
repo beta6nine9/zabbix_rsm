@@ -86,6 +86,7 @@ class Module extends CModule {
 
 		if ($action instanceof AuthAction && $userid > 0) {
 			$this->syncUserSessionAcrossDatabases($userid);
+			CWebUser::setSessionCookie(CWebUser::$data['sessionid']);
 		}
 	}
 
@@ -122,7 +123,8 @@ class Module extends CModule {
 		global $DB, $ZBX_SERVER_NAME;
 
 		$list = [];
-		$sid = CWebUser::$data['sessionid'];
+		$params = [];
+		parse_str($_SERVER['QUERY_STRING'], $params);
 
 		foreach ($DB['SERVERS'] as $server) {
 			$list[] = [

@@ -92,33 +92,6 @@ class CWebUser {
 			// remove guest session after successful login
 			$result &= DBexecute('DELETE FROM sessions WHERE sessionid='.zbx_dbstr(get_cookie(ZBX_SESSION_NAME)));
 
-			if ($result) {
-				self::setSessionCookie(self::$data['sessionid']);
-				DBend();
-
-				$master = $DB;
-
-				foreach ($DB['SERVERS'] as $server) {
-					if (!multiDBconnect($server, $error)) {
-						continue;
-					}
-
-					$user_info = DBfetch(DBselect(
-						'SELECT u.userid'.
-						' FROM users u'.
-						' WHERE u.alias='.zbx_dbstr($login)
-					));
-
-					DBexecute('INSERT INTO sessions (sessionid,userid,lastaccess,status)'.
-						' VALUES ('.zbx_dbstr(self::$data['sessionid']).','.zbx_dbstr($user_info['userid']).','.time().','.ZBX_SESSION_ACTIVE.')'
-					);
-				}
-
-				unset($DB['DB']);
-				$DB = $master;
-				DBconnect($error);
-			}
-
 			return $result;
 		}
 		catch (Exception $e) {
