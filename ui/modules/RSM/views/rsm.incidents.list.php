@@ -190,13 +190,13 @@ if ($data['tld']) {
 				new CLink(
 					$event['eventid'],
 					Url::getFor($data['url'], 'rsm.incidentdetails', [
-						'host', $data['tld']['host'],
-						'eventid', $event['eventid'],
-						'slvItemId', $data['dnssec']['itemid'],
-						'from', $start_time,
-						'to', array_key_exists('endTime', $event) ? $end_time : 'now',
-						'availItemId', $data['dnssec']['availItemId'],
-						'filter_set', 1,
+						'host' => $data['tld']['host'],
+						'eventid' => $event['eventid'],
+						'slvItemId' => $data['dnssec']['itemid'],
+						'from' => $start_time,
+						'to' => array_key_exists('endTime', $event) ? $end_time : 'now',
+						'availItemId' => $data['dnssec']['availItemId'],
+						'filter_set' => 1,
 					])
 				),
 				$incident_status,
@@ -210,12 +210,12 @@ if ($data['tld']) {
 		$tests_down = new CLink(
 			$this->data['dnssec']['totalTests'],
 			Url::getFor($data['url'], 'rsm.tests', [
-				'host', $data['tld']['host'],
-				'from', $data['from'],
-				'to', $data['to'],
-				'filter_set', 1,
-				'type', RSM_DNSSEC,
-				'slvItemId', $data['dnssec']['itemid']
+				'host' => $data['tld']['host'],
+				'from' => $data['from'],
+				'to' => $data['to'],
+				'filter_set' => 1,
+				'type' => RSM_DNSSEC,
+				'slvItemId' => $data['dnssec']['itemid']
 			])
 		);
 
