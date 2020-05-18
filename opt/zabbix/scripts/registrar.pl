@@ -497,9 +497,7 @@ sub add_new_registrar()
 
 	create_rsmhost($config_templateid, getopt('rr-id'), getopt('rr-name'), getopt('rr-family'));
 
-	my $proxy_mon_templateid = create_probe_health_tmpl();
-
-	create_rsmhosts_on_probes($proxy_mon_templateid, $rsmhost_groupid, $config_templateid, $proxies);
+	create_rsmhosts_on_probes($rsmhost_groupid, $config_templateid, $proxies);
 }
 
 sub create_main_template($)
@@ -579,7 +577,6 @@ sub create_rsmhost($$$$)
 
 sub create_rsmhosts_on_probes($$$)
 {
-	my $proxy_mon_templateid = shift;
 	my $rsmhost_groupid      = shift;
 	my $config_templateid    = shift;
 	my $proxies              = shift;
@@ -623,7 +620,7 @@ sub create_rsmhosts_on_probes($$$)
 				{'groupid' => PROBES_MON_GROUPID}
 			],
 			'templates' => [
-				{'templateid' => $proxy_mon_templateid}
+				{'templateid' => PROXY_HEALTH_TEMPLATEID}
 			],
 			'host' => "$probe_name - mon",
 			'status' => $status,

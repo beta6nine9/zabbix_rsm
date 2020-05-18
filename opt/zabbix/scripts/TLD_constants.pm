@@ -10,7 +10,6 @@ use constant false => 0;
 use constant MONITORING_TARGET_REGISTRY  => "registry";
 use constant MONITORING_TARGET_REGISTRAR => "registrar";
 
-use constant LINUX_TEMPLATEID			=> 10001;	# Template "Template OS Linux by Zabbix agent"
 use constant APP_ZABBIX_PROXY_TEMPLATEID	=> 10058;	# Template "Template App Zabbix Proxy"
 
 use constant TEMPLATES_TLD_GROUPID		=> 240;		# Host group "Templates - TLD"
@@ -28,6 +27,7 @@ use constant TEMPLATE_RDDS_TEST			=> 'Template RDDS Test';
 use constant TEMPLATE_RDDS_STATUS		=> 'Template RDDS Status';
 use constant TEMPLATE_PROBE_CONFIG_PREFIX	=> 'Template Probe Config ';
 use constant TEMPLATE_PROBE_STATUS		=> 'Template Probe Status';
+use constant TEMPLATE_PROXY_HEALTH		=> 'Template Proxy Health';
 use constant TEMPLATE_RDAP_TEST			=> 'Template RDAP Test';
 use constant TEMPLATE_RDAP_STATUS		=> 'Template RDAP Status';
 
@@ -182,7 +182,6 @@ our @EXPORT_OK = qw(
 	false
 	MONITORING_TARGET_REGISTRY
 	MONITORING_TARGET_REGISTRAR
-	LINUX_TEMPLATEID
 	APP_ZABBIX_PROXY_TEMPLATEID
 	CONFIGVALUE_DNS_UDP_RTT_HIGH_ITEMID
 	TEMPLATES_TLD_GROUPID
@@ -203,6 +202,7 @@ our @EXPORT_OK = qw(
 	TEMPLATE_RDAP_STATUS
 	TEMPLATE_PROBE_CONFIG_PREFIX
 	TEMPLATE_PROBE_STATUS
+	TEMPLATE_PROXY_HEALTH
 	VALUE_TYPE_AVAIL
 	VALUE_TYPE_PERC
 	VALUE_TYPE_NUM
@@ -227,11 +227,11 @@ our @EXPORT_OK = qw(
 our %EXPORT_TAGS = (
 	general => [ qw(true false) ],
 	templates => [ qw(
-			LINUX_TEMPLATEID
 			APP_ZABBIX_PROXY_TEMPLATEID
 			TEMPLATE_RSMHOST_CONFIG_PREFIX
 			TEMPLATE_PROBE_CONFIG_PREFIX
 			TEMPLATE_PROBE_STATUS
+			TEMPLATE_PROXY_HEALTH
 			TEMPLATE_CONFIG_HISTORY
 			TEMPLATE_DNS_TEST
 			TEMPLATE_DNS_STATUS

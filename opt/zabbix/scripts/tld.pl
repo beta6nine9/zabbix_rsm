@@ -904,9 +904,7 @@ sub add_new_tld($)
 
 	create_rsmhost($config_templateid, getopt('tld'), getopt('type'), $changes);
 
-	my $proxy_mon_templateid = create_probe_health_tmpl();
-
-	create_tld_hosts_on_probes($proxy_mon_templateid, $rsmhost_groupid, $config_templateid, $proxies);
+	create_tld_hosts_on_probes($rsmhost_groupid, $config_templateid, $proxies);
 }
 
 sub getopt_ns_servers()
@@ -1361,9 +1359,8 @@ sub create_rsmhost($$$$)
 	return $tld_hostid;
 }
 
-sub create_tld_hosts_on_probes($$$$)
+sub create_tld_hosts_on_probes($$$)
 {
-	my $proxy_mon_templateid = shift;
 	my $rsmhost_groupid      = shift;
 	my $config_templateid    = shift;
 	my $proxies              = shift;
@@ -1407,7 +1404,7 @@ sub create_tld_hosts_on_probes($$$$)
 				{'groupid' => PROBES_MON_GROUPID}
 			],
 			'templates' => [
-				{'templateid' => $proxy_mon_templateid}
+				{'templateid' => PROXY_HEALTH_TEMPLATEID}
 			],
 			'host' => "$probe_name - mon",
 			'status' => $status,

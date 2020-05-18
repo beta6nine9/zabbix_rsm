@@ -113,10 +113,6 @@ sub add_probe($$$$$$$$$$$)
 
 	###### Checking and creating required groups and templates
 
-	print("Getting 'Template Proxy Health' template: ");
-	my $probe_tmpl_health = create_probe_health_tmpl();
-	is_not_empty($probe_tmpl_health, true);
-
 	########## Creating new Probe
 
 	print("Creating '$probe_name' with interface $probe_ip:$probe_port ");
@@ -165,7 +161,7 @@ sub add_probe($$$$$$$$$$$)
 			{ 'groupid' => PROBES_MON_GROUPID },
 		],
 		'templates'	=> [
-			{ 'templateid' => $probe_tmpl_health },
+			{ 'templateid' => PROXY_HEALTH_TEMPLATEID },
 		],
 		'host'		=> "$probe_name - mon",
 		'status'	=> HOST_STATUS_MONITORED,

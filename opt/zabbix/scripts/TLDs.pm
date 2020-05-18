@@ -24,6 +24,7 @@ our @EXPORT = qw(zbx_connect check_api_error get_proxies_list
 		RDAP_TEST_TEMPLATEID
 		RDAP_STATUS_TEMPLATEID
 		PROBE_STATUS_TEMPLATEID
+		PROXY_HEALTH_TEMPLATEID
 		create_probe_template create_host create_group create_template
 		create_item create_trigger create_macro update_root_server_macros
 		create_passive_proxy probe_exists get_host_group get_template get_template_id get_probe get_host
@@ -36,7 +37,6 @@ our @EXPORT = qw(zbx_connect check_api_error get_proxies_list
 		set_proxy_status
 		get_items_like get_host_items set_tld_type get_triggers_by_items
 		add_dependency
-		create_probe_health_tmpl
 		pfail);
 
 our ($zabbix, $result);
@@ -267,6 +267,11 @@ sub RDAP_STATUS_TEMPLATEID
 sub PROBE_STATUS_TEMPLATEID
 {
 	return get_template_id(TEMPLATE_PROBE_STATUS);
+}
+
+sub PROXY_HEALTH_TEMPLATEID
+{
+	return get_template_id(TEMPLATE_PROXY_HEALTH);
 }
 
 sub remove_templates($)
@@ -702,44 +707,30 @@ sub create_group
 
 sub create_template
 {
-	my $name             = shift;
-	my $child_templateid = shift;
+	my $name = shift;
 
-	my $result;
-	my $templateid;
-	my $options;
+	my $templateid = $zabbix->exist('template', {'filter' => {'host' => $name}});
 
-	# TODO: reduce amount of copy-pasted code
-
-	unless ($templateid = $zabbix->exist('template', {'filter' => {'host' => $name}}))
+	if ($templateid)
 	{
-		$options = {
-			'groups'=> {'groupid' => TEMPLATES_TLD_GROUPID},
-			'host'  => $name
-		};
-
-		if (defined($child_templateid))
-		{
-			$options->{'templates'} = [{'templateid' => $child_templateid}];
-		}
-
-		$result = $zabbix->create('template', $options);
-
-		$templateid = $result->{'templateids'}[0];
+		$zabbix->update(
+			'template',
+			{
+				'templateid' => $templateid,
+				'groups'     => {'groupid' => TEMPLATES_TLD_GROUPID},
+				'host'       => $name
+			}
+		);
 	}
 	else
 	{
-		$options = {
-			'templateid' => $templateid,
-			'groups'     => {'groupid' => TEMPLATES_TLD_GROUPID},
-			'host'       => $name
-		};
-		if (defined($child_templateid))
-		{
-			$options->{'templates'} = [{'templateid' => $child_templateid}];
-		}
-
-		$result = $zabbix->update('template', $options);
+		my $result = $zabbix->create(
+			'template',
+			{
+				'groups'=> {'groupid' => TEMPLATES_TLD_GROUPID},
+				'host'  => $name
+			}
+		);
 		$templateid = $result->{'templateids'}[0];
 	}
 
@@ -1219,51 +1210,6 @@ sub __exec($)
 	{
 		pfail($err);
 	}
-}
-
-sub create_probe_health_tmpl()
-{
-	my $host_name = 'Template Proxy Health';
-	my $templateid = create_template($host_name, LINUX_TEMPLATEID);
-
-	my $item_key = 'zabbix[proxy,{$RSM.PROXY_NAME},lastaccess]';
-
-	create_item({
-		'name'         => 'Availability of probe',
-		'key_'         => $item_key,
-		'status'       => ITEM_STATUS_ACTIVE,
-		'hostid'       => $templateid,
-		'type'         => ITEM_TYPE_INTERNAL,
-		'value_type'   => ITEM_VALUE_TYPE_UINT64,
-		'units'        => 'unixtime',
-		'delay'        => '60'
-	});
-
-	create_trigger(
-		{
-			'description' => 'Probe {$RSM.PROXY_NAME} is unavailable',
-			'expression'  => "{TRIGGER.VALUE}=0 and {$host_name:$item_key.fuzzytime(2m)}=0 or\r\n" .
-					 "{TRIGGER.VALUE}=1 and (\r\n" .
-					 "\t{$host_name:$item_key.now()}-{$host_name:$item_key.last(#1)}>1m or\r\n" .
-					 "\t{$host_name:$item_key.now()}-{$host_name:$item_key.last(#2)}>2m or\r\n" .
-					 "\t{$host_name:$item_key.now()}-{$host_name:$item_key.last(#3)}>3m\r\n" .
-					 ")",
-			'priority'    => 4
-		},
-		$host_name
-	);
-
-	create_item({
-		'name'         => 'Probe main status',
-		'key_'         => PROBE_KEY_ONLINE,
-		'status'       => ITEM_STATUS_ACTIVE,
-		'hostid'       => $templateid,
-		'type'         => ITEM_TYPE_TRAPPER,
-		'value_type'   => ITEM_VALUE_TYPE_UINT64,
-		'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_probe'}
-	});
-
-	return $templateid;
 }
 
 sub rsmhost_dns_ns_log($$)
