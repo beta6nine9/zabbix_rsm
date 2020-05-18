@@ -669,6 +669,21 @@ class ParticularTestsListAction extends Action {
 					elseif (substr($item['key_'], 0, strlen(PROBE_RDDS_ITEM)) === PROBE_RDDS_ITEM) {
 						$hosts[$item['hostid']]['value'] = $itemValue['value'];
 					}
+					elseif ($item['key_'] == PROBE_RDDS43_TESTEDNAME) {
+						$hosts[$item['hostid']]['rdds43']['testedname'] = $itemValue['value'];
+					}
+					elseif ($item['key_'] == PROBE_RDDS43_TARGET) {
+						$hosts[$item['hostid']]['rdds43']['target'] = $itemValue['value'];
+					}
+					elseif ($item['key_'] == PROBE_RDDS80_TARGET) {
+						$hosts[$item['hostid']]['rdds80']['target'] = $itemValue['value'];
+					}
+					elseif ($item['key_'] == PROBE_RDAP_TESTEDNAME) {
+						$hosts[$item['hostid']]['rdap']['testedname'] = $itemValue['value'];
+					}
+					elseif ($item['key_'] == PROBE_RDAP_TARGET) {
+						$hosts[$item['hostid']]['rdap']['target'] = $itemValue['value'];
+					}
 
 					// Set if RDDS is enabled on a TLD level
 					if (array_key_exists(RSM_TLD_RDDS_ENABLED, $data['tld']['macros'])

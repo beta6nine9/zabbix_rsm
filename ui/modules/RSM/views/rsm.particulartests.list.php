@@ -438,7 +438,7 @@ foreach ($data['probes'] as $probe) {
 			$rdds43,
 			(isset($probe['rdds43']['ip']) && $probe['rdds43']['ip'])
 				? (new CSpan($probe['rdds43']['ip']))->setAttribute('class', $rdds43 === $down ? ZBX_STYLE_RED : ZBX_STYLE_GREEN)
-				: '-',
+				: '',
 			(isset($probe['rdds43']['target']) && $probe['rdds43']['target'])
 				? $probe['rdds43']['target']
 				: '',
@@ -449,7 +449,7 @@ foreach ($data['probes'] as $probe) {
 			$rdds80,
 			(isset($probe['rdds80']['ip']) && $probe['rdds80']['ip'])
 				? (new CSpan($probe['rdds80']['ip']))->setAttribute('class', $rdds80 === $down ? ZBX_STYLE_RED : ZBX_STYLE_GREEN)
-				: '-',
+				: '',
 			(isset($probe['rdds80']['target']) && $probe['rdds80']['target'])
 				? $probe['rdds80']['target']
 				: '',
@@ -461,7 +461,7 @@ foreach ($data['probes'] as $probe) {
 				$rdap,
 				(isset($probe['rdap']['ip']) && $probe['rdap']['ip'])
 					? (new CSpan($probe['rdap']['ip']))->setAttribute('class', $rdap === $down ? ZBX_STYLE_RED : ZBX_STYLE_GREEN)
-					: '-',
+					: '',
 				(isset($probe['rdap']['target']) && $probe['rdap']['target'])
 					? $probe['rdap']['target']
 					: '',
@@ -509,7 +509,7 @@ foreach ($data['probes'] as $probe) {
 			$rdap,
 			(isset($probe['rdap']['ip']) && $probe['rdap']['ip'])
 				? (new CSpan($probe['rdap']['ip']))->setAttribute('class', $rdap === $down ? ZBX_STYLE_RED : ZBX_STYLE_GREEN)
-				: '-',
+				: '',
 			(isset($probe['rdap']['target']) && $probe['rdap']['target'])
 				? $probe['rdap']['target']
 				: '',
@@ -528,10 +528,10 @@ foreach ($data['probes'] as $probe) {
 		$row = [
 			$probe['name'],
 			$epp,
-			(isset($probe['ip']) && $probe['ip']) ? $probe['ip'] : '-',
-			(isset($probe['login']) && $probe['login']) ? $probe['login'] : '-',
-			(isset($probe['update']) && $probe['update']) ? $probe['update'] : '-',
-			(isset($probe['info']) && $probe['info']) ? $probe['info'] : '-'
+			(isset($probe['ip']) && $probe['ip']) ? $probe['ip'] : '',
+			(isset($probe['login']) && $probe['login']) ? $probe['login'] : '',
+			(isset($probe['update']) && $probe['update']) ? $probe['update'] : '',
+			(isset($probe['info']) && $probe['info']) ? $probe['info'] : ''
 		];
 	}
 
