@@ -1417,7 +1417,7 @@ class CSlaReport
 		$database = $conf["database"];
 		$ssl_conf = $conf["ssl_conf"];
 
-		self::$dbh = new PDO("mysql:host={$hostname};dbname={$database};port=33006", $username, $password, $ssl_conf);
+		self::$dbh = new PDO("mysql:host={$hostname};dbname={$database}", $username, $password, $ssl_conf);
 		self::$dbh->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 		self::$dbh->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_NUM);
 		self::$dbh->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
