@@ -855,19 +855,14 @@ class CSlaReport
 	{
 		# get itemids of <service>.enabled for each TLD
 
-		$tlds_filter = substr(str_repeat("hosts.host like concat(?,' %') or ", count($tlds)), 0, -4);
-		$sql = "select" .
-					" items.itemid," .
-					" hosts.host" .
-				" from" .
-					" items" .
-					" left join hosts on hosts.hostid=items.hostid" .
-					" left join hosts_groups on hosts_groups.hostid=hosts.hostid" .
-				" where" .
-					" items.key_=? and" .
-					" ({$tlds_filter}) and" .
-					" hosts_groups.groupid=190";
-		$rows = self::dbSelect($sql, array_merge(["{$service}.enabled"], $tlds));
+		$tlds_filter = implode('or ', array_fill(0, count($tlds), "h.name=?"));
+		$sql = "select i.itemid, h.host".
+				" from hstgrp hg".
+				" join hosts_groups hgg on hgg.groupid=hg.groupid".
+				" join hosts h ON h.hostid=hgg.hostid and ({$tlds_filter})".
+				" join items i ON i.hostid=h.hostid AND i.key_=?".
+				" where hg.name=?";
+		$rows = self::dbSelect($sql, array_merge($tlds, ["{$service}.enabled", "TLDs"]));
 
 		$tld_to_itemids = [];
 
@@ -1422,7 +1417,7 @@ class CSlaReport
 		$database = $conf["database"];
 		$ssl_conf = $conf["ssl_conf"];
 
-		self::$dbh = new PDO("mysql:host={$hostname};dbname={$database}", $username, $password, $ssl_conf);
+		self::$dbh = new PDO("mysql:host={$hostname};dbname={$database};port=33006", $username, $password, $ssl_conf);
 		self::$dbh->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 		self::$dbh->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_NUM);
 		self::$dbh->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);

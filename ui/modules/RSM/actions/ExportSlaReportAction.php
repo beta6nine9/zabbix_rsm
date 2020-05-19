@@ -85,7 +85,7 @@ class ExportSlaReportAction extends Action {
 		}
 		elseif (class_exists('CSlaReport', true)) {
 			$report_row = CSlaReport::generate($data['server_nr'], [$data['tld']['host']], $data['filter_year'],
-				$data['filter_month'], 'XML'
+				$data['filter_month'], ['XML']
 			);
 
 			if ($report_row) {
@@ -123,7 +123,7 @@ class ExportSlaReportAction extends Action {
 				$data['tld']['host'], $report_row['year'], getMonthCaption($report_row['month']))
 			);
 
-			echo $report_row['report_xml'];
+			echo $report_row['report']['XML'];
 			exit;
 		}
 	}
