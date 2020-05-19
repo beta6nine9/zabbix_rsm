@@ -282,7 +282,7 @@ if ($data['tld']) {
 				))->addClass('first-cell-value')
 				: (new CSpan('0.000%'))->addClass('first-cell-value');
 
-			$dns_value->setHint($tld[RSM_DNS]['clock'] ? date(DATE_TIME_FORMAT_SECONDS, $tld[RSM_DNS]['clock']) : 'No value');
+			$dns_value->setHint($tld[RSM_DNS]['clock']);
 
 			$dns_graph = ($tld[RSM_DNS]['lastvalue'] > 0)
 				? new CLink('graph',
@@ -340,7 +340,7 @@ if ($data['tld']) {
 				))->addClass('first-cell-value')
 				: (new CSpan('0.000%'))->addClass('first-cell-value');
 
-			$dnssec_value->setHint($tld[RSM_DNSSEC]['clock'] ? date(DATE_TIME_FORMAT_SECONDS, $tld[RSM_DNSSEC]['clock']) : 'No value');
+			$dnssec_value->setHint($tld[RSM_DNSSEC]['clock']);
 
 			$dnssec_graph = ($tld[RSM_DNSSEC]['lastvalue'] > 0)
 				? new CLink('graph',
@@ -397,7 +397,7 @@ if ($data['tld']) {
 				))->addClass('first-cell-value')
 				: (new CSpan('0.000%'))->addClass('first-cell-value');
 
-			$rdds_value->setHint($tld[RSM_RDDS]['clock'] ? date(DATE_TIME_FORMAT_SECONDS, $tld[RSM_RDDS]['clock']) : 'No value');
+			$rdds_value->setHint($tld[RSM_RDDS]['clock']);
 
 			$rdds_graph = ($tld[RSM_RDDS]['lastvalue'] > 0)
 				? new CLink('graph',
@@ -469,7 +469,7 @@ if ($data['tld']) {
 				))->addClass('first-cell-value')
 				: (new CSpan('0.000%'))->addClass('first-cell-value');
 
-			$rdap_value->setHint($tld[RSM_RDAP]['clock'] ? date(DATE_TIME_FORMAT_SECONDS, $tld[RSM_RDAP]['clock']) : 'No value');
+			$rdap_value->setHint($tld[RSM_RDAP]['clock']);
 
 			$rdap_graph = ($tld[RSM_RDAP]['lastvalue'] > 0)
 				? new CLink('graph',
@@ -526,7 +526,7 @@ if ($data['tld']) {
 				))->addClass('first-cell-value')
 				: (new CSpan('0.000%'))->addClass('first-cell-value');
 
-			$epp_value->setHint($tld[RSM_EPP]['clock'] ? date(DATE_TIME_FORMAT_SECONDS, $tld[RSM_EPP]['clock']) : 'No value');
+			$epp_value->setHint($tld[RSM_EPP]['clock']);
 
 			$epp_graph = ($tld[RSM_EPP]['lastvalue'] > 0)
 				? new CLink('graph',
