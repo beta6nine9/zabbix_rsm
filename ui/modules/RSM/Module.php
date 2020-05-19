@@ -86,7 +86,11 @@ class Module extends CModule {
 
 		if ($action instanceof AuthAction && $userid > 0) {
 			$this->syncUserSessionAcrossDatabases($userid);
-			CWebUser::setSessionCookie(CWebUser::$data['sessionid']);
+
+			// Force to send user session cookie only when user is logged in.
+			if (isset(CWebUser::$data['sessionid'])) {
+				CWebUser::setSessionCookie(CWebUser::$data['sessionid']);
+			}
 		}
 	}
 
