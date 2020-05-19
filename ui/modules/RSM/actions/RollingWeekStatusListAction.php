@@ -527,13 +527,14 @@ class RollingWeekStatusListAction extends Action {
 
 			if ($rsm_itemids) {
 				$db_histories = DBselect(
-					'SELECT l.itemid, l.value'.
+					'SELECT l.itemid, l.value, l.clock'.
 					' FROM lastvalue l'.
 					' WHERE '.dbConditionInt('l.itemid', array_keys($rsm_itemids))
 				);
 
 				while ($history = DBfetch($db_histories)) {
 					$items[$history['itemid']]['lastvalue'] = $history['value'];
+					$items[$history['itemid']]['clock'] = $history['clock'];
 				}
 			}
 
@@ -580,6 +581,7 @@ class RollingWeekStatusListAction extends Action {
 						$data['tld'][$hostid_key][$itemkey_type[$item['key_']]] = [
 							'itemid' => $item['itemid'],
 							'lastvalue' => is_null($item['lastvalue']) ? null : sprintf('%.3f', $item['lastvalue']),
+							'clock' => $item['clock'],
 							'trigger' => false
 						];
 					}
