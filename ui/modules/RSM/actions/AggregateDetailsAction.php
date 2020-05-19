@@ -480,6 +480,11 @@ class AggregateDetailsAction extends Action {
 		$params_count = $key_parser->getParamsNum();
 		$nsids = array_unique(array_column($nsid_items, 'history_value'));
 		$nsids = array_filter($nsids, 'strlen');
+
+		if (!$nsids) {
+			return $nsids;
+		}
+
 		sort($nsids, SORT_LOCALE_STRING|SORT_NATURAL|SORT_FLAG_CASE);
 		$tldprobeid_probeid = array_combine(array_column($this->probes, 'tldprobe_hostid'), array_keys($this->probes));
 
