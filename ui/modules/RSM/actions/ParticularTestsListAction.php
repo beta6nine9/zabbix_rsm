@@ -326,13 +326,9 @@ class ParticularTestsListAction extends Action {
 				'preservekeys' => true
 			]);
 
-			/**
-			 * If there are multiple TLD probes, each with different historical value for RDAP_ENABLED, we still take only
-			 * the first one, because others will be synchronized in less then minute.
-			 */
 			$_enabled_itemid = $tlds_probes ? API::Item()->get([
 				'output' => ['itemid', 'key_'],
-				'hostids' => array_keys($tlds_probes),
+				'hostids' => $data['tld']['hostid'],
 				'filter' => [
 					'key_' => [RDAP_ENABLED, RDDS_ENABLED]
 				]
