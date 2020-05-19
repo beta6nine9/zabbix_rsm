@@ -606,7 +606,6 @@ sub create_rsmhosts_on_probes($$$)
 			],
 			'templates' => [
 				{'templateid' => PROBE_STATUS_TEMPLATEID},
-				{'templateid' => APP_ZABBIX_PROXY_TEMPLATEID},
 				{'templateid' => $probe_templateid}
 			],
 			'host'         => $probe_name,

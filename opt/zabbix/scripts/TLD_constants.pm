@@ -10,8 +10,6 @@ use constant false => 0;
 use constant MONITORING_TARGET_REGISTRY  => "registry";
 use constant MONITORING_TARGET_REGISTRAR => "registrar";
 
-use constant APP_ZABBIX_PROXY_TEMPLATEID	=> 10058;	# Template "Template App Zabbix Proxy"
-
 use constant TEMPLATES_TLD_GROUPID		=> 240;		# Host group "Templates - TLD"
 use constant PROBES_GROUPID			=> 120;		# Host group "Probes"
 use constant PROBES_MON_GROUPID			=> 130;		# Host group "Probes - Mon"
@@ -182,7 +180,6 @@ our @EXPORT_OK = qw(
 	false
 	MONITORING_TARGET_REGISTRY
 	MONITORING_TARGET_REGISTRAR
-	APP_ZABBIX_PROXY_TEMPLATEID
 	CONFIGVALUE_DNS_UDP_RTT_HIGH_ITEMID
 	TEMPLATES_TLD_GROUPID
 	PROBES_GROUPID
@@ -227,7 +224,6 @@ our @EXPORT_OK = qw(
 our %EXPORT_TAGS = (
 	general => [ qw(true false) ],
 	templates => [ qw(
-			APP_ZABBIX_PROXY_TEMPLATEID
 			TEMPLATE_RSMHOST_CONFIG_PREFIX
 			TEMPLATE_PROBE_CONFIG_PREFIX
 			TEMPLATE_PROBE_STATUS

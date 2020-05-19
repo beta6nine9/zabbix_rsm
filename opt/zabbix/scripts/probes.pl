@@ -141,7 +141,6 @@ sub add_probe($$$$$$$$$$$)
 		'templates'	=> [
 			{ 'templateid' => $probe_tmpl_id },
 			{ 'templateid' => PROBE_STATUS_TEMPLATEID },
-			{ 'templateid' => APP_ZABBIX_PROXY_TEMPLATEID },
 		],
 		'host'		=> $probe_name,
 		'status'	=> HOST_STATUS_MONITORED,
