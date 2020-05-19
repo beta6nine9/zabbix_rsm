@@ -263,22 +263,8 @@ class CSlaReport
 
 		// get RDDS and RDAP status (enabled/disabled)
 
-		$rdds_rows = self::getServiceStatus($tlds, $from, $till, "rdds");
-		$rdap_rows = self::getServiceStatus($tlds, $from, $till, "rdap");
-
-		$rdds_status = [];
-		$rdap_status = [];
-
-		foreach ($rdds_rows as $row)
-		{
-			list($tld, $status) = $row;
-			$rdds_status[$tld] = (bool)$status;
-		}
-		foreach ($rdap_rows as $row)
-		{
-			list($tld, $status) = $row;
-			$rdap_status[$tld] = (bool)$status;
-		}
+		$rdds_status = self::getServiceStatus($tlds, $from, $till, "rdds");
+		$rdap_status = self::getServiceStatus($tlds, $from, $till, "rdap");
 
 		if (self::isRdapStandalone($from))
 		{
@@ -855,61 +841,40 @@ class CSlaReport
 	{
 		# get itemids of <service>.enabled for each TLD
 
-		$tlds_filter = implode('or ', array_fill(0, count($tlds), "h.name=?"));
-		$sql = "select i.itemid, h.host".
-				" from hstgrp hg".
-				" join hosts_groups hgg on hgg.groupid=hg.groupid".
-				" join hosts h ON h.hostid=hgg.hostid and ({$tlds_filter})".
-				" join items i ON i.hostid=h.hostid AND i.key_=?".
-				" where hg.name=?";
-		$rows = self::dbSelect($sql, array_merge($tlds, ["{$service}.enabled", "TLDs"]));
-
-		$tld_to_itemids = [];
-
-		foreach ($rows as $row)
-		{
-			list($itemid, $host) = $row;
-
-			$host = explode(" ", $host, 2)[0];
-
-			if (array_key_exists($host, $tld_to_itemids))
-			{
-				array_push($tld_to_itemids[$host], $itemid);
-			}
-			else
-			{
-				$tld_to_itemids[$host] = [$itemid];
-			}
-		}
+		$tlds_placeholder = substr(str_repeat("?,", count($tlds)), 0, -1);
+		$sql = "select" .
+				" items.itemid," .
+				"hosts.host" .
+			" from" .
+				" items" .
+				" inner join hosts on hosts.hostid=items.hostid" .
+				" inner join hosts_groups on hosts_groups.hostid=hosts.hostid" .
+				" inner join hstgrp on hstgrp.groupid=hosts_groups.groupid" .
+			" where" .
+				" hstgrp.name=? and" .
+				" items.key_=? and" .
+				" hosts.name in ({$tlds_placeholder})";
+		$rows = self::dbSelect($sql, array_merge(["TLDs", "{$service}.enabled"], $tlds));
 
 		# get <service> status for each TLD
 
 		$status = [];
 
-		foreach ($tld_to_itemids as $tld => $itemids)
+		foreach ($rows as $row)
 		{
-			$tld_status = 0;
+			list($itemid, $host) = $row;
 
-			foreach ($itemids as $itemid)
-			{
-				$sql = "select exists(" .
-						"select *" .
-						" from history_uint" .
-						" where" .
-							" clock between ? and ?" .
-							" and itemid=? and" .
-							" value=1" .
-					") as status";
-				$rows = self::dbSelect($sql, [$from, $till, $itemid]);
+			$sql = "select exists(" .
+					"select *" .
+					" from history_uint" .
+					" where" .
+						" clock between ? and ?" .
+						" and itemid=? and" .
+						" value=1" .
+				") as status";
+			$status_rows = self::dbSelect($sql, [$from, $till, $itemid]);
 
-				if ($rows[0][0])
-				{
-					$tld_status = 1;
-					break;
-				}
-			}
-
-			array_push($status, [$tld, $tld_status]);
+			$status[$host] = (bool)$status_rows[0][0];
 		}
 
 		return $status;
