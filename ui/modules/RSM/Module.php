@@ -74,7 +74,7 @@ class Module extends CModule {
 			$this->before_authaction_userid = CWebUser::$data['userid'];
 		}
 		else if (!$this->permission->canAccessRoute($action->getAction())) {
-			throw new Exception('You do not have permissions to access this action.');
+			access_deny(ACCESS_DENY_PAGE);
 		}
 	}
 
