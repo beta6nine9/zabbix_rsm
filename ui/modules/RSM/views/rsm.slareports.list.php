@@ -142,7 +142,7 @@ if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY) {
 				'',
 				'',
 				'',
-				_s('%1$s %% (queries <= %2$s ms)', floatval(number_format($data['slv_dns_tcp_rtt_percentage'])),
+				_s('%1$s %% (queries <= %2$s ms)', floatval(number_format($data['slv_dns_tcp_rtt_percentage'], 3)),
 					$data['slr_dns_tcp_rtt_ms']
 				),
 				_s('<= %1$s ms, for at least %2$s %% of queries', $data['slr_dns_tcp_rtt_ms'],
@@ -183,7 +183,7 @@ if (array_key_exists('slv_rdds_downtime', $data)) {
 				'',
 				'',
 				$disabled ? 'disabled' : _s('%1$s %% (queries <= %2$s ms)',
-					floatval(number_format($data['slv_rdds_rtt_percentage'])),
+					floatval(number_format($data['slv_rdds_rtt_percentage'], 3)),
 					$data['slr_rdds_rtt_ms']
 				),
 				$disabled ? 'disabled' : _s('<= %1$s ms, for at least %2$s %% of the queries',
@@ -225,7 +225,7 @@ if (array_key_exists('slv_rdap_downtime', $data)) {
 			'',
 			$disabled
 				? 'disabled'
-				: _s('%1$s %% (queries <= %2$s ms)', floatval(number_format($data['slv_rdap_rtt_percentage'])),
+				: _s('%1$s %% (queries <= %2$s ms)', floatval(number_format($data['slv_rdap_rtt_percentage'], 3)),
 					$data['slr_rdap_rtt_ms']),
 			$disabled
 				? 'disabled'
