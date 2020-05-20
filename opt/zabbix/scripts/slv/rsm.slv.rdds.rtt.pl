@@ -33,8 +33,8 @@ use constant SLV_ITEM_KEY_RDDS_PERFORMED        => "rsm.slv.rdds.rtt.performed";
 use constant SLV_ITEM_KEY_RDDS_FAILED           => "rsm.slv.rdds.rtt.failed";
 use constant SLV_ITEM_KEY_RDDS_PFAILED          => "rsm.slv.rdds.rtt.pfailed";
 
-use constant RTT_ITEM_KEY_PATTERN_RDDS43        => 'rsm.rdds.43.rtt[{$RSM.TLD}]';
-use constant RTT_ITEM_KEY_PATTERN_RDDS80        => 'rsm.rdds.80.rtt[{$RSM.TLD}]';
+use constant RTT_ITEM_KEY_PATTERN_RDDS43        => 'rsm.rdds.43.rtt';
+use constant RTT_ITEM_KEY_PATTERN_RDDS80        => 'rsm.rdds.80.rtt';
 use constant RTT_ITEM_KEY_PATTERN_RDAP          => 'rdap.rtt';
 
 use constant RTT_TIMEOUT_ERROR_RDDS43           => -227;
