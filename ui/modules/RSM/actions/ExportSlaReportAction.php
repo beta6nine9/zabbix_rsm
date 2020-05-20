@@ -92,7 +92,8 @@ class ExportSlaReportAction extends Action {
 				$report_row = reset($report_row);
 				$report_row += [
 					'year' => $data['filter_year'],
-					'month' => $data['filter_month']
+					'month' => $data['filter_month'],
+					'report_xml' => $report_row['report']['XML'],
 				];
 			}
 		}
@@ -123,7 +124,7 @@ class ExportSlaReportAction extends Action {
 				$data['tld']['host'], $report_row['year'], getMonthCaption($report_row['month']))
 			);
 
-			echo $report_row['report']['XML'];
+			echo $report_row['report_xml'];
 			exit;
 		}
 	}
