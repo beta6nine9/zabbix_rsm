@@ -403,8 +403,8 @@ foreach ($data['probes'] as $probe) {
 	}
 	elseif ($data['type'] == RSM_RDDS) {
 		$rdap_rtt = '';
-		$rdds43_rtt = '-';
-		$rdds80_rtt = '-';
+		$rdds43_rtt = '';
+		$rdds80_rtt = '';
 
 		if (isset($probe['rdds43']['rtt'])) {
 			$rdds43_rtt = (new CSpan($probe['rdds43']['rtt']['value']))
