@@ -4731,14 +4731,30 @@ sub generate_report($$;$)
 # The data is collected for specified period, specified items of type float and str. The data is to be used later
 # for calling get_probe_results().
 #
-sub get_probe_history($$$$$$)
+sub get_probe_history($$$$$$$$)
 {
-	my $from = shift;
-	my $till = shift;
-	my $itemids_float = shift;
-	my $itemids_str = shift;
+	my $from = shift;              # input
+	my $till = shift;              # input
+	my $itemids_uint = shift;      # input
+	my $itemids_float = shift;     # input
+	my $itemids_str = shift;       # input
+	my $results_uint_buf = shift;  # output
 	my $results_float_buf = shift; # output
 	my $results_str_buf = shift;   # output
+
+	if (@{$itemids_uint} == 0)
+	{
+		$$results_uint_buf = [];
+	}
+	else
+	{
+		$$results_uint_buf = db_select(
+			"select itemid,value,clock".
+			" from " . history_table(ITEM_VALUE_TYPE_UINT64).
+			" where itemid in (" . join(',', @{$itemids_uint}) . ")".
+				" and " . sql_time_condition($from, $till)
+		);
+	}
 
 	if (@{$itemids_float} == 0)
 	{
@@ -4815,100 +4831,199 @@ sub __get_interface($$)
 
 	fail("Cannot identify interface from $service key \"$key\"");
 }
+
+#
+# Items we collect the data from:
+#
+# DNS:
+# | rsm.dns.mode                                 |
+# | rsm.dns.ns.status[ns1.zabbix.dev]            |
+# | rsm.dns.ns.status[ns2.zabbix.dev]            |
+# | rsm.dns.nsid[ns1.zabbix.dev,192.168.3.11]    |
+# | rsm.dns.nsid[ns2.zabbix.dev,192.168.3.9]     |
+# | rsm.dns.nsid[ns2.zabbix.dev,192.168.8.75]    |
+# | rsm.dns.protocol                             |
+# | rsm.dns.rtt[ns1.zabbix.dev,192.168.3.11,tcp] |
+# | rsm.dns.rtt[ns1.zabbix.dev,192.168.3.11,udp] |
+# | rsm.dns.rtt[ns2.zabbix.dev,192.168.3.9,tcp]  |
+# | rsm.dns.rtt[ns2.zabbix.dev,192.168.3.9,udp]  |
+# | rsm.dns.rtt[ns2.zabbix.dev,192.168.8.75,tcp] |
+# | rsm.dns.rtt[ns2.zabbix.dev,192.168.8.75,udp] |
+# | rsm.dns.status
+# RDDS:
+# | rsm.rdds.43.ip         |
+# | rsm.rdds.43.rtt        |
+# | rsm.rdds.43.target     |
+# | rsm.rdds.43.testedname |
+# | rsm.rdds.80.ip         |
+# | rsm.rdds.80.rtt        |
+# | rsm.rdds.80.target     |
+# | rsm.rdds.status        |
+#  RDAP:
+# | rdap.ip         |
+# | rdap.rtt        |
+# | rdap.status     |
+# | rdap.target     |
+# | rdap.testedname |
 #
 # Format history data in a convenient way for SLA API and Data Export scripts. We need to group metrics by targets.
 # Targets are differently fetched in case for DNS/DNSSEC and RDDS/RDAP but formatted in the same way (see comments
 # in the code):
 #
-# {CLOCK}->{INTERFACE}->{TARGET} => [
-#     {
-#         'rtt'
-#         'ip'
-#     },
-#     {
-#         'rtt'
-#         'ip'
+# CLOCK => {
+#     'interfaces' => {
+#         'DNS' => {
+#             'status' => 1,
+#             'protocol' => 0,
+#             'targets' => {
+#                 'ns1.example.com' => {
+#                     'status' => 1,
+#                     'metrics' => [
+#                         'rtt' => 13,
+#                         'ip' => '1.2.3.4',
+#                         'nsid' => ''
+#                     ]
+#                 }
+#             }
+#         }
+#         'RDDS43' => {
+#             'status' => 1,
+#             'targets' => {
+#                 'whois.example.com' => {
+#                     'status' => 1,
+#                     'metrics' => [
+#                         'rtt' => 35,
+#                         'ip' => '1.2.3.4'
+#                         'testedName' => 'example.com'
+#                     ]
+#                 }
+#             }
+#         }
 #     }
-# ];
-# {CLOCK}->{INTERFACE}->{TARGET} => [
-#     {
-#         'rtt'
-#         'ip'
-#         'testedName'
-#     }
-# ];
+# }
 #
-sub get_probe_results($$$$)
+sub get_probe_results($$$)
 {
 	my $service = shift;
-	my $results_float = shift;
-	my $results_str = shift;
+	my $results = shift;
 	my $item_data = shift;
 
-	my ($rd_targets, $rd_metrics, $probe_results);	# for rdds/rdap we need to collect separately
-
-	#
-	# Fetch RTT (Float) values (on Probe level).
-	#
-	# Note, for DNS service we will also collect target (Name Server) and IP
-	# because these are provided in the item parameters, e. g.:
-	#
-	# rsm.dns.udp.rtt["ns1.example.com",1.2.3.4]
-	#
-	# For other services the IPs are located in separate items which we collect on the next run.
-	#
-
-	foreach my $row_ref (@{$results_float})
-	{
-		my $itemid = $row_ref->[0];
-		my $value = $row_ref->[1];
-		my $clock = $row_ref->[2];
-
-		my $i = $item_data->{$itemid};
-
-		my $interface = __get_interface($service, $i->{'key'});
-
-		# before Upgrade to 5.x DNS/DNSSEC were handled differently, since target and ip are in item parameters
-
-		if ($service eq 'dns' || $service eq 'dnssec')
-		{
-			if (substr($i->{'key'}, 0, length("rsm.dns.udp.rtt")) eq "rsm.dns.udp.rtt")
-			{
-				my ($target, $ip) = split(',', get_nsip_from_key($i->{'key'}));
-
-				push(@{$probe_results->{$clock}{$interface}{$target}},
-					{
-						'rtt' => $value,
-						'ip' => $ip,
-					}
-				);
-			}
-		}
-		else
-		{
-			$rd_metrics->{$clock}{$interface}{'rtt'} = $value;
-		}
-	}
-
-	# before Upgrade to 5.x DNS/DNSSEC were handled differently, since target and ip are in item parameters,
-	# so there are no "str" values in case of DNS/DNSSEC
+	my $probe_results;
 
 	if ($service eq 'dns' || $service eq 'dnssec')
 	{
+		# Handle DNS/DNSSEC services differently because these contain target (Name Server) and IP
+		# in the item parameters, e. g.
+		#
+		# rsm.dns.udp.rtt["ns1.example.com",1.2.3.4]
+		#
+
+		foreach my $row_ref (@{$results})
+		{
+			my $itemid = $row_ref->[0];
+			my $value = $row_ref->[1];
+			my $clock = $row_ref->[2];
+
+			my $i = $item_data->{$itemid};
+
+			my $interface = __get_interface($service, $i->{'key'});
+
+			# DNS/DNSSEC are handled differently, since target and ip are in item parameters
+
+			if (substr($i->{'key'}, 0, length("rsm.dns.status")) eq "rsm.dns.status")
+			{
+				# service status
+				$probe_results->{$clock}{'status'} = $value;
+
+				# interface status
+				$probe_results->{$clock}{'interfaces'}{$interface}{'status'} = $value;
+			}
+			elsif (substr($i->{'key'}, 0, length("rsm.dns.protocol")) eq "rsm.dns.protocol")
+			{
+				$probe_results->{$clock}{'interfaces'}{$interface}{'protocol'} = $value;
+			}
+			elsif (substr($i->{'key'}, 0, length("rsm.dns.testedname")) eq "rsm.dns.testedname")
+			{
+				$probe_results->{$clock}{'interfaces'}{$interface}{'testedname'} = $value;
+			}
+			elsif ((substr($i->{'key'}, 0, length("rsm.dns.rtt")) eq "rsm.dns.rtt") ||
+					(substr($i->{'key'}, 0, length("rsm.dns.nsid")) eq "rsm.dns.nsid"))
+			{
+				my $field;
+
+				if (substr($i->{'key'}, 0, length("rsm.dns.rtt")) eq "rsm.dns.rtt")
+				{
+					$field = 'rtt';
+				}
+				elsif (substr($i->{'key'}, 0, length("rsm.dns.nsid")) eq "rsm.dns.nsid")
+				{
+					$field = 'nsid';
+				}
+				else
+				{
+					fail("unexpected item key \"", $i->{'key'}, "\"");
+				}
+
+				my ($target, $ip) = split(',', get_nsip_from_key($i->{'key'}));
+
+				if (!defined($probe_results->{$clock}{'interfaces'}{$interface}{'targets'}{$target}{'metrics'}))
+				{
+					push(@{$probe_results->{$clock}{'interfaces'}{$interface}{'targets'}{$target}{'metrics'}},
+						{
+							$field => $value,
+							'ip' => $ip
+						}
+					);
+				}
+				else
+				{
+					my $added = 0;
+
+					# find our metric element
+					foreach my $metric (@{$probe_results->{$clock}{'interfaces'}{$interface}{'targets'}{$target}{'metrics'}})
+					{
+						if ($metric->{'ip'} eq $ip)
+						{
+							$metric->{$field} = $value;
+							$added = 1;
+							last;
+						}
+					}
+
+					if (!$added)
+					{
+						push(@{$probe_results->{$clock}{'interfaces'}{$interface}{'targets'}{$target}{'metrics'}},
+							{
+								$field => $value,
+								'ip' => $ip
+							}
+						);
+					}
+				}
+			}
+			elsif (substr($i->{'key'}, 0, length("rsm.dns.ns.status")) eq "rsm.dns.ns.status")
+			{
+				my ($target) = split(',', get_nsip_from_key($i->{'key'}));
+
+				$probe_results->{$clock}{'interfaces'}{$interface}{'targets'}{$target}{'status'} = $value;
+			}
+			else
+			{
+				fail("unexpected item key \"", $i->{'key'}, "\"");
+			}
+		}
+
 		return $probe_results;
 	}
 
-	#
-	# Fetch String values (IP, target, testedname) for non-DNS/DNSSEC tests.
-	#
-	# Note, this is because only for those there are items like:
-	#
-	# rsm.rdds.43.ip
-	# rsm.rdds.43.target
-	# rsm.rdds.43.testedName
-	#
+	# For non-DNS/DNSSEC services the approach is more complicated. We need to collect
+	# targets and metrics and interface statuses separately and join them at the end.
 
-	foreach my $row_ref (@{$results_str})
+	my $targets = {};
+	my $metrics = {};
+	my $interfaces_status = {};
+
+	foreach my $row_ref (@{$results})
 	{
 		my $itemid = $row_ref->[0];
 		my $value = $row_ref->[1];
@@ -4916,7 +5031,80 @@ sub get_probe_results($$$$)
 
 		my $i = $item_data->{$itemid};
 
+		# NB! Exception! TODO!
+		# RDDS has this item 'rsm.rdds.status' which is the only item from which
+		# interface cannot be identified. This item covers both statuses for RDDS43
+		# and RDDS80. In the future it is suggested to split it to rsm.rdds.43.status
+		# (Up/Down) and rsm.rdds.80.status (Up/Down).
+
+		if (substr($i->{'key'}, 0, length("rsm.rdds.status")) eq 'rsm.rdds.status')
+		{
+			# service status
+			$probe_results->{$clock}{'status'} = ($value == RDDS_UP ? UP : DOWN);
+
+			# interfaces status
+
+			# RDDS_DOWN (0), RDDS_UP (1), RDDS_43_ONLY (2), RDDS_80_ONLY (3)
+			if ($value == RDDS_DOWN)
+			{
+				$interfaces_status->{$clock}{INTERFACE_RDDS43()} = DOWN;
+				$interfaces_status->{$clock}{INTERFACE_RDDS80()} = DOWN;
+			}
+			elsif ($value == RDDS_UP)
+			{
+				$interfaces_status->{$clock}{INTERFACE_RDDS43()} = UP;
+				$interfaces_status->{$clock}{INTERFACE_RDDS80()} = UP;
+			}
+			elsif ($value == RDDS_43_ONLY)
+			{
+				$interfaces_status->{$clock}{INTERFACE_RDDS43()} = UP;
+				$interfaces_status->{$clock}{INTERFACE_RDDS80()} = DOWN;
+			}
+			elsif ($value == RDDS_80_ONLY)
+			{
+				$interfaces_status->{$clock}{INTERFACE_RDDS43()} = DOWN;
+				$interfaces_status->{$clock}{INTERFACE_RDDS80()} = UP;
+			}
+			else
+			{
+				fail("item \"", $i->{'key'}, "\" has unexpected value $value, expected 0-3");
+			}
+
+			next;
+		}
+
 		my $interface = __get_interface($service, $i->{'key'});
+
+		#
+		# Collect interface statuses.
+		#
+
+		if (substr($i->{'key'}, 0, length("rdap.status")) eq 'rdap.status')
+		{
+			# service status
+			$probe_results->{$clock}{'status'} = $value;
+
+			# interface status
+			$interfaces_status->{$clock}{$interface} = $value;
+
+			next;
+		}
+
+		#
+		# Collect RDDS/RDAP tested name.
+		#
+
+		if (substr($i->{'key'}, 0, length("rsm.rdds.43.testedname")) eq 'rsm.rdds.43.testedname')
+		{
+			$probe_results->{$clock}{'interfaces'}{$interface}{'testedname'} = $value;
+			next;
+		}
+
+		if (substr($i->{'key'}, 0, length("rdap.testedname")) eq 'rdap.testedname')
+		{
+			$probe_results->{$clock}{'interfaces'}{$interface}{'testedname'} = $value;
+			next;
+		}
 
 		#
 		# Collect RDDS/RDAP targets.
@@ -4924,39 +5112,47 @@ sub get_probe_results($$$$)
 
 		if (substr($i->{'key'}, 0, length("rsm.rdds.43.target")) eq 'rsm.rdds.43.target')
 		{
-			$rd_targets->{$clock}{$interface} = $value;
+			$targets->{$clock}{$interface} = $value;
 			next;
 		}
 
 		if (substr($i->{'key'}, 0, length("rsm.rdds.80.target")) eq 'rsm.rdds.80.target')
 		{
-			$rd_targets->{$clock}{$interface} = $value;
+			$targets->{$clock}{$interface} = $value;
 			next;
 		}
 
 		if (substr($i->{'key'}, 0, length("rdap.target")) eq 'rdap.target')
 		{
-			$rd_targets->{$clock}{$interface} = $value;
+			$targets->{$clock}{$interface} = $value;
 			next;
 		}
 
 		#
-		# Collect other metrics.
+		# Collect metrics.
 		#
 
 		my $field;
 
-		if (substr($i->{'key'}, 0, length("rsm.rdds.43.ip")) eq 'rsm.rdds.43.ip')
+		if (substr($i->{'key'}, 0, length("rsm.rdds.43.rtt")) eq 'rsm.rdds.43.rtt')
+		{
+			$field = 'rtt';
+		}
+		elsif (substr($i->{'key'}, 0, length("rsm.rdds.43.ip")) eq 'rsm.rdds.43.ip')
 		{
 			$field = 'ip';
 		}
-		elsif (substr($i->{'key'}, 0, length("rsm.rdds.43.testedname")) eq 'rsm.rdds.43.testedname')
+		elsif (substr($i->{'key'}, 0, length("rsm.rdds.80.rtt")) eq 'rsm.rdds.80.rtt')
 		{
-			$field = 'testedName';
+			$field = 'rtt';
 		}
 		elsif (substr($i->{'key'}, 0, length("rsm.rdds.80.ip")) eq 'rsm.rdds.80.ip')
 		{
 			$field = 'ip';
+		}
+		elsif (substr($i->{'key'}, 0, length("rdap.rtt")) eq 'rdap.rtt')
+		{
+			$field = 'rtt';
 		}
 		elsif (substr($i->{'key'}, 0, length("rdap.ip")) eq 'rdap.ip')
 		{
@@ -4971,21 +5167,25 @@ sub get_probe_results($$$$)
 			fail("unknown $service key: ", $i->{'key'});
 		}
 
-		$rd_metrics->{$clock}{$interface}{$field} = $value;
+		$metrics->{$clock}{$interface}{$field} = $value;
 	}
 
-	# Join targets with metrics. NB! We know for each RDDS43, RDDS80, RDAP interface there
-	# is always one metric per target (unkike DNS/DNSSEC), that's why array index 0.
-	foreach my $clock (keys(%{$rd_metrics}))
+	# Join interface statuses with targets with metrics.
+	foreach my $clock (keys(%{$metrics}))
 	{
-		foreach my $interface (keys(%{$rd_metrics->{$clock}}))
+		foreach my $interface (keys(%{$metrics->{$clock}}))
 		{
-			foreach my $key (keys(%{$rd_metrics->{$clock}{$interface}}))
+			foreach my $field (keys(%{$metrics->{$clock}{$interface}}))
 			{
-				my $target = $rd_targets->{$clock}{$interface} // TARGET_PLACEHOLDER;
+				my $target = $targets->{$clock}{$interface} // TARGET_PLACEHOLDER;
+				my $interface_status = $interfaces_status->{$clock}{$interface};
 
-				$probe_results->{$clock}{$interface}{$target}[0]{$key} =
-					$rd_metrics->{$clock}{$interface}{$key};
+				$probe_results->{$clock}{'interfaces'}{$interface}{'status'} = $interface_status;
+
+				# NB! We know for each RDDS43, RDDS80, RDAP interface there
+				# is always one metric per target (unkike DNS/DNSSEC), that's why array index 0.
+				$probe_results->{$clock}{'interfaces'}{$interface}{'targets'}{$target}{'metrics'}[0]{$field} =
+					$metrics->{$clock}{$interface}{$field};
 			}
 		}
 	}

@@ -35,6 +35,8 @@ use constant DEFAULT_INITIAL_MEASUREMENTS_LIMIT => 7200;	# seconds, if the metri
 								# them from this period in the past back for recent
 								# measurement files for an incident
 
+use constant FAKE_PROBE_NAME => "";	# for Service Availability items
+
 sub main_process_signal_handler();
 sub process_server($);
 sub process_tld_batch($$$$$$);
@@ -407,7 +409,7 @@ sub process_tld_batch($$$$$$)
 		# }
 		#
 		# NB! Besides results from probes we cache Service Availability values, which
-		# are stored on a <TLD> host, for those we use empty string ("") as probe.
+		# are stored on a <TLD> host, for those we use FAKE_PROBE_NAME as probe name.
 
 		my $lastvalues_db = {'tlds' => {}};
 		get_lastvalues_from_db($lastvalues_db, $tld, \%delays);
@@ -636,8 +638,8 @@ sub cycles_to_calculate($$$$$$$$)
 
 	my %cycles;
 
-	# empty probe is for *.avail (<TLD>) items, we calculate cycles based on those values
-	my $probe = "";
+	# this is for Service Availability items, we calculate cycles based on those values
+	my $probe = FAKE_PROBE_NAME;
 
 	if (%{$lastvalues_db_tld->{$service}{'probes'}{$probe} // {}})
 	{
@@ -931,29 +933,18 @@ sub get_lastvalues_from_db($$$)
 		}
 		elsif ($hostgroupid == TLD_PROBE_RESULTS_GROUPID)
 		{
-			# this item belongs to Probe (we do not care about DNS TCP)
-			next if (substr($key, 0, length("rsm.dns.tcp")) eq "rsm.dns.tcp");
-
 			next if (substr($key, 0, length("rsm.conf")) eq "rsm.conf");
 			next if (substr($key, 0, length("rsm.probe")) eq "rsm.probe");
 
-			# SLA API version 1: start
-			next if (substr($key, 0, length("rsm.rdds.43.target")) eq "rsm.rdds.43.target");
-			next if (substr($key, 0, length("rsm.rdds.43.testedname")) eq "rsm.rdds.43.testedname");
-			next if (substr($key, 0, length("rsm.rdds.80.target")) eq "rsm.rdds.80.target");
-			if (!is_rdap_standalone($clock))
-			{
-				next if (substr($key, 0, length("rdap.target")) eq "rdap.target");
-				next if (substr($key, 0, length("rdap.testedname")) eq "rdap.testedname");
-			}
-			# SLA API version 1: end
+			# not interested in master items that return JSON, nssok and mode items
+			next if (substr($key, 0, length("rsm.dns[")) eq "rsm.dns[");
+			next if (substr($key, 0, length("rsm.rdds[")) eq "rsm.rdds[");
+			next if (substr($key, 0, length("rdap[")) eq "rdap[");
+			next if (substr($key, 0, length("rsm.dns.nssok")) eq "rsm.dns.nssok");
+			next if (substr($key, 0, length("rsm.dns.mode")) eq "rsm.dns.mode");
 
 			next unless (substr($key, 0, length("rsm.")) eq "rsm." ||
-				substr($key, 0, length("rdap[")) eq "rdap[" ||
-				substr($key, 0, length("rdap.ip")) eq "rdap.ip" ||
-				substr($key, 0, length("rdap.rtt")) eq "rdap.rtt" ||
-				substr($key, 0, length("rdap.target")) eq "rdap.target" ||
-				substr($key, 0, length("rdap.testedname")) eq "rdap.testedname");
+				substr($key, 0, length("rdap.")) eq "rdap.");
 
 			(undef, $probe) = split(" ", $host, 2);
 
@@ -975,8 +966,8 @@ sub get_lastvalues_from_db($$$)
 
 		foreach my $service ($key_service eq 'dns' ? ('dns', 'dnssec') : ($key_service))
 		{
-			# empty probe is for *.avail (<TLD>) items
-			$lastvalues_db->{'tlds'}{$tld}{$service}{'probes'}{$probe // ""}{$itemid} = {
+			# fake name is for Service Availability items
+			$lastvalues_db->{'tlds'}{$tld}{$service}{'probes'}{$probe // FAKE_PROBE_NAME()}{$itemid} = {
 				'key' => $key,
 				'value_type' => $value_type,
 				'clock' => $clock
@@ -1018,11 +1009,12 @@ sub fill_test_data($$$$)
 				'targetIP'	=> $src_metric_ref->{'ip'},
 			};
 
-			my $rtt = $src_metric_ref->{'rtt'};
+			if (exists($src_metric_ref->{'nsid'}))
+			{
+				$metric->{'nsid'} = $src_metric_ref->{'nsid'};
+			}
 
-			# SLA API version 2: start
-			$metric->{'testedName'}	= $src_metric_ref->{'testedName'} if ($service eq 'rdap');
-			# SLA API version 2: end
+			my $rtt = $src_metric_ref->{'rtt'};
 
 			if (!defined($rtt))
 			{
@@ -1182,8 +1174,130 @@ sub calculate_cycle($$$$$$$$$)
 	my $probes_with_positive = 0;
 	my $probes_online = 0;
 
+	#
+	# First, get Service Availability data.
+	#
+
+	my $service_availability_itemid;
+
+	foreach my $itemid (keys(%{$probes_data->{FAKE_PROBE_NAME()}}))
+	{
+		next unless ($probes_data->{FAKE_PROBE_NAME()}{$itemid}{'key'} eq "rsm.slv.$service.avail");
+
+		$service_availability_itemid = $itemid;
+	}
+
+	if (!$service_availability_itemid)
+	{
+		wrn("no $service Service Availability data in the database yet!");
+		return;
+	}
+
+	my $rows_ref = db_select(
+		"select itemid,value".
+		" from " . history_table(ITEM_VALUE_TYPE_UINT64).
+		" where itemid=$service_availability_itemid" .
+			" and " . sql_time_condition($from, $till)
+	);
+
+	# {
+	#     ITEMID => value (int),
+	# }
+	my %values;
+
+	map {push(@{$values{$_->[0]}}, int($_->[1]))} (@{$rows_ref});
+
+	# skip cycles that do not have test result
+	return if (scalar(keys(%values)) == 0);
+
+	foreach my $itemid (keys(%values))
+	{
+		my $key = $probes_data->{FAKE_PROBE_NAME()}{$itemid}{'key'};
+
+		if (substr($key, 0, length("rsm.slv.")) eq "rsm.slv.")
+		{
+			my $sub_key = substr($key, length("rsm.slv."));
+
+			my $index = index($sub_key, '.');	# <SERVICE>.avail
+
+			fail("cannot extract Service from item \"$key\"") if ($index == -1);
+
+			my $key_service = substr($sub_key, 0, $index);
+
+			next unless ($key_service eq $service);
+
+			fail("$service status is re-defined (status=$json->{'status'})") if (defined($json->{'status'}));
+
+			if (scalar(@{$values{$itemid}}) != 1)
+			{
+				my $msg = "item \"$key\" contains more than 1 value ".
+					selected_period($from, $till) . ": " . join(',', @{$values{$itemid}}) . "\n";
+
+				my $sql =
+					"select hi.itemid,hi.clock,hi.value,hi.ns".
+					" from history_uint hi,items i,hosts h".
+					" where hi.itemid=i.itemid".
+						" and i.hostid=h.hostid".
+						" and i.key_='$key'".
+						" and h.host='$tld'".
+						" and " . sql_time_condition($from, $till);
+
+				my $rows_ref = db_select($sql);
+
+				$msg .= "SQL: $sql\n";
+				$msg .= "---------------------\n";
+				$msg .= "itemid,clock,value,ns\n";
+				$msg .= "---------------------\n";
+
+				foreach (@{$rows_ref})
+				{
+					$msg .= join(',', @{$_}) . "\n";
+				}
+
+				chomp($msg);
+
+				fail($msg);
+			}
+
+			if ($values{$itemid}->[0] == UP)
+			{
+				$json->{'status'} = 'Up';
+			}
+			elsif ($values{$itemid}->[0] == DOWN)
+			{
+				$json->{'status'} = 'Down';
+			}
+			elsif ($values{$itemid}->[0] == UP_INCONCLUSIVE_NO_DATA)
+			{
+				$json->{'status'} = 'Up-inconclusive-no-data';
+			}
+			elsif ($values{$itemid}->[0] == UP_INCONCLUSIVE_NO_PROBES)
+			{
+				$json->{'status'} = 'Up-inconclusive-no-probes';
+			}
+			else
+			{
+				fail("item \"$key\" ($itemid) contains unexpected value \"", $values{$itemid}->[0] , "\"");
+			}
+		}
+		else
+		{
+			fail("unexpected item key: \"$key\"");
+		}
+	}
+
+	#
+	# Now get results from Probes.
+	#
+
 	foreach my $probe (keys(%{$probes_data}))
 	{
+		# Service Availability items are already handled
+		next unless ($probe ne FAKE_PROBE_NAME);
+
+		# service test from Probe is considered successful if all its interfaces are UP
+		my $service_up = 1;
+
 		my (@itemids_uint, @itemids_float, @itemids_str);
 
 		#
@@ -1209,246 +1323,85 @@ sub calculate_cycle($$$$$$$$$)
 
 		next if (@itemids_uint == 0 || @itemids_float == 0);
 
-		#
-		# Fetch availability (Integer) values (on a TLD level and Probe level):
-		#
-		# TLD level example	: rsm.slv.dns.avail
-		# Probe level example	: rsm.dns.udp
-		#
+		my ($results_uint, $results_float, $results_str);
 
-		my $rows_ref = db_select(
-			"select itemid,value".
-			" from " . history_table(ITEM_VALUE_TYPE_UINT64).
-			" where itemid in (" . join(',', @itemids_uint) . ")".
-				" and " . sql_time_condition($from, $till)
+		get_probe_history(
+			$from,
+			$till,
+			\@itemids_uint,
+			\@itemids_float,
+			\@itemids_str,
+			\$results_uint,
+			\$results_float,
+			\$results_str
 		);
-
-		# {
-		#     ITEMID => value (int),
-		# }
-		my %values;
-
-		map {push(@{$values{$_->[0]}}, int($_->[1]))} (@{$rows_ref});
-
-		# skip cycles that do not have test result
-		next if (scalar(keys(%values)) == 0);
-
-		my $service_up = 1;
-
-		foreach my $itemid (keys(%values))
-		{
-			my $key = $probes_data->{$probe}{$itemid}{'key'};
-
-			dbg("trying to identify interfaces of $service key \"$key\"...");
-
-			if (substr($key, 0, length("rsm.rdds")) eq "rsm.rdds")
-			{
-				#
-				# RDDS Availability on the Probe level. This item contains Availability of interfaces:
-				#
-				# - RDDS43
-				# - RDDS80
-				#
-
-				foreach my $value (@{$values{$itemid}})
-				{
-					$service_up = 0 unless ($value == RDDS_UP);
-
-					my $interface = AH_INTERFACE_RDDS43;
-
-					if (!defined($tested_interfaces{$interface}{$probe}{'status'}) ||
-						$tested_interfaces{$interface}{$probe}{'status'} eq AH_CITY_DOWN)
-					{
-						$tested_interfaces{$interface}{$probe}{'status'} =
-							($value == RDDS_UP || $value == RDDS_43_ONLY ? AH_CITY_UP : AH_CITY_DOWN);
-					}
-
-					$interface = AH_INTERFACE_RDDS80;
-
-					if (!defined($tested_interfaces{$interface}{$probe}{'status'}) ||
-						$tested_interfaces{$interface}{$probe}{'status'} eq AH_CITY_DOWN)
-					{
-						$tested_interfaces{$interface}{$probe}{'status'} =
-							($value == RDDS_UP || $value == RDDS_80_ONLY ? AH_CITY_UP : AH_CITY_DOWN);
-					}
-				}
-			}
-			elsif (substr($key, 0, length("rdap")) eq "rdap")
-			{
-				#
-				# RDAP Availability on the Probe level. This item contains Availability of interfaces:
-				#
-				# - RDAP
-				#
-
-				my $interface = AH_INTERFACE_RDAP;
-
-				my $city_status;
-
-				foreach my $value (@{$values{$itemid}})
-				{
-					last if (defined($city_status) && $city_status eq AH_CITY_UP);
-
-					$city_status = ($value == UP ? AH_CITY_UP : AH_CITY_DOWN);
-				}
-
-				$service_up = 0 if ($city_status eq AH_CITY_DOWN);
-
-				$tested_interfaces{$interface}{$probe}{'status'} = $city_status;
-
-			}
-			elsif (substr($key, 0, length("rsm.dns.udp")) eq "rsm.dns.udp")
-			{
-				#
-				# DNS Availability on the Probe level. This item contains Availability of interfaces:
-				#
-				# - DNS
-				# - DNSSEC
-				#
-
-				my $interface;
-
-				if ($service eq 'dnssec')
-				{
-					$interface = AH_INTERFACE_DNSSEC;
-				}
-				else
-				{
-					$interface = AH_INTERFACE_DNS;
-				}
-
-				my $city_status;
-
-				foreach my $value (@{$values{$itemid}})
-				{
-					last if (defined($city_status) && $city_status eq AH_CITY_UP);
-
-					$city_status = ($value >= $cfg_minns ? AH_CITY_UP : AH_CITY_DOWN);
-				}
-
-				$service_up = 0 if ($city_status eq AH_CITY_DOWN);
-
-				$tested_interfaces{$interface}{$probe}{'status'} = $city_status;
-			}
-			elsif (substr($key, 0, length("rsm.slv.")) eq "rsm.slv.")
-			{
-				#
-				# Service Availability on a TLD level.
-				#
-
-				my $sub_key = substr($key, length("rsm.slv."));
-
-				my $index = index($sub_key, '.');	# <SERVICE>.avail
-
-				fail("cannot extract Service from item \"$key\"") if ($index == -1);
-
-				my $key_service = substr($sub_key, 0, $index);
-
-				next unless ($key_service eq $service);
-
-				fail("$service status is re-defined (status=$json->{'status'})") if (defined($json->{'status'}));
-
-				if (scalar(@{$values{$itemid}}) != 1)
-				{
-					my $msg = "item \"$key\" contains more than 1 value ".
-						selected_period($from, $till) . ": " . join(',', @{$values{$itemid}}) . "\n";
-
-					my $sql =
-						"select hi.itemid,hi.clock,hi.value,hi.ns".
-						" from history_uint hi,items i,hosts h".
-						" where hi.itemid=i.itemid".
-							" and i.hostid=h.hostid".
-							" and i.key_='$key'".
-							" and h.host='$tld'".
-							" and " . sql_time_condition($from, $till);
-
-					my $rows_ref = db_select($sql);
-
-					$msg .= "SQL: $sql\n";
-					$msg .= "---------------------\n";
-					$msg .= "itemid,clock,value,ns\n";
-					$msg .= "---------------------\n";
-
-					foreach (@{$rows_ref})
-					{
-						$msg .= join(',', @{$_}) . "\n";
-					}
-
-					chomp($msg);
-
-					fail($msg);
-				}
-
-				if ($values{$itemid}->[0] == UP)
-				{
-					$json->{'status'} = 'Up';
-				}
-				elsif ($values{$itemid}->[0] == DOWN)
-				{
-					$json->{'status'} = 'Down';
-				}
-				elsif ($values{$itemid}->[0] == UP_INCONCLUSIVE_NO_DATA)
-				{
-					$json->{'status'} = 'Up-inconclusive-no-data';
-				}
-				elsif ($values{$itemid}->[0] == UP_INCONCLUSIVE_NO_PROBES)
-				{
-					$json->{'status'} = 'Up-inconclusive-no-probes';
-				}
-				else
-				{
-					fail("item \"$key\" ($itemid) contains unexpected value \"", $values{$itemid}->[0] , "\"");
-				}
-			}
-			else
-			{
-				fail("unexpected key \"$key\" when trying to identify Service interface");
-			}
-		}
-
-		if ($service_up)
-		{
-			$probes_with_positive++;
-		}
-
-		$probes_with_results++;
-
-		my ($results_float, $results_str);
-
-		get_probe_history($from, $till, \@itemids_float, \@itemids_str, \$results_float, \$results_str);
 
 		my $probe_results = get_probe_results(
 			$service,
-			$results_float,
-			$results_str,
+			[@{$results_uint}, @{$results_float}, @{$results_str}],
 			$probes_data->{$probe}
 		);
 
-		foreach my $clock (keys(%{$probe_results}))
+		if (scalar(keys(%{$probe_results})) > 1)
 		{
-			foreach my $interface (keys(%{$probe_results->{$clock}}))
+			fail("all service test results must have the same clock:\n", Dumper($probe_results));
+		}
+
+		my $clock = (keys(%{$probe_results}))[0];
+
+		foreach my $interface (keys(%{$probe_results->{$clock}{'interfaces'}}))
+		{
+			my $tested_interface = translate_interface($interface);
+
+			foreach my $target (keys(%{$probe_results->{$clock}{'interfaces'}{$interface}{'targets'}}))
 			{
-				foreach my $target (keys(%{$probe_results->{$clock}{$interface}}))
+				foreach my $metric (@{$probe_results->{$clock}{'interfaces'}{$interface}{'targets'}{$target}{'metrics'}})
 				{
-					foreach my $metric (@{$probe_results->{$clock}{$interface}{$target}})
+					# convert clock and rtt to integer
+					my $h = {
+						'rtt'        => int($metric->{'rtt'}),
+						'ip'         => $metric->{'ip'},
+						'clock'      => int($clock),
+					};
+
+					if (exists($metric->{'nsid'}))
 					{
-						# convert clock and rtt to integer
-						my $h = {
-							'rtt'        => int($metric->{'rtt'}),
-							'ip'         => $metric->{'ip'},
-							'clock'      => int($clock),
-						};
-
-						if (exists($metric->{'testedName'}))
-						{
-							$h->{'testedName'} = $metric->{'testedName'};
-						}
-
-						push(@{$tested_interfaces{translate_interface($interface)}{$probe}{'testData'}{$target}}, $h);
+						$h->{'nsid'} = $metric->{'nsid'};
 					}
+
+					push(@{$tested_interfaces{$tested_interface}{$probe}{'testData'}{$target}}, $h);
 				}
 			}
+
+			# interface status
+			$tested_interfaces{$tested_interface}{$probe}{'status'} =
+				($probe_results->{$clock}{'interfaces'}{$interface}{'status'} == UP ? 'Up' : 'Down');
+
+			# interface tested name
+			if (exists($probe_results->{$clock}{'interfaces'}{$interface}{'testedname'}))
+			{
+				$tested_interfaces{$tested_interface}{$probe}{'testedname'} =
+					$probe_results->{$clock}{'interfaces'}{$interface}{'testedname'};
+			}
+
+			# interface tested name, it's TCP if unspecified
+			if (defined($probe_results->{$clock}{'interfaces'}{$interface}{'protocol'}) &&
+				($probe_results->{$clock}{'interfaces'}{$interface}{'protocol'} == PROTO_UDP))
+			{
+				$tested_interfaces{$tested_interface}{$probe}{'transport'} = 'udp';
+			}
+			else
+			{
+				$tested_interfaces{$tested_interface}{$probe}{'transport'} = 'tcp';
+			}
 		}
+
+		# service status
+		if ($probe_results->{$clock}{'status'} == UP)
+		{
+			$probes_with_positive++;
+		}
+		$probes_with_results++;
 	}
 
 	# add "Offline" and "No results"
@@ -1501,6 +1454,8 @@ sub calculate_cycle($$$$$$$$$)
 			my $probe_ref = {
 				'city'		=> $probe,
 				'status'	=> $tested_interfaces{$interface}{$probe}{'status'},	# Probe status
+				'transport'	=> $tested_interfaces{$interface}{$probe}{'transport'},
+				'testedName'	=> $tested_interfaces{$interface}{$probe}{'testedname'},
 				'testData'	=> []
 			};
 
