@@ -624,7 +624,7 @@ class ParticularTestsListAction extends Action {
 						$hosts[$item['hostid']]['rdds43']['ip'] = $itemValue['value'];
 					}
 					elseif ($item['key_'] == PROBE_RDDS43_RTT) {
-						if ($itemValue['value']) {
+						if (isset($itemValue['value'])) {
 							//$rtt_value = convert_units(['value' => $itemValue['value'], 'units' => $item['units']]);
 							$rtt_value = convertUnits(['value' => $itemValue['value']]);
 							$hosts[$item['hostid']]['rdds43']['rtt'] = [
@@ -637,7 +637,7 @@ class ParticularTestsListAction extends Action {
 						$hosts[$item['hostid']]['rdds80']['ip'] = $itemValue['value'];
 					}
 					elseif ($item['key_'] == PROBE_RDDS80_RTT) {
-						if ($itemValue['value']) {
+						if (isset($itemValue['value'])) {
 							//$rtt_value = convert_units(['value' => $itemValue['value'], 'units' => $item['units']]);
 							$rtt_value = convertUnits(['value' => $itemValue['value']]);
 							$hosts[$item['hostid']]['rdds80']['rtt'] = [
@@ -650,7 +650,7 @@ class ParticularTestsListAction extends Action {
 						$hosts[$item['hostid']]['rdap']['ip'] = $itemValue['value'];
 					}
 					elseif ($item['key_'] == PROBE_RDAP_RTT) {
-						if ($itemValue['value']) {
+						if (isset($itemValue['value'])) {
 							//$rtt_value = convert_units(['value' => $itemValue['value'], 'units' => $item['units']]);
 							$rtt_value = convertUnits(['value' => $itemValue['value']]);
 							$hosts[$item['hostid']]['rdap']['rtt'] = [
