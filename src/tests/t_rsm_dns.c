@@ -38,8 +38,8 @@ int	main(int argc, char *argv[])
 {
 	char		err[256], pack_buf[2048], nsid_unpacked[NSID_MAX_LENGTH * 2 + 1], *res_ip = DEFAULT_RES_IP,
 			*tld = NULL, *ns = NULL, *ns_ip = NULL, proto = RSM_UDP, *nsid = NULL, *ns_with_ip = NULL,
-			ipv4_enabled = 0, ipv6_enabled = 0, *testprefix = DEFAULT_TESTPREFIX, dnssec_enabled = 0,
-			ignore_err = 0, log_to_file = 0;
+			ipv4_enabled = 0, ipv6_enabled = 0, *testprefix = DEFAULT_TESTPREFIX,
+			testedname[ZBX_HOST_BUF_SIZE], dnssec_enabled = 0, ignore_err = 0, log_to_file = 0;
 	int		c, index, rtt, rtt_unpacked, upd_unpacked, unpacked_values_num, nssok, test_status;
 	ldns_resolver	*res = NULL;
 	ldns_rr_list	*keys = NULL;
@@ -198,7 +198,13 @@ int	main(int argc, char *argv[])
 		}
 	}
 
-	if (SUCCEED != zbx_get_ns_ip_values(res, ns, ns_ip, keys, testprefix, tld, log_fd, &rtt, &nsid, NULL,
+	/* generate tested name */
+	if (0 != strcmp(".", tld))
+		zbx_snprintf(testedname, sizeof(testedname), "%s.%s.", testprefix, tld);
+	else
+		zbx_snprintf(testedname, sizeof(testedname), "%s.", testprefix);
+
+	if (SUCCEED != zbx_get_ns_ip_values(res, ns, ns_ip, keys, testedname, log_fd, &rtt, &nsid, NULL,
 			ipv4_enabled, ipv6_enabled, 0, err, sizeof(err)))
 	{
 		rsm_err(stderr, err);
@@ -223,7 +229,7 @@ int	main(int argc, char *argv[])
 
 	set_nss_results(nss, nss_num, DEFAULT_RTT_LIMIT, 2, &nssok, &test_status);
 
-	create_rsm_dns_json(&json, nss, nss_num, CURRENT_MODE_NORMAL, nssok, test_status, proto);
+	create_rsm_dns_json(&json, nss, nss_num, CURRENT_MODE_NORMAL, nssok, test_status, proto, testedname);
 
 	printf("OK (RTT:%d)\n", rtt_unpacked);
 	printf("OK (NSID:%s)\n", nsid);

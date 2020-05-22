@@ -1594,11 +1594,11 @@ static int	zbx_check_dnssec_no_epp(const ldns_pkt *pkt, const ldns_rr_list *keys
 }
 
 static int	zbx_get_ns_ip_values(ldns_resolver *res, const char *ns, const char *ip, const ldns_rr_list *keys,
-		const char *testprefix, const char *domain, FILE *log_fd, int *rtt, char **nsid, int *upd,
+		const char *testedname, FILE *log_fd, int *rtt, char **nsid, int *upd,
 		int ipv4_enabled, int ipv6_enabled, int epp_enabled, char *err, size_t err_size)
 {
-	char			testname[ZBX_HOST_BUF_SIZE], *host, *last_label = NULL;
-	ldns_rdf		*testname_rdf = NULL, *last_label_rdf = NULL;
+	char			*host, *last_label = NULL;
+	ldns_rdf		*testedname_rdf = NULL, *last_label_rdf = NULL;
 	ldns_pkt		*pkt = NULL;
 	ldns_rr_list		*nsset = NULL, *all_rr_list = NULL;
 	ldns_rr			*rr;
@@ -1617,13 +1617,7 @@ static int	zbx_get_ns_ip_values(ldns_resolver *res, const char *ns, const char *
 		goto out;
 	}
 
-	/* prepare test name */
-	if (0 != strcmp(".", domain))
-		zbx_snprintf(testname, sizeof(testname), "%s.%s.", testprefix, domain);
-	else
-		zbx_snprintf(testname, sizeof(testname), "%s.", testprefix);
-
-	if (NULL == (testname_rdf = ldns_rdf_new_frm_str(LDNS_RDF_TYPE_DNAME, testname)))
+	if (NULL == (testedname_rdf = ldns_rdf_new_frm_str(LDNS_RDF_TYPE_DNAME, testedname)))
 	{
 		zbx_strlcpy(err, UNEXPECTED_LDNS_MEM_ERROR, err_size);
 		*rtt = DNS[DNS_PROTO(res)].ns_query_error(ZBX_NS_QUERY_INTERNAL);
@@ -1631,7 +1625,7 @@ static int	zbx_get_ns_ip_values(ldns_resolver *res, const char *ns, const char *
 	}
 
 	/* IN A query */
-	if (SUCCEED != zbx_dns_in_a_query(&pkt, res, testname_rdf, nsid, &query_ec, err, err_size))
+	if (SUCCEED != zbx_dns_in_a_query(&pkt, res, testedname_rdf, nsid, &query_ec, err, err_size))
 	{
 		*rtt = DNS[DNS_PROTO(res)].ns_query_error(query_ec);
 		goto out;
@@ -1667,7 +1661,7 @@ static int	zbx_get_ns_ip_values(ldns_resolver *res, const char *ns, const char *
 		goto out;
 	}
 
-	if (SUCCEED != zbx_domain_in_question_section(pkt, testname, &answer_ec, err, err_size))
+	if (SUCCEED != zbx_domain_in_question_section(pkt, testedname, &answer_ec, err, err_size))
 	{
 		*rtt = DNS[DNS_PROTO(res)].ns_answer_error(answer_ec);
 		goto out;
@@ -1679,7 +1673,7 @@ static int	zbx_get_ns_ip_values(ldns_resolver *res, const char *ns, const char *
 
 		/* the AUTHORITY section should contain at least one NS RR for the last label in  */
 		/* PREFIX, e.g. "somedomain" when querying for "blahblah.somedomain.example." */
-		if (SUCCEED != zbx_get_last_label(testname, &last_label, err, err_size))
+		if (SUCCEED != zbx_get_last_label(testedname, &last_label, err, err_size))
 		{
 			*rtt = ZBX_EC_EPP_NOT_IMPLEMENTED;
 			goto out;
@@ -1775,8 +1769,8 @@ out:
 	if (NULL != pkt)
 		ldns_pkt_free(pkt);
 
-	if (NULL != testname_rdf)
-		ldns_rdf_deep_free(testname_rdf);
+	if (NULL != testedname_rdf)
+		ldns_rdf_deep_free(testedname_rdf);
 
 	if (NULL != last_label_rdf)
 		ldns_rdf_deep_free(last_label_rdf);
@@ -2201,7 +2195,7 @@ static void	set_nss_results(zbx_ns_t *nss, size_t nss_num, int rtt_limit, unsign
 }
 
 static void	create_rsm_dns_json(struct zbx_json *json, zbx_ns_t *nss, size_t nss_num, unsigned int current_mode,
-		unsigned int nssok, unsigned int status, char protocol)
+		unsigned int nssok, unsigned int status, char protocol, const char *testedname)
 {
 	size_t	i, j;
 
@@ -2242,6 +2236,7 @@ static void	create_rsm_dns_json(struct zbx_json *json, zbx_ns_t *nss, size_t nss
 	zbx_json_adduint64(json, "mode", current_mode);
 	zbx_json_adduint64(json, "status", status);
 	zbx_json_adduint64(json, "protocol", (protocol == RSM_UDP ? 0 : 1));
+	zbx_json_addstring(json, "testedname", testedname, ZBX_JSON_TYPE_STRING);
 
 	zbx_json_close(json);
 }
@@ -2423,7 +2418,8 @@ static int	update_metadata(int file_exists, const char *domain, unsigned int tes
 
 int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *result)
 {
-	char			err[ZBX_ERR_BUF_SIZE], protocol, *domain, *testprefix, *name_servers_list, *res_ip;
+	char			err[ZBX_ERR_BUF_SIZE], protocol, *domain, *testprefix, *name_servers_list, *res_ip,
+				testedname[ZBX_HOST_BUF_SIZE];
 	zbx_dnskeys_error_t	ec_dnskeys;
 	ldns_resolver		*res = NULL;
 	ldns_rr_list		*keys = NULL;
@@ -2542,6 +2538,12 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 	/* from this point item will not become NOTSUPPORTED */
 	ret = SYSINFO_RET_OK;
 
+	/* generate tested name */
+	if (0 != strcmp(".", domain))
+		zbx_snprintf(testedname, sizeof(testedname), "%s.%s.", testprefix, domain);
+	else
+		zbx_snprintf(testedname, sizeof(testedname), "%s.", testprefix);
+
 	if (0 != dnssec_enabled && SUCCEED != zbx_get_dnskeys(res, domain, res_ip, &keys, log_fd, &ec_dnskeys,
 			err, sizeof(err)))
 	{
@@ -2647,8 +2649,7 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 							nss[i].name,
 							nss[i].ips[j].ip,
 							keys,
-							testprefix,
-							domain,
+							testedname,
 							th_log_fd,
 							&nss[i].ips[j].rtt,
 							&nss[i].ips[j].nsid,
@@ -2736,7 +2737,7 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 
 	set_nss_results(nss, nss_num, rtt_limit, minns, &nssok, &test_status);
 
-	create_rsm_dns_json(&json, nss, nss_num, current_mode, nssok, test_status, protocol);
+	create_rsm_dns_json(&json, nss, nss_num, current_mode, nssok, test_status, protocol, testedname);
 
 	if (SUCCEED != update_metadata(file_exists, domain, test_status, test_recover, protocol, &current_mode,
 			&successful_tests, log_fd, err, sizeof(err)))
