@@ -1293,10 +1293,7 @@ sub calculate_cycle($$$$$$$$$)
 	foreach my $probe (keys(%{$probes_data}))
 	{
 		# Service Availability items are already handled
-		next unless ($probe ne FAKE_PROBE_NAME);
-
-		# service test from Probe is considered successful if all its interfaces are UP
-		my $service_up = 1;
+		next if ($probe eq FAKE_PROBE_NAME);
 
 		my (@itemids_uint, @itemids_float, @itemids_str);
 
@@ -1342,20 +1339,17 @@ sub calculate_cycle($$$$$$$$$)
 			$probes_data->{$probe}
 		);
 
-		if (scalar(keys(%{$probe_results})) > 1)
-		{
-			fail("all service test results must have the same clock:\n", Dumper($probe_results));
-		}
+		next if (!$probe_results);
 
-		my $clock = (keys(%{$probe_results}))[0];
-
-		foreach my $interface (keys(%{$probe_results->{$clock}{'interfaces'}}))
+		foreach my $interface (keys(%{$probe_results->{'interfaces'}}))
 		{
 			my $tested_interface = translate_interface($interface);
 
-			foreach my $target (keys(%{$probe_results->{$clock}{'interfaces'}{$interface}{'targets'}}))
+			my $clock = $probe_results->{'interfaces'}{$interface}{'clock'};
+
+			foreach my $target (keys(%{$probe_results->{'interfaces'}{$interface}{'targets'}}))
 			{
-				foreach my $metric (@{$probe_results->{$clock}{'interfaces'}{$interface}{'targets'}{$target}{'metrics'}})
+				foreach my $metric (@{$probe_results->{'interfaces'}{$interface}{'targets'}{$target}{'metrics'}})
 				{
 					# convert clock and rtt to integer
 					my $h = {
@@ -1375,18 +1369,18 @@ sub calculate_cycle($$$$$$$$$)
 
 			# interface status
 			$tested_interfaces{$tested_interface}{$probe}{'status'} =
-				($probe_results->{$clock}{'interfaces'}{$interface}{'status'} == UP ? 'Up' : 'Down');
+				($probe_results->{'interfaces'}{$interface}{'status'} == UP ? 'Up' : 'Down');
 
 			# interface tested name
-			if (exists($probe_results->{$clock}{'interfaces'}{$interface}{'testedname'}))
+			if (exists($probe_results->{'interfaces'}{$interface}{'testedname'}))
 			{
 				$tested_interfaces{$tested_interface}{$probe}{'testedname'} =
-					$probe_results->{$clock}{'interfaces'}{$interface}{'testedname'};
+					$probe_results->{'interfaces'}{$interface}{'testedname'};
 			}
 
 			# interface tested name, it's TCP if unspecified
-			if (defined($probe_results->{$clock}{'interfaces'}{$interface}{'protocol'}) &&
-				($probe_results->{$clock}{'interfaces'}{$interface}{'protocol'} == PROTO_UDP))
+			if (defined($probe_results->{'interfaces'}{$interface}{'protocol'}) &&
+				($probe_results->{'interfaces'}{$interface}{'protocol'} == PROTO_UDP))
 			{
 				$tested_interfaces{$tested_interface}{$probe}{'transport'} = 'udp';
 			}
@@ -1397,7 +1391,7 @@ sub calculate_cycle($$$$$$$$$)
 		}
 
 		# service status
-		if ($probe_results->{$clock}{'status'} == UP)
+		if ($probe_results->{'status'} == UP)
 		{
 			$probes_with_positive++;
 		}

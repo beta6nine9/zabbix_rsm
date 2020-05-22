@@ -4870,9 +4870,11 @@ sub __get_interface($$)
 # Targets are differently fetched in case for DNS/DNSSEC and RDDS/RDAP but formatted in the same way (see comments
 # in the code):
 #
-# CLOCK => {
+# {
+#     'status' => 1,
 #     'interfaces' => {
 #         'DNS' => {
+#             'clock' => 123456789,
 #             'status' => 1,
 #             'protocol' => 0,
 #             'targets' => {
@@ -4886,7 +4888,14 @@ sub __get_interface($$)
 #                 }
 #             }
 #         }
+#     }
+# }
+#
+# {
+#     'status' => 1,
+#     'interfaces' => {
 #         'RDDS43' => {
+#             'clock' => 123456789,
 #             'status' => 1,
 #             'targets' => {
 #                 'whois.example.com' => {
@@ -4895,6 +4904,20 @@ sub __get_interface($$)
 #                         'rtt' => 35,
 #                         'ip' => '1.2.3.4'
 #                         'testedName' => 'example.com'
+#                     ]
+#                 }
+#             }
+#         },
+#         'RDAP' => {
+#             'clock' => 123456800,
+#             'status' => 1,
+#             'targets' => {
+#                 'http://rdap.example.com/rdap' => {
+#                     'status' => 0,
+#                     'metrics' => [
+#                         'rtt' => 120,
+#                         'ip' => '1.2.3.8'
+#                         'testedName' => 'test.example.com'
 #                     ]
 #                 }
 #             }
@@ -4933,18 +4956,21 @@ sub get_probe_results($$$)
 			if (substr($i->{'key'}, 0, length("rsm.dns.status")) eq "rsm.dns.status")
 			{
 				# service status
-				$probe_results->{$clock}{'status'} = $value;
+				$probe_results->{'status'} = $value;
 
 				# interface status
-				$probe_results->{$clock}{'interfaces'}{$interface}{'status'} = $value;
+				$probe_results->{'interfaces'}{$interface}{'status'} = $value;
+
+				# set metrics clock from status
+				$probe_results->{'interfaces'}{$interface}{'clock'} = $clock;
 			}
 			elsif (substr($i->{'key'}, 0, length("rsm.dns.protocol")) eq "rsm.dns.protocol")
 			{
-				$probe_results->{$clock}{'interfaces'}{$interface}{'protocol'} = $value;
+				$probe_results->{'interfaces'}{$interface}{'protocol'} = $value;
 			}
 			elsif (substr($i->{'key'}, 0, length("rsm.dns.testedname")) eq "rsm.dns.testedname")
 			{
-				$probe_results->{$clock}{'interfaces'}{$interface}{'testedname'} = $value;
+				$probe_results->{'interfaces'}{$interface}{'testedname'} = $value;
 			}
 			elsif ((substr($i->{'key'}, 0, length("rsm.dns.rtt")) eq "rsm.dns.rtt") ||
 					(substr($i->{'key'}, 0, length("rsm.dns.nsid")) eq "rsm.dns.nsid"))
@@ -4966,9 +4992,9 @@ sub get_probe_results($$$)
 
 				my ($target, $ip) = split(',', get_nsip_from_key($i->{'key'}));
 
-				if (!defined($probe_results->{$clock}{'interfaces'}{$interface}{'targets'}{$target}{'metrics'}))
+				if (!defined($probe_results->{'interfaces'}{$interface}{'targets'}{$target}{'metrics'}))
 				{
-					push(@{$probe_results->{$clock}{'interfaces'}{$interface}{'targets'}{$target}{'metrics'}},
+					push(@{$probe_results->{'interfaces'}{$interface}{'targets'}{$target}{'metrics'}},
 						{
 							$field => $value,
 							'ip' => $ip
@@ -4980,7 +5006,7 @@ sub get_probe_results($$$)
 					my $added = 0;
 
 					# find our metric element
-					foreach my $metric (@{$probe_results->{$clock}{'interfaces'}{$interface}{'targets'}{$target}{'metrics'}})
+					foreach my $metric (@{$probe_results->{'interfaces'}{$interface}{'targets'}{$target}{'metrics'}})
 					{
 						if ($metric->{'ip'} eq $ip)
 						{
@@ -4992,7 +5018,7 @@ sub get_probe_results($$$)
 
 					if (!$added)
 					{
-						push(@{$probe_results->{$clock}{'interfaces'}{$interface}{'targets'}{$target}{'metrics'}},
+						push(@{$probe_results->{'interfaces'}{$interface}{'targets'}{$target}{'metrics'}},
 							{
 								$field => $value,
 								'ip' => $ip
@@ -5005,7 +5031,7 @@ sub get_probe_results($$$)
 			{
 				my ($target) = split(',', get_nsip_from_key($i->{'key'}));
 
-				$probe_results->{$clock}{'interfaces'}{$interface}{'targets'}{$target}{'status'} = $value;
+				$probe_results->{'interfaces'}{$interface}{'targets'}{$target}{'status'} = $value;
 			}
 			else
 			{
@@ -5040,7 +5066,7 @@ sub get_probe_results($$$)
 		if (substr($i->{'key'}, 0, length("rsm.rdds.status")) eq 'rsm.rdds.status')
 		{
 			# service status
-			$probe_results->{$clock}{'status'} = ($value == RDDS_UP ? UP : DOWN);
+			$probe_results->{'status'} = ($value == RDDS_UP ? UP : DOWN);
 
 			# interfaces status
 
@@ -5070,6 +5096,10 @@ sub get_probe_results($$$)
 				fail("item \"", $i->{'key'}, "\" has unexpected value $value, expected 0-3");
 			}
 
+			# set metrics clock from status
+			$probe_results->{'interfaces'}{INTERFACE_RDDS43()}{'clock'} = $clock;
+			$probe_results->{'interfaces'}{INTERFACE_RDDS80()}{'clock'} = $clock;
+
 			next;
 		}
 
@@ -5082,10 +5112,13 @@ sub get_probe_results($$$)
 		if (substr($i->{'key'}, 0, length("rdap.status")) eq 'rdap.status')
 		{
 			# service status
-			$probe_results->{$clock}{'status'} = $value;
+			$probe_results->{'status'} = $value;
 
 			# interface status
 			$interfaces_status->{$clock}{$interface} = $value;
+
+			# set metrics clock from status
+			$probe_results->{'interfaces'}{$interface}{'clock'} = $clock;
 
 			next;
 		}
@@ -5096,13 +5129,13 @@ sub get_probe_results($$$)
 
 		if (substr($i->{'key'}, 0, length("rsm.rdds.43.testedname")) eq 'rsm.rdds.43.testedname')
 		{
-			$probe_results->{$clock}{'interfaces'}{$interface}{'testedname'} = $value;
+			$probe_results->{'interfaces'}{$interface}{'testedname'} = $value;
 			next;
 		}
 
 		if (substr($i->{'key'}, 0, length("rdap.testedname")) eq 'rdap.testedname')
 		{
-			$probe_results->{$clock}{'interfaces'}{$interface}{'testedname'} = $value;
+			$probe_results->{'interfaces'}{$interface}{'testedname'} = $value;
 			next;
 		}
 
@@ -5180,11 +5213,11 @@ sub get_probe_results($$$)
 				my $target = $targets->{$clock}{$interface} // TARGET_PLACEHOLDER;
 				my $interface_status = $interfaces_status->{$clock}{$interface};
 
-				$probe_results->{$clock}{'interfaces'}{$interface}{'status'} = $interface_status;
+				$probe_results->{'interfaces'}{$interface}{'status'} = $interface_status;
 
 				# NB! We know for each RDDS43, RDDS80, RDAP interface there
 				# is always one metric per target (unkike DNS/DNSSEC), that's why array index 0.
-				$probe_results->{$clock}{'interfaces'}{$interface}{'targets'}{$target}{'metrics'}[0]{$field} =
+				$probe_results->{'interfaces'}{$interface}{'targets'}{$target}{'metrics'}[0]{$field} =
 					$metrics->{$clock}{$interface}{$field};
 			}
 		}
