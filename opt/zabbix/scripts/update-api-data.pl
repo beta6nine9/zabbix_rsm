@@ -1042,9 +1042,9 @@ sub __update_false_positives
 
 	# should we update false positiveness later? (incident state file does not exist yet)
 	my $later = 0;
-	# select resourceid,details,clock from auditlog where resourcetype=32 and clock>0 order by clock;
+	# select resourceid,note,clock from auditlog where resourcetype=32 and clock>0 order by clock;
 	my $rows_ref = db_select(
-		"select resourceid,details,clock".
+		"select resourceid,note,clock".
 		" from auditlog".
 		" where resourcetype=".AUDIT_RESOURCE_INCIDENT.
 			" and clock>$last_audit".
@@ -1053,15 +1053,12 @@ sub __update_false_positives
 	foreach my $row_ref (@$rows_ref)
 	{
 		my $eventid = $row_ref->[0];
-		my $details = $row_ref->[1];
+		my $note = $row_ref->[1];
 		my $clock = $row_ref->[2];
-
-		# ignore old "details" format (dropped in December 2014)
-		next if ($details =~ '.*Incident \[.*\]');
 
 		if ($eventid == 0)
 		{
-			$eventid = $details;
+			$eventid = $note;
 			$eventid =~ s/^([0-9]+): .*/$1/;
 		}
 
