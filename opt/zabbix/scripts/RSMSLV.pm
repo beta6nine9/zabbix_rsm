@@ -2549,34 +2549,18 @@ sub check_sent_values()
 	}
 }
 
-# Get name server details (name, IP) from item key.
-#
-# E. g.:
-#
-# rsm.dns.udp.rtt[{$RSM.TLD},i.ns.se.,194.146.106.22] -> "i.ns.se.,194.146.106.22"
-# rsm.slv.dns.avail[i.ns.se.,194.146.106.22] -> "i.ns.se.,194.146.106.22"
-sub get_nsip_from_key
+sub get_nsip_from_key($)
 {
 	my $key = shift;
 
-	my $offset = index($key, "[");
+	return "$1,$2" if ($key =~ /rsm.dns.rtt\[(.*),(.*),udp\]/);
+	return "$1,$2" if ($key =~ /rsm.dns.rtt\[(.*),(.*),tcp\]/);
+	return "$1,$2" if ($key =~ /rsm.dns.nsid\[(.*),(.*)\]/);
+	return "$1,$2" if ($key =~ /rsm.slv.dns.ns.avail\[(.*),(.*)\]/);
+	return "$1,$2" if ($key =~ /rsm.slv.dns.ns.downtime\[(.*),(.*)\]/);
 
-	return "" if ($offset == -1);
-
-	if (substr($key, $offset + 1, 1) eq "{")
-	{
-		$offset = index($key, ",");
-
-		return "" if ($offset == -1);
-	}
-
-	$offset++;
-
-	my $endpos = index($key, "]");
-
-	return "" if ($endpos == -1 || $endpos <= $offset);
-
-	return substr($key, $offset, $endpos - $offset);
+	wrn("unhandled key: $key");
+	return "";
 }
 
 sub is_internal_error
@@ -2769,7 +2753,7 @@ sub process_slv_avail_cycles($$$$$$$$$)
 			{
 				# fail("cannot get input keys for Service availability calculation");
 
-				# We used to fail here but not anymore because rsm.rdds items can be 
+				# We used to fail here but not anymore because rsm.rdds items can be
 				# disabled after switch to RDAP standalone. So some of TLDs may not have
 				# RDDS checks thus making SLV calculations for rsm.slv.rdds.* useless
 
