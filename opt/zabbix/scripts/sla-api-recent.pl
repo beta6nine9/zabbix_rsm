@@ -108,9 +108,6 @@ my $rdap_is_standalone = is_rdap_standalone($now);
 dbg("RDAP ", ($rdap_is_standalone ? "is" : "is NOT"), " standalone");
 
 my $cfg_minonline = get_macro_dns_probe_online();
-my $cfg_minns = get_macro_minns();
-
-fail("number of required working Name Servers is configured as $cfg_minns") if (1 > $cfg_minns);
 
 my %delays;
 $delays{'dns'} = $delays{'dnssec'} = get_dns_delay($now);
@@ -180,6 +177,8 @@ set_on_finish($fm);
 #     ...
 # }
 my %child_desc;
+
+my $cfg_minns;
 
 foreach my $server_key (@server_keys)
 {
@@ -283,6 +282,10 @@ sub process_server($)
 	my $server_tlds;
 
 	db_connect($server_key);
+
+	$cfg_minns = get_macro_minns();
+
+	fail("number of required working Name Servers is configured as $cfg_minns") if (1 > $cfg_minns);
 
 	my $all_probes_ref = get_probes();
 
@@ -1168,6 +1171,7 @@ sub calculate_cycle($$$$$$$$$)
 	$json->{'service'} = $service;
 	$json->{'cycleCalculationDateTime'} = $from;
 
+	# TODO: in the future consider getting rid of %tested_interfaces and using $probe_results directly
 	my %tested_interfaces;
 
 	my $probes_with_results = 0;
@@ -1290,6 +1294,9 @@ sub calculate_cycle($$$$$$$$$)
 	# Now get results from Probes.
 	#
 
+	# we need to aggregate DNS target statuses from Probes to generate Name Server Availability data
+	my $name_server_availability_data = {};
+
 	foreach my $probe (keys(%{$probes_data}))
 	{
 		# Service Availability items are already handled
@@ -1349,6 +1356,20 @@ sub calculate_cycle($$$$$$$$$)
 
 			foreach my $target (keys(%{$probe_results->{'interfaces'}{$interface}{'targets'}}))
 			{
+				# go through DNS target statuses on Probes and aggregate them
+				if ($interface eq 'dns')
+				{
+					my $city_status = $probe_results->{'interfaces'}{$interface}{'targets'}{$target}{'status'};
+
+					if (!defined($name_server_availability_data->{'targets'}{$target}) ||
+							$name_server_availability_data->{'targets'}{$target} != DOWN)
+					{
+						$name_server_availability_data->{'targets'}{$target} = $city_status;
+					}
+
+					$name_server_availability_data->{'probes'}{$probe}{$target} = $city_status;
+				}
+
 				foreach my $metric (@{$probe_results->{'interfaces'}{$interface}{'targets'}{$target}{'metrics'}})
 				{
 					# convert clock and rtt to integer
@@ -1433,7 +1454,7 @@ sub calculate_cycle($$$$$$$$$)
 	}
 
 	#
-	# add data that was collected from history and calculated in previous cycle to JSON
+	# add data that was collected from history and calculated in previous cycle
 	#
 
 	foreach my $interface (keys(%tested_interfaces))
@@ -1464,6 +1485,85 @@ sub calculate_cycle($$$$$$$$$)
 		}
 
 		push(@{$json->{'testedInterface'}}, $interface_json);
+	}
+
+	# Add aggregated Name Server Availability data. E. g.
+	#
+	# "minNameServersUp": 2,
+	# "nameServerAvailability": {
+	# 	"nameServerStatus": [
+	# 		{
+	# 			"target": "ns1.nic.exmaple",
+	# 			"status": "Down"
+	# 		},
+	# 		{
+	# 			"target": "ns2.nic.example",
+	# 			"status": "Down"
+	# 		}
+	# 	],
+	# 	"probes": [
+	# 		{
+	# 			"city": "WashingtonDC",
+	# 			"testData": [
+	# 				{
+	# 					"target": "ns1.nic.example",
+	# 					"status": "Down"
+	# 				},
+	# 				{
+	# 					"target": "ns2.nic.example",
+	#					"status": "Down"
+	# 				}
+	# 			]
+	# 		},
+	# 		{
+	# 			"city": "Sydney",
+	# 			"testData": [
+	# 				{
+	# 					"target": "ns1.nic.example",
+	# 					"status": "Up"
+	# 				},
+	# 				{
+	# 					"target": "ns2.nic.example",
+	# 					"status": "Up"
+	# 				}
+	# 			]
+	# 		}
+	# 	]
+	# }
+
+	# add configuration data
+	$json->{'minNameServersUp'} = int($cfg_minns);
+
+	foreach my $target (keys(%{$name_server_availability_data->{'targets'}}))
+	{
+		push(@{$json->{'nameServerAvailability'}{'nameServerStatus'}},
+			{
+				'target' => $target,
+				'status' => ($name_server_availability_data->{'targets'}{$target} == UP ? 'Up' : 'Down'),
+			}
+		);
+	}
+
+	foreach my $probe (keys(%{$name_server_availability_data->{'probes'}}))
+	{
+		my $test_data = [];
+
+		foreach my $target (keys(%{$name_server_availability_data->{'probes'}{$probe}}))
+		{
+			push(@{$test_data},
+				{
+					'target' => $target,
+					'status' => ($name_server_availability_data->{'probes'}{$probe}{$target} == UP ? 'Up' : 'Down'),
+				}
+			);
+		}
+
+		push(@{$json->{'probes'}},
+			{
+				'city' => $probe,
+				'testData' => $test_data,
+			}
+		);
 	}
 
 	my $perc;
