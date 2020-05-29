@@ -4692,6 +4692,9 @@ sub generate_report($$;$)
 	my $cmd = "/opt/zabbix/scripts/sla-report.php";
 	my @args = ();
 
+	# add --server-id, if called from a script that supports --server-id option (e.g., tld.pl)
+	push(@args, "--server-id", getopt("server-id")) if (opt("server-id"));
+
 	push(@args, "--debug") if opt("debug");
 	push(@args, "--stats") if opt("stats");
 	push(@args, "--force") if $force;
