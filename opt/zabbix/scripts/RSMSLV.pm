@@ -2071,7 +2071,7 @@ sub probe_online_at($$$)
 		$_PROBESTATUSES{$probe}{'itemid'} = get_probe_online_key_itemid($probe);
 	}
 
-	my $clock_limit = $clock + $delay -1;
+	my $clock_limit = $clock + $delay - 1;
 
 	for (my $cl = $clock; $cl < $clock_limit; $cl += PROBE_DELAY)
 	{
@@ -2721,11 +2721,6 @@ sub collect_slv_cycles($$$$$$)
 			push(@{$cycles{$lastclock}}, $tld);
 
 			$cycles_added++;
-		}
-
-		if (opt('dry-run') && $cycles_added == 0)
-		{
-			push(@{$cycles{$lastclock}}, $tld);
 		}
 
 		# unset TLD (for the logs)
@@ -4696,6 +4691,9 @@ sub generate_report($$;$)
 
 	my $cmd = "/opt/zabbix/scripts/sla-report.php";
 	my @args = ();
+
+	# add --server-id, if called from a script that supports --server-id option (e.g., tld.pl)
+	push(@args, "--server-id", getopt("server-id")) if (opt("server-id"));
 
 	push(@args, "--debug") if opt("debug");
 	push(@args, "--stats") if opt("stats");

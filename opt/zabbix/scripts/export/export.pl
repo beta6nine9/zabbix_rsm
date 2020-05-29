@@ -319,7 +319,8 @@ foreach my $tld_for_a_child_to_process (@{$tlds_ref})
 		# TODO: FIXME, we have done that already in other processes! (look for this message in this file)
 		foreach my $probe (keys(%{$probes_data->{$server_key}}))
 		{
-			probe_online_at($probe, $from, $till + 1);
+			# probe, from, delay
+			probe_online_at($probe, $from, ($till + 1 - $from));
 		}
 
 		my $result = __get_test_data($from, $till, $probes_data->{$server_key});
@@ -1593,7 +1594,8 @@ sub __get_probe_changes($$)
 		# TODO: FIXME, we have done that already in other processes! (look for this message in this file)
 		foreach my $probe (keys(%{$probes_data->{$server_key}}))
 		{
-			probe_online_at($probe, $from, $till + 1);
+			# probe, from, delay
+			probe_online_at($probe, $from, ($till + 1 - $from));
 		}
 
 		my $probe_times = __get_probe_times($from, $till, $probes_data->{$_server_key});

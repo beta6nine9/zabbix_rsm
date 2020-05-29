@@ -241,7 +241,7 @@ sub get_items($$)
 
 	if ($monitoring_target eq MONITORING_TARGET_REGISTRY)
 	{
-		my $sql = "select items.itemid, items.key_, items.value_type, hosts.hostid, hosts.host" .
+		$sql = "select items.itemid, items.key_, items.value_type, hosts.hostid, hosts.host" .
 			" from items" .
 				" left join hosts on hosts.hostid = items.hostid" .
 				" left join hosts_groups on hosts_groups.hostid = hosts.hostid" .
@@ -264,7 +264,7 @@ sub get_items($$)
 	}
 	elsif ($monitoring_target eq MONITORING_TARGET_REGISTRAR)
 	{
-		my $sql = "select items.itemid, items.key_, items.value_type, hosts.hostid, hosts.host" .
+		$sql = "select items.itemid, items.key_, items.value_type, hosts.hostid, hosts.host" .
 			" from items" .
 				" left join hosts on hosts.hostid = items.hostid" .
 				" left join hosts_groups on hosts_groups.hostid = hosts.hostid" .
