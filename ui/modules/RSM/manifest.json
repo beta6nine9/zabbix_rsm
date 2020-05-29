@@ -18,6 +18,11 @@
 			"layout": null,
 			"view": null
 		},
+		"userprofile.edit": {
+			"class": "UserProfileAction",
+			"layout": "layout.htmlpage",
+			"view": "administration.user.edit"
+		},
 		"rsm.sidlogin": {
 			"class": "SidLoginAction",
 			"layout": null,
