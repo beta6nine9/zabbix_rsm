@@ -136,10 +136,6 @@ if (opt('ignore-file'))
 	%ignore_hash = map { $_ => 1 } @lines;
 }
 
-my $cfg_dns_delay = undef;
-my $cfg_dns_minns;
-my $cfg_dns_valuemaps;
-
 db_connect();
 my $cfg_avail_valuemaps = get_avail_valuemaps();
 db_disconnect();
@@ -248,62 +244,11 @@ if ($check_till > $max_till)
 db_connect();
 foreach my $service (keys(%services))
 {
-	if ($service eq 'dns' || $service eq 'dnssec')
-	{
-		if (!$cfg_dns_delay)
-		{
-			$cfg_dns_delay = get_dns_delay($check_from);
-			$cfg_dns_minns = get_macro_minns();
-			$cfg_dns_valuemaps = get_valuemaps('dns');
-		}
-
-		$services{$service}{'delay'} = $cfg_dns_delay;
-		$services{$service}{'minns'} = $cfg_dns_minns;
-		$services{$service}{'valuemaps'} = $cfg_dns_valuemaps;
-		$services{$service}{'key_statuses'} = ['rsm.dns.udp[{$RSM.TLD}]']; # 0 - down, 1 - up
-		$services{$service}{'key_rtt'} = 'rsm.dns.udp.rtt[{$RSM.TLD},';
-	}
-	elsif ($service eq 'rdds')
-	{
-		$services{$service}{'delay'} = get_rdds_delay($check_from);
-
-		$services{$service}{'key_statuses'} = ['rsm.rdds[{$RSM.TLD}'];
-
-		push(@{$services{$service}{'key_statuses'}}, 'rdap[') if (!$rdap_is_standalone);
-
-		$services{$service}{+AH_INTERFACE_RDDS43}{'valuemaps'} = get_valuemaps('rdds');
-		$services{$service}{+AH_INTERFACE_RDDS43}{'key_rtt'} = 'rsm.rdds.43.rtt';
-		$services{$service}{+AH_INTERFACE_RDDS43}{'key_ip'} = 'rsm.rdds.43.ip';
-		$services{$service}{+AH_INTERFACE_RDDS43}{'key_upd'} = 'rsm.rdds.43.upd';
-
-		$services{$service}{+AH_INTERFACE_RDDS80}{'valuemaps'} = $services{$service}{+AH_INTERFACE_RDDS43}{'valuemaps'};
-		$services{$service}{+AH_INTERFACE_RDDS80}{'key_rtt'} = 'rsm.rdds.80.rtt';
-		$services{$service}{+AH_INTERFACE_RDDS80}{'key_ip'} = 'rsm.rdds.80.ip';
-
-		if (!$rdap_is_standalone)
-		{
-			$services{$service}{+AH_INTERFACE_RDAP}{'valuemaps'} = get_valuemaps('rdap');
-			$services{$service}{+AH_INTERFACE_RDAP}{'key_rtt'} = 'rdap.rtt';
-			$services{$service}{+AH_INTERFACE_RDAP}{'key_ip'} = 'rdap.ip';
-		}
-	}
-	elsif ($service eq 'rdap')
-	{
-		$services{$service}{'delay'} = get_rdap_delay($check_from);
-		$services{$service}{'key_statuses'} = ['rdap['];
-
-		$services{$service}{+AH_INTERFACE_RDAP}{'valuemaps'} = get_valuemaps('rdap');
-		$services{$service}{+AH_INTERFACE_RDAP}{'key_rtt'} = 'rdap.rtt';
-		$services{$service}{+AH_INTERFACE_RDAP}{'key_ip'} = 'rdap.ip';
-	}
-	elsif ($service eq 'epp')
-	{
-		$services{$service}{'delay'} = get_epp_delay($check_from);
-		$services{$service}{'valuemaps'} = get_valuemaps($service);
-		$services{$service}{'key_statuses'} = ['rsm.epp[{$RSM.TLD},']; # 0 - down, 1 - up
-		$services{$service}{'key_ip'} = 'rsm.epp.ip[{$RSM.TLD}]';
-		$services{$service}{'key_rtt'} = 'rsm.epp.rtt[{$RSM.TLD},';
-	}
+	$services{$service}{'delay'} = get_dns_delay($check_from)  if ($service eq 'dns');
+	$services{$service}{'delay'} = get_dns_delay($check_from)  if ($service eq 'dnssec');
+	$services{$service}{'delay'} = get_rdds_delay($check_from) if ($service eq 'rdds');
+	$services{$service}{'delay'} = get_rdap_delay($check_from) if ($service eq 'rdap');
+	$services{$service}{'delay'} = get_epp_delay($check_from)  if ($service eq 'epp');
 
 	$services{$service}{'avail_key'} = "rsm.slv.$service.avail";
 	$services{$service}{'rollweek_key'} = "rsm.slv.$service.rollweek";
