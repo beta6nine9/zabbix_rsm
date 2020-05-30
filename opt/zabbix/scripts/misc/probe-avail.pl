@@ -53,49 +53,15 @@ else
 	}
 }
 
-my $cfg_dns_delay = undef;
-my $cfg_dns_valuemaps;
-
 foreach my $service (keys(%services))
 {
-	if ($service eq 'dns' || $service eq 'dnssec')
-	{
-		if (!$cfg_dns_delay)
-		{
-			$cfg_dns_delay = get_dns_delay();
-			$cfg_dns_valuemaps = get_valuemaps('dns');
-		}
-
-		$services{$service}{'delay'} = $cfg_dns_delay;
-		$services{$service}{'valuemaps'} = $cfg_dns_valuemaps;
-		$services{$service}{'key_status'} = 'rsm.dns.udp[{$RSM.TLD}]'; # 0 - down, 1 - up
-		$services{$service}{'key_rtt'} = 'rsm.dns.udp.rtt[{$RSM.TLD},';
-	}
-
-	if ($service eq 'rdds')
-	{
-		$services{$service}{'delay'} = get_rdds_delay();
-		$services{$service}{'valuemaps'} = get_valuemaps($service);
-		$services{$service}{'key_status'} = 'rsm.rdds[{$RSM.TLD}'; # 0 - down, 1 - up, 2 - only 43, 3 - only 80
-		$services{$service}{'key_43_rtt'} = 'rsm.rdds.43.rtt';
-		$services{$service}{'key_43_ip'} = 'rsm.rdds.43.ip';
-		$services{$service}{'key_43_upd'} = 'rsm.rdds.43.upd';
-		$services{$service}{'key_80_rtt'} = 'rsm.rdds.80.rtt';
-		$services{$service}{'key_80_ip'} = 'rsm.rdds.80.ip';
-
-	}
-
-	if ($service eq 'epp')
-	{
-		$services{$service}{'delay'} = get_epp_delay();
-		$services{$service}{'valuemaps'} = get_valuemaps($service);
-		$services{$service}{'key_status'} = 'rsm.epp[{$RSM.TLD},'; # 0 - down, 1 - up
-		$services{$service}{'key_ip'} = 'rsm.epp.ip[{$RSM.TLD}]';
-		$services{$service}{'key_rtt'} = 'rsm.epp.rtt[{$RSM.TLD},';
-	}
+	$services{$service}{'delay'} = get_dns_delay()  if ($service eq 'dns');
+	$services{$service}{'delay'} = get_dns_delay()  if ($service eq 'dnssec');
+	$services{$service}{'delay'} = get_rdds_delay() if ($service eq 'rdds');
+	$services{$service}{'delay'} = get_epp_delay()  if ($service eq 'epp');
 }
 
-my ($check_from, $check_till, $continue_file);
+my ($check_from, $check_till);
 
 $check_from = $opt_from;
 $check_till = $check_from + getopt('period') * 60 - 1;
@@ -109,8 +75,8 @@ my ($from, $till) = get_real_services_period(\%services, $check_from, $check_til
 
 if (!$from)
 {
-    info("no full test periods within specified time range: ", selected_period($check_from, $check_till));
-    exit(0);
+	info("no full test periods within specified time range: ", selected_period($check_from, $check_till));
+	exit(0);
 }
 
 dbg(sprintf("getting probe statuses for period: %s", selected_period($from, $till)));
