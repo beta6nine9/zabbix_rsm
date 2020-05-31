@@ -161,6 +161,8 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		fail_if_running
 		exit_if_running
 		trim
+		str_starts_with
+		str_ends_with
 		parse_opts parse_slv_opts override_opts
 		opt getopt setopt unsetopt optkeys ts_str ts_full selected_period
 		cycle_start
@@ -597,7 +599,7 @@ sub get_lastclock($$$)
 
 	my $sql;
 
-	if ("[" eq substr($key, -1))
+	if (str_ends_with($key, "["))
 	{
 		$sql =
 			"select i.itemid".
@@ -2588,7 +2590,7 @@ sub is_internal_error_desc
 	my $desc = shift;
 
 	return 0 unless (defined($desc));
-	return 0 unless (substr($desc, 0, 1) eq "-");
+	return 0 unless (str_starts_with($desc, "-"));
 
 	return is_internal_error(get_value_from_desc($desc));
 }
@@ -4065,6 +4067,22 @@ sub trim
 	$_[0] =~ s/\s+$//g;
 }
 
+sub str_starts_with($$)
+{
+	my $string = shift;
+	my $prefix = shift;
+
+	return rindex($string, $prefix, 0) == 0;
+}
+
+sub str_ends_with($$)
+{
+	my $string = shift;
+	my $suffix = shift;
+
+	return substr($string, -length($suffix)) eq $suffix;
+}
+
 sub parse_opts
 {
 	if (!GetOptions(\%OPTS, 'help', 'dry-run', 'warnslow=f', 'nolog', 'debug', 'stats', @_))
@@ -4798,17 +4816,17 @@ sub __get_interface($$)
 
 	# RDDS service is the only having multiple interfaces
 
-	if (substr($key, 0, length("rsm.rdds.43")) eq "rsm.rdds.43")
+	if (str_starts_with($key, "rsm.rdds.43"))
 	{
 		return INTERFACE_RDDS43;
 	}
 
-	if (substr($key, 0, length("rsm.rdds.80")) eq "rsm.rdds.80")
+	if (str_starts_with($key, "rsm.rdds.80"))
 	{
 		return INTERFACE_RDDS80;
 	}
 
-	if (substr($key, 0, length("rdap")) eq "rdap")
+	if (str_starts_with($key, "rdap"))
 	{
 		return INTERFACE_RDAP;
 	}
@@ -4937,7 +4955,7 @@ sub get_probe_results($$$)
 
 			# DNS/DNSSEC are handled differently, since target and ip are in item parameters
 
-			if (substr($i->{'key'}, 0, length("rsm.dns.status")) eq "rsm.dns.status")
+			if (str_starts_with($i->{'key'}, "rsm.dns.status"))
 			{
 				# service status
 				$probe_results->{'status'} = $value;
@@ -4948,24 +4966,24 @@ sub get_probe_results($$$)
 				# set metrics clock from status
 				$probe_results->{'interfaces'}{$interface}{'clock'} = $clock;
 			}
-			elsif (substr($i->{'key'}, 0, length("rsm.dns.protocol")) eq "rsm.dns.protocol")
+			elsif (str_starts_with($i->{'key'}, "rsm.dns.protocol"))
 			{
 				$probe_results->{'interfaces'}{$interface}{'protocol'} = $value;
 			}
-			elsif (substr($i->{'key'}, 0, length("rsm.dns.testedname")) eq "rsm.dns.testedname")
+			elsif (str_starts_with($i->{'key'}, "rsm.dns.testedname"))
 			{
 				$probe_results->{'interfaces'}{$interface}{'testedname'} = $value;
 			}
-			elsif ((substr($i->{'key'}, 0, length("rsm.dns.rtt")) eq "rsm.dns.rtt") ||
-					(substr($i->{'key'}, 0, length("rsm.dns.nsid")) eq "rsm.dns.nsid"))
+			elsif (str_starts_with($i->{'key'}, "rsm.dns.rtt") ||
+					str_starts_with($i->{'key'}, "rsm.dns.nsid"))
 			{
 				my $field;
 
-				if (substr($i->{'key'}, 0, length("rsm.dns.rtt")) eq "rsm.dns.rtt")
+				if (str_starts_with($i->{'key'}, "rsm.dns.rtt"))
 				{
 					$field = 'rtt';
 				}
-				elsif (substr($i->{'key'}, 0, length("rsm.dns.nsid")) eq "rsm.dns.nsid")
+				elsif (str_starts_with($i->{'key'}, "rsm.dns.nsid"))
 				{
 					$field = 'nsid';
 				}
@@ -5011,7 +5029,7 @@ sub get_probe_results($$$)
 					}
 				}
 			}
-			elsif (substr($i->{'key'}, 0, length("rsm.dns.ns.status")) eq "rsm.dns.ns.status")
+			elsif (str_starts_with($i->{'key'}, "rsm.dns.ns.status"))
 			{
 				my ($target) = split(',', get_nsip_from_key($i->{'key'}));
 
@@ -5047,7 +5065,7 @@ sub get_probe_results($$$)
 		# and RDDS80. In the future it is suggested to split it to rsm.rdds.43.status
 		# (Up/Down) and rsm.rdds.80.status (Up/Down).
 
-		if (substr($i->{'key'}, 0, length("rsm.rdds.status")) eq 'rsm.rdds.status')
+		if (str_starts_with($i->{'key'}, "rsm.rdds.status"))
 		{
 			# service status
 			$probe_results->{'status'} = ($value == RDDS_UP ? UP : DOWN);
@@ -5093,7 +5111,7 @@ sub get_probe_results($$$)
 		# Collect interface statuses.
 		#
 
-		if (substr($i->{'key'}, 0, length("rdap.status")) eq 'rdap.status')
+		if (str_starts_with($i->{'key'}, "rdap.status"))
 		{
 			# service status
 			$probe_results->{'status'} = $value;
@@ -5111,13 +5129,13 @@ sub get_probe_results($$$)
 		# Collect RDDS/RDAP tested name.
 		#
 
-		if (substr($i->{'key'}, 0, length("rsm.rdds.43.testedname")) eq 'rsm.rdds.43.testedname')
+		if (str_starts_with($i->{'key'}, "rsm.rdds.43.testedname"))
 		{
 			$probe_results->{'interfaces'}{$interface}{'testedname'} = $value;
 			next;
 		}
 
-		if (substr($i->{'key'}, 0, length("rdap.testedname")) eq 'rdap.testedname')
+		if (str_starts_with($i->{'key'}, "rdap.testedname"))
 		{
 			$probe_results->{'interfaces'}{$interface}{'testedname'} = $value;
 			next;
@@ -5127,19 +5145,19 @@ sub get_probe_results($$$)
 		# Collect RDDS/RDAP targets.
 		#
 
-		if (substr($i->{'key'}, 0, length("rsm.rdds.43.target")) eq 'rsm.rdds.43.target')
+		if (str_starts_with($i->{'key'}, "rsm.rdds.43.target"))
 		{
 			$targets->{$clock}{$interface} = $value;
 			next;
 		}
 
-		if (substr($i->{'key'}, 0, length("rsm.rdds.80.target")) eq 'rsm.rdds.80.target')
+		if (str_starts_with($i->{'key'}, "rsm.rdds.80.target"))
 		{
 			$targets->{$clock}{$interface} = $value;
 			next;
 		}
 
-		if (substr($i->{'key'}, 0, length("rdap.target")) eq 'rdap.target')
+		if (str_starts_with($i->{'key'}, "rdap.target"))
 		{
 			$targets->{$clock}{$interface} = $value;
 			next;
@@ -5151,31 +5169,31 @@ sub get_probe_results($$$)
 
 		my $field;
 
-		if (substr($i->{'key'}, 0, length("rsm.rdds.43.rtt")) eq 'rsm.rdds.43.rtt')
+		if (str_starts_with($i->{'key'}, "rsm.rdds.43.rtt"))
 		{
 			$field = 'rtt';
 		}
-		elsif (substr($i->{'key'}, 0, length("rsm.rdds.43.ip")) eq 'rsm.rdds.43.ip')
+		elsif (str_starts_with($i->{'key'}, "rsm.rdds.43.ip"))
 		{
 			$field = 'ip';
 		}
-		elsif (substr($i->{'key'}, 0, length("rsm.rdds.80.rtt")) eq 'rsm.rdds.80.rtt')
+		elsif (str_starts_with($i->{'key'}, "rsm.rdds.80.rtt"))
 		{
 			$field = 'rtt';
 		}
-		elsif (substr($i->{'key'}, 0, length("rsm.rdds.80.ip")) eq 'rsm.rdds.80.ip')
+		elsif (str_starts_with($i->{'key'}, "rsm.rdds.80.ip"))
 		{
 			$field = 'ip';
 		}
-		elsif (substr($i->{'key'}, 0, length("rdap.rtt")) eq 'rdap.rtt')
+		elsif (str_starts_with($i->{'key'}, "rdap.rtt"))
 		{
 			$field = 'rtt';
 		}
-		elsif (substr($i->{'key'}, 0, length("rdap.ip")) eq 'rdap.ip')
+		elsif (str_starts_with($i->{'key'}, "rdap.ip"))
 		{
 			$field = 'ip';
 		}
-		elsif (substr($i->{'key'}, 0, length("rdap.testedname")) eq 'rdap.testedname')
+		elsif (str_starts_with($i->{'key'}, "rdap.testedname"))
 		{
 			$field = 'testedName';
 		}

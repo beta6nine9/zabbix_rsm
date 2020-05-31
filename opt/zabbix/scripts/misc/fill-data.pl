@@ -350,35 +350,35 @@ sub get_service_from_probe_key($)
 	my $key = shift;
 
 	# remove possible "rsm."
-	$key = substr($key, length("rsm.")) if (substr($key, 0, length("rsm.")) eq "rsm.");
+	$key = substr($key, length("rsm.")) if (str_starts_with($key, "rsm."));
 
 	my $service;
 
-	if (substr($key, 0, length("dns.udp")) eq "dns.udp")
+	if (str_starts_with($key, "dns.udp"))
 	{
 		$service = "dns-udp";
 	}
-	elsif (substr($key, 0, length("dns.tcp")) eq "dns.tcp")
+	elsif (str_starts_with($key, "dns.tcp"))
 	{
 		$service = "dns-tcp";
 	}
-	elsif (substr($key, 0, length("dnssec")) eq "dnssec")
+	elsif (str_starts_with($key, "dnssec"))
 	{
 		$service = "dns-udp";
 	}
-	elsif (substr($key, 0, length("rdds")) eq "rdds")
+	elsif (str_starts_with($key, "rdds"))
 	{
 		$service = "rdds";
 	}
-	elsif (substr($key, 0, length("rdap")) eq "rdap")
+	elsif (str_starts_with($key, "rdap"))
 	{
 		$service = "rdds";
 	}
-	elsif (substr($key, 0, length("probe")) eq "probe")
+	elsif (str_starts_with($key, "probe"))
 	{
 		$service = "config";
 	}
-	elsif (substr($key, -length(".enabled"), length(".enabled")) eq ".enabled")	# match *.enabled
+	elsif (str_ends_with($key, ".enabled"))	# match *.enabled
 	{
 		$service = "config";
 	}

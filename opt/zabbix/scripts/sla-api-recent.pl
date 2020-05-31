@@ -791,19 +791,19 @@ sub get_service_from_probe_key($)
 	my $key = shift;
 
 	# remove possible "rsm."
-	$key = substr($key, length("rsm.")) if (substr($key, 0, length("rsm.")) eq "rsm.");
+	$key = substr($key, length("rsm.")) if (str_starts_with($key, "rsm."));
 
 	my $service;
 
-	if (substr($key, 0, length("dns")) eq "dns")
+	if (str_starts_with($key, "dns"))
 	{
 		$service = "dns";
 	}
-	elsif (substr($key, 0, length("rdds")) eq "rdds")
+	elsif (str_starts_with($key, "rdds"))
 	{
 		$service = "rdds";
 	}
-	elsif (substr($key, 0, length("rdap")) eq "rdap")
+	elsif (str_starts_with($key, "rdap"))
 	{
 		$service = "rdap";
 	}
@@ -816,23 +816,23 @@ sub get_service_from_slv_key($)
 	my $key = shift;
 
 	# remove possible "rsm.slv."
-	$key = substr($key, length("rsm.slv.")) if (substr($key, 0, length("rsm.slv.")) eq "rsm.slv.");
+	$key = substr($key, length("rsm.slv.")) if (str_starts_with($key, "rsm.slv."));
 
 	my $service;
 
-	if (substr($key, 0, length("dns.")) eq "dns.")
+	if (str_starts_with($key, "dns."))
 	{
 		$service = "dns";
 	}
-	elsif (substr($key, 0, length("dnssec.")) eq "dnssec.")
+	elsif (str_starts_with($key, "dnssec."))
 	{
 		$service = "dns";
 	}
-	elsif (substr($key, 0, length("rdds.")) eq "rdds.")
+	elsif (str_starts_with($key, "rdds."))
 	{
 		$service = "rdds";
 	}
-	elsif (substr($key, 0, length("rdap.")) eq "rdap.")
+	elsif (str_starts_with($key, "rdap."))
 	{
 		$service = "rdap";
 	}
@@ -936,18 +936,18 @@ sub get_lastvalues_from_db($$$)
 		}
 		elsif ($hostgroupid == TLD_PROBE_RESULTS_GROUPID)
 		{
-			next if (substr($key, 0, length("rsm.conf")) eq "rsm.conf");
-			next if (substr($key, 0, length("rsm.probe")) eq "rsm.probe");
+			next if (str_starts_with($key, "rsm.conf"));
+			next if (str_starts_with($key, "rsm.probe"));
 
 			# not interested in master items that return JSON, nssok and mode items
-			next if (substr($key, 0, length("rsm.dns[")) eq "rsm.dns[");
-			next if (substr($key, 0, length("rsm.rdds[")) eq "rsm.rdds[");
-			next if (substr($key, 0, length("rdap[")) eq "rdap[");
-			next if (substr($key, 0, length("rsm.dns.nssok")) eq "rsm.dns.nssok");
-			next if (substr($key, 0, length("rsm.dns.mode")) eq "rsm.dns.mode");
+			next if (str_starts_with($key, "rsm.dns["));
+			next if (str_starts_with($key, "rsm.rdds["));
+			next if (str_starts_with($key, "rdap["));
+			next if (str_starts_with($key, "rsm.dns.nssok"));
+			next if (str_starts_with($key, "rsm.dns.mode"));
 
-			next unless (substr($key, 0, length("rsm.")) eq "rsm." ||
-				substr($key, 0, length("rdap.")) eq "rdap.");
+			next unless (str_starts_with($key, "rsm.") ||
+					str_starts_with($key, "rdap."));
 
 			(undef, $probe) = split(" ", $host, 2);
 
@@ -1218,7 +1218,7 @@ sub calculate_cycle($$$$$$$$$)
 	{
 		my $key = $probes_data->{FAKE_PROBE_NAME()}{$itemid}{'key'};
 
-		if (substr($key, 0, length("rsm.slv.")) eq "rsm.slv.")
+		if (str_starts_with($key, "rsm.slv."))
 		{
 			my $sub_key = substr($key, length("rsm.slv."));
 

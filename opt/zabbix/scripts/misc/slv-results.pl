@@ -68,7 +68,7 @@ if (!$from)
 {
 	$from = cycle_start($now - 5 * $delay, $delay);
 }
-elsif (substr($from, 0, length("-")) eq "-")
+elsif (str_starts_with($from, "-"))
 {
 	my $mult = substr($from, length("-"));
 
