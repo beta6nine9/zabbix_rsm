@@ -2775,7 +2775,7 @@ sub process_slv_avail_cycles($$$$$$$$$)
 sub process_slv_avail($$$$$$$$$$)
 {
 	my $tld = shift;
-	my $cfg_keys_in = shift;	# array reference, e. g. ['rsm.dns.udp.rtt[...]', ...] or ['rsm.dns.udp[...]']
+	my $cfg_keys_in = shift;	# array reference, e. g. ['rsm.dns.rtt[...,udp]', ...]
 	my $cfg_key_out = shift;
 	my $from = shift;
 	my $till = shift;
@@ -4922,7 +4922,7 @@ sub get_probe_results($$$)
 		# Handle DNS/DNSSEC services differently because these contain target (Name Server) and IP
 		# in the item parameters, e. g.
 		#
-		# rsm.dns.udp.rtt["ns1.example.com",1.2.3.4]
+		# rsm.dns.rtt["ns1.example.com",1.2.3.4,udp]
 		#
 
 		foreach my $row_ref (@{$results})
