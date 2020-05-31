@@ -13,7 +13,7 @@ use constant E_FAIL => -1;	# be careful when changing this, some functions depen
 our @EXPORT = qw(
 	SUCCESS E_FAIL
 	get_rsm_config get_rsm_server_keys get_rsm_server_key get_rsm_server_id get_rsm_local_key
-	get_rsm_local_id rsm_targets_prepare rsm_targets_apply rsm_targets_delete get_db_tls_settings
+	get_rsm_local_id rsm_targets_prepare rsm_targets_apply get_db_tls_settings
 	write_file read_file
 	sig_name
 );
@@ -201,13 +201,6 @@ sub rsm_targets_prepare($$)
 	}
 
 	return undef;
-}
-
-sub rsm_targets_delete($)
-{
-	my $file = shift;	# file to delete from target
-
-	$_TO_DELETE{$file} = undef;	# use hash instead of array to avoid duplicates
 }
 
 sub __get_file_error

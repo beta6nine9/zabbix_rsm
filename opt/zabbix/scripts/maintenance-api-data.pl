@@ -53,27 +53,35 @@ my $error = rsm_targets_prepare(AH_SLA_API_TMP_DIR, AH_SLA_API_DIR);
 
 die($error) if ($error);
 
-foreach my $tld_dir (path(AH_SLA_API_DIR)->children)
+foreach my $version_dir (path(AH_SLA_API_DIR)->children)
 {
-	next unless ($tld_dir->is_dir());
+	next unless ($version_dir->is_dir());
 
-	my $tld = $tld_dir->basename();
+	my $version = $version_dir->basename();
 
-	next if (exists($ignore{$tld}));
+	$version = substr($version, 1);
 
-	my $json;
+	foreach my $tld_dir (path(AH_SLA_API_DIR . "/$version_dir")->children)
+	{
+		next unless ($tld_dir->is_dir());
 
-	die("cannot read \"$tld\" state: ", ah_get_error()) unless (ah_state_file_json($tld, \$json) == AH_SUCCESS);
+		my $tld = $tld_dir->basename();
 
-	$json->{'status'} = 'Up-inconclusive';
-	$json->{'testedServices'} = {
-		'DNS'		=> JSON_OBJECT_DISABLED_SERVICE,
-		'DNSSEC'	=> JSON_OBJECT_DISABLED_SERVICE,
-		'EPP'		=> JSON_OBJECT_DISABLED_SERVICE,
-		'RDDS'		=> JSON_OBJECT_DISABLED_SERVICE
-	};
+		next if (exists($ignore{$tld}));
 
-	die("cannot set \"$tld\" state: ", ah_get_error()) unless (ah_save_state($tld, $json) == AH_SUCCESS);
+		my $json;
+
+		die("cannot read \"$tld\" state: ", ah_get_error()) unless (ah_read_state($version, $tld, \$json) == AH_SUCCESS);
+
+		$json->{'status'} = 'Up-inconclusive';
+		$json->{'testedServices'} = {
+			'DNS'		=> JSON_OBJECT_DISABLED_SERVICE,
+			'DNSSEC'	=> JSON_OBJECT_DISABLED_SERVICE,
+			'EPP'		=> JSON_OBJECT_DISABLED_SERVICE,
+			'RDDS'		=> JSON_OBJECT_DISABLED_SERVICE,
+		};
+
+	die("cannot set \"$tld\" state: ", ah_get_error()) unless (ah_save_state($version, $tld, $json) == AH_SUCCESS);
 }
 
 $error = rsm_targets_apply();

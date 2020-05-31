@@ -268,7 +268,7 @@ sub process_server($)
 
 	$lastvalues_cache = {};
 
-	if (ah_get_recent_cache($server_key, \$lastvalues_cache) != AH_SUCCESS)
+	if (ah_read_recent_cache($server_key, \$lastvalues_cache) != AH_SUCCESS)
 	{
 		dbg("there's no recent measurements cache file yet, but no worries");
 		$lastvalues_cache->{'tlds'} = {};
@@ -1558,7 +1558,7 @@ sub calculate_cycle($$$$$$$$$)
 			);
 		}
 
-		push(@{$json->{'probes'}},
+		push(@{$json->{'nameServerAvailability'}{'probes'}},
 			{
 				'city' => $probe,
 				'testData' => $test_data,
@@ -1613,9 +1613,49 @@ sub calculate_cycle($$$$$$$$$)
 
 	return if (opt('dry-run'));
 
-	if (ah_save_recent_measurement(ah_get_api_tld($tld), $service, $json, $from) != AH_SUCCESS)
+	if (ah_save_recent_measurement(
+			AH_SLA_API_VERSION_2,
+			ah_get_api_tld($tld),
+			$service,
+			$json,
+			$from) != AH_SUCCESS)
 	{
 		fail("cannot save recent measurement: ", ah_get_error());
+	}
+
+	if ($service ne 'rdap')
+	{
+		delete($json->{'minNameServersUp'});
+		delete($json->{'nameServerAvailability'});
+
+		foreach my $i_ref (@{$json->{'testedInterface'}})
+		{
+			foreach my $p_ref (@{$i_ref->{'probes'}})
+			{
+				delete($p_ref->{'transport'});
+				delete($p_ref->{'testedName'});
+
+				foreach my $t_ref (@{$p_ref->{'testData'}})
+				{
+					undef($t_ref->{'target'}) if ($service eq 'rdds');
+
+					foreach my $m_ref (@{$t_ref->{'metrics'}})
+					{
+						delete($m_ref->{'nsid'});
+					}
+				}
+			}
+		}
+
+		if (ah_save_recent_measurement(
+				AH_SLA_API_VERSION_1,
+				ah_get_api_tld($tld),
+				$service,
+				$json,
+				$from) != AH_SUCCESS)
+		{
+			fail("cannot save recent measurement: ", ah_get_error());
+		}
 	}
 }
 

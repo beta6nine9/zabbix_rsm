@@ -34,7 +34,6 @@ use constant AH_ALARMED_FILE => 'alarmed';
 use constant AH_DOWNTIME_FILE => 'downtime';
 use constant AH_SLA_API_DIR => '/opt/zabbix/sla';
 use constant AH_SLA_API_TMP_DIR => '/opt/zabbix/sla-tmp';
-use constant AH_SLA_API_RECENT_DIR => '/opt/zabbix/sla';
 
 use constant AH_ROOT_ZONE_DIR => 'zz--root';			# map root zone name (.) to something human readable
 
@@ -52,40 +51,39 @@ use constant JSON_OBJECT_DISABLED_SERVICE => {
 
 our @EXPORT = qw(
 	AH_SUCCESS AH_FAIL
-	AH_SLA_API_DIR AH_SLA_API_RECENT_DIR
-	AH_SLA_API_TMP_DIR ah_set_debug ah_get_error ah_state_file_json ah_save_state
+	AH_SLA_API_DIR
+	AH_SLA_API_TMP_DIR ah_set_debug ah_get_error ah_read_state ah_save_state
 	ah_save_alarmed ah_save_downtime ah_create_incident_json ah_save_incident
-	ah_save_false_positive ah_save_measurement
+	ah_save_false_positive ah_save_incident_measurement
 	ah_continue_file_name ah_lock_continue_file ah_unlock_continue_file
 	ah_get_api_tld ah_get_last_audit
-	ah_get_recent_measurement ah_save_recent_measurement ah_save_recent_cache ah_get_recent_cache
+	ah_read_recent_measurement ah_save_recent_measurement ah_save_recent_cache ah_read_recent_cache
 	ah_get_most_recent_measurement_ts
 	ah_save_audit ah_save_continue_file JSON_OBJECT_DISABLED_SERVICE
 	AH_INTERFACE_DNS AH_INTERFACE_DNSSEC AH_INTERFACE_RDDS43 AH_INTERFACE_RDDS80 AH_INTERFACE_RDAP AH_INTERFACE_EPP
 	AH_CITY_UP AH_CITY_DOWN AH_CITY_NO_RESULT AH_CITY_OFFLINE
+	AH_SLA_API_VERSION_1 AH_SLA_API_VERSION_2
 );
 
-use constant AH_JSON_FILE_VERSION_1 => 1;
-use constant AH_JSON_FILE_VERSION_2 => 2;
-
-use constant AH_JSON_FILE_VERSION_LATEST => AH_JSON_FILE_VERSION_2;
+use constant AH_SLA_API_VERSION_1 => 1;
+use constant AH_SLA_API_VERSION_2 => 2;
 
 my $_error_string = "";
 my $_debug = 0;
 
-sub ah_set_debug
+sub ah_set_debug(;$)
 {
 	my $value = shift;
 
 	$_debug = (defined($value) && $value != 0 ? 1 : 0);
 }
 
-sub ah_get_error
+sub ah_get_error()
 {
 	return $_error_string;
 }
 
-sub __ts_str
+sub __ts_str(;$)
 {
 	my $ts = shift;
 
@@ -94,7 +92,7 @@ sub __ts_str
 	return sprintf("%.4d%.2d%.2d:%.2d%.2d%.2d", $year + 1900, $mon + 1, $mday, $hour, $min, $sec);
 }
 
-sub __ts_full
+sub __ts_full(;$)
 {
 	my $ts = shift;
 
@@ -107,13 +105,14 @@ sub __ts_full
 #
 #   [base_dir]/example/monitoring/dns
 #
-sub __gen_base_path($$$)
+sub __gen_base_path($$;$$)
 {
+	my $version = shift;
 	my $tld = shift;
 	my $service = shift;
 	my $add_path = shift;
 
-	my $path = "$tld/monitoring";
+	my $path = "v$version/$tld/monitoring";
 
 	$path .= "/$service" if (defined($service));
 	$path .= "/$add_path" if (defined($add_path));
@@ -125,23 +124,25 @@ sub __gen_base_path($$$)
 #
 #   [base_dir]/example/monitoring/dns/incidents/1548853740.13468
 #
-sub __gen_inc_path($$$$)
+sub __gen_inc_path($$$$$)
 {
+	my $version = shift;
 	my $tld = shift;
 	my $service = shift;
 	my $eventid = shift;
 	my $start = shift;
 
-	return __gen_base_path($tld, $service, "incidents/$start.$eventid");
+	return __gen_base_path($version, $tld, $service, "incidents/$start.$eventid");
 }
 
-sub __make_base_path($$$)
+sub __make_base_path($$$$)
 {
+	my $version = shift;
 	my $tld = shift;
 	my $service = shift;
 	my $result_path_ptr = shift;	# pointer
 
-	my $path = AH_SLA_API_TMP_DIR . '/' . __gen_base_path($tld, $service, undef);
+	my $path = AH_SLA_API_TMP_DIR . '/' . __gen_base_path($version, $tld, $service, undef);
 
 	make_path($path, {error => \my $err});
 
@@ -156,15 +157,16 @@ sub __make_base_path($$$)
 	return AH_SUCCESS;
 }
 
-sub __make_inc_path($$$$$)
+sub __make_inc_path($$$$$$)
 {
+	my $version = shift;
 	my $tld = shift;
 	my $service = shift;
 	my $start = shift;
 	my $eventid = shift;
 	my $inc_path_ptr = shift;	# pointer
 
-	my $path = AH_SLA_API_TMP_DIR . '/' . __gen_inc_path($tld, $service, $eventid, $start);
+	my $path = AH_SLA_API_TMP_DIR . '/' . __gen_inc_path($version, $tld, $service, $eventid, $start);
 
 	make_path($path, {error => \my $err});
 
@@ -283,16 +285,9 @@ sub __write_file
 	return AH_SUCCESS;
 }
 
-sub __get_version($)
-{
-	my $service = shift;
-
-	return ($service eq 'rdap' ? AH_JSON_FILE_VERSION_2 : AH_JSON_FILE_VERSION_1);
-}
-
 sub __save_inc_false_positive($$$$)
 {
-	my $service = shift;
+	my $version = shift;
 	my $inc_path = shift;
 	my $false_positive = shift;
 	my $clock = shift;
@@ -302,18 +297,19 @@ sub __save_inc_false_positive($$$$)
 	my $json =
 	{
 		'falsePositive' => ($false_positive ? Types::Serialiser::true : Types::Serialiser::false),
-		'updateTime' => ah_int_or_null($clock)
+		'updateTime' => int_or_null($clock)
 	};
 
-	return __write_file($false_positive_path, __encode_json($json, __get_version($service)));
+	return __write_file($false_positive_path, __encode_json($version, $json));
 }
 
-sub ah_state_file_json($$)
+sub ah_read_state($$$)
 {
+	my $version = shift;
 	my $ah_tld = shift;
 	my $json_ref = shift;
 
-	my $state_path = AH_SLA_API_DIR . '/' . __gen_base_path($ah_tld, undef, undef) . '/' . AH_STATE_FILE;
+	my $state_path = AH_SLA_API_DIR . '/' . __gen_base_path($version, $ah_tld, undef, undef) . '/' . AH_STATE_FILE;
 	my $buf;
 
 	return AH_FAIL unless (__read_file($state_path, \$buf) == AH_SUCCESS);
@@ -323,22 +319,24 @@ sub ah_state_file_json($$)
 	return AH_SUCCESS;
 }
 
-sub ah_save_state($$)
+sub ah_save_state($$$)
 {
+	my $version = shift;
 	my $ah_tld = shift;
 	my $json = shift;
 
 	my $base_path;
 
-	return AH_FAIL unless (__make_base_path($ah_tld, undef, \$base_path) == AH_SUCCESS);
+	return AH_FAIL unless (__make_base_path($version, $ah_tld, undef, \$base_path) == AH_SUCCESS);
 
 	my $state_path = "$base_path/" . AH_STATE_FILE;
 
-	return __write_file($state_path, __encode_json($json, AH_JSON_FILE_VERSION_1));
+	return __write_file($state_path, __encode_json($version, $json));
 }
 
-sub ah_save_alarmed
+sub ah_save_alarmed($$$$;$)
 {
+	my $version = shift;
 	my $tld = shift;
 	my $service = shift;
 	my $status = shift;
@@ -346,17 +344,18 @@ sub ah_save_alarmed
 
 	my $base_path;
 
-	return AH_FAIL unless (__make_base_path($tld, $service, \$base_path) == AH_SUCCESS);
+	return AH_FAIL unless (__make_base_path($version, $tld, $service, \$base_path) == AH_SUCCESS);
 
 	my $alarmed_path = "$base_path/" . AH_ALARMED_FILE;
 
 	my $json = {'alarmed' => $status};
 
-	return __write_file($alarmed_path, __encode_json($json, __get_version($service)), $clock);
+	return __write_file($alarmed_path, __encode_json($version, $json), $clock);
 }
 
-sub ah_save_downtime
+sub ah_save_downtime($$$$$)
 {
+	my $version = shift;
 	my $tld = shift;
 	my $service = shift;
 	my $downtime = shift;
@@ -364,16 +363,16 @@ sub ah_save_downtime
 
 	my $base_path;
 
-	return AH_FAIL unless (__make_base_path($tld, $service, \$base_path) == AH_SUCCESS);
+	return AH_FAIL unless (__make_base_path($version, $tld, $service, \$base_path) == AH_SUCCESS);
 
 	my $alarmed_path = "$base_path/" . AH_DOWNTIME_FILE;
 
 	my $json = {'downtime' => $downtime};
 
-	return __write_file($alarmed_path, __encode_json($json, __get_version($service)), $clock);
+	return __write_file($alarmed_path, __encode_json($version, $json), $clock);
 }
 
-sub ah_create_incident_json
+sub ah_create_incident_json($$$$)
 {
 	my $eventid = shift;	# incident is identified by event ID
 	my $start = shift;
@@ -383,29 +382,28 @@ sub ah_create_incident_json
 	return
 	{
 		'incidentID' => "$start.$eventid",
-		'startTime' => ah_int_or_null($start),
-		'endTime' => ah_int_or_null($end),
+		'startTime' => int_or_null($start),
+		'endTime' => int_or_null($end),
 		'falsePositive' => ($false_positive ? Types::Serialiser::true : Types::Serialiser::false),
 		'state' => (defined($end) ? JSON_VALUE_INCIDENT_RESOLVED : JSON_VALUE_INCIDENT_ACTIVE)
 	};
 }
 
-sub __save_inc_state
+sub __save_inc_state($$$$)
 {
-	my $service = shift;
+	my $version = shift;
 	my $inc_path = shift;
 	my $json = shift;
 	my $lastclock = shift;
 
 	my $inc_state_path = "$inc_path/" . AH_INCIDENT_STATE_FILE;
 
-	return __write_file($inc_state_path, __encode_json($json, __get_version($service)), $lastclock);
+	return __write_file($inc_state_path, __encode_json($version, $json), $lastclock);
 }
 
-sub __read_inc_file($$$$$$);
-
-sub ah_save_incident
+sub ah_save_incident($$$$$$$$$)
 {
+	my $version = shift;
 	my $tld = shift;
 	my $service = shift;
 	my $eventid = shift;	# incident is identified by event ID
@@ -417,20 +415,20 @@ sub ah_save_incident
 
 	my $inc_path;
 
-	return AH_FAIL unless (__make_inc_path($tld, $service, $event_clock, $eventid, \$inc_path) == AH_SUCCESS);
+	return AH_FAIL unless (__make_inc_path($version, $tld, $service, $event_clock, $eventid, \$inc_path) == AH_SUCCESS);
 
 	my $json = {'incidents' => [ah_create_incident_json($eventid, $start, $end, $false_positive)]};
 
-	return AH_FAIL unless (__save_inc_state($service, $inc_path, $json, $lastclock) == AH_SUCCESS);
+	return AH_FAIL unless (__save_inc_state($version, $inc_path, $json, $lastclock) == AH_SUCCESS);
 
 	# If the there's no falsePositive file yet, just create it with updateTime null.
 	# Otherwise do nothing, it should always contain correct false positiveness.
 	# The false_positive changes will be updated later, when calling ah_save_false_positive().
 
 	my $buf;
-	if (__read_inc_file($tld, $service, $eventid, $start, AH_FALSE_POSITIVE_FILE, \$buf) == AH_FAIL)
+	if (__read_inc_file($version, $tld, $service, $eventid, $start, AH_FALSE_POSITIVE_FILE, \$buf) == AH_FAIL)
 	{
-		return __save_inc_false_positive($service, $inc_path, $false_positive, undef);
+		return __save_inc_false_positive($version, $inc_path, $false_positive, undef);
 	}
 }
 
@@ -456,8 +454,9 @@ sub __read_file($$)
 }
 
 # read an old file from incident directory
-sub __read_inc_file($$$$$$)
+sub __read_inc_file($$$$$$$)
 {
+	my $version = shift;
 	my $tld = shift;
 	my $service = shift;
 	my $eventid = shift;
@@ -465,7 +464,7 @@ sub __read_inc_file($$$$$$)
 	my $file = shift;
 	my $buf_ref = shift;
 
-	$file = AH_SLA_API_DIR . '/' . __gen_inc_path($tld, $service, $eventid, $start) . '/' . $file;
+	$file = AH_SLA_API_DIR . '/' . __gen_inc_path($version, $tld, $service, $eventid, $start) . '/' . $file;
 
 	RSMSLV::dbg("file: $file");
 
@@ -483,8 +482,9 @@ sub __read_inc_file($$$$$$)
 # processed (no incident state file) we ignore this change and notify the caller
 # about the need to try updating false positiveness later by setting $later_ref
 # flag to 1.
-sub ah_save_false_positive
+sub ah_save_false_positive($$$$$$$$)
 {
+	my $version = shift;
 	my $tld = shift;
 	my $service = shift;
 	my $eventid = shift;	# incident is identified by event ID
@@ -499,7 +499,7 @@ sub ah_save_false_positive
 	}
 
 	my $buf;
-	if (__read_inc_file($tld, $service, $eventid, $start, AH_INCIDENT_STATE_FILE, \$buf) == AH_FAIL)
+	if (__read_inc_file($version, $tld, $service, $eventid, $start, AH_INCIDENT_STATE_FILE, \$buf) == AH_FAIL)
 	{
 		# no incident state file yet, do not update false positiveness at this point
 		$$later_ref = 1;
@@ -514,7 +514,7 @@ sub ah_save_false_positive
 
 	my $inc_path;
 
-	return AH_FAIL unless (__make_inc_path($tld, $service, $start, $eventid, \$inc_path) == AH_SUCCESS);
+	return AH_FAIL unless (__make_inc_path($version, $tld, $service, $start, $eventid, \$inc_path) == AH_SUCCESS);
 
 	my $curr_false_positive = (($json->{'incidents'}->[0]->{'falsePositive'} eq Types::Serialiser::true) ? 1 : 0);
 
@@ -524,14 +524,15 @@ sub ah_save_false_positive
 
 		$json->{'incidents'}->[0]->{'falsePositive'} = ($false_positive ? Types::Serialiser::true : Types::Serialiser::false);
 
-		return AH_FAIL unless (__save_inc_state($service, $inc_path, $json, $clock) == AH_SUCCESS);
+		return AH_FAIL unless (__save_inc_state($version, $inc_path, $json, $clock) == AH_SUCCESS);
 	}
 
-	return __save_inc_false_positive($service, $inc_path, $false_positive, $clock);
+	return __save_inc_false_positive($version, $inc_path, $false_positive, $clock);
 }
 
-sub ah_save_measurement
+sub ah_save_incident_measurement($$$$$$$)
 {
+	my $version = shift;
 	my $tld = shift;
 	my $service = shift;
 	my $eventid = shift;	# incident is identified by event ID
@@ -541,19 +542,20 @@ sub ah_save_measurement
 
 	my $inc_path;
 
-	return AH_FAIL unless (__make_inc_path($tld, $service, $start, $eventid, \$inc_path) == AH_SUCCESS);
+	return AH_FAIL unless (__make_inc_path($version, $tld, $service, $start, $eventid, \$inc_path) == AH_SUCCESS);
 
 	my $json_path = "$inc_path/$clock.$eventid.json";
 
-	return __write_file($json_path, __encode_json($json, __get_version($service)), $clock);
+	return __write_file($json_path, __encode_json($version, $json), $clock);
 }
 
 # Base path for recent measurement, e. g.
 #
-#   [base_dir]/example/monitoring/dns/measurements/2018/02/28
+#   [base_dir]/v1/example/monitoring/dns/measurements/2018/02/28
 #
-sub __gen_recent_measurement_base_path($$$)
+sub __gen_recent_measurement_base_path($$$$)
 {
+	my $version = shift;
 	my $ah_tld = shift;
 	my $service = shift;
 	my $clock = shift;
@@ -565,22 +567,23 @@ sub __gen_recent_measurement_base_path($$$)
 
 	my $add_path = sprintf("measurements/%04d/%02d/%02d", $year, $mon, $mday);
 
-	return AH_SLA_API_RECENT_DIR . '/' . __gen_base_path($ah_tld, $service, $add_path);
+	return AH_SLA_API_DIR . '/' . __gen_base_path($version, $ah_tld, $service, $add_path);
 }
 
 # Generate path for recent measurement, e. g.
 #
 #   [base_dir]/example/monitoring/dns/measurements/2018/02/28/<measurement>.json
 #
-sub __gen_recent_measurement_path($$$$$)
+sub __gen_recent_measurement_path($$$$$$)
 {
+	my $version = shift;
 	my $ah_tld = shift;
 	my $service = shift;
 	my $clock = shift;
 	my $path_buf = shift;	# pointer to result
 	my $create = shift;	# create missing directories
 
-	my $path = __gen_recent_measurement_base_path($ah_tld, $service, $clock);
+	my $path = __gen_recent_measurement_base_path($version, $ah_tld, $service, $clock);
 
 	if ($create)
 	{
@@ -592,8 +595,9 @@ sub __gen_recent_measurement_path($$$$$)
 	return AH_SUCCESS;
 }
 
-sub ah_get_recent_measurement($$$$)
+sub ah_read_recent_measurement($$$$$)
 {
+	my $version = shift;
 	my $ah_tld = shift;
 	my $service = shift;
 	my $clock = shift;
@@ -602,7 +606,7 @@ sub ah_get_recent_measurement($$$$)
 	my ($path, $buf);
 
 	# do not create missing directories
-	return AH_FAIL unless (__gen_recent_measurement_path($ah_tld, $service, $clock, \$path, 0) == AH_SUCCESS);
+	return AH_FAIL unless (__gen_recent_measurement_path($version, $ah_tld, $service, $clock, \$path, 0) == AH_SUCCESS);
 
 	return AH_FAIL unless (__read_file($path, \$buf) == AH_SUCCESS);
 
@@ -611,8 +615,9 @@ sub ah_get_recent_measurement($$$$)
 	return AH_SUCCESS;
 }
 
-sub ah_save_recent_measurement($$$$)
+sub ah_save_recent_measurement($$$$$)
 {
+	my $version = shift;
 	my $ah_tld = shift;
 	my $service = shift;
 	my $json = shift;
@@ -621,9 +626,9 @@ sub ah_save_recent_measurement($$$$)
 	my $path;
 
 	# force creation of missing directories
-	return AH_FAIL unless (__gen_recent_measurement_path($ah_tld, $service, $clock, \$path, 1) == AH_SUCCESS);
+	return AH_FAIL unless (__gen_recent_measurement_path($version, $ah_tld, $service, $clock, \$path, 1) == AH_SUCCESS);
 
-	return __write_file($path, __encode_json($json, __get_version($service)), $clock);
+	return __write_file($path, __encode_json($version, $json), $clock);
 }
 
 # Generate path for recent measurement cache, e. g.
@@ -653,10 +658,10 @@ sub ah_save_recent_cache($$)
 
 	return AH_FAIL unless (__gen_recent_cache_path($server_key, \$path) == AH_SUCCESS);
 
-	return __write_file($path, __encode_json($json, AH_JSON_FILE_VERSION_LATEST));
+	return __write_file($path, __encode_json(AH_SLA_API_VERSION_1, $json));
 }
 
-sub ah_get_recent_cache($$)
+sub ah_read_recent_cache($$)
 {
 	my $server_key = shift;
 	my $json_ref = shift;
@@ -693,7 +698,7 @@ sub ah_get_most_recent_measurement_ts($$$$$$)
 
 	while ($clock > $oldest_clock)
 	{
-		my $path = __gen_recent_measurement_base_path($ah_tld, $service, $clock);
+		my $path = __gen_recent_measurement_base_path(AH_SLA_API_VERSION_1, $ah_tld, $service, $clock);
 
 		$search_paths{$path} = 1;
 
@@ -762,8 +767,8 @@ sub __get_audit_file_path
 
 sub __encode_json($$)
 {
-	my $json_ref = shift;
 	my $version = shift;
+	my $json_ref = shift;
 
 	$json_ref->{'version'} = $version;
 	$json_ref->{'lastUpdateApiDatabase'} = time();
@@ -809,9 +814,10 @@ sub ah_save_audit
 	return __write_file(AH_SLA_API_TMP_DIR . '/' . AH_AUDIT_FILE_PREFIX . $server_key . '.txt', $clock);
 }
 
-sub ah_int_or_null
+sub int_or_null
 {
 	my $val = shift;
+
 	return defined($val) ? int($val) : $val;
 }
 

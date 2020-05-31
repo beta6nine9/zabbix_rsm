@@ -5031,7 +5031,9 @@ sub get_probe_results($$$)
 			}
 			elsif (str_starts_with($i->{'key'}, "rsm.dns.ns.status"))
 			{
-				my ($target) = split(',', get_nsip_from_key($i->{'key'}));
+				my $target;
+
+				$target = $1 if ($i->{'key'} =~ /rsm.dns.ns.status\[(.*)\]/);
 
 				$probe_results->{'interfaces'}{$interface}{'targets'}{$target}{'status'} = $value;
 			}
