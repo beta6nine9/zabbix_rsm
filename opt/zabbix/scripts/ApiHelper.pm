@@ -61,7 +61,6 @@ our @EXPORT = qw(
 	ah_get_recent_measurement ah_save_recent_measurement ah_save_recent_cache ah_get_recent_cache
 	ah_get_most_recent_measurement_ts
 	ah_save_audit ah_save_continue_file ah_encode_pretty_json JSON_OBJECT_DISABLED_SERVICE
-	ah_get_dns_interface ah_get_rdds_interface ah_get_interface
 	AH_INTERFACE_DNS AH_INTERFACE_DNSSEC AH_INTERFACE_RDDS43 AH_INTERFACE_RDDS80 AH_INTERFACE_RDAP AH_INTERFACE_EPP
 	AH_CITY_UP AH_CITY_DOWN AH_CITY_NO_RESULT AH_CITY_OFFLINE
 );
@@ -813,51 +812,6 @@ sub ah_save_audit
 	die("Internal error: ah_save_audit() server_key not specified") unless ($server_key && $clock);
 
 	return __write_file(AH_SLA_API_TMP_DIR . '/' . AH_AUDIT_FILE_PREFIX . $server_key . '.txt', $clock);
-}
-
-sub ah_get_dns_interface($)
-{
-	my $key = shift;
-
-	if (substr($key, 0, length("rsm.dns.udp")) eq "rsm.dns.udp")
-	{
-		return AH_INTERFACE_DNS;
-	}
-
-	return;
-}
-
-sub ah_get_rdds_interface($)
-{
-	my $key = shift;
-
-	my $interface;
-
-	if (substr($key, 0, length("rsm.rdds.43")) eq "rsm.rdds.43")
-	{
-		$interface = AH_INTERFACE_RDDS43
-	}
-	elsif (substr($key, 0, length("rsm.rdds.80")) eq "rsm.rdds.80")
-	{
-		$interface = AH_INTERFACE_RDDS80;
-	}
-	elsif (substr($key, 0, length("rdap")) eq "rdap")
-	{
-		$interface = AH_INTERFACE_RDAP;
-	}
-
-	return $interface;
-}
-
-sub ah_get_interface($)
-{
-	my $key = shift;
-
-	my $interface = ah_get_dns_interface($key);
-
-	return $interface if (defined($interface));
-
-	return ah_get_rdds_interface($key);
 }
 
 sub ah_int_or_null
