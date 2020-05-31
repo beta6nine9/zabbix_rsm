@@ -1426,7 +1426,7 @@ sub __get_status_itemids
 	my $tld = shift;
 	my $key = shift;
 
-	my $key_condition = (substr($key, -1) eq ']' ? "i.key_='$key'" : "i.key_ like '$key%'");
+	my $key_condition = (str_ends_with($key, ']') ? "i.key_='$key'" : "i.key_ like '$key%'");
 
 	my $sql =
 		"select h.host,i.itemid".
@@ -2005,7 +2005,7 @@ sub __get_service_status_itemids
 	my $tld = shift;
 	my $key = shift;
 
-	my $key_condition = (substr($key, -1) eq ']' ? "i.key_='$key'" : "i.key_ like '$key%'");
+	my $key_condition = (str_ends_with($key, ']') ? "i.key_='$key'" : "i.key_ like '$key%'");
 
 	my $sql =
 		"select h.host,i.itemid".

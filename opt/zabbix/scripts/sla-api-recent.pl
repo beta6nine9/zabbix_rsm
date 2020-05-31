@@ -930,7 +930,7 @@ sub get_lastvalues_from_db($$$)
 		if ($hostgroupid == TLDS_GROUPID)
 		{
 			# this item belongs to TLD (we only care about Service availability (*.avail) items)
-			next unless (substr($key, -5) eq "avail");
+			next unless (str_ends_with($key, "avail"));
 
 			$key_service = get_service_from_slv_key($key);
 		}

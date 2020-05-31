@@ -80,7 +80,7 @@ foreach (@$tlds_ref)
 {
 	$tld = $_;
 
-	if ("[" eq substr($key, -1))
+	if (str_ends_with($key, "["))
 	{
 		my $itemids_ref = get_itemids_by_host_and_keypart($tld, $key);
 		foreach my $nsip (keys(%$itemids_ref))
