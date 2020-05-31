@@ -60,7 +60,7 @@ our @EXPORT = qw(
 	ah_get_api_tld ah_get_last_audit
 	ah_get_recent_measurement ah_save_recent_measurement ah_save_recent_cache ah_get_recent_cache
 	ah_get_most_recent_measurement_ts
-	ah_save_audit ah_save_continue_file ah_encode_pretty_json JSON_OBJECT_DISABLED_SERVICE
+	ah_save_audit ah_save_continue_file JSON_OBJECT_DISABLED_SERVICE
 	AH_INTERFACE_DNS AH_INTERFACE_DNSSEC AH_INTERFACE_RDDS43 AH_INTERFACE_RDDS80 AH_INTERFACE_RDAP AH_INTERFACE_EPP
 	AH_CITY_UP AH_CITY_DOWN AH_CITY_NO_RESULT AH_CITY_OFFLINE
 );
@@ -742,11 +742,6 @@ sub ah_save_continue_file
 	my $ts = shift;
 
 	return __write_file(AH_SLA_API_TMP_DIR . '/' . AH_CONTINUE_FILE, $ts);
-}
-
-sub ah_encode_pretty_json
-{
-	return JSON::XS->new->pretty(1)->encode(shift);
 }
 
 sub ah_get_api_tld
