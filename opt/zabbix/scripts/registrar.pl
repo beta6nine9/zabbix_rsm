@@ -1,17 +1,6 @@
 #!/usr/bin/perl
 #
-# - RDDS availability test		(data collection)	rsm.rdds			(simple, every 5 minutes)
-#   (also RDDS43 and RDDS80					rsm.rdds.43.ip			(trapper, Proxy)
-#   availability at a particular				rsm.rdds.43.rtt			-|-
-#   minute)							rsm.rdds.43.upd			-|-
-#								rsm.rdds.80.ip			-|-
-#								rsm.rdds.80.rtt			-|-
-#
-# - RDDS availability			(given minute)		rsm.slv.rdds.avail		-|-
-# - RDDS rolling week			(rolling week)		rsm.slv.rdds.rollweek		-|-
-# - RDDS43 monthly resolution RTT	(monthly)		rsm.slv.rdds.43.rtt.month	-|-
-# - RDDS80 monthly resolution RTT	(monthly)		rsm.slv.rdds.80.rtt.month	-|-
-# - RDDS monthly update time		(monthly)		rsm.slv.rdds.upd.month		-|-
+# Script to manage Registrars in Zabbix.
 
 BEGIN
 {
