@@ -112,6 +112,8 @@ Summary:			Zabbix web frontend common package
 Group:				Application/Internet
 BuildArch:			noarch
 Requires:			nginx
+# CentOS 7 specific names start
+Requires:			centos-release-scl
 Requires:			rh-php72
 Requires:			rh-php72-php-gd
 Requires:			rh-php72-php-bcmath
@@ -119,6 +121,7 @@ Requires:			rh-php72-php-mbstring
 Requires:			rh-php72-php-xml
 Requires:			rh-php72-php-ldap
 Requires:			rh-php72-php-fpm
+# CentOS 7 specific names end
 Requires:			dejavu-sans-fonts
 Requires:			zabbix-web-database = %{version}-%{release}
 Requires(post):		%{_sbindir}/update-alternatives
@@ -131,7 +134,9 @@ Zabbix web frontend common package.
 Summary:			Zabbix web frontend for MySQL
 Group:				Applications/Internet
 BuildArch:			noarch
+# CentOS 7 specific names start
 Requires:			rh-php72-php-mysqlnd
+# CentOS 7 specific names end
 Requires:			zabbix-web = %{version}-%{release}
 Provides:			zabbix-web-database = %{version}-%{release}
 
