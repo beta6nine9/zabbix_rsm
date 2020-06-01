@@ -99,8 +99,8 @@ sub check_probe_values
 	# E. g.:
 	#
 	# {
-	#       rsm.rdds[{$RSM.TLD},"rdds43.example.com","web.whois.example.com"] => [1],
-	#       rdap[...] => [0, 0],
+	#       rdap.status => [1],
+	#       rdds.status => [0, 0],
 	# }
 
 	if (scalar(keys(%{$values_ref})) == 0)

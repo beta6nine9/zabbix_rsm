@@ -531,7 +531,7 @@ TODO			$services->{$service}->{'key_rtt'} = 'rsm.dns.tcp.rtt[{$RSM.TLD},';
 		}
 		elsif ($service eq 'rdds')
 		{
-			$services->{$service}->{'key_status'} = 'rsm.rdds[{$RSM.TLD}';	# 0 - down, 1 - up, 2 - only 43, 3 - only 80
+TODO			$services->{$service}->{'key_status'} = 'rsm.rdds[{$RSM.TLD}';	# 0 - down, 1 - up, 2 - only 43, 3 - only 80
 			$services->{$service}->{'key_43_rtt'} = 'rsm.rdds.43.rtt';
 			$services->{$service}->{'key_43_ip'} = 'rsm.rdds.43.ip';
 			$services->{$service}->{'key_43_upd'} = 'rsm.rdds.43.upd';
