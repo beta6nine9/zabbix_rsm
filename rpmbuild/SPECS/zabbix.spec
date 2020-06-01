@@ -112,13 +112,6 @@ Summary:			Zabbix web frontend common package
 Group:				Application/Internet
 BuildArch:			noarch
 Requires:			nginx
-Requires:			php-gd >= 7.2
-Requires:			php-bcmath >= 7.2
-Requires:			php-mbstring >= 7.2
-Requires:			php-xml >= 7.2
-Requires:			php-ldap >= 7.2
-Requires:			php-json >= 7.2
-Requires:			php-fpm >= 7.2
 Requires:			rh-php72
 Requires:			rh-php72-php-gd
 Requires:			rh-php72-php-bcmath
