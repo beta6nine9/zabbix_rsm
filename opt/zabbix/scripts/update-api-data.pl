@@ -495,7 +495,7 @@ foreach (@server_keys)
 					}
 					else
 					{
-						if (ah_save_alarmed(
+						if ($service ne 'rdap' && ah_save_alarmed(
 								AH_SLA_API_VERSION_1,
 								$ah_tld,
 								$service,
@@ -535,7 +535,7 @@ foreach (@server_keys)
 					}
 					else
 					{
-						if (ah_save_alarmed(
+						if ($service ne 'rdap' && ah_save_alarmed(
 								AH_SLA_API_VERSION_1,
 								$ah_tld,
 								$service,
@@ -573,7 +573,7 @@ foreach (@server_keys)
 					}
 					else
 					{
-						if (ah_save_alarmed(
+						if ($service ne 'rdap' && ah_save_alarmed(
 								AH_SLA_API_VERSION_1,
 								$ah_tld,
 								$service,
@@ -627,7 +627,7 @@ foreach (@server_keys)
 					}
 					else
 					{
-						if (ah_save_alarmed(
+						if ($service ne 'rdap' && ah_save_alarmed(
 								AH_SLA_API_VERSION_1,
 								$ah_tld,
 								$service,
@@ -678,7 +678,7 @@ foreach (@server_keys)
 					}
 					else
 					{
-						if (ah_save_alarmed(
+						if ($service ne 'rdap' && ah_save_alarmed(
 								AH_SLA_API_VERSION_1,
 								$ah_tld,
 								$service,
@@ -755,7 +755,7 @@ foreach (@server_keys)
 				}
 				else
 				{
-					if (ah_save_alarmed(
+					if ($service ne 'rdap' && ah_save_alarmed(
 							AH_SLA_API_VERSION_1,
 							$ah_tld,
 							$service,
@@ -787,7 +787,7 @@ foreach (@server_keys)
 					}
 					else
 					{
-						if (ah_save_alarmed(
+						if ($service ne 'rdap' && ah_save_alarmed(
 								AH_SLA_API_VERSION_1,
 								$ah_tld,
 								$service,
@@ -940,37 +940,43 @@ foreach (@server_keys)
 
 					while ($clock < $check_till)
 					{
-						if (ah_read_recent_measurement(
-								AH_SLA_API_VERSION_1,
-								$ah_tld,
-								$service,
-								$clock,
-								\$recent_json) != AH_SUCCESS)
+						if ($service ne 'rdap')
 						{
-							# before failing let's check if there is time configured to
-							# allow for missing measurement files
-							if ($now - $clock < $allow_missing_measurements)
+							if (ah_read_recent_measurement(
+									AH_SLA_API_VERSION_1,
+									$ah_tld,
+									$service,
+									$clock,
+									\$recent_json) != AH_SUCCESS)
 							{
-								info("there is missing recent measurement for ", ts_str($clock),
-										", but since it is within limit",
-										" ($allow_missing_measurements seconds from now),",
-										" will quit and try to get it again on the next run...");
-								exit(0);
+								# before failing let's check if there is time configured
+								# to allow for missing measurement files
+								if ($now - $clock < $allow_missing_measurements)
+								{
+									info("there is missing recent measurement for ",
+										ts_str($clock), ", but since it is",
+										" within limit",
+										" ($allow_missing_measurements seconds",
+										" from now), will quit and try to get",
+										" it again on the next run...");
+
+									exit(0);
+								}
+
+								fail("cannot get recent measurement: ", ah_get_error());
 							}
 
-							fail("cannot get recent measurement: ", ah_get_error());
-						}
-
-						if (ah_save_incident_measurement(
-								AH_SLA_API_VERSION_1,
-								$ah_tld,
-								$service,
-								$eventid,
-								$event_clock,
-								$recent_json,
-								$clock) != AH_SUCCESS)
-						{
-							fail("cannot save incident: ", ah_get_error());
+							if (ah_save_incident_measurement(
+									AH_SLA_API_VERSION_1,
+									$ah_tld,
+									$service,
+									$eventid,
+									$event_clock,
+									$recent_json,
+									$clock) != AH_SUCCESS)
+							{
+								fail("cannot save incident: ", ah_get_error());
+							}
 						}
 
 						if (ah_read_recent_measurement(
@@ -1205,16 +1211,19 @@ sub __update_false_positives
 
 		dbg("auditlog: service:$service eventid:$eventid start:[".ts_str($event_clock)."] changed:[".ts_str($clock)."] false_positive:$false_positive");
 
-		unless (ah_save_false_positive(AH_SLA_API_VERSION_1, $tld, $service, $eventid, $event_clock,
-				$false_positive, $clock, \$later) == AH_SUCCESS)
+		if ($service ne 'rdap')
 		{
-			if ($later == 1)
+			unless (ah_save_false_positive(AH_SLA_API_VERSION_1, $tld, $service, $eventid, $event_clock,
+					$false_positive, $clock, \$later) == AH_SUCCESS)
 			{
-				wrn(ah_get_error());
-			}
-			else
-			{
-				fail("cannot update false_positive state: ", ah_get_error());
+				if ($later == 1)
+				{
+					wrn(ah_get_error());
+				}
+				else
+				{
+					fail("cannot update false_positive state: ", ah_get_error());
+				}
 			}
 		}
 
