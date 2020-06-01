@@ -112,12 +112,20 @@ Summary:			Zabbix web frontend common package
 Group:				Application/Internet
 BuildArch:			noarch
 Requires:			nginx
-Requires:			php-fpm >= 5.4
-Requires:			php-gd
-Requires:			php-bcmath
-Requires:			php-mbstring
-Requires:			php-xml
-Requires:			php-ldap
+Requires:			php-gd >= 7.2
+Requires:			php-bcmath >= 7.2
+Requires:			php-mbstring >= 7.2
+Requires:			php-xml >= 7.2
+Requires:			php-ldap >= 7.2
+Requires:			php-json >= 7.2
+Requires:			php-fpm >= 7.2
+Requires:			rh-php72
+Requires:			rh-php72-php-gd
+Requires:			rh-php72-php-bcmath
+Requires:			rh-php72-php-mbstring
+Requires:			rh-php72-php-xml
+Requires:			rh-php72-php-ldap
+Requires:			rh-php72-php-fpm
 Requires:			dejavu-sans-fonts
 Requires:			zabbix-web-database = %{version}-%{release}
 Requires(post):		%{_sbindir}/update-alternatives
@@ -130,7 +138,7 @@ Zabbix web frontend common package.
 Summary:			Zabbix web frontend for MySQL
 Group:				Applications/Internet
 BuildArch:			noarch
-Requires:			php-mysqlnd
+Requires:			rh-php72-php-mysqlnd
 Requires:			zabbix-web = %{version}-%{release}
 Provides:			zabbix-web-database = %{version}-%{release}
 
