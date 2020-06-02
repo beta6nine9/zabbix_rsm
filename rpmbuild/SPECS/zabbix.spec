@@ -14,8 +14,15 @@ Source11:	zabbix-server.service
 Source12:	zabbix-proxy.service
 Source15:	zabbix-tmpfiles.conf
 Source16:	partitioning.sql
+%if 0%{?rhel} >= 8
 Source17:	zbx_vhost.conf
 Source18:	zbx_php.conf
+%else
+# CentOS 7 specifics start
+Source17:	zbx_vhost-rh-php73.conf
+Source18:	zbx_php-rh-php73.conf
+# CentOS 7 specifics end
+%endif
 Source19:	nginx.conf
 Source20:	rsyslog.d-rsm.slv.conf
 Source21:	zabbix_server.conf
@@ -112,16 +119,34 @@ Summary:			Zabbix web frontend common package
 Group:				Application/Internet
 BuildArch:			noarch
 Requires:			nginx
-# CentOS 7 specific names start
+%if 0%{?rhel} >= 8
+Requires:			php-gd >= 7.2
+Requires:			php-bcmath >= 7.2
+Requires:			php-mbstring >= 7.2
+Requires:			php-xml >= 7.2
+Requires:			php-ldap >= 7.2
+Requires:			php-json >= 7.2
+Requires:			php-fpm >= 7.2
+%else
+# CentOS 7 specifics start
 Requires:			centos-release-scl
-Requires:			rh-php72
-Requires:			rh-php72-php-gd
-Requires:			rh-php72-php-bcmath
-Requires:			rh-php72-php-mbstring
-Requires:			rh-php72-php-xml
-Requires:			rh-php72-php-ldap
-Requires:			rh-php72-php-fpm
-# CentOS 7 specific names end
+Requires:			rh-php73
+Requires:			rh-php73-php-gd
+Requires:			rh-php73-php-bcmath
+Requires:			rh-php73-php-mbstring
+Requires:			rh-php73-php-xml
+Requires:			rh-php73-php-ldap
+Requires:			rh-php73-php-json
+Requires:			rh-php73-php-fpm
+Obsoletes:			php-gd
+Obsoletes:			php-bcmath
+Obsoletes:			php-mbstring
+Obsoletes:			php-xml
+Obsoletes:			php-ldap
+Obsoletes:			php-json
+Obsoletes:			php-fpm
+# CentOS 7 specifics end
+%endif
 Requires:			dejavu-sans-fonts
 Requires:			zabbix-web-database = %{version}-%{release}
 Requires(post):		%{_sbindir}/update-alternatives
@@ -134,9 +159,14 @@ Zabbix web frontend common package.
 Summary:			Zabbix web frontend for MySQL
 Group:				Applications/Internet
 BuildArch:			noarch
-# CentOS 7 specific names start
-Requires:			rh-php72-php-mysqlnd
-# CentOS 7 specific names end
+%if 0%{?rhel} >= 8
+Requires:			php-mysqlnd
+%else
+# CentOS 7 specifics start
+Requires:			rh-php73-php-mysqlnd
+Obsoletes:			php-mysqlnd
+# CentOS 7 specifics end
+%endif
 Requires:			zabbix-web = %{version}-%{release}
 Provides:			zabbix-web-database = %{version}-%{release}
 
@@ -279,7 +309,13 @@ mv $RPM_BUILD_ROOT%{_datadir}/zabbix/conf/maintenance.inc.php $RPM_BUILD_ROOT%{_
 
 # drop config files in place
 install -Dm 0644 -p %{SOURCE17} $RPM_BUILD_ROOT%{_sysconfdir}/nginx/conf.d/zbx_vhost.conf
+%if 0%{?rhel} >= 8
 install -Dm 0644 -p %{SOURCE18} $RPM_BUILD_ROOT%{_sysconfdir}/php-fpm.d/zabbix.conf
+%else
+# CentOS 7 specifics start
+install -Dm 0644 -p %{SOURCE18} $RPM_BUILD_ROOT%{_sysconfdir}/opt/rh/rh-php73/php-fpm.d/zabbix.conf
+# CentOS 7 specifics end
+%endif
 
 # install configuration files
 mv $RPM_BUILD_ROOT%{_sysconfdir}/zabbix/zabbix_proxy.conf.d $RPM_BUILD_ROOT%{_sysconfdir}/zabbix/zabbix_proxy.d
@@ -526,7 +562,13 @@ systemctl restart rsyslog
 %ghost %attr(0644,nginx,nginx) %config(noreplace) %{_sysconfdir}/zabbix/web/zabbix.conf.php
 %config(noreplace) %{_sysconfdir}/zabbix/web/maintenance.inc.php
 %config(noreplace) %{_sysconfdir}/nginx/conf.d/zbx_vhost.conf
+%if 0%{?rhel} >= 8
 %config(noreplace) %{_sysconfdir}/php-fpm.d/zabbix.conf
+%else
+# CentOS 7 specifics start
+%config(noreplace) %{_sysconfdir}/opt/rh/rh-php73/php-fpm.d/zabbix.conf
+# CentOS 7 specifics end
+%endif
 %{_datadir}/zabbix
 
 %files web-mysql
