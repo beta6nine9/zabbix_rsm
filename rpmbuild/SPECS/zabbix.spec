@@ -163,6 +163,7 @@ BuildArch:			noarch
 Requires:			php-mysqlnd
 %else
 # CentOS 7 specifics start
+Requires:			centos-release-scl
 Requires:			rh-php73-php-mysqlnd
 Obsoletes:			php-mysqlnd
 # CentOS 7 specifics end
@@ -209,6 +210,7 @@ Requires:			perl-Devel-StackTrace
 Requires:			php-cli php-pdo php-mysqlnd php-xml
 %else
 # CentOS 7 specifics start
+Requires:			centos-release-scl
 Requires:			rh-php73-php-cli rh-php73-php-pdo rh-php73-php-mysqlnd rh-php73-php-xml
 # CentOS 7 specifics start
 %endif
