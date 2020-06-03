@@ -435,7 +435,7 @@ class RollingWeekStatusListAction extends Action {
 				}
 
 				// Use filter values to find matching hosts (TLDs/Registrars).
-				$data['tld'] = $this->getTLDs($data, $selected_groupids, $included_groupids, $db_nr, $key);
+				$data['tld'] += $this->getTLDs($data, $selected_groupids, $included_groupids, $db_nr, $key);
 			}
 			else {
 				// Get "TLDs" groups.
@@ -539,7 +539,7 @@ class RollingWeekStatusListAction extends Action {
 			}
 
 			if ($avail_items) {
-				$avail_items = API::Item()->get([
+				$db_avail_items = API::Item()->get([
 					'output' => ['itemid', 'hostid', 'key_'],
 					'hostids' => array_keys($hosts),
 					'filter' => [
@@ -587,13 +587,13 @@ class RollingWeekStatusListAction extends Action {
 					}
 				}
 
-				foreach ($avail_items as $item) {
+				foreach ($db_avail_items as $item) {
 					$hostid_key = $DB['SERVERS'][$key]['NR'].$item['hostid'];
 					$data['tld'][$hostid_key][$avail_type[$item['key_']]]['availItemId'] = $item['itemid'];
 					$itemIds[$item['itemid']] = true;
 				}
 
-				$items += $avail_items;
+				$items += $db_avail_items;
 
 				if ($data['filter_slv'] !== '') {
 					foreach ($filter_slv as $filtred_hostid => $value) {
