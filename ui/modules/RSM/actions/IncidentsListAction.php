@@ -1008,6 +1008,13 @@ class IncidentsListAction extends Action {
 
 		$this->sortResults($data);
 
+		$macros = API::UserMacro()->get([
+			'output' => ['macro', 'value'],
+			'filter' => ['macro' => RSM_ROLLWEEK_SECONDS],
+			'globalmacro' => true
+		]);
+		$data += array_column($macros, 'value', 'macro');
+
 		$response = new CControllerResponseData($data);
 		$response->setTitle($data['title']);
 		$this->setResponse($response);

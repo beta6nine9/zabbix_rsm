@@ -571,19 +571,34 @@ else {
 
 // Assemble everything together.
 $filter_url = (new CUrl($data['url'].'zabbix.php'))->setArgument('action', 'rsm.incidents');
+$filter_buttons = (new CDiv())
+	->addClass(ZBX_STYLE_FILTER_FORMS)
+	->addItem(
+		(new CSubmitButton(_('Set Rolling week'), 'filter_set', 1))
+			->onClick('$.publish("timeselector.rangechange", {from: "now-'.$data[RSM_ROLLWEEK_SECONDS].'", to: "now"}); return false')
+	)
+	->addItem(
+		(new CRedirectButton(_('Reset'),
+			(new CUrl())
+				->setArgument('filter_rst', 1)
+				->getUrl()
+		))
+			->addClass(ZBX_STYLE_BTN_ALT)
+	);
 
 (new CWidget())
 	->setTitle($data['title'])
 	->addItem((new CFilter($filter_url))
 		->setProfile($data['profileIdx'])
 		->setActiveTab($data['active_tab'])
+		->hideFilterButtons()
 		->addTimeSelector($data['from'], $data['to'])
 		->addFilterTab(_('Filter'), [(new CFormList())->addRow($object_label,
 			(new CTextBox('filter_search', $data['filter_search']))
 				->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH)
 				->setAttribute('autocomplete', 'off')
 			)
-		])
+	], $filter_buttons)
 		->addVar('action', 'rsm.incidents')
 	)
 	->addItem($info_block)
