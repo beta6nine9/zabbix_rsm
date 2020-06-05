@@ -421,7 +421,7 @@ if %{_sbindir}/selinuxenabled ; then
 fi
 
 %post web
-/usr/sbin/update-alternatives --install %{_datadir}/zabbix/fonts/graphfont.ttf \
+/usr/sbin/update-alternatives --install %{_datadir}/zabbix/assets/fonts/graphfont.ttf \
 	zabbix-web-font %{_datadir}/fonts/dejavu/DejaVuSans.ttf 10
 :
 
