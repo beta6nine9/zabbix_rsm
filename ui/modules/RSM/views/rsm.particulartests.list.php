@@ -262,54 +262,25 @@ foreach ($data['probes'] as $probe) {
 				$probe_no_result = true;
 			}
 			elseif ($probe['value'] == 0) {
-				$rdds43 = $down;
-				$rdds80 = $down;
 				$rdds = ZBX_STYLE_RED;
 				$probe_down = true;
 			}
 			elseif ($probe['value'] == 1) {
-				$rdds43 = $up;
-				$rdds80 = $up;
 				$rdds = ZBX_STYLE_GREEN;
 			}
-			elseif ($probe['value'] == 2) {
-				$rdds43 = $up;
-				$rdds80 = $down;
-				$rdds = ZBX_STYLE_RED;
-				$probe_down = true;
-			}
-			elseif ($probe['value'] == 3) {
+
+			if ($probe['rdds43']['status'] == 0) {
 				$rdds43 = $down;
-				$rdds80 = $up;
-				$rdds = ZBX_STYLE_RED;
-				$probe_down = true;
 			}
-			elseif ($probe['value'] == 4) {
-				$rdds43 = $down;
+			elseif ($probe['rdds43']['status'] == 1) {
+				$rdds43 = $up;
+			}
+
+			if ($probe['rdds80']['status'] == 0) {
 				$rdds80 = $down;
-				$rdds = ZBX_STYLE_RED;
-				$probe_down = true;
 			}
-			elseif ($probe['value'] == 5) {
-				$rdds43 = $no_result;
+			elseif ($probe['rdds80']['status'] == 1) {
 				$rdds80 = $up;
-				$rdds = ZBX_STYLE_RED;
-				$probe_down = true;
-			}
-			elseif ($probe['value'] == 6) {
-				$rdds43 = $up;
-				$rdds80 = $no_result;
-				$rdds = ZBX_STYLE_RED;
-				$probe_down = true;
-			}
-			elseif ($probe['value'] == 7) {
-				$rdds43 = $up;
-				$rdds80 = $up;
-				$rdds = ZBX_STYLE_RED;
-				$probe_down = true;
-			}
-			else {
-				$rdds = ZBX_STYLE_GREY;
 			}
 
 			if (isset($data['tld']['macros'][RSM_RDAP_TLD_ENABLED])

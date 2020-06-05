@@ -763,6 +763,7 @@ sub get_probes(;$$)
 
 	return $probes_cache{$server_key}{$name}{$service};
 }
+
 sub __get_probes($)
 {
 	my $name = shift;

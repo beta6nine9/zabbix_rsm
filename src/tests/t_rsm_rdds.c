@@ -5,7 +5,7 @@
 #define DEFAULT_TESTPREFIX	"whois.nic"
 #define DEFAULT_MAXREDIRS	10
 #define DEFAULT_RDDS_NS_STRING	"Name Server:"
-#define DEFAULT_RTT_LIMIT	20
+#define DEFAULT_RTT_LIMIT	2000
 
 #define LOG_FILE1	"test1.log"
 #define LOG_FILE2	"test2.log"
@@ -46,7 +46,8 @@ int	main(int argc, char *argv[])
 	ldns_resolver		*res = NULL;
 	zbx_resolver_error_t	ec_res;
 	int			c, index, i, rtt43 = ZBX_NO_VALUE, rtt80 = ZBX_NO_VALUE, upd43 = ZBX_NO_VALUE,
-				maxredirs = DEFAULT_MAXREDIRS, log_to_file = 0, ipv_flags = 0, curl_flags = 0;
+				maxredirs = DEFAULT_MAXREDIRS, log_to_file = 0, ipv_flags = 0, curl_flags = 0,
+				rdds43_status, rdds80_status, rdds_status;
 	zbx_vector_str_t	ips43, nss;
 	zbx_http_error_t	ec_http;
 	FILE			*log_fd = stdout;
@@ -244,8 +245,26 @@ int	main(int argc, char *argv[])
 			goto out;
 	}
 
-	create_rsm_rdds_json(&json, ip43, rtt43, upd43, target43, testedname43, ip80, rtt80, target80,
-			get_rdds_result(rtt43, rtt80, DEFAULT_RTT_LIMIT));
+	switch (zbx_subtest_result(rtt43, DEFAULT_RTT_LIMIT))
+	{
+		case ZBX_SUBTEST_SUCCESS:
+			rdds43_status = 1;	/* up */
+			break;
+		case ZBX_SUBTEST_FAIL:
+			rdds43_status = 0;	/* down */
+	}
+
+	switch (zbx_subtest_result(rtt80, DEFAULT_RTT_LIMIT))
+	{
+		case ZBX_SUBTEST_SUCCESS:
+			rdds80_status = 1;	/* up */
+			break;
+		case ZBX_SUBTEST_FAIL:
+			rdds80_status = 0;	/* down */
+	}
+
+	create_rdds_json(&json, ip43, rtt43, upd43, target43, testedname43, ip80, rtt80, target80,
+			rdds43_status, rdds80_status, (rdds43_status && rdds80_status));
 
 	printf("OK (RTT43:%d RTT80:%d)\n", rtt43, rtt80);
 	printf("OK, json: %s\n", json.buffer);

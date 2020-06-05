@@ -176,4 +176,4 @@ foreach my $service (sort(keys(%{$services})))
 	}
 }
 
-print("All tests successful.\n");
+print("OK: function RSMSLV::probe_results() is working correctly.\n");

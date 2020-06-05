@@ -227,9 +227,9 @@ int	main(int argc, char *argv[])
 	nss[0].ips[0].nsid = zbx_strdup(NULL, nsid);
 	nss[0].ips[0].upd = upd_unpacked;
 
-	set_nss_results(nss, nss_num, DEFAULT_RTT_LIMIT, 2, &nssok, &test_status);
+	set_dns_test_results(nss, nss_num, DEFAULT_RTT_LIMIT, 2, &nssok, &test_status);
 
-	create_rsm_dns_json(&json, nss, nss_num, CURRENT_MODE_NORMAL, nssok, test_status, proto, testedname);
+	create_dns_json(&json, nss, nss_num, CURRENT_MODE_NORMAL, nssok, test_status, proto, testedname);
 
 	printf("OK (RTT:%d)\n", rtt_unpacked);
 	printf("OK (NSID:%s)\n", nsid);

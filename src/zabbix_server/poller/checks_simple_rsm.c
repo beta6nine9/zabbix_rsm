@@ -2171,7 +2171,7 @@ static FILE	*open_item_log(const char *host, const char *tld, const char *name, 
 	return fd;
 }
 
-static void	set_nss_results(zbx_ns_t *nss, size_t nss_num, int rtt_limit, unsigned int minns, unsigned int *nssok,
+static void	set_dns_test_results(zbx_ns_t *nss, size_t nss_num, int rtt_limit, unsigned int minns, unsigned int *nssok,
 		unsigned int *status)
 {
 	size_t	i, j;
@@ -2194,7 +2194,7 @@ static void	set_nss_results(zbx_ns_t *nss, size_t nss_num, int rtt_limit, unsign
 	*status = (*nssok >= minns ? 1 : 0);
 }
 
-static void	create_rsm_dns_json(struct zbx_json *json, zbx_ns_t *nss, size_t nss_num, unsigned int current_mode,
+static void	create_dns_json(struct zbx_json *json, zbx_ns_t *nss, size_t nss_num, unsigned int current_mode,
 		unsigned int nssok, unsigned int status, char protocol, const char *testedname)
 {
 	size_t	i, j;
@@ -2405,15 +2405,11 @@ static int	update_metadata(int file_exists, const char *domain, unsigned int tes
 
 			return delete_metadata(domain, err, err_size);
 		}
-		else
-		{
-			return SUCCEED;
-		}
+
+		return SUCCEED;
 	}
-	else
-	{
-		return write_metadata(domain, *current_mode, *successful_tests, err, err_size);
-	}
+
+	return write_metadata(domain, *current_mode, *successful_tests, err, err_size);
 }
 
 int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *result)
@@ -2512,7 +2508,8 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 			tcp_ratio,
 			minns,
 			successful_tests,
-			test_recover);
+			test_recover_udp,
+			test_recover_tcp);
 
 	extras = (dnssec_enabled ? RESOLVER_EXTRAS_DNSSEC : RESOLVER_EXTRAS_NONE);
 
@@ -2735,9 +2732,9 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 		zbx_free(threads);
 	}
 
-	set_nss_results(nss, nss_num, rtt_limit, minns, &nssok, &test_status);
+	set_dns_test_results(nss, nss_num, rtt_limit, minns, &nssok, &test_status);
 
-	create_rsm_dns_json(&json, nss, nss_num, current_mode, nssok, test_status, protocol, testedname);
+	create_dns_json(&json, nss, nss_num, current_mode, nssok, test_status, protocol, testedname);
 
 	if (SUCCEED != update_metadata(file_exists, domain, test_status, test_recover, protocol, &current_mode,
 			&successful_tests, log_fd, err, sizeof(err)))
@@ -3383,12 +3380,6 @@ out:
 	return ret;
 }
 
-				/* "RSM RDDS result" value mapping: */
-#define RDDS_DOWN	0	/* Down */
-#define RDDS_UP		1	/* Up */
-#define RDDS_ONLY43	2	/* RDDS43 only */
-#define RDDS_ONLY80	3	/* RDDS80 only */
-
 static int	zbx_ec_noerror(int ec)
 {
 	if (0 <= ec || ZBX_NO_VALUE == ec)
@@ -3534,9 +3525,9 @@ static int	zbx_split_url(const char *url, char **proto, char **domain, int *port
 	return SUCCEED;
 }
 
-static void	create_rsm_rdds_json(struct zbx_json *json, const char *ip43, int rtt43, int upd43,
+static void	create_rdds_json(struct zbx_json *json, const char *ip43, int rtt43, int upd43,
 		const char *target43, const char *testedname43, const char *ip80, int rtt80, const char *target80,
-		int status)
+		int rdds43_status, int rdds80_status, int rdds_status)
 {
 	zbx_json_init(json, 2 * ZBX_KIBIBYTE);
 
@@ -3551,6 +3542,7 @@ static void	create_rsm_rdds_json(struct zbx_json *json, const char *ip43, int rt
 		zbx_json_addstring(json, "target", target43, ZBX_JSON_TYPE_STRING);
 	if (0 != strcmp(testedname43, ""))
 		zbx_json_addstring(json, "testedname", testedname43, ZBX_JSON_TYPE_STRING);
+	zbx_json_addint64(json, "status", rdds43_status);
 
 	zbx_json_close(json);
 
@@ -3561,35 +3553,11 @@ static void	create_rsm_rdds_json(struct zbx_json *json, const char *ip43, int rt
 		zbx_json_addstring(json, "ip", ip80, ZBX_JSON_TYPE_STRING);
 	if (NULL != target80)
 		zbx_json_addstring(json, "target", target80, ZBX_JSON_TYPE_STRING);
+	zbx_json_addint64(json, "status", rdds80_status);
 
 	zbx_json_close(json);
 
-	zbx_json_addint64(json, "status", status);
-}
-
-static int	get_rdds_result(int rtt43, int rtt80, int rtt_limit)
-{
-	int	rdds_result, rdds43, rdds80;
-
-	rdds43 = zbx_subtest_result(rtt43, rtt_limit);
-	rdds80 = zbx_subtest_result(rtt80, rtt_limit);
-
-	if (ZBX_SUBTEST_SUCCESS == rdds43)
-	{
-		if (ZBX_SUBTEST_SUCCESS == rdds80)
-			rdds_result = RDDS_UP;
-		else
-			rdds_result = RDDS_ONLY43;
-	}
-	else
-	{
-		if (ZBX_SUBTEST_SUCCESS == rdds80)
-			rdds_result = RDDS_ONLY80;
-		else
-			rdds_result = RDDS_DOWN;
-	}
-
-	return rdds_result;
+	zbx_json_addint64(json, "status", rdds_status);
 }
 
 int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *result)
@@ -3822,8 +3790,28 @@ end:
 
 	if (SYSINFO_RET_OK == ret && 0 != rdds_enabled)
 	{
-		create_rsm_rdds_json(&json, ip43, rtt43, upd43, target43, testedname43, ip80, rtt80, target80,
-				get_rdds_result(rtt43, rtt80, rtt_limit));
+		int	rdds43_status, rdds80_status;
+
+		switch (zbx_subtest_result(rtt43, rtt_limit))
+		{
+			case ZBX_SUBTEST_SUCCESS:
+				rdds43_status = 1;	/* up */
+				break;
+			case ZBX_SUBTEST_FAIL:
+				rdds43_status = 0;	/* down */
+		}
+
+		switch (zbx_subtest_result(rtt80, rtt_limit))
+		{
+			case ZBX_SUBTEST_SUCCESS:
+				rdds80_status = 1;	/* up */
+				break;
+			case ZBX_SUBTEST_FAIL:
+				rdds80_status = 0;	/* down */
+		}
+
+		create_rdds_json(&json, ip43, rtt43, upd43, target43, testedname43, ip80, rtt80, target80,
+				rdds43_status, rdds80_status, (rdds43_status && rdds80_status));
 
 		SET_STR_RESULT(result, zbx_strdup(NULL, json.buffer));
 
@@ -3854,7 +3842,7 @@ out:
 	return ret;
 }
 
-static void	create_rsm_rdap_json(struct zbx_json *json, const char *ip, int rtt, const char *target,
+static void	create_rdap_json(struct zbx_json *json, const char *ip, int rtt, const char *target,
 		const char *testedname, int status)
 {
 	zbx_json_init(json, 2 * ZBX_KIBIBYTE);
@@ -4063,7 +4051,7 @@ end:
 				subtest_result = 0;	/* down */
 		}
 
-		create_rsm_rdap_json(&json, ip, rtt, base_url, testedname, subtest_result);
+		create_rdap_json(&json, ip, rtt, base_url, testedname, subtest_result);
 
 		SET_STR_RESULT(result, zbx_strdup(NULL, json.buffer));
 

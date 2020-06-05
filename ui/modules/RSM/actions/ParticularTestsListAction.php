@@ -513,7 +513,7 @@ class ParticularTestsListAction extends Action {
 				$items_to_check[] = PROBE_RDAP_RTT;
 				$items_to_check[] = PROBE_RDAP_TARGET;
 				$items_to_check[] = PROBE_RDAP_TESTEDNAME;
-				$probe_item_key[] = 'i.key_ LIKE ('.zbx_dbstr(PROBE_RDAP_ITEM.'%').')';
+				$items_to_check[] = PROBE_RDAP_STATUS;
 			}
 
 			if ($items_to_check) {
@@ -532,7 +532,7 @@ class ParticularTestsListAction extends Action {
 				$items_to_check[] = PROBE_RDAP_RTT;
 				$items_to_check[] = PROBE_RDAP_TARGET;
 				$items_to_check[] = PROBE_RDAP_TESTEDNAME;
-				$probe_item_key[] = 'i.key_ LIKE ('.zbx_dbstr(PROBE_RDAP_ITEM.'%').')';
+				$items_to_check[] = PROBE_RDAP_STATUS;
 			}
 
 			if (!isset($data['tld']['macros'][RSM_TLD_RDDS_ENABLED]) || $data['tld']['macros'][RSM_TLD_RDDS_ENABLED] != 0) {
@@ -540,10 +540,12 @@ class ParticularTestsListAction extends Action {
 				$items_to_check[] = PROBE_RDDS43_RTT;
 				$items_to_check[] = PROBE_RDDS43_TARGET;
 				$items_to_check[] = PROBE_RDDS43_TESTEDNAME;
+				$items_to_check[] = PROBE_RDDS43_STATUS;
 				$items_to_check[] = PROBE_RDDS80_IP;
 				$items_to_check[] = PROBE_RDDS80_RTT;
 				$items_to_check[] = PROBE_RDDS80_TARGET;
-				$probe_item_key[] = 'i.key_ LIKE ('.zbx_dbstr(PROBE_RDDS_ITEM.'%').')';
+				$items_to_check[] = PROBE_RDDS80_STATUS;
+				$items_to_check[] = PROBE_RDDS_STATUS;
 			}
 
 			if ($items_to_check) {
@@ -659,10 +661,10 @@ class ParticularTestsListAction extends Action {
 							];
 						}
 					}
-					elseif (substr($item['key_'], 0, strlen(PROBE_RDAP_ITEM)) === PROBE_RDAP_ITEM) {
+					elseif (substr($item['key_'], 0, strlen(PROBE_RDAP_STATUS)) === PROBE_RDAP_STATUS) {
 						$hosts[$item['hostid']]['value_rdap'] = $itemValue['value'];
 					}
-					elseif (substr($item['key_'], 0, strlen(PROBE_RDDS_ITEM)) === PROBE_RDDS_ITEM) {
+					elseif (substr($item['key_'], 0, strlen(PROBE_RDDS_STATUS)) === PROBE_RDDS_STATUS) {
 						$hosts[$item['hostid']]['value'] = $itemValue['value'];
 					}
 					elseif ($item['key_'] == PROBE_RDDS43_TESTEDNAME) {
@@ -671,8 +673,14 @@ class ParticularTestsListAction extends Action {
 					elseif ($item['key_'] == PROBE_RDDS43_TARGET) {
 						$hosts[$item['hostid']]['rdds43']['target'] = $itemValue['value'];
 					}
+					elseif ($item['key_'] == PROBE_RDDS43_STATUS) {
+						$hosts[$item['hostid']]['rdds43']['status'] = $itemValue['value'];
+					}
 					elseif ($item['key_'] == PROBE_RDDS80_TARGET) {
 						$hosts[$item['hostid']]['rdds80']['target'] = $itemValue['value'];
+					}
+					elseif ($item['key_'] == PROBE_RDDS80_STATUS) {
+						$hosts[$item['hostid']]['rdds80']['status'] = $itemValue['value'];
 					}
 					elseif ($item['key_'] == PROBE_RDAP_TESTEDNAME) {
 						$hosts[$item['hostid']]['rdap']['testedname'] = $itemValue['value'];
