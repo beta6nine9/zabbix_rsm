@@ -2376,7 +2376,9 @@ static int	update_metadata(int file_exists, const char *domain, unsigned int tes
 				*successful_tests = 0;
 				*current_mode = CURRENT_MODE_NORMAL;
 
-				rsm_info(log_fd, "mode changed from critical to normal");
+				rsm_info(log_fd, "mode changed from critical back to normal for the TLD or Registrar"
+						" due to no errors in the authoritative server tests"
+						", will continue using transport protocol according to the algorithm");
 			}
 		}
 	}
@@ -2391,7 +2393,8 @@ static int	update_metadata(int file_exists, const char *domain, unsigned int tes
 					? CURRENT_MODE_CRITICAL_UDP
 					: CURRENT_MODE_CRITICAL_TCP);
 
-			rsm_infof(log_fd, "mode changed from normal to critical, will continue using %s protocol",
+			rsm_infof(log_fd, "mode changed from normal to critical for the TLD or Registrar due to errors"
+					" in the authoritative server tests, will continue using %s protocol",
 					(RSM_UDP == protocol ? "UDP" : "TCP"));
 		}
 	}
@@ -2500,13 +2503,15 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 
 	rsm_info(log_fd, "START TEST");
 
-	rsm_infof(log_fd, "mode: %s, protocol: %s, rtt limit: %d, tcp ratio: %d, minns: %u"
-			" (for critical mode: successful: %d, required for recovery: %d for udp, %d for tcp)",
+	rsm_infof(log_fd, "mode: %s, protocol: %s, rtt limit: %d, tcp ratio: %d, minns: %u, UDP: %d, TCP: %d"
+			" (for critical mode: successful: %d, required for recovery: %d for UDP, %d for TCP)",
 			(CURRENT_MODE_NORMAL == current_mode ? "normal" : "critical"),
 			(protocol == RSM_UDP ? "UDP" : "TCP"),
 			rtt_limit,
 			tcp_ratio,
 			minns,
+			udp_enabled,
+			tcp_enabled,
 			successful_tests,
 			test_recover_udp,
 			test_recover_tcp);
