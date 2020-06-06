@@ -30,7 +30,6 @@ Source22:	zabbix_proxy_common.conf
 Source23:	zabbix_proxy_N.conf
 Source24:	zabbix-slv-logrotate
 Patch0:		config.patch
-Patch1:		fonts-config.patch
 Patch2:		fping3-sourceip-option.patch
 
 Buildroot:	%{_tmppath}/zabbix-%{version}-%{release}-root-%(%{__id_u} -n)
@@ -229,10 +228,16 @@ Zabbix js command line utility.
 %prep
 %setup0 -q -n zabbix-%{version}%{?rsmprereleasetag:%{rsmprereleasetag}}
 %patch0 -p1
-%patch1 -p1
 %patch2 -p1
 
 cp -r %{SOURCE1}/ ./
+
+## remove font file
+rm -f ui/assets/fonts/DejaVuSans.ttf
+
+# replace font in defines.inc.php
+sed -i -r "s/(define\(.*_FONT_NAME.*)DejaVuSans/\1graphfont/" \
+	ui/include/defines.inc.php
 
 # traceroute command path for global script
 sed -i -e 's|/usr/bin/traceroute|/bin/traceroute|' database/mysql/data.sql
@@ -421,6 +426,22 @@ if %{_sbindir}/selinuxenabled ; then
 fi
 
 %post web
+# The fonts directory was moved into assets subdirectory at one point.
+#
+# This broke invocation of update-alternatives command below, because the target link for zabbix-web-font changed
+# from zabbix/fonts/graphfont.ttf to zabbix/assets/fonts/graphfont.ttf
+#
+# We handle this movement by deleting /var/lib/alternatives/zabbix-web-font file if it contains the old target link.
+# We also remove symlink at zabbix/fonts/graphfont.ttf to have the old fonts directory be deleted during update.
+if [ -f /var/lib/alternatives/zabbix-web-font ] && \
+	   [ -z "$(grep %{_datadir}/zabbix/assets/fonts/graphfont.ttf /var/lib/alternatives/zabbix-web-font)" ]
+then
+	rm /var/lib/alternatives/zabbix-web-font
+	if [ -h %{_datadir}/zabbix/fonts/graphfont.ttf ]; then
+		rm %{_datadir}/zabbix/fonts/graphfont.ttf
+	fi
+fi
+
 /usr/sbin/update-alternatives --install %{_datadir}/zabbix/assets/fonts/graphfont.ttf \
 	zabbix-web-font %{_datadir}/fonts/dejavu/DejaVuSans.ttf 10
 :
