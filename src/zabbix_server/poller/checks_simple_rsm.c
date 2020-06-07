@@ -2376,7 +2376,7 @@ static int	update_metadata(int file_exists, const char *domain, unsigned int tes
 				*successful_tests = 0;
 				*current_mode = CURRENT_MODE_NORMAL;
 
-				rsm_info(log_fd, "mode changed from critical back to normal for the TLD or Registrar"
+				rsm_info(log_fd, "mode changed from critical back to normal for the TLD"
 						" due to no errors in the authoritative server tests"
 						", will continue using transport protocol according to the algorithm");
 			}
@@ -2393,7 +2393,7 @@ static int	update_metadata(int file_exists, const char *domain, unsigned int tes
 					? CURRENT_MODE_CRITICAL_UDP
 					: CURRENT_MODE_CRITICAL_TCP);
 
-			rsm_infof(log_fd, "mode changed from normal to critical for the TLD or Registrar due to errors"
+			rsm_infof(log_fd, "mode changed from normal to critical for the TLD due to errors"
 					" in the authoritative server tests, will continue using %s protocol",
 					(RSM_UDP == protocol ? "UDP" : "TCP"));
 		}
