@@ -27,19 +27,22 @@ use CArrayHelper;
 use CWebUser;
 use CControllerResponseFatal;
 use CControllerResponseData;
+use CControllerResponseRedirect;
+use Modules\RSM\Helpers\UrlHelper;
 
 class IncidentsListAction extends Action {
 
 	protected function checkInput() {
 		$fields = [
-			'host'			=>	'db hosts.host',
-			'eventid'		=>	'db events.eventid',
-			'type'			=>	'in '.implode(',', [RSM_DNS, RSM_DNSSEC, RSM_RDDS, RSM_RDAP, RSM_EPP]),
-			'filter_set'	=>	'in 1',
-			'filter_rst'	=>	'in 1',
-			'filter_search' =>	'db hosts.host',
-			'from'			=>	'string',
-			'to'			=>	'string'
+			'host'			=> 'db hosts.host',
+			'eventid'		=> 'db events.eventid',
+			'type'			=> 'in '.implode(',', [RSM_DNS, RSM_DNSSEC, RSM_RDDS, RSM_RDAP, RSM_EPP]),
+			'filter_set'	=> 'in 1',
+			'filter_rst'	=> 'in 1',
+			'filter_search' => 'db hosts.host',
+			'rolling_week'  => 'in 1',
+			'from'			=> 'string',
+			'to'			=> 'string',
 		];
 
 		$ret = $this->validateInput($fields);
@@ -936,10 +939,33 @@ class IncidentsListAction extends Action {
 	protected function doAction() {
 		global $DB;
 
+		if ($this->hasInput('rolling_week')) {
+			$data = $this->getInputAll();
+			unset($data['rolling_week']);
+			$macros = API::UserMacro()->get([
+				'output' => ['macro', 'value'],
+				'filter' => ['macro' => RSM_ROLLWEEK_SECONDS],
+				'globalmacro' => true
+			]);
+			$macros = array_column($macros, 'value', 'macro');
+			$timeshift = ($macros[RSM_ROLLWEEK_SECONDS]%SEC_PER_DAY)
+					? $macros[RSM_ROLLWEEK_SECONDS]
+					: ($macros[RSM_ROLLWEEK_SECONDS]/SEC_PER_DAY).'d';
+			$data['from'] = 'now-'.$timeshift;
+			$data['to'] = 'now';
+			$response = new CControllerResponseRedirect(UrlHelper::get($this->getAction(), $data));
+			CProfile::update('web.rsm.incidents.filter.active', 2, PROFILE_TYPE_INT);
+			$this->setResponse($response);
+
+			return;
+		}
+
 		$data = [
 			'title' => _('Incidents'),
+			'ajax_request' => $this->isAjaxRequest(),
+			'refresh' => CWebUser::$data['refresh'] ? timeUnitToSeconds(CWebUser::$data['refresh']) : null,
 			'assets_path' => $this->assets_path,
-			'type' => $this->getInput('type', get_cookie('ui-tabs-1', 0)),
+			'type' => $this->getInput('type', 0),
 			'host' => $this->getInput('host', false),
 			'tld' => null,
 			'url' => '',
@@ -950,8 +976,17 @@ class IncidentsListAction extends Action {
 			'from' => $this->hasInput('from') ? $this->getInput('from') : null,
 			'to' => $this->hasInput('to') ? $this->getInput('to') : null,
 			'active_tab' => CProfile::get('web.rsm.incidents.filter.active', 1),
+			'incidents_tab' => (int) get_cookie('incidents_tab', 0),
 			'sid' => CWebUser::getSessionCookie()
 		];
+
+		if (!$this->isAjaxRequest() && $this->hasInput('type')) {
+			$tabs_map = (get_rsm_monitoring_type() === MONITORING_TARGET_REGISTRAR)
+				? [RSM_RDDS, RSM_RDAP]
+				: [RSM_DNS, RSM_DNSSEC, RSM_RDDS, RSM_EPP, RSM_RDAP];
+			$data['incidents_tab'] = (int) array_search($this->getInput('type'), $tabs_map);
+			setcookie('incidents_tab', $data['incidents_tab']);
+		}
 
 		$this->readValues($data);
 
@@ -1007,13 +1042,6 @@ class IncidentsListAction extends Action {
 		}
 
 		$this->sortResults($data);
-
-		$macros = API::UserMacro()->get([
-			'output' => ['macro', 'value'],
-			'filter' => ['macro' => RSM_ROLLWEEK_SECONDS],
-			'globalmacro' => true
-		]);
-		$data += array_column($macros, 'value', 'macro');
 
 		$response = new CControllerResponseData($data);
 		$response->setTitle($data['title']);

@@ -846,7 +846,10 @@ class RollingWeekStatusListAction extends Action {
 	protected function doAction() {
 		global $DB;
 
-		$data = [];
+		$data = [
+			'ajax_request' => $this->isAjaxRequest(),
+			'refresh' => CWebUser::$data['refresh'] ? timeUnitToSeconds(CWebUser::$data['refresh']) : null,
+		];
 		$data['rsm_monitoring_mode'] = get_rsm_monitoring_type();
 		$data['title'] = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR)
 			? _('Registrar rolling week status')

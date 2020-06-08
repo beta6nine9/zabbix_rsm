@@ -20,6 +20,7 @@
 
 
 use Modules\RSM\Helpers\UrlHelper as URL;
+use Modules\RSM\Helpers\DynamicContent;
 $this->includeJSfile('rsm.rollingweekstatus.list.js.php');
 
 // Build filter.
@@ -274,10 +275,10 @@ if ($data['tld']) {
 				? (new CLink(
 					$tld[RSM_DNS]['lastvalue'].'%',
 					Url::getFor($tld['url'], 'rsm.incidents', [
-						'filter_rolling_week' => 1,
-						'filter_set' => 1,
-						'type' => RSM_DNS,
 						'host' => $tld['host'],
+						'type' => RSM_DNS,
+						'rolling_week' => 1,
+						'filter_set' => 1,
 					])
 				))->addClass('first-cell-value')
 				: (new CSpan('0.000%'))->addClass('first-cell-value');
@@ -334,7 +335,7 @@ if ($data['tld']) {
 						Url::getFor($tld['url'], 'rsm.incidents', [
 							'host' => $tld['host'],
 							'type' => RSM_DNSSEC,
-							'filter_rolling_week' => 1,
+							'rolling_week' => 1,
 							'filter_set' => 1,
 						])
 				))->addClass('first-cell-value')
@@ -391,7 +392,7 @@ if ($data['tld']) {
 					Url::getFor($tld['url'], 'rsm.incidents', [
 						'host' => $tld['host'],
 						'type' => RSM_RDDS,
-						'filter_rolling_week' => 1,
+						'rolling_week' => 1,
 						'filter_set' => 1,
 					])
 				))->addClass('first-cell-value')
@@ -463,8 +464,8 @@ if ($data['tld']) {
 					Url::getFor($tld['url'], 'rsm.incidents', [
 						'host' => $tld['host'],
 						'type' => RSM_RDAP,
+						'rolling_week' => 1,
 						'filter_set' => 1,
-						'filter_rolling_week' => 1,
 					])
 				))->addClass('first-cell-value')
 				: (new CSpan('0.000%'))->addClass('first-cell-value');
@@ -520,7 +521,7 @@ if ($data['tld']) {
 					Url::getFor($tld['url'], 'rsm.incidents', [
 						'host' => $tld['host'],
 						'type' => RSM_EPP,
-						'filter_rolling_week' => 1,
+						'rolling_week' => 1,
 						'filter_set' => 1,
 					])
 				))->addClass('first-cell-value')
@@ -556,6 +557,14 @@ if ($data['tld']) {
 	}
 }
 
+if ($data['ajax_request']) {
+	$dynamic_node = new CDiv([$table, $data['paging']]);
+}
+else {
+	$dynamic_node = new DynamicContent([$table, $data['paging']]);
+	$dynamic_node->refresh_seconds = $data['refresh'];
+}
+
 $widget = (new CWidget())
 	->setTitle($data['title'])
 	->addItem(
@@ -570,7 +579,7 @@ $widget = (new CWidget())
 	)
 	->addItem(
 		(new CForm())
-			->addItem([$table, $data['paging']])
+			->addItem($dynamic_node->setId('rollingweek'))
 			->setName('rollingweek')
 	)
 	->addItem(

@@ -36,8 +36,12 @@ class Navigation {
 		}
 
 		if (in_array('rsm.incidents', $this->actions)) {
+			$url = (new CUrl('zabbix.php'))
+				->setArgument('filter_rst', '1')
+				->setArgument('action', 'rsm.incidents')
+				->setArgument('rolling_week', 1);
 			$menu[] = (new CMenuItem(_('Incidents')))
-				->setAction('rsm.incidents')
+				->setUrl($url, 'rsm.incidents')
 				->setAliases([
 					'rsm.incidents', 'rsm.incidentdetails', 'rsm.tests',
 					'rsm.particulartests', 'rsm.particularproxys', 'rsm.aggregatedetails'

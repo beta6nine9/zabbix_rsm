@@ -37,6 +37,13 @@ class Action extends CAction {
 	}
 
 	/**
+	 * Check request is made via ajax.
+	 */
+	public function isAjaxRequest(): bool {
+		return strtolower($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'xmlhttprequest';
+	}
+
+	/**
 	 * Based on timestamp value stored in {$RSM.RDAP.STANDALONE}, check if RDAP at given time $timestamp is configured as
 	 * standalone service or as dependent sub-service of RDDS. It is expected that switch from RDAP as sub-service of RDDS
 	 * to RDAP as standalone service will be done only once and will never be switched back to initial state.

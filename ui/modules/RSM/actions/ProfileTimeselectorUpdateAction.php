@@ -19,8 +19,8 @@ class ProfileTimeselectorUpdateAction extends Action {
 
 		if (!$ret) {
 			$ret = in_array($this->getInput('idx'), [
-					'web.rsm.incidents.filter', 'web.rsm.incidentsdetails.filter']
-				) && $this->validateInputDateRange();
+					'web.rsm.incidents.filter', 'web.rsm.incidentsdetails.filter'
+				]) && $this->validateInputDateRange();
 		}
 
 		return $ret;

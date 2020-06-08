@@ -20,10 +20,8 @@
 
 
 use Modules\RSM\Helpers\UrlHelper as URL;
-// Load JS files.
-$this->addJsFile('flickerfreescreen.js');
-$this->addJsFile('gtlc.js');
-$this->addJsFile('class.calendar.js');
+use Modules\RSM\Helpers\DynamicContent;
+use Modules\RSM\Helpers\TabView;
 
 $object_label = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) ? _('Registrar ID') : _('TLD');
 
@@ -67,11 +65,9 @@ $headers = [
 ];
 
 if ($data['tld']) {
-	$tabs_map = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR)
-		? [RSM_RDDS, RSM_RDAP]
-		: [RSM_DNS, RSM_DNSSEC, RSM_RDDS, RSM_EPP, RSM_RDAP];
-
-	$incident_page = (new CTabView(['remember' => true]))->setSelected(array_search($data['type'], $tabs_map));
+	$incident_page = (new TabView(['remember' => true]))
+		->setCookieName('incidents_tab')
+		->setSelected($data['incidents_tab']);
 
 	// DNS
 	if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
@@ -573,18 +569,36 @@ else {
 $filter_url = (new CUrl($data['url'].'zabbix.php'))->setArgument('action', 'rsm.incidents');
 $filter_buttons = (new CDiv())
 	->addClass(ZBX_STYLE_FILTER_FORMS)
-	->addItem(
-		(new CSubmitButton(_('Set Rolling week'), 'filter_set', 1))
-			->onClick('$.publish("timeselector.rangechange", {from: "now-'.$data[RSM_ROLLWEEK_SECONDS].'", to: "now"}); return false')
-	)
+	->addItem((new CSubmitButton(_('Rolling week'), 'filter_set', 1)))
 	->addItem(
 		(new CRedirectButton(_('Reset'),
-			(new CUrl())
-				->setArgument('filter_rst', 1)
-				->getUrl()
+			Url::get('rsm.incidents', [
+				'filter_rst' => 1,
+				'rolling_week' => 1,
+			])
 		))
 			->addClass(ZBX_STYLE_BTN_ALT)
 	);
+
+if ($data['ajax_request']) {
+	$dynamic_node = new CDiv([
+		$info_block,
+		$incident_page,
+		is_a($incident_page, CTabView::class) ? (new CScriptTag($incident_page->makeJavascript())) : null,
+	]);
+}
+else {
+	// Load JS files.
+	$this->addJsFile('flickerfreescreen.js');
+	$this->addJsFile('gtlc.js');
+	$this->addJsFile('class.calendar.js');
+
+	$dynamic_node = new DynamicContent([
+		$info_block,
+		$incident_page,
+	]);
+	$dynamic_node->refresh_seconds = $data['refresh'];
+}
 
 (new CWidget())
 	->setTitle($data['title'])
@@ -600,9 +614,10 @@ $filter_buttons = (new CDiv())
 			)
 	], $filter_buttons)
 		->addVar('action', 'rsm.incidents')
+		->addVar('rolling_week', 1)
+		->addVar('type', $data['type'])
 	)
-	->addItem($info_block)
-	->addItem($incident_page)
+	->addItem($dynamic_node->setId('incidents_data'))
 	->addItem(
 		(new CTag('link', false))
 			->setAttribute('rel', 'stylesheet')
@@ -610,32 +625,3 @@ $filter_buttons = (new CDiv())
 			->setAttribute('href', $data['assets_path'].'/rsm.style.css')
 	)
 	->show();
-
-// Initialize time control.
-$tc_obj_data = [
-	'id' => 'timeline_1',
-	'domid' => 'incidents',
-	'loadSBox' => 0,
-	'loadImage' => 0,
-	'dynamic' => 0,
-	'mainObject' => 1
-];
-
-$filter = [
-	'timeline' => [
-		'profileIdx' => 'web.avail_report.filter',
-		'profileIdx2' => 0,
-		'from' => $data['from'],
-		'to' => $data['to'],
-		'from_ts' => $data['from_ts'],
-		'to_ts' => $data['to_ts']
-	],
-	'active_tab' => $data['active_tab']
-];
-
-(new CScriptTag(
-	'timeControl.addObject("incidents", '.json_encode($filter).', '.json_encode($tc_obj_data).');'.
-	'timeControl.processObjects();')
-)->show();
-
-
