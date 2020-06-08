@@ -92,15 +92,13 @@ else
 	$all_probes_ref = get_probes(undef);
 }
 
-my $probe_times_ref = get_probe_times($from, $till, $all_probes_ref);
-
 print("Status of Probes at ", ts_str(getopt('from')), "\n");
 print("---------------------------------------\n");
-foreach my $probe (keys(%$probe_times_ref))
+foreach my $probe (keys(%$all_probes_ref))
 {
-	my $offline = probe_offline_at($probe_times_ref, $probe, getopt('from'));
+	my $online = probe_online_at($probe, getopt('from'));
 
-	if ($offline == 0)
+	if ($online == 1)
 	{
 		print("$probe: Online\n");
 	}
@@ -109,8 +107,6 @@ foreach my $probe (keys(%$probe_times_ref))
 		print("$probe: Offline\n");
 	}
 }
-
-#print(Dumper($probe_times_ref));
 
 sub __validate_input
 {

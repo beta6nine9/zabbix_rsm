@@ -126,7 +126,7 @@ foreach my $service (sort(keys(%{$services})))
 
 #	db_connect();
 #	setopt('debug');
-#	my $probe_history = get_probe_history(
+#	my $probe_history = get_test_history(
 #		$from,
 #		$till,
 #		$itemids_uint,
@@ -142,7 +142,7 @@ foreach my $service (sort(keys(%{$services})))
 #
 #	exit;
 
-	my $probe_results = get_probe_results(
+	my $probe_results = get_test_results(
 		$service,
 		[@{$results_uint}, @{$results_float}, @{$results_str}],
 		$item_data

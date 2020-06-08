@@ -46,7 +46,6 @@ sub get_lastvalues_from_db($$$);
 sub calculate_cycle($$$$$$$$$);
 sub translate_interfaces($);
 sub get_interfaces($$$);
-sub probe_online_at_init();
 sub get_history_by_itemid($$$);
 sub child_error($$$$$);
 sub update_lastvalues_cache($);
@@ -1085,63 +1084,6 @@ sub fill_test_data($$$$)
 	}
 }
 
-#
-# Probe status value cache. itemid - PROBE_KEY_ONLINE item
-#
-# {
-#     probe => {
-#         'itemid' => 1234,
-#         'values' => {
-#             'clock' => value,
-#             ...
-#         }
-#     }
-# }
-#
-my %probe_statuses;
-sub probe_online_at_init()
-{
-	%probe_statuses = ();
-}
-
-sub probe_online_at($$)
-{
-	my $probe = shift;
-	my $clock = shift;
-
-	if (!defined($probe_statuses{$probe}{'itemid'}))
-	{
-		my $host = "$probe - mon";
-
-		my $rows_ref = db_select(
-			"select i.itemid,i.key_,h.host".
-			" from items i,hosts h".
-			" where i.hostid=h.hostid".
-				" and h.host='$host'".
-				" and i.key_='".PROBE_KEY_ONLINE."'"
-		);
-
-		fail("internal error: no \"$host\" item " . PROBE_KEY_ONLINE) unless (defined($rows_ref->[0]));
-
-		$probe_statuses{$probe}{'itemid'} = $rows_ref->[0]->[0];
-	}
-
-	if (!defined($probe_statuses{$probe}{'values'}{$clock}))
-	{
-		my $rows_ref = db_select(
-			"select value".
-			" from " . history_table(ITEM_VALUE_TYPE_UINT64).
-			" where itemid=" . $probe_statuses{$probe}{'itemid'}.
-				" and clock=".$clock
-		);
-
-		# Online if no value in the database
-		$probe_statuses{$probe}{'values'}{$clock} = (defined($rows_ref->[0]) ? $rows_ref->[0]->[0] : 1);
-	}
-
-	return $probe_statuses{$probe}{'values'}{$clock};
-}
-
 sub calculate_cycle($$$$$$$$$)
 {
 	$tld = shift;		# set globally
@@ -1291,7 +1233,7 @@ sub calculate_cycle($$$$$$$$$)
 	}
 
 	#
-	# Now get results from Probes.
+	# Now get test results.
 	#
 
 	# we need to aggregate DNS target statuses from Probes to generate Name Server Availability data
@@ -1329,7 +1271,7 @@ sub calculate_cycle($$$$$$$$$)
 
 		my ($results_uint, $results_float, $results_str);
 
-		get_probe_history(
+		get_test_history(
 			$from,
 			$till,
 			\@itemids_uint,
@@ -1340,83 +1282,86 @@ sub calculate_cycle($$$$$$$$$)
 			\$results_str
 		);
 
-		my $probe_results = get_probe_results(
-			$service,
+		my $results = get_test_results(
 			[@{$results_uint}, @{$results_float}, @{$results_str}],
-			$probes_data->{$probe}
+			$probes_data->{$probe},
+			$service
 		);
 
-		next if (!$probe_results);
+		next if (!$results);
 
-		foreach my $interface (keys(%{$probe_results->{'interfaces'}}))
+		foreach my $cycleclock (keys(%{$results->{$service}}))
 		{
-			my $tested_interface = translate_interface($interface);
-
-			my $clock = $probe_results->{'interfaces'}{$interface}{'clock'};
-
-			foreach my $target (keys(%{$probe_results->{'interfaces'}{$interface}{'targets'}}))
+			foreach my $interface (keys(%{$results->{$service}{$cycleclock}{'interfaces'}}))
 			{
-				# go through DNS target statuses on Probes and aggregate them
-				if ($interface eq 'dns')
-				{
-					my $city_status = $probe_results->{'interfaces'}{$interface}{'targets'}{$target}{'status'};
+				my $tested_interface = translate_interface($interface);
 
-					if (!defined($name_server_availability_data->{'targets'}{$target}) ||
-							$name_server_availability_data->{'targets'}{$target} != DOWN)
+				my $clock = $results->{$service}{$cycleclock}{'interfaces'}{$interface}{'clock'};
+
+				foreach my $target (keys(%{$results->{$service}{$cycleclock}{'interfaces'}{$interface}{'targets'}}))
+				{
+					# go through DNS target statuses on Probes and aggregate them
+					if ($interface eq 'dns')
 					{
-						$name_server_availability_data->{'targets'}{$target} = $city_status;
+						my $city_status = $results->{$service}{$cycleclock}{'interfaces'}{$interface}{'targets'}{$target}{'status'};
+
+						if (!defined($name_server_availability_data->{'targets'}{$target}) ||
+								$name_server_availability_data->{'targets'}{$target} != DOWN)
+						{
+							$name_server_availability_data->{'targets'}{$target} = $city_status;
+						}
+
+						$name_server_availability_data->{'probes'}{$probe}{$target} = $city_status;
 					}
 
-					$name_server_availability_data->{'probes'}{$probe}{$target} = $city_status;
-				}
-
-				foreach my $metric (@{$probe_results->{'interfaces'}{$interface}{'targets'}{$target}{'metrics'}})
-				{
-					# convert clock and rtt to integer
-					my $h = {
-						'rtt'        => int($metric->{'rtt'}),
-						'ip'         => $metric->{'ip'},
-						'clock'      => int($clock),
-					};
-
-					if (exists($metric->{'nsid'}))
+					foreach my $metric (@{$results->{$service}{$cycleclock}{'interfaces'}{$interface}{'targets'}{$target}{'metrics'}})
 					{
-						$h->{'nsid'} = $metric->{'nsid'};
-					}
+						# convert clock and rtt to integer
+						my $h = {
+							'rtt'        => int($metric->{'rtt'}),
+							'ip'         => $metric->{'ip'},
+							'clock'      => int($clock),
+						};
 
-					push(@{$tested_interfaces{$tested_interface}{$probe}{'testData'}{$target}}, $h);
+						if (exists($metric->{'nsid'}))
+						{
+							$h->{'nsid'} = $metric->{'nsid'};
+						}
+
+						push(@{$tested_interfaces{$tested_interface}{$probe}{'testData'}{$target}}, $h);
+					}
+				}
+
+				# interface status
+				$tested_interfaces{$tested_interface}{$probe}{'status'} =
+					($results->{$service}{$cycleclock}{'interfaces'}{$interface}{'status'} == UP ? 'Up' : 'Down');
+
+				# interface tested name
+				if (exists($results->{$service}{$cycleclock}{'interfaces'}{$interface}{'testedname'}))
+				{
+					$tested_interfaces{$tested_interface}{$probe}{'testedname'} =
+						$results->{$service}{$cycleclock}{'interfaces'}{$interface}{'testedname'};
+				}
+
+				# interface tested name, it's TCP if unspecified
+				if (exists($results->{$service}{$cycleclock}{'interfaces'}{$interface}{'protocol'}) &&
+						($results->{$service}{$cycleclock}{'interfaces'}{$interface}{'protocol'} == PROTO_UDP))
+				{
+					$tested_interfaces{$tested_interface}{$probe}{'transport'} = 'udp';
+				}
+				else
+				{
+					$tested_interfaces{$tested_interface}{$probe}{'transport'} = 'tcp';
 				}
 			}
 
-			# interface status
-			$tested_interfaces{$tested_interface}{$probe}{'status'} =
-				($probe_results->{'interfaces'}{$interface}{'status'} == UP ? 'Up' : 'Down');
-
-			# interface tested name
-			if (exists($probe_results->{'interfaces'}{$interface}{'testedname'}))
+			# service status
+			if ($results->{$service}{$cycleclock}{'status'} == UP)
 			{
-				$tested_interfaces{$tested_interface}{$probe}{'testedname'} =
-					$probe_results->{'interfaces'}{$interface}{'testedname'};
+				$probes_with_positive++;
 			}
-
-			# interface tested name, it's TCP if unspecified
-			if (defined($probe_results->{'interfaces'}{$interface}{'protocol'}) &&
-				($probe_results->{'interfaces'}{$interface}{'protocol'} == PROTO_UDP))
-			{
-				$tested_interfaces{$tested_interface}{$probe}{'transport'} = 'udp';
-			}
-			else
-			{
-				$tested_interfaces{$tested_interface}{$probe}{'transport'} = 'tcp';
-			}
+			$probes_with_results++;
 		}
-
-		# service status
-		if ($probe_results->{'status'} == UP)
-		{
-			$probes_with_positive++;
-		}
-		$probes_with_results++;
 	}
 
 	# add "Offline" and "No results"
@@ -1425,7 +1370,7 @@ sub calculate_cycle($$$$$$$$$)
 		my $probe_online;
 
 		if (defined($service_probes_ref->{$probe}) &&
-				$service_probes_ref->{$probe}->{'status'} == HOST_STATUS_MONITORED)
+				$service_probes_ref->{$probe}{'status'} == HOST_STATUS_MONITORED)
 		{
 			$probe_online = probe_online_at($probe, $from);
 		}
