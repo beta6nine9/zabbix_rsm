@@ -64,7 +64,7 @@ foreach my $service (keys(%services))
 my ($check_from, $check_till);
 
 $check_from = $opt_from;
-$check_till = $check_from + getopt('period') * 60 - 1;
+$check_till = $check_from + getopt('period') * PROBE_DELAY - 1;
 
 if ($check_till > time())
 {
@@ -98,9 +98,7 @@ print("Status of Probes at ", ts_str(getopt('from')), "\n");
 print("---------------------------------------\n");
 foreach my $probe (keys(%$all_probes_ref))
 {
-	my $online = probe_online_at($probe, getopt('from'));
-
-	if ($online == 1)
+	if (probe_online_at($probe, getopt('from'), PROBE_DELAY);
 	{
 		print("$probe: Online\n");
 	}

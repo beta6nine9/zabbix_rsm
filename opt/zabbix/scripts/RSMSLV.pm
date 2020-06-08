@@ -72,6 +72,8 @@ use constant ROLLWEEK_SHIFT_BACK	=> 180;	# seconds (must be divisible by 60) bac
 
 use constant PROBE_ONLINE_STR => 'Online';
 
+use constant PROBE_DELAY => 60;
+
 use constant DETAILED_RESULT_DELIM => ', ';
 
 use constant USE_CACHE_FALSE => 0;
@@ -89,6 +91,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		UP_INCONCLUSIVE_NO_DATA PROTO_UDP PROTO_TCP
 		MAX_LOGIN_ERROR MIN_INFO_ERROR MAX_INFO_ERROR PROBE_ONLINE_STR
 		AVAIL_SHIFT_BACK ROLLWEEK_SHIFT_BACK PROBE_ONLINE_SHIFT
+		PROBE_DELAY
 		PROBE_KEY_MANUAL
 		ONLINE OFFLINE
 		USE_CACHE_FALSE USE_CACHE_TRUE
@@ -134,7 +137,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		db_select db_select_col db_select_row db_select_value db_select_binds db_explain
 		set_slv_config get_cycle_bounds get_rollweek_bounds get_downtime_bounds
 		current_month_first_cycle month_start
-		get_probe_times probe_online_at_init probe_online_at probes2tldhostids
+		probe_online_at_init probe_online_at probes2tldhostids
 		slv_max_cycles
 		get_probe_online_key_itemid
 		init_values push_value send_values get_nsip_from_key is_service_error
@@ -142,8 +145,8 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		is_internal_error
 		is_internal_error_desc
 		collect_slv_cycles
+		online_probes
 		process_slv_avail_cycles
-		process_slv_avail
 		process_slv_rollweek_cycles
 		process_slv_downtime_cycles
 		uint_value_exists
@@ -2006,193 +2009,78 @@ sub slv_max_cycles($)
 	return $config->{'slv'}->{$var};
 }
 
-sub __print_probe_times
-{
-	my $probe_times_ref = shift;
-
-	if (scalar(keys(%{$probe_times_ref})) == 0)
-	{
-		info("no probes were online at given period");
-		return;
-	}
-
-	info("probe online times:");
-
-	foreach my $probe (keys(%{$probe_times_ref}))
-	{
-		info("  $probe");
-
-		my $idx = 0;
-		my $count = scalar(@{$probe_times_ref->{$probe}});
-
-		while ($idx < $count)
-		{
-			my $from = $probe_times_ref->{$probe}->[$idx++];
-			my $till = $probe_times_ref->{$probe}->[$idx++];
-
-			info("    ", selected_period($from, $till));
-		}
-	}
-}
-
-# Get online times of probe nodes.
 #
-# Returns hash of probe names as keys and array with online times as values:
+# Cache probe online/offline statuses
 #
 # {
-#   'probe' => [ from1, till1, from2, till2 ... ]
-#   ...
-# }
-#
-# NB! If a probe was down for the whole specified period or is currently disabled it won't be in a hash.
-sub get_probe_times($$$)
-{
-	my $from = shift;
-	my $till = shift;
-	my $probes_ref = shift;	# {host => {'hostid' => hostid, 'status' => status}, ...}
-
-	my $result = {};
-
-	return $result if (scalar(keys(%{$probes_ref})) == 0);
-
-	my @probes;
-	foreach my $probe (keys(%{$probes_ref}))
-	{
-		next unless ($probes_ref->{$probe}->{'status'} == HOST_STATUS_MONITORED);
-
-		push(@probes, "'$probe - mon'");
-	}
-
-	return $result if (scalar(@probes) == 0);
-
-	my $items_ref = db_select(
-		"select i.itemid,h.host".
-		" from items i,hosts h".
-		" where i.hostid=h.hostid".
-			" and h.host in (".join(',', @probes).")".
-			" and i.templateid is not null".
-			" and i.status<>".ITEM_STATUS_DISABLED.
-			" and i.key_='".PROBE_KEY_ONLINE."'");
-
-	foreach my $item_ref (@{$items_ref})
-	{
-		my $itemid = $item_ref->[0];
-		my $host = $item_ref->[1];
-
-		my $probe = substr($host, 0, -length(' - mon'));	# get rid of " - mon"
-
-		my $values_ref = db_select(
-			"select clock,value".
-			" from history_uint".
-			" where itemid=$itemid".
-				" and clock between $from and $till");
-
-		next unless (scalar(@{$values_ref}));
-
-		my ($values_hash_ref, $min_clock);
-		foreach my $row_ref (sort {$a->[0] <=> $b->[0]} (@{$values_ref}))	# sort by clock
-		{
-			$values_hash_ref->{truncate_from($row_ref->[0])} = $row_ref->[1];
-			$min_clock = $row_ref->[0] if (!defined($min_clock) || $row_ref->[0] < $min_clock);
-		}
-
-		my $step_clock = $min_clock;
-		my $step = 60;	# seconds
-		my $prev_value = DOWN;
-
-		# check probe status every minute, if the value is missing consider the probe down
-		while ($step_clock < $till)
-		{
-			my $value = (defined($values_hash_ref->{$step_clock}) ? $values_hash_ref->{$step_clock} : DOWN);
-
-			if ($prev_value == DOWN && $value == UP)
-			{
-				push(@{$result->{$probe}}, $step_clock);
-			}
-			elsif ($prev_value == UP && $value == DOWN)
-			{
-				# went down, add last second of previous minute
-				push(@{$result->{$probe}}, $step_clock - 1);
-			}
-
-			$step_clock += $step;
-			$prev_value = $value;
-		}
-
-		# push "till" to @times if it contains odd number of elements
-		if ($result->{$probe})
-		{
-			push(@{$result->{$probe}}, $till) if ($prev_value == UP);
-		}
-	}
-
-	if (!defined($result))
-	{
-		dbg("Probes have no values yet.");
-	}
-	elsif (opt('dry-run'))
-	{
-		__print_probe_times($result);
-	}
-
-	return $result;
-}
-
-#
-# Probe status value cache. itemid - PROBE_KEY_ONLINE item
-#
-# {
-#     probe => {
-#         'itemid' => 1234,
-#         'values' => {
-#             'clock' => value,
+#     'Probe1' => {
+#         'itemid' => 12345,
+#         'statuses' => {
+#             clock1 => 1,
+#             clock2 => 0,
+#             ...
+#         }
+#     },
+#     'Probe2' => {
+#         'itemid' => 12346,
+#         'statuses' => {
+#             clock1 => 1,
+#             clock2 => 0,
 #             ...
 #         }
 #     }
 # }
-#
-my %probe_statuses;
+my %_PROBESTATUSES;
 sub probe_online_at_init()
 {
-	%probe_statuses = ();
+	%_PROBESTATUSES = ();
 }
 
-sub probe_online_at($$)
+#
+# The probe is considered ONLINE only if each minute of the cycle (this is why
+# we need a $delay) there is ONLINE result in the database. If any of the cycle
+# minute lacks a result or has OFFLINE result the returned value will be OFFLINE.
+# Otherwise - ONLINE.
+#
+sub probe_online_at($$$)
 {
 	my $probe = shift;
 	my $clock = shift;
+	my $delay = shift;
 
-	if (!defined($probe_statuses{$probe}{'itemid'}))
+	if (!defined($_PROBESTATUSES{$probe}))
 	{
-		my $host = "$probe - mon";
-
-		my $rows_ref = db_select(
-			"select i.itemid,i.key_,h.host".
-			" from items i,hosts h".
-			" where i.hostid=h.hostid".
-				" and h.host='$host'".
-				" and i.key_='".PROBE_KEY_ONLINE."'"
-		);
-
-		fail("internal error: no \"$host\" item " . PROBE_KEY_ONLINE) unless (defined($rows_ref->[0]));
-
-		$probe_statuses{$probe}{'itemid'} = $rows_ref->[0]->[0];
+		$_PROBESTATUSES{$probe}{'itemid'} = get_probe_online_key_itemid($probe);
 	}
 
-	if (!defined($probe_statuses{$probe}{'values'}{$clock}))
-	{
-		my $rows_ref = db_select(
-			"select value".
-			" from " . history_table(ITEM_VALUE_TYPE_UINT64).
-			" where itemid=" . $probe_statuses{$probe}{'itemid'}.
-				" and clock=".$clock
-		);
+	my $clock_limit = $clock + $delay - 1;
 
-		# Online if no value in the database
-		$probe_statuses{$probe}{'values'}{$clock} = (defined($rows_ref->[0]) ? $rows_ref->[0]->[0] : 1);
+	for (my $cl = $clock; $cl < $clock_limit; $cl += PROBE_DELAY)
+	{
+		if (!defined($_PROBESTATUSES{$probe}{'statuses'}{$cl}))
+		{
+			my $rows_ref = db_select(
+				"select clock,value".
+				" from history_uint".
+				" where itemid=".$_PROBESTATUSES{$probe}{'itemid'}.
+					" and clock between $cl and $clock_limit");
+
+			my %values;
+			map {$values{$_->[0]} = $_->[1]} (@{$rows_ref});
+
+			for (my $c = $cl; $c < $clock_limit; $c += PROBE_DELAY)
+			{
+				# missing value is treated as DOWN
+				$_PROBESTATUSES{$probe}{'statuses'}{$c} = $values{$c} // DOWN;
+			}
+		}
+
+		# the probe is considered OFFLINE during the cycle in case of single DOWN
+		return 0 if ($_PROBESTATUSES{$probe}{'statuses'}{$cl} == DOWN);
 	}
 
-	return $probe_statuses{$probe}{'values'}{$clock};
+	# probe was ONLINE during the whole cycle
+	return 1;
 }
 
 # Translate probe names to hostids of appropriate tld hosts.
@@ -2781,6 +2669,29 @@ sub collect_slv_cycles($$$$$$)
 	return \%cycles;
 }
 
+#
+# Returns reference to array of Probes that were ONLINE during the
+# cycle specified by $clock. The probe is added only if it was
+# ONLINE during the whole cycle (that's why $delay is needed).
+# Missing probe ONLINE/OFFLINE status at a particular minute of the
+# cycle is treated as OFFLINE.
+#
+sub online_probes($$$)
+{
+	my $probes_ref = shift;
+	my $clock = shift;
+	my $delay = shift;
+
+	my @online_probes;
+
+	foreach my $probe (keys(%{$probes_ref}))
+	{
+		push(@online_probes, $probe) if (probe_online_at($probe, $clock, $delay))
+	}
+
+	return \@online_probes;
+}
+
 # Process cycles that need to be calculcated.
 sub process_slv_avail_cycles($$$$$$$$$)
 {
@@ -2802,11 +2713,8 @@ sub process_slv_avail_cycles($$$$$$$$$)
 	foreach my $value_ts (sort { $a <=> $b } (keys(%{$cycles_ref})))
 	{
 		my $from = cycle_start($value_ts, $delay);
-		my $till = cycle_end($value_ts, $delay);
 
-		dbg("selecting period ", selected_period($from, $till), " (value_ts:", ts_str($value_ts), ")");
-
-		my @online_probe_names = keys(%{get_probe_times($from, $till, $probes_ref)});
+		dbg("processing cycle ", ts_str($from), " (delay: $delay)");
 
 		foreach (@{$cycles_ref->{$value_ts}})
 		{
@@ -2829,8 +2737,8 @@ sub process_slv_avail_cycles($$$$$$$$$)
 				next;
 			}
 
-			process_slv_avail($tld, $keys_in{$tld}, $cfg_key_out, $from, $till, $value_ts, $cfg_minonline,
-				\@online_probe_names, $check_probe_values_cb, $cfg_value_type);
+			process_slv_avail($tld, $keys_in{$tld}, $cfg_key_out, $from, $delay, $value_ts, $cfg_minonline,
+				$probes_ref, $check_probe_values_cb, $cfg_value_type, $delay);
 		}
 
 		# unset TLD (for the logs)
@@ -2846,18 +2754,17 @@ sub process_slv_avail($$$$$$$$$$)
 	my $cfg_keys_in = shift;	# array reference, e. g. ['rsm.dns.rtt[...,udp]', ...]
 	my $cfg_key_out = shift;
 	my $from = shift;
-	my $till = shift;
+	my $delay = shift;
 	my $value_ts = shift;
 	my $cfg_minonline = shift;
-	my $online_probe_names = shift;
+	my $probes_ref = shift;
 	my $check_probe_values_ref = shift;
 	my $value_type = shift;
 
-	croak("Internal error: invalid argument to process_slv_avail()") unless (ref($online_probe_names) eq 'ARRAY');
+	my $online_probes = online_probes($probes_ref, $from, $delay);
+	my $online_probe_count = scalar(@{$online_probes});
 
-	my $online_probe_count = scalar(@{$online_probe_names});
-
-	if ($online_probe_count < $cfg_minonline)
+	if (scalar(@{$online_probes}) < $cfg_minonline)
 	{
 		push_value($tld, $cfg_key_out, $value_ts, UP_INCONCLUSIVE_NO_PROBES, ITEM_VALUE_TYPE_UINT64,
 				"Up (not enough probes online, $online_probe_count while $cfg_minonline required)");
@@ -2871,7 +2778,7 @@ sub process_slv_avail($$$$$$$$$$)
 		return;
 	}
 
-	my $hostids_ref = probes2tldhostids($tld, $online_probe_names);
+	my $hostids_ref = probes2tldhostids($tld, $online_probes);
 	if (scalar(@$hostids_ref) == 0)
 	{
 		wrn("no probe hosts found");
@@ -2884,6 +2791,8 @@ sub process_slv_avail($$$$$$$$$$)
 		wrn("no items (".join(',',@{$cfg_keys_in}).") found");
 		return;
 	}
+
+	my $till = cycle_end($from, $delay);
 
 	my $values_ref = __get_item_values($host_items_ref, $from, $till, $value_type);
 
@@ -4769,6 +4678,9 @@ sub generate_report($$;$)
 
 	my $cmd = "/opt/zabbix/scripts/sla-report.php";
 	my @args = ();
+
+	# add --server-id, if called from a script that supports --server-id option (e.g., tld.pl)
+	push(@args, "--server-id", getopt("server-id")) if (opt("server-id"));
 
 	push(@args, "--debug") if opt("debug");
 	push(@args, "--stats") if opt("stats");

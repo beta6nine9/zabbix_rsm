@@ -65,6 +65,9 @@ define('RDAP_BASE_URL',				'{$RDAP.BASE.URL}');
 define('RDDS_ENABLED',				'rdds.enabled');
 define('RDAP_ENABLED',				'rdap.enabled');
 
+// Wow often do we save history of Probe ONLINE status.
+define('RSM_PROBE_DELAY',			60);	// probe status delay
+
 // SLA monitoring rolling week items keys.
 define('RSM_SLV_DNS_ROLLWEEK',		'rsm.slv.dns.rollweek');
 define('RSM_SLV_DNSSEC_ROLLWEEK',	'rsm.slv.dnssec.rollweek');

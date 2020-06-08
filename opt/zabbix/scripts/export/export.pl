@@ -62,7 +62,10 @@ use constant EXPORT_MAX_CHILDREN_DEFAULT => 24;
 use constant EXPORT_MAX_CHILDREN_FLOOR => 1;
 use constant EXPORT_MAX_CHILDREN_CEIL => 128;
 
+sub __get_probe_changes($$);
+
 parse_opts('probe=s', 'service=s', 'tld=s', 'date=s', 'day=i', 'shift=i', 'force', 'max-children=i');
+
 setopt('nolog');
 
 my $config = get_rsm_config();
@@ -248,21 +251,9 @@ $server_key = $_;
 db_disconnect();
 db_connect($server_key);
 
-my $probes_ref = get_probes();
-my $check_probes_from = $from - 60;	# NB! We need previous value for probeChanges file (see __get_probe_changes())
-$probes_data->{$server_key} = get_probe_times($check_probes_from, $till, $probes_ref);
-
-#if (opt('debug'))
-#{
-#	foreach my $probe (keys(%{$probes_data->{$server_key}}))
-#	{
-#		for (my $idx = 0; defined($probes_data->{$server_key}->{$probe}->[$idx]); $idx++)
-#		{
-#			my $status = ($idx % 2 == 0 ? "ONLINE" : "OFFLINE");
-#			dbg("$probe: $status ", ts_full($probes_data->{$server_key}->{$probe}->[$idx]));
-#		}
-#	}
-#}
+# NB! We need previous value for probeChanges file (see __get_probe_changes())
+my $check_probes_from = $from - PROBE_DELAY;
+$probes_data->{$server_key} = get_probes();
 
 my $tlds_ref = [];
 if (opt('tld'))
@@ -322,6 +313,14 @@ foreach my $tld_for_a_child_to_process (@{$tlds_ref})
 		db_connect($server_key);
 
 		$time_start = time();
+
+		# cache probe online statuses
+		# TODO: FIXME, we have done that already in other processes! (look for this message in this file)
+		foreach my $probe (keys(%{$probes_data->{$server_key}}))
+		{
+			# probe, from, delay
+			probe_online_at($probe, $from, ($till + 1 - $from));
+		}
 
 		my $result = __get_test_data($from, $till, $probes_data->{$server_key});
 
@@ -386,7 +385,7 @@ my $false_positives = __get_false_positives($from, $till, $server_key);
 
 undef($server_key);
 
-my $probe_changes = __get_probe_changes($from);	# does not need db connection
+my $probe_changes = __get_probe_changes($from, $till);	# connects to db
 
 db_connect();
 dw_csv_init();
@@ -608,7 +607,7 @@ sub __get_test_data
 {
 	my $from = shift;
 	my $till = shift;
-	my $probe_times_ref = shift;
+	my $probes_ref = shift;
 
 	my ($nsips_ref, $dns_items_ref, $dns_tcp_items_ref, $rdds_dbl_items_ref, $rdds_str_items_ref,
 		$epp_dbl_items_ref, $epp_str_items_ref, $rdap_dbl_items_ref, $rdap_str_items_ref,
@@ -864,7 +863,7 @@ sub __get_test_data
 					# the status is set later
 					$cycles->{$cycleclock}->{'interfaces'}->{$interface}->{'probes'}->{$probe}->{'status'} = undef;
 
-					if (probe_offline_at($probe_times_ref, $probe, $cycleclock) == SUCCESS)
+					if (!probe_online_at($probe, $cycleclock, $delay))
 					{
 						$cycles->{$cycleclock}->{'interfaces'}->{$interface}->{'probes'}->{$probe}->{'status'} = PROBE_OFFLINE_STR;
 					}
@@ -1516,19 +1515,92 @@ sub __get_false_positives
 	return \@result;
 }
 
-sub __get_probe_changes
+# Get ONLINE periods of probe nodes.
+#
+# Returns hash of probe names as keys and array with online times as values:
+#
+# {
+#     'probe' => [ from1, till1, from2, till2 ... ]
+#     ...
+# }
+#
+# NB! If a probe was down for the whole specified period or is currently disabled it won't be in a hash.
+sub __get_probe_times($$$)
 {
 	my $from = shift;
+	my $till = shift;
+	my $probes_ref = shift;	# {host => {'hostid' => hostid, 'status' => status}, ...}
+
+	my $result = {};
+
+	return $result if (scalar(keys(%{$probes_ref})) == 0);
+
+	my @probes;
+	foreach my $probe (keys(%{$probes_ref}))
+	{
+		next unless ($probes_ref->{$probe}->{'status'} == HOST_STATUS_MONITORED);
+
+		my $status;
+		my $prev_status = DOWN;
+
+		for (my $clock = $from; $clock < $till; $clock += PROBE_DELAY)
+		{
+			$status = probe_online_at($probe, $clock, PROBE_DELAY);
+
+			if ($status == UP && $prev_status == DOWN)
+			{
+				push(@{$result->{$probe}}, $clock);
+			}
+			elsif ($status == DOWN && $prev_status == UP)
+			{
+				push(@{$result->{$probe}}, $clock - 1);	# 00-59
+			}
+
+			$prev_status = $status;
+		}
+
+		if ($status == UP)
+		{
+			push(@{$result->{$probe}}, $till);
+		}
+	}
+
+	if (!defined($result))
+	{
+		dbg("Probes have no values yet.");
+	}
+
+	return $result;
+}
+
+sub __get_probe_changes($$)
+{
+	my $from = shift;
+	my $till = shift;
 
 	my @result;
 
 	foreach my $_server_key (sort(keys(%{$probes_data})))
 	{
-		foreach my $probe (sort(keys(%{$probes_data->{$_server_key}})))
+		db_connect($_server_key);
+
+		# cache probe online statuses
+		# TODO: FIXME, we have done that already in other processes! (look for this message in this file)
+		foreach my $probe (keys(%{$probes_data->{$server_key}}))
 		{
-			for (my $idx = 0; defined($probes_data->{$_server_key}->{$probe}->[$idx]); $idx++)
+			# probe, from, delay
+			probe_online_at($probe, $from, ($till + 1 - $from));
+		}
+
+		my $probe_times = __get_probe_times($from, $till, $probes_data->{$_server_key});
+
+		db_disconnect();
+
+		foreach my $probe (sort(keys(%{$probe_times})))
+		{
+			for (my $idx = 0; defined($probe_times->{$probe}[$idx]); $idx++)
 			{
-				my $clock = $probes_data->{$_server_key}->{$probe}->[$idx];
+				my $clock = $probe_times->{$probe}[$idx];
 				my $status = ($idx % 2 == 0 ? PROBE_ONLINE_STR : PROBE_OFFLINE_STR);
 
 				if ($idx == 0 && $clock < $from)
@@ -1537,7 +1609,7 @@ sub __get_probe_changes
 					next;
 				}
 
-				if ($idx + 1 == scalar(@{$probes_data->{$_server_key}->{$probe}}) && ($clock % 60 != 0))
+				if ($idx + 1 == scalar(@{$probe_times->{$probe}}) && ($clock % 60 != 0))
 				{
 					# ignore last second status
 					next;

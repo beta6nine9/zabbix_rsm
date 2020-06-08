@@ -549,7 +549,10 @@ if ($data['tld']) {
 
 		$row[] = new CLink($tld['server'], Url::getFor($tld['url'], 'rsm.rollingweekstatus', []));
 
-		$table->addRow($row);
+		if ($tld['status'] == HOST_STATUS_MONITORED)
+			$table->addRow($row);
+		else
+			$table->addRow($row, ZBX_STYLE_DISABLED);
 	}
 }
 

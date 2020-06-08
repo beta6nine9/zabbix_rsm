@@ -422,14 +422,24 @@ class ParticularTestsListAction extends Action {
 		]);
 
 		foreach ($probe_items as $probe_item) {
-			$item_value = DBfetch(DBselect(
-				'SELECT h.value'.
+			$itemValues = DBfetchArray(DBselect(
+				'SELECT h.value,h.clock'.
 				' FROM history_uint h'.
 				' WHERE h.itemid='.$probe_item['itemid'].
-					' AND h.clock='.$test_time_from
+					' AND h.clock between '.$test_time_from.' AND '.$test_time_till
 			));
-			if ($item_value && $item_value['value'] == PROBE_DOWN) {
-				$data['probes'][$probe_item['hostid']]['status'] = PROBE_DOWN;
+
+			$mappedValues = array();
+
+			foreach ($itemValues as $value) {
+				$mappedValues[$value['clock']] = $value['value'];
+			}
+
+			for ($clock = $test_time_from; $clock < $test_time_till; $clock += RSM_PROBE_DELAY) {
+				if (!array_key_exists($clock, $mappedValues) || $mappedValues[$clock] == PROBE_DOWN) {
+					$data['probes'][$probeItem['hostid']]['status'] = PROBE_DOWN;
+					break;
+				}
 			}
 		}
 

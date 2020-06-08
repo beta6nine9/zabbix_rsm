@@ -273,9 +273,6 @@ sub process_server($)
 		$lastvalues_cache->{'tlds'} = {};
 	}
 
-	# initialize probe online cache
-	probe_online_at_init();
-
 	# probes available for every service
 	my %probes;
 	my $server_tlds;
@@ -1372,7 +1369,7 @@ sub calculate_cycle($$$$$$$$$)
 		if (defined($service_probes_ref->{$probe}) &&
 				$service_probes_ref->{$probe}{'status'} == HOST_STATUS_MONITORED)
 		{
-			$probe_online = probe_online_at($probe, $from);
+			$probe_online = probe_online_at($probe, $from, $delay);
 		}
 		else
 		{

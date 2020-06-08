@@ -4,6 +4,28 @@ New features:
 ..F.I..PS. [554] upgraded Zabbix to 4.X.Y (asitals, dimir, gcalenko, kalimulin, miks)
 
 --------------------------------------------------------------------------------
+Changes for rsm2.0.0rc9
+
+Bug fixes:
+....I..... [692] fixed reading list of items in sla-monthly-status.pl (asitals)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.0.0rc8
+
+Bug fixes:
+....I..... [sub-643] fixed Data Export script issue resulting in consuming exceeding amount of memory (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.0.0rc7
+
+Bug fixes:
+....I..... [sub-643] added support for translating new Data Export file testDetail.csv (dimir)
+..F....... [584] added visual identification of disabled rsmhosts on the rolling week page (dimir)
+....I..... [sub-669] changed behavior of registrar.pl to disable host when last enabled service is disabled (dimir)
+..F.I..... [665] fixed probe ONLINE status calculation for RDDS/RDAP cycles (dimir)
+....I..... [sub-663] added missing trigger for number of total/online probes with RDAP enabled (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.0.0rc6
 
 Bug fixes:
@@ -67,6 +89,12 @@ Changes for rsm1.4.0rc1
 
 New features:
 ..F.I..... [510] added support for Registrar RDDS Monitoring (asitals, dimir, gcalenko, miks, yurii)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.3.3
+
+Bug fixes:
+....I..... [685] fixed generating reports when disabling TLD and specifying --server-id (asitals)
 
 --------------------------------------------------------------------------------
 Changes for rsm1.3.2

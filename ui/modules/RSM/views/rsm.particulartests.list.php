@@ -269,18 +269,20 @@ foreach ($data['probes'] as $probe) {
 				$rdds = ZBX_STYLE_GREEN;
 			}
 
-			if ($probe['rdds43']['status'] == 0) {
-				$rdds43 = $down;
-			}
-			elseif ($probe['rdds43']['status'] == 1) {
-				$rdds43 = $up;
-			}
+			if ($data['type'] == RSM_RDDS) {
+				if ($probe['rdds43']['status'] == 0) {
+					$rdds43 = $down;
+				}
+				elseif ($probe['rdds43']['status'] == 1) {
+					$rdds43 = $up;
+				}
 
-			if ($probe['rdds80']['status'] == 0) {
-				$rdds80 = $down;
-			}
-			elseif ($probe['rdds80']['status'] == 1) {
-				$rdds80 = $up;
+				if ($probe['rdds80']['status'] == 0) {
+					$rdds80 = $down;
+				}
+				elseif ($probe['rdds80']['status'] == 1) {
+					$rdds80 = $up;
+				}
 			}
 
 			if (isset($data['tld']['macros'][RSM_RDAP_TLD_ENABLED])
