@@ -92,6 +92,8 @@ else
 	$all_probes_ref = get_probes(undef);
 }
 
+probe_online_at_init();
+
 print("Status of Probes at ", ts_str(getopt('from')), "\n");
 print("---------------------------------------\n");
 foreach my $probe (keys(%$all_probes_ref))

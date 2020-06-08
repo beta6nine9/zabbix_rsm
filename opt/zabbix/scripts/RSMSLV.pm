@@ -113,7 +113,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		get_macro_epp_rollweek_sla
 		get_macro_dns_update_time
 		get_macro_rdds_update_time
-		get_tld_items
+		get_test_items
 		get_hostid
 		get_rtt_low
 		get_macro_epp_rtt_low get_macro_probe_avail_limit
@@ -889,27 +889,62 @@ sub __get_host_items
 	return $result;
 }
 
-sub get_tld_items
+sub get_test_items($)
 {
-	my $tld = shift;
-	my $cfg_key = shift;
+	my $rsmhost = shift;
+
+	# TODO: in the future consider also collecting SLV items, to get everything related to the test
+	#
+	#my $host_cond = " and (" .
+	#			"(hg.groupid=" . TLDS_GROUPID . " and h.host='$rsmhost') or" .
+	#			" (hg.groupid=" . TLD_PROBE_RESULTS_GROUPID . " and h.host like '$rsmhost %')" .
+	#		")";
 
 	my $rows_ref = db_select(
-		"select i.itemid,i.key_".
-		" from items i,hosts h".
-		" where i.hostid=h.hostid".
-			" and h.host='$tld'".
-			" and i.key_ like '$cfg_key%'");
+		"select h.host,hg.groupid,i.itemid,i.key_,i.value_type".
+		" from items i,hosts h,hosts_groups hg".
+		" where h.hostid=i.hostid".
+			" and hg.hostid=h.hostid".
+			" and h.status=".HOST_STATUS_MONITORED.
+			" and i.status<>".ITEM_STATUS_DISABLED.
+			" and hg.groupid=" . TLD_PROBE_RESULTS_GROUPID . " and h.host like '$rsmhost %'"
+	);
 
-	my @items;
-	foreach my $row_ref (@$rows_ref)
+	my $result = {};
+
+	foreach my $row_ref (@{$rows_ref})
 	{
-		push(@items, $row_ref);
+		my $host = $row_ref->[0];
+		my $groupid = $row_ref->[1];
+		my $itemid = $row_ref->[2];
+		my $key = $row_ref->[3];
+		my $value_type = $row_ref->[4];
+
+		my $probe;
+
+		# TODO: in the future consider also collecting SLV items, to get everything related to the test
+		#
+		#if ($groupid == TLDS_GROUPID)
+		#{
+		#	$probe = "";
+		#}
+		#elsif ($host =~ /$rsmhost (.*)/)
+		if ($host =~ /$rsmhost (.*)/)
+		{
+			$probe = $1;
+		}
+		else
+		{
+			fail("unexpected host name: \"$host\"");
+		}
+
+		$result->{$probe}{$itemid} = {
+			'key' => $key,
+			'value_type' => $value_type,
+		};
 	}
 
-	fail("cannot find items ($cfg_key*) at host ($tld)") if (scalar(@items) == 0);
-
-	return \@items;
+	return $result;
 }
 
 sub get_hostid
