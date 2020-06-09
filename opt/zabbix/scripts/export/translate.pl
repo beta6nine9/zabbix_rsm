@@ -283,6 +283,6 @@ sub __translate_test_details_line
 	printf("%-" . PRINT_RIGHT_SHIFT . "s%s\n", 'cycleDateMinute', ts_full($cycle_date_minute));
 	printf("%-" . PRINT_RIGHT_SHIFT . "s%s\n", 'serviceCategory', $service_category);
 	printf("%-" . PRINT_RIGHT_SHIFT . "s%s\n", 'testType', $test_type);
-	printf("%-" . PRINT_RIGHT_SHIFT . "s%s\n", 'target', $target);
+	printf("%-" . PRINT_RIGHT_SHIFT . "s%s\n", 'target', $target // '');
 	printf("%-" . PRINT_RIGHT_SHIFT . "s%s\n", 'testedName', $tested_name);
 }
