@@ -855,6 +855,16 @@ sub __save_csv_data($)
 				}
 			}
 
+			my ($proto, $protocol_id);
+
+			# for DNS Service protocol on a whole cycle level does not
+			# make sense since it can be different on each probe node
+			if ($service ne 'dns')
+			{
+				$proto = PROTO_TCP;
+				$protocol_id = $tcp_protocol_id;
+			}
+
 			# SERVICE cycle
 			dw_append_csv(DATA_CYCLE, [
 					      dw_get_cycle_id($cycleclock, $service_category_id, $tld_id),
@@ -868,7 +878,7 @@ sub __save_csv_data($)
 					      '',
 					      '',
 					      $tld_type_id,
-					      ''	# TODO: no cycle protocol as DNS can be UDP/TCP since DNS Reboot!
+					      $protocol_id // ''	# TODO: no cycle protocol as DNS can be UDP/TCP since DNS Reboot!
 				]);
 
 			foreach my $interface (keys(%{$cycle_ref->{'interfaces'}}))
@@ -881,8 +891,11 @@ sub __save_csv_data($)
 
 					my $probe_ref = $cycle_ref->{'interfaces'}{$interface}{'probes'}{$probe};
 
-					my $proto = (exists($probe_ref->{'protocol'}) ? $probe_ref->{'protocol'} : PROTO_TCP);
-					my $protocol_id = ($proto == PROTO_UDP ? $udp_protocol_id : $tcp_protocol_id);
+					if (exists($probe_ref->{'protocol'}))
+					{
+						$proto =  $probe_ref->{'protocol'};
+						$protocol_id = ($proto == PROTO_UDP ? $udp_protocol_id : $tcp_protocol_id);
+					}
 
 					my $testedname_id = '';
 
