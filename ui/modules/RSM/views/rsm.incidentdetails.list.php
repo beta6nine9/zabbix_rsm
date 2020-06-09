@@ -20,10 +20,7 @@
 
 
 use Modules\RSM\Helpers\UrlHelper as URL;
-// Load JS files.
-$this->addJsFile('flickerfreescreen.js');
-$this->addJsFile('gtlc.js');
-$this->addJsFile('class.calendar.js');
+use Modules\RSM\Helpers\DynamicContent;
 
 $object_label = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) ? _('Registrar ID') : _('TLD');
 
@@ -138,27 +135,20 @@ $filter_url = Url::get('rsm.incidentdetails', [
 	'availItemId' => $data['availItemId'],
 	'filter_set' => 1,
 ]);
-
-(new CWidget())
-	->setTitle($data['title'])
-	->addItem((new CFilter(new CUrl($filter_url)))
-		->setProfile($data['profileIdx'])
-		->setActiveTab($data['active_tab'])
-		->addTimeSelector($data['from'], $data['to'])
-		->addFilterTab(_('Filter'), [(new CFormList())->addRow('',
-			(new CRadioButtonList('filter_failing_tests', (int) $data['filter_failing_tests']))
-				->addValue(_('Only failing tests'), 1)
-				->addValue(_('Show all'), 0)
-				->setModern(true)
-			)
-		])
-		->addVar('action', 'rsm.incidentdetails')
-		->addVar('host', $data['host'])
-		->addVar('eventid', $data['eventid'])
-		->addVar('slvItemId', $data['slvItemId'])
-		->addVar('availItemId', $data['availItemId'])
-	)
-	->additem((new CDiv())
+$filter_buttons = (new CDiv())
+	->addClass(ZBX_STYLE_FILTER_FORMS)
+	->addItem((new CSubmitButton(_('Rolling week'), 'filter_set', 1)))
+	->addItem(
+		(new CRedirectButton(_('Reset'),
+			Url::get('rsm.incidents', [
+				'filter_rst' => 1,
+				'rolling_week' => 1,
+			])
+		))
+			->addClass(ZBX_STYLE_BTN_ALT)
+	);
+$dynamic_node = [
+	(new CDiv())
 		->addClass(ZBX_STYLE_TABLE_FORMS_CONTAINER)
 		->addItem((new CTable())
 			->addClass('incidents-info')
@@ -172,20 +162,51 @@ $filter_url = Url::get('rsm.incidentdetails', [
 					]
 					: null
 			])
-		)
+		),
+	$data['paging'],
+	$table,
+	$data['paging'],
+	in_array(CWebUser::getType(), [USER_TYPE_ZABBIX_ADMIN, USER_TYPE_SUPER_ADMIN, USER_TYPE_POWER_USER])
+		? (new CButton('mark_incident', $change_incident_type_label))
+			->onClick(sprintf('javascript: location.href = "%s";', $mark_btn_on_click))
+			->addStyle('margin-top: 5px;')
+		: null
+];
+if ($data['ajax_request']) {
+	$dynamic_node = new CDiv($dynamic_node);
+}
+else {
+	// Load JS files.
+	$this->addJsFile('flickerfreescreen.js');
+	$this->addJsFile('gtlc.js');
+	$this->addJsFile('class.calendar.js');
+
+	$dynamic_node = new DynamicContent($dynamic_node);
+	$dynamic_node->refresh_seconds = $data['refresh'];
+}
+
+(new CWidget())
+	->setTitle($data['title'])
+	->addItem((new CFilter(new CUrl($filter_url)))
+		->setProfile($data['profileIdx'])
+		->setActiveTab($data['active_tab'])
+		->addTimeSelector($data['from'], $data['to'])
+		->hideFilterButtons()
+		->addFilterTab(_('Filter'), [(new CFormList())->addRow('',
+			(new CRadioButtonList('filter_failing_tests', (int) $data['filter_failing_tests']))
+				->addValue(_('Only failing tests'), 1)
+				->addValue(_('Show all'), 0)
+				->setModern(true)
+			)
+		], $filter_buttons)
+		->addVar('action', 'rsm.incidentdetails')
+		->addVar('host', $data['host'])
+		->addVar('eventid', $data['eventid'])
+		->addVar('slvItemId', $data['slvItemId'])
+		->addVar('availItemId', $data['availItemId'])
+		->addVar('rolling_week', '1')
 	)
-	->addItem([
-		$data['paging'],
-		$table,
-		$data['paging']
-	])
-	->addItem(
-		in_array(CWebUser::getType(), [USER_TYPE_ZABBIX_ADMIN, USER_TYPE_SUPER_ADMIN, USER_TYPE_POWER_USER])
-			? (new CButton('mark_incident', $change_incident_type_label))
-				->onClick(sprintf('javascript: location.href = "%s";', $mark_btn_on_click))
-				->addStyle('margin-top: 5px;')
-			: null
-	)
+	->addItem($dynamic_node->setId('incident_details'))
 	->addItem(
 		(new CTag('link', false))
 			->setAttribute('rel', 'stylesheet')
@@ -193,31 +214,3 @@ $filter_url = Url::get('rsm.incidentdetails', [
 			->setAttribute('href', $data['assets_path'].'/rsm.style.css')
 	)
 	->show();
-
-
-// Initialize time control.
-$tc_obj_data = [
-	'id' => 'timeline_1',
-	'domid' => 'incidentsdetails',
-	'loadSBox' => 0,
-	'loadImage' => 0,
-	'dynamic' => 0,
-	'mainObject' => 1
-];
-
-$filter = [
-	'timeline' => [
-		'profileIdx' => 'web.incidentsdetails.filter',
-		'profileIdx2' => 0,
-		'from' => $data['from'],
-		'to' => $data['to'],
-		'from_ts' => $data['from_ts'],
-		'to_ts' => $data['to_ts']
-	],
-	'active_tab' => $data['active_tab']
-];
-
-(new CScriptTag(
-	'timeControl.addObject("incidents", '.json_encode($filter).', '.json_encode($tc_obj_data).');'.
-	'timeControl.processObjects();'
-))->show();
