@@ -939,15 +939,16 @@ class IncidentsListAction extends Action {
 	protected function doAction() {
 		global $DB;
 
+		$macros = API::UserMacro()->get([
+			'output' => ['macro', 'value'],
+			'filter' => ['macro' => RSM_ROLLWEEK_SECONDS],
+			'globalmacro' => true
+		]);
+		$macros = array_column($macros, 'value', 'macro');
+
 		if ($this->hasInput('rolling_week')) {
 			$data = $this->getInputAll();
 			unset($data['rolling_week']);
-			$macros = API::UserMacro()->get([
-				'output' => ['macro', 'value'],
-				'filter' => ['macro' => RSM_ROLLWEEK_SECONDS],
-				'globalmacro' => true
-			]);
-			$macros = array_column($macros, 'value', 'macro');
 			$timeshift = ($macros[RSM_ROLLWEEK_SECONDS]%SEC_PER_DAY)
 					? $macros[RSM_ROLLWEEK_SECONDS]
 					: ($macros[RSM_ROLLWEEK_SECONDS]/SEC_PER_DAY).'d';
@@ -960,6 +961,7 @@ class IncidentsListAction extends Action {
 			return;
 		}
 
+		$server_now = time() - RSM_ROLLWEEK_SHIFT_BACK;
 		$data = [
 			'title' => _('Incidents'),
 			'ajax_request' => $this->isAjaxRequest(),
@@ -975,6 +977,8 @@ class IncidentsListAction extends Action {
 			'profileIdx2' => 0,
 			'from' => $this->hasInput('from') ? $this->getInput('from') : null,
 			'to' => $this->hasInput('to') ? $this->getInput('to') : null,
+			'incident_from' => date(ZBX_DATE_TIME, $server_now - $macros[RSM_ROLLWEEK_SECONDS]),
+			'incident_to' => date(ZBX_DATE_TIME, $server_now),
 			'active_tab' => CProfile::get('web.rsm.incidents.filter.active', 1),
 			'incidents_tab' => (int) get_cookie('incidents_tab', 0),
 			'sid' => CWebUser::getSessionCookie()
