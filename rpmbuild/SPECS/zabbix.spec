@@ -128,7 +128,6 @@ Requires:			php-json >= 7.2
 Requires:			php-fpm >= 7.2
 %else
 # CentOS 7 specifics start
-Requires:			centos-release-scl
 Requires:			rh-php73
 Requires:			rh-php73-php-gd
 Requires:			rh-php73-php-bcmath
@@ -162,7 +161,6 @@ BuildArch:			noarch
 Requires:			php-mysqlnd
 %else
 # CentOS 7 specifics start
-Requires:			centos-release-scl
 Requires:			rh-php73-php-mysqlnd
 Obsoletes:			php-mysqlnd
 # CentOS 7 specifics end
@@ -206,11 +204,20 @@ Requires:			perl-Path-Tiny
 Requires:			perl-Parallel-ForkManager
 Requires:			perl-Devel-StackTrace
 %if 0%{?rhel} >= 8
-Requires:			php-cli php-pdo php-mysqlnd php-xml
+Requires:			php-cli
+Requires:			php-pdo
+Requires:			php-mysqlnd
+Requires:			php-xml
 %else
 # CentOS 7 specifics start
-Requires:			centos-release-scl
-Requires:			rh-php73-php-cli rh-php73-php-pdo rh-php73-php-mysqlnd rh-php73-php-xml
+Requires:			rh-php73-php-cli
+Requires:			rh-php73-php-pdo
+Requires:			rh-php73-php-mysqlnd
+Requires:			rh-php73-php-xml
+Obsoletes:			php-cli
+Obsoletes:			php-pdo
+Obsoletes:			php-mysqlnd
+Obsoletes:			php-xml
 # CentOS 7 specifics start
 %endif
 AutoReq:			no
