@@ -56,7 +56,7 @@ use constant EXPORT_MAX_CHILDREN_FLOOR => 1;
 use constant EXPORT_MAX_CHILDREN_CEIL => 128;
 
 sub __get_test_data($$$);
-sub __save_csv_data($);
+sub __save_csv_data($$);
 sub __get_probe_changes($$);
 
 parse_opts('probe=s', 'service=s', 'tld=s', 'date=s', 'day=i', 'shift=i', 'force', 'max-children=i');
@@ -302,7 +302,7 @@ foreach my $tld_for_a_child_to_process (@{$tlds_ref})
 
 		init_process();
 
-		$tld = $tld_for_a_child_to_process;
+		set_log_tld($tld_for_a_child_to_process);
 
 		db_connect($server_key);
 
@@ -316,14 +316,14 @@ foreach my $tld_for_a_child_to_process (@{$tlds_ref})
 			probe_online_at($probe, $from, ($till + 1 - $from));
 		}
 
-		my $result = __get_test_data($tld, $from, $till);
+		my $result = __get_test_data($tld_for_a_child_to_process, $from, $till);
 
 		$time_get_test_data = time();
 
 		db_disconnect();
 
 		db_connect();	# connect to the local node
-		__save_csv_data($result);
+		__save_csv_data($tld_for_a_child_to_process, $result);
 		db_disconnect();
 
 		info(sprintf("get data: %s, load ids: %s, process records: %s, write csv: %s",
@@ -535,7 +535,7 @@ sub __get_keys
 #   	...
 sub __get_test_data($$$)
 {
-	$tld = shift;
+	my $tld = shift;
 	my $from = shift;
 	my $till = shift;
 
@@ -561,17 +561,17 @@ sub __get_test_data($$$)
 
 		$itemid_avail = get_itemid_by_hostid($hostid, $key_avail);
 
-		if (!$itemid_avail)
+		if ($itemid == E_ID_NONEXIST)
 		{
-			wrn("configuration error: service $service enabled but ", rsm_slv_error());
+			wrn("configuration error: service $service enabled $service availability item does not exist");
 			next;
 		}
 
 		$itemid_rollweek = get_itemid_by_hostid($hostid, $key_rollweek);
 
-		if (!$itemid_rollweek)
+		if ($itemid_rollweek == E_ID_NONEXIST)
 		{
-			wrn("configuration error: service $service enabled but ", rsm_slv_error());
+			wrn("configuration error: service $service enabled $service rolling week item does not exist");
 			next;
 		}
 
@@ -748,29 +748,23 @@ sub __get_test_data($$$)
 	{
 		next if (!tld_service_enabled($tld, $service, $from));
 
-		$result->{$tld}->{'services'}->{$service}->{'cycles'} = $cycles->{$service};
-		$result->{$tld}->{'services'}->{$service}->{'incidents'} = $incidents->{$service} // [];
+		$result->{'services'}{$service}{'cycles'} = $cycles->{$service};
+		$result->{'services'}{$service}{'incidents'} = $incidents->{$service} // [];
 	}
 
-	$result->{$tld}->{'type'} = __get_tld_type($tld);
+	$result->{'type'} = __get_tld_type($tld);
 
 	return $result;
 }
 
-sub __save_csv_data($)
+sub __save_csv_data($$)
 {
+	my $tld = shift;
 	my $result = shift;
 
 	$time_load_ids = $time_process_records = $time_write_csv = time();
 
-	# push data to CSV files
-
 	return if (scalar(keys(%{$result})) == 0);
-
-	if (scalar(keys(%{$result})) > 1)
-	{
-		fail("result contains more than 1 TLD in __save_csv_data()");
-	}
 
 	dw_csv_init();
 	dw_load_ids_from_db();
@@ -787,12 +781,12 @@ sub __save_csv_data($)
 	my $tcp_protocol_id = dw_get_id(ID_TRANSPORT_PROTOCOL, 'tcp');
 
 	my $tld_id = dw_get_id(ID_TLD, $tld);
-	my $tld_type_id = dw_get_id(ID_TLD_TYPE, $result->{$tld}->{'type'});
+	my $tld_type_id = dw_get_id(ID_TLD_TYPE, $result->{'type'});
 
 	# RTT.LOW macros
 	my $rtt_low;
 
-	foreach my $service (sort(keys(%{$result->{$tld}->{'services'}})))
+	foreach my $service (sort(keys(%{$result->{'services'}})))
 	{
 		my $service_ref = $services->{$service};
 
@@ -823,14 +817,14 @@ sub __save_csv_data($)
 			fail("THIS SHOULD NEVER HAPPEN");
 		}
 
-		my $incidents = $result->{$tld}{'services'}{$service}{'incidents'};
+		my $incidents = $result->{'services'}{$service}{'incidents'};
 		my $incidents_count = scalar(@{$incidents});
 		my $inc_idx = 0;
 
 		# test results
-		foreach my $cycleclock (sort(keys(%{$result->{$tld}{'services'}{$service}{'cycles'}})))
+		foreach my $cycleclock (sort(keys(%{$result->{'services'}{$service}{'cycles'}})))
 		{
-			my $cycle_ref = $result->{$tld}{'services'}{$service}{'cycles'}{$cycleclock};
+			my $cycle_ref = $result->{'services'}{$service}{'cycles'}{$cycleclock};
 
 			if (!defined($cycle_ref->{'status'}))
 			{
@@ -1119,14 +1113,9 @@ sub __save_csv_data($)
 	}
 
 	$time_process_records = time();
-
-	my $save_tld = $tld;
-	$tld = get_readable_tld($save_tld);
 	dw_write_csv_files();
-	$tld = $save_tld;
 	$time_write_csv = time();
 }
-
 
 sub __ip_version
 {
@@ -1155,98 +1144,6 @@ sub __get_tld_type
 	}
 
 	return $rows_ref->[0]->[0];
-}
-
-# $keys_str - list of complete keys
-sub __get_itemids_by_complete_key
-{
-	my $tld = shift;
-	my $probe = shift;
-
-	my $keys_str = "'" . join("','", @_) . "'";
-
-	my $host_value = ($probe ? "$tld $probe" : "$tld %");
-
-	my $rows_ref = db_select(
-		"select h.host,i.itemid,i.key_".
-		" from items i,hosts h".
-		" where i.hostid=h.hostid".
-			" and h.status=".HOST_STATUS_MONITORED.
-			" and h.host like '$host_value'".
-			" and i.key_ in ($keys_str)".
-			" and i.templateid is not null");
-
-	my %result;
-
-	my $tld_length = length($tld) + 1; # white space
-	foreach my $row_ref (@$rows_ref)
-	{
-		my $host = $row_ref->[0];
-		my $itemid = $row_ref->[1];
-		my $key = $row_ref->[2];
-
-		# remove TLD from host name to get just the Probe name
-		my $_probe = ($probe ? $probe : substr($host, $tld_length));
-
-		$result{$_probe}->{$itemid} = $key;
-	}
-
-	fail("cannot find items ($keys_str) at host ($tld *)") if (scalar(keys(%result)) == 0);
-
-	return \%result;
-}
-
-# returns hash reference of Probe=>itemid of specified key
-#
-# {
-#    'Amsterdam' => 'itemid1',
-#    'London' => 'itemid2',
-#    ...
-# }
-sub __get_status_itemids
-{
-	my $tld = shift;
-	my $key = shift;
-
-	my $key_condition = (str_ends_with($key, ']') ? "i.key_='$key'" : "i.key_ like '$key%'");
-
-	my $sql =
-		"select h.host,i.itemid".
-		" from items i,hosts h".
-		" where i.hostid=h.hostid".
-			" and h.status=".HOST_STATUS_MONITORED.
-			" and i.templateid is not null".
-			" and $key_condition".
-			" and h.host like '$tld %'".
-		" group by h.host,i.itemid";
-
-	my $rows_ref = db_select($sql);
-
-	fail("no items matching '$key' found at host '$tld %'") if (scalar(@$rows_ref) == 0);
-
-	my %result;
-
-	my $tld_length = length($tld) + 1; # white space
-	foreach my $row_ref (@$rows_ref)
-	{
-		my $host = $row_ref->[0];
-		my $itemid = $row_ref->[1];
-
-		# remove TLD from host name to get just the Probe name
-		my $probe = substr($host, $tld_length);
-
-		$result{$probe} = $itemid;
-	}
-
-	return \%result;
-}
-
-sub __check_dns_udp_rtt
-{
-	my $value = shift;
-	my $max_rtt = shift;
-
-	return (is_service_error('dns', $value, $max_rtt)) ? E_FAIL : SUCCESS;
 }
 
 sub __get_false_positives
@@ -1416,51 +1313,6 @@ sub __format_rtt
 	return $rtt unless ($rtt);			# allow empty string (in case of error)
 
 	return int($rtt);
-}
-
-# taken from RSMSLV.pm
-sub __get_dns_itemids
-{
-	my $nsips_ref = shift; # array reference of NS,IP pairs
-	my $key = shift;
-	my $tld = shift;
-	my $probe = shift;
-
-	my @keys;
-	push(@keys, "'" . $key . $_ . "]'") foreach (@$nsips_ref);
-
-	my $keys_str = join(',', @keys);
-
-	my $host_value = ($probe ? "$tld $probe" : "$tld %");
-
-	my $rows_ref = db_select(
-		"select h.host,i.itemid,i.key_".
-		" from items i,hosts h".
-		" where i.hostid=h.hostid".
-			" and h.status=".HOST_STATUS_MONITORED.
-			" and i.status<>".ITEM_STATUS_DISABLED.
-			" and h.host like '$host_value'".
-			" and i.templateid is not null".
-			" and i.key_ in ($keys_str)");
-
-	my %result;
-
-	my $tld_length = length($tld) + 1; # white space
-	foreach my $row_ref (@$rows_ref)
-	{
-		my $host = $row_ref->[0];
-		my $itemid = $row_ref->[1];
-		my $key = $row_ref->[2];
-
-		# remove TLD from host name to get just the Probe name
-		my $_probe = ($probe ? $probe : substr($host, $tld_length));
-
-		$result{$_probe}->{$itemid} = get_nsip_from_key($key);
-	}
-
-	fail("cannot find items ($keys_str) at host ($tld *)") if (scalar(keys(%result)) == 0);
-
-	return \%result;
 }
 
 sub __print_undef
@@ -1680,48 +1532,7 @@ sub __get_incidents2
 	return \@incidents;
 }
 
-# todo: taken from RSMSLV.pm
-sub __get_service_status_itemids
-{
-	my $tld = shift;
-	my $key = shift;
-
-	my $key_condition = (str_ends_with($key, ']') ? "i.key_='$key'" : "i.key_ like '$key%'");
-
-	my $sql =
-		"select h.host,i.itemid".
-		" from items i,hosts h".
-		" where i.hostid=h.hostid".
-			" and h.status=".HOST_STATUS_MONITORED.
-			" and i.status<>".ITEM_STATUS_DISABLED.
-			" and i.templateid is not null".
-			" and $key_condition".
-			" and h.host like '$tld %'".
-		" group by h.host,i.itemid";
-
-	my $rows_ref = db_select($sql);
-
-	fail("no items matching '$key' found at host '$tld %'") if (scalar(@$rows_ref) == 0);
-
-	my %result;
-
-	my $tld_length = length($tld) + 1; # white space
-	foreach my $row_ref (@$rows_ref)
-	{
-		my $host = $row_ref->[0];
-		my $itemid = $row_ref->[1];
-
-		# remove TLD from host name to get just the Probe name
-		my $probe = substr($host, $tld_length);
-
-		$result{$probe} = $itemid;
-	}
-
-	return \%result;
-}
-
-# todo: taken from RSMSLV.pm
-sub get_readable_tld
+sub __get_readable_tld
 {
 	my $tld = shift;
 
