@@ -19,10 +19,7 @@
 **/
 
 
-// Load JS files.
-$this->addJsFile('flickerfreescreen.js');
-$this->addJsFile('gtlc.js');
-$this->addJsFile('class.calendar.js');
+use Modules\RSM\Helpers\DynamicContent;
 
 $table = (new CTableInfo())
 	->setHeader([
@@ -85,18 +82,8 @@ $object_info = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR)
 		new CSpan([bold(_('Registrar family')), ': ', '', $data['tld']['info_2']])
 	]
 	: new CSpan([bold(_('TLD')), ': ', '', $data['tld']['host']]);
-
-$filter_url = (new CUrl('zabbix.php'))->setArgument('action', 'rsm.tests');
-
-(new CWidget())
-	->setTitle($data['title'])
-	->addItem((new CFilter($filter_url))
-		->setProfile($data['profileIdx'])
-		->setActiveTab($data['active_tab'])
-		->addTimeSelector($data['from'], $data['to'])
-		->addVar('action', 'rsm.tests')
-	)
-	->addItem((new CDiv(
+$dynamic_node = [
+	(new CDiv(
 		(new CTable())
 			->addClass('incidents-info')
 			->addRow([[
@@ -115,39 +102,47 @@ $filter_url = (new CUrl('zabbix.php'))->setArgument('action', 'rsm.tests');
 					new CSpan([bold(_('Total time within selected period')), ':', SPACE, convertUnitsS($this->data['downPeriod'])])
 				]
 			]])
-	))->addClass('table-forms-container'))
-	->addItem([$table, $data['paging']])
-	->addItem(
-		(new CTag('link', false))
-			->setAttribute('rel', 'stylesheet')
-			->setAttribute('type', 'text/css')
-			->setAttribute('href', $data['assets_path'].'/rsm.style.css')
-	)
-	->show();
-
-// Initialize time control.
-$tc_obj_data = [
-	'id' => 'timeline_1',
-	'domid' => 'tests',
-	'loadSBox' => 0,
-	'loadImage' => 0,
-	'dynamic' => 0,
-	'mainObject' => 1
+	))->addClass('table-forms-container'),
+	$table,
+	$data['paging'],
 ];
 
-$filter = [
-	'timeline' => [
-		'profileIdx' => 'web.avail_report.filter',
-		'profileIdx2' => 0,
-		'from' => $data['from'],
-		'to' => $data['to'],
-		'from_ts' => $data['from_ts'],
-		'to_ts' => $data['to_ts']
-	],
-	'active_tab' => $data['active_tab']
-];
+if ($data['ajax_request']) {
+	(new CDiv($dynamic_node))->setId('rsm_tests')->show();
+}
+else {
+	// Load JS files.
+	$this->addJsFile('flickerfreescreen.js');
+	$this->addJsFile('gtlc.js');
+	$this->addJsFile('class.calendar.js');
 
-(new CScriptTag(
-	'timeControl.addObject("incidents", '.json_encode($filter).', '.json_encode($tc_obj_data).');'.
-	'timeControl.processObjects();'
-))->show();
+	$filter_url = (new CUrl('zabbix.php'))->setArgument('action', 'rsm.tests');
+	$dynamic_node = (new DynamicContent($dynamic_node))->setId('rsm_tests');
+	$dynamic_node->refresh_seconds = $data['refresh'];
+
+	(new CWidget())
+		->setTitle($data['title'])
+		->addItem((new CFilter($filter_url))
+			->setProfile($data['profileIdx'])
+			->setActiveTab($data['active_tab'])
+			->addTimeSelector($data['from'], $data['to'])
+			->hideFilterButtons()
+			->addFilterTab(_('Filter'), [
+				(new CButton('rolling_week', _('Rolling week')))->onClick(
+					'$.publish("timeselector.rangechange", '.json_encode([
+						'from' => $data['rollingweek_from'],
+						'to' => $data['rollingweek_to'],
+					]).')'
+				)
+			])
+			->addVar('action', 'rsm.tests')
+		)
+		->addItem($dynamic_node)
+		->addItem(
+			(new CTag('link', false))
+				->setAttribute('rel', 'stylesheet')
+				->setAttribute('type', 'text/css')
+				->setAttribute('href', $data['assets_path'].'/rsm.style.css')
+		)
+		->show();
+}

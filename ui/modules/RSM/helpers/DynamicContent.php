@@ -22,7 +22,7 @@ class DynamicContent extends CDiv {
 			$autorefresh.
 			'function refresh() {'.
 				'$.get(window.location.href).fail(function() {'.
-					'$("#'.$id.'").text("Cannot load data, please refresh page.");'.
+					'$("#'.$id.'").html("<h1 class=\"center msg-bad\">Cannot load data, please refresh page.</h1>");'.
 				'}).done(function(resp) {'.
 					'shadow_container.html(resp);'.
 					'$("#'.$id.'").replaceWith(shadow_container.find("#'.$id.'"));'.

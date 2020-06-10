@@ -339,18 +339,31 @@ class TestsListAction extends Action {
 	protected function doAction() {
 		$this->access_deny = false;
 
+		$macros = API::UserMacro()->get([
+			'output' => ['macro', 'value'],
+			'filter' => ['macro' => RSM_ROLLWEEK_SECONDS],
+			'globalmacro' => true
+		]);
+		$macros = array_column($macros, 'value', 'macro');
+		$timeshift = ($macros[RSM_ROLLWEEK_SECONDS]%SEC_PER_DAY)
+					? $macros[RSM_ROLLWEEK_SECONDS]
+					: ($macros[RSM_ROLLWEEK_SECONDS]/SEC_PER_DAY).'d';
+
 		$data = [
 			'title' => _('Tests'),
+			'ajax_request' => $this->isAjaxRequest(),
+			'refresh' => CWebUser::$data['refresh'] ? timeUnitToSeconds(CWebUser::$data['refresh']) : null,
 			'assets_path' => $this->assets_path,
 			'profileIdx' => 'web.rsm.tests.filter',
 			'active_tab' => CProfile::get('web.rsm.tests.filter.active', 1),
 			'rsm_monitoring_mode' => get_rsm_monitoring_type(),
-			'sid' => CWebUser::getSessionCookie(),
 			'host' => $this->getInput('host'),
 			'type' => $this->getInput('type'),
 			'slvItemId' => $this->getInput('slvItemId'),
 			'from' => $this->getInput('from', ZBX_PERIOD_DEFAULT_FROM),
 			'to' => $this->getInput('to', ZBX_PERIOD_DEFAULT_TO),
+			'rollingweek_from' => 'now-'.$timeshift,
+			'rollingweek_to' => 'now',
 			'tests' => []
 		];
 
