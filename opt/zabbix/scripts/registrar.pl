@@ -384,7 +384,7 @@ sub manage_registrar($$$$)
 	{
 		my $macro = $service eq 'rdap' ? '{$RDAP.TLD.ENABLED}' : '{$RSM.TLD.' . uc($service) . '.ENABLED}';
 
-		my $macro_value = get_host_macro($main_templateid, $macro);
+		my $macro_value = get_host_macro($config_templateid, $macro);
 
 		$enabled_services{$service} = 1 if (defined($macro_value) && $macro_value->{'value'});
 	}
