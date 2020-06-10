@@ -2473,8 +2473,16 @@ int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *res
 		return ret;
 	}
 
-	/* choose test protocol */
-	if (CURRENT_MODE_NORMAL == current_mode)
+	/* choose test protocol: if only one is enabled, select that one, otherwise select based on the ratio */
+	if (udp_enabled && !tcp_enabled)
+	{
+		protocol = RSM_UDP;
+	}
+	else if (tcp_enabled && !udp_enabled)
+	{
+		protocol = RSM_TCP;
+	}
+	else if (CURRENT_MODE_NORMAL == current_mode)
 	{
 		protocol = ((item->nextcheck / 60) % tcp_ratio) == 0 ? RSM_TCP : RSM_UDP;
 	}
