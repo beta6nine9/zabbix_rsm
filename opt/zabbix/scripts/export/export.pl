@@ -974,6 +974,8 @@ sub __save_csv_data($$)
 								$ns_id // '',
 								$ip_id);
 
+							my $ns_id = (exists($metric_ref->{'nsid'}) ? dw_get_id(ID_NSID, $metric_ref->{'nsid'}) : '');
+
 							# TEST
 							dw_append_csv(DATA_TEST, [
 									      $probe_id,
@@ -987,7 +989,8 @@ sub __save_csv_data($$)
 									      $ip_id,
 									      $test_type_id,
 									      $ns_id // '',
-									      $tld_type_id
+									      $tld_type_id,
+									      $ns_id
 							]);
 
 							if ($ip)

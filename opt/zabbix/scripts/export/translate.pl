@@ -169,6 +169,7 @@ sub __translate_tests_line
 	my $test_type = dw_get_name(ID_TEST_TYPE, $columns[9]);
 	my $test_nsfqdn = dw_get_name(ID_NS_NAME, $columns[10]) // '';
 	my $tld_type = dw_get_name(ID_TLD_TYPE, $columns[11]);
+	my $nsid = dw_get_name(ID_NSID, $columns[12]) // '';
 
 	# $test_type is service interface, e. g.: dns, rdds43, rdds80
 	if ($valuemaps{$test_type}->{$test_rtt})
@@ -192,6 +193,7 @@ sub __translate_tests_line
 	printf("%-" . PRINT_RIGHT_SHIFT . "s%s\n", 'testType', $test_type);
 	printf("%-" . PRINT_RIGHT_SHIFT . "s%s\n", 'testNSFQDN', $test_nsfqdn);
 	printf("%-" . PRINT_RIGHT_SHIFT . "s%s\n", 'tldType', $tld_type);
+	printf("%-" . PRINT_RIGHT_SHIFT . "s%s\n", 'nsid', $nsid);
 }
 
 sub __translate_ns_tests_line

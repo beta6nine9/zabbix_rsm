@@ -15,6 +15,7 @@ use constant ID_PROBE => 'probe';
 use constant ID_TLD => 'tld';
 use constant ID_NS_NAME => 'ns_name';
 use constant ID_NS_IP => 'ns_ip';
+use constant ID_NSID => 'nsid';
 use constant ID_TRANSPORT_PROTOCOL => 'transport_protocol';
 use constant ID_TEST_TYPE => 'test_type';
 use constant ID_SERVICE_CATEGORY => 'service_category';
@@ -39,6 +40,7 @@ our %CATALOGS = (
 	ID_TLD() => 'tlds.csv',
 	ID_NS_NAME() => 'nsFQDNs.csv',
 	ID_NS_IP() => 'ipAddresses.csv',
+	ID_NSID() => 'nsid.csv',
 	ID_TRANSPORT_PROTOCOL() => 'transportProtocols.csv',
 	ID_TEST_TYPE() => 'testTypes.csv',
 	ID_SERVICE_CATEGORY() => 'serviceCategory.csv',
@@ -63,7 +65,7 @@ our %DATAFILES = (
 use base 'Exporter';
 
 our @EXPORT = qw(
-		ID_PROBE ID_TLD ID_NS_NAME ID_NS_IP ID_TRANSPORT_PROTOCOL ID_TEST_TYPE ID_SERVICE_CATEGORY
+		ID_PROBE ID_TLD ID_NS_NAME ID_NS_IP ID_NSID ID_TRANSPORT_PROTOCOL ID_TEST_TYPE ID_SERVICE_CATEGORY
 		ID_TLD_TYPE ID_STATUS_MAP ID_IP_VERSION ID_TARGET ID_TESTEDNAME
 		DATA_TEST DATA_NSTEST DATA_CYCLE DATA_INCIDENT DATA_INCIDENT_END
 		DATA_FALSE_POSITIVE DATA_PROBE_CHANGES
@@ -78,6 +80,7 @@ my %_MAX_IDS = (
 	ID_TLD() => 32767,
 	ID_NS_NAME() => 32767,
 	ID_NS_IP() => 32767,
+	ID_NSID() => 32767,
 	ID_TRANSPORT_PROTOCOL() => 127,
 	ID_TEST_TYPE() => 127,
 	ID_SERVICE_CATEGORY() => 127,
