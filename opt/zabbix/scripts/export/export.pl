@@ -561,7 +561,7 @@ sub __get_test_data($$$)
 
 		$itemid_avail = get_itemid_by_hostid($hostid, $key_avail);
 
-		if ($itemid == E_ID_NONEXIST)
+		if ($itemid_avail == E_ID_NONEXIST)
 		{
 			wrn("configuration error: service $service enabled $service availability item does not exist");
 			next;
