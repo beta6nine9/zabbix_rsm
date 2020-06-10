@@ -448,12 +448,15 @@ if ($data['tld']) {
 			)
 			->additem($rdap_table);
 	}
-	else {
-		$message = is_RDAP_standalone($data['from_ts'])
+	elseif ($data['rdap_standalone_start_ts'] > 0) {
+		$message = is_rdap_standalone($data['from_ts'])
 			? _('RDAP is disabled.')
 			: _('RDAP is not a standalone service.');
 
 		$rdap_tab = (new CDiv())->additem(new CDiv(bold($message), 'red center'));
+	}
+	else {
+		$rdap_tab = null;
 	}
 
 	// EPP
@@ -549,17 +552,11 @@ if ($data['tld']) {
 		$epp_tab = (new CDiv())->additem(new CDiv(bold(_('EPP is disabled.')), 'red center'));
 	}
 
-	if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
-		$incident_page->addTab('rddsTab', _('RDDS'), $rdds_tab);
-		$incident_page->addTab('rdapTab', _('RDAP'), $rdap_tab);
-	}
-	else {
-		$incident_page->addTab('dnsTab', _('DNS'), $dns_tab);
-		$incident_page->addTab('dnssecTab', _('DNSSEC'), $dnssec_tab);
-		$incident_page->addTab('rddsTab', _('RDDS'), $rdds_tab);
-		$incident_page->addTab('eppTab', _('EPP'), $epp_tab);
-		$incident_page->addTab('rdapTab', _('RDAP'), $rdap_tab);
-	}
+	($dns_tab === null) || $incident_page->addTab('dnsTab', _('DNS'), $dns_tab);
+	($dnssec_tab === null) || $incident_page->addTab('dnssecTab', _('DNSSEC'), $dnssec_tab);
+	($rdds_tab === null) || $incident_page->addTab('rddsTab', _('RDDS'), $rdds_tab);
+	($epp_tab === null) || $incident_page->addTab('eppTab', _('EPP'), $epp_tab);
+	($rdap_tab === null) || $incident_page->addTab('rdapTab', _('RDAP'), $rdap_tab);
 }
 else {
 	$incident_page = new CTableInfo(_('No TLD defined.'));

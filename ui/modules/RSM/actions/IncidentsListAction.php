@@ -981,7 +981,6 @@ class IncidentsListAction extends Action {
 			'incident_to' => date(ZBX_DATE_TIME, $server_now),
 			'active_tab' => CProfile::get('web.rsm.incidents.filter.active', 1),
 			'incidents_tab' => (int) get_cookie('incidents_tab', 0),
-			'sid' => CWebUser::getSessionCookie()
 		];
 
 		if (!$this->isAjaxRequest() && $this->hasInput('type')) {
@@ -1027,18 +1026,15 @@ class IncidentsListAction extends Action {
 			DBconnect($error);
 		}
 
-		// Chceck if RDAP standalone service was enabled during the filtered period.
-		if (is_RDAP_standalone($this->filter_time_from) !== is_RDAP_standalone($this->filter_time_till)) {
-			$rdap_standalone_ts = API::UserMacro()->get([
-				'output' => ['value'],
-				'filter' => [
-					'macro' => RSM_RDAP_STANDALONE
-				],
-				'globalmacro' => true
-			]);
+		$rdap_standalone_ts = API::UserMacro()->get([
+			'output' => ['value'],
+			'filter' => [
+				'macro' => RSM_RDAP_STANDALONE
+			],
+			'globalmacro' => true
+		]);
 
-			$data['rdap_standalone_start_ts'] = $rdap_standalone_ts ? $rdap_standalone_ts[0]['value'] : 0;
-		}
+		$data['rdap_standalone_start_ts'] = $rdap_standalone_ts ? $rdap_standalone_ts[0]['value'] : 0;
 
 		// Show error if no matching hosts found.
 		if ($data['filter_search'] && !$data['tld']) {
