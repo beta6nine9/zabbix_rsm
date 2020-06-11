@@ -11,7 +11,7 @@
 	margin: 0 5px 2px;
 	height: 11px;
 	width: 11px;
-	box-shadow: 0 0 4px green;
+	box-shadow: 0 0 3px green;
 	background-color: green;
 	border-radius: 50%;
 	display: inline-block;
@@ -20,8 +20,8 @@
 	margin: 0 5px 2px;
 	height: 11px;
 	width: 11px;
-	box-shadow: 0 0 4px red;
-	background-color: red;
+	box-shadow: 0 0 3px #ea3500;
+	background-color: #ea3500;
 	border-radius: 50%;
 	display: inline-block;
 }
@@ -29,7 +29,7 @@
 	margin: 0 5px 2px;
 	height: 11px;
 	width: 11px;
-	box-shadow: 0 0 4px grey;
+	box-shadow: 0 0 3px grey;
 	background-color: grey;
 	border-radius: 50%;
 	display: inline-block;
@@ -38,7 +38,7 @@
 	margin: 0 5px 2px;
 	height: 11px;
 	width: 11px;
-	box-shadow: 0 0 4px #c2be00;
+	box-shadow: 0 0 3px #c2be00;
 	background-color: #c2be00;
 	border-radius: 50%;
 	display: inline-block;
