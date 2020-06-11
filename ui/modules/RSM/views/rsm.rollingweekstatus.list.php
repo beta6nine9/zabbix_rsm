@@ -247,7 +247,7 @@ if ($data['tld']) {
 
 		// DNS
 		if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY && array_key_exists(RSM_DNS, $tld)
-				&& array_key_exists('trigger', $tld[RSM_DNS])) {
+				&& array_key_exists('trigger', $tld[RSM_DNS]) && $tld[RSM_DNS]['clock']) {
 			if ($tld[RSM_DNS]['trigger'] && $tld[RSM_DNS]['incident']) {
 				if (array_key_exists('availItemId', $tld[RSM_DNS]) && array_key_exists('itemid', $tld[RSM_DNS])) {
 					$dns_status = new CLink(
@@ -283,7 +283,8 @@ if ($data['tld']) {
 				))->addClass('first-cell-value')
 				: (new CSpan('0.000%'))->addClass('first-cell-value');
 
-			$dns_value->setHint($tld[RSM_DNS]['clock'], '', false);
+			if ($tld[RSM_DNS]['clock'])
+				$dns_value->setHint($tld[RSM_DNS]['clock'], '', false);
 
 			$dns_graph = ($tld[RSM_DNS]['lastvalue'] > 0)
 				? new CLink('graph',
@@ -298,14 +299,21 @@ if ($data['tld']) {
 			$row[] = [(new CSpan($dns_value))->addClass('right'), $dns_status, SPACE, $dns_graph];
 		}
 		elseif ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY) {
-			$row[] = (new CDiv())
-				->addClass('service-icon status_icon_extra iconrollingweekdisabled disabled-service')
-				->setHint(_('Incorrect TLD configuration.'), '', false);
+			if (array_key_exists(RSM_DNS, $tld)) {
+				$row[] = (new CDiv())
+					->addClass('service-icon status_icon_extra iconrollingweeknodata disabled-service')
+					->setHint(_('No value yet'), '', false);
+			}
+			else {
+				$row[] = (new CDiv())
+					->addClass('service-icon status_icon_extra iconrollingweekdisabled disabled-service')
+					->setHint(_('Incorrect TLD configuration'), '', false);
+			}
 		}
 
 		// DNSSEC
 		if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY && array_key_exists(RSM_DNSSEC, $tld)
-				&& array_key_exists('trigger', $tld[RSM_DNSSEC])) {
+				&& array_key_exists('trigger', $tld[RSM_DNSSEC]) && $tld[RSM_DNSSEC]['clock']) {
 			if ($tld[RSM_DNSSEC]['trigger'] && $tld[RSM_DNSSEC]['incident']) {
 				if (array_key_exists('availItemId', $tld[RSM_DNSSEC]) && array_key_exists('itemid', $tld[RSM_DNSSEC])) {
 					$dnssec_status = new CLink(
@@ -341,7 +349,8 @@ if ($data['tld']) {
 				))->addClass('first-cell-value')
 				: (new CSpan('0.000%'))->addClass('first-cell-value');
 
-			$dnssec_value->setHint($tld[RSM_DNSSEC]['clock'], '', false);
+			if ($tld[RSM_DNSSEC]['clock'])
+				$dnssec_value->setHint($tld[RSM_DNSSEC]['clock'], '', false);
 
 			$dnssec_graph = ($tld[RSM_DNSSEC]['lastvalue'] > 0)
 				? new CLink('graph',
@@ -355,14 +364,21 @@ if ($data['tld']) {
 			$row[] = [(new CSpan($dnssec_value))->addClass('right'), $dnssec_status, SPACE, $dnssec_graph];
 		}
 		elseif ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY) {
-			$row[] = (new CDiv(null))
-				->addClass('service-icon status_icon_extra iconrollingweekdisabled disabled-service')
-				->setHint('DNSSEC is disabled.', '', false);
+			if (array_key_exists(RSM_DNSSEC, $tld)) {
+				$row[] = (new CDiv())
+					->addClass('service-icon status_icon_extra iconrollingweeknodata disabled-service')
+					->setHint(_('No value yet'), '', false);
+			}
+			else {
+				$row[] = (new CDiv(null))
+					->addClass('service-icon status_icon_extra iconrollingweekdisabled disabled-service')
+					->setHint('DNSSEC is disabled', '', false);
+			}
 		}
 
 		// RDDS
 		// RDDS column is shown in registrar monitoring as well.
-		if (array_key_exists(RSM_RDDS, $tld) && array_key_exists('trigger', $tld[RSM_RDDS])) {
+		if (array_key_exists(RSM_RDDS, $tld) && array_key_exists('trigger', $tld[RSM_RDDS]) && $tld[RSM_RDDS]['clock']) {
 			if ($tld[RSM_RDDS]['trigger'] && $tld[RSM_RDDS]['incident']) {
 				if (array_key_exists('availItemId', $tld[RSM_RDDS]) && array_key_exists('itemid', $tld[RSM_RDDS])) {
 					$rdds_status = new CLink(
@@ -398,7 +414,8 @@ if ($data['tld']) {
 				))->addClass('first-cell-value')
 				: (new CSpan('0.000%'))->addClass('first-cell-value');
 
-			$rdds_value->setHint($tld[RSM_RDDS]['clock'], '', false);
+			if ($tld[RSM_RDDS]['clock'])
+				$rdds_value->setHint($tld[RSM_RDDS]['clock'], '', false);
 
 			$rdds_graph = ($tld[RSM_RDDS]['lastvalue'] > 0)
 				? new CLink('graph',
@@ -427,14 +444,19 @@ if ($data['tld']) {
 				new CSpan($rdds_services, 'bold')
 			];
 		}
+		else if (array_key_exists(RSM_RDDS, $tld)) {
+			$row[] = (new CDiv())
+				->addClass('service-icon status_icon_extra iconrollingweeknodata disabled-service')
+				->setHint(_('No value yet'), '', false);
+		}
 		else {
 			$row[] = (new CDiv(null))
 				->addClass('service-icon status_icon_extra iconrollingweekdisabled disabled-service')
-				->setHint('RDDS is disabled.', '', false);
+				->setHint('RDDS is disabled', '', false);
 		}
 
 		// RDAP
-		if (is_RDAP_standalone() && array_key_exists(RSM_RDAP, $tld) && array_key_exists('trigger', $tld[RSM_RDAP])) {
+		if (is_RDAP_standalone() && array_key_exists(RSM_RDAP, $tld) && array_key_exists('trigger', $tld[RSM_RDAP]) && $tld[RSM_RDAP]['clock']) {
 			if ($tld[RSM_RDAP]['trigger'] && $tld[RSM_RDAP]['incident']) {
 				if (array_key_exists('availItemId', $tld[RSM_RDAP]) && array_key_exists('itemid', $tld[RSM_RDAP])) {
 					$rdap_status =  new CLink(
@@ -470,7 +492,8 @@ if ($data['tld']) {
 				))->addClass('first-cell-value')
 				: (new CSpan('0.000%'))->addClass('first-cell-value');
 
-			$rdap_value->setHint($tld[RSM_RDAP]['clock'], '', false);
+			if ($tld[RSM_RDAP]['clock'])
+				$rdap_value->setHint($tld[RSM_RDAP]['clock'], '', false);
 
 			$rdap_graph = ($tld[RSM_RDAP]['lastvalue'] > 0)
 				? new CLink('graph',
@@ -484,14 +507,21 @@ if ($data['tld']) {
 			$row[] = [(new CSpan($rdap_value))->addClass('right'), $rdap_status, SPACE, $rdap_graph];
 		}
 		elseif (is_RDAP_standalone()) {
-			$row[] = (new CDiv())
-				->addClass('service-icon status_icon_extra iconrollingweekdisabled disabled-service')
-				->setHint('RDAP is disabled.', '', false);
+			if (array_key_exists(RSM_RDAP, $tld)) {
+				$row[] = (new CDiv())
+					->addClass('service-icon status_icon_extra iconrollingweeknodata disabled-service')
+					->setHint(_('No value yet'), '', false);
+			}
+			else {
+				$row[] = (new CDiv())
+					->addClass('service-icon status_icon_extra iconrollingweekdisabled disabled-service')
+					->setHint('RDAP is disabled', '', false);
+			}
 		}
 
 		// EPP
 		if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY && array_key_exists(RSM_EPP, $tld)
-				&& array_key_exists('trigger', $tld[RSM_EPP])) {
+				&& array_key_exists('trigger', $tld[RSM_EPP]) && $tld[RSM_EPP]['clock']) {
 			if ($tld[RSM_EPP]['trigger'] && $tld[RSM_EPP]['incident']) {
 				if (array_key_exists('availItemId', $tld[RSM_EPP]) && array_key_exists('itemid', $tld[RSM_EPP])) {
 					$epp_status = new CLink(
@@ -527,7 +557,8 @@ if ($data['tld']) {
 				))->addClass('first-cell-value')
 				: (new CSpan('0.000%'))->addClass('first-cell-value');
 
-			$epp_value->setHint($tld[RSM_EPP]['clock'], '', false);
+			if ($tld[RSM_EPP]['clock'])
+				$epp_value->setHint($tld[RSM_EPP]['clock'], '', false);
 
 			$epp_graph = ($tld[RSM_EPP]['lastvalue'] > 0)
 				? new CLink('graph',
@@ -543,9 +574,16 @@ if ($data['tld']) {
 			$row[] = [(new CSpan($epp_value))->addClass('right'), $epp_status, SPACE, $epp_graph];
 		}
 		elseif ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY) {
-			$row[] = (new CDiv(null))
-				->addClass('service-icon status_icon_extra iconrollingweekdisabled disabled-service')
-				->setHint('EPP is disabled.', '', false);
+			if (array_key_exists(RSM_EPP, $tld)) {
+				$row[] = (new CDiv())
+					->addClass('service-icon status_icon_extra iconrollingweeknodata disabled-service')
+					->setHint(_('No value yet'), '', false);
+			}
+			else {
+				$row[] = (new CDiv(null))
+					->addClass('service-icon status_icon_extra iconrollingweekdisabled disabled-service')
+					->setHint('EPP is disabled', '', false);
+			}
 		}
 
 		$row[] = new CLink($tld['server'], Url::getFor($tld['url'], 'rsm.rollingweekstatus', []));
