@@ -22,7 +22,7 @@
 use Modules\RSM\Helpers\CTableInfo;
 
 $object_label = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) ? _('Registrar ID') : _('TLD');
-$use_rdap = ($data['type'] == RSM_RDDS && !is_RDAP_standalone($data['test_time_from']));
+$rdap_is_part_of_rdds = ($data['type'] == RSM_RDDS && !is_RDAP_standalone($data['test_time_from']));
 
 if ($data['type'] == RSM_DNS || $data['type'] == RSM_DNSSEC) {
 	$table = (new CTableInfo())->setHeader([
@@ -80,7 +80,7 @@ elseif ($data['type'] == RSM_RDDS) {
 		->addItem((new CTag('th', true, _('Target'))))
 		->addItem((new CTag('th', true, _('RTT'))));
 
-	if ($use_rdap) {
+	if ($rdap_is_part_of_rdds) {
 		$row_1->addItem(
 			(new CTag('th', true, _('RDAP')))
 				->setAttribute('colspan', 5)
@@ -95,7 +95,7 @@ elseif ($data['type'] == RSM_RDDS) {
 			->addItem((new CTag('th', true, _('RTT'))));
 	}
 
-	$column_count = $use_rdap ? 12 : 8;
+	$column_count = $rdap_is_part_of_rdds ? 12 : 8;
 	$table = (new CTableInfo())
 		->setMultirowHeader([$row_1, $row_2], $column_count)
 		->setAttribute('class', 'list-table table-bordered-head');
@@ -289,15 +289,15 @@ foreach ($data['probes'] as $probe) {
 					&& $data['tld']['macros'][RSM_RDAP_TLD_ENABLED] == 0) {
 				$rdap = $disabled;
 			}
-			elseif (!isset($probe['value_rdap']) || $probe['value_rdap'] === null) {
+			elseif (!isset($probe['value']) || $probe['value'] === null) {
 				$rdap = $no_result;
 			}
-			elseif ($probe['value_rdap'] == 0) {
+			elseif ($probe['value'] == 0) {
 				$rdds = ZBX_STYLE_RED;
 				$probe_down = true;
 				$rdap = $down;
 			}
-			elseif ($probe['value_rdap'] == 1) {
+			elseif ($probe['value'] == 1) {
 				if ($rdds !== ZBX_STYLE_RED) {
 					$rdds = ZBX_STYLE_GREEN;
 				}
@@ -337,7 +337,7 @@ foreach ($data['probes'] as $probe) {
 				$probe_down = false;
 				$rdds = ZBX_STYLE_GREY;
 			}
-			elseif ((!$use_rdap || $rdap === $disabled || $rdap === $no_result)
+			elseif (($rdap_is_part_of_rdds && ($rdap === $disabled || $rdap === $no_result))
 					&& ($rdds43 === $disabled || $rdds43 === $no_result)
 					&& ($rdds80 === $disabled || $rdds80 === $no_result)) {
 				$probe_no_result = true;
@@ -397,7 +397,7 @@ foreach ($data['probes'] as $probe) {
 			}
 		}
 
-		if ($use_rdap && isset($probe['rdap']['rtt'])) {
+		if ($rdap_is_part_of_rdds && isset($probe['rdap']['rtt'])) {
 			$rdap_rtt = (new CSpan($probe['rdap']['rtt']['value']))
 				->setAttribute('class', $rdap === $down ? ZBX_STYLE_RED : ZBX_STYLE_GREEN);
 
@@ -429,7 +429,7 @@ foreach ($data['probes'] as $probe) {
 			$rdds80_rtt
 		];
 
-		if ($use_rdap) {
+		if ($rdap_is_part_of_rdds) {
 			$row = array_merge($row, [
 				$rdap,
 				(isset($probe['rdap']['ip']) && $probe['rdap']['ip'])
@@ -461,7 +461,7 @@ foreach ($data['probes'] as $probe) {
 		if ($rdds43 === $down && isset($probe['rdds43']['rtt']) && $probe['rdds43']['rtt']['value'] > 0) {
 			$rdds43_above_max_rtt++;
 		}
-		if ($use_rdap && $rdap === $down && isset($probe['rdap']['rtt']) && $probe['rdap']['rtt']['value'] > 0) {
+		if ($rdap_is_part_of_rdds && $rdap === $down && isset($probe['rdap']['rtt']) && $probe['rdap']['rtt']['value'] > 0) {
 			$rdap_above_max_rtt++;
 		}
 	}
@@ -541,7 +541,7 @@ elseif ($data['type'] == RSM_RDDS) {
 			array_key_exists('rdds80', $error) ? $error['rdds80'] : ''
 		];
 
-		if ($use_rdap) {
+		if ($rdap_is_part_of_rdds) {
 			$row = array_merge($row, ['', '', '', '', array_key_exists('rdap', $error) ? $error['rdap'] : '']);
 		}
 
@@ -561,7 +561,7 @@ elseif ($data['type'] == RSM_RDDS) {
 		$rdds80_above_max_rtt
 	];
 
-	if ($use_rdap) {
+	if ($rdap_is_part_of_rdds) {
 		$row = array_merge($row, ['', '', '', '', $rdap_above_max_rtt]);
 	}
 

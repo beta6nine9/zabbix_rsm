@@ -672,7 +672,7 @@ class ParticularTestsListAction extends Action {
 						}
 					}
 					elseif (substr($item['key_'], 0, strlen(PROBE_RDAP_STATUS)) === PROBE_RDAP_STATUS) {
-						$hosts[$item['hostid']]['value_rdap'] = $itemValue['value'];
+						$hosts[$item['hostid']]['value'] = $itemValue['value'];
 					}
 					elseif (substr($item['key_'], 0, strlen(PROBE_RDDS_STATUS)) === PROBE_RDDS_STATUS) {
 						$hosts[$item['hostid']]['value'] = $itemValue['value'];
