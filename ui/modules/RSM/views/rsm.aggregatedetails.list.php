@@ -191,24 +191,32 @@ foreach ($data['errors'] as $error_code => $errors) {
 
 // Add 'Total above max rtt' row:
 if ($data['type'] == RSM_DNS && array_key_exists('dns_nameservers', $data)) {
-	$row = [_('Total above max. RTT'), '', '', '', ''];
+	$row_udp = [_('Total above max. UDP RTT'), '', '', '', ''];
+	$row_tcp = [_('Total above max. TCP RTT'), '', '', '', ''];
 
 	foreach ($data['dns_nameservers'] as $ns_name => $ns_ips) {
 		// 'Status' column
-		$row[] = '';
+		$row_udp[] = '';
+		$row_tcp[] = '';
 
 		foreach (array_keys(array_reduce($ns_ips, 'array_merge', [])) as $ip) {
 			$error_key = $ns_name.$ip;
 			// 'IP' column
-			$row[] = array_key_exists($error_key, $data['probes_above_max_rtt'])
-				? $data['probes_above_max_rtt'][$error_key]
+			$row_udp[] = array_key_exists($error_key, $data['probes_above_max_rtt'])
+				? $data['probes_above_max_rtt'][$error_key]['udp']
+				: '0';
+			$row_tcp[] = array_key_exists($error_key, $data['probes_above_max_rtt'])
+				? $data['probes_above_max_rtt'][$error_key]['tcp']
 				: '0';
 			// 'NSID' column
-			$row[] = '';
+			$row_udp[] = '';
+			$row_tcp[] = '';
 		}
 	}
 
-	$table->addRow($row);
+	$table
+		->addRow($row_udp)
+		->addRow($row_tcp);
 }
 
 $test_result = (new CSpan(_('No result')))->addClass(ZBX_STYLE_GREY);

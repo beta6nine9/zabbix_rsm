@@ -252,10 +252,13 @@ class AggregateDetailsAction extends Action {
 				$this->probes[$probeid]['above_max_rtt'][$error_key] = true;
 
 				if (!isset($data['probes_above_max_rtt'][$error_key])) {
-					$data['probes_above_max_rtt'][$error_key] = 0;
+					$data['probes_above_max_rtt'][$error_key] = [
+						'tcp' => 0,
+						'udp' => 0,
+					];
 				}
 
-				$data['probes_above_max_rtt'][$error_key]++;
+				$data['probes_above_max_rtt'][$error_key][$transport]++;
 			}
 		}
 
