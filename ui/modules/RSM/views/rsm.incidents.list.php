@@ -566,16 +566,7 @@ else {
 $filter_url = (new CUrl($data['url'].'zabbix.php'))->setArgument('action', 'rsm.incidents');
 $filter_buttons = (new CDiv())
 	->addClass(ZBX_STYLE_FILTER_FORMS)
-	->addItem((new CSubmitButton(_('Rolling week'), 'filter_set', 1)))
-	->addItem(
-		(new CRedirectButton(_('Reset'),
-			Url::get('rsm.incidents', [
-				'filter_rst' => 1,
-				'rolling_week' => 1,
-			])
-		))
-			->addClass(ZBX_STYLE_BTN_ALT)
-	);
+	->addItem((new CSubmitButton(_('Rolling week'), 'filter_set', 1)));
 
 if ($data['ajax_request']) {
 	$dynamic_node = new CDiv([

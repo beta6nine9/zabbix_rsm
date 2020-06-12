@@ -137,16 +137,7 @@ $filter_url = Url::get('rsm.incidentdetails', [
 ]);
 $filter_buttons = (new CDiv())
 	->addClass(ZBX_STYLE_FILTER_FORMS)
-	->addItem((new CSubmitButton(_('Rolling week'), 'filter_set', 1)))
-	->addItem(
-		(new CRedirectButton(_('Reset'),
-			Url::get('rsm.incidents', [
-				'filter_rst' => 1,
-				'rolling_week' => 1,
-			])
-		))
-			->addClass(ZBX_STYLE_BTN_ALT)
-	);
+	->addItem((new CSubmitButton(_('Rolling week'), 'filter_set', 1)));
 $dynamic_node = [
 	(new CDiv())
 		->addClass(ZBX_STYLE_TABLE_FORMS_CONTAINER)
