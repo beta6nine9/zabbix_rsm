@@ -28,6 +28,8 @@ use CWebUser;
 use CPagerHelper;
 use CControllerResponseFatal;
 use CControllerResponseData;
+use CControllerResponseRedirect;
+use Modules\RSM\Helpers\UrlHelper;
 
 class IncidentDetailsAction extends Action {
 
@@ -373,6 +375,28 @@ class IncidentDetailsAction extends Action {
 	}
 
 	protected function doAction() {
+		$macros = API::UserMacro()->get([
+			'output' => ['macro', 'value'],
+			'filter' => ['macro' => RSM_ROLLWEEK_SECONDS],
+			'globalmacro' => true
+		]);
+		$macros = array_column($macros, 'value', 'macro');
+
+		if ($this->hasInput('rolling_week')) {
+			$data = $this->getInputAll();
+			unset($data['rolling_week']);
+			$timeshift = ($macros[RSM_ROLLWEEK_SECONDS]%SEC_PER_DAY)
+					? $macros[RSM_ROLLWEEK_SECONDS]
+					: ($macros[RSM_ROLLWEEK_SECONDS]/SEC_PER_DAY).'d';
+			$data['from'] = 'now-'.$timeshift;
+			$data['to'] = 'now';
+			$response = new CControllerResponseRedirect(UrlHelper::get($this->getAction(), $data));
+			CProfile::update('web.rsm.incidents.filter.active', 2, PROFILE_TYPE_INT);
+			$this->setResponse($response);
+
+			return;
+		}
+
 		$this->access_deny = false;
 		$this->server_time = time() - RSM_ROLLWEEK_SHIFT_BACK;
 		$data = [
