@@ -223,7 +223,7 @@ class AggregateDetailsAction extends Action {
 
 			$ns = $key_parser->getParam(0);
 			$ip = $key_parser->getParam(1);
-			$transport = $key_parser->getParam(2);
+			$transport = $key_parser->getParam(2);	// TODO: we have now special item for that "rsm.dns.transport"
 			$ipv = filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) ? 'ipv4' : 'ipv6';
 			$dns_nameservers[$ns][$ipv][$ip] = true;
 			$rtt_max = ($transport == 'udp') ? $data['udp_rtt'] : $data['tcp_rtt'];
