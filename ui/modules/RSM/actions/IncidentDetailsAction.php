@@ -28,8 +28,6 @@ use CWebUser;
 use CPagerHelper;
 use CControllerResponseFatal;
 use CControllerResponseData;
-use CControllerResponseRedirect;
-use Modules\RSM\Helpers\UrlHelper;
 
 class IncidentDetailsAction extends Action {
 
@@ -75,17 +73,17 @@ class IncidentDetailsAction extends Action {
 		if ($this->hasInput('filter_set')) {
 			$data['filter_failing_tests'] = $this->getInput('filter_failing_tests', 0);
 			updateTimeSelectorPeriod($data);
-			CProfile::update('web.rsm.incidentdetails.filter_failing_tests', $data['filter_failing_tests'], PROFILE_TYPE_INT);
+			CProfile::update('web.rsm.incidents.filter_failing_tests', $data['filter_failing_tests'], PROFILE_TYPE_INT);
 		}
 		elseif ($this->hasInput('filter_rst')) {
 			$data['filter_failing_tests'] = 0;
 			$data['from'] = ZBX_PERIOD_DEFAULT_FROM;
 			$data['to'] = ZBX_PERIOD_DEFAULT_TO;
 			updateTimeSelectorPeriod($data);
-			CProfile::delete('web.rsm.incidentdetails.filter_failing_tests');
+			CProfile::delete('web.rsm.incidents.filter_failing_tests');
 		}
 		else {
-			$data['filter_failing_tests'] = CProfile::get('web.rsm.incidentdetails.filter_failing_tests');
+			$data['filter_failing_tests'] = CProfile::get('web.rsm.incidents.filter_failing_tests');
 		}
 
 		$data = getTimeSelectorPeriod($data);
@@ -377,43 +375,19 @@ class IncidentDetailsAction extends Action {
 	protected function doAction() {
 		$this->access_deny = false;
 		$this->server_time = time() - RSM_ROLLWEEK_SHIFT_BACK;
-
-		$macros = API::UserMacro()->get([
-			'output' => ['macro', 'value'],
-			'filter' => ['macro' => RSM_ROLLWEEK_SECONDS],
-			'globalmacro' => true
-		]);
-		$macros = array_column($macros, 'value', 'macro');
-
-		if ($this->hasInput('rolling_week')) {
-			$data = $this->getInputAll();
-			unset($data['rolling_week']);
-			$timeshift = ($macros[RSM_ROLLWEEK_SECONDS]%SEC_PER_DAY)
-					? $macros[RSM_ROLLWEEK_SECONDS]
-					: ($macros[RSM_ROLLWEEK_SECONDS]/SEC_PER_DAY).'d';
-			$data['from'] = 'now-'.$timeshift;
-			$data['to'] = 'now';
-			$response = new CControllerResponseRedirect(UrlHelper::get($this->getAction(), $data));
-			CProfile::update('web.rsm.incidentsdetails.filter', 2, PROFILE_TYPE_INT);
-			$this->setResponse($response);
-
-			return;
-		}
-
 		$data = [
 			'title' => _('Incidents details'),
 			'ajax_request' => $this->isAjaxRequest(),
 			'refresh' => CWebUser::$data['refresh'] ? timeUnitToSeconds(CWebUser::$data['refresh']) : null,
 			'assets_path' => $this->assets_path,
-			'profileIdx' => 'web.rsm.incidentsdetails.filter',
+			'profileIdx' => 'web.rsm.incidents.filter',
 			'profileIdx2' => 0,
-			'from' => $this->getInput('from', ZBX_PERIOD_DEFAULT_FROM),
-			'to' => $this->getInput('to', ZBX_PERIOD_DEFAULT_TO),
-			'active_tab' => CProfile::get('web.rsm.incidentsdetails.filter.active', 1),
+			'active_tab' => CProfile::get('web.rsm.incidents.filter.active', 1),
 			'filter_failing_tests' => 0,
 			'rsm_monitoring_mode' => get_rsm_monitoring_type(),
 			'tests' => [],
 		];
+		$this->getInputs($data, ['from', 'to']);
 
 		$this->updateProfile($data);
 		$this->getTLD($data);

@@ -94,10 +94,7 @@ if ($data['tld']) {
 						'eventid' => $event['eventid'],
 						'slvItemId' => $data['dns']['itemid'],
 						'eventid' => $event['eventid'],
-						'from' => $data['incident_from'],
-						'to' => $data['incident_to'],
 						'availItemId' => $data['dns']['availItemId'],
-						'filter_set' => 1,
 					])
 				),
 				$incident_status,
@@ -189,10 +186,7 @@ if ($data['tld']) {
 						'host' => $data['tld']['host'],
 						'eventid' => $event['eventid'],
 						'slvItemId' => $data['dnssec']['itemid'],
-						'from' => $data['incident_from'],
-						'to' => $data['incident_to'],
 						'availItemId' => $data['dnssec']['availItemId'],
-						'filter_set' => 1,
 					])
 				),
 				$incident_status,
@@ -281,10 +275,7 @@ if ($data['tld']) {
 						'host' => $data['tld']['host'],
 						'eventid' => $event['eventid'],
 						'slvItemId' => $data['rdds']['itemid'],
-						'from' => $data['incident_from'],
-						'to' => $data['incident_to'],
 						'availItemId' => $data['rdds']['availItemId'],
-						'filter_set' => 1,
 					])
 				),
 				$incident_status,
@@ -381,10 +372,7 @@ if ($data['tld']) {
 						'host' => $data['tld']['host'],
 						'eventid' => $event['eventid'],
 						'slvItemId' => $data['rdap']['itemid'],
-						'from' => $data['incident_from'],
-						'to' => $data['incident_to'],
 						'availItemId' => $data['rdap']['availItemId'],
-						'filter_set' => 1,
 					])
 				),
 				$incident_status,
@@ -482,10 +470,7 @@ if ($data['tld']) {
 					$event['eventid'],
 					Url::getFor($data['url'], 'rsm.incidentdetails', [
 						'host' => $data['tld']['host'],
-						'from' => $data['incident_from'],
-						'to' => $data['incident_to'],
 						'availItemId' => $data['epp']['availItemId'],
-						'filter_set' => 1
 					])
 				),
 				$incident_status,
