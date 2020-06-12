@@ -258,6 +258,9 @@ $total_probes = count($data['probes']);
 					_('Service') => $data['slv_item_name'],
 					_('Test time') => date(DATE_TIME_FORMAT_SECONDS, $data['time']),
 					_('Test result') => [$test_result, ' ', _s('(calculated at %1$s)', date(DATE_TIME_FORMAT_SECONDS, $data['time'] + RSM_ROLLWEEK_SHIFT_BACK))],
+					_('Max allowed RTT') => isset($data['udp_rtt'])
+						? sprintf('UDP - %s ms, TCP - %s ms', $data['udp_rtt'], $data['tcp_rtt'])
+						: _('No data'),
 					_('Note') => _(
 						'The following table displays the data that has been received by the central node, some of'.
 						' the values may not have been available at the time of the calculation of the "Test result"'

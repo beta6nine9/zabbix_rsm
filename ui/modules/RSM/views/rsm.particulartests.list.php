@@ -638,6 +638,9 @@ $details += [
 	_('Service') => $data['slvItem']['name'],
 	_('Test time') => date(DATE_TIME_FORMAT_SECONDS, $data['time']),
 	_('Test result') => $test_result,
+	_('Max allowed RTT') => isset($data[CALCULATED_ITEM_RDDS_RTT_LOW])
+		? sprintf('RDDS - %s ms, RDAP - %s ms', $data[CALCULATED_ITEM_RDDS_RTT_LOW], $data[CALCULATED_ITEM_RDAP_RTT_LOW])
+		: _('No data'),
 	_('Note') => _(
 		'The following table displays the data that has been received by the central node, some of'.
 		' the values may not have been available at the time of the calculation of the "Test result"'

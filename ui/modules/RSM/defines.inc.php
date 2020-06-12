@@ -179,6 +179,8 @@ define('CALCULATED_ITEM_DNS_UDP_RTT_HIGH',		'rsm.configvalue[RSM.DNS.UDP.RTT.HIG
 define('CALCULATED_ITEM_DNS_TCP_RTT_HIGH',		'rsm.configvalue[RSM.DNS.TCP.RTT.HIGH]');
 define('CALCULATED_ITEM_DNS_UDP_RTT_LOW',		'rsm.configvalue[RSM.DNS.UDP.RTT.LOW]');
 define('CALCULATED_ITEM_DNS_TCP_RTT_LOW',		'rsm.configvalue[RSM.DNS.TCP.RTT.LOW]');
+define('CALCULATED_ITEM_RDDS_RTT_LOW',			'rsm.configvalue[RSM.RDDS.RTT.LOW]');
+define('CALCULATED_ITEM_RDAP_RTT_LOW',			'rsm.configvalue[RSM.RDAP.RTT.LOW]');
 define('CALCULATED_ITEM_SLV_DNS_NS_RTT_UDP',	'rsm.configvalue[RSM.SLV.DNS.UDP.RTT]');
 define('CALCULATED_ITEM_SLV_DNS_NS_RTT_TCP',	'rsm.configvalue[RSM.SLV.DNS.TCP.RTT]');
 define('CALCULATED_ITEM_SLV_DNS_NS_UPD',		'rsm.configvalue[RSM.SLV.DNS.NS.UPD]');
