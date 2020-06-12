@@ -977,8 +977,8 @@ class IncidentsListAction extends Action {
 			'profileIdx2' => 0,
 			'from' => $this->hasInput('from') ? $this->getInput('from') : null,
 			'to' => $this->hasInput('to') ? $this->getInput('to') : null,
-			'incident_from' => date(ZBX_DATE_TIME, $server_now - $macros[RSM_ROLLWEEK_SECONDS]),
-			'incident_to' => date(ZBX_DATE_TIME, $server_now),
+			'incident_from' => date(DATE_TIME_FORMAT_SECONDS, $server_now - $macros[RSM_ROLLWEEK_SECONDS]),
+			'incident_to' => date(DATE_TIME_FORMAT_SECONDS, $server_now),
 			'active_tab' => CProfile::get('web.rsm.incidents.filter.active', 1),
 			'incidents_tab' => (int) get_cookie('incidents_tab', 0),
 		];
