@@ -263,22 +263,22 @@ if ($data['tld']) {
 		foreach ($services as $service => $service_name) {
 			$rdds_subservices = null;
 
-			if ($service === RSM_RDDS && !is_RDAP_standalone()) {
-				$subservices = [];
-				if (array_key_exists(RSM_TLD_RDDS_ENABLED, ($tld[$service]['subservices']))
-						&& $tld[RSM_RDDS]['subservices'][RSM_TLD_RDDS_ENABLED] != 0) {
-					$subservices[] = 'RDDS';
-				}
-
-				if (array_key_exists(RSM_RDAP_TLD_ENABLED, ($tld[$service]['subservices'])) && !is_RDAP_standalone()
-						&& $tld[RSM_RDDS]['subservices'][RSM_RDAP_TLD_ENABLED] != 0) {
-					$subservices[] = 'RDAP';
-				}
-
-				$rdds_subservices = [SPACE, SPACE, SPACE, new CSpan(implode(' / ', $subservices), 'bold')];
-			}
-
 			if (array_key_exists($service, $tld) && array_key_exists('trigger', $tld[$service])) {
+				if ($service === RSM_RDDS && !is_RDAP_standalone()) {
+					$subservices = [];
+					if (array_key_exists(RSM_TLD_RDDS_ENABLED, ($tld[$service]['subservices']))
+							&& $tld[RSM_RDDS]['subservices'][RSM_TLD_RDDS_ENABLED] != 0) {
+						$subservices[] = 'RDDS';
+					}
+
+					if (array_key_exists(RSM_RDAP_TLD_ENABLED, ($tld[$service]['subservices'])) && !is_RDAP_standalone()
+							&& $tld[RSM_RDDS]['subservices'][RSM_RDAP_TLD_ENABLED] != 0) {
+						$subservices[] = 'RDAP';
+					}
+
+					$rdds_subservices = [SPACE, SPACE, SPACE, new CSpan(implode(' / ', $subservices), 'bold')];
+				}
+
 				if ($tld[$service]['clock']) {
 					if ($tld[$service]['trigger'] && $tld[$service]['incident']) {
 						if (array_key_exists('availItemId', $tld[$service]) && array_key_exists('itemid', $tld[$service])) {
