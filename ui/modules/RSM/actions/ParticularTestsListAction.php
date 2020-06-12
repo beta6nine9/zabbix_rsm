@@ -437,7 +437,7 @@ class ParticularTestsListAction extends Action {
 
 			for ($clock = $test_time_from; $clock < $test_time_till; $clock += RSM_PROBE_DELAY) {
 				if (!array_key_exists($clock, $mappedValues) || $mappedValues[$clock] == PROBE_DOWN) {
-					$data['probes'][$probeItem['hostid']]['status'] = PROBE_DOWN;
+					$data['probes'][$probe_item['hostid']]['status'] = PROBE_DOWN;
 					break;
 				}
 			}

@@ -387,16 +387,6 @@ class AggregateDetailsAction extends Action {
 			'history' => ITEM_VALUE_TYPE_UINT64
 		]);
 
-		foreach ($probes as $probe) {
-			/**
-			 * Value of probe item PROBE_KEY_ONLINE == PROBE_DOWN means that both DNS UDP and DNS TCP are offline.
-			 */
-			if (isset($probe['history_value']) && !isset($this->probes[$probe['hostid']]['online_status'])
-					&& $probe['history_value'] == PROBE_DOWN) {
-				$this->probes[$probe['hostid']]['online_status'] = PROBE_OFFLINE;
-			}
-		}
-
 		// Set probes test trasport.
 		$protocol_type = $this->getValueMapping(RSM_DNS_TRANSPORT_PROTOCOL_VALUE_MAP);
 
@@ -424,6 +414,15 @@ class AggregateDetailsAction extends Action {
 		}
 
 		$this->getReportData($data, $time_from, $time_till);
+
+		foreach ($probes as $probe) {
+			/**
+			 * Value of probe item PROBE_KEY_ONLINE == PROBE_DOWN means that Probe is OFFLINE
+			 */
+			if (isset($probe['history_value']) && $probe['history_value'] == PROBE_DOWN) {
+				$this->probes[$probe['hostid']]['online_status'] = PROBE_OFFLINE;
+			}
+		}
 
 		$data['probes'] = $this->probes;
 		$data['errors'] = $this->probe_errors;

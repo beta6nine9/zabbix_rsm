@@ -82,6 +82,9 @@ foreach ($data['probes'] as $probe) {
 			$probe_status_color = ZBX_STYLE_GREY;
 			$probe_status = $offline;
 			$offline_probes++;
+
+			unset($probe['results']);
+			unset($probe['transport']);
 		}
 		elseif ($probe['online_status'] == PROBE_DOWN) {
 			$probe_status_color = ZBX_STYLE_RED;
@@ -103,8 +106,8 @@ foreach ($data['probes'] as $probe) {
 		(new CSpan($probe['host']))->addClass($probe_status_color),
 		$probe_status,
 		isset($probe['transport']) ? $probe['transport'] : '-',
-		$probe_disabled ? '-' : $probe['ns_up'],
-		$probe_disabled ? '-' : $probe['ns_down']
+		($probe_disabled || $probe['online_status'] == PROBE_OFFLINE) ? '-' : $probe['ns_up'],
+		($probe_disabled || $probe['online_status'] == PROBE_OFFLINE) ? '-' : $probe['ns_down']
 	];
 
 	foreach ($data['dns_nameservers'] as $dns_udp_ns => $ipvs) {
