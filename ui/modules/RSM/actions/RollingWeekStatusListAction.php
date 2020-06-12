@@ -629,10 +629,6 @@ class RollingWeekStatusListAction extends Action {
 					$template_macros = [RSM_TLD_DNSSEC_ENABLED, RSM_TLD_EPP_ENABLED, RSM_TLD_RDDS43_ENABLED,
 						RSM_TLD_RDDS80_ENABLED, RSM_RDAP_TLD_ENABLED, RSM_TLD_RDDS_ENABLED];
 
-					if (is_RDAP_standalone()) {
-						$template_macros[] = RSM_RDAP_TLD_ENABLED;
-					}
-
 					$templateMacros = API::UserMacro()->get([
 						'output' => API_OUTPUT_EXTEND,
 						'hostids' => $templateIds,
@@ -667,6 +663,12 @@ class RollingWeekStatusListAction extends Action {
 										unset($itemIds[$data['tld'][$DB['SERVERS'][$key]['NR'].$current_hostid][$service_type]['availItemId']]);
 									}
 									unset($data['tld'][$DB['SERVERS'][$key]['NR'].$current_hostid][$service_type]);
+								}
+							}
+							elseif ($template_macro['macro'] === RSM_RDAP_TLD_ENABLED && !is_RDAP_standalone()) {
+								// handle enabled RDAP when it's part of RDDS
+								if (array_key_exists(RSM_RDDS, $data['tld'][$DB['SERVERS'][$key]['NR'].$current_hostid])) {
+									$data['tld'][$DB['SERVERS'][$key]['NR'].$current_hostid][RSM_RDDS]['subservices'][$template_macro['macro']] = $template_macro['value'];
 								}
 							}
 						}

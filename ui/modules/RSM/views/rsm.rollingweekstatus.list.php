@@ -228,6 +228,21 @@ if ($data['tld']) {
 	$from = date('YmdHis', $serverTime - $data['rollWeekSeconds']);
 	$till = date('YmdHis', $serverTime);
 
+	// Services must be in certain order.
+	$services = array();
+
+	if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY) {
+		$services[RSM_DNS] = "DNS";
+		$services[RSM_DNSSEC] = "DNSSEC";
+	}
+
+	$services[RSM_RDDS] = "RDDS";
+
+	if (is_RDAP_standalone())
+		$services[RSM_RDAP] = "RDAP";
+
+	$services[RSM_EPP] = "EPP";
+
 	foreach ($data['tld'] as $key => $tld) {
 		// REGISTRAR type.
 		if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
@@ -245,344 +260,86 @@ if ($data['tld']) {
 			];
 		}
 
-		// DNS
-		if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY && array_key_exists(RSM_DNS, $tld)
-				&& array_key_exists('trigger', $tld[RSM_DNS]) && $tld[RSM_DNS]['clock']) {
-			if ($tld[RSM_DNS]['trigger'] && $tld[RSM_DNS]['incident']) {
-				if (array_key_exists('availItemId', $tld[RSM_DNS]) && array_key_exists('itemid', $tld[RSM_DNS])) {
-					$dns_status = new CLink(
-						(new CDiv())->addClass('service-icon status_icon_extra iconrollingweekfail cell-value pointer'),
-						Url::getFor($tld['url'], 'rsm.incidentdetails', [
-							'host' => $tld['host'],
-							'eventid' => $tld[RSM_DNS]['incident'],
-							'slvItemId' => $tld[RSM_DNS]['itemid'],
-							'filter_from' => $from,
-							'filter_to' => $till,
-							'availItemId' => $tld[RSM_DNS]['availItemId'],
-							'filter_set' => 1
-						])
-					);
+		foreach ($services as $service => $service_name) {
+			$rdds_subservices = null;
+
+			if ($service === RSM_RDDS && !is_RDAP_standalone()) {
+				$subservices = [];
+				if (array_key_exists(RSM_TLD_RDDS_ENABLED, ($tld[$service]['subservices']))
+						&& $tld[RSM_RDDS]['subservices'][RSM_TLD_RDDS_ENABLED] != 0) {
+					$subservices[] = 'RDDS';
+				}
+
+				if (array_key_exists(RSM_RDAP_TLD_ENABLED, ($tld[$service]['subservices'])) && !is_RDAP_standalone()
+						&& $tld[RSM_RDDS]['subservices'][RSM_RDAP_TLD_ENABLED] != 0) {
+					$subservices[] = 'RDAP';
+				}
+
+				$rdds_subservices = [SPACE, SPACE, SPACE, new CSpan(implode(' / ', $subservices), 'bold')];
+			}
+
+			if (array_key_exists($service, $tld) && array_key_exists('trigger', $tld[$service])) {
+				if ($tld[$service]['clock']) {
+					if ($tld[$service]['trigger'] && $tld[$service]['incident']) {
+						if (array_key_exists('availItemId', $tld[$service]) && array_key_exists('itemid', $tld[$service])) {
+							$rollweek_status = new CLink(
+									(new CDiv())->addClass('service-icon status_icon_extra iconrollingweekfail cell-value pointer'),
+										Url::getFor($tld['url'], 'rsm.incidentdetails', [
+											'host' => $tld['host'],
+											'eventid' => $tld[$service]['incident'],
+											'slvItemId' => $tld[$service]['itemid'],
+											'filter_from' => $from,
+											'filter_to' => $till,
+											'availItemId' => $tld[$service]['availItemId'],
+											'filter_set' => 1
+									])
+							);
+						}
+						else {
+							$rollweek_status = (new CDiv())->addClass('service-icon status_icon_extra iconrollingweekfail cell-value pointer');
+						}
+					}
+					else {
+						$rollweek_status = (new CDiv())->addClass('service-icon status_icon_extra iconrollingweekok cell-value');
+					}
+
+					$rollweek_value = ($tld[$service]['lastvalue'] > 0)
+						? (new CLink(
+							$tld[$service]['lastvalue'].'%',
+							Url::getFor($tld['url'], 'rsm.incidents', [
+								'host' => $tld['host'],
+								'type' => $service,
+								'rolling_week' => 1,
+								'filter_set' => 1,
+							])
+							))->addClass('first-cell-value')
+						: (new CSpan('0.000%'))->addClass('first-cell-value');
+
+					if ($tld[$service]['clock'])
+						$rollweek_value->setHint($tld[$service]['clock'], '', false);
+
+					$rollweek_graph = ($tld[$service]['lastvalue'] > 0)
+						? new CLink('graph',
+							Url::getFor($tld['url'], 'history.php', [
+								'action' => 'showgraph',
+								'period' => $data['rollWeekSeconds'],
+								'itemids' => [$tld[$service]['itemid']],
+							]),
+							'cell-value')
+						: null;
+
+					$row[] = [(new CSpan($rollweek_value))->addClass('right'), $rollweek_status, SPACE, $rollweek_graph, $rdds_subservices];
 				}
 				else {
-					$dns_status = (new CDiv())->addClass('service-icon status_icon_extra iconrollingweekfail cell-value pointer');
+					$row[] = [(new CDiv())
+						->addClass('service-icon status_icon_extra iconrollingweeknodata disabled-service')
+						->setHint(_('No data yet'), '', false), $rdds_subservices];
 				}
-			}
-			else {
-				$dns_status = (new CDiv())->addClass('service-icon status_icon_extra iconrollingweekok cell-value');
-			}
-
-			$dns_value = ($tld[RSM_DNS]['lastvalue'] > 0)
-				? (new CLink(
-					$tld[RSM_DNS]['lastvalue'].'%',
-					Url::getFor($tld['url'], 'rsm.incidents', [
-						'host' => $tld['host'],
-						'type' => RSM_DNS,
-						'rolling_week' => 1,
-						'filter_set' => 1,
-					])
-				))->addClass('first-cell-value')
-				: (new CSpan('0.000%'))->addClass('first-cell-value');
-
-			if ($tld[RSM_DNS]['clock'])
-				$dns_value->setHint($tld[RSM_DNS]['clock'], '', false);
-
-			$dns_graph = ($tld[RSM_DNS]['lastvalue'] > 0)
-				? new CLink('graph',
-					Url::getFor($tld['url'], 'history.php', [
-						'action' => 'showgraph',
-						'period' => $data['rollWeekSeconds'],
-						'itemids' => [$tld[RSM_DNS]['itemid']],
-					]),
-					'cell-value'
-				)
-				: null;
-			$row[] = [(new CSpan($dns_value))->addClass('right'), $dns_status, SPACE, $dns_graph];
-		}
-		elseif ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY) {
-			if (array_key_exists(RSM_DNS, $tld)) {
-				$row[] = (new CDiv())
-					->addClass('service-icon status_icon_extra iconrollingweeknodata disabled-service')
-					->setHint(_('No value yet'), '', false);
 			}
 			else {
 				$row[] = (new CDiv())
 					->addClass('service-icon status_icon_extra iconrollingweekdisabled disabled-service')
-					->setHint(_('Incorrect TLD configuration'), '', false);
-			}
-		}
-
-		// DNSSEC
-		if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY && array_key_exists(RSM_DNSSEC, $tld)
-				&& array_key_exists('trigger', $tld[RSM_DNSSEC]) && $tld[RSM_DNSSEC]['clock']) {
-			if ($tld[RSM_DNSSEC]['trigger'] && $tld[RSM_DNSSEC]['incident']) {
-				if (array_key_exists('availItemId', $tld[RSM_DNSSEC]) && array_key_exists('itemid', $tld[RSM_DNSSEC])) {
-					$dnssec_status = new CLink(
-						(new CDiv())->addClass('service-icon status_icon_extra iconrollingweekfail cell-value pointer'),
-						Url::getFor($tld['url'], 'rsm.incidentdetails', [
-							'host' => $tld['host'],
-							'eventid' => $tld[RSM_DNSSEC]['incident'],
-							'slvItemId' => $tld[RSM_DNSSEC]['itemid'],
-							'filter_from' => $from,
-							'filter_to' => $till,
-							'availItemId' => $tld[RSM_DNSSEC]['availItemId'],
-							'filter_set' => 1,
-						])
-					);
-				}
-				else {
-					$dnssec_status = (new CDiv())->addClass('service-icon status_icon_extra iconrollingweekfail cell-value pointer');
-				}
-			}
-			else {
-				$dnssec_status = (new CDiv())->addClass('service-icon status_icon_extra iconrollingweekok cell-value');
-			}
-
-			$dnssec_value = ($tld[RSM_DNSSEC]['lastvalue'] > 0)
-				? (new CLink(
-					$tld[RSM_DNSSEC]['lastvalue'].'%',
-						Url::getFor($tld['url'], 'rsm.incidents', [
-							'host' => $tld['host'],
-							'type' => RSM_DNSSEC,
-							'rolling_week' => 1,
-							'filter_set' => 1,
-						])
-				))->addClass('first-cell-value')
-				: (new CSpan('0.000%'))->addClass('first-cell-value');
-
-			if ($tld[RSM_DNSSEC]['clock'])
-				$dnssec_value->setHint($tld[RSM_DNSSEC]['clock'], '', false);
-
-			$dnssec_graph = ($tld[RSM_DNSSEC]['lastvalue'] > 0)
-				? new CLink('graph',
-					(new CUrl($tld['url'].'history.php'))
-						->setArgument('action', 'showgraph')
-						->setArgument('period', $data['rollWeekSeconds'])
-						->setArgument('itemids', [$tld[RSM_DNSSEC]['itemid']]),
-					'cell-value'
-				)
-				: null;
-			$row[] = [(new CSpan($dnssec_value))->addClass('right'), $dnssec_status, SPACE, $dnssec_graph];
-		}
-		elseif ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY) {
-			if (array_key_exists(RSM_DNSSEC, $tld)) {
-				$row[] = (new CDiv())
-					->addClass('service-icon status_icon_extra iconrollingweeknodata disabled-service')
-					->setHint(_('No value yet'), '', false);
-			}
-			else {
-				$row[] = (new CDiv(null))
-					->addClass('service-icon status_icon_extra iconrollingweekdisabled disabled-service')
-					->setHint('DNSSEC is disabled', '', false);
-			}
-		}
-
-		// RDDS
-		// RDDS column is shown in registrar monitoring as well.
-		if (array_key_exists(RSM_RDDS, $tld) && array_key_exists('trigger', $tld[RSM_RDDS]) && $tld[RSM_RDDS]['clock']) {
-			if ($tld[RSM_RDDS]['trigger'] && $tld[RSM_RDDS]['incident']) {
-				if (array_key_exists('availItemId', $tld[RSM_RDDS]) && array_key_exists('itemid', $tld[RSM_RDDS])) {
-					$rdds_status = new CLink(
-						(new CDiv())->addClass('service-icon status_icon_extra iconrollingweekfail cell-value pointer'),
-						Url::getFor($tld['url'], 'rsm.incidentdetails', [
-							'host' => $tld['host'],
-							'eventid' => $tld[RSM_RDDS]['incident'],
-							'slvItemId' => $tld[RSM_RDDS]['itemid'],
-							'filter_from' => $from,
-							'filter_to' => $till,
-							'availItemId' => $tld[RSM_RDDS]['availItemId'],
-							'filter_set' => 1,
-						])
-					);
-				}
-				else {
-					$rdds_status = (new CDiv())->addClass('service-icon status_icon_extra iconrollingweekfail cell-value pointer');
-				}
-			}
-			else {
-				$rdds_status = (new CDiv())->addClass('service-icon status_icon_extra iconrollingweekok cell-value');
-			}
-
-			$rdds_value = ($tld[RSM_RDDS]['lastvalue'] > 0)
-				? (new CLink(
-					$tld[RSM_RDDS]['lastvalue'].'%',
-					Url::getFor($tld['url'], 'rsm.incidents', [
-						'host' => $tld['host'],
-						'type' => RSM_RDDS,
-						'rolling_week' => 1,
-						'filter_set' => 1,
-					])
-				))->addClass('first-cell-value')
-				: (new CSpan('0.000%'))->addClass('first-cell-value');
-
-			if ($tld[RSM_RDDS]['clock'])
-				$rdds_value->setHint($tld[RSM_RDDS]['clock'], '', false);
-
-			$rdds_graph = ($tld[RSM_RDDS]['lastvalue'] > 0)
-				? new CLink('graph',
-					Url::getFor($tld['url'], 'history.php', [
-						'action' => 'showgraph',
-						'period' => $data['rollWeekSeconds'],
-						'itemids' => [$tld[RSM_RDDS]['itemid']],
-					]),
-					'cell-value'
-				)
-				: null;
-
-			$ok_rdds_services = [];
-			if (array_key_exists(RSM_TLD_RDDS_ENABLED, ($tld[RSM_RDDS]['subservices']))
-					&& $tld[RSM_RDDS]['subservices'][RSM_TLD_RDDS_ENABLED] != 0) {
-				$ok_rdds_services[] = 'RDDS';
-			}
-			if (array_key_exists(RSM_RDAP_TLD_ENABLED, ($tld[RSM_RDDS]['subservices'])) && !is_RDAP_standalone()
-					&& $tld[RSM_RDDS]['subservices'][RSM_RDAP_TLD_ENABLED] != 0) {
-				$ok_rdds_services[] = 'RDAP';
-			}
-
-			$rdds_services = is_RDAP_standalone() ? null : implode(' / ', $ok_rdds_services);
-
-			$row[] = [(new CSpan($rdds_value))->addClass('right'), $rdds_status, SPACE, $rdds_graph, [SPACE,SPACE,SPACE],
-				new CSpan($rdds_services, 'bold')
-			];
-		}
-		else if (array_key_exists(RSM_RDDS, $tld)) {
-			$row[] = (new CDiv())
-				->addClass('service-icon status_icon_extra iconrollingweeknodata disabled-service')
-				->setHint(_('No value yet'), '', false);
-		}
-		else {
-			$row[] = (new CDiv(null))
-				->addClass('service-icon status_icon_extra iconrollingweekdisabled disabled-service')
-				->setHint('RDDS is disabled', '', false);
-		}
-
-		// RDAP
-		if (is_RDAP_standalone() && array_key_exists(RSM_RDAP, $tld) && array_key_exists('trigger', $tld[RSM_RDAP]) && $tld[RSM_RDAP]['clock']) {
-			if ($tld[RSM_RDAP]['trigger'] && $tld[RSM_RDAP]['incident']) {
-				if (array_key_exists('availItemId', $tld[RSM_RDAP]) && array_key_exists('itemid', $tld[RSM_RDAP])) {
-					$rdap_status =  new CLink(
-						(new CDiv())->addClass('service-icon status_icon_extra iconrollingweekfail cell-value pointer'),
-						Url::getFor($tld['url'], 'rsm.incidentdetails', [
-							'host' => $tld['host'],
-							'eventid' => $tld[RSM_RDAP]['incident'],
-							'slvItemId' => $tld[RSM_RDAP]['itemid'],
-							'filter_from' => $from,
-							'filter_to' => $till,
-							'availItemId' => $tld[RSM_RDAP]['availItemId'],
-							'filter_set' => 1,
-						])
-					);
-				}
-				else {
-					$rdap_status = (new CDiv())->addClass('service-icon status_icon_extra iconrollingweekfail cell-value pointer');
-				}
-			}
-			else {
-				$rdap_status = (new CDiv())->addClass('service-icon status_icon_extra iconrollingweekok cell-value');
-			}
-
-			$rdap_value = ($tld[RSM_RDAP]['lastvalue'] > 0)
-				? (new CLink(
-					$tld[RSM_RDAP]['lastvalue'].'%',
-					Url::getFor($tld['url'], 'rsm.incidents', [
-						'host' => $tld['host'],
-						'type' => RSM_RDAP,
-						'rolling_week' => 1,
-						'filter_set' => 1,
-					])
-				))->addClass('first-cell-value')
-				: (new CSpan('0.000%'))->addClass('first-cell-value');
-
-			if ($tld[RSM_RDAP]['clock'])
-				$rdap_value->setHint($tld[RSM_RDAP]['clock'], '', false);
-
-			$rdap_graph = ($tld[RSM_RDAP]['lastvalue'] > 0)
-				? new CLink('graph',
-					(new CUrl($tld['url'].'history.php'))
-						->setArgument('action', 'showgraph')
-						->setArgument('period', $data['rollWeekSeconds'])
-						->setArgument('itemids', [$tld[RSM_RDAP]['itemid']]),
-					'cell-value'
-				)
-				: null;
-			$row[] = [(new CSpan($rdap_value))->addClass('right'), $rdap_status, SPACE, $rdap_graph];
-		}
-		elseif (is_RDAP_standalone()) {
-			if (array_key_exists(RSM_RDAP, $tld)) {
-				$row[] = (new CDiv())
-					->addClass('service-icon status_icon_extra iconrollingweeknodata disabled-service')
-					->setHint(_('No value yet'), '', false);
-			}
-			else {
-				$row[] = (new CDiv())
-					->addClass('service-icon status_icon_extra iconrollingweekdisabled disabled-service')
-					->setHint('RDAP is disabled', '', false);
-			}
-		}
-
-		// EPP
-		if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY && array_key_exists(RSM_EPP, $tld)
-				&& array_key_exists('trigger', $tld[RSM_EPP]) && $tld[RSM_EPP]['clock']) {
-			if ($tld[RSM_EPP]['trigger'] && $tld[RSM_EPP]['incident']) {
-				if (array_key_exists('availItemId', $tld[RSM_EPP]) && array_key_exists('itemid', $tld[RSM_EPP])) {
-					$epp_status = new CLink(
-						(new CDiv())->addClass('service-icon status_icon_extra iconrollingweekfail cell-value pointer'),
-						Url::getFor($tld['url'], 'rsm.incidentdetails', [
-							'host' => $tld['host'],
-							'eventid' => $tld[RSM_EPP]['incident'],
-							'slvItemId' => $tld[RSM_EPP]['itemid'],
-							'filter_from' => $from,
-							'filter_to' => $till,
-							'availItemId' => $tld[RSM_EPP]['availItemId'],
-							'filter_set' => 1,
-						])
-					);
-				}
-				else {
-					$epp_status = (new CDiv())->addClass('service-icon status_icon_extra iconrollingweekfail cell-value pointer');
-				}
-			}
-			else {
-				$epp_status = (new CDiv())->addClass('service-icon status_icon_extra iconrollingweekok cell-value');
-			}
-
-			$epp_value = ($tld[RSM_EPP]['lastvalue'] > 0)
-				? (new CLink(
-					$tld[RSM_EPP]['lastvalue'].'%',
-					Url::getFor($tld['url'], 'rsm.incidents', [
-						'host' => $tld['host'],
-						'type' => RSM_EPP,
-						'rolling_week' => 1,
-						'filter_set' => 1,
-					])
-				))->addClass('first-cell-value')
-				: (new CSpan('0.000%'))->addClass('first-cell-value');
-
-			if ($tld[RSM_EPP]['clock'])
-				$epp_value->setHint($tld[RSM_EPP]['clock'], '', false);
-
-			$epp_graph = ($tld[RSM_EPP]['lastvalue'] > 0)
-				? new CLink('graph',
-					Url::getFor($tld['url'], 'history.php', [
-						'action' => 'showgraph',
-						'period' => $data['rollWeekSeconds'],
-						'itemids' => [$tld[RSM_EPP]['itemid']],
-					]),
-					'cell-value'
-				)
-				: null;
-
-			$row[] = [(new CSpan($epp_value))->addClass('right'), $epp_status, SPACE, $epp_graph];
-		}
-		elseif ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY) {
-			if (array_key_exists(RSM_EPP, $tld)) {
-				$row[] = (new CDiv())
-					->addClass('service-icon status_icon_extra iconrollingweeknodata disabled-service')
-					->setHint(_('No value yet'), '', false);
-			}
-			else {
-				$row[] = (new CDiv(null))
-					->addClass('service-icon status_icon_extra iconrollingweekdisabled disabled-service')
-					->setHint('EPP is disabled', '', false);
+					->setHint(_("$service_name is disabled"), '', false);
 			}
 		}
 
