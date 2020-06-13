@@ -634,13 +634,27 @@ if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
 	];
 }
 
+if ($data['type'] == RSM_RDAP) {
+	$allowed_rtt_str = isset($data[CALCULATED_ITEM_RDAP_RTT_HIGH])
+		? sprintf('%s ms', $data[CALCULATED_ITEM_RDAP_RTT_HIGH])
+		: _('No data');
+}
+elseif ($data['is_rdap_standalone']) {
+	$allowed_rtt_str = isset($data[CALCULATED_ITEM_RDDS_RTT_HIGH])
+		? sprintf('%s ms', $data[CALCULATED_ITEM_RDDS_RTT_HIGH])
+		: _('No data');
+}
+else {
+	$allowed_rtt_str = isset($data[CALCULATED_ITEM_RDDS_RTT_HIGH])
+		? sprintf('RDDS - %s ms, RDAP - %s ms', $data[CALCULATED_ITEM_RDDS_RTT_HIGH], $data[CALCULATED_ITEM_RDAP_RTT_HIGH])
+		: _('No data');
+}
+
 $details += [
 	_('Service') => $data['slvItem']['name'],
 	_('Test time') => date(DATE_TIME_FORMAT_SECONDS, $data['time']),
 	_('Test result') => $test_result,
-	_('Max allowed RTT') => isset($data[CALCULATED_ITEM_RDDS_RTT_HIGH])
-		? sprintf('RDDS - %s ms, RDAP - %s ms', $data[CALCULATED_ITEM_RDDS_RTT_HIGH], $data[CALCULATED_ITEM_RDAP_RTT_HIGH])
-		: _('No data'),
+	_('Max allowed RTT') => $allowed_rtt_str,
 	_('Note') => _(
 		'The following table displays the data that has been received by the central node, some of'.
 		' the values may not have been available at the time of the calculation of the "Test result"'

@@ -73,8 +73,9 @@ class ParticularTestsListAction extends Action {
 		);
 
 		$data['test_time_from'] = $test_time_from;
+		$data['is_rdap_standalone'] = is_RDAP_standalone($test_time_from);
 
-		if ($data['type'] == RSM_RDAP && !is_RDAP_standalone($test_time_from)) {
+		if ($data['type'] == RSM_RDAP && !$data['is_rdap_standalone']) {
 			error(_('RDAP wasn\'t a standalone service at requested time!'));
 			return;
 		}
