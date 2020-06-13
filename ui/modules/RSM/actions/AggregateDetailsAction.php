@@ -331,8 +331,8 @@ class AggregateDetailsAction extends Action {
 		$defaults = [
 			CALCULATED_ITEM_DNS_DELAY => null,
 			CALCULATED_ITEM_DNS_AVAIL_MINNS => null,	// TODO: remove 3 months after deployment
-			CALCULATED_ITEM_DNS_UDP_RTT_LOW => 500,
-			CALCULATED_ITEM_DNS_TCP_RTT_LOW => 1500
+			CALCULATED_ITEM_DNS_TCP_RTT_HIGH => 500,
+			CALCULATED_ITEM_DNS_TCP_RTT_HIGH => 1500
 		];
 		$macro = $this->getMacroHistoryValue(array_keys($defaults), $time_from);
 
@@ -349,8 +349,8 @@ class AggregateDetailsAction extends Action {
 			'type' => $this->getInput('type'),
 			'time' => $time_from,
 			'min_dns_count' => $macro[CALCULATED_ITEM_DNS_AVAIL_MINNS],	// TODO: remove 3 months after deployment
-			'udp_rtt' => $macro[CALCULATED_ITEM_DNS_UDP_RTT_LOW],
-			'tcp_rtt' => $macro[CALCULATED_ITEM_DNS_TCP_RTT_LOW],
+			'udp_rtt' => $macro[CALCULATED_ITEM_DNS_UDP_RTT_HIGH],
+			'tcp_rtt' => $macro[CALCULATED_ITEM_DNS_TCP_RTT_HIGH],
 			'test_error_message' => $this->getValueMapping(RSM_DNS_RTT_ERRORS_VALUE_MAP),
 			'test_status_message' => $this->getValueMapping(RSM_SERVICE_AVAIL_VALUE_MAP)
 		];

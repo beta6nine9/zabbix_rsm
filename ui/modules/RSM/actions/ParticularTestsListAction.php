@@ -823,7 +823,7 @@ class ParticularTestsListAction extends Action {
 
 		if ($data['host'] && $data['time'] && $data['slvItemId'] && $data['type'] !== null) {
 			$this->getReportData($data);
-			$data += $this->getMacroHistoryValue([CALCULATED_ITEM_RDDS_RTT_LOW, CALCULATED_ITEM_RDAP_RTT_LOW], $data['test_time_till']);
+			$data += $this->getMacroHistoryValue([CALCULATED_ITEM_RDDS_RTT_HIGH, CALCULATED_ITEM_RDAP_RTT_HIGH], $data['test_time_till']);
 
 			// Get value maps for error messages.
 			if ($data['type'] == RSM_RDDS) {
