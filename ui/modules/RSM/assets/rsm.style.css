@@ -1,3 +1,17 @@
+/* Variables */
+:root {
+	--border-color: #4b4a4a;
+}
+
+/* General styles */
+table.list-table {
+	border-collapse: collapse;
+	border: 1px solid var(--border-color);
+}
+table.list-table td {
+	border: 1px solid var(--border-color);
+}
+
 /* Rolling week status page */
 .service-icon {
 	margin: 0 5px 2px;
