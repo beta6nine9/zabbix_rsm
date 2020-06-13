@@ -331,7 +331,7 @@ class AggregateDetailsAction extends Action {
 		$defaults = [
 			CALCULATED_ITEM_DNS_DELAY => null,
 			CALCULATED_ITEM_DNS_AVAIL_MINNS => null,	// TODO: remove 3 months after deployment
-			CALCULATED_ITEM_DNS_TCP_RTT_HIGH => null,
+			CALCULATED_ITEM_DNS_UDP_RTT_HIGH => null,
 			CALCULATED_ITEM_DNS_TCP_RTT_HIGH => null
 		];
 		$macro = $this->getMacroHistoryValue(array_keys($defaults), $time_from);
