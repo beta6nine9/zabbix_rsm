@@ -591,10 +591,5 @@ else {
 		->addVar('type', $data['type'])
 	)
 	->addItem($dynamic_node->setId('incidents_data'))
-	->addItem(
-		(new CTag('link', false))
-			->setAttribute('rel', 'stylesheet')
-			->setAttribute('type', 'text/css')
-			->setAttribute('href', $data['assets_path'].'/rsm.style.css')
-	)
+	->addItem($data['module_style'])
 	->show();

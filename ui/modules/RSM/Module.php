@@ -6,8 +6,7 @@ use APP;
 use DB;
 use CWebUser;
 use Core\CModule as CModule;
-use CUrl;
-use Exception;
+use CTag;
 use CController as CAction;
 
 use Modules\RSM\Actions\AuthAction;
@@ -137,6 +136,32 @@ class Module extends CModule {
 		}
 
 		return $list;
+	}
+
+	/**
+	 * Get HTML <link> wrappers for RSM styles. Support current user theme. Theme file name is build from theme name and
+	 * suffix '.rsm.css'.
+	 */
+	public function getStyle(): array {
+		$theme_node = null;
+		$module_dir = $this->getDir();
+		$theme_file = getUserTheme(CWebUser::$data).'.rsm.css';
+		$assets_dir = substr($module_dir, strrpos($module_dir, 'modules/')).'/assets';
+
+		if (file_exists($module_dir.'/assets/'.$theme_file)) {
+			$theme_node = (new CTag('link', false))
+				->setAttribute('rel', 'stylesheet')
+				->setAttribute('type', 'text/css')
+				->setAttribute('href', $assets_dir.'/'.$theme_file);
+		}
+
+		return [
+			$theme_node,
+			(new CTag('link', false))
+				->setAttribute('rel', 'stylesheet')
+				->setAttribute('type', 'text/css')
+				->setAttribute('href', $assets_dir.'/rsm.style.css'),
+		];
 	}
 
 	/**

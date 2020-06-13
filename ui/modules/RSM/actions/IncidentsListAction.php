@@ -966,7 +966,7 @@ class IncidentsListAction extends Action {
 			'title' => _('Incidents'),
 			'ajax_request' => $this->isAjaxRequest(),
 			'refresh' => CWebUser::$data['refresh'] ? timeUnitToSeconds(CWebUser::$data['refresh']) : null,
-			'assets_path' => $this->assets_path,
+			'module_style' => $this->module->getStyle(),
 			'type' => $this->getInput('type', 0),
 			'host' => $this->getInput('host', false),
 			'tld' => null,

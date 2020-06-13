@@ -104,10 +104,5 @@ if ($data['type'] == RSM_DNS) {
 		]])
 	)
 	->additem($particular_proxys_table)
-	->addItem(
-		(new CTag('link', false))
-			->setAttribute('rel', 'stylesheet')
-			->setAttribute('type', 'text/css')
-			->setAttribute('href', $data['assets_path'].'/rsm.style.css')
-	)
+	->addItem($data['module_style'])
 	->show();

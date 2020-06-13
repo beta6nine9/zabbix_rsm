@@ -343,7 +343,7 @@ class AggregateDetailsAction extends Action {
 		$macro += $defaults;
 		$data = [
 			'title' => _('Details of particular test'),
-			'assets_path' => $this->assets_path,
+			'module_style' => $this->module->getStyle(),
 			'tld_host' => $this->tld['host'],
 			'slv_item_name' => $this->slv_item['name'],
 			'type' => $this->getInput('type'),

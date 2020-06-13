@@ -198,10 +198,5 @@ else {
 		->addVar('rolling_week', '1')
 	)
 	->addItem($dynamic_node->setId('incident_details'))
-	->addItem(
-		(new CTag('link', false))
-			->setAttribute('rel', 'stylesheet')
-			->setAttribute('type', 'text/css')
-			->setAttribute('href', $data['assets_path'].'/rsm.style.css')
-	)
+	->addItem($data['module_style'])
 	->show();

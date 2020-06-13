@@ -403,7 +403,7 @@ class IncidentDetailsAction extends Action {
 			'title' => _('Incidents details'),
 			'ajax_request' => $this->isAjaxRequest(),
 			'refresh' => CWebUser::$data['refresh'] ? timeUnitToSeconds(CWebUser::$data['refresh']) : null,
-			'assets_path' => $this->assets_path,
+			'module_style' => $this->module->getStyle(),
 			'profileIdx' => 'web.rsm.incidents.filter',
 			'profileIdx2' => 0,
 			'active_tab' => CProfile::get('web.rsm.incidents.filter.active', 1),

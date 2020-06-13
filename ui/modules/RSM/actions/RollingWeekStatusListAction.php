@@ -851,6 +851,7 @@ class RollingWeekStatusListAction extends Action {
 		$data = [
 			'ajax_request' => $this->isAjaxRequest(),
 			'refresh' => CWebUser::$data['refresh'] ? timeUnitToSeconds(CWebUser::$data['refresh']) : null,
+			'module_style' => $this->module->getStyle(),
 		];
 		$data['rsm_monitoring_mode'] = get_rsm_monitoring_type();
 		$data['title'] = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR)
@@ -878,7 +879,6 @@ class RollingWeekStatusListAction extends Action {
 			$data['paging'] = CPagerHelper::paginate($this->getInput('page', 1), $data['tld'], ZBX_SORT_UP, new CUrl());
 		}
 
-		$data['assets_path'] = $this->assets_path;
 		$response = new CControllerResponseData($data);
 		$response->setTitle($data['title']);
 		$this->setResponse($response);

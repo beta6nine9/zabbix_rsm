@@ -278,7 +278,7 @@ class ParticularProxyListAction extends Action {
 
 		$data = [
 			'title' => _('Test result from particular proxy'),
-			'assets_path' => $this->assets_path,
+			'module_style' => $this->module->getStyle(),
 			'host' => $this->getInput('host', null),
 			'time' => $this->getInput('time', null),
 			'slvItemId' => $this->getInput('slvItemId', null),

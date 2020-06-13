@@ -244,7 +244,7 @@ class SlaReportsListAction extends Action {
 
 		$data = [
 			'title' => _('SLA report'),
-			'assets_path' => $this->assets_path,
+			'module_style' => $this->module->getStyle(),
 			'tld' => [],
 			'url' => '',
 			'sid' => CWebUser::getSessionCookie(),

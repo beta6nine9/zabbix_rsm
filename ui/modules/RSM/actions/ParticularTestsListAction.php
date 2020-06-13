@@ -809,7 +809,7 @@ class ParticularTestsListAction extends Action {
 	protected function doAction() {
 		$data = [
 			'title'	=> _('Details of particular test'),
-			'assets_path' => $this->assets_path,
+			'module_style' => $this->module->getStyle(),
 			'host' => $this->getInput('host', null),
 			'time' => $this->getInput('time', null),
 			'slvItemId' => $this->getInput('slvItemId', null),

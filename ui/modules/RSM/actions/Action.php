@@ -9,8 +9,6 @@ use CControllerResponseFatal;
 
 class Action extends CAction {
 
-	protected $assets_path;
-
 	protected $rsm_monitoring_mode;
 	protected $is_rdap_standalone;
 
@@ -31,9 +29,6 @@ class Action extends CAction {
 
 		/** @var Modules\RSM\Module $module */
 		$this->module = APP::component()->RSM;
-
-		$module_dir = $this->module->getDir();
-		$this->assets_path = substr($module_dir, strrpos($module_dir, 'modules/')).'/assets';
 	}
 
 	/**

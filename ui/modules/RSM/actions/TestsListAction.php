@@ -353,7 +353,7 @@ class TestsListAction extends Action {
 			'title' => _('Tests'),
 			'ajax_request' => $this->isAjaxRequest(),
 			'refresh' => CWebUser::$data['refresh'] ? timeUnitToSeconds(CWebUser::$data['refresh']) : null,
-			'assets_path' => $this->assets_path,
+			'module_style' => $this->module->getStyle(),
 			'profileIdx' => 'web.rsm.tests.filter',
 			'active_tab' => CProfile::get('web.rsm.tests.filter.active', 1),
 			'rsm_monitoring_mode' => get_rsm_monitoring_type(),
