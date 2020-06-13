@@ -1,55 +1,36 @@
+/* Rolling week status page */
 .service-icon {
-	display: inline-block;
-	vertical-align: middle;
-	height: 14px;
-	width: 14px;
-	background-repeat:no-repeat;
-	margin: 0 1px 3px 1px;
-}
-
-.iconrollingweekok {
 	margin: 0 5px 2px;
 	height: 11px;
 	width: 11px;
-	background-color: green;
 	border-radius: 50%;
 	display: inline-block;
+}
+.iconrollingweekok {
+	background-color: green;
 }
 .iconrollingweekfail {
-	margin: 0 5px 2px;
-	height: 11px;
-	width: 11px;
 	background-color: #ea3500;
-	border-radius: 50%;
-	display: inline-block;
 }
 .iconrollingweekdisabled {
-	margin: 0 5px 2px;
-	height: 11px;
-	width: 11px;
 	background-color: grey;
-	border-radius: 50%;
-	display: inline-block;
 }
 .iconrollingweeknodata {
-	margin: 0 5px 2px;
-	height: 11px;
-	width: 11px;
 	background-color: #c2be00;
-	border-radius: 50%;
-	display: inline-block;
-}
-.incidents-info {
-	width: 100%;
 }
 .rolling-week-status {
 	font-size: 16px;
 	font-weight: bold;
 	float: right;
 }
+/* Incidents page */
+.incidents-info {
+	width: 100%;
+}
 .rsm-date-time {
 	float: right;
 }
+/* Particular proxy */
 .first-row-element {
 	width: 300px;
 	display: inline-block;
