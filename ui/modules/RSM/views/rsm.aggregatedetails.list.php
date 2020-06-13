@@ -105,9 +105,9 @@ foreach ($data['probes'] as $probe) {
 	$row = [
 		(new CSpan($probe['host']))->addClass($probe_status_color),
 		$probe_status,
-		isset($probe['transport']) ? $probe['transport'] : '-',
-		($probe_disabled || $probe['online_status'] == PROBE_OFFLINE) ? '-' : $probe['ns_up'],
-		($probe_disabled || $probe['online_status'] == PROBE_OFFLINE) ? '-' : $probe['ns_down']
+		isset($probe['transport']) ? $probe['transport'] : '',
+		($probe_disabled || $probe['online_status'] == PROBE_OFFLINE) ? '' : $probe['ns_up'],
+		($probe_disabled || $probe['online_status'] == PROBE_OFFLINE) ? '' : $probe['ns_down']
 	];
 
 	foreach ($data['dns_nameservers'] as $dns_udp_ns => $ipvs) {
@@ -116,7 +116,7 @@ foreach ($data['probes'] as $probe) {
 				$row[] = ($probe['results'][$dns_udp_ns]['status'] == NAMESERVER_DOWN) ? $down : $up;
 			}
 			else {
-				$row[] = '-';
+				$row[] = '';
 			}
 
 			foreach (['ipv4', 'ipv6'] as $ipv) {
@@ -147,25 +147,23 @@ foreach ($data['probes'] as $probe) {
 							}
 						}
 						else {
-							$row[] = '-';
+							$row[] = '';
 							$row[] = '';
 						}
 					}
 				}
 				else if (array_key_exists($ipv, $data['dns_nameservers'][$dns_udp_ns])) {
 					$cell_cnt = count($data['dns_nameservers'][$dns_udp_ns][$ipv]) * 2;
-
-					$row[] = ($cell_cnt > 1)
-						? (new CCol('-'))->setColSpan($cell_cnt)
-						: '-';
+					$cells = array_fill(1, (($cell_cnt > 1) ? $cell_cnt : 1), '');
+					$row = array_merge($row, $cells);
 				}
 			}
 		}
 		else {
-			$cell_cnt = 1;
-			$cell_cnt += array_key_exists('ipv4', $ipvs) ? count($ipvs['ipv4']) : 0;
-			$cell_cnt += array_key_exists('ipv6', $ipvs) ? count($ipvs['ipv6']) : 0;
-			$row[] = ($cell_cnt > 1) ? (new CCol('-'))->setColSpan($cell_cnt * 2) : '-';
+			$cell_cnt = array_key_exists('ipv4', $ipvs) ? count($ipvs['ipv4'])*2 : 0;
+			$cell_cnt += array_key_exists('ipv6', $ipvs) ? count($ipvs['ipv6'])*2 : 0;
+			$cells = array_fill(1, (($cell_cnt > 1) ? 1 + $cell_cnt : 1), '');
+			$row = array_merge($row, $cells);
 		}
 	}
 
