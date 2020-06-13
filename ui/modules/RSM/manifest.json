@@ -77,6 +77,10 @@
 		}
 	},
 	"assets": [
-		"rsm.style.css"
+		"rsm.style.css",
+		"blue-theme.rsm.css",
+		"dark-theme.rsm.css",
+		"hc-dark.rsm.css",
+		"hc-light.rsm.css"
 	]
 }
