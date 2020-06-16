@@ -1,3 +1,10 @@
+Changes for rsm2.0.0rc10
+
+Bug fixes:
+....I..... [690] fixed reference to FQDN of the name server in Data Export file nsTests.csv (dimir)
+....I..... [693] modified "hosts_inventory" table to avoid "Row size too large" MariaDB error (asitals)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.0.0rc9
 
 Bug fixes:
