@@ -1,6 +1,7 @@
 Changes for rsm2.0.0rc10
 
 Bug fixes:
+....I..... [691] fixed missing DNS TCP metrics in Data Export files nsTest.csv and tests.csv (dimir)
 ....I..... [690] fixed reference to FQDN of the name server in Data Export file nsTests.csv (dimir)
 ....I..... [693] modified "hosts_inventory" table to avoid "Row size too large" MariaDB error (asitals)
 

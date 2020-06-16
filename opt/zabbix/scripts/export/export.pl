@@ -102,6 +102,7 @@ else
 	if (get_monitoring_target() eq MONITORING_TARGET_REGISTRY)
 	{
 		$services->{'dns'} = undef;
+		$services->{SERVICE_DNS_TCP()} = undef;
 		$services->{'dnssec'} = undef;
 		$services->{'epp'} = undef;
 	}
