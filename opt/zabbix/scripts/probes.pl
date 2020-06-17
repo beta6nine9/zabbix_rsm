@@ -26,17 +26,19 @@ sub delete_probe($);
 sub disable_probe($);
 sub rename_probe($$);
 
-sub is_not_empty($$);
+sub is_not_empty($);
 
 sub validate_input;
 sub usage;
 
 my %OPTS;
-my $rv = GetOptions(\%OPTS, "probe=s", "ip=s", "port=s", "new-name=s", "server-id=s",
-			    "epp", "ipv4", "ipv6", "rdds", "rdap", "resolver=s",
-                	    "delete", "disable", "add", "rename",
-			    "psk-identity=s", "psk=s",
-                	    "verbose", "quiet", "help|?");
+my $rv = GetOptions(\%OPTS,
+	"probe=s", "ip=s", "port=s", "new-name=s", "server-id=s",
+	"epp", "ipv4", "ipv6", "rdds", "rdap", "resolver=s",
+	"delete", "disable", "add", "rename",
+	"psk-identity=s", "psk=s",
+	"verbose", "force", "quiet", "help|?"
+);
 
 usage() if ($OPTS{'help'} or not $rv);
 
@@ -117,19 +119,19 @@ sub add_probe($$$$$$$$$$$)
 
 	print("Creating '$probe_name' with interface $probe_ip:$probe_port ");
 	my $probe = create_passive_proxy($probe_name, $probe_ip, $probe_port, $psk_identity, $psk);
-	is_not_empty($probe, true);
+	is_not_empty($probe);
 
 	########## Creating new Host Group
 
 	print("Creating '$probe_name' host group: ");
 	my $probe_groupid = create_group($probe_name);
-	is_not_empty($probe_groupid, true);
+	is_not_empty($probe_groupid);
 
 	########## Creating Probe Config template
 
 	print("Creating '$probe_name' config template: ");
 	my $probe_tmpl_id = create_probe_template($probe_name, $epp, $ipv4, $ipv6, $rdds, $rdap, $resolver);
-	is_not_empty($probe_tmpl_id, true);
+	is_not_empty($probe_tmpl_id);
 
 	########## Creating Probe host
 
@@ -150,7 +152,7 @@ sub add_probe($$$$$$$$$$$)
 		]
 	});
 
-	is_not_empty($probe_host, true);
+	is_not_empty($probe_host);
 
 	########## Creating Probe monitoring host
 
@@ -176,7 +178,7 @@ sub add_probe($$$$$$$$$$$)
 		]
 	});
 
-	is_not_empty($probe_host_mon, true);
+	is_not_empty($probe_host_mon);
 
 	create_macro('{$RSM.PROXY_NAME}', $probe_name, $probe_host_mon, true);
 
@@ -248,7 +250,7 @@ sub add_probe($$$$$$$$$$$)
 			]
 		});
 
-		is_not_empty($rsmhost_probe_id, false);
+		is_not_empty($rsmhost_probe_id);
 
 		my $rsmhost_probe_items = get_host_items($rsmhost_probe_id);
 		set_service_items_status($rsmhost_probe_items, RDDS_TEST_TEMPLATEID, $rdds && $rsmhost_rdds);
@@ -275,20 +277,20 @@ sub delete_probe($) {
 
     $probe_host = get_host($probe_name, false);
 
-    check_probe_data($probe_host, "The probe host is not found", false);
+    check_probe_data($probe_host, "The probe host was not found");
 
     $probe_host_mon = get_host($probe_name.' - mon', false);
 
-    check_probe_data($probe_host_mon, "Probe monitoring host with name '$probe_name - mon' is not found", false);
+    check_probe_data($probe_host_mon, "Probe monitoring host with name '$probe_name - mon' was not found");
 
     $probe_tmpl = get_template(TEMPLATE_PROBE_CONFIG_PREFIX . $probe_name, true, false);
 
     check_probe_data($probe_tmpl, "Probe monitoring template with name '" . TEMPLATE_PROBE_CONFIG_PREFIX .
-		"$probe_name' is not found", false);
+		"$probe_name' was not found");
 
     $probe_hostgroup = get_host_group($probe_name, false, false);
 
-    check_probe_data($probe_hostgroup, "Host group with name '$probe_name' is not found", false);
+    check_probe_data($probe_hostgroup, "Host group with name '$probe_name' was not found");
 
     ########## Deleting probe template
     if (keys %{$probe_tmpl}) {
@@ -299,7 +301,7 @@ sub delete_probe($) {
 
         $result = remove_templates([ $templateid ]);
 
-	is_not_empty($result->{'templateids'}, false);
+	is_not_empty($result->{'templateids'});
     }
 
     ########## Deleting TLDs and probe host linked to the Probe
@@ -311,7 +313,7 @@ sub delete_probe($) {
 
         $result = remove_hosts( [ $hostid ] );
 
-	is_not_empty($result->{'hostids'}, false);
+	is_not_empty($result->{'hostids'});
     }
 
     ########## Deleting probe status monitoring host linked to the Probe
@@ -323,7 +325,7 @@ sub delete_probe($) {
 
 	$result = remove_hosts( [ $hostid ] );
 
-	is_not_empty($result->{'hostids'}, false);
+	is_not_empty($result->{'hostids'});
     }
 
     ########## Deleting Probe group
@@ -334,7 +336,7 @@ sub delete_probe($) {
 
         $result = remove_hostgroups( [ $hostgroupid ] );
 
-	is_not_empty($result->{'groupids'}, false);
+	is_not_empty($result->{'groupids'});
     }
 
     ########## Deleting Probe
@@ -342,7 +344,7 @@ sub delete_probe($) {
 
     $result = remove_probes( [ $probe->{'proxyid'} ] );
 
-    is_not_empty($result->{'proxyids'}, false);
+    is_not_empty($result->{'proxyids'});
 
     ##########
 
@@ -364,16 +366,16 @@ sub disable_probe($) {
 
     $probe_host = get_host($probe_name, false);
 
-    check_probe_data($probe_host, "The probe host is not found", false);
+    check_probe_data($probe_host, "The probe host was not found");
 
     $probe_host_mon = get_host($probe_name.' - mon', false);
 
-    check_probe_data($probe_host_mon, "Probe monitoring host with name '$probe_name - mon' is not found", false);
+    check_probe_data($probe_host_mon, "Probe monitoring host with name '$probe_name - mon' was not found");
 
     $probe_tmpl = get_template(TEMPLATE_PROBE_CONFIG_PREFIX . $probe_name, true, false);
 
     check_probe_data($probe_tmpl, "Probe monitoring template with name '" . TEMPLATE_PROBE_CONFIG_PREFIX .
-		"$probe_name' is not found", false);
+		"$probe_name' was not found");
 
     ########## Disabling TLDs linked to the probe and Probe monitoring host
 
@@ -385,7 +387,7 @@ sub disable_probe($) {
 
 	$result = disable_host($hostid);
 
-	is_not_empty($result->{'hostids'}, false);
+	is_not_empty($result->{'hostids'});
     }
 
     ########## Disabling probe host
@@ -397,7 +399,7 @@ sub disable_probe($) {
 
 	$result = disable_host($hostid);
 
-	is_not_empty($result->{'hostids'}, false);
+	is_not_empty($result->{'hostids'});
     }
 
     ########## Disabling probe monitoring host
@@ -409,7 +411,7 @@ sub disable_probe($) {
 
 	$result = disable_host($hostid);
 
-	is_not_empty($result->{'hostids'}, false);
+	is_not_empty($result->{'hostids'});
     }
 
     ########## Disabling all services on the Probe
@@ -423,7 +425,7 @@ sub disable_probe($) {
 
 	$result = macro_value($hostmacroid, $macros{$macro_name});
 
-	is_not_empty($result->{'hostmacroids'}, false);
+	is_not_empty($result->{'hostmacroids'});
     }
 
     ########## There's no status "disabled" so we set it to something non-passive - "active" wins
@@ -432,7 +434,7 @@ sub disable_probe($) {
 
     $result = set_proxy_status($probe->{'proxyid'}, HOST_STATUS_PROXY_ACTIVE);
 
-    is_not_empty($result->{'proxyids'}, false);
+    is_not_empty($result->{'proxyids'});
 
     ##########
 
@@ -453,29 +455,29 @@ sub rename_probe($$) {
 
     $probe_host = get_host($old_name, false);
 
-    check_probe_data($probe_host, "The probe host is not found", false);
+    check_probe_data($probe_host, "The probe host was not found");
 
     $probe_host_mon = get_host($old_name.' - mon', false);
 
-    check_probe_data($probe_host_mon, "Probe monitoring host with name '$old_name - mon' is not found", false);
+    check_probe_data($probe_host_mon, "Probe monitoring host with name '$old_name - mon' was not found");
 
 # check arguments
     $probe_tmpl = get_template(TEMPLATE_PROBE_CONFIG_PREFIX . $old_name, true, false);
 
     check_probe_data($probe_tmpl, "Probe monitoring template with name '" . TEMPLATE_PROBE_CONFIG_PREFIX .
-		"$old_name' is not found", false);
+		"$old_name' was not found");
 
     $probe_hostgroup = get_host_group($old_name, false, false);
 
-    check_probe_data($probe_hostgroup, "Host group with name '$old_name' is not found", false);
+    check_probe_data($probe_hostgroup, "Host group with name '$old_name' was not found");
 
     $probe_macro = get_host_macro($probe_host_mon->{'hostid'}, '{$RSM.PROXY_NAME}');
 
-    check_probe_data($probe_macro, "Host group with name '{\$RSM.PROXY_NAME}' is not found", false);
+    check_probe_data($probe_macro, "Host group with name '{\$RSM.PROXY_NAME}' was not found");
 
     print "Trying to rename '$old_name' probe: ";
     $result = rename_proxy($probe->{'proxyid'}, $new_name);
-    is_not_empty($result->{'proxyids'}, false);
+    is_not_empty($result->{'proxyids'});
 
     ########## Renaming TLDs linked to the probe and Probe monitoring host
     foreach my $host (@{$probe->{'hosts'}}) {
@@ -493,7 +495,7 @@ sub rename_probe($$) {
 
 	$result = rename_host($hostid, $host_name);
 
-	is_not_empty($result->{'hostids'}, false);
+	is_not_empty($result->{'hostids'});
     }
 
     ########## Renaming probe monitoring host
@@ -505,34 +507,33 @@ sub rename_probe($$) {
 
 	$result = rename_host($hostid, $new_name." - mon");
 
-	is_not_empty($result->{'hostids'}, false);
+	is_not_empty($result->{'hostids'});
     }
 
     my $template_name = $probe_tmpl->{'host'};
     print "Trying to rename '$template_name' template: ";
     $result = rename_template($probe_tmpl->{'templateid'}, TEMPLATE_PROBE_CONFIG_PREFIX . $new_name);
-    is_not_empty($result->{'templateids'}, false);
+    is_not_empty($result->{'templateids'});
 
     print "Trying to rename '$old_name' host group: ";
     $result = rename_hostgroup($probe_hostgroup->{'groupid'}, $new_name);
-    is_not_empty($result->{'groupids'}, false);
+    is_not_empty($result->{'groupids'});
 
     print "Trying to update '{\$RSM.PROXY_NAME}' macro on '$new_name - mon' host: ";
     $result = macro_value($probe_macro->{'hostmacroid'}, $new_name);
-    is_not_empty($result->{'hostmacroids'}, false);
+    is_not_empty($result->{'hostmacroids'});
 
     # rsm_probes table?
     print "The probe has been renamed successfully\n";
 }
 
-sub check_probe_data($) {
+sub check_probe_data($$) {
     my $data = shift;
     my $message = shift;
-    my $do_exit = shift;
 
-    unless (keys %{$data}) {
+    unless (keys(%{$data})) {
 	print $message."\n";
-	exit(1) if !defined($do_exit) or $do_exit != false;
+	exit(1) unless ($OPTS{'force'});
     }
 
     return true;
@@ -540,16 +541,15 @@ sub check_probe_data($) {
 
 ##############
 
-sub is_not_empty($$) {
+sub is_not_empty($) {
     my $var = shift;
-    my $do_exit = shift;
 
     if (defined($var) and scalar($var)) {
         print "success\n";
     }
     else {
-        print "failed\n";
-        exit(1) unless ($do_exit == false);
+        print "failed!\n";
+        exit(1) unless ($OPTS{'force'});
     }
 }
 
@@ -579,6 +579,9 @@ Other options
 		(default: off)
 	--rename
 		rename existing probe to specified name in --new-name argument
+		(default: off)
+	--force
+		do not exit in case of failure, try to finish the task
 		(default: off)
 
 Options for adding new probe. Argument --add.
