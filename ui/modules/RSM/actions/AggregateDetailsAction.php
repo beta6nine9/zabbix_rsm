@@ -291,7 +291,12 @@ class AggregateDetailsAction extends Action {
 			$key_parser->parse($tldprobe_item['key_']);
 			$key = $key_parser->getKey();
 			$probeid = $tldprobeid_probeid[$tldprobe_item['hostid']];
-			$value = array_key_exists('history_value', $tldprobe_item) ? $tldprobe_item['history_value'] : null;
+
+			if (!array_key_exists('history_value', $tldprobe_item)) {
+				continue;
+			}
+
+			$value = $tldprobe_item['history_value'];
 
 			switch ($key_parser->getKey()) {
 				case PROBE_DNS_NSSOK:

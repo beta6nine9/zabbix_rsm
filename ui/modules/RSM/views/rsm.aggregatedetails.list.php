@@ -106,8 +106,8 @@ foreach ($data['probes'] as $probe) {
 		(new CSpan($probe['host']))->addClass($probe_status_color),
 		$probe_status,
 		isset($probe['transport']) ? $probe['transport'] : '',
-		($probe_disabled || $probe['online_status'] == PROBE_OFFLINE) ? '' : $probe['ns_up'],
-		($probe_disabled || $probe['online_status'] == PROBE_OFFLINE) ? '' : $probe['ns_down']
+		($probe_disabled || $probe_status == $no_result || $probe['online_status'] == PROBE_OFFLINE) ? '' : $probe['ns_up'],
+		($probe_disabled || $probe_status == $no_result || $probe['online_status'] == PROBE_OFFLINE) ? '' : $probe['ns_down']
 	];
 
 	foreach ($data['dns_nameservers'] as $dns_udp_ns => $ipvs) {
