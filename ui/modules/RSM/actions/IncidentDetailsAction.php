@@ -351,25 +351,18 @@ class IncidentDetailsAction extends Action {
 		}
 		unset($printed);
 
-		$slvs = DBselect(
+		$rollweek_values = DBfetchArrayAssoc(DBselect(
 			'SELECT h.value,h.clock'.
 			' FROM history h'.
 			' WHERE h.itemid='.zbx_dbstr($data['slvItemId']).
 				' AND h.clock>='.$from_time.
 				' AND h.clock<='.$to_time.
 			' ORDER BY h.clock asc'
-		);
-
-		$slv = DBfetch($slvs);
+		), 'clock');
 
 		foreach ($data['tests'] as &$test) {
-			while ($slv) {
-				$latest = $slv;
-
-				if (!($slv = DBfetch($slvs)) || $slv['clock'] > $test['clock']) {
-					$test['slv'] = sprintf('%.3f', $latest['value']);
-					break;
-				}
+			if (isset($rollweek_values[$test['clock']])) {
+				$test['slv'] = sprintf('%.3f', $rollweek_values[$test['clock']]['value']);
 			}
 		}
 	}
