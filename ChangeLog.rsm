@@ -1,3 +1,9 @@
+Changes for rsm2.0.0rc11
+
+Bug fixes:
+....I..... [699] fixed prefix in alerts, 'tld' for registries, 'registrar' for registrars (asitals)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.0.0rc10
 
 Bug fixes:
