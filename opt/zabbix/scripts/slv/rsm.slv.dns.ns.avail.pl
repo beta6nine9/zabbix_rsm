@@ -35,7 +35,7 @@ my $max_cycles = (opt('cycles') ? getopt('cycles') : slv_max_cycles('dns'));
 my $cycle_delay = get_dns_udp_delay();
 my $current_month_latest_cycle = current_month_latest_cycle();
 my $cfg_minonline = get_macro_dns_probe_online();
-my $dns_rtt_low = get_rtt_low('dns', PROTO_UDP);
+my $dns_rtt_high = get_macro_dns_udp_rtt_high();
 my $rtt_itemids = get_all_dns_udp_rtt_itemids();
 
 init_values();
@@ -146,7 +146,7 @@ sub process_cycles # for a particular slv item
 
 		foreach my $rtt_value (@{$rtt_values})
 		{
-			if (is_service_error('dns', $rtt_value, $dns_rtt_low))
+			if (is_service_error('dns', $rtt_value, $dns_rtt_high))
 			{
 				$down_rtt_count++;
 			}

@@ -1,6 +1,7 @@
 Changes for rsm1.3.4
 
 Bug fixes:
+....I..... [697] fixed usage of incorrect RTT limit for name server availability (dimir)
 ....I..... [696] fixed inconsistency in measurement files when copying them to incidents folder (dimir)
 
 --------------------------------------------------------------------------------
