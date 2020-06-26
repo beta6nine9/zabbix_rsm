@@ -1,3 +1,9 @@
+Changes for rsm1.3.4
+
+Bug fixes:
+....I..... [696] fixed inconsistency in measurement files when copying them to incidents folder (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm1.3.3
 
 Bug fixes:
