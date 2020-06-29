@@ -1,6 +1,7 @@
 Changes for rsm2.0.0rc12
 
 Bug fixes:
+.......PS. [703] added missing functionality to respect number of tries when testing local resolver (dimir)
 
 --------------------------------------------------------------------------------
 Changes for rsm2.0.0rc11
