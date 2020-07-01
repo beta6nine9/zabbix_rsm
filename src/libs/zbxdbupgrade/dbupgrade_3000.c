@@ -5630,6 +5630,22 @@ out:
 	return ret;
 }
 
+static int	DBpatch_3000516(void)
+{
+#define SQL	"alter table host_inventory"										\
+			" modify column name varchar(128) collate utf8_bin not null default '',"			\
+			" modify column alias varchar(128) collate utf8_bin not null default '',"			\
+			" modify column os varchar(128) collate utf8_bin not null default '',"				\
+			" modify column os_short varchar(128) collate utf8_bin not null default ''"
+	if (ZBX_DB_OK > DBexecute(SQL))
+	{
+		return FAIL;
+	}
+#undef SQL
+
+	return SUCCEED;
+}
+
 #endif
 
 DBPATCH_START(3000)
@@ -5760,5 +5776,6 @@ DBPATCH_ADD(3000512, 0, 0)	/* rename {$RSM.RDDS.TESTPREFIX} to {$RSM.RDDS43.TEST
 DBPATCH_ADD(3000513, 0, 0)	/* rename report column in sla_reports to report_xml, add report_json column */
 DBPATCH_ADD(3000514, 0, 0)	/* add items for online/total probes with RDAP enabled to host "Probe statuses" */
 DBPATCH_ADD(3000515, 0, 0)	/* add trigger for number of RDAP-enabled online probes to host "Probe statuses" */
+DBPATCH_ADD(3000516, 0, 1)	/* modify "hosts_inventory" table to avoid "Row size too large" MariaDB error */
 
 DBPATCH_END()

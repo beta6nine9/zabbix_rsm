@@ -102,6 +102,7 @@ else
 	if (get_monitoring_target() eq MONITORING_TARGET_REGISTRY)
 	{
 		$services->{'dns'} = undef;
+		$services->{SERVICE_DNS_TCP()} = undef;
 		$services->{'dnssec'} = undef;
 		$services->{'epp'} = undef;
 	}
@@ -1191,7 +1192,7 @@ sub __save_csv_data
 							# Name Server (target) test
 							dw_append_csv(DATA_NSTEST, [
 									      $probe_id,
-									      $target_id,
+									      $ns_id,
 									      $tld_id,
 									      $cycleclock,
 									      dw_get_id(ID_STATUS_MAP, $target_status),

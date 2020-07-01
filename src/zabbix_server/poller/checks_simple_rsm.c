@@ -6132,6 +6132,12 @@ int	check_rsm_resolver_status(DC_ITEM *item, const AGENT_REQUEST *request, AGENT
 		goto out;
 	}
 
+	if (tries < 1 || 5 < tries)
+	{
+		SET_MSG_RESULT(result, zbx_strdup(NULL, "Third parameter must be between 1 and 5."));
+		goto out;
+	}
+
 	if (SUCCEED != is_uint31(ipv4_enabled_str, &ipv4_enabled))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid fourth parameter."));
@@ -6176,10 +6182,23 @@ int	check_rsm_resolver_status(DC_ITEM *item, const AGENT_REQUEST *request, AGENT
 	rsm_infof(log_fd, "IPv4:%s IPv6:%s", 0 == ipv4_enabled ? "DISABLED" : "ENABLED",
 			0 == ipv6_enabled ? "DISABLED" : "ENABLED");
 
-	if (SUCCEED != zbx_check_dns_connection(res, query_rdf, CHECK_DNS_CONN_RECURSIVE, 0, log_fd, err, sizeof(err)))
+	while (tries--)
 	{
-		rsm_errf(log_fd, "dns check of local resolver %s failed: %s", res_ip, err);
-		goto out;
+		if (SUCCEED == zbx_check_dns_connection(res, query_rdf, CHECK_DNS_CONN_RECURSIVE, 0, log_fd,
+				err, sizeof(err)))
+		{
+			break;
+		}
+
+		if (!tries)
+		{
+			rsm_errf(log_fd, "dns check of local resolver %s failed: %s", res_ip, err);
+			goto out;
+		}
+
+		/* will try again */
+		rsm_errf(log_fd, "dns check of local resolver %s failed: %s, will try %d more time%s",
+				res_ip, err, tries, (tries == 1 ? "" : "s"));
 	}
 
 	status = 1;

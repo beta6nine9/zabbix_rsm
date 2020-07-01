@@ -1503,7 +1503,7 @@ sub calculate_cycle($$$$$$$$$)
 
 	return if (opt('dry-run'));
 
-	if (ah_save_recent_measurement(ah_get_api_tld($tld), $service, $json, $from) != AH_SUCCESS)
+	if (ah_save_measurement(ah_get_api_tld($tld), $service, $json, $from) != AH_SUCCESS)
 	{
 		fail("cannot save recent measurement: ", ah_get_error());
 	}

@@ -869,7 +869,7 @@ foreach (@server_keys)
 
 					while ($clock < $check_till)
 					{
-						if (ah_get_recent_measurement($ah_tld, $service, $clock, \$recent_json) != AH_SUCCESS)
+						if (ah_copy_measurement($ah_tld, $service, $clock, $eventid, $event_clock) != AH_SUCCESS)
 						{
 							# before failing let's check if there is time configured to
 							# allow for missing measurement files
@@ -882,12 +882,7 @@ foreach (@server_keys)
 								exit(0);
 							}
 
-							fail("cannot get recent measurement: ", ah_get_error());
-						}
-
-						if (ah_save_measurement($ah_tld, $service, $eventid, $event_clock, $recent_json, $clock) != AH_SUCCESS)
-						{
-							fail("cannot save incident: ", ah_get_error());
+							fail("cannot copy recent measurement: ", ah_get_error());
 						}
 
 						$clock += $delay;
