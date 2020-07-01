@@ -1072,27 +1072,30 @@ sub update_ns_servers($$$$)
 
 	if (defined($changes->{'disable'}))
 	{
-		my $itemids_to_disable;
-
-		my $result = really(get_items_like($tld_hostid, "rsm.slv.dns.ns.downtime[", false));
-
-		my %current_items;
-
-		# map key => itemid
-		map {$current_items{$result->{$_}{'key_'}} = $_} (keys(%{$result}));
-
-		foreach my $nsip (@{$changes->{'disable'}})
+		foreach my $key_ptrn ('rsm.slv.dns.ns.avail', 'rsm.slv.dns.ns.downtime')
 		{
-			my ($ns, $ip) = @{$nsip};
+			my $itemids_to_disable = [];
 
-			my $key = "rsm.slv.dns.ns.downtime[$ns,$ip]";
+			my $result = really(get_items_like($tld_hostid, $key_ptrn, false));
 
-			next unless (defined($current_items{$key}));
+			my %current_items;
 
-			push(@{$itemids_to_disable}, $current_items{$key});
+			# map key => itemid
+			map {$current_items{$result->{$_}{'key_'}} = $_} (keys(%{$result}));
+
+			foreach my $nsip (@{$changes->{'disable'}})
+			{
+				my ($ns, $ip) = @{$nsip};
+
+				my $key = "$key_ptrn\[$ns,$ip\]";
+
+				next unless (defined($current_items{$key}));
+
+				push(@{$itemids_to_disable}, $current_items{$key});
+			}
+
+			disable_items($itemids_to_disable) if (@{$itemids_to_disable});
 		}
-
-		disable_items($itemids_to_disable) if (@{$itemids_to_disable});
 	}
 
 	my $macro_value = '';

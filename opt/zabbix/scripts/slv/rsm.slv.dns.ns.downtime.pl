@@ -12,8 +12,8 @@ use TLD_constants qw(:groups :api);
 use Data::Dumper;
 use DateTime;
 
-use constant AVAIL_KEY_PATTERN => 'rsm.slv.dns.ns.avail';
-use constant DOWNTIME_KEY_PATTERN => 'rsm.slv.dns.ns.downtime';
+use constant AVAIL_KEY_PATTERN => 'rsm.slv.dns.ns.avail[%,%]';
+use constant DOWNTIME_KEY_PATTERN => 'rsm.slv.dns.ns.downtime[%,%]';
 
 parse_slv_opts();
 fail_if_running();
@@ -26,8 +26,8 @@ if (!opt('dry-run'))
 {
 	recalculate_downtime(
 		"/opt/zabbix/data/rsm.slv.dns.ns.downtime.auditlog.txt",
-		"rsm.slv.dns.ns.avail[%,%]",
-		"rsm.slv.dns.ns.downtime[%,%]",
+		AVAIL_KEY_PATTERN,
+		DOWNTIME_KEY_PATTERN,
 		1,
 		1,
 		get_dns_delay(getopt('now') // time() - AVAIL_SHIFT_BACK)
@@ -72,17 +72,17 @@ sub get_ns_items
 		"select itemid,key_".
 		" from items".
 		" where hostid=$hostid".
-			" and key_ like '" . AVAIL_KEY_PATTERN . "[%'".
+			" and key_ like '" . AVAIL_KEY_PATTERN . "'".
 			" and status=${\ITEM_STATUS_ACTIVE}"
 	);
 
 	fail("failed to obtain ns avail items") unless (scalar(@{$rows_avail}));
 
 	my $rows_downtime = db_select(
-		"select itemid,key_".
+		"select itemid,key_,flags".
 		" from items".
 		" where hostid=$hostid".
-			" and key_ like '" . DOWNTIME_KEY_PATTERN . "[%'".
+			" and key_ like '" . DOWNTIME_KEY_PATTERN . "'".
 			" and status=${\ITEM_STATUS_ACTIVE}"
 	);
 
@@ -90,7 +90,10 @@ sub get_ns_items
 
 	if (scalar(@{$rows_avail}) != scalar(@{$rows_downtime}))
 	{
-		fail("got different number of ns avail and downtime items");
+		fail("got different number of ns avail and downtime items:\n",
+				Dumper($rows_avail),
+				Dumper($rows_downtime)
+		);
 	}
 
 	my $items_by_nsip = {};
