@@ -610,11 +610,11 @@ sub ah_copy_measurement($$$$$$)
 	my $src_path;
 
 	# do not create missing directories
-	return AH_FAIL unless (__gen_measurement_path($version, $ah_tld, $service, $clock, \$path, 0) == AH_SUCCESS);
+	return AH_FAIL unless (__gen_measurement_path($version, $ah_tld, $service, $clock, \$src_path, 0) == AH_SUCCESS);
 
 	my $inc_path;
 
-	return AH_FAIL unless (__make_inc_path($ah_tld, $service, $event_start, $eventid, \$inc_path) == AH_SUCCESS);
+	return AH_FAIL unless (__make_inc_path($version, $ah_tld, $service, $event_start, $eventid, \$inc_path) == AH_SUCCESS);
 
 	my $dst_path = "$inc_path/$clock.$eventid.json";
 

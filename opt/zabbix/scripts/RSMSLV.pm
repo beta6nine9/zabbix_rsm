@@ -105,6 +105,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		get_macro_rdap_rollweek_sla
 		get_macro_dns_udp_rtt_high
 		get_macro_dns_udp_rtt_low
+		get_macro_dns_tcp_rtt_high
 		get_macro_dns_tcp_rtt_low
 		get_macro_rdds_rtt_low
 		get_macro_rdap_rtt_low
@@ -245,6 +246,11 @@ sub get_macro_dns_udp_rtt_low
 sub get_macro_dns_tcp_rtt_low
 {
 	return __get_macro('{$RSM.DNS.TCP.RTT.LOW}');
+}
+
+sub get_macro_dns_tcp_rtt_high
+{
+	return __get_macro('{$RSM.DNS.TCP.RTT.HIGH}');
 }
 
 sub get_macro_rdds_rtt_low
