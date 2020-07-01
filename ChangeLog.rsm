@@ -111,6 +111,14 @@ New features:
 ..F.I..... [510] added support for Registrar RDDS Monitoring (asitals, dimir, gcalenko, miks, yurii)
 
 --------------------------------------------------------------------------------
+Changes for rsm1.3.4
+
+Bug fixes:
+....I..... [681] improved php-fpm configuration to reduce memory consumption; thanks to Ruslans Agafonovs (dimir)
+....I..... [697] fixed usage of incorrect RTT limit for name server availability (dimir)
+....I..... [696] fixed inconsistency in measurement files when copying them to incidents folder (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm1.3.3
 
 Bug fixes:
