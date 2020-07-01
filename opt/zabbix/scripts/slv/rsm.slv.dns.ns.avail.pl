@@ -34,9 +34,11 @@ else
 my $max_cycles = (opt('cycles') ? getopt('cycles') : slv_max_cycles('dns'));
 my $cycle_delay = get_dns_delay();
 my $cfg_minonline = get_macro_dns_probe_online();
-my $udp_dns_rtt_low = get_rtt_low('dns', PROTO_UDP);
-my $tcp_dns_rtt_low = get_rtt_low('dns', PROTO_TCP);
+
+my $dns_udp_rtt_high = get_macro_dns_udp_rtt_high();
+my $dns_tcp_rtt_high = get_macro_dns_tcp_rtt_high();
 my $rtt_itemids = get_all_dns_rtt_itemids();
+
 my $probes_ref = get_probes('DNS');
 
 init_values();
@@ -143,7 +145,7 @@ sub process_cycles($$$$)
 
 		foreach my $udp_rtt_value (@{$udp_rtt_values})
 		{
-			if (is_service_error('dns', $udp_rtt_value, $udp_dns_rtt_low))
+			if (is_service_error('dns', $udp_rtt_value, $dns_udp_rtt_high))
 			{
 				$down_rtt_count++;
 			}
@@ -151,7 +153,7 @@ sub process_cycles($$$$)
 
 		foreach my $tcp_rtt_value (@{$tcp_rtt_values})
 		{
-			if (is_service_error('dns', $tcp_rtt_value, $tcp_dns_rtt_low))
+			if (is_service_error('dns', $tcp_rtt_value, $dns_tcp_rtt_high))
 			{
 				$down_rtt_count++;
 			}

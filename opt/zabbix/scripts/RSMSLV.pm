@@ -2553,14 +2553,14 @@ sub is_service_error
 {
 	my $service = shift;
 	my $rtt = shift;
-	my $rtt_low = shift;	# optional
+	my $rtt_limit = shift;	# optional
 
 	return 0 unless (defined($rtt));
 
 	# not an error
 	if ($rtt >= 0)
 	{
-		return 1 if ($rtt_low && $rtt > $rtt_low);
+		return 1 if ($rtt_limit && $rtt > $rtt_limit);
 
 		# rtt within limit
 		return 0;
@@ -2589,12 +2589,12 @@ sub is_service_error_desc
 {
 	my $service = shift;
 	my $desc = shift;
-	my $rtt_low = shift;	# optional
+	my $rtt_limit = shift;	# optional
 
 	return 0 unless (defined($desc));
 	return 0 if ($desc eq "");
 
-	return is_service_error($service, get_value_from_desc($desc), $rtt_low);
+	return is_service_error($service, get_value_from_desc($desc), $rtt_limit);
 }
 
 # Collect cycles that needs to be calculated in form:

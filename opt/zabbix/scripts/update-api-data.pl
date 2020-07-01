@@ -940,12 +940,13 @@ foreach (@server_keys)
 					{
 						if ($service ne 'rdap')
 						{
-							if (ah_read_recent_measurement(
+							if (ah_copy_measurement(
 									AH_SLA_API_VERSION_1,
 									$ah_tld,
 									$service,
 									$clock,
-									\$recent_json) != AH_SUCCESS)
+									$eventid,
+									$event_clock) != AH_SUCCESS)
 							{
 								# before failing let's check if there is time configured
 								# to allow for missing measurement files
@@ -963,51 +964,31 @@ foreach (@server_keys)
 
 								fail("cannot get recent measurement: ", ah_get_error());
 							}
-
-							if (ah_save_incident_measurement(
-									AH_SLA_API_VERSION_1,
-									$ah_tld,
-									$service,
-									$eventid,
-									$event_clock,
-									$recent_json,
-									$clock) != AH_SUCCESS)
-							{
-								fail("cannot save incident: ", ah_get_error());
-							}
 						}
 
-						if (ah_read_recent_measurement(
+						if (ah_copy_measurement(
 								AH_SLA_API_VERSION_2,
 								$ah_tld,
 								$service,
 								$clock,
-								\$recent_json) != AH_SUCCESS)
+								$eventid,
+								$event_clock) != AH_SUCCESS)
 						{
-							# before failing let's check if there is time configured to
-							# allow for missing measurement files
+							# before failing let's check if there is time configured
+							# to allow for missing measurement files
 							if ($now - $clock < $allow_missing_measurements)
 							{
-								info("there is missing recent measurement for ", ts_str($clock),
-										", but since it is within limit",
-										" ($allow_missing_measurements seconds from now),",
-										" will quit and try to get it again on the next run...");
+								info("there is missing recent measurement for ",
+										ts_str($clock), ", but since it is",
+										" within limit",
+										" ($allow_missing_measurements seconds",
+										" from now), will quit and try to get",
+										" it again on the next run...");
+
 								exit(0);
 							}
 
 							fail("cannot get recent measurement: ", ah_get_error());
-						}
-
-						if (ah_save_incident_measurement(
-								AH_SLA_API_VERSION_2,
-								$ah_tld,
-								$service,
-								$eventid,
-								$event_clock,
-								$recent_json,
-								$clock) != AH_SUCCESS)
-						{
-							fail("cannot save incident: ", ah_get_error());
 						}
 
 						$clock += $delay;

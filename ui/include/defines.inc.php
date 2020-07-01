@@ -20,7 +20,8 @@
 
 
 /* RSM specifics: specific defines: start */
-define('ZABBIX_DB_VERSION_RSM',    0);
+define('ZABBIX_DB_VERSION_RSM',		0);
+
 // Additional users.
 define('USER_TYPE_ZABBIX_GUEST',	0);
 define('USER_TYPE_READ_ONLY',		4);

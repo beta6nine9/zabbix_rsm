@@ -10,6 +10,7 @@ use JSON::XS;
 use Types::Serialiser;
 use File::Copy;
 use Fcntl qw(:flock);
+use File::Copy;
 
 use constant AH_SUCCESS => 0;
 use constant AH_FAIL => 1;
@@ -54,10 +55,10 @@ our @EXPORT = qw(
 	AH_SLA_API_DIR
 	AH_SLA_API_TMP_DIR ah_set_debug ah_get_error ah_read_state ah_save_state
 	ah_save_alarmed ah_save_downtime ah_create_incident_json ah_save_incident
-	ah_save_false_positive ah_save_incident_measurement
+	ah_save_false_positive
 	ah_continue_file_name ah_lock_continue_file ah_unlock_continue_file
 	ah_get_api_tld ah_get_last_audit
-	ah_read_recent_measurement ah_save_recent_measurement ah_save_recent_cache ah_read_recent_cache
+	ah_copy_measurement ah_save_measurement ah_save_recent_cache ah_read_recent_cache
 	ah_get_most_recent_measurement_ts
 	ah_save_audit ah_save_continue_file JSON_OBJECT_DISABLED_SERVICE
 	AH_INTERFACE_DNS AH_INTERFACE_DNSSEC AH_INTERFACE_RDDS43 AH_INTERFACE_RDDS80 AH_INTERFACE_RDAP AH_INTERFACE_EPP
@@ -103,7 +104,7 @@ sub __ts_full(;$)
 
 # Generate path for SLA API file or directory, e. g.
 #
-#   [base_dir]/example/monitoring/dns
+#   [base_dir]/v1/example/monitoring/dns
 #
 sub __gen_base_path($$;$$)
 {
@@ -122,7 +123,7 @@ sub __gen_base_path($$;$$)
 
 # Generate path for SLA API incident directory, e. g.
 #
-#   [base_dir]/example/monitoring/dns/incidents/1548853740.13468
+#   [base_dir]/v1/example/monitoring/dns/incidents/1548853740.13468
 #
 sub __gen_inc_path($$$$$)
 {
@@ -257,13 +258,13 @@ sub __write_file
 
 	unless (move($full_path_new, $full_path))
 	{
-		__set_error("cannot rename file \"$full_path_new\" to \"$full_path\": $!");
+		__set_error("cannot move \"$full_path_new\" to \"$full_path\": $!");
 		return AH_FAIL;
 	}
 
 	if (defined($clock) && !utime($clock, $clock, $full_path))
 	{
-		__set_error("cannot set mtime of file \"$full_path\": $!");
+		__set_error("cannot set mtime of \"$full_path\": $!");
 		return AH_FAIL;
 	}
 
@@ -453,6 +454,27 @@ sub __read_file($$)
 	return AH_SUCCESS;
 }
 
+sub __copy_file($$$)
+{
+	my $src = shift;
+	my $dst = shift;
+	my $clock = shift;	# mtime
+
+	if (!copy($src, $dst))
+	{
+		__set_error("cannot copy \"$src\" to \"$dst\": $!");
+		return AH_FAIL;
+	}
+
+	if (!utime($clock, $clock, $dst))
+	{
+		__set_error("cannot set mtime of \"$dst\": $!");
+		return AH_FAIL;
+	}
+
+	return AH_SUCCESS;
+}
+
 # read an old file from incident directory
 sub __read_inc_file($$$$$$$)
 {
@@ -530,30 +552,11 @@ sub ah_save_false_positive($$$$$$$$)
 	return __save_inc_false_positive($version, $inc_path, $false_positive, $clock);
 }
 
-sub ah_save_incident_measurement($$$$$$$)
-{
-	my $version = shift;
-	my $tld = shift;
-	my $service = shift;
-	my $eventid = shift;	# incident is identified by event ID
-	my $start = shift;
-	my $json = shift;
-	my $clock = shift;
-
-	my $inc_path;
-
-	return AH_FAIL unless (__make_inc_path($version, $tld, $service, $start, $eventid, \$inc_path) == AH_SUCCESS);
-
-	my $json_path = "$inc_path/$clock.$eventid.json";
-
-	return __write_file($json_path, __encode_json($version, $json), $clock);
-}
-
 # Base path for recent measurement, e. g.
 #
 #   [base_dir]/v1/example/monitoring/dns/measurements/2018/02/28
 #
-sub __gen_recent_measurement_base_path($$$$)
+sub __gen_measurement_base_path($$$$)
 {
 	my $version = shift;
 	my $ah_tld = shift;
@@ -572,9 +575,9 @@ sub __gen_recent_measurement_base_path($$$$)
 
 # Generate path for recent measurement, e. g.
 #
-#   [base_dir]/example/monitoring/dns/measurements/2018/02/28/<measurement>.json
+#   [base_dir]/v1/example/monitoring/dns/measurements/2018/02/28/<measurement>.json
 #
-sub __gen_recent_measurement_path($$$$$$)
+sub __gen_measurement_path($$$$$$)
 {
 	my $version = shift;
 	my $ah_tld = shift;
@@ -583,7 +586,7 @@ sub __gen_recent_measurement_path($$$$$$)
 	my $path_buf = shift;	# pointer to result
 	my $create = shift;	# create missing directories
 
-	my $path = __gen_recent_measurement_base_path($version, $ah_tld, $service, $clock);
+	my $path = __gen_measurement_base_path($version, $ah_tld, $service, $clock);
 
 	if ($create)
 	{
@@ -595,27 +598,30 @@ sub __gen_recent_measurement_path($$$$$$)
 	return AH_SUCCESS;
 }
 
-sub ah_read_recent_measurement($$$$$)
+sub ah_copy_measurement($$$$$$)
 {
 	my $version = shift;
 	my $ah_tld = shift;
 	my $service = shift;
 	my $clock = shift;
-	my $json_ref = shift;
+	my $eventid = shift;
+	my $event_start = shift;
 
-	my ($path, $buf);
+	my $src_path;
 
 	# do not create missing directories
-	return AH_FAIL unless (__gen_recent_measurement_path($version, $ah_tld, $service, $clock, \$path, 0) == AH_SUCCESS);
+	return AH_FAIL unless (__gen_measurement_path($version, $ah_tld, $service, $clock, \$path, 0) == AH_SUCCESS);
 
-	return AH_FAIL unless (__read_file($path, \$buf) == AH_SUCCESS);
+	my $inc_path;
 
-	$$json_ref = decode_json($buf);
+	return AH_FAIL unless (__make_inc_path($ah_tld, $service, $event_start, $eventid, \$inc_path) == AH_SUCCESS);
 
-	return AH_SUCCESS;
+	my $dst_path = "$inc_path/$clock.$eventid.json";
+
+	return __copy_file($src_path, $dst_path, $clock);
 }
 
-sub ah_save_recent_measurement($$$$$)
+sub ah_save_measurement($$$$$)
 {
 	my $version = shift;
 	my $ah_tld = shift;
@@ -626,7 +632,7 @@ sub ah_save_recent_measurement($$$$$)
 	my $path;
 
 	# force creation of missing directories
-	return AH_FAIL unless (__gen_recent_measurement_path($version, $ah_tld, $service, $clock, \$path, 1) == AH_SUCCESS);
+	return AH_FAIL unless (__gen_measurement_path($version, $ah_tld, $service, $clock, \$path, 1) == AH_SUCCESS);
 
 	return __write_file($path, __encode_json($version, $json), $clock);
 }
@@ -698,7 +704,7 @@ sub ah_get_most_recent_measurement_ts($$$$$$)
 
 	while ($clock > $oldest_clock)
 	{
-		my $path = __gen_recent_measurement_base_path(AH_SLA_API_VERSION_1, $ah_tld, $service, $clock);
+		my $path = __gen_measurement_base_path(AH_SLA_API_VERSION_1, $ah_tld, $service, $clock);
 
 		$search_paths{$path} = 1;
 

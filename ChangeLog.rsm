@@ -4,6 +4,32 @@ New features:
 ..F.I..PS. [554] upgraded Zabbix to 4.X.Y (asitals, dimir, gcalenko, kalimulin, miks)
 
 --------------------------------------------------------------------------------
+Changes for rsm2.0.0rc13
+
+Bug fixes:
+....I..... [455] merged cron.d files into one file, grouped <service>.avail|rollweek|downtime script calls (asitals)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.0.0rc12
+
+Bug fixes:
+.......PS. [703] added missing functionality to respect number of tries when testing local resolver (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.0.0rc11
+
+Bug fixes:
+....I..... [699] fixed prefix in alerts, 'tld' for registries, 'registrar' for registrars (asitals)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.0.0rc10
+
+Bug fixes:
+....I..... [691] fixed missing DNS TCP metrics in Data Export files nsTest.csv and tests.csv (dimir)
+....I..... [690] fixed reference to FQDN of the name server in Data Export file nsTests.csv (dimir)
+....I..... [693] modified "hosts_inventory" table to avoid "Row size too large" MariaDB error (asitals)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.0.0rc9
 
 Bug fixes:
@@ -89,6 +115,14 @@ Changes for rsm1.4.0rc1
 
 New features:
 ..F.I..... [510] added support for Registrar RDDS Monitoring (asitals, dimir, gcalenko, miks, yurii)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.3.4
+
+Bug fixes:
+....I..... [681] improved php-fpm configuration to reduce memory consumption; thanks to Ruslans Agafonovs (dimir)
+....I..... [697] fixed usage of incorrect RTT limit for name server availability (dimir)
+....I..... [696] fixed inconsistency in measurement files when copying them to incidents folder (dimir)
 
 --------------------------------------------------------------------------------
 Changes for rsm1.3.3

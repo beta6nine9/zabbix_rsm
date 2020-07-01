@@ -325,6 +325,8 @@ sub notify($$$$$)
 	my $host_name   = shift;
 	my $data        = shift;
 
+	my $target = get_macro('{$RSM.MONITORING.TARGET}') eq 'registrar' ? 'registrar' : 'tld';
+
 	my $event_value_str = {
 		TRIGGER_VALUE_FALSE, 'OK',
 		TRIGGER_VALUE_TRUE , 'PROBLEM',
@@ -335,7 +337,7 @@ sub notify($$$$$)
 
 	my @args = (
 		$send_to,
-		join('#', ('tld', $event_value_str, $host_name, @{$data})),
+		join('#', ($target, $event_value_str, $host_name, @{$data})),
 		$event_clock_str,
 	);
 
