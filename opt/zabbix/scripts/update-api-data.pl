@@ -26,9 +26,6 @@ use constant MAX_CONTINUE_PERIOD => 30;	# minutes (NB! make sure to update this 
 use constant DEFAULT_INCIDENT_MEASUREMENTS_LIMIT => 3600;	# seconds, maximum period back from current time to look
 								# back for recent measurement files for an incident
 
-use constant DEFAULT_ALLOW_MISSING_MEASUREMENTS => 60;		# seconds, maximum period back from current time to allow
-								# for missing measurement files before exiting with non-zero
-
 parse_opts('tld=s', 'service=s', 'period=n', 'from=n', 'continue!', 'print-period!', 'ignore-file=s', 'probe=s', 'limit=n', 'max-children=n', 'server-key=s');
 
 # do not write any logs
@@ -55,13 +52,6 @@ my $config = get_rsm_config();
 set_slv_config($config);
 
 my $incident_measurements_limit = $config->{'sla_api'}->{'incident_measurements_limit'} // DEFAULT_INCIDENT_MEASUREMENTS_LIMIT;
-my $allow_missing_measurements = $config->{'sla_api'}->{'allow_missing_measurements'} // DEFAULT_ALLOW_MISSING_MEASUREMENTS;
-
-if ($allow_missing_measurements >= $incident_measurements_limit)
-{
-	fail("configuration error: \"allow_missing_measurements\" ($allow_missing_measurements)",
-			" must be less than \"incident_measurements_limit\" ($incident_measurements_limit)");
-}
 
 my @server_keys = (opt('server-key') ? getopt('server-key') : get_rsm_server_keys($config));
 
@@ -317,7 +307,7 @@ my ($from, $till) = get_real_services_period(\%services, $check_from, $check_til
 if (opt('print-period'))
 {
 	info("selected period: ", selected_period($from, $till));
-	foreach my $service (keys(%services))
+	foreach my $service (sort(keys(%services)))
 	{
 		next if (!defined($services{$service}{'from'}));
 		info("  $service\t: ", selected_period($services{$service}{'from'}, $services{$service}{'till'}));
@@ -858,31 +848,21 @@ foreach (@server_keys)
 
 					my $recent_json;
 
-					# Mind the limit of looking back for recent measurements. If incident
-					# has ended more than limit time ago, we'll do nothing.
+					# Check if we have missing measurement files for processed incident.
+					# Don't go back further than $incident_measurements_limit.
 
 					my $limit = cycle_start($now - $incident_measurements_limit, $delay);
 
 					my $clock = ($event_start > $limit ? $event_start : $limit);
 
-					my $check_till = $event_end // $till;
+					my $check_till = $event_end // $service_till;
 
 					while ($clock < $check_till)
 					{
 						if (ah_copy_measurement($ah_tld, $service, $clock, $eventid, $event_clock) != AH_SUCCESS)
 						{
-							# before failing let's check if there is time configured to
-							# allow for missing measurement files
-							if ($now - $clock < $allow_missing_measurements)
-							{
-								info("there is missing recent measurement for ", ts_str($clock),
-										", but since it is within limit",
-										" ($allow_missing_measurements seconds from now),",
-										" will quit and try to get it again on the next run...");
-								exit(0);
-							}
-
-							fail("cannot copy recent measurement: ", ah_get_error());
+							fail("missing $service measurement for ", ts_str($clock), ": ",
+									ah_get_error());
 						}
 
 						$clock += $delay;

@@ -462,16 +462,13 @@ sub process_tld($$$$$)
 		next if (scalar(@cycles_to_calculate) == 0);
 
 		my $cycles_from = $cycles_to_calculate[0];
-		my $cycles_till = $cycles_to_calculate[-1];
+		my $cycles_till = cycle_end($cycles_to_calculate[-1], $delays{$service});
 
 		next unless (tld_service_enabled($tld, $service, $cycles_from));
 
 		if (opt('print-period'))
 		{
-			info(sprintf("selected %4s period: ", $service), selected_period(
-				$cycles_from,
-				cycle_end($cycles_till, $delays{$service})
-			));
+			info(sprintf("selected %4s period: %s", $service, selected_period($cycles_from, $cycles_till)));
 		}
 
 		# TODO: leave only next line after migrating to Standalone RDAP
@@ -496,12 +493,11 @@ sub process_tld($$$$$)
 			$rtt_limits{$service} = get_history_by_itemid(
 				CONFIGVALUE_DNS_UDP_RTT_HIGH_ITEMID,
 				$cycles_from,
-				cycle_end($cycles_till, $delays{$service})
+				$cycles_till
 			);
 
-			wrn("no DNS RTT limits in history for period ", ts_str($cycles_from),
-					" - ", ts_str(cycle_end($cycles_till, $delays{$service})))
-				unless (scalar(@{$rtt_limits{$service}}));
+			wrn("no DNS RTT limits in history for selected period")
+					unless (scalar(@{$rtt_limits{$service}}));
 		}
 
 		# these are cycles we are going to recalculate for this tld-service

@@ -616,6 +616,13 @@ sub ah_copy_measurement($$$$$)
 
 	my $dst_path = "$inc_path/$clock.$eventid.json";
 
+	# do nothing if it's already there
+	my $target_dst_path = $dst_path;
+
+	$target_dst_path =~ s/${\AH_SLA_API_TMP_DIR}/${\AH_SLA_API_DIR}/;
+
+	return AH_SUCCESS if (-f $target_dst_path);
+
 	return __copy_file($src_path, $dst_path, $clock);
 }
 

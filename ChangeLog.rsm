@@ -1,3 +1,9 @@
+Changes for rsm2.0.0rc14
+
+Bug fixes:
+....I..... [700] fixed race condition between update-api-data.pl and sla-api-recent.pl causing errors about missing measurement files (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.0.0rc13
 
 Bug fixes:
