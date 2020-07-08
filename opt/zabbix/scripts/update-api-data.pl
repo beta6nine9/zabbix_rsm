@@ -760,7 +760,7 @@ foreach (@server_keys)
 				my $latest_avail_select = db_select(
 						"select value from history_uint" .
 							" where itemid=$avail_itemid" .
-							" and clock<$service_till" .
+							" and clock<=$service_till" .
 						" order by clock desc limit 1");
 
 				my $latest_avail_value = scalar(@{$latest_avail_select}) == 0 ?
@@ -807,33 +807,6 @@ foreach (@server_keys)
 					my $start = (defined($service_from) && ($service_from > $event_start) ?
 							$service_from : $event_start);
 
-					my $end;
-					if (defined($event_end))
-					{
-						if (defined($service_till))
-						{
-							if ($service_till < $event_end)
-							{
-								$end = $service_till;
-							}
-							else
-							{
-								$end = $event_end;
-							}
-						}
-						else
-						{
-							$end = $event_end;
-						}
-					}
-					else
-					{
-						if (defined($service_till))
-						{
-							$end = $service_till;
-						}
-					}
-
 					if (opt('dry-run'))
 					{
 						__prnt(uc($service), " incident id:$eventid start:", ts_str($event_start), " end:" . ($event_end ? ts_str($event_end) : "ACTIVE") . " fp:$false_positive");
@@ -855,9 +828,7 @@ foreach (@server_keys)
 
 					my $clock = ($event_start > $limit ? $event_start : $limit);
 
-					my $check_till = $event_end // $service_till;
-
-					while ($clock < $check_till)
+					while ($clock < ($event_end // $service_till))
 					{
 						if (ah_copy_measurement($ah_tld, $service, $clock, $eventid, $event_clock) != AH_SUCCESS)
 						{
