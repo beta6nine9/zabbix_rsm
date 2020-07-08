@@ -4248,7 +4248,6 @@ sub selected_period
 	return "from $from_date:$from_time" if ($from and !$till);
 
 	return "any time";
-
 }
 
 sub cycle_start($$)
