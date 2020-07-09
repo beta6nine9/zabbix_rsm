@@ -1,3 +1,6 @@
+# user zabbix does not have home directory
+HOME=/tmp
+
 * * * * *  zabbix ( /opt/zabbix/scripts/slv/rsm.slv.dns.avail.pl    && /opt/zabbix/scripts/slv/rsm.slv.dns.rollweek.pl  && /opt/zabbix/scripts/slv/rsm.slv.dns.downtime.pl  ) >> /var/log/zabbix/rsm.slv.err 2>&1
 * * * * *  zabbix ( /opt/zabbix/scripts/slv/rsm.slv.rdds.avail.pl   && /opt/zabbix/scripts/slv/rsm.slv.rdds.rollweek.pl && /opt/zabbix/scripts/slv/rsm.slv.rdds.downtime.pl ) >> /var/log/zabbix/rsm.slv.err 2>&1
 * * * * *  zabbix ( /opt/zabbix/scripts/slv/rsm.slv.rdap.avail.pl   && /opt/zabbix/scripts/slv/rsm.slv.rdap.rollweek.pl && /opt/zabbix/scripts/slv/rsm.slv.rdap.downtime.pl ) >> /var/log/zabbix/rsm.slv.err 2>&1
