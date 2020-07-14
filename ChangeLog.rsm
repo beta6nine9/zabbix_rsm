@@ -1,3 +1,9 @@
+Changes for rsm2.0.0rc15
+
+Bug fixes:
+....I..... [sub-700] added 30 seconds of waiting for the measurement file to appear to update-api-data.pl before failing (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.0.0rc14
 
 Bug fixes:

@@ -830,10 +830,36 @@ foreach (@server_keys)
 
 					while ($clock < ($event_end // $service_till))
 					{
-						if (ah_copy_measurement($ah_tld, $service, $clock, $eventid, $event_clock) != AH_SUCCESS)
+						# wait for 30 seconds at most until measurement file appears
+						my $max_wait = time() + 30;
+
+						while (1)
 						{
-							fail("missing $service measurement for ", ts_str($clock), ": ",
-									ah_get_error());
+							if (ah_copy_measurement(
+									$ah_tld,
+									$service,
+									$clock,
+									$eventid,
+									$event_clock) != AH_SUCCESS)
+							{
+								if (time() > $max_wait)
+								{
+									fail("missing $service measurement for ",
+											ts_str($clock), ": ",
+											ah_get_error());
+								}
+								else
+								{
+									dbg("missing $service measurement for ",
+											ts_str($clock), ", waiting...");
+
+									sleep(1);
+								}
+							}
+							else
+							{
+								last;
+							}
 						}
 
 						$clock += $delay;
