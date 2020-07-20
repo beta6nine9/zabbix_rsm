@@ -1101,14 +1101,14 @@ sub __save_csv_data
 							}
 							else
 							{
-								if ($metric_ref->{JSON_TAG_DESCRIPTION()})
+								if (!$metric_ref->{JSON_TAG_DESCRIPTION()})
 								{
-									($rtt) = split(',', $metric_ref->{JSON_TAG_DESCRIPTION()});
+									wrn("skipping $interface test performed at ",
+										ts_full($testclock), " because of missing RTT");
+									next METRIC;
 								}
-								else
-								{
-									$rtt = '';
-								}
+
+								($rtt) = split(',', $metric_ref->{JSON_TAG_DESCRIPTION()});
 							}
 
 							if ($metric_ref->{JSON_TAG_TARGET_IP()})

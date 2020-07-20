@@ -1,3 +1,9 @@
+Changes for rsm2.0.0rc16
+
+Bug fixes:
+....I..... [706] fixed handling of metrics that do not have RTT in Data Export (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.0.0rc15
 
 Bug fixes:
