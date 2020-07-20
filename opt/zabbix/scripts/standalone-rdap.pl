@@ -11,14 +11,7 @@ use RSMSLV;
 use TLD_constants qw(:api);
 use DateTime;
 
-use constant MACRO_RDAP_STANDALONE           => '{$RSM.RDAP.STANDALONE}';
-
-use constant SLV_ITEM_KEY_RDAP_AVAIL         => 'rsm.slv.rdap.avail';
-use constant SLV_ITEM_KEY_RDAP_DOWNTIME      => 'rsm.slv.rdap.downtime';
-use constant SLV_ITEM_KEY_RDAP_ROLLWEEK      => 'rsm.slv.rdap.rollweek';
-use constant SLV_ITEM_KEY_RDAP_RTT_FAILED    => 'rsm.slv.rdap.rtt.failed';
-use constant SLV_ITEM_KEY_RDAP_RTT_PERFORMED => 'rsm.slv.rdap.rtt.performed';
-use constant SLV_ITEM_KEY_RDAP_RTT_PFAILED   => 'rsm.slv.rdap.rtt.pfailed';
+use constant MACRO_RDAP_STANDALONE => '{$RSM.RDAP.STANDALONE}';
 
 sub main()
 {
@@ -147,21 +140,23 @@ sub set_state($)
 
 	if (!opt("dry-run"))
 	{
-		my $items_sql = "update items set status = ? where key_ in (?, ?, ?, ?, ?, ?)";
+		my $items_sql = "update" .
+					" hosts as templates" .
+					" inner join items as template_items on template_items.hostid=templates.hostid" .
+					" inner join items as host_items on host_items.templateid=template_items.itemid" .
+				" set" .
+					" host_items.status=?" .
+				" where" .
+					" templates.host=?";
 		my $items_params = [
 			$item_status,
-			SLV_ITEM_KEY_RDAP_AVAIL,
-			SLV_ITEM_KEY_RDAP_DOWNTIME,
-			SLV_ITEM_KEY_RDAP_ROLLWEEK,
-			SLV_ITEM_KEY_RDAP_RTT_FAILED,
-			SLV_ITEM_KEY_RDAP_RTT_PERFORMED,
-			SLV_ITEM_KEY_RDAP_RTT_PFAILED
+			TEMPLATE_RDAP_STATUS,
 		];
 
 		my $macro_sql = "update globalmacro set value=? where macro=?";
 		my $macro_params = [
 			$start_time,
-			MACRO_RDAP_STANDALONE
+			MACRO_RDAP_STANDALONE,
 		];
 
 		foreach my $server_key (@{$server_keys})
