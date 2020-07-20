@@ -1,7 +1,7 @@
 Changes for rsm2.0.0rc16
 
 Bug fixes:
-....I..... [706] fixed handling of metrics that do not have RTT in Data Export (dimir)
+....I..... [706] fixed handling of metrics that do not have RTT in Data Export; fixed logging value timestamp in this case (dimir)
 
 --------------------------------------------------------------------------------
 Changes for rsm2.0.0rc15
