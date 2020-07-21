@@ -74,6 +74,10 @@
 			"class": "MarkIncidentAction",
 			"layout": null,
 			"view": null
+		},
+		"rsm.probes": {
+			"class": "Probes",
+			"view": "probes"
 		}
 	},
 	"assets": [

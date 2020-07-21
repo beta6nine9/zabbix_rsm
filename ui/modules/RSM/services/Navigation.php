@@ -52,6 +52,10 @@ class Navigation {
 			$menu[] = (new CMenuItem(_('SLA reports')))->setAction('rsm.slareports');
 		}
 
+		if (in_array('rsm.probes', $this->actions)) {
+			$menu[] = (new CMenuItem(_('Probes')))->setAction('rsm.probes');
+		}
+
 		if ($menu) {
 			$node->add((new CMenuItem($label))
 				->setId('rsm_monitoring')
