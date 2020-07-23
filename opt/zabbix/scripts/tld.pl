@@ -802,6 +802,13 @@ sub manage_tld_objects($$$$$$$)
 		}
 	}
 
+	# the rest of the function disables only some of the services
+
+	if ($dns)
+	{
+		pfail("DNS service cannot be disabled");
+	}
+
 	foreach my $type (keys %{$types})
 	{
 		next if ($types->{$type} eq false);
