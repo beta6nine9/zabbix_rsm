@@ -134,6 +134,8 @@ class Probes extends Action {
 			' WHERE '.dbConditionString('itemid', array_keys($items_map))
 		);
 
+		$data['probes'] = array();
+
 		while ($value = DBfetch($values)) {
 			$data['probes'][$hosts_map[$value['itemid']]][$items_map[$value['itemid']]]['value'] = $value['value'];
 			$data['probes'][$hosts_map[$value['itemid']]][$items_map[$value['itemid']]]['clock'] = $value['clock'];
