@@ -259,7 +259,7 @@ sub add_probe($$$$$$$$$$$)
 
 	##########
 
-	print("The probe has been added successfully\n");
+	print("The probe has been added successfully\n") unless (errors());
 }
 
 sub delete_probe($) {
@@ -273,7 +273,7 @@ sub delete_probe($) {
 
     $probe = get_probe($probe_name, true);
 
-    check_probe_data($probe, "Probe \"$probe_name\" was not found on server ID ".$OPTS{'server-id'}.". Use script \"probes-enabled.pl\" to list probes available in the system. Terminating...");
+    check_probe_data($probe, "Probe \"$probe_name\" was not found on server ID ".$OPTS{'server-id'}.". Use script \"probes-enabled.pl\" to list probes available in the system.");
 
     $probe_host = get_host($probe_name, false);
 
@@ -293,7 +293,7 @@ sub delete_probe($) {
     check_probe_data($probe_hostgroup, "Host group with name '$probe_name' was not found");
 
     ########## Deleting probe template
-    if (keys %{$probe_tmpl}) {
+    if ($probe_tmpl && keys(%{$probe_tmpl})) {
 	my $templateid = $probe_tmpl->{'templateid'};
 	my $template_name = $probe_tmpl->{'host'};
 
@@ -348,7 +348,7 @@ sub delete_probe($) {
 
     ##########
 
-    print "The probe has been removed successfully\n";
+    print "The probe has been removed successfully\n" unless (errors());
 }
 
 sub disable_probe($) {
@@ -362,7 +362,7 @@ sub disable_probe($) {
 
     $probe = get_probe($probe_name, true);
 
-    check_probe_data($probe, "Probe \"$probe_name\" was not found on server ID ".$OPTS{'server-id'}.". Use script \"probes-enabled.pl\" to list probes available in the system. Terminating...");
+    check_probe_data($probe, "Probe \"$probe_name\" was not found on server ID ".$OPTS{'server-id'}.". Use script \"probes-enabled.pl\" to list probes available in the system.");
 
     $probe_host = get_host($probe_name, false);
 
@@ -438,7 +438,7 @@ sub disable_probe($) {
 
     ##########
 
-    print "The probe has been disabled successfully\n";
+    print "The probe has been disabled successfully\n" unless (errors());
 }
 
 sub rename_probe($$) {
@@ -451,7 +451,7 @@ sub rename_probe($$) {
 
     $probe = get_probe($old_name, true);
 
-    check_probe_data($probe, "Probe \"$old_name\" was not found on server ID ".$OPTS{'server-id'}.". Use script \"probes-enabled.pl\" to list probes available in the system. Terminating...");
+    check_probe_data($probe, "Probe \"$old_name\" was not found on server ID ".$OPTS{'server-id'}.". Use script \"probes-enabled.pl\" to list probes available in the system.");
 
     $probe_host = get_host($old_name, false);
 
@@ -524,14 +524,29 @@ sub rename_probe($$) {
     is_not_empty($result->{'hostmacroids'});
 
     # rsm_probes table?
-    print "The probe has been renamed successfully\n";
+    print "The probe has been renamed successfully\n" unless (errors());
+}
+
+my $_errors = 0;
+sub errors()
+{
+	return $_errors;
 }
 
 sub check_probe_data($$) {
     my $data = shift;
     my $message = shift;
 
-    unless (keys(%{$data})) {
+    if (ref($data) eq 'ARRAY')
+    {
+	    $_errors = 1;
+	    print("More than 1 probe hosts found: ", Dumper($data));
+	    exit(1) unless ($OPTS{'force'});
+    }
+
+    unless (ref($data) eq 'HASH')
+    {
+	$_errors = 1;
 	print $message."\n";
 	exit(1) unless ($OPTS{'force'});
     }
@@ -548,6 +563,7 @@ sub is_not_empty($) {
         print "success\n";
     }
     else {
+	$_errors = 1;
         print "failed!\n";
         exit(1) unless ($OPTS{'force'});
     }
