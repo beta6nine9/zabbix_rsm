@@ -266,7 +266,7 @@ sub process_server($)
 
 	$lastvalues_cache = {};
 
-	if (ah_get_recent_cache($server_key, \$lastvalues_cache) != AH_SUCCESS)
+	if (ah_read_recent_cache($server_key, \$lastvalues_cache) != AH_SUCCESS)
 	{
 		dbg("there's no recent measurements cache file yet, but no worries");
 		$lastvalues_cache->{'tlds'} = {};
@@ -659,6 +659,7 @@ sub cycles_to_calculate($$$$$$$$)
 				}
 			}
 			elsif (ah_get_most_recent_measurement_ts(
+					AH_SLA_API_VERSION_1,
 					ah_get_api_tld($tld),
 					$service,
 					$delay,
@@ -1515,7 +1516,22 @@ sub calculate_cycle($$$$$$$$$)
 
 	return if (opt('dry-run'));
 
-	if (ah_save_measurement(ah_get_api_tld($tld), $service, $json, $from) != AH_SUCCESS)
+	if ($service ne 'rdap' && ah_save_measurement(
+			AH_SLA_API_VERSION_1,
+			ah_get_api_tld($tld),
+			$service,
+			$json,
+			$from) != AH_SUCCESS)
+	{
+		fail("cannot save recent measurement: ", ah_get_error());
+	}
+
+	if (ah_save_measurement(
+			AH_SLA_API_VERSION_2,
+			ah_get_api_tld($tld),
+			$service,
+			$json,
+			$from) != AH_SUCCESS)
 	{
 		fail("cannot save recent measurement: ", ah_get_error());
 	}

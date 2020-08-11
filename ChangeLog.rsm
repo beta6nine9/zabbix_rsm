@@ -1,3 +1,10 @@
+Changes for rsm2.0.0rc17
+
+Bug fixes:
+....I..... [707] added /v1 and /v2 directories support to SLA API (dimir)
+....I..... [710] added script for checking and fixing DB corruption issues for RTT ratio SLV items (asitals)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.0.0rc16
 
 Bug fixes:
