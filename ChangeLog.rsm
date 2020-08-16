@@ -1,3 +1,9 @@
+Changes for rsm2.0.0rc18
+
+Bug fixes:
+..F....... [709] fixed counting number of Probes "Down" and with "No result" on a Particular Tests page (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.0.0rc17
 
 Bug fixes:

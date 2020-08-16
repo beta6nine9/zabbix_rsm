@@ -22,6 +22,7 @@ $widget = (new CWidget())->setTitle(_('Details of particular test'));
 
 $object_label = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) ? _('Registrar ID') : _('TLD');
 
+// $use_rdap is true if RDAP is part of RDDS
 $use_rdap = ($this->data['type'] == RSM_RDDS && !is_RDAP_standalone($data['test_time_from']));
 
 if ($this->data['type'] == RSM_DNS || $this->data['type'] == RSM_DNSSEC) {
@@ -353,10 +354,12 @@ foreach ($this->data['probes'] as $probe) {
 				$rdap = $disabled;
 			}
 
-			if ($data['type'] == RSM_RDAP && ($rdap === $disabled || $rdap === $noResult)) {
-				$probe_no_result = true;
-				$probe_down = false;
-				$rdds = ZBX_STYLE_GREY;
+			if ($data['type'] == RSM_RDAP) {
+				if ($rdap === $disabled || $rdap === $noResult) {
+					$probe_no_result = true;
+					$probe_down = false;
+					$rdds = ZBX_STYLE_GREY;
+				}
 			}
 			elseif ((!$use_rdap || $rdap === $disabled || $rdap === $noResult)
 					&& ($rdds43 === $disabled || $rdds43 === $noResult)
