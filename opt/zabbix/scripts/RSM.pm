@@ -3,7 +3,7 @@ package RSM;
 use strict;
 use warnings;
 use Config::Tiny;
-use File::Path qw(make_path remove_tree);
+use File::Path qw(make_path);
 use base 'Exporter';
 use Config '%Config';
 
@@ -102,18 +102,19 @@ sub get_rsm_local_id
 
 sub __system
 {
-	my $cmd = join('', @_);
+	my $cmd = shift;
 
-	my $rv = system($cmd);
+	my @output = `$cmd 2>&1`;
 
-	if ($rv == -1)
+	if (scalar(@output))
 	{
-		return "cannot execute command [$cmd]: $!";
-	}
+		my $err = $output[0];
 
-	if ($rv & 127)
-	{
-		return sprintf("cannot execute command [$cmd], child died with signal %d, %s coredump", ($rv & 127),  ($rv & 128) ? 'with' : 'without');
+		chomp($err);
+
+		$err = $err . ' ...' if (scalar(@output) > 1);
+
+		return $err;
 	}
 
 	return undef;
@@ -123,7 +124,7 @@ sub rsm_targets_apply()
 {
 	my $strip_components = () = $_TMP_DIR =~ /\//g;
 
-	my $error = __system('tar -cf - ', $_TMP_DIR, ' 2>/dev/null | tar --ignore-command-error -C ', $_TARGET_DIR, ' --strip-components=', $strip_components, ' -xf -');
+	my $error = __system("tar -cf - $_TMP_DIR 2>/dev/null | tar --ignore-command-error -C $_TARGET_DIR --strip-components=$strip_components -xf -");
 
 	return $error if ($error);
 
@@ -140,16 +141,7 @@ sub rsm_targets_apply()
 		}
 	}
 
-	my $err;
-
-	remove_tree($_TMP_DIR, {error => \$err});
-
-	if (@$err)
-	{
-		return "cannot delete temporary directory " . __get_file_error($err);
-	}
-
-	return undef;
+	return __system("rm -rf $_TMP_DIR");
 }
 
 sub rsm_targets_prepare($$)
@@ -161,21 +153,15 @@ sub rsm_targets_prepare($$)
 
 	if (-d $_TMP_DIR)
 	{
-		remove_tree($_TMP_DIR, {keep_root => 1, error => \$err});
+		$err = __system("rm -rf $_TMP_DIR");
 
-		if (@$err)
-		{
-			return "cannot empty temporary directory " . __get_file_error($err);
-		}
+		return $err if ($err);
 	}
 	else
 	{
-		remove_tree($_TMP_DIR, {error => \$err});
+		$err = __system("rm -rf $_TMP_DIR");
 
-		if (@$err)
-		{
-			return "cannot delete temporary directory " . __get_file_error($err);
-		}
+		return $err if ($err);
 
 		make_path($_TMP_DIR, {error => \$err});
 

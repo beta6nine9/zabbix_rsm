@@ -52,7 +52,7 @@ my $hostid = $rows_ref->[0]->[0];
 
 if (opt('set'))
 {
-	my $zabbix = Zabbix->new({'url' => $section->{'za_url'}, user => $section->{'za_user'}, password => $section->{'za_password'}});
+	my $zabbix = Zabbix->new({'url' => $section->{'za_url'}, user => $section->{'za_user'}, password => $section->{'za_password'}, debug => getopt('debug')});
 
 	my $result = $zabbix->get('proxy',{'output' => ['proxyid', 'host'], 'filter' => {'host' => $probe}, 'selectInterface' => ['ip', 'port'], 'preservekeys' => 1 });
 

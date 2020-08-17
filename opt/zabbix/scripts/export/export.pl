@@ -1092,8 +1092,11 @@ sub __save_csv_data
 							{
 								if (!defined($metric_ref->{JSON_TAG_TARGET_IP()}))
 								{
-									wrn("skipping $interface test performed at ",
-										ts_full($testclock), " because of missing IP");
+									# normally we can't have positive RTT witout IP
+									wrn("skipping $interface test",
+										($testclock ? " performed at " .
+											ts_full($testclock) : ''),
+										" because of missing IP");
 									next METRIC;
 								}
 
@@ -1101,14 +1104,16 @@ sub __save_csv_data
 							}
 							else
 							{
-								if ($metric_ref->{JSON_TAG_DESCRIPTION()})
+								if (!$metric_ref->{JSON_TAG_DESCRIPTION()})
 								{
-									($rtt) = split(',', $metric_ref->{JSON_TAG_DESCRIPTION()});
+									wrn("skipping $interface test",
+										($testclock ? " performed at " .
+											ts_full($testclock) : ''),
+										" because of missing RTT");
+									next METRIC;
 								}
-								else
-								{
-									$rtt = '';
-								}
+
+								($rtt) = split(',', $metric_ref->{JSON_TAG_DESCRIPTION()});
 							}
 
 							if ($metric_ref->{JSON_TAG_TARGET_IP()})

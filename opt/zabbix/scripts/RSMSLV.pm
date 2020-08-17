@@ -4192,7 +4192,7 @@ sub ts_full
 sub ts_ymd
 {
 	my $ts    = shift // time();
-	my $delim = shift // "-";
+	my $delim = shift // '';
 
 	my (undef, undef, undef, $mday, $mon, $year) = localtime($ts);
 
@@ -4202,11 +4202,21 @@ sub ts_ymd
 sub ts_ym
 {
 	my $ts    = shift // time();
-	my $delim = shift // "-";
+	my $delim = shift // '-';
 
 	my (undef, undef, undef, undef, $mon, $year) = localtime($ts);
 
 	return sprintf("%.4d%s%.2d", $year + 1900, $delim, $mon + 1);
+}
+
+sub ts_hms
+{
+	my $ts    = shift // time();
+	my $delim = shift // '';
+
+	my ($sec, $min, $hour) = localtime($ts);
+
+	return sprintf("%.2d%s%.2d%s%.2d", $hour, $delim, $min, $delim, $sec);
 }
 
 sub selected_period
@@ -4214,9 +4224,28 @@ sub selected_period
 	my $from = shift;
 	my $till = shift;
 
-	return "till " . ts_str($till) if (!$from and $till);
-	return "from " . ts_str($from) if ($from and !$till);
-	return "from " . ts_str($from) . " till " . ts_str($till) if ($from and $till);
+	my ($from_date, $from_time, $till_date, $till_time);
+
+	if ($from)
+	{
+		$from_date = ts_ymd($from);
+		$from_time = ts_hms($from);
+	}
+
+	if ($till)
+	{
+		$till_date = ts_ymd($till);
+		$till_time = ts_hms($till);
+	}
+
+	if ($from and $till)
+	{
+		return "from $from_date:$from_time till $till_time" if ($from_date eq $till_date);
+		return "from $from_date:$from_time till $till_date:$till_time";
+	}
+
+	return "till $till_date:$till_time" if (!$from and $till);
+	return "from $from_date:$from_time" if ($from and !$till);
 
 	return "any time";
 }

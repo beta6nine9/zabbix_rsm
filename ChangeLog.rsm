@@ -1,3 +1,36 @@
+Changes for rsm2.0.0rc18
+
+Bug fixes:
+..F....... [709] fixed counting number of Probes "Down" and with "No result" on a Particular Tests page (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.0.0rc17
+
+Bug fixes:
+....I..... [707] added /v1 and /v2 directories support to SLA API (dimir)
+....I..... [710] added script for checking and fixing DB corruption issues for RTT ratio SLV items (asitals)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.0.0rc16
+
+Bug fixes:
+....I..... [706] fixed handling of metrics that do not have RTT in Data Export; fixed logging value timestamp in this case (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.0.0rc15
+
+Bug fixes:
+....I..... [sub-700] added 30 seconds of waiting for the measurement file to appear to update-api-data.pl before failing (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.0.0rc14
+
+Bug fixes:
+....I..... [705] fixed possible SQL syntax error when Rsmhosts are being onboarded (dimir)
+....I..... [702] fixed missing home directory issue when cron job is run by zabbix user (dimir)
+....I..... [700] fixed race condition between update-api-data.pl and sla-api-recent.pl causing errors about missing measurement files (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.0.0rc13
 
 Bug fixes:
