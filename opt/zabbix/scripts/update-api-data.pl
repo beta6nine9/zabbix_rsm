@@ -26,10 +26,7 @@ use constant MAX_CONTINUE_PERIOD => 30;	# minutes (NB! make sure to update this 
 use constant DEFAULT_INCIDENT_MEASUREMENTS_LIMIT => 3600;	# seconds, maximum period back from current time to look
 								# back for recent measurement files for an incident
 
-use constant DEFAULT_ALLOW_MISSING_MEASUREMENTS => 60;		# seconds, maximum period back from current time to allow
-								# for missing measurement files before exiting with non-zero
-
-parse_opts('tld=s', 'service=s', 'period=i', 'from=i', 'continue', 'print-period', 'ignore-file=s', 'probe=s', 'limit=i', 'max-children=i', 'server-key=s');
+parse_opts('tld=s', 'service=s', 'period=i', 'from=i', 'continue!', 'print-period!', 'ignore-file=s', 'probe=s', 'limit=i', 'max-children=i', 'server-key=s');
 
 # do not write any logs
 setopt('nolog');
@@ -55,13 +52,6 @@ my $config = get_rsm_config();
 set_slv_config($config);
 
 my $incident_measurements_limit = $config->{'sla_api'}->{'incident_measurements_limit'} // DEFAULT_INCIDENT_MEASUREMENTS_LIMIT;
-my $allow_missing_measurements = $config->{'sla_api'}->{'allow_missing_measurements'} // DEFAULT_ALLOW_MISSING_MEASUREMENTS;
-
-if ($allow_missing_measurements >= $incident_measurements_limit)
-{
-	fail("configuration error: \"allow_missing_measurements\" ($allow_missing_measurements)",
-			" must be less than \"incident_measurements_limit\" ($incident_measurements_limit)");
-}
 
 my @server_keys = (opt('server-key') ? getopt('server-key') : get_rsm_server_keys($config));
 
@@ -262,7 +252,7 @@ my ($from, $till) = get_real_services_period(\%services, $check_from, $check_til
 if (opt('print-period'))
 {
 	info("selected period: ", selected_period($from, $till));
-	foreach my $service (keys(%services))
+	foreach my $service (sort(keys(%services)))
 	{
 		next if (!defined($services{$service}{'from'}));
 		info("  $service\t: ", selected_period($services{$service}{'from'}, $services{$service}{'till'}));
@@ -719,12 +709,22 @@ foreach (@server_keys)
 				}
 				else
 				{
-					if ($service ne 'rdap' && ah_save_downtime(AH_SLA_API_VERSION_1, $ah_tld, $service, $downtime, $lastclock) != AH_SUCCESS)
+					if ($service ne 'rdap' && ah_save_downtime(
+							AH_SLA_API_VERSION_1,
+							$ah_tld,
+							$service,
+							$downtime,
+							$lastclock) != AH_SUCCESS)
 					{
 						fail("cannot save downtime: ", ah_get_error());
 					}
 
-					if (ah_save_downtime(AH_SLA_API_VERSION_2, $ah_tld, $service, $downtime, $lastclock) != AH_SUCCESS)
+					if (ah_save_downtime(
+							AH_SLA_API_VERSION_2,
+							$ah_tld,
+							$service,
+							$downtime,
+							$lastclock) != AH_SUCCESS)
 					{
 						fail("cannot save downtime: ", ah_get_error());
 					}
@@ -816,7 +816,7 @@ foreach (@server_keys)
 				my $latest_avail_select = db_select(
 						"select value from history_uint" .
 							" where itemid=$avail_itemid" .
-							" and clock<$service_till" .
+							" and clock<=$service_till" .
 						" order by clock desc limit 1");
 
 				my $latest_avail_value = scalar(@{$latest_avail_select}) == 0 ?
@@ -863,33 +863,6 @@ foreach (@server_keys)
 					my $start = (defined($service_from) && ($service_from > $event_start) ?
 							$service_from : $event_start);
 
-					my $end;
-					if (defined($event_end))
-					{
-						if (defined($service_till))
-						{
-							if ($service_till < $event_end)
-							{
-								$end = $service_till;
-							}
-							else
-							{
-								$end = $event_end;
-							}
-						}
-						else
-						{
-							$end = $event_end;
-						}
-					}
-					else
-					{
-						if (defined($service_till))
-						{
-							$end = $service_till;
-						}
-					}
-
 					if (opt('dry-run'))
 					{
 						__prnt(uc($service), " incident id:$eventid start:", ts_str($event_start), " end:" . ($event_end ? ts_str($event_end) : "ACTIVE") . " fp:$false_positive");
@@ -927,20 +900,21 @@ foreach (@server_keys)
 
 					my $recent_json;
 
-					# Mind the limit of looking back for recent measurements. If incident
-					# has ended more than limit time ago, we'll do nothing.
+					# Check if we have missing measurement files for processed incident.
+					# Don't go back further than $incident_measurements_limit.
 
 					my $limit = cycle_start($now - $incident_measurements_limit, $delay);
 
 					my $clock = ($event_start > $limit ? $event_start : $limit);
 
-					my $check_till = $event_end // $till;
-
-					while ($clock < $check_till)
+					while ($clock < ($event_end // $service_till))
 					{
-						if ($service ne 'rdap')
+						# wait for 30 seconds at most until measurement file appears
+						my $max_wait = time() + 30;
+
+						while (1)
 						{
-							if (ah_copy_measurement(
+							if ($service ne 'rdap' && ah_copy_measurement(
 									AH_SLA_API_VERSION_1,
 									$ah_tld,
 									$service,
@@ -948,47 +922,51 @@ foreach (@server_keys)
 									$eventid,
 									$event_clock) != AH_SUCCESS)
 							{
-								# before failing let's check if there is time configured
-								# to allow for missing measurement files
-								if ($now - $clock < $allow_missing_measurements)
+								if (time() > $max_wait)
 								{
-									info("there is missing recent measurement for ",
-										ts_str($clock), ", but since it is",
-										" within limit",
-										" ($allow_missing_measurements seconds",
-										" from now), will quit and try to get",
-										" it again on the next run...");
-
-									exit(0);
+									fail("missing $service measurement for ",
+											ts_str($clock), ": ",
+											ah_get_error());
 								}
+								else
+								{
+									dbg("missing $service measurement for ",
+											ts_str($clock), ", waiting...");
 
-								fail("cannot get recent measurement: ", ah_get_error());
+									sleep(1);
+								}
 							}
-						}
-
-						if (ah_copy_measurement(
-								AH_SLA_API_VERSION_2,
-								$ah_tld,
-								$service,
-								$clock,
-								$eventid,
-								$event_clock) != AH_SUCCESS)
-						{
-							# before failing let's check if there is time configured
-							# to allow for missing measurement files
-							if ($now - $clock < $allow_missing_measurements)
+							else
 							{
-								info("there is missing recent measurement for ",
-										ts_str($clock), ", but since it is",
-										" within limit",
-										" ($allow_missing_measurements seconds",
-										" from now), will quit and try to get",
-										" it again on the next run...");
-
-								exit(0);
+								last;
 							}
 
-							fail("cannot get recent measurement: ", ah_get_error());
+							if (ah_copy_measurement(
+									AH_SLA_API_VERSION_2,
+									$ah_tld,
+									$service,
+									$clock,
+									$eventid,
+									$event_clock) != AH_SUCCESS)
+							{
+								if (time() > $max_wait)
+								{
+									fail("missing $service measurement for ",
+											ts_str($clock), ": ",
+											ah_get_error());
+								}
+								else
+								{
+									dbg("missing $service measurement for ",
+											ts_str($clock), ", waiting...");
+
+									sleep(1);
+								}
+							}
+							else
+							{
+								last;
+							}
 						}
 
 						$clock += $delay;
@@ -1192,8 +1170,15 @@ sub __update_false_positives
 
 		if ($service ne 'rdap')
 		{
-			unless (ah_save_false_positive(AH_SLA_API_VERSION_1, $tld, $service, $eventid, $event_clock,
-					$false_positive, $clock, \$later) == AH_SUCCESS)
+			unless (ah_save_false_positive(
+					AH_SLA_API_VERSION_1,
+					$tld,
+					$service,
+					$eventid,
+					$event_clock,
+					$false_positive,
+					$clock,
+					\$later) == AH_SUCCESS)
 			{
 				if ($later == 1)
 				{
@@ -1206,8 +1191,15 @@ sub __update_false_positives
 			}
 		}
 
-		unless (ah_save_false_positive(AH_SLA_API_VERSION_2, $tld, $service, $eventid, $event_clock,
-				$false_positive, $clock, \$later) == AH_SUCCESS)
+		unless (ah_save_false_positive(
+				AH_SLA_API_VERSION_2,
+				$tld,
+				$service,
+				$eventid,
+				$event_clock,
+				$false_positive,
+				$clock,
+				\$later) == AH_SUCCESS)
 		{
 			if ($later == 1)
 			{

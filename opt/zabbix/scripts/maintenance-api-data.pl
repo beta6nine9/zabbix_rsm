@@ -16,34 +16,24 @@ use Pod::Usage;
 use RSM;
 use RSMSLV; # required for ApiHelper
 
-my %OPTS;
+parse_opts('ignore-file=s');
 
-if (!GetOptions(\%OPTS, 'help!', 'ignore-file=s'))
-{
-	pod2usage(-verbose => 0);
-}
-
-if ($OPTS{'help'})
-{
-	pod2usage(-verbose => 1);
-}
+setopt('nolog');
 
 my %ignore;
 
-if ($OPTS{'ignore-file'})
+if (opt('ignore-file'))
 {
 	my ($buf, $error);
 
-	if (! -f $OPTS{'ignore-file'})
+	if (! -f getopt('ignore-file'))
 	{
-		print("$OPTS{'ignore-file'}: this file does not exist or is not a file\n");
-		exit 1;
+		fail(getopt('ignore-file') . ": this file does not exist or is not a file");
 	}
 
-	if (read_file($OPTS{'ignore-file'}, \$buf, \$error) != SUCCESS)
+	if (read_file(getopt('ignore-file'), \$buf, \$error) != SUCCESS)
 	{
-		print("Error reading $OPTS{'ignore-file'}: $error\n");
-		exit 1;
+		fail("error reading \"" . getopt('ignore-file') . "\": $error");
 	}
 
 	map {$ignore{$_} = 1;} (split('\n', $buf));
@@ -51,27 +41,41 @@ if ($OPTS{'ignore-file'})
 
 my $error = rsm_targets_prepare(AH_SLA_API_TMP_DIR, AH_SLA_API_DIR);
 
-die($error) if ($error);
+fail($error) if ($error);
 
 foreach my $version_dir (path(AH_SLA_API_DIR)->children)
 {
 	next unless ($version_dir->is_dir());
 
-	my $version = $version_dir->basename();
+	dbg("version_dir=[$version_dir]");
 
-	$version = substr($version, 1);
+	my $version_basename = $version_dir->basename();
 
-	foreach my $tld_dir (path(AH_SLA_API_DIR . "/$version_dir")->children)
+	dbg("version_basename=[$version_basename]");
+
+	my $version = substr($version_basename, 1);
+
+	dbg("version=[$version]");
+
+	if ($version ne AH_SLA_API_VERSION_1 && $version ne AH_SLA_API_VERSION_2)
+	{
+		fail("unknown version directory \"$version_basename\"");
+	}
+
+	foreach my $tld_dir (path($version_dir)->children)
 	{
 		next unless ($tld_dir->is_dir());
 
 		my $tld = $tld_dir->basename();
 
+		dbg("tld=[$tld]");
+
 		next if (exists($ignore{$tld}));
 
 		my $json;
 
-		die("cannot read \"$tld\" state: ", ah_get_error()) unless (ah_read_state($version, $tld, \$json) == AH_SUCCESS);
+		print("cannot read \"$tld\" state: ", ah_get_error())
+			unless (ah_read_state($version, $tld, \$json) == AH_SUCCESS);
 
 		$json->{'status'} = 'Up-inconclusive';
 		$json->{'testedServices'} = {
@@ -81,12 +85,14 @@ foreach my $version_dir (path(AH_SLA_API_DIR)->children)
 			'RDDS'		=> JSON_OBJECT_DISABLED_SERVICE,
 		};
 
-	die("cannot set \"$tld\" state: ", ah_get_error()) unless (ah_save_state($version, $tld, $json) == AH_SUCCESS);
+		fail("cannot set \"$tld\" state: ", ah_get_error())
+			unless (ah_save_state($version, $tld, $json) == AH_SUCCESS);
+	}
 }
 
 $error = rsm_targets_apply();
 
-die($error) if ($error);
+fail($error) if ($error);
 
 __END__
 

@@ -467,16 +467,13 @@ sub process_tld($$$$$)
 		next if (scalar(@cycles_to_calculate) == 0);
 
 		my $cycles_from = $cycles_to_calculate[0];
-		my $cycles_till = $cycles_to_calculate[-1];
+		my $cycles_till = cycle_end($cycles_to_calculate[-1], $delays{$service});
 
 		next unless (tld_service_enabled($tld, $service, $cycles_from));
 
 		if (opt('print-period'))
 		{
-			info(sprintf("selected %4s period: ", $service), selected_period(
-				$cycles_from,
-				cycle_end($cycles_till, $delays{$service})
-			));
+			info(sprintf("selected %4s period: %s", $service, selected_period($cycles_from, $cycles_till)));
 		}
 
 		# TODO: leave only next line after migrating to Standalone RDAP
@@ -501,12 +498,11 @@ sub process_tld($$$$$)
 			$rtt_limits{$service} = get_history_by_itemid(
 				CONFIGVALUE_DNS_UDP_RTT_HIGH_ITEMID,
 				$cycles_from,
-				cycle_end($cycles_till, $delays{$service})
+				$cycles_till
 			);
 
-			wrn("no DNS RTT limits in history for period ", ts_str($cycles_from),
-					" - ", ts_str(cycle_end($cycles_till, $delays{$service})))
-				unless (scalar(@{$rtt_limits{$service}}));
+			wrn("no DNS RTT limits in history for selected period")
+					unless (scalar(@{$rtt_limits{$service}}));
 		}
 
 		# these are cycles we are going to recalculate for this tld-service
@@ -668,6 +664,7 @@ sub cycles_to_calculate($$$$$$$$)
 				}
 			}
 			elsif (ah_get_most_recent_measurement_ts(
+					AH_SLA_API_VERSION_1,
 					ah_get_api_tld($tld),
 					$service,
 					$delay,
@@ -862,16 +859,6 @@ sub get_lastvalues_from_db($$$)
 			$host_cond
 	);
 
-	my $itemids_num = '';
-
-	foreach my $row_ref (@{$item_num_rows_ref})
-	{
-		$itemids_num .= $row_ref->[2];
-		$itemids_num .= ',';
-	}
-
-	chop($itemids_num);
-
 	my $item_str_rows_ref = db_select(
 		"select h.host,hg.groupid,i.itemid,i.key_,i.value_type".
 		" from items i,hosts h,hosts_groups hg".
@@ -882,26 +869,52 @@ sub get_lastvalues_from_db($$$)
 			$host_cond
 	);
 
-	my $itemids_str = '';
+	# return if nothing to do
+	return if (scalar(@{$item_num_rows_ref}) == 0 && scalar(@{$item_str_rows_ref}) == 0);
 
-	foreach my $row_ref (@{$item_str_rows_ref})
+	my $sql = '';
+
+	if (scalar(@{$item_num_rows_ref}))
 	{
-		$itemids_str .= $row_ref->[2];
-		$itemids_str .= ',';
+		my $itemids = '';
+
+		foreach my $row_ref (@{$item_num_rows_ref})
+		{
+			$itemids .= $row_ref->[2] . ',';
+		}
+
+		chop($itemids);
+
+		$sql .=
+			"select itemid,clock".
+			" from lastvalue".
+			" where itemid in ($itemids)";
 	}
 
-	chop($itemids_str);
-
 	# get everything from lastvalue, lastvalue_str tables
-	my $lastval_rows_ref = db_select(
-		"select itemid,clock".
-		" from lastvalue".
-		" where itemid in ($itemids_num)".
-		" union".
-		" select itemid,clock".
-		" from lastvalue_str".
-		" where itemid in ($itemids_str)"
-	);
+	if (scalar(@{$item_str_rows_ref}))
+	{
+		if (scalar(@{$item_num_rows_ref}))
+		{
+			$sql .= " union ";
+		}
+
+		my $itemids = '';
+
+		foreach my $row_ref (@{$item_str_rows_ref})
+		{
+			$itemids .= $row_ref->[2] . ',';
+		}
+
+		chop($itemids);
+
+		$sql .=
+			"select itemid,clock".
+			" from lastvalue_str".
+			" where itemid in ($itemids)";
+	}
+
+	my $lastval_rows_ref = db_select($sql);
 
 	my %lastvalues_map = map { $_->[0] => $_->[1] } @{$lastval_rows_ref};
 
@@ -1555,7 +1568,22 @@ sub calculate_cycle($$$$$$$$$)
 
 	return if (opt('dry-run'));
 
-	if (ah_save_measurement(AH_SLA_API_VERSION_2, ah_get_api_tld($tld), $service, $json, $from) != AH_SUCCESS)
+	if ($service ne 'rdap' && ah_save_measurement(
+			AH_SLA_API_VERSION_1,
+			ah_get_api_tld($tld),
+			$service,
+			$json,
+			$from) != AH_SUCCESS)
+	{
+		fail("cannot save recent measurement: ", ah_get_error());
+	}
+
+	if (ah_save_measurement(
+			AH_SLA_API_VERSION_2,
+			ah_get_api_tld($tld),
+			$service,
+			$json,
+			$from) != AH_SUCCESS)
 	{
 		fail("cannot save recent measurement: ", ah_get_error());
 	}

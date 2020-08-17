@@ -683,8 +683,9 @@ sub ah_read_recent_cache($$)
 	return AH_SUCCESS;
 }
 
-sub ah_get_most_recent_measurement_ts($$$$$$)
+sub ah_get_most_recent_measurement_ts($$$$$$$)
 {
+	my $version = shift;
 	my $ah_tld = shift;
 	my $service = shift;
 	my $delay = shift;		# use this delay to jump to the next possible file
@@ -704,7 +705,7 @@ sub ah_get_most_recent_measurement_ts($$$$$$)
 
 	while ($clock > $oldest_clock)
 	{
-		my $path = __gen_measurement_base_path(AH_SLA_API_VERSION_1, $ah_tld, $service, $clock);
+		my $path = __gen_measurement_base_path($version, $ah_tld, $service, $clock);
 
 		$search_paths{$path} = 1;
 

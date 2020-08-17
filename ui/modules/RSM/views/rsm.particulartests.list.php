@@ -332,10 +332,12 @@ foreach ($data['probes'] as $probe) {
 				$rdap = $disabled;
 			}
 
-			if ($data['type'] == RSM_RDAP && ($rdap === $disabled || $rdap === $no_result)) {
-				$probe_no_result = true;
-				$probe_down = false;
-				$rdds = ZBX_STYLE_GREY;
+			if ($data['type'] == RSM_RDAP) {
+				if ($rdap === $disabled || $rdap === $noResult) {
+					$probe_no_result = true;
+					$probe_down = false;
+					$rdds = ZBX_STYLE_GREY;
+				}
 			}
 			elseif (($rdap_is_part_of_rdds && ($rdap === $disabled || $rdap === $no_result))
 					&& ($rdds43 === $disabled || $rdds43 === $no_result)
