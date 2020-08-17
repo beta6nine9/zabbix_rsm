@@ -247,11 +247,11 @@
 #define ZBX_PROBESTATUS_LOG_PREFIX	"probestatus"		/* file will be <LOGDIR>/<PROBE>-probestatus.log */
 #define ZBX_RESOLVERSTATUS_LOG_PREFIX	"resolverstatus"	/* file will be <LOGDIR>/<PROBE>-ZBX_RESOLVERSTATUS_LOG_PREFIX.log */
 
-int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *result);
-int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *result);
-int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *result);
-int	check_rsm_epp(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *result);
-int	check_rsm_probe_status(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *result);
-int	check_rsm_resolver_status(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *result);
+int	check_rsm_dns(const char *host, int nextcheck, const AGENT_REQUEST *request, AGENT_RESULT *result);
+int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *result);
+int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *result);
+int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *result);
+int	check_rsm_probe_status(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *result);
+int	check_rsm_resolver_status(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *result);
 
 #endif

@@ -168,27 +168,27 @@ int	get_value_simple(const DC_ITEM *item, AGENT_RESULT *result, zbx_vector_ptr_t
 
 	if (0 == strcmp(request.key, "rsm.dns"))
 	{
-		if (SYSINFO_RET_OK == check_rsm_dns(item, &request, result))
+		if (SYSINFO_RET_OK == check_rsm_dns(item->host.host, item->nextcheck, &request, result))
 			ret = SUCCEED;
 	}
 	else if (0 == strcmp(request.key, "rsm.rdds"))
 	{
-		if (SYSINFO_RET_OK == check_rsm_rdds(item, &request, result))
+		if (SYSINFO_RET_OK == check_rsm_rdds(item->host.host, &request, result))
 			ret = SUCCEED;
 	}
 	else if (0 == strcmp(request.key, "rdap"))
 	{
-		if (SYSINFO_RET_OK == check_rsm_rdap(item, &request, result))
+		if (SYSINFO_RET_OK == check_rsm_rdap(item->host.host, &request, result))
 			ret = SUCCEED;
 	}
 	else if (0 == strcmp(request.key, "rsm.epp"))
 	{
-		if (SYSINFO_RET_OK == check_rsm_epp(item, &request, result))
+		if (SYSINFO_RET_OK == check_rsm_epp(item->host.host, &request, result))
 			ret = SUCCEED;
 	}
 	else if (0 == strcmp(request.key, "rsm.probe.status"))
 	{
-		if (SYSINFO_RET_OK == check_rsm_probe_status(item, &request, result))
+		if (SYSINFO_RET_OK == check_rsm_probe_status(item->host.host, &request, result))
 			ret = SUCCEED;
 	}
 	else if (0 == strcmp(request.key, "rsm.errors"))
@@ -198,7 +198,7 @@ int	get_value_simple(const DC_ITEM *item, AGENT_RESULT *result, zbx_vector_ptr_t
 	}
 	else if (0 == strcmp(request.key, "resolver.status"))
 	{
-		if (SYSINFO_RET_OK == check_rsm_resolver_status(item, &request, result))
+		if (SYSINFO_RET_OK == check_rsm_resolver_status(item->host.host, &request, result))
 			ret = SUCCEED;
 	}
 	else if (0 == strcmp(request.key, "net.tcp.service") || 0 == strcmp(request.key, "net.udp.service"))
