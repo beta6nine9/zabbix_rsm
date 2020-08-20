@@ -1,3 +1,9 @@
+Changes for rsm2.0.0rc20
+
+Bug fixes:
+..F....... [sub-709] fixed counting number of Probes "Up" on a Particular Tests page (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.0.0rc19
 
 Bug fixes:

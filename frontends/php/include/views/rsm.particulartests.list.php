@@ -251,61 +251,63 @@ foreach ($this->data['probes'] as $probe) {
 				$rdds80 = $disabled;
 				$rdds = ZBX_STYLE_GREY;
 			}
-			elseif (!isset($probe['value']) || $probe['value'] === null) {
-				$rdds43 = $noResult;
-				$rdds80 = $noResult;
-				$rdds = ZBX_STYLE_GREY;
-				$probe_no_result = true;
-			}
-			elseif ($probe['value'] == 0) {
-				$rdds43 = $down;
-				$rdds80 = $down;
-				$rdds = ZBX_STYLE_RED;
-				$probe_down = true;
-			}
-			elseif ($probe['value'] == 1) {
-				$rdds43 = $up;
-				$rdds80 = $up;
-				$rdds = ZBX_STYLE_GREEN;
-			}
-			elseif ($probe['value'] == 2) {
-				$rdds43 = $up;
-				$rdds80 = $down;
-				$rdds = ZBX_STYLE_RED;
-				$probe_down = true;
-			}
-			elseif ($probe['value'] == 3) {
-				$rdds43 = $down;
-				$rdds80 = $up;
-				$rdds = ZBX_STYLE_RED;
-				$probe_down = true;
-			}
-			elseif ($probe['value'] == 4) {
-				$rdds43 = $down;
-				$rdds80 = $down;
-				$rdds = ZBX_STYLE_RED;
-				$probe_down = true;
-			}
-			elseif ($probe['value'] == 5) {
-				$rdds43 = $noResult;
-				$rdds80 = $up;
-				$rdds = ZBX_STYLE_RED;
-				$probe_down = true;
-			}
-			elseif ($probe['value'] == 6) {
-				$rdds43 = $up;
-				$rdds80 = $noResult;
-				$rdds = ZBX_STYLE_RED;
-				$probe_down = true;
-			}
-			elseif ($probe['value'] == 7) {
-				$rdds43 = $up;
-				$rdds80 = $up;
-				$rdds = ZBX_STYLE_RED;
-				$probe_down = true;
-			}
-			else {
-				$rdds = ZBX_STYLE_GREY;
+			elseif ($this->data['type'] == RSM_RDDS) {
+				if (!isset($probe['value']) || $probe['value'] === null) {
+					$rdds43 = $noResult;
+					$rdds80 = $noResult;
+					$rdds = ZBX_STYLE_GREY;
+					$probe_no_result = true;
+				}
+				elseif ($probe['value'] == 0) {
+					$rdds43 = $down;
+					$rdds80 = $down;
+					$rdds = ZBX_STYLE_RED;
+					$probe_down = true;
+				}
+				elseif ($probe['value'] == 1) {
+					$rdds43 = $up;
+					$rdds80 = $up;
+					$rdds = ZBX_STYLE_GREEN;
+				}
+				elseif ($probe['value'] == 2) {
+					$rdds43 = $up;
+					$rdds80 = $down;
+					$rdds = ZBX_STYLE_RED;
+					$probe_down = true;
+				}
+				elseif ($probe['value'] == 3) {
+					$rdds43 = $down;
+					$rdds80 = $up;
+					$rdds = ZBX_STYLE_RED;
+					$probe_down = true;
+				}
+				elseif ($probe['value'] == 4) {
+					$rdds43 = $down;
+					$rdds80 = $down;
+					$rdds = ZBX_STYLE_RED;
+					$probe_down = true;
+				}
+				elseif ($probe['value'] == 5) {
+					$rdds43 = $noResult;
+					$rdds80 = $up;
+					$rdds = ZBX_STYLE_RED;
+					$probe_down = true;
+				}
+				elseif ($probe['value'] == 6) {
+					$rdds43 = $up;
+					$rdds80 = $noResult;
+					$rdds = ZBX_STYLE_RED;
+					$probe_down = true;
+				}
+				elseif ($probe['value'] == 7) {
+					$rdds43 = $up;
+					$rdds80 = $up;
+					$rdds = ZBX_STYLE_RED;
+					$probe_down = true;
+				}
+				else {
+					$rdds = ZBX_STYLE_GREY;
+				}
 			}
 
 			if (isset($this->data['tld']['macros'][RSM_RDAP_TLD_ENABLED])
@@ -321,7 +323,7 @@ foreach ($this->data['probes'] as $probe) {
 				$rdap = $down;
 			}
 			elseif ($probe['value_rdap'] == 1) {
-				if ($rdds !== ZBX_STYLE_RED) {
+				if ($this->data['type'] == RSM_RDDS && $rdds !== ZBX_STYLE_RED) {
 					$rdds = ZBX_STYLE_GREEN;
 				}
 
