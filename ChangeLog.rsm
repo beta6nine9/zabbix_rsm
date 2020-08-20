@@ -1,3 +1,10 @@
+Changes for rsm2.0.0rc19
+
+Bug fixes:
+....I..... [sub-707] changed /v2 directory to only contain RDAP data (dimir)
+....I..... [713] added logging of command-line parameters as soon as possible to tlds-notification.pl (asitals)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.0.0rc18
 
 Bug fixes:
@@ -8,6 +15,8 @@ Changes for rsm2.0.0rc17
 
 Bug fixes:
 ....I..... [707] added /v1 and /v2 directories support to SLA API (dimir)
+
+New features:
 ....I..... [710] added script for checking and fixing DB corruption issues for RTT ratio SLV items (asitals)
 
 --------------------------------------------------------------------------------
@@ -33,7 +42,7 @@ Bug fixes:
 --------------------------------------------------------------------------------
 Changes for rsm2.0.0rc13
 
-Bug fixes:
+New features:
 ....I..... [455] merged cron.d files into one file, grouped <service>.avail|rollweek|downtime script calls (asitals)
 
 --------------------------------------------------------------------------------

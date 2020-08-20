@@ -1516,24 +1516,29 @@ sub calculate_cycle($$$$$$$$$)
 
 	return if (opt('dry-run'));
 
-	if ($service ne 'rdap' && ah_save_measurement(
-			AH_SLA_API_VERSION_1,
-			ah_get_api_tld($tld),
-			$service,
-			$json,
-			$from) != AH_SUCCESS)
+	if ($service ne 'rdap')
 	{
-		fail("cannot save recent measurement: ", ah_get_error());
+		if (ah_save_measurement(
+				AH_SLA_API_VERSION_1,
+				ah_get_api_tld($tld),
+				$service,
+				$json,
+				$from) != AH_SUCCESS)
+		{
+			fail("cannot save recent measurement: ", ah_get_error());
+		}
 	}
-
-	if (ah_save_measurement(
-			AH_SLA_API_VERSION_2,
-			ah_get_api_tld($tld),
-			$service,
-			$json,
-			$from) != AH_SUCCESS)
+	else
 	{
-		fail("cannot save recent measurement: ", ah_get_error());
+		if (ah_save_measurement(
+				AH_SLA_API_VERSION_2,
+				ah_get_api_tld($tld),
+				$service,
+				$json,
+				$from) != AH_SUCCESS)
+		{
+			fail("cannot save recent measurement: ", ah_get_error());
+		}
 	}
 }
 
