@@ -2,6 +2,7 @@ Changes for rsm2.0.0rc22
 
 Bug fixes:
 ....I..... [sub-707] removed handling of /v2 directory from maintenance-api-data.pl (dimir)
+.......PS. [714] added "no renegotiation" flags and set SSL session timeout to 60 seconds (dimir)
 
 --------------------------------------------------------------------------------
 Changes for rsm2.0.0rc21
