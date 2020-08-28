@@ -1,3 +1,177 @@
+Changes for rsm2.0.0rc22
+
+Bug fixes:
+....I..... [sub-707] removed handling of /v2 directory from maintenance-api-data.pl (dimir)
+.......PS. [714] added "no renegotiation" flags and set SSL session timeout to 60 seconds (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.0.0rc21
+
+Bug fixes:
+....I..... [sub-707] removed functionality to create TLD state file in /v2 of SLA API (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.0.0rc20
+
+Bug fixes:
+..F....... [sub-709] fixed counting number of Probes "Up" on a Particular Tests page (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.0.0rc19
+
+Bug fixes:
+....I..... [sub-707] changed /v2 directory to only contain RDAP data (dimir)
+....I..... [713] added logging of command-line parameters as soon as possible to tlds-notification.pl (asitals)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.0.0rc18
+
+Bug fixes:
+..F....... [709] fixed counting number of Probes "Down" and with "No result" on a Particular Tests page (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.0.0rc17
+
+Bug fixes:
+....I..... [707] added /v1 and /v2 directories support to SLA API (dimir)
+
+New features:
+....I..... [710] added script for checking and fixing DB corruption issues for RTT ratio SLV items (asitals)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.0.0rc16
+
+Bug fixes:
+....I..... [706] fixed handling of metrics that do not have RTT in Data Export; fixed logging value timestamp in this case (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.0.0rc15
+
+Bug fixes:
+....I..... [sub-700] added 30 seconds of waiting for the measurement file to appear to update-api-data.pl before failing (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.0.0rc14
+
+Bug fixes:
+....I..... [705] fixed possible SQL syntax error when Rsmhosts are being onboarded (dimir)
+....I..... [702] fixed missing home directory issue when cron job is run by zabbix user (dimir)
+....I..... [700] fixed race condition between update-api-data.pl and sla-api-recent.pl causing errors about missing measurement files (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.0.0rc13
+
+New features:
+....I..... [455] merged cron.d files into one file, grouped <service>.avail|rollweek|downtime script calls (asitals)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.0.0rc12
+
+Bug fixes:
+.......PS. [703] added missing functionality to respect number of tries when testing local resolver (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.0.0rc11
+
+Bug fixes:
+....I..... [699] fixed prefix in alerts, 'tld' for registries, 'registrar' for registrars (asitals)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.0.0rc10
+
+Bug fixes:
+....I..... [691] fixed missing DNS TCP metrics in Data Export files nsTest.csv and tests.csv (dimir)
+....I..... [690] fixed reference to FQDN of the name server in Data Export file nsTests.csv (dimir)
+....I..... [693] modified "hosts_inventory" table to avoid "Row size too large" MariaDB error (asitals)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.0.0rc9
+
+Bug fixes:
+....I..... [692] fixed reading list of items in sla-monthly-status.pl (asitals)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.0.0rc8
+
+Bug fixes:
+....I..... [sub-643] fixed Data Export script issue resulting in consuming exceeding amount of memory (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.0.0rc7
+
+Bug fixes:
+....I..... [sub-643] added support for translating new Data Export file testDetail.csv (dimir)
+..F....... [584] added visual identification of disabled rsmhosts on the rolling week page (dimir)
+....I..... [sub-669] changed behavior of registrar.pl to disable host when last enabled service is disabled (dimir)
+..F.I..... [665] fixed probe ONLINE status calculation for RDDS/RDAP cycles (dimir)
+....I..... [sub-663] added missing trigger for number of total/online probes with RDAP enabled (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.0.0rc6
+
+Bug fixes:
+....I..... [sub-669] fixed SQL syntax error in Service Availability scripts when service is disabled, previous fix was incorrect (dimir)
+....I..... [680] fixed invalid rtt data type (string) in recent measurements (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.0.0rc5
+
+Bug fixes:
+....I..... [sub-642] added RDAP tested name to SLA API measurements file (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.0.0rc4
+
+Bug fixes:
+.......PS. [682] fixed regression causing DNSSEC errors not detected (dimir)
+....I..PS. [663] added missing functionality for calculating total/online probes with RDAP enabled (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.0.0rc3
+
+Bug fixes:
+.......PS. [sub-643] fixed tested name that was incorrectly set in RDDS43 test (dimir)
+....I..... [669] fixed SQL syntax error in Service Availability scripts when service is disabled (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.0.0rc2
+
+Bug fixes:
+..F.I..... [671] added monthly reports in JSON format in addition to XML (asitals)
+....I..PS. [639] added possibility to specify full RDDS43 test domain when onboarding TLD or registrar (asitals)
+..F....... [660] removed showing RDDS 'Current testing interface' label when RDAP is standalone (dimir)
+..F.I..... [642,643] fixed frontend, SLA API measurement files (version 1 and 2 for RDAP) and Data Export to store/display target and tested name (dimir)
+....I..... [655] improved performance of onboarding TLDs and registrars (asitals)
+.......PS. [649] fixed incorrect handling of zero RTT during RDDS43 test (dimir)
+....I..... [sub-506] fixed --list-services option in registrar.pl (dimir)
+..F....... [648] made info bubbles visible on mouse over in TLD rolling week status page (miks)
+..F....... [640] fixed tab indexing in incidents page (miks)
+..F....... [638] added 'server' column in rolling week status list (miks)
+..F....... [634] made rolling week status table sortable by name column (miks)
+..F....... [635] fixed syntax error in "SLA reports" page (miks)
+....I..... [637] fixed call to undefined function in registrar.pl (asitals)
+....I..... [594] added support for Standalone RDAP in change-delay.pl (kalimulin)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.0.0rc1
+
+New features:
+..F.I..... [518] added support for Standalone RDAP service (asitals, dimir, gcalenko, miks, yurii)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.4.0rc2
+
+Bug fixes:
+..F....... [514] fixed unconsistent display of host technical and visual name in different pages; removed unused file (miks)
+....I..... [549] fixed type of "Agent availability" item (asitals)
+
+--------------------------------------------------------------------------------
+Changes for rsm1.4.0rc1
+
+New features:
+..F.I..... [510] added support for Registrar RDDS Monitoring (asitals, dimir, gcalenko, miks, yurii)
+
+--------------------------------------------------------------------------------
 Changes for rsm1.3.4
 
 Bug fixes:

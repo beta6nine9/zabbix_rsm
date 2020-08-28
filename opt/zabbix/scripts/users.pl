@@ -12,30 +12,30 @@ use Zabbix;
 use RSM;
 use RSMSLV;
 
-use constant USER_TYPE_EBERO => 4;		# User type "EBERO"
-use constant USER_TYPE_TEHNICAL_SERVICE => 5;	# User type "Technical Services"
-use constant USER_TYPE_SUPER_ADMIN => 3;	# User type "Zabbix Super Admin"
+use constant USER_TYPE_READ_ONLY_USER => 4;	# User type "Read-only user"
+use constant USER_TYPE_POWER_USER     => 5;	# User type "Power user"
+use constant USER_TYPE_SUPER_ADMIN    => 3;	# User type "Zabbix Super Admin"
 
 # NB! Keep these values in sync with DB schema!
-use constant EBERO_GROUPID => 100;		# User group "EBERO users"
-use constant TEHNICAL_SERVICE_GROUPID => 110;	# User group "Technical services users"
-use constant SUPER_ADMIN_GROUPID => 7;		# User group "Zabbix administrators"
+use constant READ_ONLY_USER_GROUPID => 100;	# User group "Read-only user"
+use constant POWER_USER_GROUPID     => 110;	# User group "Power user"
+use constant SUPER_ADMIN_GROUPID    => 7;	# User group "Zabbix administrators"
 
 use constant USER_TYPES =>
 {
-	'ebero' =>
+	'read-only-user' =>
 	{
-		'type' => USER_TYPE_EBERO,
-		'usrgrpid' => EBERO_GROUPID
+		'type'     => USER_TYPE_READ_ONLY_USER,
+		'usrgrpid' => READ_ONLY_USER_GROUPID
 	},
-	'tech' =>
+	'power-user' =>
 	{
-		'type' => USER_TYPE_TEHNICAL_SERVICE,
-		'usrgrpid' => TEHNICAL_SERVICE_GROUPID
+		'type'     => USER_TYPE_POWER_USER,
+		'usrgrpid' => POWER_USER_GROUPID
 	},
 	'admin' =>
 	{
-		'type' => USER_TYPE_SUPER_ADMIN,
+		'type'     => USER_TYPE_SUPER_ADMIN,
 		'usrgrpid' => SUPER_ADMIN_GROUPID
 	}
 };
@@ -69,8 +69,7 @@ foreach my $server_key (@server_keys)
 
 	if (opt('add'))
 	{
-		my $options =
-		{
+		my $options = {
 			'alias' => getopt('user'),
 			'type' => USER_TYPES->{getopt('type')}->{'type'},
 			'passwd' => getopt('password'),
@@ -238,8 +237,8 @@ sub __validate_opts
 		{
 			my $type = getopt('type');
 
-			push(@errors, "\tunknown user type \"$type\", it must be one of: ebero, tech, admin")
-				if ($type ne 'ebero' && $type ne 'tech' && $type ne 'admin');
+			push(@errors, "\tunknown user type \"$type\", it must be one of: read-only-user, power-user, admin")
+				if ($type ne 'read-only-user' && $type ne 'power-user' && $type ne 'admin');
 		}
 	}
 	elsif (opt('modify'))
@@ -263,7 +262,7 @@ users.pl - manage users in Zabbix
 
 =head1 SYNOPSIS
 
-users.pl --add|--delete|--modify --user <user> [--type <ebero|tech|admin>] [--password <password>] [--firstname <firstname>] [--lastname <lastname>] [--server-id id] [--debug] [--help]
+users.pl --add|--delete|--modify --user <user> [--type <read-only-user|power-user|admin>] [--password <password>] [--firstname <firstname>] [--lastname <lastname>] [--server-id id] [--debug] [--help]
 
 =head1 OPTIONS
 
@@ -297,7 +296,7 @@ Specify user password.
 
 =item B<--type> type
 
-Specify user type, accepted values: ebero, tech or admin.
+Specify user type, accepted values: read-only-user, power-user or admin.
 
 =item B<--firstname> firstname
 
@@ -329,8 +328,8 @@ B<This program> will manage users in Zabbix.
 
 =head1 EXAMPLES
 
-./users.pl --add john --type ebero --password secret --firstname John --lastname Doe
+./users.pl --add john --type read-only-user --password secret --firstname John --lastname Doe
 
-This will add a new EBERO user with specified details.
+This will add a new Read-only user with specified details.
 
 =cut

@@ -9,6 +9,8 @@ declare -A SERVICES=(
 	[dns]=1
 	[dnssec]=1
 	[rdds]=1
+	[rdap]=1
+	[epp]=1
 	[online]=1
 )
 
@@ -106,10 +108,10 @@ run_custom()
 	run "$title" "$script_path" "$params"
 }
 
-run "SLA API" "sudo opt/zabbix/scripts/update-api-data.pl" "--continue"
+run "Recent measurements" "opt/zabbix/scripts/sla-api-recent.pl"
 
-run "Data Export" "sudo opt/zabbix/scripts/export/export.pl" "--date $(date +%d/%m/%Y -d '1 day ago')"
+run "SLA API" "opt/zabbix/scripts/update-api-data.pl" "--continue"
 
-run "Recent measurements" "sudo opt/zabbix/scripts/sla-api-recent.pl"
+run "Data Export" "opt/zabbix/scripts/export/export.pl" "--date $(date +%d/%m/%Y -d '1 day ago')"
 
 echo "Tests successful, congratulations!"

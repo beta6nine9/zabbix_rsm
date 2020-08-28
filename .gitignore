@@ -1,6 +1,8 @@
 /.buildpath
 /.project
 /.settings
+.vstags
+.vscode
 Makefile
 Makefile.in
 !/build/win32/**/Makefile
@@ -18,16 +20,20 @@ frontend.mo
 /config.sub
 /configure
 /cscope.*
+/etc
 /GPATH
 /GRTAGS
 /GTAGS
 /depcomp
+/install-sh
 /missing
 /nbproject
-/install-sh
+/sbin
+/share
 /tags
 *.a
 *.o
+/bin
 build/win32/examples/zabbix_sender/sender.exe
 build/win32/examples/zabbix_sender/sender.obj
 build/win32/project/*.idb
@@ -55,6 +61,7 @@ frontends/php/.project
 frontends/php/conf/zabbix.conf.php
 frontends/php/images/general/*.db
 frontends/php/images/general/tree/*.db
+frontends/php/include/classes/services/CSlaReport.php
 frontends/php/js/jsDump.js
 frontends/php/local/conf/brand.conf.php
 frontends/php/locale/POTFILES.in
@@ -77,3 +84,7 @@ src/zabbix_proxy/zabbix_proxy
 src/zabbix_sender/zabbix_sender
 src/zabbix_server/zabbix_server
 /zabbix-*.tar.gz
+opt/zabbix/scripts/rsm.conf
+opt/zabbix/cache/
+opt/zabbix/export/
+opt/zabbix/sla/

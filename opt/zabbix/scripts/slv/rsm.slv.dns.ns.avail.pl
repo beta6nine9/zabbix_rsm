@@ -16,6 +16,8 @@ fail_if_running();
 set_slv_config(get_rsm_config());
 db_connect();
 
+slv_exit(SUCCESS) if (get_monitoring_target() ne MONITORING_TARGET_REGISTRY);
+
 my $slv_item_key_pattern = 'rsm.slv.dns.ns.avail';
 my $rtt_item_key_pattern = 'rsm.dns.udp.rtt';
 
@@ -37,6 +39,8 @@ my $current_month_latest_cycle = current_month_latest_cycle();
 my $cfg_minonline = get_macro_dns_probe_online();
 my $dns_rtt_high = get_macro_dns_udp_rtt_high();
 my $rtt_itemids = get_all_dns_udp_rtt_itemids();
+
+my $probes_ref = get_probes('DNS');
 
 init_values();
 process_values();
@@ -121,7 +125,7 @@ sub process_cycles # for a particular slv item
 		my $from = $slv_clock;
 		my $till = $slv_clock + $cycle_delay - 1;
 
-		my $online_probe_count = get_online_probe_count($from, $till);
+		my $online_probe_count = scalar(@{online_probes($probes_ref, $from, $cycle_delay)});
 
 		if ($online_probe_count < $cfg_minonline)
 		{
@@ -184,22 +188,6 @@ sub get_all_dns_udp_rtt_itemids
 	}
 
 	return $itemids;
-}
-
-my $online_probe_count_cache = {};
-
-sub get_online_probe_count
-{
-	my $from = shift;
-	my $till = shift;
-	my $key = "$from-$till";
-
-	if (!defined($online_probe_count_cache->{$key}))
-	{
-		$online_probe_count_cache->{$key} = scalar(keys(%{get_probe_times($from, $till, get_probes('DNS'))}));
-	}
-
-	return $online_probe_count_cache->{$key};
 }
 
 sub get_rtt_values

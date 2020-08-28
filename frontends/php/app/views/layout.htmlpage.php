@@ -78,6 +78,12 @@ function local_generateHeader($data) {
 	// should be replaced with addPostJS() at some point
 	zbx_add_post_js('initMessages({});');
 
+	// Show error message if unknown {$RSM.MONITORING.TARGET} is set.
+	if (get_rsm_monitoring_type() !== MONITORING_TARGET_REGISTRY
+		&& get_rsm_monitoring_type() !== MONITORING_TARGET_REGISTRAR) {
+		error('Unknown monitoring target.');
+	}
+
 	// if a user logs in after several unsuccessful attempts, display a warning
 	if ($failedAttempts = CProfile::get('web.login.attempt.failed', 0)) {
 		$attempt_ip = CProfile::get('web.login.attempt.ip', '');

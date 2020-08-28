@@ -247,6 +247,12 @@ if ($page['type'] == PAGE_TYPE_HTML && $showGuiMessaging) {
 	zbx_add_post_js('initMessages({});');
 }
 
+// Show error message if unknown {$RSM.MONITORING.TARGET} is set.
+if (get_rsm_monitoring_type() !== MONITORING_TARGET_REGISTRY
+		&& get_rsm_monitoring_type() !== MONITORING_TARGET_REGISTRAR) {
+	error('Unknown monitoring target.');
+}
+
 // if a user logs in after several unsuccessful attempts, display a warning
 if ($failedAttempts = CProfile::get('web.login.attempt.failed', 0)) {
 	$attempip = CProfile::get('web.login.attempt.ip', '');

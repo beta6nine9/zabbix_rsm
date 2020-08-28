@@ -2,6 +2,11 @@
 
 class CSlaReport
 {
+	const MONITORING_TARGET_MACRO     = "{\$RSM.MONITORING.TARGET}";
+	const MONITORING_TARGET_REGISTRY  = "registry";
+	const MONITORING_TARGET_REGISTRAR = "registrar";
+	const STANDALONE_RDAP_MACRO       = "{\$RSM.RDAP.STANDALONE}";
+
 	const RSMHOST_DNS_NS_LOG_ACTION_CREATE  = 0;
 	const RSMHOST_DNS_NS_LOG_ACTION_ENABLE  = 1;
 	const RSMHOST_DNS_NS_LOG_ACTION_DISABLE = 2;
@@ -19,12 +24,13 @@ class CSlaReport
 	 * @param array $tlds      array of TLD names; if empty, reports for all TLDs will be generated
 	 * @param int   $year      year
 	 * @param int   $month     month
+	 * @param array $formats   array of formats; supported formtas are: XML, JSON
 	 *
 	 * @static
 	 *
 	 * @return array|null Returns array of reports or NULL on error. Use CSlaReport::$error to get the erorr message.
 	 */
-	public static function generate($server_id, $tlds, $year, $month)
+	public static function generate($server_id, $tlds, $year, $month, $formats)
 	{
 		if (!is_int($server_id))
 		{
@@ -45,6 +51,10 @@ class CSlaReport
 		{
 			self::$error = "\$month must be integer";
 			return null;
+		}
+		if (!is_array($formats) || array_diff($formats, ["XML", "JSON"]))
+		{
+			self::$error = "\$formats must be array of supported formats (XML, JSON)";
 		}
 
 		$duplicate_tlds = array_keys(array_diff(array_count_values($tlds), array_count_values(array_unique($tlds))));
@@ -112,6 +122,11 @@ class CSlaReport
 							"availability" => int,
 							"rtt"          => float,
 						],
+						"rdap" => [
+							"enabled"      => true|false,
+							"availability" => int,
+							"rtt"          => float,
+						],
 					],
 					...
 				];
@@ -127,7 +142,36 @@ class CSlaReport
 
 			$slrs = self::getSlrValues($from);
 
-			$reports = self::generateXml($tlds, $data, $slrs, $time, $from, $till);
+			if (in_array("XML", $formats))
+			{
+				$reportsXml = self::generateXml($data, $slrs, $time, $from, $till);
+			}
+			if (in_array("JSON", $formats))
+			{
+				$reportsJson = self::generateJson($data, $slrs, $time, $from, $till);
+			}
+
+			$reports = array_fill_keys($tlds, null); // for sorting, based on $tlds
+			foreach ($data as $tldid => $tld)
+			{
+				$report = [];
+
+				if (in_array("XML", $formats))
+				{
+					$report["XML"] = $reportsXml[$tld["host"]];
+				}
+				if (in_array("JSON", $formats))
+				{
+					$report["JSON"] = $reportsJson[$tld["host"]];
+				}
+
+				$reports[$tld["host"]] = [
+					"hostid" => $tldid,
+					"host"   => $tld["host"],
+					"report" => $report,
+				];
+			}
+			$reports = array_values($reports);
 		}
 		catch (Exception $e)
 		{
@@ -176,6 +220,17 @@ class CSlaReport
 					"rtt"          => null,
 				],
 			];
+
+			if (self::isRdapStandalone($from))
+			{
+				$data[$hostid] += [
+					"rdap" => [
+						"enabled"      => null,
+						"availability" => null,
+						"rtt"          => null,
+					],
+				];
+			}
 		}
 
 		if (count($tlds) > 0 && count($tlds) != count($data))
@@ -206,26 +261,46 @@ class CSlaReport
 			throw new Exception("Could not find any TLD(s)");
 		}
 
-		// get RDDS status (enabled/disabled)
+		// get RDDS and RDAP status (enabled/disabled)
 
-		$rows = self::getRddsStatus($tlds, $from, $till);
+		$rdds_rows = self::getServiceStatus($tlds, $from, $till, "rdds");
+		$rdap_rows = self::getServiceStatus($tlds, $from, $till, "rdap");
 
-		$rddsStatus = [];
-		foreach ($rows as $row)
+		$rdds_status = [];
+		$rdap_status = [];
+
+		foreach ($rdds_rows as $row)
 		{
 			list($tld, $status) = $row;
-			$rddsStatus[$tld] = (bool)$status;
+			$rdds_status[$tld] = (bool)$status;
+		}
+		foreach ($rdap_rows as $row)
+		{
+			list($tld, $status) = $row;
+			$rdap_status[$tld] = (bool)$status;
 		}
 
-		foreach ($data as $hostid => $tld)
+		if (self::isRdapStandalone($from))
 		{
-			$data[$hostid]["rdds"]["enabled"] = $rddsStatus[$tld["host"]];
+			foreach ($data as $hostid => $tld)
+			{
+				$data[$hostid]["rdds"]["enabled"] = $rdds_status[$tld["host"]];
+				$data[$hostid]["rdap"]["enabled"] = $rdap_status[$tld["host"]];
+			}
+		}
+		else
+		{
+			foreach ($data as $hostid => $tld)
+			{
+				$data[$hostid]["rdds"]["enabled"] = $rdds_status[$tld["host"]] || $rdap_status[$tld["host"]];
+			}
 		}
 
 		// get itemid of relevant items
 
 		$all_hostids = array_keys($data);
 		$rdds_hostids = [];
+		$rdap_hostids = [];
 
 		foreach ($data as $hostid => $tld)
 		{
@@ -233,9 +308,13 @@ class CSlaReport
 			{
 				array_push($rdds_hostids, $hostid);
 			}
+			if (self::isRdapStandalone($from) && $tld["rdap"]["enabled"])
+			{
+				array_push($rdap_hostids, $hostid);
+			}
 		}
 
-		$rows = self::getItemIds($all_hostids, $rdds_hostids);
+		$rows = self::getItemIds($all_hostids, $rdds_hostids, $rdap_hostids);
 
 		$itemkeys = [];
 		$itemhostids = [];
@@ -299,6 +378,14 @@ class CSlaReport
 					$data[$hostid]["rdds"]["rtt"] = 100.0 - $value;
 					break;
 
+				case "rsm.slv.rdap.downtime":
+					$data[$hostid]["rdap"]["availability"] = $value;
+					break;
+
+				case "rsm.slv.rdap.rtt.pfailed":
+					$data[$hostid]["rdap"]["rtt"] = 100.0 - $value;
+					break;
+
 				default:
 					if (preg_match("/^rsm\.slv\.dns\.ns\.downtime\[(.+),(.+)\]$/", $key, $matches))
 					{
@@ -343,6 +430,8 @@ class CSlaReport
 	{
 		foreach ($data as $hostid => $tld)
 		{
+			// validate host
+
 			if (is_null($tld["host"]))
 			{
 				if (defined("DEBUG") && DEBUG === true)
@@ -350,80 +439,105 @@ class CSlaReport
 
 				throw new Exception("partial or missing TLD data in the database");
 			}
-			if (is_null($tld["dns"]["availability"]))
-			{
-				if (defined("DEBUG") && DEBUG === true)
-					printf("(DEBUG) %s() \$data[{$hostid}]['dns']['availability'] is null (TLD: '{$tld["host"]}')\n", __method__);
 
-				throw new Exception("partial or missing DNS Service Availability data in the database");
-			}
-			if (!is_array($tld["dns"]["ns"]))
-			{
-				if (defined("DEBUG") && DEBUG === true)
-					printf("(DEBUG) %s() \$data[{$hostid}]['dns']['ns'] is not an array (TLD: '{$tld["host"]}')\n", __method__);
+			// validate DNS
 
-				throw new Exception("unexpected XML data structure");
-			}
-			if (count($tld["dns"]["ns"]) === 0)
+			if (self::getMonitoringTarget() == self::MONITORING_TARGET_REGISTRY)
 			{
-				if (defined("DEBUG") && DEBUG === true)
-					printf("(DEBUG) %s() \$data[{$hostid}]['dns']['ns'] is empty array (TLD: '{$tld["host"]}')\n", __method__);
-
-				throw new Exception("no Name Server availability data in the database");
-			}
-			foreach ($tld["dns"]["ns"] as $i => $ns)
-			{
-				if (is_null($ns["hostname"]))
+				if (is_null($tld["dns"]["availability"]))
 				{
 					if (defined("DEBUG") && DEBUG === true)
-						printf("(DEBUG) %s() \$data[{$hostid}]['dns']['ns'][{$i}]['hostname'] is null (TLD: '{$tld["host"]}')\n", __method__);
+						printf("(DEBUG) %s() \$data[{$hostid}]['dns']['availability'] is null (TLD: '{$tld["host"]}')\n", __method__);
+
+					throw new Exception("partial or missing DNS Service Availability data in the database");
+				}
+				if (!is_array($tld["dns"]["ns"]))
+				{
+					if (defined("DEBUG") && DEBUG === true)
+						printf("(DEBUG) %s() \$data[{$hostid}]['dns']['ns'] is not an array (TLD: '{$tld["host"]}')\n", __method__);
 
 					throw new Exception("unexpected XML data structure");
 				}
-				if (is_null($ns["ipAddress"]))
+				if (count($tld["dns"]["ns"]) === 0)
 				{
 					if (defined("DEBUG") && DEBUG === true)
-						printf("(DEBUG) %s() \$data[{$hostid}]['dns']['ns'][{$i}]['ipAddress'] is null (TLD: '{$tld["host"]}')\n", __method__);
+						printf("(DEBUG) %s() \$data[{$hostid}]['dns']['ns'] is empty array (TLD: '{$tld["host"]}')\n", __method__);
 
-					throw new Exception("unexpected XML data structure");
+					throw new Exception("no Name Server availability data in the database");
 				}
-				// TODO: "availability", "from", "till" - what if NS was disabled for whole month?
-				if (is_null($ns["availability"]))
+				foreach ($tld["dns"]["ns"] as $i => $ns)
 				{
-					if (defined("DEBUG") && DEBUG === true)
-						printf("(DEBUG) %s() \$data[{$hostid}]['dns']['ns'][{$i}]['availability'] is null (TLD: '{$tld["host"]}')\n", __method__);
+					if (is_null($ns["hostname"]))
+					{
+						if (defined("DEBUG") && DEBUG === true)
+							printf("(DEBUG) %s() \$data[{$hostid}]['dns']['ns'][{$i}]['hostname'] is null (TLD: '{$tld["host"]}')\n", __method__);
 
-					throw new Exception("no availability data of Name Server ".$ns["hostname"].":".$ns["ipAddress"]." in the database");
+						throw new Exception("unexpected XML data structure");
+					}
+					if (is_null($ns["ipAddress"]))
+					{
+						if (defined("DEBUG") && DEBUG === true)
+							printf("(DEBUG) %s() \$data[{$hostid}]['dns']['ns'][{$i}]['ipAddress'] is null (TLD: '{$tld["host"]}')\n", __method__);
+
+						throw new Exception("unexpected XML data structure");
+					}
+					// TODO: "availability", "from", "till" - what if NS was disabled for whole month?
+					if (is_null($ns["availability"]))
+					{
+						if (defined("DEBUG") && DEBUG === true)
+							printf("(DEBUG) %s() \$data[{$hostid}]['dns']['ns'][{$i}]['availability'] is null (TLD: '{$tld["host"]}')\n", __method__);
+
+						throw new Exception("no availability data of Name Server ".$ns["hostname"].":".$ns["ipAddress"]." in the database");
+					}
+					if (is_null($ns["from"]))
+					{
+						if (defined("DEBUG") && DEBUG === true)
+							printf("(DEBUG) %s() \$data[{$hostid}]['dns']['ns'][{$i}]['from'] is null (TLD: '{$tld["host"]}')\n", __method__);
+
+						throw new Exception("unexpected XML data structure");
+					}
+					if (is_null($ns["to"]))
+					{
+						if (defined("DEBUG") && DEBUG === true)
+							printf("(DEBUG) %s() \$data[{$hostid}]['dns']['ns'][{$i}]['to'] is null (TLD: '{$tld["host"]}')\n", __method__);
+
+						throw new Exception("unexpected XML data structure");
+					}
 				}
-				if (is_null($ns["from"]))
+				if (!is_float($tld["dns"]["rttUDP"]))
 				{
 					if (defined("DEBUG") && DEBUG === true)
-						printf("(DEBUG) %s() \$data[{$hostid}]['dns']['ns'][{$i}]['from'] is null (TLD: '{$tld["host"]}')\n", __method__);
+						printf("(DEBUG) %s() \$data[{$hostid}]['dns']['rttUDP'] is not float (TLD: '{$tld["host"]}')\n", __method__);
 
-					throw new Exception("unexpected XML data structure");
+					throw new Exception("invalid DNS UDP Resolution RTT value type in the database");
 				}
-				if (is_null($ns["to"]))
+				if (!is_float($tld["dns"]["rttTCP"]))
 				{
 					if (defined("DEBUG") && DEBUG === true)
-						printf("(DEBUG) %s() \$data[{$hostid}]['dns']['ns'][{$i}]['to'] is null (TLD: '{$tld["host"]}')\n", __method__);
+						printf("(DEBUG) %s() \$data[{$hostid}]['dns']['rttTCP'] is not float (TLD: '{$tld["host"]}')\n", __method__);
 
-					throw new Exception("unexpected XML data structure");
+					throw new Exception("invalid DNS TCP Resolution RTT value type in the database");
 				}
 			}
-			if (!is_float($tld["dns"]["rttUDP"]))
+			if (self::getMonitoringTarget() == self::MONITORING_TARGET_REGISTRAR)
 			{
-				if (defined("DEBUG") && DEBUG === true)
-					printf("(DEBUG) %s() \$data[{$hostid}]['dns']['rttUDP'] is not float (TLD: '{$tld["host"]}')\n", __method__);
+				/*
+					TODO: consider adding checks for DNS
 
-				throw new Exception("invalid DNS UDP Resolution RTT value type in the database");
-			}
-			if (!is_float($tld["dns"]["rttTCP"]))
-			{
-				if (defined("DEBUG") && DEBUG === true)
-					printf("(DEBUG) %s() \$data[{$hostid}]['dns']['rttTCP'] is not float (TLD: '{$tld["host"]}')\n", __method__);
+					We might want to check that DNS-related values aren't filled, i.e.,
+					* $tld["dns"]["availability"] is null
+					* $tld["dns"]["ns"] is array
+					* $tld["dns"]["ns"] is empty
+					* $tld["dns"]["rttUDP"] is null
+					* $tld["dns"]["rttTCP"] is null
 
-				throw new Exception("invalid DNS TCP Resolution RTT value type in the database");
+					On the other hand, these checks would make it harder to develop & test in environments where
+					switching between registries and registrars is possible.
+				*/
 			}
+
+			// validate RDDS
+
 			if (!is_bool($tld["rdds"]["enabled"]))
 			{
 				if (defined("DEBUG") && DEBUG === true)
@@ -465,39 +579,89 @@ class CSlaReport
 					throw new Exception("RDDS Query RTT data found in the database while it shouldn't have been");
 				}
 			}
+
+			// validate RDAP
+			// TODO: remove "if" after switching to Standalone RDAP
+			if (array_key_exists("rdap", $tld))
+			{
+				if (!is_bool($tld["rdap"]["enabled"]))
+				{
+					if (defined("DEBUG") && DEBUG === true)
+						printf("(DEBUG) %s() \$data[{$hostid}]['rdap']['enabled'] is not bool (TLD: '{$tld["host"]}')\n", __method__);
+
+					throw new Exception("invalid RDAP state value type in the database");
+				}
+				if ($tld["rdap"]["enabled"])
+				{
+					if (is_null($tld["rdap"]["availability"]))
+					{
+						if (defined("DEBUG") && DEBUG === true)
+							printf("(DEBUG) %s() \$data[{$hostid}]['rdap']['availability'] is null (TLD: '{$tld["host"]}')\n", __method__);
+
+						throw new Exception("partial or missing RDAP Service Availability data in the database");
+					}
+					if (!is_float($tld["rdap"]["rtt"]))
+					{
+						if (defined("DEBUG") && DEBUG === true)
+							printf("(DEBUG) %s() \$data[{$hostid}]['rdap']['rtt'] is not float (TLD: '{$tld["host"]}')\n", __method__);
+
+						throw new Exception("partial or missing RDAP Query RTT data in the database");
+					}
+				}
+				else
+				{
+					if (!is_null($tld["rdap"]["availability"]))
+					{
+						if (defined("DEBUG") && DEBUG === true)
+							printf("(DEBUG) %s() \$data[{$hostid}]['rdap']['availability'] is not null (TLD: '{$tld["host"]}')\n", __method__);
+
+						throw new Exception("RDAP Service Availability data found in the database while it shouldn't have been");
+					}
+					if (!is_null($tld["rdap"]["rtt"]))
+					{
+						if (defined("DEBUG") && DEBUG === true)
+							printf("(DEBUG) %s() \$data[{$hostid}]['rdap']['rtt'] is not null (TLD: '{$tld["host"]}')\n", __method__);
+
+						throw new Exception("RDAP Query RTT data found in the database while it shouldn't have been");
+					}
+				}
+			}
 		}
 	}
 
-	private static function generateXml(&$tlds, &$data, &$slrs, $generationDateTime, $reportPeriodFrom, $reportPeriodTo)
+	private static function generateXml(&$data, &$slrs, $generationDateTime, $reportPeriodFrom, $reportPeriodTo)
 	{
-		$reports = array_fill_keys($tlds, null); // for sorting, based on $tlds
+		$reports = [];
 
 		foreach ($data as $tldid => $tld)
 		{
-			$xml = new SimpleXMLElement("<reportTLD/>");
+			$xml = new SimpleXMLElement("<reportSLA/>");
 			$xml->addAttribute("id", $tld["host"]);
 			$xml->addAttribute("generationDateTime", $generationDateTime);
 			$xml->addAttribute("reportPeriodFrom", $reportPeriodFrom);
 			$xml->addAttribute("reportPeriodTo", $reportPeriodTo);
 
-			$xml_dns = $xml->addChild("DNS");
-			$xml_dns_avail = $xml_dns->addChild("serviceAvailability", $tld["dns"]["availability"]);
-			$xml_dns_avail->addAttribute("downtimeSLR", $slrs["dns-avail"]);
-			foreach ($tld["dns"]["ns"] as $ns)
+			if (self::getMonitoringTarget() == self::MONITORING_TARGET_REGISTRY)
 			{
-				$xml_ns = $xml_dns->addChild("nsAvailability", $ns["availability"]);
-				$xml_ns->addAttribute("hostname", $ns["hostname"]);
-				$xml_ns->addAttribute("ipAddress", $ns["ipAddress"]);
-				$xml_ns->addAttribute("from", $ns["from"]);
-				$xml_ns->addAttribute("to", $ns["to"]);
-				$xml_ns->addAttribute("downtimeSLR", $slrs["ns-avail"]);
+				$xml_dns = $xml->addChild("DNS");
+				$xml_dns_avail = $xml_dns->addChild("serviceAvailability", $tld["dns"]["availability"]);
+				$xml_dns_avail->addAttribute("downtimeSLR", $slrs["dns-avail"]);
+				foreach ($tld["dns"]["ns"] as $ns)
+				{
+					$xml_ns = $xml_dns->addChild("nsAvailability", $ns["availability"]);
+					$xml_ns->addAttribute("hostname", $ns["hostname"]);
+					$xml_ns->addAttribute("ipAddress", $ns["ipAddress"]);
+					$xml_ns->addAttribute("from", $ns["from"]);
+					$xml_ns->addAttribute("to", $ns["to"]);
+					$xml_ns->addAttribute("downtimeSLR", $slrs["ns-avail"]);
+				}
+				$xml_dns_udp_rtt = $xml_dns->addChild("rttUDP", $tld["dns"]["rttUDP"]);
+				$xml_dns_udp_rtt->addAttribute("rttSLR", $slrs["dns-udp-rtt"]);
+				$xml_dns_udp_rtt->addAttribute("percentageSLR", $slrs["dns-udp-percentage"]);
+				$xml_dns_tcp_rtt = $xml_dns->addChild("rttTCP", $tld["dns"]["rttTCP"]);
+				$xml_dns_tcp_rtt->addAttribute("rttSLR", $slrs["dns-tcp-rtt"]);
+				$xml_dns_tcp_rtt->addAttribute("percentageSLR", $slrs["dns-tcp-percentage"]);
 			}
-			$xml_dns_udp_rtt = $xml_dns->addChild("rttUDP", $tld["dns"]["rttUDP"]);
-			$xml_dns_udp_rtt->addAttribute("rttSLR", $slrs["dns-udp-rtt"]);
-			$xml_dns_udp_rtt->addAttribute("percentageSLR", $slrs["dns-udp-percentage"]);
-			$xml_dns_tcp_rtt = $xml_dns->addChild("rttTCP", $tld["dns"]["rttTCP"]);
-			$xml_dns_tcp_rtt->addAttribute("rttSLR", $slrs["dns-tcp-rtt"]);
-			$xml_dns_tcp_rtt->addAttribute("percentageSLR", $slrs["dns-tcp-percentage"]);
 
 			$xml_rdds = $xml->addChild("RDDS");
 			if ($tld["rdds"]["enabled"])
@@ -515,24 +679,142 @@ class CSlaReport
 			$xml_rdds_rtt->addAttribute("rttSLR", $slrs["rdds-rtt"]);
 			$xml_rdds_rtt->addAttribute("percentageSLR", $slrs["rdds-percentage"]);
 
+			if (self::isRdapStandalone($reportPeriodFrom))
+			{
+				$xml_rdap = $xml->addChild("RDAP");
+				if ($tld["rdap"]["enabled"])
+				{
+					$xml_rdap_avail = $xml_rdap->addChild("serviceAvailability", $tld["rdap"]["availability"]);
+					$xml_rdap_rtt = $xml_rdap->addChild("rtt", $tld["rdap"]["rtt"]);
+				}
+				else
+				{
+					$xml_rdap_avail = $xml_rdap->addChild("serviceAvailability", "disabled");
+					$xml_rdap_rtt = $xml_rdap->addChild("rtt", "disabled");
+				}
+
+				$xml_rdap_avail->addAttribute("downtimeSLR", $slrs["rdap-avail"]);
+				$xml_rdap_rtt->addAttribute("rttSLR", $slrs["rdap-rtt"]);
+				$xml_rdap_rtt->addAttribute("percentageSLR", $slrs["rdap-percentage"]);
+			}
+
 			$dom = dom_import_simplexml($xml)->ownerDocument;
 			$dom->formatOutput = true;
 
-			$reports[$tld["host"]] = [
-				"hostid" => $tldid,
-				"host"   => $tld["host"],
-				"report" => $dom->saveXML(),
-			];
+			$reports[$tld["host"]] = $dom->saveXML();
 		}
 
-		return array_values($reports);
+		return $reports;
+	}
+
+	private static function generateJson(&$data, &$slrs, $generationDateTime, $reportPeriodFrom, $reportPeriodTo)
+	{
+		$reports = [];
+
+		foreach ($data as $tldid => $tld)
+		{
+			$json = [
+				"$" => [
+					"id"                 => (string)$tld["host"],
+					"generationDateTime" => (int)$generationDateTime,
+					"reportPeriodFrom"   => (int)$reportPeriodFrom,
+					"reportPeriodTo"     => (int)$reportPeriodTo
+				]
+			];
+
+			if (self::getMonitoringTarget() == self::MONITORING_TARGET_REGISTRY)
+			{
+				$json["DNS"] = [
+					"serviceAvailability" => [
+						"value" => (string)$tld["dns"]["availability"],
+						"$"     => [
+							"downtimeSLR" => (int)$slrs["dns-avail"]
+						]
+					],
+					"nsAvailability" => [
+					],
+					"rttUDP" => [
+						"value" => (string)$tld["dns"]["rttUDP"],
+						"$"     => [
+							"rttSLR"        => (int)$slrs["dns-udp-rtt"],
+							"percentageSLR" => (int)$slrs["dns-udp-percentage"]
+						]
+					],
+					"rttTCP" => [
+						"value" => (string)$tld["dns"]["rttTCP"],
+						"$"     => [
+							"rttSLR"        => (int)$slrs["dns-tcp-rtt"],
+							"percentageSLR" => (int)$slrs["dns-tcp-percentage"]
+						]
+					]
+				];
+
+				foreach ($tld["dns"]["ns"] as $ns)
+				{
+					array_push(
+						$json["DNS"]["nsAvailability"],
+						[
+							"value" => (string)$ns["availability"],
+							"$"     => [
+								"hostname"    => (string)$ns["hostname"],
+								"ipAddress"   => (string)$ns["ipAddress"],
+								"from"        => (int)$ns["from"],
+								"to"          => (int)$ns["to"],
+								"downtimeSLR" => (int)$slrs["ns-avail"]
+							]
+						]
+					);
+				}
+			}
+
+			$json["RDDS"] = [
+				"serviceAvailability" => [
+					"value" => $tld["rdds"]["enabled"] ? (string)$tld["rdds"]["availability"] : "disabled",
+					"$"     => [
+						"downtimeSLR" => (int)$slrs["rdds-avail"]
+					]
+				],
+				"rtt" => [
+					"value" => $tld["rdds"]["enabled"] ? (string)$tld["rdds"]["rtt"] : "disabled",
+					"$"     => [
+						"rttSLR"        => (int)$slrs["rdds-rtt"],
+						"percentageSLR" => (int)$slrs["rdds-percentage"]
+					]
+				]
+			];
+
+			if (self::isRdapStandalone($reportPeriodFrom))
+			{
+				$json["RDAP"] = [
+					"serviceAvailability" => [
+						"value" => $tld["rdap"]["enabled"] ? (string)$tld["rdap"]["availability"] : "disabled",
+						"$"     => [
+							"downtimeSLR" => (int)$slrs["rdap-avail"]
+						]
+					],
+					"rtt" => [
+						"value" => $tld["rdap"]["enabled"] ? (string)$tld["rdap"]["rtt"] : "disabled",
+						"$"     => [
+							"rttSLR"        => (int)$slrs["rdap-rtt"],
+							"percentageSLR" => (int)$slrs["rdap-percentage"]
+						]
+					]
+				];
+			}
+
+			$json = ["reportSLA" => $json];
+
+			$reports[$tld["host"]] = json_encode($json);
+		}
+
+		return $reports;
 	}
 
 	################################################################################
 	# Data retrieval methods
 	################################################################################
 
-	private static function getItemIds($all_hostids, $rdds_hostids)
+	private static function getItemIds($all_hostids, $rdds_hostids, $rdap_hostids)
 	{
 		$hostids_placeholder = substr(str_repeat("?,", count($all_hostids)), 0, -1);
 		$sql = "select itemid,hostid,key_,value_type" .
@@ -556,12 +838,22 @@ class CSlaReport
 			$params = array_merge($params, $rdds_hostids);
 		}
 
+		if (count($rdap_hostids) > 0)
+		{
+			$hostids_placeholder = substr(str_repeat("?,", count($rdap_hostids)), 0, -1);
+			$sql .= " or (" .
+					"hostid in ({$hostids_placeholder}) and" .
+					" key_ in ('rsm.slv.rdap.downtime','rsm.slv.rdap.rtt.pfailed')" .
+				")";
+			$params = array_merge($params, $rdap_hostids);
+		}
+
 		return self::dbSelect($sql, $params);
 	}
 
-	private static function getRddsStatus($tlds, $from, $till)
+	private static function getServiceStatus($tlds, $from, $till, $service)
 	{
-		# get itemids of rdap.enabled and rdds.enabled for each TLD
+		# get itemids of <service>.enabled for each TLD
 
 		$tlds_filter = substr(str_repeat("hosts.host like concat(?,' %') or ", count($tlds)), 0, -4);
 		$sql = "select" .
@@ -572,10 +864,10 @@ class CSlaReport
 					" left join hosts on hosts.hostid=items.hostid" .
 					" left join hosts_groups on hosts_groups.hostid=hosts.hostid" .
 				" where" .
-					" items.key_ in ('rdap.enabled','rdds.enabled') and" .
+					" items.key_=? and" .
 					" ({$tlds_filter}) and" .
 					" hosts_groups.groupid=190";
-		$rows = self::dbSelect($sql, $tlds);
+		$rows = self::dbSelect($sql, array_merge(["{$service}.enabled"], $tlds));
 
 		$tld_to_itemids = [];
 
@@ -595,7 +887,7 @@ class CSlaReport
 			}
 		}
 
-		# get RDDS status for each TLD
+		# get <service> status for each TLD
 
 		$status = [];
 
@@ -638,7 +930,7 @@ class CSlaReport
 
 		if (count($tlds) === 0)
 		{
-			$sql .= " and hosts.created < ?";
+			$sql .= " and hosts.created<?";
 			$sql .= " order by hosts.host asc";
 			$params = array_merge($params, [$from]);
 		}
@@ -803,8 +1095,8 @@ class CSlaReport
 
 	private static function getSlrValues($from)
 	{
-		// map macro names with slr names
-		$macro_names = array(
+		// map macro names to slr names
+		$macro_names = [
 				'RSM.SLV.DNS.DOWNTIME'	=> 'dns-avail',				// minutes
 				'RSM.SLV.NS.DOWNTIME'	=> 'ns-avail',				// minutes
 				'RSM.SLV.DNS.TCP.RTT'	=> 'dns-tcp-percentage',	// %
@@ -813,12 +1105,15 @@ class CSlaReport
 				'RSM.DNS.UDP.RTT.LOW'	=> 'dns-udp-rtt',			// ms
 				'RSM.SLV.RDDS.DOWNTIME'	=> 'rdds-avail',			// minutes
 				'RSM.SLV.RDDS.RTT'		=> 'rdds-percentage',		// %
-				'RSM.RDDS.RTT.LOW'		=> 'rdds-rtt'				// ms
-		);
+				'RSM.RDDS.RTT.LOW'		=> 'rdds-rtt',				// ms
+				'RSM.SLV.RDAP.DOWNTIME'	=> 'rdap-avail',			// minutes
+				'RSM.SLV.RDAP.RTT'		=> 'rdap-percentage',		// %
+				'RSM.RDAP.RTT.LOW'		=> 'rdap-rtt',				// ms
+		];
 
 		// create list of item keys
 
-		$items = array();
+		$items = [];
 
 		foreach (array_keys($macro_names) as $macro_name)
 		{
@@ -872,7 +1167,8 @@ class CSlaReport
 			// TODO: fix percentage SLR in the database and remove this code!
 			if ($slr_name === 'dns-tcp-percentage' ||
 					$slr_name === 'dns-udp-percentage' ||
-					$slr_name === 'rdds-percentage')
+					$slr_name === 'rdds-percentage' ||
+					$slr_name === 'rdap-percentage')
 			{
 				$value = 100 - $value;
 			}
@@ -903,7 +1199,8 @@ class CSlaReport
 				// TODO: fix percentage SLR in the database and remove this code!
 				if ($slr_name === 'dns-tcp-percentage' ||
 						$slr_name === 'dns-udp-percentage' ||
-						$slr_name === 'rdds-percentage')
+						$slr_name === 'rdds-percentage' ||
+						$slr_name === 'rdap-percentage')
 				{
 					$value = 100 - $value;
 				}
@@ -913,6 +1210,56 @@ class CSlaReport
 		}
 
 		return $slrs;
+	}
+
+	private static function getMonitoringTarget()
+	{
+		static $monitoring_target;
+
+		if (is_null($monitoring_target))
+		{
+			$rows = self::dbSelect("select value from globalmacro where macro = ?", [self::MONITORING_TARGET_MACRO]);
+			if (!$rows)
+			{
+				throw new Exception("no macro '" . self::MONITORING_TARGET_MACRO . "'");
+			}
+
+			$monitoring_target = $rows[0][0];
+			if ($monitoring_target != self::MONITORING_TARGET_REGISTRY && $monitoring_target != self::MONITORING_TARGET_REGISTRAR)
+			{
+				throw new Exception("unexpected value of '" . self::MONITORING_TARGET_MACRO . "' - '" . $monitoring_target . "'");
+			}
+
+			if (defined("DEBUG") && DEBUG === true)
+			{
+				printf("(DEBUG) %s() monitoring target - %s\n", __method__, $monitoring_target);
+			}
+		}
+
+		return $monitoring_target;
+	}
+
+	private static function isRdapStandalone($clock)
+	{
+		static $rdap_standalone_ts;
+
+		if (is_null($rdap_standalone_ts))
+		{
+			$rows = self::dbSelect("select value from globalmacro where macro = ?", [self::STANDALONE_RDAP_MACRO]);
+			if (!$rows)
+			{
+				throw new Exception("no macro '" . self::STANDALONE_RDAP_MACRO . "'");
+			}
+
+			$rdap_standalone_ts = (int)$rows[0][0];
+
+			if (defined("DEBUG") && DEBUG === true)
+			{
+				printf("(DEBUG) %s() Standalone RDAP timestamp - %d\n", __method__, $rdap_standalone_ts);
+			}
+		}
+
+		return $rdap_standalone_ts && $clock >= $rdap_standalone_ts;
 	}
 
 	################################################################################
@@ -1056,6 +1403,11 @@ class CSlaReport
 	public static function dbCommit()
 	{
 		self::$dbh->commit();
+	}
+
+	public static function dbConnected()
+	{
+		return !is_null(self::$dbh);
 	}
 
 	public static function dbConnect($server_id)

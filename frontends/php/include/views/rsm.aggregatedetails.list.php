@@ -215,7 +215,7 @@ foreach ($data['errors'] as $error_code => $errors) {
 	$table->addRow($row);
 }
 
-	// Add 'Total above max rtt' row:
+// Add 'Total above max rtt' row:
 if ($data['type'] == RSM_DNS) {
 	$row = [_('Total above max. RTT'), '', '', ''];
 	if (array_key_exists('dns_udp_nameservers', $data)) {
@@ -240,46 +240,37 @@ if ($data['type'] == RSM_DNS) {
 	$table->addRow($row);
 }
 
-// Construct summary.
-$addition_info = [
-	new CSpan([bold(_('Probes total')), ':', SPACE, $data['totalProbes']]),
-	BR(),
-	new CSpan([bold(_('Probes offline')), ':', SPACE, $offline_probes]),
-	BR(),
-	new CSpan([bold(_('Probes with No Result')), ':', SPACE, $no_result_probes]),
-	BR(),
-	new CSpan([bold(_('Probes with Result')), ':', SPACE,
-		$data['totalProbes'] - $offline_probes - $no_result_probes
-	]),
-	BR(),
-	new CSpan([bold(_('Probes Up')), ':', SPACE,
-		$data['totalProbes'] - $offline_probes - $no_result_probes - $down_probes
-	]),
-	BR(),
-	new CSpan([bold(_('Probes Down')), ':', SPACE, $down_probes])
+// Construct details.
+$details = [
+	_('TLD') => $data['tld']['host'],
+	_('Service') => $data['slvItem']['name'],
+	_('Test time') => date(DATE_TIME_FORMAT_SECONDS, $data['time']),
+	_('Test result') => [$data['testResult'], ' ', _s('(calculated at %1$s)', date(DATE_TIME_FORMAT_SECONDS, $data['time'] + RSM_ROLLWEEK_SHIFT_BACK))],
+	_('Note') => _(
+		'The following table displays the data that has been received by the central node, some of'.
+		' the values may not have been available at the time of the calculation of the "Test result"'
+	)
 ];
 
-$particular_test = [
-	new CSpan([bold(_('TLD')), ':', SPACE, $data['tld']['name']]),
-	BR(),
-	new CSpan([bold(_('Service')), ':', SPACE, $data['slvItem']['name']]),
-	BR(),
-	new CSpan([bold(_('Test time')), ':', SPACE, date(DATE_TIME_FORMAT_SECONDS, $data['time'])]),
-	BR(),
-	new CSpan([bold(_('Test result')), ':', SPACE, $data['testResult'], SPACE,
-		_s('(calculated at %1$s)', date(DATE_TIME_FORMAT_SECONDS, $data['time'] + RSM_ROLLWEEK_SHIFT_BACK))
-	]),
-	BR(),
-	new CSpan([bold(_('Note')), ':', SPACE, _('The following table displays the data that has been received by '.
-		'the central node, some of the values may not have been available at the time of the calculation of the '.
-		'"Test result"')
-	])
+$right_details = [
+	_('Probes total') => $data['totalProbes'],
+	_('Probes offline') => $offline_probes,
+	_('Probes with No Result') => $no_result_probes,
+	_('Probes with Result') => $data['totalProbes'] - $offline_probes - $no_result_probes,
+	_('Probes Up') => $data['totalProbes'] - $offline_probes - $no_result_probes - $down_probes,
+	_('Probes Down') => $down_probes,
 ];
 
-$particular_tests_info_table = (new CTable(null))->addClass('incidents-info');
-$particular_tests_info_table->addRow([$particular_test, $addition_info]);
-
-$widget->addItem($particular_tests_info_table);
+$widget->additem((new CDiv())
+	->addClass(ZBX_STYLE_TABLE_FORMS_CONTAINER)
+	->addItem((new CTable(null))
+		->addClass('incidents-info')
+		->addRow([
+			gen_details_item($details),
+			gen_details_item($right_details),
+		])
+	)
+);
 
 $widget->addItem($table);
 

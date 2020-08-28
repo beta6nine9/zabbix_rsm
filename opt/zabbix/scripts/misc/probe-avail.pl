@@ -98,7 +98,7 @@ foreach my $service (keys(%services))
 my ($check_from, $check_till, $continue_file);
 
 $check_from = $opt_from;
-$check_till = $check_from + getopt('period') * 60 - 1;
+$check_till = $check_from + getopt('period') * PROBE_DELAY - 1;
 
 if ($check_till > time())
 {
@@ -126,15 +126,11 @@ else
 	$all_probes_ref = get_probes(undef);
 }
 
-my $probe_times_ref = get_probe_times($from, $till, $all_probes_ref);
-
 print("Status of Probes at ", ts_str(getopt('from')), "\n");
 print("---------------------------------------\n");
 foreach my $probe (keys(%$probe_times_ref))
 {
-	my $offline = probe_offline_at($probe_times_ref, $probe, getopt('from'));
-
-	if ($offline == 0)
+	if (probe_online_at($probe, getopt('from'), PROBE_DELAY);
 	{
 		print("$probe: Online\n");
 	}
@@ -143,8 +139,6 @@ foreach my $probe (keys(%$probe_times_ref))
 		print("$probe: Offline\n");
 	}
 }
-
-#print(Dumper($probe_times_ref));
 
 sub __validate_input
 {

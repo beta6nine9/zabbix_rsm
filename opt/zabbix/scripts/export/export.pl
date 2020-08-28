@@ -40,6 +40,8 @@ use constant JSON_TAG_TARGET_IP		=> 'targetIP';
 use constant JSON_TAG_CLOCK		=> 'clock';
 use constant JSON_TAG_DESCRIPTION	=> 'description';
 use constant JSON_TAG_UPD		=> 'upd';
+use constant JSON_TAG_TARGET		=> 'target';
+use constant JSON_TAG_TESTEDNAME	=> 'testedName';
 use constant JSON_INTERFACE_RDDS43	=> 'RDDS43';
 use constant JSON_INTERFACE_RDDS80	=> 'RDDS80';
 use constant JSON_INTERFACE_RDAP	=> 'RDAP';
@@ -61,6 +63,8 @@ use constant TARGETS_TARGET_DIR => '/opt/zabbix/export';
 use constant EXPORT_MAX_CHILDREN_DEFAULT => 24;
 use constant EXPORT_MAX_CHILDREN_FLOOR => 1;
 use constant EXPORT_MAX_CHILDREN_CEIL => 128;
+
+sub __get_probe_changes($$);
 
 parse_opts('probe=s', 'service=s', 'tld=s', 'date=s', 'day=n', 'shift=n', 'force!', 'max-children=n');
 setopt('nolog');
@@ -95,10 +99,15 @@ if (opt('service'))
 }
 else
 {
-	foreach my $service ('dns', 'dnssec', SERVICE_DNS_TCP, 'rdds', 'epp')	# Export DNS-TCP tests
+	if (get_monitoring_target() eq MONITORING_TARGET_REGISTRY)
 	{
-		$services->{$service} = undef;
+		$services->{'dns'} = undef;
+		$services->{SERVICE_DNS_TCP()} = undef;
+		$services->{'dnssec'} = undef;
+		$services->{'epp'} = undef;
 	}
+	$services->{'rdds'} = undef;
+	$services->{'rdap'} = undef if (is_rdap_standalone());
 }
 
 my @interfaces;
@@ -106,7 +115,8 @@ foreach my $service (keys(%{$services}))
 {
 	if ($service eq 'rdds')
 	{
-		push(@interfaces, 'rdds43', 'rdds80', 'rdap');
+		push(@interfaces, 'rdds43', 'rdds80');
+		push(@interfaces, 'rdap') if (!is_rdap_standalone());
 	}
 	else
 	{
@@ -243,21 +253,9 @@ $server_key = $_;
 db_disconnect();
 db_connect($server_key);
 
-my $probes_ref = get_probes();
-my $check_probes_from = $from - 60;	# NB! We need previous value for probeChanges file (see __get_probe_changes())
-$probes_data->{$server_key} = get_probe_times($check_probes_from, $till, $probes_ref);
-
-#if (opt('debug'))
-#{
-#	foreach my $probe (keys(%{$probes_data->{$server_key}}))
-#	{
-#		for (my $idx = 0; defined($probes_data->{$server_key}->{$probe}->[$idx]); $idx++)
-#		{
-#			my $status = ($idx % 2 == 0 ? "ONLINE" : "OFFLINE");
-#			dbg("$probe: $status ", ts_full($probes_data->{$server_key}->{$probe}->[$idx]));
-#		}
-#	}
-#}
+# NB! We need previous value for probeChanges file (see __get_probe_changes())
+my $check_probes_from = $from - PROBE_DELAY;
+$probes_data->{$server_key} = get_probes();
 
 my $tlds_ref = [];
 if (opt('tld'))
@@ -317,6 +315,14 @@ foreach my $tld_for_a_child_to_process (@{$tlds_ref})
 		db_connect($server_key);
 
 		$time_start = time();
+
+		# cache probe online statuses
+		# TODO: FIXME, we have done that already in other processes! (look for this message in this file)
+		foreach my $probe (keys(%{$probes_data->{$server_key}}))
+		{
+			# probe, from, delay
+			probe_online_at($probe, $from, ($till + 1 - $from));
+		}
 
 		my $result = __get_test_data($from, $till, $probes_data->{$server_key});
 
@@ -381,7 +387,7 @@ my $false_positives = __get_false_positives($from, $till, $server_key);
 
 undef($server_key);
 
-my $probe_changes = __get_probe_changes($from);	# does not need db connection
+my $probe_changes = __get_probe_changes($from, $till);	# connects to db
 
 db_connect();
 dw_csv_init();
@@ -496,6 +502,10 @@ sub __get_delays
 		{
 			$services->{$service}->{'delay'} = get_rdds_delay();
 		}
+		elsif ($service eq 'rdap')
+		{
+			$services->{$service}->{'delay'} = get_rdap_delay();
+		}
 		elsif ($service eq 'epp')
 		{
 			$services->{$service}->{'delay'} = get_epp_delay();
@@ -514,29 +524,59 @@ sub __get_keys
 		if ($service eq 'dns' || $service eq 'dnssec')
 		{
 			$services->{$service}->{'key_status'} = 'rsm.dns.udp[{$RSM.TLD}]';	# 0 - down, 1 - up
-			$services->{$service}->{'key_rtt'} = 'rsm.dns.udp.rtt[{$RSM.TLD},';
+			$services->{$service}->{'key_search'} = 'rsm.dns.udp.rtt[{$RSM.TLD},';
 		}
 		elsif ($service eq SERVICE_DNS_TCP)	# Export DNS-TCP tests
 		{
-			$services->{$service}->{'key_rtt'} = 'rsm.dns.tcp.rtt[{$RSM.TLD},';
+			$services->{$service}->{'key_search'} = 'rsm.dns.tcp.rtt[{$RSM.TLD},';
 		}
 		elsif ($service eq 'rdds')
 		{
 			$services->{$service}->{'key_status'} = 'rsm.rdds[{$RSM.TLD}';	# 0 - down, 1 - up, 2 - only 43, 3 - only 80
-			$services->{$service}->{'key_43_rtt'} = 'rsm.rdds.43.rtt[{$RSM.TLD}]';
-			$services->{$service}->{'key_43_ip'} = 'rsm.rdds.43.ip[{$RSM.TLD}]';
-			$services->{$service}->{'key_43_upd'} = 'rsm.rdds.43.upd[{$RSM.TLD}]';
-			$services->{$service}->{'key_80_rtt'} = 'rsm.rdds.80.rtt[{$RSM.TLD}]';
-			$services->{$service}->{'key_80_ip'} = 'rsm.rdds.80.ip[{$RSM.TLD}]';
+			$services->{$service}->{'dbl_keys'} = [
+				'rsm.rdds.43.rtt[{$RSM.TLD}]',
+				'rsm.rdds.43.upd[{$RSM.TLD}]',
+				'rsm.rdds.80.rtt[{$RSM.TLD}]',
+			];
+			$services->{$service}->{'str_keys'} = [
+				'rsm.rdds.43.ip[{$RSM.TLD}]',
+				'rsm.rdds.43.target',
+				'rsm.rdds.43.testedname',
+				'rsm.rdds.80.ip[{$RSM.TLD}]',
+				'rsm.rdds.80.target',
+			];
 
-			$services->{$service}->{'key_rdap_rtt'} = 'rdap.rtt';
-			$services->{$service}->{'key_rdap_ip'} = 'rdap.ip';
+			if (!is_rdap_standalone())
+			{
+				push(@{$services->{$service}->{'dbl_keys'}}, [
+					'rdap.rtt',
+				]);
+				push(@{$services->{$service}->{'str_keys'}}, [
+					'rdap.ip',
+					'rdap.target',
+					'rdap.testedname',
+				]);
+			}
+		}
+		elsif ($service eq 'rdap')
+		{
+			$services->{$service}->{'dbl_keys'} = [
+				'rdap.rtt',
+			];
+			$services->{$service}->{'str_keys'} = [
+				'rdap.ip',
+				'rdap.target',
+				'rdap.testedname',
+			];
 		}
 		elsif ($service eq 'epp')
 		{
-			$services->{$service}->{'key_status'} = 'rsm.epp[{$RSM.TLD},';	# 0 - down, 1 - up
-			$services->{$service}->{'key_ip'} = 'rsm.epp.ip[{$RSM.TLD}]';
-			$services->{$service}->{'key_rtt'} = 'rsm.epp.rtt[{$RSM.TLD},';
+			$services->{$service}->{'dbl_keys'} = [
+				'PLACE-HOLDER',
+			];
+			$services->{$service}->{'str_keys'} = [
+				'PLACE-HOLDER',
+			];
 		}
 
 		if ($service ne SERVICE_DNS_TCP)	# Export DNS-TCP tests, they do not refer to Service Availability
@@ -591,10 +631,11 @@ sub __get_test_data
 {
 	my $from = shift;
 	my $till = shift;
-	my $probe_times_ref = shift;
+	my $probes_ref = shift;
 
-	my ($nsips_ref, $dns_items_ref, $dns_tcp_items_ref, $rdds_dbl_items_ref, $rdds_str_items_ref, $epp_dbl_items_ref,
-		$epp_str_items_ref, $probe_dns_results_ref, $result);
+	my ($nsips_ref, $dns_items_ref, $dns_tcp_items_ref, $rdds_dbl_items_ref, $rdds_str_items_ref,
+		$epp_dbl_items_ref, $epp_str_items_ref, $rdap_dbl_items_ref, $rdap_str_items_ref,
+		$probe_dns_results_ref, $result);
 
 	foreach my $service (sort(keys(%{$services})))
 	{
@@ -639,37 +680,39 @@ sub __get_test_data
 		{
 			if (!$nsips_ref)
 			{
-				$nsips_ref = get_templated_nsips($tld, $services->{$service}->{'key_rtt'}, 1);	# templated
+				$nsips_ref = get_templated_nsips($tld, $services->{$service}->{'key_search'}, 1);	# templated
 			}
 
 			if (!$dns_items_ref)
 			{
-				$dns_items_ref = __get_dns_itemids($nsips_ref, $services->{$service}->{'key_rtt'}, $tld, getopt('probe'));
+				$dns_items_ref = __get_dns_itemids($nsips_ref, $services->{$service}->{'key_search'}, $tld, getopt('probe'));
 			}
 		}
 		elsif ($service eq SERVICE_DNS_TCP)	# Export DNS-TCP tests
 		{
 			if (!$nsips_ref)
 			{
-				$nsips_ref = get_templated_nsips($tld, $services->{$service}->{'key_rtt'}, 1);  # templated
+				$nsips_ref = get_templated_nsips($tld, $services->{$service}->{'key_search'}, 1);  # templated
 			}
-			$dns_tcp_items_ref = __get_dns_itemids($nsips_ref, $services->{$service}->{'key_rtt'}, $tld, getopt('probe'));
+			$dns_tcp_items_ref = __get_dns_itemids($nsips_ref, $services->{$service}->{'key_search'}, $tld, getopt('probe'));
 		}
 		elsif ($service eq 'rdds')
 		{
-			$rdds_dbl_items_ref = __get_rdds_dbl_itemids($tld, getopt('probe'),
-				$services->{$service}->{'key_43_rtt'},
-				$services->{$service}->{'key_80_rtt'},
-				$services->{$service}->{'key_43_upd'},
-				$services->{$service}->{'key_rdap_rtt'});
-			$rdds_str_items_ref = __get_rdds_str_itemids($tld, getopt('probe'),
-				$services->{$service}->{'key_43_ip'},
-				$services->{$service}->{'key_80_ip'},
-				$services->{$service}->{'key_rdap_ip'});
+			$rdds_dbl_items_ref = __get_itemids_by_complete_key($tld, getopt('probe'),
+				$services->{$service}->{'dbl_keys'});
+			$rdds_str_items_ref = __get_itemids_by_complete_key($tld, getopt('probe'),
+				$services->{$service}->{'str_keys'});
+		}
+		elsif ($service eq 'rdap')
+		{
+			$rdap_dbl_items_ref = __get_itemids_by_complete_key($tld, getopt('probe'),
+				$services->{$service}->{'dbl_keys'});
+			$rdap_str_items_ref = __get_itemids_by_complete_key($tld, getopt('probe'),
+				$services->{$service}->{'str_keys'});
 		}
 		elsif ($service eq 'epp')
 		{
-			$epp_dbl_items_ref = get_epp_dbl_itemids($tld, getopt('probe'), $services->{$service}->{'key_rtt'});
+			$epp_dbl_items_ref = get_epp_dbl_itemids($tld, getopt('probe'), $services->{$service}->{'key_search'});
 			$epp_str_items_ref = get_epp_str_itemids($tld, getopt('probe'), $services->{$service}->{'key_ip'});
 		}
 
@@ -775,7 +818,7 @@ sub __get_test_data
 
 		if ($service ne SERVICE_DNS_TCP && $cycles_count == 0)	# Export DNS-TCP tests, they do not refer to Service Availability
 		{
-			wrn("$service: no results");
+			wrn("$service: no results; will not process remaining services");
 			last;
 		}
 
@@ -793,7 +836,12 @@ sub __get_test_data
 		}
 		elsif ($service eq 'rdds')
 		{
-			$tests_ref = __get_rdds_test_values($rdds_dbl_items_ref, $rdds_str_items_ref,
+			$tests_ref = __get_rdds_or_rdap_test_values($rdds_dbl_items_ref, $rdds_str_items_ref,
+				$service_from, $service_till, $services->{$service}->{'valuemaps'}, $delay);
+		}
+		elsif ($service eq 'rdap')
+		{
+			$tests_ref = __get_rdds_or_rdap_test_values($rdap_dbl_items_ref, $rdap_str_items_ref,
 				$service_from, $service_till, $services->{$service}->{'valuemaps'}, $delay);
 		}
 		elsif ($service eq 'epp')
@@ -821,7 +869,7 @@ sub __get_test_data
 					# the status is set later
 					$cycles->{$cycleclock}->{'interfaces'}->{$interface}->{'probes'}->{$probe}->{'status'} = undef;
 
-					if (probe_offline_at($probe_times_ref, $probe, $cycleclock) == SUCCESS)
+					if (!probe_online_at($probe, $cycleclock, $delay))
 					{
 						$cycles->{$cycleclock}->{'interfaces'}->{$interface}->{'probes'}->{$probe}->{'status'} = PROBE_OFFLINE_STR;
 					}
@@ -864,6 +912,7 @@ sub __save_csv_data
 	my $dnssec_service_category_id = dw_get_id(ID_SERVICE_CATEGORY, 'dnssec');
 	my $rdds_service_category_id = dw_get_id(ID_SERVICE_CATEGORY, 'rdds');
 	my $epp_service_category_id = dw_get_id(ID_SERVICE_CATEGORY, 'epp');
+	my $rdap_service_category_id = dw_get_id(ID_SERVICE_CATEGORY, 'rdap');
 	my $udp_protocol_id = dw_get_id(ID_TRANSPORT_PROTOCOL, 'udp');
 	my $tcp_protocol_id = dw_get_id(ID_TRANSPORT_PROTOCOL, 'tcp');
 
@@ -900,6 +949,12 @@ sub __save_csv_data
 		elsif ($service eq 'rdds')
 		{
 			$service_category_id = $rdds_service_category_id;
+			$protocol_id = $tcp_protocol_id;
+			$proto = PROTO_TCP;
+		}
+		elsif ($service eq 'rdap')
+		{
+			$service_category_id = $rdap_service_category_id;
 			$protocol_id = $tcp_protocol_id;
 			$proto = PROTO_TCP;
 		}
@@ -974,11 +1029,17 @@ sub __save_csv_data
 					foreach my $target (keys(%{$cycle_ref->{'interfaces'}->{$interface}->{'probes'}->{$probe}->{'targets'}}))
 					{
 						my $target_status = $general_status_up;
+
+						my $ns_id = '';
 						my $target_id = '';
 
 						if ($interface eq 'DNS')
 						{
-							$target_id = dw_get_id(ID_NS_NAME, $target);
+							$ns_id = dw_get_id(ID_NS_NAME, $target);
+						}
+						elsif ($target && ($service eq 'rdds' || $service eq 'rdap'))
+						{
+							$target_id = dw_get_id(ID_TARGET, $target);
 						}
 
 						METRIC: foreach my $metric_ref (@{$cycle_ref->{'interfaces'}->{$interface}->{'probes'}->{$probe}->{'targets'}->{$target}})
@@ -1031,8 +1092,11 @@ sub __save_csv_data
 							{
 								if (!defined($metric_ref->{JSON_TAG_TARGET_IP()}))
 								{
-									wrn("skipping $interface test performed at ",
-										ts_full($testclock), " because of missing IP");
+									# normally we can't have positive RTT witout IP
+									wrn("skipping $interface test",
+										($testclock ? " performed at " .
+											ts_full($testclock) : ''),
+										" because of missing IP");
 									next METRIC;
 								}
 
@@ -1040,14 +1104,16 @@ sub __save_csv_data
 							}
 							else
 							{
-								if ($metric_ref->{JSON_TAG_DESCRIPTION()})
+								if (!$metric_ref->{JSON_TAG_DESCRIPTION()})
 								{
-									($rtt) = split(',', $metric_ref->{JSON_TAG_DESCRIPTION()});
+									wrn("skipping $interface test",
+										($testclock ? " performed at " .
+											ts_full($testclock) : ''),
+										" because of missing RTT");
+									next METRIC;
 								}
-								else
-								{
-									$rtt = '';
-								}
+
+								($rtt) = split(',', $metric_ref->{JSON_TAG_DESCRIPTION()});
 							}
 
 							if ($metric_ref->{JSON_TAG_TARGET_IP()})
@@ -1070,9 +1136,26 @@ sub __save_csv_data
 								$ip_version_id = '';
 							}
 
+							my $testedname_id = '';
+
+							if ($metric_ref->{JSON_TAG_TESTEDNAME()})
+							{
+								$testedname_id = dw_get_id(
+									ID_TESTEDNAME,
+									$metric_ref->{JSON_TAG_TESTEDNAME()}
+								);
+							}
+
+							my $cycle_id = dw_get_cycle_id(
+								$cycleclock,
+								$service_category_id,
+								$tld_id,
+								($ns_id ? $ns_id : $target_id),
+								$ip_id);
+
 							# TEST
 							__add_csv_test(
-								dw_get_cycle_id($cycleclock, $service_category_id, $tld_id, $target_id, $ip_id),
+								$cycle_id,
 								$probe_id,
 								$cycleclock,
 								$testclock,
@@ -1083,9 +1166,11 @@ sub __save_csv_data
 								$ip_version_id,
 								$ip_id,
 								dw_get_id(ID_TEST_TYPE, lc($interface)),
+								$ns_id,
+								$tld_type_id,
 								$target_id,
-								$tld_type_id
-								);
+								$testedname_id,
+							);
 
 							if ($ip)
 							{
@@ -1112,7 +1197,7 @@ sub __save_csv_data
 							# Name Server (target) test
 							dw_append_csv(DATA_NSTEST, [
 									      $probe_id,
-									      $target_id,
+									      $ns_id,
 									      $tld_id,
 									      $cycleclock,
 									      dw_get_id(ID_STATUS_MAP, $target_status),
@@ -1225,7 +1310,7 @@ sub __save_csv_data
 	$time_write_csv = time();
 }
 
-sub __add_csv_test
+sub __add_csv_test($$$$$$$$$$$$$$$)
 {
 	my $cycle_id = shift;
 	my $probe_id = shift;
@@ -1240,21 +1325,35 @@ sub __add_csv_test
 	my $test_type_id = shift;
 	my $ns_id = shift;
 	my $tld_type_id = shift;
+	my $target_id = shift;
+	my $testedname_id = shift;
 
 	dw_append_csv(DATA_TEST, [
-			      $probe_id,
-			      $cycleclock,
-			      $testclock,
-			      __format_rtt($rtt),
-			      $cycle_id,
-			      $tld_id,
-			      $protocol_id,
-			      $ip_version_id,
-			      $ip_id,
-			      $test_type_id,
-			      $ns_id,
-			      $tld_type_id
+			$probe_id,
+			$cycleclock,
+			$testclock,
+			__format_rtt($rtt),
+			$cycle_id,
+			$tld_id,
+			$protocol_id,
+			$ip_version_id,
+			$ip_id,
+			$test_type_id,
+			$ns_id,
+			$tld_type_id
+	]);
+
+	if ($target_id || $testedname_id)
+	{
+		dw_append_csv(DATA_TEST_DETAILS, [
+				$probe_id,
+				$cycleclock,
+				$service_category_id,
+				$test_type_id,
+				$target_id,
+				$testedname_id,
 		]);
+	}
 }
 
 sub __ip_version
@@ -1291,8 +1390,9 @@ sub __get_itemids_by_complete_key
 {
 	my $tld = shift;
 	my $probe = shift;
+	my $keys_ref = shift;
 
-	my $keys_str = "'" . join("','", @_) . "'";
+	my $keys_str = "'" . join("','", @{$keys_ref}) . "'";
 
 	my $host_value = ($probe ? "$tld $probe" : "$tld %");
 
@@ -1427,19 +1527,92 @@ sub __get_false_positives
 	return \@result;
 }
 
-sub __get_probe_changes
+# Get ONLINE periods of probe nodes.
+#
+# Returns hash of probe names as keys and array with online times as values:
+#
+# {
+#     'probe' => [ from1, till1, from2, till2 ... ]
+#     ...
+# }
+#
+# NB! If a probe was down for the whole specified period or is currently disabled it won't be in a hash.
+sub __get_probe_times($$$)
 {
 	my $from = shift;
+	my $till = shift;
+	my $probes_ref = shift;	# {host => {'hostid' => hostid, 'status' => status}, ...}
+
+	my $result = {};
+
+	return $result if (scalar(keys(%{$probes_ref})) == 0);
+
+	my @probes;
+	foreach my $probe (keys(%{$probes_ref}))
+	{
+		next unless ($probes_ref->{$probe}->{'status'} == HOST_STATUS_MONITORED);
+
+		my $status;
+		my $prev_status = DOWN;
+
+		for (my $clock = $from; $clock < $till; $clock += PROBE_DELAY)
+		{
+			$status = probe_online_at($probe, $clock, PROBE_DELAY);
+
+			if ($status == UP && $prev_status == DOWN)
+			{
+				push(@{$result->{$probe}}, $clock);
+			}
+			elsif ($status == DOWN && $prev_status == UP)
+			{
+				push(@{$result->{$probe}}, $clock - 1);	# 00-59
+			}
+
+			$prev_status = $status;
+		}
+
+		if ($status == UP)
+		{
+			push(@{$result->{$probe}}, $till);
+		}
+	}
+
+	if (!defined($result))
+	{
+		dbg("Probes have no values yet.");
+	}
+
+	return $result;
+}
+
+sub __get_probe_changes($$)
+{
+	my $from = shift;
+	my $till = shift;
 
 	my @result;
 
 	foreach my $_server_key (sort(keys(%{$probes_data})))
 	{
-		foreach my $probe (sort(keys(%{$probes_data->{$_server_key}})))
+		db_connect($_server_key);
+
+		# cache probe online statuses
+		# TODO: FIXME, we have done that already in other processes! (look for this message in this file)
+		foreach my $probe (keys(%{$probes_data->{$server_key}}))
 		{
-			for (my $idx = 0; defined($probes_data->{$_server_key}->{$probe}->[$idx]); $idx++)
+			# probe, from, delay
+			probe_online_at($probe, $from, ($till + 1 - $from));
+		}
+
+		my $probe_times = __get_probe_times($from, $till, $probes_data->{$_server_key});
+
+		db_disconnect();
+
+		foreach my $probe (sort(keys(%{$probe_times})))
+		{
+			for (my $idx = 0; defined($probe_times->{$probe}[$idx]); $idx++)
 			{
-				my $clock = $probes_data->{$_server_key}->{$probe}->[$idx];
+				my $clock = $probe_times->{$probe}[$idx];
 				my $status = ($idx % 2 == 0 ? PROBE_ONLINE_STR : PROBE_OFFLINE_STR);
 
 				if ($idx == 0 && $clock < $from)
@@ -1448,7 +1621,7 @@ sub __get_probe_changes
 					next;
 				}
 
-				if ($idx + 1 == scalar(@{$probes_data->{$_server_key}->{$probe}}) && ($clock % 60 != 0))
+				if ($idx + 1 == scalar(@{$probe_times->{$probe}}) && ($clock % 60 != 0))
 				{
 					# ignore last second status
 					next;
@@ -1951,79 +2124,10 @@ sub __get_service_status_itemids
 }
 
 # todo: taken from RSMSLV.pm
-# NB! THIS IS FIXED VERSION WHICH MUST REPLACE EXISTING ONE
-# 1. Improves speed by using itemid -> probe hash.
-sub __get_probe_results
+sub __get_rdds_or_rdap_test_values($$$$$$)
 {
-	my $itemids_ref = shift;
-	my $from = shift;
-	my $till = shift;
-
-	my %result;
-
-	# generate list if itemids
-	my %itemids;
-	foreach my $probe (keys(%$itemids_ref))
-	{
-		$itemids{$itemids_ref->{$probe}} = $probe;
-	}
-
-	if (scalar(keys(%itemids)) != 0)
-	{
-		my $rows_ref = db_select(
-			"select itemid,value,clock".
-			" from history_uint".
-			" where itemid in (".join(',', keys(%itemids)).")".
-				" and " . sql_time_condition($from, $till).
-			" order by clock");
-
-		foreach my $row_ref (@$rows_ref)
-		{
-			my $itemid = $row_ref->[0];
-			my $value = $row_ref->[1];
-			my $clock = $row_ref->[2];
-
-			my $probe = $itemids{$itemid};
-
-			fail("internal error: Probe of item (itemid:$itemid) not found") unless (defined($probe));
-
-			push(@{$result{$probe}}, {'value' => $value, 'clock' => $clock});
-		}
-	}
-
-	return \%result;
-}
-
-# todo: taken from RSMSLV.pm
-sub __get_rdds_dbl_itemids
-{
-	my $tld = shift;
-	my $probe = shift;
-	my $key_43_rtt = shift;
-	my $key_80_rtt = shift;
-	my $key_43_upd = shift;
-	my $key_rdap_rtt = shift;
-
-	return __get_itemids_by_complete_key($tld, $probe, $key_43_rtt, $key_80_rtt, $key_43_upd, $key_rdap_rtt);
-}
-
-# todo: taken from RSMSLV.pm
-sub __get_rdds_str_itemids
-{
-	my $tld = shift;
-	my $probe = shift;
-	my $key_43_ip = shift;
-	my $key_80_ip = shift;
-	my $key_rdap_ip = shift;
-
-	return __get_itemids_by_complete_key($tld, $probe, $key_43_ip, $key_80_ip, $key_rdap_ip);
-}
-
-# todo: taken from RSMSLV.pm
-sub __get_rdds_test_values
-{
-	my $rdds_dbl_items_ref = shift;
-	my $rdds_str_items_ref = shift;
+	my $dbl_items_ref = shift;
+	my $str_items_ref = shift;
 	my $start = shift;
 	my $end = shift;
 	my $valuemaps = shift;
@@ -2031,27 +2135,20 @@ sub __get_rdds_test_values
 
 	# generate list of itemids
 	my @dbl_itemids;
-	foreach my $probe (keys(%$rdds_dbl_items_ref))
+	foreach my $probe (keys(%$dbl_items_ref))
 	{
-		foreach my $itemid (keys(%{$rdds_dbl_items_ref->{$probe}}))
-		{
-			push(@dbl_itemids, $itemid);
-		}
+		push(@dbl_itemids, keys(%{$dbl_items_ref->{$probe}}));
 	}
 
 	my @str_itemids;
-	foreach my $probe (keys(%$rdds_str_items_ref))
+	foreach my $probe (keys(%$str_items_ref))
 	{
-		foreach my $itemid (keys(%{$rdds_str_items_ref->{$probe}}))
-		{
-			push(@str_itemids, $itemid);
-		}
+		push(@str_itemids, keys(%{$str_items_ref->{$probe}}));
 	}
 
 	return undef if (scalar(@dbl_itemids) == 0 || scalar(@str_itemids) == 0);
 
-	my $result;
-	my $target = '';
+	my ($result, $metrics, $targets);
 
 	my $dbl_rows_ref = db_select_binds("select itemid,value,clock from history where itemid=? and " . sql_time_condition($start, $end), \@dbl_itemids);
 
@@ -2061,7 +2158,7 @@ sub __get_rdds_test_values
 		my $value = $row_ref->[1];
 		my $clock = $row_ref->[2];
 
-		my ($probe, $key) = __find_probe_key_by_itemid($itemid, $rdds_dbl_items_ref);
+		my ($probe, $key) = __find_probe_key_by_itemid($itemid, $dbl_items_ref);
 
 		fail("internal error: cannot get Probe-key pair by itemid:$itemid") unless (defined($probe) and defined($key));
 
@@ -2086,10 +2183,9 @@ sub __get_rdds_test_values
 
 		my $cycleclock = cycle_start($clock, $delay);
 
-		# NB! Do not use references, that won't add data!
-		$result->{$cycleclock}->{$interface}->{$probe}->{$target}->[0]->{$type} = $value;
-		$result->{$cycleclock}->{$interface}->{$probe}->{$target}->[0]->{JSON_TAG_CLOCK()} = $clock;
-		$result->{$cycleclock}->{$interface}->{$probe}->{$target}->[0]->{JSON_TAG_DESCRIPTION()} = $description;
+		$metrics->{$cycleclock}{$interface}{$probe}{$type} = $value;
+		$metrics->{$cycleclock}{$interface}{$probe}{JSON_TAG_CLOCK()} = $clock;
+		$metrics->{$cycleclock}{$interface}{$probe}{JSON_TAG_DESCRIPTION()} = $description;
 	}
 
 	my $str_rows_ref = db_select_binds("select itemid,value,clock from history_str where itemid=? and " . sql_time_condition($start, $end), \@str_itemids);
@@ -2100,24 +2196,51 @@ sub __get_rdds_test_values
 		my $value = $row_ref->[1];
 		my $clock = $row_ref->[2];
 
-		my ($probe, $key) = __find_probe_key_by_itemid($itemid, $rdds_str_items_ref);
+		my ($probe, $key) = __find_probe_key_by_itemid($itemid, $str_items_ref);
 
 		fail("internal error: cannot get Probe-key pair by itemid:$itemid") unless (defined($probe) and defined($key));
 
 		my ($interface, $type) = __get_rdds_item_details($key);
 
-		fail("unknown RDDS interface in item $key (id:$itemid)") if (!defined($interface));
-		fail("unknown RDDS test type in item key $key (id:$itemid)") if (!defined($type));
+		fail("unknown RDDS/RDAP interface in item $key (id:$itemid)") if (!defined($interface));
+		fail("unknown RDDS/RDAP test type in item key $key (id:$itemid)") if (!defined($type));
 
-		if ($type ne JSON_TAG_TARGET_IP)
+		if ($type ne JSON_TAG_TARGET_IP &&
+				$type ne JSON_TAG_TARGET &&
+				$type ne JSON_TAG_TESTEDNAME)
 		{
-			fail("internal error: unknown item key (itemid:$itemid), expected item key representing the IP involved in $interface test");
+			fail("internal error: unknown item key (itemid:$itemid), expected item key representing details of the $interface test");
 		}
 
 		my $cycleclock = cycle_start($clock, $delay);
 
-		# NB! Do not use references, that won't add data!
-		$result->{$cycleclock}->{$interface}->{$probe}->{$target}->[0]->{$type} = $value;
+		if ($type eq JSON_TAG_TARGET)
+		{
+			# collect targets separately to merge with metrics later
+			$targets->{$cycleclock}{$interface}{$probe} = $value;
+		}
+		else
+		{
+			$metrics->{$cycleclock}{$interface}{$probe}{$type} = $value;
+		}
+	}
+
+	# connect metrics with targets
+	foreach my $cycleclock (keys(%{$metrics}))
+	{
+		foreach my $interface (keys(%{$metrics->{$cycleclock}}))
+		{
+			foreach my $probe (keys(%{$metrics->{$cycleclock}{$interface}}))
+			{
+				foreach my $key (keys(%{$metrics->{$cycleclock}{$interface}{$probe}}))
+				{
+					my $target = $targets->{$cycleclock}{$interface}{$probe} // '';
+
+					$result->{$cycleclock}{$interface}{$probe}{$target}[0]{$key} =
+						$metrics->{$cycleclock}{$interface}{$probe}{$key};
+				}
+			}
+		}
 	}
 
 	return $result;
@@ -2234,13 +2357,14 @@ sub __find_probe_key_by_itemid
 # todo: taken from RSMSLV.pm
 sub __get_rdds_item_details
 {
+	my @parts = split(/\./, shift());
+
 	my $interface;
 	my $type;
-	my @parts = split(/\./, shift());
 
 	return ($interface, $type) if (!defined($parts[0]) && !defined($parts[1]));
 
-	shift(@parts) if($parts[0] eq 'rsm');
+	shift(@parts) if ($parts[0] eq 'rsm');
 
 	if ($parts[0] eq 'rdap')
 	{
@@ -2282,6 +2406,14 @@ sub pick_rdds_item_type
 	elsif ($parts[0] eq 'upd')
 	{
 		return JSON_TAG_UPD;
+	}
+	elsif ($parts[0] eq 'target')
+	{
+		return JSON_TAG_TARGET;
+	}
+	elsif ($parts[0] eq 'testedname')
+	{
+		return JSON_TAG_TESTEDNAME;
 	}
 
 	return undef;

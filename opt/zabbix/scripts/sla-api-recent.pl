@@ -15,14 +15,13 @@ use RSMSLV;
 use TLD_constants qw(:api :config :groups :items);
 use ApiHelper;
 use File::Copy;
+use JSON::XS qw(decode_json encode_json);
 use sigtrap 'handler' => \&main_process_signal_handler, 'normal-signals';
 
 $Data::Dumper::Terse = 1;	# do not output names like "$VAR1 = "
-$Data::Dumper::Pair = " : ";	# use separator instead of " => "
+$Data::Dumper::Pair = ": ";	# use separator instead of " => "
 $Data::Dumper::Useqq = 1;	# use double quotes instead of single quotes
 $Data::Dumper::Indent = 1;	# 1 provides less indentation instead of 2
-
-use constant TARGET_PLACEHOLDER => 'TARGET_PLACEHOLDER';	# for non-DNS services
 
 use constant MAX_PERIOD => 30 * 60;	# 30 minutes
 
@@ -43,8 +42,8 @@ sub process_tld($$$$$);
 sub cycles_to_calculate($$$$$$$$);
 sub get_lastvalues_from_db($$$);
 sub calculate_cycle($$$$$$$$$);
+sub translate_interfaces($);
 sub get_interfaces($$$);
-sub probe_online_at_init();
 sub get_history_by_itemid($$$);
 sub child_error($$$$$);
 sub update_lastvalues_cache($);
@@ -102,6 +101,9 @@ my $max_period = (opt('period') ? getopt('period') * 60 : MAX_PERIOD);
 
 db_connect();
 
+my $rdap_is_standalone = is_rdap_standalone($now);
+dbg("RDAP ", ($rdap_is_standalone ? "is" : "is NOT"), " standalone");
+
 my $cfg_minonline = get_macro_dns_probe_online();
 my $cfg_minns = get_macro_minns();
 
@@ -110,17 +112,21 @@ fail("number of required working Name Servers is configured as $cfg_minns") if (
 my %delays;
 $delays{'dns'} = $delays{'dnssec'} = get_dns_udp_delay($now);
 $delays{'rdds'} = get_rdds_delay($now);
+$delays{'rdap'} = get_rdap_delay($now) if ($rdap_is_standalone);
 
 my %clock_limits;
+
 $clock_limits{'dns'} = $clock_limits{'dnssec'} = cycle_start($now - $initial_measurements_limit, $delays{'dnssec'});
 $clock_limits{'rdds'} = cycle_start($now - $initial_measurements_limit, $delays{'rdds'});
+$clock_limits{'rdap'} = cycle_start($now - $initial_measurements_limit, $delays{'rdap'}) if ($rdap_is_standalone);
 
 db_disconnect();
 
 my %service_keys = (
-	'dns' => 'rsm.slv.dns.avail',
+	'dns'    => 'rsm.slv.dns.avail',
 	'dnssec' => 'rsm.slv.dnssec.avail',
-	'rdds' => 'rsm.slv.rdds.avail'
+	'rdds'   => 'rsm.slv.rdds.avail',
+	'rdap'   => 'rsm.slv.rdap.avail',
 );
 
 my %rtt_limits;
@@ -260,14 +266,11 @@ sub process_server($)
 
 	$lastvalues_cache = {};
 
-	if (ah_get_recent_cache($server_key, \$lastvalues_cache) != AH_SUCCESS)
+	if (ah_read_recent_cache($server_key, \$lastvalues_cache) != AH_SUCCESS)
 	{
 		dbg("there's no recent measurements cache file yet, but no worries");
 		$lastvalues_cache->{'tlds'} = {};
 	}
-
-	# initialize probe online cache
-	probe_online_at_init();
 
 	# probes available for every service
 	my %probes;
@@ -459,19 +462,25 @@ sub process_tld($$$$$)
 		next if (scalar(@cycles_to_calculate) == 0);
 
 		my $cycles_from = $cycles_to_calculate[0];
-		my $cycles_till = $cycles_to_calculate[-1];
+		my $cycles_till = cycle_end($cycles_to_calculate[-1], $delays{$service});
 
 		next unless (tld_service_enabled($tld, $service, $cycles_from));
 
 		if (opt('print-period'))
 		{
-			info("selected $service period: ", selected_period(
-				$cycles_from,
-				cycle_end($cycles_till, $delays{$service})
-			));
+			info(sprintf("selected %4s period: %s", $service, selected_period($cycles_from, $cycles_till)));
 		}
 
-		my $interfaces_ref = get_interfaces($tld, $service, $now);
+		# TODO: leave only next line after migrating to Standalone RDAP
+		# my $interfaces_ref = get_interfaces($tld, $service, $now);
+		my $interfaces_ref;
+		my $interfaces_ref_rdap_before_switch;
+		my $interfaces_ref_rdap_after_switch;
+
+		if ($service ne 'rdds')
+		{
+			$interfaces_ref = get_interfaces($tld, $service, $now);
+		}
 
 		$probes_ref->{$service} = get_probes($service) unless (defined($probes_ref->{$service}));
 
@@ -484,17 +493,31 @@ sub process_tld($$$$$)
 			$rtt_limits{$service} = get_history_by_itemid(
 				CONFIGVALUE_DNS_UDP_RTT_HIGH_ITEMID,
 				$cycles_from,
-				cycle_end($cycles_till, $delays{$service})
+				$cycles_till
 			);
 
-			wrn("no DNS RTT limits in history for period ", ts_str($cycles_from),
-					" - ", ts_str(cycle_end($cycles_till, $delays{$service})))
-				unless (scalar(@{$rtt_limits{$service}}));
+			wrn("no DNS RTT limits in history for selected period")
+					unless (scalar(@{$rtt_limits{$service}}));
 		}
 
 		# these are cycles we are going to recalculate for this tld-service
 		foreach my $clock (@cycles_to_calculate)
 		{
+			if ($service eq 'rdds')
+			{
+				if (!is_rdap_standalone($clock))
+				{
+					$interfaces_ref_rdap_before_switch //= get_interfaces($tld, $service, $clock);
+					$interfaces_ref = $interfaces_ref_rdap_before_switch;
+				}
+				else
+				{
+					$interfaces_ref_rdap_after_switch //= get_interfaces($tld, $service, $clock);
+					$interfaces_ref = $interfaces_ref_rdap_after_switch;
+				}
+
+			}
+
 			calculate_cycle(
 				$tld,
 				$service,
@@ -636,6 +659,7 @@ sub cycles_to_calculate($$$$$$$$)
 				}
 			}
 			elsif (ah_get_most_recent_measurement_ts(
+					AH_SLA_API_VERSION_1,
 					ah_get_api_tld($tld),
 					$service,
 					$delay,
@@ -654,6 +678,17 @@ sub cycles_to_calculate($$$$$$$$)
 
 				dbg("$service: itemid $itemid from probe \"$probe\" not in cache yet");
 				dbg("using last clock based on initial_measurements_limit: ", ts_str($lastclock));
+			}
+
+			# TODO: remove this after migrating to Standalone RDAP
+			if ($service eq "rdap" && $lastclock < get_rdap_standalone_ts())
+			{
+				# when we switch to standalone RDAP we should start generating
+				# data starting from the time of the switch
+
+				wrn("truncating lastclock to Standalone RDAP switch time ", ts_str($lastclock));
+
+				$lastclock = get_rdap_standalone_ts();
 			}
 
 			if (opt('debug'))
@@ -695,7 +730,7 @@ sub get_history_by_itemid($$$)
 	# we need previous value to have at the time of @timestamp_from
 	my $rows_ref = db_select("select delay from items where itemid=$itemid");
 
-	$timestamp_from -= $rows_ref->[0]->[0];
+	$timestamp_from -= convert_suffixed_number($rows_ref->[0]->[0]);
 
 	return db_select(
 			"select clock,value" .
@@ -758,7 +793,7 @@ sub get_service_from_probe_key($)
 	}
 	elsif (substr($key, 0, length("rdap")) eq "rdap")
 	{
-		$service = "rdds";
+		$service = "rdap";
 	}
 
 	return $service;
@@ -784,6 +819,10 @@ sub get_service_from_slv_key($)
 	elsif (substr($key, 0, length("rdds.")) eq "rdds.")
 	{
 		$service = "rdds";
+	}
+	elsif (substr($key, 0, length("rdap.")) eq "rdap.")
+	{
+		$service = "rdap";
 	}
 	else
 	{
@@ -815,16 +854,6 @@ sub get_lastvalues_from_db($$$)
 			$host_cond
 	);
 
-	my $itemids_num = '';
-
-	foreach my $row_ref (@{$item_num_rows_ref})
-	{
-		$itemids_num .= $row_ref->[2];
-		$itemids_num .= ',';
-	}
-
-	chop($itemids_num);
-
 	my $item_str_rows_ref = db_select(
 		"select h.host,hg.groupid,i.itemid,i.key_,i.value_type".
 		" from items i,hosts h,hosts_groups hg".
@@ -835,26 +864,52 @@ sub get_lastvalues_from_db($$$)
 			$host_cond
 	);
 
-	my $itemids_str = '';
+	# return if nothing to do
+	return if (scalar(@{$item_num_rows_ref}) == 0 && scalar(@{$item_str_rows_ref}) == 0);
 
-	foreach my $row_ref (@{$item_str_rows_ref})
+	my $sql = '';
+
+	if (scalar(@{$item_num_rows_ref}))
 	{
-		$itemids_str .= $row_ref->[2];
-		$itemids_str .= ',';
+		my $itemids = '';
+
+		foreach my $row_ref (@{$item_num_rows_ref})
+		{
+			$itemids .= $row_ref->[2] . ',';
+		}
+
+		chop($itemids);
+
+		$sql .=
+			"select itemid,clock".
+			" from lastvalue".
+			" where itemid in ($itemids)";
 	}
 
-	chop($itemids_str);
-
 	# get everything from lastvalue, lastvalue_str tables
-	my $lastval_rows_ref = db_select(
-		"select itemid,clock".
-		" from lastvalue".
-		" where itemid in ($itemids_num)".
-		" union".
-		" select itemid,clock".
-		" from lastvalue_str".
-		" where itemid in ($itemids_str)"
-	);
+	if (scalar(@{$item_str_rows_ref}))
+	{
+		if (scalar(@{$item_num_rows_ref}))
+		{
+			$sql .= " union ";
+		}
+
+		my $itemids = '';
+
+		foreach my $row_ref (@{$item_str_rows_ref})
+		{
+			$itemids .= $row_ref->[2] . ',';
+		}
+
+		chop($itemids);
+
+		$sql .=
+			"select itemid,clock".
+			" from lastvalue_str".
+			" where itemid in ($itemids)";
+	}
+
+	my $lastval_rows_ref = db_select($sql);
 
 	my %lastvalues_map = map { $_->[0] => $_->[1] } @{$lastval_rows_ref};
 
@@ -891,10 +946,23 @@ sub get_lastvalues_from_db($$$)
 			next if (substr($key, 0, length("rsm.conf")) eq "rsm.conf");
 			next if (substr($key, 0, length("rsm.probe")) eq "rsm.probe");
 
+			# SLA API version 1: start
+			next if (substr($key, 0, length("rsm.rdds.43.target")) eq "rsm.rdds.43.target");
+			next if (substr($key, 0, length("rsm.rdds.43.testedname")) eq "rsm.rdds.43.testedname");
+			next if (substr($key, 0, length("rsm.rdds.80.target")) eq "rsm.rdds.80.target");
+			if (!is_rdap_standalone($clock))
+			{
+				next if (substr($key, 0, length("rdap.target")) eq "rdap.target");
+				next if (substr($key, 0, length("rdap.testedname")) eq "rdap.testedname");
+			}
+			# SLA API version 1: end
+
 			next unless (substr($key, 0, length("rsm.")) eq "rsm." ||
 				substr($key, 0, length("rdap[")) eq "rdap[" ||
 				substr($key, 0, length("rdap.ip")) eq "rdap.ip" ||
-				substr($key, 0, length("rdap.rtt")) eq "rdap.rtt");
+				substr($key, 0, length("rdap.rtt")) eq "rdap.rtt" ||
+				substr($key, 0, length("rdap.target")) eq "rdap.target" ||
+				substr($key, 0, length("rdap.testedname")) eq "rdap.testedname");
 
 			(undef, $probe) = split(" ", $host, 2);
 
@@ -903,6 +971,13 @@ sub get_lastvalues_from_db($$$)
 		else
 		{
 			fail("unexpected host group id \"$hostgroupid\"");
+		}
+
+		# TODO: remove this override after migrating to Standalone RDAP
+		if ($key_service eq "rdap" && !is_rdap_standalone($clock))
+		{
+			dbg("changing \$key_service from 'rdap' to 'rdds' because Standalone RDAP hasn't started yet");
+			$key_service = "rdds";
 		}
 
 		fail("cannot identify Service of key \"$key\"") unless ($key_service);
@@ -948,11 +1023,15 @@ sub fill_test_data($$$$)
 			next if (!defined($src_metric_ref->{'rtt'}) || ($src_metric_ref->{'rtt'} >= 0 && !defined($src_metric_ref->{'ip'})));
 
 			my $metric = {
-				'testDateTime'	=> int($src_metric_ref->{'clock'}),
-				'targetIP'	=> $src_metric_ref->{'ip'}
+				'testDateTime'	=> $src_metric_ref->{'clock'},
+				'targetIP'	=> $src_metric_ref->{'ip'},
 			};
 
 			my $rtt = $src_metric_ref->{'rtt'};
+
+			# SLA API version 2: start
+			$metric->{'testedName'}	= $src_metric_ref->{'testedName'} if ($service eq 'rdap');
+			# SLA API version 2: end
 
 			if (!defined($rtt))
 			{
@@ -1020,63 +1099,6 @@ sub fill_test_data($$$$)
 	}
 }
 
-#
-# Probe status value cache. itemid - PROBE_KEY_ONLINE item
-#
-# {
-#     probe => {
-#         'itemid' => 1234,
-#         'values' => {
-#             'clock' => value,
-#             ...
-#         }
-#     }
-# }
-#
-my %probe_statuses;
-sub probe_online_at_init()
-{
-	%probe_statuses = ();
-}
-
-sub probe_online_at($$)
-{
-	my $probe = shift;
-	my $clock = shift;
-
-	if (!defined($probe_statuses{$probe}{'itemid'}))
-	{
-		my $host = "$probe - mon";
-
-		my $rows_ref = db_select(
-			"select i.itemid,i.key_,h.host".
-			" from items i,hosts h".
-			" where i.hostid=h.hostid".
-				" and h.host='$host'".
-				" and i.key_='".PROBE_KEY_ONLINE."'"
-		);
-
-		fail("internal error: no \"$host\" item " . PROBE_KEY_ONLINE) unless (defined($rows_ref->[0]));
-
-		$probe_statuses{$probe}{'itemid'} = $rows_ref->[0]->[0];
-	}
-
-	if (!defined($probe_statuses{$probe}{'values'}{$clock}))
-	{
-		my $rows_ref = db_select(
-			"select value".
-			" from " . history_table(ITEM_VALUE_TYPE_UINT64).
-			" where itemid=" . $probe_statuses{$probe}{'itemid'}.
-				" and clock=".$clock
-		);
-
-		# Online if no value in the database
-		$probe_statuses{$probe}{'values'}{$clock} = (defined($rows_ref->[0]) ? $rows_ref->[0]->[0] : 1);
-	}
-
-	return $probe_statuses{$probe}{'values'}{$clock};
-}
-
 sub calculate_cycle($$$$$$$$$)
 {
 	$tld = shift;		# set globally
@@ -1092,7 +1114,19 @@ sub calculate_cycle($$$$$$$$$)
 	my $from = cycle_start($cycle_clock, $delay);
 	my $till = cycle_end($cycle_clock, $delay);
 
-	my $json = {'tld' => $tld, 'service' => $service, 'cycleCalculationDateTime' => $from};
+	my $json = {};
+
+	if (get_monitoring_target() eq MONITORING_TARGET_REGISTRY)
+	{
+		$json->{'tld'} = $tld;
+	}
+	elsif (get_monitoring_target() eq MONITORING_TARGET_REGISTRAR)
+	{
+		$json->{'registrarID'} = $tld;
+	}
+
+	$json->{'service'} = $service;
+	$json->{'cycleCalculationDateTime'} = $from;
 
 	my %tested_interfaces;
 
@@ -1125,7 +1159,7 @@ sub calculate_cycle($$$$$$$$$)
 			}
 		} (keys(%{$probes_data->{$probe}}));
 
-		next if (@itemids_uint == 0);
+		next if (@itemids_uint == 0 || @itemids_float == 0);
 
 		#
 		# Fetch availability (Integer) values (on a TLD level and Probe level):
@@ -1331,133 +1365,40 @@ sub calculate_cycle($$$$$$$$$)
 
 		$probes_with_results++;
 
-		next if (@itemids_float == 0);
+		my ($results_float, $results_str);
 
-		#
-		# Fetch RTT (Float) values (on Probe level).
-		#
-		# Note, for DNS service we will also collect target (Name Server) and IP
-		# because these are provided in RTT items, e. g.:
-		#
-		# rsm.dns.udp.rtt["ns1.example.com",1.2.3.4]
-		#
-		# For other services the IPs are located in separate items which we collect on the next run.
-		#
+		get_probe_history($from, $till, \@itemids_float, \@itemids_str, \$results_float, \$results_str);
 
-		$rows_ref = db_select(
-			"select itemid,value,clock".
-			" from " . history_table(ITEM_VALUE_TYPE_FLOAT).
-			" where itemid in (" . join(',', @itemids_float) . ")".
-				" and " . sql_time_condition($from, $till)
+		my $probe_results = get_probe_results(
+			$service,
+			$results_float,
+			$results_str,
+			$probes_data->{$probe}
 		);
 
-		# for convenience convert the data to format:
-		#
-		# {
-		#     ITEMID => [
-		#         {
-		#             'value' => value (float: RTT),
-		#             'clock' => clock
-		#         }
-		#     ]
-		# }
-		%values = ();
-
-		map {push(@{$values{$_->[0]}}, {'value' => int($_->[1]), 'clock' => $_->[2]})} (@{$rows_ref});
-
-		foreach my $itemid (keys(%values))
+		foreach my $clock (keys(%{$probe_results}))
 		{
-			my $i = $probes_data->{$probe}{$itemid};
-
-			foreach my $value_ref (@{$values{$itemid}})
+			foreach my $interface (keys(%{$probe_results->{$clock}}))
 			{
-				my $interface;
-
-				if ($service eq 'dnssec')
+				foreach my $target (keys(%{$probe_results->{$clock}{$interface}}))
 				{
-					$interface = AH_INTERFACE_DNSSEC;
-				}
-				else
-				{
-					$interface = ah_get_interface($i->{'key'});
-				}
+					foreach my $metric (@{$probe_results->{$clock}{$interface}{$target}})
+					{
+						# convert clock and rtt to integer
+						my $h = {
+							'rtt'        => int($metric->{'rtt'}),
+							'ip'         => $metric->{'ip'},
+							'clock'      => int($clock),
+						};
 
-				my ($target, $ip);
-				if (substr($i->{'key'}, 0, length("rsm.dns.udp.rtt")) eq "rsm.dns.udp.rtt")
-				{
-					($target, $ip) = split(',', get_nsip_from_key($i->{'key'}));
-				}
-				else
-				{
-					# for non-DNS service "target" is NULL, but we
-					# can't use it as hash key so we use placeholder
-					$target = TARGET_PLACEHOLDER;
-				}
+						if (exists($metric->{'testedName'}))
+						{
+							$h->{'testedName'} = $metric->{'testedName'};
+						}
 
-				dbg("found $service RTT: ", $value_ref->{'value'}, " IP: ", ($ip // 'UNDEF'), " (target: $target)");
-
-				push(@{$tested_interfaces{$interface}{$probe}{'testData'}{$target}}, {
-						'clock' => $value_ref->{'clock'},
-						'rtt' => $value_ref->{'value'},
-						'ip' => $ip
+						push(@{$tested_interfaces{translate_interface($interface)}{$probe}{'testData'}{$target}}, $h);
 					}
-				);
-			}
-		}
-
-		next if (@itemids_str == 0);
-
-		#
-		# Fetch IP (String) values (on Probe level) for non-DNS tests.
-		#
-		# Note, this is because only for non-DNS services there are special items for IP, e. g.:
-		#
-		# rsm.rdds.43.ip
-		#
-		# Note, targets (Name Servers) are unused in non-DNS services.
-		#
-
-		$rows_ref = db_select(
-			"select itemid,value,clock".
-			" from " . history_table(ITEM_VALUE_TYPE_STR).
-			" where itemid in (" . join(',', @itemids_str) . ")".
-				" and " . sql_time_condition($from, $till)
-		);
-
-		# for convenience convert the data to format:
-		#
-		# {
-		#     ITEMID => [
-		#         {
-		#             'value' => value (string: IP),
-		#             'clock' => clock
-		#         }
-		#     ]
-		# }
-		#
-		# Note, we only have non-DNS items here, for DNS we have collected everything above.
-		%values = ();
-
-		map {push(@{$values{$_->[0]}}, {'value' => $_->[1], 'clock' => $_->[2]})} (@{$rows_ref});
-
-		foreach my $itemid (keys(%values))
-		{
-			my $i = $probes_data->{$probe}{$itemid};
-
-			foreach my $value_ref (@{$values{$itemid}})
-			{
-				my $interface = ah_get_interface($i->{'key'});
-
-				# for non-DNS service "target" is NULL, but we
-				# can't use it as hash key so we use placeholder
-				my $target = TARGET_PLACEHOLDER;
-
-				dbg("found $service IP: ", $value_ref->{'value'}, " (target: $target)");
-
-				# For non-DNS we have only 1 metric, thus we refer to the first element of array.
-				# "clock" and "rtt" of this metric were already collected above.
-
-				$tested_interfaces{$interface}{$probe}{'testData'}{$target}->[0]->{'ip'} = $value_ref->{'value'};
+				}
 			}
 		}
 	}
@@ -1470,7 +1411,7 @@ sub calculate_cycle($$$$$$$$$)
 		if (defined($service_probes_ref->{$probe}) &&
 				$service_probes_ref->{$probe}->{'status'} == HOST_STATUS_MONITORED)
 		{
-			$probe_online = probe_online_at($probe, $from);
+			$probe_online = probe_online_at($probe, $from, $delay);
 		}
 		else
 		{
@@ -1575,17 +1516,50 @@ sub calculate_cycle($$$$$$$$$)
 
 	return if (opt('dry-run'));
 
-	if (ah_save_measurement(ah_get_api_tld($tld), $service, $json, $from) != AH_SUCCESS)
+	if ($service ne 'rdap')
 	{
-		fail("cannot save recent measurement: ", ah_get_error());
+		if (ah_save_measurement(
+				AH_SLA_API_VERSION_1,
+				ah_get_api_tld($tld),
+				$service,
+				$json,
+				$from) != AH_SUCCESS)
+		{
+			fail("cannot save recent measurement: ", ah_get_error());
+		}
 	}
+	else
+	{
+		if (ah_save_measurement(
+				AH_SLA_API_VERSION_2,
+				ah_get_api_tld($tld),
+				$service,
+				$json,
+				$from) != AH_SUCCESS)
+		{
+			fail("cannot save recent measurement: ", ah_get_error());
+		}
+	}
+}
+
+sub translate_interface($)
+{
+	my $interface = shift;
+
+	return AH_INTERFACE_DNS    if ($interface eq 'dns');
+	return AH_INTERFACE_DNSSEC if ($interface eq 'dnssec');
+	return AH_INTERFACE_RDDS43 if ($interface eq 'rdds43');
+	return AH_INTERFACE_RDDS80 if ($interface eq 'rdds80');
+	return AH_INTERFACE_RDAP   if ($interface eq 'rdap');
+
+	fail("$interface: unknown interface");
 }
 
 sub get_interfaces($$$)
 {
 	my $tld = shift;
 	my $service = shift;
-	my $now = shift;
+	my $clock = shift;
 
 	my @result;
 
@@ -1599,9 +1573,18 @@ sub get_interfaces($$$)
 	}
 	elsif ($service eq 'rdds')
 	{
-		push(@result, AH_INTERFACE_RDDS43) if (tld_interface_enabled($tld, 'rdds43', $now));
-		push(@result, AH_INTERFACE_RDDS80) if (tld_interface_enabled($tld, 'rdds80', $now));
-		push(@result, AH_INTERFACE_RDAP) if (tld_interface_enabled($tld, 'rdap', $now));
+		push(@result, AH_INTERFACE_RDDS43) if (tld_interface_enabled($tld, 'rdds43', $clock));
+		push(@result, AH_INTERFACE_RDDS80) if (tld_interface_enabled($tld, 'rdds80', $clock));
+
+		# TODO: remove this after migrating to Standalone RDAP
+		if (!is_rdap_standalone($clock))
+		{
+			push(@result, AH_INTERFACE_RDAP) if (tld_interface_enabled($tld, 'rdap', $clock));
+		}
+	}
+	elsif ($service eq 'rdap')
+	{
+		push(@result, AH_INTERFACE_RDAP);
 	}
 
 	return \@result;
@@ -1769,7 +1752,7 @@ Optionally specify TLD.
 
 =item B<--service> name
 
-Optionally specify service, one of: dns, dnssec, rdds
+Optionally specify service, one of: dns, dnssec, rdds, rdap (if it's standalone).
 
 =item B<--server-id> ID
 
