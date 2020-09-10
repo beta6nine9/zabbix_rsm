@@ -3357,6 +3357,11 @@ void	zbx_tls_init_child(void)
 			goto out;
 		}
 
+		/* RSM specifics: no renegotiation and timeout 60 seconds */
+		SSL_CTX_set_options(ctx_cert, SSL_OP_NO_SESSION_RESUMPTION_ON_RENEGOTIATION);
+		SSL_CTX_set_timeout(ctx_cert, 60);
+		/* RSM specifics: end */
+
 		zbx_log_ciphersuites(__function_name, "certificate", ctx_cert);
 	}
 
@@ -3391,6 +3396,11 @@ void	zbx_tls_init_child(void)
 			goto out;
 		}
 
+		/* RSM specifics: no renegotiation and timeout 60 seconds */
+		SSL_CTX_set_options(ctx_psk, SSL_OP_NO_SESSION_RESUMPTION_ON_RENEGOTIATION);
+		SSL_CTX_set_timeout(ctx_psk, 60);
+		/* RSM specifics: end */
+
 		zbx_log_ciphersuites(__function_name, "PSK", ctx_psk);
 	}
 
@@ -3418,6 +3428,11 @@ void	zbx_tls_init_child(void)
 			zbx_snprintf_alloc(&error, &error_alloc, &error_offset, "cannot set list of all ciphersuites:");
 			goto out;
 		}
+
+		/* RSM specifics: no renegotiation and timeout 60 seconds */
+		SSL_CTX_set_options(ctx_all, SSL_OP_NO_SESSION_RESUMPTION_ON_RENEGOTIATION);
+		SSL_CTX_set_timeout(ctx_all, 60);
+		/* RSM specifics: end */
 
 		zbx_log_ciphersuites(__function_name, "certificate and PSK", ctx_all);
 	}
@@ -4185,6 +4200,14 @@ int	zbx_tls_connect(zbx_socket_t *s, unsigned int tls_connect, char *tls_arg1, c
 		goto out1;
 	}
 
+/* RSM specifics: no renegotiation */
+#if OPENSSL_VERSION_NUMBER >= 0x1010100fL	/* OpenSSL 1.1.1 or newer, or LibreSSL */
+	SSL_set_options(s->tls_ctx->ctx, SSL_OP_NO_RENEGOTIATION);
+#else
+	s->tls_ctx->ctx->s3->flags |= SSL3_FLAGS_NO_RENEGOTIATE_CIPHERS;
+#endif
+/* RSM specifics: end */
+
 	/* set our connected TCP socket to TLS context */
 	if (1 != SSL_set_fd(s->tls_ctx->ctx, s->socket))
 	{
@@ -4920,6 +4943,14 @@ int	zbx_tls_accept(zbx_socket_t *s, unsigned int tls_accept, char **error)
 			goto out;
 		}
 	}
+
+/* RSM specifics: no renegotiation */
+#if OPENSSL_VERSION_NUMBER >= 0x1010100fL	/* OpenSSL 1.1.1 or newer, or LibreSSL */
+	SSL_set_options(s->tls_ctx->ctx, SSL_OP_NO_RENEGOTIATION);
+#else
+	s->tls_ctx->ctx->s3->flags |= SSL3_FLAGS_NO_RENEGOTIATE_CIPHERS;
+#endif
+/* RSM specifics: end */
 
 	if (1 != SSL_set_fd(s->tls_ctx->ctx, s->socket))
 	{
