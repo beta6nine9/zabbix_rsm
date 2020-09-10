@@ -1,3 +1,14 @@
+Changes for rsm2.0.1
+
+Bug fixes:
+...G...PS. [716] minimized possibility of semaphore key collision which causes daemon startup failure (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.0.0
+
+rsm2.0.0rc22 was released as rsm2.0.0rc without any changes
+
+--------------------------------------------------------------------------------
 Changes for rsm2.0.0rc22
 
 Bug fixes:
