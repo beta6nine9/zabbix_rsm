@@ -42,6 +42,47 @@
 	static unsigned char	mutexes = 0;
 #endif
 
+/* RSM specifics: get project ID for ftok(), return the right most number from config file or ascii code of 'z' (122) */
+static int	get_proj_id(const char *config)
+{
+	const char	*p;
+	int		proj_id = 0;
+	char		num_found = 0;
+
+	/* go from right to left to fetch the first number found */
+	p = config + strlen(config) - 1;
+
+	for (;;)
+	{
+		if (isdigit(*p))
+		{
+			if (0 == num_found)
+				num_found = 1;
+		}
+		else
+		{
+			if (0 != num_found)
+			{
+				p++;
+				break;
+			}
+		}
+
+		/* ignore directories */
+		if (p == config || '/' == *p)
+			break;
+
+		p--;
+	}
+
+	if (0 != num_found)
+		proj_id = atoi(p);
+
+	/* according to ftok() proj_id cannot be 0, in that case fall back to original ASCII code of 'z' */
+	return (proj_id == 0 ? (int)'z' : proj_id);
+}
+/* RSM specifics: end */
+
 /******************************************************************************
  *                                                                            *
  * Function: zbx_mutex_create_ext                                             *
@@ -78,16 +119,16 @@ int zbx_mutex_create_ext(ZBX_MUTEX *mutex, ZBX_MUTEX_NAME name, unsigned char fo
 	union semun	semopts;
 	struct semid_ds	seminfo;
 
-	if (-1 == (sem_key = ftok(CONFIG_FILE, (int)'z')))
-	{
-		zbx_error("cannot create IPC key for path '%s', try to create for path '.': %s",
-				CONFIG_FILE, zbx_strerror(errno));
+	/* RSM specifics: use different proj_id to avoid possible sem_key collisions */
+	int		proj_id;
 
-		if (-1 == (sem_key = ftok(".", (int)'z')))
-		{
-			zbx_error("cannot create IPC key for path '.': %s", zbx_strerror(errno));
-			return FAIL;
-		}
+	proj_id = get_proj_id(CONFIG_FILE);
+	/* RSM specifics: end */
+
+	if (-1 == (sem_key = ftok(CONFIG_FILE, proj_id)))	/* RSM specifics */
+	{
+		zbx_error("cannot create IPC key for path '%s': %s", CONFIG_FILE, zbx_strerror(errno));	/* RSM specifics */
+		return FAIL;
 	}
 lbl_create:
 	if (-1 != ZBX_SEM_LIST_ID || -1 != (ZBX_SEM_LIST_ID = semget(sem_key, ZBX_MUTEX_COUNT, IPC_CREAT | IPC_EXCL | 0600 /* 0022 */)))
