@@ -298,7 +298,7 @@ foreach ($data['probes'] as $probe) {
 				$rdap = $down;
 			}
 			elseif ($probe['value'] == 1) {
-				if ($rdds !== ZBX_STYLE_RED) {
+				if ($data['type'] == RSM_RDDS && $rdds !== ZBX_STYLE_RED) {
 					$rdds = ZBX_STYLE_GREEN;
 				}
 

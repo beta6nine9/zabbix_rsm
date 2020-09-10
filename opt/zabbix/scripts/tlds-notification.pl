@@ -40,7 +40,6 @@ sub main()
 	if (opt('debug'))
 	{
 		log_debug_messages(1);
-		dbg("command line: %s %s", $0, join(' ', map(index($_, ' ') == -1 ? $_ : "'$_'", @ARGV)));
 	}
 
 	process_event(getopt('send-to'), getopt('event-id'));
@@ -250,6 +249,7 @@ sub initialize()
 {
 	set_max_execution_time(MAX_EXECUTION_TIME);
 	initialize_log(!opt('nolog') && !opt('dry-run'));
+	info("command line: %s %s", $0, join(' ', map(index($_, ' ') == -1 ? $_ : "'$_'", @ARGV)));
 	db_connect();
 }
 

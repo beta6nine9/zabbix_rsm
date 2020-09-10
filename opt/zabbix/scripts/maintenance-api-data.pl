@@ -1,15 +1,11 @@
 #!/usr/bin/perl
 
-BEGIN
-{
-	our $MYDIR = $0; $MYDIR =~ s,(.*)/.*,$1,; $MYDIR = '.' if ($MYDIR eq $0);
-}
-use lib $MYDIR;
-
 use strict;
 use warnings;
 
 use Path::Tiny qw(path);
+use lib path($0)->parent->realpath()->stringify();
+
 use ApiHelper;
 use Getopt::Long;
 use Pod::Usage;
@@ -43,26 +39,9 @@ my $error = rsm_targets_prepare(AH_SLA_API_TMP_DIR, AH_SLA_API_DIR);
 
 fail($error) if ($error);
 
-foreach my $version_dir (path(AH_SLA_API_DIR)->children)
+foreach my $version (AH_SLA_API_VERSION_1)
 {
-	next unless ($version_dir->is_dir());
-
-	dbg("version_dir=[$version_dir]");
-
-	my $version_basename = $version_dir->basename();
-
-	dbg("version_basename=[$version_basename]");
-
-	my $version = substr($version_basename, 1);
-
-	dbg("version=[$version]");
-
-	if ($version ne AH_SLA_API_VERSION_1 && $version ne AH_SLA_API_VERSION_2)
-	{
-		fail("unknown version directory \"$version_basename\"");
-	}
-
-	foreach my $tld_dir (path($version_dir)->children)
+	foreach my $tld_dir (path(AH_SLA_API_DIR . "/v$version")->children)
 	{
 		next unless ($tld_dir->is_dir());
 
