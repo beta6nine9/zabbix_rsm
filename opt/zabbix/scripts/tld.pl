@@ -456,12 +456,19 @@ sub get_services($$)
 
 	my $items = get_items_like($template->{'templateid'}, 'rsm.rdds[', true);
 
-	if (%{$items} && (values(%{$items}))[0]{'status'} == 0)
+	return $result if (0 == scalar(keys(%{$items})));
+
+	# skip disabled items
+	foreach my $itemid (keys(%{$items}))
 	{
-		(values(%{$items}))[0]{'key_'} =~ /,"(\S+)","(\S+)"]/;
+		next if ($items->{$itemid}{'status'} != ITEM_STATUS_ACTIVE);
+
+		$items->{$itemid}{'key_'} =~ /,"(\S+)","(\S+)"]/;
 
 		$result->{'rdds43_servers'} = $1;
 		$result->{'rdds80_servers'} = $2;
+
+		last;
 	}
 
 	return $result;
