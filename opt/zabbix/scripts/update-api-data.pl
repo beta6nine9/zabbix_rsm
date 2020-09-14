@@ -1271,11 +1271,13 @@ sub __update_false_positives
 
 		dbg("auditlog: service:$service eventid:$eventid start:[".ts_str($event_clock)."] changed:[".ts_str($clock)."] false_positive:$false_positive");
 
+		my $ah_tld = ah_get_api_tld($tld);
+
 		if ($service ne 'rdap')
 		{
 			unless (ah_save_false_positive(
 					AH_SLA_API_VERSION_1,
-					$tld,
+					$ah_tld,
 					$service,
 					$eventid,
 					$event_clock,
@@ -1297,7 +1299,7 @@ sub __update_false_positives
 		{
 			unless (ah_save_false_positive(
 					AH_SLA_API_VERSION_2,
-					$tld,
+					$ah_tld,
 					$service,
 					$eventid,
 					$event_clock,
