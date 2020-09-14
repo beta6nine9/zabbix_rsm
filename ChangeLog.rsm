@@ -4,6 +4,14 @@ New features:
 ..F.I..PS. [554] upgraded Zabbix to 4.X.Y (asitals, dimir, gcalenko, kalimulin, miks)
 
 --------------------------------------------------------------------------------
+Changes for rsm2.0.2
+
+Bug fixes:
+..F....... [sub-643] fixed sorting by TLDs on Rolling week status page in Registry monitoring wgeb RDAP is not standalone (dimir)
+....I..... [717] fixed empty rdds43servers and rdds80servers listed with tld.pl --list-services when any of rdds servers get changed (dimir)
+....I..... [715] fixed the name of root zone "." used when updating false-positive in update-api-data.pl (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.0.1
 
 Bug fixes:
