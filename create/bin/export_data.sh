@@ -2,9 +2,8 @@
 
 if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ] || [ -z "$4" ] || [ -z "$5" ] || [ -z "$6" ]; then
 	echo "Usage: 
-	./export_data.sh -hhost -Pport -uroot -p<password> <DB name> ZBX_DATA > ../src/data.tmpl
-	./export_data.sh -hhost -Pport -uroot -p<password> <DB name> ZBX_TEMPLATE > ../src/templates.tmpl
-	./export_data.sh -hhost -Pport -uroot -p<password> <DB name> ZBX_DASHBOARD > ../src/dashboards.tmpl
+	./export_data.sh -hhost -Pport -uroot -p<password> <DB name> ZBX_DATA > ../src/rsm-data.tmpl
+	./export_data.sh -hhost -Pport -uroot -p<password> <DB name> ZBX_TEMPLATE > ../src/rsm-templates.tmpl
 	The script generates data file out of existing MySQL database." && exit 1
 fi
 dblogin="$1 $2 $3 $4"
@@ -12,6 +11,7 @@ dbname=$5
 dbflag=$6
 basedir=`dirname "$0"`
 schema=$basedir/../src/schema.tmpl
+rsm_schema=$basedir/../src/rsm-schema.tmpl
 
 echo "--
 -- Zabbix
@@ -32,8 +32,7 @@ echo "--
 -- Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 --
 "
-
-for table in `grep TABLE "$schema" | grep $dbflag | awk -F'|' '{print $2}'`; do
+for table in `grep TABLE "$schema" "$rsm_schema" | grep $dbflag | awk -F'|' '{print $2}'`; do
 	if [ "0" == `echo "select count(*) from $table" | mysql $dblogin $dbname | tail -1` ]; then
 		continue
 	fi
@@ -42,7 +41,7 @@ for table in `grep TABLE "$schema" | grep $dbflag | awk -F'|' '{print $2}'`; do
 	sortorder=""
 	# get list of all fields
 	for i in `seq 1 1000`; do
-		line=`grep -v ZBX_NODATA "$schema" | grep -A $i "TABLE|$table|" | tail -1 | grep FIELD`
+		line=`grep -v ZBX_NODATA "$schema" "$rsm_schema" | grep -A $i "TABLE|$table|" | tail -1 | grep FIELD`
 		[ -z "$line" ] && break
 		field=`echo $line | awk -F'|' '{print $2}'`
 		fields="$fields,replace(replace(replace($field,'|','&pipe;'),'\r\n','&eol;'),'\n','&bsn;') as $field"
@@ -62,7 +61,7 @@ for table in `grep TABLE "$schema" | grep $dbflag | awk -F'|' '{print $2}'`; do
 
 	# sort by first field if no sortorder is defined
 	if [ -z "$sortorder" ]; then
-		line=`grep -v ZBX_NODATA "$schema" | grep -A 1 "TABLE|$table|" | tail -1 | grep FIELD`
+		line=`grep -v ZBX_NODATA "$schema" "$rsm_schema" | grep -A 1 "TABLE|$table|" | tail -1 | grep FIELD`
 		if [ -n "$line" ]; then
 			pri_field=`echo $line | cut -f2 -d'|' | sed -e 's/ //'`
 			sortorder="order by $table.$pri_field"

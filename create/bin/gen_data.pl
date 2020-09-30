@@ -259,15 +259,11 @@ sub main
 		usage();
 	}
 
-	open(INFO, dirname($0)."/../src/data.tmpl");
+	open(INFO, dirname($0)."/../src/rsm-data.tmpl");
 	my @lines = <INFO>;
 	close(INFO);
 
-	open(INFO, dirname($0)."/../src/templates.tmpl");
-	push(@lines, <INFO>);
-	close(INFO);
-
-	open(INFO, dirname($0)."/../src/dashboards.tmpl");
+	open(INFO, dirname($0)."/../src/rsm-templates.tmpl");
 	push(@lines, <INFO>);
 	close(INFO);
 

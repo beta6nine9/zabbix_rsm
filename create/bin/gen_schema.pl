@@ -20,6 +20,7 @@ use strict;
 use File::Basename;
 
 my $file = dirname($0)."/../src/schema.tmpl";	# name the file
+my $rsm_file = dirname($0)."/../src/rsm-schema.tmpl";
 
 my ($state, %output, $eol, $fk_bol, $fk_eol, $ltab, $pkey, $table_name);
 my ($szcol1, $szcol2, $szcol3, $szcol4, $sequences, $sql_suffix);
@@ -632,6 +633,12 @@ sub process
 	open(INFO, $file);	# open the file
 	my @lines = <INFO>;	# read it into an array
 	close(INFO);		# close the file
+
+	# RSM specifics: start
+	open(INFO, $rsm_file);
+	push(@lines, <INFO>);
+	close(INFO);
+	# RSM specifics: end
 
 	foreach $line (@lines)
 	{
