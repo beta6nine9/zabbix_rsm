@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -23,42 +23,58 @@
 #include "log.h"
 
 #include "file.h"
+#include "dir.h"
 #include "http.h"
 #include "net.h"
+#include "dns.h"
 #include "system.h"
+#include "zabbix_stats.h"
 #include "zbxexec.h"
 
 #if !defined(_WINDOWS)
 #	define VFS_TEST_FILE "/etc/passwd"
 #	define VFS_TEST_REGEXP "root"
+#	define VFS_TEST_DIR  "/var/log"
 #else
 #	define VFS_TEST_FILE "c:\\windows\\win.ini"
 #	define VFS_TEST_REGEXP "fonts"
+#	define VFS_TEST_DIR  "c:\\windows"
 #endif
 
 extern int	CONFIG_TIMEOUT;
 
 static int	ONLY_ACTIVE(AGENT_REQUEST *request, AGENT_RESULT *result);
 static int	SYSTEM_RUN(AGENT_REQUEST *request, AGENT_RESULT *result);
+static int	SYSTEM_RUN_LOCAL(AGENT_REQUEST *request, AGENT_RESULT *result);
+
+ZBX_METRIC	parameters_common_local[] =
+/*	KEY			FLAG		FUNCTION		TEST PARAMETERS */
+{
+	{"system.run",		CF_HAVEPARAMS,	SYSTEM_RUN_LOCAL, 	"echo test"},
+	{NULL}
+};
 
 ZBX_METRIC	parameters_common[] =
-/*      KEY                     FLAG		FUNCTION        	TEST PARAMETERS */
+/*	KEY			FLAG		FUNCTION		TEST PARAMETERS */
 {
 	{"system.localtime",	CF_HAVEPARAMS,	SYSTEM_LOCALTIME,	"utc"},
-	{"system.run",		CF_HAVEPARAMS,	SYSTEM_RUN,	 	"echo test"},
+	{"system.run",		CF_HAVEPARAMS,	SYSTEM_RUN,		"echo test"},
 
-	{"web.page.get",	CF_HAVEPARAMS,	WEB_PAGE_GET,	 	"localhost,,80"},
-	{"web.page.perf",	CF_HAVEPARAMS,	WEB_PAGE_PERF,	 	"localhost,,80"},
+	{"web.page.get",	CF_HAVEPARAMS,	WEB_PAGE_GET,		"localhost,,80"},
+	{"web.page.perf",	CF_HAVEPARAMS,	WEB_PAGE_PERF,		"localhost,,80"},
 	{"web.page.regexp",	CF_HAVEPARAMS,	WEB_PAGE_REGEXP,	"localhost,,80,OK"},
 
-	{"vfs.file.size",	CF_HAVEPARAMS,	VFS_FILE_SIZE, 		VFS_TEST_FILE},
+	{"vfs.file.size",	CF_HAVEPARAMS,	VFS_FILE_SIZE,		VFS_TEST_FILE},
 	{"vfs.file.time",	CF_HAVEPARAMS,	VFS_FILE_TIME,		VFS_TEST_FILE ",modify"},
 	{"vfs.file.exists",	CF_HAVEPARAMS,	VFS_FILE_EXISTS,	VFS_TEST_FILE},
 	{"vfs.file.contents",	CF_HAVEPARAMS,	VFS_FILE_CONTENTS,	VFS_TEST_FILE},
 	{"vfs.file.regexp",	CF_HAVEPARAMS,	VFS_FILE_REGEXP,	VFS_TEST_FILE "," VFS_TEST_REGEXP},
-	{"vfs.file.regmatch",	CF_HAVEPARAMS,	VFS_FILE_REGMATCH, 	VFS_TEST_FILE "," VFS_TEST_REGEXP},
+	{"vfs.file.regmatch",	CF_HAVEPARAMS,	VFS_FILE_REGMATCH,	VFS_TEST_FILE "," VFS_TEST_REGEXP},
 	{"vfs.file.md5sum",	CF_HAVEPARAMS,	VFS_FILE_MD5SUM,	VFS_TEST_FILE},
 	{"vfs.file.cksum",	CF_HAVEPARAMS,	VFS_FILE_CKSUM,		VFS_TEST_FILE},
+
+	{"vfs.dir.size",	CF_HAVEPARAMS,	VFS_DIR_SIZE,		VFS_TEST_DIR},
+	{"vfs.dir.count",	CF_HAVEPARAMS,	VFS_DIR_COUNT,		VFS_TEST_DIR},
 
 	{"net.dns",		CF_HAVEPARAMS,	NET_DNS,		",zabbix.com"},
 	{"net.dns.record",	CF_HAVEPARAMS,	NET_DNS_RECORD,		",zabbix.com"},
@@ -68,15 +84,21 @@ ZBX_METRIC	parameters_common[] =
 
 	{"system.users.num",	0,		SYSTEM_USERS_NUM,	NULL},
 
-	{"log",			CF_HAVEPARAMS,	ONLY_ACTIVE, 		"logfile"},
+	{"log",			CF_HAVEPARAMS,	ONLY_ACTIVE,		"logfile"},
+	{"log.count",		CF_HAVEPARAMS,	ONLY_ACTIVE,		"logfile"},
 	{"logrt",		CF_HAVEPARAMS,	ONLY_ACTIVE,		"logfile"},
-	{"eventlog",		CF_HAVEPARAMS,	ONLY_ACTIVE, 		"system"},
+	{"logrt.count",		CF_HAVEPARAMS,	ONLY_ACTIVE,		"logfile"},
+	{"eventlog",		CF_HAVEPARAMS,	ONLY_ACTIVE,		"system"},
+
+	{"zabbix.stats",	CF_HAVEPARAMS,	ZABBIX_STATS,		"127.0.0.1,10051"},
 
 	{NULL}
 };
 
 static int	ONLY_ACTIVE(AGENT_REQUEST *request, AGENT_RESULT *result)
 {
+	ZBX_UNUSED(request);
+
 	SET_MSG_RESULT(result, zbx_strdup(NULL, "Accessible only as active check."));
 
 	return SYSINFO_RET_FAIL;
@@ -99,14 +121,11 @@ int	EXECUTE_USER_PARAMETER(AGENT_REQUEST *request, AGENT_RESULT *result)
 
 int	EXECUTE_STR(const char *command, AGENT_RESULT *result)
 {
-	const char	*__function_name = "EXECUTE_STR";
-
 	int		ret = SYSINFO_RET_FAIL;
 	char		*cmd_result = NULL, error[MAX_STRING_LEN];
 
-	init_result(result);
-
-	if (SUCCEED != zbx_execute(command, &cmd_result, error, sizeof(error), CONFIG_TIMEOUT))
+	if (SUCCEED != zbx_execute(command, &cmd_result, error, sizeof(error), CONFIG_TIMEOUT,
+			ZBX_EXIT_CODE_CHECKS_DISABLED))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, error));
 		goto out;
@@ -115,7 +134,7 @@ int	EXECUTE_STR(const char *command, AGENT_RESULT *result)
 	zbx_rtrim(cmd_result, ZBX_WHITESPACE);
 
 	zabbix_log(LOG_LEVEL_DEBUG, "%s() command:'%s' len:" ZBX_FS_SIZE_T " cmd_result:'%.20s'",
-			__function_name, command, (zbx_fs_size_t)strlen(cmd_result), cmd_result);
+			__func__, command, (zbx_fs_size_t)strlen(cmd_result), cmd_result);
 
 	SET_TEXT_RESULT(result, zbx_strdup(NULL, cmd_result));
 
@@ -160,7 +179,7 @@ int	EXECUTE_INT(const char *command, AGENT_RESULT *result)
 	return SYSINFO_RET_OK;
 }
 
-static int	SYSTEM_RUN(AGENT_REQUEST *request, AGENT_RESULT *result)
+static int	system_run(AGENT_REQUEST *request, AGENT_RESULT *result, int level)
 {
 	char	*command, *flag;
 
@@ -179,10 +198,7 @@ static int	SYSTEM_RUN(AGENT_REQUEST *request, AGENT_RESULT *result)
 		return SYSINFO_RET_FAIL;
 	}
 
-	if (1 == CONFIG_LOG_REMOTE_COMMANDS)
-		zabbix_log(LOG_LEVEL_WARNING, "Executing command '%s'", command);
-	else
-		zabbix_log(LOG_LEVEL_DEBUG, "Executing command '%s'", command);
+	zabbix_log(level, "Executing command '%s'", command);
 
 	if (NULL == flag || '\0' == *flag || 0 == strcmp(flag, "wait"))	/* default parameter */
 	{
@@ -206,3 +222,21 @@ static int	SYSTEM_RUN(AGENT_REQUEST *request, AGENT_RESULT *result)
 
 	return SYSINFO_RET_OK;
 }
+
+static int	SYSTEM_RUN(AGENT_REQUEST *request, AGENT_RESULT *result)
+{
+	int	level;
+
+	level = LOG_LEVEL_DEBUG;
+
+	if (0 != CONFIG_LOG_REMOTE_COMMANDS)
+		level = LOG_LEVEL_WARNING;
+
+	return system_run(request, result, level);
+}
+
+static int	SYSTEM_RUN_LOCAL(AGENT_REQUEST *request, AGENT_RESULT *result)
+{
+	return system_run(request, result, LOG_LEVEL_DEBUG);
+}
+

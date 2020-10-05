@@ -33,8 +33,8 @@ use constant SLV_ITEM_KEY_RDDS_PERFORMED        => "rsm.slv.rdds.rtt.performed";
 use constant SLV_ITEM_KEY_RDDS_FAILED           => "rsm.slv.rdds.rtt.failed";
 use constant SLV_ITEM_KEY_RDDS_PFAILED          => "rsm.slv.rdds.rtt.pfailed";
 
-use constant RTT_ITEM_KEY_PATTERN_RDDS43        => 'rsm.rdds.43.rtt[{$RSM.TLD}]';
-use constant RTT_ITEM_KEY_PATTERN_RDDS80        => 'rsm.rdds.80.rtt[{$RSM.TLD}]';
+use constant RTT_ITEM_KEY_PATTERN_RDDS43        => 'rsm.rdds.43.rtt';
+use constant RTT_ITEM_KEY_PATTERN_RDDS80        => 'rsm.rdds.80.rtt';
 use constant RTT_ITEM_KEY_PATTERN_RDAP          => 'rdap.rtt';
 
 use constant RTT_TIMEOUT_ERROR_RDDS43           => -227;
@@ -46,26 +46,29 @@ my $now = getopt('now') // time();
 my $rtt_params_list =
 [
 	{
-		'probes'                  => get_probes("RDDS"),
-		'tlds_service'            => "rdds43",
-		'rtt_item_key_pattern'    => RTT_ITEM_KEY_PATTERN_RDDS43,
-		'timeout_error_value'     => RTT_TIMEOUT_ERROR_RDDS43,
-		'timeout_threshold_value' => $rtt_low_rdds
+		'probes'                     => get_probes("RDDS"),
+		'tlds_service'               => "rdds43",
+		'rtt_item_key_pattern'       => RTT_ITEM_KEY_PATTERN_RDDS43,
+		'lastclock_control_item_key' => undef,
+		'timeout_error_value'        => RTT_TIMEOUT_ERROR_RDDS43,
+		'timeout_threshold_value'    => $rtt_low_rdds,
 	},
 	{
-		'probes'                  => get_probes("RDDS"),
-		'tlds_service'            => "rdds43",
-		'rtt_item_key_pattern'    => RTT_ITEM_KEY_PATTERN_RDDS80,
-		'timeout_error_value'     => RTT_TIMEOUT_ERROR_RDDS80,
-		'timeout_threshold_value' => $rtt_low_rdds
+		'probes'                     => get_probes("RDDS"),
+		'tlds_service'               => "rdds43",
+		'rtt_item_key_pattern'       => RTT_ITEM_KEY_PATTERN_RDDS80,
+		'lastclock_control_item_key' => undef,
+		'timeout_error_value'        => RTT_TIMEOUT_ERROR_RDDS80,
+		'timeout_threshold_value'    => $rtt_low_rdds,
 	},
 	{
-		'probes'                  => get_probes("RDAP"),
-		'tlds_service'            => "rdap",
-		'rtt_item_key_pattern'    => RTT_ITEM_KEY_PATTERN_RDAP,
-		'timeout_error_value'     => RTT_TIMEOUT_ERROR_RDAP,
-		'timeout_threshold_value' => $rtt_low_rdds
-	}
+		'probes'                     => get_probes("RDAP"),
+		'tlds_service'               => "rdap",
+		'rtt_item_key_pattern'       => RTT_ITEM_KEY_PATTERN_RDAP,
+		'lastclock_control_item_key' => undef,
+		'timeout_error_value'        => RTT_TIMEOUT_ERROR_RDAP,
+		'timeout_threshold_value'    => $rtt_low_rdds,
+	},
 ];
 my $rdap_standalone_params_list;
 

@@ -35,7 +35,6 @@ db_read_timeout = 30
 ;db_cipher =
 
 [slv]
-path = /opt/zabbix/scripts/slv
 zserver = 127.0.0.1
 zport = 10051
 max_cycles_dns = 20

@@ -11,7 +11,7 @@ use Pod::Usage;
 use Exporter qw(import);
 use Zabbix;
 use Alerts;
-use TLD_constants qw(:api :items :ec :groups :config);
+use TLD_constants qw(:api :items :ec :groups :config :templates);
 use File::Pid;
 use POSIX qw(floor);
 use Sys::Syslog;
@@ -55,7 +55,7 @@ use constant PROBE_LASTACCESS_ITEM => 'zabbix[proxy,{$RSM.PROXY_NAME},lastaccess
 use constant PROBE_KEY_MANUAL => 'rsm.probe.status[manual]';
 use constant PROBE_KEY_AUTOMATIC => 'rsm.probe.status[automatic,%]'; # match all in SQL
 
-use constant RSM_CONFIG_DNS_UDP_DELAY_ITEMID => 100008;	# rsm.configvalue[RSM.DNS.UDP.DELAY]
+use constant RSM_CONFIG_DNS_DELAY_ITEMID => 100008;	# rsm.configvalue[RSM.DNS.DELAY]
 use constant RSM_CONFIG_RDDS_DELAY_ITEMID => 100009;	# rsm.configvalue[RSM.RDDS.DELAY]
 use constant RSM_CONFIG_EPP_DELAY_ITEMID => 100010;	# rsm.configvalue[RSM.EPP.DELAY]
 use constant RSM_CONFIG_RDAP_DELAY_ITEMID => 100034;	# rsm.configvalue[RSM.RDAP.DELAY]
@@ -79,7 +79,7 @@ use constant DETAILED_RESULT_DELIM => ', ';
 use constant USE_CACHE_FALSE => 0;
 use constant USE_CACHE_TRUE  => 1;
 
-use constant TARGET_PLACEHOLDER => 'TARGET_PLACEHOLDER';	# for non-DNS services, see get_probe_results()
+use constant TARGET_PLACEHOLDER => 'TARGET_PLACEHOLDER';	# for non-DNS services, see get_test_results()
 
 our ($result, $dbh, $tld, $server_key);
 
@@ -105,11 +105,11 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		get_macro_rdap_rollweek_sla
 		get_macro_dns_udp_rtt_high
 		get_macro_dns_udp_rtt_low
+		get_macro_dns_tcp_rtt_high
 		get_macro_dns_tcp_rtt_low
 		get_macro_rdds_rtt_low
 		get_macro_rdap_rtt_low
-		get_dns_udp_delay
-		get_dns_tcp_delay
+		get_dns_delay
 		get_rdds_delay
 		get_rdap_delay
 		get_epp_delay
@@ -117,7 +117,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		get_macro_epp_rollweek_sla
 		get_macro_dns_update_time
 		get_macro_rdds_update_time
-		get_tld_items
+		get_test_items
 		get_hostid
 		get_rtt_low
 		get_macro_epp_rtt_low get_macro_probe_avail_limit
@@ -130,7 +130,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		get_itemid_by_hostid get_itemid_like_by_hostid get_itemids_by_host_and_keypart get_lastclock
 		get_tlds get_tlds_and_hostids
 		get_oldest_clock
-		get_probes get_nsips get_nsip_items tld_exists tld_service_enabled db_connect db_disconnect
+		get_probes get_nsips tld_exists tld_service_enabled db_connect db_disconnect
 		validate_tld validate_service
 		get_templated_nsips db_exec tld_interface_enabled
 		tld_interface_enabled_create_cache tld_interface_enabled_delete_cache
@@ -138,10 +138,10 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		db_select db_select_col db_select_row db_select_value db_select_binds db_explain
 		set_slv_config get_cycle_bounds get_rollweek_bounds get_downtime_bounds
 		current_month_first_cycle month_start
-		probe_online_at probes2tldhostids
+		probe_online_at_init probe_online_at probes2tldhostids
 		slv_max_cycles
 		get_probe_online_key_itemid
-		init_values push_value send_values get_nsip_from_key is_service_error get_templated_items_like
+		init_values push_value send_values get_nsip_from_key is_service_error
 		is_service_error_desc
 		is_internal_error
 		is_internal_error_desc
@@ -165,6 +165,8 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		fail_if_running
 		exit_if_running
 		trim
+		str_starts_with
+		str_ends_with
 		parse_opts parse_slv_opts override_opts
 		opt getopt setopt unsetopt optkeys ts_str ts_full selected_period
 		cycle_start
@@ -172,8 +174,8 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		update_slv_rtt_monthly_stats
 		recalculate_downtime
 		generate_report
-		get_probe_history
-		get_probe_results
+		get_test_history
+		get_test_results
 		set_log_tld unset_log_tld
 		convert_suffixed_number
 		usage);
@@ -246,6 +248,11 @@ sub get_macro_dns_tcp_rtt_low
 	return __get_macro('{$RSM.DNS.TCP.RTT.LOW}');
 }
 
+sub get_macro_dns_tcp_rtt_high
+{
+	return __get_macro('{$RSM.DNS.TCP.RTT.HIGH}');
+}
+
 sub get_macro_rdds_rtt_low
 {
 	return __get_macro('{$RSM.RDDS.RTT.LOW}');
@@ -256,28 +263,13 @@ sub get_macro_rdap_rtt_low
 	return __get_macro('{$RSM.RDAP.RTT.LOW}');
 }
 
-sub get_dns_udp_delay
+sub get_dns_delay
 {
 	my $value_time = (shift or time() - AVAIL_SHIFT_BACK);
 
-	my $value = __get_configvalue(RSM_CONFIG_DNS_UDP_DELAY_ITEMID, $value_time);
+	my $value = __get_configvalue(RSM_CONFIG_DNS_DELAY_ITEMID, $value_time);
 
-	return $value if (defined($value));
-
-	return __get_macro('{$RSM.DNS.UDP.DELAY}');
-}
-
-sub get_dns_tcp_delay
-{
-	my $value_time = (shift or time() - AVAIL_SHIFT_BACK);
-
-	# todo: Export DNS-TCP tests
-	# todo: if we really need DNS-TCP history the item must be added (to db schema and upgrade patch)
-#	my $value = __get_configvalue(RSM_CONFIG_DNS_TCP_DELAY_ITEMID, $value_time);
-#
-#	return $value if (defined($value));
-
-	return __get_macro('{$RSM.DNS.TCP.DELAY}');
+	return $value // __get_macro('{$RSM.DNS.DELAY}');
 }
 
 sub get_rdds_delay
@@ -616,7 +608,7 @@ sub get_lastclock($$$)
 
 	my $sql;
 
-	if ("[" eq substr($key, -1))
+	if (str_ends_with($key, "["))
 	{
 		$sql =
 			"select i.itemid".
@@ -780,6 +772,7 @@ sub get_probes(;$$)
 
 	return $probes_cache{$server_key}{$name}{$service};
 }
+
 sub __get_probes($)
 {
 	my $name = shift;
@@ -790,9 +783,8 @@ sub __get_probes($)
 		"select hosts.hostid,hosts.host,hostmacro.macro,hostmacro.value,hosts.status" .
 		" from hosts" .
 			" left join hosts_groups on hosts_groups.hostid=hosts.hostid" .
-			" left join hosts_templates as hosts_templates_1 on hosts_templates_1.hostid=hosts.hostid" .
-			" left join hosts_templates as hosts_templates_2 on hosts_templates_2.hostid=hosts_templates_1.templateid" .
-			" left join hostmacro on hostmacro.hostid=hosts_templates_2.templateid" .
+			" left join hosts_templates on hosts_templates.hostid=hosts.hostid" .
+			" left join hostmacro on hostmacro.hostid=hosts_templates.templateid" .
 		" where $name_condition" .
 			" hosts_groups.groupid=" . PROBES_GROUPID . " and" .
 			" hostmacro.macro in ('{\$RSM.IP4.ENABLED}','{\$RSM.IP6.ENABLED}','{\$RSM.RDDS.ENABLED}','{\$RSM.RDAP.ENABLED}')");
@@ -877,49 +869,6 @@ sub get_templated_nsips
 	return get_nsips("Template $host", $key);
 }
 
-# return itemids grouped by hosts:
-#
-# {
-#    'hostid1' => {
-#         'itemid1' => 'ns2,2620:0:2d0:270::1:201',
-#         'itemid2' => 'ns1,192.0.34.201'
-#    },
-#    'hostid2' => {
-#         'itemid3' => 'ns2,2620:0:2d0:270::1:201',
-#         'itemid4' => 'ns1,192.0.34.201'
-#    }
-# }
-sub get_nsip_items
-{
-	my $nsips_ref = shift; # array reference of NS,IP pairs
-	my $cfg_key_in = shift;
-	my $tld = shift;
-
-	my @keys;
-	push(@keys, "'" . $cfg_key_in . $_ . "]'") foreach (@$nsips_ref);
-
-	my $keys_str = join(',', @keys);
-
-	my $rows_ref = db_select(
-		"select h.hostid,i.itemid,i.key_ ".
-		"from items i,hosts h ".
-		"where i.hostid=h.hostid".
-			" and h.host like '$tld %'".
-			" and i.templateid is not null".
-			" and i.key_ in ($keys_str)");
-
-	my $result = {};
-
-	foreach my $row_ref (@$rows_ref)
-	{
-		$result->{$row_ref->[0]}{$row_ref->[1]} = get_nsip_from_key($row_ref->[2]);
-	}
-
-	fail("cannot find items ($keys_str) at host ($tld *)") if (scalar(keys(%{$result})) == 0);
-
-	return $result;
-}
-
 # returns a reference to a hash:
 # {
 #     hostid => {
@@ -949,27 +898,62 @@ sub __get_host_items
 	return $result;
 }
 
-sub get_tld_items
+sub get_test_items($)
 {
-	my $tld = shift;
-	my $cfg_key = shift;
+	my $rsmhost = shift;
+
+	# TODO: in the future consider also collecting SLV items, to get everything related to the test
+	#
+	#my $host_cond = " and (" .
+	#			"(hg.groupid=" . TLDS_GROUPID . " and h.host='$rsmhost') or" .
+	#			" (hg.groupid=" . TLD_PROBE_RESULTS_GROUPID . " and h.host like '$rsmhost %')" .
+	#		")";
 
 	my $rows_ref = db_select(
-		"select i.itemid,i.key_".
-		" from items i,hosts h".
-		" where i.hostid=h.hostid".
-			" and h.host='$tld'".
-			" and i.key_ like '$cfg_key%'");
+		"select h.host,hg.groupid,i.itemid,i.key_,i.value_type".
+		" from items i,hosts h,hosts_groups hg".
+		" where h.hostid=i.hostid".
+			" and hg.hostid=h.hostid".
+			" and h.status=".HOST_STATUS_MONITORED.
+			" and i.status<>".ITEM_STATUS_DISABLED.
+			" and hg.groupid=" . TLD_PROBE_RESULTS_GROUPID . " and h.host like '$rsmhost %'"
+	);
 
-	my @items;
-	foreach my $row_ref (@$rows_ref)
+	my $result = {};
+
+	foreach my $row_ref (@{$rows_ref})
 	{
-		push(@items, $row_ref);
+		my $host = $row_ref->[0];
+		my $groupid = $row_ref->[1];
+		my $itemid = $row_ref->[2];
+		my $key = $row_ref->[3];
+		my $value_type = $row_ref->[4];
+
+		my $probe;
+
+		# TODO: in the future consider also collecting SLV items, to get everything related to the test
+		#
+		#if ($groupid == TLDS_GROUPID)
+		#{
+		#	$probe = "";
+		#}
+		#elsif ($host =~ /$rsmhost (.*)/)
+		if ($host =~ /$rsmhost (.*)/)
+		{
+			$probe = $1;
+		}
+		else
+		{
+			fail("unexpected host name: \"$host\"");
+		}
+
+		$result->{$probe}{$itemid} = {
+			'key' => $key,
+			'value_type' => $value_type,
+		};
 	}
 
-	fail("cannot find items ($cfg_key*) at host ($tld)") if (scalar(@items) == 0);
-
-	return \@items;
+	return $result;
 }
 
 sub get_hostid
@@ -990,7 +974,7 @@ sub tld_exists_locally($)
 
 	my $rows_ref = db_select(
 		"select 1".
-		" from hosts h,hosts_groups hg,groups g".
+		" from hosts h,hosts_groups hg,hstgrp g".
 		" where h.hostid=hg.hostid".
 			" and hg.groupid=g.groupid".
 			" and g.name='TLDs'".
@@ -1163,9 +1147,9 @@ sub tld_interface_enabled_create_cache
 			" from hosts h,hosts_groups hg".
 			" where h.hostid=hg.hostid".
 				" and h.status=0".
-				" and hg.groupid=".TLD_PROBE_RESULTS_GROUPID);
+				" and hg.groupid=".TLDS_GROUPID);
 
-		map {$enabled_hosts_cache{$_->[0]} = substr($_->[1], 0, index($_->[1], ' '))} (@{$rows_ref});
+		map {$enabled_hosts_cache{$_->[0]} = $_->[1]} (@{$rows_ref});
 
 		@tlds_cache = uniq(values(%enabled_hosts_cache)) if (scalar(@tlds_cache) == 0);
 	}
@@ -1310,7 +1294,7 @@ sub tld_interface_enabled($$$)
 
 	# try the Template macro
 
-	my $host = "Template $tld";
+	my $host = TEMPLATE_RSMHOST_CONFIG_PREFIX . $tld;
 
 	my $macro;
 
@@ -2053,6 +2037,10 @@ sub slv_max_cycles($)
 #     }
 # }
 my %_PROBESTATUSES;
+sub probe_online_at_init()
+{
+	%_PROBESTATUSES = ();
+}
 
 #
 # The probe is considered ONLINE only if each minute of the cycle (this is why
@@ -2109,7 +2097,7 @@ sub probe_online_at($$$)
 #   "org Probe2"	100
 #   "org Probe12"	101
 # calling
-#   probes2tldhostids("org", ("Probe2", "Probe12"))
+#   probes2tldhostids("org", ["Probe2", "Probe12"])
 # will return
 #  (100, 101)
 sub probes2tldhostids
@@ -2523,34 +2511,18 @@ sub check_sent_values()
 	}
 }
 
-# Get name server details (name, IP) from item key.
-#
-# E. g.:
-#
-# rsm.dns.udp.rtt[{$RSM.TLD},i.ns.se.,194.146.106.22] -> "i.ns.se.,194.146.106.22"
-# rsm.slv.dns.avail[i.ns.se.,194.146.106.22] -> "i.ns.se.,194.146.106.22"
-sub get_nsip_from_key
+sub get_nsip_from_key($)
 {
 	my $key = shift;
 
-	my $offset = index($key, "[");
+	return "$1,$2" if ($key =~ /rsm.dns.rtt\[(.*),(.*),udp\]/);
+	return "$1,$2" if ($key =~ /rsm.dns.rtt\[(.*),(.*),tcp\]/);
+	return "$1,$2" if ($key =~ /rsm.dns.nsid\[(.*),(.*)\]/);
+	return "$1,$2" if ($key =~ /rsm.slv.dns.ns.avail\[(.*),(.*)\]/);
+	return "$1,$2" if ($key =~ /rsm.slv.dns.ns.downtime\[(.*),(.*)\]/);
 
-	return "" if ($offset == -1);
-
-	if (substr($key, $offset + 1, 1) eq "{")
-	{
-		$offset = index($key, ",");
-
-		return "" if ($offset == -1);
-	}
-
-	$offset++;
-
-	my $endpos = index($key, "]");
-
-	return "" if ($endpos == -1 || $endpos <= $offset);
-
-	return substr($key, $offset, $endpos - $offset);
+	wrn("unhandled key: $key");
+	return "";
 }
 
 sub is_internal_error
@@ -2578,7 +2550,7 @@ sub is_internal_error_desc
 	my $desc = shift;
 
 	return 0 unless (defined($desc));
-	return 0 unless (substr($desc, 0, 1) eq "-");
+	return 0 unless (str_starts_with($desc, "-"));
 
 	return is_internal_error(get_value_from_desc($desc));
 }
@@ -2629,33 +2601,6 @@ sub is_service_error_desc
 	return 0 if ($desc eq "");
 
 	return is_service_error($service, get_value_from_desc($desc), $rtt_limit);
-}
-
-sub get_templated_items_like
-{
-	my $tld = shift;
-	my $key_in = shift;
-
-	# TODO: this function could benefit from some caching because it's called
-	# on every cycle during rsm.slv*.pl calculation even though list of items
-	# is not likely to change
-
-	my $hostid = get_hostid("Template $tld");
-
-	my $items_ref = db_select(
-		"select key_".
-		" from items".
-		" where hostid=$hostid".
-			" and key_ like '$key_in%'".
-			" and status<>".ITEM_STATUS_DISABLED);
-
-	my @result;
-	foreach my $item_ref (@{$items_ref})
-	{
-		push(@result, $item_ref->[0]);
-	}
-
-	return \@result;
 }
 
 # Collect cycles that needs to be calculated in form:
@@ -2790,7 +2735,7 @@ sub process_slv_avail_cycles($$$$$$$$$)
 			{
 				# fail("cannot get input keys for Service availability calculation");
 
-				# We used to fail here but not anymore because rsm.rdds items can be 
+				# We used to fail here but not anymore because rsm.rdds items can be
 				# disabled after switch to RDAP standalone. So some of TLDs may not have
 				# RDDS checks thus making SLV calculations for rsm.slv.rdds.* useless
 
@@ -2812,7 +2757,7 @@ sub process_slv_avail_cycles($$$$$$$$$)
 sub process_slv_avail($$$$$$$$$$)
 {
 	my $tld = shift;
-	my $cfg_keys_in = shift;	# array reference, e. g. ['rsm.dns.udp.rtt[...]', ...] or ['rsm.dns.udp[...]']
+	my $cfg_keys_in = shift;	# array reference, e. g. ['rsm.dns.rtt[...,udp]', ...]
 	my $cfg_key_out = shift;
 	my $from = shift;
 	my $delay = shift;
@@ -4103,9 +4048,30 @@ sub trim
 	$_[0] =~ s/\s+$//g;
 }
 
+
+sub str_starts_with($$;$$)
+{
+	my $string = shift;
+
+	while (my $prefix = shift)
+	{
+		return 1 if (rindex($string, $prefix, 0) == 0);
+	}
+
+	return 0;
+}
+
+sub str_ends_with($$)
+{
+	my $string = shift;
+	my $suffix = shift;
+
+	return substr($string, -length($suffix)) eq $suffix;
+}
+
 sub parse_opts
 {
-	if (!GetOptions(\%OPTS, 'help!', 'dry-run!', 'warnslow=f', 'nolog!', 'debug!', 'stats!', @_))
+	if (!GetOptions(\%OPTS, 'help', 'dry-run', 'warnslow=f', 'nolog', 'debug', 'stats', @_))
 	{
 		pod2usage(-verbose => 0, -input => $POD2USAGE_FILE);
 	}
@@ -4130,7 +4096,7 @@ sub parse_slv_opts
 {
 	$POD2USAGE_FILE = '/opt/zabbix/scripts/slv/rsm.slv.usage';
 
-	parse_opts('tld=s', 'now=n', 'cycles=n', 'output-file=s', 'fill-gap=n');
+	parse_opts('tld=s', 'now=i', 'cycles=i', 'output-file=s', 'fill-gap=i');
 }
 
 sub override_opts($)
@@ -4335,27 +4301,29 @@ sub get_month_bounds(;$)
 	return ($from, $till);
 }
 
-sub get_slv_rtt_cycle_stats($$$$)
+sub get_slv_rtt_cycle_stats($$$$$$)
 {
-	my $tld         = shift;
-	my $rtt_params  = shift;
-	my $cycle_start = shift;
-	my $cycle_end   = shift;
+	my $tld             = shift;
+	my $rtt_params      = shift;
+	my $cycle_start     = shift;
+	my $cycle_end       = shift;
+	my $now             = shift;
+	my $max_nodata_time = shift;
 
-	my $probes                  = $rtt_params->{'probes'};
-	my $rtt_item_key_pattern    = $rtt_params->{'rtt_item_key_pattern'};
-	my $timeout_error_value     = $rtt_params->{'timeout_error_value'};
-	my $timeout_threshold_value = $rtt_params->{'timeout_threshold_value'};
+	my $probes                     = $rtt_params->{'probes'};
+	my $rtt_item_key_pattern       = $rtt_params->{'rtt_item_key_pattern'};
+	my $lastclock_control_item_key = $rtt_params->{'lastclock_control_item_key'};
+	my $timeout_error_value        = $rtt_params->{'timeout_error_value'};
+	my $timeout_threshold_value    = $rtt_params->{'timeout_threshold_value'};
 
 	if (scalar(keys(%{$probes})) == 0)
 	{
 		dbg("there are no probes that would be able to collect RTT stats for TLD '$tld', item '$rtt_item_key_pattern'");
 		return {
 			'expected'   => 0,
-			'total'      => 0,
 			'performed'  => 0,
 			'failed'     => 0,
-			'successful' => 0
+			'successful' => 0,
 		};
 	}
 
@@ -4368,39 +4336,63 @@ sub get_slv_rtt_cycle_stats($$$$)
 		dbg("items '$rtt_item_key_pattern' not found for for TLD '$tld'");
 		return {
 			'expected'   => 0,
-			'total'      => 0,
 			'performed'  => 0,
 			'failed'     => 0,
-			'successful' => 0
+			'successful' => 0,
 		};
 	}
 
-	my $rows = db_select(
+	my $row = db_select_row(
 			"select count(*)," .
 				" count(if(value=$timeout_error_value || value>$timeout_threshold_value,1,null))," .
 				" count(if(value between 0 and $timeout_threshold_value,1,null))" .
 			" from history" .
 			" where itemid in ($tld_itemids_str) and clock between $cycle_start and $cycle_end");
 
+	if ($row->[0] < scalar(@{$tld_itemids}) && $cycle_end > $now - $max_nodata_time)
+	{
+		if (defined($lastclock_control_item_key))
+		{
+			# for DNS, it's not known into which item (i.e., TCP or UDP) RTT value for this cycle is being written;
+			# to check if RTT was already received, check the status of the "lastclock control item" that is being written on each cycle
+
+			my $itemids = get_itemids_by_key_pattern_and_hosts($lastclock_control_item_key, $tld_hosts, ITEM_STATUS_ACTIVE);
+			my $itemids_str = join(",", @{$itemids});
+
+			my $count = db_select_value("select count(*) from lastvalue where itemid in ($itemids_str) and clock>=$cycle_start");
+
+			if ($count < scalar(@{$tld_itemids}))
+			{
+				# not enough data, try again later
+				return undef;
+			}
+		}
+		else
+		{
+			# not enough data, try again later
+			return undef;
+		}
+	}
+
 	return {
-		'expected'   => scalar(@{$tld_itemids}),        # number of expected tests, based on number of items and number of probes
-		'total'      => $rows->[0][0],                  # number of received values, including errors
-		'performed'  => $rows->[0][1] + $rows->[0][2],  # number of received values, excluding errors (timeout errors are valid values)
-		'failed'     => $rows->[0][1],                  # number of failed tests - timeout errors and successful queries over the time limit
-		'successful' => $rows->[0][2]                   # number of successful tests
+		'expected'   => scalar(@{$tld_itemids}),  # number of expected tests, based on number of items and number of probes
+		'performed'  => $row->[1] + $row->[2],    # number of received values, excluding errors (timeout errors are valid values)
+		'failed'     => $row->[1],                # number of failed tests - timeout errors and successful queries over the time limit
+		'successful' => $row->[2],                # number of successful tests
 	};
 }
 
-sub get_slv_rtt_cycle_stats_aggregated($$$$)
+sub get_slv_rtt_cycle_stats_aggregated($$$$$$)
 {
 	my $rtt_params_list = shift; # array of hashes
 	my $cycle_start     = shift;
 	my $cycle_end       = shift;
 	my $tld             = shift;
+	my $now             = shift;
+	my $max_nodata_time = shift;
 
 	my %aggregated_stats = (
 		'expected'   => 0,
-		'total'      => 0,
 		'performed'  => 0,
 		'failed'     => 0,
 		'successful' => 0
@@ -4413,10 +4405,14 @@ sub get_slv_rtt_cycle_stats_aggregated($$$$)
 			next;
 		}
 
-		my $service_stats = get_slv_rtt_cycle_stats($tld, $rtt_params, $cycle_start, $cycle_end);
+		my $service_stats = get_slv_rtt_cycle_stats($tld, $rtt_params, $cycle_start, $cycle_end, $now, $max_nodata_time);
+
+		if (!defined($service_stats))
+		{
+			return undef;
+		}
 
 		$aggregated_stats{'expected'}   += $service_stats->{'expected'};
-		$aggregated_stats{'total'}      += $service_stats->{'total'};
 		$aggregated_stats{'performed'}  += $service_stats->{'performed'};
 		$aggregated_stats{'failed'}     += $service_stats->{'failed'};
 		$aggregated_stats{'successful'} += $service_stats->{'successful'};
@@ -4585,14 +4581,11 @@ sub update_slv_rtt_monthly_stats($$$$$$$$;$)
 				$params_list = $rdap_standalone_params_list;
 			}
 
-			my $rtt_stats = get_slv_rtt_cycle_stats_aggregated($params_list, $cycle_start, $cycle_end, $tld);
+			my $rtt_stats = get_slv_rtt_cycle_stats_aggregated($params_list, $cycle_start, $cycle_end, $tld, $now, $max_nodata_time);
 
-			if ($rtt_stats->{'total'} < $rtt_stats->{'expected'} && $cycle_end > $now - $max_nodata_time)
+			if (!defined($rtt_stats))
 			{
-				if (opt('debug'))
-				{
-					dbg("stopping updatig TLD '$tld' because of missing data, cycle from $cycle_start till $cycle_end");
-				}
+				dbg("stopping updatig TLD '$tld' because of missing data, cycle from $cycle_start till $cycle_end");
 				next TLD_LOOP;
 			}
 
@@ -4627,16 +4620,16 @@ sub update_slv_rtt_monthly_stats($$$$$$$$;$)
 
 				if ($last_pfailed_value > 0)
 				{
-					fail("unexpected last pfailed value:\n".
-						"\$i                        = $i\n".
-						"\$tld                      = $tld\n".
-						"\$cycles_till_end_of_month = $cycles_till_end_of_month\n".
-						"\$end_of_prev_month        = $end_of_prev_month\n".
-						"\$last_clock               = $last_clock\n".
-						"\$cycle_delay              = $cycle_delay\n".
-						"\$cycle_start              = $cycle_start\n".
-						"\$cycle_end                = $cycle_end\n".
-						"\$last_pfailed_value       = $last_pfailed_value\n".
+					fail("unexpected last pfailed value:\n" .
+						"\$i                        = $i\n" .
+						"\$tld                      = $tld\n" .
+						"\$cycles_till_end_of_month = $cycles_till_end_of_month\n" .
+						"\$end_of_prev_month        = $end_of_prev_month\n" .
+						"\$last_clock               = $last_clock\n" .
+						"\$cycle_delay              = $cycle_delay\n" .
+						"\$cycle_start              = $cycle_start\n" .
+						"\$cycle_end                = $cycle_end\n" .
+						"\$last_pfailed_value       = $last_pfailed_value\n" .
 						"\$rtt_stats->{'expected'}  = $rtt_stats->{'expected'}");
 				}
 			}
@@ -4756,16 +4749,32 @@ sub generate_report($$;$)
 # Helper function for collecting data for SLA API and Data Export.
 #
 # The data is collected for specified period, specified items of type float and str. The data is to be used later
-# for calling get_probe_results().
+# for calling get_test_results().
 #
-sub get_probe_history($$$$$$)
+sub get_test_history($$$$$$$$)
 {
-	my $from = shift;
-	my $till = shift;
-	my $itemids_float = shift;
-	my $itemids_str = shift;
+	my $from = shift;              # input
+	my $till = shift;              # input
+	my $itemids_uint = shift;      # input
+	my $itemids_float = shift;     # input
+	my $itemids_str = shift;       # input
+	my $results_uint_buf = shift;  # output
 	my $results_float_buf = shift; # output
 	my $results_str_buf = shift;   # output
+
+	if (@{$itemids_uint} == 0)
+	{
+		$$results_uint_buf = [];
+	}
+	else
+	{
+		$$results_uint_buf = db_select(
+			"select itemid,value,clock".
+			" from " . history_table(ITEM_VALUE_TYPE_UINT64).
+			" where itemid in (" . join(',', @{$itemids_uint}) . ")".
+				" and " . sql_time_condition($from, $till)
+		);
+	}
 
 	if (@{$itemids_float} == 0)
 	{
@@ -4825,67 +4834,195 @@ sub __get_interface($$)
 
 	# RDDS service is the only having multiple interfaces
 
-	if (substr($key, 0, length("rsm.rdds.43")) eq "rsm.rdds.43")
+	if (str_starts_with($key, "rsm.rdds.43"))
 	{
 		return INTERFACE_RDDS43;
 	}
 
-	if (substr($key, 0, length("rsm.rdds.80")) eq "rsm.rdds.80")
+	if (str_starts_with($key, "rsm.rdds.80"))
 	{
 		return INTERFACE_RDDS80;
 	}
 
-	if (substr($key, 0, length("rdap")) eq "rdap")
+	if (str_starts_with($key, "rdap"))
 	{
 		return INTERFACE_RDAP;
 	}
 
 	fail("Cannot identify interface from $service key \"$key\"");
 }
+
+sub get_service_from_key($;$)
+{
+	my $key = shift;
+	my $clock = shift;
+
+	return 'dns' if (str_starts_with($key, 'rsm.dns'));
+	return 'rdds' if (str_starts_with($key, 'rsm.rdds'));
+	return 'rdds' if (str_starts_with($key, 'rdap') && !is_rdap_standalone($clock));
+	return 'rdap' if (str_starts_with($key, 'rdap') && is_rdap_standalone($clock));
+
+	fail("cannot identify service, key \"$key\" is unknown");
+}
+
+use constant FAKE_NS => '';
+use constant FAKE_NSIP => '';
+
+#
+# Items we collect the data from:
+#
+# DNS:
+# | rsm.dns.mode                                 |
+# | rsm.dns.ns.status[ns1.zabbix.dev]            |
+# | rsm.dns.ns.status[ns2.zabbix.dev]            |
+# | rsm.dns.nsid[ns1.zabbix.dev,192.168.3.11]    |
+# | rsm.dns.nsid[ns2.zabbix.dev,192.168.3.9]     |
+# | rsm.dns.nsid[ns2.zabbix.dev,192.168.8.75]    |
+# | rsm.dns.protocol                             |
+# | rsm.dns.rtt[ns1.zabbix.dev,192.168.3.11,tcp] |
+# | rsm.dns.rtt[ns1.zabbix.dev,192.168.3.11,udp] |
+# | rsm.dns.rtt[ns2.zabbix.dev,192.168.3.9,tcp]  |
+# | rsm.dns.rtt[ns2.zabbix.dev,192.168.3.9,udp]  |
+# | rsm.dns.rtt[ns2.zabbix.dev,192.168.8.75,tcp] |
+# | rsm.dns.rtt[ns2.zabbix.dev,192.168.8.75,udp] |
+# | rsm.dns.status
+# RDDS:
+# | rsm.rdds.43.ip         |
+# | rsm.rdds.43.rtt        |
+# | rsm.rdds.43.target     |
+# | rsm.rdds.43.testedname |
+# | rsm.rdds.80.ip         |
+# | rsm.rdds.80.rtt        |
+# | rsm.rdds.80.target     |
+# | rsm.rdds.status        |
+#  RDAP:
+# | rdap.ip         |
+# | rdap.rtt        |
+# | rdap.status     |
+# | rdap.target     |
+# | rdap.testedname |
 #
 # Format history data in a convenient way for SLA API and Data Export scripts. We need to group metrics by targets.
 # Targets are differently fetched in case for DNS/DNSSEC and RDDS/RDAP but formatted in the same way (see comments
 # in the code):
 #
-# {CLOCK}->{INTERFACE}->{TARGET} => [
-#     {
-#         'rtt'
-#         'ip'
-#     },
-#     {
-#         'rtt'
-#         'ip'
+# {
+#     'dns' => {
+#         '12345678' => {        <-- cycleclock
+#             'status' => 1,
+#             'interfaces' => {
+#                 'DNS' => {
+#                     'clock' => 123456789,
+#                     'status' => 1,
+#                     'protocol' => 0,
+#                     'testedname' => 'nonexistend.example.com',
+#                     'targets' => {
+#                         'ns1.example.com' => {
+#                             'status' => 1,
+#                             'metrics' => [
+#                                 'rtt' => 13,
+#                                 'ip' => '1.2.3.4',
+#                                 'nsid' => ''
+#                             ]
+#                         },
+#                         'ns1.example.com' => {
+#                             'status' => 1,
+#                             'metrics' => [
+#                                 'rtt' => 13,
+#                                 'ip' => '1.2.3.4',
+#                                 'nsid' => ''
+#                             ]
+#                         }
+#                     }
+#                 }
+#             }
+#         }
 #     }
-# ];
-# {CLOCK}->{INTERFACE}->{TARGET} => [
-#     {
-#         'rtt'
-#         'ip'
-#         'testedName'
+#     'rdds' => {
+#         '123450000' => {        <-- cycleclock
+#             'status' => 1,
+#             'interfaces' => {
+#                 'RDDS43' => {
+#                     'clock' => 123456789,
+#                     'status' => 1,
+#                     'testedname' => 'example.com'
+#                     'targets' => {
+#                         'whois.example.com' => {
+#                             'status' => 1,
+#                             'metrics' => [
+#                                 'rtt' => 35,
+#                                 'ip' => '1.2.3.4',
+#                             ]
+#                         }
+#                     }
+#                 },
+#                 'RDAP' => {
+#                     'clock' => 123456800,
+#                     'status' => 1,
+#                     'testedname' => 'test.example.com'
+#                     'targets' => {
+#                         'http://rdap.example.com/rdap' => {
+#                             'status' => 0,
+#                             'metrics' => [
+#                                 'rtt' => 120,
+#                                 'ip' => '1.2.3.8',
+#                             ]
+#                         }
+#                     }
+#                 }
+#             }
+#         }
 #     }
-# ];
+# }
 #
-sub get_probe_results($$$$)
+sub get_test_results($$;$)
 {
-	my $service = shift;
-	my $results_float = shift;
-	my $results_str = shift;
+	my $results = shift;
 	my $item_data = shift;
+	my $service_filter = shift;	# optional: only get specified service data
 
-	my ($rd_targets, $rd_metrics, $probe_results);	# for rdds/rdap we need to collect separately
+	my %delays = (
+		'dns' => get_dns_delay(),
+		'rdds' => get_rdap_delay(),
+		'rdap' => get_rdap_delay(),
+	);
 
+	# We have:
 	#
-	# Fetch RTT (Float) values (on Probe level).
+	# - rtt
+	# - ip
+	# - nsid (only dns)
+	# - protocol (only dns)
+	# - target
+	# - testedname
+	# - target status
+	# - interface status
+	# - service status
 	#
-	# Note, for DNS service we will also collect target (Name Server) and IP
-	# because these are provided in the item parameters, e. g.:
+	# Let's pre-format the data for later convenient generation.
 	#
-	# rsm.dns.udp.rtt["ns1.example.com",1.2.3.4]
+	# # servicestatuses:
+	# cycleclock => service => 'status' = 1
 	#
-	# For other services the IPs are located in separate items which we collect on the next run.
+	# # interfacedata:
+	# cycleclock => service => 'interfaces' => interface => 'status' = 1
+	# cycleclock => service => 'interfaces' => interface => 'clock' = 123455667
+	# cycleclock => service => 'interfaces' => interface => 'testedname' = example.com (not rdds80)
+	# cycleclock => service => 'interfaces' => interface => 'protocol' = 0 (dns only)
 	#
+	# # metrics:
+	# cycleclock => service => 'interfaces' => interface => 'metrics' => ns => nsip => 'rtt' = 12
+	# cycleclock => service => 'interfaces' => interface => 'metrics' => ns => nsip => 'nsid' = '' (dns only)
+	# cycleclock => service => 'interfaces' => interface => 'metrics' => ns => nsip => 'ip' = '1.2.3.4' (not dns)
+	# cycleclock => service => 'interfaces' => interface => 'metrics' => ns => nsip => 'target' = 'whois.example.com' (not dns)
+	# cycleclock => service => 'interfaces' => interface => 'metrics' => ns => nsip => 'status' = 1 (status of a target)
+	#
+	# NB! For non-DNS serives ns and nsip will be fake strings. This is needed for connecting results and
+	# targets because in DNS there are multiple targets. Let's keep single structure of the data for convenience.
 
-	foreach my $row_ref (@{$results_float})
+	my %data;
+
+	foreach my $row_ref (@{$results})
 	{
 		my $itemid = $row_ref->[0];
 		my $value = $row_ref->[1];
@@ -4893,131 +5030,196 @@ sub get_probe_results($$$$)
 
 		my $i = $item_data->{$itemid};
 
+		next if (str_ends_with($i->{'key'}, ".enabled"));
+		next if (str_starts_with($i->{'key'}, "rsm.slv."));
+		next if (str_starts_with($i->{'key'}, "rsm.dns.nssok"));
+		next if (str_starts_with($i->{'key'}, "rsm.dns.mode"));
+
+		my $service = get_service_from_key($i->{'key'});
+		my $cycleclock = cycle_start($clock, $delays{$service});
+
+		next if ($service_filter && $service ne $service_filter);
+
+		# RDDS is the only service that is not self-interface
+		if (str_starts_with($i->{'key'}, "rsm.rdds.status"))
+		{
+			# service status
+			$data{$cycleclock}{$service}{'status'} = $value;
+			next;
+		}
+
 		my $interface = __get_interface($service, $i->{'key'});
 
-		# before Upgrade to 5.x DNS/DNSSEC were handled differently, since target and ip are in item parameters
-
-		if ($service eq 'dns' || $service eq 'dnssec')
+		# if RDAP is not standalone, connect RDAP with RDDS
+		if (str_starts_with($i->{'key'}, "rdap.status"))
 		{
-			if (substr($i->{'key'}, 0, length("rsm.dns.udp.rtt")) eq "rsm.dns.udp.rtt")
+			if (is_rdap_standalone($cycleclock))
 			{
-				my ($target, $ip) = split(',', get_nsip_from_key($i->{'key'}));
+				# service status
+				$data{$cycleclock}{$service}{'status'} = $value;
+			}
+			else
+			{
+				# RDDS is UP only when all interfaces are up
+				if (!exists($data{$cycleclock}{$service}{'status'}) || $data{$cycleclock}{$service}{'status'} == 1)
+				{
+					$data{$cycleclock}{$service}{'status'} = $value;
+				}
+			}
 
-				push(@{$probe_results->{$clock}{$interface}{$target}},
+			# interface status and clock
+			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'status'} = $value;
+			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'clock'} = $clock;
+
+			# target status
+			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}{FAKE_NS()}{FAKE_NSIP()}{'status'} = $value;
+		}
+		elsif (str_starts_with($i->{'key'}, "rsm.dns.status"))
+		{
+			# service status
+			$data{$cycleclock}{$service}{'status'} = $value;
+
+			# interface status and clock
+			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'status'} = $value;
+			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'clock'} = $clock;
+		}
+		elsif (str_starts_with($i->{'key'}, "rsm.rdds.43.status", "rsm.rdds.80.status"))
+		{
+			# interface status and clock
+			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'status'} = $value;
+			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'clock'} = $clock;
+
+			# target status
+			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}{FAKE_NS()}{FAKE_NSIP()}{'status'} = $value;
+		}
+		elsif (str_starts_with($i->{'key'}, "rsm.dns.testedname", "rsm.rdds.43.testedname", "rdap.testedname"))
+		{
+			# interface tested name
+			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'testedname'} = $value;
+		}
+		elsif (str_starts_with($i->{'key'}, "rsm.dns.protocol"))
+		{
+			# interface protocol
+			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'protocol'} = $value;
+		}
+		elsif (str_starts_with($i->{'key'}, "rsm.dns.mode"))
+		{
+			# interface mode
+			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'mode'} = $value;
+		}
+		elsif (str_starts_with($i->{'key'}, "rsm.dns.nsid"))
+		{
+			# DNS metric: nsid
+			my ($ns, $nsip) = split(',', get_nsip_from_key($i->{'key'}));
+
+			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}{$ns}{$nsip}{'nsid'} = $value;
+		}
+		elsif (str_starts_with($i->{'key'}, "rsm.dns.rtt"))
+		{
+			# DNS metric: rtt
+			my ($ns, $nsip) = split(',', get_nsip_from_key($i->{'key'}));
+
+			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}{$ns}{$nsip}{'rtt'} = $value;
+		}
+		elsif (str_starts_with($i->{'key'}, "rsm.dns.ns.status"))
+		{
+			# DNS metric: target status
+			my $ns;
+
+			$ns = $1 if ($i->{'key'} =~ /rsm.dns.ns.status\[(.*)\]/);
+
+			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}{$ns}{FAKE_NSIP()}{'status'} = $value;
+		}
+		elsif (str_starts_with($i->{'key'}, "rsm.rdds.43.target", "rsm.rdds.80.target", "rdap.target"))
+		{
+			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}{FAKE_NS()}{FAKE_NSIP()}{'target'} = $value;
+		}
+		elsif (str_starts_with($i->{'key'}, "rsm.rdds.43.rtt", "rsm.rdds.80.rtt", "rdap.rtt"))
+		{
+			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}{FAKE_NS()}{FAKE_NSIP()}{'rtt'} = $value;
+		}
+		elsif (str_starts_with($i->{'key'}, "rsm.rdds.43.ip", "rsm.rdds.80.ip", "rdap.ip"))
+		{
+			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}{FAKE_NS()}{FAKE_NSIP()}{'ip'} = $value;
+		}
+		else
+		{
+			fail("unhandled key: ", $i->{'key'});
+		}
+	}
+
+	my $result = {};
+
+	# format the data accordingly
+	foreach my $cycleclock (keys(%data))
+	{
+		foreach my $service (keys(%{$data{$cycleclock}}))
+		{
+			# service status
+			$result->{$service}{$cycleclock}{'status'} = $data{$cycleclock}{$service}{'status'};
+
+			foreach my $interface (keys(%{$data{$cycleclock}{$service}{'interfaces'}}))
+			{
+				# interface status
+				$result->{$service}{$cycleclock}{'interfaces'}{$interface}{'status'} =
+					$data{$cycleclock}{$service}{'interfaces'}{$interface}{'status'};
+
+				# interface clock
+				$result->{$service}{$cycleclock}{'interfaces'}{$interface}{'clock'} =
+					$data{$cycleclock}{$service}{'interfaces'}{$interface}{'clock'};
+
+				# interface protocol
+				if (exists($data{$cycleclock}{$service}{'interfaces'}{$interface}{'protocol'}))
+				{
+					$result->{$service}{$cycleclock}{'interfaces'}{$interface}{'protocol'} =
+						$data{$cycleclock}{$service}{'interfaces'}{$interface}{'protocol'};
+				}
+
+				# interface testedname
+				if (exists($data{$cycleclock}{$service}{'interfaces'}{$interface}{'testedname'}))
+				{
+					$result->{$service}{$cycleclock}{'interfaces'}{$interface}{'testedname'} =
+						$data{$cycleclock}{$service}{'interfaces'}{$interface}{'testedname'};
+				}
+
+				foreach my $ns (keys(%{$data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}}))
+				{
+					# get rid of fake target
+					my $target = ($ns eq FAKE_NS ? $data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}{$ns}{FAKE_NSIP()}{'target'} : $ns);
+
+					# target status is in FAKE_NS
+					$result->{$service}{$cycleclock}{'interfaces'}{$interface}{'targets'}{$target}{'status'} =
+						$data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}{$ns}{FAKE_NSIP()}{'status'};
+
+					foreach my $nsip (keys(%{$data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}{$ns}}))
 					{
-						'rtt' => $value,
-						'ip' => $ip,
+						# fake NSIP for target status (dns)
+						next unless (exists($data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}{$ns}{$nsip}{'rtt'}));
+
+						# get rid of fake NSIP
+						my $ip = ($nsip eq FAKE_NSIP ? $data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}{$ns}{$nsip}{'ip'} : $nsip);
+
+						my $h = {
+							'rtt' => $data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}{$ns}{$nsip}{'rtt'},
+							'ip' => $ip,
+						};
+
+						if (exists($data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}{$ns}{$nsip}{'nsid'}))
+						{
+							$h->{'nsid'} = $data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}{$ns}{$nsip}{'nsid'};
+						}
+
+						# the metrics
+						push(@{$result->{$service}{$cycleclock}{'interfaces'}{$interface}{'targets'}{$target}{'metrics'}}, $h);
 					}
-				);
-			}
-		}
-		else
-		{
-			$rd_metrics->{$clock}{$interface}{'rtt'} = $value;
-		}
-	}
-
-	# before Upgrade to 5.x DNS/DNSSEC were handled differently, since target and ip are in item parameters,
-	# so there are no "str" values in case of DNS/DNSSEC
-
-	if ($service eq 'dns' || $service eq 'dnssec')
-	{
-		return $probe_results;
-	}
-
-	#
-	# Fetch String values (IP, target, testedname) for non-DNS/DNSSEC tests.
-	#
-	# Note, this is because only for those there are items like:
-	#
-	# rsm.rdds.43.ip
-	# rsm.rdds.43.target
-	# rsm.rdds.43.testedName
-	#
-
-	foreach my $row_ref (@{$results_str})
-	{
-		my $itemid = $row_ref->[0];
-		my $value = $row_ref->[1];
-		my $clock = $row_ref->[2];
-
-		my $i = $item_data->{$itemid};
-
-		my $interface = __get_interface($service, $i->{'key'});
-
-		#
-		# Collect RDDS/RDAP targets.
-		#
-
-		if (substr($i->{'key'}, 0, length("rsm.rdds.43.target")) eq 'rsm.rdds.43.target')
-		{
-			$rd_targets->{$clock}{$interface} = $value;
-			next;
-		}
-
-		if (substr($i->{'key'}, 0, length("rsm.rdds.80.target")) eq 'rsm.rdds.80.target')
-		{
-			$rd_targets->{$clock}{$interface} = $value;
-			next;
-		}
-
-		if (substr($i->{'key'}, 0, length("rdap.target")) eq 'rdap.target')
-		{
-			$rd_targets->{$clock}{$interface} = $value;
-			next;
-		}
-
-		#
-		# Collect other metrics.
-		#
-
-		my $field;
-
-		if (substr($i->{'key'}, 0, length("rsm.rdds.43.ip")) eq 'rsm.rdds.43.ip')
-		{
-			$field = 'ip';
-		}
-		elsif (substr($i->{'key'}, 0, length("rsm.rdds.43.testedname")) eq 'rsm.rdds.43.testedname')
-		{
-			$field = 'testedName';
-		}
-		elsif (substr($i->{'key'}, 0, length("rsm.rdds.80.ip")) eq 'rsm.rdds.80.ip')
-		{
-			$field = 'ip';
-		}
-		elsif (substr($i->{'key'}, 0, length("rdap.ip")) eq 'rdap.ip')
-		{
-			$field = 'ip';
-		}
-		elsif (substr($i->{'key'}, 0, length("rdap.testedname")) eq 'rdap.testedname')
-		{
-			$field = 'testedName';
-		}
-		else
-		{
-			fail("unknown $service key: ", $i->{'key'});
-		}
-
-		$rd_metrics->{$clock}{$interface}{$field} = $value;
-	}
-
-	# Join targets with metrics. NB! We know for each RDDS43, RDDS80, RDAP interface there
-	# is always one metric per target (unkike DNS/DNSSEC), that's why array index 0.
-	foreach my $clock (keys(%{$rd_metrics}))
-	{
-		foreach my $interface (keys(%{$rd_metrics->{$clock}}))
-		{
-			foreach my $key (keys(%{$rd_metrics->{$clock}{$interface}}))
-			{
-				my $target = $rd_targets->{$clock}{$interface} // TARGET_PLACEHOLDER;
-
-				$probe_results->{$clock}{$interface}{$target}[0]{$key} =
-					$rd_metrics->{$clock}{$interface}{$key};
+				}
 			}
 		}
 	}
 
-	return $probe_results;
+#	TODO: at the end copy dnssec as dns if it exists
+
+	return $result;
 }
 
 sub set_log_tld($)
@@ -5044,7 +5246,8 @@ sub convert_suffixed_number($)
 		"h" => 3600,
 		"d" => 86400,
 		"w" => 7*86400
-		);
+	);
+
 	my $suffix = substr($number, -1);
 
 	return $number unless (exists($suffix_map{$suffix}));

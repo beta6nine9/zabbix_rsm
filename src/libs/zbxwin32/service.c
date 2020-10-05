@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -34,7 +34,7 @@ static	SERVICE_STATUS_HANDLE	serviceHandle;
 int	application_status = ZBX_APP_RUNNING;
 
 /* free resources allocated by MAIN_ZABBIX_ENTRY() */
-void	zbx_free_service_resources();
+void	zbx_free_service_resources(int ret);
 
 static void	parent_signal_handler(int sig)
 {
@@ -44,7 +44,7 @@ static void	parent_signal_handler(int sig)
 		case SIGTERM:
 			ZBX_DO_EXIT();
 			zabbix_log(LOG_LEVEL_INFORMATION, "Got signal. Exiting ...");
-			zbx_on_exit();
+			zbx_on_exit(SUCCEED);
 			break;
 	}
 }
@@ -69,7 +69,7 @@ static VOID WINAPI	ServiceCtrlHandler(DWORD ctrlCode)
 
 			/* notify other threads and allow them to terminate */
 			ZBX_DO_EXIT();
-			zbx_free_service_resources();
+			zbx_free_service_resources(SUCCEED);
 
 			serviceStatus.dwCurrentState	= SERVICE_STOPPED;
 			serviceStatus.dwWaitHint	= 0;
@@ -304,7 +304,7 @@ static int	svc_RemoveEventSource()
 	return SUCCEED;
 }
 
-int	ZabbixRemoveService()
+int	ZabbixRemoveService(void)
 {
 	SC_HANDLE	mgr, service;
 	int		ret = FAIL;
@@ -336,7 +336,7 @@ int	ZabbixRemoveService()
 	return ret;
 }
 
-int	ZabbixStartService()
+int	ZabbixStartService(void)
 {
 	SC_HANDLE	mgr, service;
 	int		ret = FAIL;
@@ -365,7 +365,7 @@ int	ZabbixStartService()
 	return ret;
 }
 
-int	ZabbixStopService()
+int	ZabbixStopService(void)
 {
 	SC_HANDLE	mgr, service;
 	SERVICE_STATUS	status;
@@ -395,13 +395,9 @@ int	ZabbixStopService()
 	return ret;
 }
 
-void	set_parent_signal_handler()
+void	set_parent_signal_handler(void)
 {
 	signal(SIGINT, parent_signal_handler);
 	signal(SIGTERM, parent_signal_handler);
 }
 
-void CALLBACK	ZBXEndThread(ULONG_PTR dwParam)
-{
-	_endthreadex(SUCCEED);
-}

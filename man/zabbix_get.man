@@ -1,4 +1,39 @@
-.TH ZABBIX_GET 1 "2015\-08\-06" Zabbix
+.\" Start URL macro. Copied from an-ext.tmac for portability
+.de UR
+.  ds m1 \\$1\"
+.  nh
+.  if \\n(mH \{\
+.    \" Start diversion in a new environment.
+.    do ev URL-div
+.    do di URL-div
+.  \}
+..
+.\" End URL macro. Copied from an-ext.tmac for portability
+.de UE
+.  ie \\n(mH \{\
+.    br
+.    di
+.    ev
+.
+.    \" Has there been one or more input lines for the link text?
+.    ie \\n(dn \{\
+.      do HTML-NS "<a href=""\\*(m1"">"
+.      \" Yes, strip off final newline of diversion and emit it.
+.      do chop URL-div
+.      do URL-div
+\c
+.      do HTML-NS </a>
+.    \}
+.    el \
+.      do HTML-NS "<a href=""\\*(m1"">\\*(m1</a>"
+\&\\$*\"
+.  \}
+.  el \
+\\*(la\\*(m1\\*(ra\\$*\"
+.
+.  hy \\n(HY
+..
+.TH ZABBIX_GET 1 "2020\-02\-29" Zabbix
 .SH NAME
 zabbix_get \- Zabbix get utility
 .SH SYNOPSIS
@@ -30,6 +65,10 @@ zabbix_get \- Zabbix get utility
 .IR cert\-file
 .B \-\-tls\-key\-file
 .IR key\-file
+.RB [ \-\-tls\-cipher13
+.IR cipher\-string ]
+.RB [ \-\-tls\-cipher
+.IR cipher\-string ]
 .BI \-k " item\-key"
 .br
 .B zabbix_get \-s
@@ -44,6 +83,10 @@ zabbix_get \- Zabbix get utility
 .IR PSK\-identity
 .B \-\-tls\-psk\-file
 .IR PSK\-file
+.RB [ \-\-tls\-cipher13
+.IR cipher\-string ]
+.RB [ \-\-tls\-cipher
+.IR cipher\-string ]
 .BI \-k " item\-key"
 .br
 .B zabbix_get \-h
@@ -97,6 +140,10 @@ Full pathname of a file containing the private key.
 PSK\-identity string.
 .IP "\fB\-\-tls\-psk\-file\fR \fIPSK\-file\fR"
 Full pathname of a file containing the pre-shared key.
+.IP "\fB\-\-tls\-cipher13\fR \fIcipher\-string\fR"
+Cipher string for OpenSSL 1.1.1 or newer for TLS 1.3. Override the default ciphersuite selection criteria. This option is not available if OpenSSL version is less than 1.1.1.
+.IP "\fB\-\-tls\-cipher\fR \fIcipher\-string\fR"
+GnuTLS priority string (for TLS 1.2 and up) or OpenSSL cipher string (only for TLS 1.2). Override the default ciphersuite selection criteria.
 .IP "\fB\-h\fR, \fB\-\-help\fR"
 Display this help and exit.
 .IP "\fB\-V\fR, \fB\-\-version\fR"
@@ -108,9 +155,15 @@ Output version information and exit.
 .br
 \fBzabbix_get \-s 127.0.0.1 \-p 10050 \-k "system.cpu.load[all,avg1]" \-\-tls\-connect psk \-\-tls\-psk\-identity "PSK ID Zabbix agentd" \-\-tls\-psk\-file /home/zabbix/zabbix_agentd.psk\fR
 .SH "SEE ALSO"
+.UR https://www.zabbix.com/manuals
+Documentation
+.UE
+.PP
 .BR zabbix_agentd (8),
 .BR zabbix_proxy (8),
-.BR zabbix_sender (8),
-.BR zabbix_server (8)
+.BR zabbix_sender (1),
+.BR zabbix_server (8),
+.BR zabbix_js (1),
+.BR zabbix_agent2 (8)
 .SH AUTHOR
 Alexei Vladishev <alex@zabbix.com>

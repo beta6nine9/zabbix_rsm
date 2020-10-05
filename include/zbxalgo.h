@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -31,6 +31,7 @@ zbx_hash_t	zbx_hash_modfnv(const void *data, size_t len, zbx_hash_t seed);
 zbx_hash_t	zbx_hash_murmur2(const void *data, size_t len, zbx_hash_t seed);
 zbx_hash_t	zbx_hash_sdbm(const void *data, size_t len, zbx_hash_t seed);
 zbx_hash_t	zbx_hash_djb2(const void *data, size_t len, zbx_hash_t seed);
+zbx_hash_t	zbx_hash_splittable64(const void *data);
 
 #define ZBX_DEFAULT_HASH_ALGO		zbx_hash_modfnv
 #define ZBX_DEFAULT_PTR_HASH_ALGO	zbx_hash_modfnv
@@ -40,14 +41,15 @@ zbx_hash_t	zbx_hash_djb2(const void *data, size_t len, zbx_hash_t seed);
 typedef zbx_hash_t (*zbx_hash_func_t)(const void *data);
 
 zbx_hash_t	zbx_default_ptr_hash_func(const void *data);
-zbx_hash_t	zbx_default_uint64_hash_func(const void *data);
 zbx_hash_t	zbx_default_string_hash_func(const void *data);
+zbx_hash_t	zbx_default_uint64_pair_hash_func(const void *data);
 
 #define ZBX_DEFAULT_HASH_SEED		0
 
-#define ZBX_DEFAULT_PTR_HASH_FUNC	zbx_default_ptr_hash_func
-#define ZBX_DEFAULT_UINT64_HASH_FUNC	zbx_default_uint64_hash_func
-#define ZBX_DEFAULT_STRING_HASH_FUNC	zbx_default_string_hash_func
+#define ZBX_DEFAULT_PTR_HASH_FUNC		zbx_default_ptr_hash_func
+#define ZBX_DEFAULT_UINT64_HASH_FUNC		zbx_hash_splittable64
+#define ZBX_DEFAULT_STRING_HASH_FUNC		zbx_default_string_hash_func
+#define ZBX_DEFAULT_UINT64_PAIR_HASH_FUNC	zbx_default_uint64_pair_hash_func
 
 typedef int (*zbx_compare_func_t)(const void *d1, const void *d2);
 
@@ -56,12 +58,14 @@ int	zbx_default_uint64_compare_func(const void *d1, const void *d2);
 int	zbx_default_uint64_ptr_compare_func(const void *d1, const void *d2);
 int	zbx_default_str_compare_func(const void *d1, const void *d2);
 int	zbx_default_ptr_compare_func(const void *d1, const void *d2);
+int	zbx_default_uint64_pair_compare_func(const void *d1, const void *d2);
 
 #define ZBX_DEFAULT_INT_COMPARE_FUNC		zbx_default_int_compare_func
 #define ZBX_DEFAULT_UINT64_COMPARE_FUNC		zbx_default_uint64_compare_func
 #define ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC	zbx_default_uint64_ptr_compare_func
 #define ZBX_DEFAULT_STR_COMPARE_FUNC		zbx_default_str_compare_func
 #define ZBX_DEFAULT_PTR_COMPARE_FUNC		zbx_default_ptr_compare_func
+#define ZBX_DEFAULT_UINT64_PAIR_COMPARE_FUNC	zbx_default_uint64_pair_compare_func
 
 typedef void *(*zbx_mem_malloc_func_t)(void *old, size_t size);
 typedef void *(*zbx_mem_realloc_func_t)(void *old, size_t size);
@@ -132,6 +136,8 @@ typedef struct
 }
 zbx_hashset_t;
 
+#define ZBX_HASHSET_ENTRY_OFFSET	offsetof(ZBX_HASHSET_ENTRY_T, data)
+
 void	zbx_hashset_create(zbx_hashset_t *hs, size_t init_size,
 				zbx_hash_func_t hash_func,
 				zbx_compare_func_t compare_func);
@@ -144,6 +150,7 @@ void	zbx_hashset_create_ext(zbx_hashset_t *hs, size_t init_size,
 				zbx_mem_free_func_t mem_free_func);
 void	zbx_hashset_destroy(zbx_hashset_t *hs);
 
+int	zbx_hashset_reserve(zbx_hashset_t *hs, int num_slots_req);
 void	*zbx_hashset_insert(zbx_hashset_t *hs, const void *data, size_t size);
 void	*zbx_hashset_insert_ext(zbx_hashset_t *hs, const void *data, size_t size, size_t offset);
 void	*zbx_hashset_search(zbx_hashset_t *hs, const void *data);
@@ -288,6 +295,8 @@ void	zbx_vector_ ## __id ## _destroy(zbx_vector_ ## __id ## _t *vector);					\
 														\
 void	zbx_vector_ ## __id ## _append(zbx_vector_ ## __id ## _t *vector, __type value);			\
 void	zbx_vector_ ## __id ## _append_ptr(zbx_vector_ ## __id ## _t *vector, __type *value);			\
+void	zbx_vector_ ## __id ## _append_array(zbx_vector_ ## __id ## _t *vector, __type const *values,		\
+									int values_num);			\
 void	zbx_vector_ ## __id ## _remove_noorder(zbx_vector_ ## __id ## _t *vector, int index);			\
 void	zbx_vector_ ## __id ## _remove(zbx_vector_ ## __id ## _t *vector, int index);				\
 														\
@@ -310,33 +319,45 @@ void	zbx_vector_ ## __id ## _clear(zbx_vector_ ## __id ## _t *vector);
 
 #define ZBX_PTR_VECTOR_DECL(__id, __type)									\
 														\
-ZBX_VECTOR_DECL(__id, __type);											\
+ZBX_VECTOR_DECL(__id, __type)											\
 														\
-void	zbx_vector_ ## __id ## _clear_ext(zbx_vector_ ## __id ## _t *vector, zbx_clean_func_t clean_func);
+typedef void (*zbx_ ## __id ## _free_func_t)(__type data);							\
+														\
+void	zbx_vector_ ## __id ## _clear_ext(zbx_vector_ ## __id ## _t *vector, zbx_ ## __id ## _free_func_t free_func);
 
-ZBX_VECTOR_DECL(uint64, zbx_uint64_t);
-ZBX_PTR_VECTOR_DECL(str, char *);
-ZBX_PTR_VECTOR_DECL(ptr, void *);
-ZBX_VECTOR_DECL(ptr_pair, zbx_ptr_pair_t);
-ZBX_VECTOR_DECL(uint64_pair, zbx_uint64_pair_t);
+ZBX_VECTOR_DECL(uint64, zbx_uint64_t)
+ZBX_PTR_VECTOR_DECL(str, char *)
+ZBX_PTR_VECTOR_DECL(ptr, void *)
+ZBX_VECTOR_DECL(ptr_pair, zbx_ptr_pair_t)
+ZBX_VECTOR_DECL(uint64_pair, zbx_uint64_pair_t)
 
 /* this function is only for use with zbx_vector_XXX_clear_ext() */
 /* and only if the vector does not contain nested allocations */
 void	zbx_ptr_free(void *data);
+void	zbx_str_free(char *data);
 
 /* 128 bit unsigned integer handling */
 #define uset128(base, hi64, lo64)	(base)->hi = hi64; (base)->lo = lo64
 
 void	uinc128_64(zbx_uint128_t *base, zbx_uint64_t value);
 void	uinc128_128(zbx_uint128_t *base, const zbx_uint128_t *value);
-void	udiv128_64(zbx_uint128_t *result, const zbx_uint128_t *base, zbx_uint64_t value);
+void	udiv128_64(zbx_uint128_t *result, const zbx_uint128_t *dividend, zbx_uint64_t value);
 void	umul64_64(zbx_uint128_t *result, zbx_uint64_t value, zbx_uint64_t factor);
 
 unsigned int	zbx_isqrt32(unsigned int value);
 
 /* expression evaluation */
 
-int	evaluate(double *value, const char *expression, char *error, int max_error_len);
+#define ZBX_INFINITY	(1.0 / 0.0)	/* "Positive infinity" value used as a fatal error code */
+#define ZBX_UNKNOWN	(-1.0 / 0.0)	/* "Negative infinity" value used as a code for "Unknown" */
+
+#define ZBX_UNKNOWN_STR		"ZBX_UNKNOWN"	/* textual representation of ZBX_UNKNOWN */
+#define ZBX_UNKNOWN_STR_LEN	ZBX_CONST_STRLEN(ZBX_UNKNOWN_STR)
+
+int	evaluate(double *value, const char *expression, char *error, size_t max_error_len,
+		zbx_vector_ptr_t *unknown_msgs);
+int	evaluate_unknown(const char *expression, double *value, char *error, size_t max_error_len);
+double	evaluate_string_to_double(const char *in);
 
 /* forecasting */
 
@@ -368,5 +389,30 @@ int	zbx_fit_code(char *fit_str, zbx_fit_t *fit, unsigned *k, char **error);
 int	zbx_mode_code(char *mode_str, zbx_mode_t *mode, char **error);
 double	zbx_forecast(double *t, double *x, int n, double now, double time, zbx_fit_t fit, unsigned k, zbx_mode_t mode);
 double	zbx_timeleft(double *t, double *x, int n, double now, double threshold, zbx_fit_t fit, unsigned k);
+
+
+/* fifo queue of pointers */
+
+typedef struct
+{
+	void	**values;
+	int	alloc_num;
+	int	head_pos;
+	int	tail_pos;
+}
+zbx_queue_ptr_t;
+
+#define zbx_queue_ptr_empty(queue)	((queue)->head_pos == (queue)->tail_pos ? SUCCEED : FAIL)
+
+int	zbx_queue_ptr_values_num(zbx_queue_ptr_t *queue);
+void	zbx_queue_ptr_reserve(zbx_queue_ptr_t *queue, int num);
+void	zbx_queue_ptr_compact(zbx_queue_ptr_t *queue);
+void	zbx_queue_ptr_create(zbx_queue_ptr_t *queue);
+void	zbx_queue_ptr_destroy(zbx_queue_ptr_t *queue);
+void	zbx_queue_ptr_push(zbx_queue_ptr_t *queue, void *value);
+void	*zbx_queue_ptr_pop(zbx_queue_ptr_t *queue);
+void	zbx_queue_ptr_remove_value(zbx_queue_ptr_t *queue, const void *value);
+
+
 
 #endif

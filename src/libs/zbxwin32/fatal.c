@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -105,6 +105,10 @@ static void	print_fatal_info(CONTEXT *pctx)
 typedef BOOL (WINAPI *SymGetLineFromAddrW64_func_t)(HANDLE, DWORD64, PDWORD, PIMAGEHLP_LINE64);
 typedef BOOL (WINAPI *SymFromAddr_func_t)(HANDLE a, DWORD64 b , PDWORD64 c, PSYMBOL_INFO d);
 
+void	zbx_backtrace(void)
+{
+}
+
 static void	print_backtrace(CONTEXT *pctx)
 {
 	SymGetLineFromAddrW64_func_t	zbx_SymGetLineFromAddrW64 = NULL;
@@ -146,7 +150,7 @@ static void	print_backtrace(CONTEXT *pctx)
 	if (0 != GetModuleFileNameEx(hProcess, NULL, szProcessName, ARRSIZE(szProcessName)))
 	{
 		char	*ptr;
-		int	path_alloc = 0, path_offset = 0;
+		size_t	path_alloc = 0, path_offset = 0;
 
 		process_name = zbx_unicode_to_utf8(szProcessName);
 

@@ -13,7 +13,7 @@ use warnings;
 use RSM;
 use RSMSLV;
 
-parse_opts('tld=s', 'probe=s', 'from=n', 'till=n');
+parse_opts('tld=s', 'probe=s', 'from=i', 'till=i');
 
 setopt('nolog');
 setopt('dry-run');
@@ -81,7 +81,6 @@ foreach my $probe (@probes)
 				" (select i3.itemid".
 				" from items i3,hosts ho".
 				" where i3.hostid=ho.hostid".
-					" and i3.key_ not like 'probe.configvalue%'".
 					" and ho.host='$host')".
 	        	" and h.clock between $from and $till".
 	        " order by h.clock,i2.key_");
@@ -117,7 +116,6 @@ foreach my $probe (@probes)
 					" (select i3.itemid".
 					" from items i3,hosts ho".
 					" where i3.hostid=ho.hostid".
-	                			" and i3.key_ not like 'probe.configvalue%'".
 	                			" and ho.host='$host')".
 				" and h.clock between $from and $till".
 			" order by h.clock,i2.key_");

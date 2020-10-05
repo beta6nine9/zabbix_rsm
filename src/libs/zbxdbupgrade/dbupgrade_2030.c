@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -19,10 +19,8 @@
 
 #include "common.h"
 #include "db.h"
-#include "log.h"
-#include "sysinfo.h"
-#include "zbxdbupgrade.h"
 #include "dbupgrade.h"
+#include "log.h"
 
 /*
  * 2.4 development database patches
@@ -224,7 +222,8 @@ static int	DBpatch_2030021(void)
 					{"macro", "", NULL, NULL, 64, ZBX_TYPE_CHAR, ZBX_NOTNULL, 0},
 					{"value", "", NULL, NULL, 255, ZBX_TYPE_CHAR, ZBX_NOTNULL, 0},
 					{NULL}
-				}
+				},
+				NULL
 			};
 
 	return DBcreate_table(&table);
@@ -514,10 +513,10 @@ static int	dm_rename_slave_data(const char *table_name, const char *key_name, co
 	max = min + __UINT64_C(100000000000000) - 1;
 
 	if (NULL == (result = DBselect(
-			"select %s,%s"
-			" from %s"
-			" where not %s between " ZBX_FS_UI64 " and " ZBX_FS_UI64
-			" order by %s",
+			"select " ZBX_FS_SQL_NAME "," ZBX_FS_SQL_NAME
+			" from " ZBX_FS_SQL_NAME
+			" where not " ZBX_FS_SQL_NAME " between " ZBX_FS_UI64 " and " ZBX_FS_UI64
+			" order by " ZBX_FS_SQL_NAME ,
 			key_name, field_name, table_name, key_name, min, max, key_name)))
 	{
 		return FAIL;
@@ -537,7 +536,8 @@ static int	dm_rename_slave_data(const char *table_name, const char *key_name, co
 
 		name_esc = DBdyn_escape_string_len(name, field_length);
 
-		if (ZBX_DB_OK > DBexecute("update %s set %s='%s' where %s=" ZBX_FS_UI64,
+		if (ZBX_DB_OK > DBexecute("update " ZBX_FS_SQL_NAME " set " ZBX_FS_SQL_NAME "='%s'"
+				" where " ZBX_FS_SQL_NAME "=" ZBX_FS_UI64,
 				table_name, field_name, name_esc, key_name, id))
 		{
 			zbx_free(name_esc);
@@ -890,7 +890,7 @@ static int	DBpatch_2030093(void)
 {
 	const ZBX_FIELD	field = {"error", "", NULL, NULL, 2048, ZBX_TYPE_CHAR, ZBX_NOTNULL, 0};
 
-	return DBmodify_field_type("items", &field);
+	return DBmodify_field_type("items", &field, NULL);
 }
 
 static int	DBpatch_2030094(void)
@@ -996,22 +996,22 @@ static int	DBpatch_2030094(void)
 static int	parse_function(char **exp, char **func, char **params)
 {
 	char		*p, *s;
-	int		state;		/* 0 - init
+	int		state_fn;	/* 0 - init
 					 * 1 - function name/params
 					 */
 	unsigned char	flags = 0x00;	/* 0x01 - function OK
 					 * 0x02 - params OK
 					 */
 
-	for (p = *exp, s = *exp, state = 0; '\0' != *p; p++)	/* check for function */
+	for (p = *exp, s = *exp, state_fn = 0; '\0' != *p; p++)	/* check for function */
 	{
 		if (SUCCEED == is_function_char(*p))
 		{
-			state = 1;
+			state_fn = 1;
 			continue;
 		}
 
-		if (0 == state)
+		if (0 == state_fn)
 			goto error;
 
 		if ('(' == *p)	/* key parameters
@@ -1180,16 +1180,17 @@ static int	DBpatch_2030095(void)
 			zbx_chrcpy_alloc(&params, &params_alloc, &params_offset, *p);
 		}
 
-#if defined(HAVE_IBM_DB2) || defined(HAVE_ORACLE)
-		if (2048 < params_offset && 2048 /* ITEM_PARAM_LEN */ < zbx_strlen_utf8(params))
+#if defined(HAVE_ORACLE)
+		if (0 == params_offset || (2048 < params_offset && 2048 /* ITEM_PARAM_LEN */ < zbx_strlen_utf8(params)))
 #else
-		if (65535 < params_offset && 65535 /* ITEM_PARAM_LEN */ < zbx_strlen_utf8(params))
+		if (0 == params_offset ||
+				(65535 < params_offset && 65535 /* ITEM_PARAM_LEN */ < zbx_strlen_utf8(params)))
 #endif
 		{
-			zabbix_log(LOG_LEVEL_WARNING, "cannot convert calculated item expression \"%s\":"
-					" resulting expression is too long", row[1]);
+			zabbix_log(LOG_LEVEL_WARNING, "cannot convert calculated item expression \"%s\": resulting"
+					" expression is %s", row[1], 0 == params_offset ? "empty" : "too long");
 		}
-		else if (0 != strcmp(row[1], params))
+		else if ( 0 != strcmp(row[1], params))
 		{
 			params_esc = DBdyn_escape_string(params);
 
@@ -1252,7 +1253,7 @@ static int	DBpatch_2030102(void)
 {
 	const ZBX_FIELD field = {"url", "", NULL, NULL, 2048, ZBX_TYPE_CHAR, ZBX_NOTNULL, 0};
 
-	return DBmodify_field_type("httpstep", &field);
+	return DBmodify_field_type("httpstep", &field, NULL);
 }
 
 static int	DBpatch_2030103(void)
@@ -1359,14 +1360,14 @@ static int	DBpatch_2030116(void)
 {
 	const ZBX_FIELD	field = {"host", "", NULL, NULL, 128, ZBX_TYPE_CHAR, ZBX_NOTNULL, 0};
 
-	return DBmodify_field_type("hosts", &field);
+	return DBmodify_field_type("hosts", &field, NULL);
 }
 
 static int	DBpatch_2030117(void)
 {
 	const ZBX_FIELD	field = {"name", "", NULL, NULL, 128, ZBX_TYPE_CHAR, ZBX_NOTNULL, 0};
 
-	return DBmodify_field_type("hosts", &field);
+	return DBmodify_field_type("hosts", &field, NULL);
 }
 
 static int	DBpatch_2030118(void)

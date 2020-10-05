@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -17,6 +17,7 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
+#include <sys/dr.h>
 #include "common.h"
 #include "sysinfo.h"
 #include "stats.h"
@@ -26,7 +27,7 @@ int	SYSTEM_CPU_NUM(AGENT_REQUEST *request, AGENT_RESULT *result)
 {
 #ifdef HAVE_LIBPERFSTAT
 	char			*tmp;
-	perfstat_cpu_total_t	ps_cpu_total;
+	lpar_info_format2_t	buf;
 
 	if (1 < request->nparam)
 	{
@@ -43,13 +44,13 @@ int	SYSTEM_CPU_NUM(AGENT_REQUEST *request, AGENT_RESULT *result)
 		return SYSINFO_RET_FAIL;
 	}
 
-	if (-1 == perfstat_cpu_total(NULL, &ps_cpu_total, sizeof(ps_cpu_total), 1))
+	if (0 != lpar_get_info(LPAR_INFO_FORMAT2, &buf, sizeof(buf)))
 	{
 		SET_MSG_RESULT(result, zbx_dsprintf(NULL, "Cannot obtain system information: %s", zbx_strerror(errno)));
 		return SYSINFO_RET_FAIL;
 	}
 
-	SET_UI64_RESULT(result, ps_cpu_total.ncpus);
+	SET_UI64_RESULT(result, buf.online_lcpus);
 
 	return SYSINFO_RET_OK;
 #else
@@ -61,9 +62,9 @@ int	SYSTEM_CPU_NUM(AGENT_REQUEST *request, AGENT_RESULT *result)
 int	SYSTEM_CPU_UTIL(AGENT_REQUEST *request, AGENT_RESULT *result)
 {
 	char	*tmp;
-	int	cpu_num, state, mode;
+	int	cpu_num, state, mode, res;
 
-	if (3 < request->nparam)
+	if (4 < request->nparam)
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Too many parameters."));
 		return SYSINFO_RET_FAIL;
@@ -109,7 +110,23 @@ int	SYSTEM_CPU_UTIL(AGENT_REQUEST *request, AGENT_RESULT *result)
 		return SYSINFO_RET_FAIL;
 	}
 
-	if (SYSINFO_RET_FAIL == get_cpustat(result, cpu_num, state, mode))
+	tmp = get_rparam(request, 3);
+
+	if (NULL == tmp || '\0' == *tmp || 0 == strcmp(tmp, "logical"))
+	{
+		res = get_cpustat(result, cpu_num, state, mode);
+	}
+	else if (0 == strcmp(tmp, "physical"))
+	{
+		res = get_cpustat_physical(result, cpu_num, state, mode);
+	}
+	else
+	{
+		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid fourth parameter."));
+		return SYSINFO_RET_FAIL;
+	}
+
+	if (SYSINFO_RET_FAIL == res)
 	{
 		if (!ISSET_MSG(result))
 			SET_MSG_RESULT(result, zbx_strdup(NULL, "Cannot obtain CPU information."));

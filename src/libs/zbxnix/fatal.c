@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -58,10 +58,12 @@ const char	*get_signal_name(int sig)
 		case SIGSEGV:	return "SIGSEGV";
 		case SIGBUS:	return "SIGBUS";
 		case SIGQUIT:	return "SIGQUIT";
+		case SIGHUP:	return "SIGHUP";
 		case SIGINT:	return "SIGINT";
 		case SIGTERM:	return "SIGTERM";
 		case SIGPIPE:	return "SIGPIPE";
 		case SIGUSR1:	return "SIGUSR1";
+		case SIGUSR2:	return "SIGUSR2";
 		default:	return "unknown";
 	}
 }
@@ -207,7 +209,39 @@ static const char	*get_register_name(int reg)
 
 #endif	/* defined(HAVE_SYS_UCONTEXT_H) && (defined(REG_EIP) || defined(REG_RIP)) */
 
-void	print_fatal_info(int sig, siginfo_t *siginfo, void *context)
+void	zbx_backtrace(void)
+{
+#	define	ZBX_BACKTRACE_SIZE	60
+#ifdef	HAVE_EXECINFO_H
+	char	**bcktrc_syms;
+	void	*bcktrc[ZBX_BACKTRACE_SIZE];
+	int	bcktrc_sz, i;
+
+	zabbix_log(LOG_LEVEL_CRIT, "=== Backtrace: ===");
+
+	bcktrc_sz = backtrace(bcktrc, ZBX_BACKTRACE_SIZE);
+	bcktrc_syms = backtrace_symbols(bcktrc, bcktrc_sz);
+
+	if (NULL == bcktrc_syms)
+	{
+		zabbix_log(LOG_LEVEL_CRIT, "error in backtrace_symbols(): %s", zbx_strerror(errno));
+
+		for (i = 0; i < bcktrc_sz; i++)
+			zabbix_log(LOG_LEVEL_CRIT, "%d: %p", bcktrc_sz - i - 1, bcktrc[i]);
+	}
+	else
+	{
+		for (i = 0; i < bcktrc_sz; i++)
+			zabbix_log(LOG_LEVEL_CRIT, "%d: %s", bcktrc_sz - i - 1, bcktrc_syms[i]);
+
+		zbx_free(bcktrc_syms);
+	}
+#else
+	zabbix_log(LOG_LEVEL_CRIT, "backtrace is not available for this platform");
+#endif	/* HAVE_EXECINFO_H */
+}
+
+void	zbx_log_fatal_info(void *context, unsigned int flags)
 {
 #ifdef	HAVE_SYS_UCONTEXT_H
 
@@ -231,106 +265,95 @@ void	print_fatal_info(int sig, siginfo_t *siginfo, void *context)
 #	endif
 
 #endif	/* HAVE_SYS_UCONTEXT_H */
-
-#ifdef	HAVE_EXECINFO_H
-
-#	define	ZBX_BACKTRACE_SIZE	60
-
-	char	**bcktrc_syms;
-	void	*bcktrc[ZBX_BACKTRACE_SIZE];
-	int	bcktrc_sz;
-
-#endif	/* HAVE_EXECINFO_H */
-
 	int	i;
 	FILE	*fd;
 
 	zabbix_log(LOG_LEVEL_CRIT, "====== Fatal information: ======");
 
+	if (0 != (flags & ZBX_FATAL_LOG_PC_REG_SF))
+	{
 #ifdef	HAVE_SYS_UCONTEXT_H
 
 #ifdef	ZBX_GET_PC
-	zabbix_log(LOG_LEVEL_CRIT, "Program counter: %p", ZBX_GET_PC(uctx));
-	zabbix_log(LOG_LEVEL_CRIT, "=== Registers: ===");
-	for (i = 0; i < NGREG; i++)
-		zabbix_log(LOG_LEVEL_CRIT, "%-7s = %16lx = %20lu = %20ld", get_register_name(i),
-				ZBX_GET_REG(uctx, i), ZBX_GET_REG(uctx, i), ZBX_GET_REG(uctx, i));
+		/* On 64-bit GNU/Linux ZBX_GET_PC() returns 'greg_t' defined as 'long long int' (8 bytes). */
+		/* On 32-bit GNU/Linux it is defined as 'int' (4 bytes). To print registers in a common way we print */
+		/* them as 'long int' or 'unsigned long int' which is 8 bytes on 64-bit GNU/Linux and 4 bytes on */
+		/* 32-bit system. */
 
-#ifdef	REG_EBP	/* dump a bit of stack frame for i386 */
-	zabbix_log(LOG_LEVEL_CRIT, "=== Stack frame: ===");
-	for (i = 16; i >= 2; i--)
-		zabbix_log(LOG_LEVEL_CRIT, "+0x%02x(%%ebp) = ebp + %2d = %08x = %10u = %11d%s",
-				i * ZBX_PTR_SIZE, i * ZBX_PTR_SIZE,
-				*(unsigned int *)((void *)ZBX_GET_REG(uctx, REG_EBP) + i * ZBX_PTR_SIZE),
-				*(unsigned int *)((void *)ZBX_GET_REG(uctx, REG_EBP) + i * ZBX_PTR_SIZE),
-				*(unsigned int *)((void *)ZBX_GET_REG(uctx, REG_EBP) + i * ZBX_PTR_SIZE),
-				i == 2 ? " <--- call arguments" : "");
-	zabbix_log(LOG_LEVEL_CRIT, "+0x%02x(%%ebp) = ebp + %2d = %08x%28s<--- return address",
-				ZBX_PTR_SIZE, ZBX_PTR_SIZE,
-				*(unsigned int *)((void *)ZBX_GET_REG(uctx, REG_EBP) + ZBX_PTR_SIZE), "");
-	zabbix_log(LOG_LEVEL_CRIT, "     (%%ebp) = ebp      = %08x%28s<--- saved ebp value",
-				*(unsigned int *)((void *)ZBX_GET_REG(uctx, REG_EBP)), "");
-	for (i = 1; i <= 16; i++)
-		zabbix_log(LOG_LEVEL_CRIT, "-0x%02x(%%ebp) = ebp - %2d = %08x = %10u = %11d%s",
-				i * ZBX_PTR_SIZE, i * ZBX_PTR_SIZE,
-				*(unsigned int *)((void *)ZBX_GET_REG(uctx, REG_EBP) - i * ZBX_PTR_SIZE),
-				*(unsigned int *)((void *)ZBX_GET_REG(uctx, REG_EBP) - i * ZBX_PTR_SIZE),
-				*(unsigned int *)((void *)ZBX_GET_REG(uctx, REG_EBP) - i * ZBX_PTR_SIZE),
-				i == 1 ? " <--- local variables" : "");
-#endif	/* REG_EBP */
+		zabbix_log(LOG_LEVEL_CRIT, "Program counter: %p", (void *)(ZBX_GET_PC(uctx)));
+		zabbix_log(LOG_LEVEL_CRIT, "=== Registers: ===");
 
-#else
-	zabbix_log(LOG_LEVEL_CRIT, "program counter not available for this architecture");
-	zabbix_log(LOG_LEVEL_CRIT, "=== Registers: ===");
-	zabbix_log(LOG_LEVEL_CRIT, "register dump not available for this architecture");
-#endif	/* ZBX_GET_PC */
-
-#endif	/* HAVE_SYS_UCONTEXT_H */
-
-	zabbix_log(LOG_LEVEL_CRIT, "=== Backtrace: ===");
-
-#ifdef	HAVE_EXECINFO_H
-
-	bcktrc_sz = backtrace(bcktrc, ZBX_BACKTRACE_SIZE);
-	bcktrc_syms = backtrace_symbols(bcktrc, bcktrc_sz);
-
-	if (NULL == bcktrc_syms)
-	{
-		zabbix_log(LOG_LEVEL_CRIT, "error in backtrace_symbols(): %s", zbx_strerror(errno));
-
-		for (i = 0; i < bcktrc_sz; i++)
-			zabbix_log(LOG_LEVEL_CRIT, "%d: %p", bcktrc_sz - i - 1, bcktrc[i]);
-	}
-	else
-	{
-		for (i = 0; i < bcktrc_sz; i++)
-			zabbix_log(LOG_LEVEL_CRIT, "%d: %s", bcktrc_sz - i - 1, bcktrc_syms[i]);
-
-		zbx_free(bcktrc_syms);
-	}
-#else
-	zabbix_log(LOG_LEVEL_CRIT, "backtrace not available for this platform");
-
-#endif	/* HAVE_EXECINFO_H */
-
-	zabbix_log(LOG_LEVEL_CRIT, "=== Memory map: ===");
-
-	if (NULL != (fd = fopen("/proc/self/maps", "r")))
-	{
-		char line[1024];
-
-		while (NULL != fgets(line, sizeof(line), fd))
+		for (i = 0; i < NGREG; i++)
 		{
-			if (line[0] != '\0')
-				line[strlen(line) - 1] = '\0'; /* remove trailing '\n' */
-
-			zabbix_log(LOG_LEVEL_CRIT, "%s", line);
+			zabbix_log(LOG_LEVEL_CRIT, "%-7s = %16lx = %20lu = %20ld", get_register_name(i),
+					(unsigned long int)(ZBX_GET_REG(uctx, i)),
+					(unsigned long int)(ZBX_GET_REG(uctx, i)),
+					(long int)(ZBX_GET_REG(uctx, i)));
 		}
+#ifdef	REG_EBP	/* dump a bit of stack frame for i386 */
+		zabbix_log(LOG_LEVEL_CRIT, "=== Stack frame: ===");
 
-		zbx_fclose(fd);
+		for (i = 16; i >= 2; i--)
+		{
+			unsigned int	offset = (unsigned int)i * ZBX_PTR_SIZE;
+
+			zabbix_log(LOG_LEVEL_CRIT, "+0x%02x(%%ebp) = ebp + %2d = %08x = %10u = %11d%s",
+					offset, (int)offset,
+					*(unsigned int *)((void *)ZBX_GET_REG(uctx, REG_EBP) + offset),
+					*(unsigned int *)((void *)ZBX_GET_REG(uctx, REG_EBP) + offset),
+					*(int *)((void *)ZBX_GET_REG(uctx, REG_EBP) + offset),
+					i == 2 ? " <--- call arguments" : "");
+		}
+		zabbix_log(LOG_LEVEL_CRIT, "+0x%02x(%%ebp) = ebp + %2d = %08x%28s<--- return address",
+					ZBX_PTR_SIZE, (int)ZBX_PTR_SIZE,
+					*(unsigned int *)((void *)ZBX_GET_REG(uctx, REG_EBP) + ZBX_PTR_SIZE), "");
+		zabbix_log(LOG_LEVEL_CRIT, "     (%%ebp) = ebp      = %08x%28s<--- saved ebp value",
+					*(unsigned int *)((void *)ZBX_GET_REG(uctx, REG_EBP)), "");
+
+		for (i = 1; i <= 16; i++)
+		{
+			unsigned int	offset = (unsigned int)i * ZBX_PTR_SIZE;
+
+			zabbix_log(LOG_LEVEL_CRIT, "-0x%02x(%%ebp) = ebp - %2d = %08x = %10u = %11d%s",
+					offset, (int)offset,
+					*(unsigned int *)((void *)ZBX_GET_REG(uctx, REG_EBP) - offset),
+					*(unsigned int *)((void *)ZBX_GET_REG(uctx, REG_EBP) - offset),
+					*(int *)((void *)ZBX_GET_REG(uctx, REG_EBP) - offset),
+					i == 1 ? " <--- local variables" : "");
+		}
+#endif	/* REG_EBP */
+#else
+		zabbix_log(LOG_LEVEL_CRIT, "program counter not available for this architecture");
+		zabbix_log(LOG_LEVEL_CRIT, "=== Registers: ===");
+		zabbix_log(LOG_LEVEL_CRIT, "register dump not available for this architecture");
+#endif	/* ZBX_GET_PC */
+#endif	/* HAVE_SYS_UCONTEXT_H */
 	}
-	else
-		zabbix_log(LOG_LEVEL_CRIT, "memory map not available for this platform");
+
+	if (0 != (flags & ZBX_FATAL_LOG_BACKTRACE))
+		zbx_backtrace();
+
+	if (0 != (flags & ZBX_FATAL_LOG_MEM_MAP))
+	{
+		zabbix_log(LOG_LEVEL_CRIT, "=== Memory map: ===");
+
+		if (NULL != (fd = fopen("/proc/self/maps", "r")))
+		{
+			char line[1024];
+
+			while (NULL != fgets(line, sizeof(line), fd))
+			{
+				if (line[0] != '\0')
+					line[strlen(line) - 1] = '\0'; /* remove trailing '\n' */
+
+				zabbix_log(LOG_LEVEL_CRIT, "%s", line);
+			}
+
+			zbx_fclose(fd);
+		}
+		else
+			zabbix_log(LOG_LEVEL_CRIT, "memory map not available for this platform");
+	}
 
 #ifdef	ZBX_GET_PC
 	zabbix_log(LOG_LEVEL_CRIT, "================================");

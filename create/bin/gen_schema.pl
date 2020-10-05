@@ -1,7 +1,7 @@
-#!/usr/bin/perl -w
+#!/usr/bin/env perl
 #
 # Zabbix
-# Copyright (C) 2001-2017 Zabbix SIA
+# Copyright (C) 2001-2020 Zabbix SIA
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -20,6 +20,7 @@ use strict;
 use File::Basename;
 
 my $file = dirname($0)."/../src/schema.tmpl";	# name the file
+my $rsm_file = dirname($0)."/../src/rsm-schema.tmpl";
 
 my ($state, %output, $eol, $fk_bol, $fk_eol, $ltab, $pkey, $table_name);
 my ($szcol1, $szcol2, $szcol3, $szcol4, $sequences, $sql_suffix);
@@ -30,7 +31,6 @@ my %c = (
 	"database"	=>	"",
 	"after"		=>	"\t{0}\n\n#undef ZBX_TYPE_LONGTEXT_LEN\n#undef ZBX_TYPE_SHORTTEXT_LEN\n\n};\n",
 	"t_bigint"	=>	"ZBX_TYPE_UINT",
-	"t_char"	=>	"ZBX_TYPE_CHAR",
 	"t_text"	=>	"ZBX_TYPE_TEXT",
 	"t_double"	=>	"ZBX_TYPE_FLOAT",
 	"t_id"		=>	"ZBX_TYPE_ID",
@@ -42,12 +42,11 @@ my %c = (
 	"t_shorttext"	=>	"ZBX_TYPE_SHORTTEXT",
 	"t_time"	=>	"ZBX_TYPE_INT",
 	"t_varchar"	=>	"ZBX_TYPE_CHAR",
-	"t_bigdouble"	=>	"ZBX_TYPE_FLOAT",
 );
 
 $c{"before"} = "/*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -69,43 +68,16 @@ $c{"before"} = "/*
 
 const ZBX_TABLE\ttables[] = {
 
-#if defined(HAVE_IBM_DB2) || defined(HAVE_ORACLE)
+#if defined(HAVE_ORACLE)
 #	define ZBX_TYPE_SHORTTEXT_LEN	2048
 #else
 #	define ZBX_TYPE_SHORTTEXT_LEN	65535
 #endif
 
-#if defined(HAVE_IBM_DB2)
-#	define ZBX_TYPE_LONGTEXT_LEN	2048
-#	define ZBX_TYPE_TEXT_LEN	2048
-#else
-#	define ZBX_TYPE_LONGTEXT_LEN	0
-#	define ZBX_TYPE_TEXT_LEN	65535
-#endif
+#define ZBX_TYPE_LONGTEXT_LEN	0
+#define ZBX_TYPE_TEXT_LEN	65535
 
 ";
-
-my %ibm_db2 = (
-	"type"		=>	"sql",
-	"database"	=>	"ibm_db2",
-	"before"	=>	"",
-	"after"		=>	"",
-	"table_options"	=>	"",
-	"t_bigint"	=>	"bigint",
-	"t_char"	=>	"varchar",
-	"t_text"	=>	"varchar(2048)",
-	"t_double"	=>	"decfloat(16)",
-	"t_id"		=>	"bigint",
-	"t_image"	=>	"blob",
-	"t_integer"	=>	"integer",
-	"t_longtext"	=>	"varchar(2048)",
-	"t_nanosec"	=>	"integer",
-	"t_serial"	=>	"bigint",
-	"t_shorttext"	=>	"varchar(2048)",
-	"t_time"	=>	"integer",
-	"t_varchar"	=>	"varchar",
-	"t_bigdouble"	=>	"decfloat(24)"
-);
 
 my %mysql = (
 	"type"		=>	"sql",
@@ -114,9 +86,8 @@ my %mysql = (
 	"after"		=>	"",
 	"table_options"	=>	" ENGINE=InnoDB",
 	"t_bigint"	=>	"bigint unsigned",
-	"t_char"	=>	"char",
 	"t_text"	=>	"text",
-	"t_double"	=>	"double(16,4)",
+	"t_double"	=>	"DOUBLE PRECISION",
 	"t_id"		=>	"bigint unsigned",
 	"t_image"	=>	"longblob",
 	"t_integer"	=>	"integer",
@@ -126,7 +97,6 @@ my %mysql = (
 	"t_shorttext"	=>	"text",
 	"t_time"	=>	"integer",
 	"t_varchar"	=>	"varchar",
-	"t_bigdouble"	=>	"double(24,4)"
 );
 
 my %oracle = (
@@ -136,9 +106,8 @@ my %oracle = (
 	"after"		=>	"",
 	"table_options"	=>	"",
 	"t_bigint"	=>	"number(20)",
-	"t_char"	=>	"nvarchar2",
 	"t_text"	=>	"nclob",
-	"t_double"	=>	"number(20,4)",
+	"t_double"	=>	"BINARY_DOUBLE",
 	"t_id"		=>	"number(20)",
 	"t_image"	=>	"blob",
 	"t_integer"	=>	"number(10)",
@@ -148,7 +117,6 @@ my %oracle = (
 	"t_shorttext"	=>	"nvarchar2(2048)",
 	"t_time"	=>	"number(10)",
 	"t_varchar"	=>	"nvarchar2",
-	"t_bigdouble"	=>	"number(24,4)"
 );
 
 my %postgresql = (
@@ -158,9 +126,8 @@ my %postgresql = (
 	"after"		=>	"",
 	"table_options"	=>	"",
 	"t_bigint"	=>	"numeric(20)",
-	"t_char"	=>	"char",
 	"t_text"	=>	"text",
-	"t_double"	=>	"numeric(16,4)",
+	"t_double"	=>	"DOUBLE PRECISION",
 	"t_id"		=>	"bigint",
 	"t_image"	=>	"bytea",
 	"t_integer"	=>	"integer",
@@ -170,7 +137,6 @@ my %postgresql = (
 	"t_shorttext"	=>	"text",
 	"t_time"	=>	"integer",
 	"t_varchar"	=>	"varchar",
-	"t_bigdouble"	=>	"numeric(24,4)"
 );
 
 my %sqlite3 = (
@@ -180,9 +146,8 @@ my %sqlite3 = (
 	"after"		=>	"",
 	"table_options"	=>	"",
 	"t_bigint"	=>	"bigint",
-	"t_char"	=>	"char",
 	"t_text"	=>	"text",
-	"t_double"	=>	"double(16,4)",
+	"t_double"	=>	"DOUBLE PRECISION",
 	"t_id"		=>	"bigint",
 	"t_image"	=>	"longblob",
 	"t_integer"	=>	"integer",
@@ -192,7 +157,6 @@ my %sqlite3 = (
 	"t_shorttext"	=>	"text",
 	"t_time"	=>	"integer",
 	"t_varchar"	=>	"varchar",
-	"t_bigdouble"	=>	"double(24,4)"
 );
 
 sub rtrim($)
@@ -252,8 +216,10 @@ sub process_table
 
 		for ($flags)
 		{
-			# do not output ZBX_DATA, remove it
+			# do not output ZBX_DATA ZBX_DASHBOARD and ZBX_TEMPLATE, remove it
 			s/ZBX_DATA//;
+			s/ZBX_TEMPLATE//;
+			s/ZBX_DASHBOARD//;
 			s/,+$//;
 			s/^,+//;
 			s/,+/ \| /g;
@@ -432,10 +398,6 @@ sub process_field
 				$sequences = "${sequences}SELECT ${table_name}_seq.nextval INTO :new.id FROM dual;${eol}\n";
 				$sequences = "${sequences}END;${eol}\n/${eol}\n";
 			}
-			elsif ($output{"database"} eq "ibm_db2")
-			{
-				$row = "$row\tGENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1)";
-			}
 		}
 
 		my $references = "";
@@ -495,22 +457,9 @@ sub process_field
 			$name = "`${name}`";
 		}
 
-		if ($output{"database"} eq "ibm_db2")
-		{
-			@text_fields = ('blob');
-			$default = "" if (grep /$output{$type_short}/, @text_fields);
-		}
-
 		if ($default ne "")
 		{
-			if ($output{"database"} eq "ibm_db2")
-			{
-				$default = "WITH DEFAULT $default";
-			}
-			else
-			{
-				$default = "DEFAULT $default";
-			}
+			$default = "DEFAULT $default";
 		}
 
 		printf "${ltab}%-*s %-*s %-*s ${row}${references}", $szcol1, $name, $szcol2, $type_2, $szcol3, $default;
@@ -550,10 +499,22 @@ sub process_index
 			{
 				s/,/`,`/g;
 			}
-			print "CREATE${unique} INDEX `${table_name}_$name` ON `$table_name` (`$fields`);${eol}\n";
+
+			my $quote_index = "`$fields`";
+
+			for ($quote_index)
+			{
+				s/\)`/\)/g;
+				s/\(/`\(/g;
+			}
+			print "CREATE${unique} INDEX `${table_name}_$name` ON `$table_name` ($quote_index);${eol}\n";
 		}
 		else
 		{
+			for ($fields)
+			{
+				s/\(\d+\)//g;
+			}
 			print "CREATE${unique} INDEX ${table_name}_$name ON $table_name ($fields);${eol}\n";
 		}
 	}
@@ -634,9 +595,34 @@ sub process_row
 	print "INSERT INTO $table_name VALUES $values;${eol}\n";
 }
 
+sub timescaledb
+{
+	for ("history", "history_uint", "history_log", "history_text", "history_str")
+	{
+		print<<EOF
+SELECT create_hypertable('$_', 'clock', chunk_time_interval => 86400, migrate_data => true);
+EOF
+		;
+	}
+
+	for ("trends", "trends_uint")
+	{
+		print<<EOF
+SELECT create_hypertable('$_', 'clock', chunk_time_interval => 2592000, migrate_data => true);
+EOF
+		;
+	}
+	print<<EOF
+UPDATE config SET db_extension='timescaledb',hk_history_global=1,hk_trends_global=1;
+UPDATE config SET compression_status=1,compress_older='7d';
+EOF
+	;
+	exit;
+}
+
 sub usage
 {
-	print "Usage: $0 [c|ibm_db2|mysql|oracle|postgresql|sqlite3]\n";
+	print "Usage: $0 [c|mysql|oracle|postgresql|sqlite3|timescaledb]\n";
 	print "The script generates Zabbix SQL schemas and C code for different database engines.\n";
 	exit;
 }
@@ -654,6 +640,12 @@ sub process
 	open(INFO, $file);	# open the file
 	my @lines = <INFO>;	# read it into an array
 	close(INFO);		# close the file
+
+	# RSM specifics: start
+	open(INFO, $rsm_file);
+	push(@lines, <INFO>);
+	close(INFO);
+	# RSM specifics: end
 
 	foreach $line (@lines)
 	{
@@ -699,13 +691,13 @@ sub main
 	$fkeys_prefix = "";
 	$fkeys_suffix = "";
 
-	if ($format eq 'c')		{ %output = %c; }
-	elsif ($format eq 'ibm_db2')	{ %output = %ibm_db2; }
-	elsif ($format eq 'mysql')	{ %output = %mysql; }
-	elsif ($format eq 'oracle')	{ %output = %oracle; }
-	elsif ($format eq 'postgresql')	{ %output = %postgresql; }
-	elsif ($format eq 'sqlite3')	{ %output = %sqlite3; }
-	else				{ usage(); }
+	if ($format eq 'c')			{ %output = %c; }
+	elsif ($format eq 'mysql')		{ %output = %mysql; }
+	elsif ($format eq 'oracle')		{ %output = %oracle; }
+	elsif ($format eq 'postgresql')		{ %output = %postgresql; }
+	elsif ($format eq 'sqlite3')		{ %output = %sqlite3; }
+	elsif ($format eq 'timescaledb')	{ timescaledb(); }
+	else					{ usage(); }
 
 	process();
 

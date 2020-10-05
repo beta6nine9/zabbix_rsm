@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -28,12 +28,14 @@
  *                                                                            *
  * Purpose: send json SUCCEED or FAIL to socket along with an info message    *
  *                                                                            *
- * Parameters: sock    - [IN] socket descriptor                               *
- *             result  - [IN] SUCCEED or FAIL                                 *
- *             info    - [IN] info message                                    *
+ * Parameters: sock     - [IN] socket descriptor                              *
+ *             result   - [IN] SUCCEED or FAIL                                *
+ *             info     - [IN] info message (optional)                        *
+ *             version  - [IN] the version data (optional)                    *
+ *             protocol - [IN] the transport protocol                         *
  *             timeout - [IN] timeout for this operation                      *
  *                                                                            *
- * Return value: SUCCEED - data successfully transmited                       *
+ * Return value: SUCCEED - data successfully transmitted                      *
  *               NETWORK_ERROR - network related error occurred               *
  *                                                                            *
  * Author: Alexander Vladishev, Alexei Vladishev                              *
@@ -41,15 +43,14 @@
  * Comments:                                                                  *
  *                                                                            *
  ******************************************************************************/
-int	zbx_send_response_ext(zbx_socket_t *sock, int result, const char *info, int protocol, int timeout)
+int	zbx_send_response_ext(zbx_socket_t *sock, int result, const char *info, const char *version, int protocol,
+		int timeout)
 {
-	const char	*__function_name = "zbx_send_response";
-
 	struct zbx_json	json;
 	const char	*resp;
 	int		ret = SUCCEED;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
 	zbx_json_init(&json, ZBX_JSON_STAT_BUF_LEN);
 
@@ -60,7 +61,10 @@ int	zbx_send_response_ext(zbx_socket_t *sock, int result, const char *info, int 
 	if (NULL != info && '\0' != *info)
 		zbx_json_addstring(&json, ZBX_PROTO_TAG_INFO, info, ZBX_JSON_TYPE_STRING);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "%s() '%s'", __function_name, json.buffer);
+	if (NULL != version)
+		zbx_json_addstring(&json, ZBX_PROTO_TAG_VERSION, version, ZBX_JSON_TYPE_STRING);
+
+	zabbix_log(LOG_LEVEL_DEBUG, "%s() '%s'", __func__, json.buffer);
 
 	if (FAIL == (ret = zbx_tcp_send_ext(sock, json.buffer, strlen(json.buffer), protocol, timeout)))
 	{
@@ -70,7 +74,7 @@ int	zbx_send_response_ext(zbx_socket_t *sock, int result, const char *info, int 
 
 	zbx_json_free(&json);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __function_name, zbx_result_string(ret));
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
 
 	return ret;
 }
@@ -105,13 +109,11 @@ int	zbx_send_response_ext(zbx_socket_t *sock, int result, const char *info, int 
  ******************************************************************************/
 int	zbx_recv_response(zbx_socket_t *sock, int timeout, char **error)
 {
-	const char		*__function_name = "zbx_recv_response";
-
 	struct zbx_json_parse	jp;
 	char			value[16];
 	int			ret = FAIL;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
 	if (SUCCEED != zbx_tcp_recv_to(sock, timeout))
 	{
@@ -121,7 +123,7 @@ int	zbx_recv_response(zbx_socket_t *sock, int timeout, char **error)
 		goto out;
 	}
 
-	zabbix_log(LOG_LEVEL_DEBUG, "%s() '%s'", __function_name, sock->buffer);
+	zabbix_log(LOG_LEVEL_DEBUG, "%s() '%s'", __func__, sock->buffer);
 
 	/* deal with empty string here because zbx_json_open() does not produce an error message in this case */
 	if ('\0' == *sock->buffer)
@@ -136,7 +138,7 @@ int	zbx_recv_response(zbx_socket_t *sock, int timeout, char **error)
 		goto out;
 	}
 
-	if (SUCCEED != zbx_json_value_by_name(&jp, ZBX_PROTO_TAG_RESPONSE, value, sizeof(value)))
+	if (SUCCEED != zbx_json_value_by_name(&jp, ZBX_PROTO_TAG_RESPONSE, value, sizeof(value), NULL))
 	{
 		*error = zbx_strdup(*error, "no \"" ZBX_PROTO_TAG_RESPONSE "\" tag");
 		goto out;
@@ -147,7 +149,7 @@ int	zbx_recv_response(zbx_socket_t *sock, int timeout, char **error)
 		char	*info = NULL;
 		size_t	info_alloc = 0;
 
-		if (SUCCEED == zbx_json_value_by_name_dyn(&jp, ZBX_PROTO_TAG_INFO, &info, &info_alloc))
+		if (SUCCEED == zbx_json_value_by_name_dyn(&jp, ZBX_PROTO_TAG_INFO, &info, &info_alloc, NULL))
 			*error = zbx_strdup(*error, info);
 		else
 			*error = zbx_dsprintf(*error, "negative response \"%s\"", value);
@@ -157,7 +159,7 @@ int	zbx_recv_response(zbx_socket_t *sock, int timeout, char **error)
 
 	ret = SUCCEED;
 out:
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __function_name, zbx_result_string(ret));
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
 
 	return ret;
 }

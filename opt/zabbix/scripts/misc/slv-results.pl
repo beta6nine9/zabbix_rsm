@@ -20,7 +20,7 @@ my @months = (
 	qw/Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec/
 );
 
-parse_opts('tld=s', 'service=s', 'from=n', 'till=n');
+parse_opts('tld=s', 'service=s', 'from=i', 'till=i');
 
 setopt('nolog');
 setopt('dry-run');
@@ -38,7 +38,7 @@ if (opt('service'))
 {
 	if (getopt('service') eq 'dns')
 	{
-		$delay = get_dns_udp_delay();
+		$delay = get_dns_delay();
 	}
 	elsif (getopt('service') eq 'rdds')
 	{
@@ -68,7 +68,7 @@ if (!$from)
 {
 	$from = cycle_start($now - 5 * $delay, $delay);
 }
-elsif (substr($from, 0, length("-")) eq "-")
+elsif (str_starts_with($from, "-"))
 {
 	my $mult = substr($from, length("-"));
 

@@ -14,7 +14,7 @@ use RSM;
 use RSMSLV;
 use TLD_constants qw(:api);
 
-my $cfg_keys_in = ['rsm.dns.udp[{$RSM.TLD}]'];
+my $cfg_keys_in = ['rsm.dns.nssok'];
 my $cfg_key_out = 'rsm.slv.dns.avail';
 my $cfg_value_type = ITEM_VALUE_TYPE_UINT64;
 
@@ -28,7 +28,7 @@ db_connect();
 slv_exit(SUCCESS) if (get_monitoring_target() ne MONITORING_TARGET_REGISTRY);
 
 # we don't know the rollweek bounds yet so we assume it ends at least few minutes back
-my $delay = get_dns_udp_delay(getopt('now') // time() - AVAIL_SHIFT_BACK);
+my $delay = get_dns_delay(getopt('now') // time() - AVAIL_SHIFT_BACK);
 
 my (undef, undef, $max_clock) = get_cycle_bounds($delay, getopt('now'));
 
@@ -38,13 +38,13 @@ my $cfg_minns = get_macro_minns();
 my $tlds_ref;
 if (opt('tld'))
 {
-        fail("TLD ", getopt('tld'), " does not exist.") if (tld_exists(getopt('tld')) == 0);
+	fail("TLD ", getopt('tld'), " does not exist.") if (tld_exists(getopt('tld')) == 0);
 
-        $tlds_ref = [ getopt('tld') ];
+	$tlds_ref = [ getopt('tld') ];
 }
 else
 {
-        $tlds_ref = get_tlds('DNS', $max_clock);
+	$tlds_ref = get_tlds('DNS', $max_clock);
 }
 
 slv_exit(SUCCESS) if (scalar(@{$tlds_ref}) == 0);
@@ -85,7 +85,7 @@ sub check_probe_values
 	# E. g.:
 	#
 	# {
-	#	'rsm.dns.udp[{$RSM.TLD}]' => [3]
+	#	'rsm.dns.nssok' => [1]
 	# }
 
 	if (scalar(keys(%{$values_ref})) == 0)
@@ -100,9 +100,9 @@ sub check_probe_values
 	}
 
 	# stay on the safe side: if more than one value in cycle, use the positive one
-	foreach my $rtts (values(%{$values_ref}))
+	foreach my $values (values(%{$values_ref}))
 	{
-		foreach (@{$rtts})
+		foreach (@{$values})
 		{
 			return SUCCESS if ($_ >= $cfg_minns);
 		}

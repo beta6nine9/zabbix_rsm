@@ -1,0 +1,46 @@
+/* General styles */
+table.list-table {
+	border-collapse: collapse;
+	border: 1px solid var(--border-color);
+}
+table.list-table td {
+	border: 1px solid var(--border-color);
+}
+
+/* Rolling week status page */
+.service-icon {
+	margin: 0 5px;
+	height: 11px;
+	width: 11px;
+	border-radius: 50%;
+	display: inline-block;
+}
+.iconrollingweekok {
+	background-color: green;
+}
+.iconrollingweekfail {
+	background-color: #ea3500;
+}
+.iconrollingweekdisabled {
+	background-color: grey;
+}
+.iconrollingweeknodata {
+	background-color: #c2be00;
+}
+.rolling-week-status {
+	font-size: 16px;
+	font-weight: bold;
+	float: right;
+}
+/* Incidents page */
+.incidents-info {
+	width: 100%;
+}
+.rsm-date-time {
+	float: right;
+}
+/* Particular proxy */
+.first-row-element {
+	width: 300px;
+	display: inline-block;
+}

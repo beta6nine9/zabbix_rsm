@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -21,11 +21,12 @@
 #include "sysinfo.h"
 
 ZBX_METRIC	parameters_specific[] =
-/* 	KEY			FLAG		FUNCTION 		TEST PARAMETERS */
+/*	KEY			FLAG		FUNCTION		TEST PARAMETERS */
 {
 	{"vfs.fs.size",		CF_HAVEPARAMS,	VFS_FS_SIZE,		"/,free"},
 	{"vfs.fs.inode",	CF_HAVEPARAMS,	VFS_FS_INODE,		"/,free"},
 	{"vfs.fs.discovery",	0,		VFS_FS_DISCOVERY,	NULL},
+	{"vfs.fs.get",		0,		VFS_FS_GET,		NULL},
 
 	{"net.if.discovery",	0,		NET_IF_DISCOVERY,	NULL},
 	{"net.if.in",		CF_HAVEPARAMS,	NET_IF_IN,		"lan0,bytes"},
@@ -34,7 +35,7 @@ ZBX_METRIC	parameters_specific[] =
 
 	{"vm.memory.size",	CF_HAVEPARAMS,	VM_MEMORY_SIZE,		"free"},
 
-	{"proc.num",            CF_HAVEPARAMS,  PROC_NUM,               "inetd"},
+	{"proc.num",		CF_HAVEPARAMS,  PROC_NUM,		"inetd"},
 
 	{"system.cpu.util",	CF_HAVEPARAMS,	SYSTEM_CPU_UTIL,	"all,user,avg1"},
 	{"system.cpu.load",	CF_HAVEPARAMS,	SYSTEM_CPU_LOAD,	"all,avg1"},

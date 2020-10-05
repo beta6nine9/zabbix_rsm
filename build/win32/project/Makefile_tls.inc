@@ -1,7 +1,7 @@
 !IF "$(TLS)" != ""
 
-!	IF "$(TLS)" != "mbedtls" && "$(TLS)" != "gnutls" && "$(TLS)" != "openssl"
-!		ERROR Specified TLS target "$(TLS)" is not supported (supported: mbedtls, gnutls, openssl).
+!	IF "$(TLS)" != "gnutls" && "$(TLS)" != "openssl"
+!		ERROR Specified TLS target "$(TLS)" is not supported (supported: gnutls, openssl).
 !	ENDIF
 
 !	IF "$(TLSINCDIR)" == ""
@@ -38,14 +38,8 @@ ADDMSG =		You may specify path to library using TLSLIB="\somepath\lib\some.lib"
 !		ENDIF
 !	ENDIF
 
-	### mbed TLS ###
-!	IF "$(TLS)" == "mbedtls"
-!		IF "$(TLSLIBDIR)" != ""
-TLSLIB =		$(TLSLIBDIR)\mbedtls.lib
-!		ENDIF
-CFLAGS =	$(CFLAGS) /DHAVE_POLARSSL
 	### GnuTLS ###
-!	ELSEIF "$(TLS)" == "gnutls"
+!	IF "$(TLS)" == "gnutls"
 CFLAGS =	$(CFLAGS) /DHAVE_GNUTLS
 	### OpenSSL ###
 !	ELSEIF "$(TLS)" == "openssl"
@@ -60,7 +54,7 @@ TLSLIB2 =			$(TLSLIBDIR)\libssl.lib
 !				ERROR TLSLIBDIR "$(TLSLIBDIR)" contains libraries from OpenSSL 1.0.x (libeay32.lib, ssleay32.lib) and 1.1.x (libcrypto.lib, libssl.lib). TLSLIBDIR cannot be used in this case. Use TLSLIB="$(TLSLIBDIR)\libeay32.lib" TLSLIB2="$(TLSLIBDIR)\ssleay32.lib" for OpenSSL 1.0.x or TLSLIB="$(TLSLIBDIR)\libcrypto.lib" TLSLIB2="$(TLSLIBDIR)\libssl.lib" for OpenSSL 1.1.x.
 !			ENDIF
 !		ENDIF
-CFLAGS =	$(CFLAGS) /DHAVE_OPENSSL
+CFLAGS =	$(CFLAGS) /DHAVE_OPENSSL /DHAVE_OPENSSL_WITH_PSK
 !	ENDIF
 
 !	IF !EXISTS("$(TLSLIB)")
@@ -77,6 +71,6 @@ LIBS =		$(LIBS) "$(TLSLIB)"
 !	ENDIF
 
 INCS =	$(INCS) /I "$(TLSINCDIR)"
-OBJS =	$(OBJS) ..\..\..\src\libs\zbxcrypto\tls.o
+OBJS =	$(OBJS) ..\..\..\src\libs\zbxcrypto\tls.o ..\..\..\src\libs\zbxcrypto\tls_version.o
 
 !ENDIF

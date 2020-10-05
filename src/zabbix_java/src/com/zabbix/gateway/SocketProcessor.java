@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -20,6 +20,8 @@
 package com.zabbix.gateway;
 
 import java.net.Socket;
+import java.util.Map;
+import java.util.Iterator;
 
 import org.json.*;
 
@@ -30,18 +32,23 @@ class SocketProcessor implements Runnable
 {
 	private static final Logger logger = LoggerFactory.getLogger(SocketProcessor.class);
 
+	private static long cleanupTime = System.currentTimeMillis();
 	private Socket socket;
 
-	public SocketProcessor(Socket socket)
+	public static final long MILLISECONDS_IN_HOUR = 1000 * 60 * 60;
+
+	SocketProcessor(Socket socket)
 	{
 		this.socket = socket;
 	}
 
+	@Override
 	public void run()
 	{
 		logger.debug("starting to process incoming connection");
 
 		BinaryProtocolSpeaker speaker = null;
+		ItemChecker checker = null;
 
 		try
 		{
@@ -49,12 +56,22 @@ class SocketProcessor implements Runnable
 
 			JSONObject request = new JSONObject(speaker.getRequest());
 
-			ItemChecker checker;
-
 			if (request.getString(ItemChecker.JSON_TAG_REQUEST).equals(ItemChecker.JSON_REQUEST_INTERNAL))
+			{
 				checker = new InternalItemChecker(request);
+			}
 			else if (request.getString(ItemChecker.JSON_TAG_REQUEST).equals(ItemChecker.JSON_REQUEST_JMX))
+			{
 				checker = new JMXItemChecker(request);
+
+				long now = System.currentTimeMillis();
+
+				if (now >= cleanupTime)
+				{
+					cleanDiscoveredObjects(now);
+					cleanupTime = now + MILLISECONDS_IN_HOUR;
+				}
+			}
 			else
 				throw new ZabbixException("bad request tag value: '%s'", request.getString(ItemChecker.JSON_TAG_REQUEST));
 
@@ -69,19 +86,28 @@ class SocketProcessor implements Runnable
 		}
 		catch (Exception e1)
 		{
-			logger.warn("error processing request", e1);
+			String error = ZabbixException.getRootCauseMessage(e1);
+
+			// Display first item key to identify items with incorrect configuration, all items in batch have same configuration.
+			if (null == checker || null == checker.getFirstKey())
+				logger.warn("error processing request: {}", error);
+			else
+				logger.warn("error processing request, item \"{}\" failed: {}", checker.getFirstKey(), error);
+
+			logger.debug("error caused by", e1);
 
 			try
 			{
 				JSONObject response = new JSONObject();
 				response.put(ItemChecker.JSON_TAG_RESPONSE, ItemChecker.JSON_RESPONSE_FAILED);
-				response.put(ItemChecker.JSON_TAG_ERROR, e1.getMessage());
+				response.put(ItemChecker.JSON_TAG_ERROR, error);
 
 				speaker.sendResponse(response.toString());
 			}
 			catch (Exception e2)
 			{
-				logger.warn("error sending failure notification", e2);
+				logger.warn("error sending failure notification: {}", ZabbixException.getRootCauseMessage(e1));
+				logger.debug("error caused by", e2);
 			}
 		}
 		finally
@@ -91,5 +117,18 @@ class SocketProcessor implements Runnable
 		}
 
 		logger.debug("finished processing incoming connection");
+	}
+
+	private void cleanDiscoveredObjects(long now)
+	{
+		for (Iterator<Map.Entry<String, Long>> it = JavaGateway.iterativeObjects.entrySet().iterator();
+			it.hasNext(); )
+		{
+			Map.Entry<String, Long> entry = it.next();
+			long expirationTime = entry.getValue();
+
+			if (now >= expirationTime)
+				it.remove();
+		}
 	}
 }

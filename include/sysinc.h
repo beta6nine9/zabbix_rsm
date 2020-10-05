@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -289,6 +289,9 @@
 #endif
 
 #ifdef HAVE_LIBPERFSTAT
+#	ifdef HAVE_SYS_PROTOSW_H
+#		include <sys/protosw.h>		/* workaround for /usr/include/netinet/in6_var.h bug, see ZBX-6565 */
+#	endif
 #	include <libperfstat.h>
 #endif
 
@@ -348,8 +351,8 @@
 #	include <math.h>
 #endif
 
-#ifdef HAVE_REGEX_H
-#	include <regex.h>
+#ifdef HAVE_PCRE_H
+#	include <pcre.h>
 #endif
 
 #ifdef HAVE_VM_VM_PARAM_H
@@ -366,6 +369,10 @@
 
 #ifdef HAVE_SYS_TIMEB_H
 #	include <sys/timeb.h>
+#endif
+
+#ifdef HAVE_SYS_UN_H
+#	include <sys/un.h>
 #endif
 
 #ifdef HAVE_PROCINFO_H
@@ -411,6 +418,18 @@
 #ifdef HAVE_ZONE_H
 #	include <zone.h>
 #	include <utmpx.h>
+#endif
+
+#ifdef HAVE_STDDEF_H
+#	include <stddef.h>
+#endif
+
+#ifdef HAVE_LIMITS_H
+#	include <limits.h>
+#endif
+
+#ifdef HAVE_FLOAT_H
+#	include <float.h>
 #endif
 
 #endif

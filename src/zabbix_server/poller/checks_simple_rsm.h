@@ -210,15 +210,8 @@
 #define RSM_UDP	0
 #define RSM_TCP	1
 
+/* used only in EPP and probe status tests, remove and use item parameters in the future as other checks do */
 #define ZBX_MACRO_DNS_RESOLVER		"{$RSM.RESOLVER}"
-#define ZBX_MACRO_DNS_TESTPREFIX	"{$RSM.DNS.TESTPREFIX}"
-#define ZBX_MACRO_DNS_UDP_RTT		"{$RSM.DNS.UDP.RTT.HIGH}"
-#define ZBX_MACRO_DNS_TCP_RTT		"{$RSM.DNS.TCP.RTT.HIGH}"
-#define ZBX_MACRO_RDDS43_TEST_DOMAIN	"{$RSM.RDDS43.TEST.DOMAIN}"
-#define ZBX_MACRO_RDDS_RTT		"{$RSM.RDDS.RTT.HIGH}"
-#define ZBX_MACRO_RDDS_NS_STRING	"{$RSM.RDDS.NS.STRING}"
-#define ZBX_MACRO_RDDS_MAXREDIRS	"{$RSM.RDDS.MAXREDIRS}"
-#define ZBX_MACRO_RDDS_ENABLED		"{$RSM.RDDS.ENABLED}"
 #define ZBX_MACRO_EPP_LOGIN_RTT		"{$RSM.EPP.LOGIN.RTT.HIGH}"
 #define ZBX_MACRO_EPP_UPDATE_RTT	"{$RSM.EPP.UPDATE.RTT.HIGH}"
 #define ZBX_MACRO_EPP_INFO_RTT		"{$RSM.EPP.INFO.RTT.HIGH}"
@@ -239,8 +232,6 @@
 #define ZBX_MACRO_EPP_SERVERID		"{$RSM.EPP.SERVERID}"
 #define ZBX_MACRO_EPP_TESTPREFIX	"{$RSM.EPP.TESTPREFIX}"
 #define ZBX_MACRO_EPP_SERVERCERTMD5	"{$RSM.EPP.SERVERCERTMD5}"
-#define ZBX_MACRO_TLD_DNSSEC_ENABLED	"{$RSM.TLD.DNSSEC.ENABLED}"
-#define ZBX_MACRO_TLD_RDDS_ENABLED	"{$RSM.TLD.RDDS.ENABLED}"
 #define ZBX_MACRO_TLD_EPP_ENABLED	"{$RSM.TLD.EPP.ENABLED}"
 
 #define RSM_UDP_TIMEOUT	3	/* seconds */
@@ -256,11 +247,11 @@
 #define ZBX_PROBESTATUS_LOG_PREFIX	"probestatus"		/* file will be <LOGDIR>/<PROBE>-probestatus.log */
 #define ZBX_RESOLVERSTATUS_LOG_PREFIX	"resolverstatus"	/* file will be <LOGDIR>/<PROBE>-ZBX_RESOLVERSTATUS_LOG_PREFIX.log */
 
-int	check_rsm_dns(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *result, char proto);
-int	check_rsm_rdds(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *result);
-int	check_rsm_rdap(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *result);
-int	check_rsm_epp(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *result);
-int	check_rsm_probe_status(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *result);
-int	check_rsm_resolver_status(DC_ITEM *item, const AGENT_REQUEST *request, AGENT_RESULT *result);
+int	check_rsm_dns(const char *host, int nextcheck, const AGENT_REQUEST *request, AGENT_RESULT *result);
+int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *result);
+int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *result);
+int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *result);
+int	check_rsm_probe_status(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *result);
+int	check_rsm_resolver_status(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *result);
 
 #endif

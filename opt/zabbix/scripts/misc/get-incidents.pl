@@ -14,7 +14,7 @@ use warnings;
 use RSM;
 use RSMSLV;
 
-parse_opts("tld=s", "from=n", "till=n");
+parse_opts("tld=s", "from=i", "till=i");
 
 # do not write any logs
 setopt('nolog');
@@ -35,7 +35,7 @@ my $till = getopt('till');
 my $tlds_ref = opt('tld') ? [ getopt('tld') ] : get_tlds(undef, $till);
 
 my $delays = {
-	'dns'	=> get_dns_udp_delay(),
+	'dns'	=> get_dns_delay(),
 	'rdds'	=> get_rdds_delay(),
 	'epp'	=> get_epp_delay()
 };

@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -21,19 +21,20 @@
 #include "sysinfo.h"
 
 ZBX_METRIC	parameters_specific[] =
-/* 	KEY			FLAG		FUNCTION 		TEST PARAMETERS */
+/*	KEY			FLAG		FUNCTION		TEST PARAMETERS */
 {
 	{"kernel.maxfiles",	0,		KERNEL_MAXFILES,	NULL},
-	{"kernel.maxproc",	0,		KERNEL_MAXPROC, 	NULL},
+	{"kernel.maxproc",	0,		KERNEL_MAXPROC,	NULL},
 
 	{"vfs.fs.size",		CF_HAVEPARAMS,	VFS_FS_SIZE,		"/,free"},
 	{"vfs.fs.inode",	CF_HAVEPARAMS,	VFS_FS_INODE,		"/,free"},
 	{"vfs.fs.discovery",	0,		VFS_FS_DISCOVERY,	NULL},
+	{"vfs.fs.get",		0,		VFS_FS_GET,		NULL},
 
 	{"vm.memory.size",	CF_HAVEPARAMS,	VM_MEMORY_SIZE,		"free"},
 
-	{"net.tcp.listen",      CF_HAVEPARAMS,	NET_TCP_LISTEN, 	"80"},
-	{"net.udp.listen",      CF_HAVEPARAMS,	NET_UDP_LISTEN, 	"68"},
+	{"net.tcp.listen",	CF_HAVEPARAMS,	NET_TCP_LISTEN, 	"80"},
+	{"net.udp.listen",	CF_HAVEPARAMS,	NET_UDP_LISTEN, 	"68"},
 
 	{"net.if.in",		CF_HAVEPARAMS,	NET_IF_IN,		"en0,bytes"},
 	{"net.if.out",		CF_HAVEPARAMS,	NET_IF_OUT,		"en0,bytes"},

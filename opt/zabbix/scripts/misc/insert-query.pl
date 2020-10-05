@@ -14,7 +14,7 @@ sub main()
 {
 	setopt('stats');
 	setopt('nolog');
-	parse_opts('table=s', 'c!', 'oneline!');
+	parse_opts('table=s', 'c', 'oneline');
 
 	if (!opt('table'))
 	{

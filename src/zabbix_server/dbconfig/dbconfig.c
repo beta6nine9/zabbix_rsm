@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -30,7 +30,7 @@ extern int		CONFIG_CONFSYNCER_FREQUENCY;
 extern unsigned char	process_type, program_type;
 extern int		server_num, process_num;
 
-void	zbx_dbconfig_sigusr_handler(int flags)
+static void	zbx_dbconfig_sigusr_handler(int flags)
 {
 	if (ZBX_RTC_CONFIG_CACHE_RELOAD == ZBX_RTC_GET_MSG(flags))
 	{
@@ -70,51 +70,41 @@ ZBX_THREAD_ENTRY(dbconfig_thread, args)
 	zabbix_log(LOG_LEVEL_INFORMATION, "%s #%d started [%s #%d]", get_program_type_string(program_type),
 			server_num, get_process_type_string(process_type), process_num);
 
-	if (0 != CONFIG_CONFSYNCER_FREQUENCY)
-	{
-		zbx_setproctitle("%s [waiting %d sec for processes]", get_process_type_string(process_type),
-				CONFIG_CONFSYNCER_FREQUENCY);
-	}
-	else
-		zbx_setproctitle("%s [waiting for user command]", get_process_type_string(process_type));
+	update_selfmon_counter(ZBX_PROCESS_STATE_BUSY);
 
 	zbx_set_sigusr_handler(zbx_dbconfig_sigusr_handler);
-
-	/* the initial configuration sync is done by server before worker processes are forked */
-	if (0 != CONFIG_CONFSYNCER_FREQUENCY)
-		zbx_sleep_loop(CONFIG_CONFSYNCER_FREQUENCY);
-	else
-		zbx_sleep_forever();
 
 	zbx_setproctitle("%s [connecting to the database]", get_process_type_string(process_type));
 
 	DBconnect(ZBX_DB_CONNECT_NORMAL);
 
-	for (;;)
-	{
-		zbx_handle_log();
+	sec = zbx_time();
+	zbx_setproctitle("%s [syncing configuration]", get_process_type_string(process_type));
+	DCsync_configuration(ZBX_DBSYNC_INIT);
+	zbx_setproctitle("%s [synced configuration in " ZBX_FS_DBL " sec, idle %d sec]",
+			get_process_type_string(process_type), (sec = zbx_time() - sec), CONFIG_CONFSYNCER_FREQUENCY);
+	zbx_sleep_loop(CONFIG_CONFSYNCER_FREQUENCY);
 
+	while (ZBX_IS_RUNNING())
+	{
 		zbx_setproctitle("%s [synced configuration in " ZBX_FS_DBL " sec, syncing configuration]",
 				get_process_type_string(process_type), sec);
 
 		sec = zbx_time();
+		zbx_update_env(sec);
+
 		DCsync_configuration(ZBX_DBSYNC_UPDATE);
 		DCupdate_hosts_availability();
 		sec = zbx_time() - sec;
 
-		if (0 != CONFIG_CONFSYNCER_FREQUENCY)
-		{
-			zbx_setproctitle("%s [synced configuration in " ZBX_FS_DBL " sec, idle %d sec]",
-					get_process_type_string(process_type), sec, CONFIG_CONFSYNCER_FREQUENCY);
+		zbx_setproctitle("%s [synced configuration in " ZBX_FS_DBL " sec, idle %d sec]",
+				get_process_type_string(process_type), sec, CONFIG_CONFSYNCER_FREQUENCY);
 
-			zbx_sleep_loop(CONFIG_CONFSYNCER_FREQUENCY);
-		}
-		else
-		{
-			zbx_setproctitle("%s [synced configuration in " ZBX_FS_DBL " sec, waiting for user command]",
-					get_process_type_string(process_type), sec);
-
-			zbx_sleep_forever();
-		}
+		zbx_sleep_loop(CONFIG_CONFSYNCER_FREQUENCY);
 	}
+
+	zbx_setproctitle("%s #%d [terminated]", get_process_type_string(process_type), process_num);
+
+	while (1)
+		zbx_sleep(SEC_PER_MIN);
 }

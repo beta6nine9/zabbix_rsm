@@ -7,7 +7,7 @@
 //
 // Generated from the TEXTINCLUDE 2 resource.
 //
-#include "afxres.h"
+#include "winresrc.h"
 
 /////////////////////////////////////////////////////////////////////////////
 #undef APSTUDIO_READONLY_SYMBOLS
@@ -34,7 +34,7 @@ END
 
 2 TEXTINCLUDE DISCARDABLE
 BEGIN
-    "#include ""afxres.h""\r\n"
+    "#include ""winresrc.h""\r\n"
     "\0"
 END
 
@@ -47,12 +47,15 @@ END
 #endif    // APSTUDIO_INVOKED
 
 
+#ifndef ZABBIX_AGENT2
 /////////////////////////////////////////////////////////////////////////////
 //
 // 11
 //
 
 1                       11      DISCARDABLE     "MSG00001.bin"
+#endif    // ZABBIX_AGENT2
+
 #endif    // English (U.S.) resources
 /////////////////////////////////////////////////////////////////////////////
 

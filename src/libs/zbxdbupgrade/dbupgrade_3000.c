@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -19,7 +19,6 @@
 
 #include "common.h"
 #include "db.h"
-#include "zbxdbupgrade.h"
 #include "dbupgrade.h"
 #include "log.h"
 
@@ -238,19 +237,19 @@ static int	DBpatch_3000114(void)
 	return add_hosts_to_group("TLDs", 190);
 }
 
-static int	DBpatch_update_trigger_expression(const char *old, const char *new)
+static int	DBpatch_update_trigger_expression(const char *old_expr, const char *new_expr)
 {
-	char	*old_esc, *new_esc;
+	char	*old_expr_esc, *new_expr_esc;
 	int	ret = SUCCEED;
 
-	old_esc = zbx_db_dyn_escape_string(old);
-	new_esc = zbx_db_dyn_escape_string(new);
+	old_expr_esc = zbx_db_dyn_escape_string(old_expr);
+	new_expr_esc = zbx_db_dyn_escape_string(new_expr);
 
-	if (ZBX_DB_OK > DBexecute("update triggers set expression='%s' where expression='%s'", new_esc, old_esc))
+	if (ZBX_DB_OK > DBexecute("update triggers set expression='%s' where expression='%s'", new_expr_esc, old_expr_esc))
 		ret = FAIL;
 
-	zbx_free(old_esc);
-	zbx_free(new_esc);
+	zbx_free(old_expr_esc);
+	zbx_free(new_expr_esc);
 
 	return ret;
 }
@@ -292,13 +291,18 @@ static int	DBpatch_3000117(void)
 	{
 		zbx_uint64_t		hostid;
 		zbx_vector_uint64_t	templateids;
+		char			*error;
 
 		ZBX_STR2UINT64(hostid, row[0]);			/* hostid of probe host */
 		zbx_vector_uint64_create(&templateids);
 		zbx_vector_uint64_reserve(&templateids, 1);
 		zbx_vector_uint64_append(&templateids, 10058);	/* hostid of "Template App Zabbix Proxy" */
 
-		ret = DBcopy_template_elements(hostid, &templateids);
+		if (SUCCEED != (ret = DBcopy_template_elements(hostid, &templateids, &error)))
+		{
+			zabbix_log(LOG_LEVEL_CRIT, "cannot link template(s) %s", error);
+			zbx_free(error);
+		}
 
 		zbx_vector_uint64_destroy(&templateids);
 	}
@@ -415,7 +419,7 @@ typedef struct
 {
 	zbx_uint64_t	id;
 	int		conditiontype;
-	int		operator;
+	int		op;
 	const char	*value;
 }
 condition_t;
@@ -581,7 +585,7 @@ static int	db_insert_condition(zbx_uint64_t actionid, const condition_t *conditi
 	ret = DBexecute(
 			"insert into conditions (conditionid,actionid,conditiontype,operator,value)"
 			" values (" ZBX_FS_UI64 "," ZBX_FS_UI64 ",%d,%d,'%s')",
-			condition->id, actionid, condition->conditiontype, condition->operator, value_esc);
+			condition->id, actionid, condition->conditiontype, condition->op, value_esc);
 
 	zbx_free(value_esc);
 
@@ -961,7 +965,7 @@ static int	DBpatch_3000134(void)
 {
 #define DEFAULT_INTERFACE_INSERT								\
 	"insert into interface (interfaceid,hostid,main,type,useip,ip,dns,port,bulk)"		\
-	" values ('" ZBX_FS_UI64 "','" ZBX_FS_UI64 "','1','1','1','127.0.0.1','','10050','1')"
+	" values ('%u','%u','1','1','1','127.0.0.1','','10050','1')"
 
 	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
 		return SUCCEED;
@@ -986,7 +990,7 @@ static int	DBpatch_3000135(void)
 		"update globalmacro"								\
 		" set globalmacroid=(select nextid from ("					\
 			"select max(globalmacroid)+1 as nextid from globalmacro) as tmp)"	\
-		" where globalmacroid=" ZBX_FS_UI64
+		" where globalmacroid=%u"
 
 	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
 		return SUCCEED;
@@ -1025,7 +1029,7 @@ static int	DBpatch_3000136(void)
 		"update hostmacro"							\
 		" set hostmacroid=(select nextid from ("				\
 			"select max(hostmacroid)+1 as nextid from hostmacro) as tmp)"	\
-		" where hostmacroid=" ZBX_FS_UI64
+		" where hostmacroid=%u"
 
 	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
 		return SUCCEED;
@@ -1501,7 +1505,7 @@ static int	DBpatch_3000205(void)
 		"update globalmacro"								\
 		" set globalmacroid=(select nextid from ("					\
 			"select max(globalmacroid)+1 as nextid from globalmacro) as tmp)"	\
-		" where globalmacroid=" ZBX_FS_UI64
+		" where globalmacroid=%u"
 
 	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
 		return SUCCEED;
@@ -1605,7 +1609,7 @@ static int	DBpatch_3000206(void)
 		"update trigger_depends"							\
 		" set triggerdepid=(select nextid from ("					\
 			"select max(triggerdepid)+1 as nextid from trigger_depends) as tmp)"	\
-		" where triggerdepid=" ZBX_FS_UI64
+		" where triggerdepid=%u"
 
 	if (ZBX_DB_OK > DBexecute(RESERVE_TRIGGERDEPID, 1))
 		return FAIL;
@@ -1643,13 +1647,18 @@ static int	DBpatch_3000210(void)
 	{
 		zbx_uint64_t		hostid;
 		zbx_vector_uint64_t	templateids;
+		char			*error;
 
 		ZBX_STR2UINT64(hostid, row[0]);			/* hostid of probe host */
 		zbx_vector_uint64_create(&templateids);
 		zbx_vector_uint64_reserve(&templateids, 1);
 		zbx_vector_uint64_append(&templateids, 99990);	/* hostid of "Template Probe Errors" */
 
-		ret = DBcopy_template_elements(hostid, &templateids);
+		if (SUCCEED != (ret = DBcopy_template_elements(hostid, &templateids, &error)))
+		{
+			zabbix_log(LOG_LEVEL_CRIT, "cannot link template(s) %s", error);
+			zbx_free(error);
+		}
 
 		zbx_vector_uint64_destroy(&templateids);
 	}
@@ -1987,7 +1996,7 @@ static int	DBpatch_3000217(void)
 	DB_ROW			row;
 	zbx_vector_uint64_t	templateids;
 	zbx_uint64_t		hostmacroid, itemid;
-	size_t			i;
+	int			i;
 	int			ret = FAIL;
 
 	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
@@ -2070,7 +2079,7 @@ static int	DBpatch_3000217(void)
 	{
 		zbx_vector_uint64_t	hostids;
 		zbx_uint64_t		templated_itemid;
-		size_t			j;
+		int			j;
 
 		templated_itemid = itemid;
 
@@ -2249,7 +2258,7 @@ static int	DBpatch_3000219(void)
 	DB_ROW			row;
 	zbx_vector_uint64_t	templateids;
 	zbx_uint64_t		itemid;
-	size_t			i;
+	int			i;
 	int			ret = FAIL;
 
 	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
@@ -2317,7 +2326,7 @@ static int	DBpatch_3000219(void)
 	{
 		zbx_vector_uint64_t	hostids;
 		zbx_uint64_t		templated_itemid;
-		size_t			j;
+		int			j;
 
 		templated_itemid = itemid;
 
@@ -2454,13 +2463,13 @@ static int	DBpatch_3000222(void)
 		return SUCCEED;
 
 	if (ZBX_DB_OK > DBexecute("update mappings set newvalue='DNS UDP - Expecting NOERROR RCODE but got unexpected"
-			" from local resolver' where mappingid=" ZBX_FS_UI64, 12042))
+			" from local resolver' where mappingid=%u", 12042))
 	{
 		return FAIL;
 	}
 
 	if (ZBX_DB_OK > DBexecute("update mappings set newvalue='DNS TCP - Expecting NOERROR RCODE but got unexpected"
-			" from local resolver' where mappingid=" ZBX_FS_UI64, 12096))
+			" from local resolver' where mappingid=%u", 12096))
 	{
 		return FAIL;
 	}
@@ -2474,7 +2483,7 @@ static int	DBpatch_3000223(void)
 		return SUCCEED;
 
 	if (ZBX_DB_OK > DBexecute("update mappings set newvalue='RDDS80 - Maximum HTTP redirects were hit while trying"
-			" to connect to RDDS server' where mappingid=" ZBX_FS_UI64, 13576))
+			" to connect to RDDS server' where mappingid=%u", 13576))
 	{
 		return FAIL;
 	}
@@ -2514,18 +2523,23 @@ static int	DBpatch_3000224(void)
 
 	while (NULL != (row = DBfetch(result)) && SUCCEED == ret)
 	{
-		if (SUCCEED == template_is_linked_to_host("99980", row[0]))
-			continue;	/* already linked */
-
 		zbx_uint64_t		hostid;
 		zbx_vector_uint64_t	templateids;
+		char			*error;
+
+		if (SUCCEED == template_is_linked_to_host("99980", row[0]))
+			continue;	/* already linked */
 
 		ZBX_STR2UINT64(hostid, row[0]);			/* hostid of probe host */
 		zbx_vector_uint64_create(&templateids);
 		zbx_vector_uint64_reserve(&templateids, 1);
 		zbx_vector_uint64_append(&templateids, 99980);	/* hostid of "Template RDAP" */
 
-		ret = DBcopy_template_elements(hostid, &templateids);
+		if (SUCCEED != (ret = DBcopy_template_elements(hostid, &templateids, &error)))
+		{
+			zabbix_log(LOG_LEVEL_CRIT, "cannot link template(s) %s", error);
+			zbx_free(error);
+		}
 
 		zbx_vector_uint64_destroy(&templateids);
 	}
@@ -2812,7 +2826,7 @@ static int	DBpatch_3000231(void)
 	DB_ROW			row;
 	zbx_vector_uint64_t	templateids;
 	zbx_uint64_t		next_itemid, next_itemappid;
-	size_t			i;
+	int			i;
 
 	static const char	*const data[] = {
 		"ROW   |100          |{$RESOLVER.STATUS.TIMEOUT}    |5                  |",
@@ -3066,7 +3080,7 @@ static int	DBpatch_3000235(void)
 	DB_ROW			row;
 	zbx_vector_uint64_t	templateids;
 	zbx_uint64_t		next_triggerid, next_functionid;
-	size_t			i;
+	int			i;
 
 	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
 		return SUCCEED;
@@ -3244,12 +3258,12 @@ static int	DBpatch_3000303(void)
 	return DBpatch_3000238();
 }
 
-static int	move_ids(const char *table_name, const char *idfield, int id, int count)
+static int	move_ids(const char *table_name, const char *idfield, zbx_uint64_t id, int count)
 {
 	DB_RESULT	result;
 	DB_ROW		row;
 
-	result = DBselect("select %s from %s where %s>=%d order by %s desc",
+	result = DBselect("select %s from %s where %s>=" ZBX_FS_UI64 " order by %s desc",
 			idfield, table_name, idfield, id, idfield);
 
 	while (NULL != (row = DBfetch(result)))
@@ -3345,7 +3359,7 @@ static int	create_dns_downtime_trigger(const char *hostid)
 
 	if (NULL == (row = DBfetch(result)))
 	{
-		zabbix_log(LOG_LEVEL_CRIT, "item key \"%s\" not found at TLD host " ZBX_FS_UI64, itemkey, hostid);
+		zabbix_log(LOG_LEVEL_CRIT, "item key \"%s\" not found at TLD host %s", itemkey, hostid);
 		return FAIL;
 	}
 
@@ -3409,7 +3423,7 @@ static int	create_rdds_downtime_trigger(const char *hostid, const char *percent,
 
 	if (NULL == (row = DBfetch(result)))
 	{
-		zabbix_log(LOG_LEVEL_CRIT, "item key \"%s\" not found at TLD host " ZBX_FS_UI64, itemkey, hostid);
+		zabbix_log(LOG_LEVEL_CRIT, "item key \"%s\" not found at TLD host %s", itemkey, hostid);
 		return FAIL;
 	}
 
@@ -3451,7 +3465,7 @@ const char	*trigger_params[][3] = {
 static int	create_dependent_rdds_trigger_chain(const char *hostid)
 {
 	zbx_uint64_t	triggerid = 0, dependid = 0;
-	int		i;
+	size_t		i;
 
 	for (i = 0; i < sizeof(trigger_params) / sizeof(*trigger_params); i++)
 	{
@@ -3530,9 +3544,9 @@ static int	DBpatch_3000306(void)
 	return SUCCEED;
 }
 
-static int extract_string_part(char **out, char ch, const char *str, int *index, int length)
+static int extract_string_part(char **out, char ch, const char *str, size_t *index, size_t length)
 {
-	int	strbegin, part_length;
+	size_t	strbegin, part_length;
 
 	strbegin = *index;
 
@@ -3564,7 +3578,7 @@ static int extract_string_part(char **out, char ch, const char *str, int *index,
 
 static int extract_nsip_pair_from_rtt_item_key(const char *probe_item_key, char **ns, char **ip)
 {
-	int	i, probe_item_key_len;
+	size_t	i, probe_item_key_len;
 
 	if (NULL == probe_item_key || 0 == probe_item_key[0])
 		return FAIL;
@@ -3618,6 +3632,8 @@ static int	create_slv_dns_ns_avail_item(const char *tld, const char *hostid, cha
 		return FAIL;
 	}
 
+	ZBX_UNUSED(tld);
+
 	return SUCCEED;
 }
 
@@ -3654,6 +3670,8 @@ static int	create_slv_dns_ns_downtime_item(const char *tld, const char *hostid, 
 	{
 		return FAIL;
 	}
+
+	ZBX_UNUSED(tld);
 
 	return SUCCEED;
 }
@@ -4074,7 +4092,7 @@ static int	create_dns_ns_downtime_trigger(const char *itemid, const char *nsip,
 static int	create_dependent_dns_ns_trigger_chain(const char *itemid, const char *nsip)
 {
 	zbx_uint64_t	triggerid = 0, dependid = 0;
-	int		i;
+	size_t		i;
 
 	for (i = 0; i < sizeof(trigger_params) / sizeof(*trigger_params); i++)
 	{
@@ -4105,7 +4123,7 @@ static int	DBpatch_3000312(void)
 	DB_RESULT	result;
 	DB_ROW		row;
 	char		*itemkey;
-	int		prefixlen, itemkeylen;
+	size_t		prefixlen, itemkeylen;
 	const char	*key_prefix = "rsm.slv.dns.ns.downtime[";
 
 	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
@@ -4441,11 +4459,11 @@ static int	DBpatch_3000401(void)
 		"update globalmacro"								\
 		" set globalmacroid=(select nextid from ("					\
 			"select max(globalmacroid)+1 as nextid from globalmacro) as tmp)"	\
-		" where globalmacroid=" ZBX_FS_UI64
+		" where globalmacroid=%u"
 
 	DB_RESULT	result;
 	DB_ROW		row;
-	char		*monitoring_target;
+	const char	*monitoring_target;
 
 	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
 		return SUCCEED;
@@ -4760,13 +4778,13 @@ do {                                                                            
 					"select max(globalmacroid)+1 as nextid"         \
 					" from globalmacro"                             \
 				") as tmp"                                              \
-			") where globalmacroid=" ZBX_FS_UI64, globalmacroid))           \
+			") where globalmacroid=%u", globalmacroid))                     \
 	{                                                                               \
 		return FAIL;                                                            \
 	}                                                                               \
 	if (ZBX_DB_OK > DBexecute(                                                      \
 			"insert into globalmacro (globalmacroid,macro,value)"           \
-			" values (" ZBX_FS_UI64 ",'%s','%s')",                          \
+			" values (%u,'%s','%s')",                                       \
 			globalmacroid, macro, value))                                   \
 	{                                                                               \
 		return FAIL;                                                            \
@@ -4922,7 +4940,7 @@ static int	DBpatch_3000503(void)
 
 	if (ZBX_DB_OK > DBexecute("update items set"
 			" key_=replace(key_,'{$RSM.RDDS.','{$RSM.RDAP.')"
-			" where key_ like 'rdap[%]'"))
+			" where key_ like 'rdap[%%]'"))
 	{
 		return FAIL;
 	}
@@ -5015,6 +5033,17 @@ out:
 
 static int	DBpatch_3000505(void)
 {
+	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
+		return SUCCEED;
+
+	if (ZBX_DB_OK > DBexecute("update items set type=5 where type=0 and key_='zabbix[host,agent,available]'"))
+		return FAIL;
+
+	return SUCCEED;
+}
+
+static int	DBpatch_3000506(void)
+{
 	int		ret = FAIL;
 
 	zbx_uint64_t	templateid_template_rdap  = 99980;
@@ -5063,7 +5092,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_3000506(void)
+static int	DBpatch_3000507(void)
 {
 	DB_RESULT	result = NULL;
 	DB_ROW		row;
@@ -5163,7 +5192,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_3000507(void)
+static int	DBpatch_3000508(void)
 {
 	int		ret = FAIL;
 	DB_RESULT	result = NULL;
@@ -5254,7 +5283,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_3000508(void)
+static int	DBpatch_3000509(void)
 {
 	DB_RESULT	result = NULL;
 	DB_RESULT	result2 = NULL;
@@ -5387,7 +5416,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_3000509(void)
+static int	DBpatch_3000510(void)
 {
 	const ZBX_TABLE table =
 			{"rsm_target", "id", 0,
@@ -5413,7 +5442,7 @@ static int	DBpatch_3000509(void)
 	return SUCCEED;
 }
 
-static int	DBpatch_3000510(void)
+static int	DBpatch_3000511(void)
 {
 	const ZBX_TABLE table =
 			{"rsm_testedname", "id", 0,
@@ -5439,7 +5468,7 @@ static int	DBpatch_3000510(void)
 	return SUCCEED;
 }
 
-static int	DBpatch_3000511(void)
+static int	DBpatch_3000512(void)
 {
 	if (0 != (program_type & ZBX_PROGRAM_TYPE_PROXY))
 		return SUCCEED;
@@ -5462,7 +5491,7 @@ static int	DBpatch_3000511(void)
 	return SUCCEED;
 }
 
-static int	DBpatch_3000512(void)
+static int	DBpatch_3000513(void)
 {
 	/* run on both server and proxy */
 
@@ -5483,7 +5512,7 @@ static int	DBpatch_3000512(void)
 	return SUCCEED;
 }
 
-static int	DBpatch_3000513(void)
+static int	DBpatch_3000514(void)
 {
 	int		ret = FAIL;
 
@@ -5568,7 +5597,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_3000514(void)
+static int	DBpatch_3000515(void)
 {
 	zbx_uint64_t	itemid, triggerid, functionid;
 	DB_RESULT	result;
@@ -5616,7 +5645,7 @@ out:
 	return ret;
 }
 
-static int	DBpatch_3000515(void)
+static int	DBpatch_3000516(void)
 {
 #define SQL	"alter table host_inventory"										\
 			" modify column name varchar(128) collate utf8_bin not null default '',"			\
@@ -5751,16 +5780,17 @@ DBPATCH_ADD(3000501, 0, 0)	/* add macros, items and triggers for Standalone RDAP
 DBPATCH_ADD(3000502, 0, 0)	/* add {$RSM.RDAP.ENABLED} macro on probes */
 DBPATCH_ADD(3000503, 0, 0)	/* replace {$RSM.RDDS.*} with {$RSM.RDAP.*} in rdap[] keys */
 DBPATCH_ADD(3000504, 0, 0)	/* add RDAP-related macros to Global macro history */
-DBPATCH_ADD(3000505, 0, 0)	/* add "rdap.target" and "rdap.testedname" items to "Template RDAP" template */
-DBPATCH_ADD(3000506, 0, 0)	/* add "rsm.rdds.43.target", "rsm.rdds.43.testedname" and "rsm.rdds.80.target" items to "Template <RSMHOST>" templates where needed */
-DBPATCH_ADD(3000507, 0, 0)	/* add "rdap.target" and "rdap.testedname" items to hosts that use "Template RDAP" template */
-DBPATCH_ADD(3000508, 0, 0)	/* add "rsm.rdds.43.target", "rsm.rdds.43.testedname" and "rsm.rdds.80.target" items to hosts that use "Template <RSMHOST>" */
-DBPATCH_ADD(3000509, 0, 0)	/* create table rsm_target for Data Export */
-DBPATCH_ADD(3000510, 0, 0)	/* create table rsm_testedname for Data Export */
-DBPATCH_ADD(3000511, 0, 0)	/* rename {$RSM.RDDS.TESTPREFIX} to {$RSM.RDDS43.TEST.DOMAIN} */
-DBPATCH_ADD(3000512, 0, 0)	/* rename report column in sla_reports to report_xml, add report_json column */
-DBPATCH_ADD(3000513, 0, 0)	/* add items for online/total probes with RDAP enabled to host "Probe statuses" */
-DBPATCH_ADD(3000514, 0, 0)	/* add trigger for number of RDAP-enabled online probes to host "Probe statuses" */
-DBPATCH_ADD(3000515, 0, 1)	/* modify "hosts_inventory" table to avoid "Row size too large" MariaDB error */
+DBPATCH_ADD(3000505, 0, 0)	/* fixed the type of 'zabbix[host,agent,available]' items */
+DBPATCH_ADD(3000506, 0, 0)	/* add "rdap.target" and "rdap.testedname" items to "Template RDAP" template */
+DBPATCH_ADD(3000507, 0, 0)	/* add "rsm.rdds.43.target", "rsm.rdds.43.testedname" and "rsm.rdds.80.target" items to "Template <RSMHOST>" templates where needed */
+DBPATCH_ADD(3000508, 0, 0)	/* add "rdap.target" and "rdap.testedname" items to hosts that use "Template RDAP" template */
+DBPATCH_ADD(3000509, 0, 0)	/* add "rsm.rdds.43.target", "rsm.rdds.43.testedname" and "rsm.rdds.80.target" items to hosts that use "Template <RSMHOST>" */
+DBPATCH_ADD(3000510, 0, 0)	/* create table rsm_target for Data Export */
+DBPATCH_ADD(3000511, 0, 0)	/* create table rsm_testedname for Data Export */
+DBPATCH_ADD(3000512, 0, 0)	/* rename {$RSM.RDDS.TESTPREFIX} to {$RSM.RDDS43.TEST.DOMAIN} */
+DBPATCH_ADD(3000513, 0, 0)	/* rename report column in sla_reports to report_xml, add report_json column */
+DBPATCH_ADD(3000514, 0, 0)	/* add items for online/total probes with RDAP enabled to host "Probe statuses" */
+DBPATCH_ADD(3000515, 0, 0)	/* add trigger for number of RDAP-enabled online probes to host "Probe statuses" */
+DBPATCH_ADD(3000516, 0, 1)	/* modify "hosts_inventory" table to avoid "Row size too large" MariaDB error */
 
 DBPATCH_END()

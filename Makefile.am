@@ -6,81 +6,171 @@ SUBDIRS = \
 	src \
 	database \
 	man \
-	misc \
-	upgrades
+	misc
 
 EXTRA_DIST = \
 	bin \
 	build \
-	frontends \
+	ui \
 	include \
 	conf \
-	sass \
-	opt
+	sass
+
+EXTRA_DIST += opt
 
 ## "dist-hook" run after the distribution directory is filled, but before the actual tar (or shar) file is created.
 dist-hook:
-	@zabbix_revision=`git --git-dir="$(top_srcdir)/.git" rev-parse --short HEAD`; \
-	cat $(top_distdir)/include/version.h|sed "s/{ZABBIX_REVISION}/$$zabbix_revision/g" > $(top_distdir)/include/version.h.new; \
+# File revision number must be numeric (Git commit hash cannot be used).
+# Therefore to make it numeric and meaningful it is artificially composed from:
+#    - branch (development or release),
+#    - type (alpha, beta, rc or release),
+#    - number of alpha, beta or rc.
+# 'branch' expression tries to find out is it a development branch or release branch.
+#      Result is encoded as: 1 - dev branch, release branch or error occurred, 2 - tag.
+# 'type_name' expression tries to find out what type of release it is.
+#      Expected result is: "alpha", "beta", "rc" or "" (empty string).
+# 'type_num' expression encodes 'type_name' as numeric value:
+#      1 - alpha, 2 - beta, 3 - rc, 4 - release, 0 - unknown.
+# 'type_count' expression tries to find out number of "alpha", "beta" or "rc" (e.g. 1 from "rc1").
+	@branch=`(git symbolic-ref -q HEAD > /dev/null && echo 1) || (git tag -l --points-at HEAD| grep "."| grep -q -v "-" && echo 2) || echo 1`; \
+	type_name=`cat $(top_distdir)/include/version.h| sed -n -e '/ZABBIX_VERSION_RC/s/.*"\([a-z]*\)[0-9]*"/\1/p'`; \
+	type_num=`(test "x$$type_name" = "xalpha" && echo "1") || echo ""`; \
+	type_num=`(test -z $$type_num && test "x$$type_name" = "xbeta" && echo "2") || echo "$$type_num"`; \
+	type_num=`(test -z $$type_num && test "x$$type_name" = "xrc" && echo "3") || echo "$$type_num"`; \
+	type_num=`(test -z $$type_num && test -z $$type_name && echo "4") || echo "$$type_num"`; \
+	type_num=`(test -z $$type_num && echo "0") || echo "$$type_num"`; \
+	type_count=`cat $(top_distdir)/include/version.h|sed -n -e '/ZABBIX_VERSION_RC/s/.*"[a-z]*\([0-9]*\)"/\1/p'`; \
+	type_count=`printf '%02d' $$type_count`; \
+	zabbix_revision=`git rev-parse --short HEAD`; \
+	cat $(top_distdir)/include/version.h|sed "s/{ZABBIX_RC_NUM}/$$branch$$type_num$$type_count/g"| \
+	sed "s/{ZABBIX_REVISION}/$$zabbix_revision/g" > $(top_distdir)/include/version.h.new; \
 	mv $(top_distdir)/include/version.h.new $(top_distdir)/include/version.h; \
 	cat $(top_distdir)/src/zabbix_java/src/com/zabbix/gateway/GeneralInformation.java|sed "s/{ZABBIX_REVISION}/$$zabbix_revision/g" > \
 		$(top_distdir)/src/zabbix_java/src/com/zabbix/gateway/GeneralInformation.java.new; \
 	mv $(top_distdir)/src/zabbix_java/src/com/zabbix/gateway/GeneralInformation.java.new \
-		$(top_distdir)/src/zabbix_java/src/com/zabbix/gateway/GeneralInformation.java
+		$(top_distdir)/src/zabbix_java/src/com/zabbix/gateway/GeneralInformation.java; \
+	cat $(top_distdir)/src/go/pkg/version/version.go|sed "s/{ZABBIX_RC_NUM}/$$branch$$type_num$$type_count/g"| \
+	sed "s/{ZABBIX_REVISION}/$$zabbix_revision/g" > $(top_distdir)/src/go/pkg/version/version.go.new; \
+	mv $(top_distdir)/src/go/pkg/version/version.go.new $(top_distdir)/src/go/pkg/version/version.go
 
 	rm -rf `find $(top_distdir) -name ".gitignore" -o -name ".gitattributes"`
-	rm -f $(top_distdir)/create/data/data_test.sql
 	rm -f $(top_distdir)/include/config.h
-	rm -f $(top_distdir)/frontends/php/conf/zabbix.conf.php
-	rm -rf $(top_distdir)/frontends/php/tests
-	rm -f $(top_distdir)/sass/*.html
+	rm -f $(top_distdir)/include/config.h.in~
+	rm -f $(top_distdir)/ui/conf/zabbix.conf.php
+	rm -rf $(top_distdir)/ui/tests
 	rm -rf $(top_distdir)/sass/img_source
 
-dbschema_ibm_db2:
-	create/bin/gen_data.pl ibm_db2 > database/ibm_db2/data.sql
-	create/bin/gen_schema.pl ibm_db2 > database/ibm_db2/schema.sql
-
+if DBSCHEMA
 dbschema_mysql:
-	create/bin/gen_data.pl mysql > database/mysql/data.sql
-	create/bin/gen_schema.pl mysql > database/mysql/schema.sql
+	cd database/mysql && \
+	$(MAKE) $(AM_MAKEFLAGS) data.sql && \
+	$(MAKE) $(AM_MAKEFLAGS) schema.sql
 
 dbschema_oracle:
-	create/bin/gen_data.pl oracle > database/oracle/data.sql
-	create/bin/gen_schema.pl oracle > database/oracle/schema.sql
+	cd database/oracle && \
+	$(MAKE) $(AM_MAKEFLAGS) data.sql && \
+	$(MAKE) $(AM_MAKEFLAGS) schema.sql
 
 dbschema_postgresql:
-	create/bin/gen_data.pl postgresql > database/postgresql/data.sql
-	create/bin/gen_schema.pl postgresql > database/postgresql/schema.sql
+	cd database/postgresql && \
+	$(MAKE) $(AM_MAKEFLAGS) data.sql && \
+	$(MAKE) $(AM_MAKEFLAGS) schema.sql && \
+	$(MAKE) $(AM_MAKEFLAGS) timescaledb.sql
 
 dbschema_sqlite3:
-	create/bin/gen_data.pl sqlite3 > database/sqlite3/data.sql
-	create/bin/gen_schema.pl sqlite3 > database/sqlite3/schema.sql
+	cd database/sqlite3 && \
+	$(MAKE) $(AM_MAKEFLAGS) data.sql && \
+	$(MAKE) $(AM_MAKEFLAGS) schema.sql
 
 dbschema_c:
-	create/bin/gen_schema.pl c > src/libs/zbxdbhigh/dbschema.c
+	cd src/libs/zbxdbhigh && \
+	$(MAKE) $(AM_MAKEFLAGS) dbschema.c
 
-dbschema: dbschema_ibm_db2 dbschema_mysql dbschema_oracle dbschema_postgresql dbschema_sqlite3 dbschema_c
+dbschema: dbschema_mysql dbschema_oracle dbschema_postgresql dbschema_sqlite3 dbschema_c
+endif
 
 gettext:
-	frontends/php/locale/make_mo.sh
+	ui/locale/make_mo.sh
 
 css_theme_blue:
-	sass --no-cache --sourcemap=none sass/stylesheets/sass/screen.scss frontends/php/styles/blue-theme.css
-	cp frontends/php/styles/blue-theme.css sass/stylesheets/screen.css
+	sass --no-cache --sourcemap=none sass/stylesheets/sass/screen.scss ui/assets/styles/blue-theme.css
+	cp ui/assets/styles/blue-theme.css sass/stylesheets/screen.css
 
 css_theme_dark:
-	sass --no-cache --sourcemap=none sass/stylesheets/sass/dark-theme.scss frontends/php/styles/dark-theme.css
-	cp frontends/php/styles/dark-theme.css sass/stylesheets/dark-theme.css
+	sass --no-cache --sourcemap=none sass/stylesheets/sass/dark-theme.scss ui/assets/styles/dark-theme.css
+	cp ui/assets/styles/dark-theme.css sass/stylesheets/dark-theme.css
+
+css_hc_light:
+	sass --no-cache --sourcemap=none sass/stylesheets/sass/hc-light.scss ui/assets/styles/hc-light.css
+	cp ui/assets/styles/hc-light.css sass/stylesheets/hc-light.css
+
+css_hc_dark:
+	sass --no-cache --sourcemap=none sass/stylesheets/sass/hc-dark.scss ui/assets/styles/hc-dark.css
+	cp ui/assets/styles/hc-dark.css sass/stylesheets/hc-dark.css
 
 css_icons:
-	cp sass/img/icon-sprite.svg frontends/php/img/
-	cp sass/img/browser-sprite.png frontends/php/img/
-	cp sass/apple-touch-icon-120x120-precomposed.png frontends/php/img/
-	cp sass/apple-touch-icon-152x152-precomposed.png frontends/php/img/
-	cp sass/apple-touch-icon-180x180-precomposed.png frontends/php/img/
-	cp sass/apple-touch-icon-76x76-precomposed.png frontends/php/img/
-	cp sass/ms-tile-144x144.png frontends/php/img/
-	cp sass/touch-icon-192x192.png frontends/php/img/
-	cp sass/favicon.ico frontends/php/
+	cp sass/img/icon-sprite.svg ui/assets/img/
+	cp sass/img/browser-sprite.png ui/assets/img/
+	cp sass/apple-touch-icon-120x120-precomposed.png ui/assets/img/
+	cp sass/apple-touch-icon-152x152-precomposed.png ui/assets/img/
+	cp sass/apple-touch-icon-180x180-precomposed.png ui/assets/img/
+	cp sass/apple-touch-icon-76x76-precomposed.png ui/assets/img/
+	cp sass/ms-tile-144x144.png ui/assets/img/
+	cp sass/touch-icon-192x192.png ui/assets/img/
+	cp sass/favicon.ico ui/
 
-css: css_theme_blue css_theme_dark css_icons
+css: css_theme_blue css_theme_dark css_hc_light css_hc_dark css_icons
+
+## cmocka test support
+if ZBXCMOCKA
+WRAP_DB_FUNCS = \
+	-Wl,--wrap=zbx_db_vselect \
+	-Wl,--wrap=zbx_db_select_n \
+	-Wl,--wrap=zbx_db_fetch \
+	-Wl,--wrap=__zbx_DBexecute \
+	-Wl,--wrap=DBbegin \
+	-Wl,--wrap=DBcommit \
+	-Wl,--wrap=DBexecute_multiple_query \
+	-Wl,--wrap=DBfree_result
+
+WRAP_IO_FUNCS = \
+	-Wl,--wrap=fopen \
+	-Wl,--wrap=fclose \
+	-Wl,--wrap=fgets \
+	-Wl,--wrap=open
+
+WRAP_FS_FUNCS = \
+	-Wl,--wrap=opendir \
+	-Wl,--wrap=readdir \
+	-Wl,--wrap=stat \
+	-Wl,--wrap=__xstat \
+	-Wl,--wrap=__fxstat
+
+WRAP_EXIT = \
+	-Wl,--wrap=exit
+
+WRAP_COMM_FUNCS = \
+	-Wl,--wrap=read \
+	-Wl,--wrap=connect
+
+WRAP_LOG = \
+	-Wl,--wrap=__zbx_zabbix_log
+
+COMMON_WRAP_FUNCS = \
+	$(WRAP_DB_FUNCS) \
+	$(WRAP_IO_FUNCS) \
+	$(WRAP_FS_FUNCS) \
+	$(WRAP_EXIT) \
+	$(WRAP_COMM_FUNCS) \
+	$(WRAP_LOG)
+
+tests_build:
+	$(MAKE) $(AM_MAKEFLAGS) && \
+	cd tests && \
+	$(MAKE) $(AM_MAKEFLAGS) LDFLAGS="$(LDFLAGS) $(COMMON_WRAP_FUNCS)" LIBS="$(LIBS) -lcmocka -lyaml"
+
+tests: tests_build
+	tests/tests_run.pl
+endif
+
+.PHONY: test tests
