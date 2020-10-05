@@ -15,19 +15,28 @@ use constant RSMHOST_DNS_NS_LOG_ACTION_DISABLE => 2;
 
 our @EXPORT = qw(zbx_connect check_api_error get_proxies_list
 		get_api_error zbx_need_relogin
-		create_probe_template create_probe_status_template create_host create_group create_template create_item create_trigger create_macro update_root_servers
-		create_passive_proxy probe_exists get_host_group get_template get_probe get_host
+		CONFIG_HISTORY_TEMPLATEID
+		DNS_TEST_TEMPLATEID
+		DNS_STATUS_TEMPLATEID
+		DNSSEC_STATUS_TEMPLATEID
+		RDDS_TEST_TEMPLATEID
+		RDDS_STATUS_TEMPLATEID
+		RDAP_TEST_TEMPLATEID
+		RDAP_STATUS_TEMPLATEID
+		PROBE_STATUS_TEMPLATEID
+		PROXY_HEALTH_TEMPLATEID
+		create_probe_template create_host create_group create_template
+		create_item create_trigger create_macro update_root_server_macros
+		create_passive_proxy probe_exists get_host_group get_template get_template_id get_probe get_host
 		remove_templates remove_hosts remove_hostgroups remove_probes remove_items
-		disable_host disable_hosts
-		enable_items
-		disable_items disable_triggers
+		disable_host disable_hosts link_template_to_host
+		update_items_status enable_items disable_items set_service_items_status
+		disable_triggers
 		rename_host rename_proxy rename_template rename_hostgroup
 		macro_value get_global_macro_value get_host_macro
 		set_proxy_status
-		get_application_id get_items_like set_tld_type get_triggers_by_items
+		get_items_like get_host_items set_tld_type get_triggers_by_items
 		add_dependency
-		create_cron_jobs
-		create_probe_health_tmpl
 		pfail);
 
 our ($zabbix, $result);
@@ -199,6 +208,72 @@ sub get_template($$$)
 	return $result;
 }
 
+my %_saved_template_ids = ();
+
+sub get_template_id($)
+{
+	my $template_name = shift;
+
+	if (!exists($_saved_template_ids{$template_name}))
+	{
+		my $result = get_template($template_name, false, false);
+		pfail("'" . $template_name . "' does not exist") unless ($result->{'templateid'});
+		$_saved_template_ids{$template_name} = $result->{'templateid'};
+	}
+
+	return $_saved_template_ids{$template_name};
+}
+
+sub CONFIG_HISTORY_TEMPLATEID
+{
+	return get_template_id(TEMPLATE_CONFIG_HISTORY);
+}
+
+sub DNS_TEST_TEMPLATEID
+{
+	return get_template_id(TEMPLATE_DNS_TEST);
+}
+
+sub DNS_STATUS_TEMPLATEID
+{
+	return get_template_id(TEMPLATE_DNS_STATUS);
+}
+
+sub DNSSEC_STATUS_TEMPLATEID
+{
+	return get_template_id(TEMPLATE_DNSSEC_STATUS);
+}
+
+sub RDDS_TEST_TEMPLATEID
+{
+	return get_template_id(TEMPLATE_RDDS_TEST);
+}
+
+sub RDDS_STATUS_TEMPLATEID
+{
+	return get_template_id(TEMPLATE_RDDS_STATUS);
+}
+
+sub RDAP_TEST_TEMPLATEID
+{
+	return get_template_id(TEMPLATE_RDAP_TEST);
+}
+
+sub RDAP_STATUS_TEMPLATEID
+{
+	return get_template_id(TEMPLATE_RDAP_STATUS);
+}
+
+sub PROBE_STATUS_TEMPLATEID
+{
+	return get_template_id(TEMPLATE_PROBE_STATUS);
+}
+
+sub PROXY_HEALTH_TEMPLATEID
+{
+	return get_template_id(TEMPLATE_PROXY_HEALTH);
+}
+
 sub remove_templates($)
 {
 	my @templateids = shift;
@@ -241,6 +316,44 @@ sub disable_hosts($)
 	return $result;
 }
 
+# This function returns reference to array of hash references with all host's
+# template ids. This reference can be used for subsequent calls as third parameter.
+sub link_template_to_host($$;$)
+{
+	my $hostid         = shift;
+	my $new_templateid = shift;
+	my $all_templates  = shift;
+
+	my $options;
+	my $result;
+
+	if (!defined($all_templates))
+	{
+		$options = {
+			'output'                => [],
+			'filter'                => {'hostid' => $hostid},
+			'selectParentTemplates' => ['templateid']
+		};
+
+		$result = $zabbix->get('host', $options);
+
+		return undef unless (%{$result});
+
+		$all_templates = $result->{'parentTemplates'};
+	}
+
+	push @{$all_templates}, {'templateid' => $new_templateid};
+
+	$options = {
+		'hostid'    => $hostid,
+		'templates' => $all_templates
+	};
+
+	$result = $zabbix->update('host', $options);
+
+	return keys(%{$result}) ? $all_templates : undef;
+}
+
 sub remove_hostgroups($)
 {
 	my @hostgroupids = shift;
@@ -271,17 +384,17 @@ sub remove_probes($)
 
 sub update_items_status($$)
 {
-	my $items  = shift;
-	my $status = shift;
+	my $itemids = shift;
+	my $status  = shift;
 
-	unless (scalar(@{$items}))
+	unless (scalar(@{$itemids}))
 	{
 		return;
 	}
 
 	my $result;
 
-	foreach my $itemid (@{$items})
+	foreach my $itemid (@{$itemids})
 	{
 		my $rsmhost_dns_ns_log_action;
 
@@ -305,16 +418,59 @@ sub update_items_status($$)
 
 sub enable_items($)
 {
-	my $items = shift;
+	my $itemids = shift;
 
-	return update_items_status($items, ITEM_STATUS_ACTIVE);
+	return update_items_status($itemids, ITEM_STATUS_ACTIVE);
 }
 
 sub disable_items($)
 {
-	my $items = shift;
+	my $itemids = shift;
 
-	return update_items_status($items, ITEM_STATUS_DISABLED);
+	return update_items_status($itemids, ITEM_STATUS_DISABLED);
+}
+
+sub set_service_items_status($$$)
+{
+	my $host_items     = shift; # list of {key, itemid, status} hashes, result of get_host_items($hostid)
+	my $template_id    = shift; # template id
+	my $service_status = shift; # 1 for "enable", 0 for "disable"
+
+	my $item_status = $service_status ? ITEM_STATUS_ACTIVE : ITEM_STATUS_DISABLED;
+
+	set_templated_items_status($host_items, $template_id, $item_status);
+}
+
+my %template_items_cache;
+
+sub set_templated_items_status($$$)
+{
+	my $host_items  = shift; # list of {key, itemid, status} hashes, result of get_host_items($hostid)
+	my $template_id = shift; # template id
+	my $status      = shift; # ITEM_STATUS_ACTIVE or ITEM_STATUS_DISABLED
+
+	if (!exists($template_items_cache{$template_id}))
+	{
+		my $items = get_items_like($template_id, undef, 1);
+		$template_items_cache{$template_id} = { map { $_->{'key_'} => undef } values(%{$items}) };
+	}
+
+	my $template_items = $template_items_cache{$template_id};
+
+	my $itemids = [];
+
+	foreach my $item (@{$host_items})
+	{
+		if ($item->{'status'} != $status && exists($template_items->{$item->{'key'}}))
+		{
+			push(@{$itemids}, $item->{'itemid'});
+		}
+	}
+
+	if (@{$itemids})
+	{
+		update_items_status($itemids, $status);
+	}
 }
 
 sub disable_triggers($)
@@ -494,22 +650,17 @@ sub get_global_macro_value($)
 	return $result->{'value'}; # may be undef
 }
 
-sub update_root_servers(;$)
+sub update_root_server_macros(;$)
 {
 	my $root_servers = shift;
 
-	my $macro_value_v4 = "";
-	my $macro_value_v6 = "";
-
 	if ($root_servers)
 	{
-		($macro_value_v4, $macro_value_v6)  = split(';', $root_servers);
+		my ($macro_value_v4, $macro_value_v6)  = split(';', $root_servers);
 
 		create_macro('{$RSM.IP4.ROOTSERVERS1}', $macro_value_v4, undef, 1); # global, force
 		create_macro('{$RSM.IP6.ROOTSERVERS1}', $macro_value_v6, undef, 1); # global, force
 	}
-
-	return '"{$RSM.IP4.ROOTSERVERS1}","{$RSM.IP6.ROOTSERVERS1}"';
 }
 
 sub create_host
@@ -556,44 +707,30 @@ sub create_group
 
 sub create_template
 {
-	my $name             = shift;
-	my $child_templateid = shift;
+	my $name = shift;
 
-	my $result;
-	my $templateid;
-	my $options;
+	my $templateid = $zabbix->exist('template', {'filter' => {'host' => $name}});
 
-	# TODO: reduce amount of copy-pasted code
-
-	unless ($templateid = $zabbix->exist('template', {'filter' => {'host' => $name}}))
+	if ($templateid)
 	{
-		$options = {
-			'groups'=> {'groupid' => TEMPLATES_TLD_GROUPID},
-			'host'  => $name
-		};
-
-		if (defined($child_templateid))
-		{
-			$options->{'templates'} = [{'templateid' => $child_templateid}];
-		}
-
-		$result = $zabbix->create('template', $options);
-
-		$templateid = $result->{'templateids'}[0];
+		$zabbix->update(
+			'template',
+			{
+				'templateid' => $templateid,
+				'groups'     => {'groupid' => TEMPLATES_TLD_GROUPID},
+				'host'       => $name
+			}
+		);
 	}
 	else
 	{
-		$options = {
-			'templateid' => $templateid,
-			'groups'     => {'groupid' => TEMPLATES_TLD_GROUPID},
-			'host'       => $name
-		};
-		if (defined($child_templateid))
-		{
-			$options->{'templates'} = [{'templateid' => $child_templateid}];
-		}
-
-		$result = $zabbix->update('template', $options);
+		my $result = $zabbix->create(
+			'template',
+			{
+				'groups'=> {'groupid' => TEMPLATES_TLD_GROUPID},
+				'host'  => $name
+			}
+		);
 		$templateid = $result->{'templateids'}[0];
 	}
 
@@ -703,36 +840,59 @@ sub create_trigger
 	return $result;
 }
 
-sub create_macro
+sub create_macro($$;$$)
 {
 	my $name         = shift;
 	my $value        = shift;
 	my $templateid   = shift;
 	my $force_update = shift;
 
-	my $result;
-	my $error;
+	my ($result, $params, $error);
 
 	if (defined($templateid))
 	{
-		if ($zabbix->get('usermacro', {'countOutput' => 1, 'hostids' => $templateid, 'filter' => {'macro' => $name}}))
+		$params = {'countOutput' => 1, 'hostids' => $templateid, 'filter' => {'macro' => $name}};
+
+		$result = $zabbix->get('usermacro', $params);
+
+		if ($result)
 		{
-			$result = $zabbix->get('usermacro', {'output' => 'hostmacroid', 'hostids' => $templateid, 'filter' => {'macro' => $name}});
+			$params = {
+				'output' => ['hostmacroid'],
+				'hostids' => $templateid,
+				'filter' => {'macro' => $name},
+			};
+
+			$result = $zabbix->get('usermacro', $params);
+
 			if (defined($result->{'hostmacroid'}) && defined($force_update))
 			{
-				$zabbix->update('usermacro', {'hostmacroid' => $result->{'hostmacroid'}, 'value' => $value});
+				$params = {
+					'hostmacroid' => $result->{'hostmacroid'},
+					'value' => $value,
+				};
+
+				$zabbix->update('usermacro', $params);
 			}
 		}
 		else
 		{
-			$result = $zabbix->create('usermacro', {'hostid' => $templateid, 'macro' => $name, 'value' => $value});
+			my $description = CFG_MACRO_DESCRIPTION->{$name};
+
+			$params = {'hostid' => $templateid, 'macro' => $name, 'value' => $value};
+
+			$params->{'description'} = $description if (defined($description));
+
+			$result = $zabbix->create('usermacro', $params);
 		}
 
 		return $result->{'hostmacroids'}[0];
 	}
 	else
 	{
-		$result = $zabbix->get('usermacro', {'countOutput' => 1, 'globalmacro' => 1, 'filter' => {'macro' => $name}});
+		$params = {'countOutput' => 1, 'globalmacro' => 1, 'filter' => {'macro' => $name}};
+
+		$result = $zabbix->get('usermacro', $params);
 
 		if (check_api_error($result) eq true)
 		{
@@ -845,22 +1005,6 @@ sub create_passive_proxy($$$$$)
 	return;
 }
 
-sub get_application_id
-{
-	my $name       = shift;
-	my $templateid = shift;
-
-	my $applicationid;
-
-	unless ($applicationid = $zabbix->exist('application', {'filter' => {'name' => $name, 'hostid' => $templateid}}))
-	{
-		my $result = $zabbix->create('application', {'name' => $name, 'hostid' => $templateid});
-		return $result->{'applicationids'}[0];
-	}
-
-	return $applicationid;
-}
-
 sub create_probe_template
 {
 	my $root_name = shift;
@@ -871,7 +1015,7 @@ sub create_probe_template
 	my $rdap      = shift;
 	my $resolver  = shift;
 
-	my $templateid = create_template('Template ' . $root_name);
+	my $templateid = create_template(TEMPLATE_PROBE_CONFIG_PREFIX . $root_name);
 
 	create_macro('{$RSM.IP4.ENABLED}' , defined($ipv4)     ? $ipv4     : '1'        , $templateid, defined($ipv4)     ? 1 : undef);
 	create_macro('{$RSM.IP6.ENABLED}' , defined($ipv6)     ? $ipv6     : '1'        , $templateid, defined($ipv6)     ? 1 : undef);
@@ -879,78 +1023,6 @@ sub create_probe_template
 	create_macro('{$RSM.RDDS.ENABLED}', defined($rdds)     ? $rdds     : '1'        , $templateid, defined($rdds)     ? 1 : undef);
 	create_macro('{$RSM.RDAP.ENABLED}', defined($rdap)     ? $rdap     : '1'        , $templateid, defined($rdap)     ? 1 : undef);
 	create_macro('{$RSM.EPP.ENABLED}' , defined($epp)      ? $epp      : '1'        , $templateid, defined($epp)      ? 1 : undef);
-
-	return $templateid;
-}
-
-sub create_probe_status_template
-{
-	my $probe_name          = shift;
-	my $child_templateid    = shift;
-	my $root_servers_macros = shift;
-
-	my $template_name = 'Template ' . $probe_name . ' Status';
-
-	my $templateid = create_template($template_name, $child_templateid);
-
-	create_item({
-		'name'         => 'Probe status ($1)',
-		'key_'         => 'rsm.probe.status[automatic,' . $root_servers_macros . ']',
-		'hostid'       => $templateid,
-		'applications' => [get_application_id('Probe status', $templateid)],
-		'type'         => ITEM_TYPE_SIMPLE,
-		'value_type'   => ITEM_VALUE_TYPE_UINT64,
-		'delay'        => CFG_PROBE_STATUS_DELAY,
-		'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_probe'}
-	});
-
-	create_item({
-		'name'         => 'Probe status ($1)',
-		'key_'         => 'rsm.probe.status[manual]',
-		'hostid'       => $templateid,
-		'applications' => [get_application_id('Probe status', $templateid)],
-		'type'         => ITEM_TYPE_TRAPPER,
-		'value_type'   => ITEM_VALUE_TYPE_UINT64,
-		'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_probe'}
-	});
-
-	create_item({
-		'name'         => 'Local resolver status ($1)',
-		'key_'         => 'resolver.status[{$RSM.RESOLVER},{$RESOLVER.STATUS.TIMEOUT},{$RESOLVER.STATUS.TRIES},{$RSM.IP4.ENABLED},{$RSM.IP6.ENABLED}]',
-		'hostid'       => $templateid,
-		'applications' => [get_application_id('Probe status', $templateid)],
-		'type'         => ITEM_TYPE_SIMPLE,
-		'value_type'   => ITEM_VALUE_TYPE_UINT64,
-		'delay'        => CFG_PROBE_STATUS_DELAY,
-		'valuemapid'   => RSM_VALUE_MAPPINGS->{'service_state'}
-	});
-
-	create_trigger(
-		{
-			'description' => 'Probe {HOST.NAME} has been knocked out',
-			'expression'  => '{' . $template_name . ':rsm.probe.status[manual].last(0)}=0',
-			'priority'    => '4',
-		},
-		$template_name
-	);
-
-	create_trigger(
-		{
-			'description' => 'Probe {HOST.NAME} has been disabled for more than {$RSM.PROBE.MAX.OFFLINE}',
-			'expression'  => '{' . $template_name . ':rsm.probe.status[manual].max({$RSM.PROBE.MAX.OFFLINE})}=0',
-			'priority'    => '3',
-		},
-		$template_name
-	);
-
-	create_trigger(
-		{
-			'description' => 'Probe {HOST.NAME} has been disabled by tests',
-			'expression'  => '{' . $template_name . ':rsm.probe.status[automatic,"{$RSM.IP4.ROOTSERVERS1}","{$RSM.IP6.ROOTSERVERS1}"].last(0)}=0',
-			'priority'    => '4',
-		},
-		$template_name
-	);
 
 	return $templateid;
 }
@@ -975,13 +1047,47 @@ sub get_items_like($$$)
 
 	if (!defined($is_template) || $is_template == false)
 	{
-		$result = $zabbix->get('item', {'hostids' => [$hostid], 'output' => ['itemid', 'name', 'hostid', 'key_', 'status'], 'search' => {'key_' => $like}, 'preservekeys' => true});
+		$result = $zabbix->get(
+			'item',
+			{
+				'hostids' => [$hostid],
+				'output' => ['itemid', 'name', 'hostid', 'key_', 'status'],
+				'search' => {'key_' => $like},
+				'preservekeys' => true
+			}
+		);
+
 		return $result;
 	}
 
-	$result = $zabbix->get('item', {'templateids' => [$hostid], 'output' => ['itemid', 'name', 'hostid', 'key_', 'status'], 'search' => {'key_' => $like}, 'preservekeys' => true});
+	$result = $zabbix->get(
+		'item',
+		{
+			'templateids' => [$hostid],
+			'output' => ['itemid', 'name', 'hostid', 'key_', 'status'],
+			'search' => {'key_' => $like},
+			'preservekeys' => true
+		}
+	);
 
 	return $result;
+}
+
+# returns list of hashes - [{'key' => $key, 'itemid' => $itemid, 'status' => $status}, ...]
+sub get_host_items($)
+{
+	my $hostid = shift;
+
+	my $items_ref = get_items_like($hostid, undef, 0);
+	my @items_arr = map {
+		{
+			'key'    => $_->{'key_'},
+			'itemid' => $_->{'itemid'},
+			'status' => $_->{'status'},
+		}
+	} values(%{$items_ref});
+
+	return \@items_arr;
 }
 
 sub get_triggers_by_items($)
@@ -1104,177 +1210,6 @@ sub __exec($)
 	{
 		pfail($err);
 	}
-}
-
-sub create_cron_jobs($)
-{
-	my $slv_path = shift;
-
-	my $errlog = '/var/log/zabbix/rsm.slv.err';
-
-	use constant CRON_D_PATH => '/etc/cron.d';
-	my $slv_file;
-
-	my $rv = opendir DIR, CRON_D_PATH;
-
-	unless ($rv)
-	{
-		pfail("cannot open " . CRON_D_PATH);
-	}
-
-	# first remove current entries
-	while (($slv_file = readdir DIR))
-	{
-		if ($slv_file !~ /^rsm.slv/ && $slv_file !~ /^rsm.probe/)
-		{
-			next;
-		}
-
-		$slv_file = CRON_D_PATH . "/$slv_file";
-
-		__exec("/bin/rm -f $slv_file");
-	}
-
-	my $avail_shift = 0;
-	my $avail_step = 1;
-	my $avail_limit = 5;
-	my $avail_cur = $avail_shift;
-
-	my $rollweek_shift = 3;
-	my $rollweek_step = 1;
-	my $rollweek_limit = 8;
-	my $rollweek_cur = $rollweek_shift;
-
-	my $downtime_shift = 6;
-	my $downtime_step = 1;
-	my $downtime_limit = 11;
-	my $downtime_cur = $downtime_shift;
-
-	my $rtt_shift = 10;
-	my $rtt_step = 1;
-	my $rtt_limit = 20;
-	my $rtt_cur = $rtt_shift;
-
-	$rv = opendir DIR, $slv_path;
-
-	unless ($rv)
-	{
-		pfail("cannot open $slv_path");
-	}
-
-	# set up what's needed
-	while (($slv_file = readdir DIR))
-	{
-		unless ($slv_file =~ /^rsm\..*\.pl$/)
-		{
-			next;
-		}
-
-		my $cron_file = $slv_file;
-		$cron_file =~ s/\./-/g;
-
-		my $err;
-
-		if ($slv_file =~ /\.slv\..*\.rtt\.pl$/)
-		{
-			# monthly RTT data
-			if (write_file(CRON_D_PATH . "/$cron_file", "* * * * * root sleep $rtt_cur; $slv_path/$slv_file >> $errlog 2>&1\n", \$err) != SUCCESS)
-			{
-				pfail($err);
-			}
-
-			$rtt_cur += $rtt_step;
-			$rtt_cur = $rtt_shift if ($rtt_cur >= $rtt_limit);
-		}
-		elsif ($slv_file =~ /\.slv\..*\.downtime\.pl$/)
-		{
-			# downtime
-			if (write_file(CRON_D_PATH . "/$cron_file", "* * * * * root sleep $downtime_cur; $slv_path/$slv_file >> $errlog 2>&1\n", \$err) != SUCCESS)
-			{
-				pfail($err);
-			}
-
-			$downtime_cur += $downtime_step;
-			$downtime_cur = $downtime_shift if ($downtime_cur >= $downtime_limit);
-		}
-		elsif ($slv_file =~ /\.slv\..*\.avail\.pl$/)
-		{
-			# service availability
-			if (write_file(CRON_D_PATH . "/$cron_file", "* * * * * root sleep $avail_cur; $slv_path/$slv_file >> $errlog 2>&1\n", \$err) != SUCCESS)
-			{
-				pfail($err);
-			}
-
-			$avail_cur += $avail_step;
-			$avail_cur = $avail_shift if ($avail_cur >= $avail_limit);
-		}
-		elsif ($slv_file =~ /\.slv\..*\.rollweek\.pl$/)
-		{
-			# rolling week
-			if (write_file(CRON_D_PATH . "/$cron_file", "* * * * * root sleep $rollweek_cur; $slv_path/$slv_file >> $errlog 2>&1\n", \$err) != SUCCESS)
-			{
-				pfail($err);
-			}
-
-			$rollweek_cur += $rollweek_step;
-			$rollweek_cur = $rollweek_shift if ($rollweek_cur >= $rollweek_limit);
-		}
-		else
-		{
-			# everything else
-			if (write_file(CRON_D_PATH . "/$cron_file", "* * * * * root $slv_path/$slv_file >> $errlog 2>&1\n", \$err) != SUCCESS)
-			{
-				pfail($err);
-			}
-		}
-	}
-}
-
-sub create_probe_health_tmpl()
-{
-	my $host_name = 'Template Proxy Health';
-	my $templateid = create_template($host_name, LINUX_TEMPLATEID);
-
-	my $item_key = 'zabbix[proxy,{$RSM.PROXY_NAME},lastaccess]';
-
-	create_item({
-		'name'         => 'Availability of probe',
-		'key_'         => $item_key,
-		'status'       => ITEM_STATUS_ACTIVE,
-		'hostid'       => $templateid,
-		'applications' => [get_application_id('Probe Availability', $templateid)],
-		'type'         => ITEM_TYPE_INTERNAL,
-		'value_type'   => ITEM_VALUE_TYPE_UINT64,
-		'units'        => 'unixtime',
-		'delay'        => '60'
-	});
-
-	create_trigger(
-		{
-			'description' => 'Probe {$RSM.PROXY_NAME} is unavailable',
-			'expression'  => "{TRIGGER.VALUE}=0 and {$host_name:$item_key.fuzzytime(2m)}=0 or\r\n" .
-					 "{TRIGGER.VALUE}=1 and (\r\n" .
-					 "\t{$host_name:$item_key.now()}-{$host_name:$item_key.last(#1)}>1m or\r\n" .
-					 "\t{$host_name:$item_key.now()}-{$host_name:$item_key.last(#2)}>2m or\r\n" .
-					 "\t{$host_name:$item_key.now()}-{$host_name:$item_key.last(#3)}>3m\r\n" .
-					 ")",
-			'priority'    => 4
-		},
-		$host_name
-	);
-
-	create_item({
-		'name'         => 'Probe main status',
-		'key_'         => PROBE_KEY_ONLINE,
-		'status'       => ITEM_STATUS_ACTIVE,
-		'hostid'       => $templateid,
-		'applications' => [get_application_id('Probe Availability', $templateid)],
-		'type'         => ITEM_TYPE_TRAPPER,
-		'value_type'   => ITEM_VALUE_TYPE_UINT64,
-		'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_probe'}
-	});
-
-	return $templateid;
 }
 
 sub rsmhost_dns_ns_log($$)

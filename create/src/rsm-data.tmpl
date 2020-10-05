@@ -1,0 +1,365 @@
+--
+-- Zabbix
+-- Copyright (C) 2001-2020 Zabbix SIA
+--
+-- This program is free software; you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation; either version 2 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program; if not, write to the Free Software
+-- Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+--
+
+TABLE |users
+FIELDS|userid|alias      |name   |surname      |passwd                                                      |url |autologin|autologout|lang |refresh|type|theme  |rows_per_page|
+ROW   |1     |Admin      |Zabbix |Administrator|$2y$10$MMIRMGp1H8b6eslOGWlGgOXVt4enC.Jlv1tLgb7MyBEGzL3AnJoJ2|    |1        |0         |en_GB|30s    |3   |default|50           |
+ROW   |2     |guest      |Default|User         |d41d8cd98f00b204e9800998ecf8427e                            |    |0        |15m       |en_GB|30s    |1   |default|50           |
+ROW   |100   |tld-monitor|tld    |monitor      |fedcba9876543210fedcba9876543210                            |    |1        |0         |en_GB|30s    |1   |default|50           |
+
+TABLE |hstgrp
+FIELDS|groupid|name                  |internal|flags|
+ROW   |1      |Templates             |0       |0    |
+ROW   |5      |Discovered hosts      |1       |0    |
+ROW   |100    |Global macro history  |0       |0    |
+ROW   |110    |Mon                   |0       |0    |
+ROW   |120    |Probes                |0       |0    |
+ROW   |130    |Probes - Mon          |0       |0    |
+ROW   |140    |TLDs                  |0       |0    |
+ROW   |150    |gTLD                  |0       |0    |
+ROW   |160    |ccTLD                 |0       |0    |
+ROW   |170    |testTLD               |0       |0    |
+ROW   |180    |otherTLD              |0       |0    |
+ROW   |190    |TLD Probe results     |0       |0    |
+ROW   |200    |gTLD Probe results    |0       |0    |
+ROW   |210    |ccTLD Probe results   |0       |0    |
+ROW   |220    |testTLD Probe results |0       |0    |
+ROW   |230    |otherTLD Probe results|0       |0    |
+ROW   |240    |Templates - TLD       |0       |0    |
+
+TABLE |media_type
+FIELDS|mediatypeid|type|name  |smtp_server     |smtp_helo  |smtp_email        |exec_path|gsm_modem |username|passwd|status|smtp_port|smtp_security|smtp_verify_peer|smtp_verify_host|smtp_authentication|exec_params                                                |maxsessions|maxattempts|attempt_interval|content_type|script|timeout|process_tags|show_event_menu|event_menu_url|event_menu_name|description|
+ROW   |1          |0   |Email |mail.company.com|company.com|zabbix@company.com|         |          |        |      |0     |25       |0            |0               |0               |0                  |                                                           |1          |3          |10s             |0           |      |30s    |0           |0              |              |               |           |
+ROW   |3          |2   |SMS   |                |           |                  |         |/dev/ttyS0|        |      |0     |25       |0            |0               |0               |0                  |                                                           |1          |3          |10s             |0           |      |30s    |0           |0              |              |               |           |
+ROW   |10         |1   |Script|                |           |                  |script.py|          |        |      |0     |25       |0            |0               |0               |0                  |{ALERT.SENDTO}&bsn;{ALERT.SUBJECT}&bsn;{ALERT.MESSAGE}&bsn;|1          |3          |10s             |0           |      |30s    |0           |0              |              |               |           |
+
+TABLE |media_type_message
+FIELDS|mediatype_messageid|mediatypeid|eventsource|recovery|subject                                                          |message                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+ROW   |1                  |1          |0          |0       |Problem: {EVENT.NAME}                                            |Problem started at {EVENT.TIME} on {EVENT.DATE}&bsn;Problem name: {EVENT.NAME}&bsn;Host: {HOST.NAME}&bsn;Severity: {EVENT.SEVERITY}&bsn;Operational data: {EVENT.OPDATA}&bsn;Original problem ID: {EVENT.ID}&bsn;{TRIGGER.URL}                                                                                                                                                                                                              |
+ROW   |2                  |1          |0          |1       |Resolved: {EVENT.NAME}                                           |Problem has been resolved at {EVENT.RECOVERY.TIME} on {EVENT.RECOVERY.DATE}&bsn;Problem name: {EVENT.NAME}&bsn;Host: {HOST.NAME}&bsn;Severity: {EVENT.SEVERITY}&bsn;Original problem ID: {EVENT.ID}&bsn;{TRIGGER.URL}                                                                                                                                                                                                                       |
+ROW   |3                  |1          |0          |2       |Updated problem: {EVENT.NAME}                                    |{USER.FULLNAME} {EVENT.UPDATE.ACTION} problem at {EVENT.UPDATE.DATE} {EVENT.UPDATE.TIME}.&bsn;{EVENT.UPDATE.MESSAGE}&bsn;&bsn;Current problem status is {EVENT.STATUS}, acknowledged: {EVENT.ACK.STATUS}.                                                                                                                                                                                                                                   |
+ROW   |4                  |1          |1          |0       |Discovery: {DISCOVERY.DEVICE.STATUS} {DISCOVERY.DEVICE.IPADDRESS}|Discovery rule: {DISCOVERY.RULE.NAME}&bsn;&bsn;Device IP: {DISCOVERY.DEVICE.IPADDRESS}&bsn;Device DNS: {DISCOVERY.DEVICE.DNS}&bsn;Device status: {DISCOVERY.DEVICE.STATUS}&bsn;Device uptime: {DISCOVERY.DEVICE.UPTIME}&bsn;&bsn;Device service name: {DISCOVERY.SERVICE.NAME}&bsn;Device service port: {DISCOVERY.SERVICE.PORT}&bsn;Device service status: {DISCOVERY.SERVICE.STATUS}&bsn;Device service uptime: {DISCOVERY.SERVICE.UPTIME}|
+ROW   |5                  |1          |2          |0       |Autoregistration: {HOST.HOST}                                    |Host name: {HOST.HOST}&bsn;Host IP: {HOST.IP}&bsn;Agent port: {HOST.PORT}                                                                                                                                                                                                                                                                                                                                                                   |
+ROW   |6                  |3          |0          |0       |                                                                 |{EVENT.SEVERITY}: {EVENT.NAME}&bsn;Host: {HOST.NAME}&bsn;{EVENT.DATE} {EVENT.TIME}                                                                                                                                                                                                                                                                                                                                                          |
+ROW   |7                  |3          |0          |1       |                                                                 |RESOLVED: {EVENT.NAME}&bsn;Host: {HOST.NAME}&bsn;{EVENT.DATE} {EVENT.TIME}                                                                                                                                                                                                                                                                                                                                                                  |
+ROW   |8                  |3          |0          |2       |                                                                 |{USER.FULLNAME} {EVENT.UPDATE.ACTION} problem at {EVENT.UPDATE.DATE} {EVENT.UPDATE.TIME}                                                                                                                                                                                                                                                                                                                                                    |
+ROW   |9                  |3          |1          |0       |                                                                 |Discovery: {DISCOVERY.DEVICE.STATUS} {DISCOVERY.DEVICE.IPADDRESS}                                                                                                                                                                                                                                                                                                                                                                           |
+ROW   |10                 |3          |2          |0       |                                                                 |Autoregistration: {HOST.HOST}&bsn;Host IP: {HOST.IP}&bsn;Agent port: {HOST.PORT}                                                                                                                                                                                                                                                                                                                                                            |
+ROW   |11                 |10         |0          |0       |Problem: {EVENT.NAME}                                            |Problem started at {EVENT.TIME} on {EVENT.DATE}&bsn;Problem name: {EVENT.NAME}&bsn;Host: {HOST.NAME}&bsn;Severity: {EVENT.SEVERITY}&bsn;Operational data: {EVENT.OPDATA}&bsn;Original problem ID: {EVENT.ID}&bsn;{TRIGGER.URL}                                                                                                                                                                                                              |
+ROW   |12                 |10         |0          |1       |Resolved: {EVENT.NAME}                                           |Problem has been resolved at {EVENT.RECOVERY.TIME} on {EVENT.RECOVERY.DATE}&bsn;Problem name: {EVENT.NAME}&bsn;Host: {HOST.NAME}&bsn;Severity: {EVENT.SEVERITY}&bsn;Original problem ID: {EVENT.ID}&bsn;{TRIGGER.URL}                                                                                                                                                                                                                       |
+ROW   |13                 |10         |0          |2       |Updated problem: {EVENT.NAME}                                    |{USER.FULLNAME} {EVENT.UPDATE.ACTION} problem at {EVENT.UPDATE.DATE} {EVENT.UPDATE.TIME}.&bsn;{EVENT.UPDATE.MESSAGE}&bsn;&bsn;Current problem status is {EVENT.STATUS}, acknowledged: {EVENT.ACK.STATUS}.                                                                                                                                                                                                                                   |
+ROW   |14                 |10         |1          |0       |Discovery: {DISCOVERY.DEVICE.STATUS} {DISCOVERY.DEVICE.IPADDRESS}|Discovery rule: {DISCOVERY.RULE.NAME}&bsn;&bsn;Device IP: {DISCOVERY.DEVICE.IPADDRESS}&bsn;Device DNS: {DISCOVERY.DEVICE.DNS}&bsn;Device status: {DISCOVERY.DEVICE.STATUS}&bsn;Device uptime: {DISCOVERY.DEVICE.UPTIME}&bsn;&bsn;Device service name: {DISCOVERY.SERVICE.NAME}&bsn;Device service port: {DISCOVERY.SERVICE.PORT}&bsn;Device service status: {DISCOVERY.SERVICE.STATUS}&bsn;Device service uptime: {DISCOVERY.SERVICE.UPTIME}|
+ROW   |15                 |10         |2          |0       |Autoregistration: {HOST.HOST}                                    |Host name: {HOST.HOST}&bsn;Host IP: {HOST.IP}&bsn;Agent port: {HOST.PORT}                                                                                                                                                                                                                                                                                                                                                                   |
+
+TABLE |usrgrp
+FIELDS|usrgrpid|name                     |gui_access|users_status|debug_mode|
+ROW   |7       |Zabbix administrators    |0         |0           |0         |
+ROW   |8       |Guests                   |0         |1           |0         |
+ROW   |9       |Disabled                 |0         |1           |0         |
+ROW   |11      |Enabled debug mode       |0         |0           |1         |
+ROW   |12      |No access to the frontend|3         |0           |0         |
+ROW   |100     |Read-only user           |0         |0           |0         |
+ROW   |110     |Power user               |0         |0           |0         |
+ROW   |120     |Auxiliary action users   |3         |0           |0         |
+
+TABLE |users_groups
+FIELDS|id  |usrgrpid|userid|
+ROW   |2   |8       |2     |
+ROW   |4   |7       |1     |
+ROW   |100 |120     |100   |
+
+TABLE |actions
+FIELDS|actionid|name           |eventsource|evaltype|status|esc_period|formula|pause_suppressed|
+ROW   |100     |Probes-Critical|0          |0       |0     |1h        |       |1               |
+ROW   |110     |Probes-Mon     |0          |0       |0     |1h        |       |1               |
+ROW   |115     |Probes         |0          |0       |0     |1h        |       |1               |
+ROW   |120     |Central-Server |0          |0       |0     |1h        |       |1               |
+ROW   |130     |TLDs           |0          |0       |0     |1h        |       |1               |
+ROW   |140     |Probes-Knockout|0          |0       |0     |1h        |       |1               |
+
+TABLE |operations
+FIELDS|operationid|actionid|operationtype|esc_period|esc_step_from|esc_step_to|evaltype|recovery|
+ROW   |100        |100     |0            |0         |1            |1          |0       |0       |
+ROW   |110        |110     |0            |0         |1            |1          |0       |0       |
+ROW   |115        |115     |0            |0         |1            |1          |0       |0       |
+ROW   |120        |120     |0            |0         |1            |1          |0       |0       |
+ROW   |130        |130     |1            |0         |1            |1          |0       |0       |
+ROW   |131        |130     |1            |0         |1            |1          |0       |1       |
+ROW   |140        |140     |1            |0         |1            |1          |0       |0       |
+ROW   |141        |100     |11           |0         |1            |1          |0       |1       |
+ROW   |142        |110     |11           |0         |1            |1          |0       |1       |
+ROW   |143        |115     |11           |0         |1            |1          |0       |1       |
+ROW   |144        |120     |11           |0         |1            |1          |0       |1       |
+ROW   |145        |140     |11           |0         |1            |1          |0       |1       |
+
+TABLE |opmessage
+FIELDS|operationid|default_msg|subject                                                                 |message                                        |mediatypeid|
+ROW   |100        |0          |system-critical#{TRIGGER.STATUS}#{HOST.NAME1}#{ITEM.NAME1}#{ITEM.VALUE1}|{EVENT.DATE} {EVENT.TIME} UTC                  |10         |
+ROW   |110        |0          |probes#{TRIGGER.STATUS}#{HOST.NAME1}#{ITEM.NAME1}#{ITEM.VALUE1}         |{EVENT.DATE} {EVENT.TIME} UTC                  |10         |
+ROW   |115        |0          |probes#{TRIGGER.STATUS}#{HOST.NAME1}#{ITEM.NAME1}#{ITEM.VALUE1}         |{EVENT.DATE} {EVENT.TIME} UTC                  |10         |
+ROW   |120        |0          |system#{TRIGGER.STATUS}#{HOST.NAME1}#{ITEM.NAME1}#{ITEM.VALUE1}         |{EVENT.DATE} {EVENT.TIME} UTC                  |10         |
+ROW   |141        |0          |system-critical#{TRIGGER.STATUS}#{HOST.NAME1}#{ITEM.NAME1}#{ITEM.VALUE1}|{EVENT.RECOVERY.DATE} {EVENT.RECOVERY.TIME} UTC|NULL       |
+ROW   |142        |0          |probes#{TRIGGER.STATUS}#{HOST.NAME1}#{ITEM.NAME1}#{ITEM.VALUE1}         |{EVENT.RECOVERY.DATE} {EVENT.RECOVERY.TIME} UTC|NULL       |
+ROW   |143        |0          |probes#{TRIGGER.STATUS}#{HOST.NAME1}#{ITEM.NAME1}#{ITEM.VALUE1}         |{EVENT.RECOVERY.DATE} {EVENT.RECOVERY.TIME} UTC|NULL       |
+ROW   |144        |0          |system#{TRIGGER.STATUS}#{HOST.NAME1}#{ITEM.NAME1}#{ITEM.VALUE1}         |{EVENT.RECOVERY.DATE} {EVENT.RECOVERY.TIME} UTC|NULL       |
+ROW   |145        |0          |probes#{TRIGGER.STATUS}#{HOST.NAME1}#{ITEM.NAME1}#{ITEM.VALUE1}         |{EVENT.RECOVERY.DATE} {EVENT.RECOVERY.TIME} UTC|NULL       |
+
+TABLE |opmessage_usr
+FIELDS|opmessage_usrid|operationid|userid|
+ROW   |100            |100        |100   |
+ROW   |110            |110        |100   |
+ROW   |115            |115        |100   |
+ROW   |120            |120        |100   |
+
+TABLE |opcommand
+FIELDS|operationid|type|scriptid|execute_on|port|authtype|username|password|publickey|privatekey|command                                                                                             |
+ROW   |130        |0   |NULL    |1         |    |0       |        |        |         |          |/opt/zabbix/scripts/tlds-notification.pl --send-to 'zabbix alert' --event-id '{EVENT.ID}' &         |
+ROW   |131        |0   |NULL    |1         |    |0       |        |        |         |          |/opt/zabbix/scripts/tlds-notification.pl --send-to 'zabbix alert' --event-id '{EVENT.RECOVERY.ID}' &|
+ROW   |140        |0   |NULL    |1         |    |0       |        |        |         |          |/opt/zabbix/scripts/probe-manual.pl --probe '{HOST.HOST}' --set 0                                   |
+
+TABLE |opcommand_hst
+FIELDS|opcommand_hstid|operationid|hostid|
+ROW   |130            |130        |NULL  |
+ROW   |131            |131        |NULL  |
+ROW   |140            |140        |NULL  |
+
+TABLE |conditions
+FIELDS|conditionid|actionid|conditiontype|operator|value |value2|
+ROW   |101        |100     |16           |11      |      |      |
+ROW   |103        |100     |4            |5       |2     |      |
+ROW   |104        |100     |1            |0       |100001|      |
+ROW   |110        |110     |16           |11      |      |      |
+ROW   |112        |110     |4            |5       |2     |      |
+ROW   |113        |110     |0            |0       |130   |      |
+ROW   |115        |115     |16           |11      |      |      |
+ROW   |117        |115     |4            |5       |2     |      |
+ROW   |118        |115     |0            |0       |120   |      |
+ROW   |120        |120     |16           |11      |      |      |
+ROW   |122        |120     |4            |5       |2     |      |
+ROW   |123        |120     |0            |0       |110   |      |
+ROW   |130        |130     |16           |11      |      |      |
+ROW   |132        |130     |0            |0       |140   |      |
+ROW   |140        |140     |16           |11      |      |      |
+ROW   |142        |140     |4            |5       |2     |      |
+ROW   |143        |140     |0            |0       |120   |      |
+ROW   |144        |140     |2            |0       |100166|      |
+
+TABLE |config
+FIELDS|configid|refresh_unsupported|work_period    |alert_usrgrpid|discovery_groupid|
+ROW   |1       |1m                 |1-5,09:00-18:00|7             |5                |
+
+TABLE |graph_theme
+FIELDS|graphthemeid|theme     |backgroundcolor|graphcolor|gridcolor|maingridcolor|gridbordercolor|textcolor|highlightcolor|leftpercentilecolor|rightpercentilecolor|nonworktimecolor|colorpalette                                                                                                                                      |
+ROW   |1           |blue-theme|FFFFFF         |FFFFFF    |CCD5D9   |ACBBC2       |ACBBC2         |1F2C33   |E33734        |429E47             |E33734              |EBEBEB          |1A7C11,F63100,2774A4,A54F10,FC6EA3,6C59DC,AC8C14,611F27,F230E0,5CCD18,BB2A02,5A2B57,89ABF8,7EC25C,274482,2B5429,8048B4,FD5434,790E1F,87AC4D,E89DF4|
+ROW   |2           |dark-theme|2B2B2B         |2B2B2B    |454545   |4F4F4F       |4F4F4F         |F2F2F2   |E45959        |59DB8F             |E45959              |333333          |199C0D,F63100,2774A4,F7941D,FC6EA3,6C59DC,C7A72D,BA2A5D,F230E0,5CCD18,BB2A02,AC41A5,89ABF8,7EC25C,3165D5,79A277,AA73DE,FD5434,F21C3E,87AC4D,E89DF4|
+ROW   |3           |hc-light  |FFFFFF         |FFFFFF    |555555   |000000       |333333         |000000   |333333        |000000             |000000              |EBEBEB          |1A7C11,F63100,2774A4,A54F10,FC6EA3,6C59DC,AC8C14,611F27,F230E0,5CCD18,BB2A02,5A2B57,89ABF8,7EC25C,274482,2B5429,8048B4,FD5434,790E1F,87AC4D,E89DF4|
+ROW   |4           |hc-dark   |000000         |000000    |666666   |888888       |4F4F4F         |FFFFFF   |FFFFFF        |FFFFFF             |FFFFFF              |333333          |199C0D,F63100,2774A4,F7941D,FC6EA3,6C59DC,C7A72D,BA2A5D,F230E0,5CCD18,BB2A02,AC41A5,89ABF8,7EC25C,3165D5,79A277,AA73DE,FD5434,F21C3E,87AC4D,E89DF4|
+
+TABLE |globalmacro
+FIELDS|globalmacroid|macro                           |value              |description                                                                                                                                                                                                                                                                                                                                                                                                                                                    |type|
+ROW   |1            |{$RSM.IP4.MIN.PROBE.ONLINE}     |22                 |Fire a trigger if system contains less than specified number of IPv4 online Probe nodes.                                                                                                                                                                                                                                                                                                                                                                       |0   |
+ROW   |2            |{$RSM.IP6.MIN.PROBE.ONLINE}     |20                 |Fire a trigger if system contains less than specified number of IPv6 online Probe nodes.                                                                                                                                                                                                                                                                                                                                                                       |0   |
+ROW   |3            |{$RSM.PROBE.MAX.OFFLINE}        |1h                 |Fire a trigger if Probe has been manually disabled for more than specified time.                                                                                                                                                                                                                                                                                                                                                                               |0   |
+ROW   |4            |{$RSM.IP4.MIN.SERVERS}          |5                  |When testing Probe status consider it Offline if number of successfully tested IPv4 servers was less than specified.                                                                                                                                                                                                                                                                                                                                           |0   |
+ROW   |5            |{$RSM.IP6.MIN.SERVERS}          |5                  |When testing Probe status consider it Offline if number of successfully tested IPv6 servers was less than specified, if Probe supports IPv6.                                                                                                                                                                                                                                                                                                                   |0   |
+ROW   |6            |{$RSM.IP4.REPLY.MS}             |250                |When testing Probe status consider IPv4 server successful if RTT is below specified time, otherwise unsuccessful.                                                                                                                                                                                                                                                                                                                                              |0   |
+ROW   |7            |{$RSM.IP6.REPLY.MS}             |250                |When testing Probe status consider IPv6 server successful if RTT is below specified time, otherwise unsuccessful, if Probe supports IPv6.                                                                                                                                                                                                                                                                                                                      |0   |
+ROW   |8            |{$RSM.DNS.TCP.RTT.LOW}          |1500               |Consider DNS TCP RTT unsuccessful if it is over specified time. This parameter is used by scripts later when processing collected data.                                                                                                                                                                                                                                                                                                                        |0   |
+ROW   |9            |{$RSM.DNS.TCP.RTT.HIGH}         |7500               |When performing particular DNS TCP test on a Probe node consider Name Server down if RTT was over specified time.                                                                                                                                                                                                                                                                                                                                              |0   |
+ROW   |10           |{$RSM.DNS.UDP.RTT.LOW}          |500                |Consider DNS UDP RTT unsuccessful if it is over specified time. This parameter is used by scripts later when processing collected data.                                                                                                                                                                                                                                                                                                                        |0   |
+ROW   |11           |{$RSM.DNS.UDP.RTT.HIGH}         |2500               |When performing particular DNS UDP test on a Probe node consider Name Server down if RTT was over specified time.                                                                                                                                                                                                                                                                                                                                              |0   |
+ROW   |12           |{$RSM.DNS.DELAY}                |60                 |NB! This must be checked before adding first TLD! DNS UDP test cycle period (Update interval of item rsm.dns.udp[{$RSM.TLD}]).                                                                                                                                                                                                                                                                                                                                 |0   |
+ROW   |14           |{$RSM.DNS.UPDATE.TIME}          |3600               |Maximum DNS update time to consider it successful.                                                                                                                                                                                                                                                                                                                                                                                                             |0   |
+ROW   |15           |{$RSM.DNS.PROBE.ONLINE}         |20                 |Consider DNS/DNSSEC Service availability at a particular time unconditionally UP, if there was less than specified number of online probes at the time of the test cycle.                                                                                                                                                                                                                                                                                      |0   |
+ROW   |16           |{$RSM.DNS.AVAIL.MINNS}          |2                  |Consider DNS Service availability at a particular time UP if during DNS test more than specified number of Name Servers replied successfully.                                                                                                                                                                                                                                                                                                                  |0   |
+ROW   |17           |{$RSM.DNS.ROLLWEEK.SLA}         |240                |Maximum (100%) DNS/DNSSEC rolling week threshold.                                                                                                                                                                                                                                                                                                                                                                                                              |0   |
+ROW   |18           |{$RSM.RDDS.RTT.LOW}             |2000               |Consider RDDS RTT unsuccessful if it is over specified time. This parameter is used by scripts later when processing collected data.                                                                                                                                                                                                                                                                                                                           |0   |
+ROW   |19           |{$RSM.RDDS.RTT.HIGH}            |10000              |When performing particular RDDS test on a Probe node consider the target down if RTT was over specified time.                                                                                                                                                                                                                                                                                                                                                  |0   |
+ROW   |20           |{$RSM.RDDS.DELAY}               |300                |NB! This must be checked before adding first TLD! RDDS test cycle period (Update interval of item rsm.rdds[{$RSM.TLD},,]).                                                                                                                                                                                                                                                                                                                                     |0   |
+ROW   |21           |{$RSM.RDDS.UPDATE.TIME}         |3600               |Maximum RDDS update time to consider it successful.                                                                                                                                                                                                                                                                                                                                                                                                            |0   |
+ROW   |22           |{$RSM.RDDS.PROBE.ONLINE}        |10                 |Consider RDDS Service availability at a particular time unconditionally UP, if there was less than specified number of RDDS-enabled online probes at the time of the test cycle.                                                                                                                                                                                                                                                                               |0   |
+ROW   |23           |{$RSM.RDDS.ROLLWEEK.SLA}        |1440               |Maximum (100%) RDDS rolling week threshold.                                                                                                                                                                                                                                                                                                                                                                                                                    |0   |
+ROW   |24           |{$RSM.RDDS.MAXREDIRS}           |10                 |Maximum redirects to perform on the Probe node during RDDS80 test (cURL option CURLOPT_MAXREDIRS).                                                                                                                                                                                                                                                                                                                                                             |0   |
+ROW   |25           |{$RSM.EPP.DELAY}                |60                 |NB! This must be checked before adding first TLD! EPP test cycle period (Update interval of item rsm.epp[{$RSM.TLD},]).                                                                                                                                                                                                                                                                                                                                        |0   |
+ROW   |26           |{$RSM.EPP.LOGIN.RTT.LOW}        |4000               |Consider EPP-Session RTT unsuccessful if it is over specified time. This parameter is used by scripts later when processing collected data.                                                                                                                                                                                                                                                                                                                    |0   |
+ROW   |27           |{$RSM.EPP.LOGIN.RTT.HIGH}       |20000              |When performing particular EPP-Session test on a Probe node consider the target down if RTT was over specified time.                                                                                                                                                                                                                                                                                                                                           |0   |
+ROW   |28           |{$RSM.EPP.UPDATE.RTT.LOW}       |4000               |Consider EPP-Transform RTT unsuccessful if it is over specified time. This parameter is used by scripts later when processing collected data.                                                                                                                                                                                                                                                                                                                  |0   |
+ROW   |29           |{$RSM.EPP.UPDATE.RTT.HIGH}      |20000              |When performing particular EPP-Transform test on a Probe node consider the target down if RTT was over specified time.                                                                                                                                                                                                                                                                                                                                         |0   |
+ROW   |30           |{$RSM.EPP.INFO.RTT.LOW}         |2000               |Consider EPP-Query RTT unsuccessful if it is over specified time. This parameter is used by scripts later when processing collected data.                                                                                                                                                                                                                                                                                                                      |0   |
+ROW   |31           |{$RSM.EPP.INFO.RTT.HIGH}        |10000              |When performing particular EPP-Query test on a Probe node consider the target down if RTT was over specified time.                                                                                                                                                                                                                                                                                                                                             |0   |
+ROW   |32           |{$RSM.EPP.PROBE.ONLINE}         |2                  |Consider EPP Service availability at a particular time unconditionally UP, if there was less than specified number of EPP-enabled online probes at the time of the test cycle.                                                                                                                                                                                                                                                                                 |0   |
+ROW   |33           |{$RSM.EPP.ROLLWEEK.SLA}         |60                 |Maximum (100%) EPP rolling week threshold.                                                                                                                                                                                                                                                                                                                                                                                                                     |0   |
+ROW   |34           |{$RSM.PROBE.ONLINE.DELAY}       |180                |How many seconds the check rsm.probe.status[automatic,...] must be successful in order to switch from OFFLINE to ONLINE.                                                                                                                                                                                                                                                                                                                                       |0   |
+ROW   |35           |{$RSM.INCIDENT.DNS.FAIL}        |3                  |Number of subsequently failed DNS Availability tests to start an incident.                                                                                                                                                                                                                                                                                                                                                                                     |0   |
+ROW   |36           |{$RSM.INCIDENT.DNS.RECOVER}     |3                  |Number of subsequently successful DNS Availability tests to close an incident.                                                                                                                                                                                                                                                                                                                                                                                 |0   |
+ROW   |37           |{$RSM.INCIDENT.DNSSEC.FAIL}     |3                  |Number of subsequently failed DNSSEC Availability tests to start an incident.                                                                                                                                                                                                                                                                                                                                                                                  |0   |
+ROW   |38           |{$RSM.INCIDENT.DNSSEC.RECOVER}  |3                  |Number of subsequently successful DNSSEC Availability tests to close an incident.                                                                                                                                                                                                                                                                                                                                                                              |0   |
+ROW   |39           |{$RSM.INCIDENT.RDDS.FAIL}       |2                  |Number of subsequently failed RDDS Availability tests to start an incident.                                                                                                                                                                                                                                                                                                                                                                                    |0   |
+ROW   |40           |{$RSM.INCIDENT.RDDS.RECOVER}    |2                  |Number of subsequently successful RDDS Availability tests to close an incident.                                                                                                                                                                                                                                                                                                                                                                                |0   |
+ROW   |41           |{$RSM.INCIDENT.EPP.FAIL}        |2                  |Number of subsequently failed EPP Availability tests to start an incident.                                                                                                                                                                                                                                                                                                                                                                                     |0   |
+ROW   |42           |{$RSM.INCIDENT.EPP.RECOVER}     |2                  |Number of subsequently successful EPP Availability tests to close an incident.                                                                                                                                                                                                                                                                                                                                                                                 |0   |
+ROW   |43           |{$RSM.SLV.DNS.UDP.RTT}          |5                  |Maximum allowed ratio of DNS UDP queries with RTT above {$RSM.DNS.UDP.RTT.LOW}                                                                                                                                                                                                                                                                                                                                                                                 |0   |
+ROW   |44           |{$RSM.SLV.DNS.TCP.RTT}          |5                  |Maximum allowed ratio of DNS TCP queries with RTT above {$RSM.DNS.TCP.RTT.LOW}                                                                                                                                                                                                                                                                                                                                                                                 |0   |
+ROW   |45           |{$RSM.SLV.NS.DOWNTIME}          |432                |Maximum allowed downtime of DNS NS per month                                                                                                                                                                                                                                                                                                                                                                                                                   |0   |
+ROW   |46           |{$RSM.SLV.RDDS43.RTT}           |5                  |Maximum allowed ratio of RDDS43 queries with RTT above {$RSM.RDDS.RTT.LOW}                                                                                                                                                                                                                                                                                                                                                                                     |0   |
+ROW   |47           |{$RSM.SLV.RDDS80.RTT}           |5                  |Maximum allowed ratio of RDDS80 queries with RTT above {$RSM.RDDS.RTT.LOW}                                                                                                                                                                                                                                                                                                                                                                                     |0   |
+ROW   |48           |{$RSM.SLV.RDDS.UPD}             |99                 |                                                                                                                                                                                                                                                                                                                                                                                                                                                               |0   |
+ROW   |49           |{$RSM.SLV.DNS.NS.UPD}           |99                 |Part of Compliance, part of Phase 2.                                                                                                                                                                                                                                                                                                                                                                                                                           |0   |
+ROW   |50           |{$RSM.SLV.EPP.LOGIN}            |99                 |                                                                                                                                                                                                                                                                                                                                                                                                                                                               |0   |
+ROW   |51           |{$RSM.SLV.EPP.UPDATE}           |99                 |                                                                                                                                                                                                                                                                                                                                                                                                                                                               |0   |
+ROW   |52           |{$RSM.SLV.EPP.INFO}             |99                 |                                                                                                                                                                                                                                                                                                                                                                                                                                                               |0   |
+ROW   |53           |{$RSM.ROLLWEEK.THRESHOLDS}      |0,5,10,25,50,75,100|Thresholds for the SLA Monitoring->Rolling week status->Exceeding or equal to drop-down.                                                                                                                                                                                                                                                                                                                                                                       |0   |
+ROW   |54           |{$RSM.ROLLWEEK.SECONDS}         |604800             |Rolling week period. Use different from 604800 only in test purposes.                                                                                                                                                                                                                                                                                                                                                                                          |0   |
+ROW   |55           |{$RSM.PROBE.AVAIL.LIMIT}        |60                 |Maximum time from the last time Probe was available to Zabbix server. If this is over limit the Probe will be considered Offline. This parameter is related to zabbix[proxy,{$RSM.PROXY_NAME},lastaccess] item.                                                                                                                                                                                                                                                |0   |
+ROW   |56           |{$MAX_CPU_LOAD}                 |50                 |                                                                                                                                                                                                                                                                                                                                                                                                                                                               |0   |
+ROW   |57           |{$MAX_RUN_PROCESSES}            |1500               |                                                                                                                                                                                                                                                                                                                                                                                                                                                               |0   |
+ROW   |58           |{$RSM.IP4.ROOTSERVERS1}         |N/A                |List of IPv4 root servers for getting automatic Probe status (Online/Offline).                                                                                                                                                                                                                                                                                                                                                                                 |0   |
+ROW   |59           |{$RSM.IP6.ROOTSERVERS1}         |N/A                |List of IPv6 root servers for getting automatic Probe status (Online/Offline), if Probe supports IPv6.                                                                                                                                                                                                                                                                                                                                                         |0   |
+ROW   |60           |{$MIN_SWAP_PFREE}               |50                 |                                                                                                                                                                                                                                                                                                                                                                                                                                                               |0   |
+ROW   |61           |{$MAX_PROCESSES}                |3000               |                                                                                                                                                                                                                                                                                                                                                                                                                                                               |0   |
+ROW   |62           |{$MIN_FREE_MEMORY}              |20                 |                                                                                                                                                                                                                                                                                                                                                                                                                                                               |0   |
+ROW   |63           |{$MAX_CPU_IOWAIT}               |20                 |                                                                                                                                                                                                                                                                                                                                                                                                                                                               |0   |
+ROW   |64           |{$FREE_DISK_SPACE}              |20                 |                                                                                                                                                                                                                                                                                                                                                                                                                                                               |0   |
+ROW   |65           |{$FREE_DISK_INODES}             |20                 |                                                                                                                                                                                                                                                                                                                                                                                                                                                               |0   |
+ROW   |66           |{$PROBE.INTERNAL.ERROR.INTERVAL}|1m                 |The amount of time probe needs to generate internal errors for before it is considered to be broken and is put offline, used in "Internal errors happening for {$PROBE.INTERNAL.ERROR.INTERVAL}" trigger. Value can be easily changed on individual Zabbix server in "Template Probe Errors" template or fine-tuned for individual hosts. Note that time units are supported ("s" for seconds, "m" for minutes, "h" for hours, "d" for days and "w" for weeks).|0   |
+ROW   |100          |{$RESOLVER.STATUS.TIMEOUT}      |5                  |Timeout when getting resolver status, used in item resolver.status[{$RSM.RESOLVER},{$RESOLVER.STATUS.TIMEOUT},{$RESOLVER.STATUS.TRIES},{$RSM.IP4.ENABLED},{$RSM.IP6.ENABLED}]                                                                                                                                                                                                                                                                                  |0   |
+ROW   |101          |{$RESOLVER.STATUS.TRIES}        |3                  |Maximum number of tries when checking resolver status, used in item resolver.status[{$RSM.RESOLVER},{$RESOLVER.STATUS.TIMEOUT},{$RESOLVER.STATUS.TRIES},{$RSM.IP4.ENABLED},{$RSM.IP6.ENABLED}]                                                                                                                                                                                                                                                                 |0   |
+ROW   |102          |{$RSM.SLV.RDDS.RTT}             |5                  |Maximum allowed ratio of RDDS43 and RDDS80 queries with RTT above {$RSM.RDDS.RTT.LOW}                                                                                                                                                                                                                                                                                                                                                                          |0   |
+ROW   |103          |{$RSM.SLV.DNS.DOWNTIME}         |0                  |Maximum allowed downtime of DNS service per month                                                                                                                                                                                                                                                                                                                                                                                                              |0   |
+ROW   |104          |{$RSM.SLV.RDDS.DOWNTIME}        |864                |Maximum allowed downtime of RDDS service per month                                                                                                                                                                                                                                                                                                                                                                                                             |0   |
+ROW   |105          |{$RSM.MONITORING.TARGET}        |                   |* empty string - unknown; * "registry" - Monitoring target is TLD; * "registrar" - Monitoring target is Registrar;                                                                                                                                                                                                                                                                                                                                             |0   |
+ROW   |106          |{$RSM.INCIDENT.RDAP.FAIL}       |2                  |Number of subsequently failed RDAP Availability tests to start an incident.                                                                                                                                                                                                                                                                                                                                                                                    |0   |
+ROW   |107          |{$RSM.INCIDENT.RDAP.RECOVER}    |2                  |Number of subsequently successful RDAP Availability tests to close an incident.                                                                                                                                                                                                                                                                                                                                                                                |0   |
+ROW   |108          |{$RSM.RDAP.DELAY}               |300                |RDAP test cycle period (Update interval of item rdap[{$RSM.TLD},{$RDAP.TEST.DOMAIN},{$RDAP.BASE.URL},{$RSM.RDDS.MAXREDIRS},{$RSM.RDDS.RTT.HIGH},{$RDAP.TLD.ENABLED},{$RSM.RDAP.ENABLED},{$RSM.IP4.ENABLED},{$RSM.IP6.ENABLED},{$RSM.RESOLVER}])                                                                                                                                                                                                                |0   |
+ROW   |109          |{$RSM.RDAP.MAXREDIRS}           |10                 |Maximum redirects to perform on the Probe node during RDAP test (cURL option CURLOPT_MAXREDIRS)                                                                                                                                                                                                                                                                                                                                                                |0   |
+ROW   |110          |{$RSM.RDAP.PROBE.ONLINE}        |10                 |Consider RDAP Service availability at a particular time unconditionally UP, if there was less than specified number of RDAP-enabled online probes at the time of the test cycle.                                                                                                                                                                                                                                                                               |0   |
+ROW   |111          |{$RSM.RDAP.ROLLWEEK.SLA}        |1440               |Maximum (100%) RDAP rolling week threshold.                                                                                                                                                                                                                                                                                                                                                                                                                    |0   |
+ROW   |112          |{$RSM.RDAP.RTT.HIGH}            |10000              |When performing particular RDAP test on a Probe node consider the target down if RTT was over specified time.                                                                                                                                                                                                                                                                                                                                                  |0   |
+ROW   |113          |{$RSM.RDAP.RTT.LOW}             |5000               |Consider RDAP RTT unsuccessful if it is over specified time. This parameter is used by scripts later when processing collected data.                                                                                                                                                                                                                                                                                                                           |0   |
+ROW   |114          |{$RSM.RDAP.STANDALONE}          |0                  |This parameter stores timestamp of switch to Standalone RDAP. 0 or values larger than current timestamp mean the system considers RDAP to be part of RDDS service.                                                                                                                                                                                                                                                                                             |0   |
+ROW   |115          |{$RSM.SLV.RDAP.DOWNTIME}        |864                |Maximum allowed downtime of RDAP service per month                                                                                                                                                                                                                                                                                                                                                                                                             |0   |
+ROW   |116          |{$RSM.SLV.RDAP.RTT}             |5                  |Maximum allowed ratio of RDAP queries with RTT above {$RSM.RDAP.RTT.LOW}                                                                                                                                                                                                                                                                                                                                                                                       |0   |
+ROW   |117          |{$RSM.DNS.TEST.TCP.RATIO}       |10                 |The ratio (calculated against current time) of using TCP protocol instead of UDP when in normal mode of a DNS Test.                                                                                                                                                                                                                                                                                                                                            |0   |
+ROW   |118          |{$RSM.DNS.TEST.RECOVER.UDP}     |3                  |Number of subsequently successful DNS Test results to switch from critical to normal mode.                                                                                                                                                                                                                                                                                                                                                                     |0   |
+ROW   |119          |{$RSM.DNS.TEST.RECOVER.TCP}     |3                  |Number of subsequently successful DNS Test results to switch from critical to normal mode.                                                                                                                                                                                                                                                                                                                                                                     |0   |
+
+TABLE |media
+FIELDS|mediaid|userid|mediatypeid|sendto      |active|severity|period         |
+ROW   |100    |100   |10         |some address|0     |63      |1-7,00:00-24:00|
+
+TABLE |rights
+FIELDS|rightid|groupid|permission|id  |
+ROW   |100    |100    |2         |140 |
+ROW   |101    |100    |2         |150 |
+ROW   |102    |100    |0         |160 |
+ROW   |103    |100    |0         |170 |
+ROW   |104    |100    |0         |180 |
+ROW   |105    |100    |2         |100 |
+ROW   |106    |100    |2         |130 |
+ROW   |107    |100    |2         |200 |
+ROW   |108    |100    |2         |240 |
+ROW   |109    |110    |2         |130 |
+ROW   |110    |110    |2         |140 |
+ROW   |111    |110    |2         |150 |
+ROW   |112    |110    |2         |160 |
+ROW   |113    |110    |2         |170 |
+ROW   |114    |110    |2         |180 |
+ROW   |115    |110    |2         |100 |
+ROW   |116    |110    |2         |120 |
+ROW   |117    |110    |2         |190 |
+ROW   |118    |110    |2         |240 |
+ROW   |119    |110    |2         |110 |
+ROW   |120    |120    |2         |100 |
+ROW   |121    |120    |2         |110 |
+ROW   |122    |120    |2         |120 |
+ROW   |123    |120    |2         |130 |
+ROW   |124    |120    |2         |140 |
+ROW   |125    |120    |2         |190 |
+
+TABLE |regexps
+FIELDS|regexpid|name                              |test_string|
+ROW   |1       |File systems for discovery        |ext3       |
+ROW   |2       |Network interfaces for discovery  |eth0       |
+ROW   |3       |Storage devices for SNMP discovery|/boot      |
+
+TABLE |expressions
+FIELDS|expressionid|regexpid|expression                                                                                    |expression_type|exp_delimiter|case_sensitive|
+ROW   |1           |2       |^lo$                                                                                          |4              |,            |1             |
+ROW   |2           |3       |^(Physical memory&pipe;Virtual memory&pipe;Memory buffers&pipe;Cached memory&pipe;Swap space)$|4              |,            |1             |
+ROW   |3           |2       |^Software Loopback Interface                                                                  |4              |,            |1             |
+ROW   |4           |2       |^Software Loopback Interface                                                                  |4              |,            |1             |
+ROW   |5           |1       |^(\/&pipe;\/boot&pipe;\/usr&pipe;\/var&pipe;\/tmp&pipe;\/home&pipe;\/root)$                   |3              |,            |0             |
+
+TABLE |config_autoreg_tls
+FIELDS|autoreg_tlsid|tls_psk_identity|tls_psk|
+ROW   |1            |                |       |
+
+TABLE |module
+FIELDS|moduleid|id  |relative_path|status|config|
+ROW   |1       |RSM |RSM          |1     |[]    |
+
+TABLE |rsm_ip_version
+FIELDS|id  |name|
+ROW   |1   |IPv4|
+ROW   |2   |IPv6|
+
+TABLE |rsm_service_category
+FIELDS|id  |name  |
+ROW   |1   |dns   |
+ROW   |2   |dnssec|
+ROW   |3   |rdds  |
+ROW   |4   |epp   |
+ROW   |5   |ns    |
+ROW   |6   |rdap  |
+
+TABLE |rsm_status_map
+FIELDS|id  |name                     |
+ROW   |1   |Unknown                  |
+ROW   |2   |Up                       |
+ROW   |3   |Down                     |
+ROW   |4   |No result                |
+ROW   |5   |Online                   |
+ROW   |6   |Offline                  |
+ROW   |7   |Activated                |
+ROW   |8   |Deactivated              |
+ROW   |9   |Up-inconclusive-no-data  |
+ROW   |10  |Up-inconclusive-no-probes|
+
+TABLE |rsm_test_type
+FIELDS|id  |name        |
+ROW   |1   |dns         |
+ROW   |2   |rdds43      |
+ROW   |3   |rdds80      |
+ROW   |4   |eppsession  |
+ROW   |5   |eppinfo     |
+ROW   |6   |epptransform|
+ROW   |7   |rdap        |
+
+TABLE |rsm_tld_type
+FIELDS|id  |name    |
+ROW   |1   |ccTLD   |
+ROW   |2   |gTLD    |
+ROW   |3   |testTLD |
+ROW   |4   |otherTLD|
+
+TABLE |rsm_transport_protocol
+FIELDS|id  |name|
+ROW   |1   |udp |
+ROW   |2   |tcp |
+

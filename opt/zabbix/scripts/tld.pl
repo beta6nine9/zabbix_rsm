@@ -29,8 +29,6 @@ my $exp_output;
 my $trigger_thresholds = RSM_TRIGGER_THRESHOLDS;
 my $cfg_global_macros = CFG_GLOBAL_MACROS;
 
-my $ns_servers;
-
 ################################################################################
 # main
 ################################################################################
@@ -39,17 +37,7 @@ sub main()
 {
 	my $config = get_rsm_config();
 
-	pfail("SLV scripts path is not specified. Please check configuration file") unless defined $config->{'slv'}{'path'};
-
 	init_cli_opts(get_rsm_local_id($config));
-
-	if (opt('setup-cron'))
-	{
-		create_cron_jobs($config->{'slv'}{'path'});
-		print("cron jobs created successfully\n");
-
-		return;
-	}
 
 	my $server_key = opt('server-id') ? get_rsm_server_key(getopt('server-id')) : get_rsm_local_key($config);
 	init_zabbix_api($config, $server_key);
@@ -63,8 +51,11 @@ sub main()
 
 	if ($target ne MONITORING_TARGET_REGISTRY)
 	{
-		pfail("expected monitoring target \"${\MONITORING_TARGET_REGISTRY}\", but got \"$target\", if you'd like to change it, please run:".
-			"\n\n/opt/zabbix/scripts/change-macro.pl --macro '{\$RSM.MONITORING.TARGET}' --value '${\MONITORING_TARGET_REGISTRY}'");
+		pfail("expected monitoring target \"${\MONITORING_TARGET_REGISTRY}\", but got \"$target\",".
+			" if you'd like to change it, please run:".
+			"\n\n/opt/zabbix/scripts/change-macro.pl".
+			" --macro '{\$RSM.MONITORING.TARGET}'".
+			" --value '${\MONITORING_TARGET_REGISTRY}'");
 	}
 
 	# get global macros required by this script
@@ -80,30 +71,39 @@ sub main()
 	}
 	elsif (opt('list-services'))
 	{
-		list_services($server_key, getopt('tld'));
+		list_services(getopt('tld'));
 	}
 	elsif (opt('get-nsservers-list'))
 	{
-		list_nsservers($server_key, getopt('tld'));
+		list_ns_servers(getopt('tld'));
 	}
 	elsif (opt('update-nsservers'))
 	{
-		$ns_servers = get_ns_servers(getopt('tld'));
-		update_nsservers($server_key, getopt('tld'), $ns_servers);
+		my $config_templateid = get_template_id(TEMPLATE_RSMHOST_CONFIG_PREFIX . getopt('tld'));
+
+		my $ns_servers = get_ns_servers($config_templateid);
+
+		my $opt_ns_servers = getopt_ns_servers();
+
+		my $changes = get_ns_changes($ns_servers, $opt_ns_servers);
+
+		my $tld_hostid = get_host(getopt('tld'), false);	# no host groups
+
+		update_ns_servers($config_templateid, $tld_hostid, getopt('tld'), $changes);
 	}
 	elsif (opt('delete'))
 	{
-		manage_tld_objects('delete', getopt('tld'), getopt('dns'), getopt('dnssec'),
-				getopt('epp'), getopt('rdds'), getopt('rdap'));
+		manage_tld_objects('delete', getopt('tld'), getopt('dns'), getopt('dns-udp'), getopt('dns-tcp'),
+				getopt('dnssec'), getopt('epp'), getopt('rdds'), getopt('rdap'));
 	}
 	elsif (opt('disable'))
 	{
-		manage_tld_objects('disable', getopt('tld'), getopt('dns'), getopt('dnssec'),
-				getopt('epp'), getopt('rdds'), getopt('rdap'));
+		manage_tld_objects('disable', getopt('tld'), getopt('dns'), getopt('dns-udp'), getopt('dns-tcp'),
+				getopt('dnssec'), getopt('epp'), getopt('rdds'), getopt('rdap'));
 	}
 	else
 	{
-		add_new_tld();
+		add_new_tld($config);
 	}
 }
 
@@ -114,10 +114,10 @@ sub init_cli_opts($)
 	my %OPTS;
 	my $rv = GetOptions(\%OPTS,
 			"tld=s",
-			"delete!",
-			"disable!",
+			"delete",
+			"disable",
 			"type=s",
-			"set-type!",
+			"set-type",
 			"rdds43-servers=s",
 			"rdds80-servers=s",
 			"rdap-base-url=s",
@@ -125,13 +125,15 @@ sub init_cli_opts($)
 			"dns-test-prefix=s",
 			"rdds-test-prefix=s",
 			"rdds43-test-domain=s",
-			"ipv4!",
-			"ipv6!",
-			"dns!",
-			"epp!",
-			"rdds!",
-			"rdap!",
-			"dnssec!",
+			"ipv4",
+			"ipv6",
+			"dns",
+			"dns-tcp",
+			"dns-udp",
+			"epp",
+			"rdds",
+			"rdap",
+			"dnssec",
 			"epp-servers=s",
 			"epp-user=s",
 			"epp-cert=s",
@@ -145,12 +147,11 @@ sub init_cli_opts($)
 			"rdds-ns-string=s",
 			"root-servers=s",
 			"server-id=s",
-			"get-nsservers-list!",
-			"update-nsservers!",
-			"list-services!",
-			"setup-cron!",
-			"verbose!",
-			"quiet!",
+			"get-nsservers-list",
+			"update-nsservers",
+			"list-services",
+			"verbose",
+			"quiet",
 			"help|?");
 
 	if (!$rv || !%OPTS || $OPTS{'help'})
@@ -168,11 +169,6 @@ sub init_cli_opts($)
 sub validate_input($)
 {
 	my $default_server_id = shift;
-
-	if (opt('setup-cron'))
-	{
-		return;
-	}
 
 	my $msg = "";
 
@@ -226,6 +222,16 @@ sub validate_input($)
 		}
 	}
 
+	if (opt('delete') && (opt('dns-tcp') || opt('dns-udp')))
+	{
+		$msg .= "--dns-tcp, --dns-udp are not compatible with --delete\n";
+	}
+
+	if (opt('disable') && opt('dns-tcp') && opt('dns-udp'))
+	{
+		$msg .= "only one of --dns-tcp, --dns-udp can be used with --disable\n";
+	}
+
 	if ((opt('rdds43-servers') && !opt('rdds80-servers')) ||
 			(opt('rdds80-servers') && !opt('rdds43-servers')))
 	{
@@ -260,15 +266,32 @@ sub validate_input($)
 		$msg .= "EPP Server certificate file must be specified (--epp-servercert)\n" unless (getopt('epp-servercert'));
 	}
 
-	# why on Earth? Do not do this.
-	#getopt('ipv4') = 0 if (opt('update-nsservers'));
-	#getopt('ipv6') = 0 if (opt('update-nsservers'));
+	if (!opt('delete') && !opt('disable'))
+	{
+		if (opt('dns') && !opt('dns-tcp') && !opt('dns-udp'))
+		{
+			setopt('dns-tcp');
+			setopt('dns-udp');
+		}
+		elsif (opt('dns-tcp') || opt('dns-udp'))
+		{
+			setopt('dns');
+		}
+		elsif (!opt('dns') && !opt('dns-tcp') && !opt('dns-udp'))
+		{
+			setopt('dns');
+			setopt('dns-tcp');
+			setopt('dns-udp');
+		}
+	}
 
-	setopt('dns'   , 0) unless opt('dns');
-	setopt('dnssec', 0) unless opt('dnssec');
-	setopt('rdds'  , 0) unless opt('rdds');
-	setopt('epp'   , 0) unless opt('epp');
-	setopt('rdap'  , 0) unless opt('rdap');
+	setopt('dns'    , 0) unless opt('dns');
+	setopt('dnssec' , 0) unless opt('dnssec');
+	setopt('rdds'   , 0) unless opt('rdds');
+	setopt('epp'    , 0) unless opt('epp');
+	setopt('rdap'   , 0) unless opt('rdap');
+	setopt('dns-udp', 0) unless opt('dns-udp');
+	setopt('dns-tcp', 0) unless opt('dns-tcp');
 
 	if ($msg)
 	{
@@ -304,9 +327,9 @@ sub init_zabbix_api($$)
 
 	my $section = $config->{$server_key};
 
-	pfail("Zabbix API URL is not specified. Please check configuration file") unless defined $section->{'za_url'};
-	pfail("Username for Zabbix API is not specified. Please check configuration file") unless defined $section->{'za_user'};
-	pfail("Password for Zabbix API is not specified. Please check configuration file") unless defined $section->{'za_password'};
+	pfail("no 'za_url' in '$server_key' section of rsm config file") unless defined $section->{'za_url'};
+	pfail("no 'za_user' in '$server_key' section of rsm config file") unless defined $section->{'za_user'};
+	pfail("no 'za_password' in '$server_key' section of rsm config file") unless defined $section->{'za_password'};
 
 	my $attempts = 3;
 	my $result;
@@ -317,7 +340,7 @@ sub init_zabbix_api($$)
 
 	if ($result ne true)
 	{
-		pfail("Could not connect to Zabbix API. " . $result->{'data'});
+		pfail("cannot connect to Zabbix API. " . $result->{'data'});
 	}
 
 	# make sure we re-login in case of session invalidation
@@ -359,15 +382,15 @@ sub set_type()
 # list services for a single RSMHOST or all RSMHOSTs
 ################################################################################
 
-sub list_services($;$)
+sub list_services(;$)
 {
 	my $server_key = shift;
 	my $rsmhost    = shift; # optional
 
 	# NB! Keep @columns in sync with __usage()!
 	my @columns = (
-		'tld_type',
-		'tld_status',
+		'type',
+		'status',
 		'{$RSM.DNS.TESTPREFIX}',
 		'{$RSM.RDDS.NS.STRING}',
 		'rdds43_test_prefix',
@@ -377,8 +400,8 @@ sub list_services($;$)
 		'{$RDAP.TLD.ENABLED}',
 		'{$RDAP.BASE.URL}',
 		'{$RDAP.TEST.DOMAIN}',
-		'rdds43_servers',
-		'rdds80_servers',
+		'{$RSM.TLD.RDDS.43.SERVERS}',
+		'{$RSM.TLD.RDDS.80.SERVERS}',
 		'{$RSM.RDDS43.TEST.DOMAIN}',
 	);
 
@@ -388,18 +411,13 @@ sub list_services($;$)
 
 	foreach my $rsmhost (sort(@rsmhosts))
 	{
-		my $services = get_services($server_key, $rsmhost);
-
 		my @row = ();
+		my $config = get_rsmhost_config($rsmhost);
 
 		push(@row, $rsmhost);
-		push(@row, map($services->{$_}, @columns));
-
+		push(@row, map($config->{$_} // "", @columns));
 		push(@rows, \@row);
 	}
-
-	# convert undefs to empty strings
-	@rows = map([map($_ // "", @{$_})], @rows);
 
 	# all fields in a CSV must be double-quoted, even if empty
 	my $csv = Text::CSV_XS->new({binary => 1, auto_diag => 1, always_quote => 1, eol => "\n"});
@@ -414,10 +432,9 @@ sub get_tld_list()
 	return map($_->{'host'}, @{$tlds->{'hosts'}});
 }
 
-sub get_services($$)
+sub get_rsmhost_config($)
 {
-	my $server_key = shift;
-	my $rsmhost    = shift;
+	my $rsmhost = shift;
 
 	my %tld_types = (
 		TLD_TYPE_G    , undef,
@@ -429,46 +446,24 @@ sub get_services($$)
 	my $result;
 
 	# get template id, list of macros
+	my $config_templateid = get_template_id(TEMPLATE_RSMHOST_CONFIG_PREFIX . $rsmhost);
+	my $macros = get_host_macro($config_templateid, undef);
+	my $rsmhost_host = get_host($rsmhost, true);
 
-	my $template = get_template("Template $rsmhost", true, false);
-	pfail("TLD \"$rsmhost\" does not exist on \"$server_key\"") unless ($template->{'templateid'});
+	# save rsmhost status (enabled, disabled)
+	$result->{'status'} = $rsmhost_host->{'status'};
 
-	# store macros
+	# save rsmhost type (e. g. gTLD)
+	$result->{'type'} = first { exists($tld_types{$_}) } map($_->{'name'}, @{$rsmhost_host->{'groups'}});
 
-	map { $result->{$_->{'macro'}} = $_->{'value'} } @{$template->{'macros'}};
+	# save macros
+	map { $result->{$_->{'macro'}} = $_->{'value'} } @{$macros};
 
-	# get status (enabled, disabled), type (gTLD, ccTLD, ...)
-
-	my $tld_host = get_host($rsmhost, true);
-
-	$result->{'tld_status'} = $tld_host->{'status'};
-	$result->{'tld_type'} = first { exists($tld_types{$_}) } map($_->{'name'}, @{$tld_host->{'groups'}});
-
-	# get RDDS43 test prefix
-
+	# and RDDS43 test prefix (backwards compatibility)
 	if (defined($result->{'{$RSM.RDDS43.TEST.DOMAIN}'}))
 	{
 		$result->{'rdds43_test_prefix'} = $result->{'{$RSM.RDDS43.TEST.DOMAIN}'};
 		$result->{'rdds43_test_prefix'} =~ s/^(.+)\.[^.]+$/$1/ if ($rsmhost ne ".");
-	}
-
-	# get RDDS43 and RDDS80 servers
-
-	my $items = get_items_like($template->{'templateid'}, 'rsm.rdds[', true);
-
-	return $result if (0 == scalar(keys(%{$items})));
-
-	# skip disabled items
-	foreach my $itemid (keys(%{$items}))
-	{
-		next if ($items->{$itemid}{'status'} != ITEM_STATUS_ACTIVE);
-
-		$items->{$itemid}{'key_'} =~ /,"(\S+)","(\S+)"]/;
-
-		$result->{'rdds43_servers'} = $1;
-		$result->{'rdds80_servers'} = $2;
-
-		last;
 	}
 
 	return $result;
@@ -478,10 +473,9 @@ sub get_services($$)
 # manage NS + IP server pairs
 ################################################################################
 
-sub list_nsservers($;$)
+sub list_ns_servers(;$)
 {
-	my $server_key = shift;
-	my $rsmhost    = shift; # optional
+	my $rsmhost = shift; # optional
 
 	# all fields in a CSV must be double-quoted, even if empty
 	my $csv = Text::CSV_XS->new({binary => 1, auto_diag => 1, always_quote => 1, eol => "\n"});
@@ -490,16 +484,18 @@ sub list_nsservers($;$)
 
 	foreach my $rsmhost (sort(@rsmhosts))
 	{
-		my $nsservers = get_nsservers_list($server_key, $rsmhost);
-		my @ns_types = keys(%{$nsservers});
+		my $config_templateid = get_template_id(TEMPLATE_RSMHOST_CONFIG_PREFIX . $rsmhost);
+
+		my $ns_servers = get_ns_servers($config_templateid);
+		my @ns_types = keys(%{$ns_servers});
 
 		foreach my $type (sort(@ns_types))
 		{
-			my @ns_names = keys(%{$nsservers->{$type}});
+			my @ns_names = keys(%{$ns_servers->{$type}});
 
 			foreach my $ns_name (sort(@ns_names))
 			{
-				foreach my $ip (@{$nsservers->{$type}{$ns_name}})
+				foreach my $ip (@{$ns_servers->{$type}{$ns_name}})
 				{
 					$csv->print(*STDOUT, [$rsmhost, $type, $ns_name // "", $ip // ""]);
 				}
@@ -508,229 +504,173 @@ sub list_nsservers($;$)
 	}
 }
 
-sub update_nsservers($$$)
+# {
+#     'set' => [
+#         [
+#             'ns1.example.com',
+#             '1.1.1.1'
+#         ],
+#         [
+#             'ns2.example.com',
+#             '2.2.2.2'
+#         ]
+#     ],
+#     'add' => [
+#         [
+#             'ns2.example.com',
+#             '2.2.2.2'
+#         ]
+#     ],
+#     'disable' => [
+#         [
+#             'ns2.example.com',
+#             '3.3.3.3'
+#         ],
+# }
+sub get_ns_changes($$)
 {
-	my $server_key     = shift;
-	my $TLD            = shift;
-	my $new_ns_servers = shift;
+	my $ns_servers     = shift;
+	my $opt_ns_servers = shift;
 
-	# allow disabling all the NSs
-	#return unless defined $new_ns_servers;
+	my $changes;
 
-	my $old_ns_servers = get_nsservers_list($server_key, $TLD);
-
-	# allow adding NSs on an empty set
-	#return unless defined $old_ns_servers;
-
-	my @to_be_added = ();
-	my @to_be_removed = ();
-
-	foreach my $new_nsname (keys %{$new_ns_servers})
+	foreach my $opt_nsname (keys(%{$opt_ns_servers}))
 	{
-		my $new_ns = $new_ns_servers->{$new_nsname};
+		my $opt_ns = $opt_ns_servers->{$opt_nsname};
 
-		foreach my $proto (keys %{$new_ns})
+		foreach my $proto (keys %{$opt_ns})
 		{
-			my $new_ips = $new_ns->{$proto};
-			foreach my $new_ip (@{$new_ips})
+			my $opt_ips = $opt_ns->{$proto};
+
+			foreach my $opt_ip (@{$opt_ips})
 			{
+				push(@{$changes->{'set'}}, [$opt_nsname, $opt_ip]);
+
 				my $need_to_add = true;
 
-				if (defined($old_ns_servers->{$proto}) and defined($old_ns_servers->{$proto}{$new_nsname}))
+				if (defined($ns_servers) and
+						defined($ns_servers->{$proto}) and
+						defined($ns_servers->{$proto}{$opt_nsname}))
 				{
-					foreach my $old_ip (@{$old_ns_servers->{$proto}{$new_nsname}})
+					foreach my $ip (@{$ns_servers->{$proto}{$opt_nsname}})
 					{
-						$need_to_add = false if $old_ip eq $new_ip;
+						if ($ip eq $opt_ip)
+						{
+							$need_to_add = false;
+							last;
+						}
 					}
 				}
 
 				if ($need_to_add == true)
 				{
-					my $ns_ip;
-					$ns_ip->{$new_ip}{'ns'} = $new_nsname;
-					$ns_ip->{$new_ip}{'proto'} = $proto;
-					push(@to_be_added, $ns_ip);
-
-					print("add\t: $new_nsname ($new_ip)\n");
+					print("add\t: $opt_nsname ($opt_ip)\n");
+					push(@{$changes->{'add'}}, [$opt_nsname, $opt_ip]);
 				}
 			}
 
 		}
 	}
 
-	foreach my $proto (keys %{$old_ns_servers})
+	return $changes unless (defined($ns_servers));
+
+	foreach my $proto (keys %{$ns_servers})
 	{
-		my $old_ns = $old_ns_servers->{$proto};
-		foreach my $old_nsname (keys %{$old_ns})
+		my $ns = $ns_servers->{$proto};
+
+		foreach my $nsname (keys %{$ns})
 		{
-			foreach my $old_ip (@{$old_ns->{$old_nsname}})
+			foreach my $ip (@{$ns->{$nsname}})
 			{
-				my $need_to_remove = false;
+				my $need_to_disable = false;
 
-				if (defined($new_ns_servers->{$old_nsname}{$proto}))
+				if (defined($opt_ns_servers->{$nsname}{$proto}))
 				{
-					$need_to_remove = true;
+					$need_to_disable = true;
 
-					foreach my $new_ip (@{$new_ns_servers->{$old_nsname}{$proto}})
+					foreach my $opt_ip (@{$opt_ns_servers->{$nsname}{$proto}})
 					{
-						$need_to_remove = false if $new_ip eq $old_ip;
+						if ($opt_ip eq $ip)
+						{
+							$need_to_disable = false;
+							last
+						}
 					}
 				}
 				else
 				{
-					$need_to_remove = true;
+					$need_to_disable = true;
 				}
 
-				if ($need_to_remove == true)
+				if ($need_to_disable == true)
 				{
-					my $ns_ip;
-
-					$ns_ip->{$old_ip} = $old_nsname;
-
-					push(@to_be_removed, $ns_ip);
-
-					print("disable\t: $old_nsname ($old_ip)\n");
+					print("disable\t: $nsname ($ip)\n");
+					push(@{$changes->{'disable'}}, [$nsname, $ip]);
 				}
 			}
 		}
 	}
 
-	add_new_ns($TLD, \@to_be_added) if scalar(@to_be_added);
-	disable_old_ns($TLD, \@to_be_removed) if scalar(@to_be_removed);
+	return $changes;
 }
 
-sub get_nsservers_list($$)
+# returns Name Servers available in a TLD configuration as macro, as hash:
+#
+# {
+#     'v4' => {
+#         'ns1.example.com' => [
+#             '1.1.1.1'
+#         ],
+#         'ns2.example.com' => [
+#             '2.2.2.2',
+#             '3.3.3.3'
+#         ]
+#     },
+#     'v6' => {
+#         'ns3.example.com' => [
+#             '4444:4444::4444'
+#         ]
+#     }
+# }
+sub get_ns_servers($)
 {
-	my $server_key = shift;
-	my $TLD        = shift;
+	my $config_templateid = shift;
 
-	my $result;
+	my $result = get_host_macro($config_templateid, '{$RSM.DNS.NAME.SERVERS}');
 
-	my $templateid = get_template('Template ' . $TLD, false, false);
+	my $ns_servers = {};
 
-	pfail("TLD \"$TLD\" does not exist on \"$server_key\"") unless ($templateid->{'templateid'});
+	return $ns_servers unless (defined($result->{'macro'}));
 
-	$templateid = $templateid->{'templateid'};
+	return if ($result->{'value'} eq '');
 
-	my $items = get_items_like($templateid, 'rsm.dns.tcp.rtt', true);
-
-	foreach my $itemid (keys %{$items})
+	# <ns1>,<ip1> <ns2>,<ip2> ...
+	foreach my $nsip (split(' ', $result->{'value'}))
 	{
-		next if $items->{$itemid}{'status'} == ITEM_STATUS_DISABLED;
+		my ($ns, $ip) = split(',', $nsip);
 
-		my $name = $items->{$itemid}{'key_'};
-		my $ip = $items->{$itemid}{'key_'};
-
-		$ip =~ s/.+\,.+\,(.+)\]$/$1/;
-		$name =~ s/.+\,(.+)\,.+\]$/$1/;
-
-		if ($ip=~/\d*\.\d*\.\d*\.\d+/)
+		if ($ip =~ /\d*\.\d*\.\d*\.\d+/)
 		{
-			push(@{$result->{'v4'}{$name}}, $ip);
+			push(@{$ns_servers->{'v4'}{$ns}}, $ip);
 		}
 		else
 		{
-			push(@{$result->{'v6'}{$name}}, $ip);
+			push(@{$ns_servers->{'v6'}{$ns}}, $ip);
 		}
 	}
 
-	return $result;
+	return $ns_servers;
 }
 
-sub add_new_ns($)
+# locates and returns macro value from the result as returned by API
+sub __get_macro_value_from_result($$)
 {
-	my $TLD        = shift;
-	my $ns_servers = shift;
+	my $result = shift;
+	my $macro  = shift;
 
-	my $main_templateid = get_template('Template ' . $TLD, false, false);
+	my $macro_hash_ref = (grep {$_->{'macro'} eq $macro } @{$result->{'macros'}})[0];
 
-	return unless defined $main_templateid->{'templateid'};
-
-	$main_templateid = $main_templateid->{'templateid'};
-
-	my $main_hostid = get_host($TLD, false);
-
-	return unless defined $main_hostid->{'hostid'};
-
-	$main_hostid = $main_hostid->{'hostid'};
-
-	my $macro_value = get_host_macro($main_templateid, '{$RSM.TLD.DNSSEC.ENABLED}');
-
-	setopt('dnssec', 1) if (defined($macro_value) and $macro_value->{'value'} eq true);
-
-	$macro_value = get_host_macro($main_templateid, '{$RSM.TLD.EPP.ENABLED}');
-
-	setopt('epp-servers', 1) if (defined($macro_value) and $macro_value->{'value'} eq true);
-
-	foreach my $ns_ip (@$ns_servers)
-	{
-		foreach my $ip (keys %{$ns_ip})
-		{
-			my $proto = $ns_ip->{$ip}{'proto'};
-			my $ns = $ns_ip->{$ip}{'ns'};
-
-			$proto=~s/v(\d)/$1/;
-
-			create_item_dns_rtt($ns, $ip, $main_templateid, 'tcp', $proto);
-			create_item_dns_rtt($ns, $ip, $main_templateid, 'udp', $proto);
-
-			create_all_slv_ns_items($ns, $ip, $main_hostid, $TLD);
-		}
-	}
-}
-
-sub disable_old_ns($)
-{
-	my $TLD        = shift;
-	my $ns_servers = shift;
-
-	my @itemids;
-
-	my $main_templateid = get_template('Template ' . $TLD, false, false);
-
-	return unless defined $main_templateid->{'templateid'};
-
-	$main_templateid = $main_templateid->{'templateid'};
-
-	my $main_hostid = get_host($TLD, false);
-
-	return unless defined $main_hostid->{'hostid'};
-
-	$main_hostid = $main_hostid->{'hostid'};
-
-	foreach my $ns (@$ns_servers)
-	{
-		foreach my $ip (keys %{$ns})
-		{
-			my $ns_name = $ns->{$ip};
-			my $item_key = ',' . $ns_name . ',' . $ip . ']';
-
-			my $items = get_items_like($main_templateid, $item_key, true);
-
-			my @tmp_items = keys %{$items};
-
-			push(@itemids, @tmp_items);
-
-			$item_key = '[' . $ns_name . ',' . $ip . ']';
-
-			$items = get_items_like($main_hostid, $item_key, false);
-
-			@tmp_items = keys %{$items};
-
-			push(@itemids, @tmp_items);
-		}
-	}
-
-	if (@itemids)
-	{
-		my $triggers = get_triggers_by_items(\@itemids);
-
-		my @triggerids = keys %{$triggers};
-
-		#disable_triggers(\@triggerids) if scalar @triggerids;
-
-		disable_items(\@itemids);
-	}
+	return $macro_hash_ref->{'value'};
 }
 
 ################################################################################
@@ -739,24 +679,32 @@ sub disable_old_ns($)
 
 sub manage_tld_objects($$$$$$$)
 {
-	my $action = shift;
-	my $tld    = shift;
-	my $dns    = shift;
-	my $dnssec = shift;
-	my $epp    = shift;
-	my $rdds   = shift;
-	my $rdap   = shift;
+	my $action  = shift;
+	my $tld     = shift;
+	my $dns     = shift;
+	my $dns_udp = shift;
+	my $dns_tcp = shift;
+	my $dnssec  = shift;
+	my $epp     = shift;
+	my $rdds    = shift;
+	my $rdap    = shift;
 
 	my $types = {
-		'dns'    => $dns,
-		'dnssec' => $dnssec,
-		'epp'    => $epp,
-		'rdds'   => $rdds
+		'dns'		=> $dns,
+		'dns-udp'	=> $dns_udp,
+		'dns-tcp'	=> $dns_tcp,
+		'dnssec'	=> $dnssec,
+		'epp'		=> $epp,
+		'rdds'		=> $rdds,
+		'rdap'		=> $rdap,
 	};
 
-	my $main_templateid;
+	if (!__is_rdap_standalone())
+	{
+		delete($types->{'rdap'});
+	}
 
-	$types->{'rdap'} = $rdap if (__is_rdap_standalone());
+	my $config_templateid;
 
 	print("Getting main host of the TLD: ");
 	my $main_hostid = get_host($tld, false);
@@ -772,16 +720,16 @@ sub manage_tld_objects($$$$$$$)
 	}
 
 	print("Getting main template of the TLD: ");
-	my $tld_template = get_template('Template ' . $tld, false, true);
+	my $tld_template = get_template(TEMPLATE_RSMHOST_CONFIG_PREFIX . $tld, true, true);
 
 	if (scalar(%{$tld_template}))
 	{
-		$main_templateid = $tld_template->{'templateid'};
-		print("$main_templateid\n");
+		$config_templateid = $tld_template->{'templateid'};
+		print("$config_templateid\n");
 	}
 	else
 	{
-		pfail("cannot find template \"Template .$tld\"");
+		pfail("cannot find template \"" . TEMPLATE_RSMHOST_CONFIG_PREFIX . "$tld\"");
 	}
 
 	my @tld_hostids;
@@ -821,8 +769,6 @@ sub manage_tld_objects($$$$$$$)
 		my @tmp_hostids;
 		my @hostids_arr;
 
-		push(@tmp_hostids, {'hostid' => $main_hostid});
-
 		foreach my $hostid (@tld_hostids)
 		{
 			push(@tmp_hostids, {'hostid' => $hostid});
@@ -837,7 +783,7 @@ sub manage_tld_objects($$$$$$$)
 
 			if (!$result || !%{$result})
 			{
-				pfail("an error occurred while disabling hosts!");
+				pfail("an error occurred while disabling hosts");
 			}
 
 			exit;
@@ -846,82 +792,94 @@ sub manage_tld_objects($$$$$$$)
 		if ($action eq 'delete')
 		{
 			remove_hosts(\@hostids_arr);
-			remove_hosts([$main_hostid]);
-			remove_templates([$main_templateid]);
+			remove_templates([$config_templateid]);
 
 			my $hostgroupid = get_host_group('TLD ' . $tld, false, false);
 			$hostgroupid = $hostgroupid->{'groupid'};
 			remove_hostgroups([$hostgroupid]);
+
 			return;
 		}
 	}
 
+	# the rest of the function disables only some of the services
+
+	if ($dns)
+	{
+		pfail("DNS service cannot be disabled");
+	}
+
 	foreach my $type (keys %{$types})
 	{
-		next if $types->{$type} eq false;
+		next if ($types->{$type} eq false);
 
 		if ($type eq 'dnssec')
 		{
-			really(create_macro('{$RSM.TLD.DNSSEC.ENABLED}', 0, $main_templateid, true)) if ($types->{$type} eq true);
+			really(create_macro('{$RSM.TLD.DNSSEC.ENABLED}', 0, $config_templateid, true));
+			set_service_items_status(get_host_items($main_hostid), DNSSEC_STATUS_TEMPLATEID, 0);
+			next;
+		}
+		elsif ($type eq 'dns-udp')
+		{
+			if (__get_macro_value_from_result($tld_template, '{$RSM.TLD.DNS.TCP.ENABLED}') eq "0")
+			{
+				pfail("cannot disable DNS UDP because DNS TCP is already disabled");
+			}
+			really(create_macro('{$RSM.TLD.DNS.UDP.ENABLED}', 0, $config_templateid, true));
+			next;
+		}
+		elsif ($type eq 'dns-tcp')
+		{
+			if (__get_macro_value_from_result($tld_template, '{$RSM.TLD.DNS.UDP.ENABLED}') eq "0")
+			{
+				pfail("cannot disable DNS TCP because DNS UDP is already disabled");
+			}
+			really(create_macro('{$RSM.TLD.DNS.TCP.ENABLED}', 0, $config_templateid, true));
 			next;
 		}
 
-		my @itemids;
+		my $macro = $type eq 'rdap' ? '{$RDAP.TLD.ENABLED}' : '{$RSM.TLD.' . uc($type) . '.ENABLED}';
 
-		my $template_items = get_items_like($main_templateid, $type, true);
-		my $host_items = get_items_like($main_hostid, $type, false);
+		create_macro($macro, 0, $config_templateid, true);
 
-		if ($type eq 'rdds')
+		# get items on "<rsmhost>" host
+		my $rsmhost_items = get_host_items($main_hostid);
+		set_service_items_status($rsmhost_items, RDDS_STATUS_TEMPLATEID, 0);
+		set_service_items_status($rsmhost_items, RDAP_STATUS_TEMPLATEID, 0);
+
+		# get "<rsmhost> <probe>" hostids
+		my $probe_hostids = get_template(TEMPLATE_RSMHOST_CONFIG_PREFIX . $tld, false, true);
+		$probe_hostids = $probe_hostids->{'hosts'};
+		$probe_hostids = [grep($_->{'host'} ne $tld, @{$probe_hostids})];
+		$probe_hostids = [map($_->{'hostid'}, @{$probe_hostids})];
+
+		# get items on all "<rsmhost> <probe>" hosts
+		my $probe_items;
+		foreach my $hostid (@{$probe_hostids})
 		{
-			my $service_enabled_itemkey = "$type.enabled";
+			push(@{$probe_items}, @{get_host_items($hostid)});
+		}
 
-			my @service_enabled_itemid = grep { $template_items->{$_}{'key_'} eq $service_enabled_itemkey } keys(%{$template_items});
-			if (!@service_enabled_itemid)
+		# disable RDDS and/or RDAP items
+		if (__is_rdap_standalone())
+		{
+			if ($type eq 'rdds')
 			{
-				pfail("failed to find $service_enabled_itemkey item");
+				set_service_items_status($rsmhost_items, RDDS_STATUS_TEMPLATEID, 0);
+				set_service_items_status($probe_items, RDDS_TEST_TEMPLATEID, 0);
 			}
-
-			delete($template_items->{$service_enabled_itemid[0]});
-		}
-
-		if (scalar(keys(%{$template_items})))
-		{
-			push(@itemids, keys(%{$template_items}));
-		}
-		elsif ($type ne 'rdap') # RDAP doesn't have items in "Template $tld"
-		{
-			print("Could not find $type related items on the template level\n");
-		}
-
-		if (scalar(keys(%{$host_items})))
-		{
-			push(@itemids, keys(%{$host_items}));
+			if ($type eq 'rdap')
+			{
+				set_service_items_status($rsmhost_items, RDAP_STATUS_TEMPLATEID, 0);
+				set_service_items_status($probe_items, RDAP_TEST_TEMPLATEID, 0);
+			}
 		}
 		else
 		{
-			print("Could not find $type related items on host level\n");
-		}
-
-		if (scalar(@itemids))
-		{
-			my $macro = $type eq 'rdap' ? '{$RDAP.TLD.ENABLED}' : '{$RSM.TLD.' . uc($type) . '.ENABLED}';
-
-			create_macro($macro, 0, $main_templateid, true);
-
-			if ($action eq 'disable')
-			{
-				disable_items(\@itemids);
-			}
-			else # $action is 'delete'
-			{
-				remove_items(\@itemids);
-				# remove_applications_by_items(\@itemids);
-			}
-		}
-
-		if ($action eq 'disable' && $type eq 'rdap')
-		{
-			set_linked_items_enabled('rdap[', $tld, 0);
+			set_service_items_status($rsmhost_items, RDDS_STATUS_TEMPLATEID, 0);
+			set_service_items_status($rsmhost_items, RDAP_STATUS_TEMPLATEID, 0);
+			set_service_items_status($probe_items, RDDS_TEST_TEMPLATEID, 0);
+			set_service_items_status($probe_items, RDAP_TEST_TEMPLATEID, 0);
 		}
 	}
 }
@@ -930,30 +888,34 @@ sub manage_tld_objects($$$$$$$)
 # add or update RSMHOST
 ################################################################################
 
-sub add_new_tld()
+sub add_new_tld($)
 {
-	$ns_servers = get_ns_servers(getopt('tld'));
-	pfail("Could not retrieve NS servers for '" . getopt('tld') . "' TLD") unless (scalar(keys %{$ns_servers}));
+	my $config = shift;
 
-	my $root_servers_macros = update_root_servers(getopt('root-servers'));
-	print("Could not retrieve list of root servers or create global macros\n") unless (defined($root_servers_macros));
+	my $proxies = get_proxies_list();
 
-	my $main_templateid = create_main_template(getopt('tld'), $ns_servers);
-	pfail("Main templateid is not defined") unless defined $main_templateid;
+	pfail("please add at least one probe first using probes.pl") unless (%{$proxies});
+
+	update_root_server_macros(getopt('root-servers'));
+
+	# these will first go to 'Template Rsmhost Config <rsmhost>' as a macro then to '<rsmhost>' as items/triggers
+	my $opt_ns_servers = getopt_ns_servers();
+
+	my $config_templateid = create_rsmhost_template(getopt('tld'), $opt_ns_servers, $config);
 
 	my $rsmhost_groupid = really(create_group('TLD ' . getopt('tld')));
 
-	create_rsmhost();
+	my $ns_servers = get_ns_servers($config_templateid);
 
-	my $proxy_mon_templateid = create_probe_health_tmpl();
+	my $changes = get_ns_changes($ns_servers, $opt_ns_servers);
 
-	create_tld_hosts_on_probes($root_servers_macros, $proxy_mon_templateid, $rsmhost_groupid, $main_templateid);
+	create_rsmhost($config_templateid, getopt('tld'), getopt('type'), $changes);
+
+	create_tld_hosts_on_probes($rsmhost_groupid, $config_templateid, $proxies);
 }
 
-sub get_ns_servers($)
+sub getopt_ns_servers()
 {
-	my $tld = shift;
-
 	my $ns_servers;
 
 	# just in case, the input should have been validated by now
@@ -962,10 +924,10 @@ sub get_ns_servers($)
 		pfail("option --ns-servers-v4 and/or --ns-servers-v6 required for this invocation");
 	}
 
-	if (getopt('ns-servers-v4') and (getopt('ipv4') == 1 or getopt('update-nsservers')))
+	if (getopt('ns-servers-v4') && opt('ipv4'))
 	{
-		my @nsservers = split(/\s/, getopt('ns-servers-v4'));
-		foreach my $ns (@nsservers)
+		my @ns_servers = split(/\s/, getopt('ns-servers-v4'));
+		foreach my $ns (@ns_servers)
 		{
 			next if ($ns eq '');
 
@@ -987,10 +949,10 @@ sub get_ns_servers($)
 		}
 	}
 
-	if (getopt('ns-servers-v6') and (getopt('ipv6') or getopt('update-nsservers')))
+	if (getopt('ns-servers-v6') && opt('ipv6'))
 	{
-		my @nsservers = split(/\s/, getopt('ns-servers-v6'));
-		foreach my $ns (@nsservers)
+		my @ns_servers = split(/\s/, getopt('ns-servers-v6'));
+		foreach my $ns (@ns_servers)
 		{
 			next if ($ns eq '');
 
@@ -1013,68 +975,158 @@ sub get_ns_servers($)
 	return $ns_servers;
 }
 
-sub create_main_template($$)
+sub create_dns_ns_downtime_trigger($$$$$$$)
 {
-	my $tld        = shift;
-	my $ns_servers = shift;
+	my $ns          = shift;
+	my $ip          = shift;
+	my $key         = shift;
+	my $host_name   = shift;
+	my $threshold   = shift;
+	my $priority    = shift;
+	my $created_ref = shift;
 
-	my $templateid = really(create_template('Template ' . $tld));
+	my $threshold_str = '';
 
-	my $delay = 300;
-	my $appid = get_application_id('Configuration', $templateid);
-
-	foreach my $m ('RSM.IP4.ENABLED', 'RSM.IP6.ENABLED')
+	if ($threshold < 100)
 	{
-		really(create_item({
-			'name'         => 'Value of $1 variable',
-			'key_'         => 'probe.configvalue[' . $m . ']',
-			'status'       => ITEM_STATUS_ACTIVE,
-			'hostid'       => $templateid,
-			'applications' => [$appid],
-			'params'       => '{$' . $m . '}',
-			'delay'        => $delay,
-			'type'         => ITEM_TYPE_CALCULATED,
-			'value_type'   => ITEM_VALUE_TYPE_UINT64
-		}));
+		$threshold_str = "*" . ($threshold * 0.01);
 	}
 
-	foreach my $ns_name (sort keys %{$ns_servers})
+	my $options =
 	{
-		print $ns_name . "\n";
+		'description' => "DNS $ns ($ip) downtime exceeded $threshold% of allowed \$1 minutes",
+		'expression'  => "{$host_name:$key.last()}>{\$RSM.SLV.NS.DOWNTIME}$threshold_str",
+		'priority'    => $priority
+	};
 
-		my @ipv4 = defined($ns_servers->{$ns_name}{'v4'}) ? @{$ns_servers->{$ns_name}{'v4'}} : undef;
-		my @ipv6 = defined($ns_servers->{$ns_name}{'v6'}) ? @{$ns_servers->{$ns_name}{'v6'}} : undef;
+	really(create_trigger($options, $host_name, $created_ref));
+}
 
-		for (my $i_ipv4 = 0; $i_ipv4 <= $#ipv4; $i_ipv4++)
+sub create_dependent_trigger_chain($$$$$$)
+{
+	my $host_name         = shift;
+	my $ns                = shift;
+	my $ip                = shift;
+	my $key               = shift;
+	my $create_trigger_cb = shift;
+	my $thresholds_ref    = shift;
+
+	my $depend_down;
+	my $created;
+
+	foreach my $k (sort keys %{$thresholds_ref})
+	{
+		my $threshold = $thresholds_ref->{$k}{'threshold'};
+		my $priority = $thresholds_ref->{$k}{'priority'};
+
+		next if ($threshold eq 0);
+
+		my $result = &$create_trigger_cb($ns, $ip, $key, $host_name, $threshold, $priority, \$created);
+
+		my $triggerid = $result->{'triggerids'}[0];
+
+		if ($created && defined($depend_down))
 		{
-			next unless defined $ipv4[$i_ipv4];
-			print("	--v4     $ipv4[$i_ipv4]\n");
-
-			create_item_dns_rtt($ns_name, $ipv4[$i_ipv4], $templateid, "tcp", '4');
-			create_item_dns_rtt($ns_name, $ipv4[$i_ipv4], $templateid, "udp", '4');
-			if (opt('epp-servers'))
-			{
-				create_item_dns_udp_upd($ns_name, $ipv4[$i_ipv4], $templateid);
-			}
+			add_dependency($triggerid, $depend_down);
 		}
 
-		for (my $i_ipv6 = 0; $i_ipv6 <= $#ipv6; $i_ipv6++)
-		{
-			next unless defined $ipv6[$i_ipv6];
-			print("	--v6     $ipv6[$i_ipv6]\n");
+		$depend_down = $triggerid;
+	}
+}
 
-			create_item_dns_rtt($ns_name, $ipv6[$i_ipv6], $templateid, "tcp", '6');
-			create_item_dns_rtt($ns_name, $ipv6[$i_ipv6], $templateid, "udp", '6');
-			if (opt('epp-servers'))
-			{
-				create_item_dns_udp_upd($ns_name, $ipv6[$i_ipv6], $templateid);
-			}
+sub update_ns_servers($$$$)
+{
+	my $config_templateid = shift;
+	my $tld_hostid        = shift;
+	my $tld_host          = shift;
+	my $changes           = shift;	# changes to apply to items
+
+	if (defined($changes->{'add'}))
+	{
+		foreach my $nsip (@{$changes->{'add'}})
+		{
+			my ($ns, $ip) = @{$nsip};
+
+			my $key = "rsm.slv.dns.ns.avail[$ns,$ip]";
+
+			create_item(
+				{
+					'name'       => "DNS NS \$1 (\$2) availability",
+					'key_'       => $key,
+					'status'     => ITEM_STATUS_ACTIVE,
+					'hostid'     => $tld_hostid,
+					'type'       => ITEM_TYPE_TRAPPER,
+					'value_type' => ITEM_VALUE_TYPE_UINT64,
+					'valuemapid' => RSM_VALUE_MAPPINGS->{'rsm_avail'},
+				});
+
+			$key = "rsm.slv.dns.ns.downtime[$ns,$ip]";
+
+			create_item(
+				{
+					'name'       => "DNS minutes of \$1 (\$2) downtime",
+					'key_'       => $key,
+					'status'     => ITEM_STATUS_ACTIVE,
+					'hostid'     => $tld_hostid,
+					'type'       => ITEM_TYPE_TRAPPER,
+					'value_type' => ITEM_VALUE_TYPE_UINT64,
+				});
+
+			create_dependent_trigger_chain($tld_host, $ns, $ip, $key, \&create_dns_ns_downtime_trigger,
+					RSM_TRIGGER_THRESHOLDS);
 		}
 	}
 
-	create_items_dns($templateid);
-	create_items_rdds($templateid);
-	create_items_epp($templateid) if (opt('epp-servers'));
+	if (defined($changes->{'disable'}))
+	{
+		foreach my $key_ptrn ('rsm.slv.dns.ns.avail', 'rsm.slv.dns.ns.downtime')
+		{
+			my $itemids_to_disable = [];
+
+			my $result = really(get_items_like($tld_hostid, $key_ptrn, false));
+
+			my %current_items;
+
+			# map key => itemid
+			map {$current_items{$result->{$_}{'key_'}} = $_} (keys(%{$result}));
+
+			foreach my $nsip (@{$changes->{'disable'}})
+			{
+				my ($ns, $ip) = @{$nsip};
+
+				my $key = "$key_ptrn\[$ns,$ip\]";
+
+				next unless (defined($current_items{$key}));
+
+				push(@{$itemids_to_disable}, $current_items{$key});
+			}
+
+			disable_items($itemids_to_disable) if (@{$itemids_to_disable});
+		}
+	}
+
+	my $macro_value = '';
+
+	if (defined($changes->{'set'}))
+	{
+		foreach my $nsip (@{$changes->{'set'}})
+		{
+			my ($ns, $ip) = @{$nsip};
+
+			$macro_value .= ' ' unless ($macro_value eq '');
+			$macro_value .= "$ns,$ip";
+		}
+	}
+
+	really(create_macro('{$RSM.DNS.NAME.SERVERS}', $macro_value, $config_templateid, 1));
+}
+
+sub create_rsmhost_template($$)
+{
+	my $rsmhost = shift;
+	my $opt_ns_servers = shift;
+
+	my $config_templateid = really(create_template(TEMPLATE_RSMHOST_CONFIG_PREFIX . $rsmhost));
 
 	my $rdds43_test_domain;
 	if (opt('rdds-test-prefix'))
@@ -1093,23 +1145,27 @@ sub create_main_template($$)
 		$rdds43_test_domain = getopt('rdds43-test-domain');
 	}
 
-	really(create_macro('{$RSM.TLD}', $tld, $templateid));
-	really(create_macro('{$RSM.DNS.TESTPREFIX}', getopt('dns-test-prefix'), $templateid, 1));
-	really(create_macro('{$RSM.RDDS43.TEST.DOMAIN}', $rdds43_test_domain, $templateid, 1)) if (defined($rdds43_test_domain));
-	really(create_macro('{$RSM.RDDS.NS.STRING}', opt('rdds-ns-string') ? getopt('rdds-ns-string') : CFG_DEFAULT_RDDS_NS_STRING, $templateid, 1));
-	really(create_macro('{$RSM.TLD.DNSSEC.ENABLED}', getopt('dnssec'), $templateid, 1));
-	really(create_macro('{$RSM.TLD.RDDS.ENABLED}', opt('rdds43-servers') ? 1 : 0, $templateid, 1));
-	really(create_macro('{$RSM.TLD.EPP.ENABLED}', opt('epp-servers') ? 1 : 0, $templateid, 1));
+	really(create_macro('{$RSM.TLD}', $rsmhost, $config_templateid));
+	really(create_macro('{$RSM.DNS.TESTPREFIX}', getopt('dns-test-prefix'), $config_templateid, 1));
+	really(create_macro('{$RSM.RDDS43.TEST.DOMAIN}', $rdds43_test_domain, $config_templateid, 1)) if (defined($rdds43_test_domain));
+	really(create_macro('{$RSM.RDDS.NS.STRING}', opt('rdds-ns-string') ? getopt('rdds-ns-string') : CFG_DEFAULT_RDDS_NS_STRING, $config_templateid, 1));
+	really(create_macro('{$RSM.TLD.DNS.UDP.ENABLED}', getopt('dns-udp'), $config_templateid, 1));
+	really(create_macro('{$RSM.TLD.DNS.TCP.ENABLED}', getopt('dns-tcp'), $config_templateid, 1));
+	really(create_macro('{$RSM.TLD.DNSSEC.ENABLED}', getopt('dnssec'), $config_templateid, 1));
+	really(create_macro('{$RSM.TLD.RDDS.ENABLED}', opt('rdds43-servers') ? 1 : 0, $config_templateid, 1));
+	really(create_macro('{$RSM.TLD.RDDS.43.SERVERS}', getopt('rdds43-servers') // '', $config_templateid, 1));
+	really(create_macro('{$RSM.TLD.RDDS.80.SERVERS}', getopt('rdds80-servers') // '', $config_templateid, 1));
+	really(create_macro('{$RSM.TLD.EPP.ENABLED}', opt('epp-servers') ? 1 : 0, $config_templateid, 1));
 
 	if (opt('rdap-base-url') && opt('rdap-test-domain'))
 	{
-		really(create_macro('{$RDAP.BASE.URL}', getopt('rdap-base-url'), $templateid, 1));
-		really(create_macro('{$RDAP.TEST.DOMAIN}', getopt('rdap-test-domain'), $templateid, 1));
-		really(create_macro('{$RDAP.TLD.ENABLED}', 1, $templateid, 1));
+		really(create_macro('{$RDAP.BASE.URL}', getopt('rdap-base-url'), $config_templateid, 1));
+		really(create_macro('{$RDAP.TEST.DOMAIN}', getopt('rdap-test-domain'), $config_templateid, 1));
+		really(create_macro('{$RDAP.TLD.ENABLED}', 1, $config_templateid, 1));
 	}
 	else
 	{
-		really(create_macro('{$RDAP.TLD.ENABLED}', 0, $templateid, 1));
+		really(create_macro('{$RDAP.TLD.ENABLED}', 0, $config_templateid, 1));
 	}
 
 	if (getopt('epp-servers'))
@@ -1129,381 +1185,30 @@ sub create_main_template($$)
 
 		if (getopt('epp-commands'))
 		{
-			really(create_macro('{$RSM.EPP.COMMANDS}', getopt('epp-commands'), $templateid, 1));
+			really(create_macro('{$RSM.EPP.COMMANDS}', getopt('epp-commands'), $config_templateid, 1));
 		}
 		else
 		{
-			really(create_macro('{$RSM.EPP.COMMANDS}', '/opt/test-sla/epp-commands/' . $tld, $templateid));
+			really(create_macro('{$RSM.EPP.COMMANDS}', '/opt/test-sla/epp-commands/' . $rsmhost, $config_templateid));
 		}
-		really(create_macro('{$RSM.EPP.USER}', getopt('epp-user'), $templateid, 1));
-		really(create_macro('{$RSM.EPP.CERT}', encode_base64($buf, ''),  $templateid, 1));
-		really(create_macro('{$RSM.EPP.SERVERID}', getopt('epp-serverid'), $templateid, 1));
-		really(create_macro('{$RSM.EPP.TESTPREFIX}', getopt('epp-test-prefix'), $templateid, 1));
-		really(create_macro('{$RSM.EPP.SERVERCERTMD5}', get_md5(getopt('epp-servercert')), $templateid, 1));
+		really(create_macro('{$RSM.EPP.USER}', getopt('epp-user'), $config_templateid, 1));
+		really(create_macro('{$RSM.EPP.CERT}', encode_base64($buf, ''),  $config_templateid, 1));
+		really(create_macro('{$RSM.EPP.SERVERID}', getopt('epp-serverid'), $config_templateid, 1));
+		really(create_macro('{$RSM.EPP.TESTPREFIX}', getopt('epp-test-prefix'), $config_templateid, 1));
+		really(create_macro('{$RSM.EPP.SERVERCERTMD5}', get_md5(getopt('epp-servercert')), $config_templateid, 1));
 
 		my $passphrase = get_sensdata("Enter EPP secret key passphrase: ");
 		my $passwd = get_sensdata("Enter EPP password: ");
-		really(create_macro('{$RSM.EPP.PASSWD}', get_encrypted_passwd($keysalt, $passphrase, $passwd), $templateid, 1));
+		really(create_macro('{$RSM.EPP.PASSWD}', get_encrypted_passwd($keysalt, $passphrase, $passwd), $config_templateid, 1));
 		$passwd = undef;
-		really(create_macro('{$RSM.EPP.PRIVKEY}', get_encrypted_privkey($keysalt, $passphrase, getopt('epp-privkey')), $templateid, 1));
+		really(create_macro('{$RSM.EPP.PRIVKEY}', get_encrypted_privkey($keysalt, $passphrase, getopt('epp-privkey')), $config_templateid, 1));
 		$passphrase = undef;
 
 		print("EPP data saved successfully.\n");
 	}
 
-	return $templateid;
+	return $config_templateid;
 }
-
-sub create_item_dns_rtt($$$$$)
-{
-	my $ns_name       = shift;
-	my $ip            = shift;
-	my $templateid    = shift;
-	my $proto         = shift;
-	my $ipv           = shift;
-
-	pfail("undefined template ID passed to create_item_dns_rtt()") unless ($templateid);
-	pfail("no protocol parameter specified to create_item_dns_rtt()") unless ($proto);
-
-	my $proto_lc = lc($proto);
-	my $proto_uc = uc($proto);
-
-	my $item_key = 'rsm.dns.' . $proto_lc . '.rtt[{$RSM.TLD},' . $ns_name . ',' . $ip . ']';
-
-	really(create_item({
-		'name'         => 'DNS RTT of $2 ($3) (' . $proto_uc . ')',
-		'key_'         => $item_key,
-		'status'       => ITEM_STATUS_ACTIVE,
-		'hostid'       => $templateid,
-		'applications' => [get_application_id('DNS RTT (' . $proto_uc . ')', $templateid)],
-		'type'         => ITEM_TYPE_TRAPPER,
-		'value_type'   => ITEM_VALUE_TYPE_FLOAT,
-		'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_dns_rtt'}
-	}));
-}
-
-sub create_slv_item($$$$$;$)
-{
-	my $name           = shift;
-	my $key            = shift;
-	my $hostid         = shift;
-	my $value_type     = shift;
-	my $applicationids = shift;
-	my $item_status    = shift;
-
-	$item_status = ITEM_STATUS_ACTIVE unless (defined($item_status));
-
-	if ($value_type == VALUE_TYPE_AVAIL)
-	{
-		return really(create_item({
-			'name'         => $name,
-			'key_'         => $key,
-			'status'       => $item_status,
-			'hostid'       => $hostid,
-			'type'         => ITEM_TYPE_TRAPPER,
-			'value_type'   => ITEM_VALUE_TYPE_UINT64,
-			'applications' => $applicationids,
-			'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_avail'}
-		}));
-	}
-
-	if ($value_type == VALUE_TYPE_NUM)
-	{
-		return really(create_item({
-			'name'         => $name,
-			'key_'         => $key,
-			'status'       => $item_status,
-			'hostid'       => $hostid,
-			'type'         => ITEM_TYPE_TRAPPER,
-			'value_type'   => ITEM_VALUE_TYPE_UINT64,
-			'applications' => $applicationids
-		}));
-	}
-
-	if ($value_type == VALUE_TYPE_PERC)
-	{
-		return really(create_item({
-			'name'         => $name,
-			'key_'         => $key,
-			'status'       => $item_status,
-			'hostid'       => $hostid,
-			'type'         => ITEM_TYPE_TRAPPER,
-			'value_type'   => ITEM_VALUE_TYPE_FLOAT,
-			'applications' => $applicationids,
-			'units'        => '%'
-		}));
-	}
-
-	pfail("Unknown value type $value_type.");
-}
-
-sub create_item_dns_udp_upd($$$)
-{
-	my $ns_name       = shift;
-	my $ip            = shift;
-	my $templateid    = shift;
-
-	my $proto_uc = 'UDP';
-
-	return really(create_item({
-		'name'         => 'DNS update time of $2 ($3)',
-		'key_'         => 'rsm.dns.udp.upd[{$RSM.TLD},' . $ns_name . ',' . $ip . ']',
-		'status'       => (opt('epp-servers') ? ITEM_STATUS_ACTIVE : ITEM_STATUS_DISABLED),
-		'hostid'       => $templateid,
-		'applications' => [get_application_id('DNS RTT (' . $proto_uc . ')', $templateid)],
-		'type'         => ITEM_TYPE_TRAPPER,
-		'value_type'   => ITEM_VALUE_TYPE_FLOAT,
-		'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_dns_rtt'}
-	}));
-}
-
-sub create_items_dns($)
-{
-	my $templateid    = shift;
-
-	my $proto = 'tcp';
-	my $proto_uc = uc($proto);
-	my $item_key = 'rsm.dns.' . $proto . '[{$RSM.TLD}]';
-
-	really(create_item({
-		'name'         => 'Number of working DNS Name Servers of $1 (' . $proto_uc . ')',
-		'key_'         => $item_key,
-		'status'       => ITEM_STATUS_ACTIVE,
-		'hostid'       => $templateid,
-		'applications' => [get_application_id('DNS (' . $proto_uc . ')', $templateid)],
-		'type'         => ITEM_TYPE_SIMPLE,
-		'value_type'   => ITEM_VALUE_TYPE_UINT64,
-		'delay'        => $cfg_global_macros->{'{$RSM.DNS.TCP.DELAY}'}
-	}));
-
-	$proto = 'udp';
-	$proto_uc = uc($proto);
-	$item_key = 'rsm.dns.' . $proto . '[{$RSM.TLD}]';
-
-	really(create_item({
-		'name'         => 'Number of working DNS Name Servers of $1 (' . $proto_uc . ')',
-		'key_'         => $item_key,
-		'status'       => ITEM_STATUS_ACTIVE,
-		'hostid'       => $templateid,
-		'applications' => [get_application_id('DNS (' . $proto_uc . ')', $templateid)],
-		'type'         => ITEM_TYPE_SIMPLE,
-		'value_type'   => ITEM_VALUE_TYPE_UINT64,
-		'delay'        => $cfg_global_macros->{'{$RSM.DNS.UDP.DELAY}'}
-	}));
-
-	# this item is added in any case
-	really(create_item({
-		'name'       => 'DNSSEC enabled/disabled',
-		'key_'       => 'dnssec.enabled',
-		'status'     => ITEM_STATUS_ACTIVE,
-		'hostid'     => $templateid,
-		'params'     => '{$RSM.TLD.DNSSEC.ENABLED}',
-		'delay'      => 60,
-		'type'       => ITEM_TYPE_CALCULATED,
-		'value_type' => ITEM_VALUE_TYPE_UINT64
-	}));
-}
-
-sub create_items_rdds($)
-{
-	my $templateid    = shift;
-
-	if (opt('rdds43-servers'))
-	{
-		my $applicationid_43 = get_application_id('RDDS43', $templateid);
-		my $applicationid_80 = get_application_id('RDDS80', $templateid);
-
-		my $item_key = 'rsm.rdds.43.ip[{$RSM.TLD}]';
-
-		really(create_item({
-			'name'         => 'RDDS43 IP of $1',
-			'key_'         => $item_key,
-			'status'       => ITEM_STATUS_ACTIVE,
-			'hostid'       => $templateid,
-			'applications' => [$applicationid_43],
-			'type'         => ITEM_TYPE_TRAPPER,
-			'value_type'   => ITEM_VALUE_TYPE_STR
-		}));
-
-		$item_key = 'rsm.rdds.43.rtt[{$RSM.TLD}]';
-
-		really(create_item({
-			'name'         => 'RDDS43 RTT of $1',
-			'key_'         => $item_key,
-			'status'       => ITEM_STATUS_ACTIVE,
-			'hostid'       => $templateid,
-			'applications' => [$applicationid_43],
-			'type'         => ITEM_TYPE_TRAPPER,
-			'value_type'   => ITEM_VALUE_TYPE_FLOAT,
-			'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_rdds_rtt'}
-		}));
-
-		if (opt('epp-servers'))
-		{
-			$item_key = 'rsm.rdds.43.upd[{$RSM.TLD}]';
-
-			really(create_item({
-				'name'         => 'RDDS43 update time of $1',
-				'key_'         => $item_key,
-				'status'       => ITEM_STATUS_ACTIVE,
-				'hostid'       => $templateid,
-				'applications' => [$applicationid_43],
-				'type'         => ITEM_TYPE_TRAPPER,
-				'value_type'   => ITEM_VALUE_TYPE_FLOAT,
-				'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_rdds_rtt'}
-			}));
-		}
-
-		really(create_item({
-			'name'         => 'RDDS43 target',
-			'key_'         => 'rsm.rdds.43.target',
-			'status'       => ITEM_STATUS_ACTIVE,
-			'hostid'       => $templateid,
-			'applications' => [$applicationid_43],
-			'type'         => ITEM_TYPE_TRAPPER,
-			'value_type'   => ITEM_VALUE_TYPE_STR
-		}));
-
-		really(create_item({
-			'name'         => 'RDDS43 tested name',
-			'key_'         => 'rsm.rdds.43.testedname',
-			'status'       => ITEM_STATUS_ACTIVE,
-			'hostid'       => $templateid,
-			'applications' => [$applicationid_43],
-			'type'         => ITEM_TYPE_TRAPPER,
-			'value_type'   => ITEM_VALUE_TYPE_STR
-		}));
-
-		$item_key = 'rsm.rdds.80.ip[{$RSM.TLD}]';
-
-		really(create_item({
-			'name'         => 'RDDS80 IP of $1',
-			'key_'         => $item_key,
-			'status'       => ITEM_STATUS_ACTIVE,
-			'hostid'       => $templateid,
-			'applications' => [$applicationid_80],
-			'type'         => ITEM_TYPE_TRAPPER,
-			'value_type'   => ITEM_VALUE_TYPE_STR
-		}));
-
-		$item_key = 'rsm.rdds.80.rtt[{$RSM.TLD}]';
-
-		really(create_item({
-			'name'         => 'RDDS80 RTT of $1',
-			'key_'         => $item_key,
-			'status'       => ITEM_STATUS_ACTIVE,
-			'hostid'       => $templateid,
-			'applications' => [$applicationid_80],
-			'type'         => ITEM_TYPE_TRAPPER,
-			'value_type'   => ITEM_VALUE_TYPE_FLOAT,
-			'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_rdds_rtt'}
-		}));
-
-		really(create_item({
-			'name'         => 'RDDS80 target',
-			'key_'         => 'rsm.rdds.80.target',
-			'status'       => ITEM_STATUS_ACTIVE,
-			'hostid'       => $templateid,
-			'applications' => [$applicationid_80],
-			'type'         => ITEM_TYPE_TRAPPER,
-			'value_type'   => ITEM_VALUE_TYPE_STR
-		}));
-
-		$item_key = 'rsm.rdds[{$RSM.TLD},"' . getopt('rdds43-servers') . '","' . getopt('rdds80-servers') . '"]';
-
-		# disable old items to keep the history, if value of rdds43-servers and/or rdds80-servers has changed
-		my @old_rdds_availability_items = keys(%{get_items_like($templateid, 'rsm.rdds[', true)});
-		disable_items(\@old_rdds_availability_items);
-
-		# create new item (or update/enable existing item)
-		really(create_item({
-			'name'         => 'RDDS availability',
-			'key_'         => $item_key,
-			'status'       => ITEM_STATUS_ACTIVE,
-			'hostid'       => $templateid,
-			'applications' => [get_application_id('RDDS', $templateid)],
-			'type'         => ITEM_TYPE_SIMPLE,
-			'value_type'   => ITEM_VALUE_TYPE_UINT64,
-			'delay'        => $cfg_global_macros->{'{$RSM.RDDS.DELAY}'},
-			'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_rdds_result'}
-		}));
-	}
-
-	# this item is added in any case
-	really(create_item({
-		'name'       => 'RDDS enabled/disabled',
-		'key_'       => 'rdds.enabled',
-		'status'     => ITEM_STATUS_ACTIVE,
-		'hostid'     => $templateid,
-		'params'     => '{$RSM.TLD.RDDS.ENABLED}',
-		'delay'      => 60,
-		'type'       => ITEM_TYPE_CALCULATED,
-		'value_type' => ITEM_VALUE_TYPE_UINT64
-	}));
-}
-
-sub create_items_epp($)
-{
-	my $templateid    = shift;
-
-	my $applicationid = get_application_id('EPP', $templateid);
-
-	really(create_item({
-		'name'         => 'EPP service availability at $1 ($2)',
-		'key_'         => 'rsm.epp[{$RSM.TLD},"' . getopt('epp-servers') . '"]',
-		'status'       => ITEM_STATUS_ACTIVE,
-		'hostid'       => $templateid,
-		'applications' => [$applicationid],
-		'type'         => ITEM_TYPE_SIMPLE,
-		'value_type'   => ITEM_VALUE_TYPE_UINT64,
-		'delay'        => $cfg_global_macros->{'{$RSM.EPP.DELAY}'},
-		'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_epp_result'}
-	}));
-
-	really(create_item({
-		'name'         => 'EPP IP of $1',
-		'key_'         => 'rsm.epp.ip[{$RSM.TLD}]',
-		'status'       => ITEM_STATUS_ACTIVE,
-		'hostid'       => $templateid,
-		'applications' => [$applicationid],
-		'type'         => ITEM_TYPE_TRAPPER,
-		'value_type'   => ITEM_VALUE_TYPE_STR
-	}));
-
-	really(create_item({
-		'name'         => 'EPP $2 command RTT of $1',
-		'key_'         => 'rsm.epp.rtt[{$RSM.TLD},login]',
-		'status'       => ITEM_STATUS_ACTIVE,
-		'hostid'       => $templateid,
-		'applications' => [$applicationid],
-		'type'         => ITEM_TYPE_TRAPPER,
-		'value_type'   => ITEM_VALUE_TYPE_FLOAT,
-		'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_epp_rtt'}
-	}));
-
-	really(create_item({
-		'name'         => 'EPP $2 command RTT of $1',
-		'key_'         => 'rsm.epp.rtt[{$RSM.TLD},update]',
-		'status'       => ITEM_STATUS_ACTIVE,
-		'hostid'       => $templateid,
-		'applications' => [$applicationid],
-		'type'         => ITEM_TYPE_TRAPPER,
-		'value_type'   => ITEM_VALUE_TYPE_FLOAT,
-		'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_epp_rtt'}
-	}));
-
-	really(create_item({
-		'name'         => 'EPP $2 command RTT of $1',
-		'key_'         => 'rsm.epp.rtt[{$RSM.TLD},info]',
-		'status'       => ITEM_STATUS_ACTIVE,
-		'hostid'       => $templateid,
-		'applications' => [$applicationid],
-		'type'         => ITEM_TYPE_TRAPPER,
-		'value_type'   => ITEM_VALUE_TYPE_FLOAT,
-		'valuemapid'   => RSM_VALUE_MAPPINGS->{'rsm_epp_rtt'}
-	}));
-}
-
 
 sub get_sensdata($)
 {
@@ -1610,382 +1315,65 @@ sub get_md5($)
 	return md5_hex(substr($contents, $index));
 }
 
-sub create_dependent_trigger_chain($$$$)
-{
-	my $host_name       = shift;
-	my $service_or_nsip = shift;
-	my $fun             = shift;
-	my $thresholds_ref  = shift;
-
-	my $depend_down;
-	my $created;
-
-	foreach my $k (sort keys %{$thresholds_ref})
-	{
-		my $threshold = $thresholds_ref->{$k}{'threshold'};
-		my $priority = $thresholds_ref->{$k}{'priority'};
-		next if ($threshold eq 0);
-
-		my $result = &$fun($service_or_nsip, $host_name, $threshold, $priority, \$created);
-
-		my $triggerid = $result->{'triggerids'}[0];
-
-		if ($created && defined($depend_down))
-		{
-			add_dependency($triggerid, $depend_down);
-		}
-
-		$depend_down = $triggerid;
-	}
-}
-
-sub create_all_slv_ns_items($$$$)
-{
-	my $ns_name   = shift;
-	my $ip        = shift;
-	my $hostid    = shift;
-	my $host_name = shift;
-
-	create_slv_item("DNS NS $ns_name ($ip) availability", "rsm.slv.dns.ns.avail[$ns_name,$ip]",
-			$hostid, VALUE_TYPE_AVAIL, [get_application_id(APP_SLV_PARTTEST, $hostid)]);
-
-	create_slv_item("DNS minutes of $ns_name ($ip) downtime", "rsm.slv.dns.ns.downtime[$ns_name,$ip]",
-			$hostid, VALUE_TYPE_NUM, [get_application_id(APP_SLV_CURMON, $hostid)]);
-
-	create_dependent_trigger_chain($host_name, "$ns_name,$ip", \&create_dns_ns_downtime_trigger, $trigger_thresholds);
-
-	#create_slv_item('% of successful monthly DNS resolution RTT (UDP): $1 ($2)', 'rsm.slv.dns.ns.rtt.udp.month[' . $ns_name . ',' . $ip . ']', $hostid, VALUE_TYPE_PERC, [get_application_id(APP_SLV_MONTHLY, $hostid)]);
-	#create_slv_item('% of successful monthly DNS resolution RTT (TCP): $1 ($2)', 'rsm.slv.dns.ns.rtt.tcp.month[' . $ns_name . ',' . $ip . ']', $hostid, VALUE_TYPE_PERC, [get_application_id(APP_SLV_MONTHLY, $hostid)]);
-	#create_slv_item('% of successful monthly DNS update time: $1 ($2)', 'rsm.slv.dns.ns.upd.month[' . $ns_name . ',' . $ip . ']', $hostid, VALUE_TYPE_PERC, [get_application_id(APP_SLV_MONTHLY, $hostid)]) if (opt('epp-servers'));
-	#create_slv_item('DNS NS availability: $1 ($2)', 'rsm.slv.dns.ns.avail[' . $ns_name . ',' . $ip . ']', $hostid, VALUE_TYPE_AVAIL, [get_application_id(APP_SLV_PARTTEST, $hostid)]);
-	#create_slv_item('DNS NS minutes of downtime: $1 ($2)', 'rsm.slv.dns.ns.downtime[' . $ns_name . ',' . $ip . ']', $hostid, VALUE_TYPE_NUM, [get_application_id(APP_SLV_CURMON, $hostid)]);
-	#create_slv_item('DNS NS probes that returned results: $1 ($2)', 'rsm.slv.dns.ns.results[' . $ns_name . ',' . $ip . ']', $hostid, VALUE_TYPE_NUM, [get_application_id(APP_SLV_CURMON, $hostid)]);
-	#create_slv_item('DNS NS probes that returned positive results: $1 ($2)', 'rsm.slv.dns.ns.positive[' . $ns_name . ',' . $ip . ']', $hostid, VALUE_TYPE_NUM, [get_application_id(APP_SLV_CURMON, $hostid)]);
-	#create_slv_item('DNS NS positive results by SLA: $1 ($2)', 'rsm.slv.dns.ns.sla[' . $ns_name . ',' . $ip . ']', $hostid, VALUE_TYPE_NUM, [get_application_id(APP_SLV_CURMON, $hostid)]);
-	#create_slv_item('% of monthly DNS NS availability: $1 ($2)', 'rsm.slv.dns.ns.month[' . $ns_name . ',' . $ip . ']', $hostid, VALUE_TYPE_PERC, [get_application_id(APP_SLV_MONTHLY, $hostid)]);
-}
-
-sub create_slv_ns_items($$$)
-{
-	my $ns_servers = shift;
-	my $hostid     = shift;
-	my $host_name  = shift;
-
-	foreach my $ns_name (sort keys %{$ns_servers})
-	{
-		my @ipv4 = defined($ns_servers->{$ns_name}{'v4'}) ? @{$ns_servers->{$ns_name}{'v4'}} : undef;
-		my @ipv6 = defined($ns_servers->{$ns_name}{'v6'}) ? @{$ns_servers->{$ns_name}{'v6'}} : undef;
-
-		for (my $i_ipv4 = 0; $i_ipv4 <= $#ipv4; $i_ipv4++)
-		{
-			next unless defined $ipv4[$i_ipv4];
-
-			create_all_slv_ns_items($ns_name, $ipv4[$i_ipv4], $hostid, $host_name);
-		}
-
-		for (my $i_ipv6 = 0; $i_ipv6 <= $#ipv6; $i_ipv6++)
-		{
-			next unless defined $ipv6[$i_ipv6];
-
-			create_all_slv_ns_items($ns_name, $ipv6[$i_ipv6], $hostid, $host_name);
-		}
-	}
-}
-
-sub create_rdds_or_rdap_slv_items($$$;$)
-{
-	my $hostid       = shift;
-	my $host_name    = shift;
-	my $service      = shift;
-	my $item_status  = shift;
-
-	$item_status = ITEM_STATUS_ACTIVE unless (defined($item_status));
-
-	pfail("Internal error, invalid service '$service', expected RDDS or RDAP") unless ($service eq "RDDS" || $service eq "RDAP");
-
-	my $service_lc = lc($service);
-
-	create_slv_item("$service availability"         , "rsm.slv.$service_lc.avail"   , $hostid, VALUE_TYPE_AVAIL, [get_application_id(APP_SLV_PARTTEST, $hostid)]);
-	create_slv_item("$service minutes of downtime"  , "rsm.slv.$service_lc.downtime", $hostid, VALUE_TYPE_NUM  , [get_application_id(APP_SLV_CURMON, $hostid)]);
-	create_slv_item("$service weekly unavailability", "rsm.slv.$service_lc.rollweek", $hostid, VALUE_TYPE_PERC , [get_application_id(APP_SLV_ROLLWEEK, $hostid)]);
-
-	create_avail_trigger($service, $host_name);
-	create_dependent_trigger_chain($host_name, $service, \&create_downtime_trigger, $trigger_thresholds);
-	create_dependent_trigger_chain($host_name, $service, \&create_rollweek_trigger, $trigger_thresholds);
-
-	create_slv_item("Number of performed monthly $service queries", "rsm.slv.$service_lc.rtt.performed", $hostid, VALUE_TYPE_NUM , [get_application_id(APP_SLV_CURMON, $hostid)]);
-	create_slv_item("Number of failed monthly $service queries"   , "rsm.slv.$service_lc.rtt.failed"   , $hostid, VALUE_TYPE_NUM , [get_application_id(APP_SLV_CURMON, $hostid)]);
-	create_slv_item("Ratio of failed monthly $service queries"    , "rsm.slv.$service_lc.rtt.pfailed"  , $hostid, VALUE_TYPE_PERC, [get_application_id(APP_SLV_CURMON, $hostid)]);
-
-	create_dependent_trigger_chain($host_name, $service, \&create_ratio_of_failed_tests_trigger, $trigger_thresholds);
-}
-
 sub __is_rdap_standalone()
 {
-	return time() >= $cfg_global_macros->{'{$RSM.RDAP.STANDALONE}'};
+	return $cfg_global_macros->{'{$RSM.RDAP.STANDALONE}'} != 0 &&
+			time() >= $cfg_global_macros->{'{$RSM.RDAP.STANDALONE}'};
 }
 
-sub create_slv_items($$$)
+sub create_rsmhost($$$$)
 {
-	my $ns_servers = shift;
-	my $hostid     = shift;
-	my $host_name  = shift;
-
-	create_slv_ns_items($ns_servers, $hostid, $host_name);
-
-	create_slv_item('DNS availability', 'rsm.slv.dns.avail', $hostid, VALUE_TYPE_AVAIL, [get_application_id(APP_SLV_PARTTEST, $hostid)]);
-	create_slv_item('DNS minutes of downtime', 'rsm.slv.dns.downtime', $hostid, VALUE_TYPE_NUM, [get_application_id(APP_SLV_CURMON, $hostid)]);
-	create_slv_item('DNS weekly unavailability', 'rsm.slv.dns.rollweek', $hostid, VALUE_TYPE_PERC, [get_application_id(APP_SLV_ROLLWEEK, $hostid)]);
-
-	create_avail_trigger('DNS', $host_name);
-	create_dns_downtime_trigger($host_name, 5);
-	create_dependent_trigger_chain($host_name, 'DNS', \&create_rollweek_trigger, $trigger_thresholds);
-
-	if (opt('dnssec'))
-	{
-		create_slv_item('DNSSEC availability', 'rsm.slv.dnssec.avail', $hostid, VALUE_TYPE_AVAIL, [get_application_id(APP_SLV_PARTTEST, $hostid)]);
-		create_slv_item('DNSSEC weekly unavailability', 'rsm.slv.dnssec.rollweek', $hostid, VALUE_TYPE_PERC, [get_application_id(APP_SLV_ROLLWEEK, $hostid)]);
-
-		create_avail_trigger('DNSSEC', $host_name);
-		create_dependent_trigger_chain($host_name, 'DNSSEC', \&create_rollweek_trigger, $trigger_thresholds);
-	}
-
-	if (opt('epp-servers'))
-	{
-		create_slv_item('EPP availability', 'rsm.slv.epp.avail', $hostid, VALUE_TYPE_AVAIL, [get_application_id(APP_SLV_PARTTEST, $hostid)]);
-		create_slv_item('EPP minutes of downtime', 'rsm.slv.epp.downtime', $hostid, VALUE_TYPE_NUM, [get_application_id(APP_SLV_CURMON, $hostid)]);
-		create_slv_item('EPP weekly unavailability', 'rsm.slv.epp.rollweek', $hostid, VALUE_TYPE_PERC, [get_application_id(APP_SLV_ROLLWEEK, $hostid)]);
-
-		create_avail_trigger('EPP', $host_name);
-		#create_dependent_trigger_chain($host_name, 'EPP', \&create_downtime_trigger, $trigger_thresholds);
-	}
-
-	create_slv_item('Number of performed monthly DNS UDP tests', 'rsm.slv.dns.udp.rtt.performed', $hostid, VALUE_TYPE_NUM , [get_application_id(APP_SLV_CURMON, $hostid)]);
-	create_slv_item('Number of failed monthly DNS UDP tests'   , 'rsm.slv.dns.udp.rtt.failed'   , $hostid, VALUE_TYPE_NUM , [get_application_id(APP_SLV_CURMON, $hostid)]);
-	create_slv_item('Ratio of failed monthly DNS UDP tests'    , 'rsm.slv.dns.udp.rtt.pfailed'  , $hostid, VALUE_TYPE_PERC, [get_application_id(APP_SLV_CURMON, $hostid)]);
-	create_slv_item('Number of performed monthly DNS TCP tests', 'rsm.slv.dns.tcp.rtt.performed', $hostid, VALUE_TYPE_NUM , [get_application_id(APP_SLV_CURMON, $hostid)]);
-	create_slv_item('Number of failed monthly DNS TCP tests'   , 'rsm.slv.dns.tcp.rtt.failed'   , $hostid, VALUE_TYPE_NUM , [get_application_id(APP_SLV_CURMON, $hostid)]);
-	create_slv_item('Ratio of failed monthly DNS TCP tests'    , 'rsm.slv.dns.tcp.rtt.pfailed'  , $hostid, VALUE_TYPE_PERC, [get_application_id(APP_SLV_CURMON, $hostid)]);
-
-	create_dependent_trigger_chain($host_name, 'DNS UDP', \&create_ratio_of_failed_tests_trigger, $trigger_thresholds);
-	create_dependent_trigger_chain($host_name, 'DNS TCP', \&create_ratio_of_failed_tests_trigger, $trigger_thresholds);
-
-	if (opt('rdds43-servers') || opt('rdds80-servers') || opt('rdap-base-url'))
-	{
-		if (!__is_rdap_standalone())
-		{
-			# we haven't switched to RDAP yet, create RDDS items which may also include RDAP check results
-			create_rdds_or_rdap_slv_items($hostid, $host_name, "RDDS");
-
-			# create future RDAP items, it's ok for them to be active
-			create_rdds_or_rdap_slv_items($hostid, $host_name, "RDAP") if (opt('rdap-base-url'));
-		}
-		else
-		{
-			# after the switch, RDDS and RDAP item sets are opt-in
-			create_rdds_or_rdap_slv_items($hostid, $host_name, "RDAP") if (opt('rdap-base-url'));
-			create_rdds_or_rdap_slv_items($hostid, $host_name, "RDDS") if (opt('rdds43-servers') || opt('rdds80-servers'));
-		}
-	}
-}
-
-sub create_rsmhost()
-{
-	my $tld_name = getopt('tld');
-	my $tld_type = getopt('type');
+	my $config_templateid = shift;
+	my $tld_name          = shift;
+	my $tld_type          = shift;
+	my $changes           = shift;
 
 	my $tld_hostid = really(create_host({
 		'groups'     => [
 			{'groupid' => TLDS_GROUPID},
 			{'groupid' => TLD_TYPE_GROUPIDS->{$tld_type}}
 		],
+		'templates' => [
+			{'templateid' => $config_templateid},
+			{'templateid' => CONFIG_HISTORY_TEMPLATEID},
+			{'templateid' => DNS_STATUS_TEMPLATEID},
+			{'templateid' => DNSSEC_STATUS_TEMPLATEID},
+			{'templateid' => RDDS_STATUS_TEMPLATEID},
+			{'templateid' => RDAP_STATUS_TEMPLATEID},
+		],
 		'host'       => $tld_name,
 		'status'     => HOST_STATUS_MONITORED,
 		'interfaces' => [DEFAULT_MAIN_INTERFACE]
 	}));
 
-	create_slv_items($ns_servers, $tld_hostid, $tld_name);
-}
+	update_ns_servers($config_templateid, $tld_hostid, $tld_name, $changes);
+#	fail("update_ns_servers() should have been called here!");
 
-sub create_avail_trigger($$)
-{
-	my $service   = shift;
-	my $host_name = shift;
+	my $rsmhost_items = get_host_items($tld_hostid);
 
-	my $service_lc = lc($service);
-	my $expression = '';
-
-	$expression .= "({TRIGGER.VALUE}=0 and ";
-	$expression .= "{$host_name:rsm.slv.$service_lc.avail.max(#{\$RSM.INCIDENT.$service.FAIL})}=" . DOWN . ") or ";
-	$expression .= "({TRIGGER.VALUE}=1 and ";
-	$expression .= "{$host_name:rsm.slv.$service_lc.avail.count(#{\$RSM.INCIDENT.$service.RECOVER}," . DOWN . ",\"eq\")}>0)";
-
-	# NB! Configuration trigger that is used in PHP and C code to detect incident!
-	# priority must be set to 0!
-	my $options = {
-		'description' => "$service service is down",
-		'expression'  => $expression,
-		'priority'    => 0
-	};
-
-	really(create_trigger($options, $host_name));
-}
-
-sub create_dns_downtime_trigger($$)
-{
-	my $host_name = shift;
-	my $priority  = shift;
-
-	my $service_lc = lc('DNS');
-
-	my $options = {
-		'description' => 'DNS service was unavailable for at least {ITEM.VALUE1}m',
-		'expression'  => '{' . $host_name . ':rsm.slv.' . $service_lc . '.downtime.last(0)}>{$RSM.SLV.DNS.DOWNTIME}',
-		'priority'    => $priority
-	};
-
-	really(create_trigger($options, $host_name));
-}
-
-sub create_downtime_trigger($$$$$)
-{
-	my $service     = shift;
-	my $host_name   = shift;
-	my $threshold   = shift;
-	my $priority    = shift;
-	my $created_ref = shift;
-
-	my $service_lc = lc($service);
-
-	my $threshold_str = '';
-
-	if ($threshold < 100)
+	if (__is_rdap_standalone())
 	{
-		$threshold_str = "*" . ($threshold * 0.01);
-	}
-
-	my $options = {
-		'description' => $service . ' service was unavailable for ' . $threshold . '% of allowed $1 minutes',
-		'expression'  => '{' . $host_name . ':rsm.slv.' . $service_lc . '.downtime.last(0)}>={$RSM.SLV.' . $service . '.DOWNTIME}' . $threshold_str,
-		'priority'    => $priority
-	};
-
-	really(create_trigger($options, $host_name, $created_ref));
-}
-
-sub create_dns_ns_downtime_trigger($$$$$)
-{
-	my $nsip        = shift;
-	my $host_name   = shift;
-	my $threshold   = shift;
-	my $priority    = shift;
-	my $created_ref = shift;
-
-	my $nsipname = $nsip;
-	$nsipname =~ s/,/ (/;
-	$nsipname .= ')';
-
-	my $threshold_str = '';
-
-	if ($threshold < 100)
-	{
-		$threshold_str = "*" . ($threshold * 0.01);
-	}
-
-	my $options = {
-		'description' => 'DNS ' . $nsipname . ' downtime exceeded ' . $threshold . '% of allowed $1 minutes',
-		'expression'  => '{' . $host_name . ':rsm.slv.dns.ns.downtime[' . $nsip . '].last()}>{$RSM.SLV.NS.DOWNTIME}' . $threshold_str,
-		'priority'    => $priority
-	};
-
-	really(create_trigger($options, $host_name, $created_ref));
-}
-
-sub create_rollweek_trigger($$$$$)
-{
-	my $service     = shift;
-	my $host_name   = shift;
-	my $threshold   = shift;
-	my $priority    = shift;
-	my $created_ref = shift;
-
-	my $service_lc = lc($service);
-
-	my $options = {
-		'description' => $service . ' rolling week is over ' . $threshold . '%',
-		'expression'  => '{' . $host_name . ':rsm.slv.' . $service_lc . '.rollweek.last(0)}>=' . $threshold,
-		'priority'    => $priority
-	};
-
-	really(create_trigger($options, $host_name, $created_ref));
-}
-
-sub create_ratio_of_failed_tests_trigger($$$$$)
-{
-	my $service     = shift;
-	my $host_name   = shift;
-	my $threshold   = shift;
-	my $priority    = shift;
-	my $created_ref = shift;
-
-	my $item_key;
-	my $macro;
-
-	if ($service eq 'DNS UDP')
-	{
-		$item_key = 'rsm.slv.dns.udp.rtt.pfailed';
-		$macro = '{$RSM.SLV.DNS.UDP.RTT}';
-	}
-	elsif ($service eq 'DNS TCP')
-	{
-		$item_key = 'rsm.slv.dns.tcp.rtt.pfailed';
-		$macro = '{$RSM.SLV.DNS.TCP.RTT}';
-	}
-	elsif ($service eq 'RDDS')
-	{
-		$item_key = 'rsm.slv.rdds.rtt.pfailed';
-		$macro = '{$RSM.SLV.RDDS.RTT}';
-	}
-	elsif ($service eq 'RDAP')
-	{
-		$item_key = 'rsm.slv.rdap.rtt.pfailed';
-		$macro = '{$RSM.SLV.RDAP.RTT}';
+		set_service_items_status($rsmhost_items, DNS_STATUS_TEMPLATEID   , 1);
+		set_service_items_status($rsmhost_items, DNSSEC_STATUS_TEMPLATEID, opt('dnssec'));
+		set_service_items_status($rsmhost_items, RDDS_STATUS_TEMPLATEID  , opt('rdds43-servers') || opt('rdds80-servers'));
+		set_service_items_status($rsmhost_items, RDAP_STATUS_TEMPLATEID  , opt('rdap-base-url'));
 	}
 	else
 	{
-		fail("Unknown service '$service'");
+		set_service_items_status($rsmhost_items, DNS_STATUS_TEMPLATEID   , 1);
+		set_service_items_status($rsmhost_items, DNSSEC_STATUS_TEMPLATEID, opt('dnssec'));
+		set_service_items_status($rsmhost_items, RDDS_STATUS_TEMPLATEID  , opt('rdds43-servers') || opt('rdds80-servers') || opt('rdap-base-url'));
+		set_service_items_status($rsmhost_items, RDAP_STATUS_TEMPLATEID  , 0);
 	}
 
-	my $expression;
-
-	if ($threshold == 100)
-	{
-		$expression = "{$host_name:$item_key.last()}>$macro";
-	}
-	else
-	{
-		my $threshold_perc = $threshold / 100;
-		$expression = "{$host_name:$item_key.last()}>$macro*$threshold_perc";
-	}
-
-	my $options = {
-		'description' => "Ratio of failed $service tests exceeded $threshold% of allowed \$1%",
-		'expression'  => $expression,
-		'priority'    => $priority
-	};
-
-	really(create_trigger($options, $host_name, $created_ref));
+	return $tld_hostid;
 }
 
-sub create_tld_hosts_on_probes($$$$)
+sub create_tld_hosts_on_probes($$$)
 {
-	my $root_servers_macros  = shift;
-	my $proxy_mon_templateid = shift;
 	my $rsmhost_groupid      = shift;
-	my $main_templateid      = shift;
-
-	my $proxies = get_proxies_list();
-	pfail("Cannot find existing proxies") unless (%{$proxies});
+	my $config_templateid    = shift;
+	my $proxies              = shift;
 
 	# TODO Revise this part because it is creating entities (e.g. "<Probe>", "<Probe> - mon" hosts) which should
 	# have been created already by preceeding probes.pl execution. At least move the code to one place and reuse it.
@@ -2003,27 +1391,16 @@ sub create_tld_hosts_on_probes($$$$)
 		my $probe_templateid;
 		my $status;
 
-		if ($proxies->{$proxyid}{'status'} == HOST_STATUS_PROXY_ACTIVE)	# probe is "disabled"
-		{
-			$probe_templateid = create_probe_template($probe_name, 0, 0, 0, 0);
-			$status = HOST_STATUS_NOT_MONITORED;
-		}
-		else
-		{
-			$probe_templateid = create_probe_template($probe_name);
-			$status = HOST_STATUS_MONITORED;
-		}
-
-		my $probe_status_templateid = create_probe_status_template($probe_name, $probe_templateid, $root_servers_macros);
+		$probe_templateid = create_probe_template($probe_name);
+		$status = HOST_STATUS_MONITORED;
 
 		really(create_host({
 			'groups' => [
 				{'groupid' => PROBES_GROUPID}
 			],
 			'templates' => [
-				{'templateid' => $probe_status_templateid},
-				{'templateid' => APP_ZABBIX_PROXY_TEMPLATEID},
-				{'templateid' => PROBE_ERRORS_TEMPLATEID}
+				{'templateid' => PROBE_STATUS_TEMPLATEID},
+				{'templateid' => $probe_templateid}
 			],
 			'host'         => $probe_name,
 			'status'       => $status,
@@ -2036,7 +1413,7 @@ sub create_tld_hosts_on_probes($$$$)
 				{'groupid' => PROBES_MON_GROUPID}
 			],
 			'templates' => [
-				{'templateid' => $proxy_mon_templateid}
+				{'templateid' => PROXY_HEALTH_TEMPLATEID}
 			],
 			'host' => "$probe_name - mon",
 			'status' => $status,
@@ -2056,7 +1433,7 @@ sub create_tld_hosts_on_probes($$$$)
 
 		#  TODO: add the host above to more host groups: "TLD Probe Results" and/or "gTLD Probe Results" and perhaps others
 
-		really(create_host({
+		my $rsmhost_probe_hostid = really(create_host({
 			'groups' => [
 				{'groupid' => $rsmhost_groupid},
 				{'groupid' => $probe_groupid},
@@ -2064,53 +1441,34 @@ sub create_tld_hosts_on_probes($$$$)
 				{'groupid' => TLD_TYPE_PROBE_RESULTS_GROUPIDS->{getopt('type')}}
 			],
 			'templates' => [
-				{'templateid' => $main_templateid},
-				{'templateid' => RDAP_TEMPLATEID},
-				{'templateid' => $probe_templateid}
+				{'templateid' => $config_templateid},
+				{'templateid' => DNS_TEST_TEMPLATEID},
+				{'templateid' => RDDS_TEST_TEMPLATEID},
+				{'templateid' => RDAP_TEST_TEMPLATEID},
+				{'templateid' => $probe_templateid},
 			],
 			'host'         => getopt('tld') . ' ' . $probe_name,
 			'status'       => $status,
 			'proxy_hostid' => $proxyid,
 			'interfaces'   => [DEFAULT_MAIN_INTERFACE]
 		}));
-	}
 
-	if (opt('rdap-base-url') && opt('rdap-test-domain'))
-	{
-		set_linked_items_enabled('rdap[', getopt('tld'), 1);
-	}
-	else
-	{
-		set_linked_items_enabled('rdap[', getopt('tld'), 0);
-	}
-}
+		my $rsmhost_probe_items = get_host_items($rsmhost_probe_hostid);
 
-sub set_linked_items_enabled($$$)
-{
-	my $like    = shift;
-	my $tld     = shift;
-	my $enabled = shift;
-
-	my $template = 'Template ' . $tld;
-	my $result = get_template($template, false, true);	# do not select macros, select hosts
-
-	pfail("$tld template \"$template\" does not exist") if (keys(%{$result}) == 0);
-
-	foreach my $host_ref (@{$result->{'hosts'}})
-	{
-		my $hostid = $host_ref->{'hostid'};
-
-		my $result2 = really(get_items_like($hostid, $like, false));	# not a template
-
-		my @items = keys(%{$result2});
-
-		if ($enabled)
+		if (opt('rdds43-servers') || opt('rdds80-servers') || opt('rdap-base-url'))
 		{
-			enable_items(\@items);
+			my $probe_config = get_template(TEMPLATE_PROBE_CONFIG_PREFIX . $proxies->{$proxyid}{'host'}, 1, 0);
+			my %probe_config_macros = map(($_->{'macro'} => $_->{'value'}), @{$probe_config->{'macros'}});
+			my $probe_rdds = $probe_config_macros{'{$RSM.RDDS.ENABLED}'};
+			my $probe_rdap = $probe_config_macros{'{$RSM.RDAP.ENABLED}'};
+
+			set_service_items_status($rsmhost_probe_items, RDDS_TEST_TEMPLATEID, $probe_rdds && (opt('rdds43-servers') || opt('rdds80-servers')));
+			set_service_items_status($rsmhost_probe_items, RDAP_TEST_TEMPLATEID, $probe_rdap && opt('rdap-base-url'));
 		}
 		else
 		{
-			disable_items(\@items);
+			set_service_items_status($rsmhost_probe_items, RDDS_TEST_TEMPLATEID, 0);
+			set_service_items_status($rsmhost_probe_items, RDAP_TEST_TEMPLATEID, 0);
 		}
 	}
 }
@@ -2142,7 +1500,7 @@ Required options
         --tld=STRING
                 TLD name
         --dns-test-prefix=STRING
-                domain test prefix for DNS monitoring (specify '*randomtld*' for root servers monitoring)
+                domain test prefix for DNS monitoring
 
 Other options
         --delete
@@ -2210,21 +1568,24 @@ Other options
                 (default: "${\CFG_DEFAULT_RDDS_NS_STRING}")
         --root-servers=STRING
                 list of IPv4 and IPv6 root servers separated by comma and semicolon: "v4IP1[,v4IP2,...][;v6IP1[,v6IP2,...]]"
-                (default: taken from DNS)
         --server-id=STRING
                 ID of Zabbix server $default_server_id
         --rdds-test-prefix=STRING
                 domain test prefix for RDDS monitoring (needed only if rdds servers specified)
-        --rdds43-test-domain=STRING
-                test domain for RDDS monitoring (needed only if rdds servers specified)
-        --setup-cron
-                create cron jobs and exit
+	--rdds43-test-domain=STRING
+		test domain for RDDS monitoring (needed only if rdds servers specified)
         --epp
                 Action with EPP
                 (default: no)
         --dns
                 Action with DNS
                 (default: no)
+        --dns-udp
+                Action with DNS UDP
+                (default: no; this option is mutually exclusive with --dns-tcp when used with --disable)
+        --dns-tcp
+                Action with DNS TCP
+                (default: no; this option is mutually exclusive with --dns-udp when used with --disable)
         --rdds
                 Action with RDDS
                 (default: no)

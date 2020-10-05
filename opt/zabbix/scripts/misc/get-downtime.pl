@@ -14,7 +14,7 @@ use warnings;
 use RSM;
 use RSMSLV;
 
-parse_opts('tld=s', 'from=n', 'till=n', 'service=s');
+parse_opts('tld=s', 'from=i', 'till=i', 'service=s');
 
 if (opt('debug'))
 {
@@ -40,12 +40,12 @@ db_connect();
 if (getopt('service') eq 'dns')
 {
 	$key = 'rsm.slv.dns.avail';
-	$delay = get_dns_udp_delay(getopt('from'));
+	$delay = get_dns_delay(getopt('from'));
 }
 elsif (getopt('service') eq 'dns-ns')
 {
 	$key = 'rsm.slv.dns.ns.avail[';
-	$delay = get_dns_udp_delay(getopt('from'));
+	$delay = get_dns_delay(getopt('from'));
 }
 elsif (getopt('service') eq 'rdds')
 {
@@ -80,7 +80,7 @@ foreach (@$tlds_ref)
 {
 	$tld = $_;
 
-	if ("[" eq substr($key, -1))
+	if (str_ends_with($key, "["))
 	{
 		my $itemids_ref = get_itemids_by_host_and_keypart($tld, $key);
 		foreach my $nsip (keys(%$itemids_ref))

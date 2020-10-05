@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -48,13 +48,20 @@ static zbx_vmcheck_t	vmchecks[] =
 	{"cluster.status", VMCHECK_FUNC(check_vcenter_cluster_status)},
 	{"version", VMCHECK_FUNC(check_vcenter_version)},
 	{"fullname", VMCHECK_FUNC(check_vcenter_fullname)},
+	{"datastore.discovery", VMCHECK_FUNC(check_vcenter_datastore_discovery)},
+	{"datastore.read", VMCHECK_FUNC(check_vcenter_datastore_read)},
+	{"datastore.size", VMCHECK_FUNC(check_vcenter_datastore_size)},
+	{"datastore.write", VMCHECK_FUNC(check_vcenter_datastore_write)},
+	{"datastore.hv.list", VMCHECK_FUNC(check_vcenter_datastore_hv_list)},
 
 	{"hv.cluster.name", VMCHECK_FUNC(check_vcenter_hv_cluster_name)},
 	{"hv.cpu.usage", VMCHECK_FUNC(check_vcenter_hv_cpu_usage)},
+	{"hv.datacenter.name", VMCHECK_FUNC(check_vcenter_hv_datacenter_name)},
 	{"hv.datastore.discovery", VMCHECK_FUNC(check_vcenter_hv_datastore_discovery)},
 	{"hv.datastore.read", VMCHECK_FUNC(check_vcenter_hv_datastore_read)},
 	{"hv.datastore.size", VMCHECK_FUNC(check_vcenter_hv_datastore_size)},
 	{"hv.datastore.write", VMCHECK_FUNC(check_vcenter_hv_datastore_write)},
+	{"hv.datastore.list", VMCHECK_FUNC(check_vcenter_hv_datastore_list)},
 	{"hv.discovery", VMCHECK_FUNC(check_vcenter_hv_discovery)},
 	{"hv.fullname", VMCHECK_FUNC(check_vcenter_hv_fullname)},
 	{"hv.hw.cpu.num", VMCHECK_FUNC(check_vcenter_hv_hw_cpu_num)},
@@ -80,6 +87,7 @@ static zbx_vmcheck_t	vmchecks[] =
 	{"vm.cpu.num", VMCHECK_FUNC(check_vcenter_vm_cpu_num)},
 	{"vm.cpu.ready", VMCHECK_FUNC(check_vcenter_vm_cpu_ready)},
 	{"vm.cpu.usage", VMCHECK_FUNC(check_vcenter_vm_cpu_usage)},
+	{"vm.datacenter.name", VMCHECK_FUNC(check_vcenter_vm_datacenter_name)},
 	{"vm.discovery", VMCHECK_FUNC(check_vcenter_vm_discovery)},
 	{"vm.hv.name", VMCHECK_FUNC(check_vcenter_vm_hv_name)},
 	{"vm.memory.size", VMCHECK_FUNC(check_vcenter_vm_memory_size)},
@@ -104,6 +112,8 @@ static zbx_vmcheck_t	vmchecks[] =
 	{"vm.vfs.dev.write", VMCHECK_FUNC(check_vcenter_vm_vfs_dev_write)},
 	{"vm.vfs.fs.discovery", VMCHECK_FUNC(check_vcenter_vm_vfs_fs_discovery)},
 	{"vm.vfs.fs.size", VMCHECK_FUNC(check_vcenter_vm_vfs_fs_size)},
+
+	{"dc.discovery", VMCHECK_FUNC(check_vcenter_dc_discovery)},
 
 	{NULL, NULL}
 };
@@ -140,55 +150,47 @@ static int	get_vmware_function(const char *key, vmfunc_t *vmfunc)
 	return FAIL;
 }
 
-int	get_value_simple(DC_ITEM *item, AGENT_RESULT *result, zbx_vector_ptr_t *add_results)
+int	get_value_simple(const DC_ITEM *item, AGENT_RESULT *result, zbx_vector_ptr_t *add_results)
 {
-	const char	*__function_name = "get_value_simple";
-
 	AGENT_REQUEST	request;
 	vmfunc_t	vmfunc;
 	int		ret = NOTSUPPORTED;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() key_orig:'%s' addr:'%s'",
-			__function_name, item->key_orig, item->interface.addr);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() key_orig:'%s' addr:'%s'", __func__, item->key_orig, item->interface.addr);
 
 	init_request(&request);
 
 	if (SUCCEED != parse_item_key(item->key, &request))
 	{
-		SET_MSG_RESULT(result, zbx_strdup(NULL, "Key is badly formatted."));
+		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid item key format."));
 		goto out;
 	}
 
 	request.lastlogsize = item->lastlogsize;
 
-	if (0 == strcmp(request.key, "rsm.dns.udp"))
+	if (0 == strcmp(request.key, "rsm.dns"))
 	{
-		if (SYSINFO_RET_OK == check_rsm_dns(item, &request, result, RSM_UDP))
-			ret = SUCCEED;
-	}
-	else if (0 == strcmp(request.key, "rsm.dns.tcp"))
-	{
-		if (SYSINFO_RET_OK == check_rsm_dns(item, &request, result, RSM_TCP))
+		if (SYSINFO_RET_OK == check_rsm_dns(item->host.host, item->nextcheck, &request, result))
 			ret = SUCCEED;
 	}
 	else if (0 == strcmp(request.key, "rsm.rdds"))
 	{
-		if (SYSINFO_RET_OK == check_rsm_rdds(item, &request, result))
+		if (SYSINFO_RET_OK == check_rsm_rdds(item->host.host, &request, result))
 			ret = SUCCEED;
 	}
 	else if (0 == strcmp(request.key, "rdap"))
 	{
-		if (SYSINFO_RET_OK == check_rsm_rdap(item, &request, result))
+		if (SYSINFO_RET_OK == check_rsm_rdap(item->host.host, &request, result))
 			ret = SUCCEED;
 	}
 	else if (0 == strcmp(request.key, "rsm.epp"))
 	{
-		if (SYSINFO_RET_OK == check_rsm_epp(item, &request, result))
+		if (SYSINFO_RET_OK == check_rsm_epp(item->host.host, &request, result))
 			ret = SUCCEED;
 	}
 	else if (0 == strcmp(request.key, "rsm.probe.status"))
 	{
-		if (SYSINFO_RET_OK == check_rsm_probe_status(item, &request, result))
+		if (SYSINFO_RET_OK == check_rsm_probe_status(item->host.host, &request, result))
 			ret = SUCCEED;
 	}
 	else if (0 == strcmp(request.key, "rsm.errors"))
@@ -198,7 +200,7 @@ int	get_value_simple(DC_ITEM *item, AGENT_RESULT *result, zbx_vector_ptr_t *add_
 	}
 	else if (0 == strcmp(request.key, "resolver.status"))
 	{
-		if (SYSINFO_RET_OK == check_rsm_resolver_status(item, &request, result))
+		if (SYSINFO_RET_OK == check_rsm_resolver_status(item->host.host, &request, result))
 			ret = SUCCEED;
 	}
 	else if (0 == strcmp(request.key, "net.tcp.service") || 0 == strcmp(request.key, "net.udp.service"))
@@ -233,6 +235,7 @@ int	get_value_simple(DC_ITEM *item, AGENT_RESULT *result, zbx_vector_ptr_t *add_
 		if (SYSINFO_RET_OK == check_vcenter_eventlog(&request, item, result, add_results))
 			ret = SUCCEED;
 #else
+		ZBX_UNUSED(add_results);
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Support for VMware checks was not compiled in."));
 #endif
 	}
@@ -249,7 +252,7 @@ int	get_value_simple(DC_ITEM *item, AGENT_RESULT *result, zbx_vector_ptr_t *add_
 out:
 	free_request(&request);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __function_name, zbx_result_string(ret));
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
 
 	return ret;
 }

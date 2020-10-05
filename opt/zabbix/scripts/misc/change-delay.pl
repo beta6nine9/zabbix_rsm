@@ -1,15 +1,10 @@
 #!/usr/bin/perl
 
-BEGIN
-{
-	our $MYDIR = $0; $MYDIR =~ s,(.*)/.*,$1,; $MYDIR = '.' if ($MYDIR eq $0);
-	our $MYDIR2 = $0; $MYDIR2 =~ s,(.*)/.*/.*,$1,; $MYDIR2 = '..' if ($MYDIR2 eq $0);
-}
-use lib $MYDIR;
-use lib $MYDIR2;
-
 use strict;
 use warnings;
+
+use Path::Tiny;
+use lib path($0)->parent(2)->realpath()->stringify();
 
 use TLD_constants qw(:api);
 use RSM;
@@ -17,62 +12,31 @@ use RSMSLV;
 
 set_slv_config(get_rsm_config());
 
-parse_opts('type=n', 'delay=n');
+parse_opts('type=i', 'delay=i');
 usage() unless (__validate_input() == SUCCESS);
 
-my ($key_parts, $macro, $sql);
+my ($macro, $sql, $sth);
+my %macros = (
+	1 => '{$RSM.DNS.DELAY}',
+	2 => '{$RSM.RDDS.DELAY}',
+	3 => '{$RSM.RDAP.DELAY}',
+	4 => '{$RSM.EPP.DELAY}',
+);
 
 db_connect();
 
-if (getopt('type') == 1)
+if (getopt('type') == 3 && !is_rdap_standalone())
 {
-	$key_parts = ['rsm.dns.udp[%'];
-	$macro = '{$RSM.DNS.UDP.DELAY}';
-}
-elsif (getopt('type') == 2)
-{
-	$key_parts = ['rsm.dns.tcp[%'];
-	$macro = '{$RSM.DNS.TCP.DELAY}';
-}
-elsif (getopt('type') == 3)
-{
-	$key_parts = is_rdap_standalone() ? ['rsm.rdds[%'] : ['rsm.rdds[%', 'rdap[%'];
-	$macro = '{$RSM.RDDS.DELAY}';
-}
-elsif (getopt('type') == 4)
-{
-	$key_parts = ['rsm.epp[%'];
-	$macro = '{$RSM.EPP.DELAY}';
-}
-elsif (getopt('type') == 5)
-{
-	if (is_rdap_standalone())
-	{
-		$key_parts = ['rdap[%'];
-		$macro = '{$RSM.RDAP.DELAY}';
-	}
-	else
-	{
-		print("RDAP is not standalone yet\n");
-		exit;
-	}
-}
-
-if (opt('dry-run'))
-{
-	print("would set delay ", getopt('delay'), " for items with type ".ITEM_TYPE_SIMPLE." and keys like ", join(" or like ", @{$key_parts}), "\n");
-	print("would set macro $macro to ", getopt('delay'), "\n");
+	print("RDAP is not standalone yet\n");
 	exit;
 }
 
-my $sth;
+$macro = $macros{getopt('type')};
 
-$sql = "update items set delay=? where type=".ITEM_TYPE_SIMPLE." and key_ like ?";
-
-foreach my $key_part (@{$key_parts})
+if (opt('dry-run'))
 {
-	$sth = $dbh->prepare($sql) or die $dbh->errstr;
-	$sth->execute(getopt('delay'), $key_part) or die $dbh->errstr;
+	print("would set delay ", getopt('delay'), " for macro $macro\n");
+	exit;
 }
 
 $sql = "update globalmacro set value=? where macro=?";
@@ -84,6 +48,7 @@ sub __validate_input
 	return E_FAIL unless (getopt('type') and getopt('delay'));
 	return E_FAIL unless (getopt('type') >= 1 and getopt('type') <= 5);
 	return E_FAIL unless (getopt('delay') >= 60 and getopt('delay') <= 3600);
+	return E_FAIL unless (getopt('delay') % 60 == 0);
 
 	return SUCCESS;
 }
@@ -96,7 +61,7 @@ change-delay.pl - change delay of a particular service
 
 =head1 SYNOPSIS
 
-change-delay.pl --type <1-5> --delay <60-3600> [--dry-run] [--debug] [--help]
+change-delay.pl --type <1-4> --delay <60-3600> [--dry-run] [--debug] [--help]
 
 =head1 OPTIONS
 
@@ -104,7 +69,7 @@ change-delay.pl --type <1-5> --delay <60-3600> [--dry-run] [--debug] [--help]
 
 =item B<--type> number
 
-Specify number of the service: 1 - DNS UDP, 2 - DNS TCP, 3 - RDDS, 4 - EPP, 5 - RDAP (if RDAP is standalone).
+Specify number of the service: 1 - DNS, 2 - RDDS, 3 - RDAP (if RDAP is standalone), 4 - EPP.
 
 =item B<--delay> number
 
@@ -132,6 +97,6 @@ B<This program> will change the delay between particuar test in the system.
 
 ./change-delay.pl --type 2 --delay 120
 
-This will set the delay between DNS TCP tests to 120 seconds.
+This will set the the delay between RDDS tests to 120 seconds.
 
 =cut

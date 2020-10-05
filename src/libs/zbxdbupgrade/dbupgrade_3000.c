@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -291,13 +291,18 @@ static int	DBpatch_3000117(void)
 	{
 		zbx_uint64_t		hostid;
 		zbx_vector_uint64_t	templateids;
+		char			*error;
 
 		ZBX_STR2UINT64(hostid, row[0]);			/* hostid of probe host */
 		zbx_vector_uint64_create(&templateids);
 		zbx_vector_uint64_reserve(&templateids, 1);
 		zbx_vector_uint64_append(&templateids, 10058);	/* hostid of "Template App Zabbix Proxy" */
 
-		ret = DBcopy_template_elements(hostid, &templateids);
+		if (SUCCEED != (ret = DBcopy_template_elements(hostid, &templateids, &error)))
+		{
+			zabbix_log(LOG_LEVEL_CRIT, "cannot link template(s) %s", error);
+			zbx_free(error);
+		}
 
 		zbx_vector_uint64_destroy(&templateids);
 	}
@@ -1642,13 +1647,18 @@ static int	DBpatch_3000210(void)
 	{
 		zbx_uint64_t		hostid;
 		zbx_vector_uint64_t	templateids;
+		char			*error;
 
 		ZBX_STR2UINT64(hostid, row[0]);			/* hostid of probe host */
 		zbx_vector_uint64_create(&templateids);
 		zbx_vector_uint64_reserve(&templateids, 1);
 		zbx_vector_uint64_append(&templateids, 99990);	/* hostid of "Template Probe Errors" */
 
-		ret = DBcopy_template_elements(hostid, &templateids);
+		if (SUCCEED != (ret = DBcopy_template_elements(hostid, &templateids, &error)))
+		{
+			zabbix_log(LOG_LEVEL_CRIT, "cannot link template(s) %s", error);
+			zbx_free(error);
+		}
 
 		zbx_vector_uint64_destroy(&templateids);
 	}
@@ -2515,6 +2525,7 @@ static int	DBpatch_3000224(void)
 	{
 		zbx_uint64_t		hostid;
 		zbx_vector_uint64_t	templateids;
+		char			*error;
 
 		if (SUCCEED == template_is_linked_to_host("99980", row[0]))
 			continue;	/* already linked */
@@ -2524,7 +2535,11 @@ static int	DBpatch_3000224(void)
 		zbx_vector_uint64_reserve(&templateids, 1);
 		zbx_vector_uint64_append(&templateids, 99980);	/* hostid of "Template RDAP" */
 
-		ret = DBcopy_template_elements(hostid, &templateids);
+		if (SUCCEED != (ret = DBcopy_template_elements(hostid, &templateids, &error)))
+		{
+			zabbix_log(LOG_LEVEL_CRIT, "cannot link template(s) %s", error);
+			zbx_free(error);
+		}
 
 		zbx_vector_uint64_destroy(&templateids);
 	}

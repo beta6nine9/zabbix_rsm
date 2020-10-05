@@ -12,6 +12,9 @@ use TLD_constants qw(:groups :api);
 use Data::Dumper;
 use DateTime;
 
+use constant AVAIL_KEY_PATTERN => 'rsm.slv.dns.ns.avail[%,%]';
+use constant DOWNTIME_KEY_PATTERN => 'rsm.slv.dns.ns.downtime[%,%]';
+
 parse_slv_opts();
 fail_if_running();
 set_slv_config(get_rsm_config());
@@ -23,19 +26,16 @@ if (!opt('dry-run'))
 {
 	recalculate_downtime(
 		"/opt/zabbix/data/rsm.slv.dns.ns.downtime.auditlog.txt",
-		"rsm.slv.dns.ns.avail[%,%]",
-		"rsm.slv.dns.ns.downtime[%,%]",
+		AVAIL_KEY_PATTERN,
+		DOWNTIME_KEY_PATTERN,
 		1,
 		1,
-		get_dns_udp_delay(getopt('now') // time() - AVAIL_SHIFT_BACK)
+		get_dns_delay(getopt('now') // time() - AVAIL_SHIFT_BACK)
 	);
 }
 
-use constant AVAIL_KEY_PATTERN => 'rsm.slv.dns.ns.avail';
-use constant DOWNTIME_KEY_PATTERN => 'rsm.slv.dns.ns.downtime';
-
 my $max_cycles = (opt('cycles') ? getopt('cycles') : slv_max_cycles('dns'));
-my $cycle_delay = get_dns_udp_delay();
+my $cycle_delay = get_dns_delay();
 
 init_values();
 process_values();
@@ -72,17 +72,17 @@ sub get_ns_items
 		"select itemid,key_".
 		" from items".
 		" where hostid=$hostid".
-			" and key_ like '" . AVAIL_KEY_PATTERN . "[%'".
+			" and key_ like '" . AVAIL_KEY_PATTERN . "'".
 			" and status=${\ITEM_STATUS_ACTIVE}"
 	);
 
 	fail("failed to obtain ns avail items") unless (scalar(@{$rows_avail}));
 
 	my $rows_downtime = db_select(
-		"select itemid,key_".
+		"select itemid,key_,flags".
 		" from items".
 		" where hostid=$hostid".
-			" and key_ like '" . DOWNTIME_KEY_PATTERN . "[%'".
+			" and key_ like '" . DOWNTIME_KEY_PATTERN . "'".
 			" and status=${\ITEM_STATUS_ACTIVE}"
 	);
 
@@ -90,7 +90,10 @@ sub get_ns_items
 
 	if (scalar(@{$rows_avail}) != scalar(@{$rows_downtime}))
 	{
-		fail("got different number of ns avail and downtime items");
+		fail("got different number of ns avail and downtime items:\n",
+				Dumper($rows_avail),
+				Dumper($rows_downtime)
+		);
 	}
 
 	my $items_by_nsip = {};
@@ -163,7 +166,8 @@ sub calculate_downtime_values
 
 	if (SUCCESS != get_lastvalue($avail_itemid, ITEM_VALUE_TYPE_UINT64, undef, \$avail_lastclock))
 	{
-		fail("cannot get lastvalue for avail item $avail_itemid");
+		info("no name server availability data yet");
+		return;
 	}
 
 	my $downtime_value;
@@ -173,9 +177,14 @@ sub calculate_downtime_values
 	{
 		$downtime_value = 0;
 
-		$downtime_lastclock = db_select_value("select min(clock)-$cycle_delay from history_uint where itemid=?", [$avail_itemid]);
+		$downtime_lastclock = db_select_value("select min(clock)-$cycle_delay from history_uint where itemid=?",
+			[$avail_itemid]);
 
-		fail("no name server availability data yet") unless (defined($downtime_lastclock));
+		if (!defined($downtime_lastclock))
+		{
+			info("no name server availability data yet");
+			return;
+		}
 	}
 
 	if ($downtime_lastclock >= $avail_lastclock)
@@ -212,7 +221,8 @@ sub calculate_downtime_values
 
 		if (!defined($avail_value))
 		{
-			dbg("no history value for avail item $avail_itemid at ", ts_full($clock), ", the data was probably removed");
+			dbg("no history value for avail item $avail_itemid at ", ts_full($clock),
+				", the data was probably removed");
 			$avail_value = UP;
 		}
 

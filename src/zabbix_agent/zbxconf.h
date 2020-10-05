@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -20,6 +20,8 @@
 #ifndef ZABBIX_ZBXCONF_H
 #define ZABBIX_ZBXCONF_H
 
+#include "cfg.h"
+
 extern char	*CONFIG_HOSTS_ALLOWED;
 extern char	*CONFIG_HOSTNAME;
 extern char	*CONFIG_HOSTNAME_ITEM;
@@ -38,6 +40,7 @@ extern char	*CONFIG_LOAD_MODULE_PATH;
 extern char	**CONFIG_LOAD_MODULE;
 #ifdef _WINDOWS
 extern char	**CONFIG_PERF_COUNTERS;
+extern char	**CONFIG_PERF_COUNTERS_EN;
 #endif
 extern char	*CONFIG_USER;
 
@@ -57,12 +60,13 @@ extern char	*CONFIG_TLS_PSK_FILE;
 
 void	load_aliases(char **lines);
 void	load_user_parameters(char **lines);
+int	load_key_access_rule(const char *value, const struct cfg_line *cfg);
 #ifdef _WINDOWS
-void	load_perf_counters(const char **lines);
+void	load_perf_counters(const char **def_lines, const char **eng_lines);
 #endif
 
 #ifdef _AIX
-void	tl_version();
+void	tl_version(void);
 #endif
 
 #endif /* ZABBIX_ZBXCONF_H */

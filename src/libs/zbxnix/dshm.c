@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -30,9 +30,7 @@ extern char	*CONFIG_FILE;
  * Purpose: creates dynamic shared memory segment                             *
  *                                                                            *
  * Parameters: shm       - [OUT] the dynamic shared memory data               *
- *             proj_id   - [IN] the project id used to create shared memory   *
- *                              key                                           *
- *             shm_size  - [IN] the inital size (can be 0)                    *
+ *             shm_size  - [IN] the initial size (can be 0)                   *
  *             mutex     - [IN] the name of mutex used to synchronize memory  *
  *                              access                                        *
  *             copy_func - [IN] the function used to copy shared memory       *
@@ -45,31 +43,19 @@ extern char	*CONFIG_FILE;
  *                         must be freed by the caller.                       *
  *                                                                            *
  ******************************************************************************/
-int	zbx_dshm_create(zbx_dshm_t *shm, int proj_id, size_t shm_size, ZBX_MUTEX_NAME mutex,
+int	zbx_dshm_create(zbx_dshm_t *shm, size_t shm_size, zbx_mutex_name_t mutex,
 		zbx_shm_copy_func_t copy_func, char **errmsg)
 {
-	const char	*__function_name = "zbx_dshm_create";
-	key_t		shm_key;
-	int		ret = FAIL;
+	int	ret = FAIL;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() proj_id:%d size:" ZBX_FS_SIZE_T, __function_name, proj_id,
-			(zbx_fs_size_t)shm_size);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() size:" ZBX_FS_SIZE_T, __func__, (zbx_fs_size_t)shm_size);
 
-	if (FAIL == zbx_mutex_create_force(&shm->lock, mutex))
-	{
-		*errmsg = zbx_strdup(*errmsg, "cannot create mutex");
+	if (SUCCEED != zbx_mutex_create(&shm->lock, mutex, errmsg))
 		goto out;
-	}
 
 	if (0 < shm_size)
 	{
-		if (-1 == (shm_key = zbx_ftok(CONFIG_FILE, proj_id)))
-		{
-			*errmsg = zbx_strdup(*errmsg, "cannot create IPC key");
-			goto out;
-		}
-
-		if (-1 == (shm->shmid = zbx_shmget(shm_key, shm_size)))
+		if (-1 == (shm->shmid = zbx_shm_create(shm_size)))
 		{
 			*errmsg = zbx_strdup(*errmsg, "cannot allocate shared memory");
 			goto out;
@@ -78,13 +64,12 @@ int	zbx_dshm_create(zbx_dshm_t *shm, int proj_id, size_t shm_size, ZBX_MUTEX_NAM
 	else
 		shm->shmid = ZBX_NONEXISTENT_SHMID;
 
-	shm->proj_id = proj_id;
 	shm->size = shm_size;
 	shm->copy_func = copy_func;
 
 	ret = SUCCEED;
 out:
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s shmid:%d", __function_name, zbx_result_string(ret), shm->shmid);
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s shmid:%d", __func__, zbx_result_string(ret), shm->shmid);
 
 	return ret;
 }
@@ -106,10 +91,9 @@ out:
  ******************************************************************************/
 int	zbx_dshm_destroy(zbx_dshm_t *shm, char **errmsg)
 {
-	const char	*__function_name = "zbx_dshm_destroy";
-	int		ret = FAIL;
+	int	ret = FAIL;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() shmid:%d", __function_name, shm->shmid);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() shmid:%d", __func__, shm->shmid);
 
 	zbx_mutex_destroy(&shm->lock);
 
@@ -125,7 +109,7 @@ int	zbx_dshm_destroy(zbx_dshm_t *shm, char **errmsg)
 
 	ret = SUCCEED;
 out:
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __function_name, zbx_result_string(ret));
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
 
 	return ret;
 }
@@ -137,7 +121,7 @@ out:
  ******************************************************************************/
 void	zbx_dshm_lock(zbx_dshm_t *shm)
 {
-	zbx_mutex_lock(&shm->lock);
+	zbx_mutex_lock(shm->lock);
 }
 
 /******************************************************************************
@@ -147,7 +131,7 @@ void	zbx_dshm_lock(zbx_dshm_t *shm)
  ******************************************************************************/
 void	zbx_dshm_unlock(zbx_dshm_t *shm)
 {
-	zbx_mutex_unlock(&shm->lock);
+	zbx_mutex_unlock(shm->lock);
 }
 
 /******************************************************************************
@@ -163,7 +147,7 @@ void	zbx_dshm_unlock(zbx_dshm_t *shm)
  *                                                                            *
  * Return value: SUCCEED - the local reference to dynamic shared memory       *
  *                         segment was validated successfully and contains    *
- *                         corret dynamic shared memory segment address       *
+ *                         correct dynamic shared memory segment address      *
  *               FAIL    - otherwise. The errmsg contains error message and   *
  *                         must be freed by the caller.                       *
  *                                                                            *
@@ -174,10 +158,9 @@ void	zbx_dshm_unlock(zbx_dshm_t *shm)
  ******************************************************************************/
 int	zbx_dshm_validate_ref(const zbx_dshm_t *shm, zbx_dshm_ref_t *shm_ref, char **errmsg)
 {
-	const char	*__function_name = "zbx_dshm_validate_ref";
-	int		ret = FAIL;
+	int	ret = FAIL;
 
-	zabbix_log(LOG_LEVEL_TRACE, "In %s() shmid:%d refid:%d", __function_name, shm->shmid, shm_ref->shmid);
+	zabbix_log(LOG_LEVEL_TRACE, "In %s() shmid:%d refid:%d", __func__, shm->shmid, shm_ref->shmid);
 
 	if (shm->shmid != shm_ref->shmid)
 	{
@@ -204,7 +187,7 @@ int	zbx_dshm_validate_ref(const zbx_dshm_t *shm, zbx_dshm_ref_t *shm_ref, char *
 
 	ret = SUCCEED;
 out:
-	zabbix_log(LOG_LEVEL_TRACE, "End of %s():%s", __function_name, zbx_result_string(ret));
+	zabbix_log(LOG_LEVEL_TRACE, "End of %s():%s", __func__, zbx_result_string(ret));
 
 	return ret;
 }
@@ -231,21 +214,11 @@ out:
  ******************************************************************************/
 int	zbx_dshm_realloc(zbx_dshm_t *shm, size_t size, char **errmsg)
 {
-	const char	*__function_name = "zbx_dshm_realloc";
-	key_t		shm_key;
-	int		shmid, ret = FAIL;
-	void		*addr, *addr_old = NULL;
-	size_t		shm_size;
+	int	shmid, ret = FAIL;
+	void	*addr, *addr_old = NULL;
+	size_t	shm_size;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() shmid:%d size:" ZBX_FS_SIZE_T, __function_name, shm->shmid,
-			(zbx_fs_size_t)size);
-
-	/* Create the new shared memory segment. The same key is used. */
-	if (-1 == (shm_key = zbx_ftok(CONFIG_FILE, shm->proj_id)))
-	{
-		*errmsg = zbx_strdup(NULL, "cannot create IPC key");
-		goto out;
-	}
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() shmid:%d size:" ZBX_FS_SIZE_T, __func__, shm->shmid, (zbx_fs_size_t)size);
 
 	shm_size = ZBX_SIZE_T_ALIGN8(size);
 
@@ -256,19 +229,11 @@ int	zbx_dshm_realloc(zbx_dshm_t *shm, size_t size, char **errmsg)
 		goto out;
 	}
 
-	/* zbx_shmget() will:                                                 */
-	/*	- see that a shared memory segment with this key exists       */
-	/*	- mark it for deletion                                        */
-	/*	- create a new segment with this key, but with a different id */
-
-	if (-1 == (shmid = zbx_shmget(shm_key, shm_size)))
+	if (-1 == (shmid = zbx_shm_create(shm_size)))
 	{
 		*errmsg = zbx_strdup(NULL, "cannot allocate shared memory");
 		goto out;
 	}
-
-	shm->size = shm_size;
-	shm->shmid = shmid;
 
 	if ((void *)(-1) == (addr = shmat(shmid, NULL, 0)))
 	{
@@ -280,7 +245,7 @@ int	zbx_dshm_realloc(zbx_dshm_t *shm, size_t size, char **errmsg)
 	}
 
 	/* copy data from the old segment */
-	shm->copy_func(addr, shm->size, addr_old);
+	shm->copy_func(addr, shm_size, addr_old);
 
 	if (-1 == shmdt((void *)addr))
 	{
@@ -289,15 +254,18 @@ int	zbx_dshm_realloc(zbx_dshm_t *shm, size_t size, char **errmsg)
 	}
 
 	/* delete the old segment */
-	if (NULL != addr_old && -1 == shmdt((void *)addr_old))
+	if (NULL != addr_old && -1 == zbx_shm_destroy(shm->shmid))
 	{
 		*errmsg = zbx_strdup(*errmsg, "cannot detach from old shared memory");
 		goto out;
 	}
 
+	shm->size = shm_size;
+	shm->shmid = shmid;
+
 	ret = SUCCEED;
 out:
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s shmid:%d", __function_name, zbx_result_string(ret), shm->shmid);
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s shmid:%d", __func__, zbx_result_string(ret), shm->shmid);
 
 	return ret;
 }

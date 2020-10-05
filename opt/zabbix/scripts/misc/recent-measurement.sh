@@ -2,6 +2,7 @@
 
 BASE="/opt/zabbix/sla"
 
+d_version="1"
 d_tld="tld6"
 d_service="dns"
 d_date=$(date +%Y/%m/%d)
@@ -11,10 +12,11 @@ d_move=0
 usage()
 {
 	[ -n "$1" ] && echo "Error: $*"
-	echo "usage   : $0 [-t tld] [-s service] [-d YYYY/MM/DD] [-l LAST] [-m MOVE]"
+	echo "usage   : $0 [-v version] [-t tld] [-s service] [-d YYYY/MM/DD] [-l LAST] [-m MOVE]"
 	echo "options :"
+	echo "    -v VERSION (default: $d_version)"
 	echo "    -t TLD (default: $d_tld)"
-	echo "    -s Service (default: $d_service)"
+	echo "    -s SERVICE (default: $d_service)"
 	echo "    -d DATE (default: $d_date)"
 	echo "    -l LAST measurements (default: $d_last)"
 	echo "    -m CYCLES to go back from the LAST  measurements (default: $d_move)"
@@ -27,13 +29,20 @@ die()
 	exit 1
 }
 
-tld=
-service=
-date=
-last=
-move=
+version=$d_version
+tld=$d_tld
+service=$d_service
+date=$d_date
+last=$d_last
+move=$d_move
+
 while [ -n "$1" ]; do
 	case "$1" in
+		-v)
+			shift
+			[ -z "$1" ] && usage
+			version=$1
+			;;
 		-t)
 			shift
 			[ -z "$1" ] && usage
@@ -76,13 +85,7 @@ done
 
 [[ -n "$1" && $1 = "-h" ]] && usage
 
-[ -z "$tld" ] && tld=$d_tld
-[ -z "$service" ] && service=$d_service
-[ -z "$date" ] && date=$d_date
-[ -z "$last" ] && last=$d_last
-[ -z "$move" ] && move=$d_move
-
-base="$BASE/$tld/monitoring/$service/measurements/$date"
+base="$BASE/v$version/$tld/monitoring/$service/measurements/$date"
 
 [ -d $base ] || usage "$base - no such directory"
 

@@ -1,6 +1,6 @@
 dnl
 dnl Zabbix
-dnl Copyright (C) 2001-2017 Zabbix SIA
+dnl Copyright (C) 2001-2020 Zabbix SIA
 dnl
 dnl This program is free software; you can redistribute it and/or modify
 dnl it under the terms of the GNU General Public License as published by
@@ -19,9 +19,9 @@ dnl
 
 dnl Process this file with autoconf to produce a configure script.
 
-AC_INIT([Zabbix],[3.0.10])
+AC_INIT([Zabbix],[5.0.4])
 AC_CONFIG_SRCDIR(src/zabbix_server/server.c)
-AM_INIT_AUTOMAKE
+AM_INIT_AUTOMAKE([subdir-objects filename-length-max=99])
 
 AC_MSG_NOTICE([Configuring $PACKAGE_NAME $PACKAGE_VERSION])
 
@@ -37,7 +37,7 @@ dnl *                     Checks for programs                       *
 dnl *                                                               *
 dnl *****************************************************************
 
-AC_PROG_CC
+AC_PROG_CC([cc c99 gcc clang])
 AM_PROG_CC_C_O
 
 dnl *****************************************************************
@@ -58,11 +58,11 @@ AC_CHECK_HEADERS(stdio.h stdlib.h string.h unistd.h netdb.h signal.h \
   stdint.h mach/host_info.h mach/mach_host.h knlist.h pwd.h \
   sys/var.h arpa/nameser.h assert.h sys/dkstat.h sys/disk.h sys/sched.h \
   zone.h nlist.h kvm.h linux/kernel.h procinfo.h sys/dk.h \
-  sys/resource.h pthread.h windows.h process.h conio.h sys/wait.h regex.h \
+  sys/resource.h pthread.h windows.h process.h conio.h sys/wait.h \
   stdarg.h winsock2.h pdh.h psapi.h sys/sem.h sys/ipc.h sys/shm.h Winldap.h \
   Winber.h lber.h ws2tcpip.h inttypes.h sys/file.h grp.h \
-  execinfo.h libperfstat.h sys/systemcfg.h sys/mnttab.h mntent.h sys/times.h \
-  dlfcn.h sys/utsname.h)
+  execinfo.h sys/systemcfg.h sys/mnttab.h mntent.h sys/times.h \
+  dlfcn.h sys/utsname.h sys/un.h sys/protosw.h stddef.h limits.h float.h)
 AC_CHECK_HEADERS(resolv.h, [], [], [
 #ifdef HAVE_SYS_TYPES_H
 #  include <sys/types.h>
@@ -128,6 +128,11 @@ AC_CHECK_HEADERS(linux/netlink.h, [
 ], [], [
 #ifdef HAVE_SYS_SOCKET_H
 #  include <sys/socket.h>
+#endif
+])
+AC_CHECK_HEADERS(libperfstat.h, [], [], [
+#ifdef HAVE_SYS_PROTOSW_H
+#  include <sys/protosw.h>
 #endif
 ])
 
@@ -244,6 +249,194 @@ if test "x$zbx_sival_int" != "x"; then
 else
   AC_MSG_ERROR(Unable to find integer field name in union sigval of struct siginfo_t)
 fi
+
+AC_MSG_CHECKING(for res_ninit)
+AC_TRY_LINK(
+[
+#ifdef HAVE_SYS_TYPES_H
+#	include <sys/types.h>
+#endif
+#ifdef HAVE_NETINET_IN_H
+#	include <netinet/in.h>
+#endif
+#ifdef HAVE_ARPA_NAMESER_H
+#	include <arpa/nameser.h>
+#endif
+#ifdef HAVE_RESOLV_H
+#	include <resolv.h>
+#endif
+#ifndef C_IN
+#	define C_IN	ns_c_in
+#endif	/* C_IN */
+#ifndef T_SOA
+#	define T_SOA	ns_t_soa
+#endif	/* T_SOA */
+],
+[
+	struct __res_state	res_state_local;
+
+	res_ninit(&res_state_local);
+],
+AC_DEFINE(HAVE_RES_NINIT,1,[Define to 1 if 'res_ninit' exists.])
+AC_MSG_RESULT(yes),
+AC_MSG_RESULT(no))
+
+AC_MSG_CHECKING(for res_ndestroy)
+AC_TRY_LINK(
+[
+#ifdef HAVE_SYS_TYPES_H
+#	include <sys/types.h>
+#endif
+#ifdef HAVE_NETINET_IN_H
+#	include <netinet/in.h>
+#endif
+#ifdef HAVE_ARPA_NAMESER_H
+#	include <arpa/nameser.h>
+#endif
+#ifdef HAVE_RESOLV_H
+#	include <resolv.h>
+#endif
+#ifndef C_IN
+#	define C_IN	ns_c_in
+#endif	/* C_IN */
+#ifndef T_SOA
+#	define T_SOA	ns_t_soa
+#endif	/* T_SOA */
+],
+[
+	struct __res_state	res_state_local;
+
+	res_ninit(&res_state_local);
+	res_ndestroy(&res_state_local);
+],
+AC_DEFINE(HAVE_RES_NDESTROY,1,[Define to 1 if 'res_ndestroy' exists.])
+AC_MSG_RESULT(yes),
+AC_MSG_RESULT(no))
+
+AC_MSG_CHECKING(for _res._u._ext.nsaddrs[])
+AC_TRY_LINK(
+[
+#ifdef HAVE_SYS_TYPES_H
+#	include <sys/types.h>
+#endif
+#ifdef HAVE_NETINET_IN_H
+#	include <netinet/in.h>
+#endif
+#ifdef HAVE_ARPA_NAMESER_H
+#	include <arpa/nameser.h>
+#endif
+#ifdef HAVE_RESOLV_H
+#	include <resolv.h>
+#endif
+#ifndef C_IN
+#	define C_IN	ns_c_in
+#endif	/* C_IN */
+#ifndef T_SOA
+#	define T_SOA	ns_t_soa
+#endif	/* T_SOA */
+],
+[
+	struct sockaddr_in6	*sockaddrin6;
+
+	sockaddrin6 = _res._u._ext.nsaddrs[0];
+],
+AC_DEFINE(HAVE_RES_U_EXT,1,[Define to 1 if '_res._u._ext.nsaddrs[]' exists. /Linux/])
+AC_MSG_RESULT(yes),
+AC_MSG_RESULT(no))
+
+AC_MSG_CHECKING(for _res._u._ext.ext)
+AC_TRY_LINK(
+[
+#ifdef HAVE_SYS_TYPES_H
+#	include <sys/types.h>
+#endif
+#ifdef HAVE_NETINET_IN_H
+#	include <netinet/in.h>
+#endif
+#ifdef HAVE_ARPA_NAMESER_H
+#	include <arpa/nameser.h>
+#endif
+#ifdef HAVE_RESOLV_H
+#	include <resolv.h>
+#endif
+#ifndef C_IN
+#	define C_IN	ns_c_in
+#endif	/* C_IN */
+#ifndef T_SOA
+#	define T_SOA	ns_t_soa
+#endif	/* T_SOA */
+],
+[
+	struct __res_state_ext	*ext;
+
+	ext = _res._u._ext.ext;
+],
+AC_DEFINE(HAVE_RES_U_EXT_EXT,1,[Define to 1 if '_res._u._ext.ext' exists. /BSD/])
+AC_MSG_RESULT(yes),
+AC_MSG_RESULT(no))
+
+AC_MSG_CHECKING(for _res._ext.ext.nsaddrs[])
+AC_TRY_LINK(
+[
+#ifdef HAVE_SYS_TYPES_H
+#	include <sys/types.h>
+#endif
+#ifdef HAVE_NETINET_IN_H
+#	include <netinet/in.h>
+#endif
+#ifdef HAVE_ARPA_NAMESER_H
+#	include <arpa/nameser.h>
+#endif
+#ifdef HAVE_RESOLV_H
+#	include <resolv.h>
+#endif
+#ifndef C_IN
+#	define C_IN	ns_c_in
+#endif	/* C_IN */
+#ifndef T_SOA
+#	define T_SOA	ns_t_soa
+#endif	/* T_SOA */
+],
+[
+	union res_sockaddr_union	*na;
+
+	na = &_res._ext.ext.nsaddrs[0];
+],
+AC_DEFINE(HAVE_RES_EXT_EXT,1,[Define to 1 if '_res._ext.ext.nsaddrs[]' exists. /AIX/])
+AC_MSG_RESULT(yes),
+AC_MSG_RESULT(no))
+
+AC_MSG_CHECKING(for struct sockaddr_in6.sin6_len)
+AC_TRY_LINK(
+[
+#ifdef HAVE_SYS_TYPES_H
+#	include <sys/types.h>
+#endif
+#ifdef HAVE_NETINET_IN_H
+#	include <netinet/in.h>
+#endif
+#ifdef HAVE_ARPA_NAMESER_H
+#	include <arpa/nameser.h>
+#endif
+#ifdef HAVE_RESOLV_H
+#	include <resolv.h>
+#endif
+#ifndef C_IN
+#	define C_IN	ns_c_in
+#endif	/* C_IN */
+#ifndef T_SOA
+#	define T_SOA	ns_t_soa
+#endif	/* T_SOA */
+],
+[
+	struct sockaddr_in6	sin6;
+	unsigned int		len;
+
+	len = sin6.sin6_len;
+],
+AC_DEFINE(HAVE_RES_SIN6_LEN,1,[Define to 1 if 'sockaddr_in6.sin6_len' exists. /BSD/])
+AC_MSG_RESULT(yes),
+AC_MSG_RESULT(no))
 
 AC_MSG_CHECKING(for union semun)
 AC_TRY_COMPILE(
@@ -483,6 +676,22 @@ AC_DEFINE(HAVE_TM_TM_GMTOFF,1,[Define to 1 if 'tm.tm_gmtoff' exists.])
 AC_MSG_RESULT(yes),
 AC_MSG_RESULT(no))
 
+AC_MSG_CHECKING(for linker options --start-group/--end-group)
+saved_LDFLAGS="$LDFLAGS"
+LDFLAGS="-Wl,--start-group -Wl,--end-group"
+AC_TRY_LINK([], [],
+HAVE_START_GROUP="yes"
+AC_MSG_RESULT(yes),
+AC_MSG_RESULT(no)
+)
+LDFLAGS="$saved_LDFLAGS"
+
+AC_MSG_CHECKING(for '__thread' compiler support)
+AC_TRY_COMPILE([#include <stdio.h>],[static __thread int a = 0;],
+AC_DEFINE(HAVE_THREAD_LOCAL,1,[Define to 1 if compiler keyword '__thread' supported.])
+AC_MSG_RESULT(yes),
+AC_MSG_RESULT(no)
+HAVE_THREAD_LOCAL="no")
 dnl *****************************************************************
 dnl *                                                               *
 dnl *                     Checks for functions                      *
@@ -773,6 +982,7 @@ AC_CHECK_FUNCS(hstrerror)
 AC_CHECK_FUNCS(getenv)
 AC_CHECK_FUNCS(putenv)
 AC_CHECK_FUNCS(sigqueue)
+AC_CHECK_FUNCS(round)
 
 dnl *****************************************************************
 dnl *                                                               *
@@ -876,7 +1086,8 @@ dnl *                                                               *
 dnl *****************************************************************
 
 AC_MSG_CHECKING(for libperfstat 5.2.0.40 fileset)
-AC_TRY_COMPILE([#include <libperfstat.h>],
+AC_TRY_COMPILE([#include <sys/protosw.h>
+#include <libperfstat.h>],
 [perfstat_memory_total_t	memstats;
 memstats.virt_active = 0;
 ],
@@ -885,7 +1096,8 @@ AC_MSG_RESULT(yes),
 AC_MSG_RESULT(no))
 
 AC_MSG_CHECKING(for libperfstat 5.3.0.60 fileset)
-AC_TRY_COMPILE([#include <libperfstat.h>],
+AC_TRY_COMPILE([#include <sys/protosw.h>
+#include <libperfstat.h>],
 [perfstat_partition_total_t	lparstats;
 lparstats.type.b.donate_enabled = 0;
 lparstats.idle_donated_purr = 0;
@@ -967,6 +1179,7 @@ if test "x$ARCH" = "xsolaris"; then
 	AC_MSG_RESULT(yes),
 	CFLAGS="$saved_CFLAGS"
 	AC_MSG_RESULT(no))
+	CFLAGS="${CFLAGS} -DDUK_F_OLD_SOLARIS"
 fi
 
 if test "x$ARCH" = "xhpux"; then
@@ -1045,6 +1258,35 @@ AC_ARG_ENABLE(static,[  --enable-static         Build statically linked binaries
   *) AC_MSG_ERROR([bad value ${enableval} for --enable-static]) ;;
 esac])
 
+AC_ARG_ENABLE(static-libs,[  --enable-static-libs    Build statically linked binaries with selected libs from default folders],
+[case "${enableval}" in
+  yes)
+    static_linking_libs=yes
+    saved_LIBS="$LIBS"
+    LIBS="${saved_LIBS} -Wl,-bstatic -Wl,-bdynamic"
+    AC_MSG_CHECKING([if libs static linking with "-Wl,-b" is possible])
+    AC_LINK_IFELSE([AC_LANG_PROGRAM(,)],
+      [AC_MSG_RESULT([yes])
+        static_linking_support="-Wl,-b"],
+      [AC_MSG_RESULT([no])
+        static_linking_support=no])
+        LIBS="$saved_LIBS"
+
+    if test "x$static_linking_support" = "xno"; then
+      LIBS="${saved_LIBS} -Wl,-Bstatic -Wl,-Bdynamic"
+      AC_MSG_CHECKING([if libs static linking with "-Wl,-B" is possible])
+      AC_LINK_IFELSE([AC_LANG_PROGRAM(,)],
+        [AC_MSG_RESULT([yes])
+          static_linking_support="-Wl,-B"],
+        [AC_MSG_RESULT([no])
+          static_linking_support=no])
+          LIBS="$saved_LIBS"
+    fi
+    ;;
+  no) ;;
+  *) AC_MSG_ERROR([bad value ${enableval} for --enable-static-libs]) ;;
+esac])
+
 AC_ARG_ENABLE(server,[  --enable-server         Turn on build of Zabbix server],
 [case "${enableval}" in
   yes) server=yes ;;
@@ -1072,6 +1314,17 @@ esac],
 [agent=no])
 AM_CONDITIONAL(AGENT, test "x$agent" = "xyes")
 
+AC_ARG_ENABLE(agent2,[  --enable-agent2         Turn on build of Zabbix agent 2],
+[case "${enableval}" in
+  yes) agent2=yes ;;
+  no)  agent2=no ;;
+  *) AC_MSG_ERROR([bad value ${enableval} for --enable-agent2]) ;;
+esac
+test "x$agent2" = "xyes" -a "x$HAVE_THREAD_LOCAL" = "xno" && AC_MSG_ERROR([C compiler is not compatible with agent2 assembly])
+],
+[agent2=no])
+AM_CONDITIONAL(AGENT2, test "x$agent2" = "xyes")
+
 AC_ARG_ENABLE(java,[  --enable-java           Turn on build of Zabbix Java gateway],
 [case "${enableval}" in
   yes) java=yes ;;
@@ -1088,57 +1341,29 @@ AC_ARG_ENABLE(ipv6,[  --enable-ipv6           Turn on support of IPv6],
   *) AC_MSG_ERROR([bad value ${enableval} for --enable-ipv6]) ;;
 esac],
 [ipv6=no])
+AM_CONDITIONAL(IPV6, test "x$ipv6" = "xyes")
 
-AC_ARG_ENABLE(dbtls,[  --enable-dbtls          Turn on support of secure DB connections],
-[case "${enableval}" in
-  yes) dbtls=yes ;;
-  no)  dbtls=no ;;
-  *) AC_MSG_ERROR([bad value ${enableval} for --enable-dbtls]) ;;
-esac],
-[dbtls=no])
+AM_CONDITIONAL([DBSCHEMA], [test -d create])
+
+AM_CONDITIONAL([ZBXCMOCKA], [(test -d tests/) && (test "x$server" = "xyes" || test "x$proxy" = "xyes" || test "x$agent" = "xyes")])
 
 have_db="no"
 have_unixodbc="no"
 have_web_monitoring="no"
-have_jabber="no"
 have_snmp="no"
 have_ipmi="no"
 have_ipv6="no"
-have_ssh2="no"
+have_ssh="no"
 have_tls="no"
+
 
 if test "x$ipv6" = "xyes"; then
 	AC_DEFINE(HAVE_IPV6,1,[Define to 1 if IPv6 should be enabled.])
 	have_ipv6="yes"
 fi
 
-if test "x$dbtls" = "xyes"; then
-	AC_DEFINE(DBTLS,1,[Define to 1 if support for secure DB connections should be enabled.])
-	have_dbtls="yes"
-fi
-
 if test "x$server" = "xyes" || test "x$proxy" = "xyes"; then
 
-	have_multirow_insert="no"
-
-	dnl Checking for IBM DB2 support
-	AX_LIB_IBM_DB2()
-	if test "x$want_ibm_db2" = "xyes"; then
-		if test "x$have_dbtls" = "xyes"; then
-			AC_MSG_ERROR([Secure connections are not supported for IBM DB2])
-		fi
-
-		if test "x$have_db" != "xno"; then
-			AC_MSG_ERROR([You can configure for only one database.])
-		fi
-
-		if test "x$found_ibm_db2" = "xyes"; then
-			have_db="IBM DB2"
-			have_multirow_insert="yes"
-		else
-			AC_MSG_ERROR([IBM DB2 library not found])
-		fi
-	fi
 
 	dnl Checking for MySQL support
 	AX_LIB_MYSQL()
@@ -1158,10 +1383,6 @@ if test "x$server" = "xyes" || test "x$proxy" = "xyes"; then
 	dnl Checking for Oracle support
 	AX_LIB_ORACLE_OCI([10.0])
 	if test "x$want_oracle_oci" = "xyes"; then
-		if test "x$have_dbtls" = "xyes"; then
-			AC_MSG_ERROR([Secure connections are not supported for Oracle])
-		fi
-
 		if test "x$have_db" != "xno"; then
 			AC_MSG_ERROR([You can configure for only one database.])
 		fi
@@ -1180,12 +1401,8 @@ if test "x$server" = "xyes" || test "x$proxy" = "xyes"; then
 	fi
 
 	dnl Checking for PostgreSQL support
-	AX_LIB_POSTGRESQL("8.1")
+	AX_LIB_POSTGRESQL("9.2")
 	if test "x$want_postgresql" = "xyes"; then
-		if test "x$have_dbtls" = "xyes"; then
-			AC_MSG_ERROR([Secure connections are not supported for PostgreSQL])
-		fi
-
 		if test "x$have_db" != "xno"; then
 			AC_MSG_ERROR([You can configure for only one database.])
 		fi
@@ -1209,8 +1426,8 @@ if test "x$server" = "xyes" || test "x$proxy" = "xyes"; then
 	dnl Checking for SQLite3 support
 	AX_LIB_SQLITE3()
 	if test "x$want_sqlite3" = "xyes"; then
-		if test "x$have_dbtls" = "xyes"; then
-			AC_MSG_ERROR([Secure connections are not supported for SQLite3])
+		if test "x$server" = "xyes"; then
+			AC_MSG_ERROR([SQLite is not supported as a main Zabbix database backend.])
 		fi
 
 		if test "x$have_db" != "xno"; then
@@ -1245,7 +1462,7 @@ if test "x$server" = "xyes" || test "x$proxy" = "xyes"; then
 	AC_MSG_CHECKING(for Zabbix server/proxy database selection)
 	if test "x$have_db" = "xno"; then
 		AC_MSG_RESULT(error)
-		AC_MSG_ERROR([No database selected for Zabbix server/proxy. Use --with-ibm-db2 or --with-mysql or --with-oracle or --with-postgresql or --with-sqlite3.])
+		AC_MSG_ERROR([No database selected for Zabbix server/proxy. Use --with-mysql or --with-oracle or --with-postgresql or --with-sqlite3.])
 	else
 		AC_MSG_RESULT(ok)
 	fi
@@ -1258,10 +1475,10 @@ if test "x$server" = "xyes" || test "x$proxy" = "xyes"; then
 		AC_MSG_RESULT(no)
 	fi
 
-	DB_CFLAGS="$IBM_DB2_CPPFLAGS $MYSQL_CFLAGS $ORACLE_CPPFLAGS $POSTGRESQL_CFLAGS $SQLITE3_CPPFLAGS"
-	DB_LDFLAGS="$IBM_DB2_LDFLAGS $MYSQL_LDFLAGS $ORACLE_LDFLAGS $POSTGRESQL_LDFLAGS $SQLITE3_LDFLAGS"
-	DB_LIBS="$IBM_DB2_LIBS $MYSQL_LIBS $ORACLE_LIBS $POSTGRESQL_LIBS $SQLITE3_LIBS"
-	
+	DB_CFLAGS="$MYSQL_CFLAGS $ORACLE_CPPFLAGS $POSTGRESQL_CFLAGS $SQLITE3_CPPFLAGS"
+	DB_LDFLAGS="$MYSQL_LDFLAGS $ORACLE_LDFLAGS $POSTGRESQL_LDFLAGS $SQLITE3_LDFLAGS"
+	DB_LIBS="$MYSQL_LIBS $ORACLE_LIBS $POSTGRESQL_LIBS $SQLITE3_LIBS"
+
 	AC_SUBST(DB_CFLAGS)
 	AC_SUBST(DB_LDFLAGS)
 	AC_SUBST(DB_LIBS)
@@ -1271,20 +1488,6 @@ if test "x$server" = "xyes" || test "x$proxy" = "xyes"; then
 
 	PROXY_LDFLAGS="${PROXY_LDFLAGS} ${DB_LDFLAGS}"
 	PROXY_LIBS="${PROXY_LIBS} ${DB_LIBS}"
-
-	dnl Checking for Jabber libraries
-	JABBER_CHECK_CONFIG()
-	if test "x$want_jabber" = "xyes"; then
-		if test "x$found_jabber" != "xyes"; then
-			AC_MSG_ERROR([Jabber library not found])
-		else
-			have_jabber="yes"
-		fi
-	fi
-	SERVER_LDFLAGS="$SERVER_LDFLAGS $JABBER_LDFLAGS"
-	SERVER_LIBS="$SERVER_LIBS $JABBER_LIBS"
-
-	AC_SUBST(JABBER_CPPFLAGS)
 
 	dnl Check for LIBXML2 [by default - skip]
 	LIBXML2_CHECK_CONFIG([no])
@@ -1320,7 +1523,8 @@ if test "x$server" = "xyes" || test "x$proxy" = "xyes"; then
 	AC_SUBST(UNIXODBC_CFLAGS)
 
 	dnl Check for Net-SNMP [by default - skip]
-	LIBNETSNMP_CHECK_CONFIG([no])
+	LIBNETSNMP_CHECK_CONFIG([no], "5.3.0")
+
 	if test "x$want_netsnmp" = "xyes"; then
 		if test "x$found_netsnmp" != "xyes"; then
 			AC_MSG_ERROR([Invalid Net-SNMP directory - unable to find net-snmp-config])
@@ -1338,13 +1542,18 @@ if test "x$server" = "xyes" || test "x$proxy" = "xyes"; then
 
 	dnl Check for LIBSSH2 [by default - skip] at least of version 1.0.0.
 	LIBSSH2_CHECK_CONFIG([no])
+	LIBSSH_CHECK_CONFIG([no])
 	if test "x$want_ssh2" = "xyes"; then
+		if test "x$want_ssh" != "xno"; then
+			AC_MSG_ERROR([You can configure for only one SSH library (--with-ssh or --with-ssh2).])
+		fi
+
 		if test "x$found_ssh2" != "xyes"; then
 			AC_MSG_ERROR([SSH2 library not found])
 		elif test "x$accept_ssh2_version" != "xyes"; then
 			AC_MSG_ERROR([SSH2 library version requirement not met (>= 1.0.0)])
 		else
-			have_ssh2="yes"
+			have_ssh="yes (libssh2)"
 		fi
 	fi
 	SERVER_LDFLAGS="$SERVER_LDFLAGS $SSH2_LDFLAGS"
@@ -1352,8 +1561,26 @@ if test "x$server" = "xyes" || test "x$proxy" = "xyes"; then
 
 	PROXY_LDFLAGS="$PROXY_LDFLAGS $SSH2_LDFLAGS"
 	PROXY_LIBS="$PROXY_LIBS $SSH2_LIBS"
-
+	
 	AC_SUBST(SSH2_CFLAGS)
+
+	dnl Check for LIBSSH [by default - skip] at least of version 0.7.0.
+	if test "x$want_ssh" = "xyes"; then
+		if test "x$found_ssh" != "xyes"; then
+			AC_MSG_ERROR([SSH library not found])
+		elif test "x$accept_ssh_version" != "xyes"; then
+			AC_MSG_ERROR([SSH library version requirement not met (>= 0.6.0)])
+		else
+			have_ssh="yes (libssh)"
+		fi
+	fi
+	SERVER_LDFLAGS="$SERVER_LDFLAGS $SSH_LDFLAGS"
+	SERVER_LIBS="$SERVER_LIBS $SSH_LIBS"
+
+	PROXY_LDFLAGS="$PROXY_LDFLAGS $SSH_LDFLAGS"
+	PROXY_LIBS="$PROXY_LIBS $SSH_LIBS"
+	
+	AC_SUBST(SSH_CFLAGS)
 
 	found_openipmi="no"
 	dnl Check for libOpenIPMI [by default - skip]
@@ -1365,6 +1592,7 @@ if test "x$server" = "xyes" || test "x$proxy" = "xyes"; then
 			have_ipmi="yes"
 		fi
 	fi
+
 	SERVER_LDFLAGS="$SERVER_LDFLAGS $OPENIPMI_LDFLAGS"
 	SERVER_LIBS="$SERVER_LIBS $OPENIPMI_LIBS"
 
@@ -1372,32 +1600,80 @@ if test "x$server" = "xyes" || test "x$proxy" = "xyes"; then
 	PROXY_LIBS="$PROXY_LIBS $OPENIPMI_LIBS"
 
 	AC_SUBST(OPENIPMI_CFLAGS)
+
+	dnl Check for zlib, used by Zabbix server-proxy communications
+	ZLIB_CHECK_CONFIG([no])
+	if test "x$found_zlib" != "xyes"; then
+		AC_MSG_ERROR([Unable to use zlib (zlib check failed)])
+	fi
+
+	AC_SUBST(ZLIB_CFLAGS)
+
+	dnl Check for 'libpthread' library that supports PTHREAD_PROCESS_SHARED flag
+	LIBPTHREAD_CHECK_CONFIG([no])
+	if test "x$found_libpthread" != "xyes"; then
+		AC_MSG_ERROR([Unable to use libpthread (libpthread check failed)])
+	fi
 fi
 
-dnl Check for mbed TLS (PolarSSL) libpolarssl [by default - skip]
-LIBMBEDTLS_CHECK_CONFIG([no])
-if test "x$want_mbedtls" = "xyes"; then
-	if test "x$have_tls" != "xno"; then
-		AC_MSG_ERROR([You can configure for only one TLS library (--with-mbedtls, --with-gnutls or --with-openssl).])
+SERVER_LDFLAGS="$SERVER_LDFLAGS $ZLIB_LDFLAGS $LIBPTHREAD_LDFLAGS"
+SERVER_LIBS="$SERVER_LIBS $ZLIB_LIBS $LIBPTHREAD_LIBS"
+
+PROXY_LDFLAGS="$PROXY_LDFLAGS $ZLIB_LDFLAGS $LIBPTHREAD_LDFLAGS"
+PROXY_LIBS="$PROXY_LIBS $ZLIB_LIBS $LIBPTHREAD_LIBS"
+
+AGENT_LDFLAGS="$AGENT_LDFLAGS $ZLIB_LDFLAGS $LIBPTHREAD_LDFLAGS"
+AGENT_LIBS="$AGENT_LIBS $ZLIB_LIBS $LIBPTHREAD_LIBS"
+
+ZBXGET_LDFLAGS="$ZBXGET_LDFLAGS $ZLIB_LDFLAGS $LIBPTHREAD_LDFLAGS"
+ZBXGET_LIBS="$ZBXGET_LIBS $ZLIB_LIBS $LIBPTHREAD_LIBS"
+
+SENDER_LDFLAGS="$SENDER_LDFLAGS $ZLIB_LDFLAGS $LIBPTHREAD_LDFLAGS"
+SENDER_LIBS="$SENDER_LIBS $ZLIB_LIBS $LIBPTHREAD_LIBS"
+
+ZBXJS_LDFLAGS="$ZBXJS_LDFLAGS $ZLIB_LDFLAGS $LIBPTHREAD_LDFLAGS"
+ZBXJS_LIBS="$ZBXJS_LIBS $ZLIB_LIBS $LIBPTHREAD_LIBS"
+
+AM_CONDITIONAL(HAVE_IPMI, [test "x$have_ipmi" = "xyes"])
+AM_CONDITIONAL(HAVE_LIBXML2, test "x$have_libxml2" = "xyes")
+
+dnl Check if Zabbix internal IPC services are used
+have_ipcservice="no"
+if test "x$have_ipmi" = "xyes"; then
+	have_ipcservice="yes"
+fi
+
+if test "x$server" = "xyes"; then
+	have_ipcservice="yes"
+fi
+
+if test "x$proxy" = "xyes"; then
+	have_ipcservice="yes"
+fi
+
+AM_CONDITIONAL(PROXY_IPCSERVICE, [test "x$have_ipmi" = "xyes"])
+
+dnl Check for libevent, used by Zabbix IPC services
+if test "x$have_ipcservice" = "xyes"; then
+	AC_DEFINE([HAVE_IPCSERVICE], 1, [Define to 1 if Zabbix IPC services are used])
+
+	LIBEVENT_CHECK_CONFIG([no])
+	if test "x$found_libevent" != "xyes"; then
+		AC_MSG_ERROR([Unable to use libevent (libevent check failed)])
 	fi
 
-	if test "x$found_mbedtls" != "xyes"; then
-		AC_MSG_ERROR([mbed TLS (PolarSSL) library libpolarssl not found])
-	elif test "x$accept_mbedtls_version" != "xyes"; then
-		AC_MSG_ERROR([mbed TLS (PolarSSL) library version requirement not met (>= 1.3.9)])
-	else
-		have_tls="mbed TLS"
-	fi
-	TLS_CFLAGS="$MBEDTLS_CFLAGS"
-	TLS_LDFLAGS="$MBEDTLS_LDFLAGS"
-	TLS_LIBS="$MBEDTLS_LIBS"
+	SERVER_LDFLAGS="$SERVER_LDFLAGS $LIBEVENT_LDFLAGS"
+	SERVER_LIBS="$SERVER_LIBS $LIBEVENT_LIBS"
+
+	PROXY_LDFLAGS="$PROXY_LDFLAGS $LIBEVENT_LDFLAGS"
+	PROXY_LIBS="$PROXY_LIBS $LIBEVENT_LIBS"
 fi
 
 dnl Check for GnuTLS libgnutls [by default - skip]
 LIBGNUTLS_CHECK_CONFIG([no])
 if test "x$want_gnutls" = "xyes"; then
 	if test "x$have_tls" != "xno"; then
-		AC_MSG_ERROR([You can configure for only one TLS library (--with-mbedtls, --with-gnutls or --with-openssl).])
+		AC_MSG_ERROR([You can configure for only one TLS library (--with-gnutls or --with-openssl).])
 	fi
 
 	if test "x$found_gnutls" != "xyes"; then
@@ -1416,15 +1692,15 @@ dnl Check for OpenSSL libssl and libcrypto [by default - skip]
 LIBOPENSSL_CHECK_CONFIG([no])
 if test "x$want_openssl" = "xyes"; then
 	if test "x$have_tls" != "xno"; then
-		AC_MSG_ERROR([You can configure for only one TLS library (--with-mbedtls, --with-gnutls or --with-openssl).])
+		AC_MSG_ERROR([You can configure for only one TLS library (--with-gnutls or --with-openssl).])
 	fi
 
-	if test "x$found_openssl" != "xyes"; then
+	if test "x$found_openssl" != "xOpenSSL" -a "x$found_openssl" != "xOpenSSL (PSK not supported)"; then
 		AC_MSG_ERROR([OpenSSL library libssl or libcrypto not found])
 	elif test "x$accept_openssl_version" != "xyes"; then
 		AC_MSG_ERROR([OpenSSL library version requirement not met (>= 1.0.1)])
 	else
-		have_tls="OpenSSL"
+		have_tls=$found_openssl
 	fi
 	TLS_CFLAGS="$OPENSSL_CFLAGS"
 	TLS_LDFLAGS="$OPENSSL_LDFLAGS"
@@ -1446,6 +1722,17 @@ ZBXGET_LIBS="$ZBXGET_LIBS $TLS_LIBS"
 
 SENDER_LDFLAGS="$SENDER_LDFLAGS $TLS_LDFLAGS"
 SENDER_LIBS="$SENDER_LIBS $TLS_LIBS"
+
+ZBXJS_LDFLAGS="$ZLIB_LDFLAGS $TLS_LDFLAGS"
+ZBXJS_LIBS="$ZBXJS_LIBS $TLS_LIBS"
+
+if test "x$agent2" = "xyes"; then
+	AC_CHECK_PROGS([GO], [go], [no])
+	if test "x$GO" = "xno"; then
+		AC_MSG_ERROR([Unable to find "go" executable in path])
+	fi
+	AC_DEFINE(ZBX_BUILD_AGENT2,1,[Define to 1 if Agent2 is being built.])
+fi
 
 if test "x$java" = "xyes"; then
 	AC_CHECK_PROGS([JAVAC], [javac], [no])
@@ -1496,12 +1783,39 @@ SERVER_LIBS="$SERVER_LIBS $LIBCURL_LIBS"
 PROXY_LDFLAGS="$PROXY_LDFLAGS $LIBCURL_LDFLAGS"
 PROXY_LIBS="$PROXY_LIBS $LIBCURL_LIBS"
 
+AM_CONDITIONAL(HAVE_LIBCURL, test "x$found_curl" = "xyes")
+
 SERVER_LIBS="$SERVER_LIBS -lldns"
 PROXY_LIBS="$PROXY_LIBS -lldns"
 
 dnl Starting from 2.0 agent can do web monitoring
 AGENT_LDFLAGS="$AGENT_LDFLAGS $LIBCURL_LDFLAGS"
 AGENT_LIBS="$AGENT_LIBS $LIBCURL_LIBS"
+
+ZBXGET_LDFLAGS="$ZBXGET_LDFLAGS $ZLIB_LDFLAGS $LIBPTHREAD_LDFLAGS"
+ZBXGET_LIBS="$ZBXGET_LIBS $ZLIB_LIBS $LIBPTHREAD_LIBS"
+
+SENDER_LDFLAGS="$SENDER_LDFLAGS $ZLIB_LDFLAGS $LIBPTHREAD_LDFLAGS"
+SENDER_LIBS="$SENDER_LIBS $ZLIB_LIBS $LIBPTHREAD_LIBS"
+
+ZBXJS_LDFLAGS="$ZBXJS_LDFLAGS $LIBCURL_LDFLAGS"
+ZBXJS_LIBS="$ZBXJS_LIBS $LIBCURL_LIBS"
+
+dnl Check for libpcre, used by Zabbix for regular expressions
+if test "x$server" = "xyes" || test "x$proxy" = "xyes" || test "x$agent" = "xyes" || test "x$agent2" = "xyes"; then
+	LIBPCRE_CHECK_CONFIG([no])
+	if test "x$found_libpcre" != "xyes"; then
+		AC_MSG_ERROR([Unable to use libpcre (libpcre check failed)])
+	fi
+fi
+
+CFLAGS="$CFLAGS $LIBPCRE_CFLAGS"
+LDFLAGS="$LDFLAGS $LIBPCRE_LDFLAGS"
+if test "x$ARCH" = "xosx"; then
+	LIBS="$LIBPCRE_LIBS $LIBS"
+else
+	LIBS="$LIBS $LIBPCRE_LIBS"
+fi
 
 found_iconv="no"
 dnl Check for libiconv [by default - skip]
@@ -1512,10 +1826,21 @@ fi
 LDFLAGS="$LDFLAGS $ICONV_LDFLAGS"
 LIBS="$LIBS $ICONV_LIBS"
 
-AC_SUBST(ICONV_CFLAGS)
-
 RANLIB="ranlib"
 AC_SUBST(RANLIB)
+
+SERVER_CONFIG_FILE="${sysconfdir}/zabbix_server.conf"
+PROXY_CONFIG_FILE="${sysconfdir}/zabbix_proxy.conf"
+AGENT_CONFIG_FILE="${sysconfdir}/zabbix_agentd.conf"
+AGENT2_CONFIG_FILE="${sysconfdir}/zabbix_agent2.conf"
+
+EXTERNAL_SCRIPTS_PATH="${datadir}/zabbix/externalscripts"
+ALERT_SCRIPTS_PATH="${datadir}/zabbix/alertscripts"
+
+CURL_SSL_CERT_LOCATION="${datadir}/zabbix/ssl/certs"
+CURL_SSL_KEY_LOCATION="${datadir}/zabbix/ssl/keys"
+
+LOAD_MODULE_PATH="${libdir}/modules"
 
 AC_SUBST(SERVER_LDFLAGS)
 AC_SUBST(SERVER_LIBS)
@@ -1526,11 +1851,66 @@ AC_SUBST(PROXY_LIBS)
 AC_SUBST(AGENT_LDFLAGS)
 AC_SUBST(AGENT_LIBS)
 
+if test "x$HAVE_START_GROUP" = "xyes"; then
+	LD_START_GROUP=-Wl,--start-group
+	LD_END_GROUP=-Wl,--end-group
+fi
+
+CGO_CFLAGS=$TLS_CFLAGS
+CGO_LDFLAGS="$AGENT_LDFLAGS $LD_START_GROUP \
+	\${abs_top_builddir}/src/zabbix_agent/logfiles/libzbxlogfiles.a \
+	\${abs_top_builddir}/src/libs/zbxcomms/libzbxcomms.a \
+	\${abs_top_builddir}/src/libs/zbxcommon/libzbxcommon.a \
+	\${abs_top_builddir}/src/libs/zbxcrypto/libzbxcrypto.a \
+	\${abs_top_builddir}/src/libs/zbxsys/libzbxsys.a \
+	\${abs_top_builddir}/src/libs/zbxnix/libzbxnix.a \
+	\${abs_top_builddir}/src/libs/zbxconf/libzbxconf.a \
+	\${abs_top_builddir}/src/libs/zbxhttp/libzbxhttp.a \
+	\${abs_top_builddir}/src/libs/zbxcompress/libzbxcompress.a \
+	\${abs_top_builddir}/src/libs/zbxregexp/libzbxregexp.a \
+	\${abs_top_builddir}/src/libs/zbxsysinfo/libzbxagent2sysinfo.a \
+	\${abs_top_builddir}/src/libs/zbxsysinfo/common/libcommonsysinfo.a \
+	\${abs_top_builddir}/src/libs/zbxsysinfo/simple/libsimplesysinfo.a \
+	\${abs_top_builddir}/src/libs/zbxsysinfo/"$ARCH"/libspechostnamesysinfo.a \
+	\${abs_top_builddir}/src/libs/zbxsysinfo/"$ARCH"/libspecsysinfo.a \
+	\${abs_top_builddir}/src/libs/zbxexec/libzbxexec.a \
+	\${abs_top_builddir}/src/libs/zbxalgo/libzbxalgo.a \
+	\${abs_top_builddir}/src/libs/zbxjson/libzbxjson.a \
+	$LIBS $AGENT_LIBS $LD_END_GROUP"
+
+AC_SUBST(CGO_CFLAGS)
+AC_SUBST(CGO_LDFLAGS)
+
 AC_SUBST(ZBXGET_LDFLAGS)
 AC_SUBST(ZBXGET_LIBS)
 
 AC_SUBST(SENDER_LDFLAGS)
 AC_SUBST(SENDER_LIBS)
+
+AC_SUBST(ZBXJS_LDFLAGS)
+AC_SUBST(ZBXJS_LIBS)
+
+AC_SUBST(SERVER_CONFIG_FILE)
+AC_SUBST(PROXY_CONFIG_FILE)
+AC_SUBST(AGENT_CONFIG_FILE)
+AC_SUBST(AGENT2_CONFIG_FILE)
+
+AC_SUBST(EXTERNAL_SCRIPTS_PATH)
+AC_SUBST(ALERT_SCRIPTS_PATH)
+
+AC_SUBST(CURL_SSL_CERT_LOCATION)
+AC_SUBST(CURL_SSL_KEY_LOCATION)
+
+AC_SUBST(LOAD_MODULE_PATH)
+
+GOBIN=${sbindir}
+GOCMD=go
+GOWORKDIR=$ac_abs_confdir/go/src/zabbix
+
+export GOBIN=${GOBIN}
+AC_SUBST(GOBIN)
+AC_SUBST(GOCMD)
+AC_SUBST(GOWORKDIR)
 
 dnl *****************************************************************
 dnl *                                                               *
@@ -1553,8 +1933,7 @@ case "x$ARCH" in
 	xlinux|xsolaris)
 		AC_DEFINE(ZBX_PROCSTAT_COLLECTOR, 1 , [Define to 1 on linux and solaris platforms])
 		;;
-esac		
-
+esac
 
 dnl *****************************************************************
 dnl *                                                               *
@@ -1562,11 +1941,18 @@ dnl *                 Output configuration results                  *
 dnl *                                                               *
 dnl *****************************************************************
 
+m4_ifdef([CONF_TESTS],[CONF_TESTS(ZBXCMOCKA)])
+
 AC_OUTPUT([
 	Makefile
 	database/Makefile
+	database/mysql/Makefile
+	database/oracle/Makefile
+	database/postgresql/Makefile
+	database/sqlite3/Makefile
 	misc/Makefile
 	src/Makefile
+	src/go/Makefile
 	src/libs/Makefile
 	src/libs/zbxlog/Makefile
 	src/libs/zbxalgo/Makefile
@@ -1598,6 +1984,7 @@ AC_OUTPUT([
 	src/libs/zbxdb/Makefile
 	src/libs/zbxdbupgrade/Makefile
 	src/libs/zbxjson/Makefile
+	src/libs/zbxhttp/Makefile
 	src/libs/zbxserver/Makefile
 	src/libs/zbxicmpping/Makefile
 	src/libs/zbxexec/Makefile
@@ -1605,9 +1992,18 @@ AC_OUTPUT([
 	src/libs/zbxrsm/Makefile
 	src/libs/zbxmodules/Makefile
 	src/libs/zbxregexp/Makefile
+	src/libs/zbxtasks/Makefile
+	src/libs/zbxipcservice/Makefile
+	src/libs/zbxhistory/Makefile
+	src/libs/zbxcompress/Makefile
+	src/libs/zbxembed/Makefile
+	src/libs/zbxprometheus/Makefile
 	src/tests/Makefile
+	src/libs/zbxdiag/Makefile
 	src/zabbix_agent/Makefile
+	src/zabbix_agent/logfiles/Makefile
 	src/zabbix_get/Makefile
+	src/zabbix_js/Makefile
 	src/zabbix_sender/Makefile
 	src/zabbix_server/Makefile
 	src/zabbix_server/alerter/Makefile
@@ -1621,21 +2017,60 @@ AC_OUTPUT([
 	src/zabbix_server/snmptrapper/Makefile
 	src/zabbix_server/timer/Makefile
 	src/zabbix_server/trapper/Makefile
-	src/zabbix_server/watchdog/Makefile
 	src/zabbix_server/escalator/Makefile
 	src/zabbix_server/proxypoller/Makefile
 	src/zabbix_server/selfmon/Makefile
 	src/zabbix_server/vmware/Makefile
+	src/zabbix_server/taskmanager/Makefile
+	src/zabbix_server/ipmi/Makefile
+	src/zabbix_server/odbc/Makefile
+	src/zabbix_server/scripts/Makefile
+	src/zabbix_server/preprocessor/Makefile
+	src/zabbix_server/lld/Makefile
 	src/zabbix_proxy/Makefile
 	src/zabbix_proxy/heart/Makefile
 	src/zabbix_proxy/housekeeper/Makefile
 	src/zabbix_proxy/proxyconfig/Makefile
 	src/zabbix_proxy/datasender/Makefile
+	src/zabbix_proxy/taskmanager/Makefile
 	src/zabbix_java/Makefile
 	src/zabbix_rsm/Makefile
-	upgrades/Makefile
 	man/Makefile
 	])
+
+dnl The following variables use autoconf variables such as
+dnl ${sysconfdir} and ${datadir} . Which in turn contain
+dnl variables such as ${prefix}. In order to completely
+dnl substitute all variables and output end-value in
+dnl Configuration output below it is required to perform 2
+dnl substitutions.
+
+SERVER_CONFIG_FILE=`eval echo "${SERVER_CONFIG_FILE}"`
+SERVER_CONFIG_FILE=`eval echo "${SERVER_CONFIG_FILE}"`
+
+PROXY_CONFIG_FILE=`eval echo "${PROXY_CONFIG_FILE}"`
+PROXY_CONFIG_FILE=`eval echo "${PROXY_CONFIG_FILE}"`
+
+AGENT_CONFIG_FILE=`eval echo "${AGENT_CONFIG_FILE}"`
+AGENT_CONFIG_FILE=`eval echo "${AGENT_CONFIG_FILE}"`
+
+AGENT2_CONFIG_FILE=`eval echo "${AGENT2_CONFIG_FILE}"`
+AGENT2_CONFIG_FILE=`eval echo "${AGENT2_CONFIG_FILE}"`
+
+EXTERNAL_SCRIPTS_PATH=`eval echo "${EXTERNAL_SCRIPTS_PATH}"`
+EXTERNAL_SCRIPTS_PATH=`eval echo "${EXTERNAL_SCRIPTS_PATH}"`
+
+ALERT_SCRIPTS_PATH=`eval echo "${ALERT_SCRIPTS_PATH}"`
+ALERT_SCRIPTS_PATH=`eval echo "${ALERT_SCRIPTS_PATH}"`
+
+CURL_SSL_CERT_LOCATION=`eval echo "${CURL_SSL_CERT_LOCATION}"`
+CURL_SSL_CERT_LOCATION=`eval echo "${CURL_SSL_CERT_LOCATION}"`
+
+CURL_SSL_KEY_LOCATION=`eval echo "${CURL_SSL_KEY_LOCATION}"`
+CURL_SSL_KEY_LOCATION=`eval echo "${CURL_SSL_KEY_LOCATION}"`
+
+LOAD_MODULE_PATH=`eval echo "${LOAD_MODULE_PATH}"`
+LOAD_MODULE_PATH=`eval echo "${LOAD_MODULE_PATH}"`
 
 echo "
 
@@ -1652,10 +2087,6 @@ Configuration:
 
 if test "x$DB_CFLAGS" != "x"; then
 	echo "    database:              ${DB_CFLAGS}"
-fi
-
-if test "x$JABBER_CPPFLAGS" != "x"; then
-	echo "    Jabber:                ${JABBER_CPPFLAGS}"
 fi
 
 if test "x$LIBXML2_CFLAGS" != "x"; then
@@ -1678,6 +2109,10 @@ if test "x$SSH2_CFLAGS" != "x"; then
 	echo "    libssh2:               ${SSH2_CFLAGS}"
 fi
 
+if test "x$SSH_CFLAGS" != "x"; then
+	echo "    libssh:                ${SSH_CFLAGS}"
+fi
+
 if test "x$TLS_CFLAGS" != "x"; then
 	echo "    TLS:                   ${TLS_CFLAGS}"
 fi
@@ -1690,6 +2125,10 @@ if test "x$ICONV_CFLAGS" != "x"; then
 	echo "    iconv:                 ${ICONV_CFLAGS}"
 fi
 
+if test "x$LIBEVENT_CFLAGS" != "x"; then
+	echo "    libevent:              ${LIBEVENT_CFLAGS}"
+fi
+
 echo "
   Enable server:         ${server}"
 
@@ -1697,16 +2136,24 @@ if test "x$server" != "xno"; then
 
 echo "  Server details:
     With database:         ${have_db}
-    Secure connections:    ${have_dbtls}
-    WEB Monitoring:        ${have_web_monitoring}
-    Native Jabber:         ${have_jabber}
-    SNMP:                  ${have_snmp}
+    WEB Monitoring:        ${have_web_monitoring}"
+
+if test "x$have_web_monitoring" = "xcURL"; then
+echo "      SSL certificates:      ${CURL_SSL_CERT_LOCATION}
+      SSL keys:              ${CURL_SSL_KEY_LOCATION}"
+fi
+
+echo "    SNMP:                  ${have_snmp}
     IPMI:                  ${have_ipmi}
-    SSH:                   ${have_ssh2}
+    SSH:                   ${have_ssh}
     TLS:                   ${have_tls}
     ODBC:                  ${have_unixodbc}
     Linker flags:          ${SERVER_LDFLAGS} ${LDFLAGS}
-    Libraries:             ${SERVER_LIBS} ${LIBS}"
+    Libraries:             ${SERVER_LIBS} ${LIBS}
+    Configuration file:    ${SERVER_CONFIG_FILE}
+    External scripts:      ${EXTERNAL_SCRIPTS_PATH}
+    Alert scripts:         ${ALERT_SCRIPTS_PATH}
+    Modules:               ${LOAD_MODULE_PATH}"
 
 fi
 
@@ -1717,15 +2164,23 @@ if test "x$proxy" != "xno"; then
 
 echo "  Proxy details:
     With database:         ${have_db}
-    Secure connections:    ${have_dbtls}
-    WEB Monitoring:        ${have_web_monitoring}
-    SNMP:                  ${have_snmp}
+    WEB Monitoring:        ${have_web_monitoring}"
+
+if test "x$have_web_monitoring" = "xcURL"; then
+echo "      SSL certificates:      ${CURL_SSL_CERT_LOCATION}
+      SSL keys:              ${CURL_SSL_KEY_LOCATION}"
+fi
+
+echo "    SNMP:                  ${have_snmp}
     IPMI:                  ${have_ipmi}
-    SSH:                   ${have_ssh2}
+    SSH:                   ${have_ssh}
     TLS:                   ${have_tls}
     ODBC:                  ${have_unixodbc}
     Linker flags:          ${PROXY_LDFLAGS} ${LDFLAGS}
-    Libraries:             ${PROXY_LIBS} ${LIBS}"
+    Libraries:             ${PROXY_LIBS} ${LIBS}
+    Configuration file:    ${PROXY_CONFIG_FILE}
+    External scripts:      ${EXTERNAL_SCRIPTS_PATH}
+    Modules:               ${LOAD_MODULE_PATH}"
 
 fi
 
@@ -1737,9 +2192,14 @@ if test "x$agent" != "xno"; then
 echo "  Agent details:
     TLS:                   ${have_tls}
     Linker flags:          ${AGENT_LDFLAGS} ${LDFLAGS}
-    Libraries:             ${AGENT_LIBS} ${LIBS}"
+    Libraries:             ${AGENT_LIBS} ${LIBS}
+    Configuration file:    ${AGENT_CONFIG_FILE}
+    Modules:               ${LOAD_MODULE_PATH}"
 
 fi
+
+echo "
+  Enable agent 2:        ${agent2}"
 
 echo "
   Enable Java gateway:   ${java}"

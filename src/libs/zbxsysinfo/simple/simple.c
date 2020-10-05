@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -36,24 +36,24 @@
 #endif
 
 ZBX_METRIC	parameters_simple[] =
-/*      KEY                     FLAG		FUNCTION        	TEST PARAMETERS */
+/*	KEY			FLAG		FUNCTION		TEST PARAMETERS */
 {
-	{"net.tcp.service",	CF_HAVEPARAMS,	CHECK_SERVICE, 		"ssh,127.0.0.1,22"},
-	{"net.tcp.service.perf",CF_HAVEPARAMS,	CHECK_SERVICE_PERF, 	"ssh,127.0.0.1,22"},
-	{"net.udp.service",	CF_HAVEPARAMS,	CHECK_SERVICE, 		"ntp,127.0.0.1,123"},
-	{"net.udp.service.perf",CF_HAVEPARAMS,	CHECK_SERVICE_PERF, 	"ntp,127.0.0.1,123"},
+	{"net.tcp.service",	CF_HAVEPARAMS,	CHECK_SERVICE,		"ssh,127.0.0.1,22"},
+	{"net.tcp.service.perf",CF_HAVEPARAMS,	CHECK_SERVICE_PERF,	"ssh,127.0.0.1,22"},
+	{"net.udp.service",	CF_HAVEPARAMS,	CHECK_SERVICE,		"ntp,127.0.0.1,123"},
+	{"net.udp.service.perf",CF_HAVEPARAMS,	CHECK_SERVICE_PERF,	"ntp,127.0.0.1,123"},
 	{NULL}
 };
 
 #ifdef HAVE_LDAP
-static int    check_ldap(const char *host, unsigned short port, int timeout, int *value_int)
+static int	check_ldap(const char *host, unsigned short port, int timeout, int *value_int)
 {
 	LDAP		*ldap	= NULL;
 	LDAPMessage	*res	= NULL;
 	LDAPMessage	*msg	= NULL;
 	BerElement	*ber	= NULL;
 
-	char	*attrs[2] = { "namingContexts", NULL };
+	char	*attrs[2] = {"namingContexts", NULL };
 	char	*attr	 = NULL;
 	char	**valRes = NULL;
 	int	ldapErr = 0;
@@ -107,64 +107,33 @@ lbl_ret:
 }
 #endif	/* HAVE_LDAP */
 
-/******************************************************************************
- *                                                                            *
- * Function: find_ssh_ident_string                                            *
- *                                                                            *
- * Purpose: parse recv_buf for ssh identification string as per               *
- *          RFC 4253, section 4.2                                             *
- *                                                                            *
- * Parameters: recv_buf     - [IN] buffer to parse                            *
- *             remote_major - [OUT] memory pointer where protocol major is    *
- *                                  to be written to                          *
- *             remote_minor - [OUT] memory pointer where protocol minor is    *
- *                                  to be written to                          *
- *                                                                            *
- * Returns: SUCCEED - if a string matching the specification is found         *
- *          FAIL - otherwise                                                  *
- *                                                                            *
- ******************************************************************************/
-static int	find_ssh_ident_string(const char *recv_buf, int *remote_major, int *remote_minor)
-{
-	const char	*r, *l = recv_buf;
-
-	while (NULL != (r = strchr(l, '\n')))
-	{
-		if (2 == sscanf(l, "SSH-%d.%d-%*s", remote_major, remote_minor))
-			return SUCCEED;
-
-		l = r + 1;
-	}
-
-	return FAIL;
-}
-
 static int	check_ssh(const char *host, unsigned short port, int timeout, int *value_int)
 {
-	int		ret;
+	int		ret, major, minor;
 	zbx_socket_t	s;
 	char		send_buf[MAX_STRING_LEN];
-	int		remote_major, remote_minor;
+	const char	*buf;
 
 	*value_int = 0;
 
 	if (SUCCEED == (ret = zbx_tcp_connect(&s, CONFIG_SOURCE_IP, host, port, timeout, ZBX_TCP_SEC_UNENCRYPTED, NULL,
 			NULL)))
 	{
-		if (SUCCEED == (ret = zbx_tcp_recv(&s)))
+		while (NULL != (buf = zbx_tcp_recv_line(&s)))
 		{
-			if (SUCCEED == find_ssh_ident_string(s.buffer, &remote_major, &remote_minor))
+			/* parse buf for SSH identification string as per RFC 4253, section 4.2 */
+			if (2 == sscanf(buf, "SSH-%d.%d-%*s", &major, &minor))
 			{
-				zbx_snprintf(send_buf, sizeof(send_buf), "SSH-%d.%d-zabbix_agent\r\n",
-						remote_major, remote_minor);
+				zbx_snprintf(send_buf, sizeof(send_buf), "SSH-%d.%d-zabbix_agent\r\n", major, minor);
 				*value_int = 1;
+				break;
 			}
-			else
-				strscpy(send_buf, "0\n");
-
-			ret = zbx_tcp_send_raw(&s, send_buf);
 		}
 
+		if (0 == *value_int)
+			strscpy(send_buf, "0\n");
+
+		ret = zbx_tcp_send_raw(&s, send_buf);
 		zbx_tcp_close(&s);
 	}
 
@@ -177,16 +146,16 @@ static int	check_ssh(const char *host, unsigned short port, int timeout, int *va
 #ifdef HAVE_LIBCURL
 static int	check_https(const char *host, unsigned short port, int timeout, int *value_int)
 {
-	const char	*__function_name = "check_https";
-	int		err, opt;
+	CURL		*easyhandle;
+	CURLoption	opt;
+	CURLcode	err;
 	char		https_host[MAX_STRING_LEN];
-	CURL            *easyhandle;
 
 	*value_int = 0;
 
 	if (NULL == (easyhandle = curl_easy_init()))
 	{
-		zabbix_log(LOG_LEVEL_DEBUG, "%s: could not init cURL library", __function_name);
+		zabbix_log(LOG_LEVEL_DEBUG, "%s: could not init cURL library", __func__);
 		goto clean;
 	}
 
@@ -204,7 +173,7 @@ static int	check_https(const char *host, unsigned short port, int timeout, int *
 		CURLE_OK != (err = curl_easy_setopt(easyhandle, opt = CURLOPT_TIMEOUT, (long)timeout)))
 	{
 		zabbix_log(LOG_LEVEL_DEBUG, "%s: could not set cURL option [%d]: %s",
-				__function_name, opt, curl_easy_strerror(err));
+				__func__, (int)opt, curl_easy_strerror(err));
 		goto clean;
 	}
 
@@ -213,7 +182,7 @@ static int	check_https(const char *host, unsigned short port, int timeout, int *
 		if (CURLE_OK != (err = curl_easy_setopt(easyhandle, opt = CURLOPT_INTERFACE, CONFIG_SOURCE_IP)))
 		{
 			zabbix_log(LOG_LEVEL_DEBUG, "%s: could not set source interface option [%d]: %s",
-					__function_name, opt, curl_easy_strerror(err));
+					__func__, (int)opt, curl_easy_strerror(err));
 			goto clean;
 		}
 	}
@@ -222,7 +191,7 @@ static int	check_https(const char *host, unsigned short port, int timeout, int *
 		*value_int = 1;
 	else
 		zabbix_log(LOG_LEVEL_DEBUG, "%s: curl_easy_perform failed for [%s:%hu]: %s",
-				__function_name, host, port, curl_easy_strerror(err));
+				__func__, host, port, curl_easy_strerror(err));
 clean:
 	curl_easy_cleanup(easyhandle);
 
@@ -232,7 +201,6 @@ clean:
 
 static int	check_telnet(const char *host, unsigned short port, int timeout, int *value_int)
 {
-	const char	*__function_name = "check_telnet";
 	zbx_socket_t	s;
 #ifdef _WINDOWS
 	u_long		argp = 1;
@@ -259,7 +227,7 @@ static int	check_telnet(const char *host, unsigned short port, int timeout, int 
 		zbx_tcp_close(&s);
 	}
 	else
-		zabbix_log(LOG_LEVEL_DEBUG, "%s error: %s", __function_name, zbx_socket_strerror());
+		zabbix_log(LOG_LEVEL_DEBUG, "%s error: %s", __func__, zbx_socket_strerror());
 
 	return SYSINFO_RET_OK;
 }
@@ -308,7 +276,7 @@ static int	validate_imap(const char *line)
 int	check_service(AGENT_REQUEST *request, const char *default_addr, AGENT_RESULT *result, int perf)
 {
 	unsigned short	port = 0;
-	char		*service, *ip_str, ip[64], *port_str;
+	char		*service, *ip_str, ip[MAX_ZBX_DNSNAME_LEN + 1], *port_str;
 	int		value_int, ret = SYSINFO_RET_FAIL;
 	double		check_time;
 

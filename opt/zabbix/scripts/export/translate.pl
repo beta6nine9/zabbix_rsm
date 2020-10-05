@@ -131,11 +131,11 @@ sub __translate_cycles_line
 	my $incident_id = $columns[4];
 	my $cycle_tld = dw_get_name(ID_TLD, $columns[5]);
 	my $service_category = dw_get_name(ID_SERVICE_CATEGORY, $columns[6]);
-	my $cycle_nsfqdn = dw_get_name(ID_NS_NAME, $columns[7]) || '';
-	my $cycle_nsip = dw_get_name(ID_NS_IP, $columns[8]) || '';
-	my $cycle_nsipversion = dw_get_name(ID_IP_VERSION, $columns[9]) || '';
+	my $cycle_nsfqdn = dw_get_name(ID_NS_NAME, $columns[7]) // '';
+	my $cycle_nsip = dw_get_name(ID_NS_IP, $columns[8]) // '';
+	my $cycle_nsipversion = dw_get_name(ID_IP_VERSION, $columns[9]) // '';
 	my $tld_type = dw_get_name(ID_TLD_TYPE, $columns[10]);
-	my $cycle_protocol = dw_get_name(ID_TRANSPORT_PROTOCOL, $columns[11]);
+	my $cycle_protocol = dw_get_name(ID_TRANSPORT_PROTOCOL, $columns[11]) // '';
 
 	printf("%-" . PRINT_RIGHT_SHIFT . "s%s\n", 'cycleID', $cycle_id);
 	printf("%-" . PRINT_RIGHT_SHIFT . "s%s\n", 'cycleDateMinute', ts_full($cycle_date_minute));
@@ -164,11 +164,12 @@ sub __translate_tests_line
 	my $cycle_id = dw_translate_cycle_id($columns[4]);
 	my $test_tld = dw_get_name(ID_TLD, $columns[5]);
 	my $test_protocol = dw_get_name(ID_TRANSPORT_PROTOCOL, $columns[6]);
-	my $test_ipversion = dw_get_name(ID_IP_VERSION, $columns[7]) || '';
-	my $test_ipaddress = dw_get_name(ID_NS_IP, $columns[8]) || '';
+	my $test_ipversion = dw_get_name(ID_IP_VERSION, $columns[7]) // '';
+	my $test_ipaddress = dw_get_name(ID_NS_IP, $columns[8]) // '';
 	my $test_type = dw_get_name(ID_TEST_TYPE, $columns[9]);
-	my $test_nsfqdn = dw_get_name(ID_NS_NAME, $columns[10]) || '';
+	my $test_nsfqdn = dw_get_name(ID_NS_NAME, $columns[10]) // '';
 	my $tld_type = dw_get_name(ID_TLD_TYPE, $columns[11]);
+	my $nsid = dw_get_name(ID_NSID, $columns[12]) // '';
 
 	# $test_type is service interface, e. g.: dns, rdds43, rdds80
 	if ($valuemaps{$test_type}->{$test_rtt})
@@ -192,6 +193,7 @@ sub __translate_tests_line
 	printf("%-" . PRINT_RIGHT_SHIFT . "s%s\n", 'testType', $test_type);
 	printf("%-" . PRINT_RIGHT_SHIFT . "s%s\n", 'testNSFQDN', $test_nsfqdn);
 	printf("%-" . PRINT_RIGHT_SHIFT . "s%s\n", 'tldType', $tld_type);
+	printf("%-" . PRINT_RIGHT_SHIFT . "s%s\n", 'nsid', $nsid);
 }
 
 sub __translate_ns_tests_line
@@ -283,6 +285,6 @@ sub __translate_test_details_line
 	printf("%-" . PRINT_RIGHT_SHIFT . "s%s\n", 'cycleDateMinute', ts_full($cycle_date_minute));
 	printf("%-" . PRINT_RIGHT_SHIFT . "s%s\n", 'serviceCategory', $service_category);
 	printf("%-" . PRINT_RIGHT_SHIFT . "s%s\n", 'testType', $test_type);
-	printf("%-" . PRINT_RIGHT_SHIFT . "s%s\n", 'target', $target);
+	printf("%-" . PRINT_RIGHT_SHIFT . "s%s\n", 'target', $target // '');
 	printf("%-" . PRINT_RIGHT_SHIFT . "s%s\n", 'testedName', $tested_name);
 }

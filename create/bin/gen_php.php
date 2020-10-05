@@ -48,21 +48,17 @@ function parse_schema($path) {
 						break;
 					case 't_double':
 						$type = 'DB::FIELD_TYPE_FLOAT';
-						$length = 16;
-						break;
-					// ICANN specific field for 'lastvalue' table.
-					case 't_bigdouble':
-						$type = 'DB::FIELD_TYPE_DOUBLE';
 						$length = false;
 						break;
 					case 't_varchar':
-					case 't_char':
 						$type = 'DB::FIELD_TYPE_CHAR';
 						$length = $type_data['length'];
 						break;
-					case 't_blob':
 					case 't_text':
 					case 't_longtext':
+						$type = 'DB::FIELD_TYPE_NCLOB';
+						$length = false;
+						break;
 					case 't_shorttext':
 						$type = 'DB::FIELD_TYPE_TEXT';
 						$length = false;

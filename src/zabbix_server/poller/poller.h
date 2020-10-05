@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -28,5 +28,13 @@ extern int	CONFIG_UNREACHABLE_PERIOD;
 extern int	CONFIG_UNREACHABLE_DELAY;
 
 ZBX_THREAD_ENTRY(poller_thread, args);
+
+void	zbx_activate_item_host(DC_ITEM *item, zbx_timespec_t *ts);
+void	zbx_deactivate_item_host(DC_ITEM *item, zbx_timespec_t *ts, const char *error);
+void	zbx_prepare_items(DC_ITEM *items, int *errcodes, int num, AGENT_RESULT *results, unsigned char expand_macros);
+void	zbx_check_items(DC_ITEM *items, int *errcodes, int num, AGENT_RESULT *results, zbx_vector_ptr_t *add_results,
+		unsigned char poller_type);
+void	zbx_clean_items(DC_ITEM *items, int num, AGENT_RESULT *results);
+void	zbx_free_result_ptr(AGENT_RESULT *result);
 
 #endif

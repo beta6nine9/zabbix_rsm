@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -28,6 +28,24 @@
 #define ZBX_SCHEDULER_FILTER_MINUTE	3
 #define ZBX_SCHEDULER_FILTER_SECOND	4
 
+typedef struct
+{
+	int	start_day;	/* day of week when period starts */
+	int	end_day;	/* day of week when period ends, included */
+	int	start_time;	/* number of seconds from the beginning of the day when period starts */
+	int	end_time;	/* number of seconds from the beginning of the day when period ends, not included */
+}
+zbx_time_period_t;
+
+typedef struct zbx_flexible_interval
+{
+	zbx_time_period_t		period;
+	int				delay;
+
+	struct zbx_flexible_interval	*next;
+}
+zbx_flexible_interval_t;
+
 typedef struct zbx_scheduler_filter
 {
 	int				start;
@@ -51,6 +69,20 @@ typedef struct zbx_scheduler_interval
 	struct zbx_scheduler_interval	*next;
 }
 zbx_scheduler_interval_t;
+
+struct zbx_custom_interval
+{
+	zbx_flexible_interval_t		*flexible;
+	zbx_scheduler_interval_t	*scheduling;
+};
+
+const int	INTERFACE_TYPE_PRIORITY[INTERFACE_TYPE_COUNT] =
+{
+	INTERFACE_TYPE_AGENT,
+	INTERFACE_TYPE_SNMP,
+	INTERFACE_TYPE_JMX,
+	INTERFACE_TYPE_IPMI
+};
 
 static ZBX_THREAD_LOCAL volatile sig_atomic_t	zbx_timed_out;	/* 0 - no timeout occurred, 1 - SIGALRM took place */
 
@@ -130,12 +162,11 @@ const char	*get_program_name(const char *path)
  ******************************************************************************/
 void	zbx_timespec(zbx_timespec_t *ts)
 {
-	static zbx_timespec_t	*last_ts = NULL;
-	static int		corr = 0;
-#ifdef _WINDOWS
-	LARGE_INTEGER	tickPerSecond, tick;
-	static int	boottime = 0;
-	BOOL		rc = FALSE;
+	static ZBX_THREAD_LOCAL zbx_timespec_t	last_ts = {0, 0};
+	static ZBX_THREAD_LOCAL int		corr = 0;
+#if defined(_WINDOWS) || defined(__MINGW32__)
+	static ZBX_THREAD_LOCAL LARGE_INTEGER	tickPerSecond = {0};
+	struct _timeb				tb;
 #else
 	struct timeval	tv;
 	int		rc = -1;
@@ -143,34 +174,62 @@ void	zbx_timespec(zbx_timespec_t *ts)
 	struct timespec	tp;
 #	endif
 #endif
+#if defined(_WINDOWS) || defined(__MINGW32__)
 
-	if (NULL == last_ts)
-		last_ts = zbx_calloc(last_ts, 1, sizeof(zbx_timespec_t));
+	if (0 == tickPerSecond.QuadPart)
+		QueryPerformanceFrequency(&tickPerSecond);
 
-#ifdef _WINDOWS
-	if (TRUE == (rc = QueryPerformanceFrequency(&tickPerSecond)))
+	_ftime(&tb);
+
+	ts->sec = (int)tb.time;
+	ts->ns = tb.millitm * 1000000;
+
+	if (0 != tickPerSecond.QuadPart)
 	{
-		if (TRUE == (rc = QueryPerformanceCounter(&tick)))
+		LARGE_INTEGER	tick;
+
+		if (TRUE == QueryPerformanceCounter(&tick))
 		{
-			ts->ns = (int)(1000000000 * (tick.QuadPart % tickPerSecond.QuadPart) / tickPerSecond.QuadPart);
+			static ZBX_THREAD_LOCAL LARGE_INTEGER	last_tick = {0};
 
-			tick.QuadPart = tick.QuadPart / tickPerSecond.QuadPart;
+			if (0 < last_tick.QuadPart)
+			{
+				LARGE_INTEGER	qpc_tick = {0}, ntp_tick = {0};
 
-			if (0 == boottime)
-				boottime = (int)(time(NULL) - tick.QuadPart);
+				/* _ftime () returns precision in milliseconds, but 'ns' could be increased up to 1ms */
+				if (last_ts.sec == ts->sec && last_ts.ns > ts->ns && 1000000 > (last_ts.ns - ts->ns))
+				{
+					ts->ns = last_ts.ns;
+				}
+				else
+				{
+					ntp_tick.QuadPart = tickPerSecond.QuadPart * (ts->sec - last_ts.sec) +
+							tickPerSecond.QuadPart * (ts->ns - last_ts.ns) / 1000000000;
+				}
 
-			ts->sec = (int)(tick.QuadPart + boottime);
+				/* host system time can shift backwards, then correction is not reasonable */
+				if (0 <= ntp_tick.QuadPart)
+					qpc_tick.QuadPart = tick.QuadPart - last_tick.QuadPart - ntp_tick.QuadPart;
+
+				if (0 < qpc_tick.QuadPart && qpc_tick.QuadPart < tickPerSecond.QuadPart)
+				{
+					int	ns = (int)(1000000000 * qpc_tick.QuadPart / tickPerSecond.QuadPart);
+
+					if (1000000 > ns)	/* value less than 1 millisecond */
+					{
+						ts->ns += ns;
+
+						while (ts->ns >= 1000000000)
+						{
+							ts->sec++;
+							ts->ns -= 1000000000;
+						}
+					}
+				}
+			}
+
+			last_tick = tick;
 		}
-	}
-
-	if (TRUE != rc)
-	{
-		struct _timeb   tb;
-
-		_ftime(&tb);
-
-		ts->sec = (int)tb.time;
-		ts->ns = tb.millitm * 1000000;
 	}
 #else	/* not _WINDOWS */
 #ifdef HAVE_TIME_CLOCK_GETTIME
@@ -194,7 +253,7 @@ void	zbx_timespec(zbx_timespec_t *ts)
 	}
 #endif	/* not _WINDOWS */
 
-	if (last_ts->ns == ts->ns && last_ts->sec == ts->sec)
+	if (last_ts.ns == ts->ns && last_ts.sec == ts->sec)
 	{
 		ts->ns += ++corr;
 
@@ -206,8 +265,8 @@ void	zbx_timespec(zbx_timespec_t *ts)
 	}
 	else
 	{
-		last_ts->sec = ts->sec;
-		last_ts->ns = ts->ns;
+		last_ts.sec = ts->sec;
+		last_ts.ns = ts->ns;
 		corr = 0;
 	}
 }
@@ -287,7 +346,7 @@ static int	is_leap_year(int year)
  ******************************************************************************/
 void	zbx_get_time(struct tm *tm, long *milliseconds, zbx_timezone_t *tz)
 {
-#ifdef _WINDOWS
+#if defined(_WINDOWS) || defined(__MINGW32__)
 	struct _timeb	current_time;
 
 	_ftime(&current_time);
@@ -302,32 +361,60 @@ void	zbx_get_time(struct tm *tm, long *milliseconds, zbx_timezone_t *tz)
 #endif
 	if (NULL != tz)
 	{
-#ifdef HAVE_TM_TM_GMTOFF
-#	define ZBX_UTC_OFF	tm->tm_gmtoff
+		long	offset;
+#if defined(_WINDOWS) || defined(__MINGW32__)
+		offset = zbx_get_timezone_offset(current_time.time, tm);
 #else
-#	define ZBX_UTC_OFF	offset
-		long		offset;
-		struct tm	tm_utc;
-#ifdef _WINDOWS
-		tm_utc = *gmtime(&current_time.time);	/* gmtime() cannot return NULL if called with valid parameter */
-#else
-		gmtime_r(&current_time.tv_sec, &tm_utc);
+		offset = zbx_get_timezone_offset(current_time.tv_sec, tm);
 #endif
-		offset = (tm->tm_yday - tm_utc.tm_yday) * SEC_PER_DAY + (tm->tm_hour - tm_utc.tm_hour) * SEC_PER_HOUR +
-				(tm->tm_min - tm_utc.tm_min) * SEC_PER_MIN;	/* assuming seconds are equal */
-
-		while (tm->tm_year > tm_utc.tm_year)
-			offset += (SUCCEED == is_leap_year(tm_utc.tm_year++) ? SEC_PER_YEAR + SEC_PER_DAY : SEC_PER_YEAR);
-
-		while (tm->tm_year < tm_utc.tm_year)
-			offset -= (SUCCEED == is_leap_year(--tm_utc.tm_year) ? SEC_PER_YEAR + SEC_PER_DAY : SEC_PER_YEAR);
-#endif
-		tz->tz_sign = (0 <= ZBX_UTC_OFF ? '+' : '-');
-		tz->tz_hour = labs(ZBX_UTC_OFF) / SEC_PER_HOUR;
-		tz->tz_min = (labs(ZBX_UTC_OFF) - tz->tz_hour * SEC_PER_HOUR) / SEC_PER_MIN;
+		tz->tz_sign = (0 <= offset ? '+' : '-');
+		tz->tz_hour = labs(offset) / SEC_PER_HOUR;
+		tz->tz_min = (labs(offset) - tz->tz_hour * SEC_PER_HOUR) / SEC_PER_MIN;
 		/* assuming no remaining seconds like in historic Asia/Riyadh87, Asia/Riyadh88 and Asia/Riyadh89 */
-#undef ZBX_UTC_OFF
 	}
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Function: zbx_get_timezone_offset                                          *
+ *                                                                            *
+ * Purpose: get time offset from UTC                                          *
+ *                                                                            *
+ * Parameters: t  - [IN] input time to calculate offset with                  *
+ *             tm - [OUT] broken-down representation of the current time      *
+ *                                                                            *
+ * Return value: Time offset from UTC in seconds                              *
+ *                                                                            *
+ ******************************************************************************/
+long	zbx_get_timezone_offset(time_t t, struct tm *tm)
+{
+	long		offset;
+#ifndef HAVE_TM_TM_GMTOFF
+	struct tm	tm_utc;
+#endif
+
+	*tm = *localtime(&t);
+
+#ifdef HAVE_TM_TM_GMTOFF
+	offset = tm->tm_gmtoff;
+#else
+#if defined(_WINDOWS) || defined(__MINGW32__)
+	tm_utc = *gmtime(&t);
+#else
+	gmtime_r(&t, &tm_utc);
+#endif
+	offset = (tm->tm_yday - tm_utc.tm_yday) * SEC_PER_DAY +
+			(tm->tm_hour - tm_utc.tm_hour) * SEC_PER_HOUR +
+			(tm->tm_min - tm_utc.tm_min) * SEC_PER_MIN;	/* assuming seconds are equal */
+
+	while (tm->tm_year > tm_utc.tm_year)
+		offset += (SUCCEED == is_leap_year(tm_utc.tm_year++) ? SEC_PER_YEAR + SEC_PER_DAY : SEC_PER_YEAR);
+
+	while (tm->tm_year < tm_utc.tm_year)
+		offset -= (SUCCEED == is_leap_year(--tm_utc.tm_year) ? SEC_PER_YEAR + SEC_PER_DAY : SEC_PER_YEAR);
+#endif
+
+	return offset;
 }
 
 /******************************************************************************
@@ -400,6 +487,27 @@ int	zbx_day_in_month(int year, int mon)
 
 /******************************************************************************
  *                                                                            *
+ * Function: zbx_get_duration_ms                                              *
+ *                                                                            *
+ * Purpose: get duration in milliseconds since time stamp till current time   *
+ *                                                                            *
+ * Parameters:                                                                *
+ *     start_time - [IN] time from when duration should be counted            *
+ *                                                                            *
+ * Return value: duration in milliseconds since time stamp till current time  *
+ *                                                                            *
+ ******************************************************************************/
+zbx_uint64_t	zbx_get_duration_ms(const zbx_timespec_t *ts)
+{
+	zbx_timespec_t	now;
+
+	zbx_timespec(&now);
+
+	return (now.sec - ts->sec) * 1e3 + (now.ns - ts->ns) / 1e6;
+}
+
+/******************************************************************************
+ *                                                                            *
  * Function: zbx_calloc2                                                      *
  *                                                                            *
  * Purpose: allocates nmemb * size bytes of memory and fills it with zeros    *
@@ -409,7 +517,7 @@ int	zbx_day_in_month(int year, int mon)
  * Author: Eugene Grigorjev, Rudolfs Kreicbergs                               *
  *                                                                            *
  ******************************************************************************/
-void    *zbx_calloc2(const char *filename, int line, void *old, size_t nmemb, size_t size)
+void	*zbx_calloc2(const char *filename, int line, void *old, size_t nmemb, size_t size)
 {
 	int	max_attempts;
 	void	*ptr = NULL;
@@ -448,7 +556,7 @@ void    *zbx_calloc2(const char *filename, int line, void *old, size_t nmemb, si
  * Author: Eugene Grigorjev                                                   *
  *                                                                            *
  ******************************************************************************/
-void    *zbx_malloc2(const char *filename, int line, void *old, size_t size)
+void	*zbx_malloc2(const char *filename, int line, void *old, size_t size)
 {
 	int	max_attempts;
 	void	*ptr = NULL;
@@ -488,7 +596,7 @@ void    *zbx_malloc2(const char *filename, int line, void *old, size_t size)
  * Author: Eugene Grigorjev                                                   *
  *                                                                            *
  ******************************************************************************/
-void    *zbx_realloc2(const char *filename, int line, void *old, size_t size)
+void	*zbx_realloc2(const char *filename, int line, void *old, size_t size)
 {
 	int	max_attempts;
 	void	*ptr = NULL;
@@ -508,7 +616,7 @@ void    *zbx_realloc2(const char *filename, int line, void *old, size_t size)
 	exit(EXIT_FAILURE);
 }
 
-char    *zbx_strdup2(const char *filename, int line, char *old, const char *str)
+char	*zbx_strdup2(const char *filename, int line, char *old, const char *str)
 {
 	int	retry;
 	char	*ptr = NULL;
@@ -559,22 +667,21 @@ void	*zbx_guaranteed_memset(void *v, int c, size_t n)
  * Author: Eugene Grigorjev                                                   *
  *                                                                            *
  ******************************************************************************/
-void	__zbx_zbx_setproctitle(const char *fmt, ...)
+void	zbx_setproctitle(const char *fmt, ...)
 {
 #if defined(HAVE_FUNCTION_SETPROCTITLE) || defined(PS_OVERWRITE_ARGV) || defined(PS_PSTAT_ARGV)
-	const char	*__function_name = "__zbx_zbx_setproctitle";
-	char		title[MAX_STRING_LEN];
-	va_list		args;
+	char	title[MAX_STRING_LEN];
+	va_list	args;
 
 	va_start(args, fmt);
 	zbx_vsnprintf(title, sizeof(title), fmt, args);
 	va_end(args);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "%s() title:'%s'", __function_name, title);
+	zabbix_log(LOG_LEVEL_DEBUG, "%s() title:'%s'", __func__, title);
 #endif
 
 #if defined(HAVE_FUNCTION_SETPROCTITLE)
-	setproctitle(title);
+	setproctitle("%s", title);
 #elif defined(PS_OVERWRITE_ARGV) || defined(PS_PSTAT_ARGV)
 	setproctitle_set_status(title);
 #endif
@@ -586,74 +693,23 @@ void	__zbx_zbx_setproctitle(const char *fmt, ...)
  *                                                                            *
  * Purpose: check if current time is within given period                      *
  *                                                                            *
- * Parameters: period - time period in format [d1-d2,hh:mm-hh:mm]*            *
- *             now    - timestamp for comparison                              *
- *                      if NULL - use current timestamp.                      *
+ * Parameters: period - [IN] preprocessed time period                         *
+ *             tm     - [IN] broken-down time for comparison                  *
  *                                                                            *
  * Return value: FAIL - out of period, SUCCEED - within the period            *
  *                                                                            *
  * Author: Alexei Vladishev                                                   *
  *                                                                            *
- * Comments:   !!! Don't forget to sync code with PHP !!!                     *
- *                                                                            *
  ******************************************************************************/
-int	check_time_period(const char *period, time_t now)
+static int	check_time_period(const zbx_time_period_t period, struct tm *tm)
 {
-	const char	*__function_name = "check_time_period";
-	const char	*s, *delim;
-	int		d1, d2, h1, h2, m1, m2, flag, day, sec, sec1, sec2, ret = FAIL;
-	struct tm	*tm;
+	int		day, time;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() period:'%s'", __function_name, period);
-
-	if ((time_t)0 == now)
-		now = time(NULL);
-
-	tm = localtime(&now);
 	day = 0 == tm->tm_wday ? 7 : tm->tm_wday;
-	sec = SEC_PER_HOUR * tm->tm_hour + SEC_PER_MIN * tm->tm_min + tm->tm_sec;
+	time = SEC_PER_HOUR * tm->tm_hour + SEC_PER_MIN * tm->tm_min + tm->tm_sec;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "%d,%d:%d", day, (int)tm->tm_hour, (int)tm->tm_min);
-
-	for (s = period; '\0' != *s;)
-	{
-		delim = strchr(s, ';');
-
-		zabbix_log(LOG_LEVEL_DEBUG, "period [%s]", s);
-
-		flag = (6 == sscanf(s, "%d-%d,%d:%d-%d:%d", &d1, &d2, &h1, &m1, &h2, &m2));
-
-		if (0 == flag)
-		{
-			flag = (5 == sscanf(s, "%d,%d:%d-%d:%d", &d1, &h1, &m1, &h2, &m2));
-			d2 = d1;
-		}
-
-		if (0 != flag)
-		{
-			zabbix_log(LOG_LEVEL_DEBUG, "%d-%d,%d:%d-%d:%d", d1, d2, h1, m1, h2, m2);
-
-			sec1 = SEC_PER_HOUR * h1 + SEC_PER_MIN * m1;
-			sec2 = SEC_PER_HOUR * h2 + SEC_PER_MIN * m2;	/* do not include upper bound */
-
-			if (d1 <= day && day <= d2 && sec1 <= sec && sec < sec2)
-			{
-				ret = SUCCEED;
-				break;
-			}
-		}
-		else
-			zabbix_log(LOG_LEVEL_ERR, "wrong time period format [%s]", period);
-
-		if (NULL != delim)
-			s = delim + 1;
-		else
-			break;
-	}
-
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __function_name, zbx_result_string(ret));
-
-	return ret;
+	return period.start_day <= day && day <= period.end_day && period.start_time <= time && time < period.end_time ?
+			SUCCEED : FAIL;
 }
 
 /******************************************************************************
@@ -662,10 +718,9 @@ int	check_time_period(const char *period, time_t now)
  *                                                                            *
  * Purpose: return delay value that is currently applicable                   *
  *                                                                            *
- * Parameters: delay - [IN] default delay value, can be overridden            *
- *             flex_intervals - [IN] descriptions of flexible intervals       *
- *                                   in the form [dd/d1-d2,hh:mm-hh:mm;]      *
- *             now - [IN] current time                                        *
+ * Parameters: default_delay  - [IN] default delay value, can be overridden   *
+ *             flex_intervals - [IN] preprocessed flexible intervals          *
+ *             now            - [IN] current time                             *
  *                                                                            *
  * Return value: delay value - either default or minimum delay value          *
  *                             out of all applicable intervals                *
@@ -673,42 +728,22 @@ int	check_time_period(const char *period, time_t now)
  * Author: Alexei Vladishev, Alexander Vladishev, Aleksandrs Saveljevs        *
  *                                                                            *
  ******************************************************************************/
-static int	get_current_delay(int delay, const char *flex_intervals, time_t now)
+static int	get_current_delay(int default_delay, const zbx_flexible_interval_t *flex_intervals, time_t now)
 {
-	const char	*s, *delim;
-	char		flex_period[30];
-	int		flex_delay, current_delay = -1;
+	int		current_delay = -1;
 
-	if (NULL == flex_intervals || '\0' == *flex_intervals)
-		return delay;
-
-	for (s = flex_intervals; '\0' != *s; s = delim + 1)
+	while (NULL != flex_intervals)
 	{
-		delim = strchr(s, ';');
-
-		zabbix_log(LOG_LEVEL_DEBUG, "delay period [%s]", s);
-
-		if (2 == sscanf(s, "%d/%29[^;]s", &flex_delay, flex_period))
+		if ((-1 == current_delay || flex_intervals->delay < current_delay) &&
+				SUCCEED == check_time_period(flex_intervals->period, localtime(&now)))
 		{
-			zabbix_log(LOG_LEVEL_DEBUG, "%d sec at %s", flex_delay, flex_period);
-
-			if ((-1 == current_delay || flex_delay < current_delay) &&
-					SUCCEED == check_time_period(flex_period, now))
-			{
-				current_delay = flex_delay;
-			}
+			current_delay = flex_intervals->delay;
 		}
-		else
-			zabbix_log(LOG_LEVEL_ERR, "wrong delay period format: \"%s\"", s);
 
-		if (NULL == delim)
-			break;
+		flex_intervals = flex_intervals->next;
 	}
 
-	if (-1 == current_delay)
-		return delay;
-
-	return current_delay;
+	return -1 == current_delay ? default_delay : current_delay;
 }
 
 /******************************************************************************
@@ -717,10 +752,9 @@ static int	get_current_delay(int delay, const char *flex_intervals, time_t now)
  *                                                                            *
  * Purpose: return time when next delay settings take effect                  *
  *                                                                            *
- * Parameters: flex_intervals - [IN] descriptions of flexible intervals       *
- *                                   in the form [dd/d1-d2,hh:mm-hh:mm;]      *
- *             now = [IN] current time                                        *
- *             next_interval = [OUT] start of next delay interval             *
+ * Parameters: flex_intervals - [IN] preprocessed flexible intervals          *
+ *             now            - [IN] current time                             *
+ *             next_interval  - [OUT] start of next delay interval            *
  *                                                                            *
  * Return value: SUCCEED - there is a next interval                           *
  *               FAIL - otherwise (in this case, next_interval is unaffected) *
@@ -728,99 +762,293 @@ static int	get_current_delay(int delay, const char *flex_intervals, time_t now)
  * Author: Alexei Vladishev, Alexander Vladishev, Aleksandrs Saveljevs        *
  *                                                                            *
  ******************************************************************************/
-static int	get_next_delay_interval(const char *flex_intervals, time_t now, time_t *next_interval)
+static int	get_next_delay_interval(const zbx_flexible_interval_t *flex_intervals, time_t now, time_t *next_interval)
 {
-	const char	*s, *delim;
+	int		day, time, next = 0, candidate;
 	struct tm	*tm;
-	int		day, sec, sec1, sec2, delay, d1, d2, h1, h2, m1, m2, flag;
-	time_t		next = 0;
 
-	if (NULL == flex_intervals || '\0' == *flex_intervals)
+	if (NULL == flex_intervals)
 		return FAIL;
 
 	tm = localtime(&now);
 	day = 0 == tm->tm_wday ? 7 : tm->tm_wday;
-	sec = SEC_PER_HOUR * tm->tm_hour + SEC_PER_MIN * tm->tm_min + tm->tm_sec;
+	time = SEC_PER_HOUR * tm->tm_hour + SEC_PER_MIN * tm->tm_min + tm->tm_sec;
 
-	for (s = flex_intervals; '\0' != *s;)
+	for (; NULL != flex_intervals; flex_intervals = flex_intervals->next)
 	{
-		delim = strchr(s, ';');
+		const zbx_time_period_t	*p = &flex_intervals->period;
 
-		zabbix_log(LOG_LEVEL_DEBUG, "delay period [%s]", s);
-
-		flag = (7 == sscanf(s, "%d/%d-%d,%d:%d-%d:%d", &delay, &d1, &d2, &h1, &m1, &h2, &m2));
-
-		if (0 == flag)
+		if (p->start_day <= day && day <= p->end_day && time < p->end_time)	/* will be active today */
 		{
-			flag = (6 == sscanf(s, "%d/%d,%d:%d-%d:%d", &delay, &d1, &h1, &m1, &h2, &m2));
-			d2 = d1;
+			if (time < p->start_time)	/* hasn't been active today yet */
+				candidate = p->start_time;
+			else	/* currently active */
+				candidate = p->end_time;
 		}
-
-		if (0 != flag)
+		else if (day < p->end_day)	/* will be active this week */
 		{
-			zabbix_log(LOG_LEVEL_DEBUG, "%d/%d-%d,%d:%d-%d:%d", delay, d1, d2, h1, m1, h2, m2);
-
-			sec1 = SEC_PER_HOUR * h1 + SEC_PER_MIN * m1;
-			sec2 = SEC_PER_HOUR * h2 + SEC_PER_MIN * m2;	/* do not include upper bound */
-
-			if (d1 <= day && day <= d2 && sec1 <= sec && sec < sec2)	/* current period */
-			{
-				if (0 == next || next > now - sec + sec2)
-					next = now - sec + sec2;	/* the next second after the */
-									/* current interval's upper bound */
-			}
-			else if (d1 <= day && day <= d2 && sec < sec1)			/* will be active today */
-			{
-				if (0 == next || next > now - sec + sec1)
-					next = now - sec + sec1;
-			}
-			else
-			{
-				int	next_day;
-
-				next_day = (7 >= day + 1 ? day + 1 : 1);
-
-				if (d1 <= next_day && next_day <= d2)			/* will be active tomorrow */
-				{
-					if (0 == next || next > now - sec + SEC_PER_DAY + sec1)
-						next = now - sec + SEC_PER_DAY + sec1;
-				}
-				else							/* later in the future */
-				{
-					int	day_diff = -1;
-
-					if (day < d1)
-						day_diff = d1 - day;
-					if (day >= d2)
-						day_diff = (d1 + 7) - day;
-					if (d1 <= day && day < d2)
-					{
-						/* should never happen */
-						zabbix_log(LOG_LEVEL_ERR, "could not deduce day difference"
-								" [%s, day=%d, time=%02d:%02d:%02d]",
-								s, day, tm->tm_hour, tm->tm_min, tm->tm_sec);
-						day_diff = -1;
-					}
-
-					if (-1 != day_diff &&
-							(0 == next || next > now - sec + SEC_PER_DAY * day_diff + sec1))
-						next = now - sec + SEC_PER_DAY * day_diff + sec1;
-				}
-			}
+			if (day < p->start_day)	/* hasn't been active this week yet */
+				candidate = SEC_PER_DAY * (p->start_day - day) + p->start_time;
+			else	/* has been active this week and will be active at least once more by the end of it */
+				candidate = SEC_PER_DAY + p->start_time;	/* therefore will be active tomorrow */
 		}
-		else
-			zabbix_log(LOG_LEVEL_ERR, "wrong delay period format: \"%s\"", s);
+		else	/* will be active next week */
+			candidate = SEC_PER_DAY * (p->start_day + 7 - day) + p->start_time;
 
-		if (NULL != delim)
-			s = delim + 1;
-		else
-			break;
+		if (0 == next || next > candidate)
+			next = candidate;
 	}
 
-	if (0 != next && NULL != next_interval)
-		*next_interval = next;
+	if (0 == next)
+		return FAIL;
 
-	return 0 != next ? SUCCEED : FAIL;
+	*next_interval = now - time + next;
+	return SUCCEED;
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Function: time_parse                                                       *
+ *                                                                            *
+ * Purpose: parses time of day                                                *
+ *                                                                            *
+ * Parameters: time       - [OUT] number of seconds since the beginning of    *
+ *                            the day corresponding to a given time of day    *
+ *             text       - [IN] text to parse                                *
+ *             len        - [IN] number of characters available for parsing   *
+ *             parsed_len - [OUT] number of characters recognized as time     *
+ *                                                                            *
+ * Return value: SUCCEED - text was successfully parsed as time of day        *
+ *               FAIL    - otherwise (time and parsed_len remain untouched)   *
+ *                                                                            *
+ * Comments: !!! Don't forget to sync code with PHP !!!                       *
+ *           Supported formats are hh:mm, h:mm and 0h:mm; 0 <= hours <= 24;   *
+ *           0 <= minutes <= 59; if hours == 24 then minutes must be 0.       *
+ *                                                                            *
+ ******************************************************************************/
+static int	time_parse(int *time, const char *text, int len, int *parsed_len)
+{
+	const int	old_len = len;
+	const char	*ptr;
+	int		hours, minutes;
+
+	for (ptr = text; 0 < len && 0 != isdigit(*ptr) && 2 >= ptr - text; len--, ptr++)
+		;
+
+	if (SUCCEED != is_uint_n_range(text, ptr - text, &hours, sizeof(hours), 0, 24))
+		return FAIL;
+
+	if (0 >= len-- || ':' != *ptr++)
+		return FAIL;
+
+	for (text = ptr; 0 < len && 0 != isdigit(*ptr) && 2 >= ptr - text; len--, ptr++)
+		;
+
+	if (2 != ptr - text)
+		return FAIL;
+
+	if (SUCCEED != is_uint_n_range(text, 2, &minutes, sizeof(minutes), 0, 59))
+		return FAIL;
+
+	if (24 == hours && 0 != minutes)
+		return FAIL;
+
+	*parsed_len = old_len - len;
+	*time = SEC_PER_HOUR * hours + SEC_PER_MIN * minutes;
+	return SUCCEED;
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Function: time_period_parse                                                *
+ *                                                                            *
+ * Purpose: parses time period                                                *
+ *                                                                            *
+ * Parameters: period - [OUT] time period structure                           *
+ *             text   - [IN] text to parse                                    *
+ *             len    - [IN] number of characters available for parsing       *
+ *                                                                            *
+ * Return value: SUCCEED - text was successfully parsed as time period        *
+ *               FAIL    - otherwise                                          *
+ *                                                                            *
+ * Comments: !!! Don't forget to sync code with PHP !!!                       *
+ *           Supported format is d[-d],time-time where 1 <= d <= 7            *
+ *                                                                            *
+ ******************************************************************************/
+static int	time_period_parse(zbx_time_period_t *period, const char *text, int len)
+{
+	int	parsed_len;
+
+	if (0 >= len-- || '1' > *text || '7' < *text)
+		return FAIL;
+
+	period->start_day = *text++ - '0';
+
+	if (0 >= len)
+		return FAIL;
+
+	if ('-' == *text)
+	{
+		text++;
+		len--;
+
+		if (0 >= len-- || '1' > *text || '7' < *text)
+			return FAIL;
+
+		period->end_day = *text++ - '0';
+
+		if (period->start_day > period->end_day)
+			return FAIL;
+	}
+	else
+		period->end_day = period->start_day;
+
+	if (0 >= len-- || ',' != *text++)
+		return FAIL;
+
+	if (SUCCEED != time_parse(&period->start_time, text, len, &parsed_len))
+		return FAIL;
+
+	text += parsed_len;
+	len -= parsed_len;
+
+	if (0 >= len-- || '-' != *text++)
+		return FAIL;
+
+	if (SUCCEED != time_parse(&period->end_time, text, len, &parsed_len))
+		return FAIL;
+
+	if (period->start_time >= period->end_time)
+		return FAIL;
+
+	if (0 != (len -= parsed_len))
+		return FAIL;
+
+	return SUCCEED;
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Function: zbx_check_time_period                                            *
+ *                                                                            *
+ * Purpose: validate time period and check if specified time is within it     *
+ *                                                                            *
+ * Parameters: period - [IN] semicolon-separated list of time periods in one  *
+ *                           of the following formats:                        *
+ *                             d1-d2,h1:m1-h2:m2                              *
+ *                             or d1,h1:m1-h2:m2                              *
+ *             time   - [IN] time to check                                    *
+ *             res    - [OUT] check result:                                   *
+ *                              SUCCEED - if time is within period            *
+ *                              FAIL    - otherwise                           *
+ *                                                                            *
+ * Return value: validation result (SUCCEED - valid, FAIL - invalid)          *
+ *                                                                            *
+ * Comments:   !!! Don't forget to sync code with PHP !!!                     *
+ *                                                                            *
+ ******************************************************************************/
+int	zbx_check_time_period(const char *period, time_t time, int *res)
+{
+	int			res_total = FAIL;
+	const char		*next;
+	struct tm		*tm;
+	zbx_time_period_t	tp;
+
+	tm = localtime(&time);
+
+	next = strchr(period, ';');
+	while  (SUCCEED == time_period_parse(&tp, period, (NULL == next ? (int)strlen(period) : (int)(next - period))))
+	{
+		if (SUCCEED == check_time_period(tp, tm))
+			res_total = SUCCEED;	/* no short-circuits, validate all periods before return */
+
+		if (NULL == next)
+		{
+			*res = res_total;
+			return SUCCEED;
+		}
+
+		period = next + 1;
+		next = strchr(period, ';');
+	}
+
+	return FAIL;
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Function: flexible_interval_free                                           *
+ *                                                                            *
+ * Purpose: frees flexible interval                                           *
+ *                                                                            *
+ * Parameters: interval - [IN] flexible interval                              *
+ *                                                                            *
+ ******************************************************************************/
+static void	flexible_interval_free(zbx_flexible_interval_t *interval)
+{
+	zbx_flexible_interval_t	*interval_next;
+
+	for (; NULL != interval; interval = interval_next)
+	{
+		interval_next = interval->next;
+		zbx_free(interval);
+	}
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Function: flexible_interval_parse                                          *
+ *                                                                            *
+ * Purpose: parses flexible interval                                          *
+ *                                                                            *
+ * Parameters: interval - [IN/OUT] the first interval                         *
+ *             text     - [IN] the text to parse                              *
+ *             len      - [IN] the text length                                *
+ *                                                                            *
+ * Return value: SUCCEED - the interval was successfully parsed               *
+ *               FAIL    - otherwise                                          *
+ *                                                                            *
+ * Comments: !!! Don't forget to sync code with PHP !!!                       *
+ *           Supported format is delay/period                                 *
+ *                                                                            *
+ ******************************************************************************/
+static int	flexible_interval_parse(zbx_flexible_interval_t *interval, const char *text, int len)
+{
+	const char	*ptr;
+
+	for (ptr = text; 0 < len && '\0' != *ptr && '/' != *ptr; len--, ptr++)
+		;
+
+	if (SUCCEED != is_time_suffix(text, &interval->delay, (int)(ptr - text)))
+		return FAIL;
+
+	if (0 >= len-- || '/' != *ptr++)
+		return FAIL;
+
+	return time_period_parse(&interval->period, ptr, len);
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Function: calculate_dayofweek                                              *
+ *                                                                            *
+ * Purpose: calculates day of week                                            *
+ *                                                                            *
+ * Parameters: year - [IN] the year (>1752)                                   *
+ *             mon  - [IN] the month (1-12)                                   *
+ *             mday - [IN] the month day (1-31)                               *
+ *                                                                            *
+ * Return value: The day of week: 1 - Monday, 2 - Tuesday, ...                *
+ *                                                                            *
+ ******************************************************************************/
+static int	calculate_dayofweek(int year, int mon, int mday)
+{
+	static int	mon_table[] = {0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4};
+
+	if (mon < 3)
+		year--;
+
+	return (year + year / 4 - year / 100 + year / 400 + mon_table[mon - 1] + mday - 1) % 7 + 1;
 }
 
 /******************************************************************************
@@ -849,7 +1077,7 @@ static void	scheduler_filter_free(zbx_scheduler_filter_t *filter)
  *                                                                            *
  * Purpose: frees scheduler interval                                          *
  *                                                                            *
- * Parameters: filter - [IN] scheduler interval                               *
+ * Parameters: interval - [IN] scheduler interval                             *
  *                                                                            *
  ******************************************************************************/
 static void	scheduler_interval_free(zbx_scheduler_interval_t *interval)
@@ -884,7 +1112,7 @@ static void	scheduler_interval_free(zbx_scheduler_interval_t *interval)
  *             var_len - [IN] the maximum number of characters for a filter   *
  *                       variable (<from>, <to>, <step>)                      *
  *                                                                            *
- * Return value: SUCCEED - the fitler was successfully parsed                 *
+ * Return value: SUCCEED - the filter was successfully parsed                 *
  *               FAIL    - otherwise                                          *
  *                                                                            *
  * Comments: This function recursively calls itself for each filter fragment. *
@@ -984,7 +1212,7 @@ static int	scheduler_parse_filter_r(zbx_scheduler_filter_t **filter, const char 
 			return FAIL;
 	}
 
-	filter_new = zbx_malloc(NULL, sizeof(zbx_scheduler_filter_t));
+	filter_new = (zbx_scheduler_filter_t *)zbx_malloc(NULL, sizeof(zbx_scheduler_filter_t));
 	filter_new->start = start;
 	filter_new->end = end;
 	filter_new->step = step;
@@ -1008,7 +1236,7 @@ static int	scheduler_parse_filter_r(zbx_scheduler_filter_t **filter, const char 
  *             var_len - [IN] the maximum number of characters for a filter   *
  *                       variable (<from>, <to>, <step>)                      *
  *                                                                            *
- * Return value: SUCCEED - the fitler was successfully parsed                 *
+ * Return value: SUCCEED - the filter was successfully parsed                 *
  *               FAIL    - otherwise                                          *
  *                                                                            *
  * Comments: This function will fail if a filter already exists. This         *
@@ -1118,80 +1346,6 @@ static int	scheduler_interval_parse(zbx_scheduler_interval_t *interval, const ch
 
 /******************************************************************************
  *                                                                            *
- * Function: preprocess_flexible_interval                                     *
- *                                                                            *
- * Purpose: parses out the flexible interval in a text format and scheduler   *
- *          interval in zbx_scheduler_interval_t structure                    *
- *                                                                            *
- * Parameters: text       - [IN] the text to parse                            *
- *             interval   - [OUT] the parsed scheduler interval. Must be a    *
- *                          pointer to a NULL pointer on the first call. It   *
- *                          will be left untouched if the text does not       *
- *                          contain scheduler intervals                       *
- *             out        - [IN/OUT] flexible interval in text format         *
- *             out_alloc  - [IN/OUT] the number of bytes allocated for out    *
- *             out_offset - [IN/OUT] the flexible interval length in out      *
- *                          buffer                                            *
- *                                                                            *
- * Return value: SUCCEED - the text was successfully parsed                   *
- *               FAIL    - otherwise                                          *
- *                                                                            *
- * Comments: This function recursively calls itself for each interval.        *
- *                                                                            *
- ******************************************************************************/
-static int	preprocess_flexible_interval(const char *text, zbx_scheduler_interval_t **interval,
-		char **out, size_t *out_alloc, size_t *out_offset, char **errmsg)
-{
-	const char			*ptr;
-	zbx_scheduler_interval_t	*new_interval;
-
-	ptr = strchr(text, ';');
-
-	if (NULL == ptr)
-		ptr = text + strlen(text);
-
-	if (0 != isdigit(*text))
-	{
-		if (0 != *out_offset)
-			zbx_chrcpy_alloc(out, out_alloc, out_offset, ';');
-
-		zbx_strncpy_alloc(out, out_alloc, out_offset, text, ptr - text);
-	}
-
-	if ('\0' != *ptr)
-	{
-		if (SUCCEED != preprocess_flexible_interval(ptr + 1, interval, out, out_alloc, out_offset, errmsg))
-			return FAIL;
-	}
-
-	/* flexible interval has already been copied, return success */
-	if (0 != isdigit(*text))
-		return SUCCEED;
-
-	new_interval = zbx_malloc(NULL, sizeof(zbx_scheduler_interval_t));
-	memset(new_interval, 0, sizeof(zbx_scheduler_interval_t));
-
-	if (SUCCEED != scheduler_interval_parse(new_interval, text, ptr - text))
-	{
-		size_t	errmsg_alloc = 0, errmsg_offset = 0;
-
-		zbx_free(*errmsg);
-		zbx_strcpy_alloc(errmsg, &errmsg_alloc, &errmsg_offset, "invalid scheduling interval: \"");
-		zbx_strncpy_alloc(errmsg, &errmsg_alloc, &errmsg_offset, text, ptr - text + 1);
-		zbx_strcpy_alloc(errmsg, &errmsg_alloc, &errmsg_offset, "\"");
-
-		scheduler_interval_free(new_interval);
-		return FAIL;
-	}
-
-	new_interval->next = *interval;
-	*interval = new_interval;
-
-	return SUCCEED;
-}
-
-/******************************************************************************
- *                                                                            *
  * Function: scheduler_get_nearest_filter_value                               *
  *                                                                            *
  * Purpose: gets the next nearest value that satisfies the filter chain       *
@@ -1264,7 +1418,7 @@ static int	scheduler_get_wday_nextcheck(const zbx_scheduler_interval_t *interval
 	if (NULL == interval->wdays)
 		return SUCCEED;
 
-	value_now = value_next = (0 == tm->tm_wday ? 7 : tm->tm_wday);
+	value_now = value_next = calculate_dayofweek(tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday);
 
 	/* get the nearest week day from the current week day*/
 	if (SUCCEED != scheduler_get_nearest_filter_value(interval->wdays, &value_next))
@@ -1285,7 +1439,7 @@ static int	scheduler_get_wday_nextcheck(const zbx_scheduler_interval_t *interval
 	tm->tm_mday += value_next - value_now;
 
 	/* check if the resulting month day is valid */
-	return (-1 != mktime(tm) ? SUCCEED : FAIL);
+	return (tm->tm_mday <= zbx_day_in_month(tm->tm_year + 1970, tm->tm_mon + 1) ? SUCCEED : FAIL);
 }
 
 /******************************************************************************
@@ -1303,18 +1457,13 @@ static int	scheduler_get_wday_nextcheck(const zbx_scheduler_interval_t *interval
  ******************************************************************************/
 static int	scheduler_validate_wday_filter(const zbx_scheduler_interval_t *interval, struct tm *tm)
 {
-	time_t				nextcheck;
 	const zbx_scheduler_filter_t	*filter;
 	int				value;
 
 	if (NULL == interval->wdays)
 		return SUCCEED;
 
-	/* mktime will aso set correct wday value */
-	if (-1 == (nextcheck = mktime(tm)))
-		return FAIL;
-
-	value = (0 == tm->tm_wday ? 7 : tm->tm_wday);
+	value = calculate_dayofweek(tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday);
 
 	/* check if the value match week day filter */
 	for (filter = interval->wdays; NULL != filter; filter = filter->next)
@@ -1353,9 +1502,14 @@ static int	scheduler_validate_wday_filter(const zbx_scheduler_interval_t *interv
  ******************************************************************************/
 static int	scheduler_get_day_nextcheck(const zbx_scheduler_interval_t *interval, struct tm *tm)
 {
+	int	tmp;
+
 	/* first check if the provided tm structure has valid date format */
-	if (-1 == mktime(tm))
+	if (FAIL == zbx_utc_time(tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec,
+			&tmp))
+	{
 		return FAIL;
+	}
 
 	if (NULL == interval->mdays)
 		return scheduler_get_wday_nextcheck(interval, tm);
@@ -1363,13 +1517,17 @@ static int	scheduler_get_day_nextcheck(const zbx_scheduler_interval_t *interval,
 	/* iterate through month days until week day filter matches or we have ran out of month days */
 	while (SUCCEED == scheduler_get_nearest_filter_value(interval->mdays, &tm->tm_mday))
 	{
+		/* check if the date is still valid - we haven't ran out of month days */
+		if (tm->tm_mday > zbx_day_in_month(tm->tm_year + 1970, tm->tm_mon + 1))
+			break;
+
 		if (SUCCEED == scheduler_validate_wday_filter(interval, tm))
 			return SUCCEED;
 
 		tm->tm_mday++;
 
 		/* check if the date is still valid - we haven't ran out of month days */
-		if (-1 == mktime(tm))
+		if (tm->tm_mday > zbx_day_in_month(tm->tm_year + 1970, tm->tm_mon + 1))
 			break;
 	}
 
@@ -1564,10 +1722,94 @@ static void	scheduler_apply_second_filter(zbx_scheduler_interval_t *interval, st
 
 /******************************************************************************
  *                                                                            *
+ * Function: scheduler_find_dst_change                                        *
+ *                                                                            *
+ * Purpose: finds daylight saving change time inside specified time period    *
+ *                                                                            *
+ * Parameters: time_start - [IN] the time period start                        *
+ *             time_end   - [IN] the time period end                          *
+ *                                                                            *
+ * Return Value: Time when the daylight saving changes should occur.          *
+ *                                                                            *
+ * Comments: The calculated time is cached and reused if it first the         *
+ *           specified period.                                                *
+ *                                                                            *
+ ******************************************************************************/
+static time_t	scheduler_find_dst_change(time_t time_start, time_t time_end)
+{
+	static time_t	time_dst = 0;
+	struct tm	*tm;
+	time_t		time_mid;
+	int		start, end, mid, dst_start;
+
+	if (time_dst < time_start || time_dst > time_end)
+	{
+		/* assume that daylight saving will change only on 0 seconds */
+		start = time_start / 60;
+		end = time_end / 60;
+
+		tm = localtime(&time_start);
+		dst_start = tm->tm_isdst;
+
+		while (end > start + 1)
+		{
+			mid = (start + end) / 2;
+			time_mid = mid * 60;
+
+			tm = localtime(&time_mid);
+
+			if (tm->tm_isdst == dst_start)
+				start = mid;
+			else
+				end = mid;
+		}
+
+		time_dst = end * 60;
+	}
+
+	return time_dst;
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Function: scheduler_tm_inc                                                 *
+ *                                                                            *
+ * Purpose: increment struct tm value by one second                           *
+ *                                                                            *
+ * Parameters: tm - [IN/OUT] the tm structure to increment                    *
+ *                                                                            *
+ ******************************************************************************/
+static void	scheduler_tm_inc(struct tm *tm)
+{
+	if (60 > ++tm->tm_sec)
+		return;
+
+	tm->tm_sec = 0;
+	if (60 > ++tm->tm_min)
+		return;
+
+	tm->tm_min = 0;
+	if (24 > ++tm->tm_hour)
+		return;
+
+	tm->tm_hour = 0;
+	if (zbx_day_in_month(tm->tm_year + 1900, tm->tm_mon + 1) >= ++tm->tm_mday)
+		return;
+
+	tm->tm_mday = 1;
+	if (12 > ++tm->tm_mon)
+		return;
+
+	tm->tm_mon = 0;
+	tm->tm_year++;
+	return;
+}
+
+/******************************************************************************
+ *                                                                            *
  * Function: scheduler_get_nextcheck                                          *
  *                                                                            *
- * Purpose: applies second filter to the specified time/day calculating the   *
- *          next scheduled check                                              *
+ * Purpose: finds the next timestamp satisfying one of intervals.             *
  *                                                                            *
  * Parameters: interval - [IN] the scheduler interval                         *
  *             now      - [IN] the current timestamp                          *
@@ -1577,28 +1819,353 @@ static void	scheduler_apply_second_filter(zbx_scheduler_interval_t *interval, st
  ******************************************************************************/
 static time_t	scheduler_get_nextcheck(zbx_scheduler_interval_t *interval, time_t now)
 {
-	struct tm	tm_start, tm;
-	int		nextcheck = 0, current_nextcheck;
+	struct tm	tm_start, tm, tm_dst;
+	time_t		nextcheck = 0, current_nextcheck;
 
 	tm_start = *(localtime(&now));
-	tm_start.tm_isdst = -1;
 
 	for (; NULL != interval; interval = interval->next)
 	{
 		tm = tm_start;
 
-		scheduler_apply_day_filter(interval, &tm);
-		scheduler_apply_hour_filter(interval, &tm);
-		scheduler_apply_minute_filter(interval, &tm);
-		scheduler_apply_second_filter(interval, &tm);
+		do
+		{
+			scheduler_tm_inc(&tm);
+			scheduler_apply_day_filter(interval, &tm);
+			scheduler_apply_hour_filter(interval, &tm);
+			scheduler_apply_minute_filter(interval, &tm);
+			scheduler_apply_second_filter(interval, &tm);
 
-		current_nextcheck = mktime(&tm);
+			tm.tm_isdst = tm_start.tm_isdst;
+		}
+		while (-1 == (current_nextcheck = mktime(&tm)));
+
+		tm_dst = *(localtime(&current_nextcheck));
+		if (tm_dst.tm_isdst != tm_start.tm_isdst)
+		{
+			int	dst = tm_dst.tm_isdst;
+			time_t	time_dst;
+
+			time_dst = scheduler_find_dst_change(now, current_nextcheck);
+			tm_dst = *localtime(&time_dst);
+
+			scheduler_apply_day_filter(interval, &tm_dst);
+			scheduler_apply_hour_filter(interval, &tm_dst);
+			scheduler_apply_minute_filter(interval, &tm_dst);
+			scheduler_apply_second_filter(interval, &tm_dst);
+
+			tm_dst.tm_isdst = dst;
+			current_nextcheck = mktime(&tm_dst);
+		}
 
 		if (0 == nextcheck || current_nextcheck < nextcheck)
 			nextcheck = current_nextcheck;
 	}
 
 	return nextcheck;
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Function: parse_user_macro                                                 *
+ *                                                                            *
+ * Purpose: parses user macro and finds it's length                           *
+ *                                                                            *
+ * Parameters: str  - [IN] string to check                                    *
+ *             len  - [OUT] length of macro                                   *
+ *                                                                            *
+ * Return Value:                                                              *
+ *     SUCCEED - the macro was parsed successfully.                           *
+ *     FAIL    - the macro parsing failed, the content of output variables    *
+ *               is not defined.                                              *
+ *                                                                            *
+ ******************************************************************************/
+static int	parse_user_macro(const char *str, int *len)
+{
+	int	macro_r, context_l, context_r;
+
+	if ('{' != *str || '$' != *(str + 1) || SUCCEED != zbx_user_macro_parse(str, &macro_r, &context_l, &context_r,
+			NULL))
+	{
+		return FAIL;
+	}
+
+	*len = macro_r + 1;
+
+	return SUCCEED;
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Function: parse_simple_interval                                            *
+ *                                                                            *
+ * Purpose: parses user macro and finds it's length                           *
+ *                                                                            *
+ * Parameters: str   - [IN] string to check                                   *
+ *             len   - [OUT] length simple interval string until separator    *
+ *             sep   - [IN] separator to calculate length                     *
+ *             value - [OUT] interval value                                   *
+ *                                                                            *
+ * Return Value:                                                              *
+ *     SUCCEED - the macro was parsed successfully.                           *
+ *     FAIL    - the macro parsing failed, the content of output variables    *
+ *               is not defined.                                              *
+ *                                                                            *
+ ******************************************************************************/
+static int	parse_simple_interval(const char *str, int *len, char sep, int *value)
+{
+	const char	*delim;
+
+	if (SUCCEED != is_time_suffix(str, value,
+			(int)(NULL == (delim = strchr(str, sep)) ? ZBX_LENGTH_UNLIMITED : delim - str)))
+	{
+		return FAIL;
+	}
+
+	*len = NULL == delim ? (int)strlen(str) : delim - str;
+
+	return SUCCEED;
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Function: zbx_validate_interval                                            *
+ *                                                                            *
+ * Purpose: validate update interval, flexible and scheduling intervals       *
+ *                                                                            *
+ * Parameters: str   - [IN] string to check                                   *
+ *             error - [OUT] validation error                                 *
+ *                                                                            *
+ * Return Value:                                                              *
+ *     SUCCEED - parsed successfully.                                         *
+ *     FAIL    - parsing failed.                                              *
+ *                                                                            *
+ ******************************************************************************/
+int	zbx_validate_interval(const char *str, char **error)
+{
+	int		simple_interval, interval, len, custom = 0, macro;
+	const char	*delim;
+
+	if (SUCCEED == parse_user_macro(str, &len) && ('\0' == *(delim = str + len) || ';' == *delim))
+	{
+		if ('\0' == *delim)
+			delim = NULL;
+
+		simple_interval = 1;
+	}
+	else if (SUCCEED == parse_simple_interval(str, &len, ';', &simple_interval))
+	{
+		if ('\0' == *(delim = str + len))
+			delim = NULL;
+	}
+	else
+	{
+		*error = zbx_dsprintf(*error, "Invalid update interval \"%.*s\".",
+				NULL == (delim = strchr(str, ';')) ? (int)strlen(str) : (int)(delim - str), str);
+		return FAIL;
+	}
+
+	while (NULL != delim)
+	{
+		str = delim + 1;
+
+		if ((SUCCEED == (macro = parse_user_macro(str, &len)) ||
+				SUCCEED == parse_simple_interval(str, &len, '/', &interval)) &&
+				'/' == *(delim = str + len))
+		{
+			zbx_time_period_t period;
+
+			custom = 1;
+
+			if (SUCCEED == macro)
+				interval = 1;
+
+			if (0 == interval && 0 == simple_interval)
+			{
+				*error = zbx_dsprintf(*error, "Invalid flexible interval \"%.*s\".", (int)(delim - str),
+						str);
+				return FAIL;
+			}
+
+			str = delim + 1;
+
+			if (SUCCEED == parse_user_macro(str, &len) && ('\0' == *(delim = str + len) || ';' == *delim))
+			{
+				if ('\0' == *delim)
+					delim = NULL;
+
+				continue;
+			}
+
+			if (SUCCEED == time_period_parse(&period, str,
+					NULL == (delim = strchr(str, ';')) ? (int)strlen(str) : (int)(delim - str)))
+			{
+				continue;
+			}
+
+			*error = zbx_dsprintf(*error, "Invalid flexible period \"%.*s\".",
+					NULL == delim ? (int)strlen(str) : (int)(delim - str), str);
+			return FAIL;
+		}
+		else
+		{
+			zbx_scheduler_interval_t	*new_interval;
+
+			custom = 1;
+
+			if (SUCCEED == macro && ('\0' == *(delim = str + len) || ';' == *delim))
+			{
+				if ('\0' == *delim)
+					delim = NULL;
+
+				continue;
+			}
+
+			new_interval = (zbx_scheduler_interval_t *)zbx_malloc(NULL, sizeof(zbx_scheduler_interval_t));
+			memset(new_interval, 0, sizeof(zbx_scheduler_interval_t));
+
+			if (SUCCEED == scheduler_interval_parse(new_interval, str,
+					NULL == (delim = strchr(str, ';')) ? (int)strlen(str) : (int)(delim - str)))
+			{
+				scheduler_interval_free(new_interval);
+				continue;
+			}
+			scheduler_interval_free(new_interval);
+
+			*error = zbx_dsprintf(*error, "Invalid custom interval \"%.*s\".",
+					NULL == delim ? (int)strlen(str) : (int)(delim - str), str);
+
+			return FAIL;
+		}
+	}
+
+	if ((0 == custom && 0 == simple_interval) || SEC_PER_DAY < simple_interval)
+	{
+		*error = zbx_dsprintf(*error, "Invalid update interval \"%d\"", simple_interval);
+		return FAIL;
+	}
+
+	return SUCCEED;
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Function: zbx_interval_preproc                                             *
+ *                                                                            *
+ * Purpose: parses item and low-level discovery rule update intervals         *
+ *                                                                            *
+ * Parameters: interval_str     - [IN] update interval string to parse        *
+ *             simple_interval  - [OUT] simple update interval                *
+ *             custom_intervals - [OUT] flexible and scheduling intervals     *
+ *             error            - [OUT] error message                         *
+ *                                                                            *
+ * Return value: SUCCEED - intervals are valid                                *
+ *               FAIL    - otherwise                                          *
+ *                                                                            *
+ * Comments: !!! Don't forget to sync code with PHP !!!                       *
+ *           Supported format:                                                *
+ *             SimpleInterval, {";", FlexibleInterval | SchedulingInterval};  *
+ *                                                                            *
+ ******************************************************************************/
+int	zbx_interval_preproc(const char *interval_str, int *simple_interval, zbx_custom_interval_t **custom_intervals,
+		char **error)
+{
+	zbx_flexible_interval_t		*flexible = NULL;
+	zbx_scheduler_interval_t	*scheduling = NULL;
+	const char			*delim, *interval_type;
+
+	if (SUCCEED != is_time_suffix(interval_str, simple_interval,
+			(int)(NULL == (delim = strchr(interval_str, ';')) ? ZBX_LENGTH_UNLIMITED : delim - interval_str)))
+	{
+		interval_type = "update";
+		goto fail;
+	}
+
+	if (NULL == custom_intervals)	/* caller wasn't interested in custom intervals, don't parse them */
+		return SUCCEED;
+
+	while (NULL != delim)
+	{
+		interval_str = delim + 1;
+		delim = strchr(interval_str, ';');
+
+		if (0 != isdigit(*interval_str))
+		{
+			zbx_flexible_interval_t	*new_interval;
+
+			new_interval = (zbx_flexible_interval_t *)zbx_malloc(NULL, sizeof(zbx_flexible_interval_t));
+
+			if (SUCCEED != flexible_interval_parse(new_interval, interval_str,
+					(NULL == delim ? (int)strlen(interval_str) : (int)(delim - interval_str))) ||
+					(0 == *simple_interval && 0 == new_interval->delay))
+			{
+				zbx_free(new_interval);
+				interval_type = "flexible";
+				goto fail;
+			}
+
+			new_interval->next = flexible;
+			flexible = new_interval;
+		}
+		else
+		{
+			zbx_scheduler_interval_t	*new_interval;
+
+			new_interval = (zbx_scheduler_interval_t *)zbx_malloc(NULL, sizeof(zbx_scheduler_interval_t));
+			memset(new_interval, 0, sizeof(zbx_scheduler_interval_t));
+
+			if (SUCCEED != scheduler_interval_parse(new_interval, interval_str,
+					(NULL == delim ? (int)strlen(interval_str) : (int)(delim - interval_str))))
+			{
+				scheduler_interval_free(new_interval);
+				interval_type = "scheduling";
+				goto fail;
+			}
+
+			new_interval->next = scheduling;
+			scheduling = new_interval;
+		}
+	}
+
+	if ((NULL == flexible && NULL == scheduling && 0 == *simple_interval) || SEC_PER_DAY < *simple_interval)
+	{
+		interval_type = "update";
+		goto fail;
+	}
+
+	*custom_intervals = (zbx_custom_interval_t *)zbx_malloc(NULL, sizeof(zbx_custom_interval_t));
+	(*custom_intervals)->flexible = flexible;
+	(*custom_intervals)->scheduling = scheduling;
+
+	return SUCCEED;
+fail:
+	if (NULL != error)
+	{
+		*error = zbx_dsprintf(*error, "Invalid %s interval \"%.*s\".", interval_type,
+				(NULL == delim ? (int)strlen(interval_str) : (int)(delim - interval_str)),
+				interval_str);
+	}
+
+	flexible_interval_free(flexible);
+	scheduler_interval_free(scheduling);
+
+	return FAIL;
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Function: zbx_custom_interval_free                                         *
+ *                                                                            *
+ * Purpose: frees custom update intervals                                     *
+ *                                                                            *
+ * Parameters: custom_intervals - [IN] custom intervals                       *
+ *                                                                            *
+ ******************************************************************************/
+void	zbx_custom_interval_free(zbx_custom_interval_t *custom_intervals)
+{
+	flexible_interval_free(custom_intervals->flexible);
+	scheduler_interval_free(custom_intervals->scheduling);
+	zbx_free(custom_intervals);
 }
 
 /******************************************************************************
@@ -1611,9 +2178,8 @@ static time_t	scheduler_get_nextcheck(zbx_scheduler_interval_t *interval, time_t
  *                                     spread item checks over the delay      *
  *                                     period                                 *
  *             item_type        - [IN] the item type                          *
- *             delay            - [IN] default delay value, can be overridden *
- *             custom_intervals - [IN] descriptions of flexible intervals     *
- *                                     in the form [dd/d1-d2,hh:mm-hh:mm;]    *
+ *             simple_interval  - [IN] default delay value, can be overridden *
+ *             custom_intervals - [IN] preprocessed custom intervals          *
  *             now              - [IN] current timestamp                      *
  *                                                                            *
  * Return value: nextcheck value                                              *
@@ -1625,47 +2191,29 @@ static time_t	scheduler_get_nextcheck(zbx_scheduler_interval_t *interval, time_t
  *                                                                            *
  *           Old algorithm: now+delay                                         *
  *           New one: preserve period, if delay==5, nextcheck = 0,5,10,15,... *
- *           !!! Don't forget to sync code with PHP !!!                       *
  *                                                                            *
  ******************************************************************************/
-int	calculate_item_nextcheck(zbx_uint64_t seed, int item_type, int delay, const char *custom_intervals, time_t now)
+int	calculate_item_nextcheck(zbx_uint64_t seed, int item_type, int simple_interval,
+		const zbx_custom_interval_t *custom_intervals, time_t now)
 {
 	int	nextcheck = 0;
 
 	/* special processing of active items to see better view in queue */
 	if (ITEM_TYPE_ZABBIX_ACTIVE == item_type)
 	{
-		if (0 != delay)
-			nextcheck = (int)now + delay;
+		if (0 != simple_interval)
+			nextcheck = (int)now + simple_interval;
 		else
 			nextcheck = ZBX_JAN_2038;
 	}
 	else
 	{
-		int	current_delay = 0, try = 0;
+		int	current_delay = 0, attempt = 0;
 		time_t	next_interval, t, tmax, scheduled_check = 0;
-		char	*flex = NULL;
-		size_t	flex_alloc = 0, flex_offset = 0;
 
 		/* first try to parse out and calculate scheduled intervals */
 		if (NULL != custom_intervals)
-		{
-			zbx_scheduler_interval_t	*interval = NULL;
-			char				*errmsg = NULL;
-
-			if (SUCCEED == preprocess_flexible_interval(custom_intervals, &interval, &flex, &flex_alloc,
-					&flex_offset, &errmsg))
-			{
-				custom_intervals = flex;
-				scheduled_check = scheduler_get_nextcheck(interval, now + 1);
-				scheduler_interval_free(interval);
-			}
-			else
-			{
-				zabbix_log(LOG_LEVEL_ERR, "%s", errmsg);
-				zbx_free(errmsg);
-			}
-		}
+			scheduled_check = scheduler_get_nextcheck(custom_intervals->scheduling, now);
 
 		/* Try to find the nearest 'nextcheck' value with condition */
 		/* 'now' < 'nextcheck' < 'now' + SEC_PER_YEAR. If it is not */
@@ -1677,14 +2225,17 @@ int	calculate_item_nextcheck(zbx_uint64_t seed, int item_type, int delay, const 
 		while (t < tmax)
 		{
 			/* calculate 'nextcheck' value for the current interval */
-			current_delay = get_current_delay(delay, custom_intervals, t);
+			if (NULL != custom_intervals)
+				current_delay = get_current_delay(simple_interval, custom_intervals->flexible, t);
+			else
+				current_delay = simple_interval;
 
 			if (0 != current_delay)
 			{
 				nextcheck = current_delay * (int)(t / (time_t)current_delay) +
 						(int)(seed % (zbx_uint64_t)current_delay);
 
-				if (0 == try)
+				if (0 == attempt)
 				{
 					while (nextcheck <= t)
 						nextcheck += current_delay;
@@ -1698,28 +2249,80 @@ int	calculate_item_nextcheck(zbx_uint64_t seed, int item_type, int delay, const 
 			else
 				nextcheck = ZBX_JAN_2038;
 
+			if (NULL == custom_intervals)
+				break;
+
 			/* 'nextcheck' < end of the current interval ? */
 			/* the end of the current interval is the beginning of the next interval - 1 */
-			if (FAIL != get_next_delay_interval(custom_intervals, t, &next_interval) &&
+			if (FAIL != get_next_delay_interval(custom_intervals->flexible, t, &next_interval) &&
 					nextcheck >= next_interval)
 			{
 				/* 'nextcheck' is beyond the current interval */
 				t = next_interval;
-				try++;
+				attempt++;
 			}
 			else
 				break;	/* nextcheck is within the current interval */
 		}
 
-		zbx_free(flex);
-
 		if (0 != scheduled_check && scheduled_check < nextcheck)
-			nextcheck = scheduled_check;
+			nextcheck = (int)scheduled_check;
 	}
 
 	return nextcheck;
 }
+/******************************************************************************
+ *                                                                            *
+ * Function: calculate_item_nextcheck_unreachable                             *
+ *                                                                            *
+ * Purpose: calculate nextcheck timestamp for item on unreachable host        *
+ *                                                                            *
+ * Parameters: simple_interval  - [IN] default delay value, can be overridden *
+ *             custom_intervals - [IN] preprocessed custom intervals          *
+ *             disable_until    - [IN] timestamp for next check               *
+ *                                                                            *
+ * Return value: nextcheck value                                              *
+ *                                                                            *
+ ******************************************************************************/
+int	calculate_item_nextcheck_unreachable(int simple_interval, const zbx_custom_interval_t *custom_intervals,
+		time_t disable_until)
+{
+	int	nextcheck = 0;
+	time_t	next_interval, tmax, scheduled_check = 0;
 
+	/* first try to parse out and calculate scheduled intervals */
+	if (NULL != custom_intervals)
+		scheduled_check = scheduler_get_nextcheck(custom_intervals->scheduling, disable_until);
+
+	/* Try to find the nearest 'nextcheck' value with condition */
+	/* 'now' < 'nextcheck' < 'now' + SEC_PER_YEAR. If it is not */
+	/* possible to check the item within a year, fail. */
+
+	nextcheck = disable_until;
+	tmax = disable_until + SEC_PER_YEAR;
+
+	if (NULL != custom_intervals)
+	{
+		while (nextcheck < tmax)
+		{
+			if (0 != get_current_delay(simple_interval, custom_intervals->flexible, nextcheck))
+				break;
+
+			/* find the flexible interval change */
+			if (FAIL == get_next_delay_interval(custom_intervals->flexible, nextcheck, &next_interval))
+			{
+				nextcheck = ZBX_JAN_2038;
+				break;
+			}
+			nextcheck = next_interval;
+		}
+	}
+
+	if (0 != scheduled_check && scheduled_check < nextcheck)
+		nextcheck = (int)scheduled_check;
+
+	return nextcheck;
+}
 /******************************************************************************
  *                                                                            *
  * Function: calculate_proxy_nextcheck                                        *
@@ -1763,37 +2366,39 @@ time_t	calculate_proxy_nextcheck(zbx_uint64_t hostid, unsigned int delay, time_t
  ******************************************************************************/
 int	is_ip4(const char *ip)
 {
-	const char	*__function_name = "is_ip4";
 	const char	*p = ip;
-	int		nums = 0, dots = 0, res = FAIL;
+	int		digits = 0, dots = 0, res = FAIL, octet = 0;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() ip:'%s'", __function_name, ip);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() ip:'%s'", __func__, ip);
 
 	while ('\0' != *p)
 	{
 		if (0 != isdigit(*p))
 		{
-			nums++;
+			octet = octet * 10 + (*p - '0');
+			digits++;
 		}
 		else if ('.' == *p)
 		{
-			if (0 == nums || 3 < nums)
+			if (0 == digits || 3 < digits || 255 < octet)
 				break;
-			nums = 0;
+
+			digits = 0;
+			octet = 0;
 			dots++;
 		}
 		else
 		{
-			nums = 0;
+			digits = 0;
 			break;
 		}
 
 		p++;
 	}
-	if (dots == 3 && 1 <= nums && nums <= 3)
+	if (3 == dots && 1 <= digits && 3 >= digits && 255 >= octet)
 		res = SUCCEED;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __function_name, zbx_result_string(res));
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(res));
 
 	return res;
 }
@@ -1811,46 +2416,55 @@ int	is_ip4(const char *ip)
  *                                                                            *
  * Author: Alexander Vladishev                                                *
  *                                                                            *
- * Comments: could be improved (not supported x:x:x:x:x:x:d.d.d.d addresses)  *
- *                                                                            *
  ******************************************************************************/
 int	is_ip6(const char *ip)
 {
-	const char	*__function_name = "is_ip6";
-	const char	*p = ip;
-	int		nums = 0, is_nums = 0, colons = 0, dcolons = 0, res = FAIL;
+	const char	*p = ip, *last_colon;
+	int		xdigits = 0, only_xdigits = 0, colons = 0, dbl_colons = 0, res;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() ip:'%s'", __function_name, ip);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() ip:'%s'", __func__, ip);
 
 	while ('\0' != *p)
 	{
 		if (0 != isxdigit(*p))
 		{
-			nums++;
-			is_nums = 1;
+			xdigits++;
+			only_xdigits = 1;
 		}
 		else if (':' == *p)
 		{
-			if (0 == nums && 0 < colons)
-				dcolons++;
-			if (4 < nums || 1 < dcolons)
+			if (0 == xdigits && 0 < colons)
+			{
+				/* consecutive sections of zeros are replaced with a double colon */
+				only_xdigits = 1;
+				dbl_colons++;
+			}
+
+			if (4 < xdigits || 1 < dbl_colons)
 				break;
-			nums = 0;
+
+			xdigits = 0;
 			colons++;
 		}
 		else
 		{
-			is_nums = 0;
+			only_xdigits = 0;
 			break;
 		}
 
 		p++;
 	}
 
-	if (2 <= colons && colons <= 7 && 4 >= nums && 1 == is_nums)
+	if (2 > colons || 7 < colons || 1 < dbl_colons || 4 < xdigits)
+		res = FAIL;
+	else if (1 == only_xdigits)
 		res = SUCCEED;
+	else if (7 > colons && (last_colon = strrchr(ip, ':')) < p)
+		res = is_ip4(last_colon + 1);	/* past last column is ipv4 mapped address */
+	else
+		res = FAIL;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __function_name, zbx_result_string(res));
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(res));
 
 	return res;
 }
@@ -1919,7 +2533,7 @@ int	is_ip(const char *ip)
 int	zbx_validate_hostname(const char *hostname)
 {
 	int		component;	/* periods ('.') are only allowed when they serve to delimit components */
-	int		len = 255;	/* maximum hostname length comes from RFC 1035 (without terminating '\0') */
+	int		len = MAX_ZBX_DNSNAME_LEN;
 	const char	*p;
 
 	/* the first character must be an alphanumeric character */
@@ -1951,7 +2565,7 @@ int	zbx_validate_hostname(const char *hostname)
  * Purpose: check if ip matches range of ip addresses                         *
  *                                                                            *
  * Parameters: list - [IN] comma-separated list of ip ranges                  *
- *                    192.168.0.1-64,192.168.0.128,10.10.0.0/24,12fc::21      *
+ *                         192.168.0.1-64,192.168.0.128,10.10.0.0/24,12fc::21 *
  *             ip   - [IN] ip address                                         *
  *                                                                            *
  * Return value: FAIL - out of range, SUCCEED - within the range              *
@@ -1959,8 +2573,6 @@ int	zbx_validate_hostname(const char *hostname)
  ******************************************************************************/
 int	ip_in_list(const char *list, const char *ip)
 {
-	const char	*__function_name = "ip_in_list";
-
 	int		ipaddress[8];
 	zbx_iprange_t	iprange;
 	char		*address = NULL;
@@ -1968,7 +2580,7 @@ int	ip_in_list(const char *list, const char *ip)
 	const char	*ptr;
 	int		ret = FAIL;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() list:'%s' ip:'%s'", __function_name, list, ip);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() list:'%s' ip:'%s'", __func__, list, ip);
 
 	if (SUCCEED != iprange_parse(&iprange, ip))
 		goto out;
@@ -2001,7 +2613,7 @@ int	ip_in_list(const char *list, const char *ip)
 
 	zbx_free(address);
 out:
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __function_name, zbx_result_string(ret));
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
 
 	return ret;
 }
@@ -2022,11 +2634,10 @@ out:
  ******************************************************************************/
 int	int_in_list(char *list, int value)
 {
-	const char	*__function_name = "int_in_list";
-	char		*start = NULL, *end = NULL, c = '\0';
-	int		i1, i2, ret = FAIL;
+	char	*start = NULL, *end = NULL, c = '\0';
+	int	i1, i2, ret = FAIL;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() list:'%s' value:%d", __function_name, list, value);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() list:'%s' value:%d", __func__, list, value);
 
 	for (start = list; '\0' != *start;)
 	{
@@ -2065,14 +2676,14 @@ int	int_in_list(char *list, int value)
 	if (NULL != end)
 		*end = c;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __function_name, zbx_result_string(ret));
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
 
 	return ret;
 }
 
 int	zbx_double_compare(double a, double b)
 {
-	return fabs(a - b) < ZBX_DOUBLE_EPSILON ? SUCCEED : FAIL;
+	return fabs(a - b) <= ZBX_DOUBLE_EPSILON ? SUCCEED : FAIL;
 }
 
 /******************************************************************************
@@ -2096,94 +2707,76 @@ int	zbx_double_compare(double a, double b)
  ******************************************************************************/
 int	is_double_suffix(const char *str, unsigned char flags)
 {
-	size_t	i;
-	char	dot = 0;
+	int	len;
 
-	for (i = 0; '\0' != str[i]; i++)
-	{
-		/* negative number? */
-		if ('-' == str[i] && 0 == i)
-			continue;
+	if ('-' == *str)	/* check leading sign */
+		str++;
 
-		if (0 != isdigit(str[i]))
-			continue;
-
-		if ('.' == str[i] && 0 == dot)
-		{
-			dot = 1;
-			continue;
-		}
-
-		/* last character is suffix */
-		if (0 != (flags & ZBX_FLAG_DOUBLE_SUFFIX) && NULL != strchr("KMGTsmhdw", str[i]) && '\0' == str[i + 1])
-			continue;
-
+	if (FAIL == zbx_number_parse(str, &len))
 		return FAIL;
-	}
 
-	return SUCCEED;
+	if ('\0' != *(str += len) && 0 != (flags & ZBX_FLAG_DOUBLE_SUFFIX) && NULL != strchr(ZBX_UNIT_SYMBOLS, *str))
+		str++;		/* allow valid suffix if flag is enabled */
+
+	return '\0' == *str ? SUCCEED : FAIL;
+}
+
+static int	is_double_valid_syntax(const char *str)
+{
+	int	len;
+
+	/* Valid syntax is a decimal number optionally followed by a decimal exponent. */
+	/* Leading and trailing white space, NAN, INF and hexadecimal notation are not allowed. */
+
+	if ('-' == *str || '+' == *str)		/* check leading sign */
+		str++;
+
+	if (FAIL == zbx_number_parse(str, &len))
+		return FAIL;
+
+	return '\0' == *(str + len) ? SUCCEED : FAIL;
 }
 
 /******************************************************************************
  *                                                                            *
  * Function: is_double                                                        *
  *                                                                            *
- * Purpose: check if the string is double                                     *
+ * Purpose: validate and optionally convert a string to a number of type      *
+ *         'double'                                                           *
  *                                                                            *
- * Parameters: str - string to check                                          *
+ * Parameters: str   - [IN] string to check                                   *
+ *             value - [OUT] output buffer where to write the converted value *
+ *                     (optional, can be NULL)                                *
  *                                                                            *
- * Return value:  SUCCEED - the string is double                              *
- *                FAIL - otherwise                                            *
+ * Return value:  SUCCEED - the string can be converted to 'double' and       *
+ *                          was converted if 'value' is not NULL              *
+ *                FAIL - the string does not represent a valid 'double' or    *
+ *                       its value is outside of valid range                  *
  *                                                                            *
  * Author: Alexei Vladishev, Aleksandrs Saveljevs                             *
  *                                                                            *
  ******************************************************************************/
-int	is_double(const char *str)
+int	is_double(const char *str, double *value)
 {
-	int	i = 0, digits = 0;
+	double	tmp;
+	char	*endptr;
 
-	while (' ' == str[i])				/* trim left spaces */
-		i++;
+	/* Not all strings accepted by strtod() can be accepted in Zabbix. */
+	/* Therefore additional, more strict syntax check is used before strtod(). */
 
-	if ('-' == str[i] || '+' == str[i])		/* check leading sign */
-		i++;
-
-	while (0 != isdigit(str[i]))			/* check digits before dot */
-	{
-		i++;
-		digits = 1;
-	}
-
-	if ('.' == str[i])				/* check decimal dot */
-		i++;
-
-	while (0 != isdigit(str[i]))			/* check digits after dot */
-	{
-		i++;
-		digits = 1;
-	}
-
-	if (0 == digits)				/* 1., .1, and 1.1 are good, just . is not */
+	if (SUCCEED != is_double_valid_syntax(str))
 		return FAIL;
 
-	if ('e' == str[i] || 'E' == str[i])		/* check exponential part */
-	{
-		i++;
+	errno = 0;
+	tmp = strtod(str, &endptr);
 
-		if ('-' == str[i] || '+' == str[i])	/* check exponent sign */
-			i++;
+	if ('\0' != *endptr || HUGE_VAL == tmp || -HUGE_VAL == tmp || EDOM == errno)
+		return FAIL;
 
-		if (0 == isdigit(str[i]))		/* check exponent */
-			return FAIL;
+	if (NULL != value)
+		*value = tmp;
 
-		while (0 != isdigit(str[i]))
-			i++;
-	}
-
-	while (' ' == str[i])				/* trim right spaces */
-		i++;
-
-	return '\0' == str[i] ? SUCCEED : FAIL;
+	return SUCCEED;
 }
 
 /******************************************************************************
@@ -2193,8 +2786,10 @@ int	is_double(const char *str)
  * Purpose: check if the string is a non-negative integer with or without     *
  *          supported time suffix                                             *
  *                                                                            *
- * Parameters: str   - [IN] string to check                                   *
- *             value - [OUT] a pointer to converted value (optional)          *
+ * Parameters: str    - [IN] string to check                                  *
+ *             value  - [OUT] a pointer to converted value (optional)         *
+ *             length - [IN] number of characters to validate, pass           *
+ *                      ZBX_LENGTH_UNLIMITED to validate full string          *
  *                                                                            *
  * Return value: SUCCEED - the string is valid and within reasonable limits   *
  *               FAIL    - otherwise                                          *
@@ -2204,15 +2799,16 @@ int	is_double(const char *str)
  * Comments: the function automatically processes suffixes s, m, h, d, w      *
  *                                                                            *
  ******************************************************************************/
-int	is_time_suffix(const char *str, int *value)
+int	is_time_suffix(const char *str, int *value, int length)
 {
 	const int	max = 0x7fffffff;	/* minimum acceptable value for INT_MAX is 2 147 483 647 */
+	int		len = length;
 	int		value_tmp = 0, c, factor = 1;
 
-	if ('\0' == *str || 0 == isdigit(*str))
+	if ('\0' == *str || 0 >= len || 0 == isdigit(*str))
 		return FAIL;
 
-	while ('\0' != *str && 0 != isdigit(*str))
+	while ('\0' != *str && 0 < len && 0 != isdigit(*str))
 	{
 		c = (int)(unsigned char)(*str - '0');
 
@@ -2222,9 +2818,10 @@ int	is_time_suffix(const char *str, int *value)
 		value_tmp = value_tmp * 10 + c;
 
 		str++;
+		len--;
 	}
 
-	if ('\0' != *str)
+	if ('\0' != *str && 0 < len)
 	{
 		switch (*str)
 		{
@@ -2247,9 +2844,10 @@ int	is_time_suffix(const char *str, int *value)
 		}
 
 		str++;
+		len--;
 	}
 
-	if ('\0' != *str)
+	if ((ZBX_LENGTH_UNLIMITED == length && '\0' != *str) || (ZBX_LENGTH_UNLIMITED != length && 0 != len))
 		return FAIL;
 
 	if (max / factor < value_tmp)
@@ -2261,7 +2859,7 @@ int	is_time_suffix(const char *str, int *value)
 	return SUCCEED;
 }
 
-#if defined(_WINDOWS)
+#if defined(_WINDOWS) || defined(__MINGW32__)
 int	_wis_uint(const wchar_t *wide_string)
 {
 	const wchar_t	*wide_char = wide_string;
@@ -2282,36 +2880,6 @@ int	_wis_uint(const wchar_t *wide_string)
 	return SUCCEED;
 }
 #endif
-
-/******************************************************************************
- *                                                                            *
- * Function: is_int_prefix                                                    *
- *                                                                            *
- * Purpose: check if the beginning of string is a signed integer              *
- *                                                                            *
- * Parameters: str - string to check                                          *
- *                                                                            *
- * Return value:  SUCCEED - the beginning of string is a signed integer       *
- *                FAIL - otherwise                                            *
- *                                                                            *
- * Author: Aleksandrs Saveljevs                                               *
- *                                                                            *
- ******************************************************************************/
-int	is_int_prefix(const char *str)
-{
-	size_t	i = 0;
-
-	while (' ' == str[i])	/* trim left spaces */
-		i++;
-
-	if ('-' == str[i] || '+' == str[i])
-		i++;
-
-	if (0 == isdigit(str[i]))
-		return FAIL;
-
-	return SUCCEED;
-}
 
 /******************************************************************************
  *                                                                            *
@@ -2452,15 +3020,14 @@ int	is_hex_n_range(const char *str, size_t n, void *value, size_t size, zbx_uint
  *                                                                            *
  * Author: Aleksandrs Saveljevs                                               *
  *                                                                            *
- * Comments:                                                                  *
- *                                                                            *
  ******************************************************************************/
 int	is_boolean(const char *str, zbx_uint64_t *value)
 {
+	double	dbl_tmp;
 	int	res;
 
-	if (SUCCEED == (res = is_double(str)))
-		*value = (0 != atof(str));
+	if (SUCCEED == (res = is_double(str, &dbl_tmp)))
+		*value = (0 != dbl_tmp);
 	else
 	{
 		char	tmp[16];
@@ -2468,10 +3035,15 @@ int	is_boolean(const char *str, zbx_uint64_t *value)
 		strscpy(tmp, str);
 		zbx_strlower(tmp);
 
-		if (SUCCEED == (res = str_in_list("true,t,yes,y,on,up,running,enabled,available", tmp, ',')))
+		if (SUCCEED == (res = str_in_list("true,t,yes,y,on,up,running,enabled,available,ok,master", tmp, ',')))
+		{
 			*value = 1;
-		else if (SUCCEED == (res = str_in_list("false,f,no,n,off,down,unused,disabled,unavailable", tmp, ',')))
+		}
+		else if (SUCCEED == (res = str_in_list("false,f,no,n,off,down,unused,disabled,unavailable,err,slave",
+				tmp, ',')))
+		{
 			*value = 0;
+		}
 	}
 
 	return res;
@@ -2519,7 +3091,8 @@ int	is_uoct(const char *str)
  *                                                                            *
  * Function: is_uhex                                                          *
  *                                                                            *
- * Purpose: check if the string is unsigned hexadecimal                       *
+ * Purpose: check if the string is unsigned hexadecimal representation of     *
+ *          data in the form "0-9, a-f or A-F"                                *
  *                                                                            *
  * Parameters: str - string to check                                          *
  *                                                                            *
@@ -2666,7 +3239,7 @@ int	uint64_array_add(zbx_uint64_t **values, int *alloc, int *num, zbx_uint64_t v
 		}
 
 		*alloc += alloc_step;
-		*values = zbx_realloc(*values, *alloc * sizeof(zbx_uint64_t));
+		*values = (zbx_uint64_t *)zbx_realloc(*values, *alloc * sizeof(zbx_uint64_t));
 	}
 
 	memmove(&(*values)[index + 1], &(*values)[index], sizeof(zbx_uint64_t) * (*num - index));
@@ -2952,21 +3525,6 @@ int	is_time_function(const char *func)
 
 /******************************************************************************
  *                                                                            *
- * Function: is_snmp_type                                                     *
- *                                                                            *
- * Return value:  SUCCEED  - the given type is one of regular SNMP types      *
- *                FAIL - otherwise                                            *
- *                                                                            *
- * Author: Aleksandrs Saveljevs                                               *
- *                                                                            *
- ******************************************************************************/
-int	is_snmp_type(unsigned char type)
-{
-	return ITEM_TYPE_SNMPv1 == type || ITEM_TYPE_SNMPv2c == type || ITEM_TYPE_SNMPv3 == type ? SUCCEED : FAIL;
-}
-
-/******************************************************************************
- *                                                                            *
  * Function: make_hostname                                                    *
  *                                                                            *
  * Purpose: replace all not-allowed hostname characters in the string         *
@@ -3012,9 +3570,7 @@ unsigned char	get_interface_type_by_item_type(unsigned char type)
 	{
 		case ITEM_TYPE_ZABBIX:
 			return INTERFACE_TYPE_AGENT;
-		case ITEM_TYPE_SNMPv1:
-		case ITEM_TYPE_SNMPv2c:
-		case ITEM_TYPE_SNMPv3:
+		case ITEM_TYPE_SNMP:
 		case ITEM_TYPE_SNMPTRAP:
 			return INTERFACE_TYPE_SNMP;
 		case ITEM_TYPE_IPMI:
@@ -3025,6 +3581,7 @@ unsigned char	get_interface_type_by_item_type(unsigned char type)
 		case ITEM_TYPE_EXTERNAL:
 		case ITEM_TYPE_SSH:
 		case ITEM_TYPE_TELNET:
+		case ITEM_TYPE_HTTPAGENT:
 			return INTERFACE_TYPE_ANY;
 		default:
 			return INTERFACE_TYPE_UNKNOWN;
@@ -3143,7 +3700,7 @@ void	zbx_alarm_flag_clear(void)
 	zbx_timed_out = 0;
 }
 
-#if !defined(_WINDOWS)
+#if !defined(_WINDOWS) && !defined(__MINGW32__)
 unsigned int	zbx_alarm_on(unsigned int seconds)
 {
 	zbx_alarm_flag_clear();
@@ -3165,3 +3722,137 @@ int	zbx_alarm_timed_out(void)
 {
 	return (0 == zbx_timed_out ? FAIL : SUCCEED);
 }
+
+/******************************************************************************
+ *                                                                            *
+ * Function: zbx_create_token                                                 *
+ *                                                                            *
+ * Purpose: creates semi-unique token based on the seed and current timestamp *
+ *                                                                            *
+ * Parameters:  seed - [IN] the seed                                          *
+ *                                                                            *
+ * Return value: Hexadecimal token string, must be freed by caller            *
+ *                                                                            *
+ * Comments: if you change token creation algorithm do not forget to adjust   *
+ *           ZBX_DATA_SESSION_TOKEN_SIZE definition                           *
+ *                                                                            *
+ ******************************************************************************/
+char	*zbx_create_token(zbx_uint64_t seed)
+{
+	const char	*hex = "0123456789abcdef";
+	zbx_timespec_t	ts;
+	md5_state_t	state;
+	md5_byte_t	hash[MD5_DIGEST_SIZE];
+	int		i;
+	char		*token, *ptr;
+
+	ptr = token = (char *)zbx_malloc(NULL, ZBX_DATA_SESSION_TOKEN_SIZE + 1);
+
+	zbx_timespec(&ts);
+
+	zbx_md5_init(&state);
+	zbx_md5_append(&state, (const md5_byte_t *)&seed, (int)sizeof(seed));
+	zbx_md5_append(&state, (const md5_byte_t *)&ts, (int)sizeof(ts));
+	zbx_md5_finish(&state, hash);
+
+	for (i = 0; i < MD5_DIGEST_SIZE; i++)
+	{
+		*ptr++ = hex[hash[i] >> 4];
+		*ptr++ = hex[hash[i] & 15];
+	}
+
+	*ptr = '\0';
+
+	return token;
+}
+
+
+#if !defined(_WINDOWS) && defined(HAVE_RESOLV_H)
+/******************************************************************************
+ *                                                                            *
+ * Function: update_resolver_conf                                             *
+ *                                                                            *
+ * Purpose: react to "/etc/resolv.conf" update                                *
+ *                                                                            *
+ * Comments: it is intended to call this function in the end of each process  *
+ *           main loop. The purpose of calling it at the end (instead of the  *
+ *           beginning of main loop) is to let the first initialization of    *
+ *           libc resolver proceed internally.                                *
+ *                                                                            *
+ ******************************************************************************/
+static void	update_resolver_conf(void)
+{
+#define ZBX_RESOLV_CONF_FILE	"/etc/resolv.conf"
+
+	static time_t	mtime = 0;
+	zbx_stat_t	buf;
+
+	if (0 == zbx_stat(ZBX_RESOLV_CONF_FILE, &buf) && mtime != buf.st_mtime)
+	{
+		mtime = buf.st_mtime;
+
+		if (0 != res_init())
+			zabbix_log(LOG_LEVEL_WARNING, "update_resolver_conf(): res_init() failed");
+	}
+
+#undef ZBX_RESOLV_CONF_FILE
+}
+#endif
+
+/******************************************************************************
+ *                                                                            *
+ * Function: zbx_update_env                                                   *
+ *                                                                            *
+ * Purpose: throttling of update "/etc/resolv.conf" and "stdio" to the new    *
+ *          log file after rotation                                           *
+ *                                                                            *
+ * Parameters: time_now - [IN] the time for compare in seconds                *
+ *                                                                            *
+ ******************************************************************************/
+void	zbx_update_env(double time_now)
+{
+	static double	time_update = 0;
+
+	/* handle /etc/resolv.conf update and log rotate less often than once a second */
+	if (1.0 < time_now - time_update)
+	{
+		time_update = time_now;
+		zbx_handle_log();
+#if !defined(_WINDOWS) && defined(HAVE_RESOLV_H)
+		update_resolver_conf();
+#endif
+	}
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Function: zbx_dc_get_agent_item_nextcheck                                  *
+ *                                                                            *
+ * Purpose: calculate item nextcheck for zabix agent type items               *
+ *                                                                            *
+ ******************************************************************************/
+int	zbx_get_agent_item_nextcheck(zbx_uint64_t itemid, const char *delay, unsigned char state, int now,
+		int refresh_unsupported, int *nextcheck, char **error)
+{
+	if (ITEM_STATE_NORMAL == state)
+	{
+		int			simple_interval;
+		zbx_custom_interval_t	*custom_intervals;
+
+		if (SUCCEED != zbx_interval_preproc(delay, &simple_interval, &custom_intervals, error))
+		{
+			*nextcheck = ZBX_JAN_2038;
+			return FAIL;
+		}
+
+		*nextcheck = calculate_item_nextcheck(itemid, ITEM_TYPE_ZABBIX, simple_interval, custom_intervals, now);
+		zbx_custom_interval_free(custom_intervals);
+	}
+	else	/* for items notsupported for other reasons use refresh_unsupported interval */
+	{
+		*nextcheck = calculate_item_nextcheck(itemid, ITEM_TYPE_ZABBIX, refresh_unsupported, NULL, now);
+	}
+
+	return SUCCEED;
+}
+

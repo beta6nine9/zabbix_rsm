@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -25,34 +25,45 @@
 #define ZBX_MODULE_OK	0
 #define ZBX_MODULE_FAIL	-1
 
-#define ZBX_MODULE_API_VERSION_ONE	1
+/* zbx_module_api_version() MUST return this constant */
+#define ZBX_MODULE_API_VERSION	2
+
+/* old name alias is kept for source compatibility only, SHOULD NOT be used */
+#define ZBX_MODULE_API_VERSION_ONE	ZBX_MODULE_API_VERSION
+
+/* HINT: For conditional compilation with different module.h versions modules can use: */
+/* #if ZBX_MODULE_API_VERSION == X                                                     */
+/*         ...                                                                         */
+/* #endif                                                                              */
 
 #define get_rkey(request)		(request)->key
 #define get_rparams_num(request)	(request)->nparam
 #define get_rparam(request, num)	((request)->nparam > num ? (request)->params[num] : NULL)
+#define get_rparam_type(request, num)	((request)->nparam > num ? (request)->types[num] : \
+		REQUEST_PARAMETER_TYPE_UNDEFINED)
 
 /* flags for command */
 #define CF_HAVEPARAMS		0x01	/* item accepts either optional or mandatory parameters */
 #define CF_MODULE		0x02	/* item is defined in a loadable module */
 #define CF_USERPARAMETER	0x04	/* item is defined as user parameter */
 
-typedef struct
+typedef enum
 {
-	char		*key;
-	unsigned	flags;
-	int		(*function)();
-	char		*test_param;	/* item test parameters; user parameter items keep command here */
+	REQUEST_PARAMETER_TYPE_UNDEFINED = 0,
+	REQUEST_PARAMETER_TYPE_STRING,
+	REQUEST_PARAMETER_TYPE_ARRAY
 }
-ZBX_METRIC;
+zbx_request_parameter_type_t;
 
 /* agent request structure */
 typedef struct
 {
-	char		*key;
-	int		nparam;
-	char		**params;
-	zbx_uint64_t	lastlogsize;
-	int		mtime;
+	char				*key;
+	int				nparam;
+	char				**params;
+	zbx_uint64_t			lastlogsize;
+	int				mtime;
+	zbx_request_parameter_type_t	*types;
 }
 AGENT_REQUEST;
 
@@ -89,6 +100,15 @@ typedef struct
 	int		mtime;		/* meta information */
 }
 AGENT_RESULT;
+
+typedef struct
+{
+	char		*key;
+	unsigned	flags;
+	int		(*function)(AGENT_REQUEST *request, AGENT_RESULT *result);
+	char		*test_param;	/* item test parameters; user parameter items keep command here */
+}
+ZBX_METRIC;
 
 /* SET RESULT */
 
@@ -134,5 +154,71 @@ AGENT_RESULT;
 
 #define SYSINFO_RET_OK		0
 #define SYSINFO_RET_FAIL	1
+
+typedef struct
+{
+	zbx_uint64_t	itemid;
+	int		clock;
+	int		ns;
+	double		value;
+}
+ZBX_HISTORY_FLOAT;
+
+typedef struct
+{
+	zbx_uint64_t	itemid;
+	int		clock;
+	int		ns;
+	zbx_uint64_t	value;
+}
+ZBX_HISTORY_INTEGER;
+
+typedef struct
+{
+	zbx_uint64_t	itemid;
+	int		clock;
+	int		ns;
+	const char	*value;
+}
+ZBX_HISTORY_STRING;
+
+typedef struct
+{
+	zbx_uint64_t	itemid;
+	int		clock;
+	int		ns;
+	const char	*value;
+}
+ZBX_HISTORY_TEXT;
+
+typedef struct
+{
+	zbx_uint64_t	itemid;
+	int		clock;
+	int		ns;
+	const char	*value;
+	const char	*source;
+	int		timestamp;
+	int		logeventid;
+	int		severity;
+}
+ZBX_HISTORY_LOG;
+
+typedef struct
+{
+	void	(*history_float_cb)(const ZBX_HISTORY_FLOAT *history, int history_num);
+	void	(*history_integer_cb)(const ZBX_HISTORY_INTEGER *history, int history_num);
+	void	(*history_string_cb)(const ZBX_HISTORY_STRING *history, int history_num);
+	void	(*history_text_cb)(const ZBX_HISTORY_TEXT *history, int history_num);
+	void	(*history_log_cb)(const ZBX_HISTORY_LOG *history, int history_num);
+}
+ZBX_HISTORY_WRITE_CBS;
+
+int	zbx_module_api_version(void);
+int	zbx_module_init(void);
+int	zbx_module_uninit(void);
+void	zbx_module_item_timeout(int timeout);
+ZBX_METRIC	*zbx_module_item_list(void);
+ZBX_HISTORY_WRITE_CBS	zbx_module_history_write_cbs(void);
 
 #endif

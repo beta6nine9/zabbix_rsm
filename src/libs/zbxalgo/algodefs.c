@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -60,20 +60,30 @@ zbx_hash_t	zbx_hash_lookup2(const void *data, size_t len, zbx_hash_t seed)
 		len -= 12;
 	}
 
-	c = c + len;
+	c = c + (zbx_hash_t)len;
 
 	switch (len)
 	{
 		case 11:	c = c + ((zbx_hash_t)p[10] << 24);
+			ZBX_FALLTHROUGH;
 		case 10:	c = c + ((zbx_hash_t)p[9] << 16);
+			ZBX_FALLTHROUGH;
 		case 9:		c = c + ((zbx_hash_t)p[8] << 8);
+			ZBX_FALLTHROUGH;
 		case 8:		b = b + ((zbx_hash_t)p[7] << 24);
+			ZBX_FALLTHROUGH;
 		case 7:		b = b + ((zbx_hash_t)p[6] << 16);
+			ZBX_FALLTHROUGH;
 		case 6:		b = b + ((zbx_hash_t)p[5] << 8);
+			ZBX_FALLTHROUGH;
 		case 5:		b = b + p[4];
+			ZBX_FALLTHROUGH;
 		case 4:		a = a + ((zbx_hash_t)p[3] << 24);
+			ZBX_FALLTHROUGH;
 		case 3:		a = a + ((zbx_hash_t)p[2] << 16);
+			ZBX_FALLTHROUGH;
 		case 2:		a = a + ((zbx_hash_t)p[1] << 8);
+			ZBX_FALLTHROUGH;
 		case 1:		a = a + p[0];
 	}
 
@@ -83,7 +93,7 @@ zbx_hash_t	zbx_hash_lookup2(const void *data, size_t len, zbx_hash_t seed)
 }
 
 /*
- * modified FNV hash function (see http://home.comcast.net/~bretm/hash/6.html)
+ * modified FNV hash function (see http://www.isthe.com/chongo/tech/comp/fnv/)
  */
 zbx_hash_t	zbx_hash_modfnv(const void *data, size_t len, zbx_hash_t seed)
 {
@@ -119,7 +129,7 @@ zbx_hash_t	zbx_hash_murmur2(const void *data, size_t len, zbx_hash_t seed)
 	const zbx_hash_t	m = 0x5bd1e995u;
 	const zbx_hash_t	r = 24;
 
-	hash = seed ^ len;
+	hash = seed ^ (zbx_hash_t)len;
 
 	while (len >= 4)
 	{
@@ -144,7 +154,9 @@ zbx_hash_t	zbx_hash_murmur2(const void *data, size_t len, zbx_hash_t seed)
 	switch (len)
 	{
 		case 3:	hash ^= p[2] << 16;
+			ZBX_FALLTHROUGH;
 		case 2: hash ^= p[1] << 8;
+			ZBX_FALLTHROUGH;
 		case 1: hash ^= p[0];
 			hash *= m;
 	}
@@ -222,6 +234,22 @@ zbx_hash_t	zbx_hash_djb2(const void *data, size_t len, zbx_hash_t seed)
 	return hash;
 }
 
+/*
+ * see http://xoshiro.di.unimi.it/splitmix64.c
+ */
+zbx_hash_t	zbx_hash_splittable64(const void *data)
+{
+	zbx_uint64_t	value = *(const zbx_uint64_t *)data;
+
+	value ^= value >> 30;
+	value *= __UINT64_C(0xbf58476d1ce4e5b9);
+	value ^= value >> 27;
+	value *= __UINT64_C(0x94d049bb133111eb);
+	value ^= value >> 31;
+
+	return (zbx_hash_t)value ^ (value >> 32);
+}
+
 /* default hash functions */
 
 zbx_hash_t	zbx_default_ptr_hash_func(const void *data)
@@ -229,14 +257,21 @@ zbx_hash_t	zbx_default_ptr_hash_func(const void *data)
 	return ZBX_DEFAULT_PTR_HASH_ALGO(data, ZBX_PTR_SIZE, ZBX_DEFAULT_HASH_SEED);
 }
 
-zbx_hash_t	zbx_default_uint64_hash_func(const void *data)
-{
-	return ZBX_DEFAULT_UINT64_HASH_ALGO(data, sizeof(zbx_uint64_t), ZBX_DEFAULT_HASH_SEED);
-}
-
 zbx_hash_t	zbx_default_string_hash_func(const void *data)
 {
 	return ZBX_DEFAULT_STRING_HASH_ALGO(data, strlen((const char *)data), ZBX_DEFAULT_HASH_SEED);
+}
+
+zbx_hash_t	zbx_default_uint64_pair_hash_func(const void *data)
+{
+	const zbx_uint64_pair_t	*pair = (const zbx_uint64_pair_t *)data;
+
+	zbx_hash_t		hash;
+
+	hash = ZBX_DEFAULT_UINT64_HASH_FUNC(&pair->first);
+	hash = ZBX_DEFAULT_UINT64_HASH_ALGO(&pair->second, sizeof(pair->second), hash);
+
+	return hash;
 }
 
 /* default comparison functions */
@@ -280,6 +315,17 @@ int	zbx_default_ptr_compare_func(const void *d1, const void *d2)
 	const void	*p2 = *(const void **)d2;
 
 	ZBX_RETURN_IF_NOT_EQUAL(p1, p2);
+
+	return 0;
+}
+
+int	zbx_default_uint64_pair_compare_func(const void *d1, const void *d2)
+{
+	const zbx_uint64_pair_t	*p1 = (const zbx_uint64_pair_t *)d1;
+	const zbx_uint64_pair_t	*p2 = (const zbx_uint64_pair_t *)d2;
+
+	ZBX_RETURN_IF_NOT_EQUAL(p1->first, p2->first);
+	ZBX_RETURN_IF_NOT_EQUAL(p1->second, p2->second);
 
 	return 0;
 }

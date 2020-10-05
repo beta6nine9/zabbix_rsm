@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -37,48 +37,58 @@
  ******************************************************************************/
 void	send_proxyconfig(zbx_socket_t *sock, struct zbx_json_parse *jp)
 {
-	const char	*__function_name = "send_proxyconfig";
-	zbx_uint64_t	proxy_hostid;
-	char		host[HOST_HOST_LEN_MAX], *error = NULL;
+	char		*error = NULL;
 	struct zbx_json	j;
+	DC_PROXY	proxy;
+	int		flags = ZBX_TCP_PROTOCOL;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
-	if (SUCCEED != get_active_proxy_id(jp, &proxy_hostid, host, sock, &error))
+	if (SUCCEED != get_active_proxy_from_request(jp, &proxy, &error))
 	{
-		zbx_send_response(sock, FAIL, error, CONFIG_TIMEOUT);
 		zabbix_log(LOG_LEVEL_WARNING, "cannot parse proxy configuration data request from active proxy at"
 				" \"%s\": %s", sock->peer, error);
 		goto out;
 	}
 
-	update_proxy_lastaccess(proxy_hostid, time(NULL));
+	if (SUCCEED != zbx_proxy_check_permissions(&proxy, sock, &error))
+	{
+		zabbix_log(LOG_LEVEL_WARNING, "cannot accept connection from proxy \"%s\" at \"%s\", allowed address:"
+				" \"%s\": %s", proxy.host, sock->peer, proxy.proxy_address, error);
+		goto out;
+	}
+
+	zbx_update_proxy_data(&proxy, zbx_get_proxy_protocol_version(jp), time(NULL),
+			(0 != (sock->protocol & ZBX_TCP_COMPRESS) ? 1 : 0), ZBX_FLAGS_PROXY_DIFF_UPDATE_CONFIG);
+
+	if (0 != proxy.auto_compress)
+		flags |= ZBX_TCP_COMPRESS;
 
 	zbx_json_init(&j, ZBX_JSON_STAT_BUF_LEN);
 
-	if (SUCCEED != get_proxyconfig_data(proxy_hostid, &j, &error))
+	if (SUCCEED != get_proxyconfig_data(proxy.hostid, &j, &error))
 	{
-		zbx_send_response(sock, FAIL, error, CONFIG_TIMEOUT);
+		zbx_send_response_ext(sock, FAIL, error, NULL, flags, CONFIG_TIMEOUT);
 		zabbix_log(LOG_LEVEL_WARNING, "cannot collect configuration data for proxy \"%s\" at \"%s\": %s",
-				host, sock->peer, error);
+				proxy.host, sock->peer, error);
 		goto clean;
 	}
 
 	zabbix_log(LOG_LEVEL_WARNING, "sending configuration data to proxy \"%s\" at \"%s\", datalen " ZBX_FS_SIZE_T,
-			host, sock->peer, (zbx_fs_size_t)j.buffer_size);
+			proxy.host, sock->peer, (zbx_fs_size_t)j.buffer_size);
 	zabbix_log(LOG_LEVEL_DEBUG, "%s", j.buffer);
 
-	if (SUCCEED != zbx_tcp_send_to(sock, j.buffer, CONFIG_TRAPPER_TIMEOUT))
+	if (SUCCEED != zbx_tcp_send_ext(sock, j.buffer, strlen(j.buffer), flags, CONFIG_TRAPPER_TIMEOUT))
 	{
 		zabbix_log(LOG_LEVEL_WARNING, "cannot send configuration data to proxy \"%s\" at \"%s\": %s",
-				host, sock->peer, zbx_socket_strerror());
+				proxy.host, sock->peer, zbx_socket_strerror());
 	}
 clean:
 	zbx_json_free(&j);
 out:
 	zbx_free(error);
 
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
 /******************************************************************************
@@ -92,17 +102,16 @@ out:
  ******************************************************************************/
 void	recv_proxyconfig(zbx_socket_t *sock, struct zbx_json_parse *jp)
 {
-	const char		*__function_name = "recv_proxyconfig";
 	struct zbx_json_parse	jp_data;
 	int			ret;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
 	if (SUCCEED != (ret = zbx_json_brackets_by_name(jp, ZBX_PROTO_TAG_DATA, &jp_data)))
 	{
 		zabbix_log(LOG_LEVEL_WARNING, "cannot parse proxy configuration data received from server at"
 				" \"%s\": %s", sock->peer, zbx_json_strerror());
-		zbx_send_response(sock, ret, zbx_json_strerror(), CONFIG_TIMEOUT);
+		zbx_send_proxy_response(sock, ret, zbx_json_strerror(), CONFIG_TIMEOUT);
 		goto out;
 	}
 
@@ -110,7 +119,7 @@ void	recv_proxyconfig(zbx_socket_t *sock, struct zbx_json_parse *jp)
 		goto out;
 
 	process_proxyconfig(&jp_data);
-	zbx_send_response(sock, ret, NULL, CONFIG_TIMEOUT);
+	zbx_send_proxy_response(sock, ret, NULL, CONFIG_TIMEOUT);
 out:
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __function_name);
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }

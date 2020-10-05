@@ -26,21 +26,24 @@ use constant USER_TYPES =>
 	'read-only-user' =>
 	{
 		'type'     => USER_TYPE_READ_ONLY_USER,
-		'usrgrpid' => READ_ONLY_USER_GROUPID
+		'usrgrpid' => READ_ONLY_USER_GROUPID,
+		'url'      => 'zabbix.php?action=rsm.rollingweekstatus',
 	},
 	'power-user' =>
 	{
 		'type'     => USER_TYPE_POWER_USER,
-		'usrgrpid' => POWER_USER_GROUPID
+		'usrgrpid' => POWER_USER_GROUPID,
+		'url'      => 'zabbix.php?action=rsm.rollingweekstatus',
 	},
 	'admin' =>
 	{
 		'type'     => USER_TYPE_SUPER_ADMIN,
-		'usrgrpid' => SUPER_ADMIN_GROUPID
+		'usrgrpid' => SUPER_ADMIN_GROUPID,
+		'url'      => 'zabbix.php?action=dashboard.view',
 	}
 };
 
-parse_opts('add!', 'delete!', 'modify!', 'user=s', 'type=s', 'password=s', 'firstname=s', 'lastname=s', 'server-id=n');
+parse_opts('add', 'delete', 'modify', 'user=s', 'type=s', 'password=s', 'firstname=s', 'lastname=s', 'server-id=i');
 
 __validate_opts();
 
@@ -75,7 +78,8 @@ foreach my $server_key (@server_keys)
 			'passwd' => getopt('password'),
 			'name' => getopt('firstname'),
 			'surname' => getopt('lastname'),
-			'usrgrps' => {'usrgrpid' => USER_TYPES->{getopt('type')}->{'usrgrpid'}}};
+			'url' => USER_TYPES->{getopt('type')}->{'url'},
+			'usrgrps' => [{'usrgrpid' => USER_TYPES->{getopt('type')}->{'usrgrpid'}}]};
 
 		my $result = $zabbix->create('user', $options);
 

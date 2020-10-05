@@ -26,7 +26,7 @@ use constant MAX_CONTINUE_PERIOD => 30;	# minutes (NB! make sure to update this 
 use constant DEFAULT_INCIDENT_MEASUREMENTS_LIMIT => 3600;	# seconds, maximum period back from current time to look
 								# back for recent measurement files for an incident
 
-parse_opts('tld=s', 'service=s', 'period=n', 'from=n', 'continue!', 'print-period!', 'ignore-file=s', 'probe=s', 'limit=n', 'max-children=n', 'server-key=s');
+parse_opts('tld=s', 'service=s', 'period=i', 'from=i', 'continue!', 'print-period!', 'ignore-file=s', 'probe=s', 'limit=i', 'max-children=i', 'server-key=s');
 
 # do not write any logs
 setopt('nolog');
@@ -125,10 +125,6 @@ if (opt('ignore-file'))
 
 	%ignore_hash = map { $_ => 1 } @lines;
 }
-
-my $cfg_dns_delay = undef;
-my $cfg_dns_minns;
-my $cfg_dns_valuemaps;
 
 db_connect();
 my $cfg_avail_valuemaps = get_avail_valuemaps();
@@ -238,62 +234,11 @@ if ($check_till > $max_till)
 db_connect();
 foreach my $service (keys(%services))
 {
-	if ($service eq 'dns' || $service eq 'dnssec')
-	{
-		if (!$cfg_dns_delay)
-		{
-			$cfg_dns_delay = get_dns_udp_delay($check_from);
-			$cfg_dns_minns = get_macro_minns();
-			$cfg_dns_valuemaps = get_valuemaps('dns');
-		}
-
-		$services{$service}{'delay'} = $cfg_dns_delay;
-		$services{$service}{'minns'} = $cfg_dns_minns;
-		$services{$service}{'valuemaps'} = $cfg_dns_valuemaps;
-		$services{$service}{'key_statuses'} = ['rsm.dns.udp[{$RSM.TLD}]']; # 0 - down, 1 - up
-		$services{$service}{'key_rtt'} = 'rsm.dns.udp.rtt[{$RSM.TLD},';
-	}
-	elsif ($service eq 'rdds')
-	{
-		$services{$service}{'delay'} = get_rdds_delay($check_from);
-
-		$services{$service}{'key_statuses'} = ['rsm.rdds[{$RSM.TLD}'];
-
-		push(@{$services{$service}{'key_statuses'}}, 'rdap[') if (!$rdap_is_standalone);
-
-		$services{$service}{+AH_INTERFACE_RDDS43}{'valuemaps'} = get_valuemaps('rdds');
-		$services{$service}{+AH_INTERFACE_RDDS43}{'key_rtt'} = 'rsm.rdds.43.rtt[{$RSM.TLD}]';
-		$services{$service}{+AH_INTERFACE_RDDS43}{'key_ip'} = 'rsm.rdds.43.ip[{$RSM.TLD}]';
-		$services{$service}{+AH_INTERFACE_RDDS43}{'key_upd'} = 'rsm.rdds.43.upd[{$RSM.TLD}]';
-
-		$services{$service}{+AH_INTERFACE_RDDS80}{'valuemaps'} = $services{$service}{+AH_INTERFACE_RDDS43}{'valuemaps'};
-		$services{$service}{+AH_INTERFACE_RDDS80}{'key_rtt'} = 'rsm.rdds.80.rtt[{$RSM.TLD}]';
-		$services{$service}{+AH_INTERFACE_RDDS80}{'key_ip'} = 'rsm.rdds.80.ip[{$RSM.TLD}]';
-
-		if (!$rdap_is_standalone)
-		{
-			$services{$service}{+AH_INTERFACE_RDAP}{'valuemaps'} = get_valuemaps('rdap');
-			$services{$service}{+AH_INTERFACE_RDAP}{'key_rtt'} = 'rdap.rtt';
-			$services{$service}{+AH_INTERFACE_RDAP}{'key_ip'} = 'rdap.ip';
-		}
-	}
-	elsif ($service eq 'rdap')
-	{
-		$services{$service}{'delay'} = get_rdap_delay($check_from);
-		$services{$service}{'key_statuses'} = ['rdap['];
-
-		$services{$service}{+AH_INTERFACE_RDAP}{'valuemaps'} = get_valuemaps('rdap');
-		$services{$service}{+AH_INTERFACE_RDAP}{'key_rtt'} = 'rdap.rtt';
-		$services{$service}{+AH_INTERFACE_RDAP}{'key_ip'} = 'rdap.ip';
-	}
-	elsif ($service eq 'epp')
-	{
-		$services{$service}{'delay'} = get_epp_delay($check_from);
-		$services{$service}{'valuemaps'} = get_valuemaps($service);
-		$services{$service}{'key_statuses'} = ['rsm.epp[{$RSM.TLD},']; # 0 - down, 1 - up
-		$services{$service}{'key_ip'} = 'rsm.epp.ip[{$RSM.TLD}]';
-		$services{$service}{'key_rtt'} = 'rsm.epp.rtt[{$RSM.TLD},';
-	}
+	$services{$service}{'delay'} = get_dns_delay($check_from)  if ($service eq 'dns');
+	$services{$service}{'delay'} = get_dns_delay($check_from)  if ($service eq 'dnssec');
+	$services{$service}{'delay'} = get_rdds_delay($check_from) if ($service eq 'rdds');
+	$services{$service}{'delay'} = get_rdap_delay($check_from) if ($service eq 'rdap');
+	$services{$service}{'delay'} = get_epp_delay($check_from)  if ($service eq 'epp');
 
 	$services{$service}{'avail_key'} = "rsm.slv.$service.avail";
 	$services{$service}{'rollweek_key'} = "rsm.slv.$service.rollweek";
@@ -1224,9 +1169,9 @@ sub __update_false_positives
 
 	# should we update false positiveness later? (incident state file does not exist yet)
 	my $later = 0;
-	# select resourceid,details,clock from auditlog where resourcetype=32 and clock>0 order by clock;
+	# select resourceid,note,clock from auditlog where resourcetype=32 and clock>0 order by clock;
 	my $rows_ref = db_select(
-		"select resourceid,details,clock".
+		"select resourceid,note,clock".
 		" from auditlog".
 		" where resourcetype=".AUDIT_RESOURCE_INCIDENT.
 			" and clock>$last_audit".
@@ -1235,15 +1180,12 @@ sub __update_false_positives
 	foreach my $row_ref (@$rows_ref)
 	{
 		my $eventid = $row_ref->[0];
-		my $details = $row_ref->[1];
+		my $note = $row_ref->[1];
 		my $clock = $row_ref->[2];
-
-		# ignore old "details" format (dropped in December 2014)
-		next if ($details =~ '.*Incident \[.*\]');
 
 		if ($eventid == 0)
 		{
-			$eventid = $details;
+			$eventid = $note;
 			$eventid =~ s/^([0-9]+): .*/$1/;
 		}
 

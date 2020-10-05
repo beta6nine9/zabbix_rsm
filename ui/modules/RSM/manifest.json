@@ -1,0 +1,90 @@
+{
+	"manifest_version": 1,
+	"id": "RSM",
+	"name": "RSM module",
+	"author": "Zabbix",
+	"description": "RSM module",
+	"version": "1.0",
+	"namespace": "RSM",
+	"url": "https://zabbix.com",
+	"actions": {
+		"index.php": {
+			"class": "AuthAction",
+			"layout": null,
+			"view": null
+		},
+		"profile.update": {
+			"class": "ProfileUpdateAction",
+			"layout": null,
+			"view": null
+		},
+		"userprofile.edit": {
+			"class": "UserProfileAction",
+			"layout": "layout.htmlpage",
+			"view": "administration.user.edit"
+		},
+		"rsm.sidlogin": {
+			"class": "SidLoginAction",
+			"layout": null,
+			"view": null
+		},
+		"timeselector.update": {
+			"class": "ProfileTimeselectorUpdateAction",
+			"layout": "layout.json",
+			"view": null
+		},
+		"rsm.rollingweekstatus": {
+			"class": "RollingWeekStatusListAction",
+			"view": "rsm.rollingweekstatus.list"
+		},
+		"rsm.incidents": {
+			"class": "IncidentsListAction",
+			"view": "rsm.incidents.list"
+		},
+		"rsm.slareports": {
+			"class": "SlaReportsListAction",
+			"view": "rsm.slareports.list"
+		},
+		"rsm.incidentdetails": {
+			"class": "IncidentDetailsAction",
+			"view": "rsm.incidentdetails.list"
+		},
+		"rsm.tests": {
+			"class": "TestsListAction",
+			"view": "rsm.tests.list"
+		},
+		"rsm.particulartests": {
+			"class": "ParticularTestsListAction",
+			"view": "rsm.particulartests.list"
+		},
+		"rsm.aggregatedetails": {
+			"class": "AggregateDetailsAction",
+			"view": "rsm.aggregatedetails.list"
+		},
+		"rsm.particularproxys": {
+			"class": "ParticularProxyListAction",
+			"view": "rsm.particularproxys.list"
+		},
+		"export.rsm.slareports": {
+			"class": "ExportSlaReportAction",
+			"layout": null,
+			"view": null
+		},
+		"rsm.markincident": {
+			"class": "MarkIncidentAction",
+			"layout": null,
+			"view": null
+		},
+		"rsm.probes": {
+			"class": "Probes",
+			"view": "probes"
+		}
+	},
+	"assets": [
+		"rsm.style.css",
+		"blue-theme.rsm.css",
+		"dark-theme.rsm.css",
+		"hc-dark.rsm.css",
+		"hc-light.rsm.css"
+	]
+}

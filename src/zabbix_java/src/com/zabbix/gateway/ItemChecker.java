@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -30,22 +30,21 @@ abstract class ItemChecker
 {
 	private static final Logger logger = LoggerFactory.getLogger(ItemChecker.class);
 
-	public static final String JSON_TAG_CONN = "conn";
-	public static final String JSON_TAG_DATA = "data";
-	public static final String JSON_TAG_ERROR = "error";
-	public static final String JSON_TAG_KEYS = "keys";
-	public static final String JSON_TAG_PASSWORD = "password";
-	public static final String JSON_TAG_PORT = "port";
-	public static final String JSON_TAG_REQUEST = "request";
-	public static final String JSON_TAG_RESPONSE = "response";
-	public static final String JSON_TAG_USERNAME = "username";
-	public static final String JSON_TAG_VALUE = "value";
+	static final String JSON_TAG_DATA = "data";
+	static final String JSON_TAG_ERROR = "error";
+	static final String JSON_TAG_KEYS = "keys";
+	static final String JSON_TAG_PASSWORD = "password";
+	static final String JSON_TAG_REQUEST = "request";
+	static final String JSON_TAG_RESPONSE = "response";
+	static final String JSON_TAG_USERNAME = "username";
+	static final String JSON_TAG_VALUE = "value";
+	static final String JSON_TAG_JMX_ENDPOINT = "jmx_endpoint";
 
-	public static final String JSON_REQUEST_INTERNAL = "java gateway internal";
-	public static final String JSON_REQUEST_JMX = "java gateway jmx";
+	static final String JSON_REQUEST_INTERNAL = "java gateway internal";
+	static final String JSON_REQUEST_JMX = "java gateway jmx";
 
-	public static final String JSON_RESPONSE_FAILED = "failed";
-	public static final String JSON_RESPONSE_SUCCESS = "success";
+	static final String JSON_RESPONSE_FAILED = "failed";
+	static final String JSON_RESPONSE_SUCCESS = "success";
 
 	protected JSONObject request;
 	protected ArrayList<String> keys;
@@ -68,7 +67,7 @@ abstract class ItemChecker
 		}
 	}
 
-	public JSONArray getValues() throws ZabbixException
+	JSONArray getValues() throws ZabbixException
 	{
 		JSONArray values = new JSONArray();
 
@@ -76,6 +75,11 @@ abstract class ItemChecker
 			values.put(getJSONValue(key));
 
 		return values;
+	}
+
+	String getFirstKey()
+	{
+		return 0 == keys.size() ? null : keys.get(0);
 	}
 
 	protected final JSONObject getJSONValue(String key)
@@ -94,12 +98,13 @@ abstract class ItemChecker
 			try
 			{
 				logger.debug("caught exception for item '{}'", key, e1);
-				value.put(JSON_TAG_ERROR, e1.getMessage());
+				value.put(JSON_TAG_ERROR, ZabbixException.getRootCauseMessage(e1));
 			}
 			catch (JSONException e2)
 			{
-				Object[] logInfo = {JSON_TAG_ERROR, e1.getMessage(), e2};
-				logger.warn("cannot add JSON attribute '{}' with message '{}'", logInfo);
+				Object[] logInfo = {JSON_TAG_ERROR, e1.getMessage(), ZabbixException.getRootCauseMessage(e2)};
+				logger.warn("cannot add JSON attribute '{}' with message '{}': {}", logInfo);
+				logger.debug("error caused by", e2);
 			}
 		}
 

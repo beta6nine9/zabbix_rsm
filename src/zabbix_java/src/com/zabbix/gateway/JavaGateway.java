@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2017 Zabbix SIA
+** Copyright (C) 2001-2020 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -22,6 +22,9 @@ package com.zabbix.gateway;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.util.concurrent.*;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.Collections;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,6 +32,7 @@ import org.slf4j.LoggerFactory;
 public class JavaGateway
 {
 	private static final Logger logger = LoggerFactory.getLogger(JavaGateway.class);
+	public static final Map<String, Long> iterativeObjects = Collections.synchronizedMap(new HashMap<String, Long>());
 
 	public static void main(String[] args)
 	{
@@ -47,6 +51,7 @@ public class JavaGateway
 
 		Thread shutdownHook = new Thread()
 		{
+			@Override
 			public void run()
 			{
 				logger.info("Zabbix Java Gateway {} (revision {}) has stopped", GeneralInformation.VERSION, GeneralInformation.REVISION);
@@ -80,7 +85,8 @@ public class JavaGateway
 		}
 		catch (Exception e)
 		{
-			logger.error("caught fatal exception", e);
+			logger.error("caught fatal exception: {}", ZabbixException.getRootCauseMessage(e));
+			logger.debug("error caused by", e);
 		}
 	}
 }
