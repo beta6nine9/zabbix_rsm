@@ -19,7 +19,7 @@
 **/
 
 
-/* RSM specifics: specific defines: start */
+/* RSM specifics: specific defines */
 define('ZABBIX_DB_VERSION_RSM',		0);
 
 // Additional users.
@@ -27,10 +27,11 @@ define('USER_TYPE_ZABBIX_GUEST',	0);
 define('USER_TYPE_READ_ONLY',		4);
 define('USER_TYPE_POWER_USER',		5);
 define('USER_TYPE_COMPLIANCE',		6);
-/* RSM specifics: specific defines: end */
+/* RSM specifics: end */
 
-define('ZABBIX_VERSION',		'5.0.0');
-define('ZABBIX_API_VERSION',	'5.0.0');
+define('ZABBIX_VERSION',		'5.0.4');
+define('ZABBIX_API_VERSION',	'5.0.4');
+
 define('ZABBIX_EXPORT_VERSION',	'5.0');
 define('ZABBIX_DB_VERSION',		5000000);
 
@@ -156,10 +157,14 @@ define('ZBX_DB_MAX_ID', '9223372036854775807');
 // maximum number of records for create() or update() API calls
 define('ZBX_DB_MAX_INSERTS', 10000);
 
-// Default db and field character set
+// Default db and field character set (MYSQL & POSTGRESQL)
 define('ZBX_DB_DEFAULT_CHARSET', 'UTF8');
 define('ZBX_DB_MYSQL_DEFAULT_COLLATION', 'utf8_bin');
+
+// Default db defines for Oracle DB
 define('ORACLE_MAX_STRING_SIZE', 4000);
+define('ORACLE_UTF8_CHARSET', 'AL32UTF8');
+define('ORACLE_CESU8_CHARSET', 'UTF8');
 
 define('ZBX_SHOW_TECHNICAL_ERRORS', true);	/* RSM specifics: we want technical errors */
 
@@ -231,6 +236,7 @@ define('AUDIT_ACTION_LOGIN',	3);
 define('AUDIT_ACTION_LOGOUT',	4);
 define('AUDIT_ACTION_ENABLE',	5);
 define('AUDIT_ACTION_DISABLE',	6);
+define('AUDIT_ACTION_EXECUTE',	7);
 
 define('AUDIT_RESOURCE_USER',				0);
 define('AUDIT_RESOURCE_ZABBIX_CONFIG',		2);
@@ -1340,6 +1346,7 @@ define('API_NUMERIC',			28);
 define('API_LLD_MACRO',			29);
 define('API_PSK',				30);
 define('API_SORTORDER',			31);
+define('API_CALC_FORMULA',		32);
 
 // flags
 define('API_REQUIRED',					0x0001);
@@ -1382,7 +1389,8 @@ define('ZBX_MAX_PORT_NUMBER', 65535);
 
 define('ZBX_MACRO_TYPE_TEXT', 0); // Display macro value as text.
 define('ZBX_MACRO_TYPE_SECRET', 1); // Display masked macro value.
-define('ZBX_MACRO_SECRET_MASK', '******'); // Placeholder for masked macro value.
+
+define('ZBX_SECRET_MASK', '******'); // Placeholder for secret values.
 
 // Layout
 define('ZBX_LAYOUT_NORMAL',     0);
@@ -1684,6 +1692,7 @@ define('ZBX_STYLE_HEADER_CONTROLS', 'header-controls');
 define('ZBX_STYLE_HIGH_BG', 'high-bg');
 define('ZBX_STYLE_HOR_LIST', 'hor-list');
 define('ZBX_STYLE_HOVER_NOBG', 'hover-nobg');
+define('ZBX_STYLE_HINTBOX_WRAP', 'hintbox-wrap');
 define('ZBX_STYLE_ICON_ACKN', 'icon-ackn');
 define('ZBX_STYLE_ICON_CAL', 'icon-cal');
 define('ZBX_STYLE_ICON_DEPEND_DOWN', 'icon-depend-down');
@@ -1938,6 +1947,14 @@ define('PROBLEMS_TAG_NAME_NONE',      2);
 define('OPERATIONAL_DATA_SHOW_NONE',         0);
 define('OPERATIONAL_DATA_SHOW_SEPARATELY',   1);
 define('OPERATIONAL_DATA_SHOW_WITH_PROBLEM', 2);
+
+/**
+ * The sandbox attribute enables an extra set of restrictions for the content in the iframe. Default is set to empty
+ * string, which means all restrictions are applied. To disable, set to FALSE. To set a specific set of restrictions,
+ * write a custom string.
+ * https://www.w3.org/TR/2010/WD-html5-20100624/the-iframe-element.html#attr-iframe-sandbox
+ */
+define('ZBX_IFRAME_SANDBOX', '');
 
 // HTTP headers
 /*

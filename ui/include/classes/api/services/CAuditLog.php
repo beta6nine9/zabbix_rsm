@@ -79,7 +79,7 @@ class CAuditLog extends CApiService {
 		$fields = array_keys($this->getTableSchema($this->tableName())['fields']);
 		$actions = [
 			AUDIT_ACTION_ADD, AUDIT_ACTION_UPDATE, AUDIT_ACTION_DELETE, AUDIT_ACTION_LOGIN, AUDIT_ACTION_LOGOUT,
-			AUDIT_ACTION_ENABLE, AUDIT_ACTION_DISABLE
+			AUDIT_ACTION_ENABLE, AUDIT_ACTION_DISABLE, AUDIT_ACTION_EXECUTE
 		];
 		$resourcetype = [
 			AUDIT_RESOURCE_USER, AUDIT_RESOURCE_ZABBIX_CONFIG, AUDIT_RESOURCE_MEDIA_TYPE, AUDIT_RESOURCE_HOST,
@@ -167,7 +167,7 @@ class CAuditLog extends CApiService {
 		$sql_parts = $this->applyQueryFilterOptions($this->tableName, $this->tableAlias, $options, $sql_parts);
 		$sql_parts = $this->applyQueryOutputOptions($this->tableName, $this->tableAlias, $options, $sql_parts);
 		$sql_parts = $this->applyQuerySortOptions($this->tableName, $this->tableAlias, $options, $sql_parts);
-		$res = DBselect($this->createSelectQueryFromParts($sql_parts), $options['limit']);
+		$res = DBselect(self::createSelectQueryFromParts($sql_parts), $options['limit']);
 
 		while ($audit = DBfetch($res)) {
 			if (!$options['countOutput']) {

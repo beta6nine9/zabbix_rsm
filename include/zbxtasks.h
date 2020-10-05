@@ -47,6 +47,7 @@
 
 /* task data type */
 #define ZBX_TM_DATA_TYPE_TEST_ITEM		0
+#define ZBX_TM_DATA_TYPE_DIAGINFO		1
 
 /* the time period after which finished (done/expired) tasks are removed */
 #define ZBX_TM_CLEANUP_TASK_AGE			SEC_PER_DAY
@@ -124,12 +125,12 @@ zbx_tm_task_t	*zbx_tm_task_create(zbx_uint64_t taskid, unsigned char type, unsig
 void	zbx_tm_task_clear(zbx_tm_task_t *task);
 void	zbx_tm_task_free(zbx_tm_task_t *task);
 
-zbx_tm_remote_command_t	*zbx_tm_remote_command_create(int commandtype, const char *command, int execute_on, int port,
+zbx_tm_remote_command_t	*zbx_tm_remote_command_create(int command_type, const char *command, int execute_on, int port,
 		int authtype, const char *username, const char *password, const char *publickey, const char *privatekey,
 		zbx_uint64_t parent_taskid, zbx_uint64_t hostid, zbx_uint64_t alertid);
 
 zbx_tm_remote_command_result_t	*zbx_tm_remote_command_result_create(zbx_uint64_t parent_taskid, int status,
-		const char *error);
+		const char *info);
 
 zbx_tm_check_now_t	*zbx_tm_check_now_create(zbx_uint64_t itemid);
 
@@ -148,5 +149,7 @@ void	zbx_tm_json_deserialize_tasks(const struct zbx_json_parse *jp, zbx_vector_p
 
 /* separate implementation for proxy and server */
 void	zbx_tm_get_remote_tasks(zbx_vector_ptr_t *tasks, zbx_uint64_t proxy_hostid);
+
+int	zbx_tm_get_diaginfo(const struct zbx_json_parse *jp, char **info);
 
 #endif

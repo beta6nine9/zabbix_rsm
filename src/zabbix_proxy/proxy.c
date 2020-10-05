@@ -58,6 +58,7 @@
 #include "zbxipcservice.h"
 #include "../zabbix_server/preprocessor/preproc_manager.h"
 #include "../zabbix_server/preprocessor/preproc_worker.h"
+#include "zbxdiag.h"
 
 #include "rsm.h"	/* zbx_read_stdin() */
 
@@ -96,6 +97,9 @@ const char	*help_message[] = {
 	"      " ZBX_LOG_LEVEL_DECREASE "=target  Decrease log level, affects all processes if",
 	"                                 target is not specified",
 	"      " ZBX_SNMP_CACHE_RELOAD "          Reload SNMP cache",
+	"      " ZBX_DIAGINFO "=section           Log internal diagnostic information of the",
+	"                                 section (historycache, preprocessing) or",
+	"                                 everything if section is not specified",
 	"",
 	"      Log level control targets:",
 	"        process-type             All processes of specified type",
@@ -302,6 +306,8 @@ char	*CONFIG_STATS_ALLOWED_IP	= NULL;
 char	epp_passphrase[128]		= "";
 
 int	CONFIG_DOUBLE_PRECISION		= ZBX_DB_DBL_PRECISION_DISABLED;
+
+volatile sig_atomic_t	zbx_diaginfo_scope = ZBX_DIAGINFO_UNDEFINED;
 
 int	get_process_info_by_thread(int local_server_num, unsigned char *local_process_type, int *local_process_num);
 
@@ -687,7 +693,7 @@ static void	zbx_load_config(ZBX_TASK_EX *task)
 		{"StartSNMPTrapper",		&CONFIG_SNMPTRAPPER_FORKS,		TYPE_INT,
 			PARM_OPT,	0,			1},
 		{"CacheSize",			&CONFIG_CONF_CACHE_SIZE,		TYPE_UINT64,
-			PARM_OPT,	128 * ZBX_KIBIBYTE,	__UINT64_C(8) * ZBX_GIBIBYTE},
+			PARM_OPT,	128 * ZBX_KIBIBYTE,	__UINT64_C(64) * ZBX_GIBIBYTE},
 		{"HistoryCacheSize",		&CONFIG_HISTORY_CACHE_SIZE,		TYPE_UINT64,
 			PARM_OPT,	128 * ZBX_KIBIBYTE,	__UINT64_C(2) * ZBX_GIBIBYTE},
 		{"HistoryIndexCacheSize",	&CONFIG_HISTORY_INDEX_CACHE_SIZE,	TYPE_UINT64,
@@ -975,6 +981,19 @@ int	main(int argc, char **argv)
 	return daemon_start(CONFIG_ALLOW_ROOT, CONFIG_USER, t.flags);
 }
 
+static void	zbx_main_sigusr_handler(int flags)
+{
+	if (ZBX_RTC_DIAGINFO == ZBX_RTC_GET_MSG(flags))
+	{
+		int	scope = ZBX_RTC_GET_SCOPE(flags);
+
+		if (ZBX_DIAGINFO_ALL == scope)
+			zbx_diaginfo_scope = (1 << ZBX_DIAGINFO_HISTORYCACHE) |	(1 << ZBX_DIAGINFO_PREPROCESSING);
+		else
+			zbx_diaginfo_scope = 1 << scope;
+	}
+}
+
 int	MAIN_ZABBIX_ENTRY(int flags)
 {
 	zbx_socket_t	listen_sock;
@@ -1117,6 +1136,8 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 		exit(EXIT_FAILURE);
 	}
 
+	DBinit_autoincrement_options();
+
 	if (ZBX_DB_UNKNOWN == (db_type = zbx_db_get_database_type()))
 	{
 		zabbix_log(LOG_LEVEL_CRIT, "cannot use database \"%s\": database is not a Zabbix database",
@@ -1257,9 +1278,12 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 		}
 	}
 
-	/* does not need EPP passphrase */
+	/* RSM specifics: does not need EPP passphrase */
 	if ('\0' != *epp_passphrase)
 		memset(epp_passphrase, 0, strlen(epp_passphrase));
+	/* RSM specifics: end */
+
+	zbx_set_sigusr_handler(zbx_main_sigusr_handler);
 
 	while (-1 == wait(&i))	/* wait for any child to exit */
 	{
@@ -1267,6 +1291,13 @@ int	MAIN_ZABBIX_ENTRY(int flags)
 		{
 			zabbix_log(LOG_LEVEL_ERR, "failed to wait on child processes: %s", zbx_strerror(errno));
 			break;
+		}
+
+		/* check if the wait was interrupted because of diaginfo remote command */
+		if (ZBX_DIAGINFO_UNDEFINED != zbx_diaginfo_scope)
+		{
+			zbx_diag_log_info(zbx_diaginfo_scope);
+			zbx_diaginfo_scope = ZBX_DIAGINFO_UNDEFINED;
 		}
 	}
 

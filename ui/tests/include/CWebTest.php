@@ -36,7 +36,7 @@ class CWebTest extends CTest {
 
 	// Network throttling emulation modes.
 	const NETWORK_THROTTLING_NONE		= 'none';
-	const NETWORK_THROTTLING_OFFLINE		= 'offline';
+	const NETWORK_THROTTLING_OFFLINE	= 'offline';
 	const NETWORK_THROTTLING_SLOW		= 'slow';
 	const NETWORK_THROTTLING_FAST		= 'fast';
 
@@ -293,6 +293,15 @@ class CWebTest extends CTest {
 		}
 
 		$this->assertEquals($title, $this->page->getTitle());
+	}
+
+	/**
+	 * Check page header
+	 *
+	 * @param string $header	page header to be compared
+	 */
+	public function assertPageHeader($header) {
+		$this->assertEquals($header, $this->query('xpath://h1[@id="page-title-general"]')->one()->getText());
 	}
 
 	/**

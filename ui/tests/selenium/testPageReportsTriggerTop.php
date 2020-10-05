@@ -20,6 +20,8 @@
 
 require_once dirname(__FILE__).'/../include/CLegacyWebTest.php';
 
+use Facebook\WebDriver\WebDriverBy;
+
 class testPageReportsTriggerTop extends CLegacyWebTest {
 
 	public function testPageReportsTriggerTop_FilterLayout() {
@@ -216,6 +218,7 @@ class testPageReportsTriggerTop extends CLegacyWebTest {
 					'ZBX6648 Disabled Triggers', 'ZBX6648 Enabled Triggers'];
 				$this->assertTrue(count(array_diff($groups, $all_groups)) === 0);
 				$groups_form->query('xpath://a[text()="Zabbix servers"]')->one()->click();
+				COverlayDialogElement::find()->one()->waitUntilReady();
 				$this->zbxTestClickXpathWait('//div[contains(@class, "overlay-dialogue modal")]//a[text()="'.
 						$filter['host'].'"]');
 				$this->zbxTestWaitUntilElementNotVisible(WebDriverBy::xpath('//div[contains(@class, "overlay-dialogue modal")]'));

@@ -582,9 +582,10 @@ function convertUnitsS($value, $ignore_millisec = false) {
 				$parts['seconds'] = $value_abs_int;
 
 				if ($start === null || $start >= 4) {
-					$v = round(fmod($value_abs, 1) * 1000);
+					$v = fmod($value_abs, 1) * 1000;
+
 					if ($v > 0) {
-						$parts['milliseconds'] = $v;
+						$parts['milliseconds'] = formatFloat($v, null, ZBX_UNITS_ROUNDOFF_SUFFIXED);
 					}
 				}
 			}
@@ -603,8 +604,8 @@ function convertUnitsS($value, $ignore_millisec = false) {
 
 	$result = [];
 
-	foreach (array_filter($parts) as $unit => $value) {
-		$result[] = formatFloat($value, null, ZBX_UNITS_ROUNDOFF_SUFFIXED).$units[$unit];
+	foreach (array_filter($parts) as $part_unit => $part_value) {
+		$result[] = formatFloat($part_value, null, ZBX_UNITS_ROUNDOFF_SUFFIXED).$units[$part_unit];
 	}
 
 	return $result ? ($value < 0 ? '-' : '').implode(' ', $result) : '0';
@@ -1503,8 +1504,10 @@ function num2letter($number) {
 function access_deny($mode = ACCESS_DENY_OBJECT) {
 	// deny access to an object
 	if ($mode == ACCESS_DENY_OBJECT && CWebUser::isLoggedIn()) {
-		require_once dirname(__FILE__).'/page_header.php';
 		show_error_message(_('No permissions to referred object or it does not exist!'));
+
+		require_once dirname(__FILE__).'/page_header.php';
+		(new CWidget())->show();
 		require_once dirname(__FILE__).'/page_footer.php';
 	}
 	// deny access to a page
@@ -2067,8 +2070,7 @@ function get_status() {
 			}
 		}
 	}
-	$status['hosts_count'] = $status['hosts_count_monitored'] + $status['hosts_count_not_monitored']
-			+ $status['hosts_count_template'];
+	$status['hosts_count'] = $status['hosts_count_monitored'] + $status['hosts_count_not_monitored'];
 
 	// items
 	foreach ($server_status['item stats'] as $stats) {

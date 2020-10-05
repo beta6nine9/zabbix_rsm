@@ -20,6 +20,8 @@
 
 require_once dirname(__FILE__).'/../include/CLegacyWebTest.php';
 
+use Facebook\WebDriver\WebDriverBy;
+
 class testFormUserProfile extends CLegacyWebTest {
 
 	public function testFormUserProfile_SimpleUpdate() {
@@ -553,7 +555,7 @@ class testFormUserProfile extends CLegacyWebTest {
 		switch ($data['expected']) {
 			case TEST_GOOD:
 				$this->zbxTestWaitForPageToLoad();
-				$this->zbxTestWaitUntilElementNotVisible(WebDriverBy::xpath("//div[@id='overlay-bg']"));
+				COverlayDialogElement::ensureNotPresent();
 				$this->zbxTestClickWait('update');
 				$this->zbxTestCheckHeader('Global view');
 				$sql = "SELECT * FROM media WHERE sendto = '".$data['send_to']."'";

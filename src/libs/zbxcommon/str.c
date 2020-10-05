@@ -1171,19 +1171,22 @@ int	zbx_escape_string(char *dst, size_t len, const char *src, const char *charli
 char	*zbx_age2str(int age)
 {
 	size_t		offset = 0;
-	int		days, hours, minutes;
+	int		days, hours, minutes, seconds;
 	static char	buffer[32];
 
 	days = (int)((double)age / SEC_PER_DAY);
 	hours = (int)((double)(age - days * SEC_PER_DAY) / SEC_PER_HOUR);
-	minutes	= (int)((double)(age - days * SEC_PER_DAY - hours * SEC_PER_HOUR) / SEC_PER_MIN);
+	minutes = (int)((double)(age - days * SEC_PER_DAY - hours * SEC_PER_HOUR) / SEC_PER_MIN);
+	seconds = (int)((double)(age - days * SEC_PER_DAY - hours * SEC_PER_HOUR - minutes * SEC_PER_MIN));
 
 	if (0 != days)
 		offset += zbx_snprintf(buffer + offset, sizeof(buffer) - offset, "%dd ", days);
 	if (0 != days || 0 != hours)
 		offset += zbx_snprintf(buffer + offset, sizeof(buffer) - offset, "%dh ", hours);
+	if (0 != days || 0 != hours || 0 != minutes)
+		offset += zbx_snprintf(buffer + offset, sizeof(buffer) - offset, "%dm ", minutes);
 
-	zbx_snprintf(buffer + offset, sizeof(buffer) - offset, "%dm", minutes);
+	zbx_snprintf(buffer + offset, sizeof(buffer) - offset, "%ds", seconds);
 
 	return buffer;
 }
@@ -1278,7 +1281,7 @@ int	cmp_key_id(const char *key_1, const char *key_2)
  *                                                                            *
  * Purpose: Returns process name                                              *
  *                                                                            *
- * Parameters: process_type - [IN] process type; ZBX_PROCESS_TYPE_*           *
+ * Parameters: proc_type - [IN] process type; ZBX_PROCESS_TYPE_*              *
  *                                                                            *
  * Author: Alexander Vladishev                                                *
  *                                                                            *
@@ -2346,6 +2349,116 @@ void	zbx_replace_invalid_utf8(char *text)
 	*out = '\0';
 }
 
+/******************************************************************************
+ *                                                                            *
+ * Function: utf8_decode_3byte_sequence                                       *
+ *                                                                            *
+ * Purpose: decodes 3-byte utf-8 sequence                                     *
+ *                                                                            *
+ * Parameters: ptr - [IN] pointer to the 3 byte sequence                      *
+ *             out - [OUT] the decoded value                                  *
+ *                                                                            *
+ * Return value: SUCCEED on success                                           *
+ *               FAIL on failure                                              *
+ *                                                                            *
+ ******************************************************************************/
+static int	utf8_decode_3byte_sequence(const char *ptr, zbx_uint32_t *out)
+{
+	*out = ((unsigned char)*ptr++ & 0xF) << 12;
+	if (0x80 != (*ptr & 0xC0))
+		return FAIL;
+
+	*out |= ((unsigned char)*ptr++ & 0x3F) << 6;
+	if (0x80 != (*ptr & 0xC0))
+		return FAIL;
+
+	*out |= ((unsigned char)*ptr & 0x3F);
+	return SUCCEED;
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Function: zbx_cesu8_to_utf8                                                *
+ *                                                                            *
+ * Purpose: convert cesu8 encoded string to utf8                              *
+ *                                                                            *
+ * Parameters: cesu8 - [IN] pointer to the first char of NULL terminated CESU8*
+ *                     string                                                 *
+ *             utf8  - [OUT] on success, pointer to pointer to the first char *
+ *                     of allocated NULL terminated UTF8 string               *
+ *                                                                            *
+ * Return value: SUCCEED on success                                           *
+ *               FAIL on failure                                              *
+ *                                                                            *
+ ******************************************************************************/
+int	zbx_cesu8_to_utf8(const char *cesu8, char **utf8)
+{
+	const char	*in, *end;
+	char		*out;
+	size_t		len;
+
+	len = strlen(cesu8);
+	out = *utf8 = zbx_malloc(*utf8, len + 1);
+	end = cesu8 + len;
+
+	for (in = cesu8; in < end;)
+	{
+		if (0x7f >= (unsigned char)*in)
+		{
+			*out++ = *in++;
+			continue;
+		}
+
+		if (0xdf >= (unsigned char)*in)
+		{
+			if (2 > end - in)
+				goto fail;
+
+			*out++ = *in++;
+			*out++ = *in++;
+			continue;
+		}
+
+		if (0xef >= (unsigned char)*in)
+		{
+			zbx_uint32_t	c1, c2, u;
+
+			if (3 > end - in || FAIL == utf8_decode_3byte_sequence(in, &c1))
+				goto fail;
+
+			if (0xd800 > c1 || 0xdbff < c1)
+			{
+				/* normal 3-byte sequence */
+				*out++ = *in++;
+				*out++ = *in++;
+				*out++ = *in++;
+				continue;
+			}
+
+			/* decode unicode supplementary character represented as surrogate pair */
+			in += 3;
+			if (3 > end - in || FAIL == utf8_decode_3byte_sequence(in, &c2) || 0xdc00 > c2 || 0xdfff < c2)
+				goto fail;
+
+			u = 0x10000 + ((((zbx_uint32_t)c1 & 0x3ff) << 10) | (c2 & 0x3ff));
+			*out++ = 0xf0 |  u >> 18;
+			*out++ = 0x80 | (u >> 12 & 0x3f);
+			*out++ = 0x80 | (u >> 6 & 0x3f);
+			*out++ = 0x80 | (u & 0x3f);
+			in += 3;
+			continue;
+		}
+
+		/* the four-byte UTF-8 style supplementary character sequence is not supported by CESU-8 */
+		goto fail;
+	}
+	*out = '\0';
+	return SUCCEED;
+fail:
+	zbx_free(*utf8);
+	return FAIL;
+}
+
 void	dos2unix(char *str)
 {
 	char	*o = str;
@@ -2643,6 +2756,9 @@ int	zbx_strcmp_null(const char *s1, const char *s2)
  *                       ending '"' for quoted context values or the last     *
  *                       character before the ending '}' character)           *
  *                       0 if macro does not have context specified.          *
+ *     context_op - [OUT] the context matching operator (optional):           *
+ *                          CONDITION_OPERATOR_EQUAL                          *
+ *                          CONDITION_OPERATOR_REGEXP                         *
  *                                                                            *
  * Return value:                                                              *
  *     SUCCEED - the macro was parsed successfully.                           *
@@ -2650,7 +2766,7 @@ int	zbx_strcmp_null(const char *s1, const char *s2)
  *               is not defined.                                              *
  *                                                                            *
  ******************************************************************************/
-int	zbx_user_macro_parse(const char *macro, int *macro_r, int *context_l, int *context_r)
+int	zbx_user_macro_parse(const char *macro, int *macro_r, int *context_l, int *context_r, unsigned char *context_op)
 {
 	int	i;
 
@@ -2669,6 +2785,10 @@ int	zbx_user_macro_parse(const char *macro, int *macro_r, int *context_l, int *c
 		*macro_r = i;
 		*context_l = 0;
 		*context_r = 0;
+
+		if (NULL != context_op)
+			*context_op = CONDITION_OPERATOR_EQUAL;
+
 		return SUCCEED;
 	}
 
@@ -2676,9 +2796,21 @@ int	zbx_user_macro_parse(const char *macro, int *macro_r, int *context_l, int *c
 	if  (':' != macro[i])
 		return FAIL;
 
+	i++;
+	if (NULL != context_op)
+	{
+		if (0 == strncmp(macro + i, ZBX_MACRO_REGEX_PREFIX, ZBX_CONST_STRLEN(ZBX_MACRO_REGEX_PREFIX)))
+		{
+			*context_op = CONDITION_OPERATOR_REGEXP;
+			i += ZBX_CONST_STRLEN(ZBX_MACRO_REGEX_PREFIX);
+		}
+		else
+			*context_op = CONDITION_OPERATOR_EQUAL;
+	}
+
 	/* skip the whitespace after macro context separator */
-	while (' ' == macro[++i])
-		;
+	while (' ' == macro[i])
+		i++;
 
 	*context_l = i;
 
@@ -2735,19 +2867,22 @@ int	zbx_user_macro_parse(const char *macro, int *macro_r, int *context_l, int *c
  *     context - [OUT] the unquoted macro context, NULL for macros without    *
  *                     context                                                *
  *     length  - [OUT] the length of parsed macro (optional)                  *
+ *     context_op - [OUT] the context matching operator (optional):           *
+ *                          CONDITION_OPERATOR_EQUAL                          *
+ *                          CONDITION_OPERATOR_REGEXP                         *
  *                                                                            *
  * Return value:                                                              *
  *     SUCCEED - the macro was parsed successfully                            *
  *     FAIL    - the macro parsing failed, invalid parameter syntax           *
  *                                                                            *
  ******************************************************************************/
-int	zbx_user_macro_parse_dyn(const char *macro, char **name, char **context, int *length)
+int	zbx_user_macro_parse_dyn(const char *macro, char **name, char **context, int *length, unsigned char *context_op)
 {
 	const char	*ptr;
 	int		macro_r, context_l, context_r;
 	size_t		len;
 
-	if (SUCCEED != zbx_user_macro_parse(macro, &macro_r, &context_l, &context_r))
+	if (SUCCEED != zbx_user_macro_parse(macro, &macro_r, &context_l, &context_r, context_op))
 		return FAIL;
 
 	zbx_free(*context);
@@ -2759,6 +2894,10 @@ int	zbx_user_macro_parse_dyn(const char *macro, char **name, char **context, int
 		/* find the context separator ':' by stripping spaces before context */
 		while (' ' == *(--ptr))
 			;
+
+		/* remove regex: prefix from macro name for regex contexts */
+		if (NULL != context_op && CONDITION_OPERATOR_REGEXP == *context_op)
+			ptr -= ZBX_CONST_STRLEN(ZBX_MACRO_REGEX_PREFIX);
 
 		/* extract the macro name and close with '}' character */
 		len = ptr - macro + 1;
@@ -3401,7 +3540,7 @@ static int	zbx_token_parse_user_macro(const char *expression, const char *macro,
 	int			macro_r, context_l, context_r;
 	zbx_token_user_macro_t	*data;
 
-	if (SUCCEED != zbx_user_macro_parse(macro, &macro_r, &context_l, &context_r))
+	if (SUCCEED != zbx_user_macro_parse(macro, &macro_r, &context_l, &context_r, NULL))
 		return FAIL;
 
 	offset = macro - expression;
@@ -4153,7 +4292,7 @@ static size_t	zbx_no_function(const char *expr)
 			continue;
 		}
 
-		if ('{' == *ptr && '$' == *(ptr + 1) && SUCCEED == zbx_user_macro_parse(ptr, &len, &c_l, &c_r))
+		if ('{' == *ptr && '$' == *(ptr + 1) && SUCCEED == zbx_user_macro_parse(ptr, &len, &c_l, &c_r, NULL))
 		{
 			ptr += len + 1;	/* skip to the position after user macro */
 		}
@@ -4519,7 +4658,7 @@ char	*zbx_expression_extract_constant(const char *src, const zbx_strloc_t *loc)
  * Purpose: find number of parameters in parameter list                       *
  *                                                                            *
  * Parameters:                                                                *
- *      param  - parameter list                                               *
+ *      p - [IN] parameter list                                               *
  *                                                                            *
  * Return value: number of parameters (starting from 1) or                    *
  *               0 if syntax error                                            *
@@ -4619,10 +4758,11 @@ int	num_param(const char *p)
  * Purpose: return parameter by index (num) from parameter list (param)       *
  *                                                                            *
  * Parameters:                                                                *
- *      p       - parameter list                                              *
- *      num     - requested parameter index                                   *
- *      buf     - pointer of output buffer                                    *
- *      max_len - size of output buffer                                       *
+ *      p       - [IN]  parameter list                                        *
+ *      num     - [IN]  requested parameter index                             *
+ *      buf     - [OUT] pointer of output buffer                              *
+ *      max_len - [IN]  size of output buffer                                 *
+ *      type    - [OUT] parameter type (may be NULL)                          *
  *                                                                            *
  * Return value:                                                              *
  *      1 - requested parameter missing or buffer overflow                    *
@@ -4633,7 +4773,7 @@ int	num_param(const char *p)
  * Comments:  delimiter for parameters is ','                                 *
  *                                                                            *
  ******************************************************************************/
-int	get_param(const char *p, int num, char *buf, size_t max_len)
+int	get_param(const char *p, int num, char *buf, size_t max_len, zbx_request_parameter_type_t *type)
 {
 #define ZBX_ASSIGN_PARAM				\
 {							\
@@ -4645,6 +4785,9 @@ int	get_param(const char *p, int num, char *buf, size_t max_len)
 	int	state;	/* 0 - init, 1 - inside quoted param, 2 - inside unquoted param */
 	int	array, idx = 1;
 	size_t	buf_i = 0;
+
+	if (NULL != type)
+		*type = REQUEST_PARAMETER_TYPE_UNDEFINED;
 
 	if (0 == max_len)
 		return 1;	/* buffer overflow */
@@ -4667,13 +4810,26 @@ int	get_param(const char *p, int num, char *buf, size_t max_len)
 				else if ('"' == *p)
 				{
 					state = 1;
-					if (0 != array && idx == num)
-						ZBX_ASSIGN_PARAM;
+
+					if (idx == num)
+					{
+						if (NULL != type && REQUEST_PARAMETER_TYPE_UNDEFINED == *type)
+							*type = REQUEST_PARAMETER_TYPE_STRING;
+
+						if (0 != array)
+							ZBX_ASSIGN_PARAM;
+					}
 				}
 				else if ('[' == *p)
 				{
-					if (0 != array && idx == num)
-						ZBX_ASSIGN_PARAM;
+					if (idx == num)
+					{
+						if (NULL != type && REQUEST_PARAMETER_TYPE_UNDEFINED == *type)
+							*type = REQUEST_PARAMETER_TYPE_ARRAY;
+
+						if (0 != array)
+							ZBX_ASSIGN_PARAM;
+					}
 					array++;
 				}
 				else if (']' == *p && 0 != array)
@@ -4692,7 +4848,13 @@ int	get_param(const char *p, int num, char *buf, size_t max_len)
 				else if (' ' != *p)
 				{
 					if (idx == num)
+					{
+						if (NULL != type && REQUEST_PARAMETER_TYPE_UNDEFINED == *type)
+							*type = REQUEST_PARAMETER_TYPE_STRING;
+
 						ZBX_ASSIGN_PARAM;
+					}
+
 					state = 2;
 				}
 				break;
@@ -4899,8 +5061,9 @@ static int	get_param_len(const char *p, int num, size_t *sz)
  * Purpose: return parameter by index (num) from parameter list (param)       *
  *                                                                            *
  * Parameters:                                                                *
- *      p   - [IN] parameter list                                             *
- *      num - [IN] requested parameter index                                  *
+ *      p    - [IN] parameter list                                            *
+ *      num  - [IN] requested parameter index                                 *
+ *      type - [OUT] parameter type (may be NULL)                             *
  *                                                                            *
  * Return value:                                                              *
  *      NULL - requested parameter missing                                    *
@@ -4912,7 +5075,7 @@ static int	get_param_len(const char *p, int num, size_t *sz)
  * Comments:  delimiter for parameters is ','                                 *
  *                                                                            *
  ******************************************************************************/
-char	*get_param_dyn(const char *p, int num)
+char	*get_param_dyn(const char *p, int num, zbx_request_parameter_type_t *type)
 {
 	char	*buf = NULL;
 	size_t	sz;
@@ -4922,7 +5085,7 @@ char	*get_param_dyn(const char *p, int num)
 
 	buf = (char *)zbx_malloc(buf, sz + 1);
 
-	if (0 != get_param(p, num, buf, sz + 1))
+	if (0 != get_param(p, num, buf, sz + 1, type))
 		zbx_free(buf);
 
 	return buf;
@@ -5014,7 +5177,7 @@ int	replace_key_params_dyn(char **data, int key_type, replace_key_param_f cb, vo
 		while ('\0' != (*data)[i])
 		{
 			if ('{' == (*data)[i] && '$' == (*data)[i + 1] &&
-					SUCCEED == zbx_user_macro_parse(&(*data)[i], &len, &c_l, &c_r))
+					SUCCEED == zbx_user_macro_parse(&(*data)[i], &len, &c_l, &c_r, NULL))
 			{
 				i += len + 1;	/* skip to the position after user macro */
 			}
@@ -5248,7 +5411,7 @@ int	get_key_param(char *param, int num, char *buf, size_t max_len)
 		return 1;
 
 	*pr = '\0';
-	ret = get_param(pl + 1, num, buf, max_len);
+	ret = get_param(pl + 1, num, buf, max_len, NULL);
 	*pr = ']';
 
 	return ret;

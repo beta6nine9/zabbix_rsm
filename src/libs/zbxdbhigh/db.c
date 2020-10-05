@@ -27,8 +27,12 @@
 #include "zbxalgo.h"
 #include "cfg.h"
 
-#if defined(HAVE_MYSQL) || defined(HAVE_ORACLE) || defined(HAVE_POSTGRESQL)
+#if defined(HAVE_MYSQL) || defined(HAVE_POSTGRESQL)
 #define ZBX_SUPPORTED_DB_CHARACTER_SET	"utf8"
+#endif
+#if defined(HAVE_ORACLE)
+#define ZBX_ORACLE_UTF8_CHARSET "AL32UTF8"
+#define ZBX_ORACLE_CESU8_CHARSET "UTF8"
 #endif
 #if defined(HAVE_MYSQL)
 #define ZBX_SUPPORTED_DB_COLLATION	"utf8_bin"
@@ -148,6 +152,18 @@ void	zbx_db_validate_config(void)
 	}
 }
 #endif
+
+/******************************************************************************
+ *                                                                            *
+ * Function: DBinit_autoincrement_options                                     *
+ *                                                                            *
+ * Purpose: specify the autoincrement options when connecting to the database *
+ *                                                                            *
+ ******************************************************************************/
+void	DBinit_autoincrement_options(void)
+{
+	zbx_db_init_autoincrement_options();
+}
 
 /******************************************************************************
  *                                                                            *
@@ -1362,6 +1378,48 @@ const char	*zbx_user_string(zbx_uint64_t userid)
 
 /******************************************************************************
  *                                                                            *
+ * Function: DBget_user_names                                                 *
+ *                                                                            *
+ * Purpose: get user alias, name and surname                                  *
+ *                                                                            *
+ * Parameters: userid - [IN] user id                                          *
+ *             alias   - [OUT] user alias                                     *
+ *             name    - [OUT] user name                                      *
+ *             surname - [OUT] user surname                                   *
+ *                                                                            *
+ * Return value: SUCCEED or FAIL                                              *
+ *                                                                            *
+ ******************************************************************************/
+int	DBget_user_names(zbx_uint64_t userid, char **alias, char **name, char **surname)
+{
+	int		ret = FAIL;
+	DB_RESULT	result;
+	DB_ROW		row;
+
+	if (NULL == (result = DBselect(
+			"select alias,name,surname"
+			" from users"
+			" where userid=" ZBX_FS_UI64, userid)))
+	{
+		goto out;
+	}
+
+	if (NULL == (row = DBfetch(result)))
+		goto out;
+
+	*alias = zbx_strdup(NULL, row[0]);
+	*name = zbx_strdup(NULL, row[1]);
+	*surname = zbx_strdup(NULL, row[2]);
+
+	ret = SUCCEED;
+out:
+	DBfree_result(result);
+
+	return ret;
+}
+
+/******************************************************************************
+ *                                                                            *
  * Function: DBsql_id_cmp                                                     *
  *                                                                            *
  * Purpose: construct where condition                                         *
@@ -2346,12 +2404,13 @@ void	DBcheck_character_set(void)
 			else if (0 == strcasecmp("NLS_CHARACTERSET", parameter) ||
 					(0 == strcasecmp("NLS_NCHAR_CHARACTERSET", parameter)))
 			{
-				if (0 != strcasecmp(ZBX_SUPPORTED_DB_CHARACTER_SET, value))
+				if (0 != strcasecmp(ZBX_ORACLE_UTF8_CHARSET, value) &&
+						0 != strcasecmp(ZBX_ORACLE_CESU8_CHARSET, value))
 				{
 					zabbix_log(LOG_LEVEL_WARNING, "database \"%s\" parameter \"%s\" has value"
-							" \"%s\". Zabbix supports only \"%s\" character set",
+							" \"%s\". Zabbix supports only \"%s\" or \"%s\" character sets",
 							CONFIG_DBNAME, parameter, value,
-							ZBX_SUPPORTED_DB_CHARACTER_SET);
+							ZBX_ORACLE_UTF8_CHARSET, ZBX_ORACLE_CESU8_CHARSET);
 				}
 			}
 		}

@@ -327,7 +327,7 @@ class CAction extends CApiService {
 
 		$sqlParts = $this->applyQueryOutputOptions($this->tableName(), $this->tableAlias(), $options, $sqlParts);
 		$sqlParts = $this->applyQuerySortOptions($this->tableName(), $this->tableAlias(), $options, $sqlParts);
-		$dbRes = DBselect($this->createSelectQueryFromParts($sqlParts), $sqlParts['limit']);
+		$dbRes = DBselect(self::createSelectQueryFromParts($sqlParts), $sqlParts['limit']);
 		while ($action = DBfetch($dbRes)) {
 			if ($options['countOutput']) {
 				$result = $action['rowscount'];
@@ -2719,6 +2719,7 @@ class CAction extends CApiService {
 			],
 			'postValidators' => [
 				new CConditionValidator([
+					'messageMissingFormula' => _('Formula missing for action "%1$s".'),
 					'messageInvalidFormula' => _('Incorrect custom expression "%2$s" for action "%1$s": %3$s.'),
 					'messageMissingCondition' => _('Condition "%2$s" used in formula "%3$s" for action "%1$s" is not defined.'),
 					'messageUnusedCondition' => _('Condition "%2$s" is not used in formula "%3$s" for action "%1$s".'),

@@ -21,6 +21,8 @@
 require_once dirname(__FILE__).'/../include/CLegacyWebTest.php';
 require_once dirname(__FILE__).'/../../include/items.inc.php';
 
+use Facebook\WebDriver\WebDriverBy;
+
 /**
  * @backup httptest
  */
@@ -1501,7 +1503,7 @@ class testFormWeb extends CLegacyWebTest {
 				$this->zbxTestInputTypeByXpath('//div[@class="overlay-dialogue-body"]//input[@id="url"]', $url);
 				$this->zbxTestClickXpath('//div[@class="overlay-dialogue-footer"]//button[text()="Add"]');
 				$this->zbxTestWaitForPageToLoad();
-				$this->zbxTestWaitUntilElementNotVisible(WebDriverBy::xpath("//div[@id='overlay-bg']"));
+				COverlayDialogElement::ensureNotPresent();
 
 				if (isset($item['remove'])) {
 					$this->zbxTestClickXpathWait('//table[contains(@class, "httpconf-steps-dynamic-row")]//button[contains(@class,"element-table-remove")]');

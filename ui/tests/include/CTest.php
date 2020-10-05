@@ -68,6 +68,8 @@ class CTest extends PHPUnit_Framework_TestCase {
 	];
 	// Instances counter to keep track of test count.
 	protected static $instances = 0;
+	// List of behaviors.
+	protected $behaviors = null;
 
 	/**
 	 * Overridden constructor for collecting data on data sets from dataProvider annotations.
@@ -143,12 +145,13 @@ class CTest extends PHPUnit_Framework_TestCase {
 	/**
 	 * Execute callbacks specified at some point of test execution.
 	 *
-	 * @param mixed $context      class instance or class name
-	 * @param array $callbacks    callbacks to be called
+	 * @param mixed $context		class instance or class name
+	 * @param array $callbacks		callbacks to be called
+	 * @param bool $required		flag marking callbacks required
 	 *
 	 * @return boolean
 	 */
-	protected static function executeCallbacks($context, $callbacks) {
+	protected static function executeCallbacks($context, $callbacks, $required = false) {
 		if (!$callbacks) {
 			return true;
 		}
@@ -162,13 +165,25 @@ class CTest extends PHPUnit_Framework_TestCase {
 			$method = $class->getMethod($callback);
 
 			if (!$method) {
-				self::addWarning('Callback "'.$callback.'" is not defined in requested context.');
+				$error = 'Callback "'.$callback.'" is not defined in requested context.';
+				if (!$required) {
+					self::addWarning($error);
+				}
+				else {
+					throw new Exception($error);
+				}
 			}
 
 			try {
 				$method->invoke(!$method->isStatic() ? $context : null);
 			} catch (Exception $e) {
-				self::addWarning('Failed to execute callback "'.$callback.'": '.$e->getMessage());
+				$error = 'Failed to execute callback "'.$callback.'": '.$e->getMessage();
+				if (!$required) {
+					self::addWarning($error);
+				}
+				else {
+					throw new Exception($error);
+				}
 
 				return false;
 			}
@@ -251,7 +266,7 @@ class CTest extends PHPUnit_Framework_TestCase {
 		}
 
 		// Execute callbacks that should be executed before every test case.
-		self::executeCallbacks($this, self::$suite_callbacks['before-each']);
+		self::executeCallbacks($this, self::$suite_callbacks['before-each'], true);
 
 		// Test case level annotations.
 		$method_annotations = $this->getAnnotationsByType($this->annotations, 'method');
@@ -287,7 +302,7 @@ class CTest extends PHPUnit_Framework_TestCase {
 				}
 
 				// Execute callbacks that should be executed once for multiple test cases.
-				self::executeCallbacks($this, $this->getAnnotationTokensByName($method_annotations, 'on-before-once'));
+				self::executeCallbacks($this, $this->getAnnotationTokensByName($method_annotations, 'on-before-once'), true);
 
 				// Store callback to be executed after test case is executed for all data sets.
 				self::$suite_callbacks['after-once'] = $this->getAnnotationTokensByName($method_annotations,
@@ -296,7 +311,7 @@ class CTest extends PHPUnit_Framework_TestCase {
 			}
 
 			// Execute callbacks that should be executed before specific test case.
-			self::executeCallbacks($this, $this->getAnnotationTokensByName($method_annotations, 'on-before'));
+			self::executeCallbacks($this, $this->getAnnotationTokensByName($method_annotations, 'on-before'), true);
 
 			// Store callback to be executed after test case.
 			$this->case_callbacks = $this->getAnnotationTokensByName($method_annotations, 'on-after');
@@ -321,6 +336,8 @@ class CTest extends PHPUnit_Framework_TestCase {
 	 * @after
 	 */
 	public function onAfterTestCase() {
+		$errors = @file_get_contents(PHPUNIT_ERROR_LOG);
+
 		if ($this->case_backup !== null) {
 			CDBHelper::restoreTables();
 		}
@@ -337,7 +354,7 @@ class CTest extends PHPUnit_Framework_TestCase {
 			throw new PHPUnit_Framework_Warning(implode("\n", self::$warnings));
 		}
 
-		if (($errors = @file_get_contents(PHPUNIT_ERROR_LOG))) {
+		if ($errors !== '' && $errors !== false) {
 			$this->fail("Runtime errors:\n".$errors);
 		}
 	}
@@ -401,5 +418,163 @@ class CTest extends PHPUnit_Framework_TestCase {
 	 */
 	public static function onAfterAllTests() {
 		// Code is not missing here.
+	}
+
+	/**
+	 * Get list of static behaviors.
+	 * Static behaviors get attached when object is created.
+	 *
+	 * @return array
+	 */
+	public function getBehaviors() {
+		return [];
+	}
+
+	/**
+	 * Load static behaviors.
+	 */
+	public function loadBehaviors() {
+		if ($this->behaviors !== null) {
+			return;
+		}
+
+		$this->behaviors = [];
+		foreach ($this->getBehaviors() as $name => $behavior) {
+			if (is_int($name)) {
+				$name = null;
+			}
+
+			$this->attachBehavior($behavior, $name);
+		}
+	}
+
+	/**
+	 * Attach dynamic behavior.
+	 *
+	 * @param string|CBehavior $behavior    behavior or behavior class name
+	 * @param string           $name        name of the behavior or null for anonymous behavior
+	 *
+	 * @throws Exception    on invalid configuration
+	 */
+	public function attachBehavior($behavior, $name = null) {
+		$this->loadBehaviors();
+
+		if (is_string($behavior)) {
+			$behavior = ['class' => $behavior];
+		}
+
+		if (is_array($behavior) && array_key_exists('class', $behavior) && class_exists($behavior['class'])) {
+			$class = $behavior['class'];
+			unset($behavior['class']);
+			$behavior = new $class($behavior);
+		}
+
+		if ($behavior instanceof CBehavior) {
+			if ($name !== null) {
+				$this->detachBehavior($name);
+			}
+
+			$behavior->setTest($this);
+			$this->behaviors[$name] = $behavior;
+			if ($name !== null) {
+				$this->behaviors[$name] = $behavior;
+			}
+			else {
+				$this->behaviors[] = $behavior;
+			}
+		}
+		else {
+			throw new Exception('Cannot attach behavior that is not an instance of CBehavior class');
+		}
+	}
+
+	/**
+	 * Detach dynamic behavior.
+	 *
+	 * @param string $name        name of the behavior or null for anonymous behavior
+	 */
+	public function detachBehavior($name) {
+		$this->loadBehaviors();
+
+		unset($this->behaviors[$name]);
+	}
+
+	/**
+	 * Detach all behaviors.
+	 */
+	public function detachBehaviors() {
+		$this->behaviors = [];
+	}
+
+	/**
+	 * Magic method to execute methods defined in behaviors.
+	 *
+	 * @param string $name      method name
+	 * @param array  $params    method params
+	 *
+	 * @return mixed
+	 *
+	 * @throws Exception
+	 */
+	public function __call($name, $params) {
+		$this->loadBehaviors();
+
+		$target = null;
+		foreach ($this->behaviors as $behavior) {
+			if ($behavior->hasMethod($name)) {
+				$target = $behavior;
+			}
+		}
+
+		if ($target !== null) {
+			return call_user_func_array([$target, $name], $params);
+		}
+
+		throw new Exception('Cannot call method '.get_class($this).'::'.$name.'(): unknown method.');
+	}
+
+	/**
+	 * Magic method to get attributes defined in behaviors.
+	 *
+	 * @param string $name      attribute name
+	 *
+	 * @return mixed
+	 *
+	 * @throws Exception
+	 */
+	public function __get($name) {
+		$this->loadBehaviors();
+
+		foreach ($this->behaviors as $behavior) {
+			if ($behavior->hasAttribute($name)) {
+				return $behavior->$name;
+			}
+		}
+
+		throw new Exception('Cannot get attribute "'.$name.'": unknown attribute.');
+	}
+
+	/**
+	 * Magic method to set attributes defined in behaviors.
+	 *
+	 * @param string $name     attribute name
+	 * @param array  $value    attribute value
+	 *
+	 * @return mixed
+	 *
+	 * @throws Exception
+	 */
+	public function __set($name, $value) {
+		$this->loadBehaviors();
+
+		foreach ($this->behaviors as $behavior) {
+			if ($behavior->hasAttribute($name)) {
+				$behavior->$name = $value;
+
+				return;
+			}
+		}
+
+		throw new Exception('Cannot set attribute "'.$name.'": unknown attribute.');
 	}
 }

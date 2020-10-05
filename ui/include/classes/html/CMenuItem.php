@@ -89,7 +89,7 @@ class CMenuItem extends CTag {
 	/**
 	 * Set action name and derive a corresponding URL for menu item link.
 	 *
-	 * @param string  Action name.
+	 * @param string $action_name  Action name.
 	 *
 	 * @return CMenuItem
 	 */
@@ -109,12 +109,26 @@ class CMenuItem extends CTag {
 	/**
 	 * Set action name aliases.
 	 *
-	 * @param array $aliases
+	 * @param array $aliases  The aliases of menu item. Is able to specify the alias in following formats:
+	 *                        - {action_name} - The alias is applicable to page with specified action name with any GET
+	 *                          parameters in URL or without them;
+	 *                        - {action_name}?{param}={value} - The alias is applicable to page with specified action
+	 *                          when specified GET parameter exists in URL and have the same value;
+	 *                        - {action_name}?{param}=* - The alias is applicable to page with specified action
+	 *                          when specified GET parameter exists in URL and have any value;
+	 *                        - {action_name}?!{param}={value} - The alias is applicable to page with specified action
+	 *                          when specified GET parameter not exists in URL or have different value;
+	 *                        - {action_name}?!{param}=* - The alias is applicable to page with specified action
+	 *                          when specified GET parameter not exists in URL.
 	 *
 	 * @return CMenuItem
 	 */
 	public function setAliases(array $aliases): self {
-		$this->aliases = $aliases;
+		foreach ($aliases as $alias) {
+			['path' => $action_name, 'query' => $query_string] = parse_url($alias) + ['query' => ''];
+			parse_str($query_string, $query_params);
+			$this->aliases[$action_name][] = $query_params;
+		}
 
 		return $this;
 	}
@@ -165,14 +179,53 @@ class CMenuItem extends CTag {
 	/**
 	 * Deep find menu item (including this one) by action name and mark the whole chain as selected.
 	 *
-	 * @param string $action_name  Action name to search for.
-	 * @param bool $expand         Add 'is-expanded' class for selected submenus.
+	 * @param string $action_name     Action name to search for.
+	 * @param array  $request_params  Parameters of current HTTP request to compare in search process.
+	 * @param bool   $expand          Add 'is-expanded' class for selected submenus.
 	 *
 	 * @return bool  True, if menu item was selected.
 	 */
-	public function setSelectedByAction(string $action_name, bool $expand = true): bool {
-		if ($this->action === $action_name || in_array($action_name, $this->aliases)
-				|| ($this->sub_menu !== null && $this->sub_menu->setSelectedByAction($action_name, $expand))) {
+	public function setSelectedByAction(string $action_name, array $request_params, bool $expand = true): bool {
+		if (array_key_exists($action_name, $this->aliases)) {
+			foreach ($this->aliases[$action_name] as $alias_params) {
+				$no_unacceptable_params = true;
+				$unacceptable_params = [];
+				foreach ($alias_params as $name => $value) {
+					if ($name[0] === '!') {
+						$unacceptable_params[substr($name, 1)] = $value;
+						unset($alias_params[$name]);
+					}
+				}
+
+				if ($unacceptable_params) {
+					$unacceptable_params_existing = array_intersect_assoc($unacceptable_params, $request_params);
+					foreach ($unacceptable_params as $name => $value) {
+						if ($value === '*' && array_key_exists($name, $request_params)) {
+							$unacceptable_params_existing[$name] = '*';
+						}
+					}
+
+					$no_unacceptable_params = array_diff_assoc($unacceptable_params, $unacceptable_params_existing)
+						? true
+						: false;
+				}
+
+				$alias_params_diff = array_diff_assoc($alias_params, $request_params);
+				foreach ($alias_params_diff as $name => $value) {
+					if ($value === '*') {
+						unset($alias_params_diff[$name]);
+					}
+				}
+
+				if ($no_unacceptable_params && !$alias_params_diff) {
+					$this->setSelected();
+
+					return true;
+				}
+			}
+		}
+
+		if ($this->sub_menu !== null && $this->sub_menu->setSelectedByAction($action_name, $request_params, $expand)) {
 			$this->setSelected();
 
 			return true;
@@ -255,14 +308,21 @@ class CMenuItem extends CTag {
 	/**
 	 * Set url for the menu item link.
 	 *
-	 * @param CUrl $url
+	 * @param CUrl        $url
 	 * @param string|null $action_name  Associate action name to be matched by setSelected method.
 	 *
 	 * @return CMenuItem
 	 */
 	public function setUrl(CUrl $url, string $action_name = null): self {
+		$action = null;
+
+		if ($action_name !== null) {
+			$this->setAliases([$action_name]);
+			['path' => $action] = parse_url($action_name);
+		}
+
 		$this->url = $url;
-		$this->action = $action_name;
+		$this->action = $action;
 
 		return $this;
 	}

@@ -23,6 +23,14 @@ require_once 'vendor/autoload.php';
 require_once dirname(__FILE__).'/CElementQuery.php';
 require_once dirname(__FILE__).'/CommandExecutor.php';
 
+use Facebook\WebDriver\Remote\DesiredCapabilities;
+use Facebook\WebDriver\Chrome\ChromeOptions;
+use Facebook\WebDriver\Remote\RemoteWebDriver;
+use Facebook\WebDriver\Remote\RemoteWebElement;
+use Facebook\WebDriver\WebDriverDimension;
+use Facebook\WebDriver\Exception\NoSuchAlertException;
+use Facebook\WebDriver\WebDriverExpectedCondition;
+
 /**
  * Web page implementation.
  */
@@ -169,12 +177,13 @@ class CPage {
 			DBexecute('insert into sessions (sessionid, userid) values ('.zbx_dbstr($sessionid).', '.$user_id.')');
 		}
 
+		$path = parse_url(PHPUNIT_URL, PHP_URL_PATH);
 		if (self::$cookie === null || $sessionid !== self::$cookie['value']) {
 			self::$cookie = [
 				'name' => 'zbx_sessionid',
 				'value' => $sessionid,
 				'domain' => parse_url(PHPUNIT_URL, PHP_URL_HOST),
-				'path' => parse_url(PHPUNIT_URL, PHP_URL_PATH)
+				'path' => rtrim(substr($path, 0, strrpos($path, '/')), '/')
 			];
 
 			$this->driver->get(PHPUNIT_URL);
@@ -202,7 +211,7 @@ class CPage {
 			self::$cookie = null;
 		}
 		catch (\Exception $e) {
-			// Code is not missing here.
+			throw new \Exception('Cannot logout user: '.$e->getTraceAsString());
 		}
 	}
 
@@ -410,7 +419,7 @@ class CPage {
 		try {
 			return $this->driver->switchTo()->alert()->getText();
 		}
-		catch (NoAlertOpenException $exception) {
+		catch (NoSuchAlertException $exception) {
 			return null;
 		}
 	}
@@ -478,5 +487,62 @@ class CPage {
 		} catch (Exception $ex) {
 			// Code is not missing here.
 		}
+	}
+
+	/**
+	 * Refresh page.
+	 *
+	 * @return $this
+	 */
+	public function refresh() {
+		$this->driver->navigate()->refresh();
+
+		return $this;
+	}
+
+	/**
+	 * Switching to frame or iframe.
+	 *
+	 * @param CElement|string|array|null $element    iframe element
+	 *
+	 * @return $this
+	 */
+	public function switchTo($element = null) {
+		if ($element === null) {
+			$this->driver->switchTo()->defaultContent();
+
+			return $this;
+		}
+
+		if (is_string($element)) {
+			$element = $this->query($element)->one(false);
+		}
+		elseif (is_array($element)) {
+			$element = $this->query($element[0], $element[1])->one(false);
+		}
+
+		if ($element instanceof RemoteWebElement) {
+			$this->driver->switchTo()->frame($element);
+		}
+		else {
+			throw new \Exception('Cannot switch to frame that is not an element.');
+		}
+
+		return $this;
+	}
+
+	/**
+	 * Allows to login with user credentials.
+	 *
+	 * @param string $alias     Username on login screen
+	 * @param string $password  Password on login screen
+	 */
+	public function userLogin($alias, $password) {
+		$this->logout();
+		$this->open('index.php');
+		$this->query('id:name')->waitUntilVisible()->one()->fill($alias);
+		$this->query('id:password')->one()->fill($password);
+		$this->query('id:enter')->one()->click();
+		$this->waitUntilReady();
 	}
 }

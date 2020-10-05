@@ -145,6 +145,31 @@ class CControllerPopupItemTestEdit extends CControllerPopupItemTest {
 		$texts_support_lld_macros = [];
 		$supported_macros = [];
 		foreach (array_keys(array_intersect_key($inputs, $this->macros_by_item_props)) as $field) {
+			// Special processing for calculated item formula.
+			if ($field === 'params_f') {
+				$expression_data = new CTriggerExpression(['calculated' => true, 'lldmacros' => $support_lldmacros]);
+
+				if (($result = $expression_data->parse($inputs[$field])) !== false) {
+					foreach ($result->getTokens() as $token) {
+						switch ($token['type']) {
+							case CTriggerExprParserResult::TOKEN_TYPE_USER_MACRO:
+								$texts_support_user_macros[] = $token['value'];
+								break;
+
+							case CTriggerExprParserResult::TOKEN_TYPE_LLD_MACRO:
+								$texts_support_lld_macros[] = $token['value'];
+								break;
+
+							case CTriggerExprParserResult::TOKEN_TYPE_STRING:
+								$texts_support_user_macros[] = $token['data']['string'];
+								$texts_support_lld_macros[] = $token['data']['string'];
+								break;
+						}
+					}
+				}
+				continue;
+			}
+
 			$macros = $this->macros_by_item_props[$field];
 			unset($macros['support_lld_macros'], $macros['support_user_macros']);
 
@@ -188,6 +213,15 @@ class CControllerPopupItemTestEdit extends CControllerPopupItemTest {
 			}
 		}
 
+		// Check if if there is an interface and its details (SNMP) have macros and add them to list of macros.
+		if (array_key_exists('interface', $inputs) && array_key_exists('details', $inputs['interface'])) {
+			foreach ($inputs['interface']['details'] as $field) {
+				if (strstr($field, '{') !== false) {
+					$texts_support_user_macros[] = $field;
+				}
+			}
+		}
+
 		// Unset duplicate macros.
 		foreach ($supported_macros as &$item_macros_type) {
 			$item_macros_type = array_unique($item_macros_type);
@@ -207,12 +241,23 @@ class CControllerPopupItemTestEdit extends CControllerPopupItemTest {
 			'macros_values' => $this->getSupportedMacros($inputs + ['interfaceid' => $this->getInput('interfaceid', 0)])
 		]);
 
+		$show_warning = false;
+
 		// Set resolved macros to previously specified values.
-		if ($usermacros['macros'] && array_key_exists('macros', $data) && is_array($data['macros'])) {
-			foreach (array_keys($usermacros['macros']) as $macro_name) {
-				if (array_key_exists($macro_name, $data['macros'])) {
-					$usermacros['macros'][$macro_name] = $data['macros'][$macro_name];
-				}
+		foreach (array_keys($usermacros['macros']) as $macro_name) {
+			if ($usermacros['macros'] && array_key_exists('macros', $data) && is_array($data['macros'])
+					&& array_key_exists($macro_name, $data['macros'])) {
+				// Macro values were set by user. Which means those could be intentional asterisks or empty fields.
+				$usermacros['macros'][$macro_name] = $data['macros'][$macro_name];
+			}
+			elseif ($usermacros['macros'][$macro_name] === ZBX_SECRET_MASK) {
+				/*
+				 * Macro values were not set by user, so this means form was openened for the first time. So in this
+				 * case check if there are secret macros. If there are, clear the values and show warning message box.
+				 */
+
+				$usermacros['macros'][$macro_name] = '';
+				$show_warning = true;
 			}
 		}
 
@@ -267,10 +312,13 @@ class CControllerPopupItemTestEdit extends CControllerPopupItemTest {
 			'inputs' => $inputs,
 			'proxies' => in_array($this->item_type, $this->items_support_proxy) ? $this->getHostProxies() : [],
 			'proxies_enabled' => in_array($this->item_type, $this->items_support_proxy),
-			'interface_address_enabled' => in_array($this->item_type, $this->items_require_interface),
-			'interface_port_enabled' => (in_array($this->item_type, $this->items_require_interface)
-				&& $this->item_type != ITEM_TYPE_SIMPLE
+			'interface_address_enabled' => (array_key_exists($this->item_type, $this->items_require_interface)
+				&& $this->items_require_interface[$this->item_type]['address']
 			),
+			'interface_port_enabled' => (array_key_exists($this->item_type, $this->items_require_interface)
+				&& $this->items_require_interface[$this->item_type]['port']
+			),
+			'show_warning' => $show_warning,
 			'user' => [
 				'debug_mode' => $this->getDebugMode()
 			]

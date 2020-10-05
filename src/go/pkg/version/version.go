@@ -29,10 +29,10 @@ import (
 
 const (
 	APPLICATION_NAME        = "Zabbix Agent"
-	ZABBIX_REVDATE          = "9 October 2019"
+	ZABBIX_REVDATE          = "28 September 2020"
 	ZABBIX_VERSION_MAJOR    = 5
 	ZABBIX_VERSION_MINOR    = 0
-	ZABBIX_VERSION_PATCH    = 0
+	ZABBIX_VERSION_PATCH    = 4
 	ZABBIX_VERSION_RC       = ""
 	ZABBIX_VERSION_RC_NUM   = "{ZABBIX_RC_NUM}"
 	ZABBIX_VERSION_REVISION = "{ZABBIX_REVISION}"
@@ -140,7 +140,7 @@ func TitleMessage() string {
 }
 
 func Display() {
-	fmt.Printf("%s (Zabbix) %s\n", TitleMessage(), LongStr())
+	fmt.Printf("%s (Zabbix) %s\n", TitleMessage(), Long())
 	fmt.Printf("Revision %s %s, compilation time: %s %s\n\n", Revision(), RevDate(), CompileDate(), CompileTime())
 	fmt.Println(CopyrightMessage())
 }

@@ -263,7 +263,7 @@ class CTemplate extends CHostGeneral {
 
 		$sqlParts = $this->applyQueryOutputOptions($this->tableName(), $this->tableAlias(), $options, $sqlParts);
 		$sqlParts = $this->applyQuerySortOptions($this->tableName(), $this->tableAlias(), $options, $sqlParts);
-		$res = DBselect($this->createSelectQueryFromParts($sqlParts), $sqlParts['limit']);
+		$res = DBselect(self::createSelectQueryFromParts($sqlParts), $sqlParts['limit']);
 		while ($template = DBfetch($res)) {
 			if ($options['countOutput']) {
 				if ($options['groupCount']) {
@@ -335,7 +335,7 @@ class CTemplate extends CHostGeneral {
 			$templateIds[] = $templateId;
 
 			if (array_key_exists('tags', $template)) {
-				foreach ($template['tags'] as $tag) {
+				foreach (zbx_toArray($template['tags']) as $tag) {
 					$ins_tags[] = ['hostid' => $templateId] + $tag;
 				}
 			}
@@ -384,7 +384,7 @@ class CTemplate extends CHostGeneral {
 	protected function validateCreate(array $templates) {
 		$groupIds = [];
 
-		foreach ($templates as $template) {
+		foreach ($templates as &$template) {
 			// check if hosts have at least 1 group
 			if (!isset($template['groups']) || !$template['groups']) {
 				self::exception(ZBX_API_ERROR_PARAMETERS,
@@ -395,9 +395,18 @@ class CTemplate extends CHostGeneral {
 			$template['groups'] = zbx_toArray($template['groups']);
 
 			foreach ($template['groups'] as $group) {
+				if (!is_array($group) || (is_array($group) && !array_key_exists('groupid', $group))) {
+					self::exception(ZBX_API_ERROR_PARAMETERS,
+						_s('Incorrect value for field "%1$s": %2$s.', 'groups',
+							_s('the parameter "%1$s" is missing', 'groupid')
+						)
+					);
+				}
+
 				$groupIds[$group['groupid']] = $group['groupid'];
 			}
 		}
+		unset($template);
 
 		$dbHostGroups = API::HostGroup()->get([
 			'output' => ['groupid'],
@@ -509,9 +518,13 @@ class CTemplate extends CHostGeneral {
 		$macros = [];
 		foreach ($templates as &$template) {
 			if (isset($template['macros'])) {
-				$macros[$template['templateid']] = $template['macros'];
+				$macros[$template['templateid']] = zbx_toArray($template['macros']);
 
 				unset($template['macros']);
+			}
+
+			if (array_key_exists('tags', $template)) {
+				$template['tags'] = zbx_toArray($template['tags']);
 			}
 		}
 		unset($template);
@@ -611,7 +624,7 @@ class CTemplate extends CHostGeneral {
 			'preservekeys' => true
 		]);
 		if ($del_rules) {
-			API::DiscoveryRule()->delete(array_keys($del_rules), true);
+			CDiscoveryRuleManager::delete(array_keys($del_rules));
 		}
 
 		// delete the items
@@ -716,6 +729,65 @@ class CTemplate extends CHostGeneral {
 			API::Application()->delete(array_keys($delApplications), true);
 		}
 
+		// Get host prototype operations from LLD overrides where this template is linked.
+		$lld_override_operationids = [];
+
+		$db_lld_override_operationids = DBselect(
+			'SELECT loo.lld_override_operationid'.
+			' FROM lld_override_operation loo'.
+			' WHERE EXISTS('.
+				'SELECT NULL'.
+				' FROM lld_override_optemplate lot'.
+				' WHERE lot.lld_override_operationid=loo.lld_override_operationid'.
+				' AND '.dbConditionId('lot.templateid', $templateids).
+			')'
+		);
+		while ($db_lld_override_operationid = DBfetch($db_lld_override_operationids)) {
+			$lld_override_operationids[] = $db_lld_override_operationid['lld_override_operationid'];
+		}
+
+		if ($lld_override_operationids) {
+			DB::delete('lld_override_optemplate', ['templateid' => $templateids]);
+
+			// Make sure there no other operations left to safely delete the operation.
+			$delete_lld_override_operationids = [];
+
+			$db_delete_lld_override_operationids = DBselect(
+				'SELECT loo.lld_override_operationid'.
+				' FROM lld_override_operation loo'.
+				' WHERE NOT EXISTS ('.
+						'SELECT NULL'.
+						' FROM lld_override_opstatus los'.
+						' WHERE los.lld_override_operationid=loo.lld_override_operationid'.
+					')'.
+					' AND NOT EXISTS ('.
+						'SELECT NULL'.
+						' FROM lld_override_opdiscover lod'.
+						' WHERE lod.lld_override_operationid=loo.lld_override_operationid'.
+					')'.
+					' AND NOT EXISTS ('.
+						'SELECT NULL'.
+						' FROM lld_override_opinventory loi'.
+						' WHERE loi.lld_override_operationid=loo.lld_override_operationid'.
+					')'.
+					' AND NOT EXISTS ('.
+						'SELECT NULL'.
+						' FROM lld_override_optemplate lot'.
+						' WHERE lot.lld_override_operationid=loo.lld_override_operationid'.
+					')'.
+					' AND '.dbConditionId('loo.lld_override_operationid', $lld_override_operationids)
+			);
+
+			while ($db_delete_lld_override_operationid = DBfetch($db_delete_lld_override_operationids)) {
+				$delete_lld_override_operationids[] = $db_delete_lld_override_operationid['lld_override_operationid'];
+			}
+
+			if ($delete_lld_override_operationids) {
+				DB::delete('lld_override_operation', ['lld_override_operationid' => $delete_lld_override_operationids]);
+			}
+		}
+
+		// Finally delete the template.
 		DB::delete('hosts', ['hostid' => $templateids]);
 
 		// TODO: remove info from API

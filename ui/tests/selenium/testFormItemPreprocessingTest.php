@@ -478,7 +478,7 @@ class testFormItemPreprocessingTest extends CWebTest {
 				];
 
 				if ($macros['expected']) {
-					foreach ($form->getField('Macros')->getRows() as $row) {
+					foreach ($form->getField('Macros')->asTable()->getRows() as $row) {
 						$columns = $row->getColumns()->asArray();
 						/*
 						 * Macro columns are represented in following way:
@@ -525,12 +525,9 @@ class testFormItemPreprocessingTest extends CWebTest {
 				$prev_value_string = '100';
 				$prev_time_string  = 'now-1s';
 
-				$container_current = $form->getFieldContainer('Value');
-				$container_current->query('id:value')->asMultiline()->one()->fill($value_string);
-
-				$container_prev = $form->getFieldContainer('Previous value');
-				$prev_value = $container_prev->query('id:prev_value')->asMultiline()->one();
-				$prev_time = $container_prev->query('id:prev_time')->one();
+				$form->getField('Value')->fill('$value_string');
+				$prev_value = $form->getField('Previous value');
+				$prev_time = $form->getField('Prev. time');
 
 				if ($prev_value->isEnabled(true) && $prev_time->isEnabled(true)) {
 					$prev_value->fill($prev_value_string);

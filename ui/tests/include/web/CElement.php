@@ -27,6 +27,10 @@ require_once dirname(__FILE__).'/IWaitable.php';
 require_once dirname(__FILE__).'/WaitableTrait.php';
 require_once dirname(__FILE__).'/CastableTrait.php';
 
+use Facebook\WebDriver\WebDriverExpectedCondition;
+use Facebook\WebDriver\Remote\RemoteWebElement;
+use Facebook\WebDriver\WebDriverKeys;
+
 /**
  * Generic web page element.
  */
@@ -70,16 +74,19 @@ class CElement extends CBaseElement implements IWaitable {
 	 * @param RemoteWebElement $element
 	 * @param type $options
 	 */
-	public function __construct(RemoteWebElement $element, $options = []) {
-		$this->setElement($element);
+	public static function createInstance(RemoteWebElement $element, $options = []) {
+		$instance = new static($element->executor, $element->id, $element->isW3cCompliant);
+		$instance->setElement($element);
 
 		foreach ($options as $key => $value) {
-			$this->$key = $value;
+			$instance->$key = $value;
 		}
 
-		if (!$this->normalized) {
-			$this->normalize();
+		if (!$instance->normalized) {
+			$instance->normalize();
 		}
+
+		return $instance;
 	}
 
 	/**
@@ -138,6 +145,7 @@ class CElement extends CBaseElement implements IWaitable {
 		$this->executor = $element->executor;
 		$this->id = $element->id;
 		$this->fileDetector = $element->fileDetector;
+		$this->isW3cCompliant = $element->isW3cCompliant;
 	}
 
 	/**
@@ -245,7 +253,10 @@ class CElement extends CBaseElement implements IWaitable {
 	 * @return CElement
 	 */
 	public function cast($class, $options = []) {
-		return new $class($this, array_merge($options, ['parent' => $this->parent, 'by' => $this->by]));
+		return call_user_func([$class, 'createInstance'], $this, array_merge($options, [
+			'parent' => $this->parent,
+			'by' => $this->by
+		]));
 	}
 
 	/**
@@ -500,6 +511,8 @@ class CElement extends CBaseElement implements IWaitable {
 
 			CElementQuery::getDriver()->executeScript('arguments[0].click();', [$this]);
 		}
+
+		return $this;
 	}
 
 	/**
@@ -601,6 +614,10 @@ class CElement extends CBaseElement implements IWaitable {
 			return $this->asMultiline($options);
 		}
 
+		if (in_array('input-group', $class)) {
+			return $this->asInputGroup($options);
+		}
+
 		CTest::addWarning('No specific element was detected');
 
 		return $this;
@@ -628,6 +645,13 @@ class CElement extends CBaseElement implements IWaitable {
 	 */
 	public function checkValue($expected, $raise_exception = true) {
 		$value = $this->getValue();
+		if ($value === null) {
+			if ($raise_exception) {
+				throw new Exception('Cannot get value of the non-interactable element.');
+			}
+
+			return false;
+		}
 
 		if (is_array($value)) {
 			if (!is_array($expected)) {
@@ -647,6 +671,14 @@ class CElement extends CBaseElement implements IWaitable {
 		}
 
 		if ($expected != $value && $raise_exception) {
+			if (!is_scalar($value) || is_bool($value)) {
+				$value = json_encode($value);
+			}
+
+			if (!is_scalar($expected) || is_bool($expected)) {
+				$expected = json_encode($expected);
+			}
+
 			throw new Exception('Element value '.$value.' doesn\'t match expected '.$expected.'.');
 		}
 

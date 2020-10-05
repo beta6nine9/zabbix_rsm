@@ -30,7 +30,9 @@ DIST_SUBDIRS = \
 	zbxhistory \
 	zbxcompress \
 	zbxembed \
-	zbxprometheus
+	zbxprometheus \
+	zbxdiag
+
 
 DIST_SUBDIRS += zbxrsm
 
@@ -51,7 +53,8 @@ SERVER_SUBDIRS = \
 	zbxhistory \
 	zbxcompress \
 	zbxembed \
-	zbxprometheus
+	zbxprometheus \
+	zbxdiag
 
 SERVER_SUBDIRS += zbxrsm
 
@@ -72,7 +75,8 @@ PROXY_SUBDIRS = \
 	zbxhistory \
 	zbxcompress \
 	zbxembed \
-	zbxprometheus
+	zbxprometheus \
+	zbxdiag
 
 PROXY_SUBDIRS += zbxrsm
 

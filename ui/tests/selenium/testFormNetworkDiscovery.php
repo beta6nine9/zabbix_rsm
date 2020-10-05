@@ -21,6 +21,8 @@
 //require_once dirname(__FILE__).'/../include/class.cwebtest.php';
 require_once dirname(__FILE__).'/../include/CLegacyWebTest.php';
 
+use Facebook\WebDriver\WebDriverBy;
+
 /**
  * @backup drules
  */
@@ -558,7 +560,7 @@ class testFormNetworkDiscovery extends CLegacyWebTest {
 					switch ($key) {
 						case 'check_action':
 							$action = $value;
-							$this->zbxTestWaitUntilElementNotVisible(WebDriverBy::id('overlay-bg'));
+							COverlayDialogElement::ensureNotPresent();
 							$this->zbxTestClickButtonText($action);
 							if ($action !== 'Remove') {
 								COverlayDialogElement::find()->one()->waitUntilReady();
@@ -607,7 +609,7 @@ class testFormNetworkDiscovery extends CLegacyWebTest {
 					$button = ($action === 'Add') ? 'Add' : 'Update';
 					$this->zbxTestClickXpath('//div[@class="overlay-dialogue-footer"]/button[text()="'.$button.'"]');
 					if (!array_key_exists('error_in_checks', $data)) {
-						$this->zbxTestWaitUntilElementNotVisible(WebDriverBy::id('overlay-bg'));
+						COverlayDialogElement::ensureNotPresent();
 						$this->zbxTestWaitUntilElementVisible(WebDriverBy::xpath('//div[@id="dcheckList"]'.
 								'//div[contains(text(), "'.$check['type'].'")]'));
 					}

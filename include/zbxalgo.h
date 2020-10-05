@@ -136,6 +136,8 @@ typedef struct
 }
 zbx_hashset_t;
 
+#define ZBX_HASHSET_ENTRY_OFFSET	offsetof(ZBX_HASHSET_ENTRY_T, data)
+
 void	zbx_hashset_create(zbx_hashset_t *hs, size_t init_size,
 				zbx_hash_func_t hash_func,
 				zbx_compare_func_t compare_func);
@@ -339,7 +341,7 @@ void	zbx_str_free(char *data);
 
 void	uinc128_64(zbx_uint128_t *base, zbx_uint64_t value);
 void	uinc128_128(zbx_uint128_t *base, const zbx_uint128_t *value);
-void	udiv128_64(zbx_uint128_t *result, const zbx_uint128_t *base, zbx_uint64_t value);
+void	udiv128_64(zbx_uint128_t *result, const zbx_uint128_t *dividend, zbx_uint64_t value);
 void	umul64_64(zbx_uint128_t *result, zbx_uint64_t value, zbx_uint64_t factor);
 
 unsigned int	zbx_isqrt32(unsigned int value);
