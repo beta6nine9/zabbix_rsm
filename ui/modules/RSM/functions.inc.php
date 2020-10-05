@@ -282,7 +282,7 @@ function gen_details_item(array $details) {
  * Create DB connection to other DB server.
  *
  * @param array  $server       Database server parameters
- * @param string $error                returns a message in case of an error
+ * @param string $error        returns a message in case of an error
  *
  * @return bool
  */
@@ -293,4 +293,46 @@ function multiDBconnect($server, &$error) {
 	$DB = array_merge($DB, $server);
 
 	return DBconnect($error);
+}
+
+/**
+ * Convert elapsed time to human readable string.
+ *
+ * @param DateTime $datetime   any supported date and time format (http://www.php.net/manual/en/datetime.formats.php)
+ * @param bool     $full       report full string even when zeroes
+ *
+ * @return string
+ */
+function elapsedTime($datetime, $full = false) {
+	$now = new DateTime;
+	$ago = new DateTime($datetime);
+
+	$diff = $now->diff($ago);
+
+	$diff->w = floor($diff->d / 7);
+	$diff->d -= $diff->w * 7;
+
+	$string = array(
+		'y' => 'year',
+		'm' => 'month',
+		'w' => 'week',
+		'd' => 'day',
+		'h' => 'hour',
+		'i' => 'minute',
+		's' => 'second',
+	);
+
+	foreach ($string as $k => &$v) {
+		if ($diff->$k) {
+			$v = $diff->$k . ' ' . $v . ($diff->$k > 1 ? 's' : '');
+		} else {
+			unset($string[$k]);
+		}
+	}
+
+	if (!$full) {
+		$string = array_slice($string, 0, 1);
+	}
+
+	return $string ? implode(', ', $string) . ' ago' : 'just now';
 }
