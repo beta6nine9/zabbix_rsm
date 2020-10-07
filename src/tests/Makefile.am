@@ -35,7 +35,8 @@ COMMON_OBJS = \
 	$(top_srcdir)/src/libs/zbxcommon/libzbxcommon.a \
 	$(top_srcdir)/src/libs/zbxdb/libzbxdb.a \
 	$(top_srcdir)/src/libs/zbxexec/libzbxexec.a \
-	$(top_srcdir)/src/libs/zbxregexp/libzbxregexp.a
+	$(top_srcdir)/src/libs/zbxregexp/libzbxregexp.a \
+	$(top_srcdir)/src/libs/zbxcrypto/libzbxcrypto.a
 
 t_rsm_dns_LDADD = $(COMMON_OBJS) @SERVER_LIBS@
 t_rsm_dns_LDFLAGS = @SERVER_LDFLAGS@
