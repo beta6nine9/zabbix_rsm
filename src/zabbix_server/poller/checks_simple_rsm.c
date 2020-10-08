@@ -2002,78 +2002,6 @@ static zbx_subtest_result_t	zbx_subtest_result(int rtt, int rtt_limit)
 	return (0 > rtt || rtt > rtt_limit ? ZBX_SUBTEST_FAIL : ZBX_SUBTEST_SUCCESS);
 }
 
-static int	zbx_conf_str(zbx_uint64_t *hostid, const char *macro, char **value, char *err, size_t err_size)
-{
-	int	ret = FAIL;
-
-	if (NULL != *value)
-	{
-		zbx_strlcpy(err, "unfreed memory detected", err_size);
-		goto out;
-	}
-
-	DCget_user_macro(hostid, 1, macro, value);
-	if (NULL == *value || '\0' == **value)
-	{
-		zbx_snprintf(err, err_size, "macro %s is not set", macro);
-		zbx_free(*value);
-		goto out;
-	}
-
-	ret = SUCCEED;
-out:
-	return ret;
-}
-
-static int	zbx_conf_int(zbx_uint64_t *hostid, const char *macro, int *value, char min, char *err, size_t err_size)
-{
-	char	*value_str = NULL;
-	int	ret = FAIL;
-
-	DCget_user_macro(hostid, 1, macro, &value_str);
-	if (NULL == value_str || '\0' == *value_str)
-	{
-		zbx_snprintf(err, err_size, "macro %s is not set", macro);
-		goto out;
-	}
-
-	*value = atoi(value_str);
-
-	if (min > *value)
-	{
-		zbx_snprintf(err, err_size, "the value of macro %s cannot be less than %d", macro, min);
-		goto out;
-	}
-
-	ret = SUCCEED;
-out:
-	zbx_free(value_str);
-
-	return ret;
-}
-
-static int	zbx_conf_ip_support(zbx_uint64_t *hostid, int *ipv4_enabled, int *ipv6_enabled,
-		char *err, size_t err_size)
-{
-	int	ret = FAIL;
-
-	if (SUCCEED != zbx_conf_int(hostid, ZBX_MACRO_IP4_ENABLED, ipv4_enabled, 0, err, err_size))
-		goto out;
-
-	if (SUCCEED != zbx_conf_int(hostid, ZBX_MACRO_IP6_ENABLED, ipv6_enabled, 0, err, err_size))
-		goto out;
-
-	if (0 == *ipv4_enabled && 0 == *ipv6_enabled)
-	{
-		zbx_strlcpy(err, "both IPv4 and IPv6 disabled", err_size);
-		goto out;
-	}
-
-	ret = SUCCEED;
-out:
-	return ret;
-}
-
 static const char	*get_probe_from_host(const char *host)
 {
 	const char	*p;
@@ -2138,8 +2066,8 @@ static FILE	*open_item_log(const char *host, const char *tld, const char *name, 
 	return fd;
 }
 
-static void	set_dns_test_results(zbx_ns_t *nss, size_t nss_num, int rtt_limit, unsigned int minns, unsigned int *nssok,
-		unsigned int *status)
+static void	set_dns_test_results(zbx_ns_t *nss, size_t nss_num, int rtt_limit, unsigned int minns,
+		unsigned int *nssok, unsigned int *status)
 {
 	size_t	i, j;
 
@@ -2395,7 +2323,7 @@ int	check_rsm_dns(const char *host, int nextcheck, const AGENT_REQUEST *request,
 	unsigned int		extras, current_mode, test_status, minns, nssok;
 	struct zbx_json		json;
 	int			dnssec_enabled, rdds_enabled, epp_enabled, udp_enabled, tcp_enabled, ipv4_enabled,
-				ipv6_enabled, udp_rtt_limit, tcp_rtt_limit, rtt_limit, successful_tests, file_exists,
+				ipv6_enabled, udp_rtt_limit, tcp_rtt_limit, rtt_limit, successful_tests, file_exists = 0,
 				tcp_ratio, test_recover_udp, test_recover_tcp, test_recover, ret = SYSINFO_RET_FAIL;
 
 	if (17 != request->nparam)
@@ -3777,7 +3705,7 @@ end:
 			case ZBX_SUBTEST_SUCCESS:
 				rdds43_status = 1;	/* up */
 				break;
-			case ZBX_SUBTEST_FAIL:
+			default:	/* ZBX_SUBTEST_FAIL */
 				rdds43_status = 0;	/* down */
 		}
 
@@ -3786,7 +3714,7 @@ end:
 			case ZBX_SUBTEST_SUCCESS:
 				rdds80_status = 1;	/* up */
 				break;
-			case ZBX_SUBTEST_FAIL:
+			default:	/* ZBX_SUBTEST_FAIL */
 				rdds80_status = 0;	/* down */
 		}
 
@@ -4027,7 +3955,7 @@ end:
 			case ZBX_SUBTEST_SUCCESS:
 				subtest_result = 1;	/* up */
 				break;
-			case ZBX_SUBTEST_FAIL:
+			default:	/* ZBX_SUBTEST_FAIL */
 				subtest_result = 0;	/* down */
 		}
 
@@ -4814,7 +4742,7 @@ int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *
 				*epp_passwd_salt_b64 = NULL, *epp_privkey_enc_b64 = NULL, *epp_privkey_salt_b64 = NULL,
 				*epp_user = NULL, *epp_passwd = NULL, *epp_privkey = NULL, *epp_cert_b64 = NULL,
 				*epp_cert = NULL, *epp_commands = NULL, *epp_serverid = NULL, *epp_testprefix = NULL,
-				*epp_servercertmd5 = NULL, *tmp;
+				*epp_servercertmd5 = NULL;
 	unsigned short		epp_port = 700;
 	X509			*epp_server_x509 = NULL;
 	const SSL_METHOD	*method;
@@ -4825,9 +4753,8 @@ int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *
 	zbx_socket_t		sock;
 	zbx_vector_str_t	epp_hosts, epp_ips;
 	unsigned int		extras;
-	int			rv, epp_enabled, epp_cert_size, rtt, rtt1 = ZBX_NO_VALUE, rtt2 = ZBX_NO_VALUE,
-				rtt3 = ZBX_NO_VALUE, rtt1_limit, rtt2_limit, rtt3_limit, ipv4_enabled, ipv6_enabled,
-				ret = SYSINFO_RET_FAIL;
+	int			rv, epp_cert_size, rtt, rtt1 = ZBX_NO_VALUE, rtt2 = ZBX_NO_VALUE,
+				rtt3 = ZBX_NO_VALUE, ipv4_enabled = 0, ipv6_enabled = 0, ret = SYSINFO_RET_FAIL;
 
 	zbx_vector_str_create(&epp_hosts);
 	zbx_vector_str_create(&epp_ips);
@@ -5085,18 +5012,6 @@ out:
 	else
 	{
 		/* TODO: save result: ip, rtt1, rtt2, rtt3 */
-
-		/* set availability of EPP (up/down) */
-		if (ZBX_SUBTEST_SUCCESS != zbx_subtest_result(rtt1, rtt1_limit) ||
-				ZBX_SUBTEST_SUCCESS != zbx_subtest_result(rtt2, rtt2_limit) ||
-				ZBX_SUBTEST_SUCCESS != zbx_subtest_result(rtt3, rtt3_limit))
-		{
-			/* down */
-		}
-		else
-		{
-			/* up */
-		}
 	}
 
 	rsm_info(log_fd, "END TEST");
@@ -5201,7 +5116,7 @@ out:
 int	check_rsm_probe_status(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *result)
 {
 	char			err[ZBX_ERR_BUF_SIZE], ips4_init = 0, ips6_init = 0;
-	const char		*ip, *p;
+	const char		*ip;
 	zbx_vector_str_t	ips4, ips6;
 	ldns_resolver		*res = NULL;
 	ldns_rdf		*query_rdf = NULL;

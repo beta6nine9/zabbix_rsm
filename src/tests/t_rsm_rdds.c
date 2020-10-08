@@ -47,7 +47,7 @@ int	main(int argc, char *argv[])
 	zbx_resolver_error_t	ec_res;
 	int			c, index, i, rtt43 = ZBX_NO_VALUE, rtt80 = ZBX_NO_VALUE, upd43 = ZBX_NO_VALUE,
 				maxredirs = DEFAULT_MAXREDIRS, log_to_file = 0, ipv_flags = 0, curl_flags = 0,
-				rdds43_status, rdds80_status, rdds_status;
+				rdds43_status, rdds80_status;
 	zbx_vector_str_t	ips43, nss;
 	zbx_http_error_t	ec_http;
 	FILE			*log_fd = stdout;
@@ -250,7 +250,7 @@ int	main(int argc, char *argv[])
 		case ZBX_SUBTEST_SUCCESS:
 			rdds43_status = 1;	/* up */
 			break;
-		case ZBX_SUBTEST_FAIL:
+		default:	/* ZBX_SUBTEST_FAIL */
 			rdds43_status = 0;	/* down */
 	}
 
@@ -259,7 +259,7 @@ int	main(int argc, char *argv[])
 		case ZBX_SUBTEST_SUCCESS:
 			rdds80_status = 1;	/* up */
 			break;
-		case ZBX_SUBTEST_FAIL:
+		default:	/* ZBX_SUBTEST_FAIL */
 			rdds80_status = 0;	/* down */
 	}
 

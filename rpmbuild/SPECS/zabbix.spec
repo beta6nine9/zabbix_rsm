@@ -354,13 +354,14 @@ build_flags="$build_flags --enable-server --with-libevent --with-libpcre"
 build_flags="$build_flags --enable-agent"
 %endif
 
-#CFLAGS="$RPM_OPT_FLAGS -fPIC -pie -Wl,-z,relro -Wl,-z,now"
-#CXXFLAGS="$RPM_OPT_FLAGS -fPIC -pie -Wl,-z,relro -Wl,-z,now"
-CFLAGS="-fPIC -pie -g -O3 -m64 -march=westmere -mtune=haswell -feliminate-unused-debug-types -pipe -Wall      \
--Wp,-D_FORTIFY_SOURCE=2 -fexceptions -fstack-protector --param=ssp-buffer-size=32 -Wformat -Wformat-security  \
--fasynchronous-unwind-tables -Wp,-D_REENTRANT -ftree-loop-distribute-patterns -Wl,-z -Wl,now -Wl,-z -Wl,relro \
--fno-semantic-interposition -ffat-lto-objects -fno-trapping-math -Wl,-sort-common -Wl,--enable-new-dtags      \
--Wa,-mbranches-within-32B-boundaries"
+CFLAGS="$RPM_OPT_FLAGS -fPIC -pie -Wl,-z,relro -Wl,-z,now"
+# GCC 9
+#CFLAGS="-fPIC -pie -g -O3 -m64 -march=westmere -mtune=haswell -feliminate-unused-debug-types -pipe -Wall      \
+#-Wp,-D_FORTIFY_SOURCE=2 -fexceptions -fstack-protector --param=ssp-buffer-size=32 -Wformat -Wformat-security  \
+#-fasynchronous-unwind-tables -Wp,-D_REENTRANT -ftree-loop-distribute-patterns -Wl,-z -Wl,now -Wl,-z -Wl,relro \
+#-fno-semantic-interposition -ffat-lto-objects -fno-trapping-math -Wl,-sort-common -Wl,--enable-new-dtags      \
+#-Wa,-mbranches-within-32B-boundaries"
+
 CXXFLAGS="$CFLAGS"
 
 export CFLAGS
@@ -430,7 +431,6 @@ mv $RPM_BUILD_ROOT%{_sysconfdir}/zabbix/zabbix_server.conf.d $RPM_BUILD_ROOT%{_s
 
 %if 0%{?rhel} >= 8
 mv $RPM_BUILD_ROOT%{_sysconfdir}/zabbix/zabbix_agentd.conf.d $RPM_BUILD_ROOT%{_sysconfdir}/zabbix/zabbix_agentd.d
-%endif
 
 install -dm 755 $RPM_BUILD_ROOT%{_docdir}/zabbix-agent-%{version}
 
@@ -443,6 +443,7 @@ cat conf/zabbix_agentd.conf | sed \
 	-e '/^# LogFileSize=.*/a \\nLogFileSize=0' \
 	-e '/^# Include=$/a \\nInclude=%{_sysconfdir}/zabbix/zabbix_agentd.d/' \
 	> $RPM_BUILD_ROOT%{_sysconfdir}/zabbix/zabbix_agentd.conf
+%endif
 
 mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/rsyslog.d
 cp %{SOURCE20} $RPM_BUILD_ROOT%{_sysconfdir}/rsyslog.d/rsm.slv.conf
