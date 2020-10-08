@@ -234,11 +234,11 @@ if ($check_till > $max_till)
 db_connect();
 foreach my $service (keys(%services))
 {
-	$services{$service}{'delay'} = get_dns_delay($check_from)  if ($service eq 'dns');
-	$services{$service}{'delay'} = get_dns_delay($check_from)  if ($service eq 'dnssec');
-	$services{$service}{'delay'} = get_rdds_delay($check_from) if ($service eq 'rdds');
-	$services{$service}{'delay'} = get_rdap_delay($check_from) if ($service eq 'rdap');
-	$services{$service}{'delay'} = get_epp_delay($check_from)  if ($service eq 'epp');
+	$services{$service}{'delay'} = get_dns_delay()  if ($service eq 'dns');
+	$services{$service}{'delay'} = get_dns_delay()  if ($service eq 'dnssec');
+	$services{$service}{'delay'} = get_rdds_delay() if ($service eq 'rdds');
+	$services{$service}{'delay'} = get_rdap_delay() if ($service eq 'rdap');
+	$services{$service}{'delay'} = get_epp_delay()  if ($service eq 'epp');
 
 	$services{$service}{'avail_key'} = "rsm.slv.$service.avail";
 	$services{$service}{'rollweek_key'} = "rsm.slv.$service.rollweek";

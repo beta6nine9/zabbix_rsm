@@ -25,7 +25,7 @@ set_slv_config(get_rsm_config());
 db_connect();
 
 # we don't know the rollweek bounds yet so we assume it ends at least few minutes back
-my $delay = get_rdds_delay(getopt('now') // time() - ROLLWEEK_SHIFT_BACK);
+my $delay = get_rdds_delay();
 
 my (undef, undef, $max_clock) = get_cycle_bounds($delay, getopt('now'));
 

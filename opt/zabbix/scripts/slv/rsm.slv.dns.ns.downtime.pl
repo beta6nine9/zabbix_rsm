@@ -30,7 +30,7 @@ if (!opt('dry-run'))
 		DOWNTIME_KEY_PATTERN,
 		1,
 		1,
-		get_dns_delay(getopt('now') // time() - AVAIL_SHIFT_BACK)
+		get_dns_delay()
 	);
 }
 

@@ -24,41 +24,36 @@ use Fcntl qw(:flock);
 use List::Util qw(min max);
 use Devel::StackTrace;
 
-use constant E_ID_NONEXIST => -2;
-use constant E_ID_MULTIPLE => -3;
+use constant E_ID_NONEXIST			=> -2;
+use constant E_ID_MULTIPLE			=> -3;
 
-use constant PROTO_UDP	=> 0;
-use constant PROTO_TCP	=> 1;
+use constant PROTO_UDP				=> 0;
+use constant PROTO_TCP				=> 1;
 
-						# "RSM Service Availability" value mapping:
-use constant DOWN			=> 0;	# Down
-use constant UP				=> 1;	# Up
-use constant UP_INCONCLUSIVE_NO_DATA	=> 2;	# Up-inconclusive-no-data
-use constant UP_INCONCLUSIVE_NO_PROBES	=> 3;	# Up-inconclusive-no-probes
+							# "RSM Service Availability" value mapping:
+use constant DOWN				=> 0;	# Down
+use constant UP					=> 1;	# Up
+use constant UP_INCONCLUSIVE_NO_DATA		=> 2;	# Up-inconclusive-no-data
+use constant UP_INCONCLUSIVE_NO_PROBES		=> 3;	# Up-inconclusive-no-probes
 
-use constant ONLINE => 1;	# todo: check where these are used
-use constant OFFLINE => 0;	# todo: check where these are used
-use constant SLV_UNAVAILABILITY_LIMIT => 49; # NB! must be in sync with frontend
+use constant ONLINE				=> 1;	# todo: check where these are used
+use constant OFFLINE				=> 0;	# todo: check where these are used
+use constant SLV_UNAVAILABILITY_LIMIT		=> 49;	# NB! must be in sync with frontend
 
-use constant MIN_LOGIN_ERROR => -205;
-use constant MAX_LOGIN_ERROR => -203;
-use constant MIN_INFO_ERROR => -211;
-use constant MAX_INFO_ERROR => -209;
+use constant MIN_LOGIN_ERROR			=> -205;
+use constant MAX_LOGIN_ERROR			=> -203;
+use constant MIN_INFO_ERROR			=> -211;
+use constant MAX_INFO_ERROR			=> -209;
 
-use constant TRIGGER_SEVERITY_NOT_CLASSIFIED => 0;
-use constant EVENT_OBJECT_TRIGGER => 0;
-use constant EVENT_SOURCE_TRIGGERS => 0;
-use constant TRIGGER_VALUE_FALSE => 0;
-use constant TRIGGER_VALUE_TRUE => 1;
-use constant INCIDENT_FALSE_POSITIVE => 1; # NB! must be in sync with frontend
-use constant PROBE_LASTACCESS_ITEM => 'zabbix[proxy,{$RSM.PROXY_NAME},lastaccess]';
-use constant PROBE_KEY_MANUAL => 'rsm.probe.status[manual]';
-use constant PROBE_KEY_AUTOMATIC => 'rsm.probe.status[automatic,%]'; # match all in SQL
-
-use constant RSM_CONFIG_DNS_DELAY_ITEMID => 100008;	# rsm.configvalue[RSM.DNS.DELAY]
-use constant RSM_CONFIG_RDDS_DELAY_ITEMID => 100009;	# rsm.configvalue[RSM.RDDS.DELAY]
-use constant RSM_CONFIG_EPP_DELAY_ITEMID => 100010;	# rsm.configvalue[RSM.EPP.DELAY]
-use constant RSM_CONFIG_RDAP_DELAY_ITEMID => 100034;	# rsm.configvalue[RSM.RDAP.DELAY]
+use constant TRIGGER_SEVERITY_NOT_CLASSIFIED	=> 0;
+use constant EVENT_OBJECT_TRIGGER		=> 0;
+use constant EVENT_SOURCE_TRIGGERS		=> 0;
+use constant TRIGGER_VALUE_FALSE		=> 0;
+use constant TRIGGER_VALUE_TRUE			=> 1;
+use constant INCIDENT_FALSE_POSITIVE		=> 1;	# NB! must be in sync with frontend
+use constant PROBE_LASTACCESS_ITEM		=> 'zabbix[proxy,{$RSM.PROXY_NAME},lastaccess]';
+use constant PROBE_KEY_MANUAL			=> 'rsm.probe.status[manual]';
+use constant PROBE_KEY_AUTOMATIC		=> 'rsm.probe.status[automatic,%]'; # match all in SQL
 
 # In order to do the calculation we should wait till all the results
 # are available on the server (from proxies). We shift back 2 minutes
@@ -66,20 +61,20 @@ use constant RSM_CONFIG_RDAP_DELAY_ITEMID => 100034;	# rsm.configvalue[RSM.RDAP.
 # calculations.
 
 # NB! These numbers must be in sync with Frontend (details page)!
-use constant PROBE_ONLINE_SHIFT		=> 120;	# seconds (must be divisible by 60) to go back for Probe online status calculation
-use constant AVAIL_SHIFT_BACK		=> 120;	# seconds (must be divisible by 60) to go back for Service Availability calculation
-use constant ROLLWEEK_SHIFT_BACK	=> 180;	# seconds (must be divisible by 60) back when Service Availability is definitely calculated
+use constant PROBE_ONLINE_SHIFT			=> 120; # seconds (must be divisible by 60) to go back for Probe online status calculation
+use constant AVAIL_SHIFT_BACK			=> 120; # seconds (must be divisible by 60) to go back for Service Availability calculation
+use constant ROLLWEEK_SHIFT_BACK		=> 180; # seconds (must be divisible by 60) back when Service Availability is definitely calculated
 
-use constant PROBE_ONLINE_STR => 'Online';
+use constant PROBE_ONLINE_STR			=> 'Online';
 
-use constant PROBE_DELAY => 60;
+use constant PROBE_DELAY			=> 60;
 
-use constant DETAILED_RESULT_DELIM => ', ';
+use constant DETAILED_RESULT_DELIM		=> ', ';
 
-use constant USE_CACHE_FALSE => 0;
-use constant USE_CACHE_TRUE  => 1;
+use constant USE_CACHE_FALSE			=> 0;
+use constant USE_CACHE_TRUE			=> 1;
 
-use constant TARGET_PLACEHOLDER => 'TARGET_PLACEHOLDER';	# for non-DNS services, see get_test_results()
+use constant TARGET_PLACEHOLDER			=> 'TARGET_PLACEHOLDER'; # for non-DNS services, see get_test_results()
 
 our ($result, $dbh, $tld, $server_key);
 
@@ -198,123 +193,107 @@ my $log_open = 0;
 my $monitoring_target; # see get_monitoring_target()
 my $rdap_standalone_ts; # see get_rdap_standalone_ts()
 
-sub get_macro_minns
+sub get_macro_minns()
 {
 	return __get_macro('{$RSM.DNS.AVAIL.MINNS}');
 }
 
-sub get_macro_dns_probe_online
+sub get_macro_dns_probe_online()
 {
 	return __get_macro('{$RSM.DNS.PROBE.ONLINE}');
 }
 
-sub get_macro_rdds_probe_online
+sub get_macro_rdds_probe_online()
 {
 	return __get_macro('{$RSM.RDDS.PROBE.ONLINE}');
 }
 
-sub get_macro_rdap_probe_online
+sub get_macro_rdap_probe_online()
 {
 	return __get_macro('{$RSM.RDAP.PROBE.ONLINE}');
 }
 
-sub get_macro_dns_rollweek_sla
+sub get_macro_dns_rollweek_sla()
 {
 	return __get_macro('{$RSM.DNS.ROLLWEEK.SLA}');
 }
 
-sub get_macro_rdds_rollweek_sla
+sub get_macro_rdds_rollweek_sla()
 {
 	return __get_macro('{$RSM.RDDS.ROLLWEEK.SLA}');
 }
 
-sub get_macro_rdap_rollweek_sla
+sub get_macro_rdap_rollweek_sla()
 {
 	return __get_macro('{$RSM.RDAP.ROLLWEEK.SLA}');
 }
 
-sub get_macro_dns_udp_rtt_high
+sub get_macro_dns_udp_rtt_high()
 {
 	return __get_macro('{$RSM.DNS.UDP.RTT.HIGH}');
 }
 
-sub get_macro_dns_udp_rtt_low
+sub get_macro_dns_udp_rtt_low()
 {
 	return __get_macro('{$RSM.DNS.UDP.RTT.LOW}');
 }
 
-sub get_macro_dns_tcp_rtt_low
+sub get_macro_dns_tcp_rtt_low()
 {
 	return __get_macro('{$RSM.DNS.TCP.RTT.LOW}');
 }
 
-sub get_macro_dns_tcp_rtt_high
+sub get_macro_dns_tcp_rtt_high()
 {
 	return __get_macro('{$RSM.DNS.TCP.RTT.HIGH}');
 }
 
-sub get_macro_rdds_rtt_low
+sub get_macro_rdds_rtt_low()
 {
 	return __get_macro('{$RSM.RDDS.RTT.LOW}');
 }
 
-sub get_macro_rdap_rtt_low
+sub get_macro_rdap_rtt_low()
 {
 	return __get_macro('{$RSM.RDAP.RTT.LOW}');
 }
 
-sub get_dns_delay
+sub get_dns_delay()
 {
-	my $value_time = (shift or time() - AVAIL_SHIFT_BACK);
-
-	my $value = __get_configvalue(RSM_CONFIG_DNS_DELAY_ITEMID, $value_time);
-
-	return $value // __get_macro('{$RSM.DNS.DELAY}');
+	return __get_macro('{$RSM.DNS.DELAY}');
 }
 
-sub get_rdds_delay
+sub get_rdds_delay()
 {
-	my $value_time = (shift or time() - AVAIL_SHIFT_BACK);
-
-	my $value = __get_configvalue(RSM_CONFIG_RDDS_DELAY_ITEMID, $value_time);
-
-	return $value // __get_macro('{$RSM.RDDS.DELAY}');
+	return __get_macro('{$RSM.RDDS.DELAY}');
 }
 
-sub get_rdap_delay
+sub get_rdap_delay()
 {
-	my $value_time = (shift or time() - AVAIL_SHIFT_BACK);
-
-	my $value = __get_configvalue(RSM_CONFIG_RDAP_DELAY_ITEMID, $value_time);
-
-	return $value // __get_macro('{$RSM.RDAP.DELAY}');
+	return __get_macro('{$RSM.RDAP.DELAY}');
 }
 
-sub get_epp_delay
+sub get_epp_delay()
 {
-	my $value_time = (shift or time() - AVAIL_SHIFT_BACK);
-
-	my $value = __get_configvalue(RSM_CONFIG_EPP_DELAY_ITEMID, $value_time);
-
-	return $value // __get_macro('{$RSM.EPP.DELAY}');
+	return __get_macro('{$RSM.EPP.DELAY}');
 }
 
-sub get_macro_dns_update_time
+sub get_macro_dns_update_time()
 {
 	return __get_macro('{$RSM.DNS.UPDATE.TIME}');
 }
 
-sub get_macro_rdds_update_time
+sub get_macro_rdds_update_time()
 {
 	return __get_macro('{$RSM.RDDS.UPDATE.TIME}');
 }
 
-sub get_macro_epp_probe_online
+sub get_macro_epp_probe_online()
 {
 	return __get_macro('{$RSM.EPP.PROBE.ONLINE}');
 }
 
-sub get_macro_epp_rollweek_sla
+sub get_macro_epp_rollweek_sla()
 {
 	return __get_macro('{$RSM.EPP.ROLLWEEK.SLA}');
 }
@@ -6155,42 +6134,6 @@ sub __get_probestatus_times
 	}
 
 	return \@times;
-}
-
-sub __get_configvalue
-{
-	my $itemid = shift;
-	my $value_time = shift;
-
-	my $hour = 3600;
-	my $day = $hour * 24;
-	my $month = $day * 30;
-
-	my $diff = $hour;
-
-	while (1)
-	{
-		my $rows_ref = db_select(
-			"select value".
-			" from history_uint".
-			" where itemid=$itemid".
-				" and " . sql_time_condition($value_time - $diff, $value_time).
-			" order by clock desc".
-			" limit 1"
-		);
-
-		foreach my $row_ref (@$rows_ref)
-		{
-			return $row_ref->[0];
-		}
-
-		# no more attempts
-		return if ($diff == $month);
-
-		# try bigger period
-		$diff = $month if ($diff == $day);
-		$diff = $day if ($diff == $hour);
-	}
 }
 
 1;

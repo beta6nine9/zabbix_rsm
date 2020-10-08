@@ -109,9 +109,9 @@ dbg("RDAP ", ($rdap_is_standalone ? "is" : "is NOT"), " standalone");
 my $cfg_minonline = get_macro_dns_probe_online();
 
 my %delays;
-$delays{'dns'} = $delays{'dnssec'} = get_dns_delay($now);
-$delays{'rdds'} = get_rdds_delay($now);
-$delays{'rdap'} = get_rdap_delay($now) if ($rdap_is_standalone);
+$delays{'dns'} = $delays{'dnssec'} = get_dns_delay();
+$delays{'rdds'} = get_rdds_delay();
+$delays{'rdap'} = get_rdap_delay() if ($rdap_is_standalone);
 
 my %clock_limits;
 

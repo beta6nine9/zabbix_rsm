@@ -32,12 +32,12 @@ if (!opt('dry-run'))
 		$cfg_key_out,
 		get_macro_incident_rdds_fail(),
 		get_macro_incident_rdds_recover(),
-		get_rdds_delay(getopt('now') // time() - AVAIL_SHIFT_BACK)
+		get_rdds_delay()
 	);
 }
 
 # we don't know the cycle bounds yet so we assume it ends at least few minutes back
-my $delay = get_rdds_delay(getopt('now') // time() - AVAIL_SHIFT_BACK);
+my $delay = get_rdds_delay();
 
 my (undef, undef, $max_clock) = get_cycle_bounds($delay, getopt('now'));
 
