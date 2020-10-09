@@ -162,6 +162,8 @@ Requires:			rh-php73-php-xml
 Requires:			rh-php73-php-ldap
 Requires:			rh-php73-php-json
 Requires:			rh-php73-php-fpm
+Obsoletes:			php
+Obsoletes:			php-common
 Obsoletes:			php-gd
 Obsoletes:			php-bcmath
 Obsoletes:			php-mbstring
