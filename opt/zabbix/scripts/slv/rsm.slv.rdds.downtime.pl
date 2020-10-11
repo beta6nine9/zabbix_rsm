@@ -39,7 +39,7 @@ if (!opt('dry-run'))
 # we don't know the cycle bounds yet so we assume it ends at least few minutes back
 my $delay = get_rdds_delay();
 
-my (undef, undef, $max_clock) = get_cycle_bounds($delay, getopt('now'));
+my $max_clock = cycle_start(getopt('now') // time(), $delay);
 
 my $tlds_ref;
 if (opt('tld'))

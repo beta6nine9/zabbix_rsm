@@ -30,7 +30,7 @@ db_connect();
 my $delay = get_rdds_delay();
 
 # get timestamp of the beginning of the latest cycle
-my (undef, undef, $max_clock) = get_cycle_bounds($delay, getopt('now'));
+my $max_clock = cycle_start(getopt('now') // time(), $delay);
 
 my $cfg_minonline = get_macro_rdds_probe_online();
 

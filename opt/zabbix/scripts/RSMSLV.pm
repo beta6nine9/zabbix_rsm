@@ -65,6 +65,8 @@ use constant PROBE_ONLINE_SHIFT			=> 120; # seconds (must be divisible by 60) to
 use constant AVAIL_SHIFT_BACK			=> 120; # seconds (must be divisible by 60) to go back for Service Availability calculation
 use constant ROLLWEEK_SHIFT_BACK		=> 180; # seconds (must be divisible by 60) back when Service Availability is definitely calculated
 
+use constant WAIT_FOR_AVAIL_DATA		=> 120; # seconds to wait before sending UP_INCONCLUSIVE_NO_DATA to <service>.avail item
+
 use constant PROBE_ONLINE_STR			=> 'Online';
 
 use constant PROBE_DELAY			=> 60;
@@ -131,7 +133,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		tld_interface_enabled_create_cache tld_interface_enabled_delete_cache
 		db_handler_read_status_start db_handler_read_status_end
 		db_select db_select_col db_select_row db_select_value db_select_binds db_explain
-		set_slv_config get_cycle_bounds get_rollweek_bounds get_downtime_bounds
+		set_slv_config get_rollweek_bounds get_downtime_bounds
 		current_month_first_cycle month_start
 		probe_online_at_init probe_online_at probes2tldhostids
 		slv_max_cycles
@@ -1928,18 +1930,6 @@ sub month_start
 	return $dt->epoch();
 }
 
-# Get time bounds of the last cycle guaranteed to have all probe results.
-sub get_cycle_bounds
-{
-	my $delay = shift;
-	my $now = shift || (time() - $delay - AVAIL_SHIFT_BACK);	# last complete cycle, usually used for service availability calculation
-
-	my $from = cycle_start($now, $delay);
-	my $till = cycle_end($now, $delay);
-
-	return ($from, $till, $from);
-}
-
 # Get time bounds for rolling week calculation. Last cycle must be complete.
 sub get_rollweek_bounds
 {
@@ -2598,12 +2588,12 @@ sub is_service_error_desc
 # where value_ts is value timestamp of the cycle
 sub collect_slv_cycles($$$$$$)
 {
-	my $tlds_ref = shift;
-	my $delay = shift;
+	my $tlds_ref    = shift;
+	my $delay       = shift;
 	my $cfg_key_out = shift;
-	my $value_type = shift;	# value type of $cfg_key_out
-	my $max_clock = shift;	# latest cycle to process
-	my $max_cycles = shift;
+	my $value_type  = shift;	# value type of $cfg_key_out
+	my $max_clock   = shift;	# latest cycle to process
+	my $max_cycles  = shift;
 
 	# cache TLD data
 	my %cycles;
@@ -2722,8 +2712,35 @@ sub process_slv_avail_cycles($$$$$$$$$)
 				next;
 			}
 
-			process_slv_avail($tld, $keys_in{$tld}, $cfg_key_out, $from, $delay, $value_ts, $cfg_minonline,
-				$probes_ref, $check_probe_values_cb, $cfg_value_type, $delay);
+			my ($value, $info) = process_slv_avail($tld, $keys_in{$tld}, $from, $delay, $cfg_minonline,
+				$probes_ref, $check_probe_values_cb, $cfg_value_type);
+
+			if (!defined($value))
+			{
+				# something unexpected happened, process_slv_avail() probably wrote it to the log file
+				next;
+			}
+
+			if ($value == UP_INCONCLUSIVE_NO_DATA && cycle_start(time(), $delay) - $from < WAIT_FOR_AVAIL_DATA)
+			{
+				# not enough data, but cycle isn't old enough
+				...; # TODO: skip following cycles, maybe create "$skip_tlds->{$tld} = 1" hash
+				next;
+			}
+
+			if ($value == UP_INCONCLUSIVE_NO_PROBES && alerts_enabled() == SUCCESS)
+			{
+				add_alert(ts_str($value_ts) . "#system#zabbix#$cfg_key_out#PROBLEM#$tld (not enough" .
+						" probes online, $online_probe_count while $cfg_minonline required)");
+			}
+
+			if ($value == UP_INCONCLUSIVE_NO_DATA && alerts_enabled() == SUCCESS)
+			{
+				add_alert(ts_str($value_ts) . "#system#zabbix#$cfg_key_out#PROBLEM#$tld (not enough" .
+						" probes with results, $probes_with_results while $cfg_minonline required)");
+			}
+
+			push_value($tld, $cfg_key_out, $value_ts, $value, ITEM_VALUE_TYPE_UINT64, $info);
 		}
 
 		# unset TLD (for the logs)
@@ -2735,32 +2752,22 @@ sub process_slv_avail_cycles($$$$$$$$$)
 
 sub process_slv_avail($$$$$$$$$$)
 {
-	my $tld = shift;
-	my $cfg_keys_in = shift;	# array reference, e. g. ['rsm.dns.rtt[...,udp]', ...]
-	my $cfg_key_out = shift;
-	my $from = shift;
-	my $delay = shift;
-	my $value_ts = shift;
-	my $cfg_minonline = shift;
-	my $probes_ref = shift;
+	my $tld                    = shift;
+	my $cfg_keys_in            = shift;	# array reference, e. g. ['rsm.dns.rtt[...,udp]', ...]
+	my $from                   = shift;
+	my $delay                  = shift;
+	my $cfg_minonline          = shift;
+	my $probes_ref             = shift;
 	my $check_probe_values_ref = shift;
-	my $value_type = shift;
+	my $value_type             = shift;
 
 	my $online_probes = online_probes($probes_ref, $from, $delay);
 	my $online_probe_count = scalar(@{$online_probes});
 
 	if (scalar(@{$online_probes}) < $cfg_minonline)
 	{
-		push_value($tld, $cfg_key_out, $value_ts, UP_INCONCLUSIVE_NO_PROBES, ITEM_VALUE_TYPE_UINT64,
-				"Up (not enough probes online, $online_probe_count while $cfg_minonline required)");
-
-		if (alerts_enabled() == SUCCESS)
-		{
-			add_alert(ts_str($value_ts) . "#system#zabbix#$cfg_key_out#PROBLEM#$tld (not enough probes" .
-					" online, $online_probe_count while $cfg_minonline required)");
-		}
-
-		return;
+		return (UP_INCONCLUSIVE_NO_PROBES,
+			"Up (not enough probes online, $online_probe_count while $cfg_minonline required)");
 	}
 
 	my $hostids_ref = probes2tldhostids($tld, $online_probes);
@@ -2785,16 +2792,8 @@ sub process_slv_avail($$$$$$$$$$)
 
 	if ($probes_with_results < $cfg_minonline)
 	{
-		push_value($tld, $cfg_key_out, $value_ts, UP_INCONCLUSIVE_NO_DATA, ITEM_VALUE_TYPE_UINT64,
-				"Up (not enough probes with results, $probes_with_results while $cfg_minonline required)");
-
-		if (alerts_enabled() == SUCCESS)
-		{
-			add_alert(ts_str($value_ts) . "#system#zabbix#$cfg_key_out#PROBLEM#$tld (not enough probes" .
-					" with results, $probes_with_results while $cfg_minonline required)");
-		}
-
-		return;
+		return (UP_INCONCLUSIVE_NO_DATA,
+			"Up (not enough probes with results, $probes_with_results while $cfg_minonline required)");
 	}
 
 	my $probes_with_positive = 0;
@@ -2815,11 +2814,11 @@ sub process_slv_avail($$$$$$$$$$)
 
 	if ($perc > SLV_UNAVAILABILITY_LIMIT)
 	{
-		push_value($tld, $cfg_key_out, $value_ts, UP, ITEM_VALUE_TYPE_UINT64, "Up ($detailed_info)");
+		return (UP, "Up ($detailed_info)");
 	}
 	else
 	{
-		push_value($tld, $cfg_key_out, $value_ts, DOWN, ITEM_VALUE_TYPE_UINT64, "Down ($detailed_info)");
+		return (DOWN, "Down ($detailed_info)");
 	}
 }
 

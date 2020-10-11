@@ -32,7 +32,7 @@ slv_exit(SUCCESS) if (!is_rdap_standalone(getopt('now')));
 my $delay = get_rdap_delay();
 
 # get timestamp of the beginning of the latest cycle
-my (undef, undef, $max_clock) = get_cycle_bounds($delay, getopt('now'));
+my $max_clock = cycle_start(getopt('now') // time(), $delay);
 
 my $cfg_minonline = get_macro_rdap_probe_online();
 
