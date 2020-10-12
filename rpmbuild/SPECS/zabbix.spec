@@ -305,10 +305,10 @@ Zabbix js command line utility.
 sed -r -i.bak "s,^(\s*const CONFIG_FILE_PATH =).*,\1 '/etc/zabbix/web/zabbix.conf.php';," \
 	ui/include/classes/core/CConfigFile.php
 
-sed -r -i.bak "s,^(\s*require_once ).*maintenance\.inc\.php.*,\1 '/etc/zabbix/web/maintenance.inc.php';," \
+sed -r -i.bak "s,^(\s*require_once ).*conf/maintenance\.inc\.php.*,\1 '/etc/zabbix/web/maintenance.inc.php';," \
 	ui/include/classes/core/ZBase.php
 
-sed -r -i.bak "s,^(\s*\$configFile =).*CONFIG_FILE_PATH.*,\1 CConfigFile::CONFIG_FILE_PATH;," \
+sed -r -i.bak 's,^(\s*\$configFile =).*CONFIG_FILE_PATH.*,\1 CConfigFile::CONFIG_FILE_PATH;,' \
 	ui/include/classes/core/ZBase.php
 
 %patch2 -p1
