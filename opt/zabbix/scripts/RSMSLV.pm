@@ -2636,9 +2636,9 @@ sub collect_slv_cycles($$$$$$)
 
 			$cycles_added++;
 		}
-
-		unset_log_tld();
 	}
+
+	unset_log_tld();
 
 	return \%cycles;
 }
@@ -2669,18 +2669,21 @@ sub online_probes($$$)
 # Process cycles that need to be calculcated.
 sub process_slv_avail_cycles($$$$$$$$$)
 {
-	my $cycles_ref = shift;
-	my $probes_ref = shift;
-	my $delay = shift;
-	my $cfg_keys_in = shift;	# if input key(s) is/are known
-	my $cfg_keys_in_cb = shift;	# if input key(s) is/are unknown (DNSSEC, RDDS), call this function to get them
-	my $cfg_key_out = shift;
-	my $cfg_minonline = shift;
+	my $cycles_ref            = shift;
+	my $probes_ref            = shift;
+	my $delay                 = shift;
+	my $cfg_keys_in           = shift;	# if input key(s) is/are known
+	my $cfg_keys_in_cb        = shift;	# if input key(s) is/are unknown (DNSSEC, RDDS), call this function to get them
+	my $cfg_key_out           = shift;
+	my $cfg_minonline         = shift;
 	my $check_probe_values_cb = shift;
-	my $cfg_value_type = shift;
+	my $cfg_value_type        = shift;
 
 	# cache TLD data
 	my %keys_in;
+
+	# hash for storing TLDs that should be skipped (e.g., because they don't have enough data)
+	my %skip_tlds;
 
 	init_values();
 
@@ -2693,6 +2696,11 @@ sub process_slv_avail_cycles($$$$$$$$$)
 		foreach my $tld (@{$cycles_ref->{$value_ts}})
 		{
 			set_log_tld($tld);
+
+			if (exists($skip_tlds{$tld}))
+			{
+				next;
+			}
 
 			if (!defined($keys_in{$tld}))
 			{
@@ -2711,8 +2719,8 @@ sub process_slv_avail_cycles($$$$$$$$$)
 				next;
 			}
 
-			my ($value, $info) = process_slv_avail($tld, $keys_in{$tld}, $from, $delay, $cfg_minonline,
-				$probes_ref, $check_probe_values_cb, $cfg_value_type);
+			my ($value, $info) = process_slv_avail($tld, $keys_in{$tld}, $cfg_key_out, $value_ts, $from,
+				$delay, $cfg_minonline, $probes_ref, $check_probe_values_cb, $cfg_value_type);
 
 			if (!defined($value))
 			{
@@ -2723,26 +2731,14 @@ sub process_slv_avail_cycles($$$$$$$$$)
 			if ($value == UP_INCONCLUSIVE_NO_DATA && cycle_start(time(), $delay) - $from < WAIT_FOR_AVAIL_DATA)
 			{
 				# not enough data, but cycle isn't old enough
-				...; # TODO: skip following cycles, maybe create "$skip_tlds->{$tld} = 1" hash
+				$skip_tlds{$tld} = undef;
 				next;
 			}
 
-			if ($value == UP_INCONCLUSIVE_NO_PROBES && alerts_enabled() == SUCCESS)
-			{
-				add_alert(ts_str($value_ts) . "#system#zabbix#$cfg_key_out#PROBLEM#$tld (not enough" .
-						" probes online, $online_probe_count while $cfg_minonline required)");
-			}
-
-			if ($value == UP_INCONCLUSIVE_NO_DATA && alerts_enabled() == SUCCESS)
-			{
-				add_alert(ts_str($value_ts) . "#system#zabbix#$cfg_key_out#PROBLEM#$tld (not enough" .
-						" probes with results, $probes_with_results while $cfg_minonline required)");
-			}
-
 			push_value($tld, $cfg_key_out, $value_ts, $value, ITEM_VALUE_TYPE_UINT64, $info);
-
-			unset_log_tld();
 		}
+
+		unset_log_tld();
 	}
 
 	send_values();
@@ -2752,6 +2748,8 @@ sub process_slv_avail($$$$$$$$$$)
 {
 	my $tld                    = shift;
 	my $cfg_keys_in            = shift;	# array reference, e. g. ['rsm.dns.rtt[...,udp]', ...]
+	my $cfg_key_out            = shift;
+	my $value_ts               = shift;
 	my $from                   = shift;
 	my $delay                  = shift;
 	my $cfg_minonline          = shift;
@@ -2764,6 +2762,12 @@ sub process_slv_avail($$$$$$$$$$)
 
 	if (scalar(@{$online_probes}) < $cfg_minonline)
 	{
+		if (alerts_enabled() == SUCCESS)
+		{
+			add_alert(ts_str($value_ts) . "#system#zabbix#$cfg_key_out#PROBLEM#$tld (not enough" .
+					" probes online, $online_probe_count while $cfg_minonline required)");
+		}
+
 		return (UP_INCONCLUSIVE_NO_PROBES,
 			"Up (not enough probes online, $online_probe_count while $cfg_minonline required)");
 	}
@@ -2790,6 +2794,12 @@ sub process_slv_avail($$$$$$$$$$)
 
 	if ($probes_with_results < $cfg_minonline)
 	{
+		if (alerts_enabled() == SUCCESS)
+		{
+			add_alert(ts_str($value_ts) . "#system#zabbix#$cfg_key_out#PROBLEM#$tld (not enough" .
+					" probes with results, $probes_with_results while $cfg_minonline required)");
+		}
+
 		return (UP_INCONCLUSIVE_NO_DATA,
 			"Up (not enough probes with results, $probes_with_results while $cfg_minonline required)");
 	}
@@ -2854,9 +2864,9 @@ sub process_slv_rollweek_cycles($$$$$)
 			my $perc = sprintf("%.3f", $downtime * 100 / $cfg_sla);
 
 			push_value($tld, $cfg_key_out, $value_ts, $perc, ITEM_VALUE_TYPE_FLOAT, "result: $perc% (down: $downtime minutes, sla: $cfg_sla)");
-
-			unset_log_tld();
 		}
+
+		unset_log_tld();
 	}
 
 	send_values();
@@ -2919,9 +2929,9 @@ sub process_slv_downtime_cycles($$$$)
 			}
 
 			push_value($tld, $cfg_key_out, $value_ts, $downtime, ITEM_VALUE_TYPE_UINT64, ts_str($from), " - ", ts_str($till));
-
-			unset_log_tld();
 		}
+
+		unset_log_tld();
 	}
 
 	send_values();
