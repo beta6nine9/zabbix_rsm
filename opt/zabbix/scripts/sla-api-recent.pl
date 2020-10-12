@@ -23,7 +23,7 @@ $Data::Dumper::Pair = ": ";	# use separator instead of " => "
 $Data::Dumper::Useqq = 1;	# use double quotes instead of single quotes
 $Data::Dumper::Indent = 1;	# 1 provides less indentation instead of 2
 
-use constant MAX_PERIOD => 30 * 60;	# 30 minutes
+use constant MAX_PERIOD => 30 * 60;	# 30 minutes, do not handle longer periods in 1 run
 
 use constant SUBSTR_KEY_LEN => 20;	# for logging
 
