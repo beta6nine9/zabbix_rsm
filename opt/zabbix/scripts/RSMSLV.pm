@@ -62,7 +62,6 @@ use constant PROBE_KEY_AUTOMATIC		=> 'rsm.probe.status[automatic,%]'; # match al
 
 # NB! These numbers must be in sync with Frontend (details page)!
 use constant PROBE_ONLINE_SHIFT			=> 120; # seconds (must be divisible by 60) to go back for Probe online status calculation
-use constant AVAIL_SHIFT_BACK			=> 120; # seconds (must be divisible by 60) to go back for Service Availability calculation
 use constant ROLLWEEK_SHIFT_BACK		=> 180; # seconds (must be divisible by 60) back when Service Availability is definitely calculated
 
 use constant WAIT_FOR_AVAIL_DATA		=> 120; # seconds to wait before sending UP_INCONCLUSIVE_NO_DATA to <service>.avail item
@@ -87,7 +86,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		UP_INCONCLUSIVE_NO_PROBES
 		UP_INCONCLUSIVE_NO_DATA PROTO_UDP PROTO_TCP
 		MAX_LOGIN_ERROR MIN_INFO_ERROR MAX_INFO_ERROR PROBE_ONLINE_STR
-		AVAIL_SHIFT_BACK ROLLWEEK_SHIFT_BACK PROBE_ONLINE_SHIFT
+		PROBE_ONLINE_SHIFT ROLLWEEK_SHIFT_BACK WAIT_FOR_AVAIL_DATA
 		PROBE_DELAY
 		PROBE_KEY_MANUAL
 		ONLINE OFFLINE
