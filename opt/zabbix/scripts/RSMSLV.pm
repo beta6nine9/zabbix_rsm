@@ -62,7 +62,6 @@ use constant PROBE_KEY_AUTOMATIC		=> 'rsm.probe.status[automatic,%]'; # match al
 
 # NB! These numbers must be in sync with Frontend (details page)!
 use constant PROBE_ONLINE_SHIFT			=> 120; # seconds (must be divisible by 60) to go back for Probe online status calculation
-use constant ROLLWEEK_SHIFT_BACK		=> 180; # seconds (must be divisible by 60) back when Service Availability is definitely calculated
 
 use constant WAIT_FOR_AVAIL_DATA		=> 120; # seconds to wait before sending UP_INCONCLUSIVE_NO_DATA to <service>.avail item
 
@@ -86,7 +85,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		UP_INCONCLUSIVE_NO_PROBES
 		UP_INCONCLUSIVE_NO_DATA PROTO_UDP PROTO_TCP
 		MAX_LOGIN_ERROR MIN_INFO_ERROR MAX_INFO_ERROR PROBE_ONLINE_STR
-		PROBE_ONLINE_SHIFT ROLLWEEK_SHIFT_BACK WAIT_FOR_AVAIL_DATA
+		PROBE_ONLINE_SHIFT WAIT_FOR_AVAIL_DATA
 		PROBE_DELAY
 		PROBE_KEY_MANUAL
 		ONLINE OFFLINE
@@ -1933,7 +1932,7 @@ sub month_start
 sub get_rollweek_bounds
 {
 	my $delay = shift;
-	my $now = shift || (time() - $delay - ROLLWEEK_SHIFT_BACK);	# last complete cycle, service availability must be calculated
+	my $now = shift || (time() - $delay);
 
 	my $till = cycle_end($now, $delay);
 	my $from = $till - __get_macro('{$RSM.ROLLWEEK.SECONDS}') + 1;
@@ -1946,7 +1945,7 @@ sub get_rollweek_bounds
 sub get_downtime_bounds
 {
 	my $delay = shift;
-	my $now = shift || (time() - $delay - ROLLWEEK_SHIFT_BACK);	# last complete cycle, service availability must be calculated
+	my $now = shift || (time() - $delay);
 
 	require DateTime;
 
