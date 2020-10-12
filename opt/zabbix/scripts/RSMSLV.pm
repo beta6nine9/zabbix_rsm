@@ -2600,9 +2600,9 @@ sub collect_slv_cycles($$$$$$)
 
 	my ($lastvalue, $lastclock);
 
-	foreach (@{$tlds_ref})
+	foreach my $tld (@{$tlds_ref})
 	{
-		$tld = $_;	# set global variable here
+		set_log_tld($tld);
 
 		my $itemid = get_itemid_by_host($tld, $cfg_key_out);
 
@@ -2637,8 +2637,7 @@ sub collect_slv_cycles($$$$$$)
 			$cycles_added++;
 		}
 
-		# unset TLD (for the logs)
-		$tld = undef;
+		unset_log_tld();
 	}
 
 	return \%cycles;
@@ -2691,9 +2690,9 @@ sub process_slv_avail_cycles($$$$$$$$$)
 
 		dbg("processing cycle ", ts_str($from), " (delay: $delay)");
 
-		foreach (@{$cycles_ref->{$value_ts}})
+		foreach my $tld (@{$cycles_ref->{$value_ts}})
 		{
-			$tld = $_;	# set global variable here
+			set_log_tld($tld);
 
 			if (!defined($keys_in{$tld}))
 			{
@@ -2741,10 +2740,9 @@ sub process_slv_avail_cycles($$$$$$$$$)
 			}
 
 			push_value($tld, $cfg_key_out, $value_ts, $value, ITEM_VALUE_TYPE_UINT64, $info);
-		}
 
-		# unset TLD (for the logs)
-		$tld = undef;
+			unset_log_tld();
+		}
 	}
 
 	send_values();
@@ -2840,10 +2838,9 @@ sub process_slv_rollweek_cycles($$$$$)
 
 		dbg("selecting period ", selected_period($from, $till), " (value_ts:", ts_str($clock), ")");
 
-		foreach (@{$cycles_ref->{$clock}})
+		foreach my $tld (@{$cycles_ref->{$clock}})
 		{
-			# NB! This is needed in order to set the value globally.
-			$tld = $_;
+			set_log_tld($tld);
 
 			$itemids{$tld}{'itemid_in'} = get_itemid_by_host($tld, $cfg_key_in) unless ($itemids{$tld}{'itemid_in'});
 			$itemids{$tld}{'itemid_out'} = get_itemid_by_host($tld, $cfg_key_out) unless ($itemids{$tld}{'itemid_out'});
@@ -2857,10 +2854,9 @@ sub process_slv_rollweek_cycles($$$$$)
 			my $perc = sprintf("%.3f", $downtime * 100 / $cfg_sla);
 
 			push_value($tld, $cfg_key_out, $value_ts, $perc, ITEM_VALUE_TYPE_FLOAT, "result: $perc% (down: $downtime minutes, sla: $cfg_sla)");
-		}
 
-		# unset TLD (for the logs)
-		$tld = undef;
+			unset_log_tld();
+		}
 	}
 
 	send_values();
@@ -2885,10 +2881,9 @@ sub process_slv_downtime_cycles($$$$)
 
 		dbg("selecting period ", selected_period($from, $till), " (value_ts:", ts_str($clock), ")");
 
-		foreach (@{$cycles_ref->{$clock}})
+		foreach my $tld (@{$cycles_ref->{$clock}})
 		{
-			# NB! This is needed in order to set the value globally.
-			$tld = $_;
+			set_log_tld($tld);
 
 			$itemids{$tld}{'itemid_in'} = get_itemid_by_host($tld, $cfg_key_in) unless ($itemids{$tld}{'itemid_in'});
 			$itemids{$tld}{'itemid_out'} = get_itemid_by_host($tld, $cfg_key_out) unless ($itemids{$tld}{'itemid_out'});
@@ -2924,10 +2919,9 @@ sub process_slv_downtime_cycles($$$$)
 			}
 
 			push_value($tld, $cfg_key_out, $value_ts, $downtime, ITEM_VALUE_TYPE_UINT64, ts_str($from), " - ", ts_str($till));
-		}
 
-		# unset TLD (for the logs)
-		$tld = undef;
+			unset_log_tld();
+		}
 	}
 
 	send_values();
