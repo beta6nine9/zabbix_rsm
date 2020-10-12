@@ -412,6 +412,11 @@ chmod -x opt/zabbix/scripts/CSlaReport.php
 
 cp opt/zabbix/scripts/CSlaReport.php $RPM_BUILD_ROOT%{_datadir}/zabbix/include/classes/services/CSlaReport.php
 
+# since CentOS 8 this directory belongs to php-fpm
+%if 0%{?rhel} < 8
+mkdir -p $RPM_BUILD_ROOT%{_sharedstatedir}/php/session
+%endif
+
 # install frontend configuration files
 mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/zabbix/web
 touch $RPM_BUILD_ROOT%{_sysconfdir}/zabbix/web/zabbix.conf.php
@@ -763,6 +768,10 @@ systemctl restart rsyslog
 %doc AUTHORS ChangeLog COPYING NEWS README
 %doc nginx.conf
 %dir %attr(0750,nginx,nginx) %{_sysconfdir}/zabbix/web
+# since CentOS 8 this directory belongs to php-fpm
+%if 0%{?rhel} < 8
+%dir %attr(0770,root,nginx) %{_sharedstatedir}/php/session
+%endif
 %ghost %attr(0644,nginx,nginx) %config(noreplace) %{_sysconfdir}/zabbix/web/zabbix.conf.php
 %config(noreplace) %{_sysconfdir}/zabbix/web/maintenance.inc.php
 %config(noreplace) %{_sysconfdir}/nginx/conf.d/zbx_vhost.conf
