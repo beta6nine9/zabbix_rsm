@@ -17,6 +17,8 @@ use Getopt::Long qw(:config no_auto_abbrev);
 use constant CRONTAB_FILE => '/etc/cron.d/rsm';
 use constant SLV_LOG_FILE => '/var/log/zabbix/rsm.slv.err';
 
+my $JOB_USER = 'zabbix';	# default user of the job
+
 my @cron_jobs = (
 	['main', '* * * * *' , 0 , '/opt/zabbix/scripts/slv/rsm.probe.online.pl'       , SLV_LOG_FILE],
 	undef,
@@ -51,9 +53,13 @@ my @cron_jobs = (
 
 sub main()
 {
-	parse_opts('enable-main', 'enable-db-partitioning', 'enable-all', 'disable-all', 'delete-all');
+	parse_opts('enable-main', 'enable-db-partitioning', 'enable-all', 'disable-all', 'delete-all', 'user=s');
 	setopt('nolog');
 
+	if (opt('user'))
+	{
+		$JOB_USER = getopt('user');
+	}
 	if (opt('enable-main'))
 	{
 		usage("Cannot use --enable-main with --enable-all") if (opt('enable-all'));
@@ -120,8 +126,10 @@ sub create_all($$)
 		{
 			my ($group, $timing, $delay, $script, $logfile) = @{$job};
 
-			$crontab .= sprintf("%s%-${timing_len}s root sleep %${delay_len}d; %-${script_len}s >> %s 2>&1\n",
-					$group_status->{$group}, $timing, $delay, $script, $logfile);
+			$crontab .= sprintf(
+				"%s%-${timing_len}s $JOB_USER sleep %${delay_len}d; %-${script_len}s >> %s 2>&1\n",
+				$group_status->{$group}, $timing, $delay, $script, $logfile
+			);
 		}
 		else
 		{
@@ -166,7 +174,7 @@ setup-cron.pl - setup cron jobs.
 
 =head1 SYNOPSIS
 
-setup-cron.pl [--enable-main] [--enable-db-partitioning] [--enable-all] [--disable-all] [--delete-all] [--help]
+setup-cron.pl [--enable-main] [--enable-db-partitioning] [--enable-all] [--disable-all] [--delete-all] [--user] [--help]
 
 =head1 OPTIONS
 
@@ -191,6 +199,10 @@ Disable all cron jobs.
 =item B<--delete-all> int
 
 Delete cron jobs.
+
+=item B<--user> user
+
+Override the default "zabbix" cron job user.
 
 =item B<--help>
 
