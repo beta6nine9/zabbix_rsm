@@ -174,7 +174,7 @@ setup-cron.pl - setup cron jobs.
 
 =head1 SYNOPSIS
 
-setup-cron.pl [--enable-main] [--enable-db-partitioning] [--enable-all] [--disable-all] [--delete-all] [--user] [--help]
+setup-cron.pl [--enable-main] [--enable-db-partitioning] [--enable-all] [--disable-all] [--delete-all] [--user user] [--help]
 
 =head1 OPTIONS
 
