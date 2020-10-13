@@ -1,3 +1,9 @@
+Changes for rsm2.1.0rc2
+
+Bug fixes:
+....I..... [724] fixed cron job user, add ability to override it when using setup-cron.pl script (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.1.0rc1
 
 New features:
