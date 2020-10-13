@@ -20,35 +20,28 @@ use constant SLV_LOG_FILE => '/var/log/zabbix/rsm.slv.err';
 my $JOB_USER = 'zabbix';	# default user of the job
 
 my @cron_jobs = (
-	['main', '* * * * *' , 0 , '/opt/zabbix/scripts/slv/rsm.probe.online.pl'       , SLV_LOG_FILE],
-	undef,
-	['main', '* * * * *' , 10, '/opt/zabbix/scripts/slv/rsm.slv.dns.avail.pl'      , SLV_LOG_FILE],
-	['main', '* * * * *' , 20, '/opt/zabbix/scripts/slv/rsm.slv.dns.rollweek.pl'   , SLV_LOG_FILE],
-	['main', '* * * * *' , 20, '/opt/zabbix/scripts/slv/rsm.slv.dns.downtime.pl'   , SLV_LOG_FILE],
-	['main', '* * * * *' , 30, '/opt/zabbix/scripts/slv/rsm.slv.dns.udp.rtt.pl'    , SLV_LOG_FILE],
-	['main', '* * * * *' , 30, '/opt/zabbix/scripts/slv/rsm.slv.dns.tcp.rtt.pl'    , SLV_LOG_FILE],
-	['main', '* * * * *' , 10, '/opt/zabbix/scripts/slv/rsm.slv.dns.ns.avail.pl'   , SLV_LOG_FILE],
-	['main', '* * * * *' , 20, '/opt/zabbix/scripts/slv/rsm.slv.dns.ns.downtime.pl', SLV_LOG_FILE],
-	undef,
-	['main', '* * * * *' , 10, '/opt/zabbix/scripts/slv/rsm.slv.dnssec.avail.pl'   , SLV_LOG_FILE],
-	['main', '* * * * *' , 20, '/opt/zabbix/scripts/slv/rsm.slv.dnssec.rollweek.pl', SLV_LOG_FILE],
-	undef,
-	['main', '* * * * *' , 10, '/opt/zabbix/scripts/slv/rsm.slv.rdds.avail.pl'     , SLV_LOG_FILE],
-	['main', '* * * * *' , 20, '/opt/zabbix/scripts/slv/rsm.slv.rdds.rollweek.pl'  , SLV_LOG_FILE],
-	['main', '* * * * *' , 20, '/opt/zabbix/scripts/slv/rsm.slv.rdds.downtime.pl'  , SLV_LOG_FILE],
-	['main', '* * * * *' , 30, '/opt/zabbix/scripts/slv/rsm.slv.rdds.rtt.pl'       , SLV_LOG_FILE],
-	undef,
-	['main', '* * * * *' , 10, '/opt/zabbix/scripts/slv/rsm.slv.rdap.avail.pl'     , SLV_LOG_FILE],
-	['main', '* * * * *' , 20, '/opt/zabbix/scripts/slv/rsm.slv.rdap.rollweek.pl'  , SLV_LOG_FILE],
-	['main', '* * * * *' , 20, '/opt/zabbix/scripts/slv/rsm.slv.rdap.downtime.pl'  , SLV_LOG_FILE],
-	['main', '* * * * *' , 30, '/opt/zabbix/scripts/slv/rsm.slv.rdap.rtt.pl'       , SLV_LOG_FILE],
-	undef,
-	['main', '0 1 1 * *' , 0 , '/opt/zabbix/scripts/disable-rdds-for-rdap-hosts.pl', '/var/log/zabbix/disable-rdds-for-rdap-hosts.err'],
-	['main', '0 15 1 * *', 0 , '/opt/zabbix/scripts/sla-monthly-status.pl'         , '/var/log/zabbix/sla-monthly-status.err'],
-	['main', '0 15 1 * *', 0 , '/opt/zabbix/scripts/sla-report.php'                , '/var/log/zabbix/sla-report.err'],
-	undef,
-	['db'  , '0 23 * * *', 0 , '/opt/zabbix/scripts/MySQL_part_management.pl'      , '/var/log/zabbix/zabbix-mysql-partitioning'],
-	['db'  , '0 2 * * *' , 0 , '/opt/zabbix/scripts/MySQL_part_management.pl'      , '/var/log/zabbix/zabbix-mysql-partitioning'],
+	'# in case user does not have home directory',
+	'HOME=/tmp',
+	'',
+	['main', '* * * * *' , 0 , '/opt/zabbix/scripts/slv/rsm.probe.online.pl'                                                                                                            , SLV_LOG_FILE],
+	'',
+	['main', '* * * * *' , 0 , '(/opt/zabbix/scripts/slv/rsm.slv.dns.avail.pl && /opt/zabbix/scripts/slv/rsm.slv.dns.rollweek.pl && /opt/zabbix/scripts/slv/rsm.slv.dns.downtime.pl)'   , SLV_LOG_FILE],
+	['main', '* * * * *' , 5 , '(/opt/zabbix/scripts/slv/rsm.slv.rdds.avail.pl && /opt/zabbix/scripts/slv/rsm.slv.rdds.rollweek.pl && /opt/zabbix/scripts/slv/rsm.slv.rdds.downtime.pl)', SLV_LOG_FILE],
+	['main', '* * * * *' , 10, '(/opt/zabbix/scripts/slv/rsm.slv.rdap.avail.pl && /opt/zabbix/scripts/slv/rsm.slv.rdap.rollweek.pl && /opt/zabbix/scripts/slv/rsm.slv.rdap.downtime.pl)', SLV_LOG_FILE],
+	['main', '* * * * *' , 12, '(/opt/zabbix/scripts/slv/rsm.slv.dnssec.avail.pl && /opt/zabbix/scripts/slv/rsm.slv.dnssec.rollweek.pl)'                                                , SLV_LOG_FILE],
+	['main', '* * * * *' , 14, '(/opt/zabbix/scripts/slv/rsm.slv.dns.ns.avail.pl && /opt/zabbix/scripts/slv/rsm.slv.dns.ns.downtime.pl)'                                                , SLV_LOG_FILE],
+	'',
+	['main', '* * * * *' , 5 , '/opt/zabbix/scripts/slv/rsm.slv.dns.udp.rtt.pl'                                                                                                         , SLV_LOG_FILE],
+	['main', '* * * * *' , 6 , '/opt/zabbix/scripts/slv/rsm.slv.dns.tcp.rtt.pl'                                                                                                         , SLV_LOG_FILE],
+	['main', '* * * * *' , 7 , '/opt/zabbix/scripts/slv/rsm.slv.rdds.rtt.pl'                                                                                                            , SLV_LOG_FILE],
+	['main', '* * * * *' , 8 , '/opt/zabbix/scripts/slv/rsm.slv.rdap.rtt.pl'                                                                                                            , SLV_LOG_FILE],
+	'',
+	['main', '0 1 1 * *' , 0 , '/opt/zabbix/scripts/disable-rdds-for-rdap-hosts.pl'                                                                                                     , '/var/log/zabbix/disable-rdds-for-rdap-hosts.err'],
+	['main', '0 15 1 * *', 0 , '/opt/zabbix/scripts/sla-monthly-status.pl'                                                                                                              , '/var/log/zabbix/sla-monthly-status.err'],
+	['main', '0 15 1 * *', 0 , '/opt/zabbix/scripts/sla-report.php'                                                                                                                     , '/var/log/zabbix/sla-report.err'],
+	'',
+	['db'  , '0 23 * * *', 0 , '/opt/zabbix/scripts/MySQL_part_management.pl'                                                                                                           , '/var/log/zabbix/zabbix-mysql-partitioning'],
+	['db'  , '0 2 * * *' , 0 , '/opt/zabbix/scripts/MySQL_part_management.pl'                                                                                                           , '/var/log/zabbix/zabbix-mysql-partitioning'],
 );
 
 sub main()
@@ -109,9 +102,9 @@ sub create_all($$)
 	my $enable_main = shift;
 	my $enable_db   = shift;
 
-	my $timing_len = max(map(defined($_) ? length($_->[1]) : 0, @cron_jobs));
-	my $delay_len  = max(map(defined($_) ? length($_->[2]) : 0, @cron_jobs));
-	my $script_len = max(map(defined($_) ? length($_->[3]) : 0, @cron_jobs));
+	my $timing_len = max(map(ref($_) eq 'ARRAY' ? length($_->[1]) : 0, @cron_jobs));
+	my $delay_len  = max(map(ref($_) eq 'ARRAY' ? length($_->[2]) : 0, @cron_jobs));
+	my $script_len = max(map(ref($_) eq 'ARRAY' ? length($_->[3]) : 0, @cron_jobs));
 
 	my $group_status = {
 		"main" => $enable_main ? "" : "#",
@@ -122,7 +115,7 @@ sub create_all($$)
 
 	for my $job (@cron_jobs)
 	{
-		if (defined($job))
+		if (ref($job) eq 'ARRAY')
 		{
 			my ($group, $timing, $delay, $script, $logfile) = @{$job};
 
@@ -133,7 +126,7 @@ sub create_all($$)
 		}
 		else
 		{
-			$crontab .= "\n";
+			$crontab .= "$job\n";
 		}
 	}
 
