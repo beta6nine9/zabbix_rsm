@@ -475,24 +475,16 @@ class RollingWeekStatusListAction extends Action {
 			'filter_rdap' => RSM_RDAP,
 			'filter_epp' => RSM_EPP
 		];
-		$item_keys = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR)
-			? [RSM_SLV_RDDS_ROLLWEEK]
-			: [RSM_SLV_DNSSEC_ROLLWEEK, RSM_SLV_RDDS_ROLLWEEK, RSM_SLV_EPP_ROLLWEEK];
+		$item_keys = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY)
+			? [RSM_SLV_DNS_ROLLWEEK, RSM_SLV_DNSSEC_ROLLWEEK, RSM_SLV_RDDS_ROLLWEEK, RSM_SLV_EPP_ROLLWEEK]
+			: [RSM_SLV_RDDS_ROLLWEEK];
 		$avail_items = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY)
-			? [RSM_SLV_DNSSEC_AVAIL, RSM_SLV_RDDS_AVAIL, RSM_SLV_EPP_AVAIL]
-			: [];
-
-		if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY) {
-			$item_keys[] = RSM_SLV_DNS_ROLLWEEK;
-			$avail_items[] = RSM_SLV_DNS_AVAIL;
-
-			if (is_RDAP_standalone()) {
-				$avail_items[] = RSM_SLV_RDAP_AVAIL;
-			}
-		}
+			? [RSM_SLV_DNS_AVAIL, RSM_SLV_DNSSEC_AVAIL, RSM_SLV_RDDS_AVAIL, RSM_SLV_EPP_AVAIL]
+			: [RSM_SLV_RDDS_AVAIL];
 
 		if (is_RDAP_standalone()) {
 			$item_keys[] = RSM_SLV_RDAP_ROLLWEEK;
+			$avail_items[] = RSM_SLV_RDAP_AVAIL;
 		}
 
 		foreach ($tlds_by_server as $key => $hosts) {
