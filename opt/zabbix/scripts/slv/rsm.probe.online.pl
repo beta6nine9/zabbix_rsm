@@ -183,10 +183,10 @@ sub get_manual_status($$$)
 	}
 	if ($rows->[0][0] < $from)
 	{
-		# manual status was changed before the cycle
-		return $rows->[0][1] == ONLINE ? ONLINE : OFFLINE;
+		# manual status changed before the cycle
+		return $rows->[0][1] != ONLINE ? OFFLINE : ONLINE;
 	}
-	if ($rows->[0][0] >= $from && $rows->[0][0] < $till && $rows->[0][1] == OFFLINE)
+	if ($rows->[0][0] >= $from && $rows->[0][0] <= $till && $rows->[0][1] == OFFLINE)
 	{
 		# manual status changed to OFFLINE during the cycle
 		return OFFLINE;
@@ -211,7 +211,7 @@ sub get_manual_status($$$)
 		# manual status has never changed before the cycle (ONLINE by default)
 		return ONLINE;
 	}
-	if ($rows->[0][0] == OFFLINE)
+	if ($rows->[0][0] != ONLINE)
 	{
 		# manual status before the cycle was OFFLINE
 		return OFFLINE;
