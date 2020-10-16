@@ -11,246 +11,213 @@ use lib $MYDIR;
 
 use strict;
 use warnings;
+use Data::Dumper;
 use RSM;
 use RSMSLV;
 use TLD_constants qw(:items :api);
 
-use constant PROBE_LASTACCESS_ITEM	=> 'zabbix[proxy,{$RSM.PROXY_NAME},lastaccess]';
-use constant PROBE_KEY_AUTOMATIC	=> 'rsm.probe.status[automatic,%]';	# match all in SQL
-
-parse_opts('now=i');
-fail_if_running();
-
-set_slv_config(get_rsm_config());
-
-db_connect();
-
-my $probe_avail_limit = get_macro_probe_avail_limit();
-
-my $now = (opt('now') ? getopt('now') : time() - PROBE_ONLINE_SHIFT);
-
-my $from = truncate_from($now);
-my $till = $from + 59;
-my $value_ts = $from;
-
-dbg("selected period: ", selected_period($from, $till), ", with value timestamp: ", ts_full($value_ts));
-
-my $probes_ref = get_probes();
-
-my $probe_times_ref = __get_main_probe_status_times($from, $till, $probes_ref);
-my @online_probes = keys(%{$probe_times_ref});
-
-init_values();
-
-foreach my $probe (keys(%$probes_ref))
+sub main()
 {
-	my $itemid = get_probe_online_key_itemid($probe);
+	parse_opts('now=i');
+	fail_if_running();
+	set_slv_config(get_rsm_config());
 
-	fail(rsm_slv_error()) unless ($itemid);
-
-	next if (!opt('dry-run') && uint_value_exists($value_ts, $itemid));
-
-	my @result = grep(/^$probe$/, @online_probes);
-	my $status = (@result ? UP : DOWN);
-
-	my $status_str = "$probe is " . ($status == UP ? "Up" : "Down");
-
-	push_value("$probe - mon", PROBE_KEY_ONLINE, $value_ts, $status, ITEM_VALUE_TYPE_UINT64, $status_str);
-}
-
-send_values();
-
-slv_exit(SUCCESS);
-
-use constant PREV_VALUE => 0;
-use constant BETWEEN_VALUE => 1;
-
-sub __get_main_probe_status_times
-{
-	my $from = shift;
-	my $till = shift;
-	my $probes_ref = shift; # { host => {'hostid' => hostid, 'status' => status}, ... }
+	db_connect();
+	init_values();
 
 	my $probe_avail_limit = get_macro_probe_avail_limit();
+	my $probes_ref = get_probes();
 
-	dbg("from:$from till:$till probe_avail_limit:$probe_avail_limit");
-
-	my $result = {};
-
-	# check probe lastaccess time
-	foreach my $probe (keys(%$probes_ref))
+	if (opt('now'))
 	{
-		next unless ($probes_ref->{$probe}->{'status'} == HOST_STATUS_MONITORED);
-
-		my $host = "$probe - mon";
-
-		my $itemid = get_itemid_by_host($host, PROBE_LASTACCESS_ITEM);
-		if (!$itemid)
-		{
-			wrn("configuration error: ", rsm_slv_error());
-			next;
-		}
-
-		my $times_ref = __get_lastaccess_times($itemid, $probe_avail_limit, $from, $till);
-
-		my $hostid = $probes_ref->{$probe}->{'hostid'};
-
-		if (scalar(@$times_ref) != 0)
-		{
-			dbg("$probe lastaccess times: ", join(',', @$times_ref)) if (opt('debug'));
-
-			$times_ref = __get_probestatus_times($probe, $hostid, $times_ref, PROBE_KEY_MANUAL, PREV_VALUE);
-		}
-
-		if (scalar(@$times_ref) != 0)
-		{
-			dbg("$probe manual probestatus times: ", join(',', @$times_ref)) if (opt('debug'));
-
-			$times_ref = __get_probestatus_times($probe, $hostid, $times_ref, PROBE_KEY_AUTOMATIC, BETWEEN_VALUE);
-		}
-
-		if (scalar(@$times_ref) != 0)
-		{
-			dbg("$probe automatic probestatus times: ", join(',', @$times_ref)) if (opt('debug'));
-
-			$result->{$probe} = $times_ref;
-		}
+		process_cycle($probes_ref, getopt('now'), $probe_avail_limit);
+	}
+	else
+	{
+		process_cycle($probes_ref, $^T - PROBE_DELAY * 2, $probe_avail_limit);
+		process_cycle($probes_ref, $^T - PROBE_DELAY * 1, $probe_avail_limit);
 	}
 
-	return $result;
+	send_values();
+	db_disconnect();
+	slv_exit(SUCCESS);
 }
 
-# Times when probe "lastaccess" within $probe_avail_limit.
-sub __get_lastaccess_times
+sub process_cycle($$$)
 {
-	my $itemid = shift;
+	my $probes_ref        = shift;
+	my $now               = shift;
 	my $probe_avail_limit = shift;
-	my $from = shift;
-	my $till = shift;
 
-	my ($rows_ref, @times, $last_status);
+	my $from = cycle_start($now, PROBE_DELAY);
+	my $till = cycle_end($now, PROBE_DELAY);
+	my $value_ts = $from;
 
-	# get the previous status
-	$rows_ref = db_select(
-		"select clock,value".
-		" from history_uint".
-		" where itemid=$itemid".
-			" and clock between ".($from-3600)." and ".($from-1).
-		" order by itemid desc,clock desc".
-		" limit 1");
+	dbg("selected period: ", selected_period($from, $till), ", with value timestamp: ", ts_full($value_ts));
 
-	$last_status = UP;
-	if (scalar(@$rows_ref) != 0)
+	foreach my $probe (keys(%{$probes_ref}))
 	{
-		my $clock = $rows_ref->[0]->[0];
-		my $value = $rows_ref->[0]->[1];
+		next if ($probes_ref->{$probe}{'status'} != HOST_STATUS_MONITORED);
 
-		dbg("clock:$clock value:$value");
+		next if (uint_value_exists($value_ts, get_itemid_by_host("$probe - mon", PROBE_KEY_ONLINE)));
 
-		$last_status = DOWN if ($clock - $value > $probe_avail_limit);
-	}
+		my $status = get_main_status($probe, $probes_ref->{$probe}{'hostid'}, $from, $till, $probe_avail_limit);
 
-	push(@times, truncate_from($from)) if ($last_status == UP);
-
-	$rows_ref = db_select(
-		"select clock,value".
-		" from history_uint".
-		" where itemid=$itemid".
-	    		" and clock between $from and $till".
-	    		" and value!=0".
-		" order by itemid,clock");
-
-	foreach my $row_ref (@$rows_ref)
-	{
-		my $clock = $row_ref->[0];
-		my $value = $row_ref->[1];
-
-		my $status = ($clock - $value > $probe_avail_limit) ? DOWN : UP;
-
-		if ($last_status != $status)
+		if (!defined($status))
 		{
-			if ($status == UP)
+			if (cycle_start($^T, PROBE_DELAY) - $from < WAIT_FOR_PROBE_DATA)
 			{
-				$clock = truncate_from($clock);
-			}
-			else
-			{
-				$clock = truncate_till($clock);
+				next;
 			}
 
-			push(@times, $clock);
-
-			dbg("clock:$clock diff:", ($clock - $value));
-
-			$last_status = $status;
+			$status = OFFLINE;
 		}
-	}
 
-	# push "till" to @times if it contains odd number of elements
-	if (scalar(@times) != 0)
-	{
-		push(@times, $till) if ($last_status == UP);
-	}
+		my $status_str = "$probe is " . ($status == ONLINE ? "Up" : "Down");
 
-	return \@times;
+		push_value("$probe - mon", PROBE_KEY_ONLINE, $value_ts, $status, ITEM_VALUE_TYPE_UINT64, $status_str);
+	}
 }
 
-sub __get_probestatus_times($$$$$)
+sub get_main_status($$$$$)
 {
-	my $probe = shift;
-	my $hostid = shift;
-	my $times_ref = shift; # input
-	my $key = shift;
-	my $time_spec = shift;
+	my $probe_host        = shift;
+	my $probe_hostid      = shift;
+	my $from              = shift;
+	my $till              = shift;
+	my $probe_avail_limit = shift;
 
-	my $key_match = "i.key_";
-	$key_match .= ($key =~ m/%/) ? " like '$key'" : "='$key'";
+	my $status;
 
-	my $itemid;
-	if ($key =~ m/%/)
+	$status = get_lastaccess_status("$probe_host - mon", $from, $till, $probe_avail_limit);
+
+	if (!defined($status) || $status == OFFLINE)
 	{
-		$itemid = get_itemid_like_by_hostid($hostid, $key);
-	}
-	else
-	{
-		$itemid = get_itemid_by_hostid($hostid, $key);
+		return $status;
 	}
 
-	if (!$itemid)
+	$status = get_automatic_status($probe_hostid, $from, $till);
+
+	if (!defined($status) || $status == OFFLINE)
 	{
-		wrn("configuration error: ", rsm_slv_error());
-		return;
+		return $status;
 	}
 
-	my $rows_ref;
+	$status = get_manual_status($probe_hostid, $from, $till);
 
-	if ($time_spec == PREV_VALUE)
+	if (!defined($status) || $status == OFFLINE)
 	{
-		$rows_ref = db_select(
-			"select value".
-			" from history_uint".
-			" where itemid=$itemid".
-				" and clock<" . $times_ref->[0].
-			" order by clock desc".
-			" limit 1");
-	}
-	elsif ($time_spec == BETWEEN_VALUE)
-	{
-		$rows_ref = db_select(
-			"select value".
-			" from history_uint".
-			" where itemid=$itemid".
-				" and clock between $times_ref->[0] and $times_ref->[1]");
-	}
-	else
-	{
-		fail("unknown time specification: $time_spec");
+		return $status;
 	}
 
-	if (@{$rows_ref} && $rows_ref->[0]->[0] == OFFLINE)
-	{
-		return [];
-	}
-
-	return [$times_ref->[0], $times_ref->[1]];
+	return ONLINE;
 }
+
+sub get_lastaccess_status($$$)
+{
+	my $host              = shift;
+	my $from              = shift;
+	my $till              = shift;
+	my $probe_avail_limit = shift;
+
+	my $itemid = get_itemid_by_host($host, PROBE_KEY_LASTACCESS);
+
+	my $sql = "select clock,value from history_uint where itemid=? and clock between ? and ?";
+	my $params = [$itemid, $from, $till];
+	my $rows = db_select($sql, $params);
+
+	if (!@{$rows})
+	{
+		return undef;
+	}
+	if ($rows->[0][0] - $rows->[0][1] > $probe_avail_limit)
+	{
+		return OFFLINE;
+	}
+	return ONLINE;
+}
+
+sub get_automatic_status($$$)
+{
+	my $hostid = shift;
+	my $from   = shift;
+	my $till   = shift;
+
+	my $itemid = get_itemid_like_by_hostid($hostid, PROBE_KEY_AUTOMATIC);
+
+	my $sql = "select value from history_uint where itemid=? and clock between ? and ?";
+	my $params = [$itemid, $from, $till];
+	my $rows = db_select($sql, $params);
+
+	if (!@{$rows})
+	{
+		return undef;
+	}
+	if ($rows->[0][0] != ONLINE)
+	{
+		return OFFLINE;
+	}
+	return ONLINE;
+}
+
+sub get_manual_status($$$)
+{
+	my $hostid = shift;
+	my $from   = shift;
+	my $till   = shift;
+
+	my $itemid = get_itemid_by_hostid($hostid, PROBE_KEY_MANUAL);
+
+	my $sql;
+	my $params;
+	my $rows;
+
+	$sql = "select clock,value from lastvalue where itemid=?";
+	$params = [$itemid];
+	$rows = db_select($sql, $params);
+
+	if (!@{$rows})
+	{
+		# manual status has never changed (ONLINE by default)
+		return ONLINE;
+	}
+	if ($rows->[0][0] < $from)
+	{
+		# manual status was changed before the cycle
+		return $rows->[0][1] == ONLINE ? ONLINE : OFFLINE;
+	}
+	if ($rows->[0][0] >= $from && $rows->[0][0] < $till && $rows->[0][1] == OFFLINE)
+	{
+		# manual status changed to OFFLINE during the cycle
+		return OFFLINE;
+	}
+
+	$sql = "select value from history_uint where itemid=? and clock between ? and ? and value=? limit 1";
+	$params = [$itemid, $from, $till, OFFLINE];
+	$rows = db_select($sql, $params);
+
+	if (@{$rows})
+	{
+		# manual status changed to OFFLINE during the cycle
+		return OFFLINE;
+	}
+
+	$sql = "select value from history_uint where itemid=? and clock<? order by clock desc limit 1";
+	$params = [$itemid, $from];
+	$rows = db_select($sql, $params);
+
+	if (!@{$rows})
+	{
+		# manual status has never changed before the cycle (ONLINE by default)
+		return ONLINE;
+	}
+	if ($rows->[0][0] == OFFLINE)
+	{
+		# manual status before the cycle was OFFLINE
+		return OFFLINE;
+	}
+
+	return ONLINE;
+}
+
+main();

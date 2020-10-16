@@ -18,7 +18,7 @@ use Expect;
 use Data::Dumper;
 use RSM;
 use RSMSLV;
-use TLD_constants qw(:general :templates :groups :value_types :ec :slv :config :api);
+use TLD_constants qw(:general :templates :groups :ec :config :api);
 use TLDs;
 use Text::CSV_XS;
 
