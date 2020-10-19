@@ -22,8 +22,6 @@
 /*
  * These numbers must be in sync with Backend!
  */
-// server delay time in seconds.
-define('RSM_ROLLWEEK_SHIFT_BACK', 180);
 
 // SLA monitoring start year.
 define('SLA_MONITORING_START_YEAR',	2014);
