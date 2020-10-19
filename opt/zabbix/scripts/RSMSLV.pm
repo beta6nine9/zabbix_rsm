@@ -2601,8 +2601,9 @@ sub collect_slv_cycles($$$$$$)
 
 		if (get_lastvalue($itemid, $value_type, \$lastvalue, \$lastclock) != SUCCESS)
 		{
-			# new item
-			push(@{$cycles{$max_clock}}, $tld);
+			# new item; add some shiftback to avoid skipping the cycle because insufficient number of probes
+			my $clock = cycle_start($max_clock - 120, $delay);
+			push(@{$cycles{$clock}}, $tld);
 
 			next;
 		}
@@ -2686,6 +2687,32 @@ sub process_slv_avail_cycles($$$$$$$$$)
 
 		dbg("processing cycle ", ts_str($from), " (delay: $delay)");
 
+		# check if ONLINE/OFFLINE status of all probes is available
+		# (i.e., rsm.probe.online item must have values for every minute during the cycle)
+
+		my $sql = "select" .
+				" count(*)" .
+			" from" .
+				" hosts" .
+				" inner join items on items.hostid=hosts.hostid" .
+				" left join lastvalue on lastvalue.itemid=items.itemid" .
+				" inner join hosts_groups on hosts_groups.hostid=hosts.hostid" .
+			" where" .
+				" hosts.status=? and" .
+				" hosts_groups.groupid=? and" .
+				" items.key_=? and" .
+				" coalesce(lastvalue.clock,0)<?";
+		my $params = [HOST_STATUS_MONITORED, PROBES_MON_GROUPID, PROBE_KEY_ONLINE, $from + $delay - 60];
+		my $probes_without_status = db_select_value($sql, $params);
+
+		if (db_select_value($sql, $params) > 0)
+		{
+			dbg("skipping cycle, found $probes_without_status probe(s) without status");
+			last;
+		}
+
+		# process rsmhosts
+
 		foreach my $tld (@{$cycles_ref->{$value_ts}})
 		{
 			set_log_tld($tld);
@@ -2753,7 +2780,7 @@ sub process_slv_avail($$$$$$$$$$)
 	my $online_probes = online_probes($probes_ref, $from, $delay);
 	my $online_probe_count = scalar(@{$online_probes});
 
-	if (scalar(@{$online_probes}) < $cfg_minonline)
+	if ($online_probe_count < $cfg_minonline)
 	{
 		if (alerts_enabled() == SUCCESS)
 		{
