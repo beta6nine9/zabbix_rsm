@@ -581,7 +581,7 @@ class RollingWeekStatusListAction extends Action {
 						$data['tld'][$hostid_key][$itemkey_type[$item['key_']]] = [
 							'itemid' => $item['itemid'],
 							'lastvalue' => is_null($item['lastvalue']) ? null : sprintf('%.3f', $item['lastvalue']),
-							'clock' => isset($item['clock']) ? date(DATE_TIME_FORMAT_SECONDS, $item['clock']) : null,
+							'clock' => isset($item['clock']) ? $item['clock'] : null,
 							'trigger' => false
 						];
 					}

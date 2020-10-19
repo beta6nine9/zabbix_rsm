@@ -224,10 +224,6 @@ else {
 $table = (new CTableInfo())->setHeader($header_columns);
 
 if ($data['tld']) {
-	$serverTime = time() - RSM_ROLLWEEK_SHIFT_BACK;
-	$from = date('YmdHis', $serverTime - $data['rollWeekSeconds']);
-	$till = date('YmdHis', $serverTime);
-
 	// Services must be in certain order.
 	$services = array();
 
@@ -282,16 +278,14 @@ if ($data['tld']) {
 				if ($tld[$service]['clock']) {
 					if ($tld[$service]['trigger'] && $tld[$service]['incident']) {
 						if (array_key_exists('availItemId', $tld[$service]) && array_key_exists('itemid', $tld[$service])) {
+
 							$rollweek_status = new CLink(
 									(new CDiv())->addClass('service-icon status_icon_extra iconrollingweekfail cell-value pointer'),
 										Url::getFor($tld['url'], 'rsm.incidentdetails', [
 											'host' => $tld['host'],
 											'eventid' => $tld[$service]['incident'],
 											'slvItemId' => $tld[$service]['itemid'],
-											'filter_from' => $from,
-											'filter_to' => $till,
-											'availItemId' => $tld[$service]['availItemId'],
-											'filter_set' => 1
+											'availItemId' => $tld[$service]['availItemId']
 									])
 							);
 						}
@@ -315,8 +309,9 @@ if ($data['tld']) {
 							))->addClass('first-cell-value')
 						: (new CSpan('0.000%'))->addClass('first-cell-value');
 
-					if ($tld[$service]['clock'])
-						$rollweek_value->setHint($tld[$service]['clock'], '', false);
+					if ($tld[$service]['clock']) {
+						$rollweek_value->setHint(date(DATE_TIME_FORMAT_SECONDS, $tld[$service]['clock']), '', false);
+					}
 
 					$rollweek_graph = ($tld[$service]['lastvalue'] > 0)
 						? new CLink('graph',

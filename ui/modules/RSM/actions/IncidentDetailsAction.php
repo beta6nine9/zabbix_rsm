@@ -391,7 +391,7 @@ class IncidentDetailsAction extends Action {
 		}
 
 		$this->access_deny = false;
-		$this->server_time = time() - RSM_ROLLWEEK_SHIFT_BACK;
+		$this->server_time = time();
 		$data = [
 			'title' => _('Incidents details'),
 			'ajax_request' => $this->isAjaxRequest(),
