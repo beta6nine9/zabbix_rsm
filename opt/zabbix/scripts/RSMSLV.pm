@@ -51,19 +51,14 @@ use constant EVENT_SOURCE_TRIGGERS		=> 0;
 use constant TRIGGER_VALUE_FALSE		=> 0;
 use constant TRIGGER_VALUE_TRUE			=> 1;
 use constant INCIDENT_FALSE_POSITIVE		=> 1;	# NB! must be in sync with frontend
-use constant PROBE_LASTACCESS_ITEM		=> 'zabbix[proxy,{$RSM.PROXY_NAME},lastaccess]';
-use constant PROBE_KEY_MANUAL			=> 'rsm.probe.status[manual]';
-use constant PROBE_KEY_AUTOMATIC		=> 'rsm.probe.status[automatic,%]'; # match all in SQL
 
 # In order to do the calculation we should wait till all the results
 # are available on the server (from proxies). We shift back 2 minutes
 # in case of "availability" and 3 minutes in case of "rolling week"
 # calculations.
 
-# NB! These numbers must be in sync with Frontend (details page)!
-use constant PROBE_ONLINE_SHIFT			=> 120; # seconds (must be divisible by 60) to go back for Probe online status calculation
-
 use constant WAIT_FOR_AVAIL_DATA		=> 120; # seconds to wait before sending UP_INCONCLUSIVE_NO_DATA to <service>.avail item
+use constant WAIT_FOR_PROBE_DATA		=> 120; # seconds to wait before sending OFFLINE to rsm.probe.online item
 
 use constant PROBE_ONLINE_STR			=> 'Online';
 
@@ -85,9 +80,9 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		UP_INCONCLUSIVE_NO_PROBES
 		UP_INCONCLUSIVE_NO_DATA PROTO_UDP PROTO_TCP
 		MAX_LOGIN_ERROR MIN_INFO_ERROR MAX_INFO_ERROR PROBE_ONLINE_STR
-		PROBE_ONLINE_SHIFT WAIT_FOR_AVAIL_DATA
+		WAIT_FOR_AVAIL_DATA
+		WAIT_FOR_PROBE_DATA
 		PROBE_DELAY
-		PROBE_KEY_MANUAL
 		ONLINE OFFLINE
 		USE_CACHE_FALSE USE_CACHE_TRUE
 		TARGET_PLACEHOLDER
@@ -149,7 +144,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		float_value_exists
 		sql_time_condition get_incidents get_downtime
 		history_table
-		get_lastvalue get_lastvalues_by_itemids get_itemids_by_hostids get_nsip_values
+		get_lastvalue get_itemids_by_hostids get_nsip_values
 		get_valuemaps get_statusmaps get_detailed_result
 		get_avail_valuemaps
 		get_result_string get_tld_by_trigger truncate_from truncate_till alerts_enabled
@@ -2606,8 +2601,9 @@ sub collect_slv_cycles($$$$$$)
 
 		if (get_lastvalue($itemid, $value_type, \$lastvalue, \$lastclock) != SUCCESS)
 		{
-			# new item
-			push(@{$cycles{$max_clock}}, $tld);
+			# new item; add some shiftback to avoid skipping the cycle because insufficient number of probes
+			my $clock = cycle_start($max_clock - 120, $delay);
+			push(@{$cycles{$clock}}, $tld);
 
 			next;
 		}
@@ -2691,6 +2687,32 @@ sub process_slv_avail_cycles($$$$$$$$$)
 
 		dbg("processing cycle ", ts_str($from), " (delay: $delay)");
 
+		# check if ONLINE/OFFLINE status of all probes is available
+		# (i.e., rsm.probe.online item must have values for every minute during the cycle)
+
+		my $sql = "select" .
+				" count(*)" .
+			" from" .
+				" hosts" .
+				" inner join items on items.hostid=hosts.hostid" .
+				" left join lastvalue on lastvalue.itemid=items.itemid" .
+				" inner join hosts_groups on hosts_groups.hostid=hosts.hostid" .
+			" where" .
+				" hosts.status=? and" .
+				" hosts_groups.groupid=? and" .
+				" items.key_=? and" .
+				" coalesce(lastvalue.clock,0)<?";
+		my $params = [HOST_STATUS_MONITORED, PROBES_MON_GROUPID, PROBE_KEY_ONLINE, $from + $delay - 60];
+		my $probes_without_status = db_select_value($sql, $params);
+
+		if (db_select_value($sql, $params) > 0)
+		{
+			dbg("skipping cycle, found $probes_without_status probe(s) without status");
+			last;
+		}
+
+		# process rsmhosts
+
 		foreach my $tld (@{$cycles_ref->{$value_ts}})
 		{
 			set_log_tld($tld);
@@ -2758,7 +2780,7 @@ sub process_slv_avail($$$$$$$$$$)
 	my $online_probes = online_probes($probes_ref, $from, $delay);
 	my $online_probe_count = scalar(@{$online_probes});
 
-	if (scalar(@{$online_probes}) < $cfg_minonline)
+	if ($online_probe_count < $cfg_minonline)
 	{
 		if (alerts_enabled() == SUCCESS)
 		{
@@ -6002,7 +6024,7 @@ sub __get_reachable_times
 	my $till = shift;
 
 	my $host = "$probe - mon";
-	my $itemid = get_itemid_by_host($host, PROBE_LASTACCESS_ITEM);
+	my $itemid = get_itemid_by_host($host, PROBE_KEY_LASTACCESS);
 
 	my ($rows_ref, @times, $last_status);
 
