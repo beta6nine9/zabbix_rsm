@@ -19,6 +19,8 @@
 **/
 
 
+use Modules\RSM\Helpers\UrlHelper as URL;
+
 $table = (new CTableInfo())->setHeader([
 		'#',
 		_('Probe Node'),
@@ -103,12 +105,27 @@ foreach ($data['probes'] as $probe => $values) {
 	]);
 }
 
+$table_macros = (new CTableInfo())->setHeader([
+		_('Macro'),
+		_('Value')
+]);
+
+foreach ($data['probe_macros'] as $macro => $value) {
+	$table_macros->addRow([
+		new CLink($macro, Url::getFor('', 'macros.edit')),
+		$value
+	]);
+}
+
 (new CWidget())
 		->setTitle($data['title'])
 		->addItem($data['module_style'])
 		->additem((new CDiv())
 			->addClass(ZBX_STYLE_TABLE_FORMS_CONTAINER)
 			->addItem($table))
+		->additem((new CDiv())
+			->addClass(ZBX_STYLE_TABLE_FORMS_SEPARATOR)
+			->addItem($table_macros))
 		->show();
 
 echo (new CDiv(
