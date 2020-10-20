@@ -179,23 +179,23 @@ setup-cron.pl [--enable-main] [--enable-db-partitioning] [--enable-all] [--disab
 
 =over 8
 
-=item B<--enable-main> int
+=item B<--enable-main>
 
 Enable only main cron jobs. These are jobs for SLV scripts (executed every minute) and some jobs that are executed once per month.
 
-=item B<--enable-db-partitioning> int
+=item B<--enable-db-partitioning>
 
 Enable only DB partitioning cron jobs.
 
-=item B<--enable-all> int
+=item B<--enable-all>
 
 Enable all cron jobs.
 
-=item B<--disable-all> int
+=item B<--disable-all>
 
 Disable all cron jobs.
 
-=item B<--delete-all> int
+=item B<--delete-all>
 
 Delete all cron jobs.
 
