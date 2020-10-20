@@ -45,28 +45,15 @@ foreach ($data['tests'] as $test) {
 		$start_end_incident = SPACE;
 	}
 
-	if ($data['type'] == RSM_DNS || $data['type'] == RSM_DNSSEC) {
-		$details_link = new CLink(
-			_('Details'),
-			(new CUrl('zabbix.php'))
-				->setArgument('action', 'rsm.aggregatedetails')
-				->setArgument('slv_itemid', $data['slvItemId'])
-				->setArgument('tld_host', $data['tld']['host'])
-				->setArgument('time', $test['clock'])
-				->setArgument('type', $data['type'])
-		);
-	}
-	else {
-		$details_link = new CLink(
-			_('Details'),
-			(new CUrl('zabbix.php'))
-				->setArgument('action', 'rsm.particulartests')
-				->setArgument('slvItemId', $data['slvItemId'])
-				->setArgument('host', $data['tld']['host'])
-				->setArgument('time', $test['clock'])
-				->setArgument('type', $data['type'])
-		);
-	}
+	$details_link = new CLink(
+		_('Details'),
+		(new CUrl('zabbix.php'))
+			->setArgument('action', ($data['type'] == RSM_DNS || $data['type'] == RSM_DNSSEC) ? 'rsm.aggregatedetails' : 'rsm.particulartests')
+			->setArgument('slvItemId', $data['slvItemId'])
+			->setArgument('host', $data['tld']['host'])
+			->setArgument('time', $test['clock'])
+			->setArgument('type', $data['type'])
+	);
 
 	$table->addRow([
 		$start_end_incident,

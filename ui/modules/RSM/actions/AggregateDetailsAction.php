@@ -44,17 +44,17 @@ class AggregateDetailsAction extends Action {
 
 	protected function checkInput() {
 		$fields = [
-			'tld_host'	=> 'required|string',
+			'host'		=> 'required|string',
 			'type'		=> 'required|in '.implode(',', [RSM_DNS, RSM_DNSSEC]),
 			'time'		=> 'required|int32',
-			'slv_itemid' => 'required|int32'
+			'slvItemId' => 'required|int32'
 		];
 
 		// Report is not available in registrar mode.
 		if (get_rsm_monitoring_type() === MONITORING_TARGET_REGISTRAR) {
 			$this->setResponse(new CControllerResponseRedirect((new CUrl('zabbix.php'))
 				->setArgument('action', 'rsm.incidentdetails')
-				->setArgument('host', $this->getInput('tld_host', ''))
+				->setArgument('host', $this->getInput('host', ''))
 				->getUrl()
 			));
 
@@ -81,7 +81,7 @@ class AggregateDetailsAction extends Action {
 	}
 
 	/**
-	 * Check is requested tld_host and slv_itemid exists.
+	 * Check is requested host and slvItemId exists.
 	 * Initializes properties: 'tld', 'slv_item', 'availability_item', 'probes'.
 	 *
 	 * @return bool
@@ -92,7 +92,7 @@ class AggregateDetailsAction extends Action {
 			'output' => ['hostid', 'host', 'name'],
 			'tlds' => true,
 			'filter' => [
-				'host' => $this->getInput('tld_host')
+				'host' => $this->getInput('host')
 			]
 		]);
 		$this->tld = reset($tld);
@@ -104,7 +104,7 @@ class AggregateDetailsAction extends Action {
 		// slv_item
 		$slv_items = API::Item()->get([
 			'output' => ['name'],
-			'itemids' => $this->getInput('slv_itemid')
+			'itemids' => $this->getInput('slvItemId')
 		]);
 		$this->slv_item = reset($slv_items);
 
@@ -347,7 +347,7 @@ class AggregateDetailsAction extends Action {
 
 		$macro += $defaults;
 		$data = [
-			'title' => _('Details of particular test'),
+			'title' => _('Test details'),
 			'module_style' => $this->module->getStyle(),
 			'tld_host' => $this->tld['host'],
 			'slv_item_name' => $this->slv_item['name'],
