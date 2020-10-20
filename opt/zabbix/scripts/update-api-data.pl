@@ -494,16 +494,14 @@ foreach (@server_keys)
 								fail("cannot save alarmed: ", ah_get_error());
 							}
 						}
-						else
+
+						if (ah_save_alarmed(
+								AH_SLA_API_VERSION_2,
+								$ah_tld,
+								$service,
+								JSON_VALUE_ALARMED_DISABLED) != AH_SUCCESS)
 						{
-							if (ah_save_alarmed(
-									AH_SLA_API_VERSION_2,
-									$ah_tld,
-									$service,
-									JSON_VALUE_ALARMED_DISABLED) != AH_SUCCESS)
-							{
-								fail("cannot save alarmed: ", ah_get_error());
-							}
+							fail("cannot save alarmed: ", ah_get_error());
 						}
 
 						$json_state_ref->{'testedServices'}->{uc($service)} = JSON_OBJECT_DISABLED_SERVICE;
@@ -539,16 +537,14 @@ foreach (@server_keys)
 								fail("cannot save alarmed: ", ah_get_error());
 							}
 						}
-						else
+
+						if (ah_save_alarmed(
+								AH_SLA_API_VERSION_2,
+								$ah_tld,
+								$service,
+								JSON_VALUE_ALARMED_NO) != AH_SUCCESS)
 						{
-							if (ah_save_alarmed(
-									AH_SLA_API_VERSION_2,
-									$ah_tld,
-									$service,
-									JSON_VALUE_ALARMED_NO) != AH_SUCCESS)
-							{
-								fail("cannot save alarmed: ", ah_get_error());
-							}
+							fail("cannot save alarmed: ", ah_get_error());
 						}
 
 						$json_state_ref->{'testedServices'}->{uc($service)} = {
@@ -582,16 +578,14 @@ foreach (@server_keys)
 								fail("cannot save alarmed: ", ah_get_error());
 							}
 						}
-						else
+
+						if (ah_save_alarmed(
+								AH_SLA_API_VERSION_2,
+								$ah_tld,
+								$service,
+								JSON_VALUE_ALARMED_NO) != AH_SUCCESS)
 						{
-							if (ah_save_alarmed(
-									AH_SLA_API_VERSION_2,
-									$ah_tld,
-									$service,
-									JSON_VALUE_ALARMED_NO) != AH_SUCCESS)
-							{
-								fail("cannot save alarmed: ", ah_get_error());
-							}
+							fail("cannot save alarmed: ", ah_get_error());
 						}
 
 						$json_state_ref->{'testedServices'}->{uc($service)} = {
@@ -641,16 +635,14 @@ foreach (@server_keys)
 								fail("cannot save alarmed: ", ah_get_error());
 							}
 						}
-						else
+
+						if (ah_save_alarmed(
+								AH_SLA_API_VERSION_2,
+								$ah_tld,
+								$service,
+								JSON_VALUE_ALARMED_NO) != AH_SUCCESS)
 						{
-							if (ah_save_alarmed(
-									AH_SLA_API_VERSION_2,
-									$ah_tld,
-									$service,
-									JSON_VALUE_ALARMED_NO) != AH_SUCCESS)
-							{
-								fail("cannot save alarmed: ", ah_get_error());
-							}
+							fail("cannot save alarmed: ", ah_get_error());
 						}
 
 						$json_state_ref->{'testedServices'}->{uc($service)} = {
@@ -697,16 +689,14 @@ foreach (@server_keys)
 								fail("cannot save alarmed: ", ah_get_error());
 							}
 						}
-						else
+
+						if (ah_save_alarmed(
+								AH_SLA_API_VERSION_2,
+								$ah_tld,
+								$service,
+								JSON_VALUE_ALARMED_NO) != AH_SUCCESS)
 						{
-							if (ah_save_alarmed(
-									AH_SLA_API_VERSION_2,
-									$ah_tld,
-									$service,
-									JSON_VALUE_ALARMED_NO) != AH_SUCCESS)
-							{
-								fail("cannot save alarmed: ", ah_get_error());
-							}
+							fail("cannot save alarmed: ", ah_get_error());
 						}
 
 						$json_state_ref->{'testedServices'}->{uc($service)} = {
@@ -746,17 +736,15 @@ foreach (@server_keys)
 							fail("cannot save downtime: ", ah_get_error());
 						}
 					}
-					else
+
+					if (ah_save_downtime(
+							AH_SLA_API_VERSION_2,
+							$ah_tld,
+							$service,
+							$downtime,
+							$lastclock) != AH_SUCCESS)
 					{
-						if (ah_save_downtime(
-								AH_SLA_API_VERSION_2,
-								$ah_tld,
-								$service,
-								$downtime,
-								$lastclock) != AH_SUCCESS)
-						{
-							fail("cannot save downtime: ", ah_get_error());
-						}
+						fail("cannot save downtime: ", ah_get_error());
 					}
 				}
 
@@ -795,17 +783,15 @@ foreach (@server_keys)
 							fail("cannot save alarmed: ", ah_get_error());
 						}
 					}
-					else
+
+					if (ah_save_alarmed(
+							AH_SLA_API_VERSION_2,
+							$ah_tld,
+							$service,
+							$alarmed_status,
+							$lastclock) != AH_SUCCESS)
 					{
-						if (ah_save_alarmed(
-								AH_SLA_API_VERSION_2,
-								$ah_tld,
-								$service,
-								$alarmed_status,
-								$lastclock) != AH_SUCCESS)
-						{
-							fail("cannot save alarmed: ", ah_get_error());
-						}
+						fail("cannot save alarmed: ", ah_get_error());
 					}
 				}
 
@@ -831,16 +817,14 @@ foreach (@server_keys)
 								fail("cannot save alarmed: ", ah_get_error());
 							}
 						}
-						else
+
+						if (ah_save_alarmed(
+								AH_SLA_API_VERSION_2,
+								$ah_tld,
+								$service,
+								JSON_VALUE_ALARMED_NO) != AH_SUCCESS)
 						{
-							if (ah_save_alarmed(
-									AH_SLA_API_VERSION_2,
-									$ah_tld,
-									$service,
-									JSON_VALUE_ALARMED_NO) != AH_SUCCESS)
-							{
-								fail("cannot save alarmed: ", ah_get_error());
-							}
+							fail("cannot save alarmed: ", ah_get_error());
 						}
 
 						$json_state_ref->{'testedServices'}->{uc($service)} = {
@@ -925,21 +909,19 @@ foreach (@server_keys)
 								fail("cannot save incident: ", ah_get_error());
 							}
 						}
-						else
+
+						if (ah_save_incident(
+								AH_SLA_API_VERSION_2,
+								$ah_tld,
+								$service,
+								$eventid,
+								$event_clock,
+								$event_start,
+								$event_end,
+								$false_positive,
+								$lastclock) != AH_SUCCESS)
 						{
-							if (ah_save_incident(
-									AH_SLA_API_VERSION_2,
-									$ah_tld,
-									$service,
-									$eventid,
-									$event_clock,
-									$event_start,
-									$event_end,
-									$false_positive,
-									$lastclock) != AH_SUCCESS)
-							{
-								fail("cannot save incident: ", ah_get_error());
-							}
+							fail("cannot save incident: ", ah_get_error());
 						}
 					}
 
@@ -957,9 +939,9 @@ foreach (@server_keys)
 						# wait for 30 seconds at most until measurement file appears
 						my $max_wait = time() + 30;
 
-						while (1)
+						if ($service ne 'rdap')
 						{
-							if ($service ne 'rdap')
+							while (1)
 							{
 								if (ah_copy_measurement(
 										AH_SLA_API_VERSION_1,
@@ -988,34 +970,35 @@ foreach (@server_keys)
 									last;
 								}
 							}
-							else
-							{
-								if (ah_copy_measurement(
-										AH_SLA_API_VERSION_2,
-										$ah_tld,
-										$service,
-										$clock,
-										$eventid,
-										$event_clock) != AH_SUCCESS)
-								{
-									if (time() > $max_wait)
-									{
-										fail("missing $service measurement for ",
-											ts_str($clock), ": ",
-											ah_get_error());
-									}
-									else
-									{
-										dbg("missing $service measurement for ",
-											ts_str($clock), ", waiting...");
+						}
 
-										sleep(1);
-									}
+						while (1)
+						{
+							if (ah_copy_measurement(
+									AH_SLA_API_VERSION_2,
+									$ah_tld,
+									$service,
+									$clock,
+									$eventid,
+									$event_clock) != AH_SUCCESS)
+							{
+								if (time() > $max_wait)
+								{
+									fail("missing $service measurement for ",
+										ts_str($clock), ": ",
+										ah_get_error());
 								}
 								else
 								{
-									last;
+									dbg("missing $service measurement for ",
+										ts_str($clock), ", waiting...");
+
+									sleep(1);
 								}
+							}
+							else
+							{
+								last;
 							}
 						}
 
@@ -1048,6 +1031,7 @@ foreach (@server_keys)
 				}
 			}
 
+			# 707: it was agreed state file should only be in v1
 			if (ah_save_state(AH_SLA_API_VERSION_1, $ah_tld, $json_state_ref) != AH_SUCCESS)
 			{
 				fail("cannot save TLD state: ", ah_get_error());
@@ -1237,26 +1221,24 @@ sub __update_false_positives
 				}
 			}
 		}
-		else
+
+		unless (ah_save_false_positive(
+				AH_SLA_API_VERSION_2,
+				$ah_tld,
+				$service,
+				$eventid,
+				$event_clock,
+				$false_positive,
+				$clock,
+				\$later) == AH_SUCCESS)
 		{
-			unless (ah_save_false_positive(
-					AH_SLA_API_VERSION_2,
-					$ah_tld,
-					$service,
-					$eventid,
-					$event_clock,
-					$false_positive,
-					$clock,
-					\$later) == AH_SUCCESS)
+			if ($later == 1)
 			{
-				if ($later == 1)
-				{
-					wrn(ah_get_error());
-				}
-				else
-				{
-					fail("cannot update false_positive state: ", ah_get_error());
-				}
+				wrn(ah_get_error());
+			}
+			else
+			{
+				fail("cannot update false_positive state: ", ah_get_error());
 			}
 		}
 	}
