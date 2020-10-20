@@ -144,6 +144,7 @@ sub init_cli_opts($)
 			"epp-servercert=s",
 			"ns-servers-v4=s",
 			"ns-servers-v6=s",
+			"dns-minns=i",
 			"rdds-ns-string=s",
 			"root-servers=s",
 			"server-id=s",
@@ -191,6 +192,10 @@ sub validate_input($)
 		elsif (!opt('ns-servers-v4') && !opt('ns-servers-v6'))
 		{
 			$msg .= "at least one of the --ns-servers-v4,--ns-servers-v6 options must be specified\n";
+		}
+		elsif (!opt('dns-minns'))
+		{
+			$msg .= "--dns-minns must be specified\n";
 		}
 	}
 
@@ -403,6 +408,7 @@ sub list_services(;$)
 		'{$RSM.TLD.RDDS.43.SERVERS}',
 		'{$RSM.TLD.RDDS.80.SERVERS}',
 		'{$RSM.RDDS43.TEST.DOMAIN}',
+		'{$RSM.TLD.DNS.AVAIL.MINNS}',
 	);
 
 	my @rsmhosts = ($rsmhost // get_tld_list());
@@ -1151,6 +1157,7 @@ sub create_rsmhost_template($$)
 	really(create_macro('{$RSM.RDDS.NS.STRING}', opt('rdds-ns-string') ? getopt('rdds-ns-string') : CFG_DEFAULT_RDDS_NS_STRING, $config_templateid, 1));
 	really(create_macro('{$RSM.TLD.DNS.UDP.ENABLED}', getopt('dns-udp'), $config_templateid, 1));
 	really(create_macro('{$RSM.TLD.DNS.TCP.ENABLED}', getopt('dns-tcp'), $config_templateid, 1));
+	really(create_macro('{$RSM.TLD.DNS.AVAIL.MINNS}', getopt('dns-minns'), $config_templateid, 1));
 	really(create_macro('{$RSM.TLD.DNSSEC.ENABLED}', getopt('dnssec'), $config_templateid, 1));
 	really(create_macro('{$RSM.TLD.RDDS.ENABLED}', opt('rdds43-servers') ? 1 : 0, $config_templateid, 1));
 	really(create_macro('{$RSM.TLD.RDDS.43.SERVERS}', getopt('rdds43-servers') // '', $config_templateid, 1));
@@ -1536,6 +1543,8 @@ Other options
                 list of IPv4 name servers separated by space (name and IP separated by comma): "NAME,IP[ NAME,IP2 ...]"
         --ns-servers-v6=STRING
                 list of IPv6 name servers separated by space (name and IP separated by comma): "NAME,IP[ NAME,IP2 ...]"
+        --dns-minns=INT
+                minimum number of the available nameservers
         --rdds43-servers=STRING
                 list of RDDS43 servers separated by comma: "NAME1,NAME2,..."
         --rdds80-servers=STRING
