@@ -1,3 +1,14 @@
+Changes for rsm2.1.0rc4
+
+Bug fixes:
+..F....... [731] fixed displaying zero values in Probe statistics in top-right corner (dimir)
+..F....... [730] fixed NSID handling on DNS Test details page (dimir)
+..F....... [729] kept link names as "Details", rename details page titles to "Test details" (dimir)
+....I..... [728] added generating SLA API v2 files for other services than RDAP (dimir)
+....I..... [sub-724] removed "sleep" statements from the cron jobs (dimir)
+....I..... [727] fixed PHP error when monitoring target is "registrar" (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.1.0rc3
 
 Bug fixes:
