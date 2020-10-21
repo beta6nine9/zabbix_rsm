@@ -7,6 +7,7 @@ Bug fixes:
 ....I..... [728] added generating SLA API v2 files for other services than RDAP (dimir)
 ....I..... [sub-724] removed "sleep" statements from the cron jobs (dimir)
 ....I..... [727] fixed PHP error when monitoring target is "registrar" (dimir)
+..F....... [726] fixed PHP warning when clicking the red icon on Rolling week status page (dimir)
 
 --------------------------------------------------------------------------------
 Changes for rsm2.1.0rc3
