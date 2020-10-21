@@ -224,10 +224,6 @@ else {
 $table = (new CTableInfo())->setHeader($header_columns);
 
 if ($data['tld']) {
-	$serverTime = time() - RSM_ROLLWEEK_SHIFT_BACK;
-	$from = date('YmdHis', $serverTime - $data['rollWeekSeconds']);
-	$till = date('YmdHis', $serverTime);
-
 	// Services must be in certain order.
 	$services = array();
 
@@ -288,10 +284,7 @@ if ($data['tld']) {
 											'host' => $tld['host'],
 											'eventid' => $tld[$service]['incident'],
 											'slvItemId' => $tld[$service]['itemid'],
-											'filter_from' => $from,
-											'filter_to' => $till,
-											'availItemId' => $tld[$service]['availItemId'],
-											'filter_set' => 1
+											'availItemId' => $tld[$service]['availItemId']
 									])
 							);
 						}
