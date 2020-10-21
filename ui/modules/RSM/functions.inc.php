@@ -261,7 +261,7 @@ function gen_details_item(array $details) {
 	$output = [];
 
 	foreach ($details as $key => $value) {
-		if (!$value) {
+		if (!isset($value)) {
 			continue;
 		}
 
