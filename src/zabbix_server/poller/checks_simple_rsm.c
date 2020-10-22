@@ -2019,7 +2019,7 @@ static const char	*get_probe_from_host(const char *host)
  * Purpose: Open log file for simple check                                    *
  *                                                                            *
  * Parameters: host     - [IN]  name of the host: <Probe> or <TLD Probe>      *
- *             tld      - [IN]  NULL in case of probestatus check             *
+ *             tld      - [IN]  NULL in case of probe/resolver status checks  *
  *             name     - [IN]  name of the test: dns, rdds, epp, probestatus *
  *             err      - [OUT] buffer for error message                      *
  *             err_size - [IN]  size of err buffer                            *
@@ -3788,16 +3788,16 @@ int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 	}
 
 	/* TLD goes first, then RDAP specific parameters, then TLD options, probe options and global settings */
-	GET_PARAM_EMPTY(domain       , 0 , "TLD");
-	GET_PARAM_EMPTY(testedname   , 1 , "Test domain");
-	GET_PARAM_EMPTY(base_url     , 2 , "RDAP service endpoint");
-	GET_PARAM_UINT (maxredirs    , 3 , "maximal number of redirections allowed");
-	GET_PARAM_UINT (rtt_limit    , 4 , "maximum allowed RTT");
-	GET_PARAM_UINT (tld_enabled  , 5 , "RDAP enabled for TLD");
-	GET_PARAM_UINT (probe_enabled, 6 , "RDAP enabled for probe");
-	GET_PARAM_UINT (ipv4_enabled , 7 , "IPv4 enabled");
-	GET_PARAM_UINT (ipv6_enabled , 8 , "IPv6 enabled");
-	GET_PARAM_EMPTY(res_ip       , 9 , "IP address of local resolver");
+	GET_PARAM_EMPTY(domain       , 0, "TLD");
+	GET_PARAM_EMPTY(testedname   , 1, "Test domain");
+	GET_PARAM_EMPTY(base_url     , 2, "RDAP service endpoint");
+	GET_PARAM_UINT (maxredirs    , 3, "maximal number of redirections allowed");
+	GET_PARAM_UINT (rtt_limit    , 4, "maximum allowed RTT");
+	GET_PARAM_UINT (tld_enabled  , 5, "RDAP enabled for TLD");
+	GET_PARAM_UINT (probe_enabled, 6, "RDAP enabled for probe");
+	GET_PARAM_UINT (ipv4_enabled , 7, "IPv4 enabled");
+	GET_PARAM_UINT (ipv6_enabled , 8, "IPv6 enabled");
+	GET_PARAM_EMPTY(res_ip       , 9, "IP address of local resolver");
 
 	/* open log file */
 	if (NULL == (log_fd = open_item_log(host, domain, ZBX_RDAP_LOG_PREFIX, err, sizeof(err))))
@@ -5132,16 +5132,16 @@ int	check_rsm_probe_status(const char *host, const AGENT_REQUEST *request, AGENT
 		goto out;
 	}
 
-	GET_PARAM_EMPTY(check_mode      , 0 , "mode of the check");
-	GET_PARAM_UINT (ipv4_enabled    , 1 , "IPv4 enabled");
-	GET_PARAM_UINT (ipv6_enabled    , 2 , "IPv6 enabled");
-	GET_PARAM_EMPTY(ipv4_rootservers, 3 , "IPv4 root servers");
-	GET_PARAM_EMPTY(ipv6_rootservers, 4 , "IPv6 root servers");
-	GET_PARAM_UINT (ipv4_min_servers, 5 , "IPv4 root servers required to be working");
-	GET_PARAM_UINT (ipv6_min_servers, 6 , "IPv6 root servers required to be working");
-	GET_PARAM_UINT (ipv4_reply_ms   , 7 , "RTT to consider IPv4 root server working");
-	GET_PARAM_UINT (ipv6_reply_ms   , 8 , "RTT to consider IPv6 root server working");
-	GET_PARAM_UINT (online_delay    , 9 , "seconds to be successful in order to switch from OFFLINE to ONLINE");
+	GET_PARAM_EMPTY(check_mode      , 0, "mode of the check");
+	GET_PARAM_UINT (ipv4_enabled    , 1, "IPv4 enabled");
+	GET_PARAM_UINT (ipv6_enabled    , 2, "IPv6 enabled");
+	GET_PARAM_EMPTY(ipv4_rootservers, 3, "IPv4 root servers");
+	GET_PARAM_EMPTY(ipv6_rootservers, 4, "IPv6 root servers");
+	GET_PARAM_UINT (ipv4_min_servers, 5, "IPv4 root servers required to be working");
+	GET_PARAM_UINT (ipv6_min_servers, 6, "IPv6 root servers required to be working");
+	GET_PARAM_UINT (ipv4_reply_ms   , 7, "RTT to consider IPv4 root server working");
+	GET_PARAM_UINT (ipv6_reply_ms   , 8, "RTT to consider IPv6 root server working");
+	GET_PARAM_UINT (online_delay    , 9, "seconds to be successful in order to switch from OFFLINE to ONLINE");
 
 	if (0 != strcmp("automatic", check_mode))
 	{
@@ -5367,17 +5367,17 @@ int	check_rsm_resolver_status(const char *host, const AGENT_REQUEST *request, AG
 	}
 
 	/* TLD goes first, then RDAP specific parameters, then TLD options, probe options and global settings */
-	GET_PARAM_EMPTY(res_ip      , 0 , "IP address of local resolver");
-	GET_PARAM_UINT (timeout     , 1 , "timeout in seconds");
-	GET_PARAM_UINT (tries       , 2 , "maximum number of tries");
-	GET_PARAM_UINT (ipv4_enabled, 3 , "IPv4 enabled");
-	GET_PARAM_UINT (ipv6_enabled, 4 , "IPv6 enabled");
+	GET_PARAM_EMPTY(res_ip      , 0, "IP address of local resolver");
+	GET_PARAM_UINT (timeout     , 1, "timeout in seconds");
+	GET_PARAM_UINT (tries       , 2, "maximum number of tries");
+	GET_PARAM_UINT (ipv4_enabled, 3, "IPv4 enabled");
+	GET_PARAM_UINT (ipv6_enabled, 4, "IPv6 enabled");
 
 	/* open log file */
 	if (NULL == (log_fd = open_item_log(host, NULL, ZBX_RESOLVERSTATUS_LOG_PREFIX, err, sizeof(err))))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
-		goto end;
+		goto out;
 	}
 
 	extras = RESOLVER_EXTRAS_DNSSEC;
@@ -5415,7 +5415,7 @@ int	check_rsm_resolver_status(const char *host, const AGENT_REQUEST *request, AG
 		if (!tries)
 		{
 			rsm_errf(log_fd, "dns check of local resolver %s failed: %s", res_ip, err);
-			goto out;
+			goto end;
 		}
 
 		/* will try again */
