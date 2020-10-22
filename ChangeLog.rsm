@@ -1,3 +1,11 @@
+Changes for rsm2.1.0rc5
+
+Bug fixes:
+....I..... [734] fixed targetIP and minNameServersUp in measurement files (dimir)
+..F....... [733] fixed vertical align of data on Rolling week status page (gcalenko)
+.......PS. [732] fixed incorrect log handle processing when resolver check fails (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.1.0rc4
 
 Bug fixes:
