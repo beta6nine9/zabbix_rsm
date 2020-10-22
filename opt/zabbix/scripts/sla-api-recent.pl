@@ -1487,7 +1487,10 @@ sub calculate_cycle($$$$$$$$$)
 	# }
 
 	# add configuration data
-	$json->{'minNameServersUp'} = int($cfg_minns);
+	if ($service eq 'dns' || $service eq 'dnssec')
+	{
+		$json->{'minNameServersUp'} = int($cfg_minns);
+	}
 
 	foreach my $target (keys(%{$name_server_availability_data->{'targets'}}))
 	{
@@ -1591,6 +1594,7 @@ sub calculate_cycle($$$$$$$$$)
 		fail("cannot save recent measurement: ", ah_get_error());
 	}
 
+	# the first version had no RDAP and no additional stuff that appeared in version 2
 	if ($service ne 'rdap')
 	{
 		delete($json->{'minNameServersUp'});

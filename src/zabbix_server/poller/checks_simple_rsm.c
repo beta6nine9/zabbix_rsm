@@ -3755,7 +3755,8 @@ static void	create_rdap_json(struct zbx_json *json, const char *ip, int rtt, con
 {
 	zbx_json_init(json, 2 * ZBX_KIBIBYTE);
 
-	zbx_json_addstring(json, "ip", ip, ZBX_JSON_TYPE_STRING);
+	if (NULL != ip)
+		zbx_json_addstring(json, "ip", ip, ZBX_JSON_TYPE_STRING);
 	zbx_json_addint64(json, "rtt", rtt);
 	zbx_json_addstring(json, "target", target, ZBX_JSON_TYPE_STRING);
 	zbx_json_addstring(json, "testedname", testedname, ZBX_JSON_TYPE_STRING);
