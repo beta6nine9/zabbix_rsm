@@ -408,7 +408,6 @@ sub list_services(;$)
 		'{$RSM.TLD.RDDS.43.SERVERS}',
 		'{$RSM.TLD.RDDS.80.SERVERS}',
 		'{$RSM.RDDS43.TEST.DOMAIN}',
-		'{$RSM.TLD.DNS.AVAIL.MINNS}',
 	);
 
 	my @rsmhosts = ($rsmhost // get_tld_list());
