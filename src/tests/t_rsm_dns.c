@@ -224,7 +224,7 @@ int	main(int argc, char *argv[])
 
 	/* test json */
 	nss[0].ips[0].rtt = rtt_unpacked;
-	nss[0].ips[0].nsid = zbx_strdup(NULL, nsid);
+	nss[0].ips[0].nsid = zbx_strdup(NULL, (nsid ? nsid : ""));
 	nss[0].ips[0].upd = upd_unpacked;
 
 	set_dns_test_results(nss, nss_num, DEFAULT_RTT_LIMIT, 2, &nssok, &test_status);
