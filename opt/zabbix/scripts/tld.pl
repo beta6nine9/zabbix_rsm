@@ -73,6 +73,10 @@ sub main()
 	{
 		list_services(getopt('tld'));
 	}
+	elsif(opt('get-dns-minns'))
+	{
+		get_dns_minns(getopt('tld'));
+	}
 	elsif (opt('get-nsservers-list'))
 	{
 		list_ns_servers(getopt('tld'));
@@ -145,6 +149,7 @@ sub init_cli_opts($)
 			"ns-servers-v4=s",
 			"ns-servers-v6=s",
 			"dns-minns=i",
+			"get-dns-minns",
 			"rdds-ns-string=s",
 			"root-servers=s",
 			"server-id=s",
@@ -178,7 +183,7 @@ sub validate_input($)
 		$msg .= "TLD must be specified (--tld)\n";
 	}
 
-	if (!opt('delete') && !opt('disable') && !opt('get-nsservers-list') && !opt('update-nsservers') && !opt('list-services'))
+	if (!opt('delete') && !opt('disable') && !opt('get-nsservers-list') && !opt('update-nsservers') && !opt('list-services') && !opt('get-dns-minns'))
 	{
 		if (!opt('type'))
 		{
@@ -216,12 +221,12 @@ sub validate_input($)
 
 	if (!opt('delete') && !opt('disable'))
 	{
-		if (!opt('ipv4') && !opt('ipv6') && !opt('get-nsservers-list') && !opt('update-nsservers') && !opt('list-services'))
+		if (!opt('ipv4') && !opt('ipv6') && !opt('get-nsservers-list') && !opt('update-nsservers') && !opt('list-services') && !opt('get-dns-minns'))
 		{
 			$msg .= "at least one IPv4 or IPv6 must be enabled (--ipv4 or --ipv6)\n";
 		}
 
-		if (!opt('dns-test-prefix') && !opt('get-nsservers-list') && !opt('update-nsservers') && !opt('list-services'))
+		if (!opt('dns-test-prefix') && !opt('get-nsservers-list') && !opt('update-nsservers') && !opt('list-services') && !opt('get-dns-minns'))
 		{
 			$msg .= "DNS test prefix must be specified (--dns-test-prefix)\n";
 		}
@@ -472,6 +477,21 @@ sub get_rsmhost_config($)
 	}
 
 	return $result;
+}
+
+################################################################################
+# get minimum number of the available nameservers
+################################################################################
+
+sub get_dns_minns($)
+{
+	my $rsmhost = shift;
+
+	my $config_templateid = get_template_id(TEMPLATE_RSMHOST_CONFIG_PREFIX . $rsmhost);
+
+	print Dumper get_host_macro($config_templateid, '{$RSM.TLD.DNS.AVAIL.MINNS}');
+
+	...;
 }
 
 ################################################################################
@@ -1543,7 +1563,9 @@ Other options
         --ns-servers-v6=STRING
                 list of IPv6 name servers separated by space (name and IP separated by comma): "NAME,IP[ NAME,IP2 ...]"
         --dns-minns=INT
-                minimum number of the available nameservers
+                set minimum number of the available nameservers
+        --get-dns-minns
+                get minimum number of the available nameservers
         --rdds43-servers=STRING
                 list of RDDS43 servers separated by comma: "NAME1,NAME2,..."
         --rdds80-servers=STRING
