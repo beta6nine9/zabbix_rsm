@@ -40,11 +40,11 @@ int	main(int argc, char *argv[])
 			*tld = NULL, *ns = NULL, *ns_ip = NULL, proto = RSM_UDP, *nsid = NULL, *ns_with_ip = NULL,
 			ipv4_enabled = 0, ipv6_enabled = 0, *testprefix = DEFAULT_TESTPREFIX,
 			testedname[ZBX_HOST_BUF_SIZE], dnssec_enabled = 0, ignore_err = 0, log_to_file = 0;
-	int		c, index, rtt, rtt_unpacked, upd_unpacked, unpacked_values_num, nssok, test_status;
+	int		c, index, rtt, rtt_unpacked, upd_unpacked;
 	ldns_resolver	*res = NULL;
 	ldns_rr_list	*keys = NULL;
 	FILE		*log_fd = stdout;
-	unsigned int	extras;
+	unsigned int	extras, nssok, test_status;
 	size_t		size_one_unpacked, size_two_unpacked, nss_num = 0;
 	zbx_ns_t	*nss = NULL;
 	struct zbx_json	json;
@@ -224,7 +224,7 @@ int	main(int argc, char *argv[])
 
 	/* test json */
 	nss[0].ips[0].rtt = rtt_unpacked;
-	nss[0].ips[0].nsid = zbx_strdup(NULL, nsid);
+	nss[0].ips[0].nsid = zbx_strdup(NULL, (nsid ? nsid : ""));
 	nss[0].ips[0].upd = upd_unpacked;
 
 	set_dns_test_results(nss, nss_num, DEFAULT_RTT_LIMIT, 2, &nssok, &test_status);

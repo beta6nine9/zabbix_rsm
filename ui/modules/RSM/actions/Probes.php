@@ -152,6 +152,18 @@ class Probes extends Action {
 			$data['lastaccess_limit'] = $lastaccess_limit[0]['value'];
 		}
 
+		if (!($probe_macros = API::UserMacro()->get([
+				'output' => ['macro', 'value'],
+				'search' => ['macro' => 'PROBE'],
+				'globalmacro' => true
+				]))) {
+			error('cannot get global macros');
+		}
+		else {
+			foreach ($probe_macros as $macro) {
+				$data['probe_macros'][$macro['macro']] = $macro['value'];
+			}
+		}
 		$data['generated_at'] = time();
 
 		$response = new CControllerResponseData($data);

@@ -1,5 +1,5 @@
 Name:		zabbix
-Version:	5.0.0%{rsmversion}
+Version:	5.0.4%{rsmversion}
 Release: 	%{?rsmprereleasetag:0.}1%{?rsmprereleasetag:%{rsmprereleasetag}}%{?dist}
 Summary:	The Enterprise-class open source monitoring solution
 Group:		Applications/Internet
@@ -10,6 +10,7 @@ Source1:	selinux
 Source3:	zabbix-logrotate.in
 Source6:	zabbix-server.init
 Source7:	zabbix-proxy.init
+Source10:	zabbix-agent.service
 Source11:	zabbix-server.service
 Source12:	zabbix-proxy.service
 Source15:	zabbix-tmpfiles.conf
@@ -29,7 +30,6 @@ Source21:	zabbix_server.conf
 Source22:	zabbix_proxy_common.conf
 Source23:	zabbix_proxy_N.conf
 Source24:	zabbix-slv-logrotate
-Patch0:		config.patch
 Patch2:		fping3-sourceip-option.patch
 
 Buildroot:	%{_tmppath}/zabbix-%{version}-%{release}-root-%(%{__id_u} -n)
@@ -46,10 +46,18 @@ Buildroot:	%{_tmppath}/zabbix-%{version}-%{release}-root-%(%{__id_u} -n)
 # Relabel files
 %global relabel_files() \ # ADD files in *.fc file
 
+%if 0%{?rhel} >= 8
+BuildRequires:	mariadb-connector-c-devel
+%else
 BuildRequires:	mysql-devel
+%endif
 BuildRequires:	libevent-devel
 BuildRequires:	pcre-devel
+%if 0%{?rhel} >= 8
+BuildRequires:	ldns-devel >= 1.7.1
+%else
 BuildRequires:	ldns-devel >= 1.6.17
+%endif
 BuildRequires:	curl-devel >= 7.13.1
 BuildRequires:	openssl-devel >= 1.0.1
 BuildRequires:	systemd
@@ -66,7 +74,11 @@ Group:				Applications/Internet
 Requires(post):		systemd
 Requires(preun):	systemd
 Requires(postun):	systemd
+%if 0%{?rhel} >= 8
+Requires:		ldns >= 1.7.1
+%else
 Requires:		ldns >= 1.6.17
+%endif
 Provides:		zabbix-proxy = %{version}-%{release}
 Provides:		zabbix-proxy-implementation = %{version}-%{release}
 Obsoletes:		zabbix
@@ -78,7 +90,12 @@ Zabbix proxy with MySQL or MariaDB database support.
 %package proxy-mysql-selinux
 Summary:		SELinux Policies for Zabbix proxy
 Group:			System Environment/Base
-Requires(post):		selinux-policy-base >= %{selinux_policyver}, selinux-policy-targeted >= %{selinux_policyver}, policycoreutils, policycoreutils-python libselinux-utils
+Requires(post):		selinux-policy-base >= %{selinux_policyver}, selinux-policy-targeted >= %{selinux_policyver}, policycoreutils, libselinux-utils
+%if 0%{?rhel} >= 8
+Requires(post):		policycoreutils-python-utils
+%else
+Requires(post):		policycoreutils-python
+%endif
 Requires:		zabbix-proxy = %{version}-%{release}
 
 %description proxy-mysql-selinux
@@ -91,7 +108,11 @@ Requires:			fping
 Requires(post):		systemd
 Requires(preun):	systemd
 Requires(postun):	systemd
+%if 0%{?rhel} >= 8
+Requires:		ldns >= 1.7.1
+%else
 Requires:		ldns >= 1.6.17
+%endif
 Requires:		perl-Data-Dumper
 Requires:		perl-DBD-MySQL
 Requires:		perl-Devel-StackTrace
@@ -106,7 +127,12 @@ Zabbix server with MySQL or MariaDB database support.
 %package server-mysql-selinux
 Summary:		SELinux Policies for Zabbix server
 Group:			System Environment/Base
-Requires(post):		selinux-policy-base >= %{selinux_policyver}, selinux-policy-targeted >= %{selinux_policyver}, policycoreutils, policycoreutils-python libselinux-utils
+Requires(post):		selinux-policy-base >= %{selinux_policyver}, selinux-policy-targeted >= %{selinux_policyver}, policycoreutils, libselinux-utils
+%if 0%{?rhel} >= 8
+Requires(post):		policycoreutils-python-utils
+%else
+Requires(post):		policycoreutils-python
+%endif
 Requires:		zabbix-server = %{version}-%{release}
 
 %description server-mysql-selinux
@@ -136,6 +162,8 @@ Requires:			rh-php73-php-xml
 Requires:			rh-php73-php-ldap
 Requires:			rh-php73-php-json
 Requires:			rh-php73-php-fpm
+Obsoletes:			php
+Obsoletes:			php-common
 Obsoletes:			php-gd
 Obsoletes:			php-bcmath
 Obsoletes:			php-mbstring
@@ -175,7 +203,12 @@ Zabbix web frontend for MySQL.
 Summary:		SELinux Policies for Zabbix web frontend
 Group:			System Environment/Base
 BuildArch:		noarch
-Requires(post):		selinux-policy-base >= %{selinux_policyver}, selinux-policy-targeted >= %{selinux_policyver}, policycoreutils, policycoreutils-python libselinux-utils
+Requires(post):		selinux-policy-base >= %{selinux_policyver}, selinux-policy-targeted >= %{selinux_policyver}, policycoreutils, libselinux-utils
+%if 0%{?rhel} >= 8
+Requires(post):		policycoreutils-python-utils
+%else
+Requires(post):		policycoreutils-python
+%endif
 Requires:		zabbix-web-mysql = %{version}-%{release}
 
 %description web-mysql-selinux
@@ -185,11 +218,45 @@ SELinux policy modules for use with Zabbix web frontend.
 Summary:		SELinux Policies for Zabbix agent
 Group:			System Environment/Base
 BuildArch:		noarch
-Requires(post):		selinux-policy-base >= %{selinux_policyver}, selinux-policy-targeted >= %{selinux_policyver}, policycoreutils, policycoreutils-python libselinux-utils
+Requires(post):		selinux-policy-base >= %{selinux_policyver}, selinux-policy-targeted >= %{selinux_policyver}, policycoreutils, libselinux-utils
+%if 0%{?rhel} >= 8
+Requires(post):		policycoreutils-python-utils
+%else
+Requires(post):		policycoreutils-python
+%endif
 Requires:		zabbix-agent
 
 %description agent-selinux
 SELinux policy modules for Zabbix agent.
+
+%if 0%{?rhel} >= 8
+%package agent
+Summary:                        Zabbix Agent
+Group:                          Applications/Internet
+Requires:                       logrotate
+Requires(pre):                  /usr/sbin/useradd
+Requires(post):                 systemd
+Requires(preun):                systemd
+Requires(preun):                systemd
+Obsoletes:                      zabbix
+
+%description agent
+Zabbix agent to be installed on monitored systems.
+
+%package get
+Summary:                        Zabbix Get
+Group:                          Applications/Internet
+
+%description get
+Zabbix get command line utility
+
+%package sender
+Summary:                        Zabbix Sender
+Group:                          Applications/Internet
+
+%description sender
+Zabbix sender command line utility
+%endif
 
 %package scripts
 Summary:			Zabbix scripts for RSM
@@ -234,7 +301,16 @@ Zabbix js command line utility.
 
 %prep
 %setup0 -q -n zabbix-%{version}%{?rsmprereleasetag:%{rsmprereleasetag}}
-%patch0 -p1
+
+sed -r -i.bak "s,^(\s*const CONFIG_FILE_PATH =).*,\1 '/etc/zabbix/web/zabbix.conf.php';," \
+	ui/include/classes/core/CConfigFile.php
+
+sed -r -i.bak "s,^(\s*require_once ).*conf/maintenance\.inc\.php.*,\1 '/etc/zabbix/web/maintenance.inc.php';," \
+	ui/include/classes/core/ZBase.php
+
+sed -r -i.bak 's,^(\s*\$configFile =).*CONFIG_FILE_PATH.*,\1 CConfigFile::CONFIG_FILE_PATH;,' \
+	ui/include/classes/core/ZBase.php
+
 %patch2 -p1
 
 cp -r %{SOURCE1}/ ./
@@ -267,7 +343,6 @@ build_flags="
 	--enable-dependency-tracking
 	--sysconfdir=/etc/zabbix
 	--libdir=%{_libdir}/zabbix
-	--with-openssl
 	--with-libcurl
 	--enable-proxy
 	--enable-ipv6
@@ -277,13 +352,25 @@ build_flags="$build_flags --with-openssl"
 
 build_flags="$build_flags --enable-server --with-libevent --with-libpcre"
 
+%if 0%{?rhel} >= 8
+build_flags="$build_flags --enable-agent"
+%endif
+
 CFLAGS="$RPM_OPT_FLAGS -fPIC -pie -Wl,-z,relro -Wl,-z,now"
-CXXFLAGS="$RPM_OPT_FLAGS -fPIC -pie -Wl,-z,relro -Wl,-z,now"
+# GCC 9
+#CFLAGS="-fPIC -pie -g -O3 -m64 -march=westmere -mtune=haswell -feliminate-unused-debug-types -pipe -Wall      \
+#-Wp,-D_FORTIFY_SOURCE=2 -fexceptions -fstack-protector --param=ssp-buffer-size=32 -Wformat -Wformat-security  \
+#-fasynchronous-unwind-tables -Wp,-D_REENTRANT -ftree-loop-distribute-patterns -Wl,-z -Wl,now -Wl,-z -Wl,relro \
+#-fno-semantic-interposition -ffat-lto-objects -fno-trapping-math -Wl,-sort-common -Wl,--enable-new-dtags      \
+#-Wa,-mbranches-within-32B-boundaries"
+
+CXXFLAGS="$CFLAGS"
 
 export CFLAGS
 export CXXFLAGS
 %configure $build_flags --with-mysql
 make -s %{?_smp_mflags}
+
 mv src/zabbix_server/zabbix_server src/zabbix_server/zabbix_server_mysql
 mv src/zabbix_proxy/zabbix_proxy src/zabbix_proxy/zabbix_proxy_mysql
 
@@ -307,6 +394,7 @@ mkdir -p $RPM_BUILD_ROOT%{_localstatedir}/run/zabbix
 # install server and proxy binaries
 install -m 0755 -p src/zabbix_server/zabbix_server_* $RPM_BUILD_ROOT%{_sbindir}/
 rm $RPM_BUILD_ROOT%{_sbindir}/zabbix_server
+
 install -m 0755 -p src/zabbix_proxy/zabbix_proxy_* $RPM_BUILD_ROOT%{_sbindir}/
 rm $RPM_BUILD_ROOT%{_sbindir}/zabbix_proxy
 rm $RPM_BUILD_ROOT%{_sysconfdir}/zabbix/zabbix_proxy.conf
@@ -319,8 +407,15 @@ mv $RPM_BUILD_ROOT%{_datadir}/zabbix/externalscripts $RPM_BUILD_ROOT/usr/lib/zab
 # install frontend files
 find ui -name '*.orig' | xargs rm -f
 cp -a ui/* $RPM_BUILD_ROOT%{_datadir}/zabbix
+
+chmod -x opt/zabbix/scripts/CSlaReport.php
+
 cp opt/zabbix/scripts/CSlaReport.php $RPM_BUILD_ROOT%{_datadir}/zabbix/include/classes/services/CSlaReport.php
+
+# since CentOS 8 this directory belongs to php-fpm
+%if 0%{?rhel} < 8
 mkdir -p $RPM_BUILD_ROOT%{_sharedstatedir}/php/session
+%endif
 
 # install frontend configuration files
 mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/zabbix/web
@@ -341,6 +436,22 @@ install -Dm 0644 -p %{SOURCE18} $RPM_BUILD_ROOT%{_sysconfdir}/opt/rh/rh-php73/ph
 mv $RPM_BUILD_ROOT%{_sysconfdir}/zabbix/zabbix_proxy.conf.d $RPM_BUILD_ROOT%{_sysconfdir}/zabbix/zabbix_proxy.d
 mv $RPM_BUILD_ROOT%{_sysconfdir}/zabbix/zabbix_server.conf.d $RPM_BUILD_ROOT%{_sysconfdir}/zabbix/zabbix_server.d
 
+%if 0%{?rhel} >= 8
+mv $RPM_BUILD_ROOT%{_sysconfdir}/zabbix/zabbix_agentd.conf.d $RPM_BUILD_ROOT%{_sysconfdir}/zabbix/zabbix_agentd.d
+
+install -dm 755 $RPM_BUILD_ROOT%{_docdir}/zabbix-agent-%{version}
+
+install -m 0644 conf/zabbix_agentd/userparameter_mysql.conf $RPM_BUILD_ROOT%{_sysconfdir}/zabbix/zabbix_agentd.d
+install -m 0644 conf/zabbix_agentd/userparameter_examples.conf $RPM_BUILD_ROOT%{_docdir}/zabbix-agent-%{version}
+
+cat conf/zabbix_agentd.conf | sed \
+	-e '/^# PidFile=/a \\nPidFile=%{_localstatedir}/run/zabbix/zabbix_agentd.pid' \
+	-e 's|^LogFile=.*|LogFile=%{_localstatedir}/log/zabbix/zabbix_agentd.log|g' \
+	-e '/^# LogFileSize=.*/a \\nLogFileSize=0' \
+	-e '/^# Include=$/a \\nInclude=%{_sysconfdir}/zabbix/zabbix_agentd.d/' \
+	> $RPM_BUILD_ROOT%{_sysconfdir}/zabbix/zabbix_agentd.conf
+%endif
+
 mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/rsyslog.d
 cp %{SOURCE20} $RPM_BUILD_ROOT%{_sysconfdir}/rsyslog.d/rsm.slv.conf
 cp %{SOURCE21} $RPM_BUILD_ROOT%{_sysconfdir}/zabbix/zabbix_server.conf
@@ -353,17 +464,32 @@ mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d
 cat %{SOURCE3} | sed \
 	-e 's|COMPONENT|server|g' \
 	> $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/zabbix-server
+
 cat %{SOURCE3} | sed \
 	-e 's|COMPONENT|proxy*|g' \
 	> $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/zabbix-proxy
+
+%if 0%{?rhel} >= 8
+cat %{SOURCE3} | sed \
+	-e 's|COMPONENT|agentd|g' \
+	> $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/zabbix-agent
+%endif
 
 # install startup scripts
 install -Dm 0644 -p %{SOURCE11} $RPM_BUILD_ROOT%{_unitdir}/zabbix-server.service
 install -Dm 0644 -p %{SOURCE12} $RPM_BUILD_ROOT%{_unitdir}/zabbix-proxy.service
 
+%if 0%{?rhel} >= 8
+install -Dm 0644 -p %{SOURCE10} $RPM_BUILD_ROOT%{_unitdir}/zabbix-agent.service
+%endif
+
 # install systemd-tmpfiles conf
 install -Dm 0644 -p %{SOURCE15} $RPM_BUILD_ROOT%{_prefix}/lib/tmpfiles.d/zabbix-server.conf
 install -Dm 0644 -p %{SOURCE15} $RPM_BUILD_ROOT%{_prefix}/lib/tmpfiles.d/zabbix-proxy.conf
+
+%if 0%{?rhel} >= 8
+install -Dm 0644 -p %{SOURCE15} $RPM_BUILD_ROOT%{_prefix}/lib/tmpfiles.d/zabbix-agent.conf
+%endif
 
 # Install SELinux policy modules
 %_format MODULES selinux/$x.pp.bz2
@@ -380,6 +506,54 @@ install -Dm 0644 -p %{SOURCE24} $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/zabbix
 
 %clean
 rm -rf $RPM_BUILD_ROOT
+
+%if 0%{?rhel} >= 8
+%pre agent
+getent group zabbix > /dev/null || groupadd -r zabbix
+getent passwd zabbix > /dev/null || \
+    useradd -r -g zabbix -d %{_localstatedir}/lib/zabbix -s /sbin/nologin \
+	    -c "Zabbix Monitoring System" zabbix
+:
+
+%post agent
+%systemd_post zabbix-agent.service
+
+%preun agent
+if [ "$1" = 0 ]; then
+    %systemd_preun zabbix-agent.service
+fi
+:
+
+%postun agent
+%systemd_postun_with_restart zabbix-agent.service
+
+%files agent
+%defattr(-,root,root,-)
+%doc AUTHORS ChangeLog COPYING NEWS README
+%config(noreplace) %{_sysconfdir}/zabbix/zabbix_agentd.conf
+%config(noreplace) %{_sysconfdir}/logrotate.d/zabbix-agent
+%dir %{_sysconfdir}/zabbix/zabbix_agentd.d
+%config(noreplace) %{_sysconfdir}/zabbix/zabbix_agentd.d/userparameter_mysql.conf
+%doc %{_docdir}/zabbix-agent-%{version}/userparameter_examples.conf
+%attr(0755,zabbix,zabbix) %dir %{_localstatedir}/log/zabbix
+%attr(0755,zabbix,zabbix) %dir %{_localstatedir}/run/zabbix
+%{_sbindir}/zabbix_agentd
+%{_mandir}/man8/zabbix_agentd.8*
+%{_unitdir}/zabbix-agent.service
+%{_prefix}/lib/tmpfiles.d/zabbix-agent.conf
+
+%files get
+%defattr(-,root,root,-)
+%doc AUTHORS ChangeLog COPYING NEWS README
+%{_bindir}/zabbix_get
+%{_mandir}/man1/zabbix_get.1*
+
+%files sender
+%defattr(-,root,root,-)
+%doc AUTHORS ChangeLog COPYING NEWS README
+%{_bindir}/zabbix_sender
+%{_mandir}/man1/zabbix_sender.1*
+%endif
 
 %pre proxy-mysql
 getent group zabbix > /dev/null || groupadd -r zabbix
@@ -594,7 +768,10 @@ systemctl restart rsyslog
 %doc AUTHORS ChangeLog COPYING NEWS README
 %doc nginx.conf
 %dir %attr(0750,nginx,nginx) %{_sysconfdir}/zabbix/web
-%dir %attr(0750,nginx,nginx) %{_sharedstatedir}/php/session
+# since CentOS 8 this directory belongs to php-fpm
+%if 0%{?rhel} < 8
+%dir %attr(0770,root,nginx) %{_sharedstatedir}/php/session
+%endif
 %ghost %attr(0644,nginx,nginx) %config(noreplace) %{_sysconfdir}/zabbix/web/zabbix.conf.php
 %config(noreplace) %{_sysconfdir}/zabbix/web/maintenance.inc.php
 %config(noreplace) %{_sysconfdir}/nginx/conf.d/zbx_vhost.conf

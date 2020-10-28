@@ -29,7 +29,7 @@ int	main(int argc, char *argv[])
 				ipv6_enabled = 1, maxredirs = DEFAULT_MAXREDIRS, ipv_flags = 0, curl_flags = 0;
 	struct zbx_json_parse	jp;
 	ldns_resolver		*res = NULL;
-	char			*testedname, *base_url, is_ipv4,  rdap_prefix[64], *res_ip = NULL, *proto = NULL,
+	char			*testedname = NULL, *base_url = NULL, is_ipv4,  rdap_prefix[64], *res_ip = NULL, *proto = NULL,
 				*target = NULL, *prefix = NULL, *full_url = NULL, *value_str = NULL,
 				err[ZBX_ERR_BUF_SIZE];
 	const char		*ip = NULL;

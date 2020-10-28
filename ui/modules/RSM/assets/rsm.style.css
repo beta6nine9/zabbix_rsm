@@ -32,6 +32,16 @@ table.list-table td {
 	font-weight: bold;
 	float: right;
 }
+.rolling-week-value {
+	display: inline-block;
+	text-align: right;
+	width: 65px;
+}
+.rolling-week-graph {
+	display: inline-block;
+	width: 40px;
+}
+
 /* Incidents page */
 .incidents-info {
 	width: 100%;
@@ -39,6 +49,7 @@ table.list-table td {
 .rsm-date-time {
 	float: right;
 }
+
 /* Particular proxy */
 .first-row-element {
 	width: 300px;

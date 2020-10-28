@@ -2002,78 +2002,6 @@ static zbx_subtest_result_t	zbx_subtest_result(int rtt, int rtt_limit)
 	return (0 > rtt || rtt > rtt_limit ? ZBX_SUBTEST_FAIL : ZBX_SUBTEST_SUCCESS);
 }
 
-static int	zbx_conf_str(zbx_uint64_t *hostid, const char *macro, char **value, char *err, size_t err_size)
-{
-	int	ret = FAIL;
-
-	if (NULL != *value)
-	{
-		zbx_strlcpy(err, "unfreed memory detected", err_size);
-		goto out;
-	}
-
-	DCget_user_macro(hostid, 1, macro, value);
-	if (NULL == *value || '\0' == **value)
-	{
-		zbx_snprintf(err, err_size, "macro %s is not set", macro);
-		zbx_free(*value);
-		goto out;
-	}
-
-	ret = SUCCEED;
-out:
-	return ret;
-}
-
-static int	zbx_conf_int(zbx_uint64_t *hostid, const char *macro, int *value, char min, char *err, size_t err_size)
-{
-	char	*value_str = NULL;
-	int	ret = FAIL;
-
-	DCget_user_macro(hostid, 1, macro, &value_str);
-	if (NULL == value_str || '\0' == *value_str)
-	{
-		zbx_snprintf(err, err_size, "macro %s is not set", macro);
-		goto out;
-	}
-
-	*value = atoi(value_str);
-
-	if (min > *value)
-	{
-		zbx_snprintf(err, err_size, "the value of macro %s cannot be less than %d", macro, min);
-		goto out;
-	}
-
-	ret = SUCCEED;
-out:
-	zbx_free(value_str);
-
-	return ret;
-}
-
-static int	zbx_conf_ip_support(zbx_uint64_t *hostid, int *ipv4_enabled, int *ipv6_enabled,
-		char *err, size_t err_size)
-{
-	int	ret = FAIL;
-
-	if (SUCCEED != zbx_conf_int(hostid, ZBX_MACRO_IP4_ENABLED, ipv4_enabled, 0, err, err_size))
-		goto out;
-
-	if (SUCCEED != zbx_conf_int(hostid, ZBX_MACRO_IP6_ENABLED, ipv6_enabled, 0, err, err_size))
-		goto out;
-
-	if (0 == *ipv4_enabled && 0 == *ipv6_enabled)
-	{
-		zbx_strlcpy(err, "both IPv4 and IPv6 disabled", err_size);
-		goto out;
-	}
-
-	ret = SUCCEED;
-out:
-	return ret;
-}
-
 static const char	*get_probe_from_host(const char *host)
 {
 	const char	*p;
@@ -2091,7 +2019,7 @@ static const char	*get_probe_from_host(const char *host)
  * Purpose: Open log file for simple check                                    *
  *                                                                            *
  * Parameters: host     - [IN]  name of the host: <Probe> or <TLD Probe>      *
- *             tld      - [IN]  NULL in case of probestatus check             *
+ *             tld      - [IN]  NULL in case of probe/resolver status checks  *
  *             name     - [IN]  name of the test: dns, rdds, epp, probestatus *
  *             err      - [OUT] buffer for error message                      *
  *             err_size - [IN]  size of err buffer                            *
@@ -2138,8 +2066,8 @@ static FILE	*open_item_log(const char *host, const char *tld, const char *name, 
 	return fd;
 }
 
-static void	set_dns_test_results(zbx_ns_t *nss, size_t nss_num, int rtt_limit, unsigned int minns, unsigned int *nssok,
-		unsigned int *status)
+static void	set_dns_test_results(zbx_ns_t *nss, size_t nss_num, int rtt_limit, unsigned int minns,
+		unsigned int *nssok, unsigned int *status)
 {
 	size_t	i, j;
 
@@ -2395,7 +2323,7 @@ int	check_rsm_dns(const char *host, int nextcheck, const AGENT_REQUEST *request,
 	unsigned int		extras, current_mode, test_status, minns, nssok;
 	struct zbx_json		json;
 	int			dnssec_enabled, rdds_enabled, epp_enabled, udp_enabled, tcp_enabled, ipv4_enabled,
-				ipv6_enabled, udp_rtt_limit, tcp_rtt_limit, rtt_limit, successful_tests, file_exists,
+				ipv6_enabled, udp_rtt_limit, tcp_rtt_limit, rtt_limit, successful_tests, file_exists = 0,
 				tcp_ratio, test_recover_udp, test_recover_tcp, test_recover, ret = SYSINFO_RET_FAIL;
 
 	if (17 != request->nparam)
@@ -3777,7 +3705,7 @@ end:
 			case ZBX_SUBTEST_SUCCESS:
 				rdds43_status = 1;	/* up */
 				break;
-			case ZBX_SUBTEST_FAIL:
+			default:	/* ZBX_SUBTEST_FAIL */
 				rdds43_status = 0;	/* down */
 		}
 
@@ -3786,7 +3714,7 @@ end:
 			case ZBX_SUBTEST_SUCCESS:
 				rdds80_status = 1;	/* up */
 				break;
-			case ZBX_SUBTEST_FAIL:
+			default:	/* ZBX_SUBTEST_FAIL */
 				rdds80_status = 0;	/* down */
 		}
 
@@ -3827,7 +3755,8 @@ static void	create_rdap_json(struct zbx_json *json, const char *ip, int rtt, con
 {
 	zbx_json_init(json, 2 * ZBX_KIBIBYTE);
 
-	zbx_json_addstring(json, "ip", ip, ZBX_JSON_TYPE_STRING);
+	if (NULL != ip)
+		zbx_json_addstring(json, "ip", ip, ZBX_JSON_TYPE_STRING);
 	zbx_json_addint64(json, "rtt", rtt);
 	zbx_json_addstring(json, "target", target, ZBX_JSON_TYPE_STRING);
 	zbx_json_addstring(json, "testedname", testedname, ZBX_JSON_TYPE_STRING);
@@ -3860,16 +3789,16 @@ int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 	}
 
 	/* TLD goes first, then RDAP specific parameters, then TLD options, probe options and global settings */
-	GET_PARAM_EMPTY(domain       , 0 , "TLD");
-	GET_PARAM_EMPTY(testedname   , 1 , "Test domain");
-	GET_PARAM_EMPTY(base_url     , 2 , "RDAP service endpoint");
-	GET_PARAM_UINT (maxredirs    , 3 , "maximal number of redirections allowed");
-	GET_PARAM_UINT (rtt_limit    , 4 , "maximum allowed RTT");
-	GET_PARAM_UINT (tld_enabled  , 5 , "RDAP enabled for TLD");
-	GET_PARAM_UINT (probe_enabled, 6 , "RDAP enabled for probe");
-	GET_PARAM_UINT (ipv4_enabled , 7 , "IPv4 enabled");
-	GET_PARAM_UINT (ipv6_enabled , 8 , "IPv6 enabled");
-	GET_PARAM_EMPTY(res_ip       , 9 , "IP address of local resolver");
+	GET_PARAM_EMPTY(domain       , 0, "TLD");
+	GET_PARAM_EMPTY(testedname   , 1, "Test domain");
+	GET_PARAM_EMPTY(base_url     , 2, "RDAP service endpoint");
+	GET_PARAM_UINT (maxredirs    , 3, "maximal number of redirections allowed");
+	GET_PARAM_UINT (rtt_limit    , 4, "maximum allowed RTT");
+	GET_PARAM_UINT (tld_enabled  , 5, "RDAP enabled for TLD");
+	GET_PARAM_UINT (probe_enabled, 6, "RDAP enabled for probe");
+	GET_PARAM_UINT (ipv4_enabled , 7, "IPv4 enabled");
+	GET_PARAM_UINT (ipv6_enabled , 8, "IPv6 enabled");
+	GET_PARAM_EMPTY(res_ip       , 9, "IP address of local resolver");
 
 	/* open log file */
 	if (NULL == (log_fd = open_item_log(host, domain, ZBX_RDAP_LOG_PREFIX, err, sizeof(err))))
@@ -4027,7 +3956,7 @@ end:
 			case ZBX_SUBTEST_SUCCESS:
 				subtest_result = 1;	/* up */
 				break;
-			case ZBX_SUBTEST_FAIL:
+			default:	/* ZBX_SUBTEST_FAIL */
 				subtest_result = 0;	/* down */
 		}
 
@@ -4814,7 +4743,7 @@ int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *
 				*epp_passwd_salt_b64 = NULL, *epp_privkey_enc_b64 = NULL, *epp_privkey_salt_b64 = NULL,
 				*epp_user = NULL, *epp_passwd = NULL, *epp_privkey = NULL, *epp_cert_b64 = NULL,
 				*epp_cert = NULL, *epp_commands = NULL, *epp_serverid = NULL, *epp_testprefix = NULL,
-				*epp_servercertmd5 = NULL, *tmp;
+				*epp_servercertmd5 = NULL;
 	unsigned short		epp_port = 700;
 	X509			*epp_server_x509 = NULL;
 	const SSL_METHOD	*method;
@@ -4825,9 +4754,8 @@ int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *
 	zbx_socket_t		sock;
 	zbx_vector_str_t	epp_hosts, epp_ips;
 	unsigned int		extras;
-	int			rv, epp_enabled, epp_cert_size, rtt, rtt1 = ZBX_NO_VALUE, rtt2 = ZBX_NO_VALUE,
-				rtt3 = ZBX_NO_VALUE, rtt1_limit, rtt2_limit, rtt3_limit, ipv4_enabled, ipv6_enabled,
-				ret = SYSINFO_RET_FAIL;
+	int			rv, epp_cert_size, rtt, rtt1 = ZBX_NO_VALUE, rtt2 = ZBX_NO_VALUE,
+				rtt3 = ZBX_NO_VALUE, ipv4_enabled = 0, ipv6_enabled = 0, ret = SYSINFO_RET_FAIL;
 
 	zbx_vector_str_create(&epp_hosts);
 	zbx_vector_str_create(&epp_ips);
@@ -5085,18 +5013,6 @@ out:
 	else
 	{
 		/* TODO: save result: ip, rtt1, rtt2, rtt3 */
-
-		/* set availability of EPP (up/down) */
-		if (ZBX_SUBTEST_SUCCESS != zbx_subtest_result(rtt1, rtt1_limit) ||
-				ZBX_SUBTEST_SUCCESS != zbx_subtest_result(rtt2, rtt2_limit) ||
-				ZBX_SUBTEST_SUCCESS != zbx_subtest_result(rtt3, rtt3_limit))
-		{
-			/* down */
-		}
-		else
-		{
-			/* up */
-		}
 	}
 
 	rsm_info(log_fd, "END TEST");
@@ -5201,7 +5117,7 @@ out:
 int	check_rsm_probe_status(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *result)
 {
 	char			err[ZBX_ERR_BUF_SIZE], ips4_init = 0, ips6_init = 0;
-	const char		*ip, *p;
+	const char		*ip;
 	zbx_vector_str_t	ips4, ips6;
 	ldns_resolver		*res = NULL;
 	ldns_rdf		*query_rdf = NULL;
@@ -5217,16 +5133,16 @@ int	check_rsm_probe_status(const char *host, const AGENT_REQUEST *request, AGENT
 		goto out;
 	}
 
-	GET_PARAM_EMPTY(check_mode      , 0 , "mode of the check");
-	GET_PARAM_UINT (ipv4_enabled    , 1 , "IPv4 enabled");
-	GET_PARAM_UINT (ipv6_enabled    , 2 , "IPv6 enabled");
-	GET_PARAM_EMPTY(ipv4_rootservers, 3 , "IPv4 root servers");
-	GET_PARAM_EMPTY(ipv6_rootservers, 4 , "IPv6 root servers");
-	GET_PARAM_UINT (ipv4_min_servers, 5 , "IPv4 root servers required to be working");
-	GET_PARAM_UINT (ipv6_min_servers, 6 , "IPv6 root servers required to be working");
-	GET_PARAM_UINT (ipv4_reply_ms   , 7 , "RTT to consider IPv4 root server working");
-	GET_PARAM_UINT (ipv6_reply_ms   , 8 , "RTT to consider IPv6 root server working");
-	GET_PARAM_UINT (online_delay    , 9 , "seconds to be successful in order to switch from OFFLINE to ONLINE");
+	GET_PARAM_EMPTY(check_mode      , 0, "mode of the check");
+	GET_PARAM_UINT (ipv4_enabled    , 1, "IPv4 enabled");
+	GET_PARAM_UINT (ipv6_enabled    , 2, "IPv6 enabled");
+	GET_PARAM_EMPTY(ipv4_rootservers, 3, "IPv4 root servers");
+	GET_PARAM_EMPTY(ipv6_rootservers, 4, "IPv6 root servers");
+	GET_PARAM_UINT (ipv4_min_servers, 5, "IPv4 root servers required to be working");
+	GET_PARAM_UINT (ipv6_min_servers, 6, "IPv6 root servers required to be working");
+	GET_PARAM_UINT (ipv4_reply_ms   , 7, "RTT to consider IPv4 root server working");
+	GET_PARAM_UINT (ipv6_reply_ms   , 8, "RTT to consider IPv6 root server working");
+	GET_PARAM_UINT (online_delay    , 9, "seconds to be successful in order to switch from OFFLINE to ONLINE");
 
 	if (0 != strcmp("automatic", check_mode))
 	{
@@ -5452,17 +5368,17 @@ int	check_rsm_resolver_status(const char *host, const AGENT_REQUEST *request, AG
 	}
 
 	/* TLD goes first, then RDAP specific parameters, then TLD options, probe options and global settings */
-	GET_PARAM_EMPTY(res_ip      , 0 , "IP address of local resolver");
-	GET_PARAM_UINT (timeout     , 1 , "timeout in seconds");
-	GET_PARAM_UINT (tries       , 2 , "maximum number of tries");
-	GET_PARAM_UINT (ipv4_enabled, 3 , "IPv4 enabled");
-	GET_PARAM_UINT (ipv6_enabled, 4 , "IPv6 enabled");
+	GET_PARAM_EMPTY(res_ip      , 0, "IP address of local resolver");
+	GET_PARAM_UINT (timeout     , 1, "timeout in seconds");
+	GET_PARAM_UINT (tries       , 2, "maximum number of tries");
+	GET_PARAM_UINT (ipv4_enabled, 3, "IPv4 enabled");
+	GET_PARAM_UINT (ipv6_enabled, 4, "IPv6 enabled");
 
 	/* open log file */
 	if (NULL == (log_fd = open_item_log(host, NULL, ZBX_RESOLVERSTATUS_LOG_PREFIX, err, sizeof(err))))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
-		goto end;
+		goto out;
 	}
 
 	extras = RESOLVER_EXTRAS_DNSSEC;
@@ -5500,7 +5416,7 @@ int	check_rsm_resolver_status(const char *host, const AGENT_REQUEST *request, AG
 		if (!tries)
 		{
 			rsm_errf(log_fd, "dns check of local resolver %s failed: %s", res_ip, err);
-			goto out;
+			goto end;
 		}
 
 		/* will try again */

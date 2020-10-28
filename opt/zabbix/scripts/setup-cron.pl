@@ -17,43 +17,42 @@ use Getopt::Long qw(:config no_auto_abbrev);
 use constant CRONTAB_FILE => '/etc/cron.d/rsm';
 use constant SLV_LOG_FILE => '/var/log/zabbix/rsm.slv.err';
 
+my $JOB_USER = 'zabbix';	# default user of the job
+
 my @cron_jobs = (
-	['main', '* * * * *' , 0 , '/opt/zabbix/scripts/slv/rsm.probe.online.pl'       , SLV_LOG_FILE],
-	undef,
-	['main', '* * * * *' , 10, '/opt/zabbix/scripts/slv/rsm.slv.dns.avail.pl'      , SLV_LOG_FILE],
-	['main', '* * * * *' , 20, '/opt/zabbix/scripts/slv/rsm.slv.dns.rollweek.pl'   , SLV_LOG_FILE],
-	['main', '* * * * *' , 20, '/opt/zabbix/scripts/slv/rsm.slv.dns.downtime.pl'   , SLV_LOG_FILE],
-	['main', '* * * * *' , 30, '/opt/zabbix/scripts/slv/rsm.slv.dns.udp.rtt.pl'    , SLV_LOG_FILE],
-	['main', '* * * * *' , 30, '/opt/zabbix/scripts/slv/rsm.slv.dns.tcp.rtt.pl'    , SLV_LOG_FILE],
-	['main', '* * * * *' , 10, '/opt/zabbix/scripts/slv/rsm.slv.dns.ns.avail.pl'   , SLV_LOG_FILE],
-	['main', '* * * * *' , 20, '/opt/zabbix/scripts/slv/rsm.slv.dns.ns.downtime.pl', SLV_LOG_FILE],
-	undef,
-	['main', '* * * * *' , 10, '/opt/zabbix/scripts/slv/rsm.slv.dnssec.avail.pl'   , SLV_LOG_FILE],
-	['main', '* * * * *' , 20, '/opt/zabbix/scripts/slv/rsm.slv.dnssec.rollweek.pl', SLV_LOG_FILE],
-	undef,
-	['main', '* * * * *' , 10, '/opt/zabbix/scripts/slv/rsm.slv.rdds.avail.pl'     , SLV_LOG_FILE],
-	['main', '* * * * *' , 20, '/opt/zabbix/scripts/slv/rsm.slv.rdds.rollweek.pl'  , SLV_LOG_FILE],
-	['main', '* * * * *' , 20, '/opt/zabbix/scripts/slv/rsm.slv.rdds.downtime.pl'  , SLV_LOG_FILE],
-	['main', '* * * * *' , 30, '/opt/zabbix/scripts/slv/rsm.slv.rdds.rtt.pl'       , SLV_LOG_FILE],
-	undef,
-	['main', '* * * * *' , 10, '/opt/zabbix/scripts/slv/rsm.slv.rdap.avail.pl'     , SLV_LOG_FILE],
-	['main', '* * * * *' , 20, '/opt/zabbix/scripts/slv/rsm.slv.rdap.rollweek.pl'  , SLV_LOG_FILE],
-	['main', '* * * * *' , 20, '/opt/zabbix/scripts/slv/rsm.slv.rdap.downtime.pl'  , SLV_LOG_FILE],
-	['main', '* * * * *' , 30, '/opt/zabbix/scripts/slv/rsm.slv.rdap.rtt.pl'       , SLV_LOG_FILE],
-	undef,
-	['main', '0 1 1 * *' , 0 , '/opt/zabbix/scripts/disable-rdds-for-rdap-hosts.pl', '/var/log/zabbix/disable-rdds-for-rdap-hosts.err'],
-	['main', '0 15 1 * *', 0 , '/opt/zabbix/scripts/sla-monthly-status.pl'         , '/var/log/zabbix/sla-monthly-status.err'],
-	['main', '0 15 1 * *', 0 , '/opt/zabbix/scripts/sla-report.php'                , '/var/log/zabbix/sla-report.err'],
-	undef,
-	['db'  , '0 23 * * *', 0 , '/opt/zabbix/scripts/MySQL_part_management.pl'      , '/var/log/zabbix/zabbix-mysql-partitioning'],
-	['db'  , '0 2 * * *' , 0 , '/opt/zabbix/scripts/MySQL_part_management.pl'      , '/var/log/zabbix/zabbix-mysql-partitioning'],
+	'# ignore missing home directory errors',
+	'HOME=/tmp',
+	'',
+	['main', '* * * * *' , 0, '/opt/zabbix/scripts/slv/rsm.probe.online.pl'                                                                                                            , SLV_LOG_FILE],
+	'',
+	['main', '* * * * *' , 0, '(/opt/zabbix/scripts/slv/rsm.slv.dns.avail.pl && /opt/zabbix/scripts/slv/rsm.slv.dns.rollweek.pl && /opt/zabbix/scripts/slv/rsm.slv.dns.downtime.pl)'   , SLV_LOG_FILE],
+	['main', '* * * * *' , 0, '(/opt/zabbix/scripts/slv/rsm.slv.rdds.avail.pl && /opt/zabbix/scripts/slv/rsm.slv.rdds.rollweek.pl && /opt/zabbix/scripts/slv/rsm.slv.rdds.downtime.pl)', SLV_LOG_FILE],
+	['main', '* * * * *' , 0, '(/opt/zabbix/scripts/slv/rsm.slv.rdap.avail.pl && /opt/zabbix/scripts/slv/rsm.slv.rdap.rollweek.pl && /opt/zabbix/scripts/slv/rsm.slv.rdap.downtime.pl)', SLV_LOG_FILE],
+	['main', '* * * * *' , 0, '(/opt/zabbix/scripts/slv/rsm.slv.dnssec.avail.pl && /opt/zabbix/scripts/slv/rsm.slv.dnssec.rollweek.pl)'                                                , SLV_LOG_FILE],
+	['main', '* * * * *' , 0, '(/opt/zabbix/scripts/slv/rsm.slv.dns.ns.avail.pl && /opt/zabbix/scripts/slv/rsm.slv.dns.ns.downtime.pl)'                                                , SLV_LOG_FILE],
+	'',
+	['main', '* * * * *' , 0, '/opt/zabbix/scripts/slv/rsm.slv.dns.udp.rtt.pl'                                                                                                         , SLV_LOG_FILE],
+	['main', '* * * * *' , 0, '/opt/zabbix/scripts/slv/rsm.slv.dns.tcp.rtt.pl'                                                                                                         , SLV_LOG_FILE],
+	['main', '* * * * *' , 0, '/opt/zabbix/scripts/slv/rsm.slv.rdds.rtt.pl'                                                                                                            , SLV_LOG_FILE],
+	['main', '* * * * *' , 0, '/opt/zabbix/scripts/slv/rsm.slv.rdap.rtt.pl'                                                                                                            , SLV_LOG_FILE],
+	'',
+	['main', '0 1 1 * *' , 0, '/opt/zabbix/scripts/disable-rdds-for-rdap-hosts.pl'                                                                                                     , '/var/log/zabbix/disable-rdds-for-rdap-hosts.err'],
+	['main', '0 15 1 * *', 0, '/opt/zabbix/scripts/sla-monthly-status.pl'                                                                                                              , '/var/log/zabbix/sla-monthly-status.err'],
+	['main', '0 15 1 * *', 0, '/opt/zabbix/scripts/sla-report.php'                                                                                                                     , '/var/log/zabbix/sla-report.err'],
+	'',
+	['db'  , '0 23 * * *', 0, '/opt/zabbix/scripts/MySQL_part_management.pl'                                                                                                           , '/var/log/zabbix/zabbix-mysql-partitioning'],
+	['db'  , '0 2 * * *' , 0, '/opt/zabbix/scripts/MySQL_part_management.pl'                                                                                                           , '/var/log/zabbix/zabbix-mysql-partitioning'],
 );
 
 sub main()
 {
-	parse_opts('enable-main', 'enable-db-partitioning', 'enable-all', 'disable-all', 'delete-all');
+	parse_opts('enable-main', 'enable-db-partitioning', 'enable-all', 'disable-all', 'delete-all', 'user=s');
 	setopt('nolog');
 
+	if (opt('user'))
+	{
+		$JOB_USER = getopt('user');
+	}
 	if (opt('enable-main'))
 	{
 		usage("Cannot use --enable-main with --enable-all") if (opt('enable-all'));
@@ -103,9 +102,9 @@ sub create_all($$)
 	my $enable_main = shift;
 	my $enable_db   = shift;
 
-	my $timing_len = max(map(defined($_) ? length($_->[1]) : 0, @cron_jobs));
-	my $delay_len  = max(map(defined($_) ? length($_->[2]) : 0, @cron_jobs));
-	my $script_len = max(map(defined($_) ? length($_->[3]) : 0, @cron_jobs));
+	my $timing_len = max(map(ref($_) eq 'ARRAY'                 ? length($_->[1]) : 0, @cron_jobs));
+	my $delay_len  = max(map(ref($_) eq 'ARRAY' && $_->[2] != 0 ? length($_->[2]) : 0, @cron_jobs));
+	my $script_len = max(map(ref($_) eq 'ARRAY'                 ? length($_->[3]) : 0, @cron_jobs));
 
 	my $group_status = {
 		"main" => $enable_main ? "" : "#",
@@ -116,16 +115,24 @@ sub create_all($$)
 
 	for my $job (@cron_jobs)
 	{
-		if (defined($job))
+		if (ref($job) eq 'ARRAY')
 		{
 			my ($group, $timing, $delay, $script, $logfile) = @{$job};
 
-			$crontab .= sprintf("%s%-${timing_len}s root sleep %${delay_len}d; %-${script_len}s >> %s 2>&1\n",
-					$group_status->{$group}, $timing, $delay, $script, $logfile);
+			my $sleep = (
+				$delay ?
+				sprintf("sleep %${delay_len}d; ", $delay) :
+				sprintf(($delay_len ? "        %${delay_len}s" : "%${delay_len}s"), "")
+			);
+
+			$crontab .= sprintf(
+				"%s%-${timing_len}s $JOB_USER %s%-${script_len}s >> %s 2>&1\n",
+				$group_status->{$group}, $timing, $sleep, $script, $logfile
+			);
 		}
 		else
 		{
-			$crontab .= "\n";
+			$crontab .= "$job\n";
 		}
 	}
 
@@ -166,31 +173,35 @@ setup-cron.pl - setup cron jobs.
 
 =head1 SYNOPSIS
 
-setup-cron.pl [--enable-main] [--enable-db-partitioning] [--enable-all] [--disable-all] [--delete-all] [--help]
+setup-cron.pl [--enable-main] [--enable-db-partitioning] [--enable-all] [--disable-all] [--delete-all] [--user user] [--help]
 
 =head1 OPTIONS
 
 =over 8
 
-=item B<--enable-main> int
+=item B<--enable-main>
 
-Enable main cron jobs. These are jobs for SLV scripts (executed every minute) and some jobs that are executed once per month.
+Enable only main cron jobs. These are jobs for SLV scripts (executed every minute) and some jobs that are executed once per month.
 
-=item B<--enable-db-partitioning> int
+=item B<--enable-db-partitioning>
 
-Enable DB partitioning cron jobs.
+Enable only DB partitioning cron jobs.
 
-=item B<--enable-all> int
+=item B<--enable-all>
 
 Enable all cron jobs.
 
-=item B<--disable-all> int
+=item B<--disable-all>
 
 Disable all cron jobs.
 
-=item B<--delete-all> int
+=item B<--delete-all>
 
-Delete cron jobs.
+Delete all cron jobs.
+
+=item B<--user> user
+
+Override the default "zabbix" cron job user.
 
 =item B<--help>
 
