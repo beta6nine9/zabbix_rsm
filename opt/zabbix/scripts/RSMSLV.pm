@@ -116,6 +116,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		get_macro_incident_rdap_fail get_macro_incident_rdap_recover
 		get_monitoring_target
 		get_rdap_standalone_ts is_rdap_standalone
+		get_dns_minns
 		get_itemid_by_key get_itemid_by_host
 		get_itemid_by_hostid get_itemid_like_by_hostid get_itemids_by_host_and_keypart get_lastclock
 		get_tlds get_tlds_and_hostids
@@ -190,6 +191,9 @@ my $rdap_standalone_ts; # see get_rdap_standalone_ts()
 
 sub get_macro_minns()
 {
+	# TODO: replace calls to this function with calls to get_dns_minns($rsmhost, $clock)
+	# TODO: remove this function, global macro {$RSM.DNS.AVAIL.MINNS} does not exist anymore
+	...;
 	return __get_macro('{$RSM.DNS.AVAIL.MINNS}');
 }
 
@@ -434,6 +438,64 @@ sub is_rdap_standalone(;$)
 	my $ts = get_rdap_standalone_ts();
 
 	return defined($ts) && $now >= $ts ? 1 : 0;
+}
+
+my $dns_minns_cache;
+
+sub get_dns_minns($$)
+{
+	my $rsmhost = shift;
+	my $clock   = shift;
+
+	if (!defined($dns_minns_cache))
+	{
+		my $sql = "select" .
+				" rsmhost.value," .
+				"minns.value" .
+			" from" .
+				" hostmacro as rsmhost," .
+				"hostmacro as minns" .
+			" where" .
+				" rsmhost.hostid=minns.hostid and" .
+				" rsmhost.macro='{\$RSM.TLD}' and" .
+				" minns.macro='{\$RSM.TLD.DNS.AVAIL.MINNS}'";
+		my $rows = db_select($sql);
+
+		foreach my $row (@{$rows})
+		{
+			my ($rsmhost, $macro) = @{$row};
+
+			if ($macro =~ /^(\d+)(?:;(\d+):(\d+))?$/)
+			{
+				$dns_minns_cache->{$rsmhost} = {
+					'curr_value' => $1,
+					'next_clock' => $2,
+					'next_value' => $3,
+				};
+			}
+			else
+			{
+				fail("invalid value of {\$RSM.TLD.DNS.AVAIL.MINNS} for '$rsmhost': '$macro'");
+			}
+
+		}
+	}
+
+	if (!exists($dns_minns_cache->{$rsmhost}))
+	{
+		fail("unknown rsmhost '$rsmhost'");
+	}
+
+	my $minns = $dns_minns_cache->{$rsmhost};
+
+	if (!defined($minns->{'next_clock'}) || $clock < $minns->{'next_clock'})
+	{
+		return $minns->{'curr_clock'};
+	}
+	else
+	{
+		return $minns->{'next_clock'};
+	}
 }
 
 sub get_itemid_by_key

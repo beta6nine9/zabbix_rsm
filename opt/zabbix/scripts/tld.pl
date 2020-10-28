@@ -75,7 +75,7 @@ sub main()
 	}
 	elsif(opt('get-dns-minns'))
 	{
-		get_dns_minns(getopt('tld'));
+		show_dns_minns(getopt('tld'));
 	}
 	elsif (opt('get-nsservers-list'))
 	{
@@ -483,7 +483,7 @@ sub get_rsmhost_config($)
 # get minimum number of the available nameservers
 ################################################################################
 
-sub get_dns_minns($)
+sub show_dns_minns($)
 {
 	my $rsmhost = shift;
 
