@@ -1,3 +1,10 @@
+Changes for rsm2.1.0rc6
+
+Bug fixes:
+....I..... [736] fixed internal error rate item configuration (dimir)
+....I..... [735] added functionality to re-login in case saved session ID becomes invalid (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.1.0rc5
 
 Bug fixes:
