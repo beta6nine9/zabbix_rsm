@@ -298,7 +298,7 @@ if ($data['tld']) {
 					}
 
 					$rollweek_value = ($tld[$service]['lastvalue'] > 0)
-						? (new CLink(
+						? new CLink(
 							$tld[$service]['lastvalue'].'%',
 							Url::getFor($tld['url'], 'rsm.incidents', [
 								'host' => $tld['host'],
@@ -306,8 +306,8 @@ if ($data['tld']) {
 								'rolling_week' => 1,
 								'filter_set' => 1,
 							])
-							))->addClass('first-cell-value')
-						: (new CSpan('0.000%'))->addClass('first-cell-value');
+							)
+						: new CSpan('0.000%');
 
 					if ($tld[$service]['clock']) {
 						$rollweek_value->setHint(date(DATE_TIME_FORMAT_SECONDS, $tld[$service]['clock']), '', false);
@@ -323,18 +323,32 @@ if ($data['tld']) {
 							'cell-value')
 						: null;
 
-					$row[] = [(new CSpan($rollweek_value))->addClass('right'), $rollweek_status, SPACE, $rollweek_graph, $rdds_subservices];
+					$row[] = [
+						(new CSpan($rollweek_value))->addClass('rolling-week-value'),
+						$rollweek_status,
+						SPACE,
+						(new CSpan($rollweek_graph))->addClass('rolling-week-graph'),
+						$rdds_subservices
+					];
 				}
 				else {
-					$row[] = [(new CDiv())
-						->addClass('service-icon status_icon_extra iconrollingweeknodata disabled-service')
-						->setHint(_('No data yet'), '', false), $rdds_subservices];
+					$row[] = [
+						(new CSpan(''))->addClass('rolling-week-value'),
+						(new CDiv())
+							->addClass('service-icon status_icon_extra iconrollingweeknodata disabled-service')
+							->setHint(_('No data yet'), '', false),
+						(new CSpan(null))->addClass('rolling-week-graph'),
+						$rdds_subservices
+					];
 				}
 			}
 			else {
-				$row[] = (new CDiv())
-					->addClass('service-icon status_icon_extra iconrollingweekdisabled disabled-service')
-					->setHint(_("$service_name is disabled"), '', false);
+				$row[] = [
+					(new CSpan(null))->addClass('rolling-week-value'),
+					(new CDiv())
+						->addClass('service-icon status_icon_extra iconrollingweekdisabled disabled-service')
+						->setHint(_("$service_name is disabled"), '', false)
+				];
 			}
 		}
 

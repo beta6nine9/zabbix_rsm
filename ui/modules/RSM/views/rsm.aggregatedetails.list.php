@@ -21,6 +21,15 @@
 
 use Modules\RSM\Helpers\CTableInfo;
 
+// NSIDs converted from hex to ASCII
+$nsids_converted = [];
+if ($data['nsids']) {
+	foreach ($data['nsids'] as $index => $value) {
+		$value = chunk_split($value, 2, ' ').' ("'.hex2bin($value).'")';
+		$nsids_converted[$index] = $value;
+	}
+}
+
 // Create table header.
 $rows = [
 	(new CRow(null, true))
@@ -138,9 +147,9 @@ foreach ($data['probes'] as $probe) {
 							$span->addClass($class);
 							$row[] = $span;
 
-							if (isset($probe['results_nsid'][$dns_udp_ns][$ip])) {
+							if (isset($probe['results_nsid'][$dns_udp_ns][$ip]) && is_numeric($probe['results_nsid'][$dns_udp_ns][$ip])) {
 								$nsid_index = $probe['results_nsid'][$dns_udp_ns][$ip];
-								$row[] = (new CDiv($nsid_index + 1))->setHint($data['nsids'][$nsid_index]);
+								$row[] = (new CDiv($nsid_index + 1))->setHint($nsids_converted[$nsid_index]);
 							}
 							else {
 								$row[] = '';
@@ -234,9 +243,7 @@ if ($data['nsids']) {
 		->setAttribute('class', ZBX_STYLE_LIST_TABLE);
 
 	foreach ($data['nsids'] as $index => $value) {
-		// Show NSID value in similar dig syntax.
-		$value = chunk_split($value, 2, ' ').' ("'.hex2bin($value).'")';
-		$nsids_table->addRow([(new CCol($index + 1))->addClass(ZBX_STYLE_CENTER), $value]);
+		$nsids_table->addRow([(new CCol($index + 1))->addClass(ZBX_STYLE_CENTER), $nsids_converted[$index]]);
 	}
 
 	$table = [new CTag('p', true, $table), $nsids_table];

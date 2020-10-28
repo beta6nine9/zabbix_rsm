@@ -45,7 +45,7 @@ foreach ($data['tests'] as $test) {
 		new CLink(
 			_('Details'),
 			(new CUrl('zabbix.php'))
-				->setArgument('action', 'rsm.particulartests')
+				->setArgument('action', ($data['type'] == RSM_DNS || $data['type'] == RSM_DNSSEC) ? 'rsm.aggregatedetails' : 'rsm.particulartests')
 				->setArgument('slvItemId', $data['slvItemId'])
 				->setArgument('host', $data['tld']['host'])
 				->setArgument('time', $test['clock'])

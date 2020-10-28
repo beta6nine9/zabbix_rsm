@@ -1,3 +1,42 @@
+Changes for rsm2.1.0rc6
+
+Bug fixes:
+....I..... [736] fixed internal error rate item configuration (dimir)
+....I..... [735] added functionality to re-login in case saved session ID becomes invalid (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.1.0rc5
+
+Bug fixes:
+....I..... [734] fixed targetIP and minNameServersUp in measurement files (dimir)
+..F....... [733] fixed vertical align of data on Rolling week status page (gcalenko)
+.......PS. [732] fixed incorrect log handle processing when resolver check fails (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.1.0rc4
+
+Bug fixes:
+..F....... [731] fixed displaying zero values in Probe statistics in top-right corner (dimir)
+..F....... [730] fixed NSID handling on DNS Test details page (dimir)
+..F....... [729] kept link names as "Details", rename details page titles to "Test details" (dimir)
+....I..... [728] added generating SLA API v2 files for other services than RDAP (dimir)
+....I..... [sub-724] removed "sleep" statements from the cron jobs (dimir)
+....I..... [727] fixed PHP error when monitoring target is "registrar" (dimir)
+..F....... [726] fixed PHP warning when clicking the red icon on Rolling week status page (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.1.0rc3
+
+Bug fixes:
+....I..... [sub-724] added cron job grouping (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.1.0rc2
+
+Bug fixes:
+....I..... [724] fixed cron job user, add ability to override it when using setup-cron.pl script (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.1.0rc1
 
 New features:

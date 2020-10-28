@@ -36,63 +36,89 @@ use constant _LOGIN_TIMEOUT => 5;
 use constant _DEFAULT_REQUEST_TIMEOUT => 60;
 use constant _DEFAULT_REQUEST_ATTEMPTS => 10;
 
-my ($REQUEST_TIMEOUT, $REQUEST_ATTEMPTS, $AUTH_FILE, $DEBUG);
+my ($_OPTIONS, $AUTH_FILE);
 
 sub new($$) {
-    my ($class, $options) = @_;
-
-    $DEBUG = $options->{'debug'};
-    undef($options->{'debug'});
+    my $class;
+    ($class, $_OPTIONS) = @_;
 
     my $ua = LWP::UserAgent->new();
 
 #    $ua->ssl_opts(verify_hostname => 0);
 
-    $REQUEST_TIMEOUT = (defined($options->{request_timeout}) ? $options->{request_timeout} : _DEFAULT_REQUEST_TIMEOUT);
-    $REQUEST_ATTEMPTS = (defined($options->{request_attempts}) ? $options->{request_attempts} : _DEFAULT_REQUEST_ATTEMPTS);
-
     $ua->agent("Net::Zabbix");
 
-    my $req = HTTP::Request->new(POST => $options->{'url'}."/api_jsonrpc.php");
+    my $req = HTTP::Request->new(POST => $_OPTIONS->{'url'}."/api_jsonrpc.php");
 
-    $req->authorization_basic($options->{user}, $options->{password}) if ($options->{auth_basic});
+    $req->authorization_basic($_OPTIONS->{user}, $_OPTIONS->{password}) if ($_OPTIONS->{auth_basic});
 
     $req->content_type('application/json-rpc');
 
-    my $domain = $options->{'url'};
+    my $domain = $_OPTIONS->{'url'};
     $domain =~ s,^https*\://(.+)/*$,$1,;
     $domain =~ s,/,-,g;
     $AUTH_FILE = '/tmp/'.$domain.'.tmp';
 
-    print("AUTH_FILE: $AUTH_FILE\n") if ($DEBUG);
+    print("AUTH_FILE: $AUTH_FILE\n") if ($_OPTIONS->{'debug'});
 
     if (my $authid = get_authid()) {
 
-	print("Using previous authid: $authid\n") if ($DEBUG);
+	print("Checking previous authid: $authid\n") if ($_OPTIONS->{'debug'});
 
-	$ua->timeout($REQUEST_TIMEOUT);
+	my $request = encode_json({
+		jsonrpc => "2.0",
+		method  => "user.checkAuthentication",
+		params  => {
+			sessionid => $authid,
+		},
+		id => 1,
+	});
 
-	my $self = {
-            UserAgent => $ua,
-            request   => $req,
-            count     => 0,
-            auth      => $authid,
-            error => undef,
-            };
+	print("REQUEST:\n", Dumper($request), "\n") if ($_OPTIONS->{'debug'});
 
-	bless( $self, $class );
+	$req->content($request);
 
-	return bless ($self, $class) if defined $self->api_version();
+	$ua->timeout(_LOGIN_TIMEOUT);
+
+	my $res = $ua->request($req);
+
+	croak "cannot connect to Zabbix: " . $res->status_line unless ($res->is_success);
+
+	my $result;
+
+	eval { $result = decode_json($res->content) };
+	croak "Zabbix API returned invalid JSON: " . $@ if $@;
+
+	print("REPLY:\n", Dumper($result), "\n") if ($_OPTIONS->{'debug'});
+
+	if (!defined($result->{'error'}))
+	{
+		print("Using previous authid: $authid\n") if ($_OPTIONS->{'debug'});
+
+		$ua->timeout($_OPTIONS->{request_timeout} // _DEFAULT_REQUEST_TIMEOUT);
+
+		my $self = {
+			UserAgent => $ua,
+			request   => $req,
+			count     => 0,
+			auth      => $authid,
+			error => undef,
+		};
+
+		bless($self, $class);
+
+		return bless($self, $class) if (defined($self->api_version()));
+        }
     }
 
-    print("no authid in the file, logging in...\n") if ($DEBUG);
+    print("no or invalid authid in the file, logging in...\n") if ($_OPTIONS->{'debug'});
 
     my $request = encode_json( {
 	    jsonrpc => "2.0",
        method => "user.login",
         params => {
-            user => $options->{user},
-            password => $options->{password},
+            user => $_OPTIONS->{user},
+            password => $_OPTIONS->{password},
         },
         id => 1,
     });
@@ -103,7 +129,7 @@ sub new($$) {
 
     while ($login_attempts--)
     {
-	print("REQUEST:\n", Dumper($request), "\n") if ($DEBUG);
+	print("REQUEST:\n", Dumper($request), "\n") if ($_OPTIONS->{'debug'});
 
 	$req->content($request);
 
@@ -111,20 +137,20 @@ sub new($$) {
 
 	my $res = $ua->request($req);
 
-	$ua->timeout($REQUEST_TIMEOUT);
+	$ua->timeout($_OPTIONS->{request_timeout} // _DEFAULT_REQUEST_TIMEOUT);
 
 	croak "cannot connect to Zabbix: " . $res->status_line unless ($res->is_success);
 
 	eval { $result = decode_json($res->content) };
 	croak "Zabbix API returned invalid JSON: " . $@ if $@;
 
-	print("REPLY:\n", Dumper($result), "\n") if ($DEBUG);
+	print("REPLY:\n", Dumper($result), "\n") if ($_OPTIONS->{'debug'});
 
 	if (defined($result->{'error'}))
 	{
 	    last unless ($result->{'error'}->{'data'} =~ /Session terminated/);
 	}
-    }
+   }
 
     croak "cannot connect to Zabbix: " . $result->{'error'}->{'message'} . ' ' . $result->{'error'}->{'data'} if (defined($result->{'error'}));
 
@@ -529,8 +555,10 @@ sub __send_request {
 
     $req->content(to_ascii(encode_json($request)));
 
+    print("REQUEST:\n", Dumper($req), "\n") if ($_OPTIONS->{'debug'});
+
     my $res;
-    my $attempts = $REQUEST_ATTEMPTS;
+    my $attempts = $_OPTIONS->{request_attempts} // _DEFAULT_REQUEST_ATTEMPTS;
     my $sleep = 1;
 
     while ($attempts-- > 0) {
@@ -548,20 +576,16 @@ sub __send_request {
 
     my $result = decode_json($res->content);
 
-    if (defined($result->{'error'})) {
-	if ($result->{'error'}->{'data'} =~ /Session terminated/) {
-		delete_authid();
-	}
-	else
-	{
-		print("REQUEST FAILED:\n", Dumper($req), "\n");
-		print("REPLY:\n", Dumper($result), "\n");
-	}
+    if ($_OPTIONS->{'debug'}) {
+        if (defined($result->{'error'})) {
+            print("REQUEST FAILED! ");
+        }
 
+        print("REPLY:\n", Dumper($result), "\n") if ($_OPTIONS->{'debug'});
     }
-    elsif ($DEBUG) {
-	print("REQUEST:\n", Dumper($req), "\n");
-	print("REPLY:\n", Dumper($result), "\n");
+
+    if (defined($result->{'error'}) && $result->{'error'}{'data'} =~ /Session terminated/) {
+        delete_authid();
     }
 
     return $result;

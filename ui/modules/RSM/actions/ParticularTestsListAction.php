@@ -809,7 +809,7 @@ class ParticularTestsListAction extends Action {
 
 	protected function doAction() {
 		$data = [
-			'title'	=> _('Details of particular test'),
+			'title'	=> _('Test details'),
 			'module_style' => $this->module->getStyle(),
 			'host' => $this->getInput('host', null),
 			'time' => $this->getInput('time', null),
