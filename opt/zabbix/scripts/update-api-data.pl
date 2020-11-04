@@ -251,11 +251,13 @@ my ($from, $till) = get_real_services_period(\%services, $check_from, $check_til
 
 if (opt('print-period'))
 {
-	info("selected period: ", selected_period($from, $till));
+	info(sprintf("SELECTED %6s period: %s", "TOTAL", selected_period($from, $till)));
 	foreach my $service (sort(keys(%services)))
 	{
 		next if (!defined($services{$service}{'from'}));
-		info("  $service\t: ", selected_period($services{$service}{'from'}, $services{$service}{'till'}));
+		info(sprintf("selected %6s period: %s",
+				$service,
+				selected_period($services{$service}{'from'}, $services{$service}{'till'})));
 	}
 }
 else

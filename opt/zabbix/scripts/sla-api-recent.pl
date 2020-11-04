@@ -473,7 +473,7 @@ sub process_tld($$$$$)
 
 		if (opt('print-period'))
 		{
-			info(sprintf("selected %4s period: %s", $service, selected_period($cycles_from, $cycles_till)));
+			info(sprintf("selected %6s period: %s", $service, selected_period($cycles_from, $cycles_till)));
 		}
 
 		# TODO: leave only next line after migrating to Standalone RDAP

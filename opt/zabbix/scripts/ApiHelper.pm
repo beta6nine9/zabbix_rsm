@@ -427,10 +427,18 @@ sub ah_save_incident($$$$$$$$$)
 	# The false_positive changes will be updated later, when calling ah_save_false_positive().
 
 	my $buf;
-	if (__read_inc_file($version, $tld, $service, $eventid, $start, AH_FALSE_POSITIVE_FILE, \$buf) == AH_FAIL)
+	if (__read_inc_file($version, $tld, $service, $eventid, $start, AH_FALSE_POSITIVE_FILE, \$buf) == AH_SUCCESS)
 	{
-		return __save_inc_false_positive($version, $inc_path, $false_positive, undef);
+		my $current_json = decode_json($buf);
+
+		if ($false_positive eq $current_json->{'falsePositive'})
+		{
+			# content hasn't changed
+			return AH_SUCCESS;
+		}
 	}
+
+	return __save_inc_false_positive($version, $inc_path, $false_positive, undef);
 }
 
 sub __read_file($$)
@@ -475,7 +483,7 @@ sub __copy_file($$$)
 	return AH_SUCCESS;
 }
 
-# read an old file from incident directory
+# read current file from incident directory
 sub __read_inc_file($$$$$$$)
 {
 	my $version = shift;
@@ -488,7 +496,7 @@ sub __read_inc_file($$$$$$$)
 
 	$file = AH_SLA_API_DIR . '/' . __gen_inc_path($version, $tld, $service, $eventid, $start) . '/' . $file;
 
-	RSMSLV::dbg("file: $file");
+	RSMSLV::dbg("reading file: $file");
 
 	return __read_file($file, $buf_ref);
 }
