@@ -1335,7 +1335,11 @@ sub calculate_cycle($$$$$$$$$)
 
 						if (exists($metric->{'nsid'}))
 						{
-							$h->{'nsid'} = $metric->{'nsid'};
+							$h->{'nsid'} = (
+								$metric->{'nsid'} eq ''
+								? undef
+								: $metric->{'nsid'}
+							);
 						}
 
 						push(@{$tested_interfaces{$tested_interface}{$probe}{'testData'}{$target}}, $h);
