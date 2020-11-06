@@ -1033,8 +1033,12 @@ foreach (@server_keys)
 				}
 			}
 
-			# 707: it was agreed state file should only be in v1
 			if (ah_save_state(AH_SLA_API_VERSION_1, $ah_tld, $json_state_ref) != AH_SUCCESS)
+			{
+				fail("cannot save TLD state: ", ah_get_error());
+			}
+
+			if (ah_save_state(AH_SLA_API_VERSION_2, $ah_tld, $json_state_ref) != AH_SUCCESS)
 			{
 				fail("cannot save TLD state: ", ah_get_error());
 			}
