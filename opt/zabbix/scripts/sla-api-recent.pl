@@ -1388,7 +1388,7 @@ sub calculate_cycle($$$$$$$$$)
 						$results->{$service}{$cycleclock}{'interfaces'}{$interface}{'testedname'};
 				}
 
-				# interface tested name, it's TCP if unspecified
+				# interface transport protocol, it's TCP if unspecified
 				if (exists($results->{$service}{$cycleclock}{'interfaces'}{$interface}{'protocol'}) &&
 						($results->{$service}{$cycleclock}{'interfaces'}{$interface}{'protocol'} == PROTO_UDP))
 				{
@@ -1622,7 +1622,7 @@ sub calculate_cycle($$$$$$$$$)
 		fail("cannot save recent measurement: ", ah_get_error());
 	}
 
-	# the first version had no RDAP and no additional stuff that appeared in version 2
+	# the first version had no RDAP and no additional things that appeared in version 2, so let's remove them
 	if ($service ne 'rdap')
 	{
 		delete($json->{'minNameServersUp'});

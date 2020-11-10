@@ -1,3 +1,12 @@
+Changes for rsm2.1.0rc7
+
+Bug fixes:
+....I..... [741] fixed missing DNSSEC metrics in SLA API measurement files (dimir)
+....I..... [740] added back v2 monitoring/state files (dimir)
+....I..... [737] fixed marking incident as false positive in SLA API (dimir)
+....I..... [738] changed empty NSID to be saved as null in recent measurement file (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.1.0rc6
 
 Bug fixes:
