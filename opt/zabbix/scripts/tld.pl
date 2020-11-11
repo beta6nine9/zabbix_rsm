@@ -500,7 +500,7 @@ sub parse_dns_minns_macro($)
 	}
 	else
 	{
-		fail("unexpected value/format of macro: $old_minns_macro");
+		fail("unexpected value/format of macro: $macro");
 	}
 }
 
@@ -1264,7 +1264,6 @@ sub create_rsmhost_template($$)
 	return $config_templateid;
 }
 
-
 sub build_dns_minns_macro($)
 {
 	my $old_minns_macro = shift;
@@ -1401,8 +1400,6 @@ sub build_dns_minns_macro($)
 
 	return $new_minns_macro;
 }
-
-
 
 sub get_sensdata($)
 {
