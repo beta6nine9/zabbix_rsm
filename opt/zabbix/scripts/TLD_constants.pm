@@ -99,7 +99,7 @@ use constant RSM_VALUE_MAPPINGS => {
 	'rsm_probe'       => 100
 };
 
-use constant AUDIT_RESOURCE_INCIDENT => 32;
+use constant AUDIT_RESOURCE_INCIDENT => 132;
 
 use constant RSM_TRIGGER_THRESHOLDS => {
 	'1' => {'threshold' => '10', 'priority' => 2},
