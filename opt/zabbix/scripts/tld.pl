@@ -29,6 +29,10 @@ my $exp_output;
 my $trigger_thresholds = RSM_TRIGGER_THRESHOLDS;
 my $cfg_global_macros = CFG_GLOBAL_MACROS;
 
+use constant DNS_MINNS_DEFAULT		=> 2;
+use constant DNS_MINNS_OFFSET_MINUTES	=> 15;
+use constant DNS_MINNS_OFFSET		=> DNS_MINNS_OFFSET_MINUTES * 60;
+
 ################################################################################
 # main
 ################################################################################
@@ -144,7 +148,7 @@ sub init_cli_opts($)
 			"epp-servercert=s",
 			"ns-servers-v4=s",
 			"ns-servers-v6=s",
-			"dns-minns=i",
+			"dns-minns=s",
 			"rdds-ns-string=s",
 			"root-servers=s",
 			"server-id=s",
@@ -192,10 +196,6 @@ sub validate_input($)
 		elsif (!opt('ns-servers-v4') && !opt('ns-servers-v6'))
 		{
 			$msg .= "at least one of the --ns-servers-v4,--ns-servers-v6 options must be specified\n";
-		}
-		elsif (!opt('dns-minns'))
-		{
-			$msg .= "--dns-minns must be specified\n";
 		}
 	}
 
@@ -408,6 +408,7 @@ sub list_services(;$)
 		'{$RSM.TLD.RDDS.43.SERVERS}',
 		'{$RSM.TLD.RDDS.80.SERVERS}',
 		'{$RSM.RDDS43.TEST.DOMAIN}',
+		'dns_minns',
 	);
 
 	my @rsmhosts = ($rsmhost // get_tld_list());
@@ -461,6 +462,10 @@ sub get_rsmhost_config($)
 	# save rsmhost type (e. g. gTLD)
 	$result->{'type'} = first { exists($tld_types{$_}) } map($_->{'name'}, @{$rsmhost_host->{'groups'}});
 
+	# save DNS minns
+	my ($minns_macro) = grep($_->{'macro'} eq '{$RSM.TLD.DNS.AVAIL.MINNS}', @{$macros});
+	$result->{'dns_minns'} = parse_dns_minns_macro($minns_macro->{'value'});
+
 	# save macros
 	map { $result->{$_->{'macro'}} = $_->{'value'} } @{$macros};
 
@@ -472,6 +477,31 @@ sub get_rsmhost_config($)
 	}
 
 	return $result;
+}
+
+sub parse_dns_minns_macro($)
+{
+	my $macro = shift;
+
+	if ($macro =~ /^(\d+)(?:;(\d+):(\d+))?$/)
+	{
+		my $curr_minns  = $1;
+		my $sched_clock = $2;
+		my $sched_minns = $3;
+
+		if (!defined($sched_clock) || cycle_start($^T, 60) < $sched_clock)
+		{
+			return $curr_minns;
+		}
+		else
+		{
+			return $sched_minns;
+		}
+	}
+	else
+	{
+		fail("unexpected value/format of macro: $old_minns_macro");
+	}
 }
 
 ################################################################################
@@ -1131,7 +1161,23 @@ sub create_rsmhost_template($$)
 	my $rsmhost = shift;
 	my $opt_ns_servers = shift;
 
-	my $config_templateid = really(create_template(TEMPLATE_RSMHOST_CONFIG_PREFIX . $rsmhost));
+	my $config_template = get_template(TEMPLATE_RSMHOST_CONFIG_PREFIX . $rsmhost, 1, 0);
+	my $config_templateid;
+
+	my $dns_minns;
+
+	if (%{$config_template})
+	{
+		$config_templateid = $config_template->{'templateid'};
+
+		my ($minns_macro) = grep($_->{'macro'} eq '{$RSM.TLD.DNS.AVAIL.MINNS}', @{$config_template->{'macros'}});
+
+		$dns_minns = build_dns_minns_macro($minns_macro->{'value'});
+	}
+	else
+	{
+		$dns_minns = build_dns_minns_macro(undef);
+	}
 
 	my $rdds43_test_domain;
 	if (opt('rdds-test-prefix'))
@@ -1150,13 +1196,15 @@ sub create_rsmhost_template($$)
 		$rdds43_test_domain = getopt('rdds43-test-domain');
 	}
 
+	$config_templateid //= really(create_template(TEMPLATE_RSMHOST_CONFIG_PREFIX . $rsmhost));
+
 	really(create_macro('{$RSM.TLD}', $rsmhost, $config_templateid));
 	really(create_macro('{$RSM.DNS.TESTPREFIX}', getopt('dns-test-prefix'), $config_templateid, 1));
 	really(create_macro('{$RSM.RDDS43.TEST.DOMAIN}', $rdds43_test_domain, $config_templateid, 1)) if (defined($rdds43_test_domain));
 	really(create_macro('{$RSM.RDDS.NS.STRING}', opt('rdds-ns-string') ? getopt('rdds-ns-string') : CFG_DEFAULT_RDDS_NS_STRING, $config_templateid, 1));
 	really(create_macro('{$RSM.TLD.DNS.UDP.ENABLED}', getopt('dns-udp'), $config_templateid, 1));
 	really(create_macro('{$RSM.TLD.DNS.TCP.ENABLED}', getopt('dns-tcp'), $config_templateid, 1));
-	really(create_macro('{$RSM.TLD.DNS.AVAIL.MINNS}', getopt('dns-minns'), $config_templateid, 1));
+	really(create_macro('{$RSM.TLD.DNS.AVAIL.MINNS}', $dns_minns, $config_templateid, 1));
 	really(create_macro('{$RSM.TLD.DNSSEC.ENABLED}', getopt('dnssec'), $config_templateid, 1));
 	really(create_macro('{$RSM.TLD.RDDS.ENABLED}', opt('rdds43-servers') ? 1 : 0, $config_templateid, 1));
 	really(create_macro('{$RSM.TLD.RDDS.43.SERVERS}', getopt('rdds43-servers') // '', $config_templateid, 1));
@@ -1215,6 +1263,146 @@ sub create_rsmhost_template($$)
 
 	return $config_templateid;
 }
+
+
+sub build_dns_minns_macro($)
+{
+	my $old_minns_macro = shift;
+
+	my $new_minns_macro;
+
+	if (!defined($old_minns_macro)) # if (new tld) ...
+	{
+		if (!opt('dns-minns'))
+		{
+			$new_minns_macro = DNS_MINNS_DEFAULT;
+		}
+		else
+		{
+			# opt for new tld - "<curr_minns>" or "<curr_minns>;<sched_minns>;<sched_clock>"
+			if (getopt('dns-minns') =~ /^(\d+)(?:;(\d+);(\d+))?$/)
+			{
+				my $curr_minns  = $1;
+				my $sched_minns = $2;
+				my $sched_clock = $3;
+
+				if (defined($sched_clock))
+				{
+					$sched_clock = cycle_start($sched_clock, 60);
+
+					if ($sched_clock <= cycle_start($^T, 60))
+					{
+						undef $sched_clock;
+						undef $sched_minns;
+					}
+				}
+
+				if (defined($sched_clock) && $sched_minns != $curr_minns)
+				{
+					$new_minns_macro = "$curr_minns;$sched_clock:$sched_minns";
+				}
+				else
+				{
+					$new_minns_macro = $curr_minns;
+				}
+			}
+			else
+			{
+				fail("invalid value/format of --dns-minns: " . getopt('dns-minns'));
+			}
+		}
+	}
+	else # else if (existing tld) ...
+	{
+		if (!opt('dns-minns'))
+		{
+			$new_minns_macro = $old_minns_macro;
+		}
+		else
+		{
+			my $macro_curr_minns;
+			my $macro_sched_clock;
+			my $macro_sched_minns;
+
+			# macro - "<curr_minns>" or "<curr_minns>;<sched_clock>:<sched_minns>"
+			if ($old_minns_macro =~ /^(\d+)(?:;(\d+):(\d+))?$/)
+			{
+				$macro_curr_minns  = $1;
+				$macro_sched_clock = $2;
+				$macro_sched_minns = $3;
+			}
+			else
+			{
+				fail("unexpected value/format of macro: $old_minns_macro");
+			}
+
+			# opt for existing tld - "<sched_minns>" or "<sched_minns>;<sched_clock>"
+			if (getopt('dns-minns') =~ /^(\d+)(?:;(\d+))?$/)
+			{
+				my $opt_sched_minns = $1;
+				my $opt_sched_clock = $2;
+
+				if (defined($opt_sched_clock))
+				{
+					$opt_sched_clock = cycle_start($opt_sched_clock, 60);
+				}
+
+				if (defined($macro_sched_clock) && defined($opt_sched_clock) &&
+					$macro_sched_clock == $opt_sched_clock &&
+					$macro_sched_minns == $opt_sched_minns)
+				{
+					# macro already contains the same scheduling time and minns
+					return $old_minns_macro;
+				}
+
+				if (!defined($macro_sched_clock) && $macro_curr_minns == $opt_sched_minns)
+				{
+					# minns value is the same as current one (and currently change is not scheduled)
+					return $old_minns_macro;
+				}
+
+				if (defined($macro_sched_clock) && cycle_start($^T, 60) >= $macro_sched_clock - DNS_MINNS_OFFSET)
+				{
+					fail("change to $macro_sched_minns is already scheduled and will happen at $macro_sched_clock");
+				}
+
+				if (defined($opt_sched_clock))
+				{
+					if ($opt_sched_clock < cycle_start($^T, 60))
+					{
+						fail("scheduled time is in the past");
+					}
+					if ($opt_sched_clock < cycle_start($^T + DNS_MINNS_OFFSET, 60))
+					{
+						$opt_sched_clock = ts_full($opt_sched_clock);
+						fail("scheduled time '$opt_sched_clock' is too soon");
+					}
+				}
+				else
+				{
+					$opt_sched_clock = cycle_start($^T + DNS_MINNS_OFFSET, 60)
+				}
+
+				if ($macro_curr_minns == $opt_sched_minns)
+				{
+					$new_minns_macro = $macro_curr_minns;
+				}
+				else
+				{
+					$new_minns_macro = "$macro_curr_minns;$opt_sched_clock:$opt_sched_minns";
+				}
+			}
+			else
+			{
+				fail("invalid value/format of --dns-minns: " . getopt('dns-minns'));
+			}
+		}
+	}
+
+	return $new_minns_macro;
+}
+
+
 
 sub get_sensdata($)
 {
@@ -1542,8 +1730,8 @@ Other options
                 list of IPv4 name servers separated by space (name and IP separated by comma): "NAME,IP[ NAME,IP2 ...]"
         --ns-servers-v6=STRING
                 list of IPv6 name servers separated by space (name and IP separated by comma): "NAME,IP[ NAME,IP2 ...]"
-        --dns-minns=INT
-                set minimum number of the available nameservers
+        --dns-minns=INT|STRING
+                set minimum number of the available nameservers; use '<minns>;<timestamp>' to schedule the change
         --rdds43-servers=STRING
                 list of RDDS43 servers separated by comma: "NAME1,NAME2,..."
         --rdds80-servers=STRING
