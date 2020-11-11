@@ -1,3 +1,9 @@
+Changes for rsm2.1.0rc8
+
+Bug fixes:
+....I..... [sub-737] fixed functionality of toggling "false positive" flag of the resolved incident in SLA API (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.1.0rc7
 
 Bug fixes:
