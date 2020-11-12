@@ -468,9 +468,9 @@ sub get_dns_minns($$)
 			if ($macro =~ /^(\d+)(?:;(\d+):(\d+))?$/)
 			{
 				$dns_minns_cache->{$rsmhost} = {
-					'curr_value' => $1,
+					'curr_minns' => $1,
 					'next_clock' => $2,
-					'next_value' => $3,
+					'next_minns' => $3,
 				};
 			}
 			else
@@ -490,11 +490,11 @@ sub get_dns_minns($$)
 
 	if (!defined($minns->{'next_clock'}) || $clock < $minns->{'next_clock'})
 	{
-		return $minns->{'curr_clock'};
+		return $minns->{'curr_minns'};
 	}
 	else
 	{
-		return $minns->{'next_clock'};
+		return $minns->{'next_minns'};
 	}
 }
 
