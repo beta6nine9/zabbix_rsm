@@ -635,7 +635,7 @@ class ParticularTestsListAction extends Action {
 				}
 				elseif ($data['type'] == RSM_RDDS || $data['type'] == RSM_RDAP) {
 					if ($item['key_'] == PROBE_RDDS43_IP) {
-						$hosts[$item['hostid']]['rdds43']['ip'] = $itemValue['value'];
+						$hosts[$item['hostid']]['rdds43']['ip'] = $itemValue ? $itemValue['value'] : null;
 					}
 					elseif ($item['key_'] == PROBE_RDDS43_RTT) {
 						if (isset($itemValue['value'])) {
@@ -648,7 +648,7 @@ class ParticularTestsListAction extends Action {
 						}
 					}
 					elseif ($item['key_'] == PROBE_RDDS80_IP) {
-						$hosts[$item['hostid']]['rdds80']['ip'] = $itemValue['value'];
+						$hosts[$item['hostid']]['rdds80']['ip'] = $itemValue ? $itemValue['value'] : null;
 					}
 					elseif ($item['key_'] == PROBE_RDDS80_RTT) {
 						if (isset($itemValue['value'])) {
@@ -661,7 +661,7 @@ class ParticularTestsListAction extends Action {
 						}
 					}
 					elseif ($item['key_'] == PROBE_RDAP_IP) {
-						$hosts[$item['hostid']]['rdap']['ip'] = $itemValue['value'];
+						$hosts[$item['hostid']]['rdap']['ip'] = $itemValue ? $itemValue['value'] : null;
 					}
 					elseif ($item['key_'] == PROBE_RDAP_RTT) {
 						if (isset($itemValue['value'])) {
