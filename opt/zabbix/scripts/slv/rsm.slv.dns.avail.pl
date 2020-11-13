@@ -14,7 +14,7 @@ use RSM;
 use RSMSLV;
 use TLD_constants qw(:api);
 
-my $cfg_keys_in = ['rsm.dns.nssok'];
+my $cfg_keys_in = ['rsm.dns.status'];
 my $cfg_key_out = 'rsm.slv.dns.avail';
 my $cfg_value_type = ITEM_VALUE_TYPE_UINT64;
 
@@ -33,7 +33,6 @@ my $delay = get_dns_delay();
 my $max_clock = cycle_start(getopt('now') // time(), $delay);
 
 my $cfg_minonline = get_macro_dns_probe_online();
-my $cfg_minns = get_macro_minns();
 
 my $tlds_ref;
 if (opt('tld'))
@@ -76,7 +75,7 @@ process_slv_avail_cycles(
 
 slv_exit(SUCCESS);
 
-# SUCCESS - more than or equal to $cfg_minns Name Servers were tested successfully
+# SUCCESS - DNS Test status on the probe returned 1
 # E_FAIL  - otherwise
 sub check_probe_values
 {
@@ -85,7 +84,7 @@ sub check_probe_values
 	# E. g.:
 	#
 	# {
-	#	'rsm.dns.nssok' => [1]
+	#	'rsm.dns.status' => [1]
 	# }
 
 	if (scalar(keys(%{$values_ref})) == 0)
@@ -93,18 +92,12 @@ sub check_probe_values
 		fail("THIS SHOULD NEVER HAPPEN rsm.slv.dns.avail.pl:check_probe_values()");
 	}
 
-	if (1 > $cfg_minns)
-	{
-		wrn("number of required working Name Servers is configured as $cfg_minns");
-		return SUCCESS;
-	}
-
 	# stay on the safe side: if more than one value in cycle, use the positive one
 	foreach my $values (values(%{$values_ref}))
 	{
 		foreach (@{$values})
 		{
-			return SUCCESS if ($_ >= $cfg_minns);
+			return SUCCESS if ($_ == 1);
 		}
 	}
 

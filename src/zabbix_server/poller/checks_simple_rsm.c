@@ -1717,7 +1717,7 @@ static int	zbx_get_ns_ip_values(ldns_resolver *res, const char *ns, const char *
 
 			if (0 > now - ts)
 			{
-				zbx_snprintf(err, err_size, "Unix timestamp of %s is in the future (current: %lu)",
+				zbx_snprintf(err, err_size, "Unix timestamp of %s is in the future (current: %u)",
 						host, now);
 				zbx_free(host);
 				*upd = ZBX_EC_EPP_NOT_IMPLEMENTED;
@@ -2067,30 +2067,59 @@ static FILE	*open_item_log(const char *host, const char *tld, const char *name, 
 }
 
 static void	set_dns_test_results(zbx_ns_t *nss, size_t nss_num, int rtt_limit, unsigned int minns,
-		unsigned int *nssok, unsigned int *status)
+		unsigned int *nssok, unsigned int *test_status, unsigned int *dnssec_status, int dnssec_enabled,
+		FILE *log_fd)
 {
-	size_t	i, j;
+	unsigned int	dnssec_nssok = 0;
+	size_t		i, j;
 
 	*nssok = 0;
 
 	for (i = 0; i < nss_num; i++)
 	{
+		int	ns_dnssec_status = SUCCEED;
+
 		for (j = 0; j < nss[i].ips_num; j++)
 		{
 			/* if a single IP of the Name Server fails, consider the whole Name Server down */
 			if (ZBX_SUBTEST_SUCCESS != zbx_subtest_result(nss[i].ips[j].rtt, rtt_limit))
 				nss[i].result = FAIL;
+
+			if (dnssec_enabled &&
+					(ZBX_EC_DNS_UDP_DNSSEC_FIRST >= nss[i].ips[j].rtt &&
+						nss[i].ips[j].rtt >= ZBX_EC_DNS_UDP_DNSSEC_LAST) ||
+					(ZBX_EC_DNS_TCP_DNSSEC_FIRST >= nss[i].ips[j].rtt &&
+						nss[i].ips[j].rtt >= ZBX_EC_DNS_TCP_DNSSEC_LAST)
+			)
+			{
+				ns_dnssec_status = FAIL;	/* this name server received dnssec error */
+			}
 		}
 
 		if (SUCCEED == nss[i].result)
 			(*nssok)++;
+
+		if (dnssec_enabled)
+		{
+			if (SUCCEED == ns_dnssec_status)
+			{
+				rsm_infof(log_fd, "%s: DNSSEC OK", nss[i].name);
+				dnssec_nssok++;
+			}
+			else
+				rsm_infof(log_fd, "%s: DNSSEC failed", nss[i].name);
+		}
 	}
 
-	*status = (*nssok >= minns ? 1 : 0);
+	*test_status = (*nssok >= minns ? 1 : 0);
+
+	if (dnssec_enabled)
+		*dnssec_status = (dnssec_nssok >= minns ? 1 : 0);
 }
 
 static void	create_dns_json(struct zbx_json *json, zbx_ns_t *nss, size_t nss_num, unsigned int current_mode,
-		unsigned int nssok, unsigned int status, char protocol, const char *testedname)
+		unsigned int nssok, unsigned int test_status, unsigned int dnssec_status, char protocol,
+		const char *testedname, int dnssec_enabled)
 {
 	size_t	i, j;
 
@@ -2129,9 +2158,12 @@ static void	create_dns_json(struct zbx_json *json, zbx_ns_t *nss, size_t nss_num
 
 	zbx_json_adduint64(json, "nssok", nssok);
 	zbx_json_adduint64(json, "mode", current_mode);
-	zbx_json_adduint64(json, "status", status);
+	zbx_json_adduint64(json, "status", test_status);
 	zbx_json_adduint64(json, "protocol", (protocol == RSM_UDP ? 0 : 1));
 	zbx_json_addstring(json, "testedname", testedname, ZBX_JSON_TYPE_STRING);
+
+	if (dnssec_enabled)
+		zbx_json_adduint64(json, "dnssecstatus", dnssec_status);
 
 	zbx_json_close(json);
 }
@@ -2320,7 +2352,7 @@ int	check_rsm_dns(const char *host, int nextcheck, const AGENT_REQUEST *request,
 	FILE			*log_fd;
 	zbx_ns_t		*nss = NULL;
 	size_t			i, j, nss_num = 0;
-	unsigned int		extras, current_mode, test_status, minns, nssok;
+	unsigned int		extras, current_mode, test_status, dnssec_status, minns, nssok;
 	struct zbx_json		json;
 	int			dnssec_enabled, rdds_enabled, epp_enabled, udp_enabled, tcp_enabled, ipv4_enabled,
 				ipv6_enabled, udp_rtt_limit, tcp_rtt_limit, rtt_limit, successful_tests, file_exists = 0,
@@ -2640,9 +2672,11 @@ int	check_rsm_dns(const char *host, int nextcheck, const AGENT_REQUEST *request,
 		zbx_free(threads);
 	}
 
-	set_dns_test_results(nss, nss_num, rtt_limit, minns, &nssok, &test_status);
+	set_dns_test_results(nss, nss_num, rtt_limit, minns, &nssok, &test_status, &dnssec_status, dnssec_enabled,
+			log_fd);
 
-	create_dns_json(&json, nss, nss_num, current_mode, nssok, test_status, protocol, testedname);
+	create_dns_json(&json, nss, nss_num, current_mode, nssok, test_status, dnssec_status, protocol, testedname,
+			dnssec_enabled);
 
 	if (SUCCEED != update_metadata(file_exists, domain, test_status, test_recover, protocol, &current_mode,
 			&successful_tests, log_fd, err, sizeof(err)))
@@ -3626,7 +3660,7 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 				if (0 > now - ts)
 				{
 					rsm_errf(log_fd, "Unix timestamp of Name Server \"%s\" is in the future"
-							" (current: %lu)", random_ns, now);
+							" (current: %u)", random_ns, now);
 					upd43 = ZBX_EC_RDDS43_INTERNAL_GENERAL;
 				}
 			}
