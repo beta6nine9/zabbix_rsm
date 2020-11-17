@@ -1,3 +1,11 @@
+Changes for rsm2.1.0rc9
+
+Bug fixes:
+..F....... [748] added "Incident" to the list of allowed resource types in API when searching for audit log (asitals)
+..F....... [745] fixed RDDS warnings on "Test details" page (asitals)
+....I..... [742] removed "testedName" and "protocol" from measurements when "No result" or "Offline" probe status (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.1.0rc8
 
 Bug fixes:
