@@ -1465,10 +1465,15 @@ sub calculate_cycle($$$$$$$$$)
 			my $probe_ref = {
 				'city'		=> $probe,
 				'status'	=> $tested_interfaces{$interface}{$probe}{'status'},	# Probe status
-				'transport'	=> $tested_interfaces{$interface}{$probe}{'transport'},
-				'testedName'	=> $tested_interfaces{$interface}{$probe}{'testedname'},
 				'testData'	=> []
 			};
+
+			if ($tested_interfaces{$interface}{$probe}{'status'} ne AH_CITY_OFFLINE &&
+					$tested_interfaces{$interface}{$probe}{'status'} ne AH_CITY_NO_RESULT)
+			{
+				$probe_ref->{'transport'}  = $tested_interfaces{$interface}{$probe}{'transport'};
+				$probe_ref->{'testedName'} = $tested_interfaces{$interface}{$probe}{'testedname'};
+			}
 
 			fill_test_data(
 				$service,
