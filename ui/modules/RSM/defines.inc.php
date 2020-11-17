@@ -247,7 +247,7 @@ define('RSM_MONITORING_TARGET',			'{$RSM.MONITORING.TARGET}');
 define('MONITORING_TARGET_REGISTRY',	'registry');
 define('MONITORING_TARGET_REGISTRAR',	'registrar');
 
-define('AUDIT_RESOURCE_INCIDENT',	132);
+define('AUDIT_RESOURCE_INCIDENT',	100001);
 
 // Salt used for switching frontends
 // static string can be replaced with environment variable getenv('RSM_SECRET_KEY')
