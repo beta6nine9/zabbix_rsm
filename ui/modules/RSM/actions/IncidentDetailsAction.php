@@ -271,43 +271,25 @@ class IncidentDetailsAction extends Action {
 			}
 		}
 
-		$main_event_from_time = $data['main_event']['clock'] - $data['main_event']['clock'] % $delay_time - ($fail_count - 1) * $delay_time;
-		$original_main_event_from_time = $main_event_from_time;
-		$main_event_from_time -= (DISPLAY_CYCLES_BEFORE_RECOVERY * $delay_time);
+		// get recovery event
+		$recovery_event = null;
 
-		if ($this->hasInput('filter_set')) {
-			$from_time = ($main_event_from_time >= $data['from_ts'])
-				? $main_event_from_time
-				: $data['from_ts'];
-		}
-		else {
-			$from_time = $main_event_from_time;
+		if ($data['main_event']['r_eventid']) {
+			$recovery_event = API::Event()->get([
+				'output' => ['clock'],
+				'eventids' => $data['main_event']['r_eventid']
+			]);
+			$recovery_event = reset($recovery_event);
 		}
 
-		// Get end event.
-		$end_event_time_till = $this->hasInput('filter_set') ? ' AND e.clock<='.$data['to_ts'] : '';
+		// get from/till times
+		$from = $data['from_ts'];
+		$till = $data['to_ts'];
 
-		$end_event = DBfetch(DBselect(
-			'SELECT e.clock,e.value'.
-			' FROM events e'.
-			' WHERE e.objectid='.$data['main_event']['objectid'].
-				' AND e.clock>='.$data['main_event']['clock'].
-				$end_event_time_till.
-				' AND e.object='.EVENT_OBJECT_TRIGGER.
-				' AND e.source='.EVENT_SOURCE_TRIGGERS.
-				' AND e.value='.TRIGGER_VALUE_FALSE.
-			' ORDER BY e.clock',
-			1
-		));
+		$from = max($from, $data['main_event']['clock'] - DISPLAY_CYCLES_BEFORE_RECOVERY * $delay_time);
 
-		$to_time = $this->hasInput('filter_set') ? $data['to_ts'] : $this->server_time;
-
-		if ($end_event) {
-			$to_time = $end_event['clock'] - ($end_event['clock'] % $delay_time) + (DISPLAY_CYCLES_AFTER_RECOVERY * $delay_time);
-
-			if ($this->hasInput('filter_set') && $to_time >= $data['to_ts']) {
-				$to_time = $data['to_ts'];
-			}
+		if ($recovery_event) {
+			$till = min($till, $recovery_event['clock'] + DISPLAY_CYCLES_AFTER_RECOVERY * $delay_time);
 		}
 
 		// result generation
@@ -317,46 +299,41 @@ class IncidentDetailsAction extends Action {
 		if ($data['main_event']['false_positive']) {
 			$data['incidentType'] = INCIDENT_FALSE_POSITIVE;
 		}
-		elseif ($end_event && $end_event['value'] == TRIGGER_VALUE_FALSE) {
+		elseif ($recovery_event) {
 			$data['incidentType'] = INCIDENT_RESOLVED;
 		}
 		else {
 			$data['incidentType'] = INCIDENT_ACTIVE;
 		}
 
-		$data['active'] = (bool) $end_event;
+		$data['active'] = (bool) $recovery_event; // for "mark/unmark as false positive"
 
 		$failing_tests = $data['filter_failing_tests'] ? ' AND h.value='.DOWN : '';
 		$tests = DBselect($sql =
 			'SELECT h.value, h.clock'.
 			' FROM history_uint h'.
 			' WHERE h.itemid='.zbx_dbstr($data['availItemId']).
-				' AND h.clock>='.$from_time.
-				' AND h.clock<='.$to_time.
+				' AND h.clock>='.$from.
+				' AND h.clock<='.$till.
 				$failing_tests.
 			' ORDER BY h.clock asc'
 		);
 
-		$printed = []; // Prevent listing of repeated tests before incident start time. This can happen right after delay is changed.
 		while ($test = DBfetch($tests)) {
-			if ($test['clock'] > $original_main_event_from_time || !array_key_exists($test['clock'], $printed)) {
-				$printed[$test['clock']] = true;
-				$data['tests'][] = [
-					'clock' => $test['clock'],
-					'value' => $test['value'],
-					'startEvent' => ($data['main_event']['clock'] == $test['clock']),
-					'endEvent' => $end_event && $end_event['clock'] == $test['clock'] ? $end_event['value'] : TRIGGER_VALUE_TRUE
-				];
-			}
+			$data['tests'][] = [
+				'clock' => $test['clock'],
+				'value' => $test['value'],
+				'startEvent' => $data['main_event']['clock'] == $test['clock'],
+				'endEvent' => $recovery_event && $recovery_event['clock'] == $test['clock']
+			];
 		}
-		unset($printed);
 
 		$rollweek_values = DBfetchArrayAssoc(DBselect(
 			'SELECT h.value,h.clock'.
 			' FROM history h'.
 			' WHERE h.itemid='.zbx_dbstr($data['slvItemId']).
-				' AND h.clock>='.$from_time.
-				' AND h.clock<='.$to_time.
+				' AND h.clock>='.$from.
+				' AND h.clock<='.$till.
 			' ORDER BY h.clock asc'
 		), 'clock');
 

@@ -33,13 +33,11 @@ $table = (new CTableInfo())->setHeader([
 ]);
 
 foreach ($data['tests'] as $test) {
-	if (isset($test['startEvent']) && $test['startEvent']) {
+	if ($test['startEvent']) {
 		$start_end_incident = _('Start time');
 	}
-	elseif (isset($test['endEvent']) && $test['endEvent'] != TRIGGER_VALUE_TRUE) {
-		$start_end_incident = ($test['endEvent'] == TRIGGER_VALUE_FALSE)
-			? _('Resolved')
-			: _('Resolved (no data)');
+	elseif ($test['endEvent']) {
+		$start_end_incident = _('Resolved');
 	}
 	else {
 		$start_end_incident = SPACE;
@@ -74,11 +72,6 @@ if ($data['incidentType'] == INCIDENT_ACTIVE) {
 }
 elseif ($data['incidentType'] == INCIDENT_RESOLVED) {
 	$incident_type = _('Resolved');
-	$change_incident_type = INCIDENT_FALSE_POSITIVE;
-	$change_incident_type_label = _('Mark incident as false positive');
-}
-elseif ($data['incidentType'] == INCIDENT_RESOLVED_NO_DATA) {
-	$incident_type = _('Resolved (no data)');
 	$change_incident_type = INCIDENT_FALSE_POSITIVE;
 	$change_incident_type_label = _('Mark incident as false positive');
 }
