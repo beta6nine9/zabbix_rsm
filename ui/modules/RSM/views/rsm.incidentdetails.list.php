@@ -117,7 +117,7 @@ $filter_url = Url::get('rsm.incidentdetails', [
 ]);
 $filter_buttons = (new CDiv())
 	->addClass(ZBX_STYLE_FILTER_FORMS)
-	->addItem((new CSubmitButton(_('Rolling week'), 'filter_set', 1)));
+	->addItem((new CSubmitButton(_('Rolling week'), 'rolling_week', 1)));
 $dynamic_node = [
 	(new CDiv())
 		->addClass(ZBX_STYLE_TABLE_FORMS_CONTAINER)
@@ -167,6 +167,7 @@ else {
 			(new CRadioButtonList('filter_failing_tests', (int) $data['filter_failing_tests']))
 				->addValue(_('Only failing tests'), 1)
 				->addValue(_('Show all'), 0)
+				->onChange('$(this).closest("form").submit()')	
 				->setModern(true)
 			)
 		], $filter_buttons)
@@ -175,7 +176,7 @@ else {
 		->addVar('eventid', $data['eventid'])
 		->addVar('slvItemId', $data['slvItemId'])
 		->addVar('availItemId', $data['availItemId'])
-		->addVar('rolling_week', '1')
+		->addVar('filter_set', 1)
 	)
 	->addItem($dynamic_node->setId('incident_details'))
 	->addItem($data['module_style'])
