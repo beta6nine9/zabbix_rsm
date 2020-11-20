@@ -167,7 +167,7 @@ else {
 			(new CRadioButtonList('filter_failing_tests', (int) $data['filter_failing_tests']))
 				->addValue(_('Only failing tests'), 1)
 				->addValue(_('Show all'), 0)
-				->onChange('$(this).closest("form").submit()')	
+				->onChange('$(this).closest("form").submit()')
 				->setModern(true)
 			)
 		], $filter_buttons)
