@@ -318,7 +318,7 @@ foreach ($data['probes'] as $probe) {
 			 * See issue 386 for more details.
 			 */
 
-			if ($data['tld_rdds_enabled'] == false && $rdds43 === $noResult) {
+			if ($data['tld_rdds_enabled'] == false && $rdds43 === $no_result) {
 				$rdds43 = $disabled;
 				$rdds80 = $disabled;
 				$probe_no_result = false;
@@ -337,7 +337,7 @@ foreach ($data['probes'] as $probe) {
 			}
 
 			if ($data['type'] == RSM_RDAP) {
-				if ($rdap === $disabled || $rdap === $noResult) {
+				if ($rdap === $disabled || $rdap === $no_result) {
 					$probe_no_result = true;
 					$probe_down = false;
 					$rdds = ZBX_STYLE_GREY;
