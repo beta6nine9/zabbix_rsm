@@ -583,6 +583,15 @@ class RollingWeekStatusListAction extends Action {
 					$hostid_key = $DB['SERVERS'][$key]['NR'].$item['hostid'];
 					$data['tld'][$hostid_key][$avail_type[$item['key_']]]['availItemId'] = $item['itemid'];
 					$itemIds[$item['itemid']] = true;
+
+					$rows = DBselect(
+						'SELECT clock'.
+						' FROM lastvalue'.
+						' WHERE itemid='.$item['itemid']
+					);
+
+					$row = DBfetch($rows);
+					$data['tld'][$hostid_key][$avail_type[$item['key_']]]['availClock'] = $row['clock'];
 				}
 
 				$items += $db_avail_items;

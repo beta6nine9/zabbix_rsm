@@ -34,6 +34,7 @@ use constant DATA_INCIDENT_END => 'incidentEnd';
 use constant DATA_FALSE_POSITIVE => 'falsePositive';
 use constant DATA_PROBE_CHANGES => 'probeChanges';
 use constant DATA_TEST_DETAILS => 'testDetails';
+use constant DATA_MINNS => 'minns';
 
 our %CATALOGS = (
 	ID_PROBE() => 'probeNames.csv',
@@ -60,6 +61,7 @@ our %DATAFILES = (
 	DATA_FALSE_POSITIVE() => 'falsePositiveChanges.csv',
 	DATA_PROBE_CHANGES() => 'probeChanges.csv',
 	DATA_TEST_DETAILS() => 'testDetails.csv',
+	DATA_MINNS() => 'minns.csv',
 );
 
 use base 'Exporter';
@@ -69,7 +71,7 @@ our @EXPORT = qw(
 		ID_TLD_TYPE ID_STATUS_MAP ID_IP_VERSION ID_TARGET ID_TESTEDNAME
 		DATA_TEST DATA_NSTEST DATA_CYCLE DATA_INCIDENT DATA_INCIDENT_END
 		DATA_FALSE_POSITIVE DATA_PROBE_CHANGES
-		DATA_TEST_DETAILS
+		DATA_TEST_DETAILS DATA_MINNS
 		%CATALOGS %DATAFILES
 		dw_csv_init dw_append_csv dw_load_ids_from_db dw_get_id dw_get_name dw_write_csv_files
 		dw_write_csv_catalogs dw_delete_csvs dw_get_cycle_id dw_translate_cycle_id dw_set_date

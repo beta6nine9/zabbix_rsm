@@ -177,8 +177,6 @@ set_on_finish($fm);
 # }
 my %child_desc;
 
-my $cfg_minns;
-
 foreach my $server_key (@server_keys)
 {
 	my $pid = $fm->start();
@@ -278,10 +276,6 @@ sub process_server($)
 	my $server_tlds;
 
 	db_connect($server_key);
-
-	$cfg_minns = get_macro_minns();
-
-	fail("number of required working Name Servers is configured as $cfg_minns") if (1 > $cfg_minns);
 
 	my $all_probes_ref = get_probes();
 
@@ -1489,6 +1483,10 @@ sub calculate_cycle($$$$$$$$$)
 	# add configuration data
 	if ($service eq 'dns' || $service eq 'dnssec')
 	{
+		my $cfg_minns = get_dns_minns($tld, $cycle_clock);
+
+		fail("number of Minimum Name Servers for TLD $tld is configured as $cfg_minns") if (1 > $cfg_minns);
+
 		$json->{'minNameServersUp'} = int($cfg_minns);
 	}
 

@@ -5147,6 +5147,15 @@ sub get_test_results($$;$)
 			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'status'} = $value;
 			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'clock'} = $clock;
 		}
+		elsif (str_starts_with($i->{'key'}, "rsm.dnssec.status"))
+		{
+			# service status
+			$data{$cycleclock}{$service}{'status'} = $value;
+
+			# interface status and clock
+			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'status'} = $value;
+			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'clock'} = $clock;
+		}
 		elsif (str_starts_with($i->{'key'}, "rsm.rdds.43.status", "rsm.rdds.80.status"))
 		{
 			# interface status and clock

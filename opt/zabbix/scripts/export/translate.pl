@@ -108,6 +108,10 @@ while ($line = <$fh>)
 	{
 		__translate_test_details_line($line);
 	}
+	elsif ($data_type eq 'minns.csv')
+	{
+		__translate_minns_line($line);
+	}
 	else
 	{
 		__usage("\"$data_type\" is not supported yet, currently supported are cycles.csv, tests.csv, incidents.csv, incidentsEndTime.csv");
@@ -287,4 +291,21 @@ sub __translate_test_details_line
 	printf("%-" . PRINT_RIGHT_SHIFT . "s%s\n", 'testType', $test_type);
 	printf("%-" . PRINT_RIGHT_SHIFT . "s%s\n", 'target', $target // '');
 	printf("%-" . PRINT_RIGHT_SHIFT . "s%s\n", 'testedName', $tested_name);
+}
+
+sub __translate_minns_line
+{
+	my $line = shift;
+
+	chomp($line);
+
+	my @columns = split(',', $line);
+
+	my $test_tld = dw_get_name(ID_TLD, $columns[0]);
+	my $minns = $columns[1];
+	my $cycle_date_minute = $columns[2];
+
+	printf("%-" . PRINT_RIGHT_SHIFT . "s%s\n", 'testTLD', $test_tld);
+	printf("%-" . PRINT_RIGHT_SHIFT . "s%s\n", 'minns', $minns);
+	printf("%-" . PRINT_RIGHT_SHIFT . "s%s\n", 'cycleDateMinute', ts_full($cycle_date_minute));
 }

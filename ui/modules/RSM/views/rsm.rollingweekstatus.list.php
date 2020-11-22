@@ -326,6 +326,16 @@ if ($data['tld']) {
 					$row[] = [
 						(new CSpan($rollweek_value))->addClass('rolling-week-value'),
 						$rollweek_status,
+						(new CLink(
+							'',
+							(new CUrl('zabbix.php'))
+							->setArgument('action', 'rsm.tests')
+							->setArgument('slvItemId', $tld[$service]['itemid'])
+							->setArgument('host', $tld['host'])
+							->setArgument('type', $service)
+						))
+						->addClass('icon-eye')
+						->setHint(date(DATE_TIME_FORMAT_SECONDS, $tld[$service]['availClock']), '', false),
 						SPACE,
 						(new CSpan($rollweek_graph))->addClass('rolling-week-graph'),
 						$rdds_subservices

@@ -273,7 +273,7 @@ class AggregateDetailsAction extends Action {
 				'key_' => [
 					$ns_status_key.'[',
 					PROBE_DNS_NSSOK,
-					PROBE_DNS_STATUS,
+					($data['type'] == RSM_DNS ? PROBE_DNS_STATUS : PROBE_DNSSEC_STATUS),
 					CALCULATED_PROBE_RSM_IP4_ENABLED,
 					CALCULATED_PROBE_RSM_IP6_ENABLED
 				]
@@ -305,7 +305,8 @@ class AggregateDetailsAction extends Action {
 					break;
 
 				case PROBE_DNS_STATUS:
-					// Set DNS Test status.
+				case PROBE_DNSSEC_STATUS:
+					// Set DNS/DNSSEC Test status.
 					$this->probes[$probeid]['online_status'] = $value;
 					break;
 
@@ -335,7 +336,6 @@ class AggregateDetailsAction extends Action {
 		$time_from = strtotime(date('Y-m-d H:i:0', $this->getInput('time')));
 		$defaults = [
 			CALCULATED_ITEM_DNS_DELAY => null,
-			CALCULATED_ITEM_DNS_AVAIL_MINNS => null,	// TODO: remove 3 months after deployment
 			CALCULATED_ITEM_DNS_UDP_RTT_HIGH => null,
 			CALCULATED_ITEM_DNS_TCP_RTT_HIGH => null
 		];
@@ -353,7 +353,6 @@ class AggregateDetailsAction extends Action {
 			'slv_item_name' => $this->slv_item['name'],
 			'type' => $this->getInput('type'),
 			'time' => $time_from,
-			'min_dns_count' => $macro[CALCULATED_ITEM_DNS_AVAIL_MINNS],	// TODO: remove 3 months after deployment
 			'udp_rtt' => $macro[CALCULATED_ITEM_DNS_UDP_RTT_HIGH],
 			'tcp_rtt' => $macro[CALCULATED_ITEM_DNS_TCP_RTT_HIGH],
 			'test_error_message' => $this->getValueMapping(RSM_DNS_RTT_ERRORS_VALUE_MAP),

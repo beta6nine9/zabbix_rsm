@@ -146,7 +146,6 @@ my $max = cycle_end(time() - 240, 60);
 fail("cannot export data: selected time period is in the future") if (!opt('force') && $till > $max);
 
 # consider only tests that started within given period
-my $cfg_dns_minns;
 my $cfg_dns_minonline;
 foreach my $service (sort(keys(%{$services})))
 {
@@ -154,14 +153,12 @@ foreach my $service (sort(keys(%{$services})))
 
 	if ($service eq 'dns' || $service eq 'dnssec')
 	{
-		if (!$cfg_dns_minns)
+		if (!$cfg_dns_minonline)
 		{
-			$cfg_dns_minns = get_macro_minns();
 			$cfg_dns_minonline = get_macro_dns_probe_online();
 		}
 
-		$services->{$service}->{'minns'} = $cfg_dns_minns;
-		$services->{$service}->{'minonline'} = get_macro_dns_probe_online();
+		$services->{$service}->{'minonline'} = $cfg_dns_minonline;
 	}
 
 	if ($services->{$service}->{'from'} && $services->{$service}->{'from'} < $date)
@@ -873,7 +870,17 @@ sub __save_csv_data($$)
 					      '',
 					      $tld_type_id,
 					      $protocol_id // ''	# TODO: no cycle protocol as DNS can be UDP/TCP since DNS Reboot!
+			]);
+
+			if ($service eq 'dns')
+			{
+				# DNS MINNS
+				dw_append_csv(DATA_MINNS, [
+						      $tld_id,
+						      get_dns_minns($tld, $cycleclock),
+						      $cycleclock
 				]);
+			}
 
 			foreach my $interface (keys(%{$cycle_ref->{'interfaces'}}))
 			{
