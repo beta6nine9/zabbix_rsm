@@ -87,8 +87,6 @@ use constant PROBE_KEY_AUTOMATIC			=> 'rsm.probe.status[automatic,%]';
 
 use constant CONFIGVALUE_DNS_UDP_RTT_HIGH_ITEMID	=> 100011;	# itemid of rsm.configvalue[RSM.DNS.UDP.RTT.HIGH] item
 
-use constant AUDIT_RESOURCE_INCIDENT			=> 32;
-
 use constant CFG_PROBE_STATUS_DELAY			=> 60;
 
 use constant ZBX_FLAG_DISCOVERY_NORMAL			=> 0;
@@ -109,6 +107,8 @@ use constant RSM_VALUE_MAPPINGS => {
 	'rsm_avail'		=> 110,
 	'rsm_probe'		=> 100,
 };
+
+use constant AUDIT_RESOURCE_INCIDENT => 100001;
 
 use constant RSM_TRIGGER_THRESHOLDS => {
 	'1' => {'threshold' => '10', 'priority' => 2},

@@ -39,7 +39,7 @@ my $error = rsm_targets_prepare(AH_SLA_API_TMP_DIR, AH_SLA_API_DIR);
 
 fail($error) if ($error);
 
-foreach my $version (AH_SLA_API_VERSION_1)
+foreach my $version (AH_SLA_API_VERSION_1, AH_SLA_API_VERSION_2)
 {
 	foreach my $tld_dir (path(AH_SLA_API_DIR . "/v$version")->children)
 	{

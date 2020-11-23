@@ -33,13 +33,11 @@ $table = (new CTableInfo())->setHeader([
 ]);
 
 foreach ($data['tests'] as $test) {
-	if (isset($test['startEvent']) && $test['startEvent']) {
+	if ($test['startEvent']) {
 		$start_end_incident = _('Start time');
 	}
-	elseif (isset($test['endEvent']) && $test['endEvent'] != TRIGGER_VALUE_TRUE) {
-		$start_end_incident = ($test['endEvent'] == TRIGGER_VALUE_FALSE)
-			? _('Resolved')
-			: _('Resolved (no data)');
+	elseif ($test['endEvent']) {
+		$start_end_incident = _('Resolved');
 	}
 	else {
 		$start_end_incident = SPACE;
@@ -74,11 +72,6 @@ if ($data['incidentType'] == INCIDENT_ACTIVE) {
 }
 elseif ($data['incidentType'] == INCIDENT_RESOLVED) {
 	$incident_type = _('Resolved');
-	$change_incident_type = INCIDENT_FALSE_POSITIVE;
-	$change_incident_type_label = _('Mark incident as false positive');
-}
-elseif ($data['incidentType'] == INCIDENT_RESOLVED_NO_DATA) {
-	$incident_type = _('Resolved (no data)');
 	$change_incident_type = INCIDENT_FALSE_POSITIVE;
 	$change_incident_type_label = _('Mark incident as false positive');
 }
@@ -124,7 +117,7 @@ $filter_url = Url::get('rsm.incidentdetails', [
 ]);
 $filter_buttons = (new CDiv())
 	->addClass(ZBX_STYLE_FILTER_FORMS)
-	->addItem((new CSubmitButton(_('Rolling week'), 'filter_set', 1)));
+	->addItem((new CSubmitButton(_('Rolling week'), 'rolling_week', 1)));
 $dynamic_node = [
 	(new CDiv())
 		->addClass(ZBX_STYLE_TABLE_FORMS_CONTAINER)
@@ -174,6 +167,7 @@ else {
 			(new CRadioButtonList('filter_failing_tests', (int) $data['filter_failing_tests']))
 				->addValue(_('Only failing tests'), 1)
 				->addValue(_('Show all'), 0)
+				->onChange('$(this).closest("form").submit()')
 				->setModern(true)
 			)
 		], $filter_buttons)
@@ -182,7 +176,7 @@ else {
 		->addVar('eventid', $data['eventid'])
 		->addVar('slvItemId', $data['slvItemId'])
 		->addVar('availItemId', $data['availItemId'])
-		->addVar('rolling_week', '1')
+		->addVar('filter_set', 1)
 	)
 	->addItem($dynamic_node->setId('incident_details'))
 	->addItem($data['module_style'])

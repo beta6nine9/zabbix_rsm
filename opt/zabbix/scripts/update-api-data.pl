@@ -270,11 +270,12 @@ my ($from, $till) = get_real_services_period(\%services, $check_from, $check_til
 
 if (opt('print-period'))
 {
-	info("selected period: ", selected_period($from, $till));
 	foreach my $service (sort(keys(%services)))
 	{
 		next if (!defined($services{$service}{'from'}));
-		info("  $service\t: ", selected_period($services{$service}{'from'}, $services{$service}{'till'}));
+		info(sprintf("selected %6s period: %s",
+				$service,
+				selected_period($services{$service}{'from'}, $services{$service}{'till'})));
 	}
 }
 else
@@ -1050,8 +1051,12 @@ foreach (@server_keys)
 				}
 			}
 
-			# 707: it was agreed state file should only be in v1
 			if (ah_save_state(AH_SLA_API_VERSION_1, $ah_tld, $json_state_ref) != AH_SUCCESS)
+			{
+				fail("cannot save TLD state: ", ah_get_error());
+			}
+
+			if (ah_save_state(AH_SLA_API_VERSION_2, $ah_tld, $json_state_ref) != AH_SUCCESS)
 			{
 				fail("cannot save TLD state: ", ah_get_error());
 			}

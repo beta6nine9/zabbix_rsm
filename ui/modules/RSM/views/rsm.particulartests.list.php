@@ -146,39 +146,43 @@ foreach ($data['probes'] as $probe) {
 			$probe_no_result = false;
 
 			// RDDS
-			if (isset($data['tld']['macros'][RSM_RDDS_ENABLED])
-					&& $data['tld']['macros'][RSM_RDDS_ENABLED] == 0) {
+			if (isset($data['tld']['macros'][RSM_TLD_RDDS_ENABLED])
+					&& $data['tld']['macros'][RSM_TLD_RDDS_ENABLED] == 0) {
 				$rdds43 = $disabled;
 				$rdds80 = $disabled;
 				$rdds = ZBX_STYLE_GREY;
 			}
-			elseif (!isset($probe['value']) || $probe['value'] === null) {
-				$rdds43 = $no_result;
-				$rdds80 = $no_result;
-				$rdds = ZBX_STYLE_GREY;
-				$probe_no_result = true;
-			}
-			elseif ($probe['value'] == 0) {
-				$rdds = ZBX_STYLE_RED;
-				$probe_down = true;
-			}
-			elseif ($probe['value'] == 1) {
-				$rdds = ZBX_STYLE_GREEN;
-			}
+			else {
+				if (!isset($probe['value']) || $probe['value'] === null) {
+					$rdds43 = $no_result;
+					$rdds80 = $no_result;
+					$rdds = ZBX_STYLE_GREY;
+					$probe_no_result = true;
+				}
+				else {
+					if ($probe['value'] == 0) {
+						$rdds = ZBX_STYLE_RED;
+						$probe_down = true;
+					}
+					elseif ($probe['value'] == 1) {
+						$rdds = ZBX_STYLE_GREEN;
+					}
 
-			if ($data['type'] == RSM_RDDS) {
-				if ($probe['rdds43']['status'] == 0) {
-					$rdds43 = $down;
-				}
-				elseif ($probe['rdds43']['status'] == 1) {
-					$rdds43 = $up;
-				}
+					if ($data['type'] == RSM_RDDS) {
+						if ($probe['rdds43']['status'] == 0) {
+							$rdds43 = $down;
+						}
+						elseif ($probe['rdds43']['status'] == 1) {
+							$rdds43 = $up;
+						}
 
-				if ($probe['rdds80']['status'] == 0) {
-					$rdds80 = $down;
-				}
-				elseif ($probe['rdds80']['status'] == 1) {
-					$rdds80 = $up;
+						if ($probe['rdds80']['status'] == 0) {
+							$rdds80 = $down;
+						}
+						elseif ($probe['rdds80']['status'] == 1) {
+							$rdds80 = $up;
+						}
+					}
 				}
 			}
 
@@ -211,7 +215,7 @@ foreach ($data['probes'] as $probe) {
 			 * See issue 386 for more details.
 			 */
 
-			if ($data['tld_rdds_enabled'] == false && $rdds43 === $noResult) {
+			if ($data['tld_rdds_enabled'] == false && $rdds43 === $no_result) {
 				$rdds43 = $disabled;
 				$rdds80 = $disabled;
 				$probe_no_result = false;
@@ -230,7 +234,7 @@ foreach ($data['probes'] as $probe) {
 			}
 
 			if ($data['type'] == RSM_RDAP) {
-				if ($rdap === $disabled || $rdap === $noResult) {
+				if ($rdap === $disabled || $rdap === $no_result) {
 					$probe_no_result = true;
 					$probe_down = false;
 					$rdds = ZBX_STYLE_GREY;

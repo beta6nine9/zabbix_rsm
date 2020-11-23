@@ -125,7 +125,6 @@ define('RSM_SLA_SCREEN_TYPE_GRAPH_6',		6);
 define('INCIDENT_ACTIVE',			0);
 define('INCIDENT_RESOLVED',			1);
 define('INCIDENT_FALSE_POSITIVE',	2);
-define('INCIDENT_RESOLVED_NO_DATA',	3);
 
 // false positive event status.
 define('INCIDENT_FLAG_NORMAL',			0);
@@ -167,8 +166,8 @@ define('CALCULATED_PROBE_RSM_IP4_ENABLED',		'probe.configvalue[RSM.IP4.ENABLED]'
 define('CALCULATED_PROBE_RSM_IP6_ENABLED',		'probe.configvalue[RSM.IP6.ENABLED]');
 
 // Number of test cycles to show before and after incident recovery event.
-define('DISPLAY_CYCLES_AFTER_RECOVERY',		6); // (including recovery event)
-define('DISPLAY_CYCLES_BEFORE_RECOVERY',	3);
+define('DISPLAY_CYCLES_BEFORE_RECOVERY',	4);
+define('DISPLAY_CYCLES_AFTER_RECOVERY',		6);
 
 // SLA monitoring probe status items keys.
 define('PROBE_KEY_ONLINE',			'rsm.probe.online');
@@ -244,7 +243,7 @@ define('RSM_MONITORING_TARGET',			'{$RSM.MONITORING.TARGET}');
 define('MONITORING_TARGET_REGISTRY',	'registry');
 define('MONITORING_TARGET_REGISTRAR',	'registrar');
 
-define('AUDIT_RESOURCE_INCIDENT',	132);
+define('AUDIT_RESOURCE_INCIDENT',	100001);
 
 // Salt used for switching frontends
 // static string can be replaced with environment variable getenv('RSM_SECRET_KEY')
