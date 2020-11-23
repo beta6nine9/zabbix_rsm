@@ -1,3 +1,33 @@
+Changes for rsm2.1.0rc10
+
+Bug fixes:
+..F....... [747] fixed filtering on the Incident details page (asitals, gcalenko)
+..F....... [sub-745] fixed "Undefined variable: noResult" error (asitals)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.1.0rc9
+
+Bug fixes:
+..F....... [748] added "Incident" to the list of allowed resource types in API when searching for audit log (asitals)
+..F....... [745] fixed RDDS warnings on "Test details" page (asitals)
+....I..... [742] removed "testedName" and "protocol" from measurements when "No result" or "Offline" probe status (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.1.0rc8
+
+Bug fixes:
+....I..... [sub-737] fixed functionality of toggling "false positive" flag of the resolved incident in SLA API (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.1.0rc7
+
+Bug fixes:
+....I..... [741] fixed missing DNSSEC metrics in SLA API measurement files (dimir)
+....I..... [740] added back v2 monitoring/state files (dimir)
+....I..... [737] fixed marking incident as false positive in SLA API (dimir)
+....I..... [738] changed empty NSID to be saved as null in recent measurement file (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.1.0rc6
 
 Bug fixes:

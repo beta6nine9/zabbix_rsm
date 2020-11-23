@@ -4908,7 +4908,7 @@ use constant FAKE_NSIP => '';
 #
 # {
 #     'dns' => {
-#         '12345678' => {        <-- cycleclock
+#         '12345600' => {        <-- cycleclock
 #             'status' => 1,
 #             'interfaces' => {
 #                 'DNS' => {
@@ -4979,7 +4979,7 @@ sub get_test_results($$;$)
 {
 	my $results = shift;
 	my $item_data = shift;
-	my $service_filter = shift;	# optional: only get specified service data
+	my $service_filter = shift;	# optional: only get the data of the specified service
 
 	my %delays = (
 		'dns' => get_dns_delay(),

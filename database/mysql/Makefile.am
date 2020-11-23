@@ -1,7 +1,8 @@
 if DBSCHEMA
 DATABASE = mysql
 
-data.sql: $(top_srcdir)/create/src/data.tmpl $(top_srcdir)/create/src/templates.tmpl $(top_srcdir)/create/src/dashboards.tmpl $(top_srcdir)/create/bin/gen_data.pl
+# RSM specifics: add rsm-*.tmpl depencencies
+data.sql: $(top_srcdir)/create/src/data.tmpl $(top_srcdir)/create/src/templates.tmpl $(top_srcdir)/create/src/dashboards.tmpl $(top_srcdir)/create/bin/gen_data.pl $(top_srcdir)/create/src/rsm-data.tmpl $(top_srcdir)/create/src/rsm-templates.tmpl
 	$(top_srcdir)/create/bin/gen_data.pl $(DATABASE) > data.sql
 
 schema.sql: $(top_srcdir)/create/src/schema.tmpl $(top_srcdir)/create/bin/gen_schema.pl

@@ -8,7 +8,7 @@ use lib path($0)->parent->realpath()->stringify();
 
 use RSM;
 use RSMSLV;
-use TLD_constants qw(:api);
+use TLD_constants qw(:api :templates);
 use DateTime;
 
 use constant MACRO_RDAP_STANDALONE => '{$RSM.RDAP.STANDALONE}';

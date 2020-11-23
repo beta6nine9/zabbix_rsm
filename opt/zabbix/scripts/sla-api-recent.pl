@@ -35,7 +35,7 @@ use constant DEFAULT_INITIAL_MEASUREMENTS_LIMIT => 7200;	# seconds, if the metri
 								# them from this period in the past back for recent
 								# measurement files for an incident
 
-use constant FAKE_PROBE_NAME => "";	# for Service Availability items
+use constant FAKE_PROBE_NAME => "";	# for Service Availability items, this is only needed for cache
 
 sub main_process_signal_handler();
 sub process_server($);
@@ -431,6 +431,14 @@ sub process_tld_batch($$$$$$)
 	db_disconnect();
 }
 
+# dns-results-cache:
+# As we know there is no real DNSSEC service. It is not tested the same way as
+# DNS, RDDS and RDAP are. It is part of DNS and it uses DNS results from the
+# database. In order to avoid double selects of the same data we'll keep the
+# DNS results cached. This is hack that needs to be removed some day when we
+# implement DNSSEC service handling in all the places/scripts properly.
+my $dns_results_cache = {};
+
 sub process_tld($$$$$)
 {
 	my $tld = shift;
@@ -439,6 +447,9 @@ sub process_tld($$$$$)
 	my $lastvalues_db_tld = shift;
 	my $lastvalues_cache_tld = shift;
 
+	# dns-results-cache:
+	# ensure 'dnssec' comes after 'dns' by using sort(), because
+	# 'dnssec' will use a copy of 'dns' results saved to the cache
 	foreach my $service (sort(keys(%{$lastvalues_db_tld})))
 	{
 		next if (opt('service') && $service ne getopt('service'));
@@ -473,7 +484,7 @@ sub process_tld($$$$$)
 
 		if (opt('print-period'))
 		{
-			info(sprintf("selected %4s period: %s", $service, selected_period($cycles_from, $cycles_till)));
+			info(sprintf("selected %6s period: %s", $service, selected_period($cycles_from, $cycles_till)));
 		}
 
 		# TODO: leave only next line after migrating to Standalone RDAP
@@ -1298,14 +1309,34 @@ sub calculate_cycle($$$$$$$$$)
 			$service
 		);
 
+		# dns-results-cache:
+		if ($service eq 'dns')
+		{
+			# remember this for the cycle where we'll handle DNSSEC service
+			$dns_results_cache = $results->{'dns'};
+		}
+		elsif ($service eq 'dnssec')
+		{
+			$results->{'dnssec'} = $dns_results_cache;
+		}
+
 		next if (!$results);
 
 		foreach my $cycleclock (keys(%{$results->{$service}}))
 		{
 			foreach my $interface (keys(%{$results->{$service}{$cycleclock}{'interfaces'}}))
 			{
-				my $tested_interface = translate_interface($interface);
+				my $tested_interface;
 
+				# dns-results-cache:
+				if ($service eq 'dnssec')
+				{
+					$tested_interface = translate_interface('dnssec');
+				}
+				else
+				{
+					$tested_interface = translate_interface($interface);
+				}
 				my $clock = $results->{$service}{$cycleclock}{'interfaces'}{$interface}{'clock'};
 
 				foreach my $target (keys(%{$results->{$service}{$cycleclock}{'interfaces'}{$interface}{'targets'}}))
@@ -1335,7 +1366,11 @@ sub calculate_cycle($$$$$$$$$)
 
 						if (exists($metric->{'nsid'}))
 						{
-							$h->{'nsid'} = $metric->{'nsid'};
+							$h->{'nsid'} = (
+								$metric->{'nsid'} eq ''
+								? undef
+								: $metric->{'nsid'}
+							);
 						}
 
 						push(@{$tested_interfaces{$tested_interface}{$probe}{'testData'}{$target}}, $h);
@@ -1353,7 +1388,7 @@ sub calculate_cycle($$$$$$$$$)
 						$results->{$service}{$cycleclock}{'interfaces'}{$interface}{'testedname'};
 				}
 
-				# interface tested name, it's TCP if unspecified
+				# interface transport protocol, it's TCP if unspecified
 				if (exists($results->{$service}{$cycleclock}{'interfaces'}{$interface}{'protocol'}) &&
 						($results->{$service}{$cycleclock}{'interfaces'}{$interface}{'protocol'} == PROTO_UDP))
 				{
@@ -1372,6 +1407,12 @@ sub calculate_cycle($$$$$$$$$)
 			}
 			$probes_with_results++;
 		}
+	}
+
+	# dns-results-cache:
+	if ($service eq 'dnssec')
+	{
+		undef($dns_results_cache);
 	}
 
 	# add "Offline" and "No results"
@@ -1424,10 +1465,15 @@ sub calculate_cycle($$$$$$$$$)
 			my $probe_ref = {
 				'city'		=> $probe,
 				'status'	=> $tested_interfaces{$interface}{$probe}{'status'},	# Probe status
-				'transport'	=> $tested_interfaces{$interface}{$probe}{'transport'},
-				'testedName'	=> $tested_interfaces{$interface}{$probe}{'testedname'},
 				'testData'	=> []
 			};
+
+			if ($tested_interfaces{$interface}{$probe}{'status'} ne AH_CITY_OFFLINE &&
+					$tested_interfaces{$interface}{$probe}{'status'} ne AH_CITY_NO_RESULT)
+			{
+				$probe_ref->{'transport'}  = $tested_interfaces{$interface}{$probe}{'transport'};
+				$probe_ref->{'testedName'} = $tested_interfaces{$interface}{$probe}{'testedname'};
+			}
 
 			fill_test_data(
 				$service,
@@ -1571,19 +1617,6 @@ sub calculate_cycle($$$$$$$$$)
 
 	return if (opt('dry-run'));
 
-	if ($service ne 'rdap')
-	{
-		if (ah_save_measurement(
-				AH_SLA_API_VERSION_1,
-				ah_get_api_tld($tld),
-				$service,
-				$json,
-				$from) != AH_SUCCESS)
-		{
-			fail("cannot save recent measurement: ", ah_get_error());
-		}
-	}
-
 	if (ah_save_measurement(
 			AH_SLA_API_VERSION_2,
 			ah_get_api_tld($tld),
@@ -1594,7 +1627,7 @@ sub calculate_cycle($$$$$$$$$)
 		fail("cannot save recent measurement: ", ah_get_error());
 	}
 
-	# the first version had no RDAP and no additional stuff that appeared in version 2
+	# the first version had no RDAP and no additional things that appeared in version 2, so let's remove them
 	if ($service ne 'rdap')
 	{
 		delete($json->{'minNameServersUp'});
