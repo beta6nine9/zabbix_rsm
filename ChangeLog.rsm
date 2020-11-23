@@ -1,3 +1,10 @@
+Changes for rsm2.1.0rc10
+
+Bug fixes:
+..F....... [747] fixed filtering on the Incident details page (asitals, gcalenko)
+..F....... [sub-745] fixed "Undefined variable: noResult" error (asitals)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.1.0rc9
 
 Bug fixes:
