@@ -1335,6 +1335,14 @@ sub build_dns_minns_macro($)
 				fail("unexpected value/format of macro: $old_minns_macro");
 			}
 
+			if (defined($macro_sched_clock) && $macro_sched_clock <= $^T)
+			{
+				$macro_curr_minns = $macro_sched_minns;
+
+				undef $macro_sched_clock;
+				undef $macro_sched_minns;
+			}
+
 			# opt for existing tld - "<sched_minns>" or "<sched_minns>;<sched_clock>"
 			if (getopt('dns-minns') =~ /^(\d+)(?:;(\d+))?$/)
 			{
