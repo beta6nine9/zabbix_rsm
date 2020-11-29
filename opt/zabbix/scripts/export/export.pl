@@ -1033,7 +1033,11 @@ sub __save_csv_data($$)
 
 							my $nscyclestatus;
 
-							if ($nscycle{$ns}{$ip}{'total'} < $services->{$service}->{'minonline'})
+							if ($cycle_ref->{'status'} ne UP && $cycle_ref->{'status'} ne DOWN)
+							{
+								$nscyclestatus = $cycle_ref->{'status'};
+							}
+							elsif ($nscycle{$ns}{$ip}{'total'} < $services->{$service}->{'minonline'})
 							{
 								$nscyclestatus = $general_status_up;
 							}
