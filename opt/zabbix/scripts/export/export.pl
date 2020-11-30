@@ -1020,7 +1020,7 @@ sub __save_csv_data($$)
 							# Name Server (target) test
 							dw_append_csv(DATA_NSTEST, [
 									      $probe_id,
-									      $ns_id,
+									      $cycle_ns_id,
 									      $tld_id,
 									      $cycleclock,
 									      dw_get_id(ID_STATUS_MAP, $target_status),
