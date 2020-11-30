@@ -903,32 +903,41 @@ sub __save_csv_data($$)
 
 					my $testclock = $probe_ref->{'clock'};
 
+					# DNS test details are saved per probe
+					if ($service eq 'dns')
+					{
+						dw_append_csv(DATA_TEST_DETAILS, [
+							$probe_id,
+							$cycleclock,
+							$service_category_id,
+							$test_type_id,
+							'',
+							$testedname_id,
+						]);
+					}
+
 					foreach my $target (keys(%{$cycle_ref->{'interfaces'}{$interface}{'probes'}{$probe}{'targets'}}))
 					{
 						my $target_ref = $cycle_ref->{'interfaces'}{$interface}{'probes'}{$probe}{'targets'}{$target};
 
 						my $target_status = ($target_ref->{'status'} eq UP ? $general_status_up : $general_status_down);
 
-						my ($ns_id, $target_id);
+						my $cycle_ns_id;
 
-						if ($interface eq 'dns')
+						# non-DNS test details are saved per target
+						if ($service ne 'dns')
 						{
-							$ns_id = dw_get_id(ID_NS_NAME, $target);
-						}
-						else
-						{
-							$target_id = dw_get_id(ID_TARGET, $target);
-						}
+							dw_append_csv(DATA_TEST_DETAILS, [
+								$probe_id,
+								$cycleclock,
+								$service_category_id,
+								$test_type_id,
+								dw_get_id(ID_TARGET, $target),
+								$testedname_id,
+							]);
 
-						# test details
-						dw_append_csv(DATA_TEST_DETAILS, [
-								      $probe_id,
-								      $cycleclock,
-								      $service_category_id,
-								      $test_type_id,
-								      $target_id // '',
-								      $testedname_id,
-						]);
+							$cycle_ns_id = dw_get_id(ID_NS_NAME, $target);
+						}
 
 						foreach my $metric_ref (@{$cycle_ref->{'interfaces'}{$interface}{'probes'}{$probe}{'targets'}{$target}{'metrics'}})
 						{
@@ -971,7 +980,7 @@ sub __save_csv_data($$)
 								$cycleclock,
 								$service_category_id,
 								$tld_id,
-								$ns_id // '',
+								$cycle_ns_id // '',
 								$ip_id);
 
 							my $ns_id = (exists($metric_ref->{'nsid'}) ? dw_get_id(ID_NSID, $metric_ref->{'nsid'}) : '');
@@ -988,7 +997,7 @@ sub __save_csv_data($$)
 									      $ip_version_id,
 									      $ip_id,
 									      $test_type_id,
-									      $ns_id // '',
+									      $ns_id,
 									      $tld_type_id,
 									      $ns_id
 							]);
