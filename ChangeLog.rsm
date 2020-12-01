@@ -1,3 +1,11 @@
+Changes for rsm2.1.0rc11
+
+Bug fixes:
+....I..... [752] removed duplicate DNS test detail records from Data Export (dimir)
+....I..... [751] added support for Up-inconclusive-no-data and Up-inconclusive-no-probes to Name Server availability status in Data Export (dimir)
+....I..... [741] fixed empty DNSSEC results from Probes in SLA API measurement files (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.1.0rc10
 
 Bug fixes:

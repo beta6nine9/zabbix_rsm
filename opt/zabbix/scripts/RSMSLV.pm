@@ -4812,7 +4812,7 @@ sub generate_report($$;$)
 #
 # Helper function for collecting data for SLA API and Data Export.
 #
-# The data is collected for specified period, specified items of type float and str. The data is to be used later
+# The data is collected for specified period, specified items of type uint, float and str. The data is to be used later
 # for calling get_test_results().
 #
 sub get_test_history($$$$$$$$)
@@ -5101,6 +5101,9 @@ sub get_test_results($$;$)
 
 		my $service = get_service_from_key($i->{'key'});
 		my $cycleclock = cycle_start($clock, $delays{$service});
+
+		# DNSSEC is part of DNS
+		$service = 'dnssec' if ($service_filter && $service_filter eq 'dnssec');
 
 		next if ($service_filter && $service ne $service_filter);
 
