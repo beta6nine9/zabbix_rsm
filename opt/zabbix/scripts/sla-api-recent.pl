@@ -1313,11 +1313,11 @@ sub calculate_cycle($$$$$$$$$)
 		if ($service eq 'dns')
 		{
 			# remember this for the cycle where we'll handle DNSSEC service
-			$dns_results_cache = $results->{'dns'};
+			$dns_results_cache->{$probe} = $results->{'dns'};
 		}
 		elsif ($service eq 'dnssec')
 		{
-			$results->{'dnssec'} = $dns_results_cache;
+			$results->{'dnssec'} = $dns_results_cache->{$probe};
 		}
 
 		next if (!$results);
