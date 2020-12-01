@@ -1,3 +1,10 @@
+Changes for rsm2.2.0rc1
+
+New features:
+..F.I..... [718] implement Different DNS algorithm for ccTLDs (asitals, dimir)
+..F.I..... [719] implement Real-time monitoring (asitals, dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.1.0rc11
 
 Bug fixes:
