@@ -2,14 +2,12 @@
 #
 # Script to manage Registrars in Zabbix.
 
-BEGIN
-{
-	our $MYDIR = $0; $MYDIR =~ s,(.*)/.*,$1,; $MYDIR = '.' if ($MYDIR eq $0);
-}
-use lib $MYDIR;
+use FindBin;
+use lib $FindBin::RealBin;
 
 use strict;
 use warnings;
+
 use Zabbix;
 use Getopt::Long;
 use MIME::Base64;

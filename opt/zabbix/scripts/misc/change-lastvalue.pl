@@ -1,11 +1,12 @@
 #!/usr/bin/perl
 
+use FindBin;
+use lib "$FindBin::RealBin/..";
+
 use strict;
 use warnings;
 
 use Data::Dumper;
-
-use lib '/opt/zabbix/scripts';
 
 use RSM;
 use RSMSLV;

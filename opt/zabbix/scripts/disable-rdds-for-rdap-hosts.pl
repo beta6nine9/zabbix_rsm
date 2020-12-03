@@ -1,11 +1,12 @@
 #!/usr/bin/perl
 
-use warnings;
+use FindBin;
+use lib $FindBin::RealBin;
+
 use strict;
+use warnings;
 
 use Pod::Usage qw(pod2usage);
-use Path::Tiny;
-use lib path($0)->parent()->realpath()->stringify();
 
 use Zabbix;
 use RSM;

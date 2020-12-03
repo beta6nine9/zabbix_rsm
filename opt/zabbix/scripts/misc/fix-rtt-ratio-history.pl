@@ -1,6 +1,7 @@
 #!/usr/bin/env perl
 
-use lib '/opt/zabbix/scripts';
+use FindBin;
+use lib "$FindBin::RealBin/..";
 
 use strict;
 use warnings;

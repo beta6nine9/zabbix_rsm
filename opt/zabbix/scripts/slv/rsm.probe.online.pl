@@ -3,14 +3,12 @@
 # This script is ment to be run by cron every minute. It calculates availability of each probe (host "<Probe> - mon")
 # at particular time and sends results to Zabbix trapper.
 
-BEGIN
-{
-	our $MYDIR = $0; $MYDIR =~ s,(.*)/.*/.*,$1,; $MYDIR = '..' if ($MYDIR eq $0);
-}
-use lib $MYDIR;
+use FindBin;
+use lib "$FindBin::RealBin/..";
 
 use strict;
 use warnings;
+
 use Data::Dumper;
 use RSM;
 use RSMSLV;

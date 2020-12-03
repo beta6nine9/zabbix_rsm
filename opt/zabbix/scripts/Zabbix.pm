@@ -2,6 +2,8 @@ package Zabbix;
 # by DotNeft with UTF-8 support
 
 use strict;
+use warnings;
+
 use JSON::XS;
 use Encode;
 use Carp;

@@ -1,10 +1,10 @@
 #!/usr/bin/perl
 
+use FindBin;
+use lib $FindBin::RealBin;
+
 use strict;
 use warnings;
-
-use Path::Tiny;
-use lib path($0)->parent->realpath()->stringify();
 
 use Data::Dumper;
 
