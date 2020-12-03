@@ -10,7 +10,7 @@ use strict;
 use warnings;
 use RSM;
 use RSMSLV;
-use TLD_constants qw(:ec :api :items :config :items);
+use TLD_constants qw(:ec :api :config :items);
 use ApiHelper;
 use Parallel::ForkManager;
 use Data::Dumper;

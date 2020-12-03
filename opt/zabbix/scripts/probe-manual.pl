@@ -11,7 +11,7 @@ use warnings;
 
 use RSM;
 use RSMSLV;
-use TLD_constants qw(:api);
+use TLD_constants qw(:api :items);
 use Data::Dumper;
 use Pusher qw(push_to_trapper);
 
