@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 #
 # This script is ment to be run by cron every minute. It calculates availability of each probe (host "<Probe> - mon")
 # at particular time and sends results to Zabbix trapper.
