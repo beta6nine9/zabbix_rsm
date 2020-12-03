@@ -1717,7 +1717,8 @@ static int	zbx_get_ns_ip_values(ldns_resolver *res, const char *ns, const char *
 
 			if (0 > now - ts)
 			{
-				zbx_snprintf(err, err_size, "Unix timestamp of %s is in the future (current: %u)",
+				zbx_snprintf(err, err_size,
+						"Unix timestamp of %s is in the future (current: " ZBX_FS_UI64 ")",
 						host, now);
 				zbx_free(host);
 				*upd = ZBX_EC_EPP_NOT_IMPLEMENTED;
@@ -2085,12 +2086,12 @@ static void	set_dns_test_results(zbx_ns_t *nss, size_t nss_num, int rtt_limit, u
 			if (ZBX_SUBTEST_SUCCESS != zbx_subtest_result(nss[i].ips[j].rtt, rtt_limit))
 				nss[i].result = FAIL;
 
-			if (dnssec_enabled &&
+			if (dnssec_enabled && (
 					(ZBX_EC_DNS_UDP_DNSSEC_FIRST >= nss[i].ips[j].rtt &&
 						nss[i].ips[j].rtt >= ZBX_EC_DNS_UDP_DNSSEC_LAST) ||
 					(ZBX_EC_DNS_TCP_DNSSEC_FIRST >= nss[i].ips[j].rtt &&
 						nss[i].ips[j].rtt >= ZBX_EC_DNS_TCP_DNSSEC_LAST)
-			)
+			))
 			{
 				ns_dnssec_status = FAIL;	/* this name server received dnssec error */
 			}
