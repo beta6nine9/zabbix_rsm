@@ -1115,7 +1115,7 @@ sub __save_csv_data($$)
 			}
 
 			# report only incidents within given period
-			if ($event_start > $from)
+			if ($event_start >= $from)
 			{
 				dw_append_csv(DATA_INCIDENT, [
 						      $eventid,
