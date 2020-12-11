@@ -86,7 +86,6 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		ONLINE OFFLINE
 		USE_CACHE_FALSE USE_CACHE_TRUE
 		TARGET_PLACEHOLDER
-		get_macro_minns
 		get_macro_dns_probe_online
 		get_macro_rdds_probe_online
 		get_macro_rdap_probe_online
@@ -188,14 +187,6 @@ my $log_open = 0;
 
 my $monitoring_target; # see get_monitoring_target()
 my $rdap_standalone_ts; # see get_rdap_standalone_ts()
-
-sub get_macro_minns()
-{
-	# TODO: replace calls to this function with calls to get_dns_minns($rsmhost, $clock)
-	# TODO: remove this function, global macro {$RSM.DNS.AVAIL.MINNS} does not exist anymore
-	...;
-	return __get_macro('{$RSM.DNS.AVAIL.MINNS}');
-}
 
 sub get_macro_dns_probe_online()
 {

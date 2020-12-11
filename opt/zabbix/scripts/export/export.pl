@@ -540,6 +540,11 @@ sub __get_test_data($$$)
 	{
 		next if (!tld_service_enabled($tld, $service, $from));
 
+		if ($service eq 'dns' || $service eq 'dnssec')
+		{
+			$result->{'minns'} = get_dns_minns($tld, $from);
+		}
+
 		my $delay = $services->{$service}{'delay'};
 		my $service_from = $services->{$service}{'from'};
 		my $service_till = $services->{$service}{'till'};
@@ -873,7 +878,7 @@ sub __save_csv_data($$)
 				# DNS MINNS
 				dw_append_csv(DATA_MINNS, [
 						      $tld_id,
-						      get_dns_minns($tld, $cycleclock),
+						      $result->{'minns'},
 						      $cycleclock
 				]);
 			}
@@ -938,7 +943,9 @@ sub __save_csv_data($$)
 								dw_get_id(ID_TARGET, $target),
 								$testedname_id,
 							]);
-
+						}
+						else
+						{
 							$cycle_ns_id = dw_get_id(ID_NS_NAME, $target);
 						}
 
@@ -986,7 +993,7 @@ sub __save_csv_data($$)
 								$cycle_ns_id // '',
 								$ip_id);
 
-							my $ns_id = (exists($metric_ref->{'nsid'}) ? dw_get_id(ID_NSID, $metric_ref->{'nsid'}) : '');
+							my $nsid_id = (exists($metric_ref->{'nsid'}) ? dw_get_id(ID_NSID, $metric_ref->{'nsid'}) : '');
 
 							# TEST
 							dw_append_csv(DATA_TEST, [
@@ -1000,9 +1007,9 @@ sub __save_csv_data($$)
 									      $ip_version_id,
 									      $ip_id,
 									      $test_type_id,
-									      $ns_id,
+									      $cycle_ns_id,
 									      $tld_type_id,
-									      $ns_id
+									      $nsid_id
 							]);
 
 							if ($ip)
@@ -1018,7 +1025,7 @@ sub __save_csv_data($$)
 							}
 						}
 
-						if ($interface eq 'dns')
+						if ($cycle_ns_id)
 						{
 							# Name Server (target) test
 							dw_append_csv(DATA_NSTEST, [
@@ -1033,7 +1040,6 @@ sub __save_csv_data($$)
 						}
 					}
 				}
-
 
 				if ($interface eq 'dns')
 				{
@@ -1058,8 +1064,6 @@ sub __save_csv_data($$)
 								my $perc = $nscycle{$ns}{$ip}{'positive'} * 100 / $nscycle{$ns}{$ip}{'total'};
 								$nscyclestatus = ($perc > SLV_UNAVAILABILITY_LIMIT ? $general_status_up : $general_status_down);
 							}
-
-							#dbg("get ip version, csv:ns_avail service:$service, ip:", (defined($ip) ? $ip : "UNDEF"));
 
 							my $ns_id = dw_get_id(ID_NS_NAME, $ns);
 							my $ip_id = dw_get_id(ID_NS_IP, $ip);
