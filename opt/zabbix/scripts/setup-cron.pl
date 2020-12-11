@@ -16,29 +16,32 @@ use constant SLV_LOG_FILE => '/var/log/zabbix/rsm.slv.err';
 
 my $JOB_USER = 'zabbix';	# default user of the job
 
+my $echo_pid = 'echo -n $$ > /tmp/rsm.probe.online.pl.pid; ';
+my $wait_pid = 'sleep 3; timeout 30 tail --pid=$(cat /tmp/rsm.probe.online.pl.pid) -f /dev/null; ';
+
 my @cron_jobs = (
 	'# ignore missing home directory errors',
 	'HOME=/tmp',
 	'',
-	['main', '* * * * *' , 0, '/opt/zabbix/scripts/slv/rsm.probe.online.pl'                                                                                                            , SLV_LOG_FILE],
+	['main', '* * * * *' , 0, $echo_pid . '/opt/zabbix/scripts/slv/rsm.probe.online.pl'                                                                                                            , SLV_LOG_FILE],
 	'',
-	['main', '* * * * *' , 0, '(/opt/zabbix/scripts/slv/rsm.slv.dns.avail.pl && /opt/zabbix/scripts/slv/rsm.slv.dns.rollweek.pl && /opt/zabbix/scripts/slv/rsm.slv.dns.downtime.pl)'   , SLV_LOG_FILE],
-	['main', '* * * * *' , 0, '(/opt/zabbix/scripts/slv/rsm.slv.rdds.avail.pl && /opt/zabbix/scripts/slv/rsm.slv.rdds.rollweek.pl && /opt/zabbix/scripts/slv/rsm.slv.rdds.downtime.pl)', SLV_LOG_FILE],
-	['main', '* * * * *' , 0, '(/opt/zabbix/scripts/slv/rsm.slv.rdap.avail.pl && /opt/zabbix/scripts/slv/rsm.slv.rdap.rollweek.pl && /opt/zabbix/scripts/slv/rsm.slv.rdap.downtime.pl)', SLV_LOG_FILE],
-	['main', '* * * * *' , 0, '(/opt/zabbix/scripts/slv/rsm.slv.dnssec.avail.pl && /opt/zabbix/scripts/slv/rsm.slv.dnssec.rollweek.pl)'                                                , SLV_LOG_FILE],
-	['main', '* * * * *' , 0, '(/opt/zabbix/scripts/slv/rsm.slv.dns.ns.avail.pl && /opt/zabbix/scripts/slv/rsm.slv.dns.ns.downtime.pl)'                                                , SLV_LOG_FILE],
+	['main', '* * * * *' , 0, $wait_pid . '(/opt/zabbix/scripts/slv/rsm.slv.dns.avail.pl && /opt/zabbix/scripts/slv/rsm.slv.dns.rollweek.pl && /opt/zabbix/scripts/slv/rsm.slv.dns.downtime.pl)'   , SLV_LOG_FILE],
+	['main', '* * * * *' , 0, $wait_pid . '(/opt/zabbix/scripts/slv/rsm.slv.rdds.avail.pl && /opt/zabbix/scripts/slv/rsm.slv.rdds.rollweek.pl && /opt/zabbix/scripts/slv/rsm.slv.rdds.downtime.pl)', SLV_LOG_FILE],
+	['main', '* * * * *' , 0, $wait_pid . '(/opt/zabbix/scripts/slv/rsm.slv.rdap.avail.pl && /opt/zabbix/scripts/slv/rsm.slv.rdap.rollweek.pl && /opt/zabbix/scripts/slv/rsm.slv.rdap.downtime.pl)', SLV_LOG_FILE],
+	['main', '* * * * *' , 0, $wait_pid . '(/opt/zabbix/scripts/slv/rsm.slv.dnssec.avail.pl && /opt/zabbix/scripts/slv/rsm.slv.dnssec.rollweek.pl)'                                                , SLV_LOG_FILE],
+	['main', '* * * * *' , 0, $wait_pid . '(/opt/zabbix/scripts/slv/rsm.slv.dns.ns.avail.pl && /opt/zabbix/scripts/slv/rsm.slv.dns.ns.downtime.pl)'                                                , SLV_LOG_FILE],
 	'',
-	['main', '* * * * *' , 0, '/opt/zabbix/scripts/slv/rsm.slv.dns.udp.rtt.pl'                                                                                                         , SLV_LOG_FILE],
-	['main', '* * * * *' , 0, '/opt/zabbix/scripts/slv/rsm.slv.dns.tcp.rtt.pl'                                                                                                         , SLV_LOG_FILE],
-	['main', '* * * * *' , 0, '/opt/zabbix/scripts/slv/rsm.slv.rdds.rtt.pl'                                                                                                            , SLV_LOG_FILE],
-	['main', '* * * * *' , 0, '/opt/zabbix/scripts/slv/rsm.slv.rdap.rtt.pl'                                                                                                            , SLV_LOG_FILE],
+	['main', '* * * * *' , 0, '/opt/zabbix/scripts/slv/rsm.slv.dns.udp.rtt.pl'                                                                                                                     , SLV_LOG_FILE],
+	['main', '* * * * *' , 0, '/opt/zabbix/scripts/slv/rsm.slv.dns.tcp.rtt.pl'                                                                                                                     , SLV_LOG_FILE],
+	['main', '* * * * *' , 0, '/opt/zabbix/scripts/slv/rsm.slv.rdds.rtt.pl'                                                                                                                        , SLV_LOG_FILE],
+	['main', '* * * * *' , 0, '/opt/zabbix/scripts/slv/rsm.slv.rdap.rtt.pl'                                                                                                                        , SLV_LOG_FILE],
 	'',
-	['main', '0 1 1 * *' , 0, '/opt/zabbix/scripts/disable-rdds-for-rdap-hosts.pl'                                                                                                     , '/var/log/zabbix/disable-rdds-for-rdap-hosts.err'],
-	['main', '0 15 1 * *', 0, '/opt/zabbix/scripts/sla-monthly-status.pl'                                                                                                              , '/var/log/zabbix/sla-monthly-status.err'],
-	['main', '0 15 1 * *', 0, '/opt/zabbix/scripts/sla-report.php'                                                                                                                     , '/var/log/zabbix/sla-report.err'],
+	['main', '0 1 1 * *' , 0, '/opt/zabbix/scripts/disable-rdds-for-rdap-hosts.pl'                                                                                                                 , '/var/log/zabbix/disable-rdds-for-rdap-hosts.err'],
+	['main', '0 15 1 * *', 0, '/opt/zabbix/scripts/sla-monthly-status.pl'                                                                                                                          , '/var/log/zabbix/sla-monthly-status.err'],
+	['main', '0 15 1 * *', 0, '/opt/zabbix/scripts/sla-report.php'                                                                                                                                 , '/var/log/zabbix/sla-report.err'],
 	'',
-	['db'  , '0 23 * * *', 0, '/opt/zabbix/scripts/MySQL_part_management.pl'                                                                                                           , '/var/log/zabbix/zabbix-mysql-partitioning'],
-	['db'  , '0 2 * * *' , 0, '/opt/zabbix/scripts/MySQL_part_management.pl'                                                                                                           , '/var/log/zabbix/zabbix-mysql-partitioning'],
+	['db'  , '0 23 * * *', 0, '/opt/zabbix/scripts/MySQL_part_management.pl'                                                                                                                       , '/var/log/zabbix/zabbix-mysql-partitioning'],
+	['db'  , '0 2 * * *' , 0, '/opt/zabbix/scripts/MySQL_part_management.pl'                                                                                                                       , '/var/log/zabbix/zabbix-mysql-partitioning'],
 );
 
 sub main()
