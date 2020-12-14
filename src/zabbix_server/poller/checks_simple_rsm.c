@@ -544,7 +544,8 @@ static int      zbx_get_ts_from_host(const char *host, time_t *ts)
 	if (p2 == p || '0' == *p)
 		return FAIL;
 
-	*ts = atoi(p);
+	if (1 != sscanf(p, ZBX_FS_TIME_T, ts))
+		return FAIL;
 
 	return SUCCEED;
 }
@@ -2343,21 +2344,51 @@ static int	update_metadata(int file_exists, const char *domain, unsigned int tes
 	return write_metadata(domain, *current_mode, *successful_tests, err, err_size);
 }
 
+/* the value can be in 2 formats:                                                          */
+/*   <value>                                                                               */
+/*   <value>;<timestamp>:<newvalue>                                                        */
+/*                                                                                         */
+/* In the latter case the new value gets into effect after specified timestamp has passed. */
+int	get_dns_minns_from_value(time_t now, const char *value, int *minns)
+{
+	const char	*p, *minns_p;
+	time_t		ts;
+
+	for (minns_p = value; NULL != (p = strchr(minns_p, ';'));)
+	{
+		if (1 != sscanf(++p, ZBX_FS_TIME_T, &ts))
+			return FAIL;
+
+		if (ts > now)
+			break;
+
+		if (NULL == (p = strchr(minns_p, ':')))
+			return FAIL;
+
+		minns_p = ++p;
+	}
+
+	*minns = atoi(minns_p);
+
+	return SUCCEED;
+}
+
 int	check_rsm_dns(const char *host, int nextcheck, const AGENT_REQUEST *request, AGENT_RESULT *result)
 {
 	char			err[ZBX_ERR_BUF_SIZE], protocol, *domain, *testprefix, *name_servers_list, *res_ip,
-				testedname[ZBX_HOST_BUF_SIZE];
+				testedname[ZBX_HOST_BUF_SIZE], *minns_value;
 	zbx_dnskeys_error_t	ec_dnskeys;
 	ldns_resolver		*res = NULL;
 	ldns_rr_list		*keys = NULL;
 	FILE			*log_fd;
 	zbx_ns_t		*nss = NULL;
 	size_t			i, j, nss_num = 0;
-	unsigned int		extras, current_mode, test_status, dnssec_status, minns, nssok;
+	unsigned int		extras, current_mode, test_status, dnssec_status, nssok;
 	struct zbx_json		json;
 	int			dnssec_enabled, rdds_enabled, epp_enabled, udp_enabled, tcp_enabled, ipv4_enabled,
 				ipv6_enabled, udp_rtt_limit, tcp_rtt_limit, rtt_limit, successful_tests, file_exists = 0,
-				tcp_ratio, test_recover_udp, test_recover_tcp, test_recover, ret = SYSINFO_RET_FAIL;
+				tcp_ratio, test_recover_udp, test_recover_tcp, test_recover, minns,
+				ret = SYSINFO_RET_FAIL;
 
 	if (17 != request->nparam)
 	{
@@ -2382,7 +2413,13 @@ int	check_rsm_dns(const char *host, int nextcheck, const AGENT_REQUEST *request,
 	GET_PARAM_UINT (tcp_ratio        , 13, "TCP ratio");
 	GET_PARAM_UINT (test_recover_udp , 14, "successful tests to recover from critical mode (UDP)");
 	GET_PARAM_UINT (test_recover_tcp , 15, "successful tests to recover from critical mode (TCP)");
-	GET_PARAM_UINT (minns            , 16, "required number of working name servers");
+	GET_PARAM_EMPTY(minns_value      , 16, "minimum number of working name servers");
+
+	if (SUCCEED != get_dns_minns_from_value((time_t)nextcheck, minns_value, &minns))
+	{
+		SET_MSG_RESULT(result, zbx_dsprintf(NULL, "unexpected format of parameter #17: %s", minns_value));
+		return SYSINFO_RET_FAIL;
+	}
 
 	if (SUCCEED != metadata_file_exists(domain, &file_exists, err, sizeof(err)))
 	{
@@ -2439,7 +2476,7 @@ int	check_rsm_dns(const char *host, int nextcheck, const AGENT_REQUEST *request,
 
 	rsm_info(log_fd, "START TEST");
 
-	rsm_infof(log_fd, "mode: %s, protocol: %s, rtt limit: %d, tcp ratio: %d, minns: %u, UDP: %d, TCP: %d"
+	rsm_infof(log_fd, "mode: %s, protocol: %s, rtt limit: %d, tcp ratio: %d, minns: %d, UDP: %d, TCP: %d"
 			" (for critical mode: successful: %d, required for recovery: %d for UDP, %d for TCP)",
 			(CURRENT_MODE_NORMAL == current_mode ? "normal" : "critical"),
 			(protocol == RSM_UDP ? "UDP" : "TCP"),
