@@ -1710,9 +1710,9 @@ Other options
                 if none or all services specified - will disable the whole TLD
         --list-services
                 list services of each TLD, the output is comma-separated list:
-                <TLD>,<TLD-TYPE>,<TLD-STATUS>,<RDDS.DNS.TESTPREFIX>,<RDDS.NS.STRING>,<RDDS43.TEST.PREFIX>,
+                <TLD>,<TLD-TYPE>,<TLD-STATUS>,<DNS.TESTPREFIX>,<RDDS.NS.STRING>,<RDDS43.TEST.PREFIX>,
                 <TLD.DNSSEC.ENABLED>,<TLD.EPP.ENABLED>,<TLD.RDDS.ENABLED>,<TLD.RDAP.ENABLED>,
-                <RDAP.BASE.URL>,<RDAP.TEST.DOMAIN>,<RDDS43.SERVERS>,<RDDS80.SERVERS>,<RDDS43.TEST.DOMAIN>
+                <RDAP.BASE.URL>,<RDAP.TEST.DOMAIN>,<RDDS43.SERVERS>,<RDDS80.SERVERS>,<RDDS43.TEST.DOMAIN>,<DNS.MINNS>
         --get-nsservers-list
                 CSV formatted list of NS + IP server pairs for specified TLD:
                 <TLD>,<IP-VERSION>,<NAME-SERVER>,<IP>
@@ -1736,7 +1736,13 @@ Other options
         --ns-servers-v6=STRING
                 list of IPv6 name servers separated by space (name and IP separated by comma): "NAME,IP[ NAME,IP2 ...]"
         --dns-minns=INT|STRING
-                set minimum number of the available nameservers; use '<minns>;<timestamp>' to schedule the change
+                Set minimum number of the available nameservers.
+                New TLD:
+                        If option is not specified, it defaults to ${\DNS_MINNS_DEFAULT} nameservers.
+                        Syntax: "<curr_minns>" or "<curr_minns>;<sched_minns>;<sched_clock>"
+                Existing TLD:
+                        If timestamp is not specified, the change will be scheduled to happen in ${\DNS_MINNS_OFFSET_MINUTES} minutes.
+                        Sytnax: "<sched_minns>" or "<sched_minns>;<sched_clock>"
         --rdds43-servers=STRING
                 list of RDDS43 servers separated by comma: "NAME1,NAME2,..."
         --rdds80-servers=STRING
