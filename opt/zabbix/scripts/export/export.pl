@@ -540,11 +540,6 @@ sub __get_test_data($$$)
 	{
 		next if (!tld_service_enabled($tld, $service, $from));
 
-		if ($service eq 'dns' || $service eq 'dnssec')
-		{
-			$result->{'minns'} = get_dns_minns($tld, $from);
-		}
-
 		my $delay = $services->{$service}{'delay'};
 		my $service_from = $services->{$service}{'from'};
 		my $service_till = $services->{$service}{'till'};
@@ -723,6 +718,11 @@ sub __get_test_data($$$)
 					next;
 				}
 
+				if ($service eq 'dns' || $service eq 'dnssec')
+				{
+					$cycles->{$service}{$cycleclock}{'minns'} = get_dns_minns($tld, $cycleclock);
+				}
+
 				foreach my $interface (keys(%{$results->{$service}{$cycleclock}{'interfaces'}}))
 				{
 					# the status is set later
@@ -878,7 +878,7 @@ sub __save_csv_data($$)
 				# DNS MINNS
 				dw_append_csv(DATA_MINNS, [
 						      $tld_id,
-						      $result->{'minns'},
+						      $cycle_ref->{'minns'},
 						      $cycleclock
 				]);
 			}
@@ -1118,7 +1118,7 @@ sub __save_csv_data($$)
 						      $eventid,
 						      $event_end,
 						      $failed_tests
-					]);
+				]);
 			}
 
 			# report only incidents within given period
@@ -1130,7 +1130,7 @@ sub __save_csv_data($$)
 						      $tld_id,
 						      $service_category_id,
 						      $tld_type_id
-					]);
+				]);
 			}
 		}
 	}
