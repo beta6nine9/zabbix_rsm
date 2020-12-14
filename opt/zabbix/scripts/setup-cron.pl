@@ -16,8 +16,8 @@ use constant SLV_LOG_FILE => '/var/log/zabbix/rsm.slv.err';
 
 my $JOB_USER = 'zabbix';	# default user of the job
 
-my $echo_pid = 'echo -n $$ > /tmp/rsm.probe.online.pl.pid; ';
-my $wait_pid = 'sleep 3; timeout 30 tail --pid=$(cat /tmp/rsm.probe.online.pl.pid) -f /dev/null; ';
+my $echo_pid = 'echo -n $$ > /tmp/rsm.probe.online.pl.cron.pid; ';
+my $wait_pid = 'sleep 3; timeout 30 tail --pid=$(cat /tmp/rsm.probe.online.pl.cron.pid) -f /dev/null; ';
 
 my @cron_jobs = (
 	'# ignore missing home directory errors',
