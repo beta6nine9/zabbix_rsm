@@ -935,7 +935,9 @@ sub __save_csv_data($$)
 								dw_get_id(ID_TARGET, $target),
 								$testedname_id,
 							]);
-
+						}
+						else
+						{
 							$cycle_ns_id = dw_get_id(ID_NS_NAME, $target);
 						}
 
@@ -983,7 +985,7 @@ sub __save_csv_data($$)
 								$cycle_ns_id // '',
 								$ip_id);
 
-							my $ns_id = (exists($metric_ref->{'nsid'}) ? dw_get_id(ID_NSID, $metric_ref->{'nsid'}) : '');
+							my $nsid_id = (exists($metric_ref->{'nsid'}) ? dw_get_id(ID_NSID, $metric_ref->{'nsid'}) : '');
 
 							# TEST
 							dw_append_csv(DATA_TEST, [
@@ -997,9 +999,9 @@ sub __save_csv_data($$)
 									      $ip_version_id,
 									      $ip_id,
 									      $test_type_id,
-									      $ns_id,
+									      $cycle_ns_id // '',
 									      $tld_type_id,
-									      $ns_id
+									      $nsid_id
 							]);
 
 							if ($ip)
@@ -1015,7 +1017,7 @@ sub __save_csv_data($$)
 							}
 						}
 
-						if ($interface eq 'dns')
+						if ($cycle_ns_id)
 						{
 							# Name Server (target) test
 							dw_append_csv(DATA_NSTEST, [
@@ -1030,7 +1032,6 @@ sub __save_csv_data($$)
 						}
 					}
 				}
-
 
 				if ($interface eq 'dns')
 				{
