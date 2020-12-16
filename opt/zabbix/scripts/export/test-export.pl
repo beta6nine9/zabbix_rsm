@@ -6,6 +6,32 @@ use warnings;
 use Getopt::Long;
 use Text::CSV_XS;
 
+my @catalog_names = (
+	'ipAddresses',
+	'ipVersions',
+	'nsFQDNs',
+	'probeNames',
+	'serviceCategory',
+	'statusMaps',
+	'testTypes',
+	'tlds',
+	'tldTypes',
+	'transportProtocols',
+);
+
+my @generic_data_file_names = (
+	'probeChanges',
+);
+
+my @tld_data_file_names = (
+	'cycles',
+	'falsePositiveChanges',
+	'incidents',
+	'incidentsEndTime',
+	'nsTests',
+	'tests',
+);
+
 #####################################
 #                                   #
 # dealing with command line options #
@@ -14,6 +40,8 @@ use Text::CSV_XS;
 
 # display help message
 my $help = 0;
+
+my $tld;
 
 # start and length of the interval for which CSV files were generated
 my $period_start = 0;
@@ -29,42 +57,58 @@ my %files;
 my %options;
 
 $options{'help'} = \$help;
+$options{'tld=s'} = \$tld;
 $options{'from=i'} = \$period_start;
 $options{'period=i'} = \$length;
 $options{'debug'} = \$debug;
 $options{'fail_immediately'} = \$fail_immediately;
-
-foreach my $csv_file (('cycles', 'falsePositiveChanges', 'incidents', 'incidentsEndTime', 'ipAddresses', 'ipVersions',
-		'nsFQDNs', 'nsTests', 'probeChanges', 'probeNames', 'serviceCategory', 'statusMaps', 'tests',
-		'testTypes', 'tlds', 'tldTypes', 'transportProtocols'))
-{
-	$files{$csv_file} = $csv_file . '.csv';
-	$options{$csv_file . '=s'} = \$files{$csv_file};
-}
 
 if (!GetOptions(%options))
 {
 	$help = 1;
 }
 
-if (!$period_start && !$help)
+if ((!$tld || !$period_start) && !$help)
 {
-	print("Period start parameter is mandatory\n");
+	print("TLD and Period start parameters are mandatory\n");
 	$help = 1;
 }
 
 if ($help)
 {
-	print("Usage: $0 --from=<period start timestamp> [--period=<period length (seconds)>] [--debug] [--fail_immediately]");
-
-	foreach my $file (sort(keys(%files)))
-	{
-			print(" [--$file=<$file CSV file>]");
-	}
-
-	print("\n");
+	print("Usage: $0 --tld=<TLD> --from=<period start timestamp> [--period=<period length (seconds)>] [--debug]".
+		" [--fail_immediately]\n");
 
 	exit();
+}
+
+##################
+#                #
+# set file names #
+#                #
+##################
+
+# catalogs
+foreach my $csv_file (@catalog_names)
+{
+	$files{$csv_file} = "/opt/zabbix/export/$csv_file.csv";
+}
+
+# sec, min, hour, mday, mon, year
+my (undef, undef, undef, $mday, $mon, $year) = localtime($period_start);
+$mon += 1;
+$year += 1900;
+
+# generic data files
+foreach my $csv_file (@generic_data_file_names)
+{
+	$files{$csv_file} = "/opt/zabbix/export/$year/$mon/$mday/$csv_file.csv";
+}
+
+# tld data files
+foreach my $csv_file (@tld_data_file_names)
+{
+	$files{$csv_file} = "/opt/zabbix/export/$year/$mon/$mday/$tld/$csv_file.csv";
 }
 
 ##########################################
