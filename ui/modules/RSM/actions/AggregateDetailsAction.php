@@ -72,8 +72,6 @@ class AggregateDetailsAction extends Action {
 	/**
 	 * Check if user has enough permissions to all requested resources.
 	 *
-	 * @throws Exception if no access to requested resources.
-	 *
 	 * @return boolean
 	 */
 	protected function checkPermissions() {
@@ -98,7 +96,7 @@ class AggregateDetailsAction extends Action {
 		$this->tld = reset($tld);
 
 		if (!$this->tld) {
-			throw new Exception(_('No permissions to referred TLD or it does not exist!'));
+			return false;
 		}
 
 		// slv_item
@@ -109,7 +107,7 @@ class AggregateDetailsAction extends Action {
 		$this->slv_item = reset($slv_items);
 
 		if (!$this->slv_item) {
-			throw new Exception(_('No permissions to referred SLV item or it does not exist!'));
+			return false;
 		}
 
 		// availability_item
@@ -122,7 +120,7 @@ class AggregateDetailsAction extends Action {
 		$this->availability_item = reset($avail_item);
 
 		if (!$this->availability_item) {
-			throw new Exception(_s('Item with key "%1$s" not exist on TLD!', $key));
+			return false;
 		}
 
 		// probes

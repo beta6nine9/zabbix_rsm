@@ -58,10 +58,8 @@ class IncidentDetailsAction extends Action {
 	}
 
 	protected function checkPermissions() {
-		$valid_users = [USER_TYPE_READ_ONLY, USER_TYPE_ZABBIX_USER, USER_TYPE_POWER_USER, USER_TYPE_COMPLIANCE,
-			USER_TYPE_ZABBIX_ADMIN, USER_TYPE_SUPER_ADMIN];
-
-		return in_array($this->getUserType(), $valid_users);
+		// ensure we have access to Rsmhost, limit output to hostid to avoid selecting the whole thing
+		return !empty(API::Host()->get(['output' => ['hostid'], 'filter' => ['host' => $this->getInput('host', null)]]));
 	}
 
 	protected function updateProfile(array &$data = []) {
