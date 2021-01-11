@@ -9,7 +9,7 @@ use warnings;
 use RSM;
 use RSMSLV;
 use ApiHelper;
-use JSON::XS qw(decode_json encode_json);
+use JSON::XS qw(decode_json);
 use Data::Dumper;
 use Data::Compare;
 use Path::Tiny;

@@ -72,6 +72,7 @@ use constant AH_SLA_API_VERSION_2 => 2;
 
 my $_error_string = "";
 my $_debug = 0;
+my $_json_xs;
 
 sub ah_set_debug(;$)
 {
@@ -789,7 +790,14 @@ sub __encode_json($$)
 	$json_ref->{'version'} = $version;
 	$json_ref->{'lastUpdateApiDatabase'} = time();
 
-	return encode_json($json_ref);
+	if (!defined($_json_xs))
+	{
+		$_json_xs = JSON::XS->new();
+		$_json_xs->utf8();
+		$_json_xs->canonical();
+	}
+
+	return $_json_xs->encode($json_ref);
 }
 
 # get the time of last audit log entry that was checked
