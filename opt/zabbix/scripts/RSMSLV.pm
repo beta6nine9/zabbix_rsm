@@ -1378,8 +1378,11 @@ sub generate_db_error($$)
 
 	if (defined($handle->{'ParamValues'}) && %{$handle->{'ParamValues'}})
 	{
-		my $params = join(',', values(%{$handle->{'ParamValues'}}));
-		push(@message_parts, "(params: [$params])");
+		my $params = $handle->{'ParamValues'};
+		my @params = @{$params}{sort {$a <=> $b} keys(%{$params})};
+		my $params_str = join(',', map($_ // 'undef', @params));
+
+		push(@message_parts, "(params: [$params_str])");
 	}
 
 	if (defined($handle->{'ParamArrays'}) && %{$handle->{'ParamArrays'}})
