@@ -29,9 +29,11 @@ my $exp_output;
 my $trigger_thresholds = RSM_TRIGGER_THRESHOLDS;
 my $cfg_global_macros = CFG_GLOBAL_MACROS;
 
-use constant DNS_MINNS_DEFAULT		=> 2;
-use constant DNS_MINNS_OFFSET_MINUTES	=> 15;
-use constant DNS_MINNS_OFFSET		=> DNS_MINNS_OFFSET_MINUTES * 60;
+use constant DNS_MINNS_DEFAULT			=> 2;
+use constant DNS_MINNS_OFFSET_MINUTES		=> 15;
+use constant DNS_MINNS_OFFSET			=> DNS_MINNS_OFFSET_MINUTES * 60;
+use constant DNS_MINNS_MIN_INTERVAL_DAYS	=> 90;
+use constant DNS_MINNS_MIN_INTERVAL		=> DNS_MINNS_MIN_INTERVAL_DAYS * 86400;
 
 ################################################################################
 # main
@@ -1291,8 +1293,8 @@ sub build_dns_minns_macro($)
 
 					if ($sched_clock <= cycle_start($^T, 60))
 					{
-						undef $sched_clock;
-						undef $sched_minns;
+						undef($sched_clock);
+						undef($sched_minns);
 					}
 				}
 
@@ -1337,10 +1339,18 @@ sub build_dns_minns_macro($)
 
 			if (defined($macro_sched_clock) && $macro_sched_clock <= $^T)
 			{
+				if (getopt('dns-minns') != $macro_sched_minns && $macro_sched_clock >= $^T - DNS_MINNS_MIN_INTERVAL)
+				{
+					my $macro_sched_clock_str = ts_full($macro_sched_clock);
+
+					fail("the change was already done on $macro_sched_clock_str, please wait at" .
+						" least " . DNS_MINNS_MIN_INTERVAL_DAYS . " days before the next change");
+				}
+
 				$macro_curr_minns = $macro_sched_minns;
 
-				undef $macro_sched_clock;
-				undef $macro_sched_minns;
+				undef($macro_sched_clock);
+				undef($macro_sched_minns);
 			}
 
 			# opt for existing tld - "<sched_minns>" or "<sched_minns>;<sched_clock>"
@@ -1370,7 +1380,9 @@ sub build_dns_minns_macro($)
 
 				if (defined($macro_sched_clock) && cycle_start($^T, 60) >= $macro_sched_clock - DNS_MINNS_OFFSET)
 				{
-					fail("change to $macro_sched_minns is already scheduled and will happen at $macro_sched_clock");
+					my $macro_sched_clock_str = ts_full($macro_sched_clock);
+
+					fail("change to $macro_sched_minns is already scheduled and will happen at $macro_sched_clock_str");
 				}
 
 				if (defined($opt_sched_clock))
