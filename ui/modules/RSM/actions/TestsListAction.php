@@ -230,7 +230,8 @@ class TestsListAction extends Action {
 				' FROM history_uint h'.
 				' WHERE h.itemid='.$avail_item.
 					' AND h.clock>='.$data['from_ts'].
-					' AND h.clock<='.$data['to_ts']
+					' AND h.clock<='.$data['to_ts'].
+				' ORDER BY h.clock DESC'
 			);
 
 			// Result generation.
@@ -238,18 +239,16 @@ class TestsListAction extends Action {
 			$data['statusChanges'] = 0;
 
 			while ($test = DBfetch($tests)) {
-				if ($test['value'] == 0) {
-					$data['tests'][] = [
-						'value' => $test['value'],
-						'clock' => $test['clock'],
-						'incident' => 0,
-						'updated' => false
-					];
+				$data['tests'][] = [
+					'value' => $test['value'],
+					'clock' => $test['clock'],
+					'incident' => 0,
+					'updated' => false
+				];
 
 					if (!$test['value']) {
 						$data['downTests']++;
 					}
-				}
 
 				// State changes.
 				if (!isset($status_changed)) {

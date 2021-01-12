@@ -1,11 +1,13 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 #
 # Availability of particular nameservers
 
-BEGIN { our $MYDIR = $0; $MYDIR =~ s,(.*)/.*/.*,$1,; $MYDIR = '..' if ($MYDIR eq $0); }
-use lib $MYDIR;
+use FindBin;
+use lib "$FindBin::RealBin/..";
+
 use strict;
 use warnings;
+
 use RSM;
 use RSMSLV;
 use TLD_constants qw(:groups :api);
@@ -108,7 +110,7 @@ sub process_cycles($$$$)
 			$slv_clock = current_month_first_cycle();
 		}
 
-		if ($slv_clock >= current_month_latest_cycle())
+		if ($slv_clock >= cycle_start($now, $cycle_delay))
 		{
 			dbg("processed all available data");
 			last;
@@ -134,11 +136,19 @@ sub process_cycles($$$$)
 
 		if ($probes_with_results < $cfg_minonline)
 		{
-			push_value($tld, $slv_itemkey, $from, UP_INCONCLUSIVE_NO_DATA, ITEM_VALUE_TYPE_UINT64,
-				"Up (not enough probes with results, $probes_with_results" .
-				" while $cfg_minonline required)");
+			if (cycle_start(time(), $cycle_delay) - $from < WAIT_FOR_AVAIL_DATA)
+			{
+				# not enough data, but cycle isn't old enough+
+				last;
+			}
+			else
+			{
+				push_value($tld, $slv_itemkey, $from, UP_INCONCLUSIVE_NO_DATA, ITEM_VALUE_TYPE_UINT64,
+					"Up (not enough probes with results, $probes_with_results" .
+					" while $cfg_minonline required)");
 
-			next;
+				next;
+			}
 		}
 
 		my $down_rtt_count = 0;
@@ -214,10 +224,4 @@ sub get_rtt_values($$$)
 		" where itemid in ($itemids_placeholder) and clock between ? and ?",
 		[@{$itemids}, $from, $till]
 	);
-}
-
-sub current_month_latest_cycle()
-{
-	# we don't know the rollweek bounds yet so we assume it ends at least few minutes back
-	return cycle_start($now, $cycle_delay) - AVAIL_SHIFT_BACK;
 }

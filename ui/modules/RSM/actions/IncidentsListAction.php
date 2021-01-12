@@ -164,89 +164,70 @@ class IncidentsListAction extends Action {
 		$items = $this->fetchItems($data);
 
 		if ($items) {
-			$dns_items = [];
-			$dnssec_items = [];
-			$rdds_items = [];
-			$rdap_items = [];
-			$epp_items = [];
-			$dns_avail_item = [];
-			$dnssec_avail_item = [];
-			$rdds_avail_item = [];
-			$rdap_avail_item = [];
-			$epp_avail_item = [];
+			$avail_itemid['dns'] = null;
+			$avail_itemid['dnssec'] = null;
+			$avail_itemid['rdds'] = null;
+			$avail_itemid['rdap'] = null;
+			$avail_itemid['epp'] = null;
+
 			$itemids = [];
 
+			# Rolling Week items
 			foreach ($items as $item) {
 				switch ($item['key_']) {
 					case RSM_SLV_DNS_ROLLWEEK:
-						$data['dns']['itemid'] = $item['itemid'];
-						$data['dns']['slv'] = sprintf('%.3f', $item['lastvalue']);
-						$data['dns']['slvTestTime'] = $item['lastclock'];
-						$data['dns']['events'] = [];
+						$service = 'dns';
 						break;
-
 					case RSM_SLV_DNSSEC_ROLLWEEK:
-						$data['dnssec']['itemid'] = $item['itemid'];
-						$data['dnssec']['slv'] = sprintf('%.3f', $item['lastvalue']);
-						$data['dnssec']['slvTestTime'] = $item['lastclock'];
-						$data['dnssec']['events'] = [];
+						$service = 'dnssec';
 						break;
-
 					case RSM_SLV_RDDS_ROLLWEEK:
-						$data['rdds']['itemid'] = $item['itemid'];
-						$data['rdds']['slv'] = sprintf('%.3f', $item['lastvalue']);
-						$data['rdds']['slvTestTime'] = $item['lastclock'];
-						$data['rdds']['events'] = [];
+						$service = 'rdds';
 						break;
-
 					case RSM_SLV_RDAP_ROLLWEEK:
-						$data['rdap']['itemid'] = $item['itemid'];
-						$data['rdap']['slv'] = sprintf('%.3f', $item['lastvalue']);
-						$data['rdap']['slvTestTime'] = $item['lastclock'];
-						$data['rdap']['events'] = [];
+						$service = 'rdap';
 						break;
-
 					case RSM_SLV_EPP_ROLLWEEK:
-						$data['epp']['itemid'] = $item['itemid'];
-						$data['epp']['slv'] = sprintf('%.3f', $item['lastvalue']);
-						$data['epp']['slvTestTime'] = $item['lastclock'];
-						$data['epp']['events'] = [];
+						$service = 'epp';
 						break;
+					default:
+						$service = null;
+				}
 
+				if ($service !== null) {
+					$data[$service]['itemid'] = $item['itemid'];
+					$data[$service]['slv'] = sprintf('%.3f', $item['lastvalue']);
+					$data[$service]['slvTestTime'] = $item['lastclock'];
+					$data[$service]['events'] = [];
+				}
+			}
+
+			# Service Availability items
+			foreach ($items as $item) {
+				switch ($item['key_']) {
 					case RSM_SLV_DNS_AVAIL:
-						$data['dns']['availItemId'] = $item['itemid'];
-						$dns_avail_item = $item['itemid'];
-						$dns_items[] = $item['itemid'];
-						$itemids[] = $item['itemid'];
+						$service = 'dns';
 						break;
-
 					case RSM_SLV_DNSSEC_AVAIL:
-						$data['dnssec']['availItemId'] = $item['itemid'];
-						$dnssec_avail_item = $item['itemid'];
-						$dnssec_items[] = $item['itemid'];
-						$itemids[] = $item['itemid'];
+						$service = 'dnssec';
 						break;
-
 					case RSM_SLV_RDDS_AVAIL:
-						$data['rdds']['availItemId'] = $item['itemid'];
-						$rdds_avail_item = $item['itemid'];
-						$rdds_items[] = $item['itemid'];
-						$itemids[] = $item['itemid'];
+						$service = 'rdds';
 						break;
-
 					case RSM_SLV_RDAP_AVAIL:
-						$data['rdap']['availItemId'] = $item['itemid'];
-						$rdap_avail_item = $item['itemid'];
-						$rdap_items[] = $item['itemid'];
-						$itemids[] = $item['itemid'];
+						$service = 'rdap';
 						break;
-
 					case RSM_SLV_EPP_AVAIL:
-						$data['epp']['availItemId'] = $item['itemid'];
-						$epp_avail_item = $item['itemid'];
-						$epp_items[] = $item['itemid'];
-						$itemids[] = $item['itemid'];
+						$service = 'epp';
 						break;
+					default:
+						$service = null;
+				}
+
+				if ($service !== null) {
+					$data[$service]['availItemId'] = $item['itemid'];
+					$avail_itemid[$service] = $item['itemid'];
+					$itemids[] = $item['itemid'];
 				}
 			}
 
@@ -271,19 +252,19 @@ class IncidentsListAction extends Action {
 			foreach ($triggers as $trigger) {
 				$trigger_item = reset($trigger['items']);
 
-				if (in_array($trigger_item['itemid'], $dns_items)) {
+				if ($trigger_item['itemid'] == $avail_itemid['dns']) {
 					$dns_triggers[] = $trigger['triggerid'];
 				}
-				elseif (in_array($trigger_item['itemid'], $dnssec_items)) {
+				elseif ($trigger_item['itemid'] == $avail_itemid['dnssec']) {
 					$dnssec_triggers[] = $trigger['triggerid'];
 				}
-				elseif (in_array($trigger_item['itemid'], $rdap_items)) {
-					$rdap_triggers[] = $trigger['triggerid'];
-				}
-				elseif (in_array($trigger_item['itemid'], $rdds_items)) {
+				elseif ($trigger_item['itemid'] == $avail_itemid['rdds']) {
 					$rdds_triggers[] = $trigger['triggerid'];
 				}
-				elseif (in_array($trigger_item['itemid'], $epp_items)) {
+				elseif ($trigger_item['itemid'] == $avail_itemid['rdap']) {
+					$rdap_triggers[] = $trigger['triggerid'];
+				}
+				elseif ($trigger_item['itemid'] == $avail_itemid['epp']) {
 					$epp_triggers[] = $trigger['triggerid'];
 				}
 			}
@@ -381,13 +362,13 @@ class IncidentsListAction extends Action {
 								if (in_array($event_triggerid, $dns_triggers)) {
 									unset($data['dns']['events'][$i]['status']);
 									$item_type = 'dns';
-									$itemid = $dns_avail_item;
+									$itemid = $avail_itemid['dns'];
 									$data['dns']['events'][$i] = array_merge($data['dns']['events'][$i], $newData[$i]);
 								}
 								elseif (in_array($event_triggerid, $dnssec_triggers)) {
 									unset($data['dnssec']['events'][$i]['status']);
 									$item_type = 'dnssec';
-									$itemid = $dnssec_avail_item;
+									$itemid = $avail_itemid['dnssec'];
 									$data['dnssec']['events'][$i] = array_merge(
 										$data['dnssec']['events'][$i],
 										$newData[$i]
@@ -396,19 +377,19 @@ class IncidentsListAction extends Action {
 								elseif (in_array($event_triggerid, $rdds_triggers)) {
 									unset($data['rdds']['events'][$i]['status']);
 									$item_type = 'rdds';
-									$itemid = $rdds_avail_item;
+									$itemid = $avail_itemid['rdds'];
 									$data['rdds']['events'][$i] = array_merge($data['rdds']['events'][$i], $newData[$i]);
 								}
 								elseif (in_array($event_triggerid, $rdap_triggers)) {
 									unset($data['rdap']['events'][$i]['status']);
 									$item_type = 'rdap';
-									$itemid = $rdap_avail_item;
+									$itemid = $avail_itemid['rdap'];
 									$data['rdap']['events'][$i] = array_merge($data['rdap']['events'][$i], $newData[$i]);
 								}
 								elseif (in_array($event_triggerid, $epp_triggers)) {
 									unset($data['epp']['events'][$i]['status']);
 									$item_type = 'epp';
-									$itemid = $epp_avail_item;
+									$itemid = $avail_itemid['epp'];
 									$data['epp']['events'][$i] = array_merge($data['epp']['events'][$i], $newData[$i]);
 								}
 
@@ -432,31 +413,31 @@ class IncidentsListAction extends Action {
 							if (isset($data['dns']['events'][$i])) {
 								$item_info = [
 									'itemType' => 'dns',
-									'itemId' => $dns_avail_item
+									'itemId' => $avail_itemid['dns']
 								];
 							}
 							elseif (isset($data['dnssec']['events'][$i])) {
 								$item_info = [
 									'itemType' => 'dnssec',
-									'itemId' => $dnssec_avail_item
+									'itemId' => $avail_itemid['dnssec']
 								];
 							}
 							elseif (isset($data['rdds']['events'][$i])) {
 								$item_info = [
 									'itemType' => 'rdds',
-									'itemId' => $rdds_avail_item
+									'itemId' => $avail_itemid['rdds']
 								];
 							}
 							elseif (isset($data['rdap']['events'][$i])) {
 								$item_info = [
 									'itemType' => 'rdap',
-									'itemId' => $rdap_avail_item
+									'itemId' => $avail_itemid['rdap']
 								];
 							}
 							elseif (isset($data['epp']['events'][$i])) {
 								$item_info = [
 									'itemType' => 'epp',
-									'itemId' => $epp_avail_item
+									'itemId' => $avail_itemid['epp']
 								];
 							}
 
@@ -518,19 +499,19 @@ class IncidentsListAction extends Action {
 
 							$info_itemid = '';
 							if (in_array($event_triggerid, $dns_triggers)) {
-								$info_itemid = $dns_avail_item;
+								$info_itemid = $avail_itemid['dns'];
 							}
 							elseif (in_array($event_triggerid, $dnssec_triggers)) {
-								$info_itemid = $dnssec_avail_item;
+								$info_itemid = $avail_itemid['dnssec'];
 							}
 							elseif (in_array($event_triggerid, $rdds_triggers)) {
-								$info_itemid = $rdds_avail_item;
+								$info_itemid = $avail_itemid['rdds'];
 							}
 							elseif (in_array($event_triggerid, $rdap_triggers)) {
-								$info_itemid = $rdap_avail_item;
+								$info_itemid = $avail_itemid['rdap'];
 							}
 							elseif (in_array($event_triggerid, $epp_triggers)) {
-								$info_itemid = $epp_avail_item;
+								$info_itemid = $avail_itemid['epp'];
 							}
 
 							if ($info_itemid) {
@@ -565,7 +546,7 @@ class IncidentsListAction extends Action {
 						unset($data['dns']['events'][$i]['status']);
 
 						$item_type = 'dns';
-						$itemid = $dns_avail_item;
+						$itemid = $avail_itemid['dns'];
 						$get_history = true;
 
 						$data['dns']['events'][$i] = array_merge($data['dns']['events'][$i], $incidents[$i]);
@@ -581,7 +562,7 @@ class IncidentsListAction extends Action {
 						unset($data['dnssec']['events'][$i]['status']);
 
 						$item_type = 'dnssec';
-						$itemid = $dnssec_avail_item;
+						$itemid = $avail_itemid['dnssec'];
 						$get_history = true;
 
 						$data['dnssec']['events'][$i] = array_merge($data['dnssec']['events'][$i], $incidents[$i]);
@@ -597,7 +578,7 @@ class IncidentsListAction extends Action {
 						unset($data['rdds']['events'][$i]['status']);
 
 						$item_type = 'rdds';
-						$itemid = $rdds_avail_item;
+						$itemid = $avail_itemid['rdds'];
 						$get_history = true;
 
 						$data['rdds']['events'][$i] = array_merge($data['rdds']['events'][$i], $incidents[$i]);
@@ -613,7 +594,7 @@ class IncidentsListAction extends Action {
 						unset($data['rdap']['events'][$i]['status']);
 
 						$item_type = 'rdap';
-						$itemid = $rdap_avail_item;
+						$itemid = $avail_itemid['rdap'];
 						$get_history = true;
 
 						$data['rdap']['events'][$i] = array_merge($data['rdap']['events'][$i], $incidents[$i]);
@@ -629,7 +610,7 @@ class IncidentsListAction extends Action {
 						unset($data['epp']['events'][$i]['status']);
 
 						$item_type = 'epp';
-						$itemid = $epp_avail_item;
+						$itemid = $avail_itemid['epp'];
 						$get_history = true;
 
 						$data['epp']['events'][$i] = array_merge($data['epp']['events'][$i], $incidents[$i]);
@@ -678,23 +659,23 @@ class IncidentsListAction extends Action {
 
 				if (in_array($objectid, $dns_triggers)) {
 					$item_type = 'dns';
-					$itemid = $dns_avail_item;
+					$itemid = $avail_itemid['dns'];
 				}
 				elseif (in_array($objectid, $dnssec_triggers)) {
 					$item_type = 'dnssec';
-					$itemid = $dnssec_avail_item;
+					$itemid = $avail_itemid['dnssec'];
 				}
 				elseif (in_array($objectid, $rdds_triggers)) {
 					$item_type = 'rdds';
-					$itemid = $rdds_avail_item;
+					$itemid = $avail_itemid['rdds'];
 				}
 				elseif (in_array($objectid, $rdap_triggers)) {
 					$item_type = 'rdap';
-					$itemid = $rdap_avail_item;
+					$itemid = $avail_itemid['rdap'];
 				}
 				elseif (in_array($objectid, $epp_triggers)) {
 					$item_type = 'epp';
-					$itemid = $epp_avail_item;
+					$itemid = $avail_itemid['epp'];
 				}
 
 				if ($event) {
@@ -729,20 +710,20 @@ class IncidentsListAction extends Action {
 			$data['epp']['inIncident'] = 0;
 
 			$avail_items = [];
-			if ($dns_avail_item) {
-				$avail_items[] = $dns_avail_item;
+			if ($avail_itemid['dns']) {
+				$avail_items[] = $avail_itemid['dns'];
 			}
-			if ($dnssec_avail_item) {
-				$avail_items[] = $dnssec_avail_item;
+			if ($avail_itemid['dnssec']) {
+				$avail_items[] = $avail_itemid['dnssec'];
 			}
-			if ($rdds_avail_item) {
-				$avail_items[] = $rdds_avail_item;
+			if ($avail_itemid['rdds']) {
+				$avail_items[] = $avail_itemid['rdds'];
 			}
-			if ($rdap_avail_item) {
-				$avail_items[] = $rdap_avail_item;
+			if ($avail_itemid['rdap']) {
+				$avail_items[] = $avail_itemid['rdap'];
 			}
-			if ($epp_avail_item) {
-				$avail_items[] = $epp_avail_item;
+			if ($avail_itemid['epp']) {
+				$avail_items[] = $avail_itemid['epp'];
 			}
 
 			$items_histories = DBselect(
@@ -755,19 +736,19 @@ class IncidentsListAction extends Action {
 			);
 
 			while ($items_history = DBfetch($items_histories)) {
-				if ($items_history['itemid'] == $dns_avail_item) {
+				if ($items_history['itemid'] == $avail_itemid['dns']) {
 					$type = 'dns';
 				}
-				elseif ($items_history['itemid'] == $dnssec_avail_item) {
+				elseif ($items_history['itemid'] == $avail_itemid['dnssec']) {
 					$type = 'dnssec';
 				}
-				elseif ($items_history['itemid'] == $rdds_avail_item) {
+				elseif ($items_history['itemid'] == $avail_itemid['rdds']) {
 					$type = 'rdds';
 				}
-				elseif ($items_history['itemid'] == $rdap_avail_item) {
+				elseif ($items_history['itemid'] == $avail_itemid['rdap']) {
 					$type = 'rdap';
 				}
-				elseif ($items_history['itemid'] == $epp_avail_item) {
+				elseif ($items_history['itemid'] == $avail_itemid['epp']) {
 					$type = 'epp';
 				}
 
@@ -886,24 +867,24 @@ class IncidentsListAction extends Action {
 						if ($item['key_'] == CALCULATED_ITEM_DNS_DELAY) {
 							if (isset($services['dns'])) {
 								$services['dns']['delay'] = $item_value['value'];
-								$services['dns']['itemId'] = $dns_avail_item;
+								$services['dns']['itemId'] = $avail_itemid['dns'];
 							}
 							if (isset($services['dnssec'])) {
 								$services['dnssec']['delay'] = $item_value['value'];
-								$services['dnssec']['itemId'] = $dnssec_avail_item;
+								$services['dnssec']['itemId'] = $avail_itemid['dnssec'];
 							}
 						}
 						elseif ($item['key_'] == CALCULATED_ITEM_RDDS_DELAY) {
 							$services['rdds']['delay'] = $item_value['value'];
-							$services['rdds']['itemId'] = $rdds_avail_item;
+							$services['rdds']['itemId'] = $avail_itemid['rdds'];
 						}
 						elseif ($item['key_'] == CALCULATED_ITEM_RDAP_DELAY) {
 							$services['rdap']['delay'] = $item_value['value'];
-							$services['rdap']['itemId'] = $rdap_avail_item;
+							$services['rdap']['itemId'] = $avail_itemid['rdap'];
 						}
 						elseif ($item['key_'] == CALCULATED_ITEM_EPP_DELAY) {
 							$services['epp']['delay'] = $item_value['value'];
-							$services['epp']['itemId'] = $epp_avail_item;
+							$services['epp']['itemId'] = $avail_itemid['epp'];
 						}
 					}
 				}
@@ -961,7 +942,8 @@ class IncidentsListAction extends Action {
 			return;
 		}
 
-		$server_now = time() - RSM_ROLLWEEK_SHIFT_BACK;
+		$server_now = time();
+
 		$data = [
 			'title' => _('Incidents'),
 			'ajax_request' => $this->isAjaxRequest(),

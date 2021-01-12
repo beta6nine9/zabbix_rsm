@@ -262,7 +262,7 @@ $total_probes = count($data['probes']);
 					_('TLD') => $data['tld_host'],
 					_('Service') => $data['slv_item_name'],
 					_('Test time') => date(DATE_TIME_FORMAT_SECONDS, $data['time']),
-					_('Test result') => [$test_result, ' ', _s('(calculated at %1$s)', date(DATE_TIME_FORMAT_SECONDS, $data['time'] + RSM_ROLLWEEK_SHIFT_BACK))],
+					_('Test result') => $test_result,
 					_('Max allowed RTT') => isset($data['udp_rtt'])
 						? sprintf('UDP - %s ms, TCP - %s ms', $data['udp_rtt'], $data['tcp_rtt'])
 						: _('No data'),

@@ -79,6 +79,17 @@ trait CastableTrait {
 	}
 
 	/**
+	 * Cast object to ZDropdown element.
+	 *
+	 * @param array $options    additional casting options
+	 *
+	 * @return CZDropdownElement
+	 */
+	public function asZDropdown($options = []) {
+		return $this->cast(CZDropdownElement::class, $options);
+	}
+
+	/**
 	 * Cast object to Form element.
 	 *
 	 * @param array $options    additional casting options
@@ -263,5 +274,16 @@ trait CastableTrait {
 	 */
 	public function asInputGroup($options = []) {
 		return $this->cast(CInputGroupElement::class, $options);
+	}
+
+	/**
+	 * Cast object to Interface element.
+	 *
+	 * @param array $options    additional casting options
+	 *
+	 * @return CHostInterfaceElement
+	 */
+	public function asHostInterfaceElement($options = []) {
+		return $this->cast(CHostInterfaceElement::class, $options);
 	}
 }

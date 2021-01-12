@@ -1,18 +1,18 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
+
+use FindBin;
+use lib "$FindBin::RealBin/..";
 
 use strict;
 use warnings;
 
-use Path::Tiny;
-use lib path($0)->parent()->parent()->realpath()->stringify();
-use lib '/opt/zabbix/scripts';
-
 use RSM;
 use RSMSLV;
 use ApiHelper;
-use JSON::XS qw(decode_json encode_json);
+use JSON::XS qw(decode_json);
 use Data::Dumper;
 use Data::Compare;
+use Path::Tiny;
 
 $Data::Dumper::Terse = 1;       # do not output names like "$VAR1 = "
 $Data::Dumper::Pair = ": ";     # use separator instead of " => "

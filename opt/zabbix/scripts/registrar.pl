@@ -1,15 +1,13 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 #
 # Script to manage Registrars in Zabbix.
 
-BEGIN
-{
-	our $MYDIR = $0; $MYDIR =~ s,(.*)/.*,$1,; $MYDIR = '.' if ($MYDIR eq $0);
-}
-use lib $MYDIR;
+use FindBin;
+use lib $FindBin::RealBin;
 
 use strict;
 use warnings;
+
 use Zabbix;
 use Getopt::Long;
 use MIME::Base64;
@@ -18,7 +16,7 @@ use Expect;
 use Data::Dumper;
 use RSM;
 use RSMSLV;
-use TLD_constants qw(:general :templates :groups :value_types :ec :slv :config :api);
+use TLD_constants qw(:general :templates :groups :ec :config :api);
 use TLDs;
 use Text::CSV_XS;
 

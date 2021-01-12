@@ -1,15 +1,13 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 #
 # RDAP rolling week
 
-BEGIN
-{
-	our $MYDIR = $0; $MYDIR =~ s,(.*)/.*/.*,$1,; $MYDIR = '..' if ($MYDIR eq $0);
-}
-use lib $MYDIR;
+use FindBin;
+use lib "$FindBin::RealBin/..";
 
 use strict;
 use warnings;
+
 use RSM;
 use RSMSLV;
 use TLD_constants qw(:api);
@@ -27,9 +25,9 @@ db_connect();
 slv_exit(SUCCESS) if (!is_rdap_standalone(getopt('now')));
 
 # we don't know the rollweek bounds yet so we assume it ends at least few minutes back
-my $delay = get_rdap_delay(getopt('now') // time() - ROLLWEEK_SHIFT_BACK);
+my $delay = get_rdap_delay();
 
-my (undef, undef, $max_clock) = get_cycle_bounds($delay, getopt('now'));
+my $max_clock = cycle_start(getopt('now') // time(), $delay);
 
 my $cfg_sla = get_macro_rdap_rollweek_sla();
 

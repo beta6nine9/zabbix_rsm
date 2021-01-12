@@ -1,15 +1,13 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 #
 # Minutes of RDAP downtime during running month
 
-BEGIN
-{
-	our $MYDIR = $0; $MYDIR =~ s,(.*)/.*/.*,$1,; $MYDIR = '..' if ($MYDIR eq $0);
-}
-use lib $MYDIR;
+use FindBin;
+use lib "$FindBin::RealBin/..";
 
 use strict;
 use warnings;
+
 use RSM;
 use RSMSLV;
 use TLD_constants qw(:api);
@@ -34,14 +32,14 @@ if (!opt('dry-run'))
 		$cfg_key_out,
 		get_macro_incident_rdap_fail(),
 		get_macro_incident_rdap_recover(),
-		get_rdap_delay(getopt('now') // time() - AVAIL_SHIFT_BACK)
+		get_rdap_delay()
 	);
 }
 
 # we don't know the cycle bounds yet so we assume it ends at least few minutes back
-my $delay = get_rdap_delay(getopt('now') // time() - AVAIL_SHIFT_BACK);
+my $delay = get_rdap_delay();
 
-my (undef, undef, $max_clock) = get_cycle_bounds($delay, getopt('now'));
+my $max_clock = cycle_start(getopt('now') // time(), $delay);
 
 my $tlds_ref;
 if (opt('tld'))

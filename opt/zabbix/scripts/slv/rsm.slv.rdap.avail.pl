@@ -1,15 +1,13 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 #
 # RDAP availability
 
-BEGIN
-{
-	our $MYDIR = $0; $MYDIR =~ s,(.*)/.*/.*,$1,; $MYDIR = '..' if ($MYDIR eq $0);
-}
-use lib $MYDIR;
+use FindBin;
+use lib "$FindBin::RealBin/..";
 
 use strict;
 use warnings;
+
 use RSM;
 use RSMSLV;
 use TLD_constants qw(:api);
@@ -29,10 +27,10 @@ db_connect();
 slv_exit(SUCCESS) if (!is_rdap_standalone(getopt('now')));
 
 # we don't know the cycle bounds yet so we assume it ends at least few minutes back
-my $delay = get_rdap_delay(getopt('now') // time() - AVAIL_SHIFT_BACK);
+my $delay = get_rdap_delay();
 
 # get timestamp of the beginning of the latest cycle
-my (undef, undef, $max_clock) = get_cycle_bounds($delay, getopt('now'));
+my $max_clock = cycle_start(getopt('now') // time(), $delay);
 
 my $cfg_minonline = get_macro_rdap_probe_online();
 

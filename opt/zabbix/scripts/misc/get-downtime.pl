@@ -1,12 +1,7 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
-BEGIN
-{
-	our $MYDIR = $0; $MYDIR =~ s,(.*)/.*,$1,; $MYDIR = '.' if ($MYDIR eq $0);
-	our $MYDIR2 = $0; $MYDIR2 =~ s,(.*)/.*/.*,$1,; $MYDIR2 = '..' if ($MYDIR2 eq $0);
-}
-use lib $MYDIR;
-use lib $MYDIR2;
+use FindBin;
+use lib "$FindBin::RealBin/..";
 
 use strict;
 use warnings;
@@ -40,24 +35,24 @@ db_connect();
 if (getopt('service') eq 'dns')
 {
 	$key = 'rsm.slv.dns.avail';
-	$delay = get_dns_delay(getopt('from'));
+	$delay = get_dns_delay();
 }
 elsif (getopt('service') eq 'dns-ns')
 {
 	$key = 'rsm.slv.dns.ns.avail[';
-	$delay = get_dns_delay(getopt('from'));
+	$delay = get_dns_delay();
 }
 elsif (getopt('service') eq 'rdds')
 {
 	$service_type = 'rdds';
 	$key = 'rsm.slv.rdds.avail';
-	$delay = get_rdds_delay(getopt('from'));
+	$delay = get_rdds_delay();
 }
 elsif (getopt('service') eq 'epp')
 {
 	$service_type = 'epp';
 	$key = 'rsm.slv.epp.avail';
-	$delay = get_epp_delay(getopt('from'));
+	$delay = get_epp_delay();
 }
 else
 {

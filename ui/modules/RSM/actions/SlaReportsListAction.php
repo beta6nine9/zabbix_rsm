@@ -70,6 +70,12 @@ class SlaReportsListAction extends Action {
 	}
 
 	protected function checkPermissions() {
+		$valid_users = [USER_TYPE_READ_ONLY, USER_TYPE_ZABBIX_USER, USER_TYPE_POWER_USER, USER_TYPE_COMPLIANCE,
+			USER_TYPE_ZABBIX_ADMIN, USER_TYPE_SUPER_ADMIN];
+
+		if (!in_array($this->getUserType(), $valid_users))
+			return false;
+
 		// In the future we should consider adding the check if specified Rsmhost exist here.
 		// Currently it's in fetchData() since we don't want to do the same job twice.
 		return true;

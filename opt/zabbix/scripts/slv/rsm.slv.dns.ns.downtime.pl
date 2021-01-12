@@ -1,11 +1,13 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 #
 # Minutes of DNS downtime during running month for particular nameservers
 
-BEGIN { our $MYDIR = $0; $MYDIR =~ s,(.*)/.*/.*,$1,; $MYDIR = '..' if ($MYDIR eq $0); }
-use lib $MYDIR;
+use FindBin;
+use lib "$FindBin::RealBin/..";
+
 use strict;
 use warnings;
+
 use RSM;
 use RSMSLV;
 use TLD_constants qw(:groups :api);
@@ -30,7 +32,7 @@ if (!opt('dry-run'))
 		DOWNTIME_KEY_PATTERN,
 		1,
 		1,
-		get_dns_delay(getopt('now') // time() - AVAIL_SHIFT_BACK)
+		get_dns_delay()
 	);
 }
 

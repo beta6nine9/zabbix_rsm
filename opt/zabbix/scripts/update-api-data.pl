@@ -1,16 +1,14 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
-BEGIN
-{
-	our $MYDIR = $0; $MYDIR =~ s,(.*)/.*,$1,; $MYDIR = '.' if ($MYDIR eq $0);
-}
-use lib $MYDIR;
+use FindBin;
+use lib $FindBin::RealBin;
 
 use strict;
 use warnings;
+
 use RSM;
 use RSMSLV;
-use TLD_constants qw(:ec :api :items :config :items);
+use TLD_constants qw(:ec :api :config :items);
 use ApiHelper;
 use Parallel::ForkManager;
 use Data::Dumper;
@@ -26,7 +24,24 @@ use constant MAX_CONTINUE_PERIOD => 30;	# minutes (NB! make sure to update this 
 use constant DEFAULT_INCIDENT_MEASUREMENTS_LIMIT => 3600;	# seconds, maximum period back from current time to look
 								# back for recent measurement files for an incident
 
-parse_opts('tld=s', 'service=s', 'period=i', 'from=i', 'continue!', 'print-period!', 'ignore-file=s', 'probe=s', 'limit=i', 'max-children=i', 'server-key=s');
+# We must wait for the maximum period when Service Availability and Rolling Week
+# values are calculated, sent to the server and saved in the database. Here we
+# specify the minimum age of latest cycle we are able to process.
+use constant LATEST_CYCLE_AGE	=> 240;	# seconds (must be divisible by 60)
+
+parse_opts(
+	'tld=s',
+	'service=s',
+	'period=i',
+	'from=i',
+	'continue!',
+	'print-period!',
+	'ignore-file=s',
+	'probe=s',
+	'limit=i',
+	'max-children=i',
+	'server-key=s'
+);
 
 # do not write any logs
 setopt('nolog');
@@ -51,7 +66,8 @@ if (!opt('dry-run') && (my $error = rsm_targets_prepare(AH_SLA_API_TMP_DIR, AH_S
 my $config = get_rsm_config();
 set_slv_config($config);
 
-my $incident_measurements_limit = $config->{'sla_api'}->{'incident_measurements_limit'} // DEFAULT_INCIDENT_MEASUREMENTS_LIMIT;
+my $incident_measurements_limit =
+		$config->{'sla_api'}->{'incident_measurements_limit'} // DEFAULT_INCIDENT_MEASUREMENTS_LIMIT;
 
 my @server_keys = (opt('server-key') ? getopt('server-key') : get_rsm_server_keys($config));
 
@@ -132,7 +148,7 @@ db_disconnect();
 
 my $now = time();
 
-my $max_till = truncate_till(time() - ROLLWEEK_SHIFT_BACK - 60);	# make sure all the data is already calculated
+my $max_till = truncate_till(time() - LATEST_CYCLE_AGE);
 
 my ($check_from, $check_till, $continue_file);
 
@@ -226,7 +242,8 @@ if ($check_till > $max_till)
 		$left_str = "$left minutes";
 	}
 
-	wrn(sprintf("the specified period (%s) is in the future, please wait for %s", selected_period($check_from, $check_till), $left_str));
+	wrn(sprintf("the specified period (%s) is in the future, please wait for %s",
+			selected_period($check_from, $check_till), $left_str));
 
 	slv_exit(SUCCESS);
 }
@@ -234,11 +251,11 @@ if ($check_till > $max_till)
 db_connect();
 foreach my $service (keys(%services))
 {
-	$services{$service}{'delay'} = get_dns_delay($check_from)  if ($service eq 'dns');
-	$services{$service}{'delay'} = get_dns_delay($check_from)  if ($service eq 'dnssec');
-	$services{$service}{'delay'} = get_rdds_delay($check_from) if ($service eq 'rdds');
-	$services{$service}{'delay'} = get_rdap_delay($check_from) if ($service eq 'rdap');
-	$services{$service}{'delay'} = get_epp_delay($check_from)  if ($service eq 'epp');
+	$services{$service}{'delay'} = get_dns_delay()  if ($service eq 'dns');
+	$services{$service}{'delay'} = get_dns_delay()  if ($service eq 'dnssec');
+	$services{$service}{'delay'} = get_rdds_delay() if ($service eq 'rdds');
+	$services{$service}{'delay'} = get_rdap_delay() if ($service eq 'rdap');
+	$services{$service}{'delay'} = get_epp_delay()  if ($service eq 'epp');
 
 	$services{$service}{'avail_key'} = "rsm.slv.$service.avail";
 	$services{$service}{'rollweek_key'} = "rsm.slv.$service.rollweek";

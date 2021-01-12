@@ -2,6 +2,7 @@ package Alerts;
 
 use strict;
 use warnings;
+
 use Redis;
 use base 'Exporter';
 
