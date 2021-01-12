@@ -430,7 +430,7 @@ sub process_tld_batch($$$$$$)
 # database. In order to avoid double selects of the same data we'll keep the
 # DNS results cached. This is hack that needs to be removed some day when we
 # implement DNSSEC service handling in all the places/scripts properly.
-my $dns_results_cache = {};
+my $dns_results_cache;
 
 sub process_tld($$$$$)
 {
@@ -439,6 +439,8 @@ sub process_tld($$$$$)
 	my $all_probes_ref = shift;
 	my $lastvalues_db_tld = shift;
 	my $lastvalues_cache_tld = shift;
+
+	$dns_results_cache = {};
 
 	# dns-results-cache:
 	# ensure 'dnssec' comes after 'dns' by using sort(), because
@@ -1400,12 +1402,6 @@ sub calculate_cycle($$$$$$$$$)
 			}
 			$probes_with_results++;
 		}
-	}
-
-	# dns-results-cache:
-	if ($service eq 'dnssec')
-	{
-		undef($dns_results_cache);
 	}
 
 	# add "Offline" and "No results"

@@ -73,7 +73,12 @@ class SlaReportsListAction extends Action {
 		$valid_users = [USER_TYPE_READ_ONLY, USER_TYPE_ZABBIX_USER, USER_TYPE_POWER_USER, USER_TYPE_COMPLIANCE,
 			USER_TYPE_ZABBIX_ADMIN, USER_TYPE_SUPER_ADMIN];
 
-		return in_array($this->getUserType(), $valid_users);
+		if (!in_array($this->getUserType(), $valid_users))
+			return false;
+
+		// In the future we should consider adding the check if specified Rsmhost exist here.
+		// Currently it's in fetchData() since we don't want to do the same job twice.
+		return true;
 	}
 
 	protected function fetchData(array &$data) {
@@ -281,8 +286,10 @@ class SlaReportsListAction extends Action {
 
 			$data['rolling_week_url'] = $url;
 		}
-		elseif ($this->filter_valid) {
-			//error(_s('Host "%s" doesn\'t exist or you don\'t have permissions to access it.', $data['filter_search']));
+		elseif ($this->filter_valid && $data['filter_search']) {
+			$object_label = (get_rsm_monitoring_type() === MONITORING_TARGET_REGISTRAR) ? _('Registrar ID') : _('TLD');
+
+			error(_s('%s "%s" does not exist or you do not have permissions to access it.', $object_label, $data['filter_search']));
 		}
 
 		$response = new CControllerResponseData($data);

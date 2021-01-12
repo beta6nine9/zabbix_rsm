@@ -1007,7 +1007,7 @@ sub __save_csv_data($$)
 									      $ip_version_id,
 									      $ip_id,
 									      $test_type_id,
-									      $cycle_ns_id,
+									      $cycle_ns_id // '',
 									      $tld_type_id,
 									      $nsid_id
 							]);
@@ -1122,7 +1122,7 @@ sub __save_csv_data($$)
 			}
 
 			# report only incidents within given period
-			if ($event_start > $from)
+			if ($event_start >= $from)
 			{
 				dw_append_csv(DATA_INCIDENT, [
 						      $eventid,

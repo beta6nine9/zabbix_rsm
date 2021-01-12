@@ -72,11 +72,15 @@ class AggregateDetailsAction extends Action {
 	/**
 	 * Check if user has enough permissions to all requested resources.
 	 *
-	 * @throws Exception if no access to requested resources.
-	 *
 	 * @return boolean
 	 */
 	protected function checkPermissions() {
+		$valid_users = [USER_TYPE_READ_ONLY, USER_TYPE_ZABBIX_USER, USER_TYPE_POWER_USER, USER_TYPE_COMPLIANCE,
+			USER_TYPE_ZABBIX_ADMIN, USER_TYPE_SUPER_ADMIN];
+
+		if (!in_array($this->getUserType(), $valid_users))
+			return false;
+
 		return (parent::checkPermissions() && $this->initAdditionalInput());
 	}
 
@@ -98,7 +102,7 @@ class AggregateDetailsAction extends Action {
 		$this->tld = reset($tld);
 
 		if (!$this->tld) {
-			throw new Exception(_('No permissions to referred TLD or it does not exist!'));
+			return false;
 		}
 
 		// slv_item
@@ -109,7 +113,7 @@ class AggregateDetailsAction extends Action {
 		$this->slv_item = reset($slv_items);
 
 		if (!$this->slv_item) {
-			throw new Exception(_('No permissions to referred SLV item or it does not exist!'));
+			return false;
 		}
 
 		// availability_item
@@ -122,7 +126,7 @@ class AggregateDetailsAction extends Action {
 		$this->availability_item = reset($avail_item);
 
 		if (!$this->availability_item) {
-			throw new Exception(_s('Item with key "%1$s" not exist on TLD!', $key));
+			return false;
 		}
 
 		// probes

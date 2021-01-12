@@ -47,6 +47,11 @@ class ParticularTestsListAction extends Action {
 		return $ret;
 	}
 
+	protected function checkPermissions() {
+		// ensure we have access to Rsmhost, limit output to hostid to avoid selecting the whole thing
+		return !empty(API::Host()->get(['output' => ['hostid'], 'filter' => ['host' => $this->getInput('host', null)]]));
+	}
+
 	protected function updateProfile(array &$data) {
 		if ($data['host'] && $data['time'] && $data['slvItemId'] && $data['type'] !== null) {
 			CProfile::update('web.rsm.particulartests.host', $data['host'], PROFILE_TYPE_STR);
