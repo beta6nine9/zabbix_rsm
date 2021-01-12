@@ -87,7 +87,7 @@ sub main()
 
 		my $changes = get_ns_changes($ns_servers, $opt_ns_servers);
 
-		my $tld_hostid = get_host(getopt('tld'), false);	# no host groups
+		my $tld_hostid = get_host(getopt('tld'), false)->{'hostid'};	# no host groups
 
 		update_ns_servers($config_templateid, $tld_hostid, getopt('tld'), $changes);
 	}
@@ -1049,7 +1049,7 @@ sub update_ns_servers($$$$)
 
 			my $key = "rsm.slv.dns.ns.avail[$ns,$ip]";
 
-			create_item(
+			really(create_item(
 				{
 					'name'       => "DNS NS \$1 (\$2) availability",
 					'key_'       => $key,
@@ -1058,11 +1058,11 @@ sub update_ns_servers($$$$)
 					'type'       => ITEM_TYPE_TRAPPER,
 					'value_type' => ITEM_VALUE_TYPE_UINT64,
 					'valuemapid' => RSM_VALUE_MAPPINGS->{'rsm_avail'},
-				});
+				}));
 
 			$key = "rsm.slv.dns.ns.downtime[$ns,$ip]";
 
-			create_item(
+			really(create_item(
 				{
 					'name'       => "DNS minutes of \$1 (\$2) downtime",
 					'key_'       => $key,
@@ -1070,7 +1070,7 @@ sub update_ns_servers($$$$)
 					'hostid'     => $tld_hostid,
 					'type'       => ITEM_TYPE_TRAPPER,
 					'value_type' => ITEM_VALUE_TYPE_UINT64,
-				});
+				}));
 
 			create_dependent_trigger_chain($tld_host, $ns, $ip, $key, \&create_dns_ns_downtime_trigger,
 					RSM_TRIGGER_THRESHOLDS);

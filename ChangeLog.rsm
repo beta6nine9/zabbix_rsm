@@ -1,3 +1,13 @@
+Changes for rsm2.1.0rc12
+
+Bug fixes:
+..F....... [756] improved permission checks and error handling (dimir)
+....I..... [755] fixed warnings in Data Export script (dimir)
+....I..... [sub-741] fixed missing DNSSEC test data in measurement files of SLA API (dimir)
+....I..... [758] fixed updating list of nameservers (asitals)
+....I..... [754] fixed missing incident in Data Export when it starts at the beginning of the day (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.1.0rc11
 
 Bug fixes:

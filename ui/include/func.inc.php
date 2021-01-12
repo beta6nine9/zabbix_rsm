@@ -1542,8 +1542,10 @@ function access_deny($mode = ACCESS_DENY_OBJECT) {
 				$data['buttons'][] = (new CButton('login', _('Login')))
 					->onClick('javascript: document.location = "index.php?request='.$url.'";');
 			}
-			$data['buttons'][] = (new CButton('back', _('Go to dashboard')))
-				->onClick('javascript: document.location = "zabbix.php?action=dashboard.view"');
+
+			// RSM specifics: link to Rolling week status page instead of dashboard in case of error
+			$data['buttons'][] = (new CButton('back', _('Go to Rolling week status')))
+				->onClick('javascript: document.location = "zabbix.php?action=rsm.rollingweekstatus"');
 		}
 		// if the user is not logged in - offer to login
 		else {
