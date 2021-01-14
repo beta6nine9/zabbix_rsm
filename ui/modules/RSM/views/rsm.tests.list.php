@@ -71,8 +71,6 @@ else {
 	$service_name = _('EPP service availability');
 }
 
-
-
 $object_info = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR)
 	? [
 		new CSpan([bold(_('Registrar ID')), ': ', '', $data['tld']['host']]),

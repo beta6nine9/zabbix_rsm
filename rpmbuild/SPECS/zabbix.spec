@@ -1,5 +1,5 @@
 Name:		zabbix
-Version:	5.0.4%{rsmversion}
+Version:	5.0.6%{rsmversion}
 Release: 	%{?rsmprereleasetag:0.}1%{?rsmprereleasetag:%{rsmprereleasetag}}%{?dist}
 Summary:	The Enterprise-class open source monitoring solution
 Group:		Applications/Internet

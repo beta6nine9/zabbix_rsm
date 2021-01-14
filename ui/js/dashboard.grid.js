@@ -61,6 +61,10 @@
 			widget_actions['itemid'] = widget['fields']['itemid'];
 		}
 
+		if (widget.fields.dynamic && widget.fields.dynamic == 1 && data.dashboard.dynamic_hostid !== null) {
+			widget_actions['dynamic_hostid'] = data.dashboard.dynamic_hostid;
+		}
+
 		widget['content_header'] = $('<div>', {'class': classes['head']})
 			.append($('<h4>').text((widget['header'] !== '')
 				? widget['header']
@@ -2482,7 +2486,7 @@
 	}
 
 	/**
-	 * Find first empty position in gived size.
+	 * Find first empty position in given size.
 	 *
 	 * @param {object} $obj               Dashboard object.
 	 * @param {object} data               Dashboard 'dashboardGrid' object.
@@ -2615,7 +2619,7 @@
 	};
 
 	/**
-	 * Get jQuery obejct of the new widget placeholder.
+	 * Get jQuery object of the new widget placeholder.
 	 *
 	 * @returns {jQuery}
 	 */
@@ -3565,6 +3569,15 @@
 			$.each(data['widgets'], function(index, widget) {
 				if (widget.fields.dynamic && widget.fields.dynamic == 1) {
 					updateWidgetContent($this, data, widget);
+
+					var widget_actions = $('.btn-widget-action', widget['content_header']).data('menu-popup').data;
+
+					if (data.dashboard.dynamic_hostid !== null) {
+						widget_actions.dynamic_hostid = data.dashboard.dynamic_hostid;
+					}
+					else {
+						delete widget_actions.dynamic_hostid;
+					}
 				}
 			});
 		},

@@ -1,10 +1,10 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
+
+use FindBin;
+use lib "$FindBin::RealBin/..";
 
 use strict;
 use warnings;
-
-use Path::Tiny;
-use lib path($0)->parent(2)->realpath()->stringify();
 
 use TLD_constants qw(:api);
 use RSM;

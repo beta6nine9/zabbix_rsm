@@ -81,6 +81,7 @@
 #define ZBX_EC_DNS_UDP_RCODE_CATCHALL	-270	/* DNS UDP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got unexpected */
 #define ZBX_EC_DNS_UDP_RES_NOREPLY	-400	/* DNS UDP - No server could be reached by local resolver */
 /* DNS UDP DNSSEC error codes */
+#define ZBX_EC_DNS_UDP_DNSSEC_FIRST	-401	/* NB! This must be the first defined UDP DNSSEC error */
 #define ZBX_EC_DNS_UDP_DNSKEY_NONE	-401	/* DNS UDP - The TLD is configured as DNSSEC-enabled, but no DNSKEY was found in the apex */
 #define ZBX_EC_DNS_UDP_DNSKEY_NOADBIT	-402	/* DNS UDP - No AD bit from local resolver */
 #define ZBX_EC_DNS_UDP_RES_NXDOMAIN	-403	/* DNS UDP - Expecting NOERROR RCODE but got NXDOMAIN from local resolver */
@@ -99,6 +100,7 @@
 #define ZBX_EC_DNS_UDP_WILD_NOTCOVERED	-423	/* DNS UDP - Wildcard not covered by the given NSEC RRs */
 #define ZBX_EC_DNS_UDP_RRSIG_MISS_RDATA	-425	/* DNS UDP - The RRSIG has too few RDATA fields */
 #define ZBX_EC_DNS_UDP_DNSSEC_CATCHALL	-427	/* DNS UDP - Malformed DNSSEC response */
+#define ZBX_EC_DNS_UDP_DNSSEC_LAST	-427	/* NB! This must be the last defined UDP DNSSEC error */
 /* DNS TCP error codes */
 #define ZBX_EC_DNS_TCP_NS_TO		-600	/* DNS TCP - DNS TCP - Timeout reply from name server */
 #define ZBX_EC_DNS_TCP_NS_ECON		-601	/* DNS TCP - Error opening connection to name server */
@@ -135,6 +137,7 @@
 #define ZBX_EC_DNS_TCP_RCODE_CATCHALL	-670	/* DNS TCP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got unexpected */
 #define ZBX_EC_DNS_TCP_RES_NOREPLY	-800	/* DNS TCP - No server could be reached by local resolver */
 /* DNS TCP DNSSEC error codes */
+#define ZBX_EC_DNS_TCP_DNSSEC_FIRST	-801	/* NB! This must be the first defined TCP DNSSEC error */
 #define ZBX_EC_DNS_TCP_DNSKEY_NONE	-801	/* DNS TCP - The TLD is configured as DNSSEC-enabled, but no DNSKEY was found in the apex */
 #define ZBX_EC_DNS_TCP_DNSKEY_NOADBIT	-802	/* DNS TCP - No AD bit from local resolver */
 #define ZBX_EC_DNS_TCP_RES_NXDOMAIN	-803	/* DNS TCP - Expecting NOERROR RCODE but got NXDOMAIN from local resolver */
@@ -153,6 +156,7 @@
 #define ZBX_EC_DNS_TCP_WILD_NOTCOVERED	-823	/* DNS TCP - Wildcard not covered by the given NSEC RRs */
 #define ZBX_EC_DNS_TCP_RRSIG_MISS_RDATA	-825	/* DNS TCP - The RRSIG has too few RDATA fields */
 #define ZBX_EC_DNS_TCP_DNSSEC_CATCHALL	-827	/* DNS TCP - Malformed DNSSEC response */
+#define ZBX_EC_DNS_TCP_DNSSEC_LAST	-827	/* NB! This must be the last defined TCP DNSSEC error */
 /* RDDS error codes */
 #define ZBX_EC_RDDS43_NONS		-201	/* Whois server returned no NS */
 #define ZBX_EC_RDDS80_NOCODE		-206	/* no HTTP status code */

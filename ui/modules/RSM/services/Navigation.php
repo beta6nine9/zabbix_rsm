@@ -44,7 +44,7 @@ class Navigation {
 				->setUrl($url, 'rsm.incidents')
 				->setAliases([
 					'rsm.incidents', 'rsm.incidentdetails', 'rsm.tests',
-					'rsm.particulartests', 'rsm.particularproxys', 'rsm.aggregatedetails'
+					'rsm.particulartests', 'rsm.aggregatedetails'
 				]);
 		}
 

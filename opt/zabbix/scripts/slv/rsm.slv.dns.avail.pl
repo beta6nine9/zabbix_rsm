@@ -1,20 +1,18 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 #
 # DNS availability
 
-BEGIN
-{
-	our $MYDIR = $0; $MYDIR =~ s,(.*)/.*/.*,$1,; $MYDIR = '..' if ($MYDIR eq $0);
-}
-use lib $MYDIR;
+use FindBin;
+use lib "$FindBin::RealBin/..";
 
 use strict;
 use warnings;
+
 use RSM;
 use RSMSLV;
 use TLD_constants qw(:api);
 
-my $cfg_keys_in = ['rsm.dns.nssok'];
+my $cfg_keys_in = ['rsm.dns.status'];
 my $cfg_key_out = 'rsm.slv.dns.avail';
 my $cfg_value_type = ITEM_VALUE_TYPE_UINT64;
 
@@ -28,12 +26,11 @@ db_connect();
 slv_exit(SUCCESS) if (get_monitoring_target() ne MONITORING_TARGET_REGISTRY);
 
 # we don't know the rollweek bounds yet so we assume it ends at least few minutes back
-my $delay = get_dns_delay(getopt('now') // time() - AVAIL_SHIFT_BACK);
+my $delay = get_dns_delay();
 
-my (undef, undef, $max_clock) = get_cycle_bounds($delay, getopt('now'));
+my $max_clock = cycle_start(getopt('now') // time(), $delay);
 
 my $cfg_minonline = get_macro_dns_probe_online();
-my $cfg_minns = get_macro_minns();
 
 my $tlds_ref;
 if (opt('tld'))
@@ -76,7 +73,7 @@ process_slv_avail_cycles(
 
 slv_exit(SUCCESS);
 
-# SUCCESS - more than or equal to $cfg_minns Name Servers were tested successfully
+# SUCCESS - DNS Test status on the probe returned 1
 # E_FAIL  - otherwise
 sub check_probe_values
 {
@@ -85,7 +82,7 @@ sub check_probe_values
 	# E. g.:
 	#
 	# {
-	#	'rsm.dns.nssok' => [1]
+	#	'rsm.dns.status' => [1]
 	# }
 
 	if (scalar(keys(%{$values_ref})) == 0)
@@ -93,18 +90,12 @@ sub check_probe_values
 		fail("THIS SHOULD NEVER HAPPEN rsm.slv.dns.avail.pl:check_probe_values()");
 	}
 
-	if (1 > $cfg_minns)
-	{
-		wrn("number of required working Name Servers is configured as $cfg_minns");
-		return SUCCESS;
-	}
-
 	# stay on the safe side: if more than one value in cycle, use the positive one
 	foreach my $values (values(%{$values_ref}))
 	{
 		foreach (@{$values})
 		{
-			return SUCCESS if ($_ >= $cfg_minns);
+			return SUCCESS if ($_ == 1);
 		}
 	}
 

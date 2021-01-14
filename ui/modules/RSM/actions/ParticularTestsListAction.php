@@ -109,7 +109,6 @@ class ParticularTestsListAction extends Action {
 		}
 
 		if ($data['type'] == RSM_DNS) {
-			$calculated_item_key[] = CALCULATED_ITEM_DNS_AVAIL_MINNS;	// TODO: remove 3 months after deployment
 			$calculated_item_key[] = CALCULATED_ITEM_DNS_UDP_RTT_HIGH;
 		}
 
@@ -150,10 +149,7 @@ class ParticularTestsListAction extends Action {
 			$macro_item_value = reset($macro_item_value);
 
 			if ($data['type'] == RSM_DNS) {
-				if ($macro_item['key_'] == CALCULATED_ITEM_DNS_AVAIL_MINNS) {	// TODO: remove 3 months after deployment
-					$min_dns_count = $macro_item_value['value'];				// TODO: remove 3 months after deployment
-				}
-				elseif ($macro_item['key_'] == CALCULATED_ITEM_DNS_UDP_RTT_HIGH) {
+				if ($macro_item['key_'] == CALCULATED_ITEM_DNS_UDP_RTT_HIGH) {
 					$udp_rtt = $macro_item_value['value'];
 				}
 				else {

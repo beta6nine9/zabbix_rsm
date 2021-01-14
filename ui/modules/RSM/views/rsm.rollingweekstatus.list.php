@@ -278,6 +278,7 @@ if ($data['tld']) {
 				if ($tld[$service]['clock']) {
 					if ($tld[$service]['trigger'] && $tld[$service]['incident']) {
 						if (array_key_exists('availItemId', $tld[$service]) && array_key_exists('itemid', $tld[$service])) {
+
 							$rollweek_status = new CLink(
 									(new CDiv())->addClass('service-icon status_icon_extra iconrollingweekfail cell-value pointer'),
 										Url::getFor($tld['url'], 'rsm.incidentdetails', [
@@ -308,8 +309,9 @@ if ($data['tld']) {
 							)
 						: new CSpan('0.000%');
 
-					if ($tld[$service]['clock'])
-						$rollweek_value->setHint($tld[$service]['clock'], '', false);
+					if ($tld[$service]['clock']) {
+						$rollweek_value->setHint(date(DATE_TIME_FORMAT_SECONDS, $tld[$service]['clock']), '', false);
+					}
 
 					$rollweek_graph = ($tld[$service]['lastvalue'] > 0)
 						? new CLink('graph',
@@ -324,6 +326,16 @@ if ($data['tld']) {
 					$row[] = [
 						(new CSpan($rollweek_value))->addClass('rolling-week-value'),
 						$rollweek_status,
+						(new CLink(
+							'',
+							Url::getFor($tld['url'], 'rsm.tests', [
+								'slvItemId' => $tld[$service]['itemid'],
+								'host' => $tld['host'],
+								'type' => $service
+							])
+						))
+						->addClass('icon-eye')
+						->setHint(date(DATE_TIME_FORMAT_SECONDS, $tld[$service]['availClock']), '', false),
 						SPACE,
 						(new CSpan($rollweek_graph))->addClass('rolling-week-graph'),
 						$rdds_subservices

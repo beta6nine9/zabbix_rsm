@@ -1,10 +1,10 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
+
+use FindBin;
+use lib $FindBin::RealBin;
 
 use strict;
 use warnings;
-
-use Path::Tiny qw(path);
-use lib path($0)->parent->realpath()->stringify();
 
 use ApiHelper;
 use Getopt::Long;

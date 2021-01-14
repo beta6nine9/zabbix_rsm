@@ -1,10 +1,10 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
+
+use FindBin;
+use lib $FindBin::RealBin;
 
 use strict;
 use warnings;
-
-use Path::Tiny;
-use lib path($0)->parent->realpath()->stringify();
 
 use Data::Dumper;
 
@@ -15,7 +15,6 @@ use RSMSLV;
 use TLD_constants qw(:api :config :groups :items);
 use ApiHelper;
 use File::Copy;
-use JSON::XS qw(decode_json encode_json);
 use sigtrap 'handler' => \&main_process_signal_handler, 'normal-signals';
 
 $Data::Dumper::Terse = 1;	# do not output names like "$VAR1 = "
@@ -23,7 +22,7 @@ $Data::Dumper::Pair = ": ";	# use separator instead of " => "
 $Data::Dumper::Useqq = 1;	# use double quotes instead of single quotes
 $Data::Dumper::Indent = 1;	# 1 provides less indentation instead of 2
 
-use constant MAX_PERIOD => 30 * 60;	# 30 minutes
+use constant MAX_PERIOD => 30 * 60;	# 30 minutes, do not handle longer periods in 1 run
 
 use constant SUBSTR_KEY_LEN => 20;	# for logging
 
@@ -109,9 +108,9 @@ dbg("RDAP ", ($rdap_is_standalone ? "is" : "is NOT"), " standalone");
 my $cfg_minonline = get_macro_dns_probe_online();
 
 my %delays;
-$delays{'dns'} = $delays{'dnssec'} = get_dns_delay($now);
-$delays{'rdds'} = get_rdds_delay($now);
-$delays{'rdap'} = get_rdap_delay($now) if ($rdap_is_standalone);
+$delays{'dns'} = $delays{'dnssec'} = get_dns_delay();
+$delays{'rdds'} = get_rdds_delay();
+$delays{'rdap'} = get_rdap_delay() if ($rdap_is_standalone);
 
 my %clock_limits;
 
@@ -176,8 +175,6 @@ set_on_finish($fm);
 #     ...
 # }
 my %child_desc;
-
-my $cfg_minns;
 
 foreach my $server_key (@server_keys)
 {
@@ -278,10 +275,6 @@ sub process_server($)
 	my $server_tlds;
 
 	db_connect($server_key);
-
-	$cfg_minns = get_macro_minns();
-
-	fail("number of required working Name Servers is configured as $cfg_minns") if (1 > $cfg_minns);
 
 	my $all_probes_ref = get_probes();
 
@@ -1531,6 +1524,10 @@ sub calculate_cycle($$$$$$$$$)
 	# add configuration data
 	if ($service eq 'dns' || $service eq 'dnssec')
 	{
+		my $cfg_minns = get_dns_minns($tld, $cycle_clock);
+
+		fail("number of Minimum Name Servers for TLD $tld is configured as $cfg_minns") if (1 > $cfg_minns);
+
 		$json->{'minNameServersUp'} = int($cfg_minns);
 	}
 

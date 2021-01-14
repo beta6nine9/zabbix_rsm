@@ -61,10 +61,6 @@
 			"class": "AggregateDetailsAction",
 			"view": "rsm.aggregatedetails.list"
 		},
-		"rsm.particularproxys": {
-			"class": "ParticularProxyListAction",
-			"view": "rsm.particularproxys.list"
-		},
 		"export.rsm.slareports": {
 			"class": "ExportSlaReportAction",
 			"layout": null,

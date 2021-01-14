@@ -1,15 +1,11 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
-BEGIN
-{
-	our $MYDIR = $0; $MYDIR =~ s,(.*)/.*,$1,; $MYDIR = '.' if ($MYDIR eq $0);
-	our $MYDIR2 = $0; $MYDIR2 =~ s,(.*)/.*/.*,$1,; $MYDIR2 = '..' if ($MYDIR2 eq $0);
-}
-use lib $MYDIR;
-use lib $MYDIR2;
+use FindBin;
+use lib "$FindBin::RealBin";
+use lib "$FindBin::RealBin/..";
 
-use warnings;
 use strict;
+use warnings;
 
 use RSM;
 use RSMSLV;
@@ -146,7 +142,6 @@ my $max = cycle_end(time() - 240, 60);
 fail("cannot export data: selected time period is in the future") if (!opt('force') && $till > $max);
 
 # consider only tests that started within given period
-my $cfg_dns_minns;
 my $cfg_dns_minonline;
 foreach my $service (sort(keys(%{$services})))
 {
@@ -154,14 +149,12 @@ foreach my $service (sort(keys(%{$services})))
 
 	if ($service eq 'dns' || $service eq 'dnssec')
 	{
-		if (!$cfg_dns_minns)
+		if (!$cfg_dns_minonline)
 		{
-			$cfg_dns_minns = get_macro_minns();
 			$cfg_dns_minonline = get_macro_dns_probe_online();
 		}
 
-		$services->{$service}->{'minns'} = $cfg_dns_minns;
-		$services->{$service}->{'minonline'} = get_macro_dns_probe_online();
+		$services->{$service}->{'minonline'} = $cfg_dns_minonline;
 	}
 
 	if ($services->{$service}->{'from'} && $services->{$service}->{'from'} < $date)
@@ -725,6 +718,11 @@ sub __get_test_data($$$)
 					next;
 				}
 
+				if ($service eq 'dns' || $service eq 'dnssec')
+				{
+					$cycles->{$service}{$cycleclock}{'minns'} = get_dns_minns($tld, $cycleclock);
+				}
+
 				foreach my $interface (keys(%{$results->{$service}{$cycleclock}{'interfaces'}}))
 				{
 					# the status is set later
@@ -873,7 +871,17 @@ sub __save_csv_data($$)
 					      '',
 					      $tld_type_id,
 					      $protocol_id // ''	# TODO: no cycle protocol as DNS can be UDP/TCP since DNS Reboot!
+			]);
+
+			if ($service eq 'dns')
+			{
+				# DNS MINNS
+				dw_append_csv(DATA_MINNS, [
+						      $tld_id,
+						      $cycle_ref->{'minns'},
+						      $cycleclock
 				]);
+			}
 
 			foreach my $interface (keys(%{$cycle_ref->{'interfaces'}}))
 			{
@@ -1057,8 +1065,6 @@ sub __save_csv_data($$)
 								$nscyclestatus = ($perc > SLV_UNAVAILABILITY_LIMIT ? $general_status_up : $general_status_down);
 							}
 
-							#dbg("get ip version, csv:ns_avail service:$service, ip:", (defined($ip) ? $ip : "UNDEF"));
-
 							my $ns_id = dw_get_id(ID_NS_NAME, $ns);
 							my $ip_id = dw_get_id(ID_NS_IP, $ip);
 
@@ -1112,7 +1118,7 @@ sub __save_csv_data($$)
 						      $eventid,
 						      $event_end,
 						      $failed_tests
-					]);
+				]);
 			}
 
 			# report only incidents within given period
@@ -1124,7 +1130,7 @@ sub __save_csv_data($$)
 						      $tld_id,
 						      $service_category_id,
 						      $tld_type_id
-					]);
+				]);
 			}
 		}
 	}

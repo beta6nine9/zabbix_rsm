@@ -58,6 +58,12 @@ class IncidentDetailsAction extends Action {
 	}
 
 	protected function checkPermissions() {
+		$valid_users = [USER_TYPE_READ_ONLY, USER_TYPE_ZABBIX_USER, USER_TYPE_POWER_USER, USER_TYPE_COMPLIANCE,
+			USER_TYPE_ZABBIX_ADMIN, USER_TYPE_SUPER_ADMIN];
+
+		if (!in_array($this->getUserType(), $valid_users))
+			return false;
+
 		// ensure we have access to Rsmhost, limit output to hostid to avoid selecting the whole thing
 		return !empty(API::Host()->get(['output' => ['hostid'], 'filter' => ['host' => $this->getInput('host', null)]]));
 	}
@@ -366,7 +372,7 @@ class IncidentDetailsAction extends Action {
 		}
 
 		$this->access_deny = false;
-		$this->server_time = time() - RSM_ROLLWEEK_SHIFT_BACK;
+		$this->server_time = time();
 		$data = [
 			'title' => _('Incidents details'),
 			'ajax_request' => $this->isAjaxRequest(),

@@ -18,7 +18,7 @@ class Permission {
 	// RSM modules routes.
 	const MODULE_ROUTES = [
 		'rsm.rollingweekstatus', 'rsm.incidents', 'rsm.slareports', 'rsm.incidentdetails', 'rsm.tests',
-		'rsm.particulartests', 'rsm.aggregatedetails', 'rsm.particularproxys', 'export.rsm.slareports',
+		'rsm.particulartests', 'rsm.aggregatedetails', 'export.rsm.slareports',
 		'rsm.markincident',
 	];
 

@@ -17,17 +17,17 @@ db_read_timeout = 30
 ;db_ca_path =
 ;db_cipher =
 
-[server_2]
-za_url = https://zabbix2.example.com
-za_user = Admin
-za_password = password
-db_name = zabbix2
-db_user = user
-db_password = password
-db_host = localhost
-db_connect_timeout = 30
-db_write_timeout = 30
-db_read_timeout = 30
+;[server_2]
+;za_url = https://zabbix2.example.com
+;za_user = Admin
+;za_password = password
+;db_name = zabbix2
+;db_user = user
+;db_password = password
+;db_host = localhost
+;db_connect_timeout = 30
+;db_write_timeout = 30
+;db_read_timeout = 30
 ;db_key_file =
 ;db_cert_file =
 ;db_ca_file =

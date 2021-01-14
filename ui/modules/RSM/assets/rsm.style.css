@@ -6,6 +6,9 @@ table.list-table {
 table.list-table td {
 	border: 1px solid var(--border-color);
 }
+a:hover {
+	border-bottom-color: transparent !important;
+}
 
 /* Rolling week status page */
 .service-icon {
@@ -50,8 +53,18 @@ table.list-table td {
 	float: right;
 }
 
-/* Particular proxy */
+/* Test list */
 .first-row-element {
 	width: 300px;
 	display: inline-block;
+}
+
+/* Icons */
+.icon-eye {
+	display: inline-block;
+	vertical-align: middle;
+	border-bottom: 1px solid transparent;
+	background: url("icon-eye.svg") no-repeat 0 0;
+	width: 24px;
+	height: 24px;
 }

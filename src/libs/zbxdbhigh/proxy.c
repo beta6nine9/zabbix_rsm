@@ -3517,7 +3517,7 @@ static int	process_history_data_by_itemids(zbx_socket_t *sock, zbx_client_item_v
 					0 == strncmp(items[i].key_orig, "resolver", ZBX_CONST_STRLEN("resolver"))))
 			{
 				zabbix_log(LOG_LEVEL_WARNING,
-						"skipping [" ZBX_FS_UI64 "; %s; %s] value [%s] bacause it is %d seconds old",
+						"skipping [" ZBX_FS_UI64 "; %s; %s] value [%s] because it is " ZBX_FS_I64 " seconds old",
 						items[i].itemid, items[i].host.host, items[i].key_orig,
 						values[i].value, now - values[i].ts.sec);
 
@@ -3698,7 +3698,11 @@ static void	process_history_data_by_keys(zbx_socket_t *sock, zbx_client_item_val
 		for (i = 0; i < values_num; i++)
 		{
 			if (SUCCEED != errcodes[i])
+			{
+				zabbix_log(LOG_LEVEL_DEBUG, "cannot retrieve key \"%s\" on host \"%s\" from "
+						"configuration cache", hostkeys[i].key, hostkeys[i].host);
 				continue;
+			}
 
 			if (last_hostid != items[i].host.hostid)
 			{
@@ -3722,6 +3726,11 @@ static void	process_history_data_by_keys(zbx_socket_t *sock, zbx_client_item_val
 				{
 					zabbix_log(LOG_LEVEL_WARNING, "%s", error);
 					zbx_free(error);
+				}
+				else
+				{
+					zabbix_log(LOG_LEVEL_DEBUG, "unknown validation error for item \"%s\"",
+							(NULL == items[i].key) ? items[i].key_orig : items[i].key);
 				}
 
 				DCconfig_clean_items(&items[i], &errcodes[i], 1);

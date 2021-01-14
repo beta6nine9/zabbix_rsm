@@ -24,62 +24,52 @@ use Fcntl qw(:flock);
 use List::Util qw(min max);
 use Devel::StackTrace;
 
-use constant E_ID_NONEXIST => -2;
-use constant E_ID_MULTIPLE => -3;
+use constant E_ID_NONEXIST			=> -2;
+use constant E_ID_MULTIPLE			=> -3;
 
-use constant PROTO_UDP	=> 0;
-use constant PROTO_TCP	=> 1;
+use constant PROTO_UDP				=> 0;
+use constant PROTO_TCP				=> 1;
 
-						# "RSM Service Availability" value mapping:
-use constant DOWN			=> 0;	# Down
-use constant UP				=> 1;	# Up
-use constant UP_INCONCLUSIVE_NO_DATA	=> 2;	# Up-inconclusive-no-data
-use constant UP_INCONCLUSIVE_NO_PROBES	=> 3;	# Up-inconclusive-no-probes
+							# "RSM Service Availability" value mapping:
+use constant DOWN				=> 0;	# Down
+use constant UP					=> 1;	# Up
+use constant UP_INCONCLUSIVE_NO_DATA		=> 2;	# Up-inconclusive-no-data
+use constant UP_INCONCLUSIVE_NO_PROBES		=> 3;	# Up-inconclusive-no-probes
 
-use constant ONLINE => 1;	# todo: check where these are used
-use constant OFFLINE => 0;	# todo: check where these are used
-use constant SLV_UNAVAILABILITY_LIMIT => 49; # NB! must be in sync with frontend
+use constant ONLINE				=> 1;	# todo: check where these are used
+use constant OFFLINE				=> 0;	# todo: check where these are used
+use constant SLV_UNAVAILABILITY_LIMIT		=> 49;	# NB! must be in sync with frontend
 
-use constant MIN_LOGIN_ERROR => -205;
-use constant MAX_LOGIN_ERROR => -203;
-use constant MIN_INFO_ERROR => -211;
-use constant MAX_INFO_ERROR => -209;
+use constant MIN_LOGIN_ERROR			=> -205;
+use constant MAX_LOGIN_ERROR			=> -203;
+use constant MIN_INFO_ERROR			=> -211;
+use constant MAX_INFO_ERROR			=> -209;
 
-use constant TRIGGER_SEVERITY_NOT_CLASSIFIED => 0;
-use constant EVENT_OBJECT_TRIGGER => 0;
-use constant EVENT_SOURCE_TRIGGERS => 0;
-use constant TRIGGER_VALUE_FALSE => 0;
-use constant TRIGGER_VALUE_TRUE => 1;
-use constant INCIDENT_FALSE_POSITIVE => 1; # NB! must be in sync with frontend
-use constant PROBE_LASTACCESS_ITEM => 'zabbix[proxy,{$RSM.PROXY_NAME},lastaccess]';
-use constant PROBE_KEY_MANUAL => 'rsm.probe.status[manual]';
-use constant PROBE_KEY_AUTOMATIC => 'rsm.probe.status[automatic,%]'; # match all in SQL
-
-use constant RSM_CONFIG_DNS_DELAY_ITEMID => 100008;	# rsm.configvalue[RSM.DNS.DELAY]
-use constant RSM_CONFIG_RDDS_DELAY_ITEMID => 100009;	# rsm.configvalue[RSM.RDDS.DELAY]
-use constant RSM_CONFIG_EPP_DELAY_ITEMID => 100010;	# rsm.configvalue[RSM.EPP.DELAY]
-use constant RSM_CONFIG_RDAP_DELAY_ITEMID => 100034;	# rsm.configvalue[RSM.RDAP.DELAY]
+use constant TRIGGER_SEVERITY_NOT_CLASSIFIED	=> 0;
+use constant EVENT_OBJECT_TRIGGER		=> 0;
+use constant EVENT_SOURCE_TRIGGERS		=> 0;
+use constant TRIGGER_VALUE_FALSE		=> 0;
+use constant TRIGGER_VALUE_TRUE			=> 1;
+use constant INCIDENT_FALSE_POSITIVE		=> 1;	# NB! must be in sync with frontend
 
 # In order to do the calculation we should wait till all the results
 # are available on the server (from proxies). We shift back 2 minutes
 # in case of "availability" and 3 minutes in case of "rolling week"
 # calculations.
 
-# NB! These numbers must be in sync with Frontend (details page)!
-use constant PROBE_ONLINE_SHIFT		=> 120;	# seconds (must be divisible by 60) to go back for Probe online status calculation
-use constant AVAIL_SHIFT_BACK		=> 120;	# seconds (must be divisible by 60) to go back for Service Availability calculation
-use constant ROLLWEEK_SHIFT_BACK	=> 180;	# seconds (must be divisible by 60) back when Service Availability is definitely calculated
+use constant WAIT_FOR_AVAIL_DATA		=> 120; # seconds to wait before sending UP_INCONCLUSIVE_NO_DATA to <service>.avail item
+use constant WAIT_FOR_PROBE_DATA		=> 120; # seconds to wait before sending OFFLINE to rsm.probe.online item
 
-use constant PROBE_ONLINE_STR => 'Online';
+use constant PROBE_ONLINE_STR			=> 'Online';
 
-use constant PROBE_DELAY => 60;
+use constant PROBE_DELAY			=> 60;
 
-use constant DETAILED_RESULT_DELIM => ', ';
+use constant DETAILED_RESULT_DELIM		=> ', ';
 
-use constant USE_CACHE_FALSE => 0;
-use constant USE_CACHE_TRUE  => 1;
+use constant USE_CACHE_FALSE			=> 0;
+use constant USE_CACHE_TRUE			=> 1;
 
-use constant TARGET_PLACEHOLDER => 'TARGET_PLACEHOLDER';	# for non-DNS services, see get_test_results()
+use constant TARGET_PLACEHOLDER			=> 'TARGET_PLACEHOLDER'; # for non-DNS services, see get_test_results()
 
 our ($result, $dbh, $tld, $server_key);
 
@@ -90,13 +80,12 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		UP_INCONCLUSIVE_NO_PROBES
 		UP_INCONCLUSIVE_NO_DATA PROTO_UDP PROTO_TCP
 		MAX_LOGIN_ERROR MIN_INFO_ERROR MAX_INFO_ERROR PROBE_ONLINE_STR
-		AVAIL_SHIFT_BACK ROLLWEEK_SHIFT_BACK PROBE_ONLINE_SHIFT
+		WAIT_FOR_AVAIL_DATA
+		WAIT_FOR_PROBE_DATA
 		PROBE_DELAY
-		PROBE_KEY_MANUAL
 		ONLINE OFFLINE
 		USE_CACHE_FALSE USE_CACHE_TRUE
 		TARGET_PLACEHOLDER
-		get_macro_minns
 		get_macro_dns_probe_online
 		get_macro_rdds_probe_online
 		get_macro_rdap_probe_online
@@ -126,6 +115,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		get_macro_incident_rdap_fail get_macro_incident_rdap_recover
 		get_monitoring_target
 		get_rdap_standalone_ts is_rdap_standalone
+		get_dns_minns
 		get_itemid_by_key get_itemid_by_host
 		get_itemid_by_hostid get_itemid_like_by_hostid get_itemids_by_host_and_keypart get_lastclock
 		get_tlds get_tlds_and_hostids
@@ -136,7 +126,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		tld_interface_enabled_create_cache tld_interface_enabled_delete_cache
 		db_handler_read_status_start db_handler_read_status_end
 		db_select db_select_col db_select_row db_select_value db_select_binds db_explain
-		set_slv_config get_cycle_bounds get_rollweek_bounds get_downtime_bounds
+		set_slv_config get_rollweek_bounds get_downtime_bounds
 		current_month_first_cycle month_start
 		probe_online_at_init probe_online_at probes2tldhostids
 		slv_max_cycles
@@ -154,7 +144,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		float_value_exists
 		sql_time_condition get_incidents get_downtime
 		history_table
-		get_lastvalue get_lastvalues_by_itemids get_itemids_by_hostids get_nsip_values
+		get_lastvalue get_itemids_by_hostids get_nsip_values
 		get_valuemaps get_statusmaps get_detailed_result
 		get_avail_valuemaps
 		get_result_string get_tld_by_trigger truncate_from truncate_till alerts_enabled
@@ -198,123 +188,102 @@ my $log_open = 0;
 my $monitoring_target; # see get_monitoring_target()
 my $rdap_standalone_ts; # see get_rdap_standalone_ts()
 
-sub get_macro_minns
-{
-	return __get_macro('{$RSM.DNS.AVAIL.MINNS}');
-}
-
-sub get_macro_dns_probe_online
+sub get_macro_dns_probe_online()
 {
 	return __get_macro('{$RSM.DNS.PROBE.ONLINE}');
 }
 
-sub get_macro_rdds_probe_online
+sub get_macro_rdds_probe_online()
 {
 	return __get_macro('{$RSM.RDDS.PROBE.ONLINE}');
 }
 
-sub get_macro_rdap_probe_online
+sub get_macro_rdap_probe_online()
 {
 	return __get_macro('{$RSM.RDAP.PROBE.ONLINE}');
 }
 
-sub get_macro_dns_rollweek_sla
+sub get_macro_dns_rollweek_sla()
 {
 	return __get_macro('{$RSM.DNS.ROLLWEEK.SLA}');
 }
 
-sub get_macro_rdds_rollweek_sla
+sub get_macro_rdds_rollweek_sla()
 {
 	return __get_macro('{$RSM.RDDS.ROLLWEEK.SLA}');
 }
 
-sub get_macro_rdap_rollweek_sla
+sub get_macro_rdap_rollweek_sla()
 {
 	return __get_macro('{$RSM.RDAP.ROLLWEEK.SLA}');
 }
 
-sub get_macro_dns_udp_rtt_high
+sub get_macro_dns_udp_rtt_high()
 {
 	return __get_macro('{$RSM.DNS.UDP.RTT.HIGH}');
 }
 
-sub get_macro_dns_udp_rtt_low
+sub get_macro_dns_udp_rtt_low()
 {
 	return __get_macro('{$RSM.DNS.UDP.RTT.LOW}');
 }
 
-sub get_macro_dns_tcp_rtt_low
+sub get_macro_dns_tcp_rtt_low()
 {
 	return __get_macro('{$RSM.DNS.TCP.RTT.LOW}');
 }
 
-sub get_macro_dns_tcp_rtt_high
+sub get_macro_dns_tcp_rtt_high()
 {
 	return __get_macro('{$RSM.DNS.TCP.RTT.HIGH}');
 }
 
-sub get_macro_rdds_rtt_low
+sub get_macro_rdds_rtt_low()
 {
 	return __get_macro('{$RSM.RDDS.RTT.LOW}');
 }
 
-sub get_macro_rdap_rtt_low
+sub get_macro_rdap_rtt_low()
 {
 	return __get_macro('{$RSM.RDAP.RTT.LOW}');
 }
 
-sub get_dns_delay
+sub get_dns_delay()
 {
-	my $value_time = (shift or time() - AVAIL_SHIFT_BACK);
-
-	my $value = __get_configvalue(RSM_CONFIG_DNS_DELAY_ITEMID, $value_time);
-
-	return $value // __get_macro('{$RSM.DNS.DELAY}');
+	return __get_macro('{$RSM.DNS.DELAY}');
 }
 
-sub get_rdds_delay
+sub get_rdds_delay()
 {
-	my $value_time = (shift or time() - AVAIL_SHIFT_BACK);
-
-	my $value = __get_configvalue(RSM_CONFIG_RDDS_DELAY_ITEMID, $value_time);
-
-	return $value // __get_macro('{$RSM.RDDS.DELAY}');
+	return __get_macro('{$RSM.RDDS.DELAY}');
 }
 
-sub get_rdap_delay
+sub get_rdap_delay()
 {
-	my $value_time = (shift or time() - AVAIL_SHIFT_BACK);
-
-	my $value = __get_configvalue(RSM_CONFIG_RDAP_DELAY_ITEMID, $value_time);
-
-	return $value // __get_macro('{$RSM.RDAP.DELAY}');
+	return __get_macro('{$RSM.RDAP.DELAY}');
 }
 
-sub get_epp_delay
+sub get_epp_delay()
 {
-	my $value_time = (shift or time() - AVAIL_SHIFT_BACK);
-
-	my $value = __get_configvalue(RSM_CONFIG_EPP_DELAY_ITEMID, $value_time);
-
-	return $value // __get_macro('{$RSM.EPP.DELAY}');
+	return __get_macro('{$RSM.EPP.DELAY}');
 }
 
-sub get_macro_dns_update_time
+sub get_macro_dns_update_time()
 {
 	return __get_macro('{$RSM.DNS.UPDATE.TIME}');
 }
 
-sub get_macro_rdds_update_time
+sub get_macro_rdds_update_time()
 {
 	return __get_macro('{$RSM.RDDS.UPDATE.TIME}');
 }
 
-sub get_macro_epp_probe_online
+sub get_macro_epp_probe_online()
 {
 	return __get_macro('{$RSM.EPP.PROBE.ONLINE}');
 }
 
-sub get_macro_epp_rollweek_sla
+sub get_macro_epp_rollweek_sla()
 {
 	return __get_macro('{$RSM.EPP.ROLLWEEK.SLA}');
 }
@@ -460,6 +429,64 @@ sub is_rdap_standalone(;$)
 	my $ts = get_rdap_standalone_ts();
 
 	return defined($ts) && $now >= $ts ? 1 : 0;
+}
+
+my $dns_minns_cache;
+
+sub get_dns_minns($$)
+{
+	my $rsmhost = shift;
+	my $clock   = shift;
+
+	if (!defined($dns_minns_cache))
+	{
+		my $sql = "select" .
+				" rsmhost.value," .
+				"minns.value" .
+			" from" .
+				" hostmacro as rsmhost," .
+				"hostmacro as minns" .
+			" where" .
+				" rsmhost.hostid=minns.hostid and" .
+				" rsmhost.macro='{\$RSM.TLD}' and" .
+				" minns.macro='{\$RSM.TLD.DNS.AVAIL.MINNS}'";
+		my $rows = db_select($sql);
+
+		foreach my $row (@{$rows})
+		{
+			my ($rsmhost, $macro) = @{$row};
+
+			if ($macro =~ /^(\d+)(?:;(\d+):(\d+))?$/)
+			{
+				$dns_minns_cache->{$rsmhost} = {
+					'curr_minns' => $1,
+					'next_clock' => $2,
+					'next_minns' => $3,
+				};
+			}
+			else
+			{
+				fail("invalid value of {\$RSM.TLD.DNS.AVAIL.MINNS} for '$rsmhost': '$macro'");
+			}
+
+		}
+	}
+
+	if (!exists($dns_minns_cache->{$rsmhost}))
+	{
+		fail("unknown rsmhost '$rsmhost'");
+	}
+
+	my $minns = $dns_minns_cache->{$rsmhost};
+
+	if (!defined($minns->{'next_clock'}) || $clock < $minns->{'next_clock'})
+	{
+		return $minns->{'curr_minns'};
+	}
+	else
+	{
+		return $minns->{'next_minns'};
+	}
 }
 
 sub get_itemid_by_key
@@ -1351,8 +1378,11 @@ sub generate_db_error($$)
 
 	if (defined($handle->{'ParamValues'}) && %{$handle->{'ParamValues'}})
 	{
-		my $params = join(',', values(%{$handle->{'ParamValues'}}));
-		push(@message_parts, "(params: [$params])");
+		my $params = $handle->{'ParamValues'};
+		my @params = @{$params}{sort {$a <=> $b} keys(%{$params})};
+		my $params_str = join(',', map($_ // 'undef', @params));
+
+		push(@message_parts, "(params: [$params_str])");
 	}
 
 	if (defined($handle->{'ParamArrays'}) && %{$handle->{'ParamArrays'}})
@@ -1949,23 +1979,11 @@ sub month_start
 	return $dt->epoch();
 }
 
-# Get time bounds of the last cycle guaranteed to have all probe results.
-sub get_cycle_bounds
-{
-	my $delay = shift;
-	my $now = shift || (time() - $delay - AVAIL_SHIFT_BACK);	# last complete cycle, usually used for service availability calculation
-
-	my $from = cycle_start($now, $delay);
-	my $till = cycle_end($now, $delay);
-
-	return ($from, $till, $from);
-}
-
 # Get time bounds for rolling week calculation. Last cycle must be complete.
 sub get_rollweek_bounds
 {
 	my $delay = shift;
-	my $now = shift || (time() - $delay - ROLLWEEK_SHIFT_BACK);	# last complete cycle, service availability must be calculated
+	my $now = shift || (time() - $delay);
 
 	my $till = cycle_end($now, $delay);
 	my $from = $till - __get_macro('{$RSM.ROLLWEEK.SECONDS}') + 1;
@@ -1978,7 +1996,7 @@ sub get_rollweek_bounds
 sub get_downtime_bounds
 {
 	my $delay = shift;
-	my $now = shift || (time() - $delay - ROLLWEEK_SHIFT_BACK);	# last complete cycle, service availability must be calculated
+	my $now = shift || (time() - $delay);
 
 	require DateTime;
 
@@ -2619,28 +2637,29 @@ sub is_service_error_desc
 # where value_ts is value timestamp of the cycle
 sub collect_slv_cycles($$$$$$)
 {
-	my $tlds_ref = shift;
-	my $delay = shift;
+	my $tlds_ref    = shift;
+	my $delay       = shift;
 	my $cfg_key_out = shift;
-	my $value_type = shift;	# value type of $cfg_key_out
-	my $max_clock = shift;	# latest cycle to process
-	my $max_cycles = shift;
+	my $value_type  = shift;	# value type of $cfg_key_out
+	my $max_clock   = shift;	# latest cycle to process
+	my $max_cycles  = shift;
 
 	# cache TLD data
 	my %cycles;
 
 	my ($lastvalue, $lastclock);
 
-	foreach (@{$tlds_ref})
+	foreach my $tld (@{$tlds_ref})
 	{
-		$tld = $_;	# set global variable here
+		set_log_tld($tld);
 
 		my $itemid = get_itemid_by_host($tld, $cfg_key_out);
 
 		if (get_lastvalue($itemid, $value_type, \$lastvalue, \$lastclock) != SUCCESS)
 		{
-			# new item
-			push(@{$cycles{$max_clock}}, $tld);
+			# new item; add some shiftback to avoid skipping the cycle because insufficient number of probes
+			my $clock = cycle_start($max_clock - 120, $delay);
+			push(@{$cycles{$clock}}, $tld);
 
 			next;
 		}
@@ -2667,10 +2686,9 @@ sub collect_slv_cycles($$$$$$)
 
 			$cycles_added++;
 		}
-
-		# unset TLD (for the logs)
-		$tld = undef;
 	}
+
+	unset_log_tld();
 
 	return \%cycles;
 }
@@ -2701,18 +2719,21 @@ sub online_probes($$$)
 # Process cycles that need to be calculcated.
 sub process_slv_avail_cycles($$$$$$$$$)
 {
-	my $cycles_ref = shift;
-	my $probes_ref = shift;
-	my $delay = shift;
-	my $cfg_keys_in = shift;	# if input key(s) is/are known
-	my $cfg_keys_in_cb = shift;	# if input key(s) is/are unknown (DNSSEC, RDDS), call this function to get them
-	my $cfg_key_out = shift;
-	my $cfg_minonline = shift;
+	my $cycles_ref            = shift;
+	my $probes_ref            = shift;
+	my $delay                 = shift;
+	my $cfg_keys_in           = shift;	# if input key(s) is/are known
+	my $cfg_keys_in_cb        = shift;	# if input key(s) is/are unknown (DNSSEC, RDDS), call this function to get them
+	my $cfg_key_out           = shift;
+	my $cfg_minonline         = shift;
 	my $check_probe_values_cb = shift;
-	my $cfg_value_type = shift;
+	my $cfg_value_type        = shift;
 
 	# cache TLD data
 	my %keys_in;
+
+	# hash for storing TLDs that should be skipped (e.g., because they don't have enough data)
+	my %skip_tlds;
 
 	init_values();
 
@@ -2722,9 +2743,40 @@ sub process_slv_avail_cycles($$$$$$$$$)
 
 		dbg("processing cycle ", ts_str($from), " (delay: $delay)");
 
-		foreach (@{$cycles_ref->{$value_ts}})
+		# check if ONLINE/OFFLINE status of all probes is available
+		# (i.e., rsm.probe.online item must have values for every minute during the cycle)
+
+		my $sql = "select" .
+				" count(*)" .
+			" from" .
+				" hosts" .
+				" inner join items on items.hostid=hosts.hostid" .
+				" left join lastvalue on lastvalue.itemid=items.itemid" .
+				" inner join hosts_groups on hosts_groups.hostid=hosts.hostid" .
+			" where" .
+				" hosts.status=? and" .
+				" hosts_groups.groupid=? and" .
+				" items.key_=? and" .
+				" coalesce(lastvalue.clock,0)<?";
+		my $params = [HOST_STATUS_MONITORED, PROBES_MON_GROUPID, PROBE_KEY_ONLINE, $from + $delay - 60];
+		my $probes_without_status = db_select_value($sql, $params);
+
+		if (db_select_value($sql, $params) > 0)
 		{
-			$tld = $_;	# set global variable here
+			dbg("skipping cycle, found $probes_without_status probe(s) without status");
+			last;
+		}
+
+		# process rsmhosts
+
+		foreach my $tld (@{$cycles_ref->{$value_ts}})
+		{
+			set_log_tld($tld);
+
+			if (exists($skip_tlds{$tld}))
+			{
+				next;
+			}
 
 			if (!defined($keys_in{$tld}))
 			{
@@ -2743,12 +2795,26 @@ sub process_slv_avail_cycles($$$$$$$$$)
 				next;
 			}
 
-			process_slv_avail($tld, $keys_in{$tld}, $cfg_key_out, $from, $delay, $value_ts, $cfg_minonline,
-				$probes_ref, $check_probe_values_cb, $cfg_value_type, $delay);
+			my ($value, $info) = process_slv_avail($tld, $keys_in{$tld}, $cfg_key_out, $value_ts, $from,
+				$delay, $cfg_minonline, $probes_ref, $check_probe_values_cb, $cfg_value_type);
+
+			if (!defined($value))
+			{
+				# something unexpected happened, process_slv_avail() probably wrote it to the log file
+				next;
+			}
+
+			if ($value == UP_INCONCLUSIVE_NO_DATA && cycle_start(time(), $delay) - $from < WAIT_FOR_AVAIL_DATA)
+			{
+				# not enough data, but cycle isn't old enough
+				$skip_tlds{$tld} = undef;
+				next;
+			}
+
+			push_value($tld, $cfg_key_out, $value_ts, $value, ITEM_VALUE_TYPE_UINT64, $info);
 		}
 
-		# unset TLD (for the logs)
-		$tld = undef;
+		unset_log_tld();
 	}
 
 	send_values();
@@ -2756,32 +2822,30 @@ sub process_slv_avail_cycles($$$$$$$$$)
 
 sub process_slv_avail($$$$$$$$$$)
 {
-	my $tld = shift;
-	my $cfg_keys_in = shift;	# array reference, e. g. ['rsm.dns.rtt[...,udp]', ...]
-	my $cfg_key_out = shift;
-	my $from = shift;
-	my $delay = shift;
-	my $value_ts = shift;
-	my $cfg_minonline = shift;
-	my $probes_ref = shift;
+	my $tld                    = shift;
+	my $cfg_keys_in            = shift;	# array reference, e. g. ['rsm.dns.rtt[...,udp]', ...]
+	my $cfg_key_out            = shift;
+	my $value_ts               = shift;
+	my $from                   = shift;
+	my $delay                  = shift;
+	my $cfg_minonline          = shift;
+	my $probes_ref             = shift;
 	my $check_probe_values_ref = shift;
-	my $value_type = shift;
+	my $value_type             = shift;
 
 	my $online_probes = online_probes($probes_ref, $from, $delay);
 	my $online_probe_count = scalar(@{$online_probes});
 
-	if (scalar(@{$online_probes}) < $cfg_minonline)
+	if ($online_probe_count < $cfg_minonline)
 	{
-		push_value($tld, $cfg_key_out, $value_ts, UP_INCONCLUSIVE_NO_PROBES, ITEM_VALUE_TYPE_UINT64,
-				"Up (not enough probes online, $online_probe_count while $cfg_minonline required)");
-
 		if (alerts_enabled() == SUCCESS)
 		{
-			add_alert(ts_str($value_ts) . "#system#zabbix#$cfg_key_out#PROBLEM#$tld (not enough probes" .
-					" online, $online_probe_count while $cfg_minonline required)");
+			add_alert(ts_str($value_ts) . "#system#zabbix#$cfg_key_out#PROBLEM#$tld (not enough" .
+					" probes online, $online_probe_count while $cfg_minonline required)");
 		}
 
-		return;
+		return (UP_INCONCLUSIVE_NO_PROBES,
+			"Up (not enough probes online, $online_probe_count while $cfg_minonline required)");
 	}
 
 	my $hostids_ref = probes2tldhostids($tld, $online_probes);
@@ -2806,16 +2870,14 @@ sub process_slv_avail($$$$$$$$$$)
 
 	if ($probes_with_results < $cfg_minonline)
 	{
-		push_value($tld, $cfg_key_out, $value_ts, UP_INCONCLUSIVE_NO_DATA, ITEM_VALUE_TYPE_UINT64,
-				"Up (not enough probes with results, $probes_with_results while $cfg_minonline required)");
-
 		if (alerts_enabled() == SUCCESS)
 		{
-			add_alert(ts_str($value_ts) . "#system#zabbix#$cfg_key_out#PROBLEM#$tld (not enough probes" .
-					" with results, $probes_with_results while $cfg_minonline required)");
+			add_alert(ts_str($value_ts) . "#system#zabbix#$cfg_key_out#PROBLEM#$tld (not enough" .
+					" probes with results, $probes_with_results while $cfg_minonline required)");
 		}
 
-		return;
+		return (UP_INCONCLUSIVE_NO_DATA,
+			"Up (not enough probes with results, $probes_with_results while $cfg_minonline required)");
 	}
 
 	my $probes_with_positive = 0;
@@ -2836,11 +2898,11 @@ sub process_slv_avail($$$$$$$$$$)
 
 	if ($perc > SLV_UNAVAILABILITY_LIMIT)
 	{
-		push_value($tld, $cfg_key_out, $value_ts, UP, ITEM_VALUE_TYPE_UINT64, "Up ($detailed_info)");
+		return (UP, "Up ($detailed_info)");
 	}
 	else
 	{
-		push_value($tld, $cfg_key_out, $value_ts, DOWN, ITEM_VALUE_TYPE_UINT64, "Down ($detailed_info)");
+		return (DOWN, "Down ($detailed_info)");
 	}
 }
 
@@ -2862,10 +2924,9 @@ sub process_slv_rollweek_cycles($$$$$)
 
 		dbg("selecting period ", selected_period($from, $till), " (value_ts:", ts_str($clock), ")");
 
-		foreach (@{$cycles_ref->{$clock}})
+		foreach my $tld (@{$cycles_ref->{$clock}})
 		{
-			# NB! This is needed in order to set the value globally.
-			$tld = $_;
+			set_log_tld($tld);
 
 			$itemids{$tld}{'itemid_in'} = get_itemid_by_host($tld, $cfg_key_in) unless ($itemids{$tld}{'itemid_in'});
 			$itemids{$tld}{'itemid_out'} = get_itemid_by_host($tld, $cfg_key_out) unless ($itemids{$tld}{'itemid_out'});
@@ -2881,8 +2942,7 @@ sub process_slv_rollweek_cycles($$$$$)
 			push_value($tld, $cfg_key_out, $value_ts, $perc, ITEM_VALUE_TYPE_FLOAT, "result: $perc% (down: $downtime minutes, sla: $cfg_sla)");
 		}
 
-		# unset TLD (for the logs)
-		$tld = undef;
+		unset_log_tld();
 	}
 
 	send_values();
@@ -2907,10 +2967,9 @@ sub process_slv_downtime_cycles($$$$)
 
 		dbg("selecting period ", selected_period($from, $till), " (value_ts:", ts_str($clock), ")");
 
-		foreach (@{$cycles_ref->{$clock}})
+		foreach my $tld (@{$cycles_ref->{$clock}})
 		{
-			# NB! This is needed in order to set the value globally.
-			$tld = $_;
+			set_log_tld($tld);
 
 			$itemids{$tld}{'itemid_in'} = get_itemid_by_host($tld, $cfg_key_in) unless ($itemids{$tld}{'itemid_in'});
 			$itemids{$tld}{'itemid_out'} = get_itemid_by_host($tld, $cfg_key_out) unless ($itemids{$tld}{'itemid_out'});
@@ -2948,8 +3007,7 @@ sub process_slv_downtime_cycles($$$$)
 			push_value($tld, $cfg_key_out, $value_ts, $downtime, ITEM_VALUE_TYPE_UINT64, ts_str($from), " - ", ts_str($till));
 		}
 
-		# unset TLD (for the logs)
-		$tld = undef;
+		unset_log_tld();
 	}
 
 	send_values();
@@ -5086,6 +5144,15 @@ sub get_test_results($$;$)
 			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'status'} = $value;
 			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'clock'} = $clock;
 		}
+		elsif (str_starts_with($i->{'key'}, "rsm.dnssec.status"))
+		{
+			# service status
+			$data{$cycleclock}{$service}{'status'} = $value;
+
+			# interface status and clock
+			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'status'} = $value;
+			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'clock'} = $clock;
+		}
 		elsif (str_starts_with($i->{'key'}, "rsm.rdds.43.status", "rsm.rdds.80.status"))
 		{
 			# interface status and clock
@@ -6025,7 +6092,7 @@ sub __get_reachable_times
 	my $till = shift;
 
 	my $host = "$probe - mon";
-	my $itemid = get_itemid_by_host($host, PROBE_LASTACCESS_ITEM);
+	my $itemid = get_itemid_by_host($host, PROBE_KEY_LASTACCESS);
 
 	my ($rows_ref, @times, $last_status);
 
@@ -6158,42 +6225,6 @@ sub __get_probestatus_times
 	}
 
 	return \@times;
-}
-
-sub __get_configvalue
-{
-	my $itemid = shift;
-	my $value_time = shift;
-
-	my $hour = 3600;
-	my $day = $hour * 24;
-	my $month = $day * 30;
-
-	my $diff = $hour;
-
-	while (1)
-	{
-		my $rows_ref = db_select(
-			"select value".
-			" from history_uint".
-			" where itemid=$itemid".
-				" and " . sql_time_condition($value_time - $diff, $value_time).
-			" order by clock desc".
-			" limit 1"
-		);
-
-		foreach my $row_ref (@$rows_ref)
-		{
-			return $row_ref->[0];
-		}
-
-		# no more attempts
-		return if ($diff == $month);
-
-		# try bigger period
-		$diff = $month if ($diff == $day);
-		$diff = $day if ($diff == $hour);
-	}
 }
 
 1;
