@@ -303,7 +303,7 @@ foreach my $tld_for_a_child_to_process (@{$tlds_ref})
 
 		# cache probe online statuses
 		# TODO: FIXME, we have done that already in other processes! (look for this message in this file)
-		foreach my $probe (keys(%{$probes_data->{$server_key}}))
+		foreach my $probe (sort(keys(%{$probes_data->{$server_key}})))
 		{
 			# probe, from, delay
 			probe_online_at($probe, $from, ($till + 1 - $from));
@@ -660,7 +660,7 @@ sub __get_test_data($$$)
 
 	my $test_items = get_test_items($tld);
 
-	foreach my $probe (keys(%{$test_items}))
+	foreach my $probe (sort(keys(%{$test_items})))
 	{
 		my (@itemids_uint, @itemids_float, @itemids_str);
 
@@ -1240,7 +1240,7 @@ sub __get_probe_times($$$)
 	return $result if (scalar(keys(%{$probes_ref})) == 0);
 
 	my @probes;
-	foreach my $probe (keys(%{$probes_ref}))
+	foreach my $probe (sort(keys(%{$probes_ref})))
 	{
 		next unless ($probes_ref->{$probe}->{'status'} == HOST_STATUS_MONITORED);
 
