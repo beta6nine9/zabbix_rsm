@@ -53,7 +53,7 @@ sub wait_for_children($);
 sub terminate_children($);
 sub get_swap_usage($);
 
-parse_opts('tld=s', 'service=s', 'server-id=i', 'now=i', 'period=i', 'print-period', 'max-children=i', 'max-wait=i', 'debug2');
+parse_opts('tld=s', 'service=s', 'server-id=i', 'now=i', 'period=i', 'print-period', 'max-children=i', 'max-wait=i', 'prettify-json', 'debug2');
 
 setopt('nolog');
 
@@ -678,7 +678,7 @@ sub cycles_to_calculate($$$$$$$$)
 					$clock_limits{$service},
 					\$ts) == AH_SUCCESS)
 			{
-				$lastclock = $ts + $delay;
+				$lastclock = $ts;
 
 				dbg("$service: itemid $itemid from probe \"$probe\" not in cache yet");
 				dbg("using the time since most recent measurement file: ", ts_str($lastclock));
@@ -1001,15 +1001,15 @@ sub fill_test_data($$$$)
 	my $dst = shift;
 	my $hist = shift;
 
-	foreach my $target (keys(%{$src}))
+	foreach my $target (sort(keys(%{$src})))
 	{
 		my $test_data_ref = {
-			'target'	=> ($target eq TARGET_PLACEHOLDER ? undef : $target),
+			'target'	=> $target,
 			'status'	=> undef,
 			'metrics'	=> []
 		};
 
-		foreach my $src_metric_ref (@{$src->{$target}})
+		foreach my $src_metric_ref (sort { $a->{'ip'} cmp $b->{'ip'} } @{$src->{$target}})
 		{
 			# "rtt" and "ip" values represent the same test but they are stored in different items with
 			# different value types. This means they can appear in history tables at different times.
@@ -1442,14 +1442,14 @@ sub calculate_cycle($$$$$$$$$)
 	# add data that was collected from history and calculated in previous cycle
 	#
 
-	foreach my $interface (keys(%tested_interfaces))
+	foreach my $interface (sort(keys(%tested_interfaces)))
 	{
 		my $interface_json = {
 			'interface'	=> $interface,
 			'probes'	=> []
 		};
 
-		foreach my $probe (keys(%{$tested_interfaces{$interface}}))
+		foreach my $probe (sort(keys(%{$tested_interfaces{$interface}})))
 		{
 			my $probe_ref = {
 				'city'		=> $probe,
@@ -1531,7 +1531,7 @@ sub calculate_cycle($$$$$$$$$)
 		$json->{'minNameServersUp'} = int($cfg_minns);
 	}
 
-	foreach my $target (keys(%{$name_server_availability_data->{'targets'}}))
+	foreach my $target (sort(keys(%{$name_server_availability_data->{'targets'}})))
 	{
 		push(@{$json->{'nameServerAvailability'}{'nameServerStatus'}},
 			{
@@ -1541,11 +1541,11 @@ sub calculate_cycle($$$$$$$$$)
 		);
 	}
 
-	foreach my $probe (keys(%{$name_server_availability_data->{'probes'}}))
+	foreach my $probe (sort(keys(%{$name_server_availability_data->{'probes'}})))
 	{
 		my $test_data = [];
 
-		foreach my $target (keys(%{$name_server_availability_data->{'probes'}{$probe}}))
+		foreach my $target (sort(keys(%{$name_server_availability_data->{'probes'}{$probe}})))
 		{
 			push(@{$test_data},
 				{
@@ -1855,7 +1855,7 @@ sla-api-current.pl - generate recent SLA API measurement files for newly collect
 
 =head1 SYNOPSIS
 
-sla-api-current.pl [--tld <tld>] [--service <name>] [--server-id <id>] [--now unixtimestamp] [--period minutes] [--print-period] [--max-children n] [--max-wait seconds] [--debug] [--dry-run] [--help]
+sla-api-current.pl [--tld <tld>] [--service <name>] [--server-id <id>] [--now unixtimestamp] [--period minutes] [--print-period] [--max-children n] [--max-wait seconds] [--prettify-json] [--debug] [--dry-run] [--help]
 
 =head1 OPTIONS
 
@@ -1893,6 +1893,10 @@ Specify maximum number of child processes to run in parallel (default: 64).
 
 Specify maximum number of seconds to wait for single child process to finish (default: 600). If still running
 the process will be sent TERM signal causing the script to exit with non-zero exit code.
+
+=item B<--prettify-json>
+
+Prettify output in JSON files.
 
 =item B<--debug>
 

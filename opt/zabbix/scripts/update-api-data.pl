@@ -40,7 +40,8 @@ parse_opts(
 	'probe=s',
 	'limit=i',
 	'max-children=i',
-	'server-key=s'
+	'server-key=s',
+	'prettify-json'
 );
 
 # do not write any logs
@@ -1342,7 +1343,7 @@ update-api-data.pl - save information about the incidents to a filesystem
 
 =head1 SYNOPSIS
 
-update-api-data.pl [--service <dns|dnssec|rdds|rdap|epp>] [--tld <tld>|--ignore-file <file>] [--from <timestamp>|--continue] [--print-period] [--period minutes] [--dry-run [--probe name]] [--warnslow <seconds>] [--debug] [--help]
+update-api-data.pl [--service <dns|dnssec|rdds|rdap|epp>] [--tld <tld>|--ignore-file <file>] [--from <timestamp>|--continue] [--print-period] [--period minutes] [--dry-run [--probe name]] [--warnslow <seconds>] [--prettify-json] [--debug] [--help]
 
 =head1 OPTIONS
 
@@ -1414,6 +1415,10 @@ Specify the key of the server to handle (e. g. server_2). It must be listed in r
 =item B<--max-children> n
 
 Specify maximum number of child processes to run in parallel.
+
+=item B<--prettify-json>
+
+Prettify output in JSON files.
 
 =item B<--debug>
 

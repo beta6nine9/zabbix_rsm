@@ -69,8 +69,6 @@ use constant DETAILED_RESULT_DELIM		=> ', ';
 use constant USE_CACHE_FALSE			=> 0;
 use constant USE_CACHE_TRUE			=> 1;
 
-use constant TARGET_PLACEHOLDER			=> 'TARGET_PLACEHOLDER'; # for non-DNS services, see get_test_results()
-
 our ($result, $dbh, $tld, $server_key);
 
 our %OPTS; # specified command-line options
@@ -85,7 +83,6 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		PROBE_DELAY
 		ONLINE OFFLINE
 		USE_CACHE_FALSE USE_CACHE_TRUE
-		TARGET_PLACEHOLDER
 		get_macro_dns_probe_online
 		get_macro_rdds_probe_online
 		get_macro_rdap_probe_online

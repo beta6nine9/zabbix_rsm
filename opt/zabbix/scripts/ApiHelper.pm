@@ -4,6 +4,7 @@ use strict;
 use warnings;
 
 use RSM;
+use RSMSLV;
 use File::Path qw(make_path);
 use DateTime::Format::RFC3339;
 use base 'Exporter';
@@ -788,13 +789,14 @@ sub __encode_json($$)
 	my $json_ref = shift;
 
 	$json_ref->{'version'} = $version;
-	$json_ref->{'lastUpdateApiDatabase'} = time();
+	$json_ref->{'lastUpdateApiDatabase'} = $^T;
 
 	if (!defined($_json_xs))
 	{
 		$_json_xs = JSON::XS->new();
 		$_json_xs->utf8();
 		$_json_xs->canonical();
+		$_json_xs->pretty() if (opt('prettify-json'));
 	}
 
 	return $_json_xs->encode($json_ref);
