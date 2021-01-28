@@ -5,6 +5,7 @@ use warnings;
 
 use Getopt::Long;
 use Text::CSV_XS;
+use DateTime;
 
 my @catalog_names = (
 	'ipAddresses',
@@ -32,6 +33,8 @@ my @tld_data_file_names = (
 	'tests',
 );
 
+sub parse_time_str($);
+
 #####################################
 #                                   #
 # dealing with command line options #
@@ -58,7 +61,7 @@ my %options;
 
 $options{'help'} = \$help;
 $options{'tld=s'} = \$tld;
-$options{'from=i'} = \$period_start;
+$options{'clock=s'} = \$period_start;
 $options{'period=i'} = \$length;
 $options{'debug'} = \$debug;
 $options{'fail_immediately'} = \$fail_immediately;
@@ -74,9 +77,11 @@ if ((!$tld || !$period_start) && !$help)
 	$help = 1;
 }
 
+$period_start = parse_time_str($period_start);
+
 if ($help)
 {
-	print("Usage: $0 --tld=<TLD> --from=<period start timestamp> [--period=<period length (seconds)>] [--debug]".
+	print("Usage: $0 --tld=<TLD> --clock=<period start timestamp> [--period=<period length (seconds)>] [--debug]".
 		" [--fail_immediately]\n");
 
 	exit();
@@ -121,6 +126,25 @@ use constant INT => qr/^[+-]?[0-9]+$/;
 use constant DEC => qr/^[+-]?[0-9]+.?[0-9]*$/;
 use constant TIME => qr/^[0-9]+$/;
 use constant ERR => qr/^-[0-9]+/;
+
+sub parse_time_str($)
+{
+	my $str = shift;
+
+	if (my @matches = ($str =~ /^(\d\d\d\d)-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d)$/))
+	{
+		my ($year, $month, $date, $hour, $minute, $second) = @matches;
+
+		return DateTime->new('year' => $year, 'month' => $month, 'day' => $date, 'hour' => $hour, 'minute' => $minute, 'second' => $second)->epoch();
+	}
+
+	if (my @matches = ($str =~ /^(\d+)$/))
+	{
+		return $matches[0];
+	}
+
+	fail("invalid format of timestamp: '$str'");
+}
 
 sub empty($)
 {
