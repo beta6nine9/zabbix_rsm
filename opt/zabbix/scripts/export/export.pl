@@ -576,7 +576,7 @@ sub __get_test_data($$$)
 			" from history_uint".
 			" where itemid=$itemid_avail".
 				" and " . sql_time_condition($service_from, $service_till).
-			" order by itemid,clock"	# NB! order is important, see how the result is used below
+			" order by clock"	# NB! order is important, see how the result is used below
 		);
 
 		my $last_avail_clock;
@@ -883,11 +883,11 @@ sub __save_csv_data($$)
 				]);
 			}
 
-			foreach my $interface (keys(%{$cycle_ref->{'interfaces'}}))
+			foreach my $interface (sort(keys(%{$cycle_ref->{'interfaces'}})))
 			{
 				my $test_type_id = dw_get_id(ID_TEST_TYPE, $interface);
 
-				foreach my $probe (keys(%{$cycle_ref->{'interfaces'}{$interface}{'probes'}}))
+				foreach my $probe (sort(keys(%{$cycle_ref->{'interfaces'}{$interface}{'probes'}})))
 				{
 					my $probe_id = dw_get_id(ID_PROBE, $probe);
 
@@ -924,7 +924,7 @@ sub __save_csv_data($$)
 						]);
 					}
 
-					foreach my $target (keys(%{$cycle_ref->{'interfaces'}{$interface}{'probes'}{$probe}{'targets'}}))
+					foreach my $target (sort(keys(%{$cycle_ref->{'interfaces'}{$interface}{'probes'}{$probe}{'targets'}})))
 					{
 						my $target_ref = $cycle_ref->{'interfaces'}{$interface}{'probes'}{$probe}{'targets'}{$target};
 
@@ -1043,9 +1043,9 @@ sub __save_csv_data($$)
 
 				if ($interface eq 'dns')
 				{
-					foreach my $ns (keys(%nscycle))
+					foreach my $ns (sort(keys(%nscycle)))
 					{
-						foreach my $ip (keys(%{$nscycle{$ns}}))
+						foreach my $ip (sort(keys(%{$nscycle{$ns}})))
 						{
 							#dbg("NS $ns,$ip : positive ", $nscycle{$ns}{$ip}{'positive'}, "/", $nscycle{$ns}{$ip}{'total'});
 

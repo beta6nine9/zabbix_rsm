@@ -4830,7 +4830,8 @@ sub get_test_history($$$$$$$$)
 			"select itemid,value,clock".
 			" from " . history_table(ITEM_VALUE_TYPE_UINT64).
 			" where itemid in (" . join(',', @{$itemids_uint}) . ")".
-				" and " . sql_time_condition($from, $till)
+				" and " . sql_time_condition($from, $till) .
+			" order by clock,itemid"
 		);
 	}
 
@@ -4844,7 +4845,8 @@ sub get_test_history($$$$$$$$)
 			"select itemid,value,clock".
 			" from " . history_table(ITEM_VALUE_TYPE_FLOAT).
 			" where itemid in (" . join(',', @{$itemids_float}) . ")".
-				" and " . sql_time_condition($from, $till)
+				" and " . sql_time_condition($from, $till) .
+			" order by clock,itemid"
 		);
 	}
 
@@ -4858,7 +4860,8 @@ sub get_test_history($$$$$$$$)
 			"select itemid,value,clock".
 			" from " . history_table(ITEM_VALUE_TYPE_STR).
 			" where itemid in (" . join(',', @{$itemids_str}) . ")".
-				" and " . sql_time_condition($from, $till)
+				" and " . sql_time_condition($from, $till) .
+			" order by clock,itemid"
 		);
 
 	}
@@ -4923,6 +4926,7 @@ sub get_service_from_key($;$)
 	fail("cannot identify service, key \"$key\" is unknown");
 }
 
+# in order to keep data structures consistent let's use these for non-DNS services
 use constant FAKE_NS => '';
 use constant FAKE_NSIP => '';
 
@@ -5221,14 +5225,14 @@ sub get_test_results($$;$)
 	my $result = {};
 
 	# format the data accordingly
-	foreach my $cycleclock (keys(%data))
+	foreach my $cycleclock (sort(keys(%data)))
 	{
-		foreach my $service (keys(%{$data{$cycleclock}}))
+		foreach my $service (sort(keys(%{$data{$cycleclock}})))
 		{
 			# service status
 			$result->{$service}{$cycleclock}{'status'} = $data{$cycleclock}{$service}{'status'};
 
-			foreach my $interface (keys(%{$data{$cycleclock}{$service}{'interfaces'}}))
+			foreach my $interface (sort(keys(%{$data{$cycleclock}{$service}{'interfaces'}})))
 			{
 				# interface status
 				$result->{$service}{$cycleclock}{'interfaces'}{$interface}{'status'} =
@@ -5252,7 +5256,7 @@ sub get_test_results($$;$)
 						$data{$cycleclock}{$service}{'interfaces'}{$interface}{'testedname'};
 				}
 
-				foreach my $ns (keys(%{$data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}}))
+				foreach my $ns (sort(keys(%{$data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}})))
 				{
 					# get rid of fake target
 					my $target = ($ns eq FAKE_NS ? $data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}{$ns}{FAKE_NSIP()}{'target'} : $ns);
@@ -5261,7 +5265,7 @@ sub get_test_results($$;$)
 					$result->{$service}{$cycleclock}{'interfaces'}{$interface}{'targets'}{$target}{'status'} =
 						$data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}{$ns}{FAKE_NSIP()}{'status'};
 
-					foreach my $nsip (keys(%{$data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}{$ns}}))
+					foreach my $nsip (sort(keys(%{$data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}{$ns}})))
 					{
 						# fake NSIP for target status (dns)
 						next unless (exists($data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}{$ns}{$nsip}{'rtt'}));
@@ -6124,7 +6128,7 @@ sub __get_reachable_times
 		" where itemid=$itemid".
 			" and clock between $from and $till".
 			" and value!=0".
-		" order by itemid,clock");
+		" order by clock");
 
 	foreach my $row_ref (@$rows_ref)
 	{
