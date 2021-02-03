@@ -66,8 +66,11 @@ class TestsListAction extends Action {
 			$data['tld'] = reset($tld);
 		}
 		else {
-			error(_('No permissions to referred TLD or it does not exist!'));
+			error(_('No permissions to referred object or it does not exist!'));
+			return false;
 		}
+
+		return true;
 	}
 
 	protected function getItems(array &$data) {
@@ -289,9 +292,8 @@ class TestsListAction extends Action {
 				$rsm = reset($rsm);
 			}
 			else {
-				show_error_message(_s('No permissions to referred host "%1$s" or it does not exist!', RSM_HOST));
-				$this->access_deny = true;
-				return;
+				error(_s('No permissions to host "%1$s" or it does not exist!', RSM_HOST));
+				return false;
 			}
 
 			$item = API::Item()->get([
@@ -305,8 +307,7 @@ class TestsListAction extends Action {
 			}
 			else {
 				error(_s('Missing items at host "%1$s"!', RSM_HOST));
-				$this->access_deny = true;
-				return;
+				return false;
 			}
 
 			$item_value = API::History()->get([
@@ -333,11 +334,11 @@ class TestsListAction extends Action {
 				}
 			}
 		}
+
+		return true;
 	}
 
 	protected function doAction() {
-		$this->access_deny = false;
-
 		$macros = API::UserMacro()->get([
 			'output' => ['macro', 'value'],
 			'filter' => ['macro' => RSM_ROLLWEEK_SECONDS],
@@ -363,30 +364,29 @@ class TestsListAction extends Action {
 			'to' => $this->getInput('to', ZBX_PERIOD_DEFAULT_TO),
 			'rollingweek_from' => 'now-'.$timeshift,
 			'rollingweek_to' => 'now',
-			'tests' => []
+			'tests' => [],
 		];
 
 		$timeline = getTimeSelectorPeriod([
 			'profileIdx' => $data['profileIdx'],
-			'profileIdx2' => 0
+			'profileIdx2' => 0,
+			'from' => $data['from'],
+			'to' => $data['to'],
 		]);
 		$data += [
 			'from_ts' => $timeline['from_ts'],
-			'to_ts' => $timeline['to_ts']
+			'to_ts' => $timeline['to_ts'],
 		];
 
-		$this->getTLD($data);
-		$this->getItems($data);
+		if ($this->getTLD($data) && $this->getItems($data)) {
+			$data['paging'] = CPagerHelper::paginate($this->getInput('page', 1), $data['tests'], ZBX_SORT_UP, new CUrl());
 
-		$data['paging'] = CPagerHelper::paginate($this->getInput('page', 1), $data['tests'], ZBX_SORT_UP, new CUrl());
-
-		if ($this->access_deny) {
-			$this->setResponse(new CControllerResponseFatal());
-		}
-		else {
 			$response = new CControllerResponseData($data);
 			$response->setTitle($data['title']);
 			$this->setResponse($response);
+		}
+		else {
+			$this->setResponse(new CControllerResponseFatal());
 		}
 	}
 }

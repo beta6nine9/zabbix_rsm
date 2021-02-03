@@ -1537,6 +1537,13 @@ function access_deny($mode = ACCESS_DENY_OBJECT) {
 				'buttons' => []
 			];
 
+			// RSM specifics: add specific error message
+			$errors = CSession::getValue('messages');
+			if ($errors) {
+				array_unshift($data['messages'], reset($errors));
+			}
+			// RSM specifics: end
+
 			// display the login button only for guest users
 			if (CWebUser::isGuest()) {
 				$data['buttons'][] = (new CButton('login', _('Login')))
