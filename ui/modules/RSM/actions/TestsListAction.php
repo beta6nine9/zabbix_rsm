@@ -363,16 +363,18 @@ class TestsListAction extends Action {
 			'to' => $this->getInput('to', ZBX_PERIOD_DEFAULT_TO),
 			'rollingweek_from' => 'now-'.$timeshift,
 			'rollingweek_to' => 'now',
-			'tests' => []
+			'tests' => [],
 		];
 
 		$timeline = getTimeSelectorPeriod([
 			'profileIdx' => $data['profileIdx'],
-			'profileIdx2' => 0
+			'profileIdx2' => 0,
+			'from' => $data['from'],
+			'to' => $data['to'],
 		]);
 		$data += [
 			'from_ts' => $timeline['from_ts'],
-			'to_ts' => $timeline['to_ts']
+			'to_ts' => $timeline['to_ts'],
 		];
 
 		$this->getTLD($data);

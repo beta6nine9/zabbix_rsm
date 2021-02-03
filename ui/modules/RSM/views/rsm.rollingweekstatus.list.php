@@ -331,7 +331,9 @@ if ($data['tld']) {
 							Url::getFor($tld['url'], 'rsm.tests', [
 								'slvItemId' => $tld[$service]['itemid'],
 								'host' => $tld['host'],
-								'type' => $service
+								'type' => $service,
+								'from' => ZBX_PERIOD_DEFAULT_FROM,
+								'to' => ZBX_PERIOD_DEFAULT_TO,
 							])
 						))
 						->addClass('icon-eye')
@@ -348,7 +350,7 @@ if ($data['tld']) {
 							->addClass('service-icon status_icon_extra iconrollingweeknodata disabled-service')
 							->setHint(_('No data yet'), '', false),
 						(new CSpan(null))->addClass('rolling-week-graph'),
-						$rdds_subservices
+						$rdds_subservices,
 					];
 				}
 			}
