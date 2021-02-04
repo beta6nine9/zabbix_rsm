@@ -848,7 +848,7 @@ sub create_macro($$;$$)
 	my $templateid   = shift;
 	my $force_update = shift;
 
-	my ($result, $params, $error);
+	my ($result, $params);
 
 	if (defined($templateid))
 	{

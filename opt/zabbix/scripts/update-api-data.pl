@@ -944,8 +944,6 @@ foreach (@server_keys)
 						}
 					}
 
-					my $recent_json;
-
 					# Check if we have missing measurement files for processed incident.
 					# Don't go back further than $incident_measurements_limit.
 

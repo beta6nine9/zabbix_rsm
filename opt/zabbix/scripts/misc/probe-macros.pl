@@ -15,8 +15,6 @@ parse_opts();
 setopt('nolog');
 setopt('dry-run');
 
-my @probes;
-
 set_slv_config(get_rsm_config());
 
 db_connect();

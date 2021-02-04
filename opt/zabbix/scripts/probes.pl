@@ -443,7 +443,7 @@ sub rename_probe($$) {
     my $old_name = shift;
     my $new_name = shift;
 
-    my ($result, $probe, $probe_host, $probe_host_mon, $probe_tmpl, $probe_tmpl_status, $probe_hostgroup, $probe_macro);
+    my ($result, $probe, $probe_host, $probe_host_mon, $probe_tmpl, $probe_hostgroup, $probe_macro);
 
     print "Trying to rename '".$old_name."' probe...\n";
 

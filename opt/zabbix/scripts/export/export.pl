@@ -1239,7 +1239,6 @@ sub __get_probe_times($$$)
 
 	return $result if (scalar(keys(%{$probes_ref})) == 0);
 
-	my @probes;
 	foreach my $probe (sort(keys(%{$probes_ref})))
 	{
 		next unless ($probes_ref->{$probe}->{'status'} == HOST_STATUS_MONITORED);
