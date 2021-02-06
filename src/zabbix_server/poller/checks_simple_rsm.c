@@ -2373,7 +2373,8 @@ int	get_dns_minns_from_value(time_t now, const char *value, int *minns)
 	return SUCCEED;
 }
 
-int	check_rsm_dns(const char *host, int nextcheck, const AGENT_REQUEST *request, AGENT_RESULT *result)
+int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, int nextcheck,
+		const AGENT_REQUEST *request, AGENT_RESULT *result)
 {
 	char			err[ZBX_ERR_BUF_SIZE], protocol, *domain, *testprefix, *name_servers_list, *res_ip,
 				testedname[ZBX_HOST_BUF_SIZE], *minns_value;
@@ -2449,7 +2450,9 @@ int	check_rsm_dns(const char *host, int nextcheck, const AGENT_REQUEST *request,
 	}
 	else if (CURRENT_MODE_NORMAL == current_mode)
 	{
-		protocol = ((nextcheck / 60) % tcp_ratio) == 0 ? RSM_TCP : RSM_UDP;
+		/* Add noise (hostid + itemid) to avoid using TCP by all proxies simultaneously. */
+		/* This should balance usage of TCP protocol and avoid abusing the Name Servers. */
+		protocol = ((nextcheck / 60 + hostid + itemid) % tcp_ratio) == 0 ? RSM_TCP : RSM_UDP;
 	}
 	else
 	{

@@ -170,8 +170,11 @@ int	get_value_simple(const DC_ITEM *item, AGENT_RESULT *result, zbx_vector_ptr_t
 
 	if (0 == strcmp(request.key, "rsm.dns"))
 	{
-		if (SYSINFO_RET_OK == check_rsm_dns(item->host.host, item->nextcheck, &request, result))
+		if (SYSINFO_RET_OK == check_rsm_dns(item->host.hostid, item->itemid, item->host.host, item->nextcheck,
+				&request, result))
+		{
 			ret = SUCCEED;
+		}
 	}
 	else if (0 == strcmp(request.key, "rsm.rdds"))
 	{
