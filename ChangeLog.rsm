@@ -1,6 +1,12 @@
+Changes for rsm2.2.0rc3
+
+Bug fixes:
+.......PS. [759] added balancing of TCP protocol usage in DNS test (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.2.0rc2
 
-New features:
+Bug fixes:
 ..F....... [763] fixed warnings in case of invalid input data on Tests page (dimir, gcalenko)
 ..F....... [762] fixed handling period when viewing Tests page (dimir, gcalenko)
 
