@@ -1,9 +1,41 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
 use strict;
 use warnings;
+
 use Getopt::Long;
 use Text::CSV_XS;
+use DateTime;
+
+my @catalog_names = (
+	'ipAddresses',
+	'ipVersions',
+	'nsFQDNs',
+	'probeNames',
+	'serviceCategory',
+	'statusMaps',
+	'testTypes',
+	'tlds',
+	'tldTypes',
+	'transportProtocols',
+);
+
+my @generic_data_file_names = (
+	'probeChanges',
+	'falsePositiveChanges',
+);
+
+my @tld_data_file_names = (
+	'cycles',
+	'incidents',
+	'incidentsEndTime',
+	'nsTests',
+	'tests',
+);
+
+use constant DEBUG_NTH_ROW => 1000;	# in debug mode, each Nth row to print
+
+sub parse_time_str($);
 
 #####################################
 #                                   #
@@ -14,9 +46,11 @@ use Text::CSV_XS;
 # display help message
 my $help = 0;
 
+my $tld;
+
 # start and length of the interval for which CSV files were generated
-my $period_start = 0;
-my $length = 86400;
+my $clock = 0;
+my $period = 86400;
 
 # output progress while testing
 my $debug = 0;
@@ -28,42 +62,69 @@ my %files;
 my %options;
 
 $options{'help'} = \$help;
-$options{'from=i'} = \$period_start;
-$options{'period=i'} = \$length;
+$options{'tld=s'} = \$tld;
+$options{'clock=s'} = \$clock;
+$options{'period=i'} = \$period;
 $options{'debug'} = \$debug;
 $options{'fail_immediately'} = \$fail_immediately;
-
-foreach my $csv_file (('cycles', 'falsePositiveChanges', 'incidents', 'incidentsEndTime', 'ipAddresses', 'ipVersions',
-		'nsFQDNs', 'nsTests', 'probeChanges', 'probeNames', 'serviceCategory', 'statusMaps', 'tests',
-		'testTypes', 'tlds', 'tldTypes', 'transportProtocols'))
-{
-	$files{$csv_file} = $csv_file . '.csv';
-	$options{$csv_file . '=s'} = \$files{$csv_file};
-}
 
 if (!GetOptions(%options))
 {
 	$help = 1;
 }
 
-if (!$period_start && !$help)
+if ((!$tld || !$clock) && !$help)
 {
-	print("Period start parameter is mandatory\n");
+	print("TLD and Period start parameters are mandatory\n");
 	$help = 1;
 }
 
+my $clock_ret;
+if (!($clock_ret = parse_time_str($clock)))
+{
+	print("invalid format of timestamp: '$clock'\n");
+	$help = 1;
+}
+$clock = $clock_ret;
+
 if ($help)
 {
-	print("Usage: $0 --from=<period start timestamp> [--period=<period length (seconds)>] [--debug] [--fail_immediately]");
-
-	foreach my $file (sort(keys(%files)))
-	{
-			print(" [--$file=<$file CSV file>]");
-	}
-
-	print("\n");
+	print("Usage: $0 --tld=<TLD> --clock=<timestamp or yyyy-mm-dd HH:MM:SS> [--period=<period length (seconds)>]
+		[--debug] [--fail_immediately]\n");
 
 	exit();
+}
+
+##################
+#                #
+# set file names #
+#                #
+##################
+
+# catalogs
+foreach my $csv_file (@catalog_names)
+{
+	$files{$csv_file} = "/opt/zabbix/export/$csv_file.csv";
+}
+
+# sec, min, hour, mday, mon, year
+my (undef, undef, undef, $mday, $mon, $year) = localtime($clock);
+$mon += 1;
+$year += 1900;
+
+$mon = "0$mon" if (length($mon) == 1);
+$mday = "0$mday" if (length($mday) == 1);
+
+# generic data files
+foreach my $csv_file (@generic_data_file_names)
+{
+	$files{$csv_file} = "/opt/zabbix/export/$year/$mon/$mday/$csv_file.csv";
+}
+
+# tld data files
+foreach my $csv_file (@tld_data_file_names)
+{
+	$files{$csv_file} = "/opt/zabbix/export/$year/$mon/$mday/$tld/$csv_file.csv";
 }
 
 ##########################################
@@ -76,6 +137,25 @@ use constant INT => qr/^[+-]?[0-9]+$/;
 use constant DEC => qr/^[+-]?[0-9]+.?[0-9]*$/;
 use constant TIME => qr/^[0-9]+$/;
 use constant ERR => qr/^-[0-9]+/;
+
+sub parse_time_str($)
+{
+	my $str = shift;
+
+	if (my @matches = ($str =~ /^(\d\d\d\d)-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d)$/))
+	{
+		my ($year, $month, $date, $hour, $minute, $second) = @matches;
+
+		return DateTime->new('year' => $year, 'month' => $month, 'day' => $date, 'hour' => $hour, 'minute' => $minute, 'second' => $second)->epoch();
+	}
+
+	if (my @matches = ($str =~ /^(\d+)$/))
+	{
+		return $matches[0];
+	}
+
+	return undef;
+}
 
 sub empty($)
 {
@@ -110,7 +190,7 @@ sub fromperiod($)
 
 	if ($value =~ TIME)
 	{
-		return $period_start <= $value && $value < $period_start + $length;
+		return $clock <= $value && $value < $clock + $period
 	}
 
 	return 0;
@@ -151,6 +231,8 @@ sub unique($$)
 use constant OK =>	'[ OK ]';
 use constant FAIL =>	'[FAIL]';
 
+my $all_tests_successful = 1;
+
 sub open_file($$)
 {
 	my $fileref = shift;
@@ -164,6 +246,9 @@ sub open_file($$)
 	}
 
 	print(FAIL . " \"$filename\" does not exist\n");
+
+	$all_tests_successful = 0;
+
 	return 0;
 }
 
@@ -196,15 +281,23 @@ sub print_results($$$$$$)
 	}
 }
 
-sub everything_ok($)
+sub everything_ok($$)
 {
+	my $wrong_columns = shift;
 	my $flags = shift;
 
 	my $res = 1;
 
+	$all_tests_successful = 0 if ($wrong_columns);
+
 	foreach my $flag (@{$flags})
 	{
 		$res &&= $flag;
+
+		# set global value here
+		$all_tests_successful = 0 if (!$flag);
+
+		last unless ($res);
 	}
 
 	return $res;
@@ -256,13 +349,13 @@ if (open_file(\$file, $files{$name}))
 		last if ($wrong_columns = scalar(@{$row}) != $columns);
 
 		$row_number++;
-		print("\033[JProcessing row $row_number" . "\033[G") if ($debug && $row_number % 1000 == 0);
+		print("\033[JProcessing row $row_number" . "\033[G") if ($debug && $row_number % DEBUG_NTH_ROW == 0);
 
 		$no_fails[0] &&= $row->[0] =~ INT;
 		$no_fails[1] &&= unique(0, $row);
 		$no_fails[2] &&= unique(1, $row);
 
-		if ($fail_immediately && !everything_ok(\@no_fails))
+		if (!everything_ok($wrong_columns, \@no_fails) && $fail_immediately)
 		{
 			print("Interrupted on row $row_number!\n");
 			$interrupted = 1;
@@ -297,13 +390,13 @@ if (open_file(\$file, $files{$name}))
 		last if ($wrong_columns = scalar(@{$row}) != $columns);
 
 		$row_number++;
-		print("\033[JProcessing row $row_number" . "\033[G") if ($debug && $row_number % 1000 == 0);
+		print("\033[JProcessing row $row_number" . "\033[G") if ($debug && $row_number % DEBUG_NTH_ROW == 0);
 
 		$no_fails[0] &&= $row->[0] =~ INT;
 		$no_fails[1] &&= unique(0, $row);
 		$no_fails[2] &&= unique(1, $row);
 
-		if ($fail_immediately && !everything_ok(\@no_fails))
+		if (!everything_ok($wrong_columns, \@no_fails) && $fail_immediately)
 		{
 			print("Interrupted on row $row_number!\n");
 			$interrupted = 1;
@@ -338,13 +431,13 @@ if (open_file(\$file, $files{$name}))
 		last if ($wrong_columns = scalar(@{$row}) != $columns);
 
 		$row_number++;
-		print("\033[JProcessing row $row_number" . "\033[G") if ($debug && $row_number % 1000 == 0);
+		print("\033[JProcessing row $row_number" . "\033[G") if ($debug && $row_number % DEBUG_NTH_ROW == 0);
 
 		$no_fails[0] &&= $row->[0] =~ INT;
 		$no_fails[1] &&= unique(0, $row);
 		$no_fails[2] &&= unique(1, $row);
 
-		if ($fail_immediately && !everything_ok(\@no_fails))
+		if (!everything_ok($wrong_columns, \@no_fails) && $fail_immediately)
 		{
 			print("Interrupted on row $row_number!\n");
 			$interrupted = 1;
@@ -379,13 +472,13 @@ if (open_file(\$file, $files{$name}))
 		last if ($wrong_columns = scalar(@{$row}) != $columns);
 
 		$row_number++;
-		print("\033[JProcessing row $row_number" . "\033[G") if ($debug && $row_number % 1000 == 0);
+		print("\033[JProcessing row $row_number" . "\033[G") if ($debug && $row_number % DEBUG_NTH_ROW == 0);
 
 		$no_fails[0] &&= $row->[0] =~ INT;
 		$no_fails[1] &&= unique(0, $row);
 		$no_fails[2] &&= unique(1, $row);
 
-		if ($fail_immediately && !everything_ok(\@no_fails))
+		if (!everything_ok($wrong_columns, \@no_fails) && $fail_immediately)
 		{
 			print("Interrupted on row $row_number!\n");
 			$interrupted = 1;
@@ -407,7 +500,9 @@ $columns = 2;
 	'"id" column contains unique values',
 	'"serviceCategory" column contains unique values',
 	'"id" for DNS service is specified',
-	'"id" for NS service is specified'
+	'"id" for NS service is specified',
+	'"id" for RDDS service is specified',
+	'"id" for RDAP service is specified',
 );
 @no_fails = (1) x scalar(@cases);
 @uniqueness = ({}) x $columns;
@@ -415,6 +510,7 @@ $columns = 2;
 my $DNS_id;
 my $NS_id;
 my $RDDS_id;
+my $RDAP_id;
 
 if (open_file(\$file, $files{$name}))
 {
@@ -426,7 +522,7 @@ if (open_file(\$file, $files{$name}))
 		last if ($wrong_columns = scalar(@{$row}) != $columns);
 
 		$row_number++;
-		print("\033[JProcessing row $row_number" . "\033[G") if ($debug && $row_number % 1000 == 0);
+		print("\033[JProcessing row $row_number" . "\033[G") if ($debug && $row_number % DEBUG_NTH_ROW == 0);
 
 		$no_fails[0] &&= $row->[0] =~ INT;
 		$no_fails[1] &&= unique(0, $row);
@@ -447,7 +543,12 @@ if (open_file(\$file, $files{$name}))
 			$RDDS_id = $row->[0];
 		}
 
-		if ($fail_immediately && !everything_ok(\@no_fails))
+		if ($row->[1] =~ /^RDAP$/i)
+		{
+			$RDAP_id = $row->[0];
+		}
+
+		if (!everything_ok($wrong_columns, \@no_fails) && $fail_immediately)
 		{
 			print("Interrupted on row $row_number!\n");
 			$interrupted = 1;
@@ -457,6 +558,8 @@ if (open_file(\$file, $files{$name}))
 
 	$no_fails[3] &&= $DNS_id;
 	$no_fails[4] &&= $NS_id;
+	$no_fails[5] &&= $RDDS_id;
+	$no_fails[6] &&= $RDAP_id;
 
 	if (!$DNS_id)
 	{
@@ -471,6 +574,11 @@ if (open_file(\$file, $files{$name}))
 	if (!$RDDS_id)
 	{
 		$RDDS_id = 3;
+	}
+
+	if (!$RDAP_id)
+	{
+		$RDAP_id = 6;
 	}
 
 	print_results($files{$name}, $csv->eof(), $interrupted, $wrong_columns, \@no_fails, \@cases);
@@ -500,13 +608,13 @@ if (open_file(\$file, $files{$name}))
 		last if ($wrong_columns = scalar(@{$row}) != $columns);
 
 		$row_number++;
-		print("\033[JProcessing row $row_number" . "\033[G") if ($debug && $row_number % 1000 == 0);
+		print("\033[JProcessing row $row_number" . "\033[G") if ($debug && $row_number % DEBUG_NTH_ROW == 0);
 
 		$no_fails[0] &&= $row->[0] =~ INT;
 		$no_fails[1] &&= unique(0, $row);
 		$no_fails[2] &&= unique(1, $row);
 
-		if ($fail_immediately && !everything_ok(\@no_fails))
+		if (!everything_ok($wrong_columns, \@no_fails) && $fail_immediately)
 		{
 			print("Interrupted on row $row_number!\n");
 			$interrupted = 1;
@@ -541,13 +649,13 @@ if (open_file(\$file, $files{$name}))
 		last if ($wrong_columns = scalar(@{$row}) != $columns);
 
 		$row_number++;
-		print("\033[JProcessing row $row_number" . "\033[G") if ($debug && $row_number % 1000 == 0);
+		print("\033[JProcessing row $row_number" . "\033[G") if ($debug && $row_number % DEBUG_NTH_ROW == 0);
 
 		$no_fails[0] &&= $row->[0] =~ INT;
 		$no_fails[1] &&= unique(0, $row);
 		$no_fails[2] &&= unique(1, $row);
 
-		if ($fail_immediately && !everything_ok(\@no_fails))
+		if (!everything_ok($wrong_columns, \@no_fails) && $fail_immediately)
 		{
 			print("Interrupted on row $row_number!\n");
 			$interrupted = 1;
@@ -582,13 +690,13 @@ if (open_file(\$file, $files{$name}))
 		last if ($wrong_columns = scalar(@{$row}) != $columns);
 
 		$row_number++;
-		print("\033[JProcessing row $row_number" . "\033[G") if ($debug && $row_number % 1000 == 0);
+		print("\033[JProcessing row $row_number" . "\033[G") if ($debug && $row_number % DEBUG_NTH_ROW == 0);
 
 		$no_fails[0] &&= $row->[0] =~ INT;
 		$no_fails[1] &&= unique(0, $row);
 		$no_fails[2] &&= unique(1, $row);
 
-		if ($fail_immediately && !everything_ok(\@no_fails))
+		if (!everything_ok($wrong_columns, \@no_fails) && $fail_immediately)
 		{
 			print("Interrupted on row $row_number!\n");
 			$interrupted = 1;
@@ -623,13 +731,13 @@ if (open_file(\$file, $files{$name}))
 		last if ($wrong_columns = scalar(@{$row}) != $columns);
 
 		$row_number++;
-		print("\033[JProcessing row $row_number" . "\033[G") if ($debug && $row_number % 1000 == 0);
+		print("\033[JProcessing row $row_number" . "\033[G") if ($debug && $row_number % DEBUG_NTH_ROW == 0);
 
 		$no_fails[0] &&= $row->[0] =~ INT;
 		$no_fails[1] &&= unique(0, $row);
 		$no_fails[2] &&= unique(1, $row);
 
-		if ($fail_immediately && !everything_ok(\@no_fails))
+		if (!everything_ok($wrong_columns, \@no_fails) && $fail_immediately)
 		{
 			print("Interrupted on row $row_number!\n");
 			$interrupted = 1;
@@ -664,13 +772,13 @@ if (open_file(\$file, $files{$name}))
 		last if ($wrong_columns = scalar(@{$row}) != $columns);
 
 		$row_number++;
-		print("\033[JProcessing row $row_number" . "\033[G") if ($debug && $row_number % 1000 == 0);
+		print("\033[JProcessing row $row_number" . "\033[G") if ($debug && $row_number % DEBUG_NTH_ROW == 0);
 
 		$no_fails[0] &&= $row->[0] =~ INT;
 		$no_fails[1] &&= unique(0, $row);
 		$no_fails[2] &&= unique(1, $row);
 
-		if ($fail_immediately && !everything_ok(\@no_fails))
+		if (!everything_ok($wrong_columns, \@no_fails) && $fail_immediately)
 		{
 			print("Interrupted on row $row_number!\n");
 			$interrupted = 1;
@@ -692,14 +800,18 @@ $columns = 4;
 	'"probeName" column entries are from "probeNames" "id" column',
 	'"probeChangeDateTime" is a timestamp',
 	'"probeChangeDateTime" is from requested period',
-	'"probeChangeDateTime" contains unique values',
+#	'"probeChangeDateTime" contains unique values', # todo: this should work with probe-timestamp
 	'"probestatus" is an integer',
 	'"probestatus" column entries are from "statusMaps" "id" column'
 );
 @no_fails = (1) x scalar(@cases);
 @uniqueness = ({}) x $columns;
 
-if (open_file(\$file, $files{$name}))
+if (! -e $files{$name})
+{
+	# it's OK, optional file
+}
+elsif (open_file(\$file, $files{$name}))
 {
 	$row_number = 0;
 	$interrupted = 0;
@@ -709,17 +821,17 @@ if (open_file(\$file, $files{$name}))
 		last if ($wrong_columns = scalar(@{$row}) != $columns);
 
 		$row_number++;
-		print("\033[JProcessing row $row_number" . "\033[G") if ($debug && $row_number % 1000 == 0);
+		print("\033[JProcessing row $row_number" . "\033[G") if ($debug && $row_number % DEBUG_NTH_ROW == 0);
 
 		$no_fails[0] &&= $row->[0] =~ INT;
 		$no_fails[1] &&= exists($probeNames_id{$row->[0]});
 		$no_fails[2] &&= $row->[1] =~ TIME;
 		$no_fails[3] &&= fromperiod($row->[1]);
-		$no_fails[4] &&= unique(1, $row);
-		$no_fails[5] &&= $row->[2] =~ INT;
-		$no_fails[6] &&= exists($statusMaps_id{$row->[2]});
+#		$no_fails[4] &&= unique(1, $row); # todo: this should work with probe-timestamp
+		$no_fails[4] &&= $row->[2] =~ INT;
+		$no_fails[5] &&= exists($statusMaps_id{$row->[2]});
 
-		if ($fail_immediately && !everything_ok(\@no_fails))
+		if (!everything_ok($wrong_columns, \@no_fails) && $fail_immediately)
 		{
 			print("Interrupted on row $row_number!\n");
 			$interrupted = 1;
@@ -739,7 +851,6 @@ $columns = 5;
 	'"incidentID" contains unique values',
 	'"incidentStartTime" is a timestamp',
 	'"incidentStartTime" is from requested period',
-	'"incidentStartTime" contains unique values',
 	'"incidentTLD" is an integer',
 	'"incidentTLD" column entries are from "tlds" "id" column',
 	'"serviceCategory" is an integer',
@@ -753,7 +864,11 @@ $columns = 5;
 my %incidents;
 my $incident;
 
-if (open_file(\$file, $files{$name}))
+if (! -e $files{$name})
+{
+	# it's OK, optional file
+}
+elsif (open_file(\$file, $files{$name}))
 {
 	$row_number = 0;
 	$interrupted = 0;
@@ -763,19 +878,18 @@ if (open_file(\$file, $files{$name}))
 		last if ($wrong_columns = scalar(@{$row}) != $columns);
 
 		$row_number++;
-		print("\033[JProcessing row $row_number" . "\033[G") if ($debug && $row_number % 1000 == 0);
+		print("\033[JProcessing row $row_number" . "\033[G") if ($debug && $row_number % DEBUG_NTH_ROW == 0);
 
-		$no_fails[ 0] &&= $row->[0] =~ INT;
-		$no_fails[ 1] &&= unique(0, $row);
-		$no_fails[ 2] &&= $row->[1] =~ TIME;
-		$no_fails[ 3] &&= fromperiod($row->[1]);
-		$no_fails[ 4] &&= unique(1, $row);
-		$no_fails[ 5] &&= $row->[2] =~ INT;
-		$no_fails[ 6] &&= exists($tlds_id{$row->[2]});
-		$no_fails[ 7] &&= $row->[3] =~ INT;
-		$no_fails[ 8] &&= exists($serviceCategory_id{$row->[3]});
-		$no_fails[ 9] &&= $row->[4] =~ INT;
-		$no_fails[10] &&= exists($tldTypes_id{$row->[4]});
+		$no_fails[0] &&= $row->[0] =~ INT;
+		$no_fails[1] &&= unique(0, $row);
+		$no_fails[2] &&= $row->[1] =~ TIME;
+		$no_fails[3] &&= fromperiod($row->[1]);
+		$no_fails[4] &&= $row->[2] =~ INT;
+		$no_fails[5] &&= exists($tlds_id{$row->[2]});
+		$no_fails[6] &&= $row->[3] =~ INT;
+		$no_fails[7] &&= exists($serviceCategory_id{$row->[3]});
+		$no_fails[8] &&= $row->[4] =~ INT;
+		$no_fails[9] &&= exists($tldTypes_id{$row->[4]});
 
 		$incidents{$row->[0]} = {
 			'incidentStartTime' => $row->[1],
@@ -784,7 +898,7 @@ if (open_file(\$file, $files{$name}))
 			'tldType' => $row->[4]
 		};
 
-		if ($fail_immediately && !everything_ok(\@no_fails))
+		if (!everything_ok($wrong_columns, \@no_fails) && $fail_immediately)
 		{
 			print("Interrupted on row $row_number!\n");
 			$interrupted = 1;
@@ -804,14 +918,17 @@ $columns = 3;
 	'"incidentID" contains unique values',
 	'"incidentEndTime" is a timestamp',
 	'"incidentEndTime" is from requested period',
-	'"incidentEndTime" contains unique values',
 	'"incidentEndTime" is greater than "incidents" "incidentStartTime" if "incidentsEndTime" "incidentID" matches "incidents" "incidentID"',
 	'"incidentFailedTests" is an integer'
 );
 @no_fails = (1) x scalar(@cases);
 @uniqueness = ({}) x $columns;
 
-if (open_file(\$file, $files{$name}))
+if (! -e $files{$name})
+{
+	# it's OK, optional file
+}
+elsif (open_file(\$file, $files{$name}))
 {
 	$row_number = 0;
 	$interrupted = 0;
@@ -821,7 +938,7 @@ if (open_file(\$file, $files{$name}))
 		last if ($wrong_columns = scalar(@{$row}) != $columns);
 
 		$row_number++;
-		print("\033[JProcessing row $row_number" . "\033[G") if ($debug && $row_number % 1000 == 0);
+		print("\033[JProcessing row $row_number" . "\033[G") if ($debug && $row_number % DEBUG_NTH_ROW == 0);
 
 		$incident = $incidents{$row->[0]};
 
@@ -829,11 +946,10 @@ if (open_file(\$file, $files{$name}))
 		$no_fails[1] &&= unique(0, $row);
 		$no_fails[2] &&= $row->[1] =~ TIME;
 		$no_fails[3] &&= fromperiod($row->[1]);
-		$no_fails[4] &&= unique(1, $row);
-		$no_fails[5] &&= after($row->[1], $incident->{'incidentStartTime'}) if ($incident);
-		$no_fails[6] &&= $row->[2] =~ INT;
+		$no_fails[4] &&= after($row->[1], $incident->{'incidentStartTime'}) if ($incident);
+		$no_fails[5] &&= $row->[2] =~ INT;
 
-		if ($fail_immediately && !everything_ok(\@no_fails))
+		if (!everything_ok($wrong_columns, \@no_fails) && $fail_immediately)
 		{
 			print("Interrupted on row $row_number!\n");
 			$interrupted = 1;
@@ -859,7 +975,11 @@ $columns = 4;
 @no_fails = (1) x scalar(@cases);
 @uniqueness = ({}) x $columns;
 
-if (open_file(\$file, $files{$name}))
+if (! -e $files{$name})
+{
+	# it's OK, optional file
+}
+elsif (open_file(\$file, $files{$name}))
 {
 	$row_number = 0;
 	$interrupted = 0;
@@ -869,7 +989,7 @@ if (open_file(\$file, $files{$name}))
 		last if ($wrong_columns = scalar(@{$row}) != $columns);
 
 		$row_number++;
-		print("\033[JProcessing row $row_number" . "\033[G") if ($debug && $row_number % 1000 == 0);
+		print("\033[JProcessing row $row_number" . "\033[G") if ($debug && $row_number % DEBUG_NTH_ROW == 0);
 
 		$incident = $incidents{$row->[0]};
 
@@ -880,7 +1000,7 @@ if (open_file(\$file, $files{$name}))
 		$no_fails[4] &&= after($row->[1], $incident->{'incidentStartTime'}) if ($incident);
 		$no_fails[5] &&= $row->[2] =~ INT;
 
-		if ($fail_immediately && !everything_ok(\@no_fails))
+		if (!everything_ok($wrong_columns, \@no_fails) && $fail_immediately)
 		{
 			print("Interrupted on row $row_number!\n");
 			$interrupted = 1;
@@ -942,7 +1062,7 @@ if (open_file(\$file, $files{$name}))
 		last if ($wrong_columns = scalar(@{$row}) != $columns);
 
 		$row_number++;
-		print("\033[JProcessing row $row_number" . "\033[G") if ($debug && $row_number % 1000 == 0);
+		print("\033[JProcessing row $row_number" . "\033[G") if ($debug && $row_number % DEBUG_NTH_ROW == 0);
 
 		$incident = (!empty($row->[4]) ? $incidents{$row->[4]} : undef);
 
@@ -950,9 +1070,16 @@ if (open_file(\$file, $files{$name}))
 		$no_fails[ 1] &&= $row->[1] =~ TIME;
 		$no_fails[ 2] &&= isround($row->[1]);
 		$no_fails[ 3] &&= fromperiod($row->[1]);
-		$no_fails[ 4] &&= $row->[2] =~ DEC;
+		$no_fails[ 4] &&= ($row->[2] =~ DEC || $row->[6] == $NS_id); # cycleEmergencyThreshold is not implemented for service category "NS"
 		$no_fails[ 5] &&= $row->[3] =~ INT;
 		$no_fails[ 6] &&= exists($statusMaps_id{$row->[3]});
+
+		if (!$no_fails[4])
+		{
+			print("DIMBUG NS_id=$NS_id servcat=", $row->[6], ": ", join(',', @{$row}), "\n");
+			exit 1;
+		}
+		
 		$no_fails[ 7] &&= $row->[4] =~ INT || empty($row->[4]);
 		$no_fails[ 8] &&= $row->[5] =~ INT;
 		$no_fails[ 9] &&= exists($tlds_id{$row->[5]});
@@ -972,9 +1099,9 @@ if (open_file(\$file, $files{$name}))
 		$no_fails[23] &&= $row->[10] =~ INT;
 		$no_fails[24] &&= exists($tldTypes_id{$row->[10]});
 		$no_fails[25] &&= $row->[10] eq $incident->{'tldType'} if ($incident);
-		$no_fails[26] &&= $row->[11] =~ INT;
-		$no_fails[27] &&= exists($transportProtocols_id{$row->[11]});
-		$no_fails[28] &&= $row->[0] eq $row->[1] . '-' . $row->[6] . '-' . $row->[5] . '-' . (empty($row->[7]) ? '0' : $row->[7]) . '-' . (empty($row->[8]) ? '0' : $row->[8]);
+		$no_fails[26] &&= ($row->[11] =~ INT || $row->[6] == $NS_id || $row->[6] == $DNS_id);                          # cycleProtocol is unknown for
+		$no_fails[27] &&= (exists($transportProtocols_id{$row->[11]}) || $row->[6] == $NS_id || $row->[6] == $DNS_id); # "NS" and "DNS" service category
+		$no_fails[28] &&= $row->[0] eq sprintf("%d%03d%05d%05d%05d", $row->[1], $row->[6], $row->[5], $row->[7] || 0, $row->[8] || 0);
 
 		$cycles{$row->[0]} = {
 			'cycleDateMinute' => $row->[1],
@@ -987,7 +1114,7 @@ if (open_file(\$file, $files{$name}))
 			'cycleNSProtocol' => $row->[11]
 		};
 
-		if ($fail_immediately && !everything_ok(\@no_fails))
+		if (!everything_ok($wrong_columns, \@no_fails) && $fail_immediately)
 		{
 			print("Interrupted on row $row_number!\n");
 			$interrupted = 1;
@@ -1034,7 +1161,7 @@ $columns = 12;
 	'"testNSFQDN" matches "cycles" "cycleNSFQDN" if "tests" "cycleID" matches "cycles" "cycleID"',
 	'"tldType" is an integer',
 	'"tldType" column entries are from "tldTypes" "id" column',
-	'"tldType" matches "cycles" "tldType" if "tests" "cycleID" matches "cycles" "cycleID"'
+	'"tldType" matches "cycles" "tldType" if "tests" "cycleID" matches "cycles" "cycleID"',
 );
 @no_fails = (1) x scalar(@cases);
 @uniqueness = ({}) x $columns;
@@ -1049,7 +1176,7 @@ if (open_file(\$file, $files{$name}))
 		last if ($wrong_columns = scalar(@{$row}) != $columns);
 
 		$row_number++;
-		print("\033[JProcessing row $row_number" . "\033[G") if ($debug && $row_number % 1000 == 0);
+		print("\033[JProcessing row $row_number" . "\033[G") if ($debug && $row_number % DEBUG_NTH_ROW == 0);
 
 		$cycle = $cycles{$row->[4]};
 
@@ -1084,7 +1211,7 @@ if (open_file(\$file, $files{$name}))
 		$no_fails[28] &&= exists($tldTypes_id{$row->[11]});
 		$no_fails[29] &&= $row->[11] eq $cycle->{'tldType'} if ($cycle);
 
-		if ($fail_immediately && !everything_ok(\@no_fails))
+		if (!everything_ok($wrong_columns, \@no_fails) && $fail_immediately)
 		{
 			print("Interrupted on row $row_number!\n");
 			$interrupted = 1;
@@ -1098,7 +1225,7 @@ if (open_file(\$file, $files{$name}))
 
 # check "nsTests" file
 $name = 'nsTests';
-$columns = 8;
+$columns = 7;
 @cases = (
 	'"probeName" is an integer',
 	'"probeName" column entries are from "probeNames" "id" column',
@@ -1134,7 +1261,7 @@ if (open_file(\$file, $files{$name}))
 		last if ($wrong_columns = scalar(@{$row}) != $columns);
 
 		$row_number++;
-		print("\033[JProcessing row $row_number" . "\033[G") if ($debug && $row_number % 1000 == 0);
+		print("\033[JProcessing row $row_number" . "\033[G") if ($debug && $row_number % DEBUG_NTH_ROW == 0);
 
 		$cycle = $cycles{$row->[5]};
 
@@ -1152,14 +1279,14 @@ if (open_file(\$file, $files{$name}))
 		$no_fails[11] &&= $row->[3] eq $cycle->{'cycleDateMinute'} if ($cycle);
 		$no_fails[12] &&= $row->[4] =~ INT;
 		$no_fails[13] &&= exists($statusMaps_id{$row->[4]});
-		$no_fails[14] &&= $row->[6] =~ INT;
-		$no_fails[15] &&= exists($tldTypes_id{$row->[6]});
-		$no_fails[16] &&= $row->[6] eq $cycle->{'tldType'} if ($cycle);
-		$no_fails[17] &&= $row->[7] =~ INT;
-		$no_fails[18] &&= exists($transportProtocols_id{$row->[7]});
-		$no_fails[19] &&= $row->[7] eq $cycle->{'cycleNSProtocol'} if ($cycle);
+		$no_fails[14] &&= $row->[5] =~ INT;
+		$no_fails[15] &&= exists($tldTypes_id{$row->[5]});
+		$no_fails[16] &&= $row->[5] eq $cycle->{'tldType'} if ($cycle);
+		$no_fails[17] &&= $row->[6] =~ INT;
+		$no_fails[18] &&= exists($transportProtocols_id{$row->[6]});
+		$no_fails[19] &&= $row->[6] eq $cycle->{'cycleNSProtocol'} if ($cycle);
 
-		if ($fail_immediately && !everything_ok(\@no_fails))
+		if (!everything_ok($wrong_columns, \@no_fails) && $fail_immediately)
 		{
 			print("Interrupted on row $row_number!\n");
 			$interrupted = 1;
@@ -1172,3 +1299,5 @@ if (open_file(\$file, $files{$name}))
 }
 
 %cycles = ();
+
+exit !$all_tests_successful;
