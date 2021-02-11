@@ -1,3 +1,9 @@
+Changes for rsm2.0.3
+
+New features:
+....I..... [764] updated test-export.pl according to the latest Data Export version (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.0.2
 
 Bug fixes:
