@@ -1,6 +1,12 @@
+Changes for rsm2.2.0rc3
+
+Bug fixes:
+.......PS. [759] added balancing of TCP protocol usage in DNS test (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.2.0rc2
 
-New features:
+Bug fixes:
 ..F....... [763] fixed warnings in case of invalid input data on Tests page (dimir, gcalenko)
 ..F....... [762] fixed handling period when viewing Tests page (dimir, gcalenko)
 
@@ -104,6 +110,12 @@ Changes for rsm2.1.0rc1
 New features:
 ..F.I..PS. [554] upgraded Zabbix to 5.0.4 (asitals, dimir, gcalenko, kalimulin, miks)
 ..F.I..PS. [599] implemented DNS Monitoring Reboot (asitals, dimir, gcalenko, kalimulin)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.0.3
+
+New features:
+....I..... [764] updated test-export.pl according to the latest Data Export version (dimir)
 
 --------------------------------------------------------------------------------
 Changes for rsm2.0.2
