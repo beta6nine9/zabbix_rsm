@@ -643,6 +643,8 @@ $columns = 2;
 @no_fails = (1) x scalar(@cases);
 @uniqueness = ({}) x $columns;
 
+my $DNSTYPE_id;
+
 if (open_file(\$file, $files{$name}))
 {
 	$row_number = 0;
@@ -659,12 +661,24 @@ if (open_file(\$file, $files{$name}))
 		$no_fails[1] &&= unique(0, $row);
 		$no_fails[2] &&= unique(1, $row);
 
+		if ($row->[1] =~ /^DNS$/i)
+		{
+			$DNSTYPE_id = $row->[0];
+		}
+
 		if (!everything_ok($wrong_columns, \@no_fails) && $fail_immediately)
 		{
 			print("Interrupted on row $row_number!\n");
 			$interrupted = 1;
 			last;
 		}
+	}
+
+	$no_fails[3] &&= $DNSTYPE_id;
+
+	if (!$DNSTYPE_id)
+	{
+		$DNSTYPE_id = 1;
 	}
 
 	print_results($files{$name}, $csv->eof(), $interrupted, $wrong_columns, \@no_fails, \@cases);
@@ -1339,8 +1353,8 @@ if (open_file(\$file, $files{$name}))
 		$no_fails[27] &&= $row->[11] =~ INT;
 		$no_fails[28] &&= exists($tldTypes_id{$row->[11]});
 		$no_fails[29] &&= $row->[11] eq $cycle->{'tldType'} if ($cycle);
-		$no_fails[30] &&= ($row->[12] =~ INT || $row->[9] != TESTTYPE_DNS);
-		$no_fails[31] &&= (exists($nsid_id{$row->[12]}) || $row->[9] != TESTTYPE_DNS);
+		$no_fails[30] &&= ($row->[12] =~ INT || $row->[9] != $DNSTYPE_id);
+		$no_fails[31] &&= (exists($nsid_id{$row->[12]}) || $row->[9] != $DNSTYPE_id);
 
 		if (!everything_ok($wrong_columns, \@no_fails) && $fail_immediately)
 		{
