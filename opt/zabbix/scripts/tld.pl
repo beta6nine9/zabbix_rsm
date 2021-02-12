@@ -745,28 +745,24 @@ sub manage_tld_objects($$$$$$$)
 	print("Getting main host of the TLD: ");
 	my $main_hostid = get_host($tld, false);
 
-	if (scalar(%{$main_hostid}))
-	{
-		$main_hostid = $main_hostid->{'hostid'};
-		print("$main_hostid\n");
-	}
-	else
+	if (!scalar(%{$main_hostid}))
 	{
 		pfail("cannot find host \"$tld\"");
 	}
 
+	$main_hostid = $main_hostid->{'hostid'};
+	print("$main_hostid\n");
+
 	print("Getting main template of the TLD: ");
 	my $tld_template = get_template(TEMPLATE_RSMHOST_CONFIG_PREFIX . $tld, true, true);
 
-	if (scalar(%{$tld_template}))
-	{
-		$config_templateid = $tld_template->{'templateid'};
-		print("$config_templateid\n");
-	}
-	else
+	if (!scalar(%{$tld_template}))
 	{
 		pfail("cannot find template \"" . TEMPLATE_RSMHOST_CONFIG_PREFIX . "$tld\"");
 	}
+
+	$config_templateid = $tld_template->{'templateid'};
+	print("$config_templateid\n");
 
 	my @tld_hostids;
 
@@ -874,9 +870,19 @@ sub manage_tld_objects($$$$$$$)
 			next;
 		}
 
-		my $macro = $type eq 'rdap' ? '{$RDAP.TLD.ENABLED}' : '{$RSM.TLD.' . uc($type) . '.ENABLED}';
-
-		create_macro($macro, 0, $config_templateid, true);
+		if (__is_rdap_standalone())
+		{
+			my $macro = $type eq 'rdap' ? '{$RDAP.TLD.ENABLED}' : '{$RSM.TLD.' . uc($type) . '.ENABLED}';
+			create_macro($macro, 0, $config_templateid, true);
+		}
+		else
+		{
+			# disable both macros: RDDS and RDAP
+			my $macro = '{$RSM.TLD.' . uc($type) . '.ENABLED}';
+			create_macro($macro, 0, $config_templateid, true);
+			$macro = '{$RDAP.TLD.ENABLED}';
+			create_macro($macro, 0, $config_templateid, true);
+		}
 
 		# get items on "<rsmhost>" host
 		my $rsmhost_items = get_host_items($main_hostid);
