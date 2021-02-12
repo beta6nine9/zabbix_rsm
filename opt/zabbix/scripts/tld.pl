@@ -391,8 +391,7 @@ sub set_type()
 
 sub list_services(;$)
 {
-	my $server_key = shift;
-	my $rsmhost    = shift; # optional
+	my $rsmhost = shift; # optional
 
 	# NB! Keep @columns in sync with __usage()!
 	my @columns = (
