@@ -1349,6 +1349,9 @@ define('API_LLD_MACRO',			29);
 define('API_PSK',				30);
 define('API_SORTORDER',			31);
 define('API_CALC_FORMULA',		32);
+/* RSM specifics: specific defines */
+define('API_RSM_CUSTOM',		1024);
+/* RSM specifics: end */
 
 // flags
 define('API_REQUIRED',					0x0001);

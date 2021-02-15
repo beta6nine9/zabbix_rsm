@@ -171,6 +171,16 @@ class CApiInputValidator {
 
 			case API_URL:
 				return self::validateUrl($rule, $data, $path, $error);
+
+			/* RSM specifics */
+			case API_RSM_CUSTOM:
+				if (!array_key_exists('function', $rule) || !is_callable($rule['function']))
+				{
+					$error = _s('Incorrect validation rules "%1$s": %2$s.', $path, _('function not specified'));
+					return false;
+				}
+				return $rule['function']($rule, $data, $path, $error);
+			/* RSM specifics: end */
 		}
 
 		// This message can be untranslated because warn about incorrect validation rules at a development stage.
@@ -219,6 +229,9 @@ class CApiInputValidator {
 			case API_HTTP_POST:
 			case API_VARIABLE_NAME:
 			case API_URL:
+			/* RSM specifics */
+			case API_RSM_CUSTOM:
+			/* RSM specifics: end */
 				return true;
 
 			case API_OBJECT:
