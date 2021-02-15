@@ -4,3 +4,5 @@
 !.gitignore
 !RSM/
 !RSM/**
+!RsmProvisioningApi/
+!RsmProvisioningApi/**
