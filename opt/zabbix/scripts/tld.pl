@@ -494,15 +494,11 @@ sub parse_dns_minns_macro($)
 		{
 			return $curr_minns;
 		}
-		else
-		{
-			return $sched_minns;
-		}
+
+		return $sched_minns;
 	}
-	else
-	{
-		fail("unexpected value/format of macro: $macro");
-	}
+
+	fail("unexpected value/format of macro: $macro");
 }
 
 ################################################################################
@@ -1294,7 +1290,12 @@ sub build_dns_minns_macro($)
 
 				if (defined($sched_clock))
 				{
-					$sched_clock = cycle_start($sched_clock, 60);
+					if ((my $tmp = cycle_start($sched_clock, 60)) != $sched_clock)
+					{
+						$sched_clock = $tmp;
+						wrn("truncating scheduled time to the beginning of the minute ",
+								ts_str($sched_clock));
+					}
 
 					if ($sched_clock <= cycle_start($^T, 60))
 					{
@@ -1344,7 +1345,7 @@ sub build_dns_minns_macro($)
 
 			if (defined($macro_sched_clock) && $macro_sched_clock <= $^T)
 			{
-				if (getopt('dns-minns') != $macro_sched_minns && $macro_sched_clock >= $^T - DNS_MINNS_MIN_INTERVAL)
+				if (getopt('dns-minns') ne $macro_sched_minns && $macro_sched_clock >= $^T - DNS_MINNS_MIN_INTERVAL)
 				{
 					my $macro_sched_clock_str = ts_full($macro_sched_clock);
 
@@ -1366,12 +1367,17 @@ sub build_dns_minns_macro($)
 
 				if (defined($opt_sched_clock))
 				{
-					$opt_sched_clock = cycle_start($opt_sched_clock, 60);
+					if ((my $tmp = cycle_start($opt_sched_clock, 60)) != $opt_sched_clock)
+					{
+						$opt_sched_clock = $tmp;
+						wrn("truncating scheduled time to the beginning of the minute ",
+								ts_str($opt_sched_clock));
+					}
 				}
 
 				if (defined($macro_sched_clock) && defined($opt_sched_clock) &&
-					$macro_sched_clock == $opt_sched_clock &&
-					$macro_sched_minns == $opt_sched_minns)
+						$macro_sched_clock == $opt_sched_clock &&
+						$macro_sched_minns == $opt_sched_minns)
 				{
 					# macro already contains the same scheduling time and minns
 					return $old_minns_macro;
@@ -1383,7 +1389,7 @@ sub build_dns_minns_macro($)
 					return $old_minns_macro;
 				}
 
-				if (defined($macro_sched_clock) && cycle_start($^T, 60) >= $macro_sched_clock - DNS_MINNS_OFFSET)
+				if (defined($macro_sched_clock) && $^T >= $macro_sched_clock - DNS_MINNS_OFFSET)
 				{
 					my $macro_sched_clock_str = ts_full($macro_sched_clock);
 
@@ -1392,14 +1398,15 @@ sub build_dns_minns_macro($)
 
 				if (defined($opt_sched_clock))
 				{
-					if ($opt_sched_clock < cycle_start($^T, 60))
-					{
-						fail("scheduled time is in the past");
-					}
-					if ($opt_sched_clock < cycle_start($^T + DNS_MINNS_OFFSET, 60))
+					if ($opt_sched_clock < $^T)
 					{
 						$opt_sched_clock = ts_full($opt_sched_clock);
-						fail("scheduled time '$opt_sched_clock' is too soon");
+						fail("scheduled time \"$opt_sched_clock\" is in the past");
+					}
+					if ($opt_sched_clock < $^T + DNS_MINNS_OFFSET)
+					{
+						$opt_sched_clock = ts_full($opt_sched_clock);
+						fail("scheduled time \"$opt_sched_clock\" is too soon");
 					}
 				}
 				else
