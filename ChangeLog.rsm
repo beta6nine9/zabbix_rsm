@@ -1,3 +1,11 @@
+Changes for rsm2.2.0rc4
+
+Bug fixes:
+....I..... [766] fixed tld.pl error message when specifying --dns-minns (dimir)
+....I..... [765] fixed tld.pl --tld option when specified with --list-services (dimir)
+....I..... [767] fixed tld.pl "--disable --rdds" when RDAP is not standalone (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.2.0rc3
 
 Bug fixes:
