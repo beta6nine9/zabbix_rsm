@@ -674,12 +674,6 @@ class ParticularTestsListAction extends Action {
 							];
 						}
 					}
-					elseif (substr($item['key_'], 0, strlen(PROBE_RDAP_STATUS)) === PROBE_RDAP_STATUS) {
-						$hosts[$item['hostid']]['value'] = $itemValue['value'];
-					}
-					elseif (substr($item['key_'], 0, strlen(PROBE_RDDS_STATUS)) === PROBE_RDDS_STATUS) {
-						$hosts[$item['hostid']]['value'] = $itemValue['value'];
-					}
 					elseif ($item['key_'] == PROBE_RDDS43_TESTEDNAME) {
 						$hosts[$item['hostid']]['rdds43']['testedname'] = $itemValue['value'];
 					}
@@ -700,6 +694,12 @@ class ParticularTestsListAction extends Action {
 					}
 					elseif ($item['key_'] == PROBE_RDAP_TARGET) {
 						$hosts[$item['hostid']]['rdap']['target'] = $itemValue['value'];
+					}
+					elseif (substr($item['key_'], 0, strlen(PROBE_RDDS_STATUS)) === PROBE_RDDS_STATUS) {
+						$hosts[$item['hostid']]['rdds']['status'] = $itemValue['value'];
+					}
+					elseif (substr($item['key_'], 0, strlen(PROBE_RDAP_STATUS)) === PROBE_RDAP_STATUS) {
+						$hosts[$item['hostid']]['rdap']['status'] = $itemValue['value'];
 					}
 
 					// Set if RDDS is enabled on a TLD level
