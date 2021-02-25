@@ -2513,6 +2513,12 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 		goto end;
 	}
 
+	if (nss_num == 0)
+	{
+		SET_MSG_RESULT(result, zbx_strdup(NULL, "nothing to do, no Name Servers to test"));
+		goto end;
+	}
+
 	/* from this point item will not become NOTSUPPORTED */
 	ret = SYSINFO_RET_OK;
 
