@@ -1,3 +1,12 @@
+Changes for rsm2.2.0rc5
+
+Bug fixes:
+....I..... [773] fixed undefined subroutine error, path() from Path::Tiny (dimir)
+....I..... [770] changed --verbose option to --debug in both tld.pl and probes.pl (dimir)
+..F....... [771] fixed displaying RDDS/RDAP test status on details of particular test page (dimir)
+.......PS. [772] fixed handling of situation when there are no supported NS-IP pairs to test on the Probe node (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.2.0rc4
 
 Bug fixes:
