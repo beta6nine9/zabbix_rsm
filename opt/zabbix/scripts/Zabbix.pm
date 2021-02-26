@@ -583,7 +583,7 @@ sub __send_request {
             print("REQUEST FAILED! ");
         }
 
-        print("REPLY:\n", Dumper($result), "\n") if ($_OPTIONS->{'debug'});
+        print("REPLY:\n", Dumper($result));
     }
 
     if (defined($result->{'error'}) && $result->{'error'}{'data'} =~ /Session terminated/) {

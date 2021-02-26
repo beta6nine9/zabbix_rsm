@@ -597,6 +597,8 @@ Other options
 	--force
 		do not exit in case of failure, try to finish the task
 		(default: off)
+	--verbose
+		print every Zabbix API request and response, useful for troubleshooting
 
 Options for adding new probe. Argument --add.
 	--ip
