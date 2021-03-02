@@ -78,7 +78,7 @@ sub init_cli_opts($)
 			"rdds-ns-string=s",
 			"root-servers=s",
 			"rdds43-test-domain=s",
-			"verbose",
+			"debug",
 			"help|?");
 
 	if (!$rv || !%OPTS || $OPTS{'help'})
@@ -219,7 +219,7 @@ sub init_zabbix_api($$)
 	my $error;
 
 	RELOGIN:
-	$result = zbx_connect($section->{'za_url'}, $section->{'za_user'}, $section->{'za_password'}, getopt('verbose'));
+	$result = zbx_connect($section->{'za_url'}, $section->{'za_user'}, $section->{'za_password'}, getopt('debug'));
 
 	if ($result ne true)
 	{
@@ -764,6 +764,8 @@ Other options
         --rdap
                 Action with RDAP
                 (only effective after switch to Standalone RDAP, default: no)
+	--debug
+		print every Zabbix API request and response, useful for troubleshooting
         --help
                 display this message
 EOF
