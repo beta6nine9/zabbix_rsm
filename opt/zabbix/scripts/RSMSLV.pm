@@ -473,11 +473,6 @@ sub is_rsmhost_reconfigured($$$)
 		}
 	}
 
-	# TODO: remove these
-	#$config_times->{'~foo'} = [1614751199];
-	#$config_times->{'~bar'} = [1614751200];
-	#$config_times->{'~baz'} = [1614751259];
-
 	if (!exists($config_times->{$rsmhost}))
 	{
 		fail("{\$RSM.TLD.CONFIG.TIMES} for '$rsmhost' not found");
@@ -490,9 +485,6 @@ sub is_rsmhost_reconfigured($$$)
 	{
 		my $reconfig_time_start = cycle_start($config_time, 60);
 		my $reconfig_time_end   = cycle_end($config_time + (RECONFIG_MINUTES - 1) * 60, 60);
-
-		# TODO: remove this
-		#print ts_hms($reconfig_time_start) =~ s/(\d\d)(\d\d)(\d\d)/$1:$2:$3/r . ' .. ' . ts_hms($reconfig_time_end) =~ s/(\d\d)(\d\d)(\d\d)/$1:$2:$3/r . "\n";
 
 		if ($cycle_end >= $reconfig_time_start && $cycle_start <= $reconfig_time_end)
 		{
