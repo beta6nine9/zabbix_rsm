@@ -395,33 +395,35 @@ class AggregateDetailsAction extends Action {
 			'history' => ITEM_VALUE_TYPE_UINT64
 		]);
 
-		// Set probes test trasport.
-		$protocol_type = $this->getValueMapping(RSM_DNS_TRANSPORT_PROTOCOL_VALUE_MAP);
+		if ($test_result['value'] != UP_INCONCLUSIVE_RECONFIG) {
+			// Set probes test trasport.
+			$protocol_type = $this->getValueMapping(RSM_DNS_TRANSPORT_PROTOCOL_VALUE_MAP);
 
-		if (!$protocol_type) {
-			error(_('Value mapping for "Transport protocol" is not found.'));
-		}
-		else {
-			$tldprobeid_probeid = array_combine(array_column($this->probes, 'tldprobe_hostid'), array_keys($this->probes));
-			$tldprobe_values = $this->getItemsHistoryValue([
-				'output' => ['itemid', 'hostid'],
-				'hostids' => array_column($this->probes, 'tldprobe_hostid'),
-				'filter' => ['key_' => PROBE_DNS_PROTOCOL],
-				'time_from' => $time_from,
-				'time_till' => $time_till,
-				'history' => ITEM_VALUE_TYPE_UINT64
-			]);
+			if (!$protocol_type) {
+				error(_('Value mapping for "Transport protocol" not found.'));
+			}
+			else {
+				$tldprobeid_probeid = array_combine(array_column($this->probes, 'tldprobe_hostid'), array_keys($this->probes));
+				$tldprobe_values = $this->getItemsHistoryValue([
+					'output' => ['itemid', 'hostid'],
+					'hostids' => array_column($this->probes, 'tldprobe_hostid'),
+					'filter' => ['key_' => PROBE_DNS_PROTOCOL],
+					'time_from' => $time_from,
+					'time_till' => $time_till,
+					'history' => ITEM_VALUE_TYPE_UINT64
+				]);
 
-			foreach ($tldprobe_values as $tldprobe_value) {
-				if (isset($tldprobe_value['history_value'])) {
-					$tldprobeid = $tldprobe_value['hostid'];
-					$probeid = $tldprobeid_probeid[$tldprobeid];
-					$this->probes[$probeid]['transport'] = $protocol_type[$tldprobe_value['history_value']];
+				foreach ($tldprobe_values as $tldprobe_value) {
+					if (isset($tldprobe_value['history_value'])) {
+						$tldprobeid = $tldprobe_value['hostid'];
+						$probeid = $tldprobeid_probeid[$tldprobeid];
+						$this->probes[$probeid]['transport'] = $protocol_type[$tldprobe_value['history_value']];
+					}
 				}
 			}
-		}
 
-		$this->getReportData($data, $time_from, $time_till);
+			$this->getReportData($data, $time_from, $time_till);
+		}
 
 		foreach ($probes as $probe) {
 			/**
@@ -435,6 +437,9 @@ class AggregateDetailsAction extends Action {
 		$data['probes'] = $this->probes;
 		$data['errors'] = $this->probe_errors;
 		krsort($data['errors']);
+
+
+
 
 		$response = new CControllerResponseData($data);
 		$response->setTitle($data['title']);

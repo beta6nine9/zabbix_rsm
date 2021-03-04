@@ -245,6 +245,8 @@ define('MONITORING_TARGET_REGISTRAR',	'registrar');
 
 define('AUDIT_RESOURCE_INCIDENT',	100001);
 
+define('UP_INCONCLUSIVE_RECONFIG',	4);
+
 // Salt used for switching frontends
 // static string can be replaced with environment variable getenv('RSM_SECRET_KEY')
 define('RSM_SECRET_KEY',		'An0KXLtNTwCGd2FUeKqUsJ#X0#6N%B=OVZ(sfsB&dQEx6aVte2^ZXTset&!%l4f#');

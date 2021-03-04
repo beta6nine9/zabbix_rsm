@@ -489,13 +489,13 @@ if ($data['type'] == RSM_RDDS || $data['type'] == RSM_RDAP
 }
 
 if (in_array($data['type'], [RSM_RDDS, RSM_RDAP])) {
-	$test_result = $data['testResult'];
+	$test_result = $data['test_result'];
 }
 else {
-	if ($data['testResult'] === null) {
+	if ($data['test_result'] === null) {
 		$test_result = $no_result;
 	}
-	elseif ($data['testResult'] == PROBE_UP) {
+	elseif ($data['test_result'] == PROBE_UP) {
 		$test_result = $up;
 	}
 	else {
