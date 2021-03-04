@@ -81,7 +81,10 @@ our %OPTS; # specified command-line options
 our @EXPORT = qw($result $dbh $tld $server_key
 		E_ID_NONEXIST E_ID_MULTIPLE UP DOWN SLV_UNAVAILABILITY_LIMIT MIN_LOGIN_ERROR
 		UP_INCONCLUSIVE_NO_PROBES
-		UP_INCONCLUSIVE_NO_DATA PROTO_UDP PROTO_TCP
+		UP_INCONCLUSIVE_NO_DATA
+		UP_INCONCLUSIVE_RECONFIG
+		PROTO_UDP
+		PROTO_TCP
 		MAX_LOGIN_ERROR MIN_INFO_ERROR MAX_INFO_ERROR PROBE_ONLINE_STR
 		WAIT_FOR_AVAIL_DATA
 		WAIT_FOR_PROBE_DATA
@@ -2897,6 +2900,11 @@ sub process_slv_avail($$$$$$$$$$)
 	my $check_probe_values_ref = shift;
 	my $value_type             = shift;
 
+	if (is_rsmhost_reconfigured($tld, $delay, $from))
+	{
+		return (UP_INCONCLUSIVE_RECONFIG, "Up (rsmhost has been reconfigured recently)");
+	}
+
 	my $online_probes = online_probes($probes_ref, $from, $delay);
 	my $online_probe_count = scalar(@{$online_probes});
 
@@ -4703,14 +4711,26 @@ sub update_slv_rtt_monthly_stats($$$$$$$$;$)
 				$params_list = $rdap_standalone_params_list;
 			}
 
-			# TODO: consider only Up, Down
-			# ignore Up-inconclusive-...
-			my $rtt_stats = get_slv_rtt_cycle_stats_aggregated($params_list, $cycle_start, $cycle_end, $tld, $now, $max_nodata_time);
+			my $rtt_stats;
 
-			if (!defined($rtt_stats))
+			if (is_rsmhost_reconfigured($tld, $cycle_delay, $cycle_start))
 			{
-				dbg("stopping updatig TLD '$tld' because of missing data, cycle from $cycle_start till $cycle_end");
-				next TLD_LOOP;
+				$rtt_stats = {
+					'expected'   => 0,
+					'performed'  => 0,
+					'failed'     => 0,
+					'successful' => 0
+				};
+			}
+			else
+			{
+				$rtt_stats = get_slv_rtt_cycle_stats_aggregated($params_list, $cycle_start, $cycle_end, $tld, $now, $max_nodata_time);
+
+				if (!defined($rtt_stats))
+				{
+					dbg("stopping updatig TLD '$tld' because of missing data, cycle from $cycle_start till $cycle_end");
+					next TLD_LOOP;
+				}
 			}
 
 			$cycles_till_end_of_month--;
