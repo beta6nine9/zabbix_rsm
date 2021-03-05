@@ -626,6 +626,7 @@ sub __get_test_data($$$)
 			my $cycleclock = cycle_start($clock, $delay);
 
 			# todo: later rewrite to use valuemap ID from item
+			$cycles->{$service}{$cycleclock}{'rawstatus'} = $value;
 			$cycles->{$service}{$cycleclock}{'status'} = get_result_string($cfg_avail_valuemaps, $value);
 		}
 
@@ -921,7 +922,7 @@ sub __save_csv_data($$)
 							$test_type_id,
 							'',
 							$testedname_id,
-						]);
+						]) unless ($cycle_ref->{'rawstatus'} == UP_INCONCLUSIVE_RECONFIG);
 					}
 
 					foreach my $target (keys(%{$cycle_ref->{'interfaces'}{$interface}{'probes'}{$probe}{'targets'}}))
@@ -942,7 +943,7 @@ sub __save_csv_data($$)
 								$test_type_id,
 								dw_get_id(ID_TARGET, $target),
 								$testedname_id,
-							]);
+							]) unless ($cycle_ref->{'rawstatus'} == UP_INCONCLUSIVE_RECONFIG);
 						}
 						else
 						{
@@ -1010,7 +1011,7 @@ sub __save_csv_data($$)
 									      $cycle_ns_id // '',
 									      $tld_type_id,
 									      $nsid_id
-							]);
+							]) unless ($cycle_ref->{'rawstatus'} == UP_INCONCLUSIVE_RECONFIG);
 
 							if ($ip)
 							{
@@ -1036,7 +1037,7 @@ sub __save_csv_data($$)
 									      dw_get_id(ID_STATUS_MAP, $target_status),
 									      $tld_type_id,
 									      $protocol_id
-								]);
+								]) unless ($cycle_ref->{'rawstatus'} == UP_INCONCLUSIVE_RECONFIG);
 						}
 					}
 				}
@@ -1053,6 +1054,7 @@ sub __save_csv_data($$)
 
 							if ($cycle_ref->{'status'} ne UP && $cycle_ref->{'status'} ne DOWN)
 							{
+								# Up-inconclusive-*
 								$nscyclestatus = $cycle_ref->{'status'};
 							}
 							elsif ($nscycle{$ns}{$ip}{'total'} < $services->{$service}->{'minonline'})
