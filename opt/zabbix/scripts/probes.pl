@@ -594,9 +594,6 @@ Other options
 	--rename
 		rename existing probe to specified name in --new-name argument
 		(default: off)
-	--force
-		do not exit in case of failure, try to finish the task
-		(default: off)
 	--debug
 		print every Zabbix API request and response, useful for troubleshooting
         --help
