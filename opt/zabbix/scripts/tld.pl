@@ -73,6 +73,7 @@ sub main()
 
 	if (opt('set-type'))
 	{
+		update_rsmhost_config_times(getopt('tld'));
 		set_type();
 	}
 	elsif (opt('list-services'))
@@ -85,6 +86,8 @@ sub main()
 	}
 	elsif (opt('update-nsservers'))
 	{
+		update_rsmhost_config_times(getopt('tld'));
+
 		my $config_templateid = get_template_id(TEMPLATE_RSMHOST_CONFIG_PREFIX . getopt('tld'));
 
 		my $ns_servers = get_ns_servers($config_templateid);
@@ -99,16 +102,19 @@ sub main()
 	}
 	elsif (opt('delete'))
 	{
+		update_rsmhost_config_times(getopt('tld'));
 		manage_tld_objects('delete', getopt('tld'), getopt('dns'), getopt('dns-udp'), getopt('dns-tcp'),
 				getopt('dnssec'), getopt('epp'), getopt('rdds'), getopt('rdap'));
 	}
 	elsif (opt('disable'))
 	{
+		update_rsmhost_config_times(getopt('tld'));
 		manage_tld_objects('disable', getopt('tld'), getopt('dns'), getopt('dns-udp'), getopt('dns-tcp'),
 				getopt('dnssec'), getopt('epp'), getopt('rdds'), getopt('rdap'));
 	}
 	else
 	{
+		update_rsmhost_config_times(getopt('tld'));
 		add_new_tld($config);
 	}
 }
@@ -1164,22 +1170,26 @@ sub create_rsmhost_template($$)
 	my $rsmhost = shift;
 	my $opt_ns_servers = shift;
 
-	my $config_template = get_template(TEMPLATE_RSMHOST_CONFIG_PREFIX . $rsmhost, 1, 0);
-	my $config_templateid;
+	my $template = get_template(TEMPLATE_RSMHOST_CONFIG_PREFIX . $rsmhost, 1, 0);
+	my $templateid;
+
+	my $new_rsmhost = !%{$template};
 
 	my $dns_minns;
 
-	if (%{$config_template})
+	if ($new_rsmhost)
 	{
-		$config_templateid = $config_template->{'templateid'};
+		$templateid = really(create_template(TEMPLATE_RSMHOST_CONFIG_PREFIX . $rsmhost));
 
-		my ($minns_macro) = grep($_->{'macro'} eq '{$RSM.TLD.DNS.AVAIL.MINNS}', @{$config_template->{'macros'}});
-
-		$dns_minns = build_dns_minns_macro($minns_macro->{'value'});
+		$dns_minns = build_dns_minns_macro(undef);
 	}
 	else
 	{
-		$dns_minns = build_dns_minns_macro(undef);
+		$templateid = $template->{'templateid'};
+
+		my ($minns_macro) = grep($_->{'macro'} eq '{$RSM.TLD.DNS.AVAIL.MINNS}', @{$template->{'macros'}});
+
+		$dns_minns = build_dns_minns_macro($minns_macro->{'value'});
 	}
 
 	my $rdds43_test_domain;
@@ -1199,30 +1209,31 @@ sub create_rsmhost_template($$)
 		$rdds43_test_domain = getopt('rdds43-test-domain');
 	}
 
-	$config_templateid //= really(create_template(TEMPLATE_RSMHOST_CONFIG_PREFIX . $rsmhost));
+	my $rdds_ns_string = opt('rdds-ns-string') ? getopt('rdds-ns-string') : CFG_DEFAULT_RDDS_NS_STRING;
 
-	really(create_macro('{$RSM.TLD}', $rsmhost, $config_templateid));
-	really(create_macro('{$RSM.DNS.TESTPREFIX}', getopt('dns-test-prefix'), $config_templateid, 1));
-	really(create_macro('{$RSM.RDDS43.TEST.DOMAIN}', $rdds43_test_domain, $config_templateid, 1)) if (defined($rdds43_test_domain));
-	really(create_macro('{$RSM.RDDS.NS.STRING}', opt('rdds-ns-string') ? getopt('rdds-ns-string') : CFG_DEFAULT_RDDS_NS_STRING, $config_templateid, 1));
-	really(create_macro('{$RSM.TLD.DNS.UDP.ENABLED}', getopt('dns-udp'), $config_templateid, 1));
-	really(create_macro('{$RSM.TLD.DNS.TCP.ENABLED}', getopt('dns-tcp'), $config_templateid, 1));
-	really(create_macro('{$RSM.TLD.DNS.AVAIL.MINNS}', $dns_minns, $config_templateid, 1));
-	really(create_macro('{$RSM.TLD.DNSSEC.ENABLED}', getopt('dnssec'), $config_templateid, 1));
-	really(create_macro('{$RSM.TLD.RDDS.ENABLED}', opt('rdds43-servers') ? 1 : 0, $config_templateid, 1));
-	really(create_macro('{$RSM.TLD.RDDS.43.SERVERS}', getopt('rdds43-servers') // '', $config_templateid, 1));
-	really(create_macro('{$RSM.TLD.RDDS.80.SERVERS}', getopt('rdds80-servers') // '', $config_templateid, 1));
-	really(create_macro('{$RSM.TLD.EPP.ENABLED}', opt('epp-servers') ? 1 : 0, $config_templateid, 1));
+	really(create_macro('{$RSM.TLD}'                , $rsmhost                      , $templateid));
+	really(create_macro('{$RSM.DNS.TESTPREFIX}'     , getopt('dns-test-prefix')     , $templateid, 1));
+	really(create_macro('{$RSM.RDDS43.TEST.DOMAIN}' , $rdds43_test_domain           , $templateid, 1)) if (defined($rdds43_test_domain));
+	really(create_macro('{$RSM.RDDS.NS.STRING}'     , $rdds_ns_string               , $templateid, 1));
+	really(create_macro('{$RSM.TLD.DNS.UDP.ENABLED}', getopt('dns-udp')             , $templateid, 1));
+	really(create_macro('{$RSM.TLD.DNS.TCP.ENABLED}', getopt('dns-tcp')             , $templateid, 1));
+	really(create_macro('{$RSM.TLD.DNS.AVAIL.MINNS}', $dns_minns                    , $templateid, 1));
+	really(create_macro('{$RSM.TLD.DNSSEC.ENABLED}' , getopt('dnssec')              , $templateid, 1));
+	really(create_macro('{$RSM.TLD.RDDS.ENABLED}'   , opt('rdds43-servers') ? 1 : 0 , $templateid, 1));
+	really(create_macro('{$RSM.TLD.RDDS.43.SERVERS}', getopt('rdds43-servers') // '', $templateid, 1));
+	really(create_macro('{$RSM.TLD.RDDS.80.SERVERS}', getopt('rdds80-servers') // '', $templateid, 1));
+	really(create_macro('{$RSM.TLD.EPP.ENABLED}'    , opt('epp-servers') ? 1 : 0    , $templateid, 1));
+	really(create_macro('{$RSM.TLD.CONFIG.TIMES}'   , $^T                           , $templateid, 1)) if ($new_rsmhost);
 
 	if (opt('rdap-base-url') && opt('rdap-test-domain'))
 	{
-		really(create_macro('{$RDAP.BASE.URL}', getopt('rdap-base-url'), $config_templateid, 1));
-		really(create_macro('{$RDAP.TEST.DOMAIN}', getopt('rdap-test-domain'), $config_templateid, 1));
-		really(create_macro('{$RDAP.TLD.ENABLED}', 1, $config_templateid, 1));
+		really(create_macro('{$RDAP.BASE.URL}'   , getopt('rdap-base-url')   , $templateid, 1));
+		really(create_macro('{$RDAP.TEST.DOMAIN}', getopt('rdap-test-domain'), $templateid, 1));
+		really(create_macro('{$RDAP.TLD.ENABLED}', 1                         , $templateid, 1));
 	}
 	else
 	{
-		really(create_macro('{$RDAP.TLD.ENABLED}', 0, $config_templateid, 1));
+		really(create_macro('{$RDAP.TLD.ENABLED}', 0, $templateid, 1));
 	}
 
 	if (getopt('epp-servers'))
@@ -1242,29 +1253,29 @@ sub create_rsmhost_template($$)
 
 		if (getopt('epp-commands'))
 		{
-			really(create_macro('{$RSM.EPP.COMMANDS}', getopt('epp-commands'), $config_templateid, 1));
+			really(create_macro('{$RSM.EPP.COMMANDS}', getopt('epp-commands'), $templateid, 1));
 		}
 		else
 		{
-			really(create_macro('{$RSM.EPP.COMMANDS}', '/opt/test-sla/epp-commands/' . $rsmhost, $config_templateid));
+			really(create_macro('{$RSM.EPP.COMMANDS}', '/opt/test-sla/epp-commands/' . $rsmhost, $templateid));
 		}
-		really(create_macro('{$RSM.EPP.USER}', getopt('epp-user'), $config_templateid, 1));
-		really(create_macro('{$RSM.EPP.CERT}', encode_base64($buf, ''),  $config_templateid, 1));
-		really(create_macro('{$RSM.EPP.SERVERID}', getopt('epp-serverid'), $config_templateid, 1));
-		really(create_macro('{$RSM.EPP.TESTPREFIX}', getopt('epp-test-prefix'), $config_templateid, 1));
-		really(create_macro('{$RSM.EPP.SERVERCERTMD5}', get_md5(getopt('epp-servercert')), $config_templateid, 1));
+		really(create_macro('{$RSM.EPP.USER}', getopt('epp-user'), $templateid, 1));
+		really(create_macro('{$RSM.EPP.CERT}', encode_base64($buf, ''),  $templateid, 1));
+		really(create_macro('{$RSM.EPP.SERVERID}', getopt('epp-serverid'), $templateid, 1));
+		really(create_macro('{$RSM.EPP.TESTPREFIX}', getopt('epp-test-prefix'), $templateid, 1));
+		really(create_macro('{$RSM.EPP.SERVERCERTMD5}', get_md5(getopt('epp-servercert')), $templateid, 1));
 
 		my $passphrase = get_sensdata("Enter EPP secret key passphrase: ");
 		my $passwd = get_sensdata("Enter EPP password: ");
-		really(create_macro('{$RSM.EPP.PASSWD}', get_encrypted_passwd($keysalt, $passphrase, $passwd), $config_templateid, 1));
+		really(create_macro('{$RSM.EPP.PASSWD}', get_encrypted_passwd($keysalt, $passphrase, $passwd), $templateid, 1));
 		$passwd = undef;
-		really(create_macro('{$RSM.EPP.PRIVKEY}', get_encrypted_privkey($keysalt, $passphrase, getopt('epp-privkey')), $config_templateid, 1));
+		really(create_macro('{$RSM.EPP.PRIVKEY}', get_encrypted_privkey($keysalt, $passphrase, getopt('epp-privkey')), $templateid, 1));
 		$passphrase = undef;
 
 		print("EPP data saved successfully.\n");
 	}
 
-	return $config_templateid;
+	return $templateid;
 }
 
 sub build_dns_minns_macro($)
