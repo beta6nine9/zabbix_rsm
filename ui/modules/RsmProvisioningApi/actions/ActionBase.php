@@ -8,26 +8,34 @@ use API;
 use CApiInputValidator;
 use CController;
 use CControllerResponseData;
-use CWebUser;
 use Exception;
 
 abstract class ActionBase extends CController
 {
-	const USER_READONLY         = 'provisioning-api-readonly';
-	const USER_READWRITE        = 'provisioning-api-readwrite';
+	private const USER_READONLY  = 'provisioning-api-readonly';
+	private const USER_READWRITE = 'provisioning-api-readwrite';
 
-	const REQUEST_METHOD_GET    = 'GET';
-	const REQUEST_METHOD_DELETE = 'DELETE';
-	const REQUEST_METHOD_PUT    = 'PUT';
+	protected const REQUEST_METHOD_GET     = 'GET';
+	protected const REQUEST_METHOD_DELETE  = 'DELETE';
+	protected const REQUEST_METHOD_PUT     = 'PUT';
 
+	abstract protected function checkMonitoringTarget();
 	abstract protected function getInputRules(): array;
-	abstract protected function handleGetRequest();
-	abstract protected function handleDeleteRequest();
-	abstract protected function handlePutRequest();
+	abstract protected function getObjectIdInputField();
+	abstract protected function getObjects(?string $objectId);
+	abstract protected function createObject();
+	abstract protected function updateObject();
+	abstract protected function deleteObject();
 
 	public function __construct()
 	{
+		parent::__construct();
 		$this->disableSIDvalidation();
+	}
+
+	public function __destruct()
+	{
+		printf("\n\nTime-Spent: %f\n", microtime(true) - $_SERVER['REQUEST_TIME_FLOAT']);
 	}
 
 	protected function checkPermissions()
@@ -115,25 +123,37 @@ abstract class ActionBase extends CController
 
 	protected function doAction()
 	{
+		if (!$this->checkMonitoringTarget())
+		{
+			throw new Exception('Invalid monitoring target');
+		}
+
+		DBstart();
+
 		switch ($_SERVER['REQUEST_METHOD'])
 		{
 			case self::REQUEST_METHOD_GET:
-				return $this->handleGetRequest();
+				$this->handleGetRequest();
+				break;
 
 			case self::REQUEST_METHOD_DELETE:
-				return $this->handleDeleteRequest();
+				$this->handleDeleteRequest();
+				break;
 
 			case self::REQUEST_METHOD_PUT:
-				return $this->handlePutRequest();
+				$this->handlePutRequest();
+				break;
 
 			default:
 				throw new Exception('Unsupported request method');
 		}
+
+		DBend(false);
 	}
 
 	protected function returnJson(array $json)
 	{
-		$options = 0;
+		$options = JSON_UNESCAPED_SLASHES;
 
 		if (!is_int(key($json)))
 		{
@@ -143,5 +163,48 @@ abstract class ActionBase extends CController
 		$this->setResponse(new CControllerResponseData([
 			'main_block' => json_encode($json, $options)
 		]));
+	}
+
+	protected function handleGetRequest()
+	{
+		if ($this->hasInput($this->getObjectIdInputField()))
+		{
+			$data = $this->getObjects($this->getInput($this->getObjectIdInputField()));
+
+			if (empty($data))
+			{
+				throw new Exception("Requested object does not exist");
+			}
+
+			$data = $data[0];
+		}
+		else
+		{
+			$data = $this->getObjects(null);
+		}
+
+		$this->returnJson($data);
+	}
+
+	protected function handleDeleteRequest()
+	{
+		var_dump(__METHOD__);
+		$this->returnJson(['foo' => 'bar']);
+	}
+
+	protected function handlePutRequest()
+	{
+		$objects = $this->getObjects($this->getInput($this->getObjectIdInputField()));
+
+		if (empty($objects))
+		{
+			$this->createObject();
+		}
+		else
+		{
+			$this->updateObject();
+		}
+
+		$this->returnJson([$this->getInput($this->getObjectIdInputField())]);
 	}
 }

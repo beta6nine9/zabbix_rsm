@@ -3,15 +3,18 @@
 namespace Modules\RsmProvisioningApi\Actions;
 
 use API;
-use Modules\RsmProvisioningApi\RsmApi as RsmApi;
 
-class Probe extends ActionBase
+class Probe extends ActionBaseEx
 {
-	const MACRO_IP4_ENABLED  = '{$RSM.IP4.ENABLED}';
-	const MACRO_IP6_ENABLED  = '{$RSM.IP6.ENABLED}';
-	const MACRO_RDAP_ENABLED = '{$RSM.RDAP.ENABLED}';
-	const MACRO_RDDS_ENABLED = '{$RSM.RDDS.ENABLED}';
-	const MACRO_RESOLVER     = '{$RSM.RESOLVER}';
+	protected function checkMonitoringTarget()
+	{
+		return true;
+	}
+
+	protected function getObjectIdInputField()
+	{
+		return 'probe';
+	}
 
 	protected function getInputRules(): array
 	{
@@ -58,60 +61,12 @@ class Probe extends ActionBase
 		}
 	}
 
-	protected function handleGetRequest()
-	{
-		if ($this->hasInput('probe'))
-		{
-			$data = $this->getProbes($this->getInput('probe'));
-			if (empty($data))
-			{
-				// TODO: probe not found
-			}
-			else
-			{
-				$data = $data[0];
-			}
-		}
-		else
-		{
-			$data = $this->getProbes(null);
-		}
-
-		$this->returnJson($data);
-	}
-
-	protected function handleDeleteRequest()
-	{
-		var_dump(__METHOD__);
-		$this->returnJson(['foo' => 'bar']);
-	}
-
-	protected function handlePutRequest()
-	{
-		var_dump(__METHOD__);
-		$this->returnJson(['foo' => 'bar']);
-	}
-
-	private function getProbes($probe)
+	protected function getObjects(?string $objectId)
 	{
 		// TODO: add sanity checks
+		// TODO: include disabled objects (with all services disabled)
 
-		// get 'Probes' host group id
-		$data = API::HostGroup()->get([
-			'output' => ['groupid'],
-			'filter' => ['name' => 'Probes'],
-		]);
-		$hostGroupId = $data[0]['groupid'];
-
-		// get probe hosts
-		$data = API::Host()->get([
-			'output' => ['host'],
-			'groupids' => [$hostGroupId],
-			'filter' => [
-				'status' => HOST_STATUS_MONITORED,
-				'host' => is_null($probe) ? [] : [$probe],
-			],
-		]);
+		$data = $this->getHostsByHostGroup('Probes', $objectId, null);
 		$hosts = array_column($data, 'host', 'hostid');
 
 		if (empty($hosts))
@@ -122,41 +77,28 @@ class Probe extends ActionBase
 		// get proxies
 		$data = API::Proxy()->get([
 			'output' => ['host'],
-			'filter' => ['status' => HOST_STATUS_PROXY_PASSIVE, 'host' => $hosts],
+			'filter' => [
+				'host' => $hosts,
+			],
 			'selectInterface' => ['ip', 'port'],
 		]);
 		$interfaces = array_column($data, 'interface', 'host');
 
 		// get templates
 		$templateNames = array_values(array_map(fn($host) => 'Template Probe Config ' . $host, $hosts));
-		$data = API::Template()->get([
-			'output' => ['host', 'templateid'],
-			'filter' => ['host' => $templateNames],
-		]);
-		$templates = array_column($data, 'host', 'templateid');
+		$templates = array_flip($this->getTemplateIds($templateNames));
 
 		// get template macros
-		$data = API::UserMacro()->get([
-			'output'  => ['hostid', 'macro', 'value'],
-			'hostids' => array_keys($templates),
-			'filter'  => [
-				'macro' => [
-					self::MACRO_IP4_ENABLED,
-					self::MACRO_IP6_ENABLED,
-					self::MACRO_RDAP_ENABLED,
-					self::MACRO_RDDS_ENABLED,
-					self::MACRO_RESOLVER,
-				],
-			],
-		]);
-		$macros = [];
-		foreach ($data as $item)
-		{
-			$host = str_replace('Template Probe Config ', '' , $templates[$item['hostid']]);
-			$macro = $item['macro'];
-			$value = $item['value'];
-			$macros[$host][$macro] = $value;
-		}
+		$macros = $this->getHostMacros(
+			array_map(fn($host) => str_replace('Template Probe Config ', '', $host), $templates),
+			[
+				self::MACRO_PROBE_IP4_ENABLED,
+				self::MACRO_PROBE_IP6_ENABLED,
+				self::MACRO_PROBE_RDAP_ENABLED,
+				self::MACRO_PROBE_RDDS_ENABLED,
+				self::MACRO_PROBE_RESOLVER,
+			]
+		);
 
 		// get lastvalue of "rsm.probe.status[manual]" item
 		$data = DBfetchArray(DBselect(
@@ -173,6 +115,7 @@ class Probe extends ActionBase
 
 		// join data in a common data structure
 		$result = [];
+
 		foreach ($hosts as $hostid => $host)
 		{
 			$result[] = [
@@ -180,27 +123,204 @@ class Probe extends ActionBase
 				'serviceStatus'                 => [
 					[
 						'service'               => 'rdap',
-						'enabled'               => boolval($macros[$host][self::MACRO_RDAP_ENABLED]),
+						'enabled'               => (bool)$macros[$host][self::MACRO_PROBE_RDAP_ENABLED],
 					],
 					[
 						'service'               => 'rdds',
-						'enabled'               => boolval($macros[$host][self::MACRO_RDDS_ENABLED]),
+						'enabled'               => (bool)$macros[$host][self::MACRO_PROBE_RDDS_ENABLED],
 					],
 				],
 				'zabbixProxyParameters'         => [
-					'ipv4Enable'                => boolval($macros[$host][self::MACRO_IP4_ENABLED]),
-					'ipv6Enable'                => boolval($macros[$host][self::MACRO_IP6_ENABLED]),
-					'ipResolver'                => $macros[$host][self::MACRO_RESOLVER],
+					'ipv4Enable'                => (bool)$macros[$host][self::MACRO_PROBE_IP4_ENABLED],
+					'ipv6Enable'                => (bool)$macros[$host][self::MACRO_PROBE_IP6_ENABLED],
+					'ipResolver'                => $macros[$host][self::MACRO_PROBE_RESOLVER],
 					'proxyIp'                   => $interfaces[$host]['ip'],
 					'proxyPort'                 => $interfaces[$host]['port'],
 					'proxyPskIdentity'          => null,
 					'proxyPsk'                  => null,
 				],
-				'online'                        => boolval($status[$hostid]),
-				'zabbixMonitoringCentralServer' => 'TODO',            // TODO: fill with real value
+				'online'                        => (bool)$status[$hostid],
+				'zabbixMonitoringCentralServer' => 'TODO',                                                              // TODO: fill with real value
 			];
 		}
 
 		return $result;
+	}
+
+	protected function createObject()
+	{
+		$input = $this->getInputAll();
+
+		$hostGroupIds = $this->getHostGroupIds($this->getHostGroupNames(null));
+		$templateIds = $this->getTemplateIds($this->getTemplateNames(null));
+
+		$data = API::Proxy()->create($this->createProxyConfig($input));
+		$proxyId = $data['proxyids'][0];
+
+		$data = API::HostGroup()->create($this->createHostGroupConfig($input));
+		$hostGroupIds[$input['probe']] = $data['groupids'][0];
+
+		$data = API::Template()->create($this->createTemplateConfig($input, $hostGroupIds));
+		$templateIds['Template Probe Config ' . $input['probe']] = $data['templateids'][0];
+
+		$data = API::Host()->create($this->createProbeHostConfig($input, $hostGroupIds, $templateIds, $proxyId));
+
+		$data = API::Host()->create($this->createProbeMonHostConfig($input, $hostGroupIds, $templateIds));
+
+		$this->updateRsmhostProbeHosts(null, $input['probe'], $hostGroupIds, $templateIds);
+	}
+
+	protected function updateObject()
+	{
+		$input = $this->getInputAll();
+
+		$hostGroupIds = $this->getHostGroupIds($this->getHostGroupNames([$input['probe']]));
+		$templateIds = $this->getTemplateIds($this->getTemplateNames(['Template Probe Config ' . $input['probe']]));
+
+		$config = $this->createTemplateConfig($input, $hostGroupIds);
+		$config['templateid'] = $templateIds[$config['host']];
+		$data = API::Template()->update($config);
+
+		$config = $this->createProbeHostConfig($input, $hostGroupIds, $templateIds, null);
+		$config['hostid'] = $this->getHostId($config['host']);
+		$data = API::Host()->update($config);
+
+		$config = $this->createProbeMonHostConfig($input, $hostGroupIds, $templateIds);
+		$config['hostid'] = $this->getHostId($config['host']);
+		$data = API::Host()->update($config);
+
+		$this->updateRsmhostProbeHosts(null, $input['probe'], $hostGroupIds, $templateIds);
+	}
+
+	protected function deleteObject()
+	{
+	}
+
+	private function getHostGroupNames(?array $additionalNames)
+	{
+		$names = [
+			'Templates - TLD',
+			'Probes',
+			'Probes - Mon',
+		];
+
+		if (!is_null($additionalNames))
+		{
+			$names = array_merge($names, $additionalNames);
+		}
+
+		return $names;
+	}
+
+	private function getTemplateNames(?array $additionalNames)
+	{
+		$names = [
+			'Template Probe Status',
+			'Template Proxy Health',
+		];
+
+		if (!is_null($additionalNames))
+		{
+			$names = array_merge($names, $additionalNames);
+		}
+
+		return $names;
+	}
+
+	function createProxyConfig(array $input)
+	{
+		return [
+			'host'             => $input['probe'],
+			'status'           => HOST_STATUS_PROXY_PASSIVE,
+			'tls_connect'      => HOST_ENCRYPTION_PSK,
+			'tls_psk_identity' => $input['zabbixProxyParameters']['proxyPskIdentity'],
+			'tls_psk'          => $input['zabbixProxyParameters']['proxyPsk'],
+			'interface'        => [
+				'type'  => INTERFACE_TYPE_AGENT,
+				'main'  => INTERFACE_PRIMARY,
+				'useip' => INTERFACE_USE_IP,
+				'ip'    => $input['zabbixProxyParameters']['proxyIp'],
+				'dns'   => '',
+				'port'  => $input['zabbixProxyParameters']['proxyPort'],
+			],
+		];
+	}
+
+	private function createHostGroupConfig(array $input)
+	{
+		return [
+			'name' => $input['probe'],
+		];
+	}
+
+	function createTemplateConfig(array $input, array $hostGroupIds)
+	{
+		$services = array_column($input['servicesStatus'], 'enabled', 'service');
+
+		return [
+			'host'   => 'Template Probe Config ' . $input['probe'],
+			'groups' => [
+				['groupid' => $hostGroupIds['Templates - TLD']],
+			],
+			'macros' => [
+				$this->createMacroConfig(self::MACRO_PROBE_IP4_ENABLED , (int)$input['zabbixProxyParameters']['ipv4Enable']),
+				$this->createMacroConfig(self::MACRO_PROBE_IP6_ENABLED , (int)$input['zabbixProxyParameters']['ipv6Enable']),
+				$this->createMacroConfig(self::MACRO_PROBE_RDAP_ENABLED, (int)$services['rdap']),
+				$this->createMacroConfig(self::MACRO_PROBE_RDDS_ENABLED, (int)$services['rdds']),
+				$this->createMacroConfig(self::MACRO_PROBE_RESOLVER    , $input['zabbixProxyParameters']['ipResolver']),
+			],
+		];
+	}
+
+	function createProbeHostConfig(array $input, array $hostGroupIds, array $templateIds, $proxyId)
+	{
+		$config = [
+			'host'         => $input['probe'],
+			'status'       => HOST_STATUS_MONITORED,
+			'interfaces'   => [
+				self::DEFAULT_MAIN_INTERFACE,
+			],
+			'groups'       => [
+				['groupid' => $hostGroupIds['Probes']],
+			],
+			'templates'    => [
+				['templateid' => $templateIds['Template Probe Config ' . $input['probe']]],
+				['templateid' => $templateIds['Template Probe Status']],
+			],
+		];
+
+		if (!is_null($proxyId))
+		{
+			$config['proxy_hostid'] = $proxyId;
+		}
+
+		return $config;
+	}
+
+	function createProbeMonHostConfig(array $input, array $hostGroupIds, array $templateIds)
+	{
+		return [
+			'host'         => $input['probe'] . ' - mon',
+			'status'       => HOST_STATUS_MONITORED,
+			'interfaces'   => [
+				[
+					'type'  => INTERFACE_TYPE_AGENT,
+					'main'  => INTERFACE_PRIMARY,
+					'useip' => INTERFACE_USE_IP,
+					'ip'    => $input['zabbixProxyParameters']['proxyIp'],
+					'dns'   => '',
+					'port'  => '10050',
+				],
+			],
+			'groups'       => [
+				['groupid' => $hostGroupIds['Probes - Mon']],
+			],
+			'templates'    => [
+				['templateid' => $templateIds['Template Proxy Health']],
+			],
+			'macros'       => [
+				$this->createMacroConfig(self::MACRO_PROBE_PROXY_NAME, $input['probe']),
+			],
+		];
 	}
 }
