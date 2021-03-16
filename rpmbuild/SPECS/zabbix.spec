@@ -45,7 +45,11 @@ Buildroot:	%{_tmppath}/zabbix-%{version}-%{release}-root-%(%{__id_u} -n)
 # Relabel files
 %global relabel_files() \ # ADD files in *.fc file
 
+%if 0%{?rhel} >= 8
+BuildRequires:	mariadb-connector-c-devel
+%else
 BuildRequires:	mysql-devel
+%endif
 BuildRequires:	ldns-devel >= 1.6.17
 BuildRequires:	curl-devel >= 7.13.1
 %if 0%{?rhel} >= 6
