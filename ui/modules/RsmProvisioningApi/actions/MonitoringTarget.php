@@ -4,22 +4,23 @@ namespace Modules\RsmProvisioningApi\Actions;
 
 use API;
 
-abstract class MonitoringTarget extends ActionBaseEx
-{
-	private   const MONITORING_TARGET           = '{$RSM.MONITORING.TARGET}';
-	protected const MONITORING_TARGET_REGISTRY  = 'registry';
-	protected const MONITORING_TARGET_REGISTRAR = 'registrar';
+abstract class MonitoringTarget extends ActionBaseEx {
 
-	protected function getMonitoringTarget()
-	{
-		// TODO: add sanity checks
+	protected function deleteObject() {
+		$input = $this->getInputAll();
 
-		$data = API::UserMacro()->get([
-			'output' => ['value'],
-			'globalmacro' => true,
-			'filter' => ['macro' => self::MONITORING_TARGET],
-		]);
+		$templateId = $this->getTemplateId('Template Rsmhost Config ' . $input[$this->getObjectIdInputField()]);
 
-		return $data[0]['value'];
+		$hostids = array_column($this->getHostsByTemplateId($templateId, null, null), 'hostid', 'host');
+
+		// delete "<rsmhost>", "<rsmhost> <probe>" hosts
+		$data = API::Host()->delete(array_values($hostids));
+
+		// delete "Template Rsmhost Config <rsmhost>" template
+		$data = API::Template()->delete([$templateId]);
+
+		// delete "TLD <rsmhost>" host group
+		$hostGroupId = $this->getHostGroupId('TLD ' . $input[$this->getObjectIdInputField()]);
+		$data = API::HostGroup()->delete([$hostGroupId]);
 	}
 }

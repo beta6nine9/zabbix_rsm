@@ -10,8 +10,8 @@ use CController;
 use CControllerResponseData;
 use Exception;
 
-abstract class ActionBase extends CController
-{
+abstract class ActionBase extends CController {
+
 	private const USER_READONLY  = 'provisioning-api-readonly';
 	private const USER_READWRITE = 'provisioning-api-readwrite';
 
@@ -27,19 +27,35 @@ abstract class ActionBase extends CController
 	abstract protected function updateObject();
 	abstract protected function deleteObject();
 
-	public function __construct()
-	{
+	public function __construct() {
 		parent::__construct();
 		$this->disableSIDvalidation();
 	}
 
-	public function __destruct()
-	{
-		printf("\n\nTime-Spent: %f\n", microtime(true) - $_SERVER['REQUEST_TIME_FLOAT']);
+	public function __destruct() {
+		$this->printStats();
 	}
 
-	protected function checkPermissions()
-	{
+	protected function printStats() {
+		$stats = mysqli_get_connection_stats($GLOBALS['DB']['DB']);
+		echo "\n"
+			. str_pad('', 80, '-') . "\n"
+			. "selects        - " . str_pad(number_format($stats['result_set_queries'             ], 0, '.', '\''), 7, ' ', STR_PAD_LEFT) . "\n"
+			. "updates        - " . str_pad(number_format($stats['non_result_set_queries'         ], 0, '.', '\''), 7, ' ', STR_PAD_LEFT) . "\n"
+			. "total          - " . str_pad(number_format($stats['com_query'                      ], 0, '.', '\''), 7, ' ', STR_PAD_LEFT) . "\n"
+			. "\n"
+			. "rows_fetched   - " . str_pad(number_format($stats['rows_fetched_from_server_normal'], 0, '.', '\''), 7, ' ', STR_PAD_LEFT) . "\n"
+			. "\n"
+			. "fetched_int    - " . str_pad(number_format($stats['proto_text_fetched_int'         ], 0, '.', '\''), 7, ' ', STR_PAD_LEFT) . "\n"
+			. "fetched_bigint - " . str_pad(number_format($stats['proto_text_fetched_bigint'      ], 0, '.', '\''), 7, ' ', STR_PAD_LEFT) . "\n"
+			. "fetched_string - " . str_pad(number_format($stats['proto_text_fetched_string'      ], 0, '.', '\''), 7, ' ', STR_PAD_LEFT) . "\n"
+			. "fetched_enum   - " . str_pad(number_format($stats['proto_text_fetched_enum'        ], 0, '.', '\''), 7, ' ', STR_PAD_LEFT) . "\n"
+			. "\n"
+			. "time_spent     - " . number_format(microtime(true) - $_SERVER['REQUEST_TIME_FLOAT'], 3, '.', '\'') . " seconds\n"
+			. str_pad('', 80, '-') . "\n";
+	}
+
+	protected function checkPermissions() {
 		if (!isset($_SERVER['PHP_AUTH_USER']))
 		{
 			return false;
@@ -79,13 +95,11 @@ abstract class ActionBase extends CController
 		}
 	}
 
-	protected function checkInput()
-	{
+	protected function checkInput() {
 		return $this->validateInput($this->getInputRules());
 	}
 
-	public function validateInput($validationRules)
-	{
+	public function validateInput($validationRules) {
 		$this->input = $this->getRequestInput();
 
 		if (!CApiInputValidator::validate($validationRules, $this->input, '', $error))
@@ -99,8 +113,7 @@ abstract class ActionBase extends CController
 		return true;
 	}
 
-	protected function getRequestInput(): array
-	{
+	protected function getRequestInput(): array {
 		switch ($_SERVER['REQUEST_METHOD'])
 		{
 			case self::REQUEST_METHOD_GET:
@@ -121,8 +134,7 @@ abstract class ActionBase extends CController
 		}
 	}
 
-	protected function doAction()
-	{
+	protected function doAction() {
 		if (!$this->checkMonitoringTarget())
 		{
 			throw new Exception('Invalid monitoring target');
@@ -151,22 +163,7 @@ abstract class ActionBase extends CController
 		DBend(false);
 	}
 
-	protected function returnJson(array $json)
-	{
-		$options = JSON_UNESCAPED_SLASHES;
-
-		if (!is_int(key($json)))
-		{
-			$options |= JSON_PRETTY_PRINT;
-		}
-
-		$this->setResponse(new CControllerResponseData([
-			'main_block' => json_encode($json, $options)
-		]));
-	}
-
-	protected function handleGetRequest()
-	{
+	protected function handleGetRequest() {
 		if ($this->hasInput($this->getObjectIdInputField()))
 		{
 			$data = $this->getObjects($this->getInput($this->getObjectIdInputField()));
@@ -186,14 +183,13 @@ abstract class ActionBase extends CController
 		$this->returnJson($data);
 	}
 
-	protected function handleDeleteRequest()
-	{
-		var_dump(__METHOD__);
+	protected function handleDeleteRequest() {
+		$this->deleteObject();
+
 		$this->returnJson(['foo' => 'bar']);
 	}
 
-	protected function handlePutRequest()
-	{
+	protected function handlePutRequest() {
 		$objects = $this->getObjects($this->getInput($this->getObjectIdInputField()));
 
 		if (empty($objects))
@@ -206,5 +202,18 @@ abstract class ActionBase extends CController
 		}
 
 		$this->returnJson([$this->getInput($this->getObjectIdInputField())]);
+	}
+
+	protected function returnJson(array $json) {
+		$options = JSON_UNESCAPED_SLASHES;
+
+		if (!is_int(key($json)))
+		{
+			$options |= JSON_PRETTY_PRINT;
+		}
+
+		$this->setResponse(new CControllerResponseData([
+			'main_block' => json_encode($json, $options)
+		]));
 	}
 }

@@ -7,8 +7,8 @@ require_once __DIR__ . '/../validators/validators.inc.php';
 use API;
 use Exception;
 
-abstract class ActionBaseEx extends ActionBase
-{
+abstract class ActionBaseEx extends ActionBase {
+
 	protected const DEFAULT_MAIN_INTERFACE = [
 		'type'  => INTERFACE_TYPE_AGENT,
 		'main'  => INTERFACE_PRIMARY,
@@ -17,6 +17,9 @@ abstract class ActionBaseEx extends ActionBase
 		'dns'   => '',
 		'port'  => '10050',
 	];
+
+	private const MACRO_GLOBAL_MONITORING_TARGET = '{$RSM.MONITORING.TARGET}';
+	private const MACRO_GLOBAL_RDAP_STANDALONE   = '{$RSM.RDAP.STANDALONE}';
 
 	protected const MACRO_PROBE_PROXY_NAME   = '{$RSM.PROXY_NAME}';
 	protected const MACRO_PROBE_IP4_ENABLED  = '{$RSM.IP4.ENABLED}';
@@ -68,73 +71,340 @@ abstract class ActionBaseEx extends ActionBase
 		self::MACRO_TLD_RDDS_NS_STRING     => 'What to look for in RDDS output, e.g. "Name Server:"',
 	];
 
-	/******************************************************************************************************************
-	 * Common functions                                                                                               *
-	 ******************************************************************************************************************/
+	protected const MONITORING_TARGET_REGISTRY  = 'registry';
+	protected const MONITORING_TARGET_REGISTRAR = 'registrar';
 
-	protected function createRsmhostProbeHosts(?string $rsmhost, ?string $probe, array $hostGroupIds, array $templateIds)
-	{
-		// TODO: sanity checks
+	/**
+	 * Creates "<rsmhost> <probe>" hosts when either new rsmhost or new probe is created.
+	 */
+	protected function createRsmhostProbeHosts(array $rsmhostConfigs, array $probeConfigs, array $hostGroupIds, array $templateIds) {
+		// get missing host group ids
 
-		$rsmhostConfigs = $this->getRsmhostConfigs($rsmhost);
-		$probeConfigs = $this->getProbeConfigs($probe);
-
-		$hostGroupIds = array_merge(
-			$hostGroupIds,
-			$this->getHostGroupIds(array_keys($probeConfigs))
+		$missingHostGroups = array_merge(
+			array_diff(
+				array_map(fn($rsmhost) => 'TLD ' . $rsmhost, array_keys($rsmhostConfigs)),
+				array_keys($hostGroupIds)
+			),
+			array_diff(
+				array_keys($probeConfigs),
+				array_keys($hostGroupIds)
+			)
 		);
-		$templateIds = array_merge(
-			$templateIds,
-			$this->getTemplateIds(array_map(fn($probe) => 'Template Probe Config ' . $probe, array_keys($probeConfigs)))
+		$hostGroupIds += $this->getHostGroupIds($missingHostGroups);
+
+		// get missing template ids
+
+		$missingTemplates = array_merge(
+			array_diff(
+				array_map(fn($rsmhost) => 'Template Rsmhost Config ' . $rsmhost, array_keys($rsmhostConfigs)),
+				array_keys($templateIds)
+			),
+			array_diff(
+				array_map(fn($probe) => 'Template Probe Config ' . $probe, array_keys($probeConfigs)),
+				array_keys($templateIds)
+			)
 		);
+		$templateIds += $this->getTemplateIds($missingTemplates);
+
+		// create configs for hosts
+
+		$configs = [];
 
 		foreach ($rsmhostConfigs as $rsmhost => $rsmhostConfig)
 		{
 			foreach ($probeConfigs as $probe => $probeConfig)
 			{
-				$config = $this->createRsmhostProbeHostConfig($hostGroupIds, $templateIds, $rsmhost, $rsmhostConfig['tldType'], $probe, $probeConfig['proxy_hostid']);
-				$data = API::Host()->create($config);
-				print_r($data);
+				$configs[] = [
+					'host'         => $rsmhost . ' ' . $probe,
+					'status'       => HOST_STATUS_MONITORED,
+					'proxy_hostid' => $probeConfig['proxy_hostid'],
+					'interfaces'   => [self::DEFAULT_MAIN_INTERFACE],
+					'groups'       => $this->getRsmhostProbeHostGroupsConfig($hostGroupIds, $rsmhostConfig['tldType'], $probe, $rsmhost),
+					'templates'    => $this->getRsmhostProbeTemplatesConfig($templateIds, $probe, $rsmhost),
+				];
 			}
 		}
+
+		// create hosts
+
+		$hosts = [];
+
+		if (!empty($configs))
+		{
+			$data = API::Host()->create($configs);
+			$hosts = array_combine($data['hostids'], array_column($configs, 'host'));
+		}
+
+		return $hosts;
 	}
 
-	protected function updateRsmhostProbeHosts(?string $rsmhost, ?string $probe, array $hostGroupIds, array $templateIds)
-	{
-		// TODO: sanity checks
+	/**
+	 * Updates "<rsmhost> <probe>" hosts when tldType of existing rsmhost is modified.
+	 */
+	protected function updateRsmhostProbeHosts(array $rsmhostConfigs, array $probeConfigs, array $hostGroupIds) {
+		// get missing host group ids
 
-		$rsmhostConfigs = $this->getRsmhostConfigs($rsmhost);
-		$probeConfigs = $this->getProbeConfigs($probe);
+		$missingHostGroups = array_merge(
+			array_diff(
+				array_map(fn($rsmhost) => 'TLD ' . $rsmhost, array_keys($rsmhostConfigs)),
+				array_keys($hostGroupIds)
+			),
+			array_diff(
+				array_keys($probeConfigs),
+				array_keys($hostGroupIds)
+			)
+		);
+		$hostGroupIds += $this->getHostGroupIds($missingHostGroups);
 
-		$hostGroupIds = array_merge(
-			$hostGroupIds,
-			$this->getHostGroupIds(array_keys($probeConfigs))
-		);
-		$templateIds = array_merge(
-			$templateIds,
-			$this->getTemplateIds(array_map(fn($probe) => 'Template Probe Config ' . $probe, array_keys($probeConfigs)))
-		);
+		// create list of hosts, get hostids
+
+		$hosts = [];
 
 		foreach ($rsmhostConfigs as $rsmhost => $rsmhostConfig)
 		{
 			foreach ($probeConfigs as $probe => $probeConfig)
 			{
-				$config = $this->createRsmhostProbeHostConfig($hostGroupIds, $templateIds, $rsmhost, $rsmhostConfig['tldType'], $probe, $probeConfig['proxy_hostid']);
-				$config['hostid'] = $this->getHostId($config['host']);
-				$data = API::Host()->update($config);
+				$hosts[] = $rsmhost . ' ' . $probe;
 			}
+		}
+
+		$hostids = $this->getHostIds($hosts);
+		$hosts = array_flip($hostids);
+
+		// create configs for hosts
+
+		$configs = [];
+
+		foreach ($rsmhostConfigs as $rsmhost => $rsmhostConfig)
+		{
+			foreach ($probeConfigs as $probe => $probeConfig)
+			{
+				$configs[] = [
+					'hostid' => $hostids[$rsmhost . ' ' . $probe],
+					'groups' => $this->getRsmhostProbeHostGroupsConfig($hostGroupIds, $rsmhostConfig['tldType'], $probe, $rsmhost),
+				];
+			}
+		}
+
+		// update hosts
+
+		if (!empty($configs))
+		{
+			$data = API::Host()->update($configs);
+		}
+
+		return $hosts;
+	}
+
+	private function getRsmhostProbeHostGroupsConfig(array $hostGroupIds, string $tldType, string $probe, string $rsmhost) {
+		return [
+			['groupid' => $hostGroupIds['TLD Probe results']],
+			['groupid' => $hostGroupIds[$tldType . ' Probe results']],
+			['groupid' => $hostGroupIds[$probe]],
+			['groupid' => $hostGroupIds['TLD ' . $rsmhost]],
+		];
+	}
+
+	private function getRsmhostProbeTemplatesConfig(array $templateIds, string $probe, string $rsmhost) {
+		$templates = [];
+
+		if ($this->getMonitoringTarget() === self::MONITORING_TARGET_REGISTRY)
+		{
+			$templates[] = ['templateid' => $templateIds['Template DNS Test']];
+		}
+
+		$templates[] = ['templateid' => $templateIds['Template RDAP Test']];
+		$templates[] = ['templateid' => $templateIds['Template RDDS Test']];
+		$templates[] = ['templateid' => $templateIds['Template Probe Config ' . $probe]];
+		$templates[] = ['templateid' => $templateIds['Template Rsmhost Config ' . $rsmhost]];
+
+		return $templates;
+	}
+
+	/**
+	 * Enables and disables items in "<rsmhost>" and "<rsmhost> <probe>" hosts.
+	 */
+	protected function updateServiceItemStatus(array $statusHosts, array $testHosts, array $templateIds, array $rsmhostConfigs, array $probeConfigs) {
+		$hosts = $statusHosts + $testHosts;
+
+		// get template items
+
+		$config = [
+			'output' => ['key_', 'hostid'],
+			'hostids' => [
+				$templateIds['Template DNS Test'],
+				$templateIds['Template RDAP Test'],
+				$templateIds['Template RDDS Test'],
+			],
+		];
+		if (!empty($statusHosts))
+		{
+			$config['hostids'] = array_merge(
+				$config['hostids'],
+				[
+					$templateIds['Template DNS Status'],
+					$templateIds['Template DNSSEC Status'],
+					$templateIds['Template RDAP Status'],
+					$templateIds['Template RDDS Status'],
+				]
+			);
+		}
+		$data = API::Item()->get($config);
+
+		$templates = array_flip($templateIds);
+
+		$templateItems = []; // [host => [key1, key2, ...], ...]
+
+		foreach ($data as $item)
+		{
+			$templateItems[$templates[$item['hostid']]][] = $item['key_'];
+		}
+
+		// get host items
+
+		$config = [
+			'output'  => ['itemid', 'key_', 'status', 'hostid'],
+			'hostids' => array_keys($hosts),
+		];
+		$data = API::Item()->get($config);
+
+		// group host items by host and status
+
+		$hostItems = [];
+
+		foreach ($data as $item)
+		{
+			$itemid = $item['itemid'];
+			$key    = $item['key_'];
+			$status = $item['status'];
+			$host   = $hosts[$item['hostid']];
+
+			if ($status != ITEM_STATUS_ACTIVE && $status != ITEM_STATUS_DISABLED)
+			{
+				throw new Exception("Unexpected item status");
+			}
+
+			$hostItems[$host][$key] = [
+				'itemid' => $itemid,
+				'status' => $status,
+			];
+		}
+
+		// enable/disable items
+
+		$config = [];
+
+		foreach ($statusHosts as $hostid => $host)
+		{
+			$status = $rsmhostConfigs[$host]['dnssec'] ? ITEM_STATUS_ACTIVE : ITEM_STATUS_DISABLED;
+			$config += $this->getItemStatusConfig($hostItems[$host], $templateItems['Template DNSSEC Status'], $status);
+
+			if ($this->isStandaloneRdap())
+			{
+				$status = $rsmhostConfigs[$host]['rdap'] ? ITEM_STATUS_ACTIVE : ITEM_STATUS_DISABLED;
+				$config += $this->getItemStatusConfig($hostItems[$host], $templateItems['Template RDAP Status'], $status);
+
+				$status = $rsmhostConfigs[$host]['rdds'] ? ITEM_STATUS_ACTIVE : ITEM_STATUS_DISABLED;
+				$config += $this->getItemStatusConfig($hostItems[$host], $templateItems['Template RDDS Status'], $status);
+			}
+			else
+			{
+				$status = ITEM_STATUS_DISABLED;
+				$config += $this->getItemStatusConfig($hostItems[$host], $templateItems['Template RDAP Status'], $status);
+
+				$status = $rsmhostConfigs[$host]['rdap'] || $rsmhostConfigs[$host]['rdds'] ? ITEM_STATUS_ACTIVE : ITEM_STATUS_DISABLED;
+				$config += $this->getItemStatusConfig($hostItems[$host], $templateItems['Template RDDS Status'], $status);
+			}
+
+			foreach ($testHosts as $hostid => $host)
+			{
+				list ($rsmhost, $probe) = explode(' ', $host);
+
+				$status = $rsmhostConfigs[$rsmhost]['rdap'] && $probeConfigs[$probe]['rdap'] ? ITEM_STATUS_ACTIVE : ITEM_STATUS_DISABLED;
+				$config += $this->getItemStatusConfig($hostItems[$host], $templateItems['Template RDAP Test'], $status);
+
+				$status = $rsmhostConfigs[$rsmhost]['rdds'] && $probeConfigs[$probe]['rdds'] ? ITEM_STATUS_ACTIVE : ITEM_STATUS_DISABLED;
+				$config += $this->getItemStatusConfig($hostItems[$host], $templateItems['Template RDDS Test'], $status);
+			}
+		}
+
+		if (!empty($config))
+		{
+			$data = API::Item()->update($config);
 		}
 	}
 
-	/******************************************************************************************************************
-	 * Probe and Rsmhost config getters                                                                               *
-	 ******************************************************************************************************************/
+	/**
+	 * Creates $config for enabling/disabling host items. Used in updateServiceItemStatus().
+	 *
+	 * @param array $items     list of all items
+	 * @param array $keys      list of keys that need to be updated
+	 * @param int   $newStatus new status
+	 *
+	 * @return array
+	 */
+	private function getItemStatusConfig(array $items, array $keys, int $newStatus): array {
+		$config = [];
 
-	protected function getProbeConfigs(?string $probe)
-	{
-		// TODO: add sanity checks
-		// TODO: include disabled objects (with all services disabled)
+		foreach ($keys as $key)
+		{
+			if ($items[$key]['status'] != $newStatus)
+			{
+				$itemid = $items[$key]['itemid'];
 
+				$config[$itemid] = [
+					'itemid' => $itemid,
+					'status' => $newStatus,
+				];
+			}
+		}
+
+		return $config;
+	}
+
+	/**
+	 * Returns monitoring target.
+	 */
+	protected function getMonitoringTarget() {
+		static $result = null;
+
+		if (is_null($result))
+		{
+			$data = API::UserMacro()->get([
+				'output'      => ['value'],
+				'globalmacro' => true,
+				'filter'      => ['macro' => self::MACRO_GLOBAL_MONITORING_TARGET],
+			]);
+
+			$result = $data[0]['value'];
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Returns status of Standalone RDAP.
+	 */
+	protected function isStandaloneRdap() {
+		static $result = null;
+
+		if (is_null($result))
+		{
+			$data = API::UserMacro()->get([
+				'output'      => ['value'],
+				'globalmacro' => true,
+				'filter'      => ['macro' => self::MACRO_GLOBAL_RDAP_STANDALONE],
+			]);
+
+			$ts = (int)$data[0]['value'];
+
+			$result = $ts && $_SERVER['REQUEST_TIME'] >= $ts;
+		}
+
+		return $result;
+	}
+
+	protected function getProbeConfigs() {
 		// get 'Probes' host group id
 		$hostGroupIds = $this->getHostGroupIds(['Probes']);
 
@@ -142,10 +412,6 @@ abstract class ActionBaseEx extends ActionBase
 		$data = API::Host()->get([
 			'output'   => ['host', 'proxy_hostid'],
 			'groupids' => [$hostGroupIds['Probes']],
-			'filter'   => [
-				'status' => HOST_STATUS_MONITORED,
-				'host'   => is_null($probe) ? [] : [$probe],
-			],
 		]);
 		$hosts = array_column($data, 'host', 'hostid');
 		$proxies = array_column($data, 'proxy_hostid', 'hostid');
@@ -187,11 +453,7 @@ abstract class ActionBaseEx extends ActionBase
 		return $result;
 	}
 
-	protected function getRsmhostConfigs(?string $rsmhost)
-	{
-		// TODO: add sanity checks
-		// TODO: include disabled objects (with all services disabled)
-
+	protected function getRsmhostConfigs() {
 		// get 'TLDs' host group id
 		$hostGroupIds = $this->getHostGroupIds(['TLDs']);
 
@@ -199,10 +461,6 @@ abstract class ActionBaseEx extends ActionBase
 		$data = API::Host()->get([
 			'output'   => ['host'],
 			'groupids' => [$hostGroupIds['TLDs']],
-			'filter'   => [
-				'status' => HOST_STATUS_MONITORED,
-				'host'   => is_null($rsmhost) ? [] : [$rsmhost],
-			],
 		]);
 		$hosts = array_column($data, 'host', 'hostid');
 
@@ -233,9 +491,10 @@ abstract class ActionBaseEx extends ActionBase
 		foreach ($hosts as $host)
 		{
 			$result[$host] = [
-				'tldType' => 'gTLD',                                                              // TODO: fill with real value; test what performs better - API::Host()->get() or API::HostGroup()->Get()
+				'tldType' => 'gTLD',                                                                                    // TODO: fill with real value; test what performs better - API::Host()->get() or API::HostGroup()->Get()
 				'dnsUdp'  => (bool)$macros[$host][self::MACRO_TLD_DNS_UDP_ENABLED],
 				'dnsTcp'  => (bool)$macros[$host][self::MACRO_TLD_DNS_TCP_ENABLED],
+				'dnssec'  => (bool)$macros[$host][self::MACRO_TLD_DNSSEC_ENABLED],
 				'rdap'    => (bool)$macros[$host][self::MACRO_TLD_RDAP_ENABLED],
 				'rdds'    => (bool)$macros[$host][self::MACRO_TLD_RDDS_ENABLED],
 			];
@@ -244,12 +503,10 @@ abstract class ActionBaseEx extends ActionBase
 		return $result;
 	}
 
-	/******************************************************************************************************************
-	 * API helpers                                                                                                    *
-	 ******************************************************************************************************************/
-
-	protected function createMacroConfig($macro, $value)
-	{
+	/**
+	 * Creates config array of a macro (macro, value, description).
+	 */
+	protected function createMacroConfig(string $macro, string $value) {
 		if (!array_key_exists($macro, self::MACRO_DESCRIPTIONS))
 		{
 			throw new Exception("Macro '$macro' does not have description");
@@ -262,33 +519,7 @@ abstract class ActionBaseEx extends ActionBase
 		];
 	}
 
-	protected function createRsmhostProbeHostConfig(array $hostGroupIds, array $templateIds, string $rsmhost, string $rsmhostType, string $probe, string $proxyHostId)
-	{
-		return [
-			'host'         => $rsmhost . ' ' . $probe,
-			'status'       => HOST_STATUS_MONITORED,
-			'proxy_hostid' => $proxyHostId,
-			'interfaces'   => [
-				self::DEFAULT_MAIN_INTERFACE,
-			],
-			'groups'       => [
-				['groupid' => $hostGroupIds['TLD Probe results']],
-				['groupid' => $hostGroupIds[$rsmhostType . ' Probe results']],
-				['groupid' => $hostGroupIds[$probe]],
-				['groupid' => $hostGroupIds['TLD ' . $rsmhost]],
-			],
-			'templates'    => [
-				['templateid' => $templateIds['Template DNS Test']],
-				['templateid' => $templateIds['Template RDAP Test']],
-				['templateid' => $templateIds['Template RDDS Test']],
-				['templateid' => $templateIds['Template Probe Config ' . $probe]],
-				['templateid' => $templateIds['Template Rsmhost Config ' . $rsmhost]],
-			],
-		];
-	}
-
-	protected function getHostsByHostGroup(string $hostGroup, ?string $host, ?array $additionalFields)
-	{
+	protected function getHostsByHostGroupId(int $hostGroupId, ?string $host, ?array $additionalFields) {
 		$outputFields = ['host'];
 
 		if (!is_null($additionalFields))
@@ -296,29 +527,67 @@ abstract class ActionBaseEx extends ActionBase
 			$outputFields = array_merge($outputFields, $additionalFields);
 		}
 
-		$hostGroupIds = $this->getHostGroupIds([$hostGroup]);
-
 		return API::Host()->get([
 			'output'   => $outputFields,
-			'groupids' => $hostGroupIds,
+			'groupids' => [$hostGroupId],
 			'filter'   => [
-				'host'   => is_null($host) ? [] : [$host],
+				'host' => is_null($host) ? [] : [$host],
 			],
 		]);
 	}
 
-	protected function getHostId(string $host)
-	{
-		$data = API::Host()->get([
-			'output' => ['hostid'],
-			'filter' => ['host' => $host],
-		]);
-
-		return $data[0]['hostid'];
+	protected function getHostsByHostGroup(string $hostGroup, ?string $host, ?array $additionalFields) {
+		return $this->getHostsByHostGroupId($this->getHostGroupId($hostGroup), $hostGroup, $additionalFields);
 	}
 
-	protected function getHostGroupIds(array $hostGroupNames)
-	{
+	protected function getHostsByTemplateId(int $templateId, ?string $host, ?array $additionalFields) {
+		$outputFields = ['host'];
+
+		if (!is_null($additionalFields))
+		{
+			$outputFields = array_merge($outputFields, $additionalFields);
+		}
+
+		return API::Host()->get([
+			'output'      => $outputFields,
+			'templateids' => [$templateId],
+			'filter'      => [
+				'host' => is_null($host) ? [] : [$host],
+			],
+		]);
+	}
+
+	protected function getHostsByTemplate(string $template, ?string $host, ?array $additionalFields) {
+		return $this->getHostsByTemplateId($this->getTemplateId($template), $host, $additionalFields);
+	}
+
+	protected function getHostIds(array $hosts) {
+		if (empty($hosts))
+		{
+			return [];
+		}
+
+		$data = API::Host()->get([
+			'output' => ['hostid', 'host'],
+			'filter' => ['host' => $hosts],
+		]);
+
+		$hostids = array_column($data, 'hostid', 'host');
+
+		return $hostids;
+	}
+
+	protected function getHostId(string $host) {
+		$hostids = $this->getHostIds([$host]);
+		return $hostids[$host];
+	}
+
+	protected function getHostGroupIds(array $hostGroupNames) {
+		if (empty($hostGroupNames))
+		{
+			return [];
+		}
+
 		$data = API::HostGroup()->get([
 			'output' => ['groupid', 'name'],
 			'filter' => ['name' => $hostGroupNames],
@@ -326,13 +595,20 @@ abstract class ActionBaseEx extends ActionBase
 
 		$hostGroupIds = array_column($data, 'groupid', 'name');
 
-		// TODO: check if all requested groups are found
-
 		return $hostGroupIds;
 	}
 
-	protected function getTemplateIds(array $templateHosts)
-	{
+	protected function getHostGroupId(string $hostGroup) {
+		$hostGroupIds = $this->getHostGroupIds([$hostGroup]);
+		return $hostGroupIds[$hostGroup];
+	}
+
+	protected function getTemplateIds(array $templateHosts) {
+		if (empty($templateHosts))
+		{
+			return [];
+		}
+
 		$data = API::Template()->get([
 			'output' => ['templateid', 'host'],
 			'filter' => ['host' => $templateHosts],
@@ -340,13 +616,36 @@ abstract class ActionBaseEx extends ActionBase
 
 		$templateIds = array_column($data, 'templateid', 'host');
 
-		// TODO: check if all requested templates are found
-
 		return $templateIds;
 	}
 
-	protected function getHostMacros(array $hosts, array $macros)
-	{
+	protected function getTemplateId(string $templateHost) {
+		$templateIds = $this->getTemplateIds([$templateHost]);
+		return $templateIds[$templateHost];
+	}
+
+	protected function getProxyIds(array $proxies) {
+		if (empty($proxies))
+		{
+			return [];
+		}
+
+		$data = API::Proxy()->get([
+			'output' => ['proxyid', 'host'],
+			'filter' => ['host' => $proxies],
+		]);
+
+		$proxyIds = array_column($data, 'proxyid', 'host');
+
+		return $proxyIds;
+	}
+
+	protected function getProxyId(string $proxy) {
+		$proxyIds = $this->getProxyIds([$proxy]);
+		return $proxyIds[$proxy];
+	}
+
+	protected function getHostMacros(array $hosts, array $macros) {
 		$data = API::UserMacro()->get([
 			'output'  => ['hostid', 'macro', 'value'],
 			'hostids' => array_keys($hosts),

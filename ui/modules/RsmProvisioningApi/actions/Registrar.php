@@ -5,20 +5,17 @@ namespace Modules\RsmProvisioningApi\Actions;
 use API;
 use Exception;
 
-class Registrar extends MonitoringTarget
-{
-	protected function checkMonitoringTarget()
-	{
+class Registrar extends MonitoringTarget {
+
+	protected function checkMonitoringTarget() {
 		return $this->getMonitoringTarget() == MONITORING_TARGET_REGISTRAR;
 	}
 
-	protected function getObjectIdInputField()
-	{
+	protected function getObjectIdInputField() {
 		return 'registrar';
 	}
 
-	protected function getInputRules(): array
-	{
+	protected function getInputRules(): array {
 		switch ($_SERVER['REQUEST_METHOD'])
 		{
 			case self::REQUEST_METHOD_GET:
@@ -62,26 +59,31 @@ class Registrar extends MonitoringTarget
 		}
 	}
 
-	protected function getObjects(?string $objectId)
-	{
-		// TODO: add sanity checks
-		// TODO: include disabled objects (with all services disabled)
+	/******************************************************************************************************************
+	 * Functions for retrieving object                                                                                *
+	 ******************************************************************************************************************/
+
+	protected function getObjects(?string $objectId) {
+		// get hosts
 
 		$data = $this->getHostsByHostGroup('TLDs', $objectId, ['info_1', 'info_2']);
-		$hosts = array_column($data, 'host', 'hostid');
-		$registrarNames = array_column($data, 'info_1', 'host');
-		$registrarFamilies = array_column($data, 'info_2', 'host');
 
-		if (empty($hosts))
+		if (empty($data))
 		{
 			return [];
 		}
 
+		$hosts = array_column($data, 'host', 'hostid');
+		$info1 = array_column($data, 'info_1', 'host');
+		$info2 = array_column($data, 'info_2', 'host');
+
 		// get templates
+
 		$templateNames = array_values(array_map(fn($host) => 'Template Rsmhost Config ' . $host, $hosts));
 		$templates = array_flip($this->getTemplateIds($templateNames));
 
 		// get template macros
+
 		$macros = $this->getHostMacros(
 			array_map(fn($host) => str_replace('Template Rsmhost Config ', '', $host), $templates),
 			[
@@ -97,14 +99,15 @@ class Registrar extends MonitoringTarget
 		);
 
 		// join data in a common data structure
+
 		$result = [];
 
 		foreach ($hosts as $host)
 		{
 			$result[] = [
 				'registrar'                     => $host,
-				'registrarName'                 => $registrarNames[$host],
-				'registrarFamily'               => $registrarFamilies[$host],
+				'registrarName'                 => $info1[$host],
+				'registrarFamily'               => $info2[$host],
 				'servicesStatus'                => [
 					[
 						'service'               => 'rdap',
@@ -130,20 +133,32 @@ class Registrar extends MonitoringTarget
 		return $result;
 	}
 
-	protected function createObject()
-	{
+	/******************************************************************************************************************
+	 * Functions for creating object                                                                                  *
+	 ******************************************************************************************************************/
+
+	protected function createObject() {
 	}
 
-	protected function updateObject()
-	{
+	/******************************************************************************************************************
+	 * Functions for updating object                                                                                  *
+	 ******************************************************************************************************************/
+
+	protected function updateObject() {
 	}
 
-	protected function deleteObject()
-	{
+	/******************************************************************************************************************
+	 * Functions for deleting object                                                                                  *
+	 ******************************************************************************************************************/
+
+	protected function deleteObject() {
 	}
 
-	private function createTemplateConfig(array $input, array $hostGroupIds)
-	{
+	/******************************************************************************************************************
+	 * Helper functions                                                                                               *
+	 ******************************************************************************************************************/
+
+	private function createTemplateConfig(array $input, array $hostGroupIds) {
 		$services = array_column($input['servicesStatus'], 'enabled', 'service');
 
 		return [
@@ -168,21 +183,17 @@ class Registrar extends MonitoringTarget
 		];
 	}
 
-	private function createHostGroupConfig(array $input)
-	{
+	private function createHostGroupConfig(array $input) {
 		return [
 			'name' => 'TLD ' . $input['tld'],
 		];
 	}
 
-	private function createTldHostConfig(array $input, array $hostGroupIds, array $templateIds)
-	{
+	private function createTldHostConfig(array $input, array $hostGroupIds, array $templateIds) {
 		return [
 			'host'         => $input['registrar'],
 			'status'       => HOST_STATUS_MONITORED,
-			'interfaces'   => [
-				self::DEFAULT_MAIN_INTERFACE,
-			],
+			'interfaces'   => [self::DEFAULT_MAIN_INTERFACE],
 			'groups'       => [
 				['groupid' => $hostGroupIds['TLDs']],
 				['groupid' => $hostGroupIds['gTLD']],

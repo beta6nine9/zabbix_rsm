@@ -236,6 +236,7 @@ ui/.buildpath
 ui/.htpasswd
 ui/.idea
 ui/.project
+ui/nbproject
 ui/conf/zabbix.conf.php
 ui/images/general/*.db
 ui/images/general/tree/*.db
