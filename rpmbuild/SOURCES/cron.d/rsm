@@ -15,8 +15,8 @@ HOME=/tmp
 * * * * *  zabbix /opt/zabbix/scripts/slv/rsm.probe.online.pl        >> /var/log/zabbix/rsm.slv.err 2>&1
 
 0 1 1 * *  zabbix /opt/zabbix/scripts/disable-rdds-for-rdap-hosts.pl >> /var/log/zabbix/disable-rdds-for-rdap-hosts.err 2>&1
-0 15 1 * * zabbix /opt/zabbix/scripts/sla-monthly-status.pl          >> /var/log/zabbix/sla-monthly-status.err 2>&1
-0 15 1 * * zabbix /opt/zabbix/scripts/sla-report.php                 >> /var/log/zabbix/sla-report.err 2>&1
+0 15 7 * * zabbix /opt/zabbix/scripts/sla-monthly-status.pl          >> /var/log/zabbix/sla-monthly-status.err 2>&1
+0 15 7 * * zabbix /opt/zabbix/scripts/sla-report.php                 >> /var/log/zabbix/sla-report.err 2>&1
 
 0 23 * * * zabbix /opt/zabbix/scripts/MySQL_part_management.pl       >> /var/log/zabbix/zabbix-mysql-partitioning 2>&1
 0 2 * * *  zabbix /opt/zabbix/scripts/MySQL_part_management.pl       >> /var/log/zabbix/zabbix-mysql-partitioning 2>&1
