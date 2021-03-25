@@ -1,7 +1,9 @@
 Changes for rsm2.0.4
 
-Bug fixes:
+New features:
 ....I..... [779] added script sla-reports-to-files.pl that exports monthly reports from the database to files (dimir)
+
+Bug fixes:
 ....I..... [780] allowed non-unique values in falsePositiveChanges.csv and let export.pl skip cycles that are missing Rolling Week value (dimir)
 ....I..... [778] included TLDs that were created during previous month when generating the report and end-of-month alerts (asitals)
 
