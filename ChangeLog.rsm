@@ -135,6 +135,16 @@ New features:
 ..F.I..PS. [599] implemented DNS Monitoring Reboot (asitals, dimir, gcalenko, kalimulin)
 
 --------------------------------------------------------------------------------
+Changes for rsm2.0.4
+
+New features:
+....I..... [779] added script sla-reports-to-files.pl that exports monthly reports from the database to files (dimir)
+
+Bug fixes:
+....I..... [780] allowed non-unique values in falsePositiveChanges.csv and let export.pl skip cycles that are missing Rolling Week value (dimir)
+....I..... [778] included TLDs that were created during previous month when generating the report and end-of-month alerts (asitals)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.0.3
 
 New features:

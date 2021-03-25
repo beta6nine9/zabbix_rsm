@@ -43,7 +43,7 @@ sub main()
 
 	my $slrs = get_slrs();
 
-	my ($items, $itemids_float, $itemids_uint) = get_items($slrs, $from);
+	my ($items, $itemids_float, $itemids_uint) = get_items($slrs, $till);
 
 	my $data_uint  = get_data($itemids_uint , "history_uint", $from, $till);
 	my $data_float = get_data($itemids_float, "history"     , $from, $till);
@@ -229,7 +229,7 @@ sub get_slrs()
 sub get_items($$)
 {
 	my $slr  = shift;
-	my $from = shift;
+	my $till = shift;
 
 	my $monitoring_target = get_monitoring_target();
 
@@ -244,7 +244,7 @@ sub get_items($$)
 				" left join hosts_groups on hosts_groups.hostid = hosts.hostid" .
 			" where (items.key_ in (?, ?, ?, ?, ?, ?, ?) or items.key_ like ?) and" .
 				" hosts_groups.groupid = ? and" .
-				" hosts.created < ?";
+				" hosts.created <= ?";
 
 		$params = [
 			SLV_ITEM_KEY_DNS_DOWNTIME,
@@ -256,7 +256,7 @@ sub get_items($$)
 			SLV_ITEM_KEY_RDAP_PFAILED,
 			SLV_ITEM_KEY_DNS_NS_DOWNTIME,
 			TLDS_GROUPID,
-			$from,
+			$till,
 		];
 	}
 	elsif ($monitoring_target eq MONITORING_TARGET_REGISTRAR)
@@ -267,7 +267,7 @@ sub get_items($$)
 				" left join hosts_groups on hosts_groups.hostid = hosts.hostid" .
 			" where items.key_ in (?, ?, ?, ?) and" .
 				" hosts_groups.groupid = ? and" .
-				" hosts.created < ?";
+				" hosts.created <= ?";
 
 		$params = [
 			SLV_ITEM_KEY_RDDS_DOWNTIME,
@@ -275,7 +275,7 @@ sub get_items($$)
 			SLV_ITEM_KEY_RDAP_DOWNTIME,
 			SLV_ITEM_KEY_RDAP_PFAILED,
 			TLDS_GROUPID,
-			$from,
+			$till,
 		];
 	}
 	else
