@@ -857,7 +857,7 @@ sub __get_test_data
 			{
 				if (!$cycles->{$cycleclock})
 				{
-					__no_cycle_result($service, $cycleclock);
+					__no_cycle_result(uc($service) . " Service Availability", "rsm.slv.$service.avail", $cycleclock);
 					next;
 				}
 			}
@@ -982,7 +982,13 @@ sub __save_csv_data
 			{
 				if (!defined($cycle_ref->{'status'}))
 				{
-					__no_cycle_result($service, $cycleclock);
+					__no_cycle_result(uc($service) . " Service Availability", "rsm.slv.$service.avail", $cycleclock);
+					next;
+				}
+
+				if (!defined($cycle_ref->{'rollweek'}))
+				{
+					__no_cycle_result(uc($service) . " Rolling Week", "rsm.slv.$service.rollweek", $cycleclock);
 					next;
 				}
 			}
@@ -2450,18 +2456,18 @@ sub get_readable_tld
 # todo: taken from RSMSLV.pm
 # NB! THIS IS FIXED VERSION WHICH MUST REPLACE EXISTING ONE
 # (improved log message)
-sub __no_cycle_result
+sub __no_cycle_result($$$)
 {
-	my $service = shift;
+	my $name  = shift;
+	my $key   = shift;
 	my $clock = shift;
-	my $details = shift;
 
-	wrn(uc($service), " service availability result is missing for timestamp ", ts_full($clock), ".",
+	wrn("$name result is missing for timestamp ", ts_full($clock), ".",
 		" This means that either script was not executed or Zabbix server was",
 		" not running at that time. In order to fix this problem please connect",
 		" to appropriate server (check @<server_key> in the beginning of this message)",
 		" and run the following command:");
-	wrn("/opt/zabbix/scripts/slv/rsm.slv." . lc($service) . ".avail.pl --now $clock");
+	wrn("/opt/zabbix/scripts/slv/$key.pl --now $clock");
 }
 
 __END__

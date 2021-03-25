@@ -968,7 +968,6 @@ $columns = 4;
 	'"incidentID" is an integer',
 	'"incidentChangeDateTime" is a timestamp',
 	'"incidentChangeDateTime" is from requested period',
-	'"incidentChangeDateTime" contains unique values',
 	'"incidentChangeDateTime" is greater than "incidents" "incidentStartTime" if "falsePositiveChanges" "incidentID" matches "incidents" "incidentID"',
 	'"incidentStatus" is an integer'
 );
@@ -996,9 +995,8 @@ elsif (open_file(\$file, $files{$name}))
 		$no_fails[0] &&= $row->[0] =~ INT;
 		$no_fails[1] &&= $row->[1] =~ TIME;
 		$no_fails[2] &&= fromperiod($row->[1]);
-		$no_fails[3] &&= unique(1, $row);
-		$no_fails[4] &&= after($row->[1], $incident->{'incidentStartTime'}) if ($incident);
-		$no_fails[5] &&= $row->[2] =~ INT;
+		$no_fails[3] &&= after($row->[1], $incident->{'incidentStartTime'}) if ($incident);
+		$no_fails[4] &&= $row->[2] =~ INT;
 
 		if (!everything_ok($wrong_columns, \@no_fails) && $fail_immediately)
 		{
@@ -1073,13 +1071,6 @@ if (open_file(\$file, $files{$name}))
 		$no_fails[ 4] &&= ($row->[2] =~ DEC || $row->[6] == $NS_id); # cycleEmergencyThreshold is not implemented for service category "NS"
 		$no_fails[ 5] &&= $row->[3] =~ INT;
 		$no_fails[ 6] &&= exists($statusMaps_id{$row->[3]});
-
-		if (!$no_fails[4])
-		{
-			print("DIMBUG NS_id=$NS_id servcat=", $row->[6], ": ", join(',', @{$row}), "\n");
-			exit 1;
-		}
-		
 		$no_fails[ 7] &&= $row->[4] =~ INT || empty($row->[4]);
 		$no_fails[ 8] &&= $row->[5] =~ INT;
 		$no_fails[ 9] &&= exists($tlds_id{$row->[5]});

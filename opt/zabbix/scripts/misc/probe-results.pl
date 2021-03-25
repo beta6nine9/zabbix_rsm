@@ -13,15 +13,14 @@ use warnings;
 use RSM;
 use RSMSLV;
 
-parse_opts('tld=s', 'probe=s', 'from=n', 'till=n');
-
 setopt('nolog');
 setopt('dry-run');
 
+parse_opts('tld=s', 'probe=s', 'from=n', 'till=n');
+
 if (!opt('tld'))
 {
-	print("usage: $0 --tld <tld> [--from <from> --till <till> --probe <probe>]\n");
-	exit(1);
+	usage("\"--tld\" has to be specified");
 }
 
 $tld = getopt('tld');
@@ -149,3 +148,55 @@ foreach my $probe (@probes)
 }
 
 db_disconnect();
+
+__END__
+
+=head1 NAME
+
+probe-results.pl - show results from Probes
+
+=head1 SYNOPSIS
+
+probe-results.pl --tld <tld> [--from <clock>] [--till <clock>] [--probe <probe>]
+
+=head1 OPTIONS
+
+=over 8
+
+=item B<--tld> tld
+
+Specify TLD.
+
+=item B<--from> clock
+
+Specify unix timestamp to show results from. If not specified the starting point will be 2 RDDS cycles back.
+
+=item B<--till> clock
+
+Specify unix timestamp to show results till. If not specified the ending point will be 2 RDDS cycles back.
+
+=item B<--probe> probe
+
+Specify Probe.
+
+=item B<--debug>
+
+Run the script in debug mode. This means printing more information.
+
+=item B<--help>
+
+Print a brief help message and exit.
+
+=back
+
+=head1 DESCRIPTION
+
+B<This program> will change the delay between particuar test in the system.
+
+=head1 EXAMPLES
+
+./probe-results.pl --tld tld1
+
+This will display probe results from pre-previous RDDS cycle.
+
+=cut
