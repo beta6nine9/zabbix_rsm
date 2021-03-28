@@ -88,12 +88,12 @@ sub main()
 	{
 		update_rsmhost_config_times(getopt('tld'));
 
-		my $tld_config_templateid = get_template_id(TEMPLATE_RSMHOST_CONFIG_PREFIX . getopt('tld'));
-		my $dns_config_templateid = get_template_id(TEMPLATE_RSMHOST_DNS_TEST_PREFIX . getopt('tld'));
+		my $config_templateid   = get_template_id(TEMPLATE_RSMHOST_CONFIG_PREFIX . getopt('tld'));
+		my $dns_test_templateid = get_template_id(TEMPLATE_RSMHOST_DNS_TEST_PREFIX . getopt('tld'));
 
 		my $tld_hostid = get_host(getopt('tld'), false)->{'hostid'};	# no host groups
 
-		update_ns_servers($tld_config_templateid, $dns_config_templateid, $tld_hostid, getopt('tld'));
+		update_ns_servers($config_templateid, $dns_test_templateid, $tld_hostid, getopt('tld'));
 	}
 	elsif (opt('delete'))
 	{
@@ -827,14 +827,14 @@ sub add_new_tld($)
 
 	update_root_server_macros(getopt('root-servers'));
 
-	my $tld_config_templateid = create_rsmhost_template(getopt('tld'));
-	my $dns_config_templateid = create_rsmhost_dns_test_template(getopt('tld'));
+	my $config_templateid   = create_rsmhost_template(getopt('tld'));
+	my $dns_test_templateid = create_rsmhost_dns_test_template(getopt('tld'));
 
 	my $rsmhost_groupid = really(create_group('TLD ' . getopt('tld')));
 
-	create_rsmhost($tld_config_templateid, $dns_config_templateid, getopt('tld'), getopt('type'));
+	create_rsmhost($config_templateid, $dns_test_templateid, getopt('tld'), getopt('type'));
 
-	create_tld_hosts_on_probes($rsmhost_groupid, $tld_config_templateid, $proxies);
+	create_tld_hosts_on_probes($rsmhost_groupid, $config_templateid, $dns_test_templateid, $proxies);
 }
 
 sub create_dns_ns_downtime_trigger($$$$$$$)
@@ -896,21 +896,21 @@ sub create_dependent_trigger_chain($$$$$$)
 	}
 }
 
-sub get_nsip_list_from_opt()
+sub get_nsip_list_from_opts()
 {
 	my @list = ();
 
 	push(@list, split(/\s+/, getopt('ns-servers-v4'))) if (opt('ipv4') && getopt('ns-servers-v4'));
 	push(@list, split(/\s+/, getopt('ns-servers-v6'))) if (opt('ipv6') && getopt('ns-servers-v6'));
 
-	my @invalid = grep {!/.+,.+/} @list;
+	my @invalid = grep {!/^[^,]+,[^,]+$/} @list;
 	if (@invalid)
 	{
 		my $invalid = join(', ', map("\"$_\"", @invalid));
 		pfail("incorrect Name Server format: expected \"<NAME>,<IP>\" got " . $invalid);
 	}
 
-	@list = keys(%{{map { $_ => undef } @list}}); # uniq
+	@list = uniq(@list);
 
 	return @list;
 }
@@ -952,74 +952,182 @@ sub sort_nsip($$)
 }
 
 # https://metacpan.org/source/ZMIJ/Array-Utils-0.5/Utils.pm
-sub array_minus(\@\@) {
+sub array_minus(\@\@)
+{
 	my %e = map{ $_ => undef } @{$_[1]};
 	return grep( ! exists( $e{$_} ), @{$_[0]} );
 }
 
+sub uniq
+{
+	return keys(%{{map { $_ => undef } @_}});
+}
+
 sub update_ns_servers($$$$)
 {
-	my $tld_config_templateid = shift;
-	my $dns_config_templateid = shift;
-	my $tld_hostid            = shift;
-	my $tld_host              = shift;
+	my $config_templateid   = shift;
+	my $dns_test_templateid = shift;
+	my $tld_hostid          = shift;
+	my $tld_host            = shift;
 
-	my @opt_nsip_list   = get_nsip_list_from_opt();
-	my @macro_nsip_list = get_nsip_list_from_macro($tld_config_templateid);
+	my $dns_test_item = get_items_like($dns_test_templateid, 'rsm.dns[', 1);
+	my $dns_test_itemid = [values(%{$dns_test_item})]->[0]{'itemid'};
 
-	my @create  = sort(sort_nsip array_minus(@opt_nsip_list, @macro_nsip_list));
-	my @disable = sort(sort_nsip array_minus(@macro_nsip_list, @opt_nsip_list));
+	my @opt_nsip_list   = get_nsip_list_from_opts();
+	my @macro_nsip_list = get_nsip_list_from_macro($config_templateid);
+	my @opt_ns_list     = uniq(map(substr($_, 0, index($_, ',')), @opt_nsip_list));
+	my @macro_ns_list   = uniq(map(substr($_, 0, index($_, ',')), @macro_nsip_list));
 
-	foreach my $nsip (@create)
+	my @nsip_create  = sort(sort_nsip array_minus(@opt_nsip_list, @macro_nsip_list));
+	my @nsip_disable = sort(sort_nsip array_minus(@macro_nsip_list, @opt_nsip_list));
+	my @ns_create    = sort(array_minus(@opt_ns_list, @macro_ns_list));
+	my @ns_disable   = sort(array_minus(@macro_ns_list, @opt_ns_list));
+
+	foreach my $nsip (@nsip_create)
 	{
 		my ($ns, $ip) = split(/,/, $nsip);
 
 		print("add\t: $ns ($ip)\n");
 
-		my $key = "rsm.slv.dns.ns.avail[$ns,$ip]";
+		# "DNS Status" items
 
-		really(create_item(
-			{
-				'name'       => "DNS NS \$1 (\$2) availability",
-				'key_'       => $key,
-				'status'     => ITEM_STATUS_ACTIVE,
-				'hostid'     => $tld_hostid,
-				'type'       => ITEM_TYPE_TRAPPER,
-				'value_type' => ITEM_VALUE_TYPE_UINT64,
-				'valuemapid' => RSM_VALUE_MAPPINGS->{'rsm_avail'},
-			}));
+		really(create_item({
+			'name'       => "DNS NS \$1 (\$2) availability",
+			'key_'       => "rsm.slv.dns.ns.avail[$ns,$ip]",
+			'status'     => ITEM_STATUS_ACTIVE,
+			'hostid'     => $tld_hostid,
+			'type'       => ITEM_TYPE_TRAPPER,
+			'value_type' => ITEM_VALUE_TYPE_UINT64,
+			'valuemapid' => RSM_VALUE_MAPPINGS->{'rsm_avail'},
+		}));
 
-		$key = "rsm.slv.dns.ns.downtime[$ns,$ip]";
+		my $key = "rsm.slv.dns.ns.downtime[$ns,$ip]";
 
-		really(create_item(
-			{
-				'name'       => "DNS minutes of \$1 (\$2) downtime",
-				'key_'       => $key,
-				'status'     => ITEM_STATUS_ACTIVE,
-				'hostid'     => $tld_hostid,
-				'type'       => ITEM_TYPE_TRAPPER,
-				'value_type' => ITEM_VALUE_TYPE_UINT64,
-			}));
+		really(create_item({
+			'name'       => "DNS minutes of \$1 (\$2) downtime",
+			'key_'       => $key,
+			'status'     => ITEM_STATUS_ACTIVE,
+			'hostid'     => $tld_hostid,
+			'type'       => ITEM_TYPE_TRAPPER,
+			'value_type' => ITEM_VALUE_TYPE_UINT64,
+		}));
 
 		create_dependent_trigger_chain($tld_host, $ns, $ip, $key, \&create_dns_ns_downtime_trigger,
 				RSM_TRIGGER_THRESHOLDS);
+
+		# "DNS Test" items
+
+		really(create_item({
+			'name'          => "DNS NSID of $ns,$ip",
+			'key_'          => "rsm.dns.nsid[$ns,$ip]",
+			'status'        => ITEM_STATUS_ACTIVE,
+			'hostid'        => $dns_test_templateid,
+			'type'          => ITEM_TYPE_DEPENDENT,
+			'master_itemid' => $dns_test_itemid,
+			'value_type'    => ITEM_VALUE_TYPE_STR,
+			'description'   => 'DNS Name Server Identifier of the target Name Server that was tested.',
+			'preprocessing' => [{
+				'type'                 => ZBX_PREPROC_JSONPATH,
+				'params'               => "\$.nsips[?(@.['ns'] == '$ns' && @.['ip'] == '$ip')].nsid.first()",
+				'error_handler'        => ZBX_PREPROC_FAIL_DISCARD_VALUE,
+				'error_handler_params' => '',
+			}],
+		}));
+
+		really(create_item({
+			'name'        => "DNS NS RTT of $ns,$ip using tcp",
+			'key_'        => "rsm.dns.rtt[$ns,$ip,tcp]",
+			'status'      => ITEM_STATUS_ACTIVE,
+			'hostid'      => $dns_test_templateid,
+			'type'        => ITEM_TYPE_DEPENDENT,
+			'master_itemid' => $dns_test_itemid,
+			'value_type'  => ITEM_VALUE_TYPE_FLOAT,
+			'valuemapid'  => RSM_VALUE_MAPPINGS->{'rsm_dns_rtt'},
+			'description' => 'The Round-Time Trip returned when testing specific IP of Name Server using TCP protocol.',
+			'preprocessing' => [{
+				'type'                 => ZBX_PREPROC_JSONPATH,
+				'params'               => "\$.nsips[?(@.['ns'] == '$ns' && @.['ip'] == '$ip' && @.['protocol'] == 'tcp')].rtt.first()",
+				'error_handler'        => ZBX_PREPROC_FAIL_DISCARD_VALUE,
+				'error_handler_params' => '',
+			}],
+		}));
+
+		really(create_item({
+			'name'        => "DNS NS RTT of $ns,$ip using udp",
+			'key_'        => "rsm.dns.rtt[$ns,$ip,udp]",
+			'status'      => ITEM_STATUS_ACTIVE,
+			'hostid'      => $dns_test_templateid,
+			'type'        => ITEM_TYPE_DEPENDENT,
+			'master_itemid' => $dns_test_itemid,
+			'value_type'  => ITEM_VALUE_TYPE_FLOAT,
+			'valuemapid'  => RSM_VALUE_MAPPINGS->{'rsm_dns_rtt'},
+			'description' => 'The Round-Time Trip returned when testing specific IP of Name Server using UDP protocol.',
+			'preprocessing' => [{
+				'type'                 => ZBX_PREPROC_JSONPATH,
+				'params'               => "\$.nsips[?(@.['ns'] == '$ns' && @.['ip'] == '$ip' && @.['protocol'] == 'udp')].rtt.first()",
+				'error_handler'        => ZBX_PREPROC_FAIL_DISCARD_VALUE,
+				'error_handler_params' => '',
+			}],
+		}));
 	}
 
-	if (@disable)
+	foreach my $ns (@ns_create)
 	{
-		my $items = really(get_items_like($tld_hostid, 'rsm.slv.dns.ns.', false));
+		really(create_item({
+			'name'          => "DNS Test: DNS NS status of $ns",
+			'key_'          => "rsm.dns.ns.status[$ns]",
+			'status'        => ITEM_STATUS_ACTIVE,
+			'hostid'        => $dns_test_templateid,
+			'type'          => ITEM_TYPE_DEPENDENT,
+			'master_itemid' => $dns_test_itemid,
+			'value_type'    => ITEM_VALUE_TYPE_FLOAT,
+			'valuemapid'    => RSM_VALUE_MAPPINGS->{'rsm_dns_rtt'},
+			'description'   => 'Status of Name Server: 0 (Down), 1 (Up). The Name Server is considered to be up if all its IPs returned successful RTTs.',
+			'preprocessing' => [{
+				'type'                 => ZBX_PREPROC_JSONPATH,
+				'params'               => "\$.nss[?(@.['ns'] == '$ns')].status.first()",
+				'error_handler'        => ZBX_PREPROC_FAIL_DISCARD_VALUE,
+				'error_handler_params' => '',
+			}],
+		}));
+	}
+
+	if (@nsip_disable || @ns_disable)
+	{
+		my $status_items = really(get_items_like($tld_hostid, 'rsm.slv.dns.ns.', 0));
+		my $test_items = really(get_items_like($dns_test_templateid, 'rsm.dns.', 0));
+
+		my %all_items = (
+			map({ $_->{'key_'} => $_->{'itemid'} } values(%{$status_items})),
+			map({ $_->{'key_'} => $_->{'itemid'} } values(%{$test_items})),
+		);
 
 		my @disable_items = ();
 
-		foreach my $nsip (@disable)
+		foreach my $nsip (@nsip_disable)
 		{
 			my ($ns, $ip) = split(/,/, $nsip);
 
 			print("disable\t: $ns ($ip)\n");
 
-			my @nsip_items = grep { $_->{'key_'} =~ /^rsm\.slv\.dns\.ns\.(avail|downtime)\[$ns,$ip\]$/ } values(%{$items});
+			my $key;
+			push(
+				@disable_items,
+				$all_items{$key = "rsm.slv.dns.ns.avail[$ns,$ip]"}    // pfail("item '$key' not found"),
+				$all_items{$key = "rsm.slv.dns.ns.downtime[$ns,$ip]"} // pfail("item '$key' not found"),
+				$all_items{$key = "rsm.dns.nsid[$ns,$ip]"}            // pfail("item '$key' not found"),
+				$all_items{$key = "rsm.dns.rtt[$ns,$ip,tcp]"}         // pfail("item '$key' not found"),
+				$all_items{$key = "rsm.dns.rtt[$ns,$ip,udp]"}         // pfail("item '$key' not found"),
+			);
+		}
 
-			push(@disable_items, map($_->{'itemid'}, @nsip_items));
+		foreach my $ns (@ns_disable)
+		{
+			my $key;
+			push(
+				@disable_items,
+				$all_items{$key = "rsm.dns.ns.status[$ns]"} // pfail("item '$key' not found"),
+			);
 		}
 
 		disable_items(\@disable_items);
@@ -1027,7 +1135,7 @@ sub update_ns_servers($$$$)
 
 	my $macro_value = join(' ', sort(sort_nsip @opt_nsip_list));
 
-	really(create_macro('{$RSM.DNS.NAME.SERVERS}', $macro_value, $tld_config_templateid, 1));
+	really(create_macro('{$RSM.DNS.NAME.SERVERS}', $macro_value, $config_templateid, 1));
 }
 
 sub create_rsmhost_template($)
@@ -1146,7 +1254,7 @@ sub create_rsmhost_dns_test_template($)
 {
 	my $rsmhost = shift;
 
-	my $templateid = really(create_template(TEMPLATE_RSMHOST_DNS_TEST_PREFIX . $rsmhost));
+	my $templateid = really(create_template(TEMPLATE_RSMHOST_DNS_TEST_PREFIX . $rsmhost, [DNS_TEST_TEMPLATEID]));
 
 	return $templateid;
 }
@@ -1430,10 +1538,10 @@ sub __is_rdap_standalone()
 
 sub create_rsmhost($$$$)
 {
-	my $tld_config_templateid = shift;
-	my $dns_config_templateid = shift;
-	my $tld_name              = shift;
-	my $tld_type              = shift;
+	my $config_templateid   = shift;
+	my $dns_test_templateid = shift;
+	my $tld_name            = shift;
+	my $tld_type            = shift;
 
 	my $tld_hostid = really(create_host({
 		'groups'     => [
@@ -1441,7 +1549,7 @@ sub create_rsmhost($$$$)
 			{'groupid' => TLD_TYPE_GROUPIDS->{$tld_type}}
 		],
 		'templates' => [
-			{'templateid' => $tld_config_templateid},
+			{'templateid' => $config_templateid},
 			{'templateid' => CONFIG_HISTORY_TEMPLATEID},
 			{'templateid' => DNS_STATUS_TEMPLATEID},
 			{'templateid' => DNSSEC_STATUS_TEMPLATEID},
@@ -1453,7 +1561,7 @@ sub create_rsmhost($$$$)
 		'interfaces' => [DEFAULT_MAIN_INTERFACE]
 	}));
 
-	update_ns_servers($tld_config_templateid, $dns_config_templateid, $tld_hostid, $tld_name);
+	update_ns_servers($config_templateid, $dns_test_templateid, $tld_hostid, $tld_name);
 
 	my $rsmhost_items = get_host_items($tld_hostid);
 
@@ -1477,9 +1585,10 @@ sub create_rsmhost($$$$)
 
 sub create_tld_hosts_on_probes($$$)
 {
-	my $rsmhost_groupid      = shift;
-	my $config_templateid    = shift;
-	my $proxies              = shift;
+	my $rsmhost_groupid     = shift;
+	my $config_templateid   = shift;
+	my $dns_test_templateid = shift;
+	my $proxies             = shift;
 
 	# TODO Revise this part because it is creating entities (e.g. "<Probe>", "<Probe> - mon" hosts) which should
 	# have been created already by preceeding probes.pl execution. At least move the code to one place and reuse it.
@@ -1548,7 +1657,7 @@ sub create_tld_hosts_on_probes($$$)
 			],
 			'templates' => [
 				{'templateid' => $config_templateid},
-				{'templateid' => DNS_TEST_TEMPLATEID},
+				{'templateid' => $dns_test_templateid},
 				{'templateid' => RDDS_TEST_TEMPLATEID},
 				{'templateid' => RDAP_TEST_TEMPLATEID},
 				{'templateid' => $probe_templateid},

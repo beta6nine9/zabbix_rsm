@@ -709,30 +709,40 @@ sub create_group
 
 sub create_template
 {
-	my $name = shift;
+	my $name               = shift;
+	my $linked_templateids = shift; # optional
 
 	my $templateid = $zabbix->exist('template', {'filter' => {'host' => $name}});
 
 	if ($templateid)
 	{
-		$zabbix->update(
-			'template',
-			{
-				'templateid' => $templateid,
-				'groups'     => {'groupid' => TEMPLATES_TLD_GROUPID},
-				'host'       => $name
-			}
-		);
+		my $config = {
+			'templateid' => $templateid,
+			'groups'     => {'groupid' => TEMPLATES_TLD_GROUPID},
+			'host'       => $name
+		};
+
+		if (defined($linked_templateids))
+		{
+			$config->{'templates'} = [map({'templateid' => $_}, @{$linked_templateids})];
+		}
+
+		$zabbix->update('template', $config);
 	}
 	else
 	{
-		my $result = $zabbix->create(
-			'template',
-			{
-				'groups'=> {'groupid' => TEMPLATES_TLD_GROUPID},
-				'host'  => $name
-			}
-		);
+		my $config = {
+			'groups'=> {'groupid' => TEMPLATES_TLD_GROUPID},
+			'host'  => $name
+		};
+
+		if (defined($linked_templateids))
+		{
+			$config->{'templates'} = [map({'templateid' => $_}, @{$linked_templateids})];
+		}
+
+		my $result = $zabbix->create('template', $config);
+
 		$templateid = $result->{'templateids'}[0];
 	}
 
