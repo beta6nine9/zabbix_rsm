@@ -153,18 +153,18 @@ foreach ($data['probes'] as $probe) {
 				$rdds = ZBX_STYLE_GREY;
 			}
 			else {
-				if (!isset($probe['value']) || $probe['value'] === null) {
+				if (!isset($probe['rdds']['status']) || $probe['rdds']['status'] === null) {
 					$rdds43 = $no_result;
 					$rdds80 = $no_result;
 					$rdds = ZBX_STYLE_GREY;
 					$probe_no_result = true;
 				}
 				else {
-					if ($probe['value'] == 0) {
+					if ($probe['rdds']['status'] == 0) {
 						$rdds = ZBX_STYLE_RED;
 						$probe_down = true;
 					}
-					elseif ($probe['value'] == 1) {
+					elseif ($probe['rdds']['status'] == 1) {
 						$rdds = ZBX_STYLE_GREEN;
 					}
 
@@ -186,19 +186,20 @@ foreach ($data['probes'] as $probe) {
 				}
 			}
 
+			// RDAP
 			if (isset($data['tld']['macros'][RSM_RDAP_TLD_ENABLED])
 					&& $data['tld']['macros'][RSM_RDAP_TLD_ENABLED] == 0) {
 				$rdap = $disabled;
 			}
-			elseif (!isset($probe['value']) || $probe['value'] === null) {
+			elseif (!isset($probe['rdap']['status']) || $probe['rdap']['status'] === null) {
 				$rdap = $no_result;
 			}
-			elseif ($probe['value'] == 0) {
+			elseif ($probe['rdap']['status'] == 0) {
 				$rdds = ZBX_STYLE_RED;
 				$probe_down = true;
 				$rdap = $down;
 			}
-			elseif ($probe['value'] == 1) {
+			elseif ($probe['rdap']['status'] == 1) {
 				if ($data['type'] == RSM_RDDS && $rdds !== ZBX_STYLE_RED) {
 					$rdds = ZBX_STYLE_GREEN;
 				}
@@ -221,8 +222,8 @@ foreach ($data['probes'] as $probe) {
 				$probe_no_result = false;
 			}
 			/**
-			 * Another exception: if RDDS is disabled at probe level, this is another case when we doesn't request data
-			 * and cannot distinguish when probe has no data and when it is disabled. So, ask help to macros.
+			 * Another exception: if RDDS is disabled at probe level, this is another case when we don't request
+			 * data and cannot distinguish when probe has no data and when it is disabled. So, let's use macros.
 			 *
 			 * Macros {$RSM.RDDS.ENABLED} is used to disable all 3 sub-services, so, if its 0, all three are displayed
 			 * as disabled.
@@ -488,13 +489,13 @@ if ($data['type'] == RSM_RDDS || $data['type'] == RSM_RDAP
 }
 
 if (in_array($data['type'], [RSM_RDDS, RSM_RDAP])) {
-	$test_result = $data['testResult'];
+	$test_result = $data['test_result'];
 }
 else {
-	if ($data['testResult'] === null) {
+	if ($data['test_result'] === null) {
 		$test_result = $no_result;
 	}
-	elseif ($data['testResult'] == PROBE_UP) {
+	elseif ($data['test_result'] == PROBE_UP) {
 		$test_result = $up;
 	}
 	else {

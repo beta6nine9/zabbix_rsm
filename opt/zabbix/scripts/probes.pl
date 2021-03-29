@@ -35,7 +35,7 @@ my $rv = GetOptions(\%OPTS,
 	"epp", "ipv4", "ipv6", "rdds", "rdap", "resolver=s",
 	"delete", "disable", "add", "rename",
 	"psk-identity=s", "psk=s",
-	"verbose", "force", "quiet", "help|?"
+	"debug", "force", "quiet", "help|?"
 );
 
 usage() if ($OPTS{'help'} or not $rv);
@@ -46,7 +46,7 @@ my $section = get_rsm_config()->{get_rsm_server_key($OPTS{'server-id'})};
 pfail("server-id \"", $OPTS{'server-id'}, "\" not found in configuration file") unless (defined($section));
 
 my $attempts = 3;
-RELOGIN: zbx_connect($section->{'za_url'}, $section->{'za_user'}, $section->{'za_password'}, $OPTS{'verbose'});
+RELOGIN: zbx_connect($section->{'za_url'}, $section->{'za_user'}, $section->{'za_password'}, $OPTS{'debug'});
 
 if ($OPTS{'delete'})
 {
@@ -594,9 +594,10 @@ Other options
 	--rename
 		rename existing probe to specified name in --new-name argument
 		(default: off)
-	--force
-		do not exit in case of failure, try to finish the task
-		(default: off)
+	--debug
+		print every Zabbix API request and response, useful for troubleshooting
+        --help
+                display this message
 
 Options for adding new probe. Argument --add.
 	--ip

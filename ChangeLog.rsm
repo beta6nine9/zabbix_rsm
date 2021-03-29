@@ -1,3 +1,26 @@
+Changes for rsm2.2.0rc6
+
+Bug fixes:
+....I..PS. [760] added support for new cycle status: Up-inconclusive-reconfig (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.2.0rc5
+
+Bug fixes:
+....I..... [773] fixed undefined subroutine error, path() from Path::Tiny (dimir)
+....I..... [770] changed --verbose option to --debug in both tld.pl and probes.pl (dimir)
+..F....... [771] fixed displaying RDDS/RDAP test status on details of particular test page (dimir)
+.......PS. [772] fixed handling of situation when there are no supported NS-IP pairs to test on the Probe node (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.2.0rc4
+
+Bug fixes:
+....I..... [766] fixed tld.pl error message when specifying --dns-minns (dimir)
+....I..... [765] fixed tld.pl --tld option when specified with --list-services (dimir)
+....I..... [767] fixed tld.pl "--disable --rdds" when RDAP is not standalone (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.2.0rc3
 
 Bug fixes:
@@ -110,6 +133,16 @@ Changes for rsm2.1.0rc1
 New features:
 ..F.I..PS. [554] upgraded Zabbix to 5.0.4 (asitals, dimir, gcalenko, kalimulin, miks)
 ..F.I..PS. [599] implemented DNS Monitoring Reboot (asitals, dimir, gcalenko, kalimulin)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.0.4
+
+New features:
+....I..... [779] added script sla-reports-to-files.pl that exports monthly reports from the database to files (dimir)
+
+Bug fixes:
+....I..... [780] allowed non-unique values in falsePositiveChanges.csv and let export.pl skip cycles that are missing Rolling Week value (dimir)
+....I..... [778] included TLDs that were created during previous month when generating the report and end-of-month alerts (asitals)
 
 --------------------------------------------------------------------------------
 Changes for rsm2.0.3

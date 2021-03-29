@@ -119,6 +119,14 @@ sub process_cycles($$$$)
 		my $from = $slv_clock;
 		my $till = $slv_clock + $cycle_delay - 1;
 
+		if (is_rsmhost_reconfigured($tld, $cycle_delay, $from))
+		{
+			push_value($tld, $slv_itemkey, $from, UP_INCONCLUSIVE_RECONFIG, ITEM_VALUE_TYPE_UINT64,
+				"Up (rsmhost has been reconfigured recently)");
+
+			next;
+		}
+
 		my $online_probe_count = scalar(@{online_probes($probes_ref, $from, $cycle_delay)});
 
 		if ($online_probe_count < $cfg_minonline)

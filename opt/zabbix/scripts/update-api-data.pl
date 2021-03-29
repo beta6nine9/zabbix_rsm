@@ -1046,12 +1046,15 @@ foreach (@server_keys)
 				}
 			}
 
-			if (ah_save_state(AH_SLA_API_VERSION_1, $ah_tld, $json_state_ref) != AH_SUCCESS)
+			if (ah_save_state(AH_SLA_API_VERSION_2, $ah_tld, $json_state_ref) != AH_SUCCESS)
 			{
 				fail("cannot save TLD state: ", ah_get_error());
 			}
 
-			if (ah_save_state(AH_SLA_API_VERSION_2, $ah_tld, $json_state_ref) != AH_SUCCESS)
+			# version 1 has no standalone RDAP
+			delete($json_state_ref->{'testedServices'}{'RDAP'});
+
+			if (ah_save_state(AH_SLA_API_VERSION_1, $ah_tld, $json_state_ref) != AH_SUCCESS)
 			{
 				fail("cannot save TLD state: ", ah_get_error());
 			}

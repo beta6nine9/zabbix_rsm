@@ -626,6 +626,7 @@ sub __get_test_data($$$)
 			my $cycleclock = cycle_start($clock, $delay);
 
 			# todo: later rewrite to use valuemap ID from item
+			$cycles->{$service}{$cycleclock}{'rawstatus'} = $value;
 			$cycles->{$service}{$cycleclock}{'status'} = get_result_string($cfg_avail_valuemaps, $value);
 		}
 
@@ -714,7 +715,7 @@ sub __get_test_data($$$)
 			{
 				if (!exists($cycles->{$service}{$cycleclock}))
 				{
-					__no_cycle_result($service, $cycleclock);
+					__no_cycle_result(uc($service) . " Service Availability", "rsm.slv.$service.avail", $cycleclock);
 					next;
 				}
 
@@ -826,7 +827,13 @@ sub __save_csv_data($$)
 
 			if (!defined($cycle_ref->{'status'}))
 			{
-				__no_cycle_result($service, $cycleclock);
+				__no_cycle_result(uc($service) . " Service Availability", "rsm.slv.$service.avail", $cycleclock);
+				next;
+			}
+
+			if (!defined($cycle_ref->{'rollweek'}))
+			{
+				__no_cycle_result(uc($service) . " Rolling Week", "rsm.slv.$service.rollweek", $cycleclock);
 				next;
 			}
 
@@ -921,7 +928,7 @@ sub __save_csv_data($$)
 							$test_type_id,
 							'',
 							$testedname_id,
-						]);
+						]) unless ($cycle_ref->{'rawstatus'} == UP_INCONCLUSIVE_RECONFIG);
 					}
 
 					foreach my $target (sort(keys(%{$cycle_ref->{'interfaces'}{$interface}{'probes'}{$probe}{'targets'}})))
@@ -942,7 +949,7 @@ sub __save_csv_data($$)
 								$test_type_id,
 								dw_get_id(ID_TARGET, $target),
 								$testedname_id,
-							]);
+							]) unless ($cycle_ref->{'rawstatus'} == UP_INCONCLUSIVE_RECONFIG);
 						}
 						else
 						{
@@ -1010,7 +1017,7 @@ sub __save_csv_data($$)
 									      $cycle_ns_id // '',
 									      $tld_type_id,
 									      $nsid_id
-							]);
+							]) unless ($cycle_ref->{'rawstatus'} == UP_INCONCLUSIVE_RECONFIG);
 
 							if ($ip)
 							{
@@ -1036,7 +1043,7 @@ sub __save_csv_data($$)
 									      dw_get_id(ID_STATUS_MAP, $target_status),
 									      $tld_type_id,
 									      $protocol_id
-								]);
+								]) unless ($cycle_ref->{'rawstatus'} == UP_INCONCLUSIVE_RECONFIG);
 						}
 					}
 				}
@@ -1053,6 +1060,7 @@ sub __save_csv_data($$)
 
 							if ($cycle_ref->{'status'} ne UP && $cycle_ref->{'status'} ne DOWN)
 							{
+								# Up-inconclusive-*
 								$nscyclestatus = $cycle_ref->{'status'};
 							}
 							elsif ($nscycle{$ns}{$ip}{'total'} < $services->{$service}->{'minonline'})
@@ -1566,18 +1574,18 @@ sub __get_readable_tld
 # todo: taken from RSMSLV.pm
 # NB! THIS IS FIXED VERSION WHICH MUST REPLACE EXISTING ONE
 # (improved log message)
-sub __no_cycle_result
+sub __no_cycle_result($$$)
 {
-	my $service = shift;
+	my $name  = shift;
+	my $key   = shift;
 	my $clock = shift;
-	my $details = shift;
 
-	wrn(uc($service), " service availability result is missing for timestamp ", ts_full($clock), ".",
+	wrn("$name result is missing for timestamp ", ts_full($clock), ".",
 		" This means that either script was not executed or Zabbix server was",
 		" not running at that time. In order to fix this problem please connect",
 		" to appropriate server (check @<server_key> in the beginning of this message)",
 		" and run the following command:");
-	wrn("/opt/zabbix/scripts/slv/rsm.slv." . lc($service) . ".avail.pl --now $clock");
+	wrn("/opt/zabbix/scripts/slv/$key.pl --now $clock");
 }
 
 __END__

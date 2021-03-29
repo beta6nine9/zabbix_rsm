@@ -73,6 +73,7 @@ sub main()
 
 	if (opt('set-type'))
 	{
+		update_rsmhost_config_times(getopt('tld'));
 		set_type();
 	}
 	elsif (opt('list-services'))
@@ -85,6 +86,8 @@ sub main()
 	}
 	elsif (opt('update-nsservers'))
 	{
+		update_rsmhost_config_times(getopt('tld'));
+
 		my $config_templateid = get_template_id(TEMPLATE_RSMHOST_CONFIG_PREFIX . getopt('tld'));
 
 		my $ns_servers = get_ns_servers($config_templateid);
@@ -99,16 +102,19 @@ sub main()
 	}
 	elsif (opt('delete'))
 	{
+		update_rsmhost_config_times(getopt('tld'));
 		manage_tld_objects('delete', getopt('tld'), getopt('dns'), getopt('dns-udp'), getopt('dns-tcp'),
 				getopt('dnssec'), getopt('epp'), getopt('rdds'), getopt('rdap'));
 	}
 	elsif (opt('disable'))
 	{
+		update_rsmhost_config_times(getopt('tld'));
 		manage_tld_objects('disable', getopt('tld'), getopt('dns'), getopt('dns-udp'), getopt('dns-tcp'),
 				getopt('dnssec'), getopt('epp'), getopt('rdds'), getopt('rdap'));
 	}
 	else
 	{
+		update_rsmhost_config_times(getopt('tld'));
 		add_new_tld($config);
 	}
 }
@@ -157,7 +163,7 @@ sub init_cli_opts($)
 			"get-nsservers-list",
 			"update-nsservers",
 			"list-services",
-			"verbose",
+			"debug",
 			"quiet",
 			"help|?");
 
@@ -343,7 +349,7 @@ sub init_zabbix_api($$)
 	my $error;
 
 	RELOGIN:
-	$result = zbx_connect($section->{'za_url'}, $section->{'za_user'}, $section->{'za_password'}, getopt('verbose'));
+	$result = zbx_connect($section->{'za_url'}, $section->{'za_user'}, $section->{'za_password'}, getopt('debug'));
 
 	if ($result ne true)
 	{
@@ -391,8 +397,7 @@ sub set_type()
 
 sub list_services(;$)
 {
-	my $server_key = shift;
-	my $rsmhost    = shift; # optional
+	my $rsmhost = shift; # optional
 
 	# NB! Keep @columns in sync with __usage()!
 	my @columns = (
@@ -495,15 +500,11 @@ sub parse_dns_minns_macro($)
 		{
 			return $curr_minns;
 		}
-		else
-		{
-			return $sched_minns;
-		}
+
+		return $sched_minns;
 	}
-	else
-	{
-		fail("unexpected value/format of macro: $macro");
-	}
+
+	fail("unexpected value/format of macro: $macro");
 }
 
 ################################################################################
@@ -746,28 +747,24 @@ sub manage_tld_objects($$$$$$$)
 	print("Getting main host of the TLD: ");
 	my $main_hostid = get_host($tld, false);
 
-	if (scalar(%{$main_hostid}))
-	{
-		$main_hostid = $main_hostid->{'hostid'};
-		print("$main_hostid\n");
-	}
-	else
+	if (!scalar(%{$main_hostid}))
 	{
 		pfail("cannot find host \"$tld\"");
 	}
 
+	$main_hostid = $main_hostid->{'hostid'};
+	print("$main_hostid\n");
+
 	print("Getting main template of the TLD: ");
 	my $tld_template = get_template(TEMPLATE_RSMHOST_CONFIG_PREFIX . $tld, true, true);
 
-	if (scalar(%{$tld_template}))
-	{
-		$config_templateid = $tld_template->{'templateid'};
-		print("$config_templateid\n");
-	}
-	else
+	if (!scalar(%{$tld_template}))
 	{
 		pfail("cannot find template \"" . TEMPLATE_RSMHOST_CONFIG_PREFIX . "$tld\"");
 	}
+
+	$config_templateid = $tld_template->{'templateid'};
+	print("$config_templateid\n");
 
 	my @tld_hostids;
 
@@ -875,9 +872,19 @@ sub manage_tld_objects($$$$$$$)
 			next;
 		}
 
-		my $macro = $type eq 'rdap' ? '{$RDAP.TLD.ENABLED}' : '{$RSM.TLD.' . uc($type) . '.ENABLED}';
-
-		create_macro($macro, 0, $config_templateid, true);
+		if (__is_rdap_standalone())
+		{
+			my $macro = $type eq 'rdap' ? '{$RDAP.TLD.ENABLED}' : '{$RSM.TLD.' . uc($type) . '.ENABLED}';
+			create_macro($macro, 0, $config_templateid, true);
+		}
+		else
+		{
+			# disable both macros: RDDS and RDAP
+			my $macro = '{$RSM.TLD.' . uc($type) . '.ENABLED}';
+			create_macro($macro, 0, $config_templateid, true);
+			$macro = '{$RDAP.TLD.ENABLED}';
+			create_macro($macro, 0, $config_templateid, true);
+		}
 
 		# get items on "<rsmhost>" host
 		my $rsmhost_items = get_host_items($main_hostid);
@@ -1163,22 +1170,26 @@ sub create_rsmhost_template($$)
 	my $rsmhost = shift;
 	my $opt_ns_servers = shift;
 
-	my $config_template = get_template(TEMPLATE_RSMHOST_CONFIG_PREFIX . $rsmhost, 1, 0);
-	my $config_templateid;
+	my $template = get_template(TEMPLATE_RSMHOST_CONFIG_PREFIX . $rsmhost, 1, 0);
+	my $templateid;
+
+	my $new_rsmhost = !%{$template};
 
 	my $dns_minns;
 
-	if (%{$config_template})
+	if ($new_rsmhost)
 	{
-		$config_templateid = $config_template->{'templateid'};
+		$templateid = really(create_template(TEMPLATE_RSMHOST_CONFIG_PREFIX . $rsmhost));
 
-		my ($minns_macro) = grep($_->{'macro'} eq '{$RSM.TLD.DNS.AVAIL.MINNS}', @{$config_template->{'macros'}});
-
-		$dns_minns = build_dns_minns_macro($minns_macro->{'value'});
+		$dns_minns = build_dns_minns_macro(undef);
 	}
 	else
 	{
-		$dns_minns = build_dns_minns_macro(undef);
+		$templateid = $template->{'templateid'};
+
+		my ($minns_macro) = grep($_->{'macro'} eq '{$RSM.TLD.DNS.AVAIL.MINNS}', @{$template->{'macros'}});
+
+		$dns_minns = build_dns_minns_macro($minns_macro->{'value'});
 	}
 
 	my $rdds43_test_domain;
@@ -1198,30 +1209,31 @@ sub create_rsmhost_template($$)
 		$rdds43_test_domain = getopt('rdds43-test-domain');
 	}
 
-	$config_templateid //= really(create_template(TEMPLATE_RSMHOST_CONFIG_PREFIX . $rsmhost));
+	my $rdds_ns_string = opt('rdds-ns-string') ? getopt('rdds-ns-string') : CFG_DEFAULT_RDDS_NS_STRING;
 
-	really(create_macro('{$RSM.TLD}', $rsmhost, $config_templateid));
-	really(create_macro('{$RSM.DNS.TESTPREFIX}', getopt('dns-test-prefix'), $config_templateid, 1));
-	really(create_macro('{$RSM.RDDS43.TEST.DOMAIN}', $rdds43_test_domain, $config_templateid, 1)) if (defined($rdds43_test_domain));
-	really(create_macro('{$RSM.RDDS.NS.STRING}', opt('rdds-ns-string') ? getopt('rdds-ns-string') : CFG_DEFAULT_RDDS_NS_STRING, $config_templateid, 1));
-	really(create_macro('{$RSM.TLD.DNS.UDP.ENABLED}', getopt('dns-udp'), $config_templateid, 1));
-	really(create_macro('{$RSM.TLD.DNS.TCP.ENABLED}', getopt('dns-tcp'), $config_templateid, 1));
-	really(create_macro('{$RSM.TLD.DNS.AVAIL.MINNS}', $dns_minns, $config_templateid, 1));
-	really(create_macro('{$RSM.TLD.DNSSEC.ENABLED}', getopt('dnssec'), $config_templateid, 1));
-	really(create_macro('{$RSM.TLD.RDDS.ENABLED}', opt('rdds43-servers') ? 1 : 0, $config_templateid, 1));
-	really(create_macro('{$RSM.TLD.RDDS.43.SERVERS}', getopt('rdds43-servers') // '', $config_templateid, 1));
-	really(create_macro('{$RSM.TLD.RDDS.80.SERVERS}', getopt('rdds80-servers') // '', $config_templateid, 1));
-	really(create_macro('{$RSM.TLD.EPP.ENABLED}', opt('epp-servers') ? 1 : 0, $config_templateid, 1));
+	really(create_macro('{$RSM.TLD}'                , $rsmhost                      , $templateid));
+	really(create_macro('{$RSM.DNS.TESTPREFIX}'     , getopt('dns-test-prefix')     , $templateid, 1));
+	really(create_macro('{$RSM.RDDS43.TEST.DOMAIN}' , $rdds43_test_domain           , $templateid, 1)) if (defined($rdds43_test_domain));
+	really(create_macro('{$RSM.RDDS.NS.STRING}'     , $rdds_ns_string               , $templateid, 1));
+	really(create_macro('{$RSM.TLD.DNS.UDP.ENABLED}', getopt('dns-udp')             , $templateid, 1));
+	really(create_macro('{$RSM.TLD.DNS.TCP.ENABLED}', getopt('dns-tcp')             , $templateid, 1));
+	really(create_macro('{$RSM.TLD.DNS.AVAIL.MINNS}', $dns_minns                    , $templateid, 1));
+	really(create_macro('{$RSM.TLD.DNSSEC.ENABLED}' , getopt('dnssec')              , $templateid, 1));
+	really(create_macro('{$RSM.TLD.RDDS.ENABLED}'   , opt('rdds43-servers') ? 1 : 0 , $templateid, 1));
+	really(create_macro('{$RSM.TLD.RDDS.43.SERVERS}', getopt('rdds43-servers') // '', $templateid, 1));
+	really(create_macro('{$RSM.TLD.RDDS.80.SERVERS}', getopt('rdds80-servers') // '', $templateid, 1));
+	really(create_macro('{$RSM.TLD.EPP.ENABLED}'    , opt('epp-servers') ? 1 : 0    , $templateid, 1));
+	really(create_macro('{$RSM.TLD.CONFIG.TIMES}'   , $^T                           , $templateid, 1)) if ($new_rsmhost);
 
 	if (opt('rdap-base-url') && opt('rdap-test-domain'))
 	{
-		really(create_macro('{$RDAP.BASE.URL}', getopt('rdap-base-url'), $config_templateid, 1));
-		really(create_macro('{$RDAP.TEST.DOMAIN}', getopt('rdap-test-domain'), $config_templateid, 1));
-		really(create_macro('{$RDAP.TLD.ENABLED}', 1, $config_templateid, 1));
+		really(create_macro('{$RDAP.BASE.URL}'   , getopt('rdap-base-url')   , $templateid, 1));
+		really(create_macro('{$RDAP.TEST.DOMAIN}', getopt('rdap-test-domain'), $templateid, 1));
+		really(create_macro('{$RDAP.TLD.ENABLED}', 1                         , $templateid, 1));
 	}
 	else
 	{
-		really(create_macro('{$RDAP.TLD.ENABLED}', 0, $config_templateid, 1));
+		really(create_macro('{$RDAP.TLD.ENABLED}', 0, $templateid, 1));
 	}
 
 	if (getopt('epp-servers'))
@@ -1241,29 +1253,29 @@ sub create_rsmhost_template($$)
 
 		if (getopt('epp-commands'))
 		{
-			really(create_macro('{$RSM.EPP.COMMANDS}', getopt('epp-commands'), $config_templateid, 1));
+			really(create_macro('{$RSM.EPP.COMMANDS}', getopt('epp-commands'), $templateid, 1));
 		}
 		else
 		{
-			really(create_macro('{$RSM.EPP.COMMANDS}', '/opt/test-sla/epp-commands/' . $rsmhost, $config_templateid));
+			really(create_macro('{$RSM.EPP.COMMANDS}', '/opt/test-sla/epp-commands/' . $rsmhost, $templateid));
 		}
-		really(create_macro('{$RSM.EPP.USER}', getopt('epp-user'), $config_templateid, 1));
-		really(create_macro('{$RSM.EPP.CERT}', encode_base64($buf, ''),  $config_templateid, 1));
-		really(create_macro('{$RSM.EPP.SERVERID}', getopt('epp-serverid'), $config_templateid, 1));
-		really(create_macro('{$RSM.EPP.TESTPREFIX}', getopt('epp-test-prefix'), $config_templateid, 1));
-		really(create_macro('{$RSM.EPP.SERVERCERTMD5}', get_md5(getopt('epp-servercert')), $config_templateid, 1));
+		really(create_macro('{$RSM.EPP.USER}', getopt('epp-user'), $templateid, 1));
+		really(create_macro('{$RSM.EPP.CERT}', encode_base64($buf, ''),  $templateid, 1));
+		really(create_macro('{$RSM.EPP.SERVERID}', getopt('epp-serverid'), $templateid, 1));
+		really(create_macro('{$RSM.EPP.TESTPREFIX}', getopt('epp-test-prefix'), $templateid, 1));
+		really(create_macro('{$RSM.EPP.SERVERCERTMD5}', get_md5(getopt('epp-servercert')), $templateid, 1));
 
 		my $passphrase = get_sensdata("Enter EPP secret key passphrase: ");
 		my $passwd = get_sensdata("Enter EPP password: ");
-		really(create_macro('{$RSM.EPP.PASSWD}', get_encrypted_passwd($keysalt, $passphrase, $passwd), $config_templateid, 1));
+		really(create_macro('{$RSM.EPP.PASSWD}', get_encrypted_passwd($keysalt, $passphrase, $passwd), $templateid, 1));
 		$passwd = undef;
-		really(create_macro('{$RSM.EPP.PRIVKEY}', get_encrypted_privkey($keysalt, $passphrase, getopt('epp-privkey')), $config_templateid, 1));
+		really(create_macro('{$RSM.EPP.PRIVKEY}', get_encrypted_privkey($keysalt, $passphrase, getopt('epp-privkey')), $templateid, 1));
 		$passphrase = undef;
 
 		print("EPP data saved successfully.\n");
 	}
 
-	return $config_templateid;
+	return $templateid;
 }
 
 sub build_dns_minns_macro($)
@@ -1289,7 +1301,12 @@ sub build_dns_minns_macro($)
 
 				if (defined($sched_clock))
 				{
-					$sched_clock = cycle_start($sched_clock, 60);
+					if ((my $tmp = cycle_start($sched_clock, 60)) != $sched_clock)
+					{
+						$sched_clock = $tmp;
+						wrn("truncating scheduled time to the beginning of the minute ",
+								ts_str($sched_clock));
+					}
 
 					if ($sched_clock <= cycle_start($^T, 60))
 					{
@@ -1339,7 +1356,7 @@ sub build_dns_minns_macro($)
 
 			if (defined($macro_sched_clock) && $macro_sched_clock <= $^T)
 			{
-				if (getopt('dns-minns') != $macro_sched_minns && $macro_sched_clock >= $^T - DNS_MINNS_MIN_INTERVAL)
+				if (getopt('dns-minns') ne $macro_sched_minns && $macro_sched_clock >= $^T - DNS_MINNS_MIN_INTERVAL)
 				{
 					my $macro_sched_clock_str = ts_full($macro_sched_clock);
 
@@ -1361,12 +1378,17 @@ sub build_dns_minns_macro($)
 
 				if (defined($opt_sched_clock))
 				{
-					$opt_sched_clock = cycle_start($opt_sched_clock, 60);
+					if ((my $tmp = cycle_start($opt_sched_clock, 60)) != $opt_sched_clock)
+					{
+						$opt_sched_clock = $tmp;
+						wrn("truncating scheduled time to the beginning of the minute ",
+								ts_str($opt_sched_clock));
+					}
 				}
 
 				if (defined($macro_sched_clock) && defined($opt_sched_clock) &&
-					$macro_sched_clock == $opt_sched_clock &&
-					$macro_sched_minns == $opt_sched_minns)
+						$macro_sched_clock == $opt_sched_clock &&
+						$macro_sched_minns == $opt_sched_minns)
 				{
 					# macro already contains the same scheduling time and minns
 					return $old_minns_macro;
@@ -1378,7 +1400,7 @@ sub build_dns_minns_macro($)
 					return $old_minns_macro;
 				}
 
-				if (defined($macro_sched_clock) && cycle_start($^T, 60) >= $macro_sched_clock - DNS_MINNS_OFFSET)
+				if (defined($macro_sched_clock) && $^T >= $macro_sched_clock - DNS_MINNS_OFFSET)
 				{
 					my $macro_sched_clock_str = ts_full($macro_sched_clock);
 
@@ -1387,14 +1409,15 @@ sub build_dns_minns_macro($)
 
 				if (defined($opt_sched_clock))
 				{
-					if ($opt_sched_clock < cycle_start($^T, 60))
-					{
-						fail("scheduled time is in the past");
-					}
-					if ($opt_sched_clock < cycle_start($^T + DNS_MINNS_OFFSET, 60))
+					if ($opt_sched_clock < $^T)
 					{
 						$opt_sched_clock = ts_full($opt_sched_clock);
-						fail("scheduled time '$opt_sched_clock' is too soon");
+						fail("scheduled time \"$opt_sched_clock\" is in the past");
+					}
+					if ($opt_sched_clock < $^T + DNS_MINNS_OFFSET)
+					{
+						$opt_sched_clock = ts_full($opt_sched_clock);
+						fail("scheduled time \"$opt_sched_clock\" is too soon");
 					}
 				}
 				else
@@ -1811,6 +1834,8 @@ Other options
         --rdap
                 Action with RDAP
                 (only effective after switch to Standalone RDAP, default: no)
+	--debug
+		print every Zabbix API request and response, useful for troubleshooting
         --help
                 display this message
 EOF

@@ -44,11 +44,10 @@ foreach ($data['probes'] as $probe => $values) {
 	$elements['errors'] = '';
 
 	if (isset($values['mainstatus']['value'])) {
-		$style = $values['mainstatus']['value'] == 0 ? ZBX_STYLE_RED : ZBX_STYLE_GREEN;
 		$time = elapsedTime('@'.$values['mainstatus']['clock']);
 
-		$elements['probe'] = (new CSpan($probe))->addClass($style);
-		$elements['calculated'] = $time;
+		$elements['probe'] = (new CSpan($probe))->addClass($values['mainstatus']['value'] == 0 ? ZBX_STYLE_RED : ZBX_STYLE_GREEN);
+		$elements['calculated'] = ($time ? $time : (new CSpan('Never'))->addClass(ZBX_STYLE_RED));
 	}
 
 	if (isset($values['automatic']['value'])) {

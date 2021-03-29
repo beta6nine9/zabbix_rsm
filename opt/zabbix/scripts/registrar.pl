@@ -44,14 +44,17 @@ sub main()
 	}
 	elsif (opt('delete'))
 	{
+		update_rsmhost_config_times(getopt('rr-id'));
 		manage_registrar('delete', getopt('rr-id'), getopt('rdds'), getopt('rdap'));
 	}
 	elsif (opt('disable'))
 	{
+		update_rsmhost_config_times(getopt('rr-id'));
 		manage_registrar('disable', getopt('rr-id'), getopt('rdds'), getopt('rdap'));
 	}
 	else
 	{
+		update_rsmhost_config_times(getopt('rr-id'));
 		add_new_registrar();
 	}
 }
@@ -78,7 +81,7 @@ sub init_cli_opts($)
 			"rdds-ns-string=s",
 			"root-servers=s",
 			"rdds43-test-domain=s",
-			"verbose",
+			"debug",
 			"help|?");
 
 	if (!$rv || !%OPTS || $OPTS{'help'})
@@ -219,7 +222,7 @@ sub init_zabbix_api($$)
 	my $error;
 
 	RELOGIN:
-	$result = zbx_connect($section->{'za_url'}, $section->{'za_user'}, $section->{'za_password'}, getopt('verbose'));
+	$result = zbx_connect($section->{'za_url'}, $section->{'za_user'}, $section->{'za_password'}, getopt('debug'));
 
 	if ($result ne true)
 	{
@@ -531,21 +534,36 @@ sub create_main_template($)
 
 	my $template_name = TEMPLATE_RSMHOST_CONFIG_PREFIX . $rsmhost;
 
-	my $templateid = really(create_template($template_name));
+	my $template = get_template(TEMPLATE_RSMHOST_CONFIG_PREFIX . $rsmhost, 1, 0);
+	my $templateid;
 
-	really(create_macro('{$RSM.TLD}', $rsmhost, $templateid));
-	really(create_macro('{$RSM.RDDS43.TEST.DOMAIN}', getopt('rdds43-test-domain'), $templateid, 1)) if (opt('rdds43-test-domain'));
-	really(create_macro('{$RSM.RDDS.NS.STRING}', opt('rdds-ns-string') ? getopt('rdds-ns-string') : CFG_DEFAULT_RDDS_NS_STRING, $templateid, 1));
-	really(create_macro('{$RSM.TLD.RDDS.ENABLED}', opt('rdds43-servers') ? 1 : 0, $templateid, 1));
+	my $new_rsmhost = !%{$template};
+
+	if ($new_rsmhost)
+	{
+		$templateid = really(create_template($template_name));
+	}
+	else
+	{
+		$templateid = $template->{'templateid'};
+	}
+
+	my $rdds_ns_string = opt('rdds-ns-string') ? getopt('rdds-ns-string') : CFG_DEFAULT_RDDS_NS_STRING;
+
+	really(create_macro('{$RSM.TLD}'                , $rsmhost                      , $templateid));
+	really(create_macro('{$RSM.RDDS43.TEST.DOMAIN}' , getopt('rdds43-test-domain')  , $templateid, 1)) if (opt('rdds43-test-domain'));
+	really(create_macro('{$RSM.RDDS.NS.STRING}'     , $rdds_ns_string               , $templateid, 1));
+	really(create_macro('{$RSM.TLD.RDDS.ENABLED}'   , opt('rdds43-servers') ? 1 : 0 , $templateid, 1));
 	really(create_macro('{$RSM.TLD.RDDS.43.SERVERS}', getopt('rdds43-servers') // '', $templateid, 1));
 	really(create_macro('{$RSM.TLD.RDDS.80.SERVERS}', getopt('rdds80-servers') // '', $templateid, 1));
-	really(create_macro('{$RSM.TLD.EPP.ENABLED}', 0, $templateid)); # required by rsm.rdds[] metric
+	really(create_macro('{$RSM.TLD.EPP.ENABLED}'    , 0                             , $templateid)); # required by rsm.rdds[] metric
+	really(create_macro('{$RSM.TLD.CONFIG.TIMES}'   , $^T                           , $templateid, 1)) if ($new_rsmhost);
 
 	if (opt('rdap-base-url') && opt('rdap-test-domain'))
 	{
-		really(create_macro('{$RDAP.BASE.URL}', getopt('rdap-base-url'), $templateid, 1));
+		really(create_macro('{$RDAP.BASE.URL}'   , getopt('rdap-base-url')   , $templateid, 1));
 		really(create_macro('{$RDAP.TEST.DOMAIN}', getopt('rdap-test-domain'), $templateid, 1));
-		really(create_macro('{$RDAP.TLD.ENABLED}', 1, $templateid, 1));
+		really(create_macro('{$RDAP.TLD.ENABLED}', 1                         , $templateid, 1));
 	}
 	else
 	{
@@ -764,6 +782,8 @@ Other options
         --rdap
                 Action with RDAP
                 (only effective after switch to Standalone RDAP, default: no)
+	--debug
+		print every Zabbix API request and response, useful for troubleshooting
         --help
                 display this message
 EOF

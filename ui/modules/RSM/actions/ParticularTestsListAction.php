@@ -282,10 +282,10 @@ class ParticularTestsListAction extends Action {
 					$test_result_color = ($test_result['value'] == PROBE_DOWN) ? ZBX_STYLE_RED : ZBX_STYLE_GREEN;
 				}
 
-				$data['testResult'] = (new CSpan($test_result_label))->addClass($test_result_color);
+				$data['test_result'] = (new CSpan($test_result_label))->addClass($test_result_color);
 			}
 			else {
-				$data['testResult'] = $test_result['value'];
+				$data['test_result'] = $test_result['value'];
 			}
 		}
 		else {
@@ -571,165 +571,149 @@ class ParticularTestsListAction extends Action {
 			' OR '.dbConditionString('i.key_', [PROBE_EPP_IP, PROBE_EPP_UPDATE, PROBE_EPP_INFO, PROBE_EPP_LOGIN]).')';
 		}
 
-		// Get items.
-		$items = ($probe_item_key !== '') ? DBselect(
-			'SELECT i.itemid,i.key_,i.hostid,i.value_type,i.valuemapid,i.units'.
-			' FROM items i'.
-			' WHERE '.dbConditionInt('i.hostid', $hostids).
-				' AND i.status='.ITEM_STATUS_ACTIVE.
-				$probe_item_key
-		) : null;
+		// Set if RDDS is enabled on a TLD level
+		if (array_key_exists(RSM_TLD_RDDS_ENABLED, $data['tld']['macros'])
+						&& $data['tld']['macros'][RSM_TLD_RDDS_ENABLED] != 0) {
+			$data['tld_rdds_enabled'] = true;
+		}
+		else {
+			$data['tld_rdds_enabled'] = false;
+		}
 
-		$nsArray = [];
+		if ($test_result['value'] != UP_INCONCLUSIVE_RECONFIG) {
+			// Get items.
+			$items = ($probe_item_key !== '') ? DBselect(
+				'SELECT i.itemid,i.key_,i.hostid,i.value_type,i.valuemapid,i.units'.
+				' FROM items i'.
+				' WHERE '.dbConditionInt('i.hostid', $hostids).
+					' AND i.status='.ITEM_STATUS_ACTIVE.
+					$probe_item_key
+			) : null;
 
-		// get items value
-		if ($items) {
-			while ($item = DBfetch($items)) {
-				$itemValue = API::History()->get([
-					'itemids' => $item['itemid'],
-					'time_from' => $test_time_from,
-					'time_till' => $test_time_till,
-					'history' => $item['value_type'],
-					'output' => API_OUTPUT_EXTEND
-				]);
+			$nsArray = [];
 
-				$itemValue = reset($itemValue);
+			// get items value
+			if ($items) {
+				while ($item = DBfetch($items)) {
+					$itemValue = API::History()->get([
+						'itemids' => $item['itemid'],
+						'time_from' => $test_time_from,
+						'time_till' => $test_time_till,
+						'history' => $item['value_type'],
+						'output' => API_OUTPUT_EXTEND
+					]);
 
-				if ($data['type'] == RSM_DNS && $item['key_'] === PROBE_DNS_UDP_ITEM) {
-					$hosts[$item['hostid']]['result'] = $itemValue ? $itemValue['value'] : null;
-				}
-				elseif ($data['type'] == RSM_DNS && mb_substr($item['key_'], 0, 16) == PROBE_DNS_UDP_ITEM_RTT) {
-					preg_match('/^[^\[]+\[([^\]]+)]$/', $item['key_'], $matches);
-					$nsValues = explode(',', $matches[1]);
+					$itemValue = reset($itemValue);
 
-					if (!$itemValue) {
-						$nsArray[$item['hostid']][$nsValues[1]]['value'][] = NS_NO_RESULT;
+					if ($data['type'] == RSM_DNS && $item['key_'] === PROBE_DNS_UDP_ITEM) {
+						$hosts[$item['hostid']]['result'] = $itemValue ? $itemValue['value'] : null;
 					}
-					elseif ($itemValue['value'] < $udp_rtt && !isServiceErrorCode($itemValue['value'], $data['type'])) {
-						$nsArray[$item['hostid']][$nsValues[1]]['value'][] = NS_UP;
-					}
-					else {
-						$nsArray[$item['hostid']][$nsValues[1]]['value'][] = NS_DOWN;
-					}
-				}
-				elseif ($data['type'] == RSM_DNSSEC && mb_substr($item['key_'], 0, 16) == PROBE_DNS_UDP_ITEM_RTT) {
-					if (!isset($hosts[$item['hostid']]['value'])) {
-						$hosts[$item['hostid']]['value']['ok'] = 0;
-						$hosts[$item['hostid']]['value']['fail'] = 0;
-						$hosts[$item['hostid']]['value']['total'] = 0;
-						$hosts[$item['hostid']]['value']['noResult'] = 0;
-					}
+					elseif ($data['type'] == RSM_DNS && mb_substr($item['key_'], 0, 16) == PROBE_DNS_UDP_ITEM_RTT) {
+						preg_match('/^[^\[]+\[([^\]]+)]$/', $item['key_'], $matches);
+						$nsValues = explode(',', $matches[1]);
 
-					if ($itemValue) {
-						if (isServiceErrorCode($itemValue['value'], $data['type'])) {
-							$hosts[$item['hostid']]['value']['fail']++;
+						if (!$itemValue) {
+							$nsArray[$item['hostid']][$nsValues[1]]['value'][] = NS_NO_RESULT;
+						}
+						elseif ($itemValue['value'] < $udp_rtt && !isServiceErrorCode($itemValue['value'], $data['type'])) {
+							$nsArray[$item['hostid']][$nsValues[1]]['value'][] = NS_UP;
 						}
 						else {
-							$hosts[$item['hostid']]['value']['ok']++;
+							$nsArray[$item['hostid']][$nsValues[1]]['value'][] = NS_DOWN;
 						}
 					}
-					else {
-						$hosts[$item['hostid']]['value']['noResult']++;
-					}
-
-					$hosts[$item['hostid']]['value']['total']++;
-				}
-				elseif ($data['type'] == RSM_RDDS || $data['type'] == RSM_RDAP) {
-					if ($item['key_'] == PROBE_RDDS43_IP) {
-						$hosts[$item['hostid']]['rdds43']['ip'] = $itemValue ? $itemValue['value'] : null;
-					}
-					elseif ($item['key_'] == PROBE_RDDS43_RTT) {
-						if (isset($itemValue['value'])) {
-							//$rtt_value = convert_units(['value' => $itemValue['value'], 'units' => $item['units']]);
-							$rtt_value = convertUnits(['value' => $itemValue['value']]);
-							$hosts[$item['hostid']]['rdds43']['rtt'] = [
-								'description' => $rtt_value < 0 ? applyValueMap($rtt_value, $item['valuemapid']) : null,
-								'value' => $rtt_value
-							];
-						}
-					}
-					elseif ($item['key_'] == PROBE_RDDS80_IP) {
-						$hosts[$item['hostid']]['rdds80']['ip'] = $itemValue ? $itemValue['value'] : null;
-					}
-					elseif ($item['key_'] == PROBE_RDDS80_RTT) {
-						if (isset($itemValue['value'])) {
-							//$rtt_value = convert_units(['value' => $itemValue['value'], 'units' => $item['units']]);
-							$rtt_value = convertUnits(['value' => $itemValue['value']]);
-							$hosts[$item['hostid']]['rdds80']['rtt'] = [
-								'description' => $rtt_value < 0 ? applyValueMap($rtt_value, $item['valuemapid']) : null,
-								'value' => $rtt_value
-							];
-						}
-					}
-					elseif ($item['key_'] == PROBE_RDAP_IP) {
-						$hosts[$item['hostid']]['rdap']['ip'] = $itemValue ? $itemValue['value'] : null;
-					}
-					elseif ($item['key_'] == PROBE_RDAP_RTT) {
-						if (isset($itemValue['value'])) {
-							//$rtt_value = convert_units(['value' => $itemValue['value'], 'units' => $item['units']]);
-							$rtt_value = convertUnits(['value' => $itemValue['value']]);
-							$hosts[$item['hostid']]['rdap']['rtt'] = [
-								'description' => $rtt_value < 0 ? applyValueMap($rtt_value, $item['valuemapid']) : null,
-								'value' => $rtt_value
-							];
-						}
-					}
-					elseif (substr($item['key_'], 0, strlen(PROBE_RDAP_STATUS)) === PROBE_RDAP_STATUS) {
-						$hosts[$item['hostid']]['value'] = $itemValue['value'];
-					}
-					elseif (substr($item['key_'], 0, strlen(PROBE_RDDS_STATUS)) === PROBE_RDDS_STATUS) {
-						$hosts[$item['hostid']]['value'] = $itemValue['value'];
-					}
-					elseif ($item['key_'] == PROBE_RDDS43_TESTEDNAME) {
-						$hosts[$item['hostid']]['rdds43']['testedname'] = $itemValue['value'];
-					}
-					elseif ($item['key_'] == PROBE_RDDS43_TARGET) {
-						$hosts[$item['hostid']]['rdds43']['target'] = $itemValue['value'];
-					}
-					elseif ($item['key_'] == PROBE_RDDS43_STATUS) {
-						$hosts[$item['hostid']]['rdds43']['status'] = $itemValue['value'];
-					}
-					elseif ($item['key_'] == PROBE_RDDS80_TARGET) {
-						$hosts[$item['hostid']]['rdds80']['target'] = $itemValue['value'];
-					}
-					elseif ($item['key_'] == PROBE_RDDS80_STATUS) {
-						$hosts[$item['hostid']]['rdds80']['status'] = $itemValue['value'];
-					}
-					elseif ($item['key_'] == PROBE_RDAP_TESTEDNAME) {
-						$hosts[$item['hostid']]['rdap']['testedname'] = $itemValue['value'];
-					}
-					elseif ($item['key_'] == PROBE_RDAP_TARGET) {
-						$hosts[$item['hostid']]['rdap']['target'] = $itemValue['value'];
-					}
-
-					// Set if RDDS is enabled on a TLD level
-					if (array_key_exists(RSM_TLD_RDDS_ENABLED, $data['tld']['macros'])
-							&& $data['tld']['macros'][RSM_TLD_RDDS_ENABLED] != 0) {
-						$data['tld_rdds_enabled'] = true;
-					}
-					else {
-						$data['tld_rdds_enabled'] = false;
-					}
-
-					// Count result for table bottom summary rows.
-					if ($item['key_'] == PROBE_RDAP_RTT && 0 > $itemValue['value']) {
-						$error_code = (int)$itemValue['value'];
-
-						if (!array_key_exists($error_code, $data['errors'])) {
-							$data['errors'][$error_code] = [
-								'description' => applyValueMap($error_code, $item['valuemapid'])
-							];
-						}
-						if (!array_key_exists('rdap', $data['errors'][$error_code])) {
-							$data['errors'][$error_code]['rdap'] = 0;
+					elseif ($data['type'] == RSM_DNSSEC && mb_substr($item['key_'], 0, 16) == PROBE_DNS_UDP_ITEM_RTT) {
+						if (!isset($hosts[$item['hostid']]['value'])) {
+							$hosts[$item['hostid']]['value']['ok'] = 0;
+							$hosts[$item['hostid']]['value']['fail'] = 0;
+							$hosts[$item['hostid']]['value']['total'] = 0;
+							$hosts[$item['hostid']]['value']['noResult'] = 0;
 						}
 
-						$data['errors'][$error_code]['rdap']++;
-					}
-					elseif ($item['key_'] == PROBE_RDDS43_RTT || $item['key_'] == PROBE_RDDS80_RTT) {
-						$column = $item['key_'] == PROBE_RDDS43_RTT ? 'rdds43' : 'rdds80';
+						if ($itemValue) {
+							if (isServiceErrorCode($itemValue['value'], $data['type'])) {
+								$hosts[$item['hostid']]['value']['fail']++;
+							}
+							else {
+								$hosts[$item['hostid']]['value']['ok']++;
+							}
+						}
+						else {
+							$hosts[$item['hostid']]['value']['noResult']++;
+						}
 
-						if (0 > $itemValue['value']) {
+						$hosts[$item['hostid']]['value']['total']++;
+					}
+					elseif ($data['type'] == RSM_RDDS || $data['type'] == RSM_RDAP) {
+						if ($item['key_'] == PROBE_RDDS43_IP) {
+							$hosts[$item['hostid']]['rdds43']['ip'] = $itemValue ? $itemValue['value'] : null;
+						}
+						elseif ($item['key_'] == PROBE_RDDS43_RTT) {
+							if (isset($itemValue['value'])) {
+								//$rtt_value = convert_units(['value' => $itemValue['value'], 'units' => $item['units']]);
+								$rtt_value = convertUnits(['value' => $itemValue['value']]);
+								$hosts[$item['hostid']]['rdds43']['rtt'] = [
+									'description' => $rtt_value < 0 ? applyValueMap($rtt_value, $item['valuemapid']) : null,
+									'value' => $rtt_value
+								];
+							}
+						}
+						elseif ($item['key_'] == PROBE_RDDS80_IP) {
+							$hosts[$item['hostid']]['rdds80']['ip'] = $itemValue ? $itemValue['value'] : null;
+						}
+						elseif ($item['key_'] == PROBE_RDDS80_RTT) {
+							if (isset($itemValue['value'])) {
+								//$rtt_value = convert_units(['value' => $itemValue['value'], 'units' => $item['units']]);
+								$rtt_value = convertUnits(['value' => $itemValue['value']]);
+								$hosts[$item['hostid']]['rdds80']['rtt'] = [
+									'description' => $rtt_value < 0 ? applyValueMap($rtt_value, $item['valuemapid']) : null,
+									'value' => $rtt_value
+								];
+							}
+						}
+						elseif ($item['key_'] == PROBE_RDAP_IP) {
+							$hosts[$item['hostid']]['rdap']['ip'] = $itemValue ? $itemValue['value'] : null;
+						}
+						elseif ($item['key_'] == PROBE_RDAP_RTT) {
+							if (isset($itemValue['value'])) {
+								//$rtt_value = convert_units(['value' => $itemValue['value'], 'units' => $item['units']]);
+								$rtt_value = convertUnits(['value' => $itemValue['value']]);
+								$hosts[$item['hostid']]['rdap']['rtt'] = [
+									'description' => $rtt_value < 0 ? applyValueMap($rtt_value, $item['valuemapid']) : null,
+									'value' => $rtt_value
+								];
+							}
+						}
+						elseif ($item['key_'] == PROBE_RDDS43_TESTEDNAME) {
+							$hosts[$item['hostid']]['rdds43']['testedname'] = $itemValue['value'];
+						}
+						elseif ($item['key_'] == PROBE_RDDS43_TARGET) {
+							$hosts[$item['hostid']]['rdds43']['target'] = $itemValue['value'];
+						}
+						elseif ($item['key_'] == PROBE_RDDS43_STATUS) {
+							$hosts[$item['hostid']]['rdds43']['status'] = $itemValue['value'];
+						}
+						elseif ($item['key_'] == PROBE_RDDS80_TARGET) {
+							$hosts[$item['hostid']]['rdds80']['target'] = $itemValue['value'];
+						}
+						elseif ($item['key_'] == PROBE_RDDS80_STATUS) {
+							$hosts[$item['hostid']]['rdds80']['status'] = $itemValue['value'];
+						}
+						elseif ($item['key_'] == PROBE_RDAP_TESTEDNAME) {
+							$hosts[$item['hostid']]['rdap']['testedname'] = $itemValue['value'];
+						}
+						elseif ($item['key_'] == PROBE_RDAP_TARGET) {
+							$hosts[$item['hostid']]['rdap']['target'] = $itemValue['value'];
+						}
+						elseif (substr($item['key_'], 0, strlen(PROBE_RDDS_STATUS)) === PROBE_RDDS_STATUS) {
+							$hosts[$item['hostid']]['rdds']['status'] = $itemValue['value'];
+						}
+						elseif (substr($item['key_'], 0, strlen(PROBE_RDAP_STATUS)) === PROBE_RDAP_STATUS) {
+							$hosts[$item['hostid']]['rdap']['status'] = $itemValue['value'];
+						}
+
+						// Count result for table bottom summary rows.
+						if ($item['key_'] == PROBE_RDAP_RTT && 0 > $itemValue['value']) {
 							$error_code = (int)$itemValue['value'];
 
 							if (!array_key_exists($error_code, $data['errors'])) {
@@ -737,35 +721,53 @@ class ParticularTestsListAction extends Action {
 									'description' => applyValueMap($error_code, $item['valuemapid'])
 								];
 							}
-							if (!array_key_exists($column, $data['errors'][$error_code])) {
-								$data['errors'][$error_code][$column] = 0;
+							if (!array_key_exists('rdap', $data['errors'][$error_code])) {
+								$data['errors'][$error_code]['rdap'] = 0;
 							}
 
-							$data['errors'][$error_code][$column]++;
+							$data['errors'][$error_code]['rdap']++;
+						}
+						elseif ($item['key_'] == PROBE_RDDS43_RTT || $item['key_'] == PROBE_RDDS80_RTT) {
+							$column = $item['key_'] == PROBE_RDDS43_RTT ? 'rdds43' : 'rdds80';
+
+							if (0 > $itemValue['value']) {
+								$error_code = (int)$itemValue['value'];
+
+								if (!array_key_exists($error_code, $data['errors'])) {
+									$data['errors'][$error_code] = [
+										'description' => applyValueMap($error_code, $item['valuemapid'])
+									];
+								}
+								if (!array_key_exists($column, $data['errors'][$error_code])) {
+									$data['errors'][$error_code][$column] = 0;
+								}
+
+								$data['errors'][$error_code][$column]++;
+							}
 						}
 					}
-				}
-				elseif ($data['type'] == RSM_EPP) {
-					if ($item['key_'] == PROBE_EPP_IP) {
-						$hosts[$item['hostid']]['ip'] = $itemValue['value'];
-					}
-					elseif ($item['key_'] == PROBE_EPP_UPDATE) {
-						$hosts[$item['hostid']]['update'] = $itemValue['value']
-							? applyValueMap(convertUnits(['value' => $itemValue['value'], 'units' => $item['units']]), $item['valuemapid'])
-							: null;
-					}
-					elseif ($item['key_'] == PROBE_EPP_INFO) {
-						$hosts[$item['hostid']]['info'] = $itemValue['value']
-							? applyValueMap(convertUnits(['value' => $itemValue['value'], 'units' => $item['units']]), $item['valuemapid'])
-							: null;
-					}
-					elseif ($item['key_'] == PROBE_EPP_LOGIN) {
-						$hosts[$item['hostid']]['login'] = $itemValue['value']
-							? applyValueMap(convertUnits(['value' => $itemValue['value'], 'units' => $item['units']]), $item['valuemapid'])
-							: null;
-					}
-					else {
-						$hosts[$item['hostid']]['value'] = $itemValue['value'];
+					elseif ($data['type'] == RSM_EPP) {
+						if ($item['key_'] == PROBE_EPP_IP) {
+							$hosts[$item['hostid']]['ip'] = $itemValue['value'];
+						}
+						elseif ($item['key_'] == PROBE_EPP_UPDATE) {
+							$hosts[$item['hostid']]['update'] = $itemValue['value']
+								? applyValueMap(convertUnits(['value' => $itemValue['value'], 'units' => $item['units']]), $item['valuemapid'])
+								: null;
+						}
+						elseif ($item['key_'] == PROBE_EPP_INFO) {
+							$hosts[$item['hostid']]['info'] = $itemValue['value']
+								? applyValueMap(convertUnits(['value' => $itemValue['value'], 'units' => $item['units']]), $item['valuemapid'])
+								: null;
+						}
+						elseif ($item['key_'] == PROBE_EPP_LOGIN) {
+							$hosts[$item['hostid']]['login'] = $itemValue['value']
+								? applyValueMap(convertUnits(['value' => $itemValue['value'], 'units' => $item['units']]), $item['valuemapid'])
+								: null;
+						}
+						else {
+							$hosts[$item['hostid']]['value'] = $itemValue['value'];
+						}
 					}
 				}
 			}
