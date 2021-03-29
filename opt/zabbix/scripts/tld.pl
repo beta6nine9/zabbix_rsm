@@ -75,6 +75,7 @@ sub main()
 	{
 		update_rsmhost_config_times(getopt('tld'));
 		set_type();
+		request_config_cache_reload();
 	}
 	elsif (opt('list-services'))
 	{
@@ -94,23 +95,28 @@ sub main()
 		my $tld_hostid = get_host(getopt('tld'), false)->{'hostid'};	# no host groups
 
 		update_ns_servers($config_templateid, $dns_test_templateid, $tld_hostid, getopt('tld'));
+
+		request_config_cache_reload();
 	}
 	elsif (opt('delete'))
 	{
 		update_rsmhost_config_times(getopt('tld'));
 		manage_tld_objects('delete', getopt('tld'), getopt('dns'), getopt('dns-udp'), getopt('dns-tcp'),
 				getopt('dnssec'), getopt('epp'), getopt('rdds'), getopt('rdap'));
+		request_config_cache_reload();
 	}
 	elsif (opt('disable'))
 	{
 		update_rsmhost_config_times(getopt('tld'));
 		manage_tld_objects('disable', getopt('tld'), getopt('dns'), getopt('dns-udp'), getopt('dns-tcp'),
 				getopt('dnssec'), getopt('epp'), getopt('rdds'), getopt('rdap'));
+		request_config_cache_reload();
 	}
 	else
 	{
 		update_rsmhost_config_times(getopt('tld'));
 		add_new_tld($config);
+		request_config_cache_reload();
 	}
 }
 

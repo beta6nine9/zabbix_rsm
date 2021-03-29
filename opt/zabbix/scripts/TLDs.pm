@@ -39,6 +39,7 @@ our @EXPORT = qw(zbx_connect check_api_error get_proxies_list
 		get_items_like get_host_items set_tld_type get_triggers_by_items
 		add_dependency
 		update_rsmhost_config_times
+		request_config_cache_reload
 		pfail);
 
 our ($zabbix, $result);
@@ -1270,6 +1271,11 @@ sub update_rsmhost_config_times($)
 	push(@times, $^T);
 
 	create_macro('{$RSM.TLD.CONFIG.TIMES}', join(';', @times), $config_template->{'templateid'}, 1);
+}
+
+sub request_config_cache_reload()
+{
+	create_macro('{$RSM.CONFIG.CACHE.RELOAD.REQUESTED}', time(), undef, 1);
 }
 
 sub pfail
