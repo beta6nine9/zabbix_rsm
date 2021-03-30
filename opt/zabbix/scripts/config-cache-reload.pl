@@ -45,7 +45,7 @@ sub main()
 		@args = map('"' . $_ . '"', @args);
 
 		dbg("executing $cmd @args");
-		my $out = qx($cmd @args 2>&1);
+		my $out = rtrim(qx($cmd @args 2>&1));
 
 		if ($out)
 		{

@@ -1226,7 +1226,7 @@ sub create_rsmhost_template($)
 		my $m = '{$RSM.EPP.KEYSALT}';
 		my $keysalt = get_global_macro_value($m);
 		pfail('cannot get macro ', $m) unless defined($keysalt);
-		trim($keysalt);
+		$keysalt = trim($keysalt);
 		pfail("global macro $m must conatin |") unless ($keysalt =~ m/\|/);
 
 		if (getopt('epp-commands'))
