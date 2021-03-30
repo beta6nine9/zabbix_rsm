@@ -1410,153 +1410,153 @@ sub calculate_cycle($$$$$$$$$)
 				}
 			}
 		}
+	}
 
-		# add "Offline" and "No results"
-		foreach my $probe (keys(%{$all_probes_ref}))
+	# add "Offline" and "No results"
+	foreach my $probe (keys(%{$all_probes_ref}))
+	{
+		my $probe_online;
+
+		if (defined($service_probes_ref->{$probe}) &&
+				$service_probes_ref->{$probe}{'status'} == HOST_STATUS_MONITORED)
 		{
-			my $probe_online;
-
-			if (defined($service_probes_ref->{$probe}) &&
-					$service_probes_ref->{$probe}{'status'} == HOST_STATUS_MONITORED)
-			{
-				$probe_online = probe_online_at($probe, $from, $delay);
-			}
-			else
-			{
-				$probe_online = 0;
-			}
-
-			foreach my $interface (@{$interfaces_ref})
-			{
-				if (!$probe_online)
-				{
-					$tested_interfaces{$interface}{$probe}{'status'} = AH_CITY_OFFLINE;
-
-					# We detected that probe was offline but there might be still results.
-					# It is requested to ignore those in both here and in Frontend.
-					undef($tested_interfaces{$interface}{$probe}{'testData'});
-				}
-				elsif (!defined($tested_interfaces{$interface}{$probe}{'status'}))
-				{
-					$tested_interfaces{$interface}{$probe}{'status'} = AH_CITY_NO_RESULT;
-				}
-			}
+			$probe_online = probe_online_at($probe, $from, $delay);
+		}
+		else
+		{
+			$probe_online = 0;
 		}
 
-		#
-		# add data that was collected from history and calculated in previous cycle
-		#
-
-		foreach my $interface (keys(%tested_interfaces))
+		foreach my $interface (@{$interfaces_ref})
 		{
-			my $interface_json = {
-				'interface'	=> $interface,
-				'probes'	=> []
+			if (!$probe_online)
+			{
+				$tested_interfaces{$interface}{$probe}{'status'} = AH_CITY_OFFLINE;
+
+				# We detected that probe was offline but there might be still results.
+				# It is requested to ignore those in both here and in Frontend.
+				undef($tested_interfaces{$interface}{$probe}{'testData'});
+			}
+			elsif (!defined($tested_interfaces{$interface}{$probe}{'status'}))
+			{
+				$tested_interfaces{$interface}{$probe}{'status'} = AH_CITY_NO_RESULT;
+			}
+		}
+	}
+
+	#
+	# add data that was collected from history and calculated in previous cycle
+	#
+
+	foreach my $interface (keys(%tested_interfaces))
+	{
+		my $interface_json = {
+			'interface'	=> $interface,
+			'probes'	=> []
+		};
+
+		foreach my $probe (keys(%{$tested_interfaces{$interface}}))
+		{
+			my $probe_ref = {
+				'city'		=> $probe,
+				'status'	=> $tested_interfaces{$interface}{$probe}{'status'},	# Probe status
+				'testData'	=> []
 			};
 
-			foreach my $probe (keys(%{$tested_interfaces{$interface}}))
+			if ($tested_interfaces{$interface}{$probe}{'status'} ne AH_CITY_OFFLINE &&
+					$tested_interfaces{$interface}{$probe}{'status'} ne AH_CITY_NO_RESULT)
 			{
-				my $probe_ref = {
-					'city'		=> $probe,
-					'status'	=> $tested_interfaces{$interface}{$probe}{'status'},	# Probe status
-					'testData'	=> []
-				};
-
-				if ($tested_interfaces{$interface}{$probe}{'status'} ne AH_CITY_OFFLINE &&
-						$tested_interfaces{$interface}{$probe}{'status'} ne AH_CITY_NO_RESULT)
-				{
-					$probe_ref->{'transport'}  = $tested_interfaces{$interface}{$probe}{'transport'};
-					$probe_ref->{'testedName'} = $tested_interfaces{$interface}{$probe}{'testedname'};
-				}
-
-				fill_test_data(
-					$service,
-					$tested_interfaces{$interface}{$probe}{'testData'},
-					$probe_ref->{'testData'},
-					$rtt_limit
-				);
-
-				push(@{$interface_json->{'probes'}}, $probe_ref);
+				$probe_ref->{'transport'}  = $tested_interfaces{$interface}{$probe}{'transport'};
+				$probe_ref->{'testedName'} = $tested_interfaces{$interface}{$probe}{'testedname'};
 			}
 
-			push(@{$json->{'testedInterface'}}, $interface_json);
+			fill_test_data(
+				$service,
+				$tested_interfaces{$interface}{$probe}{'testData'},
+				$probe_ref->{'testData'},
+				$rtt_limit
+			);
+
+			push(@{$interface_json->{'probes'}}, $probe_ref);
 		}
 
-		# Add aggregated Name Server Availability data. E. g.
-		#
-		# "minNameServersUp": 2,
-		# "nameServerAvailability": {
-		# 	"nameServerStatus": [
-		# 		{
-		# 			"target": "ns1.nic.exmaple",
-		# 			"status": "Down"
-		# 		},
-		# 		{
-		# 			"target": "ns2.nic.example",
-		# 			"status": "Down"
-		# 		}
-		# 	],
-		# 	"probes": [
-		# 		{
-		# 			"city": "WashingtonDC",
-		# 			"testData": [
-		# 				{
-		# 					"target": "ns1.nic.example",
-		# 					"status": "Down"
-		# 				},
-		# 				{
-		# 					"target": "ns2.nic.example",
-		#					"status": "Down"
-		# 				}
-		# 			]
-		# 		},
-		# 		{
-		# 			"city": "Sydney",
-		# 			"testData": [
-		# 				{
-		# 					"target": "ns1.nic.example",
-		# 					"status": "Up"
-		# 				},
-		# 				{
-		# 					"target": "ns2.nic.example",
-		# 					"status": "Up"
-		# 				}
-		# 			]
-		# 		}
-		# 	]
-		# }
+		push(@{$json->{'testedInterface'}}, $interface_json);
+	}
 
-		foreach my $target (keys(%{$name_server_availability_data->{'targets'}}))
+	# Add aggregated Name Server Availability data. E. g.
+	#
+	# "minNameServersUp": 2,
+	# "nameServerAvailability": {
+	# 	"nameServerStatus": [
+	# 		{
+	# 			"target": "ns1.nic.exmaple",
+	# 			"status": "Down"
+	# 		},
+	# 		{
+	# 			"target": "ns2.nic.example",
+	# 			"status": "Down"
+	# 		}
+	# 	],
+	# 	"probes": [
+	# 		{
+	# 			"city": "WashingtonDC",
+	# 			"testData": [
+	# 				{
+	# 					"target": "ns1.nic.example",
+	# 					"status": "Down"
+	# 				},
+	# 				{
+	# 					"target": "ns2.nic.example",
+	#					"status": "Down"
+	# 				}
+	# 			]
+	# 		},
+	# 		{
+	# 			"city": "Sydney",
+	# 			"testData": [
+	# 				{
+	# 					"target": "ns1.nic.example",
+	# 					"status": "Up"
+	# 				},
+	# 				{
+	# 					"target": "ns2.nic.example",
+	# 					"status": "Up"
+	# 				}
+	# 			]
+	# 		}
+	# 	]
+	# }
+
+	foreach my $target (keys(%{$name_server_availability_data->{'targets'}}))
+	{
+		push(@{$json->{'nameServerAvailability'}{'nameServerStatus'}},
+			{
+				'target' => $target,
+				'status' => ($name_server_availability_data->{'targets'}{$target} == UP ? 'Up' : 'Down'),
+			}
+		);
+	}
+
+	foreach my $probe (keys(%{$name_server_availability_data->{'probes'}}))
+	{
+		my $test_data = [];
+
+		foreach my $target (keys(%{$name_server_availability_data->{'probes'}{$probe}}))
 		{
-			push(@{$json->{'nameServerAvailability'}{'nameServerStatus'}},
+			push(@{$test_data},
 				{
 					'target' => $target,
-					'status' => ($name_server_availability_data->{'targets'}{$target} == UP ? 'Up' : 'Down'),
+					'status' => ($name_server_availability_data->{'probes'}{$probe}{$target} == UP ? 'Up' : 'Down'),
 				}
 			);
 		}
 
-		foreach my $probe (keys(%{$name_server_availability_data->{'probes'}}))
-		{
-			my $test_data = [];
-
-			foreach my $target (keys(%{$name_server_availability_data->{'probes'}{$probe}}))
+		push(@{$json->{'nameServerAvailability'}{'probes'}},
 			{
-				push(@{$test_data},
-					{
-						'target' => $target,
-						'status' => ($name_server_availability_data->{'probes'}{$probe}{$target} == UP ? 'Up' : 'Down'),
-					}
-				);
+				'city' => $probe,
+				'testData' => $test_data,
 			}
-
-			push(@{$json->{'nameServerAvailability'}{'probes'}},
-				{
-					'city' => $probe,
-					'testData' => $test_data,
-				}
-			);
-		}
+		);
 	}
 
 	# add configuration data
