@@ -141,4 +141,6 @@ unsigned int	configured_tls_accept_mode;
 unsigned int	configured_tls_connect_modes;
 unsigned int	configured_tls_accept_modes;
 
+char	*CONFIG_EXPORT_TYPE	= NULL;
+
 #endif	/* _T_RSM_H_ */
