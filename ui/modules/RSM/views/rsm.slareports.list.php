@@ -37,11 +37,15 @@ $widget = (new CWidget())
 						->setWidth(ZBX_TEXTAREA_FILTER_STANDARD_WIDTH)
 						->setAttribute('autocomplete', 'off')
 					)
-					->addRow(_('Period'), [
-						new CComboBox('filter_month', $data['filter_month'], null, array_combine($months,
-							array_map('getMonthCaption', $months))),
+					->addRow(new CLabel(_('Period'), 'label-filter_month'), [
+						(new CSelect('filter_month'))
+							->setFocusableElementId('label-filter_month')
+							->setValue($data['filter_month'])
+							->addOptions(CSelect::createOptionsFromArray(array_combine($months, array_map('getMonthCaption', $months)))),
 						SPACE,
-						new CComboBox('filter_year', $data['filter_year'], null, array_combine($years, $years))
+						(new CSelect('filter_year'))
+							->setValue($data['filter_year'])
+							->addOptions(CSelect::createOptionsFromArray(array_combine($years, $years)))
 					])
 				]
 			)

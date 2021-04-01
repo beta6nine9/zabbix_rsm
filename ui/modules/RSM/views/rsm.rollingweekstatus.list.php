@@ -156,22 +156,43 @@ else {
 }
 
 // Add right-most filter column.
-$filter_value = (new CComboBox('filter_slv', isset($data['filter_slv']) ? $data['filter_slv'] : null))
-	->addItem('', _('any'))
-	->addItem(SLA_MONITORING_SLV_FILTER_NON_ZERO, _('non-zero'));
+$filter_value = (new CSelect('filter_slv'))
+	->setFocusableElementId('label-filter-value');
 
-foreach (explode(',', $data['slv']) as $slv) {
-	$filter_value->addItem($slv, $slv.'%');
+if (isset($data['filter_slv'])) {
+	$filter_value->setValue($data['filter_slv']);
 }
 
+$options = [
+	'' => _('any'),
+	SLA_MONITORING_SLV_FILTER_NON_ZERO => _('non-zero')
+];
+
+foreach (explode(',', $data['slv']) as $slv) {
+	$options[$slv] = $slv.'%';
+}
+
+$filter_value->addOptions(CSelect::createOptionsFromArray($options));
+
+// filter status
+$filter_status = (new CSelect('filter_status'))
+	->setFocusableElementId('label-filter-status');
+
+if (isset($data['filter_status'])) {
+	$filter_status->setValue($data['filter_status']);
+}
+
+$filter_status->addOptions(CSelect::createOptionsFromArray(
+	[
+		0 => _('all'),
+		1 => _('fail'),
+		2 => _('disabled'),
+	]
+));
+
 $filter_fields[] = (new CFormList())
-	->addRow(_('Exceeding or equal to'), $filter_value)
-	->addRow(_('Current status'),
-		(new CComboBox('filter_status', array_key_exists('filter_status', $data) ? $data['filter_status'] : null))
-			->addItem(0, _('all'))
-			->addItem(1, _('fail'))
-			->addItem(2, _('disabled'))
-	);
+	->addRow(new CLabel(_('Exceeding or equal to'), 'label-filter-value'), $filter_value)
+	->addRow(new CLabel(_('Current status'), 'label-filter-status'), $filter_status);
 
 // Create data table.
 if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
