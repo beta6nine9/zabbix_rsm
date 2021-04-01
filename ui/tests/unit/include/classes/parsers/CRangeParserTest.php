@@ -1,7 +1,7 @@
 ﻿<?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2020 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -19,12 +19,14 @@
 **/
 
 
-class CRangeParserTest extends PHPUnit_Framework_TestCase {
+use PHPUnit\Framework\TestCase;
+
+class CRangeParserTest extends TestCase {
 
 	/**
 	 * An array of time periods and parsed results.
 	 */
-	public static function testProvider() {
+	public static function dataProvider() {
 		return [
 			// success
 			[
@@ -752,7 +754,7 @@ class CRangeParserTest extends PHPUnit_Framework_TestCase {
 	}
 
 	/**
-	 * @dataProvider testProvider
+	 * @dataProvider dataProvider
 	 *
 	 * @param string $source
 	 * @param int    $pos

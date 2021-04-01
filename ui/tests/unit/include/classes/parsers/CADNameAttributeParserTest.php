@@ -1,7 +1,7 @@
-<?php
+<?php declare(strict_types=1);
 /*
 ** Zabbix
-** Copyright (C) 2001-2020 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -19,12 +19,14 @@
 **/
 
 
-class CADNameAttributeParserTest extends PHPUnit_Framework_TestCase {
+use PHPUnit\Framework\TestCase;
+
+class CADNameAttributeParserTest extends TestCase {
 
 	/**
 	 * An array of user name strings and parsed results.
 	 */
-	public static function testProvider() {
+	public static function dataProvider() {
 		$strict = ['strict' => true];
 		// Parse only sAMAccountName.
 		$only_sama = ['nametype' => CADNameAttributeParser::ZBX_TYPE_SAMA];
@@ -176,7 +178,7 @@ class CADNameAttributeParserTest extends PHPUnit_Framework_TestCase {
 	}
 
 	/**
-	 * @dataProvider testProvider
+	 * @dataProvider dataProvider
 	 *
 	 * @param string $source
 	 * @param int    $pos

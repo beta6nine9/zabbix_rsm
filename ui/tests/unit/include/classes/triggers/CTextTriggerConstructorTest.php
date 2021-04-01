@@ -1,7 +1,7 @@
-<?php
+<?php declare(strict_types=1);
 /*
 ** Zabbix
-** Copyright (C) 2001-2020 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -19,18 +19,20 @@
 **/
 
 
-class CTextTriggerConstructorTest extends PHPUnit_Framework_TestCase {
+use PHPUnit\Framework\TestCase;
+
+class CTextTriggerConstructorTest extends TestCase {
 
 	/**
 	 * @var CTextTriggerConstructor
 	 */
 	protected $constructor;
 
-	public function setUp() {
+	protected function setUp(): void {
 		$this->constructor = new CTextTriggerConstructor(new CTriggerExpression());
 	}
 
-	public function testGetExpressionFromPartsValidProvider() {
+	public function dataProviderGetExpressionFromPartsValid() {
 		return [
 			[
 				'host',
@@ -298,7 +300,7 @@ class CTextTriggerConstructorTest extends PHPUnit_Framework_TestCase {
 	/**
 	 * Test calling getExpressionFromParts() with valid parameters.
 	 *
-	 * @dataProvider testGetExpressionFromPartsValidProvider
+	 * @dataProvider dataProviderGetExpressionFromPartsValid
 	 *
 	 * @param $host
 	 * @param $item
@@ -318,7 +320,7 @@ class CTextTriggerConstructorTest extends PHPUnit_Framework_TestCase {
 		$this->markTestIncomplete();
 	}
 
-	public function testGetPartsFromExpressionProvider() {
+	public function dataProviderGetPartsFromExpression() {
 		return [
 			[
 				'({Zabbix server:system.hostname.regexp(a)})=0',
@@ -535,7 +537,7 @@ class CTextTriggerConstructorTest extends PHPUnit_Framework_TestCase {
 	}
 
 	/**
-	 * @dataProvider testGetPartsFromExpressionProvider
+	 * @dataProvider dataProviderGetPartsFromExpression
 	 *
 	 * @param $expression
 	 * @param array $expectedParts

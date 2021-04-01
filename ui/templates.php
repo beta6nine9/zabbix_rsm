@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2020 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -516,12 +516,10 @@ elseif (hasRequest('add') || hasRequest('update')) {
 		if ($templateId == 0) {
 			$messageSuccess = _('Template added');
 			$messageFailed = _('Cannot add template');
-			$auditAction = AUDIT_ACTION_ADD;
 		}
 		else {
 			$messageSuccess = _('Template updated');
 			$messageFailed = _('Cannot update template');
-			$auditAction = AUDIT_ACTION_UPDATE;
 		}
 
 		// Add new group.
@@ -583,7 +581,10 @@ elseif (hasRequest('add') || hasRequest('update')) {
 
 			$result = API::Template()->update($template);
 
-			if (!$result) {
+			if ($result) {
+				add_audit_ext(AUDIT_ACTION_UPDATE, AUDIT_RESOURCE_TEMPLATE, $templateId, $templateName, 'hosts', null, null);
+			}
+			else {
 				throw new Exception();
 			}
 		}
@@ -653,10 +654,10 @@ elseif (hasRequest('add') || hasRequest('update')) {
 
 			// copy template screens
 			$dbTemplateScreens = API::TemplateScreen()->get([
+				'noInheritance' => true,
 				'output' => ['screenid'],
 				'templateids' => $cloneTemplateId,
-				'preservekeys' => true,
-				'inherited' => false
+				'preservekeys' => true
 			]);
 
 			if ($dbTemplateScreens) {
@@ -669,10 +670,6 @@ elseif (hasRequest('add') || hasRequest('update')) {
 					throw new Exception();
 				}
 			}
-		}
-
-		if ($result) {
-			add_audit_ext($auditAction, AUDIT_RESOURCE_TEMPLATE, $templateId, $templateName, 'hosts', null, null);
 		}
 
 		unset($_REQUEST['form'], $_REQUEST['templateid']);
