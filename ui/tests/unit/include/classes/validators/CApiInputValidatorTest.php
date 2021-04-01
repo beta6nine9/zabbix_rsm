@@ -1,7 +1,7 @@
-<?php
+<?php declare(strict_types=1);
 /*
 ** Zabbix
-** Copyright (C) 2001-2020 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -19,7 +19,9 @@
 **/
 
 
-class CApiInputValidatorTest extends PHPUnit_Framework_TestCase {
+use PHPUnit\Framework\TestCase;
+
+class CApiInputValidatorTest extends TestCase {
 
 	public function dataProviderInput() {
 		return [
@@ -3096,6 +3098,144 @@ class CApiInputValidatorTest extends PHPUnit_Framework_TestCase {
 				'text{EVENT.TAGS."JIRAID"}text',
 				'/1/url',
 				'text{EVENT.TAGS."JIRAID"}text'
+			],
+			[
+				['type' => API_TRIGGER_EXPRESSION],
+				null,
+				'/1/expression',
+				'Invalid parameter "/1/expression": a character string is expected.'
+			],
+			[
+				['type' => API_TRIGGER_EXPRESSION, 'flags' => API_NOT_EMPTY],
+				'',
+				'/1/expression',
+				'Invalid parameter "/1/expression": cannot be empty.'
+			],
+			[
+				['type' => API_TRIGGER_EXPRESSION],
+				[],
+				'/1/expression',
+				'Invalid parameter "/1/expression": a character string is expected.'
+			],
+			[
+				['type' => API_TRIGGER_EXPRESSION, 'length' => 10],
+				'{host:item.last()} = 0',
+				'/1/expression',
+				'Invalid parameter "/1/expression": value is too long.'
+			],
+			[
+				['type' => API_TRIGGER_EXPRESSION],
+				'{host:item.last() = 0',
+				'/1/expression',
+				'Invalid parameter "/1/expression": incorrect trigger expression starting from "{host:item.last() = 0".'
+			],
+			[
+				['type' => API_TRIGGER_EXPRESSION],
+				'9 and 1',
+				'/1/expression',
+				'Invalid parameter "/1/expression": trigger expression must contain at least one host:key reference.'
+			],
+			[
+				['type' => API_TRIGGER_EXPRESSION],
+				'{host:item.last()} = {#LLD_MACRO}',
+				'/1/expression',
+				'Invalid parameter "/1/expression": incorrect trigger expression starting from " {#LLD_MACRO}".'
+			],
+			[
+				['type' => API_TRIGGER_EXPRESSION, 'flags' => API_ALLOW_LLD_MACRO],
+				'{host:item.last()} = {#LLD_MACRO}',
+				'/1/expression',
+				'{host:item.last()} = {#LLD_MACRO}'
+			],
+			[
+				['type' => API_TRIGGER_EXPRESSION],
+				'{host:item.last()} = 0',
+				'/1/expression',
+				'{host:item.last()} = 0'
+			],
+			[
+				['type' => API_TRIGGER_EXPRESSION],
+				'{host:item.last()} = {$USER_MACRO}',
+				'/1/expression',
+				'{host:item.last()} = {$USER_MACRO}'
+			],
+			[
+				['type' => API_TRIGGER_EXPRESSION],
+				'',
+				'/1/expression',
+				''
+			],
+			[
+				['type' => API_JSONRPC_PARAMS],
+				[],
+				'/params',
+				[]
+			],
+			[
+				['type' => API_JSONRPC_PARAMS],
+				'',
+				'/params',
+				'Invalid parameter "/params": an array or object is expected.'
+			],
+			[
+				['type' => API_JSONRPC_PARAMS],
+				1,
+				'/params',
+				'Invalid parameter "/params": an array or object is expected.'
+			],
+			[
+				['type' => API_JSONRPC_PARAMS],
+				true,
+				'/params',
+				'Invalid parameter "/params": an array or object is expected.'
+			],
+			[
+				['type' => API_JSONRPC_PARAMS],
+				'23',
+				'/params',
+				'Invalid parameter "/params": an array or object is expected.'
+			],
+			[
+				['type' => API_JSONRPC_PARAMS],
+				null,
+				'/params',
+				'Invalid parameter "/params": an array or object is expected.'
+			],
+			[
+				['type' => API_JSONRPC_ID],
+				[],
+				'/id',
+				'Invalid parameter "/id": a string, number or null value is expected.'
+			],
+			[
+				['type' => API_JSONRPC_ID],
+				'id',
+				'/id',
+				'id'
+			],
+			[
+				['type' => API_JSONRPC_ID],
+				1,
+				'/id',
+				1
+			],
+			[
+				['type' => API_JSONRPC_ID],
+				true,
+				'/id',
+				'Invalid parameter "/id": a string, number or null value is expected.'
+			],
+			[
+				['type' => API_JSONRPC_ID],
+				'23',
+				'/id',
+				'23'
+			],
+			[
+				['type' => API_JSONRPC_ID],
+				null,
+				'/id',
+				null
 			]
 		];
 	}

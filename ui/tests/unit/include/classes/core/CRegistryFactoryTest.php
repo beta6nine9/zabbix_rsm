@@ -1,7 +1,7 @@
-<?php
+<?php declare(strict_types=1);
 /*
 ** Zabbix
-** Copyright (C) 2001-2020 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -19,14 +19,16 @@
 **/
 
 
-class CRegistryFactoryTest extends PHPUnit_Framework_TestCase {
+use PHPUnit\Framework\TestCase;
+
+class CRegistryFactoryTest extends TestCase {
 
 	/**
 	 * @var CRegistryFactory
 	 */
 	protected $factory;
 
-	public function setUp() {
+	protected function setUp(): void {
 		$this->factory = new CRegistryFactory([
 			'string' => 'DateTime',
 			'closure' => function() {

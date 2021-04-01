@@ -161,6 +161,8 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		slv_exit
 		fail_if_running
 		exit_if_running
+		ltrim
+		rtrim
 		trim
 		str_starts_with
 		str_ends_with
@@ -4172,12 +4174,26 @@ sub fail
 	slv_exit(E_FAIL);
 }
 
-sub trim
+sub ltrim($)
 {
-	$_[0] =~ s/^\s+//g;
-	$_[0] =~ s/\s+$//g;
+	my $string = shift;
+
+	return $string =~ s/^\s+//r;
 }
 
+sub rtrim($)
+{
+	my $string = shift;
+
+	return $string =~ s/\s+$//r;
+}
+
+sub trim($)
+{
+	my $string = shift;
+
+	return $string =~ s/^\s+|\s+$//gr;
+}
 
 sub str_starts_with($$;$$)
 {

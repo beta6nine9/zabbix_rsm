@@ -39,6 +39,7 @@ our @EXPORT = qw(zbx_connect check_api_error get_proxies_list
 		get_items_like get_host_items set_tld_type get_triggers_by_items
 		add_dependency
 		update_rsmhost_config_times
+		request_config_cache_reload
 		pfail);
 
 our ($zabbix, $result);
@@ -709,30 +710,40 @@ sub create_group
 
 sub create_template
 {
-	my $name = shift;
+	my $name               = shift;
+	my $linked_templateids = shift; # optional
 
 	my $templateid = $zabbix->exist('template', {'filter' => {'host' => $name}});
 
 	if ($templateid)
 	{
-		$zabbix->update(
-			'template',
-			{
-				'templateid' => $templateid,
-				'groups'     => {'groupid' => TEMPLATES_TLD_GROUPID},
-				'host'       => $name
-			}
-		);
+		my $config = {
+			'templateid' => $templateid,
+			'groups'     => {'groupid' => TEMPLATES_TLD_GROUPID},
+			'host'       => $name
+		};
+
+		if (defined($linked_templateids))
+		{
+			$config->{'templates'} = [map({'templateid' => $_}, @{$linked_templateids})];
+		}
+
+		$zabbix->update('template', $config);
 	}
 	else
 	{
-		my $result = $zabbix->create(
-			'template',
-			{
-				'groups'=> {'groupid' => TEMPLATES_TLD_GROUPID},
-				'host'  => $name
-			}
-		);
+		my $config = {
+			'groups'=> {'groupid' => TEMPLATES_TLD_GROUPID},
+			'host'  => $name
+		};
+
+		if (defined($linked_templateids))
+		{
+			$config->{'templates'} = [map({'templateid' => $_}, @{$linked_templateids})];
+		}
+
+		my $result = $zabbix->create('template', $config);
+
 		$templateid = $result->{'templateids'}[0];
 	}
 
@@ -1260,6 +1271,11 @@ sub update_rsmhost_config_times($)
 	push(@times, $^T);
 
 	create_macro('{$RSM.TLD.CONFIG.TIMES}', join(';', @times), $config_template->{'templateid'}, 1);
+}
+
+sub request_config_cache_reload()
+{
+	create_macro('{$RSM.CONFIG.CACHE.RELOAD.REQUESTED}', time(), undef, 1);
 }
 
 sub pfail

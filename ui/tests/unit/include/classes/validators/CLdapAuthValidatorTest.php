@@ -1,7 +1,7 @@
-<?php
+<?php declare(strict_types=1);
 /*
 ** Zabbix
-** Copyright (C) 2001-2020 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -21,13 +21,15 @@
 /**
  * @incomplete
  */
+use PHPUnit\Framework\TestCase;
+
 class CLdapAuthValidatorTest extends CValidatorTest {
 
-	public function setUp() {
+	protected function setUp(): void {
 		$this->markTestIncomplete('This test is not yet written');
 	}
 
-	public function validParamProvider() {
+	public function dataProviderValidParam() {
 		return [
 			[[
 				'conf' => []
@@ -35,15 +37,15 @@ class CLdapAuthValidatorTest extends CValidatorTest {
 		];
 	}
 
-	public function validValuesProvider() {
+	public function dataProviderValidValues() {
 		return [[]];
 	}
 
-	public function invalidValuesProvider() {
+	public function dataProviderInvalidValues() {
 		return [[]];
 	}
 
-	public function invalidValuesWithObjectsProvider() {
+	public function dataProviderInvalidValuesWithObjects() {
 		return [[]];
 	}
 

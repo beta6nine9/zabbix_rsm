@@ -1,7 +1,7 @@
-<?php
+<?php declare(strict_types=1);
 /*
 ** Zabbix
-** Copyright (C) 2001-2020 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -19,9 +19,11 @@
 **/
 
 
+use PHPUnit\Framework\TestCase;
+
 class C32ImportConverterTest extends CImportConverterTest {
 
-	public function testConvertProvider() {
+	public function dataProviderConvert() {
 		return [
 			[
 				[
@@ -797,7 +799,7 @@ class C32ImportConverterTest extends CImportConverterTest {
 	}
 
 	/**
-	 * @dataProvider testConvertProvider
+	 * @dataProvider dataProviderConvert
 	 *
 	 * @param $data
 	 * @param $expected
