@@ -1,3 +1,10 @@
+Changes for rsm2.2.0rc7
+
+Bug fixes:
+....I..... [sub-760] got rid of LLD when handling NS,IP pairs (asitals)
+..F....PS. [sub-760] updated to Zabbix 5.0.10 (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.2.0rc6
 
 Bug fixes:
