@@ -90,7 +90,7 @@ Zabbix proxy with MySQL or MariaDB database support.
 %package proxy-mysql-selinux
 Summary:		SELinux Policies for Zabbix proxy
 Group:			System Environment/Base
-Requires(post):		selinux-policy-base >= %{selinux_policyver}, selinux-policy-targeted >= %{selinux_policyver}, policycoreutils, policycoreutils-python libselinux-utils
+Requires(post):		selinux-policy-base >= %{selinux_policyver}, selinux-policy-targeted >= %{selinux_policyver}, policycoreutils, policycoreutils-python-utils libselinux-utils
 Requires:		zabbix-proxy = %{version}-%{release}
 
 %description proxy-mysql-selinux
@@ -126,7 +126,7 @@ Zabbix server with MySQL or MariaDB database support.
 %package server-mysql-selinux
 Summary:		SELinux Policies for Zabbix server
 Group:			System Environment/Base
-Requires(post):		selinux-policy-base >= %{selinux_policyver}, selinux-policy-targeted >= %{selinux_policyver}, policycoreutils, policycoreutils-python libselinux-utils
+Requires(post):		selinux-policy-base >= %{selinux_policyver}, selinux-policy-targeted >= %{selinux_policyver}, policycoreutils, policycoreutils-python-utils libselinux-utils
 Requires:		zabbix-server = %{version}-%{release}
 
 %description server-mysql-selinux
@@ -171,7 +171,7 @@ Zabbix web frontend for MySQL
 Summary:		SELinux Policies for Zabbix web frontend
 Group:			System Environment/Base
 BuildArch:		noarch
-Requires(post):		selinux-policy-base >= %{selinux_policyver}, selinux-policy-targeted >= %{selinux_policyver}, policycoreutils, policycoreutils-python libselinux-utils
+Requires(post):		selinux-policy-base >= %{selinux_policyver}, selinux-policy-targeted >= %{selinux_policyver}, policycoreutils, policycoreutils-python-utils libselinux-utils
 Requires:		zabbix-web-mysql = %{version}-%{release}
 
 %description web-mysql-selinux
@@ -182,7 +182,7 @@ SELinux policy modules for use with Zabbix web frontend
 Summary:		SELinux Policies for Zabbix agent
 Group:			System Environment/Base
 BuildArch:		noarch
-Requires(post):		selinux-policy-base >= %{selinux_policyver}, selinux-policy-targeted >= %{selinux_policyver}, policycoreutils, policycoreutils-python libselinux-utils
+Requires(post):		selinux-policy-base >= %{selinux_policyver}, selinux-policy-targeted >= %{selinux_policyver}, policycoreutils, policycoreutils-python-utils libselinux-utils
 Requires:		zabbix-agent
 
 %description agent-selinux
@@ -196,7 +196,7 @@ BuildArch:			noarch
 Requires:			perl-Data-Dumper, perl-DBD-MySQL, perl-Sys-Syslog
 Requires:			perl-DateTime, perl-Config-Tiny, perl-libwww-perl
 Requires:			perl-LWP-Protocol-https, perl-JSON-XS, perl-Expect
-Requires:			perl-Redis, perl-File-Pid, perl-DateTime-Format-RFC3339
+Requires:			perl-Redis, perl-DateTime-Format-RFC3339
 Requires:			perl-Text-CSV_XS, perl-Types-Serialiser
 Requires:			perl-Path-Tiny
 Requires:			perl-Parallel-ForkManager
