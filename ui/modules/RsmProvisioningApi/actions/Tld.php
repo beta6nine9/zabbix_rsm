@@ -58,7 +58,6 @@ class Tld extends MonitoringTarget {
 							'rdapTestedDomain'          => ['type' => API_STRING_UTF8, 'flags' => API_REQUIRED],
 							'rdds43NsString'            => ['type' => API_STRING_UTF8, 'flags' => API_REQUIRED],
 						]],
-						'zabbixMonitoringCentralServer' => ['type' => API_UINT64     , 'in' => implode(',', array_keys($GLOBALS['DB']['SERVERS']))],    // TODO: check if that's actually current server
 					]
 				];
 
@@ -151,7 +150,6 @@ class Tld extends MonitoringTarget {
 					'rdapTestedDomain'          => $macros[$host][self::MACRO_TLD_RDAP_ENABLED] ? $macros[$host][self::MACRO_TLD_RDAP_TEST_DOMAIN]   : null,
 					'rdds43NsString'            => $macros[$host][self::MACRO_TLD_RDDS_ENABLED] ? $macros[$host][self::MACRO_TLD_RDDS_NS_STRING]     : null,
 				],
-				'zabbixMonitoringCentralServer' => 'TODO',                                                              // TODO: fill with real value
 			];
 		}
 

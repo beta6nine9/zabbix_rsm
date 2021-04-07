@@ -49,7 +49,6 @@ class Probe extends ActionBaseEx {
 							'proxyPsk'                  => ['type' => API_PSK        , 'flags' => API_REQUIRED],
 						]],
 						'online'                        => ['type' => API_BOOLEAN    , 'flags' => API_REQUIRED],                                        // TODO: "element to put the probe node in manual offline mode" - when receiving list, we should skip disabled probes (not knocked off) completely?
-						'zabbixMonitoringCentralServer' => ['type' => API_UINT64     , 'in' => implode(',', array_keys($GLOBALS['DB']['SERVERS']))],    // TODO: check if that's actually current server
 					]
 				];
 
@@ -146,7 +145,6 @@ class Probe extends ActionBaseEx {
 					'proxyPsk'                  => null,
 				],
 				'online'                        => (bool)$status[$hostid],
-				'zabbixMonitoringCentralServer' => 'TODO',                                                              // TODO: fill with real value
 			];
 		}
 
