@@ -19,7 +19,11 @@ abstract class ActionBase extends CController {
 	protected const REQUEST_METHOD_DELETE  = 'DELETE';
 	protected const REQUEST_METHOD_PUT     = 'PUT';
 
+	protected $oldObject = null;
+	protected $newObject = null;
+
 	abstract protected function checkMonitoringTarget();
+	abstract protected function requestConfigCacheReload();
 	abstract protected function getInputRules(): array;
 	abstract protected function getObjectIdInputField();
 	abstract protected function getObjects(?string $objectId);
@@ -33,26 +37,63 @@ abstract class ActionBase extends CController {
 	}
 
 	public function __destruct() {
-		$this->printStats();
+		$stats = $this->getStats();
+		$stats = explode("\n", $stats);
+
+		foreach ($stats as $i => $line)
+		{
+			header(sprintf("Rsm-Stats-%02d: %s", $i, $line));
+		}
 	}
 
-	protected function printStats() {
-		$stats = mysqli_get_connection_stats($GLOBALS['DB']['DB']);
-		echo "\n"
-			. str_pad('', 80, '-') . "\n"
-			. "selects        - " . str_pad(number_format($stats['result_set_queries'             ], 0, '.', '\''), 7, ' ', STR_PAD_LEFT) . "\n"
-			. "updates        - " . str_pad(number_format($stats['non_result_set_queries'         ], 0, '.', '\''), 7, ' ', STR_PAD_LEFT) . "\n"
-			. "total          - " . str_pad(number_format($stats['com_query'                      ], 0, '.', '\''), 7, ' ', STR_PAD_LEFT) . "\n"
-			. "\n"
-			. "rows_fetched   - " . str_pad(number_format($stats['rows_fetched_from_server_normal'], 0, '.', '\''), 7, ' ', STR_PAD_LEFT) . "\n"
-			. "\n"
-			. "fetched_int    - " . str_pad(number_format($stats['proto_text_fetched_int'         ], 0, '.', '\''), 7, ' ', STR_PAD_LEFT) . "\n"
-			. "fetched_bigint - " . str_pad(number_format($stats['proto_text_fetched_bigint'      ], 0, '.', '\''), 7, ' ', STR_PAD_LEFT) . "\n"
-			. "fetched_string - " . str_pad(number_format($stats['proto_text_fetched_string'      ], 0, '.', '\''), 7, ' ', STR_PAD_LEFT) . "\n"
-			. "fetched_enum   - " . str_pad(number_format($stats['proto_text_fetched_enum'        ], 0, '.', '\''), 7, ' ', STR_PAD_LEFT) . "\n"
-			. "\n"
-			. "time_spent     - " . number_format(microtime(true) - $_SERVER['REQUEST_TIME_FLOAT'], 3, '.', '\'') . " seconds\n"
-			. str_pad('', 80, '-') . "\n";
+	protected function getStats() {
+		$format = fn($n) => sprintf('%7s', number_format($n, 0, '.', '\''));
+
+		$dbStats = mysqli_get_connection_stats($GLOBALS['DB']['DB']);
+
+		$time_spent = microtime(true) - $_SERVER['REQUEST_TIME_FLOAT'];
+
+		$data = [
+			null,
+			'total'          => $format($dbStats['com_query']),
+			'selects'        => $format($dbStats['result_set_queries'    ]) . sprintf(" (%.1f%%)", $dbStats['result_set_queries'    ] / $dbStats['com_query'] * 100),
+			'updates'        => $format($dbStats['non_result_set_queries']) . sprintf(" (%.1f%%)", $dbStats['non_result_set_queries'] / $dbStats['com_query'] * 100),
+			null,
+			'rows fetched'   => $format($dbStats['rows_fetched_from_server_normal']),
+			null,
+			'fetched int'    => $format($dbStats['proto_text_fetched_int']),
+			'fetched bigint' => $format($dbStats['proto_text_fetched_bigint']),
+			'fetched string' => $format($dbStats['proto_text_fetched_string']),
+			'fetched enum'   => $format($dbStats['proto_text_fetched_enum']),
+			null,
+			'memory used'    => sprintf("%.2f MB", memory_get_peak_usage(true) / 1024 / 1024),
+			'time spent'     => sprintf("%.2f seconds", $time_spent),
+			#'select time'    => sprintf("%.2f seconds (%.1f%%)", $GLOBALS['select_time' ], $GLOBALS['select_time' ] / $time_spent * 100),
+			#'execute time'   => sprintf("%.2f seconds (%.1f%%)", $GLOBALS['execute_time'], $GLOBALS['execute_time'] / $time_spent * 100),
+			#'fetch time'     => sprintf("%.2f seconds (%.1f%%)", $GLOBALS['fetch_time'  ], $GLOBALS['fetch_time'  ] / $time_spent * 100),
+			null,
+		];
+
+		$k_len = max(array_map('strlen', array_keys($data)));
+		$v_len = max(array_map('strlen', array_values($data)));
+
+		$line = '+' . str_pad('', $k_len + 2, '-') . '+' . str_pad('', $v_len + 2, '-') . '+';
+
+		$output = '';
+
+		foreach ($data as $k => $v)
+		{
+			if (is_null($v))
+			{
+				$output .= $line . "\n";
+			}
+			else
+			{
+				$output .= sprintf("| %-{$k_len}s | %-{$v_len}s |\n", $k, $v);
+			}
+		}
+
+		return substr($output, 0, -1);
 	}
 
 	protected function checkPermissions() {
@@ -134,33 +175,56 @@ abstract class ActionBase extends CController {
 		}
 	}
 
+	public function errorHandler(int $errno, string $errstr, string $errfile, int $errline, array $errcontext) {
+		throw new \ErrorException($errstr, 0, $errno, $errfile, $errline);
+	}
+
 	protected function doAction() {
-		if (!$this->checkMonitoringTarget())
+		set_error_handler([$this, 'errorHandler'], E_ALL | E_STRICT);
+
+		try
 		{
-			throw new Exception('Invalid monitoring target');
+			DBstart();
+
+			if (!$this->checkMonitoringTarget())
+			{
+				throw new Exception('Invalid monitoring target');
+			}
+
+			switch ($_SERVER['REQUEST_METHOD'])
+			{
+				case self::REQUEST_METHOD_GET:
+					$this->handleGetRequest();
+					break;
+
+				case self::REQUEST_METHOD_DELETE:
+					$this->handleDeleteRequest();
+					break;
+
+				case self::REQUEST_METHOD_PUT:
+					$this->handlePutRequest();
+					break;
+
+				default:
+					throw new Exception('Unsupported request method');
+			}
+
+			DBend(true);
+		}
+		catch (\Throwable $e)
+		{
+			$this->returnJson([
+				'code'    => $e->getCode(),
+				'message' => $e->getMessage(),
+				'file'    => $e->getFile(),
+				'line'    => $e->getLine(),
+				'trace'   => $e->getTraceAsString(),
+			]);
+
+			DBend(false);
 		}
 
-		DBstart();
-
-		switch ($_SERVER['REQUEST_METHOD'])
-		{
-			case self::REQUEST_METHOD_GET:
-				$this->handleGetRequest();
-				break;
-
-			case self::REQUEST_METHOD_DELETE:
-				$this->handleDeleteRequest();
-				break;
-
-			case self::REQUEST_METHOD_PUT:
-				$this->handlePutRequest();
-				break;
-
-			default:
-				throw new Exception('Unsupported request method');
-		}
-
-		DBend(false);
+		restore_error_handler();
 	}
 
 	protected function handleGetRequest() {
@@ -184,12 +248,19 @@ abstract class ActionBase extends CController {
 	}
 
 	protected function handleDeleteRequest() {
+		// TODO: check if object exists
+		// TODO: 
+
 		$this->deleteObject();
+
+		$this->requestConfigCacheReload();
 
 		$this->returnJson(['foo' => 'bar']);
 	}
 
 	protected function handlePutRequest() {
+		$this->newObject = $this->getInputAll();
+
 		$objects = $this->getObjects($this->getInput($this->getObjectIdInputField()));
 
 		if (empty($objects))
@@ -198,8 +269,11 @@ abstract class ActionBase extends CController {
 		}
 		else
 		{
+			$this->oldObject = $objects[0];
 			$this->updateObject();
 		}
+
+		$this->requestConfigCacheReload();
 
 		$this->returnJson([$this->getInput($this->getObjectIdInputField())]);
 	}

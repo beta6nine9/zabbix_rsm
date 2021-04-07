@@ -160,8 +160,8 @@ class Probe extends ActionBaseEx {
 	protected function createObject() {
 		$input = $this->getInputAll();
 
-		$hostGroupIds = $this->getHostGroupIds($this->getHostGroupNames(null));
-		$templateIds = $this->getTemplateIds($this->getTemplateNames(null));
+		$this->hostGroupIds += $this->getHostGroupIds($this->getHostGroupNames(null));
+		$this->templateIds  += $this->getTemplateIds($this->getTemplateNames(null));
 
 		// create proxy
 
@@ -189,19 +189,19 @@ class Probe extends ActionBaseEx {
 			'name' => $input['probe'],
 		];
 		$data = API::HostGroup()->create($config);
-		$hostGroupIds[$input['probe']] = $data['groupids'][0];
+		$this->hostGroupIds[$input['probe']] = $data['groupids'][0];
 
 		// create "Template Probe Config <probe>" template
 
 		$config = [
 			'host'   => 'Template Probe Config ' . $input['probe'],
 			'groups' => [
-				['groupid' => $hostGroupIds['Templates - TLD']],
+				['groupid' => $this->hostGroupIds['Templates - TLD']],
 			],
 			'macros' => $this->getMacrosConfig($input),
 		];
 		$data = API::Template()->create($config);
-		$templateIds['Template Probe Config ' . $input['probe']] = $data['templateids'][0];
+		$this->templateIds['Template Probe Config ' . $input['probe']] = $data['templateids'][0];
 
 		// create "<probe>" host
 
@@ -211,11 +211,11 @@ class Probe extends ActionBaseEx {
 			'proxy_hostid' => $proxyId,
 			'interfaces'   => [self::DEFAULT_MAIN_INTERFACE],
 			'groups'       => [
-				['groupid' => $hostGroupIds['Probes']],
+				['groupid' => $this->hostGroupIds['Probes']],
 			],
 			'templates'    => [
-				['templateid' => $templateIds['Template Probe Config ' . $input['probe']]],
-				['templateid' => $templateIds['Template Probe Status']],
+				['templateid' => $this->templateIds['Template Probe Config ' . $input['probe']]],
+				['templateid' => $this->templateIds['Template Probe Status']],
 			],
 		];
 		$data = API::Host()->create($config);
@@ -236,10 +236,10 @@ class Probe extends ActionBaseEx {
 				],
 			],
 			'groups'       => [
-				['groupid' => $hostGroupIds['Probes - Mon']],
+				['groupid' => $this->hostGroupIds['Probes - Mon']],
 			],
 			'templates'    => [
-				['templateid' => $templateIds['Template Proxy Health']],
+				['templateid' => $this->templateIds['Template Proxy Health']],
 			],
 			'macros'       => [
 				$this->createMacroConfig(self::MACRO_PROBE_PROXY_NAME, $input['probe']),
@@ -252,11 +252,11 @@ class Probe extends ActionBaseEx {
 		$rsmhostConfigs = $this->getRsmhostConfigs();
 		$probeConfigs = $this->getProbeConfigs();
 
-		$rsmhostProbeHosts = $this->createRsmhostProbeHosts($rsmhostConfigs, $probeConfigs, $hostGroupIds, $templateIds);
+		$rsmhostProbeHosts = $this->createTestHosts($rsmhostConfigs, $probeConfigs);
 
 		// enable/disable items, based on service status and standalone rdap status
 
-		$this->updateServiceItemStatus([], $rsmhostProbeHosts, $templateIds, $rsmhostConfigs, $probeConfigs);
+		$this->updateServiceItemStatus([], $rsmhostProbeHosts, $rsmhostConfigs, $probeConfigs);
 	}
 
 	/******************************************************************************************************************
@@ -266,7 +266,7 @@ class Probe extends ActionBaseEx {
 	protected function updateObject() {
 		$input = $this->getInputAll();
 
-		$templateIds = $this->getTemplateIds($this->getTemplateNames(null));
+		$this->templateIds += $this->getTemplateIds($this->getTemplateNames(null));
 
 		// update "Template Probe Config <probe>" template
 
@@ -317,7 +317,7 @@ class Probe extends ActionBaseEx {
 			],
 		];
 
-		$this->updateServiceItemStatus([], $rsmhostProbeHosts, $templateIds, $rsmhostConfigs, $probeConfigs);
+		$this->updateServiceItemStatus([], $rsmhostProbeHosts, $rsmhostConfigs, $probeConfigs);
 	}
 
 	/******************************************************************************************************************

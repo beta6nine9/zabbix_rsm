@@ -67,10 +67,6 @@ class Tld extends MonitoringTarget {
 		}
 	}
 
-	/******************************************************************************************************************
-	 * Functions for retrieving object                                                                                *
-	 ******************************************************************************************************************/
-
 	protected function getObjects(?string $objectId) {
 		// get hosts
 
@@ -205,82 +201,32 @@ class Tld extends MonitoringTarget {
 		return $tldTypes;
 	}
 
-	/******************************************************************************************************************
-	 * Functions for creating object                                                                                  *
-	 ******************************************************************************************************************/
-
 	protected function createObject() {
-		$input = $this->getInputAll();
-
-		$hostGroupIds = $this->getHostGroupIds($this->getHostGroupNames($input['tldType'], null));
-		$templateIds = $this->getTemplateIds($this->getTemplateNames(null));
-
-		$this->createRsmhostHostGroup($input, $hostGroupIds);
-		$this->createRsmhostConfigTemplate($input, $hostGroupIds, $templateIds);
-		$rsmhostHostid = $this->createRsmhostHost($input, $hostGroupIds, $templateIds);
-
-		// create "<rsmhost> <probe>" hosts
-
-		$services = array_column($input['servicesStatus'], 'enabled', 'service');
-
-		$rsmhostConfigs = [
-			$input['tld'] => [
-				'tldType' => $input['tldType'],
-				'dnsUdp'  => $services['dnsUDP'],
-				'dnsTcp'  => $services['dnsTCP'],
-				'dnssec'  => $input['dnsParameters']['dnssecEnabled'],
-				'rdap'    => $services['rdap'],
-				'rdds'    => $services['rdds'],
-			],
-		];
-
-		$probeConfigs = $this->getProbeConfigs();
-
-		$rsmhostProbeHosts = $this->createRsmhostProbeHosts($rsmhostConfigs, $probeConfigs, $hostGroupIds, $templateIds);
-
-		// enable/disable items, based on service status and standalone rdap status
-
-		$this->updateServiceItemStatus([$rsmhostHostid => $input['tld']], $rsmhostProbeHosts, $templateIds, $rsmhostConfigs, $probeConfigs);
+		parent::createObject();
+		$this->updateDnsNsItems();
 	}
 
-	private function createRsmhostHostGroup(array $input, array &$hostGroupIds) {
-		$config = [
-			'name' => 'TLD ' . $input['tld'],
-		];
-		$data = API::HostGroup()->create($config);
-
-		$hostGroupIds['TLD ' . $input['tld']] = $data['groupids'][0];
+	protected function updateObject() {
+		parent::updateObject();
+		$this->updateDnsNsItems();
 	}
 
-	private function createRsmhostConfigTemplate(array $input, array $hostGroupIds, array &$templateIds) {
+	protected function createStatusHost(array $input) {
 		$config = [
-			'host'   => 'Template Rsmhost Config ' . $input['tld'],
-			'groups' => [
-				['groupid' => $hostGroupIds['Templates - TLD']],
-			],
-			'macros' => $this->getMacrosConfig($input),
-		];
-		$data = API::Template()->create($config);
-
-		$templateIds['Template Rsmhost Config ' . $input['tld']] = $data['templateids'][0];
-	}
-
-	private function createRsmhostHost(array $input, array $hostGroupIds, array $templateIds) {
-		$config = [
-			'host'       => $input['tld'],
+			'host'       => $input[$this->getObjectIdInputField()],
 			'status'     => HOST_STATUS_MONITORED,
 			'interfaces' => [self::DEFAULT_MAIN_INTERFACE],
 			'groups'     => [
-				['groupid' => $hostGroupIds['TLDs']],
-				['groupid' => $hostGroupIds[$input['tldType']]],
+				['groupid' => $this->hostGroupIds['TLDs']],
+				['groupid' => $this->hostGroupIds[$input['tldType']]],
 			],
 			'templates'  => [
-				['templateid' => $templateIds['Template Rsmhost Config ' . $input['tld']]],
-				['templateid' => $templateIds['Template Config History']],
-				['templateid' => $templateIds['Template DNS Status']],
-				['templateid' => $templateIds['Template DNSSEC Status']],
-				['templateid' => $templateIds['Template RDAP Status']],
-				['templateid' => $templateIds['Template RDDS Status']],
+				['templateid' => $this->templateIds['Template Rsmhost Config ' . $input[$this->getObjectIdInputField()]]],
+				['templateid' => $this->templateIds['Template Config History']],
+				['templateid' => $this->templateIds['Template DNS Status']],
+				['templateid' => $this->templateIds['Template DNSSEC Status']],
+				['templateid' => $this->templateIds['Template RDAP Status']],
+				['templateid' => $this->templateIds['Template RDDS Status']],
 			],
 		];
 		$data = API::Host()->create($config);
@@ -288,57 +234,35 @@ class Tld extends MonitoringTarget {
 		return $data['hostids'][0];
 	}
 
-	/******************************************************************************************************************
-	 * Functions for updating object                                                                                  *
-	 ******************************************************************************************************************/
+	protected function createTemplates(array $input) {
+		parent::createTemplates($input);
 
-	protected function updateObject() {
-		$input = $this->getInputAll();
-
-		$hostGroupIds = $this->getHostGroupIds($this->getHostGroupNames($input['tldType'], ['TLD ' . $input['tld']]));
-		$templateIds = $this->getTemplateIds($this->getTemplateNames(null));
-
-		$this->updateRsmhostConfigTemplate($input);
-		$rsmhostHostid = $this->updateRsmhostHost($input, $hostGroupIds);
-
-		// update "<rsmhost> <probe>" hosts
-
-		$services = array_column($input['servicesStatus'], 'enabled', 'service');
-
-		$rsmhostConfigs = [
-			$input['tld'] => [
-				'tldType' => $input['tldType'],
-				'dnsUdp'  => $services['dnsUDP'],
-				'dnsTcp'  => $services['dnsTCP'],
-				'dnssec'  => $input['dnsParameters']['dnssecEnabled'],
-				'rdap'    => $services['rdap'],
-				'rdds'    => $services['rdds'],
-			],
-		];
-
-		$probeConfigs = $this->getProbeConfigs();
-
-		$rsmhostProbeHosts = $this->updateRsmhostProbeHosts($rsmhostConfigs, $probeConfigs, $hostGroupIds);
-
-		// enable/disable items, based on service status and standalone rdap status
-
-		$this->updateServiceItemStatus([$rsmhostHostid => $input['tld']], $rsmhostProbeHosts, $templateIds, $rsmhostConfigs, $probeConfigs);
-	}
-
-	private function updateRsmhostConfigTemplate(array $input) {
 		$config = [
-			'templateid' => $this->getTemplateId('Template Rsmhost Config ' . $input['tld']),
-			'macros'     => $this->getMacrosConfig($input),
+			'host'      => 'Template DNS Test - ' . $input[$this->getObjectIdInputField()],
+			'groups'    => [
+				['groupid' => $this->hostGroupIds['Templates - TLD']],
+			],
+			'templates' => [$this->templateIds['Template DNS Test']],
 		];
-		$data = API::Template()->update($config);
+		$data = API::Template()->create($config);
+
+		$this->templateIds['Template DNS Test - ' . $input[$this->getObjectIdInputField()]] = $data['templateids'][0];
 	}
 
-	private function updateRsmhostHost(array $input, array $hostGroupIds) {
+	protected function getRsmhostProbeTemplatesConfig(string $probe, string $rsmhost) {
+		$templates = parent::getRsmhostProbeTemplatesConfig($probe, $rsmhost);
+
+		$templates[] = ['templateid' => $this->templateIds['Template DNS Test - ' . $rsmhost]];
+
+		return $templates;
+	}
+
+	protected function updateStatustHost(array $input) {
 		$config = [
 			'hostid' => $this->getHostId($input['tld']),
 			'groups' => [
-				['groupid' => $hostGroupIds['TLDs']],
-				['groupid' => $hostGroupIds[$input['tldType']]],
+				['groupid' => $this->hostGroupIds['TLDs']],
+				['groupid' => $this->hostGroupIds[$input['tldType']]],
 			],
 		];
 		$data = API::Host()->update($config);
@@ -346,18 +270,21 @@ class Tld extends MonitoringTarget {
 		return $data['hostids'][0];
 	}
 
-	/******************************************************************************************************************
-	 * Helper functions                                                                                               *
-	 ******************************************************************************************************************/
+	protected function deleteObject() {
+		parent::deleteObject();
 
-	private function getHostGroupNames(string $tldType, ?array $additionalNames) {
+		$templateId = $this->getTemplateId('Template DNS Test - ' . $this->getInput('tld'));
+		$data = API::Template()->delete([$templateId]);
+	}
+
+	protected function getHostGroupNames(array $input, ?array $additionalNames) {
 		$names = [
 			// groups for "<rsmhost>" host
 			'Templates - TLD',
 			'TLDs',
-			$tldType,
+			$input['tldType'],
 			// groups for "<rsmhost> <probe>" hosts
-			$tldType . ' Probe results',
+			$input['tldType'] . ' Probe results',
 			'TLD Probe results',
 		];
 
@@ -369,7 +296,7 @@ class Tld extends MonitoringTarget {
 		return $names;
 	}
 
-	private function getTemplateNames(?array $additionalNames) {
+	protected function getTemplateNames(?array $additionalNames) {
 		$names = [
 			// templates for "<rsmhost>" host
 			'Template Config History',
@@ -379,6 +306,7 @@ class Tld extends MonitoringTarget {
 			'Template RDDS Status',
 			// templates for "<rsmhost> <probe>" hosts
 			'Template DNS Test',
+			'Template DNS Test - ' . $this->newObject['tld'],
 			'Template RDAP Test',
 			'Template RDDS Test',
 		];
@@ -391,7 +319,313 @@ class Tld extends MonitoringTarget {
 		return $names;
 	}
 
-	private function nsipStrToList($str) {
+	protected function getRsmhostConfigsFromInput(array $input) {
+		$services = array_column($input['servicesStatus'], 'enabled', 'service');
+
+		return [
+			$input[$this->getObjectIdInputField()] => [
+				'tldType' => $input['tldType'],
+				'dnsUdp'  => $services['dnsUDP'],
+				'dnsTcp'  => $services['dnsTCP'],
+				'dnssec'  => $input['dnsParameters']['dnssecEnabled'],
+				'rdap'    => $services['rdap'],
+				'rdds'    => $services['rdds'],
+			],
+		];
+	}
+
+	protected function getMacrosConfig(array $input) {
+		$services = array_column($input['servicesStatus'], 'enabled', 'service');
+
+		return [
+			$this->createMacroConfig(self::MACRO_TLD                   , $input[$this->getObjectIdInputField()]),
+			$this->createMacroConfig(self::MACRO_TLD_CONFIG_TIMES      , $_SERVER['REQUEST_TIME']),
+
+			$this->createMacroConfig(self::MACRO_TLD_DNS_UDP_ENABLED   , (int)$services['dnsUDP']),
+			$this->createMacroConfig(self::MACRO_TLD_DNS_TCP_ENABLED   , (int)$services['dnsTCP']),
+			$this->createMacroConfig(self::MACRO_TLD_DNSSEC_ENABLED    , (int)$input['dnsParameters']['dnssecEnabled']),
+			$this->createMacroConfig(self::MACRO_TLD_RDAP_ENABLED      , (int)$services['rdap']),
+			$this->createMacroConfig(self::MACRO_TLD_RDDS_ENABLED      , (int)$services['rdds']),
+
+			$this->createMacroConfig(self::MACRO_TLD_DNS_NAME_SERVERS  , $this->nsipListToStr($input['dnsParameters']['nsIps'])),
+			$this->createMacroConfig(self::MACRO_TLD_DNS_AVAIL_MINNS   , $input['dnsParameters']['minNameServersUP']),    // TODO: schedule minns change
+			$this->createMacroConfig(self::MACRO_TLD_DNS_TESTPREFIX    , $input['dnsParameters']['nsTestPrefix']),
+
+			$this->createMacroConfig(self::MACRO_TLD_RDAP_BASE_URL     , $input['rddsParameters']['rdapUrl']),
+			$this->createMacroConfig(self::MACRO_TLD_RDAP_TEST_DOMAIN  , $input['rddsParameters']['rdapTestedDomain']),
+
+			$this->createMacroConfig(self::MACRO_TLD_RDDS43_TEST_DOMAIN, $input['rddsParameters']['rdds43TestedDomain']),
+			$this->createMacroConfig(self::MACRO_TLD_RDDS_NS_STRING    , $input['rddsParameters']['rdds43NsString']),
+			//$this->createMacroConfig(self::MACRO_TLD_RDDS_43_SERVERS   , $input['rddsParameters']['rdds43Server']),     // TODO: fill with real value
+			//$this->createMacroConfig(self::MACRO_TLD_RDDS_80_SERVERS   , $input['rddsParameters']['rdds80Url']),        // TODO: fill with real value
+		];
+	}
+
+	private function updateDnsNsItems() {
+		$oldNsIpList = is_null($this->oldObject) ? [] : $this->oldObject['dnsParameters']['nsIps'];
+		$newNsIpList = is_null($this->newObject) ? [] : $this->newObject['dnsParameters']['nsIps'];
+		$oldNsList   = array_unique(array_column($oldNsIpList, 'ns'));
+		$newNsList   = array_unique(array_column($newNsIpList, 'ns'));
+
+		$createNsIp  = array_udiff($newNsIpList, $oldNsIpList, [$this, 'compareNsIp']);
+		$disableNsIp = array_udiff($oldNsIpList, $newNsIpList, [$this, 'compareNsIp']);
+		$createNs    = array_diff($newNsList, $oldNsList);
+		$disableNs   = array_diff($oldNsList, $newNsList);
+
+		$createNsIp  = $this->sortNsIpPairs($createNsIp);
+		$disableNsIp = $this->sortNsIpPairs($disableNsIp);
+		sort($createNs);
+		sort($disableNs);
+
+		$testTemplateId = $this->templateIds['Template DNS Test - ' . $this->newObject['tld']];
+
+		if (!empty($createNsIp))
+		{
+			// get value maps
+
+			$valueMapIds = $this->getValueMapIds([
+				'RSM Service Availability',
+				'RSM DNS rtt',
+			]);
+
+			// get itemid of "DNS Test" master item
+
+			$dnsTestItemId = $this->getTemplateItemId('Template DNS Test - ' . $this->newObject['tld'], 'rsm.dns[');
+
+			// create item pseudo-configs
+
+			$statusItems = [];
+			$testItems = [];
+
+			foreach ($createNsIp as $nsip)
+			{
+				$ns = $nsip['ns'];
+				$ip = $nsip['ip'];
+
+				$statusItems += [
+					"rsm.slv.dns.ns.avail[$ns,$ip]" => [
+						'name'       => "DNS NS \$1 (\$2) availability",
+						'valuemapid' => $valueMapIds['RSM Service Availability'],
+					],
+					"rsm.slv.dns.ns.downtime[$ns,$ip]" => [
+						'name'       => "DNS minutes of \$1 (\$2) downtime",
+						'valuemapid' => null,
+					],
+				];
+
+				$testItems += [
+					"rsm.dns.nsid[$ns,$ip]" => [
+						'name'                 => "DNS NSID of $ns,$ip",
+						'value_type'           => ITEM_VALUE_TYPE_STR,
+						'valuemapid'           => null,
+						'description'          => 'DNS Name Server Identifier of the target Name Server that was tested.',
+						'preprocessing_params' => "\$.nsips[?(@.['ns'] == '$ns' && @.['ip'] == '$ip')].nsid.first()",
+					],
+					"rsm.dns.rtt[$ns,$ip,tcp]" => [
+						'name'                 => "DNS NS RTT of $ns,$ip using tcp",
+						'value_type'           => ITEM_VALUE_TYPE_FLOAT,
+						'valuemapid'           => $valueMapIds['RSM DNS rtt'],
+						'description'          => 'The Round-Time Trip returned when testing specific IP of Name Server using TCP protocol.',
+						'preprocessing_params' => "\$.nsips[?(@.['ns'] == '$ns' && @.['ip'] == '$ip' && @.['protocol'] == 'tcp')].rtt.first()",
+					],
+					"rsm.dns.rtt[$ns,$ip,udp]" => [
+						'name'                 => "DNS NS RTT of $ns,$ip using udp",
+						'value_type'           => ITEM_VALUE_TYPE_FLOAT,
+						'valuemapid'           => $valueMapIds['RSM DNS rtt'],
+						'description'          => 'The Round-Time Trip returned when testing specific IP of Name Server using UDP protocol.',
+						'preprocessing_params' => "\$.nsips[?(@.['ns'] == '$ns' && @.['ip'] == '$ip' && @.['protocol'] == 'udp')].rtt.first()",
+					],
+				];
+			}
+
+			foreach ($createNs as $ns)
+			{
+				$testItems += [
+					"rsm.dns.ns.status[$ns]" => [
+						'name'                 => "DNS Test: DNS NS status of $ns",
+						'value_type'           => ITEM_VALUE_TYPE_FLOAT,
+						'valuemapid'           => $valueMapIds['RSM DNS rtt'],
+						'description'          => 'Status of Name Server: 0 (Down), 1 (Up). The Name Server is considered to be up if all its IPs returned successful RTTs.',
+						'preprocessing_params' => "\$.nss[?(@.['ns'] == '$ns')].status.first()",
+					],
+				];
+			}
+
+			// check which items already exist; enable them, remove from pseudo-configs
+
+			$enableItemIds = [];
+
+			$data = API::Item()->get([
+				'output' => ['itemid', 'key_'],
+				'hostid' => $this->statusHostId,
+				'filter' => ['key_' => array_keys($statusItems)],
+			]);
+			if (!empty($data))
+			{
+				$statusItems = array_diff_key($statusItems, array_column($data, 'itemid', 'key_'));
+				$enableItemIds = array_merge($enableItemIds, array_column($data, 'itemid'));
+			}
+
+			$data = API::Item()->get([
+				'output' => ['itemid', 'key_'],
+				'hostid' => $testTemplateId,
+				'filter' => ['key_' => array_keys($testItems)],
+			]);
+			if (!empty($data))
+			{
+				$testItems = array_diff_key($testItems, array_column($data, 'itemid', 'key_'));
+				$enableItemIds = array_merge($enableItemIds, array_column($data, 'itemid'));
+			}
+
+			if (!empty($enableItemIds))
+			{
+				$config = array_map(fn($itemid) => ['itemid' => $itemid, 'status' => ITEM_STATUS_ACTIVE], $enableItemIds);
+				$data = API::Item()->update($config);
+			}
+
+			// build configs for items that need to be created
+
+			$itemConfigs = [];
+
+			foreach ($statusItems as $key => $item)
+			{
+				$itemConfigs[] = [
+					'name'       => $item['name'],
+					'key_'       => $key,
+					'status'     => ITEM_STATUS_ACTIVE,
+					'hostid'     => $this->statusHostId,
+					'type'       => ITEM_TYPE_TRAPPER,
+					'value_type' => ITEM_VALUE_TYPE_UINT64,
+					'valuemapid' => $item['valuemapid'],
+				];
+			}
+
+			foreach ($testItems as $key => $item)
+			{
+				$itemConfigs[] = [
+					'name'          => $item['name'],
+					'key_'          => $key,
+					'status'        => ITEM_STATUS_ACTIVE,
+					'hostid'        => $testTemplateId,
+					'type'          => ITEM_TYPE_DEPENDENT,
+					'master_itemid' => $dnsTestItemId,
+					'value_type'    => $item['value_type'],
+					'valuemapid'    => $item['valuemapid'],
+					'description'   => $item['description'],
+					'preprocessing' => [[
+						'type'                 => ZBX_PREPROC_JSONPATH,
+						'params'               => $item['preprocessing_params'],
+						'error_handler'        => ZBX_PREPROC_FAIL_DISCARD_VALUE,
+						'error_handler_params' => '',
+					]],
+				];
+			}
+
+			// create items
+
+			$data = API::Item()->create($itemConfigs);
+
+			// create triggers
+
+			$thresholds = [
+				['threshold' =>  '10', 'priority' => 2],
+				['threshold' =>  '25', 'priority' => 3],
+				['threshold' =>  '50', 'priority' => 3],
+				['threshold' =>  '75', 'priority' => 4],
+				['threshold' => '100', 'priority' => 5],
+			];
+
+			$triggerConfigs = [];
+
+			foreach ($createNsIp as $nsip)
+			{
+				$ns  = $nsip['ns'];
+				$ip  = $nsip['ip'];
+				$key = "rsm.slv.dns.ns.downtime[$ns,$ip]";
+
+				foreach ($thresholds as $thresholdRow)
+				{
+					$threshold = $thresholdRow['threshold'];
+					$priority  = $thresholdRow['priority'];
+
+					$thresholdStr = $threshold < 100 ? '*' . ($threshold * 0.01) : '';
+
+					$triggerConfigs[] = [
+						'description' => "DNS $ns ($ip) downtime exceeded $threshold% of allowed \$1 minutes",
+						'expression'  => sprintf('{%s:%s.last()}>{$RSM.SLV.NS.DOWNTIME}%s', $this->newObject['tld'], $key, $thresholdStr),
+						'priority'    => $priority,
+					];
+				}
+			}
+
+			if (!empty($triggerConfigs))
+			{
+				$data = API::Trigger()->create($triggerConfigs);
+
+				$triggerDependencyConfigs = [];
+
+				foreach ($data['triggerids'] as $i => $triggerId)
+				{
+					if ($i % count($thresholds) === 0)
+					{
+						continue;
+					}
+
+					$triggerDependencyConfigs[] = [
+						'triggerid'          => $data['triggerids'][$i - 1],
+						'dependsOnTriggerid' => $triggerId,
+					];
+				}
+
+				$data = API::Trigger()->addDependencies($triggerDependencyConfigs);
+			}
+		}
+
+		if (!empty($disableNsIp))
+		{
+			$statusItems = [];
+			$testItems   = [];
+
+			foreach ($disableNsIp as $nsip)
+			{
+				$ns = $nsip['ns'];
+				$ip = $nsip['ip'];
+
+				$statusItems[] = "rsm.slv.dns.ns.avail[$ns,$ip]";
+				$statusItems[] = "rsm.slv.dns.ns.downtime[$ns,$ip]";
+
+				$testItems[] = "rsm.dns.nsid[$ns,$ip]";
+				$testItems[] = "rsm.dns.rtt[$ns,$ip,tcp]";
+				$testItems[] = "rsm.dns.rtt[$ns,$ip,udp]";
+
+			}
+			foreach ($disableNs as $ns)
+			{
+				$testItems[] = "rsm.dns.ns.status[$ns]";
+			}
+
+			$disableItemIds = [];
+			$disableItemIds += $this->getItemIds($this->statusHostId, $statusItems);
+			$disableItemIds += $this->getItemIds($testTemplateId, $testItems);
+
+			$config = array_map(fn($itemid) => ['itemid' => $itemid, 'status' => ITEM_STATUS_DISABLED], array_values($disableItemIds));
+			$data = API::Item()->update($config);
+		}
+	}
+
+	private function getTemplateItemId(string $template, string $key): int {
+		$config = [
+			'output'      => ['itemid'],
+			'templated'   => true,
+			'templateids' => [$this->templateIds[$template]],
+			'search'      => ['key_' => $key],
+		];
+		$data = API::Item()->get($config);
+
+		return $data[0]['itemid'];
+	}
+
+	private function nsipStrToList(string $str): array {
 		$list = [];
 
 		foreach (explode(' ', $str) as $nsip)
@@ -407,7 +641,7 @@ class Tld extends MonitoringTarget {
 		return $this->sortNsIpPairs($list);
 	}
 
-	private function nsipListToStr($list) {
+	private function nsipListToStr(array $list): string {
 		$list = $this->sortNsIpPairs($list);
 
 		foreach ($list as &$nsip)
@@ -419,25 +653,7 @@ class Tld extends MonitoringTarget {
 		return implode(' ', $list);
 	}
 
-	private function sortNsIpPairs(array $nsipList) {
-		// IPv4/IPv6 comparison function for sorting
-
-		$cmp_function = function($a, $b)
-		{
-			$a = inet_pton($a);
-			$b = inet_pton($b);
-
-			if (strlen($a) != strlen($b))
-			{
-				// put IPv4 before IPv6
-				return strlen($a) - strlen($b);
-			}
-			else
-			{
-				return strcmp($a, $b);
-			}
-		};
-
+	private function sortNsIpPairs(array $nsipList): array {
 		// make [ns => [ip1, ip2, ...], ...] array
 
 		$nsipListGrouped = [];
@@ -451,7 +667,7 @@ class Tld extends MonitoringTarget {
 
 		foreach ($nsipListGrouped as &$ips)
 		{
-			usort($ips, $cmp_function);
+			usort($ips, [$this, 'compareIp']);
 		}
 		unset($ips);
 
@@ -477,30 +693,29 @@ class Tld extends MonitoringTarget {
 		return $result;
 	}
 
-	private function getMacrosConfig(array $input) {
-		$services = array_column($input['servicesStatus'], 'enabled', 'service');
+	private function compareIp(string $a, string $b): int {
+		$a = inet_pton($a);
+		$b = inet_pton($b);
 
-		return [
-			$this->createMacroConfig(self::MACRO_TLD                   , $input['tld']),
-			$this->createMacroConfig(self::MACRO_TLD_CONFIG_TIMES      , $_SERVER['REQUEST_TIME']),
+		if (strlen($a) != strlen($b))
+		{
+			// put IPv4 before IPv6
+			return strlen($a) - strlen($b);
+		}
+		else
+		{
+			return strcmp($a, $b);
+		}
+	}
 
-			$this->createMacroConfig(self::MACRO_TLD_DNS_UDP_ENABLED   , (int)$services['dnsUDP']),
-			$this->createMacroConfig(self::MACRO_TLD_DNS_TCP_ENABLED   , (int)$services['dnsTCP']),
-			$this->createMacroConfig(self::MACRO_TLD_DNSSEC_ENABLED    , (int)$input['dnsParameters']['dnssecEnabled']),
-			$this->createMacroConfig(self::MACRO_TLD_RDAP_ENABLED      , (int)$services['rdap']),
-			$this->createMacroConfig(self::MACRO_TLD_RDDS_ENABLED      , (int)$services['rdds']),
-
-			$this->createMacroConfig(self::MACRO_TLD_DNS_NAME_SERVERS  , $this->nsipListToStr($input['dnsParameters']['nsIps'])),
-			$this->createMacroConfig(self::MACRO_TLD_DNS_AVAIL_MINNS   , $input['dnsParameters']['minNameServersUP']),    // TODO: schedule minns change
-			$this->createMacroConfig(self::MACRO_TLD_DNS_TESTPREFIX    , $input['dnsParameters']['nsTestPrefix']),
-
-			$this->createMacroConfig(self::MACRO_TLD_RDAP_BASE_URL     , $input['rddsParameters']['rdapUrl']),
-			$this->createMacroConfig(self::MACRO_TLD_RDAP_TEST_DOMAIN  , $input['rddsParameters']['rdapTestedDomain']),
-
-			$this->createMacroConfig(self::MACRO_TLD_RDDS43_TEST_DOMAIN, $input['rddsParameters']['rdds43TestedDomain']),
-			$this->createMacroConfig(self::MACRO_TLD_RDDS_NS_STRING    , $input['rddsParameters']['rdds43NsString']),
-			//$this->createMacroConfig(self::MACRO_TLD_RDDS_43_SERVERS   , $input['rddsParameters']['rdds43Server']),     // TODO: fill with real value
-			//$this->createMacroConfig(self::MACRO_TLD_RDDS_80_SERVERS   , $input['rddsParameters']['rdds80Url']),        // TODO: fill with real value
-		];
+	private function compareNsIp(array $a, array $b): int {
+		if ($a['ns'] != $b['ns'])
+		{
+			return strcmp($a['ns'], $b['ns']);
+		}
+		else
+		{
+			return $this->compareIp($a['ip'], $b['ip']);
+		}
 	}
 }

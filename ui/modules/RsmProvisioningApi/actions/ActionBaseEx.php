@@ -18,8 +18,9 @@ abstract class ActionBaseEx extends ActionBase {
 		'port'  => '10050',
 	];
 
-	private const MACRO_GLOBAL_MONITORING_TARGET = '{$RSM.MONITORING.TARGET}';
-	private const MACRO_GLOBAL_RDAP_STANDALONE   = '{$RSM.RDAP.STANDALONE}';
+	private const MACRO_GLOBAL_MONITORING_TARGET   = '{$RSM.MONITORING.TARGET}';
+	private const MACRO_GLOBAL_RDAP_STANDALONE     = '{$RSM.RDAP.STANDALONE}';
+	private const MACRO_GLOBAL_CONFIG_CACHE_RELOAD = '{$RSM.CONFIG.CACHE.RELOAD.REQUESTED}';
 
 	protected const MACRO_PROBE_PROXY_NAME   = '{$RSM.PROXY_NAME}';
 	protected const MACRO_PROBE_IP4_ENABLED  = '{$RSM.IP4.ENABLED}';
@@ -74,37 +75,40 @@ abstract class ActionBaseEx extends ActionBase {
 	protected const MONITORING_TARGET_REGISTRY  = 'registry';
 	protected const MONITORING_TARGET_REGISTRAR = 'registrar';
 
+	protected $templateIds  = [];
+	protected $hostGroupIds = [];
+
 	/**
 	 * Creates "<rsmhost> <probe>" hosts when either new rsmhost or new probe is created.
 	 */
-	protected function createRsmhostProbeHosts(array $rsmhostConfigs, array $probeConfigs, array $hostGroupIds, array $templateIds) {
+	protected function createTestHosts(array $rsmhostConfigs, array $probeConfigs) {
 		// get missing host group ids
 
 		$missingHostGroups = array_merge(
 			array_diff(
 				array_map(fn($rsmhost) => 'TLD ' . $rsmhost, array_keys($rsmhostConfigs)),
-				array_keys($hostGroupIds)
+				array_keys($this->hostGroupIds)
 			),
 			array_diff(
 				array_keys($probeConfigs),
-				array_keys($hostGroupIds)
+				array_keys($this->hostGroupIds)
 			)
 		);
-		$hostGroupIds += $this->getHostGroupIds($missingHostGroups);
+		$this->hostGroupIds += $this->getHostGroupIds($missingHostGroups);
 
 		// get missing template ids
 
 		$missingTemplates = array_merge(
 			array_diff(
 				array_map(fn($rsmhost) => 'Template Rsmhost Config ' . $rsmhost, array_keys($rsmhostConfigs)),
-				array_keys($templateIds)
+				array_keys($this->templateIds)
 			),
 			array_diff(
 				array_map(fn($probe) => 'Template Probe Config ' . $probe, array_keys($probeConfigs)),
-				array_keys($templateIds)
+				array_keys($this->templateIds)
 			)
 		);
-		$templateIds += $this->getTemplateIds($missingTemplates);
+		$this->templateIds += $this->getTemplateIds($missingTemplates);
 
 		// create configs for hosts
 
@@ -119,8 +123,8 @@ abstract class ActionBaseEx extends ActionBase {
 					'status'       => HOST_STATUS_MONITORED,
 					'proxy_hostid' => $probeConfig['proxy_hostid'],
 					'interfaces'   => [self::DEFAULT_MAIN_INTERFACE],
-					'groups'       => $this->getRsmhostProbeHostGroupsConfig($hostGroupIds, $rsmhostConfig['tldType'], $probe, $rsmhost),
-					'templates'    => $this->getRsmhostProbeTemplatesConfig($templateIds, $probe, $rsmhost),
+					'groups'       => $this->getRsmhostProbeHostGroupsConfig($rsmhostConfig['tldType'], $probe, $rsmhost),
+					'templates'    => $this->getRsmhostProbeTemplatesConfig($probe, $rsmhost),
 				];
 			}
 		}
@@ -141,20 +145,20 @@ abstract class ActionBaseEx extends ActionBase {
 	/**
 	 * Updates "<rsmhost> <probe>" hosts when tldType of existing rsmhost is modified.
 	 */
-	protected function updateRsmhostProbeHosts(array $rsmhostConfigs, array $probeConfigs, array $hostGroupIds) {
+	protected function updateRsmhostProbeHosts(array $rsmhostConfigs, array $probeConfigs) {
 		// get missing host group ids
 
 		$missingHostGroups = array_merge(
 			array_diff(
 				array_map(fn($rsmhost) => 'TLD ' . $rsmhost, array_keys($rsmhostConfigs)),
-				array_keys($hostGroupIds)
+				array_keys($this->hostGroupIds)
 			),
 			array_diff(
 				array_keys($probeConfigs),
-				array_keys($hostGroupIds)
+				array_keys($this->hostGroupIds)
 			)
 		);
-		$hostGroupIds += $this->getHostGroupIds($missingHostGroups);
+		$this->hostGroupIds += $this->getHostGroupIds($missingHostGroups);
 
 		// create list of hosts, get hostids
 
@@ -181,7 +185,7 @@ abstract class ActionBaseEx extends ActionBase {
 			{
 				$configs[] = [
 					'hostid' => $hostids[$rsmhost . ' ' . $probe],
-					'groups' => $this->getRsmhostProbeHostGroupsConfig($hostGroupIds, $rsmhostConfig['tldType'], $probe, $rsmhost),
+					'groups' => $this->getRsmhostProbeHostGroupsConfig($rsmhostConfig['tldType'], $probe, $rsmhost),
 				];
 			}
 		}
@@ -196,27 +200,22 @@ abstract class ActionBaseEx extends ActionBase {
 		return $hosts;
 	}
 
-	private function getRsmhostProbeHostGroupsConfig(array $hostGroupIds, string $tldType, string $probe, string $rsmhost) {
+	private function getRsmhostProbeHostGroupsConfig(string $tldType, string $probe, string $rsmhost) {
 		return [
-			['groupid' => $hostGroupIds['TLD Probe results']],
-			['groupid' => $hostGroupIds[$tldType . ' Probe results']],
-			['groupid' => $hostGroupIds[$probe]],
-			['groupid' => $hostGroupIds['TLD ' . $rsmhost]],
+			['groupid' => $this->hostGroupIds['TLD Probe results']],
+			['groupid' => $this->hostGroupIds[$tldType . ' Probe results']],
+			['groupid' => $this->hostGroupIds[$probe]],
+			['groupid' => $this->hostGroupIds['TLD ' . $rsmhost]],
 		];
 	}
 
-	private function getRsmhostProbeTemplatesConfig(array $templateIds, string $probe, string $rsmhost) {
+	protected function getRsmhostProbeTemplatesConfig(string $probe, string $rsmhost) {
 		$templates = [];
 
-		if ($this->getMonitoringTarget() === self::MONITORING_TARGET_REGISTRY)
-		{
-			$templates[] = ['templateid' => $templateIds['Template DNS Test']];
-		}
-
-		$templates[] = ['templateid' => $templateIds['Template RDAP Test']];
-		$templates[] = ['templateid' => $templateIds['Template RDDS Test']];
-		$templates[] = ['templateid' => $templateIds['Template Probe Config ' . $probe]];
-		$templates[] = ['templateid' => $templateIds['Template Rsmhost Config ' . $rsmhost]];
+		$templates[] = ['templateid' => $this->templateIds['Template RDAP Test']];
+		$templates[] = ['templateid' => $this->templateIds['Template RDDS Test']];
+		$templates[] = ['templateid' => $this->templateIds['Template Probe Config ' . $probe]];
+		$templates[] = ['templateid' => $this->templateIds['Template Rsmhost Config ' . $rsmhost]];
 
 		return $templates;
 	}
@@ -224,7 +223,7 @@ abstract class ActionBaseEx extends ActionBase {
 	/**
 	 * Enables and disables items in "<rsmhost>" and "<rsmhost> <probe>" hosts.
 	 */
-	protected function updateServiceItemStatus(array $statusHosts, array $testHosts, array $templateIds, array $rsmhostConfigs, array $probeConfigs) {
+	protected function updateServiceItemStatus(array $statusHosts, array $testHosts, array $rsmhostConfigs, array $probeConfigs) {
 		$hosts = $statusHosts + $testHosts;
 
 		// get template items
@@ -232,9 +231,9 @@ abstract class ActionBaseEx extends ActionBase {
 		$config = [
 			'output' => ['key_', 'hostid'],
 			'hostids' => [
-				$templateIds['Template DNS Test'],
-				$templateIds['Template RDAP Test'],
-				$templateIds['Template RDDS Test'],
+				$this->templateIds['Template DNS Test'],
+				$this->templateIds['Template RDAP Test'],
+				$this->templateIds['Template RDDS Test'],
 			],
 		];
 		if (!empty($statusHosts))
@@ -242,16 +241,16 @@ abstract class ActionBaseEx extends ActionBase {
 			$config['hostids'] = array_merge(
 				$config['hostids'],
 				[
-					$templateIds['Template DNS Status'],
-					$templateIds['Template DNSSEC Status'],
-					$templateIds['Template RDAP Status'],
-					$templateIds['Template RDDS Status'],
+					$this->templateIds['Template DNS Status'],
+					$this->templateIds['Template DNSSEC Status'],
+					$this->templateIds['Template RDAP Status'],
+					$this->templateIds['Template RDDS Status'],
 				]
 			);
 		}
 		$data = API::Item()->get($config);
 
-		$templates = array_flip($templateIds);
+		$templates = array_flip($this->templateIds);
 
 		$templateItems = []; // [host => [key1, key2, ...], ...]
 
@@ -370,13 +369,7 @@ abstract class ActionBaseEx extends ActionBase {
 
 		if (is_null($result))
 		{
-			$data = API::UserMacro()->get([
-				'output'      => ['value'],
-				'globalmacro' => true,
-				'filter'      => ['macro' => self::MACRO_GLOBAL_MONITORING_TARGET],
-			]);
-
-			$result = $data[0]['value'];
+			$result = $this->getGlobalMacro(self::MACRO_GLOBAL_MONITORING_TARGET);
 		}
 
 		return $result;
@@ -390,13 +383,7 @@ abstract class ActionBaseEx extends ActionBase {
 
 		if (is_null($result))
 		{
-			$data = API::UserMacro()->get([
-				'output'      => ['value'],
-				'globalmacro' => true,
-				'filter'      => ['macro' => self::MACRO_GLOBAL_RDAP_STANDALONE],
-			]);
-
-			$ts = (int)$data[0]['value'];
+			$ts = (int)$this->getGlobalMacro(self::MACRO_GLOBAL_RDAP_STANDALONE);
 
 			$result = $ts && $_SERVER['REQUEST_TIME'] >= $ts;
 		}
@@ -404,14 +391,21 @@ abstract class ActionBaseEx extends ActionBase {
 		return $result;
 	}
 
+	/**
+	 * Requests config-cache-reload to be performed.
+	 */
+	protected function requestConfigCacheReload() {
+		$this->setGlobalMacro(self::MACRO_GLOBAL_CONFIG_CACHE_RELOAD, time());
+	}
+
 	protected function getProbeConfigs() {
 		// get 'Probes' host group id
-		$hostGroupIds = $this->getHostGroupIds(['Probes']);
+		$this->hostGroupIds += $this->getHostGroupIds(['Probes']);
 
 		// get probe hosts
 		$data = API::Host()->get([
 			'output'   => ['host', 'proxy_hostid'],
-			'groupids' => [$hostGroupIds['Probes']],
+			'groupids' => [$this->hostGroupIds['Probes']],
 		]);
 		$hosts = array_column($data, 'host', 'hostid');
 		$proxies = array_column($data, 'proxy_hostid', 'hostid');
@@ -455,12 +449,12 @@ abstract class ActionBaseEx extends ActionBase {
 
 	protected function getRsmhostConfigs() {
 		// get 'TLDs' host group id
-		$hostGroupIds = $this->getHostGroupIds(['TLDs']);
+		$this->hostGroupIds += $this->getHostGroupIds(['TLDs']);
 
 		// get tld hosts
 		$data = API::Host()->get([
 			'output'   => ['host'],
-			'groupids' => [$hostGroupIds['TLDs']],
+			'groupids' => [$this->hostGroupIds['TLDs']],
 		]);
 		$hosts = array_column($data, 'host', 'hostid');
 
@@ -519,7 +513,27 @@ abstract class ActionBaseEx extends ActionBase {
 		];
 	}
 
-	protected function getHostsByHostGroupId(int $hostGroupId, ?string $host, ?array $additionalFields) {
+	/**
+	 * Returns hosts from specific host group in the following format:
+	 * <pre>
+	 * &nbsp; [
+	 * &nbsp;     0 => [
+	 * &nbsp;         'hostid' => ...,
+	 * &nbsp;         'host' => ...,
+	 * &nbsp;         ...
+	 * &nbsp;     ],
+	 * &nbsp;     ...,
+	 * &nbsp; ]
+	 * </pre>
+	 * Use array_column() to extract specific column.
+	 *
+	 * @param int         $hostGroupId
+	 * @param string|null $host
+	 * @param array|null  $additionalFields
+	 *
+	 * @return array
+	 */
+	protected function getHostsByHostGroupId(int $hostGroupId, ?string $host, ?array $additionalFields): array {
 		$outputFields = ['host'];
 
 		if (!is_null($additionalFields))
@@ -536,11 +550,51 @@ abstract class ActionBaseEx extends ActionBase {
 		]);
 	}
 
-	protected function getHostsByHostGroup(string $hostGroup, ?string $host, ?array $additionalFields) {
-		return $this->getHostsByHostGroupId($this->getHostGroupId($hostGroup), $hostGroup, $additionalFields);
+	/**
+	 * Returns hosts from specific host group in the following format:
+	 * <pre>
+	 * &nbsp; [
+	 * &nbsp;     0 => [
+	 * &nbsp;         'hostid' => ...,
+	 * &nbsp;         'host' => ...,
+	 * &nbsp;         ...
+	 * &nbsp;     ],
+	 * &nbsp;     ...,
+	 * &nbsp; ]
+	 * </pre>
+	 * Use array_column() to extract specific column.
+	 *
+	 * @param string      $hostGroup
+	 * @param string|null $host
+	 * @param array|null  $additionalFields
+	 *
+	 * @return array
+	 */
+	protected function getHostsByHostGroup(string $hostGroup, ?string $host, ?array $additionalFields): array {
+		return $this->getHostsByHostGroupId($this->getHostGroupId($hostGroup), $host, $additionalFields);
 	}
 
-	protected function getHostsByTemplateId(int $templateId, ?string $host, ?array $additionalFields) {
+	/**
+	 * Returns hosts from specific template in the following format:
+	 * <pre>
+	 * &nbsp; [
+	 * &nbsp;     0 => [
+	 * &nbsp;         'hostid' => ...,
+	 * &nbsp;         'host' => ...,
+	 * &nbsp;         ...
+	 * &nbsp;     ],
+	 * &nbsp;     ...,
+	 * &nbsp; ]
+	 * </pre>
+	 * Use array_column() to extract specific column.
+	 *
+	 * @param int         $templateId
+	 * @param string|null $host
+	 * @param array|null  $additionalFields
+	 *
+	 * @return array
+	 */
+	protected function getHostsByTemplateId(int $templateId, ?string $host, ?array $additionalFields): array {
 		$outputFields = ['host'];
 
 		if (!is_null($additionalFields))
@@ -557,11 +611,46 @@ abstract class ActionBaseEx extends ActionBase {
 		]);
 	}
 
-	protected function getHostsByTemplate(string $template, ?string $host, ?array $additionalFields) {
+	/**
+	 * Returns hosts from specific template in the following format:
+	 * <pre>
+	 * &nbsp; [
+	 * &nbsp;     0 => [
+	 * &nbsp;         'hostid' => ...,
+	 * &nbsp;         'host' => ...,
+	 * &nbsp;         ...
+	 * &nbsp;     ],
+	 * &nbsp;     ...,
+	 * &nbsp; ]
+	 * </pre>
+	 * Use array_column() to extract specific column.
+	 *
+	 * @param string      $template
+	 * @param string|null $host
+	 * @param array|null  $additionalFields
+	 *
+	 * @return array
+	 */
+	protected function getHostsByTemplate(string $template, ?string $host, ?array $additionalFields): array {
 		return $this->getHostsByTemplateId($this->getTemplateId($template), $host, $additionalFields);
 	}
 
-	protected function getHostIds(array $hosts) {
+	/**
+	 * Returns hostids in the following format:
+	 * <pre>
+	 * &nbsp; [
+	 * &nbsp;     'host 1' => '100001',
+	 * &nbsp;     'host 2' => '100002',
+	 * &nbsp;     'host 3' => '100003',
+	 * &nbsp;     ...,
+	 * &nbsp; ]
+	 * </pre>
+	 *
+	 * @param array $hosts
+	 *
+	 * @return array
+	 */
+	protected function getHostIds(array $hosts): array {
 		if (empty($hosts))
 		{
 			return [];
@@ -577,12 +666,111 @@ abstract class ActionBaseEx extends ActionBase {
 		return $hostids;
 	}
 
-	protected function getHostId(string $host) {
-		$hostids = $this->getHostIds([$host]);
-		return $hostids[$host];
+	/**
+	 * Returns hostid.
+	 *
+	 * @param string $host
+	 *
+	 * @return int
+	 */
+	protected function getHostId(string $host): int {
+		return current($this->getHostIds([$host]));
 	}
 
-	protected function getHostGroupIds(array $hostGroupNames) {
+	/**
+	 * Returns itemids in the following format:
+	 *
+	 * <pre>
+	 * &nbsp; [
+	 * &nbsp;     'key 1' => '100001',
+	 * &nbsp;     'key 2' => '100002',
+	 * &nbsp;     'key 3' => '100003',
+	 * &nbsp;     ...,
+	 * &nbsp; ]
+	 * </pre>
+	 *
+	 * @param int $hostId
+	 * @param array $keys
+	 *
+	 * @return array
+	 */
+	protected function getItemIds(int $hostId, array $keys): array {
+		if (empty($keys))
+		{
+			return [];
+		}
+
+		$data = API::Item()->get([
+			'output' => ['itemid', 'key_'],
+			'hostid' => [$hostId],
+			'filter' => ['key_' => $keys],
+		]);
+
+		return array_column($data, 'itemid', 'key_');
+	}
+
+	/**
+	 * Returns itemid.
+	 *
+	 * @param int $hostId
+	 * @param string $key
+	 *
+	 * @return int
+	 */
+	protected function getItemId(int $hostId, string $key): int {
+		return current($this->getItemIds($hostId, [$key]));
+	}
+
+	/**
+	 * Returns itemids in the following format:
+	 *
+	 * <pre>
+	 * &nbsp; [
+	 * &nbsp;     'key 1' => '100001',
+	 * &nbsp;     'key 2' => '100002',
+	 * &nbsp;     'key 3' => '100003',
+	 * &nbsp;     ...,
+	 * &nbsp; ]
+	 * </pre>
+	 *
+	 * @param int $hostId
+	 * @param array $keys
+	 *
+	 * @return array
+	 */
+	protected function findItemIds(int $hostId, array $keys): array {
+		if (empty($keys))
+		{
+			return [];
+		}
+
+		$data = API::Item()->get([
+			'hostid'                 => [$hostId],
+			'output'                 => ['itemid', 'key_'],
+			'searchWildcardsEnabled' => true,
+			'searchByAny'            => true,
+			'search'                 => ['key_' => $keys],
+		]);
+
+		return array_column($data, 'itemid', 'key_');
+	}
+
+	/**
+	 * Returns host group ids in the following format:
+	 * <pre>
+	 * &nbsp; [
+	 * &nbsp;     'host group 1' => '100001',
+	 * &nbsp;     'host group 2' => '100002',
+	 * &nbsp;     'host group 3' => '100003',
+	 * &nbsp;     ...,
+	 * &nbsp; ]
+	 * </pre>
+	 *
+	 * @param array $hostGroupNames
+	 *
+	 * @return array
+	 */
+	protected function getHostGroupIds(array $hostGroupNames): array {
 		if (empty($hostGroupNames))
 		{
 			return [];
@@ -593,17 +781,36 @@ abstract class ActionBaseEx extends ActionBase {
 			'filter' => ['name' => $hostGroupNames],
 		]);
 
-		$hostGroupIds = array_column($data, 'groupid', 'name');
-
-		return $hostGroupIds;
+		return array_column($data, 'groupid', 'name');
 	}
 
-	protected function getHostGroupId(string $hostGroup) {
-		$hostGroupIds = $this->getHostGroupIds([$hostGroup]);
-		return $hostGroupIds[$hostGroup];
+	/**
+	 * Returns host group id.
+	 *
+	 * @param string $hostGroup
+	 *
+	 * @return int
+	 */
+	protected function getHostGroupId(string $hostGroup): int {
+		return current($this->getHostGroupIds([$hostGroup]));
 	}
 
-	protected function getTemplateIds(array $templateHosts) {
+	/**
+	 * Returns template ids in the following format:
+	 * <pre>
+	 * &nbsp; [
+	 * &nbsp;     'template 1' => '100001',
+	 * &nbsp;     'template 2' => '100002',
+	 * &nbsp;     'template 3' => '100003',
+	 * &nbsp;     ...,
+	 * &nbsp; ]
+	 * </pre>
+	 *
+	 * @param array $templateHosts
+	 *
+	 * @return array
+	 */
+	protected function getTemplateIds(array $templateHosts): array {
 		if (empty($templateHosts))
 		{
 			return [];
@@ -614,17 +821,36 @@ abstract class ActionBaseEx extends ActionBase {
 			'filter' => ['host' => $templateHosts],
 		]);
 
-		$templateIds = array_column($data, 'templateid', 'host');
-
-		return $templateIds;
+		return array_column($data, 'templateid', 'host');
 	}
 
-	protected function getTemplateId(string $templateHost) {
-		$templateIds = $this->getTemplateIds([$templateHost]);
-		return $templateIds[$templateHost];
+	/**
+	 * Returns template id.
+	 *
+	 * @param string $templateHost
+	 *
+	 * @return int
+	 */
+	protected function getTemplateId(string $templateHost): int {
+		return current($this->getTemplateIds([$templateHost]));
 	}
 
-	protected function getProxyIds(array $proxies) {
+	/**
+	 * Returns proxy ids in the following format:
+	 * <pre>
+	 * &nbsp; [
+	 * &nbsp;     'proxy 1' => '100001',
+	 * &nbsp;     'proxy 2' => '100002',
+	 * &nbsp;     'proxy 3' => '100003',
+	 * &nbsp;     ...,
+	 * &nbsp; ]
+	 * </pre>
+	 *
+	 * @param array $proxies
+	 *
+	 * @return array
+	 */
+	protected function getProxyIds(array $proxies): array {
 		if (empty($proxies))
 		{
 			return [];
@@ -640,11 +866,67 @@ abstract class ActionBaseEx extends ActionBase {
 		return $proxyIds;
 	}
 
-	protected function getProxyId(string $proxy) {
-		$proxyIds = $this->getProxyIds([$proxy]);
-		return $proxyIds[$proxy];
+	/**
+	 * Returns proxy id.
+	 *
+	 * @param string $proxy
+	 *
+	 * @return int
+	 */
+	protected function getProxyId(string $proxy): int {
+		return current($this->getProxyIds([$proxy]));
 	}
 
+	/**
+	 * Returns value map ids in the following format:
+	 * <pre>
+	 * &nbsp; [
+	 * &nbsp;     'value map 1' => '100001',
+	 * &nbsp;     'value map 2' => '100002',
+	 * &nbsp;     'value map 3' => '100003',
+	 * &nbsp;     ...,
+	 * &nbsp; ]
+	 * </pre>
+	 *
+	 * @param array $valueMaps
+	 *
+	 * @return array
+	 */
+	protected function getValueMapIds(array $valueMaps): array {
+		if (empty($valueMaps))
+		{
+			return [];
+		}
+
+		$data = API::ValueMap()->get([
+			'output' => ['valuemapid', 'name'],
+			'filter' => ['name' => $valueMaps],
+		]);
+
+		$valueMapIds = array_column($data, 'valuemapid', 'name');
+
+		return $valueMapIds;
+	}
+
+	/**
+	 * Returns host macros in the following format:
+	 * <pre>
+	 * &nbsp; [
+	 * &nbsp;     'host 1' => [
+	 * &nbsp;         'macro 1' => 'value 1',
+	 * &nbsp;         'macro 2' => 'value 2',
+	 * &nbsp;         'macro 3' => 'value 3',
+	 * &nbsp;         ...
+	 * &nbsp;     ],
+	 * &nbsp;     ...
+	 * &nbsp; ]
+	 * </pre>
+	 *
+	 * @param array $hosts
+	 * @param array $macros
+	 *
+	 * @return type
+	 */
 	protected function getHostMacros(array $hosts, array $macros) {
 		$data = API::UserMacro()->get([
 			'output'  => ['hostid', 'macro', 'value'],
@@ -664,5 +946,31 @@ abstract class ActionBaseEx extends ActionBase {
 		}
 
 		return $result;
+	}
+
+	protected function getGlobalMacro(string $macro): string {
+		$data = API::UserMacro()->get([
+			'output'      => ['value'],
+			'globalmacro' => true,
+			'filter'      => ['macro' => $macro],
+		]);
+
+		return $data[0]['value'];
+	}
+
+	protected function setGlobalMacro(string $macro, string $value) {
+		$data = API::UserMacro()->get([
+			'output'      => ['globalmacroid', 'value'],
+			'globalmacro' => true,
+			'filter'      => ['macro' => $macro],
+		]);
+
+		if ($data[0]['value'] != $value)
+		{
+			$data = API::UserMacro()->updateGlobal([
+				'globalmacroid' => $data[0]['globalmacroid'],
+				'value'         => $value,
+			]);
+		}
 	}
 }

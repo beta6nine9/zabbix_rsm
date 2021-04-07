@@ -2,7 +2,6 @@
 
 namespace Modules\RsmProvisioningApi\Actions;
 
-use API;
 use Exception;
 
 class Registrar extends MonitoringTarget {
@@ -137,7 +136,25 @@ class Registrar extends MonitoringTarget {
 	 * Functions for creating object                                                                                  *
 	 ******************************************************************************************************************/
 
-	protected function createObject() {
+	protected function createStatusHost(array $input) {
+		$config = [
+			'host'       => $input[$this->getObjectIdInputField()],
+			'status'     => HOST_STATUS_MONITORED,
+			'interfaces' => [self::DEFAULT_MAIN_INTERFACE],
+			'groups'     => [
+				['groupid' => $this->hostGroupIds['TLDs']],
+				['groupid' => $this->hostGroupIds['gTLD']],
+			],
+			'templates'  => [
+				['templateid' => $this->templateIds['Template Rsmhost Config ' . $input[$this->getObjectIdInputField()]]],
+				['templateid' => $this->templateIds['Template Config History']],
+				['templateid' => $this->templateIds['Template RDAP Status']],
+				['templateid' => $this->templateIds['Template RDDS Status']],
+			],
+		];
+		$data = API::Host()->create($config);
+
+		return $data['hostids'][0];
 	}
 
 	/******************************************************************************************************************
@@ -148,62 +165,38 @@ class Registrar extends MonitoringTarget {
 	}
 
 	/******************************************************************************************************************
-	 * Functions for deleting object                                                                                  *
-	 ******************************************************************************************************************/
-
-	protected function deleteObject() {
-	}
-
-	/******************************************************************************************************************
 	 * Helper functions                                                                                               *
 	 ******************************************************************************************************************/
 
-	private function createTemplateConfig(array $input, array $hostGroupIds) {
+	protected function getRsmhostConfigsFromInput(array $input) {
 		$services = array_column($input['servicesStatus'], 'enabled', 'service');
 
 		return [
-			'host'   => 'Template Rsmhost Config ' . $input['tld'],
-			'groups' => [
-				['groupid' => $hostGroupIds['Templates - TLD']],
-			],
-			'macros' => [
-				$this->createMacroConfig(self::MACRO_TLD               , $input['tld']),
-
-				$this->createMacroConfig(self::MACRO_RDAP_ENABLED      , (int)$services['rdap']),
-				$this->createMacroConfig(self::MACRO_RDDS_ENABLED      , (int)$services['rdds']),
-
-				$this->createMacroConfig(self::MACRO_RDAP_BASE_URL     , $input['rddsParameters']['rdapUrl']),
-				$this->createMacroConfig(self::MACRO_RDAP_TEST_DOMAIN  , $input['rddsParameters']['rdapTestedDomain']),
-
-				$this->createMacroConfig(self::MACRO_RDDS43_TEST_DOMAIN, $input['rddsParameters']['rdds43TestedDomain']),
-				$this->createMacroConfig(self::MACRO_RDDS_NS_STRING    , $input['rddsParameters']['rdds43NsString']),
-				//$this->createMacroConfig(self::MACRO_RDDS_43_SERVERS   , $input['rddsParameters']['rdds43Server']),     // TODO: fill with real value
-				//$this->createMacroConfig(self::MACRO_RDDS_80_SERVERS   , $input['rddsParameters']['rdds80Url']),        // TODO: fill with real value
+			$input[$this->getObjectIdInputField()] => [
+				'tldType' => 'gTLD',
+				'rdap'    => $services['rdap'],
+				'rdds'    => $services['rdds'],
 			],
 		];
 	}
 
-	private function createHostGroupConfig(array $input) {
-		return [
-			'name' => 'TLD ' . $input['tld'],
-		];
-	}
+	protected function getMacrosConfig(array $input) {
+		$services = array_column($input['servicesStatus'], 'enabled', 'service');
 
-	private function createTldHostConfig(array $input, array $hostGroupIds, array $templateIds) {
 		return [
-			'host'         => $input['registrar'],
-			'status'       => HOST_STATUS_MONITORED,
-			'interfaces'   => [self::DEFAULT_MAIN_INTERFACE],
-			'groups'       => [
-				['groupid' => $hostGroupIds['TLDs']],
-				['groupid' => $hostGroupIds['gTLD']],
-			],
-			'templates'    => [
-				['templateid' => $templateIds['Template Rsmhost Config ' . $input['tld']]],
-				['templateid' => $templateIds['Template Config History']],
-				['templateid' => $templateIds['Template RDAP Status']],
-				['templateid' => $templateIds['Template RDDS Status']],
-			],
+			$this->createMacroConfig(self::MACRO_TLD                   , $input[$this->getObjectIdInputField()]),
+			$this->createMacroConfig(self::MACRO_TLD_CONFIG_TIMES      , $_SERVER['REQUEST_TIME']),
+
+			$this->createMacroConfig(self::MACRO_TLD_RDAP_ENABLED      , (int)$services['rdap']),
+			$this->createMacroConfig(self::MACRO_TLD_RDDS_ENABLED      , (int)$services['rdds']),
+
+			$this->createMacroConfig(self::MACRO_TLD_RDAP_BASE_URL     , $input['rddsParameters']['rdapUrl']),
+			$this->createMacroConfig(self::MACRO_TLD_RDAP_TEST_DOMAIN  , $input['rddsParameters']['rdapTestedDomain']),
+
+			$this->createMacroConfig(self::MACRO_TLD_RDDS43_TEST_DOMAIN, $input['rddsParameters']['rdds43TestedDomain']),
+			$this->createMacroConfig(self::MACRO_TLD_RDDS_NS_STRING    , $input['rddsParameters']['rdds43NsString']),
+			//$this->createMacroConfig(self::MACRO_TLD_RDDS_43_SERVERS   , $input['rddsParameters']['rdds43Server']),     // TODO: fill with real value
+			//$this->createMacroConfig(self::MACRO_TLD_RDDS_80_SERVERS   , $input['rddsParameters']['rdds80Url']),        // TODO: fill with real value
 		];
 	}
 }
