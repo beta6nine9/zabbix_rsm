@@ -155,6 +155,7 @@ use constant CFG_MACRO_DESCRIPTION => {
 	'{$RSM.RDDS43.TEST.DOMAIN}'	=> 'Domain name to use when querying RDDS43 server, e.g. "whois.example"',
 	'{$RSM.RESOLVER}'		=> 'DNS resolver used by the probe',
 	'{$RSM.TLD}'			=> 'Name of the rsmhost, e. g. "example"',
+	'{$RSM.TLD.CONFIG.TIMES}'	=> 'Semicolon separated list of timestamps when TLD was changed',
 	'{$RSM.TLD.DNS.AVAIL.MINNS}'	=> 'Consider DNS Service availability at a particular time UP if during DNS test more than specified number of Name Servers replied successfully.',
 	'{$RSM.TLD.DNS.TCP.ENABLED}'	=> 'Indicates whether DNS TCP enabled on the rsmhost',
 	'{$RSM.TLD.DNS.UDP.ENABLED}'	=> 'Indicates whether DNS UDP enabled on the rsmhost',

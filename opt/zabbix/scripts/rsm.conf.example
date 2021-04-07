@@ -45,6 +45,8 @@ max_cycles_rdds = 10
 [sla_api]
 ; seconds, maximum period back from current time to look back for recent measurement files for an incident
 incident_measurements_limit = 3600
+; seconds, maximum period back from current time to allow for missing measurement files before exiting with non-zero
+allow_missing_measurements = 60
 ; seconds, if the metric is not in cache and no measurements within this period, start generating them from this period in the past
 initial_measurements_limit = 7200
 

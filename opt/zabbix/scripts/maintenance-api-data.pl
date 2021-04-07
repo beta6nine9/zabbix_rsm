@@ -9,6 +9,7 @@ use warnings;
 use ApiHelper;
 use Getopt::Long;
 use Pod::Usage;
+use Path::Tiny qw(path);
 use RSM;
 use RSMSLV; # required for ApiHelper
 

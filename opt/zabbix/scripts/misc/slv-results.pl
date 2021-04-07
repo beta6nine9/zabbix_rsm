@@ -31,7 +31,7 @@ fail("TLD \"" . getopt('tld') . "\" not found") unless (tld_exists(getopt('tld')
 
 if (opt('service'))
 {
-	if (getopt('service') eq 'dns')
+	if (getopt('service') eq 'dns' || getopt('service') eq 'dnssec')
 	{
 		$delay = get_dns_delay();
 	}
@@ -39,9 +39,13 @@ if (opt('service'))
 	{
 		$delay = get_rdds_delay();
 	}
+	elsif (getopt('service') eq 'rdap')
+	{
+		$delay = get_rdap_delay();
+	}
 	else
 	{
-		fail("unknown service \"", getopt('service'), "\" expected: dns, rdds");
+		fail("unknown service \"", getopt('service'), "\" expected: dns, dnssec, rdds or rdap");
 	}
 }
 else
@@ -81,9 +85,9 @@ my $incidents;
 
 if (opt('service'))
 {
-	my $itemid = get_itemid_by_host(getopt('tld'), 'rsm.slv.rdds.avail');
+	my $itemid = get_itemid_by_host(getopt('tld'), "rsm.slv.".getopt('service').".avail");
 
-	$incidents = get_incidents($itemid, get_rdds_delay(), $from, $till);
+	$incidents = get_incidents($itemid, $delay, $from, $till);
 }
 
 my $service_cond = (opt('service') ? " and i.key_ like '%." . getopt('service') . ".%'" : "");
@@ -156,17 +160,21 @@ foreach my $row_ref (@$rows_ref)
 
 	my $service;
 
-	if ($key =~ '.dns.')
+	if ($key =~ '\.dns\.')
 	{
 		$service = 'DNS';
 	}
-	elsif ($key =~ '.dnssec.')
+	elsif ($key =~ '\.dnssec\.')
 	{
 		$service = 'DNSSEC';
 	}
-	elsif ($key =~ '.rdds.')
+	elsif ($key =~ '\.rdds\.')
 	{
 		$service = 'RDDS';
+	}
+	elsif ($key =~ '\.rdap\.')
+	{
+		$service = 'RDAP';
 	}
 	else
 	{
@@ -175,15 +183,15 @@ foreach my $row_ref (@$rows_ref)
 
 	my $type;
 
-	if ($key =~ '.avail')
+	if ($key =~ '\.avail')
 	{
 		$type = 'Availability';
 	}
-	elsif ($key =~ '.downtime')
+	elsif ($key =~ '\.downtime')
 	{
 		$type = 'Downtime';
 	}
-	elsif ($key =~ '.rollweek')
+	elsif ($key =~ '\.rollweek')
 	{
 		$type = 'Rolling week';
 	}

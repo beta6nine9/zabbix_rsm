@@ -270,7 +270,7 @@ class AggregateDetailsAction extends Action {
 		$data['nsids'] = $this->getNSIDdata($dns_nameservers, $time_from, $time_till);
 		$key_parser->parse(PROBE_DNS_NS_STATUS);
 		$ns_status_key = $key_parser->getKey();
-		$tldprobes_items = $this->getItemsHistoryValue([
+		$tldprobe_values = $this->getItemsHistoryValue([
 			'output' => ['key_', 'itemid', 'hostid'],
 			'hostids' => array_column($this->probes, 'tldprobe_hostid'),
 			'search' => [
@@ -291,18 +291,18 @@ class AggregateDetailsAction extends Action {
 		]);
 		$probe_nscount = [];
 
-		foreach ($tldprobes_items as $tldprobe_item) {
-			$key_parser->parse($tldprobe_item['key_']);
+		foreach ($tldprobe_values as $tldprobe_value) {
+			$key_parser->parse($tldprobe_value['key_']);
 			$key = $key_parser->getKey();
-			$probeid = $tldprobeid_probeid[$tldprobe_item['hostid']];
+			$probeid = $tldprobeid_probeid[$tldprobe_value['hostid']];
 
-			if (!array_key_exists('history_value', $tldprobe_item)) {
+			if (!array_key_exists('history_value', $tldprobe_value)) {
 				continue;
 			}
 
-			$value = $tldprobe_item['history_value'];
+			$value = $tldprobe_value['history_value'];
 
-			switch ($key_parser->getKey()) {
+			switch ($key) {
 				case PROBE_DNS_NSSOK:
 					// Set Name servers up count.
 					$this->probes[$probeid]['ns_up'] = $value;
@@ -321,7 +321,7 @@ class AggregateDetailsAction extends Action {
 					break;
 
 				case 'probe.configvalue':
-					$ipv = ($tldprobe_item['key_'] == CALCULATED_PROBE_RSM_IP4_ENABLED) ? 'ipv4' : 'ipv6';
+					$ipv = ($tldprobe_value['key_'] == CALCULATED_PROBE_RSM_IP4_ENABLED) ? 'ipv4' : 'ipv6';
 					$this->probes[$probeid][$ipv] = $value;
 					break;
 			}
@@ -395,33 +395,35 @@ class AggregateDetailsAction extends Action {
 			'history' => ITEM_VALUE_TYPE_UINT64
 		]);
 
-		// Set probes test trasport.
-		$protocol_type = $this->getValueMapping(RSM_DNS_TRANSPORT_PROTOCOL_VALUE_MAP);
+		if ($test_result['value'] != UP_INCONCLUSIVE_RECONFIG) {
+			// Set probes test trasport.
+			$protocol_type = $this->getValueMapping(RSM_DNS_TRANSPORT_PROTOCOL_VALUE_MAP);
 
-		if (!$protocol_type) {
-			error(_('Value mapping for "Transport protocol" is not found.'));
-		}
-		else {
-			$tldprobeid_probeid = array_combine(array_column($this->probes, 'tldprobe_hostid'), array_keys($this->probes));
-			$tldprobes_items = $this->getItemsHistoryValue([
-				'output' => ['itemid', 'hostid'],
-				'hostids' => array_column($this->probes, 'tldprobe_hostid'),
-				'filter' => ['key_' => PROBE_DNS_PROTOCOL],
-				'time_from' => $time_from,
-				'time_till' => $time_till,
-				'history' => ITEM_VALUE_TYPE_UINT64
-			]);
+			if (!$protocol_type) {
+				error(_('Value mapping for "Transport protocol" not found.'));
+			}
+			else {
+				$tldprobeid_probeid = array_combine(array_column($this->probes, 'tldprobe_hostid'), array_keys($this->probes));
+				$tldprobe_values = $this->getItemsHistoryValue([
+					'output' => ['itemid', 'hostid'],
+					'hostids' => array_column($this->probes, 'tldprobe_hostid'),
+					'filter' => ['key_' => PROBE_DNS_PROTOCOL],
+					'time_from' => $time_from,
+					'time_till' => $time_till,
+					'history' => ITEM_VALUE_TYPE_UINT64
+				]);
 
-			foreach ($tldprobes_items as $tldprobe_item) {
-				if (isset($tldprobe_item['history_value'])) {
-					$tldprobeid = $tldprobe_item['hostid'];
-					$probeid = $tldprobeid_probeid[$tldprobeid];
-					$this->probes[$probeid]['transport'] = $protocol_type[$tldprobe_item['history_value']];
+				foreach ($tldprobe_values as $tldprobe_value) {
+					if (isset($tldprobe_value['history_value'])) {
+						$tldprobeid = $tldprobe_value['hostid'];
+						$probeid = $tldprobeid_probeid[$tldprobeid];
+						$this->probes[$probeid]['transport'] = $protocol_type[$tldprobe_value['history_value']];
+					}
 				}
 			}
-		}
 
-		$this->getReportData($data, $time_from, $time_till);
+			$this->getReportData($data, $time_from, $time_till);
+		}
 
 		foreach ($probes as $probe) {
 			/**
@@ -435,6 +437,9 @@ class AggregateDetailsAction extends Action {
 		$data['probes'] = $this->probes;
 		$data['errors'] = $this->probe_errors;
 		krsort($data['errors']);
+
+
+
 
 		$response = new CControllerResponseData($data);
 		$response->setTitle($data['title']);

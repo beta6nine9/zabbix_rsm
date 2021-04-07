@@ -35,6 +35,7 @@ use constant DOWN				=> 0;	# Down
 use constant UP					=> 1;	# Up
 use constant UP_INCONCLUSIVE_NO_DATA		=> 2;	# Up-inconclusive-no-data
 use constant UP_INCONCLUSIVE_NO_PROBES		=> 3;	# Up-inconclusive-no-probes
+use constant UP_INCONCLUSIVE_RECONFIG		=> 4;	# Up-inconclusive-reconfig
 
 use constant ONLINE				=> 1;	# todo: check where these are used
 use constant OFFLINE				=> 0;	# todo: check where these are used
@@ -69,6 +70,8 @@ use constant DETAILED_RESULT_DELIM		=> ', ';
 use constant USE_CACHE_FALSE			=> 0;
 use constant USE_CACHE_TRUE			=> 1;
 
+use constant RECONFIG_MINUTES 			=> 10; # how much time to consider cycles in reconfig
+
 our ($result, $dbh, $tld, $server_key);
 
 our %OPTS; # specified command-line options
@@ -76,7 +79,10 @@ our %OPTS; # specified command-line options
 our @EXPORT = qw($result $dbh $tld $server_key
 		E_ID_NONEXIST E_ID_MULTIPLE UP DOWN SLV_UNAVAILABILITY_LIMIT MIN_LOGIN_ERROR
 		UP_INCONCLUSIVE_NO_PROBES
-		UP_INCONCLUSIVE_NO_DATA PROTO_UDP PROTO_TCP
+		UP_INCONCLUSIVE_NO_DATA
+		UP_INCONCLUSIVE_RECONFIG
+		PROTO_UDP
+		PROTO_TCP
 		MAX_LOGIN_ERROR MIN_INFO_ERROR MAX_INFO_ERROR PROBE_ONLINE_STR
 		WAIT_FOR_AVAIL_DATA
 		WAIT_FOR_PROBE_DATA
@@ -112,6 +118,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		get_macro_incident_rdap_fail get_macro_incident_rdap_recover
 		get_monitoring_target
 		get_rdap_standalone_ts is_rdap_standalone
+		is_rsmhost_reconfigured
 		get_dns_minns
 		get_itemid_by_key get_itemid_by_host
 		get_itemid_by_hostid get_itemid_like_by_hostid get_itemids_by_host_and_keypart get_lastclock
@@ -173,8 +180,6 @@ my $config = undef;
 my $_sender_values;	# used to send values to Zabbix server
 
 my $POD2USAGE_FILE;	# usage message file
-
-my $_lock_fh;
 
 my $start_time;
 my $total_sql_count = 0;
@@ -426,6 +431,66 @@ sub is_rdap_standalone(;$)
 	my $ts = get_rdap_standalone_ts();
 
 	return defined($ts) && $now >= $ts ? 1 : 0;
+}
+
+my $config_times;
+
+sub is_rsmhost_reconfigured($$$)
+{
+	my $rsmhost = shift;
+	my $delay   = shift;
+	my $clock   = shift;
+
+	if (!defined($config_times))
+	{
+		my $sql = "select" .
+				" hosts.host," .
+				" hostmacro.value" .
+			" from" .
+				" hosts" .
+				" inner join hosts_templates on hosts_templates.hostid=hosts.hostid" .
+				" inner join hosts as templates on templates.hostid=hosts_templates.templateid" .
+				" inner join hostmacro on hostmacro.hostid=templates.hostid" .
+				" inner join hosts_groups on hosts_groups.hostid=hosts.hostid" .
+				" inner join hstgrp on hstgrp.groupid=hosts_groups.groupid" .
+			" where" .
+				" hstgrp.name='TLDs' and" .
+				" hostmacro.macro='{\$RSM.TLD.CONFIG.TIMES}'";
+		my $rows = db_select($sql);
+
+		foreach my $row (@{$rows})
+		{
+			my ($rsmhost, $macro) = @{$row};
+
+			if (!$macro)
+			{
+				fail("invalid value of {\$RSM.TLD.CONFIG.TIMES} for '$rsmhost': '$macro'");
+			}
+
+			$config_times->{$rsmhost} = [split(/;/, $macro)];
+		}
+	}
+
+	if (!exists($config_times->{$rsmhost}))
+	{
+		fail("{\$RSM.TLD.CONFIG.TIMES} for '$rsmhost' not found");
+	}
+
+	my $cycle_start = cycle_start($clock, $delay);
+	my $cycle_end   = cycle_end($clock, $delay);
+
+	foreach my $config_time (@{$config_times->{$rsmhost}})
+	{
+		my $reconfig_time_start = cycle_start($config_time, 60);
+		my $reconfig_time_end   = cycle_end($config_time + (RECONFIG_MINUTES - 1) * 60, 60);
+
+		if ($cycle_end >= $reconfig_time_start && $cycle_start <= $reconfig_time_end)
+		{
+			return 1;
+		}
+	}
+
+	return 0;
 }
 
 my $dns_minns_cache;
@@ -2830,6 +2895,11 @@ sub process_slv_avail($$$$$$$$$$)
 	my $check_probe_values_ref = shift;
 	my $value_type             = shift;
 
+	if (is_rsmhost_reconfigured($tld, $delay, $from))
+	{
+		return (UP_INCONCLUSIVE_RECONFIG, "Up (rsmhost has been reconfigured recently)");
+	}
+
 	my $online_probes = online_probes($probes_ref, $from, $delay);
 	my $online_probe_count = scalar(@{$online_probes});
 
@@ -4636,12 +4706,26 @@ sub update_slv_rtt_monthly_stats($$$$$$$$;$)
 				$params_list = $rdap_standalone_params_list;
 			}
 
-			my $rtt_stats = get_slv_rtt_cycle_stats_aggregated($params_list, $cycle_start, $cycle_end, $tld, $now, $max_nodata_time);
+			my $rtt_stats;
 
-			if (!defined($rtt_stats))
+			if (is_rsmhost_reconfigured($tld, $cycle_delay, $cycle_start))
 			{
-				dbg("stopping updatig TLD '$tld' because of missing data, cycle from $cycle_start till $cycle_end");
-				next TLD_LOOP;
+				$rtt_stats = {
+					'expected'   => 0,
+					'performed'  => 0,
+					'failed'     => 0,
+					'successful' => 0
+				};
+			}
+			else
+			{
+				$rtt_stats = get_slv_rtt_cycle_stats_aggregated($params_list, $cycle_start, $cycle_end, $tld, $now, $max_nodata_time);
+
+				if (!defined($rtt_stats))
+				{
+					dbg("stopping updatig TLD '$tld' because of missing data, cycle from $cycle_start till $cycle_end");
+					next TLD_LOOP;
+				}
 			}
 
 			$cycles_till_end_of_month--;
@@ -6056,176 +6140,9 @@ sub __get_macro
 	return $rows_ref->[0]->[0];
 }
 
-# return an array reference of values of items for the particular period
-sub __get_dbl_values
-{
-	my $itemids_ref = shift;
-	my $from = shift;
-	my $till = shift;
-
-	my $result = [];
-
-	return $result if (scalar(@{$itemids_ref}) == 0);
-
-	my $itemids_str = join(',', @{$itemids_ref});
-
-	my $rows_ref = db_select("select value from history where itemid in ($itemids_str) and clock between $from and $till order by clock");
-
-	foreach my $row_ref (@$rows_ref)
-	{
-		push(@{$result}, $row_ref->[0]);
-	}
-
-	return $result;
-}
-
 sub __get_pidfile
 {
 	return PID_DIR . '/' . __script() . '.pid';
-}
-
-# Times when probe "lastaccess" within $probe_avail_limit.
-sub __get_reachable_times
-{
-	my $probe = shift;
-	my $probe_avail_limit = shift;
-	my $from = shift;
-	my $till = shift;
-
-	my $host = "$probe - mon";
-	my $itemid = get_itemid_by_host($host, PROBE_KEY_LASTACCESS);
-
-	my ($rows_ref, @times, $last_status);
-
-	# get the previous status
-	$rows_ref = db_select(
-		"select clock,value".
-		" from history_uint".
-		" where itemid=$itemid".
-			" and clock between ".($from-3600)." and ".($from-1).
-		" order by itemid desc,clock desc".
-		" limit 1");
-
-	$last_status = UP;
-	if (scalar(@$rows_ref) != 0)
-	{
-		my $clock = $rows_ref->[0]->[0];
-		my $value = $rows_ref->[0]->[1];
-
-		dbg("clock:$clock value:$value");
-
-		$last_status = DOWN if ($clock - $value > $probe_avail_limit);
-	}
-
-	push(@times, $from) if ($last_status == UP);
-
-	$rows_ref = db_select(
-		"select clock,value".
-		" from history_uint".
-		" where itemid=$itemid".
-			" and clock between $from and $till".
-			" and value!=0".
-		" order by clock");
-
-	foreach my $row_ref (@$rows_ref)
-	{
-		my $clock = $row_ref->[0];
-		my $value = $row_ref->[1];
-
-		my $status = ($clock - $value > $probe_avail_limit) ? DOWN : UP;
-
-		if ($last_status != $status)
-		{
-			push(@times, $clock);
-
-			dbg("clock:$clock diff:", ($clock - $value));
-
-			$last_status = $status;
-		}
-	}
-
-	# push "till" to @times if it contains odd number of elements
-	if (scalar(@times) != 0)
-	{
-		push(@times, $till) if ($last_status == UP);
-	}
-
-	return \@times;
-}
-
-sub __get_probestatus_times
-{
-	my $probe = shift;
-	my $hostid = shift;
-	my $times_ref = shift; # input
-	my $key = shift;
-
-	my ($rows_ref, @times, $last_status);
-
-	my $itemid;
-	if ($key =~ m/%/)
-	{
-		$itemid = get_itemid_like_by_hostid($hostid, $key);
-	}
-	else
-	{
-		$itemid = get_itemid_by_hostid($hostid, $key);
-	}
-
-	if ($itemid < 0)
-	{
-		fail("misconfiguration: no item \"$key\" at probe host \"$probe\"") if ($itemid == E_ID_NONEXIST);
-		fail("misconfiguration: multiple items \"$key\" at probe host \"$probe\"") if ($itemid == E_ID_MULTIPLE);
-
-		fail("cannot get ID of item \"$key\" at probe host \"$probe\": unknown error");
-	}
-
-	$rows_ref = db_select("select value from history_uint where itemid=$itemid and clock<" . $times_ref->[0] . " order by clock desc limit 1");
-
-	$last_status = UP;
-	if (scalar(@$rows_ref) != 0)
-	{
-		my $value = $rows_ref->[0]->[0];
-
-		$last_status = DOWN if ($value == OFFLINE);
-	}
-
-	my $idx = 0;
-	my $times_count = scalar(@$times_ref);
-	while ($idx < $times_count)
-	{
-		my $from = $times_ref->[$idx++];
-		my $till = $times_ref->[$idx++];
-
-		$rows_ref = db_select("select clock,value from history_uint where itemid=$itemid and clock between $from and $till order by itemid,clock");
-
-		push(@times, $from) if ($last_status == UP);
-
-		foreach my $row_ref (@$rows_ref)
-		{
-			my $clock = $row_ref->[0];
-			my $value = $row_ref->[1];
-
-			my $status = ($value == OFFLINE) ? DOWN : UP;
-
-			if ($last_status != $status)
-			{
-				push(@times, $clock);
-
-				dbg("clock:$clock value:$value");
-
-				$last_status = $status;
-			}
-		}
-
-		# push "till" to @times if it contains odd number of elements
-		if (scalar(@times) != 0)
-		{
-			push(@times, $till) if ($last_status == UP);
-		}
-	}
-
-	return \@times;
 }
 
 1;

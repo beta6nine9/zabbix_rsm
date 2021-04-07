@@ -38,6 +38,7 @@ our @EXPORT = qw(zbx_connect check_api_error get_proxies_list
 		set_proxy_status
 		get_items_like get_host_items set_tld_type get_triggers_by_items
 		add_dependency
+		update_rsmhost_config_times
 		pfail);
 
 our ($zabbix, $result);
@@ -848,7 +849,7 @@ sub create_macro($$;$$)
 	my $templateid   = shift;
 	my $force_update = shift;
 
-	my ($result, $params, $error);
+	my ($result, $params);
 
 	if (defined($templateid))
 	{
@@ -1229,6 +1230,36 @@ sub rsmhost_dns_ns_log($$)
 	db_connect($server_key);
 	db_exec($sql, $params);
 	db_disconnect();
+}
+
+sub update_rsmhost_config_times($)
+{
+	my $rsmhost = shift;
+
+	my $config_template = get_template(TEMPLATE_RSMHOST_CONFIG_PREFIX . $rsmhost, 1, 0);
+
+	if (!%{$config_template})
+	{
+		# don't do anything for new rsmhosts
+		return;
+	}
+
+	my ($macro) = grep { $_->{'macro'} eq '{$RSM.TLD.CONFIG.TIMES}' } @{$config_template->{'macros'}};
+
+	if (!defined($macro))
+	{
+		pfail("macro \"{\$RSM.TLD.CONFIG.TIMES}\" not found for rsmhost \"$rsmhost\"");
+	}
+
+	my @times = split(/;/, $macro->{'value'});
+
+	# remove entries that are more than 6 months old
+	@times = grep { $_ >= $^T - 180 * 86400 } @times;
+
+	# add current time
+	push(@times, $^T);
+
+	create_macro('{$RSM.TLD.CONFIG.TIMES}', join(';', @times), $config_template->{'templateid'}, 1);
 }
 
 sub pfail

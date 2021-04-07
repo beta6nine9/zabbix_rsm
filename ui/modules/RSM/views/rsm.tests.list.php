@@ -92,7 +92,7 @@ $dynamic_node = [
 			->addRow([[
 				[
 					(new CSpan([bold(_('Number of tests downtime')), ':', SPACE, $this->data['downTests']]))->addClass('first-row-element'),
-					new CSpan([bold(_('Number of mimutes downtime')), ':', SPACE, $this->data['downTimeMinutes']])
+					new CSpan([bold(_('Number of minutes downtime')), ':', SPACE, $this->data['downTimeMinutes']])
 				],
 				BR(),
 				[

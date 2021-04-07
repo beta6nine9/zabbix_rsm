@@ -200,7 +200,7 @@ class CSlaReport
 
 		// get hostid of TLDs
 
-		$rows = self::getTldHostIds($tlds, $from);
+		$rows = self::getTldHostIds($tlds, $till);
 
 		foreach ($rows as $row)
 		{
@@ -880,7 +880,7 @@ class CSlaReport
 		return $status;
 	}
 
-	private static function getTldHostIds($tlds, $from)
+	private static function getTldHostIds($tlds, $till)
 	{
 		$sql = "select hosts.hostid,hosts.host" .
 			" from hosts" .
@@ -890,9 +890,9 @@ class CSlaReport
 
 		if (count($tlds) === 0)
 		{
-			$sql .= " and hosts.created<?";
+			$sql .= " and hosts.created<=?";
 			$sql .= " order by hosts.host asc";
-			$params = array_merge($params, [$from]);
+			$params = array_merge($params, [$till]);
 		}
 		else
 		{

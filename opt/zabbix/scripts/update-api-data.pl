@@ -147,8 +147,6 @@ db_connect();
 my $cfg_avail_valuemaps = get_avail_valuemaps();
 db_disconnect();
 
-my $now = time();
-
 my $max_till = truncate_till(time() - LATEST_CYCLE_AGE);
 
 my ($check_from, $check_till, $continue_file);
@@ -770,7 +768,7 @@ foreach (@server_keys)
 				dbg("getting current $service service availability (delay:$delay)");
 
 				# get alarmed
-				my $incidents = get_incidents($avail_itemid, $delay, $now);
+				my $incidents = get_incidents($avail_itemid, $delay, $service_from);
 
 				my $alarmed_status;
 
@@ -944,12 +942,10 @@ foreach (@server_keys)
 						}
 					}
 
-					my $recent_json;
-
 					# Check if we have missing measurement files for processed incident.
 					# Don't go back further than $incident_measurements_limit.
 
-					my $limit = cycle_start($now - $incident_measurements_limit, $delay);
+					my $limit = cycle_start($service_from - $incident_measurements_limit, $delay);
 
 					my $clock = ($event_start > $limit ? $event_start : $limit);
 
@@ -1050,12 +1046,15 @@ foreach (@server_keys)
 				}
 			}
 
-			if (ah_save_state(AH_SLA_API_VERSION_1, $ah_tld, $json_state_ref) != AH_SUCCESS)
+			if (ah_save_state(AH_SLA_API_VERSION_2, $ah_tld, $json_state_ref) != AH_SUCCESS)
 			{
 				fail("cannot save TLD state: ", ah_get_error());
 			}
 
-			if (ah_save_state(AH_SLA_API_VERSION_2, $ah_tld, $json_state_ref) != AH_SUCCESS)
+			# version 1 has no standalone RDAP
+			delete($json_state_ref->{'testedServices'}{'RDAP'});
+
+			if (ah_save_state(AH_SLA_API_VERSION_1, $ah_tld, $json_state_ref) != AH_SUCCESS)
 			{
 				fail("cannot save TLD state: ", ah_get_error());
 			}
