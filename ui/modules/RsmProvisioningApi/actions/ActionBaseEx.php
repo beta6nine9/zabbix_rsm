@@ -42,8 +42,8 @@ abstract class ActionBaseEx extends ActionBase {
 	protected const MACRO_TLD_RDAP_BASE_URL      = '{$RDAP.BASE.URL}';
 	protected const MACRO_TLD_RDAP_TEST_DOMAIN   = '{$RDAP.TEST.DOMAIN}';
 	protected const MACRO_TLD_RDDS43_TEST_DOMAIN = '{$RSM.RDDS43.TEST.DOMAIN}';
-	//protected const MACRO_TLD_RDDS_43_SERVERS    ? '{$RSM.TLD.RDDS.43.SERVERS}';
-	//protected const MACRO_TLD_RDDS_80_SERVERS    ? '{$RSM.TLD.RDDS.80.SERVERS}';
+	protected const MACRO_TLD_RDDS43_SERVER      = '{$RSM.TLD.RDDS.43.SERVER}';
+	protected const MACRO_TLD_RDDS80_URL         = '{$RSM.TLD.RDDS.80.URL}';
 	protected const MACRO_TLD_RDDS_NS_STRING     = '{$RSM.RDDS.NS.STRING}';
 
 	protected const MACRO_DESCRIPTIONS = [
@@ -67,8 +67,8 @@ abstract class ActionBaseEx extends ActionBase {
 		self::MACRO_TLD_RDAP_BASE_URL      => 'Base URL for RDAP queries, e.g. http://whois.zabbix',
 		self::MACRO_TLD_RDAP_TEST_DOMAIN   => 'Test domain for RDAP queries, e.g. whois.zabbix',
 		self::MACRO_TLD_RDDS43_TEST_DOMAIN => 'Domain name to use when querying RDDS43 server, e.g. "whois.example"',
-		//self::MACRO_TLD_RDDS_43_SERVERS    ?? 'List of RDDS43 server host names as candidates for a test',
-		//self::MACRO_TLD_RDDS_80_SERVERS    ?? 'List of Web Whois server host names as candidates for a test',
+		self::MACRO_TLD_RDDS43_SERVER      => 'Hostname of the RDDS43 server',
+		self::MACRO_TLD_RDDS80_URL         => 'URL of the RDDS80 service to be tested',
 		self::MACRO_TLD_RDDS_NS_STRING     => 'What to look for in RDDS output, e.g. "Name Server:"',
 	];
 

@@ -85,14 +85,14 @@ class Registrar extends MonitoringTarget {
 		$macros = $this->getHostMacros(
 			array_map(fn($host) => str_replace('Template Rsmhost Config ', '', $host), $templates),
 			[
-				self::MACRO_RDAP_ENABLED,
-				self::MACRO_RDDS_ENABLED,
-				self::MACRO_RDAP_BASE_URL,
-				self::MACRO_RDAP_TEST_DOMAIN,
-				self::MACRO_RDDS43_TEST_DOMAIN,
-				//self::MACRO_RDDS_43_SERVERS,
-				//self::MACRO_RDDS_80_SERVERS,
-				self::MACRO_RDDS_NS_STRING,
+				self::MACRO_TLD_RDAP_ENABLED,
+				self::MACRO_TLD_RDDS_ENABLED,
+				self::MACRO_TLD_RDAP_BASE_URL,
+				self::MACRO_TLD_RDAP_TEST_DOMAIN,
+				self::MACRO_TLD_RDDS43_TEST_DOMAIN,
+				self::MACRO_TLD_RDDS43_SERVER,
+				self::MACRO_TLD_RDDS80_URL,
+				self::MACRO_TLD_RDDS_NS_STRING,
 			]
 		);
 
@@ -117,9 +117,9 @@ class Registrar extends MonitoringTarget {
 					],
 				],
 				'rddsParameters'                => [
-					'rdds43Server'              => 'TODO', // $macros[$host][self::MACRO_RDDS_ENABLED] ? $macros[$host][self::MACRO_RDDS_43_SERVERS]    : null,
+					'rdds43Server'              => $macros[$host][self::MACRO_RDDS_ENABLED] ? $macros[$host][self::MACRO_TLD_RDDS43_SERVER]  : null,
 					'rdds43TestedDomain'        => $macros[$host][self::MACRO_RDDS_ENABLED] ? $macros[$host][self::MACRO_RDDS43_TEST_DOMAIN] : null,
-					'rdds80Url'                 => 'TODO', // $macros[$host][self::MACRO_RDDS_ENABLED] ? $macros[$host][self::MACRO_RDDS_80_SERVERS]    : null,
+					'rdds80Url'                 => $macros[$host][self::MACRO_RDDS_ENABLED] ? $macros[$host][self::MACRO_TLD_RDDS80_URL]     : null,
 					'rdapUrl'                   => $macros[$host][self::MACRO_RDAP_ENABLED] ? $macros[$host][self::MACRO_RDAP_BASE_URL]      : null,
 					'rdapTestedDomain'          => $macros[$host][self::MACRO_RDAP_ENABLED] ? $macros[$host][self::MACRO_RDAP_TEST_DOMAIN]   : null,
 					'rdds43NsString'            => $macros[$host][self::MACRO_RDDS_ENABLED] ? $macros[$host][self::MACRO_RDDS_NS_STRING]     : null,
@@ -193,8 +193,8 @@ class Registrar extends MonitoringTarget {
 
 			$this->createMacroConfig(self::MACRO_TLD_RDDS43_TEST_DOMAIN, $input['rddsParameters']['rdds43TestedDomain']),
 			$this->createMacroConfig(self::MACRO_TLD_RDDS_NS_STRING    , $input['rddsParameters']['rdds43NsString']),
-			//$this->createMacroConfig(self::MACRO_TLD_RDDS_43_SERVERS   , $input['rddsParameters']['rdds43Server']),     // TODO: fill with real value
-			//$this->createMacroConfig(self::MACRO_TLD_RDDS_80_SERVERS   , $input['rddsParameters']['rdds80Url']),        // TODO: fill with real value
+			$this->createMacroConfig(self::MACRO_TLD_RDDS43_SERVER     , $input['rddsParameters']['rdds43Server']),
+			$this->createMacroConfig(self::MACRO_TLD_RDDS80_URL        , $input['rddsParameters']['rdds80Url']),
 		];
 	}
 }
