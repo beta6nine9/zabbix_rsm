@@ -37,8 +37,8 @@ class Registrar extends MonitoringTarget {
 						'registrar'                     => ['type' => API_UINT64     , 'flags' => API_REQUIRED],
 						'registrarName'                 => ['type' => API_STRING_UTF8, 'flags' => API_REQUIRED],
 						'registrarFamily'               => ['type' => API_STRING_UTF8, 'flags' => API_REQUIRED],
-						'servicesStatus'                => ['type' => API_OBJECTS    , 'flags' => API_REQUIRED, 'uniq' => [['service']], 'fields' => [  // TODO: all services (i.e. rdds, rdap) must be specified
-							'service'                   => ['type' => API_STRING_UTF8, 'flags' => API_REQUIRED, 'in' => 'rdap,rdds'],
+						'servicesStatus'                => ['type' => API_OBJECTS    , 'flags' => API_REQUIRED, 'uniq' => [['service']], 'fields' => [  // TODO: all services (i.e. rdds43, rdds80, rdap) must be specified
+							'service'                   => ['type' => API_STRING_UTF8, 'flags' => API_REQUIRED, 'in' => 'rdap,rdds43,rdds80'],
 							'enabled'                   => ['type' => API_BOOLEAN    , 'flags' => API_REQUIRED],
 						]],
 						'rddsParameters'                => ['type' => API_OBJECT     , 'flags' => API_REQUIRED, 'fields' => [
@@ -92,7 +92,7 @@ class Registrar extends MonitoringTarget {
 				self::MACRO_TLD_RDDS43_TEST_DOMAIN,
 				self::MACRO_TLD_RDDS43_SERVER,
 				self::MACRO_TLD_RDDS80_URL,
-				self::MACRO_TLD_RDDS_NS_STRING,
+				self::MACRO_TLD_RDDS43_NS_STRING,
 			]
 		);
 
@@ -112,7 +112,11 @@ class Registrar extends MonitoringTarget {
 						'enabled'               => (bool)$macros[$host][self::MACRO_RDAP_ENABLED],
 					],
 					[
-						'service'               => 'rdds',
+						'service'               => 'rdds43',
+						'enabled'               => (bool)$macros[$host][self::MACRO_RDDS_ENABLED],
+					],
+					[
+						'service'               => 'rdds80',
 						'enabled'               => (bool)$macros[$host][self::MACRO_RDDS_ENABLED],
 					],
 				],
@@ -173,7 +177,8 @@ class Registrar extends MonitoringTarget {
 			$input[$this->getObjectIdInputField()] => [
 				'tldType' => 'gTLD',
 				'rdap'    => $services['rdap'],
-				'rdds'    => $services['rdds'],
+				'rdds43'  => $services['rdds43'],
+				'rdds80'  => $services['rdds80'],
 			],
 		];
 	}
@@ -186,13 +191,14 @@ class Registrar extends MonitoringTarget {
 			$this->createMacroConfig(self::MACRO_TLD_CONFIG_TIMES      , $_SERVER['REQUEST_TIME']),
 
 			$this->createMacroConfig(self::MACRO_TLD_RDAP_ENABLED      , (int)$services['rdap']),
-			$this->createMacroConfig(self::MACRO_TLD_RDDS_ENABLED      , (int)$services['rdds']),
+			$this->createMacroConfig(self::MACRO_TLD_RDDS_ENABLED      , (int)$services['rdds43']),
+			//$this->createMacroConfig(self::MACRO_TLD_RDDS_ENABLED      , (int)$services['rdds80']),
 
 			$this->createMacroConfig(self::MACRO_TLD_RDAP_BASE_URL     , $input['rddsParameters']['rdapUrl']),
 			$this->createMacroConfig(self::MACRO_TLD_RDAP_TEST_DOMAIN  , $input['rddsParameters']['rdapTestedDomain']),
 
 			$this->createMacroConfig(self::MACRO_TLD_RDDS43_TEST_DOMAIN, $input['rddsParameters']['rdds43TestedDomain']),
-			$this->createMacroConfig(self::MACRO_TLD_RDDS_NS_STRING    , $input['rddsParameters']['rdds43NsString']),
+			$this->createMacroConfig(self::MACRO_TLD_RDDS43_NS_STRING  , $input['rddsParameters']['rdds43NsString']),
 			$this->createMacroConfig(self::MACRO_TLD_RDDS43_SERVER     , $input['rddsParameters']['rdds43Server']),
 			$this->createMacroConfig(self::MACRO_TLD_RDDS80_URL        , $input['rddsParameters']['rdds80Url']),
 		];

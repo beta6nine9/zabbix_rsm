@@ -43,8 +43,8 @@ abstract class ActionBaseEx extends ActionBase {
 	protected const MACRO_TLD_RDAP_TEST_DOMAIN   = '{$RDAP.TEST.DOMAIN}';
 	protected const MACRO_TLD_RDDS43_TEST_DOMAIN = '{$RSM.RDDS43.TEST.DOMAIN}';
 	protected const MACRO_TLD_RDDS43_SERVER      = '{$RSM.TLD.RDDS43.SERVER}';
+	protected const MACRO_TLD_RDDS43_NS_STRING   = '{$RSM.RDDS.NS.STRING}';
 	protected const MACRO_TLD_RDDS80_URL         = '{$RSM.TLD.RDDS80.URL}';
-	protected const MACRO_TLD_RDDS_NS_STRING     = '{$RSM.RDDS.NS.STRING}';
 
 	protected const MACRO_DESCRIPTIONS = [
 		self::MACRO_PROBE_PROXY_NAME       => '',
@@ -69,7 +69,7 @@ abstract class ActionBaseEx extends ActionBase {
 		self::MACRO_TLD_RDDS43_TEST_DOMAIN => 'Domain name to use when querying RDDS43 server, e.g. "whois.example"',
 		self::MACRO_TLD_RDDS43_SERVER      => 'Hostname of the RDDS43 server',
 		self::MACRO_TLD_RDDS80_URL         => 'URL of the RDDS80 service to be tested',
-		self::MACRO_TLD_RDDS_NS_STRING     => 'What to look for in RDDS output, e.g. "Name Server:"',
+		self::MACRO_TLD_RDDS43_NS_STRING   => 'What to look for in RDDS output, e.g. "Name Server:"',
 	];
 
 	protected const MONITORING_TARGET_REGISTRY  = 'registry';
@@ -303,15 +303,18 @@ abstract class ActionBaseEx extends ActionBase {
 				$status = $rsmhostConfigs[$host]['rdap'] ? ITEM_STATUS_ACTIVE : ITEM_STATUS_DISABLED;
 				$config += $this->getItemStatusConfig($hostItems[$host], $templateItems['Template RDAP Status'], $status);
 
-				$status = $rsmhostConfigs[$host]['rdds'] ? ITEM_STATUS_ACTIVE : ITEM_STATUS_DISABLED;
+				$status = $rsmhostConfigs[$host]['rdds43'] ? ITEM_STATUS_ACTIVE : ITEM_STATUS_DISABLED;
 				$config += $this->getItemStatusConfig($hostItems[$host], $templateItems['Template RDDS Status'], $status);
+
+				//$status = $rsmhostConfigs[$host]['rdds80'] ? ITEM_STATUS_ACTIVE : ITEM_STATUS_DISABLED;
+				//$config += $this->getItemStatusConfig($hostItems[$host], $templateItems['Template RDDS Status'], $status);
 			}
 			else
 			{
 				$status = ITEM_STATUS_DISABLED;
 				$config += $this->getItemStatusConfig($hostItems[$host], $templateItems['Template RDAP Status'], $status);
 
-				$status = $rsmhostConfigs[$host]['rdap'] || $rsmhostConfigs[$host]['rdds'] ? ITEM_STATUS_ACTIVE : ITEM_STATUS_DISABLED;
+				$status = $rsmhostConfigs[$host]['rdap'] || $rsmhostConfigs[$host]['rdds43'] ? ITEM_STATUS_ACTIVE : ITEM_STATUS_DISABLED;
 				$config += $this->getItemStatusConfig($hostItems[$host], $templateItems['Template RDDS Status'], $status);
 			}
 
@@ -322,8 +325,11 @@ abstract class ActionBaseEx extends ActionBase {
 				$status = $rsmhostConfigs[$rsmhost]['rdap'] && $probeConfigs[$probe]['rdap'] ? ITEM_STATUS_ACTIVE : ITEM_STATUS_DISABLED;
 				$config += $this->getItemStatusConfig($hostItems[$host], $templateItems['Template RDAP Test'], $status);
 
-				$status = $rsmhostConfigs[$rsmhost]['rdds'] && $probeConfigs[$probe]['rdds'] ? ITEM_STATUS_ACTIVE : ITEM_STATUS_DISABLED;
+				$status = $rsmhostConfigs[$rsmhost]['rdds43'] && $probeConfigs[$probe]['rdds'] ? ITEM_STATUS_ACTIVE : ITEM_STATUS_DISABLED;
 				$config += $this->getItemStatusConfig($hostItems[$host], $templateItems['Template RDDS Test'], $status);
+
+				//$status = $rsmhostConfigs[$rsmhost]['rdds80'] && $probeConfigs[$probe]['rdds'] ? ITEM_STATUS_ACTIVE : ITEM_STATUS_DISABLED;
+				//$config += $this->getItemStatusConfig($hostItems[$host], $templateItems['Template RDDS Test'], $status);
 			}
 		}
 
@@ -490,7 +496,8 @@ abstract class ActionBaseEx extends ActionBase {
 				'dnsTcp'  => (bool)$macros[$host][self::MACRO_TLD_DNS_TCP_ENABLED],
 				'dnssec'  => (bool)$macros[$host][self::MACRO_TLD_DNSSEC_ENABLED],
 				'rdap'    => (bool)$macros[$host][self::MACRO_TLD_RDAP_ENABLED],
-				'rdds'    => (bool)$macros[$host][self::MACRO_TLD_RDDS_ENABLED],
+				'rdds43'  => (bool)$macros[$host][self::MACRO_TLD_RDDS_ENABLED],
+				'rdds80'  => (bool)$macros[$host][self::MACRO_TLD_RDDS_ENABLED],
 			];
 		}
 
