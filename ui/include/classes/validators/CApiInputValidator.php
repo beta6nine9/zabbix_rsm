@@ -174,9 +174,14 @@ class CApiInputValidator {
 
 			/* RSM specifics */
 			case API_RSM_CUSTOM:
-				if (!array_key_exists('function', $rule) || !is_callable($rule['function']))
+				if (!array_key_exists('function', $rule))
 				{
 					$error = _s('Incorrect validation rules "%1$s": %2$s.', $path, _('function not specified'));
+					return false;
+				}
+				if (!is_callable($rule['function']))
+				{
+					$error = _s('Incorrect validation rules "%1$s": %2$s.', $path, _('specified function is not callable'));
 					return false;
 				}
 				return $rule['function']($rule, $data, $path, $error);

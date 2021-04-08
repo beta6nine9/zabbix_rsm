@@ -42,8 +42,8 @@ abstract class ActionBaseEx extends ActionBase {
 	protected const MACRO_TLD_RDAP_BASE_URL      = '{$RDAP.BASE.URL}';
 	protected const MACRO_TLD_RDAP_TEST_DOMAIN   = '{$RDAP.TEST.DOMAIN}';
 	protected const MACRO_TLD_RDDS43_TEST_DOMAIN = '{$RSM.RDDS43.TEST.DOMAIN}';
-	protected const MACRO_TLD_RDDS43_SERVER      = '{$RSM.TLD.RDDS.43.SERVER}';
-	protected const MACRO_TLD_RDDS80_URL         = '{$RSM.TLD.RDDS.80.URL}';
+	protected const MACRO_TLD_RDDS43_SERVER      = '{$RSM.TLD.RDDS43.SERVER}';
+	protected const MACRO_TLD_RDDS80_URL         = '{$RSM.TLD.RDDS80.URL}';
 	protected const MACRO_TLD_RDDS_NS_STRING     = '{$RSM.RDDS.NS.STRING}';
 
 	protected const MACRO_DESCRIPTIONS = [

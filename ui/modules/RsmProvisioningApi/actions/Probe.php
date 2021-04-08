@@ -42,11 +42,10 @@ class Probe extends ActionBaseEx {
 						'zabbixProxyParameters'         => ['type' => API_OBJECT     , 'flags' => API_REQUIRED, 'fields' => [
 							'ipv4Enable'                => ['type' => API_BOOLEAN    , 'flags' => API_REQUIRED],
 							'ipv6Enable'                => ['type' => API_BOOLEAN    , 'flags' => API_REQUIRED],
-							'ipResolver'                => ['type' => API_RSM_CUSTOM , 'flags' => API_REQUIRED, 'function' => 'RsmValidateIPv4'],       // TODO: IPv4, IPv6 or both?
-							'proxyIp'                   => ['type' => API_RSM_CUSTOM , 'flags' => API_REQUIRED, 'function' => 'RsmValidateIPv4'],       // TODO: IPv4, IPv6 or both?
+							'proxyIp'                   => ['type' => API_RSM_CUSTOM , 'flags' => API_REQUIRED, 'function' => 'RsmValidateIP'],
 							'proxyPort'                 => ['type' => API_UINT64     , 'flags' => API_REQUIRED, 'in' => '1:65535'],
-							'proxyPskIdentity'          => ['type' => API_STRING_UTF8, 'flags' => API_REQUIRED],
-							'proxyPsk'                  => ['type' => API_PSK        , 'flags' => API_REQUIRED],
+							'proxyPskIdentity'          => ['type' => API_STRING_UTF8, 'flags' => API_REQUIRED | API_NOT_EMPTY],
+							'proxyPsk'                  => ['type' => API_PSK        , 'flags' => API_REQUIRED | API_NOT_EMPTY],
 						]],
 						'online'                        => ['type' => API_BOOLEAN    , 'flags' => API_REQUIRED],                                        // TODO: "element to put the probe node in manual offline mode" - when receiving list, we should skip disabled probes (not knocked off) completely?
 					]
@@ -99,7 +98,6 @@ class Probe extends ActionBaseEx {
 				self::MACRO_PROBE_IP6_ENABLED,
 				self::MACRO_PROBE_RDAP_ENABLED,
 				self::MACRO_PROBE_RDDS_ENABLED,
-				self::MACRO_PROBE_RESOLVER,
 			]
 		);
 
@@ -138,7 +136,6 @@ class Probe extends ActionBaseEx {
 				'zabbixProxyParameters'         => [
 					'ipv4Enable'                => (bool)$macros[$host][self::MACRO_PROBE_IP4_ENABLED],
 					'ipv6Enable'                => (bool)$macros[$host][self::MACRO_PROBE_IP6_ENABLED],
-					'ipResolver'                => $macros[$host][self::MACRO_PROBE_RESOLVER],
 					'proxyIp'                   => $interfaces[$host]['ip'],
 					'proxyPort'                 => $interfaces[$host]['port'],
 					'proxyPskIdentity'          => null,
@@ -393,12 +390,14 @@ class Probe extends ActionBaseEx {
 	private function getMacrosConfig(array $input) {
 		$services = array_column($input['servicesStatus'], 'enabled', 'service');
 
+		$ipResolver = $input['zabbixProxyParameters']['ipv4Enable'] ? '127.0.0.1' : '0:0:0:0:0:0:0:1';
+
 		return [
 			$this->createMacroConfig(self::MACRO_PROBE_IP4_ENABLED , (int)$input['zabbixProxyParameters']['ipv4Enable']),
 			$this->createMacroConfig(self::MACRO_PROBE_IP6_ENABLED , (int)$input['zabbixProxyParameters']['ipv6Enable']),
 			$this->createMacroConfig(self::MACRO_PROBE_RDAP_ENABLED, (int)$services['rdap']),
 			$this->createMacroConfig(self::MACRO_PROBE_RDDS_ENABLED, (int)$services['rdds']),
-			$this->createMacroConfig(self::MACRO_PROBE_RESOLVER    , $input['zabbixProxyParameters']['ipResolver']),
+			$this->createMacroConfig(self::MACRO_PROBE_RESOLVER    , $ipResolver),
 		];
 	}
 }

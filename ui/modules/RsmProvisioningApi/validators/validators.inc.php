@@ -1,7 +1,11 @@
 <?php
 
 function RsmValidateProbeIdentifier($rule, &$data, $path, &$error) {
-	// TODO: add validation: "No spaces are allowed."
+	if (!preg_match('/^[a-zA-Z0-9_\-]+$/', $data))
+	{
+		$error = _s('Invalid parameter "%1$s": %2$s.', $path, _('may include only a-z, A-Z, 0-9, "_" and "-"'));
+		return false;
+	}
 
 	return true;
 }
