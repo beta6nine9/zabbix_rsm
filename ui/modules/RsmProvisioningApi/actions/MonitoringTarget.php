@@ -1,5 +1,7 @@
 <?php
 
+//declare(strict_types=1); // TODO: enable strict_types
+
 namespace Modules\RsmProvisioningApi\Actions;
 
 use API;
@@ -38,23 +40,23 @@ abstract class MonitoringTarget extends ActionBaseEx {
 
 		// enable/disable items, based on service status and standalone rdap status
 
-		$statusHosts = [$this->statusHostId => $input[$this->getObjectIdInputField()]];
+		$statusHosts = [$this->statusHostId => $input['id']];
 
 		$this->updateServiceItemStatus($statusHosts, $testHosts, $rsmhostConfigs, $probeConfigs);
 	}
 
 	private function createHostGroups(array $input) {
 		$config = [
-			'name' => 'TLD ' . $input[$this->getObjectIdInputField()],
+			'name' => 'TLD ' . $input['id'],
 		];
 		$data = API::HostGroup()->create($config);
 
-		$this->hostGroupIds['TLD ' . $input[$this->getObjectIdInputField()]] = $data['groupids'][0];
+		$this->hostGroupIds['TLD ' . $input['id']] = $data['groupids'][0];
 	}
 
 	protected function createTemplates(array $input) {
 		$config = [
-			'host'   => 'Template Rsmhost Config ' . $input[$this->getObjectIdInputField()],
+			'host'   => 'Template Rsmhost Config ' . $input['id'],
 			'groups' => [
 				['groupid' => $this->hostGroupIds['Templates - TLD']],
 			],
@@ -62,7 +64,7 @@ abstract class MonitoringTarget extends ActionBaseEx {
 		];
 		$data = API::Template()->create($config);
 
-		$this->templateIds['Template Rsmhost Config ' . $input[$this->getObjectIdInputField()]] = $data['templateids'][0];
+		$this->templateIds['Template Rsmhost Config ' . $input['id']] = $data['templateids'][0];
 	}
 
 	/******************************************************************************************************************
@@ -72,7 +74,7 @@ abstract class MonitoringTarget extends ActionBaseEx {
 	protected function updateObject() {
 		$input = $this->getInputAll();
 
-		$this->hostGroupIds += $this->getHostGroupIds($this->getHostGroupNames($input, ['TLD ' . $input[$this->getObjectIdInputField()]]));
+		$this->hostGroupIds += $this->getHostGroupIds($this->getHostGroupNames($input, ['TLD ' . $input['id']]));
 		$this->templateIds  += $this->getTemplateIds($this->getTemplateNames(null));
 
 		$this->updateTemplates($input);
@@ -87,14 +89,14 @@ abstract class MonitoringTarget extends ActionBaseEx {
 
 		// enable/disable items, based on service status and standalone rdap status
 
-		$statusHosts = [$this->statusHostId => $input[$this->getObjectIdInputField()]];
+		$statusHosts = [$this->statusHostId => $input['id']];
 
 		$this->updateServiceItemStatus($statusHosts, $rsmhostProbeHosts, $rsmhostConfigs, $probeConfigs);
 	}
 
 	protected function updateTemplates(array $input) {
 		$config = [
-			'templateid' => $this->getTemplateId('Template Rsmhost Config ' . $input[$this->getObjectIdInputField()]),
+			'templateid' => $this->getTemplateId('Template Rsmhost Config ' . $input['id']),
 			'macros'     => $this->getMacrosConfig($input),
 		];
 		$data = API::Template()->update($config);
@@ -106,7 +108,7 @@ abstract class MonitoringTarget extends ActionBaseEx {
 
 	protected function deleteObject() {
 		$input = $this->getInputAll();
-		$rsmhost = $input[$this->getObjectIdInputField()];
+		$rsmhost = $input['id'];
 
 		$templateId = $this->getTemplateId('Template Rsmhost Config ' . $rsmhost);
 

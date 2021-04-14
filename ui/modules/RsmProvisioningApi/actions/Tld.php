@@ -1,5 +1,7 @@
 <?php
 
+//declare(strict_types=1); // TODO: enable strict_types
+
 namespace Modules\RsmProvisioningApi\Actions;
 
 use API;
@@ -11,31 +13,27 @@ class Tld extends MonitoringTarget {
 		return $this->getMonitoringTarget() == MONITORING_TARGET_REGISTRY;
 	}
 
-	protected function getObjectIdInputField() {
-		return 'tld';
-	}
-
 	protected function getInputRules(): array {
 		switch ($_SERVER['REQUEST_METHOD'])
 		{
 			case self::REQUEST_METHOD_GET:
 				return [
 					'type' => API_OBJECT, 'fields' => [
-						'tld'                           => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateTldIdentifier'],
+						'id'                            => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateTldIdentifier'],
 					]
 				];
 
 			case self::REQUEST_METHOD_DELETE:
 				return [
 					'type' => API_OBJECT, 'fields' => [
-						'tld'                           => ['type' => API_RSM_CUSTOM , 'flags' => API_REQUIRED, 'function' => 'RsmValidateTldIdentifier'],
+						'id'                            => ['type' => API_RSM_CUSTOM , 'flags' => API_REQUIRED, 'function' => 'RsmValidateTldIdentifier'],
 					]
 				];
 
 			case self::REQUEST_METHOD_PUT:
 				return [
 					'type' => API_OBJECT, 'fields' => [
-						'tld'                           => ['type' => API_RSM_CUSTOM , 'flags' => API_REQUIRED, 'function' => 'RsmValidateTldIdentifier'],
+						'id'                            => ['type' => API_RSM_CUSTOM , 'flags' => API_REQUIRED, 'function' => 'RsmValidateTldIdentifier'],
 						'tldType'                       => ['type' => API_STRING_UTF8, 'flags' => API_REQUIRED, 'in' => 'gTLD,ccTLD,otherTLD,testTLD'],
 						'dnsParameters'                 => ['type' => API_OBJECT     , 'flags' => API_REQUIRED, 'fields' => [
 							'nsIps'                     => ['type' => API_OBJECTS    , 'flags' => API_REQUIRED, 'uniq' => [['ns', 'ip']], 'fields' => [ // TODO: at least one NS, IP pair is required
@@ -215,7 +213,7 @@ class Tld extends MonitoringTarget {
 
 	protected function createStatusHost(array $input) {
 		$config = [
-			'host'       => $input[$this->getObjectIdInputField()],
+			'host'       => $input['id'],
 			'status'     => HOST_STATUS_MONITORED,
 			'interfaces' => [self::DEFAULT_MAIN_INTERFACE],
 			'groups'     => [
@@ -223,7 +221,7 @@ class Tld extends MonitoringTarget {
 				['groupid' => $this->hostGroupIds[$input['tldType']]],
 			],
 			'templates'  => [
-				['templateid' => $this->templateIds['Template Rsmhost Config ' . $input[$this->getObjectIdInputField()]]],
+				['templateid' => $this->templateIds['Template Rsmhost Config ' . $input['id']]],
 				['templateid' => $this->templateIds['Template Config History']],
 				['templateid' => $this->templateIds['Template DNS Status']],
 				['templateid' => $this->templateIds['Template DNSSEC Status']],
@@ -240,7 +238,7 @@ class Tld extends MonitoringTarget {
 		parent::createTemplates($input);
 
 		$config = [
-			'host'      => 'Template DNS Test - ' . $input[$this->getObjectIdInputField()],
+			'host'      => 'Template DNS Test - ' . $input['id'],
 			'groups'    => [
 				['groupid' => $this->hostGroupIds['Templates - TLD']],
 			],
@@ -248,7 +246,7 @@ class Tld extends MonitoringTarget {
 		];
 		$data = API::Template()->create($config);
 
-		$this->templateIds['Template DNS Test - ' . $input[$this->getObjectIdInputField()]] = $data['templateids'][0];
+		$this->templateIds['Template DNS Test - ' . $input['id']] = $data['templateids'][0];
 	}
 
 	protected function getRsmhostProbeTemplatesConfig(string $probe, string $rsmhost) {
@@ -261,7 +259,7 @@ class Tld extends MonitoringTarget {
 
 	protected function updateStatustHost(array $input) {
 		$config = [
-			'hostid' => $this->getHostId($input['tld']),
+			'hostid' => $this->getHostId($input['id']),
 			'groups' => [
 				['groupid' => $this->hostGroupIds['TLDs']],
 				['groupid' => $this->hostGroupIds[$input['tldType']]],
@@ -275,7 +273,7 @@ class Tld extends MonitoringTarget {
 	protected function deleteObject() {
 		parent::deleteObject();
 
-		$templateId = $this->getTemplateId('Template DNS Test - ' . $this->getInput('tld'));
+		$templateId = $this->getTemplateId('Template DNS Test - ' . $this->getInput('id'));
 		$data = API::Template()->delete([$templateId]);
 	}
 
@@ -308,7 +306,7 @@ class Tld extends MonitoringTarget {
 			'Template RDDS Status',
 			// templates for "<rsmhost> <probe>" hosts
 			'Template DNS Test',
-			'Template DNS Test - ' . $this->newObject['tld'],
+			'Template DNS Test - ' . $this->newObject['id'],
 			'Template RDAP Test',
 			'Template RDDS Test',
 		];
@@ -325,7 +323,7 @@ class Tld extends MonitoringTarget {
 		$services = array_column($input['servicesStatus'], 'enabled', 'service');
 
 		return [
-			$input[$this->getObjectIdInputField()] => [
+			$input['id'] => [
 				'tldType' => $input['tldType'],
 				'dnsUdp'  => $services['dnsUDP'],
 				'dnsTcp'  => $services['dnsTCP'],
@@ -341,7 +339,7 @@ class Tld extends MonitoringTarget {
 		$services = array_column($input['servicesStatus'], 'enabled', 'service');
 
 		return [
-			$this->createMacroConfig(self::MACRO_TLD                   , $input[$this->getObjectIdInputField()]),
+			$this->createMacroConfig(self::MACRO_TLD                   , $input['id']),
 			$this->createMacroConfig(self::MACRO_TLD_CONFIG_TIMES      , $_SERVER['REQUEST_TIME']),
 
 			$this->createMacroConfig(self::MACRO_TLD_DNS_UDP_ENABLED   , (int)$services['dnsUDP']),
@@ -381,7 +379,7 @@ class Tld extends MonitoringTarget {
 		sort($createNs);
 		sort($disableNs);
 
-		$testTemplateId = $this->templateIds['Template DNS Test - ' . $this->newObject['tld']];
+		$testTemplateId = $this->templateIds['Template DNS Test - ' . $this->newObject['id']];
 
 		if (!empty($createNsIp))
 		{
@@ -394,7 +392,7 @@ class Tld extends MonitoringTarget {
 
 			// get itemid of "DNS Test" master item
 
-			$dnsTestItemId = $this->getTemplateItemId('Template DNS Test - ' . $this->newObject['tld'], 'rsm.dns[');
+			$dnsTestItemId = $this->getTemplateItemId('Template DNS Test - ' . $this->newObject['id'], 'rsm.dns[');
 
 			// create item pseudo-configs
 
@@ -556,7 +554,7 @@ class Tld extends MonitoringTarget {
 
 					$triggerConfigs[] = [
 						'description' => "DNS $ns ($ip) downtime exceeded $threshold% of allowed \$1 minutes",
-						'expression'  => sprintf('{%s:%s.last()}>{$RSM.SLV.NS.DOWNTIME}%s', $this->newObject['tld'], $key, $thresholdStr),
+						'expression'  => sprintf('{%s:%s.last()}>{$RSM.SLV.NS.DOWNTIME}%s', $this->newObject['id'], $key, $thresholdStr),
 						'priority'    => $priority,
 					];
 				}

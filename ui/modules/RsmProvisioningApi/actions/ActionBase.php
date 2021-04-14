@@ -1,5 +1,7 @@
 <?php
 
+//declare(strict_types=1); // TODO: enable strict_types
+
 namespace Modules\RsmProvisioningApi\Actions;
 
 require_once __DIR__ . '/../validators/validators.inc.php';
@@ -9,15 +11,17 @@ use CApiInputValidator;
 use CController;
 use CControllerResponseData;
 use Exception;
+use ErrorException;
+use Throwable;
 
 abstract class ActionBase extends CController {
 
 	private const USER_READONLY  = 'provisioning-api-readonly';
 	private const USER_READWRITE = 'provisioning-api-readwrite';
 
-	protected const REQUEST_METHOD_GET     = 'GET';
-	protected const REQUEST_METHOD_DELETE  = 'DELETE';
-	protected const REQUEST_METHOD_PUT     = 'PUT';
+	protected const REQUEST_METHOD_GET    = 'GET';
+	protected const REQUEST_METHOD_DELETE = 'DELETE';
+	protected const REQUEST_METHOD_PUT    = 'PUT';
 
 	protected $oldObject = null;
 	protected $newObject = null;
@@ -25,7 +29,6 @@ abstract class ActionBase extends CController {
 	abstract protected function checkMonitoringTarget();
 	abstract protected function requestConfigCacheReload();
 	abstract protected function getInputRules(): array;
-	abstract protected function getObjectIdInputField();
 	abstract protected function getObjects(?string $objectId);
 	abstract protected function createObject();
 	abstract protected function updateObject();
@@ -37,17 +40,22 @@ abstract class ActionBase extends CController {
 	}
 
 	public function __destruct() {
-		$stats = $this->getStats();
-		$stats = explode("\n", $stats);
-
-		foreach ($stats as $i => $line)
+		if (!headers_sent())
 		{
-			header(sprintf("Rsm-Stats-%02d: %s", $i, $line));
+			$stats = $this->getStats();
+			$stats = explode("\n", $stats);
+
+			foreach ($stats as $i => $line)
+			{
+				header(sprintf("Rsm-Stats-%02d: %s", $i, $line));
+			}
 		}
 	}
 
-	protected function getStats() {
+	protected function getStats(): string {
 		$format = fn($n) => sprintf('%7s', number_format($n, 0, '.', '\''));
+
+		// gather stats
 
 		$dbStats = mysqli_get_connection_stats($GLOBALS['DB']['DB']);
 
@@ -74,10 +82,12 @@ abstract class ActionBase extends CController {
 			null,
 		];
 
+		// format stats as table
+
 		$k_len = max(array_map('strlen', array_keys($data)));
 		$v_len = max(array_map('strlen', array_values($data)));
 
-		$line = '+' . str_pad('', $k_len + 2, '-') . '+' . str_pad('', $v_len + 2, '-') . '+';
+		$line = '+' . str_repeat('-', $k_len + 2) . '+' . str_repeat('-', $v_len + 2) . '+';
 
 		$output = '';
 
@@ -96,13 +106,43 @@ abstract class ActionBase extends CController {
 		return substr($output, 0, -1);
 	}
 
-	protected function checkPermissions() {
+	protected function check(bool $condition, string $message): void
+	{
+		if (!$condition)
+		{
+			throw new Exception($message);
+		}
+	}
+
+	public function errorHandler(int $errno, string $errstr, string $errfile, int $errline): void {
+		// turn PHP errors, warnings, notices into exceptions
+		throw new ErrorException($errstr, 0, $errno, $errfile, $errline);
+	}
+
+	final protected function checkPermissions(): bool {
+		// permissions have to be validated in doAction(), otherwise frontend will output HTML
+		return true;
+	}
+
+	final protected function checkInput(): bool {
+		// input has to be validated in doAction(), otherwise frontend will output HTML
+		return true;
+	}
+
+	final public function validateInput($validationRules): bool {
+		// normally, validateInput() is supposed to be called from checkInput(), but not in this module
+		throw new Exception('Internal error');
+	}
+
+	protected function isValidUser(&$error): bool {
 		if (!isset($_SERVER['PHP_AUTH_USER']))
 		{
+			$error = "Username is not specified";
 			return false;
 		}
 		if (!isset($_SERVER['PHP_AUTH_PW']))
 		{
+			$error = "Password is not specified";
 			return false;
 		}
 
@@ -113,9 +153,11 @@ abstract class ActionBase extends CController {
 
 		if ($userData === false)
 		{
+			$error = "Invalid username or password";
 			return false;
 		}
 
+		// required hack for API
 		API::getWrapper()->auth = $userData['sessionid'];
 
 		DBexecute('DELETE FROM sessions WHERE userid=' . $userData['userid'] . ' AND lastaccess<' . (time() - 12 * SEC_PER_HOUR));
@@ -132,51 +174,57 @@ abstract class ActionBase extends CController {
 				return $username === self::USER_READWRITE;
 
 			default:
+				$error = "Invalid request method";
 				return false;
 		}
 	}
 
-	protected function checkInput() {
-		return $this->validateInput($this->getInputRules());
-	}
-
-	public function validateInput($validationRules) {
+	protected function isValidInput(&$error): bool {
 		$this->input = $this->getRequestInput();
+
+		$validationRules = $this->getInputRules();
 
 		if (!CApiInputValidator::validate($validationRules, $this->input, '', $error))
 		{
-			$this->returnJson([
-				'error' => $error
-			]);
 			return false;
 		}
 
 		return true;
 	}
 
-	protected function getRequestInput(): array {
+	private function getRequestInput(): array {
+		$input = null;
+
 		switch ($_SERVER['REQUEST_METHOD'])
 		{
 			case self::REQUEST_METHOD_GET:
 				$input = $_GET;
 				unset($input['action']);
-				return $input;
+				break;
 
 			case self::REQUEST_METHOD_DELETE:
 				$input = $_GET;
 				unset($input['action']);
-				return $input;
+				break;
 
 			case self::REQUEST_METHOD_PUT:
-				return json_decode(file_get_contents('php://input'), true);
+				$input = json_decode(file_get_contents('php://input'), true);
+				if (array_key_exists('id', $this->input))
+				{
+					throw new Exception('Unexpected parameter: "id"');
+				}
+				if (!array_key_exists('id', $_GET))
+				{
+					throw new Exception('Missing parameter: "id"');
+				}
+				$input = ['id' => $_GET['id']] + $input;
+				break;
 
 			default:
 				throw new Exception('Unsupported request method');
 		}
-	}
 
-	public function errorHandler(int $errno, string $errstr, string $errfile, int $errline, array $errcontext) {
-		throw new \ErrorException($errstr, 0, $errno, $errfile, $errline);
+		return $input;
 	}
 
 	protected function doAction() {
@@ -184,6 +232,18 @@ abstract class ActionBase extends CController {
 
 		try
 		{
+			$error = null;
+
+			if (!$this->isValidUser($error))
+			{
+				throw new Exception($error);
+			}
+
+			if (!$this->isValidInput($error))
+			{
+				throw new Exception($error);
+			}
+
 			DBstart();
 
 			if (!$this->checkMonitoringTarget())
@@ -209,16 +269,22 @@ abstract class ActionBase extends CController {
 					throw new Exception('Unsupported request method');
 			}
 
+			if (!empty($GLOBALS['ZBX_MESSAGES']))
+			{
+				throw new Exception('Internal error');
+			}
+
 			DBend(true);
 		}
-		catch (\Throwable $e)
+		catch (Throwable $e)
 		{
 			$this->returnJson([
-				'code'    => $e->getCode(),
-				'message' => $e->getMessage(),
-				'file'    => $e->getFile(),
-				'line'    => $e->getLine(),
-				'trace'   => $e->getTraceAsString(),
+				'code'     => $e->getCode(),
+				'message'  => $e->getMessage(),
+				'file'     => $e->getFile(),
+				'line'     => $e->getLine(),
+				'trace'    => explode("\n", $e->getTraceAsString()),
+				'messages' => $GLOBALS['ZBX_MESSAGES'],
 			]);
 
 			DBend(false);
@@ -228,9 +294,9 @@ abstract class ActionBase extends CController {
 	}
 
 	protected function handleGetRequest() {
-		if ($this->hasInput($this->getObjectIdInputField()))
+		if ($this->hasInput('id'))
 		{
-			$data = $this->getObjects($this->getInput($this->getObjectIdInputField()));
+			$data = $this->getObjects($this->getInput('id'));
 
 			if (empty($data))
 			{
@@ -261,7 +327,7 @@ abstract class ActionBase extends CController {
 	protected function handlePutRequest() {
 		$this->newObject = $this->getInputAll();
 
-		$objects = $this->getObjects($this->getInput($this->getObjectIdInputField()));
+		$objects = $this->getObjects($this->newObject['id']);
 
 		if (empty($objects))
 		{
@@ -275,7 +341,9 @@ abstract class ActionBase extends CController {
 
 		$this->requestConfigCacheReload();
 
-		$this->returnJson([$this->getInput($this->getObjectIdInputField())]);
+		$data = $this->getObjects($this->newObject['id']);
+		$data = $data[0];
+		$this->returnJson($data);
 	}
 
 	protected function returnJson(array $json) {

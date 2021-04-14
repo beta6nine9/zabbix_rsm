@@ -1,5 +1,7 @@
 <?php
 
+//declare(strict_types=1); // TODO: enable strict_types
+
 namespace Modules\RsmProvisioningApi\Actions;
 
 require_once __DIR__ . '/../validators/validators.inc.php';

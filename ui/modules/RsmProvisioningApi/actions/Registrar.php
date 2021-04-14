@@ -1,5 +1,7 @@
 <?php
 
+//declare(strict_types=1); // TODO: enable strict_types
+
 namespace Modules\RsmProvisioningApi\Actions;
 
 use Exception;
@@ -10,31 +12,27 @@ class Registrar extends MonitoringTarget {
 		return $this->getMonitoringTarget() == MONITORING_TARGET_REGISTRAR;
 	}
 
-	protected function getObjectIdInputField() {
-		return 'registrar';
-	}
-
 	protected function getInputRules(): array {
 		switch ($_SERVER['REQUEST_METHOD'])
 		{
 			case self::REQUEST_METHOD_GET:
 				return [
 					'type' => API_OBJECT, 'fields' => [
-						'registrar'                     => ['type' => API_UINT64],
+						'id'                            => ['type' => API_UINT64],
 					]
 				];
 
 			case self::REQUEST_METHOD_DELETE:
 				return [
 					'type' => API_OBJECT, 'fields' => [
-						'registrar'                     => ['type' => API_UINT64     , 'flags' => API_REQUIRED],
+						'id'                            => ['type' => API_UINT64     , 'flags' => API_REQUIRED],
 					]
 				];
 
 			case self::REQUEST_METHOD_PUT:
 				return [
 					'type' => API_OBJECT, 'fields' => [
-						'registrar'                     => ['type' => API_UINT64     , 'flags' => API_REQUIRED],
+						'id'                            => ['type' => API_UINT64     , 'flags' => API_REQUIRED],
 						'registrarName'                 => ['type' => API_STRING_UTF8, 'flags' => API_REQUIRED],
 						'registrarFamily'               => ['type' => API_STRING_UTF8, 'flags' => API_REQUIRED],
 						'servicesStatus'                => ['type' => API_OBJECTS    , 'flags' => API_REQUIRED, 'uniq' => [['service']], 'fields' => [  // TODO: all services (i.e. rdds43, rdds80, rdap) must be specified
@@ -140,7 +138,7 @@ class Registrar extends MonitoringTarget {
 
 	protected function createStatusHost(array $input) {
 		$config = [
-			'host'       => $input[$this->getObjectIdInputField()],
+			'host'       => $input['id'],
 			'status'     => HOST_STATUS_MONITORED,
 			'interfaces' => [self::DEFAULT_MAIN_INTERFACE],
 			'groups'     => [
@@ -148,7 +146,7 @@ class Registrar extends MonitoringTarget {
 				['groupid' => $this->hostGroupIds['gTLD']],
 			],
 			'templates'  => [
-				['templateid' => $this->templateIds['Template Rsmhost Config ' . $input[$this->getObjectIdInputField()]]],
+				['templateid' => $this->templateIds['Template Rsmhost Config ' . $input['id']]],
 				['templateid' => $this->templateIds['Template Config History']],
 				['templateid' => $this->templateIds['Template RDAP Status']],
 				['templateid' => $this->templateIds['Template RDDS Status']],
@@ -174,7 +172,7 @@ class Registrar extends MonitoringTarget {
 		$services = array_column($input['servicesStatus'], 'enabled', 'service');
 
 		return [
-			$input[$this->getObjectIdInputField()] => [
+			$input['id'] => [
 				'tldType' => 'gTLD',
 				'rdap'    => $services['rdap'],
 				'rdds43'  => $services['rdds43'],
@@ -187,7 +185,7 @@ class Registrar extends MonitoringTarget {
 		$services = array_column($input['servicesStatus'], 'enabled', 'service');
 
 		return [
-			$this->createMacroConfig(self::MACRO_TLD                   , $input[$this->getObjectIdInputField()]),
+			$this->createMacroConfig(self::MACRO_TLD                   , $input['id']),
 			$this->createMacroConfig(self::MACRO_TLD_CONFIG_TIMES      , $_SERVER['REQUEST_TIME']),
 
 			$this->createMacroConfig(self::MACRO_TLD_RDAP_ENABLED      , (int)$services['rdap']),

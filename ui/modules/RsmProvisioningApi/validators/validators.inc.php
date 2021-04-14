@@ -1,5 +1,7 @@
 <?php
 
+//declare(strict_types=1); // TODO: enable strict_types
+
 function RsmValidateProbeIdentifier($rule, &$data, $path, &$error) {
 	if (!preg_match('/^[a-zA-Z0-9_\-]+$/', $data))
 	{
