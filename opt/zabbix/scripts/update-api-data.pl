@@ -810,7 +810,7 @@ foreach (@server_keys)
 						{
 							fail("cannot save alarmed: ", ah_get_error());
 						}
-					}					
+					}
 				}
 
 				my $rollweek;
