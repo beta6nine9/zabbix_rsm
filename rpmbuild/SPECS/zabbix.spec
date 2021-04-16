@@ -138,7 +138,6 @@ Requires:		zabbix-server = %{version}-%{release}
 %description server-mysql-selinux
 SELinux policy modules for use with Zabbix server.
 
-
 %package web
 Summary:			Zabbix web frontend common package
 Group:				Application/Internet
@@ -171,6 +170,7 @@ Obsoletes:			php-xml
 Obsoletes:			php-ldap
 Obsoletes:			php-json
 Obsoletes:			php-fpm
+%endif
 # CentOS 7 specifics end
 Requires:			dejavu-sans-fonts
 Requires:			zabbix-web-database = %{version}-%{release}
