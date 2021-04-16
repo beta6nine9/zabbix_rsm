@@ -172,7 +172,6 @@ Obsoletes:			php-ldap
 Obsoletes:			php-json
 Obsoletes:			php-fpm
 # CentOS 7 specifics end
-%endif
 Requires:			dejavu-sans-fonts
 Requires:			zabbix-web-database = %{version}-%{release}
 Requires(post):		%{_sbindir}/update-alternatives
@@ -262,10 +261,13 @@ Zabbix sender command line utility
 Summary:			Zabbix scripts for RSM
 Group:				Applications/Internet
 BuildArch:			noarch
+%if 0%{?rhel} < 8
+Requires:			perl-File-Pid
+%endif
 Requires:			perl-Data-Dumper, perl-DBD-MySQL, perl-Sys-Syslog
 Requires:			perl-DateTime, perl-Config-Tiny, perl-libwww-perl
 Requires:			perl-LWP-Protocol-https, perl-JSON-XS, perl-Expect
-Requires:			perl-Redis, perl-File-Pid, perl-DateTime-Format-RFC3339
+Requires:			perl-Redis, perl-DateTime-Format-RFC3339
 Requires:			perl-Text-CSV_XS, perl-Types-Serialiser
 Requires:			perl-Path-Tiny
 Requires:			perl-Parallel-ForkManager
@@ -346,6 +348,8 @@ build_flags="
 	--with-libcurl
 	--enable-proxy
 	--enable-ipv6
+	--with-openssl
+	--enable-server
 "
 
 build_flags="$build_flags --with-openssl"
