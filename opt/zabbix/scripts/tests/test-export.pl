@@ -1431,8 +1431,8 @@ if (open_file(\$file, $files{$name}, MANDATORY))
 		$no_fails[ 6] &&= exists($serviceCategory_id{$row->[2]});
 		$no_fails[ 7] &&= $row->[3] =~ INT;
 		$no_fails[ 8] &&= exists($testTypes_id{$row->[3]});
-		$no_fails[ 9] &&= $row->[4] =~ INT;
-		$no_fails[10] &&= exists($target_id{$row->[4]});
+		$no_fails[ 9] &&= $row->[4] =~ INT;                 || empty($row->[4]);
+		$no_fails[10] &&= exists($target_id{$row->[4]})     || empty($row->[4]);
 		$no_fails[11] &&= $row->[5] =~ INT                  || empty($row->[5]);
 		$no_fails[12] &&= exists($testedName_id{$row->[5]}) || empty($row->[5]);
 
