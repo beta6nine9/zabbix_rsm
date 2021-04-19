@@ -146,7 +146,7 @@ foreach ($data['probes'] as $probe) {
 								if ($result < 0) {
 									$class = ($class == ZBX_STYLE_GREEN && !isset($probe['dns_error'][$nskey]))
 											? ZBX_STYLE_GREEN : ZBX_STYLE_RED;
-									$span->setHint($data['test_error_message'][$result]);
+									$span->setAttribute('title', $data['test_error_message'][$result]);
 								}
 
 								$span->addClass($class);
@@ -154,7 +154,7 @@ foreach ($data['probes'] as $probe) {
 
 								if (isset($probe['results_nsid'][$dns_udp_ns][$ip]) && is_numeric($probe['results_nsid'][$dns_udp_ns][$ip])) {
 									$nsid_index = $probe['results_nsid'][$dns_udp_ns][$ip];
-									$row[] = (new CDiv($nsid_index + 1))->setHint($nsids_converted[$nsid_index]);
+									$row[] = (new CDiv($nsid_index + 1))->setAttribute('title', $nsids_converted[$nsid_index]);
 								}
 								else {
 									$row[] = '';
@@ -187,7 +187,7 @@ foreach ($data['probes'] as $probe) {
 
 // Add error rows at the bottom of table.
 foreach ($data['errors'] as $error_code => $errors) {
-	$row = [(new CSpan(_('Total ') . $error_code))->setHint($data['test_error_message'][$error_code]), '', '', '', ''];
+	$row = [(new CSpan(_('Total ') . $error_code))->setAttribute('title', $data['test_error_message'][$error_code]), '', '', '', ''];
 
 	foreach ($data['dns_nameservers'] as $ns_name => $ns_ips) {
 		// 'Status' column

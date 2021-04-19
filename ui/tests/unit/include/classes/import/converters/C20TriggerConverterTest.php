@@ -1,7 +1,7 @@
-<?php
+<?php declare(strict_types=1);
 /*
 ** Zabbix
-** Copyright (C) 2001-2020 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -19,9 +19,11 @@
 **/
 
 
-class C20TriggerConverterTest extends PHPUnit_Framework_TestCase {
+use PHPUnit\Framework\TestCase;
 
-	public function testConvertProvider() {
+class C20TriggerConverterTest extends TestCase {
+
+	public function dataProviderConvert() {
 		return [
 			['1#1', '1<>1'],
 
@@ -77,7 +79,7 @@ class C20TriggerConverterTest extends PHPUnit_Framework_TestCase {
 	}
 
 	/**
-	 * @dataProvider testConvertProvider
+	 * @dataProvider dataProviderConvert
 	 *
 	 * @param $expression
 	 * @param $expectedConvertedExpression

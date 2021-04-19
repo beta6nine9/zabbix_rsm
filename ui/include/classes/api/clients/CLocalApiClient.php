@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2020 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -52,12 +52,12 @@ class CLocalApiClient extends CApiClient {
 	 *
 	 * @param string 	$requestApi			API name
 	 * @param string 	$requestMethod		API method
-	 * @param mixed 	$params				API parameters
+	 * @param array 	$params				API parameters
 	 * @param string	$auth				Authentication token
 	 *
 	 * @return CApiClientResponse
 	 */
-	public function callMethod($requestApi, $requestMethod, $params, $auth) {
+	public function callMethod($requestApi, $requestMethod, array $params, $auth) {
 		global $DB;
 
 		$api = strtolower($requestApi);
@@ -67,7 +67,7 @@ class CLocalApiClient extends CApiClient {
 
 		// check API
 		if (!$this->isValidApi($api)) {
-			$response->errorCode = ZBX_API_ERROR_PARAMETERS;
+			$response->errorCode = ZBX_API_ERROR_NO_METHOD;
 			$response->errorMessage = _s('Incorrect API "%1$s".', $requestApi);
 
 			return $response;
@@ -75,18 +75,8 @@ class CLocalApiClient extends CApiClient {
 
 		// check method
 		if (!$this->isValidMethod($api, $method)) {
-			$response->errorCode = ZBX_API_ERROR_PARAMETERS;
+			$response->errorCode = ZBX_API_ERROR_NO_METHOD;
 			$response->errorMessage = _s('Incorrect method "%1$s.%2$s".', $requestApi, $requestMethod);
-
-			return $response;
-		}
-
-		// check params
-		if (!is_array($params)) {
-			$response->errorCode = ZBX_API_ERROR_PARAMETERS;
-			$response->errorMessage = _s('Cannot call method "%1$s.%2$s" without parameters.', $requestApi,
-				$requestMethod
-			);
 
 			return $response;
 		}

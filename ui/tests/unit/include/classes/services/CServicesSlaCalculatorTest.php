@@ -1,7 +1,7 @@
-<?php
+<?php declare(strict_types=1);
 /*
 ** Zabbix
-** Copyright (C) 2001-2020 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -19,16 +19,18 @@
 **/
 
 
-class CServicesSlaCalculatorTest extends PHPUnit_Framework_TestCase {
+use PHPUnit\Framework\TestCase;
+
+class CServicesSlaCalculatorTest extends TestCase {
 
 	protected $defaultTimezone;
 
-	public function setUp() {
+	protected function setUp(): void {
 		$this->defaultTimezone = date_default_timezone_get();
 		date_default_timezone_set('Europe/Riga');
 	}
 
-	public function testCalculateSlaProvider() {
+	public function dataProviderCalculateSla() {
 		return [
 			[
 				[
@@ -142,7 +144,7 @@ class CServicesSlaCalculatorTest extends PHPUnit_Framework_TestCase {
 	}
 
 	/**
-	 * @dataProvider testCalculateSlaProvider
+	 * @dataProvider dataProviderCalculateSla
 	 *
 	 * @param array $alarms
 	 * @param array $times
@@ -161,7 +163,7 @@ class CServicesSlaCalculatorTest extends PHPUnit_Framework_TestCase {
 		$this->markTestIncomplete();
 	}
 
-	public function tearDown() {
+	protected function tearDown(): void {
 		date_default_timezone_set($this->defaultTimezone);
 	}
 

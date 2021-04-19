@@ -51,10 +51,12 @@ RELOGIN: zbx_connect($section->{'za_url'}, $section->{'za_user'}, $section->{'za
 if ($OPTS{'delete'})
 {
 	delete_probe($OPTS{'probe'});
+	request_config_cache_reload();
 }
 elsif ($OPTS{'disable'})
 {
 	disable_probe($OPTS{'probe'});
+	request_config_cache_reload();
 }
 elsif ($OPTS{'add'})
 {
@@ -80,10 +82,13 @@ elsif ($OPTS{'add'})
 		$OPTS{'rdap'},
 		$OPTS{'resolver'}
 	);
+
+	request_config_cache_reload();
 }
 elsif ($OPTS{'rename'})
 {
 	rename_probe($OPTS{'probe'}, $OPTS{'new-name'});
+	request_config_cache_reload();
 }
 
 exit;

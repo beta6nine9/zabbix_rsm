@@ -1,3 +1,10 @@
+Changes for rsm2.2.0rc7
+
+Bug fixes:
+....I..... [sub-760] got rid of LLD when handling NS,IP pairs (asitals)
+..F....PS. [sub-760] updated to Zabbix 5.0.10 (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.2.0rc6
 
 Bug fixes:
@@ -133,6 +140,12 @@ Changes for rsm2.1.0rc1
 New features:
 ..F.I..PS. [554] upgraded Zabbix to 5.0.4 (asitals, dimir, gcalenko, kalimulin, miks)
 ..F.I..PS. [599] implemented DNS Monitoring Reboot (asitals, dimir, gcalenko, kalimulin)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.0.5
+
+Bug fixes:
+....I..... [sub-780] added support for Registrars, test details and fixed unique ID checking in test-export.pl (dimir)
 
 --------------------------------------------------------------------------------
 Changes for rsm2.0.4
