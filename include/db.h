@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2020 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -505,6 +505,10 @@ const ZBX_FIELD	*DBget_field(const ZBX_TABLE *table, const char *fieldname);
 zbx_uint64_t	DBget_maxid_num(const char *tablename, int num);
 
 void	DBcheck_capabilities(void);
+
+#ifdef HAVE_POSTGRESQL
+char	*zbx_db_get_schema_esc(void);
+#endif
 
 /******************************************************************************
  *                                                                            *

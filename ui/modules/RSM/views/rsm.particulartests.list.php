@@ -282,7 +282,7 @@ foreach ($data['probes'] as $probe) {
 				->setAttribute('class', $rdds43 === $down ? ZBX_STYLE_RED : ZBX_STYLE_GREEN);
 
 			if ($probe['rdds43']['rtt']['description']) {
-				$rdds43_rtt->setHint($probe['rdds43']['rtt']['description']);
+				$rdds43_rtt->setAttribute('title', $probe['rdds43']['rtt']['description']);
 			}
 		}
 
@@ -291,7 +291,7 @@ foreach ($data['probes'] as $probe) {
 				->setAttribute('class', $rdds80 === $down ? ZBX_STYLE_RED : ZBX_STYLE_GREEN);
 
 			if ($probe['rdds80']['rtt']['description']) {
-				$rdds80_rtt->setHint($probe['rdds80']['rtt']['description']);
+				$rdds80_rtt->setAttribute('title', $probe['rdds80']['rtt']['description']);
 			}
 		}
 
@@ -300,7 +300,7 @@ foreach ($data['probes'] as $probe) {
 				->setAttribute('class', $rdap === $down ? ZBX_STYLE_RED : ZBX_STYLE_GREEN);
 
 			if ($probe['rdap']['rtt']['description']) {
-				$rdap_rtt->setHint($probe['rdap']['rtt']['description']);
+				$rdap_rtt->setAttribute('title', $probe['rdap']['rtt']['description']);
 			}
 		}
 
@@ -371,7 +371,7 @@ foreach ($data['probes'] as $probe) {
 				->setAttribute('class', $rdap === $down ? ZBX_STYLE_RED : ZBX_STYLE_GREEN);
 
 			if ($probe['rdap']['rtt']['description']) {
-				$rdap_rtt->setHint($probe['rdap']['rtt']['description']);
+				$rdap_rtt->setAttribute('title', $probe['rdap']['rtt']['description']);
 			}
 		}
 
@@ -413,7 +413,7 @@ foreach ($data['probes'] as $probe) {
 if ($data['type'] == RSM_RDAP) {
 	foreach ($data['errors'] as $error_code => $error) {
 		$table->addRow([
-			(new CSpan(_('Total ') . $error_code))->setHint($error['description']),
+			(new CSpan(_('Total ') . $error_code))->setAttribute('title', $error['description']),
 			'',
 			'',
 			'',
@@ -427,7 +427,7 @@ if ($data['type'] == RSM_RDAP) {
 elseif ($data['type'] == RSM_RDDS) {
 	foreach ($data['errors'] as $error_code => $error) {
 		$row = [
-			(new CSpan(_('Total ') . $error_code))->setHint($error['description']),
+			(new CSpan(_('Total ') . $error_code))->setAttribute('title', $error['description']),
 			'',
 			'',
 			'',

@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2020 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -70,14 +70,15 @@ class testPageLowLevelDiscovery extends CWebTest {
 				$this->assertEquals($form->getField($name)->getValue(), $value);
 				switch ($value) {
 					case 'SNMP agent':
-						$this->assertTrue($form->query('id:filter_snmp_oid')->one()->isVisible());
+						$this->assertTrue($form->getField('SNMP OID')->isVisible());
 						break;
 					case 'Zabbix trapper':
-						$this->assertFalse($form->query('id:filter_delay_row')->one()->isVisible());
+						$this->assertFalse($form->getField('Update interval')->isVisible());
 						break;
 					case 'Normal':
 					case 'Not supported':
-						$this->assertFalse($form->query('id:filter_status')->one()->isEnabled());
+						$this->assertFalse($form->getField('Status')->isEnabled());
+						$this->assertEquals('all', $form->getField('Status')->getText());
 						break;
 				}
 			}
@@ -91,8 +92,8 @@ class testPageLowLevelDiscovery extends CWebTest {
 		// Checking Title, Header and Column names.
 		$headers = ['', 'Host', 'Name', 'Items', 'Triggers', 'Graphs', 'Hosts',
 				'Key', 'Interval', 'Type', 'Status', 'Info'];
-		$this->assertPageTitle('Configuration of discovery rules');
-		$this->assertPageHeader('Discovery rules');
+		$this->page->assertTitle('Configuration of discovery rules');
+		$this->page->assertHeader('Discovery rules');
 		$table = $this->query('class:list-table')->asTable()->one();
 		$this->assertSame($headers, $table->getHeadersText());
 
@@ -276,7 +277,7 @@ class testPageLowLevelDiscovery extends CWebTest {
 					'filter' => [
 						'Host groups' => 'Templates/Server hardware'
 					],
-					'rows' => 39
+					'rows' => 40
 				]
 			],
 			[
@@ -436,7 +437,8 @@ class testPageLowLevelDiscovery extends CWebTest {
 					],
 					'expected' => [
 						'Containers discovery',
-						'Images discovery'
+						'Images discovery',
+						'Replication Discovery'
 					]
 				]
 			],

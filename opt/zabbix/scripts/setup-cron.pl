@@ -40,6 +40,9 @@ my @cron_jobs = (
 	['main', '0 15 1 * *', 0, '/opt/zabbix/scripts/sla-monthly-status.pl'                                                                                                                          , '/var/log/zabbix/sla-monthly-status.err'],
 	['main', '0 15 1 * *', 0, '/opt/zabbix/scripts/sla-report.php'                                                                                                                                 , '/var/log/zabbix/sla-report.err'],
 	'',
+	['main', '* * * * *' , 0, 'sleep 15; /opt/zabbix/scripts/config-cache-reload.pl'                                                                                                               , '/var/log/zabbix/config-cache-reload.log'],
+	['main', '* * * * *' , 0, 'sleep 45; /opt/zabbix/scripts/config-cache-reload.pl'                                                                                                               , '/var/log/zabbix/config-cache-reload.log'],
+	'',
 	['db'  , '0 23 * * *', 0, '/opt/zabbix/scripts/MySQL_part_management.pl'                                                                                                                       , '/var/log/zabbix/zabbix-mysql-partitioning'],
 	['db'  , '0 2 * * *' , 0, '/opt/zabbix/scripts/MySQL_part_management.pl'                                                                                                                       , '/var/log/zabbix/zabbix-mysql-partitioning'],
 );

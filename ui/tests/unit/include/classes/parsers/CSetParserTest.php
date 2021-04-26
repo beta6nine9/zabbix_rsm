@@ -1,7 +1,7 @@
-<?php
+<?php declare(strict_types=1);
 /*
 ** Zabbix
-** Copyright (C) 2001-2020 Zabbix SIA
+** Copyright (C) 2001-2021 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -19,13 +19,15 @@
 **/
 
 
+use PHPUnit\Framework\TestCase;
+
 class CSetParserTest extends CParserTest {
 
 	protected function getParser() {
 		return new CSetParser(['<', '>', '<>', 'and', 'or']);
 	}
 
-	public function testProvider() {
+	public function dataProvider() {
 		return [
 			['<', 0, CParser::PARSE_SUCCESS, '<'],
 			['<=', 0, CParser::PARSE_SUCCESS_CONT, '<'],

@@ -46,16 +46,19 @@ sub main()
 	{
 		update_rsmhost_config_times(getopt('rr-id'));
 		manage_registrar('delete', getopt('rr-id'), getopt('rdds'), getopt('rdap'));
+		request_config_cache_reload();
 	}
 	elsif (opt('disable'))
 	{
 		update_rsmhost_config_times(getopt('rr-id'));
 		manage_registrar('disable', getopt('rr-id'), getopt('rdds'), getopt('rdap'));
+		request_config_cache_reload();
 	}
 	else
 	{
 		update_rsmhost_config_times(getopt('rr-id'));
 		add_new_registrar();
+		request_config_cache_reload();
 	}
 }
 

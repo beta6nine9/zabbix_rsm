@@ -50,7 +50,8 @@ sub parse_time_str($);
 # display help message
 my $help = 0;
 
-my $tld;
+my $monitoring_target;
+my $rsmhost;
 
 # start and length of the interval for which CSV files were generated
 my $clock = 0;
@@ -66,20 +67,41 @@ my %files;
 my %options;
 
 $options{'help'} = \$help;
-$options{'tld=s'} = \$tld;
+$options{'monitoring-target=s'} = \$monitoring_target;
+$options{'tld=s'} = \$rsmhost;
 $options{'clock=s'} = \$clock;
 $options{'period=i'} = \$period;
 $options{'debug'} = \$debug;
-$options{'fail_immediately'} = \$fail_immediately;
+$options{'fail-immediately'} = \$fail_immediately;
 
 if (!GetOptions(%options))
 {
 	$help = 1;
 }
 
-if ((!$tld || !$clock) && !$help)
+if (!$rsmhost && !$help)
 {
-	print("TLD and Period start parameters are mandatory\n");
+	print("--tld is mandatory\n");
+	$help = 1;
+}
+
+use constant TARGET_RY => "registry";
+use constant TARGET_RR => "registrar";
+
+if (!$monitoring_target && !$help)
+{
+	print("--monitoring-target is mandatory\n");
+	$help = 1;
+}
+elsif ($monitoring_target && !$help && $monitoring_target ne TARGET_RY && $monitoring_target ne TARGET_RR)
+{
+	print("\"$monitoring_target\": invalid monitoring target, expected \"".TARGET_RY."\" or \"".TARGET_RR."\"\n");
+	$help = 1;
+}
+
+if (!$clock && !$help)
+{
+	print("--clock is mandatory\n");
 	$help = 1;
 }
 
@@ -93,10 +115,10 @@ $clock = $clock_ret;
 
 if ($help)
 {
-	print("Usage: $0 --tld=<TLD> --clock=<timestamp or yyyy-mm-dd HH:MM:SS> [--period=<period length (seconds)>]
-		[--debug] [--fail_immediately]\n");
+	print("Usage: $0 --monitoring-target=<registry|registrar> --tld=<TLD> --clock=<timestamp or yyyy-mm-dd HH:MM:SS> [--period=<period length (seconds)>]
+		[--debug] [--fail-immediately]\n");
 
-	exit();
+	exit(1);
 }
 
 ##################
@@ -128,7 +150,7 @@ foreach my $csv_file (@generic_data_file_names)
 # tld data files
 foreach my $csv_file (@tld_data_file_names)
 {
-	$files{$csv_file} = "/opt/zabbix/export/$year/$mon/$mday/$tld/$csv_file.csv";
+	$files{$csv_file} = "/opt/zabbix/export/$year/$mon/$mday/$rsmhost/$csv_file.csv";
 }
 
 ##########################################
@@ -168,7 +190,7 @@ sub empty($)
 	return '' eq $value;
 }
 
-sub emptyiff($$)
+sub emptyif($$)
 {
 	my $value = shift;
 	my $condition = shift;
@@ -235,12 +257,16 @@ sub unique($$)
 use constant OK =>	'[ OK ]';
 use constant FAIL =>	'[FAIL]';
 
+use constant MANDATORY =>	1;
+use constant OPTIONAL =>	2;
+
 my $all_tests_successful = 1;
 
-sub open_file($$)
+sub open_file($$$)
 {
 	my $fileref = shift;
 	my $filename = shift;
+	my $mode = shift;
 
 	print("Checking \"$filename\"...\n");
 
@@ -249,9 +275,12 @@ sub open_file($$)
 		return 1;
 	}
 
-	print(FAIL . " \"$filename\" does not exist\n");
+	if ($mode == MANDATORY)
+	{
+		print(FAIL . " \"$filename\" does not exist\n");
 
-	$all_tests_successful = 0;
+		$all_tests_successful = 0;
+	}
 
 	return 0;
 }
@@ -313,7 +342,7 @@ sub everything_ok($$)
 #                      #
 ########################
 
-$|=1 if ($debug); #autoflush
+$|=1 if ($debug);	#autoflush
 
 my $csv = Text::CSV_XS->new(
 	{
@@ -341,9 +370,9 @@ $columns = 2;
 	'"ipAddress" column contains unique values'
 );
 @no_fails = (1) x scalar(@cases);
-@uniqueness = ({}) x $columns;
+@uniqueness = ({});
 
-if (open_file(\$file, $files{$name}))
+if (open_file(\$file, $files{$name}, MANDATORY))
 {
 	$row_number = 0;
 	$interrupted = 0;
@@ -382,9 +411,9 @@ $columns = 2;
 	'"ipVersion" column contains unique values'
 );
 @no_fails = (1) x scalar(@cases);
-@uniqueness = ({}) x $columns;
+@uniqueness = ({});
 
-if (open_file(\$file, $files{$name}))
+if (open_file(\$file, $files{$name}, MANDATORY))
 {
 	$row_number = 0;
 	$interrupted = 0;
@@ -423,9 +452,9 @@ $columns = 2;
 	'"nsFQDN" column contains unique values'
 );
 @no_fails = (1) x scalar(@cases);
-@uniqueness = ({}) x $columns;
+@uniqueness = ({});
 
-if (open_file(\$file, $files{$name}))
+if (open_file(\$file, $files{$name}, ($monitoring_target eq TARGET_RY ? MANDATORY : OPTIONAL)))
 {
 	$row_number = 0;
 	$interrupted = 0;
@@ -464,9 +493,9 @@ $columns = 2;
 	'"probeName" column contains unique values'
 );
 @no_fails = (1) x scalar(@cases);
-@uniqueness = ({}) x $columns;
+@uniqueness = ({});
 
-if (open_file(\$file, $files{$name}))
+if (open_file(\$file, $files{$name}, MANDATORY))
 {
 	$row_number = 0;
 	$interrupted = 0;
@@ -509,14 +538,14 @@ $columns = 2;
 	'"id" for RDAP service is specified',
 );
 @no_fails = (1) x scalar(@cases);
-@uniqueness = ({}) x $columns;
+@uniqueness = ({});
 
 my $DNS_id;
 my $NS_id;
 my $RDDS_id;
 my $RDAP_id;
 
-if (open_file(\$file, $files{$name}))
+if (open_file(\$file, $files{$name}, MANDATORY))
 {
 	$row_number = 0;
 	$interrupted = 0;
@@ -600,9 +629,9 @@ $columns = 2;
 	'"status" column contains unique values'
 );
 @no_fails = (1) x scalar(@cases);
-@uniqueness = ({}) x $columns;
+@uniqueness = ({});
 
-if (open_file(\$file, $files{$name}))
+if (open_file(\$file, $files{$name}, MANDATORY))
 {
 	$row_number = 0;
 	$interrupted = 0;
@@ -641,11 +670,11 @@ $columns = 2;
 	'"testType" column contains unique values'
 );
 @no_fails = (1) x scalar(@cases);
-@uniqueness = ({}) x $columns;
+@uniqueness = ({});
 
 my $DNSTYPE_id;
 
-if (open_file(\$file, $files{$name}))
+if (open_file(\$file, $files{$name}, MANDATORY))
 {
 	$row_number = 0;
 	$interrupted = 0;
@@ -696,9 +725,9 @@ $columns = 2;
 	'"tld" column contains unique values'
 );
 @no_fails = (1) x scalar(@cases);
-@uniqueness = ({}) x $columns;
+@uniqueness = ({});
 
-if (open_file(\$file, $files{$name}))
+if (open_file(\$file, $files{$name}, MANDATORY))
 {
 	$row_number = 0;
 	$interrupted = 0;
@@ -737,9 +766,9 @@ $columns = 2;
 	'"tldType" column contains unique values'
 );
 @no_fails = (1) x scalar(@cases);
-@uniqueness = ({}) x $columns;
+@uniqueness = ({});
 
-if (open_file(\$file, $files{$name}))
+if (open_file(\$file, $files{$name}, MANDATORY))
 {
 	$row_number = 0;
 	$interrupted = 0;
@@ -778,9 +807,9 @@ $columns = 2;
 	'"transportProtocol" column contains unique values'
 );
 @no_fails = (1) x scalar(@cases);
-@uniqueness = ({}) x $columns;
+@uniqueness = ({});
 
-if (open_file(\$file, $files{$name}))
+if (open_file(\$file, $files{$name}, MANDATORY))
 {
 	$row_number = 0;
 	$interrupted = 0;
@@ -819,9 +848,9 @@ $columns = 2;
 	'"nsid" column contains unique values'
 );
 @no_fails = (1) x scalar(@cases);
-@uniqueness = ({}) x $columns;
+@uniqueness = ({});
 
-if (open_file(\$file, $files{$name}))
+if (open_file(\$file, $files{$name}, ($monitoring_target eq TARGET_RY ? MANDATORY : OPTIONAL)))
 {
 	$row_number = 0;
 	$interrupted = 0;
@@ -860,9 +889,9 @@ $columns = 2;
 	'"target" column contains unique values'
 );
 @no_fails = (1) x scalar(@cases);
-@uniqueness = ({}) x $columns;
+@uniqueness = ({});
 
-if (open_file(\$file, $files{$name}))
+if (open_file(\$file, $files{$name}, MANDATORY))
 {
 	$row_number = 0;
 	$interrupted = 0;
@@ -901,9 +930,9 @@ $columns = 2;
 	'"testedName" column contains unique values'
 );
 @no_fails = (1) x scalar(@cases);
-@uniqueness = ({}) x $columns;
+@uniqueness = ({});
 
-if (open_file(\$file, $files{$name}))
+if (open_file(\$file, $files{$name}, MANDATORY))
 {
 	$row_number = 0;
 	$interrupted = 0;
@@ -946,13 +975,9 @@ $columns = 4;
 	'"probestatus" column entries are from "statusMaps" "id" column'
 );
 @no_fails = (1) x scalar(@cases);
-@uniqueness = ({}) x $columns;
+@uniqueness = ({});
 
-if (! -e $files{$name})
-{
-	# it's OK, optional file
-}
-elsif (open_file(\$file, $files{$name}))
+if (open_file(\$file, $files{$name}, OPTIONAL))
 {
 	$row_number = 0;
 	$interrupted = 0;
@@ -1000,16 +1025,12 @@ $columns = 5;
 	'"tldType" column entries are from "tldTypes" "id" column'
 );
 @no_fails = (1) x scalar(@cases);
-@uniqueness = ({}) x $columns;
+@uniqueness = ({});
 
 my %incidents;
 my $incident;
 
-if (! -e $files{$name})
-{
-	# it's OK, optional file
-}
-elsif (open_file(\$file, $files{$name}))
+if (open_file(\$file, $files{$name}, OPTIONAL))
 {
 	$row_number = 0;
 	$interrupted = 0;
@@ -1063,13 +1084,9 @@ $columns = 3;
 	'"incidentFailedTests" is an integer'
 );
 @no_fails = (1) x scalar(@cases);
-@uniqueness = ({}) x $columns;
+@uniqueness = ({});
 
-if (! -e $files{$name})
-{
-	# it's OK, optional file
-}
-elsif (open_file(\$file, $files{$name}))
+if (open_file(\$file, $files{$name}, OPTIONAL))
 {
 	$row_number = 0;
 	$interrupted = 0;
@@ -1113,13 +1130,9 @@ $columns = 4;
 	'"incidentStatus" is an integer'
 );
 @no_fails = (1) x scalar(@cases);
-@uniqueness = ({}) x $columns;
+@uniqueness = ({});
 
-if (! -e $files{$name})
-{
-	# it's OK, optional file
-}
-elsif (open_file(\$file, $files{$name}))
+if (open_file(\$file, $files{$name}, OPTIONAL))
 {
 	$row_number = 0;
 	$interrupted = 0;
@@ -1186,12 +1199,12 @@ $columns = 12;
 	'"cycleID" is the concatenation of "cycleDateMinute", "serviceCategory", "cycleTLD", "cycleNSFQDN", "cycleNSIP"'
 );
 @no_fails = (1) x scalar(@cases);
-@uniqueness = ({}) x $columns;
+@uniqueness = ({});
 
 my %cycles;
 my $cycle;
 
-if (open_file(\$file, $files{$name}))
+if (open_file(\$file, $files{$name}, MANDATORY))
 {
 	$row_number = 0;
 	$interrupted = 0;
@@ -1212,22 +1225,22 @@ if (open_file(\$file, $files{$name}))
 		$no_fails[ 4] &&= ($row->[2] =~ DEC || $row->[6] == $NS_id); # cycleEmergencyThreshold is not implemented for service category "NS"
 		$no_fails[ 5] &&= $row->[3] =~ INT;
 		$no_fails[ 6] &&= exists($statusMaps_id{$row->[3]});
-		$no_fails[ 7] &&= $row->[4] =~ INT || empty($row->[4]);
+		$no_fails[ 7] &&= $row->[4] =~ INT                   || empty($row->[4]);
 		$no_fails[ 8] &&= $row->[5] =~ INT;
 		$no_fails[ 9] &&= exists($tlds_id{$row->[5]});
 		$no_fails[10] &&= $row->[5] eq $incident->{'incidentTLD'} if ($incident);
 		$no_fails[11] &&= $row->[6] =~ INT;
 		$no_fails[12] &&= exists($serviceCategory_id{$row->[6]});
 		$no_fails[13] &&= $row->[6] eq $incident->{'serviceCategory'} if ($incident);
-		$no_fails[14] &&= $row->[7] =~ INT || empty($row->[7]);
-		$no_fails[15] &&= exists($nsFQDNs_id{$row->[7]}) if (!empty($row->[7]));
-		$no_fails[16] &&= emptyiff($row->[7], $row->[6] ne $NS_id);
-		$no_fails[17] &&= $row->[8] =~ INT || empty($row->[8]);
-		$no_fails[18] &&= exists($ipAddresses_id{$row->[8]}) if (!empty($row->[8]));
-		$no_fails[19] &&= emptyiff($row->[8], $row->[6] ne $NS_id);
-		$no_fails[20] &&= $row->[9] =~ INT || empty($row->[9]);
-		$no_fails[21] &&= exists($ipVersions_id{$row->[9]}) if (!empty($row->[9]));
-		$no_fails[22] &&= emptyiff($row->[9], $row->[6] ne $NS_id);
+		$no_fails[14] &&= $row->[7] =~ INT                   || empty($row->[7]);
+		$no_fails[15] &&= exists($nsFQDNs_id{$row->[7]})     || empty($row->[7]);
+		$no_fails[16] &&= emptyif($row->[7], $row->[6] ne $NS_id);
+		$no_fails[17] &&= $row->[8] =~ INT                   || empty($row->[8]);
+		$no_fails[18] &&= exists($ipAddresses_id{$row->[8]}) || empty($row->[8]);
+		$no_fails[19] &&= emptyif($row->[8], $row->[6] ne $NS_id);
+		$no_fails[20] &&= $row->[9] =~ INT                   || empty($row->[9]);
+		$no_fails[21] &&= exists($ipVersions_id{$row->[9]})  || empty($row->[9]);
+		$no_fails[22] &&= emptyif($row->[9], $row->[6] ne $NS_id);
 		$no_fails[23] &&= $row->[10] =~ INT;
 		$no_fails[24] &&= exists($tldTypes_id{$row->[10]});
 		$no_fails[25] &&= $row->[10] eq $incident->{'tldType'} if ($incident);
@@ -1298,9 +1311,9 @@ $columns = 13;
 	'"nsid" column entries are from "nsid" "id" column'
 );
 @no_fails = (1) x scalar(@cases);
-@uniqueness = ({}) x $columns;
+@uniqueness = ({});
 
-if (open_file(\$file, $files{$name}))
+if (open_file(\$file, $files{$name}, MANDATORY))
 {
 	$row_number = 0;
 	$interrupted = 0;
@@ -1329,17 +1342,17 @@ if (open_file(\$file, $files{$name}))
 		$no_fails[12] &&= $row->[6] =~ INT;
 		$no_fails[13] &&= exists($transportProtocols_id{$row->[6]});
 		$no_fails[14] &&= $row->[6] eq $cycle->{'cycleNSProtocol'} if ($cycle);
-		$no_fails[15] &&= $row->[7] =~ INT || empty($row->[7]) && $row->[3] =~ ERR;
-		$no_fails[16] &&= exists($ipVersions_id{$row->[7]}) if (!empty($row->[7]));
+		$no_fails[15] &&= $row->[7] =~ INT                   || empty($row->[7]) && $row->[3] =~ ERR;
+		$no_fails[16] &&= exists($ipVersions_id{$row->[7]})  || empty($row->[7]);
 		$no_fails[17] &&= $row->[7] eq $cycle->{'cycleNSIPversion'} if ($cycle && $cycle->{'serviceCategory'} ne $RDDS_id);
-		$no_fails[18] &&= $row->[8] =~ INT || empty($row->[8]) && $row->[3] =~ ERR;
-		$no_fails[19] &&= exists($ipAddresses_id{$row->[8]}) if (!empty($row->[8]));
+		$no_fails[18] &&= $row->[8] =~ INT                   || empty($row->[8]) && $row->[3] =~ ERR;
+		$no_fails[19] &&= exists($ipAddresses_id{$row->[8]}) || empty($row->[8]);
 		$no_fails[20] &&= $row->[8] eq $cycle->{'cycleNSIP'} if ($cycle && $cycle->{'serviceCategory'} ne $RDDS_id);
 		$no_fails[21] &&= $row->[9] =~ INT;
 		$no_fails[22] &&= exists($testTypes_id{$row->[9]});
-		$no_fails[23] &&= $row->[10] =~ INT || empty($row->[10]);
-		$no_fails[24] &&= exists($nsFQDNs_id{$row->[10]}) if (!empty($row->[10]));
-		$no_fails[25] &&= emptyiff($row->[10], $row->[9] ne $DNS_id);
+		$no_fails[23] &&= $row->[10] =~ INT                  || empty($row->[10]);
+		$no_fails[24] &&= exists($nsFQDNs_id{$row->[10]})    || empty($row->[10]);
+		$no_fails[25] &&= emptyif($row->[10], $row->[9] ne $DNS_id);
 		$no_fails[26] &&= $row->[10] eq $cycle->{'cycleNSFQDN'} if ($cycle);
 		$no_fails[27] &&= $row->[11] =~ INT;
 		$no_fails[28] &&= exists($tldTypes_id{$row->[11]});
@@ -1385,9 +1398,9 @@ $columns = 7;
 	'"nsTestProtocol" matches "cycles" "cycleNSProtocol" if "nsTests" "cycleID" matches "cycles" "cycleID"'
 );
 @no_fails = (1) x scalar(@cases);
-@uniqueness = ({}) x $columns;
+@uniqueness = ({});
 
-if (open_file(\$file, $files{$name}))
+if (open_file(\$file, $files{$name}, ($monitoring_target eq TARGET_RY ? MANDATORY : OPTIONAL)))
 {
 	$row_number = 0;
 	$interrupted = 0;
@@ -1453,9 +1466,9 @@ $columns = 6;
 	'"testedName" column entries are from "testedName" "id" column'
 );
 @no_fails = (1) x scalar(@cases);
-@uniqueness = ({}) x $columns;
+@uniqueness = ({});
 
-if (open_file(\$file, $files{$name}))
+if (open_file(\$file, $files{$name}, MANDATORY))
 {
 	$row_number = 0;
 	$interrupted = 0;
@@ -1478,10 +1491,10 @@ if (open_file(\$file, $files{$name}))
 		$no_fails[ 6] &&= exists($serviceCategory_id{$row->[2]});
 		$no_fails[ 7] &&= $row->[3] =~ INT;
 		$no_fails[ 8] &&= exists($testTypes_id{$row->[3]});
-		$no_fails[ 9] &&= ($row->[4] =~ INT || $row->[4] eq '');
-		$no_fails[10] &&= (exists($target_id{$row->[4]}) || $row->[4] eq '');
-		$no_fails[11] &&= ($row->[5] =~ INT || $row->[5] eq '');
-		$no_fails[12] &&= (exists($testedName_id{$row->[5]}) || $row->[5] eq '');
+		$no_fails[ 9] &&= $row->[4] =~ INT                  || empty($row->[4]);
+		$no_fails[10] &&= exists($target_id{$row->[4]})     || empty($row->[4]);
+		$no_fails[11] &&= $row->[5] =~ INT                  || empty($row->[5]);
+		$no_fails[12] &&= exists($testedName_id{$row->[5]}) || empty($row->[5]);
 
 		if (!everything_ok($wrong_columns, \@no_fails) && $fail_immediately)
 		{
