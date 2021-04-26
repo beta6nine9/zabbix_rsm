@@ -13,9 +13,10 @@ use CControllerResponseData;
 use Exception;
 use ErrorException;
 use Throwable;
+use Modules\RsmProvisioningApi\RsmException;
 
-abstract class ActionBase extends CController {
-
+abstract class ActionBase extends CController
+{
 	private const USER_READONLY  = 'provisioning-api-readonly';
 	private const USER_READWRITE = 'provisioning-api-readwrite';
 
@@ -26,20 +27,22 @@ abstract class ActionBase extends CController {
 	protected $oldObject = null;
 	protected $newObject = null;
 
-	abstract protected function checkMonitoringTarget();
-	abstract protected function requestConfigCacheReload();
+	abstract protected function checkMonitoringTarget(): bool;
+	abstract protected function requestConfigCacheReload(): void;
 	abstract protected function getInputRules(): array;
-	abstract protected function getObjects(?string $objectId);
-	abstract protected function createObject();
-	abstract protected function updateObject();
-	abstract protected function deleteObject();
+	abstract protected function getObjects(?string $objectId): array;
+	abstract protected function createObject(): void;
+	abstract protected function updateObject(): void;
+	abstract protected function deleteObject(): void;
 
-	public function __construct() {
+	public function __construct()
+	{
 		parent::__construct();
 		$this->disableSIDvalidation();
 	}
 
-	public function __destruct() {
+	public function __destruct()
+	{
 		if (!headers_sent())
 		{
 			$stats = $this->getStats();
@@ -52,7 +55,8 @@ abstract class ActionBase extends CController {
 		}
 	}
 
-	protected function getStats(): string {
+	protected function getStats(): string
+	{
 		$format = fn($n) => sprintf('%7s', number_format($n, 0, '.', '\''));
 
 		// gather stats
@@ -110,40 +114,43 @@ abstract class ActionBase extends CController {
 	{
 		if (!$condition)
 		{
-			throw new Exception($message);
+			throw new Exception('[Internal error] ' . $message);
 		}
 	}
 
-	public function errorHandler(int $errno, string $errstr, string $errfile, int $errline): void {
+	public function errorHandler(int $errno, string $errstr, string $errfile, int $errline): void
+	{
 		// turn PHP errors, warnings, notices into exceptions
 		throw new ErrorException($errstr, 0, $errno, $errfile, $errline);
 	}
 
-	final protected function checkPermissions(): bool {
+	final protected function checkPermissions(): bool
+	{
 		// permissions have to be validated in doAction(), otherwise frontend will output HTML
 		return true;
 	}
 
-	final protected function checkInput(): bool {
+	final protected function checkInput(): bool
+	{
 		// input has to be validated in doAction(), otherwise frontend will output HTML
 		return true;
 	}
 
-	final public function validateInput($validationRules): bool {
+	final public function validateInput($validationRules): bool
+	{
 		// normally, validateInput() is supposed to be called from checkInput(), but not in this module
-		throw new Exception('Internal error');
+		throw new Exception('[Internal error] ' . __FUNCTION__ . '() should never be called');
 	}
 
-	protected function isValidUser(&$error): bool {
-		if (!isset($_SERVER['PHP_AUTH_USER']))
+	protected function rsmValidateUser(): void
+	{
+		if (!isset($_SERVER['PHP_AUTH_USER']) || $_SERVER['PHP_AUTH_USER'] === '')
 		{
-			$error = "Username is not specified";
-			return false;
+			throw new RsmException(401, 'Username is not specified');
 		}
-		if (!isset($_SERVER['PHP_AUTH_PW']))
+		if (!isset($_SERVER['PHP_AUTH_PW']) || $_SERVER['PHP_AUTH_USER'] === '')
 		{
-			$error = "Password is not specified";
-			return false;
+			throw new RsmException(401, 'Password is not specified');
 		}
 
 		$username = $_SERVER['PHP_AUTH_USER'];
@@ -153,8 +160,7 @@ abstract class ActionBase extends CController {
 
 		if ($userData === false)
 		{
-			$error = "Invalid username or password";
-			return false;
+			throw new RsmException(401, 'Invalid username or password');
 		}
 
 		// required hack for API
@@ -165,34 +171,163 @@ abstract class ActionBase extends CController {
 		switch ($_SERVER['REQUEST_METHOD'])
 		{
 			case self::REQUEST_METHOD_GET:
-				return $username === self::USER_READWRITE || $username === self::USER_READONLY;
+				if ($username !== self::USER_READWRITE && $username !== self::USER_READONLY)
+				{
+					throw new RsmException(403, 'Forbidden');
+				}
+				break;
 
 			case self::REQUEST_METHOD_DELETE:
-				return $username === self::USER_READWRITE;
+				if ($username !== self::USER_READWRITE)
+				{
+					throw new RsmException(403, 'Forbidden');
+				}
+				break;
 
 			case self::REQUEST_METHOD_PUT:
-				return $username === self::USER_READWRITE;
+				if ($username !== self::USER_READWRITE)
+				{
+					throw new RsmException(403, 'Forbidden');
+				}
+				break;
 
 			default:
-				$error = "Invalid request method";
-				return false;
+				header('Allow: GET,DELETE,PUT');
+				throw new RsmException(405, 'Method Not Allowed');
 		}
 	}
 
-	protected function isValidInput(&$error): bool {
-		$this->input = $this->getRequestInput();
+	protected function rsmValidateInput(): void
+	{
+		$rules = $this->getInputRules();
+		$error = null;
 
-		$validationRules = $this->getInputRules();
-
-		if (!CApiInputValidator::validate($validationRules, $this->input, '', $error))
+		if (!CApiInputValidator::validate($rules, $this->input, '', $error))
 		{
-			return false;
+			if (preg_match('/^Invalid parameter "/', $error))
+			{
+				$error = preg_replace_callback('/(?<=^Invalid parameter ")\/(.*?)(?=")/', fn($m) => str_replace('/', '.', $m[1]), $error);
+				throw new RsmException(400, 'JSON does not comply with definition', $error);
+			}
+			else
+			{
+				throw new RsmException(400, $error);
+			}
 		}
-
-		return true;
 	}
 
-	private function getRequestInput(): array {
+	/**
+	 * Checks if status is specified in input for all known services, based on input rules.
+	 *
+	 * @param string $errorMessage
+	 */
+	protected function validateInputServices(string $errorMessage): void
+	{
+		$rules = $this->getInputRules();
+
+		$inputServices = array_column($this->input['servicesStatus'], 'service');
+		$rulesServices = $rules['fields']['servicesStatus']['fields']['service']['in'];
+
+		$diff = array_diff($rulesServices, $inputServices);
+		if ($diff)
+		{
+			throw new RsmException(400, $errorMessage);
+		}
+	}
+
+	/**
+	 * Checks if array contains all required keys.
+	 *
+	 * @param array $keys
+	 * @param array $array
+	 * @param string $errorMessage
+	 */
+	protected function requireArrayKeys(array $keys, array $array, string $errorMessage): void
+	{
+		$missing = array_diff($keys, array_keys($array));
+
+		if (!empty($missing))
+		{
+			throw new RsmException(400, $errorMessage);
+		}
+	}
+
+	/**
+	 * Checks if array contains any key that is not allowed.
+	 *
+	 * @param array $keys
+	 * @param array $array
+	 * @param string $errorMessage
+	 */
+	protected function forbidArrayKeys(array $keys, array $array, string $errorMessage): void
+	{
+		$forbidden = array_intersect($keys, array_keys($array));
+
+		if ($forbidden)
+		{
+			throw new RsmException(400, $errorMessage);
+		}
+	}
+
+	/**
+	 * Checks if any JSON object has duplicate keys.
+	 *
+	 * @param string $json
+	 *
+	 * @return bool
+	 */
+	private function jsonHasDuplicateKeys(string $json): bool
+	{
+		$code = "import sys"                                     . "\n"
+			  . "import json"                                    . "\n"
+			  . ""                                               . "\n"
+			  . "def fun(kv_pairs):"                             . "\n"
+			  . "    keys = [kv[0] for kv in kv_pairs]"          . "\n"
+			  . "    if len(keys) != len(set(keys)):"            . "\n"
+			  . "        exit(1)"                                . "\n"
+			  . "    return kv_pairs"                            . "\n"
+			  . ""                                               . "\n"
+			  . "json.loads(sys.argv[1], object_pairs_hook=fun)" . "\n";
+
+		$execCode = escapeshellarg($code);
+		$execJson = escapeshellarg($json);
+
+		$output = null;
+		$result = null;
+
+		$ret = exec("python -c $execCode $execJson 2>&1", $output, $result);
+
+		if ($ret === false || $result !== 0)
+		{
+			return true;
+		}
+
+		return false;
+	}
+
+	private function jsonParsingError(string $json): string
+	{
+		$code = "import sys"                  . "\n"
+			  . "import json"                 . "\n"
+			  . ""                            . "\n"
+			  . "try:"                        . "\n"
+			  . "    json.loads(sys.argv[1])" . "\n"
+			  . "except ValueError as e:"     . "\n"
+			  . "    print(e.message)"        . "\n";
+
+
+		$execCode = escapeshellarg($code);
+		$execJson = escapeshellarg($json);
+
+		$output = null;
+
+		exec("python -c $execCode $execJson 2>&1", $output);
+
+		return implode("\n", $output);
+	}
+
+	private function getRequestInput(): array
+	{
 		$input = null;
 
 		switch ($_SERVER['REQUEST_METHOD'])
@@ -208,41 +343,47 @@ abstract class ActionBase extends CController {
 				break;
 
 			case self::REQUEST_METHOD_PUT:
-				$input = json_decode(file_get_contents('php://input'), true);
-				if (array_key_exists('id', $this->input))
+				$json = file_get_contents('php://input');
+				$input = json_decode($json, true);
+
+				if (is_null($input))
 				{
-					throw new Exception('Unexpected parameter: "id"');
+					$descr = json_last_error_msg() . "\n" . $this->jsonParsingError($json);
+					throw new RsmException(400, 'JSON syntax is invalid', $descr);
+				}
+				if ($this->jsonHasDuplicateKeys($json))
+				{
+					throw new RsmException(400, 'JSON does not comply with definition', 'JSON contains duplicate keys');
+				}
+				if (array_key_exists('id', $input))
+				{
+					throw new RsmException(400, 'JSON does not comply with definition');
 				}
 				if (!array_key_exists('id', $_GET))
 				{
-					throw new Exception('Missing parameter: "id"');
+					throw new RsmException(500, 'General error');
 				}
+
 				$input = ['id' => $_GET['id']] + $input;
 				break;
 
 			default:
-				throw new Exception('Unsupported request method');
+				throw new RsmException(500, 'General error');
 		}
 
 		return $input;
 	}
 
-	protected function doAction() {
+	protected function doAction(): void
+	{
 		set_error_handler([$this, 'errorHandler'], E_ALL | E_STRICT);
 
 		try
 		{
-			$error = null;
+			$this->input = $this->getRequestInput();
 
-			if (!$this->isValidUser($error))
-			{
-				throw new Exception($error);
-			}
-
-			if (!$this->isValidInput($error))
-			{
-				throw new Exception($error);
-			}
+			$this->rsmValidateUser();
+			$this->rsmValidateInput();
 
 			DBstart();
 
@@ -276,16 +417,34 @@ abstract class ActionBase extends CController {
 
 			DBend(true);
 		}
+		catch (RsmException $e)
+		{
+			$this->setCommonResponse(
+				$e->getResultCode(),
+				$e->getTitle(),
+				$e->getDescription(),
+				$e->getDetails(),
+				$e->getUpdatedObject()
+			);
+
+			DBend(false);
+		}
 		catch (Throwable $e)
 		{
-			$this->returnJson([
-				'code'     => $e->getCode(),
-				'message'  => $e->getMessage(),
-				'file'     => $e->getFile(),
-				'line'     => $e->getLine(),
-				'trace'    => explode("\n", $e->getTraceAsString()),
-				'messages' => $GLOBALS['ZBX_MESSAGES'],
-			]);
+			$this->setCommonResponse(
+				500,
+				'General error',
+				$e->getMessage(),
+				[
+					'exception' => get_class($e),
+					'code'      => $e->getCode(),
+					'file'      => $e->getFile(),
+					'line'      => $e->getLine(),
+					'trace'     => explode("\n", $e->getTraceAsString()),
+					'messages'  => $GLOBALS['ZBX_MESSAGES'],
+				],
+				null
+			);
 
 			DBend(false);
 		}
@@ -293,16 +452,11 @@ abstract class ActionBase extends CController {
 		restore_error_handler();
 	}
 
-	protected function handleGetRequest() {
+	protected function handleGetRequest(): void
+	{
 		if ($this->hasInput('id'))
 		{
 			$data = $this->getObjects($this->getInput('id'));
-
-			if (empty($data))
-			{
-				throw new Exception("Requested object does not exist");
-			}
-
 			$data = $data[0];
 		}
 		else
@@ -313,9 +467,16 @@ abstract class ActionBase extends CController {
 		$this->returnJson($data);
 	}
 
-	protected function handleDeleteRequest() {
-		// TODO: check if object exists
-		// TODO: 
+	protected function handleDeleteRequest(): void
+	{
+		$data = $this->getObjects($this->getInput('id'));
+
+		if (empty($data))
+		{
+			throw new Exception("Requested object does not exist");
+		}
+
+		$this->oldObject = $data[0];
 
 		$this->deleteObject();
 
@@ -324,7 +485,10 @@ abstract class ActionBase extends CController {
 		$this->returnJson(['foo' => 'bar']);
 	}
 
-	protected function handlePutRequest() {
+	protected function handlePutRequest(): void
+	{
+		// TODO: Changes to Zabbix shall only be executed if the configuration information changes between the current configuration in Zabbix and the TLD Object provided to the API.
+
 		$this->newObject = $this->getInputAll();
 
 		$objects = $this->getObjects($this->newObject['id']);
@@ -346,7 +510,8 @@ abstract class ActionBase extends CController {
 		$this->returnJson($data);
 	}
 
-	protected function returnJson(array $json) {
+	protected function returnJson(array $json): void
+	{
 		$options = JSON_UNESCAPED_SLASHES;
 
 		if (!is_int(key($json)))
@@ -357,5 +522,32 @@ abstract class ActionBase extends CController {
 		$this->setResponse(new CControllerResponseData([
 			'main_block' => json_encode($json, $options)
 		]));
+	}
+
+	protected function setCommonResponse(int $resultCode, string $title, ?string $description, ?array $details, ?array $updatedObject)
+	{
+		$supportedResultCodes = [
+			200, // OK
+			400, // Bad Request
+			401, // Unauthorized
+			403, // Forbidden
+			404, // Not Found
+			500, // Internal Server Error
+		];
+
+		if (!in_array($resultCode, $supportedResultCodes))
+		{
+			throw new Exception("Result code '$resultCode' is not supported");
+		}
+
+		http_response_code($resultCode);
+
+		$this->returnJson([
+			'resultCode'    => $resultCode,
+			'title'         => $title,
+			'description'   => $description,
+			'details'       => $details,
+			'updatedObject' => $updatedObject,
+		]);
 	}
 }

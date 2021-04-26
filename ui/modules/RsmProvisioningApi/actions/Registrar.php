@@ -6,13 +6,15 @@ namespace Modules\RsmProvisioningApi\Actions;
 
 use Exception;
 
-class Registrar extends MonitoringTarget {
-
-	protected function checkMonitoringTarget() {
+class Registrar extends MonitoringTarget
+{
+	protected function checkMonitoringTarget(): bool
+	{
 		return $this->getMonitoringTarget() == MONITORING_TARGET_REGISTRAR;
 	}
 
-	protected function getInputRules(): array {
+	protected function getFullInputRules(): array
+	{
 		switch ($_SERVER['REQUEST_METHOD'])
 		{
 			case self::REQUEST_METHOD_GET:
@@ -25,27 +27,27 @@ class Registrar extends MonitoringTarget {
 			case self::REQUEST_METHOD_DELETE:
 				return [
 					'type' => API_OBJECT, 'fields' => [
-						'id'                            => ['type' => API_UINT64     , 'flags' => API_REQUIRED],
+						'id'                            => ['type' => API_UINT64     ],
 					]
 				];
 
 			case self::REQUEST_METHOD_PUT:
 				return [
 					'type' => API_OBJECT, 'fields' => [
-						'id'                            => ['type' => API_UINT64     , 'flags' => API_REQUIRED],
-						'registrarName'                 => ['type' => API_STRING_UTF8, 'flags' => API_REQUIRED],
-						'registrarFamily'               => ['type' => API_STRING_UTF8, 'flags' => API_REQUIRED],
-						'servicesStatus'                => ['type' => API_OBJECTS    , 'flags' => API_REQUIRED, 'uniq' => [['service']], 'fields' => [  // TODO: all services (i.e. rdds43, rdds80, rdap) must be specified
-							'service'                   => ['type' => API_STRING_UTF8, 'flags' => API_REQUIRED, 'in' => 'rdap,rdds43,rdds80'],
-							'enabled'                   => ['type' => API_BOOLEAN    , 'flags' => API_REQUIRED],
+						'id'                            => ['type' => API_UINT64     ],
+						'registrarName'                 => ['type' => API_STRING_UTF8],
+						'registrarFamily'               => ['type' => API_STRING_UTF8],
+						'servicesStatus'                => ['type' => API_OBJECTS    , 'uniq' => [['service']], 'fields' => [  // TODO: all services (i.e. rdds43, rdds80, rdap) must be specified
+							'service'                   => ['type' => API_STRING_UTF8, 'in' => 'rdap,rdds43,rdds80'],
+							'enabled'                   => ['type' => API_BOOLEAN    ],
 						]],
-						'rddsParameters'                => ['type' => API_OBJECT     , 'flags' => API_REQUIRED, 'fields' => [
-							'rdds43Server'              => ['type' => API_STRING_UTF8, 'flags' => API_REQUIRED],
-							'rdds43TestedDomain'        => ['type' => API_STRING_UTF8, 'flags' => API_REQUIRED],
-							'rdds80Url'                 => ['type' => API_STRING_UTF8, 'flags' => API_REQUIRED],
-							'rdapUrl'                   => ['type' => API_STRING_UTF8, 'flags' => API_REQUIRED],
-							'rdapTestedDomain'          => ['type' => API_STRING_UTF8, 'flags' => API_REQUIRED],
-							'rdds43NsString'            => ['type' => API_STRING_UTF8, 'flags' => API_REQUIRED],
+						'rddsParameters'                => ['type' => API_OBJECT     , 'fields' => [
+							'rdds43Server'              => ['type' => API_STRING_UTF8],
+							'rdds43TestedDomain'        => ['type' => API_STRING_UTF8],
+							'rdds80Url'                 => ['type' => API_STRING_UTF8],
+							'rdapUrl'                   => ['type' => API_STRING_UTF8],
+							'rdapTestedDomain'          => ['type' => API_STRING_UTF8],
+							'rdds43NsString'            => ['type' => API_STRING_UTF8],
 						]],
 					]
 				];
@@ -55,11 +57,23 @@ class Registrar extends MonitoringTarget {
 		}
 	}
 
+	protected function getInputRules(): array
+	{
+		$rules = $this->getFullInputRules();
+
+		if ($_SERVER['REQUEST_METHOD'] == self::REQUEST_METHOD_PUT)
+		{
+		}
+
+		return $rules;
+	}
+
 	/******************************************************************************************************************
 	 * Functions for retrieving object                                                                                *
 	 ******************************************************************************************************************/
 
-	protected function getObjects(?string $objectId) {
+	protected function getObjects(?string $objectId): array
+	{
 		// get hosts
 
 		$data = $this->getHostsByHostGroup('TLDs', $objectId, ['info_1', 'info_2']);
@@ -136,9 +150,10 @@ class Registrar extends MonitoringTarget {
 	 * Functions for creating object                                                                                  *
 	 ******************************************************************************************************************/
 
-	protected function createStatusHost(array $input) {
+	protected function createStatusHost(): int
+	{
 		$config = [
-			'host'       => $input['id'],
+			'host'       => $this->newObject['id'],
 			'status'     => HOST_STATUS_MONITORED,
 			'interfaces' => [self::DEFAULT_MAIN_INTERFACE],
 			'groups'     => [
@@ -146,7 +161,7 @@ class Registrar extends MonitoringTarget {
 				['groupid' => $this->hostGroupIds['gTLD']],
 			],
 			'templates'  => [
-				['templateid' => $this->templateIds['Template Rsmhost Config ' . $input['id']]],
+				['templateid' => $this->templateIds['Template Rsmhost Config ' . $this->newObject['id']]],
 				['templateid' => $this->templateIds['Template Config History']],
 				['templateid' => $this->templateIds['Template RDAP Status']],
 				['templateid' => $this->templateIds['Template RDDS Status']],
@@ -161,18 +176,20 @@ class Registrar extends MonitoringTarget {
 	 * Functions for updating object                                                                                  *
 	 ******************************************************************************************************************/
 
-	protected function updateObject() {
+	protected function updateObject(): void
+	{
 	}
 
 	/******************************************************************************************************************
 	 * Helper functions                                                                                               *
 	 ******************************************************************************************************************/
 
-	protected function getRsmhostConfigsFromInput(array $input) {
-		$services = array_column($input['servicesStatus'], 'enabled', 'service');
+	protected function getRsmhostConfigsFromInput(): array
+	{
+		$services = array_column($this->newObject['servicesStatus'], 'enabled', 'service');
 
 		return [
-			$input['id'] => [
+			$this->newObject['id'] => [
 				'tldType' => 'gTLD',
 				'rdap'    => $services['rdap'],
 				'rdds43'  => $services['rdds43'],
@@ -181,24 +198,25 @@ class Registrar extends MonitoringTarget {
 		];
 	}
 
-	protected function getMacrosConfig(array $input) {
-		$services = array_column($input['servicesStatus'], 'enabled', 'service');
+	protected function getMacrosConfig(): array
+	{
+		$services = array_column($this->newObject['servicesStatus'], 'enabled', 'service');
 
 		return [
-			$this->createMacroConfig(self::MACRO_TLD                   , $input['id']),
+			$this->createMacroConfig(self::MACRO_TLD                   , $this->newObject['id']),
 			$this->createMacroConfig(self::MACRO_TLD_CONFIG_TIMES      , $_SERVER['REQUEST_TIME']),
 
 			$this->createMacroConfig(self::MACRO_TLD_RDAP_ENABLED      , (int)$services['rdap']),
 			$this->createMacroConfig(self::MACRO_TLD_RDDS_ENABLED      , (int)$services['rdds43']),
 			//$this->createMacroConfig(self::MACRO_TLD_RDDS_ENABLED      , (int)$services['rdds80']),
 
-			$this->createMacroConfig(self::MACRO_TLD_RDAP_BASE_URL     , $input['rddsParameters']['rdapUrl']),
-			$this->createMacroConfig(self::MACRO_TLD_RDAP_TEST_DOMAIN  , $input['rddsParameters']['rdapTestedDomain']),
+			$this->createMacroConfig(self::MACRO_TLD_RDAP_BASE_URL     , $this->newObject['rddsParameters']['rdapUrl']),
+			$this->createMacroConfig(self::MACRO_TLD_RDAP_TEST_DOMAIN  , $this->newObject['rddsParameters']['rdapTestedDomain']),
 
-			$this->createMacroConfig(self::MACRO_TLD_RDDS43_TEST_DOMAIN, $input['rddsParameters']['rdds43TestedDomain']),
-			$this->createMacroConfig(self::MACRO_TLD_RDDS43_NS_STRING  , $input['rddsParameters']['rdds43NsString']),
-			$this->createMacroConfig(self::MACRO_TLD_RDDS43_SERVER     , $input['rddsParameters']['rdds43Server']),
-			$this->createMacroConfig(self::MACRO_TLD_RDDS80_URL        , $input['rddsParameters']['rdds80Url']),
+			$this->createMacroConfig(self::MACRO_TLD_RDDS43_TEST_DOMAIN, $this->newObject['rddsParameters']['rdds43TestedDomain']),
+			$this->createMacroConfig(self::MACRO_TLD_RDDS43_NS_STRING  , $this->newObject['rddsParameters']['rdds43NsString']),
+			$this->createMacroConfig(self::MACRO_TLD_RDDS43_SERVER     , $this->newObject['rddsParameters']['rdds43Server']),
+			$this->createMacroConfig(self::MACRO_TLD_RDDS80_URL        , $this->newObject['rddsParameters']['rdds80Url']),
 		];
 	}
 }

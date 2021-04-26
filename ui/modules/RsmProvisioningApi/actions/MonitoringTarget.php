@@ -6,14 +6,14 @@ namespace Modules\RsmProvisioningApi\Actions;
 
 use API;
 
-abstract class MonitoringTarget extends ActionBaseEx {
-
-	abstract protected function getRsmhostConfigsFromInput(array $input);
-	abstract protected function getMacrosConfig(array $input);
-	abstract protected function createStatusHost(array $input);
-	abstract protected function updateStatustHost(array $input);
-	abstract protected function getHostGroupNames(array $input, ?array $additionalNames);
-	abstract protected function getTemplateNames(?array $additionalNames);
+abstract class MonitoringTarget extends ActionBaseEx
+{
+	abstract protected function getRsmhostConfigsFromInput(): array;
+	abstract protected function getMacrosConfig(): array;
+	abstract protected function createStatusHost(): int;
+	abstract protected function updateStatustHost(): int;
+	abstract protected function getHostGroupNames(?array $additionalNames): array;
+	abstract protected function getTemplateNames(?array $additionalNames): array;
 
 	protected $statusHostId = null;
 
@@ -21,83 +21,84 @@ abstract class MonitoringTarget extends ActionBaseEx {
 	 * Functions for creating object                                                                                  *
 	 ******************************************************************************************************************/
 
-	protected function createObject() {
-		$input = $this->getInputAll();
-
-		$this->hostGroupIds += $this->getHostGroupIds($this->getHostGroupNames($input, null));
+	protected function createObject(): void
+	{
+		$this->hostGroupIds += $this->getHostGroupIds($this->getHostGroupNames(null));
 		$this->templateIds  += $this->getTemplateIds($this->getTemplateNames(null));
 
-		$this->createHostGroups($input);
-		$this->createTemplates($input);
-		$this->statusHostId = $this->createStatusHost($input);
+		$this->createHostGroups();
+		$this->createTemplates();
+		$this->statusHostId = $this->createStatusHost();
 
 		// create "<rsmhost> <probe>" hosts
 
-		$rsmhostConfigs = $this->getRsmhostConfigsFromInput($input);
+		$rsmhostConfigs = $this->getRsmhostConfigsFromInput();
 		$probeConfigs = $this->getProbeConfigs();
 
 		$testHosts = $this->createTestHosts($rsmhostConfigs, $probeConfigs);
 
 		// enable/disable items, based on service status and standalone rdap status
 
-		$statusHosts = [$this->statusHostId => $input['id']];
+		$statusHosts = [$this->statusHostId => $this->newObject['id']];
 
 		$this->updateServiceItemStatus($statusHosts, $testHosts, $rsmhostConfigs, $probeConfigs);
 	}
 
-	private function createHostGroups(array $input) {
+	private function createHostGroups(): void
+	{
 		$config = [
-			'name' => 'TLD ' . $input['id'],
+			'name' => 'TLD ' . $this->newObject['id'],
 		];
 		$data = API::HostGroup()->create($config);
 
-		$this->hostGroupIds['TLD ' . $input['id']] = $data['groupids'][0];
+		$this->hostGroupIds['TLD ' . $this->newObject['id']] = $data['groupids'][0];
 	}
 
-	protected function createTemplates(array $input) {
+	protected function createTemplates(): void
+	{
 		$config = [
-			'host'   => 'Template Rsmhost Config ' . $input['id'],
+			'host'   => 'Template Rsmhost Config ' . $this->newObject['id'],
 			'groups' => [
 				['groupid' => $this->hostGroupIds['Templates - TLD']],
 			],
-			'macros' => $this->getMacrosConfig($input),
+			'macros' => $this->getMacrosConfig(),
 		];
 		$data = API::Template()->create($config);
 
-		$this->templateIds['Template Rsmhost Config ' . $input['id']] = $data['templateids'][0];
+		$this->templateIds['Template Rsmhost Config ' . $this->newObject['id']] = $data['templateids'][0];
 	}
 
 	/******************************************************************************************************************
 	 * Functions for updating object                                                                                  *
 	 ******************************************************************************************************************/
 
-	protected function updateObject() {
-		$input = $this->getInputAll();
-
-		$this->hostGroupIds += $this->getHostGroupIds($this->getHostGroupNames($input, ['TLD ' . $input['id']]));
+	protected function updateObject(): void
+	{
+		$this->hostGroupIds += $this->getHostGroupIds($this->getHostGroupNames(['TLD ' . $this->newObject['id']]));
 		$this->templateIds  += $this->getTemplateIds($this->getTemplateNames(null));
 
-		$this->updateTemplates($input);
-		$this->statusHostId = $this->updateStatustHost($input);
+		$this->updateTemplates();
+		$this->statusHostId = $this->updateStatustHost();
 
 		// update "<rsmhost> <probe>" hosts
 
-		$rsmhostConfigs = $this->getRsmhostConfigsFromInput($input);
+		$rsmhostConfigs = $this->getRsmhostConfigsFromInput();
 		$probeConfigs = $this->getProbeConfigs();
 
-		$rsmhostProbeHosts = $this->updateRsmhostProbeHosts($rsmhostConfigs, $probeConfigs);
+		$testHosts = $this->updateTestHosts($rsmhostConfigs, $probeConfigs);
 
 		// enable/disable items, based on service status and standalone rdap status
 
-		$statusHosts = [$this->statusHostId => $input['id']];
+		$statusHosts = [$this->statusHostId => $this->newObject['id']];
 
-		$this->updateServiceItemStatus($statusHosts, $rsmhostProbeHosts, $rsmhostConfigs, $probeConfigs);
+		$this->updateServiceItemStatus($statusHosts, $testHosts, $rsmhostConfigs, $probeConfigs);
 	}
 
-	protected function updateTemplates(array $input) {
+	private function updateTemplates(): void
+	{
 		$config = [
-			'templateid' => $this->getTemplateId('Template Rsmhost Config ' . $input['id']),
-			'macros'     => $this->getMacrosConfig($input),
+			'templateid' => $this->getTemplateId('Template Rsmhost Config ' . $this->newObject['id']),
+			'macros'     => $this->getMacrosConfig(),
 		];
 		$data = API::Template()->update($config);
 	}
@@ -106,11 +107,9 @@ abstract class MonitoringTarget extends ActionBaseEx {
 	 * Functions for deleting object                                                                                  *
 	 ******************************************************************************************************************/
 
-	protected function deleteObject() {
-		$input = $this->getInputAll();
-		$rsmhost = $input['id'];
-
-		$templateId = $this->getTemplateId('Template Rsmhost Config ' . $rsmhost);
+	protected function deleteObject(): void
+	{
+		$templateId = $this->getTemplateId('Template Rsmhost Config ' . $this->oldObject['id']);
 
 		$hostids = array_column($this->getHostsByTemplateId($templateId, null, null), 'hostid', 'host');
 
@@ -121,7 +120,7 @@ abstract class MonitoringTarget extends ActionBaseEx {
 		$data = API::Template()->delete([$templateId]);
 
 		// delete "TLD <rsmhost>" host group
-		$hostGroupId = $this->getHostGroupId('TLD ' . $rsmhost);
+		$hostGroupId = $this->getHostGroupId('TLD ' . $this->oldObject['id']);
 		$data = API::HostGroup()->delete([$hostGroupId]);
 	}
 }
