@@ -1,3 +1,9 @@
+Changes for rsm2.2.0rc8
+
+Bug fixes:
+....I..... [sub-760] fixed Name Server Availability calculation (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.2.0rc7
 
 Bug fixes:

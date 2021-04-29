@@ -195,7 +195,7 @@ sub get_all_dns_rtt_itemids
 			" left join hosts on hosts.hostid = items.hostid" .
 		" where" .
 			" items.key_ like '$cfg_key_in_pattern' and" .
-			" items.flags=${\ZBX_FLAG_DISCOVERY_CREATED} and" .
+			" items.type=${\ITEM_TYPE_DEPENDENT} and" .
 			" items.status<>${\ITEM_STATUS_DISABLED} and" .
 			" hosts.host like '% %'"
 	);
