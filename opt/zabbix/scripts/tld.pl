@@ -1086,8 +1086,8 @@ sub update_ns_servers($$$$)
 			'hostid'        => $dns_test_templateid,
 			'type'          => ITEM_TYPE_DEPENDENT,
 			'master_itemid' => $dns_test_itemid,
-			'value_type'    => ITEM_VALUE_TYPE_FLOAT,
-			'valuemapid'    => RSM_VALUE_MAPPINGS->{'rsm_dns_rtt'},
+			'value_type'    => ITEM_VALUE_TYPE_UINT64,
+			'valuemapid'    => RSM_VALUE_MAPPINGS->{'service_state'},
 			'description'   => 'Status of Name Server: 0 (Down), 1 (Up). The Name Server is considered to be up if all its IPs returned successful RTTs.',
 			'preprocessing' => [{
 				'type'                 => ZBX_PREPROC_JSONPATH,
