@@ -628,6 +628,11 @@ sub __get_test_data($$$)
 			# todo: later rewrite to use valuemap ID from item
 			$cycles->{$service}{$cycleclock}{'rawstatus'} = $value;
 			$cycles->{$service}{$cycleclock}{'status'} = get_result_string($cfg_avail_valuemaps, $value);
+
+			if ($service eq 'dns')
+			{
+				$cycles->{$service}{$cycleclock}{'minns'} = get_dns_minns($tld, $cycleclock);
+			}
 		}
 
 		# Rolling week data (is synced with availability data from above)
@@ -656,7 +661,6 @@ sub __get_test_data($$$)
 			wrn("$service: no results; will not process remaining services");
 			return $result;
 		}
-
 	}
 
 	my $test_items = get_test_items($tld);
@@ -717,11 +721,6 @@ sub __get_test_data($$$)
 				{
 					__no_cycle_result(uc($service) . " Service Availability", "rsm.slv.$service.avail", $cycleclock);
 					next;
-				}
-
-				if ($service eq 'dns' || $service eq 'dnssec')
-				{
-					$cycles->{$service}{$cycleclock}{'minns'} = get_dns_minns($tld, $cycleclock);
 				}
 
 				foreach my $interface (keys(%{$results->{$service}{$cycleclock}{'interfaces'}}))
@@ -866,27 +865,27 @@ sub __save_csv_data($$)
 
 			# SERVICE cycle
 			dw_append_csv(DATA_CYCLE, [
-					      dw_get_cycle_id($cycleclock, $service_category_id, $tld_id),
-					      $cycleclock,
-					      $cycle_ref->{'rollweek'},
-					      dw_get_id(ID_STATUS_MAP, $cycle_ref->{'status'}),
-					      $eventid,
-					      $tld_id,
-					      $service_category_id,
-					      '',
-					      '',
-					      '',
-					      $tld_type_id,
-					      $protocol_id // ''	# TODO: no cycle protocol as DNS can be UDP/TCP since DNS Reboot!
+					dw_get_cycle_id($cycleclock, $service_category_id, $tld_id),
+					$cycleclock,
+					$cycle_ref->{'rollweek'},
+					dw_get_id(ID_STATUS_MAP, $cycle_ref->{'status'}),
+					$eventid,
+					$tld_id,
+					$service_category_id,
+					'',
+					'',
+					'',
+					$tld_type_id,
+					$protocol_id // ''	# TODO: no cycle protocol as DNS can be UDP/TCP since DNS Reboot!
 			]);
 
 			if ($service eq 'dns')
 			{
 				# DNS MINNS
 				dw_append_csv(DATA_MINNS, [
-						      $tld_id,
-						      $cycle_ref->{'minns'},
-						      $cycleclock
+						$tld_id,
+						$cycle_ref->{'minns'},
+						$cycleclock
 				]);
 			}
 
@@ -934,8 +933,6 @@ sub __save_csv_data($$)
 					foreach my $target (sort(keys(%{$cycle_ref->{'interfaces'}{$interface}{'probes'}{$probe}{'targets'}})))
 					{
 						my $target_ref = $cycle_ref->{'interfaces'}{$interface}{'probes'}{$probe}{'targets'}{$target};
-
-						my $target_status = ($target_ref->{'status'} eq UP ? $general_status_up : $general_status_down);
 
 						my $cycle_ns_id;
 
@@ -1034,13 +1031,27 @@ sub __save_csv_data($$)
 
 						if ($cycle_ns_id)
 						{
+							my $target_status;
+
+							if (defined($target_ref->{'status'}))
+							{
+								if ($target_ref->{'status'} eq UP)
+								{
+									$target_status = dw_get_id(ID_STATUS_MAP, $general_status_up);
+								}
+								else
+								{
+									$target_status = dw_get_id(ID_STATUS_MAP, $general_status_down);
+								}
+							}
+
 							# Name Server (target) test
 							dw_append_csv(DATA_NSTEST, [
 									      $probe_id,
 									      $cycle_ns_id,
 									      $tld_id,
 									      $cycleclock,
-									      dw_get_id(ID_STATUS_MAP, $target_status),
+									      $target_status,
 									      $tld_type_id,
 									      $protocol_id
 								]) unless ($cycle_ref->{'rawstatus'} == UP_INCONCLUSIVE_RECONFIG);

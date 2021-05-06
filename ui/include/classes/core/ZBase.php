@@ -367,18 +367,18 @@ class ZBase {
 			/* RSM specifics: start */
 			global $DB;
 
-			$last_server = "*UNKNOWN*";
+			$urls = '';
 			foreach ($DB['SERVERS'] as $server) {
-				$last_server = $server['SERVER'];
-				if (($DB['SERVER'] !== $server['SERVER'] || $DB['PORT'] !== $server['PORT']
-						|| $DB['DATABASE'] !== $server['DATABASE'] || $DB['USER'] !== $server['USER']
-						|| $DB['PASSWORD'] !== $server['PASSWORD']) && multiDBconnect($server, $error)) {
-					redirect($server['URL']);
-					exit;
+				if (0 != strcmp($server['SERVER'] != $DB['SERVER'])) {
+					$urls .= ' ' . $server['URL'];
 				}
 			}
 
-			$error = _('All servers are down') . ". Last error was on server \"$last_server\": $error";
+			$error = _('This frontend cannot connect to the database') . ': ' . $error;
+
+			if ($urls != '') {
+				$error .= ". Please consider one of the following frontends: " . $urls;
+			}
 			/* RSM specifics: end */
 
 			throw new DBException($error);
