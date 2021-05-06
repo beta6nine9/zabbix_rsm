@@ -1,7 +1,10 @@
 Changes for rsm2.2.0rc8
 
 Bug fixes:
+....I..... [783] fixed handling minns values in Data Export when there is no data from Probes (dimir)
+..F....... [782] fixed undefined function error when Frontend cannot connect to its database (dimir)
 ....I..... [sub-760] fixed Name Server Availability calculation (dimir)
+....I..... [sub-760] fixed value type and value mapping of dependent item "rsm.dns.ns.status" (dimir)
 
 --------------------------------------------------------------------------------
 Changes for rsm2.2.0rc7
