@@ -10,6 +10,14 @@ use Modules\RsmProvisioningApi\RsmException;
 
 class Tld extends MonitoringTarget
 {
+	private const RSMHOST_DNS_NS_LOG_ACTION_CREATE  = 0;
+	private const RSMHOST_DNS_NS_LOG_ACTION_ENABLE  = 1;
+	private const RSMHOST_DNS_NS_LOG_ACTION_DISABLE = 2;
+
+	/******************************************************************************************************************
+	 * Functions for validation                                                                                       *
+	 ******************************************************************************************************************/
+
 	protected function checkMonitoringTarget(): bool
 	{
 		return $this->getMonitoringTarget() == MONITORING_TARGET_REGISTRY;
@@ -74,16 +82,9 @@ class Tld extends MonitoringTarget
 
 		if ($_SERVER['REQUEST_METHOD'] == self::REQUEST_METHOD_PUT)
 		{
-			$this->validateInputServices('All services (i.e. rdds43, rdds80, rdap, dnsTCP and dnsUDP) must be specified');
+			$this->requireArrayKeys(['tldType'], $this->input, 'JSON does not comply with definition');
 
 			$services = array_column($this->input['servicesStatus'], 'enabled', 'service');
-
-			if (!$this->isStandaloneRdap() && $services['rdds43'] != $services['rdds80'])
-			{
-				throw new RsmException(400, 'An enabled status for rdds43 require that rdds80 is enabled and vice versa');
-			}
-
-			$this->requireArrayKeys(['tldType'], $this->input, 'JSON does not comply with definition');
 
 			if ($services['dnsUDP'] || $services['dnsTCP'])
 			{
@@ -96,49 +97,18 @@ class Tld extends MonitoringTarget
 			}
 			else
 			{
-				$this->forbidArrayKeys(['dnsParameters'], $this->input, 'An element within the dnsParameters object or the dnsParameters object is included but the status of the service is disabled');
-
 				if ($services['rdap'] || $services['rdds43'] || $services['rdds80'])
 				{
 					throw new RsmException(400, 'DNS service can only be disabled if all other services are disabled');
 				}
-			}
-
-			if ($services['rdap'] || $services['rdds43'] || $services['rdds80'])
-			{
-				$this->requireArrayKeys(['rddsParameters'], $this->input, 'rddsParameters object is missing and at least one RDDS service (i.e. rdds43, rdds80 or rdap) is enabled');
-
-				if ($services['rdap'])
-				{
-					$this->requireArrayKeys(['rdapUrl', 'rdapTestedDomain',], $this->input['rddsParameters'], 'An element within the rddsParameters object is missing based on the enabled status of a service to be monitored');
-				}
-				else
-				{
-					$this->forbidArrayKeys(['rdapUrl', 'rdapTestedDomain',], $this->input['rddsParameters'], 'An element within the rddsParameter object or the rddsParameter object is included but the status of the service is disabled');
-				}
-				if ($services['rdds43'])
-				{
-					$this->requireArrayKeys(['rdds43Server', 'rdds43TestedDomain', 'rdds43NsString'], $this->input['rddsParameters'], 'An element within the rddsParameters object is missing based on the enabled status of a service to be monitored');
-				}
-				else
-				{
-					$this->forbidArrayKeys(['rdds43Server', 'rdds43TestedDomain', 'rdds43NsString'], $this->input['rddsParameters'], 'An element within the rddsParameter object or the rddsParameter object is included but the status of the service is disabled');
-				}
-				if ($services['rdds80'])
-				{
-					$this->requireArrayKeys(['rdds80Url'], $this->input['rddsParameters'], 'An element within the rddsParameters object is missing based on the enabled status of a service to be monitored');
-				}
-				else
-				{
-					$this->forbidArrayKeys(['rdds80Url'], $this->input['rddsParameters'], 'An element within the rddsParameter object or the rddsParameter object is included but the status of the service is disabled');
-				}
-			}
-			else
-			{
-				$this->forbidArrayKeys(['rddsParameters'], $this->input, 'An element within the rddsParameter object or the rddsParameter object is included but the status of the service is disabled');
+				$this->forbidArrayKeys(['dnsParameters'], $this->input, 'An element within the dnsParameters object or the dnsParameters object is included but the status of the service is disabled');
 			}
 		}
 	}
+
+	/******************************************************************************************************************
+	 * Functions for retrieving object                                                                                *
+	 ******************************************************************************************************************/
 
 	protected function getObjects(?string $objectId): array
 	{
@@ -148,11 +118,6 @@ class Tld extends MonitoringTarget
 
 		if (empty($data))
 		{
-			if (!is_null($objectId))
-			{
-				throw new RsmException(404, 'The TLD does not exist in Zabbix');
-			}
-
 			return [];
 		}
 
@@ -188,6 +153,27 @@ class Tld extends MonitoringTarget
 				self::MACRO_TLD_RDDS43_NS_STRING,
 			]
 		);
+
+		// get current minNs
+
+		foreach ($hosts as $host)
+		{
+			$matches = null;
+
+			if (!preg_match('/^(\d+)(?:;(\d+):(\d+))?$/', $macros[$host][self::MACRO_TLD_DNS_AVAIL_MINNS], $matches))
+			{
+				throw new Exception("Unexpected 'minNs' value in \$this->oldObject: '{$macros[$host][self::MACRO_TLD_DNS_AVAIL_MINNS]}'");
+			}
+
+			if (!isset($matches[2]) || (int)(time() / 60) * 60 < $matches[2])
+			{
+				$macros[$host][self::MACRO_TLD_DNS_AVAIL_MINNS] = $matches[1];
+			}
+			else
+			{
+				$macros[$host][self::MACRO_TLD_DNS_AVAIL_MINNS] = $matches[3];
+			}
+		}
 
 		// join data in a common data structure
 
@@ -240,86 +226,13 @@ class Tld extends MonitoringTarget
 		return $result;
 	}
 
-	private function getTldTypes(array $hostids): array
-	{
-		$tldTypeGroups = ['gTLD', 'ccTLD', 'otherTLD', 'testTLD'];
-
-		$tldTypes = [];
-
-		if (count($hostids) == 1)
-		{
-			$data = API::Host()->get([
-				'output'       => ['hostid', 'host'],
-				'hostids'      => $hostids,
-				'selectGroups' => ['name'],
-			]);
-			$data = $data[0];
-
-			foreach ($data['groups'] as $hostGroup)
-			{
-				if (in_array($hostGroup['name'], $tldTypeGroups))
-				{
-					$tldTypes[$data['host']] = $hostGroup['name'];
-					break;
-				}
-			}
-		}
-		else
-		{
-			$data = API::HostGroup()->get([
-				'output'      => ['groupid', 'name'],
-				'filter'      => ['name' => $tldTypeGroups],
-				'hostids'     => $hostids,
-				'selectHosts' => ['host'],
-			]);
-			foreach ($data as $hostGroup)
-			{
-				foreach ($hostGroup['hosts'] as $hostid)
-				{
-					$tldTypes[$hostid['host']] = $hostGroup['name'];
-				}
-			}
-		}
-
-		return $tldTypes;
-	}
+	/******************************************************************************************************************
+	 * Functions for creating object                                                                                  *
+	 ******************************************************************************************************************/
 
 	protected function createObject(): void
 	{
 		parent::createObject();
-		$this->updateDnsNsItems();
-	}
-
-	protected function updateObject(): void
-	{
-		$services = array_column($this->newObject['servicesStatus'], 'enabled', 'service');
-
-		if ($services['dnsUDP'] || $services['dnsTCP'])
-		{
-			$newMinNs = $this->newObject['dnsParameters']['minNs'];
-			$oldMinNs = $this->oldObject['dnsParameters']['minNs'];
-
-			if (!preg_match('/^(\d+)(?:;(\d+):(\d+))?$/', $oldMinNs, $matches))
-			{
-				throw new Exception("Unexpected 'minNs' value in \$this->oldObject: '$oldMinNs'");
-			}
-
-			if (!isset($matches[2]) || (int)(time() / 60) * 60 < $matches[2])
-			{
-				$oldMinNs = $matches[1];
-			}
-			else
-			{
-				$oldMinNs = $matches[3];
-			}
-
-			if ($newMinNs != $oldMinNs)
-			{
-				throw new RsmException(400, 'The minNS value is not the same as in the system');
-			}
-		}
-
-		parent::updateObject();
 		$this->updateDnsNsItems();
 	}
 
@@ -356,20 +269,37 @@ class Tld extends MonitoringTarget
 			'groups'    => [
 				['groupid' => $this->hostGroupIds['Templates - TLD']],
 			],
-			'templates' => [$this->templateIds['Template DNS Test']],
+			'templates' => [
+				['templateid' => $this->templateIds['Template DNS Test']],
+			],
 		];
 		$data = API::Template()->create($config);
 
 		$this->templateIds['Template DNS Test - ' . $this->newObject['id']] = $data['templateids'][0];
 	}
 
-	protected function getTestTemplatesConfig(string $probe, string $rsmhost): array
+	/******************************************************************************************************************
+	 * Functions for updating object                                                                                  *
+	 ******************************************************************************************************************/
+
+	protected function updateObject(): void
 	{
-		$templates = parent::getTestTemplatesConfig($probe, $rsmhost);
+		$this->compareMinNsOnUpdate();
+		parent::updateObject();
+		$this->updateDnsNsItems();
+	}
 
-		$templates[] = ['templateid' => $this->templateIds['Template DNS Test - ' . $rsmhost]];
+	private function compareMinNsOnUpdate()
+	{
+		$services = array_column($this->newObject['servicesStatus'], 'enabled', 'service');
 
-		return $templates;
+		if ($services['dnsUDP'] || $services['dnsTCP'])
+		{
+			if ($this->newObject['dnsParameters']['minNs'] != $this->oldObject['dnsParameters']['minNs'])
+			{
+				throw new RsmException(400, 'The minNS value is not the same as in the system');
+			}
+		}
 	}
 
 	protected function updateStatustHost(): int
@@ -386,6 +316,30 @@ class Tld extends MonitoringTarget
 		return $data['hostids'][0];
 	}
 
+	protected function disableObject(): void {
+		parent::disableObject();
+
+		$this->updateMacros(
+			$this->templateIds['Template Rsmhost Config ' . $this->getInput('id')],
+			[
+				self::MACRO_TLD_DNS_NAME_SERVERS => '',
+				self::MACRO_TLD_DNS_UDP_ENABLED => 0,
+				self::MACRO_TLD_DNS_TCP_ENABLED => 0,
+				self::MACRO_TLD_DNSSEC_ENABLED => 0,
+				self::MACRO_TLD_RDAP_ENABLED => 0,
+				self::MACRO_TLD_RDDS_ENABLED => 0,
+				//self::MACRO_TLD_RDDS_ENABLED => 0, // TODO: split into RDDS43 and RDDS80
+			]
+		);
+
+		$this->templateIds += $this->getTemplateIds(['Template DNS Test - ' . $this->getInput('id')]);
+		$this->updateDnsNsItems();
+	}
+
+	/******************************************************************************************************************
+	 * Functions for deleting object                                                                                  *
+	 ******************************************************************************************************************/
+
 	protected function deleteObject(): void
 	{
 		parent::deleteObject();
@@ -393,6 +347,10 @@ class Tld extends MonitoringTarget
 		$templateId = $this->getTemplateId('Template DNS Test - ' . $this->getInput('id'));
 		$data = API::Template()->delete([$templateId]);
 	}
+
+	/******************************************************************************************************************
+	 * Misc functions                                                                                                 *
+	 ******************************************************************************************************************/
 
 	protected function getHostGroupNames(?array $additionalNames): array
 	{
@@ -457,6 +415,23 @@ class Tld extends MonitoringTarget
 
 	protected function getMacrosConfig(): array
 	{
+		$minNs = null;
+
+		if (is_null($this->oldObject))
+		{
+			$minNs = $this->newObject['dnsParameters']['minNs'];
+		}
+		else
+		{
+			$templateId = $this->getTemplateId('Template Rsmhost Config ' . $this->newObject['id']);
+			$data = API::UserMacro()->get([
+				'output' => ['value'],
+				'hostids' => [$templateId],
+				'filter' => ['macro' => self::MACRO_TLD_DNS_AVAIL_MINNS],
+			]);
+			$minNs = $data[0]['value'];
+		}
+
 		$services = array_column($this->newObject['servicesStatus'], 'enabled', 'service');
 
 		return [
@@ -471,7 +446,7 @@ class Tld extends MonitoringTarget
 			//$this->createMacroConfig(self::MACRO_TLD_RDDS_ENABLED      , (int)$services['rdds80']),
 
 			$this->createMacroConfig(self::MACRO_TLD_DNS_NAME_SERVERS  , $this->nsipListToStr($this->newObject['dnsParameters']['nsIps'])),
-			$this->createMacroConfig(self::MACRO_TLD_DNS_AVAIL_MINNS   , $this->newObject['dnsParameters']['minNs']),    // TODO: schedule minns change
+			$this->createMacroConfig(self::MACRO_TLD_DNS_AVAIL_MINNS   , $minNs),
 			$this->createMacroConfig(self::MACRO_TLD_DNS_TESTPREFIX    , $this->newObject['dnsParameters']['nsTestPrefix']),
 
 			$this->createMacroConfig(self::MACRO_TLD_RDAP_BASE_URL     , $this->newObject['rddsParameters']['rdapUrl']),
@@ -484,10 +459,14 @@ class Tld extends MonitoringTarget
 		];
 	}
 
+	/******************************************************************************************************************
+	 * Handling DNS NS items                                                                                          *
+	 ******************************************************************************************************************/
+
 	private function updateDnsNsItems(): void
 	{
-		$oldNsIpList = is_null($this->oldObject) ? [] : $this->oldObject['dnsParameters']['nsIps'];
-		$newNsIpList = is_null($this->newObject) ? [] : $this->newObject['dnsParameters']['nsIps'];
+		$oldNsIpList = isset($this->oldObject['dnsParameters']) ? $this->oldObject['dnsParameters']['nsIps'] : [];
+		$newNsIpList = isset($this->newObject['dnsParameters']) ? $this->newObject['dnsParameters']['nsIps'] : [];
 		$oldNsList   = array_unique(array_column($oldNsIpList, 'ns'));
 		$newNsList   = array_unique(array_column($newNsIpList, 'ns'));
 
@@ -564,6 +543,7 @@ class Tld extends MonitoringTarget
 
 			foreach ($createNs as $ns)
 			{
+				// TODO: value type - uint64, mapping - service_state (whatever that one is)
 				$testItems += [
 					"rsm.dns.ns.status[$ns]" => [
 						'name'                 => "DNS Test: DNS NS status of $ns",
@@ -586,8 +566,19 @@ class Tld extends MonitoringTarget
 			]);
 			if (!empty($data))
 			{
-				$statusItems = array_diff_key($statusItems, array_column($data, 'itemid', 'key_'));
+				$foundItems = array_column($data, 'itemid', 'key_');
+				$statusItems = array_diff_key($statusItems, $foundItems);
 				$enableItemIds = array_merge($enableItemIds, array_column($data, 'itemid'));
+
+				// update rsmhost_dns_ns_log table
+
+				foreach ($foundItems as $key => $itemid)
+				{
+					if (preg_match('/^rsm\.slv\.dns\.ns\.downtime\[.*,.*\]$/', $key))
+					{
+						$this->updateRsmhostDnsNsLog($itemid, self::RSMHOST_DNS_NS_LOG_ACTION_ENABLE);
+					}
+				}
 			}
 
 			$data = API::Item()->get([
@@ -597,7 +588,8 @@ class Tld extends MonitoringTarget
 			]);
 			if (!empty($data))
 			{
-				$testItems = array_diff_key($testItems, array_column($data, 'itemid', 'key_'));
+				$foundItems = array_column($data, 'itemid', 'key_');
+				$testItems = array_diff_key($testItems, $foundItems);
 				$enableItemIds = array_merge($enableItemIds, array_column($data, 'itemid'));
 			}
 
@@ -607,101 +599,123 @@ class Tld extends MonitoringTarget
 				$data = API::Item()->update($config);
 			}
 
-			// build configs for items that need to be created
-
-			$itemConfigs = [];
-
-			foreach ($statusItems as $key => $item)
+			if (!empty($statusItems) || !empty($testItems))
 			{
-				$itemConfigs[] = [
-					'name'       => $item['name'],
-					'key_'       => $key,
-					'status'     => ITEM_STATUS_ACTIVE,
-					'hostid'     => $this->statusHostId,
-					'type'       => ITEM_TYPE_TRAPPER,
-					'value_type' => ITEM_VALUE_TYPE_UINT64,
-					'valuemapid' => $item['valuemapid'],
-				];
-			}
-
-			foreach ($testItems as $key => $item)
-			{
-				$itemConfigs[] = [
-					'name'          => $item['name'],
-					'key_'          => $key,
-					'status'        => ITEM_STATUS_ACTIVE,
-					'hostid'        => $testTemplateId,
-					'type'          => ITEM_TYPE_DEPENDENT,
-					'master_itemid' => $dnsTestItemId,
-					'value_type'    => $item['value_type'],
-					'valuemapid'    => $item['valuemapid'],
-					'description'   => $item['description'],
-					'preprocessing' => [[
-						'type'                 => ZBX_PREPROC_JSONPATH,
-						'params'               => $item['preprocessing_params'],
-						'error_handler'        => ZBX_PREPROC_FAIL_DISCARD_VALUE,
-						'error_handler_params' => '',
-					]],
-				];
-			}
-
-			// create items
-
-			$data = API::Item()->create($itemConfigs);
-
-			// create triggers
-
-			$thresholds = [
-				['threshold' =>  '10', 'priority' => 2],
-				['threshold' =>  '25', 'priority' => 3],
-				['threshold' =>  '50', 'priority' => 3],
-				['threshold' =>  '75', 'priority' => 4],
-				['threshold' => '100', 'priority' => 5],
-			];
-
-			$triggerConfigs = [];
-
-			foreach ($createNsIp as $nsip)
-			{
-				$ns  = $nsip['ns'];
-				$ip  = $nsip['ip'];
-				$key = "rsm.slv.dns.ns.downtime[$ns,$ip]";
-
-				foreach ($thresholds as $thresholdRow)
+				if (empty($statusItems))
 				{
-					$threshold = $thresholdRow['threshold'];
-					$priority  = $thresholdRow['priority'];
+					throw new Exception('both $statusItems and $testItems should have values, but $statusItems is empty');
+				}
+				if (empty($testItems))
+				{
+					throw new Exception('both $statusItems and $testItems should have values, but $testItems is empty');
+				}
 
-					$thresholdStr = $threshold < 100 ? '*' . ($threshold * 0.01) : '';
+				// build configs for items that need to be created
 
-					$triggerConfigs[] = [
-						'description' => "DNS $ns ($ip) downtime exceeded $threshold% of allowed \$1 minutes",
-						'expression'  => sprintf('{%s:%s.last()}>{$RSM.SLV.NS.DOWNTIME}%s', $this->newObject['id'], $key, $thresholdStr),
-						'priority'    => $priority,
+				$itemConfigs = [];
+
+				foreach ($statusItems as $key => $item)
+				{
+					$itemConfigs[] = [
+						'name'       => $item['name'],
+						'key_'       => $key,
+						'status'     => ITEM_STATUS_ACTIVE,
+						'hostid'     => $this->statusHostId,
+						'type'       => ITEM_TYPE_TRAPPER,
+						'value_type' => ITEM_VALUE_TYPE_UINT64,
+						'valuemapid' => $item['valuemapid'],
 					];
 				}
-			}
 
-			if (!empty($triggerConfigs))
-			{
-				$data = API::Trigger()->create($triggerConfigs);
-
-				$triggerDependencyConfigs = [];
-
-				foreach ($data['triggerids'] as $i => $triggerId)
+				foreach ($testItems as $key => $item)
 				{
-					if ($i % count($thresholds) === 0)
+					$itemConfigs[] = [
+						'name'          => $item['name'],
+						'key_'          => $key,
+						'status'        => ITEM_STATUS_ACTIVE,
+						'hostid'        => $testTemplateId,
+						'type'          => ITEM_TYPE_DEPENDENT,
+						'master_itemid' => $dnsTestItemId,
+						'value_type'    => $item['value_type'],
+						'valuemapid'    => $item['valuemapid'],
+						'description'   => $item['description'],
+						'preprocessing' => [[
+							'type'                 => ZBX_PREPROC_JSONPATH,
+							'params'               => $item['preprocessing_params'],
+							'error_handler'        => ZBX_PREPROC_FAIL_DISCARD_VALUE,
+							'error_handler_params' => '',
+						]],
+					];
+				}
+
+				// create items
+
+				$data = API::Item()->create($itemConfigs);
+
+				// update rsmhost_dns_ns_log table
+
+				foreach ($itemConfigs as $i => $itemConfig)
+				{
+					if (preg_match('/^rsm\.slv\.dns\.ns\.downtime\[.*,.*\]$/', $itemConfig['key_']))
 					{
-						continue;
+						$this->updateRsmhostDnsNsLog($data['itemids'][$i], self::RSMHOST_DNS_NS_LOG_ACTION_CREATE);
+					}
+				}
+
+				// create triggers
+
+				$thresholds = [
+					['threshold' =>  '10', 'priority' => 2],
+					['threshold' =>  '25', 'priority' => 3],
+					['threshold' =>  '50', 'priority' => 3],
+					['threshold' =>  '75', 'priority' => 4],
+					['threshold' => '100', 'priority' => 5],
+				];
+
+				$triggerConfigs = [];
+
+				foreach ($createNsIp as $nsip)
+				{
+					$ns  = $nsip['ns'];
+					$ip  = $nsip['ip'];
+					$key = "rsm.slv.dns.ns.downtime[$ns,$ip]";
+
+					foreach ($thresholds as $thresholdRow)
+					{
+						$threshold = $thresholdRow['threshold'];
+						$priority  = $thresholdRow['priority'];
+
+						$thresholdStr = $threshold < 100 ? '*' . ($threshold * 0.01) : '';
+
+						$triggerConfigs[] = [
+							'description' => "DNS $ns ($ip) downtime exceeded $threshold% of allowed \$1 minutes",
+							'expression'  => sprintf('{%s:%s.last()}>{$RSM.SLV.NS.DOWNTIME}%s', $this->newObject['id'], $key, $thresholdStr),
+							'priority'    => $priority,
+						];
+					}
+				}
+
+				if (!empty($triggerConfigs))
+				{
+					$data = API::Trigger()->create($triggerConfigs);
+
+					$triggerDependencyConfigs = [];
+
+					foreach ($data['triggerids'] as $i => $triggerId)
+					{
+						if ($i % count($thresholds) === 0)
+						{
+							continue;
+						}
+
+						$triggerDependencyConfigs[] = [
+							'triggerid'          => $data['triggerids'][$i - 1],
+							'dependsOnTriggerid' => $triggerId,
+						];
 					}
 
-					$triggerDependencyConfigs[] = [
-						'triggerid'          => $data['triggerids'][$i - 1],
-						'dependsOnTriggerid' => $triggerId,
-					];
+					$data = API::Trigger()->addDependencies($triggerDependencyConfigs);
 				}
-
-				$data = API::Trigger()->addDependencies($triggerDependencyConfigs);
 			}
 		}
 
@@ -734,25 +748,41 @@ class Tld extends MonitoringTarget
 
 			$config = array_map(fn($itemid) => ['itemid' => $itemid, 'status' => ITEM_STATUS_DISABLED], array_values($disableItemIds));
 			$data = API::Item()->update($config);
+
+			// update rsmhost_dns_ns_log table
+
+			foreach ($disableItemIds as $key => $itemid)
+			{
+				if (preg_match('/^rsm\.slv\.dns\.ns\.downtime\[.*,.*\]$/', $key))
+				{
+					$this->updateRsmhostDnsNsLog($itemid, self::RSMHOST_DNS_NS_LOG_ACTION_DISABLE);
+				}
+			}
 		}
 	}
 
-	private function getTemplateItemId(string $template, string $key): int
+	private function updateRsmhostDnsNsLog(int $itemid, int $action): void
 	{
-		$config = [
-			'output'      => ['itemid'],
-			'templated'   => true,
-			'templateids' => [$this->templateIds[$template]],
-			'search'      => ['key_' => $key],
-		];
-		$data = API::Item()->get($config);
-
-		return $data[0]['itemid'];
+		$sql = 'insert into rsmhost_dns_ns_log (itemid,clock,action) values (%d,%d,%d)';
+		$sql = sprintf($sql, $itemid, $_SERVER['REQUEST_TIME'], $action);
+		if (!DBexecute($sql))
+		{
+			throw new Exception('Query failed');
+		}
 	}
+
+	/******************************************************************************************************************
+	 * Functions for converting ns,ip strings to lists, lists to strings                                              *
+	 ******************************************************************************************************************/
 
 	private function nsipStrToList(string $str): array
 	{
 		$list = [];
+
+		if ($str === '')
+		{
+			return $list;
+		}
 
 		foreach (explode(' ', $str) as $nsip)
 		{

@@ -25,6 +25,8 @@ abstract class ActionBaseEx extends ActionBase
 	private const MACRO_GLOBAL_CONFIG_CACHE_RELOAD = '{$RSM.CONFIG.CACHE.RELOAD.REQUESTED}';
 
 	protected const MACRO_PROBE_PROXY_NAME   = '{$RSM.PROXY_NAME}';
+	protected const MACRO_PROBE_PROXY_IP     = '{$RSM.PROXY.IP}';
+	protected const MACRO_PROBE_PROXY_PORT   = '{$RSM.PROXY.PORT}';
 	protected const MACRO_PROBE_IP4_ENABLED  = '{$RSM.IP4.ENABLED}';
 	protected const MACRO_PROBE_IP6_ENABLED  = '{$RSM.IP6.ENABLED}';
 	protected const MACRO_PROBE_RDAP_ENABLED = '{$RSM.RDAP.ENABLED}';
@@ -50,6 +52,8 @@ abstract class ActionBaseEx extends ActionBase
 
 	protected const MACRO_DESCRIPTIONS = [
 		self::MACRO_PROBE_PROXY_NAME       => '',
+		self::MACRO_PROBE_PROXY_IP         => 'Proxy IP of the proxy',
+		self::MACRO_PROBE_PROXY_PORT       => 'Port of the proxy',
 		self::MACRO_PROBE_IP4_ENABLED      => 'Indicates whether the probe supports IPv4',
 		self::MACRO_PROBE_IP6_ENABLED      => 'Indicates whether the probe supports IPv6',
 		self::MACRO_PROBE_RDAP_ENABLED     => 'Indicates whether the probe supports RDAP protocol',
@@ -111,6 +115,16 @@ abstract class ActionBaseEx extends ActionBase
 				array_keys($this->templateIds)
 			)
 		);
+		if ($this->getMonitoringTarget() === self::MONITORING_TARGET_REGISTRY)
+		{
+			$missingTemplates = array_merge(
+				$missingTemplates,
+				array_diff(
+					array_map(fn($rsmhost) => 'Template DNS Test - ' . $rsmhost, array_keys($rsmhostConfigs)),
+					array_keys($this->templateIds)
+				)
+			);
+		}
 		$this->templateIds += $this->getTemplateIds($missingTemplates);
 
 		// create configs for hosts
@@ -216,12 +230,19 @@ abstract class ActionBaseEx extends ActionBase
 
 	protected function getTestTemplatesConfig(string $probe, string $rsmhost): array
 	{
-		return [
+		$templates = [
 			['templateid' => $this->templateIds['Template RDAP Test']],
 			['templateid' => $this->templateIds['Template RDDS Test']],
 			['templateid' => $this->templateIds['Template Probe Config ' . $probe]],
 			['templateid' => $this->templateIds['Template Rsmhost Config ' . $rsmhost]],
 		];
+
+		if ($this->getMonitoringTarget() === self::MONITORING_TARGET_REGISTRY)
+		{
+			$templates[] = ['templateid' => $this->templateIds['Template DNS Test - ' . $rsmhost]];
+		}
+
+		return $templates;
 	}
 
 	/**
@@ -496,13 +517,16 @@ abstract class ActionBaseEx extends ActionBase
 			]
 		);
 
+		// get TLD types
+		$tldTypes = $this->getTldTypes(array_keys($hosts));
+
 		// join data in a common data structure
 		$result = [];
 
 		foreach ($hosts as $host)
 		{
 			$result[$host] = [
-				'tldType' => 'gTLD',                                                                                    // TODO: fill with real value; test what performs better - API::Host()->get() or API::HostGroup()->Get()
+				'tldType' => $tldTypes[$host],
 				'dnsUdp'  => (bool)$macros[$host][self::MACRO_TLD_DNS_UDP_ENABLED],
 				'dnsTcp'  => (bool)$macros[$host][self::MACRO_TLD_DNS_TCP_ENABLED],
 				'dnssec'  => (bool)$macros[$host][self::MACRO_TLD_DNSSEC_ENABLED],
@@ -513,6 +537,50 @@ abstract class ActionBaseEx extends ActionBase
 		}
 
 		return $result;
+	}
+
+	protected function getTldTypes(array $hostids): array
+	{
+		$tldTypeGroups = ['gTLD', 'ccTLD', 'otherTLD', 'testTLD'];
+
+		$tldTypes = [];
+
+		if (count($hostids) == 1)
+		{
+			$data = API::Host()->get([
+				'output'       => ['hostid', 'host'],
+				'hostids'      => $hostids,
+				'selectGroups' => ['name'],
+			]);
+			$data = $data[0];
+
+			foreach ($data['groups'] as $hostGroup)
+			{
+				if (in_array($hostGroup['name'], $tldTypeGroups))
+				{
+					$tldTypes[$data['host']] = $hostGroup['name'];
+					break;
+				}
+			}
+		}
+		else
+		{
+			$data = API::HostGroup()->get([
+				'output'      => ['groupid', 'name'],
+				'filter'      => ['name' => $tldTypeGroups],
+				'hostids'     => $hostids,
+				'selectHosts' => ['host'],
+			]);
+			foreach ($data as $hostGroup)
+			{
+				foreach ($hostGroup['hosts'] as $hostid)
+				{
+					$tldTypes[$hostid['host']] = $hostGroup['name'];
+				}
+			}
+		}
+
+		return $tldTypes;
 	}
 
 	/**
@@ -530,6 +598,44 @@ abstract class ActionBaseEx extends ActionBase
 			'macro'       => $macro,
 			'value'       => $value,
 		];
+	}
+
+	/**
+	 * Updates macro values.
+	 *
+	 * @param int $hostid
+	 * @param array $newValues
+	 */
+	protected function updateMacros(int $hostid, array $newValues): void
+	{
+		$data = API::UserMacro()->get([
+			'output'  => ['hostmacroid', 'macro', 'value'],
+			'hostids' => [$hostid],
+			'filter'  => ['macro' => array_keys($newValues)],
+		]);
+
+		if (count($data) != count($newValues))
+		{
+			throw new Exception('Failed to find all macros');
+		}
+
+		$config = [];
+
+		foreach ($data as $macro)
+		{
+			if ($macro['value'] != $newValues[$macro['macro']])
+			{
+				$config[] = [
+					'hostmacroid' => $macro['hostmacroid'],
+					'value'       => $newValues[$macro['macro']],
+				];
+			}
+		}
+
+		if (!empty($config))
+		{
+			API::UserMacro()->update($config);
+		}
 	}
 
 	/**
@@ -749,6 +855,27 @@ abstract class ActionBaseEx extends ActionBase
 	}
 
 	/**
+	 * Returns itemid.
+	 *
+	 * @param string $template
+	 * @param string $key
+	 *
+	 * @return int
+	 */
+	protected function getTemplateItemId(string $template, string $key): int
+	{
+		$config = [
+			'output'      => ['itemid'],
+			'templated'   => true,
+			'templateids' => [$this->templateIds[$template]],
+			'search'      => ['key_' => $key],
+		];
+		$data = API::Item()->get($config);
+
+		return $data[0]['itemid'];
+	}
+
+	/**
 	 * Returns itemids in the following format:
 	 *
 	 * <pre>
@@ -909,6 +1036,25 @@ abstract class ActionBaseEx extends ActionBase
 	protected function getProxyId(string $proxy): int
 	{
 		return current($this->getProxyIds([$proxy]));
+	}
+
+	protected function getInterfaceId(int $hostid): int
+	{
+		$data = API::HostInterface()->get([
+			'output' => ['interfaceid'],
+			'hostids' => [$hostid],
+		]);
+
+		if (count($data) == 0)
+		{
+			throw new Exception('Interface not found');
+		}
+		if (count($data) > 1)
+		{
+			throw new Exception('Found more than one interface');
+		}
+
+		return $data[0]['interfaceid'];
 	}
 
 	/**

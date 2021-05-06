@@ -30,9 +30,11 @@ abstract class ActionBase extends CController
 	abstract protected function checkMonitoringTarget(): bool;
 	abstract protected function requestConfigCacheReload(): void;
 	abstract protected function getInputRules(): array;
+	abstract protected function isObjectBeingDisabled(): bool;
 	abstract protected function getObjects(?string $objectId): array;
 	abstract protected function createObject(): void;
 	abstract protected function updateObject(): void;
+	abstract protected function disableObject(): void;
 	abstract protected function deleteObject(): void;
 
 	public function __construct()
@@ -108,14 +110,6 @@ abstract class ActionBase extends CController
 		}
 
 		return substr($output, 0, -1);
-	}
-
-	protected function check(bool $condition, string $message): void
-	{
-		if (!$condition)
-		{
-			throw new Exception('[Internal error] ' . $message);
-		}
 	}
 
 	public function errorHandler(int $errno, string $errstr, string $errfile, int $errline): void
@@ -374,6 +368,45 @@ abstract class ActionBase extends CController
 		return $input;
 	}
 
+	protected function getSeverityString(int $severity): string
+	{
+		switch ($severity)
+		{
+			case E_ERROR:
+				return 'E_ERROR';
+			case E_WARNING:
+				return 'E_WARNING';
+			case E_PARSE:
+				return 'E_PARSE';
+			case E_NOTICE:
+				return 'E_NOTICE';
+			case E_CORE_ERROR:
+				return 'E_CORE_ERROR';
+			case E_CORE_WARNING:
+				return 'E_CORE_WARNING';
+			case E_COMPILE_ERROR:
+				return 'E_COMPILE_ERROR';
+			case E_COMPILE_WARNING:
+				return 'E_COMPILE_WARNING';
+			case E_USER_ERROR:
+				return 'E_USER_ERROR';
+			case E_USER_WARNING:
+				return 'E_USER_WARNING';
+			case E_USER_NOTICE:
+				return 'E_USER_NOTICE';
+			case E_STRICT:
+				return 'E_STRICT';
+			case E_RECOVERABLE_ERROR:
+				return 'E_RECOVERABLE_ERROR';
+			case E_DEPRECATED:
+				return 'E_DEPRECATED';
+			case E_USER_DEPRECATED:
+				return 'E_USER_DEPRECATED';
+			default:
+				return (string)$severity;
+		}
+	}
+
 	protected function doAction(): void
 	{
 		set_error_handler([$this, 'errorHandler'], E_ALL | E_STRICT);
@@ -419,11 +452,18 @@ abstract class ActionBase extends CController
 		}
 		catch (RsmException $e)
 		{
+			$details = $e->getDetails();
+
+			if (is_null($details) && $e->getResultCode() === 500)
+			{
+				$details = $this->getExceptionDetails($e);
+			}
+
 			$this->setCommonResponse(
 				$e->getResultCode(),
 				$e->getTitle(),
 				$e->getDescription(),
-				$e->getDetails(),
+				$details,
 				$e->getUpdatedObject()
 			);
 
@@ -431,20 +471,7 @@ abstract class ActionBase extends CController
 		}
 		catch (Throwable $e)
 		{
-			$this->setCommonResponse(
-				500,
-				'General error',
-				$e->getMessage(),
-				[
-					'exception' => get_class($e),
-					'code'      => $e->getCode(),
-					'file'      => $e->getFile(),
-					'line'      => $e->getLine(),
-					'trace'     => explode("\n", $e->getTraceAsString()),
-					'messages'  => $GLOBALS['ZBX_MESSAGES'],
-				],
-				null
-			);
+			$this->setCommonResponse(500, 'General error', $e->getMessage(), $this->getExceptionDetails($e), null);
 
 			DBend(false);
 		}
@@ -452,11 +479,35 @@ abstract class ActionBase extends CController
 		restore_error_handler();
 	}
 
+	private function getExceptionDetails(Throwable $e)
+	{
+		$details = [];
+
+		$details['exception'] = get_class($e);
+		if ($e instanceof ErrorException)
+		{
+			$details['severity'] = $this->getSeverityString($e->getSeverity());
+		}
+		$details['code']     = $e->getCode();
+		$details['file']     = $e->getFile();
+		$details['line']     = $e->getLine();
+		$details['trace']    = explode("\n", $e->getTraceAsString());
+		$details['messages'] = $GLOBALS['ZBX_MESSAGES'];
+
+		return $details;
+	}
+
 	protected function handleGetRequest(): void
 	{
 		if ($this->hasInput('id'))
 		{
 			$data = $this->getObjects($this->getInput('id'));
+
+			if (empty($data))
+			{
+				throw new RsmException(404, 'The object does not exist in Zabbix');
+			}
+
 			$data = $data[0];
 		}
 		else
@@ -469,11 +520,13 @@ abstract class ActionBase extends CController
 
 	protected function handleDeleteRequest(): void
 	{
+		global $ZBX_MESSAGES;
+
 		$data = $this->getObjects($this->getInput('id'));
 
 		if (empty($data))
 		{
-			throw new Exception("Requested object does not exist");
+			throw new RsmException(404, 'The object does not exist in Zabbix');
 		}
 
 		$this->oldObject = $data[0];
@@ -482,12 +535,22 @@ abstract class ActionBase extends CController
 
 		$this->requestConfigCacheReload();
 
-		$this->returnJson(['foo' => 'bar']);
+		// when deleting objects, API puts informative messages into $ZBX_MESSAGES; move them to $details of the response
+		$details = [];
+		while (count($ZBX_MESSAGES) > 0 && $ZBX_MESSAGES[0]['type'] === 'info' && preg_match('/^Deleted: /', $ZBX_MESSAGES[0]['message']))
+		{
+			$message = array_shift($ZBX_MESSAGES);
+			$details['info'][] = $message['message'];
+		}
+
+		$this->setCommonResponse(200, 'Update executed successfully', null, $details, null);
 	}
 
 	protected function handlePutRequest(): void
 	{
-		// TODO: Changes to Zabbix shall only be executed if the configuration information changes between the current configuration in Zabbix and the TLD Object provided to the API.
+		// TODO: changes to Zabbix shall only be executed if the configuration information changes
+		// between the current configuration in Zabbix and the object provided to the API
+		global $ZBX_MESSAGES;
 
 		$this->newObject = $this->getInputAll();
 
@@ -500,14 +563,33 @@ abstract class ActionBase extends CController
 		else
 		{
 			$this->oldObject = $objects[0];
-			$this->updateObject();
+
+			if ($this->isObjectBeingDisabled())
+			{
+				$this->disableObject();
+			}
+			else
+			{
+				$this->updateObject();
+			}
 		}
 
 		$this->requestConfigCacheReload();
 
-		$data = $this->getObjects($this->newObject['id']);
-		$data = $data[0];
-		$this->returnJson($data);
+		// when disabling objects, API puts informative messages into $ZBX_MESSAGES; move them to $details of the response
+		$details = null;
+		while (count($ZBX_MESSAGES) > 0 && $ZBX_MESSAGES[0]['type'] === 'info' && preg_match('/^Updated status of host /', $ZBX_MESSAGES[0]['message']))
+		{
+			if (is_null($details))
+			{
+				$details = [];
+			}
+			$message = array_shift($ZBX_MESSAGES);
+			$details['info'][] = $message['message'];
+		}
+
+		$objects = $this->getObjects($this->newObject['id']);
+		$this->setCommonResponse(200, 'Update executed successfully', null, $details, $objects[0]);
 	}
 
 	protected function returnJson(array $json): void

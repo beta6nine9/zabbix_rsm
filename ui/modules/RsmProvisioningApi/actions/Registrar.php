@@ -4,50 +4,55 @@
 
 namespace Modules\RsmProvisioningApi\Actions;
 
+use API;
 use Exception;
 
 class Registrar extends MonitoringTarget
 {
+	/******************************************************************************************************************
+	 * Functions for validation                                                                                       *
+	 ******************************************************************************************************************/
+
 	protected function checkMonitoringTarget(): bool
 	{
 		return $this->getMonitoringTarget() == MONITORING_TARGET_REGISTRAR;
 	}
 
-	protected function getFullInputRules(): array
+	protected function getInputRules(): array
 	{
 		switch ($_SERVER['REQUEST_METHOD'])
 		{
 			case self::REQUEST_METHOD_GET:
 				return [
 					'type' => API_OBJECT, 'fields' => [
-						'id'                            => ['type' => API_UINT64],
+						'id'                     => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateInt', 'min' => 1, 'error' => 'IANAID must be a positive integer'],
 					]
 				];
 
 			case self::REQUEST_METHOD_DELETE:
 				return [
 					'type' => API_OBJECT, 'fields' => [
-						'id'                            => ['type' => API_UINT64     ],
+						'id'                     => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateInt', 'min' => 1, 'error' => 'IANAID must be a positive integer'],
 					]
 				];
 
 			case self::REQUEST_METHOD_PUT:
 				return [
 					'type' => API_OBJECT, 'fields' => [
-						'id'                            => ['type' => API_UINT64     ],
-						'registrarName'                 => ['type' => API_STRING_UTF8],
-						'registrarFamily'               => ['type' => API_STRING_UTF8],
-						'servicesStatus'                => ['type' => API_OBJECTS    , 'uniq' => [['service']], 'fields' => [  // TODO: all services (i.e. rdds43, rdds80, rdap) must be specified
-							'service'                   => ['type' => API_STRING_UTF8, 'in' => 'rdap,rdds43,rdds80'],
-							'enabled'                   => ['type' => API_BOOLEAN    ],
+						'id'                     => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateInt', 'min' => 1, 'error' => 'IANAID must be a positive integer'],
+						'registrarName'          => ['type' => API_STRING_UTF8],
+						'registrarFamily'        => ['type' => API_STRING_UTF8],
+						'servicesStatus'         => ['type' => API_OBJECTS    , 'uniq' => [['service']], 'fields' => [
+							'service'            => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateEnum', 'in' => ['rdap', 'rdds43', 'rdds80'], 'error' => 'Service is not supported'],
+							'enabled'            => ['type' => API_BOOLEAN    ],
 						]],
-						'rddsParameters'                => ['type' => API_OBJECT     , 'fields' => [
-							'rdds43Server'              => ['type' => API_STRING_UTF8],
-							'rdds43TestedDomain'        => ['type' => API_STRING_UTF8],
-							'rdds80Url'                 => ['type' => API_STRING_UTF8],
-							'rdapUrl'                   => ['type' => API_STRING_UTF8],
-							'rdapTestedDomain'          => ['type' => API_STRING_UTF8],
-							'rdds43NsString'            => ['type' => API_STRING_UTF8],
+						'rddsParameters'         => ['type' => API_OBJECT     , 'fields' => [
+							'rdds43Server'       => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateHostname', 'error' => 'Invalid domain name provided in "tld", "ns", "rdds43Server", "rdds43TestedDomain", "rdapTestedDomain" or "nsTestPrefix" element'],
+							'rdds43TestedDomain' => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateDomainName', 'error' => 'Invalid domain name provided in "tld", "ns", "rdds43Server", "rdds43TestedDomain", "rdapTestedDomain" or "nsTestPrefix" element'],
+							'rdds80Url'          => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateUrl', 'error' => 'Invalid URL provided on rdds80Url'],
+							'rdapUrl'            => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateRdapUrl', 'error' => 'The "rdapUrl" element can only be an URL or "not listed" or "no https"'],
+							'rdapTestedDomain'   => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateDomainName', 'error' => 'Invalid domain name provided in "tld", "ns", "rdds43Server", "rdds43TestedDomain", "rdapTestedDomain" or "nsTestPrefix" element'],
+							'rdds43NsString'     => ['type' => API_STRING_UTF8],
 						]],
 					]
 				];
@@ -55,17 +60,6 @@ class Registrar extends MonitoringTarget
 			default:
 				throw new Exception('Unsupported request method');
 		}
-	}
-
-	protected function getInputRules(): array
-	{
-		$rules = $this->getFullInputRules();
-
-		if ($_SERVER['REQUEST_METHOD'] == self::REQUEST_METHOD_PUT)
-		{
-		}
-
-		return $rules;
 	}
 
 	/******************************************************************************************************************
@@ -101,8 +95,8 @@ class Registrar extends MonitoringTarget
 				self::MACRO_TLD_RDDS_ENABLED,
 				self::MACRO_TLD_RDAP_BASE_URL,
 				self::MACRO_TLD_RDAP_TEST_DOMAIN,
-				self::MACRO_TLD_RDDS43_TEST_DOMAIN,
 				self::MACRO_TLD_RDDS43_SERVER,
+				self::MACRO_TLD_RDDS43_TEST_DOMAIN,
 				self::MACRO_TLD_RDDS80_URL,
 				self::MACRO_TLD_RDDS43_NS_STRING,
 			]
@@ -176,13 +170,76 @@ class Registrar extends MonitoringTarget
 	 * Functions for updating object                                                                                  *
 	 ******************************************************************************************************************/
 
-	protected function updateObject(): void
+	protected function updateStatustHost(): int
 	{
+		$config = [
+			'hostid' => $this->getHostId($this->newObject['id']),
+			'groups' => [
+				['groupid' => $this->hostGroupIds['TLDs']],
+				['groupid' => $this->hostGroupIds['gTLD']],
+			],
+		];
+		$data = API::Host()->update($config);
+
+		return $data['hostids'][0];
+	}
+
+	protected function disableObject(): void {
+		parent::disableObject();
+
+		$this->updateMacros(
+			$this->templateIds['Template Rsmhost Config ' . $this->getInput('id')],
+			[
+				self::MACRO_TLD_RDAP_ENABLED => 0,
+				self::MACRO_TLD_RDDS_ENABLED => 0,
+				//self::MACRO_TLD_RDDS_ENABLED => 0, // TODO: split into RDDS43 and RDDS80
+			]
+		);
 	}
 
 	/******************************************************************************************************************
-	 * Helper functions                                                                                               *
+	 * Misc functions                                                                                               *
 	 ******************************************************************************************************************/
+
+	protected function getHostGroupNames(?array $additionalNames): array
+	{
+		$names = [
+			// groups for "<rsmhost>" host
+			'Templates - TLD',
+			'TLDs',
+			'gTLD',
+			// groups for "<rsmhost> <probe>" hosts
+			'gTLD Probe results',
+			'TLD Probe results',
+		];
+
+		if (!is_null($additionalNames))
+		{
+			$names = array_merge($names, $additionalNames);
+		}
+
+		return $names;
+	}
+
+	protected function getTemplateNames(?array $additionalNames): array
+	{
+		$names = [
+			// templates for "<rsmhost>" host
+			'Template Config History',
+			'Template RDAP Status',
+			'Template RDDS Status',
+			// templates for "<rsmhost> <probe>" hosts
+			'Template RDAP Test',
+			'Template RDDS Test',
+		];
+
+		if (!is_null($additionalNames))
+		{
+			$names = array_merge($names, $additionalNames);
+		}
+
+		return $names;
+	}
 
 	protected function getRsmhostConfigsFromInput(): array
 	{
