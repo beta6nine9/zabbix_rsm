@@ -141,7 +141,8 @@ class Tld extends MonitoringTarget
 				self::MACRO_TLD_DNS_TCP_ENABLED,
 				self::MACRO_TLD_DNSSEC_ENABLED,
 				self::MACRO_TLD_RDAP_ENABLED,
-				self::MACRO_TLD_RDDS_ENABLED,
+				self::MACRO_TLD_RDDS43_ENABLED,
+				self::MACRO_TLD_RDDS80_ENABLED,
 				self::MACRO_TLD_DNS_NAME_SERVERS,
 				self::MACRO_TLD_DNS_AVAIL_MINNS,
 				self::MACRO_TLD_DNS_TESTPREFIX,
@@ -205,20 +206,20 @@ class Tld extends MonitoringTarget
 					],
 					[
 						'service'        => 'rdds43',
-						'enabled'        => (bool)$macros[$host][self::MACRO_TLD_RDDS_ENABLED],
+						'enabled'        => (bool)$macros[$host][self::MACRO_TLD_RDDS43_ENABLED],
 					],
 					[
 						'service'        => 'rdds80',
-						'enabled'        => (bool)$macros[$host][self::MACRO_TLD_RDDS_ENABLED],
+						'enabled'        => (bool)$macros[$host][self::MACRO_TLD_RDDS80_ENABLED],
 					],
 				],
 				'rddsParameters'         => [
-					'rdds43Server'       => $macros[$host][self::MACRO_TLD_RDDS_ENABLED] ? $macros[$host][self::MACRO_TLD_RDDS43_SERVER]      : null,
-					'rdds43TestedDomain' => $macros[$host][self::MACRO_TLD_RDDS_ENABLED] ? $macros[$host][self::MACRO_TLD_RDDS43_TEST_DOMAIN] : null,
-					'rdds80Url'          => $macros[$host][self::MACRO_TLD_RDDS_ENABLED] ? $macros[$host][self::MACRO_TLD_RDDS80_URL]         : null,
-					'rdapUrl'            => $macros[$host][self::MACRO_TLD_RDAP_ENABLED] ? $macros[$host][self::MACRO_TLD_RDAP_BASE_URL]      : null,
-					'rdapTestedDomain'   => $macros[$host][self::MACRO_TLD_RDAP_ENABLED] ? $macros[$host][self::MACRO_TLD_RDAP_TEST_DOMAIN]   : null,
-					'rdds43NsString'     => $macros[$host][self::MACRO_TLD_RDDS_ENABLED] ? $macros[$host][self::MACRO_TLD_RDDS43_NS_STRING]   : null,
+					'rdds43Server'       => $macros[$host][self::MACRO_TLD_RDDS43_ENABLED] ? $macros[$host][self::MACRO_TLD_RDDS43_SERVER]      : null,
+					'rdds43TestedDomain' => $macros[$host][self::MACRO_TLD_RDDS43_ENABLED] ? $macros[$host][self::MACRO_TLD_RDDS43_TEST_DOMAIN] : null,
+					'rdds80Url'          => $macros[$host][self::MACRO_TLD_RDDS80_ENABLED] ? $macros[$host][self::MACRO_TLD_RDDS80_URL]         : null,
+					'rdapUrl'            => $macros[$host][self::MACRO_TLD_RDAP_ENABLED]   ? $macros[$host][self::MACRO_TLD_RDAP_BASE_URL]      : null,
+					'rdapTestedDomain'   => $macros[$host][self::MACRO_TLD_RDAP_ENABLED]   ? $macros[$host][self::MACRO_TLD_RDAP_TEST_DOMAIN]   : null,
+					'rdds43NsString'     => $macros[$host][self::MACRO_TLD_RDDS43_ENABLED] ? $macros[$host][self::MACRO_TLD_RDDS43_NS_STRING]   : null,
 				],
 			];
 		}
@@ -327,8 +328,8 @@ class Tld extends MonitoringTarget
 				self::MACRO_TLD_DNS_TCP_ENABLED => 0,
 				self::MACRO_TLD_DNSSEC_ENABLED => 0,
 				self::MACRO_TLD_RDAP_ENABLED => 0,
-				self::MACRO_TLD_RDDS_ENABLED => 0,
-				//self::MACRO_TLD_RDDS_ENABLED => 0, // TODO: split into RDDS43 and RDDS80
+				self::MACRO_TLD_RDDS43_ENABLED => 0,
+				self::MACRO_TLD_RDDS80_ENABLED => 0,
 			]
 		);
 
@@ -442,8 +443,8 @@ class Tld extends MonitoringTarget
 			$this->createMacroConfig(self::MACRO_TLD_DNS_TCP_ENABLED   , (int)$services['dnsTCP']),
 			$this->createMacroConfig(self::MACRO_TLD_DNSSEC_ENABLED    , (int)$this->newObject['dnsParameters']['dnssecEnabled']),
 			$this->createMacroConfig(self::MACRO_TLD_RDAP_ENABLED      , (int)$services['rdap']),
-			$this->createMacroConfig(self::MACRO_TLD_RDDS_ENABLED      , (int)$services['rdds43']),
-			//$this->createMacroConfig(self::MACRO_TLD_RDDS_ENABLED      , (int)$services['rdds80']),
+			$this->createMacroConfig(self::MACRO_TLD_RDDS43_ENABLED    , (int)$services['rdds43']),
+			$this->createMacroConfig(self::MACRO_TLD_RDDS80_ENABLED    , (int)$services['rdds80']),
 
 			$this->createMacroConfig(self::MACRO_TLD_DNS_NAME_SERVERS  , $this->nsipListToStr($this->newObject['dnsParameters']['nsIps'])),
 			$this->createMacroConfig(self::MACRO_TLD_DNS_AVAIL_MINNS   , $minNs),

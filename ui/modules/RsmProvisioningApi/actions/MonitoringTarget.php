@@ -39,11 +39,6 @@ abstract class MonitoringTarget extends ActionBaseEx
 
 			$services = array_column($this->input['servicesStatus'], 'enabled', 'service');
 
-			if (!$this->isStandaloneRdap() && $services['rdds43'] != $services['rdds80'])
-			{
-				throw new RsmException(400, 'An enabled status for rdds43 require that rdds80 is enabled and vice versa');
-			}
-
 			if ($services['rdap'] || $services['rdds43'] || $services['rdds80'])
 			{
 				$this->requireArrayKeys(['rddsParameters'], $this->input, 'rddsParameters object is missing and at least one RDDS service (i.e., rdds43, rdds80 or rdap) is enabled');

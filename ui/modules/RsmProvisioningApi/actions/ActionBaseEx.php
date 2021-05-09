@@ -39,7 +39,8 @@ abstract class ActionBaseEx extends ActionBase
 	protected const MACRO_TLD_DNS_TCP_ENABLED    = '{$RSM.TLD.DNS.TCP.ENABLED}';
 	protected const MACRO_TLD_DNSSEC_ENABLED     = '{$RSM.TLD.DNSSEC.ENABLED}';
 	protected const MACRO_TLD_RDAP_ENABLED       = '{$RDAP.TLD.ENABLED}';
-	protected const MACRO_TLD_RDDS_ENABLED       = '{$RSM.TLD.RDDS.ENABLED}';
+	protected const MACRO_TLD_RDDS43_ENABLED     = '{$RSM.TLD.RDDS43.ENABLED}';
+	protected const MACRO_TLD_RDDS80_ENABLED     = '{$RSM.TLD.RDDS80.ENABLED}';
 	protected const MACRO_TLD_DNS_NAME_SERVERS   = '{$RSM.DNS.NAME.SERVERS}';
 	protected const MACRO_TLD_DNS_AVAIL_MINNS    = '{$RSM.TLD.DNS.AVAIL.MINNS}';
 	protected const MACRO_TLD_DNS_TESTPREFIX     = '{$RSM.DNS.TESTPREFIX}';
@@ -66,7 +67,8 @@ abstract class ActionBaseEx extends ActionBase
 		self::MACRO_TLD_DNS_TCP_ENABLED    => 'Indicates whether DNS TCP enabled on the rsmhost',
 		self::MACRO_TLD_DNSSEC_ENABLED     => 'Indicates whether DNSSEC is enabled on the rsmhost',
 		self::MACRO_TLD_RDAP_ENABLED       => 'Indicates whether RDAP is enabled on the rsmhost',
-		self::MACRO_TLD_RDDS_ENABLED       => 'Indicates whether RDDS is enabled on the rsmhost',
+		self::MACRO_TLD_RDDS43_ENABLED     => 'Indicates whether RDDS43 is enabled on the rsmhost',
+		self::MACRO_TLD_RDDS80_ENABLED     => 'Indicates whether RDDS80 is enabled on the rsmhost',
 		self::MACRO_TLD_DNS_NAME_SERVERS   => 'List of Name Server (name, IP pairs) to monitor',
 		self::MACRO_TLD_DNS_AVAIL_MINNS    => 'Consider DNS Service availability at a particular time UP if during DNS test more than specified number of Name Servers replied successfully.',
 		self::MACRO_TLD_DNS_TESTPREFIX     => 'Prefix for DNS tests, e.g. nonexistent',
@@ -513,7 +515,8 @@ abstract class ActionBaseEx extends ActionBase
 				self::MACRO_TLD_DNS_TCP_ENABLED,
 				self::MACRO_TLD_DNSSEC_ENABLED,
 				self::MACRO_TLD_RDAP_ENABLED,
-				self::MACRO_TLD_RDDS_ENABLED,
+				self::MACRO_TLD_RDDS43_ENABLED,
+				self::MACRO_TLD_RDDS80_ENABLED,
 			]
 		);
 
@@ -531,8 +534,8 @@ abstract class ActionBaseEx extends ActionBase
 				'dnsTcp'  => (bool)$macros[$host][self::MACRO_TLD_DNS_TCP_ENABLED],
 				'dnssec'  => (bool)$macros[$host][self::MACRO_TLD_DNSSEC_ENABLED],
 				'rdap'    => (bool)$macros[$host][self::MACRO_TLD_RDAP_ENABLED],
-				'rdds43'  => (bool)$macros[$host][self::MACRO_TLD_RDDS_ENABLED],
-				'rdds80'  => (bool)$macros[$host][self::MACRO_TLD_RDDS_ENABLED],
+				'rdds43'  => (bool)$macros[$host][self::MACRO_TLD_RDDS43_ENABLED],
+				'rdds80'  => (bool)$macros[$host][self::MACRO_TLD_RDDS80_ENABLED],
 			];
 		}
 

@@ -92,7 +92,8 @@ class Registrar extends MonitoringTarget
 			array_map(fn($host) => str_replace('Template Rsmhost Config ', '', $host), $templates),
 			[
 				self::MACRO_TLD_RDAP_ENABLED,
-				self::MACRO_TLD_RDDS_ENABLED,
+				self::MACRO_TLD_RDDS43_ENABLED,
+				self::MACRO_TLD_RDDS80_ENABLED,
 				self::MACRO_TLD_RDAP_BASE_URL,
 				self::MACRO_TLD_RDAP_TEST_DOMAIN,
 				self::MACRO_TLD_RDDS43_SERVER,
@@ -191,8 +192,8 @@ class Registrar extends MonitoringTarget
 			$this->templateIds['Template Rsmhost Config ' . $this->getInput('id')],
 			[
 				self::MACRO_TLD_RDAP_ENABLED => 0,
-				self::MACRO_TLD_RDDS_ENABLED => 0,
-				//self::MACRO_TLD_RDDS_ENABLED => 0, // TODO: split into RDDS43 and RDDS80
+				self::MACRO_TLD_RDDS43_ENABLED => 0,
+				self::MACRO_TLD_RDDS80_ENABLED => 0,
 			]
 		);
 	}
@@ -264,8 +265,8 @@ class Registrar extends MonitoringTarget
 			$this->createMacroConfig(self::MACRO_TLD_CONFIG_TIMES      , $_SERVER['REQUEST_TIME']),
 
 			$this->createMacroConfig(self::MACRO_TLD_RDAP_ENABLED      , (int)$services['rdap']),
-			$this->createMacroConfig(self::MACRO_TLD_RDDS_ENABLED      , (int)$services['rdds43']),
-			//$this->createMacroConfig(self::MACRO_TLD_RDDS_ENABLED      , (int)$services['rdds80']),
+			$this->createMacroConfig(self::MACRO_TLD_RDDS43_ENABLED    , (int)$services['rdds43']),
+			$this->createMacroConfig(self::MACRO_TLD_RDDS80_ENABLED    , (int)$services['rdds80']),
 
 			$this->createMacroConfig(self::MACRO_TLD_RDAP_BASE_URL     , $this->newObject['rddsParameters']['rdapUrl']),
 			$this->createMacroConfig(self::MACRO_TLD_RDAP_TEST_DOMAIN  , $this->newObject['rddsParameters']['rdapTestedDomain']),
