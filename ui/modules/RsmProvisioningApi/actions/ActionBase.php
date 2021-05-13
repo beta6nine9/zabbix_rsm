@@ -212,10 +212,8 @@ abstract class ActionBase extends CController
 
 	/**
 	 * Checks if status is specified in input for all known services, based on input rules.
-	 *
-	 * @param string $errorMessage
 	 */
-	protected function validateInputServices(string $errorMessage): void
+	protected function validateInputServices(): void
 	{
 		$rules = $this->getInputRules();
 
@@ -225,7 +223,13 @@ abstract class ActionBase extends CController
 		$diff = array_diff($rulesServices, $inputServices);
 		if ($diff)
 		{
-			throw new RsmException(400, $errorMessage);
+			$rulesServicesStr = implode(', ', $rulesServices);
+			$rulesServicesStr = preg_replace('/, ([^,]+)$/', ' and $1', $rulesServicesStr);
+
+			$title = 'All services (i.e., ' . $rulesServicesStr . ') must be specified';
+			$descr = 'Missing services: ' . implode(', ', $diff);
+
+			throw new RsmException(400, $title, $descr);
 		}
 	}
 
@@ -320,7 +324,7 @@ abstract class ActionBase extends CController
 		return implode("\n", $output);
 	}
 
-	private function getRequestInput(): array
+	protected function getRequestInput(): array
 	{
 		$input = null;
 
@@ -413,9 +417,10 @@ abstract class ActionBase extends CController
 
 		try
 		{
+			$this->rsmValidateUser();
+
 			$this->input = $this->getRequestInput();
 
-			$this->rsmValidateUser();
 			$this->rsmValidateInput();
 
 			DBstart();
@@ -601,8 +606,13 @@ abstract class ActionBase extends CController
 			$options |= JSON_PRETTY_PRINT;
 		}
 
+		$output = json_encode($json, $options);
+
+		$output = preg_replace('/\{[\s\r\n]*("ns": "[\w.]+"),[\s\r\n]*("ip": "[\w.:]+")[\s\r\n]*\}/', '{ $1, $2 }', $output);
+		$output = preg_replace('/\{[\s\r\n]*("service": "\w+"),[\s\r\n]*("enabled": \w+)[\s\r\n]*\}/', '{ $1, $2 }', $output);
+
 		$this->setResponse(new CControllerResponseData([
-			'main_block' => json_encode($json, $options)
+			'main_block' => $output
 		]));
 	}
 

@@ -35,11 +35,11 @@ abstract class MonitoringTarget extends ActionBaseEx
 			$allServices = implode(', ', $allServices);
 			$allServices = preg_replace('/, ([^,]+)$/', ' and $1', $allServices);
 
-			$this->validateInputServices('All services (i.e., ' . $allServices . ') must be specified');
+			$this->validateInputServices();
 
 			$services = array_column($this->input['servicesStatus'], 'enabled', 'service');
 
-			if (!$this->isStandaloneRdap() && $services['rdds43'] != $services['rdds80'])
+			if ($services['rdds43'] != $services['rdds80'])
 			{
 				throw new RsmException(400, 'An enabled status for rdds43 require that rdds80 is enabled and vice versa');
 			}

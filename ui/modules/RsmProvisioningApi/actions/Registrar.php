@@ -18,6 +18,18 @@ class Registrar extends MonitoringTarget
 		return $this->getMonitoringTarget() == MONITORING_TARGET_REGISTRAR;
 	}
 
+	protected function getRequestInput(): array
+	{
+		$input = parent::getRequestInput();
+
+		if (array_key_exists('id', $input) && is_numeric($input['id']))
+		{
+			$input['id'] = (int)$input['id'];
+		}
+
+		return $input;
+	}
+
 	protected function getInputRules(): array
 	{
 		switch ($_SERVER['REQUEST_METHOD'])
@@ -59,6 +71,16 @@ class Registrar extends MonitoringTarget
 
 			default:
 				throw new Exception('Unsupported request method');
+		}
+	}
+
+	protected function rsmValidateInput(): void
+	{
+		parent::rsmValidateInput();
+
+		if ($_SERVER['REQUEST_METHOD'] == self::REQUEST_METHOD_PUT)
+		{
+			$this->requireArrayKeys(['registrarName', 'registrarFamily'], $this->input, 'JSON does not comply with definition');
 		}
 	}
 
@@ -115,24 +137,24 @@ class Registrar extends MonitoringTarget
 				'servicesStatus'                => [
 					[
 						'service'               => 'rdap',
-						'enabled'               => (bool)$macros[$host][self::MACRO_RDAP_ENABLED],
+						'enabled'               => (bool)$macros[$host][self::MACRO_TLD_RDAP_ENABLED],
 					],
 					[
 						'service'               => 'rdds43',
-						'enabled'               => (bool)$macros[$host][self::MACRO_RDDS_ENABLED],
+						'enabled'               => (bool)$macros[$host][self::MACRO_TLD_RDDS_ENABLED],
 					],
 					[
 						'service'               => 'rdds80',
-						'enabled'               => (bool)$macros[$host][self::MACRO_RDDS_ENABLED],
+						'enabled'               => (bool)$macros[$host][self::MACRO_TLD_RDDS_ENABLED],
 					],
 				],
 				'rddsParameters'                => [
-					'rdds43Server'              => $macros[$host][self::MACRO_RDDS_ENABLED] ? $macros[$host][self::MACRO_TLD_RDDS43_SERVER]  : null,
-					'rdds43TestedDomain'        => $macros[$host][self::MACRO_RDDS_ENABLED] ? $macros[$host][self::MACRO_RDDS43_TEST_DOMAIN] : null,
-					'rdds80Url'                 => $macros[$host][self::MACRO_RDDS_ENABLED] ? $macros[$host][self::MACRO_TLD_RDDS80_URL]     : null,
-					'rdapUrl'                   => $macros[$host][self::MACRO_RDAP_ENABLED] ? $macros[$host][self::MACRO_RDAP_BASE_URL]      : null,
-					'rdapTestedDomain'          => $macros[$host][self::MACRO_RDAP_ENABLED] ? $macros[$host][self::MACRO_RDAP_TEST_DOMAIN]   : null,
-					'rdds43NsString'            => $macros[$host][self::MACRO_RDDS_ENABLED] ? $macros[$host][self::MACRO_RDDS_NS_STRING]     : null,
+					'rdds43Server'              => $macros[$host][self::MACRO_TLD_RDDS_ENABLED] ? $macros[$host][self::MACRO_TLD_RDDS43_SERVER]      : null,
+					'rdds43TestedDomain'        => $macros[$host][self::MACRO_TLD_RDDS_ENABLED] ? $macros[$host][self::MACRO_TLD_RDDS43_TEST_DOMAIN] : null,
+					'rdds80Url'                 => $macros[$host][self::MACRO_TLD_RDDS_ENABLED] ? $macros[$host][self::MACRO_TLD_RDDS80_URL]         : null,
+					'rdapUrl'                   => $macros[$host][self::MACRO_TLD_RDAP_ENABLED] ? $macros[$host][self::MACRO_TLD_RDAP_BASE_URL]      : null,
+					'rdapTestedDomain'          => $macros[$host][self::MACRO_TLD_RDAP_ENABLED] ? $macros[$host][self::MACRO_TLD_RDAP_TEST_DOMAIN]   : null,
+					'rdds43NsString'            => $macros[$host][self::MACRO_TLD_RDDS_ENABLED] ? $macros[$host][self::MACRO_TLD_RDDS43_NS_STRING]   : null,
 				],
 			];
 		}
@@ -147,7 +169,9 @@ class Registrar extends MonitoringTarget
 	protected function createStatusHost(): int
 	{
 		$config = [
-			'host'       => $this->newObject['id'],
+			'host'       => (string)$this->newObject['id'],
+			'info_1'     => $this->newObject['registrarName'],
+			'info_2'     => $this->newObject['registrarFamily'],
 			'status'     => HOST_STATUS_MONITORED,
 			'interfaces' => [self::DEFAULT_MAIN_INTERFACE],
 			'groups'     => [
