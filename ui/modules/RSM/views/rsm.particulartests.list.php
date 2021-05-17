@@ -121,8 +121,14 @@ if ($data['type'] == RSM_RDDS || $data['type'] == RSM_RDAP || $data['type'] == R
 	$down_probes = 0;
 }
 
+$show_totals = false;
+
 foreach ($data['probes'] as $probe) {
 	$status = null;
+
+	if (isset($probe['rdds43']['rtt']) || isset($probe['rdds80']['rtt']) || isset($probe['rdap']['rtt'])) {
+		$show_totals = true;
+	}
 
 	if (isset($probe['status']) && $probe['status'] === PROBE_DOWN) {
 		if ($data['type'] == RSM_RDAP) {
@@ -422,7 +428,9 @@ if ($data['type'] == RSM_RDAP) {
 		]);
 	}
 
-	$table->addRow([_('Total above max. RTT'), '', '', '', '', $rdap_above_max_rtt]);
+	if ($show_totals) {
+		$table->addRow([_('Total above max. RTT'), '', '', '', '', $rdap_above_max_rtt]);
+	}
 }
 elseif ($data['type'] == RSM_RDDS) {
 	foreach ($data['errors'] as $error_code => $error) {
@@ -463,7 +471,9 @@ elseif ($data['type'] == RSM_RDDS) {
 		$row = array_merge($row, ['', '', '', '', $rdap_above_max_rtt]);
 	}
 
-	$table->addRow($row);
+	if ($show_totals) {
+		$table->addRow($row);
+	}
 }
 
 if ($data['type'] == RSM_RDDS || $data['type'] == RSM_RDAP

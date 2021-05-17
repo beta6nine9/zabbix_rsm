@@ -211,7 +211,7 @@ if ($data['type'] == RSM_DNS && array_key_exists('dns_nameservers', $data)) {
 	$row_tcp = [_('Total above max. TCP RTT'), '', '', '', ''];
 
 	foreach ($data['dns_nameservers'] as $ns_name => $ns_ips) {
-		// 'Status' column
+		// Name Server 'Status' column for UDP and TCP must be empty
 		$row_udp[] = '';
 		$row_tcp[] = '';
 

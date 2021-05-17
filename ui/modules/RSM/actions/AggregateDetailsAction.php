@@ -140,7 +140,7 @@ class AggregateDetailsAction extends Action {
 			$probe_host = substr($probe['host'], 0, strrpos($probe['host'], ' - mon'));
 
 			if ($probe_host) {
-				// tld: "longrow", probe: "Dufftown - mon" will result in "longrow Dufftown".
+				// tld "example" and probe "Los_Angeles - mon" will result in host "example Los_Angeles"
 				$tld_probe_names[$this->tld['host'].' '.$probe_host] = $probe['hostid'];
 				$this->probes[$probe['hostid']] = [
 					'host' => $probe_host,
@@ -180,16 +180,29 @@ class AggregateDetailsAction extends Action {
 
 	protected function getReportData(array &$data, $time_from, $time_till) {
 		$key_parser = new CItemKey;
-		$tldprobeid_probeid = array_combine(array_column($this->probes, 'tldprobe_hostid'), array_keys($this->probes));
-		$data['probes_status'] = array_column($this->probes, 'tldprobe_status', 'host');
+
 		$dns_nameservers = [];
+		$tldprobeid_probeid = [];
+		$data['probes_status'] = [];
+
+		foreach ($this->probes as $hostid => $hash) {
+			// Only take data from Probes that are ONLINE
+			if (!isset($hash['online_status']) || $hash['online_status'] != PROBE_OFFLINE) {
+				$tldprobeid_probeid[$hash['tldprobe_hostid']] = $hostid;
+				$data['probes_status'][$hash['host']] = $hash['tldprobe_status'];
+			}
+		}
+
+		if (!$tldprobeid_probeid) {
+			return;
+		}
 
 		// Keys for PROBE_DNS_UDP_RTT and PROBE_DNS_TCP_RTT differs only by last parameter value.
 		$key_parser->parse(PROBE_DNS_UDP_RTT);
 		$dns_rtt_key = $key_parser->getKey();
 		$rtt_items = API::Item()->get([
 			'output' => ['key_', 'itemid', 'hostid'],
-			'hostids' => array_column($this->probes, 'tldprobe_hostid'),
+			'hostids' => array_keys($tldprobeid_probeid),
 			'search' => [
 				'key_' => $dns_rtt_key.'['
 			],
@@ -215,6 +228,7 @@ class AggregateDetailsAction extends Action {
 
 			$tldprobeid = $rtt_item['hostid'];
 			$probeid = $tldprobeid_probeid[$tldprobeid];
+
 			$item_value = !array_key_exists('online_status', $this->probes[$probeid])	// Skip offline probes
 					&& array_key_exists($rtt_item['itemid'], $rtt_values)
 				? (int) $rtt_values[$rtt_item['itemid']]
@@ -395,6 +409,15 @@ class AggregateDetailsAction extends Action {
 			'history' => ITEM_VALUE_TYPE_UINT64
 		]);
 
+		foreach ($probes as $probe) {
+			/**
+			 * Value of probe item PROBE_KEY_ONLINE == PROBE_DOWN means that Probe is OFFLINE
+			 */
+			if (isset($probe['history_value']) && $probe['history_value'] == PROBE_DOWN) {
+				$this->probes[$probe['hostid']]['online_status'] = PROBE_OFFLINE;
+			}
+		}
+
 		if ($test_result['value'] != UP_INCONCLUSIVE_RECONFIG) {
 			// Set probes test trasport.
 			$protocol_type = $this->getValueMapping(RSM_DNS_TRANSPORT_PROTOCOL_VALUE_MAP);
@@ -425,21 +448,9 @@ class AggregateDetailsAction extends Action {
 			$this->getReportData($data, $time_from, $time_till);
 		}
 
-		foreach ($probes as $probe) {
-			/**
-			 * Value of probe item PROBE_KEY_ONLINE == PROBE_DOWN means that Probe is OFFLINE
-			 */
-			if (isset($probe['history_value']) && $probe['history_value'] == PROBE_DOWN) {
-				$this->probes[$probe['hostid']]['online_status'] = PROBE_OFFLINE;
-			}
-		}
-
 		$data['probes'] = $this->probes;
 		$data['errors'] = $this->probe_errors;
 		krsort($data['errors']);
-
-
-
 
 		$response = new CControllerResponseData($data);
 		$response->setTitle($data['title']);
