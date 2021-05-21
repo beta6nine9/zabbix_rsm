@@ -152,7 +152,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		get_valuemaps get_statusmaps get_detailed_result
 		get_avail_valuemaps
 		get_result_string get_tld_by_trigger truncate_from truncate_till alerts_enabled
-		get_real_services_period dbg info wrn fail set_on_fail
+		get_real_services_period dbg info wrn fail set_on_fail log_only_message log_stacktrace
 		format_stats_time
 		init_process finalize_process
 		slv_exit
@@ -4069,7 +4069,7 @@ sub slv_exit
 
 	finalize_process($rv);
 
-	if ($rv != SUCCESS)
+	if ($rv != SUCCESS && log_stacktrace())
 	{
 		map { __log('err', $_) } split("\n", Devel::StackTrace->new()->as_string());
 	}
@@ -4153,6 +4153,38 @@ my $on_fail_cb;
 sub set_on_fail
 {
 	$on_fail_cb = shift;
+}
+
+my $log_only_message = 0;
+
+sub log_only_message(;$)
+{
+	my $flag = shift;
+
+	my $prev = $log_only_message;
+
+	if (defined($flag))
+	{
+		$log_only_message = $flag;
+	}
+
+	return $prev;
+}
+
+my $log_stacktrace = 1;
+
+sub log_stacktrace(;$)
+{
+	my $flag = shift;
+
+	my $prev = $log_stacktrace;
+
+	if (defined($flag))
+	{
+		$log_stacktrace = $flag;
+	}
+
+	return $prev;
 }
 
 sub fail
@@ -6117,7 +6149,14 @@ sub __log
 
 		flock($stdout_lock_handle, LOCK_EX) or die("cannot lock \"$stdout_lock_file\": $!");
 
-		print {$stdout ? *STDOUT : *STDERR} (sprintf("%6d:", $$), ts_str(), " [$priority] ", $server_str, ($cur_tld eq "" ? "" : "$cur_tld: "), __func(), "$msg\n");
+		if (log_only_message())
+		{
+			print {$stdout ? *STDOUT : *STDERR} ("[$priority] $msg\n");
+		}
+		else
+		{
+			print {$stdout ? *STDOUT : *STDERR} (sprintf("%6d:", $$), ts_str(), " [$priority] ", $server_str, ($cur_tld eq "" ? "" : "$cur_tld: "), __func(), "$msg\n");
+		}
 
 		# flush stdout
 		select()->flush();
