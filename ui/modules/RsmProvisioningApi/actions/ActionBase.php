@@ -142,7 +142,7 @@ abstract class ActionBase extends CController
 		{
 			throw new RsmException(401, 'Username is not specified');
 		}
-		if (!isset($_SERVER['PHP_AUTH_PW']) || $_SERVER['PHP_AUTH_USER'] === '')
+		if (!isset($_SERVER['PHP_AUTH_PW']) || $_SERVER['PHP_AUTH_PW'] === '')
 		{
 			throw new RsmException(401, 'Password is not specified');
 		}
