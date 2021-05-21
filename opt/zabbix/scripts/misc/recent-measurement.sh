@@ -2,8 +2,8 @@
 
 BASE="/opt/zabbix/sla"
 
-d_version="1"
-d_tld="tld6"
+d_version="2"
+d_tld="tld1"
 d_service="dns"
 d_date=$(date +%Y/%m/%d)
 d_last=1
@@ -108,5 +108,14 @@ for file in $files; do
 
 	echo -n "$date; "
 	ls -l $file
-	cat $file | jq -SC .
+
+	# fix timestamps
+	cp $file -f $file.new
+	egrep -o --color=none '1[0-9]{9}' $file | while read ts; do
+		hr=$(date +'%Y-%m-%d %H:%M:%S' -d @$ts)
+		sed -ri "s/$ts/\"$hr\"/g" $file.new
+	done
+
+	cat $file.new | jq -SC .
+	rm -f $file.new
 done
