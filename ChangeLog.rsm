@@ -1,3 +1,9 @@
+Changes for rsm2.2.0rc9
+
+..F....... [sub-782] fixed error message when Frontend cannot connect to the database (dimir)
+..F....... [784] hid unnecessary data on Test Details page when no data from probes (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.2.0rc8
 
 Bug fixes:
