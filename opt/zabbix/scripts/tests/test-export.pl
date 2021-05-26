@@ -1410,7 +1410,7 @@ $columns = 6;
 @no_fails = (1) x scalar(@cases);
 @uniqueness = ({});
 
-if (open_file(\$file, $files{$name}, MANDATORY))
+if (open_file(\$file, $files{$name}, OPTIONAL))
 {
 	$row_number = 0;
 	$interrupted = 0;
