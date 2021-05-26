@@ -147,10 +147,10 @@ foreach ($data['probes'] as $probe) {
 		$offline_probes++;
 	}
 	else {
-		if ($data['type'] == RSM_RDDS || $data['type'] == RSM_RDAP) {
-			$probe_down = false;
-			$probe_no_result = false;
+		$probe_down = false;
+		$probe_no_result = false;
 
+		if ($data['type'] == RSM_RDDS) {
 			// RDDS
 			if (isset($data['tld']['macros'][RSM_TLD_RDDS_ENABLED])
 					&& $data['tld']['macros'][RSM_TLD_RDDS_ENABLED] == 0) {
@@ -191,7 +191,8 @@ foreach ($data['probes'] as $probe) {
 					}
 				}
 			}
-
+		}
+		else {
 			// RDAP
 			if (isset($data['tld']['macros'][RSM_RDAP_TLD_ENABLED])
 					&& $data['tld']['macros'][RSM_RDAP_TLD_ENABLED] == 0) {
@@ -260,20 +261,6 @@ foreach ($data['probes'] as $probe) {
 			}
 			elseif ($probe_no_result) {
 				$no_result_probes++;
-			}
-		}
-		else {
-			// EPP
-			if (!isset($probe['value']) || $probe['value'] === null) {
-				$epp = $no_result;
-				$no_result_probes++;
-			}
-			elseif ($probe['value'] == 0) {
-				$epp = $down;
-				$down_probes++;
-			}
-			elseif ($probe['value'] == 1) {
-				$epp = $up;
 			}
 		}
 	}
