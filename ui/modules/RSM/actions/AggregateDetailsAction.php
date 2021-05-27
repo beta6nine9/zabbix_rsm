@@ -181,8 +181,13 @@ class AggregateDetailsAction extends Action {
 	protected function getReportData(array &$data, $time_from, $time_till) {
 		$key_parser = new CItemKey;
 
+		# array of Name Servers with 'ipv4' and 'ipv6' sub arrays
 		$dns_nameservers = [];
+
+		# map of '<TLD> <Probe>' hostid => '<Probe>' hostid
 		$tldprobeid_probeid = [];
+
+		# '<Probe>' => status
 		$data['probes_status'] = [];
 
 		foreach ($this->probes as $hostid => $hash) {
@@ -308,6 +313,11 @@ class AggregateDetailsAction extends Action {
 		foreach ($tldprobe_values as $tldprobe_value) {
 			$key_parser->parse($tldprobe_value['key_']);
 			$key = $key_parser->getKey();
+
+			if (!array_key_exists($tldprobe_value['hostid'], $tldprobeid_probeid)) {
+				continue;
+			}
+
 			$probeid = $tldprobeid_probeid[$tldprobe_value['hostid']];
 
 			if (!array_key_exists('history_value', $tldprobe_value)) {
