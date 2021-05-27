@@ -43,16 +43,19 @@ sub main()
 		if (defined($macro_id))
 		{
 			$found_tld = 1;
-			info('Found tld "' . $tld . '" on server "' . $server_key . '"');
+			info('Found TLD "' . $tld . '" on server "' . $server_key . '"');
+			info('Value of macro: "' . $macro_value . '"');
 
 			if (opt('schedule'))
 			{
 				schedule($tld, $macro_id, $macro_value, getopt('value'), getopt('timestamp'));
+
 				# TODO: schedule config-cache-reload
 			}
 			if (opt('cancel'))
 			{
 				cancel($tld, $macro_id, $macro_value);
+
 				# TODO: schedule config-cache-reload
 			}
 			if (opt('status'))
@@ -80,6 +83,21 @@ sub pfail
 {
 	log_stacktrace(0);
 	fail(@_);
+}
+
+sub format_time($)
+{
+	my $ts = shift;
+
+	if (!defined($ts))
+	{
+		return undef;
+	}
+
+	my $ymd = ts_ymd($ts, '-');
+	my $hms = ts_hms($ts, ':');
+
+	return "$ymd $hms ($ts)";
 }
 
 sub check_opts()
@@ -180,12 +198,12 @@ sub schedule($$$$$)
 	if (!defined($time))
 	{
 		$time = cycle_start($^T + DNS_MINNS_OFFSET, 60);
-		wrn('Setting time of change to: ' . ts_full($time));
+		wrn('Time of change is not specified, setting it to: ' . format_time($time));
 	}
 	if ($time % 60 != 0)
 	{
 		$time = cycle_start($time, 60);
-		wrn('Truncating time of change to the beginning of the minute: ' . ts_full($time));
+		wrn('Truncating time of change to the beginning of the minute: ' . format_time($time));
 	}
 
 	my $now = cycle_start($^T, 60);
@@ -199,16 +217,13 @@ sub schedule($$$$$)
 	{
 		pfail('Specified time is within next ' . DNS_MINNS_OFFSET_MINUTES . ' minutes');
 	}
-	if (defined($minns->{'scheduled_clock'}))
+	if (defined($minns->{'previous_clock'}) && $minns->{'previous_clock'} < $now && $minns->{'previous_clock'} >= $now - DNS_MINNS_MIN_INTERVAL)
 	{
-		if ($minns->{'scheduled_clock'} < $now && $minns->{'scheduled_clock'} >= $now - DNS_MINNS_MIN_INTERVAL)
-		{
-			pfail('There already was a change during last ' . DNS_MINNS_MIN_INTERVAL_DAYS . ' days');
-		}
-		if ($minns->{'scheduled_clock'} >= $now && $minns->{'scheduled_clock'} < $^T + DNS_MINNS_OFFSET)
-		{
-			pfail('Cannot schedule the change, there already is a scheduled change within next ' . DNS_MINNS_OFFSET_MINUTES . ' minutes');
-		}
+		pfail('There already was a change during last ' . DNS_MINNS_MIN_INTERVAL_DAYS . ' days');
+	}
+	if (defined($minns->{'scheduled_clock'})&& $minns->{'scheduled_clock'} >= $now && $minns->{'scheduled_clock'} < $^T + DNS_MINNS_OFFSET)
+	{
+		pfail('Cannot schedule the change, there already is a scheduled change within next ' . DNS_MINNS_OFFSET_MINUTES . ' minutes');
 	}
 	if ($value == $minns->{'current_value'})
 	{
@@ -216,6 +231,7 @@ sub schedule($$$$$)
 	}
 
 	set_minns_macro($macro_id, $minns->{'current_value'} . ';' . $time . ':' . $value);
+	info();
 	info('The change was scheduled successfully');
 }
 
@@ -237,6 +253,7 @@ sub cancel($$$)
 	}
 
 	set_minns_macro($macro_id, $minns->{'current_value'});
+	info();
 	info('The change was canceled successfully');
 }
 
@@ -247,19 +264,20 @@ sub status($$)
 
 	my $minns = parse_minns_macro($macro_value);
 
-	info('Current time: '  . ts_full($^T));
-	info('Current value: ' . $minns->{'current_value'});
+	info();
+	info('Current status:');
+	info('* time: '  . format_time($^T));
+	info('* minns: ' . $minns->{'current_value'});
 
-	if (defined($minns->{'scheduled_clock'}))
-	{
-		info('Scheduled time: ' . ts_full($minns->{'scheduled_clock'}));
-		info('Scheduled value: ' . $minns->{'scheduled_value'});
-	}
-	else
-	{
-		info('Scheduled time: -');
-		info('Scheduled value: -');
-	}
+	info();
+	info('Scheduling status:');
+	info('* time: '  . (format_time($minns->{'scheduled_clock'}) // '-'));
+	info('* new minns: ' . ($minns->{'scheduled_value'} // '-'));
+
+	info();
+	info('Previous change:');
+	info('* time: '  . (format_time($minns->{'previous_clock'}) // '-'));
+	info('* old minns: ' . ($minns->{'previous_value'} // '-'));
 }
 
 sub parse_minns_macro($)
@@ -271,9 +289,13 @@ sub parse_minns_macro($)
 		my $curr_minns  = $1;
 		my $sched_clock = $2;
 		my $sched_minns = $3;
+		my $prev_clock  = undef;
+		my $prev_minns  = undef;
 
 		if (defined($sched_clock) && $sched_clock < cycle_start($^T, 60))
 		{
+			$prev_clock = $sched_clock;
+			$prev_minns = $curr_minns;
 			$curr_minns = $sched_minns;
 			undef($sched_clock);
 			undef($sched_minns);
@@ -283,12 +305,13 @@ sub parse_minns_macro($)
 			'current_value'   => $curr_minns,
 			'scheduled_clock' => $sched_clock,
 			'scheduled_value' => $sched_minns,
+			'previous_clock'  => $prev_clock,
+			'previous_value'  => $prev_minns,
 		};
 	}
 
 	pfail('Unexpected value/format of macro: ' . $macro);
 }
-
 
 main();
 
@@ -301,8 +324,11 @@ set-minns.pl - update minimum number of name servers.
 =head1 SYNOPSIS
 
 set-minns.pl --tld <tld> --schedule --value <value> [--timestamp <timestamp>] [--debug]
+
 set-minns.pl --tld <tld> --cancel [--debug]
+
 set-minns.pl --tld <tld> --status [--debug]
+
 set-minns.pl --help
 
 =head1 OPTIONS

@@ -164,7 +164,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		str_starts_with
 		str_ends_with
 		parse_opts parse_slv_opts override_opts
-		opt getopt setopt unsetopt optkeys ts_str ts_full selected_period
+		opt getopt setopt unsetopt optkeys ts_str ts_full ts_ymd ts_hms selected_period
 		cycle_start
 		cycle_end
 		update_slv_rtt_monthly_stats
