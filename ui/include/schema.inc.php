@@ -155,7 +155,7 @@ return [
 				'null' => false,
 				'type' => DB::FIELD_TYPE_INT,
 				'length' => 10,
-				'default' => '0',
+				'default' => '0'
 			],
 			'proxy_hostid' => [
 				'null' => true,
@@ -337,13 +337,13 @@ return [
 				'null' => false,
 				'type' => DB::FIELD_TYPE_CHAR,
 				'length' => 128,
-				'default' => '',
+				'default' => ''
 			],
 			'info_2' => [
 				'null' => false,
 				'type' => DB::FIELD_TYPE_CHAR,
 				'length' => 128,
-				'default' => '',
+				'default' => ''
 			],
 			'flags' => [
 				'null' => false,
@@ -8389,7 +8389,7 @@ return [
 				'null' => false,
 				'type' => DB::FIELD_TYPE_INT,
 				'length' => 10,
-				'default' => '0',
+				'default' => '0'
 			],
 			'optional' => [
 				'null' => false,
@@ -8421,6 +8421,21 @@ return [
 		]
 	],
 	'rsm_ns_ip' => [
+		'key' => 'id',
+		'fields' => [
+			'id' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_UINT,
+				'length' => 20
+			],
+			'name' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_CHAR,
+				'length' => 255
+			]
+		]
+	],
+	'rsm_nsid' => [
 		'key' => 'id',
 		'fields' => [
 			'id' => [
@@ -8683,6 +8698,66 @@ return [
 				'null' => false,
 				'type' => DB::FIELD_TYPE_INT,
 				'length' => 10
+			]
+		]
+	],
+	'provisioning_api_log' => [
+		'key' => 'provisioning_api_logid',
+		'fields' => [
+			'provisioning_api_logid' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_ID,
+				'length' => 20
+			],
+			'clock' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_INT,
+				'length' => 10
+			],
+			'user' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_CHAR,
+				'length' => 100
+			],
+			'interface' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_CHAR,
+				'length' => 8
+			],
+			'identifier' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_CHAR,
+				'length' => 255
+			],
+			'operation' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_CHAR,
+				'length' => 6
+			],
+			'object_type' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_CHAR,
+				'length' => 9
+			],
+			'object_before' => [
+				'null' => true,
+				'type' => DB::FIELD_TYPE_NCLOB,
+				'default' => NULL
+			],
+			'object_after' => [
+				'null' => true,
+				'type' => DB::FIELD_TYPE_NCLOB,
+				'default' => NULL
+			],
+			'remote_addr' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_CHAR,
+				'length' => 45
+			],
+			'x_forwarded_for' => [
+				'null' => true,
+				'type' => DB::FIELD_TYPE_CHAR,
+				'length' => 255
 			]
 		]
 	]

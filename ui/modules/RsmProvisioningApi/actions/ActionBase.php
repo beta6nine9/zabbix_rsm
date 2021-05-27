@@ -10,6 +10,7 @@ use API;
 use CApiInputValidator;
 use CController;
 use CControllerResponseData;
+use DB;
 use Exception;
 use ErrorException;
 use Throwable;
@@ -430,28 +431,14 @@ abstract class ActionBase extends CController
 				throw new Exception('Invalid monitoring target');
 			}
 
-			switch ($_SERVER['REQUEST_METHOD'])
-			{
-				case self::REQUEST_METHOD_GET:
-					$this->handleGetRequest();
-					break;
-
-				case self::REQUEST_METHOD_DELETE:
-					$this->handleDeleteRequest();
-					break;
-
-				case self::REQUEST_METHOD_PUT:
-					$this->handlePutRequest();
-					break;
-
-				default:
-					throw new Exception('Unsupported request method');
-			}
+			$this->handleRequest();
 
 			if (!empty($GLOBALS['ZBX_MESSAGES']))
 			{
 				throw new Exception('Internal error');
 			}
+
+			$this->storeLog();
 
 			DBend(true);
 		}
@@ -502,7 +489,28 @@ abstract class ActionBase extends CController
 		return $details;
 	}
 
-	protected function handleGetRequest(): void
+	private function handleRequest(): void
+	{
+		switch ($_SERVER['REQUEST_METHOD'])
+		{
+			case self::REQUEST_METHOD_GET:
+				$this->handleGetRequest();
+				break;
+
+			case self::REQUEST_METHOD_DELETE:
+				$this->handleDeleteRequest();
+				break;
+
+			case self::REQUEST_METHOD_PUT:
+				$this->handlePutRequest();
+				break;
+
+			default:
+				throw new Exception('Unsupported request method');
+		}
+	}
+
+	private function handleGetRequest(): void
 	{
 		if ($this->hasInput('id'))
 		{
@@ -523,7 +531,7 @@ abstract class ActionBase extends CController
 		$this->returnJson($data);
 	}
 
-	protected function handleDeleteRequest(): void
+	private function handleDeleteRequest(): void
 	{
 		global $ZBX_MESSAGES;
 
@@ -551,7 +559,7 @@ abstract class ActionBase extends CController
 		$this->setCommonResponse(200, 'Update executed successfully', null, $details, null);
 	}
 
-	protected function handlePutRequest(): void
+	private function handlePutRequest(): void
 	{
 		// TODO: changes to Zabbix shall only be executed if the configuration information changes
 		// between the current configuration in Zabbix and the object provided to the API
@@ -595,6 +603,57 @@ abstract class ActionBase extends CController
 
 		$objects = $this->getObjects($this->newObject['id']);
 		$this->setCommonResponse(200, 'Update executed successfully', null, $details, $objects[0]);
+	}
+
+	protected function storeLog(): void
+	{
+		if (in_array($_SERVER['REQUEST_METHOD'], [self::REQUEST_METHOD_PUT, self::REQUEST_METHOD_DELETE]))
+		{
+			$operation = null;
+			$objectType = null;
+
+			if (is_null($this->oldObject) && !is_null($this->newObject))
+			{
+				$operation = 'add';
+			}
+			else if (!is_null($this->oldObject) && !is_null($this->newObject))
+			{
+				$operation = 'update';
+			}
+			else if (!is_null($this->oldObject) && is_null($this->newObject))
+			{
+				$operation = 'delete';
+			}
+
+			if ($this instanceof Tld)
+			{
+				$objectType = 'tld';
+			}
+			else if ($this instanceof Probe)
+			{
+				$objectType = 'registrar';
+			}
+			else if ($this instanceof Probe)
+			{
+				$objectType = 'probeNode';
+			}
+
+			$values = [
+				'provisioning_api_logid' => DB::reserveIds('provisioning_api_log', 1),
+				'clock'                  => $_SERVER['REQUEST_TIME'],
+				'user'                   => $_SERVER['PHP_AUTH_USER'],
+				'interface'              => 'internal',
+				'identifier'             => $this->getInput('id'),
+				'operation'              => $operation,
+				'object_type'            => $objectType,
+				'object_before'          => is_null($this->oldObject) ? null : json_encode($this->oldObject, JSON_UNESCAPED_SLASHES),
+				'object_after'           => is_null($this->newObject) ? null : json_encode($this->newObject, JSON_UNESCAPED_SLASHES),
+				'remote_addr'            => $_SERVER['REMOTE_ADDR'],
+				'x_forwarded_for'        => array_key_exists('HTTP_X_FORWARDED_FOR', $_SERVER) ? $_SERVER['HTTP_X_FORWARDED_FOR'] : null,
+			];
+
+			DB::insert('provisioning_api_log', [$values], false);
+		}
 	}
 
 	protected function returnJson(array $json): void

@@ -283,13 +283,10 @@ function forwardRequest(int $serverId, string $objectType, ?string $objectId, st
 		throw new RsmException(500, 'General error', 'curl_exec() failed: ' . curl_error($ch));
 	}
 
-	list($head, $body) = explode("\r\n\r\n", $output, 2);
+	list($messageHeaders, $messageBody) = explode("\r\n\r\n", $output, 2);
 
 	$contentType  = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
 	$responseCode = curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
-	//$privateData  = curl_getinfo($ch, CURLINFO_PRIVATE);
-
-	curl_close($ch);
 
 	if ($contentType !== 'application/json')
 	{
@@ -298,13 +295,13 @@ function forwardRequest(int $serverId, string $objectType, ?string $objectId, st
 			'url'             => curl_getinfo($ch, CURLINFO_EFFECTIVE_URL),
 			'content-type'    => $contentType,
 			'response-code'   => $responseCode,
-			'message-headers' => explode("\r\n", $head),
-			'message-body'    => $body,
+			'message-headers' => explode("\r\n", $messageHeaders),
+			'message-body'    => $messageBody,
 		];
 		throw new RsmException(500, 'General error', 'Frontend returned unexpected Content-Type', $details);
 	}
 
-	$json = json_decode($body, true);
+	$json = json_decode($messageBody, true);
 	if (is_null($json))
 	{
 		// TODO: add python helper for getting some more info
@@ -320,60 +317,9 @@ function forwardRequest(int $serverId, string $objectType, ?string $objectId, st
 		$json['centralServer'] = $serverId;
 	}
 
+	curl_close($ch);
+
 	sendResponse($responseCode, $json);
-}
-
-function createCurlMultiHandle(array $chList)//: resource
-{
-	$mh = curl_multi_init();
-	if ($mh === false)
-	{
-		throw new RsmException(500, 'General error', 'curl_multi_init() failed');
-	}
-
-	foreach ($chList as $ch)
-	{
-		$res = curl_multi_add_handle($mh, $ch);
-
-		if ($res !== CURLM_OK)
-		{
-			$descr = sprintf('curl_multi_add_handle() failed: %s (%d)', curl_multi_strerror($res), $res);
-			throw new RsmException(500, 'General error', $descr);
-		}
-	}
-
-	return $mh;
-}
-
-function execCurlMultiHandle($mh): void
-{
-	$active = 1;
-
-	while ($active)
-	{
-		$res = curl_multi_exec($mh, $active);
-
-		if ($res !== CURLM_OK)
-		{
-			$descr = sprintf('curl_multi_exec() failed: %s (%d)', curl_multi_strerror($res), $res);
-			throw new RsmException(500, 'General error', $descr);
-		}
-
-		if ($active)
-		{
-			$res = curl_multi_select($mh);
-
-			if ($res === -1)
-			{
-				throw new RsmException(500, 'General error', 'curl_multi_select() failed');
-			}
-		}
-	}
-
-	// undocumented: calling curl_multi_info_read() makes it possible to read errors with curl_errno() and curl_error()
-	while (curl_multi_info_read($mh) !== false)
-	{
-	}
 }
 
 /**
@@ -510,6 +456,59 @@ function forwardRequestMulti(string $objectType): void
 	sendResponse($responseCode, $objects);
 }
 
+function createCurlMultiHandle(array $chList)//: resource
+{
+	$mh = curl_multi_init();
+	if ($mh === false)
+	{
+		throw new RsmException(500, 'General error', 'curl_multi_init() failed');
+	}
+
+	foreach ($chList as $ch)
+	{
+		$res = curl_multi_add_handle($mh, $ch);
+
+		if ($res !== CURLM_OK)
+		{
+			$descr = sprintf('curl_multi_add_handle() failed: %s (%d)', curl_multi_strerror($res), $res);
+			throw new RsmException(500, 'General error', $descr);
+		}
+	}
+
+	return $mh;
+}
+
+function execCurlMultiHandle($mh): void
+{
+	$active = 1;
+
+	while ($active)
+	{
+		$res = curl_multi_exec($mh, $active);
+
+		if ($res !== CURLM_OK)
+		{
+			$descr = sprintf('curl_multi_exec() failed: %s (%d)', curl_multi_strerror($res), $res);
+			throw new RsmException(500, 'General error', $descr);
+		}
+
+		if ($active)
+		{
+			$res = curl_multi_select($mh);
+
+			if ($res === -1)
+			{
+				throw new RsmException(500, 'General error', 'curl_multi_select() failed');
+			}
+		}
+	}
+
+	// undocumented: calling curl_multi_info_read() makes it possible to read errors with curl_errno() and curl_error()
+	while (curl_multi_info_read($mh) !== false)
+	{
+	}
+}
+
 /**
  * Initializes curl handle and sets all options.
  *
@@ -539,6 +538,15 @@ function createCurlHandle(int $serverId, string $objectType, ?string $objectId, 
 		$url .= '&id=' . curl_escape($ch, $objectId);
 	}
 
+	$ipAddresses = array_key_exists('HTTP_X_FORWARDED_FOR', $_SERVER) ? [$_SERVER['HTTP_X_FORWARDED_FOR']] : [];
+	$ipAddresses[] = $_SERVER['REMOTE_ADDR'];
+	$ipAddresses = implode(', ', $ipAddresses);
+
+	$headers = [
+		'Expect:',
+		'X-Forwarded-For: ' . $ipAddresses,
+	];
+
 	$options = [
 		CURLOPT_URL            => $url,
 		CURLOPT_HTTPAUTH       => CURLAUTH_BASIC,
@@ -546,7 +554,7 @@ function createCurlHandle(int $serverId, string $objectType, ?string $objectId, 
 		CURLOPT_PASSWORD       => User::getPpassword(),
 		CURLOPT_RETURNTRANSFER => true,
 		CURLOPT_HEADER         => true,
-		CURLOPT_HTTPHEADER     => ['Expect:'],
+		CURLOPT_HTTPHEADER     => $headers,
 		CURLOPT_ENCODING       => '',
 		CURLOPT_CONNECTTIMEOUT => App::getConfig('settings')['curl_timeout'],
 		CURLOPT_PRIVATE        => $serverId,
@@ -581,6 +589,13 @@ function createCurlHandle(int $serverId, string $objectType, ?string $objectId, 
 
 	return $ch;
 }
+
+/*
+TODO: extract from forwardRequest[Multi]()
+function getJsonFromCurl($ch, bool $list, )
+{
+}
+*/
 
 /**
  * Finds serverId where the object is onboarded.
