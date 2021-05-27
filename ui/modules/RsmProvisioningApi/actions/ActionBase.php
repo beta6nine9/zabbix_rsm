@@ -629,7 +629,7 @@ abstract class ActionBase extends CController
 			{
 				$objectType = 'tld';
 			}
-			else if ($this instanceof Probe)
+			else if ($this instanceof Registrar)
 			{
 				$objectType = 'registrar';
 			}
