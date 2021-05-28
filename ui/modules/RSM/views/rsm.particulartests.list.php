@@ -121,8 +121,14 @@ if ($data['type'] == RSM_RDDS || $data['type'] == RSM_RDAP || $data['type'] == R
 	$down_probes = 0;
 }
 
+$show_totals = false;
+
 foreach ($data['probes'] as $probe) {
 	$status = null;
+
+	if (isset($probe['rdds43']['rtt']) || isset($probe['rdds80']['rtt']) || isset($probe['rdap']['rtt'])) {
+		$show_totals = true;
+	}
 
 	if (isset($probe['status']) && $probe['status'] === PROBE_DOWN) {
 		if ($data['type'] == RSM_RDAP) {
@@ -141,10 +147,10 @@ foreach ($data['probes'] as $probe) {
 		$offline_probes++;
 	}
 	else {
-		if ($data['type'] == RSM_RDDS || $data['type'] == RSM_RDAP) {
-			$probe_down = false;
-			$probe_no_result = false;
+		$probe_down = false;
+		$probe_no_result = false;
 
+		if ($data['type'] == RSM_RDDS) {
 			// RDDS
 			if (isset($data['tld']['macros'][RSM_TLD_RDDS_ENABLED])
 					&& $data['tld']['macros'][RSM_TLD_RDDS_ENABLED] == 0) {
@@ -185,7 +191,8 @@ foreach ($data['probes'] as $probe) {
 					}
 				}
 			}
-
+		}
+		else {
 			// RDAP
 			if (isset($data['tld']['macros'][RSM_RDAP_TLD_ENABLED])
 					&& $data['tld']['macros'][RSM_RDAP_TLD_ENABLED] == 0) {
@@ -254,20 +261,6 @@ foreach ($data['probes'] as $probe) {
 			}
 			elseif ($probe_no_result) {
 				$no_result_probes++;
-			}
-		}
-		else {
-			// EPP
-			if (!isset($probe['value']) || $probe['value'] === null) {
-				$epp = $no_result;
-				$no_result_probes++;
-			}
-			elseif ($probe['value'] == 0) {
-				$epp = $down;
-				$down_probes++;
-			}
-			elseif ($probe['value'] == 1) {
-				$epp = $up;
 			}
 		}
 	}
@@ -422,7 +415,9 @@ if ($data['type'] == RSM_RDAP) {
 		]);
 	}
 
-	$table->addRow([_('Total above max. RTT'), '', '', '', '', $rdap_above_max_rtt]);
+	if ($show_totals) {
+		$table->addRow([_('Total above max. RTT'), '', '', '', '', $rdap_above_max_rtt]);
+	}
 }
 elseif ($data['type'] == RSM_RDDS) {
 	foreach ($data['errors'] as $error_code => $error) {
@@ -463,7 +458,9 @@ elseif ($data['type'] == RSM_RDDS) {
 		$row = array_merge($row, ['', '', '', '', $rdap_above_max_rtt]);
 	}
 
-	$table->addRow($row);
+	if ($show_totals) {
+		$table->addRow($row);
+	}
 }
 
 if ($data['type'] == RSM_RDDS || $data['type'] == RSM_RDAP
