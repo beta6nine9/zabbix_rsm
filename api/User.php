@@ -70,7 +70,7 @@ class User
 		return self::$username;
 	}
 
-	public static function getPpassword(): string
+	public static function getPassword(): string
 	{
 		return self::$password;
 	}

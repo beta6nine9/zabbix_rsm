@@ -538,20 +538,16 @@ function createCurlHandle(int $serverId, string $objectType, ?string $objectId, 
 		$url .= '&id=' . curl_escape($ch, $objectId);
 	}
 
-	$ipAddresses = array_key_exists('HTTP_X_FORWARDED_FOR', $_SERVER) ? [$_SERVER['HTTP_X_FORWARDED_FOR']] : [];
-	$ipAddresses[] = $_SERVER['REMOTE_ADDR'];
-	$ipAddresses = implode(', ', $ipAddresses);
-
 	$headers = [
 		'Expect:',
-		'X-Forwarded-For: ' . $ipAddresses,
+		'X-Forwarded-For: ' . $_SERVER['REMOTE_ADDR'], // ignore incoming X-Forwarded-For header if it exists
 	];
 
 	$options = [
 		CURLOPT_URL            => $url,
 		CURLOPT_HTTPAUTH       => CURLAUTH_BASIC,
 		CURLOPT_USERNAME       => User::getUsername(),
-		CURLOPT_PASSWORD       => User::getPpassword(),
+		CURLOPT_PASSWORD       => User::getPassword(),
 		CURLOPT_RETURNTRANSFER => true,
 		CURLOPT_HEADER         => true,
 		CURLOPT_HTTPHEADER     => $headers,
