@@ -12,6 +12,7 @@ use TLD_constants qw(:templates);
 use Data::Dumper;
 
 use constant MACRO_TLD_DNS_AVAIL_MINNS => '{$RSM.TLD.DNS.AVAIL.MINNS}';
+use constant MACRO_CONFIG_CACHE_RELOAD => '{$RSM.CONFIG.CACHE.RELOAD.REQUESTED}';
 
 use constant DNS_MINNS_OFFSET_MINUTES		=> 15;
 use constant DNS_MINNS_OFFSET			=> DNS_MINNS_OFFSET_MINUTES * 60;
@@ -49,14 +50,12 @@ sub main()
 			if (opt('schedule'))
 			{
 				schedule($tld, $macro_id, $macro_value, getopt('value'), getopt('timestamp'));
-
-				# TODO: schedule config-cache-reload
+				request_config_cache_reload();
 			}
 			if (opt('cancel'))
 			{
 				cancel($tld, $macro_id, $macro_value);
-
-				# TODO: schedule config-cache-reload
+				request_config_cache_reload();
 			}
 			if (opt('status'))
 			{
@@ -183,6 +182,22 @@ sub set_minns_macro($$)
 
 	my $sql = 'update hostmacro set value=? where hostmacroid=?';
 	my $params = [$macro_value, $macro_id];
+
+	db_exec($sql, $params);
+}
+
+sub request_config_cache_reload()
+{
+	set_global_macro(MACRO_CONFIG_CACHE_RELOAD, $^T);
+}
+
+sub set_global_macro($$)
+{
+	my $macro = shift;
+	my $value = shift;
+
+	my $sql = 'update globalmacro set value=? where macro=?';
+	my $params = [$value, $macro];
 
 	db_exec($sql, $params);
 }
