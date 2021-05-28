@@ -1,5 +1,5 @@
 Name:		zabbix
-Version:	5.0.10%{rsmversion}
+Version:	5.0.12%{rsmversion}
 Release: 	%{?rsmprereleasetag:0.}1%{?rsmprereleasetag:%{rsmprereleasetag}}%{?dist}
 Summary:	The Enterprise-class open source monitoring solution
 Group:		Applications/Internet
@@ -48,16 +48,13 @@ Buildroot:	%{_tmppath}/zabbix-%{version}-%{release}-root-%(%{__id_u} -n)
 
 %if 0%{?rhel} >= 8
 BuildRequires:	mariadb-connector-c-devel
+BuildRequires:	ldns-devel >= 1.7.1
 %else
 BuildRequires:	mysql-devel
+BuildRequires:	ldns-devel >= 1.6.17
 %endif
 BuildRequires:	libevent-devel
 BuildRequires:	pcre-devel
-%if 0%{?rhel} >= 8
-BuildRequires:	ldns-devel >= 1.7.1
-%else
-BuildRequires:	ldns-devel >= 1.6.17
-%endif
 BuildRequires:	curl-devel >= 7.13.1
 BuildRequires:	openssl-devel >= 1.0.1
 BuildRequires:	systemd

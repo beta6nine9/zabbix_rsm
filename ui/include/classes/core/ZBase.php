@@ -367,9 +367,10 @@ class ZBase {
 			/* RSM specifics: start */
 			global $DB;
 
+			/* Collect URLs alternative to this failed one */
 			$urls = '';
 			foreach ($DB['SERVERS'] as $server) {
-				if (0 != strcmp($server['SERVER'] != $DB['SERVER'])) {
+				if (0 != strcmp($server['SERVER'], $DB['SERVER'])) {
 					$urls .= ' ' . $server['URL'];
 				}
 			}
