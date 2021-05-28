@@ -61,6 +61,49 @@ do															\
 }															\
 while (0)
 
+/* selects single value of zbx_uint64_t type from the database */
+#define SELECT_VALUE_UINT64(target_variable, query, ...)								\
+															\
+do															\
+{															\
+	DB_RESULT	__result;											\
+	DB_ROW		__row;												\
+															\
+	__result = DBselect(query, __VA_ARGS__);									\
+															\
+	/* check for errors */												\
+	if (NULL == __result)												\
+	{														\
+		zabbix_log(LOG_LEVEL_CRIT, "%s() on line %d: query failed", __func__, __LINE__);			\
+		goto out;												\
+	}														\
+															\
+	__row = DBfetch(__result);											\
+															\
+	/* check if there's at least one row in the resultset */							\
+	if (NULL == __row)												\
+	{														\
+		zabbix_log(LOG_LEVEL_CRIT, "%s() on line %d: query did not return any rows", __func__, __LINE__);	\
+		DBfree_result(__result);										\
+		goto out;												\
+	}														\
+															\
+	ZBX_STR2UINT64(target_variable, __row[0]);									\
+															\
+	__row = DBfetch(__result);											\
+															\
+	/* check that there are no more rows in the resultset */							\
+	if (NULL != __row)												\
+	{														\
+		zabbix_log(LOG_LEVEL_CRIT, "%s() on line %d: query returned more than one row", __func__, __LINE__);	\
+		DBfree_result(__result);										\
+		goto out;												\
+	}														\
+															\
+	DBfree_result(__result);											\
+}															\
+while (0)
+
 extern unsigned char	program_type;
 
 /*
@@ -256,6 +299,88 @@ static int	DBpatch_5000004(void)
 	return ret;
 }
 
+/* 5000004, 1 - create {$RSM.PROXY.IP}, {$RSM.PROXY.PORT} macros */
+static int	DBpatch_5000004_1(void)
+{
+	int		ret = FAIL;
+
+	DB_RESULT	result = NULL;
+	DB_ROW		row;
+
+	ONLY_SERVER();
+
+	result = DBselect("select"
+				" hosts.host,"
+				"hosts.status,"
+				"interface.ip,"
+				"interface.port"
+			" from"
+				" hosts"
+				" left join interface on interface.hostid=hosts.hostid"
+			" where"
+				" hosts.status in (5,6)");
+
+	if (NULL == result)
+		goto out;
+
+	while (NULL != (row = DBfetch(result)))
+	{
+		const char	*host;
+		int		status;
+		const char	*ip;
+		const char	*port;
+		zbx_uint64_t	templateid;
+
+		host   = row[0];
+		status = atoi(row[1]);
+		ip     = row[2];
+		port   = row[3];
+
+		if (status != 6)
+		{
+			zabbix_log(LOG_LEVEL_CRIT, "%s() on line %d: proxy '%s' must be passive (enabled)", __func__, __LINE__, host);		\
+			goto out;
+		}
+
+		SELECT_VALUE_UINT64(templateid, "select hostid from hosts where host='Template Probe Config %s'", host);
+
+#define SQL	"insert into hostmacro set hostmacroid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",macro='%s',value='%s',description='%s',type=0"
+		DB_EXEC(SQL, DBget_maxid_num("hostmacro", 1), templateid, "{$RSM.PROXY.IP}", ip, "Proxy IP of the proxy");
+		DB_EXEC(SQL, DBget_maxid_num("hostmacro", 1), templateid, "{$RSM.PROXY.PORT}", port, "Port of the proxy");
+#undef SQL
+	}
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
+
+/* 5000004, 2 - create provisioning_api_log table */
+static int	DBpatch_5000004_2(void)
+{
+	int	ret = FAIL;
+
+	DB_EXEC("create table provisioning_api_log ("
+			"provisioning_api_logid bigint(20) unsigned not null,"
+			"clock int(11) not null,"
+			"user varchar(100) not null,"
+			"interface varchar(8) not null,"
+			"identifier varchar(255) not null,"
+			"operation varchar(6) not null,"
+			"object_type varchar(9) not null,"
+			"object_before text default null,"
+			"object_after text default null,"
+			"remote_addr varchar(45) not null,"
+			"x_forwarded_for varchar(255) default null,"
+			"primary key (provisioning_api_logid)"
+		")");
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
 #endif
 
 DBPATCH_START(5000)
@@ -271,5 +396,7 @@ DBPATCH_RSM(5000002, 3, 0, 0)	/* delete "rsm.configvalue[RSM.DNS.AVAIL.MINNS]" i
 DBPATCH_RSM(5000002, 4, 0, 0)	/* replace "{$RSM.DNS.AVAIL.MINNS}" to "{$RSM.TLD.DNS.AVAIL.MINNS}" in item keys (template and hosts) */
 DBPATCH_ADD(5000003, 0, 0)
 DBPATCH_ADD(5000004, 0, 0)
+DBPATCH_RSM(5000004, 1, 0, 0)	/* create {$RSM.PROXY.IP}, {$RSM.PROXY.PORT} macros */
+DBPATCH_RSM(5000004, 2, 0, 1)	/* create provisioning_api_log table */
 
 DBPATCH_END()
