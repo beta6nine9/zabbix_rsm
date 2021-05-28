@@ -21,6 +21,7 @@
 #include "db.h"
 #include "dbupgrade.h"
 #include "log.h"
+#include "dbupgrade_macros.h"
 
 /*
  * Some common helpers that can be used as one-liners in patches to avoid copy-pasting.
@@ -262,8 +263,126 @@ out:
 	return ret;
 }
 
-/* 5000002, 5 - split {$RSM.TLD.RDDS.ENABLED} macro into {$RSM.TLD.RDDS43.ENABLED} and {$RSM.TLD.RDDS80.ENABLED} */
-static int	DBpatch_5000002_5(void)
+static int	DBpatch_5000003(void)
+{
+	DB_RESULT	result;
+	int		ret;
+	const char	*fields[] = {"subject", "message"};
+
+	result = DBselect("select om.operationid,om.subject,om.message"
+			" from opmessage om,operations o,actions a"
+			" where om.operationid=o.operationid"
+				" and o.actionid=a.actionid"
+				" and a.eventsource=0 and o.operationtype=11");
+
+	ret = db_rename_macro(result, "opmessage", "operationid", fields, ARRSIZE(fields), "{EVENT.NAME}",
+			"{EVENT.RECOVERY.NAME}");
+
+	DBfree_result(result);
+
+	return ret;
+}
+
+static int	DBpatch_5000004(void)
+{
+	DB_RESULT	result;
+	int		ret;
+	const char	*fields[] = {"subject", "message"};
+
+	result = DBselect("select mediatype_messageid,subject,message from media_type_message where recovery=1");
+
+	ret = db_rename_macro(result, "media_type_message", "mediatype_messageid", fields, ARRSIZE(fields),
+			"{EVENT.NAME}", "{EVENT.RECOVERY.NAME}");
+
+	DBfree_result(result);
+
+	return ret;
+}
+
+/* 5000004, 1 - create {$RSM.PROXY.IP}, {$RSM.PROXY.PORT} macros */
+static int	DBpatch_5000004_1(void)
+{
+	int		ret = FAIL;
+
+	DB_RESULT	result = NULL;
+	DB_ROW		row;
+
+	ONLY_SERVER();
+
+	result = DBselect("select"
+				" hosts.host,"
+				"hosts.status,"
+				"interface.ip,"
+				"interface.port"
+			" from"
+				" hosts"
+				" left join interface on interface.hostid=hosts.hostid"
+			" where"
+				" hosts.status in (5,6)");
+
+	if (NULL == result)
+		goto out;
+
+	while (NULL != (row = DBfetch(result)))
+	{
+		const char	*host;
+		int		status;
+		const char	*ip;
+		const char	*port;
+		zbx_uint64_t	templateid;
+
+		host   = row[0];
+		status = atoi(row[1]);
+		ip     = row[2];
+		port   = row[3];
+
+		if (status != 6)
+		{
+			zabbix_log(LOG_LEVEL_CRIT, "%s() on line %d: proxy '%s' must be passive (enabled)", __func__, __LINE__, host);		\
+			goto out;
+		}
+
+		SELECT_VALUE_UINT64(templateid, "select hostid from hosts where host='Template Probe Config %s'", host);
+
+#define SQL	"insert into hostmacro set hostmacroid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",macro='%s',value='%s',description='%s',type=0"
+		DB_EXEC(SQL, DBget_maxid_num("hostmacro", 1), templateid, "{$RSM.PROXY.IP}", ip, "Proxy IP of the proxy");
+		DB_EXEC(SQL, DBget_maxid_num("hostmacro", 1), templateid, "{$RSM.PROXY.PORT}", port, "Port of the proxy");
+#undef SQL
+	}
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
+
+/* 5000004, 2 - create provisioning_api_log table */
+static int	DBpatch_5000004_2(void)
+{
+	int	ret = FAIL;
+
+	DB_EXEC("create table provisioning_api_log ("
+			"provisioning_api_logid bigint(20) unsigned not null,"
+			"clock int(11) not null,"
+			"user varchar(100) not null,"
+			"interface varchar(8) not null,"
+			"identifier varchar(255) not null,"
+			"operation varchar(6) not null,"
+			"object_type varchar(9) not null,"
+			"object_before text default null,"
+			"object_after text default null,"
+			"remote_addr varchar(45) not null,"
+			"x_forwarded_for varchar(255) default null,"
+			"primary key (provisioning_api_logid)"
+		")");
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
+/* 5000004, 3 - split {$RSM.TLD.RDDS.ENABLED} macro into {$RSM.TLD.RDDS43.ENABLED} and {$RSM.TLD.RDDS80.ENABLED} */
+static int	DBpatch_5000004_3(void)
 {
 	int		ret = FAIL;
 
@@ -313,8 +432,8 @@ out:
 	return ret;
 }
 
-/* 5000002, 6 - replace {$RSM.TLD.RDDS.ENABLED} macro with {$RSM.TLD.RDDS43.ENABLED} and {$RSM.TLD.RDDS80.ENABLED} in rsm.dns[] and rsm.rdds[] item keys */
-static int	DBpatch_5000002_6(void)
+/* 5000004, 4 - replace {$RSM.TLD.RDDS.ENABLED} macro with {$RSM.TLD.RDDS43.ENABLED} and {$RSM.TLD.RDDS80.ENABLED} in rsm.dns[] and rsm.rdds[] item keys */
+static int	DBpatch_5000004_4(void)
 {
 	int	ret = FAIL;
 
@@ -334,8 +453,8 @@ out:
 	return ret;
 }
 
-/* 5000002, 7 - split rdds.enabled item into rdds43.enabled and rdds80.enabled */
-static int	DBpatch_5000002_7(void)
+/* 5000004, 5 - split rdds.enabled item into rdds43.enabled and rdds80.enabled */
+static int	DBpatch_5000004_5(void)
 {
 	int		ret = FAIL;
 
@@ -489,8 +608,12 @@ DBPATCH_RSM(5000002, 1, 0, 1)	/* RSM FY21 */
 DBPATCH_RSM(5000002, 2, 0, 0)	/* move {$RSM.DNS.AVAIL.MINNS} from globalmacro to hostmacro, rename to {$RSM.TLD.DNS.AVAIL.MINNS} */
 DBPATCH_RSM(5000002, 3, 0, 0)	/* delete "rsm.configvalue[RSM.DNS.AVAIL.MINNS]" item */
 DBPATCH_RSM(5000002, 4, 0, 0)	/* replace "{$RSM.DNS.AVAIL.MINNS}" to "{$RSM.TLD.DNS.AVAIL.MINNS}" in item keys (template and hosts) */
-DBPATCH_RSM(5000002, 5, 0, 0)	/* split {$RSM.TLD.RDDS.ENABLED} macro into {$RSM.TLD.RDDS43.ENABLED} and {$RSM.TLD.RDDS80.ENABLED} */
-DBPATCH_RSM(5000002, 6, 0, 0)	/* replace {$RSM.TLD.RDDS.ENABLED} macro with {$RSM.TLD.RDDS43.ENABLED} and {$RSM.TLD.RDDS80.ENABLED} in rsm.dns[] and rsm.rdds[] item keys */
-DBPATCH_RSM(5000002, 7, 0, 0)	/* split rdds.enabled item into rdds43.enabled and rdds80.enabled */
+DBPATCH_ADD(5000003, 0, 0)
+DBPATCH_ADD(5000004, 0, 0)
+DBPATCH_RSM(5000004, 1, 0, 0)	/* create {$RSM.PROXY.IP}, {$RSM.PROXY.PORT} macros */
+DBPATCH_RSM(5000004, 2, 0, 1)	/* create provisioning_api_log table */
+DBPATCH_RSM(5000004, 3, 0, 0)	/* split {$RSM.TLD.RDDS.ENABLED} macro into {$RSM.TLD.RDDS43.ENABLED} and {$RSM.TLD.RDDS80.ENABLED} */
+DBPATCH_RSM(5000004, 4, 0, 0)	/* replace {$RSM.TLD.RDDS.ENABLED} macro with {$RSM.TLD.RDDS43.ENABLED} and {$RSM.TLD.RDDS80.ENABLED} in rsm.dns[] and rsm.rdds[] item keys */
+DBPATCH_RSM(5000004, 5, 0, 0)	/* split rdds.enabled item into rdds43.enabled and rdds80.enabled */
 
 DBPATCH_END()

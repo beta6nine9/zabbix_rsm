@@ -258,24 +258,47 @@ abstract class ActionBaseEx extends ActionBase
 
 		$config = [
 			'output' => ['key_', 'hostid'],
-			'hostids' => [
-				$this->templateIds['Template DNS Test'],
+			'hostids' => [],
+		];
+
+		$config['hostids'] = array_merge(
+			$config['hostids'],
+			[
 				$this->templateIds['Template RDAP Test'],
 				$this->templateIds['Template RDDS Test'],
-			],
-		];
+			]
+		);
 		if (!empty($statusHosts))
 		{
 			$config['hostids'] = array_merge(
 				$config['hostids'],
 				[
-					$this->templateIds['Template DNS Status'],
-					$this->templateIds['Template DNSSEC Status'],
 					$this->templateIds['Template RDAP Status'],
 					$this->templateIds['Template RDDS Status'],
 				]
 			);
 		}
+
+		if ($this->getMonitoringTarget() === self::MONITORING_TARGET_REGISTRY)
+		{
+			$config['hostids'] = array_merge(
+				$config['hostids'],
+				[
+					$this->templateIds['Template DNS Test'],
+				]
+			);
+			if (!empty($statusHosts))
+			{
+				$config['hostids'] = array_merge(
+					$config['hostids'],
+					[
+						$this->templateIds['Template DNS Status'],
+						$this->templateIds['Template DNSSEC Status'],
+					]
+				);
+			}
+		}
+
 		$data = API::Item()->get($config);
 
 		$templates = array_flip($this->templateIds);
@@ -323,9 +346,12 @@ abstract class ActionBaseEx extends ActionBase
 
 		foreach ($statusHosts as $hostid => $host)
 		{
-			$status = $rsmhostConfigs[$host]['dnssec'] ? ITEM_STATUS_ACTIVE : ITEM_STATUS_DISABLED;
-			$config += $this->getItemStatusConfig($hostItems[$host], $templateItems['Template DNSSEC Status'], $status);
-
+			if ($this->getMonitoringTarget() === self::MONITORING_TARGET_REGISTRY)
+			{
+				$status = $rsmhostConfigs[$host]['dnssec'] ? ITEM_STATUS_ACTIVE : ITEM_STATUS_DISABLED;
+				$config += $this->getItemStatusConfig($hostItems[$host], $templateItems['Template DNSSEC Status'], $status);
+			}
+			
 			if ($this->isStandaloneRdap())
 			{
 				$status = $rsmhostConfigs[$host]['rdap'] ? ITEM_STATUS_ACTIVE : ITEM_STATUS_DISABLED;

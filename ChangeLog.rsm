@@ -1,3 +1,14 @@
+Changes for rsm2.2.0rc10
+
+..F....... [sub-782] fixed displaying probes with mixed online/offline status on Aggregated details page (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.2.0rc9
+
+..F....... [sub-782] fixed error message when Frontend cannot connect to the database (dimir)
+..F....... [784] hid unnecessary data on Test Details page when no data from probes (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.2.0rc8
 
 Bug fixes:
@@ -149,6 +160,18 @@ Changes for rsm2.1.0rc1
 New features:
 ..F.I..PS. [554] upgraded Zabbix to 5.0.4 (asitals, dimir, gcalenko, kalimulin, miks)
 ..F.I..PS. [599] implemented DNS Monitoring Reboot (asitals, dimir, gcalenko, kalimulin)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.0.7
+
+Bug fixes:
+.......PS. [sub-780] made check for testDetails.csv optional in test-export.pl (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.0.6
+
+Bug fixes:
+.......PS. [781] integrated fix ZBX-14856 (dimir)
 
 --------------------------------------------------------------------------------
 Changes for rsm2.0.5

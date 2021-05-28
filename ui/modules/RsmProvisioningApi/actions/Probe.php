@@ -65,7 +65,7 @@ class Probe extends ActionBaseEx
 
 		if ($_SERVER['REQUEST_METHOD'] == self::REQUEST_METHOD_PUT)
 		{
-			$this->validateInputServices('All services (i.e. rdds and rdap) must be specified');
+			$this->validateInputServices();
 			$this->requireArrayKeys(['zabbixProxyParameters'], $this->input, 'JSON does not comply with definition');
 			$this->requireArrayKeys(['ipv4Enable', 'ipv6Enable', 'proxyIp', 'proxyPort', 'proxyPskIdentity', 'proxyPsk'], $this->input['zabbixProxyParameters'], 'JSON does not comply with definition');
 

@@ -10,6 +10,7 @@ use API;
 use CApiInputValidator;
 use CController;
 use CControllerResponseData;
+use DB;
 use Exception;
 use ErrorException;
 use Throwable;
@@ -142,7 +143,7 @@ abstract class ActionBase extends CController
 		{
 			throw new RsmException(401, 'Username is not specified');
 		}
-		if (!isset($_SERVER['PHP_AUTH_PW']) || $_SERVER['PHP_AUTH_USER'] === '')
+		if (!isset($_SERVER['PHP_AUTH_PW']) || $_SERVER['PHP_AUTH_PW'] === '')
 		{
 			throw new RsmException(401, 'Password is not specified');
 		}
@@ -212,10 +213,8 @@ abstract class ActionBase extends CController
 
 	/**
 	 * Checks if status is specified in input for all known services, based on input rules.
-	 *
-	 * @param string $errorMessage
 	 */
-	protected function validateInputServices(string $errorMessage): void
+	protected function validateInputServices(): void
 	{
 		$rules = $this->getInputRules();
 
@@ -225,7 +224,13 @@ abstract class ActionBase extends CController
 		$diff = array_diff($rulesServices, $inputServices);
 		if ($diff)
 		{
-			throw new RsmException(400, $errorMessage);
+			$rulesServicesStr = implode(', ', $rulesServices);
+			$rulesServicesStr = preg_replace('/, ([^,]+)$/', ' and $1', $rulesServicesStr);
+
+			$title = 'All services (i.e., ' . $rulesServicesStr . ') must be specified';
+			$descr = 'Missing services: ' . implode(', ', $diff);
+
+			throw new RsmException(400, $title, $descr);
 		}
 	}
 
@@ -320,7 +325,7 @@ abstract class ActionBase extends CController
 		return implode("\n", $output);
 	}
 
-	private function getRequestInput(): array
+	protected function getRequestInput(): array
 	{
 		$input = null;
 
@@ -413,9 +418,10 @@ abstract class ActionBase extends CController
 
 		try
 		{
+			$this->rsmValidateUser();
+
 			$this->input = $this->getRequestInput();
 
-			$this->rsmValidateUser();
 			$this->rsmValidateInput();
 
 			DBstart();
@@ -425,28 +431,14 @@ abstract class ActionBase extends CController
 				throw new Exception('Invalid monitoring target');
 			}
 
-			switch ($_SERVER['REQUEST_METHOD'])
-			{
-				case self::REQUEST_METHOD_GET:
-					$this->handleGetRequest();
-					break;
-
-				case self::REQUEST_METHOD_DELETE:
-					$this->handleDeleteRequest();
-					break;
-
-				case self::REQUEST_METHOD_PUT:
-					$this->handlePutRequest();
-					break;
-
-				default:
-					throw new Exception('Unsupported request method');
-			}
+			$this->handleRequest();
 
 			if (!empty($GLOBALS['ZBX_MESSAGES']))
 			{
 				throw new Exception('Internal error');
 			}
+
+			$this->storeLog();
 
 			DBend(true);
 		}
@@ -497,7 +489,28 @@ abstract class ActionBase extends CController
 		return $details;
 	}
 
-	protected function handleGetRequest(): void
+	private function handleRequest(): void
+	{
+		switch ($_SERVER['REQUEST_METHOD'])
+		{
+			case self::REQUEST_METHOD_GET:
+				$this->handleGetRequest();
+				break;
+
+			case self::REQUEST_METHOD_DELETE:
+				$this->handleDeleteRequest();
+				break;
+
+			case self::REQUEST_METHOD_PUT:
+				$this->handlePutRequest();
+				break;
+
+			default:
+				throw new Exception('Unsupported request method');
+		}
+	}
+
+	private function handleGetRequest(): void
 	{
 		if ($this->hasInput('id'))
 		{
@@ -518,7 +531,7 @@ abstract class ActionBase extends CController
 		$this->returnJson($data);
 	}
 
-	protected function handleDeleteRequest(): void
+	private function handleDeleteRequest(): void
 	{
 		global $ZBX_MESSAGES;
 
@@ -546,7 +559,7 @@ abstract class ActionBase extends CController
 		$this->setCommonResponse(200, 'Update executed successfully', null, $details, null);
 	}
 
-	protected function handlePutRequest(): void
+	private function handlePutRequest(): void
 	{
 		// TODO: changes to Zabbix shall only be executed if the configuration information changes
 		// between the current configuration in Zabbix and the object provided to the API
@@ -592,6 +605,57 @@ abstract class ActionBase extends CController
 		$this->setCommonResponse(200, 'Update executed successfully', null, $details, $objects[0]);
 	}
 
+	protected function storeLog(): void
+	{
+		if (in_array($_SERVER['REQUEST_METHOD'], [self::REQUEST_METHOD_PUT, self::REQUEST_METHOD_DELETE]))
+		{
+			$operation = null;
+			$objectType = null;
+
+			if (is_null($this->oldObject) && !is_null($this->newObject))
+			{
+				$operation = 'add';
+			}
+			else if (!is_null($this->oldObject) && !is_null($this->newObject))
+			{
+				$operation = 'update';
+			}
+			else if (!is_null($this->oldObject) && is_null($this->newObject))
+			{
+				$operation = 'delete';
+			}
+
+			if ($this instanceof Tld)
+			{
+				$objectType = 'tld';
+			}
+			else if ($this instanceof Registrar)
+			{
+				$objectType = 'registrar';
+			}
+			else if ($this instanceof Probe)
+			{
+				$objectType = 'probeNode';
+			}
+
+			$values = [
+				'provisioning_api_logid' => DB::reserveIds('provisioning_api_log', 1),
+				'clock'                  => $_SERVER['REQUEST_TIME'],
+				'user'                   => $_SERVER['PHP_AUTH_USER'],
+				'interface'              => 'internal',
+				'identifier'             => $this->getInput('id'),
+				'operation'              => $operation,
+				'object_type'            => $objectType,
+				'object_before'          => is_null($this->oldObject) ? null : json_encode($this->oldObject, JSON_UNESCAPED_SLASHES),
+				'object_after'           => is_null($this->newObject) ? null : json_encode($this->newObject, JSON_UNESCAPED_SLASHES),
+				'remote_addr'            => $_SERVER['REMOTE_ADDR'],
+				'x_forwarded_for'        => array_key_exists('HTTP_X_FORWARDED_FOR', $_SERVER) ? $_SERVER['HTTP_X_FORWARDED_FOR'] : null,
+			];
+
+			DB::insert('provisioning_api_log', [$values], false);
+		}
+	}
+
 	protected function returnJson(array $json): void
 	{
 		$options = JSON_UNESCAPED_SLASHES;
@@ -601,8 +665,13 @@ abstract class ActionBase extends CController
 			$options |= JSON_PRETTY_PRINT;
 		}
 
+		$output = json_encode($json, $options);
+
+		$output = preg_replace('/\{[\s\r\n]*("ns": "[\w.]+"),[\s\r\n]*("ip": "[\w.:]+")[\s\r\n]*\}/', '{ $1, $2 }', $output);
+		$output = preg_replace('/\{[\s\r\n]*("service": "\w+"),[\s\r\n]*("enabled": \w+)[\s\r\n]*\}/', '{ $1, $2 }', $output);
+
 		$this->setResponse(new CControllerResponseData([
-			'main_block' => json_encode($json, $options)
+			'main_block' => $output
 		]));
 	}
 

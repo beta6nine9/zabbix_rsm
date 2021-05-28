@@ -35,7 +35,7 @@ abstract class MonitoringTarget extends ActionBaseEx
 			$allServices = implode(', ', $allServices);
 			$allServices = preg_replace('/, ([^,]+)$/', ' and $1', $allServices);
 
-			$this->validateInputServices('All services (i.e., ' . $allServices . ') must be specified');
+			$this->validateInputServices();
 
 			$services = array_column($this->input['servicesStatus'], 'enabled', 'service');
 
