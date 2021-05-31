@@ -142,13 +142,13 @@ sub create_all($$)
 	my $error;
 	if (write_file(CRONTAB_FILE, $crontab, \$error) != SUCCESS)
 	{
-		print(STDERR "failed to enable cron jobs\n");
+		print(STDERR "failed to process cron jobs\n");
 		print(STDERR "$error\n");
 		exit(1);
 	}
 	else
 	{
-		printf("cron jobs created successfully\n");
+		printf("cron jobs processed successfully\n");
 	}
 }
 
