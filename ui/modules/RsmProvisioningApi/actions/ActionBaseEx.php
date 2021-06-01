@@ -203,6 +203,7 @@ abstract class ActionBaseEx extends ActionBase
 			{
 				$configs[] = [
 					'hostid' => $hostids[$rsmhost . ' ' . $probe],
+					'status' => HOST_STATUS_MONITORED,
 					'groups' => $this->getTestHostGroupsConfig($rsmhostConfig['tldType'], $probe, $rsmhost),
 				];
 			}
@@ -349,7 +350,7 @@ abstract class ActionBaseEx extends ActionBase
 				$status = $rsmhostConfigs[$host]['dnssec'] ? ITEM_STATUS_ACTIVE : ITEM_STATUS_DISABLED;
 				$config += $this->getItemStatusConfig($hostItems[$host], $templateItems['Template DNSSEC Status'], $status);
 			}
-			
+
 			if ($this->isStandaloneRdap())
 			{
 				$status = $rsmhostConfigs[$host]['rdap'] ? ITEM_STATUS_ACTIVE : ITEM_STATUS_DISABLED;
@@ -1064,23 +1065,19 @@ abstract class ActionBaseEx extends ActionBase
 		return current($this->getProxyIds([$proxy]));
 	}
 
-	protected function getInterfaceId(int $hostid): int
+	protected function getInterfaceId(int $hostid): ?int
 	{
 		$data = API::HostInterface()->get([
 			'output' => ['interfaceid'],
 			'hostids' => [$hostid],
 		]);
 
-		if (count($data) == 0)
-		{
-			throw new Exception('Interface not found');
-		}
 		if (count($data) > 1)
 		{
 			throw new Exception('Found more than one interface');
 		}
 
-		return $data[0]['interfaceid'];
+		return count($data) === 0 ? null : $data[0]['interfaceid'];
 	}
 
 	/**

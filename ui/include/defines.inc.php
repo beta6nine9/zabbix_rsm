@@ -19,7 +19,7 @@
 **/
 
 /* RSM specifics: specific defines */
-define('ZABBIX_DB_VERSION_RSM',		1);
+define('ZABBIX_DB_VERSION_RSM',		2);
 
 // Additional users.
 define('USER_TYPE_ZABBIX_GUEST',	0);
@@ -31,7 +31,7 @@ define('USER_TYPE_COMPLIANCE',		6);
 define('ZABBIX_VERSION',		'5.0.12');
 define('ZABBIX_API_VERSION',	'5.0.12');
 define('ZABBIX_EXPORT_VERSION',	'5.0');
-define('ZABBIX_DB_VERSION',		5000002);
+define('ZABBIX_DB_VERSION',		5000004);
 
 define('ZABBIX_COPYRIGHT_FROM',	'2001');
 define('ZABBIX_COPYRIGHT_TO',	'2021');
