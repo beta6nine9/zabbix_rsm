@@ -35,6 +35,7 @@ my @tld_data_file_names = (
 	'nsTests',
 	'tests',
 	'testDetails',
+	'minns',
 );
 
 use constant DEBUG_NTH_ROW => 1000;	# in debug mode, each Nth row to print
@@ -1495,6 +1496,51 @@ if (open_file(\$file, $files{$name}, OPTIONAL))
 		$no_fails[10] &&= exists($target_id{$row->[4]})     || empty($row->[4]);
 		$no_fails[11] &&= $row->[5] =~ INT                  || empty($row->[5]);
 		$no_fails[12] &&= exists($testedName_id{$row->[5]}) || empty($row->[5]);
+
+		if (!everything_ok($wrong_columns, \@no_fails) && $fail_immediately)
+		{
+			print("Interrupted on row $row_number!\n");
+			$interrupted = 1;
+			last;
+		}
+	}
+
+	print_results($files{$name}, $csv->eof(), $interrupted, $wrong_columns, \@no_fails, \@cases);
+	close($file);
+}
+
+# check "minns" file
+$name = 'minns';
+$columns = 3;
+@cases = (
+	'"minnsTLD" is an integer',
+	'"minnsTLD" column entries are from "tlds" "id" column',
+	'"minns" is an integer',
+	'"cycleDateMinute" is a timestamp',
+	'"cycleDateMinute" seconds are 00',
+	'"cycleDateMinute" is from requested period',
+);
+@no_fails = (1) x scalar(@cases);
+@uniqueness = ({});
+
+if (open_file(\$file, $files{$name}, OPTIONAL))
+{
+	$row_number = 0;
+	$interrupted = 0;
+
+	while (my $row = $csv->getline($file))
+	{
+		last if ($wrong_columns = scalar(@{$row}) != $columns);
+
+		$row_number++;
+		print("\033[JProcessing row $row_number" . "\033[G") if ($debug && $row_number % DEBUG_NTH_ROW == 0);
+
+		$no_fails[0] &&= $row->[0] =~ INT;
+		$no_fails[1] &&= exists($tlds_id{$row->[0]});
+		$no_fails[2] &&= $row->[1] =~ INT;
+		$no_fails[3] &&= $row->[2] =~ TIME;
+		$no_fails[4] &&= isround($row->[2]);
+		$no_fails[5] &&= fromperiod($row->[2]);
 
 		if (!everything_ok($wrong_columns, \@no_fails) && $fail_immediately)
 		{
