@@ -31,7 +31,7 @@ abstract class ActionBase extends CController
 	abstract protected function checkMonitoringTarget(): bool;
 	abstract protected function requestConfigCacheReload(): void;
 	abstract protected function getInputRules(): array;
-	abstract protected function isObjectBeingDisabled(): bool;
+	abstract protected function isObjectDisabled(array $object): bool;
 	abstract protected function getObjects(?string $objectId): array;
 	abstract protected function createObject(): void;
 	abstract protected function updateObject(): void;
@@ -545,7 +545,6 @@ abstract class ActionBase extends CController
 		$this->oldObject = $data[0];
 
 		$this->deleteObject();
-
 		$this->requestConfigCacheReload();
 
 		// when deleting objects, API puts informative messages into $ZBX_MESSAGES; move them to $details of the response
@@ -572,22 +571,26 @@ abstract class ActionBase extends CController
 		if (empty($objects))
 		{
 			$this->createObject();
+			$this->requestConfigCacheReload();
 		}
 		else
 		{
 			$this->oldObject = $objects[0];
 
-			if ($this->isObjectBeingDisabled())
+			if ($this->isObjectDisabled($this->newObject))
 			{
-				$this->disableObject();
+				if (!$this->isObjectDisabled($this->oldObject))
+				{
+					$this->disableObject();
+					$this->requestConfigCacheReload();
+				}
 			}
 			else
 			{
 				$this->updateObject();
+				$this->requestConfigCacheReload();
 			}
 		}
-
-		$this->requestConfigCacheReload();
 
 		// when disabling objects, API puts informative messages into $ZBX_MESSAGES; move them to $details of the response
 		$details = null;

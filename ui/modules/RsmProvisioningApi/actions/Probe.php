@@ -272,8 +272,9 @@ class Probe extends ActionBaseEx
 	 * Functions for updating object                                                                                  *
 	 ******************************************************************************************************************/
 
-	protected function isObjectBeingDisabled(): bool {
-		$params = $this->newObject['zabbixProxyParameters'];
+	protected function isObjectDisabled(array $object): bool
+	{
+		$params = $object['zabbixProxyParameters'];
 
 		return !$params['ipv4Enable'] && !$params['ipv6Enable'];
 	}

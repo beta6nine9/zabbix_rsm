@@ -136,9 +136,9 @@ abstract class MonitoringTarget extends ActionBaseEx
 	 * Functions for updating object                                                                                  *
 	 ******************************************************************************************************************/
 
-	protected function isObjectBeingDisabled(): bool
+	protected function isObjectDisabled(array $object): bool
 	{
-		$services = array_column($this->newObject['servicesStatus'], 'enabled');
+		$services = array_column($object['servicesStatus'], 'enabled');
 
 		return empty(array_filter($services));
 	}

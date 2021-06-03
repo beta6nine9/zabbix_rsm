@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+set -o errexit
+set -o nounset
+set -o pipefail
+#set -o xtrace
+
+declare -r USE_FORWARDER=0
+declare -r FRONTEND_URL="http://127.0.0.1/icann-git/dev-papi/ui"
+declare -r FORWARDER_URL="http://127.0.0.1/icann-git/dev-papi/api"

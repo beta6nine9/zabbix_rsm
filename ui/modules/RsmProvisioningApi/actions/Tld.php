@@ -214,12 +214,12 @@ class Tld extends MonitoringTarget
 					],
 				],
 				'rddsParameters'         => [
-					'rdds43Server'       => $macros[$host][self::MACRO_TLD_RDDS43_ENABLED] ? $macros[$host][self::MACRO_TLD_RDDS43_SERVER]      : null,
-					'rdds43TestedDomain' => $macros[$host][self::MACRO_TLD_RDDS43_ENABLED] ? $macros[$host][self::MACRO_TLD_RDDS43_TEST_DOMAIN] : null,
-					'rdds80Url'          => $macros[$host][self::MACRO_TLD_RDDS80_ENABLED] ? $macros[$host][self::MACRO_TLD_RDDS80_URL]         : null,
-					'rdapUrl'            => $macros[$host][self::MACRO_TLD_RDAP_ENABLED]   ? $macros[$host][self::MACRO_TLD_RDAP_BASE_URL]      : null,
-					'rdapTestedDomain'   => $macros[$host][self::MACRO_TLD_RDAP_ENABLED]   ? $macros[$host][self::MACRO_TLD_RDAP_TEST_DOMAIN]   : null,
-					'rdds43NsString'     => $macros[$host][self::MACRO_TLD_RDDS43_ENABLED] ? $macros[$host][self::MACRO_TLD_RDDS43_NS_STRING]   : null,
+					'rdds43Server'       => $macros[$host][self::MACRO_TLD_RDDS43_SERVER],
+					'rdds43TestedDomain' => $macros[$host][self::MACRO_TLD_RDDS43_TEST_DOMAIN],
+					'rdds80Url'          => $macros[$host][self::MACRO_TLD_RDDS80_URL],
+					'rdapUrl'            => $macros[$host][self::MACRO_TLD_RDAP_BASE_URL],
+					'rdapTestedDomain'   => $macros[$host][self::MACRO_TLD_RDAP_TEST_DOMAIN],
+					'rdds43NsString'     => $macros[$host][self::MACRO_TLD_RDDS43_NS_STRING],
 				],
 			];
 		}
@@ -307,6 +307,7 @@ class Tld extends MonitoringTarget
 	{
 		$config = [
 			'hostid' => $this->getHostId($this->newObject['id']),
+			'status' => HOST_STATUS_MONITORED,
 			'groups' => [
 				['groupid' => $this->hostGroupIds['TLDs']],
 				['groupid' => $this->hostGroupIds[$this->newObject['tldType']]],
@@ -323,7 +324,6 @@ class Tld extends MonitoringTarget
 		$this->updateMacros(
 			$this->templateIds['Template Rsmhost Config ' . $this->getInput('id')],
 			[
-				self::MACRO_TLD_DNS_NAME_SERVERS => '',
 				self::MACRO_TLD_DNS_UDP_ENABLED => 0,
 				self::MACRO_TLD_DNS_TCP_ENABLED => 0,
 				self::MACRO_TLD_DNSSEC_ENABLED => 0,
@@ -334,7 +334,6 @@ class Tld extends MonitoringTarget
 		);
 
 		$this->templateIds += $this->getTemplateIds(['Template DNS Test - ' . $this->getInput('id')]);
-		$this->updateDnsNsItems();
 	}
 
 	/******************************************************************************************************************
@@ -435,6 +434,7 @@ class Tld extends MonitoringTarget
 
 		$services = array_column($this->newObject['servicesStatus'], 'enabled', 'service');
 
+		// TODO: consider using $this->updateMacros() instead of building full list of macros
 		return [
 			$this->createMacroConfig(self::MACRO_TLD                   , $this->newObject['id']),
 			$this->createMacroConfig(self::MACRO_TLD_CONFIG_TIMES      , $_SERVER['REQUEST_TIME']),
@@ -450,13 +450,24 @@ class Tld extends MonitoringTarget
 			$this->createMacroConfig(self::MACRO_TLD_DNS_AVAIL_MINNS   , $minNs),
 			$this->createMacroConfig(self::MACRO_TLD_DNS_TESTPREFIX    , $this->newObject['dnsParameters']['nsTestPrefix']),
 
-			$this->createMacroConfig(self::MACRO_TLD_RDAP_BASE_URL     , $this->newObject['rddsParameters']['rdapUrl']),
-			$this->createMacroConfig(self::MACRO_TLD_RDAP_TEST_DOMAIN  , $this->newObject['rddsParameters']['rdapTestedDomain']),
-
-			$this->createMacroConfig(self::MACRO_TLD_RDDS43_TEST_DOMAIN, $this->newObject['rddsParameters']['rdds43TestedDomain']),
-			$this->createMacroConfig(self::MACRO_TLD_RDDS43_NS_STRING  , $this->newObject['rddsParameters']['rdds43NsString']),
-			$this->createMacroConfig(self::MACRO_TLD_RDDS43_SERVER     , $this->newObject['rddsParameters']['rdds43Server']),
-			$this->createMacroConfig(self::MACRO_TLD_RDDS80_URL        , $this->newObject['rddsParameters']['rdds80Url']),
+			$this->createMacroConfig(self::MACRO_TLD_RDAP_BASE_URL     , $this->newObject['rddsParameters']['rdapUrl'] ??
+																		 $this->oldObject['rddsParameters']['rdapUrl'] ??
+																		 ''),
+			$this->createMacroConfig(self::MACRO_TLD_RDAP_TEST_DOMAIN  , $this->newObject['rddsParameters']['rdapTestedDomain'] ??
+																		 $this->oldObject['rddsParameters']['rdapTestedDomain'] ??
+																		 ''),
+			$this->createMacroConfig(self::MACRO_TLD_RDDS43_TEST_DOMAIN, $this->newObject['rddsParameters']['rdds43TestedDomain'] ??
+																		 $this->oldObject['rddsParameters']['rdds43TestedDomain'] ??
+																		 ''),
+			$this->createMacroConfig(self::MACRO_TLD_RDDS43_NS_STRING  , $this->newObject['rddsParameters']['rdds43NsString'] ??
+																		 $this->oldObject['rddsParameters']['rdds43NsString'] ??
+																		 ''),
+			$this->createMacroConfig(self::MACRO_TLD_RDDS43_SERVER     , $this->newObject['rddsParameters']['rdds43Server'] ??
+																		 $this->oldObject['rddsParameters']['rdds43Server'] ??
+																		 ''),
+			$this->createMacroConfig(self::MACRO_TLD_RDDS80_URL        , $this->newObject['rddsParameters']['rdds80Url'] ??
+																		 $this->oldObject['rddsParameters']['rdds80Url'] ??
+																		 ''),
 		];
 	}
 
