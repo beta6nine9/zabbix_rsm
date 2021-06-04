@@ -1,7 +1,6 @@
 <?php
 
 require_once('constants.php');
-require_once('App.php');
 require_once('Database.php');
 require_once('Input.php');
 require_once('RsmException.php');
@@ -9,8 +8,7 @@ require_once('User.php');
 
 function main(): void
 {
-	$app = new App();
-	$app->setErrorHandler();
+	setErrorHandler();
 
 	try
 	{
@@ -39,6 +37,30 @@ function main(): void
 	{
 		setCommonResponse(500, 'General error', $e->getMessage(), getExceptionDetails($e), null);
 	}
+}
+
+function setErrorHandler()
+{
+	set_error_handler(
+		function(int $errno, string $errstr, string $errfile, int $errline): void
+		{
+			// turn PHP errors, warnings, notices into exceptions
+			throw new ErrorException($errstr, 0, $errno, $errfile, $errline);
+		},
+		E_ALL | E_STRICT
+	);
+}
+
+function getConfig(string $section): array
+{
+	static $config = null;
+
+	if (is_null($config))
+	{
+		$config = require('config.php');
+	}
+
+	return $config[$section];
 }
 
 function getExceptionDetails(Throwable $e)
@@ -131,11 +153,11 @@ function sendResponse(int $resultCode, array $json)
 {
 	$options = JSON_UNESCAPED_SLASHES;
 
-	if (App::getConfig('settings')['prettify_output_list'])
+	if (getConfig('settings')['prettify_output_list'])
 	{
 		$options |= JSON_PRETTY_PRINT;
 	}
-	if (App::getConfig('settings')['prettify_output_object'] && !is_int(key($json)))
+	if (getConfig('settings')['prettify_output_object'] && !is_int(key($json)))
 	{
 		$options |= JSON_PRETTY_PRINT;
 	}
@@ -241,7 +263,7 @@ function handlePutRequest(string $objectType, ?string $objectId, string $payload
 	}
 	else
 	{
-		if (!array_key_exists($serverIdRequested, App::getConfig('frontends')))
+		if (!array_key_exists($serverIdRequested, getConfig('frontends')))
 		{
 			throw new RsmException(400, 'The centralServer does not exist in the system.');
 		}
@@ -253,7 +275,7 @@ function handlePutRequest(string $objectType, ?string $objectId, string $payload
 
 	if (is_null($serverIdActual))
 	{
-		$serverIds = is_null($serverIdRequested) ? array_keys(App::getConfig('frontends')) : [$serverIdRequested];
+		$serverIds = is_null($serverIdRequested) ? array_keys(getConfig('frontends')) : [$serverIdRequested];
 
 		$counts = getObjectCounts($serverIds, $objectType);
 		$serverId = array_search(min($counts), $counts);
@@ -333,7 +355,7 @@ function forwardRequest(int $serverId, string $objectType, ?string $objectId, st
  */
 function forwardRequestMulti(string $objectType): void
 {
-	$serverIds = array_keys(App::getConfig('frontends'));
+	$serverIds = array_keys(getConfig('frontends'));
 
 	$chList = [];
 
@@ -531,7 +553,7 @@ function createCurlHandle(int $serverId, string $objectType, ?string $objectId, 
 		throw new RsmException(500, 'General error', 'curl_init() failed');
 	}
 
-	$url = App::getConfig('frontends')[$serverId]['url'] . '/zabbix.php';
+	$url = getConfig('frontends')[$serverId]['url'] . '/zabbix.php';
 	$url .= '?action=' . curl_escape($ch, FRONTEND_ACTIONS[$objectType]);
 	if (!is_null($objectId))
 	{
@@ -552,7 +574,7 @@ function createCurlHandle(int $serverId, string $objectType, ?string $objectId, 
 		CURLOPT_HEADER         => true,
 		CURLOPT_HTTPHEADER     => $headers,
 		CURLOPT_ENCODING       => '',
-		CURLOPT_CONNECTTIMEOUT => App::getConfig('settings')['curl_timeout'],
+		CURLOPT_CONNECTTIMEOUT => getConfig('settings')['curl_timeout'],
 		CURLOPT_PRIVATE        => $serverId,
 	];
 
@@ -615,7 +637,7 @@ function findObject(string $objectType, string $objectId): ?int
 
 	$hostGroup = ($objectType === OBJECT_TYPE_TLDS || $objectType === OBJECT_TYPE_REGISTRARS) ? 'TLDs' : 'Probes';
 
-	$config = App::getConfig('databases');
+	$config = getConfig('databases');
 
 	$serverIds = [];
 
@@ -664,7 +686,7 @@ function getObjectCounts(array $serverIds, string $objectType): array
 
 	$hostGroup = ($objectType === OBJECT_TYPE_TLDS || $objectType === OBJECT_TYPE_REGISTRARS) ? 'TLDs' : 'Probes';
 
-	$config = App::getConfig('databases');
+	$config = getConfig('databases');
 
 	$counts = [];
 
@@ -689,7 +711,7 @@ function getObjectCounts(array $serverIds, string $objectType): array
  */
 function getMaxObjectCount(string $objectType): int
 {
-	$config = App::getConfig('settings');
+	$config = getConfig('settings');
 
 	switch ($objectType)
 	{
