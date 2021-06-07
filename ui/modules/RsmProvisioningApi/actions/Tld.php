@@ -30,21 +30,21 @@ class Tld extends MonitoringTarget
 			case self::REQUEST_METHOD_GET:
 				return [
 					'type' => API_OBJECT, 'fields' => [
-						'id'                     => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateTldIdentifier', 'error' => 'The syntax of the TLD in the URL is invalid'],
+						'id'                     => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateTldIdentifier', 'error' => 'A valid DNS label was not provided in the TLD field in the URL'],
 					]
 				];
 
 			case self::REQUEST_METHOD_DELETE:
 				return [
 					'type' => API_OBJECT, 'fields' => [
-						'id'                     => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateTldIdentifier', 'error' => 'The syntax of the TLD in the URL is invalid'],
+						'id'                     => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateTldIdentifier', 'error' => 'A valid DNS label was not provided in the TLD field in the URL'],
 					]
 				];
 
 			case self::REQUEST_METHOD_PUT:
 				return [
 					'type' => API_OBJECT, 'fields' => [
-						'id'                     => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateTldIdentifier', 'error' => 'The syntax of the TLD in the URL is invalid'],
+						'id'                     => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateTldIdentifier', 'error' => 'A valid DNS label was not provided in the TLD field in the URL'],
 						'tld'                    => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateInvalid', 'error' => 'The "tld" element included in a PUT request'],
 						'tldType'                => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateEnum', 'in' => ['gTLD', 'ccTLD', 'otherTLD', 'testTLD'], 'error' => 'TLD type is invalid'],
 						'dnsParameters'          => ['type' => API_OBJECT     , 'fields' => [
