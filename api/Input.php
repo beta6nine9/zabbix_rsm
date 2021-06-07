@@ -5,45 +5,51 @@ require_once('RsmException.php');
 
 class Input
 {
+	private static string $objectType;
+	private static ?string $objectId;
+
 	public static function validate()
 	{
-		if (count($_GET) > 2)
+		$urlBase = dirname($_SERVER['SCRIPT_NAME']) . '/';
+		$url = $_SERVER['REQUEST_URI'];
+
+		if (strncmp($url, $urlBase, strlen($urlBase)))
 		{
-			throw new RsmException(500, 'General error');
+			$descr = 'Failed to parse URL, SCRIPT_NAME: "' . $_SERVER['SCRIPT_NAME'] . '", REQUEST_URI: "' . $_SERVER['REQUEST_URI'] . '"';
+			throw new RsmException(500, 'General error', $descr);
+		}
+
+		$urlComponents = parse_url(substr($url, strlen($urlBase)));
+
+		$endPoint = explode('/', $urlComponents['path']);
+
+		if (count($endPoint) > 2)
+		{
+			throw new RsmException(400, 'The end-point does not exist');
+		}
+
+		self::$objectType = $endPoint[0];
+		self::$objectId   = $endPoint[1] ?? null;
+
+		if (!in_array($endPoint[0], [OBJECT_TYPE_TLDS, OBJECT_TYPE_REGISTRARS, OBJECT_TYPE_PROBES]))
+		{
+			throw new RsmException(400, 'The end-point does not exist');
+		}
+
+		if (array_key_exists('query', $urlComponents))
+		{
+			throw new RsmException(400, 'The end-point does not support parameters');
 		}
 	}
 
 	public static function getObjectType(): string
 	{
-		if (!array_key_exists('object_type', $_GET))
-		{
-			throw new RsmException(500, 'General error');
-		}
-
-		$objectType = $_GET['object_type'];
-
-		if (!in_array($objectType, [OBJECT_TYPE_TLDS, OBJECT_TYPE_REGISTRARS, OBJECT_TYPE_PROBES]))
-		{
-			throw new RsmException(500, 'General error', 'Unsupported object type: ' . $objectType);
-		}
-
-		return $objectType;
+		return self::$objectType;
 	}
 
 	public static function getObjectId(): ?string
 	{
-		$objectId = null;
-
-		if (count($_GET) === 2)
-		{
-			if (!array_key_exists('id', $_GET))
-			{
-				throw new RsmException(500, 'General error', 'Object ID not specified');
-			}
-			$objectId = $_GET['id'];
-		}
-
-		return $objectId;
+		return self::$objectId;
 	}
 
 	public static function getPayload(): string
