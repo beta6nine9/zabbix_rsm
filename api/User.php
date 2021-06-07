@@ -5,14 +5,6 @@ require_once('RsmException.php');
 
 class User
 {
-	// TODO: move usernames and passwords to config.php
-
-	// must be kept in sync with frontends
-	private const USER_READONLY_USERNAME  = 'provisioning-api-readonly';
-	private const USER_READWRITE_USERNAME = 'provisioning-api-readwrite';
-	private const USER_READONLY_PASSWORD  = '$2y$10$nD9fJYeWFsktv7wOMcg52Ob0LRgwrj4JWevPpemErLUo78FDp7WXK'; # php -r 'echo password_hash($argv[1], PASSWORD_BCRYPT, ["cost" => 10]) . "\n";' -- 'password'
-	private const USER_READWRITE_PASSWORD = '$2y$10$nD9fJYeWFsktv7wOMcg52Ob0LRgwrj4JWevPpemErLUo78FDp7WXK'; # php -r 'echo password_hash($argv[1], PASSWORD_BCRYPT, ["cost" => 10]) . "\n";' -- 'password'
-
 	private static ?string $username = null;
 	private static ?string $password = null;
 
@@ -30,8 +22,10 @@ class User
 		self::$username = $_SERVER['PHP_AUTH_USER'];
 		self::$password = $_SERVER['PHP_AUTH_PW'];
 
-		if (!(self::$username == self::USER_READONLY_USERNAME && password_verify(self::$password, self::USER_READONLY_PASSWORD) === true) &&
-			!(self::$username == self::USER_READWRITE_USERNAME && password_verify(self::$password, self::USER_READWRITE_PASSWORD) === true))
+		$config = getConfig('users');
+
+		if (!(self::$username == $config['readonly']['username'] && password_verify(self::$password, $config['readonly']['password']) === true) &&
+			!(self::$username == $config['readwrite']['username'] && password_verify(self::$password, $config['readwrite']['password']) === true))
 		{
 			throw new RsmException(401, 'Invalid username or password');
 		}
@@ -39,21 +33,21 @@ class User
 		switch ($_SERVER['REQUEST_METHOD'])
 		{
 			case REQUEST_METHOD_GET:
-				if (self::$username !== self::USER_READWRITE_USERNAME && self::$username !== self::USER_READONLY_USERNAME)
+				if (self::$username !== $config['readwrite']['username'] && self::$username !== $config['readonly']['username'])
 				{
 					throw new RsmException(403, 'Forbidden');
 				}
 				break;
 
 			case REQUEST_METHOD_DELETE:
-				if (self::$username !== self::USER_READWRITE_USERNAME)
+				if (self::$username !== $config['readwrite']['username'])
 				{
 					throw new RsmException(403, 'Forbidden');
 				}
 				break;
 
 			case REQUEST_METHOD_PUT:
-				if (self::$username !== self::USER_READWRITE_USERNAME)
+				if (self::$username !== $config['readwrite']['username'])
 				{
 					throw new RsmException(403, 'Forbidden');
 				}
