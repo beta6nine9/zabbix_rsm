@@ -120,6 +120,27 @@ function getSeverityString(int $severity): string
 	}
 }
 
+function getJsonParsingError(string $json): string
+{
+	$code = "import sys"                  . "\n"
+		  . "import json"                 . "\n"
+		  . ""                            . "\n"
+		  . "try:"                        . "\n"
+		  . "    json.loads(sys.argv[1])" . "\n"
+		  . "except ValueError as e:"     . "\n"
+		  . "    print(e.message)"        . "\n";
+
+
+	$execCode = escapeshellarg($code);
+	$execJson = escapeshellarg($json);
+
+	$output = null;
+
+	exec("python -c $execCode $execJson 2>&1", $output);
+
+	return implode("\n", $output);
+}
+
 function setCommonResponse(int $resultCode, string $title, ?string $description, ?array $details, ?array $updatedObject)
 {
 	// must be kept in sync with frontends
@@ -244,8 +265,7 @@ function handlePutRequest(string $objectType, ?string $objectId, string $payload
 	$json = json_decode($payload, true);
 	if (is_null($json))
 	{
-		// TODO: add python helper for getting some more info
-		throw new RsmException(400, 'JSON syntax is invalid');
+		throw new RsmException(400, 'JSON syntax is invalid', getJsonParsingError($payload));
 	}
 
 	$serverIdRequested = array_key_exists('centralServer', $json) ? $json['centralServer'] : null;
@@ -300,44 +320,9 @@ function forwardRequest(int $serverId, string $objectType, ?string $objectId, st
 
 	$output = curl_exec($ch);
 
-	if ($output === false)
-	{
-		throw new RsmException(500, 'General error', 'curl_exec() failed: ' . curl_error($ch));
-	}
-
-	list($messageHeaders, $messageBody) = explode("\r\n\r\n", $output, 2);
-
-	$contentType  = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
-	$responseCode = curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
-
-	if ($contentType !== 'application/json')
-	{
-		$details = [
-			'server-id'       => $serverId,
-			'url'             => curl_getinfo($ch, CURLINFO_EFFECTIVE_URL),
-			'content-type'    => $contentType,
-			'response-code'   => $responseCode,
-			'message-headers' => explode("\r\n", $messageHeaders),
-			'message-body'    => $messageBody,
-		];
-		throw new RsmException(500, 'General error', 'Frontend returned unexpected Content-Type', $details);
-	}
-
-	$json = json_decode($messageBody, true);
-	if (is_null($json))
-	{
-		// TODO: add python helper for getting some more info
-		throw new RsmException(500, 'General error', 'Cannot parse frontend\'s response');
-	}
-
-	if (array_key_exists('resultCode', $json))
-	{
-		$json['details']['centralServer'] = $serverId;
-	}
-	else
-	{
-		$json['centralServer'] = $serverId;
-	}
+	$json = null;
+	$responseCode = null;
+	getCurlResponse($ch, false, $output, $json, $responseCode);
 
 	curl_close($ch);
 
@@ -372,69 +357,10 @@ function forwardRequestMulti(string $objectType): void
 
 	foreach ($chList as $ch)
 	{
-		$error          = null;
-		$messageHeaders = null;
-		$messageBody    = null;
-		$contentType    = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
-		$responseCode   = curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
-		$serverId       = (int)curl_getinfo($ch, CURLINFO_PRIVATE);
-
-		// curl_getinfo() should have returned null if server did not send valid Content-Type, but somehow it returned false
-		if ($contentType === false)
-		{
-			$contentType = null;
-		}
-
-		$errNo = curl_errno($ch);
-
-		if (is_null($error) && $errNo)
-		{
-			$error = 'Curl failed: ' . curl_strerror($errNo) . ': ' . curl_error($ch);
-		}
-		else
-		{
-			$output = curl_multi_getcontent($ch);
-			list($messageHeaders, $messageBody) = explode("\r\n\r\n", $output, 2);
-			$json = json_decode($messageBody, true);
-		}
-
-		if (is_null($error) && $contentType !== 'application/json')
-		{
-			$error = 'Frontend returned unexpected Content-Type';
-		}
-		if (is_null($error) && $responseCode !== 200)
-		{
-			$error = 'Frontend returned unexpected response code';
-		}
-		if (is_null($error) && is_null($json))
-		{
-			// TODO: add python helper for getting some more info
-			$error = 'Cannot parse frontend\'s response';
-		}
-		if (is_null($error) && count($json) > 0 && !is_int(key($json)))
-		{
-			$error = 'Unexpected response from frontend, expected array, got object';
-		}
-
-		if (!is_null($error))
-		{
-			$details = [
-				'server-id'       => $serverId,
-				'url'             => curl_getinfo($ch, CURLINFO_EFFECTIVE_URL),
-				'content-type'    => $contentType,
-				'response-code'   => $responseCode,
-				'message-headers' => is_null($messageHeaders) ? null : explode("\r\n", $messageHeaders),
-				'message-body'    => $messageBody,
-			];
-
-			throw new RsmException(500, 'General error', $error, $details);
-		}
-
-		foreach ($json as &$object)
-		{
-			$object['centralServer'] = $serverId;
-		}
-		unset($object);
+		$output = curl_multi_getcontent($ch);
+		$json = null;
+		$responseCode = null;
+		getCurlResponse($ch, true, $output, $json, $responseCode);
 
 		$objects = array_merge($objects, $json);
 	}
@@ -476,59 +402,6 @@ function forwardRequestMulti(string $objectType): void
 	);
 
 	sendResponse($responseCode, $objects);
-}
-
-function createCurlMultiHandle(array $chList)//: resource
-{
-	$mh = curl_multi_init();
-	if ($mh === false)
-	{
-		throw new RsmException(500, 'General error', 'curl_multi_init() failed');
-	}
-
-	foreach ($chList as $ch)
-	{
-		$res = curl_multi_add_handle($mh, $ch);
-
-		if ($res !== CURLM_OK)
-		{
-			$descr = sprintf('curl_multi_add_handle() failed: %s (%d)', curl_multi_strerror($res), $res);
-			throw new RsmException(500, 'General error', $descr);
-		}
-	}
-
-	return $mh;
-}
-
-function execCurlMultiHandle($mh): void
-{
-	$active = 1;
-
-	while ($active)
-	{
-		$res = curl_multi_exec($mh, $active);
-
-		if ($res !== CURLM_OK)
-		{
-			$descr = sprintf('curl_multi_exec() failed: %s (%d)', curl_multi_strerror($res), $res);
-			throw new RsmException(500, 'General error', $descr);
-		}
-
-		if ($active)
-		{
-			$res = curl_multi_select($mh);
-
-			if ($res === -1)
-			{
-				throw new RsmException(500, 'General error', 'curl_multi_select() failed');
-			}
-		}
-	}
-
-	// undocumented: calling curl_multi_info_read() makes it possible to read errors with curl_errno() and curl_error()
-	while (curl_multi_info_read($mh) !== false)
-	{
-	}
 }
 
 /**
@@ -608,12 +481,183 @@ function createCurlHandle(int $serverId, string $objectType, ?string $objectId, 
 	return $ch;
 }
 
-/*
-TODO: extract from forwardRequest[Multi]()
-function getJsonFromCurl($ch, bool $list, )
+/**
+ * Creates "curl multi handle".
+ *
+ * @param array $chList
+ *
+ * @return resource
+ *
+ * @throws RsmException
+ */
+function createCurlMultiHandle(array $chList)//: resource
 {
+	$mh = curl_multi_init();
+	if ($mh === false)
+	{
+		throw new RsmException(500, 'General error', 'curl_multi_init() failed');
+	}
+
+	foreach ($chList as $ch)
+	{
+		$res = curl_multi_add_handle($mh, $ch);
+
+		if ($res !== CURLM_OK)
+		{
+			$descr = sprintf('curl_multi_add_handle() failed: %s (%d)', curl_multi_strerror($res), $res);
+			throw new RsmException(500, 'General error', $descr);
+		}
+	}
+
+	return $mh;
 }
-*/
+
+/**
+ * Execute "curl multi handle" and wait until they all finalize.
+ *
+ * @param type $mh
+ *
+ * @throws RsmException
+ */
+function execCurlMultiHandle($mh): void
+{
+	$active = 1;
+
+	while ($active)
+	{
+		$res = curl_multi_exec($mh, $active);
+
+		if ($res !== CURLM_OK)
+		{
+			$descr = sprintf('curl_multi_exec() failed: %s (%d)', curl_multi_strerror($res), $res);
+			throw new RsmException(500, 'General error', $descr);
+		}
+
+		if ($active)
+		{
+			$res = curl_multi_select($mh);
+
+			if ($res === -1)
+			{
+				throw new RsmException(500, 'General error', 'curl_multi_select() failed');
+			}
+		}
+	}
+
+	// undocumented: calling curl_multi_info_read() makes it possible to read errors with curl_errno() and curl_error()
+	while (curl_multi_info_read($mh) !== false)
+	{
+	}
+}
+
+/**
+ * Validates curl response and fills $json and $responseCode.
+ *
+ * @param type $ch
+ * @param bool $isMulti
+ * @param string $output
+ * @param array|null $json
+ * @param int|null $responseCode
+ *
+ * @throws RsmException
+ */
+function getCurlResponse($ch, bool $isMulti, string $output, ?array &$json, ?int &$responseCode): void
+{
+	$error          = null;
+	$messageHeaders = null;
+	$messageBody    = null;
+	$contentType    = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+	$responseCode   = curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+	$serverId       = (int)curl_getinfo($ch, CURLINFO_PRIVATE);
+
+	// curl_getinfo() should have returned null if server did not send valid Content-Type, but sometimes it returns false
+	if ($contentType === false)
+	{
+		$contentType = null;
+	}
+
+	$errNo = curl_errno($ch);
+
+	if (is_null($error) && $errNo)
+	{
+			$error = 'Curl failed: ' . curl_strerror($errNo) . ': ' . curl_error($ch);
+	}
+	else
+	{
+		list($messageHeaders, $messageBody) = explode("\r\n\r\n", $output, 2);
+		$json = json_decode($messageBody, true);
+	}
+
+	if (is_null($error) && $isMulti && $responseCode !== 200)
+	{
+		$error = 'Frontend returned unexpected response code';
+	}
+	if (is_null($error) && $contentType !== 'application/json')
+	{
+		$error = 'Frontend returned unexpected Content-Type';
+	}
+	if (is_null($error) && is_null($json))
+	{
+		$error = 'Cannot parse frontend\'s response';
+	}
+	if (is_null($error) && $isMulti && count($json) > 0 && !is_int(key($json)))
+	{
+		$error = 'Unexpected response from frontend, expected array, got object';
+	}
+
+	if (!is_null($error))
+	{
+		$details = [
+			'server-id'       => $serverId,
+			'url'             => curl_getinfo($ch, CURLINFO_EFFECTIVE_URL),
+			'content-type'    => $contentType,
+			'response-code'   => $responseCode,
+			'message-headers' => is_null($messageHeaders) ? null : explode("\r\n", $messageHeaders),
+			'message-body'    => $messageBody,
+		];
+		throw new RsmException(500, 'General error', $error, $details);
+	}
+
+	updateJsonWithServerId($json, $serverId);
+}
+
+/**
+ * Puts $serverId into JSON list or object.
+ *
+ * @param array $json
+ * @param int $serverId
+ */
+function updateJsonWithServerId(array &$json, int $serverId): void
+{
+	if (count($json) === 0 || is_int(key($json)))
+	{
+		// list of objects
+		foreach ($json as &$object)
+		{
+			$object['centralServer'] = $serverId;
+		}
+		unset($object);
+	}
+	elseif (array_key_exists('resultCode', $json))
+	{
+		// common response
+		if (!is_null($json['updatedObject']))
+		{
+			// PUT request, 'updatedObject' exists
+			$json['updatedObject']['centralServer'] = $serverId;
+		}
+		else
+		{
+			// DELETE request, 'updatedObject' does not exist
+			$json['details']['centralServer'] = $serverId;
+		}
+	}
+	else
+	{
+		// single object
+		$json['centralServer'] = $serverId;
+	}
+}
 
 /**
  * Finds serverId where the object is onboarded.
