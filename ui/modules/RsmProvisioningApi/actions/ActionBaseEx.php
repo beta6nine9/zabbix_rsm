@@ -358,18 +358,17 @@ abstract class ActionBaseEx extends ActionBase
 				$status = $rsmhostConfigs[$host]['rdap'] ? ITEM_STATUS_ACTIVE : ITEM_STATUS_DISABLED;
 				$config += $this->getItemStatusConfig($hostItems[$host], $templateItems['Template RDAP Status'], $status);
 
-				$status = $rsmhostConfigs[$host]['rdds43'] ? ITEM_STATUS_ACTIVE : ITEM_STATUS_DISABLED;
+				$active = $rsmhostConfigs[$host]['rdds43'] || $rsmhostConfigs[$host]['rdds80'];
+				$status = $active ? ITEM_STATUS_ACTIVE : ITEM_STATUS_DISABLED;
 				$config += $this->getItemStatusConfig($hostItems[$host], $templateItems['Template RDDS Status'], $status);
-
-				//$status = $rsmhostConfigs[$host]['rdds80'] ? ITEM_STATUS_ACTIVE : ITEM_STATUS_DISABLED;
-				//$config += $this->getItemStatusConfig($hostItems[$host], $templateItems['Template RDDS Status'], $status);
 			}
 			else
 			{
 				$status = ITEM_STATUS_DISABLED;
 				$config += $this->getItemStatusConfig($hostItems[$host], $templateItems['Template RDAP Status'], $status);
 
-				$status = $rsmhostConfigs[$host]['rdap'] || $rsmhostConfigs[$host]['rdds43'] ? ITEM_STATUS_ACTIVE : ITEM_STATUS_DISABLED;
+				$active = $rsmhostConfigs[$host]['rdap'] || $rsmhostConfigs[$host]['rdds43']  || $rsmhostConfigs[$host]['rdds80'];
+				$status = $active ? ITEM_STATUS_ACTIVE : ITEM_STATUS_DISABLED;
 				$config += $this->getItemStatusConfig($hostItems[$host], $templateItems['Template RDDS Status'], $status);
 			}
 
@@ -380,11 +379,22 @@ abstract class ActionBaseEx extends ActionBase
 				$status = $rsmhostConfigs[$rsmhost]['rdap'] && $probeConfigs[$probe]['rdap'] ? ITEM_STATUS_ACTIVE : ITEM_STATUS_DISABLED;
 				$config += $this->getItemStatusConfig($hostItems[$host], $templateItems['Template RDAP Test'], $status);
 
-				$status = $rsmhostConfigs[$rsmhost]['rdds43'] && $probeConfigs[$probe]['rdds'] ? ITEM_STATUS_ACTIVE : ITEM_STATUS_DISABLED;
-				$config += $this->getItemStatusConfig($hostItems[$host], $templateItems['Template RDDS Test'], $status);
+				$rdds43_active = $rsmhostConfigs[$rsmhost]['rdds43'] && $probeConfigs[$probe]['rdds'];
+				$rdds80_active = $rsmhostConfigs[$rsmhost]['rdds80'] && $probeConfigs[$probe]['rdds'];
+				$rdds_active   = $rdds43_active || $rdds80_active;
 
-				//$status = $rsmhostConfigs[$rsmhost]['rdds80'] && $probeConfigs[$probe]['rdds'] ? ITEM_STATUS_ACTIVE : ITEM_STATUS_DISABLED;
-				//$config += $this->getItemStatusConfig($hostItems[$host], $templateItems['Template RDDS Test'], $status);
+				$rdds43_items = array_filter($templateItems['Template RDDS Test'], fn($key) => preg_match('/^rsm\.rdds\.43\./', $key));
+				$rdds80_items = array_filter($templateItems['Template RDDS Test'], fn($key) => preg_match('/^rsm\.rdds\.80\./', $key));
+				$rdds_items   = array_filter($templateItems['Template RDDS Test'], fn($key) => !preg_match('/^rsm\.rdds\.(43|80)\./', $key));
+
+				$status = $rdds43_active ? ITEM_STATUS_ACTIVE : ITEM_STATUS_DISABLED;
+				$config += $this->getItemStatusConfig($hostItems[$host], $rdds43_items, $status);
+
+				$status = $rdds80_active ? ITEM_STATUS_ACTIVE : ITEM_STATUS_DISABLED;
+				$config += $this->getItemStatusConfig($hostItems[$host], $rdds80_items, $status);
+
+				$status = $rdds_active ? ITEM_STATUS_ACTIVE : ITEM_STATUS_DISABLED;
+				$config += $this->getItemStatusConfig($hostItems[$host], $rdds_items, $status);
 			}
 		}
 
