@@ -381,6 +381,24 @@ out:
 	return ret;
 }
 
+/* 5000004, 3 - remove {$RSM.EPP.ENABLED} and {$RSM.TLD.EPP.ENABLED} macros from rsm.dns[] and rsm.rdds[] items */
+static int	DBpatch_5000004_3(void)
+{
+	int	ret = FAIL;
+
+	ONLY_SERVER();
+
+#define SQL	"update items set key_=replace(key_,'%s','') where key_ like '%s'"
+	DB_EXEC(SQL, "{$RSM.TLD.EPP.ENABLED}", "rsm.dns[%]");
+	DB_EXEC(SQL, "{$RSM.TLD.EPP.ENABLED}", "rsm.rdds[%]");
+	DB_EXEC(SQL, "{$RSM.EPP.ENABLED}"    , "rsm.rdds[%]");
+#undef SQL
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
 #endif
 
 DBPATCH_START(5000)
@@ -398,5 +416,6 @@ DBPATCH_ADD(5000003, 0, 0)
 DBPATCH_ADD(5000004, 0, 0)
 DBPATCH_RSM(5000004, 1, 0, 0)	/* create {$RSM.PROXY.IP}, {$RSM.PROXY.PORT} macros */
 DBPATCH_RSM(5000004, 2, 0, 1)	/* create provisioning_api_log table */
+DBPATCH_RSM(5000004, 3, 0, 0)	/* remove {$RSM.EPP.ENABLED} and {$RSM.TLD.EPP.ENABLED} macros from rsm.dns[] and rsm.rdds[] items */
 
 DBPATCH_END()
