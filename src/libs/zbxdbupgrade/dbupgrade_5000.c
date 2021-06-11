@@ -381,8 +381,26 @@ out:
 	return ret;
 }
 
-/* 5000004, 3 - split {$RSM.TLD.RDDS.ENABLED} macro into {$RSM.TLD.RDDS43.ENABLED} and {$RSM.TLD.RDDS80.ENABLED} */
+/* 5000004, 3 - remove {$RSM.EPP.ENABLED} and {$RSM.TLD.EPP.ENABLED} macros from rsm.dns[] and rsm.rdds[] items */
 static int	DBpatch_5000004_3(void)
+{
+	int	ret = FAIL;
+
+	ONLY_SERVER();
+
+#define SQL	"update items set key_=replace(key_,'%s','') where key_ like '%s'"
+	DB_EXEC(SQL, "{$RSM.TLD.EPP.ENABLED}", "rsm.dns[%]");
+	DB_EXEC(SQL, "{$RSM.TLD.EPP.ENABLED}", "rsm.rdds[%]");
+	DB_EXEC(SQL, "{$RSM.EPP.ENABLED}"    , "rsm.rdds[%]");
+#undef SQL
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
+/* 5000004, 4 - split {$RSM.TLD.RDDS.ENABLED} macro into {$RSM.TLD.RDDS43.ENABLED} and {$RSM.TLD.RDDS80.ENABLED} */
+static int	DBpatch_5000004_4(void)
 {
 	int		ret = FAIL;
 
@@ -432,8 +450,8 @@ out:
 	return ret;
 }
 
-/* 5000004, 4 - replace {$RSM.TLD.RDDS.ENABLED} macro with {$RSM.TLD.RDDS43.ENABLED} and {$RSM.TLD.RDDS80.ENABLED} in rsm.dns[] and rsm.rdds[] item keys */
-static int	DBpatch_5000004_4(void)
+/* 5000004, 5 - replace {$RSM.TLD.RDDS.ENABLED} macro with {$RSM.TLD.RDDS43.ENABLED} and {$RSM.TLD.RDDS80.ENABLED} in rsm.dns[] and rsm.rdds[] item keys */
+static int	DBpatch_5000004_5(void)
 {
 	int	ret = FAIL;
 
@@ -453,8 +471,8 @@ out:
 	return ret;
 }
 
-/* 5000004, 5 - split rdds.enabled item into rdds43.enabled and rdds80.enabled */
-static int	DBpatch_5000004_5(void)
+/* 5000004, 6 - split rdds.enabled item into rdds43.enabled and rdds80.enabled */
+static int	DBpatch_5000004_6(void)
 {
 	int		ret = FAIL;
 
@@ -612,8 +630,9 @@ DBPATCH_ADD(5000003, 0, 0)
 DBPATCH_ADD(5000004, 0, 0)
 DBPATCH_RSM(5000004, 1, 0, 0)	/* create {$RSM.PROXY.IP}, {$RSM.PROXY.PORT} macros */
 DBPATCH_RSM(5000004, 2, 0, 1)	/* create provisioning_api_log table */
-DBPATCH_RSM(5000004, 3, 0, 0)	/* split {$RSM.TLD.RDDS.ENABLED} macro into {$RSM.TLD.RDDS43.ENABLED} and {$RSM.TLD.RDDS80.ENABLED} */
-DBPATCH_RSM(5000004, 4, 0, 0)	/* replace {$RSM.TLD.RDDS.ENABLED} macro with {$RSM.TLD.RDDS43.ENABLED} and {$RSM.TLD.RDDS80.ENABLED} in rsm.dns[] and rsm.rdds[] item keys */
-DBPATCH_RSM(5000004, 5, 0, 0)	/* split rdds.enabled item into rdds43.enabled and rdds80.enabled */
+DBPATCH_RSM(5000004, 3, 0, 0)	/* remove {$RSM.EPP.ENABLED} and {$RSM.TLD.EPP.ENABLED} macros from rsm.dns[] and rsm.rdds[] items */
+DBPATCH_RSM(5000004, 4, 0, 0)	/* split {$RSM.TLD.RDDS.ENABLED} macro into {$RSM.TLD.RDDS43.ENABLED} and {$RSM.TLD.RDDS80.ENABLED} */
+DBPATCH_RSM(5000004, 5, 0, 0)	/* replace {$RSM.TLD.RDDS.ENABLED} macro with {$RSM.TLD.RDDS43.ENABLED} and {$RSM.TLD.RDDS80.ENABLED} in rsm.dns[] and rsm.rdds[] item keys */
+DBPATCH_RSM(5000004, 6, 0, 0)	/* split rdds.enabled item into rdds43.enabled and rdds80.enabled */
 
 DBPATCH_END()

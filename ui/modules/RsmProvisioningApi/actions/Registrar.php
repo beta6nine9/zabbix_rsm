@@ -37,21 +37,21 @@ class Registrar extends MonitoringTarget
 			case self::REQUEST_METHOD_GET:
 				return [
 					'type' => API_OBJECT, 'fields' => [
-						'id'                     => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateInt', 'min' => 1, 'error' => 'IANAID must be a positive integer'],
+						'id'                     => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateInt', 'min' => 1, 'error' => 'The IANAID must be a positive integer in the URL'],
 					]
 				];
 
 			case self::REQUEST_METHOD_DELETE:
 				return [
 					'type' => API_OBJECT, 'fields' => [
-						'id'                     => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateInt', 'min' => 1, 'error' => 'IANAID must be a positive integer'],
+						'id'                     => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateInt', 'min' => 1, 'error' => 'The IANAID must be a positive integer in the URL'],
 					]
 				];
 
 			case self::REQUEST_METHOD_PUT:
 				return [
 					'type' => API_OBJECT, 'fields' => [
-						'id'                     => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateInt', 'min' => 1, 'error' => 'IANAID must be a positive integer'],
+						'id'                     => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateInt', 'min' => 1, 'error' => 'The IANAID must be a positive integer in the URL'],
 						'registrarName'          => ['type' => API_STRING_UTF8],
 						'registrarFamily'        => ['type' => API_STRING_UTF8],
 						'servicesStatus'         => ['type' => API_OBJECTS    , 'uniq' => [['service']], 'fields' => [
