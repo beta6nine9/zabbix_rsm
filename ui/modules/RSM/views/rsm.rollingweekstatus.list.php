@@ -91,6 +91,37 @@ else {
 		(new CButton('checkAllServices', _('All/Any')))->addClass(ZBX_STYLE_BTN_LINK)
 	]);
 
+	// Subservices
+	$filter_column_2_components = [
+		new CSpan([
+			(new CCheckBox('filter_rdds43_subgroup'))->setChecked($data['filter_rdds43_subgroup']),
+			SPACE,
+			_(RSM_RDDS_SUBSERVICE_RDDS43)
+		], 'checkbox-block'),
+		SPACE,
+		new CSpan([
+			(new CCheckBox('filter_rdds80_subgroup'))->setChecked($data['filter_rdds80_subgroup']),
+			SPACE,
+			_(RSM_RDDS_SUBSERVICE_RDDS80)
+		], 'checkbox-block')
+	];
+
+	if (!is_RDAP_standalone()) {
+		$filter_column_2_components = array_merge($filter_column_2_components, [
+			SPACE,
+			new CSpan([
+				(new CCheckBox('filter_rdap_subgroup'))->setChecked($data['filter_rdap_subgroup']),
+				SPACE,
+				_(RSM_RDDS_SUBSERVICE_RDAP)
+			], 'checkbox-block')
+		]);
+	}
+
+	$filter_column_2_components = array_merge($filter_column_2_components, [
+		SPACE,
+		(new CButton('checkAllSubservices', _('All/Any')))->addClass(ZBX_STYLE_BTN_LINK)
+	]);
+
 	$filter_column_2 = (new CFormList())
 		->addRow((new CSpan(_('Services')))->addStyle('padding: 0 25px;'), $services_filter)
 		->addRow((new CSpan(_('TLD types')))->addStyle('padding: 0 25px;'), [
@@ -130,27 +161,9 @@ else {
 				_(RSM_TEST_GROUP)
 			], 'checkbox-block'),
 			SPACE,
-			(new CButton('checkAllGroups', _('All/Any')))->addClass(ZBX_STYLE_BTN_LINK)
-		]);
-
-	if (!is_RDAP_standalone()) {
-		$filter_column_2
-			->addRow((new CSpan(_('Enabled subservices')))->addStyle('padding: 0 25px;'), [
-				new CSpan([
-					(new CCheckBox('filter_rdds_subgroup'))->setChecked($data['filter_rdds_subgroup']),
-					SPACE,
-					_(RSM_RDDS_SUBSERVICE_RDDS)
-				], 'checkbox-block'),
-				SPACE,
-				new CSpan([
-					(new CCheckBox('filter_rdap_subgroup'))->setChecked($data['filter_rdap_subgroup']),
-					SPACE,
-					_(RSM_RDDS_SUBSERVICE_RDAP)
-				], 'checkbox-block'),
-				SPACE,
-				(new CButton('checkAllSubservices', _('All/Any')))->addClass(ZBX_STYLE_BTN_LINK)
-			]);
-	}
+			(new CButton('checkAllGroups', _('All/Any')))->addClass(ZBX_STYLE_BTN_LINK),
+		])
+		->addRow((new CSpan(_('Enabled subservices')))->addStyle('padding: 0 25px;'), $filter_column_2_components);
 
 	$filter_fields[] = $filter_column_2;
 }
@@ -281,16 +294,25 @@ if ($data['tld']) {
 			$rdds_subservices = null;
 
 			if (array_key_exists($service, $tld) && array_key_exists('trigger', $tld[$service])) {
-				if ($service === RSM_RDDS && !is_RDAP_standalone()) {
+
+				if ($service === RSM_RDDS) {
 					$subservices = [];
-					if (array_key_exists(RSM_TLD_RDDS_ENABLED, ($tld[$service]['subservices']))
-							&& $tld[RSM_RDDS]['subservices'][RSM_TLD_RDDS_ENABLED] != 0) {
-						$subservices[] = 'RDDS';
+
+					if (array_key_exists(RSM_TLD_RDDS43_ENABLED, ($tld[$service]['subservices']))
+							&& $tld[RSM_RDDS]['subservices'][RSM_TLD_RDDS43_ENABLED] != 0) {
+						$subservices[] = 'RDDS43';
 					}
 
-					if (array_key_exists(RSM_RDAP_TLD_ENABLED, ($tld[$service]['subservices'])) && !is_RDAP_standalone()
-							&& $tld[RSM_RDDS]['subservices'][RSM_RDAP_TLD_ENABLED] != 0) {
-						$subservices[] = 'RDAP';
+					if (array_key_exists(RSM_TLD_RDDS80_ENABLED, ($tld[$service]['subservices']))
+							&& $tld[RSM_RDDS]['subservices'][RSM_TLD_RDDS80_ENABLED] != 0) {
+						$subservices[] = 'RDDS80';
+					}
+
+					if (!is_RDAP_standalone()) {
+						if (array_key_exists(RSM_RDAP_TLD_ENABLED, ($tld[$service]['subservices']))
+										&& $tld[RSM_RDDS]['subservices'][RSM_RDAP_TLD_ENABLED] != 0) {
+							$subservices[] = 'RDAP';
+						}
 					}
 
 					$rdds_subservices = [SPACE, SPACE, SPACE, new CSpan(implode(' / ', $subservices), 'bold')];

@@ -229,8 +229,9 @@ define('RSM_G_TLD_GROUP',		'gTLD');
 define('RSM_OTHER_TLD_GROUP',	'otherTLD');
 define('RSM_TEST_GROUP',		'testTLD');
 
-define('RSM_RDDS_SUBSERVICE_RDDS',	'RDDS43/80');
-define('RSM_RDDS_SUBSERVICE_RDAP',	'RDAP');
+define('RSM_RDDS_SUBSERVICE_RDDS43',	'RDDS43');
+define('RSM_RDDS_SUBSERVICE_RDDS80',	'RDDS80');
+define('RSM_RDDS_SUBSERVICE_RDAP',		'RDAP');
 
 // Value maps used for special purpose.
 define('PROBES_MON_GROUPID',					130);
