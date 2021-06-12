@@ -388,7 +388,7 @@ static int	DBpatch_5000004_3(void)
 
 	ONLY_SERVER();
 
-#define SQL	"update items set key_=replace(key_,'%s','') where key_ like '%s'"
+#define SQL	"update items set key_=replace(key_,',%s','') where key_ like '%s'"
 	DB_EXEC(SQL, "{$RSM.TLD.EPP.ENABLED}", "rsm.dns[%]");
 	DB_EXEC(SQL, "{$RSM.TLD.EPP.ENABLED}", "rsm.rdds[%]");
 	DB_EXEC(SQL, "{$RSM.EPP.ENABLED}"    , "rsm.rdds[%]");
