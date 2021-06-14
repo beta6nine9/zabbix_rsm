@@ -352,9 +352,10 @@ static int	DBpatch_5000004_1(void)
 
 	ret = SUCCEED;
 out:
+	DBfree_result(result);
+
 	return ret;
 }
-
 
 /* 5000004, 2 - create provisioning_api_log table */
 static int	DBpatch_5000004_2(void)
@@ -399,8 +400,100 @@ out:
 	return ret;
 }
 
-/* 5000004, 4 - split {$RSM.TLD.RDDS.ENABLED} macro into {$RSM.TLD.RDDS43.ENABLED} and {$RSM.TLD.RDDS80.ENABLED} */
+/* 5000004, 4 - rename {$RSM.TLD.RDDS.43.SERVERS} to {$RSM.TLD.RDDS43.SERVER} */
 static int	DBpatch_5000004_4(void)
+{
+	int	ret = FAIL;
+
+	DB_RESULT	result = NULL;
+	DB_ROW		row;
+
+	ONLY_SERVER();
+
+	result = DBselect("select hostmacroid,value from hostmacro where macro='{$RSM.TLD.RDDS.43.SERVERS}'");
+
+	if (NULL == result)
+		goto out;
+
+	while (NULL != (row = DBfetch(result)))
+	{
+		const char	*macroid = row[0];
+		const char	*value   = row[1];
+
+		if (NULL != strchr(value, ','))
+		{
+			zabbix_log(LOG_LEVEL_CRIT, "%s() on line %d: macro contains more than one server: '%s' (id: %s)",
+					__func__, __LINE__, value, macroid);
+			goto out;
+		}
+
+		DB_EXEC("update hostmacro set macro='{$RSM.TLD.RDDS43.SERVER}' where hostmacroid=%s", macroid);
+	}
+
+	ret = SUCCEED;
+out:
+	DBfree_result(result);
+
+	return ret;
+}
+
+/* 5000004, 5 - rename {$RSM.TLD.RDDS.80.SERVERS} to {$RSM.TLD.RDDS80.URL} */
+static int	DBpatch_5000004_5(void)
+{
+	int	ret = FAIL;
+
+	DB_RESULT	result = NULL;
+	DB_ROW		row;
+
+	ONLY_SERVER();
+
+	result = DBselect("select hostmacroid,value from hostmacro where macro='{$RSM.TLD.RDDS.80.SERVERS}'");
+
+	if (NULL == result)
+		goto out;
+
+	while (NULL != (row = DBfetch(result)))
+	{
+		const char	*macroid = row[0];
+		const char	*value   = row[1];
+
+		if (NULL != strchr(value, ','))
+		{
+			zabbix_log(LOG_LEVEL_CRIT, "%s() on line %d: macro contains more than one server: '%s' (id: %s)",
+					__func__, __LINE__, value, macroid);
+			goto out;
+		}
+
+		DB_EXEC("update hostmacro set macro='{$RSM.TLD.RDDS80.URL}',value='http://%s/' where hostmacroid=%s",
+				value, macroid);
+	}
+
+	ret = SUCCEED;
+out:
+	DBfree_result(result);
+
+	return ret;
+}
+
+/* 5000004, 6 - update rsm.rdds[] items to use {$RSM.TLD.RDDS43.SERVER} and {$RSM.TLD.RDDS80.URL} */
+static int	DBpatch_5000004_6(void)
+{
+	int	ret = FAIL;
+
+	ONLY_SERVER();
+
+#define SQL	"update items set key_=replace(key_,'%s','%s') where key_ like 'rsm.rdds[%%]'"
+	DB_EXEC(SQL, "{$RSM.TLD.RDDS.43.SERVERS}", "{$RSM.TLD.RDDS43.SERVER}");
+	DB_EXEC(SQL, "{$RSM.TLD.RDDS.80.SERVERS}", "{$RSM.TLD.RDDS80.URL}");
+#undef SQL
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
+/* 5000004, 7 - split {$RSM.TLD.RDDS.ENABLED} macro into {$RSM.TLD.RDDS43.ENABLED} and {$RSM.TLD.RDDS80.ENABLED} */
+static int	DBpatch_5000004_7(void)
 {
 	int		ret = FAIL;
 
@@ -450,8 +543,8 @@ out:
 	return ret;
 }
 
-/* 5000004, 5 - replace {$RSM.TLD.RDDS.ENABLED} macro with {$RSM.TLD.RDDS43.ENABLED} and {$RSM.TLD.RDDS80.ENABLED} in rsm.dns[] and rsm.rdds[] item keys */
-static int	DBpatch_5000004_5(void)
+/* 5000004, 8 - replace {$RSM.TLD.RDDS.ENABLED} macro with {$RSM.TLD.RDDS43.ENABLED} and {$RSM.TLD.RDDS80.ENABLED} in rsm.dns[] and rsm.rdds[] item keys */
+static int	DBpatch_5000004_8(void)
 {
 	int	ret = FAIL;
 
@@ -471,8 +564,8 @@ out:
 	return ret;
 }
 
-/* 5000004, 6 - split rdds.enabled item into rdds43.enabled and rdds80.enabled */
-static int	DBpatch_5000004_6(void)
+/* 5000004, 9 - split rdds.enabled item into rdds43.enabled and rdds80.enabled */
+static int	DBpatch_5000004_9(void)
 {
 	int		ret = FAIL;
 
@@ -631,8 +724,11 @@ DBPATCH_ADD(5000004, 0, 0)
 DBPATCH_RSM(5000004, 1, 0, 0)	/* create {$RSM.PROXY.IP}, {$RSM.PROXY.PORT} macros */
 DBPATCH_RSM(5000004, 2, 0, 1)	/* create provisioning_api_log table */
 DBPATCH_RSM(5000004, 3, 0, 0)	/* remove {$RSM.EPP.ENABLED} and {$RSM.TLD.EPP.ENABLED} macros from rsm.dns[] and rsm.rdds[] items */
-DBPATCH_RSM(5000004, 4, 0, 0)	/* split {$RSM.TLD.RDDS.ENABLED} macro into {$RSM.TLD.RDDS43.ENABLED} and {$RSM.TLD.RDDS80.ENABLED} */
-DBPATCH_RSM(5000004, 5, 0, 0)	/* replace {$RSM.TLD.RDDS.ENABLED} macro with {$RSM.TLD.RDDS43.ENABLED} and {$RSM.TLD.RDDS80.ENABLED} in rsm.dns[] and rsm.rdds[] item keys */
-DBPATCH_RSM(5000004, 6, 0, 0)	/* split rdds.enabled item into rdds43.enabled and rdds80.enabled */
+DBPATCH_RSM(5000004, 4, 0, 0)	/* rename {$RSM.TLD.RDDS.43.SERVERS} to {$RSM.TLD.RDDS43.SERVER} */
+DBPATCH_RSM(5000004, 5, 0, 0)	/* rename {$RSM.TLD.RDDS.80.SERVERS} to {$RSM.TLD.RDDS80.URL} */
+DBPATCH_RSM(5000004, 6, 0, 0)	/* update rsm.rdds[] items to use {$RSM.TLD.RDDS43.SERVER} and {$RSM.TLD.RDDS80.URL} */
+DBPATCH_RSM(5000004, 7, 0, 0)	/* split {$RSM.TLD.RDDS.ENABLED} macro into {$RSM.TLD.RDDS43.ENABLED} and {$RSM.TLD.RDDS80.ENABLED} */
+DBPATCH_RSM(5000004, 8, 0, 0)	/* replace {$RSM.TLD.RDDS.ENABLED} macro with {$RSM.TLD.RDDS43.ENABLED} and {$RSM.TLD.RDDS80.ENABLED} in rsm.dns[] and rsm.rdds[] item keys */
+DBPATCH_RSM(5000004, 9, 0, 0)	/* split rdds.enabled item into rdds43.enabled and rdds80.enabled */
 
 DBPATCH_END()
