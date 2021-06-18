@@ -194,6 +194,20 @@ abstract class ActionBase extends CController
 
 	protected function rsmValidateInput(): void
 	{
+		if ($_SERVER['REQUEST_METHOD'] === self::REQUEST_METHOD_PUT)
+		{
+			array_walk_recursive(
+				$this->input,
+				function($v, $k)
+				{
+					if (is_null($v))
+					{
+						throw new RsmException(400, 'JSON does not comply with definition', 'Value of the "' . $k . '" element is NULL');
+					}
+				}
+			);
+		}
+
 		$rules = $this->getInputRules();
 		$error = null;
 

@@ -281,6 +281,7 @@ class Probe extends ActionBaseEx
 
 	protected function updateObject(): void
 	{
+		$this->hostGroupIds += $this->getHostGroupIds($this->getHostGroupNames(null));
 		$this->templateIds += $this->getTemplateIds($this->getTemplateNames(null));
 
 		// update proxy
@@ -316,13 +317,15 @@ class Probe extends ActionBaseEx
 
 		$config = [
 			'hostid' => $this->getHostId($this->newObject['id']),
+			'status' => HOST_STATUS_MONITORED,
 		];
 		$data = API::Host()->update($config);
 
 		// update "<probe> - mon" host
 
 		$config = [
-			'hostid'     => $this->getHostId($this->newObject['id'] . ' - mon'),
+			'hostid' => $this->getHostId($this->newObject['id'] . ' - mon'),
+			'status' => HOST_STATUS_MONITORED,
 			'interfaces' => [
 				[
 					'type'  => INTERFACE_TYPE_AGENT,
@@ -336,13 +339,16 @@ class Probe extends ActionBaseEx
 		];
 		$data = API::Host()->update($config);
 
-		// enable/disable items, based on service status and standalone rdap status
-
-		$testHosts = $this->getHostsByHostGroup($this->newObject['id'], null, null);
+		// update "<rsmhost> <probe>" hosts
 
 		$rsmhostConfigs = $this->getRsmhostConfigs();
 		$probeConfigs = $this->getProbeConfigFromInput($proxyId);
 
+		$this->updateTestHosts($rsmhostConfigs, $probeConfigs);
+
+		// enable/disable items, based on service status and standalone rdap status
+
+		$testHosts = $this->getHostsByHostGroup($this->newObject['id'], null, null);
 		$this->updateServiceItemStatus([], $testHosts, $rsmhostConfigs, $probeConfigs);
 	}
 
@@ -419,14 +425,19 @@ class Probe extends ActionBaseEx
 	{
 		$services = array_column($this->newObject['servicesStatus'], 'enabled', 'service');
 
+		$config = [
+			'proxy_hostid' => $proxyId,
+			'enabled'      => null,
+			'ipv4'         => $this->newObject['zabbixProxyParameters']['ipv4Enable'],
+			'ipv6'         => $this->newObject['zabbixProxyParameters']['ipv6Enable'],
+			'rdap'         => $services['rdap'],
+			'rdds'         => $services['rdds'],
+		];
+
+		$config['enabled'] = $config['ipv4'] || $config['ipv6'];
+
 		return [
-			$this->newObject['id'] => [
-				'proxy_hostid' => $proxyId,
-				'ipv4'         => $this->newObject['zabbixProxyParameters']['ipv4Enable'],
-				'ipv6'         => $this->newObject['zabbixProxyParameters']['ipv6Enable'],
-				'rdap'         => $services['rdap'],
-				'rdds'         => $services['rdds'],
-			],
+			$this->newObject['id'] => $config,
 		];
 	}
 

@@ -135,9 +135,11 @@ abstract class ActionBaseEx extends ActionBase
 		{
 			foreach ($probeConfigs as $probe => $probeConfig)
 			{
+				$enabled = $rsmhostConfig['enabled'] && $probeConfig['enabled'];
+
 				$configs[] = [
 					'host'         => $rsmhost . ' ' . $probe,
-					'status'       => HOST_STATUS_MONITORED,
+					'status'       => $enabled ? HOST_STATUS_MONITORED : HOST_STATUS_NOT_MONITORED,
 					'proxy_hostid' => $probeConfig['proxy_hostid'],
 					'interfaces'   => [self::DEFAULT_MAIN_INTERFACE],
 					'groups'       => $this->getTestHostGroupsConfig($rsmhostConfig['tldType'], $probe, $rsmhost),
@@ -201,9 +203,11 @@ abstract class ActionBaseEx extends ActionBase
 		{
 			foreach ($probeConfigs as $probe => $probeConfig)
 			{
+				$enabled = $rsmhostConfig['enabled'] && $probeConfig['enabled'];
+
 				$configs[] = [
 					'hostid' => $hostids[$rsmhost . ' ' . $probe],
-					'status' => HOST_STATUS_MONITORED,
+					'status' => $enabled ? HOST_STATUS_MONITORED : HOST_STATUS_NOT_MONITORED,
 					'groups' => $this->getTestHostGroupsConfig($rsmhostConfig['tldType'], $probe, $rsmhost),
 				];
 			}
@@ -499,13 +503,18 @@ abstract class ActionBaseEx extends ActionBase
 
 		foreach ($hosts as $hostid => $host)
 		{
-			$result[$host] = [
+			$config = [
 				'proxy_hostid' => $proxies[$hostid],
+				'enabled'      => null,
 				'ipv4'         => (bool)$macros[$host][self::MACRO_PROBE_IP4_ENABLED],
 				'ipv6'         => (bool)$macros[$host][self::MACRO_PROBE_IP6_ENABLED],
 				'rdap'         => (bool)$macros[$host][self::MACRO_PROBE_RDAP_ENABLED],
 				'rdds'         => (bool)$macros[$host][self::MACRO_PROBE_RDDS_ENABLED],
 			];
+
+			$config['enabled'] = $config['ipv4'] || $config['ipv6'];
+
+			$result[$host] = $config;
 		}
 
 		return $result;
@@ -513,6 +522,8 @@ abstract class ActionBaseEx extends ActionBase
 
 	protected function getRsmhostConfigs(): array
 	{
+		// Warning: This method is used from Probe.php and cannot be moved to Tld.php and Registrar.php
+
 		// get 'TLDs' host group id
 		$this->hostGroupIds += $this->getHostGroupIds(['TLDs']);
 
@@ -552,15 +563,40 @@ abstract class ActionBaseEx extends ActionBase
 
 		foreach ($hosts as $host)
 		{
-			$result[$host] = [
-				'tldType' => $tldTypes[$host],
-				'dnsUdp'  => (bool)$macros[$host][self::MACRO_TLD_DNS_UDP_ENABLED],
-				'dnsTcp'  => (bool)$macros[$host][self::MACRO_TLD_DNS_TCP_ENABLED],
-				'dnssec'  => (bool)$macros[$host][self::MACRO_TLD_DNSSEC_ENABLED],
-				'rdap'    => (bool)$macros[$host][self::MACRO_TLD_RDAP_ENABLED],
-				'rdds43'  => (bool)$macros[$host][self::MACRO_TLD_RDDS_ENABLED],
-				'rdds80'  => (bool)$macros[$host][self::MACRO_TLD_RDDS_ENABLED],
-			];
+			$config = null;
+
+			switch ($this->getMonitoringTarget())
+			{
+				case self::MONITORING_TARGET_REGISTRY:
+					$config = [
+						'tldType' => $tldTypes[$host],
+						'enabled' => null,
+						'dnsUdp'  => (bool)$macros[$host][self::MACRO_TLD_DNS_UDP_ENABLED],
+						'dnsTcp'  => (bool)$macros[$host][self::MACRO_TLD_DNS_TCP_ENABLED],
+						'dnssec'  => (bool)$macros[$host][self::MACRO_TLD_DNSSEC_ENABLED],
+						'rdap'    => (bool)$macros[$host][self::MACRO_TLD_RDAP_ENABLED],
+						'rdds43'  => (bool)$macros[$host][self::MACRO_TLD_RDDS_ENABLED],
+						'rdds80'  => (bool)$macros[$host][self::MACRO_TLD_RDDS_ENABLED],
+					];
+					break;
+
+				case self::MONITORING_TARGET_REGISTRAR:
+					$config = [
+						'tldType' => $tldTypes[$host],
+						'enabled' => null,
+						'rdap'    => (bool)$macros[$host][self::MACRO_TLD_RDAP_ENABLED],
+						'rdds43'  => (bool)$macros[$host][self::MACRO_TLD_RDDS_ENABLED],
+						'rdds80'  => (bool)$macros[$host][self::MACRO_TLD_RDDS_ENABLED],
+					];
+					break;
+
+				default:
+					throw new Exception('Unsupported monitoring target');
+			}
+
+			$config['enabled'] = $config['dnsUdp'] || $config['dnsTcp'];
+
+			$result[$host] = $config;
 		}
 
 		return $result;
