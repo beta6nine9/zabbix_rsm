@@ -273,6 +273,7 @@ class Registrar extends MonitoringTarget
 		return [
 			$this->newObject['id'] => [
 				'tldType' => 'gTLD',
+				'enabled' => $services['rdap'] || $services['rdds43'] || $services['rdds80'],
 				'rdap'    => $services['rdap'],
 				'rdds43'  => $services['rdds43'],
 				'rdds80'  => $services['rdds80'],

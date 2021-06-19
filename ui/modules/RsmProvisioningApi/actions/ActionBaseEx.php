@@ -578,6 +578,7 @@ abstract class ActionBaseEx extends ActionBase
 						'rdds43'  => (bool)$macros[$host][self::MACRO_TLD_RDDS_ENABLED],
 						'rdds80'  => (bool)$macros[$host][self::MACRO_TLD_RDDS_ENABLED],
 					];
+					$config['enabled'] = $config['dnsUdp'] || $config['dnsTcp'];
 					break;
 
 				case self::MONITORING_TARGET_REGISTRAR:
@@ -588,13 +589,12 @@ abstract class ActionBaseEx extends ActionBase
 						'rdds43'  => (bool)$macros[$host][self::MACRO_TLD_RDDS_ENABLED],
 						'rdds80'  => (bool)$macros[$host][self::MACRO_TLD_RDDS_ENABLED],
 					];
+					$config['enabled'] = $config['rdap'] || $config['rdds43'] || $config['rdds80'];
 					break;
 
 				default:
 					throw new Exception('Unsupported monitoring target');
 			}
-
-			$config['enabled'] = $config['dnsUdp'] || $config['dnsTcp'];
 
 			$result[$host] = $config;
 		}
