@@ -102,7 +102,7 @@ class Input
 	{
 		// Must be kept in sync with checks in module's RsmValidateProbeIdentifier().
 
-		return preg_match('/^[a-zA-Z0-9_\-]+$/', $data);
+		return preg_match('/^[a-zA-Z0-9_\-]+$/', $id);
 	}
 
 	public static function getObjectType(): string
@@ -119,6 +119,4 @@ class Input
 	{
 		return file_get_contents('php://input');
 	}
-
-
 }

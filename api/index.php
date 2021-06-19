@@ -283,6 +283,10 @@ function handlePutRequest(string $objectType, ?string $objectId, string $payload
 	}
 	else
 	{
+		if (!is_int($serverIdRequested))
+		{
+			throw new RsmException(400, 'JSON does not comply with definition', 'centralServer should be an integer');
+		}
 		if (!array_key_exists($serverIdRequested, getConfig('frontends')))
 		{
 			throw new RsmException(400, 'The centralServer does not exist in the system.');

@@ -400,16 +400,21 @@ class Tld extends MonitoringTarget
 	{
 		$services = array_column($this->newObject['servicesStatus'], 'enabled', 'service');
 
+		$config = [
+			'tldType' => $this->newObject['tldType'],
+			'enabled' => null,
+			'dnsUdp'  => $services['dnsUDP'],
+			'dnsTcp'  => $services['dnsTCP'],
+			'dnssec'  => $this->newObject['dnsParameters']['dnssecEnabled'],
+			'rdap'    => $services['rdap'],
+			'rdds43'  => $services['rdds43'],
+			'rdds80'  => $services['rdds80'],
+		];
+
+		$config['enabled'] = $config['dnsUdp'] || $config['dnsTcp'];
+
 		return [
-			$this->newObject['id'] => [
-				'tldType' => $this->newObject['tldType'],
-				'dnsUdp'  => $services['dnsUDP'],
-				'dnsTcp'  => $services['dnsTCP'],
-				'dnssec'  => $this->newObject['dnsParameters']['dnssecEnabled'],
-				'rdap'    => $services['rdap'],
-				'rdds43'  => $services['rdds43'],
-				'rdds80'  => $services['rdds80'],
-			],
+			$this->newObject['id'] => $config,
 		];
 	}
 
