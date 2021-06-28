@@ -103,7 +103,7 @@ if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
 }
 $details[_('Service')] = $data['slvItem']['name'];
 $details[_('Incident type')] = $incident_type;
-if ($data['type'] == RSM_RDDS && !$data['is_rdap_standalone']) {
+if ($data['type'] == RSM_RDDS) {
 	$details[_('Current testing interface')] = $data['testing_interfaces'];
 }
 

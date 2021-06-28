@@ -263,14 +263,15 @@ class CSlaReport
 
 		// get RDDS and RDAP status (enabled/disabled)
 
-		$rdds_status = self::getServiceStatus($tlds, $from, $till, "rdds");
+		$rdds43_status = self::getServiceStatus($tlds, $from, $till, "rdds43");
+		$rdds80_status = self::getServiceStatus($tlds, $from, $till, "rdds80");
 		$rdap_status = self::getServiceStatus($tlds, $from, $till, "rdap");
 
 		if (self::isRdapStandalone($from))
 		{
 			foreach ($data as $hostid => $tld)
 			{
-				$data[$hostid]["rdds"]["enabled"] = $rdds_status[$tld["host"]];
+				$data[$hostid]["rdds"]["enabled"] = $rdds43_status[$tld["host"]] || $rdds80_status[$tld["host"]];
 				$data[$hostid]["rdap"]["enabled"] = $rdap_status[$tld["host"]];
 			}
 		}

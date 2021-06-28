@@ -80,6 +80,9 @@ class ParticularTestsListAction extends Action {
 		$data['test_time_from'] = $test_time_from;
 		$data['is_rdap_standalone'] = is_RDAP_standalone($test_time_from);
 
+		$data['tld_rdds_enabled'] = false;
+		$data['tld_rdap_enabled'] = false;
+
 		if ($data['type'] == RSM_RDAP && !$data['is_rdap_standalone']) {
 			error(_('RDAP wasn\'t a standalone service at requested time!'));
 			return;
@@ -192,7 +195,7 @@ class ParticularTestsListAction extends Action {
 				'preservekeys' => true
 			]);
 
-			$user_macros_filter = [RSM_TLD_RDDS_ENABLED];
+			$user_macros_filter = [RSM_TLD_RDDS43_ENABLED, RSM_TLD_RDDS80_ENABLED];
 			if ($data['type'] == RSM_RDDS || is_RDAP_standalone($test_time_from)) {
 				$user_macros_filter = array_merge($user_macros_filter, [RSM_RDAP_TLD_ENABLED]);
 			}
@@ -333,14 +336,15 @@ class ParticularTestsListAction extends Action {
 				'output' => ['itemid', 'key_'],
 				'hostids' => $data['tld']['hostid'],
 				'filter' => [
-					'key_' => [RDAP_ENABLED, RDDS_ENABLED]
+					'key_' => [RDAP_ENABLED, RDDS43_ENABLED, RDDS80_ENABLED]
 				]
 			]) : null;
 
 			if ($_enabled_itemid) {
 				$_enabled_item_map = [
 					RDAP_ENABLED => null,
-					RDDS_ENABLED => null
+					RDDS43_ENABLED => null,
+					RDDS80_ENABLED => null
 				];
 
 				foreach ($_enabled_itemid as $_enabled_itemid) {
@@ -356,7 +360,8 @@ class ParticularTestsListAction extends Action {
 				}
 				// Since RDAP is separate service, no need to process RDDS data anymore.
 				if ($data['type'] == RSM_RDAP) {
-					unset($_enabled_item_map[RDDS_ENABLED]);
+					unset($_enabled_item_map[RDDS43_ENABLED]);
+					unset($_enabled_item_map[RDDS80_ENABLED]);
 				}
 
 				foreach ($_enabled_item_map as $_enabled_item => $_enabled_itemid) {
@@ -381,8 +386,8 @@ class ParticularTestsListAction extends Action {
 						 * and assumes that service was enabled whole cycle if at least in one minute it was enabled.
 						 *
 						 * Example:
-						 * Historically RDDS_ENABLED is collected each minute. Historically test cycle was minute long.
-						 * Now test cycle is 5 minutes long during which RDDS_ENABLED can be both enabled and disabled. So,
+						 * Historically RDDS(43/80)_ENABLED is collected each minute. Historically test cycle was minute long.
+						 * Now test cycle is 5 minutes long during which RDDS(43/80)_ENABLED can be both enabled and disabled. So,
 						 * with this workaround we consider it as enabled if at least one minute it was enabled or disabled
 						 * if all 5 minutes it was disabled.
 						 */
@@ -391,8 +396,12 @@ class ParticularTestsListAction extends Action {
 							$history_value = $history_value[0];
 
 							switch ($history_value['itemid']) {
-								case $_enabled_item_map[RDDS_ENABLED]:
-									$data['tld']['macros'][RSM_TLD_RDDS_ENABLED] = $history_value['value'];
+								case $_enabled_item_map[RDDS43_ENABLED]:
+									$data['tld']['macros'][RSM_TLD_RDDS43_ENABLED] = $history_value['value'];
+									break;
+
+								case $_enabled_item_map[RDDS80_ENABLED]:
+									$data['tld']['macros'][RSM_TLD_RDDS80_ENABLED] = $history_value['value'];
 									break;
 
 								case $_enabled_item_map[RDAP_ENABLED]:
@@ -403,14 +412,6 @@ class ParticularTestsListAction extends Action {
 					}
 				}
 			}
-		}
-
-		if (array_key_exists(RSM_RDAP_TLD_ENABLED, $data['tld']['macros'])
-				&& $data['tld']['macros'][RSM_RDAP_TLD_ENABLED] != 0) {
-			$data['tld_rdap_enabled'] = true;
-		}
-		else {
-			$data['tld_rdap_enabled'] = false;
 		}
 
 		// Get probe status.
@@ -522,6 +523,8 @@ class ParticularTestsListAction extends Action {
 			$probe_item_key = [];
 
 			if (!isset($data['tld']['macros'][RSM_RDAP_TLD_ENABLED]) || $data['tld']['macros'][RSM_RDAP_TLD_ENABLED] != 0) {
+				$data['tld_rdap_enabled'] = true;
+
 				$items_to_check[] = PROBE_RDAP_IP;
 				$items_to_check[] = PROBE_RDAP_RTT;
 				$items_to_check[] = PROBE_RDAP_TARGET;
@@ -541,6 +544,8 @@ class ParticularTestsListAction extends Action {
 			// RDAP should be under type=RSM_RDDS only if it is not enabled as standalone service.
 			if ((!isset($data['tld']['macros'][RSM_RDAP_TLD_ENABLED]) || $data['tld']['macros'][RSM_RDAP_TLD_ENABLED] != 0)
 					&& !is_RDAP_standalone($test_time_from)) {
+				$data['tld_rdds_enabled'] = true;
+
 				$items_to_check[] = PROBE_RDAP_IP;
 				$items_to_check[] = PROBE_RDAP_RTT;
 				$items_to_check[] = PROBE_RDAP_TARGET;
@@ -548,12 +553,20 @@ class ParticularTestsListAction extends Action {
 				$items_to_check[] = PROBE_RDAP_STATUS;
 			}
 
-			if (!isset($data['tld']['macros'][RSM_TLD_RDDS_ENABLED]) || $data['tld']['macros'][RSM_TLD_RDDS_ENABLED] != 0) {
+			if (!isset($data['tld']['macros'][RSM_TLD_RDDS43_ENABLED]) || $data['tld']['macros'][RSM_TLD_RDDS43_ENABLED] != 0) {
+				$data['tld_rdds_enabled'] = true;
+
 				$items_to_check[] = PROBE_RDDS43_IP;
 				$items_to_check[] = PROBE_RDDS43_RTT;
 				$items_to_check[] = PROBE_RDDS43_TARGET;
 				$items_to_check[] = PROBE_RDDS43_TESTEDNAME;
 				$items_to_check[] = PROBE_RDDS43_STATUS;
+				$items_to_check[] = PROBE_RDDS_STATUS;
+			}
+
+			if (!isset($data['tld']['macros'][RSM_TLD_RDDS80_ENABLED]) || $data['tld']['macros'][RSM_TLD_RDDS80_ENABLED] != 0) {
+				$data['tld_rdds_enabled'] = true;
+
 				$items_to_check[] = PROBE_RDDS80_IP;
 				$items_to_check[] = PROBE_RDDS80_RTT;
 				$items_to_check[] = PROBE_RDDS80_TARGET;
@@ -569,15 +582,6 @@ class ParticularTestsListAction extends Action {
 		else {
 			$probe_item_key = ' AND (i.key_ LIKE ('.zbx_dbstr(PROBE_EPP_RESULT.'%').')'.
 			' OR '.dbConditionString('i.key_', [PROBE_EPP_IP, PROBE_EPP_UPDATE, PROBE_EPP_INFO, PROBE_EPP_LOGIN]).')';
-		}
-
-		// Set if RDDS is enabled on a TLD level
-		if (array_key_exists(RSM_TLD_RDDS_ENABLED, $data['tld']['macros'])
-						&& $data['tld']['macros'][RSM_TLD_RDDS_ENABLED] != 0) {
-			$data['tld_rdds_enabled'] = true;
-		}
-		else {
-			$data['tld_rdds_enabled'] = false;
 		}
 
 		if ($test_result['value'] != UP_INCONCLUSIVE_RECONFIG) {

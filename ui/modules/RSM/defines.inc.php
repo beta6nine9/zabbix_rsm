@@ -45,7 +45,6 @@ define('RSM_RDDS_ENABLED',			'{$RSM.RDDS.ENABLED}');
 define('RSM_RDAP_ENABLED',			'{$RSM.RDAP.ENABLED}');
 define('RSM_TLD_DNSSEC_ENABLED',	'{$RSM.TLD.DNSSEC.ENABLED}');
 define('RSM_TLD_EPP_ENABLED',		'{$RSM.TLD.EPP.ENABLED}');
-define('RSM_TLD_RDDS_ENABLED',		'{$RSM.TLD.RDDS.ENABLED}');
 define('RSM_TLD_RDDS43_ENABLED',	'{$RSM.TLD.RDDS43.ENABLED}');
 define('RSM_TLD_RDDS80_ENABLED',	'{$RSM.TLD.RDDS80.ENABLED}');
 define('RSM_PROBE_AVAIL_LIMIT',		'{$RSM.PROBE.AVAIL.LIMIT}');
@@ -53,7 +52,8 @@ define('RSM_RDAP_TLD_ENABLED',		'{$RDAP.TLD.ENABLED}');
 define('RSM_SLV_DNS_NS_UPD',		'{$RSM.SLV.DNS.NS.UPD}');
 define('RSM_DNS_UPDATE_TIME',		'{$RSM.DNS.UPDATE.TIME}');
 define('RDAP_BASE_URL',				'{$RDAP.BASE.URL}');
-define('RDDS_ENABLED',				'rdds.enabled');
+define('RDDS43_ENABLED',			'rdds43.enabled');
+define('RDDS80_ENABLED',			'rdds80.enabled');
 define('RDAP_ENABLED',				'rdap.enabled');
 
 // Wow often do we save history of Probe ONLINE status.

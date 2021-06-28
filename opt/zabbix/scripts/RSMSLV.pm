@@ -1158,6 +1158,7 @@ sub __tld_service_enabled($$$)
 	if ($service eq 'rdds')
 	{
 		return 1 if (tld_interface_enabled($tld, 'rdds43', $now));
+		return 1 if (tld_interface_enabled($tld, 'rdds80', $now));
 		return 1 if (tld_interface_enabled($tld, 'rdap', $now) && !is_rdap_standalone($now));
 		return 0;
 	}
@@ -1170,11 +1171,6 @@ sub __tld_service_enabled($$$)
 sub enabled_item_key_from_interface
 {
 	my $interface = shift;
-
-	if ($interface eq 'rdds43' || $interface eq 'rdds80')
-	{
-		return 'rdds.enabled';
-	}
 
 	return "$interface.enabled";
 }
@@ -1392,10 +1388,6 @@ sub tld_interface_enabled($$$)
 	if ($interface eq 'rdap')
 	{
 		$macro = '{$RDAP.TLD.ENABLED}';
-	}
-	elsif ($interface eq 'rdds43' || $interface eq 'rdds80')
-	{
-		$macro = '{$RSM.TLD.RDDS.ENABLED}';
 	}
 	else
 	{

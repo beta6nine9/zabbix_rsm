@@ -221,17 +221,19 @@ class IncidentDetailsAction extends Action {
 						'hostids' => $template['templateid'],
 						'filter' => [
 							'macro' => $data['is_rdap_standalone']
-								? [RSM_TLD_RDDS43_ENABLED, RSM_TLD_RDDS80_ENABLED, RSM_TLD_RDDS_ENABLED]
-								: [RSM_TLD_RDDS43_ENABLED, RSM_TLD_RDDS80_ENABLED, RSM_RDAP_TLD_ENABLED,
-										RSM_RDAP_TLD_ENABLED, RSM_TLD_RDDS_ENABLED]
+								? [RSM_TLD_RDDS43_ENABLED, RSM_TLD_RDDS80_ENABLED]
+								: [RSM_TLD_RDDS43_ENABLED, RSM_TLD_RDDS80_ENABLED, RSM_RDAP_TLD_ENABLED]
 						]
 					]);
 
 					foreach ($template_macros as $template_macro) {
 						$data['tld']['subservices'][$template_macro['macro']] = $template_macro['value'];
 
-						if ($template_macro['macro'] === RSM_TLD_RDDS_ENABLED && $template_macro['value'] != 0) {
-							$ok_rdds_services[] = 'RDDS';
+						if ($template_macro['macro'] === RSM_TLD_RDDS43_ENABLED && $template_macro['value'] != 0) {
+							$ok_rdds_services[] = 'RDDS43';
+						}
+						elseif ($template_macro['macro'] === RSM_TLD_RDDS80_ENABLED && $template_macro['value'] != 0) {
+							$ok_rdds_services[] = 'RDDS80';
 						}
 						elseif ($template_macro['macro'] === RSM_RDAP_TLD_ENABLED && $template_macro['value'] != 0) {
 							$ok_rdds_services[] = 'RDAP';
