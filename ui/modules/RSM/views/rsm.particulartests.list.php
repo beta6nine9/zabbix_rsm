@@ -124,6 +124,9 @@ $show_totals = false;
 foreach ($data['probes'] as $probe) {
 	$status = null;
 
+	$probe_down = false;
+	$probe_no_result = false;
+
 	if (isset($probe['rdds43']['rtt']) || isset($probe['rdds80']['rtt']) || isset($probe['rdap']['rtt'])) {
 		$show_totals = true;
 	}
@@ -142,8 +145,6 @@ foreach ($data['probes'] as $probe) {
 		$offline_probes++;
 	}
 	else {
-		$probe_down = false;
-		$probe_no_result = false;
 		$rdds = ZBX_STYLE_GREEN;
 
 		if ($data['type'] == RSM_RDDS) {
