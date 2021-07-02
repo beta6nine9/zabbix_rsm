@@ -279,7 +279,7 @@ class CSlaReport
 		{
 			foreach ($data as $hostid => $tld)
 			{
-				$data[$hostid]["rdds"]["enabled"] = $rdds_status[$tld["host"]] || $rdap_status[$tld["host"]];
+				$data[$hostid]["rdds"]["enabled"] = $rdds43_status[$tld["host"]] || $rdds80_status[$tld["host"]] || $rdap_status[$tld["host"]];
 			}
 		}
 
