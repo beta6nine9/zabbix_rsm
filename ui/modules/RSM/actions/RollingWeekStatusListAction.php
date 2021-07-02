@@ -780,6 +780,11 @@ class RollingWeekStatusListAction extends Action {
 		// Filter RDDS subservices.
 		if ($data['filter_rdap_subgroup'] || $data['filter_rdds43_subgroup'] || $data['filter_rdds80_subgroup']) {
 			foreach ($data['tld'] as $key => $tld) {
+				if (is_RDAP_standalone() && !array_key_exists(RSM_RDDS, $tld)) {
+					// do not let RDDS subservices affect RDAP-only enabled Rsmhosts in Standalone RDAP mode
+					continue;
+				}
+
 				if (!array_key_exists(RSM_RDDS, $tld) || !array_key_exists('subservices', $tld[RSM_RDDS])) {
 					unset($data['tld'][$key]);
 					continue;

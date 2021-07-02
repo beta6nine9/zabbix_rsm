@@ -92,7 +92,7 @@ else {
 	]);
 
 	// Subservices
-	$filter_column_2_components = [
+	$subservices_components = [
 		new CSpan([
 			(new CCheckBox('filter_rdds43_subgroup'))->setChecked($data['filter_rdds43_subgroup']),
 			SPACE,
@@ -107,7 +107,7 @@ else {
 	];
 
 	if (!is_RDAP_standalone()) {
-		$filter_column_2_components = array_merge($filter_column_2_components, [
+		$subservices_components = array_merge($subservices_components, [
 			SPACE,
 			new CSpan([
 				(new CCheckBox('filter_rdap_subgroup'))->setChecked($data['filter_rdap_subgroup']),
@@ -117,7 +117,7 @@ else {
 		]);
 	}
 
-	$filter_column_2_components = array_merge($filter_column_2_components, [
+	$subservices_components = array_merge($subservices_components, [
 		SPACE,
 		(new CButton('checkAllSubservices', _('All/Any')))->addClass(ZBX_STYLE_BTN_LINK)
 	]);
@@ -163,7 +163,7 @@ else {
 			SPACE,
 			(new CButton('checkAllGroups', _('All/Any')))->addClass(ZBX_STYLE_BTN_LINK),
 		])
-		->addRow((new CSpan(_('Enabled subservices')))->addStyle('padding: 0 25px;'), $filter_column_2_components);
+		->addRow((new CSpan(_('Enabled subservices')))->addStyle('padding: 0 25px;'), $subservices_components);
 
 	$filter_fields[] = $filter_column_2;
 }
