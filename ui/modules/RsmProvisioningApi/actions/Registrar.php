@@ -142,11 +142,11 @@ class Registrar extends MonitoringTarget
 					],
 					[
 						'service'               => 'rdds43',
-						'enabled'               => (bool)$macros[$host][self::MACRO_TLD_RDDS_ENABLED],
+						'enabled'               => (bool)$macros[$host][self::MACRO_TLD_RDDS43_ENABLED],
 					],
 					[
 						'service'               => 'rdds80',
-						'enabled'               => (bool)$macros[$host][self::MACRO_TLD_RDDS_ENABLED],
+						'enabled'               => (bool)$macros[$host][self::MACRO_TLD_RDDS80_ENABLED],
 					],
 				],
 				'rddsParameters'                => [
