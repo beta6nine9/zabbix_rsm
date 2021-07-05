@@ -56,3 +56,10 @@ password = password
 
 [redis]
 enabled = 0
+
+[provisioning_api]
+url = https://api.example.com/
+readonly_username = username
+readonly_password = password
+readwrite_username = username
+readwrite_password = password
