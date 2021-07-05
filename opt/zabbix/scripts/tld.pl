@@ -1093,6 +1093,17 @@ sub create_main_template($$)
 		$rdds43_test_domain = getopt('rdds43-test-domain');
 	}
 
+	# NB! Macros {$RSM.TLD.RDDS.ENABLED} and {$RDAP.TLD.ENABLED} reflect different information depending
+	# in Standalone RDAP:
+	#
+	# if RDAP is standalone:
+	#   {$RSM.TLD.RDDS.ENABLED} tells if RDDS SERVICE is enabled
+	#   {$RDAP.TLD.ENABLED}     tells if RDAP SERVICE is enabled
+	#
+	# if RDAP is NOT standalone:
+	#   {$RSM.TLD.RDDS.ENABLED} tells if RDDS43/RDDS80 subservices of RDDS SERVICE are enabled
+	#   {$RDAP.TLD.ENABLED}     tells if RDAP subservice of RDDS SERVICE is enabled
+
 	really(create_macro('{$RSM.TLD}', $tld, $templateid));
 	really(create_macro('{$RSM.DNS.TESTPREFIX}', getopt('dns-test-prefix'), $templateid, 1));
 	really(create_macro('{$RSM.RDDS43.TEST.DOMAIN}', $rdds43_test_domain, $templateid, 1)) if (defined($rdds43_test_domain));
@@ -1722,7 +1733,8 @@ sub create_rdds_or_rdap_slv_items($$$;$)
 
 sub __is_rdap_standalone()
 {
-	return time() >= $cfg_global_macros->{'{$RSM.RDAP.STANDALONE}'};
+	return  $cfg_global_macros->{'{$RSM.RDAP.STANDALONE}'} != 0 &&
+			time() >= $cfg_global_macros->{'{$RSM.RDAP.STANDALONE}'};
 }
 
 sub create_slv_items($$$)
