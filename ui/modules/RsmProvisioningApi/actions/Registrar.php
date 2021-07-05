@@ -198,6 +198,8 @@ class Registrar extends MonitoringTarget
 	{
 		$config = [
 			'hostid' => $this->getHostId($this->newObject['id']),
+			'info_1' => $this->newObject['registrarName'],
+			'info_2' => $this->newObject['registrarFamily'],
 			'status' => HOST_STATUS_MONITORED,
 			'groups' => [
 				['groupid' => $this->hostGroupIds['TLDs']],

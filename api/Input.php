@@ -84,7 +84,7 @@ class Input
 			return false;
 		}
 		// if 3rd and 4th characters are '--', then 1st and 2nd characters must be 'xn' (i.e., 'xn--')
-		if (($id[0] != 'x' || $id[1] != 'n') && $id[2] == '-' && $id[3] == '-')
+		if (strlen($id) >= 4 && ($id[0] != 'x' || $id[1] != 'n') && $id[2] == '-' && $id[3] == '-')
 		{
 			return false;
 		}

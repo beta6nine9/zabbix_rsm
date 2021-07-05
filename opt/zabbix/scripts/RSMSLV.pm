@@ -174,6 +174,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		get_test_results
 		set_log_tld unset_log_tld
 		convert_suffixed_number
+		var_dump
 		usage);
 
 # configuration, set in set_slv_config()
@@ -5458,6 +5459,11 @@ sub convert_suffixed_number($)
 	substr($number, -1) = '';
 
 	return $number * $suffix_map{$suffix};
+}
+
+sub var_dump
+{
+	print Dumper @_;
 }
 
 sub usage
