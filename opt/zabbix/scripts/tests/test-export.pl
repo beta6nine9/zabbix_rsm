@@ -1523,7 +1523,7 @@ $columns = 3;
 @no_fails = (1) x scalar(@cases);
 @uniqueness = ({});
 
-if (open_file(\$file, $files{$name}, OPTIONAL))
+if (open_file(\$file, $files{$name}, ($monitoring_target eq TARGET_RY ? MANDATORY : OPTIONAL)))
 {
 	$row_number = 0;
 	$interrupted = 0;
