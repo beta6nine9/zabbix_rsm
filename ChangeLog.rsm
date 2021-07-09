@@ -1,3 +1,8 @@
+Changes for rsm2.2.0rc11
+
+....I..... [787] added support for 'minns.csv' to test-export.pl (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.2.0rc10
 
 ..F....... [sub-784] fixed displaying probes with mixed online/offline status on Aggregated details page (dimir)

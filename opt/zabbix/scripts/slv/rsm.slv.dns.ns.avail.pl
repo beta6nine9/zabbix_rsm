@@ -11,6 +11,7 @@ use warnings;
 use RSM;
 use RSMSLV;
 use TLD_constants qw(:groups :api);
+use List::Util qw(max);
 
 parse_slv_opts();
 fail_if_running();
@@ -106,8 +107,22 @@ sub process_cycles($$$$)
 		}
 		else
 		{
-			# start from beginning of the current month if no slv data
-			$slv_clock = current_month_first_cycle();
+			my $itemids = [
+				@{$rtt_itemids->{$tld}{$nsip}{"udp"}},
+				@{$rtt_itemids->{$tld}{$nsip}{"tcp"}},
+			];
+			my $itemids_placeholder = join(",", ("?") x scalar(@{$itemids}));
+			my $sql = "select min(clock) from history where itemid in ($itemids_placeholder)";
+
+			my $min_clock = db_select_value($sql, $itemids);
+
+			if (!defined($min_clock))
+			{
+				dbg("RTT values for nsip '$nsip' were not found");
+				last;
+			}
+
+			$slv_clock = max(cycle_start($min_clock, $cycle_delay), current_month_first_cycle());
 		}
 
 		if ($slv_clock >= cycle_start($now, $cycle_delay))
@@ -146,7 +161,7 @@ sub process_cycles($$$$)
 		{
 			if (cycle_start(time(), $cycle_delay) - $from < WAIT_FOR_AVAIL_DATA)
 			{
-				# not enough data, but cycle isn't old enough+
+				# not enough data, but cycle isn't old enough
 				last;
 			}
 			else

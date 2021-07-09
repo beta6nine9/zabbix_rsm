@@ -716,8 +716,16 @@ sub manage_tld_objects($$$$$$$)
 
 		if ($action eq 'delete')
 		{
+			my $dns_test_template = get_template(TEMPLATE_RSMHOST_DNS_TEST_PREFIX . $tld, true, true);
+
+			if (!%{$dns_test_template})
+			{
+				pfail("cannot find template \"" . TEMPLATE_RSMHOST_DNS_TEST_PREFIX . "$tld\"");
+			}
+
 			remove_hosts(\@hostids_arr);
 			remove_templates([$config_templateid]);
+			remove_templates([$dns_test_template->{'templateid'}]);
 
 			my $hostgroupid = get_host_group('TLD ' . $tld, false, false);
 			$hostgroupid = $hostgroupid->{'groupid'};
