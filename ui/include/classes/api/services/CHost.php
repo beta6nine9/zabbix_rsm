@@ -725,6 +725,10 @@ class CHost extends CHostGeneral {
 			if (!array_key_exists('name', $host) || trim($host['name']) === '') {
 				$host['name'] = $host['host'];
 			}
+
+			// RSM specifics: store time when host was created
+			$host['created'] = time();
+			// RSM specifics: end
 		}
 		unset($host);
 
