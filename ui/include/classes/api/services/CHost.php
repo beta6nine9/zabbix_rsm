@@ -609,6 +609,15 @@ class CHost extends CHostGeneral {
 			return (string) count($result);
 		}
 
+		// Hosts share table with host prototypes. Therefore remove host unrelated fields.
+		if ($this->outputIsRequested('discover', $options['output'])) {
+			foreach ($result as &$row) {
+				unset($row['discover']);
+			}
+
+			unset($row);
+		}
+
 		if ($result) {
 			$result = $this->addRelatedObjects($options, $result);
 		}
@@ -862,6 +871,11 @@ class CHost extends CHostGeneral {
 	 */
 	public function update($hosts) {
 		$hosts = zbx_toArray($hosts);
+
+		if (!$hosts) {
+			self::exception(ZBX_API_ERROR_PARAMETERS, _('Empty input parameter.'));
+		}
+
 		$hostids = zbx_objectValues($hosts, 'hostid');
 
 		$db_hosts = $this->get([
@@ -1966,6 +1980,10 @@ class CHost extends CHostGeneral {
 	 * @throws APIException if the input is invalid.
 	 */
 	protected function validateCreate(array $hosts) {
+		if (!$hosts) {
+			self::exception(ZBX_API_ERROR_PARAMETERS, _('Empty input parameter.'));
+		}
+
 		$host_name_parser = new CHostNameParser();
 
 		$host_db_fields = ['host' => null];

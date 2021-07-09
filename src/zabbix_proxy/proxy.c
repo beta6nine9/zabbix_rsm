@@ -306,7 +306,7 @@ char	*CONFIG_STATS_ALLOWED_IP	= NULL;
 /* a passphrase for EPP data encryption used in proxy poller */
 char	epp_passphrase[128]		= "";
 
-int	CONFIG_DOUBLE_PRECISION		= ZBX_DB_DBL_PRECISION_DISABLED;
+int	CONFIG_DOUBLE_PRECISION		= ZBX_DB_DBL_PRECISION_ENABLED;
 
 volatile sig_atomic_t	zbx_diaginfo_scope = ZBX_DIAGINFO_UNDEFINED;
 
