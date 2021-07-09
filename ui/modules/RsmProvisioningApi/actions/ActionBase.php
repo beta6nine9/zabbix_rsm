@@ -452,7 +452,7 @@ abstract class ActionBase extends CController
 				throw new Exception('Internal error');
 			}
 
-			$this->storeLog();
+			$this->logSuccess();
 
 			DBend(true);
 		}
@@ -474,12 +474,16 @@ abstract class ActionBase extends CController
 			);
 
 			DBend(false);
+
+			$this->logFailure();
 		}
 		catch (Throwable $e)
 		{
 			$this->setCommonResponse(500, 'General error', $e->getMessage(), $this->getExceptionDetails($e), null);
 
 			DBend(false);
+
+			$this->logFailure();
 		}
 
 		restore_error_handler();
@@ -622,7 +626,7 @@ abstract class ActionBase extends CController
 		$this->setCommonResponse(200, 'Update executed successfully', null, $details, $objects[0]);
 	}
 
-	protected function storeLog(): void
+	private function logSuccess(): void
 	{
 		if (in_array($_SERVER['REQUEST_METHOD'], [self::REQUEST_METHOD_PUT, self::REQUEST_METHOD_DELETE]))
 		{
@@ -670,6 +674,61 @@ abstract class ActionBase extends CController
 			];
 
 			DB::insert('provisioning_api_log', [$values], false);
+		}
+	}
+
+	private function logFailure()
+	{
+		openlog('ProvisioningAPI', LOG_CONS | LOG_NDELAY | LOG_PID | LOG_PERROR, LOG_LOCAL0);
+
+		$this->log($_SERVER['REQUEST_METHOD'] . ' ' . $_SERVER['REQUEST_URI']);
+
+		$input = file_get_contents('php://input');
+
+		if ($input !== '')
+		{
+			$this->log('');
+			$this->log('INPUT:');
+			$this->log($input);
+		}
+
+		$output = $this->getResponse()->getData()['main_block'];
+
+		if ($output)
+		{
+			$this->log('');
+			$this->log('OUTPUT:');
+			$this->log($output);
+		}
+
+		closelog();
+	}
+
+	private function log(string $message): void
+	{
+		static $rand = null;
+
+		if (is_null($rand))
+		{
+			$rand = rand(0x10000000, 0xFFFFFFFF);
+		}
+
+		$ts = date('Y-m-d H:i:s');
+
+		$lines = explode("\n", trim($message));
+
+		if (count($lines) === 1)
+		{
+			$line = sprintf('[%s] [%08x] %s', $ts, $rand, $lines[0]);
+			syslog(LOG_ERR, $line);
+		}
+		else
+		{
+			foreach ($lines as $i => $line)
+			{
+				$line = sprintf('[%s] [%08x] %03d: %s', $ts, $rand, $i + 1, $line);
+				syslog(LOG_ERR, $line);
+			}
 		}
 	}
 

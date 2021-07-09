@@ -150,12 +150,12 @@ class Registrar extends MonitoringTarget
 					],
 				],
 				'rddsParameters'                => [
-					'rdds43Server'              => $macros[$host][self::MACRO_TLD_RDDS43_SERVER],
-					'rdds43TestedDomain'        => $macros[$host][self::MACRO_TLD_RDDS43_TEST_DOMAIN],
-					'rdds80Url'                 => $macros[$host][self::MACRO_TLD_RDDS80_URL],
-					'rdapUrl'                   => $macros[$host][self::MACRO_TLD_RDAP_BASE_URL],
-					'rdapTestedDomain'          => $macros[$host][self::MACRO_TLD_RDAP_TEST_DOMAIN],
-					'rdds43NsString'            => $macros[$host][self::MACRO_TLD_RDDS43_NS_STRING],
+					'rdds43Server'              => $macros[$host][self::MACRO_TLD_RDDS43_SERVER]      ?: null,
+					'rdds43TestedDomain'        => $macros[$host][self::MACRO_TLD_RDDS43_TEST_DOMAIN] ?: null,
+					'rdds80Url'                 => $macros[$host][self::MACRO_TLD_RDDS80_URL]         ?: null,
+					'rdapUrl'                   => $macros[$host][self::MACRO_TLD_RDAP_BASE_URL]      ?: null,
+					'rdapTestedDomain'          => $macros[$host][self::MACRO_TLD_RDAP_TEST_DOMAIN]   ?: null,
+					'rdds43NsString'            => $macros[$host][self::MACRO_TLD_RDDS43_NS_STRING]   ?: null,
 				],
 			];
 		}
@@ -199,6 +199,8 @@ class Registrar extends MonitoringTarget
 	{
 		$config = [
 			'hostid' => $this->getHostId($this->newObject['id']),
+			'info_1' => $this->newObject['registrarName'],
+			'info_2' => $this->newObject['registrarFamily'],
 			'status' => HOST_STATUS_MONITORED,
 			'groups' => [
 				['groupid' => $this->hostGroupIds['TLDs']],

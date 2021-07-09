@@ -24,7 +24,15 @@ function get_json()
             { "ns": "a.ns.tld${i}", "ip": "127.0.0.1" },
             { "ns": "b.ns.tld${i}", "ip": "127.0.0.3" },
             { "ns": "b.ns.tld${i}", "ip": "0:0:0:0:0:ffff:7f00:0004" },
-            { "ns": "b.ns.tld${i}", "ip": "127.0.0.2" }
+            { "ns": "b.ns.tld${i}", "ip": "127.0.0.2" },
+            { "ns": "c.ns.tld${i}", "ip": "127.0.0.1" },
+            { "ns": "d.ns.tld${i}", "ip": "127.0.0.3" },
+            { "ns": "d.ns.tld${i}", "ip": "0:0:0:0:0:ffff:7f00:0004" },
+            { "ns": "d.ns.tld${i}", "ip": "127.0.0.2" },
+            { "ns": "e.ns.tld${i}", "ip": "127.0.0.1" },
+            { "ns": "f.ns.tld${i}", "ip": "127.0.0.3" },
+            { "ns": "f.ns.tld${i}", "ip": "0:0:0:0:0:ffff:7f00:0004" },
+            { "ns": "f.ns.tld${i}", "ip": "127.0.0.2" }
         ],
         "dnssecEnabled": true,
         "nsTestPrefix": "www.zz--icann-monitoring.example",

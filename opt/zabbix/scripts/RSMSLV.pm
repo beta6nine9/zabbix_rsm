@@ -174,6 +174,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		get_test_results
 		set_log_tld unset_log_tld
 		convert_suffixed_number
+		var_dump
 		usage);
 
 # configuration, set in set_slv_config()
@@ -4684,16 +4685,12 @@ sub update_slv_rtt_monthly_stats($$$$$$$$;$)
 	my $rtt_params_list             = shift;
 	my $rdap_standalone_params_list = shift;
 
-	# $params_list - for RDDS, this is either $rtt_params_list (RDDS43, RRDS80 and RDAP) the migration to
-	# Standalone RDAP, or $rdap_standalone_params_list (RDDS43 and RDDS80) after migration to Standalone RDAP.
-	# For other services, $params_list is always $rtt_params_list.
-	# TODO: remove after migration to Standalone RDAP
-	my $params_list = $rtt_params_list;
-
 	# how long to wait for data after $cycle_end if number of performed checks is smaller than expected checks
 	# TODO: $max_nodata_time = $cycle_delay * x?
 	# TODO: move to rsm.conf?
 	my $max_nodata_time = 300;
+
+	my $shiftback_for_new_items = 600;
 
 	# contents: $slv_items->{$tld}{$item_key} = [$last_clock, $last_value];
 	my $slv_items = get_slv_rtt_monthly_items($single_tld, $slv_item_key_performed, $slv_item_key_failed, $slv_item_key_pfailed);
@@ -4708,15 +4705,53 @@ sub update_slv_rtt_monthly_stats($$$$$$$$;$)
 	{
 		set_log_tld($tld);
 
+		# $params_list - for RDDS, this is either $rtt_params_list (RDDS43, RRDS80 and RDAP) the migration to
+		# Standalone RDAP, or $rdap_standalone_params_list (RDDS43 and RDDS80) after migration to Standalone RDAP.
+		# For other services, $params_list is always $rtt_params_list.
+		# TODO: remove after migration to Standalone RDAP
+		my $params_list = $rtt_params_list;
+
 		my $last_clock           = $slv_items->{$tld}{$slv_item_key_performed}[0];
 		my $last_performed_value = $slv_items->{$tld}{$slv_item_key_performed}[1];
 		my $last_failed_value    = $slv_items->{$tld}{$slv_item_key_failed}[1];
 		my $last_pfailed_value   = $slv_items->{$tld}{$slv_item_key_pfailed}[1];
 
-		# if there's no lastvalue, start collecting stats from the begining of the current month
+		# if there's no lastvalue, start collecting stats from the time when oldest RTT was received
 		if (!defined($last_clock))
 		{
-			$last_clock = $end_of_prev_month;
+			my @itemids = ();
+			my $min_clock = undef;
+
+			foreach my $params (@{$params_list})
+			{
+				if (%{$params->{'probes'}})
+				{
+					my $hosts = [map("$tld $_", keys(%{$params->{'probes'}}))];
+					my $rtt_itemids = get_itemids_by_key_pattern_and_hosts($params->{'rtt_item_key_pattern'}, $hosts, ITEM_STATUS_ACTIVE);
+
+					push(@itemids, @{$rtt_itemids});
+				}
+			}
+
+			if (@itemids)
+			{
+				my $itemids_placeholder = join(",", ("?") x scalar(@itemids));
+
+				$min_clock = db_select_value("select min(clock) from history where itemid in ($itemids_placeholder)", [@itemids]);
+			}
+
+			if (defined($min_clock))
+			{
+				$last_clock = cycle_start($min_clock, $cycle_delay) - $cycle_delay;
+			}
+			else
+			{
+				$last_clock = cycle_start($now - $shiftback_for_new_items, $cycle_delay) - $cycle_delay;
+			}
+
+			$last_performed_value = 0;
+			$last_failed_value    = 0;
+			$last_pfailed_value   = 0;
 		}
 
 		my $cycles_till_end_of_month = cycles_till_end_of_month($last_clock + $cycle_delay, $cycle_delay);
@@ -5450,6 +5485,11 @@ sub convert_suffixed_number($)
 	substr($number, -1) = '';
 
 	return $number * $suffix_map{$suffix};
+}
+
+sub var_dump
+{
+	print Dumper @_;
 }
 
 sub usage

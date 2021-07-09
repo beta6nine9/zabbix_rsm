@@ -6,6 +6,8 @@ require_once('Input.php');
 require_once('RsmException.php');
 require_once('User.php');
 
+$api_output = '';
+
 function main(): void
 {
 	setErrorHandler();
@@ -32,10 +34,13 @@ function main(): void
 			$details,
 			$e->getUpdatedObject()
 		);
+
+		logFailure();
 	}
 	catch (Throwable $e)
 	{
 		setCommonResponse(500, 'General error', $e->getMessage(), getExceptionDetails($e), null);
+		logFailure();
 	}
 }
 
@@ -172,6 +177,8 @@ function setCommonResponse(int $resultCode, string $title, ?string $description,
 
 function sendResponse(int $resultCode, array $json)
 {
+	global $api_output;
+
 	$options = JSON_UNESCAPED_SLASHES;
 
 	if (getConfig('settings')['prettify_output_list'])
@@ -183,15 +190,15 @@ function sendResponse(int $resultCode, array $json)
 		$options |= JSON_PRETTY_PRINT;
 	}
 
-	$output = json_encode($json, $options);
+	$api_output = json_encode($json, $options);
 
-	$output = preg_replace('/\{[\s\r\n]*("ns": "[\w.]+"),[\s\r\n]*("ip": "[\w.:]+")[\s\r\n]*\}/', '{ $1, $2 }', $output);
-	$output = preg_replace('/\{[\s\r\n]*("service": "\w+"),[\s\r\n]*("enabled": \w+)[\s\r\n]*\}/', '{ $1, $2 }', $output);
+	$api_output = preg_replace('/\{[\s\r\n]*("ns": "[\w.]+"),[\s\r\n]*("ip": "[\w.:]+")[\s\r\n]*\}/', '{ $1, $2 }', $api_output);
+	$api_output = preg_replace('/\{[\s\r\n]*("service": "\w+"),[\s\r\n]*("enabled": \w+)[\s\r\n]*\}/', '{ $1, $2 }', $api_output);
 
 	http_response_code($resultCode);
 	header('Content-Type: application/json');
 	header('Cache-Control: no-store');
-	echo $output;
+	echo $api_output;
 }
 
 function handleRequest(): void
@@ -774,6 +781,59 @@ function getMaxObjectCount(string $objectType): int
 
 		default:
 			throw new RsmException(500, 'General error', 'Unsupported $objectType: ' . $objectType);
+	}
+}
+
+function logFailure()
+{
+	openlog('ProvisioningAPI', LOG_CONS | LOG_NDELAY | LOG_PID | LOG_PERROR, LOG_LOCAL0);
+
+	writeLog($_SERVER['REQUEST_METHOD'] . ' ' . $_SERVER['REQUEST_URI']);
+
+	$input = file_get_contents('php://input');
+
+	if ($input !== '')
+	{
+		writeLog('');
+		writeLog('INPUT:');
+		writeLog($input);
+	}
+
+	if ($GLOBALS['api_output'])
+	{
+		writeLog('');
+		writeLog('OUTPUT:');
+		writeLog($GLOBALS['api_output']);
+	}
+
+	closelog();
+}
+
+function writeLog(string $message): void
+{
+	static $rand = null;
+
+	if (is_null($rand))
+	{
+		$rand = rand(0x10000000, 0xFFFFFFFF);
+	}
+
+	$ts = date('Y-m-d H:i:s');
+
+	$lines = explode("\n", trim($message));
+
+	if (count($lines) === 1)
+	{
+		$line = sprintf('[%s] [%08x] %s', $ts, $rand, $lines[0]);
+		syslog(LOG_ERR, $line);
+	}
+	else
+	{
+		foreach ($lines as $i => $line)
+		{
+			$line = sprintf('[%s] [%08x] %03d: %s', $ts, $rand, $i + 1, $line);
+			syslog(LOG_ERR, $line);
+		}
 	}
 }
 
