@@ -1,3 +1,14 @@
+Changes for rsm2.2.0rc12
+
+....I..... [795] split SQL that checks sent SLV values to chunks (dimir)
+..F....... [794] fixed Frontend warnings when RDAP is part of RDDS and is disabled on an Rsmhost (dimir)
+....I..... [791] improved error message when Zabbix API returnes error because the "session is expired" (dimir)
+....I..... [792] added removal of "Template DNS Test - <tld>" template when deleting tld (asitals)
+....I..... [793] added storing the time when host is created via API (asitals)
+....I..... [790] adjusted time of the first calculated cycle for rsm.slv.dns.ns.* and rsm.slv.<service>.rtt.* scripts (asitals)
+....I..... [sub-787] set 'minns.csv' file as mandatory for 'Registry' monitoring target in test-export.pl (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.2.0rc11
 
 ....I..... [787] added support for 'minns.csv' to test-export.pl (dimir)
