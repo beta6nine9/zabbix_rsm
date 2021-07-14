@@ -150,6 +150,21 @@ foreach ($data['probes'] as $probe) {
 		$probe_down = false;
 		$probe_no_result = false;
 
+        // setting $rdap, $rdds43 and $rdds80 to 'disabled' happens also later
+        // this is a dirty hack to set it independent of the service (rdds or rdap)
+        // in the future hopefully the whole parsing here will be rewritten
+        if (isset($data['tld']['macros'][RSM_RDAP_TLD_ENABLED])
+	            && $data['tld']['macros'][RSM_RDAP_TLD_ENABLED] == 0) {
+            $rdap = $disabled;
+        }
+
+        if (isset($data['tld']['macros'][RSM_TLD_RDDS_ENABLED])
+	            && $data['tld']['macros'][RSM_TLD_RDDS_ENABLED] == 0) {
+            $rdds43 = $disabled;
+            $rdds80 = $disabled;
+            $rdds = ZBX_STYLE_GREY;
+        }
+
 		if ($data['type'] == RSM_RDDS) {
 			// RDDS
 			if (isset($data['tld']['macros'][RSM_TLD_RDDS_ENABLED])
