@@ -1,3 +1,9 @@
+Changes for rsm2.2.0rc13
+
+..F....... [sub-794] fixed Frontend warnings on a RDDS test details page (dimir)
+....I..... [sub-795] fixed SQL query that caused syntax error (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.2.0rc12
 
 ....I..... [795] split SQL that checks sent SLV values to chunks (dimir)
