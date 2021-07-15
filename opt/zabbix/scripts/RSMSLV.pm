@@ -2545,7 +2545,7 @@ sub check_sent_values()
 
 			my $filter = join(" or ", ("(itemid=? and clock=?)") x (@chunk / 2));
 			my $sql = "select itemid,value,clock from $table where $filter";
-			my $rows = db_select($sql, $history_params->{$table});
+			my $rows = db_select($sql, \@chunk);
 
 			foreach my $row (@{$rows})
 			{
