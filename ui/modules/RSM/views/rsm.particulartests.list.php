@@ -150,21 +150,6 @@ foreach ($data['probes'] as $probe) {
 		$probe_down = false;
 		$probe_no_result = false;
 
-        // setting $rdap, $rdds43 and $rdds80 to 'disabled' happens also later
-        // this is a dirty hack to set it independent of the service (rdds or rdap)
-        // in the future hopefully the whole parsing here will be rewritten
-        if (isset($data['tld']['macros'][RSM_RDAP_TLD_ENABLED])
-	            && $data['tld']['macros'][RSM_RDAP_TLD_ENABLED] == 0) {
-            $rdap = $disabled;
-        }
-
-        if (isset($data['tld']['macros'][RSM_TLD_RDDS_ENABLED])
-	            && $data['tld']['macros'][RSM_TLD_RDDS_ENABLED] == 0) {
-            $rdds43 = $disabled;
-            $rdds80 = $disabled;
-            $rdds = ZBX_STYLE_GREY;
-        }
-
 		if ($data['type'] == RSM_RDDS) {
 			// RDDS
 			if (isset($data['tld']['macros'][RSM_TLD_RDDS_ENABLED])
@@ -207,76 +192,75 @@ foreach ($data['probes'] as $probe) {
 				}
 			}
 		}
-		else {
-			// RDAP
-			if (isset($data['tld']['macros'][RSM_RDAP_TLD_ENABLED])
-					&& $data['tld']['macros'][RSM_RDAP_TLD_ENABLED] == 0) {
-				$rdap = $disabled;
-			}
-			elseif (!isset($probe['rdap']['status']) || $probe['rdap']['status'] === null) {
-				$rdap = $no_result;
-			}
-			elseif ($probe['rdap']['status'] == 0) {
-				$rdds = ZBX_STYLE_RED;
-				$probe_down = true;
-				$rdap = $down;
-			}
-			elseif ($probe['rdap']['status'] == 1) {
-				if ($data['type'] == RSM_RDDS && $rdds !== ZBX_STYLE_RED) {
-					$rdds = ZBX_STYLE_GREEN;
-				}
 
-				$rdap = $up;
-			}
+        // RDAP, both as part of RDDS and as standalone service
+        if (isset($data['tld']['macros'][RSM_RDAP_TLD_ENABLED])
+				&& $data['tld']['macros'][RSM_RDAP_TLD_ENABLED] == 0) {
+            $rdap = $disabled;
+        }
+        elseif (!isset($probe['rdap']['status']) || $probe['rdap']['status'] === null) {
+            $rdap = $no_result;
+        }
+        elseif ($probe['rdap']['status'] == 0) {
+            $rdds = ZBX_STYLE_RED;
+            $probe_down = true;
+            $rdap = $down;
+        }
+        elseif ($probe['rdap']['status'] == 1) {
+            if ($data['type'] == RSM_RDDS && $rdds !== ZBX_STYLE_RED) {
+                $rdds = ZBX_STYLE_GREEN;
+            }
 
-			/**
-			 * An exception: if sub-service is disabled at TLD level, sub-services should be disabled at probe level
-			 * too. This need to be added as exception because in case if sub-service is disabled at TLD level, we never
-			 * request values of related items. As the result, we cannot detect what is a reason why there are no
-			 * results for sub-service.
-			 *
-			 * See issue 386 for more details.
-			 */
+            $rdap = $up;
+        }
 
-			if ($data['tld_rdds_enabled'] == false && $rdds43 === $no_result) {
-				$rdds43 = $disabled;
-				$rdds80 = $disabled;
-				$probe_no_result = false;
-			}
-			/**
-			 * Another exception: if RDDS is disabled at probe level, this is another case when we don't request
-			 * data and cannot distinguish when probe has no data and when it is disabled. So, let's use macros.
-			 *
-			 * Macros {$RSM.RDDS.ENABLED} is used to disable all 3 sub-services, so, if its 0, all three are displayed
-			 * as disabled.
-			 */
-			elseif (isset($probe['macros'][RSM_RDDS_ENABLED]) && $probe['macros'][RSM_RDDS_ENABLED] == 0) {
-				$rdds43 = $disabled;
-				$rdds80 = $disabled;
-				$rdap = $disabled;
-			}
+        /**
+         * An exception: if sub-service is disabled at TLD level, sub-services should be disabled at probe level
+         * too. This need to be added as exception because in case if sub-service is disabled at TLD level, we never
+         * request values of related items. As the result, we cannot detect what is a reason why there are no
+         * results for sub-service.
+         *
+         * See issue 386 for more details.
+         */
 
-			if ($data['type'] == RSM_RDAP) {
-				if ($rdap === $disabled || $rdap === $no_result) {
-					$probe_no_result = true;
-					$probe_down = false;
-					$rdds = ZBX_STYLE_GREY;
-				}
-			}
-			elseif (($rdap_is_part_of_rdds && ($rdap === $disabled || $rdap === $no_result))
-					&& ($rdds43 === $disabled || $rdds43 === $no_result)
-					&& ($rdds80 === $disabled || $rdds80 === $no_result)) {
-				$probe_no_result = true;
-				$probe_down = false;
-				$rdds = ZBX_STYLE_GREY;
-			}
+        if ($data['tld_rdds_enabled'] == false && $rdds43 === $no_result) {
+            $rdds43 = $disabled;
+            $rdds80 = $disabled;
+            $probe_no_result = false;
+        }
+        /**
+         * Another exception: if RDDS is disabled at probe level, this is another case when we don't request
+         * data and cannot distinguish when probe has no data and when it is disabled. So, let's use macros.
+         *
+         * Macros {$RSM.RDDS.ENABLED} is used to disable all 3 sub-services, so, if its 0, all three are displayed
+         * as disabled.
+         */
+        elseif (isset($probe['macros'][RSM_RDDS_ENABLED]) && $probe['macros'][RSM_RDDS_ENABLED] == 0) {
+            $rdds43 = $disabled;
+            $rdds80 = $disabled;
+            $rdap = $disabled;
+        }
 
-			if ($probe_down) {
-				$down_probes++;
-			}
-			elseif ($probe_no_result) {
-				$no_result_probes++;
-			}
+        if ($data['type'] == RSM_RDAP) {
+            if ($rdap === $disabled || $rdap === $no_result) {
+                $probe_no_result = true;
+                $probe_down = false;
+                $rdds = ZBX_STYLE_GREY;
+            }
+        }
+        elseif (($rdap_is_part_of_rdds && ($rdap === $disabled || $rdap === $no_result))
+				&& ($rdds43 === $disabled || $rdds43 === $no_result)
+				&& ($rdds80 === $disabled || $rdds80 === $no_result)) {
+            $probe_no_result = true;
+            $probe_down = false;
+            $rdds = ZBX_STYLE_GREY;
+        }
+
+        if ($probe_down) {
+            $down_probes++;
+        }
+        elseif ($probe_no_result) {
+            $no_result_probes++;
 		}
 	}
 
