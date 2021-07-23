@@ -1,3 +1,9 @@
+Changes for rsm2.2.0rc14
+
+........S. [799] fixed memory leak in history syncer when updating lastvalue tables (dimir)
+........S. [ZBX-19715] fixed high memory usage in trappers and proxy pollers when sending configuration to Zabbix proxy (vso)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.2.0rc13
 
 ..F....... [sub-794] fixed Frontend warnings on a RDDS test details page (dimir)
@@ -8,7 +14,7 @@ Changes for rsm2.2.0rc12
 
 ....I..... [795] split SQL that checks sent SLV values to chunks (dimir)
 ..F....... [794] fixed Frontend warnings when RDAP is part of RDDS and is disabled on an Rsmhost (dimir)
-....I..... [791] improved error message when Zabbix API returnes error because the "session is expired" (dimir)
+....I..... [791] improved error message when Zabbix API returns error because the "session is expired" (dimir)
 ....I..... [792] added removal of "Template DNS Test - <tld>" template when deleting tld (asitals)
 ....I..... [793] added storing the time when host is created via API (asitals)
 ....I..... [790] adjusted time of the first calculated cycle for rsm.slv.dns.ns.* and rsm.slv.<service>.rtt.* scripts (asitals)
