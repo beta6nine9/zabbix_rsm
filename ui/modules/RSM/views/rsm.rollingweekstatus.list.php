@@ -177,7 +177,7 @@ if (isset($data['filter_slv'])) {
 }
 
 $options = [
-	'' => _('any'),
+	SLA_MONITORING_SLV_FILTER_ANY => _('any'),
 	SLA_MONITORING_SLV_FILTER_NON_ZERO => _('non-zero')
 ];
 

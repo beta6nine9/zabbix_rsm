@@ -28,6 +28,7 @@ define('SLA_MONITORING_START_YEAR',	2014);
 
 // SLA monitoring extra filter value.
 define('SLA_MONITORING_SLV_FILTER_NON_ZERO',	-1);
+define('SLA_MONITORING_SLV_FILTER_ANY',			-2);
 
 // SLA monitoring services.
 define('RSM_DNS',			0);

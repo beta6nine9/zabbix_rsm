@@ -2397,6 +2397,9 @@ sub compare_hashes($$)
 #
 # Note: Don't wait for too long, DB transactions on Zabbix Server may fail and
 # then data won't be synced. If this happens, warnings will be thrown.
+
+use constant SENT_VALUES_CHUNK_SIZE	=> 1000;
+
 sub check_sent_values()
 {
 	my $data = [];
@@ -2529,20 +2532,25 @@ sub check_sent_values()
 		# TODO: it might be needed to group entries by clock, i.e.,
 		# where (clock=? and itemid in (?,?,?)) or (clock=? and itemid in (?,?,?))
 
-		my $filter = join(" or ", ("(itemid=? and clock=?)") x (@{$history_params->{$table}} / 2));
-		my $sql = "select itemid,value,clock from $table where $filter";
-		my $rows = db_select($sql, $history_params->{$table});
-
-		foreach my $row (@{$rows})
+		while (@{$history_params->{$table}})
 		{
-			my ($itemid, $value, $clock) = @{$row};
+			my @chunk = splice(@{$history_params->{$table}}, 0, SENT_VALUES_CHUNK_SIZE);
 
-			if (exists($history->{$itemid}{$clock}))
+			my $filter = join(" or ", ("(itemid=? and clock=?)") x (@chunk / 2));
+			my $sql = "select itemid,value,clock from $table where $filter";
+			my $rows = db_select($sql, \@chunk);
+
+			foreach my $row (@{$rows})
 			{
-				wrn("THIS SHOULD NOT HAPPEN, value for itemid=$itemid, clock=$clock has duplicates or exists in multiple history tables");
-			}
+				my ($itemid, $value, $clock) = @{$row};
 
-			$history->{$itemid}{$clock} = $value;
+				if (exists($history->{$itemid}{$clock}))
+				{
+					wrn("THIS SHOULD NOT HAPPEN, value for itemid=$itemid, clock=$clock has duplicates or exists in multiple history tables");
+				}
+
+				$history->{$itemid}{$clock} = $value;
+			}
 		}
 	}
 

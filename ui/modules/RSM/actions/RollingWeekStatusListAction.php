@@ -602,7 +602,7 @@ class RollingWeekStatusListAction extends Action {
 
 				$items += $db_avail_items;
 
-				if ($data['filter_slv'] !== '') {
+				if ($data['filter_slv'] !== SLA_MONITORING_SLV_FILTER_ANY) {
 					foreach ($filter_slv as $filtred_hostid => $value) {
 						if ($value === false) {
 							unset($data['tld'][$DB['SERVERS'][$key]['NR'].$filtred_hostid], $hosts[$filtred_hostid]);
@@ -711,7 +711,7 @@ class RollingWeekStatusListAction extends Action {
 					 * Only hosts with disabled items are re-tested.
 					 * Only if filter 'Exceeding or equal to' is not set to 'any'.
 					 */
-					if ($hosts_with_disabled_items && $data['filter_slv'] !== '') {
+					if ($hosts_with_disabled_items && $data['filter_slv'] !== SLA_MONITORING_SLV_FILTER_ANY) {
 						foreach ($hosts_with_disabled_items as $hostid => $value) {
 							$available = false;
 							$host = $data['tld'][$DB['SERVERS'][$key]['NR'].$hostid];
