@@ -10,6 +10,10 @@ use TLD_constants qw(:general :templates :groups :api :config :tls :items);
 use Data::Dumper;
 use base 'Exporter';
 
+$Data::Dumper::Terse = 1;       # do not output names like "$VAR1 = "
+$Data::Dumper::Pair = ": ";     # use separator instead of " => "
+$Data::Dumper::Useqq = 1;       # use double quotes instead of single quotes
+
 use constant RSMHOST_DNS_NS_LOG_ACTION_CREATE  => 0;
 use constant RSMHOST_DNS_NS_LOG_ACTION_ENABLE  => 1;
 use constant RSMHOST_DNS_NS_LOG_ACTION_DISABLE => 2;
@@ -220,7 +224,14 @@ sub get_template_id($)
 	if (!exists($_saved_template_ids{$template_name}))
 	{
 		my $result = get_template($template_name, false, false);
+
+		if (ref($result) eq 'HASH' && defined($result->{'error'}))
+		{
+			pfail("cannot get '" . $template_name . "': " . Dumper($result->{'error'}));
+		}
+
 		pfail("'" . $template_name . "' does not exist") unless ($result->{'templateid'});
+
 		$_saved_template_ids{$template_name} = $result->{'templateid'};
 	}
 
@@ -938,6 +949,11 @@ sub get_host_macro
 	my $result;
 
 	$result = $zabbix->get('usermacro', {'hostids' => $templateid, 'output' => 'extend', 'filter' => {'macro' => $name}});
+
+	if (ref($result) eq 'HASH' && defined($result->{'error'}))
+	{
+		pfail("cannot get hostmacro: " . Dumper($result->{'error'}));
+	}
 
 	return $result;
 }
