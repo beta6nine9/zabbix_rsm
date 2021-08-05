@@ -35,7 +35,7 @@ sub delete_authid();
 
 use constant _LOGIN_TIMEOUT => 5;
 
-use constant _DEFAULT_REQUEST_TIMEOUT => 60;
+use constant _DEFAULT_REQUEST_TIMEOUT => 60;  # seconds, passed to LWP::UserAgent
 use constant _DEFAULT_REQUEST_ATTEMPTS => 10;
 
 my ($_OPTIONS, $AUTH_FILE);

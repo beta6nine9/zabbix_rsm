@@ -2215,6 +2215,8 @@ static int	DBmass_add_history(ZBX_DC_HISTORY *history, int history_num)
 					",clock = if(values(clock) > clock, values(clock), clock)",
 				lastvalue_sql
 		);
+
+		zbx_free(lastvalue_sql);
 	}
 
 	if (NULL != lastvalue_str_sql)
@@ -2225,6 +2227,8 @@ static int	DBmass_add_history(ZBX_DC_HISTORY *history, int history_num)
 					",clock = if(values(clock) > clock, values(clock), clock)",
 				lastvalue_str_sql
 		);
+
+		zbx_free(lastvalue_str_sql);
 	}
 out:
 	zbx_vector_ptr_destroy(&history_values);

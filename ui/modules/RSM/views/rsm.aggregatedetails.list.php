@@ -243,7 +243,7 @@ if (array_key_exists('test_result', $data)) {
 }
 
 // NSID index/value table
-if (isset($data['nsids'])) {
+if (isset($data['nsids']) && count($data['nsids']) != 0) {
 	$nsids_table = (new CTable())
 		->setHeader([(new CColHeader(_('Numeric NSID')))->setWidth('1%'), _('Real NSID')])
 		->setAttribute('class', ZBX_STYLE_LIST_TABLE);
@@ -255,7 +255,38 @@ if (isset($data['nsids'])) {
 	$table = [new CTag('p', true, $table), $nsids_table];
 }
 
+// for DNSSEC service, display specific DNSSEC errors
+if (isset($data['dnssec_errors']) && count($data['dnssec_errors']) != 0) {
+	$dnssec_errors_table = (new CTable())
+		->setHeader([(new CColHeader(_('Error code')))->setWidth('1%'), _('Description')])
+		->setAttribute('class', ZBX_STYLE_LIST_TABLE);
+
+	foreach ($data['dnssec_errors'] as $code => $description) {
+		$dnssec_errors_table->addRow([(new CCol($code))->addClass(ZBX_STYLE_CENTER), $description]);
+	}
+
+	$table = [new CTag('p', true, $table), $dnssec_errors_table];
+}
+
 $total_probes = count($data['probes']);
+
+$details = [
+	_('TLD') => $data['tld_host'],
+	_('Service') => $data['slv_item_name'],
+	_('Test time') => date(DATE_TIME_FORMAT_SECONDS, $data['time']),
+	_('Test result') => $test_result,
+	_('Max allowed RTT') => isset($data['udp_rtt'])
+		? sprintf('UDP - %s ms, TCP - %s ms', $data['udp_rtt'], $data['tcp_rtt'])
+		: _('No data'),
+	_('Note') => _(
+		'The following table displays the data that has been received by the central node, some of'.
+		' the values may not have been available at the time of the calculation of the "Test result"'
+	)
+];
+
+if ($data['type'] == RSM_DNSSEC) {
+	$details[_('Note 2')] = _('See the list of specific DNSSEC errors in the table below');
+}
 
 (new CWidget())
 	->setTitle($data['title'])
@@ -264,19 +295,7 @@ $total_probes = count($data['probes']);
 		->addItem((new CTable())
 			->addClass('incidents-info')
 			->addRow([
-				gen_details_item([
-					_('TLD') => $data['tld_host'],
-					_('Service') => $data['slv_item_name'],
-					_('Test time') => date(DATE_TIME_FORMAT_SECONDS, $data['time']),
-					_('Test result') => $test_result,
-					_('Max allowed RTT') => isset($data['udp_rtt'])
-						? sprintf('UDP - %s ms, TCP - %s ms', $data['udp_rtt'], $data['tcp_rtt'])
-						: _('No data'),
-					_('Note') => _(
-						'The following table displays the data that has been received by the central node, some of'.
-						' the values may not have been available at the time of the calculation of the "Test result"'
-					)
-				]),
+				gen_details_item($details),
 				gen_details_item([
 					_('Probes total') => $total_probes,
 					_('Probes offline') => $offline_probes,
