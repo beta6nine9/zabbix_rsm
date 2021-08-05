@@ -1493,7 +1493,7 @@ define('RSM_DNS_RTT_ERRORS_VALUE_MAP', 120);
 define('RSM_RDDS_RTT_ERRORS_VALUE_MAP', 130);
 
 // if magic quotes on, then get rid of them
-if (get_magic_quotes_gpc()) {
+if (function_exists('get_magic_quotes_gpc') && get_magic_quotes_gpc()) {
 	function zbx_stripslashes($value) {
 		$value = is_array($value) ? array_map('zbx_stripslashes', $value) : stripslashes($value);
 		return $value;
