@@ -287,6 +287,10 @@ class AggregateDetailsAction extends Action {
 
 		$data['dns_nameservers'] = $dns_nameservers;
 		$data['nsids'] = $this->getNSIDdata($dns_nameservers, $time_from, $time_till);
+
+		if ($data['type'] == RSM_DNSSEC)
+			$data['dnssec_errors'] = $this->getDnssecErrorData();
+
 		$key_parser->parse(PROBE_DNS_NS_STATUS);
 		$ns_status_key = $key_parser->getKey();
 		$tldprobe_values = $this->getItemsHistoryValue([
@@ -470,7 +474,7 @@ class AggregateDetailsAction extends Action {
 
 	/**
 	 * Collects NSID item values for all probe name servers and ips. NSID unique values will be stored in
-	 * $data['nsids] with key having incremental index and value NSID value. Additionaly probe ns+ip NSID results
+	 * $data['nsids'] with key having incremental index and value NSID value. Additionaly probe ns+ip NSID results
 	 * will be stored in 'results_nsid' property of $this->probes[{PROBE_ID}] array as incremental index
 	 * pointing to value in $data['nsids'].
 	 *
@@ -543,5 +547,29 @@ class AggregateDetailsAction extends Action {
 		}
 
 		return $nsids;
+	}
+
+	/**
+	 * Collects DNSSEC-specific errors. The errors will be returned as an array with error code as index
+	 * and error description as value.
+	 *
+	 * Return array of DNSSEC-specific errors.
+	 *
+	 * @return array
+	 */
+	protected function getDnssecErrorData() {
+		$dnssec_errors = [];
+
+		// These DNS error codes include DNSSEC
+		$errors = $this->getValueMapping(RSM_DNS_RTT_ERRORS_VALUE_MAP);
+
+		// Let's filter out DNSSEC ones
+		foreach ($errors as $code => $description) {
+			if (isServiceErrorCode($code, RSM_DNSSEC)) {
+				$dnssec_errors[$code] = $description;
+			}
+		}
+
+		return $dnssec_errors;
 	}
 }
