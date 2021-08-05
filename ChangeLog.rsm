@@ -1,3 +1,9 @@
+Changes for rsm2.2.0rc15
+
+..F....... [800] added table with DNSSEC-specific errors to DNSSEC Test details page (dimir)
+........S. [798] fixed filter on a Rolling week status page to remember "any" setting (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.2.0rc14
 
 ........S. [799] fixed memory leak in history syncer when updating lastvalue tables (dimir)
