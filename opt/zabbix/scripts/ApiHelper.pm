@@ -55,6 +55,7 @@ use constant JSON_OBJECT_DISABLED_SERVICE => {
 use constant FIX_JSON_VALUES_FALSE => 0;
 use constant FIX_JSON_VALUES_TRUE  => 1;
 
+# keep fields in alphabetical order
 my $JSON_FIELDS = {
 	'number' => {
 		'fields' => {
@@ -62,6 +63,7 @@ my $JSON_FIELDS = {
 			'emergencyThreshold'       => 1,
 			'downtime'                 => 1,
 			'lastUpdateApiDatabase'    => 1,
+			'minNameServersUp'         => 1,
 			'testDateTime'             => 1,
 			'version'                  => 1,
 		},
@@ -73,13 +75,16 @@ my $JSON_FIELDS = {
 			'city'                     => 1,
 			'incidentID'               => 1,
 			'interface'                => 1,
+			'nsid'                     => 1,
 			'result'                   => 1,
 			'service'                  => 1,
 			'state'                    => 1,
 			'status'                   => 1,
 			'target'                   => 1,
 			'targetIP'                 => 1,
+			'testedName'               => 1,
 			'tld'                      => 1,
+			'transport'                => 1,
 		},
 		'cb' => sub {my $value = shift(); return defined($value) ? "$value" : undef},
 	},
