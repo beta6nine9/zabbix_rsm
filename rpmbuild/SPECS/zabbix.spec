@@ -281,10 +281,12 @@ Requires:			rh-php73-php-cli
 Requires:			rh-php73-php-pdo
 Requires:			rh-php73-php-mysqlnd
 Requires:			rh-php73-php-xml
+Requires:			rh-php73-php-json
 Obsoletes:			php-cli
 Obsoletes:			php-pdo
 Obsoletes:			php-mysqlnd
 Obsoletes:			php-xml
+Obsoletes:			php-json
 # CentOS 7 specifics start
 %endif
 AutoReq:			no
