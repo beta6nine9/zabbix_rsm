@@ -274,7 +274,7 @@ Requires:			php-cli
 Requires:			php-pdo
 Requires:			php-mysqlnd
 Requires:			php-xml
-Requires:                       php-json
+Requires:			php-json
 %else
 # CentOS 7 specifics start
 Requires:			rh-php73-php-cli
