@@ -1,4 +1,6 @@
-Name:		zabbix
+%define	namespace	50
+
+Name:		zabbix%{namespace}
 Version:	5.0.13%{rsmversion}
 Release: 	%{?rsmprereleasetag:0.}1%{?rsmprereleasetag:%{rsmprereleasetag}}%{?dist}
 Summary:	The Enterprise-class open source monitoring solution
@@ -37,7 +39,7 @@ Buildroot:	%{_tmppath}/zabbix-%{version}-%{release}-root-%(%{__id_u} -n)
 %global selinuxtype	targeted
 %global moduletype	services
 
-%global modulenames	zabbix_proxy zabbix_server zabbix_agent zbx_php-fpm zbx_nginx
+%global modulenames	zabbix%{namespace}_proxy zabbix%{namespace}_server zabbix_agent zbx_php-fpm zbx_nginx
 # Version of distribution SELinux policy package.
 %global selinux_policyver	3.13.1-102.el7_3.13
 
@@ -76,10 +78,10 @@ Requires:		ldns >= 1.7.1
 %else
 Requires:		ldns >= 1.6.17
 %endif
-Provides:		zabbix-proxy = %{version}-%{release}
-Provides:		zabbix-proxy-implementation = %{version}-%{release}
-Obsoletes:		zabbix
-Obsoletes:		zabbix-proxy
+Provides:		zabbix%{namespace}-proxy = %{version}-%{release}
+Provides:		zabbix%{namespace}-proxy-implementation = %{version}-%{release}
+Obsoletes:		zabbix%{namespace}
+Obsoletes:		zabbix%{namespace}-proxy
 
 %description proxy-mysql
 Zabbix proxy with MySQL or MariaDB database support.
@@ -93,7 +95,7 @@ Requires(post):		policycoreutils-python-utils
 %else
 Requires(post):		policycoreutils-python
 %endif
-Requires:		zabbix-proxy = %{version}-%{release}
+Requires:		zabbix%{namespace}-proxy = %{version}-%{release}
 
 %description proxy-mysql-selinux
 SELinux policy modules for use with Zabbix proxy.
@@ -113,10 +115,10 @@ Requires:		ldns >= 1.6.17
 Requires:		perl-Data-Dumper
 Requires:		perl-DBD-MySQL
 Requires:		perl-Devel-StackTrace
-Provides:		zabbix-server = %{version}-%{release}
-Provides:		zabbix-server-implementation = %{version}-%{release}
-Obsoletes:		zabbix
-Obsoletes:		zabbix-server
+Provides:		zabbix%{namespace}-server = %{version}-%{release}
+Provides:		zabbix%{namespace}-server-implementation = %{version}-%{release}
+Obsoletes:		zabbix%{namespace}
+Obsoletes:		zabbix%{namespace}-server
 
 %description server-mysql
 Zabbix server with MySQL or MariaDB database support.
@@ -130,7 +132,7 @@ Requires(post):		policycoreutils-python-utils
 %else
 Requires(post):		policycoreutils-python
 %endif
-Requires:		zabbix-server = %{version}-%{release}
+Requires:		zabbix%{namespace}-server = %{version}-%{release}
 
 %description server-mysql-selinux
 SELinux policy modules for use with Zabbix server.
@@ -343,8 +345,8 @@ gzip database/mysql/schema.sql
 build_flags="
 	-q
 	--enable-dependency-tracking
-	--sysconfdir=/etc/zabbix
-	--libdir=%{_libdir}/zabbix
+	--sysconfdir=/etc/zabbix%{namespace}
+	--libdir=%{_libdir}/zabbix%{namespace}
 	--with-libcurl
 	--enable-proxy
 	--enable-ipv6
@@ -375,13 +377,20 @@ export CXXFLAGS
 %configure $build_flags --with-mysql
 make -s %{?_smp_mflags}
 
-mv src/zabbix_server/zabbix_server src/zabbix_server/zabbix_server_mysql
-mv src/zabbix_proxy/zabbix_proxy src/zabbix_proxy/zabbix_proxy_mysql
+mv src/zabbix_server/zabbix_server src/zabbix_server/zabbix%{namespace}_server_mysql
+mv src/zabbix_proxy/zabbix_proxy src/zabbix_proxy/zabbix%{namespace}_proxy_mysql
 
-touch src/zabbix_server/zabbix_server
-touch src/zabbix_proxy/zabbix_proxy
+touch src/zabbix_server/zabbix%{namespace}_server
+touch src/zabbix_proxy/zabbix%{namespace}_proxy
 
-cd selinux && make SHARE="%{_datadir}" TARGETS="%{modulenames}"
+# add namespace to selinux modules
+cd selinux
+sed -i "s,module zabbix_proxy,module zabbix%{namespace}_proxy," zabbix_proxy.te
+sed -i "s,module zabbix_server,module zabbix%{namespace}_server," zabbix_server.te
+mv zabbix_proxy.te zabbix%{namespace}_proxy.te
+mv zabbix_server.te zabbix%{namespace}_server.te
+
+make SHARE="%{_datadir}" TARGETS="%{modulenames}"
 
 %install
 
@@ -391,22 +400,23 @@ rm -rf $RPM_BUILD_ROOT
 make DESTDIR=$RPM_BUILD_ROOT install
 
 # install necessary directories
-mkdir -p $RPM_BUILD_ROOT%{_localstatedir}/log/zabbix
-mkdir -p $RPM_BUILD_ROOT%{_localstatedir}/log/zabbix/slv
-mkdir -p $RPM_BUILD_ROOT%{_localstatedir}/run/zabbix
+mkdir -p $RPM_BUILD_ROOT%{_localstatedir}/log/zabbix%{namespace}
+mkdir -p $RPM_BUILD_ROOT%{_localstatedir}/log/zabbix%{namespace}/slv
+mkdir -p $RPM_BUILD_ROOT%{_localstatedir}/run/zabbix%{namespace}
 
 # install server and proxy binaries
-install -m 0755 -p src/zabbix_server/zabbix_server_* $RPM_BUILD_ROOT%{_sbindir}/
+install -m 0755 -p src/zabbix_server/zabbix%{namespace}_server_* $RPM_BUILD_ROOT%{_sbindir}/
 rm $RPM_BUILD_ROOT%{_sbindir}/zabbix_server
+rm $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_server.conf
 
-install -m 0755 -p src/zabbix_proxy/zabbix_proxy_* $RPM_BUILD_ROOT%{_sbindir}/
+install -m 0755 -p src/zabbix_proxy/zabbix%{namespace}_proxy_* $RPM_BUILD_ROOT%{_sbindir}/
 rm $RPM_BUILD_ROOT%{_sbindir}/zabbix_proxy
-rm $RPM_BUILD_ROOT%{_sysconfdir}/zabbix/zabbix_proxy.conf
+rm $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_proxy.conf
 
 # install directories for scripts
-mkdir -p $RPM_BUILD_ROOT/usr/lib/zabbix
-mv $RPM_BUILD_ROOT%{_datadir}/zabbix/alertscripts $RPM_BUILD_ROOT/usr/lib/zabbix
-mv $RPM_BUILD_ROOT%{_datadir}/zabbix/externalscripts $RPM_BUILD_ROOT/usr/lib/zabbix
+mkdir -p $RPM_BUILD_ROOT/usr/lib/zabbix%{namespace}
+mv $RPM_BUILD_ROOT%{_datadir}/zabbix/alertscripts $RPM_BUILD_ROOT/usr/lib/zabbix%{namespace}
+mv $RPM_BUILD_ROOT%{_datadir}/zabbix/externalscripts $RPM_BUILD_ROOT/usr/lib/zabbix%{namespace}
 
 # install frontend files
 find ui -name '*.orig' | xargs rm -f
@@ -437,41 +447,41 @@ install -Dm 0644 -p %{SOURCE18} $RPM_BUILD_ROOT%{_sysconfdir}/opt/rh/rh-php73/ph
 %endif
 
 # install configuration files
-mv $RPM_BUILD_ROOT%{_sysconfdir}/zabbix/zabbix_proxy.conf.d $RPM_BUILD_ROOT%{_sysconfdir}/zabbix/zabbix_proxy.d
-mv $RPM_BUILD_ROOT%{_sysconfdir}/zabbix/zabbix_server.conf.d $RPM_BUILD_ROOT%{_sysconfdir}/zabbix/zabbix_server.d
+mv $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_proxy.conf.d $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_proxy.d
+mv $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_server.conf.d $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_server.d
 
 %if 0%{?rhel} >= 8
-mv $RPM_BUILD_ROOT%{_sysconfdir}/zabbix/zabbix_agentd.conf.d $RPM_BUILD_ROOT%{_sysconfdir}/zabbix/zabbix_agentd.d
+mv $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_agentd.conf.d $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_agentd.d
 
 install -dm 755 $RPM_BUILD_ROOT%{_docdir}/zabbix-agent-%{version}
 
-install -m 0644 conf/zabbix_agentd/userparameter_mysql.conf $RPM_BUILD_ROOT%{_sysconfdir}/zabbix/zabbix_agentd.d
+install -m 0644 conf/zabbix_agentd/userparameter_mysql.conf $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_agentd.d
 install -m 0644 conf/zabbix_agentd/userparameter_examples.conf $RPM_BUILD_ROOT%{_docdir}/zabbix-agent-%{version}
 
 cat conf/zabbix_agentd.conf | sed \
-	-e '/^# PidFile=/a \\nPidFile=%{_localstatedir}/run/zabbix/zabbix_agentd.pid' \
-	-e 's|^LogFile=.*|LogFile=%{_localstatedir}/log/zabbix/zabbix_agentd.log|g' \
+	-e '/^# PidFile=/a \\nPidFile=%{_localstatedir}/run/zabbix%{namespace}/zabbix_agentd.pid' \
+	-e 's|^LogFile=.*|LogFile=%{_localstatedir}/log/zabbix%{namespace}/zabbix_agentd.log|g' \
 	-e '/^# LogFileSize=.*/a \\nLogFileSize=0' \
-	-e '/^# Include=$/a \\nInclude=%{_sysconfdir}/zabbix/zabbix_agentd.d/' \
-	> $RPM_BUILD_ROOT%{_sysconfdir}/zabbix/zabbix_agentd.conf
+	-e '/^# Include=$/a \\nInclude=%{_sysconfdir}/zabbix%{namespace}/zabbix_agentd.d/' \
+	> $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_agentd.conf
 %endif
 
 mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/rsyslog.d
 cp %{SOURCE20} $RPM_BUILD_ROOT%{_sysconfdir}/rsyslog.d/rsm.slv.conf
-cp %{SOURCE21} $RPM_BUILD_ROOT%{_sysconfdir}/zabbix/zabbix_server.conf
+cp %{SOURCE21} $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix%{namespace}_server.conf
 
-cp %{SOURCE22} $RPM_BUILD_ROOT%{_sysconfdir}/zabbix/zabbix_proxy_common.conf
-cp %{SOURCE23} $RPM_BUILD_ROOT%{_sysconfdir}/zabbix/zabbix_proxy_N.conf
+cp %{SOURCE22} $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix%{namespace}_proxy_common.conf
+cp %{SOURCE23} $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix%{namespace}_proxy_N.conf
 
 # install logrotate configuration files
 mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d
 cat %{SOURCE3} | sed \
 	-e 's|COMPONENT|server|g' \
-	> $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/zabbix-server
+	> $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/zabbix%{namespace}-server
 
 cat %{SOURCE3} | sed \
 	-e 's|COMPONENT|proxy*|g' \
-	> $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/zabbix-proxy
+	> $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/zabbix%{namespace}-proxy
 
 %if 0%{?rhel} >= 8
 cat %{SOURCE3} | sed \
@@ -480,16 +490,16 @@ cat %{SOURCE3} | sed \
 %endif
 
 # install startup scripts
-install -Dm 0644 -p %{SOURCE11} $RPM_BUILD_ROOT%{_unitdir}/zabbix-server.service
-install -Dm 0644 -p %{SOURCE12} $RPM_BUILD_ROOT%{_unitdir}/zabbix-proxy.service
+install -Dm 0644 -p %{SOURCE11} $RPM_BUILD_ROOT%{_unitdir}/zabbix%{namespace}-server.service
+install -Dm 0644 -p %{SOURCE12} $RPM_BUILD_ROOT%{_unitdir}/zabbix%{namespace}-proxy.service
 
 %if 0%{?rhel} >= 8
 install -Dm 0644 -p %{SOURCE10} $RPM_BUILD_ROOT%{_unitdir}/zabbix-agent.service
 %endif
 
 # install systemd-tmpfiles conf
-install -Dm 0644 -p %{SOURCE15} $RPM_BUILD_ROOT%{_prefix}/lib/tmpfiles.d/zabbix-server.conf
-install -Dm 0644 -p %{SOURCE15} $RPM_BUILD_ROOT%{_prefix}/lib/tmpfiles.d/zabbix-proxy.conf
+install -Dm 0644 -p %{SOURCE15} $RPM_BUILD_ROOT%{_prefix}/lib/tmpfiles.d/zabbix%{namespace}-server.conf
+install -Dm 0644 -p %{SOURCE15} $RPM_BUILD_ROOT%{_prefix}/lib/tmpfiles.d/zabbix%{namespace}-proxy.conf
 
 %if 0%{?rhel} >= 8
 install -Dm 0644 -p %{SOURCE15} $RPM_BUILD_ROOT%{_prefix}/lib/tmpfiles.d/zabbix-agent.conf
@@ -506,7 +516,7 @@ install -d $RPM_BUILD_ROOT/opt/zabbix
 install -d $RPM_BUILD_ROOT/opt/zabbix/data
 cp -r opt/zabbix/* $RPM_BUILD_ROOT/opt/zabbix/
 
-install -Dm 0644 -p %{SOURCE24} $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/zabbix-slv
+install -Dm 0644 -p %{SOURCE24} $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/zabbix%{namespace}-slv
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -534,13 +544,13 @@ fi
 %files agent
 %defattr(-,root,root,-)
 %doc AUTHORS ChangeLog COPYING NEWS README
-%config(noreplace) %{_sysconfdir}/zabbix/zabbix_agentd.conf
+%config(noreplace) %{_sysconfdir}/zabbix%{namespace}/zabbix_agentd.conf
 %config(noreplace) %{_sysconfdir}/logrotate.d/zabbix-agent
-%dir %{_sysconfdir}/zabbix/zabbix_agentd.d
-%config(noreplace) %{_sysconfdir}/zabbix/zabbix_agentd.d/userparameter_mysql.conf
+%dir %{_sysconfdir}/zabbix%{namespace}/zabbix_agentd.d
+%config(noreplace) %{_sysconfdir}/zabbix%{namespace}/zabbix_agentd.d/userparameter_mysql.conf
 %doc %{_docdir}/zabbix-agent-%{version}/userparameter_examples.conf
-%attr(0755,zabbix,zabbix) %dir %{_localstatedir}/log/zabbix
-%attr(0755,zabbix,zabbix) %dir %{_localstatedir}/run/zabbix
+%attr(0755,zabbix,zabbix) %dir %{_localstatedir}/log/zabbix%{namespace}
+%attr(0755,zabbix,zabbix) %dir %{_localstatedir}/run/zabbix%{namespace}
 %{_sbindir}/zabbix_agentd
 %{_mandir}/man8/zabbix_agentd.8*
 %{_unitdir}/zabbix-agent.service
@@ -562,14 +572,14 @@ fi
 %pre proxy-mysql
 getent group zabbix > /dev/null || groupadd -r zabbix
 getent passwd zabbix > /dev/null || \
-	useradd -r -g zabbix -d %{_localstatedir}/lib/zabbix -s /sbin/nologin \
+	useradd -r -g zabbix -d %{_localstatedir}/lib/zabbix%{namespace} -s /sbin/nologin \
 	-c "Zabbix Monitoring System" zabbix
 :
 
 %pre server-mysql
 getent group zabbix > /dev/null || groupadd -r zabbix
 getent passwd zabbix > /dev/null || \
-	useradd -r -g zabbix -d %{_localstatedir}/lib/zabbix -s /sbin/nologin \
+	useradd -r -g zabbix -d %{_localstatedir}/lib/zabbix%{namespace} -s /sbin/nologin \
 	-c "Zabbix Monitoring System" zabbix
 mkdir -p %{_localstatedir}/lib/zabbix
 chown -R zabbix:zabbix %{_localstatedir}/lib/zabbix
@@ -583,28 +593,28 @@ getent passwd zabbix > /dev/null || \
 :
 
 %post proxy-mysql
-%systemd_post zabbix-proxy.service
-/usr/sbin/update-alternatives --install %{_sbindir}/zabbix_proxy \
-	zabbix-proxy %{_sbindir}/zabbix_proxy_mysql 10
+%systemd_post zabbix%{namespace}-proxy.service
+/usr/sbin/update-alternatives --install %{_sbindir}/zabbix%{namespace}_proxy \
+	zabbix%{namespace}-proxy %{_sbindir}/zabbix%{namespace}_proxy_mysql 10
 :
 
 %post proxy-mysql-selinux
 %{_sbindir}/semodule -n -s %{selinuxtype} -i %{_datadir}/selinux/packages/zabbix_agent.pp.bz2
-%{_sbindir}/semodule -n -s %{selinuxtype} -i %{_datadir}/selinux/packages/zabbix_proxy.pp.bz2
+%{_sbindir}/semodule -n -s %{selinuxtype} -i %{_datadir}/selinux/packages/zabbix%{namespace}_proxy.pp.bz2
 if %{_sbindir}/selinuxenabled ; then
     %{_sbindir}/load_policy
     %relabel_files
 fi
 
 %post server-mysql
-%systemd_post zabbix-server.service
-/usr/sbin/update-alternatives --install %{_sbindir}/zabbix_server \
-	zabbix-server %{_sbindir}/zabbix_server_mysql 10
+%systemd_post zabbix%{namespace}-server.service
+/usr/sbin/update-alternatives --install %{_sbindir}/zabbix%{namespace}_server \
+	zabbix%{namespace}-server %{_sbindir}/zabbix%{namespace}_server_mysql 10
 :
 
 %post server-mysql-selinux
 %{_sbindir}/semodule -n -s %{selinuxtype} -i %{_datadir}/selinux/packages/zabbix_agent.pp.bz2
-%{_sbindir}/semodule -n -s %{selinuxtype} -i %{_datadir}/selinux/packages/zabbix_server.pp.bz2
+%{_sbindir}/semodule -n -s %{selinuxtype} -i %{_datadir}/selinux/packages/zabbix%{namespace}_server.pp.bz2
 if %{_sbindir}/selinuxenabled ; then
     %{_sbindir}/load_policy
     %relabel_files
@@ -642,6 +652,7 @@ fi
 
 %post agent-selinux
 %{_sbindir}/semodule -n -s %{selinuxtype} -i %{_datadir}/selinux/packages/zabbix_agent.pp.bz2
+
 if %{_sbindir}/selinuxenabled ; then
     %{_sbindir}/load_policy
     %relabel_files
@@ -653,16 +664,16 @@ systemctl restart rsyslog
 %preun proxy-mysql
 if [ "$1" = 0 ]; then
 %systemd_preun zabbix-proxy.service
-/usr/sbin/update-alternatives --remove zabbix-proxy \
-%{_sbindir}/zabbix_proxy_mysql
+/usr/sbin/update-alternatives --remove zabbix%{namespace}-proxy \
+%{_sbindir}/zabbix%{namespace}_proxy_mysql
 fi
 :
 
 %preun server-mysql
 if [ "$1" = 0 ]; then
-%systemd_preun zabbix-server.service
-/usr/sbin/update-alternatives --remove zabbix-server \
-	%{_sbindir}/zabbix_server_mysql
+%systemd_preun zabbix%{namespace}-server.service
+/usr/sbin/update-alternatives --remove zabbix%{namespace}-server \
+	%{_sbindir}/zabbix%{namespace}_server_mysql
 fi
 :
 
@@ -674,7 +685,7 @@ fi
 :
 
 %postun proxy-mysql
-%systemd_postun_with_restart zabbix-proxy.service
+%systemd_postun_with_restart zabbix%{namespace}-proxy.service
 
 %postun proxy-mysql-selinux
 if [ $1 -eq 0 ]; then
@@ -687,7 +698,7 @@ if [ $1 -eq 0 ]; then
 fi
 
 %postun server-mysql
-%systemd_postun_with_restart zabbix-server.service
+%systemd_postun_with_restart zabbix%{namespace}-server.service
 
 %postun server-mysql-selinux
 if [ $1 -eq 0 ]; then
@@ -726,45 +737,45 @@ systemctl restart rsyslog
 %defattr(-,root,root,-)
 %doc AUTHORS ChangeLog COPYING NEWS README
 %doc database/mysql/schema.sql.gz
-%attr(0640,root,zabbix) %config(noreplace) %{_sysconfdir}/zabbix/zabbix_proxy_common.conf
-%attr(0640,root,zabbix) %config(noreplace) %{_sysconfdir}/zabbix/zabbix_proxy_N.conf
-%dir /usr/lib/zabbix/externalscripts
-%{_sysconfdir}/logrotate.d/zabbix-proxy
-%attr(0755,zabbix,zabbix) %dir %{_localstatedir}/log/zabbix
-%attr(0755,zabbix,zabbix) %dir %{_localstatedir}/run/zabbix
+%attr(0640,root,zabbix) %config(noreplace) %{_sysconfdir}/zabbix%{namespace}/zabbix%{namespace}_proxy_common.conf
+%attr(0640,root,zabbix) %config(noreplace) %{_sysconfdir}/zabbix%{namespace}/zabbix%{namespace}_proxy_N.conf
+%dir /usr/lib/zabbix%{namespace}/externalscripts
+%{_sysconfdir}/logrotate.d/zabbix%{namespace}-proxy
+%attr(0755,zabbix,zabbix) %dir %{_localstatedir}/log/zabbix%{namespace}
+%attr(0755,zabbix,zabbix) %dir %{_localstatedir}/run/zabbix%{namespace}
 %{_mandir}/man8/zabbix_proxy.8*
-%{_unitdir}/zabbix-proxy.service
-%{_prefix}/lib/tmpfiles.d/zabbix-proxy.conf
-%{_sbindir}/zabbix_proxy_mysql
+%{_unitdir}/zabbix%{namespace}-proxy.service
+%{_prefix}/lib/tmpfiles.d/zabbix%{namespace}-proxy.conf
+%{_sbindir}/zabbix%{namespace}_proxy_mysql
 %{_bindir}/t_rsm_*
 
 %files proxy-mysql-selinux
 %defattr(-,root,root,0755)
-%attr(0644,root,root) %{_datadir}/selinux/packages/zabbix_proxy.pp.bz2
+%attr(0644,root,root) %{_datadir}/selinux/packages/zabbix%{namespace}_proxy.pp.bz2
 %attr(0644,root,root) %{_datadir}/selinux/packages/zabbix_agent.pp.bz2
 
 %files server-mysql
 %defattr(-,root,root,-)
 %doc AUTHORS ChangeLog COPYING NEWS README
 %doc database/mysql/create.sql.gz
-%attr(0640,root,zabbix) %config(noreplace) %{_sysconfdir}/zabbix/zabbix_server.conf
-%dir /usr/lib/zabbix/alertscripts
-%dir /usr/lib/zabbix/externalscripts
-%{_sysconfdir}/logrotate.d/zabbix-server
-%attr(0755,zabbix,zabbix) %dir %{_localstatedir}/log/zabbix
-%attr(0755,zabbix,zabbix) %dir %{_localstatedir}/log/zabbix/slv
-%attr(0755,zabbix,zabbix) %dir %{_localstatedir}/run/zabbix
+%attr(0640,root,zabbix) %config(noreplace) %{_sysconfdir}/zabbix%{namespace}/zabbix%{namespace}_server.conf
+%dir /usr/lib/zabbix%{namespace}/alertscripts
+%dir /usr/lib/zabbix%{namespace}/externalscripts
+%{_sysconfdir}/logrotate.d/zabbix%{namespace}-server
+%attr(0755,zabbix,zabbix) %dir %{_localstatedir}/log/zabbix%{namespace}
+%attr(0755,zabbix,zabbix) %dir %{_localstatedir}/log/zabbix%{namespace}/slv
+%attr(0755,zabbix,zabbix) %dir %{_localstatedir}/run/zabbix%{namespace}
 %{_mandir}/man8/zabbix_server.8*
-%{_unitdir}/zabbix-server.service
-%{_prefix}/lib/tmpfiles.d/zabbix-server.conf
-%{_sbindir}/zabbix_server_mysql
+%{_unitdir}/zabbix%{namespace}-server.service
+%{_prefix}/lib/tmpfiles.d/zabbix%{namespace}-server.conf
+%{_sbindir}/zabbix%{namespace}_server_mysql
 %{_bindir}/rsm_epp_dec
 %{_bindir}/rsm_epp_enc
 %{_bindir}/rsm_epp_gen
 
 %files server-mysql-selinux
 %defattr(-,root,root,0755)
-%attr(0644,root,root) %{_datadir}/selinux/packages/zabbix_server.pp.bz2
+%attr(0644,root,root) %{_datadir}/selinux/packages/zabbix%{namespace}_server.pp.bz2
 %attr(0644,root,root) %{_datadir}/selinux/packages/zabbix_agent.pp.bz2
 
 %files web
@@ -805,7 +816,7 @@ systemctl restart rsyslog
 %defattr(-,zabbix,zabbix,0755)
 /opt/zabbix/*
 %defattr(-,root,root,0755)
-%{_sysconfdir}/logrotate.d/zabbix-slv
+%{_sysconfdir}/logrotate.d/zabbix%{namespace}-slv
 %{_sysconfdir}/rsyslog.d/rsm.slv.conf
 
 %files js
