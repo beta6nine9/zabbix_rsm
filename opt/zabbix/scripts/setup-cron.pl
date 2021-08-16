@@ -12,39 +12,43 @@ use List::Util qw(max);
 use Getopt::Long qw(:config no_auto_abbrev);
 
 use constant CRONTAB_FILE => '/etc/cron.d/rsm';
-use constant SLV_LOG_FILE => '/var/log/zabbix/rsm.slv.err';
+use constant LOG_DIR      => '/var/log/zabbix';
+use constant SCRIPTS_DIR  => '/opt/zabbix/scripts';
+use constant SLV_LOG_FILE => LOG_DIR . '/rsm.slv.err';
+
+use constant PID_FILE     => '/tmp/zabbix-rsm.probe.online.pl.cron.pid';
 
 my $JOB_USER = 'zabbix';	# default user of the job
 
-my $echo_pid = 'echo -n $$ > /tmp/rsm.probe.online.pl.cron.pid; ';
-my $wait_pid = 'sleep 3; timeout 30 tail --pid=$(cat /tmp/rsm.probe.online.pl.cron.pid) -f /dev/null; ';
+my $echo_pid = 'echo -n $$ > ' . PID_FILE . '; ';
+my $wait_pid = 'sleep 3; timeout 30 tail --pid=$(cat ' . PID_FILE . ') -f /dev/null; ';
 
 my @cron_jobs = (
 	'# ignore missing home directory errors',
 	'HOME=/tmp',
 	'',
-	['main', '* * * * *' , 0, $echo_pid . '/opt/zabbix/scripts/slv/rsm.probe.online.pl'                                                                                                            , SLV_LOG_FILE],
+	['main', '* * * * *' , 0, $echo_pid . SCRIPTS_DIR . '/slv/rsm.probe.online.pl'                                                                                                                 , SLV_LOG_FILE],
 	'',
-	['main', '* * * * *' , 0, $wait_pid . '(/opt/zabbix/scripts/slv/rsm.slv.dns.avail.pl && /opt/zabbix/scripts/slv/rsm.slv.dns.rollweek.pl && /opt/zabbix/scripts/slv/rsm.slv.dns.downtime.pl)'   , SLV_LOG_FILE],
-	['main', '* * * * *' , 0, $wait_pid . '(/opt/zabbix/scripts/slv/rsm.slv.rdds.avail.pl && /opt/zabbix/scripts/slv/rsm.slv.rdds.rollweek.pl && /opt/zabbix/scripts/slv/rsm.slv.rdds.downtime.pl)', SLV_LOG_FILE],
-	['main', '* * * * *' , 0, $wait_pid . '(/opt/zabbix/scripts/slv/rsm.slv.rdap.avail.pl && /opt/zabbix/scripts/slv/rsm.slv.rdap.rollweek.pl && /opt/zabbix/scripts/slv/rsm.slv.rdap.downtime.pl)', SLV_LOG_FILE],
-	['main', '* * * * *' , 0, $wait_pid . '(/opt/zabbix/scripts/slv/rsm.slv.dnssec.avail.pl && /opt/zabbix/scripts/slv/rsm.slv.dnssec.rollweek.pl)'                                                , SLV_LOG_FILE],
-	['main', '* * * * *' , 0, $wait_pid . '(/opt/zabbix/scripts/slv/rsm.slv.dns.ns.avail.pl && /opt/zabbix/scripts/slv/rsm.slv.dns.ns.downtime.pl)'                                                , SLV_LOG_FILE],
+	['main', '* * * * *' , 0, $wait_pid . '(' . SCRIPTS_DIR . '/slv/rsm.slv.dns.avail.pl && ' . SCRIPTS_DIR . '/slv/rsm.slv.dns.rollweek.pl && ' . SCRIPTS_DIR . '/slv/rsm.slv.dns.downtime.pl)'   , SLV_LOG_FILE],
+	['main', '* * * * *' , 0, $wait_pid . '(' . SCRIPTS_DIR . '/slv/rsm.slv.rdds.avail.pl && ' . SCRIPTS_DIR . '/slv/rsm.slv.rdds.rollweek.pl && ' . SCRIPTS_DIR . '/slv/rsm.slv.rdds.downtime.pl)', SLV_LOG_FILE],
+	['main', '* * * * *' , 0, $wait_pid . '(' . SCRIPTS_DIR . '/slv/rsm.slv.rdap.avail.pl && ' . SCRIPTS_DIR . '/slv/rsm.slv.rdap.rollweek.pl && ' . SCRIPTS_DIR . '/slv/rsm.slv.rdap.downtime.pl)', SLV_LOG_FILE],
+	['main', '* * * * *' , 0, $wait_pid . '(' . SCRIPTS_DIR . '/slv/rsm.slv.dnssec.avail.pl && ' . SCRIPTS_DIR . '/slv/rsm.slv.dnssec.rollweek.pl)'                                                , SLV_LOG_FILE],
+	['main', '* * * * *' , 0, $wait_pid . '(' . SCRIPTS_DIR . '/slv/rsm.slv.dns.ns.avail.pl && ' . SCRIPTS_DIR . '/slv/rsm.slv.dns.ns.downtime.pl)'                                                , SLV_LOG_FILE],
 	'',
-	['main', '* * * * *' , 0, '/opt/zabbix/scripts/slv/rsm.slv.dns.udp.rtt.pl'                                                                                                                     , SLV_LOG_FILE],
-	['main', '* * * * *' , 0, '/opt/zabbix/scripts/slv/rsm.slv.dns.tcp.rtt.pl'                                                                                                                     , SLV_LOG_FILE],
-	['main', '* * * * *' , 0, '/opt/zabbix/scripts/slv/rsm.slv.rdds.rtt.pl'                                                                                                                        , SLV_LOG_FILE],
-	['main', '* * * * *' , 0, '/opt/zabbix/scripts/slv/rsm.slv.rdap.rtt.pl'                                                                                                                        , SLV_LOG_FILE],
+	['main', '* * * * *' , 0, SCRIPTS_DIR . '/slv/rsm.slv.dns.udp.rtt.pl'                                                                                                                          , SLV_LOG_FILE],
+	['main', '* * * * *' , 0, SCRIPTS_DIR . '/slv/rsm.slv.dns.tcp.rtt.pl'                                                                                                                          , SLV_LOG_FILE],
+	['main', '* * * * *' , 0, SCRIPTS_DIR . '/slv/rsm.slv.rdds.rtt.pl'                                                                                                                             , SLV_LOG_FILE],
+	['main', '* * * * *' , 0, SCRIPTS_DIR . '/slv/rsm.slv.rdap.rtt.pl'                                                                                                                             , SLV_LOG_FILE],
 	'',
-	['main', '0 1 1 * *' , 0, '/opt/zabbix/scripts/disable-rdds-for-rdap-hosts.pl'                                                                                                                 , '/var/log/zabbix/disable-rdds-for-rdap-hosts.err'],
-	['main', '0 15 1 * *', 0, '/opt/zabbix/scripts/sla-monthly-status.pl'                                                                                                                          , '/var/log/zabbix/sla-monthly-status.err'],
-	['main', '0 15 1 * *', 0, '/opt/zabbix/scripts/sla-report.php'                                                                                                                                 , '/var/log/zabbix/sla-report.err'],
+	['main', '0 1 1 * *' , 0, SCRIPTS_DIR . '/disable-rdds-for-rdap-hosts.pl'                                                                                                                      , LOG_DIR . '/disable-rdds-for-rdap-hosts.err'],
+	['main', '0 15 1 * *', 0, SCRIPTS_DIR . '/sla-monthly-status.pl'                                                                                                                               , LOG_DIR . '/sla-monthly-status.err'],
+	['main', '0 15 1 * *', 0, SCRIPTS_DIR . '/sla-report.php'                                                                                                                                      , LOG_DIR . '/sla-report.err'],
 	'',
-	['main', '* * * * *' , 0, 'sleep 15; /opt/zabbix/scripts/config-cache-reload.pl'                                                                                                               , '/var/log/zabbix/config-cache-reload.log'],
-	['main', '* * * * *' , 0, 'sleep 45; /opt/zabbix/scripts/config-cache-reload.pl'                                                                                                               , '/var/log/zabbix/config-cache-reload.log'],
+	['main', '* * * * *' , 0, 'sleep 15; ' . SCRIPTS_DIR . '/config-cache-reload.pl'                                                                                                               , LOG_DIR . '/config-cache-reload.log'],
+	['main', '* * * * *' , 0, 'sleep 45; ' . SCRIPTS_DIR . '/config-cache-reload.pl'                                                                                                               , LOG_DIR . '/config-cache-reload.log'],
 	'',
-	['db'  , '0 23 * * *', 0, '/opt/zabbix/scripts/MySQL_part_management.pl'                                                                                                                       , '/var/log/zabbix/zabbix-mysql-partitioning'],
-	['db'  , '0 2 * * *' , 0, '/opt/zabbix/scripts/MySQL_part_management.pl'                                                                                                                       , '/var/log/zabbix/zabbix-mysql-partitioning'],
+	['db'  , '0 23 * * *', 0, SCRIPTS_DIR . '/MySQL_part_management.pl'                                                                                                                            , LOG_DIR . '/zabbix-mysql-partitioning'],
+	['db'  , '0 2 * * *' , 0, SCRIPTS_DIR . '/MySQL_part_management.pl'                                                                                                                            , LOG_DIR . '/zabbix-mysql-partitioning'],
 );
 
 sub main()
