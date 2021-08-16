@@ -502,7 +502,7 @@ cp %{SOURCE23} $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_proxy_N.c
 
 # add namespace to AlertScriptsPath and ExternalScripts
 sed -i "s,/opt/zabbix/,/opt/zabbix%{namespace}/," $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_server.conf
-sed -i "s,/opt/zabbix/,/opt/zabbix%{namespace}/," $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_proxy_N.conf
+sed -i "s,/opt/zabbix/,/opt/zabbix%{namespace}/," $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_proxy_common.conf
 
 # install logrotate configuration files
 mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d
