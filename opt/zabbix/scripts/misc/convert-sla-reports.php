@@ -94,7 +94,7 @@ function main($argv)
 
 	if (defined("STATS") && STATS === true)
 	{
-		printf("(STATS) Report count - %d\n", count($reports));
+		printf("(STATS) Report count - %d\n", count($rows));
 		printf("(STATS) Total time   - %.6f\n", microtime(true) - $start_time);
 		printf("(STATS) Mem usage    - %.2f MB\n", memory_get_peak_usage(true) / 1024 / 1024);
 	}
