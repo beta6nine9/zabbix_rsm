@@ -635,6 +635,40 @@ __END__
 
 =head1 NAME
 
-merge-monthly-reports.pl
+merge-monthly-reports.pl - merge monthly reports from old and new databases, store them in the new database.
+
+=head1 SYNOPSIS
+
+merge-monthly-reports.pl --old-config <filename> --new-config <filename> --server-id <server_id> --year <year> --month <month>
+
+=head1 OPTIONS
+
+=over 8
+
+=item B<--old-config> filename
+
+Full path to the old rsm.conf file.
+
+=item B<--new-config> filename
+
+Full path to the new rsm.conf file.
+
+=item B<--server-id> server_id
+
+ID of Zabbix server.
+
+=item B<--year> year
+
+Year when the report was generated.
+
+=item B<--month> month
+
+Month when the report was generated.
+
+=item B<--help>
+
+Print a brief help message and exit.
+
+=back
 
 =cut
