@@ -32,7 +32,6 @@ Source21:	zabbix_server.conf
 Source22:	zabbix_proxy_common.conf
 Source23:	zabbix_proxy_N.conf
 Source24:	zabbix-slv-logrotate
-Patch2:		fping3-sourceip-option.patch
 
 Buildroot:	%{_tmppath}/zabbix-%{version}-%{release}-root-%(%{__id_u} -n)
 
@@ -316,8 +315,6 @@ sed -r -i.bak "s,^(\s*require_once ).*conf/maintenance\.inc\.php.*,\1 '/etc/zabb
 
 sed -r -i.bak 's,^(\s*\$configFile =).*CONFIG_FILE_PATH.*,\1 CConfigFile::CONFIG_FILE_PATH;,' \
 	ui/include/classes/core/ZBase.php
-
-%patch2 -p1
 
 cp -r %{SOURCE1}/ ./
 
