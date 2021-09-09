@@ -221,7 +221,7 @@ sub add_probe($$$$$$$$$$$)
 		{
 			$rsmhost_probe_templates = [
 				{ 'templateid' => $rsmhost_config->{'templateid'} },
-				{ 'templateid' => DNS_TEST_TEMPLATEID },
+				{ 'templateid' => get_template_id(TEMPLATE_RSMHOST_DNS_TEST_PREFIX . $tld->{'name'}) },
 				{ 'templateid' => RDDS_TEST_TEMPLATEID },
 				{ 'templateid' => RDAP_TEST_TEMPLATEID },
 				{ 'templateid' => $probe_tmpl_id },
