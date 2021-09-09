@@ -35,8 +35,6 @@ Source24:	zabbix-slv-logrotate
 
 Buildroot:	%{_tmppath}/zabbix-%{version}-%{release}-root-%(%{__id_u} -n)
 
-%global zabbix_prefix	zabbix50
-
 %global selinuxtype	targeted
 %global moduletype	services
 
@@ -45,6 +43,9 @@ Buildroot:	%{_tmppath}/zabbix-%{version}-%{release}-root-%(%{__id_u} -n)
 %global selinux_policyver	3.13.1-102.el7_3.13
 
 %global _format() export %1=""; for x in %{modulenames}; do %1+=%2; %1+=" "; done;
+
+%global namespace_list /opt/zabbix /var/log/zabbix /etc/zabbix /usr/lib/zabbix /run/zabbix /usr/sbin/zabbix /etc/sysconfig/zabbix /tmp/zabbix /etc/cron.d/rsm Description=Zabbix
+%global _set_namespace_pattern() export %1=""; for x in %{namespace_list}; do %1+=s,$x,%2,g; %1+=";"; done;
 
 # Relabel files
 %global relabel_files() \ # ADD files in *.fc file
@@ -75,9 +76,13 @@ Requires(post):		systemd
 Requires(preun):	systemd
 Requires(postun):	systemd
 %if 0%{?rhel} >= 8
-Requires:		ldns >= 1.7.1
+# TODO: temporary solution for deployment, add ldns version back after DNS Reboot is deployed
+#Requires:		ldns >= 1.7.1
+Requires:		ldns
 %else
-Requires:		ldns >= 1.6.17
+# TODO: temporary solution for deployment, add ldns version back after DNS Reboot is deployed
+#Requires:		ldns >= 1.6.17
+Requires:		ldns
 %endif
 Provides:		zabbix%{namespace}-proxy = %{version}-%{release}
 Provides:		zabbix%{namespace}-proxy-implementation = %{version}-%{release}
@@ -109,9 +114,13 @@ Requires(post):		systemd
 Requires(preun):	systemd
 Requires(postun):	systemd
 %if 0%{?rhel} >= 8
-Requires:		ldns >= 1.7.1
+# TODO: temporary solution for deployment, add ldns version back after DNS Reboot is deployed
+#Requires:		ldns >= 1.7.1
+Requires:		ldns
 %else
-Requires:		ldns >= 1.6.17
+# TODO: temporary solution for deployment, add ldns version back after DNS Reboot is deployed
+#Requires:		ldns >= 1.6.17
+Requires:		ldns
 %endif
 Requires:		perl-Data-Dumper
 Requires:		perl-DBD-MySQL
@@ -173,9 +182,9 @@ Obsoletes:			php-fpm
 %endif
 # CentOS 7 specifics end
 Requires:			dejavu-sans-fonts
-Requires:			zabbix-web-database = %{version}-%{release}
-Requires(post):		%{_sbindir}/update-alternatives
-Requires(preun):	%{_sbindir}/update-alternatives
+Requires:			zabbix%{namespace}-web-database = %{version}-%{release}
+Requires(post):			%{_sbindir}/update-alternatives
+Requires(preun):		%{_sbindir}/update-alternatives
 
 %description web
 Zabbix web frontend common package.
@@ -192,8 +201,8 @@ Requires:			rh-php73-php-mysqlnd
 Obsoletes:			php-mysqlnd
 # CentOS 7 specifics end
 %endif
-Requires:			zabbix-web = %{version}-%{release}
-Provides:			zabbix-web-database = %{version}-%{release}
+Requires:			zabbix%{namespace}-web = %{version}-%{release}
+Provides:			zabbix%{namespace}-web-database = %{version}-%{release}
 
 %description web-mysql
 Zabbix web frontend for MySQL.
@@ -208,7 +217,7 @@ Requires(post):		policycoreutils-python-utils
 %else
 Requires(post):		policycoreutils-python
 %endif
-Requires:		zabbix-web-mysql = %{version}-%{release}
+Requires:		zabbix%{namespace}-web-mysql = %{version}-%{release}
 
 %description web-mysql-selinux
 SELinux policy modules for use with Zabbix web frontend.
@@ -305,6 +314,10 @@ Group:				Applications/Internet
 Zabbix js command line utility.
 
 %prep
+
+# set NAMESPACE_PATTERN for prep section
+%_set_namespace_pattern NAMESPACE_PATTERN ${x}%{namespace}
+
 %setup0 -q -n zabbix-%{version}%{?rsmprereleasetag:%{rsmprereleasetag}}
 
 sed -r -i.bak "s,^(\s*const CONFIG_FILE_PATH =).*,\1 '/etc/zabbix/web/zabbix.conf.php';," \
@@ -335,7 +348,7 @@ cat database/mysql/data.sql >> database/mysql/create.sql
 cat %{SOURCE16} >> database/mysql/create.sql
 
 # fix scripts path
-sed -i "s,/opt/zabbix,/opt/%{zabbix_prefix}," database/mysql/create.sql
+sed -i "$NAMESPACE_PATTERN" database/mysql/create.sql
 
 gzip database/mysql/create.sql
 
@@ -391,6 +404,7 @@ cd selinux
 sed -i "s,module zabbix_proxy,module zabbix%{namespace}_proxy,"   zabbix_proxy.te
 sed -i "s,module zabbix_server,module zabbix%{namespace}_server," zabbix_server.te
 sed -i "s,module zabbix_agent,module zabbix%{namespace}_agent,"   zabbix_agent.te
+
 mv zabbix_proxy.te zabbix%{namespace}_proxy.te
 mv zabbix_server.te zabbix%{namespace}_server.te
 mv zabbix_agent.te zabbix%{namespace}_agent.te
@@ -398,6 +412,9 @@ mv zabbix_agent.te zabbix%{namespace}_agent.te
 make SHARE="%{_datadir}" TARGETS="%{modulenames}"
 
 %install
+
+# set NAMESPACE_PATTERN for install section
+%_set_namespace_pattern NAMESPACE_PATTERN ${x}%{namespace}
 
 rm -rf $RPM_BUILD_ROOT
 
@@ -408,9 +425,6 @@ make DESTDIR=$RPM_BUILD_ROOT install
 mkdir -p $RPM_BUILD_ROOT%{_localstatedir}/log/zabbix%{namespace}
 mkdir -p $RPM_BUILD_ROOT%{_localstatedir}/log/zabbix%{namespace}/slv
 mkdir -p $RPM_BUILD_ROOT%{_localstatedir}/run/zabbix%{namespace}
-
-mkdir -p $RPM_BUILD_ROOT%{_localstatedir}/log/%{zabbix_prefix}
-mkdir -p $RPM_BUILD_ROOT%{_localstatedir}/log/%{zabbix_prefix}/slv
 
 # install server and proxy binaries
 install -m 0755 -p src/zabbix_server/zabbix%{namespace}_server_* $RPM_BUILD_ROOT%{_sbindir}/
@@ -438,9 +452,9 @@ mv $RPM_BUILD_ROOT%{_bindir}/t_rsm_rdds $RPM_BUILD_ROOT%{_bindir}/zabbix%{namesp
 mv $RPM_BUILD_ROOT%{_bindir}/t_rsm_rdap $RPM_BUILD_ROOT%{_bindir}/zabbix%{namespace}_t_rsm_rdap
 
 # install directories for scripts
-mkdir -p $RPM_BUILD_ROOT/usr/lib/zabbix%{namespace}
-mv $RPM_BUILD_ROOT%{_datadir}/zabbix/alertscripts $RPM_BUILD_ROOT/usr/lib/zabbix%{namespace}
-mv $RPM_BUILD_ROOT%{_datadir}/zabbix/externalscripts $RPM_BUILD_ROOT/usr/lib/zabbix%{namespace}
+mkdir -p $RPM_BUILD_ROOT%{_libdir}/zabbix%{namespace}
+mv $RPM_BUILD_ROOT%{_datadir}/zabbix/alertscripts    $RPM_BUILD_ROOT%{_libdir}/zabbix%{namespace}
+mv $RPM_BUILD_ROOT%{_datadir}/zabbix/externalscripts $RPM_BUILD_ROOT%{_libdir}/zabbix%{namespace}
 
 # install frontend files
 find ui -name '*.orig' | xargs rm -f
@@ -471,45 +485,36 @@ install -Dm 0644 -p %{SOURCE18} $RPM_BUILD_ROOT%{_sysconfdir}/opt/rh/rh-php73/ph
 %endif
 
 # install configuration files
-mv $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_proxy.conf.d $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_proxy.d
+mv $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_proxy.conf.d  $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_proxy.d
 mv $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_server.conf.d $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_server.d
 
 %if 0%{?rhel} >= 8
 mv $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_agentd.conf.d $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_agentd.d
 
 install -dm 755 $RPM_BUILD_ROOT%{_docdir}/zabbix-agent-%{version}
-
-install -m 0644 conf/zabbix_agentd/userparameter_mysql.conf $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_agentd.d
+install -m 0644 conf/zabbix_agentd/userparameter_mysql.conf    $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_agentd.d
 install -m 0644 conf/zabbix_agentd/userparameter_examples.conf $RPM_BUILD_ROOT%{_docdir}/zabbix-agent-%{version}
 
-cat conf/zabbix_agentd.conf | sed \
-	-e '/^# PidFile=/a \\nPidFile=%{_localstatedir}/run/zabbix%{namespace}/zabbix_agentd.pid' \
-	-e 's|^LogFile=.*|LogFile=%{_localstatedir}/log/zabbix%{namespace}/zabbix_agentd.log|g' \
-	-e '/^# LogFileSize=.*/a \\nLogFileSize=0' \
-	-e '/^# Include=$/a \\nInclude=%{_sysconfdir}/zabbix%{namespace}/zabbix_agentd.d/' \
-	> $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_agentd.conf
+sed -i "$NAMESPACE_PATTERN" conf/zabbix_agentd.conf
 %endif
 
 mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/rsyslog.d
-cp %{SOURCE20} $RPM_BUILD_ROOT%{_sysconfdir}/rsyslog.d/zabbix%{namespace}-rsm.slv.conf
-cp %{SOURCE21} $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_server.conf
-
-cp %{SOURCE22} $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_proxy_common.conf
-cp %{SOURCE23} $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_proxy_N.conf
-
-# add namespace to AlertScriptsPath and ExternalScripts
-sed -i "s,/opt/zabbix/,/opt/zabbix%{namespace}/," $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_server.conf
-sed -i "s,/opt/zabbix/,/opt/zabbix%{namespace}/," $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_proxy_common.conf
+cp %{SOURCE20}              $RPM_BUILD_ROOT%{_sysconfdir}/rsyslog.d/zabbix%{namespace}-rsm.slv.conf
+sed -i "$NAMESPACE_PATTERN" $RPM_BUILD_ROOT%{_sysconfdir}/rsyslog.d/*.conf
+cp %{SOURCE21}              $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_server.conf
+cp %{SOURCE22}              $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_proxy_common.conf
+cp %{SOURCE23}              $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_proxy_N.conf
+sed -i "$NAMESPACE_PATTERN" $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/*.conf
 
 # install logrotate configuration files
 mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d
 cat %{SOURCE3} | sed \
 	-e 's|COMPONENT|server|g' \
-	> $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/zabbix%{namespace}-server
-
+	>                   $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/zabbix%{namespace}-server
 cat %{SOURCE3} | sed \
 	-e 's|COMPONENT|proxy*|g' \
-	> $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/zabbix%{namespace}-proxy
+	>                   $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/zabbix%{namespace}-proxy
+sed -i "$NAMESPACE_PATTERN" $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/*
 
 %if 0%{?rhel} >= 8
 cat %{SOURCE3} | sed \
@@ -520,22 +525,22 @@ cat %{SOURCE3} | sed \
 # install startup scripts
 install -Dm 0644 -p %{SOURCE11} $RPM_BUILD_ROOT%{_unitdir}/zabbix%{namespace}-server.service
 install -Dm 0644 -p %{SOURCE12} $RPM_BUILD_ROOT%{_unitdir}/zabbix%{namespace}-proxy.service
-
 %if 0%{?rhel} >= 8
 install -Dm 0644 -p %{SOURCE10} $RPM_BUILD_ROOT%{_unitdir}/zabbix-agent.service
 %endif
+sed -i "$NAMESPACE_PATTERN"     $RPM_BUILD_ROOT%{_unitdir}/*
 
 # install systemd-tmpfiles conf
 install -Dm 0644 -p %{SOURCE15} $RPM_BUILD_ROOT%{_prefix}/lib/tmpfiles.d/zabbix%{namespace}-server.conf
 install -Dm 0644 -p %{SOURCE15} $RPM_BUILD_ROOT%{_prefix}/lib/tmpfiles.d/zabbix%{namespace}-proxy.conf
-
 %if 0%{?rhel} >= 8
 install -Dm 0644 -p %{SOURCE15} $RPM_BUILD_ROOT%{_prefix}/lib/tmpfiles.d/zabbix-agent.conf
 %endif
+sed -i "$NAMESPACE_PATTERN"     $RPM_BUILD_ROOT%{_prefix}/lib/tmpfiles.d/*
 
 # Install SELinux policy modules
 %_format MODULES selinux/$x.pp.bz2
-echo $MODULES
+
 install -d $RPM_BUILD_ROOT%{_datadir}/selinux/packages
 install -m 0644 $MODULES \
     $RPM_BUILD_ROOT%{_datadir}/selinux/packages
@@ -544,47 +549,10 @@ install -d $RPM_BUILD_ROOT/opt/zabbix%{namespace}
 install -d $RPM_BUILD_ROOT/opt/zabbix%{namespace}/data
 cp -r opt/zabbix/* $RPM_BUILD_ROOT/opt/zabbix%{namespace}/
 
-# fix /var/log/zabbix path
-sed -i "s,/var/log/zabbix,/var/log/zabbix%{namespace}," $RPM_BUILD_ROOT/opt/zabbix%{namespace}/scripts/setup-cron.pl
-sed -i "s,/var/log/zabbix,/var/log/zabbix%{namespace}," $RPM_BUILD_ROOT/opt/zabbix%{namespace}/scripts/tlds-notification.pl
-sed -i "s,/var/log/zabbix,/var/log/zabbix%{namespace}," $RPM_BUILD_ROOT/opt/zabbix%{namespace}/scripts/RSMSLV.pm
-
-# fix rsm.probe.online.pl pid file
-sed -i "s,/tmp/zabbix,/tmp/zabbix%{namespace}," $RPM_BUILD_ROOT/opt/zabbix%{namespace}/scripts/setup-cron.pl
-
-# fix /etc/cron.d/rsm path
-sed -i "s,/etc/cron.d/rsm,/etc/cron.d/zabbix%{namespace}-rsm," $RPM_BUILD_ROOT/opt/zabbix%{namespace}/scripts/setup-cron.pl
-
-# fix /opt/zabbix path
-sed -i "s,opt/zabbix,opt/zabbix%{namespace}," $RPM_BUILD_ROOT/opt/zabbix%{namespace}/alertscripts/salesforce.pl
-sed -i "s,opt/zabbix,opt/zabbix%{namespace}," $RPM_BUILD_ROOT/opt/zabbix%{namespace}/scripts/export/DaWa.pm
-sed -i "s,opt/zabbix,opt/zabbix%{namespace}," $RPM_BUILD_ROOT/opt/zabbix%{namespace}/scripts/export/translate.pl
-sed -i "s,opt/zabbix,opt/zabbix%{namespace}," $RPM_BUILD_ROOT/opt/zabbix%{namespace}/scripts/export/export.pl
-sed -i "s,opt/zabbix,opt/zabbix%{namespace}," $RPM_BUILD_ROOT/opt/zabbix%{namespace}/scripts/misc/recent-measurement.sh
-sed -i "s,opt/zabbix,opt/zabbix%{namespace}," $RPM_BUILD_ROOT/opt/zabbix%{namespace}/scripts/misc/convert-sla-reports.php
-sed -i "s,opt/zabbix,opt/zabbix%{namespace}," $RPM_BUILD_ROOT/opt/zabbix%{namespace}/scripts/misc/change-lastvalue.pl
-sed -i "s,opt/zabbix,opt/zabbix%{namespace}," $RPM_BUILD_ROOT/opt/zabbix%{namespace}/scripts/slv/rsm.slv.rdap.downtime.pl
-sed -i "s,opt/zabbix,opt/zabbix%{namespace}," $RPM_BUILD_ROOT/opt/zabbix%{namespace}/scripts/slv/rsm.slv.rdds.downtime.pl
-sed -i "s,opt/zabbix,opt/zabbix%{namespace}," $RPM_BUILD_ROOT/opt/zabbix%{namespace}/scripts/slv/rsm.slv.dns.downtime.pl
-sed -i "s,opt/zabbix,opt/zabbix%{namespace}," $RPM_BUILD_ROOT/opt/zabbix%{namespace}/scripts/slv/rsm.slv.dns.ns.downtime.pl
-sed -i "s,opt/zabbix,opt/zabbix%{namespace}," $RPM_BUILD_ROOT/opt/zabbix%{namespace}/scripts/tests/test-sla-api-recent.sh
-sed -i "s,opt/zabbix,opt/zabbix%{namespace}," $RPM_BUILD_ROOT/opt/zabbix%{namespace}/scripts/tests/test-scripts.sh
-sed -i "s,opt/zabbix,opt/zabbix%{namespace}," $RPM_BUILD_ROOT/opt/zabbix%{namespace}/scripts/tests/test-update-api-data.pl
-sed -i "s,opt/zabbix,opt/zabbix%{namespace}," $RPM_BUILD_ROOT/opt/zabbix%{namespace}/scripts/tests/test-export.pl
-sed -i "s,opt/zabbix,opt/zabbix%{namespace}," $RPM_BUILD_ROOT/opt/zabbix%{namespace}/scripts/maintenance-api-data.pl
-sed -i "s,opt/zabbix,opt/zabbix%{namespace}," $RPM_BUILD_ROOT/opt/zabbix%{namespace}/scripts/sla-reports-to-files.pl
-sed -i "s,opt/zabbix,opt/zabbix%{namespace}," $RPM_BUILD_ROOT/opt/zabbix%{namespace}/scripts/probes.pl
-sed -i "s,opt/zabbix,opt/zabbix%{namespace}," $RPM_BUILD_ROOT/opt/zabbix%{namespace}/scripts/setup-cron.pl
-sed -i "s,opt/zabbix,opt/zabbix%{namespace}," $RPM_BUILD_ROOT/opt/zabbix%{namespace}/scripts/registrar.pl
-sed -i "s,opt/zabbix,opt/zabbix%{namespace}," $RPM_BUILD_ROOT/opt/zabbix%{namespace}/scripts/tld.pl
-sed -i "s,opt/zabbix,opt/zabbix%{namespace}," $RPM_BUILD_ROOT/opt/zabbix%{namespace}/scripts/sla-report.php
-sed -i "s,opt/zabbix,opt/zabbix%{namespace}," $RPM_BUILD_ROOT/opt/zabbix%{namespace}/scripts/CSlaReport.php
-sed -i "s,opt/zabbix,opt/zabbix%{namespace}," $RPM_BUILD_ROOT/opt/zabbix%{namespace}/scripts/RSM.pm
-sed -i "s,opt/zabbix,opt/zabbix%{namespace}," $RPM_BUILD_ROOT/opt/zabbix%{namespace}/scripts/sla-api-recent.pl
-sed -i "s,opt/zabbix,opt/zabbix%{namespace}," $RPM_BUILD_ROOT/opt/zabbix%{namespace}/scripts/ApiHelper.pm
-sed -i "s,opt/zabbix,opt/zabbix%{namespace}," $RPM_BUILD_ROOT/opt/zabbix%{namespace}/scripts/RSMSLV.pm
+sed -i "$NAMESPACE_PATTERN" $(find $RPM_BUILD_ROOT/opt/zabbix%{namespace} -type f -name '*.pl' -o -name '*.pm' -o -name '*.php' -o -name '*.sh')
 
 install -Dm 0644 -p %{SOURCE24} $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/zabbix%{namespace}-slv
+sed -i "$NAMESPACE_PATTERN"     $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/zabbix%{namespace}-slv
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -807,7 +775,7 @@ systemctl restart rsyslog
 %doc database/mysql/schema.sql.gz
 %attr(0640,root,zabbix) %config(noreplace) %{_sysconfdir}/zabbix%{namespace}/zabbix_proxy_common.conf
 %attr(0640,root,zabbix) %config(noreplace) %{_sysconfdir}/zabbix%{namespace}/zabbix_proxy_N.conf
-%dir /usr/lib/zabbix%{namespace}/externalscripts
+%dir %{_libdir}/zabbix%{namespace}/externalscripts
 %{_sysconfdir}/logrotate.d/zabbix%{namespace}-proxy
 %attr(0755,zabbix,zabbix) %dir %{_localstatedir}/log/zabbix%{namespace}
 %attr(0755,zabbix,zabbix) %dir %{_localstatedir}/run/zabbix%{namespace}
@@ -827,8 +795,8 @@ systemctl restart rsyslog
 %doc AUTHORS ChangeLog COPYING NEWS README
 %doc database/mysql/create.sql.gz
 %attr(0640,root,zabbix) %config(noreplace) %{_sysconfdir}/zabbix%{namespace}/zabbix_server.conf
-%dir /usr/lib/zabbix%{namespace}/alertscripts
-%dir /usr/lib/zabbix%{namespace}/externalscripts
+%dir %{_libdir}/zabbix%{namespace}/alertscripts
+%dir %{_libdir}/zabbix%{namespace}/externalscripts
 %{_sysconfdir}/logrotate.d/zabbix%{namespace}-server
 %attr(0755,zabbix,zabbix) %dir %{_localstatedir}/log/zabbix%{namespace}
 %attr(0755,zabbix,zabbix) %dir %{_localstatedir}/log/zabbix%{namespace}/slv
