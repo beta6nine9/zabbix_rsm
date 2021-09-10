@@ -158,7 +158,7 @@ function RsmValidateTldIdentifier($rule, &$data, $path, &$error): bool
 		return false;
 	}
 	// if 3rd and 4th characters are '--', then 1st and 2nd characters must be 'xn' (i.e., 'xn--')
-    if (($data[0] != 'x' || $data[1] != 'n') && $data[2] == '-' && $data[3] == '-')
+    if (strlen($data) >= 4 && ($data[0] != 'x' || $data[1] != 'n') && $data[2] == '-' && $data[3] == '-')
 	{
 		$error = $rule['error'];
 		return false;

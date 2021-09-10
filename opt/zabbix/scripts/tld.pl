@@ -106,10 +106,10 @@ sub cmd_list_services()
 			$data->{'tldType'},                                                          # type
 			$services{'dnsUDP'} || $services{'dnsTCP'} ? 0 : 1,                          # status
 			$data->{'dnsParameters'}{'nsTestPrefix'},                                    # {$RSM.DNS.TESTPREFIX}
-			$data->{'rddsParameters'}{'rdds43NsString'} // '',                           # {$RSM.RDDS.NS.STRING}
+			$data->{'rddsParameters'}{'rdds43NsString'} // 'Name Server:',               # {$RSM.RDDS.NS.STRING}
 			$rdds43_test_prefix // '',                                                   # $rdds43_test_prefix
 			$data->{'dnsParameters'}{'dnssecEnabled'} ? 1 : 0,                           # {$RSM.TLD.DNSSEC.ENABLED}
-			'',                                                                          # {$RSM.TLD.EPP.ENABLED}
+			'0',                                                                         # {$RSM.TLD.EPP.ENABLED}
 			$services{'rdds43'} || $services{'rdds80'} ? 1 : 0,                          # {$RSM.TLD.RDDS.ENABLED}
 			$services{'rdap'} ? 1 : 0,                                                   # {$RDAP.TLD.ENABLED}
 			$data->{'rddsParameters'}{'rdapUrl'} // '',                                  # {$RDAP.BASE.URL}
@@ -146,7 +146,7 @@ sub cmd_get_nsservers_list()
 
 		foreach my $nsip (@{$data->{'dnsParameters'}{'nsIps'}})
 		{
-			my $ip_version = $nsip->{'ip'} =~ /^\d+\.\d+\.\d+\.\d+$/ ? 'ipv4' : 'ipv6';
+			my $ip_version = $nsip->{'ip'} =~ /^\d+\.\d+\.\d+\.\d+$/ ? 'v4' : 'v6';
 			push(@{$nsip_lists->{$ip_version}{$nsip->{'ns'}}}, $nsip->{'ip'});
 		}
 
