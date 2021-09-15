@@ -52,10 +52,14 @@ Buildroot:	%{_tmppath}/zabbix-%{version}-%{release}-root-%(%{__id_u} -n)
 
 %if 0%{?rhel} >= 8
 BuildRequires:	mariadb-connector-c-devel
-BuildRequires:	ldns-devel >= 1.7.1
+# TODO: temporary solution for deployment, add ldns version back after DNS Reboot is deployed
+#BuildRequires:	ldns-devel >= 1.7.1
+BuildRequires:	ldns-devel
 %else
 BuildRequires:	mysql-devel
-BuildRequires:	ldns-devel >= 1.6.17
+# TODO: temporary solution for deployment, add ldns version back after DNS Reboot is deployed
+#BuildRequires:	ldns-devel >= 1.6.17
+BuildRequires:	ldns-devel
 %endif
 BuildRequires:	libevent-devel
 BuildRequires:	pcre-devel
