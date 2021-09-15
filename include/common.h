@@ -1120,7 +1120,8 @@ void	zbx_setproctitle(const char *fmt, ...) __zbx_attr_format_printf(1, 2);
 #define ZBX_JAN_2038		2145916800
 #define ZBX_JAN_1970_IN_SEC	2208988800.0	/* 1970 - 1900 in seconds */
 
-#define ZBX_MAX_RECV_DATA_SIZE	(1 * ZBX_GIBIBYTE)
+#define ZBX_MAX_RECV_DATA_SIZE		(1 * ZBX_GIBIBYTE)
+#define ZBX_MAX_RECV_LARGE_DATA_SIZE	(__UINT64_C(16) * ZBX_GIBIBYTE)
 
 /* max length of base64 data */
 #define ZBX_MAX_B64_LEN		(16 * ZBX_KIBIBYTE)
@@ -1304,6 +1305,7 @@ int	zbx_get_file_time(const char *path, zbx_file_time_t *time);
 void	find_cr_lf_szbyte(const char *encoding, const char **cr, const char **lf, size_t *szbyte);
 int	zbx_read(int fd, char *buf, size_t count, const char *encoding);
 int	zbx_is_regular_file(const char *path);
+char	*zbx_fgets(char *buffer, int size, FILE *fp);
 
 int	MAIN_ZABBIX_ENTRY(int flags);
 

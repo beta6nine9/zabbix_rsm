@@ -1,7 +1,16 @@
+Changes for rsm2.2.0rc16
+
+....I..... [723] removed MySQL_part_management.pl, adjusted setup-cron.pl accordingly (dimir)
+....I..... [809] replaced INDEX with PRIMARY KEY in history tables (asitals,dimir)
+....I..... [802] added script for merging monthly reports from two databases (asitals)
+....I..... [803] updated configuration key names for TLS encryption in tlds-notification.pl (asitals)
+....I..... [805] added changes to allow running Zabbix 5.0 with 3.0 (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.2.0rc15
 
 ..F....... [800] added table with DNSSEC-specific errors to DNSSEC Test details page (dimir)
-........S. [798] fixed filter on a Rolling week status page to remember "any" setting (dimir)
+........S. [798] fixed filter on a Rolling week status page to remember "any" setting (dimir,gcalenko)
 
 --------------------------------------------------------------------------------
 Changes for rsm2.2.0rc14
@@ -194,6 +203,12 @@ Changes for rsm2.1.0rc1
 New features:
 ..F.I..PS. [554] upgraded Zabbix to 5.0.4 (asitals, dimir, gcalenko, kalimulin, miks)
 ..F.I..PS. [599] implemented DNS Monitoring Reboot (asitals, dimir, gcalenko, kalimulin)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.0.9
+
+Bug fixes:
+....I..... [sub-786] improved performance of forcing JSON value types of SLA API scripts (asitals,dimir)
 
 --------------------------------------------------------------------------------
 Changes for rsm2.0.8

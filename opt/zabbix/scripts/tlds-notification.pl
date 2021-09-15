@@ -750,7 +750,6 @@ sub __get_db_config()
 	my $db_tls_key_file  = undef;
 	my $db_tls_cert_file = undef;
 	my $db_tls_ca_file   = undef;
-	my $db_tls_ca_path   = undef;
 	my $db_tls_cipher    = undef;
 
 	open(my $fh, '<', ZABBIX_SERVER_CONF_FILE) or fail("cannot open ${\ZABBIX_SERVER_CONF_FILE}: $!");
@@ -767,11 +766,10 @@ sub __get_db_config()
 			$db_user = $value if ($key eq 'DBUser');
 			$db_pswd = $value if ($key eq 'DBPassword');
 
-			$db_tls_key_file  = $value if ($key eq 'DBKeyFile');
-			$db_tls_cert_file = $value if ($key eq 'DBCertFile');
-			$db_tls_ca_file   = $value if ($key eq 'DBCAFile');
-			$db_tls_ca_path   = $value if ($key eq 'DBCAPath');
-			$db_tls_cipher    = $value if ($key eq 'DBCipher');
+			$db_tls_key_file  = $value if ($key eq 'DBTLSKeyFile');
+			$db_tls_cert_file = $value if ($key eq 'DBTLSCertFile');
+			$db_tls_ca_file   = $value if ($key eq 'DBTLSCAFile');
+			$db_tls_cipher    = $value if ($key eq 'DBTLSCipher13');
 		}
 	}
 
@@ -782,7 +780,6 @@ sub __get_db_config()
 	$db_tls_settings .= "mysql_ssl_client_key="  . $db_tls_key_file  . ";" if (defined($db_tls_key_file));
 	$db_tls_settings .= "mysql_ssl_client_cert=" . $db_tls_cert_file . ";" if (defined($db_tls_cert_file));
 	$db_tls_settings .= "mysql_ssl_ca_file="     . $db_tls_ca_file   . ";" if (defined($db_tls_ca_file));
-	$db_tls_settings .= "mysql_ssl_ca_path="     . $db_tls_ca_path   . ";" if (defined($db_tls_ca_path));
 	$db_tls_settings .= "mysql_ssl_cipher="      . $db_tls_cipher    . ";" if (defined($db_tls_cipher));
 
 	if ($db_tls_settings)

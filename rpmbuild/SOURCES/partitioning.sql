@@ -1,3 +1,6 @@
+ALTER TABLE `history_uint` DROP INDEX `history_uint_1`, ADD PRIMARY KEY (`itemid`, `clock`, `ns`);
+ALTER TABLE `history`      DROP INDEX `history_1`,      ADD PRIMARY KEY (`itemid`, `clock`, `ns`);
+ALTER TABLE `history_str`  DROP INDEX `history_str_1`,  ADD PRIMARY KEY (`itemid`, `clock`, `ns`);
 ALTER TABLE `history`      PARTITION BY RANGE (clock) (PARTITION p2011_10_23 VALUES LESS THAN (UNIX_TIMESTAMP("2011-10-24 00:00:00") div 1) ENGINE = InnoDB);
 ALTER TABLE `history_log`  PARTITION BY RANGE (clock) (PARTITION p2011_10_23 VALUES LESS THAN (UNIX_TIMESTAMP("2011-10-24 00:00:00") div 1) ENGINE = InnoDB);
 ALTER TABLE `history_str`  PARTITION BY RANGE (clock) (PARTITION p2011_10_23 VALUES LESS THAN (UNIX_TIMESTAMP("2011-10-24 00:00:00") div 1) ENGINE = InnoDB);

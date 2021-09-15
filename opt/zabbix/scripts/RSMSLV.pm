@@ -20,9 +20,10 @@ use Time::HiRes;
 use Fcntl qw(:flock);	# for the LOCK_* constants, logging to stdout by multiple processes
 use RSM;
 use Pusher qw(push_to_trapper);
-use Fcntl qw(:flock);
 use List::Util qw(min max);
 use Devel::StackTrace;
+use FindBin;
+use Digest::MD5 qw(md5);
 
 use constant E_ID_NONEXIST			=> -2;
 use constant E_ID_MULTIPLE			=> -3;
@@ -6129,13 +6130,14 @@ sub __func
 
 sub __script
 {
-	my $script = $0;
-
-	$script =~ s,.*/([^/]*)$,$1,;
-
-	return $script;
+	return $FindBin::Script;
 }
 
+sub __scriptsum
+{
+	# convert md5 (take only first 8 bytes of it) to 4-byte integer (L (long))
+	return $FindBin::Script . '-' . unpack('L', substr(md5($FindBin::RealBin), 0, 8));
+}
 
 sub __init_stdout_lock
 {
@@ -6143,7 +6145,7 @@ sub __init_stdout_lock
 	{
 		my $username = $ENV{LOGNAME} || $ENV{USER} || getpwuid($<) || getlogin() || 'unknown';
 
-		$stdout_lock_file = PID_DIR . '/' . __script() . ".${username}.stdout.lock";
+		$stdout_lock_file = PID_DIR . '/' . __scriptsum() . ".${username}.stdout.lock";
 
 		open($stdout_lock_handle, ">", $stdout_lock_file) or die("cannot open \"$stdout_lock_file\": $!");
 	}
@@ -6237,7 +6239,7 @@ sub __get_macro
 
 sub __get_pidfile
 {
-	return PID_DIR . '/' . __script() . '.pid';
+	return PID_DIR . '/' . __scriptsum() . '.pid';
 }
 
 1;

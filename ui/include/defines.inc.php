@@ -28,8 +28,8 @@ define('USER_TYPE_POWER_USER',		5);
 define('USER_TYPE_COMPLIANCE',		6);
 /* RSM specifics: end */
 
-define('ZABBIX_VERSION',		'5.0.13');
-define('ZABBIX_API_VERSION',	'5.0.13');
+define('ZABBIX_VERSION',		'5.0.15');
+define('ZABBIX_API_VERSION',	'5.0.15');
 define('ZABBIX_EXPORT_VERSION',	'5.0');
 define('ZABBIX_DB_VERSION',		5000004);
 

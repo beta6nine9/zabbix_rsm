@@ -143,4 +143,6 @@ unsigned int	configured_tls_accept_modes;
 
 char	*CONFIG_EXPORT_TYPE	= NULL;
 
+int	CONFIG_TCP_MAX_BACKLOG_SIZE	= SOMAXCONN;
+
 #endif	/* _T_RSM_H_ */
