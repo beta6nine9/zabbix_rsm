@@ -52,57 +52,39 @@ use constant JSON_OBJECT_DISABLED_SERVICE => {
 	'status'	=> 'Disabled'
 };
 
-use constant FIX_JSON_VALUES_FALSE => 0;
-use constant FIX_JSON_VALUES_TRUE  => 1;
+use constant JSON_VALUE_NUMBER         => 1;
+use constant JSON_VALUE_STRING         => 2;
+use constant JSON_VALUE_BOOLEAN        => 3;
+use constant JSON_VALUE_NUMBER_OR_NULL => 4;
 
 # keep fields in alphabetical order
 my $JSON_FIELDS = {
-	'number' => {
-		'fields' => {
-			'cycleCalculationDateTime' => 1,
-			'emergencyThreshold'       => 1,
-			'downtime'                 => 1,
-			'lastUpdateApiDatabase'    => 1,
-			'minNameServersUp'         => 1,
-			'testDateTime'             => 1,
-			'version'                  => 1,
-		},
-		'cb' => sub {my $value = shift(); return $value + 0},
-	},
-	'string' => {
-		'fields' => {
-			'alarmed'                  => 1,
-			'city'                     => 1,
-			'incidentID'               => 1,
-			'interface'                => 1,
-			'nsid'                     => 1,
-			'result'                   => 1,
-			'service'                  => 1,
-			'state'                    => 1,
-			'status'                   => 1,
-			'target'                   => 1,
-			'targetIP'                 => 1,
-			'testedName'               => 1,
-			'tld'                      => 1,
-			'transport'                => 1,
-		},
-		'cb' => sub {my $value = shift(); return defined($value) ? "$value" : undef},
-	},
-	'bool' => {
-		'fields' => {
-			'falsePositive'            => 1,
-		},
-		'cb' => sub {my $value = shift(); return $value ? Types::Serialiser::true : Types::Serialiser::false},
-	},
-	'number_or_null' => {
-		'fields' => {
-			'endTime'                  => 1,
-			'rtt'                      => 1,
-			'startTime'                => 1,
-			'updateTime'               => 1,
-		},
-		'cb' => sub {my $value = shift(); return int_or_null($value)},
-	}
+	'cycleCalculationDateTime' => JSON_VALUE_NUMBER,
+	'emergencyThreshold'       => JSON_VALUE_NUMBER,
+	'downtime'                 => JSON_VALUE_NUMBER,
+	'lastUpdateApiDatabase'    => JSON_VALUE_NUMBER,
+	'minNameServersUp'         => JSON_VALUE_NUMBER,
+	'testDateTime'             => JSON_VALUE_NUMBER,
+	'version'                  => JSON_VALUE_NUMBER,
+	'alarmed'                  => JSON_VALUE_STRING,
+	'city'                     => JSON_VALUE_STRING,
+	'incidentID'               => JSON_VALUE_STRING,
+	'interface'                => JSON_VALUE_STRING,
+	'nsid'                     => JSON_VALUE_STRING,
+	'result'                   => JSON_VALUE_STRING,
+	'service'                  => JSON_VALUE_STRING,
+	'state'                    => JSON_VALUE_STRING,
+	'status'                   => JSON_VALUE_STRING,
+	'target'                   => JSON_VALUE_STRING,
+	'targetIP'                 => JSON_VALUE_STRING,
+	'testedName'               => JSON_VALUE_STRING,
+	'tld'                      => JSON_VALUE_STRING,
+	'transport'                => JSON_VALUE_STRING,
+	'falsePositive'            => JSON_VALUE_BOOLEAN,
+	'endTime'                  => JSON_VALUE_NUMBER_OR_NULL,
+	'rtt'                      => JSON_VALUE_NUMBER_OR_NULL,
+	'startTime'                => JSON_VALUE_NUMBER_OR_NULL,
+	'updateTime'               => JSON_VALUE_NUMBER_OR_NULL,
 };
 
 our @EXPORT = qw(
@@ -342,50 +324,54 @@ sub __write_file
 	return AH_SUCCESS;
 }
 
-sub __fix_json_value($$)
-{
-	my $value = shift;
-	my $field = shift;
-
-	foreach my $type (%{$JSON_FIELDS})
-	{
-		if (exists($JSON_FIELDS->{$type}{'fields'}{$field}))
-		{
-			$value->{$field} = $JSON_FIELDS->{$type}{'cb'}->($value->{$field});
-			return 1;
-		}
-	}
-
-	return 0;
-}
-
-sub __fix_json_values($);
-
 sub __fix_json_values($)
 {
-	my $value = shift;
+	my @values = (shift);
 
-	if (ref($value) eq 'ARRAY')
+	while (@values)
 	{
-		foreach my $element (@{$value})
+		my $value = pop(@values);
+
+		if (ref($value) eq 'ARRAY')
 		{
-			__fix_json_values($element);
+			push(@values, @{$value});
 		}
-	}
-	elsif (ref($value) eq 'HASH')
-	{
-		foreach my $field (keys(%{$value}))
+		elsif (ref($value) eq 'HASH')
 		{
-			if (ref($value->{$field}) eq '')
+			foreach my $field (keys(%{$value}))
 			{
-				if (!__fix_json_value($value, $field))
+				if (ref($value->{$field}) eq '')
 				{
-					die("unknown field: $field\n");
+					if (!exists($JSON_FIELDS->{$field}))
+					{
+						die("unknown field: $field\n");
+					}
+
+					if ($JSON_FIELDS->{$field} == JSON_VALUE_NUMBER)
+					{
+						$value->{$field} += 0;
+					}
+					elsif ($JSON_FIELDS->{$field} == JSON_VALUE_STRING)
+					{
+						$value->{$field} = (defined($value->{$field}) ? "$value->{$field}" : undef);
+					}
+					elsif ($JSON_FIELDS->{$field} == JSON_VALUE_BOOLEAN)
+					{
+						$value->{$field} = ($value->{$field} ? Types::Serialiser::true : Types::Serialiser::false);
+					}
+					elsif ($JSON_FIELDS->{$field} == JSON_VALUE_NUMBER_OR_NULL)
+					{
+						$value->{$field} = int_or_null($value->{$field});
+					}
+					else
+					{
+						die("unknown \"$field\" value type: $JSON_FIELDS->{$field}\n");
+					}
 				}
-			}
-			else
-			{
-				__fix_json_values($value->{$field});
+				else
+				{
+					push(@values, $value->{$field});
+				}
 			}
 		}
 	}
@@ -406,7 +392,7 @@ sub __save_inc_false_positive($$$$)
 		'updateTime' => int_or_null($clock)
 	};
 
-	return __write_file($false_positive_path, __encode_json($version, $json, FIX_JSON_VALUES_TRUE));
+	return __write_file($false_positive_path, __encode_json($version, $json, 1));
 }
 
 sub ah_read_state($$$)
@@ -437,7 +423,7 @@ sub ah_save_state($$$)
 
 	my $state_path = "$base_path/" . AH_STATE_FILE;
 
-	return __write_file($state_path, __encode_json($version, $json, FIX_JSON_VALUES_TRUE));
+	return __write_file($state_path, __encode_json($version, $json, 1));
 }
 
 sub ah_save_alarmed($$$$;$)
@@ -456,7 +442,7 @@ sub ah_save_alarmed($$$$;$)
 
 	my $json = {'alarmed' => $status};
 
-	return __write_file($alarmed_path, __encode_json($version, $json, FIX_JSON_VALUES_TRUE), $clock);
+	return __write_file($alarmed_path, __encode_json($version, $json, 1), $clock);
 }
 
 sub ah_save_downtime($$$$$)
@@ -475,7 +461,7 @@ sub ah_save_downtime($$$$$)
 
 	my $json = {'downtime' => $downtime};
 
-	return __write_file($alarmed_path, __encode_json($version, $json, FIX_JSON_VALUES_TRUE), $clock);
+	return __write_file($alarmed_path, __encode_json($version, $json, 1), $clock);
 }
 
 sub ah_create_incident_json($$$$)
@@ -504,7 +490,7 @@ sub __save_inc_state($$$$)
 
 	my $inc_state_path = "$inc_path/" . AH_INCIDENT_STATE_FILE;
 
-	return __write_file($inc_state_path, __encode_json($version, $json, FIX_JSON_VALUES_TRUE), $lastclock);
+	return __write_file($inc_state_path, __encode_json($version, $json, 1), $lastclock);
 }
 
 sub ah_save_incident($$$$$$$$$)
@@ -747,7 +733,7 @@ sub ah_save_measurement($$$$$)
 	# force creation of missing directories
 	return AH_FAIL unless (__gen_measurement_path($version, $ah_tld, $service, $clock, \$path, 1) == AH_SUCCESS);
 
-	return __write_file($path, __encode_json($version, $json, FIX_JSON_VALUES_TRUE), $clock);
+	return __write_file($path, __encode_json($version, $json, 1), $clock);
 }
 
 # Generate path for recent measurement cache, e. g.
@@ -777,7 +763,7 @@ sub ah_save_recent_cache($$)
 
 	return AH_FAIL unless (__gen_recent_cache_path($server_key, \$path) == AH_SUCCESS);
 
-	return __write_file($path, __encode_json(AH_SLA_API_VERSION_1, $json, FIX_JSON_VALUES_FALSE));
+	return __write_file($path, __encode_json(AH_SLA_API_VERSION_1, $json, 0));	# do not attempt to fix JSON values
 }
 
 sub ah_read_recent_cache($$)
@@ -889,9 +875,9 @@ sub __encode_json($$$)
 {
 	my $version = shift;
 	my $json_ref = shift;
-	my $fix_json_values = shift;
+	my $fix_values = shift;
 
-	__fix_json_values($json_ref) if ($fix_json_values == FIX_JSON_VALUES_TRUE);
+	__fix_json_values($json_ref) if ($fix_values == 1);
 
 	$json_ref->{'version'} = $version;
 	$json_ref->{'lastUpdateApiDatabase'} = $^T;
