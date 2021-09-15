@@ -1,4 +1,4 @@
-TARGETS?= zbx_nginx zabbix_server zabbix_proxy zabbix_agent zbx_php-fpm
+TARGETS?=zbx_nginx zabbix_server5 zabbix_proxy5 zabbix_agent zbx_php-fpm
 MODULES?=${TARGETS:=.pp.bz2}
 
 all: ${TARGETS:=.pp.bz2}
