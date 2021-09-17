@@ -45,8 +45,8 @@ my $tables = {	'history' => { 'period' => 'day', 'keep_history' => '75'},
 		'history_text' => { 'period' => 'day', 'keep_history' => '75'},
 		'history_uint' => { 'period' => 'day', 'keep_history' => '75'},
 
-		'trends' => { 'period' => 'month', 'keep_history' => '9999'},
-		'trends_uint' => { 'period' => 'month', 'keep_history' => '9999'},
+		'trends' => { 'period' => 'month', 'keep_history' => '3'},
+		'trends_uint' => { 'period' => 'month', 'keep_history' => '3'},
 	     };
 my $amount_partitions = 10;
 
