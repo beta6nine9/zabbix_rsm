@@ -34,15 +34,15 @@ use constant DEFAULT_INITIAL_MEASUREMENTS_LIMIT => 7200;	# seconds, if the metri
 								# them from this period in the past back for recent
 								# measurement files for an incident
 
-use constant FAKE_PROBE_NAME => "";	# for Service Availability items, this is only needed for cache
+use constant RSMHOST => "";	# for Service Availability items, this is only needed for cache
 
 sub main_process_signal_handler();
 sub process_server($);
 sub process_tld_batch($$$$$$);
-sub process_tld($$$$$);
+sub process_tld($$$$$$);
 sub cycles_to_calculate($$$$$$$$);
-sub get_lastvalues_from_db($$$);
-sub calculate_cycle($$$$$$$$$);
+sub get_lastvalues_from_db($$$$);
+sub calculate_cycle($$$$$$$$$$);
 sub translate_interfaces($);
 sub get_interfaces($$$);
 sub get_history_by_itemid($$$);
@@ -117,6 +117,8 @@ my %clock_limits;
 $clock_limits{'dns'} = $clock_limits{'dnssec'} = cycle_start($now - $initial_measurements_limit, $delays{'dnssec'});
 $clock_limits{'rdds'} = cycle_start($now - $initial_measurements_limit, $delays{'rdds'});
 $clock_limits{'rdap'} = cycle_start($now - $initial_measurements_limit, $delays{'rdap'}) if ($rdap_is_standalone);
+
+my $heartbeat = get_heartbeat();
 
 db_disconnect();
 
@@ -400,11 +402,13 @@ sub process_tld_batch($$$$$$)
 		#     }
 		# }
 		#
-		# NB! Besides results from probes we cache Service Availability values, which
-		# are stored on a <TLD> host, for those we use FAKE_PROBE_NAME as probe name.
+		# NB! Besides results from probes we cache Service Availability
+		# values, which are stored on a <RSMHOST> host.
 
-		my $lastvalues_db = {'tlds' => {}};
-		get_lastvalues_from_db($lastvalues_db, $tld, \%delays);
+		my $lastvalues_db    = {'tlds' => {}};
+		my $lastvalues_nsids = {'tlds' => {}};
+
+		get_lastvalues_from_db($lastvalues_db, $lastvalues_nsids, $tld, \%delays);
 
 		$lastvalues_cache->{'tlds'}{$tld} //= {};
 
@@ -413,6 +417,7 @@ sub process_tld_batch($$$$$$)
 			$probes_ref,
 			$all_probes_ref,
 			$lastvalues_db->{'tlds'}{$tld},
+			$lastvalues_nsids->{'tlds'}{$tld},
 			$lastvalues_cache->{'tlds'}{$tld}
 		);
 
@@ -432,12 +437,13 @@ sub process_tld_batch($$$$$$)
 # implement DNSSEC service handling in all the places/scripts properly.
 my $dns_results_cache;
 
-sub process_tld($$$$$)
+sub process_tld($$$$$$)
 {
 	my $tld = shift;
 	my $probes_ref = shift;
 	my $all_probes_ref = shift;
 	my $lastvalues_db_tld = shift;
+	my $lastvalues_nsids_tld = shift;
 	my $lastvalues_cache_tld = shift;
 
 	$dns_results_cache = {};
@@ -533,6 +539,7 @@ sub process_tld($$$$$)
 				$tld,
 				$service,
 				$lastvalues_db_tld->{$service}{'probes'},
+				$lastvalues_nsids_tld->{'probes'},
 				$clock,
 				$delays{$service},
 				$rtt_limits{$service},
@@ -640,7 +647,7 @@ sub cycles_to_calculate($$$$$$$$)
 	my %cycles;
 
 	# this is for Service Availability items, we calculate cycles based on those values
-	my $probe = FAKE_PROBE_NAME;
+	my $probe = RSMHOST;
 
 	if (%{$lastvalues_db_tld->{$service}{'probes'}{$probe} // {}})
 	{
@@ -843,9 +850,10 @@ sub get_service_from_slv_key($)
 	return $service;
 }
 
-sub get_lastvalues_from_db($$$)
+sub get_lastvalues_from_db($$$$)
 {
 	my $lastvalues_db = shift;
+	my $lastvalues_nsids = shift;
 	my $tld = shift;
 	my $delays = shift;
 
@@ -891,8 +899,10 @@ sub get_lastvalues_from_db($$$)
 
 		chop($itemids);
 
+		# Note! The "value" field is only needed for $lastvalues_nsids!
+
 		$sql .=
-			"select itemid,clock".
+			"select itemid,clock,value".
 			" from lastvalue".
 			" where itemid in ($itemids)";
 	}
@@ -914,15 +924,17 @@ sub get_lastvalues_from_db($$$)
 
 		chop($itemids);
 
+		# Note! The "value" field is only needed for $lastvalues_nsids!
+
 		$sql .=
-			"select itemid,clock".
+			"select itemid,clock,value".
 			" from lastvalue_str".
 			" where itemid in ($itemids)";
 	}
 
 	my $lastval_rows_ref = db_select($sql);
 
-	my %lastvalues_map = map { $_->[0] => $_->[1] } @{$lastval_rows_ref};
+	my %lastvalues_map = map { $_->[0] => {'clock' => $_->[1], 'value' => $_->[2]} } @{$lastval_rows_ref};
 
 	undef($lastval_rows_ref);
 
@@ -938,7 +950,10 @@ sub get_lastvalues_from_db($$$)
 
 		next unless(defined($lastvalues_map{$itemid}));
 
-		my $clock = $lastvalues_map{$itemid};
+		my $clock = $lastvalues_map{$itemid}{'clock'};
+
+		# Note! The "value" field is only needed for $lastvalues_nsids!
+		my $value = $lastvalues_map{$itemid}{'value'};	
 
 		my ($probe, $key_service);
 
@@ -951,6 +966,7 @@ sub get_lastvalues_from_db($$$)
 		}
 		elsif ($hostgroupid == TLD_PROBE_RESULTS_GROUPID)
 		{
+			# not interested in those
 			next if (str_starts_with($key, "rsm.conf"));
 			next if (str_starts_with($key, "rsm.probe"));
 
@@ -961,6 +977,7 @@ sub get_lastvalues_from_db($$$)
 			next if (str_starts_with($key, "rsm.dns.nssok"));
 			next if (str_starts_with($key, "rsm.dns.mode"));
 
+			# from what's left, only interested in those
 			next unless (str_starts_with($key, "rsm.") ||
 					str_starts_with($key, "rdap."));
 
@@ -985,11 +1002,22 @@ sub get_lastvalues_from_db($$$)
 		foreach my $service ($key_service eq 'dns' ? ('dns', 'dnssec') : ($key_service))
 		{
 			# fake name is for Service Availability items
-			$lastvalues_db->{'tlds'}{$tld}{$service}{'probes'}{$probe // FAKE_PROBE_NAME()}{$itemid} = {
-				'key' => $key,
+			$lastvalues_db->{'tlds'}{$tld}{$service}{'probes'}{$probe // RSMHOST()}{$itemid} = {
+				'key'        => $key,
+				'clock'      => $clock,
 				'value_type' => $value_type,
-				'clock' => $clock
 			};
+
+			if ($service eq 'dns' && str_starts_with($key, "rsm.dns.nsid"))
+			{
+				my ($ns, $ip) = split(',', get_nsip_from_key($key));
+
+				$lastvalues_nsids->{'tlds'}{$tld}{'probes'}{$probe}{$ns}{$ip} = {
+					'itemid' => $itemid,
+					'clock'  => $clock,
+					'value'  => $value,
+				}
+			}
 		}
 	}
 }
@@ -1100,11 +1128,12 @@ sub fill_test_data($$$$)
 	}
 }
 
-sub calculate_cycle($$$$$$$$$)
+sub calculate_cycle($$$$$$$$$$)
 {
 	$tld = shift;		# set globally
 	my $service = shift;
 	my $probes_data = shift;
+	my $lastvalue_nsids_probes = shift;
 	my $cycle_clock = shift;
 	my $delay = shift;
 	my $rtt_limit = shift;
@@ -1138,9 +1167,9 @@ sub calculate_cycle($$$$$$$$$)
 
 	my $service_availability_itemid;
 
-	foreach my $itemid (keys(%{$probes_data->{FAKE_PROBE_NAME()}}))
+	foreach my $itemid (keys(%{$probes_data->{RSMHOST()}}))
 	{
-		next unless ($probes_data->{FAKE_PROBE_NAME()}{$itemid}{'key'} eq "rsm.slv.$service.avail");
+		next unless ($probes_data->{RSMHOST()}{$itemid}{'key'} eq "rsm.slv.$service.avail");
 
 		$service_availability_itemid = $itemid;
 	}
@@ -1172,7 +1201,7 @@ sub calculate_cycle($$$$$$$$$)
 
 	foreach my $itemid (keys(%values))
 	{
-		my $key = $probes_data->{FAKE_PROBE_NAME()}{$itemid}{'key'};
+		my $key = $probes_data->{RSMHOST()}{$itemid}{'key'};
 
 		if (str_starts_with($key, "rsm.slv."))
 		{
@@ -1269,7 +1298,7 @@ sub calculate_cycle($$$$$$$$$)
 	foreach my $probe (keys(%{$probes_data}))
 	{
 		# Service Availability items are already handled
-		next if ($probe eq FAKE_PROBE_NAME);
+		next if ($probe eq RSMHOST);
 
 		my $results;
 
@@ -1375,12 +1404,52 @@ sub calculate_cycle($$$$$$$$$)
 							'clock'      => int($clock),
 						};
 
-						if (exists($metric->{'nsid'}))
+						# "empty NSID" == "no NSID" in the database
+						my $nsid = '';
+
+						if ($service eq 'dns' || $service eq 'dnssec')
+						{
+							if (exists($metric->{'nsid'}))
+							{
+								# NSID is available in this cycle
+								$nsid = $metric->{'nsid'};
+							}
+							else
+							{
+								my $nsid_details = $lastvalue_nsids_probes->{$probe}{$target}{$metric->{'ip'}};
+
+								if (cycle_start($nsid_details->{'clock'}, $delay) <= $cycleclock)
+								{
+									# getting NSID from lastvalue table
+									$nsid = $nsid_details->{'value'};
+								}
+								else
+								{
+									# get it from the history table
+									my $rows_ref = db_select(
+										"select value".
+										" from " . history_table(ITEM_VALUE_TYPE_STR).
+										" where itemid=$nsid_details->{'itemid'}".
+											" and " . sql_time_condition($cycleclock - $heartbeat, $cycleclock).
+										" order by clock desc".
+										" limit 1"
+									);
+
+									if (scalar(@{$rows_ref}) != 0)
+									{
+										# getting NSID from history table
+										$nsid = $rows_ref->[0]->[0];
+									}
+								}
+							}
+						}
+
+						if (defined($nsid))
 						{
 							$h->{'nsid'} = (
-								$metric->{'nsid'} eq ''
+								$nsid eq ''
 								? undef
-								: $metric->{'nsid'}
+								: $nsid
 							);
 						}
 

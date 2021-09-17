@@ -149,7 +149,9 @@ class Probes extends Action {
 			error('global macro "' . RSM_PROBE_AVAIL_LIMIT . '" not found');
 		}
 		else {
-			$data['lastaccess_limit'] = $lastaccess_limit[0]['value'];
+			// give the limit a little time to avoid false-positives,
+			// it's currently 60 seconds with item delay 60 seconds
+			$data['lastaccess_limit'] = $lastaccess_limit[0]['value'] + 60;
 		}
 
 		if (!($probe_macros = API::UserMacro()->get([

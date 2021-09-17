@@ -124,6 +124,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		get_rdap_standalone_ts is_rdap_standalone
 		is_rsmhost_reconfigured
 		get_dns_minns
+		get_heartbeat
 		get_itemid_by_key get_itemid_by_host
 		get_itemid_by_hostid get_itemid_like_by_hostid get_itemids_by_host_and_keypart get_lastclock
 		get_tlds get_tlds_and_hostids
@@ -555,6 +556,25 @@ sub get_dns_minns($$)
 	{
 		return $minns->{'next_minns'};
 	}
+}
+
+my $heartbeat_cache;
+
+sub get_heartbeat()
+{
+	if (!defined($heartbeat_cache))
+	{
+		$heartbeat_cache = db_select_value(
+			"select ip.params".
+			" from item_preproc ip,items i".
+			" where ip.itemid=i.itemid".
+				" and i.key_ like 'rsm.dns.nsid%'".
+				" and ip.type=" . ZBX_PREPROC_THROTTLE_TIMED_VALUE.
+			" limit 1"
+		);
+	}
+
+	return $heartbeat_cache;
 }
 
 sub get_itemid_by_key
@@ -999,7 +1019,7 @@ sub get_test_items($)
 
 	# TODO: in the future consider also collecting SLV items, to get everything related to the test
 	#
-	#my $host_cond = " and (" .
+	# my $host_cond = " and (" .
 	#			"(hg.groupid=" . TLDS_GROUPID . " and h.host='$rsmhost') or" .
 	#			" (hg.groupid=" . TLD_PROBE_RESULTS_GROUPID . " and h.host like '$rsmhost %')" .
 	#		")";
@@ -1018,21 +1038,21 @@ sub get_test_items($)
 
 	foreach my $row_ref (@{$rows_ref})
 	{
-		my $host = $row_ref->[0];
-		my $groupid = $row_ref->[1];
-		my $itemid = $row_ref->[2];
-		my $key = $row_ref->[3];
+		my $host       = $row_ref->[0];
+		my $groupid    = $row_ref->[1];
+		my $itemid     = $row_ref->[2];
+		my $key        = $row_ref->[3];
 		my $value_type = $row_ref->[4];
 
 		my $probe;
 
 		# TODO: in the future consider also collecting SLV items, to get everything related to the test
 		#
-		#if ($groupid == TLDS_GROUPID)
-		#{
+		# if ($groupid == TLDS_GROUPID)
+		# {
 		#	$probe = "";
-		#}
-		#elsif ($host =~ /$rsmhost (.*)/)
+		# }
+		# elsif ($host =~ /$rsmhost (.*)/)
 		if ($host =~ /$rsmhost (.*)/)
 		{
 			$probe = $1;
@@ -5113,11 +5133,11 @@ use constant FAKE_NSIP => '';
 #
 # {
 #     'dns' => {
-#         '12345600' => {        <-- cycleclock
+#         '12345600' => {                   <-- cycleclock
 #             'status' => 1,
 #             'interfaces' => {
 #                 'DNS' => {
-#                     'clock' => 123456789,
+#                     'clock' => 123456789, <-- test clock
 #                     'status' => 1,
 #                     'protocol' => 0,
 #                     'testedname' => 'nonexistend.example.com',

@@ -471,6 +471,24 @@ class AggregateDetailsAction extends Action {
 		$this->setResponse($response);
 	}
 
+	protected function getHeartbeat($hostid, $nsid_item_keys) {
+		$heartbeat_item = API::Item()->get([
+			'output'              => 'itemid',
+			'hostids'             => $hostid,
+			'filter'              => ['key_' => $nsid_item_keys],
+			'selectPreprocessing' => 'extend',
+			'limit'               => 1,
+		]);
+
+		foreach ($heartbeat_item[0]['preprocessing'] as $rule) {
+			if ($rule['type'] != ZBX_PREPROC_THROTTLE_TIMED_VALUE)
+				continue;
+
+			return $rule['params'];
+		}
+
+		return 0;
+	}
 
 	/**
 	 * Collects NSID item values for all probe name servers and ips. NSID unique values will be stored in
@@ -507,14 +525,29 @@ class AggregateDetailsAction extends Action {
 			return $nsids;
 		}
 
-		$nsid_items = $this->getItemsHistoryValue([
+		// get NSID heartbeat value from the first item of the first probe
+		$heartbeat = $this->getHeartbeat(reset($this->probes)['tldprobe_hostid'], $nsid_item_keys);
+
+		if (!$heartbeat) {
+			error('Cannot get NSID heartbeat value');
+			return $nsids;
+		}
+
+		$options = [
 			'output' => ['key_', 'type', 'hostid'],
 			'hostids' => array_column($this->probes, 'tldprobe_hostid'),
 			'filter' => ['key_' => $nsid_item_keys],
-			'time_from' => $time_from,
+			'time_from' => $time_from - $heartbeat,
 			'time_till' => $time_till,
-			'history' => ITEM_VALUE_TYPE_STR
-		]);
+			'history' => ITEM_VALUE_TYPE_STR,
+		];
+
+		$history_options = [
+			'sortorder' => ZBX_SORT_DOWN,
+			'sortfield' => 'clock',
+		];
+
+		$nsid_items = $this->getItemsHistoryValue($options, $history_options);
 
 		$key_parser->parse(PROBE_DNS_NSID);
 		$params_count = $key_parser->getParamsNum();

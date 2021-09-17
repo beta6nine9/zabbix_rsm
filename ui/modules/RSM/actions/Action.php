@@ -173,7 +173,7 @@ class Action extends CAction {
 	 * @param int $options['history']    Item value type.
 	 * @return array
 	 */
-	protected function getItemsHistoryValue(array $options) {
+	protected function getItemsHistoryValue(array $options, array $history_options = []) {
 		$options += [
 			'output' => ['itemid', 'hostid'],
 			'preservekeys' => true
@@ -182,13 +182,15 @@ class Action extends CAction {
 		$items = API::Item()->get($options);
 
 		if ($items) {
-			$values = API::History()->get([
-				'output' => ['itemid', 'value'],
-				'itemids' => array_keys($items),
+			$history_options += [
+				'output'    => ['itemid', 'value'],
+				'itemids'   => array_keys($items),
 				'time_from' => $options['time_from'],
 				'time_till' => $options['time_till'],
-				'history' => $options['history']
-			]);
+				'history'   => $options['history'],
+			];
+
+			$values = API::History()->get($history_options);
 
 			foreach ($values as $value) {
 				$items[$value['itemid']] += ['history_value' => $value['value']];
