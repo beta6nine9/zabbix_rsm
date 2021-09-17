@@ -502,9 +502,25 @@ install -m 0644 conf/zabbix_agentd/userparameter_examples.conf $RPM_BUILD_ROOT%{
 sed -i "$NAMESPACE_PATTERN" conf/zabbix_agentd.conf
 %endif
 
+# install scripts
+install -d $RPM_BUILD_ROOT/opt/zabbix%{namespace}
+install -d $RPM_BUILD_ROOT/opt/zabbix%{namespace}/data
+cp -r opt/zabbix/* $RPM_BUILD_ROOT/opt/zabbix%{namespace}/
+
+sed -i "$NAMESPACE_PATTERN" $(find $RPM_BUILD_ROOT/opt/zabbix%{namespace} -type f -name '*.pl' -o -name '*.pm' -o -name '*.php' -o -name '*.sh')
+
+# install rsyslog configuration file
 mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/rsyslog.d
-cp %{SOURCE20}              $RPM_BUILD_ROOT%{_sysconfdir}/rsyslog.d/zabbix%{namespace}-rsm.slv.conf
+cp %{SOURCE20}              $RPM_BUILD_ROOT%{_sysconfdir}/rsyslog.d/rsm%{namespace}.slv.conf
 sed -i "$NAMESPACE_PATTERN" $RPM_BUILD_ROOT%{_sysconfdir}/rsyslog.d/*.conf
+
+# in addition, we need to rename rsyslog template names because of the namespace
+sed -i "s/RSM/RSM%{namespace}/" $RPM_BUILD_ROOT%{_sysconfdir}/rsyslog.d/*.conf
+
+# and rsyslog ident
+sed -ir "s/^(use constant.*ZABBIX_NAMESPACE.*=>).*/\1 '%{namespace}';/" $RPM_BUILD_ROOT/opt/zabbix%{namespace}/scripts/RSMSLV.pm
+
+# install zabbix configuration files
 cp %{SOURCE21}              $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_server.conf
 cp %{SOURCE22}              $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_proxy_common.conf
 cp %{SOURCE23}              $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_proxy_N.conf
@@ -549,12 +565,7 @@ install -d $RPM_BUILD_ROOT%{_datadir}/selinux/packages
 install -m 0644 $MODULES \
     $RPM_BUILD_ROOT%{_datadir}/selinux/packages
 
-install -d $RPM_BUILD_ROOT/opt/zabbix%{namespace}
-install -d $RPM_BUILD_ROOT/opt/zabbix%{namespace}/data
-cp -r opt/zabbix/* $RPM_BUILD_ROOT/opt/zabbix%{namespace}/
-
-sed -i "$NAMESPACE_PATTERN" $(find $RPM_BUILD_ROOT/opt/zabbix%{namespace} -type f -name '*.pl' -o -name '*.pm' -o -name '*.php' -o -name '*.sh')
-
+# install logrotate rules
 install -Dm 0644 -p %{SOURCE24} $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/zabbix%{namespace}-slv
 sed -i "$NAMESPACE_PATTERN"     $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/zabbix%{namespace}-slv
 
@@ -699,6 +710,8 @@ if %{_sbindir}/selinuxenabled ; then
 fi
 
 %post scripts
+# TODO: remove in the future, this was renamed to rsm50.slv.conf
+rm -f /etc/rsyslog.d/zabbix50-rsm.slv.conf*
 systemctl restart rsyslog
 
 %preun proxy-mysql
@@ -854,7 +867,7 @@ systemctl restart rsyslog
 /opt/zabbix%{namespace}/*
 %defattr(-,root,root,0755)
 %{_sysconfdir}/logrotate.d/zabbix%{namespace}-slv
-%{_sysconfdir}/rsyslog.d/zabbix%{namespace}-rsm.slv.conf
+%{_sysconfdir}/rsyslog.d/rsm%{namespace}.slv.conf
 %attr(0755,zabbix,zabbix) %dir %{_localstatedir}/log/zabbix%{namespace}
 %attr(0755,zabbix,zabbix) %dir %{_localstatedir}/log/zabbix%{namespace}/slv
 

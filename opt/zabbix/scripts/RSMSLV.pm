@@ -73,6 +73,9 @@ use constant USE_CACHE_TRUE			=> 1;
 
 use constant RECONFIG_MINUTES 			=> 10; # how much time to consider cycles in reconfig
 
+# for packaging, use this as part of the "ident" for syslog
+use constant ZABBIX_NAMESPACE			=> '';
+
 our ($result, $dbh, $tld, $server_key);
 
 our %OPTS; # specified command-line options
@@ -3018,9 +3021,9 @@ sub process_slv_rollweek_cycles($$$$$)
 			my $perc = sprintf("%.3f", $downtime * 100 / $cfg_sla);
 
 			push_value($tld, $cfg_key_out, $value_ts, $perc, ITEM_VALUE_TYPE_FLOAT, "result: $perc% (down: $downtime minutes, sla: $cfg_sla)");
-		}
 
-		unset_log_tld();
+			unset_log_tld();
+		}
 	}
 
 	send_values();
@@ -3083,9 +3086,9 @@ sub process_slv_downtime_cycles($$$$)
 			}
 
 			push_value($tld, $cfg_key_out, $value_ts, $downtime, ITEM_VALUE_TYPE_UINT64, ts_str($from), " - ", ts_str($till));
-		}
 
-		unset_log_tld();
+			unset_log_tld();
+		}
 	}
 
 	send_values();
@@ -6080,8 +6083,11 @@ sub __fp_get_oldest_clock($$)
 # Internal subs #
 #################
 
-my $program = $0; $program =~ s,.*/,,g;
-my $logopt = 'pid';
+my $program  =  $0;
+$program     =~ s,.*/,,g;
+$program     =~ s,(rsm)\.(slv|probe)\.,${1}@{[ZABBIX_NAMESPACE]}.${2}.,g;
+
+my $logopt   = 'pid';
 my $facility = 'user';
 my $prev_tld = "";
 
