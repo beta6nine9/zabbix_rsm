@@ -1,3 +1,9 @@
+Changes for rsm2.2.0rc19
+
+Bug fixes:
+....I..... [sub-813] fixed undefined array reference in export.pl (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.2.0rc18
 
 Bug fixes:
