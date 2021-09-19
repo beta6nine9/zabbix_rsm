@@ -518,7 +518,7 @@ sed -i "$NAMESPACE_PATTERN" $RPM_BUILD_ROOT%{_sysconfdir}/rsyslog.d/*.conf
 sed -i "s/RSM/RSM%{namespace}/" $RPM_BUILD_ROOT%{_sysconfdir}/rsyslog.d/*.conf
 
 # and rsyslog ident
-sed -ir "s/^(use constant.*ZABBIX_NAMESPACE.*=>).*/\1 '%{namespace}';/" $RPM_BUILD_ROOT/opt/zabbix%{namespace}/scripts/RSMSLV.pm
+sed -i -r "s/^(use constant.*ZABBIX_NAMESPACE.*=>).*/\1 '%{namespace}';/" $RPM_BUILD_ROOT/opt/zabbix%{namespace}/scripts/RSMSLV.pm
 
 # install zabbix configuration files
 cp %{SOURCE21}              $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_server.conf
