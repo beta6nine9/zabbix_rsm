@@ -3041,9 +3041,9 @@ sub process_slv_rollweek_cycles($$$$$)
 			my $perc = sprintf("%.3f", $downtime * 100 / $cfg_sla);
 
 			push_value($tld, $cfg_key_out, $value_ts, $perc, ITEM_VALUE_TYPE_FLOAT, "result: $perc% (down: $downtime minutes, sla: $cfg_sla)");
-
-			unset_log_tld();
 		}
+
+		unset_log_tld();
 	}
 
 	send_values();
@@ -3106,9 +3106,9 @@ sub process_slv_downtime_cycles($$$$)
 			}
 
 			push_value($tld, $cfg_key_out, $value_ts, $downtime, ITEM_VALUE_TYPE_UINT64, ts_str($from), " - ", ts_str($till));
-
-			unset_log_tld();
 		}
+
+		unset_log_tld();
 	}
 
 	send_values();
