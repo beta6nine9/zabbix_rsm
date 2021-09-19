@@ -1047,7 +1047,7 @@ sub __save_csv_data($$$)
 								{
 									$nsid_id = dw_get_id(ID_NSID, $metric_ref->{'nsid'});
 								}
-								elsif (defined($nsids_result->{$probe}))
+								elsif (defined($nsids_result->{$probe}{$target}{$ip}))
 								{
 									# try to get throttled off value
 									for (my $idx = 0; $idx < scalar(@{$nsids_result->{$probe}{$target}{$ip}}); $idx++)
