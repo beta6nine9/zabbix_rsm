@@ -54,12 +54,12 @@ Buildroot:	%{_tmppath}/zabbix-%{version}-%{release}-root-%(%{__id_u} -n)
 BuildRequires:	mariadb-connector-c-devel
 # TODO: temporary solution for deployment, add ldns version back after DNS Reboot is deployed
 #BuildRequires:	ldns-devel >= 1.7.1
-BuildRequires:	ldns-devel
+BuildRequires:	ldns%{namespace}-devel
 %else
 BuildRequires:	mysql-devel
 # TODO: temporary solution for deployment, add ldns version back after DNS Reboot is deployed
 #BuildRequires:	ldns-devel >= 1.6.17
-BuildRequires:	ldns-devel
+BuildRequires:	ldns%{namespace}-devel
 %endif
 BuildRequires:	libevent-devel
 BuildRequires:	pcre-devel
@@ -82,11 +82,11 @@ Requires(postun):	systemd
 %if 0%{?rhel} >= 8
 # TODO: temporary solution for deployment, add ldns version back after DNS Reboot is deployed
 #Requires:		ldns >= 1.7.1
-Requires:		ldns
+Requires:		ldns%{namespace}
 %else
 # TODO: temporary solution for deployment, add ldns version back after DNS Reboot is deployed
 #Requires:		ldns >= 1.6.17
-Requires:		ldns
+Requires:		ldns%{namespace}
 %endif
 Provides:		zabbix%{namespace}-proxy = %{version}-%{release}
 Provides:		zabbix%{namespace}-proxy-implementation = %{version}-%{release}
@@ -120,11 +120,11 @@ Requires(postun):	systemd
 %if 0%{?rhel} >= 8
 # TODO: temporary solution for deployment, add ldns version back after DNS Reboot is deployed
 #Requires:		ldns >= 1.7.1
-Requires:		ldns
+Requires:		ldns%{namespace}
 %else
 # TODO: temporary solution for deployment, add ldns version back after DNS Reboot is deployed
 #Requires:		ldns >= 1.6.17
-Requires:		ldns
+Requires:		ldns%{namespace}
 %endif
 Requires:		perl-Data-Dumper
 Requires:		perl-DBD-MySQL
