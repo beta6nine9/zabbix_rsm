@@ -31,7 +31,6 @@ Source20:	rsyslog.d-rsm.slv.conf
 Source21:	zabbix_server.conf
 Source22:	zabbix_proxy_common.conf
 Source23:	zabbix_proxy_N.conf
-Source24:	zabbix-slv-logrotate
 
 Buildroot:	%{_tmppath}/zabbix-%{version}-%{release}-root-%(%{__id_u} -n)
 
@@ -565,10 +564,6 @@ install -d $RPM_BUILD_ROOT%{_datadir}/selinux/packages
 install -m 0644 $MODULES \
     $RPM_BUILD_ROOT%{_datadir}/selinux/packages
 
-# install logrotate rules
-install -Dm 0644 -p %{SOURCE24} $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/zabbix%{namespace}-slv
-sed -i "$NAMESPACE_PATTERN"     $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/zabbix%{namespace}-slv
-
 %clean
 rm -rf $RPM_BUILD_ROOT
 
@@ -866,7 +861,6 @@ systemctl restart rsyslog
 %defattr(-,zabbix,zabbix,0755)
 /opt/zabbix%{namespace}/*
 %defattr(-,root,root,0755)
-%{_sysconfdir}/logrotate.d/zabbix%{namespace}-slv
 %{_sysconfdir}/rsyslog.d/rsm%{namespace}.slv.conf
 %attr(0755,zabbix,zabbix) %dir %{_localstatedir}/log/zabbix%{namespace}
 %attr(0755,zabbix,zabbix) %dir %{_localstatedir}/log/zabbix%{namespace}/slv
