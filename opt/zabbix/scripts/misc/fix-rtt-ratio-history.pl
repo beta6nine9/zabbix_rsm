@@ -219,7 +219,7 @@ sub parse_cli_opts($$$$)
 	{
 		usage('missing option: --service');
 	}
-	if ($$service ne 'dns' && $$service ne 'rdds' && $$service ne 'rdap')
+	if ($$service ne 'dns.udp' && $$service ne 'dns.tcp' && $$service ne 'rdds' && $$service ne 'rdap')
 	{
 		usage('invalid service: ' . $$service);
 	}
@@ -275,7 +275,7 @@ fix-rtt-ratio-history.pl [--server-id <server-id>] --service <service> --check|-
 
 =item B<--service <service>>
 
-Specify service - dns, rdds, rdap.
+Specify service - dns.udp, dns.tcp, rdds, rdap.
 
 =item B<--check>
 
