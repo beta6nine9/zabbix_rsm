@@ -888,6 +888,7 @@ sub get_lastvalues_from_db($$$$)
 
 	my $sql = '';
 
+	# get everything from lastvalue, lastvalue_str tables
 	if (scalar(@{$item_num_rows_ref}))
 	{
 		my $itemids = '';
@@ -907,7 +908,6 @@ sub get_lastvalues_from_db($$$$)
 			" where itemid in ($itemids)";
 	}
 
-	# get everything from lastvalue, lastvalue_str tables
 	if (scalar(@{$item_str_rows_ref}))
 	{
 		if (scalar(@{$item_num_rows_ref}))
@@ -934,7 +934,9 @@ sub get_lastvalues_from_db($$$$)
 
 	my $lastval_rows_ref = db_select($sql);
 
-	my %lastvalues_map = map { $_->[0] => {'clock' => $_->[1], 'value' => $_->[2]} } @{$lastval_rows_ref};
+	my $lastvalues_map = {};
+
+	map { $lastvalues_map->{$_->[0]} = {'clock' => $_->[1], 'value' => $_->[2]} } @{$lastval_rows_ref};
 
 	undef($lastval_rows_ref);
 
@@ -948,12 +950,12 @@ sub get_lastvalues_from_db($$$$)
 	{
 		my ($host, $hostgroupid, $itemid, $key, $value_type) = @{$row_ref};
 
-		next unless(defined($lastvalues_map{$itemid}));
+		next unless(defined($lastvalues_map->{$itemid}));
 
-		my $clock = $lastvalues_map{$itemid}{'clock'};
+		my $clock = $lastvalues_map->{$itemid}{'clock'};
 
 		# Note! The "value" field is only needed for $lastvalues_nsids!
-		my $value = $lastvalues_map{$itemid}{'value'};	
+		my $value = $lastvalues_map->{$itemid}{'value'};
 
 		my ($probe, $key_service);
 
@@ -1418,18 +1420,28 @@ sub calculate_cycle($$$$$$$$$$)
 							{
 								my $nsid_details = $lastvalue_nsids_probes->{$probe}{$target}{$metric->{'ip'}};
 
-								if (cycle_start($nsid_details->{'clock'}, $delay) <= $cycleclock)
+								if (defined($nsid_details))
 								{
 									# getting NSID from lastvalue table
 									$nsid = $nsid_details->{'value'};
 								}
 								else
 								{
+									dbg("'$tld $probe' item rsm.dns.nsid[$target,$metric->{'ip'}] not in lastvalue, getting itemid and then value from history");
+
+									my $itemid = db_select_value(
+										"select itemid".
+										" from items i,hosts h".
+										" where i.hostid=h.hostid".
+											" and h.host='$tld $probe'".
+											" and i.key_='rsm.dns.nsid[$target,$metric->{'ip'}]'"
+									);
+
 									# get it from the history table
 									my $rows_ref = db_select(
 										"select value".
 										" from " . history_table(ITEM_VALUE_TYPE_STR).
-										" where itemid=$nsid_details->{'itemid'}".
+										" where itemid=$itemid".
 											" and " . sql_time_condition($cycleclock - $heartbeat, $cycleclock).
 										" order by clock desc".
 										" limit 1"
