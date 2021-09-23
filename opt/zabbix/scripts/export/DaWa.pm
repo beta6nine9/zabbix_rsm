@@ -9,7 +9,7 @@ use Text::CSV_XS;
 use File::Path qw(make_path);
 use Fcntl qw(:flock);
 
-use constant CSV_FILES_DIR => '/opt/zabbix/export-tmp';
+use constant OUTPUT_DIR => get_data_export_output_dir();
 
 # catalogs
 use constant ID_PROBE => 'probe';
@@ -73,6 +73,7 @@ our @EXPORT = qw(
 		DATA_TEST DATA_NSTEST DATA_CYCLE DATA_INCIDENT DATA_INCIDENT_END
 		DATA_FALSE_POSITIVE DATA_PROBE_CHANGES
 		DATA_TEST_DETAILS DATA_MINNS
+		OUTPUT_DIR
 		%CATALOGS %DATAFILES
 		dw_csv_init dw_append_csv dw_load_ids_from_db dw_get_id dw_get_name dw_write_csv_files
 		dw_write_csv_catalogs dw_delete_csvs dw_get_cycle_id dw_translate_cycle_id dw_set_date
@@ -236,7 +237,7 @@ sub __csv_file_full_path
 	die("File '$id_type' is unknown") unless ($DATAFILES{$id_type});
 	die("Internal error: export date is unknown") unless ($_year && $_month && $_day);
 
-	my $path = CSV_FILES_DIR . '/' . $_year . '/' . $_month . '/' . $_day . '/';
+	my $path = OUTPUT_DIR . '/' . $_year . '/' . $_month . '/' . $_day . '/';
 
 	$path .= $tld  . '/' if ($tld);
 
@@ -251,7 +252,7 @@ sub __csv_catalog_full_path
 
 	die("Catalog '$id_type' is unknown") unless ($CATALOGS{$id_type});
 
-	my $path = CSV_FILES_DIR . '/';
+	my $path = OUTPUT_DIR . '/';
 
 	__make_path($path);
 

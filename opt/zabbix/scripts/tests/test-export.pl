@@ -1,11 +1,18 @@
 #!/usr/bin/env perl
 
+use FindBin;
+use lib "$FindBin::RealBin/..";
+
 use strict;
 use warnings;
+
+use RSM;
 
 use Getopt::Long;
 use Text::CSV_XS;
 use DateTime;
+
+use constant BASE_DIR => get_data_export_output_dir();
 
 my @catalog_names = (
 	'ipAddresses',
@@ -131,7 +138,7 @@ if ($help)
 # catalogs
 foreach my $csv_file (@catalog_names)
 {
-	$files{$csv_file} = "/opt/zabbix/export/$csv_file.csv";
+	$files{$csv_file} = "@{[BASE_DIR]}/$csv_file.csv";
 }
 
 # sec, min, hour, mday, mon, year
@@ -145,13 +152,13 @@ $mday = "0$mday" if (length($mday) == 1);
 # generic data files
 foreach my $csv_file (@generic_data_file_names)
 {
-	$files{$csv_file} = "/opt/zabbix/export/$year/$mon/$mday/$csv_file.csv";
+	$files{$csv_file} = "@{[BASE_DIR]}/$year/$mon/$mday/$csv_file.csv";
 }
 
 # tld data files
 foreach my $csv_file (@tld_data_file_names)
 {
-	$files{$csv_file} = "/opt/zabbix/export/$year/$mon/$mday/$rsmhost/$csv_file.csv";
+	$files{$csv_file} = "@{[BASE_DIR]}/$year/$mon/$mday/$rsmhost/$csv_file.csv";
 }
 
 ##########################################

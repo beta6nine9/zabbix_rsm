@@ -35,8 +35,6 @@ use constant AH_INCIDENT_STATE_FILE => 'state';
 use constant AH_FALSE_POSITIVE_FILE => 'falsePositive';
 use constant AH_ALARMED_FILE => 'alarmed';
 use constant AH_DOWNTIME_FILE => 'downtime';
-use constant AH_SLA_API_DIR => '/opt/zabbix/sla';
-use constant AH_SLA_API_TMP_DIR => '/opt/zabbix/sla-tmp';
 
 use constant AH_ROOT_ZONE_DIR => 'zz--root';			# map root zone name (.) to something human readable
 
@@ -56,6 +54,9 @@ use constant JSON_VALUE_NUMBER         => 1;
 use constant JSON_VALUE_STRING         => 2;
 use constant JSON_VALUE_BOOLEAN        => 3;
 use constant JSON_VALUE_NUMBER_OR_NULL => 4;
+
+use constant AH_SLA_API_DIR     => get_sla_api_output_dir();
+use constant AH_SLA_API_TMP_DIR => "@{[AH_SLA_API_DIR]}-tmp";
 
 # keep fields in alphabetical order
 my $JSON_FIELDS = {
@@ -738,7 +739,7 @@ sub ah_save_measurement($$$$$)
 
 # Generate path for recent measurement cache, e. g.
 #
-#   /opt/zabbix/cache/server_1/example.json
+#   /opt/zabbix/cache/sla-api/server_1.json
 #
 sub __gen_recent_cache_path($$)
 {

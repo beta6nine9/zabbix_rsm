@@ -1949,8 +1949,8 @@ Print a brief help message and exit.
 =head1 DESCRIPTION
 
 B<This program> will generate the most recent measurement files for newly collected monitoring data. The files will be
-available under directory /opt/zabbix/sla-v2 . Each run the script would generate new measurement files for the period
-from the last run till up to 30 minutes.
+available under directory specified in rsm.conf . Each run the script would generate new measurement files for the period
+from the last run till up to 30 minutes (unless option --period is given).
 
 =head1 EXAMPLES
 

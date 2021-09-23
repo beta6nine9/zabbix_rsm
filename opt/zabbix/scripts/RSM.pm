@@ -17,6 +17,8 @@ our @EXPORT = qw(
 	get_rsm_local_id rsm_targets_prepare rsm_targets_apply get_db_tls_settings
 	write_file read_file
 	sig_name
+	get_sla_api_output_dir
+	get_data_export_output_dir
 );
 
 use constant RSM_SERVER_KEY_PREFIX => 'server_';
@@ -296,6 +298,20 @@ my @sig_names;
 sub sig_name
 {
 	return "SIG" . $sig_names[shift];
+}
+
+sub get_sla_api_output_dir()
+{
+	my $config = get_rsm_config();
+
+	return $config->{'sla_api'}{'output_dir'} || die("\"output_dir\" must be specified in \"sla_api\" section of rsm.conf\"");
+}
+
+sub get_data_export_output_dir()
+{
+	my $config = get_rsm_config();
+
+	return $config->{'data_export'}{'output_dir'} || die("\"output_dir\" must be specified in \"data_export\" section of rsm.conf\"");
 }
 
 1;

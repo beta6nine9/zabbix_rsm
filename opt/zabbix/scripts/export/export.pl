@@ -23,18 +23,18 @@ use constant PROBE_STATUS_UP => 'Up';
 use constant PROBE_STATUS_DOWN => 'Down';
 use constant PROBE_STATUS_UNKNOWN => 'Unknown';
 
-use constant JSON_INTERFACE_DNS		=> 'DNS';
-use constant JSON_INTERFACE_DNSSEC	=> 'DNSSEC';
-use constant TRIGGER_SEVERITY_NOT_CLASSIFIED	=> 0;
-use constant TRIGGER_VALUE_FALSE	=> 0;
-use constant SEC_PER_WEEK	=> 604800;
-use constant EVENT_OBJECT_TRIGGER	=> 0;
-use constant EVENT_SOURCE_TRIGGERS	=> 0;
-use constant TRIGGER_VALUE_TRUE		=> 1;
-use constant JSON_INTERFACE_RDDS43	=> 'RDDS43';
-use constant JSON_INTERFACE_RDDS80	=> 'RDDS80';
-use constant JSON_INTERFACE_RDAP	=> 'RDAP';
-use constant ROOT_ZONE_READABLE		=> 'zz--root';
+use constant JSON_INTERFACE_DNS              => 'DNS';
+use constant JSON_INTERFACE_DNSSEC           => 'DNSSEC';
+use constant TRIGGER_SEVERITY_NOT_CLASSIFIED => 0;
+use constant TRIGGER_VALUE_FALSE             => 0;
+use constant SEC_PER_WEEK                    => 604800;
+use constant EVENT_OBJECT_TRIGGER            => 0;
+use constant EVENT_SOURCE_TRIGGERS           => 0;
+use constant TRIGGER_VALUE_TRUE              => 1;
+use constant JSON_INTERFACE_RDDS43           => 'RDDS43';
+use constant JSON_INTERFACE_RDDS80           => 'RDDS80';
+use constant JSON_INTERFACE_RDAP             => 'RDAP';
+use constant ROOT_ZONE_READABLE              => 'zz--root';
 
 use constant PROBE_OFFLINE_STR	=> 'Offline';
 use constant PROBE_ONLINE_STR	=> 'Online';
@@ -44,8 +44,7 @@ use constant AH_STATUS_DOWN	=> 'Down';
 
 use constant true => 1;
 
-use constant TARGETS_TMP_DIR => '/opt/zabbix/export-tmp';
-use constant TARGETS_TARGET_DIR => '/opt/zabbix/export';
+use constant TMP_DIR => "@{[OUTPUT_DIR]}-tmp";
 
 use constant EXPORT_MAX_CHILDREN_DEFAULT => 24;
 use constant EXPORT_MAX_CHILDREN_FLOOR => 1;
@@ -78,7 +77,7 @@ usage() unless ($d && $m && $y);
 
 dw_set_date($y, $m, $d);
 
-if (!opt('dry-run') && (my $error = rsm_targets_prepare(TARGETS_TMP_DIR, TARGETS_TARGET_DIR)))
+if (!opt('dry-run') && (my $error = rsm_targets_prepare(TMP_DIR, OUTPUT_DIR)))
 {
 	fail($error);
 }
