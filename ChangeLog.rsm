@@ -1,7 +1,10 @@
 Changes for rsm2.2.0rc19
 
+New features:
+....I..... [815] added configuration option "output_dir" for SLA API and Data Export to rsm.conf (dimir)
+
 Bug fixes:
-....I..... [sub-813] fixed undefined array reference in export.pl (dimir)
+....I..... [sub-813] fixed undefined array reference in export.pl and incorrect NSID handling in recent measurements of rdds and rdap service (dimir)
 
 --------------------------------------------------------------------------------
 Changes for rsm2.2.0rc18
