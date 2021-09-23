@@ -1404,11 +1404,11 @@ sub calculate_cycle($$$$$$$$$$)
 							'clock'      => int($clock),
 						};
 
-						# "empty NSID" == "no NSID" in the database
-						my $nsid = '';
-
 						if ($service eq 'dns' || $service eq 'dnssec')
 						{
+							# "empty NSID" == "no NSID" in the database
+							my $nsid = '';
+
 							if (exists($metric->{'nsid'}))
 							{
 								# NSID is available in this cycle
@@ -1442,15 +1442,8 @@ sub calculate_cycle($$$$$$$$$$)
 									}
 								}
 							}
-						}
 
-						if (defined($nsid))
-						{
-							$h->{'nsid'} = (
-								$nsid eq ''
-								? undef
-								: $nsid
-							);
+							$h->{'nsid'} = ($nsid eq '' ? undef : $nsid);
 						}
 
 						push(@{$tested_interfaces{$tested_interface}{$probe}{'testData'}{$target}}, $h);
