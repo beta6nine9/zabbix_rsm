@@ -1038,7 +1038,7 @@ sub __save_csv_data($$$)
 								$cycle_ns_id // '',
 								$ip_id);
 
-							my $nsid_id = '';
+							my $nsid_id = dw_get_id(ID_NSID, '');
 
 							if ($service eq 'dns' || $service eq 'dnssec')
 							{
