@@ -1,3 +1,16 @@
+Changes for rsm2.2.0rc21
+
+Bug fixes:
+....I..... [sub-813] fixed nsid handling in Data Export tests.csv file (dimir)
+....I..... [sub-815] added missing helper scripts in misc directory (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.2.0rc20
+
+Bug fixes:
+....I..... [sub-813] fixed undefined array reference in export.pl and incorrect NSID handling in recent measurements of rdds and rdap service (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.2.0rc19
 
 New features:
