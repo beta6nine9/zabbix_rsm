@@ -25,7 +25,7 @@ our @EXPORT = qw(
 );
 
 use constant RSM_SERVER_KEY_PREFIX   => 'server_';
-use constant RSM_DEFAULT_CONFIG_FILE => "$FindBin::RealBin/rsm.conf";
+use constant RSM_DEFAULT_CONFIG_FILE => "/opt/zabbix/scripts/rsm.conf";
 
 my ($_TARGET_DIR, $_TMP_DIR, %_TO_DELETE);
 

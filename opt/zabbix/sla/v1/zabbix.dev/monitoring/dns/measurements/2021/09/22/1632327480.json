@@ -1,0 +1,30 @@
+{
+   "cycleCalculationDateTime" : 1632327480,
+   "lastUpdateApiDatabase" : 1632327654,
+   "service" : "dns",
+   "status" : "Up-inconclusive-no-data",
+   "testedInterface" : [
+      {
+         "interface" : "DNS",
+         "probes" : [
+            {
+               "city" : "Dimcity",
+               "status" : "Offline",
+               "testData" : []
+            },
+            {
+               "city" : "Probe1-Server1",
+               "status" : "Offline",
+               "testData" : []
+            },
+            {
+               "city" : "Probe2-Server1",
+               "status" : "No result",
+               "testData" : []
+            }
+         ]
+      }
+   ],
+   "tld" : "zabbix.dev",
+   "version" : 1
+}
