@@ -514,7 +514,7 @@ cp %{SOURCE20}              $RPM_BUILD_ROOT%{_sysconfdir}/rsyslog.d/rsm%{namespa
 sed -i "$NAMESPACE_PATTERN" $RPM_BUILD_ROOT%{_sysconfdir}/rsyslog.d/*.conf
 
 # in addition, we need to rename rsyslog template names because of the namespace
-sed -i "s/RSM/RSM%{namespace}/" $RPM_BUILD_ROOT%{_sysconfdir}/rsyslog.d/*.conf
+sed -i "s/RSM/RSM%{namespace}/g" $RPM_BUILD_ROOT%{_sysconfdir}/rsyslog.d/*.conf
 sed -i -r "s/rsm\.slv\./rsm%{namespace}.slv./g;s/rsm\.probe\./rsm%{namespace}.probe./g" $RPM_BUILD_ROOT%{_sysconfdir}/rsyslog.d/*.conf
 
 # and rsyslog ident
