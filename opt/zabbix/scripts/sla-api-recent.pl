@@ -1135,7 +1135,7 @@ sub calculate_cycle($$$$$$$$$$)
 	$tld = shift;		# set globally
 	my $service = shift;
 	my $probes_data = shift;
-	my $lastvalue_nsids_probes = shift;
+	my $lastvalues_nsids_tld = shift;
 	my $cycle_clock = shift;
 	my $delay = shift;
 	my $rtt_limit = shift;
@@ -1418,9 +1418,9 @@ sub calculate_cycle($$$$$$$$$$)
 							}
 							else
 							{
-								my $nsid_details = $lastvalue_nsids_probes->{$probe}{$target}{$metric->{'ip'}};
+								my $nsid_details = $lastvalues_nsids_tld->{$probe}{$target}{$metric->{'ip'}};
 
-								if (defined($nsid_details))
+								if (defined($nsid_details) && $nsid_details->{'clock'} <= $cycleclock)
 								{
 									# getting NSID from lastvalue table
 									$nsid = $nsid_details->{'value'};
@@ -1437,9 +1437,9 @@ sub calculate_cycle($$$$$$$$$$)
 											" and i.key_='rsm.dns.nsid[$target,$metric->{'ip'}]'"
 									);
 
-									# get it from the history table
+									# get it from the history table, the first using descending order by clock
 									my $rows_ref = db_select(
-										"select value".
+										"select value,clock".
 										" from " . history_table(ITEM_VALUE_TYPE_STR).
 										" where itemid=$itemid".
 											" and " . sql_time_condition($cycleclock - $heartbeat, $cycleclock).
@@ -1449,7 +1449,7 @@ sub calculate_cycle($$$$$$$$$$)
 
 									if (scalar(@{$rows_ref}) != 0)
 									{
-										# getting NSID from history table
+										# getting the most recent NSID from history table
 										$nsid = $rows_ref->[0]->[0];
 									}
 								}
