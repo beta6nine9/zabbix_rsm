@@ -936,6 +936,8 @@ sub __save_csv_data($$$)
 
 				foreach my $probe (sort(keys(%{$cycle_ref->{'interfaces'}{$interface}{'probes'}})))
 				{
+					next unless ($probe_ref->{'clock'});
+
 					my $probe_id = dw_get_id(ID_PROBE, $probe);
 
 					my $probe_ref = $cycle_ref->{'interfaces'}{$interface}{'probes'}{$probe};
