@@ -1368,6 +1368,10 @@ sub calculate_cycle($$$$$$$$$$)
 		{
 			foreach my $interface (keys(%{$results->{$service}{$cycleclock}{'interfaces'}}))
 			{
+				my $clock = $results->{$service}{$cycleclock}{'interfaces'}{$interface}{'clock'};
+
+				next unless ($clock);
+
 				my $tested_interface;
 
 				# dns-results-cache:
@@ -1379,7 +1383,6 @@ sub calculate_cycle($$$$$$$$$$)
 				{
 					$tested_interface = translate_interface($interface);
 				}
-				my $clock = $results->{$service}{$cycleclock}{'interfaces'}{$interface}{'clock'};
 
 				foreach my $target (keys(%{$results->{$service}{$cycleclock}{'interfaces'}{$interface}{'targets'}}))
 				{
@@ -1618,10 +1621,14 @@ sub calculate_cycle($$$$$$$$$$)
 
 		foreach my $target (sort(keys(%{$name_server_availability_data->{'probes'}{$probe}})))
 		{
+			my $status = $name_server_availability_data->{'probes'}{$probe}{$target};
+
+			next unless (defined($status));
+
 			push(@{$test_data},
 				{
 					'target' => $target,
-					'status' => ($name_server_availability_data->{'probes'}{$probe}{$target} == UP ? 'Up' : 'Down'),
+					'status' => ($status == UP ? 'Up' : 'Down'),
 				}
 			);
 		}
