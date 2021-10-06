@@ -1,0 +1,10 @@
+[test-case]
+
+"PoC test case 1"
+
+[execute]
+
+# execute "date"
+"2020-12-01 09:00:00","date","+'%F %T %Z'"
+"2020-12-02 09:00:00","date","+'%F %T %Z'"
+"2020-12-03 09:00:00","date","+'%F %T %Z'"
