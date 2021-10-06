@@ -5424,6 +5424,9 @@ sub get_test_results($$;$)
 					# get rid of fake target
 					my $target = ($ns eq FAKE_NS ? $data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}{$ns}{FAKE_NSIP()}{'target'} : $ns);
 
+					# TODO: some probes return partial data, for now just handle it this way :-(
+					next unless (defined($target));
+
 					# target status is in FAKE_NS
 					$result->{$service}{$cycleclock}{'interfaces'}{$interface}{'targets'}{$target}{'status'} =
 						$data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}{$ns}{FAKE_NSIP()}{'status'};

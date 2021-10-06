@@ -936,17 +936,19 @@ sub __save_csv_data($$$)
 
 				foreach my $probe (sort(keys(%{$cycle_ref->{'interfaces'}{$interface}{'probes'}})))
 				{
-					next unless ($probe_ref->{'clock'});
+					my $probe_ref = $cycle_ref->{'interfaces'}{$interface}{'probes'}{$probe};
 
 					my $probe_id = dw_get_id(ID_PROBE, $probe);
 
-					my $probe_ref = $cycle_ref->{'interfaces'}{$interface}{'probes'}{$probe};
-
 					if (exists($probe_ref->{'protocol'}))
 					{
-						$proto =  $probe_ref->{'protocol'};
+						$proto = $probe_ref->{'protocol'};
 						$protocol_id = ($proto == PROTO_UDP ? $udp_protocol_id : $tcp_protocol_id);
 					}
+
+					# TODO: some probes return partial data, for now just handle it this way :-(
+					next unless (defined($probe_ref->{'clock'}));
+					next unless (defined($proto));
 
 					my $testedname_id = '';
 
@@ -976,6 +978,9 @@ sub __save_csv_data($$$)
 					foreach my $target (sort(keys(%{$cycle_ref->{'interfaces'}{$interface}{'probes'}{$probe}{'targets'}})))
 					{
 						my $target_ref = $cycle_ref->{'interfaces'}{$interface}{'probes'}{$probe}{'targets'}{$target};
+
+						# TODO: some probes return partial data, for now just handle it this way :-(
+						next unless (defined($target_ref->{'status'}));
 
 						my $cycle_ns_id;
 
