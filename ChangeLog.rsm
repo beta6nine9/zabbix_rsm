@@ -1,3 +1,10 @@
+Changes for rsm2.2.0rc22
+
+Bug fixes:
+....I..... [816] added Test Automation framework with Data Export, SLA API and SLV scripts test cases (asitals)
+....I..... [sub-813] fixed incorrect nsid taken from lastvalue in SLA API (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.2.0rc21
 
 Bug fixes:
