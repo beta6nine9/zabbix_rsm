@@ -32,6 +32,9 @@ $table = (new CTableInfo())->setHeader([
 		_('Internal errors')
 ]);
 
+// order output by Probe names
+ksort($data['probes'], SORT_NATURAL);
+
 $index = 1;
 foreach ($data['probes'] as $probe => $values) {
 	// defaults, if empty
