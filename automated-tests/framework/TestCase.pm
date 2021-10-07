@@ -173,11 +173,11 @@ sub run_test_case($)
 
 		my $db_args = "--host='$db_host' --port=3306 --user='$db_user' '$db_name'";
 
-		my $dump_file = $ENV{"WORKSPACE"} . '/' . DB_DUMPS_DIR . '/' . basename($test_case_filename);
+		my $dump_file = get_working_directory() . '/' . DB_DUMPS_DIR . '/' . basename($test_case_filename);
 
 		$dump_file =~ s/\.txt/.sql/;
 
-		make_path($ENV{"WORKSPACE"} . '/' . DB_DUMPS_DIR);
+		make_path(get_working_directory() . '/' . DB_DUMPS_DIR);
 
 		local $ENV{'MYSQL_PWD'} = $db_pswd;
 

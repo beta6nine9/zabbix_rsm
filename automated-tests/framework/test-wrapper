@@ -42,11 +42,8 @@ if [[ -f "$CONF_FILE" ]]; then
 	. "$CONF_FILE"
 fi
 
-: ${WORKSPACE:=$(pwd)}
-: ${SOURCE_DIRECTORY:="$WORKSPACE/source"}
+: ${SOURCE_DIRECTORY:="$(pwd)/source"}
 : ${SOURCE_DIRECTORY_TMP:="$SOURCE_DIRECTORY@tmp"}
-
-export WORKSPACE
 
 export GIT_URL=${GIT_URL:?"not specified"}
 export GIT_BRANCH=${GIT_BRANCH:?"not specified"}

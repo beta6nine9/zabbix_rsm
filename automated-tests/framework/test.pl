@@ -33,7 +33,6 @@ use ProvisioningApi;
 use TestCase;
 
 my @REQUIRED_ENV_VARIABLES = (
-	"WORKSPACE",
 	"ZBX_SERVER_DB_HOST",
 	"ZBX_SERVER_DB_NAME",
 	"ZBX_SERVER_DB_USER",

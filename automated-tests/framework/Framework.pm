@@ -14,6 +14,7 @@ our @EXPORT = qw(
 	write_file
 	get_dir_tree
 	get_source_directory
+	get_working_directory
 	get_build_directory
 	get_logs_directory
 	get_server_pid_file
@@ -34,9 +35,10 @@ our @EXPORT = qw(
 );
 
 use Archive::Tar;
-use Cwd;
+use Cwd qw(cwd abs_path);
 use Data::Dumper;
 use Date::Parse;
+use File::Basename;
 use File::Spec;
 use List::Util qw(max);
 use Text::Diff;
@@ -44,6 +46,8 @@ use Text::Diff;
 use Database;
 use Options;
 use Output;
+
+use constant WORKING_DIRECTORY => cwd();
 
 my @prev_dir = undef;
 
@@ -174,27 +178,32 @@ sub get_dir_tree($)
 
 sub get_source_directory()
 {
-	return $ENV{"WORKSPACE"} . "/source";
+	return abs_path(dirname(abs_path($0)) . '/../..');
+}
+
+sub get_working_directory()
+{
+	return WORKING_DIRECTORY;
 }
 
 sub get_build_directory()
 {
-	return $ENV{"WORKSPACE"} . "/build";
+	return get_working_directory() . "/build";
 }
 
 sub get_logs_directory()
 {
-	return $ENV{"WORKSPACE"} . "/logs";
+	return get_working_directory() . "/logs";
 }
 
 sub get_server_pid_file()
 {
-	return $ENV{"WORKSPACE"} . "/zabbix_server.pid";
+	return get_working_directory() . "/zabbix_server.pid";
 }
 
 sub get_server_socket_dir()
 {
-	return $ENV{"WORKSPACE"};
+	return get_working_directory();
 }
 
 sub get_libfaketime_so_path()
@@ -267,7 +276,7 @@ sub zbx_build($$$)
 				"ListenPort"           => "<ListenPort>",
 				"LogFile"              => get_logs_directory() . "/zabbix_proxy.log",
 				"LogFileSize"          => "0",
-				"PidFile"              => $ENV{"WORKSPACE"} . "/zabbix_proxy.pid",
+				"PidFile"              => get_working_directory() . "/zabbix_proxy.pid",
 				"DBHost"               => $ENV{"ZBX_PROXY_DB_HOST"}     // "",
 				"DBName"               => $ENV{"ZBX_PROXY_DB_NAME"}     // "",
 				"DBUser"               => $ENV{"ZBX_PROXY_DB_USER"}     // "",
