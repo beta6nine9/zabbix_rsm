@@ -310,13 +310,13 @@ perl -e '
     my $config = Config::Tiny->new;
     $config = Config::Tiny->read($config_file);
 
-    $config->{"paths"}{"source_dir"}        = $source_dir;
-    $config->{"paths"}{"build_dir"}         = $work_dir;
-    $config->{"paths"}{"logs_dir"}          = $work_dir . "/logs";
-    $config->{"paths"}{"db_dumps_dir"}      = $work_dir . "/db_logs";
-    $config->{"paths"}{"server_socket_dir"} = $work_dir;
-    $config->{"zabbix_server"}{"pid_file"}  = $work_dir . "zabbix_server.pid";
-    #$config->{"frontend"}{"url"}            = ...;
+    $config->{"paths"}{"source_dir"}         = $source_dir;
+    $config->{"paths"}{"build_dir"}          = $work_dir;
+    $config->{"paths"}{"logs_dir"}           = $work_dir . "/logs";
+    $config->{"paths"}{"db_dumps_dir"}       = $work_dir . "/db_logs";
+    $config->{"zabbix_server"}{"socket_dir"} = $work_dir;
+    $config->{"zabbix_server"}{"pid_file"}   = $work_dir . "zabbix_server.pid";
+    #$config->{"frontend"}{"url"}             = ...;
 
     $config->write($config_file);
 ' "$SOURCE_DIR" "$WORK_DIR"

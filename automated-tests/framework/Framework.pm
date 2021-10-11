@@ -391,7 +391,7 @@ sub zbx_start_server(;$$$)
 			(
 				"ListenPort"              => "10051",
 				"LogFile"                 => $log_file,
-				"SocketDir"               => get_config('paths', 'server_socket_dir'),
+				"SocketDir"               => get_config('zabbix_server', 'socket_dir'),
 				"LogFileSize"             => "0",
 				"PidFile"                 => get_config('zabbix_server', 'pid_file'),
 				"DBHost"                  => get_config("zabbix_server", "db_host"),
