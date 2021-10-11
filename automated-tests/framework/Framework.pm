@@ -13,11 +13,6 @@ our @EXPORT = qw(
 	read_file
 	write_file
 	get_dir_tree
-	get_source_directory
-	get_working_directory
-	get_build_directory
-	get_logs_directory
-	get_server_pid_file
 	get_libfaketime_so_path
 	zbx_build
 	zbx_drop_db
@@ -35,25 +30,24 @@ our @EXPORT = qw(
 );
 
 use Archive::Tar;
-use Cwd qw(cwd abs_path);
+use Cwd qw(cwd);
 use Data::Dumper;
 use Date::Parse;
-use File::Basename;
 use File::Spec;
 use List::Util qw(max);
 use Text::Diff;
 
+use Configuration;
 use Database;
 use Options;
 use Output;
-
-use constant WORKING_DIRECTORY => cwd();
 
 my @prev_dir = undef;
 
 sub initialize()
 {
 	initialize_log(!opt('nolog'), 1, \&finalize);
+	initialize_config();
 	info("command line: %s %s", $0, join(' ', map(index($_, ' ') == -1 ? $_ : "'$_'", @ARGV)));
 }
 
@@ -176,36 +170,6 @@ sub get_dir_tree($)
 	return @names;
 }
 
-sub get_source_directory()
-{
-	return abs_path(dirname(abs_path($0)) . '/../..');
-}
-
-sub get_working_directory()
-{
-	return WORKING_DIRECTORY;
-}
-
-sub get_build_directory()
-{
-	return get_working_directory() . "/build";
-}
-
-sub get_logs_directory()
-{
-	return get_working_directory() . "/logs";
-}
-
-sub get_server_pid_file()
-{
-	return get_working_directory() . "/zabbix_server.pid";
-}
-
-sub get_server_socket_dir()
-{
-	return get_working_directory();
-}
-
 sub get_libfaketime_so_path()
 {
 	my $path = undef;
@@ -231,7 +195,7 @@ sub zbx_build($$$)
 
 	if ($enable_server || $enable_proxy || $enable_agent)
 	{
-		push(@configure_args, '--prefix=' . get_build_directory());
+		push(@configure_args, '--prefix=' . get_config('paths', 'build_dir'));
 		push(@configure_args, '--enable-dependency-tracking');
 		push(@configure_args, '--with-libevent');
 		push(@configure_args, '--with-libpcre');
@@ -244,7 +208,10 @@ sub zbx_build($$$)
 		push(@configure_args, '--enable-agent')  if ($enable_agent);
 	}
 
-	pushd(get_source_directory());
+	my $source_dir = get_config('paths', 'source_dir');
+	my $build_dir  = get_config('paths', 'build_dir');
+
+	pushd($source_dir);
 
 	execute('./bootstrap.sh');
 	{
@@ -267,28 +234,28 @@ sub zbx_build($$$)
 	if ($enable_proxy)
 	{
 		zbx_update_config(
-			get_source_directory() . "/conf/zabbix_proxy.conf",
-			get_build_directory() . "/etc/zabbix_proxy.conf.example",
+			$source_dir . "/conf/zabbix_proxy.conf",
+			$build_dir . "/etc/zabbix_proxy.conf.example",
 			{
 				"ProxyMode"            => "1",
 				"Server"               => "127.0.0.1",
 				"Hostname"             => "<Hostname>",
 				"ListenPort"           => "<ListenPort>",
-				"LogFile"              => get_logs_directory() . "/zabbix_proxy.log",
+				"LogFile"              => get_config('paths', 'logs_dir') . "/zabbix_proxy.log",
 				"LogFileSize"          => "0",
-				"PidFile"              => get_working_directory() . "/zabbix_proxy.pid",
-				"DBHost"               => $ENV{"ZBX_PROXY_DB_HOST"}     // "",
-				"DBName"               => $ENV{"ZBX_PROXY_DB_NAME"}     // "",
-				"DBUser"               => $ENV{"ZBX_PROXY_DB_USER"}     // "",
-				"DBPassword"           => $ENV{"ZBX_PROXY_DB_PASSWORD"} // "",
+				#"PidFile"              => get_config('zabbix_proxy', 'pid_file'),
+				#"DBHost"               => get_conig('zabbix_proxy', 'db_host'),
+				#"DBName"               => get_conig('zabbix_proxy', 'db_name'),
+				#"DBUser"               => get_conig('zabbix_proxy', 'db_username'),
+				#"DBPassword"           => get_conig('zabbix_proxy', 'db_password'),
 				"CacheSize"            => "1G",
 			}
 		);
 	}
 
 	rsm_update_config(
-		get_source_directory() . "/opt/zabbix/scripts/rsm.conf.example",
-		get_source_directory() . "/opt/zabbix/scripts/rsm.conf",
+		$source_dir . "/opt/zabbix/scripts/rsm.conf.example",
+		$source_dir . "/opt/zabbix/scripts/rsm.conf",
 		{
 			"server_1.za_url"                     => $ENV{"ZBX_FRONTEND_URL"},
 			"server_1.za_user"                    => $ENV{"ZBX_FRONTEND_USER"},
@@ -317,7 +284,7 @@ sub zbx_drop_db()
 
 sub zbx_create_db()
 {
-	my $sql_dir = get_source_directory() . "/database/mysql";
+	my $sql_dir = get_config('paths', 'source_dir') . "/database/mysql";
 
 	my $db_host = get_db_host();
 	my $db_name = get_db_name();
@@ -384,7 +351,7 @@ sub zbx_update_config($$$)
 sub zbx_get_server_pid()
 {
 	my $pid = undef;
-	my $pid_file = get_server_pid_file();
+	my $pid_file = get_config('zabbix_server', 'pid_file');
 
 	if (-f $pid_file)
 	{
@@ -411,22 +378,22 @@ sub zbx_start_server(;$$$)
 	my $logfile_suffix   = shift // '';
 	my $config_overrides = shift // {};
 
-	my $executable     = get_build_directory() . "/sbin/zabbix_server";
-	my $log_file       = get_logs_directory() . "/zabbix_server" . $logfile_suffix . ".log";
+	my $executable     = get_config('paths', 'build_dir') . "/sbin/zabbix_server";
+	my $log_file       = get_config('paths', 'logs_dir') . "/zabbix_server" . $logfile_suffix . ".log";
 	my $libfaketime_so = get_libfaketime_so_path();
 
 	info("updating zabbix_server.conf");
 
 	zbx_update_config(
-		get_source_directory() . "/conf/zabbix_server.conf",
-		get_build_directory() . "/etc/zabbix_server.conf",
+		get_config('paths', 'source_dir') . "/conf/zabbix_server.conf",
+		get_config('paths', 'build_dir') . "/etc/zabbix_server.conf",
 		{
 			(
 				"ListenPort"              => "10051",
 				"LogFile"                 => $log_file,
-				"SocketDir"               => get_server_socket_dir(),
+				"SocketDir"               => get_config('paths', 'server_socket_dir'),
 				"LogFileSize"             => "0",
-				"PidFile"                 => get_server_pid_file(),
+				"PidFile"                 => get_config('zabbix_server', 'pid_file'),
 				"DBHost"                  => $ENV{"ZBX_SERVER_DB_HOST"},
 				"DBName"                  => $ENV{"ZBX_SERVER_DB_NAME"},
 				"DBUser"                  => $ENV{"ZBX_SERVER_DB_USER"},
@@ -484,7 +451,7 @@ sub zbx_start_server(;$$$)
 
 	if (!defined($pid))
 	{
-		fail("zabbix server failed to start, check '%s'", get_logs_directory() . "/zabbix_server.log");
+		fail("zabbix server failed to start, check '%s'", get_config('paths', 'logs_dir') . "/zabbix_server.log");
 	}
 
 	dbg("waiting until server reports 'main process started' in the log file");

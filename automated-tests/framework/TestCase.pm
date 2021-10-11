@@ -17,6 +17,7 @@ use File::Basename;
 use File::Path qw(make_path);
 use Text::CSV_XS qw(csv);
 
+use Configuration;
 use Database;
 use Framework;
 use Options;
@@ -53,8 +54,6 @@ my %command_handlers = (
 
 my $test_case_filename;
 my $test_case_name;
-
-use constant DB_DUMPS_DIR         => 'db_dumps';
 
 ################################################################################
 # main functions
@@ -171,17 +170,15 @@ sub run_test_case($)
 		my $db_user = get_db_user();
 		my $db_pswd = get_db_pswd();
 
-		my $db_args = "--host='$db_host' --port=3306 --user='$db_user' '$db_name'";
+		my $db_dumps_dir = get_config('paths', 'db_dumps_dir');
 
-		my $dump_file = get_working_directory() . '/' . DB_DUMPS_DIR . '/' . basename($test_case_filename);
+		make_path($db_dumps_dir);
 
-		$dump_file =~ s/\.txt/.sql/;
-
-		make_path(get_working_directory() . '/' . DB_DUMPS_DIR);
+		my $db_dump_file = $db_dumps_dir . '/' . basename($test_case_filename =~ s/\.txt^/.sql/r);
 
 		local $ENV{'MYSQL_PWD'} = $db_pswd;
 
-		execute("mysqldump $db_args > '$dump_file'");
+		execute("mysqldump --host='$db_host' --port=3306 --user='$db_user' '$db_name' > '$db_dump_file'");
 
 		$failure_message  = "test case failed\n";
 		$failure_message .= "\n";
@@ -189,7 +186,7 @@ sub run_test_case($)
 		$failure_message .= "filename: '$test_case_filename'\n";
 		$failure_message .= "command: " . (defined($command) ? "'$command'" : "undef") . "\n";
 		$failure_message .= "line number: " . ($line_num + 1) . "\n";
-		$failure_message .= "db dump created: $dump_file";
+		$failure_message .= "db dump created: $db_dump_file";
 		$failure_message .= "\n";
 		$failure_message .= $test_case[$line_num];
 
@@ -769,11 +766,13 @@ sub __cmd_create_probe($)
 	create_probe(1, $probe, $ip, $port, $ipv4, $ipv6, $rdds, $rdap);
 	db_commit();
 
-	if (-f get_build_directory() . "/etc/zabbix_proxy.conf.example")
+	my $build_dir = get_config('paths', 'build_dir');
+
+	if (-f $build_dir . "/etc/zabbix_proxy.conf.example")
 	{
 		zbx_update_config(
-			get_build_directory() . "/etc/zabbix_proxy.conf.example",
-			get_build_directory() . "/etc/zabbix_proxy_$probe.conf",
+			$build_dir . "/etc/zabbix_proxy.conf.example",
+			$build_dir . "/etc/zabbix_proxy_$probe.conf",
 			{
 				"Hostname"   => $probe,
 				"ListenPort" => $port,

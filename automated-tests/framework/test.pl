@@ -25,26 +25,13 @@ use Pod::Usage;
 use Time::HiRes qw(time);
 use XML::LibXML;
 
-use Output;
+use Output; # Output must be "used" before any other module to setup __WARN__ and __DIE__ hooks and catch potential issues during "using" other modules
+use Configuration;
 use Options;
 use Database;
 use Framework;
 use ProvisioningApi;
 use TestCase;
-
-my @REQUIRED_ENV_VARIABLES = (
-	"ZBX_SERVER_DB_HOST",
-	"ZBX_SERVER_DB_NAME",
-	"ZBX_SERVER_DB_USER",
-	"ZBX_SERVER_DB_PASSWORD",
-	#"ZBX_PROXY_DB_HOST",
-	#"ZBX_PROXY_DB_NAME",
-	#"ZBX_PROXY_DB_USER",
-	#"ZBX_PROXY_DB_PASSWORD",
-	"ZBX_FRONTEND_URL",
-	"ZBX_FRONTEND_USER",
-	"ZBX_FRONTEND_PASSWORD",
-);
 
 use constant XML_REPORT_FILE => "test-results.xml";
 
@@ -71,14 +58,6 @@ sub main()
 		log_debug_messages(1);
 	}
 
-	foreach (@REQUIRED_ENV_VARIABLES)
-	{
-		if (!exists($ENV{$_}))
-		{
-			fail("environment variable '$_' not found")
-		}
-	}
-
 	if (-f XML_REPORT_FILE)
 	{
 		unlink(XML_REPORT_FILE) or fail("cannot unlink file '%s': %s", XML_REPORT_FILE, $!);
@@ -86,7 +65,7 @@ sub main()
 
 	if (!opt("skip-build"))
 	{
-		foreach my $directory (get_build_directory(), get_logs_directory())
+		foreach my $directory (get_config('paths', 'build_dir'), get_config('paths', 'logs_dir'))
 		{
 			if (-d $directory)
 			{
