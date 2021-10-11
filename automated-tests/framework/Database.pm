@@ -17,17 +17,13 @@ our @EXPORT = qw(
 	db_rollback
 	db_create_dump
 	db_compare_dumps
-	get_db_host
-	get_db_name
-	get_db_user
-	get_db_pswd
-	get_db_tls_settings
 );
 
 use DBI;
 use Data::Dumper;
 use Scalar::Util qw(looks_like_number);
 
+use Configuration;
 use Output;
 
 use constant ZABBIX_SERVER_CONF_FILE => '/etc/zabbix/zabbix_server.conf';
@@ -41,10 +37,10 @@ sub db_connect()
 		fail("already connected to the database");
 	}
 
-	my $db_host = get_db_host();
-	my $db_user = get_db_user();
-	my $db_pswd = get_db_pswd();
-	my $db_tls_settings = get_db_tls_settings();
+	my $db_host = get_config("zabbix_server", "db_host");
+	my $db_user = get_config("zabbix_server", "db_username");
+	my $db_pswd = get_config("zabbix_server", "db_password");
+	my $db_tls_settings = "mysql_ssl=0;";
 
 	my $data_source = "DBI:mysql:";
 
@@ -352,31 +348,6 @@ sub __get_fields_for_dump($)
 	}
 
 	return join(',', map($_->[0], @{$rows}));
-}
-
-sub get_db_host()
-{
-	return $ENV{'ZBX_SERVER_DB_HOST'};
-}
-
-sub get_db_name()
-{
-	return $ENV{'ZBX_SERVER_DB_NAME'};
-}
-
-sub get_db_user()
-{
-	return $ENV{'ZBX_SERVER_DB_USER'};
-}
-
-sub get_db_pswd()
-{
-	return $ENV{'ZBX_SERVER_DB_PASSWORD'};
-}
-
-sub get_db_tls_settings()
-{
-	return "mysql_ssl=0;";
 }
 
 sub __handle_db_error($$$)

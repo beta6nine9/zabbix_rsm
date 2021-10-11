@@ -257,13 +257,13 @@ sub zbx_build($$$)
 		$source_dir . "/opt/zabbix/scripts/rsm.conf.example",
 		$source_dir . "/opt/zabbix/scripts/rsm.conf",
 		{
-			"server_1.za_url"                     => $ENV{"ZBX_FRONTEND_URL"},
-			"server_1.za_user"                    => $ENV{"ZBX_FRONTEND_USER"},
-			"server_1.za_password"                => $ENV{"ZBX_FRONTEND_PASSWORD"},
-			"server_1.db_host"                    => $ENV{"ZBX_SERVER_DB_HOST"},
-			"server_1.db_name"                    => $ENV{"ZBX_SERVER_DB_NAME"},
-			"server_1.db_user"                    => $ENV{"ZBX_SERVER_DB_USER"},
-			"server_1.db_password"                => $ENV{"ZBX_SERVER_DB_PASSWORD"},
+			"server_1.za_url"                     => get_config("frontend", "url"),
+			"server_1.za_user"                    => get_config("frontend", "username"),
+			"server_1.za_password"                => get_config("frontend", "password"),
+			"server_1.db_host"                    => get_config("zabbix_server", "db_host"),
+			"server_1.db_name"                    => get_config("zabbix_server", "db_name"),
+			"server_1.db_user"                    => get_config("zabbix_server", "db_username"),
+			"server_1.db_password"                => get_config("zabbix_server", "db_password"),
 			"slv.zserver"                         => "127.0.0.1",
 			"slv.zport"                           => "10051",
 			"sla_api.incident_measurements_limit" => 0,
@@ -277,7 +277,7 @@ sub zbx_build($$$)
 
 sub zbx_drop_db()
 {
-	my $db_name = get_db_name();
+	my $db_name = get_config("zabbix_server", "db_name");
 	info("dropping database '%s'", $db_name);
 	db_exec("drop database if exists $db_name");
 }
@@ -286,10 +286,10 @@ sub zbx_create_db()
 {
 	my $sql_dir = get_config('paths', 'source_dir') . "/database/mysql";
 
-	my $db_host = get_db_host();
-	my $db_name = get_db_name();
-	my $db_user = get_db_user();
-	my $db_pswd = get_db_pswd();
+	my $db_host = get_config("zabbix_server", "db_host");
+	my $db_name = get_config("zabbix_server", "db_name");
+	my $db_user = get_config("zabbix_server", "db_username");
+	my $db_pswd = get_config("zabbix_server", "db_password");
 
 	info("creating database '%s'", $db_name);
 	db_exec("create database $db_name character set utf8 collate utf8_bin");
@@ -394,10 +394,10 @@ sub zbx_start_server(;$$$)
 				"SocketDir"               => get_config('paths', 'server_socket_dir'),
 				"LogFileSize"             => "0",
 				"PidFile"                 => get_config('zabbix_server', 'pid_file'),
-				"DBHost"                  => $ENV{"ZBX_SERVER_DB_HOST"},
-				"DBName"                  => $ENV{"ZBX_SERVER_DB_NAME"},
-				"DBUser"                  => $ENV{"ZBX_SERVER_DB_USER"},
-				"DBPassword"              => $ENV{"ZBX_SERVER_DB_PASSWORD"},
+				"DBHost"                  => get_config("zabbix_server", "db_host"),
+				"DBName"                  => get_config("zabbix_server", "db_name"),
+				"DBUser"                  => get_config("zabbix_server", "db_username"),
+				"DBPassword"              => get_config("zabbix_server", "db_password"),
 				"CacheSize"               => "1G",
 				"TrapperTimeout"          => "3",
 				"StartTrappers"           => "1",

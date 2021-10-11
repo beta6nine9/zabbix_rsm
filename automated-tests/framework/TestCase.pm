@@ -165,10 +165,10 @@ sub run_test_case($)
 	}
 	else
 	{
-		my $db_host = get_db_host();
-		my $db_name = get_db_name();
-		my $db_user = get_db_user();
-		my $db_pswd = get_db_pswd();
+		my $db_host = get_config("zabbix_server", "db_host");
+		my $db_name = get_config("zabbix_server", "db_name");
+		my $db_user = get_config("zabbix_server", "db_username");
+		my $db_pswd = get_config("zabbix_server", "db_password");
 
 		my $db_dumps_dir = get_config('paths', 'db_dumps_dir');
 

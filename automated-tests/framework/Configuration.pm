@@ -21,7 +21,6 @@ my $config;
 
 sub initialize_config()
 {
-	print Dumper CONFIG_FILE;
 	$config = Config::Tiny->new;
 	$config = Config::Tiny->read(CONFIG_FILE);
 
@@ -29,8 +28,6 @@ sub initialize_config()
 	{
 		fail(Config::Tiny->errstr());
 	}
-
-	print Dumper $config;
 }
 
 sub get_config($$)
