@@ -14,6 +14,8 @@ class Tld extends MonitoringTarget
 	private const RSMHOST_DNS_NS_LOG_ACTION_ENABLE  = 1;
 	private const RSMHOST_DNS_NS_LOG_ACTION_DISABLE = 2;
 
+	private const NSID_THROTTLING_INTERVAL_SECONDS = 3600;
+
 	/******************************************************************************************************************
 	 * Functions for validation                                                                                       *
 	 ******************************************************************************************************************/
@@ -535,25 +537,48 @@ class Tld extends MonitoringTarget
 
 				$testItems += [
 					"rsm.dns.nsid[$ns,$ip]" => [
-						'name'                 => "DNS NSID of $ns,$ip",
-						'value_type'           => ITEM_VALUE_TYPE_STR,
-						'valuemapid'           => null,
-						'description'          => 'DNS Name Server Identifier of the target Name Server that was tested.',
-						'preprocessing_params' => "\$.nsips[?(@.['ns'] == '$ns' && @.['ip'] == '$ip')].nsid.first()",
+						'name'          => "DNS NSID of $ns,$ip",
+						'value_type'    => ITEM_VALUE_TYPE_STR,
+						'valuemapid'    => null,
+						'description'   => 'DNS Name Server Identifier of the target Name Server that was tested.',
+						'preprocessing' => [
+							[
+								'type'                 => ZBX_PREPROC_JSONPATH,
+								'params'               => "\$.nsips[?(@.['ns'] == '$ns' && @.['ip'] == '$ip')].nsid.first()",
+								'error_handler'        => ZBX_PREPROC_FAIL_DISCARD_VALUE,
+								'error_handler_params' => '',
+							],
+							[
+								'type'                 => ZBX_PREPROC_THROTTLE_TIMED_VALUE,
+								'params'               => NSID_THROTTLING_INTERVAL_SECONDS,
+								'error_handler'        => ZBX_PREPROC_FAIL_DEFAULT,
+								'error_handler_params' => '',
+							],
+						],
 					],
 					"rsm.dns.rtt[$ns,$ip,tcp]" => [
-						'name'                 => "DNS NS RTT of $ns,$ip using tcp",
-						'value_type'           => ITEM_VALUE_TYPE_FLOAT,
-						'valuemapid'           => $valueMapIds['RSM DNS rtt'],
-						'description'          => 'The Round-Time Trip returned when testing specific IP of Name Server using TCP protocol.',
-						'preprocessing_params' => "\$.nsips[?(@.['ns'] == '$ns' && @.['ip'] == '$ip' && @.['protocol'] == 'tcp')].rtt.first()",
+						'name'          => "DNS NS RTT of $ns,$ip using tcp",
+						'value_type'    => ITEM_VALUE_TYPE_FLOAT,
+						'valuemapid'    => $valueMapIds['RSM DNS rtt'],
+						'description'   => 'The Round-Time Trip returned when testing specific IP of Name Server using TCP protocol.',
+						'preprocessing' => [[
+							'type'                 => ZBX_PREPROC_JSONPATH,
+							'params'               => "\$.nsips[?(@.['ns'] == '$ns' && @.['ip'] == '$ip' && @.['protocol'] == 'tcp')].rtt.first()",
+							'error_handler'        => ZBX_PREPROC_FAIL_DISCARD_VALUE,
+							'error_handler_params' => '',
+						]],
 					],
 					"rsm.dns.rtt[$ns,$ip,udp]" => [
-						'name'                 => "DNS NS RTT of $ns,$ip using udp",
-						'value_type'           => ITEM_VALUE_TYPE_FLOAT,
-						'valuemapid'           => $valueMapIds['RSM DNS rtt'],
-						'description'          => 'The Round-Time Trip returned when testing specific IP of Name Server using UDP protocol.',
-						'preprocessing_params' => "\$.nsips[?(@.['ns'] == '$ns' && @.['ip'] == '$ip' && @.['protocol'] == 'udp')].rtt.first()",
+						'name'          => "DNS NS RTT of $ns,$ip using udp",
+						'value_type'    => ITEM_VALUE_TYPE_FLOAT,
+						'valuemapid'    => $valueMapIds['RSM DNS rtt'],
+						'description'   => 'The Round-Time Trip returned when testing specific IP of Name Server using UDP protocol.',
+						'preprocessing' => [[
+							'type'                 => ZBX_PREPROC_JSONPATH,
+							'params'               => "\$.nsips[?(@.['ns'] == '$ns' && @.['ip'] == '$ip' && @.['protocol'] == 'udp')].rtt.first()",
+							'error_handler'        => ZBX_PREPROC_FAIL_DISCARD_VALUE,
+							'error_handler_params' => '',
+						]],
 					],
 				];
 			}
@@ -563,11 +588,16 @@ class Tld extends MonitoringTarget
 				// TODO: value type - uint64, mapping - service_state (whatever that one is)
 				$testItems += [
 					"rsm.dns.ns.status[$ns]" => [
-						'name'                 => "DNS Test: DNS NS status of $ns",
-						'value_type'           => ITEM_VALUE_TYPE_FLOAT,
-						'valuemapid'           => $valueMapIds['RSM DNS rtt'],
-						'description'          => 'Status of Name Server: 0 (Down), 1 (Up). The Name Server is considered to be up if all its IPs returned successful RTTs.',
-						'preprocessing_params' => "\$.nss[?(@.['ns'] == '$ns')].status.first()",
+						'name'          => "DNS Test: DNS NS status of $ns",
+						'value_type'    => ITEM_VALUE_TYPE_FLOAT,
+						'valuemapid'    => $valueMapIds['RSM DNS rtt'],
+						'description'   => 'Status of Name Server: 0 (Down), 1 (Up). The Name Server is considered to be up if all its IPs returned successful RTTs.',
+						'preprocessing' => [[
+							'type'                 => ZBX_PREPROC_JSONPATH,
+							'params'               => "\$.nss[?(@.['ns'] == '$ns')].status.first()",
+							'error_handler'        => ZBX_PREPROC_FAIL_DISCARD_VALUE,
+							'error_handler_params' => '',
+						]],
 					],
 				];
 			}
@@ -656,12 +686,7 @@ class Tld extends MonitoringTarget
 						'value_type'    => $item['value_type'],
 						'valuemapid'    => $item['valuemapid'],
 						'description'   => $item['description'],
-						'preprocessing' => [[
-							'type'                 => ZBX_PREPROC_JSONPATH,
-							'params'               => $item['preprocessing_params'],
-							'error_handler'        => ZBX_PREPROC_FAIL_DISCARD_VALUE,
-							'error_handler_params' => '',
-						]],
+						'preprocessing' => $item['preprocessing'],
 					];
 				}
 
