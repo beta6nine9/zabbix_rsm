@@ -550,7 +550,7 @@ class Tld extends MonitoringTarget
 							],
 							[
 								'type'                 => ZBX_PREPROC_THROTTLE_TIMED_VALUE,
-								'params'               => NSID_THROTTLING_INTERVAL_SECONDS,
+								'params'               => self::NSID_THROTTLING_INTERVAL_SECONDS,
 								'error_handler'        => ZBX_PREPROC_FAIL_DEFAULT,
 								'error_handler_params' => '',
 							],
