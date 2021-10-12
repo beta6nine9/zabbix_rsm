@@ -34,14 +34,14 @@ return [
 	],
 	'frontends' => [
 		1 => [
-			'url' => 'http://127.0.0.1/icann-git/dev-papi/ui',
+			'url' => 'http://127.0.0.1/ui',
 		],
 	],
 	'settings' => [
 		'curl_timeout'           => 3,
-		'max_tlds'               => 10,
+		'max_tlds'               => 400,
 		'max_registrars'         => 10,
-		'max_probes'             => 10,
+		'max_probes'             => 40,
 		'prettify_output_list'   => false,
 		'prettify_output_object' => true,
 	],
