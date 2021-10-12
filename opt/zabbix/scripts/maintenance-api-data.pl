@@ -90,7 +90,7 @@ maintenance-api-data.pl.pl [--ignore-file <file>] [--help]
 
 =item B<--ignore-file> file
 
-Optionally specify text file with list of new-line separated TLDs (directories under /opt/zabbix/sla) to ignore.
+Optionally specify text file with list of new-line separated RsmHosts to ignore.
 
 =item B<--help>
 

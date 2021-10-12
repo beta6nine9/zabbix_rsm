@@ -594,6 +594,7 @@ class RollingWeekStatusListAction extends Action {
 						' WHERE itemid='.$item['itemid']
 					);
 
+
 					$row = DBfetch($rows);
 					if ($row && $row['clock']) {
 						$data['tld'][$hostid_key][$avail_type[$item['key_']]]['availClock'] = $row['clock'];

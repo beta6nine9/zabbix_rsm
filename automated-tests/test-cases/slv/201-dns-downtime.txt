@@ -1,0 +1,139 @@
+[test-case]
+
+"201 DNS downtime"
+
+[prepare-server-database]
+
+[set-global-macro]
+
+"{$RSM.MONITORING.TARGET}","registry"
+"{$RSM.IP4.ROOTSERVERS1}","193.0.14.129,192.5.5.241,199.7.83.42,198.41.0.4,192.112.36.4"
+"{$RSM.IP6.ROOTSERVERS1}","2001:7fe::53,2001:500:2f::f,2001:500:9f::42,2001:503:ba3e::2:30,2001:500:12::d0d"
+"{$RSM.DNS.PROBE.ONLINE}","2"
+"{$RSM.RDDS.PROBE.ONLINE}","2"
+"{$RSM.RDAP.PROBE.ONLINE}","2"
+"{$RSM.IP4.MIN.PROBE.ONLINE}","2"
+"{$RSM.IP6.MIN.PROBE.ONLINE}","2"
+"{$RSM.RDAP.STANDALONE}","1609459200"
+
+[create-probe]
+
+"Probe1-Server1","127.0.0.1","10061",1,1,1,1
+
+[create-tld]
+
+"tld1","test","ccTLD",1,1,1,"ns1.tld1,192.168.1.1","","","","","",""
+"tld2","test","ccTLD",1,1,1,"ns1.tld2,192.168.2.1","","","","","",""
+"tld3","test","ccTLD",1,1,1,"ns1.tld3,192.168.3.1","","","","","",""
+"tld4","test","ccTLD",1,1,1,"ns1.tld4,192.168.4.1","","","","","",""
+"tld5","test","ccTLD",1,1,1,"ns1.tld5,192.168.5.1","","","","","",""
+"tld6","test","ccTLD",1,1,1,"ns1.tld5,192.168.5.1","","","","","",""
+
+[disable-tld]
+
+"tld6"
+
+[fill-history]
+
+# 0 - Down
+# 1 - Up
+# 2 - Up-inconclusive-no-data
+# 3 - Up-inconclusive-no-probes
+# 4 - Up-inconclusive-reconfig
+
+# prefill with dummy values before the incidents
+"tld1","rsm.slv.dns.avail",60,"2021-03-31 22:55:00",1,1,1,0,0
+"tld2","rsm.slv.dns.avail",60,"2021-03-31 22:55:00",1,1,1,0,0
+"tld3","rsm.slv.dns.avail",60,"2021-03-31 22:55:00",1,1,1,0,0
+"tld4","rsm.slv.dns.avail",60,"2021-03-31 22:55:00",1,1,1,0,0
+"tld5","rsm.slv.dns.avail",60,"2021-03-31 22:55:00",1,1,1,0,0
+"tld6","rsm.slv.dns.avail",60,"2021-03-31 22:55:00",1,1,1,0,0
+
+# 100% down, then 100% up
+"tld1","rsm.slv.dns.avail",60,"2021-03-31 23:00:00",0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+"tld1","rsm.slv.dns.avail",60,"2021-04-01 00:00:00",1,1,1,1,1
+
+# false positive
+"tld2","rsm.slv.dns.avail",60,"2021-03-31 23:00:00",0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+"tld2","rsm.slv.dns.avail",60,"2021-04-01 00:00:00",1,1,1,1,1
+
+# down while not in incident
+"tld3","rsm.slv.dns.avail",60,"2021-03-31 23:00:00",0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+"tld3","rsm.slv.dns.avail",60,"2021-04-01 00:00:00",1,1,1,1,1
+
+# up, down, up, down, ...
+"tld4","rsm.slv.dns.avail",60,"2021-03-31 23:00:00",0,1,0,2,0,3,0,4,0,1,0,2,0,3,0,4,0,1,0,2,0,3,0,4,0,1,0,2,0,3,0,4,0,1,0,2,0,3,0,4,0,1,0,2,0,3,0,4,0,1,0,2,0,3,0,4,0,1,0,2
+"tld4","rsm.slv.dns.avail",60,"2021-04-01 00:00:00",1,1,1,1,1
+
+# incident not closed
+"tld5","rsm.slv.dns.avail",60,"2021-03-31 23:00:00",0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+"tld5","rsm.slv.dns.avail",60,"2021-04-01 00:00:00",0,0,0,0,0
+
+# disabled
+"tld6","rsm.slv.dns.avail",60,"2021-03-31 23:00:00",0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+"tld6","rsm.slv.dns.avail",60,"2021-04-01 00:00:00",1,1,1,1,1
+
+[fix-lastvalue-tables]
+
+[create-incident]
+
+"tld1","DNS service is down","2021-03-31 23:00:00","2021-04-01 01:00:00",0
+"tld2","DNS service is down","2021-03-31 23:00:00","2021-04-01 01:00:00",1
+#"tld3",... - no incident for tld3
+"tld4","DNS service is down","2021-03-31 23:00:00","2021-04-01 01:00:00",0
+"tld5","DNS service is down","2021-03-31 23:00:00","",0
+"tld6","DNS service is down","2021-03-31 23:00:00","2021-04-01 01:00:00",0
+
+[start-server]
+
+"2021-03-01 09:00:00"
+
+[execute]
+
+"","rm -f /opt/zabbix/data/rsm.slv.dns.downtime.auditlog.txt"
+"2021-03-31 23:01:00","/opt/zabbix/scripts/slv/rsm.slv.dns.downtime.pl --nolog"
+"2021-04-01 02:00:00","/opt/zabbix/scripts/slv/rsm.slv.dns.downtime.pl --nolog --cycles 150"
+
+[stop-server]
+
+[compare-history]
+
+"tld1","rsm.slv.dns.downtime",60,"2021-03-31 22:55:00",,,,,0
+"tld1","rsm.slv.dns.downtime",60,"2021-03-31 23:00:00",1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60
+"tld1","rsm.slv.dns.downtime",60,"2021-04-01 00:00:00",0,0,0,0,0,,
+
+"tld2","rsm.slv.dns.downtime",60,"2021-03-31 22:55:00",,,,,0
+"tld2","rsm.slv.dns.downtime",60,"2021-03-31 23:00:00",0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+"tld2","rsm.slv.dns.downtime",60,"2021-04-01 00:00:00",0,0,0,0,0,,
+
+"tld3","rsm.slv.dns.downtime",60,"2021-03-31 22:55:00",,,,,0
+"tld3","rsm.slv.dns.downtime",60,"2021-03-31 23:00:00",0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+"tld3","rsm.slv.dns.downtime",60,"2021-04-01 00:00:00",0,0,0,0,0,,
+
+"tld4","rsm.slv.dns.downtime",60,"2021-03-31 22:55:00",,,,,0
+"tld4","rsm.slv.dns.downtime",60,"2021-03-31 23:00:00",1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13,14,14,15,15,16,16,17,17,18,18,19,19,20,20,21,21,22,22,23,23,24,24,25,25,26,26,27,27,28,28,29,29,30,30
+"tld4","rsm.slv.dns.downtime",60,"2021-04-01 00:00:00",0,0,0,0,0,,
+
+"tld5","rsm.slv.dns.downtime",60,"2021-03-31 22:55:00",,,,,0
+"tld5","rsm.slv.dns.downtime",60,"2021-03-31 23:00:00",1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60
+"tld5","rsm.slv.dns.downtime",60,"2021-04-01 00:00:00",0,2,3,4,5,,
+
+"tld6","rsm.slv.dns.downtime",60,"2021-03-31 22:55:00",,,,,
+"tld6","rsm.slv.dns.downtime",60,"2021-03-31 23:00:00",,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+"tld6","rsm.slv.dns.downtime",60,"2021-04-01 00:00:00",,,,,,,
+
+[check-incident]
+
+"tld1","DNS service was unavailable for at least {ITEM.VALUE1}m" ,"2021-03-31 23:00:00","2021-04-01 00:00:00"
+"tld4","DNS service was unavailable for at least {ITEM.VALUE1}m" ,"2021-03-31 23:00:00","2021-04-01 00:00:00"
+"tld5","DNS service was unavailable for at least {ITEM.VALUE1}m" ,"2021-03-31 23:00:00","2021-04-01 00:00:00"
+"tld5","DNS service was unavailable for at least {ITEM.VALUE1}m" ,"2021-04-01 00:01:00",""
+
+[check-event-count]
+
+"tld1","DNS service was unavailable for at least {ITEM.VALUE1}m",2
+"tld2","DNS service was unavailable for at least {ITEM.VALUE1}m",0
+"tld3","DNS service was unavailable for at least {ITEM.VALUE1}m",0
+"tld4","DNS service was unavailable for at least {ITEM.VALUE1}m",2
+"tld5","DNS service was unavailable for at least {ITEM.VALUE1}m",3
+"tld6","DNS service was unavailable for at least {ITEM.VALUE1}m",0

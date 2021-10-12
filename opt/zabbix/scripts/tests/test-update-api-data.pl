@@ -1,7 +1,12 @@
 #!/usr/bin/env perl
 
+use FindBin;
+use lib "$FindBin::RealBin/..";
+
 use strict;
 use warnings;
+
+use RSM;
 
 use Getopt::Long;
 use JSON::XS;
@@ -11,7 +16,7 @@ use Data::Validate::IP qw(is_ipv4 is_ipv6);
 
 # directory where files are generated
 
-use constant BASE_PATH	=> '/opt/zabbix/sla';
+use constant BASE_PATH => get_sla_api_output_dir();
 
 # JSON value types
 

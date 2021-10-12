@@ -1,0 +1,85 @@
+[test-case]
+
+"001 DNS availability up/down"
+
+[prepare-server-database]
+
+[set-global-macro]
+
+"{$RSM.MONITORING.TARGET}","registry"
+"{$RSM.IP4.ROOTSERVERS1}","193.0.14.129,192.5.5.241,199.7.83.42,198.41.0.4,192.112.36.4"
+"{$RSM.IP6.ROOTSERVERS1}","2001:7fe::53,2001:500:2f::f,2001:500:9f::42,2001:503:ba3e::2:30,2001:500:12::d0d"
+"{$RSM.DNS.PROBE.ONLINE}","2"
+"{$RSM.RDDS.PROBE.ONLINE}","2"
+"{$RSM.RDAP.PROBE.ONLINE}","2"
+"{$RSM.IP4.MIN.PROBE.ONLINE}","2"
+"{$RSM.IP6.MIN.PROBE.ONLINE}","2"
+"{$RSM.RDAP.STANDALONE}","1609459200"
+
+[create-probe]
+
+"Probe1-Server1","127.0.0.1","10061",1,1,1,1
+"Probe2-Server1","127.0.0.1","10062",1,1,1,1
+"Probe3-Server1","127.0.0.1","10063",1,1,1,1
+"Probe4-Server1","127.0.0.1","10064",1,1,1,1
+
+[create-tld]
+
+"tld1","test","ccTLD",1,1,1,"ns1.tld1,192.168.1.1","","","","","",""
+"tld2","test","ccTLD",1,1,1,"ns1.tld2,192.168.2.1","","","","","",""
+"tld3","test","ccTLD",1,1,1,"ns1.tld3,192.168.3.1","","","","","",""
+
+[disable-tld]
+
+"tld3"
+
+[set-host-macro]
+
+"Template Rsmhost Config tld1","{$RSM.TLD.CONFIG.TIMES}",1617235230
+
+[fill-history]
+
+"Probe1-Server1 - mon","rsm.probe.online",60,1617234300,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,1,1,1,1,1
+"Probe2-Server1 - mon","rsm.probe.online",60,1617234300,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1
+"Probe3-Server1 - mon","rsm.probe.online",60,1617234300,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1
+"Probe4-Server1 - mon","rsm.probe.online",60,1617234300,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1
+
+"tld1 Probe1-Server1","rsm.dns.status",60,1617234300,1,1,1,1,0,1,1,1,1,0,1,1,1,1,0,1,1,1,1,0,1,1,1,1,0,1,1,1,1,0
+"tld1 Probe2-Server1","rsm.dns.status",60,1617234300,1,1,1,0,0,1,1,1,0,0,1,1,1,0,0,1,1,1,0,0,1,1,1,0,0,1,1,1,0,0
+"tld1 Probe3-Server1","rsm.dns.status",60,1617234300,1,1,0,0,0,1,1,0,0,0,1,1,0,0,0,1,1,0,0,0,1,1,0,0,0,1,1,0,0,0
+"tld1 Probe4-Server1","rsm.dns.status",60,1617234300,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0
+
+"tld2 Probe1-Server1","rsm.dns.status",60,1617234300,1,1,1,1,0,1,1,1,1,0,1,1,1,1,0,1,1,1,1,0,1,1,1,1,0,,,,,
+"tld2 Probe2-Server1","rsm.dns.status",60,1617234300,1,1,1,0,0,1,1,1,0,0,1,1,1,0,0,1,1,1,0,0,1,1,1,0,0,,,,,
+"tld2 Probe3-Server1","rsm.dns.status",60,1617234300,1,1,0,0,0,1,1,0,0,0,1,1,0,0,0,1,1,0,0,0,1,1,0,0,0,,,,,
+"tld2 Probe4-Server1","rsm.dns.status",60,1617234300,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,,,,,
+
+"tld3 Probe1-Server1","rsm.dns.status",60,1617234300,1,1,1,1,0,1,1,1,1,0,1,1,1,1,0,1,1,1,1,0,1,1,1,1,0,1,1,1,1,0
+"tld3 Probe2-Server1","rsm.dns.status",60,1617234300,1,1,1,0,0,1,1,1,0,0,1,1,1,0,0,1,1,1,0,0,1,1,1,0,0,1,1,1,0,0
+"tld3 Probe3-Server1","rsm.dns.status",60,1617234300,1,1,0,0,0,1,1,0,0,0,1,1,0,0,0,1,1,0,0,0,1,1,0,0,0,1,1,0,0,0
+"tld3 Probe4-Server1","rsm.dns.status",60,1617234300,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0
+
+[fix-lastvalue-tables]
+
+[start-server]
+
+"2021-01-23 00:00:00"
+
+[execute]
+
+"2021-03-31 23:45:00","/opt/zabbix/scripts/slv/rsm.slv.dns.avail.pl --nolog"
+"2021-04-01 01:00:00","/opt/zabbix/scripts/slv/rsm.slv.dns.avail.pl --nolog --cycles 120"
+
+[stop-server]
+
+[compare-history]
+
+# 0 - Down
+# 1 - Up
+# 2 - Up-inconclusive-no-data
+# 3 - Up-inconclusive-no-probes
+# 4 - Up-inconclusive-reconfig
+
+"tld1","rsm.slv.dns.avail",60,1617234000,,,,3,3,1,1,1,0,0,1,1,1,0,0,1,1,1,1,0,4,4,4,4,4,4,4,4,4,4,1,1,1,0,0,,
+"tld2","rsm.slv.dns.avail",60,1617234000,,,,3,3,1,1,1,0,0,1,1,1,0,0,1,1,1,1,0,3,3,3,3,3,3,3,3,3,3,2,2,2,2,2,,
+"tld3","rsm.slv.dns.avail",60,1617234000,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,

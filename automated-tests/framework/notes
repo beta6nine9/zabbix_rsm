@@ -1,0 +1,2 @@
+tar -czvf ../archive.tar.gz --owner=0 --group=0 .
+TS=1611251940; NOW=$(date) && sudo date -s "$(date -d @$TS)" && echo -n $TS > last_update.txt && sudo date -s "$NOW"

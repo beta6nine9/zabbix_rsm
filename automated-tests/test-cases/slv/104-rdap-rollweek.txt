@@ -1,0 +1,183 @@
+[test-case]
+
+"104 RDAP rollweek"
+
+[prepare-server-database]
+
+[set-global-macro]
+
+"{$RSM.MONITORING.TARGET}","registry"
+"{$RSM.IP4.ROOTSERVERS1}","193.0.14.129,192.5.5.241,199.7.83.42,198.41.0.4,192.112.36.4"
+"{$RSM.IP6.ROOTSERVERS1}","2001:7fe::53,2001:500:2f::f,2001:500:9f::42,2001:503:ba3e::2:30,2001:500:12::d0d"
+"{$RSM.DNS.PROBE.ONLINE}","2"
+"{$RSM.RDDS.PROBE.ONLINE}","2"
+"{$RSM.RDAP.PROBE.ONLINE}","2"
+"{$RSM.IP4.MIN.PROBE.ONLINE}","2"
+"{$RSM.IP6.MIN.PROBE.ONLINE}","2"
+"{$RSM.RDAP.STANDALONE}","1609459200"
+
+# reduce duration of rollweek to 4 hours
+"{$RSM.ROLLWEEK.SECONDS}","14400"
+# reduce RDAP rollweek SLA to 200 minutes; 10% - 20, 25% - 50, 50% - 100, 75% - 150, 100% - 200
+"{$RSM.RDAP.ROLLWEEK.SLA}","200"
+
+[create-probe]
+
+"Probe1-Server1","127.0.0.1","10061",1,1,1,1
+
+[create-tld]
+
+"tld1","test","ccTLD",1,1,1,"ns1.tld1,192.168.1.1","","","","rdap_base_url","rdap_test_domain",""
+"tld2","test","ccTLD",1,1,1,"ns1.tld2,192.168.2.1","","","","rdap_base_url","rdap_test_domain",""
+"tld3","test","ccTLD",1,1,1,"ns1.tld3,192.168.3.1","","","","rdap_base_url","rdap_test_domain",""
+"tld4","test","ccTLD",1,1,1,"ns1.tld4,192.168.4.1","","","","rdap_base_url","rdap_test_domain",""
+"tld5","test","ccTLD",1,1,1,"ns1.tld5,192.168.5.1","","","","rdap_base_url","rdap_test_domain",""
+"tld6","test","ccTLD",1,1,1,"ns1.tld5,192.168.5.1","","","","rdap_base_url","rdap_test_domain",""
+
+[disable-tld]
+
+"tld6"
+
+[fill-history]
+
+# 0 - Down
+# 1 - Up
+# 2 - Up-inconclusive-no-data
+# 3 - Up-inconclusive-no-probes
+# 4 - Up-inconclusive-reconfig
+
+# prefill with dummy values before the incidents
+"tld1","rsm.slv.rdap.avail",300,"2021-03-01 08:45:00",1,1,1
+"tld2","rsm.slv.rdap.avail",300,"2021-03-01 08:45:00",1,1,1
+"tld3","rsm.slv.rdap.avail",300,"2021-03-01 08:45:00",1,1,1
+"tld4","rsm.slv.rdap.avail",300,"2021-03-01 08:45:00",1,1,1
+"tld5","rsm.slv.rdap.avail",300,"2021-03-01 08:45:00",1,1,1
+"tld6","rsm.slv.rdap.avail",300,"2021-03-01 08:45:00",1,1,1
+
+# 100% down, then 100% up
+"tld1","rsm.slv.rdap.avail",300,"2021-03-01 09:00:00",0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+"tld1","rsm.slv.rdap.avail",300,"2021-03-01 13:00:00",1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
+
+# false positive
+"tld2","rsm.slv.rdap.avail",300,"2021-03-01 09:00:00",0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+"tld2","rsm.slv.rdap.avail",300,"2021-03-01 13:00:00",1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
+
+# down while not in incident
+"tld3","rsm.slv.rdap.avail",300,"2021-03-01 09:00:00",0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+"tld3","rsm.slv.rdap.avail",300,"2021-03-01 13:00:00",1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
+
+# up, down, up, down, ...
+"tld4","rsm.slv.rdap.avail",300,"2021-03-01 09:00:00",0,1,0,2,0,3,0,4,0,1,0,2,0,3,0,4,0,1,0,2,0,3,0,4,0,1,0,2,0,3,0,4,0,1,0,2,0,3,0,4,0,1,0,2,0,3,0,4
+"tld4","rsm.slv.rdap.avail",300,"2021-03-01 13:00:00",1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
+
+# incident not closed
+"tld5","rsm.slv.rdap.avail",300,"2021-03-01 09:00:00",0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+"tld5","rsm.slv.rdap.avail",300,"2021-03-01 13:00:00",1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
+
+# disabled
+"tld6","rsm.slv.rdap.avail",300,"2021-03-01 09:00:00",0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+"tld6","rsm.slv.rdap.avail",300,"2021-03-01 13:00:00",1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
+
+[fix-lastvalue-tables]
+
+[create-incident]
+
+"tld1","RDAP service is down","2021-03-01 09:00:00","2021-03-01 13:00:00",0
+"tld2","RDAP service is down","2021-03-01 09:00:00","2021-03-01 13:00:00",1
+#"tld3",... - no incident for tld3
+"tld4","RDAP service is down","2021-03-01 09:00:00","2021-03-01 13:00:00",0
+"tld5","RDAP service is down","2021-03-01 09:00:00","",0
+"tld6","RDAP service is down","2021-03-01 09:00:00","2021-03-01 13:00:00",0
+
+[start-server]
+
+"2021-03-01 09:00:00"
+
+[execute]
+
+"2021-03-01 08:50:00","/opt/zabbix/scripts/slv/rsm.slv.rdap.rollweek.pl --nolog"
+"2021-03-01 23:00:00","/opt/zabbix/scripts/slv/rsm.slv.rdap.rollweek.pl --nolog --cycles 150"
+
+[stop-server]
+
+[compare-history]
+
+"tld1","rsm.slv.rdap.rollweek",300,"2021-03-01 08:30:00",,,,0,0
+"tld1","rsm.slv.rdap.rollweek",300,"2021-03-01 09:00:00",2.5,5.0,7.5,10.0,12.5,15.0,17.5,20.0,22.5,25.0,27.5,30.0,32.5,35.0,37.5,40.0,42.5,45.0,47.5,50.0,52.5,55.0,57.5,60.0,62.5,65.0,67.5,70.0,72.5,75.0,77.5,80.0,82.5,85.0,87.5,90.0,92.5,95.0,97.5,100.0,102.5,105.0,107.5,110.0,112.5,115.0,117.5,120.0
+"tld1","rsm.slv.rdap.rollweek",300,"2021-03-01 13:00:00",117.5,115.0,112.5,110.0,107.5,105.0,102.5,100.0,97.5,95.0,92.5,90.0,87.5,85.0,82.5,80.0,77.5,75.0,72.5,70.0,67.5,65.0,62.5,60.0,57.5,55.0,52.5,50.0,47.5,45.0,42.5,40.0,37.5,35.0,32.5,30.0,27.5,25.0,22.5,20.0,17.5,15.0,12.5,10.0,7.5,5.0,2.5,0.0,,
+
+"tld2","rsm.slv.rdap.rollweek",300,"2021-03-01 08:30:00",,,,0,0
+"tld2","rsm.slv.rdap.rollweek",300,"2021-03-01 09:00:00",0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+"tld2","rsm.slv.rdap.rollweek",300,"2021-03-01 13:00:00",0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,,
+
+"tld3","rsm.slv.rdap.rollweek",300,"2021-03-01 08:30:00",,,,0,0
+"tld3","rsm.slv.rdap.rollweek",300,"2021-03-01 09:00:00",0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+"tld3","rsm.slv.rdap.rollweek",300,"2021-03-01 13:00:00",0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,,
+
+"tld4","rsm.slv.rdap.rollweek",300,"2021-03-01 08:30:00",,,,0,0
+"tld4","rsm.slv.rdap.rollweek",300,"2021-03-01 09:00:00",2.5,2.5,5.0,5.0,7.5,7.5,10.0,10.0,12.5,12.5,15.0,15.0,17.5,17.5,20.0,20.0,22.5,22.5,25.0,25.0,27.5,27.5,30.0,30.0,32.5,32.5,35.0,35.0,37.5,37.5,40.0,40.0,42.5,42.5,45.0,45.0,47.5,47.5,50.0,50.0,52.5,52.5,55.0,55.0,57.5,57.5,60.0,60.0
+"tld4","rsm.slv.rdap.rollweek",300,"2021-03-01 13:00:00",57.5,57.5,55.0,55.0,52.5,52.5,50.0,50.0,47.5,47.5,45.0,45.0,42.5,42.5,40.0,40.0,37.5,37.5,35.0,35.0,32.5,32.5,30.0,30.0,27.5,27.5,25.0,25.0,22.5,22.5,20.0,20.0,17.5,17.5,15.0,15.0,12.5,12.5,10.0,10.0,7.5,7.5,5.0,5.0,2.5,2.5,0.0,0.0,,
+
+"tld5","rsm.slv.rdap.rollweek",300,"2021-03-01 08:30:00",,,,0,0
+"tld5","rsm.slv.rdap.rollweek",300,"2021-03-01 09:00:00",2.5,5.0,7.5,10.0,12.5,15.0,17.5,20.0,22.5,25.0,27.5,30.0,32.5,35.0,37.5,40.0,42.5,45.0,47.5,50.0,52.5,55.0,57.5,60.0,62.5,65.0,67.5,70.0,72.5,75.0,77.5,80.0,82.5,85.0,87.5,90.0,92.5,95.0,97.5,100.0,102.5,105.0,107.5,110.0,112.5,115.0,117.5,120.0
+"tld5","rsm.slv.rdap.rollweek",300,"2021-03-01 13:00:00",117.5,115.0,112.5,110.0,107.5,105.0,102.5,100.0,97.5,95.0,92.5,90.0,87.5,85.0,82.5,80.0,77.5,75.0,72.5,70.0,67.5,65.0,62.5,60.0,57.5,55.0,52.5,50.0,47.5,45.0,42.5,40.0,37.5,35.0,32.5,30.0,27.5,25.0,22.5,20.0,17.5,15.0,12.5,10.0,7.5,5.0,2.5,0.0,,
+
+"tld6","rsm.slv.rdap.rollweek",300,"2021-03-01 08:30:00",,,,,
+"tld6","rsm.slv.rdap.rollweek",300,"2021-03-01 09:00:00",,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+"tld6","rsm.slv.rdap.rollweek",300,"2021-03-01 13:00:00",,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+
+[check-incident]
+
+"tld1","RDAP rolling week is over 10%" ,"2021-03-01 09:15:00","2021-03-01 16:40:00"
+"tld1","RDAP rolling week is over 25%" ,"2021-03-01 09:45:00","2021-03-01 16:10:00"
+"tld1","RDAP rolling week is over 50%" ,"2021-03-01 10:35:00","2021-03-01 15:20:00"
+"tld1","RDAP rolling week is over 75%" ,"2021-03-01 11:25:00","2021-03-01 14:30:00"
+"tld1","RDAP rolling week is over 100%","2021-03-01 12:15:00","2021-03-01 13:40:00"
+
+"tld4","RDAP rolling week is over 10%" ,"2021-03-01 09:30:00","2021-03-01 16:20:00"
+"tld4","RDAP rolling week is over 25%" ,"2021-03-01 10:30:00","2021-03-01 15:20:00"
+"tld4","RDAP rolling week is over 50%" ,"2021-03-01 12:10:00","2021-03-01 13:40:00"
+
+"tld5","RDAP rolling week is over 10%" ,"2021-03-01 09:15:00","2021-03-01 16:40:00"
+"tld5","RDAP rolling week is over 25%" ,"2021-03-01 09:45:00","2021-03-01 16:10:00"
+"tld5","RDAP rolling week is over 50%" ,"2021-03-01 10:35:00","2021-03-01 15:20:00"
+"tld5","RDAP rolling week is over 75%" ,"2021-03-01 11:25:00","2021-03-01 14:30:00"
+"tld5","RDAP rolling week is over 100%","2021-03-01 12:15:00","2021-03-01 13:40:00"
+
+[check-event-count]
+
+"tld1","RDAP rolling week is over 10%",2
+"tld1","RDAP rolling week is over 25%",2
+"tld1","RDAP rolling week is over 50%",2
+"tld1","RDAP rolling week is over 75%",2
+"tld1","RDAP rolling week is over 100%",2
+
+"tld2","RDAP rolling week is over 10%",0
+"tld2","RDAP rolling week is over 25%",0
+"tld2","RDAP rolling week is over 50%",0
+"tld2","RDAP rolling week is over 75%",0
+"tld2","RDAP rolling week is over 100%",0
+
+"tld3","RDAP rolling week is over 10%",0
+"tld3","RDAP rolling week is over 25%",0
+"tld3","RDAP rolling week is over 50%",0
+"tld3","RDAP rolling week is over 75%",0
+"tld3","RDAP rolling week is over 100%",0
+
+"tld4","RDAP rolling week is over 10%",2
+"tld4","RDAP rolling week is over 25%",2
+"tld4","RDAP rolling week is over 50%",2
+"tld4","RDAP rolling week is over 75%",0
+"tld4","RDAP rolling week is over 100%",0
+
+"tld5","RDAP rolling week is over 10%",2
+"tld5","RDAP rolling week is over 25%",2
+"tld5","RDAP rolling week is over 50%",2
+"tld5","RDAP rolling week is over 75%",2
+"tld5","RDAP rolling week is over 100%",2
+
+"tld6","RDAP rolling week is over 10%",0
+"tld6","RDAP rolling week is over 25%",0
+"tld6","RDAP rolling week is over 50%",0
+"tld6","RDAP rolling week is over 75%",0
+"tld6","RDAP rolling week is over 100%",0

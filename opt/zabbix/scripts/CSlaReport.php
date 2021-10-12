@@ -179,6 +179,12 @@ class CSlaReport
 
 			self::$error = $e->getMessage();
 
+			$prev = $e->getPrevious();
+			if (!is_null($prev))
+			{
+				self::$error .= ": " . $prev->getMessage();
+			}
+
 			if (defined("DEBUG") && DEBUG === true)
 			{
 				self::$error .= "\n" . $e->getTraceAsString();
