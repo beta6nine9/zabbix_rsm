@@ -26,8 +26,6 @@ use Scalar::Util qw(looks_like_number);
 use Configuration;
 use Output;
 
-use constant ZABBIX_SERVER_CONF_FILE => '/etc/zabbix/zabbix_server.conf';
-
 my $db_handle;
 
 sub db_connect()

@@ -315,7 +315,7 @@ perl -e '
     $config->{"paths"}{"logs_dir"}           = $work_dir . "/logs";
     $config->{"paths"}{"db_dumps_dir"}       = $work_dir . "/db_logs";
     $config->{"zabbix_server"}{"socket_dir"} = $work_dir;
-    $config->{"zabbix_server"}{"pid_file"}   = $work_dir . "zabbix_server.pid";
+    $config->{"zabbix_server"}{"pid_file"}   = $work_dir . "/zabbix_server.pid";
     #$config->{"frontend"}{"url"}             = ...;
 
     $config->write($config_file);
