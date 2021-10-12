@@ -1,6 +1,9 @@
 #!/bin/bash
 
-BASE="/opt/zabbix/sla"
+DIR="$(dirname "$(readlink -f "$0")")"
+
+BASE="$($DIR/../misc/get-sla-api-output-dir.pl)"
+
 SCHEMA_FILE="$(dirname $0)/test-sla-api-recent.schema"
 
 declare -A DELAYS=([dns]=60 [dnssec]=60 [rdds]=300)

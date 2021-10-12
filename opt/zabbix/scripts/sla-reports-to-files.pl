@@ -11,6 +11,8 @@ use RSMSLV;
 
 use File::Path qw(make_path);
 
+use constant SLA_API_DIR => get_sla_api_output_dir();
+
 sub main()
 {
 	parse_opts("year=i", "month=i");
@@ -55,7 +57,7 @@ sub main()
 				next;
 			}
 
-			my $path = "/opt/zabbix/sla/v2/$rsmhost/monthlyReports";
+			my $path = "@{[SLA_API_DIR]}/v2/$rsmhost/monthlyReports";
 
 			make_path($path, {error => \my $err});
 

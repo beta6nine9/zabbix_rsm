@@ -32,16 +32,19 @@ $table = (new CTableInfo())->setHeader([
 		_('Internal errors')
 ]);
 
+// order output by Probe names
+ksort($data['probes'], SORT_NATURAL);
+
 $index = 1;
 foreach ($data['probes'] as $probe => $values) {
 	// defaults, if empty
-	$elements['probe'] = $probe;
+	$elements['probe']      = $probe;
 	$elements['calculated'] = '';
-	$elements['automatic'] = '';
-	$elements['manual'] = '';
+	$elements['automatic']  = '';
+	$elements['manual']     = '';
 	$elements['lastaccess'] = '';
-	$elements['resolver'] = '';
-	$elements['errors'] = '';
+	$elements['resolver']   = '';
+	$elements['errors']     = '';
 
 	if (isset($values['mainstatus']['value'])) {
 		$time = elapsedTime('@'.$values['mainstatus']['clock']);

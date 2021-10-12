@@ -1,6 +1,8 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-BASE="/opt/zabbix/sla"
+DIR="$(dirname "$(readlink -f "$0")")"
+
+BASE="$($DIR/get-sla-api-output-dir.pl)"
 
 d_version="2"
 d_tld="tld1"

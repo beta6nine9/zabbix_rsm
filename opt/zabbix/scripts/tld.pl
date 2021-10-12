@@ -1040,10 +1040,17 @@ sub update_ns_servers($$$$)
 			'master_itemid' => $dns_test_itemid,
 			'value_type'    => ITEM_VALUE_TYPE_STR,
 			'description'   => 'DNS Name Server Identifier of the target Name Server that was tested.',
-			'preprocessing' => [{
+			'preprocessing' => [
+			{
 				'type'                 => ZBX_PREPROC_JSONPATH,
 				'params'               => "\$.nsips[?(@.['ns'] == '$ns' && @.['ip'] == '$ip')].nsid.first()",
 				'error_handler'        => ZBX_PREPROC_FAIL_DISCARD_VALUE,
+				'error_handler_params' => '',
+			},
+			{
+				'type'                 => ZBX_PREPROC_THROTTLE_TIMED_VALUE,
+				'params'               => ZBX_PREPROC_THROTTLE_TIMED_VALUE_SECONDS,
+				'error_handler'        => 0,
 				'error_handler_params' => '',
 			}],
 		}));

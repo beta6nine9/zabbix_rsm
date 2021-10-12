@@ -1,0 +1,7 @@
+[test-case]
+
+"PoC test case 3"
+
+[execute]
+
+"2020-12-03 09:00:00","date +'%F %T %Z'"

@@ -23,18 +23,18 @@ use constant PROBE_STATUS_UP => 'Up';
 use constant PROBE_STATUS_DOWN => 'Down';
 use constant PROBE_STATUS_UNKNOWN => 'Unknown';
 
-use constant JSON_INTERFACE_DNS		=> 'DNS';
-use constant JSON_INTERFACE_DNSSEC	=> 'DNSSEC';
-use constant TRIGGER_SEVERITY_NOT_CLASSIFIED	=> 0;
-use constant TRIGGER_VALUE_FALSE	=> 0;
-use constant SEC_PER_WEEK	=> 604800;
-use constant EVENT_OBJECT_TRIGGER	=> 0;
-use constant EVENT_SOURCE_TRIGGERS	=> 0;
-use constant TRIGGER_VALUE_TRUE		=> 1;
-use constant JSON_INTERFACE_RDDS43	=> 'RDDS43';
-use constant JSON_INTERFACE_RDDS80	=> 'RDDS80';
-use constant JSON_INTERFACE_RDAP	=> 'RDAP';
-use constant ROOT_ZONE_READABLE		=> 'zz--root';
+use constant JSON_INTERFACE_DNS              => 'DNS';
+use constant JSON_INTERFACE_DNSSEC           => 'DNSSEC';
+use constant TRIGGER_SEVERITY_NOT_CLASSIFIED => 0;
+use constant TRIGGER_VALUE_FALSE             => 0;
+use constant SEC_PER_WEEK                    => 604800;
+use constant EVENT_OBJECT_TRIGGER            => 0;
+use constant EVENT_SOURCE_TRIGGERS           => 0;
+use constant TRIGGER_VALUE_TRUE              => 1;
+use constant JSON_INTERFACE_RDDS43           => 'RDDS43';
+use constant JSON_INTERFACE_RDDS80           => 'RDDS80';
+use constant JSON_INTERFACE_RDAP             => 'RDAP';
+use constant ROOT_ZONE_READABLE              => 'zz--root';
 
 use constant PROBE_OFFLINE_STR	=> 'Offline';
 use constant PROBE_ONLINE_STR	=> 'Online';
@@ -44,15 +44,15 @@ use constant AH_STATUS_DOWN	=> 'Down';
 
 use constant true => 1;
 
-use constant TARGETS_TMP_DIR => '/opt/zabbix/export-tmp';
-use constant TARGETS_TARGET_DIR => '/opt/zabbix/export';
+use constant TMP_DIR => "@{[OUTPUT_DIR]}-tmp";
 
 use constant EXPORT_MAX_CHILDREN_DEFAULT => 24;
 use constant EXPORT_MAX_CHILDREN_FLOOR => 1;
 use constant EXPORT_MAX_CHILDREN_CEIL => 128;
 
 sub __get_test_data($$$);
-sub __save_csv_data($$);
+sub __get_test_nsid_data($$$);
+sub __save_csv_data($$$);
 sub __get_probe_changes($$);
 
 parse_opts('probe=s', 'service=s', 'tld=s', 'date=s', 'day=i', 'shift=i', 'force', 'max-children=i');
@@ -77,7 +77,7 @@ usage() unless ($d && $m && $y);
 
 dw_set_date($y, $m, $d);
 
-if (!opt('dry-run') && (my $error = rsm_targets_prepare(TARGETS_TMP_DIR, TARGETS_TARGET_DIR)))
+if (!opt('dry-run') && (my $error = rsm_targets_prepare(TMP_DIR, OUTPUT_DIR)))
 {
 	fail($error);
 }
@@ -181,6 +181,8 @@ foreach my $service (sort(keys(%{$services})))
 my $probes_data;
 
 my ($time_start, $time_get_test_data, $time_load_ids, $time_process_records, $time_write_csv);
+
+my $heartbeat = get_heartbeat();
 
 my $fm = new Parallel::ForkManager(opt('max-children') ? getopt('max-children') : EXPORT_MAX_CHILDREN_DEFAULT);
 
@@ -302,7 +304,7 @@ foreach my $tld_for_a_child_to_process (@{$tlds_ref})
 		$time_start = time();
 
 		# cache probe online statuses
-		# TODO: FIXME, we have done that already in other processes! (look for this message in this file)
+		# TODO: FIXME, we have done that already in other processes! (search for this message in this file)
 		foreach my $probe (sort(keys(%{$probes_data->{$server_key}})))
 		{
 			# probe, from, delay
@@ -311,12 +313,14 @@ foreach my $tld_for_a_child_to_process (@{$tlds_ref})
 
 		my $result = __get_test_data($tld_for_a_child_to_process, $from, $till);
 
+		my $nsids_result = __get_test_nsid_data($tld_for_a_child_to_process, $from - $heartbeat, $till);
+
 		$time_get_test_data = time();
 
 		db_disconnect();
 
 		db_connect();	# connect to the local node
-		__save_csv_data($tld_for_a_child_to_process, $result);
+		__save_csv_data($tld_for_a_child_to_process, $result, $nsids_result);
 		db_disconnect();
 
 		info(sprintf("get data: %s, load ids: %s, process records: %s, write csv: %s",
@@ -517,14 +521,16 @@ sub __get_keys
 # - get list of items
 # - get results:
 #   "probe1" =>
-#   	"ns1.foo.example" =>
+#   	"ns1.foo.example" =>                     <-- target
 #   		"192.0.1.2" =>
 #   			"clock" => 1439154000,
-#   			"rtt" => 120,
+#   			"rtt"   => 120,
+#			"nsid"  => 646E732E6578616D706C652E636F6D
 #   		"192.0.1.3"
 #   			"clock" => 1439154000,
-#   			"rtt" => 1603,
-#   	"ns2.foo.example" =>
+#   			"rtt"   => 1603,
+#			"nsid"  => 31646E732E6578616D706C652E636F6D
+#   	"ns2.foo.example" =>                     <-- target
 #   	...
 sub __get_test_data($$$)
 {
@@ -573,7 +579,7 @@ sub __get_test_data($$$)
 		# SERVICE availability data
 		my $rows_ref = db_select(
 			"select value,clock".
-			" from history_uint".
+			" from " . history_table(ITEM_VALUE_TYPE_UINT64).
 			" where itemid=$itemid_avail".
 				" and " . sql_time_condition($service_from, $service_till).
 			" order by clock"	# NB! order is important, see how the result is used below
@@ -755,10 +761,45 @@ sub __get_test_data($$$)
 	return $result;
 }
 
-sub __save_csv_data($$)
+# NB! Currently the returned NSIDs are ordered by clock. The caller, when using returned data has to
+# run through the beginning to get the "previously throttled off" value. If in the future this
+# becomes a performance issue this should be improved to get the needed value more efficiently.
+sub __get_test_nsid_data($$$)
 {
-	my $tld = shift;
-	my $result = shift;
+	$tld     = shift; # set globally
+	my $from = shift;
+	my $till = shift;
+
+	my $rows_ref = db_select(
+		"select h.host,i.key_,hi.clock,hi.value".
+		" from hosts h,items i, history_str hi".
+		" where h.hostid=i.hostid".
+			" and i.itemid=hi.itemid".
+			" and h.host like '$tld %'".
+			" and i.key_ like 'rsm.dns.nsid%'".
+			" and " . sql_time_condition($from, $till).
+		" order by clock asc"                               # NB! Must be ordered by clock, see collecting later.
+	);
+
+	# {probe}->{ns}{ip} = [{'clock' => clock, 'value' => value}, ...]
+	my $results = {};
+
+	foreach my $row_ref (@{$rows_ref})
+	{
+		my (undef, $probe) = split(' ', $row_ref->[0]);
+		my ($ns, $ip) = split(',', get_nsip_from_key($row_ref->[1]));
+
+		push(@{$results->{$probe}{$ns}{$ip}}, {'clock' => $row_ref->[2], 'value' => $row_ref->[3]});
+	}
+
+	return $results;
+}
+
+sub __save_csv_data($$$)
+{
+	my $tld          = shift;
+	my $result       = shift;
+	my $nsids_result = shift;
 
 	$time_load_ids = $time_process_records = $time_write_csv = time();
 
@@ -769,14 +810,14 @@ sub __save_csv_data($$)
 
 	$time_load_ids = time();
 
-	my $ns_service_category_id = dw_get_id(ID_SERVICE_CATEGORY, 'ns');
-	my $dns_service_category_id = dw_get_id(ID_SERVICE_CATEGORY, 'dns');
-	my $dnssec_service_category_id = dw_get_id(ID_SERVICE_CATEGORY, 'dnssec');
-	my $rdds_service_category_id = dw_get_id(ID_SERVICE_CATEGORY, 'rdds');
-	my $epp_service_category_id = dw_get_id(ID_SERVICE_CATEGORY, 'epp');
-	my $rdap_service_category_id = dw_get_id(ID_SERVICE_CATEGORY, 'rdap');
-	my $udp_protocol_id = dw_get_id(ID_TRANSPORT_PROTOCOL, 'udp');
-	my $tcp_protocol_id = dw_get_id(ID_TRANSPORT_PROTOCOL, 'tcp');
+	my $ns_service_category_id     = dw_get_id(ID_SERVICE_CATEGORY,   'ns');
+	my $dns_service_category_id    = dw_get_id(ID_SERVICE_CATEGORY,   'dns');
+	my $dnssec_service_category_id = dw_get_id(ID_SERVICE_CATEGORY,   'dnssec');
+	my $rdds_service_category_id   = dw_get_id(ID_SERVICE_CATEGORY,   'rdds');
+	my $epp_service_category_id    = dw_get_id(ID_SERVICE_CATEGORY,   'epp');
+	my $rdap_service_category_id   = dw_get_id(ID_SERVICE_CATEGORY,   'rdap');
+	my $udp_protocol_id            = dw_get_id(ID_TRANSPORT_PROTOCOL, 'udp');
+	my $tcp_protocol_id            = dw_get_id(ID_TRANSPORT_PROTOCOL, 'tcp');
 
 	my $tld_id = dw_get_id(ID_TLD, $tld);
 	my $tld_type_id = dw_get_id(ID_TLD_TYPE, $result->{'type'});
@@ -895,15 +936,19 @@ sub __save_csv_data($$)
 
 				foreach my $probe (sort(keys(%{$cycle_ref->{'interfaces'}{$interface}{'probes'}})))
 				{
-					my $probe_id = dw_get_id(ID_PROBE, $probe);
-
 					my $probe_ref = $cycle_ref->{'interfaces'}{$interface}{'probes'}{$probe};
+
+					my $probe_id = dw_get_id(ID_PROBE, $probe);
 
 					if (exists($probe_ref->{'protocol'}))
 					{
-						$proto =  $probe_ref->{'protocol'};
+						$proto = $probe_ref->{'protocol'};
 						$protocol_id = ($proto == PROTO_UDP ? $udp_protocol_id : $tcp_protocol_id);
 					}
+
+					# TODO: some probes return partial data, for now just handle it this way :-(
+					next unless (defined($probe_ref->{'clock'}));
+					next unless (defined($proto));
 
 					my $testedname_id = '';
 
@@ -933,6 +978,9 @@ sub __save_csv_data($$)
 					foreach my $target (sort(keys(%{$cycle_ref->{'interfaces'}{$interface}{'probes'}{$probe}{'targets'}})))
 					{
 						my $target_ref = $cycle_ref->{'interfaces'}{$interface}{'probes'}{$probe}{'targets'}{$target};
+
+						# TODO: some probes return partial data, for now just handle it this way :-(
+						next unless (defined($target_ref->{'status'}));
 
 						my $cycle_ns_id;
 
@@ -997,7 +1045,34 @@ sub __save_csv_data($$)
 								$cycle_ns_id // '',
 								$ip_id);
 
-							my $nsid_id = (exists($metric_ref->{'nsid'}) ? dw_get_id(ID_NSID, $metric_ref->{'nsid'}) : '');
+							my $nsid_id = dw_get_id(ID_NSID, '');
+
+							if ($service eq 'dns' || $service eq 'dnssec')
+							{
+								if (exists($metric_ref->{'nsid'}))
+								{
+									$nsid_id = dw_get_id(ID_NSID, $metric_ref->{'nsid'});
+								}
+								elsif (defined($nsids_result->{$probe}{$target}{$ip}))
+								{
+									# try to get throttled off value
+									for (my $idx = 0; $idx < scalar(@{$nsids_result->{$probe}{$target}{$ip}}); $idx++)
+									{
+										# throttled off values are ordered by clock, see __get_test_nsid_data()
+										if ($nsids_result->{$probe}{$target}{$ip}[$idx]{'clock'} <= $testclock)
+										{
+											# if throttled off value is older, get the closest one to $testclock
+											$nsid_id = dw_get_id(ID_NSID, $nsids_result->{$probe}{$target}{$ip}[$idx]{'value'});
+											# dbg("$target\[$ip\]\t", ts_full($nsids_result->{$probe}{$target}{$ip}[$idx]{'clock'}), " suits for ", ts_full($testclock), "\n");
+										}
+										else
+										{
+											# no more older throttled off values
+											last;
+										}
+									}
+								}
+							}
 
 							# TEST
 							dw_append_csv(DATA_TEST, [
@@ -1307,7 +1382,7 @@ sub __get_probe_changes($$)
 		db_connect($_server_key);
 
 		# cache probe online statuses
-		# TODO: FIXME, we have done that already in other processes! (look for this message in this file)
+		# TODO: FIXME, we have done that already in other processes! (search for this message in this file)
 		foreach my $probe (keys(%{$probes_data->{$server_key}}))
 		{
 			# probe, from, delay
