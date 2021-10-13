@@ -296,13 +296,7 @@ WORK_DIR="/home/$USER/tests"
 sudo ln -sfn "$SOURCE_DIR/opt/zabbix" /opt/zabbix
 
 # update tests.conf
-perl -e '
-    use strict;
-    use warnings;
-
-    use Data::Dumper;
-    use Config::Tiny;
-
+perl -M'Config::Tiny' -e '
     my $config_file = $ARGV[0] . "/automated-tests/framework/tests.conf";
     my $source_dir  = $ARGV[0];
     my $work_dir    = $ARGV[1];
