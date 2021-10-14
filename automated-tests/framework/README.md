@@ -354,7 +354,7 @@ config["zabbix_server"]["pid_file"]   = work_dir + "/zabbix_server.pid";
 #config["frontend"]["url"]             = ...;
 
 with open(config_file, "w") as f:
-    config.write(f)
+    config.write(f, space_around_delimiters=False)
 
 ' "$SOURCE_DIR" "$WORK_DIR"
 ```
