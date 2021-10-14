@@ -296,13 +296,7 @@ WORK_DIR="/home/$USER/tests"
 sudo ln -sfn "$SOURCE_DIR/opt/zabbix" /opt/zabbix
 
 # update tests.conf
-perl -e '
-    use strict;
-    use warnings;
-
-    use Data::Dumper;
-    use Config::Tiny;
-
+perl -M'Config::Tiny' -e '
     my $config_file = $ARGV[0] . "/automated-tests/framework/tests.conf";
     my $source_dir  = $ARGV[0];
     my $work_dir    = $ARGV[1];
@@ -315,7 +309,7 @@ perl -e '
     $config->{"paths"}{"logs_dir"}           = $work_dir . "/logs";
     $config->{"paths"}{"db_dumps_dir"}       = $work_dir . "/db_logs";
     $config->{"zabbix_server"}{"socket_dir"} = $work_dir;
-    $config->{"zabbix_server"}{"pid_file"}   = $work_dir . "zabbix_server.pid";
+    $config->{"zabbix_server"}{"pid_file"}   = $work_dir . "/zabbix_server.pid";
     #$config->{"frontend"}{"url"}             = ...;
 
     $config->write($config_file);
