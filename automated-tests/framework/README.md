@@ -330,3 +330,31 @@ rm -rf "$WORK_DIR/*"
 # show results
 cat test-results.xml
 ```
+
+Python version for updating `tests.conf` (unlike perl version, this maintains original order of sections and keys):
+```
+python3 -c '
+
+import sys
+import configparser
+
+config_file = sys.argv[1] + "/automated-tests/framework/tests.conf"
+source_dir  = sys.argv[1]
+work_dir    = sys.argv[2]
+
+config = configparser.ConfigParser()
+config.read(config_file)
+
+config["paths"]["source_dir"]         = source_dir;
+config["paths"]["build_dir"]          = work_dir;
+config["paths"]["logs_dir"]           = work_dir + "/logs";
+config["paths"]["db_dumps_dir"]       = work_dir + "/db_logs";
+config["zabbix_server"]["socket_dir"] = work_dir;
+config["zabbix_server"]["pid_file"]   = work_dir + "/zabbix_server.pid";
+#config["frontend"]["url"]             = ...;
+
+with open(config_file, "w") as f:
+    config.write(f)
+
+' "$SOURCE_DIR" "$WORK_DIR"
+```
