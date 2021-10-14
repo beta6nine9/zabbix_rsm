@@ -296,47 +296,10 @@ WORK_DIR="/home/$USER/tests"
 sudo ln -sfn "$SOURCE_DIR/opt/zabbix" /opt/zabbix
 
 # update tests.conf
-perl -M'Config::Tiny' -e '
-    my $config_file = $ARGV[0] . "/automated-tests/framework/tests.conf";
-    my $source_dir  = $ARGV[0];
-    my $work_dir    = $ARGV[1];
-
-    my $config = Config::Tiny->new;
-    $config = Config::Tiny->read($config_file);
-
-    $config->{"paths"}{"source_dir"}         = $source_dir;
-    $config->{"paths"}{"build_dir"}          = $work_dir;
-    $config->{"paths"}{"logs_dir"}           = $work_dir . "/logs";
-    $config->{"paths"}{"db_dumps_dir"}       = $work_dir . "/db_logs";
-    $config->{"zabbix_server"}{"socket_dir"} = $work_dir;
-    $config->{"zabbix_server"}{"pid_file"}   = $work_dir . "/zabbix_server.pid";
-    #$config->{"frontend"}{"url"}             = ...;
-
-    $config->write($config_file);
-' "$SOURCE_DIR" "$WORK_DIR"
-
-# go to directory where tests will be executed
-cd "$WORK_DIR"
-
-# remove everything
-rm -rf "$WORK_DIR/*"
-
-# build Zabbix server
-"$TESTS_DIR/framework/run-tests.pl" --build-proxy --build-server
-
-# run tests
-"$TESTS_DIR/framework/run-tests.pl" --skip-build --test-case-dir "$TESTS_DIR/test-cases/poc/"
-
-# show results
-cat test-results.xml
-```
-
-Python version for updating `tests.conf` (unlike perl version, this maintains original order of sections and keys):
-```
 python3 -c '
 
-import sys
 import configparser
+import sys
 
 config_file = sys.argv[1] + "/automated-tests/framework/tests.conf"
 source_dir  = sys.argv[1]
@@ -357,4 +320,19 @@ with open(config_file, "w") as f:
     config.write(f, space_around_delimiters=False)
 
 ' "$SOURCE_DIR" "$WORK_DIR"
+
+# go to directory where tests will be executed
+cd "$WORK_DIR"
+
+# remove everything
+rm -rf "$WORK_DIR/*"
+
+# build Zabbix server
+"$TESTS_DIR/framework/run-tests.pl" --build-proxy --build-server
+
+# run tests
+"$TESTS_DIR/framework/run-tests.pl" --skip-build --test-case-dir "$TESTS_DIR/test-cases/poc/"
+
+# show results
+cat test-results.xml
 ```
