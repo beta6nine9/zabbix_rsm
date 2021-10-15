@@ -1607,10 +1607,14 @@ sub calculate_cycle($$$$$$$$$$)
 
 	foreach my $target (sort(keys(%{$name_server_availability_data->{'targets'}})))
 	{
+		my $status = $name_server_availability_data->{'targets'}{$target};
+
+		next unless (defined($status));
+
 		push(@{$json->{'nameServerAvailability'}{'nameServerStatus'}},
 			{
 				'target' => $target,
-				'status' => ($name_server_availability_data->{'targets'}{$target} == UP ? 'Up' : 'Down'),
+				'status' => ($status == UP ? 'Up' : 'Down'),
 			}
 		);
 	}
