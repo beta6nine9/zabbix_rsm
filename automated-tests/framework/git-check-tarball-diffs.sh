@@ -4,6 +4,16 @@ set -o errexit
 set -o nounset
 #set -o xtrace
 
+new_tarball=
+
+function cleanup {
+	if [ -n "$new_tarball" ]; then
+		rm -f $new_tarball
+	fi
+}
+
+trap cleanup EXIT
+
 LOGFILE="/tmp/git-diff-tarball.txt"
 
 git diff --name-only | grep --color=none '\.tar.gz' > $LOGFILE

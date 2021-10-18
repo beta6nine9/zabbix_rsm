@@ -5,7 +5,7 @@ set -o nounset
 set -o pipefail
 #set -o xtrace
 
-TEST_CASE_DIR="../test-cases"
+TEST_CASE_DIR="automated-tests/test-cases"
 
 test=
 target=
@@ -63,14 +63,14 @@ while [ $# -gt 0 ]; do
 	fi
 done
 
-sudo source/opt/zabbix/scripts/setup-cron.pl --disable-all --user vl 2>/dev/null || true
+sudo opt/zabbix/scripts/setup-cron.pl --disable-all --user vl 2>/dev/null || true
 pkill zabbix_ 2>/dev/null || true
 
 if [ -z "$test" ]; then
-	TZ=UTC faketime '2021-01-23 00:00:00' ./test-wrapper --skip-build --test-case-dir $TEST_CASE_DIR/$target $EXTRA_ARGS
+	automated-tests/framework/run-tests.pl --skip-build --test-case-dir $TEST_CASE_DIR/$target $EXTRA_ARGS
 else
 	test=$(printf "%03d" $test)
-	TZ=UTC faketime '2021-01-23 00:00:00' ./test-wrapper --skip-build --test-case-file $TEST_CASE_DIR/$target/$test-*.txt $EXTRA_ARGS
+	automated-tests/framework/run-tests.pl --skip-build --test-case-file $TEST_CASE_DIR/$target/$test-*.txt $EXTRA_ARGS
 fi
 
 grep 'testcase name' test-results.xml -A1 | grep 'failure' -B1
