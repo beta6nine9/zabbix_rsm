@@ -684,8 +684,40 @@ sub get_itemids_by_hosts_and_keys($)
 {
 	my $filter = shift; # [[host, key], ...]
 
-	my $filter_string = join(" or ", ("(hosts.host = ? and items.key_ = ?)") x scalar(@{$filter}));
-	my $filter_params = [map(($_->[0], $_->[1]), @{$filter})];
+	my %grouped_by_hosts = ();
+	my %grouped_by_keys = ();
+
+	foreach my $filter_row (@{$filter})
+	{
+		my ($host, $key) = @{$filter_row};
+
+		push(@{$grouped_by_hosts{$host}}, $key);
+		push(@{$grouped_by_keys{$key}}, $host);
+	}
+
+	my @filter_params;
+	my @filter_groups;
+
+	if (scalar(keys(%grouped_by_hosts)) < scalar(keys(%grouped_by_keys)))
+	{
+		foreach my $host (sort(keys(%grouped_by_hosts)))
+		{
+			my @keys = sort(@{$grouped_by_hosts{$host}});
+			my $keys_placeholder = join(",", ("?") x scalar(@keys));
+			push(@filter_groups, "(hosts.host=? and items.key_ in ($keys_placeholder))");
+			push(@filter_params, $host, @keys);
+		}
+	}
+	else
+	{
+		foreach my $key (sort(keys(%grouped_by_keys)))
+		{
+			my @hosts = sort(@{$grouped_by_keys{$key}});
+			my $hosts_placeholder = join(",", ("?") x scalar(@hosts));
+			push(@filter_groups, "(items.key_=? and hosts.host in ($hosts_placeholder))");
+			push(@filter_params, $key, @hosts);
+		}
+	}
 
 	my $sql = "select" .
 			" hosts.host," .
@@ -695,9 +727,9 @@ sub get_itemids_by_hosts_and_keys($)
 			" hosts" .
 			" left join items on items.hostid = hosts.hostid" .
 		" where" .
-			" " . $filter_string;
+			" " . join(" or ", @filter_groups);
 
-	my $rows = db_select($sql, $filter_params);
+	my $rows = db_select($sql, \@filter_params);
 
 	my $result = {};
 
