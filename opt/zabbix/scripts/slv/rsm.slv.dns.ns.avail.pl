@@ -200,35 +200,71 @@ sub process_cycles($$$$)
 
 sub get_all_dns_rtt_itemids
 {
-	my $rows = db_select(
+	my $rows;
+
+	# get hostid and host of all "<rsmhost> <probe>" hosts
+
+	$rows = db_select(
 		"select" .
-			" substring_index(hosts.host,' ',1)," .
-			"items.itemid," .
-			"items.key_" .
+			" hosts.hostid," .
+			"hosts.host" .
 		" from" .
-			" items" .
-			" left join hosts on hosts.hostid = items.hostid" .
+			" hosts" .
+			" inner join hosts_groups on hosts_groups.hostid=hosts.hostid" .
+			" inner join hstgrp on hstgrp.groupid=hosts_groups.groupid" .
 		" where" .
-			" items.key_ like '$cfg_key_in_pattern' and" .
-			" items.type=${\ITEM_TYPE_DEPENDENT} and" .
-			" items.status<>${\ITEM_STATUS_DISABLED} and" .
-			" hosts.host like '% %'"
+			" hstgrp.name='TLD Probe results'"
 	);
 
-	my $itemids = {};
+	# create mapping ‎"<rsmhost> <probe>" hostid => <rsmhost> host
+
+	my %tlds;
 
 	foreach my $row (@{$rows})
 	{
-		my ($tld, $itemid, $key) = @{$row};
+		my ($hostid, $host) = @{$row};
+		my ($tld) = split(/ /, $host);
+		$tlds{$hostid} = $tld;
+	}
+
+	# get itemids of rtt items on "<rsmhost> <probe>" hosts
+
+	$rows = db_select(
+		"select" .
+			" hostid," .
+			"itemid," .
+			"key_" .
+		" from" .
+			" items" .
+		" where" .
+			" templateid is not null and" .
+			" type=${\ITEM_TYPE_DEPENDENT} and" .
+			" status<>${\ITEM_STATUS_DISABLED} and" .
+			" key_ like '$cfg_key_in_pattern'"
+	);
+
+	# format result
+
+	my %itemids;
+
+	foreach my $row (@{$rows})
+	{
+		my ($hostid, $itemid, $key) = @{$row};
+		my $tld = $tlds{$hostid};
+
+		if (!defined($tld))
+		{
+			fail("couldn't find tld for itemid '$itemid', hostid '$hostid'");
+		}
 
 		$key =~ /^.+\[(.+,.+),(.+)\]$/;
 		my $nsip = $1;
 		my $protocol = $2;
 
-		push(@{$itemids->{$tld}{$nsip}{$protocol}}, $itemid);
+		push(@{$itemids{$tld}{$nsip}{$protocol}}, $itemid);
 	}
 
-	return $itemids;
+	return \%itemids;
 }
 
 sub get_rtt_values($$$)
