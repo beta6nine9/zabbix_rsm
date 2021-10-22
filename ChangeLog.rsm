@@ -1,3 +1,10 @@
+Changes for rsm2.2.0rc23
+
+Bug fixes:
+....I..... [818] added skipping targets from Probes that have no status to SLA API script (dimir)
+....I..... [821] improved SQL queries of SLV and other scripts (asitals)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.2.0rc22
 
 Bug fixes:
