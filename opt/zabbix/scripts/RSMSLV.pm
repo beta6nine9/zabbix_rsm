@@ -6250,15 +6250,25 @@ sub __log
 	$prev_tld = $cur_tld;
 }
 
+my $globalmacro_cache;
+
 sub __get_macro
 {
 	my $m = shift;
 
-	my $rows_ref = db_select("select value from globalmacro where macro='$m'");
+	if (!defined($globalmacro_cache))
+	{
+		my $rows = db_select("select macro, value from globalmacro");
 
-	fail("cannot find macro '$m'") unless (1 == scalar(@$rows_ref));
+		$globalmacro_cache = { map { $_->[0] => $_->[1] } @{$rows} };
+	}
 
-	return $rows_ref->[0]->[0];
+	if (!exists($globalmacro_cache->{$m}))
+	{
+		fail("cannot find macro '$m'");
+	}
+
+	return $globalmacro_cache->{$m};
 }
 
 sub __get_pidfile
