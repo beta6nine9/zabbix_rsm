@@ -739,6 +739,7 @@ sub cycles_to_calculate($$$$$$$$)
 }
 
 # gets the history of item for a given period
+
 sub get_history_by_itemid($$$)
 {
 	my $itemid = shift;
@@ -1130,6 +1131,38 @@ sub fill_test_data($$$$)
 	}
 }
 
+sub get_history($$$$)
+{
+	my $itemids = shift;
+	my $table   = shift;
+	my $from    = shift;
+	my $till    = shift;
+
+	my $max_chunk_size = 100;
+
+	my @itemids = @{$itemids};
+	my @rows = ();
+
+	while (@itemids)
+	{
+		my @itemids_splice = splice(@itemids, 0, $max_chunk_size);
+		my $itemids_placeholder = join(",", ("?") x scalar(@itemids_splice));
+
+		my $sql = "select itemid,value,clock" .
+			" from $table" .
+			" where" .
+				" itemid in ($itemids_placeholder) and" .
+				" clock between ? and ?";
+		my $params = [@itemids_splice, $from, $till];
+
+		my $rows = db_select($sql, $params);
+
+		push(@rows, @{$rows});
+	}
+
+	return @rows;
+}
+
 sub calculate_cycle($$$$$$$$$$)
 {
 	$tld = shift;		# set globally
@@ -1294,6 +1327,49 @@ sub calculate_cycle($$$$$$$$$$)
 	# Now get test results.
 	#
 
+	# get itemids of probe items, group them by type and by probe
+
+	my %itemids_by_probe;
+
+	my @itemids_uint;
+	my @itemids_float;
+	my @itemids_str;
+
+	foreach my $probe (keys(%{$probes_data}))
+	{
+		# service availability items are already handled
+		next if ($probe eq RSMHOST);
+
+		# in case of Up-inconclusive-reconfig do not collect probe results
+		next if ($rawstatus == UP_INCONCLUSIVE_RECONFIG);
+
+		# collect itemids, group them by value_type to fetch values from according history table later
+
+		my $probe_data = $probes_data->{$probe};
+
+		my @probe_itemids_uint  = grep { $probe_data->{$_}{'value_type'} == ITEM_VALUE_TYPE_UINT64 } keys(%{$probe_data});
+		my @probe_itemids_float = grep { $probe_data->{$_}{'value_type'} == ITEM_VALUE_TYPE_FLOAT  } keys(%{$probe_data});
+		my @probe_itemids_str   = grep { $probe_data->{$_}{'value_type'} == ITEM_VALUE_TYPE_STR    } keys(%{$probe_data});
+
+		next if (@probe_itemids_uint == 0 || @probe_itemids_float == 0);
+
+		$itemids_by_probe{$probe} = [@probe_itemids_uint, @probe_itemids_float, @probe_itemids_str];
+
+		push(@itemids_uint , @probe_itemids_uint);
+		push(@itemids_float, @probe_itemids_float);
+		push(@itemids_str  , @probe_itemids_str);
+	}
+
+	# get history of probe items
+
+	my @rows;
+
+	push(@rows, get_history(\@itemids_uint , "history_uint", $from, $till));
+	push(@rows, get_history(\@itemids_float, "history"     , $from, $till));
+	push(@rows, get_history(\@itemids_str  , "history_str" , $from, $till));
+
+	my %rows = map { $_->[0] => $_ } @rows;
+
 	# we need to aggregate DNS target statuses from Probes to generate Name Server Availability data
 	my $name_server_availability_data = {};
 
@@ -1307,48 +1383,11 @@ sub calculate_cycle($$$$$$$$$$)
 		# In case of Up-inconclusive-reconfig do not collect probe results
 		if ($rawstatus != UP_INCONCLUSIVE_RECONFIG)
 		{
-			my (@itemids_uint, @itemids_float, @itemids_str);
-			my ($results_uint, $results_float, $results_str);
+			next if (!defined($itemids_by_probe{$probe}));
 
-			#
-			# collect itemids, separate them by value_type to fetch values from according history table later
-			#
+			my @results = grep { defined($_) } map($rows{$_}, @{$itemids_by_probe{$probe}});
 
-			map {
-				my $i = $probes_data->{$probe}{$_};
-
-				if ($i->{'value_type'} == ITEM_VALUE_TYPE_UINT64)
-				{
-					push(@itemids_uint, $_);
-				}
-				elsif ($i->{'value_type'} == ITEM_VALUE_TYPE_FLOAT)
-				{
-					push(@itemids_float, $_);
-				}
-				elsif ($i->{'value_type'} == ITEM_VALUE_TYPE_STR)
-				{
-					push(@itemids_str, $_);
-				}
-			} (keys(%{$probes_data->{$probe}}));
-
-			next if (@itemids_uint == 0 || @itemids_float == 0);
-
-			get_test_history(
-				$from,
-				$till,
-				\@itemids_uint,
-				\@itemids_float,
-				\@itemids_str,
-				\$results_uint,
-				\$results_float,
-				\$results_str
-			);
-
-			$results = get_test_results(
-				[@{$results_uint}, @{$results_float}, @{$results_str}],
-				$probes_data->{$probe},
-				$service
-			);
+			$results = get_test_results(\@results, $probes_data->{$probe}, $service);
 		}
 
 		# dns-results-cache:
@@ -1654,7 +1693,7 @@ sub calculate_cycle($$$$$$$$$$)
 
 		$json->{'minNameServersUp'} = int($cfg_minns);
 	}
-		
+
 	if (opt('debug2'))
 	{
 		print(Dumper($json));
