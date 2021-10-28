@@ -5025,8 +5025,7 @@ sub get_test_history($$$$$$$$)
 			"select itemid,value,clock".
 			" from " . history_table(ITEM_VALUE_TYPE_UINT64).
 			" where itemid in (" . join(',', @{$itemids_uint}) . ")".
-				" and " . sql_time_condition($from, $till) .
-			" order by clock,itemid"
+				" and " . sql_time_condition($from, $till)
 		);
 	}
 
@@ -5040,8 +5039,7 @@ sub get_test_history($$$$$$$$)
 			"select itemid,value,clock".
 			" from " . history_table(ITEM_VALUE_TYPE_FLOAT).
 			" where itemid in (" . join(',', @{$itemids_float}) . ")".
-				" and " . sql_time_condition($from, $till) .
-			" order by clock,itemid"
+				" and " . sql_time_condition($from, $till)
 		);
 	}
 
@@ -5055,8 +5053,7 @@ sub get_test_history($$$$$$$$)
 			"select itemid,value,clock".
 			" from " . history_table(ITEM_VALUE_TYPE_STR).
 			" where itemid in (" . join(',', @{$itemids_str}) . ")".
-				" and " . sql_time_condition($from, $till) .
-			" order by clock,itemid"
+				" and " . sql_time_condition($from, $till)
 		);
 
 	}
