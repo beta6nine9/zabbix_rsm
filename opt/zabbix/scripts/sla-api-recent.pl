@@ -36,6 +36,14 @@ use constant DEFAULT_INITIAL_MEASUREMENTS_LIMIT => 7200;	# seconds, if the metri
 
 use constant RSMHOST => "";	# for Service Availability items, this is only needed for cache
 
+my %service_status_to_str = (
+	&UP                        => 'Up',
+	&DOWN                      => 'Down',
+	&UP_INCONCLUSIVE_NO_DATA   => 'Up-inconclusive-no-data',
+	&UP_INCONCLUSIVE_NO_PROBES => 'Up-inconclusive-no-probes',
+	&UP_INCONCLUSIVE_RECONFIG  => 'Up-inconclusive-reconfig',
+);
+
 sub main_process_signal_handler();
 sub process_server($);
 sub process_tld_batch($$$$$$);
@@ -1163,21 +1171,42 @@ sub get_history($$$$)
 	return @rows;
 }
 
+sub probes_data_to_itemids($)
+{
+	my $data = shift;
+
+	my $itemids;
+
+	foreach my $probe (keys(%{$data}))
+	{
+		foreach my $itemid (keys(%{$data->{$probe}}))
+		{
+			my $key = $data->{$probe}{$itemid}{'key'};
+
+			$itemids->{$probe}{$key} = $itemid;
+		}
+	}
+
+	return $itemids;
+}
+
 sub calculate_cycle($$$$$$$$$$)
 {
 	$tld = shift;		# set globally
-	my $service = shift;
-	my $probes_data = shift;
+	my $service              = shift;
+	my $probes_data          = shift;
 	my $lastvalues_nsids_tld = shift;
-	my $cycle_clock = shift;
-	my $delay = shift;
-	my $rtt_limit = shift;
-	my $service_probes_ref = shift;	# probes enabled for the service ('name' => {'hostid' => hostid, 'status' => status}) available for this service
-	my $all_probes_ref = shift;	# same structure but all available probes in the system, for listing in JSON files
-	my $interfaces_ref = shift;
+	my $cycle_clock          = shift;
+	my $delay                = shift;
+	my $rtt_limit            = shift;
+	my $service_probes_ref   = shift;	# probes enabled for the service ('name' => {'hostid' => hostid, 'status' => status}) available for this service
+	my $all_probes_ref       = shift;	# same structure but all available probes in the system, for listing in JSON files
+	my $interfaces_ref       = shift;
 
 	my $from = cycle_start($cycle_clock, $delay);
 	my $till = cycle_end($cycle_clock, $delay);
+
+	my $itemids = probes_data_to_itemids($probes_data);
 
 	my $json = {'testedInterface' => []};
 
@@ -1200,14 +1229,7 @@ sub calculate_cycle($$$$$$$$$$)
 	# First, get Service Availability data.
 	#
 
-	my $service_availability_itemid;
-
-	foreach my $itemid (keys(%{$probes_data->{RSMHOST()}}))
-	{
-		next unless ($probes_data->{RSMHOST()}{$itemid}{'key'} eq "rsm.slv.$service.avail");
-
-		$service_availability_itemid = $itemid;
-	}
+	my $service_availability_itemid = $itemids->{RSMHOST()}{"rsm.slv.$service.avail"};
 
 	if (!$service_availability_itemid)
 	{
@@ -1283,32 +1305,14 @@ sub calculate_cycle($$$$$$$$$$)
 				fail($msg);
 			}
 
-			if ($values{$itemid}->[0] == UP)
-			{
-				$json->{'status'} = 'Up';
-			}
-			elsif ($values{$itemid}->[0] == DOWN)
-			{
-				$json->{'status'} = 'Down';
-			}
-			elsif ($values{$itemid}->[0] == UP_INCONCLUSIVE_NO_DATA)
-			{
-				$json->{'status'} = 'Up-inconclusive-no-data';
-			}
-			elsif ($values{$itemid}->[0] == UP_INCONCLUSIVE_NO_PROBES)
-			{
-				$json->{'status'} = 'Up-inconclusive-no-probes';
-			}
-			elsif ($values{$itemid}->[0] == UP_INCONCLUSIVE_RECONFIG)
-			{
-				$json->{'status'} = 'Up-inconclusive-reconfig';
-			}
-			else
-			{
-				fail("item \"$key\" ($itemid) contains unexpected value \"", $values{$itemid}->[0] , "\"");
-			}
+			$rawstatus = $values{$itemid}[0];
 
-			$rawstatus = $values{$itemid}->[0];
+			$json->{'status'} = $service_status_to_str{$rawstatus};
+
+			if (!defined($json->{'status'}))
+			{
+				fail("item \"$key\" ($itemid) contains unexpected value \"$rawstatus\"");
+			}
 		}
 		else
 		{
@@ -1368,7 +1372,7 @@ sub calculate_cycle($$$$$$$$$$)
 	push(@rows, get_history(\@itemids_float, "history"     , $from, $till));
 	push(@rows, get_history(\@itemids_str  , "history_str" , $from, $till));
 
-	my %rows = map { $_->[0] => $_ } @rows;
+	my %rows_by_itemid = map { $_->[0] => $_ } @rows;
 
 	# we need to aggregate DNS target statuses from Probes to generate Name Server Availability data
 	my $name_server_availability_data = {};
@@ -1385,7 +1389,7 @@ sub calculate_cycle($$$$$$$$$$)
 		{
 			next if (!defined($itemids_by_probe{$probe}));
 
-			my @results = grep { defined($_) } map($rows{$_}, @{$itemids_by_probe{$probe}});
+			my @results = grep { defined($_) } map($rows_by_itemid{$_}, @{$itemids_by_probe{$probe}});
 
 			$results = get_test_results(\@results, $probes_data->{$probe}, $service);
 		}
@@ -1400,8 +1404,6 @@ sub calculate_cycle($$$$$$$$$$)
 		{
 			$results->{'dnssec'} = $dns_results_cache->{$cycle_clock}{$probe};
 		}
-
-		next if (!$results);
 
 		foreach my $cycleclock (keys(%{$results->{$service}}))
 		{
@@ -1471,13 +1473,7 @@ sub calculate_cycle($$$$$$$$$$)
 								{
 									dbg("'$tld $probe' item rsm.dns.nsid[$target,$metric->{'ip'}] not in lastvalue, getting itemid and then value from history");
 
-									my $itemid = db_select_value(
-										"select itemid".
-										" from items i,hosts h".
-										" where i.hostid=h.hostid".
-											" and h.host='$tld $probe'".
-											" and i.key_='rsm.dns.nsid[$target,$metric->{'ip'}]'"
-									);
+									my $itemid = $itemids->{$probe}{"rsm.dns.nsid[$target,$metric->{'ip'}]"};
 
 									# get it from the history table, the first using descending order by clock
 									my $rows_ref = db_select(
