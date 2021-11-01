@@ -445,6 +445,8 @@ sub process_tld_batch($$$$$$)
 # implement DNSSEC service handling in all the places/scripts properly.
 my $dns_results_cache;
 
+my $nsids_cache;
+
 sub process_tld($$$$$$)
 {
 	my $tld = shift;
@@ -455,6 +457,7 @@ sub process_tld($$$$$$)
 	my $lastvalues_cache_tld = shift;
 
 	$dns_results_cache = {};
+	$nsids_cache = {};
 
 	# dns-results-cache:
 	# ensure 'dnssec' comes after 'dns' by using sort(), because
@@ -1171,6 +1174,82 @@ sub get_history($$$$)
 	return @rows;
 }
 
+sub get_history_with_throttling($$$$)
+{
+	my $itemids = shift;
+	my $table   = shift;
+	my $from    = shift;
+	my $till    = shift;
+
+	my $sql;
+	my $params;
+	my $rows;
+
+	# get max clocks
+
+	my $itemids_placeholder = join(",", ("?") x scalar(@{$itemids}));
+	$sql = "select itemid,max(clock) from $table where itemid in ($itemids_placeholder) and clock between ? and ? group by itemid";
+	$params = [@{$itemids}, $from, $till];
+	$rows = db_select($sql, $params);
+
+	if (!@{$rows})
+	{
+		return [];
+	}
+
+	# get values
+
+	my $filter_placeholder = join("or", ("(itemid=? and clock=?)") x scalar(@{$rows}));
+	$sql = "select itemid,clock,value from $table where $filter_placeholder";
+	$params = [map(@{$_}, @{$rows})];
+	$rows = db_select($sql, $params);
+
+	return $rows;
+}
+
+sub get_cycle_nsids($$$)
+{
+	my $lastvalues = shift;
+	my $from       = shift;
+	my $till       = shift;
+
+	my %result  = ();
+	my %missing = ();
+
+	foreach my $probe (keys(%{$lastvalues}))
+	{
+		foreach my $ns (keys(%{$lastvalues->{$probe}}))
+		{
+			foreach my $ip (keys(%{$lastvalues->{$probe}{$ns}}))
+			{
+				my $itemid = $lastvalues->{$probe}{$ns}{$ip}{'itemid'};
+				my $clock  = $lastvalues->{$probe}{$ns}{$ip}{'clock'};
+				my $value  = $lastvalues->{$probe}{$ns}{$ip}{'value'};
+
+				if ($clock <= $till)
+				{
+					$result{$probe}{$ns}{$ip} = $value;
+				}
+				else
+				{
+					$missing{$itemid} = \$result{$probe}{$ns}{$ip};
+				}
+			}
+		}
+	}
+
+	my $history = get_history_with_throttling([keys(%missing)], 'history_str', $from - $heartbeat + 60, $till);
+
+	foreach my $row (@{$history})
+	{
+		my ($itemid, undef, $value) = @{$row};
+
+		${$missing{$itemid}} = $value;
+	}
+
+	return \%result;
+}
+
 sub probes_data_to_itemids($)
 {
 	my $data = shift;
@@ -1353,7 +1432,7 @@ sub calculate_cycle($$$$$$$$$$)
 
 		my @probe_itemids_uint  = grep { $probe_data->{$_}{'value_type'} == ITEM_VALUE_TYPE_UINT64 } keys(%{$probe_data});
 		my @probe_itemids_float = grep { $probe_data->{$_}{'value_type'} == ITEM_VALUE_TYPE_FLOAT  } keys(%{$probe_data});
-		my @probe_itemids_str   = grep { $probe_data->{$_}{'value_type'} == ITEM_VALUE_TYPE_STR    } keys(%{$probe_data});
+		my @probe_itemids_str   = grep { $probe_data->{$_}{'value_type'} == ITEM_VALUE_TYPE_STR && $probe_data->{$_}{'key'} !~ /^rsm\.dns\.nsid\[/ } keys(%{$probe_data});
 
 		next if (@probe_itemids_uint == 0 || @probe_itemids_float == 0);
 
@@ -1373,6 +1452,18 @@ sub calculate_cycle($$$$$$$$$$)
 	push(@rows, get_history(\@itemids_str  , "history_str" , $from, $till));
 
 	my %rows_by_itemid = map { $_->[0] => $_ } @rows;
+
+	my $nsids;
+
+	if ($service eq 'dns' || $service eq 'dnssec')
+	{
+		if (!exists($nsids_cache->{$cycle_clock}))
+		{
+			$nsids_cache->{$cycle_clock} = get_cycle_nsids($lastvalues_nsids_tld, $from, $till);
+		}
+
+		$nsids = $nsids_cache->{$cycle_clock};
+	}
 
 	# we need to aggregate DNS target statuses from Probes to generate Name Server Availability data
 	my $name_server_availability_data = {};
@@ -1452,48 +1543,7 @@ sub calculate_cycle($$$$$$$$$$)
 
 						if ($service eq 'dns' || $service eq 'dnssec')
 						{
-							# "empty NSID" == "no NSID" in the database
-							my $nsid = '';
-
-							if (exists($metric->{'nsid'}))
-							{
-								# NSID is available in this cycle
-								$nsid = $metric->{'nsid'};
-							}
-							else
-							{
-								my $nsid_details = $lastvalues_nsids_tld->{$probe}{$target}{$metric->{'ip'}};
-
-								if (defined($nsid_details) && $nsid_details->{'clock'} <= $cycleclock)
-								{
-									# getting NSID from lastvalue table
-									$nsid = $nsid_details->{'value'};
-								}
-								else
-								{
-									dbg("'$tld $probe' item rsm.dns.nsid[$target,$metric->{'ip'}] not in lastvalue, getting itemid and then value from history");
-
-									my $itemid = $itemids->{$probe}{"rsm.dns.nsid[$target,$metric->{'ip'}]"};
-
-									# get it from the history table, the first using descending order by clock
-									my $rows_ref = db_select(
-										"select value,clock".
-										" from " . history_table(ITEM_VALUE_TYPE_STR).
-										" where itemid=$itemid".
-											" and " . sql_time_condition($cycleclock - $heartbeat, $cycleclock).
-										" order by clock desc".
-										" limit 1"
-									);
-
-									if (scalar(@{$rows_ref}) != 0)
-									{
-										# getting the most recent NSID from history table
-										$nsid = $rows_ref->[0]->[0];
-									}
-								}
-							}
-
-							$h->{'nsid'} = ($nsid eq '' ? undef : $nsid);
+							$h->{'nsid'} = $nsids->{$probe}{$target}{$metric->{'ip'}} // '';
 						}
 
 						push(@{$tested_interfaces{$tested_interface}{$probe}{'testData'}{$target}}, $h);
@@ -2012,7 +2062,7 @@ from the last run till up to 30 minutes (unless option --period is given).
 
 =head1 EXAMPLES
 
-/opt/zabbix/scripts/sla-api-recent.pl
+/opt/zabbix50/scripts/sla-api-recent.pl
 
 Generate recent measurement files for the period from last generated till up to 30 minutes.
 
