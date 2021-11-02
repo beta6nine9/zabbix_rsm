@@ -7,14 +7,15 @@ use strict;
 use warnings;
 
 use Data::Dumper;
-
+use File::Copy;
+use IO::Select;
 use Parallel::ForkManager;
+use Socket;
 
 use RSM;
 use RSMSLV;
 use TLD_constants qw(:api :config :groups :items);
 use ApiHelper;
-use File::Copy;
 use sigtrap 'handler' => \&main_process_signal_handler, 'normal-signals';
 
 $Data::Dumper::Terse = 1;	# do not output names like "$VAR1 = "
@@ -46,7 +47,7 @@ my %service_status_to_str = (
 
 sub main_process_signal_handler();
 sub process_server($);
-sub process_tld_batch($$$$$$);
+sub process_tld_batch($$$);
 sub process_tld($$$$$$);
 sub cycles_to_calculate($$$$$$$$);
 sub get_lastvalues_from_db($$$$);
@@ -57,9 +58,7 @@ sub get_history_by_itemid($$$);
 sub child_error($$$$$);
 sub update_lastvalues_cache($);
 sub set_on_finish($);
-sub wait_for_children($);
 sub terminate_children($);
-sub get_swap_usage($);
 
 parse_opts('tld=s', 'service=s', 'server-id=i', 'now=i', 'period=i', 'print-period', 'max-children=i', 'max-wait=i', 'prettify-json', 'debug2');
 
@@ -168,8 +167,8 @@ else
 	fail("cannot calculate maximum number of processes to use") unless ($children_per_server);
 }
 
-info("servers             : $server_count") if (opt('stats'));
-info("max children/server : $children_per_server") if (opt('stats'));
+info("servers         : $server_count") if (opt('stats'));
+info("children/server : $children_per_server") if (opt('stats'));
 
 my $child_failed = 0;
 my $signal_sent = 0;
@@ -179,9 +178,9 @@ my $fm = new Parallel::ForkManager($server_count);
 set_on_finish($fm);
 
 # {
-#     PID => {'desc' => 'server_#_parent', 'from' => 1234324235, 'swap-usage' => '0 kB'},
+#     PID => {'desc' => 'server_#_parent', 'from' => 1234324235},
 #     ...
-#     PID => {'desc' => 'server_#_child', 'from' => 1234324235, 'swap-usage' => '4 kB'},
+#     PID => {'desc' => 'server_#_child', 'from' => 1234324235},
 #     ...
 # }
 my %child_desc;
@@ -204,68 +203,57 @@ foreach my $server_key (@server_keys)
 	$child_desc{$pid} = {
 		'desc' => "${server_key}_parent",
 		'from' => time(),
-		'swap-usage' => '0 kB'
 	};
-	#$child_desc{$pid}->{'smaps-dumped'} = 0;
 
 	dbg("$child_desc{$pid}->{'desc'} (PID:$pid) STARTED");
 }
 
-wait_for_children($fm);
+$fm->wait_all_children();
 
 slv_exit($child_failed ? E_FAIL : SUCCESS);
-
-sub wait_for_children($)
-{
-	my $fm = shift;
-
-	for (;;)
-	{
-		$fm->reap_finished_children();
-
-		my @procs = $fm->running_procs();
-
-		return unless (scalar(@procs));
-
-		dbg("waiting for ", scalar(@procs), " children:");
-
-		# check wether there's long running process
-		foreach my $pid (@procs)
-		{
-			my $swap_usage = get_swap_usage($pid);
-
-			if (defined($swap_usage) && ($swap_usage ne $child_desc{$pid}->{'swap-usage'}))
-			{
-				wrn("$child_desc{$pid}->{'desc'} (PID:$pid) is swapping $swap_usage");
-
-				$child_desc{$pid}->{'swap-usage'} = $swap_usage;
-
-				# TODO: consider writing if is over 1000 kB, add date/time to the file name, write only if size changed
-				# if (!$child_desc{$pid}->{'smaps-dumped'})
-				# {
-				# 	mkdir("/tmp/sla-api-recent-smaps") unless (-d "/tmp/sla-api-recent-smaps");
-				#
-				# 	copy("/proc/$pid/smaps","/tmp/sla-api-recent-smaps/$pid") or fail("cannot copy smaps file: $!");
-				#
-				# 	$child_desc{$pid}->{'smaps-dumped'} = 1;
-				#
-				# 	wrn("$child_desc{$pid}->{'desc'} (PID:$pid) smaps file saved to /tmp/sla-api-recent-smaps/$pid");
-				# }
-			}
-			else
-			{
-				dbg("$child_desc{$pid}->{'desc'} (PID:$pid), running for ", (time() - $child_desc{$pid}->{'from'}), " seconds");
-			}
-		}
-
-		sleep(1);
-	}
-}
 
 sub main_process_signal_handler()
 {
 	wrn("main process caught a signal: $!");
 	slv_exit(E_FAIL);
+}
+
+sub get_tld_from_socket($)
+{
+	my $select = shift;
+
+	my @ready;
+	my $socket;
+
+	@ready = $select->can_write();
+	$socket = $ready[0];
+
+	print $socket "\n";
+
+	@ready = $select->can_read();
+	$socket = $ready[0];
+
+	my $tld = <$socket>;
+
+	if (defined($tld))
+	{
+		chomp($tld);
+	}
+
+	return $tld;
+}
+
+sub put_tld_into_socket($$)
+{
+	my $select = shift;
+	my $tld    = shift;
+
+	my @ready = $select->can_read();
+	my $socket = $ready[0];
+
+	<$socket>;
+
+	print $socket "$tld\n";
 }
 
 sub process_server($)
@@ -280,8 +268,6 @@ sub process_server($)
 		$lastvalues_cache->{'tlds'} = {};
 	}
 
-	# probes available for every service
-	my %probes;
 	my $server_tlds;
 
 	db_connect($server_key);
@@ -307,22 +293,18 @@ sub process_server($)
 
 	my $tlds_per_child = int($server_tld_count / $children_count);
 
-	info("children/$server_key : $children_count") if (opt('stats'));
-
 	my $fm = new Parallel::ForkManager($children_count);
 	set_on_finish($fm);
 
-	my $tldi_begin = 0;
-	my $tldi_end;
-
 	%child_desc = ();
 
-	while ($children_count)
-	{
-		$tldi_end = $tldi_begin + $tlds_per_child;
+	my @sockets;
 
-		# add one extra from remainder
-		$tldi_end++ if ($server_tld_count - $tldi_begin - ($children_count * $tlds_per_child));
+	for (my $i = 0; $i < $children_count; $i++)
+	{
+		socketpair(my $child, my $parent, AF_UNIX, SOCK_STREAM, PF_UNSPEC) or fail("socketpair() failed: $!");
+		$child->autoflush(1);
+		$parent->autoflush(1);
 
 		my %child_data;
 
@@ -330,32 +312,45 @@ sub process_server($)
 
 		if ($pid == 0)
 		{
-			init_process();
+			close($parent);
 
 			set_alarm($max_wait);
 
-			process_tld_batch($server_tlds, $tldi_begin, $tldi_end, \%child_data, \%probes, $all_probes_ref);
+			init_process();
+
+			process_tld_batch($child, \%child_data, $all_probes_ref);
 
 			finalize_process();
+
+			close($child);
 
 			$fm->finish(SUCCESS, \%child_data);
 		}
 
+		close($child);
+		push(@sockets, $parent);
+
 		$child_desc{$pid} = {
 			'desc' => "${server_key}_child",
 			'from' => time(),
-			'swap-usage' => '0 kB'
 		};
-		#$child_desc{$pid}->{'smaps-dumped'} = 0;
 
 		dbg("$child_desc{$pid}->{'desc'} (PID:$pid) STARTED");
-
-		$tldi_begin = $tldi_end;
-
-		$children_count--;
 	}
 
-	wait_for_children($fm);
+	my $select = IO::Select->new(@sockets);
+
+	foreach my $tld (sort(@{$server_tlds}))
+	{
+		put_tld_into_socket($select, $tld);
+	}
+
+	foreach my $socket (@sockets)
+	{
+		close($socket);
+	}
+
+	$fm->wait_all_children();
 
 	# Do not update cache if something happened.
 	if (!opt('dry-run') && !opt('now'))
@@ -367,20 +362,26 @@ sub process_server($)
 	}
 }
 
-sub process_tld_batch($$$$$$)
+sub process_tld_batch($$$)
 {
-	my $tlds = shift;
-	my $tldi_begin = shift;
-	my $tldi_end = shift;
+	my $socket         = shift;
 	my $child_data_ref = shift;
-	my $probes_ref = shift;		# probes by services
 	my $all_probes_ref = shift;	# all available probes in the system
+
+	my $probes_ref;	# probes by services
 
 	db_connect($server_key);
 
-	for (my $tldi = $tldi_begin; $tldi != $tldi_end; $tldi++)
+	my $select = IO::Select->new($socket);
+
+	while (1)
 	{
-		$tld = $tlds->[$tldi]; # global variable
+		$tld = get_tld_from_socket($select); # global variable
+
+		if (!defined($tld))
+		{
+			last;
+		}
 
 		# Last values from the "lastvalue" (availability, RTTs) and "lastvalue_str" (IPs) tables.
 		#
@@ -1968,30 +1969,6 @@ sub set_on_finish($)
 	);
 }
 
-sub get_swap_usage($)
-{
-	my $pid = shift;
-
-	my $status_file = "/proc/$pid/status";
-
-	my $swap_usage;
-
-	open(my $status, '<', $status_file) or fail("cannot open \"$status_file\": $!");
-
-	while (<$status>)
-	{
-		if (/^VmSwap:\s+(\d*.*)/)
-		{
-			$swap_usage = $1;
-			last;
-		}
-	}
-
-	close($status);
-
-	return $swap_usage;
-}
-
 __END__
 
 =head1 NAME
@@ -2065,7 +2042,7 @@ from the last run till up to 30 minutes (unless option --period is given).
 
 =head1 EXAMPLES
 
-/opt/zabbix50/scripts/sla-api-recent.pl
+/opt/zabbix/scripts/sla-api-recent.pl
 
 Generate recent measurement files for the period from last generated till up to 30 minutes.
 
