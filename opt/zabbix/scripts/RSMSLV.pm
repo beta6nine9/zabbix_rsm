@@ -167,6 +167,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		rtrim
 		trim
 		str_starts_with
+		str_starts_with_any
 		str_ends_with
 		parse_opts parse_slv_opts override_opts
 		opt getopt setopt unsetopt optkeys ts_str ts_full selected_period
@@ -4254,7 +4255,15 @@ sub trim($)
 	return $string =~ s/^\s+|\s+$//gr;
 }
 
-sub str_starts_with($$;$$)
+sub str_starts_with($$)
+{
+	my $string = shift;
+	my $prefix = shift;
+
+	return rindex($string, $prefix, 0) == 0;
+}
+
+sub str_starts_with_any($$$;$)
 {
 	my $string = shift;
 
@@ -5349,7 +5358,7 @@ sub get_test_results($$;$)
 			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'status'} = $value;
 			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'clock'} = $clock;
 		}
-		elsif (str_starts_with($i->{'key'}, "rsm.rdds.43.status", "rsm.rdds.80.status"))
+		elsif (str_starts_with_any($i->{'key'}, "rsm.rdds.43.status", "rsm.rdds.80.status"))
 		{
 			# interface status and clock
 			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'status'} = $value;
@@ -5358,7 +5367,7 @@ sub get_test_results($$;$)
 			# target status
 			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}{FAKE_NS()}{FAKE_NSIP()}{'status'} = $value;
 		}
-		elsif (str_starts_with($i->{'key'}, "rsm.dns.testedname", "rsm.rdds.43.testedname", "rdap.testedname"))
+		elsif (str_starts_with_any($i->{'key'}, "rsm.dns.testedname", "rsm.rdds.43.testedname", "rdap.testedname"))
 		{
 			# interface tested name
 			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'testedname'} = $value;
@@ -5396,15 +5405,15 @@ sub get_test_results($$;$)
 
 			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}{$ns}{FAKE_NSIP()}{'status'} = $value;
 		}
-		elsif (str_starts_with($i->{'key'}, "rsm.rdds.43.target", "rsm.rdds.80.target", "rdap.target"))
+		elsif (str_starts_with_any($i->{'key'}, "rsm.rdds.43.target", "rsm.rdds.80.target", "rdap.target"))
 		{
 			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}{FAKE_NS()}{FAKE_NSIP()}{'target'} = $value;
 		}
-		elsif (str_starts_with($i->{'key'}, "rsm.rdds.43.rtt", "rsm.rdds.80.rtt", "rdap.rtt"))
+		elsif (str_starts_with_any($i->{'key'}, "rsm.rdds.43.rtt", "rsm.rdds.80.rtt", "rdap.rtt"))
 		{
 			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}{FAKE_NS()}{FAKE_NSIP()}{'rtt'} = $value;
 		}
-		elsif (str_starts_with($i->{'key'}, "rsm.rdds.43.ip", "rsm.rdds.80.ip", "rdap.ip"))
+		elsif (str_starts_with_any($i->{'key'}, "rsm.rdds.43.ip", "rsm.rdds.80.ip", "rdap.ip"))
 		{
 			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}{FAKE_NS()}{FAKE_NSIP()}{'ip'} = $value;
 		}
