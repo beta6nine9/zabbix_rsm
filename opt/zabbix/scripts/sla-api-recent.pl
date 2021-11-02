@@ -291,8 +291,6 @@ sub process_server($)
 
 	my $children_count = ($server_tld_count < $children_per_server ? $server_tld_count : $children_per_server);
 
-	my $tlds_per_child = int($server_tld_count / $children_count);
-
 	my $fm = new Parallel::ForkManager($children_count);
 	set_on_finish($fm);
 
@@ -345,9 +343,16 @@ sub process_server($)
 		put_tld_into_socket($select, $tld);
 	}
 
-	foreach my $socket (@sockets)
+	while ($select->count())
 	{
-		close($socket);
+		my @ready = $select->can_read();
+
+		foreach my $socket (@ready)
+		{
+			$select->remove($socket);
+			<$socket>;
+			close($socket);
+		}
 	}
 
 	$fm->wait_all_children();
