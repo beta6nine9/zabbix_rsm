@@ -1238,13 +1238,16 @@ sub get_cycle_nsids($$$)
 		}
 	}
 
-	my $history = get_history_with_throttling([keys(%missing)], 'history_str', $from - $heartbeat + 60, $till);
-
-	foreach my $row (@{$history})
+	if (keys(%missing))
 	{
-		my ($itemid, undef, $value) = @{$row};
+		my $history = get_history_with_throttling([keys(%missing)], 'history_str', $from - $heartbeat + 60, $till);
 
-		${$missing{$itemid}} = $value;
+		foreach my $row (@{$history})
+		{
+			my ($itemid, undef, $value) = @{$row};
+
+			${$missing{$itemid}} = $value;
+		}
 	}
 
 	return \%result;
