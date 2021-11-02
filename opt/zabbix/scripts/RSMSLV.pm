@@ -4257,10 +4257,7 @@ sub trim($)
 
 sub str_starts_with($$)
 {
-	my $string = shift;
-	my $prefix = shift;
-
-	return rindex($string, $prefix, 0) == 0;
+	return rindex($_[0], $_[1], 0) == 0;
 }
 
 sub str_starts_with_any($$$;$)
