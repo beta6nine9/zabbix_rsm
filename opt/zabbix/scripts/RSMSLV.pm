@@ -5338,21 +5338,27 @@ sub get_test_results($$;$)
 		}
 		elsif ($item_key eq "rsm.dns.status")
 		{
-			# service status
-			$data{$cycleclock}{$service}{'status'} = $value;
+			if ($service eq 'dns')
+			{
+				# service status
+				$data{$cycleclock}{$service}{'status'} = $value;
 
-			# interface status and clock
-			$interface_data->{'status'} = $value;
-			$interface_data->{'clock'} = $clock;
+				# interface status and clock
+				$interface_data->{'status'} = $value;
+				$interface_data->{'clock'} = $clock;
+			}
 		}
-		elsif ($item_key eq "rsm.dnssec.status") # bug? DNS data is filled with rsm.dns.status, then overwritten by rsm.dnssec.status
+		elsif ($item_key eq "rsm.dnssec.status")
 		{
-			# service status
-			$data{$cycleclock}{$service}{'status'} = $value;
+			if ($service eq 'dnssec')
+			{
+				# service status
+				$data{$cycleclock}{$service}{'status'} = $value;
 
-			# interface status and clock
-			$interface_data->{'status'} = $value;
-			$interface_data->{'clock'} = $clock;
+				# interface status and clock
+				$interface_data->{'status'} = $value;
+				$interface_data->{'clock'} = $clock;
+			}
 		}
 		elsif ($item_key eq "rsm.rdds.43.status" || $item_key eq "rsm.rdds.80.status")
 		{
