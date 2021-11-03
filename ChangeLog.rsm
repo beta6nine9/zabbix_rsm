@@ -1,4 +1,4 @@
-Changes for rsm2.2.0rc23
+Changes for rsm2.2.0rc24
 
 Bug fixes:
 ....I..... [sub-821] improved SQL queries of sla-api-recent.pl script (asitals)
