@@ -5,7 +5,8 @@ set -o nounset
 set -o pipefail
 #set -o xtrace
 
-TEST_CASE_DIR="automated-tests/test-cases"
+DIR="$(dirname "$(readlink -f "$0")")"
+TEST_CASE_DIR="$DIR/../test-cases"
 
 test=
 target=
@@ -41,7 +42,7 @@ done
 if [ -z "$target" ]; then
 	echo "usage: $0 [-s|-d] [number] [-- options]"
 	echo
-	echo "Run a test case. Specify additional options to test-wrapper script after --."
+	echo "Run a test case. Specify additional options to run-tests.pl script after --."
 	echo " -s      SLA API test case"
 	echo " -d      Data Export test case"
 	echo " number  0-prefixed number of the test"
@@ -50,7 +51,7 @@ if [ -z "$target" ]; then
 	echo
 	echo "will run"
 	echo
-	echo "./test-wrapper --skip-build --test-case-file $TEST_CASE_DIR/sla-api/003-*.txt"
+	echo "automated-tests/framework/run-tests.pl --skip-build --test-case-file $TEST_CASE_DIR/sla-api/003-*.txt"
 	exit 1
 fi
 
