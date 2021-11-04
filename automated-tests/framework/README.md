@@ -296,23 +296,29 @@ WORK_DIR="/home/$USER/tests"
 sudo ln -sfn "$SOURCE_DIR/opt/zabbix" /opt/zabbix
 
 # update tests.conf
-perl -M'Config::Tiny' -e '
-    my $config_file = $ARGV[0] . "/automated-tests/framework/tests.conf";
-    my $source_dir  = $ARGV[0];
-    my $work_dir    = $ARGV[1];
+python3 -c '
 
-    my $config = Config::Tiny->new;
-    $config = Config::Tiny->read($config_file);
+import configparser
+import sys
 
-    $config->{"paths"}{"source_dir"}         = $source_dir;
-    $config->{"paths"}{"build_dir"}          = $work_dir;
-    $config->{"paths"}{"logs_dir"}           = $work_dir . "/logs";
-    $config->{"paths"}{"db_dumps_dir"}       = $work_dir . "/db_logs";
-    $config->{"zabbix_server"}{"socket_dir"} = $work_dir;
-    $config->{"zabbix_server"}{"pid_file"}   = $work_dir . "/zabbix_server.pid";
-    #$config->{"frontend"}{"url"}             = ...;
+config_file = sys.argv[1] + "/automated-tests/framework/tests.conf"
+source_dir  = sys.argv[1]
+work_dir    = sys.argv[2]
 
-    $config->write($config_file);
+config = configparser.ConfigParser()
+config.read(config_file)
+
+config["paths"]["source_dir"]         = source_dir;
+config["paths"]["build_dir"]          = work_dir;
+config["paths"]["logs_dir"]           = work_dir + "/logs";
+config["paths"]["db_dumps_dir"]       = work_dir + "/db_logs";
+config["zabbix_server"]["socket_dir"] = work_dir;
+config["zabbix_server"]["pid_file"]   = work_dir + "/zabbix_server.pid";
+#config["frontend"]["url"]             = ...;
+
+with open(config_file, "w") as f:
+    config.write(f, space_around_delimiters=False)
+
 ' "$SOURCE_DIR" "$WORK_DIR"
 
 # go to directory where tests will be executed

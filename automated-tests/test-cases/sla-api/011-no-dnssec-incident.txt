@@ -337,6 +337,8 @@
 "tld3","rsm.slv.dnssec.rollweek","1611251940","0"
 "tld3","rsm.slv.rdds.avail","1611251700","0"
 "tld3","rsm.slv.rdds.rollweek","1611251700","0"
+"tld3","rsm.slv.rdap.avail","1611251700","0"
+"tld3","rsm.slv.rdap.rollweek","1611251700","0"
 "tld3","rsm.slv.dns.ns.avail[ns1.tld3,192.0.2.51]","1611251940","0"
 "tld3","rsm.slv.dns.ns.avail[ns2.tld3,192.0.2.52]","1611251940","0"
 "tld3","rsm.slv.dns.ns.avail[ns3.tld3,192.0.2.53]","1611251940","0"

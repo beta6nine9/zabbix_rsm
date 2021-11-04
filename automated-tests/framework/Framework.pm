@@ -248,7 +248,7 @@ sub zbx_build($$$)
 				#"DBName"               => get_conig('zabbix_proxy', 'db_name'),
 				#"DBUser"               => get_conig('zabbix_proxy', 'db_username'),
 				#"DBPassword"           => get_conig('zabbix_proxy', 'db_password'),
-				"CacheSize"            => "1G",
+				"CacheSize"            => "64M",
 			}
 		);
 	}
@@ -398,7 +398,7 @@ sub zbx_start_server(;$$$)
 				"DBName"                  => get_config("zabbix_server", "db_name"),
 				"DBUser"                  => get_config("zabbix_server", "db_username"),
 				"DBPassword"              => get_config("zabbix_server", "db_password"),
-				"CacheSize"               => "1G",
+				"CacheSize"               => "64M",
 				"TrapperTimeout"          => "3",
 				"StartTrappers"           => "1",
 				"StartEscalators"         => "1",

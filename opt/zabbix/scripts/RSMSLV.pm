@@ -167,6 +167,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		rtrim
 		trim
 		str_starts_with
+		str_starts_with_any
 		str_ends_with
 		parse_opts parse_slv_opts override_opts
 		opt getopt setopt unsetopt optkeys ts_str ts_full selected_period
@@ -684,8 +685,40 @@ sub get_itemids_by_hosts_and_keys($)
 {
 	my $filter = shift; # [[host, key], ...]
 
-	my $filter_string = join(" or ", ("(hosts.host = ? and items.key_ = ?)") x scalar(@{$filter}));
-	my $filter_params = [map(($_->[0], $_->[1]), @{$filter})];
+	my %grouped_by_hosts = ();
+	my %grouped_by_keys = ();
+
+	foreach my $filter_row (@{$filter})
+	{
+		my ($host, $key) = @{$filter_row};
+
+		push(@{$grouped_by_hosts{$host}}, $key);
+		push(@{$grouped_by_keys{$key}}, $host);
+	}
+
+	my @filter_params;
+	my @filter_groups;
+
+	if (scalar(keys(%grouped_by_hosts)) < scalar(keys(%grouped_by_keys)))
+	{
+		foreach my $host (sort(keys(%grouped_by_hosts)))
+		{
+			my @keys = sort(@{$grouped_by_hosts{$host}});
+			my $keys_placeholder = join(",", ("?") x scalar(@keys));
+			push(@filter_groups, "(hosts.host=? and items.key_ in ($keys_placeholder))");
+			push(@filter_params, $host, @keys);
+		}
+	}
+	else
+	{
+		foreach my $key (sort(keys(%grouped_by_keys)))
+		{
+			my @hosts = sort(@{$grouped_by_keys{$key}});
+			my $hosts_placeholder = join(",", ("?") x scalar(@hosts));
+			push(@filter_groups, "(items.key_=? and hosts.host in ($hosts_placeholder))");
+			push(@filter_params, $key, @hosts);
+		}
+	}
 
 	my $sql = "select" .
 			" hosts.host," .
@@ -695,9 +728,9 @@ sub get_itemids_by_hosts_and_keys($)
 			" hosts" .
 			" left join items on items.hostid = hosts.hostid" .
 		" where" .
-			" " . $filter_string;
+			" " . join(" or ", @filter_groups);
 
-	my $rows = db_select($sql, $filter_params);
+	my $rows = db_select($sql, \@filter_params);
 
 	my $result = {};
 
@@ -4222,7 +4255,14 @@ sub trim($)
 	return $string =~ s/^\s+|\s+$//gr;
 }
 
-sub str_starts_with($$;$$)
+sub str_starts_with($$)
+{
+	# $_[0] - string
+	# $_[1] - prefix
+	return rindex($_[0], $_[1], 0) == 0;
+}
+
+sub str_starts_with_any($$$;$)
 {
 	my $string = shift;
 
@@ -4236,10 +4276,9 @@ sub str_starts_with($$;$$)
 
 sub str_ends_with($$)
 {
-	my $string = shift;
-	my $suffix = shift;
-
-	return substr($string, -length($suffix)) eq $suffix;
+	# $_[0] - string
+	# $_[1] - suffix
+	return substr($_[0], -length($_[1])) eq $_[1];
 }
 
 sub parse_opts
@@ -4391,18 +4430,16 @@ sub selected_period
 
 sub cycle_start($$)
 {
-	my $now = shift;
-	my $delay = shift;
-
-	return $now - ($now % $delay);
+	# $_[0] - clock
+	# $_[1] - delay
+	return $_[0] - ($_[0] % $_[1]);
 }
 
 sub cycle_end($$)
 {
-	my $now = shift;
-	my $delay = shift;
-
-	return cycle_start($now, $delay) + $delay - 1;
+	# $_[0] - clock
+	# $_[1] - delay
+	return $_[0] - ($_[0] % $_[1]) + $_[1] - 1;
 }
 
 sub cycles_till_end_of_month($$)
@@ -4993,8 +5030,7 @@ sub get_test_history($$$$$$$$)
 			"select itemid,value,clock".
 			" from " . history_table(ITEM_VALUE_TYPE_UINT64).
 			" where itemid in (" . join(',', @{$itemids_uint}) . ")".
-				" and " . sql_time_condition($from, $till) .
-			" order by clock,itemid"
+				" and " . sql_time_condition($from, $till)
 		);
 	}
 
@@ -5008,8 +5044,7 @@ sub get_test_history($$$$$$$$)
 			"select itemid,value,clock".
 			" from " . history_table(ITEM_VALUE_TYPE_FLOAT).
 			" where itemid in (" . join(',', @{$itemids_float}) . ")".
-				" and " . sql_time_condition($from, $till) .
-			" order by clock,itemid"
+				" and " . sql_time_condition($from, $till)
 		);
 	}
 
@@ -5023,8 +5058,7 @@ sub get_test_history($$$$$$$$)
 			"select itemid,value,clock".
 			" from " . history_table(ITEM_VALUE_TYPE_STR).
 			" where itemid in (" . join(',', @{$itemids_str}) . ")".
-				" and " . sql_time_condition($from, $till) .
-			" order by clock,itemid"
+				" and " . sql_time_condition($from, $till)
 		);
 
 	}
@@ -5249,18 +5283,16 @@ sub get_test_results($$;$)
 
 	foreach my $row_ref (@{$results})
 	{
-		my $itemid = $row_ref->[0];
-		my $value = $row_ref->[1];
-		my $clock = $row_ref->[2];
+		my ($itemid, $value, $clock) = @{$row_ref};
 
-		my $i = $item_data->{$itemid};
+		my $item_key = $item_data->{$itemid}{'key'};
 
-		next if (str_ends_with($i->{'key'}, ".enabled"));
-		next if (str_starts_with($i->{'key'}, "rsm.slv."));
-		next if (str_starts_with($i->{'key'}, "rsm.dns.nssok"));
-		next if (str_starts_with($i->{'key'}, "rsm.dns.mode"));
+		next if (str_ends_with($item_key, ".enabled"));
+		next if (str_starts_with($item_key, "rsm.slv."));
+		next if ($item_key eq "rsm.dns.nssok");
+		next if ($item_key eq "rsm.dns.mode");
 
-		my $service = get_service_from_key($i->{'key'});
+		my $service = get_service_from_key($item_key);
 		my $cycleclock = cycle_start($clock, $delays{$service});
 
 		# DNSSEC is part of DNS
@@ -5269,17 +5301,19 @@ sub get_test_results($$;$)
 		next if ($service_filter && $service ne $service_filter);
 
 		# RDDS is the only service that is not self-interface
-		if (str_starts_with($i->{'key'}, "rsm.rdds.status"))
+		if ($item_key eq "rsm.rdds.status")
 		{
 			# service status
 			$data{$cycleclock}{$service}{'status'} = $value;
 			next;
 		}
 
-		my $interface = __get_interface($service, $i->{'key'});
+		my $interface = __get_interface($service, $item_key);
+
+		my $interface_data = $data{$cycleclock}{$service}{'interfaces'}{$interface} //= {};
 
 		# if RDAP is not standalone, connect RDAP with RDDS
-		if (str_starts_with($i->{'key'}, "rdap.status"))
+		if ($item_key eq "rdap.status")
 		{
 			if (is_rdap_standalone($cycleclock))
 			{
@@ -5296,92 +5330,98 @@ sub get_test_results($$;$)
 			}
 
 			# interface status and clock
-			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'status'} = $value;
-			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'clock'} = $clock;
+			$interface_data->{'status'} = $value;
+			$interface_data->{'clock'} = $clock;
 
 			# target status
-			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}{FAKE_NS()}{FAKE_NSIP()}{'status'} = $value;
+			$interface_data->{'metrics'}{FAKE_NS()}{FAKE_NSIP()}{'status'} = $value;
 		}
-		elsif (str_starts_with($i->{'key'}, "rsm.dns.status"))
+		elsif ($item_key eq "rsm.dns.status")
 		{
-			# service status
-			$data{$cycleclock}{$service}{'status'} = $value;
+			if ($service eq 'dns')
+			{
+				# service status
+				$data{$cycleclock}{$service}{'status'} = $value;
 
-			# interface status and clock
-			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'status'} = $value;
-			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'clock'} = $clock;
+				# interface status and clock
+				$interface_data->{'status'} = $value;
+				$interface_data->{'clock'} = $clock;
+			}
 		}
-		elsif (str_starts_with($i->{'key'}, "rsm.dnssec.status"))
+		elsif ($item_key eq "rsm.dnssec.status")
 		{
-			# service status
-			$data{$cycleclock}{$service}{'status'} = $value;
+			if ($service eq 'dnssec')
+			{
+				# service status
+				$data{$cycleclock}{$service}{'status'} = $value;
 
-			# interface status and clock
-			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'status'} = $value;
-			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'clock'} = $clock;
+				# interface status and clock
+				$interface_data->{'status'} = $value;
+				$interface_data->{'clock'} = $clock;
+			}
 		}
-		elsif (str_starts_with($i->{'key'}, "rsm.rdds.43.status", "rsm.rdds.80.status"))
+		elsif ($item_key eq "rsm.rdds.43.status" || $item_key eq "rsm.rdds.80.status")
 		{
 			# interface status and clock
-			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'status'} = $value;
-			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'clock'} = $clock;
+			$interface_data->{'status'} = $value;
+			$interface_data->{'clock'} = $clock;
 
 			# target status
-			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}{FAKE_NS()}{FAKE_NSIP()}{'status'} = $value;
+			$interface_data->{'metrics'}{FAKE_NS()}{FAKE_NSIP()}{'status'} = $value;
 		}
-		elsif (str_starts_with($i->{'key'}, "rsm.dns.testedname", "rsm.rdds.43.testedname", "rdap.testedname"))
+		elsif ($item_key eq "rsm.dns.testedname" || $item_key eq "rsm.rdds.43.testedname" || $item_key eq "rdap.testedname")
 		{
 			# interface tested name
-			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'testedname'} = $value;
+			$interface_data->{'testedname'} = $value;
 		}
-		elsif (str_starts_with($i->{'key'}, "rsm.dns.protocol"))
+		elsif ($item_key eq "rsm.dns.protocol")
 		{
 			# interface protocol
-			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'protocol'} = $value;
+			$interface_data->{'protocol'} = $value;
 		}
-		elsif (str_starts_with($i->{'key'}, "rsm.dns.mode"))
+		elsif ($item_key eq "rsm.dns.mode")
 		{
 			# interface mode
-			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'mode'} = $value;
+			$interface_data->{'mode'} = $value;
 		}
-		elsif (str_starts_with($i->{'key'}, "rsm.dns.nsid"))
+		elsif (str_starts_with($item_key, "rsm.dns.nsid["))
 		{
 			# DNS metric: nsid
-			my ($ns, $nsip) = split(',', get_nsip_from_key($i->{'key'}));
+			my ($ns, $nsip) = split(',', get_nsip_from_key($item_key));
 
-			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}{$ns}{$nsip}{'nsid'} = $value;
+			$interface_data->{'metrics'}{$ns}{$nsip}{'nsid'} = $value;
 		}
-		elsif (str_starts_with($i->{'key'}, "rsm.dns.rtt"))
+		elsif (str_starts_with($item_key, "rsm.dns.rtt["))
 		{
 			# DNS metric: rtt
-			my ($ns, $nsip) = split(',', get_nsip_from_key($i->{'key'}));
+			my ($ns, $nsip) = split(',', get_nsip_from_key($item_key));
 
-			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}{$ns}{$nsip}{'rtt'} = $value;
+			$interface_data->{'metrics'}{$ns}{$nsip}{'rtt'} = $value;
 		}
-		elsif (str_starts_with($i->{'key'}, "rsm.dns.ns.status"))
+		elsif (str_starts_with($item_key, "rsm.dns.ns.status["))
 		{
 			# DNS metric: target status
 			my $ns;
 
-			$ns = $1 if ($i->{'key'} =~ /rsm.dns.ns.status\[(.*)\]/);
+			$ns = $1 if ($item_key =~ /rsm.dns.ns.status\[(.*)\]/);
 
-			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}{$ns}{FAKE_NSIP()}{'status'} = $value;
+			$interface_data->{'metrics'}{$ns}{FAKE_NSIP()}{'status'} = $value;
 		}
-		elsif (str_starts_with($i->{'key'}, "rsm.rdds.43.target", "rsm.rdds.80.target", "rdap.target"))
+		elsif ($item_key eq "rsm.rdds.43.target" || $item_key eq "rsm.rdds.80.target" || $item_key eq "rdap.target")
 		{
-			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}{FAKE_NS()}{FAKE_NSIP()}{'target'} = $value;
+			$interface_data->{'metrics'}{FAKE_NS()}{FAKE_NSIP()}{'target'} = $value;
 		}
-		elsif (str_starts_with($i->{'key'}, "rsm.rdds.43.rtt", "rsm.rdds.80.rtt", "rdap.rtt"))
+		elsif ($item_key eq "rsm.rdds.43.rtt" || $item_key eq "rsm.rdds.80.rtt" || $item_key eq "rdap.rtt")
 		{
-			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}{FAKE_NS()}{FAKE_NSIP()}{'rtt'} = $value;
+			$interface_data->{'metrics'}{FAKE_NS()}{FAKE_NSIP()}{'rtt'} = $value;
 		}
-		elsif (str_starts_with($i->{'key'}, "rsm.rdds.43.ip", "rsm.rdds.80.ip", "rdap.ip"))
+		elsif ($item_key eq "rsm.rdds.43.ip" || $item_key eq "rsm.rdds.80.ip" || $item_key eq "rdap.ip")
 		{
-			$data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}{FAKE_NS()}{FAKE_NSIP()}{'ip'} = $value;
+			$interface_data->{'metrics'}{FAKE_NS()}{FAKE_NSIP()}{'ip'} = $value;
 		}
 		else
 		{
-			fail("unhandled key: ", $i->{'key'});
+			fail("unhandled key: ", $item_key);
 		}
 	}
 
@@ -5397,60 +5437,49 @@ sub get_test_results($$;$)
 
 			foreach my $interface (sort(keys(%{$data{$cycleclock}{$service}{'interfaces'}})))
 			{
-				# interface status
-				$result->{$service}{$cycleclock}{'interfaces'}{$interface}{'status'} =
-					$data{$cycleclock}{$service}{'interfaces'}{$interface}{'status'};
+				my $interface_data = $data{$cycleclock}{$service}{'interfaces'}{$interface};
+				my $interface_result = $result->{$service}{$cycleclock}{'interfaces'}{$interface} = {};
 
-				# interface clock
-				$result->{$service}{$cycleclock}{'interfaces'}{$interface}{'clock'} =
-					$data{$cycleclock}{$service}{'interfaces'}{$interface}{'clock'};
+				$interface_result->{'status'    } = $interface_data->{'status'};
+				$interface_result->{'clock'     } = $interface_data->{'clock'};
+				$interface_result->{'protocol'  } = $interface_data->{'protocol'} if (exists($interface_data->{'protocol'}));
+				$interface_result->{'testedname'} = $interface_data->{'testedname'} if (exists($interface_data->{'testedname'}));
 
-				# interface protocol
-				if (exists($data{$cycleclock}{$service}{'interfaces'}{$interface}{'protocol'}))
+				foreach my $ns (sort(keys(%{$interface_data->{'metrics'}})))
 				{
-					$result->{$service}{$cycleclock}{'interfaces'}{$interface}{'protocol'} =
-						$data{$cycleclock}{$service}{'interfaces'}{$interface}{'protocol'};
-				}
+					my $ns_metrics_data = $interface_data->{'metrics'}{$ns};
 
-				# interface testedname
-				if (exists($data{$cycleclock}{$service}{'interfaces'}{$interface}{'testedname'}))
-				{
-					$result->{$service}{$cycleclock}{'interfaces'}{$interface}{'testedname'} =
-						$data{$cycleclock}{$service}{'interfaces'}{$interface}{'testedname'};
-				}
-
-				foreach my $ns (sort(keys(%{$data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}})))
-				{
 					# get rid of fake target
-					my $target = ($ns eq FAKE_NS ? $data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}{$ns}{FAKE_NSIP()}{'target'} : $ns);
+					my $target = ($ns eq FAKE_NS ? $ns_metrics_data->{FAKE_NSIP()}{'target'} : $ns);
 
 					# TODO: some probes return partial data, for now just handle it this way :-(
 					next unless (defined($target));
 
-					# target status is in FAKE_NS
-					$result->{$service}{$cycleclock}{'interfaces'}{$interface}{'targets'}{$target}{'status'} =
-						$data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}{$ns}{FAKE_NSIP()}{'status'};
+					my $target_result = $interface_result->{'targets'}{$target} = {};
 
-					foreach my $nsip (sort(keys(%{$data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}{$ns}})))
+					# target status is in FAKE_NS
+					$target_result->{'status'} = $ns_metrics_data->{FAKE_NSIP()}{'status'};
+
+					foreach my $nsip (sort(keys(%{$ns_metrics_data})))
 					{
 						# fake NSIP for target status (dns)
-						next unless (exists($data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}{$ns}{$nsip}{'rtt'}));
+						next unless (exists($ns_metrics_data->{$nsip}{'rtt'}));
 
 						# get rid of fake NSIP
-						my $ip = ($nsip eq FAKE_NSIP ? $data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}{$ns}{$nsip}{'ip'} : $nsip);
+						my $ip = ($nsip eq FAKE_NSIP ? $ns_metrics_data->{$nsip}{'ip'} : $nsip);
 
 						my $h = {
-							'rtt' => $data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}{$ns}{$nsip}{'rtt'},
+							'rtt' => $ns_metrics_data->{$nsip}{'rtt'},
 							'ip' => $ip,
 						};
 
-						if (exists($data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}{$ns}{$nsip}{'nsid'}))
+						if (exists($ns_metrics_data->{$nsip}{'nsid'}))
 						{
-							$h->{'nsid'} = $data{$cycleclock}{$service}{'interfaces'}{$interface}{'metrics'}{$ns}{$nsip}{'nsid'};
+							$h->{'nsid'} = $ns_metrics_data->{$nsip}{'nsid'};
 						}
 
 						# the metrics
-						push(@{$result->{$service}{$cycleclock}{'interfaces'}{$interface}{'targets'}{$target}{'metrics'}}, $h);
+						push(@{$target_result->{'metrics'}}, $h);
 					}
 				}
 			}
@@ -6218,15 +6247,25 @@ sub __log
 	$prev_tld = $cur_tld;
 }
 
+my $globalmacro_cache;
+
 sub __get_macro
 {
 	my $m = shift;
 
-	my $rows_ref = db_select("select value from globalmacro where macro='$m'");
+	if (!defined($globalmacro_cache))
+	{
+		my $rows = db_select("select macro, value from globalmacro");
 
-	fail("cannot find macro '$m'") unless (1 == scalar(@$rows_ref));
+		$globalmacro_cache = { map { $_->[0] => $_->[1] } @{$rows} };
+	}
 
-	return $rows_ref->[0]->[0];
+	if (!exists($globalmacro_cache->{$m}))
+	{
+		fail("cannot find macro '$m'");
+	}
+
+	return $globalmacro_cache->{$m};
 }
 
 sub __get_pidfile
