@@ -20,6 +20,7 @@ use Text::CSV_XS qw(csv);
 use Configuration;
 use Database;
 use Framework;
+use HttpClient;
 use Options;
 use Output;
 use ProvisioningApi;
@@ -50,6 +51,7 @@ my %command_handlers = (
 	'create-incident'         => [\&__cmd_create_incident        , 1, 1], # rsmhost,description,from,till,false_positive
 	'check-incident'          => [\&__cmd_check_incident         , 1, 1], # rsmhost,description,from,till
 	'check-event-count'       => [\&__cmd_check_event_count      , 1, 1], # rsmhost,description,count
+	'provisioning-api'        => [\&__cmd_provisioning_api       , 1, 1], # endpoint,method,expected_code,user,request,response
 );
 
 my $test_case_filename;
@@ -1070,7 +1072,75 @@ sub __cmd_check_event_count($)
 	}
 }
 
+sub __cmd_provisioning_api($)
+{
+	my $args = shift;
 
+	# [provisioning-api]
+	# endpoint,method,expected_code,user,request,response
+
+	my ($endpoint, $method, $expected_code, $user, $request, $response) = __unpack($args);
+
+	my $users = {
+		'' => undef,
+		'nonexistent' => {
+			'username' => 'nonexistent',
+			'password' => 'nonexistent',
+		},
+		'invalid_password' => {
+			'username' => get_config('provisioning-api', 'username_readonly'),
+			'password' => get_config('provisioning-api', 'password_readonly') . '_invalid',
+		},
+		'readonly' => {
+			'username' => get_config('provisioning-api', 'username_readonly'),
+			'password' => get_config('provisioning-api', 'password_readonly'),
+		},
+		'readwrite' => {
+			'username' => get_config('provisioning-api', 'username_readwrite'),
+			'password' => get_config('provisioning-api', 'password_readwrite'),
+		},
+	};
+
+	if (!exists($users->{$user}))
+	{
+		fail("unsupported user '$user', supported users: '', 'nonexistent', 'invalid_password', 'readonly', 'readwrite'");
+	}
+
+	if ($request ne '' && !File::Spec->file_name_is_absolute($request))
+	{
+		my (undef, $test_case_dir, undef) = File::Spec->splitpath($test_case_filename);
+
+		$request = File::Spec->catfile($test_case_dir, $request);
+	}
+	if ($response ne '' && !File::Spec->file_name_is_absolute($response))
+	{
+		my (undef, $test_case_dir, undef) = File::Spec->splitpath($test_case_filename);
+
+		$response = File::Spec->catfile($test_case_dir, $response);
+	}
+
+	my $payload = $request eq '' ? undef : read_file($request);
+
+	my $url = get_config('provisioning-api', 'url') . $endpoint;
+
+	my ($status_code, $content_type, $response_body) = http_request($url, $method, $users->{$user}, $payload);
+
+	if ($status_code != $expected_code)
+	{
+		fail("unexpected status code '$status_code', expected '$expected_code'");
+	}
+
+	if (!defined($content_type) || $content_type ne 'application/json')
+	{
+		$content_type //= 'undef';
+		fail("unexpected content type '$content_type', expected 'application/json'");
+	}
+
+	if ($response ne '')
+	{
+		...;
+	}
+}
 
 ################################################################################
 # helper functions
