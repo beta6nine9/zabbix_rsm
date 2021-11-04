@@ -7,14 +7,15 @@ use strict;
 use warnings;
 
 use Data::Dumper;
-
+use File::Copy;
+use IO::Select;
 use Parallel::ForkManager;
+use Socket;
 
 use RSM;
 use RSMSLV;
 use TLD_constants qw(:api :config :groups :items);
 use ApiHelper;
-use File::Copy;
 use sigtrap 'handler' => \&main_process_signal_handler, 'normal-signals';
 
 $Data::Dumper::Terse = 1;	# do not output names like "$VAR1 = "
@@ -36,9 +37,17 @@ use constant DEFAULT_INITIAL_MEASUREMENTS_LIMIT => 7200;	# seconds, if the metri
 
 use constant RSMHOST => "";	# for Service Availability items, this is only needed for cache
 
+my %service_status_to_str = (
+	&UP                        => 'Up',
+	&DOWN                      => 'Down',
+	&UP_INCONCLUSIVE_NO_DATA   => 'Up-inconclusive-no-data',
+	&UP_INCONCLUSIVE_NO_PROBES => 'Up-inconclusive-no-probes',
+	&UP_INCONCLUSIVE_RECONFIG  => 'Up-inconclusive-reconfig',
+);
+
 sub main_process_signal_handler();
 sub process_server($);
-sub process_tld_batch($$$$$$);
+sub process_tld_batch($$$);
 sub process_tld($$$$$$);
 sub cycles_to_calculate($$$$$$$$);
 sub get_lastvalues_from_db($$$$);
@@ -49,9 +58,7 @@ sub get_history_by_itemid($$$);
 sub child_error($$$$$);
 sub update_lastvalues_cache($);
 sub set_on_finish($);
-sub wait_for_children($);
 sub terminate_children($);
-sub get_swap_usage($);
 
 parse_opts('tld=s', 'service=s', 'server-id=i', 'now=i', 'period=i', 'print-period', 'max-children=i', 'max-wait=i', 'prettify-json', 'debug2');
 
@@ -160,8 +167,8 @@ else
 	fail("cannot calculate maximum number of processes to use") unless ($children_per_server);
 }
 
-info("servers             : $server_count") if (opt('stats'));
-info("max children/server : $children_per_server") if (opt('stats'));
+info("servers         : $server_count") if (opt('stats'));
+info("children/server : $children_per_server") if (opt('stats'));
 
 my $child_failed = 0;
 my $signal_sent = 0;
@@ -171,9 +178,9 @@ my $fm = new Parallel::ForkManager($server_count);
 set_on_finish($fm);
 
 # {
-#     PID => {'desc' => 'server_#_parent', 'from' => 1234324235, 'swap-usage' => '0 kB'},
+#     PID => {'desc' => 'server_#_parent', 'from' => 1234324235},
 #     ...
-#     PID => {'desc' => 'server_#_child', 'from' => 1234324235, 'swap-usage' => '4 kB'},
+#     PID => {'desc' => 'server_#_child', 'from' => 1234324235},
 #     ...
 # }
 my %child_desc;
@@ -196,68 +203,57 @@ foreach my $server_key (@server_keys)
 	$child_desc{$pid} = {
 		'desc' => "${server_key}_parent",
 		'from' => time(),
-		'swap-usage' => '0 kB'
 	};
-	#$child_desc{$pid}->{'smaps-dumped'} = 0;
 
 	dbg("$child_desc{$pid}->{'desc'} (PID:$pid) STARTED");
 }
 
-wait_for_children($fm);
+$fm->wait_all_children();
 
 slv_exit($child_failed ? E_FAIL : SUCCESS);
-
-sub wait_for_children($)
-{
-	my $fm = shift;
-
-	for (;;)
-	{
-		$fm->reap_finished_children();
-
-		my @procs = $fm->running_procs();
-
-		return unless (scalar(@procs));
-
-		dbg("waiting for ", scalar(@procs), " children:");
-
-		# check wether there's long running process
-		foreach my $pid (@procs)
-		{
-			my $swap_usage = get_swap_usage($pid);
-
-			if (defined($swap_usage) && ($swap_usage ne $child_desc{$pid}->{'swap-usage'}))
-			{
-				wrn("$child_desc{$pid}->{'desc'} (PID:$pid) is swapping $swap_usage");
-
-				$child_desc{$pid}->{'swap-usage'} = $swap_usage;
-
-				# TODO: consider writing if is over 1000 kB, add date/time to the file name, write only if size changed
-				# if (!$child_desc{$pid}->{'smaps-dumped'})
-				# {
-				# 	mkdir("/tmp/sla-api-recent-smaps") unless (-d "/tmp/sla-api-recent-smaps");
-				#
-				# 	copy("/proc/$pid/smaps","/tmp/sla-api-recent-smaps/$pid") or fail("cannot copy smaps file: $!");
-				#
-				# 	$child_desc{$pid}->{'smaps-dumped'} = 1;
-				#
-				# 	wrn("$child_desc{$pid}->{'desc'} (PID:$pid) smaps file saved to /tmp/sla-api-recent-smaps/$pid");
-				# }
-			}
-			else
-			{
-				dbg("$child_desc{$pid}->{'desc'} (PID:$pid), running for ", (time() - $child_desc{$pid}->{'from'}), " seconds");
-			}
-		}
-
-		sleep(1);
-	}
-}
 
 sub main_process_signal_handler()
 {
 	wrn("main process caught a signal: $!");
 	slv_exit(E_FAIL);
+}
+
+sub get_tld_from_socket($)
+{
+	my $select = shift;
+
+	my @ready;
+	my $socket;
+
+	@ready = $select->can_write();
+	$socket = $ready[0];
+
+	print $socket "\n";
+
+	@ready = $select->can_read();
+	$socket = $ready[0];
+
+	my $tld = <$socket>;
+
+	if (defined($tld))
+	{
+		chomp($tld);
+	}
+
+	return $tld;
+}
+
+sub put_tld_into_socket($$)
+{
+	my $select = shift;
+	my $tld    = shift;
+
+	my @ready = $select->can_read();
+	my $socket = $ready[0];
+
+	<$socket>;
+
+	print $socket "$tld\n";
 }
 
 sub process_server($)
@@ -272,8 +268,6 @@ sub process_server($)
 		$lastvalues_cache->{'tlds'} = {};
 	}
 
-	# probes available for every service
-	my %probes;
 	my $server_tlds;
 
 	db_connect($server_key);
@@ -297,24 +291,18 @@ sub process_server($)
 
 	my $children_count = ($server_tld_count < $children_per_server ? $server_tld_count : $children_per_server);
 
-	my $tlds_per_child = int($server_tld_count / $children_count);
-
-	info("children/$server_key : $children_count") if (opt('stats'));
-
 	my $fm = new Parallel::ForkManager($children_count);
 	set_on_finish($fm);
 
-	my $tldi_begin = 0;
-	my $tldi_end;
-
 	%child_desc = ();
 
-	while ($children_count)
-	{
-		$tldi_end = $tldi_begin + $tlds_per_child;
+	my @sockets;
 
-		# add one extra from remainder
-		$tldi_end++ if ($server_tld_count - $tldi_begin - ($children_count * $tlds_per_child));
+	for (my $i = 0; $i < $children_count; $i++)
+	{
+		socketpair(my $child, my $parent, AF_UNIX, SOCK_STREAM, PF_UNSPEC) or fail("socketpair() failed: $!");
+		$child->autoflush(1);
+		$parent->autoflush(1);
 
 		my %child_data;
 
@@ -322,32 +310,52 @@ sub process_server($)
 
 		if ($pid == 0)
 		{
-			init_process();
+			close($parent);
 
 			set_alarm($max_wait);
 
-			process_tld_batch($server_tlds, $tldi_begin, $tldi_end, \%child_data, \%probes, $all_probes_ref);
+			init_process();
+
+			process_tld_batch($child, \%child_data, $all_probes_ref);
 
 			finalize_process();
+
+			close($child);
 
 			$fm->finish(SUCCESS, \%child_data);
 		}
 
+		close($child);
+		push(@sockets, $parent);
+
 		$child_desc{$pid} = {
 			'desc' => "${server_key}_child",
 			'from' => time(),
-			'swap-usage' => '0 kB'
 		};
-		#$child_desc{$pid}->{'smaps-dumped'} = 0;
 
 		dbg("$child_desc{$pid}->{'desc'} (PID:$pid) STARTED");
-
-		$tldi_begin = $tldi_end;
-
-		$children_count--;
 	}
 
-	wait_for_children($fm);
+	my $select = IO::Select->new(@sockets);
+
+	foreach my $tld (sort(@{$server_tlds}))
+	{
+		put_tld_into_socket($select, $tld);
+	}
+
+	while ($select->count())
+	{
+		my @ready = $select->can_read();
+
+		foreach my $socket (@ready)
+		{
+			$select->remove($socket);
+			<$socket>;
+			close($socket);
+		}
+	}
+
+	$fm->wait_all_children();
 
 	# Do not update cache if something happened.
 	if (!opt('dry-run') && !opt('now'))
@@ -359,20 +367,26 @@ sub process_server($)
 	}
 }
 
-sub process_tld_batch($$$$$$)
+sub process_tld_batch($$$)
 {
-	my $tlds = shift;
-	my $tldi_begin = shift;
-	my $tldi_end = shift;
+	my $socket         = shift;
 	my $child_data_ref = shift;
-	my $probes_ref = shift;		# probes by services
 	my $all_probes_ref = shift;	# all available probes in the system
+
+	my $probes_ref;	# probes by services
 
 	db_connect($server_key);
 
-	for (my $tldi = $tldi_begin; $tldi != $tldi_end; $tldi++)
+	my $select = IO::Select->new($socket);
+
+	while (1)
 	{
-		$tld = $tlds->[$tldi]; # global variable
+		$tld = get_tld_from_socket($select); # global variable
+
+		if (!defined($tld))
+		{
+			last;
+		}
 
 		# Last values from the "lastvalue" (availability, RTTs) and "lastvalue_str" (IPs) tables.
 		#
@@ -437,6 +451,8 @@ sub process_tld_batch($$$$$$)
 # implement DNSSEC service handling in all the places/scripts properly.
 my $dns_results_cache;
 
+my $nsids_cache;
+
 sub process_tld($$$$$$)
 {
 	my $tld = shift;
@@ -447,6 +463,7 @@ sub process_tld($$$$$$)
 	my $lastvalues_cache_tld = shift;
 
 	$dns_results_cache = {};
+	$nsids_cache = {};
 
 	# dns-results-cache:
 	# ensure 'dnssec' comes after 'dns' by using sort(), because
@@ -739,6 +756,7 @@ sub cycles_to_calculate($$$$$$$$)
 }
 
 # gets the history of item for a given period
+
 sub get_history_by_itemid($$$)
 {
 	my $itemid = shift;
@@ -1130,21 +1148,153 @@ sub fill_test_data($$$$)
 	}
 }
 
+sub get_history($$$$)
+{
+	my $itemids = shift;
+	my $table   = shift;
+	my $from    = shift;
+	my $till    = shift;
+
+	my $max_chunk_size = 100;
+
+	my @itemids = @{$itemids};
+	my @rows = ();
+
+	while (@itemids)
+	{
+		my @itemids_splice = splice(@itemids, 0, $max_chunk_size);
+		my $itemids_placeholder = join(",", ("?") x scalar(@itemids_splice));
+
+		my $sql = "select itemid,value,clock" .
+			" from $table" .
+			" where" .
+				" itemid in ($itemids_placeholder) and" .
+				" clock between ? and ?";
+		my $params = [@itemids_splice, $from, $till];
+
+		my $rows = db_select($sql, $params);
+
+		push(@rows, @{$rows});
+	}
+
+	return @rows;
+}
+
+sub get_history_with_throttling($$$$)
+{
+	my $itemids = shift;
+	my $table   = shift;
+	my $from    = shift;
+	my $till    = shift;
+
+	my $sql;
+	my $params;
+	my $rows;
+
+	# get max clocks
+
+	my $itemids_placeholder = join(",", ("?") x scalar(@{$itemids}));
+	$sql = "select itemid,max(clock) from $table where itemid in ($itemids_placeholder) and clock between ? and ? group by itemid";
+	$params = [@{$itemids}, $from, $till];
+	$rows = db_select($sql, $params);
+
+	if (!@{$rows})
+	{
+		return [];
+	}
+
+	# get values
+
+	my $filter_placeholder = join("or", ("(itemid=? and clock=?)") x scalar(@{$rows}));
+	$sql = "select itemid,clock,value from $table where $filter_placeholder";
+	$params = [map(@{$_}, @{$rows})];
+	$rows = db_select($sql, $params);
+
+	return $rows;
+}
+
+sub get_cycle_nsids($$$)
+{
+	my $lastvalues = shift;
+	my $from       = shift;
+	my $till       = shift;
+
+	my %result  = ();
+	my %missing = ();
+
+	foreach my $probe (keys(%{$lastvalues}))
+	{
+		foreach my $ns (keys(%{$lastvalues->{$probe}}))
+		{
+			foreach my $ip (keys(%{$lastvalues->{$probe}{$ns}}))
+			{
+				my $itemid = $lastvalues->{$probe}{$ns}{$ip}{'itemid'};
+				my $clock  = $lastvalues->{$probe}{$ns}{$ip}{'clock'};
+				my $value  = $lastvalues->{$probe}{$ns}{$ip}{'value'};
+
+				if ($clock <= $till)
+				{
+					$result{$probe}{$ns}{$ip} = $value;
+				}
+				else
+				{
+					$missing{$itemid} = \$result{$probe}{$ns}{$ip};
+				}
+			}
+		}
+	}
+
+	if (keys(%missing))
+	{
+		my $history = get_history_with_throttling([keys(%missing)], 'history_str', $from - $heartbeat + 60, $till);
+
+		foreach my $row (@{$history})
+		{
+			my ($itemid, undef, $value) = @{$row};
+
+			${$missing{$itemid}} = $value;
+		}
+	}
+
+	return \%result;
+}
+
+sub probes_data_to_itemids($)
+{
+	my $data = shift;
+
+	my $itemids;
+
+	foreach my $probe (keys(%{$data}))
+	{
+		foreach my $itemid (keys(%{$data->{$probe}}))
+		{
+			my $key = $data->{$probe}{$itemid}{'key'};
+
+			$itemids->{$probe}{$key} = $itemid;
+		}
+	}
+
+	return $itemids;
+}
+
 sub calculate_cycle($$$$$$$$$$)
 {
 	$tld = shift;		# set globally
-	my $service = shift;
-	my $probes_data = shift;
+	my $service              = shift;
+	my $probes_data          = shift;
 	my $lastvalues_nsids_tld = shift;
-	my $cycle_clock = shift;
-	my $delay = shift;
-	my $rtt_limit = shift;
-	my $service_probes_ref = shift;	# probes enabled for the service ('name' => {'hostid' => hostid, 'status' => status}) available for this service
-	my $all_probes_ref = shift;	# same structure but all available probes in the system, for listing in JSON files
-	my $interfaces_ref = shift;
+	my $cycle_clock          = shift;
+	my $delay                = shift;
+	my $rtt_limit            = shift;
+	my $service_probes_ref   = shift;	# probes enabled for the service ('name' => {'hostid' => hostid, 'status' => status}) available for this service
+	my $all_probes_ref       = shift;	# same structure but all available probes in the system, for listing in JSON files
+	my $interfaces_ref       = shift;
 
 	my $from = cycle_start($cycle_clock, $delay);
 	my $till = cycle_end($cycle_clock, $delay);
+
+	my $itemids = probes_data_to_itemids($probes_data);
 
 	my $json = {'testedInterface' => []};
 
@@ -1167,14 +1317,7 @@ sub calculate_cycle($$$$$$$$$$)
 	# First, get Service Availability data.
 	#
 
-	my $service_availability_itemid;
-
-	foreach my $itemid (keys(%{$probes_data->{RSMHOST()}}))
-	{
-		next unless ($probes_data->{RSMHOST()}{$itemid}{'key'} eq "rsm.slv.$service.avail");
-
-		$service_availability_itemid = $itemid;
-	}
+	my $service_availability_itemid = $itemids->{RSMHOST()}{"rsm.slv.$service.avail"};
 
 	if (!$service_availability_itemid)
 	{
@@ -1250,32 +1393,14 @@ sub calculate_cycle($$$$$$$$$$)
 				fail($msg);
 			}
 
-			if ($values{$itemid}->[0] == UP)
-			{
-				$json->{'status'} = 'Up';
-			}
-			elsif ($values{$itemid}->[0] == DOWN)
-			{
-				$json->{'status'} = 'Down';
-			}
-			elsif ($values{$itemid}->[0] == UP_INCONCLUSIVE_NO_DATA)
-			{
-				$json->{'status'} = 'Up-inconclusive-no-data';
-			}
-			elsif ($values{$itemid}->[0] == UP_INCONCLUSIVE_NO_PROBES)
-			{
-				$json->{'status'} = 'Up-inconclusive-no-probes';
-			}
-			elsif ($values{$itemid}->[0] == UP_INCONCLUSIVE_RECONFIG)
-			{
-				$json->{'status'} = 'Up-inconclusive-reconfig';
-			}
-			else
-			{
-				fail("item \"$key\" ($itemid) contains unexpected value \"", $values{$itemid}->[0] , "\"");
-			}
+			$rawstatus = $values{$itemid}[0];
 
-			$rawstatus = $values{$itemid}->[0];
+			$json->{'status'} = $service_status_to_str{$rawstatus};
+
+			if (!defined($json->{'status'}))
+			{
+				fail("item \"$key\" ($itemid) contains unexpected value \"$rawstatus\"");
+			}
 		}
 		else
 		{
@@ -1294,6 +1419,61 @@ sub calculate_cycle($$$$$$$$$$)
 	# Now get test results.
 	#
 
+	# get itemids of probe items, group them by type and by probe
+
+	my %itemids_by_probe;
+
+	my @itemids_uint;
+	my @itemids_float;
+	my @itemids_str;
+
+	foreach my $probe (keys(%{$probes_data}))
+	{
+		# service availability items are already handled
+		next if ($probe eq RSMHOST);
+
+		# in case of Up-inconclusive-reconfig do not collect probe results
+		next if ($rawstatus == UP_INCONCLUSIVE_RECONFIG);
+
+		# collect itemids, group them by value_type to fetch values from according history table later
+
+		my $probe_data = $probes_data->{$probe};
+
+		my @probe_itemids_uint  = grep { $probe_data->{$_}{'value_type'} == ITEM_VALUE_TYPE_UINT64 } keys(%{$probe_data});
+		my @probe_itemids_float = grep { $probe_data->{$_}{'value_type'} == ITEM_VALUE_TYPE_FLOAT  } keys(%{$probe_data});
+		my @probe_itemids_str   = grep { $probe_data->{$_}{'value_type'} == ITEM_VALUE_TYPE_STR && $probe_data->{$_}{'key'} !~ /^rsm\.dns\.nsid\[/ } keys(%{$probe_data});
+
+		next if (@probe_itemids_uint == 0 || @probe_itemids_float == 0);
+
+		$itemids_by_probe{$probe} = [@probe_itemids_uint, @probe_itemids_float, @probe_itemids_str];
+
+		push(@itemids_uint , @probe_itemids_uint);
+		push(@itemids_float, @probe_itemids_float);
+		push(@itemids_str  , @probe_itemids_str);
+	}
+
+	# get history of probe items
+
+	my @rows;
+
+	push(@rows, get_history(\@itemids_uint , "history_uint", $from, $till));
+	push(@rows, get_history(\@itemids_float, "history"     , $from, $till));
+	push(@rows, get_history(\@itemids_str  , "history_str" , $from, $till));
+
+	my %rows_by_itemid = map { $_->[0] => $_ } @rows;
+
+	my $nsids;
+
+	if ($service eq 'dns' || $service eq 'dnssec')
+	{
+		if (!exists($nsids_cache->{$cycle_clock}))
+		{
+			$nsids_cache->{$cycle_clock} = get_cycle_nsids($lastvalues_nsids_tld, $from, $till);
+		}
+
+		$nsids = $nsids_cache->{$cycle_clock};
+	}
+
 	# we need to aggregate DNS target statuses from Probes to generate Name Server Availability data
 	my $name_server_availability_data = {};
 
@@ -1307,62 +1487,23 @@ sub calculate_cycle($$$$$$$$$$)
 		# In case of Up-inconclusive-reconfig do not collect probe results
 		if ($rawstatus != UP_INCONCLUSIVE_RECONFIG)
 		{
-			my (@itemids_uint, @itemids_float, @itemids_str);
-			my ($results_uint, $results_float, $results_str);
+			next if (!defined($itemids_by_probe{$probe}));
 
-			#
-			# collect itemids, separate them by value_type to fetch values from according history table later
-			#
+			my @results = grep { defined($_) } map($rows_by_itemid{$_}, @{$itemids_by_probe{$probe}});
 
-			map {
-				my $i = $probes_data->{$probe}{$_};
-
-				if ($i->{'value_type'} == ITEM_VALUE_TYPE_UINT64)
-				{
-					push(@itemids_uint, $_);
-				}
-				elsif ($i->{'value_type'} == ITEM_VALUE_TYPE_FLOAT)
-				{
-					push(@itemids_float, $_);
-				}
-				elsif ($i->{'value_type'} == ITEM_VALUE_TYPE_STR)
-				{
-					push(@itemids_str, $_);
-				}
-			} (keys(%{$probes_data->{$probe}}));
-
-			next if (@itemids_uint == 0 || @itemids_float == 0);
-
-			get_test_history(
-				$from,
-				$till,
-				\@itemids_uint,
-				\@itemids_float,
-				\@itemids_str,
-				\$results_uint,
-				\$results_float,
-				\$results_str
-			);
-
-			$results = get_test_results(
-				[@{$results_uint}, @{$results_float}, @{$results_str}],
-				$probes_data->{$probe},
-				$service
-			);
+			$results = get_test_results(\@results, $probes_data->{$probe}, $service);
 		}
 
 		# dns-results-cache:
 		if ($service eq 'dns')
 		{
 			# remember this for the cycle where we'll handle DNSSEC service
-			$dns_results_cache->{$probe} = $results->{'dns'};
+			$dns_results_cache->{$cycle_clock}{$probe} = $results->{'dns'};
 		}
 		elsif ($service eq 'dnssec')
 		{
-			$results->{'dnssec'} = $dns_results_cache->{$probe};
+			$results->{'dnssec'} = $dns_results_cache->{$cycle_clock}{$probe};
 		}
-
-		next if (!$results);
 
 		foreach my $cycleclock (keys(%{$results->{$service}}))
 		{
@@ -1411,54 +1552,7 @@ sub calculate_cycle($$$$$$$$$$)
 
 						if ($service eq 'dns' || $service eq 'dnssec')
 						{
-							# "empty NSID" == "no NSID" in the database
-							my $nsid = '';
-
-							if (exists($metric->{'nsid'}))
-							{
-								# NSID is available in this cycle
-								$nsid = $metric->{'nsid'};
-							}
-							else
-							{
-								my $nsid_details = $lastvalues_nsids_tld->{$probe}{$target}{$metric->{'ip'}};
-
-								if (defined($nsid_details) && $nsid_details->{'clock'} <= $cycleclock)
-								{
-									# getting NSID from lastvalue table
-									$nsid = $nsid_details->{'value'};
-								}
-								else
-								{
-									dbg("'$tld $probe' item rsm.dns.nsid[$target,$metric->{'ip'}] not in lastvalue, getting itemid and then value from history");
-
-									my $itemid = db_select_value(
-										"select itemid".
-										" from items i,hosts h".
-										" where i.hostid=h.hostid".
-											" and h.host='$tld $probe'".
-											" and i.key_='rsm.dns.nsid[$target,$metric->{'ip'}]'"
-									);
-
-									# get it from the history table, the first using descending order by clock
-									my $rows_ref = db_select(
-										"select value,clock".
-										" from " . history_table(ITEM_VALUE_TYPE_STR).
-										" where itemid=$itemid".
-											" and " . sql_time_condition($cycleclock - $heartbeat, $cycleclock).
-										" order by clock desc".
-										" limit 1"
-									);
-
-									if (scalar(@{$rows_ref}) != 0)
-									{
-										# getting the most recent NSID from history table
-										$nsid = $rows_ref->[0]->[0];
-									}
-								}
-							}
-
-							$h->{'nsid'} = ($nsid eq '' ? undef : $nsid);
+							$h->{'nsid'} = $nsids->{$probe}{$target}{$metric->{'ip'}} // '';
 						}
 
 						push(@{$tested_interfaces{$tested_interface}{$probe}{'testData'}{$target}}, $h);
@@ -1607,10 +1701,14 @@ sub calculate_cycle($$$$$$$$$$)
 
 	foreach my $target (sort(keys(%{$name_server_availability_data->{'targets'}})))
 	{
+		my $status = $name_server_availability_data->{'targets'}{$target};
+
+		next unless (defined($status));
+
 		push(@{$json->{'nameServerAvailability'}{'nameServerStatus'}},
 			{
 				'target' => $target,
-				'status' => ($name_server_availability_data->{'targets'}{$target} == UP ? 'Up' : 'Down'),
+				'status' => ($status == UP ? 'Up' : 'Down'),
 			}
 		);
 	}
@@ -1650,7 +1748,7 @@ sub calculate_cycle($$$$$$$$$$)
 
 		$json->{'minNameServersUp'} = int($cfg_minns);
 	}
-		
+
 	if (opt('debug2'))
 	{
 		print(Dumper($json));
@@ -1874,30 +1972,6 @@ sub set_on_finish($)
 			}
 		}
 	);
-}
-
-sub get_swap_usage($)
-{
-	my $pid = shift;
-
-	my $status_file = "/proc/$pid/status";
-
-	my $swap_usage;
-
-	open(my $status, '<', $status_file) or fail("cannot open \"$status_file\": $!");
-
-	while (<$status>)
-	{
-		if (/^VmSwap:\s+(\d*.*)/)
-		{
-			$swap_usage = $1;
-			last;
-		}
-	}
-
-	close($status);
-
-	return $swap_usage;
 }
 
 __END__

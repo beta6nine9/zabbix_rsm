@@ -33,7 +33,7 @@ class ParticularTestsListAction extends Action {
 	protected function checkInput() {
 		$fields = [
 			'host'		=> 'string',
-			'type'		=> 'required|in '.implode(',', [RSM_DNS, RSM_DNSSEC, RSM_RDDS, RSM_EPP, RSM_RDAP]),
+			'type'		=> 'required|in '.implode(',', [RSM_RDDS, RSM_EPP, RSM_RDAP]),
 			'time'		=> 'int32',
 			'slvItemId' => 'int32'
 		];
@@ -91,17 +91,7 @@ class ParticularTestsListAction extends Action {
 		$data['totalProbes'] = 0;
 
 		// Decide which items need to select.
-		if ($data['type'] == RSM_DNS || $data['type'] == RSM_DNSSEC) {
-			$calculated_item_key[] = CALCULATED_ITEM_DNS_DELAY;
-
-			if ($data['type'] == RSM_DNS) {
-				$data['downProbes'] = 0;
-			}
-			else {
-				$data['totalTests'] = 0;
-			}
-		}
-		elseif ($data['type'] == RSM_RDAP) {
+		if ($data['type'] == RSM_RDAP) {
 			$calculated_item_key[] = CALCULATED_ITEM_RDAP_DELAY;
 		}
 		elseif ($data['type'] == RSM_RDDS) {
@@ -109,10 +99,6 @@ class ParticularTestsListAction extends Action {
 		}
 		else {
 			$calculated_item_key[] = CALCULATED_ITEM_EPP_DELAY;
-		}
-
-		if ($data['type'] == RSM_DNS) {
-			$calculated_item_key[] = CALCULATED_ITEM_DNS_UDP_RTT_HIGH;
 		}
 
 		// Get host with calculated items.
@@ -150,18 +136,7 @@ class ParticularTestsListAction extends Action {
 			]);
 
 			$macro_item_value = reset($macro_item_value);
-
-			if ($data['type'] == RSM_DNS) {
-				if ($macro_item['key_'] == CALCULATED_ITEM_DNS_UDP_RTT_HIGH) {
-					$udp_rtt = $macro_item_value['value'];
-				}
-				else {
-					$macro_time = $macro_item_value['value'] - 1;
-				}
-			}
-			else {
-				$macro_time = $macro_item_value['value'] - 1;
-			}
+			$macro_time = $macro_item_value['value'] - 1;
 		}
 
 		// Time calculation.
@@ -229,13 +204,7 @@ class ParticularTestsListAction extends Action {
 		}
 
 		// Get test result.
-		if ($data['type'] == RSM_DNS) {
-			$key = RSM_SLV_DNS_AVAIL;
-		}
-		elseif ($data['type'] == RSM_DNSSEC) {
-			$key = RSM_SLV_DNSSEC_AVAIL;
-		}
-		elseif ($data['type'] == RSM_RDDS) {
+		if ($data['type'] == RSM_RDDS) {
 			$key = RSM_SLV_RDDS_AVAIL;
 		}
 		elseif ($data['type'] == RSM_RDAP) {
@@ -272,7 +241,7 @@ class ParticularTestsListAction extends Action {
 			}
 
 			// Get mapped value for test result.
-			if (in_array($data['type'], [RSM_DNS, RSM_DNSSEC, RSM_RDDS, RSM_RDAP])) {
+			if (in_array($data['type'], [RSM_RDDS, RSM_RDAP])) {
 				$test_result_label = ($test_result['value'] !== null)
 					? getMappedValue($test_result['value'], RSM_SERVICE_AVAIL_VALUE_MAP)
 					: false;
@@ -515,10 +484,7 @@ class ParticularTestsListAction extends Action {
 		unset($hosts_templates, $hosted_templates);
 
 		// get only used items
-		if ($data['type'] == RSM_DNS || $data['type'] == RSM_DNSSEC) {
-			$probe_item_key = ' AND (i.key_ LIKE ('.zbx_dbstr(PROBE_DNS_UDP_ITEM_RTT.'%').') OR i.key_='.zbx_dbstr(PROBE_DNS_UDP_ITEM).')';
-		}
-		elseif ($data['type'] == RSM_RDAP) {
+		if ($data['type'] == RSM_RDAP) {
 			$items_to_check = [];
 			$probe_item_key = [];
 
@@ -607,48 +573,12 @@ class ParticularTestsListAction extends Action {
 						'output' => API_OUTPUT_EXTEND
 					]);
 
+					if (!$itemValue)
+						continue;
+
 					$itemValue = reset($itemValue);
 
-					if ($data['type'] == RSM_DNS && $item['key_'] === PROBE_DNS_UDP_ITEM) {
-						$hosts[$item['hostid']]['result'] = $itemValue ? $itemValue['value'] : null;
-					}
-					elseif ($data['type'] == RSM_DNS && mb_substr($item['key_'], 0, 16) == PROBE_DNS_UDP_ITEM_RTT) {
-						preg_match('/^[^\[]+\[([^\]]+)]$/', $item['key_'], $matches);
-						$nsValues = explode(',', $matches[1]);
-
-						if (!$itemValue) {
-							$nsArray[$item['hostid']][$nsValues[1]]['value'][] = NS_NO_RESULT;
-						}
-						elseif ($itemValue['value'] < $udp_rtt && !isServiceErrorCode($itemValue['value'], $data['type'])) {
-							$nsArray[$item['hostid']][$nsValues[1]]['value'][] = NS_UP;
-						}
-						else {
-							$nsArray[$item['hostid']][$nsValues[1]]['value'][] = NS_DOWN;
-						}
-					}
-					elseif ($data['type'] == RSM_DNSSEC && mb_substr($item['key_'], 0, 16) == PROBE_DNS_UDP_ITEM_RTT) {
-						if (!isset($hosts[$item['hostid']]['value'])) {
-							$hosts[$item['hostid']]['value']['ok'] = 0;
-							$hosts[$item['hostid']]['value']['fail'] = 0;
-							$hosts[$item['hostid']]['value']['total'] = 0;
-							$hosts[$item['hostid']]['value']['noResult'] = 0;
-						}
-
-						if ($itemValue) {
-							if (isServiceErrorCode($itemValue['value'], $data['type'])) {
-								$hosts[$item['hostid']]['value']['fail']++;
-							}
-							else {
-								$hosts[$item['hostid']]['value']['ok']++;
-							}
-						}
-						else {
-							$hosts[$item['hostid']]['value']['noResult']++;
-						}
-
-						$hosts[$item['hostid']]['value']['total']++;
-					}
-					elseif ($data['type'] == RSM_RDDS || $data['type'] == RSM_RDAP) {
+					if ($data['type'] == RSM_RDDS || $data['type'] == RSM_RDAP) {
 						if ($item['key_'] == PROBE_RDDS43_IP) {
 							$hosts[$item['hostid']]['rdds43']['ip'] = $itemValue ? $itemValue['value'] : null;
 						}
@@ -779,27 +709,6 @@ class ParticularTestsListAction extends Action {
 
 		// Sort errors.
 		krsort($data['errors']);
-
-		if ($data['type'] == RSM_DNS) {
-			foreach ($nsArray as $hostId => $nss) {
-				$hosts[$hostId]['value']['fail'] = 0;
-
-				foreach ($nss as $nsName => $nsValue) {
-					if (in_array(NS_DOWN, $nsValue['value'])) {
-						$hosts[$hostId]['value']['fail']++;
-					}
-				}
-
-				// Calculate Down probes.
-				if (count($nss) - $hosts[$hostId]['value']['fail'] < $min_dns_count) {	// TODO: remove 3 months after deployment
-					$data['downProbes']++;
-					$hosts[$hostId]['class'] = ZBX_STYLE_RED;
-				}
-				else {
-					$hosts[$hostId]['class'] = ZBX_STYLE_GREEN;
-				}
-			}
-		}
 
 		foreach ($hosts as $host) {
 			foreach ($data['probes'] as $hostId => $probe) {
