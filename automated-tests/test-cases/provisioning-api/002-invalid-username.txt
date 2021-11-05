@@ -1,0 +1,43 @@
+[test-case]
+
+002 Invalid username
+
+[prepare-server-database]
+
+[set-global-macro]
+
+"{$RSM.MONITORING.TARGET}","registry"
+"{$RSM.IP4.ROOTSERVERS1}","193.0.14.129,192.5.5.241,199.7.83.42,198.41.0.4,192.112.36.4"
+"{$RSM.IP6.ROOTSERVERS1}","2001:7fe::53,2001:500:2f::f,2001:500:9f::42,2001:503:ba3e::2:30,2001:500:12::d0d"
+"{$RSM.DNS.PROBE.ONLINE}","2"
+"{$RSM.RDDS.PROBE.ONLINE}","2"
+"{$RSM.RDAP.PROBE.ONLINE}","2"
+"{$RSM.IP4.MIN.PROBE.ONLINE}","2"
+"{$RSM.IP6.MIN.PROBE.ONLINE}","2"
+"{$RSM.RDAP.STANDALONE}","1609459200"
+
+[provisioning-api]
+
+"/"           ,"GET",401,"nonexistent","",""
+"/nonexistent","GET",401,"nonexistent","",""
+"/tlds"       ,"GET",401,"nonexistent","",""
+"/registrars" ,"GET",401,"nonexistent","",""
+"/probeNodes" ,"GET",401,"nonexistent","",""
+
+"/"           ,"PUT",401,"nonexistent","",""
+"/nonexistent","PUT",401,"nonexistent","",""
+"/tlds"       ,"PUT",401,"nonexistent","",""
+"/registrars" ,"PUT",401,"nonexistent","",""
+"/probeNodes" ,"PUT",401,"nonexistent","",""
+
+"/"           ,"DELETE",401,"nonexistent","",""
+"/nonexistent","DELETE",401,"nonexistent","",""
+"/tlds"       ,"DELETE",401,"nonexistent","",""
+"/registrars" ,"DELETE",401,"nonexistent","",""
+"/probeNodes" ,"DELETE",401,"nonexistent","",""
+
+"/"           ,"TEST",401,"nonexistent","",""
+"/nonexistent","TEST",401,"nonexistent","",""
+"/tlds"       ,"TEST",401,"nonexistent","",""
+"/registrars" ,"TEST",401,"nonexistent","",""
+"/probeNodes" ,"TEST",401,"nonexistent","",""
