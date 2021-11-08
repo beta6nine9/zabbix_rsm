@@ -1,6 +1,6 @@
 [test-case]
 
-011 TLD not found (ry)
+"011 TLD not found (ry)"
 
 [prepare-server-database]
 

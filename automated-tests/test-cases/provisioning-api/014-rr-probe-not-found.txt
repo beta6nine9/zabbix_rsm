@@ -1,6 +1,6 @@
 [test-case]
 
-014 Probe not found (rr)
+"014 Probe not found (rr)"
 
 [prepare-server-database]
 

@@ -1,6 +1,6 @@
 [test-case]
 
-013 Registrar not found (rr)
+"013 Registrar not found (rr)"
 
 [prepare-server-database]
 

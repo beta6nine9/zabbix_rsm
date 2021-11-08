@@ -1,6 +1,6 @@
 [test-case]
 
-005 Invalid method
+"005 Invalid method"
 
 [prepare-server-database]
 

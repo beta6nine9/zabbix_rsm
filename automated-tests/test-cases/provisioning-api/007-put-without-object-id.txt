@@ -1,6 +1,6 @@
 [test-case]
 
-007 PUT  without object ID
+"007 PUT  without object ID"
 
 [prepare-server-database]
 

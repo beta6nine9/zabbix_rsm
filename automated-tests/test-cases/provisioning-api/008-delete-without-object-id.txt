@@ -1,6 +1,6 @@
 [test-case]
 
-008 DELETE without object ID
+"008 DELETE without object ID"
 
 [prepare-server-database]
 
