@@ -1,3 +1,9 @@
+Changes for rsm2.2.0rc25
+
+Bug fixes:
+....I..... [807] moved preprocessing from Proxy to Server side (for RSM simple checks) to avoid loosing part of test results (asitals, dimir, wiper)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.2.0rc24
 
 Bug fixes:
