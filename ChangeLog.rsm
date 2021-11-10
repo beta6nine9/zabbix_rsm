@@ -1,7 +1,13 @@
+Changes for rsm2.2.0rc26
+
+Bug fixes:
+..F....... [817] improved fetching Service Availability data on Rolling week status page (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.2.0rc25
 
 Bug fixes:
-....I..... [807] moved preprocessing from Proxy to Server side (for RSM simple checks) to avoid loosing part of test results (asitals, dimir, wiper)
+.......PS. [807] moved preprocessing from Proxy to Server side (for RSM simple checks) to avoid losing part of test results (asitals, dimir, wiper)
 
 --------------------------------------------------------------------------------
 Changes for rsm2.2.0rc24
