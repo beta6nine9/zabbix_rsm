@@ -29,3 +29,5 @@
 "/probeNodes/probe1","PUT",400,"readwrite","101-input-probe-missing-services.json",""
 "/probeNodes/probe1","PUT",400,"readwrite","101-input-probe-missing-services-rdap.json",""
 "/probeNodes/probe1","PUT",400,"readwrite","101-input-probe-missing-services-rdds.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","101-input-probe-missing-services-service.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","101-input-probe-missing-services-status.json",""
