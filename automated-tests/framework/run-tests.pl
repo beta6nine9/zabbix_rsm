@@ -44,7 +44,17 @@ sub main()
 	#use_probes_pl(1);
 	#use_tld_pl(1);
 
-	parse_opts("test-case-file=s@", "test-case-dir=s@", "skip-build", "build-server", "build-proxy", "build-agent", "debug", "help");
+	parse_opts(
+		"test-case-file=s@",
+		"test-case-dir=s@",
+		"skip-build",
+		"build-server",
+		"build-proxy",
+		"build-agent",
+		"stop-on-failure",
+		"debug",
+		"help",
+	);
 	setopt("nolog", 1);
 
 	usage("can't use both --skip-build and --build-server at the same time", 1) if (opt("skip-build") && opt("build-server"));
@@ -95,6 +105,10 @@ sub main()
 
 		push(@test_case_results, [$filename, $test_case_name, $skipped, $failure, $test_case_duration]);
 
+		if (defined($failure) && opt("stop-on-failure"))
+		{
+			last;
+		}
 	}
 	$test_suite_duration = time() - $test_suite_duration;
 
