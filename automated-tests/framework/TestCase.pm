@@ -1108,12 +1108,16 @@ sub __cmd_provisioning_api($)
 
 	if ($request ne '' && !File::Spec->file_name_is_absolute($request))
 	{
+		info("request payload file: '%s'", $request);
+
 		my (undef, $test_case_dir, undef) = File::Spec->splitpath($test_case_filename);
 
 		$request = File::Spec->catfile($test_case_dir, $request);
 	}
 	if ($response ne '' && !File::Spec->file_name_is_absolute($response))
 	{
+		info("response payload file: '%s'", $request);
+
 		my (undef, $test_case_dir, undef) = File::Spec->splitpath($test_case_filename);
 
 		$response = File::Spec->catfile($test_case_dir, $response);
