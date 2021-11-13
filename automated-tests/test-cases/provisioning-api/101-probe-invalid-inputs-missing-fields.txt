@@ -25,6 +25,7 @@
 "/probeNodes/probe1","PUT",400,"readwrite","101-input-probe-missing-params-proxy-port.json",""
 "/probeNodes/probe1","PUT",400,"readwrite","101-input-probe-missing-params-proxy-psk-id.json",""
 "/probeNodes/probe1","PUT",400,"readwrite","101-input-probe-missing-params-proxy-psk-key.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","101-input-probe-missing-server.json",""
 "/probeNodes/probe1","PUT",400,"readwrite","101-input-probe-missing-services.json",""
 "/probeNodes/probe1","PUT",400,"readwrite","101-input-probe-missing-services-rdap.json",""
 "/probeNodes/probe1","PUT",400,"readwrite","101-input-probe-missing-services-rdds.json",""
