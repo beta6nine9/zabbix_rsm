@@ -230,6 +230,8 @@ abstract class ActionBase extends CController
 	 */
 	protected function validateInputServices(): void
 	{
+		$this->requireArrayKeys(['servicesStatus'], $this->input, 'JSON does not comply with definition');
+
 		$rules = $this->getInputRules();
 
 		$inputServices = array_column($this->input['servicesStatus'], 'service');

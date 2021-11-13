@@ -125,6 +125,35 @@ function getSeverityString(int $severity): string
 	}
 }
 
+function jsonHasDuplicateKeys(string $json): bool
+{
+	$code = "import sys"                                     . "\n"
+		  . "import json"                                    . "\n"
+		  . ""                                               . "\n"
+		  . "def fun(kv_pairs):"                             . "\n"
+		  . "    keys = [kv[0] for kv in kv_pairs]"          . "\n"
+		  . "    if len(keys) != len(set(keys)):"            . "\n"
+		  . "        exit(1)"                                . "\n"
+		  . "    return kv_pairs"                            . "\n"
+		  . ""                                               . "\n"
+		  . "json.loads(sys.argv[1], object_pairs_hook=fun)" . "\n";
+
+	$execCode = escapeshellarg($code);
+	$execJson = escapeshellarg($json);
+
+	$output = null;
+	$result = null;
+
+	$ret = exec("python -c $execCode $execJson 2>&1", $output, $result);
+
+	if ($ret === false || $result !== 0)
+	{
+		return true;
+	}
+
+	return false;
+}
+
 function getJsonParsingError(string $json): string
 {
 	$code = "import sys"                  . "\n"
@@ -274,6 +303,10 @@ function handlePutRequest(string $objectType, ?string $objectId, string $payload
 	if (is_null($json))
 	{
 		throw new RsmException(400, 'JSON syntax is invalid', getJsonParsingError($payload));
+	}
+	if (jsonHasDuplicateKeys($payload))
+	{
+		throw new RsmException(400, 'JSON does not comply with definition', 'JSON contains duplicate keys');
 	}
 
 	$serverIdRequested = array_key_exists('centralServer', $json) ? $json['centralServer'] : null;
