@@ -18,9 +18,9 @@
 
 [provisioning-api]
 
-"/probeNodes/probe1","PUT",400,"readwrite","102-input-probe-empty-params.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","102-input-probe-empty-params-proxy-ip.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","102-input-probe-empty-params-proxy-psk-id.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","102-input-probe-empty-params-proxy-psk-key.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","102-input-probe-empty-services.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","102-input-probe-empty-services-service.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/102-empty-params.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/102-empty-params-proxy-ip.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/102-empty-params-proxy-psk-id.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/102-empty-params-proxy-psk-key.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/102-empty-services.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/102-empty-services-service.json",""

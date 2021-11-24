@@ -18,11 +18,11 @@
 
 [provisioning-api]
 
-"/probeNodes/probe1","PUT",400,"readwrite","106-input-probe-bool-params.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","106-input-probe-bool-params-proxy-ip.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","106-input-probe-bool-params-proxy-port.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","106-input-probe-bool-params-proxy-psk-id.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","106-input-probe-bool-params-proxy-psk-key.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","106-input-probe-bool-server.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","106-input-probe-bool-services.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","106-input-probe-bool-services-service.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/106-bool-params.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/106-bool-params-proxy-ip.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/106-bool-params-proxy-port.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/106-bool-params-proxy-psk-id.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/106-bool-params-proxy-psk-key.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/106-bool-server.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/106-bool-services.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/106-bool-services-service.json",""

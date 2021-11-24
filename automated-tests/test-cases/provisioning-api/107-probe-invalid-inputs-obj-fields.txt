@@ -18,13 +18,13 @@
 
 [provisioning-api]
 
-"/probeNodes/probe1","PUT",400,"readwrite","107-input-probe-obj-params-ipv4.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","107-input-probe-obj-params-ipv6.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","107-input-probe-obj-params-proxy-ip.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","107-input-probe-obj-params-proxy-port.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","107-input-probe-obj-params-proxy-psk-id.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","107-input-probe-obj-params-proxy-psk-key.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","107-input-probe-obj-server.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","107-input-probe-obj-services.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","107-input-probe-obj-services-service.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","107-input-probe-obj-services-status.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/107-obj-params-ipv4.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/107-obj-params-ipv6.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/107-obj-params-proxy-ip.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/107-obj-params-proxy-port.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/107-obj-params-proxy-psk-id.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/107-obj-params-proxy-psk-key.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/107-obj-server.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/107-obj-services.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/107-obj-services-service.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/107-obj-services-status.json",""

@@ -18,13 +18,13 @@
 
 [provisioning-api]
 
-"/probeNodes/probe1","PUT",400,"readwrite","108-input-probe-array-params-ipv4.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","108-input-probe-array-params-ipv6.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","108-input-probe-array-params.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","108-input-probe-array-params-proxy-ip.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","108-input-probe-array-params-proxy-port.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","108-input-probe-array-params-proxy-psk-id.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","108-input-probe-array-params-proxy-psk-key.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","108-input-probe-array-server.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","108-input-probe-array-services-service.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","108-input-probe-array-services-status.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/108-array-params-ipv4.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/108-array-params-ipv6.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/108-array-params.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/108-array-params-proxy-ip.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/108-array-params-proxy-port.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/108-array-params-proxy-psk-id.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/108-array-params-proxy-psk-key.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/108-array-server.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/108-array-services-service.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/108-array-services-status.json",""

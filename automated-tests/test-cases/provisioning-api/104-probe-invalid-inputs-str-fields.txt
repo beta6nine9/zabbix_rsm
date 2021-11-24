@@ -18,10 +18,10 @@
 
 [provisioning-api]
 
-"/probeNodes/probe1","PUT",400,"readwrite","104-input-probe-str-params-ipv4.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","104-input-probe-str-params-ipv6.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","104-input-probe-str-params.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","104-input-probe-str-params-proxy-port.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","104-input-probe-str-server.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","104-input-probe-str-services.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","104-input-probe-str-services-status.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/104-str-params-ipv4.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/104-str-params-ipv6.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/104-str-params.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/104-str-params-proxy-port.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/104-str-server.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/104-str-services.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/104-str-services-status.json",""
