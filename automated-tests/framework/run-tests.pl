@@ -44,7 +44,17 @@ sub main()
 	#use_probes_pl(1);
 	#use_tld_pl(1);
 
-	parse_opts("test-case-file=s@", "test-case-dir=s@", "skip-build", "build-server", "build-proxy", "build-agent", "debug", "help");
+	parse_opts(
+		"test-case-file=s@",
+		"test-case-dir=s@",
+		"skip-build",
+		"build-server",
+		"build-proxy",
+		"build-agent",
+		"stop-on-failure",
+		"debug",
+		"help",
+	);
 	setopt("nolog", 1);
 
 	usage("can't use both --skip-build and --build-server at the same time", 1) if (opt("skip-build") && opt("build-server"));
@@ -95,6 +105,10 @@ sub main()
 
 		push(@test_case_results, [$filename, $test_case_name, $skipped, $failure, $test_case_duration]);
 
+		if (defined($failure) && opt("stop-on-failure"))
+		{
+			last;
+		}
 	}
 	$test_suite_duration = time() - $test_suite_duration;
 
@@ -330,7 +344,17 @@ test.pl - execute test cases.
 
 =head1 SYNOPSIS
 
-test.pl [--test-case-file <file>] [--test-case-dir <dir>] [--debug] [--help]
+run-tests.pl [--test-case-file <file>] ... [--test-case-dir <dir>] ... [--skip-build] [--build-server] [--build-proxy] [--build-agent] [--stop-on-failure] [--debug] [--help]
+
+=head1 EXAMPLES
+
+run-tests.pl --build-proxy --build-server
+
+run-tests.pl --skip-build --test-case-file <dir>/001-*.txt
+
+run-tests.pl --skip-build $(printf -- "--test-case-file %s " $(find <dir> -name '0??-*.txt'))
+
+run-tests.pl --skip-build --test-case-dir <dir> --stop-on-failure
 
 =head1 DEPENDENCIES
 
@@ -365,6 +389,10 @@ Build Zabbix proxy.
 =item B<--build-agent>
 
 Build Zabbix agent.
+
+=item B<--stop-on-failure>
+
+Stop executing test cases on the first failure.
 
 =item B<--debug>
 
