@@ -39,8 +39,8 @@ class Probe extends ActionBaseEx
 						'id'                    => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateProbeIdentifier', 'error' => 'The syntax of the probe node in the URL is invalid'],
 						'probe'                 => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateInvalid', 'error' => 'The "probe" element was included in a PUT request'],
 						'servicesStatus'        => ['type' => API_OBJECTS    , 'uniq' => [['service']], 'fields' => [
-							'service'           => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateEnum', 'in' => ['rdap', 'rdds'], 'error' => 'Service is not supported'],
-							'enabled'           => ['type' => API_BOOLEAN    ],
+							'service'           => ['type' => API_RSM_CUSTOM , 'flags' => API_REQUIRED, 'function' => 'RsmValidateEnum', 'in' => ['rdap', 'rdds'], 'error' => 'Service is not supported'],
+							'enabled'           => ['type' => API_BOOLEAN    , 'flags' => API_REQUIRED],
 						]],
 						'zabbixProxyParameters' => ['type' => API_OBJECT     , 'fields' => [
 							'ipv4Enable'        => ['type' => API_BOOLEAN    ],

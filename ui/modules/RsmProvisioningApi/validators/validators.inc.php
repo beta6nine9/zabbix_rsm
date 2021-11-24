@@ -85,6 +85,16 @@ function RsmValidateIPv6($rule, &$data, $path, &$error): bool
 
 function RsmValidateDomainName($rule, &$data, $path, &$error): bool
 {
+	if (!is_string($data))
+	{
+		$error = $rule['error'];
+		return false;
+	}
+	if ($data === '')
+	{
+		$error = $rule['error'];
+		return false;
+	}
 	// see rfc8499 for the definition of Domain name
 	if (filter_var($data, FILTER_VALIDATE_DOMAIN) === false)
 	{
@@ -96,6 +106,11 @@ function RsmValidateDomainName($rule, &$data, $path, &$error): bool
 
 function RsmValidateHostname($rule, &$data, $path, &$error): bool
 {
+	if (!is_string($data))
+	{
+		$error = $rule['error'];
+		return false;
+	}
 	// see rfc8499 for the definition of hostname
 	if (filter_var($data, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME) === false)
 	{

@@ -51,16 +51,16 @@ class Tld extends MonitoringTarget
 						'tldType'                => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateEnum', 'in' => ['gTLD', 'ccTLD', 'otherTLD', 'testTLD'], 'error' => 'TLD type is invalid'],
 						'dnsParameters'          => ['type' => API_OBJECT     , 'fields' => [
 							'nsIps'              => ['type' => API_OBJECTS    , 'uniq' => [['ns', 'ip']], 'fields' => [
-								'ns'             => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateHostname', 'error' => 'Invalid domain name provided in "tld", "ns", "rdds43Server", "rdds43TestedDomain", "rdapTestedDomain" or "nsTestPrefix" element'],
-								'ip'             => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateIP', 'error' => 'Invalid IP provided in the "ip" element'],
+								'ns'             => ['type' => API_RSM_CUSTOM , 'flags' => API_REQUIRED, 'function' => 'RsmValidateHostname', 'error' => 'Invalid domain name provided in "tld", "ns", "rdds43Server", "rdds43TestedDomain", "rdapTestedDomain" or "nsTestPrefix" element'],
+								'ip'             => ['type' => API_RSM_CUSTOM , 'flags' => API_REQUIRED, 'function' => 'RsmValidateIP', 'error' => 'Invalid IP provided in the "ip" element'],
 							]],
 							'dnssecEnabled'      => ['type' => API_BOOLEAN    ],
 							'nsTestPrefix'       => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateDomainName', 'error' => 'Invalid domain name provided in "tld", "ns", "rdds43Server", "rdds43TestedDomain", "rdapTestedDomain" or "nsTestPrefix" element'],
 							'minNs'              => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateInt', 'min' => 1, 'error' => 'The "minNS" element must be a positive integer'],
 						]],
 						'servicesStatus'         => ['type' => API_OBJECTS    , 'uniq' => [['service']], 'fields' => [
-							'service'            => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateEnum', 'in' => ['dnsUDP', 'dnsTCP', 'rdap', 'rdds43', 'rdds80'], 'error' => 'Service is not supported'],
-							'enabled'            => ['type' => API_BOOLEAN    ],
+							'service'            => ['type' => API_RSM_CUSTOM , 'flags' => API_REQUIRED, 'function' => 'RsmValidateEnum', 'in' => ['dnsUDP', 'dnsTCP', 'rdap', 'rdds43', 'rdds80'], 'error' => 'Service is not supported'],
+							'enabled'            => ['type' => API_BOOLEAN    , 'flags' => API_REQUIRED],
 						]],
 						'rddsParameters'         => ['type' => API_OBJECT     , 'fields' => [
 							'rdds43Server'       => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateHostname', 'error' => 'Invalid domain name provided in "tld", "ns", "rdds43Server", "rdds43TestedDomain", "rdapTestedDomain" or "nsTestPrefix" element'],
@@ -68,7 +68,7 @@ class Tld extends MonitoringTarget
 							'rdds80Url'          => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateUrl', 'error' => 'Invalid URL provided on rdds80Url'],
 							'rdapUrl'            => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateRdapUrl', 'error' => 'The "rdapUrl" element can only be an URL or "not listed" or "no https"'],
 							'rdapTestedDomain'   => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateDomainName', 'error' => 'Invalid domain name provided in "tld", "ns", "rdds43Server", "rdds43TestedDomain", "rdapTestedDomain" or "nsTestPrefix" element'],
-							'rdds43NsString'     => ['type' => API_STRING_UTF8],
+							'rdds43NsString'     => ['type' => API_STRING_UTF8, 'flags' => API_NOT_EMPTY],
 						]],
 					]
 				];

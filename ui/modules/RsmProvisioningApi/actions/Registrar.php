@@ -55,8 +55,8 @@ class Registrar extends MonitoringTarget
 						'registrarName'          => ['type' => API_STRING_UTF8],
 						'registrarFamily'        => ['type' => API_STRING_UTF8],
 						'servicesStatus'         => ['type' => API_OBJECTS    , 'uniq' => [['service']], 'fields' => [
-							'service'            => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateEnum', 'in' => ['rdap', 'rdds43', 'rdds80'], 'error' => 'Service is not supported'],
-							'enabled'            => ['type' => API_BOOLEAN    ],
+							'service'            => ['type' => API_RSM_CUSTOM , 'flags' => API_REQUIRED, 'function' => 'RsmValidateEnum', 'in' => ['rdap', 'rdds43', 'rdds80'], 'error' => 'Service is not supported'],
+							'enabled'            => ['type' => API_BOOLEAN    , 'flags' => API_REQUIRED],
 						]],
 						'rddsParameters'         => ['type' => API_OBJECT     , 'fields' => [
 							'rdds43Server'       => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateHostname', 'error' => 'Invalid domain name provided in "tld", "ns", "rdds43Server", "rdds43TestedDomain", "rdapTestedDomain" or "nsTestPrefix" element'],
@@ -64,7 +64,7 @@ class Registrar extends MonitoringTarget
 							'rdds80Url'          => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateUrl', 'error' => 'Invalid URL provided on rdds80Url'],
 							'rdapUrl'            => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateRdapUrl', 'error' => 'The "rdapUrl" element can only be an URL or "not listed" or "no https"'],
 							'rdapTestedDomain'   => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateDomainName', 'error' => 'Invalid domain name provided in "tld", "ns", "rdds43Server", "rdds43TestedDomain", "rdapTestedDomain" or "nsTestPrefix" element'],
-							'rdds43NsString'     => ['type' => API_STRING_UTF8],
+							'rdds43NsString'     => ['type' => API_STRING_UTF8, 'flags' => API_NOT_EMPTY],
 						]],
 					]
 				];
