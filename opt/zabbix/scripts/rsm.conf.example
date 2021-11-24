@@ -41,6 +41,7 @@ max_cycles_dns = 20
 max_cycles_dnssec = 20
 max_cycles_rdap = 10
 max_cycles_rdds = 10
+reconfig_duration = 20
 
 [sla_api]
 output_dir = /opt/zabbix/sla
