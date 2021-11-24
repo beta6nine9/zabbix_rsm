@@ -1,12 +1,6 @@
 {
     "tldType": "gTLD",
-    "servicesStatus": [
-        { "service": "dnsUDP", "enabled": true },
-        { "service": "dnsTCP", "enabled": true },
-        { "service": "rdds43", "enabled": true },
-        { "service": "rdds80", "enabled": true },
-        { "service": "rdap"  , "enabled": true }
-    ],
+    "servicesStatus": false,
     "dnsParameters": {
         "nsIps": [
             { "ns": "a.ns.tld1", "ip": "192.168.1.1" },

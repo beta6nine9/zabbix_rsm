@@ -21,7 +21,7 @@
         "rdds43Server": "whois.nic.example",
         "rdds43TestedDomain": "nic.example",
         "rdds80Url": "https://whois.nic.example",
-        "rdapUrl": "https://www.nic.example/domain",
+        "rdapUrl": {},
         "rdapTestedDomain": "nic.example",
         "rdds43NsString": "Name Server:"
     }

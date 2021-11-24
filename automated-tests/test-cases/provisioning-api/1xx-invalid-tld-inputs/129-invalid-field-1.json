@@ -24,5 +24,6 @@
         "rdapUrl": "https://www.nic.example/domain",
         "rdapTestedDomain": "nic.example",
         "rdds43NsString": "Name Server:"
-    }
+    },
+    "offline": true
 }

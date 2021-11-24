@@ -15,7 +15,7 @@
         ],
         "dnssecEnabled": true,
         "nsTestPrefix": "www.monitoring.example",
-        "minNs": 2
+        "minNs": {}
     },
     "rddsParameters": {
         "rdds43Server": "whois.nic.example",

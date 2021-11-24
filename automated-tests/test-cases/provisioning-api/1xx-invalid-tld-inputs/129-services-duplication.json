@@ -5,6 +5,7 @@
         { "service": "dnsTCP", "enabled": true },
         { "service": "rdds43", "enabled": true },
         { "service": "rdds80", "enabled": true },
+        { "service": "rdap"  , "enabled": true },
         { "service": "rdap"  , "enabled": true }
     ],
     "dnsParameters": {

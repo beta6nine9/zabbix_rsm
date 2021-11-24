@@ -4,7 +4,7 @@
         { "service": "dnsUDP", "enabled": true },
         { "service": "dnsTCP", "enabled": true },
         { "service": "rdds43", "enabled": true },
-        { "service": "rdds80", "enabled": true },
+        { "service": "rdds80", "enabled": false },
         { "service": "rdap"  , "enabled": true }
     ],
     "dnsParameters": {

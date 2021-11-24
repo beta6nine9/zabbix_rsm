@@ -3,7 +3,7 @@
     "servicesStatus": [
         { "service": "dnsUDP", "enabled": true },
         { "service": "dnsTCP", "enabled": true },
-        { "service": "rdds43", "enabled": true },
+        { "service": "rdds43", "enabled": false },
         { "service": "rdds80", "enabled": true },
         { "service": "rdap"  , "enabled": true }
     ],

@@ -11,7 +11,7 @@
         "nsIps": [
             { "ns": "a.ns.tld1", "ip": "192.168.1.1" },
             { "ns": "b.ns.tld1", "ip": "192.168.1.2" },
-            { "ns": "c.ns.tld1", "ip": "192.168.1.3" }
+            { "ns": "c.ns.tld1", "ip": "" }
         ],
         "dnssecEnabled": true,
         "nsTestPrefix": "www.monitoring.example",

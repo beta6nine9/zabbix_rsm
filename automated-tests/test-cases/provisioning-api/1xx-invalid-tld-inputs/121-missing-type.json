@@ -1,5 +1,4 @@
 {
-    "tldType": "gTLD",
     "servicesStatus": [
         { "service": "dnsUDP", "enabled": true },
         { "service": "dnsTCP", "enabled": true },

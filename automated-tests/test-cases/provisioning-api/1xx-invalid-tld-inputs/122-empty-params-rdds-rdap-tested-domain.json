@@ -19,7 +19,7 @@
     },
     "rddsParameters": {
         "rdds43Server": "whois.nic.example",
-        "rdds43TestedDomain": "nic.example",
+        "rdds43TestedDomain": "",
         "rdds80Url": "https://whois.nic.example",
         "rdapUrl": "https://www.nic.example/domain",
         "rdapTestedDomain": "nic.example",

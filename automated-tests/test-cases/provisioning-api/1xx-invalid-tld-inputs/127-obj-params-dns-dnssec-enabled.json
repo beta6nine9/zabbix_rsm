@@ -13,7 +13,7 @@
             { "ns": "b.ns.tld1", "ip": "192.168.1.2" },
             { "ns": "c.ns.tld1", "ip": "192.168.1.3" }
         ],
-        "dnssecEnabled": true,
+        "dnssecEnabled": {},
         "nsTestPrefix": "www.monitoring.example",
         "minNs": 2
     },
