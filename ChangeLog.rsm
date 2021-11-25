@@ -1,3 +1,11 @@
+Changes for rsm2.2.0rc27
+
+Bug fixes:
+....I..... [825] moved reconfig duration from constant to rsm.conf (asitals)
+....I..... [827] removed "Zabbix Server" host and unused templates from DB schema (dimir)
+..F....... [826] fixed "sessionid" errors when switching between frontends (dimir, gcalenko)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.2.0rc26
 
 Bug fixes:
@@ -82,7 +90,7 @@ Changes for rsm2.2.0rc15
 
 Bug fixes:
 ..F....... [800] added table with DNSSEC-specific errors to DNSSEC Test details page (dimir)
-........S. [798] fixed filter on a Rolling week status page to remember "any" setting (dimir,gcalenko)
+........S. [798] fixed filter on a Rolling week status page to remember "any" setting (dimir, gcalenko)
 
 --------------------------------------------------------------------------------
 Changes for rsm2.2.0rc14
