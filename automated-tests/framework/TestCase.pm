@@ -12,6 +12,7 @@ our @EXPORT = qw(
 use Data::Dumper;
 use DateTime;
 use Date::Parse;
+use File::Copy;
 use File::Spec;
 use File::Basename;
 use File::Path qw(make_path);
@@ -45,6 +46,7 @@ my %command_handlers = (
 	'execute'                 => [\&__cmd_execute                , 1, 1], # datetime,command or datetime,command,arg,arg,arg,...
 	'start-server'            => [\&__cmd_start_server           , 1, 1], # datetime,key=value,key=value,...
 	'stop-server'             => [\&__cmd_stop_server            , 0, 1], # (void)
+	'update-rsm-conf'         => [\&__cmd_update_rsm_conf        , 1, 1], # section,property,value
 	'create-probe'            => [\&__cmd_create_probe           , 1, 1], # probe,ip,port,ipv4,ipv6,rdds,rdap
 	'create-tld'              => [\&__cmd_create_tld             , 1, 1], # tld,dns_test_prefix,type,dnssec,dns_udp,dns_tcp,ns_servers_v4,ns_servers_v6,rdds43_servers,rdds80_servers,rdap_base_url,rdap_test_domain,rdds_test_prefix
 	'disable-tld'             => [\&__cmd_disable_tld            , 1, 1], # tld
@@ -84,6 +86,13 @@ sub run_test_case($)
 
 	if (!$skip_test_case)
 	{
+		my $source_dir = get_config('paths', 'source_dir');
+
+		copy(
+			$source_dir . "/opt/zabbix/scripts/rsm.conf.default",
+			$source_dir . "/opt/zabbix/scripts/rsm.conf",
+		) or fail("cannot copy rsm.conf file: %s", $!);;
+
 		db_connect();
 	}
 
@@ -753,6 +762,21 @@ sub __cmd_stop_server()
 	# (void)
 
 	zbx_stop_server();
+}
+
+sub __cmd_update_rsm_conf($)
+{
+	my $args = shift;
+
+	# [update-rsm-conf]
+	# section,property,value
+
+	my ($section, $property, $value) = __unpack($args);
+
+	my $source_dir = get_config('paths', 'source_dir');
+	my $config_file = $source_dir . "/opt/zabbix/scripts/rsm.conf";
+
+	rsm_update_config($config_file, $config_file, {"$section.$property" => $value});
 }
 
 sub __cmd_create_probe($)

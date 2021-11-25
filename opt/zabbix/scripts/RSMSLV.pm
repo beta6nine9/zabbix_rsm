@@ -71,8 +71,6 @@ use constant DETAILED_RESULT_DELIM		=> ', ';
 use constant USE_CACHE_FALSE			=> 0;
 use constant USE_CACHE_TRUE			=> 1;
 
-use constant RECONFIG_MINUTES 			=> 10; # how much time to consider cycles in reconfig
-
 # for packaging, use this as part of the "ident" for syslog
 use constant ZABBIX_NAMESPACE			=> '';
 
@@ -442,7 +440,22 @@ sub is_rdap_standalone(;$)
 	return defined($ts) && $now >= $ts ? 1 : 0;
 }
 
+sub get_reconfig_duration()
+{
+	if (!defined($config))
+	{
+		fail("missing config");
+	}
+	if (!defined($config->{'slv'}{'reconfig_duration'}))
+	{
+		fail("missing config option: 'reconfig_duration'");
+	}
+
+	return $config->{'slv'}{'reconfig_duration'};
+}
+
 my $config_times;
+my $reconfig_duration;
 
 sub is_rsmhost_reconfigured($$$)
 {
@@ -480,6 +493,11 @@ sub is_rsmhost_reconfigured($$$)
 		}
 	}
 
+	if (!defined($reconfig_duration))
+	{
+		$reconfig_duration = get_reconfig_duration();
+	}
+
 	if (!exists($config_times->{$rsmhost}))
 	{
 		fail("{\$RSM.TLD.CONFIG.TIMES} for '$rsmhost' not found");
@@ -491,7 +509,7 @@ sub is_rsmhost_reconfigured($$$)
 	foreach my $config_time (@{$config_times->{$rsmhost}})
 	{
 		my $reconfig_time_start = cycle_start($config_time, 60);
-		my $reconfig_time_end   = cycle_end($config_time + (RECONFIG_MINUTES - 1) * 60, 60);
+		my $reconfig_time_end   = cycle_end($config_time + ($reconfig_duration - 1) * 60, 60);
 
 		if ($cycle_end >= $reconfig_time_start && $cycle_start <= $reconfig_time_end)
 		{

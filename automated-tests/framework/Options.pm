@@ -21,7 +21,14 @@ my %OPTS;
 
 sub parse_opts
 {
-	my $rv = GetOptionsFromArray([@ARGV], \%OPTS, @_);
+	my @args = @ARGV;
+
+	my $rv = GetOptionsFromArray(\@args, \%OPTS, @_);
+
+	if (@args)
+	{
+		usage('Failed to parse all arguments: ' . join(', ', @args), 1);
+	}
 
 	if (!$rv || $OPTS{'help'})
 	{

@@ -479,16 +479,16 @@ class RollingWeekStatusListAction extends Action {
 			'filter_rdap' => RSM_RDAP,
 			'filter_epp' => RSM_EPP
 		];
-		$item_keys = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY)
+		$rollweek_keys = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY)
 			? [RSM_SLV_DNS_ROLLWEEK, RSM_SLV_DNSSEC_ROLLWEEK, RSM_SLV_RDDS_ROLLWEEK, RSM_SLV_EPP_ROLLWEEK]
 			: [RSM_SLV_RDDS_ROLLWEEK];
-		$avail_items = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY)
+		$avail_keys = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY)
 			? [RSM_SLV_DNS_AVAIL, RSM_SLV_DNSSEC_AVAIL, RSM_SLV_RDDS_AVAIL, RSM_SLV_EPP_AVAIL]
 			: [RSM_SLV_RDDS_AVAIL];
 
 		if (is_RDAP_standalone()) {
-			$item_keys[] = RSM_SLV_RDAP_ROLLWEEK;
-			$avail_items[] = RSM_SLV_RDAP_AVAIL;
+			$rollweek_keys[] = RSM_SLV_RDAP_ROLLWEEK;
+			$avail_keys[] = RSM_SLV_RDAP_AVAIL;
 		}
 
 		foreach ($tlds_by_server as $key => $hosts) {
@@ -505,11 +505,11 @@ class RollingWeekStatusListAction extends Action {
 			$db_items = DBselect(
 				'SELECT i.itemid, i.hostid, i.key_'.
 				' FROM items i'.
-				' WHERE '.dbConditionString('i.key_', $item_keys).
+				' WHERE '.dbConditionString('i.key_', $rollweek_keys).
 					' AND '.dbConditionInt('i.hostid', array_keys($hosts))
 			);
 
-			$rsm_itemids = [];
+			$rollweek_itemids = [];
 			while ($item = DBfetch($db_items)) {
 				$items[$item['itemid']] = [
 					'itemid' => $item['itemid'],
@@ -518,14 +518,14 @@ class RollingWeekStatusListAction extends Action {
 					'lastvalue' => null
 				];
 
-				$rsm_itemids[$item['itemid']] = true;
+				$rollweek_itemids[$item['itemid']] = true;
 			}
 
-			if ($rsm_itemids) {
+			if ($rollweek_itemids) {
 				$db_histories = DBselect(
 					'SELECT l.itemid, l.value, l.clock'.
 					' FROM lastvalue l'.
-					' WHERE '.dbConditionInt('l.itemid', array_keys($rsm_itemids))
+					' WHERE '.dbConditionInt('l.itemid', array_keys($rollweek_itemids))
 				);
 
 				while ($history = DBfetch($db_histories)) {
@@ -534,12 +534,12 @@ class RollingWeekStatusListAction extends Action {
 				}
 			}
 
-			if ($avail_items) {
-				$db_avail_items = API::Item()->get([
+			if ($avail_keys) {
+				$avail_items = API::Item()->get([
 					'output' => ['itemid', 'hostid', 'key_'],
 					'hostids' => array_keys($hosts),
 					'filter' => [
-						'key_' => $avail_items
+						'key_' => $avail_keys
 					],
 					'preservekeys' => true
 				]);
@@ -583,25 +583,26 @@ class RollingWeekStatusListAction extends Action {
 					}
 				}
 
-				foreach ($db_avail_items as $item) {
+				// request latest Service Availability clocks
+				$rows = DBfetchArray(DBselect(
+					'SELECT itemid,clock'.
+					' FROM lastvalue'.
+					' WHERE '.dbConditionInt('itemid', array_keys($avail_items))
+				));
+
+				// create 'itemid' => 'clock' hash
+				$avail_itemid_clocks = array_column($rows, 'clock', 'itemid');
+
+				foreach ($avail_items as $item) {
 					$hostid_key = $DB['SERVERS'][$key]['NR'].$item['hostid'];
 					$data['tld'][$hostid_key][$avail_type[$item['key_']]]['availItemId'] = $item['itemid'];
 					$itemIds[$item['itemid']] = true;
 
-					$rows = DBselect(
-						'SELECT clock'.
-						' FROM lastvalue'.
-						' WHERE itemid='.$item['itemid']
-					);
-
-
-					$row = DBfetch($rows);
-					if ($row && $row['clock']) {
-						$data['tld'][$hostid_key][$avail_type[$item['key_']]]['availClock'] = $row['clock'];
-					}
+					if (array_key_exists($item['itemid'], $avail_itemid_clocks))
+					   $data['tld'][$hostid_key][$avail_type[$item['key_']]]['availClock'] = $avail_itemid_clocks[$item['itemid']];
 				}
 
-				$items += $db_avail_items;
+				$items += $avail_items;
 
 				if ($data['filter_slv'] !== SLA_MONITORING_SLV_FILTER_ANY) {
 					foreach ($filter_slv as $filtred_hostid => $value) {

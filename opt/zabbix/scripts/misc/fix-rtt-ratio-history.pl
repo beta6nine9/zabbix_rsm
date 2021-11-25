@@ -159,7 +159,7 @@ sub get_corruptions($)
 		from
 			hosts
 			inner join hosts_groups on hosts_groups.hostid = hosts.hostid
-			inner join groups on groups.groupid = hosts_groups.groupid
+			inner join hstgrp on hstgrp.groupid = hosts_groups.groupid
 			left join items as items_rtt_performed on
 				items_rtt_performed.hostid = hosts.hostid and
 				items_rtt_performed.key_ like ?
@@ -176,7 +176,7 @@ sub get_corruptions($)
 			left join lastvalue as lastvalue_rtt_pfailed on
 				lastvalue_rtt_pfailed.itemid = items_rtt_pfailed.itemid
 		where
-			groups.name = 'TLDs' and
+			hstgrp.name = 'TLDs' and
 			coalesce(lastvalue_rtt_performed.clock, lastvalue_rtt_failed.clock, lastvalue_rtt_pfailed.clock) is not null and
 			(
 				lastvalue_rtt_performed.clock is null or

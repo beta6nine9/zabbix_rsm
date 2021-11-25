@@ -344,7 +344,17 @@ test.pl - execute test cases.
 
 =head1 SYNOPSIS
 
-test.pl [--test-case-file <file>] [--test-case-dir <dir>] [--debug] [--help]
+run-tests.pl [--test-case-file <file>] ... [--test-case-dir <dir>] ... [--skip-build] [--build-server] [--build-proxy] [--build-agent] [--stop-on-failure] [--debug] [--help]
+
+=head1 EXAMPLES
+
+run-tests.pl --build-proxy --build-server
+
+run-tests.pl --skip-build --test-case-file <dir>/001-*.txt
+
+run-tests.pl --skip-build $(printf -- "--test-case-file %s " $(find <dir> -name '0??-*.txt'))
+
+run-tests.pl --skip-build --test-case-dir <dir> --stop-on-failure
 
 =head1 DEPENDENCIES
 
@@ -379,6 +389,10 @@ Build Zabbix proxy.
 =item B<--build-agent>
 
 Build Zabbix agent.
+
+=item B<--stop-on-failure>
+
+Stop executing test cases on the first failure.
 
 =item B<--debug>
 
