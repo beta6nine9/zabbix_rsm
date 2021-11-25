@@ -1,6 +1,6 @@
 [test-case]
 
-"301 RDAP RTT"
+"304 RDAP RTT"
 
 [prepare-server-database]
 
@@ -38,6 +38,10 @@
 [set-host-macro]
 
 "Template Rsmhost Config tld2","{$RSM.TLD.CONFIG.TIMES}",1617233430
+
+[update-rsm-conf]
+
+"slv","reconfig_duration",10
 
 [fill-history]
 

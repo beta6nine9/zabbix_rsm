@@ -37,6 +37,10 @@
 
 "Template Rsmhost Config tld1","{$RSM.TLD.CONFIG.TIMES}",1617235230
 
+[update-rsm-conf]
+
+"slv","reconfig_duration",10
+
 [fill-history]
 
 "Probe1-Server1 - mon","rsm.probe.online",60,1617234300,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,1,1,1,1,1

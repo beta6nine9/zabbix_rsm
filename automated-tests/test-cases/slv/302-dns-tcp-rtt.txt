@@ -1,6 +1,6 @@
 [test-case]
 
-"301 DNS TCP RTT"
+"302 DNS TCP RTT"
 
 [prepare-server-database]
 
@@ -38,6 +38,10 @@
 [set-host-macro]
 
 "Template Rsmhost Config tld2","{$RSM.TLD.CONFIG.TIMES}",1617233430
+
+[update-rsm-conf]
+
+"slv","reconfig_duration",10
 
 [fill-history]
 
