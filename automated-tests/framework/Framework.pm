@@ -255,7 +255,7 @@ sub zbx_build($$$)
 
 	rsm_update_config(
 		$source_dir . "/opt/zabbix/scripts/rsm.conf.example",
-		$source_dir . "/opt/zabbix/scripts/rsm.conf",
+		$source_dir . "/opt/zabbix/scripts/rsm.conf.default",
 		{
 			"server_1.za_url"                     => get_config("frontend", "url"),
 			"server_1.za_user"                    => get_config("frontend", "username"),

@@ -18,6 +18,10 @@ class Action extends CAction {
 	protected $module;
 
 	public function init() {
+		/**
+		 * Disabling SID validation is a hackish way but without it current
+		 * implementation of switching between frontends will not work.
+		 */
 		$this->disableSIDValidation();
 
 		/** @var Modules\RSM\Services\MacroService $macro */
