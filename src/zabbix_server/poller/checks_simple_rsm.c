@@ -34,6 +34,9 @@
 #define ZBX_SEND_BUF_SIZE	128
 #define ZBX_RDDS_PREVIEW_SIZE	100
 
+#define DEFAULT_RESOLVER_PORT	53
+#define DEFAULT_NAMESERVER_PORT	53
+#define DEFAULT_RDDS43_PORT	43
 #define ZBX_HTTP_RESPONSE_OK	200L
 
 #define XML_PATH_SERVER_ID	0
@@ -386,8 +389,8 @@ static int	zbx_validate_ip(const char *ip, int ipv4_enabled, int ipv6_enabled, l
 	return SUCCEED;
 }
 
-static int	zbx_set_resolver_ns(ldns_resolver *res, const char *name, const char *ip, int ipv4_enabled,
-		int ipv6_enabled, FILE *log_fd, char *err, size_t err_size)
+static int	zbx_set_resolver_ns(ldns_resolver *res, const char *name, const char *ip, uint16_t port,
+		int ipv4_enabled, int ipv6_enabled, FILE *log_fd, char *err, size_t err_size)
 {
 	ldns_rdf	*ip_rdf;
 	ldns_status	status;
@@ -397,6 +400,8 @@ static int	zbx_set_resolver_ns(ldns_resolver *res, const char *name, const char 
 		zbx_snprintf(err, err_size, "invalid or unsupported IP of \"%s\": \"%s\"", name, ip);
 		return FAIL;
 	}
+
+	ldns_resolver_set_port(res, port);
 
 	status = ldns_resolver_push_nameserver(res, ip_rdf);
 	ldns_rdf_deep_free(ip_rdf);
@@ -408,7 +413,7 @@ static int	zbx_set_resolver_ns(ldns_resolver *res, const char *name, const char 
 		return FAIL;
 	}
 
-	rsm_infof(log_fd, "successfully using %s (%s)", name, ip);
+	rsm_infof(log_fd, "successfully using %s (%s:%hu)", name, ip, port);
 	return SUCCEED;
 }
 
@@ -423,8 +428,8 @@ static unsigned char	ip_support(int ipv4_enabled, int ipv6_enabled)
 	return 0;	/* no preference */
 }
 
-static int	zbx_change_resolver(ldns_resolver *res, const char *name, const char *ip, int ipv4_enabled,
-		int ipv6_enabled, FILE *log_fd, char *err, size_t err_size)
+static int	zbx_change_resolver(ldns_resolver *res, const char *name, const char *ip, uint16_t port,
+		int ipv4_enabled, int ipv6_enabled, FILE *log_fd, char *err, size_t err_size)
 {
 	ldns_rdf	*pop;
 
@@ -432,17 +437,17 @@ static int	zbx_change_resolver(ldns_resolver *res, const char *name, const char 
 	while (NULL != (pop = ldns_resolver_pop_nameserver(res)))
 		ldns_rdf_deep_free(pop);
 
-	return zbx_set_resolver_ns(res, name, ip, ipv4_enabled, ipv6_enabled, log_fd, err, err_size);
+	return zbx_set_resolver_ns(res, name, ip, port, ipv4_enabled, ipv6_enabled, log_fd, err, err_size);
 }
 
-static int	zbx_create_resolver(ldns_resolver **res, const char *name, const char *ip, char protocol,
+static int	zbx_create_resolver(ldns_resolver **res, const char *name, const char *ip, uint16_t port, char protocol,
 		int ipv4_enabled, int ipv6_enabled, unsigned int extras, int timeout, unsigned char tries, FILE *log_fd,
 		char *err, size_t err_size)
 {
 	struct timeval	tv = {.tv_usec = 0, .tv_sec = timeout};
 
 	if (NULL != *res)
-		return zbx_change_resolver(*res, name, ip, ipv4_enabled, ipv6_enabled, log_fd, err, err_size);
+		return zbx_change_resolver(*res, name, ip, port, ipv4_enabled, ipv6_enabled, log_fd, err, err_size);
 
 	/* create a new resolver */
 	if (NULL == (*res = ldns_resolver_new()))
@@ -452,7 +457,7 @@ static int	zbx_create_resolver(ldns_resolver **res, const char *name, const char
 	}
 
 	/* push nameserver to it */
-	if (SUCCEED != zbx_set_resolver_ns(*res, name, ip, ipv4_enabled, ipv6_enabled, log_fd, err, err_size))
+	if (SUCCEED != zbx_set_resolver_ns(*res, name, ip, port, ipv4_enabled, ipv6_enabled, log_fd, err, err_size))
 		return FAIL;
 
 	/* set timeout of one try */
@@ -1389,12 +1394,27 @@ err:
 		case LDNS_STATUS_NETWORK_ERR:
 			/* UDP */
 			if (!ldns_resolver_usevc(res))
+			{
 				*ec = ZBX_NS_QUERY_NOREPLY;
+			}
 			/* TCP */
-			else if (0 <= sec && zbx_time() - sec >= RSM_TCP_TIMEOUT * RSM_TCP_RETRY)
-				*ec = ZBX_NS_QUERY_TO;
 			else
-				*ec = ZBX_NS_QUERY_ECON;
+			{
+				struct timeval	tv;
+				uint8_t		retry;
+
+				tv = ldns_resolver_timeout(res);
+				retry = ldns_resolver_retry(res);
+
+				if (0 <= sec && zbx_time() - sec >= tv.tv_sec * retry)
+				{
+					*ec = ZBX_NS_QUERY_TO;
+				}
+				else
+				{
+					*ec = ZBX_NS_QUERY_ECON;
+				}
+			}
 
 			break;
 		case LDNS_STATUS_WIRE_INCOMPLETE_HEADER:
@@ -1572,8 +1592,8 @@ static int	zbx_check_dnssec_no_epp(const ldns_pkt *pkt, const ldns_rr_list *keys
 	return ret;
 }
 
-static int	zbx_get_ns_ip_values(ldns_resolver *res, const char *ns, const char *ip, const ldns_rr_list *keys,
-		const char *testedname, FILE *log_fd, int *rtt, char **nsid, int *upd,
+static int	zbx_get_ns_ip_values(ldns_resolver *res, const char *ns, const char *ip, uint16_t port,
+		const ldns_rr_list *keys, const char *testedname, FILE *log_fd, int *rtt, char **nsid, int *upd,
 		int ipv4_enabled, int ipv6_enabled, int epp_enabled, char *err, size_t err_size)
 {
 	char			*host, *last_label = NULL;
@@ -1590,7 +1610,7 @@ static int	zbx_get_ns_ip_values(ldns_resolver *res, const char *ns, const char *
 	int			ret = FAIL;
 
 	/* change the resolver */
-	if (SUCCEED != zbx_change_resolver(res, ns, ip, ipv4_enabled, ipv6_enabled, log_fd, err, err_size))
+	if (SUCCEED != zbx_change_resolver(res, ns, ip, port, ipv4_enabled, ipv6_enabled, log_fd, err, err_size))
 	{
 		*rtt = DNS[DNS_PROTO(res)].ns_query_error(ZBX_NS_QUERY_INTERNAL);
 		goto out;
@@ -2364,6 +2384,8 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 	size_t			i, j, nss_num = 0;
 	unsigned int		extras, current_mode, test_status, dnssec_status, nssok;
 	struct zbx_json		json;
+	uint16_t		resolver_port = DEFAULT_RESOLVER_PORT,
+				nameserver_port = DEFAULT_NAMESERVER_PORT;
 	int			dnssec_enabled,
 				rdds43_enabled,
 				rdds80_enabled,
@@ -2491,7 +2513,8 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 	extras = (dnssec_enabled ? RESOLVER_EXTRAS_DNSSEC : RESOLVER_EXTRAS_NONE);
 
 	/* create resolver */
-	if (SUCCEED != zbx_create_resolver(&res, "resolver", res_ip, protocol, ipv4_enabled, ipv6_enabled, extras,
+	if (SUCCEED != zbx_create_resolver(&res, "resolver", res_ip, resolver_port, protocol, ipv4_enabled, ipv6_enabled,
+			extras,
 			(RSM_UDP == protocol ? RSM_UDP_TIMEOUT : RSM_TCP_TIMEOUT),
 			(RSM_UDP == protocol ? RSM_UDP_RETRY : RSM_TCP_RETRY),
 			log_fd, err, sizeof(err)))
@@ -2628,6 +2651,7 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 					if (NULL != th_log_fd && SUCCEED != zbx_get_ns_ip_values(res,
 							nss[i].name,
 							nss[i].ips[j].ip,
+							nameserver_port,
 							keys,
 							testedname,
 							th_log_fd,
@@ -3555,6 +3579,8 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 	zbx_resolver_error_t	ec_res;
 	time_t			ts, now;
 	zbx_http_error_t	ec_http;
+	uint16_t		resolver_port = DEFAULT_RESOLVER_PORT,
+				rdds43_port = DEFAULT_RDDS43_PORT;
 	int			probe_rdds_enabled,
 				rdds43_enabled,
 				rdds80_enabled,
@@ -3632,7 +3658,7 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 	}
 
 	/* create resolver, note: it's used in both RDDS43 and RDDS80 tests */
-	if (SUCCEED != zbx_create_resolver(&res, "resolver", res_ip, RSM_TCP, ipv4_enabled, ipv6_enabled,
+	if (SUCCEED != zbx_create_resolver(&res, "resolver", res_ip, resolver_port, RSM_TCP, ipv4_enabled, ipv6_enabled,
 			RESOLVER_EXTRAS_NONE, RSM_TCP_TIMEOUT, RSM_TCP_RETRY, log_fd, err, sizeof(err)))
 	{
 		/* exception, item becomes UNSUPPORTED */
@@ -3694,7 +3720,7 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 		rsm_infof(log_fd, "start RDDS43 test (ip %s, request \"%s\", expected NS string \"%s\")",
 				ip43, rdds43_testedname, rdds43_ns_string);
 
-		if (SUCCEED != zbx_rdds43_test(rdds43_testedname, ip43, 43, RSM_TCP_TIMEOUT, &answer, &rtt43,
+		if (SUCCEED != zbx_rdds43_test(rdds43_testedname, ip43, rdds43_port, RSM_TCP_TIMEOUT, &answer, &rtt43,
 				err, sizeof(err)))
 		{
 			rsm_errf(log_fd, "RDDS43 of \"%s\" (%s) failed: %s", rdds43_server, ip43, err);
@@ -3898,6 +3924,7 @@ int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 	const char		*ip = NULL;
 	size_t			value_alloc = 0;
 	zbx_http_error_t	ec_http;
+	uint16_t		resolver_port = DEFAULT_RESOLVER_PORT;
 	int			maxredirs, rtt_limit, tld_enabled, probe_enabled, ipv4_enabled, ipv6_enabled,
 				ipv_flags = 0, curl_flags = 0, port, rtt = ZBX_NO_VALUE, ret = SYSINFO_RET_FAIL;
 
@@ -3951,7 +3978,7 @@ int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 	}
 
 	/* create resolver */
-	if (SUCCEED != zbx_create_resolver(&res, "resolver", res_ip, RSM_TCP, ipv4_enabled, ipv6_enabled,
+	if (SUCCEED != zbx_create_resolver(&res, "resolver", res_ip, resolver_port, RSM_TCP, ipv4_enabled, ipv6_enabled,
 			RESOLVER_EXTRAS_DNSSEC, RSM_TCP_TIMEOUT, RSM_TCP_RETRY, log_fd, err, sizeof(err)))
 	{
 		SET_MSG_RESULT(result, zbx_dsprintf(NULL, "Cannot create resolver: %s.", err));
@@ -4867,6 +4894,7 @@ int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *
 	zbx_socket_t		sock;
 	zbx_vector_str_t	epp_hosts, epp_ips;
 	unsigned int		extras;
+	uint16_t		resolver_port = DEFAULT_RESOLVER_PORT;
 	int			rv, epp_cert_size, rtt, rtt1 = ZBX_NO_VALUE, rtt2 = ZBX_NO_VALUE,
 				rtt3 = ZBX_NO_VALUE, ipv4_enabled = 0, ipv6_enabled = 0, ret = SYSINFO_RET_FAIL;
 
@@ -4929,8 +4957,8 @@ int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *
 	extras = RESOLVER_EXTRAS_DNSSEC;
 
 	/* create resolver */
-	if (SUCCEED != zbx_create_resolver(&res, "resolver", res_ip, RSM_TCP, ipv4_enabled, ipv6_enabled, extras,
-			RSM_TCP_TIMEOUT, RSM_TCP_RETRY, log_fd, err, sizeof(err)))
+	if (SUCCEED != zbx_create_resolver(&res, "resolver", res_ip, resolver_port, RSM_TCP, ipv4_enabled, ipv6_enabled,
+			extras, RSM_TCP_TIMEOUT, RSM_TCP_RETRY, log_fd, err, sizeof(err)))
 	{
 		SET_MSG_RESULT(result, zbx_dsprintf(NULL, "cannot create resolver: %s", err));
 		goto out;
@@ -5236,6 +5264,7 @@ int	check_rsm_probe_status(const char *host, const AGENT_REQUEST *request, AGENT
 	ldns_rdf		*query_rdf = NULL;
 	FILE			*log_fd = NULL;
 	unsigned int		extras = RESOLVER_EXTRAS_DNSSEC;
+	uint16_t		resolver_port = DEFAULT_RESOLVER_PORT;
 	int			i, ipv4_enabled = 0, ipv6_enabled = 0, ipv4_min_servers, ipv6_min_servers, ipv4_reply_ms,
 				ipv6_reply_ms, online_delay, ok_servers, ret;
 	char			*check_mode, *ipv4_rootservers, *ipv6_rootservers, status = ZBX_EC_PROBE_UNSUPPORTED;
@@ -5303,8 +5332,8 @@ int	check_rsm_probe_status(const char *host, const AGENT_REQUEST *request, AGENT
 		{
 			ip = ips4.values[i];
 
-			if (SUCCEED != zbx_create_resolver(&res, "root server", ip, RSM_UDP, ipv4_enabled, ipv6_enabled,
-					extras, RSM_UDP_TIMEOUT, RSM_UDP_RETRY, log_fd, err, sizeof(err)))
+			if (SUCCEED != zbx_create_resolver(&res, "root server", ip, resolver_port, RSM_UDP, ipv4_enabled,
+					ipv6_enabled, extras, RSM_UDP_TIMEOUT, RSM_UDP_RETRY, log_fd, err, sizeof(err)))
 			{
 				SET_MSG_RESULT(result, zbx_dsprintf(NULL, "cannot instantiate LDNS resolver: %s", err));
 				goto out;
@@ -5358,8 +5387,8 @@ int	check_rsm_probe_status(const char *host, const AGENT_REQUEST *request, AGENT
 		{
 			ip = ips6.values[i];
 
-			if (SUCCEED != zbx_create_resolver(&res, "root server", ip, RSM_UDP, ipv4_enabled, ipv6_enabled,
-					extras, RSM_UDP_TIMEOUT, RSM_UDP_RETRY, log_fd, err, sizeof(err)))
+			if (SUCCEED != zbx_create_resolver(&res, "root server", ip, resolver_port, RSM_UDP, ipv4_enabled,
+					ipv6_enabled, extras, RSM_UDP_TIMEOUT, RSM_UDP_RETRY, log_fd, err, sizeof(err)))
 			{
 				SET_MSG_RESULT(result, zbx_dsprintf(NULL, "cannot instantiate LDNS resolver: %s", err));
 				goto out;
@@ -5476,6 +5505,7 @@ int	check_rsm_resolver_status(const char *host, const AGENT_REQUEST *request, AG
 	ldns_rdf	*query_rdf = NULL;
 	FILE		*log_fd = NULL;
 	unsigned int	extras;
+	uint16_t	resolver_port;
 	int		timeout, tries, ipv4_enabled, ipv6_enabled, status = 0, ret = SYSINFO_RET_FAIL;
 
 	if (5 != request->nparam)
@@ -5501,8 +5531,8 @@ int	check_rsm_resolver_status(const char *host, const AGENT_REQUEST *request, AG
 	extras = RESOLVER_EXTRAS_DNSSEC;
 
 	/* create resolver */
-	if (SUCCEED != zbx_create_resolver(&res, "resolver", res_ip, RSM_UDP, ipv4_enabled, ipv6_enabled, extras,
-			RSM_UDP_TIMEOUT, RSM_UDP_RETRY, log_fd, err, sizeof(err)))
+	if (SUCCEED != zbx_create_resolver(&res, "resolver", res_ip, resolver_port, RSM_UDP, ipv4_enabled, ipv6_enabled,
+			extras, RSM_UDP_TIMEOUT, RSM_UDP_RETRY, log_fd, err, sizeof(err)))
 	{
 		SET_MSG_RESULT(result, zbx_dsprintf(NULL, "Cannot create resolver: %s.", err));
 		goto end;

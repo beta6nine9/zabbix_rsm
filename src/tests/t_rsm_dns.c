@@ -2,8 +2,11 @@
 #include "../zabbix_server/poller/checks_simple_rsm.c"
 
 #define DEFAULT_RES_IP		"127.0.0.1"
+#define DEFAULT_RES_PORT	53
+#define DEFAULT_NS_PORT		53
 #define DEFAULT_TESTPREFIX	"www.zz--rsm-monitoring"
 #define DEFAULT_RTT_LIMIT	20
+#define DEFAULT_MINNS		1
 #define EXPECTED_NSS_NUM	1
 
 #define LOG_FILE1	"test1.log"
@@ -18,16 +21,19 @@ void	zbx_on_exit(int ret)
 
 void	exit_usage(const char *program)
 {
-	fprintf(stderr, "usage: %s -t <tld> -n <ns> -i <ip> <[-4] [-6]> [-r <res_ip>] [-p <testprefix>] [-d] [-g] [-f] [-h]\n", program);
+	fprintf(stderr, "usage: %s -t <tld> -n <ns> -i <ip> <[-4] [-6]> [-r <res_ip>] [-o <res/_port>] [-p <testprefix>] [-d] [-c] [-m] [-g] [-f] [-h]\n", program);
 	fprintf(stderr, "       -t <tld>          TLD to test\n");
 	fprintf(stderr, "       -n <ns>           Name Server to test\n");
 	fprintf(stderr, "       -i <ip>           IP address of the Name Server to test\n");
 	fprintf(stderr, "       -4                enable IPv4\n");
 	fprintf(stderr, "       -6                enable IPv6\n");
 	fprintf(stderr, "       -r <res_ip>       IP address of resolver to use (default: %s)\n", DEFAULT_RES_IP);
+	fprintf(stderr, "       -o <res_port>     port of resolver to use (default: %hu)\n", DEFAULT_RES_PORT);
+	fprintf(stderr, "       -s <ns_port>      port of name server to use (default: %hu)\n", DEFAULT_NS_PORT);
 	fprintf(stderr, "       -p <testprefix>   domain testprefix to use (default: %s)\n", DEFAULT_TESTPREFIX);
 	fprintf(stderr, "       -d                enable DNSSEC\n");
 	fprintf(stderr, "       -c                use TCP instead of UDP\n");
+	fprintf(stderr, "       -m                timeout in seconds (default udp:%d tcp:%d)\n", RSM_UDP_TIMEOUT, RSM_TCP_TIMEOUT);
 	fprintf(stderr, "       -g                ignore errors, try to finish the test\n");
 	fprintf(stderr, "       -f                log packets to files (%s, %s) instead of stdout\n", LOG_FILE1, LOG_FILE2);
 	fprintf(stderr, "       -h                show this message and quit\n");
@@ -40,7 +46,7 @@ int	main(int argc, char *argv[])
 			*tld = NULL, *ns = NULL, *ns_ip = NULL, proto = RSM_UDP, *nsid = NULL, *ns_with_ip = NULL,
 			ipv4_enabled = 0, ipv6_enabled = 0, *testprefix = DEFAULT_TESTPREFIX,
 			testedname[ZBX_HOST_BUF_SIZE], dnssec_enabled = 0, ignore_err = 0, log_to_file = 0;
-	int		c, index, rtt, rtt_unpacked, upd_unpacked;
+	int		c, index, rtt, rtt_unpacked, upd_unpacked, minns = DEFAULT_MINNS, timeout = -1;
 	ldns_resolver	*res = NULL;
 	ldns_rr_list	*keys = NULL;
 	FILE		*log_fd = stdout;
@@ -48,10 +54,11 @@ int	main(int argc, char *argv[])
 	size_t		size_one_unpacked, size_two_unpacked, nss_num = 0;
 	zbx_ns_t	*nss = NULL;
 	struct zbx_json	json;
+	uint16_t	res_port = DEFAULT_RES_PORT, ns_port = DEFAULT_NS_PORT;
 
 	opterr = 0;
 
-	while ((c = getopt (argc, argv, "t:n:i:46r:p:dcgfh")) != -1)
+	while ((c = getopt (argc, argv, "t:n:i:46r:o:s:p:dcm:gfh")) != -1)
 	{
 		switch (c)
 		{
@@ -73,6 +80,12 @@ int	main(int argc, char *argv[])
 			case 'r':
 				res_ip = optarg;
 				break;
+			case 'o':
+				res_port = atoi(optarg);
+				break;
+			case 's':
+				ns_port = atoi(optarg);
+				break;
 			case 'p':
 				testprefix = optarg;
 				break;
@@ -81,6 +94,9 @@ int	main(int argc, char *argv[])
 				break;
 			case 'c':
 				proto = RSM_TCP;
+				break;
+			case 'm':
+				timeout = atoi(optarg);
 				break;
 			case 'g':
 				ignore_err = 1;
@@ -131,13 +147,18 @@ int	main(int argc, char *argv[])
 		exit_usage(argv[0]);
 	}
 
-	rsm_infof(log_fd, "tld:%s, ns:%s, ip:%s, res:%s, testprefix:%s", tld, ns, ns_ip, res_ip, testprefix);
+	if (-1 == timeout)
+	{
+		timeout = (RSM_UDP == proto ? RSM_UDP_TIMEOUT : RSM_TCP_TIMEOUT);
+	}
+
+	rsm_infof(log_fd, "tld:%s ns:%s ip:%s res:%s testprefix:%s timeout:%d", tld, ns, ns_ip, res_ip, testprefix, timeout);
 
 	extras = (dnssec_enabled ? RESOLVER_EXTRAS_DNSSEC : RESOLVER_EXTRAS_NONE);
 
 	/* create resolver */
-	if (SUCCEED != zbx_create_resolver(&res, "resolver", res_ip, proto, ipv4_enabled, ipv6_enabled, extras,
-			(RSM_UDP == proto ? RSM_UDP_TIMEOUT : RSM_TCP_TIMEOUT),
+	if (SUCCEED != zbx_create_resolver(&res, "resolver", res_ip, res_port, proto, ipv4_enabled, ipv6_enabled, extras,
+			timeout,
 			(RSM_UDP == proto ? RSM_UDP_RETRY : RSM_TCP_RETRY),
 			log_fd, err, sizeof(err)))
 	{
@@ -204,7 +225,7 @@ int	main(int argc, char *argv[])
 	else
 		zbx_snprintf(testedname, sizeof(testedname), "%s.", testprefix);
 
-	if (SUCCEED != zbx_get_ns_ip_values(res, ns, ns_ip, keys, testedname, log_fd, &rtt, &nsid, NULL,
+	if (SUCCEED != zbx_get_ns_ip_values(res, ns, ns_ip, ns_port, keys, testedname, log_fd, &rtt, &nsid, NULL,
 			ipv4_enabled, ipv6_enabled, 0, err, sizeof(err)))
 	{
 		rsm_err(stderr, err);
@@ -227,8 +248,8 @@ int	main(int argc, char *argv[])
 	nss[0].ips[0].nsid = zbx_strdup(NULL, (nsid ? nsid : ""));
 	nss[0].ips[0].upd = upd_unpacked;
 
-	set_dns_test_results(nss, nss_num, DEFAULT_RTT_LIMIT, 2, &nssok, &test_status, &dnssec_status, dnssec_enabled,
-			stdout);
+	set_dns_test_results(nss, nss_num, DEFAULT_RTT_LIMIT, minns, &nssok, &test_status, &dnssec_status,
+			dnssec_enabled, stdout);
 
 	create_dns_json(&json, nss, nss_num, CURRENT_MODE_NORMAL, nssok, test_status, dnssec_status, proto, testedname,
 			dnssec_enabled);

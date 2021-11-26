@@ -1,6 +1,7 @@
 #include "t_rsm.h"
 #include "../zabbix_server/poller/checks_simple_rsm.c"
 
+#define DEFAULT_RES_PORT	53
 #define DEFAULT_MAXREDIRS	10
 #define DEFAULT_RTT_LIMIT	20
 
@@ -11,10 +12,13 @@ void	zbx_on_exit(int ret)
 
 void	exit_usage(const char *program)
 {
-	fprintf(stderr, "usage: %s -r <ip> -u <base_url> -d <testedname> [-h]\n", program);
+	fprintf(stderr, "usage: %s -r <ip> -u <base_url> -d <testedname> <[-4 -6]> [-o <res_port>] [-h]\n", program);
 	fprintf(stderr, "       -r <res_ip>       local resolver IP\n");
+	fprintf(stderr, "       -o <res_port>     port of resolver to use (default: %hu)\n", DEFAULT_RES_PORT);
 	fprintf(stderr, "       -u <base_url>     RDAP service endpoint\n");
 	fprintf(stderr, "       -d <testedname>   domain name to use in RDAP query\n");
+	fprintf(stderr, "       -4                enable IPv4\n");
+	fprintf(stderr, "       -6                enable IPv6\n");
 	fprintf(stderr, "       -h                show this message and quit\n");
 	exit(EXIT_FAILURE);
 }
@@ -25,30 +29,40 @@ int	main(int argc, char *argv[])
 	zbx_resolver_error_t	ec_res;
 	curl_data_t		data = {NULL, 0, 0};
 	zbx_http_error_t	ec_http;
-	int			c, index, port, rtt_limit = DEFAULT_RTT_LIMIT, rtt = ZBX_NO_VALUE, ipv4_enabled = 1,
-				ipv6_enabled = 1, maxredirs = DEFAULT_MAXREDIRS, ipv_flags = 0, curl_flags = 0;
+	int			c, index, rdap_port, rtt_limit = DEFAULT_RTT_LIMIT, rtt = ZBX_NO_VALUE,
+				maxredirs = DEFAULT_MAXREDIRS, ipv_flags = 0, curl_flags = 0;
 	struct zbx_json_parse	jp;
 	ldns_resolver		*res = NULL;
 	char			*testedname = NULL, *base_url = NULL, is_ipv4,  rdap_prefix[64], *res_ip = NULL, *proto = NULL,
 				*target = NULL, *prefix = NULL, *full_url = NULL, *value_str = NULL,
-				err[ZBX_ERR_BUF_SIZE];
+				ipv4_enabled = 0, ipv6_enabled = 0, err[ZBX_ERR_BUF_SIZE];
 	const char		*ip = NULL;
 	size_t			value_alloc = 0;
+	uint16_t		res_port = DEFAULT_RES_PORT;
 
 	zbx_vector_str_create(&ips);
 
-	while ((c = getopt (argc, argv, "r:u:d:h")) != -1)
+	while ((c = getopt (argc, argv, "r:o:u:d:46h")) != -1)
 	{
 		switch (c)
 		{
 			case 'r':
 				res_ip = optarg;
 				break;
+			case 'o':
+				res_port = atoi(optarg);
+				break;
 			case 'u':
 				base_url = optarg;
 				break;
 			case 'd':
 				testedname = optarg;
+				break;
+			case '4':
+				ipv4_enabled = 1;
+				break;
+			case '6':
+				ipv6_enabled = 1;
 				break;
 			case 'h':
 				exit_usage(argv[0]);
@@ -87,9 +101,15 @@ int	main(int argc, char *argv[])
 		exit_usage(argv[0]);
 	}
 
-	printf("IP: %s, URL: %s , Test domain: %s\n", res_ip, base_url, testedname);
+	if (0 == ipv4_enabled && 0 == ipv6_enabled)
+	{
+		fprintf(stderr, "at least one IP version [-4, -6] must be specified\n");
+		exit_usage(argv[0]);
+	}
 
-	if (SUCCEED != zbx_create_resolver(&res, "resolver", res_ip, RSM_TCP, ipv4_enabled, ipv6_enabled,
+	printf("IP: %s, URL: %s, Test domain: %s\n", res_ip, base_url, testedname);
+
+	if (SUCCEED != zbx_create_resolver(&res, "resolver", res_ip, res_port, RSM_TCP, ipv4_enabled, ipv6_enabled,
 			RESOLVER_EXTRAS_DNSSEC, RSM_TCP_TIMEOUT, RSM_TCP_RETRY, stderr, err, sizeof(err)))
 	{
 		rsm_errf(stderr, "cannot create resolver: %s", err);
@@ -111,10 +131,12 @@ int	main(int argc, char *argv[])
 		goto out;
 	}
 
-	ipv_flags |= ZBX_FLAG_IPV4_ENABLED;
-	ipv_flags |= ZBX_FLAG_IPV6_ENABLED;
+	if (ipv4_enabled)
+		ipv_flags |= ZBX_FLAG_IPV4_ENABLED;
+	if (ipv6_enabled)
+		ipv_flags |= ZBX_FLAG_IPV6_ENABLED;
 
-	if (SUCCEED != zbx_split_url(base_url, &proto, &target, &port, &prefix, err, sizeof(err)))
+	if (SUCCEED != zbx_split_url(base_url, &proto, &target, &rdap_port, &prefix, err, sizeof(err)))
 	{
 		rtt = ZBX_EC_RDAP_INTERNAL_GENERAL;
 		rsm_errf(stderr, "RDAP \"%s\": %s", base_url, err);
@@ -154,12 +176,12 @@ int	main(int argc, char *argv[])
 
 	if (0 == is_ipv4)
 	{
-		full_url = zbx_dsprintf(full_url, "%s[%s]:%d%s%s/%s", proto, ip, port, prefix, rdap_prefix,
+		full_url = zbx_dsprintf(full_url, "%s[%s]:%d%s%s/%s", proto, ip, rdap_port, prefix, rdap_prefix,
 				testedname);
 	}
 	else
 	{
-		full_url = zbx_dsprintf(full_url, "%s%s:%d%s%s/%s", proto, ip, port, prefix, rdap_prefix, testedname);
+		full_url = zbx_dsprintf(full_url, "%s%s:%d%s%s/%s", proto, ip, rdap_port, prefix, rdap_prefix, testedname);
 	}
 
 	/* base_url example: http://whois.example */
