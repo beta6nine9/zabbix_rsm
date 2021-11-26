@@ -1149,7 +1149,7 @@ sub __cmd_provisioning_api($)
 
 	my $payload = $request eq '' ? undef : read_file($request);
 
-	my $url = get_config('provisioning-api', 'url') . $endpoint;
+	my $url = rtrim(get_config('provisioning-api', 'url'), '/') . '/' . ltrim($endpoint, '/');
 
 	my ($status_code, $content_type, $response_body) = http_request($url, $method, $users->{$user}, $payload);
 

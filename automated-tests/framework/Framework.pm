@@ -25,6 +25,8 @@ our @EXPORT = qw(
 	tar_unpack
 	tar_compare
 	str_starts_with
+	ltrim
+	rtrim
 	to_unixtimestamp
 	format_table
 );
@@ -690,6 +692,22 @@ sub str_starts_with($$)
 	{
 		return 0;
 	}
+}
+
+sub ltrim($;$)
+{
+	my $string = shift;
+	my $chars  = shift // '\s';
+
+	return $string =~ s/^[$chars]+//r;
+}
+
+sub rtrim($;$)
+{
+	my $string = shift;
+	my $chars  = shift // '\s';
+
+	return $string =~ s/[$chars]+$//r;
 }
 
 sub to_unixtimestamp($)
