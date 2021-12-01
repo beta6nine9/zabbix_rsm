@@ -1399,7 +1399,7 @@ static int	zbx_dns_in_a_query(ldns_pkt **pkt, ldns_resolver *res, const ldns_rdf
 		goto err;
 	}
 
-	/*extract_nsid(ldns_pkt_edns_data(*pkt), nsid);*/
+	extract_nsid(ldns_pkt_edns_data(*pkt), nsid);
 
 	ret = SUCCEED;
 
@@ -1913,6 +1913,12 @@ static int	zbx_get_nameservers(char *name_servers_list, zbx_ns_t **nss, size_t *
 		}
 		else
 		{
+			if (*nss_num == nss_alloc)
+			{
+				nss_alloc += 8;
+				*nss = (zbx_ns_t *)zbx_realloc(*nss, nss_alloc * sizeof(zbx_ns_t));
+			}
+
 			/* check if need to add NS */
 			for (i = 0; i < *nss_num; i++)
 			{
@@ -1929,12 +1935,6 @@ static int	zbx_get_nameservers(char *name_servers_list, zbx_ns_t **nss, size_t *
 
 				break;
 			}
-		}
-
-		if (*nss_num == nss_alloc)
-		{
-			nss_alloc += 8;
-			*nss = (zbx_ns_t *)zbx_realloc(*nss, nss_alloc * sizeof(zbx_ns_t));
 		}
 
 		/* add NS here */
