@@ -1399,7 +1399,7 @@ static int	zbx_dns_in_a_query(ldns_pkt **pkt, ldns_resolver *res, const ldns_rdf
 		goto err;
 	}
 
-	extract_nsid(ldns_pkt_edns_data(*pkt), nsid);
+	/*extract_nsid(ldns_pkt_edns_data(*pkt), nsid);*/
 
 	ret = SUCCEED;
 
