@@ -374,7 +374,7 @@ class AggregateDetailsAction extends Action {
 		$macro = $this->getMacroHistoryValue(array_keys($defaults), $time_from);
 
 		foreach (array_diff_key($defaults, $macro) as $key => $val) {
-			error(_s('Macro "%s" value not found.', $key));
+			error(_s('History value of "%s" not found.', $key));
 		}
 
 		$macro += $defaults;
@@ -432,7 +432,7 @@ class AggregateDetailsAction extends Action {
 			}
 		}
 
-		if ($test_result['value'] != UP_INCONCLUSIVE_RECONFIG) {
+		if (array_key_exists('test_result', $data) && $data['test_result'] != UP_INCONCLUSIVE_RECONFIG) {
 			// Set probes test trasport.
 			$protocol_type = $this->getValueMapping(RSM_DNS_TRANSPORT_PROTOCOL_VALUE_MAP);
 

@@ -133,8 +133,12 @@ class Action extends CAction {
 					'sortorder' => ZBX_SORT_DOWN,
 					'limit' => 1
 				]);
+
 				$macro_item_value = reset($macro_item_value);
-				$values[$macro_item['key_']] = $macro_item_value['value'];
+
+				if ($macro_item_value) {
+					$values[$macro_item['key_']] = $macro_item_value['value'];
+				}
 			}
 		}
 

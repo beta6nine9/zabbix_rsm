@@ -5488,6 +5488,7 @@ int	check_rsm_resolver_status(const char *host, const AGENT_REQUEST *request, AG
 
 	/* from this point item will not become NOTSUPPORTED */
 	ret = SYSINFO_RET_OK;
+
 	rsm_info(log_fd, "START TEST");
 
 	rsm_infof(log_fd, "IPv4:%s IPv6:%s", 0 == ipv4_enabled ? "DISABLED" : "ENABLED",
@@ -5525,7 +5526,7 @@ end:
 
 		SET_UI64_RESULT(result, status);
 
-		/* probe knock-down if local resolver non-functional */
+		/* knock-down the probe if local resolver non-functional */
 		if (0 == status)
 			zbx_dc_rsm_errors_inc();
 	}
