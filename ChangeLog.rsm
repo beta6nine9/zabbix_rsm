@@ -1,4 +1,4 @@
-Changes for rsm2.2.1rc1
+Changes for rsm2.2.1
 
 Bug fixes:
 .......PS. [830] added code that takes care of simple check preprocessing on server side (part of 807) (dimir)
