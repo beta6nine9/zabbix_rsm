@@ -3594,12 +3594,12 @@ int	zbx_dbsync_compare_item_preprocs(zbx_dbsync_t *sync)
 			" from item_preproc pp,items i,hosts h"
 			" where pp.itemid=i.itemid"
 				" and i.hostid=h.hostid"
-				" and (h.proxy_hostid is null"
-					" or i.type in (%d,%d,%d,%d))"
+/* RSM specifics:               " and (h.proxy_hostid is null" RSM specifics: move all preprocessing to server */
+/* move all preprocessing to server     " or i.type in (%d,%d,%d,%d))"                                         */
 				" and h.status in (%d,%d)"
 				" and i.flags<>%d"
 			" order by pp.itemid",
-			ITEM_TYPE_INTERNAL, ITEM_TYPE_AGGREGATE, ITEM_TYPE_CALCULATED, ITEM_TYPE_DEPENDENT,
+/*                      ITEM_TYPE_INTERNAL, ITEM_TYPE_AGGREGATE, ITEM_TYPE_CALCULATED, ITEM_TYPE_DEPENDENT,    */
 			HOST_STATUS_MONITORED, HOST_STATUS_NOT_MONITORED,
 			ZBX_FLAG_DISCOVERY_PROTOTYPE)))
 	{
@@ -3626,11 +3626,12 @@ int	zbx_dbsync_compare_item_preprocs(zbx_dbsync_t *sync)
 
 		/* Sync preproccessing for all dependent items as they can depend on item processed by Zabbx server, */
 		/* avoid syncing preprocessing for internal items monitored by Zabbix proxy                          */
-		if (type != ITEM_TYPE_DEPENDENT && SUCCEED != DBis_null(dbrow[10]) &&
-				SUCCEED != is_item_processed_by_server(type, dbrow[9]))
-		{
-			continue;
-		}
+/* RSM specifics: move all preprocessing to server                                      */
+/*              if (type != ITEM_TYPE_DEPENDENT && SUCCEED != DBis_null(dbrow[10]) &&   */
+/*                              SUCCEED != is_item_processed_by_server(type, dbrow[9])) */
+/*              {                                                                       */
+/* 	                continue;                                                       */
+/*              }                                                                       */
 
 		ZBX_STR2UINT64(rowid, dbrow[0]);
 		zbx_hashset_insert(&ids, &rowid, sizeof(rowid));
