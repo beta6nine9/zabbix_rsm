@@ -1,3 +1,11 @@
+Changes for rsm2.2.1
+
+Bug fixes:
+.......PS. [830] added code that takes care of simple check preprocessing on server side (part of 807) (dimir)
+..F....... [829] fixed frontend error messages when part of the history data is missing (dimir)
+.......PS. [832] fixed possible crash when collecting Name Servers (asitals)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.2.0
 
 rsm2.0.0rc27 was released as rsm2.2.0 without any changes
