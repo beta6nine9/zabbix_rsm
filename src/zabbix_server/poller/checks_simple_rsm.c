@@ -1874,22 +1874,25 @@ static int	zbx_get_nameservers(char *name_servers_list, zbx_ns_t **nss, size_t *
 		int ipv6_enabled, FILE *log_fd, char *err, size_t err_size)
 {
 	char		*ns, *ip, *ns_next;
-	size_t		i, j, nss_alloc = 8;
+	size_t		i, j, nss_alloc = 0;
 	zbx_ns_t	*ns_entry;
 
 	*nss_num = 0;
 	ns = name_servers_list;
 
-	do
+	while (NULL != ns)
 	{
 		if (NULL != (ns_next = strchr(ns, ' ')))
+		{
 			*ns_next = '\0';
+			ns_next++;
+		}
 
 		if (NULL == (ip = strchr(ns, ',')))
 		{
-			zbx_snprintf(err, err_size, "invalid entry \"%s\" in list of name servers \"%s\""
+			zbx_snprintf(err, err_size, "invalid entry \"%s\" in the list of name servers"
 					", expected \"<NS>,<IP>\"",
-					ns, name_servers_list);
+					ns);
 			return FAIL;
 		}
 
@@ -1898,46 +1901,47 @@ static int	zbx_get_nameservers(char *name_servers_list, zbx_ns_t **nss, size_t *
 
 		if (SUCCEED != zbx_validate_ip(ip, ipv4_enabled, ipv6_enabled, NULL, NULL))
 		{
-			rsm_warnf(log_fd, "unsupported IP address \"%s\" in list of name servers \"%s\", ignored",
-					ip, name_servers_list);
+			rsm_warnf(log_fd, "unsupported IP address \"%s\" in the list of name servers, ignored", ip);
 			goto next_ns;
 		}
 
 		ns_entry = NULL;
 
-		if (0 == *nss_num)
+		/* find NS */
+		for (i = 0; i < *nss_num; i++)
 		{
-			*nss = (zbx_ns_t *)zbx_malloc(*nss, nss_alloc * sizeof(zbx_ns_t));
-		}
-		else
-		{
-			/* check if need to add NS */
-			for (i = 0; i < *nss_num; i++)
+			if (0 != strcmp(((*nss)[i]).name, ns))
 			{
-				if (0 != strcmp(((*nss)[i]).name, ns))
-					continue;
-
-				ns_entry = &(*nss)[i];
-
-				for (j = 0; j < ns_entry->ips_num; j++)
-				{
-					if (0 == strcmp(ns_entry->ips[j].ip, ip))
-						goto next_ns;
-				}
-
-				break;
+				continue;
 			}
+
+			ns_entry = &(*nss)[i];
+
+			for (j = 0; j < ns_entry->ips_num; j++)
+			{
+				if (0 == strcmp(ns_entry->ips[j].ip, ip))
+				{
+					goto next_ns;
+				}
+			}
+
+			break;
 		}
 
-		if (*nss_num == nss_alloc)
-		{
-			nss_alloc += 8;
-			*nss = (zbx_ns_t *)zbx_realloc(*nss, nss_alloc * sizeof(zbx_ns_t));
-		}
-
-		/* add NS here */
+		/* add NS */
 		if (NULL == ns_entry)
 		{
+			if (0 == *nss_num)
+			{
+				nss_alloc = 8;
+				*nss = (zbx_ns_t *)zbx_malloc(*nss, nss_alloc * sizeof(zbx_ns_t));
+			}
+			else if (nss_alloc == *nss_num)
+			{
+				nss_alloc += 8;
+				*nss = (zbx_ns_t *)zbx_realloc(*nss, nss_alloc * sizeof(zbx_ns_t));
+			}
+
 			ns_entry = &(*nss)[*nss_num];
 
 			ns_entry->name = zbx_strdup(NULL, ns);
@@ -1947,11 +1951,15 @@ static int	zbx_get_nameservers(char *name_servers_list, zbx_ns_t **nss, size_t *
 			(*nss_num)++;
 		}
 
-		/* add IP here */
+		/* add IP */
 		if (0 == ns_entry->ips_num)
+		{
 			ns_entry->ips = (zbx_ns_ip_t *)zbx_malloc(NULL, sizeof(zbx_ns_ip_t));
+		}
 		else
+		{
 			ns_entry->ips = (zbx_ns_ip_t *)zbx_realloc(ns_entry->ips, (ns_entry->ips_num + 1) * sizeof(zbx_ns_ip_t));
+		}
 
 		ns_entry->ips[ns_entry->ips_num].ip = zbx_strdup(NULL, ip);
 		ns_entry->ips[ns_entry->ips_num].upd = ZBX_NO_VALUE;
@@ -1959,9 +1967,8 @@ static int	zbx_get_nameservers(char *name_servers_list, zbx_ns_t **nss, size_t *
 
 		ns_entry->ips_num++;
 next_ns:
-		ns = ns_next + 1;
+		ns = ns_next;
 	}
-	while (NULL != ns_next);
 
 	return SUCCEED;
 }
@@ -5547,6 +5554,7 @@ int	check_rsm_resolver_status(const char *host, const AGENT_REQUEST *request, AG
 
 	/* from this point item will not become NOTSUPPORTED */
 	ret = SYSINFO_RET_OK;
+
 	rsm_info(log_fd, "START TEST");
 
 	rsm_infof(log_fd, "IPv4:%s IPv6:%s", 0 == ipv4_enabled ? "DISABLED" : "ENABLED",
@@ -5584,7 +5592,7 @@ end:
 
 		SET_UI64_RESULT(result, status);
 
-		/* probe knock-down if local resolver non-functional */
+		/* knock-down the probe if local resolver non-functional */
 		if (0 == status)
 			zbx_dc_rsm_errors_inc();
 	}

@@ -548,7 +548,7 @@ static int	get_proxyconfig_table_items(zbx_uint64_t proxy_hostid, struct zbx_jso
 				" and r.proxy_hostid=" ZBX_FS_UI64
 				" and r.status in (%d,%d)"
 				" and t.flags<>%d"
-				" and t.type in (%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d)" /* RSM specifics: ,%d)"*/
+				" and t.type in (%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d)" /* RSM specifics: move all preprocessing to server */
 			" order by t.%s",
 			proxy_hostid,
 			HOST_STATUS_MONITORED, HOST_STATUS_NOT_MONITORED,
@@ -556,7 +556,7 @@ static int	get_proxyconfig_table_items(zbx_uint64_t proxy_hostid, struct zbx_jso
 			ITEM_TYPE_ZABBIX, ITEM_TYPE_ZABBIX_ACTIVE, ITEM_TYPE_SNMP, ITEM_TYPE_IPMI, ITEM_TYPE_TRAPPER,
 			ITEM_TYPE_SIMPLE, ITEM_TYPE_HTTPTEST, ITEM_TYPE_EXTERNAL, ITEM_TYPE_DB_MONITOR, ITEM_TYPE_SSH,
 			ITEM_TYPE_TELNET, ITEM_TYPE_JMX, ITEM_TYPE_SNMPTRAP, ITEM_TYPE_INTERNAL,
-			ITEM_TYPE_HTTPAGENT,/* ITEM_TYPE_DEPENDENT, RSM specifics: no dependent items for proxies */
+			ITEM_TYPE_HTTPAGENT,/* ITEM_TYPE_DEPENDENT, RSM specifics: move all preprocessing to server, dependent items are not needed on proxy */
 			table->recid);
 
 	if (NULL == (result = DBselect("%s", sql)))
@@ -967,7 +967,7 @@ int	get_proxyconfig_data(zbx_uint64_t proxy_hostid, struct zbx_json *j, char **e
 		"hostmacro",
 		"items",
 		"item_rtdata",
-		/* "item_preproc", RSM specifics: */
+		/* "item_preproc", RSM specifics: move all preprocessing to server, preprocessing rules are not needed on proxy */
 		"drules",
 		"dchecks",
 		"regexps",
@@ -2845,14 +2845,14 @@ static void	process_item_value(const DC_ITEM *item, AGENT_RESULT *result, zbx_ti
 	{
 		if (0 != (ZBX_FLAG_DISCOVERY_RULE & item->flags))
 		{
-			/* RSM specifics: pre-process items from proxy */
+			/* RSM specifics: move all preprocessing to server */
 			zbx_preprocess_item_value(item->itemid, item->host.hostid, item->value_type, item->flags, result, ts,
 					item->state, error);
 			*h_num = 0;
 		}
 		else
 		{
-			/* RSM specifics: pre-process items from proxy */
+			/* RSM specifics: move all preprocessing to server */
 			zbx_preprocess_item_value(item->itemid, item->host.hostid, item->value_type, item->flags, result, ts,
 					item->state, error);
 			*h_num = 1;
