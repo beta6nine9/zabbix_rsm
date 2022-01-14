@@ -1,0 +1,42 @@
+[test-case]
+
+"#num# - onboard 2 probes (all services enabled), onboard 2 tlds (all services enabled), disable 1 tld, try disabling it again"
+
+[prepare-server-database]
+
+[set-global-macro]
+
+"{$RSM.MONITORING.TARGET}","registry"
+"{$RSM.IP4.ROOTSERVERS1}","193.0.14.129,192.5.5.241,199.7.83.42,198.41.0.4,192.112.36.4"
+"{$RSM.IP6.ROOTSERVERS1}","2001:7fe::53,2001:500:2f::f,2001:500:9f::42,2001:503:ba3e::2:30,2001:500:12::d0d"
+"{$RSM.DNS.PROBE.ONLINE}","2"
+"{$RSM.RDDS.PROBE.ONLINE}","2"
+"{$RSM.RDAP.PROBE.ONLINE}","2"
+"{$RSM.IP4.MIN.PROBE.ONLINE}","2"
+"{$RSM.IP6.MIN.PROBE.ONLINE}","2"
+"{$RSM.RDAP.STANDALONE}","1609459200"
+
+[provisioning-api]
+
+"/probeNodes/probe1","PUT",200,"readwrite","200-input-probe1.json",""
+"/probeNodes/probe2","PUT",200,"readwrite","200-input-probe2.json",""
+
+"/tlds/tld1","PUT",200,"readwrite","200-input-tld1.json",""
+"/tlds/tld2","PUT",200,"readwrite","200-input-tld2.json",""
+
+[fill-history]
+
+"tld2","rsm.slv.dns.downtime"                          ,60,0,1
+"tld2","rsm.slv.dns.ns.downtime[a.ns.tld2,192.168.2.1]",60,0,1
+"tld2","rsm.slv.dns.tcp.rtt.pfailed"                   ,60,0,1
+"tld2","rsm.slv.dns.udp.rtt.pfailed"                   ,60,0,1
+
+[execute-sql-query]
+
+"update history      set clock=floor(unix_timestamp()/300)*300 where clock=0"
+"update history_uint set clock=floor(unix_timestamp()/300)*300 where clock=0"
+
+[provisioning-api]
+
+"/tlds/tld2","PUT",200,"readwrite","200-input-tld-disabled.json",""
+"/tlds/tld2","PUT",200,"readwrite","200-input-tld-disabled.json",""
