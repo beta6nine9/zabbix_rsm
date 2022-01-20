@@ -29,6 +29,7 @@ use ProvisioningApi;
 my %command_handlers = (
 	# command => [$handler, $has_arguments, $fork],
 	'test-case'               => [\&__cmd_test_case              , 1, 0], # name
+	'set-variable'            => [\&__cmd_set_variable           , 1, 0], # name,value
 	'enable-debug-mode'       => [\&__cmd_enable_debug_mode      , 0, 0], # (void)
 	'disable-debug-mode'      => [\&__cmd_disable_debug_mode     , 0, 0], # (void)
 	'empty-directory'         => [\&__cmd_empty_directory        , 1, 1], # directory
@@ -58,6 +59,7 @@ my %command_handlers = (
 
 my $test_case_filename;
 my $test_case_name;
+my $test_case_variables;
 
 ################################################################################
 # main functions
@@ -73,6 +75,9 @@ sub run_test_case($)
 
 	# reset the name of the test case
 	$test_case_name = undef;
+
+	# reset the variables of the test case
+	$test_case_variables = {};
 
 	my $line_num = 0;
 	my $command = undef;
@@ -113,6 +118,8 @@ sub run_test_case($)
 			}
 
 			$command = $1;
+
+			info("handling command '$command'");
 
 			if (!exists($command_handlers{$command}))
 			{
@@ -295,6 +302,20 @@ sub __cmd_test_case($)
 	($test_case_name) = __unpack($args);
 
 	info("test case - '$test_case_name'");
+}
+
+sub __cmd_set_variable($)
+{
+	my $args = shift;
+
+	# [set-variable]
+	# name,value
+
+	my ($name, $value) = __unpack($args);
+
+	info("storing variable (name: '$name', value: '$value')");
+
+	$test_case_variables->{$name} = $value;
 }
 
 sub __cmd_enable_debug_mode()
@@ -1178,7 +1199,26 @@ sub __unpack($)
 {
 	my $args = shift;
 
-	return @{csv('allow_whitespace' => 1, 'in' => \$args)->[0]};
+	my @values = @{csv('allow_whitespace' => 1, 'in' => \$args)->[0]};
+
+	foreach (@values)
+	{
+		$_ =~ s!(\$\{(.*?)\})! $test_case_variables->{$2} // $1 !ge;
+	}
+
+	return @values;
+}
+
+sub __expect($$$)
+{
+	my $value          = shift;
+	my $expected_value = shift;
+	my $message        = shift;
+
+	if ($value ne $expected_value)
+	{
+		fail($message, $value, $expected_value);
+	}
 }
 
 sub __get_hostid($)
