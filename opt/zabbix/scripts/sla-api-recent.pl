@@ -125,8 +125,6 @@ $clock_limits{'dns'} = $clock_limits{'dnssec'} = cycle_start($now - $initial_mea
 $clock_limits{'rdds'} = cycle_start($now - $initial_measurements_limit, $delays{'rdds'});
 $clock_limits{'rdap'} = cycle_start($now - $initial_measurements_limit, $delays{'rdap'}) if ($rdap_is_standalone);
 
-my $heartbeat = get_heartbeat();
-
 db_disconnect();
 
 my %service_keys = (
@@ -1246,7 +1244,7 @@ sub get_cycle_nsids($$$)
 
 	if (keys(%missing))
 	{
-		my $history = get_history_with_throttling([keys(%missing)], 'history_str', $from - $heartbeat + 60, $till);
+		my $history = get_history_with_throttling([keys(%missing)], 'history_str', $from - get_heartbeat() + 60, $till);
 
 		foreach my $row (@{$history})
 		{
