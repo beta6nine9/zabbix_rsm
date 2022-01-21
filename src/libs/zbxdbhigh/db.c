@@ -3067,6 +3067,7 @@ retry_oracle:
 			ret = FAIL;
 	}
 #endif
+
 out:
 	zbx_free(sql_command);
 
