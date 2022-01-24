@@ -139,4 +139,12 @@ char	*CONFIG_EXPORT_TYPE	= NULL;
 
 int	CONFIG_TCP_MAX_BACKLOG_SIZE	= SOMAXCONN;
 
+ZBX_METRIC      parameters_common_http[] =
+/*	KEY			FLAG		FUNCTION		TEST PARAMETERS */
+{
+	{"web.page.get",	CF_HAVEPARAMS,	NULL,			"localhost,,80"}
+};
+
+void	xml_escape_xpath(char **data) {}
+
 #endif	/* _T_RSM_H_ */
