@@ -1,0 +1,4 @@
+{
+	"expected-qname"  : "example.example",
+	"expected-qtypes" : ["A", "AAAA"]
+}

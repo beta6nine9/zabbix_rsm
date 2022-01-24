@@ -55,6 +55,8 @@ my %command_handlers = (
 	'check-incident'          => [\&__cmd_check_incident         , 1, 1], # rsmhost,description,from,till
 	'check-event-count'       => [\&__cmd_check_event_count      , 1, 1], # rsmhost,description,count
 	'provisioning-api'        => [\&__cmd_provisioning_api       , 1, 1], # endpoint,method,expected_code,user,request,response
+	'start-tool'              => [\&__cmd_start_tool             , 1, 1], # tool_name,pid-file,input-file
+	'stop-tool'               => [\&__cmd_stop_tool              , 1, 1], # tool_name,pid-file
 );
 
 my $test_case_filename;
@@ -400,20 +402,7 @@ sub __cmd_compare_files($)
 
 	if (!tar_compare($archive, $directory))
 	{
-		my $rows = db_select(
-			"select distinct e.eventid,from_unixtime(e.clock) as clock,h.host,e.name,e.value".
-			" from events e,triggers t,functions f,items i,hosts h".
-			" where e.source=0".
-				" and e.objectid=t.triggerid".
-				" and t.triggerid=f.triggerid".
-				" and f.itemid=i.itemid".
-				" and i.hostid=h.hostid".
-			" order by e.eventid asc"
-		);
-
-		fail("contents of '$directory' differ from contents of '$archive'" .
-			", events (eventid, clock, rsmhost, trigger, value):\n".
-			join("\n", map {join("\t", @{$_})} (@{$rows})));
+		fail("contents of '$directory' differ from contents of '$archive'");
 	}
 }
 
@@ -1189,6 +1178,30 @@ sub __cmd_provisioning_api($)
 	{
 		...;
 	}
+}
+
+sub __cmd_start_tool($)
+{
+	my $args = shift;
+
+	# [start-tool]
+	# tool_name,pid_file,input_file
+
+	my ($tool_name, $pid_file, $input_file) = __unpack($args);
+
+	start_tool($tool_name, $pid_file, $input_file);
+}
+
+sub __cmd_stop_tool($)
+{
+	my $args = shift;
+
+	# [stop-tool]
+	# tool_name,pid_file
+
+	my ($tool_name, $pid_file) = __unpack($args);
+
+	stop_tool($tool_name, $pid_file);
 }
 
 ################################################################################

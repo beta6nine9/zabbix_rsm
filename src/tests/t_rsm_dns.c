@@ -19,9 +19,10 @@ void	zbx_on_exit(int ret)
 	ZBX_UNUSED(ret);
 }
 
-void	exit_usage(const char *program)
+static void	exit_usage(const char *program)
 {
-	fprintf(stderr, "usage: %s -t <tld> -n <ns> -i <ip> <[-4] [-6]> [-r <res_ip>] [-o <res/_port>] [-p <testprefix>] [-d] [-c] [-m] [-g] [-f] [-h]\n", program);
+	fprintf(stderr, "usage: %s -t <tld> -n <ns> -i <ip> <[-4] [-6]> [-r <res_ip>] [-o <res/_port>] [-p <testprefix>]"
+			" [-d] [-c] [-m <seconds>] [-j <file>] [-f] [-h]\n", program);
 	fprintf(stderr, "       -t <tld>          TLD to test\n");
 	fprintf(stderr, "       -n <ns>           Name Server to test\n");
 	fprintf(stderr, "       -i <ip>           IP address of the Name Server to test\n");
@@ -33,8 +34,8 @@ void	exit_usage(const char *program)
 	fprintf(stderr, "       -p <testprefix>   domain testprefix to use (default: %s)\n", DEFAULT_TESTPREFIX);
 	fprintf(stderr, "       -d                enable DNSSEC\n");
 	fprintf(stderr, "       -c                use TCP instead of UDP\n");
-	fprintf(stderr, "       -m                timeout in seconds (default udp:%d tcp:%d)\n", RSM_UDP_TIMEOUT, RSM_TCP_TIMEOUT);
-	fprintf(stderr, "       -g                ignore errors, try to finish the test\n");
+	fprintf(stderr, "       -m <seconds>      timeout (default udp:%d tcp:%d)\n", RSM_UDP_TIMEOUT, RSM_TCP_TIMEOUT);
+	fprintf(stderr, "       -j <file>         write resulting json to the file\n");
 	fprintf(stderr, "       -f                log packets to files (%s, %s) instead of stdout\n", LOG_FILE1, LOG_FILE2);
 	fprintf(stderr, "       -h                show this message and quit\n");
 	exit(EXIT_FAILURE);
@@ -45,7 +46,8 @@ int	main(int argc, char *argv[])
 	char		err[256], pack_buf[2048], nsid_unpacked[NSID_MAX_LENGTH * 2 + 1], *res_ip = DEFAULT_RES_IP,
 			*tld = NULL, *ns = NULL, *ns_ip = NULL, proto = RSM_UDP, *nsid = NULL, *ns_with_ip = NULL,
 			ipv4_enabled = 0, ipv6_enabled = 0, *testprefix = DEFAULT_TESTPREFIX,
-			testedname[ZBX_HOST_BUF_SIZE], dnssec_enabled = 0, ignore_err = 0, log_to_file = 0;
+			testedname[ZBX_HOST_BUF_SIZE], dnssec_enabled = 0,
+			*json_file = NULL;
 	int		c, index, rtt, rtt_unpacked, upd_unpacked, minns = DEFAULT_MINNS, timeout = -1;
 	ldns_resolver	*res = NULL;
 	ldns_rr_list	*keys = NULL;
@@ -58,7 +60,7 @@ int	main(int argc, char *argv[])
 
 	opterr = 0;
 
-	while ((c = getopt (argc, argv, "t:n:i:46r:o:s:p:dcm:gfh")) != -1)
+	while ((c = getopt(argc, argv, "t:n:i:46r:o:s:p:dcm:j:fh")) != -1)
 	{
 		switch (c)
 		{
@@ -98,11 +100,8 @@ int	main(int argc, char *argv[])
 			case 'm':
 				timeout = atoi(optarg);
 				break;
-			case 'g':
-				ignore_err = 1;
-				break;
-			case 'f':
-				log_to_file = 1;
+			case 'j':
+				json_file = optarg;
 				break;
 			case 'h':
 				exit_usage(argv[0]);
@@ -163,11 +162,11 @@ int	main(int argc, char *argv[])
 			log_fd, err, sizeof(err)))
 	{
 		rsm_errf(stderr, "cannot create resolver: %s", err);
-		goto out;
+		exit(EXIT_FAILURE);
 	}
 
 	ns_with_ip = zbx_malloc(NULL, strlen(ns) + 1 + strlen(ns_ip) + 1);
-	zbx_strlcpy(ns_with_ip, ns, sizeof(ns_with_ip));
+	zbx_strlcpy(ns_with_ip, ns, strlen(ns) + 1);
 	strcat(ns_with_ip, ",");
 	strcat(ns_with_ip, ns_ip);
 
@@ -175,47 +174,22 @@ int	main(int argc, char *argv[])
 			sizeof(err)))
 	{
 		rsm_errf(stderr, "cannot get namservers: %s", err);
-		goto out;
+		exit(EXIT_FAILURE);
 	}
 
 	if (EXPECTED_NSS_NUM != nss_num)
 	{
 		rsm_errf(stderr, "unexpected number of nameservers: %d", nss_num);
+		exit(EXIT_FAILURE);
 	}
 
 	if (0 != dnssec_enabled)
 	{
 		zbx_dnskeys_error_t	dnskeys_ec;
 
-		if (log_to_file != 0)
-		{
-			if (NULL == (log_fd = fopen(LOG_FILE1, "w")))
-			{
-				rsm_errf(stderr, "cannot open file \"%s\" for writing: %s", LOG_FILE1, strerror(errno));
-				exit(EXIT_FAILURE);
-			}
-		}
-
 		if (SUCCEED != zbx_get_dnskeys(res, tld, res_ip, &keys, log_fd, &dnskeys_ec, err, sizeof(err)))
 		{
 			rsm_errf(stderr, "%s (error=%d)", err, DNS[DNS_PROTO(res)].dnskeys_error(dnskeys_ec));
-			if (0 == ignore_err)
-				goto out;
-		}
-	}
-
-	if (log_to_file != 0)
-	{
-		if (0 != fclose(log_fd))
-		{
-			rsm_errf(stderr, "cannot close file %s: %s", LOG_FILE1, strerror(errno));
-			goto out;
-		}
-
-		if (NULL == (log_fd = fopen(LOG_FILE2, "w")))
-		{
-			rsm_errf(stderr, "cannot open file \"%s\" for writing: %s", LOG_FILE2, strerror(errno));
-			goto out;
 		}
 	}
 
@@ -229,8 +203,6 @@ int	main(int argc, char *argv[])
 			ipv4_enabled, ipv6_enabled, 0, err, sizeof(err)))
 	{
 		rsm_err(stderr, err);
-		if (0 == ignore_err)
-			goto out;
 	}
 
 	/* we have nsid, now test that it works with packing/unpacking */
@@ -240,7 +212,7 @@ int	main(int argc, char *argv[])
 	if (SUCCEED != unpack_values(&size_one_unpacked, &size_two_unpacked, &rtt_unpacked, &upd_unpacked,
 			nsid_unpacked, pack_buf, stderr))
 	{
-		goto out;
+		exit(EXIT_FAILURE);
 	}
 
 	/* test json */
@@ -258,14 +230,22 @@ int	main(int argc, char *argv[])
 	printf("OK (NSID:%s)\n", nsid);
 	printf("OK, json: %s\n", json.buffer);
 
-	zbx_json_free(&json);
-
-out:
-	if (log_to_file != 0)
+	if (json_file)
 	{
-		if (0 != fclose(log_fd))
-			rsm_errf(stderr, "cannot close log file: %s", strerror(errno));
+		char	*error = NULL;
+		int	rv;
+
+		rsm_infof(log_fd, "writing to %s...", json_file);
+
+		rv = write_json_status(json_file, json.buffer, &error);
+
+		zbx_free(error);
+
+		if (rv != SUCCEED)
+			exit(EXIT_FAILURE);
 	}
+
+	zbx_json_free(&json);
 
 	if (NULL != keys)
 		ldns_rr_list_deep_free(keys);

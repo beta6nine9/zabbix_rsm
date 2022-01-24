@@ -2,9 +2,9 @@
 
 bin_PROGRAMS = t_rsm_dns t_rsm_rdds t_rsm_rdap
 
-t_rsm_dns_SOURCES = t_rsm_dns.c t_rsm.h
-t_rsm_rdds_SOURCES = t_rsm_rdds.c t_rsm.h
-t_rsm_rdap_SOURCES = t_rsm_rdap.c t_rsm.h
+t_rsm_dns_SOURCES  = t_rsm.c t_rsm_dns.c t_rsm.h
+t_rsm_rdds_SOURCES = t_rsm.c t_rsm_rdds.c t_rsm.h
+t_rsm_rdap_SOURCES = t_rsm.c t_rsm_rdap.c t_rsm.h
 
 COMMON_OBJS = \
 	$(top_srcdir)/src/zabbix_server/poller/libzbxpoller.a \

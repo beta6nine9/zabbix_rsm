@@ -29,6 +29,8 @@ our @EXPORT = qw(
 	rtrim
 	to_unixtimestamp
 	format_table
+	start_tool
+	stop_tool
 );
 
 use Archive::Tar;
@@ -43,6 +45,8 @@ use Configuration;
 use Database;
 use Options;
 use Output;
+
+use constant TOOLS_DIR => '../tools';
 
 my @prev_dir = undef;
 
@@ -352,26 +356,7 @@ sub zbx_update_config($$$)
 
 sub zbx_get_server_pid()
 {
-	my $pid = undef;
-	my $pid_file = get_config('zabbix_server', 'pid_file');
-
-	if (-f $pid_file)
-	{
-		$pid = read_file($pid_file);
-
-		if ($pid !~ /^\d+$/)
-		{
-			fail("invalid format of server pid: '%s'", $pid);
-		}
-
-		if (!kill(0, $pid))
-		{
-			wrn("Zabbix server PID '$pid' found, but process does not accept signals");
-			$pid = undef;
-		}
-	}
-
-	return $pid;
+	return __get_pid(get_config('zabbix_server', 'pid_file'));
 }
 
 sub zbx_start_server(;$$$)
@@ -770,6 +755,109 @@ sub format_table($$)
 	$table .= $line;
 
 	return $table;
+}
+
+sub start_tool($$$)
+{
+	my $tool       = shift;
+	my $pid_file   = shift;
+	my $input_file = shift;
+
+	info("starting $tool");
+
+	dbg("checking if $tool is running");
+
+	my $pid = __get_pid($pid_file);
+
+	if (defined($pid))
+	{
+		fail("$tool is already running, pid: '%d'", $pid);
+	}
+
+	dbg("starting the tool $tool");
+
+	my $executable = TOOLS_DIR . "/$tool/main.pl $pid_file $input_file";
+
+	execute("$executable");
+
+	dbg("waiting until pid file is created");
+	sleep(1);
+
+	dbg("getting pid of currently running $tool");
+	$pid = __get_pid($pid_file);
+
+	if (!defined($pid))
+	{
+		fail("$tool failed to start");
+	}
+}
+
+sub stop_tool($$)
+{
+	my $tool     = shift;
+	my $pid_file = shift;
+
+	my $pid = __get_pid($pid_file);
+
+	if (!defined($pid))
+	{
+		fail("$tool is not running");
+	}
+
+	info("stopping $tool");
+
+	if (!kill("SIGINT", $pid))
+	{
+		fail("failed to send SIGINT to $tool");
+	}
+
+	dbg("waiting until $tool is stopped");
+
+	my $stopped;
+
+	for (my $i = 0; $i < 3; $i++)
+	{
+		$stopped = !kill(0, $pid);
+
+		if ($stopped)
+		{
+			last;
+		}
+
+		sleep(1);
+	}
+
+	if (!$stopped)
+	{
+		fail("failed to stop the tool $tool");
+	}
+
+	unlink($pid_file);
+}
+
+sub __get_pid($)
+{
+	my $pid_file = shift;
+
+	my $pid = undef;
+
+	if (-f $pid_file)
+	{
+		$pid = read_file($pid_file);
+
+		if ($pid !~ /^\d+$/)
+		{
+			fail("invalid format of server pid: '%s'", $pid);
+		}
+
+		if (!kill(0, $pid))
+		{
+			wrn("The PID of requested process '$pid' found, but process does not accept signals: $!");
+			$pid = undef;
+		}
+	}
+
+	return $pid;
 }
 
 1;

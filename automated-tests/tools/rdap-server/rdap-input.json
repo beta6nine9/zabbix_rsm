@@ -1,0 +1,8 @@
+{
+	"expected-request" : "GET /rdap/domain/example.example HTTP/",
+	"reply-status"     : "HTTP/1.1 200 OK",
+	"reply-headers"    : {
+		"Content-type" : "Content-Type: application/json"
+	},
+	"reply-data"       : "{\"ldhName\": \"example.example\"}"
+}

@@ -145,4 +145,6 @@ char	*CONFIG_EXPORT_TYPE	= NULL;
 
 int	CONFIG_TCP_MAX_BACKLOG_SIZE	= SOMAXCONN;
 
+int	write_json_status(const char *json_file, const char *buffer, char **error);
+
 #endif	/* _T_RSM_H_ */

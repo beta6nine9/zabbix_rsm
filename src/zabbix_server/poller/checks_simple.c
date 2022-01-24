@@ -181,12 +181,12 @@ int	get_value_simple(const DC_ITEM *item, AGENT_RESULT *result, zbx_vector_ptr_t
 	}
 	else if (0 == strcmp(request.key, "rsm.rdds"))
 	{
-		if (SYSINFO_RET_OK == check_rsm_rdds(item->host.host, &request, result))
+		if (SYSINFO_RET_OK == check_rsm_rdds(item->host.host, &request, result, NULL))
 			ret = SUCCEED;
 	}
 	else if (0 == strcmp(request.key, "rdap"))
 	{
-		if (SYSINFO_RET_OK == check_rsm_rdap(item->host.host, &request, result))
+		if (SYSINFO_RET_OK == check_rsm_rdap(item->host.host, &request, result, NULL))
 			ret = SUCCEED;
 	}
 	else if (0 == strcmp(request.key, "rsm.epp"))
