@@ -1,3 +1,13 @@
+Changes for rsm2.2.2
+
+Bug fixes:
+..F.I..PS. [834] removed unnecessary code that differs from vanilla Zabbix (dimir)
+....I..... [831] fixed SLA API measurements script errors when running for Registrars (dimir)
+
+New features:
+.......... [834] upgraded to Zabbix 5.0.19 (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.2.1
 
 Bug fixes:
