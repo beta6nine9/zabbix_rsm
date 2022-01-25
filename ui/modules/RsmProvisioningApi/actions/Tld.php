@@ -508,6 +508,7 @@ class Tld extends MonitoringTarget
 			$valueMapIds = $this->getValueMapIds([
 				'RSM Service Availability',
 				'RSM DNS rtt',
+				'Service state',
 			]);
 
 			// get itemid of "DNS Test" master item
@@ -585,12 +586,11 @@ class Tld extends MonitoringTarget
 
 			foreach ($createNs as $ns)
 			{
-				// TODO: value type - uint64, mapping - service_state (whatever that one is)
 				$testItems += [
 					"rsm.dns.ns.status[$ns]" => [
-						'name'          => "DNS Test: DNS NS status of $ns",
-						'value_type'    => ITEM_VALUE_TYPE_FLOAT,
-						'valuemapid'    => $valueMapIds['RSM DNS rtt'],
+						'name'          => "DNS NS status of $ns",
+						'value_type'    => ITEM_VALUE_TYPE_UINT64,
+						'valuemapid'    => $valueMapIds['Service state'],
 						'description'   => 'Status of Name Server: 0 (Down), 1 (Up). The Name Server is considered to be up if all its IPs returned successful RTTs.',
 						'preprocessing' => [[
 							'type'                 => ZBX_PREPROC_JSONPATH,
