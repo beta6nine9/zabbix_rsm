@@ -192,6 +192,13 @@ sub run_test_case($)
 	}
 	else
 	{
+		$failure_message  = "test case failed\n";
+		$failure_message .= "\n";
+		$failure_message .= "test case: " . (defined($test_case_name) ? "'$test_case_name'" : "undef") . "\n";
+		$failure_message .= "filename: '$test_case_filename'\n";
+		$failure_message .= "command: " . (defined($command) ? "'$command'" : "undef") . "\n";
+		$failure_message .= "line number: " . ($line_num + 1) . "\n";
+
 		if ($test_case_uses_db == 1)
 		{
 			my $db_host = get_config("zabbix_server", "db_host");
@@ -208,15 +215,10 @@ sub run_test_case($)
 			local $ENV{'MYSQL_PWD'} = $db_pswd;
 
 			execute("mysqldump --host='$db_host' --port=3306 --user='$db_user' '$db_name' > '$db_dump_file'");
+
+			$failure_message .= "db dump created: $db_dump_file";
 		}
 
-		$failure_message  = "test case failed\n";
-		$failure_message .= "\n";
-		$failure_message .= "test case: " . (defined($test_case_name) ? "'$test_case_name'" : "undef") . "\n";
-		$failure_message .= "filename: '$test_case_filename'\n";
-		$failure_message .= "command: " . (defined($command) ? "'$command'" : "undef") . "\n";
-		$failure_message .= "line number: " . ($line_num + 1) . "\n";
-		$failure_message .= "db dump created: $db_dump_file";
 		$failure_message .= "\n";
 		$failure_message .= $test_case[$line_num];
 
