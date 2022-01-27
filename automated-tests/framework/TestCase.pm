@@ -81,6 +81,8 @@ sub run_test_case($)
 	# reset the variables of the test case
 	$test_case_variables = {};
 
+	my $test_case_uses_db = 0;
+
 	my $line_num = 0;
 	my $command = undef;
 	my $succeeded = 1;
@@ -122,6 +124,11 @@ sub run_test_case($)
 			$command = $1;
 
 			info("handling command '$command'");
+
+			if ($command eq "prepare-server-database")
+			{
+				$test_case_uses_db = 1;
+			}
 
 			if (!exists($command_handlers{$command}))
 			{
@@ -185,20 +192,23 @@ sub run_test_case($)
 	}
 	else
 	{
-		my $db_host = get_config("zabbix_server", "db_host");
-		my $db_name = get_config("zabbix_server", "db_name");
-		my $db_user = get_config("zabbix_server", "db_username");
-		my $db_pswd = get_config("zabbix_server", "db_password");
+		if ($test_case_uses_db == 1)
+		{
+			my $db_host = get_config("zabbix_server", "db_host");
+			my $db_name = get_config("zabbix_server", "db_name");
+			my $db_user = get_config("zabbix_server", "db_username");
+			my $db_pswd = get_config("zabbix_server", "db_password");
 
-		my $db_dumps_dir = get_config('paths', 'db_dumps_dir');
+			my $db_dumps_dir = get_config('paths', 'db_dumps_dir');
 
-		make_path($db_dumps_dir);
+			make_path($db_dumps_dir);
 
-		my $db_dump_file = $db_dumps_dir . '/' . basename($test_case_filename =~ s/\.txt^/.sql/r);
+			my $db_dump_file = $db_dumps_dir . '/' . basename($test_case_filename =~ s/\.txt^/.sql/r);
 
-		local $ENV{'MYSQL_PWD'} = $db_pswd;
+			local $ENV{'MYSQL_PWD'} = $db_pswd;
 
-		execute("mysqldump --host='$db_host' --port=3306 --user='$db_user' '$db_name' > '$db_dump_file'");
+			execute("mysqldump --host='$db_host' --port=3306 --user='$db_user' '$db_name' > '$db_dump_file'");
+		}
 
 		$failure_message  = "test case failed\n";
 		$failure_message .= "\n";
