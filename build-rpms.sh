@@ -1,6 +1,6 @@
 #!/bin/bash
 
-RSM_VERSION="rsm2.2.2rc1"	# MAJOR.PROD.QA
+RSM_VERSION="rsm2.2.2"	# MAJOR.PROD.QA
 RPMDIR="rpmbuild"
 SRV_VERSION_FILE="include/version.h"
 FE_VERSION_FILE="ui/include/defines.inc.php"
