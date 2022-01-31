@@ -25,6 +25,7 @@ use HttpClient;
 use Options;
 use Output;
 use ProvisioningApi;
+use ZabbixConstants;
 
 my %command_handlers = (
 	# command => [$handler, $has_arguments, $fork],
@@ -58,6 +59,15 @@ my %command_handlers = (
 	'start-tool'              => [\&__cmd_start_tool             , 1, 1], # tool_name,pid-file,input-file
 	'stop-tool'               => [\&__cmd_stop_tool              , 1, 1], # tool_name,pid-file
 	'run-simple-check'        => [\&__cmd_run_simple_check       , 1, 1], # command,...
+	'check-proxy'             => [\&__cmd_check_proxy            , 1, 1], # proxy,status,ip,port,psk-identity,psk
+	'check-host'              => [\&__cmd_check_host             , 1, 1], # host,status,info_1,info_2,proxy,template_count,host_group_count,macro_count,item_count
+	'check-host-count'        => [\&__cmd_check_host_count       , 1, 1], # type,count
+	'check-host-template'     => [\&__cmd_check_host_template    , 1, 1], # host,template
+	'check-host-group'        => [\&__cmd_check_host_group       , 1, 1], # host,group
+	'check-host-macro'        => [\&__cmd_check_host_macro       , 1, 1], # host,macro,value
+	'check-item'              => [\&__cmd_check_item             , 1, 1], # host,key,name,status,item_type,value_type,delay,history,trends,units,params,master_item,valuemap,preproc_count,trigger_count
+	'check-preproc'           => [\&__cmd_check_preproc          , 1, 1], # host,key,step,type,params,error_handler,error_handler_params
+	'check-trigger'           => [\&__cmd_check_trigger          , 1, 1], # host,status,priority,trigger,dependency,expression,recovery_expression
 );
 
 my $test_case_filename;
@@ -1233,6 +1243,616 @@ sub __cmd_run_simple_check($)
 	execute($command);
 }
 
+sub __cmd_check_proxy($)
+{
+	my $args = shift;
+
+	# [check-proxy]
+	# proxy,status,ip,port,psk-identity,psk
+
+	my ($proxy, $expected_status, $expected_ip, $expected_port, $expected_psk_identity, $expected_psk) = __unpack($args);
+
+	info("checking proxy '$proxy'");
+
+	my $statuses = {
+		"enabled"  => HOST_STATUS_PROXY_PASSIVE,
+		"disabled" => HOST_STATUS_PROXY_ACTIVE,
+	};
+	if (!exists($statuses->{$expected_status}))
+	{
+		fail("unsupported status '$expected_status', supported statuses: 'enabled', 'disabled'");
+	}
+
+	my $sql;
+	my $params;
+	my $rows;
+
+	$sql = "select" .
+			" hostid," .
+			"status," .
+			"tls_connect," .
+			"tls_accept," .
+			"tls_psk_identity," .
+			"tls_psk" .
+		" from" .
+			" hosts" .
+		" where" .
+			" host=? and" .
+			" status in (?,?)";
+	$params = [$proxy, HOST_STATUS_PROXY_ACTIVE, HOST_STATUS_PROXY_PASSIVE];
+	$rows = db_select($sql, $params);
+
+	if (scalar(@{$rows}) == 0)
+	{
+		fail("proxy '$proxy' not found");
+	}
+	if (scalar(@{$rows}) > 1)
+	{
+		fail("found more than one proxy '$proxy'");
+	}
+
+	my ($hostid, $status, $tls_connect, $tls_accept, $psk_identity, $psk) = @{$rows->[0]};
+
+	$sql = "select" .
+			" type," .
+			"useip," .
+			"ip," .
+			"port" .
+		" from" .
+			" interface" .
+		" where" .
+			" hostid=?";
+	$params = [$hostid];
+	$rows = db_select($sql, $params);
+
+	if (scalar(@{$rows}) == 0)
+	{
+		fail("interface not found");
+	}
+	if (scalar(@{$rows}) > 1)
+	{
+		fail("found more than one interface");
+	}
+
+	my ($interface_type, $useip, $ip, $port) = @{$rows->[0]};
+
+	__expect($interface_type, INTERFACE_TYPE_UNKNOWN       , "unexpected interface type '%d', expected '%d'");
+	__expect($status        , $statuses->{$expected_status}, "unexpected status '%d', expected '%d'");
+	__expect($useip         , INTERFACE_USE_IP             , "unexpected value of interface.useip '%d', expected '%d'");
+	__expect($ip            , $expected_ip                 , "unexpected ip '%s', expected '%s'");
+	__expect($port          , $expected_port               , "unexpected port '%d', expected '%d'");
+	__expect($tls_connect   , HOST_ENCRYPTION_PSK          , "unexpected value of hosts.tls_connect '%d', expected '%d'");
+	__expect($tls_accept    , HOST_ENCRYPTION_NONE         , "unexpected value of hosts.tls_accept '%d', expected '%d'");
+	__expect($psk_identity  , $expected_psk_identity       , "unexpected psk identity '%s', expected '%s'");
+	__expect($psk           , $expected_psk                , "unexpected psk '%s', expected '%s'");
+}
+
+sub __cmd_check_host($)
+{
+	my $args = shift;
+
+	# [check-host]
+	# host,status,info_1,info_2,proxy,template_count,host_group_count,macro_count,item_count
+
+	my (
+		$host,
+		$expected_status,
+		$expected_info_1,
+		$expected_info_2,
+		$expected_proxy,
+		$expected_template_count,
+		$expected_host_group_count,
+		$expected_macro_count,
+		$expected_item_count
+	) = __unpack($args);
+
+	info("checking host '$host'");
+
+	my $statuses = {
+		"enabled"  => HOST_STATUS_MONITORED,
+		"disabled" => HOST_STATUS_NOT_MONITORED,
+		"template" => HOST_STATUS_TEMPLATE,
+	};
+	if (!exists($statuses->{$expected_status}))
+	{
+		fail("unsupported status '$expected_status', supported statuses: 'enabled', 'disabled', 'template'");
+	}
+
+	my $sql;
+	my $params;
+	my $rows;
+
+	$sql = "select" .
+			" hosts.hostid," .
+			"hosts.status," .
+			"hosts.name," .
+			"hosts.info_1," .
+			"hosts.info_2," .
+			"proxies.host as proxy" .
+		" from" .
+			" hosts" .
+			" left join hosts as proxies on proxies.hostid = hosts.proxy_hostid" .
+		" where" .
+			" hosts.host=? and" .
+			" hosts.status in (?,?,?)";
+	$params = [$host, HOST_STATUS_MONITORED, HOST_STATUS_NOT_MONITORED, HOST_STATUS_TEMPLATE];
+	$rows = db_select($sql, $params);
+
+	if (scalar(@{$rows}) == 0)
+	{
+		fail("host '$host' not found");
+	}
+	if (scalar(@{$rows}) > 1)
+	{
+		fail("found more than one host '$host'");
+	}
+
+	my ($hostid, $status, $name, $info_1, $info_2, $proxy) = @{$rows->[0]};
+
+	my $template_count   = db_select_value("select count(*) from hosts_templates where hostid=?", [$hostid]);
+	my $host_group_count = db_select_value("select count(*) from hosts_groups    where hostid=?", [$hostid]);
+	my $macro_count      = db_select_value("select count(*) from hostmacro       where hostid=?", [$hostid]);
+	my $item_count       = db_select_value("select count(*) from items           where hostid=?", [$hostid]);
+
+	__expect($name  , $host                        , "unexpected host name '%s', expected '%s'");
+	__expect($status, $statuses->{$expected_status}, "unexpected status '%d', expected '%d'");
+	__expect($info_1, $expected_info_1             , "unexpected info_1 '%s', expected '%s'");
+	__expect($info_2, $expected_info_2             , "unexpected info_2 's', expected '%s'");
+
+	if (($proxy // '') ne $expected_proxy)
+	{
+		if ($expected_proxy eq '')
+		{
+			fail("host is monitored by proxy '$proxy', expected it to be monitored directly");
+		}
+		else
+		{
+			fail("host is not monitored by proxy, expected it to be monitored by proxy '$expected_proxy'");
+		}
+	}
+
+	__expect($template_count  , $expected_template_count  , "unexpected template count '%d', expected '%d'");
+	__expect($host_group_count, $expected_host_group_count, "unexpected host group count '%d', expected '%d'");
+	__expect($macro_count     , $expected_macro_count     , "unexpected macro count '%d', expected '%d'");
+	__expect($item_count      , $expected_item_count      , "unexpected item count '%d', expected '%d'");
+}
+
+sub __cmd_check_host_count($)
+{
+	my $args = shift;
+
+	# [check-host-count]
+	# type,count
+
+	my ($type, $expected_count) = __unpack($args);
+
+	info("checking number of hosts, type '$type'");
+
+	my $status = {
+		"host"     => [HOST_STATUS_MONITORED, HOST_STATUS_NOT_MONITORED],
+		"template" => [HOST_STATUS_TEMPLATE],
+		"proxy"    => [HOST_STATUS_PROXY_PASSIVE, HOST_STATUS_PROXY_ACTIVE],
+	};
+
+	if (!exists($status->{$type}))
+	{
+		fail("invalid type '$type', supported types: 'host', 'template', 'proxy'");
+	}
+
+	my $status_placeholder = join(",", ("?") x scalar(@{$status->{$type}}));
+	my $sql = "select count(*) from hosts where status in ($status_placeholder)";
+
+	my $count = db_select_value($sql, $status->{$type});
+
+	__expect($count, $expected_count, "unexpected number of hosts '%d', expected '%d'");
+}
+
+sub __cmd_check_host_template($)
+{
+	my $args = shift;
+
+	# [check-host-template]
+	# host,template
+
+	my ($host, $template) = __unpack($args);
+
+	info("checking if template '$template' is linked to host '$host'");
+
+	my $sql = "select" .
+			" 1" .
+		" from" .
+			" hosts" .
+			" inner join hosts_templates on hosts_templates.hostid=hosts.hostid" .
+			" inner join hosts as templates on templates.hostid=hosts_templates.templateid" .
+		" where" .
+			" hosts.host=? and" .
+			" templates.host=?";
+	my $params = [$host, $template];
+
+	my $rows = db_select($sql, $params);
+
+	if (scalar(@{$rows}) == 0)
+	{
+		fail("template '$template' is not linked to host '$host'");
+	}
+	if (scalar(@{$rows}) > 1)
+	{
+		fail("template '$template' is linked to host '$host' more than once");
+	}
+}
+
+sub __cmd_check_host_group($)
+{
+	my $args = shift;
+
+	# [check-host-group]
+	# host,group
+
+	my ($host, $group) = __unpack($args);
+
+	info("checking if group '$group' is linked to host '$host'");
+
+	my $sql = "select" .
+			" 1" .
+		" from" .
+			" hosts" .
+			" inner join hosts_groups on hosts_groups.hostid=hosts.hostid" .
+			" inner join hstgrp on hstgrp.groupid=hosts_groups.groupid" .
+		" where" .
+			" hosts.host=? and" .
+			" hstgrp.name=?";
+	my $params = [$host, $group];
+
+	my $rows = db_select($sql, $params);
+
+	if (scalar(@{$rows}) == 0)
+	{
+		fail("group '$group' is not linked to host '$host'");
+	}
+	if (scalar(@{$rows}) > 1)
+	{
+		fail("group '$group' is linked to host '$host' more than once");
+	}
+}
+
+sub __cmd_check_host_macro($)
+{
+	my $args = shift;
+
+	# [check-host-macro]
+	# host,macro,value
+
+	my ($host, $macro, $expected_value) = __unpack($args);
+
+	info("checking host macro (host: '$host', macro: '$macro')");
+
+	my $hostid = __get_hostid($host);
+
+	my $rows = db_select("select value from hostmacro where hostid=? and macro=?", [$hostid, $macro]);
+
+	if (scalar(@{$rows}) == 0)
+	{
+		fail("host '$host' does not have macro '$macro'");
+	}
+	if (scalar(@{$rows}) > 1)
+	{
+		fail("host '$host' has more than one macro '$macro'");
+	}
+
+	__expect($rows->[0][0], $expected_value, "unexpected value '%s', expected '%s'");
+}
+
+sub __cmd_check_item($)
+{
+	my $args = shift;
+
+	# [check-item]
+	# host,key,name,status,item_type,value_type,delay,history,trends,units,params,master_item,valuemap,preproc_count,trigger_count
+
+	my ($host, $key, $name, $status, $item_type, $value_type, $delay, $history, $trends, $units, $expected_params, $master_item, $valuemap, $expected_preproc_count, $expected_trigger_count) = __unpack($args);
+
+	info("checking host item (host: '$host', item: '$key')");
+
+	my $statuses = {
+		"enabled"  => ITEM_STATUS_ACTIVE,
+		"disabled" => ITEM_STATUS_DISABLED,
+	};
+	if (!exists($statuses->{$status}))
+	{
+		fail("unsupported status '$status', supported statuses: 'enabled', 'disabled'");
+	}
+
+	my $item_types = {
+		"trapper"    => ITEM_TYPE_TRAPPER,
+		"simple"     => ITEM_TYPE_SIMPLE,
+		"internal"   => ITEM_TYPE_INTERNAL,
+		"external"   => ITEM_TYPE_EXTERNAL,
+		"calculated" => ITEM_TYPE_CALCULATED,
+		"dependent"  => ITEM_TYPE_DEPENDENT,
+	};
+	if (!exists($item_types->{$item_type}))
+	{
+		fail("unsupported item type '$item_type', supported item types: 'trapper', 'simple', 'internal', 'external', 'calculated', 'dependent'");
+	}
+
+	my $value_types = {
+		"float"  => ITEM_VALUE_TYPE_FLOAT,
+		"str"    => ITEM_VALUE_TYPE_STR,
+		"uint64" => ITEM_VALUE_TYPE_UINT64,
+		"text"   => ITEM_VALUE_TYPE_TEXT,
+	};
+	if (!exists($value_types->{$value_type}))
+	{
+		fail("unsupported value type '$value_type', supported value types: 'float', 'str', 'uint64', 'text'");
+	}
+
+	my $itemid = __get_itemid($host, $key);
+
+	__compare_db_row(
+		"items",
+		[["itemid", $itemid]],
+		["itemid", "key_", "hostid", "templateid", "interfaceid", "description", "valuemapid", "master_itemid"],
+		{
+			'headers'    => '',
+			'posts'      => '',
+			'name'       => $name,
+			'status'     => $statuses->{$status},
+			'type'       => $item_types->{$item_type},
+			'value_type' => $value_types->{$value_type},
+			'delay'      => $delay,
+			'history'    => $history,
+			'trends'     => $trends,
+			'units'      => $units,
+			'params'     => $expected_params,
+		}
+	);
+
+	my $sql = "select" .
+			" master_items.key_," .
+			"valuemaps.name" .
+		 " from" .
+			" items" .
+			" left join items as master_items on master_items.itemid=items.master_itemid" .
+			" left join valuemaps on valuemaps.valuemapid=items.valuemapid" .
+		" where" .
+			" items.itemid=?";
+	my $params = [$itemid];
+	my $row = db_select_row($sql, $params);
+
+	__expect($row->[0] // "", $master_item, "unexpected master item '%s', expected '%s'");
+	__expect($row->[1] // "", $valuemap   , "unexpected valuemap '%s', expected '%s'");
+
+	my $preproc_count = db_select_value("select count(*) from item_preproc where itemid=?", [$itemid]);
+	__expect($preproc_count, $expected_preproc_count, "unexpected number of preproc steps '%d', expected '%d'");
+
+	my $trigger_count = db_select_value("select count(distinct triggerid) from functions where itemid=?", [$itemid]);
+	__expect($trigger_count, $expected_trigger_count, "unexpected number of triggers '%d', expected '%d'");
+}
+
+sub __cmd_check_preproc($)
+{
+	my $args = shift;
+
+	# [check-preproc]
+	# host,key,step,type,params,error_handler,error_handler_params
+
+	my ($host, $key, $step, $expected_type, $expected_params, $expected_error_handler, $expected_error_handler_params) = __unpack($args);
+
+	info("checking item preprocessing step (host: '$host', item: '$key', step: '$step')");
+
+	my $preproc_types = {
+		"delta-speed"          => ZBX_PREPROC_DELTA_SPEED,
+		"jsonpath"             => ZBX_PREPROC_JSONPATH,
+		"throttle-timed-value" => ZBX_PREPROC_THROTTLE_TIMED_VALUE,
+	};
+	if (!exists($preproc_types->{$expected_type}))
+	{
+		fail("unsupported preprocessing type '$expected_type', supported preprocessing types: 'delta-speed', 'jsonpath', 'throttle-timed-value'");
+	}
+
+	my $error_handlers = {
+		"default"       => ZBX_PREPROC_FAIL_DEFAULT,
+		"discard-value" => ZBX_PREPROC_FAIL_DISCARD_VALUE,
+	};
+	if (!exists($error_handlers->{$expected_error_handler}))
+	{
+		fail("unsupported error handler '$expected_error_handler', supported error handlers: 'default', 'discard-value'");
+	}
+
+	my $itemid = __get_itemid($host, $key);
+
+	my $sql = "select type,params,error_handler,error_handler_params from item_preproc where itemid=? and step=?";
+	my $params = [$itemid, $step];
+	my $rows = db_select($sql, $params);
+
+	if (scalar(@{$rows}) == 0)
+	{
+		fail("item '$key' does not have preprocessing step '$step'");
+	}
+	if (scalar(@{$rows}) > 1)
+	{
+		fail("item '$key' has more than one preprocessing step '$step'");
+	}
+
+	__expect($rows->[0][0], $preproc_types->{$expected_type}          , "unexpected preprocessing type '%d', expected '%d'");
+	__expect($rows->[0][1], $expected_params                          , "unexpected preprocessing params '%s', expected '%s'");
+	__expect($rows->[0][2], $error_handlers->{$expected_error_handler}, "unexpected preprocessing error handler '%d', expected '%d'");
+	__expect($rows->[0][3], $expected_error_handler_params            , "unexpected preprocessing error handler params '%s', expected '%s'");
+}
+
+sub __cmd_check_trigger($)
+{
+	my $args = shift;
+
+	# [check-trigger]
+	# host,status,priority,trigger,dependency,expression,recovery_expression
+
+	my ($host, $status, $priority, $trigger, $dependency, $expression, $recovery_expression) = __unpack($args);
+
+	info("checking trigger (host: '$host', trigger: '$trigger')");
+
+	my $statuses = {
+		"enabled"  => TRIGGER_STATUS_ENABLED,
+		"disabled" => TRIGGER_STATUS_DISABLED,
+	};
+	if (!exists($statuses->{$status}))
+	{
+		fail("unsupported status '$status', supported statuses: 'enabled', 'disabled'");
+	}
+
+	my $priorities = {
+		"not-classified" => TRIGGER_SEVERITY_NOT_CLASSIFIED,
+		"information"    => TRIGGER_SEVERITY_INFORMATION,
+		"warning"        => TRIGGER_SEVERITY_WARNING,
+		"average"        => TRIGGER_SEVERITY_AVERAGE,
+		"high"           => TRIGGER_SEVERITY_HIGH,
+		"disaster"       => TRIGGER_SEVERITY_DISASTER,
+	};
+	if (!exists($priorities->{$priority}))
+	{
+		fail("unsupported priority '$priority', supported priorities: 'not-classified', 'information', 'warning', 'average', 'high', 'disaster'");
+	}
+
+	################################################################################################################
+	#
+	# Logic of storing triggers is a bit complex and tangled, therefore checking triggers isn't as straightforward
+	# as checking other types of objects.
+	#
+	# Steps:
+	# * parse expression and replace all "{item.function(params)}" with "{functionid}"
+	# * do the same for recovery_expression
+	# * compare row from "triggers" table with expected values, ignore expression and recovery_expression for now
+	# * compare expression
+	# * compare recovery_expression expression
+	# * validate dependency
+	#
+	# Getting $triggerid is not as trivial as a simple select, $triggerid is retrieved in $callback.
+	#
+	# Although function calls are replaced with functionids in expressions, expressions in the database may contain
+	# newlines which makes it non-trivial to compare them by using __compare_db_row(). In future, __compare_db_row()
+	# could be updated to accept some callback function for modifying values from DB, if this functionality will be
+	# needed in multiple places.
+	#
+	# Current $callback implementation works for current triggers, but it relies on trigger expressions being
+	# different enough. We migh run into situation when it fails because some expressions are too similar. In that
+	# case, either trigger expressions should be rewritten, or $callback should be improved.
+	#
+	################################################################################################################
+
+	my $triggerid; # will be filled in $callback->()
+
+	my $expression_field;   # used in $callback->()
+	my $expression_pattern; # used in $callback->()
+
+	my $callback = sub
+	{
+		my $item      = shift;
+		my $function  = shift;
+		my $parameter = shift;
+
+		my $itemid = __get_itemid($host, $item);
+
+		my $sql = "select" .
+				" functions.triggerid," .
+				"functions.functionid" .
+			" from" .
+				" triggers" .
+				" inner join functions on functions.triggerid=triggers.triggerid" .
+			" where" .
+				" regexp_replace(triggers.$expression_field,'[[:space:]]+',' ') like ? and" .
+				" functions.itemid=? and" .
+				" functions.name=? and" .
+				" functions.parameter=?";
+		my $params = [$expression_pattern, $itemid, $function, $parameter];
+
+		my $rows = db_select($sql, $params);
+
+		if (scalar(@{$rows}) == 0)
+		{
+			fail("function '$function' with parameter '$parameter' for item '$item' not found");
+		}
+		if (scalar(@{$rows}) > 1)
+		{
+			fail("found more than one function '$function' with parameter '$parameter' for item '$item'");
+		}
+
+		my ($function_triggerid, $functionid) = @{$rows->[0]};
+
+		if (!defined($triggerid))
+		{
+			$triggerid = $function_triggerid;
+		}
+		elsif ($triggerid != $function_triggerid)
+		{
+			fail("function's triggerid does not match with triggerid of another function(s)");
+		}
+
+		return "{" . $functionid . "}";
+	};
+
+	# replace textual function calls with functionids in $expression and $recovery_expression; set $triggerid via $callback
+
+	my $pattern = '\{([\w\.]+(?:\[[^\]]+\])?)\.(\w+)\((.*?)\)\}'; # extracting parts from {item.function(parameter)}
+
+	$expression_field = "expression";
+	$expression_pattern = ($expression =~ s/$pattern/{%}/gr);
+	$expression =~ s/$pattern/$callback->($1,$2,$3)/ge;
+
+	if ($recovery_expression)
+	{
+		$expression_field = "recovery_expression";
+		$expression_pattern = ($recovery_expression =~ s/$pattern/{%}/gr);
+		$recovery_expression =~ s/$pattern/$callback->($1,$2,$3)/ge;
+	}
+
+	# now, when we have $triggerid, we can check most of the values in the database
+
+	__compare_db_row(
+		"triggers",
+		[["triggerid", $triggerid]],
+		["triggerid", "expression", "templateid", "recovery_expression"],
+		{
+			"description"   => $trigger,
+			"status"        => $statuses->{$status},
+			"value"         => TRIGGER_VALUE_FALSE,
+			"priority"      => $priorities->{$priority},
+			"comments"      => '',
+			"recovery_mode" => $recovery_expression ? ZBX_RECOVERY_MODE_RECOVERY_EXPRESSION : ZBX_RECOVERY_MODE_EXPRESSION,
+		}
+	);
+
+	# expression and recovery_expression may contain newlines in the DB, therefore those have to be checked separately
+
+	my $row = db_select_row("select expression,recovery_expression from triggers where triggerid=?", [$triggerid]);
+
+	my $db_expression          = $row->[0] =~ s/\s+/ /gr;
+	my $db_recovery_expression = $row->[1] =~ s/\s+/ /gr;
+
+	__expect($db_expression         , $expression         , "unexpected expression '%s', expected '%s'");
+	__expect($db_recovery_expression, $recovery_expression, "unexpected recovery_expression '%s', expected '%s'");
+
+	# check dependency
+
+	my $sql = "select" .
+		" triggers.description" .
+	" from" .
+		" trigger_depends" .
+		" inner join triggers on triggers.triggerid=trigger_depends.triggerid_up" .
+	" where" .
+		" trigger_depends.triggerid_down=?";
+	my $params = [$triggerid];
+	my $rows = db_select($sql, $params);
+
+	if (scalar(@{$rows}) > 1)
+	{
+		fail("found more than one dependency");
+	}
+
+	my $db_dependency = scalar(@{$rows}) == 0 ? "" : $rows->[0][0];
+
+	__expect($db_dependency, $dependency, "unexpected dependency on '%s', expected '%s'");
+}
+
 ################################################################################
 # helper functions
 ################################################################################
@@ -1257,9 +1877,19 @@ sub __expect($$$)
 	my $expected_value = shift;
 	my $message        = shift;
 
-	if ($value ne $expected_value)
+	if (!defined($value) || !defined($expected_value))
 	{
-		fail($message, $value, $expected_value);
+		if (defined($value) || defined($expected_value))
+		{
+			fail($message, $value // '<undef>', $expected_value // '<undef>');
+		}
+	}
+	else
+	{
+		if ($value ne $expected_value)
+		{
+			fail($message, $value, $expected_value);
+		}
 	}
 }
 
@@ -1278,10 +1908,21 @@ sub __get_itemid($$)
 	my $host = shift;
 	my $key  = shift;
 
-	my $sql = "select itemid from items left join hosts on hosts.hostid=items.hostid where hosts.host=? and items.key_=?";
+	my $sql = "select items.itemid from items inner join hosts on hosts.hostid=items.hostid where hosts.host=? and items.key_=?";
 	my $params = [$host, $key];
 
-	return db_select_value($sql, $params);
+	my $rows = db_select($sql, $params);
+
+	if (scalar(@{$rows}) == 0)
+	{
+		fail("host '$host' does not have item '$key'");
+	}
+	if (scalar(@{$rows}) > 1)
+	{
+		fail("host '$host' has more than one item '$key'");
+	}
+
+	return $rows->[0][0];
 }
 
 sub __get_triggerid($$)
@@ -1319,6 +1960,82 @@ sub __get_history_table($)
 	return "history_text" if ($value_type == 4); # ITEM_VALUE_TYPE_TEXT
 
 	fail("unhandled value type: '$value_type'");
+}
+
+sub __compare_db_row($$$$)
+{
+	my $table           = shift;
+	my @filter          = @{+shift}; # list [[field, value], ...]
+	my @ignore_fields   = @{+shift}; # list of fields
+	my %override_values = %{+shift}; # hash {$field => $value}
+
+	my $sql;
+	my $params;
+	my $rows;
+	my $row;
+
+	# get default values and the order of columns
+
+	$sql = "select" .
+			" column_name," .
+			"regexp_replace(column_default, \"^'(.*)'\$\", '\\\\1')" .
+		" from" .
+			" information_schema.columns" .
+		" where" .
+			" table_schema=database() and" .
+			" table_name=? and" .
+			" column_name not in (" .
+				join(",", ("?") x scalar(@ignore_fields)) .
+			")" .
+		" order by" .
+			" ordinal_position asc";
+	$params = [$table, @ignore_fields];
+
+	$rows = db_select($sql, $params);
+
+	my @columns = map($_->[0], @{$rows});
+
+	my $expected_values = {
+		map({ $_->[0] => $_->[1] } @{$rows}),
+		%override_values,
+	};
+
+	# get actual values
+
+	my $sql_columns = join(",", @columns);
+	my $sql_filter  = join(" and ", map($_->[0] . "=?", @filter));
+	$sql = "select $sql_columns from $table where $sql_filter";
+	$params = [map($_->[1], @filter)];
+
+	$row = db_select_row($sql, $params);
+
+	# compare values
+
+	for (my $i = 0; $i < scalar(@{$row}); $i++)
+	{
+		fail("internal error") if (!exists($columns[$i]));
+		fail("internal error") if (!exists($row->[$i]));
+		fail("internal error") if (!exists($expected_values->{$columns[$i]}));
+
+		my $column   = $columns[$i];
+		my $value    = $row->[$i];
+		my $expected = delete($expected_values->{$column});
+
+		# TODO: remove after fixing 'lifetime' values
+		if ($table eq 'items' && $column eq 'lifetime' && $value eq '0')
+		{
+			$value = '30d';
+		}
+		# TODO: remove after fixing 'request_method' values
+		if ($table eq 'items' && $column eq 'request_method' && $value eq '1')
+		{
+			$value = '0';
+		}
+
+		__expect($value, $expected, "unexpected value '%s', expected '%s' (column: '$column')");
+	}
+
+	fail("internal error") if (scalar(keys(%{$expected_values})) > 0);
 }
 
 ################################################################################
