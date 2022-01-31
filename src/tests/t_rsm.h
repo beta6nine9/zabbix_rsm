@@ -92,12 +92,6 @@ const char	*CONFIG_LOG_FILE;
 char	*CONFIG_FILE;
 int	CONFIG_LOG_FILE_SIZE;
 
-char	*CONFIG_DB_CIPHER;
-char	*CONFIG_DB_CA_PATH;
-char	*CONFIG_DB_CA_FILE;
-char	*CONFIG_DB_CERT_FILE;
-char	*CONFIG_DB_KEY_FILE;
-
 char	*CONFIG_DB_TLS_CONNECT		= NULL;
 char	*CONFIG_DB_TLS_CERT_FILE	= NULL;
 char	*CONFIG_DB_TLS_KEY_FILE		= NULL;
@@ -144,5 +138,13 @@ unsigned int	configured_tls_accept_modes;
 char	*CONFIG_EXPORT_TYPE	= NULL;
 
 int	CONFIG_TCP_MAX_BACKLOG_SIZE	= SOMAXCONN;
+
+ZBX_METRIC      parameters_common_http[] =
+/*	KEY			FLAG		FUNCTION		TEST PARAMETERS */
+{
+	{"web.page.get",	CF_HAVEPARAMS,	NULL,			"localhost,,80"}
+};
+
+void	xml_escape_xpath(char **data) {}
 
 #endif	/* _T_RSM_H_ */

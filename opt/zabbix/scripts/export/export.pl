@@ -182,8 +182,6 @@ my $probes_data;
 
 my ($time_start, $time_get_test_data, $time_load_ids, $time_process_records, $time_write_csv);
 
-my $heartbeat = get_heartbeat();
-
 my $fm = new Parallel::ForkManager(opt('max-children') ? getopt('max-children') : EXPORT_MAX_CHILDREN_DEFAULT);
 
 set_on_fail(\&__wait_all_children_cb);
@@ -313,7 +311,12 @@ foreach my $tld_for_a_child_to_process (@{$tlds_ref})
 
 		my $result = __get_test_data($tld_for_a_child_to_process, $from, $till);
 
-		my $nsids_result = __get_test_nsid_data($tld_for_a_child_to_process, $from - $heartbeat, $till);
+		my $nsids_result;
+
+		if (get_monitoring_target() eq MONITORING_TARGET_REGISTRY)
+		{
+			$nsids_result = __get_test_nsid_data($tld_for_a_child_to_process, $from - get_heartbeat(), $till);
+		}
 
 		$time_get_test_data = time();
 
