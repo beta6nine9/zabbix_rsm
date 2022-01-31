@@ -57,6 +57,7 @@ my %command_handlers = (
 	'provisioning-api'        => [\&__cmd_provisioning_api       , 1, 1], # endpoint,method,expected_code,user,request,response
 	'start-tool'              => [\&__cmd_start_tool             , 1, 1], # tool_name,pid-file,input-file
 	'stop-tool'               => [\&__cmd_stop_tool              , 1, 1], # tool_name,pid-file
+	'run-simple-check'        => [\&__cmd_run_simple_check       , 1, 1], # command,...
 );
 
 my $test_case_filename;
@@ -1214,6 +1215,22 @@ sub __cmd_stop_tool($)
 	my ($tool_name, $pid_file) = __unpack($args);
 
 	stop_tool($tool_name, $pid_file);
+}
+
+sub __cmd_run_simple_check($)
+{
+	my $args = shift;
+
+	# [run-simple-check]
+	# command
+
+	my ($command) = __unpack($args);
+
+	my $build_dir = get_config('paths', 'build_dir');
+
+	$command = "$build_dir/bin/$command";
+
+	execute($command);
 }
 
 ################################################################################

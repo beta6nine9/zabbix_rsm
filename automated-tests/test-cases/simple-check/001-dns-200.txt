@@ -1,0 +1,16 @@
+[test-case]
+
+"DNS UDP - No reply from name server (-200)"
+
+[execute]
+
+"","rm -rf   /tmp/simple-check-test"
+"","mkdir -p /tmp/simple-check-test"
+
+[run-simple-check]
+
+"t_rsm_dns -t example -n ns1.example -i 127.0.0.1 -4 -s 5054 -m 1 -j /tmp/simple-check-test/status.json"
+
+[compare-files]
+
+"/tmp/simple-check-test","001-output.tar.gz"

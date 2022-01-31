@@ -3,23 +3,23 @@ package Net::DNS::NameserverCustom;
 use strict;
 use warnings;
 
-our $VERSION = (qw$Id: Nameserver.pm 1841 2021-06-23 20:34:28Z willem $)[2];
+our $VERSION = (qw$Id: NameserverCustom.pm 1841 2021-06-23 20:34:28Z willem $)[2];
 
 
 =head1 NAME
 
-Net::DNS::Nameserver - DNS server class
+Net::DNS::NameserverCustom - DNS server class
 
 =head1 SYNOPSIS
 
-    use Net::DNS::Nameserver;
+    use Net::DNS::NameserverCustom;
 
-    my $nameserver = Net::DNS::Nameserver->new(
+    my $nameserver = Net::DNS::NameserverCustom->new(
 	LocalAddr	=> ['::1' , '127.0.0.1'],
 	ZoneFile	=> "filename"
 	);
 
-    my $nameserver = Net::DNS::Nameserver->new(
+    my $nameserver = Net::DNS::NameserverCustom->new(
 	LocalAddr	=> '10.1.2.3',
 	LocalPort	=> 5353,
 	ReplyHandler	=> \&reply_handler
@@ -28,7 +28,7 @@ Net::DNS::Nameserver - DNS server class
 
 =head1 DESCRIPTION
 
-Net::DNS::Nameserver offers a simple mechanism for instantiation of
+Net::DNS::NameserverCustom offers a simple mechanism for instantiation of
 customised DNS server objects intended to provide test responses to
 queries emanating from a client resolver.
 
@@ -142,6 +142,7 @@ sub new {
 	}
 
 	$custom_opts->{OverrideOwner} = $self{OverrideOwner};
+	$custom_opts->{OverrideReply} = $self{OverrideReply};
 
 	#--------------------------------------------------------------------------
 	# Create the Select object.
@@ -441,7 +442,13 @@ sub tcp_connection {
 				delete $self->{_tcp}{$sock};
 				return;
 			}
-			my $reply_data = $reply->data(65535);	# limit to one TCP envelope
+			
+			my $reply_data;
+			if ( $custom_opts->{OverrideReply} ) {
+				$reply_data = $custom_opts->{OverrideReply};
+			} else {
+				$reply_data = $reply->data(65535);	# limit to one TCP envelope
+			}
 			warn "multi-packet TCP response not implemented" if $reply->header->tc;
 			my $len = length $reply_data;
 			$self->{_tcp}{$sock}{outbuffer} = pack( 'n a*', $len, $reply_data );
@@ -490,14 +497,23 @@ sub udp_connection {
 
 	my $max_len = ( $query && $self->{Truncate} ) ? $query->edns->size : undef;
 
+	my $reply_data;
+	if ( $custom_opts->{OverrideReply} ) {
+		$reply_data = $custom_opts->{OverrideReply};
+	}
+	else {
+		$reply_data = $reply->data($max_len);
+	}
+
 	if ( $self->{Verbose} ) {
 		local $| = 1;
 		print "Maximum UDP size advertised by $peerhost#$peerport: $max_len\n" if $max_len;
 		print "Writing response - ";
-		print $sock->send( $reply->data($max_len) ) ? "done" : "failed: $!", "\n";
+		print $sock->send( $reply_data ) ? "done" : "failed: $!", "\n";
 
-	} else {
-		$sock->send( $reply->data($max_len) );
+	}
+	else {
+		$sock->send( $reply_data );
 	}
 	return;
 }
@@ -634,12 +650,12 @@ __END__
 
 =head2 new
 
-    $nameserver = Net::DNS::Nameserver->new(
+    $nameserver = Net::DNS::NameserverCustom->new(
 	LocalAddr	=> ['::1' , '127.0.0.1'],
 	ZoneFile	=> "filename"
 	);
 
-    $nameserver = Net::DNS::Nameserver->new(
+    $nameserver = Net::DNS::NameserverCustom->new(
 	LocalAddr	=> '10.1.2.3',
 	LocalPort	=> 5353,
 	ReplyHandler	=> \&reply_handler,
@@ -647,7 +663,7 @@ __END__
 	Truncate	=> 0
     );
 
-Returns a Net::DNS::Nameserver object, or undef if the object
+Returns a Net::DNS::NameserverCustom object, or undef if the object
 could not be created.
 
 Each instance is configured using the following optional arguments:
@@ -776,7 +792,7 @@ additional filtering on its basis may be applied.
 
     use strict;
     use warnings;
-    use Net::DNS::Nameserver;
+    use Net::DNS::NameserverCustom;
 
     sub reply_handler {
 	my ( $qname, $qclass, $qtype, $peerhost, $query, $conn ) = @_;
@@ -807,7 +823,7 @@ additional filtering on its basis may be applied.
     }
 
 
-    my $ns = Net::DNS::Nameserver->new(
+    my $ns = Net::DNS::NameserverCustom->new(
 	LocalPort    => 5353,
 	ReplyHandler => \&reply_handler,
 	Verbose	     => 1
@@ -820,7 +836,7 @@ additional filtering on its basis may be applied.
 =head1 BUGS
 
 Limitations in perl make it impossible to guarantee that replies to
-UDP queries from Net::DNS::Nameserver are sent from the IP-address
+UDP queries from Net::DNS::NameserverCustom are sent from the IP-address
 to which the query was directed.  This is a problem for machines with
 multiple IP-addresses and causes violation of RFC2181 section 4.
 Thus a UDP socket created listening to INADDR_ANY (all available

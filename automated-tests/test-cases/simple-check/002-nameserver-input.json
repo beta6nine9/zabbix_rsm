@@ -1,0 +1,7 @@
+{
+	"flags" : {
+		"aa" : 1
+	},
+	"owner" : "example",
+	"override-reply" : "foo"
+}

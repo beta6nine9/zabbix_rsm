@@ -1,0 +1,24 @@
+[test-case]
+
+"RDAP - Expecting NOERROR RCODE but got unexpected error when resolving hostname (-5)"
+
+[start-tool]
+
+"resolver","/tmp/resolver.pid","201-resolver-input.json"
+
+[execute]
+
+"","rm -rf   /tmp/simple-check-test"
+"","mkdir -p /tmp/simple-check-test"
+
+[run-simple-check]
+
+"t_rsm_rdap -m 1 -r 127.0.0.1 -o 5053 -u http://example.example:4380/rdap -d example.example -4 -j /tmp/simple-check-test/status.json"
+
+[stop-tool]
+
+"resolver","/tmp/resolver.pid"
+
+[compare-files]
+
+"/tmp/simple-check-test","201-output.tar.gz"

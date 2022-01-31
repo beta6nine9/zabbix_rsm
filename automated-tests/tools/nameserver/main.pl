@@ -124,6 +124,7 @@ sub reply_handler
 
 # name, port, pid_file, verbose, reply_handler, additional options to NameserverCustom
 start_dns_server("NAMESERVER", PORT, $pid_file, 0, \&reply_handler, {
-		'OverrideOwner' => $config->{'override-owner'}
+		'OverrideOwner' => $config->{'override-owner'},
+		'OverrideReply' => $config->{'override-reply'},
 	}
 );

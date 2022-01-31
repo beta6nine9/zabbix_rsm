@@ -1,0 +1,26 @@
+[test-case]
+
+"RDDS43 - Whois server returned no NS (-201)"
+
+[start-tool]
+
+"resolver","/tmp/resolver.pid","102-resolver-input.json"
+"rdds43-server","/tmp/rdds43-server.pid","102-rdds43-server-input.json"
+
+[execute]
+
+"","rm -rf   /tmp/simple-check-test"
+"","mkdir -p /tmp/simple-check-test"
+
+[run-simple-check]
+
+"t_rsm_rdds -m 1 -t example -a example.example -s 4343 -w http://example.example -g 4380 -p example -4 -r 127.0.0.1 -o 5053 -j /tmp/simple-check-test/status.json"
+
+[stop-tool]
+
+"rdds43-server","/tmp/rdds43-server.pid"
+"resolver","/tmp/resolver.pid"
+
+[compare-files]
+
+"/tmp/simple-check-test","102-output.tar.gz"
