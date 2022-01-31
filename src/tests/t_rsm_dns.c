@@ -1,4 +1,5 @@
 #include "t_rsm.h"
+#include "t_rsm_decl.h"
 #include "../zabbix_server/poller/checks_simple_rsm.c"
 
 #define DEFAULT_RES_IP		"127.0.0.1"

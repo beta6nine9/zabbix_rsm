@@ -1,9 +1,9 @@
 #include "t_rsm.h"
+#include "t_rsm_decl.h"
 #include "../zabbix_server/poller/checks_simple_rsm.c"
 
 #define DEFAULT_RES_PORT	53
 #define DEFAULT_MAXREDIRS	10
-#define DEFAULT_RTT_LIMIT	20
 
 void	zbx_on_exit(int ret)
 {
@@ -28,18 +28,15 @@ static void	exit_usage(const char *program)
 
 int	main(int argc, char *argv[])
 {
-	int			c, index, rdap_port, rtt_limit = DEFAULT_RTT_LIMIT, rtt = ZBX_NO_VALUE,
-				maxredirs = DEFAULT_MAXREDIRS, timeout = -1;
-	ldns_resolver		*res = NULL;
-	char			*testedname = NULL, *base_url = NULL, is_ipv4, *res_ip = NULL,
-				*value_str = NULL,
-				ipv4_enabled = 0, ipv6_enabled = 0, *json_file = NULL,
-				key[8192],
-				res_host_buf[ZBX_HOST_BUF_SIZE], err[ZBX_ERR_BUF_SIZE];
-	const char		*ip = NULL;
-	uint16_t		res_port = DEFAULT_RES_PORT;
-	AGENT_REQUEST		request;
-	AGENT_RESULT		result;
+	int		c, index,
+			maxredirs = DEFAULT_MAXREDIRS, timeout = -1;
+	char		*testedname = NULL, *base_url = NULL, *res_ip = NULL,
+			ipv4_enabled = 0, ipv6_enabled = 0, *json_file = NULL,
+			key[8192],
+			res_host_buf[ZBX_HOST_BUF_SIZE];
+	uint16_t	res_port = DEFAULT_RES_PORT;
+	AGENT_REQUEST	request;
+	AGENT_RESULT	result;
 
 	while ((c = getopt(argc, argv, "r:o:u:d:46m:j:h")) != -1)
 	{

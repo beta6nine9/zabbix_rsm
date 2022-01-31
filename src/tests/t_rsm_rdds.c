@@ -1,4 +1,5 @@
 #include "t_rsm.h"
+#include "t_rsm_decl.h"
 #include "../zabbix_server/poller/checks_simple_rsm.c"
 
 #define DEFAULT_RES_IP		"127.0.0.1"
@@ -40,31 +41,22 @@ static void	exit_usage(const char *program)
 	fprintf(stderr, "       -j <file>         write resulting json to the file\n");
 	fprintf(stderr, "       -f                log packets to files (%s, %s) (default: stdout)\n",
 			LOG_FILE1, LOG_FILE2);
-	fprintf(stderr, "       -v                enable CURLOPT_VERBOSE when performing HTTP request "
-			"(default: off)\n");
 	fprintf(stderr, "       -h                show this message and quit\n");
 	exit(EXIT_FAILURE);
 }
 
 int	main(int argc, char *argv[])
 {
-	char			err[256], *tld = NULL, *testedname43 = NULL, *testedname80 = NULL,
+	char			*tld = NULL, *testedname43 = NULL, *testedname80 = NULL,
 				*res_ip = DEFAULT_RES_IP, ipv4_enabled = 0,
-				ipv6_enabled = 0, *ip43 = NULL, *ip80 = NULL, *testprefix = DEFAULT_TESTPREFIX,
-				target43[ZBX_HOST_BUF_SIZE] = "", target80[ZBX_HOST_BUF_SIZE] = "",
-				testurl[1024], *answer = NULL, *json_file = NULL, key[8192],
+				ipv6_enabled = 0, *testprefix = DEFAULT_TESTPREFIX,
+				*json_file = NULL, key[8192],
 				res_host_buf[ZBX_HOST_BUF_SIZE], rdds43_host_buf[ZBX_HOST_BUF_SIZE],
 				rdds80_host_buf[ZBX_HOST_BUF_SIZE];
-	ldns_resolver		*res = NULL;
-	zbx_resolver_error_t	ec_res;
-	int			c, index, i, rtt43 = ZBX_NO_VALUE, rtt80 = ZBX_NO_VALUE, upd43 = ZBX_NO_VALUE,
-				maxredirs = DEFAULT_MAXREDIRS, log_to_file = 0, ipv_flags = 0, curl_flags = 0,
-				rdds43_status, rdds80_status, timeout = -1;
-	zbx_vector_str_t	ips43, nss;
-	zbx_http_error_t	ec_http;
+	int			c, index,
+				maxredirs = DEFAULT_MAXREDIRS,
+				timeout = -1;
 	FILE			*log_fd = stdout;
-	unsigned int		extras = RESOLVER_EXTRAS_NONE;
-	struct zbx_json		json;
 	uint16_t		res_port = DEFAULT_RES_PORT, rdds43_port = DEFAULT_RDDS43_PORT,
 				rdds80_port = DEFAULT_RDDS80_PORT;
 	AGENT_REQUEST		request;
@@ -72,7 +64,7 @@ int	main(int argc, char *argv[])
 
 	opterr = 0;
 
-	while ((c = getopt(argc, argv, "t:a:w:46r:o:s:g:p:e:m:j:fvh")) != -1)
+	while ((c = getopt(argc, argv, "t:a:w:46r:o:s:g:p:e:m:j:fh")) != -1)
 	{
 		switch (c)
 		{
@@ -114,12 +106,6 @@ int	main(int argc, char *argv[])
 				break;
 			case 'j':
 				json_file = optarg;
-				break;
-			case 'f':
-				log_to_file = 1;
-				break;
-			case 'v':
-				curl_flags |= ZBX_FLAG_CURL_VERBOSE;
 				break;
 			case 'h':
 				exit_usage(argv[0]);

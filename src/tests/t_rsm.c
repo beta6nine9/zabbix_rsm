@@ -1,4 +1,5 @@
 #include "common.h"
+#include "t_rsm.h"
 
 #include <stdio.h>
 #include <errno.h>

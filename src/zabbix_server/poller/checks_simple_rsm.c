@@ -3574,7 +3574,7 @@ static void	create_rdds_json(struct zbx_json *json, const char *ip43, int rtt43,
 	zbx_json_addint64(json, "status", rdds_status);
 }
 
-void	get_host_and_port_from_str(const char *str, char *host, size_t host_size, unsigned short *port,
+static void	get_host_and_port_from_str(const char *str, char *host, size_t host_size, unsigned short *port,
 		unsigned short default_port)
 {
 	char	*str_copy, *p;
@@ -3991,15 +3991,6 @@ int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 	GET_PARAM_UINT  (ipv6_enabled , 8, "IPv6 enabled");
 	GET_PARAM_NEMPTY(resolver_str , 9, "IP address of local resolver");
 
-	if (SUCCEED != zbx_split_url(base_url, &scheme, &domain, &port, &path, err, sizeof(err)))
-	{
-		SET_MSG_RESULT(result, zbx_dsprintf(NULL, "\"%s\": %s", base_url, err));
-		goto out;
-	}
-
-	get_host_and_port_from_str(resolver_str, resolver_ip, sizeof(resolver_ip), &resolver_port,
-			DEFAULT_RESOLVER_PORT);
-
 	/* open log file */
 	if (NULL == output_fd)
 	{
@@ -4013,10 +4004,6 @@ int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 	{
 		log_fd = output_fd;
 	}
-
-	zbx_vector_str_create(&ips);
-
-	rsm_info(log_fd, "START TEST");
 
 	if (0 == probe_enabled)
 	{
@@ -4032,13 +4019,30 @@ int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 		goto out;
 	}
 
-	/* create resolver */
-	if (SUCCEED != zbx_create_resolver(&res, "resolver", resolver_ip, resolver_port, RSM_TCP, ipv4_enabled,
-			ipv6_enabled, RESOLVER_EXTRAS_DNSSEC, RSM_TCP_TIMEOUT, RSM_TCP_RETRY, log_fd, err, sizeof(err)))
+	zbx_vector_str_create(&ips);
+
+	if (SUCCEED != str_in_list("not listed,no https", base_url, ','))
 	{
-		SET_MSG_RESULT(result, zbx_dsprintf(NULL, "Cannot create resolver: %s.", err));
-		goto out;
+		if (SUCCEED != zbx_split_url(base_url, &scheme, &domain, &port, &path, err, sizeof(err)))
+		{
+			SET_MSG_RESULT(result, zbx_dsprintf(NULL, "\"%s\": %s", base_url, err));
+			goto out;
+		}
+
+		get_host_and_port_from_str(resolver_str, resolver_ip, sizeof(resolver_ip), &resolver_port,
+				DEFAULT_RESOLVER_PORT);
+
+		/* create resolver */
+		if (SUCCEED != zbx_create_resolver(&res, "resolver", resolver_ip, resolver_port, RSM_TCP, ipv4_enabled,
+				ipv6_enabled, RESOLVER_EXTRAS_DNSSEC, RSM_TCP_TIMEOUT, RSM_TCP_RETRY, log_fd,
+				err, sizeof(err)))
+		{
+			SET_MSG_RESULT(result, zbx_dsprintf(NULL, "Cannot create resolver: %s.", err));
+			goto out;
+		}
 	}
+
+	rsm_info(log_fd, "START TEST");
 
 	/* from this point item will not become NOTSUPPORTED */
 	ret = SYSINFO_RET_OK;
@@ -4334,6 +4338,9 @@ static int	get_tmpl(const char *epp_commands, const char *command, char **tmpl)
 	char	buf[256];
 	size_t	tmpl_alloc = 512, tmpl_offset = 0;
 	int	f, nbytes, ret = FAIL;
+
+	if (NULL == epp_commands)
+		goto out;
 
 	zbx_snprintf(buf, sizeof(buf), "%s/%s.tmpl", epp_commands, command);
 
@@ -5091,6 +5098,13 @@ int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *
 	{
 		rtt1 = rtt2 = rtt3 = ZBX_EC_EPP_INTERNAL_GENERAL;
 		rsm_err(log_fd, "cannot attach TCP socket to SSL session");
+		goto out;
+	}
+
+	if (epp_cert_b64 == NULL)
+	{
+		rtt1 = rtt2 = rtt3 = ZBX_EC_EPP_INTERNAL_GENERAL;
+		rsm_err(log_fd, "no EPP certificate");
 		goto out;
 	}
 
