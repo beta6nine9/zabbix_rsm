@@ -1263,6 +1263,17 @@ sub __cmd_check_proxy($)
 		fail("unsupported status '$expected_status', supported statuses: 'enabled', 'disabled'");
 	}
 
+	if ($expected_status eq "enabled")
+	{
+		fail("when status is 'enabled', ip should not be empty") if (!$expected_ip);
+		fail("when status is 'enabled', port should not be empty") if (!$expected_port);
+	}
+	if ($expected_status eq "disabled")
+	{
+		fail("when status is 'enabled', ip should be empty") if ($expected_ip);
+		fail("when status is 'enabled', port should be empty") if ($expected_port);
+	}
+
 	my $sql;
 	my $params;
 	my $rows;
@@ -1293,6 +1304,12 @@ sub __cmd_check_proxy($)
 
 	my ($hostid, $status, $tls_connect, $tls_accept, $psk_identity, $psk) = @{$rows->[0]};
 
+	__expect($status        , $statuses->{$expected_status}, "unexpected status '%d', expected '%d'");
+	__expect($tls_connect   , HOST_ENCRYPTION_PSK          , "unexpected value of hosts.tls_connect '%d', expected '%d'");
+	__expect($tls_accept    , HOST_ENCRYPTION_NONE         , "unexpected value of hosts.tls_accept '%d', expected '%d'");
+	__expect($psk_identity  , $expected_psk_identity       , "unexpected psk identity '%s', expected '%s'");
+	__expect($psk           , $expected_psk                , "unexpected psk '%s', expected '%s'");
+
 	$sql = "select" .
 			" type," .
 			"useip," .
@@ -1305,26 +1322,31 @@ sub __cmd_check_proxy($)
 	$params = [$hostid];
 	$rows = db_select($sql, $params);
 
-	if (scalar(@{$rows}) == 0)
+	if ($expected_status eq "enabled")
 	{
-		fail("interface not found");
+		if (scalar(@{$rows}) == 0)
+		{
+			fail("interface not found");
+		}
+		if (scalar(@{$rows}) > 1)
+		{
+			fail("found more than one interface");
+		}
+
+		my ($interface_type, $useip, $ip, $port) = @{$rows->[0]};
+
+		__expect($interface_type, INTERFACE_TYPE_UNKNOWN       , "unexpected interface type '%d', expected '%d'");
+		__expect($useip         , INTERFACE_USE_IP             , "unexpected value of interface.useip '%d', expected '%d'");
+		__expect($ip            , $expected_ip                 , "unexpected ip '%s', expected '%s'");
+		__expect($port          , $expected_port               , "unexpected port '%d', expected '%d'");
 	}
-	if (scalar(@{$rows}) > 1)
+	else
 	{
-		fail("found more than one interface");
+		if (scalar(@{$rows}) > 0)
+		{
+			fail("interface found, while disabled proxies should not have an interface");
+		}
 	}
-
-	my ($interface_type, $useip, $ip, $port) = @{$rows->[0]};
-
-	__expect($interface_type, INTERFACE_TYPE_UNKNOWN       , "unexpected interface type '%d', expected '%d'");
-	__expect($status        , $statuses->{$expected_status}, "unexpected status '%d', expected '%d'");
-	__expect($useip         , INTERFACE_USE_IP             , "unexpected value of interface.useip '%d', expected '%d'");
-	__expect($ip            , $expected_ip                 , "unexpected ip '%s', expected '%s'");
-	__expect($port          , $expected_port               , "unexpected port '%d', expected '%d'");
-	__expect($tls_connect   , HOST_ENCRYPTION_PSK          , "unexpected value of hosts.tls_connect '%d', expected '%d'");
-	__expect($tls_accept    , HOST_ENCRYPTION_NONE         , "unexpected value of hosts.tls_accept '%d', expected '%d'");
-	__expect($psk_identity  , $expected_psk_identity       , "unexpected psk identity '%s', expected '%s'");
-	__expect($psk           , $expected_psk                , "unexpected psk '%s', expected '%s'");
 }
 
 sub __cmd_check_host($)
@@ -1863,9 +1885,19 @@ sub __unpack($)
 
 	my @values = @{csv('allow_whitespace' => 1, 'in' => \$args)->[0]};
 
+	my $callback = sub
+	{
+		my $match    = shift;
+		my $variable = shift;
+
+		return get_config($1, $2) if ($variable =~ /^cfg:([\w\-]+):([\w\-]+)$/);
+		return $test_case_variables->{$variable} if (exists($test_case_variables->{$variable}));
+		return $match;
+	};
+
 	foreach (@values)
 	{
-		$_ =~ s!(\$\{(.*?)\})! $test_case_variables->{$2} // $1 !ge;
+		$_ =~ s!(\$\{(.*?)\})! $callback->($1, $2) !ge;
 	}
 
 	return @values;
