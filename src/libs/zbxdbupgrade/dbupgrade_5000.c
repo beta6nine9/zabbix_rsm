@@ -262,6 +262,11 @@ static int	DBpatch_5000004(void)
 	return ret;
 }
 
+static int	DBpatch_5000005(void)
+{
+	return DBcreate_index("alerts", "alerts_8", "acknowledgeid", 0);
+}
+
 #endif
 
 DBPATCH_START(5000)
@@ -277,5 +282,6 @@ DBPATCH_RSM(5000002, 3, 0, 0)	/* delete "rsm.configvalue[RSM.DNS.AVAIL.MINNS]" i
 DBPATCH_RSM(5000002, 4, 0, 0)	/* replace "{$RSM.DNS.AVAIL.MINNS}" to "{$RSM.TLD.DNS.AVAIL.MINNS}" in item keys (template and hosts) */
 DBPATCH_ADD(5000003, 0, 0)
 DBPATCH_ADD(5000004, 0, 0)
+DBPATCH_ADD(5000005, 0, 0)
 
 DBPATCH_END()
