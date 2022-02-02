@@ -23,3 +23,765 @@
 
 "/tlds/tld1","PUT",200,"readwrite","200-input-tld1.json",""
 "/tlds/tld2","PUT",200,"readwrite","200-input-tld2-dns-rdds43-rdds80.json",""
+
+[check-proxy]
+
+"probe1","enabled","192.168.200.1",10001,"test","00112233445566778899aabbccddeeff"
+"probe2","enabled","192.168.200.2",10002,"test","ffeeddccbbaa99887766554433221100"
+
+[check-host]
+
+# host,status,info_1,info_2,proxy,template_count,host_group_count,macro_count,item_count
+
+"Template Probe Config probe1","template","","","",0,1,7,0
+"Template Probe Config probe2","template","","","",0,1,7,0
+"Template Rsmhost Config tld1","template","","","",0,1,17,0
+"Template DNS Test - tld1"    ,"template","","","",1,1,0,18
+"Template Rsmhost Config tld2","template","","","",0,1,17,0
+"Template DNS Test - tld2"    ,"template","","","",1,1,0,18
+
+"probe1"      ,"enabled","","","probe1",2,1,0,6
+"probe1 - mon","enabled","","",        ,1,1,1,2
+"probe2"      ,"enabled","","","probe2",2,1,0,6
+"probe2 - mon","enabled","","",        ,1,1,1,2
+"tld1"        ,"enabled","","",        ,6,2,0,35
+"tld1 probe1" ,"enabled","","","probe1",5,4,0,35
+"tld1 probe2" ,"enabled","","","probe2",5,4,0,35
+"tld2"        ,"enabled","","",        ,6,2,0,35
+"tld2 probe1" ,"enabled","","","probe1",5,4,0,35
+"tld2 probe2" ,"enabled","","","probe2",5,4,0,35
+
+[check-host-count]
+
+# Expected templates:
+# * "Template Probe Status"
+# * "Template Proxy Health"
+# * "Template Config History"
+# * "Template DNS Status"
+# * "Template DNSSEC Status"
+# * "Template DNS Test"
+# * "Template RDAP Status"
+# * "Template RDAP Test"
+# * "Template RDDS Status"
+# * "Template RDDS Test"
+# * "Template Probe Config <probe>" for each probe
+# * "Template Rsmhost Config <rsmhost>" for each rsmhost
+# * "Template DNS Test - <rsmhost>" for each rsmhost
+#
+# 10 + (2 probes * 1) + (2 rsmhosts * 2) = 16
+"template",16
+
+# Expected proxies - one for each probe
+"proxy",2
+
+# Expected hosts:
+# * "Global macro history"
+# * "Probe statuses"
+# * 2 for each probe
+# * 1 for each rsmhost
+# * 1 for each "rsmhost, probe"
+#
+# 2 + (2 probes * 2) + (2 rsmhosts * 1) + (2 probes * 2 rsmhosts * 1) = 12
+"host",12
+
+[check-host-template]
+
+"probe1"      ,"Template Probe Config probe1"
+"probe1"      ,"Template Probe Status"
+
+"probe1 - mon","Template Proxy Health"
+
+"probe2"      ,"Template Probe Config probe2"
+"probe2"      ,"Template Probe Status"
+
+"probe2 - mon","Template Proxy Health"
+
+"tld1"        ,"Template Config History"
+"tld1"        ,"Template DNSSEC Status"
+"tld1"        ,"Template DNS Status"
+"tld1"        ,"Template RDAP Status"
+"tld1"        ,"Template RDDS Status"
+"tld1"        ,"Template Rsmhost Config tld1"
+
+"tld1 probe1" ,"Template RDAP Test"
+"tld1 probe1" ,"Template RDDS Test"
+"tld1 probe1" ,"Template Probe Config probe1"
+"tld1 probe1" ,"Template Rsmhost Config tld1"
+"tld1 probe1" ,"Template DNS Test - tld1"
+
+"tld1 probe2" ,"Template RDAP Test"
+"tld1 probe2" ,"Template RDDS Test"
+"tld1 probe2" ,"Template Probe Config probe2"
+"tld1 probe2" ,"Template Rsmhost Config tld1"
+"tld1 probe2" ,"Template DNS Test - tld1"
+
+"tld2"        ,"Template Config History"
+"tld2"        ,"Template DNSSEC Status"
+"tld2"        ,"Template DNS Status"
+"tld2"        ,"Template RDAP Status"
+"tld2"        ,"Template RDDS Status"
+"tld2"        ,"Template Rsmhost Config tld2"
+
+"tld2 probe1" ,"Template RDAP Test"
+"tld2 probe1" ,"Template RDDS Test"
+"tld2 probe1" ,"Template Probe Config probe1"
+"tld2 probe1" ,"Template Rsmhost Config tld2"
+"tld2 probe1" ,"Template DNS Test - tld2"
+
+"tld2 probe2" ,"Template RDAP Test"
+"tld2 probe2" ,"Template RDDS Test"
+"tld2 probe2" ,"Template Probe Config probe2"
+"tld2 probe2" ,"Template Rsmhost Config tld2"
+"tld2 probe2" ,"Template DNS Test - tld2"
+
+[check-host-group]
+
+"probe1"      ,"Probes"
+
+"probe1 - mon","Probes - Mon"
+
+"probe2"      ,"Probes"
+
+"probe2 - mon","Probes - Mon"
+
+"tld1"        ,"TLDs"
+"tld1"        ,"gTLD"
+
+"tld1 probe1" ,"TLD Probe results"
+"tld1 probe1" ,"gTLD Probe results"
+"tld1 probe1" ,"probe1"
+"tld1 probe1" ,"TLD tld1"
+
+"tld1 probe2" ,"TLD Probe results"
+"tld1 probe2" ,"gTLD Probe results"
+"tld1 probe2" ,"probe2"
+"tld1 probe2" ,"TLD tld1"
+
+"tld2"        ,"TLDs"
+"tld2"        ,"gTLD"
+
+"tld2 probe1" ,"TLD Probe results"
+"tld2 probe1" ,"gTLD Probe results"
+"tld2 probe1" ,"probe1"
+"tld2 probe1" ,"TLD tld2"
+
+"tld2 probe2" ,"TLD Probe results"
+"tld2 probe2" ,"gTLD Probe results"
+"tld2 probe2" ,"probe2"
+"tld2 probe2" ,"TLD tld2"
+
+[check-host-macro]
+
+"Template Probe Config probe1","{$RSM.IP4.ENABLED}" ,"1"
+"Template Probe Config probe1","{$RSM.IP6.ENABLED}" ,"1"
+"Template Probe Config probe1","{$RSM.PROXY.IP}"    ,"192.168.200.1"
+"Template Probe Config probe1","{$RSM.PROXY.PORT}"  ,"10001"
+"Template Probe Config probe1","{$RSM.RDAP.ENABLED}","1"
+"Template Probe Config probe1","{$RSM.RDDS.ENABLED}","1"
+"Template Probe Config probe1","{$RSM.RESOLVER}"    ,"127.0.0.1"
+
+"Template Probe Config probe2","{$RSM.IP4.ENABLED}" ,"1"
+"Template Probe Config probe2","{$RSM.IP6.ENABLED}" ,"1"
+"Template Probe Config probe2","{$RSM.PROXY.IP}"    ,"192.168.200.2"
+"Template Probe Config probe2","{$RSM.PROXY.PORT}"  ,"10002"
+"Template Probe Config probe2","{$RSM.RDAP.ENABLED}","0"
+"Template Probe Config probe2","{$RSM.RDDS.ENABLED}","1"
+"Template Probe Config probe2","{$RSM.RESOLVER}"    ,"127.0.0.1"
+
+"Template Rsmhost Config tld1","{$RDAP.BASE.URL}"          ,"https://www.nic.example/domain"
+"Template Rsmhost Config tld1","{$RDAP.TEST.DOMAIN}"       ,"nic.example"
+"Template Rsmhost Config tld1","{$RDAP.TLD.ENABLED}"       ,"1"
+"Template Rsmhost Config tld1","{$RSM.DNS.NAME.SERVERS}"   ,"a.ns.tld1,192.168.1.1 b.ns.tld1,192.168.1.2 b.ns.tld1,192.168.1.3"
+"Template Rsmhost Config tld1","{$RSM.DNS.TESTPREFIX}"     ,"www.monitoring.example"
+"Template Rsmhost Config tld1","{$RSM.RDDS.NS.STRING}"     ,"Name Server:"
+"Template Rsmhost Config tld1","{$RSM.RDDS43.TEST.DOMAIN}" ,"nic.example"
+"Template Rsmhost Config tld1","{$RSM.TLD}"                ,"tld1"
+#"Template Rsmhost Config tld1","{$RSM.TLD.CONFIG.TIMES}"   ,"<timestamp>"
+"Template Rsmhost Config tld1","{$RSM.TLD.DNS.AVAIL.MINNS}","2"
+"Template Rsmhost Config tld1","{$RSM.TLD.DNS.TCP.ENABLED}","1"
+"Template Rsmhost Config tld1","{$RSM.TLD.DNS.UDP.ENABLED}","1"
+"Template Rsmhost Config tld1","{$RSM.TLD.DNSSEC.ENABLED}" ,"1"
+"Template Rsmhost Config tld1","{$RSM.TLD.RDDS43.ENABLED}" ,"1"
+"Template Rsmhost Config tld1","{$RSM.TLD.RDDS43.SERVER}"  ,"whois.nic.example"
+"Template Rsmhost Config tld1","{$RSM.TLD.RDDS80.ENABLED}" ,"1"
+"Template Rsmhost Config tld1","{$RSM.TLD.RDDS80.URL}"     ,"https://whois.nic.example"
+
+"Template Rsmhost Config tld2","{$RDAP.BASE.URL}"          ,""
+"Template Rsmhost Config tld2","{$RDAP.TEST.DOMAIN}"       ,""
+"Template Rsmhost Config tld2","{$RDAP.TLD.ENABLED}"       ,"0"
+"Template Rsmhost Config tld2","{$RSM.DNS.NAME.SERVERS}"   ,"a.ns.tld2,192.168.2.1 b.ns.tld2,192.168.2.2 b.ns.tld2,192.168.2.3"
+"Template Rsmhost Config tld2","{$RSM.DNS.TESTPREFIX}"     ,"www.monitoring.example"
+"Template Rsmhost Config tld2","{$RSM.RDDS.NS.STRING}"     ,"Name Server:"
+"Template Rsmhost Config tld2","{$RSM.RDDS43.TEST.DOMAIN}" ,"nic.example"
+"Template Rsmhost Config tld2","{$RSM.TLD}"                ,"tld2"
+#"Template Rsmhost Config tld2","{$RSM.TLD.CONFIG.TIMES}"   ,"<timestamp>"
+"Template Rsmhost Config tld2","{$RSM.TLD.DNS.AVAIL.MINNS}","2"
+"Template Rsmhost Config tld2","{$RSM.TLD.DNS.TCP.ENABLED}","1"
+"Template Rsmhost Config tld2","{$RSM.TLD.DNS.UDP.ENABLED}","1"
+"Template Rsmhost Config tld2","{$RSM.TLD.DNSSEC.ENABLED}" ,"1"
+"Template Rsmhost Config tld2","{$RSM.TLD.RDDS43.ENABLED}" ,"1"
+"Template Rsmhost Config tld2","{$RSM.TLD.RDDS43.SERVER}"  ,"whois.nic.example"
+"Template Rsmhost Config tld2","{$RSM.TLD.RDDS80.ENABLED}" ,"1"
+"Template Rsmhost Config tld2","{$RSM.TLD.RDDS80.URL}"     ,"https://whois.nic.example"
+
+"probe1 - mon","{$RSM.PROXY_NAME}","probe1"
+
+"probe2 - mon","{$RSM.PROXY_NAME}","probe2"
+
+[set-variable]
+
+"resolver-status-key"       ,"resolver.status[{$RSM.RESOLVER},{$RESOLVER.STATUS.TIMEOUT},{$RESOLVER.STATUS.TRIES},{$RSM.IP4.ENABLED},{$RSM.IP6.ENABLED}]"
+"probe-status-automatic-key","rsm.probe.status[automatic,""{$RSM.IP4.ENABLED}"",""{$RSM.IP6.ENABLED}"",""{$RSM.IP4.ROOTSERVERS1}"",""{$RSM.IP6.ROOTSERVERS1}"",""{$RSM.IP4.MIN.SERVERS}"",""{$RSM.IP6.MIN.SERVERS}"",""{$RSM.IP4.REPLY.MS}"",""{$RSM.IP6.REPLY.MS}"",""{$RSM.PROBE.ONLINE.DELAY}""]"
+"probe-status-manual-key"   ,"rsm.probe.status[manual]"
+"dns-test-key"              ,"rsm.dns[{$RSM.TLD},{$RSM.DNS.TESTPREFIX},{$RSM.DNS.NAME.SERVERS},{$RSM.TLD.DNSSEC.ENABLED},{$RSM.TLD.RDDS43.ENABLED},{$RSM.TLD.RDDS80.ENABLED},{$RSM.TLD.DNS.UDP.ENABLED},{$RSM.TLD.DNS.TCP.ENABLED},{$RSM.IP4.ENABLED},{$RSM.IP6.ENABLED},{$RSM.RESOLVER},{$RSM.DNS.UDP.RTT.HIGH},{$RSM.DNS.TCP.RTT.HIGH},{$RSM.DNS.TEST.TCP.RATIO},{$RSM.DNS.TEST.RECOVER.UDP},{$RSM.DNS.TEST.RECOVER.TCP},{$RSM.TLD.DNS.AVAIL.MINNS}]"
+"rdap-test-key"             ,"rdap[{$RSM.TLD},{$RDAP.TEST.DOMAIN},{$RDAP.BASE.URL},{$RSM.RDDS.MAXREDIRS},{$RSM.RDDS.RTT.HIGH},{$RDAP.TLD.ENABLED},{$RSM.RDAP.ENABLED},{$RSM.IP4.ENABLED},{$RSM.IP6.ENABLED},{$RSM.RESOLVER}]"
+"rdds-test-key"             ,"rsm.rdds[{$RSM.TLD},{$RSM.TLD.RDDS43.SERVER},{$RSM.TLD.RDDS80.URL},{$RSM.RDDS43.TEST.DOMAIN},{$RSM.RDDS.NS.STRING},{$RSM.RDDS.ENABLED},{$RSM.TLD.RDDS43.ENABLED},{$RSM.TLD.RDDS80.ENABLED},{$RSM.IP4.ENABLED},{$RSM.IP6.ENABLED},{$RSM.RESOLVER},{$RSM.RDDS.RTT.HIGH},{$RSM.RDDS.MAXREDIRS}]"
+
+[check-item]
+
+# "host","key","status","item_type","value_type","delay","history","trends","units","params_","master_item","valuemap","name",preproc_count,trigger_count
+
+"probe1"      ,"rsm.errors"                                    ,"Internal error rate"                          ,"enabled" ,"simple"    ,"float" ,"1m"               ,"90d","365d",""        ,""                          ,""                ,""                        ,1,2
+"probe1"      ,"${resolver-status-key}"                        ,"Local resolver status ($1)"                   ,"enabled" ,"simple"    ,"uint64","1m"               ,"90d","365d",""        ,""                          ,""                ,"Service state"           ,0,0
+"probe1"      ,"${probe-status-automatic-key}"                 ,"Probe status ($1)"                            ,"enabled" ,"simple"    ,"uint64","1m"               ,"90d","365d",""        ,""                          ,""                ,"RSM Probe status"        ,0,1
+"probe1"      ,"${probe-status-manual-key}"                    ,"Probe status ($1)"                            ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,"RSM Probe status"        ,0,2
+"probe1"      ,"probe.configvalue[RSM.IP4.ENABLED]"            ,"Value of $1 variable"                         ,"enabled" ,"calculated","uint64","5m"               ,"90d","365d",""        ,"{$RSM.IP4.ENABLED}"        ,""                ,""                        ,0,0
+"probe1"      ,"probe.configvalue[RSM.IP6.ENABLED]"            ,"Value of $1 variable"                         ,"enabled" ,"calculated","uint64","5m"               ,"90d","365d",""        ,"{$RSM.IP6.ENABLED}"        ,""                ,""                        ,0,0
+
+"probe1 - mon","zabbix[proxy,{$RSM.PROXY_NAME},lastaccess]"    ,"Availability of probe"                        ,"enabled" ,"internal"  ,"uint64","60"               ,"90d","365d","unixtime",""                          ,""                ,""                        ,0,1
+"probe1 - mon","rsm.probe.online"                              ,"Probe main status"                            ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,"RSM Probe status"        ,0,0
+
+"probe2"      ,"rsm.errors"                                    ,"Internal error rate"                          ,"enabled" ,"simple"    ,"float" ,"1m"               ,"90d","365d",""        ,""                          ,""                ,""                        ,1,2
+"probe2"      ,"${resolver-status-key}"                        ,"Local resolver status ($1)"                   ,"enabled" ,"simple"    ,"uint64","1m"               ,"90d","365d",""        ,""                          ,""                ,"Service state"           ,0,0
+"probe2"      ,"${probe-status-automatic-key}"                 ,"Probe status ($1)"                            ,"enabled" ,"simple"    ,"uint64","1m"               ,"90d","365d",""        ,""                          ,""                ,"RSM Probe status"        ,0,1
+"probe2"      ,"${probe-status-manual-key}"                    ,"Probe status ($1)"                            ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,"RSM Probe status"        ,0,2
+"probe2"      ,"probe.configvalue[RSM.IP4.ENABLED]"            ,"Value of $1 variable"                         ,"enabled" ,"calculated","uint64","5m"               ,"90d","365d",""        ,"{$RSM.IP4.ENABLED}"        ,""                ,""                        ,0,0
+"probe2"      ,"probe.configvalue[RSM.IP6.ENABLED]"            ,"Value of $1 variable"                         ,"enabled" ,"calculated","uint64","5m"               ,"90d","365d",""        ,"{$RSM.IP6.ENABLED}"        ,""                ,""                        ,0,0
+
+"probe2 - mon","zabbix[proxy,{$RSM.PROXY_NAME},lastaccess]"    ,"Availability of probe"                        ,"enabled" ,"internal"  ,"uint64","60"               ,"90d","365d","unixtime",""                          ,""                ,""                        ,0,1
+"probe2 - mon","rsm.probe.online"                              ,"Probe main status"                            ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,"RSM Probe status"        ,0,0
+
+"tld1"        ,"dns.tcp.enabled"                               ,"DNS TCP enabled/disabled"                     ,"enabled" ,"calculated","uint64","1m"               ,"90d","365d",""        ,"{$RSM.TLD.DNS.TCP.ENABLED}",""                ,""                        ,0,0
+"tld1"        ,"dns.udp.enabled"                               ,"DNS UDP enabled/disabled"                     ,"enabled" ,"calculated","uint64","1m"               ,"90d","365d",""        ,"{$RSM.TLD.DNS.UDP.ENABLED}",""                ,""                        ,0,0
+"tld1"        ,"dnssec.enabled"                                ,"DNSSEC enabled/disabled"                      ,"enabled" ,"calculated","uint64","1m"               ,"90d","365d",""        ,"{$RSM.TLD.DNSSEC.ENABLED}" ,""                ,""                        ,0,0
+"tld1"        ,"rdap.enabled"                                  ,"RDAP enabled/disabled"                        ,"enabled" ,"calculated","uint64","1m"               ,"90d","365d",""        ,"{$RDAP.TLD.ENABLED}"       ,""                ,""                        ,0,0
+"tld1"        ,"rdds43.enabled"                                ,"RDDS43 enabled/disabled"                      ,"enabled" ,"calculated","uint64","1m"               ,"90d","365d",""        ,"{$RSM.TLD.RDDS43.ENABLED}" ,""                ,""                        ,0,0
+"tld1"        ,"rdds80.enabled"                                ,"RDDS80 enabled/disabled"                      ,"enabled" ,"calculated","uint64","1m"               ,"90d","365d",""        ,"{$RSM.TLD.RDDS80.ENABLED}" ,""                ,""                        ,0,0
+"tld1"        ,"rsm.slv.dns.avail"                             ,"DNS availability"                             ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,"RSM Service Availability",0,1
+"tld1"        ,"rsm.slv.dns.downtime"                          ,"DNS minutes of downtime"                      ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,""                        ,0,1
+"tld1"        ,"rsm.slv.dns.ns.avail[a.ns.tld1,192.168.1.1]"   ,"DNS NS $1 ($2) availability"                  ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,"RSM Service Availability",0,0
+"tld1"        ,"rsm.slv.dns.ns.avail[b.ns.tld1,192.168.1.2]"   ,"DNS NS $1 ($2) availability"                  ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,"RSM Service Availability",0,0
+"tld1"        ,"rsm.slv.dns.ns.avail[b.ns.tld1,192.168.1.3]"   ,"DNS NS $1 ($2) availability"                  ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,"RSM Service Availability",0,0
+"tld1"        ,"rsm.slv.dns.ns.downtime[a.ns.tld1,192.168.1.1]","DNS minutes of $1 ($2) downtime"              ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,""                        ,0,5
+"tld1"        ,"rsm.slv.dns.ns.downtime[b.ns.tld1,192.168.1.2]","DNS minutes of $1 ($2) downtime"              ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,""                        ,0,5
+"tld1"        ,"rsm.slv.dns.ns.downtime[b.ns.tld1,192.168.1.3]","DNS minutes of $1 ($2) downtime"              ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,""                        ,0,5
+"tld1"        ,"rsm.slv.dns.rollweek"                          ,"DNS weekly unavailability"                    ,"enabled" ,"trapper"   ,"float" ,"0"                ,"90d","365d","%"       ,""                          ,""                ,""                        ,0,5
+"tld1"        ,"rsm.slv.dns.tcp.rtt.failed"                    ,"DNS Number of failed monthly TCP tests"       ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,""                        ,0,0
+"tld1"        ,"rsm.slv.dns.tcp.rtt.performed"                 ,"DNS Number of performed monthly TCP tests"    ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,""                        ,0,0
+"tld1"        ,"rsm.slv.dns.tcp.rtt.pfailed"                   ,"DNS Ratio of failed monthly TCP tests"        ,"enabled" ,"trapper"   ,"float" ,"0"                ,"90d","365d","%"       ,""                          ,""                ,""                        ,0,5
+"tld1"        ,"rsm.slv.dns.udp.rtt.failed"                    ,"DNS Number of failed monthly UDP tests"       ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,""                        ,0,0
+"tld1"        ,"rsm.slv.dns.udp.rtt.performed"                 ,"DNS Number of performed monthly UDP tests"    ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,""                        ,0,0
+"tld1"        ,"rsm.slv.dns.udp.rtt.pfailed"                   ,"DNS Ratio of failed monthly UDP tests"        ,"enabled" ,"trapper"   ,"float" ,"0"                ,"90d","365d","%"       ,""                          ,""                ,""                        ,0,5
+"tld1"        ,"rsm.slv.dnssec.avail"                          ,"DNSSEC availability"                          ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,"RSM Service Availability",0,1
+"tld1"        ,"rsm.slv.dnssec.rollweek"                       ,"DNSSEC weekly unavailability"                 ,"enabled" ,"trapper"   ,"float" ,"0"                ,"90d","365d","%"       ,""                          ,""                ,""                        ,0,5
+"tld1"        ,"rsm.slv.rdap.avail"                            ,"RDAP availability"                            ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,"RSM Service Availability",0,1
+"tld1"        ,"rsm.slv.rdap.downtime"                         ,"RDAP minutes of downtime"                     ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,""                        ,0,5
+"tld1"        ,"rsm.slv.rdap.rollweek"                         ,"RDAP weekly unavailability"                   ,"enabled" ,"trapper"   ,"float" ,"0"                ,"90d","365d","%"       ,""                          ,""                ,""                        ,0,5
+"tld1"        ,"rsm.slv.rdap.rtt.failed"                       ,"RDAP Number of failed monthly queries"        ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,""                        ,0,0
+"tld1"        ,"rsm.slv.rdap.rtt.performed"                    ,"RDAP Number of performed monthly queries"     ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,""                        ,0,0
+"tld1"        ,"rsm.slv.rdap.rtt.pfailed"                      ,"RDAP Ratio of failed monthly queries"         ,"enabled" ,"trapper"   ,"float" ,"0"                ,"90d","365d","%"       ,""                          ,""                ,""                        ,0,5
+"tld1"        ,"rsm.slv.rdds.avail"                            ,"RDDS availability"                            ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,"RSM Service Availability",0,1
+"tld1"        ,"rsm.slv.rdds.downtime"                         ,"RDDS minutes of downtime"                     ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,""                        ,0,5
+"tld1"        ,"rsm.slv.rdds.rollweek"                         ,"RDDS weekly unavailability"                   ,"enabled" ,"trapper"   ,"float" ,"0"                ,"90d","365d","%"       ,""                          ,""                ,""                        ,0,5
+"tld1"        ,"rsm.slv.rdds.rtt.failed"                       ,"RDDS Number of failed monthly queries"        ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,""                        ,0,0
+"tld1"        ,"rsm.slv.rdds.rtt.performed"                    ,"RDDS Number of performed monthly queries"     ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,""                        ,0,0
+"tld1"        ,"rsm.slv.rdds.rtt.pfailed"                      ,"RDDS Ratio of failed monthly queries"         ,"enabled" ,"trapper"   ,"float" ,"0"                ,"90d","365d","%"       ,""                          ,""                ,""                        ,0,5
+
+"tld1 probe1" ,"rdap.ip"                                       ,"RDAP IP"                                      ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdap-test-key}",""                        ,1,0
+"tld1 probe1" ,"rdap.rtt"                                      ,"RDAP RTT"                                     ,"enabled" ,"dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${rdap-test-key}","RSM RDAP rtt"            ,1,0
+"tld1 probe1" ,"rdap.status"                                   ,"RDAP status"                                  ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${rdap-test-key}","Service state"           ,1,0
+"tld1 probe1" ,"rdap.target"                                   ,"RDAP target"                                  ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdap-test-key}",""                        ,1,0
+"tld1 probe1" ,"rdap.testedname"                               ,"RDAP tested name"                             ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdap-test-key}",""                        ,1,0
+"tld1 probe1" ,"${rdap-test-key}"                              ,"RDAP Test"                                    ,"enabled" ,"simple"    ,"text"  ,"{$RSM.RDAP.DELAY}","0"  ,"0"   ,""        ,""                          ,""                ,""                        ,0,0
+"tld1 probe1" ,"rsm.dns.mode"                                  ,"DNS Test mode"                                ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"DNS test mode"           ,1,0
+"tld1 probe1" ,"rsm.dns.ns.status[a.ns.tld1]"                  ,"DNS NS status of a.ns.tld1"                   ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"Service state"           ,1,0
+"tld1 probe1" ,"rsm.dns.ns.status[b.ns.tld1]"                  ,"DNS NS status of b.ns.tld1"                   ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"Service state"           ,1,0
+"tld1 probe1" ,"rsm.dns.nsid[a.ns.tld1,192.168.1.1]"           ,"DNS NSID of a.ns.tld1,192.168.1.1"            ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${dns-test-key}" ,""                        ,2,0
+"tld1 probe1" ,"rsm.dns.nsid[b.ns.tld1,192.168.1.2]"           ,"DNS NSID of b.ns.tld1,192.168.1.2"            ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${dns-test-key}" ,""                        ,2,0
+"tld1 probe1" ,"rsm.dns.nsid[b.ns.tld1,192.168.1.3]"           ,"DNS NSID of b.ns.tld1,192.168.1.3"            ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${dns-test-key}" ,""                        ,2,0
+"tld1 probe1" ,"rsm.dns.nssok"                                 ,"DNS number of working Name Servers"           ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,""                        ,1,0
+"tld1 probe1" ,"rsm.dns.protocol"                              ,"DNS transport protocol"                       ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"Transport protocol"      ,1,0
+"tld1 probe1" ,"rsm.dns.rtt[a.ns.tld1,192.168.1.1,tcp]"        ,"DNS NS RTT of a.ns.tld1,192.168.1.1 using tcp","enabled" ,"dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"RSM DNS rtt"             ,1,0
+"tld1 probe1" ,"rsm.dns.rtt[a.ns.tld1,192.168.1.1,udp]"        ,"DNS NS RTT of a.ns.tld1,192.168.1.1 using udp","enabled" ,"dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"RSM DNS rtt"             ,1,0
+"tld1 probe1" ,"rsm.dns.rtt[b.ns.tld1,192.168.1.2,tcp]"        ,"DNS NS RTT of b.ns.tld1,192.168.1.2 using tcp","enabled" ,"dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"RSM DNS rtt"             ,1,0
+"tld1 probe1" ,"rsm.dns.rtt[b.ns.tld1,192.168.1.2,udp]"        ,"DNS NS RTT of b.ns.tld1,192.168.1.2 using udp","enabled" ,"dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"RSM DNS rtt"             ,1,0
+"tld1 probe1" ,"rsm.dns.rtt[b.ns.tld1,192.168.1.3,tcp]"        ,"DNS NS RTT of b.ns.tld1,192.168.1.3 using tcp","enabled" ,"dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"RSM DNS rtt"             ,1,0
+"tld1 probe1" ,"rsm.dns.rtt[b.ns.tld1,192.168.1.3,udp]"        ,"DNS NS RTT of b.ns.tld1,192.168.1.3 using udp","enabled" ,"dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"RSM DNS rtt"             ,1,0
+"tld1 probe1" ,"rsm.dns.status"                                ,"DNS status"                                   ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"Service state"           ,1,0
+"tld1 probe1" ,"rsm.dns.testedname"                            ,"DNS tested name"                              ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${dns-test-key}" ,""                        ,1,0
+"tld1 probe1" ,"rsm.dnssec.status"                             ,"DNSSEC status"                                ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"Service state"           ,1,0
+"tld1 probe1" ,"${dns-test-key}"                               ,"DNS Test"                                     ,"enabled" ,"simple"    ,"text"  ,"{$RSM.DNS.DELAY}" ,"0"  ,"0"   ,""        ,""                          ,""                ,""                        ,0,0
+"tld1 probe1" ,"rsm.rdds.43.ip"                                ,"RDDS43 IP"                                    ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdds-test-key}",""                        ,1,0
+"tld1 probe1" ,"rsm.rdds.43.rtt"                               ,"RDDS43 RTT"                                   ,"enabled" ,"dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${rdds-test-key}","RSM RDDS rtt"            ,1,0
+"tld1 probe1" ,"rsm.rdds.43.status"                            ,"RDDS43 status"                                ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${rdds-test-key}","Service state"           ,1,0
+"tld1 probe1" ,"rsm.rdds.43.target"                            ,"RDDS43 target"                                ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdds-test-key}",""                        ,1,0
+"tld1 probe1" ,"rsm.rdds.43.testedname"                        ,"RDDS43 tested name"                           ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdds-test-key}",""                        ,1,0
+"tld1 probe1" ,"rsm.rdds.80.ip"                                ,"RDDS80 IP"                                    ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdds-test-key}",""                        ,1,0
+"tld1 probe1" ,"rsm.rdds.80.rtt"                               ,"RDDS80 RTT"                                   ,"enabled" ,"dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${rdds-test-key}","RSM RDDS rtt"            ,1,0
+"tld1 probe1" ,"rsm.rdds.80.status"                            ,"RDDS80 status"                                ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${rdds-test-key}","Service state"           ,1,0
+"tld1 probe1" ,"rsm.rdds.80.target"                            ,"RDDS80 target"                                ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdds-test-key}",""                        ,1,0
+"tld1 probe1" ,"rsm.rdds.status"                               ,"RDDS status"                                  ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${rdds-test-key}","Service state"           ,1,0
+"tld1 probe1" ,"${rdds-test-key}"                              ,"RDDS Test"                                    ,"enabled" ,"simple"    ,"text"  ,"{$RSM.RDDS.DELAY}","0"  ,"0"   ,""        ,""                          ,""                ,""                        ,0,0
+
+"tld1 probe2" ,"rdap.ip"                                       ,"RDAP IP"                                      ,"disabled","dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdap-test-key}",""                        ,1,0
+"tld1 probe2" ,"rdap.rtt"                                      ,"RDAP RTT"                                     ,"disabled","dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${rdap-test-key}","RSM RDAP rtt"            ,1,0
+"tld1 probe2" ,"rdap.status"                                   ,"RDAP status"                                  ,"disabled","dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${rdap-test-key}","Service state"           ,1,0
+"tld1 probe2" ,"rdap.target"                                   ,"RDAP target"                                  ,"disabled","dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdap-test-key}",""                        ,1,0
+"tld1 probe2" ,"rdap.testedname"                               ,"RDAP tested name"                             ,"disabled","dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdap-test-key}",""                        ,1,0
+"tld1 probe2" ,"${rdap-test-key}"                              ,"RDAP Test"                                    ,"disabled","simple"    ,"text"  ,"{$RSM.RDAP.DELAY}","0"  ,"0"   ,""        ,""                          ,""                ,""                        ,0,0
+"tld1 probe2" ,"rsm.dns.mode"                                  ,"DNS Test mode"                                ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"DNS test mode"           ,1,0
+"tld1 probe2" ,"rsm.dns.ns.status[a.ns.tld1]"                  ,"DNS NS status of a.ns.tld1"                   ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"Service state"           ,1,0
+"tld1 probe2" ,"rsm.dns.ns.status[b.ns.tld1]"                  ,"DNS NS status of b.ns.tld1"                   ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"Service state"           ,1,0
+"tld1 probe2" ,"rsm.dns.nsid[a.ns.tld1,192.168.1.1]"           ,"DNS NSID of a.ns.tld1,192.168.1.1"            ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${dns-test-key}" ,""                        ,2,0
+"tld1 probe2" ,"rsm.dns.nsid[b.ns.tld1,192.168.1.2]"           ,"DNS NSID of b.ns.tld1,192.168.1.2"            ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${dns-test-key}" ,""                        ,2,0
+"tld1 probe2" ,"rsm.dns.nsid[b.ns.tld1,192.168.1.3]"           ,"DNS NSID of b.ns.tld1,192.168.1.3"            ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${dns-test-key}" ,""                        ,2,0
+"tld1 probe2" ,"rsm.dns.nssok"                                 ,"DNS number of working Name Servers"           ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,""                        ,1,0
+"tld1 probe2" ,"rsm.dns.protocol"                              ,"DNS transport protocol"                       ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"Transport protocol"      ,1,0
+"tld1 probe2" ,"rsm.dns.rtt[a.ns.tld1,192.168.1.1,tcp]"        ,"DNS NS RTT of a.ns.tld1,192.168.1.1 using tcp","enabled" ,"dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"RSM DNS rtt"             ,1,0
+"tld1 probe2" ,"rsm.dns.rtt[a.ns.tld1,192.168.1.1,udp]"        ,"DNS NS RTT of a.ns.tld1,192.168.1.1 using udp","enabled" ,"dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"RSM DNS rtt"             ,1,0
+"tld1 probe2" ,"rsm.dns.rtt[b.ns.tld1,192.168.1.2,tcp]"        ,"DNS NS RTT of b.ns.tld1,192.168.1.2 using tcp","enabled" ,"dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"RSM DNS rtt"             ,1,0
+"tld1 probe2" ,"rsm.dns.rtt[b.ns.tld1,192.168.1.2,udp]"        ,"DNS NS RTT of b.ns.tld1,192.168.1.2 using udp","enabled" ,"dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"RSM DNS rtt"             ,1,0
+"tld1 probe2" ,"rsm.dns.rtt[b.ns.tld1,192.168.1.3,tcp]"        ,"DNS NS RTT of b.ns.tld1,192.168.1.3 using tcp","enabled" ,"dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"RSM DNS rtt"             ,1,0
+"tld1 probe2" ,"rsm.dns.rtt[b.ns.tld1,192.168.1.3,udp]"        ,"DNS NS RTT of b.ns.tld1,192.168.1.3 using udp","enabled" ,"dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"RSM DNS rtt"             ,1,0
+"tld1 probe2" ,"rsm.dns.status"                                ,"DNS status"                                   ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"Service state"           ,1,0
+"tld1 probe2" ,"rsm.dns.testedname"                            ,"DNS tested name"                              ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${dns-test-key}" ,""                        ,1,0
+"tld1 probe2" ,"rsm.dnssec.status"                             ,"DNSSEC status"                                ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"Service state"           ,1,0
+"tld1 probe2" ,"${dns-test-key}"                               ,"DNS Test"                                     ,"enabled" ,"simple"    ,"text"  ,"{$RSM.DNS.DELAY}" ,"0"  ,"0"   ,""        ,""                          ,""                ,""                        ,0,0
+"tld1 probe2" ,"rsm.rdds.43.ip"                                ,"RDDS43 IP"                                    ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdds-test-key}",""                        ,1,0
+"tld1 probe2" ,"rsm.rdds.43.rtt"                               ,"RDDS43 RTT"                                   ,"enabled" ,"dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${rdds-test-key}","RSM RDDS rtt"            ,1,0
+"tld1 probe2" ,"rsm.rdds.43.status"                            ,"RDDS43 status"                                ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${rdds-test-key}","Service state"           ,1,0
+"tld1 probe2" ,"rsm.rdds.43.target"                            ,"RDDS43 target"                                ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdds-test-key}",""                        ,1,0
+"tld1 probe2" ,"rsm.rdds.43.testedname"                        ,"RDDS43 tested name"                           ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdds-test-key}",""                        ,1,0
+"tld1 probe2" ,"rsm.rdds.80.ip"                                ,"RDDS80 IP"                                    ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdds-test-key}",""                        ,1,0
+"tld1 probe2" ,"rsm.rdds.80.rtt"                               ,"RDDS80 RTT"                                   ,"enabled" ,"dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${rdds-test-key}","RSM RDDS rtt"            ,1,0
+"tld1 probe2" ,"rsm.rdds.80.status"                            ,"RDDS80 status"                                ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${rdds-test-key}","Service state"           ,1,0
+"tld1 probe2" ,"rsm.rdds.80.target"                            ,"RDDS80 target"                                ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdds-test-key}",""                        ,1,0
+"tld1 probe2" ,"rsm.rdds.status"                               ,"RDDS status"                                  ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${rdds-test-key}","Service state"           ,1,0
+"tld1 probe2" ,"${rdds-test-key}"                              ,"RDDS Test"                                    ,"enabled" ,"simple"    ,"text"  ,"{$RSM.RDDS.DELAY}","0"  ,"0"   ,""        ,""                          ,""                ,""                        ,0,0
+
+"tld2"        ,"dns.tcp.enabled"                               ,"DNS TCP enabled/disabled"                     ,"enabled" ,"calculated","uint64","1m"               ,"90d","365d",""        ,"{$RSM.TLD.DNS.TCP.ENABLED}",""                ,""                        ,0,0
+"tld2"        ,"dns.udp.enabled"                               ,"DNS UDP enabled/disabled"                     ,"enabled" ,"calculated","uint64","1m"               ,"90d","365d",""        ,"{$RSM.TLD.DNS.UDP.ENABLED}",""                ,""                        ,0,0
+"tld2"        ,"dnssec.enabled"                                ,"DNSSEC enabled/disabled"                      ,"enabled" ,"calculated","uint64","1m"               ,"90d","365d",""        ,"{$RSM.TLD.DNSSEC.ENABLED}" ,""                ,""                        ,0,0
+"tld2"        ,"rdap.enabled"                                  ,"RDAP enabled/disabled"                        ,"enabled" ,"calculated","uint64","1m"               ,"90d","365d",""        ,"{$RDAP.TLD.ENABLED}"       ,""                ,""                        ,0,0
+"tld2"        ,"rdds43.enabled"                                ,"RDDS43 enabled/disabled"                      ,"enabled" ,"calculated","uint64","1m"               ,"90d","365d",""        ,"{$RSM.TLD.RDDS43.ENABLED}" ,""                ,""                        ,0,0
+"tld2"        ,"rdds80.enabled"                                ,"RDDS80 enabled/disabled"                      ,"enabled" ,"calculated","uint64","1m"               ,"90d","365d",""        ,"{$RSM.TLD.RDDS80.ENABLED}" ,""                ,""                        ,0,0
+"tld2"        ,"rsm.slv.dns.avail"                             ,"DNS availability"                             ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,"RSM Service Availability",0,1
+"tld2"        ,"rsm.slv.dns.downtime"                          ,"DNS minutes of downtime"                      ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,""                        ,0,1
+"tld2"        ,"rsm.slv.dns.ns.avail[a.ns.tld2,192.168.2.1]"   ,"DNS NS $1 ($2) availability"                  ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,"RSM Service Availability",0,0
+"tld2"        ,"rsm.slv.dns.ns.avail[b.ns.tld2,192.168.2.2]"   ,"DNS NS $1 ($2) availability"                  ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,"RSM Service Availability",0,0
+"tld2"        ,"rsm.slv.dns.ns.avail[b.ns.tld2,192.168.2.3]"   ,"DNS NS $1 ($2) availability"                  ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,"RSM Service Availability",0,0
+"tld2"        ,"rsm.slv.dns.ns.downtime[a.ns.tld2,192.168.2.1]","DNS minutes of $1 ($2) downtime"              ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,""                        ,0,5
+"tld2"        ,"rsm.slv.dns.ns.downtime[b.ns.tld2,192.168.2.2]","DNS minutes of $1 ($2) downtime"              ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,""                        ,0,5
+"tld2"        ,"rsm.slv.dns.ns.downtime[b.ns.tld2,192.168.2.3]","DNS minutes of $1 ($2) downtime"              ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,""                        ,0,5
+"tld2"        ,"rsm.slv.dns.rollweek"                          ,"DNS weekly unavailability"                    ,"enabled" ,"trapper"   ,"float" ,"0"                ,"90d","365d","%"       ,""                          ,""                ,""                        ,0,5
+"tld2"        ,"rsm.slv.dns.tcp.rtt.failed"                    ,"DNS Number of failed monthly TCP tests"       ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,""                        ,0,0
+"tld2"        ,"rsm.slv.dns.tcp.rtt.performed"                 ,"DNS Number of performed monthly TCP tests"    ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,""                        ,0,0
+"tld2"        ,"rsm.slv.dns.tcp.rtt.pfailed"                   ,"DNS Ratio of failed monthly TCP tests"        ,"enabled" ,"trapper"   ,"float" ,"0"                ,"90d","365d","%"       ,""                          ,""                ,""                        ,0,5
+"tld2"        ,"rsm.slv.dns.udp.rtt.failed"                    ,"DNS Number of failed monthly UDP tests"       ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,""                        ,0,0
+"tld2"        ,"rsm.slv.dns.udp.rtt.performed"                 ,"DNS Number of performed monthly UDP tests"    ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,""                        ,0,0
+"tld2"        ,"rsm.slv.dns.udp.rtt.pfailed"                   ,"DNS Ratio of failed monthly UDP tests"        ,"enabled" ,"trapper"   ,"float" ,"0"                ,"90d","365d","%"       ,""                          ,""                ,""                        ,0,5
+"tld2"        ,"rsm.slv.dnssec.avail"                          ,"DNSSEC availability"                          ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,"RSM Service Availability",0,1
+"tld2"        ,"rsm.slv.dnssec.rollweek"                       ,"DNSSEC weekly unavailability"                 ,"enabled" ,"trapper"   ,"float" ,"0"                ,"90d","365d","%"       ,""                          ,""                ,""                        ,0,5
+"tld2"        ,"rsm.slv.rdap.avail"                            ,"RDAP availability"                            ,"disabled","trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,"RSM Service Availability",0,1
+"tld2"        ,"rsm.slv.rdap.downtime"                         ,"RDAP minutes of downtime"                     ,"disabled","trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,""                        ,0,5
+"tld2"        ,"rsm.slv.rdap.rollweek"                         ,"RDAP weekly unavailability"                   ,"disabled","trapper"   ,"float" ,"0"                ,"90d","365d","%"       ,""                          ,""                ,""                        ,0,5
+"tld2"        ,"rsm.slv.rdap.rtt.failed"                       ,"RDAP Number of failed monthly queries"        ,"disabled","trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,""                        ,0,0
+"tld2"        ,"rsm.slv.rdap.rtt.performed"                    ,"RDAP Number of performed monthly queries"     ,"disabled","trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,""                        ,0,0
+"tld2"        ,"rsm.slv.rdap.rtt.pfailed"                      ,"RDAP Ratio of failed monthly queries"         ,"disabled","trapper"   ,"float" ,"0"                ,"90d","365d","%"       ,""                          ,""                ,""                        ,0,5
+"tld2"        ,"rsm.slv.rdds.avail"                            ,"RDDS availability"                            ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,"RSM Service Availability",0,1
+"tld2"        ,"rsm.slv.rdds.downtime"                         ,"RDDS minutes of downtime"                     ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,""                        ,0,5
+"tld2"        ,"rsm.slv.rdds.rollweek"                         ,"RDDS weekly unavailability"                   ,"enabled" ,"trapper"   ,"float" ,"0"                ,"90d","365d","%"       ,""                          ,""                ,""                        ,0,5
+"tld2"        ,"rsm.slv.rdds.rtt.failed"                       ,"RDDS Number of failed monthly queries"        ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,""                        ,0,0
+"tld2"        ,"rsm.slv.rdds.rtt.performed"                    ,"RDDS Number of performed monthly queries"     ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,""                        ,0,0
+"tld2"        ,"rsm.slv.rdds.rtt.pfailed"                      ,"RDDS Ratio of failed monthly queries"         ,"enabled" ,"trapper"   ,"float" ,"0"                ,"90d","365d","%"       ,""                          ,""                ,""                        ,0,5
+
+"tld2 probe1" ,"rdap.ip"                                       ,"RDAP IP"                                      ,"disabled","dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdap-test-key}",""                        ,1,0
+"tld2 probe1" ,"rdap.rtt"                                      ,"RDAP RTT"                                     ,"disabled","dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${rdap-test-key}","RSM RDAP rtt"            ,1,0
+"tld2 probe1" ,"rdap.status"                                   ,"RDAP status"                                  ,"disabled","dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${rdap-test-key}","Service state"           ,1,0
+"tld2 probe1" ,"rdap.target"                                   ,"RDAP target"                                  ,"disabled","dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdap-test-key}",""                        ,1,0
+"tld2 probe1" ,"rdap.testedname"                               ,"RDAP tested name"                             ,"disabled","dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdap-test-key}",""                        ,1,0
+"tld2 probe1" ,"${rdap-test-key}"                              ,"RDAP Test"                                    ,"disabled","simple"    ,"text"  ,"{$RSM.RDAP.DELAY}","0"  ,"0"   ,""        ,""                          ,""                ,""                        ,0,0
+"tld2 probe1" ,"rsm.dns.mode"                                  ,"DNS Test mode"                                ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"DNS test mode"           ,1,0
+"tld2 probe1" ,"rsm.dns.ns.status[a.ns.tld2]"                  ,"DNS NS status of a.ns.tld2"                   ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"Service state"           ,1,0
+"tld2 probe1" ,"rsm.dns.ns.status[b.ns.tld2]"                  ,"DNS NS status of b.ns.tld2"                   ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"Service state"           ,1,0
+"tld2 probe1" ,"rsm.dns.nsid[a.ns.tld2,192.168.2.1]"           ,"DNS NSID of a.ns.tld2,192.168.2.1"            ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${dns-test-key}" ,""                        ,2,0
+"tld2 probe1" ,"rsm.dns.nsid[b.ns.tld2,192.168.2.2]"           ,"DNS NSID of b.ns.tld2,192.168.2.2"            ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${dns-test-key}" ,""                        ,2,0
+"tld2 probe1" ,"rsm.dns.nsid[b.ns.tld2,192.168.2.3]"           ,"DNS NSID of b.ns.tld2,192.168.2.3"            ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${dns-test-key}" ,""                        ,2,0
+"tld2 probe1" ,"rsm.dns.nssok"                                 ,"DNS number of working Name Servers"           ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,""                        ,1,0
+"tld2 probe1" ,"rsm.dns.protocol"                              ,"DNS transport protocol"                       ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"Transport protocol"      ,1,0
+"tld2 probe1" ,"rsm.dns.rtt[a.ns.tld2,192.168.2.1,tcp]"        ,"DNS NS RTT of a.ns.tld2,192.168.2.1 using tcp","enabled" ,"dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"RSM DNS rtt"             ,1,0
+"tld2 probe1" ,"rsm.dns.rtt[a.ns.tld2,192.168.2.1,udp]"        ,"DNS NS RTT of a.ns.tld2,192.168.2.1 using udp","enabled" ,"dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"RSM DNS rtt"             ,1,0
+"tld2 probe1" ,"rsm.dns.rtt[b.ns.tld2,192.168.2.2,tcp]"        ,"DNS NS RTT of b.ns.tld2,192.168.2.2 using tcp","enabled" ,"dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"RSM DNS rtt"             ,1,0
+"tld2 probe1" ,"rsm.dns.rtt[b.ns.tld2,192.168.2.2,udp]"        ,"DNS NS RTT of b.ns.tld2,192.168.2.2 using udp","enabled" ,"dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"RSM DNS rtt"             ,1,0
+"tld2 probe1" ,"rsm.dns.rtt[b.ns.tld2,192.168.2.3,tcp]"        ,"DNS NS RTT of b.ns.tld2,192.168.2.3 using tcp","enabled" ,"dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"RSM DNS rtt"             ,1,0
+"tld2 probe1" ,"rsm.dns.rtt[b.ns.tld2,192.168.2.3,udp]"        ,"DNS NS RTT of b.ns.tld2,192.168.2.3 using udp","enabled" ,"dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"RSM DNS rtt"             ,1,0
+"tld2 probe1" ,"rsm.dns.status"                                ,"DNS status"                                   ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"Service state"           ,1,0
+"tld2 probe1" ,"rsm.dns.testedname"                            ,"DNS tested name"                              ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${dns-test-key}" ,""                        ,1,0
+"tld2 probe1" ,"rsm.dnssec.status"                             ,"DNSSEC status"                                ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"Service state"           ,1,0
+"tld2 probe1" ,"${dns-test-key}"                               ,"DNS Test"                                     ,"enabled" ,"simple"    ,"text"  ,"{$RSM.DNS.DELAY}" ,"0"  ,"0"   ,""        ,""                          ,""                ,""                        ,0,0
+"tld2 probe1" ,"rsm.rdds.43.ip"                                ,"RDDS43 IP"                                    ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdds-test-key}",""                        ,1,0
+"tld2 probe1" ,"rsm.rdds.43.rtt"                               ,"RDDS43 RTT"                                   ,"enabled" ,"dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${rdds-test-key}","RSM RDDS rtt"            ,1,0
+"tld2 probe1" ,"rsm.rdds.43.status"                            ,"RDDS43 status"                                ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${rdds-test-key}","Service state"           ,1,0
+"tld2 probe1" ,"rsm.rdds.43.target"                            ,"RDDS43 target"                                ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdds-test-key}",""                        ,1,0
+"tld2 probe1" ,"rsm.rdds.43.testedname"                        ,"RDDS43 tested name"                           ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdds-test-key}",""                        ,1,0
+"tld2 probe1" ,"rsm.rdds.80.ip"                                ,"RDDS80 IP"                                    ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdds-test-key}",""                        ,1,0
+"tld2 probe1" ,"rsm.rdds.80.rtt"                               ,"RDDS80 RTT"                                   ,"enabled" ,"dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${rdds-test-key}","RSM RDDS rtt"            ,1,0
+"tld2 probe1" ,"rsm.rdds.80.status"                            ,"RDDS80 status"                                ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${rdds-test-key}","Service state"           ,1,0
+"tld2 probe1" ,"rsm.rdds.80.target"                            ,"RDDS80 target"                                ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdds-test-key}",""                        ,1,0
+"tld2 probe1" ,"rsm.rdds.status"                               ,"RDDS status"                                  ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${rdds-test-key}","Service state"           ,1,0
+"tld2 probe1" ,"${rdds-test-key}"                              ,"RDDS Test"                                    ,"enabled" ,"simple"    ,"text"  ,"{$RSM.RDDS.DELAY}","0"  ,"0"   ,""        ,""                          ,""                ,""                        ,0,0
+
+"tld2 probe2" ,"rdap.ip"                                       ,"RDAP IP"                                      ,"disabled","dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdap-test-key}",""                        ,1,0
+"tld2 probe2" ,"rdap.rtt"                                      ,"RDAP RTT"                                     ,"disabled","dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${rdap-test-key}","RSM RDAP rtt"            ,1,0
+"tld2 probe2" ,"rdap.status"                                   ,"RDAP status"                                  ,"disabled","dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${rdap-test-key}","Service state"           ,1,0
+"tld2 probe2" ,"rdap.target"                                   ,"RDAP target"                                  ,"disabled","dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdap-test-key}",""                        ,1,0
+"tld2 probe2" ,"rdap.testedname"                               ,"RDAP tested name"                             ,"disabled","dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdap-test-key}",""                        ,1,0
+"tld2 probe2" ,"${rdap-test-key}"                              ,"RDAP Test"                                    ,"disabled","simple"    ,"text"  ,"{$RSM.RDAP.DELAY}","0"  ,"0"   ,""        ,""                          ,""                ,""                        ,0,0
+"tld2 probe2" ,"rsm.dns.mode"                                  ,"DNS Test mode"                                ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"DNS test mode"           ,1,0
+"tld2 probe2" ,"rsm.dns.ns.status[a.ns.tld2]"                  ,"DNS NS status of a.ns.tld2"                   ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"Service state"           ,1,0
+"tld2 probe2" ,"rsm.dns.ns.status[b.ns.tld2]"                  ,"DNS NS status of b.ns.tld2"                   ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"Service state"           ,1,0
+"tld2 probe2" ,"rsm.dns.nsid[a.ns.tld2,192.168.2.1]"           ,"DNS NSID of a.ns.tld2,192.168.2.1"            ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${dns-test-key}" ,""                        ,2,0
+"tld2 probe2" ,"rsm.dns.nsid[b.ns.tld2,192.168.2.2]"           ,"DNS NSID of b.ns.tld2,192.168.2.2"            ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${dns-test-key}" ,""                        ,2,0
+"tld2 probe2" ,"rsm.dns.nsid[b.ns.tld2,192.168.2.3]"           ,"DNS NSID of b.ns.tld2,192.168.2.3"            ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${dns-test-key}" ,""                        ,2,0
+"tld2 probe2" ,"rsm.dns.nssok"                                 ,"DNS number of working Name Servers"           ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,""                        ,1,0
+"tld2 probe2" ,"rsm.dns.protocol"                              ,"DNS transport protocol"                       ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"Transport protocol"      ,1,0
+"tld2 probe2" ,"rsm.dns.rtt[a.ns.tld2,192.168.2.1,tcp]"        ,"DNS NS RTT of a.ns.tld2,192.168.2.1 using tcp","enabled" ,"dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"RSM DNS rtt"             ,1,0
+"tld2 probe2" ,"rsm.dns.rtt[a.ns.tld2,192.168.2.1,udp]"        ,"DNS NS RTT of a.ns.tld2,192.168.2.1 using udp","enabled" ,"dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"RSM DNS rtt"             ,1,0
+"tld2 probe2" ,"rsm.dns.rtt[b.ns.tld2,192.168.2.2,tcp]"        ,"DNS NS RTT of b.ns.tld2,192.168.2.2 using tcp","enabled" ,"dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"RSM DNS rtt"             ,1,0
+"tld2 probe2" ,"rsm.dns.rtt[b.ns.tld2,192.168.2.2,udp]"        ,"DNS NS RTT of b.ns.tld2,192.168.2.2 using udp","enabled" ,"dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"RSM DNS rtt"             ,1,0
+"tld2 probe2" ,"rsm.dns.rtt[b.ns.tld2,192.168.2.3,tcp]"        ,"DNS NS RTT of b.ns.tld2,192.168.2.3 using tcp","enabled" ,"dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"RSM DNS rtt"             ,1,0
+"tld2 probe2" ,"rsm.dns.rtt[b.ns.tld2,192.168.2.3,udp]"        ,"DNS NS RTT of b.ns.tld2,192.168.2.3 using udp","enabled" ,"dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"RSM DNS rtt"             ,1,0
+"tld2 probe2" ,"rsm.dns.status"                                ,"DNS status"                                   ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"Service state"           ,1,0
+"tld2 probe2" ,"rsm.dns.testedname"                            ,"DNS tested name"                              ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${dns-test-key}" ,""                        ,1,0
+"tld2 probe2" ,"rsm.dnssec.status"                             ,"DNSSEC status"                                ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${dns-test-key}" ,"Service state"           ,1,0
+"tld2 probe2" ,"${dns-test-key}"                               ,"DNS Test"                                     ,"enabled" ,"simple"    ,"text"  ,"{$RSM.DNS.DELAY}" ,"0"  ,"0"   ,""        ,""                          ,""                ,""                        ,0,0
+"tld2 probe2" ,"rsm.rdds.43.ip"                                ,"RDDS43 IP"                                    ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdds-test-key}",""                        ,1,0
+"tld2 probe2" ,"rsm.rdds.43.rtt"                               ,"RDDS43 RTT"                                   ,"enabled" ,"dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${rdds-test-key}","RSM RDDS rtt"            ,1,0
+"tld2 probe2" ,"rsm.rdds.43.status"                            ,"RDDS43 status"                                ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${rdds-test-key}","Service state"           ,1,0
+"tld2 probe2" ,"rsm.rdds.43.target"                            ,"RDDS43 target"                                ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdds-test-key}",""                        ,1,0
+"tld2 probe2" ,"rsm.rdds.43.testedname"                        ,"RDDS43 tested name"                           ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdds-test-key}",""                        ,1,0
+"tld2 probe2" ,"rsm.rdds.80.ip"                                ,"RDDS80 IP"                                    ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdds-test-key}",""                        ,1,0
+"tld2 probe2" ,"rsm.rdds.80.rtt"                               ,"RDDS80 RTT"                                   ,"enabled" ,"dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${rdds-test-key}","RSM RDDS rtt"            ,1,0
+"tld2 probe2" ,"rsm.rdds.80.status"                            ,"RDDS80 status"                                ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${rdds-test-key}","Service state"           ,1,0
+"tld2 probe2" ,"rsm.rdds.80.target"                            ,"RDDS80 target"                                ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdds-test-key}",""                        ,1,0
+"tld2 probe2" ,"rsm.rdds.status"                               ,"RDDS status"                                  ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${rdds-test-key}","Service state"           ,1,0
+"tld2 probe2" ,"${rdds-test-key}"                              ,"RDDS Test"                                    ,"enabled" ,"simple"    ,"text"  ,"{$RSM.RDDS.DELAY}","0"  ,"0"   ,""        ,""                          ,""                ,""                        ,0,0
+
+[check-preproc]
+
+"probe1"     ,"rsm.errors"                            ,1,"delta-speed"         ,""                                                                                                       ,"default"      ,""
+"probe2"     ,"rsm.errors"                            ,1,"delta-speed"         ,""                                                                                                       ,"default"      ,""
+
+"tld1 probe1","rdap.ip"                               ,1,"jsonpath"            ,"$.ip"                                                                                                   ,"discard-value",""
+"tld1 probe1","rdap.rtt"                              ,1,"jsonpath"            ,"$.rtt"                                                                                                  ,"default"      ,""
+"tld1 probe1","rdap.status"                           ,1,"jsonpath"            ,"$.status"                                                                                               ,"default"      ,""
+"tld1 probe1","rdap.target"                           ,1,"jsonpath"            ,"$.target"                                                                                               ,"discard-value",""
+"tld1 probe1","rdap.testedname"                       ,1,"jsonpath"            ,"$.testedname"                                                                                           ,"discard-value",""
+"tld1 probe1","rsm.dns.mode"                          ,1,"jsonpath"            ,"$.mode"                                                                                                 ,"default"      ,""
+"tld1 probe1","rsm.dns.ns.status[a.ns.tld1]"          ,1,"jsonpath"            ,"$.nss[?(@.['ns'] == 'a.ns.tld1')].status.first()"                                                       ,"discard-value",""
+"tld1 probe1","rsm.dns.ns.status[b.ns.tld1]"          ,1,"jsonpath"            ,"$.nss[?(@.['ns'] == 'b.ns.tld1')].status.first()"                                                       ,"discard-value",""
+"tld1 probe1","rsm.dns.nsid[a.ns.tld1,192.168.1.1]"   ,1,"jsonpath"            ,"$.nsips[?(@.['ns'] == 'a.ns.tld1' && @.['ip'] == '192.168.1.1')].nsid.first()"                          ,"discard-value",""
+"tld1 probe1","rsm.dns.nsid[a.ns.tld1,192.168.1.1]"   ,2,"throttle-timed-value","3600"                                                                                                   ,"default"      ,""
+"tld1 probe1","rsm.dns.nsid[b.ns.tld1,192.168.1.2]"   ,1,"jsonpath"            ,"$.nsips[?(@.['ns'] == 'b.ns.tld1' && @.['ip'] == '192.168.1.2')].nsid.first()"                          ,"discard-value",""
+"tld1 probe1","rsm.dns.nsid[b.ns.tld1,192.168.1.2]"   ,2,"throttle-timed-value","3600"                                                                                                   ,"default"      ,""
+"tld1 probe1","rsm.dns.nsid[b.ns.tld1,192.168.1.3]"   ,1,"jsonpath"            ,"$.nsips[?(@.['ns'] == 'b.ns.tld1' && @.['ip'] == '192.168.1.3')].nsid.first()"                          ,"discard-value",""
+"tld1 probe1","rsm.dns.nsid[b.ns.tld1,192.168.1.3]"   ,2,"throttle-timed-value","3600"                                                                                                   ,"default"      ,""
+"tld1 probe1","rsm.dns.nssok"                         ,1,"jsonpath"            ,"$.nssok"                                                                                                ,"default"      ,""
+"tld1 probe1","rsm.dns.protocol"                      ,1,"jsonpath"            ,"$.protocol"                                                                                             ,"default"      ,""
+"tld1 probe1","rsm.dns.rtt[a.ns.tld1,192.168.1.1,tcp]",1,"jsonpath"            ,"$.nsips[?(@.['ns'] == 'a.ns.tld1' && @.['ip'] == '192.168.1.1' && @.['protocol'] == 'tcp')].rtt.first()","discard-value",""
+"tld1 probe1","rsm.dns.rtt[a.ns.tld1,192.168.1.1,udp]",1,"jsonpath"            ,"$.nsips[?(@.['ns'] == 'a.ns.tld1' && @.['ip'] == '192.168.1.1' && @.['protocol'] == 'udp')].rtt.first()","discard-value",""
+"tld1 probe1","rsm.dns.rtt[b.ns.tld1,192.168.1.2,tcp]",1,"jsonpath"            ,"$.nsips[?(@.['ns'] == 'b.ns.tld1' && @.['ip'] == '192.168.1.2' && @.['protocol'] == 'tcp')].rtt.first()","discard-value",""
+"tld1 probe1","rsm.dns.rtt[b.ns.tld1,192.168.1.2,udp]",1,"jsonpath"            ,"$.nsips[?(@.['ns'] == 'b.ns.tld1' && @.['ip'] == '192.168.1.2' && @.['protocol'] == 'udp')].rtt.first()","discard-value",""
+"tld1 probe1","rsm.dns.rtt[b.ns.tld1,192.168.1.3,tcp]",1,"jsonpath"            ,"$.nsips[?(@.['ns'] == 'b.ns.tld1' && @.['ip'] == '192.168.1.3' && @.['protocol'] == 'tcp')].rtt.first()","discard-value",""
+"tld1 probe1","rsm.dns.rtt[b.ns.tld1,192.168.1.3,udp]",1,"jsonpath"            ,"$.nsips[?(@.['ns'] == 'b.ns.tld1' && @.['ip'] == '192.168.1.3' && @.['protocol'] == 'udp')].rtt.first()","discard-value",""
+"tld1 probe1","rsm.dns.status"                        ,1,"jsonpath"            ,"$.status"                                                                                               ,"default"      ,""
+"tld1 probe1","rsm.dns.testedname"                    ,1,"jsonpath"            ,"$.testedname"                                                                                           ,"default"      ,""
+"tld1 probe1","rsm.dnssec.status"                     ,1,"jsonpath"            ,"$.dnssecstatus"                                                                                         ,"discard-value",""
+"tld1 probe1","rsm.rdds.43.ip"                        ,1,"jsonpath"            ,"$.rdds43.ip"                                                                                            ,"discard-value",""
+"tld1 probe1","rsm.rdds.43.rtt"                       ,1,"jsonpath"            ,"$.rdds43.rtt"                                                                                           ,"default"      ,""
+"tld1 probe1","rsm.rdds.43.status"                    ,1,"jsonpath"            ,"$.rdds43.status"                                                                                        ,"default"      ,""
+"tld1 probe1","rsm.rdds.43.target"                    ,1,"jsonpath"            ,"$.rdds43.target"                                                                                        ,"discard-value",""
+"tld1 probe1","rsm.rdds.43.testedname"                ,1,"jsonpath"            ,"$.rdds43.testedname"                                                                                    ,"discard-value",""
+"tld1 probe1","rsm.rdds.80.ip"                        ,1,"jsonpath"            ,"$.rdds80.ip"                                                                                            ,"discard-value",""
+"tld1 probe1","rsm.rdds.80.rtt"                       ,1,"jsonpath"            ,"$.rdds80.rtt"                                                                                           ,"default"      ,""
+"tld1 probe1","rsm.rdds.80.status"                    ,1,"jsonpath"            ,"$.rdds80.status"                                                                                        ,"default"      ,""
+"tld1 probe1","rsm.rdds.80.target"                    ,1,"jsonpath"            ,"$.rdds80.target"                                                                                        ,"discard-value",""
+"tld1 probe1","rsm.rdds.status"                       ,1,"jsonpath"            ,"$.status"                                                                                               ,"default"      ,""
+
+"tld1 probe2","rdap.ip"                               ,1,"jsonpath"            ,"$.ip"                                                                                                   ,"discard-value",""
+"tld1 probe2","rdap.rtt"                              ,1,"jsonpath"            ,"$.rtt"                                                                                                  ,"default"      ,""
+"tld1 probe2","rdap.status"                           ,1,"jsonpath"            ,"$.status"                                                                                               ,"default"      ,""
+"tld1 probe2","rdap.target"                           ,1,"jsonpath"            ,"$.target"                                                                                               ,"discard-value",""
+"tld1 probe2","rdap.testedname"                       ,1,"jsonpath"            ,"$.testedname"                                                                                           ,"discard-value",""
+"tld1 probe2","rsm.dns.mode"                          ,1,"jsonpath"            ,"$.mode"                                                                                                 ,"default"      ,""
+"tld1 probe2","rsm.dns.ns.status[a.ns.tld1]"          ,1,"jsonpath"            ,"$.nss[?(@.['ns'] == 'a.ns.tld1')].status.first()"                                                       ,"discard-value",""
+"tld1 probe2","rsm.dns.ns.status[b.ns.tld1]"          ,1,"jsonpath"            ,"$.nss[?(@.['ns'] == 'b.ns.tld1')].status.first()"                                                       ,"discard-value",""
+"tld1 probe2","rsm.dns.nsid[a.ns.tld1,192.168.1.1]"   ,1,"jsonpath"            ,"$.nsips[?(@.['ns'] == 'a.ns.tld1' && @.['ip'] == '192.168.1.1')].nsid.first()"                          ,"discard-value",""
+"tld1 probe2","rsm.dns.nsid[a.ns.tld1,192.168.1.1]"   ,2,"throttle-timed-value","3600"                                                                                                   ,"default"      ,""
+"tld1 probe2","rsm.dns.nsid[b.ns.tld1,192.168.1.2]"   ,1,"jsonpath"            ,"$.nsips[?(@.['ns'] == 'b.ns.tld1' && @.['ip'] == '192.168.1.2')].nsid.first()"                          ,"discard-value",""
+"tld1 probe2","rsm.dns.nsid[b.ns.tld1,192.168.1.2]"   ,2,"throttle-timed-value","3600"                                                                                                   ,"default"      ,""
+"tld1 probe2","rsm.dns.nsid[b.ns.tld1,192.168.1.3]"   ,1,"jsonpath"            ,"$.nsips[?(@.['ns'] == 'b.ns.tld1' && @.['ip'] == '192.168.1.3')].nsid.first()"                          ,"discard-value",""
+"tld1 probe2","rsm.dns.nsid[b.ns.tld1,192.168.1.3]"   ,2,"throttle-timed-value","3600"                                                                                                   ,"default"      ,""
+"tld1 probe2","rsm.dns.nssok"                         ,1,"jsonpath"            ,"$.nssok"                                                                                                ,"default"      ,""
+"tld1 probe2","rsm.dns.protocol"                      ,1,"jsonpath"            ,"$.protocol"                                                                                             ,"default"      ,""
+"tld1 probe2","rsm.dns.rtt[a.ns.tld1,192.168.1.1,tcp]",1,"jsonpath"            ,"$.nsips[?(@.['ns'] == 'a.ns.tld1' && @.['ip'] == '192.168.1.1' && @.['protocol'] == 'tcp')].rtt.first()","discard-value",""
+"tld1 probe2","rsm.dns.rtt[a.ns.tld1,192.168.1.1,udp]",1,"jsonpath"            ,"$.nsips[?(@.['ns'] == 'a.ns.tld1' && @.['ip'] == '192.168.1.1' && @.['protocol'] == 'udp')].rtt.first()","discard-value",""
+"tld1 probe2","rsm.dns.rtt[b.ns.tld1,192.168.1.2,tcp]",1,"jsonpath"            ,"$.nsips[?(@.['ns'] == 'b.ns.tld1' && @.['ip'] == '192.168.1.2' && @.['protocol'] == 'tcp')].rtt.first()","discard-value",""
+"tld1 probe2","rsm.dns.rtt[b.ns.tld1,192.168.1.2,udp]",1,"jsonpath"            ,"$.nsips[?(@.['ns'] == 'b.ns.tld1' && @.['ip'] == '192.168.1.2' && @.['protocol'] == 'udp')].rtt.first()","discard-value",""
+"tld1 probe2","rsm.dns.rtt[b.ns.tld1,192.168.1.3,tcp]",1,"jsonpath"            ,"$.nsips[?(@.['ns'] == 'b.ns.tld1' && @.['ip'] == '192.168.1.3' && @.['protocol'] == 'tcp')].rtt.first()","discard-value",""
+"tld1 probe2","rsm.dns.rtt[b.ns.tld1,192.168.1.3,udp]",1,"jsonpath"            ,"$.nsips[?(@.['ns'] == 'b.ns.tld1' && @.['ip'] == '192.168.1.3' && @.['protocol'] == 'udp')].rtt.first()","discard-value",""
+"tld1 probe2","rsm.dns.status"                        ,1,"jsonpath"            ,"$.status"                                                                                               ,"default"      ,""
+"tld1 probe2","rsm.dns.testedname"                    ,1,"jsonpath"            ,"$.testedname"                                                                                           ,"default"      ,""
+"tld1 probe2","rsm.dnssec.status"                     ,1,"jsonpath"            ,"$.dnssecstatus"                                                                                         ,"discard-value",""
+"tld1 probe2","rsm.rdds.43.ip"                        ,1,"jsonpath"            ,"$.rdds43.ip"                                                                                            ,"discard-value",""
+"tld1 probe2","rsm.rdds.43.rtt"                       ,1,"jsonpath"            ,"$.rdds43.rtt"                                                                                           ,"default"      ,""
+"tld1 probe2","rsm.rdds.43.status"                    ,1,"jsonpath"            ,"$.rdds43.status"                                                                                        ,"default"      ,""
+"tld1 probe2","rsm.rdds.43.target"                    ,1,"jsonpath"            ,"$.rdds43.target"                                                                                        ,"discard-value",""
+"tld1 probe2","rsm.rdds.43.testedname"                ,1,"jsonpath"            ,"$.rdds43.testedname"                                                                                    ,"discard-value",""
+"tld1 probe2","rsm.rdds.80.ip"                        ,1,"jsonpath"            ,"$.rdds80.ip"                                                                                            ,"discard-value",""
+"tld1 probe2","rsm.rdds.80.rtt"                       ,1,"jsonpath"            ,"$.rdds80.rtt"                                                                                           ,"default"      ,""
+"tld1 probe2","rsm.rdds.80.status"                    ,1,"jsonpath"            ,"$.rdds80.status"                                                                                        ,"default"      ,""
+"tld1 probe2","rsm.rdds.80.target"                    ,1,"jsonpath"            ,"$.rdds80.target"                                                                                        ,"discard-value",""
+"tld1 probe2","rsm.rdds.status"                       ,1,"jsonpath"            ,"$.status"                                                                                               ,"default"      ,""
+
+"tld2 probe1","rdap.ip"                               ,1,"jsonpath"            ,"$.ip"                                                                                                   ,"discard-value",""
+"tld2 probe1","rdap.rtt"                              ,1,"jsonpath"            ,"$.rtt"                                                                                                  ,"default"      ,""
+"tld2 probe1","rdap.status"                           ,1,"jsonpath"            ,"$.status"                                                                                               ,"default"      ,""
+"tld2 probe1","rdap.target"                           ,1,"jsonpath"            ,"$.target"                                                                                               ,"discard-value",""
+"tld2 probe1","rdap.testedname"                       ,1,"jsonpath"            ,"$.testedname"                                                                                           ,"discard-value",""
+"tld2 probe1","rsm.dns.mode"                          ,1,"jsonpath"            ,"$.mode"                                                                                                 ,"default"      ,""
+"tld2 probe1","rsm.dns.ns.status[a.ns.tld2]"          ,1,"jsonpath"            ,"$.nss[?(@.['ns'] == 'a.ns.tld2')].status.first()"                                                       ,"discard-value",""
+"tld2 probe1","rsm.dns.ns.status[b.ns.tld2]"          ,1,"jsonpath"            ,"$.nss[?(@.['ns'] == 'b.ns.tld2')].status.first()"                                                       ,"discard-value",""
+"tld2 probe1","rsm.dns.nsid[a.ns.tld2,192.168.2.1]"   ,1,"jsonpath"            ,"$.nsips[?(@.['ns'] == 'a.ns.tld2' && @.['ip'] == '192.168.2.1')].nsid.first()"                          ,"discard-value",""
+"tld2 probe1","rsm.dns.nsid[a.ns.tld2,192.168.2.1]"   ,2,"throttle-timed-value","3600"                                                                                                   ,"default"      ,""
+"tld2 probe1","rsm.dns.nsid[b.ns.tld2,192.168.2.2]"   ,1,"jsonpath"            ,"$.nsips[?(@.['ns'] == 'b.ns.tld2' && @.['ip'] == '192.168.2.2')].nsid.first()"                          ,"discard-value",""
+"tld2 probe1","rsm.dns.nsid[b.ns.tld2,192.168.2.2]"   ,2,"throttle-timed-value","3600"                                                                                                   ,"default"      ,""
+"tld2 probe1","rsm.dns.nsid[b.ns.tld2,192.168.2.3]"   ,1,"jsonpath"            ,"$.nsips[?(@.['ns'] == 'b.ns.tld2' && @.['ip'] == '192.168.2.3')].nsid.first()"                          ,"discard-value",""
+"tld2 probe1","rsm.dns.nsid[b.ns.tld2,192.168.2.3]"   ,2,"throttle-timed-value","3600"                                                                                                   ,"default"      ,""
+"tld2 probe1","rsm.dns.nssok"                         ,1,"jsonpath"            ,"$.nssok"                                                                                                ,"default"      ,""
+"tld2 probe1","rsm.dns.protocol"                      ,1,"jsonpath"            ,"$.protocol"                                                                                             ,"default"      ,""
+"tld2 probe1","rsm.dns.rtt[a.ns.tld2,192.168.2.1,tcp]",1,"jsonpath"            ,"$.nsips[?(@.['ns'] == 'a.ns.tld2' && @.['ip'] == '192.168.2.1' && @.['protocol'] == 'tcp')].rtt.first()","discard-value",""
+"tld2 probe1","rsm.dns.rtt[a.ns.tld2,192.168.2.1,udp]",1,"jsonpath"            ,"$.nsips[?(@.['ns'] == 'a.ns.tld2' && @.['ip'] == '192.168.2.1' && @.['protocol'] == 'udp')].rtt.first()","discard-value",""
+"tld2 probe1","rsm.dns.rtt[b.ns.tld2,192.168.2.2,tcp]",1,"jsonpath"            ,"$.nsips[?(@.['ns'] == 'b.ns.tld2' && @.['ip'] == '192.168.2.2' && @.['protocol'] == 'tcp')].rtt.first()","discard-value",""
+"tld2 probe1","rsm.dns.rtt[b.ns.tld2,192.168.2.2,udp]",1,"jsonpath"            ,"$.nsips[?(@.['ns'] == 'b.ns.tld2' && @.['ip'] == '192.168.2.2' && @.['protocol'] == 'udp')].rtt.first()","discard-value",""
+"tld2 probe1","rsm.dns.rtt[b.ns.tld2,192.168.2.3,tcp]",1,"jsonpath"            ,"$.nsips[?(@.['ns'] == 'b.ns.tld2' && @.['ip'] == '192.168.2.3' && @.['protocol'] == 'tcp')].rtt.first()","discard-value",""
+"tld2 probe1","rsm.dns.rtt[b.ns.tld2,192.168.2.3,udp]",1,"jsonpath"            ,"$.nsips[?(@.['ns'] == 'b.ns.tld2' && @.['ip'] == '192.168.2.3' && @.['protocol'] == 'udp')].rtt.first()","discard-value",""
+"tld2 probe1","rsm.dns.status"                        ,1,"jsonpath"            ,"$.status"                                                                                               ,"default"      ,""
+"tld2 probe1","rsm.dns.testedname"                    ,1,"jsonpath"            ,"$.testedname"                                                                                           ,"default"      ,""
+"tld2 probe1","rsm.dnssec.status"                     ,1,"jsonpath"            ,"$.dnssecstatus"                                                                                         ,"discard-value",""
+"tld2 probe1","rsm.rdds.43.ip"                        ,1,"jsonpath"            ,"$.rdds43.ip"                                                                                            ,"discard-value",""
+"tld2 probe1","rsm.rdds.43.rtt"                       ,1,"jsonpath"            ,"$.rdds43.rtt"                                                                                           ,"default"      ,""
+"tld2 probe1","rsm.rdds.43.status"                    ,1,"jsonpath"            ,"$.rdds43.status"                                                                                        ,"default"      ,""
+"tld2 probe1","rsm.rdds.43.target"                    ,1,"jsonpath"            ,"$.rdds43.target"                                                                                        ,"discard-value",""
+"tld2 probe1","rsm.rdds.43.testedname"                ,1,"jsonpath"            ,"$.rdds43.testedname"                                                                                    ,"discard-value",""
+"tld2 probe1","rsm.rdds.80.ip"                        ,1,"jsonpath"            ,"$.rdds80.ip"                                                                                            ,"discard-value",""
+"tld2 probe1","rsm.rdds.80.rtt"                       ,1,"jsonpath"            ,"$.rdds80.rtt"                                                                                           ,"default"      ,""
+"tld2 probe1","rsm.rdds.80.status"                    ,1,"jsonpath"            ,"$.rdds80.status"                                                                                        ,"default"      ,""
+"tld2 probe1","rsm.rdds.80.target"                    ,1,"jsonpath"            ,"$.rdds80.target"                                                                                        ,"discard-value",""
+"tld2 probe1","rsm.rdds.status"                       ,1,"jsonpath"            ,"$.status"                                                                                               ,"default"      ,""
+
+"tld2 probe2","rdap.ip"                               ,1,"jsonpath"            ,"$.ip"                                                                                                   ,"discard-value",""
+"tld2 probe2","rdap.rtt"                              ,1,"jsonpath"            ,"$.rtt"                                                                                                  ,"default"      ,""
+"tld2 probe2","rdap.status"                           ,1,"jsonpath"            ,"$.status"                                                                                               ,"default"      ,""
+"tld2 probe2","rdap.target"                           ,1,"jsonpath"            ,"$.target"                                                                                               ,"discard-value",""
+"tld2 probe2","rdap.testedname"                       ,1,"jsonpath"            ,"$.testedname"                                                                                           ,"discard-value",""
+"tld2 probe2","rsm.dns.mode"                          ,1,"jsonpath"            ,"$.mode"                                                                                                 ,"default"      ,""
+"tld2 probe2","rsm.dns.ns.status[a.ns.tld2]"          ,1,"jsonpath"            ,"$.nss[?(@.['ns'] == 'a.ns.tld2')].status.first()"                                                       ,"discard-value",""
+"tld2 probe2","rsm.dns.ns.status[b.ns.tld2]"          ,1,"jsonpath"            ,"$.nss[?(@.['ns'] == 'b.ns.tld2')].status.first()"                                                       ,"discard-value",""
+"tld2 probe2","rsm.dns.nsid[a.ns.tld2,192.168.2.1]"   ,1,"jsonpath"            ,"$.nsips[?(@.['ns'] == 'a.ns.tld2' && @.['ip'] == '192.168.2.1')].nsid.first()"                          ,"discard-value",""
+"tld2 probe2","rsm.dns.nsid[a.ns.tld2,192.168.2.1]"   ,2,"throttle-timed-value","3600"                                                                                                   ,"default"      ,""
+"tld2 probe2","rsm.dns.nsid[b.ns.tld2,192.168.2.2]"   ,1,"jsonpath"            ,"$.nsips[?(@.['ns'] == 'b.ns.tld2' && @.['ip'] == '192.168.2.2')].nsid.first()"                          ,"discard-value",""
+"tld2 probe2","rsm.dns.nsid[b.ns.tld2,192.168.2.2]"   ,2,"throttle-timed-value","3600"                                                                                                   ,"default"      ,""
+"tld2 probe2","rsm.dns.nsid[b.ns.tld2,192.168.2.3]"   ,1,"jsonpath"            ,"$.nsips[?(@.['ns'] == 'b.ns.tld2' && @.['ip'] == '192.168.2.3')].nsid.first()"                          ,"discard-value",""
+"tld2 probe2","rsm.dns.nsid[b.ns.tld2,192.168.2.3]"   ,2,"throttle-timed-value","3600"                                                                                                   ,"default"      ,""
+"tld2 probe2","rsm.dns.nssok"                         ,1,"jsonpath"            ,"$.nssok"                                                                                                ,"default"      ,""
+"tld2 probe2","rsm.dns.protocol"                      ,1,"jsonpath"            ,"$.protocol"                                                                                             ,"default"      ,""
+"tld2 probe2","rsm.dns.rtt[a.ns.tld2,192.168.2.1,tcp]",1,"jsonpath"            ,"$.nsips[?(@.['ns'] == 'a.ns.tld2' && @.['ip'] == '192.168.2.1' && @.['protocol'] == 'tcp')].rtt.first()","discard-value",""
+"tld2 probe2","rsm.dns.rtt[a.ns.tld2,192.168.2.1,udp]",1,"jsonpath"            ,"$.nsips[?(@.['ns'] == 'a.ns.tld2' && @.['ip'] == '192.168.2.1' && @.['protocol'] == 'udp')].rtt.first()","discard-value",""
+"tld2 probe2","rsm.dns.rtt[b.ns.tld2,192.168.2.2,tcp]",1,"jsonpath"            ,"$.nsips[?(@.['ns'] == 'b.ns.tld2' && @.['ip'] == '192.168.2.2' && @.['protocol'] == 'tcp')].rtt.first()","discard-value",""
+"tld2 probe2","rsm.dns.rtt[b.ns.tld2,192.168.2.2,udp]",1,"jsonpath"            ,"$.nsips[?(@.['ns'] == 'b.ns.tld2' && @.['ip'] == '192.168.2.2' && @.['protocol'] == 'udp')].rtt.first()","discard-value",""
+"tld2 probe2","rsm.dns.rtt[b.ns.tld2,192.168.2.3,tcp]",1,"jsonpath"            ,"$.nsips[?(@.['ns'] == 'b.ns.tld2' && @.['ip'] == '192.168.2.3' && @.['protocol'] == 'tcp')].rtt.first()","discard-value",""
+"tld2 probe2","rsm.dns.rtt[b.ns.tld2,192.168.2.3,udp]",1,"jsonpath"            ,"$.nsips[?(@.['ns'] == 'b.ns.tld2' && @.['ip'] == '192.168.2.3' && @.['protocol'] == 'udp')].rtt.first()","discard-value",""
+"tld2 probe2","rsm.dns.status"                        ,1,"jsonpath"            ,"$.status"                                                                                               ,"default"      ,""
+"tld2 probe2","rsm.dns.testedname"                    ,1,"jsonpath"            ,"$.testedname"                                                                                           ,"default"      ,""
+"tld2 probe2","rsm.dnssec.status"                     ,1,"jsonpath"            ,"$.dnssecstatus"                                                                                         ,"discard-value",""
+"tld2 probe2","rsm.rdds.43.ip"                        ,1,"jsonpath"            ,"$.rdds43.ip"                                                                                            ,"discard-value",""
+"tld2 probe2","rsm.rdds.43.rtt"                       ,1,"jsonpath"            ,"$.rdds43.rtt"                                                                                           ,"default"      ,""
+"tld2 probe2","rsm.rdds.43.status"                    ,1,"jsonpath"            ,"$.rdds43.status"                                                                                        ,"default"      ,""
+"tld2 probe2","rsm.rdds.43.target"                    ,1,"jsonpath"            ,"$.rdds43.target"                                                                                        ,"discard-value",""
+"tld2 probe2","rsm.rdds.43.testedname"                ,1,"jsonpath"            ,"$.rdds43.testedname"                                                                                    ,"discard-value",""
+"tld2 probe2","rsm.rdds.80.ip"                        ,1,"jsonpath"            ,"$.rdds80.ip"                                                                                            ,"discard-value",""
+"tld2 probe2","rsm.rdds.80.rtt"                       ,1,"jsonpath"            ,"$.rdds80.rtt"                                                                                           ,"default"      ,""
+"tld2 probe2","rsm.rdds.80.status"                    ,1,"jsonpath"            ,"$.rdds80.status"                                                                                        ,"default"      ,""
+"tld2 probe2","rsm.rdds.80.target"                    ,1,"jsonpath"            ,"$.rdds80.target"                                                                                        ,"discard-value",""
+"tld2 probe2","rsm.rdds.status"                       ,1,"jsonpath"            ,"$.status"                                                                                               ,"default"      ,""
+
+[check-trigger]
+
+"probe1","enabled","warning","Internal errors happening"                                                 ,"Internal errors happening for {$PROBE.INTERNAL.ERROR.INTERVAL}","{rsm.errors.last()}>0",""
+"probe1","enabled","high"   ,"Internal errors happening for {$PROBE.INTERNAL.ERROR.INTERVAL}"            ,""                                                              ,"{rsm.errors.min({$PROBE.INTERNAL.ERROR.INTERVAL})}>0",""
+"probe1","enabled","high"   ,"Probe {HOST.NAME} has been disabled by tests"                              ,""                                                              ,"{${probe-status-automatic-key}.last(0)}=0",""
+"probe1","enabled","average","Probe {HOST.NAME} has been disabled for more than {$RSM.PROBE.MAX.OFFLINE}",""                                                              ,"{rsm.probe.status[manual].max({$RSM.PROBE.MAX.OFFLINE})}=0",""
+"probe1","enabled","high"   ,"Probe {HOST.NAME} has been knocked out"                                    ,""                                                              ,"{rsm.probe.status[manual].last(0)}=0",""
+
+"probe1 - mon","enabled","high","Probe {$RSM.PROXY_NAME} is unavailable","","{TRIGGER.VALUE}=0 and {zabbix[proxy,{$RSM.PROXY_NAME},lastaccess].fuzzytime(2m)}=0 or {TRIGGER.VALUE}=1 and ( {zabbix[proxy,{$RSM.PROXY_NAME},lastaccess].now()}-{zabbix[proxy,{$RSM.PROXY_NAME},lastaccess].last(#1)}>1m or {zabbix[proxy,{$RSM.PROXY_NAME},lastaccess].now()}-{zabbix[proxy,{$RSM.PROXY_NAME},lastaccess].last(#2)}>2m or {zabbix[proxy,{$RSM.PROXY_NAME},lastaccess].now()}-{zabbix[proxy,{$RSM.PROXY_NAME},lastaccess].last(#3)}>3m )",""
+
+"probe2","enabled","warning","Internal errors happening"                                                 ,"Internal errors happening for {$PROBE.INTERNAL.ERROR.INTERVAL}","{rsm.errors.last()}>0",""
+"probe2","enabled","high"   ,"Internal errors happening for {$PROBE.INTERNAL.ERROR.INTERVAL}"            ,""                                                              ,"{rsm.errors.min({$PROBE.INTERNAL.ERROR.INTERVAL})}>0",""
+"probe2","enabled","high"   ,"Probe {HOST.NAME} has been disabled by tests"                              ,""                                                              ,"{${probe-status-automatic-key}.last(0)}=0",""
+"probe2","enabled","average","Probe {HOST.NAME} has been disabled for more than {$RSM.PROBE.MAX.OFFLINE}",""                                                              ,"{rsm.probe.status[manual].max({$RSM.PROBE.MAX.OFFLINE})}=0",""
+"probe2","enabled","high"   ,"Probe {HOST.NAME} has been knocked out"                                    ,""                                                              ,"{rsm.probe.status[manual].last(0)}=0",""
+
+"probe2 - mon","enabled","high","Probe {$RSM.PROXY_NAME} is unavailable","","{TRIGGER.VALUE}=0 and {zabbix[proxy,{$RSM.PROXY_NAME},lastaccess].fuzzytime(2m)}=0 or {TRIGGER.VALUE}=1 and ( {zabbix[proxy,{$RSM.PROXY_NAME},lastaccess].now()}-{zabbix[proxy,{$RSM.PROXY_NAME},lastaccess].last(#1)}>1m or {zabbix[proxy,{$RSM.PROXY_NAME},lastaccess].now()}-{zabbix[proxy,{$RSM.PROXY_NAME},lastaccess].last(#2)}>2m or {zabbix[proxy,{$RSM.PROXY_NAME},lastaccess].now()}-{zabbix[proxy,{$RSM.PROXY_NAME},lastaccess].last(#3)}>3m )",""
+
+"tld1","enabled","warning"       ,"DNS a.ns.tld1 (192.168.1.1) downtime exceeded 10% of allowed $1 minutes" ,"DNS a.ns.tld1 (192.168.1.1) downtime exceeded 25% of allowed $1 minutes" ,"{rsm.slv.dns.ns.downtime[a.ns.tld1,192.168.1.1].last()}>{$RSM.SLV.NS.DOWNTIME}*0.1",""
+"tld1","enabled","average"       ,"DNS a.ns.tld1 (192.168.1.1) downtime exceeded 25% of allowed $1 minutes" ,"DNS a.ns.tld1 (192.168.1.1) downtime exceeded 50% of allowed $1 minutes" ,"{rsm.slv.dns.ns.downtime[a.ns.tld1,192.168.1.1].last()}>{$RSM.SLV.NS.DOWNTIME}*0.25",""
+"tld1","enabled","average"       ,"DNS a.ns.tld1 (192.168.1.1) downtime exceeded 50% of allowed $1 minutes" ,"DNS a.ns.tld1 (192.168.1.1) downtime exceeded 75% of allowed $1 minutes" ,"{rsm.slv.dns.ns.downtime[a.ns.tld1,192.168.1.1].last()}>{$RSM.SLV.NS.DOWNTIME}*0.5",""
+"tld1","enabled","high"          ,"DNS a.ns.tld1 (192.168.1.1) downtime exceeded 75% of allowed $1 minutes" ,"DNS a.ns.tld1 (192.168.1.1) downtime exceeded 100% of allowed $1 minutes","{rsm.slv.dns.ns.downtime[a.ns.tld1,192.168.1.1].last()}>{$RSM.SLV.NS.DOWNTIME}*0.75",""
+"tld1","enabled","disaster"      ,"DNS a.ns.tld1 (192.168.1.1) downtime exceeded 100% of allowed $1 minutes",""                                                                        ,"{rsm.slv.dns.ns.downtime[a.ns.tld1,192.168.1.1].last()}>{$RSM.SLV.NS.DOWNTIME}",""
+"tld1","enabled","warning"       ,"DNS b.ns.tld1 (192.168.1.2) downtime exceeded 10% of allowed $1 minutes" ,"DNS b.ns.tld1 (192.168.1.2) downtime exceeded 25% of allowed $1 minutes" ,"{rsm.slv.dns.ns.downtime[b.ns.tld1,192.168.1.2].last()}>{$RSM.SLV.NS.DOWNTIME}*0.1",""
+"tld1","enabled","average"       ,"DNS b.ns.tld1 (192.168.1.2) downtime exceeded 25% of allowed $1 minutes" ,"DNS b.ns.tld1 (192.168.1.2) downtime exceeded 50% of allowed $1 minutes" ,"{rsm.slv.dns.ns.downtime[b.ns.tld1,192.168.1.2].last()}>{$RSM.SLV.NS.DOWNTIME}*0.25",""
+"tld1","enabled","average"       ,"DNS b.ns.tld1 (192.168.1.2) downtime exceeded 50% of allowed $1 minutes" ,"DNS b.ns.tld1 (192.168.1.2) downtime exceeded 75% of allowed $1 minutes" ,"{rsm.slv.dns.ns.downtime[b.ns.tld1,192.168.1.2].last()}>{$RSM.SLV.NS.DOWNTIME}*0.5",""
+"tld1","enabled","high"          ,"DNS b.ns.tld1 (192.168.1.2) downtime exceeded 75% of allowed $1 minutes" ,"DNS b.ns.tld1 (192.168.1.2) downtime exceeded 100% of allowed $1 minutes","{rsm.slv.dns.ns.downtime[b.ns.tld1,192.168.1.2].last()}>{$RSM.SLV.NS.DOWNTIME}*0.75",""
+"tld1","enabled","disaster"      ,"DNS b.ns.tld1 (192.168.1.2) downtime exceeded 100% of allowed $1 minutes",""                                                                        ,"{rsm.slv.dns.ns.downtime[b.ns.tld1,192.168.1.2].last()}>{$RSM.SLV.NS.DOWNTIME}",""
+"tld1","enabled","warning"       ,"DNS b.ns.tld1 (192.168.1.3) downtime exceeded 10% of allowed $1 minutes" ,"DNS b.ns.tld1 (192.168.1.3) downtime exceeded 25% of allowed $1 minutes" ,"{rsm.slv.dns.ns.downtime[b.ns.tld1,192.168.1.3].last()}>{$RSM.SLV.NS.DOWNTIME}*0.1",""
+"tld1","enabled","average"       ,"DNS b.ns.tld1 (192.168.1.3) downtime exceeded 25% of allowed $1 minutes" ,"DNS b.ns.tld1 (192.168.1.3) downtime exceeded 50% of allowed $1 minutes" ,"{rsm.slv.dns.ns.downtime[b.ns.tld1,192.168.1.3].last()}>{$RSM.SLV.NS.DOWNTIME}*0.25",""
+"tld1","enabled","average"       ,"DNS b.ns.tld1 (192.168.1.3) downtime exceeded 50% of allowed $1 minutes" ,"DNS b.ns.tld1 (192.168.1.3) downtime exceeded 75% of allowed $1 minutes" ,"{rsm.slv.dns.ns.downtime[b.ns.tld1,192.168.1.3].last()}>{$RSM.SLV.NS.DOWNTIME}*0.5",""
+"tld1","enabled","high"          ,"DNS b.ns.tld1 (192.168.1.3) downtime exceeded 75% of allowed $1 minutes" ,"DNS b.ns.tld1 (192.168.1.3) downtime exceeded 100% of allowed $1 minutes","{rsm.slv.dns.ns.downtime[b.ns.tld1,192.168.1.3].last()}>{$RSM.SLV.NS.DOWNTIME}*0.75",""
+"tld1","enabled","disaster"      ,"DNS b.ns.tld1 (192.168.1.3) downtime exceeded 100% of allowed $1 minutes",""                                                                        ,"{rsm.slv.dns.ns.downtime[b.ns.tld1,192.168.1.3].last()}>{$RSM.SLV.NS.DOWNTIME}",""
+"tld1","enabled","warning"       ,"DNS rolling week is over 10%"                                            ,"DNS rolling week is over 25%"                                            ,"{rsm.slv.dns.rollweek.last(0)}>=10",""
+"tld1","enabled","average"       ,"DNS rolling week is over 25%"                                            ,"DNS rolling week is over 50%"                                            ,"{rsm.slv.dns.rollweek.last(0)}>=25",""
+"tld1","enabled","average"       ,"DNS rolling week is over 50%"                                            ,"DNS rolling week is over 75%"                                            ,"{rsm.slv.dns.rollweek.last(0)}>=50",""
+"tld1","enabled","high"          ,"DNS rolling week is over 75%"                                            ,"DNS rolling week is over 100%"                                           ,"{rsm.slv.dns.rollweek.last(0)}>=75",""
+"tld1","enabled","disaster"      ,"DNS rolling week is over 100%"                                           ,""                                                                        ,"{rsm.slv.dns.rollweek.last(0)}>=100",""
+"tld1","enabled","warning"       ,"DNSSEC rolling week is over 10%"                                         ,"DNSSEC rolling week is over 25%"                                         ,"{rsm.slv.dnssec.rollweek.last(0)}>=10",""
+"tld1","enabled","average"       ,"DNSSEC rolling week is over 25%"                                         ,"DNSSEC rolling week is over 50%"                                         ,"{rsm.slv.dnssec.rollweek.last(0)}>=25",""
+"tld1","enabled","average"       ,"DNSSEC rolling week is over 50%"                                         ,"DNSSEC rolling week is over 75%"                                         ,"{rsm.slv.dnssec.rollweek.last(0)}>=50",""
+"tld1","enabled","high"          ,"DNSSEC rolling week is over 75%"                                         ,"DNSSEC rolling week is over 100%"                                        ,"{rsm.slv.dnssec.rollweek.last(0)}>=75",""
+"tld1","enabled","disaster"      ,"DNSSEC rolling week is over 100%"                                        ,""                                                                        ,"{rsm.slv.dnssec.rollweek.last(0)}>=100",""
+"tld1","enabled","not-classified","DNSSEC service is down"                                                  ,""                                                                        ,"{rsm.slv.dnssec.avail.max(#{$RSM.INCIDENT.DNSSEC.FAIL})}=0","{rsm.slv.dnssec.avail.min(#{$RSM.INCIDENT.DNSSEC.RECOVER})}>0"
+"tld1","enabled","not-classified","DNS service is down"                                                     ,""                                                                        ,"{rsm.slv.dns.avail.max(#{$RSM.INCIDENT.DNS.FAIL})}=0","{rsm.slv.dns.avail.min(#{$RSM.INCIDENT.DNS.RECOVER})}>0"
+"tld1","enabled","disaster"      ,"DNS service was unavailable for at least {ITEM.VALUE1}m"                 ,""                                                                        ,"{rsm.slv.dns.downtime.last(0)}>{$RSM.SLV.DNS.DOWNTIME}",""
+"tld1","enabled","warning"       ,"Ratio of failed DNS TCP tests exceeded 10% of allowed $1%"               ,"Ratio of failed DNS TCP tests exceeded 25% of allowed $1%"               ,"{rsm.slv.dns.tcp.rtt.pfailed.last()}>{$RSM.SLV.DNS.TCP.RTT}*0.1",""
+"tld1","enabled","average"       ,"Ratio of failed DNS TCP tests exceeded 25% of allowed $1%"               ,"Ratio of failed DNS TCP tests exceeded 50% of allowed $1%"               ,"{rsm.slv.dns.tcp.rtt.pfailed.last()}>{$RSM.SLV.DNS.TCP.RTT}*0.25",""
+"tld1","enabled","average"       ,"Ratio of failed DNS TCP tests exceeded 50% of allowed $1%"               ,"Ratio of failed DNS TCP tests exceeded 75% of allowed $1%"               ,"{rsm.slv.dns.tcp.rtt.pfailed.last()}>{$RSM.SLV.DNS.TCP.RTT}*0.5",""
+"tld1","enabled","high"          ,"Ratio of failed DNS TCP tests exceeded 75% of allowed $1%"               ,"Ratio of failed DNS TCP tests exceeded 100% of allowed $1%"              ,"{rsm.slv.dns.tcp.rtt.pfailed.last()}>{$RSM.SLV.DNS.TCP.RTT}*0.75",""
+"tld1","enabled","disaster"      ,"Ratio of failed DNS TCP tests exceeded 100% of allowed $1%"              ,""                                                                        ,"{rsm.slv.dns.tcp.rtt.pfailed.last()}>{$RSM.SLV.DNS.TCP.RTT}",""
+"tld1","enabled","warning"       ,"Ratio of failed DNS UDP tests exceeded 10% of allowed $1%"               ,"Ratio of failed DNS UDP tests exceeded 25% of allowed $1%"               ,"{rsm.slv.dns.udp.rtt.pfailed.last()}>{$RSM.SLV.DNS.UDP.RTT}*0.1",""
+"tld1","enabled","average"       ,"Ratio of failed DNS UDP tests exceeded 25% of allowed $1%"               ,"Ratio of failed DNS UDP tests exceeded 50% of allowed $1%"               ,"{rsm.slv.dns.udp.rtt.pfailed.last()}>{$RSM.SLV.DNS.UDP.RTT}*0.25",""
+"tld1","enabled","average"       ,"Ratio of failed DNS UDP tests exceeded 50% of allowed $1%"               ,"Ratio of failed DNS UDP tests exceeded 75% of allowed $1%"               ,"{rsm.slv.dns.udp.rtt.pfailed.last()}>{$RSM.SLV.DNS.UDP.RTT}*0.5",""
+"tld1","enabled","high"          ,"Ratio of failed DNS UDP tests exceeded 75% of allowed $1%"               ,"Ratio of failed DNS UDP tests exceeded 100% of allowed $1%"              ,"{rsm.slv.dns.udp.rtt.pfailed.last()}>{$RSM.SLV.DNS.UDP.RTT}*0.75",""
+"tld1","enabled","disaster"      ,"Ratio of failed DNS UDP tests exceeded 100% of allowed $1%"              ,""                                                                        ,"{rsm.slv.dns.udp.rtt.pfailed.last()}>{$RSM.SLV.DNS.UDP.RTT}",""
+"tld1","enabled","warning"       ,"Ratio of failed RDAP tests exceeded 10% of allowed $1%"                  ,"Ratio of failed RDAP tests exceeded 25% of allowed $1%"                  ,"{rsm.slv.rdap.rtt.pfailed.last()}>{$RSM.SLV.RDAP.RTT}*0.1",""
+"tld1","enabled","average"       ,"Ratio of failed RDAP tests exceeded 25% of allowed $1%"                  ,"Ratio of failed RDAP tests exceeded 50% of allowed $1%"                  ,"{rsm.slv.rdap.rtt.pfailed.last()}>{$RSM.SLV.RDAP.RTT}*0.25",""
+"tld1","enabled","average"       ,"Ratio of failed RDAP tests exceeded 50% of allowed $1%"                  ,"Ratio of failed RDAP tests exceeded 75% of allowed $1%"                  ,"{rsm.slv.rdap.rtt.pfailed.last()}>{$RSM.SLV.RDAP.RTT}*0.5",""
+"tld1","enabled","high"          ,"Ratio of failed RDAP tests exceeded 75% of allowed $1%"                  ,"Ratio of failed RDAP tests exceeded 100% of allowed $1%"                 ,"{rsm.slv.rdap.rtt.pfailed.last()}>{$RSM.SLV.RDAP.RTT}*0.75",""
+"tld1","enabled","disaster"      ,"Ratio of failed RDAP tests exceeded 100% of allowed $1%"                 ,""                                                                        ,"{rsm.slv.rdap.rtt.pfailed.last()}>{$RSM.SLV.RDAP.RTT}",""
+"tld1","enabled","warning"       ,"Ratio of failed RDDS tests exceeded 10% of allowed $1%"                  ,"Ratio of failed RDDS tests exceeded 25% of allowed $1%"                  ,"{rsm.slv.rdds.rtt.pfailed.last()}>{$RSM.SLV.RDDS.RTT}*0.1",""
+"tld1","enabled","average"       ,"Ratio of failed RDDS tests exceeded 25% of allowed $1%"                  ,"Ratio of failed RDDS tests exceeded 50% of allowed $1%"                  ,"{rsm.slv.rdds.rtt.pfailed.last()}>{$RSM.SLV.RDDS.RTT}*0.25",""
+"tld1","enabled","average"       ,"Ratio of failed RDDS tests exceeded 50% of allowed $1%"                  ,"Ratio of failed RDDS tests exceeded 75% of allowed $1%"                  ,"{rsm.slv.rdds.rtt.pfailed.last()}>{$RSM.SLV.RDDS.RTT}*0.5",""
+"tld1","enabled","high"          ,"Ratio of failed RDDS tests exceeded 75% of allowed $1%"                  ,"Ratio of failed RDDS tests exceeded 100% of allowed $1%"                 ,"{rsm.slv.rdds.rtt.pfailed.last()}>{$RSM.SLV.RDDS.RTT}*0.75",""
+"tld1","enabled","disaster"      ,"Ratio of failed RDDS tests exceeded 100% of allowed $1%"                 ,""                                                                        ,"{rsm.slv.rdds.rtt.pfailed.last()}>{$RSM.SLV.RDDS.RTT}",""
+"tld1","enabled","warning"       ,"RDAP rolling week is over 10%"                                           ,"RDAP rolling week is over 25%"                                           ,"{rsm.slv.rdap.rollweek.last(0)}>=10",""
+"tld1","enabled","average"       ,"RDAP rolling week is over 25%"                                           ,"RDAP rolling week is over 50%"                                           ,"{rsm.slv.rdap.rollweek.last(0)}>=25",""
+"tld1","enabled","average"       ,"RDAP rolling week is over 50%"                                           ,"RDAP rolling week is over 75%"                                           ,"{rsm.slv.rdap.rollweek.last(0)}>=50",""
+"tld1","enabled","high"          ,"RDAP rolling week is over 75%"                                           ,"RDAP rolling week is over 100%"                                          ,"{rsm.slv.rdap.rollweek.last(0)}>=75",""
+"tld1","enabled","disaster"      ,"RDAP rolling week is over 100%"                                          ,""                                                                        ,"{rsm.slv.rdap.rollweek.last(0)}>=100",""
+"tld1","enabled","not-classified","RDAP service is down"                                                    ,""                                                                        ,"{rsm.slv.rdap.avail.max(#{$RSM.INCIDENT.RDAP.FAIL})}=0","{rsm.slv.rdap.avail.min(#{$RSM.INCIDENT.RDAP.RECOVER})}>0"
+"tld1","enabled","warning"       ,"RDAP service was unavailable for 10% of allowed $1 minutes"              ,"RDAP service was unavailable for 25% of allowed $1 minutes"              ,"{rsm.slv.rdap.downtime.last(0)}>={$RSM.SLV.RDAP.DOWNTIME}*0.1",""
+"tld1","enabled","average"       ,"RDAP service was unavailable for 25% of allowed $1 minutes"              ,"RDAP service was unavailable for 50% of allowed $1 minutes"              ,"{rsm.slv.rdap.downtime.last(0)}>={$RSM.SLV.RDAP.DOWNTIME}*0.25",""
+"tld1","enabled","average"       ,"RDAP service was unavailable for 50% of allowed $1 minutes"              ,"RDAP service was unavailable for 75% of allowed $1 minutes"              ,"{rsm.slv.rdap.downtime.last(0)}>={$RSM.SLV.RDAP.DOWNTIME}*0.5",""
+"tld1","enabled","high"          ,"RDAP service was unavailable for 75% of allowed $1 minutes"              ,"RDAP service was unavailable for 100% of allowed $1 minutes"             ,"{rsm.slv.rdap.downtime.last(0)}>={$RSM.SLV.RDAP.DOWNTIME}*0.75",""
+"tld1","enabled","disaster"      ,"RDAP service was unavailable for 100% of allowed $1 minutes"             ,""                                                                        ,"{rsm.slv.rdap.downtime.last(0)}>={$RSM.SLV.RDAP.DOWNTIME}",""
+"tld1","enabled","warning"       ,"RDDS rolling week is over 10%"                                           ,"RDDS rolling week is over 25%"                                           ,"{rsm.slv.rdds.rollweek.last(0)}>=10",""
+"tld1","enabled","average"       ,"RDDS rolling week is over 25%"                                           ,"RDDS rolling week is over 50%"                                           ,"{rsm.slv.rdds.rollweek.last(0)}>=25",""
+"tld1","enabled","average"       ,"RDDS rolling week is over 50%"                                           ,"RDDS rolling week is over 75%"                                           ,"{rsm.slv.rdds.rollweek.last(0)}>=50",""
+"tld1","enabled","high"          ,"RDDS rolling week is over 75%"                                           ,"RDDS rolling week is over 100%"                                          ,"{rsm.slv.rdds.rollweek.last(0)}>=75",""
+"tld1","enabled","disaster"      ,"RDDS rolling week is over 100%"                                          ,""                                                                        ,"{rsm.slv.rdds.rollweek.last(0)}>=100",""
+"tld1","enabled","not-classified","RDDS service is down"                                                    ,""                                                                        ,"{rsm.slv.rdds.avail.max(#{$RSM.INCIDENT.RDDS.FAIL})}=0","{rsm.slv.rdds.avail.min(#{$RSM.INCIDENT.RDDS.RECOVER})}>0"
+"tld1","enabled","warning"       ,"RDDS service was unavailable for 10% of allowed $1 minutes"              ,"RDDS service was unavailable for 25% of allowed $1 minutes"              ,"{rsm.slv.rdds.downtime.last(0)}>={$RSM.SLV.RDDS.DOWNTIME}*0.1",""
+"tld1","enabled","average"       ,"RDDS service was unavailable for 25% of allowed $1 minutes"              ,"RDDS service was unavailable for 50% of allowed $1 minutes"              ,"{rsm.slv.rdds.downtime.last(0)}>={$RSM.SLV.RDDS.DOWNTIME}*0.25",""
+"tld1","enabled","average"       ,"RDDS service was unavailable for 50% of allowed $1 minutes"              ,"RDDS service was unavailable for 75% of allowed $1 minutes"              ,"{rsm.slv.rdds.downtime.last(0)}>={$RSM.SLV.RDDS.DOWNTIME}*0.5",""
+"tld1","enabled","high"          ,"RDDS service was unavailable for 75% of allowed $1 minutes"              ,"RDDS service was unavailable for 100% of allowed $1 minutes"             ,"{rsm.slv.rdds.downtime.last(0)}>={$RSM.SLV.RDDS.DOWNTIME}*0.75",""
+"tld1","enabled","disaster"      ,"RDDS service was unavailable for 100% of allowed $1 minutes"             ,""                                                                        ,"{rsm.slv.rdds.downtime.last(0)}>={$RSM.SLV.RDDS.DOWNTIME}",""
+
+"tld2","enabled","warning"       ,"DNS a.ns.tld2 (192.168.2.1) downtime exceeded 10% of allowed $1 minutes" ,"DNS a.ns.tld2 (192.168.2.1) downtime exceeded 25% of allowed $1 minutes" ,"{rsm.slv.dns.ns.downtime[a.ns.tld2,192.168.2.1].last()}>{$RSM.SLV.NS.DOWNTIME}*0.1",""
+"tld2","enabled","average"       ,"DNS a.ns.tld2 (192.168.2.1) downtime exceeded 25% of allowed $1 minutes" ,"DNS a.ns.tld2 (192.168.2.1) downtime exceeded 50% of allowed $1 minutes" ,"{rsm.slv.dns.ns.downtime[a.ns.tld2,192.168.2.1].last()}>{$RSM.SLV.NS.DOWNTIME}*0.25",""
+"tld2","enabled","average"       ,"DNS a.ns.tld2 (192.168.2.1) downtime exceeded 50% of allowed $1 minutes" ,"DNS a.ns.tld2 (192.168.2.1) downtime exceeded 75% of allowed $1 minutes" ,"{rsm.slv.dns.ns.downtime[a.ns.tld2,192.168.2.1].last()}>{$RSM.SLV.NS.DOWNTIME}*0.5",""
+"tld2","enabled","high"          ,"DNS a.ns.tld2 (192.168.2.1) downtime exceeded 75% of allowed $1 minutes" ,"DNS a.ns.tld2 (192.168.2.1) downtime exceeded 100% of allowed $1 minutes","{rsm.slv.dns.ns.downtime[a.ns.tld2,192.168.2.1].last()}>{$RSM.SLV.NS.DOWNTIME}*0.75",""
+"tld2","enabled","disaster"      ,"DNS a.ns.tld2 (192.168.2.1) downtime exceeded 100% of allowed $1 minutes",""                                                                        ,"{rsm.slv.dns.ns.downtime[a.ns.tld2,192.168.2.1].last()}>{$RSM.SLV.NS.DOWNTIME}",""
+"tld2","enabled","warning"       ,"DNS b.ns.tld2 (192.168.2.2) downtime exceeded 10% of allowed $1 minutes" ,"DNS b.ns.tld2 (192.168.2.2) downtime exceeded 25% of allowed $1 minutes" ,"{rsm.slv.dns.ns.downtime[b.ns.tld2,192.168.2.2].last()}>{$RSM.SLV.NS.DOWNTIME}*0.1",""
+"tld2","enabled","average"       ,"DNS b.ns.tld2 (192.168.2.2) downtime exceeded 25% of allowed $1 minutes" ,"DNS b.ns.tld2 (192.168.2.2) downtime exceeded 50% of allowed $1 minutes" ,"{rsm.slv.dns.ns.downtime[b.ns.tld2,192.168.2.2].last()}>{$RSM.SLV.NS.DOWNTIME}*0.25",""
+"tld2","enabled","average"       ,"DNS b.ns.tld2 (192.168.2.2) downtime exceeded 50% of allowed $1 minutes" ,"DNS b.ns.tld2 (192.168.2.2) downtime exceeded 75% of allowed $1 minutes" ,"{rsm.slv.dns.ns.downtime[b.ns.tld2,192.168.2.2].last()}>{$RSM.SLV.NS.DOWNTIME}*0.5",""
+"tld2","enabled","high"          ,"DNS b.ns.tld2 (192.168.2.2) downtime exceeded 75% of allowed $1 minutes" ,"DNS b.ns.tld2 (192.168.2.2) downtime exceeded 100% of allowed $1 minutes","{rsm.slv.dns.ns.downtime[b.ns.tld2,192.168.2.2].last()}>{$RSM.SLV.NS.DOWNTIME}*0.75",""
+"tld2","enabled","disaster"      ,"DNS b.ns.tld2 (192.168.2.2) downtime exceeded 100% of allowed $1 minutes",""                                                                        ,"{rsm.slv.dns.ns.downtime[b.ns.tld2,192.168.2.2].last()}>{$RSM.SLV.NS.DOWNTIME}",""
+"tld2","enabled","warning"       ,"DNS b.ns.tld2 (192.168.2.3) downtime exceeded 10% of allowed $1 minutes" ,"DNS b.ns.tld2 (192.168.2.3) downtime exceeded 25% of allowed $1 minutes" ,"{rsm.slv.dns.ns.downtime[b.ns.tld2,192.168.2.3].last()}>{$RSM.SLV.NS.DOWNTIME}*0.1",""
+"tld2","enabled","average"       ,"DNS b.ns.tld2 (192.168.2.3) downtime exceeded 25% of allowed $1 minutes" ,"DNS b.ns.tld2 (192.168.2.3) downtime exceeded 50% of allowed $1 minutes" ,"{rsm.slv.dns.ns.downtime[b.ns.tld2,192.168.2.3].last()}>{$RSM.SLV.NS.DOWNTIME}*0.25",""
+"tld2","enabled","average"       ,"DNS b.ns.tld2 (192.168.2.3) downtime exceeded 50% of allowed $1 minutes" ,"DNS b.ns.tld2 (192.168.2.3) downtime exceeded 75% of allowed $1 minutes" ,"{rsm.slv.dns.ns.downtime[b.ns.tld2,192.168.2.3].last()}>{$RSM.SLV.NS.DOWNTIME}*0.5",""
+"tld2","enabled","high"          ,"DNS b.ns.tld2 (192.168.2.3) downtime exceeded 75% of allowed $1 minutes" ,"DNS b.ns.tld2 (192.168.2.3) downtime exceeded 100% of allowed $1 minutes","{rsm.slv.dns.ns.downtime[b.ns.tld2,192.168.2.3].last()}>{$RSM.SLV.NS.DOWNTIME}*0.75",""
+"tld2","enabled","disaster"      ,"DNS b.ns.tld2 (192.168.2.3) downtime exceeded 100% of allowed $1 minutes",""                                                                        ,"{rsm.slv.dns.ns.downtime[b.ns.tld2,192.168.2.3].last()}>{$RSM.SLV.NS.DOWNTIME}",""
+"tld2","enabled","warning"       ,"DNS rolling week is over 10%"                                            ,"DNS rolling week is over 25%"                                            ,"{rsm.slv.dns.rollweek.last(0)}>=10",""
+"tld2","enabled","average"       ,"DNS rolling week is over 25%"                                            ,"DNS rolling week is over 50%"                                            ,"{rsm.slv.dns.rollweek.last(0)}>=25",""
+"tld2","enabled","average"       ,"DNS rolling week is over 50%"                                            ,"DNS rolling week is over 75%"                                            ,"{rsm.slv.dns.rollweek.last(0)}>=50",""
+"tld2","enabled","high"          ,"DNS rolling week is over 75%"                                            ,"DNS rolling week is over 100%"                                           ,"{rsm.slv.dns.rollweek.last(0)}>=75",""
+"tld2","enabled","disaster"      ,"DNS rolling week is over 100%"                                           ,""                                                                        ,"{rsm.slv.dns.rollweek.last(0)}>=100",""
+"tld2","enabled","warning"       ,"DNSSEC rolling week is over 10%"                                         ,"DNSSEC rolling week is over 25%"                                         ,"{rsm.slv.dnssec.rollweek.last(0)}>=10",""
+"tld2","enabled","average"       ,"DNSSEC rolling week is over 25%"                                         ,"DNSSEC rolling week is over 50%"                                         ,"{rsm.slv.dnssec.rollweek.last(0)}>=25",""
+"tld2","enabled","average"       ,"DNSSEC rolling week is over 50%"                                         ,"DNSSEC rolling week is over 75%"                                         ,"{rsm.slv.dnssec.rollweek.last(0)}>=50",""
+"tld2","enabled","high"          ,"DNSSEC rolling week is over 75%"                                         ,"DNSSEC rolling week is over 100%"                                        ,"{rsm.slv.dnssec.rollweek.last(0)}>=75",""
+"tld2","enabled","disaster"      ,"DNSSEC rolling week is over 100%"                                        ,""                                                                        ,"{rsm.slv.dnssec.rollweek.last(0)}>=100",""
+"tld2","enabled","not-classified","DNSSEC service is down"                                                  ,""                                                                        ,"{rsm.slv.dnssec.avail.max(#{$RSM.INCIDENT.DNSSEC.FAIL})}=0","{rsm.slv.dnssec.avail.min(#{$RSM.INCIDENT.DNSSEC.RECOVER})}>0"
+"tld2","enabled","not-classified","DNS service is down"                                                     ,""                                                                        ,"{rsm.slv.dns.avail.max(#{$RSM.INCIDENT.DNS.FAIL})}=0","{rsm.slv.dns.avail.min(#{$RSM.INCIDENT.DNS.RECOVER})}>0"
+"tld2","enabled","disaster"      ,"DNS service was unavailable for at least {ITEM.VALUE1}m"                 ,""                                                                        ,"{rsm.slv.dns.downtime.last(0)}>{$RSM.SLV.DNS.DOWNTIME}",""
+"tld2","enabled","warning"       ,"Ratio of failed DNS TCP tests exceeded 10% of allowed $1%"               ,"Ratio of failed DNS TCP tests exceeded 25% of allowed $1%"               ,"{rsm.slv.dns.tcp.rtt.pfailed.last()}>{$RSM.SLV.DNS.TCP.RTT}*0.1",""
+"tld2","enabled","average"       ,"Ratio of failed DNS TCP tests exceeded 25% of allowed $1%"               ,"Ratio of failed DNS TCP tests exceeded 50% of allowed $1%"               ,"{rsm.slv.dns.tcp.rtt.pfailed.last()}>{$RSM.SLV.DNS.TCP.RTT}*0.25",""
+"tld2","enabled","average"       ,"Ratio of failed DNS TCP tests exceeded 50% of allowed $1%"               ,"Ratio of failed DNS TCP tests exceeded 75% of allowed $1%"               ,"{rsm.slv.dns.tcp.rtt.pfailed.last()}>{$RSM.SLV.DNS.TCP.RTT}*0.5",""
+"tld2","enabled","high"          ,"Ratio of failed DNS TCP tests exceeded 75% of allowed $1%"               ,"Ratio of failed DNS TCP tests exceeded 100% of allowed $1%"              ,"{rsm.slv.dns.tcp.rtt.pfailed.last()}>{$RSM.SLV.DNS.TCP.RTT}*0.75",""
+"tld2","enabled","disaster"      ,"Ratio of failed DNS TCP tests exceeded 100% of allowed $1%"              ,""                                                                        ,"{rsm.slv.dns.tcp.rtt.pfailed.last()}>{$RSM.SLV.DNS.TCP.RTT}",""
+"tld2","enabled","warning"       ,"Ratio of failed DNS UDP tests exceeded 10% of allowed $1%"               ,"Ratio of failed DNS UDP tests exceeded 25% of allowed $1%"               ,"{rsm.slv.dns.udp.rtt.pfailed.last()}>{$RSM.SLV.DNS.UDP.RTT}*0.1",""
+"tld2","enabled","average"       ,"Ratio of failed DNS UDP tests exceeded 25% of allowed $1%"               ,"Ratio of failed DNS UDP tests exceeded 50% of allowed $1%"               ,"{rsm.slv.dns.udp.rtt.pfailed.last()}>{$RSM.SLV.DNS.UDP.RTT}*0.25",""
+"tld2","enabled","average"       ,"Ratio of failed DNS UDP tests exceeded 50% of allowed $1%"               ,"Ratio of failed DNS UDP tests exceeded 75% of allowed $1%"               ,"{rsm.slv.dns.udp.rtt.pfailed.last()}>{$RSM.SLV.DNS.UDP.RTT}*0.5",""
+"tld2","enabled","high"          ,"Ratio of failed DNS UDP tests exceeded 75% of allowed $1%"               ,"Ratio of failed DNS UDP tests exceeded 100% of allowed $1%"              ,"{rsm.slv.dns.udp.rtt.pfailed.last()}>{$RSM.SLV.DNS.UDP.RTT}*0.75",""
+"tld2","enabled","disaster"      ,"Ratio of failed DNS UDP tests exceeded 100% of allowed $1%"              ,""                                                                        ,"{rsm.slv.dns.udp.rtt.pfailed.last()}>{$RSM.SLV.DNS.UDP.RTT}",""
+"tld2","enabled","warning"       ,"Ratio of failed RDAP tests exceeded 10% of allowed $1%"                  ,"Ratio of failed RDAP tests exceeded 25% of allowed $1%"                  ,"{rsm.slv.rdap.rtt.pfailed.last()}>{$RSM.SLV.RDAP.RTT}*0.1",""
+"tld2","enabled","average"       ,"Ratio of failed RDAP tests exceeded 25% of allowed $1%"                  ,"Ratio of failed RDAP tests exceeded 50% of allowed $1%"                  ,"{rsm.slv.rdap.rtt.pfailed.last()}>{$RSM.SLV.RDAP.RTT}*0.25",""
+"tld2","enabled","average"       ,"Ratio of failed RDAP tests exceeded 50% of allowed $1%"                  ,"Ratio of failed RDAP tests exceeded 75% of allowed $1%"                  ,"{rsm.slv.rdap.rtt.pfailed.last()}>{$RSM.SLV.RDAP.RTT}*0.5",""
+"tld2","enabled","high"          ,"Ratio of failed RDAP tests exceeded 75% of allowed $1%"                  ,"Ratio of failed RDAP tests exceeded 100% of allowed $1%"                 ,"{rsm.slv.rdap.rtt.pfailed.last()}>{$RSM.SLV.RDAP.RTT}*0.75",""
+"tld2","enabled","disaster"      ,"Ratio of failed RDAP tests exceeded 100% of allowed $1%"                 ,""                                                                        ,"{rsm.slv.rdap.rtt.pfailed.last()}>{$RSM.SLV.RDAP.RTT}",""
+"tld2","enabled","warning"       ,"Ratio of failed RDDS tests exceeded 10% of allowed $1%"                  ,"Ratio of failed RDDS tests exceeded 25% of allowed $1%"                  ,"{rsm.slv.rdds.rtt.pfailed.last()}>{$RSM.SLV.RDDS.RTT}*0.1",""
+"tld2","enabled","average"       ,"Ratio of failed RDDS tests exceeded 25% of allowed $1%"                  ,"Ratio of failed RDDS tests exceeded 50% of allowed $1%"                  ,"{rsm.slv.rdds.rtt.pfailed.last()}>{$RSM.SLV.RDDS.RTT}*0.25",""
+"tld2","enabled","average"       ,"Ratio of failed RDDS tests exceeded 50% of allowed $1%"                  ,"Ratio of failed RDDS tests exceeded 75% of allowed $1%"                  ,"{rsm.slv.rdds.rtt.pfailed.last()}>{$RSM.SLV.RDDS.RTT}*0.5",""
+"tld2","enabled","high"          ,"Ratio of failed RDDS tests exceeded 75% of allowed $1%"                  ,"Ratio of failed RDDS tests exceeded 100% of allowed $1%"                 ,"{rsm.slv.rdds.rtt.pfailed.last()}>{$RSM.SLV.RDDS.RTT}*0.75",""
+"tld2","enabled","disaster"      ,"Ratio of failed RDDS tests exceeded 100% of allowed $1%"                 ,""                                                                        ,"{rsm.slv.rdds.rtt.pfailed.last()}>{$RSM.SLV.RDDS.RTT}",""
+"tld2","enabled","warning"       ,"RDAP rolling week is over 10%"                                           ,"RDAP rolling week is over 25%"                                           ,"{rsm.slv.rdap.rollweek.last(0)}>=10",""
+"tld2","enabled","average"       ,"RDAP rolling week is over 25%"                                           ,"RDAP rolling week is over 50%"                                           ,"{rsm.slv.rdap.rollweek.last(0)}>=25",""
+"tld2","enabled","average"       ,"RDAP rolling week is over 50%"                                           ,"RDAP rolling week is over 75%"                                           ,"{rsm.slv.rdap.rollweek.last(0)}>=50",""
+"tld2","enabled","high"          ,"RDAP rolling week is over 75%"                                           ,"RDAP rolling week is over 100%"                                          ,"{rsm.slv.rdap.rollweek.last(0)}>=75",""
+"tld2","enabled","disaster"      ,"RDAP rolling week is over 100%"                                          ,""                                                                        ,"{rsm.slv.rdap.rollweek.last(0)}>=100",""
+"tld2","enabled","not-classified","RDAP service is down"                                                    ,""                                                                        ,"{rsm.slv.rdap.avail.max(#{$RSM.INCIDENT.RDAP.FAIL})}=0","{rsm.slv.rdap.avail.min(#{$RSM.INCIDENT.RDAP.RECOVER})}>0"
+"tld2","enabled","warning"       ,"RDAP service was unavailable for 10% of allowed $1 minutes"              ,"RDAP service was unavailable for 25% of allowed $1 minutes"              ,"{rsm.slv.rdap.downtime.last(0)}>={$RSM.SLV.RDAP.DOWNTIME}*0.1",""
+"tld2","enabled","average"       ,"RDAP service was unavailable for 25% of allowed $1 minutes"              ,"RDAP service was unavailable for 50% of allowed $1 minutes"              ,"{rsm.slv.rdap.downtime.last(0)}>={$RSM.SLV.RDAP.DOWNTIME}*0.25",""
+"tld2","enabled","average"       ,"RDAP service was unavailable for 50% of allowed $1 minutes"              ,"RDAP service was unavailable for 75% of allowed $1 minutes"              ,"{rsm.slv.rdap.downtime.last(0)}>={$RSM.SLV.RDAP.DOWNTIME}*0.5",""
+"tld2","enabled","high"          ,"RDAP service was unavailable for 75% of allowed $1 minutes"              ,"RDAP service was unavailable for 100% of allowed $1 minutes"             ,"{rsm.slv.rdap.downtime.last(0)}>={$RSM.SLV.RDAP.DOWNTIME}*0.75",""
+"tld2","enabled","disaster"      ,"RDAP service was unavailable for 100% of allowed $1 minutes"             ,""                                                                        ,"{rsm.slv.rdap.downtime.last(0)}>={$RSM.SLV.RDAP.DOWNTIME}",""
+"tld2","enabled","warning"       ,"RDDS rolling week is over 10%"                                           ,"RDDS rolling week is over 25%"                                           ,"{rsm.slv.rdds.rollweek.last(0)}>=10",""
+"tld2","enabled","average"       ,"RDDS rolling week is over 25%"                                           ,"RDDS rolling week is over 50%"                                           ,"{rsm.slv.rdds.rollweek.last(0)}>=25",""
+"tld2","enabled","average"       ,"RDDS rolling week is over 50%"                                           ,"RDDS rolling week is over 75%"                                           ,"{rsm.slv.rdds.rollweek.last(0)}>=50",""
+"tld2","enabled","high"          ,"RDDS rolling week is over 75%"                                           ,"RDDS rolling week is over 100%"                                          ,"{rsm.slv.rdds.rollweek.last(0)}>=75",""
+"tld2","enabled","disaster"      ,"RDDS rolling week is over 100%"                                          ,""                                                                        ,"{rsm.slv.rdds.rollweek.last(0)}>=100",""
+"tld2","enabled","not-classified","RDDS service is down"                                                    ,""                                                                        ,"{rsm.slv.rdds.avail.max(#{$RSM.INCIDENT.RDDS.FAIL})}=0","{rsm.slv.rdds.avail.min(#{$RSM.INCIDENT.RDDS.RECOVER})}>0"
+"tld2","enabled","warning"       ,"RDDS service was unavailable for 10% of allowed $1 minutes"              ,"RDDS service was unavailable for 25% of allowed $1 minutes"              ,"{rsm.slv.rdds.downtime.last(0)}>={$RSM.SLV.RDDS.DOWNTIME}*0.1",""
+"tld2","enabled","average"       ,"RDDS service was unavailable for 25% of allowed $1 minutes"              ,"RDDS service was unavailable for 50% of allowed $1 minutes"              ,"{rsm.slv.rdds.downtime.last(0)}>={$RSM.SLV.RDDS.DOWNTIME}*0.25",""
+"tld2","enabled","average"       ,"RDDS service was unavailable for 50% of allowed $1 minutes"              ,"RDDS service was unavailable for 75% of allowed $1 minutes"              ,"{rsm.slv.rdds.downtime.last(0)}>={$RSM.SLV.RDDS.DOWNTIME}*0.5",""
+"tld2","enabled","high"          ,"RDDS service was unavailable for 75% of allowed $1 minutes"              ,"RDDS service was unavailable for 100% of allowed $1 minutes"             ,"{rsm.slv.rdds.downtime.last(0)}>={$RSM.SLV.RDDS.DOWNTIME}*0.75",""
+"tld2","enabled","disaster"      ,"RDDS service was unavailable for 100% of allowed $1 minutes"             ,""                                                                        ,"{rsm.slv.rdds.downtime.last(0)}>={$RSM.SLV.RDDS.DOWNTIME}",""
