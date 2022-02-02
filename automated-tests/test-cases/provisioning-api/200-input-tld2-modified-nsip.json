@@ -12,7 +12,7 @@
             { "ns": "a.ns.tld2", "ip": "192.168.2.1" },
             { "ns": "b.ns.tld2", "ip": "192.168.2.2" },
             { "ns": "b.ns.tld2", "ip": "192.168.2.4" },
-            { "ns": "b.ns.tld3", "ip": "192.168.2.5" }
+            { "ns": "c.ns.tld2", "ip": "192.168.2.5" }
         ],
         "dnssecEnabled": true,
         "nsTestPrefix": "www.monitoring.example",
