@@ -174,7 +174,7 @@ int	get_value_simple(const DC_ITEM *item, AGENT_RESULT *result, zbx_vector_ptr_t
 		/* generate array of strings  */
 		/* pass it to check_rsm_dns() */
 		if (SYSINFO_RET_OK == check_rsm_dns(item->host.hostid, item->itemid, item->host.host, item->nextcheck,
-				&request, result))
+				&request, result, NULL))
 		{
 			ret = SUCCEED;
 		}

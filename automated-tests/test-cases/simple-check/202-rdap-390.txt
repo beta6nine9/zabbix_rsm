@@ -6,10 +6,7 @@
 
 "","rm -rf   /tmp/simple-check-test"
 "","mkdir -p /tmp/simple-check-test"
-
-[run-simple-check]
-
-"t_rsm_rdap -m 1 -r 127.0.0.1 -o 5053 -u 'not listed' -d example.example -4 -j /tmp/simple-check-test/status.json"
+"","${cfg:paths:build_dir}/bin/t_rsm_rdap -r 127.0.0.1 -o 5053 -u 'not listed' -d example.example -4 -j /tmp/simple-check-test/status.json"
 
 [compare-files]
 

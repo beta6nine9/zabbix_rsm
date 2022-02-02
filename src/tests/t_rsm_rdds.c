@@ -21,9 +21,9 @@ void	zbx_on_exit(int ret)
 
 static void	exit_usage(const char *program)
 {
-	fprintf(stderr, "usage: %s -t <tld> -a <testedname43> -w <testedname80> <[-4] [-6]> [-s whois port] [-g web-whois port]"
-			" [-r <res_ip>] [-o <res_port>] [-p <testprefix>] [-e <maxredirs80>] [-m <seconds>] [-j <file>]"
-			" [-f] [-h]\n", program);
+	fprintf(stderr, "usage: %s -t <tld> -a <testedname43> -w <testedname80> <[-4] [-6]> [-s whois port]"
+			" [-g web-whois port] [-r <res_ip>] [-o <res_port>] [-p <testprefix>] [-e <maxredirs80>]"
+			" [-j <file>] [-f] [-h]\n", program);
 	fprintf(stderr, "       -t <tld>          TLD to test\n");
 	fprintf(stderr, "       -a <testedname43> WHOIS server to use for RDDS43 test\n");
 	fprintf(stderr, "       -w <testedname80> WEB-WHOIS URL to use for RDDS80 test\n");
@@ -37,7 +37,6 @@ static void	exit_usage(const char *program)
 			DEFAULT_TESTPREFIX);
 	fprintf(stderr, "       -e <maxredirs80>  maximum redirections to use in RDDS80 test (default: %d)\n",
 			DEFAULT_MAXREDIRS);
-	fprintf(stderr, "       -m <seconds>      timeout (default:%d)\n", RSM_TCP_TIMEOUT);
 	fprintf(stderr, "       -j <file>         write resulting json to the file\n");
 	fprintf(stderr, "       -f                log packets to files (%s, %s) (default: stdout)\n",
 			LOG_FILE1, LOG_FILE2);
@@ -54,8 +53,7 @@ int	main(int argc, char *argv[])
 				res_host_buf[ZBX_HOST_BUF_SIZE], rdds43_host_buf[ZBX_HOST_BUF_SIZE],
 				rdds80_host_buf[ZBX_HOST_BUF_SIZE];
 	int			c, index,
-				maxredirs = DEFAULT_MAXREDIRS,
-				timeout = -1;
+				maxredirs = DEFAULT_MAXREDIRS;
 	FILE			*log_fd = stdout;
 	uint16_t		res_port = DEFAULT_RES_PORT, rdds43_port = DEFAULT_RDDS43_PORT,
 				rdds80_port = DEFAULT_RDDS80_PORT;
@@ -64,7 +62,7 @@ int	main(int argc, char *argv[])
 
 	opterr = 0;
 
-	while ((c = getopt(argc, argv, "t:a:w:46r:o:s:g:p:e:m:j:fh")) != -1)
+	while ((c = getopt(argc, argv, "t:a:w:46r:o:s:g:p:e:j:fh")) != -1)
 	{
 		switch (c)
 		{
@@ -100,9 +98,6 @@ int	main(int argc, char *argv[])
 				break;
 			case 'e':
 				maxredirs = atoi(optarg);
-				break;
-			case 'm':
-				timeout = atoi(optarg);
 				break;
 			case 'j':
 				json_file = optarg;
@@ -155,16 +150,11 @@ int	main(int argc, char *argv[])
 		exit_usage(argv[0]);
 	}
 
-	if (-1 == timeout)
-	{
-		timeout = RSM_TCP_TIMEOUT;
-	}
-
 	init_request(&request);
 
-	zbx_snprintf(rdds43_host_buf, sizeof(rdds43_host_buf), "%s:%hu", testedname43, rdds43_port);
+	zbx_snprintf(rdds43_host_buf, sizeof(rdds43_host_buf), "%s;%hu", testedname43, rdds43_port);
 	zbx_snprintf(rdds80_host_buf, sizeof(rdds80_host_buf), "%s:%hu", testedname80, rdds80_port);
-	zbx_snprintf(res_host_buf,    sizeof(res_host_buf),    "%s:%hu", res_ip,       res_port);
+	zbx_snprintf(res_host_buf,    sizeof(res_host_buf),    "%s;%hu", res_ip,       res_port);
 
 	zbx_snprintf(key, sizeof(key), "rsm.rdds[%s,%s,%s,%s,%s,%d,%d,%d,%d,%d,%s,%d,%d]",
 			tld,		/* Rsmhost */

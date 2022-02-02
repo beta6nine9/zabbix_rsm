@@ -252,7 +252,7 @@
 #define ZBX_RESOLVERSTATUS_LOG_PREFIX	"resolverstatus"	/* file will be <LOGDIR>/<PROBE>-ZBX_RESOLVERSTATUS_LOG_PREFIX.log */
 
 int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, int nextcheck,
-		const AGENT_REQUEST *request, AGENT_RESULT *result);
+		const AGENT_REQUEST *request, AGENT_RESULT *result, FILE *output_fd);
 int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *result, FILE *output_fd);
 int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *result, FILE *output_fd);
 int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *result);

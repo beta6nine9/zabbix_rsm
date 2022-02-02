@@ -12,8 +12,8 @@ void	zbx_on_exit(int ret)
 
 static void	exit_usage(const char *program)
 {
-	fprintf(stderr, "usage: %s -r <ip> [-o <res_port>] -u <base_url> -d <testedname> <[-4 -6]> [-m <seconds>]"
-			" [-j <file>] [-h]\n", program);
+	fprintf(stderr, "usage: %s -r <ip> [-o <res_port>] -u <base_url> -d <testedname> <[-4 -6]> [-j <file>] [-h]\n",
+			program);
 	fprintf(stderr, "       -r <res_ip>       local resolver IP\n");
 	fprintf(stderr, "       -o <res_port>     port of resolver to use (default: %hu)\n", DEFAULT_RES_PORT);
 	fprintf(stderr, "       -u <base_url>     RDAP service endpoint\n");
@@ -21,7 +21,6 @@ static void	exit_usage(const char *program)
 	fprintf(stderr, "       -4                enable IPv4\n");
 	fprintf(stderr, "       -6                enable IPv6\n");
 	fprintf(stderr, "       -h                show this message and quit\n");
-	fprintf(stderr, "       -m <seconds>      timeout (default:%d)\n", RSM_TCP_TIMEOUT);
 	fprintf(stderr, "       -j <file>         write resulting json to the file\n");
 	exit(EXIT_FAILURE);
 }
@@ -29,7 +28,7 @@ static void	exit_usage(const char *program)
 int	main(int argc, char *argv[])
 {
 	int		c, index,
-			maxredirs = DEFAULT_MAXREDIRS, timeout = -1;
+			maxredirs = DEFAULT_MAXREDIRS;
 	char		*testedname = NULL, *base_url = NULL, *res_ip = NULL,
 			ipv4_enabled = 0, ipv6_enabled = 0, *json_file = NULL,
 			key[8192],
@@ -38,7 +37,7 @@ int	main(int argc, char *argv[])
 	AGENT_REQUEST	request;
 	AGENT_RESULT	result;
 
-	while ((c = getopt(argc, argv, "r:o:u:d:46m:j:h")) != -1)
+	while ((c = getopt(argc, argv, "r:o:u:d:46j:h")) != -1)
 	{
 		switch (c)
 		{
@@ -59,9 +58,6 @@ int	main(int argc, char *argv[])
 				break;
 			case '6':
 				ipv6_enabled = 1;
-				break;
-			case 'm':
-				timeout = atoi(optarg);
 				break;
 			case 'j':
 				json_file = optarg;
@@ -109,12 +105,7 @@ int	main(int argc, char *argv[])
 		exit_usage(argv[0]);
 	}
 
-	if (-1 == timeout)
-	{
-		timeout = RSM_TCP_TIMEOUT;
-	}
-
-	zbx_snprintf(res_host_buf,  sizeof(res_host_buf),  "%s:%hu", res_ip, res_port);
+	zbx_snprintf(res_host_buf,  sizeof(res_host_buf),  "%s;%hu", res_ip, res_port);
 
 	printf("IP: %s, URL: %s, Test domain: %s\n", res_host_buf, base_url, testedname);
 

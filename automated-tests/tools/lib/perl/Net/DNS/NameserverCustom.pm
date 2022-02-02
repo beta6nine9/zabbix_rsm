@@ -311,17 +311,6 @@ sub make_reply {
 
 		$header->rcode($rcode);
 
-#		$reply->{'answer'}{'owner'}{'label'} = ['foo'];
-#		$reply->{'answer'}{'owner'}{'name'} = 'foo';
-
-#		$reply->{'answer'}{'owner'} = new Net::DNS::DomainName1035(
-#			'label' => ['foo'],
-#			'name'  => 'foo',
-#		);
-
-#		$ans->[0]{'owner'}{'name'} = 'foo';
-#		$ans->[0]{'owner'}{'label'} = ['foo'];
-
 		$reply->{answer}     = [@$ans]	if $ans;
 		$reply->{authority}  = [@$auth] if $auth;
 		$reply->{additional} = [@$add]	if $add;

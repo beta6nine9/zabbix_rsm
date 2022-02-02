@@ -225,10 +225,11 @@ zbx_subtest_result_t;
 
 typedef struct
 {
-	char	*ip;
-	int	rtt;
-	int	upd;
-	char	*nsid;
+	char		*ip;
+	unsigned short	port;
+	int		rtt;
+	int		upd;
+	char		*nsid;
 }
 zbx_ns_ip_t;
 
@@ -408,12 +409,12 @@ static int	zbx_set_resolver_ns(ldns_resolver *res, const char *name, const char 
 
 	if (LDNS_STATUS_OK != status)
 	{
-		zbx_snprintf(err, err_size, "cannot set \"%s\" (%s) as resolver. %s.", name, ip,
+		zbx_snprintf(err, err_size, "cannot set \"%s\" (%s, port:%hu) as resolver. %s.", name, ip, port,
 				ldns_get_errorstr_by_id(status));
 		return FAIL;
 	}
 
-	rsm_infof(log_fd, "successfully using %s (%s:%hu)", name, ip, port);
+	rsm_infof(log_fd, "successfully using %s (%s, port:%hu)", name, ip, port);
 	return SUCCEED;
 }
 
@@ -1862,6 +1863,29 @@ out:
 	return ret;
 }
 
+static void	get_host_and_port_from_str(const char *str, char delim, char *host, size_t host_size,
+		unsigned short *port, unsigned short default_port)
+{
+	char	*str_copy, *p;
+
+	str_copy = zbx_strdup(NULL, str);
+
+	if (NULL == (p = strchr(str_copy, delim)))
+	{
+		*port = default_port;
+	}
+	else
+	{
+		*p = '\0';
+		p++;
+		*port = atoi(p);
+	}
+
+	zbx_snprintf(host, host_size, "%s", str_copy);
+
+	zbx_free(str_copy);
+}
+
 /******************************************************************************
  *                                                                            *
  * Function: zbx_get_nameservers                                              *
@@ -1871,11 +1895,12 @@ out:
  *                                                                            *
  ******************************************************************************/
 static int	zbx_get_nameservers(char *name_servers_list, zbx_ns_t **nss, size_t *nss_num, int ipv4_enabled,
-		int ipv6_enabled, FILE *log_fd, char *err, size_t err_size)
+		int ipv6_enabled, unsigned short default_port, FILE *log_fd, char *err, size_t err_size)
 {
-	char		*ns, *ip, *ns_next;
+	char		*ns, *ip, *ns_next, ip_buf[INTERFACE_IP_LEN_MAX];
 	size_t		i, j, nss_alloc = 0;
 	zbx_ns_t	*ns_entry;
+	unsigned short	port;
 
 	*nss_num = 0;
 	ns = name_servers_list;
@@ -1891,7 +1916,7 @@ static int	zbx_get_nameservers(char *name_servers_list, zbx_ns_t **nss, size_t *
 		if (NULL == (ip = strchr(ns, ',')))
 		{
 			zbx_snprintf(err, err_size, "invalid entry \"%s\" in the list of name servers"
-					", expected \"<NS>,<IP>\"",
+					", expected \"<NS>,<IP>[;<PORT>]\"",
 					ns);
 			return FAIL;
 		}
@@ -1899,9 +1924,11 @@ static int	zbx_get_nameservers(char *name_servers_list, zbx_ns_t **nss, size_t *
 		*ip = '\0';
 		ip++;
 
-		if (SUCCEED != zbx_validate_ip(ip, ipv4_enabled, ipv6_enabled, NULL, NULL))
+		get_host_and_port_from_str(ip, ';', ip_buf, sizeof(ip_buf), &port, default_port);
+
+		if (SUCCEED != zbx_validate_ip(ip_buf, ipv4_enabled, ipv6_enabled, NULL, NULL))
 		{
-			rsm_warnf(log_fd, "unsupported IP address \"%s\" in the list of name servers, ignored", ip);
+			rsm_warnf(log_fd, "unsupported IP address \"%s\" in the list of name servers, ignored", ip_buf);
 			goto next_ns;
 		}
 
@@ -1919,7 +1946,7 @@ static int	zbx_get_nameservers(char *name_servers_list, zbx_ns_t **nss, size_t *
 
 			for (j = 0; j < ns_entry->ips_num; j++)
 			{
-				if (0 == strcmp(ns_entry->ips[j].ip, ip))
+				if (0 == strcmp(ns_entry->ips[j].ip, ip) && ns_entry->ips[j].port == port)
 				{
 					goto next_ns;
 				}
@@ -1961,7 +1988,8 @@ static int	zbx_get_nameservers(char *name_servers_list, zbx_ns_t **nss, size_t *
 			ns_entry->ips = (zbx_ns_ip_t *)zbx_realloc(ns_entry->ips, (ns_entry->ips_num + 1) * sizeof(zbx_ns_ip_t));
 		}
 
-		ns_entry->ips[ns_entry->ips_num].ip = zbx_strdup(NULL, ip);
+		ns_entry->ips[ns_entry->ips_num].ip = zbx_strdup(NULL, ip_buf);
+		ns_entry->ips[ns_entry->ips_num].port = port;
 		ns_entry->ips[ns_entry->ips_num].upd = ZBX_NO_VALUE;
 		ns_entry->ips[ns_entry->ips_num].nsid = NULL;
 
@@ -2379,9 +2407,11 @@ static int	get_dns_minns_from_value(time_t now, const char *value, int *minns)
 }
 
 int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, int nextcheck,
-		const AGENT_REQUEST *request, AGENT_RESULT *result)
+		const AGENT_REQUEST *request, AGENT_RESULT *result, FILE *output_fd)
 {
-	char			err[ZBX_ERR_BUF_SIZE], protocol, *rsmhost, *testprefix, *name_servers_list, *resolver_ip,
+	char			err[ZBX_ERR_BUF_SIZE], protocol, *rsmhost, *testprefix, *name_servers_list,
+				*resolver_str,
+				resolver_ip[ZBX_HOST_BUF_SIZE],
 				testedname[ZBX_HOST_BUF_SIZE], *minns_value;
 	zbx_dnskeys_error_t	ec_dnskeys;
 	ldns_resolver		*res = NULL;
@@ -2391,8 +2421,7 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 	size_t			i, j, nss_num = 0;
 	unsigned int		extras, current_mode, test_status, dnssec_status, nssok;
 	struct zbx_json		json;
-	uint16_t		resolver_port = DEFAULT_RESOLVER_PORT,
-				nameserver_port = DEFAULT_NAMESERVER_PORT;
+	uint16_t		resolver_port;
 	int			dnssec_enabled,
 				rdds43_enabled,
 				rdds80_enabled,
@@ -2431,7 +2460,7 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 	GET_PARAM_UINT  (tcp_enabled      , 7 , "DNS TCP enabled");
 	GET_PARAM_UINT  (ipv4_enabled     , 8 , "IPv4 enabled");
 	GET_PARAM_UINT  (ipv6_enabled     , 9 , "IPv6 enabled");
-	GET_PARAM_NEMPTY(resolver_ip      , 10, "IP address of local resolver");
+	GET_PARAM_NEMPTY(resolver_str     , 10, "IP address of local resolver");
 	GET_PARAM_UINT  (udp_rtt_limit    , 11, "maximum allowed UDP RTT");
 	GET_PARAM_UINT  (tcp_rtt_limit    , 12, "maximum allowed TCP RTT");
 	GET_PARAM_UINT  (tcp_ratio        , 13, "TCP ratio");
@@ -2496,12 +2525,17 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 	}
 
 	/* open log file */
-	if (NULL == (log_fd = open_item_log(host, rsmhost, ZBX_DNS_LOG_PREFIX, err, sizeof(err))))
+	if (NULL == output_fd)
 	{
-		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
-		return ret;
+		if (NULL == (log_fd = open_item_log(host, rsmhost, ZBX_DNS_LOG_PREFIX, err, sizeof(err))))
+		{
+			SET_MSG_RESULT(result, zbx_strdup(NULL, err));
+			return ret;
+		}
 	}
-
+	else
+		log_fd = output_fd;
+		
 	rsm_info(log_fd, "START TEST");
 
 	rsm_infof(log_fd, "mode: %s, protocol: %s, rtt limit: %d, tcp ratio: %d, minns: %d, UDP: %d, TCP: %d"
@@ -2519,11 +2553,14 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 
 	extras = (dnssec_enabled ? RESOLVER_EXTRAS_DNSSEC : RESOLVER_EXTRAS_NONE);
 
+	get_host_and_port_from_str(resolver_str, ';', resolver_ip, sizeof(resolver_ip), &resolver_port,
+			DEFAULT_RESOLVER_PORT);
+
 	/* create resolver */
 	if (SUCCEED != zbx_create_resolver(&res, "resolver", resolver_ip, resolver_port, protocol, ipv4_enabled,
 			ipv6_enabled, extras,
 			(RSM_UDP == protocol ? RSM_UDP_TIMEOUT : RSM_TCP_TIMEOUT),
-			(RSM_UDP == protocol ? RSM_UDP_RETRY : RSM_TCP_RETRY),
+			(RSM_UDP == protocol ? RSM_UDP_RETRY   : RSM_TCP_RETRY),
 			log_fd, err, sizeof(err)))
 	{
 		SET_MSG_RESULT(result, zbx_dsprintf(NULL, "cannot create resolver: %s", err));
@@ -2532,8 +2569,8 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 
 	/* get list of Name Servers and IPs, by default it will set every Name Server */
 	/* as working so if we have no IPs the result of Name Server will be SUCCEED  */
-	if (SUCCEED != zbx_get_nameservers(name_servers_list, &nss, &nss_num, ipv4_enabled, ipv6_enabled, log_fd,
-			err, sizeof(err)))
+	if (SUCCEED != zbx_get_nameservers(name_servers_list, &nss, &nss_num, ipv4_enabled, ipv6_enabled,
+			DEFAULT_NAMESERVER_PORT, log_fd, err, sizeof(err)))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
 		goto end;
@@ -2658,7 +2695,7 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 					if (NULL != th_log_fd && SUCCEED != zbx_get_ns_ip_values(res,
 							nss[i].name,
 							nss[i].ips[j].ip,
-							nameserver_port,
+							nss[i].ips[j].port,
 							keys,
 							testedname,
 							th_log_fd,
@@ -2786,7 +2823,7 @@ end:
 			ldns_resolver_free(res);
 	}
 
-	if (NULL != log_fd)
+	if (NULL == output_fd && NULL != log_fd)
 		fclose(log_fd);
 out:
 	return ret;
@@ -3574,29 +3611,6 @@ static void	create_rdds_json(struct zbx_json *json, const char *ip43, int rtt43,
 	zbx_json_addint64(json, "status", rdds_status);
 }
 
-static void	get_host_and_port_from_str(const char *str, char *host, size_t host_size, unsigned short *port,
-		unsigned short default_port)
-{
-	char	*str_copy, *p;
-
-	str_copy = zbx_strdup(NULL, str);
-
-	if (NULL == (p = strchr(str_copy, ':')))
-	{
-		*port = default_port;
-	}
-	else
-	{
-		*p = '\0';
-		p++;
-		*port = atoi(p);
-	}
-
-	zbx_snprintf(host, host_size, "%s", str_copy);
-
-	zbx_free(str_copy);
-}
-
 int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *result, FILE *output_fd)
 {
 	char			*rsmhost, *rdds43_server_str, *rdds80_url, *resolver_str, *rdds43_ns_string, *answer = NULL,
@@ -3681,10 +3695,10 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 		}
 	}
 
-	get_host_and_port_from_str(resolver_str, resolver_ip, sizeof(resolver_ip), &resolver_port,
+	get_host_and_port_from_str(resolver_str, ';', resolver_ip, sizeof(resolver_ip), &resolver_port,
 			DEFAULT_RESOLVER_PORT);
 
-	get_host_and_port_from_str(rdds43_server_str, rdds43_server, sizeof(rdds43_server), &rdds43_port,
+	get_host_and_port_from_str(rdds43_server_str, ';', rdds43_server, sizeof(rdds43_server), &rdds43_port,
 			DEFAULT_RDDS43_PORT);
 
 	/* open log file */
@@ -3697,9 +3711,7 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 		}
 	}
 	else
-	{
 		log_fd = output_fd;
-	}
 
 	/* create resolver, note: it's used in both RDDS43 and RDDS80 tests */
 	if (SUCCEED != zbx_create_resolver(&res, "resolver", resolver_ip, resolver_port, RSM_TCP, ipv4_enabled,
@@ -4001,9 +4013,7 @@ int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 		}
 	}
 	else
-	{
 		log_fd = output_fd;
-	}
 
 	if (0 == probe_enabled)
 	{
@@ -4029,7 +4039,7 @@ int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 			goto out;
 		}
 
-		get_host_and_port_from_str(resolver_str, resolver_ip, sizeof(resolver_ip), &resolver_port,
+		get_host_and_port_from_str(resolver_str, ';', resolver_ip, sizeof(resolver_ip), &resolver_port,
 				DEFAULT_RESOLVER_PORT);
 
 		/* create resolver */

@@ -8,12 +8,10 @@
 
 [execute]
 
+"","rm -f    /tmp/dns-test-metadata-example.bin"
 "","rm -rf   /tmp/simple-check-test"
 "","mkdir -p /tmp/simple-check-test"
-
-[run-simple-check]
-
-"t_rsm_dns -t example -n ns1.example -i 127.0.0.1 -4 -r 127.0.0.1 -s 5054 -m 1 -j /tmp/simple-check-test/status.json"
+"","${cfg:paths:build_dir}/bin/t_rsm_dns -t example -n ns1.example -i 127.0.0.1 -4 -r 127.0.0.1 -s 5054 -j /tmp/simple-check-test/status.json"
 
 [stop-tool]
 
