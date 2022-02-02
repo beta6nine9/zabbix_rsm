@@ -227,7 +227,7 @@ sub run_test_case($)
 
 			execute("mysqldump --host='$db_host' --port=3306 --user='$db_user' '$db_name' > '$db_dump_file'");
 
-			$failure_message .= "db dump created: $db_dump_file";
+			$failure_message .= "db dump created: '$db_dump_file'\n";
 		}
 
 		$failure_message .= "\n";
