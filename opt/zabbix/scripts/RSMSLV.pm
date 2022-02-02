@@ -582,6 +582,11 @@ my $heartbeat_cache;
 
 sub get_heartbeat()
 {
+	if (get_monitoring_target() ne MONITORING_TARGET_REGISTRY)
+	{
+		fail("getting heartbeat is only supported for Registry Monitoring");
+	}
+
 	if (!defined($heartbeat_cache))
 	{
 		$heartbeat_cache = db_select_value(

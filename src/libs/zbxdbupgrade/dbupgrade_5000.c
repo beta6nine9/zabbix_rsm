@@ -712,6 +712,11 @@ out:
 	return ret;
 }
 
+static int	DBpatch_5000005(void)
+{
+	return DBcreate_index("alerts", "alerts_8", "acknowledgeid", 0);
+}
+
 #endif
 
 DBPATCH_START(5000)
@@ -736,5 +741,6 @@ DBPATCH_RSM(5000004, 6, 0, 0)	/* update rsm.rdds[] items to use {$RSM.TLD.RDDS43
 DBPATCH_RSM(5000004, 7, 0, 0)	/* split {$RSM.TLD.RDDS.ENABLED} macro into {$RSM.TLD.RDDS43.ENABLED} and {$RSM.TLD.RDDS80.ENABLED} */
 DBPATCH_RSM(5000004, 8, 0, 0)	/* replace {$RSM.TLD.RDDS.ENABLED} macro with {$RSM.TLD.RDDS43.ENABLED} and {$RSM.TLD.RDDS80.ENABLED} in rsm.dns[] and rsm.rdds[] item keys */
 DBPATCH_RSM(5000004, 9, 0, 0)	/* split rdds.enabled item into rdds43.enabled and rdds80.enabled */
+DBPATCH_ADD(5000005, 0, 0)
 
 DBPATCH_END()

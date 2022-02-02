@@ -38,13 +38,6 @@ extern char	*CONFIG_DB_TLS_CA_FILE;
 extern char	*CONFIG_DB_TLS_CIPHER;
 extern char	*CONFIG_DB_TLS_CIPHER_13;
 extern int	CONFIG_DBPORT;
-#ifdef DBTLS
-extern char	*CONFIG_DB_KEY_FILE;
-extern char	*CONFIG_DB_CERT_FILE;
-extern char	*CONFIG_DB_CA_FILE;
-extern char	*CONFIG_DB_CA_PATH;
-extern char	*CONFIG_DB_CIPHER;
-#endif
 extern int	CONFIG_HISTSYNCER_FORKS;
 extern int	CONFIG_UNAVAILABLE_DELAY;
 
@@ -181,6 +174,8 @@ struct	_DC_TRIGGER;
 #	define ITEM_POSTS_LEN		65535
 #	define ITEM_HEADERS_LEN		65535
 #endif
+
+#define APPLICATION_NAME_LEN		255
 
 #define HISTORY_STR_VALUE_LEN		255
 #define HISTORY_TEXT_VALUE_LEN		65535

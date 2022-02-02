@@ -18,6 +18,7 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
+
 /* RSM specifics: specific defines */
 define('ZABBIX_DB_VERSION_RSM',		2);
 
@@ -28,8 +29,9 @@ define('USER_TYPE_POWER_USER',		5);
 define('USER_TYPE_COMPLIANCE',		6);
 /* RSM specifics: end */
 
-define('ZABBIX_VERSION',		'5.0.15');
-define('ZABBIX_API_VERSION',	'5.0.15');
+define('ZABBIX_VERSION',		'5.0.19');
+define('ZABBIX_API_VERSION',	'5.0.19');
+
 define('ZABBIX_EXPORT_VERSION',	'5.0');
 define('ZABBIX_DB_VERSION',		5000004);
 
@@ -156,8 +158,9 @@ define('ZBX_DB_MAX_ID', '9223372036854775807');
 define('ZBX_DB_MAX_INSERTS', 10000);
 
 // Default db and field character set (MYSQL & POSTGRESQL)
-define('ZBX_DB_DEFAULT_CHARSET', 'UTF8');
-define('ZBX_DB_MYSQL_DEFAULT_COLLATION', 'utf8_bin');
+define('ZBX_DB_POSTGRESQL_ALLOWED_CHARSET', 'UTF8');
+define('ZBX_DB_MYSQL_ALLOWED_CHARSETS', ['UTF8', 'UTF8MB3']);
+define('ZBX_DB_MYSQL_ALLOWED_COLLATIONS', ['utf8_bin', 'utf8mb3_bin']);
 
 // Default db defines for Oracle DB
 define('ORACLE_MAX_STRING_SIZE', 4000);
