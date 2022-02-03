@@ -305,8 +305,13 @@ static int	DBpatch_5000004(void)
 	return ret;
 }
 
-/* 5000004, 1 - create {$RSM.PROXY.IP}, {$RSM.PROXY.PORT} macros */
-static int	DBpatch_5000004_1(void)
+static int	DBpatch_5000005(void)
+{
+	return DBcreate_index("alerts", "alerts_8", "acknowledgeid", 0);
+}
+
+/* 5000005, 1 - create {$RSM.PROXY.IP}, {$RSM.PROXY.PORT} macros */
+static int	DBpatch_5000005_1(void)
 {
 	int		ret = FAIL;
 
@@ -363,8 +368,8 @@ out:
 	return ret;
 }
 
-/* 5000004, 2 - create provisioning_api_log table */
-static int	DBpatch_5000004_2(void)
+/* 5000005, 2 - create provisioning_api_log table */
+static int	DBpatch_5000005_2(void)
 {
 	int	ret = FAIL;
 
@@ -388,8 +393,8 @@ out:
 	return ret;
 }
 
-/* 5000004, 3 - remove {$RSM.EPP.ENABLED} and {$RSM.TLD.EPP.ENABLED} macros from rsm.dns[] and rsm.rdds[] items */
-static int	DBpatch_5000004_3(void)
+/* 5000005, 3 - remove {$RSM.EPP.ENABLED} and {$RSM.TLD.EPP.ENABLED} macros from rsm.dns[] and rsm.rdds[] items */
+static int	DBpatch_5000005_3(void)
 {
 	int	ret = FAIL;
 
@@ -406,8 +411,8 @@ out:
 	return ret;
 }
 
-/* 5000004, 4 - rename {$RSM.TLD.RDDS.43.SERVERS} to {$RSM.TLD.RDDS43.SERVER} */
-static int	DBpatch_5000004_4(void)
+/* 5000005, 4 - rename {$RSM.TLD.RDDS.43.SERVERS} to {$RSM.TLD.RDDS43.SERVER} */
+static int	DBpatch_5000005_4(void)
 {
 	int	ret = FAIL;
 
@@ -443,8 +448,8 @@ out:
 	return ret;
 }
 
-/* 5000004, 5 - rename {$RSM.TLD.RDDS.80.SERVERS} to {$RSM.TLD.RDDS80.URL} */
-static int	DBpatch_5000004_5(void)
+/* 5000005, 5 - rename {$RSM.TLD.RDDS.80.SERVERS} to {$RSM.TLD.RDDS80.URL} */
+static int	DBpatch_5000005_5(void)
 {
 	int	ret = FAIL;
 
@@ -481,8 +486,8 @@ out:
 	return ret;
 }
 
-/* 5000004, 6 - update rsm.rdds[] items to use {$RSM.TLD.RDDS43.SERVER} and {$RSM.TLD.RDDS80.URL} */
-static int	DBpatch_5000004_6(void)
+/* 5000005, 6 - update rsm.rdds[] items to use {$RSM.TLD.RDDS43.SERVER} and {$RSM.TLD.RDDS80.URL} */
+static int	DBpatch_5000005_6(void)
 {
 	int	ret = FAIL;
 
@@ -498,8 +503,8 @@ out:
 	return ret;
 }
 
-/* 5000004, 7 - split {$RSM.TLD.RDDS.ENABLED} macro into {$RSM.TLD.RDDS43.ENABLED} and {$RSM.TLD.RDDS80.ENABLED} */
-static int	DBpatch_5000004_7(void)
+/* 5000005, 7 - split {$RSM.TLD.RDDS.ENABLED} macro into {$RSM.TLD.RDDS43.ENABLED} and {$RSM.TLD.RDDS80.ENABLED} */
+static int	DBpatch_5000005_7(void)
 {
 	int		ret = FAIL;
 
@@ -549,8 +554,8 @@ out:
 	return ret;
 }
 
-/* 5000004, 8 - replace {$RSM.TLD.RDDS.ENABLED} macro with {$RSM.TLD.RDDS43.ENABLED} and {$RSM.TLD.RDDS80.ENABLED} in rsm.dns[] and rsm.rdds[] item keys */
-static int	DBpatch_5000004_8(void)
+/* 5000005, 8 - replace {$RSM.TLD.RDDS.ENABLED} macro with {$RSM.TLD.RDDS43.ENABLED} and {$RSM.TLD.RDDS80.ENABLED} in rsm.dns[] and rsm.rdds[] item keys */
+static int	DBpatch_5000005_8(void)
 {
 	int	ret = FAIL;
 
@@ -570,8 +575,8 @@ out:
 	return ret;
 }
 
-/* 5000004, 9 - split rdds.enabled item into rdds43.enabled and rdds80.enabled */
-static int	DBpatch_5000004_9(void)
+/* 5000005, 9 - split rdds.enabled item into rdds43.enabled and rdds80.enabled */
+static int	DBpatch_5000005_9(void)
 {
 	int		ret = FAIL;
 
@@ -712,11 +717,6 @@ out:
 	return ret;
 }
 
-static int	DBpatch_5000005(void)
-{
-	return DBcreate_index("alerts", "alerts_8", "acknowledgeid", 0);
-}
-
 #endif
 
 DBPATCH_START(5000)
@@ -732,15 +732,15 @@ DBPATCH_RSM(5000002, 3, 0, 0)	/* delete "rsm.configvalue[RSM.DNS.AVAIL.MINNS]" i
 DBPATCH_RSM(5000002, 4, 0, 0)	/* replace "{$RSM.DNS.AVAIL.MINNS}" to "{$RSM.TLD.DNS.AVAIL.MINNS}" in item keys (template and hosts) */
 DBPATCH_ADD(5000003, 0, 0)
 DBPATCH_ADD(5000004, 0, 0)
-DBPATCH_RSM(5000004, 1, 0, 0)	/* create {$RSM.PROXY.IP}, {$RSM.PROXY.PORT} macros */
-DBPATCH_RSM(5000004, 2, 0, 1)	/* create provisioning_api_log table */
-DBPATCH_RSM(5000004, 3, 0, 0)	/* remove {$RSM.EPP.ENABLED} and {$RSM.TLD.EPP.ENABLED} macros from rsm.dns[] and rsm.rdds[] items */
-DBPATCH_RSM(5000004, 4, 0, 0)	/* rename {$RSM.TLD.RDDS.43.SERVERS} to {$RSM.TLD.RDDS43.SERVER} */
-DBPATCH_RSM(5000004, 5, 0, 0)	/* rename {$RSM.TLD.RDDS.80.SERVERS} to {$RSM.TLD.RDDS80.URL} */
-DBPATCH_RSM(5000004, 6, 0, 0)	/* update rsm.rdds[] items to use {$RSM.TLD.RDDS43.SERVER} and {$RSM.TLD.RDDS80.URL} */
-DBPATCH_RSM(5000004, 7, 0, 0)	/* split {$RSM.TLD.RDDS.ENABLED} macro into {$RSM.TLD.RDDS43.ENABLED} and {$RSM.TLD.RDDS80.ENABLED} */
-DBPATCH_RSM(5000004, 8, 0, 0)	/* replace {$RSM.TLD.RDDS.ENABLED} macro with {$RSM.TLD.RDDS43.ENABLED} and {$RSM.TLD.RDDS80.ENABLED} in rsm.dns[] and rsm.rdds[] item keys */
-DBPATCH_RSM(5000004, 9, 0, 0)	/* split rdds.enabled item into rdds43.enabled and rdds80.enabled */
 DBPATCH_ADD(5000005, 0, 0)
+DBPATCH_RSM(5000005, 1, 0, 0)	/* create {$RSM.PROXY.IP}, {$RSM.PROXY.PORT} macros */
+DBPATCH_RSM(5000005, 2, 0, 1)	/* create provisioning_api_log table */
+DBPATCH_RSM(5000005, 3, 0, 0)	/* remove {$RSM.EPP.ENABLED} and {$RSM.TLD.EPP.ENABLED} macros from rsm.dns[] and rsm.rdds[] items */
+DBPATCH_RSM(5000005, 4, 0, 0)	/* rename {$RSM.TLD.RDDS.43.SERVERS} to {$RSM.TLD.RDDS43.SERVER} */
+DBPATCH_RSM(5000005, 5, 0, 0)	/* rename {$RSM.TLD.RDDS.80.SERVERS} to {$RSM.TLD.RDDS80.URL} */
+DBPATCH_RSM(5000005, 6, 0, 0)	/* update rsm.rdds[] items to use {$RSM.TLD.RDDS43.SERVER} and {$RSM.TLD.RDDS80.URL} */
+DBPATCH_RSM(5000005, 7, 0, 0)	/* split {$RSM.TLD.RDDS.ENABLED} macro into {$RSM.TLD.RDDS43.ENABLED} and {$RSM.TLD.RDDS80.ENABLED} */
+DBPATCH_RSM(5000005, 8, 0, 0)	/* replace {$RSM.TLD.RDDS.ENABLED} macro with {$RSM.TLD.RDDS43.ENABLED} and {$RSM.TLD.RDDS80.ENABLED} in rsm.dns[] and rsm.rdds[] item keys */
+DBPATCH_RSM(5000005, 9, 0, 0)	/* split rdds.enabled item into rdds43.enabled and rdds80.enabled */
 
 DBPATCH_END()
