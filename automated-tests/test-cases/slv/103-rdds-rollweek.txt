@@ -1,6 +1,6 @@
 [test-case]
 
-"103 RDDS rollweek"
+"RDDS rollweek"
 
 [prepare-server-database]
 

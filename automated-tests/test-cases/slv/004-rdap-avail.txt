@@ -1,6 +1,6 @@
 [test-case]
 
-"004 RDAP availability up/down"
+"RDAP availability up/down"
 
 [prepare-server-database]
 

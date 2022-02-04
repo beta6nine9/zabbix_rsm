@@ -1,6 +1,6 @@
 [test-case]
 
-"303 RDDS RTT"
+"RDDS RTT"
 
 [prepare-server-database]
 

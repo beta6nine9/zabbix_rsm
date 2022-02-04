@@ -1,6 +1,6 @@
 [test-case]
 
-"002 Pre-filled Catalog IDs"
+"Pre-filled Catalog IDs"
 
 [empty-directory]
 

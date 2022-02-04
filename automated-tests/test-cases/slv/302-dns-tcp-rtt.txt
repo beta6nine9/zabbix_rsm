@@ -1,6 +1,6 @@
 [test-case]
 
-"302 DNS TCP RTT"
+"DNS TCP RTT"
 
 [prepare-server-database]
 

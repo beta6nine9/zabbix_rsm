@@ -1,6 +1,6 @@
 [test-case]
 
-"010 No dns incident"
+"No dns incident"
 
 [prepare-server-database]
 

@@ -1,6 +1,6 @@
 [test-case]
 
-"009 Invalid monitoring target (ry)"
+"Invalid monitoring target (ry)"
 
 [prepare-server-database]
 

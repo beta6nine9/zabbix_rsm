@@ -1,6 +1,6 @@
 [test-case]
 
-"201 DNS downtime"
+"DNS downtime"
 
 [prepare-server-database]
 

@@ -1,6 +1,6 @@
 [test-case]
 
-"006 Invalid endpoint"
+"Invalid endpoint"
 
 [prepare-server-database]
 

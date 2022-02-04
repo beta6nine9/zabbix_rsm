@@ -1,6 +1,6 @@
 [test-case]
 
-"018 Resolved false positive dns incident"
+"Resolved false positive dns incident"
 
 [prepare-server-database]
 

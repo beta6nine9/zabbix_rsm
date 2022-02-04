@@ -1,6 +1,6 @@
 [test-case]
 
-"005 DNS NS availability up/down"
+"DNS NS availability up/down"
 
 [prepare-server-database]
 

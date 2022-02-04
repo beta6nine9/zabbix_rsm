@@ -1,6 +1,6 @@
 [test-case]
 
-"012 Probe not found (ry)"
+"Probe not found (ry)"
 
 [prepare-server-database]
 

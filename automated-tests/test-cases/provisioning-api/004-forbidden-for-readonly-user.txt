@@ -1,6 +1,6 @@
 [test-case]
 
-"004 Forbidden for readonly user"
+"Forbidden for readonly user"
 
 [prepare-server-database]
 

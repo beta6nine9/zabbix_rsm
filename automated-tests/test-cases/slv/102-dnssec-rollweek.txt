@@ -1,6 +1,6 @@
 [test-case]
 
-"102 DNSSEC rollweek"
+"DNSSEC rollweek"
 
 [prepare-server-database]
 

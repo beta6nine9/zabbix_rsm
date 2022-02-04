@@ -1,6 +1,6 @@
 [test-case]
 
-"001 All services disabled"
+"All services disabled"
 
 [prepare-server-database]
 

@@ -1,6 +1,6 @@
 [test-case]
 
-"005 Incidents within rolling week"
+"Incidents within rolling week"
 
 [prepare-server-database]
 

@@ -1,6 +1,6 @@
 [test-case]
 
-"008 Active RDDS incident"
+"Active RDDS incident"
 
 [prepare-server-database]
 

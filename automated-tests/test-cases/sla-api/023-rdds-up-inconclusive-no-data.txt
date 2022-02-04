@@ -1,6 +1,6 @@
 [test-case]
 
-"023 rdds up-inconclusive-no-data"
+"rdds up-inconclusive-no-data"
 
 [prepare-server-database]
 

@@ -1,6 +1,6 @@
 [test-case]
 
-"001 Catalog IDs generation"
+"Catalog IDs generation"
 
 [empty-directory]
 

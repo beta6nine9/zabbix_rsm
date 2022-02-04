@@ -1,6 +1,6 @@
 [test-case]
 
-"003 All services enabled, all down (and throttled NSIDs)"
+"All services enabled, all down (and throttled NSIDs)"
 
 [prepare-server-database]
 

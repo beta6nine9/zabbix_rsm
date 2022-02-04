@@ -1,6 +1,6 @@
 [test-case]
 
-"001 Username not specified"
+"Username not specified"
 
 [prepare-server-database]
 

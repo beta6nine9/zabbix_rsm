@@ -1,6 +1,6 @@
 [test-case]
 
-"002 Invalid username"
+"Invalid username"
 
 [prepare-server-database]
 

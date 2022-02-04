@@ -1,6 +1,6 @@
 [test-case]
 
-"009 Active RDAP incident"
+"Active RDAP incident"
 
 [prepare-server-database]
 

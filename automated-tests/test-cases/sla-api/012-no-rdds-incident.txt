@@ -1,6 +1,6 @@
 [test-case]
 
-"012 No rdds incident"
+"No rdds incident"
 
 [prepare-server-database]
 
