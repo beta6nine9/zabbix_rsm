@@ -1,6 +1,6 @@
 [test-case]
 
-"#num# - onboard 2 probes (all services enabled), onboard 2 tlds (all services enabled), update 1 tld (disable RDAP and RDDS80)"
+"onboard 2 probes (all services enabled), onboard 2 tlds (all services enabled), update 1 tld (disable RDAP and RDDS80)"
 
 [prepare-server-database]
 

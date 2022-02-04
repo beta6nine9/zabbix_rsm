@@ -1,6 +1,6 @@
 [test-case]
 
-"#num# - onboard 2 probes (all services enabled on one probe, only rdap enabled on other probe), onboard 2 tlds (all enabled on tld1, rdds disabled on tld2)"
+"onboard 2 probes (all services enabled on one probe, only rdap enabled on other probe), onboard 2 tlds (all enabled on tld1, rdds disabled on tld2)"
 
 [prepare-server-database]
 

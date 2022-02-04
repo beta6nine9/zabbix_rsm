@@ -1,6 +1,6 @@
 [test-case]
 
-"#num# - standalone rdap - onboard 2 probes (all services enabled), onboard 2 tlds (all services enabled), disable rdds and rdap, enable them back"
+"standalone rdap - onboard 2 probes (all services enabled), onboard 2 tlds (all services enabled), disable rdds and rdap, enable them back"
 
 [prepare-server-database]
 

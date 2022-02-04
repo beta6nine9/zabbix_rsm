@@ -1,6 +1,6 @@
 [test-case]
 
-"#num# - onboard 2 probes (all services enabled), onboard 2 tlds (all services enabled), modify name servers (disable some, create some new)"
+"onboard 2 probes (all services enabled), onboard 2 tlds (all services enabled), modify name servers (disable some, create some new)"
 
 [prepare-server-database]
 
