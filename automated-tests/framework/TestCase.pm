@@ -325,6 +325,11 @@ sub __cmd_test_case($)
 
 	($test_case_name) = __unpack($args);
 
+	if ($test_case_name !~ /^\d/ && $test_case_filename =~ /\/(\d+)[^\/]+$/)
+	{
+		$test_case_name = $1 . ' - ' . $test_case_name;
+	}
+
 	info("test case - '$test_case_name'");
 }
 
