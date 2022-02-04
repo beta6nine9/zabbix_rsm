@@ -1,6 +1,6 @@
 [test-case]
 
-"129 - TLD, invalid inputs - misc scenarios"
+"TLD, invalid inputs - misc scenarios"
 
 [prepare-server-database]
 

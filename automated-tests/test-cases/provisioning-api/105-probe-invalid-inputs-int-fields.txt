@@ -1,6 +1,6 @@
 [test-case]
 
-"105 - Probe, invalid inputs - integer fields"
+"Probe, invalid inputs - integer fields"
 
 [prepare-server-database]
 

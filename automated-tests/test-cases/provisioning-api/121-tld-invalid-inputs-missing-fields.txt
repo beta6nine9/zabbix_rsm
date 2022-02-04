@@ -1,6 +1,6 @@
 [test-case]
 
-"121 - TLD, invalid inputs - missing fields"
+"TLD, invalid inputs - missing fields"
 
 [prepare-server-database]
 

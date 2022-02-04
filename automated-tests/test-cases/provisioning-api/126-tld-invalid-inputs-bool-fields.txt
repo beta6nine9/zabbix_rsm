@@ -1,6 +1,6 @@
 [test-case]
 
-"126 - TLD, invalid inputs - bool fields"
+"TLD, invalid inputs - bool fields"
 
 [prepare-server-database]
 

@@ -1,6 +1,6 @@
 [test-case]
 
-"128 - TLD, invalid inputs - array fields"
+"TLD, invalid inputs - array fields"
 
 [prepare-server-database]
 

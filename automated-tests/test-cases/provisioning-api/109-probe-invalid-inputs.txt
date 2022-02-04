@@ -1,6 +1,6 @@
 [test-case]
 
-"109 - Probe, invalid inputs - misc scenarios"
+"Probe, invalid inputs - misc scenarios"
 
 [prepare-server-database]
 

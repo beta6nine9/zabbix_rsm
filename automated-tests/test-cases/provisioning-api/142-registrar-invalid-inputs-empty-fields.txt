@@ -1,6 +1,6 @@
 [test-case]
 
-"142 - Registrar, invalid inputs - empty fields"
+"Registrar, invalid inputs - empty fields"
 
 [prepare-server-database]
 

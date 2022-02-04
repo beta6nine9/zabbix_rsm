@@ -1,6 +1,6 @@
 [test-case]
 
-"146 - Registrar, invalid inputs - bool fields"
+"Registrar, invalid inputs - bool fields"
 
 [prepare-server-database]
 
