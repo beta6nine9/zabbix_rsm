@@ -246,16 +246,16 @@ class Tld extends MonitoringTarget
 			'status'     => HOST_STATUS_MONITORED,
 			'interfaces' => [self::DEFAULT_MAIN_INTERFACE],
 			'groups'     => [
-				['groupid' => $this->hostGroupIds['TLDs']],
-				['groupid' => $this->hostGroupIds[$this->newObject['tldType']]],
+				['groupid' => $this->getHostGroupId('TLDs')],
+				['groupid' => $this->getHostGroupId($this->newObject['tldType'])],
 			],
 			'templates'  => [
-				['templateid' => $this->templateIds['Template Rsmhost Config ' . $this->newObject['id']]],
-				['templateid' => $this->templateIds['Template Config History']],
-				['templateid' => $this->templateIds['Template DNS Status']],
-				['templateid' => $this->templateIds['Template DNSSEC Status']],
-				['templateid' => $this->templateIds['Template RDAP Status']],
-				['templateid' => $this->templateIds['Template RDDS Status']],
+				['templateid' => $this->getTemplateId('Template Rsmhost Config ' . $this->newObject['id'])],
+				['templateid' => $this->getTemplateId('Template Config History')],
+				['templateid' => $this->getTemplateId('Template DNS Status')],
+				['templateid' => $this->getTemplateId('Template DNSSEC Status')],
+				['templateid' => $this->getTemplateId('Template RDAP Status')],
+				['templateid' => $this->getTemplateId('Template RDDS Status')],
 			],
 		];
 		$data = API::Host()->create($config);
@@ -270,15 +270,13 @@ class Tld extends MonitoringTarget
 		$config = [
 			'host'      => 'Template DNS Test - ' . $this->newObject['id'],
 			'groups'    => [
-				['groupid' => $this->hostGroupIds['Templates - TLD']],
+				['groupid' => $this->getHostGroupId('Templates - TLD')],
 			],
 			'templates' => [
-				['templateid' => $this->templateIds['Template DNS Test']],
+				['templateid' => $this->getTemplateId('Template DNS Test')],
 			],
 		];
 		$data = API::Template()->create($config);
-
-		$this->templateIds['Template DNS Test - ' . $this->newObject['id']] = $data['templateids'][0];
 	}
 
 	/******************************************************************************************************************
@@ -311,8 +309,8 @@ class Tld extends MonitoringTarget
 			'hostid' => $this->getHostId($this->newObject['id']),
 			'status' => HOST_STATUS_MONITORED,
 			'groups' => [
-				['groupid' => $this->hostGroupIds['TLDs']],
-				['groupid' => $this->hostGroupIds[$this->newObject['tldType']]],
+				['groupid' => $this->getHostGroupId('TLDs')],
+				['groupid' => $this->getHostGroupId($this->newObject['tldType'])],
 			],
 		];
 		$data = API::Host()->update($config);
@@ -324,7 +322,7 @@ class Tld extends MonitoringTarget
 		parent::disableObject();
 
 		$this->updateMacros(
-			$this->templateIds['Template Rsmhost Config ' . $this->getInput('id')],
+			$this->getTemplateId('Template Rsmhost Config ' . $this->getInput('id')),
 			[
 				self::MACRO_TLD_DNS_UDP_ENABLED => 0,
 				self::MACRO_TLD_DNS_TCP_ENABLED => 0,
@@ -334,8 +332,6 @@ class Tld extends MonitoringTarget
 				self::MACRO_TLD_RDDS80_ENABLED => 0,
 			]
 		);
-
-		$this->templateIds += $this->getTemplateIds(['Template DNS Test - ' . $this->getInput('id')]);
 	}
 
 	/******************************************************************************************************************
@@ -353,50 +349,6 @@ class Tld extends MonitoringTarget
 	/******************************************************************************************************************
 	 * Misc functions                                                                                                 *
 	 ******************************************************************************************************************/
-
-	protected function getHostGroupNames(?array $additionalNames): array
-	{
-		$names = [
-			// groups for "<rsmhost>" host
-			'Templates - TLD',
-			'TLDs',
-			$this->newObject['tldType'],
-			// groups for "<rsmhost> <probe>" hosts
-			$this->newObject['tldType'] . ' Probe results',
-			'TLD Probe results',
-		];
-
-		if (!is_null($additionalNames))
-		{
-			$names = array_merge($names, $additionalNames);
-		}
-
-		return $names;
-	}
-
-	protected function getTemplateNames(?array $additionalNames): array
-	{
-		$names = [
-			// templates for "<rsmhost>" host
-			'Template Config History',
-			'Template DNS Status',
-			'Template DNSSEC Status',
-			'Template RDAP Status',
-			'Template RDDS Status',
-			// templates for "<rsmhost> <probe>" hosts
-			'Template DNS Test',
-			'Template DNS Test - ' . $this->newObject['id'],
-			'Template RDAP Test',
-			'Template RDDS Test',
-		];
-
-		if (!is_null($additionalNames))
-		{
-			$names = array_merge($names, $additionalNames);
-		}
-
-		return $names;
-	}
 
 	protected function getRsmhostConfigsFromInput(): array
 	{
@@ -499,7 +451,7 @@ class Tld extends MonitoringTarget
 		sort($createNs);
 		sort($disableNs);
 
-		$testTemplateId = $this->templateIds['Template DNS Test - ' . $this->newObject['id']];
+		$testTemplateId = $this->getTemplateId('Template DNS Test - ' . $this->newObject['id']);
 
 		if (!empty($createNsIp))
 		{

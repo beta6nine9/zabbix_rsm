@@ -83,51 +83,36 @@ abstract class ActionBaseEx extends ActionBase
 	protected const MONITORING_TARGET_REGISTRY  = 'registry';
 	protected const MONITORING_TARGET_REGISTRAR = 'registrar';
 
-	protected $templateIds  = [];
-	protected $hostGroupIds = [];
+	private $hostGroupIds = [];
+	private $templateIds  = [];
 
 	/**
 	 * Creates "<rsmhost> <probe>" hosts when either new rsmhost or new probe is created.
 	 */
 	protected function createTestHosts(array $rsmhostConfigs, array $probeConfigs): array
 	{
-		// get missing host group ids
+		// cache host group ids
 
-		$missingHostGroups = array_merge(
-			array_diff(
-				array_map(fn($rsmhost) => 'TLD ' . $rsmhost, array_keys($rsmhostConfigs)),
-				array_keys($this->hostGroupIds)
-			),
-			array_diff(
-				array_keys($probeConfigs),
-				array_keys($this->hostGroupIds)
-			)
+		$hostGroups = array_merge(
+			array_map(fn($rsmhost) => 'TLD ' . $rsmhost, array_keys($rsmhostConfigs)),
+			array_keys($probeConfigs),
 		);
-		$this->hostGroupIds += $this->getHostGroupIds($missingHostGroups);
+		$this->getHostGroupIds($hostGroups);
 
-		// get missing template ids
+		// cache template ids
 
-		$missingTemplates = array_merge(
-			array_diff(
-				array_map(fn($rsmhost) => 'Template Rsmhost Config ' . $rsmhost, array_keys($rsmhostConfigs)),
-				array_keys($this->templateIds)
-			),
-			array_diff(
-				array_map(fn($probe) => 'Template Probe Config ' . $probe, array_keys($probeConfigs)),
-				array_keys($this->templateIds)
-			)
+		$templates = array_merge(
+			array_map(fn($rsmhost) => 'Template Rsmhost Config ' . $rsmhost, array_keys($rsmhostConfigs)),
+			array_map(fn($probe) => 'Template Probe Config ' . $probe, array_keys($probeConfigs)),
 		);
 		if ($this->getMonitoringTarget() === self::MONITORING_TARGET_REGISTRY)
 		{
-			$missingTemplates = array_merge(
-				$missingTemplates,
-				array_diff(
-					array_map(fn($rsmhost) => 'Template DNS Test - ' . $rsmhost, array_keys($rsmhostConfigs)),
-					array_keys($this->templateIds)
-				)
+			$templates = array_merge(
+				$templates,
+				array_map(fn($rsmhost) => 'Template DNS Test - ' . $rsmhost, array_keys($rsmhostConfigs)),
 			);
 		}
-		$this->templateIds += $this->getTemplateIds($missingTemplates);
+		$this->getTemplateIds($templates);
 
 		// create configs for hosts
 
@@ -168,19 +153,13 @@ abstract class ActionBaseEx extends ActionBase
 	 */
 	protected function updateTestHosts(array $rsmhostConfigs, array $probeConfigs): array
 	{
-		// get missing host group ids
+		// cache host group ids
 
-		$missingHostGroups = array_merge(
-			array_diff(
-				array_map(fn($rsmhost) => 'TLD ' . $rsmhost, array_keys($rsmhostConfigs)),
-				array_keys($this->hostGroupIds)
-			),
-			array_diff(
-				array_keys($probeConfigs),
-				array_keys($this->hostGroupIds)
-			)
+		$hostGroups = array_merge(
+			array_map(fn($rsmhost) => 'TLD ' . $rsmhost, array_keys($rsmhostConfigs)),
+			array_keys($probeConfigs),
 		);
-		$this->hostGroupIds += $this->getHostGroupIds($missingHostGroups);
+		$this->getHostGroupIds($hostGroups);
 
 		// create list of hosts, get hostids
 
@@ -228,25 +207,25 @@ abstract class ActionBaseEx extends ActionBase
 	private function getTestHostGroupsConfig(string $tldType, string $probe, string $rsmhost): array
 	{
 		return [
-			['groupid' => $this->hostGroupIds['TLD Probe results']],
-			['groupid' => $this->hostGroupIds[$tldType . ' Probe results']],
-			['groupid' => $this->hostGroupIds[$probe]],
-			['groupid' => $this->hostGroupIds['TLD ' . $rsmhost]],
+			['groupid' => $this->getHostGroupId('TLD Probe results')],
+			['groupid' => $this->getHostGroupId($tldType . ' Probe results')],
+			['groupid' => $this->getHostGroupId($probe)],
+			['groupid' => $this->getHostGroupId('TLD ' . $rsmhost)],
 		];
 	}
 
 	protected function getTestTemplatesConfig(string $probe, string $rsmhost): array
 	{
 		$templates = [
-			['templateid' => $this->templateIds['Template RDAP Test']],
-			['templateid' => $this->templateIds['Template RDDS Test']],
-			['templateid' => $this->templateIds['Template Probe Config ' . $probe]],
-			['templateid' => $this->templateIds['Template Rsmhost Config ' . $rsmhost]],
+			['templateid' => $this->getTemplateId('Template RDAP Test')],
+			['templateid' => $this->getTemplateId('Template RDDS Test')],
+			['templateid' => $this->getTemplateId('Template Probe Config ' . $probe)],
+			['templateid' => $this->getTemplateId('Template Rsmhost Config ' . $rsmhost)],
 		];
 
 		if ($this->getMonitoringTarget() === self::MONITORING_TARGET_REGISTRY)
 		{
-			$templates[] = ['templateid' => $this->templateIds['Template DNS Test - ' . $rsmhost]];
+			$templates[] = ['templateid' => $this->getTemplateId('Template DNS Test - ' . $rsmhost)];
 		}
 
 		return $templates;
@@ -269,8 +248,8 @@ abstract class ActionBaseEx extends ActionBase
 		$config['hostids'] = array_merge(
 			$config['hostids'],
 			[
-				$this->templateIds['Template RDAP Test'],
-				$this->templateIds['Template RDDS Test'],
+				$this->getTemplateId('Template RDAP Test'),
+				$this->getTemplateId('Template RDDS Test'),
 			]
 		);
 		if (!empty($statusHosts))
@@ -278,8 +257,8 @@ abstract class ActionBaseEx extends ActionBase
 			$config['hostids'] = array_merge(
 				$config['hostids'],
 				[
-					$this->templateIds['Template RDAP Status'],
-					$this->templateIds['Template RDDS Status'],
+					$this->getTemplateId('Template RDAP Status'),
+					$this->getTemplateId('Template RDDS Status'),
 				]
 			);
 		}
@@ -289,7 +268,7 @@ abstract class ActionBaseEx extends ActionBase
 			$config['hostids'] = array_merge(
 				$config['hostids'],
 				[
-					$this->templateIds['Template DNS Test'],
+					$this->getTemplateId('Template DNS Test'),
 				]
 			);
 			if (!empty($statusHosts))
@@ -297,8 +276,8 @@ abstract class ActionBaseEx extends ActionBase
 				$config['hostids'] = array_merge(
 					$config['hostids'],
 					[
-						$this->templateIds['Template DNS Status'],
-						$this->templateIds['Template DNSSEC Status'],
+						$this->getTemplateId('Template DNS Status'),
+						$this->getTemplateId('Template DNSSEC Status'),
 					]
 				);
 			}
@@ -479,13 +458,10 @@ abstract class ActionBaseEx extends ActionBase
 
 	protected function getProbeConfigs(): array
 	{
-		// get 'Probes' host group id
-		$this->hostGroupIds += $this->getHostGroupIds(['Probes']);
-
 		// get probe hosts
 		$data = API::Host()->get([
 			'output'   => ['host', 'proxy_hostid'],
-			'groupids' => [$this->hostGroupIds['Probes']],
+			'groupids' => [$this->getHostGroupId('Probes')],
 		]);
 		$hosts = array_column($data, 'host', 'hostid');
 		$proxies = array_column($data, 'proxy_hostid', 'hostid');
@@ -536,13 +512,10 @@ abstract class ActionBaseEx extends ActionBase
 	{
 		// Warning: This method is used from Probe.php and cannot be moved to Tld.php and Registrar.php
 
-		// get 'TLDs' host group id
-		$this->hostGroupIds += $this->getHostGroupIds(['TLDs']);
-
 		// get tld hosts
 		$data = API::Host()->get([
 			'output'   => ['host'],
-			'groupids' => [$this->hostGroupIds['TLDs']],
+			'groupids' => [$this->getHostGroupId('TLDs')],
 		]);
 		$hosts = array_column($data, 'host', 'hostid');
 
@@ -943,7 +916,7 @@ abstract class ActionBaseEx extends ActionBase
 		$config = [
 			'output'      => ['itemid'],
 			'templated'   => true,
-			'templateids' => [$this->templateIds[$template]],
+			'templateids' => [$this->getTemplateId($template)],
 			'search'      => ['key_' => $key],
 		];
 		$data = API::Item()->get($config);
@@ -1003,17 +976,40 @@ abstract class ActionBaseEx extends ActionBase
 	 */
 	protected function getHostGroupIds(array $hostGroupNames): array
 	{
-		if (empty($hostGroupNames))
+		$missing = array_diff($hostGroupNames, array_keys($this->hostGroupIds));
+
+		if (empty($this->hostGroupIds))
 		{
-			return [];
+			$missing = array_merge(
+				$missing,
+				[
+					'TLDs',
+					'TLD Probe results',
+					'gTLD',
+					'gTLD Probe results',
+					'ccTLD',
+					'ccTLD Probe results',
+					'otherTLD',
+					'otherTLD Probe results',
+					'testTLD',
+					'testTLD Probe results',
+					'Probes',
+					'Probes - Mon',
+					'Templates - TLD',
+				]
+			);
 		}
 
-		$data = API::HostGroup()->get([
-			'output' => ['groupid', 'name'],
-			'filter' => ['name' => $hostGroupNames],
-		]);
+		if (!empty($missing))
+		{
+			$data = API::HostGroup()->get([
+				'output' => ['groupid', 'name'],
+				'filter' => ['name' => $missing],
+			]);
+			$this->hostGroupIds += array_column($data, 'groupid', 'name');
+		}
 
-		return array_column($data, 'groupid', 'name');
+		return array_column(array_map(fn($name) => [$name, $this->hostGroupIds[$name]], $hostGroupNames), 1, 0);
 	}
 
 	/**
@@ -1025,6 +1021,10 @@ abstract class ActionBaseEx extends ActionBase
 	 */
 	protected function getHostGroupId(string $hostGroup): int
 	{
+		if (array_key_exists($hostGroup, $this->hostGroupIds))
+		{
+			return $this->hostGroupIds[$hostGroup];
+		}
 		return current($this->getHostGroupIds([$hostGroup]));
 	}
 
@@ -1045,17 +1045,37 @@ abstract class ActionBaseEx extends ActionBase
 	 */
 	protected function getTemplateIds(array $templateHosts): array
 	{
-		if (empty($templateHosts))
+		$missing = array_diff($templateHosts, array_keys($this->templateIds));
+
+		if (empty($this->templateIds))
 		{
-			return [];
+			$missing = array_merge(
+				$missing,
+				[
+					'Template Proxy Health',
+					'Template Probe Status',
+					'Template Config History',
+					'Template DNS Status',
+					'Template DNS Test',
+					'Template DNSSEC Status',
+					'Template RDAP Status',
+					'Template RDAP Test',
+					'Template RDDS Status',
+					'Template RDDS Test',
+				]
+			);
 		}
 
-		$data = API::Template()->get([
-			'output' => ['templateid', 'host'],
-			'filter' => ['host' => $templateHosts],
-		]);
+		if (!empty($missing))
+		{
+			$data = API::Template()->get([
+				'output' => ['templateid', 'host'],
+				'filter' => ['host' => $missing],
+			]);
+			$this->templateIds += array_column($data, 'templateid', 'host');
+		}
 
-		return array_column($data, 'templateid', 'host');
+		return array_column(array_map(fn($name) => [$name, $this->templateIds[$name]], $templateHosts), 1, 0);
 	}
 
 	/**
@@ -1067,6 +1087,10 @@ abstract class ActionBaseEx extends ActionBase
 	 */
 	protected function getTemplateId(string $templateHost): int
 	{
+		if (array_key_exists($templateHost, $this->templateIds))
+		{
+			return $this->templateIds[$templateHost];
+		}
 		return current($this->getTemplateIds([$templateHost]));
 	}
 

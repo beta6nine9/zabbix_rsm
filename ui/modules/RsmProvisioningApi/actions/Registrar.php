@@ -176,14 +176,14 @@ class Registrar extends MonitoringTarget
 			'status'     => HOST_STATUS_MONITORED,
 			'interfaces' => [self::DEFAULT_MAIN_INTERFACE],
 			'groups'     => [
-				['groupid' => $this->hostGroupIds['TLDs']],
-				['groupid' => $this->hostGroupIds['gTLD']],
+				['groupid' => $this->getHostGroupId('TLDs')],
+				['groupid' => $this->getHostGroupId('gTLD')],
 			],
 			'templates'  => [
-				['templateid' => $this->templateIds['Template Rsmhost Config ' . $this->newObject['id']]],
-				['templateid' => $this->templateIds['Template Config History']],
-				['templateid' => $this->templateIds['Template RDAP Status']],
-				['templateid' => $this->templateIds['Template RDDS Status']],
+				['templateid' => $this->getTemplateId('Template Rsmhost Config ' . $this->newObject['id'])],
+				['templateid' => $this->getTemplateId('Template Config History')],
+				['templateid' => $this->getTemplateId('Template RDAP Status')],
+				['templateid' => $this->getTemplateId('Template RDDS Status')],
 			],
 		];
 		$data = API::Host()->create($config);
@@ -203,8 +203,8 @@ class Registrar extends MonitoringTarget
 			'info_2' => $this->newObject['registrarFamily'],
 			'status' => HOST_STATUS_MONITORED,
 			'groups' => [
-				['groupid' => $this->hostGroupIds['TLDs']],
-				['groupid' => $this->hostGroupIds['gTLD']],
+				['groupid' => $this->getHostGroupId('TLDs')],
+				['groupid' => $this->getHostGroupId('gTLD')],
 			],
 		];
 		$data = API::Host()->update($config);
@@ -216,7 +216,7 @@ class Registrar extends MonitoringTarget
 		parent::disableObject();
 
 		$this->updateMacros(
-			$this->templateIds['Template Rsmhost Config ' . $this->getInput('id')],
+			$this->getTemplateId('Template Rsmhost Config ' . $this->getInput('id')),
 			[
 				self::MACRO_TLD_RDAP_ENABLED => 0,
 				self::MACRO_TLD_RDDS43_ENABLED => 0,
@@ -228,46 +228,6 @@ class Registrar extends MonitoringTarget
 	/******************************************************************************************************************
 	 * Misc functions                                                                                               *
 	 ******************************************************************************************************************/
-
-	protected function getHostGroupNames(?array $additionalNames): array
-	{
-		$names = [
-			// groups for "<rsmhost>" host
-			'Templates - TLD',
-			'TLDs',
-			'gTLD',
-			// groups for "<rsmhost> <probe>" hosts
-			'gTLD Probe results',
-			'TLD Probe results',
-		];
-
-		if (!is_null($additionalNames))
-		{
-			$names = array_merge($names, $additionalNames);
-		}
-
-		return $names;
-	}
-
-	protected function getTemplateNames(?array $additionalNames): array
-	{
-		$names = [
-			// templates for "<rsmhost>" host
-			'Template Config History',
-			'Template RDAP Status',
-			'Template RDDS Status',
-			// templates for "<rsmhost> <probe>" hosts
-			'Template RDAP Test',
-			'Template RDDS Test',
-		];
-
-		if (!is_null($additionalNames))
-		{
-			$names = array_merge($names, $additionalNames);
-		}
-
-		return $names;
-	}
 
 	protected function getRsmhostConfigsFromInput(): array
 	{

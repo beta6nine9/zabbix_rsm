@@ -15,8 +15,6 @@ abstract class MonitoringTarget extends ActionBaseEx
 	abstract protected function getMacrosConfig(): array;
 	abstract protected function createStatusHost(): int;
 	abstract protected function updateStatustHost(): int;
-	abstract protected function getHostGroupNames(?array $additionalNames): array;
-	abstract protected function getTemplateNames(?array $additionalNames): array;
 
 	protected $statusHostId = null;
 
@@ -87,9 +85,6 @@ abstract class MonitoringTarget extends ActionBaseEx
 			throw new RsmException(400, 'At least one service must be enabled');
 		}
 
-		$this->hostGroupIds += $this->getHostGroupIds($this->getHostGroupNames(null));
-		$this->templateIds  += $this->getTemplateIds($this->getTemplateNames(null));
-
 		$this->createHostGroups();
 		$this->createTemplates();
 		$this->statusHostId = $this->createStatusHost();
@@ -114,8 +109,6 @@ abstract class MonitoringTarget extends ActionBaseEx
 			'name' => 'TLD ' . $this->newObject['id'],
 		];
 		$data = API::HostGroup()->create($config);
-
-		$this->hostGroupIds['TLD ' . $this->newObject['id']] = $data['groupids'][0];
 	}
 
 	protected function createTemplates(): void
@@ -123,13 +116,11 @@ abstract class MonitoringTarget extends ActionBaseEx
 		$config = [
 			'host'   => 'Template Rsmhost Config ' . $this->newObject['id'],
 			'groups' => [
-				['groupid' => $this->hostGroupIds['Templates - TLD']],
+				['groupid' => $this->getHostGroupId('Templates - TLD')],
 			],
 			'macros' => $this->getMacrosConfig(),
 		];
 		$data = API::Template()->create($config);
-
-		$this->templateIds['Template Rsmhost Config ' . $this->newObject['id']] = $data['templateids'][0];
 	}
 
 	/******************************************************************************************************************
@@ -145,9 +136,6 @@ abstract class MonitoringTarget extends ActionBaseEx
 
 	protected function updateObject(): void
 	{
-		$this->hostGroupIds += $this->getHostGroupIds($this->getHostGroupNames(['TLD ' . $this->newObject['id']]));
-		$this->templateIds  += $this->getTemplateIds($this->getTemplateNames(null));
-
 		$this->updateTemplates();
 		$this->statusHostId = $this->updateStatustHost();
 
@@ -178,9 +166,7 @@ abstract class MonitoringTarget extends ActionBaseEx
 	{
 		$this->generateMonthlyReport();
 
-		$this->templateIds += $this->getTemplateIds(['Template Rsmhost Config ' . $this->getInput('id')]);
-
-		$templateId = $this->templateIds['Template Rsmhost Config ' . $this->input['id']];
+		$templateId = $this->getTemplateId('Template Rsmhost Config ' . $this->input['id']);
 		$hosts = $this->getHostsByTemplateId($templateId, null, null);
 
 		foreach ($hosts as $host)

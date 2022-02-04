@@ -171,9 +171,6 @@ class Probe extends ActionBaseEx
 
 	protected function createObject(): void
 	{
-		$this->hostGroupIds += $this->getHostGroupIds($this->getHostGroupNames(null));
-		$this->templateIds  += $this->getTemplateIds($this->getTemplateNames(null));
-
 		// create proxy
 
 		$config = [
@@ -198,19 +195,17 @@ class Probe extends ActionBaseEx
 			'name' => $this->newObject['id'],
 		];
 		$data = API::HostGroup()->create($config);
-		$this->hostGroupIds[$this->newObject['id']] = $data['groupids'][0];
 
 		// create "Template Probe Config <probe>" template
 
 		$config = [
 			'host'   => 'Template Probe Config ' . $this->newObject['id'],
 			'groups' => [
-				['groupid' => $this->hostGroupIds['Templates - TLD']],
+				['groupid' => $this->getHostGroupId('Templates - TLD')],
 			],
 			'macros' => $this->getMacrosConfig(),
 		];
 		$data = API::Template()->create($config);
-		$this->templateIds['Template Probe Config ' . $this->newObject['id']] = $data['templateids'][0];
 
 		// create "<probe>" host
 
@@ -220,11 +215,11 @@ class Probe extends ActionBaseEx
 			'proxy_hostid' => $proxyId,
 			'interfaces'   => [self::DEFAULT_MAIN_INTERFACE],
 			'groups'       => [
-				['groupid' => $this->hostGroupIds['Probes']],
+				['groupid' => $this->getHostGroupId('Probes')],
 			],
 			'templates'    => [
-				['templateid' => $this->templateIds['Template Probe Config ' . $this->newObject['id']]],
-				['templateid' => $this->templateIds['Template Probe Status']],
+				['templateid' => $this->getTemplateId('Template Probe Config ' . $this->newObject['id'])],
+				['templateid' => $this->getTemplateId('Template Probe Status')],
 			],
 		];
 		$data = API::Host()->create($config);
@@ -245,10 +240,10 @@ class Probe extends ActionBaseEx
 				],
 			],
 			'groups'       => [
-				['groupid' => $this->hostGroupIds['Probes - Mon']],
+				['groupid' => $this->getHostGroupId('Probes - Mon')],
 			],
 			'templates'    => [
-				['templateid' => $this->templateIds['Template Proxy Health']],
+				['templateid' => $this->getTemplateId('Template Proxy Health')],
 			],
 			'macros'       => [
 				$this->createMacroConfig(self::MACRO_PROBE_PROXY_NAME, $this->newObject['id']),
@@ -265,7 +260,13 @@ class Probe extends ActionBaseEx
 
 		// enable/disable items, based on service status and standalone rdap status
 
-		$this->updateServiceItemStatus([], $testHosts, $rsmhostConfigs, $probeConfigs);
+		$data = API::Host()->get([
+			'output'   => ['host'],
+			'groupids' => [$this->getHostGroupId('TLDs')],
+		]);
+		$statusHosts = array_column($data, 'host', 'hostid');
+
+		$this->updateServiceItemStatus($statusHosts, $testHosts, $rsmhostConfigs, $probeConfigs);
 	}
 
 	/******************************************************************************************************************
@@ -281,9 +282,6 @@ class Probe extends ActionBaseEx
 
 	protected function updateObject(): void
 	{
-		$this->hostGroupIds += $this->getHostGroupIds($this->getHostGroupNames(null));
-		$this->templateIds += $this->getTemplateIds($this->getTemplateNames(null));
-
 		// update proxy
 
 		$proxyId = $this->getProxyId($this->newObject['id']);
@@ -348,8 +346,16 @@ class Probe extends ActionBaseEx
 
 		// enable/disable items, based on service status and standalone rdap status
 
+		$data = API::Host()->get([
+			'output'   => ['host'],
+			'groupids' => [$this->getHostGroupId('TLDs')],
+		]);
+		$statusHosts = array_column($data, 'host', 'hostid');
+
 		$testHosts = $this->getHostsByHostGroup($this->newObject['id'], null, null);
-		$this->updateServiceItemStatus([], $testHosts, $rsmhostConfigs, $probeConfigs);
+		$testHosts = array_column($testHosts, 'host', 'hostid');
+
+		$this->updateServiceItemStatus($statusHosts, $testHosts, $rsmhostConfigs, $probeConfigs);
 	}
 
 	protected function disableObject(): void
@@ -439,49 +445,6 @@ class Probe extends ActionBaseEx
 		return [
 			$this->newObject['id'] => $config,
 		];
-	}
-
-	private function getHostGroupNames(?array $additionalNames): array
-	{
-		$names = [
-			// groups for "<rsmhost>" and "<rsmhost> - mon" hosts
-			'Templates - TLD',
-			'Probes',
-			'Probes - Mon',
-			// groups for "<rsmhost> <probe>" hosts
-			'TLD Probe results',
-			'gTLD Probe results',
-			'ccTLD Probe results',
-			'testTLD Probe results',
-			'otherTLD Probe results',
-		];
-
-		if (!is_null($additionalNames))
-		{
-			$names = array_merge($names, $additionalNames);
-		}
-
-		return $names;
-	}
-
-	private function getTemplateNames(?array $additionalNames): array
-	{
-		$names = [
-			// templates for "<rsmhost>" and "<rsmhost> - mon" hosts
-			'Template Probe Status',
-			'Template Proxy Health',
-			// templates for "<rsmhost> <probe>" hosts
-			'Template DNS Test',
-			'Template RDAP Test',
-			'Template RDDS Test',
-		];
-
-		if (!is_null($additionalNames))
-		{
-			$names = array_merge($names, $additionalNames);
-		}
-
-		return $names;
 	}
 
 	private function getMacrosConfig(): array
