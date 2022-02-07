@@ -5585,7 +5585,7 @@ int	check_rsm_resolver_status(const char *host, const AGENT_REQUEST *request, AG
 	ldns_rdf	*query_rdf = NULL;
 	FILE		*log_fd = NULL;
 	unsigned int	extras;
-	uint16_t	resolver_port;
+	uint16_t	resolver_port = DEFAULT_RESOLVER_PORT;
 	int		timeout, tries, ipv4_enabled, ipv6_enabled, status = 0, ret = SYSINFO_RET_FAIL;
 
 	if (5 != request->nparam)

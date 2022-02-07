@@ -14,7 +14,8 @@ EXTRA_DIST = \
 	ui \
 	include \
 	conf \
-	sass
+	sass \
+	api
 
 EXTRA_DIST += opt
 
