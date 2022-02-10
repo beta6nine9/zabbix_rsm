@@ -1192,6 +1192,16 @@ sub __cmd_provisioning_api($)
 
 	if ($status_code != $expected_code)
 	{
+		# print out human-readable "message-body" if it exists, as it may contain some useful debug info
+		if ($response_body =~ /"message-body": "(.*)"/)
+		{
+			my $str = $1;
+			$str =~ s/\\n/\n/g;
+			$str =~ s/\\"/"/g;
+			$str =~ s/^/message-body: /mg;
+			info($str);
+		}
+
 		fail("unexpected status code '$status_code', expected '$expected_code'");
 	}
 
