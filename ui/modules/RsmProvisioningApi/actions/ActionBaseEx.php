@@ -238,54 +238,36 @@ abstract class ActionBaseEx extends ActionBase
 	{
 		$hosts = $statusHosts + $testHosts;
 
+		// get template ids
+
+		$templateNames = [];
+
+		$templateNames[] = 'Template RDAP Test';
+		$templateNames[] = 'Template RDDS Test';
+		if (!empty($statusHosts))
+		{
+			$templateNames[] = 'Template RDAP Status';
+			$templateNames[] = 'Template RDDS Status';
+		}
+		if ($this->getMonitoringTarget() === self::MONITORING_TARGET_REGISTRY)
+		{
+			$templateNames[] = 'Template DNS Test';
+			if (!empty($statusHosts))
+			{
+				$templateNames[] = 'Template DNS Status';
+				$templateNames[] = 'Template DNSSEC Status';
+			}
+		}
+
+		$templates = array_flip($this->getTemplateIds($templateNames)); # [id => name, ...]
+
 		// get template items
 
 		$config = [
 			'output' => ['key_', 'hostid'],
-			'hostids' => [],
+			'hostids' => array_keys($templates),
 		];
-
-		$config['hostids'] = array_merge(
-			$config['hostids'],
-			[
-				$this->getTemplateId('Template RDAP Test'),
-				$this->getTemplateId('Template RDDS Test'),
-			]
-		);
-		if (!empty($statusHosts))
-		{
-			$config['hostids'] = array_merge(
-				$config['hostids'],
-				[
-					$this->getTemplateId('Template RDAP Status'),
-					$this->getTemplateId('Template RDDS Status'),
-				]
-			);
-		}
-
-		if ($this->getMonitoringTarget() === self::MONITORING_TARGET_REGISTRY)
-		{
-			$config['hostids'] = array_merge(
-				$config['hostids'],
-				[
-					$this->getTemplateId('Template DNS Test'),
-				]
-			);
-			if (!empty($statusHosts))
-			{
-				$config['hostids'] = array_merge(
-					$config['hostids'],
-					[
-						$this->getTemplateId('Template DNS Status'),
-						$this->getTemplateId('Template DNSSEC Status'),
-					]
-				);
-			}
-		}
-
 		$data = API::Item()->get($config);
-
-		$templates = array_flip($this->templateIds);
 
 		$templateItems = []; // [host => [key1, key2, ...], ...]
 
