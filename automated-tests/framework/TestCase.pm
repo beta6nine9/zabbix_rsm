@@ -1378,25 +1378,9 @@ sub __cmd_check_host($)
 		fail("unsupported status '$expected_status', supported statuses: 'enabled', 'disabled', 'template'");
 	}
 
-	my $sql;
-	my $params;
-	my $rows;
-
-	$sql = "select" .
-			" hosts.hostid," .
-			"hosts.status," .
-			"hosts.name," .
-			"hosts.info_1," .
-			"hosts.info_2," .
-			"proxies.host as proxy" .
-		" from" .
-			" hosts" .
-			" left join hosts as proxies on proxies.hostid = hosts.proxy_hostid" .
-		" where" .
-			" hosts.host=? and" .
-			" hosts.status in (?,?,?)";
-	$params = [$host, HOST_STATUS_MONITORED, HOST_STATUS_NOT_MONITORED, HOST_STATUS_TEMPLATE];
-	$rows = db_select($sql, $params);
+	my $sql = "select hostid from hosts where host=? and status in (?,?,?)";
+	my $params = [$host, HOST_STATUS_MONITORED, HOST_STATUS_NOT_MONITORED, HOST_STATUS_TEMPLATE];
+	my $rows = db_select($sql, $params);
 
 	if (scalar(@{$rows}) == 0)
 	{
@@ -1407,17 +1391,23 @@ sub __cmd_check_host($)
 		fail("found more than one host '$host'");
 	}
 
-	my ($hostid, $status, $name, $info_1, $info_2, $proxy) = @{$rows->[0]};
+	my $hostid = $rows->[0][0];
 
-	my $template_count   = db_select_value("select count(*) from hosts_templates where hostid=?", [$hostid]);
-	my $host_group_count = db_select_value("select count(*) from hosts_groups    where hostid=?", [$hostid]);
-	my $macro_count      = db_select_value("select count(*) from hostmacro       where hostid=?", [$hostid]);
-	my $item_count       = db_select_value("select count(*) from items           where hostid=?", [$hostid]);
+	__compare_db_row(
+		"hosts",
+		[["hostid", $hostid]],
+		["hostid", "created", "proxy_hostid", "host"],
+		{
+			"status"      => $statuses->{$expected_status},
+			"name"        => $host,
+			"info_1"      => $expected_info_1,
+			"info_2"      => $expected_info_2,
+			"description" => "",
+		},
+	);
 
-	__expect($name  , $host                        , "unexpected host name '%s', expected '%s'");
-	__expect($status, $statuses->{$expected_status}, "unexpected status '%d', expected '%d'");
-	__expect($info_1, $expected_info_1             , "unexpected info_1 '%s', expected '%s'");
-	__expect($info_2, $expected_info_2             , "unexpected info_2 's', expected '%s'");
+	$sql = "select proxies.host from hosts left join hosts as proxies on proxies.hostid=hosts.proxy_hostid where hosts.hostid=?";
+	my $proxy = db_select_value($sql, [$hostid]);
 
 	if (($proxy // '') ne $expected_proxy)
 	{
@@ -1430,6 +1420,11 @@ sub __cmd_check_host($)
 			fail("host is not monitored by proxy, expected it to be monitored by proxy '$expected_proxy'");
 		}
 	}
+
+	my $template_count   = db_select_value("select count(*) from hosts_templates where hostid=?", [$hostid]);
+	my $host_group_count = db_select_value("select count(*) from hosts_groups    where hostid=?", [$hostid]);
+	my $macro_count      = db_select_value("select count(*) from hostmacro       where hostid=?", [$hostid]);
+	my $item_count       = db_select_value("select count(*) from items           where hostid=?", [$hostid]);
 
 	__expect($template_count  , $expected_template_count  , "unexpected template count '%d', expected '%d'");
 	__expect($host_group_count, $expected_host_group_count, "unexpected host group count '%d', expected '%d'");
@@ -2008,7 +2003,7 @@ sub __compare_db_row($$$$)
 
 	$sql = "select" .
 			" column_name," .
-			"regexp_replace(column_default, \"^'(.*)'\$\", '\\\\1')" .
+			"if(column_default<>'NULL',regexp_replace(column_default, \"^'(.*)'\$\", '\\\\1'),NULL)" .
 		" from" .
 			" information_schema.columns" .
 		" where" .
