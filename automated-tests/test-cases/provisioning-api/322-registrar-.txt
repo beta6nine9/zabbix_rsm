@@ -1,0 +1,501 @@
+[test-case]
+
+"onboard 2 probes (all services enabled on one probe, only dns enabled on other probe), onboard 2 registrars (all enabled on rr1, rdds disabled on rr2)"
+
+[prepare-server-database]
+
+[set-global-macro]
+
+"{$RSM.MONITORING.TARGET}","registrar"
+"{$RSM.IP4.ROOTSERVERS1}","193.0.14.129,192.5.5.241,199.7.83.42,198.41.0.4,192.112.36.4"
+"{$RSM.IP6.ROOTSERVERS1}","2001:7fe::53,2001:500:2f::f,2001:500:9f::42,2001:503:ba3e::2:30,2001:500:12::d0d"
+"{$RSM.DNS.PROBE.ONLINE}","2"
+"{$RSM.RDDS.PROBE.ONLINE}","2"
+"{$RSM.RDAP.PROBE.ONLINE}","2"
+"{$RSM.IP4.MIN.PROBE.ONLINE}","2"
+"{$RSM.IP6.MIN.PROBE.ONLINE}","2"
+"{$RSM.RDAP.STANDALONE}","1609459200"
+
+[provisioning-api]
+
+"/probeNodes/probe1","PUT",200,"readwrite","300-input-probe1.json",""
+"/probeNodes/probe2","PUT",200,"readwrite","300-input-probe2-dns.json",""
+
+"/registrars/1","PUT",200,"readwrite","300-input-rr1.json",""
+"/registrars/2","PUT",200,"readwrite","300-input-rr2-rdap.json",""
+
+[check-proxy]
+
+"probe1","enabled","192.168.200.1",10001,"test","00112233445566778899aabbccddeeff"
+"probe2","enabled","192.168.200.2",10002,"test","ffeeddccbbaa99887766554433221100"
+
+[check-host]
+
+# host,status,info_1,info_2,proxy,template_count,host_group_count,macro_count,item_count
+
+"Template Probe Config probe1","template","","","",0,1,7,0
+"Template Probe Config probe2","template","","","",0,1,7,0
+"Template Rsmhost Config 1"   ,"template","","","",0,1,11,0
+"Template Rsmhost Config 2"   ,"template","","","",0,1,11,0
+
+"probe1"      ,"enabled",""                ,""                  ,"probe1",2,1,0,6
+"probe1 - mon","enabled",""                ,""                  ,        ,1,1,1,2
+"probe2"      ,"enabled",""                ,""                  ,"probe2",2,1,0,6
+"probe2 - mon","enabled",""                ,""                  ,        ,1,1,1,2
+"1"           ,"enabled","Registrar Name 1","Registrar Family 1",        ,4,2,0,18
+"1 probe1"    ,"enabled",""                ,""                  ,"probe1",4,4,0,17
+"1 probe2"    ,"enabled",""                ,""                  ,"probe2",4,4,0,17
+"2"           ,"enabled","Registrar Name 2","Registrar Family 2",        ,4,2,0,18
+"2 probe1"    ,"enabled",""                ,""                  ,"probe1",4,4,0,17
+"2 probe2"    ,"enabled",""                ,""                  ,"probe2",4,4,0,17
+
+[check-host-count]
+
+# Expected templates:
+# * "Template Probe Status"
+# * "Template Proxy Health"
+# * "Template Config History"
+# * "Template DNS Status"
+# * "Template DNSSEC Status"
+# * "Template DNS Test"
+# * "Template RDAP Status"
+# * "Template RDAP Test"
+# * "Template RDDS Status"
+# * "Template RDDS Test"
+# * "Template Probe Config <probe>" for each probe
+# * "Template Rsmhost Config tld<rsmhost>" for each rsmhost
+#
+# 10 + (2 probes * 1) + (2 rsmhosts * 1) = 14
+"template",14
+
+# Expected proxies - one for each probe
+"proxy",2
+
+# Expected hosts:
+# * "Global macro history"
+# * "Probe statuses"
+# * 2 for each probe
+# * 1 for each rsmhost
+# * 1 for each "rsmhost, probe"
+#
+# 2 + (2 probes * 2) + (2 rsmhosts * 1) + (2 probes * 2 rsmhosts * 1) = 12
+"host",12
+
+[check-host-template]
+
+"probe1"      ,"Template Probe Config probe1"
+"probe1"      ,"Template Probe Status"
+
+"probe1 - mon","Template Proxy Health"
+
+"probe2"      ,"Template Probe Config probe2"
+"probe2"      ,"Template Probe Status"
+
+"probe2 - mon","Template Proxy Health"
+
+"1"           ,"Template Config History"
+"1"           ,"Template RDAP Status"
+"1"           ,"Template RDDS Status"
+"1"           ,"Template Rsmhost Config 1"
+
+"1 probe1"    ,"Template RDAP Test"
+"1 probe1"    ,"Template RDDS Test"
+"1 probe1"    ,"Template Probe Config probe1"
+"1 probe1"    ,"Template Rsmhost Config 1"
+
+"1 probe2"    ,"Template RDAP Test"
+"1 probe2"    ,"Template RDDS Test"
+"1 probe2"    ,"Template Probe Config probe2"
+"1 probe2"    ,"Template Rsmhost Config 1"
+
+"2"           ,"Template Config History"
+"2"           ,"Template RDAP Status"
+"2"           ,"Template RDDS Status"
+"2"           ,"Template Rsmhost Config 2"
+
+"2 probe1"    ,"Template RDAP Test"
+"2 probe1"    ,"Template RDDS Test"
+"2 probe1"    ,"Template Probe Config probe1"
+"2 probe1"    ,"Template Rsmhost Config 2"
+
+"2 probe2"    ,"Template RDAP Test"
+"2 probe2"    ,"Template RDDS Test"
+"2 probe2"    ,"Template Probe Config probe2"
+"2 probe2"    ,"Template Rsmhost Config 2"
+
+[check-host-group]
+
+"probe1"      ,"Probes"
+
+"probe1 - mon","Probes - Mon"
+
+"probe2"      ,"Probes"
+
+"probe2 - mon","Probes - Mon"
+
+"1"           ,"TLDs"
+"1"           ,"gTLD"
+
+"1 probe1"    ,"TLD Probe results"
+"1 probe1"    ,"gTLD Probe results"
+"1 probe1"    ,"probe1"
+"1 probe1"    ,"TLD 1"
+
+"1 probe2"    ,"TLD Probe results"
+"1 probe2"    ,"gTLD Probe results"
+"1 probe2"    ,"probe2"
+"1 probe2"    ,"TLD 1"
+
+"2"           ,"TLDs"
+"2"           ,"gTLD"
+
+"2 probe1"    ,"TLD Probe results"
+"2 probe1"    ,"gTLD Probe results"
+"2 probe1"    ,"probe1"
+"2 probe1"    ,"TLD 2"
+
+"2 probe2"    ,"TLD Probe results"
+"2 probe2"    ,"gTLD Probe results"
+"2 probe2"    ,"probe2"
+"2 probe2"    ,"TLD 2"
+
+[check-host-macro]
+
+"Template Probe Config probe1","{$RSM.IP4.ENABLED}" ,"1"
+"Template Probe Config probe1","{$RSM.IP6.ENABLED}" ,"1"
+"Template Probe Config probe1","{$RSM.PROXY.IP}"    ,"192.168.200.1"
+"Template Probe Config probe1","{$RSM.PROXY.PORT}"  ,"10001"
+"Template Probe Config probe1","{$RSM.RDAP.ENABLED}","1"
+"Template Probe Config probe1","{$RSM.RDDS.ENABLED}","1"
+"Template Probe Config probe1","{$RSM.RESOLVER}"    ,"127.0.0.1"
+
+"Template Probe Config probe2","{$RSM.IP4.ENABLED}" ,"1"
+"Template Probe Config probe2","{$RSM.IP6.ENABLED}" ,"1"
+"Template Probe Config probe2","{$RSM.PROXY.IP}"    ,"192.168.200.2"
+"Template Probe Config probe2","{$RSM.PROXY.PORT}"  ,"10002"
+"Template Probe Config probe2","{$RSM.RDAP.ENABLED}","0"
+"Template Probe Config probe2","{$RSM.RDDS.ENABLED}","0"
+"Template Probe Config probe2","{$RSM.RESOLVER}"    ,"127.0.0.1"
+
+"Template Rsmhost Config 1"   ,"{$RDAP.BASE.URL}"          ,"https://www.nic.example/domain"
+"Template Rsmhost Config 1"   ,"{$RDAP.TEST.DOMAIN}"       ,"nic.example"
+"Template Rsmhost Config 1"   ,"{$RDAP.TLD.ENABLED}"       ,"1"
+"Template Rsmhost Config 1"   ,"{$RSM.RDDS.NS.STRING}"     ,"Name Server:"
+"Template Rsmhost Config 1"   ,"{$RSM.RDDS43.TEST.DOMAIN}" ,"nic.example"
+"Template Rsmhost Config 1"   ,"{$RSM.TLD}"                ,"1"
+#"Template Rsmhost Config 1"   ,"{$RSM.TLD.CONFIG.TIMES}"   ,"<timestamp>"
+"Template Rsmhost Config 1"   ,"{$RSM.TLD.RDDS43.ENABLED}" ,"1"
+"Template Rsmhost Config 1"   ,"{$RSM.TLD.RDDS43.SERVER}"  ,"whois.nic.example"
+"Template Rsmhost Config 1"   ,"{$RSM.TLD.RDDS80.ENABLED}" ,"1"
+"Template Rsmhost Config 1"   ,"{$RSM.TLD.RDDS80.URL}"     ,"https://whois.nic.example"
+
+"Template Rsmhost Config 2"   ,"{$RDAP.BASE.URL}"          ,"https://www.nic.example/domain"
+"Template Rsmhost Config 2"   ,"{$RDAP.TEST.DOMAIN}"       ,"nic.example"
+"Template Rsmhost Config 2"   ,"{$RDAP.TLD.ENABLED}"       ,"1"
+"Template Rsmhost Config 2"   ,"{$RSM.RDDS.NS.STRING}"     ,""
+"Template Rsmhost Config 2"   ,"{$RSM.RDDS43.TEST.DOMAIN}" ,""
+"Template Rsmhost Config 2"   ,"{$RSM.TLD}"                ,"2"
+#"Template Rsmhost Config 2"   ,"{$RSM.TLD.CONFIG.TIMES}"   ,"<timestamp>"
+"Template Rsmhost Config 2"   ,"{$RSM.TLD.RDDS43.ENABLED}" ,"0"
+"Template Rsmhost Config 2"   ,"{$RSM.TLD.RDDS43.SERVER}"  ,""
+"Template Rsmhost Config 2"   ,"{$RSM.TLD.RDDS80.ENABLED}" ,"0"
+"Template Rsmhost Config 2"   ,"{$RSM.TLD.RDDS80.URL}"     ,""
+
+"probe1 - mon","{$RSM.PROXY_NAME}","probe1"
+
+"probe2 - mon","{$RSM.PROXY_NAME}","probe2"
+
+[set-variable]
+
+"resolver-status-key"       ,"resolver.status[{$RSM.RESOLVER},{$RESOLVER.STATUS.TIMEOUT},{$RESOLVER.STATUS.TRIES},{$RSM.IP4.ENABLED},{$RSM.IP6.ENABLED}]"
+"probe-status-automatic-key","rsm.probe.status[automatic,""{$RSM.IP4.ENABLED}"",""{$RSM.IP6.ENABLED}"",""{$RSM.IP4.ROOTSERVERS1}"",""{$RSM.IP6.ROOTSERVERS1}"",""{$RSM.IP4.MIN.SERVERS}"",""{$RSM.IP6.MIN.SERVERS}"",""{$RSM.IP4.REPLY.MS}"",""{$RSM.IP6.REPLY.MS}"",""{$RSM.PROBE.ONLINE.DELAY}""]"
+"probe-status-manual-key"   ,"rsm.probe.status[manual]"
+"rdap-test-key"             ,"rdap[{$RSM.TLD},{$RDAP.TEST.DOMAIN},{$RDAP.BASE.URL},{$RSM.RDDS.MAXREDIRS},{$RSM.RDDS.RTT.HIGH},{$RDAP.TLD.ENABLED},{$RSM.RDAP.ENABLED},{$RSM.IP4.ENABLED},{$RSM.IP6.ENABLED},{$RSM.RESOLVER}]"
+"rdds-test-key"             ,"rsm.rdds[{$RSM.TLD},{$RSM.TLD.RDDS43.SERVER},{$RSM.TLD.RDDS80.URL},{$RSM.RDDS43.TEST.DOMAIN},{$RSM.RDDS.NS.STRING},{$RSM.RDDS.ENABLED},{$RSM.TLD.RDDS43.ENABLED},{$RSM.TLD.RDDS80.ENABLED},{$RSM.IP4.ENABLED},{$RSM.IP6.ENABLED},{$RSM.RESOLVER},{$RSM.RDDS.RTT.HIGH},{$RSM.RDDS.MAXREDIRS}]"
+
+[check-item]
+
+# "host","key","status","item_type","value_type","delay","history","trends","units","params_","master_item","valuemap","name",preproc_count,trigger_count
+
+"probe1"      ,"rsm.errors"                                    ,"Internal error rate"                          ,"enabled" ,"simple"    ,"float" ,"1m"               ,"90d","365d",""        ,""                          ,""                ,""                        ,1,2
+"probe1"      ,"${resolver-status-key}"                        ,"Local resolver status ($1)"                   ,"enabled" ,"simple"    ,"uint64","1m"               ,"90d","365d",""        ,""                          ,""                ,"Service state"           ,0,0
+"probe1"      ,"${probe-status-automatic-key}"                 ,"Probe status ($1)"                            ,"enabled" ,"simple"    ,"uint64","1m"               ,"90d","365d",""        ,""                          ,""                ,"RSM Probe status"        ,0,1
+"probe1"      ,"${probe-status-manual-key}"                    ,"Probe status ($1)"                            ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,"RSM Probe status"        ,0,2
+"probe1"      ,"probe.configvalue[RSM.IP4.ENABLED]"            ,"Value of $1 variable"                         ,"enabled" ,"calculated","uint64","5m"               ,"90d","365d",""        ,"{$RSM.IP4.ENABLED}"        ,""                ,""                        ,0,0
+"probe1"      ,"probe.configvalue[RSM.IP6.ENABLED]"            ,"Value of $1 variable"                         ,"enabled" ,"calculated","uint64","5m"               ,"90d","365d",""        ,"{$RSM.IP6.ENABLED}"        ,""                ,""                        ,0,0
+
+"probe1 - mon","zabbix[proxy,{$RSM.PROXY_NAME},lastaccess]"    ,"Availability of probe"                        ,"enabled" ,"internal"  ,"uint64","60"               ,"90d","365d","unixtime",""                          ,""                ,""                        ,0,1
+"probe1 - mon","rsm.probe.online"                              ,"Probe main status"                            ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,"RSM Probe status"        ,0,0
+
+"probe2"      ,"rsm.errors"                                    ,"Internal error rate"                          ,"enabled" ,"simple"    ,"float" ,"1m"               ,"90d","365d",""        ,""                          ,""                ,""                        ,1,2
+"probe2"      ,"${resolver-status-key}"                        ,"Local resolver status ($1)"                   ,"enabled" ,"simple"    ,"uint64","1m"               ,"90d","365d",""        ,""                          ,""                ,"Service state"           ,0,0
+"probe2"      ,"${probe-status-automatic-key}"                 ,"Probe status ($1)"                            ,"enabled" ,"simple"    ,"uint64","1m"               ,"90d","365d",""        ,""                          ,""                ,"RSM Probe status"        ,0,1
+"probe2"      ,"${probe-status-manual-key}"                    ,"Probe status ($1)"                            ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,"RSM Probe status"        ,0,2
+"probe2"      ,"probe.configvalue[RSM.IP4.ENABLED]"            ,"Value of $1 variable"                         ,"enabled" ,"calculated","uint64","5m"               ,"90d","365d",""        ,"{$RSM.IP4.ENABLED}"        ,""                ,""                        ,0,0
+"probe2"      ,"probe.configvalue[RSM.IP6.ENABLED]"            ,"Value of $1 variable"                         ,"enabled" ,"calculated","uint64","5m"               ,"90d","365d",""        ,"{$RSM.IP6.ENABLED}"        ,""                ,""                        ,0,0
+
+"probe2 - mon","zabbix[proxy,{$RSM.PROXY_NAME},lastaccess]"    ,"Availability of probe"                        ,"enabled" ,"internal"  ,"uint64","60"               ,"90d","365d","unixtime",""                          ,""                ,""                        ,0,1
+"probe2 - mon","rsm.probe.online"                              ,"Probe main status"                            ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,"RSM Probe status"        ,0,0
+
+"1"           ,"dns.tcp.enabled"                               ,"DNS TCP enabled/disabled"                     ,"enabled" ,"calculated","uint64","1m"               ,"90d","365d",""        ,"{$RSM.TLD.DNS.TCP.ENABLED}",""                ,""                        ,0,0
+"1"           ,"dns.udp.enabled"                               ,"DNS UDP enabled/disabled"                     ,"enabled" ,"calculated","uint64","1m"               ,"90d","365d",""        ,"{$RSM.TLD.DNS.UDP.ENABLED}",""                ,""                        ,0,0
+"1"           ,"dnssec.enabled"                                ,"DNSSEC enabled/disabled"                      ,"enabled" ,"calculated","uint64","1m"               ,"90d","365d",""        ,"{$RSM.TLD.DNSSEC.ENABLED}" ,""                ,""                        ,0,0
+"1"           ,"rdap.enabled"                                  ,"RDAP enabled/disabled"                        ,"enabled" ,"calculated","uint64","1m"               ,"90d","365d",""        ,"{$RDAP.TLD.ENABLED}"       ,""                ,""                        ,0,0
+"1"           ,"rdds43.enabled"                                ,"RDDS43 enabled/disabled"                      ,"enabled" ,"calculated","uint64","1m"               ,"90d","365d",""        ,"{$RSM.TLD.RDDS43.ENABLED}" ,""                ,""                        ,0,0
+"1"           ,"rdds80.enabled"                                ,"RDDS80 enabled/disabled"                      ,"enabled" ,"calculated","uint64","1m"               ,"90d","365d",""        ,"{$RSM.TLD.RDDS80.ENABLED}" ,""                ,""                        ,0,0
+"1"           ,"rsm.slv.rdap.avail"                            ,"RDAP availability"                            ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,"RSM Service Availability",0,1
+"1"           ,"rsm.slv.rdap.downtime"                         ,"RDAP minutes of downtime"                     ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,""                        ,0,5
+"1"           ,"rsm.slv.rdap.rollweek"                         ,"RDAP weekly unavailability"                   ,"enabled" ,"trapper"   ,"float" ,"0"                ,"90d","365d","%"       ,""                          ,""                ,""                        ,0,5
+"1"           ,"rsm.slv.rdap.rtt.failed"                       ,"RDAP Number of failed monthly queries"        ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,""                        ,0,0
+"1"           ,"rsm.slv.rdap.rtt.performed"                    ,"RDAP Number of performed monthly queries"     ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,""                        ,0,0
+"1"           ,"rsm.slv.rdap.rtt.pfailed"                      ,"RDAP Ratio of failed monthly queries"         ,"enabled" ,"trapper"   ,"float" ,"0"                ,"90d","365d","%"       ,""                          ,""                ,""                        ,0,5
+"1"           ,"rsm.slv.rdds.avail"                            ,"RDDS availability"                            ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,"RSM Service Availability",0,1
+"1"           ,"rsm.slv.rdds.downtime"                         ,"RDDS minutes of downtime"                     ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,""                        ,0,5
+"1"           ,"rsm.slv.rdds.rollweek"                         ,"RDDS weekly unavailability"                   ,"enabled" ,"trapper"   ,"float" ,"0"                ,"90d","365d","%"       ,""                          ,""                ,""                        ,0,5
+"1"           ,"rsm.slv.rdds.rtt.failed"                       ,"RDDS Number of failed monthly queries"        ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,""                        ,0,0
+"1"           ,"rsm.slv.rdds.rtt.performed"                    ,"RDDS Number of performed monthly queries"     ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,""                        ,0,0
+"1"           ,"rsm.slv.rdds.rtt.pfailed"                      ,"RDDS Ratio of failed monthly queries"         ,"enabled" ,"trapper"   ,"float" ,"0"                ,"90d","365d","%"       ,""                          ,""                ,""                        ,0,5
+
+"1 probe1"    ,"rdap.ip"                                       ,"RDAP IP"                                      ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdap-test-key}",""                        ,1,0
+"1 probe1"    ,"rdap.rtt"                                      ,"RDAP RTT"                                     ,"enabled" ,"dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${rdap-test-key}","RSM RDAP rtt"            ,1,0
+"1 probe1"    ,"rdap.status"                                   ,"RDAP status"                                  ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${rdap-test-key}","Service state"           ,1,0
+"1 probe1"    ,"rdap.target"                                   ,"RDAP target"                                  ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdap-test-key}",""                        ,1,0
+"1 probe1"    ,"rdap.testedname"                               ,"RDAP tested name"                             ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdap-test-key}",""                        ,1,0
+"1 probe1"    ,"${rdap-test-key}"                              ,"RDAP Test"                                    ,"enabled" ,"simple"    ,"text"  ,"{$RSM.RDAP.DELAY}","0"  ,"0"   ,""        ,""                          ,""                ,""                        ,0,0
+"1 probe1"    ,"rsm.rdds.43.ip"                                ,"RDDS43 IP"                                    ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdds-test-key}",""                        ,1,0
+"1 probe1"    ,"rsm.rdds.43.rtt"                               ,"RDDS43 RTT"                                   ,"enabled" ,"dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${rdds-test-key}","RSM RDDS rtt"            ,1,0
+"1 probe1"    ,"rsm.rdds.43.status"                            ,"RDDS43 status"                                ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${rdds-test-key}","Service state"           ,1,0
+"1 probe1"    ,"rsm.rdds.43.target"                            ,"RDDS43 target"                                ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdds-test-key}",""                        ,1,0
+"1 probe1"    ,"rsm.rdds.43.testedname"                        ,"RDDS43 tested name"                           ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdds-test-key}",""                        ,1,0
+"1 probe1"    ,"rsm.rdds.80.ip"                                ,"RDDS80 IP"                                    ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdds-test-key}",""                        ,1,0
+"1 probe1"    ,"rsm.rdds.80.rtt"                               ,"RDDS80 RTT"                                   ,"enabled" ,"dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${rdds-test-key}","RSM RDDS rtt"            ,1,0
+"1 probe1"    ,"rsm.rdds.80.status"                            ,"RDDS80 status"                                ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${rdds-test-key}","Service state"           ,1,0
+"1 probe1"    ,"rsm.rdds.80.target"                            ,"RDDS80 target"                                ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdds-test-key}",""                        ,1,0
+"1 probe1"    ,"rsm.rdds.status"                               ,"RDDS status"                                  ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${rdds-test-key}","Service state"           ,1,0
+"1 probe1"    ,"${rdds-test-key}"                              ,"RDDS Test"                                    ,"enabled" ,"simple"    ,"text"  ,"{$RSM.RDDS.DELAY}","0"  ,"0"   ,""        ,""                          ,""                ,""                        ,0,0
+
+"1 probe2"    ,"rdap.ip"                                       ,"RDAP IP"                                      ,"disabled","dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdap-test-key}",""                        ,1,0
+"1 probe2"    ,"rdap.rtt"                                      ,"RDAP RTT"                                     ,"disabled","dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${rdap-test-key}","RSM RDAP rtt"            ,1,0
+"1 probe2"    ,"rdap.status"                                   ,"RDAP status"                                  ,"disabled","dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${rdap-test-key}","Service state"           ,1,0
+"1 probe2"    ,"rdap.target"                                   ,"RDAP target"                                  ,"disabled","dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdap-test-key}",""                        ,1,0
+"1 probe2"    ,"rdap.testedname"                               ,"RDAP tested name"                             ,"disabled","dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdap-test-key}",""                        ,1,0
+"1 probe2"    ,"${rdap-test-key}"                              ,"RDAP Test"                                    ,"disabled","simple"    ,"text"  ,"{$RSM.RDAP.DELAY}","0"  ,"0"   ,""        ,""                          ,""                ,""                        ,0,0
+"1 probe2"    ,"rsm.rdds.43.ip"                                ,"RDDS43 IP"                                    ,"disabled","dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdds-test-key}",""                        ,1,0
+"1 probe2"    ,"rsm.rdds.43.rtt"                               ,"RDDS43 RTT"                                   ,"disabled","dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${rdds-test-key}","RSM RDDS rtt"            ,1,0
+"1 probe2"    ,"rsm.rdds.43.status"                            ,"RDDS43 status"                                ,"disabled","dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${rdds-test-key}","Service state"           ,1,0
+"1 probe2"    ,"rsm.rdds.43.target"                            ,"RDDS43 target"                                ,"disabled","dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdds-test-key}",""                        ,1,0
+"1 probe2"    ,"rsm.rdds.43.testedname"                        ,"RDDS43 tested name"                           ,"disabled","dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdds-test-key}",""                        ,1,0
+"1 probe2"    ,"rsm.rdds.80.ip"                                ,"RDDS80 IP"                                    ,"disabled","dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdds-test-key}",""                        ,1,0
+"1 probe2"    ,"rsm.rdds.80.rtt"                               ,"RDDS80 RTT"                                   ,"disabled","dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${rdds-test-key}","RSM RDDS rtt"            ,1,0
+"1 probe2"    ,"rsm.rdds.80.status"                            ,"RDDS80 status"                                ,"disabled","dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${rdds-test-key}","Service state"           ,1,0
+"1 probe2"    ,"rsm.rdds.80.target"                            ,"RDDS80 target"                                ,"disabled","dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdds-test-key}",""                        ,1,0
+"1 probe2"    ,"rsm.rdds.status"                               ,"RDDS status"                                  ,"disabled","dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${rdds-test-key}","Service state"           ,1,0
+"1 probe2"    ,"${rdds-test-key}"                              ,"RDDS Test"                                    ,"disabled","simple"    ,"text"  ,"{$RSM.RDDS.DELAY}","0"  ,"0"   ,""        ,""                          ,""                ,""                        ,0,0
+
+"2"           ,"dns.tcp.enabled"                               ,"DNS TCP enabled/disabled"                     ,"enabled" ,"calculated","uint64","1m"               ,"90d","365d",""        ,"{$RSM.TLD.DNS.TCP.ENABLED}",""                ,""                        ,0,0
+"2"           ,"dns.udp.enabled"                               ,"DNS UDP enabled/disabled"                     ,"enabled" ,"calculated","uint64","1m"               ,"90d","365d",""        ,"{$RSM.TLD.DNS.UDP.ENABLED}",""                ,""                        ,0,0
+"2"           ,"dnssec.enabled"                                ,"DNSSEC enabled/disabled"                      ,"enabled" ,"calculated","uint64","1m"               ,"90d","365d",""        ,"{$RSM.TLD.DNSSEC.ENABLED}" ,""                ,""                        ,0,0
+"2"           ,"rdap.enabled"                                  ,"RDAP enabled/disabled"                        ,"enabled" ,"calculated","uint64","1m"               ,"90d","365d",""        ,"{$RDAP.TLD.ENABLED}"       ,""                ,""                        ,0,0
+"2"           ,"rdds43.enabled"                                ,"RDDS43 enabled/disabled"                      ,"enabled" ,"calculated","uint64","1m"               ,"90d","365d",""        ,"{$RSM.TLD.RDDS43.ENABLED}" ,""                ,""                        ,0,0
+"2"           ,"rdds80.enabled"                                ,"RDDS80 enabled/disabled"                      ,"enabled" ,"calculated","uint64","1m"               ,"90d","365d",""        ,"{$RSM.TLD.RDDS80.ENABLED}" ,""                ,""                        ,0,0
+"2"           ,"rsm.slv.rdap.avail"                            ,"RDAP availability"                            ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,"RSM Service Availability",0,1
+"2"           ,"rsm.slv.rdap.downtime"                         ,"RDAP minutes of downtime"                     ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,""                        ,0,5
+"2"           ,"rsm.slv.rdap.rollweek"                         ,"RDAP weekly unavailability"                   ,"enabled" ,"trapper"   ,"float" ,"0"                ,"90d","365d","%"       ,""                          ,""                ,""                        ,0,5
+"2"           ,"rsm.slv.rdap.rtt.failed"                       ,"RDAP Number of failed monthly queries"        ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,""                        ,0,0
+"2"           ,"rsm.slv.rdap.rtt.performed"                    ,"RDAP Number of performed monthly queries"     ,"enabled" ,"trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,""                        ,0,0
+"2"           ,"rsm.slv.rdap.rtt.pfailed"                      ,"RDAP Ratio of failed monthly queries"         ,"enabled" ,"trapper"   ,"float" ,"0"                ,"90d","365d","%"       ,""                          ,""                ,""                        ,0,5
+"2"           ,"rsm.slv.rdds.avail"                            ,"RDDS availability"                            ,"disabled","trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,"RSM Service Availability",0,1
+"2"           ,"rsm.slv.rdds.downtime"                         ,"RDDS minutes of downtime"                     ,"disabled","trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,""                        ,0,5
+"2"           ,"rsm.slv.rdds.rollweek"                         ,"RDDS weekly unavailability"                   ,"disabled","trapper"   ,"float" ,"0"                ,"90d","365d","%"       ,""                          ,""                ,""                        ,0,5
+"2"           ,"rsm.slv.rdds.rtt.failed"                       ,"RDDS Number of failed monthly queries"        ,"disabled","trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,""                        ,0,0
+"2"           ,"rsm.slv.rdds.rtt.performed"                    ,"RDDS Number of performed monthly queries"     ,"disabled","trapper"   ,"uint64","0"                ,"90d","365d",""        ,""                          ,""                ,""                        ,0,0
+"2"           ,"rsm.slv.rdds.rtt.pfailed"                      ,"RDDS Ratio of failed monthly queries"         ,"disabled","trapper"   ,"float" ,"0"                ,"90d","365d","%"       ,""                          ,""                ,""                        ,0,5
+
+"2 probe1"    ,"rdap.ip"                                       ,"RDAP IP"                                      ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdap-test-key}",""                        ,1,0
+"2 probe1"    ,"rdap.rtt"                                      ,"RDAP RTT"                                     ,"enabled" ,"dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${rdap-test-key}","RSM RDAP rtt"            ,1,0
+"2 probe1"    ,"rdap.status"                                   ,"RDAP status"                                  ,"enabled" ,"dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${rdap-test-key}","Service state"           ,1,0
+"2 probe1"    ,"rdap.target"                                   ,"RDAP target"                                  ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdap-test-key}",""                        ,1,0
+"2 probe1"    ,"rdap.testedname"                               ,"RDAP tested name"                             ,"enabled" ,"dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdap-test-key}",""                        ,1,0
+"2 probe1"    ,"${rdap-test-key}"                              ,"RDAP Test"                                    ,"enabled" ,"simple"    ,"text"  ,"{$RSM.RDAP.DELAY}","0"  ,"0"   ,""        ,""                          ,""                ,""                        ,0,0
+"2 probe1"    ,"rsm.rdds.43.ip"                                ,"RDDS43 IP"                                    ,"disabled","dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdds-test-key}",""                        ,1,0
+"2 probe1"    ,"rsm.rdds.43.rtt"                               ,"RDDS43 RTT"                                   ,"disabled","dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${rdds-test-key}","RSM RDDS rtt"            ,1,0
+"2 probe1"    ,"rsm.rdds.43.status"                            ,"RDDS43 status"                                ,"disabled","dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${rdds-test-key}","Service state"           ,1,0
+"2 probe1"    ,"rsm.rdds.43.target"                            ,"RDDS43 target"                                ,"disabled","dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdds-test-key}",""                        ,1,0
+"2 probe1"    ,"rsm.rdds.43.testedname"                        ,"RDDS43 tested name"                           ,"disabled","dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdds-test-key}",""                        ,1,0
+"2 probe1"    ,"rsm.rdds.80.ip"                                ,"RDDS80 IP"                                    ,"disabled","dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdds-test-key}",""                        ,1,0
+"2 probe1"    ,"rsm.rdds.80.rtt"                               ,"RDDS80 RTT"                                   ,"disabled","dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${rdds-test-key}","RSM RDDS rtt"            ,1,0
+"2 probe1"    ,"rsm.rdds.80.status"                            ,"RDDS80 status"                                ,"disabled","dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${rdds-test-key}","Service state"           ,1,0
+"2 probe1"    ,"rsm.rdds.80.target"                            ,"RDDS80 target"                                ,"disabled","dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdds-test-key}",""                        ,1,0
+"2 probe1"    ,"rsm.rdds.status"                               ,"RDDS status"                                  ,"disabled","dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${rdds-test-key}","Service state"           ,1,0
+"2 probe1"    ,"${rdds-test-key}"                              ,"RDDS Test"                                    ,"disabled","simple"    ,"text"  ,"{$RSM.RDDS.DELAY}","0"  ,"0"   ,""        ,""                          ,""                ,""                        ,0,0
+
+"2 probe2"    ,"rdap.ip"                                       ,"RDAP IP"                                      ,"disabled","dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdap-test-key}",""                        ,1,0
+"2 probe2"    ,"rdap.rtt"                                      ,"RDAP RTT"                                     ,"disabled","dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${rdap-test-key}","RSM RDAP rtt"            ,1,0
+"2 probe2"    ,"rdap.status"                                   ,"RDAP status"                                  ,"disabled","dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${rdap-test-key}","Service state"           ,1,0
+"2 probe2"    ,"rdap.target"                                   ,"RDAP target"                                  ,"disabled","dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdap-test-key}",""                        ,1,0
+"2 probe2"    ,"rdap.testedname"                               ,"RDAP tested name"                             ,"disabled","dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdap-test-key}",""                        ,1,0
+"2 probe2"    ,"${rdap-test-key}"                              ,"RDAP Test"                                    ,"disabled","simple"    ,"text"  ,"{$RSM.RDAP.DELAY}","0"  ,"0"   ,""        ,""                          ,""                ,""                        ,0,0
+"2 probe2"    ,"rsm.rdds.43.ip"                                ,"RDDS43 IP"                                    ,"disabled","dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdds-test-key}",""                        ,1,0
+"2 probe2"    ,"rsm.rdds.43.rtt"                               ,"RDDS43 RTT"                                   ,"disabled","dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${rdds-test-key}","RSM RDDS rtt"            ,1,0
+"2 probe2"    ,"rsm.rdds.43.status"                            ,"RDDS43 status"                                ,"disabled","dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${rdds-test-key}","Service state"           ,1,0
+"2 probe2"    ,"rsm.rdds.43.target"                            ,"RDDS43 target"                                ,"disabled","dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdds-test-key}",""                        ,1,0
+"2 probe2"    ,"rsm.rdds.43.testedname"                        ,"RDDS43 tested name"                           ,"disabled","dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdds-test-key}",""                        ,1,0
+"2 probe2"    ,"rsm.rdds.80.ip"                                ,"RDDS80 IP"                                    ,"disabled","dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdds-test-key}",""                        ,1,0
+"2 probe2"    ,"rsm.rdds.80.rtt"                               ,"RDDS80 RTT"                                   ,"disabled","dependent" ,"float" ,"0"                ,"90d","365d",""        ,""                          ,"${rdds-test-key}","RSM RDDS rtt"            ,1,0
+"2 probe2"    ,"rsm.rdds.80.status"                            ,"RDDS80 status"                                ,"disabled","dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${rdds-test-key}","Service state"           ,1,0
+"2 probe2"    ,"rsm.rdds.80.target"                            ,"RDDS80 target"                                ,"disabled","dependent" ,"str"   ,"0"                ,"90d","0"   ,""        ,""                          ,"${rdds-test-key}",""                        ,1,0
+"2 probe2"    ,"rsm.rdds.status"                               ,"RDDS status"                                  ,"disabled","dependent" ,"uint64","0"                ,"90d","365d",""        ,""                          ,"${rdds-test-key}","Service state"           ,1,0
+"2 probe2"    ,"${rdds-test-key}"                              ,"RDDS Test"                                    ,"disabled","simple"    ,"text"  ,"{$RSM.RDDS.DELAY}","0"  ,"0"   ,""        ,""                          ,""                ,""                        ,0,0
+
+[check-preproc]
+
+"probe1"     ,"rsm.errors"                            ,1,"delta-speed"         ,""                                                                                                       ,"default"      ,""
+"probe2"     ,"rsm.errors"                            ,1,"delta-speed"         ,""                                                                                                       ,"default"      ,""
+
+"1 probe1"   ,"rdap.ip"                               ,1,"jsonpath"            ,"$.ip"                                                                                                   ,"discard-value",""
+"1 probe1"   ,"rdap.rtt"                              ,1,"jsonpath"            ,"$.rtt"                                                                                                  ,"default"      ,""
+"1 probe1"   ,"rdap.status"                           ,1,"jsonpath"            ,"$.status"                                                                                               ,"default"      ,""
+"1 probe1"   ,"rdap.target"                           ,1,"jsonpath"            ,"$.target"                                                                                               ,"discard-value",""
+"1 probe1"   ,"rdap.testedname"                       ,1,"jsonpath"            ,"$.testedname"                                                                                           ,"discard-value",""
+"1 probe1"   ,"rsm.rdds.43.ip"                        ,1,"jsonpath"            ,"$.rdds43.ip"                                                                                            ,"discard-value",""
+"1 probe1"   ,"rsm.rdds.43.rtt"                       ,1,"jsonpath"            ,"$.rdds43.rtt"                                                                                           ,"default"      ,""
+"1 probe1"   ,"rsm.rdds.43.status"                    ,1,"jsonpath"            ,"$.rdds43.status"                                                                                        ,"default"      ,""
+"1 probe1"   ,"rsm.rdds.43.target"                    ,1,"jsonpath"            ,"$.rdds43.target"                                                                                        ,"discard-value",""
+"1 probe1"   ,"rsm.rdds.43.testedname"                ,1,"jsonpath"            ,"$.rdds43.testedname"                                                                                    ,"discard-value",""
+"1 probe1"   ,"rsm.rdds.80.ip"                        ,1,"jsonpath"            ,"$.rdds80.ip"                                                                                            ,"discard-value",""
+"1 probe1"   ,"rsm.rdds.80.rtt"                       ,1,"jsonpath"            ,"$.rdds80.rtt"                                                                                           ,"default"      ,""
+"1 probe1"   ,"rsm.rdds.80.status"                    ,1,"jsonpath"            ,"$.rdds80.status"                                                                                        ,"default"      ,""
+"1 probe1"   ,"rsm.rdds.80.target"                    ,1,"jsonpath"            ,"$.rdds80.target"                                                                                        ,"discard-value",""
+"1 probe1"   ,"rsm.rdds.status"                       ,1,"jsonpath"            ,"$.status"                                                                                               ,"default"      ,""
+
+"1 probe2"   ,"rdap.ip"                               ,1,"jsonpath"            ,"$.ip"                                                                                                   ,"discard-value",""
+"1 probe2"   ,"rdap.rtt"                              ,1,"jsonpath"            ,"$.rtt"                                                                                                  ,"default"      ,""
+"1 probe2"   ,"rdap.status"                           ,1,"jsonpath"            ,"$.status"                                                                                               ,"default"      ,""
+"1 probe2"   ,"rdap.target"                           ,1,"jsonpath"            ,"$.target"                                                                                               ,"discard-value",""
+"1 probe2"   ,"rdap.testedname"                       ,1,"jsonpath"            ,"$.testedname"                                                                                           ,"discard-value",""
+"1 probe2"   ,"rsm.rdds.43.ip"                        ,1,"jsonpath"            ,"$.rdds43.ip"                                                                                            ,"discard-value",""
+"1 probe2"   ,"rsm.rdds.43.rtt"                       ,1,"jsonpath"            ,"$.rdds43.rtt"                                                                                           ,"default"      ,""
+"1 probe2"   ,"rsm.rdds.43.status"                    ,1,"jsonpath"            ,"$.rdds43.status"                                                                                        ,"default"      ,""
+"1 probe2"   ,"rsm.rdds.43.target"                    ,1,"jsonpath"            ,"$.rdds43.target"                                                                                        ,"discard-value",""
+"1 probe2"   ,"rsm.rdds.43.testedname"                ,1,"jsonpath"            ,"$.rdds43.testedname"                                                                                    ,"discard-value",""
+"1 probe2"   ,"rsm.rdds.80.ip"                        ,1,"jsonpath"            ,"$.rdds80.ip"                                                                                            ,"discard-value",""
+"1 probe2"   ,"rsm.rdds.80.rtt"                       ,1,"jsonpath"            ,"$.rdds80.rtt"                                                                                           ,"default"      ,""
+"1 probe2"   ,"rsm.rdds.80.status"                    ,1,"jsonpath"            ,"$.rdds80.status"                                                                                        ,"default"      ,""
+"1 probe2"   ,"rsm.rdds.80.target"                    ,1,"jsonpath"            ,"$.rdds80.target"                                                                                        ,"discard-value",""
+"1 probe2"   ,"rsm.rdds.status"                       ,1,"jsonpath"            ,"$.status"                                                                                               ,"default"      ,""
+
+"2 probe1"   ,"rdap.ip"                               ,1,"jsonpath"            ,"$.ip"                                                                                                   ,"discard-value",""
+"2 probe1"   ,"rdap.rtt"                              ,1,"jsonpath"            ,"$.rtt"                                                                                                  ,"default"      ,""
+"2 probe1"   ,"rdap.status"                           ,1,"jsonpath"            ,"$.status"                                                                                               ,"default"      ,""
+"2 probe1"   ,"rdap.target"                           ,1,"jsonpath"            ,"$.target"                                                                                               ,"discard-value",""
+"2 probe1"   ,"rdap.testedname"                       ,1,"jsonpath"            ,"$.testedname"                                                                                           ,"discard-value",""
+"2 probe1"   ,"rsm.rdds.43.ip"                        ,1,"jsonpath"            ,"$.rdds43.ip"                                                                                            ,"discard-value",""
+"2 probe1"   ,"rsm.rdds.43.rtt"                       ,1,"jsonpath"            ,"$.rdds43.rtt"                                                                                           ,"default"      ,""
+"2 probe1"   ,"rsm.rdds.43.status"                    ,1,"jsonpath"            ,"$.rdds43.status"                                                                                        ,"default"      ,""
+"2 probe1"   ,"rsm.rdds.43.target"                    ,1,"jsonpath"            ,"$.rdds43.target"                                                                                        ,"discard-value",""
+"2 probe1"   ,"rsm.rdds.43.testedname"                ,1,"jsonpath"            ,"$.rdds43.testedname"                                                                                    ,"discard-value",""
+"2 probe1"   ,"rsm.rdds.80.ip"                        ,1,"jsonpath"            ,"$.rdds80.ip"                                                                                            ,"discard-value",""
+"2 probe1"   ,"rsm.rdds.80.rtt"                       ,1,"jsonpath"            ,"$.rdds80.rtt"                                                                                           ,"default"      ,""
+"2 probe1"   ,"rsm.rdds.80.status"                    ,1,"jsonpath"            ,"$.rdds80.status"                                                                                        ,"default"      ,""
+"2 probe1"   ,"rsm.rdds.80.target"                    ,1,"jsonpath"            ,"$.rdds80.target"                                                                                        ,"discard-value",""
+"2 probe1"   ,"rsm.rdds.status"                       ,1,"jsonpath"            ,"$.status"                                                                                               ,"default"      ,""
+
+"2 probe2"   ,"rdap.ip"                               ,1,"jsonpath"            ,"$.ip"                                                                                                   ,"discard-value",""
+"2 probe2"   ,"rdap.rtt"                              ,1,"jsonpath"            ,"$.rtt"                                                                                                  ,"default"      ,""
+"2 probe2"   ,"rdap.status"                           ,1,"jsonpath"            ,"$.status"                                                                                               ,"default"      ,""
+"2 probe2"   ,"rdap.target"                           ,1,"jsonpath"            ,"$.target"                                                                                               ,"discard-value",""
+"2 probe2"   ,"rdap.testedname"                       ,1,"jsonpath"            ,"$.testedname"                                                                                           ,"discard-value",""
+"2 probe2"   ,"rsm.rdds.43.ip"                        ,1,"jsonpath"            ,"$.rdds43.ip"                                                                                            ,"discard-value",""
+"2 probe2"   ,"rsm.rdds.43.rtt"                       ,1,"jsonpath"            ,"$.rdds43.rtt"                                                                                           ,"default"      ,""
+"2 probe2"   ,"rsm.rdds.43.status"                    ,1,"jsonpath"            ,"$.rdds43.status"                                                                                        ,"default"      ,""
+"2 probe2"   ,"rsm.rdds.43.target"                    ,1,"jsonpath"            ,"$.rdds43.target"                                                                                        ,"discard-value",""
+"2 probe2"   ,"rsm.rdds.43.testedname"                ,1,"jsonpath"            ,"$.rdds43.testedname"                                                                                    ,"discard-value",""
+"2 probe2"   ,"rsm.rdds.80.ip"                        ,1,"jsonpath"            ,"$.rdds80.ip"                                                                                            ,"discard-value",""
+"2 probe2"   ,"rsm.rdds.80.rtt"                       ,1,"jsonpath"            ,"$.rdds80.rtt"                                                                                           ,"default"      ,""
+"2 probe2"   ,"rsm.rdds.80.status"                    ,1,"jsonpath"            ,"$.rdds80.status"                                                                                        ,"default"      ,""
+"2 probe2"   ,"rsm.rdds.80.target"                    ,1,"jsonpath"            ,"$.rdds80.target"                                                                                        ,"discard-value",""
+"2 probe2"   ,"rsm.rdds.status"                       ,1,"jsonpath"            ,"$.status"                                                                                               ,"default"      ,""
+
+[check-trigger]
+
+"probe1","enabled","warning","Internal errors happening"                                                 ,"Internal errors happening for {$PROBE.INTERNAL.ERROR.INTERVAL}","{rsm.errors.last()}>0",""
+"probe1","enabled","high"   ,"Internal errors happening for {$PROBE.INTERNAL.ERROR.INTERVAL}"            ,""                                                              ,"{rsm.errors.min({$PROBE.INTERNAL.ERROR.INTERVAL})}>0",""
+"probe1","enabled","high"   ,"Probe {HOST.NAME} has been disabled by tests"                              ,""                                                              ,"{${probe-status-automatic-key}.last(0)}=0",""
+"probe1","enabled","average","Probe {HOST.NAME} has been disabled for more than {$RSM.PROBE.MAX.OFFLINE}",""                                                              ,"{rsm.probe.status[manual].max({$RSM.PROBE.MAX.OFFLINE})}=0",""
+"probe1","enabled","high"   ,"Probe {HOST.NAME} has been knocked out"                                    ,""                                                              ,"{rsm.probe.status[manual].last(0)}=0",""
+
+"probe1 - mon","enabled","high","Probe {$RSM.PROXY_NAME} is unavailable","","{TRIGGER.VALUE}=0 and {zabbix[proxy,{$RSM.PROXY_NAME},lastaccess].fuzzytime(2m)}=0 or {TRIGGER.VALUE}=1 and ( {zabbix[proxy,{$RSM.PROXY_NAME},lastaccess].now()}-{zabbix[proxy,{$RSM.PROXY_NAME},lastaccess].last(#1)}>1m or {zabbix[proxy,{$RSM.PROXY_NAME},lastaccess].now()}-{zabbix[proxy,{$RSM.PROXY_NAME},lastaccess].last(#2)}>2m or {zabbix[proxy,{$RSM.PROXY_NAME},lastaccess].now()}-{zabbix[proxy,{$RSM.PROXY_NAME},lastaccess].last(#3)}>3m )",""
+
+"probe2","enabled","warning","Internal errors happening"                                                 ,"Internal errors happening for {$PROBE.INTERNAL.ERROR.INTERVAL}","{rsm.errors.last()}>0",""
+"probe2","enabled","high"   ,"Internal errors happening for {$PROBE.INTERNAL.ERROR.INTERVAL}"            ,""                                                              ,"{rsm.errors.min({$PROBE.INTERNAL.ERROR.INTERVAL})}>0",""
+"probe2","enabled","high"   ,"Probe {HOST.NAME} has been disabled by tests"                              ,""                                                              ,"{${probe-status-automatic-key}.last(0)}=0",""
+"probe2","enabled","average","Probe {HOST.NAME} has been disabled for more than {$RSM.PROBE.MAX.OFFLINE}",""                                                              ,"{rsm.probe.status[manual].max({$RSM.PROBE.MAX.OFFLINE})}=0",""
+"probe2","enabled","high"   ,"Probe {HOST.NAME} has been knocked out"                                    ,""                                                              ,"{rsm.probe.status[manual].last(0)}=0",""
+
+"probe2 - mon","enabled","high","Probe {$RSM.PROXY_NAME} is unavailable","","{TRIGGER.VALUE}=0 and {zabbix[proxy,{$RSM.PROXY_NAME},lastaccess].fuzzytime(2m)}=0 or {TRIGGER.VALUE}=1 and ( {zabbix[proxy,{$RSM.PROXY_NAME},lastaccess].now()}-{zabbix[proxy,{$RSM.PROXY_NAME},lastaccess].last(#1)}>1m or {zabbix[proxy,{$RSM.PROXY_NAME},lastaccess].now()}-{zabbix[proxy,{$RSM.PROXY_NAME},lastaccess].last(#2)}>2m or {zabbix[proxy,{$RSM.PROXY_NAME},lastaccess].now()}-{zabbix[proxy,{$RSM.PROXY_NAME},lastaccess].last(#3)}>3m )",""
+
+"1","enabled","warning"       ,"Ratio of failed RDAP tests exceeded 10% of allowed $1%"                  ,"Ratio of failed RDAP tests exceeded 25% of allowed $1%"                  ,"{rsm.slv.rdap.rtt.pfailed.last()}>{$RSM.SLV.RDAP.RTT}*0.1",""
+"1","enabled","average"       ,"Ratio of failed RDAP tests exceeded 25% of allowed $1%"                  ,"Ratio of failed RDAP tests exceeded 50% of allowed $1%"                  ,"{rsm.slv.rdap.rtt.pfailed.last()}>{$RSM.SLV.RDAP.RTT}*0.25",""
+"1","enabled","average"       ,"Ratio of failed RDAP tests exceeded 50% of allowed $1%"                  ,"Ratio of failed RDAP tests exceeded 75% of allowed $1%"                  ,"{rsm.slv.rdap.rtt.pfailed.last()}>{$RSM.SLV.RDAP.RTT}*0.5",""
+"1","enabled","high"          ,"Ratio of failed RDAP tests exceeded 75% of allowed $1%"                  ,"Ratio of failed RDAP tests exceeded 100% of allowed $1%"                 ,"{rsm.slv.rdap.rtt.pfailed.last()}>{$RSM.SLV.RDAP.RTT}*0.75",""
+"1","enabled","disaster"      ,"Ratio of failed RDAP tests exceeded 100% of allowed $1%"                 ,""                                                                        ,"{rsm.slv.rdap.rtt.pfailed.last()}>{$RSM.SLV.RDAP.RTT}",""
+"1","enabled","warning"       ,"Ratio of failed RDDS tests exceeded 10% of allowed $1%"                  ,"Ratio of failed RDDS tests exceeded 25% of allowed $1%"                  ,"{rsm.slv.rdds.rtt.pfailed.last()}>{$RSM.SLV.RDDS.RTT}*0.1",""
+"1","enabled","average"       ,"Ratio of failed RDDS tests exceeded 25% of allowed $1%"                  ,"Ratio of failed RDDS tests exceeded 50% of allowed $1%"                  ,"{rsm.slv.rdds.rtt.pfailed.last()}>{$RSM.SLV.RDDS.RTT}*0.25",""
+"1","enabled","average"       ,"Ratio of failed RDDS tests exceeded 50% of allowed $1%"                  ,"Ratio of failed RDDS tests exceeded 75% of allowed $1%"                  ,"{rsm.slv.rdds.rtt.pfailed.last()}>{$RSM.SLV.RDDS.RTT}*0.5",""
+"1","enabled","high"          ,"Ratio of failed RDDS tests exceeded 75% of allowed $1%"                  ,"Ratio of failed RDDS tests exceeded 100% of allowed $1%"                 ,"{rsm.slv.rdds.rtt.pfailed.last()}>{$RSM.SLV.RDDS.RTT}*0.75",""
+"1","enabled","disaster"      ,"Ratio of failed RDDS tests exceeded 100% of allowed $1%"                 ,""                                                                        ,"{rsm.slv.rdds.rtt.pfailed.last()}>{$RSM.SLV.RDDS.RTT}",""
+"1","enabled","warning"       ,"RDAP rolling week is over 10%"                                           ,"RDAP rolling week is over 25%"                                           ,"{rsm.slv.rdap.rollweek.last(0)}>=10",""
+"1","enabled","average"       ,"RDAP rolling week is over 25%"                                           ,"RDAP rolling week is over 50%"                                           ,"{rsm.slv.rdap.rollweek.last(0)}>=25",""
+"1","enabled","average"       ,"RDAP rolling week is over 50%"                                           ,"RDAP rolling week is over 75%"                                           ,"{rsm.slv.rdap.rollweek.last(0)}>=50",""
+"1","enabled","high"          ,"RDAP rolling week is over 75%"                                           ,"RDAP rolling week is over 100%"                                          ,"{rsm.slv.rdap.rollweek.last(0)}>=75",""
+"1","enabled","disaster"      ,"RDAP rolling week is over 100%"                                          ,""                                                                        ,"{rsm.slv.rdap.rollweek.last(0)}>=100",""
+"1","enabled","not-classified","RDAP service is down"                                                    ,""                                                                        ,"{rsm.slv.rdap.avail.max(#{$RSM.INCIDENT.RDAP.FAIL})}=0","{rsm.slv.rdap.avail.min(#{$RSM.INCIDENT.RDAP.RECOVER})}>0"
+"1","enabled","warning"       ,"RDAP service was unavailable for 10% of allowed $1 minutes"              ,"RDAP service was unavailable for 25% of allowed $1 minutes"              ,"{rsm.slv.rdap.downtime.last(0)}>={$RSM.SLV.RDAP.DOWNTIME}*0.1",""
+"1","enabled","average"       ,"RDAP service was unavailable for 25% of allowed $1 minutes"              ,"RDAP service was unavailable for 50% of allowed $1 minutes"              ,"{rsm.slv.rdap.downtime.last(0)}>={$RSM.SLV.RDAP.DOWNTIME}*0.25",""
+"1","enabled","average"       ,"RDAP service was unavailable for 50% of allowed $1 minutes"              ,"RDAP service was unavailable for 75% of allowed $1 minutes"              ,"{rsm.slv.rdap.downtime.last(0)}>={$RSM.SLV.RDAP.DOWNTIME}*0.5",""
+"1","enabled","high"          ,"RDAP service was unavailable for 75% of allowed $1 minutes"              ,"RDAP service was unavailable for 100% of allowed $1 minutes"             ,"{rsm.slv.rdap.downtime.last(0)}>={$RSM.SLV.RDAP.DOWNTIME}*0.75",""
+"1","enabled","disaster"      ,"RDAP service was unavailable for 100% of allowed $1 minutes"             ,""                                                                        ,"{rsm.slv.rdap.downtime.last(0)}>={$RSM.SLV.RDAP.DOWNTIME}",""
+"1","enabled","warning"       ,"RDDS rolling week is over 10%"                                           ,"RDDS rolling week is over 25%"                                           ,"{rsm.slv.rdds.rollweek.last(0)}>=10",""
+"1","enabled","average"       ,"RDDS rolling week is over 25%"                                           ,"RDDS rolling week is over 50%"                                           ,"{rsm.slv.rdds.rollweek.last(0)}>=25",""
+"1","enabled","average"       ,"RDDS rolling week is over 50%"                                           ,"RDDS rolling week is over 75%"                                           ,"{rsm.slv.rdds.rollweek.last(0)}>=50",""
+"1","enabled","high"          ,"RDDS rolling week is over 75%"                                           ,"RDDS rolling week is over 100%"                                          ,"{rsm.slv.rdds.rollweek.last(0)}>=75",""
+"1","enabled","disaster"      ,"RDDS rolling week is over 100%"                                          ,""                                                                        ,"{rsm.slv.rdds.rollweek.last(0)}>=100",""
+"1","enabled","not-classified","RDDS service is down"                                                    ,""                                                                        ,"{rsm.slv.rdds.avail.max(#{$RSM.INCIDENT.RDDS.FAIL})}=0","{rsm.slv.rdds.avail.min(#{$RSM.INCIDENT.RDDS.RECOVER})}>0"
+"1","enabled","warning"       ,"RDDS service was unavailable for 10% of allowed $1 minutes"              ,"RDDS service was unavailable for 25% of allowed $1 minutes"              ,"{rsm.slv.rdds.downtime.last(0)}>={$RSM.SLV.RDDS.DOWNTIME}*0.1",""
+"1","enabled","average"       ,"RDDS service was unavailable for 25% of allowed $1 minutes"              ,"RDDS service was unavailable for 50% of allowed $1 minutes"              ,"{rsm.slv.rdds.downtime.last(0)}>={$RSM.SLV.RDDS.DOWNTIME}*0.25",""
+"1","enabled","average"       ,"RDDS service was unavailable for 50% of allowed $1 minutes"              ,"RDDS service was unavailable for 75% of allowed $1 minutes"              ,"{rsm.slv.rdds.downtime.last(0)}>={$RSM.SLV.RDDS.DOWNTIME}*0.5",""
+"1","enabled","high"          ,"RDDS service was unavailable for 75% of allowed $1 minutes"              ,"RDDS service was unavailable for 100% of allowed $1 minutes"             ,"{rsm.slv.rdds.downtime.last(0)}>={$RSM.SLV.RDDS.DOWNTIME}*0.75",""
+"1","enabled","disaster"      ,"RDDS service was unavailable for 100% of allowed $1 minutes"             ,""                                                                        ,"{rsm.slv.rdds.downtime.last(0)}>={$RSM.SLV.RDDS.DOWNTIME}",""
+
+"2","enabled","warning"       ,"Ratio of failed RDAP tests exceeded 10% of allowed $1%"                  ,"Ratio of failed RDAP tests exceeded 25% of allowed $1%"                  ,"{rsm.slv.rdap.rtt.pfailed.last()}>{$RSM.SLV.RDAP.RTT}*0.1",""
+"2","enabled","average"       ,"Ratio of failed RDAP tests exceeded 25% of allowed $1%"                  ,"Ratio of failed RDAP tests exceeded 50% of allowed $1%"                  ,"{rsm.slv.rdap.rtt.pfailed.last()}>{$RSM.SLV.RDAP.RTT}*0.25",""
+"2","enabled","average"       ,"Ratio of failed RDAP tests exceeded 50% of allowed $1%"                  ,"Ratio of failed RDAP tests exceeded 75% of allowed $1%"                  ,"{rsm.slv.rdap.rtt.pfailed.last()}>{$RSM.SLV.RDAP.RTT}*0.5",""
+"2","enabled","high"          ,"Ratio of failed RDAP tests exceeded 75% of allowed $1%"                  ,"Ratio of failed RDAP tests exceeded 100% of allowed $1%"                 ,"{rsm.slv.rdap.rtt.pfailed.last()}>{$RSM.SLV.RDAP.RTT}*0.75",""
+"2","enabled","disaster"      ,"Ratio of failed RDAP tests exceeded 100% of allowed $1%"                 ,""                                                                        ,"{rsm.slv.rdap.rtt.pfailed.last()}>{$RSM.SLV.RDAP.RTT}",""
+"2","enabled","warning"       ,"Ratio of failed RDDS tests exceeded 10% of allowed $1%"                  ,"Ratio of failed RDDS tests exceeded 25% of allowed $1%"                  ,"{rsm.slv.rdds.rtt.pfailed.last()}>{$RSM.SLV.RDDS.RTT}*0.1",""
+"2","enabled","average"       ,"Ratio of failed RDDS tests exceeded 25% of allowed $1%"                  ,"Ratio of failed RDDS tests exceeded 50% of allowed $1%"                  ,"{rsm.slv.rdds.rtt.pfailed.last()}>{$RSM.SLV.RDDS.RTT}*0.25",""
+"2","enabled","average"       ,"Ratio of failed RDDS tests exceeded 50% of allowed $1%"                  ,"Ratio of failed RDDS tests exceeded 75% of allowed $1%"                  ,"{rsm.slv.rdds.rtt.pfailed.last()}>{$RSM.SLV.RDDS.RTT}*0.5",""
+"2","enabled","high"          ,"Ratio of failed RDDS tests exceeded 75% of allowed $1%"                  ,"Ratio of failed RDDS tests exceeded 100% of allowed $1%"                 ,"{rsm.slv.rdds.rtt.pfailed.last()}>{$RSM.SLV.RDDS.RTT}*0.75",""
+"2","enabled","disaster"      ,"Ratio of failed RDDS tests exceeded 100% of allowed $1%"                 ,""                                                                        ,"{rsm.slv.rdds.rtt.pfailed.last()}>{$RSM.SLV.RDDS.RTT}",""
+"2","enabled","warning"       ,"RDAP rolling week is over 10%"                                           ,"RDAP rolling week is over 25%"                                           ,"{rsm.slv.rdap.rollweek.last(0)}>=10",""
+"2","enabled","average"       ,"RDAP rolling week is over 25%"                                           ,"RDAP rolling week is over 50%"                                           ,"{rsm.slv.rdap.rollweek.last(0)}>=25",""
+"2","enabled","average"       ,"RDAP rolling week is over 50%"                                           ,"RDAP rolling week is over 75%"                                           ,"{rsm.slv.rdap.rollweek.last(0)}>=50",""
+"2","enabled","high"          ,"RDAP rolling week is over 75%"                                           ,"RDAP rolling week is over 100%"                                          ,"{rsm.slv.rdap.rollweek.last(0)}>=75",""
+"2","enabled","disaster"      ,"RDAP rolling week is over 100%"                                          ,""                                                                        ,"{rsm.slv.rdap.rollweek.last(0)}>=100",""
+"2","enabled","not-classified","RDAP service is down"                                                    ,""                                                                        ,"{rsm.slv.rdap.avail.max(#{$RSM.INCIDENT.RDAP.FAIL})}=0","{rsm.slv.rdap.avail.min(#{$RSM.INCIDENT.RDAP.RECOVER})}>0"
+"2","enabled","warning"       ,"RDAP service was unavailable for 10% of allowed $1 minutes"              ,"RDAP service was unavailable for 25% of allowed $1 minutes"              ,"{rsm.slv.rdap.downtime.last(0)}>={$RSM.SLV.RDAP.DOWNTIME}*0.1",""
+"2","enabled","average"       ,"RDAP service was unavailable for 25% of allowed $1 minutes"              ,"RDAP service was unavailable for 50% of allowed $1 minutes"              ,"{rsm.slv.rdap.downtime.last(0)}>={$RSM.SLV.RDAP.DOWNTIME}*0.25",""
+"2","enabled","average"       ,"RDAP service was unavailable for 50% of allowed $1 minutes"              ,"RDAP service was unavailable for 75% of allowed $1 minutes"              ,"{rsm.slv.rdap.downtime.last(0)}>={$RSM.SLV.RDAP.DOWNTIME}*0.5",""
+"2","enabled","high"          ,"RDAP service was unavailable for 75% of allowed $1 minutes"              ,"RDAP service was unavailable for 100% of allowed $1 minutes"             ,"{rsm.slv.rdap.downtime.last(0)}>={$RSM.SLV.RDAP.DOWNTIME}*0.75",""
+"2","enabled","disaster"      ,"RDAP service was unavailable for 100% of allowed $1 minutes"             ,""                                                                        ,"{rsm.slv.rdap.downtime.last(0)}>={$RSM.SLV.RDAP.DOWNTIME}",""
+"2","enabled","warning"       ,"RDDS rolling week is over 10%"                                           ,"RDDS rolling week is over 25%"                                           ,"{rsm.slv.rdds.rollweek.last(0)}>=10",""
+"2","enabled","average"       ,"RDDS rolling week is over 25%"                                           ,"RDDS rolling week is over 50%"                                           ,"{rsm.slv.rdds.rollweek.last(0)}>=25",""
+"2","enabled","average"       ,"RDDS rolling week is over 50%"                                           ,"RDDS rolling week is over 75%"                                           ,"{rsm.slv.rdds.rollweek.last(0)}>=50",""
+"2","enabled","high"          ,"RDDS rolling week is over 75%"                                           ,"RDDS rolling week is over 100%"                                          ,"{rsm.slv.rdds.rollweek.last(0)}>=75",""
+"2","enabled","disaster"      ,"RDDS rolling week is over 100%"                                          ,""                                                                        ,"{rsm.slv.rdds.rollweek.last(0)}>=100",""
+"2","enabled","not-classified","RDDS service is down"                                                    ,""                                                                        ,"{rsm.slv.rdds.avail.max(#{$RSM.INCIDENT.RDDS.FAIL})}=0","{rsm.slv.rdds.avail.min(#{$RSM.INCIDENT.RDDS.RECOVER})}>0"
+"2","enabled","warning"       ,"RDDS service was unavailable for 10% of allowed $1 minutes"              ,"RDDS service was unavailable for 25% of allowed $1 minutes"              ,"{rsm.slv.rdds.downtime.last(0)}>={$RSM.SLV.RDDS.DOWNTIME}*0.1",""
+"2","enabled","average"       ,"RDDS service was unavailable for 25% of allowed $1 minutes"              ,"RDDS service was unavailable for 50% of allowed $1 minutes"              ,"{rsm.slv.rdds.downtime.last(0)}>={$RSM.SLV.RDDS.DOWNTIME}*0.25",""
+"2","enabled","average"       ,"RDDS service was unavailable for 50% of allowed $1 minutes"              ,"RDDS service was unavailable for 75% of allowed $1 minutes"              ,"{rsm.slv.rdds.downtime.last(0)}>={$RSM.SLV.RDDS.DOWNTIME}*0.5",""
+"2","enabled","high"          ,"RDDS service was unavailable for 75% of allowed $1 minutes"              ,"RDDS service was unavailable for 100% of allowed $1 minutes"             ,"{rsm.slv.rdds.downtime.last(0)}>={$RSM.SLV.RDDS.DOWNTIME}*0.75",""
+"2","enabled","disaster"      ,"RDDS service was unavailable for 100% of allowed $1 minutes"             ,""                                                                        ,"{rsm.slv.rdds.downtime.last(0)}>={$RSM.SLV.RDDS.DOWNTIME}",""
