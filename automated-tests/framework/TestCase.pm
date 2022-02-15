@@ -823,40 +823,48 @@ sub __cmd_execute_ex($)
 		}
 	}
 
-	if ($expected_stdout ne "")
+	if ($expected_stdout ne "" || $expected_stderr ne "")
 	{
-		if ($expected_stdout =~ m{^/(.*)/$})
-		{
-			if ($stdout !~ /$1/)
-			{
-				fail("stdout doesn't match expected pattern");
-			}
-		}
-		else
-		{
-			if (index($stdout, $expected_stdout) == -1)
-			{
-				fail("stdout doesn't contain expected substring");
-			}
-		}
-	}
+		# store outputs in hash to avoid having huge amounts of text in stacktrace in case of failure
+		my %outputs = (
+			'stdout' => [$stdout, $expected_stdout],
+			'stderr' => [$stderr, $expected_stderr],
+		);
 
-	if ($expected_stderr ne "")
-	{
-		if ($expected_stderr =~ m{^/(.*)/$})
+		my $compare = sub
 		{
-			if ($stderr !~ /$1/)
+			my $stream = shift;
+
+			my $output   = $outputs{$stream}[0];
+			my $expected = $outputs{$stream}[1];
+
+			if ($expected =~ m{^/(.*)/$})
 			{
-				fail("stderr doesn't match expected pattern");
+				# if pattern is enclosed in //, treat it as regex pattern
+				if ($output !~ /$1/)
+				{
+					fail("$stream doesn't match expected pattern");
+				}
 			}
-		}
-		else
-		{
-			if (index($stderr, $expected_stderr) == -1)
+			else
 			{
-				fail("stderr doesn't contain expected substring");
+				# if pattern is not enclosed in //, treat it as a substring
+				if (index($output, $expected) == -1)
+				{
+					# substring was not found, trim trailing newlines and try again
+					$output   =~ s/\s+$//mg;
+					$expected =~ s/\s+$//mg;
+
+					if (index($output, $expected) == -1)
+					{
+						fail("$stream doesn't contain expected substring");
+					}
+				}
 			}
-		}
+		};
+
+		$compare->("stdout") if ($expected_stdout ne "");
+		$compare->("stderr") if ($expected_stderr ne "");
 	}
 }
 
