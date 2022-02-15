@@ -45,7 +45,8 @@ my %command_handlers = (
 	'fix-lastvalue-tables'    => [\&__cmd_fix_lastvalue_tables   , 0, 1], # (void)
 	'set-global-macro'        => [\&__cmd_set_global_macro       , 1, 1], # macro,value
 	'set-host-macro'          => [\&__cmd_set_host_macro         , 1, 1], # host,macro,value
-	'execute'                 => [\&__cmd_execute                , 1, 1], # datetime,command or datetime,command,arg,arg,arg,...
+	'execute'                 => [\&__cmd_execute                , 1, 1], # datetime,command[,arg,arg,arg,...]
+	'execute-ex'              => [\&__cmd_execute_ex             , 1, 1], # datetime,status,expected_stdout,expected_stderr,command[,arg,arg,arg,...]
 	'start-server'            => [\&__cmd_start_server           , 1, 1], # datetime,key=value,key=value,...
 	'stop-server'             => [\&__cmd_stop_server            , 0, 1], # (void)
 	'update-rsm-conf'         => [\&__cmd_update_rsm_conf        , 1, 1], # section,property,value
@@ -747,14 +748,7 @@ sub __cmd_execute($)
 
 	if ($datetime eq "")
 	{
-		if (scalar(@command) == 1)
-		{
-			execute($command[0]);
-		}
-		else
-		{
-			execute(@command);
-		}
+		execute(@command);
 	}
 	else
 	{
@@ -773,6 +767,95 @@ sub __cmd_execute($)
 		else
 		{
 			execute("faketime", "-f", "@" . $datetime, @command);
+		}
+	}
+}
+
+sub __cmd_execute_ex($)
+{
+	my $args = shift;
+
+	# [execute-ex]
+	# datetime,status,expected_stdout,expected_stderr,command[,arg,arg,arg,...]
+
+	my ($datetime, $status, $expected_stdout, $expected_stderr, @command) = __unpack($args);
+
+	my $exit_status;
+	my $stdout;
+	my $stderr;
+
+	if ($datetime eq "")
+	{
+		($exit_status, $stdout, $stderr) = execute_ex(@command);
+	}
+	else
+	{
+		if ($datetime !~ /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)
+		{
+			fail("invalid format for datetime, expected 'yyyy-mm-dd hh:mm:ss': '$datetime'");
+		}
+
+		local $ENV{'TZ'} = 'UTC';
+		local $ENV{'FAKETIME_DONT_RESET'} = '1';
+
+		if (scalar(@command) == 1)
+		{
+			($exit_status, $stdout, $stderr) = execute_ex("faketime -f '\@$datetime' $command[0]");
+		}
+		else
+		{
+			($exit_status, $stdout, $stderr) = execute_ex("faketime", "-f", "@" . $datetime, @command);
+		}
+	}
+
+	if ($status =~ /^!(.*)$/)
+	{
+		if ($exit_status == $1)
+		{
+			fail("unexpected exit status '%d', expected '%s'", $exit_status, $status);
+		}
+	}
+	else
+	{
+		if ($exit_status != $status)
+		{
+			fail("unexpected exit status '%d', expected '%s'", $exit_status, $status);
+		}
+	}
+
+	if ($expected_stdout ne "")
+	{
+		if ($expected_stdout =~ m{^/(.*)/$})
+		{
+			if ($stdout !~ /$1/)
+			{
+				fail("stdout doesn't match expected pattern");
+			}
+		}
+		else
+		{
+			if (index($stdout, $expected_stdout) == -1)
+			{
+				fail("stdout doesn't contain expected substring");
+			}
+		}
+	}
+
+	if ($expected_stderr ne "")
+	{
+		if ($expected_stderr =~ m{^/(.*)/$})
+		{
+			if ($stderr !~ /$1/)
+			{
+				fail("stderr doesn't match expected pattern");
+			}
+		}
+		else
+		{
+			if (index($stderr, $expected_stderr) == -1)
+			{
+				fail("stderr doesn't contain expected substring");
+			}
 		}
 	}
 }

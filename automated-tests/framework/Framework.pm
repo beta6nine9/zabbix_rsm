@@ -10,6 +10,7 @@ our @EXPORT = qw(
 	pushd
 	popd
 	execute
+	execute_ex
 	read_file
 	write_file
 	get_dir_tree
@@ -38,6 +39,8 @@ use Cwd qw(cwd);
 use Data::Dumper;
 use Date::Parse;
 use File::Spec;
+use IO::Select;
+use IPC::Open3;
 use List::Util qw(max);
 use Text::Diff;
 
@@ -102,6 +105,64 @@ sub execute
 			fail("child exited with value %d", $? >> 8);
 		}
 	}
+}
+
+sub execute_ex
+{
+	info("executing: " . join(" ", map('"' . $_ . '"', @_)));
+
+	my $stdout = "";
+	my $stderr = "";
+
+	my $stdout_handle;
+	my $stderr_handle;
+	open($stdout_handle, "+>", undef) or fail("open() failed: $!");
+	open($stderr_handle, "+>", undef) or fail("open() failed: $!");
+
+	my $select = IO::Select->new();
+	$select->add($stdout_handle);
+	$select->add($stderr_handle);
+
+	my $pid = open3(undef, $stdout_handle, $stderr_handle, @_);
+
+	while ($select->count())
+	{
+		my @ready = $select->can_read();
+
+		foreach my $handle (@ready)
+		{
+			my $line = <$handle>;
+
+			if (defined($line))
+			{
+				if ($handle == $stdout_handle)
+				{
+					print("[stdout] $line");
+					$stdout .= $line;
+				}
+				elsif ($handle == $stderr_handle)
+				{
+					print("[stderr] $line");
+					$stderr .= $line;
+				}
+				else
+				{
+					fail("internal error");
+				}
+			}
+			else
+			{
+				$select->remove($handle);
+				close($handle);
+			}
+		}
+	}
+
+	waitpid($pid, 0);
+
+	my $exit_status = $? >> 8;
+
+	return ($exit_status, $stdout, $stderr);
 }
 
 sub read_file($)
