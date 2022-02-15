@@ -62,13 +62,12 @@ class TestsListAction extends Action {
 			'tlds' => true
 		]);
 
-		if ($tld) {
-			$data['tld'] = reset($tld);
-		}
-		else {
+		if (!$tld) {
 			error(_('No permissions to referred object or it does not exist!'));
 			return false;
 		}
+
+		$data['tld'] = reset($tld);
 
 		return true;
 	}

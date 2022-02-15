@@ -61,7 +61,12 @@ class CControllerPopupMedia extends CController {
 	}
 
 	protected function checkPermissions() {
-		return (CWebUser::getType() == USER_TYPE_ZABBIX_ADMIN || CWebUser::getType() == USER_TYPE_SUPER_ADMIN);
+		if (CWebUser::getType() < USER_TYPE_ZABBIX_ADMIN
+				|| (CWebUser::isGuest() && CWebUser::getType() < USER_TYPE_SUPER_ADMIN)) {
+			return false;
+		}
+
+		return true;
 	}
 
 	protected function doAction() {
