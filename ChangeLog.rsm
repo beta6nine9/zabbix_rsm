@@ -1,3 +1,9 @@
+Changes for rsm2.2.3
+
+Bug fixes:
+........S. [ZBX-20059] fixed duplicate metric values being inserted when there is network issue between Zabbix server and Zabbix proxy (vso)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.2.2
 
 Bug fixes:
