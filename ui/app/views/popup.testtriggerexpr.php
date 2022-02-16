@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -26,7 +26,7 @@
 $data_table = (new CTable())
 	->addStyle('width: 100%;')
 	->setHeader([
-		_('Expression Variable Elements'),
+		_('Expression variable elements'),
 		_('Result type'),
 		_('Value')
 	]);

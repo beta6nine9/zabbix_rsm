@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -64,7 +64,6 @@ void metric_get_meta(ZBX_ACTIVE_METRIC *metric, zbx_uint64_t *lastlogsize, int *
 void metric_set_unsupported(ZBX_ACTIVE_METRIC *metric)
 {
 	metric->state = ITEM_STATE_NOTSUPPORTED;
-	metric->refresh_unsupported = 0;
 	metric->error_count = 0;
 	metric->start_time = 0.0;
 	metric->processed_bytes = 0;
@@ -81,7 +80,6 @@ int metric_set_supported(ZBX_ACTIVE_METRIC *metric, zbx_uint64_t lastlogsize_sen
 		if (ITEM_STATE_NOTSUPPORTED == metric->state)
 		{
 			metric->state = ITEM_STATE_NORMAL;
-			metric->refresh_unsupported = 0;
 		}
 
 		if (lastlogsize_sent != metric->lastlogsize || mtime_sent != metric->mtime ||
@@ -178,12 +176,14 @@ static void free_log_result(log_result_t *result)
 	zbx_free(result);
 }
 
-int	process_value_cb(const char *server, unsigned short port, const char *host, const char *key,
+int	process_value_cb(zbx_vector_ptr_t *addrs, zbx_vector_ptr_t *agent2_result, const char *host, const char *key,
 		const char *value, unsigned char state, zbx_uint64_t *lastlogsize, const int *mtime,
 		unsigned long *timestamp, const char *source, unsigned short *severity, unsigned long *logeventid,
 		unsigned char flags)
 {
-	log_result_t *result = (log_result_t *)server;
+	ZBX_UNUSED(addrs);
+
+	log_result_t *result = (log_result_t *)agent2_result;
 	if (result->values.values_num == result->slots)
 		return FAIL;
 
@@ -295,7 +295,7 @@ func ProcessLogCheck(data unsafe.Pointer, item *LogItem, refresh int, cblob unsa
 
 	var cerrmsg *C.char
 	cprepVec := C.new_prep_vec() // In Agent2 it is always empty vector. Not used but required for linking.
-	ret := C.process_log_check(C.char_lp_t(unsafe.Pointer(result)), 0, C.zbx_vector_ptr_lp_t(cblob),
+	ret := C.process_log_check(nil, C.zbx_vector_ptr_lp_t(unsafe.Pointer(result)), C.zbx_vector_ptr_lp_t(cblob),
 		C.ZBX_ACTIVE_METRIC_LP(data), C.zbx_process_value_func_t(C.process_value_cb), &clastLogsizeSent,
 		&cmtimeSent, &cerrmsg, cprepVec)
 	C.free_prep_vec(cprepVec)

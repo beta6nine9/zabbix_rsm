@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -21,7 +21,7 @@ package agent
 
 type AgentOptions struct {
 	LogType                string   `conf:"optional,default=file"`
-	LogFile                string   `conf:"optional,default=/tmp/zabbix_agent2.log"`
+	LogFile                string   `conf:"optional,default=c:\\zabbix_agent2.log"`
 	LogFileSize            int      `conf:"optional,range=0:1024,default=1"`
 	DebugLevel             int      `conf:"optional,range=0:5,default=3"`
 	PidFile                string   `conf:"optional"`
@@ -46,6 +46,7 @@ type AgentOptions struct {
 	Server                 string   `conf:"optional"`
 	UserParameter          []string `conf:"optional"`
 	UnsafeUserParameters   int      `conf:"optional,range=0:1,default=0"`
+	UserParameterDir       string   `conf:"optional"`
 	ControlSocket          string   `conf:"optional"`
 	Alias                  []string `conf:"optional"`
 	PerfCounter            []string `conf:"optional"`
@@ -60,6 +61,9 @@ type AgentOptions struct {
 	TLSKeyFile             string   `conf:"optional"`
 	TLSServerCertIssuer    string   `conf:"optional"`
 	TLSServerCertSubject   string   `conf:"optional"`
+	ExternalPlugins        []string `conf:"optional,name=PluginPath"`
+	ExternalPluginTimeout  int      `conf:"optional,name=PluginTimeout,range=1:30"`
+	ExternalPluginsSocket  string   `conf:"optional,name=PluginSocket,default=\\\\.\\pipe\\agent.plugin.sock"`
 
 	AllowKey interface{} `conf:"optional"`
 	DenyKey  interface{} `conf:"optional"`

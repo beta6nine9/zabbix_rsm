@@ -1,7 +1,7 @@
 <?php declare(strict_types=1);
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -145,6 +145,17 @@ class CSelect extends CTag {
 	}
 
 	/**
+	 * @param string|null $name
+	 *
+	 * @return self
+	 */
+	public function setName($name): self {
+		$this->name = $name;
+
+		return $this;
+	}
+
+	/**
 	 * @param int $width
 	 *
 	 * @return self
@@ -165,6 +176,17 @@ class CSelect extends CTag {
 	}
 
 	/**
+	 * @param int $value
+	 *
+	 * @return self
+	 */
+	public function setAdaptiveWidth(int $value): self {
+		$this->addStyle('max-width: '.$value.'px;');
+
+		return $this->setWidthAuto();
+	}
+
+	/**
 	 * Set custom template for options.
 	 *
 	 * @param string $template
@@ -173,6 +195,19 @@ class CSelect extends CTag {
 	 */
 	public function setOptionTemplate(string $template) {
 		$this->setAttribute('option-template', $template);
+
+		return $this;
+	}
+
+	/**
+	 * Set custom template for selected option.
+	 *
+	 * @param string $template
+	 *
+	 * @return self
+	 */
+	public function setSelectedOptionTemplate(string $template) {
+		$this->setAttribute('selected-option-template', $template);
 
 		return $this;
 	}

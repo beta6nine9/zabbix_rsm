@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -22,6 +22,9 @@
 
 // Sync with SASS variable: $ui-transition-duration.
 const UI_TRANSITION_DURATION = 300;
+
+const PROFILE_TYPE_INT = 2;
+const PROFILE_TYPE_STR = 3;
 
 // Array indexOf method for javascript<1.6 compatibility
 if (!Array.prototype.indexOf) {
@@ -80,7 +83,7 @@ var PageRefresh = {
 
 		if (this.delayLeft < 0 && !overlays_stack.length) {
 			if (ED) {
-				sessionStorage.scrollTop = jQuery(window).scrollTop();
+				sessionStorage.scrollTop = $('.wrapper').scrollTop();
 			}
 
 			location.reload();
@@ -208,7 +211,6 @@ var AudioControl = {
  * Elements with class 'blink' will blink for 'data-seconds-to-blink' seconds
  * If 'data-seconds-to-blink' is omitted, element will blink forever.
  * For elements with class 'blink' and attribute 'data-toggle-class' class will be toggled.
- * @author Konstantin Buravcov
  */
 var jqBlink = {
 	shown: true, // are objects currently shown or hidden?
@@ -317,7 +319,10 @@ var hintBox = {
 				return false;
 			}
 
-			hintBox.displayHint(e, $target, 400);
+			hintBox.displayHint(e, $target, $target.data('hintbox-delay') !== undefined
+				? $target.data('hintbox-delay')
+				: 400
+			);
 
 			return false;
 		});
@@ -656,14 +661,20 @@ function rm4favorites(object, objectid) {
  * Toggles filter state and updates title and icons accordingly.
  *
  * @param {string} 	idx					User profile index
- * @param {string} 	value_int			Integer value
+ * @param {string} 	value				Value
  * @param {object} 	idx2				An array of IDs
+ * @param {integer} profile_type		Profile type
  */
-function updateUserProfile(idx, value_int, idx2) {
+function updateUserProfile(idx, value, idx2, profile_type = PROFILE_TYPE_INT) {
+	const value_fields = {
+		[PROFILE_TYPE_INT]: 'value_int',
+		[PROFILE_TYPE_STR]: 'value_str'
+	};
+
 	return sendAjaxData('zabbix.php?action=profile.update', {
 		data: {
 			idx: idx,
-			value_int: value_int,
+			[value_fields[profile_type]]: value,
 			idx2: idx2
 		}
 	});
@@ -676,11 +687,11 @@ function changeWidgetState(obj, widgetId, idx) {
 
 	if (css === 'btn-widget-expand') {
 		jQuery('.body', widgetObj).slideUp(50);
-		jQuery('.dashbrd-widget-foot', widgetObj).slideUp(50);
+		jQuery('.dashboard-widget-foot', widgetObj).slideUp(50);
 	}
 	else {
 		jQuery('.body', widgetObj).slideDown(50);
-		jQuery('.dashbrd-widget-foot', widgetObj).slideDown(50);
+		jQuery('.dashboard-widget-foot', widgetObj).slideDown(50);
 
 		state = 1;
 	}
@@ -830,6 +841,7 @@ function getConditionFormula(conditions, evalType) {
 	 * - row					- element row selector
 	 * - add					- add row button selector
 	 * - remove					- remove row button selector
+	 * - rows					- array of rows objects data
 	 * - counter 				- number to start row enumeration from
 	 * - dataCallback			- function to generate the data passed to the template
 	 * - remove_next_sibling	- remove also next element
@@ -852,6 +864,7 @@ function getConditionFormula(conditions, evalType) {
 			disable: '.element-table-disable',
 			counter: null,
 			beforeRow: null,
+			rows: [],
 			dataCallback: function(data) {
 				return {};
 			}
@@ -889,8 +902,51 @@ function getConditionFormula(conditions, evalType) {
 				// disable the parent row
 				disableRow($(this).closest(options.row));
 			});
+
+			if (typeof options.rows === 'object') {
+				var before_row = (options['beforeRow'] !== null)
+					? $(options['beforeRow'], table)
+					: $(options.add, table).closest('tr');
+
+				initRows(table, before_row, options);
+			}
 		});
 	};
+
+	/**
+	 * Renders options.rows array as HTML rows during initialization.
+	 *
+	 * @param {jQuery} table       Table jquery node.
+	 * @param {jQuery} before_row  Rendered rows will be inserted before this node.
+	 * @param {object} options     Object with options.
+	 */
+	function initRows(table, before_row, options) {
+		var template = new Template($(options.template).html()),
+			counter = table.data('dynamicRows').counter,
+			$row;
+
+		options.rows.forEach((data) => {
+			data.rowNum = counter;
+			$row = $(template.evaluate($.extend(data, options.dataCallback(data))));
+
+			for (const name in data) {
+				// Set 'z-select' value.
+				$row
+					.find(`z-select[name$="[${counter}][${name}]"]`)
+					.val(data[name]);
+
+				// Set 'radio' value.
+				$row
+					.find(`[type="radio"][name$="[${counter}][${name}]"][value="${$.escapeSelector(data[name])}"]`)
+					.attr('checked', 'checked');
+			}
+
+			before_row.before($row);
+			++counter;
+		});
+
+		table.data('dynamicRows').counter = counter;
+	}
 
 	/**
 	 * Adds a row before the given row.
@@ -1009,7 +1065,7 @@ jQuery(function ($) {
 	};
 
 	if (ED && typeof sessionStorage.scrollTop !== 'undefined') {
-		$(window).scrollTop(sessionStorage.scrollTop);
+		$('.wrapper').scrollTop(sessionStorage.scrollTop);
 		sessionStorage.removeItem('scrollTop');
 	}
 });

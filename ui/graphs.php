@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -26,7 +26,7 @@ require_once dirname(__FILE__).'/include/forms.inc.php';
 
 $page['title'] = hasRequest('parent_discoveryid') ? _('Configuration of graph prototypes') : _('Configuration of graphs');
 $page['file'] = 'graphs.php';
-$page['scripts'] = ['colorpicker.js', 'multiselect.js'];
+$page['scripts'] = ['colorpicker.js'];
 
 require_once dirname(__FILE__).'/include/page_header.php';
 
@@ -61,6 +61,7 @@ $fields = [
 	'show_triggers' =>		[T_ZBX_INT, O_OPT, null,		IN('1'),		null],
 	'group_graphid' =>		[T_ZBX_INT, O_OPT, null,		DB_ID,			null],
 	'copy_targetids' =>		[T_ZBX_INT, O_OPT, null,		DB_ID,			null],
+	'context' =>			[T_ZBX_STR, O_MAND, P_SYS,		IN('"host", "template"'),	null],
 	// actions
 	'action' =>				[T_ZBX_STR, O_OPT, P_SYS|P_ACT, IN('"graph.masscopyto","graph.massdelete","graph.updatediscover"'),	null],
 	'add' =>				[T_ZBX_STR, O_OPT, P_SYS|P_ACT, null,			null],
@@ -74,7 +75,7 @@ $fields = [
 	// filter
 	'filter_set' =>			[T_ZBX_STR, O_OPT, P_SYS,		null,	null],
 	'filter_rst' =>			[T_ZBX_STR, O_OPT, P_SYS,		null,	null],
-	'filter_groups' =>		[T_ZBX_INT, O_OPT, null,		DB_ID,	null],
+	'filter_groupids' =>	[T_ZBX_INT, O_OPT, null,		DB_ID,	null],
 	'filter_hostids' =>		[T_ZBX_INT, O_OPT, null,		DB_ID,	null],
 	// sort and sortorder
 	'sort' =>				[T_ZBX_STR, O_OPT, P_SYS, IN('"graphtype","name","discover"'),					null],
@@ -95,12 +96,8 @@ if (isset($_REQUEST['yaxismax']) && zbx_empty($_REQUEST['yaxismax'])) {
 }
 check_fields($fields);
 
-$gitems = [];
-foreach (getRequest('items', []) as $gitem) {
-	$gitems[] = json_decode($gitem, true);
-}
+$gitems = getRequest('items', []);
 
-$_REQUEST['items'] = $gitems;
 $_REQUEST['show_3d'] = getRequest('show_3d', 0);
 $_REQUEST['show_legend'] = getRequest('show_legend', 0);
 
@@ -252,15 +249,6 @@ elseif (hasRequest('add') || hasRequest('update')) {
 	}
 
 	if ($result) {
-		if (hasRequest('graphid')) {
-			add_audit(AUDIT_ACTION_UPDATE, AUDIT_RESOURCE_GRAPH,
-				'Graph ID ['.$graph['graphid'].'] Graph ['.getRequest('name').']'
-			);
-		}
-		else {
-			add_audit(AUDIT_ACTION_ADD, AUDIT_RESOURCE_GRAPH, 'Graph ['.getRequest('name').']');
-		}
-
 		unset($_REQUEST['form']);
 	}
 
@@ -406,25 +394,27 @@ elseif (hasRequest('action') && getRequest('action') === 'graph.masscopyto' && h
 	show_messages();
 }
 
+$prefix = (getRequest('context') === 'host') ? 'web.hosts.' : 'web.templates.';
+
 /**
  * Update profile keys.
  */
-$sort_field = getRequest('sort', CProfile::get('web.'.$page['file'].'.sort', 'name'));
-$sort_order = getRequest('sortorder', CProfile::get('web.'.$page['file'].'.sortorder', ZBX_SORT_UP));
+$sort_field = getRequest('sort', CProfile::get($prefix.$page['file'].'.sort', 'name'));
+$sort_order = getRequest('sortorder', CProfile::get($prefix.$page['file'].'.sortorder', ZBX_SORT_UP));
 
-CProfile::update('web.'.$page['file'].'.sort', $sort_field, PROFILE_TYPE_STR);
-CProfile::update('web.'.$page['file'].'.sortorder', $sort_order, PROFILE_TYPE_STR);
+CProfile::update($prefix.$page['file'].'.sort', $sort_field, PROFILE_TYPE_STR);
+CProfile::update($prefix.$page['file'].'.sortorder', $sort_order, PROFILE_TYPE_STR);
 
 if (hasRequest('filter_set')) {
-	CProfile::updateArray('web.graphs.filter_groups', getRequest('filter_groups', []), PROFILE_TYPE_ID);
-	CProfile::updateArray('web.graphs.filter_hostids', getRequest('filter_hostids', []), PROFILE_TYPE_ID);
+	CProfile::updateArray($prefix.'graphs.filter_groupids', getRequest('filter_groupids', []), PROFILE_TYPE_ID);
+	CProfile::updateArray($prefix.'graphs.filter_hostids', getRequest('filter_hostids', []), PROFILE_TYPE_ID);
 }
 elseif (hasRequest('filter_rst')) {
-	CProfile::deleteIdx('web.graphs.filter_groups');
+	CProfile::deleteIdx($prefix.'graphs.filter_groupids');
 
-	$filter_hostids = getRequest('filter_hostids', CProfile::getArray('web.graphs.filter_hostids', []));
+	$filter_hostids = getRequest('filter_hostids', CProfile::getArray($prefix.'graphs.filter_hostids', []));
 	if (count($filter_hostids) != 1) {
-		CProfile::deleteIdx('web.graphs.filter_hostids');
+		CProfile::deleteIdx($prefix.'graphs.filter_hostids');
 	}
 }
 
@@ -440,8 +430,8 @@ if (hasRequest('parent_discoveryid')) {
 }
 else {
 	$filter = [
-		'groups' => CProfile::getArray('web.graphs.filter_groups', null),
-		'hosts' => CProfile::getArray('web.graphs.filter_hostids', null)
+		'groups' => CProfile::getArray($prefix.'graphs.filter_groupids', null),
+		'hosts' => CProfile::getArray($prefix.'graphs.filter_hostids', null)
 	];
 }
 
@@ -461,15 +451,26 @@ if ($filter_groupids) {
 }
 
 // Get hosts.
-$filter['hosts'] = $filter['hosts']
-	? CArrayHelper::renameObjectsKeys(API::Host()->get([
-		'output' => ['hostid', 'name'],
-		'hostids' => $filter['hosts'],
-		'templated_hosts' => true,
-		'editable' => true,
-		'preservekeys' => true
-	]), ['hostid' => 'id'])
-	: [];
+if (getRequest('context') === 'host') {
+	$filter['hosts'] = $filter['hosts']
+		? CArrayHelper::renameObjectsKeys(API::Host()->get([
+			'output' => ['hostid', 'name'],
+			'hostids' => $filter['hosts'],
+			'editable' => true,
+			'preservekeys' => true
+		]), ['hostid' => 'id'])
+		: [];
+}
+else {
+	$filter['hosts'] = $filter['hosts']
+		? CArrayHelper::renameObjectsKeys(API::Template()->get([
+			'output' => ['templateid', 'name'],
+			'templateids' => $filter['hosts'],
+			'editable' => true,
+			'preservekeys' => true
+		]), ['templateid' => 'id'])
+		: [];
+}
 
 // Get hostid.
 if ($hostid == 0 && count($filter['hosts']) == 1) {
@@ -491,7 +492,8 @@ elseif (isset($_REQUEST['form'])) {
 		'parent_discoveryid' => getRequest('parent_discoveryid'),
 		'group_gid' => getRequest('group_gid', []),
 		'hostid' => $hostid,
-		'normal_only' => getRequest('normal_only')
+		'normal_only' => getRequest('normal_only'),
+		'context' => getRequest('context')
 	];
 
 	if (!empty($data['graphid']) && !isset($_REQUEST['form_refresh'])) {
@@ -551,7 +553,7 @@ elseif (isset($_REQUEST['form'])) {
 		// templates
 		$flag = ($data['parent_discoveryid'] === null) ? ZBX_FLAG_DISCOVERY_NORMAL : ZBX_FLAG_DISCOVERY_PROTOTYPE;
 		$data['templates'] = makeGraphTemplatesHtml($graph['graphid'], getGraphParentTemplates([$graph], $flag),
-			$flag
+			$flag, CWebUser::checkAccess(CRoleHelper::UI_CONFIGURATION_TEMPLATES), $data['context']
 		);
 
 		// items
@@ -611,7 +613,7 @@ elseif (isset($_REQUEST['form'])) {
 	// items
 	if ($data['items']) {
 		$items = API::Item()->get([
-			'output' => ['itemid', 'hostid', 'name', 'key_', 'flags'],
+			'output' => ['itemid', 'hostid', 'name', 'flags'],
 			'selectHosts' => ['hostid', 'name'],
 			'itemids' => zbx_objectValues($data['items'], 'itemid'),
 			'filter' => [
@@ -627,12 +629,36 @@ elseif (isset($_REQUEST['form'])) {
 			$item['host'] = $host['name'];
 			$item['hostid'] = $items[$item['itemid']]['hostid'];
 			$item['name'] = $items[$item['itemid']]['name'];
-			$item['key_'] = $items[$item['itemid']]['key_'];
 			$item['flags'] = $items[$item['itemid']]['flags'];
 		}
 		unset($item);
+	}
 
-		$data['items'] = CMacrosResolverHelper::resolveItemNames($data['items']);
+	// Set ymin_item_name.
+	$data['ymin_item_name'] = '';
+	$data['ymax_item_name'] = '';
+
+	if ($data['ymin_itemid'] != 0 || $data['ymax_itemid'] != 0) {
+		$items = API::Item()->get([
+			'output' => ['itemid', 'name'],
+			'selectHosts' => ['name'],
+			'itemids' => array_filter([$data['ymin_itemid'], $data['ymax_itemid']]),
+			'filter' => [
+				'flags' => [ZBX_FLAG_DISCOVERY_NORMAL, ZBX_FLAG_DISCOVERY_PROTOTYPE, ZBX_FLAG_DISCOVERY_CREATED]
+			],
+			'webitems' => true,
+			'preservekeys' => true
+		]);
+
+		if ($data['ymin_itemid'] != 0 && array_key_exists($data['ymin_itemid'], $items)) {
+			$item = $items[$data['ymin_itemid']];
+			$data['ymin_item_name'] = $item['hosts'][0]['name'].NAME_DELIMITER.$item['name'];
+		}
+
+		if ($data['ymax_itemid'] != 0 && array_key_exists($data['ymax_itemid'], $items)) {
+			$item = $items[$data['ymax_itemid']];
+			$data['ymax_item_name'] = $item['hosts'][0]['name'].NAME_DELIMITER.$item['name'];
+		}
 	}
 
 	$data['items'] = array_values($data['items']);
@@ -664,8 +690,6 @@ elseif (isset($_REQUEST['form'])) {
 	echo (new CView('configuration.graph.edit', $data))->getOutput();
 }
 else {
-	$config = select_config();
-
 	$data = [
 		'filter' => $filter,
 		'hostid' => $hostid,
@@ -673,8 +697,9 @@ else {
 		'graphs' => [],
 		'sort' => $sort_field,
 		'sortorder' => $sort_order,
-		'profileIdx' => 'web.graphs.filter',
-		'active_tab' => CProfile::get('web.graphs.filter.active', 1)
+		'profileIdx' => $prefix.'graphs.filter',
+		'active_tab' => CProfile::get($prefix.'graphs.filter.active', 1),
+		'context' => getRequest('context')
 	];
 
 	// Select graphs.
@@ -683,8 +708,9 @@ else {
 		'hostids' => $filter['hosts'] ? array_keys($filter['hosts']) : null,
 		'groupids' => $filter_groupids,
 		'discoveryids' => hasRequest('parent_discoveryid') ? $discoveryRule['itemid'] : null,
+		'templated' => ($data['context'] === 'template'),
 		'editable' => true,
-		'limit' => $config['search_limit'] + 1
+		'limit' => CSettingsHelper::get(CSettingsHelper::SEARCH_LIMIT) + 1
 	];
 
 	$data['graphs'] = hasRequest('parent_discoveryid')
@@ -712,7 +738,13 @@ else {
 
 	CPagerHelper::savePage($page['file'], $page_num);
 
-	$data['paging'] = CPagerHelper::paginate($page_num, $data['graphs'], $sort_order, new CUrl('graphs.php'));
+	$url = (new CUrl('graphs.php'))->setArgument('context', $data['context']);
+
+	if (hasRequest('parent_discoveryid')) {
+		$url->setArgument('parent_discoveryid', $data['parent_discoveryid']);
+	}
+
+	$data['paging'] = CPagerHelper::paginate($page_num, $data['graphs'], $sort_order, $url);
 
 	// Get graphs after paging.
 	$options = [
@@ -772,6 +804,8 @@ else {
 		? ZBX_FLAG_DISCOVERY_NORMAL
 		: ZBX_FLAG_DISCOVERY_PROTOTYPE
 	);
+
+	$data['allowed_ui_conf_templates'] = CWebUser::checkAccess(CRoleHelper::UI_CONFIGURATION_TEMPLATES);
 
 	// render view
 	echo (new CView('configuration.graph.list', $data))->getOutput();

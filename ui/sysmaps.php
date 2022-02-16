@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -21,13 +21,11 @@
 
 require_once dirname(__FILE__).'/include/config.inc.php';
 require_once dirname(__FILE__).'/include/maps.inc.php';
-require_once dirname(__FILE__).'/include/ident.inc.php';
 require_once dirname(__FILE__).'/include/forms.inc.php';
 
 $page['title'] = _('Configuration of network maps');
 $page['file'] = 'sysmaps.php';
 $page['type'] = detect_page_type(PAGE_TYPE_HTML);
-$page['scripts'] = ['multiselect.js'];
 
 require_once dirname(__FILE__).'/include/page_header.php';
 
@@ -110,10 +108,16 @@ else {
 	$sysmap = [];
 }
 
+$allowed_edit = CWebUser::checkAccess(CRoleHelper::ACTIONS_EDIT_MAPS);
+
 /*
  * Actions
  */
 if (hasRequest('add') || hasRequest('update')) {
+	if (!$allowed_edit) {
+		access_deny(ACCESS_DENY_PAGE);
+	}
+
 	$map = [
 		'name' => getRequest('name'),
 		'width' => getRequest('width'),
@@ -178,7 +182,6 @@ if (hasRequest('add') || hasRequest('update')) {
 
 		$messageSuccess = _('Network map updated');
 		$messageFailed = _('Cannot update network map');
-		$auditAction = AUDIT_ACTION_UPDATE;
 	}
 	else {
 		if (getRequest('form') === 'full_clone') {
@@ -186,7 +189,7 @@ if (hasRequest('add') || hasRequest('update')) {
 				'output' => [],
 				'selectSelements' => ['selementid', 'elements', 'elementtype', 'iconid_off', 'iconid_on', 'label',
 					'label_location', 'x', 'y', 'iconid_disabled', 'iconid_maintenance', 'elementsubtype', 'areatype',
-					'width', 'height', 'viewtype', 'use_iconmap', 'application', 'urls'
+					'width', 'height', 'viewtype', 'use_iconmap', 'urls', 'tags', 'evaltype'
 				],
 				'selectShapes' => ['type', 'x', 'y', 'width', 'height', 'text', 'font', 'font_size', 'font_color',
 					'text_halign', 'text_valign', 'border_type', 'border_width', 'border_color', 'background_color',
@@ -209,11 +212,9 @@ if (hasRequest('add') || hasRequest('update')) {
 
 		$messageSuccess = _('Network map added');
 		$messageFailed = _('Cannot add network map');
-		$auditAction = AUDIT_ACTION_ADD;
 	}
 
 	if ($result) {
-		add_audit($auditAction, AUDIT_RESOURCE_MAP, 'Name ['.$map['name'].']');
 		unset($_REQUEST['form']);
 	}
 
@@ -224,7 +225,12 @@ if (hasRequest('add') || hasRequest('update')) {
 	}
 	show_messages($result, $messageSuccess, $messageFailed);
 }
-elseif ((hasRequest('delete') && hasRequest('sysmapid')) || (hasRequest('action') && getRequest('action') == 'map.massdelete')) {
+elseif ((hasRequest('delete') && hasRequest('sysmapid'))
+		|| (hasRequest('action') && getRequest('action') == 'map.massdelete')) {
+	if (!$allowed_edit) {
+		access_deny(ACCESS_DENY_PAGE);
+	}
+
 	$sysmapIds = getRequest('maps', []);
 
 	if (hasRequest('sysmapid')) {
@@ -242,10 +248,6 @@ elseif ((hasRequest('delete') && hasRequest('sysmapid')) || (hasRequest('action'
 
 	if ($result) {
 		unset($_REQUEST['form']);
-
-		foreach ($maps as $map) {
-			add_audit_ext(AUDIT_ACTION_DELETE, AUDIT_RESOURCE_MAP, $map['sysmapid'], $map['name'], null, null, null);
-		}
 	}
 
 	$result = DBend($result);
@@ -263,6 +265,10 @@ elseif ((hasRequest('delete') && hasRequest('sysmapid')) || (hasRequest('action'
  * Display
  */
 if (hasRequest('form')) {
+	if (!$allowed_edit) {
+		access_deny(ACCESS_DENY_PAGE);
+	}
+
 	$current_userid = CWebUser::$data['userid'];
 	$userids[$current_userid] = $current_userid;
 	$user_groupids = [];
@@ -294,7 +300,7 @@ if (hasRequest('form')) {
 	}
 
 	$data['users'] = API::User()->get([
-		'output' => ['userid', 'alias', 'name', 'surname'],
+		'output' => ['userid', 'username', 'name', 'surname'],
 		'userids' => $userids,
 		'preservekeys' => true
 	]);
@@ -346,9 +352,6 @@ if (hasRequest('form')) {
 	$data['current_user_userid'] = $current_userid;
 	$data['form_refresh'] = getRequest('form_refresh');
 
-	// config
-	$data['config'] = select_config();
-
 	// advanced labels
 	$data['labelTypes'] = sysmapElementLabel();
 	$data['labelTypesLimited'] = $data['labelTypes'];
@@ -391,8 +394,6 @@ else {
 		DBend();
 	}
 
-	$config = select_config();
-
 	$data = [
 		'filter' => [
 			'name' => CProfile::get('web.sysmapconf.filter_name', '')
@@ -400,14 +401,16 @@ else {
 		'sort' => $sortField,
 		'sortorder' => $sortOrder,
 		'profileIdx' => 'web.sysmapconf.filter',
-		'active_tab' => CProfile::get('web.sysmapconf.filter.active', 1)
+		'active_tab' => CProfile::get('web.sysmapconf.filter.active', 1),
+		'allowed_edit' => $allowed_edit
 	];
 
 	// get maps
+	$limit = CSettingsHelper::get(CSettingsHelper::SEARCH_LIMIT) + 1;
 	$data['maps'] = API::Map()->get([
 		'output' => ['sysmapid', 'name', 'width', 'height'],
 		'sortfield' => $sortField,
-		'limit' => $config['search_limit'] + 1,
+		'limit' => $limit,
 		'search' => [
 			'name' => ($data['filter']['name'] === '') ? null : $data['filter']['name']
 		],

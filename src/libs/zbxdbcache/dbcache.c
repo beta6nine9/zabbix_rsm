@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -22,21 +22,25 @@
 #include "threads.h"
 
 #include "db.h"
-#include "dbcache.h"
 #include "ipc.h"
 #include "mutexs.h"
 #include "zbxserver.h"
 #include "proxy.h"
 #include "events.h"
 #include "memalloc.h"
-#include "zbxalgo.h"
 #include "valuecache.h"
 #include "zbxmodules.h"
 #include "module.h"
 #include "export.h"
 #include "zbxjson.h"
 #include "zbxhistory.h"
+#include "daemon.h"
+#include "zbxavailability.h"
+#include "zbxtrends.h"
 #include "zbxalgo.h"
+#include "../zbxalgo/vectorimpl.h"
+
+#include "dbcache.h"
 
 static zbx_mem_info_t	*hc_index_mem = NULL;
 static zbx_mem_info_t	*hc_mem = NULL;
@@ -60,7 +64,7 @@ extern unsigned char	program_type;
 extern int		CONFIG_DOUBLE_PRECISION;
 extern char		*CONFIG_EXPORT_DIR;
 
-#define ZBX_IDS_SIZE	9
+#define ZBX_IDS_SIZE	10
 
 #define ZBX_HC_ITEMS_INIT_SIZE	1000
 
@@ -72,6 +76,7 @@ extern char		*CONFIG_EXPORT_DIR;
 /* the maximum number of items in one synchronization batch */
 #define ZBX_HC_SYNC_MAX		1000
 #define ZBX_HC_TIMER_MAX	(ZBX_HC_SYNC_MAX / 2)
+#define ZBX_HC_TIMER_SOFT_MAX	(ZBX_HC_TIMER_MAX - 10)
 
 /* the minimum processed item percentage of item candidates to continue synchronizing */
 #define ZBX_HC_SYNC_MIN_PCNT	10
@@ -123,6 +128,8 @@ typedef struct
 	int			trends_last_cleanup_hour;
 	int			history_num_total;
 	int			history_progress_ts;
+
+	unsigned char		db_trigger_queue_lock;
 
 	zbx_hc_proxyqueue_t     proxyqueue;
 }
@@ -183,9 +190,12 @@ static int	hc_queue_elem_compare_func(const void *d1, const void *d2);
 static int	hc_queue_get_size(void);
 static int	hc_get_history_compression_age(void);
 
+ZBX_PTR_VECTOR_DECL(item_tag, zbx_tag_t)
+ZBX_PTR_VECTOR_IMPL(item_tag, zbx_tag_t)
+
+ZBX_PTR_VECTOR_IMPL(tags, zbx_tag_t*)
+
 /******************************************************************************
- *                                                                            *
- * Function: DCget_stats_all                                                  *
  *                                                                            *
  * Purpose: retrieves all internal metrics of the database cache              *
  *                                                                            *
@@ -213,11 +223,7 @@ void	DCget_stats_all(zbx_wcache_info_t *wcache_info)
 
 /******************************************************************************
  *                                                                            *
- * Function: DCget_stats                                                      *
- *                                                                            *
  * Purpose: get statistics of the database cache                              *
- *                                                                            *
- * Author: Alexander Vladishev                                                *
  *                                                                            *
  ******************************************************************************/
 void	*DCget_stats(int request)
@@ -331,13 +337,9 @@ void	*DCget_stats(int request)
 
 /******************************************************************************
  *                                                                            *
- * Function: DCget_trend                                                      *
- *                                                                            *
  * Purpose: find existing or add new structure and return pointer             *
  *                                                                            *
  * Return value: pointer to a trend structure                                 *
- *                                                                            *
- * Author: Alexander Vladishev                                                *
  *                                                                            *
  ******************************************************************************/
 static ZBX_DC_TREND	*DCget_trend(zbx_uint64_t itemid)
@@ -354,8 +356,6 @@ static ZBX_DC_TREND	*DCget_trend(zbx_uint64_t itemid)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: DCupdate_trends                                                  *
  *                                                                            *
  * Purpose: apply disable_from changes to cache                               *
  *                                                                            *
@@ -382,8 +382,6 @@ static void	DCupdate_trends(zbx_vector_uint64_pair_t *trends_diff)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: dc_insert_trends_in_db                                           *
  *                                                                            *
  * Purpose: helper function for DCflush trends                                *
  *                                                                            *
@@ -432,8 +430,6 @@ static void	dc_insert_trends_in_db(ZBX_DC_TREND *trends, int trends_num, unsigne
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: dc_remove_updated_trends                                         *
  *                                                                            *
  * Purpose: Update trends disable_until for items without trends data past or *
  *          equal the specified clock                                         *
@@ -506,8 +502,6 @@ static void	dc_remove_updated_trends(ZBX_DC_TREND *trends, int trends_num, const
 
 /******************************************************************************
  *                                                                            *
- * Function: dc_trends_update_float                                           *
- *                                                                            *
  * Purpose: helper function for DCflush trends                                *
  *                                                                            *
  ******************************************************************************/
@@ -538,8 +532,6 @@ static void	dc_trends_update_float(ZBX_DC_TREND *trend, DB_ROW row, int num, siz
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: dc_trends_update_uint                                            *
  *                                                                            *
  * Purpose: helper function for DCflush trends                                *
  *                                                                            *
@@ -578,8 +570,6 @@ static void	dc_trends_update_uint(ZBX_DC_TREND *trend, DB_ROW row, int num, size
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: dc_trends_fetch_and_update                                       *
  *                                                                            *
  * Purpose: helper function for DCflush trends                                *
  *                                                                            *
@@ -657,11 +647,7 @@ static void	dc_trends_fetch_and_update(ZBX_DC_TREND *trends, int trends_num, zbx
 
 /******************************************************************************
  *                                                                            *
- * Function: DBflush_trends                                                   *
- *                                                                            *
  * Purpose: flush trend to the database                                       *
- *                                                                            *
- * Author: Alexander Vladishev                                                *
  *                                                                            *
  ******************************************************************************/
 static void	DBflush_trends(ZBX_DC_TREND *trends, int *trends_num, zbx_vector_uint64_pair_t *trends_diff)
@@ -781,11 +767,7 @@ static void	DBflush_trends(ZBX_DC_TREND *trends, int *trends_num, zbx_vector_uin
 
 /******************************************************************************
  *                                                                            *
- * Function: DCflush_trend                                                    *
- *                                                                            *
  * Purpose: move trend to the array of trends for flushing to DB              *
- *                                                                            *
- * Author: Alexander Vladishev                                                *
  *                                                                            *
  ******************************************************************************/
 static void	DCflush_trend(ZBX_DC_TREND *trend, ZBX_DC_TREND **trends, int *trends_alloc, int *trends_num)
@@ -808,11 +790,7 @@ static void	DCflush_trend(ZBX_DC_TREND *trend, ZBX_DC_TREND **trends, int *trend
 
 /******************************************************************************
  *                                                                            *
- * Function: DCadd_trend                                                      *
- *                                                                            *
  * Purpose: add new value to the trends                                       *
- *                                                                            *
- * Author: Alexander Vladishev                                                *
  *                                                                            *
  ******************************************************************************/
 static void	DCadd_trend(const ZBX_DC_HISTORY *history, ZBX_DC_TREND **trends, int *trends_alloc, int *trends_num)
@@ -856,8 +834,6 @@ static void	DCadd_trend(const ZBX_DC_HISTORY *history, ZBX_DC_TREND **trends, in
 
 /******************************************************************************
  *                                                                            *
- * Function: DCmass_update_trends                                             *
- *                                                                            *
  * Purpose: update trends cache and get list of trends to flush into database *
  *                                                                            *
  * Parameters: history         - [IN]  array of history data                  *
@@ -865,8 +841,6 @@ static void	DCadd_trend(const ZBX_DC_HISTORY *history, ZBX_DC_TREND **trends, in
  *             trends          - [OUT] list of trends to flush into database  *
  *             trends_num      - [OUT] number of trends                       *
  *             compression_age - [IN]  history compression age                *
- *                                                                            *
- * Author: Alexander Vladishev                                                *
  *                                                                            *
  ******************************************************************************/
 static void	DCmass_update_trends(const ZBX_DC_HISTORY *history, int history_num, ZBX_DC_TREND **trends,
@@ -943,8 +917,6 @@ static int	zbx_trend_compare(const void *d1, const void *d2)
 
 /******************************************************************************
  *                                                                            *
- * Function: DBmass_update_trends                                             *
- *                                                                            *
  * Purpose: prepare history data using items from configuration cache         *
  *                                                                            *
  * Parameters: trends      - [IN] trends from cache to be added to database   *
@@ -979,8 +951,6 @@ zbx_host_info_t;
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_host_info_clean                                              *
- *                                                                            *
  * Purpose: frees resources allocated to store host groups names              *
  *                                                                            *
  * Parameters: host_info - [IN] host information                              *
@@ -993,8 +963,6 @@ static void	zbx_host_info_clean(zbx_host_info_t *host_info)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: db_get_hosts_info_by_hostid                                      *
  *                                                                            *
  * Purpose: get hosts groups names                                            *
  *                                                                            *
@@ -1050,17 +1018,15 @@ typedef struct
 	zbx_uint64_t		itemid;
 	char			*name;
 	DC_ITEM			*item;
-	zbx_vector_ptr_t	applications;
+	zbx_vector_item_tag_t	item_tags;
 }
 zbx_item_info_t;
 
 /******************************************************************************
  *                                                                            *
- * Function: db_get_items_info_by_itemid                                      *
+ * Purpose: get items name and item tags                                      *
  *                                                                            *
- * Purpose: get items name and applications                                   *
- *                                                                            *
- * Parameters: items_info - [IN/OUT] output item name and applications        *
+ * Parameters: items_info - [IN/OUT] output item name and item tags           *
  *             itemids    - [IN] the item identifiers                         *
  *                                                                            *
  ******************************************************************************/
@@ -1088,18 +1054,15 @@ static void	db_get_items_info_by_itemid(zbx_hashset_t *items_info, const zbx_vec
 			continue;
 		}
 
-		zbx_substitute_item_name_macros(item_info->item, row[1], &item_info->name);
+		item_info->name = zbx_strdup(item_info->name, row[1]);
 	}
 	DBfree_result(result);
 
 	sql_offset = 0;
 	zbx_snprintf_alloc(&sql, &sql_alloc, &sql_offset,
-			"select i.itemid,a.name"
-			" from applications a,items_applications i"
-			" where a.applicationid=i.applicationid"
-				" and");
+			"select itemid,tag,value from item_tag where");
 
-	DBadd_condition_alloc(&sql, &sql_alloc, &sql_offset, "i.itemid", itemids->values, itemids->values_num);
+	DBadd_condition_alloc(&sql, &sql_alloc, &sql_offset, "itemid", itemids->values, itemids->values_num);
 
 	result = DBselect("%s", sql);
 
@@ -1107,6 +1070,7 @@ static void	db_get_items_info_by_itemid(zbx_hashset_t *items_info, const zbx_vec
 	{
 		zbx_uint64_t	itemid;
 		zbx_item_info_t	*item_info;
+		zbx_tag_t	item_tag;
 
 		ZBX_DBROW2UINT64(itemid, row[0]);
 
@@ -1116,37 +1080,48 @@ static void	db_get_items_info_by_itemid(zbx_hashset_t *items_info, const zbx_vec
 			continue;
 		}
 
-		zbx_vector_ptr_append(&item_info->applications, zbx_strdup(NULL, row[1]));
+		item_tag.tag = zbx_strdup(NULL, row[1]);
+		item_tag.value = zbx_strdup(NULL, row[2]);
+		zbx_vector_item_tag_append(&item_info->item_tags, item_tag);
 	}
 	DBfree_result(result);
 }
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_item_info_clean                                              *
+ * Purpose: frees resources allocated to store item tag                       *
  *                                                                            *
- * Purpose: frees resources allocated to store item applications and name     *
+ * Parameters: item_tag - [IN] item tag                                       *
+ *                                                                            *
+ ******************************************************************************/
+static void	item_tag_free(zbx_tag_t item_tag)
+{
+	zbx_free(item_tag.tag);
+	zbx_free(item_tag.value);
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Purpose: frees resources allocated to store item tags and name             *
  *                                                                            *
  * Parameters: item_info - [IN] item information                              *
  *                                                                            *
  ******************************************************************************/
 static void	zbx_item_info_clean(zbx_item_info_t *item_info)
 {
-	zbx_vector_ptr_clear_ext(&item_info->applications, zbx_ptr_free);
-	zbx_vector_ptr_destroy(&item_info->applications);
+	zbx_vector_item_tag_clear_ext(&item_info->item_tags, item_tag_free);
+	zbx_vector_item_tag_destroy(&item_info->item_tags);
 	zbx_free(item_info->name);
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: DCexport_trends                                                  *
  *                                                                            *
  * Purpose: export trends                                                     *
  *                                                                            *
  * Parameters: trends     - [IN] trends from cache                            *
  *             trends_num - [IN] number of trends                             *
  *             hosts_info - [IN] hosts groups names                           *
- *             items_info - [IN] item names and applications                  *
+ *             items_info - [IN] item names and tags                          *
  *                                                                            *
  ******************************************************************************/
 static void	DCexport_trends(const ZBX_DC_TREND *trends, int trends_num, zbx_hashset_t *hosts_info,
@@ -1191,10 +1166,17 @@ static void	DCexport_trends(const ZBX_DC_TREND *trends, int trends_num, zbx_hash
 
 		zbx_json_close(&json);
 
-		zbx_json_addarray(&json, ZBX_PROTO_TAG_APPLICATIONS);
+		zbx_json_addarray(&json, ZBX_PROTO_TAG_ITEM_TAGS);
 
-		for (j = 0; j < item_info->applications.values_num; j++)
-			zbx_json_addstring(&json, NULL, item_info->applications.values[j], ZBX_JSON_TYPE_STRING);
+		for (j = 0; j < item_info->item_tags.values_num; j++)
+		{
+			zbx_tag_t	item_tag = item_info->item_tags.values[j];
+
+			zbx_json_addobject(&json, NULL);
+			zbx_json_addstring(&json, ZBX_PROTO_TAG_TAG, item_tag.tag, ZBX_JSON_TYPE_STRING);
+			zbx_json_addstring(&json, ZBX_PROTO_TAG_VALUE, item_tag.value, ZBX_JSON_TYPE_STRING);
+			zbx_json_close(&json);
+		}
 
 		zbx_json_close(&json);
 		zbx_json_adduint64(&json, ZBX_PROTO_TAG_ITEMID, item->itemid);
@@ -1232,14 +1214,12 @@ static void	DCexport_trends(const ZBX_DC_TREND *trends, int trends_num, zbx_hash
 
 /******************************************************************************
  *                                                                            *
- * Function: DCexport_history                                                 *
- *                                                                            *
  * Purpose: export history                                                    *
  *                                                                            *
  * Parameters: history     - [IN/OUT] array of history data                   *
  *             history_num - [IN] number of history structures                *
  *             hosts_info  - [IN] hosts groups names                          *
- *             items_info  - [IN] item names and applications                 *
+ *             items_info  - [IN] item names and tags                         *
  *                                                                            *
  ******************************************************************************/
 static void	DCexport_history(const ZBX_DC_HISTORY *history, int history_num, zbx_hashset_t *hosts_info,
@@ -1289,10 +1269,17 @@ static void	DCexport_history(const ZBX_DC_HISTORY *history, int history_num, zbx
 
 		zbx_json_close(&json);
 
-		zbx_json_addarray(&json, ZBX_PROTO_TAG_APPLICATIONS);
+		zbx_json_addarray(&json, ZBX_PROTO_TAG_ITEM_TAGS);
 
-		for (j = 0; j < item_info->applications.values_num; j++)
-			zbx_json_addstring(&json, NULL, item_info->applications.values[j], ZBX_JSON_TYPE_STRING);
+		for (j = 0; j < item_info->item_tags.values_num; j++)
+		{
+			zbx_tag_t	item_tag = item_info->item_tags.values[j];
+
+			zbx_json_addobject(&json, NULL);
+			zbx_json_addstring(&json, ZBX_PROTO_TAG_TAG, item_tag.tag, ZBX_JSON_TYPE_STRING);
+			zbx_json_addstring(&json, ZBX_PROTO_TAG_VALUE, item_tag.value, ZBX_JSON_TYPE_STRING);
+			zbx_json_close(&json);
+		}
 
 		zbx_json_close(&json);
 		zbx_json_adduint64(&json, ZBX_PROTO_TAG_ITEMID, item->itemid);
@@ -1339,8 +1326,6 @@ static void	DCexport_history(const ZBX_DC_HISTORY *history, int history_num, zbx
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: DCexport_history_and_trends                                      *
  *                                                                            *
  * Purpose: export history and trends                                         *
  *                                                                            *
@@ -1396,7 +1381,7 @@ static void	DCexport_history_and_trends(const ZBX_DC_HISTORY *history, int histo
 		item_info.itemid = item->itemid;
 		item_info.name = NULL;
 		item_info.item = item;
-		zbx_vector_ptr_create(&item_info.applications);
+		zbx_vector_item_tag_create(&item_info.item_tags);
 		zbx_hashset_insert(&items_info, &item_info, sizeof(item_info));
 	}
 
@@ -1424,7 +1409,7 @@ static void	DCexport_history_and_trends(const ZBX_DC_HISTORY *history, int histo
 			item_info.itemid = item->itemid;
 			item_info.name = NULL;
 			item_info.item = item;
-			zbx_vector_ptr_create(&item_info.applications);
+			zbx_vector_item_tag_create(&item_info.item_tags);
 			zbx_hashset_insert(&items_info, &item_info, sizeof(item_info));
 		}
 	}
@@ -1460,8 +1445,6 @@ clean:
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: DCexport_all_trends                                              *
  *                                                                            *
  * Purpose: export all trends                                                 *
  *                                                                            *
@@ -1510,11 +1493,7 @@ static void	DCexport_all_trends(const ZBX_DC_TREND *trends, int trends_num)
 
 /******************************************************************************
  *                                                                            *
- * Function: DCsync_trends                                                    *
- *                                                                            *
  * Purpose: flush all trends to the database                                  *
- *                                                                            *
- * Author: Alexander Vladishev                                                *
  *                                                                            *
  ******************************************************************************/
 static void	DCsync_trends(void)
@@ -1563,8 +1542,6 @@ static void	DCsync_trends(void)
 
 /******************************************************************************
  *                                                                            *
- * Function: recalculate_triggers                                             *
- *                                                                            *
  * Purpose: re-calculate and update values of triggers related to the items   *
  *                                                                            *
  * Parameters: history           - [IN] array of history data                 *
@@ -1573,16 +1550,15 @@ static void	DCsync_trends(void)
  *                                      (used for item lookup)                *
  *             history_items     - [IN] the items                             *
  *             history_errcodes  - [IN] item error codes                      *
- *             timer_triggerids  - [IN] the timer triggerids to process       *
- *             ts                - [IN] timer trigger timestamp               *
+ *             timers            - [IN] the trigger timers                    *
  *             trigger_diff      - [OUT] trigger updates                      *
  *                                                                            *
  ******************************************************************************/
 static void	recalculate_triggers(const ZBX_DC_HISTORY *history, int history_num,
 		const zbx_vector_uint64_t *history_itemids, const DC_ITEM *history_items, const int *history_errcodes,
-		const zbx_vector_uint64_t *timer_triggerids, zbx_timespec_t *ts, zbx_vector_ptr_t *trigger_diff)
+		const zbx_vector_ptr_t *timers, zbx_vector_ptr_t *trigger_diff)
 {
-	int			i, item_num = 0;
+	int			i, item_num = 0, timers_num = 0;
 	zbx_uint64_t		*itemids = NULL;
 	zbx_timespec_t		*timespecs = NULL;
 	zbx_hashset_t		trigger_info;
@@ -1609,10 +1585,18 @@ static void	recalculate_triggers(const ZBX_DC_HISTORY *history, int history_num,
 		}
 	}
 
-	if (0 == item_num && 0 == timer_triggerids->values_num)
+	for (i = 0; i < timers->values_num; i++)
+	{
+		zbx_trigger_timer_t	*timer = (zbx_trigger_timer_t *)timers->values[i];
+
+		if (0 != timer->lock)
+			timers_num++;
+	}
+
+	if (0 == item_num && 0 == timers_num)
 		goto out;
 
-	zbx_hashset_create(&trigger_info, MAX(100, 2 * item_num + timer_triggerids->values_num),
+	zbx_hashset_create(&trigger_info, MAX(100, 2 * item_num + timers_num),
 			ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
 
 	zbx_vector_ptr_create(&trigger_order);
@@ -1623,11 +1607,22 @@ static void	recalculate_triggers(const ZBX_DC_HISTORY *history, int history_num,
 	if (0 != item_num)
 	{
 		DCconfig_get_triggers_by_itemids(&trigger_info, &trigger_order, itemids, timespecs, item_num);
+		prepare_triggers((DC_TRIGGER **)trigger_order.values, trigger_order.values_num);
 		zbx_determine_items_in_expressions(&trigger_order, itemids, item_num);
 	}
 
-	if (0 != timer_triggerids->values_num)
-		zbx_dc_get_timer_triggers_by_triggerids(&trigger_info, &trigger_order, timer_triggerids, ts);
+	if (0 != timers_num)
+	{
+		int	offset = trigger_order.values_num;
+
+		zbx_dc_get_triggers_by_timers(&trigger_info, &trigger_order, timers);
+
+		if (offset != trigger_order.values_num)
+		{
+			prepare_triggers((DC_TRIGGER **)trigger_order.values + offset,
+					trigger_order.values_num - offset);
+		}
+	}
 
 	zbx_vector_ptr_sort(&trigger_order, ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC);
 	evaluate_expressions(&trigger_order, history_itemids, history_items, history_errcodes);
@@ -1721,8 +1716,6 @@ static void	DCinventory_value_free(zbx_inventory_value_t *inventory_value)
 
 /******************************************************************************
  *                                                                            *
- * Function: dc_history_clean_value                                           *
- *                                                                            *
  * Purpose: frees resources allocated to store str/text/log value             *
  *                                                                            *
  * Parameters: history     - [IN] the history data                            *
@@ -1756,8 +1749,6 @@ static void	dc_history_clean_value(ZBX_DC_HISTORY *history)
 
 /******************************************************************************
  *                                                                            *
- * Function: hc_free_item_values                                              *
- *                                                                            *
  * Purpose: frees resources allocated to store str/text/log values            *
  *                                                                            *
  * Parameters: history     - [IN] the history data                            *
@@ -1773,8 +1764,6 @@ static void	hc_free_item_values(ZBX_DC_HISTORY *history, int history_num)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: dc_history_set_error                                             *
  *                                                                            *
  * Purpose: sets history data to notsupported                                 *
  *                                                                            *
@@ -1794,8 +1783,6 @@ static void	dc_history_set_error(ZBX_DC_HISTORY *hdata, char *errmsg)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: dc_history_set_value                                             *
  *                                                                            *
  * Purpose: sets history data value                                           *
  *                                                                            *
@@ -1850,8 +1837,6 @@ static void	dc_history_set_value(ZBX_DC_HISTORY *hdata, unsigned char value_type
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: normalize_item_value                                             *
  *                                                                            *
  * Purpose: normalize item value by performing truncation of long text        *
  *          values and changes value format according to the item value type  *
@@ -1928,8 +1913,6 @@ static void	normalize_item_value(const DC_ITEM *item, ZBX_DC_HISTORY *hdata)
 
 /******************************************************************************
  *                                                                            *
- * Function: calculate_item_update                                            *
- *                                                                            *
  * Purpose: calculates what item fields must be updated                       *
  *                                                                            *
  * Parameters: item      - [IN] the item                                      *
@@ -1942,11 +1925,9 @@ static void	normalize_item_value(const DC_ITEM *item, ZBX_DC_HISTORY *hdata)
  ******************************************************************************/
 static zbx_item_diff_t	*calculate_item_update(DC_ITEM *item, const ZBX_DC_HISTORY *h)
 {
-	zbx_uint64_t	flags;
+	zbx_uint64_t	flags = 0;
 	const char	*item_error = NULL;
 	zbx_item_diff_t	*diff;
-
-	flags = item->host.proxy_hostid == 0 ? ZBX_FLAGS_ITEM_DIFF_UPDATE_LASTCLOCK : 0;
 
 	if (0 != (ZBX_DC_FLAG_META & h->flags))
 	{
@@ -1967,7 +1948,7 @@ static zbx_item_diff_t	*calculate_item_update(DC_ITEM *item, const ZBX_DC_HISTOR
 					item->host.host, item->key_orig, h->value.str);
 
 			zbx_add_event(EVENT_SOURCE_INTERNAL, EVENT_OBJECT_ITEM, item->itemid, &h->ts, h->state, NULL,
-					NULL, NULL, 0, 0, NULL, 0, NULL, 0, NULL, h->value.err);
+					NULL, NULL, 0, 0, NULL, 0, NULL, 0, NULL, NULL, h->value.err);
 
 			if (0 != strcmp(item->error, h->value.err))
 				item_error = h->value.err;
@@ -1980,7 +1961,7 @@ static zbx_item_diff_t	*calculate_item_update(DC_ITEM *item, const ZBX_DC_HISTOR
 			/* we know it's EVENT_OBJECT_ITEM because LLDRULE that becomes */
 			/* supported is handled in lld_process_discovery_rule()        */
 			zbx_add_event(EVENT_SOURCE_INTERNAL, EVENT_OBJECT_ITEM, item->itemid, &h->ts, h->state,
-					NULL, NULL, NULL, 0, 0, NULL, 0, NULL, 0, NULL, NULL);
+					NULL, NULL, NULL, 0, 0, NULL, 0, NULL, 0, NULL, NULL, NULL);
 
 			item_error = "";
 		}
@@ -2001,7 +1982,6 @@ static zbx_item_diff_t	*calculate_item_update(DC_ITEM *item, const ZBX_DC_HISTOR
 
 	diff = (zbx_item_diff_t *)zbx_malloc(NULL, sizeof(zbx_item_diff_t));
 	diff->itemid = item->itemid;
-	diff->lastclock = h->ts.sec;
 	diff->flags = flags;
 
 	if (0 != (ZBX_FLAGS_ITEM_DIFF_UPDATE_LASTLOGSIZE & flags))
@@ -2023,8 +2003,6 @@ static zbx_item_diff_t	*calculate_item_update(DC_ITEM *item, const ZBX_DC_HISTOR
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: DBmass_update_items                                              *
  *                                                                            *
  * Purpose: update item data and inventory in database                        *
  *                                                                            *
@@ -2074,38 +2052,28 @@ static void	DBmass_update_items(const zbx_vector_ptr_t *item_diff, const zbx_vec
 
 /******************************************************************************
  *                                                                            *
- * Function: DCmass_proxy_update_items                                        *
- *                                                                            *
- * Purpose: update items info after new value is received                     *
+ * Purpose: prepare itemdiff after receiving new values                       *
  *                                                                            *
  * Parameters: history     - array of history data                            *
  *             history_num - number of history structures                     *
- *                                                                            *
- * Author: Alexei Vladishev, Eugene Grigorjev, Alexander Vladishev            *
+ *             item_diff   - vector to store prepared diff                    *
  *                                                                            *
  ******************************************************************************/
-static void	DCmass_proxy_update_items(ZBX_DC_HISTORY *history, int history_num)
+static void	DCmass_proxy_prepare_itemdiff(ZBX_DC_HISTORY *history, int history_num, zbx_vector_ptr_t *item_diff)
 {
-	int			i;
-	zbx_vector_ptr_t	item_diff;
-	zbx_item_diff_t		*diffs;
+	int	i;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
-	zbx_vector_ptr_create(&item_diff);
-	zbx_vector_ptr_reserve(&item_diff, history_num);
-
-	/* preallocate zbx_item_diff_t structures for item_diff vector */
-	diffs = (zbx_item_diff_t *)zbx_malloc(NULL, sizeof(zbx_item_diff_t) * history_num);
+	zbx_vector_ptr_reserve(item_diff, history_num);
 
 	for (i = 0; i < history_num; i++)
 	{
-		zbx_item_diff_t	*diff = &diffs[i];
+		zbx_item_diff_t	*diff = (zbx_item_diff_t *)zbx_malloc(NULL, sizeof(zbx_item_diff_t));
 
 		diff->itemid = history[i].itemid;
 		diff->state = history[i].state;
-		diff->lastclock = history[i].ts.sec;
-		diff->flags = ZBX_FLAGS_ITEM_DIFF_UPDATE_STATE | ZBX_FLAGS_ITEM_DIFF_UPDATE_LASTCLOCK;
+		diff->flags = ZBX_FLAGS_ITEM_DIFF_UPDATE_STATE;
 
 		if (0 != (ZBX_DC_FLAG_META & history[i].flags))
 		{
@@ -2114,37 +2082,202 @@ static void	DCmass_proxy_update_items(ZBX_DC_HISTORY *history, int history_num)
 			diff->flags |= ZBX_FLAGS_ITEM_DIFF_UPDATE_LASTLOGSIZE | ZBX_FLAGS_ITEM_DIFF_UPDATE_MTIME;
 		}
 
-		zbx_vector_ptr_append(&item_diff, diff);
+		zbx_vector_ptr_append(item_diff, diff);
 	}
-
-	if (0 != item_diff.values_num)
-	{
-		size_t	sql_offset = 0;
-
-		zbx_vector_ptr_sort(&item_diff, ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC);
-
-		DBbegin_multiple_update(&sql, &sql_alloc, &sql_offset);
-
-		zbx_db_save_item_changes(&sql, &sql_alloc, &sql_offset, &item_diff,
-				ZBX_FLAGS_ITEM_DIFF_UPDATE_LASTLOGSIZE | ZBX_FLAGS_ITEM_DIFF_UPDATE_MTIME);
-
-		DBend_multiple_update(&sql, &sql_alloc, &sql_offset);
-
-		if (sql_offset > 16)	/* In ORACLE always present begin..end; */
-			DBexecute("%s", sql);
-
-		DCconfig_items_apply_changes(&item_diff);
-	}
-
-	zbx_vector_ptr_destroy(&item_diff);
-	zbx_free(diffs);
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
 /******************************************************************************
  *                                                                            *
- * Function: DBmass_add_history                                               *
+ * Purpose: update items info after new value is received                     *
+ *                                                                            *
+ * Parameters: item_diff - diff of items to be updated                        *
+ *                                                                            *
+ ******************************************************************************/
+static void	DBmass_proxy_update_items(zbx_vector_ptr_t *item_diff)
+{
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+
+	if (0 != item_diff->values_num)
+	{
+		size_t	sql_offset = 0;
+
+		zbx_vector_ptr_sort(item_diff, ZBX_DEFAULT_UINT64_PTR_COMPARE_FUNC);
+
+		DBbegin_multiple_update(&sql, &sql_alloc, &sql_offset);
+
+		zbx_db_save_item_changes(&sql, &sql_alloc, &sql_offset, item_diff,
+				ZBX_FLAGS_ITEM_DIFF_UPDATE_LASTLOGSIZE | ZBX_FLAGS_ITEM_DIFF_UPDATE_MTIME);
+
+		DBend_multiple_update(&sql, &sql_alloc, &sql_offset);
+
+		if (sql_offset > 16)	/* In ORACLE always present begin..end; */
+			DBexecute("%s", sql);
+	}
+
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
+}
+
+typedef struct
+{
+	char	*table_name;
+	char	*sql;
+	size_t	sql_alloc, sql_offset;
+}
+zbx_history_dupl_select_t;
+
+static int	history_value_compare_func(const void *d1, const void *d2)
+{
+	const ZBX_DC_HISTORY	*i1 = *(const ZBX_DC_HISTORY **)d1;
+	const ZBX_DC_HISTORY	*i2 = *(const ZBX_DC_HISTORY **)d2;
+
+	ZBX_RETURN_IF_NOT_EQUAL(i1->itemid, i2->itemid);
+	ZBX_RETURN_IF_NOT_EQUAL(i1->value_type, i2->value_type);
+	ZBX_RETURN_IF_NOT_EQUAL(i1->ts.sec, i2->ts.sec);
+	ZBX_RETURN_IF_NOT_EQUAL(i1->ts.ns, i2->ts.ns);
+
+	return 0;
+}
+
+static void	vc_flag_duplicates(zbx_vector_ptr_t *history_index, zbx_vector_ptr_t *duplicates)
+{
+	int	i;
+
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+
+	for (i = 0; i < duplicates->values_num; i++)
+	{
+		int	idx_cached;
+
+		if (FAIL != (idx_cached = zbx_vector_ptr_bsearch(history_index, duplicates->values[i],
+				history_value_compare_func)))
+		{
+			ZBX_DC_HISTORY	*cached_value = (ZBX_DC_HISTORY *)history_index->values[idx_cached];
+
+			dc_history_clean_value(cached_value);
+			cached_value->flags |= ZBX_DC_FLAGS_NOT_FOR_HISTORY;
+		}
+	}
+
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
+}
+
+static void	db_fetch_duplicates(zbx_history_dupl_select_t *query, unsigned char value_type,
+		zbx_vector_ptr_t *duplicates)
+{
+	DB_RESULT	result;
+	DB_ROW		row;
+
+	if (NULL == query->sql)
+		return;
+
+	result = DBselect("%s", query->sql);
+
+	while (NULL != (row = DBfetch(result)))
+	{
+		ZBX_DC_HISTORY	*d = (ZBX_DC_HISTORY *)zbx_malloc(NULL, sizeof(ZBX_DC_HISTORY));
+
+		ZBX_STR2UINT64(d->itemid, row[0]);
+		d->ts.sec = atoi(row[1]);
+		d->ts.ns = atoi(row[2]);
+
+		d->value_type = value_type;
+
+		zbx_vector_ptr_append(duplicates, d);
+	}
+	DBfree_result(result);
+
+	zbx_free(query->sql);
+}
+
+static void	remove_history_duplicates(zbx_vector_ptr_t *history)
+{
+	int				i;
+	zbx_history_dupl_select_t	select_flt = {.table_name = "history"},
+					select_uint = {.table_name = "history_uint"},
+					select_str = {.table_name = "history_str"},
+					select_log = {.table_name = "history_log"},
+					select_text = {.table_name = "history_text"};
+	zbx_vector_ptr_t		duplicates, history_index;
+
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+
+	zbx_vector_ptr_create(&duplicates);
+	zbx_vector_ptr_create(&history_index);
+
+	zbx_vector_ptr_append_array(&history_index, history->values, history->values_num);
+	zbx_vector_ptr_sort(&history_index, history_value_compare_func);
+
+	for (i = 0; i < history_index.values_num; i++)
+	{
+		ZBX_DC_HISTORY			*h = history_index.values[i];
+		zbx_history_dupl_select_t	*select_ptr;
+		char				*separator = " or";
+
+		if (h->value_type == ITEM_VALUE_TYPE_FLOAT)
+			select_ptr = &select_flt;
+		else if (h->value_type == ITEM_VALUE_TYPE_UINT64)
+			select_ptr = &select_uint;
+		else if (h->value_type == ITEM_VALUE_TYPE_STR)
+			select_ptr = &select_str;
+		else if (h->value_type == ITEM_VALUE_TYPE_LOG)
+			select_ptr = &select_log;
+		else if (h->value_type == ITEM_VALUE_TYPE_TEXT)
+			select_ptr = &select_text;
+		else
+			continue;
+
+		if (NULL == select_ptr->sql)
+		{
+			zbx_snprintf_alloc(&select_ptr->sql, &select_ptr->sql_alloc, &select_ptr->sql_offset,
+					"select itemid,clock,ns"
+					" from %s"
+					" where", select_ptr->table_name);
+			separator = "";
+		}
+
+		zbx_snprintf_alloc(&select_ptr->sql, &select_ptr->sql_alloc, &select_ptr->sql_offset,
+				"%s (itemid=" ZBX_FS_UI64 " and clock=%d and ns=%d)", separator , h->itemid,
+				h->ts.sec, h->ts.ns);
+	}
+
+	db_fetch_duplicates(&select_flt, ITEM_VALUE_TYPE_FLOAT, &duplicates);
+	db_fetch_duplicates(&select_uint, ITEM_VALUE_TYPE_UINT64, &duplicates);
+	db_fetch_duplicates(&select_str, ITEM_VALUE_TYPE_STR, &duplicates);
+	db_fetch_duplicates(&select_log, ITEM_VALUE_TYPE_LOG, &duplicates);
+	db_fetch_duplicates(&select_text, ITEM_VALUE_TYPE_TEXT, &duplicates);
+
+	vc_flag_duplicates(&history_index, &duplicates);
+
+	zbx_vector_ptr_clear_ext(&duplicates, (zbx_clean_func_t)zbx_ptr_free);
+	zbx_vector_ptr_destroy(&duplicates);
+	zbx_vector_ptr_destroy(&history_index);
+
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
+}
+
+static int	add_history(ZBX_DC_HISTORY *history, int history_num, zbx_vector_ptr_t *history_values, int *ret_flush)
+{
+	int	i, ret = SUCCEED;
+
+	for (i = 0; i < history_num; i++)
+	{
+		ZBX_DC_HISTORY	*h = &history[i];
+
+		if (0 != (ZBX_DC_FLAGS_NOT_FOR_HISTORY & h->flags))
+			continue;
+
+		zbx_vector_ptr_append(history_values, h);
+	}
+
+	if (0 != history_values->values_num)
+		ret = zbx_vc_add_values(history_values, ret_flush);
+
+	return ret;
+}
+
+/******************************************************************************
  *                                                                            *
  * Purpose: inserting new history data after new value is received            *
  *                                                                            *
@@ -2154,86 +2287,87 @@ static void	DCmass_proxy_update_items(ZBX_DC_HISTORY *history, int history_num)
  ******************************************************************************/
 static int	DBmass_add_history(ZBX_DC_HISTORY *history, int history_num)
 {
-	int			i, ret = SUCCEED;
+	int			ret, ret_flush = FLUSH_SUCCEED, num;
 	zbx_vector_ptr_t	history_values;
-	char			*lastvalue_sql = NULL;
-	char			*lastvalue_str_sql = NULL;
-	size_t			lastvalue_sql_alloc = 0, lastvalue_sql_offset;
-	size_t			lastvalue_str_sql_alloc = 0, lastvalue_str_sql_offset;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
 	zbx_vector_ptr_create(&history_values);
 	zbx_vector_ptr_reserve(&history_values, history_num);
 
-	for (i = 0; i < history_num; i++)
+	if (FAIL == (ret = add_history(history, history_num, &history_values, &ret_flush)) &&
+			FLUSH_DUPL_REJECTED == ret_flush)
 	{
-		ZBX_DC_HISTORY	*h = &history[i];
+		num = history_values.values_num;
+		remove_history_duplicates(&history_values);
+		zbx_vector_ptr_clear(&history_values);
 
-		if (0 != (ZBX_DC_FLAGS_NOT_FOR_HISTORY & h->flags))
-			continue;
-
-		zbx_vector_ptr_append(&history_values, h);
-	}
-
-	if (0 != history_values.values_num)
-	{
-		if (SUCCEED != (ret = zbx_vc_add_values(&history_values)))
-			goto out;
+		if (SUCCEED == (ret = add_history(history, history_num, &history_values, &ret_flush)))
+			zabbix_log(LOG_LEVEL_WARNING, "skipped %d duplicates", num - history_values.values_num);
 	}
 
 	/* RSM specifics: update lastvalue and lastvalue_str tables with fresh values for frontend */
-	for (i = 0; i < history_values.values_num; i++)
+	if (0 != history_values.values_num)
 	{
-		const ZBX_DC_HISTORY	*h = (ZBX_DC_HISTORY *)history_values.values[i];
+		int	i;
+		char	*lastvalue_sql = NULL;
+		char	*lastvalue_str_sql = NULL;
+		size_t	lastvalue_sql_alloc = 0, lastvalue_sql_offset;
+		size_t	lastvalue_str_sql_alloc = 0, lastvalue_str_sql_offset;
 
-		if (ITEM_VALUE_TYPE_FLOAT == h->value_type)
+		for (i = 0; i < history_values.values_num; i++)
 		{
-			zbx_snprintf_alloc(&lastvalue_sql, &lastvalue_sql_alloc, &lastvalue_sql_offset,
-					"%s(" ZBX_FS_UI64 ",%d," ZBX_FS_DBL ")",
-					NULL == lastvalue_sql ? "" : ",",
-					h->itemid, h->ts.sec, h->value.dbl);
+			const ZBX_DC_HISTORY	*h = (ZBX_DC_HISTORY *)history_values.values[i];
+
+			if (ITEM_VALUE_TYPE_FLOAT == h->value_type)
+			{
+				zbx_snprintf_alloc(&lastvalue_sql, &lastvalue_sql_alloc, &lastvalue_sql_offset,
+						"%s(" ZBX_FS_UI64 ",%d," ZBX_FS_DBL ")",
+						NULL == lastvalue_sql ? "" : ",",
+						h->itemid, h->ts.sec, h->value.dbl);
+			}
+			else if (ITEM_VALUE_TYPE_UINT64 == h->value_type)
+			{
+				zbx_snprintf_alloc(&lastvalue_sql, &lastvalue_sql_alloc, &lastvalue_sql_offset,
+						"%s(" ZBX_FS_UI64 ",%d," ZBX_FS_UI64 ")",
+						NULL == lastvalue_sql ? "" : ",",
+						h->itemid, h->ts.sec, h->value.ui64);
+			}
+			else if (ITEM_VALUE_TYPE_STR == h->value_type)
+			{
+				zbx_snprintf_alloc(&lastvalue_str_sql, &lastvalue_str_sql_alloc, &lastvalue_str_sql_offset,
+						"%s(" ZBX_FS_UI64 ",%d,'%s')",
+						NULL == lastvalue_str_sql ? "" : ",",
+						h->itemid, h->ts.sec, h->value.str);
+			}
 		}
-		else if (ITEM_VALUE_TYPE_UINT64 == h->value_type)
+
+		if (NULL != lastvalue_sql)
 		{
-			zbx_snprintf_alloc(&lastvalue_sql, &lastvalue_sql_alloc, &lastvalue_sql_offset,
-					"%s(" ZBX_FS_UI64 ",%d," ZBX_FS_UI64 ")",
-					NULL == lastvalue_sql ? "" : ",",
-					h->itemid, h->ts.sec, h->value.ui64);
+			DBexecute("insert ignore into lastvalue (itemid,clock,value) values %s"
+					" on duplicate key update"
+						" value = if(values(clock) > clock, values(value), value)"
+						",clock = if(values(clock) > clock, values(clock), clock)",
+					lastvalue_sql
+			);
+
+			zbx_free(lastvalue_sql);
 		}
-		else if (ITEM_VALUE_TYPE_STR == h->value_type)
+
+		if (NULL != lastvalue_str_sql)
 		{
-			zbx_snprintf_alloc(&lastvalue_str_sql, &lastvalue_str_sql_alloc, &lastvalue_str_sql_offset,
-					"%s(" ZBX_FS_UI64 ",%d,'%s')",
-					NULL == lastvalue_str_sql ? "" : ",",
-					h->itemid, h->ts.sec, h->value.str);
+			DBexecute("insert ignore into lastvalue_str (itemid,clock,value) values %s"
+					" on duplicate key update"
+						" value = if(values(clock) > clock, values(value), value)"
+						",clock = if(values(clock) > clock, values(clock), clock)",
+					lastvalue_str_sql
+			);
+
+			zbx_free(lastvalue_str_sql);
 		}
 	}
+	/* RSM specifics: end */
 
-	if (NULL != lastvalue_sql)
-	{
-		DBexecute("insert ignore into lastvalue (itemid,clock,value) values %s"
-				" on duplicate key update"
-					" value = if(values(clock) > clock, values(value), value)"
-					",clock = if(values(clock) > clock, values(clock), clock)",
-				lastvalue_sql
-		);
-
-		zbx_free(lastvalue_sql);
-	}
-
-	if (NULL != lastvalue_str_sql)
-	{
-		DBexecute("insert ignore into lastvalue_str (itemid,clock,value) values %s"
-				" on duplicate key update"
-					" value = if(values(clock) > clock, values(value), value)"
-					",clock = if(values(clock) > clock, values(clock), clock)",
-				lastvalue_str_sql
-		);
-
-		zbx_free(lastvalue_str_sql);
-	}
-out:
 	zbx_vector_ptr_destroy(&history_values);
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
@@ -2242,8 +2376,6 @@ out:
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: dc_add_proxy_history                                             *
  *                                                                            *
  * Purpose: helper function for DCmass_proxy_add_history()                    *
  *                                                                            *
@@ -2312,8 +2444,6 @@ static void	dc_add_proxy_history(ZBX_DC_HISTORY *history, int history_num)
 
 /******************************************************************************
  *                                                                            *
- * Function: dc_add_proxy_history_meta                                        *
- *                                                                            *
  * Purpose: helper function for DCmass_proxy_add_history()                    *
  *                                                                            *
  * Comment: this function is meant for items with value_type other other than *
@@ -2381,8 +2511,6 @@ static void	dc_add_proxy_history_meta(ZBX_DC_HISTORY *history, int history_num)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: dc_add_proxy_history_log                                         *
  *                                                                            *
  * Purpose: helper function for DCmass_proxy_add_history()                    *
  *                                                                            *
@@ -2453,8 +2581,6 @@ static void	dc_add_proxy_history_log(ZBX_DC_HISTORY *history, int history_num)
 
 /******************************************************************************
  *                                                                            *
- * Function: dc_add_proxy_history_notsupported                                *
- *                                                                            *
  * Purpose: helper function for DCmass_proxy_add_history()                    *
  *                                                                            *
  ******************************************************************************/
@@ -2484,17 +2610,13 @@ static void	dc_add_proxy_history_notsupported(ZBX_DC_HISTORY *history, int histo
 
 /******************************************************************************
  *                                                                            *
- * Function: DCmass_proxy_add_history                                         *
- *                                                                            *
  * Purpose: inserting new history data after new value is received            *
  *                                                                            *
  * Parameters: history     - array of history data                            *
  *             history_num - number of history structures                     *
  *                                                                            *
- * Author: Alexander Vladishev                                                *
- *                                                                            *
  ******************************************************************************/
-static void	DCmass_proxy_add_history(ZBX_DC_HISTORY *history, int history_num)
+static void	DBmass_proxy_add_history(ZBX_DC_HISTORY *history, int history_num)
 {
 	int	i, h_num = 0, h_meta_num = 0, hlog_num = 0, notsupported_num = 0;
 
@@ -2548,8 +2670,6 @@ static void	DCmass_proxy_add_history(ZBX_DC_HISTORY *history, int history_num)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: DCmass_prepare_history                                           *
  *                                                                            *
  * Purpose: prepare history data using items from configuration cache and     *
  *          generate item changes to be applied and host inventory values to  *
@@ -2629,8 +2749,8 @@ static void	DCmass_prepare_history(ZBX_DC_HISTORY *history, const zbx_vector_uin
 		{
 			h->flags |= ZBX_DC_FLAG_NOHISTORY;
 			zabbix_log(LOG_LEVEL_WARNING, "item \"%s:%s\" value timestamp \"%s %s\" is outside history "
-					"storage period", item->host.host, item->key_orig, zbx_date2str(h->ts.sec),
-					zbx_time2str(h->ts.sec));
+					"storage period", item->host.host, item->key_orig,
+					zbx_date2str(h->ts.sec, NULL), zbx_time2str(h->ts.sec, NULL));
 		}
 
 		if (ITEM_VALUE_TYPE_FLOAT == item->value_type || ITEM_VALUE_TYPE_UINT64 == item->value_type)
@@ -2644,7 +2764,7 @@ static void	DCmass_prepare_history(ZBX_DC_HISTORY *history, const zbx_vector_uin
 				h->flags |= ZBX_DC_FLAG_NOTRENDS;
 				zabbix_log(LOG_LEVEL_WARNING, "item \"%s:%s\" value timestamp \"%s %s\" is outside "
 						"trends storage period", item->host.host, item->key_orig,
-						zbx_date2str(h->ts.sec), zbx_time2str(h->ts.sec));
+						zbx_date2str(h->ts.sec, NULL), zbx_time2str(h->ts.sec, NULL));
 			}
 		}
 		else
@@ -2673,8 +2793,6 @@ static void	DCmass_prepare_history(ZBX_DC_HISTORY *history, const zbx_vector_uin
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: DCmodule_prepare_history                                         *
  *                                                                            *
  * Purpose: prepare history data to share them with loadable modules, sort    *
  *          data by type skipping low-level discovery data, meta information  *
@@ -2859,15 +2977,79 @@ static void	DCmodule_sync_history(int history_float_num, int history_integer_num
 	}
 }
 
+/******************************************************************************
+ *                                                                            *
+ * Purpose: prepares history update by checking which values must be stored   *
+ *                                                                            *
+ * Parameters: history     - [IN/OUT] the history values                      *
+ *             history_num - [IN] the number of history values                *
+ *                                                                            *
+ ******************************************************************************/
+static void	proxy_prepare_history(ZBX_DC_HISTORY *history, int history_num)
+{
+	int			i, *errcodes;
+	DC_ITEM			*items;
+	zbx_vector_uint64_t	itemids;
+
+	zbx_vector_uint64_create(&itemids);
+	zbx_vector_uint64_reserve(&itemids, history_num);
+
+	for (i = 0; i < history_num; i++)
+		zbx_vector_uint64_append(&itemids, history[i].itemid);
+
+	items = (DC_ITEM *)zbx_malloc(NULL, sizeof(DC_ITEM) * (size_t)history_num);
+	errcodes = (int *)zbx_malloc(NULL, sizeof(int) * (size_t)history_num);
+
+	DCconfig_get_items_by_itemids(items, itemids.values, errcodes, itemids.values_num);
+
+	for (i = 0; i < history_num; i++)
+	{
+		if (SUCCEED != errcodes[i])
+			continue;
+
+		/* store items with enabled history  */
+		if (0 != items[i].history)
+			continue;
+
+		/* store numeric items to handle data conversion errors on server and trends */
+		if (ITEM_VALUE_TYPE_FLOAT == items[i].value_type || ITEM_VALUE_TYPE_UINT64 == items[i].value_type)
+			continue;
+
+		/* store discovery rules */
+		if (0 != (items[i].flags & ZBX_FLAG_DISCOVERY_RULE))
+			continue;
+
+		/* store errors or first value after an error */
+		if (ITEM_STATE_NOTSUPPORTED == history[i].state || ITEM_STATE_NOTSUPPORTED == items[i].state)
+			continue;
+
+		/* store items linked to host inventory */
+		if (0 != items[i].inventory_link)
+			continue;
+
+		dc_history_clean_value(history + i);
+
+		/* all checks passed, item value must not be stored in proxy history/sent to server */
+		history[i].flags |= ZBX_DC_FLAG_NOVALUE;
+	}
+
+	DCconfig_clean_items(items, errcodes, history_num);
+	zbx_free(items);
+	zbx_free(errcodes);
+	zbx_vector_uint64_destroy(&itemids);
+}
+
 static void	sync_proxy_history(int *total_num, int *more)
 {
-	int			history_num;
+	int			history_num, txn_rc;
 	time_t			sync_start;
 	zbx_vector_ptr_t	history_items;
+	zbx_vector_ptr_t	item_diff;
 	ZBX_DC_HISTORY		history[ZBX_HC_SYNC_MAX];
 
 	zbx_vector_ptr_create(&history_items);
 	zbx_vector_ptr_reserve(&history_items, ZBX_HC_SYNC_MAX);
+	zbx_vector_ptr_create(&item_diff);
 
 	sync_start = time(NULL);
 
@@ -2886,30 +3068,47 @@ static void	sync_proxy_history(int *total_num, int *more)
 			break;
 
 		hc_get_item_values(history, &history_items);	/* copy item data from history cache */
+		proxy_prepare_history(history, history_items.values_num);
+
+		DCmass_proxy_prepare_itemdiff(history, history_num, &item_diff);
 
 		do
 		{
 			DBbegin();
 
-			DCmass_proxy_add_history(history, history_num);
-			DCmass_proxy_update_items(history, history_num);
+			DBmass_proxy_add_history(history, history_num);
+			DBmass_proxy_update_items(&item_diff);
 		}
-		while (ZBX_DB_DOWN == DBcommit());
+		while (ZBX_DB_DOWN == (txn_rc = DBcommit()));
 
 		LOCK_CACHE;
 
 		hc_push_items(&history_items);	/* return items to history cache */
-		cache->history_num -= history_num;
 
-		if (0 != hc_queue_get_size())
+		if (ZBX_DB_FAIL != txn_rc)
+		{
+			if (0 != item_diff.values_num)
+				DCconfig_items_apply_changes(&item_diff);
+
+			cache->history_num -= history_num;
+
+			if (0 != hc_queue_get_size())
+				*more = ZBX_SYNC_MORE;
+
+			UNLOCK_CACHE;
+
+			*total_num += history_num;
+
+			hc_free_item_values(history, history_num);
+		}
+		else
+		{
 			*more = ZBX_SYNC_MORE;
-
-		UNLOCK_CACHE;
-
-		*total_num += history_num;
+			UNLOCK_CACHE;
+		}
 
 		zbx_vector_ptr_clear(&history_items);
-		hc_free_item_values(history, history_num);
+		zbx_vector_ptr_clear_ext(&item_diff, zbx_default_mem_free_func);
 
 		/* Exit from sync loop if we have spent too much time here */
 		/* unless we are doing full sync. This is done to allow    */
@@ -2917,12 +3116,11 @@ static void	sync_proxy_history(int *total_num, int *more)
 	}
 	while (ZBX_SYNC_MORE == *more && ZBX_HC_SYNC_TIME_MAX >= time(NULL) - sync_start);
 
+	zbx_vector_ptr_destroy(&item_diff);
 	zbx_vector_ptr_destroy(&history_items);
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: sync_server_history                                              *
  *                                                                            *
  * Purpose: flush history cache to database, process triggers of flushed      *
  *          and timer triggers from timer queue                               *
@@ -2955,8 +3153,8 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 					history_text_num, history_log_num, txn_error, compression_age;
 	unsigned int			item_retrieve_mode;
 	time_t				sync_start;
-	zbx_vector_uint64_t		triggerids, timer_triggerids;
-	zbx_vector_ptr_t		history_items, trigger_diff, item_diff, inventory_values;
+	zbx_vector_uint64_t		triggerids ;
+	zbx_vector_ptr_t		history_items, trigger_diff, item_diff, inventory_values, trigger_timers;
 	zbx_vector_uint64_pair_t	trends_diff, proxy_subscribtions;
 	ZBX_DC_HISTORY			history[ZBX_HC_SYNC_MAX];
 
@@ -3003,8 +3201,8 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 	zbx_vector_uint64_create(&triggerids);
 	zbx_vector_uint64_reserve(&triggerids, ZBX_HC_SYNC_MAX);
 
-	zbx_vector_uint64_create(&timer_triggerids);
-	zbx_vector_uint64_reserve(&timer_triggerids, ZBX_HC_TIMER_MAX);
+	zbx_vector_ptr_create(&trigger_timers);
+	zbx_vector_ptr_reserve(&trigger_timers, ZBX_HC_TIMER_MAX);
 
 	zbx_vector_ptr_create(&history_items);
 	zbx_vector_ptr_reserve(&history_items, ZBX_HC_SYNC_MAX);
@@ -3017,7 +3215,6 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 		int			*errcodes, trends_num = 0, timers_num = 0, ret = SUCCEED;
 		zbx_vector_uint64_t	itemids;
 		ZBX_DC_TREND		*trends = NULL;
-		zbx_timespec_t		ts;
 
 		zbx_vector_uint64_create(&itemids);
 
@@ -3039,8 +3236,6 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 		}
 		else
 			history_num = 0;
-
-		zbx_timespec(&ts);
 
 		if (0 != history_num)
 		{
@@ -3066,6 +3261,9 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 			{
 				DCconfig_items_apply_changes(&item_diff);
 				DCmass_update_trends(history, history_num, &trends, &trends_num, compression_age);
+
+				if (0 != trends_num)
+					zbx_tfc_invalidate_trends(trends, trends_num);
 
 				do
 				{
@@ -3095,24 +3293,34 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 
 		if (FAIL != ret)
 		{
-			zbx_dc_get_timer_triggerids(&timer_triggerids, time(NULL), ZBX_HC_TIMER_MAX);
-			timers_num = timer_triggerids.values_num;
+			/* don't process trigger timers when server is shutting down */
+			if (ZBX_IS_RUNNING())
+			{
+				zbx_dc_get_trigger_timers(&trigger_timers, time(NULL), ZBX_HC_TIMER_SOFT_MAX,
+						ZBX_HC_TIMER_MAX);
+			}
 
-			if (ZBX_HC_TIMER_MAX == timers_num)
+			timers_num = trigger_timers.values_num;
+
+			if (ZBX_HC_TIMER_SOFT_MAX <= timers_num)
 				*more = ZBX_SYNC_MORE;
 
 			if (0 != history_num || 0 != timers_num)
 			{
-				/* timer triggers do not intersect with item triggers because item triggers */
-				/* where already locked and skipped when retrieving timer triggers          */
-				zbx_vector_uint64_append_array(&triggerids, timer_triggerids.values,
-						timer_triggerids.values_num);
+				for (i = 0; i < trigger_timers.values_num; i++)
+				{
+					zbx_trigger_timer_t	*timer = (zbx_trigger_timer_t *)trigger_timers.values[i];
+
+					if (0 != timer->lock)
+						zbx_vector_uint64_append(&triggerids, timer->triggerid);
+				}
+
 				do
 				{
 					DBbegin();
 
 					recalculate_triggers(history, history_num, &itemids, items, errcodes,
-							&timer_triggerids, &ts, &trigger_diff);
+							&trigger_timers, &trigger_diff);
 
 					/* process trigger events generated by recalculate_triggers() */
 					zbx_process_events(&trigger_diff, &triggerids);
@@ -3120,19 +3328,17 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 						zbx_db_save_trigger_changes(&trigger_diff);
 
 					if (ZBX_DB_OK == (txn_error = DBcommit()))
-					{
 						DCconfig_triggers_apply_changes(&trigger_diff);
-						DBupdate_itservices(&trigger_diff);
-					}
 					else
 						zbx_clean_events();
 
 					zbx_vector_ptr_clear_ext(&trigger_diff, (zbx_clean_func_t)zbx_trigger_diff_free);
 				}
 				while (ZBX_DB_DOWN == txn_error);
-			}
 
-			zbx_vector_uint64_clear(&timer_triggerids);
+				if (ZBX_DB_OK == txn_error)
+					zbx_events_update_itservices();
+			}
 		}
 
 		if (0 != triggerids.values_num)
@@ -3140,6 +3346,12 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 			*triggers_num += triggerids.values_num;
 			DCconfig_unlock_triggers(&triggerids);
 			zbx_vector_uint64_clear(&triggerids);
+		}
+
+		if (0 != trigger_timers.values_num)
+		{
+			zbx_dc_reschedule_trigger_timers(&trigger_timers, time(NULL));
+			zbx_vector_ptr_clear(&trigger_timers);
 		}
 
 		if (0 != proxy_subscribtions.values_num)
@@ -3239,13 +3451,11 @@ static void	sync_server_history(int *values_num, int *triggers_num, int *more)
 	zbx_vector_uint64_pair_destroy(&trends_diff);
 	zbx_vector_uint64_pair_destroy(&proxy_subscribtions);
 
-	zbx_vector_uint64_destroy(&timer_triggerids);
+	zbx_vector_ptr_destroy(&trigger_timers);
 	zbx_vector_uint64_destroy(&triggerids);
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: sync_history_cache_full                                          *
  *                                                                            *
  * Purpose: writes updates and new data from history cache to database        *
  *                                                                            *
@@ -3279,9 +3489,6 @@ static void	sync_history_cache_full(void)
 	{
 		/* unlock all triggers before full sync so no items are locked by triggers */
 		DCconfig_unlock_all_triggers();
-
-		/* clear timer trigger queue to avoid processing time triggers at exit */
-		zbx_dc_clear_timer_queue();
 	}
 
 	tmp_history_queue = cache->history_queue;
@@ -3325,8 +3532,6 @@ static void	sync_history_cache_full(void)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_log_sync_history_cache_progress                              *
  *                                                                            *
  * Purpose: log progress of syncing history data                              *
  *                                                                            *
@@ -3376,8 +3581,6 @@ void	zbx_log_sync_history_cache_progress(void)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_sync_history_cache                                           *
  *                                                                            *
  * Purpose: writes updates and new data from history cache to database        *
  *                                                                            *
@@ -3634,8 +3837,6 @@ static void	dc_local_add_history_empty(zbx_uint64_t itemid, unsigned char item_v
 
 /******************************************************************************
  *                                                                            *
- * Function: dc_add_history                                                   *
- *                                                                            *
  * Purpose: add new value to the cache                                        *
  *                                                                            *
  * Parameters:  itemid          - [IN] the itemid                             *
@@ -3674,6 +3875,9 @@ void	dc_add_history(zbx_uint64_t itemid, unsigned char item_value_type, unsigned
 		dc_local_add_history_notsupported(itemid, ts, error, lastlogsize, mtime, value_flags);
 		return;
 	}
+
+	if (NULL == result)
+		return;
 
 	/* allow proxy to send timestamps of empty (throttled etc) values to update nextchecks for queue */
 	if (!ISSET_VALUE(result) && !ISSET_META(result) && 0 != (program_type & ZBX_PROGRAM_TYPE_SERVER))
@@ -3774,8 +3978,6 @@ ZBX_MEM_FUNC_IMPL(__hc, hc_mem)
 
 /******************************************************************************
  *                                                                            *
- * Function: hc_queue_elem_compare_func                                       *
- *                                                                            *
  * Purpose: compares history queue elements                                   *
  *                                                                            *
  ******************************************************************************/
@@ -3792,8 +3994,6 @@ static int	hc_queue_elem_compare_func(const void *d1, const void *d2)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: hc_free_data                                                     *
  *                                                                            *
  * Purpose: free history item data allocated in history cache                 *
  *                                                                            *
@@ -3833,8 +4033,6 @@ static void	hc_free_data(zbx_hc_data_t *data)
 
 /******************************************************************************
  *                                                                            *
- * Function: hc_queue_item                                                    *
- *                                                                            *
  * Purpose: put back item into history queue                                  *
  *                                                                            *
  * Parameters: data - [IN] history item data                                  *
@@ -3848,8 +4046,6 @@ static void	hc_queue_item(zbx_hc_item_t *item)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: hc_get_item                                                      *
  *                                                                            *
  * Purpose: returns history item by itemid                                    *
  *                                                                            *
@@ -3865,8 +4061,6 @@ static zbx_hc_item_t	*hc_get_item(zbx_uint64_t itemid)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: hc_add_item                                                      *
  *                                                                            *
  * Purpose: adds a new item to history cache                                  *
  *                                                                            *
@@ -3884,8 +4078,6 @@ static zbx_hc_item_t	*hc_add_item(zbx_uint64_t itemid, zbx_hc_data_t *data)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: hc_mem_value_str_dup                                             *
  *                                                                            *
  * Purpose: copies string value to history cache                              *
  *                                                                            *
@@ -3908,8 +4100,6 @@ static char	*hc_mem_value_str_dup(const dc_value_str_t *str)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: hc_clone_history_str_data                                        *
  *                                                                            *
  * Purpose: clones string value into history data memory                      *
  *                                                                            *
@@ -3940,8 +4130,6 @@ static int	hc_clone_history_str_data(char **dst, const dc_value_str_t *str)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: hc_clone_history_log_data                                        *
  *                                                                            *
  * Purpose: clones log value into history data memory                         *
  *                                                                            *
@@ -3980,8 +4168,6 @@ static int	hc_clone_history_log_data(zbx_log_value_t **dst, const dc_item_value_
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: hc_clone_history_data                                            *
  *                                                                            *
  * Purpose: clones item value from local cache into history cache             *
  *                                                                            *
@@ -4098,8 +4284,6 @@ static int	hc_clone_history_data(zbx_hc_data_t **data, const dc_item_value_t *it
 
 /******************************************************************************
  *                                                                            *
- * Function: hc_add_item_values                                               *
- *                                                                            *
  * Purpose: adds item values to the history cache                             *
  *                                                                            *
  * Parameters: values     - [IN] the item values to add                       *
@@ -4171,8 +4355,6 @@ static void	hc_add_item_values(dc_item_value_t *values, int values_num)
 
 /******************************************************************************
  *                                                                            *
- * Function: hc_copy_history_data                                             *
- *                                                                            *
  * Purpose: copies item value from history cache into the specified history   *
  *          value                                                             *
  *                                                                            *
@@ -4235,8 +4417,6 @@ static void	hc_copy_history_data(ZBX_DC_HISTORY *history, zbx_uint64_t itemid, z
 
 /******************************************************************************
  *                                                                            *
- * Function: hc_pop_items                                                     *
- *                                                                            *
  * Purpose: pops the next batch of history items from cache for processing    *
  *                                                                            *
  * Parameters: history_items - [OUT] the locked history items                 *
@@ -4261,8 +4441,6 @@ static void	hc_pop_items(zbx_vector_ptr_t *history_items)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: hc_get_item_values                                               *
  *                                                                            *
  * Purpose: gets item history values                                          *
  *                                                                            *
@@ -4289,8 +4467,6 @@ static void	hc_get_item_values(ZBX_DC_HISTORY *history, zbx_vector_ptr_t *histor
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: hc_push_processed_items                                          *
  *                                                                            *
  * Purpose: push back the processed history items into history cache          *
  *                                                                            *
@@ -4335,8 +4511,6 @@ void	hc_push_items(zbx_vector_ptr_t *history_items)
 
 /******************************************************************************
  *                                                                            *
- * Function: hc_queue_get_size                                                *
- *                                                                            *
  * Purpose: retrieve the size of history queue                                *
  *                                                                            *
  ******************************************************************************/
@@ -4353,9 +4527,7 @@ int	hc_get_history_compression_age(void)
 
 	zbx_config_get(&cfg, ZBX_CONFIG_FLAGS_DB_EXTENSION);
 
-	if (ON == cfg.db.history_compression_availability &&
-			ON == cfg.db.history_compression_status &&
-			0 != cfg.db.history_compress_older)
+	if (ON == cfg.db.history_compression_status && 0 != cfg.db.history_compress_older)
 	{
 		compression_age = (int)time(NULL) - cfg.db.history_compress_older;
 	}
@@ -4370,11 +4542,7 @@ int	hc_get_history_compression_age(void)
 
 /******************************************************************************
  *                                                                            *
- * Function: init_trend_cache                                                 *
- *                                                                            *
  * Purpose: Allocate shared memory for trend cache (part of database cache)   *
- *                                                                            *
- * Author: Vladimir Levijev                                                   *
  *                                                                            *
  * Comments: Is optionally called from init_database_cache()                  *
  *                                                                            *
@@ -4421,11 +4589,7 @@ out:
 
 /******************************************************************************
  *                                                                            *
- * Function: init_database_cache                                              *
- *                                                                            *
  * Purpose: Allocate shared memory for database cache                         *
- *                                                                            *
- * Author: Alexei Vladishev, Alexander Vladishev                              *
  *                                                                            *
  ******************************************************************************/
 int	init_database_cache(char **error)
@@ -4433,6 +4597,12 @@ int	init_database_cache(char **error)
 	int	ret;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
+
+	if (NULL != cache)
+	{
+		ret = SUCCEED;
+		goto out;
+	}
 
 	if (SUCCEED != (ret = zbx_mutex_create(&cache_lock, ZBX_MUTEX_CACHE, error)))
 		goto out;
@@ -4482,6 +4652,8 @@ int	init_database_cache(char **error)
 	cache->history_num_total = 0;
 	cache->history_progress_ts = 0;
 
+	cache->db_trigger_queue_lock = 1;
+
 	if (NULL == sql)
 		sql = (char *)zbx_malloc(sql, sql_alloc);
 out:
@@ -4492,11 +4664,7 @@ out:
 
 /******************************************************************************
  *                                                                            *
- * Function: DCsync_all                                                       *
- *                                                                            *
  * Purpose: writes updates and new data from pool and cache data to database  *
- *                                                                            *
- * Author: Alexei Vladishev                                                   *
  *                                                                            *
  ******************************************************************************/
 static void	DCsync_all(void)
@@ -4512,37 +4680,39 @@ static void	DCsync_all(void)
 
 /******************************************************************************
  *                                                                            *
- * Function: free_database_cache                                              *
- *                                                                            *
  * Purpose: Free memory allocated for database cache                          *
  *                                                                            *
- * Author: Alexei Vladishev, Alexander Vladishev                              *
- *                                                                            *
  ******************************************************************************/
-void	free_database_cache(void)
+void	free_database_cache(int sync)
 {
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
-	DCsync_all();
+	if (ZBX_SYNC_ALL == sync)
+		DCsync_all();
 
 	cache = NULL;
+
+	zbx_mem_destroy(hc_mem);
+	hc_mem = NULL;
+	zbx_mem_destroy(hc_index_mem);
+	hc_index_mem = NULL;
 
 	zbx_mutex_destroy(&cache_lock);
 	zbx_mutex_destroy(&cache_ids_lock);
 
 	if (0 != (program_type & ZBX_PROGRAM_TYPE_SERVER))
+	{
+		zbx_mem_destroy(trend_mem);
+		trend_mem = NULL;
 		zbx_mutex_destroy(&trends_lock);
+	}
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
 /******************************************************************************
  *                                                                            *
- * Function: DCget_nextid                                                     *
- *                                                                            *
  * Purpose: Return next id for requested table                                *
- *                                                                            *
- * Author: Alexander Vladishev                                                *
  *                                                                            *
  ******************************************************************************/
 zbx_uint64_t	DCget_nextid(const char *table_name, int num)
@@ -4618,59 +4788,30 @@ zbx_uint64_t	DCget_nextid(const char *table_name, int num)
 
 /******************************************************************************
  *                                                                            *
- * Function: DCupdate_hosts_availability                                      *
- *                                                                            *
- * Purpose: performs host availability reset for hosts with availability set  *
- *          on interfaces without enabled items                               *
+ * Purpose: performs interface availability reset for hosts with              *
+ *          availability set on interfaces without enabled items              *
  *                                                                            *
  ******************************************************************************/
-void	DCupdate_hosts_availability(void)
+void	DCupdate_interfaces_availability(void)
 {
-	zbx_vector_ptr_t	hosts;
-	char			*sql_buf = NULL;
-	size_t			sql_buf_alloc = 0, sql_buf_offset = 0;
-	int			i;
+	zbx_vector_availability_ptr_t		interfaces;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __func__);
 
-	zbx_vector_ptr_create(&hosts);
+	zbx_vector_availability_ptr_create(&interfaces);
 
-	if (SUCCEED != DCreset_hosts_availability(&hosts))
+	if (SUCCEED != DCreset_interfaces_availability(&interfaces))
 		goto out;
 
-	DBbegin();
-	DBbegin_multiple_update(&sql_buf, &sql_buf_alloc, &sql_buf_offset);
-
-	for (i = 0; i < hosts.values_num; i++)
-	{
-		if (SUCCEED != zbx_sql_add_host_availability(&sql_buf, &sql_buf_alloc, &sql_buf_offset,
-				(zbx_host_availability_t *)hosts.values[i]))
-		{
-			continue;
-		}
-
-		zbx_strcpy_alloc(&sql_buf, &sql_buf_alloc, &sql_buf_offset, ";\n");
-		DBexecute_overflowed_sql(&sql_buf, &sql_buf_alloc, &sql_buf_offset);
-	}
-
-	DBend_multiple_update(&sql_buf, &sql_buf_alloc, &sql_buf_offset);
-
-	if (16 < sql_buf_offset)
-		DBexecute("%s", sql_buf);
-
-	DBcommit();
-
-	zbx_free(sql_buf);
+	zbx_availabilities_flush(&interfaces);
 out:
-	zbx_vector_ptr_clear_ext(&hosts, (zbx_mem_free_func_t)zbx_host_availability_free);
-	zbx_vector_ptr_destroy(&hosts);
+	zbx_vector_availability_ptr_clear_ext(&interfaces, zbx_interface_availability_free);
+	zbx_vector_availability_ptr_destroy(&interfaces);
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_hc_get_diag_stats                                            *
  *                                                                            *
  * Purpose: get history cache diagnostics statistics                          *
  *                                                                            *
@@ -4686,8 +4827,6 @@ void	zbx_hc_get_diag_stats(zbx_uint64_t *items_num, zbx_uint64_t *values_num)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_hc_get_mem_stats                                             *
  *                                                                            *
  * Purpose: get shared memory allocator statistics                            *
  *                                                                            *
@@ -4706,8 +4845,6 @@ void	zbx_hc_get_mem_stats(zbx_mem_stats_t *data, zbx_mem_stats_t *index)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_hc_get_items                                                 *
  *                                                                            *
  * Purpose: get statistics of cached items                                    *
  *                                                                            *
@@ -4733,7 +4870,25 @@ void	zbx_hc_get_items(zbx_vector_uint64_pair_t *items)
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_hc_proxyqueue_peek                                           *
+ * Purpose: checks if database trigger queue table is locked                  *
+ *                                                                            *
+ ******************************************************************************/
+int	zbx_db_trigger_queue_locked(void)
+{
+	return 0 == cache->db_trigger_queue_lock ? FAIL : SUCCEED;
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Purpose: unlocks database trigger queue table                              *
+ *                                                                            *
+ ******************************************************************************/
+void	zbx_db_trigger_queue_unlock(void)
+{
+	cache->db_trigger_queue_lock = 0;
+}
+
+/******************************************************************************
  *                                                                            *
  * Purpose: return first proxy in a queue, function assumes that a queue is   *
  *          not empty                                                         *
@@ -4755,8 +4910,6 @@ static zbx_uint64_t	zbx_hc_proxyqueue_peek(void)
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_hc_proxyqueue_enqueue                                        *
- *                                                                            *
  * Purpose: add new proxyid to a queue                                        *
  *                                                                            *
  * Parameters: proxyid   - [IN] the proxy id                                  *
@@ -4774,8 +4927,6 @@ static void	zbx_hc_proxyqueue_enqueue(zbx_uint64_t proxyid)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_hc_proxyqueue_dequeue                                        *
  *                                                                            *
  * Purpose: try to dequeue proxyid from a proxy queue                         *
  *                                                                            *
@@ -4805,8 +4956,6 @@ static int	zbx_hc_proxyqueue_dequeue(zbx_uint64_t proxyid)
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_hc_proxyqueue_clear                                          *
- *                                                                            *
  * Purpose: remove all proxies from proxy priority queue                      *
  *                                                                            *
  ******************************************************************************/
@@ -4817,8 +4966,6 @@ static void	zbx_hc_proxyqueue_clear(void)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_hc_check_proxy                                               *
  *                                                                            *
  * Purpose: check status of a history cache usage, enqueue/dequeue proxy      *
  *          from priority list and accordingly enable or disable wait mode    *
@@ -4889,4 +5036,3 @@ out:
 
 	return ret;
 }
-

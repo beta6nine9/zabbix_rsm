@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -38,23 +38,19 @@ class testMultiselect extends CWebTest {
 	}
 
 	public function testMultiselect_SuggestCreateNew() {
-		$this->checkSuggest('hosts.php?form=create', 'hostsForm',
-			'Groups', 'QQQwww', 'multiselect-suggest'
-		);
+		$this->checkSuggest('zabbix.php?action=host.edit','host-form', 'Groups', 'QQQwww', 'multiselect-suggest');
 	}
 
 	public function checkSuggest($link, $query, $name, $string, $class) {
 		$this->page->login()->open($link)->waitUntilReady();
 		$this->page->updateViewport();
-		$form = $this->query('name:'.$query)->asForm()->one();
-		$field = $form->getField($name);
+		$field = $this->query('name:'.$query)->asForm()->one()->getField($name);
 		$element = $field->query('tag:input')->one();
 		$element->type($string);
 		$this->query('class', $class)->waitUntilVisible();
 
-		$this->assertScreenshotExcept($element->parents('class:table-forms')->one(),
-			[$element], $string
-		);
+		$this->assertScreenshotExcept($element->parents('class', (($query === 'host-form') ? 'form-grid' : 'table-forms'))
+				->one(), [$element], $string);
 	}
 
 	public function testMultiselect_NotSuggestAlreadySelected() {

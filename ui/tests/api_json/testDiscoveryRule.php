@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -34,7 +34,7 @@ class testDiscoveryRule extends CAPITest {
 					'name' => 'API LLD rule invalid permissions',
 					'key_' => 'apilldruleinvalidpermissions',
 					'hostid' => '1',
-					'type' => '0',
+					'type' => ITEM_TYPE_ZABBIX,
 					'interfaceid' => '50022',
 					'delay' => '30s'
 				],
@@ -45,7 +45,7 @@ class testDiscoveryRule extends CAPITest {
 					'name' => 'API LLD rule invalid interface',
 					'key_' => 'apilldruleinvalidinterface',
 					'hostid' => '50009',
-					'type' => '0',
+					'type' => ITEM_TYPE_ZABBIX,
 					'interfaceid' => '1',
 					'delay' => '30s'
 				],
@@ -56,11 +56,42 @@ class testDiscoveryRule extends CAPITest {
 					'name' => 'API LLD rule 4',
 					'key_' => 'apilldrule4',
 					'hostid' => '50009',
-					'type' => '0',
+					'type' => ITEM_TYPE_ZABBIX,
 					'interfaceid' => '50022',
 					'delay' => '30s'
 				],
 				'expected_error' => 'Item with key "apilldrule4" already exists on "API Host".'
+			],
+			'Test without update interval for mqtt.get key of Agent type' => [
+				'discoveryrule' => [
+					'name' => 'API mqtt.get',
+					'key_' => 'mqtt.get[test]',
+					'hostid' => '50009',
+					'type' => ITEM_TYPE_ZABBIX,
+					'interfaceid' => '50022'
+				],
+				'expected_error' => 'Incorrect arguments passed to function.'
+			],
+			'Test 0 update interval for mqtt.get key of Agent type' => [
+				'discoveryrule' => [
+					'name' => 'API mqtt.get',
+					'key_' => 'mqtt.get[test]',
+					'hostid' => '50009',
+					'type' => ITEM_TYPE_ZABBIX,
+					'interfaceid' => '50022',
+					'delay' => '0'
+				],
+				'expected_error' => 'Item will not be refreshed. Specified update interval requires having at least one either flexible or scheduling interval.'
+			],
+			'Test 0 update interval for wrong mqtt key of Active agent type' => [
+				'discoveryrule' => [
+					'name' => 'API mqtt.get',
+					'key_' => 'mqt.get[test]',
+					'hostid' => '50009',
+					'type' => ITEM_TYPE_ZABBIX_ACTIVE,
+					'delay' => '0'
+				],
+				'expected_error' => 'Item will not be refreshed. Specified update interval requires having at least one either flexible or scheduling interval.'
 			],
 			'Test  LLD rule with unsupported item type' => [
 				'discoveryrule' => [
@@ -74,7 +105,7 @@ class testDiscoveryRule extends CAPITest {
 				'expected_error' => 'Invalid parameter "/1/type": value must be one of '.implode(', ', [
 					ITEM_TYPE_ZABBIX, ITEM_TYPE_TRAPPER, ITEM_TYPE_SIMPLE, ITEM_TYPE_INTERNAL, ITEM_TYPE_ZABBIX_ACTIVE,
 					ITEM_TYPE_EXTERNAL, ITEM_TYPE_DB_MONITOR, ITEM_TYPE_IPMI, ITEM_TYPE_SSH, ITEM_TYPE_TELNET,
-					ITEM_TYPE_JMX, ITEM_TYPE_DEPENDENT, ITEM_TYPE_HTTPAGENT, ITEM_TYPE_SNMP
+					ITEM_TYPE_JMX, ITEM_TYPE_DEPENDENT, ITEM_TYPE_HTTPAGENT, ITEM_TYPE_SNMP, ITEM_TYPE_SCRIPT
 				]).'.'
 			]
 		];
@@ -125,7 +156,7 @@ class testDiscoveryRule extends CAPITest {
 
 				case ITEM_TYPE_DEPENDENT:
 					$params = [
-						'master_itemid' => '160151',
+						'master_itemid' => '150151',
 						'delay' => '0'
 					];
 					break;
@@ -170,7 +201,27 @@ class testDiscoveryRule extends CAPITest {
 			];
 		}
 
-		return $item_type_tests;
+		return [
+			'Test 0 update interval for mqtt.get key of Active agent type' => [
+				'discoveryrule' => [
+					'name' => 'API LLD rule mqtt',
+					'key_' => 'mqtt.get[0]',
+					'hostid' => '50009',
+					'type' => ITEM_TYPE_ZABBIX_ACTIVE,
+					'delay' => '0'
+				],
+				'expected_error' => null
+			],
+			'Test without update interval for mqtt.get key of Active agent type' => [
+				'discoveryrule' => [
+					'name' => 'API LLD rule mqtt',
+					'key_' => 'mqtt.get[1]',
+					'hostid' => '50009',
+					'type' => ITEM_TYPE_ZABBIX_ACTIVE
+				],
+				'expected_error' => null
+			]
+		] + $item_type_tests;
 
 		// TODO: add other properties, multiple rules, duplicates etc.
 	}
@@ -195,10 +246,13 @@ class testDiscoveryRule extends CAPITest {
 					' WHERE i.itemid='.zbx_dbstr($id)
 				);
 
+				if ($discoveryrules[$num]['type'] === ITEM_TYPE_ZABBIX_ACTIVE && substr($discoveryrules[$num]['key_'], 0, 8) === 'mqtt.get') {
+					$discoveryrules[$num]['delay'] = CTestArrayHelper::get($discoveryrules[$num], 'delay', '0');
+				}
 				$this->assertSame($db_discoveryrule['hostid'], $discoveryrules[$num]['hostid']);
 				$this->assertSame($db_discoveryrule['name'], $discoveryrules[$num]['name']);
 				$this->assertSame($db_discoveryrule['key_'], $discoveryrules[$num]['key_']);
-				$this->assertSame($db_discoveryrule['type'], $discoveryrules[$num]['type']);
+				$this->assertSame($db_discoveryrule['type'], strval($discoveryrules[$num]['type']));
 				$this->assertSame($db_discoveryrule['delay'], $discoveryrules[$num]['delay']);
 			}
 		}
@@ -1259,6 +1313,19 @@ class testDiscoveryRule extends CAPITest {
 					]
 				],
 				'expected_error' => 'Incorrect value for field "params": value of third parameter must be one of '.ZBX_PREPROC_CSV_NO_HEADER.', '.ZBX_PREPROC_CSV_HEADER.'.'
+			],
+			'Test non-empty preprocessing parameters for ZBX_PREPROC_XML_TO_JSON type' => [
+				'discoveryrule' => [
+					'preprocessing' => [
+						[
+							'type' => ZBX_PREPROC_XML_TO_JSON,
+							'params' => 'abc',
+							'error_handler' => ZBX_PREPROC_FAIL_DEFAULT,
+							'error_handler_params' => ''
+						]
+					]
+				],
+				'expected_error' => 'Incorrect value for field "params": should be empty.'
 			]
 		];
 	}
@@ -1523,6 +1590,19 @@ class testDiscoveryRule extends CAPITest {
 						[
 							'type' => ZBX_PREPROC_CSV_TO_JSON,
 							'params' => ",\n\"\n0",
+							'error_handler' => ZBX_PREPROC_FAIL_DEFAULT,
+							'error_handler_params' => ''
+						]
+					]
+				],
+				'expected_error' => null
+			],
+			'Test valid preprocessing with type ZBX_PREPROC_XML_TO_JSON having empty parameters' => [
+				'discoveryrule' => [
+					'preprocessing' => [
+						[
+							'type' => ZBX_PREPROC_XML_TO_JSON,
+							'params' => '',
 							'error_handler' => ZBX_PREPROC_FAIL_DEFAULT,
 							'error_handler_params' => ''
 						]
@@ -2980,8 +3060,8 @@ class testDiscoveryRule extends CAPITest {
 			],
 			'Test overrides and override operations are deleted.' => [
 				['133763'],
-				['1001', '1002'],
-				['1001', '1002', '1003', '1004', '1005', '1006'],
+				['10001', '10002'],
+				['10001', '10002', '10003', '10004', '10005', '10006'],
 				null
 			]
 		];
@@ -3422,7 +3502,7 @@ class testDiscoveryRule extends CAPITest {
 						]
 					])
 				],
-				'expected_error' => 'Invalid parameter "/1/overrides/1/filter/conditions/1/operator": value must be one of '.implode(', ', [CONDITION_OPERATOR_REGEXP, CONDITION_OPERATOR_NOT_REGEXP]).'.'
+				'expected_error' => 'Invalid parameter "/1/overrides/1/filter/conditions/1/operator": value must be one of '.implode(', ', [CONDITION_OPERATOR_REGEXP, CONDITION_OPERATOR_NOT_REGEXP, CONDITION_OPERATOR_EXISTS, CONDITION_OPERATOR_NOT_EXISTS]).'.'
 			],
 			// LLD rule override operation
 			'Test /1/overrides/1/operations/1/operationobject type is validated.' => [
@@ -3473,7 +3553,7 @@ class testDiscoveryRule extends CAPITest {
 						]
 					])
 				],
-				'expected_error' => 'Invalid parameter "/1/overrides/1/operations/1": value must be one of opstatus, opdiscover, opperiod, ophistory, optrends.'
+				'expected_error' => 'Invalid parameter "/1/overrides/1/operations/1": value must be one of opstatus, opdiscover, opperiod, ophistory, optrends, optag.'
 			],
 			// LLD rule override operation status
 			'Test /1/overrides/1/operations/1/opstatus/status is mandatory.' => [
@@ -4170,26 +4250,6 @@ class testDiscoveryRule extends CAPITest {
 				],
 				'expected_error' => 'Invalid parameter "/1/overrides/1/operations/1/optag/1/tag": cannot be empty.'
 			],
-			'Test /1/overrides/1/operations/1/optag is is not supported for item prototype object.' => [
-				'discoveryrules' => [
-					$new_lld_overrides([
-						[
-							'name' => 'override',
-							'step' => 1,
-							'operations' => [
-								[
-									'operationobject' => OPERATION_OBJECT_ITEM_PROTOTYPE,
-									'operator' => CONDITION_OPERATOR_NOT_REGEXP,
-									'optag' => [
-										['tag' => 'www']
-									]
-								]
-							]
-						]
-					])
-				],
-				'expected_error' => 'Invalid parameter "/1/overrides/1/operations/1": unexpected parameter "optag".'
-			],
 			'Test /1/overrides/1/operations/1/optag is is not supported for graph prototype object.' => [
 				'discoveryrules' => [
 					$new_lld_overrides([
@@ -4199,26 +4259,6 @@ class testDiscoveryRule extends CAPITest {
 							'operations' => [
 								[
 									'operationobject' => OPERATION_OBJECT_GRAPH_PROTOTYPE,
-									'operator' => CONDITION_OPERATOR_NOT_REGEXP,
-									'optag' => [
-										['tag' => 'www']
-									]
-								]
-							]
-						]
-					])
-				],
-				'expected_error' => 'Invalid parameter "/1/overrides/1/operations/1": unexpected parameter "optag".'
-			],
-			'Test /1/overrides/1/operations/1/optag is is not supported for host prototype object.' => [
-				'discoveryrules' => [
-					$new_lld_overrides([
-						[
-							'name' => 'override',
-							'step' => 1,
-							'operations' => [
-								[
-									'operationobject' => OPERATION_OBJECT_HOST_PROTOTYPE,
 									'operator' => CONDITION_OPERATOR_NOT_REGEXP,
 									'optag' => [
 										['tag' => 'www']
@@ -4941,6 +4981,16 @@ class testDiscoveryRule extends CAPITest {
 											'templateid' => '50010'
 										]
 									],
+									'optag' => [
+										[
+											'tag' => 'tag1',
+											'value' => 'value1'
+										],
+										[
+											'tag' => 'tag2',
+											'value' => 'value2'
+										]
+									],
 									'opinventory' => [
 										'inventory_mode' => HOST_INVENTORY_AUTOMATIC
 									]
@@ -5014,6 +5064,16 @@ class testDiscoveryRule extends CAPITest {
 									'optemplate' => [
 										[
 											'templateid' => '50010'
+										]
+									],
+									'optag' => [
+										[
+											'tag' => 'tag1',
+											'value' => 'value1'
+										],
+										[
+											'tag' => 'tag2',
+											'value' => 'value2'
 										]
 									],
 									'opinventory' => [
@@ -5624,6 +5684,16 @@ class testDiscoveryRule extends CAPITest {
 											'templateid' => '50010'
 										]
 									],
+									'optag' => [
+										[
+											'tag' => 'tag1',
+											'value' => 'value1'
+										],
+										[
+											'tag' => 'tag2',
+											'value' => 'value2'
+										]
+									],
 									'opinventory' => [
 										'inventory_mode' => HOST_INVENTORY_AUTOMATIC
 									]
@@ -5746,6 +5816,16 @@ class testDiscoveryRule extends CAPITest {
 										],
 										[
 											'templateid' => '50010'
+										]
+									],
+									'optag' => [
+										[
+											'tag' => 'tag1',
+											'value' => 'value1'
+										],
+										[
+											'tag' => 'tag2',
+											'value' => 'value2'
 										]
 									],
 									'opinventory' => [
@@ -5906,6 +5986,16 @@ class testDiscoveryRule extends CAPITest {
 							],
 							[
 								'templateid' => '50010'
+							]
+						],
+						'optag' => [
+							[
+								'tag' => 'tag1',
+								'value' => 'value1'
+							],
+							[
+								'tag' => 'tag2',
+								'value' => 'value2'
 							]
 						],
 						'opinventory' => [

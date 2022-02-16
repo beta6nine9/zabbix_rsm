@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -24,7 +24,7 @@ require_once dirname(__FILE__).'/include/hosts.inc.php';
 
 $page['title'] = _('Availability report');
 $page['file'] = 'report2.php';
-$page['scripts'] = ['class.calendar.js', 'gtlc.js', 'multiselect.js', 'report2.js'];
+$page['scripts'] = ['class.calendar.js', 'gtlc.js', 'report2.js'];
 $page['type'] = detect_page_type(PAGE_TYPE_HTML);
 
 require_once dirname(__FILE__).'/include/page_header.php';
@@ -143,8 +143,6 @@ $timeselector_options = [
 	'to' => getRequest('to')
 ];
 updateTimeSelectorPeriod($timeselector_options);
-
-$config = select_config();
 
 /*
  * Header
@@ -357,6 +355,7 @@ else {
 
 		if ($templated_triggers_all) {
 			// Select monitored host triggers, derived from templates and belonging to the requested groups.
+			$limit = CSettingsHelper::get(CSettingsHelper::SEARCH_LIMIT) + 1;
 			$triggers = API::Trigger()->get([
 				'output' => ['triggerid', 'description', 'expression', 'value'],
 				'selectHosts' => ['name'],
@@ -364,7 +363,7 @@ else {
 				'monitored' => true,
 				'groupids' => ($data['filter']['hostgroupid'] == 0) ? null : array_keys($hostgroupids),
 				'filter' => ['templateid' => array_keys($templated_triggers_all)],
-				'limit' => $config['search_limit'] + 1
+				'limit' => $limit
 			]);
 		}
 		else {
@@ -431,6 +430,7 @@ else {
 		// Select monitored host triggers, derived from templates and belonging to the requested groups.
 		$groups = enrichParentGroups($data['filter']['groups']);
 
+		$limit = CSettingsHelper::get(CSettingsHelper::SEARCH_LIMIT) + 1;
 		$triggers = API::Trigger()->get([
 			'output' => ['triggerid', 'description', 'expression', 'value'],
 			'selectHosts' => ['name'],
@@ -438,7 +438,7 @@ else {
 			'hostids' => $data['filter']['hostids'] ? array_keys($data['filter']['hostids']) : null,
 			'expandDescription' => true,
 			'monitored' => true,
-			'limit' => $config['search_limit'] + 1
+			'limit' => $limit
 		]);
 
 		$filter_column
@@ -491,7 +491,8 @@ else {
 	unset($trigger);
 
 	$reportWidget->addItem(
-		(new CFilter(new CUrl('report2.php')))
+		(new CFilter())
+			->setResetUrl(new CUrl('report2.php'))
 			->setProfile($data['filter']['timeline']['profileIdx'])
 			->setActiveTab($data['filter']['active_tab'])
 			->addFormItem((new CVar('mode', $report_mode))->removeId())
@@ -511,6 +512,7 @@ else {
 	$page_num = getRequest('page', 1);
 	CPagerHelper::savePage($page['file'], $page_num);
 	$paging = CPagerHelper::paginate($page_num, $triggers, ZBX_SORT_UP, new CUrl('report2.php'));
+	$allowed_ui_problems = CWebUser::checkAccess(CRoleHelper::UI_MONITORING_PROBLEMS);
 
 	foreach ($triggers as $trigger) {
 		$availability = calculateAvailability($trigger['triggerid'], $data['filter']['timeline']['from_ts'],
@@ -527,12 +529,14 @@ else {
 
 		$triggerTable->addRow([
 			$trigger['host_name'],
-			new CLink($trigger['description'],
-				(new CUrl('zabbix.php'))
-					->setArgument('action', 'problem.view')
-					->setArgument('filter_triggerids', [$trigger['triggerid']])
-					->setArgument('filter_set', '1')
-			),
+			$allowed_ui_problems
+				? new CLink($trigger['description'],
+					(new CUrl('zabbix.php'))
+						->setArgument('action', 'problem.view')
+						->setArgument('filter_name', '')
+						->setArgument('triggerids', [$trigger['triggerid']])
+				)
+				: $trigger['description'],
 			($availability['true'] < 0.00005)
 				? ''
 				: (new CSpan(sprintf('%.4f%%', $availability['true'])))->addClass(ZBX_STYLE_RED),
@@ -548,8 +552,7 @@ else {
 		'domid' => 'avail_report',
 		'loadSBox' => 0,
 		'loadImage' => 0,
-		'dynamic' => 0,
-		'mainObject' => 1
+		'dynamic' => 0
 	];
 	zbx_add_post_js(
 		'timeControl.addObject("avail_report", '.zbx_jsvalue($data['filter']).', '.zbx_jsvalue($obj_data).');'

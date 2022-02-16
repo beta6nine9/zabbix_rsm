@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -21,13 +21,112 @@
 require_once dirname(__FILE__).'/../include/CWebTest.php';
 
 /**
- * @backup media_type_message
+ * @backup media_type
+ *
+ * @onBefore prepareMediaTypeMessageTemplatesData
  */
 class testFormAdministrationMediaTypeMessageTemplates extends CWebTest {
 
 	// SQL query to get message_template and media_type tables to compare hash values.
 	private $sql = 'SELECT * FROM media_type mt INNER JOIN media_type_message mtm ON mt.mediatypeid=mtm.mediatypeid'.
 			' ORDER BY mt.mediatypeid';
+
+	public static function prepareMediaTypeMessageTemplatesData() {
+		CDataHelper::call('mediatype.create', [
+			[
+				'name' => 'Email (HTML) Service',
+				'type' => 0,
+				'smtp_server' => 'apimail@company.com',
+				'smtp_helo' => 'zabbix.com',
+				'smtp_email' => 'zabbix@company.com',
+				'message_templates' => [
+					[
+						'eventsource' => 4,
+						'recovery' => 0,
+						'subject' => 'Service "{SERVICE.NAME}" problem: {EVENT.NAME}',
+						'message' => '<b>Service problem started</b> at {EVENT.TIME} on {EVENT.DATE}<br>'.
+								'<b>Service problem name:</b> {EVENT.NAME}<br><b>Service:</b> {SERVICE.NAME}<br><b>'.
+								'Severity:</b> {EVENT.SEVERITY}<br><b>Original problem ID:</b> {EVENT.ID}<br>'.
+								'Service description: {SERVICE.DESCRIPTION}<br><br>{SERVICE.ROOTCAUSE}'
+					],
+					[
+						'eventsource' => 4,
+						'recovery' => 1,
+						'subject' => 'Service "{SERVICE.NAME}" resolved in {EVENT.DURATION}: {EVENT.NAME}',
+						'message' => '<b>Service "{SERVICE.NAME}" has been resolved</b> at {EVENT.RECOVERY.TIME} on '.
+								'{EVENT.RECOVERY.DATE}<br><b>Problem name:</b> {EVENT.NAME}<br><b>Problem duration:</b> '.
+								'{EVENT.DURATION}<br><b>Severity:</b> {EVENT.SEVERITY}<br><b>Original problem ID:</b> {EVENT.ID}'.
+								'<br>Service description: {SERVICE.DESCRIPTION}'
+					],
+					[
+						'eventsource' => 4,
+						'recovery' => 2,
+						'subject' => 'Changed "{SERVICE.NAME}" service status to {EVENT.UPDATE.SEVERITY} in {EVENT.AGE}',
+						'message' => '<b>Changed "{SERVICE.NAME}" service status</b> to {EVENT.UPDATE.SEVERITY} at '.
+								'{EVENT.UPDATE.DATE} {EVENT.UPDATE.TIME}.<br><b>Current problem age</b> is {EVENT.AGE}.<br>'.
+								'Service description: {SERVICE.DESCRIPTION}<br><br>{SERVICE.ROOTCAUSE}'
+					]
+				]
+			],
+			[
+				'name' => 'Email Service',
+				'type' => 0,
+				'smtp_server' => 'apimail@company.com',
+				'smtp_helo' => 'zabbix.com',
+				'smtp_email' => 'zabbix@company.com',
+				'message_templates' => [
+					[
+						'eventsource' => 4,
+						'recovery' => 0,
+						'subject' => 'Service "{SERVICE.NAME}" problem: {EVENT.NAME}',
+						'message' => '<b>Service problem started</b> at {EVENT.TIME} on {EVENT.DATE}<br><b>Service '.
+								'problem name:</b> {EVENT.NAME}<br><b>Service:</b> {SERVICE.NAME}<br><b>Severity:</b> '.
+								'{EVENT.SEVERITY}<br><b>Original problem ID:</b> {EVENT.ID}<br>'.
+								'Service description: {SERVICE.DESCRIPTION}<br><br>{SERVICE.ROOTCAUSE}'
+					],
+					[
+						'eventsource' => 4,
+						'recovery' => 1,
+						'subject' => 'Service "{SERVICE.NAME}" resolved in {EVENT.DURATION}: {EVENT.NAME}',
+						'message' => '<b>Service "{SERVICE.NAME}" has been resolved</b> at {EVENT.RECOVERY.TIME} on '.
+								'{EVENT.RECOVERY.DATE}<br><b>Problem name:</b> {EVENT.NAME}<br><b>Problem duration:</b> '.
+								'{EVENT.DURATION}<br><b>Severity:</b> {EVENT.SEVERITY}<br><b>Original problem ID:</b> {EVENT.ID}'.
+								'<br>Service description: {SERVICE.DESCRIPTION}'
+					],
+					[
+						'eventsource' => 4,
+						'recovery' => 2,
+						'subject' => 'Changed "{SERVICE.NAME}" service status to {EVENT.UPDATE.SEVERITY} in {EVENT.AGE}',
+						'message' => '<b>Changed "{SERVICE.NAME}" service status</b> to {EVENT.UPDATE.SEVERITY} at '.
+								'{EVENT.UPDATE.DATE} {EVENT.UPDATE.TIME}.<br><b>Current problem age</b> is {EVENT.AGE}.<br>'.
+								'Service description: {SERVICE.DESCRIPTION}<br><br>{SERVICE.ROOTCAUSE}'
+					]
+				]
+			],
+			[
+				'name' => 'SMS Service',
+				'type' => 2,
+				'gsm_modem' => 'test',
+				'message_templates' => [
+					[
+						'eventsource' => 4,
+						'recovery' => 0,
+						'message' => "{EVENT.NAME}\n".'{EVENT.DATE} {EVENT.TIME}'
+					],
+					[
+						'eventsource' => 4,
+						'recovery' => 1,
+						'message' => "{EVENT.NAME}\n".'{EVENT.DATE} {EVENT.TIME}'
+					],
+					[
+						'eventsource' => 4,
+						'recovery' => 2,
+						'message' => "{EVENT.NAME}\n".'{EVENT.DATE} {EVENT.TIME}'
+					]
+				]
+			]
+		]);
+	}
 
 	public function testFormAdministrationMediaTypeMessageTemplates_Layout() {
 		// Open a new media type configuration form and switch to Message templates tab.
@@ -116,6 +215,36 @@ class testFormAdministrationMediaTypeMessageTemplates extends CWebTest {
 									"Current problem status is {EVENT.STATUS}, age is {EVENT.AGE}, acknowledged: {EVENT.ACK.STATUS}."
 						],
 						[
+							'Message type' => 'Service',
+							'Subject' => 'Service "{SERVICE.NAME}" problem: {EVENT.NAME}',
+							'Message' => "Service problem started at {EVENT.TIME} on {EVENT.DATE}\n".
+									"Service problem name: {EVENT.NAME}\n".
+									"Service: {SERVICE.NAME}\n".
+									"Severity: {EVENT.SEVERITY}\n".
+									"Original problem ID: {EVENT.ID}\n".
+									"Service description: {SERVICE.DESCRIPTION}\n\n".
+									"{SERVICE.ROOTCAUSE}"
+						],
+						[
+							'Message type' => 'Service recovery',
+							'Subject' => 'Service "{SERVICE.NAME}" resolved in {EVENT.DURATION}: {EVENT.NAME}',
+							'Message' => 'Service "{SERVICE.NAME}" has been resolved at {EVENT.RECOVERY.TIME} on '.
+									"{EVENT.RECOVERY.DATE}\nProblem name: {EVENT.NAME}\n".
+									"Problem duration: {EVENT.DURATION}\n".
+									"Severity: {EVENT.SEVERITY}\n".
+									"Original problem ID: {EVENT.ID}\n".
+									"Service description: {SERVICE.DESCRIPTION}"
+						],
+						[
+							'Message type' => 'Service update',
+							'Subject' => 'Changed "{SERVICE.NAME}" service status to {EVENT.UPDATE.SEVERITY} in {EVENT.AGE}',
+							'Message' => "Changed \"{SERVICE.NAME}\" service status to {EVENT.UPDATE.SEVERITY} at ".
+									"{EVENT.UPDATE.DATE} {EVENT.UPDATE.TIME}.\n".
+									"Current problem age is {EVENT.AGE}.\n".
+									"Service description: {SERVICE.DESCRIPTION}\n\n".
+									"{SERVICE.ROOTCAUSE}"
+						],
+						[
 							'Message type' => 'Discovery',
 							'Subject' => 'Discovery: {DISCOVERY.DEVICE.STATUS} {DISCOVERY.DEVICE.IPADDRESS}',
 							'Message' => "Discovery rule: {DISCOVERY.RULE.NAME}\n\n".
@@ -184,6 +313,31 @@ class testFormAdministrationMediaTypeMessageTemplates extends CWebTest {
 									'</b> {EVENT.STATUS}<br><b>Age:</b> {EVENT.AGE}<br><b>Acknowledged:</b> {EVENT.ACK.STATUS}.'
 						],
 						[
+							'Message type' => 'Service',
+							'Subject' => 'Service "{SERVICE.NAME}" problem: {EVENT.NAME}',
+							'Message' => '<b>Service problem started</b> at {EVENT.TIME} on {EVENT.DATE}'.
+									'<br><b>Service problem name:</b> {EVENT.NAME}<br><b>Service:</b> '.
+									'{SERVICE.NAME}<br><b>Severity:</b> {EVENT.SEVERITY}<br><b>Original '.
+									'problem ID:</b> {EVENT.ID}<br><b>Service description:</b> {SERVICE.DESCRIPTION}<br>'.
+									'<br>{SERVICE.ROOTCAUSE}'
+						],
+						[
+							'Message type' => 'Service recovery',
+							'Subject' => 'Service "{SERVICE.NAME}" resolved in {EVENT.DURATION}: {EVENT.NAME}',
+							'Message' => '<b>Service "{SERVICE.NAME}" has been resolved</b> at {EVENT.RECOVERY.TIME} on '.
+									'{EVENT.RECOVERY.DATE}<br><b>Problem name:</b> {EVENT.NAME}<br>'.
+									'<b>Problem duration:</b> {EVENT.DURATION}<br>'.
+									'<b>Severity:</b> {EVENT.SEVERITY}<br><b>Original problem ID:</b> {EVENT.ID}<br>'.
+									'<b>Service description:</b> {SERVICE.DESCRIPTION}'
+						],
+						[
+							'Message type' => 'Service update',
+							'Subject' => 'Changed "{SERVICE.NAME}" service status to {EVENT.UPDATE.SEVERITY} in {EVENT.AGE}',
+							'Message' => '<b>Changed "{SERVICE.NAME}" service status</b> to {EVENT.UPDATE.SEVERITY} at '.
+									'{EVENT.UPDATE.DATE} {EVENT.UPDATE.TIME}.<br><b>Current problem age</b> is {EVENT.AGE}.'.
+									'<br><b>Service description:</b> {SERVICE.DESCRIPTION}<br><br>{SERVICE.ROOTCAUSE}'
+						],
+						[
 							'Message type' => 'Discovery',
 							'Subject' => 'Discovery: {DISCOVERY.DEVICE.STATUS} {DISCOVERY.DEVICE.IPADDRESS}',
 							'Message' => '<b>Discovery rule:</b> {DISCOVERY.RULE.NAME}<br><br><b>Device IP:</b> '.
@@ -237,6 +391,21 @@ class testFormAdministrationMediaTypeMessageTemplates extends CWebTest {
 							'Message type' => 'Problem update',
 							'Message' => '{USER.FULLNAME} {EVENT.UPDATE.ACTION} problem in {EVENT.AGE} at '.
 									'{EVENT.UPDATE.DATE} {EVENT.UPDATE.TIME}'
+						],
+						[
+							'Message type' => 'Service',
+							'Message' => "{EVENT.NAME}\n".
+									'{EVENT.DATE} {EVENT.TIME}'
+						],
+						[
+							'Message type' => 'Service recovery',
+							'Message' => "{EVENT.NAME}\n".
+									'{EVENT.DATE} {EVENT.TIME}'
+						],
+						[
+							'Message type' => 'Service update',
+							'Message' => "{EVENT.NAME}\n".
+									'{EVENT.DATE} {EVENT.TIME}'
 						],
 						[
 							'Message type' => 'Discovery',
@@ -366,6 +535,74 @@ class testFormAdministrationMediaTypeMessageTemplates extends CWebTest {
 					]
 				]
 			],
+			// Change message format from plain text to HTML for "Email (HTML) Service"
+			[
+				[
+					'media_type' => 'Email (HTML) Service',
+					'media_type_fields' => [
+						'Message format' => 'HTML'
+					],
+					'message_templates' => [
+						[
+							'Message type' => 'Service',
+							'Subject' => 'Service "{SERVICE.NAME}" problem: {EVENT.NAME}',
+							'Message' => "Service problem started at {EVENT.TIME} on {EVENT.DATE}\n".
+									"Service problem name: {EVENT.NAME}\n".
+									"Service: {SERVICE.NAME}\n".
+									"Severity: {EVENT.SEVERITY}\n".
+									"Original problem ID: {EVENT.ID}\n\n".
+									"{SERVICE.ROOTCAUSE}"
+						],
+						[
+							'Message type' => 'Service recovery',
+							'Subject' => 'Service "{SERVICE.NAME}" resolved in {EVENT.DURATION}: {EVENT.NAME}',
+							'Message' => 'Service "{SERVICE.NAME}" has been resolved at {EVENT.RECOVERY.TIME} on '.
+									"{EVENT.RECOVERY.DATE}\nProblem name: {EVENT.NAME}\nProblem duration: {EVENT.DURATION}\n".
+									"Severity: {EVENT.SEVERITY}\nOriginal problem ID: {EVENT.ID}"
+						],
+						[
+							'Message type' => 'Service update',
+							'Subject' => 'Changed "{SERVICE.NAME}" service status to {EVENT.UPDATE.SEVERITY} in {EVENT.AGE}',
+							'Message' => 'Changed "{SERVICE.NAME}" service status to {EVENT.UPDATE.SEVERITY} at '.
+									"{EVENT.UPDATE.DATE} {EVENT.UPDATE.TIME}.\nCurrent problem age is {EVENT.AGE}.\n\n".
+									"{SERVICE.ROOTCAUSE}"
+						]
+					]
+				]
+			],
+			// Change message format from HTML to plain text for "Email (HTML) Service"
+			[
+				[
+					'media_type' => 'Email (HTML) Service',
+					'media_type_fields' => [
+						'Message format' => 'Plain text'
+					],
+					'message_templates' => [
+						[
+							'Message type' => 'Service',
+							'Subject' => 'Service "{SERVICE.NAME}" problem: {EVENT.NAME}',
+							'Message' => '<b>Service problem started</b> at {EVENT.TIME} on {EVENT.DATE}<br>'.
+									'<b>Service problem name:</b> {EVENT.NAME}<br><b>Service:</b> {SERVICE.NAME}<br>'.
+									'<b>Severity:</b> {EVENT.SEVERITY}<br><b>Original problem ID:</b> {EVENT.ID}<br><br>'.
+									'{SERVICE.ROOTCAUSE}'
+						],
+						[
+							'Message type' => 'Service recovery',
+							'Subject' => 'Service "{SERVICE.NAME}" resolved in {EVENT.DURATION}: {EVENT.NAME}',
+							'Message' => '<b>Service "{SERVICE.NAME}" has been resolved</b> at {EVENT.RECOVERY.TIME} on '.
+									'{EVENT.RECOVERY.DATE}<br><b>Problem name:</b> {EVENT.NAME}<br><b>Problem duration:</b> '.
+									'{EVENT.DURATION}<br><b>Severity:</b> {EVENT.SEVERITY}<br><b>Original problem ID:</b> {EVENT.ID}'
+						],
+						[
+							'Message type' => 'Service update',
+							'Subject' => 'Changed "{SERVICE.NAME}" service status to {EVENT.UPDATE.SEVERITY} in {EVENT.AGE}',
+							'Message' => '<b>Changed "{SERVICE.NAME}" service status</b> to {EVENT.UPDATE.SEVERITY} at '.
+									'{EVENT.UPDATE.DATE} {EVENT.UPDATE.TIME}.<br><b>Current problem age</b> is '.
+									'{EVENT.AGE}.<br><br>{SERVICE.ROOTCAUSE}'
+						]
+					]
+				]
+			],
 			// Change message format from HTML to plain text
 			[
 				[
@@ -426,7 +663,30 @@ class testFormAdministrationMediaTypeMessageTemplates extends CWebTest {
 					]
 				]
 			],
-			// Update exsting message templates for Email media type.
+			// Update existing message templates for "Email Service".
+			[
+				[
+					'media_type' => 'Email Service',
+					'message_templates' => [
+						[
+							'Message type' => 'Service',
+							'Subject' => 'New service subject !@#$%^&*()_+ōš六書',
+							'Message' => 'New service message !@#$%^&*()_+ōš六書'
+						],
+						[
+							'Message type' => 'Service recovery',
+							'Subject' => 'New service recovery subject !@#$%^&*()_+ōš六書',
+							'Message' => 'New service recovery message !@#$%^&*()_+ōš六書'
+						],
+						[
+							'Message type' => 'Service update',
+							'Subject' => 'New service update subject !@#$%^&*()_+ōš六書',
+							'Message' => 'New service update message !@#$%^&*()_+ōš六書'
+						]
+					]
+				]
+			],
+			// Update existing message templates for Email media type.
 			[
 				[
 					'media_type' => 'Email',
@@ -459,7 +719,27 @@ class testFormAdministrationMediaTypeMessageTemplates extends CWebTest {
 					]
 				]
 			],
-			// Update exsting message templates for SMS media type.
+			// Update existing message templates for "SMS Service".
+			[
+				[
+					'media_type' => 'SMS Service',
+					'message_templates' => [
+						[
+							'Message type' => 'Service',
+							'Message' => 'New service SMS !@#$%^&*()_+ōš六書'
+						],
+						[
+							'Message type' => 'Service recovery',
+							'Message' => 'New service recovery SMS !@#$%^&*()_+ōš六書'
+						],
+						[
+							'Message type' => 'Service update',
+							'Message' => 'New service update SMS !@#$%^&*()_+ōš六書'
+						]
+					]
+				]
+			],
+			// Update existing message templates for SMS media type.
 			[
 				[
 					'media_type' => 'SMS',
@@ -551,7 +831,7 @@ class testFormAdministrationMediaTypeMessageTemplates extends CWebTest {
 
 	/**
 	 * @dataProvider getUpdateMessageTemplateData
-	 * @backup media_type_message
+	 * @backup media_type
 	 */
 	public function testFormAdministrationMediaTypeMessageTemplates_Update($data) {
 		// Open configuration of an existing media type, update its format if needed and switch to Message templates tab.
@@ -564,10 +844,10 @@ class testFormAdministrationMediaTypeMessageTemplates extends CWebTest {
 		else {
 			$this->modifyMessageTemplates($data);
 		}
-		$this->query('id:media_type_form')->asForm()->one()->submit();
+		$this->query('id:media-type-form')->asForm()->one()->submit();
 		// Open message template list of the edited media type and check that message template updates took place.
 		$this->query('link', $data['media_type'])->one()->WaitUntilClickable()->click();
-		$media_form = $this->query('id:media_type_form')->asForm()->one();
+		$media_form = $this->query('id:media-type-form')->asForm()->one();
 		$media_form->selectTab('Message templates');
 		$templates_list->invalidate();
 		if (array_key_exists('remove_all', $data)) {
@@ -589,7 +869,7 @@ class testFormAdministrationMediaTypeMessageTemplates extends CWebTest {
 		$templates_list = $this->query('id:messageTemplatesFormlist')->asTable()->one();
 		$templates_list->findRow('Message type', 'Problem')->query('button:Edit')->one()->click();
 		$this->query('id:mediatype_message_form')->waitUntilVisible()->asForm()->one()->submit();
-		$this->query('id:media_type_form')->asForm()->one()->submit();
+		$this->query('id:media-type-form')->asForm()->one()->submit();
 
 		// Check that no DB changes took place.
 		$this->assertEquals($old_hash, CDBHelper::getHash($this->sql));
@@ -631,7 +911,7 @@ class testFormAdministrationMediaTypeMessageTemplates extends CWebTest {
 					$form->submit();
 					break;
 				case 'Add':
-					$templates_list->query('button:Add')->one()->click();
+					$templates_list->query('button:Add')->waitUntilClickable()->one()->click();
 					$form = $this->query('id:mediatype_message_form')->waitUntilVisible()->asForm()->one();
 					unset($template['action']);
 					$form->fill($template);
@@ -682,7 +962,7 @@ class testFormAdministrationMediaTypeMessageTemplates extends CWebTest {
 			$this->page->login()->open('zabbix.php?action=mediatype.list')->waitUntilReady();
 			$this->query('link', $media_type)->one()->WaitUntilClickable()->click();
 		}
-		$media_form = $this->query('id:media_type_form')->asForm()->one();
+		$media_form = $this->query('id:media-type-form')->asForm()->one();
 		if ($media_type_fields !== null) {
 			$media_form->fill($media_type_fields);
 		}

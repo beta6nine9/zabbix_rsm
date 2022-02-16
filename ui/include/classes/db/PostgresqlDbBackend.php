@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -266,9 +266,7 @@ class PostgresqlDbBackend extends DbBackend {
 	 * @return bool
 	 */
 	public static function isCompressed(array $tables): bool {
-		// Compression is available for TimescaleDB 1.5 and greater.
-		$config = select_config();
-		if ($config['db_extension'] != ZBX_DB_EXTENSION_TIMESCALEDB || $config['compression_availability'] != 1) {
+		if (CHousekeepingHelper::get(CHousekeepingHelper::DB_EXTENSION) != ZBX_DB_EXTENSION_TIMESCALEDB) {
 			return false;
 		}
 

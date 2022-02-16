@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -23,27 +23,29 @@ class CControllerProxyCreate extends CController {
 
 	protected function checkInput() {
 		$fields = [
-			'host' =>			'db       hosts.host',
-			'status' =>			'db       hosts.status     |in '.HOST_STATUS_PROXY_ACTIVE.','.HOST_STATUS_PROXY_PASSIVE,
-			'dns' =>			'db       interface.dns',
-			'ip' =>				'db       interface.ip',
-			'useip' =>			'db       interface.useip  |in 0,1',
-			'port' =>			'db       interface.port',
-			'proxy_address' =>	'db       hosts.proxy_address',
-			'description' =>	'db       hosts.description',
-			'tls_connect' => 	'db       hosts.tls_connect    |in '.HOST_ENCRYPTION_NONE.','.HOST_ENCRYPTION_PSK.','.
+			'host' =>				'db hosts.host',
+			'status' =>				'db hosts.status|in '.HOST_STATUS_PROXY_ACTIVE.','.HOST_STATUS_PROXY_PASSIVE,
+			'dns' =>				'db interface.dns',
+			'ip' =>					'db interface.ip',
+			'useip' =>				'db interface.useip|in 0,1',
+			'port' =>				'db interface.port',
+			'proxy_address' =>		'db hosts.proxy_address',
+			'description' =>		'db hosts.description',
+			'tls_connect' =>		'db hosts.tls_connect|in '.HOST_ENCRYPTION_NONE.','.HOST_ENCRYPTION_PSK.','.
 				HOST_ENCRYPTION_CERTIFICATE,
-			'tls_accept' => 	'db       hosts.tls_accept     |in 0,'.HOST_ENCRYPTION_NONE.','.HOST_ENCRYPTION_PSK.','.
+			'tls_accept' =>			'db hosts.tls_accept|in 0,'.HOST_ENCRYPTION_NONE.','.HOST_ENCRYPTION_PSK.','.
 				(HOST_ENCRYPTION_NONE | HOST_ENCRYPTION_PSK).','.
 				HOST_ENCRYPTION_CERTIFICATE.','.
 				(HOST_ENCRYPTION_NONE | HOST_ENCRYPTION_CERTIFICATE).','.
 				(HOST_ENCRYPTION_PSK | HOST_ENCRYPTION_CERTIFICATE).','.
 				(HOST_ENCRYPTION_NONE | HOST_ENCRYPTION_PSK | HOST_ENCRYPTION_CERTIFICATE),
-			'tls_issuer' => 	'db       hosts.tls_issuer',
-			'tls_psk' =>		'db       hosts.tls_psk',
-			'tls_psk_identity'=>'db       hosts.tls_psk_identity',
-			'tls_subject' => 	'db       hosts.tls_subject',
-			'form_refresh' =>	'int32'
+			'tls_psk' =>			'db hosts.tls_psk',
+			'tls_psk_identity' =>	'db hosts.tls_psk_identity',
+			'psk_edit_mode' =>		'in 0,1',
+			'tls_issuer' =>			'db hosts.tls_issuer',
+			'tls_subject' =>		'db hosts.tls_subject',
+			'clone_proxyid' =>		'db hosts.hostid',
+			'form_refresh' =>		'int32'
 		];
 
 		$ret = $this->validateInput($fields);
@@ -53,7 +55,7 @@ class CControllerProxyCreate extends CController {
 				case self::VALIDATION_ERROR:
 					$response = new CControllerResponseRedirect('zabbix.php?action=proxy.edit');
 					$response->setFormData($this->getInputAll());
-					$response->setMessageError(_('Cannot add proxy'));
+					CMessageHelper::setErrorTitle(_('Cannot add proxy'));
 					$this->setResponse($response);
 					break;
 				case self::VALIDATION_FATAL_ERROR:
@@ -66,7 +68,7 @@ class CControllerProxyCreate extends CController {
 	}
 
 	protected function checkPermissions() {
-		return ($this->getUserType() == USER_TYPE_SUPER_ADMIN);
+		return $this->checkAccess(CRoleHelper::UI_ADMINISTRATION_PROXIES);
 	}
 
 	protected function doAction() {
@@ -75,6 +77,19 @@ class CControllerProxyCreate extends CController {
 		$this->getInputs($proxy, ['host', 'status', 'description', 'tls_connect', 'tls_accept', 'tls_issuer',
 			'tls_subject', 'tls_psk_identity', 'tls_psk'
 		]);
+
+		if ($this->hasInput('clone_proxyid') && (array_key_exists('tls_connect', $proxy)
+					&& $proxy['tls_connect'] == HOST_ENCRYPTION_PSK)) {
+			$clone_proxies = API::Proxy()->get([
+				'output' => ['tls_psk_identity', 'tls_psk'],
+				'proxyids' => $this->getInput('clone_proxyid'),
+				'editable' => true
+			]);
+			$clone_proxy = reset($clone_proxies);
+
+			$proxy['tls_psk_identity'] = $clone_proxy['tls_psk_identity'];
+			$proxy['tls_psk'] = $clone_proxy['tls_psk'];
+		}
 
 		if ($this->getInput('status', HOST_STATUS_PROXY_ACTIVE) == HOST_STATUS_PROXY_PASSIVE) {
 			$proxy['interface'] = [];
@@ -88,12 +103,6 @@ class CControllerProxyCreate extends CController {
 
 		$result = API::Proxy()->create([$proxy]);
 
-		if ($result) {
-			add_audit(AUDIT_ACTION_ADD, AUDIT_RESOURCE_PROXY,
-				'['.$this->getInput('host', '').'] ['.reset($result['proxyids']).']'
-			);
-		}
-
 		$result = DBend($result);
 
 		if ($result) {
@@ -102,14 +111,14 @@ class CControllerProxyCreate extends CController {
 				->setArgument('page', CPagerHelper::loadPage('proxy.list', null))
 			);
 			$response->setFormData(['uncheck' => '1']);
-			$response->setMessageOk(_('Proxy added'));
+			CMessageHelper::setSuccessTitle(_('Proxy added'));
 		}
 		else {
 			$response = new CControllerResponseRedirect((new CUrl('zabbix.php'))
 				->setArgument('action', 'proxy.edit')
 			);
 			$response->setFormData($this->getInputAll());
-			$response->setMessageError(_('Cannot add proxy'));
+			CMessageHelper::setErrorTitle(_('Cannot add proxy'));
 		}
 		$this->setResponse($response);
 	}

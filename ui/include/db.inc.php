@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -74,6 +74,7 @@ function DBconnect(&$error) {
 
 	if ($db->getError() || ($DB['ENCRYPTION'] && !$db->isConnectionSecure()) || !$db->checkDbVersion()
 			|| !$db->checkConfig()) {
+
 		$error = $db->getError();
 		return false;
 	}
@@ -400,7 +401,16 @@ function DBfetch($cursor, $convertNulls = true) {
 			}
 			break;
 		case ZBX_DB_POSTGRESQL:
-			if (!$result = pg_fetch_assoc($cursor)) {
+			if ($result = pg_fetch_assoc($cursor)) {
+				$i = 0;
+				foreach ($result as &$value) {
+					if (pg_field_type($cursor, $i++) === 'bytea') {
+						$value = pg_unescape_bytea($value);
+					}
+				}
+				unset($value);
+			}
+			else {
 				pg_free_result($cursor);
 			}
 			break;
@@ -528,7 +538,8 @@ function zbx_db_search($table, $options, &$sql_parts) {
 
 		if ($tableSchema['fields'][$field]['type'] !== DB::FIELD_TYPE_CHAR
 				&& $tableSchema['fields'][$field]['type'] !== DB::FIELD_TYPE_NCLOB
-				&& $tableSchema['fields'][$field]['type'] !== DB::FIELD_TYPE_TEXT) {
+				&& $tableSchema['fields'][$field]['type'] !== DB::FIELD_TYPE_TEXT
+				&& $tableSchema['fields'][$field]['type'] !== DB::FIELD_TYPE_CUID) {
 			continue;
 		}
 

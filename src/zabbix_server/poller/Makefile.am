@@ -5,8 +5,6 @@ noinst_LIBRARIES = libzbxpoller.a libzbxpoller_server.a libzbxpoller_proxy.a
 libzbxpoller_a_SOURCES = \
 	checks_agent.c \
 	checks_agent.h \
-	checks_aggregate.c \
-	checks_aggregate.h \
 	checks_calculated.c \
 	checks_calculated.h \
 	checks_db.c \
@@ -19,6 +17,8 @@ libzbxpoller_a_SOURCES = \
 	checks_internal.h \
 	checks_java.c \
 	checks_java.h \
+	checks_script.c \
+	checks_script.h \
 	checks_simple.c \
 	checks_simple.h \
 	checks_simple_vmware.c \
@@ -32,10 +32,11 @@ libzbxpoller_a_SOURCES = \
 	poller.c \
 	poller.h
 
+# RSM specifics
 libzbxpoller_a_SOURCES += checks_simple_rsm.c checks_simple_rsm.h
-	
+
 libzbxpoller_server_a_SOURCES = \
- 	checks_internal.h \
+	checks_internal.h \
 	checks_internal_server.c
 
 libzbxpoller_proxy_a_SOURCES = \

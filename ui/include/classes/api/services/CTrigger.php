@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -24,6 +24,15 @@
  */
 class CTrigger extends CTriggerGeneral {
 
+	public const ACCESS_RULES = [
+		'get' => ['min_user_type' => USER_TYPE_ZABBIX_USER],
+		'create' => ['min_user_type' => USER_TYPE_ZABBIX_ADMIN],
+		'update' => ['min_user_type' => USER_TYPE_ZABBIX_ADMIN],
+		'delete' => ['min_user_type' => USER_TYPE_ZABBIX_ADMIN],
+		'adddependencies' => ['min_user_type' => USER_TYPE_ZABBIX_ADMIN],
+		'deletedependencies' => ['min_user_type' => USER_TYPE_ZABBIX_ADMIN]
+	];
+
 	protected $tableName = 'triggers';
 	protected $tableAlias = 't';
 	protected $sortColumns = ['triggerid', 'description', 'status', 'priority', 'lastchange', 'hostname'];
@@ -36,7 +45,6 @@ class CTrigger extends CTriggerGeneral {
 	 * @param array $options['hostids']
 	 * @param array $options['groupids']
 	 * @param array $options['triggerids']
-	 * @param array $options['applicationids']
 	 * @param array $options['status']
 	 * @param bool  $options['editable']
 	 * @param array $options['count']
@@ -64,7 +72,6 @@ class CTrigger extends CTriggerGeneral {
 			'hostids'						=> null,
 			'triggerids'					=> null,
 			'itemids'						=> null,
-			'applicationids'				=> null,
 			'functions'						=> null,
 			'inherited'						=> null,
 			'dependent'						=> null,
@@ -204,17 +211,6 @@ class CTrigger extends CTriggerGeneral {
 			if ($options['groupCount']) {
 				$sqlParts['group']['f'] = 'f.itemid';
 			}
-		}
-
-		// applicationids
-		if ($options['applicationids'] !== null) {
-			zbx_value2array($options['applicationids']);
-
-			$sqlParts['from']['functions'] = 'functions f';
-			$sqlParts['from']['items_applications'] = 'items_applications ia';
-			$sqlParts['where']['a'] = dbConditionInt('ia.applicationid', $options['applicationids']);
-			$sqlParts['where']['ft'] = 'f.triggerid=t.triggerid';
-			$sqlParts['where']['fia'] = 'f.itemid=ia.itemid';
 		}
 
 		// functions
@@ -419,10 +415,10 @@ class CTrigger extends CTriggerGeneral {
 
 		// only_true
 		if ($options['only_true'] !== null) {
-			$config = select_config();
 			$sqlParts['where']['ot'] = '((t.value='.TRIGGER_VALUE_TRUE.')'.
 				' OR ((t.value='.TRIGGER_VALUE_FALSE.')'.
-					' AND (t.lastchange>'.(time() - timeUnitToSeconds($config['ok_period'])).
+					' AND (t.lastchange>'.
+					(time() - timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::OK_PERIOD))).
 				'))'.
 			')';
 		}
@@ -621,7 +617,7 @@ class CTrigger extends CTriggerGeneral {
 
 		CTriggerManager::delete($triggerids);
 
-		$this->addAuditBulk(AUDIT_ACTION_DELETE, AUDIT_RESOURCE_TRIGGER, $db_triggers);
+		$this->addAuditBulk(CAudit::ACTION_DELETE, CAudit::RESOURCE_TRIGGER, $db_triggers);
 
 		return ['triggerids' => $triggerids];
 	}
@@ -691,7 +687,7 @@ class CTrigger extends CTriggerGeneral {
 			: ['editable' => true];
 
 		$triggers = $this->get([
-			'output' => ['triggerid', 'description', 'flags'],
+			'output' => ['triggerid', 'description', 'templateid', 'flags'],
 			'triggerids' => $triggerids,
 			'preservekeys' => true
 		] + $permission_check);
@@ -701,6 +697,12 @@ class CTrigger extends CTriggerGeneral {
 		}
 
 		foreach ($triggers as $trigger) {
+			if ($trigger['templateid'] && !$inherited) {
+				self::exception(ZBX_API_ERROR_PERMISSIONS, _s('Cannot update dependencies of inherited trigger "%1$s".',
+					$trigger['description']
+				));
+			}
+
 			if ($trigger['flags'] == ZBX_FLAG_DISCOVERY_CREATED) {
 				self::exception(ZBX_API_ERROR_PERMISSIONS, _s('Cannot update "%2$s" for a discovered trigger "%1$s".',
 					$trigger['description'], 'dependencies'
@@ -816,7 +818,7 @@ class CTrigger extends CTriggerGeneral {
 			: ['editable' => true];
 
 		$triggers = $this->get([
-			'output' => ['triggerid', 'description', 'flags'],
+			'output' => ['triggerid', 'description', 'templateid', 'flags'],
 			'triggerids' => $triggerids,
 			'preservekeys' => true
 		] + $permission_check);
@@ -830,6 +832,12 @@ class CTrigger extends CTriggerGeneral {
 		}
 
 		foreach ($triggers as $trigger) {
+			if ($trigger['templateid'] && !$inherited) {
+				self::exception(ZBX_API_ERROR_PERMISSIONS, _s('Cannot update dependencies of inherited trigger "%1$s".',
+					$trigger['description']
+				));
+			}
+
 			if ($trigger['flags'] == ZBX_FLAG_DISCOVERY_CREATED) {
 				self::exception(ZBX_API_ERROR_PERMISSIONS, _s('Cannot update "%2$s" for a discovered trigger "%1$s".',
 					$trigger['description'], 'dependencies'
@@ -893,9 +901,10 @@ class CTrigger extends CTriggerGeneral {
 
 		$parentTriggers = $this->get([
 			'output' => ['triggerid'],
+			'selectDependencies' => ['triggerid'],
 			'hostids' => $templateIds,
 			'preservekeys' => true,
-			'selectDependencies' => ['triggerid']
+			'nopermissions' => true
 		]);
 
 		if ($parentTriggers) {
@@ -927,10 +936,10 @@ class CTrigger extends CTriggerGeneral {
 						}
 					}
 				}
-				$this->deleteDependencies($childTriggers);
+				$this->deleteDependencies($childTriggers, true);
 
 				if ($newDependencies) {
-					$this->addDependencies($newDependencies);
+					$this->addDependencies($newDependencies, true);
 				}
 			}
 		}

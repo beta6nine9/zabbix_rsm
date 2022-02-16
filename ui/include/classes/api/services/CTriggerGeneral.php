@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -111,15 +111,22 @@ abstract class CTriggerGeneral extends CApiService {
 			$this->getHostTriggersByDescription($tpl_triggers_by_description)
 		);
 
-		$expression_data = new CTriggerExpression(['lldmacros' => $this instanceof CTriggerPrototype]);
-		$recovery_expression_data = new CTriggerExpression(['lldmacros' => $this instanceof CTriggerPrototype]);
+		$expression_parser = new CExpressionParser([
+			'usermacros' => true,
+			'lldmacros' => $this instanceof CTriggerPrototype
+		]);
+
+		$recovery_expression_parser = new CExpressionParser([
+			'usermacros' => true,
+			'lldmacros' => $this instanceof CTriggerPrototype
+		]);
 
 		// List of triggers to check for duplicates. Grouped by description.
 		$descriptions = [];
 		$triggerids = [];
 
 		$output = ['url', 'status', 'priority', 'comments', 'type', 'correlation_mode', 'correlation_tag',
-			'manual_close', 'opdata'
+			'manual_close', 'opdata', 'event_name'
 		];
 		if ($this instanceof CTriggerPrototype) {
 			$output[] = 'discover';
@@ -136,43 +143,56 @@ abstract class CTriggerGeneral extends CApiService {
 
 			$tpl_hostid = $tpl_hostids_by_triggerid[$tpl_trigger['triggerid']][0];
 
-			// expression: {template:item.func()} => {host:item.func()}
-			if (!$expression_data->parse($tpl_trigger['expression'])) {
-				self::exception(ZBX_API_ERROR_PARAMETERS, $expression_data->error);
+			// expression: func(/template/item) => func(/host/item)
+			if ($expression_parser->parse($tpl_trigger['expression']) != CParser::PARSE_SUCCESS) {
+				self::exception(ZBX_API_ERROR_PARAMETERS, _s('Incorrect value for field "%1$s": %2$s.',
+					'expression', $expression_parser->getError()
+				));
 			}
 
-			// recovery_expression: {template:item.func()} => {host:item.func()}
+			// recovery_expression: func(/template/item) => func(/host/item)
 			if ($tpl_trigger['recovery_mode'] == ZBX_RECOVERY_MODE_RECOVERY_EXPRESSION) {
-				if (!$recovery_expression_data->parse($tpl_trigger['recovery_expression'])) {
-					self::exception(ZBX_API_ERROR_PARAMETERS, $recovery_expression_data->error);
+				if ($recovery_expression_parser->parse($tpl_trigger['recovery_expression']) != CParser::PARSE_SUCCESS) {
+					self::exception(ZBX_API_ERROR_PARAMETERS, _s('Incorrect value for field "%1$s": %2$s.',
+						'recovery_expression', $recovery_expression_parser->getError()
+					));
 				}
 			}
 
 			$new_trigger = $tpl_trigger;
+			$new_trigger['uuid'] = '';
 			unset($new_trigger['triggerid'], $new_trigger['templateid']);
 
 			if (array_key_exists($tpl_hostid, $hosts_by_tpl_hostid)) {
 				foreach ($hosts_by_tpl_hostid[$tpl_hostid] as $host) {
 					$new_trigger['expression'] = $tpl_trigger['expression'];
-					$expr_part = end($expression_data->expressions);
+					$hist_functions = $expression_parser->getResult()->getTokensOfTypes(
+						[CExpressionParserResult::TOKEN_TYPE_HIST_FUNCTION]
+					);
+					$hist_function = end($hist_functions);
 					do {
+						$query_parameter = $hist_function['data']['parameters'][0];
 						$new_trigger['expression'] = substr_replace($new_trigger['expression'],
-							'{'.$host['host'].':'.$expr_part['item'].'.'.$expr_part['function'].'}',
-							$expr_part['pos'], strlen($expr_part['expression'])
+							'/'.$host['host'].'/'.$query_parameter['data']['item'], $query_parameter['pos'],
+							$query_parameter['length']
 						);
 					}
-					while ($expr_part = prev($expression_data->expressions));
+					while ($hist_function = prev($hist_functions));
 
 					if ($tpl_trigger['recovery_mode'] == ZBX_RECOVERY_MODE_RECOVERY_EXPRESSION) {
 						$new_trigger['recovery_expression'] = $tpl_trigger['recovery_expression'];
-						$expr_part = end($recovery_expression_data->expressions);
+						$hist_functions = $recovery_expression_parser->getResult()->getTokensOfTypes(
+							[CExpressionParserResult::TOKEN_TYPE_HIST_FUNCTION]
+						);
+						$hist_function = end($hist_functions);
 						do {
+							$query_parameter = $hist_function['data']['parameters'][0];
 							$new_trigger['recovery_expression'] = substr_replace($new_trigger['recovery_expression'],
-								'{'.$host['host'].':'.$expr_part['item'].'.'.$expr_part['function'].'}',
-								$expr_part['pos'], strlen($expr_part['expression'])
+								'/'.$host['host'].'/'.$query_parameter['data']['item'], $query_parameter['pos'],
+								$query_parameter['length']
 							);
 						}
-						while ($expr_part = prev($recovery_expression_data->expressions));
+						while ($hist_function = prev($hist_functions));
 					}
 
 					if (array_key_exists($host['hostid'], $chd_triggers_all)
@@ -199,7 +219,10 @@ abstract class CTriggerGeneral extends CApiService {
 						$descriptions[$new_trigger['description']][] = [
 							'expression' => $new_trigger['expression'],
 							'recovery_expression' => $new_trigger['recovery_expression'],
-							'hostid' => $host['hostid']
+							'host' => [
+								'hostid' => $host['hostid'],
+								'status' => $host['status']
+							]
 						];
 					}
 				}
@@ -276,7 +299,7 @@ abstract class CTriggerGeneral extends CApiService {
 	 */
 	private static function getLinkedHosts(array $tpl_hostids, array $hostids = null) {
 		// Fetch all child hosts and templates
-		$sql = 'SELECT ht.hostid,ht.templateid,h.host'.
+		$sql = 'SELECT ht.hostid,ht.templateid,h.host,h.status'.
 			' FROM hosts_templates ht,hosts h'.
 			' WHERE ht.hostid=h.hostid'.
 				' AND '.dbConditionInt('ht.templateid', $tpl_hostids).
@@ -291,7 +314,8 @@ abstract class CTriggerGeneral extends CApiService {
 		while ($row = DBfetch($result)) {
 			$hosts_by_tpl_hostid[$row['templateid']][] = [
 				'hostid' => $row['hostid'],
-				'host' => $row['host']
+				'host' => $row['host'],
+				'status' => $row['status']
 			];
 		}
 
@@ -317,7 +341,8 @@ abstract class CTriggerGeneral extends CApiService {
 	 */
 	private function getHostTriggersByTemplateId(array $tpl_triggerids, array $hostids = null) {
 		$output = 't.triggerid,t.expression,t.description,t.url,t.status,t.priority,t.comments,t.type,t.recovery_mode,'.
-			't.recovery_expression,t.correlation_mode,t.correlation_tag,t.manual_close,t.opdata,t.templateid,i.hostid';
+			't.recovery_expression,t.correlation_mode,t.correlation_tag,t.manual_close,t.opdata,t.templateid,'.
+			't.event_name,i.hostid';
 		if ($this instanceof CTriggerPrototype) {
 			$output .= ',t.discover';
 		}
@@ -368,11 +393,19 @@ abstract class CTriggerGeneral extends CApiService {
 	private function getHostTriggersByDescription(array $tpl_triggers_by_description) {
 		$chd_triggers_description = [];
 
-		$expression_data = new CTriggerExpression(['lldmacros' => $this instanceof CTriggerPrototype]);
-		$recovery_expression_data = new CTriggerExpression(['lldmacros' => $this instanceof CTriggerPrototype]);
+		$expression_parser = new CExpressionParser([
+			'usermacros' => true,
+			'lldmacros' => $this instanceof CTriggerPrototype
+		]);
+
+		$recovery_expression_parser = new CExpressionParser([
+			'usermacros' => true,
+			'lldmacros' => $this instanceof CTriggerPrototype
+		]);
 
 		$output = 't.triggerid,t.expression,t.description,t.url,t.status,t.priority,t.comments,t.type,t.recovery_mode,'.
-			't.recovery_expression,t.correlation_mode,t.correlation_tag,t.manual_close,t.opdata,i.hostid,h.host';
+			't.recovery_expression,t.correlation_mode,t.correlation_tag,t.manual_close,t.opdata,t.event_name,i.hostid,'.
+			'h.host';
 		if ($this instanceof CTriggerPrototype) {
 			$output .= ',t.discover';
 		}
@@ -399,15 +432,20 @@ abstract class CTriggerGeneral extends CApiService {
 			);
 
 			foreach ($tpl_triggers as $tpl_trigger) {
-				// expression: {template:item.func()} => {host:item.func()}
-				if (!$expression_data->parse($tpl_trigger['expression'])) {
-					self::exception(ZBX_API_ERROR_PARAMETERS, $expression_data->error);
+				// expression: func(/template/item) => func(/host/item)
+				if ($expression_parser->parse($tpl_trigger['expression']) != CParser::PARSE_SUCCESS) {
+					self::exception(ZBX_API_ERROR_PARAMETERS, _s('Incorrect value for field "%1$s": %2$s.',
+						'expression', $expression_parser->getError()
+					));
 				}
 
-				// recovery_expression: {template:item.func()} => {host:item.func()}
+				// recovery_expression: func(/template/item) => func(/host/item)
 				if ($tpl_trigger['recovery_mode'] == ZBX_RECOVERY_MODE_RECOVERY_EXPRESSION) {
-					if (!$recovery_expression_data->parse($tpl_trigger['recovery_expression'])) {
-						self::exception(ZBX_API_ERROR_PARAMETERS, $recovery_expression_data->error);
+					if ($recovery_expression_parser->parse($tpl_trigger['recovery_expression']) !=
+							CParser::PARSE_SUCCESS) {
+						self::exception(ZBX_API_ERROR_PARAMETERS, _s('Incorrect value for field "%1$s": %2$s.',
+							'recovery_expression', $recovery_expression_parser->getError()
+						));
 					}
 				}
 
@@ -420,15 +458,20 @@ abstract class CTriggerGeneral extends CApiService {
 						continue;
 					}
 
+					// Replace template name in /host/key reference to target host name.
 					$expression = $tpl_trigger['expression'];
-					$expr_part = end($expression_data->expressions);
+					$hist_functions = $expression_parser->getResult()->getTokensOfTypes(
+						[CExpressionParserResult::TOKEN_TYPE_HIST_FUNCTION]
+					);
+					$hist_function = end($hist_functions);
 					do {
+						$query_parameter = $hist_function['data']['parameters'][0];
 						$expression = substr_replace($expression,
-							'{'.$chd_trigger['host'].':'.$expr_part['item'].'.'.$expr_part['function'].'}',
-							$expr_part['pos'], strlen($expr_part['expression'])
+							'/'.$chd_trigger['host'].'/'.$query_parameter['data']['item'], $query_parameter['pos'],
+							$query_parameter['length']
 						);
 					}
-					while ($expr_part = prev($expression_data->expressions));
+					while ($hist_function = prev($hist_functions));
 
 					if ($chd_trigger['expression'] !== $expression) {
 						continue;
@@ -436,14 +479,18 @@ abstract class CTriggerGeneral extends CApiService {
 
 					if ($tpl_trigger['recovery_mode'] == ZBX_RECOVERY_MODE_RECOVERY_EXPRESSION) {
 						$recovery_expression = $tpl_trigger['recovery_expression'];
-						$expr_part = end($recovery_expression_data->expressions);
+						$hist_functions = $recovery_expression_parser->getResult()->getTokensOfTypes(
+							[CExpressionParserResult::TOKEN_TYPE_HIST_FUNCTION]
+						);
+						$hist_function = end($hist_functions);
 						do {
+							$query_parameter = $hist_function['data']['parameters'][0];
 							$recovery_expression = substr_replace($recovery_expression,
-								'{'.$chd_trigger['host'].':'.$expr_part['item'].'.'.$expr_part['function'].'}',
-								$expr_part['pos'], strlen($expr_part['expression'])
+								'/'.$chd_trigger['host'].'/'.$query_parameter['data']['item'], $query_parameter['pos'],
+								$query_parameter['length']
 							);
 						}
-						while ($expr_part = prev($recovery_expression_data->expressions));
+						while ($hist_function = prev($hist_functions));
 
 						if ($chd_trigger['recovery_expression'] !== $recovery_expression) {
 							continue;
@@ -500,19 +547,22 @@ abstract class CTriggerGeneral extends CApiService {
 	 * @return array
 	 */
 	protected function populateHostIds($descriptions) {
-		$expression_data = new CTriggerExpression(['lldmacros' => $this instanceof CTriggerPrototype]);
+		$expression_parser = new CExpressionParser([
+			'usermacros' => true,
+			'lldmacros' => $this instanceof CTriggerPrototype
+		]);
 
 		$hosts = [];
 
 		foreach ($descriptions as $description => $triggers) {
 			foreach ($triggers as $index => $trigger) {
-				$expression_data->parse($trigger['expression']);
-				$hosts[$expression_data->getHosts()[0]][$description][] = $index;
+				$expression_parser->parse($trigger['expression']);
+				$hosts[$expression_parser->getResult()->getHosts()[0]][$description][] = $index;
 			}
 		}
 
 		$db_hosts = DBselect(
-			'SELECT h.hostid,h.host'.
+			'SELECT h.hostid,h.host,h.status'.
 			' FROM hosts h'.
 			' WHERE '.dbConditionString('h.host', array_keys($hosts)).
 				' AND '.dbConditionInt('h.status',
@@ -523,7 +573,10 @@ abstract class CTriggerGeneral extends CApiService {
 		while ($db_host = DBfetch($db_hosts)) {
 			foreach ($hosts[$db_host['host']] as $description => $indexes) {
 				foreach ($indexes as $index) {
-					$descriptions[$description][$index]['hostid'] = $db_host['hostid'];
+					$descriptions[$description][$index]['host'] = [
+						'hostid' => $db_host['hostid'],
+						'status' => $db_host['status']
+					];
 				}
 			}
 			unset($hosts[$db_host['host']]);
@@ -555,8 +608,8 @@ abstract class CTriggerGeneral extends CApiService {
 			$expressions = [];
 
 			foreach ($triggers as $trigger) {
-				$hostids[$trigger['hostid']] = true;
-				$expressions[$trigger['expression']][$trigger['recovery_expression']] = $trigger['hostid'];
+				$hostids[$trigger['host']['hostid']] = true;
+				$expressions[$trigger['expression']][$trigger['recovery_expression']] = $trigger['host']['hostid'];
 			}
 
 			$db_triggers = DBfetchArray(DBselect(
@@ -593,6 +646,44 @@ abstract class CTriggerGeneral extends CApiService {
 					);
 				}
 			}
+		}
+	}
+
+	/**
+	 * Check that only triggers on templates have UUID. Add UUID to all triggers on templates, if it does not exists.
+	 *
+	 * @param array $triggers_to_create
+	 * @param array $descriptions
+	 *
+	 * @throws APIException
+	 */
+	protected function checkAndAddUuid(array &$triggers_to_create, array $descriptions): void {
+		foreach ($descriptions as $triggers) {
+			foreach ($triggers as $trigger) {
+				if ($trigger['host']['status'] != HOST_STATUS_TEMPLATE && $trigger['uuid'] !== null) {
+					self::exception(ZBX_API_ERROR_PARAMETERS,
+						_s('Invalid parameter "%1$s": %2$s.', '/'.($trigger['index'] + 1),
+							_s('unexpected parameter "%1$s"', 'uuid')
+						)
+					);
+				}
+
+				if ($trigger['host']['status'] == HOST_STATUS_TEMPLATE && $trigger['uuid'] === null) {
+					$triggers_to_create[$trigger['index']]['uuid'] = generateUuidV4();
+				}
+			}
+		}
+
+		$db_uuid = DB::select('triggers', [
+			'output' => ['uuid'],
+			'filter' => ['uuid' => array_column($triggers_to_create, 'uuid')],
+			'limit' => 1
+		]);
+
+		if ($db_uuid) {
+			self::exception(ZBX_API_ERROR_PARAMETERS,
+				_s('Entry with UUID "%1$s" already exists.', $db_uuid[0]['uuid'])
+			);
 		}
 	}
 
@@ -751,6 +842,7 @@ abstract class CTriggerGeneral extends CApiService {
 	 * @param array  $triggers[]['description']                  [IN]
 	 * @param string $triggers[]['expression']                   [IN]
 	 * @param string $triggers[]['opdata']                       [IN]
+	 * @param string $triggers[]['event_name']                   [IN]
 	 * @param string $triggers[]['comments']                     [IN] (optional)
 	 * @param int    $triggers[]['priority']                     [IN] (optional)
 	 * @param int    $triggers[]['status']                       [IN] (optional)
@@ -771,9 +863,11 @@ abstract class CTriggerGeneral extends CApiService {
 	 * @throws APIException if validation failed.
 	 */
 	protected function validateCreate(array &$triggers) {
-		$api_input_rules = ['type' => API_OBJECTS, 'flags' => API_NOT_EMPTY | API_NORMALIZE, 'uniq' => [['description', 'expression']], 'fields' => [
+		$api_input_rules = ['type' => API_OBJECTS, 'flags' => API_NOT_EMPTY | API_NORMALIZE, 'uniq' => [['uuid'], ['description', 'expression']], 'fields' => [
+			'uuid' =>					['type' => API_UUID],
 			'description' =>			['type' => API_STRING_UTF8, 'flags' => API_REQUIRED | API_NOT_EMPTY, 'length' => DB::getFieldLength('triggers', 'description')],
 			'expression' =>				['type' => API_TRIGGER_EXPRESSION, 'flags' => API_REQUIRED | API_NOT_EMPTY | API_ALLOW_LLD_MACRO],
+			'event_name' =>				['type' => API_EVENT_NAME, 'length' => DB::getFieldLength('triggers', 'event_name')],
 			'opdata' =>					['type' => API_STRING_UTF8, 'length' => DB::getFieldLength('triggers', 'opdata')],
 			'comments' =>				['type' => API_STRING_UTF8, 'length' => DB::getFieldLength('triggers', 'comments')],
 			'priority' =>				['type' => API_INT32, 'in' => implode(',', range(TRIGGER_SEVERITY_NOT_CLASSIFIED, TRIGGER_SEVERITY_COUNT - 1))],
@@ -805,16 +899,20 @@ abstract class CTriggerGeneral extends CApiService {
 		}
 
 		$descriptions = [];
-		foreach ($triggers as $trigger) {
+		foreach ($triggers as $index => $trigger) {
 			self::checkTriggerRecoveryMode($trigger);
 			self::checkTriggerCorrelationMode($trigger);
 
 			$descriptions[$trigger['description']][] = [
+				'index' => $index,
+				'uuid' => array_key_exists('uuid', $trigger) ? $trigger['uuid'] : null,
 				'expression' => $trigger['expression'],
 				'recovery_expression' => $trigger['recovery_expression']
 			];
 		}
+
 		$descriptions = $this->populateHostIds($descriptions);
+		$this->checkAndAddUuid($triggers, $descriptions);
 		$this->checkDuplicates($descriptions);
 	}
 
@@ -825,6 +923,7 @@ abstract class CTriggerGeneral extends CApiService {
 	 * @param array  $triggers[]['triggerid']                    [IN]
 	 * @param array  $triggers[]['description']                  [IN/OUT] (optional)
 	 * @param string $triggers[]['expression']                   [IN/OUT] (optional)
+	 * @param string $triggers[]['event_name']                   [IN] (optional)
 	 * @param string $triggers[]['opdata']                       [IN] (optional)
 	 * @param string $triggers[]['comments']                     [IN] (optional)
 	 * @param int    $triggers[]['priority']                     [IN] (optional)
@@ -846,6 +945,7 @@ abstract class CTriggerGeneral extends CApiService {
 	 * @param array  $db_triggers[<tnum>]['triggerid']           [OUT]
 	 * @param array  $db_triggers[<tnum>]['description']         [OUT]
 	 * @param string $db_triggers[<tnum>]['expression']          [OUT]
+	 * @param string $db_triggers[<tnum>]['event_name']          [OUT]
 	 * @param string $db_triggers[<tnum>]['opdata']              [OUT]
 	 * @param int    $db_triggers[<tnum>]['recovery_mode']       [OUT]
 	 * @param string $db_triggers[<tnum>]['recovery_expression'] [OUT]
@@ -869,6 +969,7 @@ abstract class CTriggerGeneral extends CApiService {
 			'triggerid' =>				['type' => API_ID, 'flags' => API_REQUIRED],
 			'description' =>			['type' => API_STRING_UTF8, 'flags' => API_NOT_EMPTY, 'length' => DB::getFieldLength('triggers', 'description')],
 			'expression' =>				['type' => API_TRIGGER_EXPRESSION, 'flags' => API_NOT_EMPTY | API_ALLOW_LLD_MACRO],
+			'event_name' =>				['type' => API_EVENT_NAME, 'length' => DB::getFieldLength('triggers', 'event_name')],
 			'opdata' =>					['type' => API_STRING_UTF8, 'length' => DB::getFieldLength('triggers', 'opdata')],
 			'comments' =>				['type' => API_STRING_UTF8, 'length' => DB::getFieldLength('triggers', 'comments')],
 			'priority' =>				['type' => API_INT32, 'in' => implode(',', range(TRIGGER_SEVERITY_NOT_CLASSIFIED, TRIGGER_SEVERITY_COUNT - 1))],
@@ -902,7 +1003,7 @@ abstract class CTriggerGeneral extends CApiService {
 		$options = [
 			'output' => ['triggerid', 'description', 'expression', 'url', 'status', 'priority', 'comments', 'type',
 				'templateid', 'recovery_mode', 'recovery_expression', 'correlation_mode', 'correlation_tag',
-				'manual_close', 'opdata'
+				'manual_close', 'opdata', 'event_name'
 			],
 			'selectDependencies' => ['triggerid'],
 			'triggerids' => zbx_objectValues($triggers, 'triggerid'),
@@ -1046,21 +1147,6 @@ abstract class CTriggerGeneral extends CApiService {
 	 * @throws APIException
 	 */
 	protected function createReal(array &$triggers, $inherited = false) {
-		$class = get_class($this);
-
-		switch ($class) {
-			case 'CTrigger':
-				$resource = AUDIT_RESOURCE_TRIGGER;
-				break;
-
-			case 'CTriggerPrototype':
-				$resource = AUDIT_RESOURCE_TRIGGER_PROTOTYPE;
-				break;
-
-			default:
-				self::exception(ZBX_API_ERROR_INTERNAL, _('Internal error.'));
-		}
-
 		$new_triggers = $triggers;
 		$new_functions = [];
 		$triggers_functions = [];
@@ -1078,7 +1164,7 @@ abstract class CTriggerGeneral extends CApiService {
 				$new_functions[] = $trigger_function;
 			}
 
-			if ($class === 'CTriggerPrototype') {
+			if ($this instanceof CTriggerPrototype) {
 				$new_trigger['flags'] = ZBX_FLAG_DISCOVERY_PROTOTYPE;
 			}
 
@@ -1101,7 +1187,8 @@ abstract class CTriggerGeneral extends CApiService {
 		}
 
 		if (!$inherited) {
-			$this->addAuditBulk(AUDIT_ACTION_ADD, $resource, $triggers);
+			$resource = ($this instanceof CTrigger) ? CAudit::RESOURCE_TRIGGER : CAudit::RESOURCE_TRIGGER_PROTOTYPE;
+			$this->addAuditBulk(CAudit::ACTION_ADD, $resource, $triggers);
 		}
 	}
 
@@ -1151,21 +1238,6 @@ abstract class CTriggerGeneral extends CApiService {
 	 * @throws APIException
 	 */
 	protected function updateReal(array $triggers, array $db_triggers, $inherited = false) {
-		$class = get_class($this);
-
-		switch ($class) {
-			case 'CTrigger':
-				$resource = AUDIT_RESOURCE_TRIGGER;
-				break;
-
-			case 'CTriggerPrototype':
-				$resource = AUDIT_RESOURCE_TRIGGER_PROTOTYPE;
-				break;
-
-			default:
-				self::exception(ZBX_API_ERROR_INTERNAL, _('Internal error.'));
-		}
-
 		$upd_triggers = [];
 		$new_functions = [];
 		$del_functions_triggerids = [];
@@ -1174,11 +1246,6 @@ abstract class CTriggerGeneral extends CApiService {
 		$del_triggertagids = [];
 		$save_triggers = $triggers;
 		$this->implode_expressions($triggers, $db_triggers, $triggers_functions, $inherited);
-
-		if ($class === 'CTrigger') {
-			// The list of the triggers with changed priority.
-			$changed_priority_triggerids = [];
-		}
 
 		foreach ($triggers as $tnum => $trigger) {
 			$db_trigger = $db_triggers[$tnum];
@@ -1196,8 +1263,14 @@ abstract class CTriggerGeneral extends CApiService {
 				$upd_trigger['values']['recovery_expression'] = $trigger['recovery_expression'];
 			}
 
+			if (array_key_exists('uuid', $trigger)) {
+				$upd_trigger['values']['uuid'] = $trigger['uuid'];
+			}
 			if ($trigger['description'] !== $db_trigger['description']) {
 				$upd_trigger['values']['description'] = $trigger['description'];
+			}
+			if (array_key_exists('event_name', $trigger) && $trigger['event_name'] !== $db_trigger['event_name']) {
+				$upd_trigger['values']['event_name'] = $trigger['event_name'];
 			}
 			if (array_key_exists('opdata', $trigger) && $trigger['opdata'] !== $db_trigger['opdata']) {
 				$upd_trigger['values']['opdata'] = $trigger['opdata'];
@@ -1211,16 +1284,12 @@ abstract class CTriggerGeneral extends CApiService {
 			if (array_key_exists('status', $trigger) && $trigger['status'] != $db_trigger['status']) {
 				$upd_trigger['values']['status'] = $trigger['status'];
 			}
-			if ($class === 'CTriggerPrototype'
+			if ($this instanceof CTriggerPrototype
 					&& array_key_exists('discover', $trigger) && $trigger['discover'] != $db_trigger['discover']) {
 				$upd_trigger['values']['discover'] = $trigger['discover'];
 			}
 			if (array_key_exists('priority', $trigger) && $trigger['priority'] != $db_trigger['priority']) {
 				$upd_trigger['values']['priority'] = $trigger['priority'];
-
-				if ($class === 'CTrigger') {
-					$changed_priority_triggerids[] = $trigger['triggerid'];
-				}
 			}
 			if (array_key_exists('comments', $trigger) && $trigger['comments'] !== $db_trigger['comments']) {
 				$upd_trigger['values']['comments'] = $trigger['comments'];
@@ -1290,13 +1359,9 @@ abstract class CTriggerGeneral extends CApiService {
 			DB::insert('trigger_tag', $new_tags);
 		}
 
-		if ($class === 'CTrigger' && $changed_priority_triggerids
-				&& CTriggerManager::usedInItServices($changed_priority_triggerids)) {
-			updateItServices();
-		}
-
 		if (!$inherited) {
-			$this->addAuditBulk(AUDIT_ACTION_UPDATE, $resource, $save_triggers, zbx_toHash($db_triggers, 'triggerid'));
+			$resource = ($this instanceof CTrigger) ? CAudit::RESOURCE_TRIGGER : CAudit::RESOURCE_TRIGGER_PROTOTYPE;
+			$this->addAuditBulk(CAudit::ACTION_UPDATE, $resource, $save_triggers, zbx_toHash($db_triggers, 'triggerid'));
 		}
 	}
 
@@ -1304,8 +1369,7 @@ abstract class CTriggerGeneral extends CApiService {
 	 * Implodes expression and recovery_expression for each trigger. Also returns array of functions and
 	 * array of hostnames for each trigger.
 	 *
-	 * For example: {localhost:system.cpu.load.last(0)}>10 will be translated to {12}>10 and
-	 *              created database representation.
+	 * For example: last(/host/system.cpu.load)>10 will be translated to {12}>10 and created database representation.
 	 *
 	 * Note: All expressions must be already validated and exploded.
 	 *
@@ -1337,22 +1401,22 @@ abstract class CTriggerGeneral extends CApiService {
 
 		switch ($class) {
 			case 'CTrigger':
-				$expressionData = new CTriggerExpression(['lldmacros' => false]);
+				$expression_parser = new CExpressionParser(['usermacros' => true]);
 				$error_wrong_host = _('Incorrect trigger expression. Host "%1$s" does not exist or you have no access to this host.');
 				$error_host_and_template = _('Incorrect trigger expression. Trigger expression elements should not belong to a template and a host simultaneously.');
-				$triggerFunctionValidator = new CFunctionValidator(['lldmacros' => false]);
 				break;
 
 			case 'CTriggerPrototype':
-				$expressionData = new CTriggerExpression();
+				$expression_parser = new CExpressionParser(['usermacros' => true, 'lldmacros' => true]);
 				$error_wrong_host = _('Incorrect trigger prototype expression. Host "%1$s" does not exist or you have no access to this host.');
 				$error_host_and_template = _('Incorrect trigger prototype expression. Trigger prototype expression elements should not belong to a template and a host simultaneously.');
-				$triggerFunctionValidator = new CFunctionValidator();
 				break;
 
 			default:
 				self::exception(ZBX_API_ERROR_INTERNAL, _('Internal error.'));
 		}
+
+		$hist_function_value_types = (new CHistFunctionData())->getValueTypes();
 
 		/*
 		 * [
@@ -1378,33 +1442,40 @@ abstract class CTriggerGeneral extends CApiService {
 		foreach ($triggers as $tnum => $trigger) {
 			$expressions_changed = ($db_triggers === null
 				|| ($trigger['expression'] !== $db_triggers[$tnum]['expression']
-					|| $trigger['recovery_expression'] !== $db_triggers[$tnum]['recovery_expression']));
+				|| $trigger['recovery_expression'] !== $db_triggers[$tnum]['recovery_expression']));
 
 			if (!$expressions_changed) {
 				continue;
 			}
 
-			$expressionData->parse($trigger['expression']);
-			$expressions = $expressionData->expressions;
+			$expression_parser->parse($trigger['expression']);
+			$hist_functions = $expression_parser->getResult()->getTokensOfTypes(
+				[CExpressionParserResult::TOKEN_TYPE_HIST_FUNCTION]
+			);
 
 			if ($trigger['recovery_mode'] == ZBX_RECOVERY_MODE_RECOVERY_EXPRESSION) {
-				$expressionData->parse($trigger['recovery_expression']);
-				$expressions = array_merge($expressions, $expressionData->expressions);
+				$expression_parser->parse($trigger['recovery_expression']);
+				$hist_functions = array_merge($hist_functions, $expression_parser->getResult()->getTokensOfTypes(
+					[CExpressionParserResult::TOKEN_TYPE_HIST_FUNCTION]
+				));
 			}
 
-			foreach ($expressions as $exprPart) {
-				if (!array_key_exists($exprPart['host'], $hosts_keys)) {
-					$hosts_keys[$exprPart['host']] = [
+			foreach ($hist_functions as $hist_function) {
+				$host = $hist_function['data']['parameters'][0]['data']['host'];
+				$item = $hist_function['data']['parameters'][0]['data']['item'];
+
+				if (!array_key_exists($host, $hosts_keys)) {
+					$hosts_keys[$host] = [
 						'hostid' => null,
-						'host' => $exprPart['host'],
+						'host' => $host,
 						'status' => null,
 						'keys' => []
 					];
 				}
 
-				$hosts_keys[$exprPart['host']]['keys'][$exprPart['item']] = [
+				$hosts_keys[$host]['keys'][$item] = [
 					'itemid' => null,
-					'key' => $exprPart['item'],
+					'key' => $item,
 					'value_type' => null,
 					'flags' => null
 				];
@@ -1506,21 +1577,28 @@ abstract class CTriggerGeneral extends CApiService {
 		}
 
 		foreach ($triggers as $tnum => &$trigger) {
-			$expressions_changed = $db_triggers === null
+			$expressions_changed = ($db_triggers === null
 				|| ($trigger['expression'] !== $db_triggers[$tnum]['expression']
-				|| $trigger['recovery_expression'] !== $db_triggers[$tnum]['recovery_expression']);
+				|| $trigger['recovery_expression'] !== $db_triggers[$tnum]['recovery_expression']));
 
 			if (!$expressions_changed) {
 				continue;
 			}
 
-			$expressionData->parse($trigger['expression']);
-			$expressions1 = $expressionData->expressions;
-			$expressions2 = [];
+			$expression_parser->parse($trigger['expression']);
+
+			$hist_functions1 = $expression_parser->getResult()->getTokensOfTypes(
+				[CExpressionParserResult::TOKEN_TYPE_HIST_FUNCTION]
+			);
+
+			$hist_functions2 = [];
 
 			if ($trigger['recovery_mode'] == ZBX_RECOVERY_MODE_RECOVERY_EXPRESSION) {
-				$expressionData->parse($trigger['recovery_expression']);
-				$expressions2 = $expressionData->expressions;
+				$expression_parser->parse($trigger['recovery_expression']);
+
+				$hist_functions2 = $expression_parser->getResult()->getTokensOfTypes(
+					[CExpressionParserResult::TOKEN_TYPE_HIST_FUNCTION]
+				);
 			}
 
 			$triggers_functions[$tnum] = [];
@@ -1538,9 +1616,12 @@ abstract class CTriggerGeneral extends CApiService {
 			$hosts = [];
 
 			// Common checks.
-			foreach (array_merge($expressions1, $expressions2) as $exprPart) {
-				$host_keys = $hosts_keys[$exprPart['host']];
-				$key = $host_keys['keys'][$exprPart['item']];
+			foreach (array_merge($hist_functions1, $hist_functions2) as $hist_function) {
+				$host = $hist_function['data']['parameters'][0]['data']['host'];
+				$item = $hist_function['data']['parameters'][0]['data']['item'];
+
+				$host_keys = $hosts_keys[$host];
+				$key = $host_keys['keys'][$item];
 
 				if ($host_keys['hostid'] === null) {
 					self::exception(ZBX_API_ERROR_PARAMETERS, _params($error_wrong_host, [$host_keys['host']]));
@@ -1553,21 +1634,24 @@ abstract class CTriggerGeneral extends CApiService {
 					));
 				}
 
-				if (!$triggerFunctionValidator->validate([
-						'function' => $exprPart['function'],
-						'functionName' => $exprPart['functionName'],
-						'functionParamList' => $exprPart['functionParamList'],
-						'valueType' => $key['value_type']])) {
-					self::exception(ZBX_API_ERROR_PARAMETERS, $triggerFunctionValidator->getError());
+				if (!in_array($key['value_type'], $hist_function_value_types[$hist_function['data']['function']])) {
+					self::exception(ZBX_API_ERROR_PARAMETERS, _s(
+						'Incorrect item value type "%1$s" provided for trigger function "%2$s".',
+						itemValueTypeString($key['value_type']), $hist_function['data']['function']
+					));
 				}
 
-				if (!array_key_exists($exprPart['expression'], $triggers_functions[$tnum])) {
-					$triggers_functions[$tnum][$exprPart['expression']] = [
+				if (!array_key_exists($hist_function['match'], $triggers_functions[$tnum])) {
+					$query_parameter = $hist_function['data']['parameters'][0];
+					$parameter = substr_replace($hist_function['match'], TRIGGER_QUERY_PLACEHOLDER,
+						$query_parameter['pos'] - $hist_function['pos'], $query_parameter['length']
+					);
+					$triggers_functions[$tnum][$hist_function['match']] = [
 						'functionid' => null,
 						'triggerid' => null,
 						'itemid' => $key['itemid'],
-						'name' => $exprPart['functionName'],
-						'parameter' => $exprPart['functionParam']
+						'name' => $hist_function['data']['function'],
+						'parameter' => substr($parameter, strlen($hist_function['data']['function']) + 1, -1)
 					];
 					$functions_num++;
 				}
@@ -1578,7 +1662,7 @@ abstract class CTriggerGeneral extends CApiService {
 
 				$status_mask |= ($host_keys['status'] == HOST_STATUS_TEMPLATE ? 0x01 : 0x02);
 				$hostids[$host_keys['hostid']] = true;
-				$hosts[$exprPart['host']] = true;
+				$hosts[$host] = true;
 			}
 
 			// When both templates and hosts are referenced in expressions.
@@ -1588,13 +1672,13 @@ abstract class CTriggerGeneral extends CApiService {
 
 			// Triggers with children cannot be moved from one template to another host or template.
 			if ($class === 'CTrigger' && $db_triggers !== null && $expressions_changed) {
-				$expressionData->parse($db_triggers[$tnum]['expression']);
-				$old_hosts1 = $expressionData->getHosts();
+				$expression_parser->parse($db_triggers[$tnum]['expression']);
+				$old_hosts1 = $expression_parser->getResult()->getHosts();
 				$old_hosts2 = [];
 
 				if ($trigger['recovery_mode'] == ZBX_RECOVERY_MODE_RECOVERY_EXPRESSION) {
-					$expressionData->parse($db_triggers[$tnum]['recovery_expression']);
-					$old_hosts2 = $expressionData->getHosts();
+					$expression_parser->parse($db_triggers[$tnum]['recovery_expression']);
+					$old_hosts2 = $expression_parser->getResult()->getHosts();
 				}
 
 				$is_moved = true;
@@ -1655,11 +1739,11 @@ abstract class CTriggerGeneral extends CApiService {
 		$expression_max_length = DB::getFieldLength('triggers', 'expression');
 		$recovery_expression_max_length = DB::getFieldLength('triggers', 'recovery_expression');
 
-		// Replace {host:item.func()} macros with {<functionid>}.
+		// Replace func(/host/item) macros with {<functionid>}.
 		foreach ($triggers as $tnum => &$trigger) {
-			$expressions_changed = $db_triggers === null
+			$expressions_changed = ($db_triggers === null
 				|| ($trigger['expression'] !== $db_triggers[$tnum]['expression']
-				|| $trigger['recovery_expression'] !== $db_triggers[$tnum]['recovery_expression']);
+				|| $trigger['recovery_expression'] !== $db_triggers[$tnum]['recovery_expression']));
 
 			if (!$expressions_changed) {
 				continue;
@@ -1669,17 +1753,20 @@ abstract class CTriggerGeneral extends CApiService {
 				$trigger_function['functionid'] = $functionid;
 				$functionid = bcadd($functionid, 1, 0);
 			}
-			unset($function);
+			unset($trigger_function);
 
-			$expressionData->parse($trigger['expression']);
-			$exprPart = end($expressionData->expressions);
+			$expression_parser->parse($trigger['expression']);
+			$hist_functions = $expression_parser->getResult()->getTokensOfTypes(
+				[CExpressionParserResult::TOKEN_TYPE_HIST_FUNCTION]
+			);
+			$hist_function = end($hist_functions);
 			do {
 				$trigger['expression'] = substr_replace($trigger['expression'],
-					'{'.$triggers_functions[$tnum][$exprPart['expression']]['functionid'].'}',
-					$exprPart['pos'], strlen($exprPart['expression'])
+					'{'.$triggers_functions[$tnum][$hist_function['match']]['functionid'].'}',
+					$hist_function['pos'], $hist_function['length']
 				);
 			}
-			while ($exprPart = prev($expressionData->expressions));
+			while ($hist_function = prev($hist_functions));
 
 			if (mb_strlen($trigger['expression']) > $expression_max_length) {
 				self::exception(ZBX_API_ERROR_PARAMETERS, _s(
@@ -1688,15 +1775,18 @@ abstract class CTriggerGeneral extends CApiService {
 			}
 
 			if ($trigger['recovery_mode'] == ZBX_RECOVERY_MODE_RECOVERY_EXPRESSION) {
-				$expressionData->parse($trigger['recovery_expression']);
-				$exprPart = end($expressionData->expressions);
+				$expression_parser->parse($trigger['recovery_expression']);
+				$hist_functions = $expression_parser->getResult()->getTokensOfTypes(
+					[CExpressionParserResult::TOKEN_TYPE_HIST_FUNCTION]
+				);
+				$hist_function = end($hist_functions);
 				do {
 					$trigger['recovery_expression'] = substr_replace($trigger['recovery_expression'],
-						'{'.$triggers_functions[$tnum][$exprPart['expression']]['functionid'].'}',
-						$exprPart['pos'], strlen($exprPart['expression'])
+						'{'.$triggers_functions[$tnum][$hist_function['match']]['functionid'].'}',
+						$hist_function['pos'], $hist_function['length']
 					);
 				}
-				while ($exprPart = prev($expressionData->expressions));
+				while ($hist_function = prev($hist_functions));
 
 				if (mb_strlen($trigger['recovery_expression']) > $recovery_expression_max_length) {
 					self::exception(ZBX_API_ERROR_PARAMETERS, _s('Invalid parameter "%1$s": %2$s.',
@@ -1810,7 +1900,8 @@ abstract class CTriggerGeneral extends CApiService {
 		$data['hostids'] = zbx_toArray($data['hostids']);
 
 		$output = ['triggerid', 'description', 'expression', 'recovery_mode', 'recovery_expression', 'url', 'status',
-			'priority', 'comments', 'type', 'correlation_mode', 'correlation_tag', 'manual_close', 'opdata'
+			'priority', 'comments', 'type', 'correlation_mode', 'correlation_tag', 'manual_close', 'opdata',
+			'event_name'
 		];
 		if ($this instanceof CTriggerPrototype) {
 			$output[] = 'discover';
@@ -1820,7 +1911,8 @@ abstract class CTriggerGeneral extends CApiService {
 			'output' => $output,
 			'selectTags' => ['tag', 'value'],
 			'hostids' => $data['templateids'],
-			'preservekeys' => true
+			'preservekeys' => true,
+			'nopermissions' => true
 		]);
 
 		$triggers = CMacrosResolverHelper::resolveTriggerExpressions($triggers,

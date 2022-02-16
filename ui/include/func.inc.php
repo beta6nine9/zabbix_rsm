@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -94,25 +94,6 @@ function countRequest($str = null) {
 	}
 }
 
-/************ COOKIES ************/
-function get_cookie($name, $default_value = null) {
-	if (isset($_COOKIE[$name])) {
-		return $_COOKIE[$name];
-	}
-
-	return $default_value;
-}
-
-function zbx_setcookie($name, $value, $time = null) {
-	setcookie($name, $value, isset($time) ? $time : 0, CSession::getDefaultCookiePath(), null, HTTPS, true);
-	$_COOKIE[$name] = $value;
-}
-
-function zbx_unsetcookie($name) {
-	zbx_setcookie($name, null, -99999);
-	unset($_COOKIE[$name]);
-}
-
 /************* DATE *************/
 function getMonthCaption($num) {
 	switch ($num) {
@@ -193,24 +174,40 @@ function dowHrMinToSec($dow, $hr, $min) {
 	return $dow * SEC_PER_DAY + $hr * SEC_PER_HOUR + $min * SEC_PER_MIN;
 }
 
-// Convert timestamp to string representation. Return 'Never' if 0.
-function zbx_date2str($format, $value = null) {
+/**
+ * Convert time to a string representation. Return 'Never' if timestamp is 0.
+ *
+ * @param             $format
+ * @param null        $time
+ * @param string|null $timezone
+ *
+ * @throws Exception
+ *
+ * @return string
+ */
+function zbx_date2str($format, $time = null, string $timezone = null) {
 	static $weekdaynames, $weekdaynameslong, $months, $monthslong;
 
-	$prefix = '';
+	if ($time === null) {
+		$time = time();
+	}
 
-	if ($value === null) {
-		$value = time();
-	}
-	elseif ($value > ZBX_MAX_DATE) {
-		$prefix = '> ';
-		$value = ZBX_MAX_DATE;
-	}
-	elseif (!$value) {
+	if ($time == 0) {
 		return _('Never');
 	}
 
-	if (!is_array($weekdaynames)) {
+	if ($time > ZBX_MAX_DATE) {
+		$prefix = '> ';
+		$datetime = new DateTime('@'.ZBX_MAX_DATE);
+	}
+	else {
+		$prefix = '';
+		$datetime = new DateTime('@'.$time);
+	}
+
+	$datetime->setTimezone(new DateTimeZone($timezone ?? date_default_timezone_get()));
+
+	if ($weekdaynames === null) {
 		$weekdaynames = [
 			0 => _('Sun'),
 			1 => _('Mon'),
@@ -222,7 +219,7 @@ function zbx_date2str($format, $value = null) {
 		];
 	}
 
-	if (!is_array($weekdaynameslong)) {
+	if ($weekdaynameslong === null) {
 		$weekdaynameslong = [
 			0 => _('Sunday'),
 			1 => _('Monday'),
@@ -234,7 +231,7 @@ function zbx_date2str($format, $value = null) {
 		];
 	}
 
-	if (!is_array($months)) {
+	if ($months === null) {
 		$months = [
 			1 => _('Jan'),
 			2 => _('Feb'),
@@ -251,7 +248,7 @@ function zbx_date2str($format, $value = null) {
 		];
 	}
 
-	if (!is_array($monthslong)) {
+	if ($monthslong === null) {
 		$monthslong = [
 			1 => _('January'),
 			2 => _('February'),
@@ -268,30 +265,28 @@ function zbx_date2str($format, $value = null) {
 		];
 	}
 
-	$rplcs = [
-		'l' => $weekdaynameslong[date('w', $value)],
-		'F' => $monthslong[date('n', $value)],
-		'D' => $weekdaynames[date('w', $value)],
-		'M' => $months[date('n', $value)]
+	$replacements = [
+		'l' => $weekdaynameslong[$datetime->format('w')],
+		'F' => $monthslong[$datetime->format('n')],
+		'D' => $weekdaynames[$datetime->format('w')],
+		'M' => $months[$datetime->format('n')]
 	];
 
-	$output = $part = '';
+	$output = '';
+
 	$length = strlen($format);
 
 	for ($i = 0; $i < $length; $i++) {
-		$pchar = ($i > 0) ? substr($format, $i - 1, 1) : '';
-		$char = substr($format, $i, 1);
+		$char = $format[$i];
+		$char_escaped = $i > 0 && $format[$i - 1] === '\\';
 
-		if ($pchar != '\\' && isset($rplcs[$char])) {
-			$output .= (strlen($part) ? date($part, $value) : '').$rplcs[$char];
-			$part = '';
+		if (!$char_escaped && array_key_exists($char, $replacements)) {
+			$output .= $replacements[$char];
 		}
 		else {
-			$part .= $char;
+			$output .= $datetime->format($char);
 		}
 	}
-
-	$output .= (strlen($part) > 0) ? date($part, $value) : '';
 
 	return $prefix.$output;
 }
@@ -612,7 +607,7 @@ function convertUnitsS($value, $ignore_millisec = false) {
 }
 
 /**
- * Converts value to actual value.
+ * Converts a raw value to a user-friendly representation based on unit and other parameters.
  * Example:
  * 	6442450944 B convert to 6 GB
  *
@@ -630,6 +625,39 @@ function convertUnitsS($value, $ignore_millisec = false) {
  * @return string
  */
 function convertUnits(array $options) {
+	[
+		'value' => $value,
+		'units' => $units
+	] = convertUnitsRaw($options);
+
+	$result = $value;
+
+	if ($units !== '') {
+		$result .= ' '.$units;
+	}
+
+	return $result;
+}
+
+/**
+ * Converts a raw value to a user-friendly representation based on unit and other parameters.
+ * Example:
+ * 	6442450944 B convert to 6 GB
+ *
+ * @param array  $options
+ * @param string $options['value']
+ * @param string $options['units']
+ * @param int    $options['convert']
+ * @param int    $options['power']
+ * @param string $options['unit_base']
+ * @param bool   $options['ignore_milliseconds']
+ * @param int    $options['precision']
+ * @param int    $options['decimals']
+ * @param bool   $options['decimals_exact']
+ *
+ * @return array
+ */
+function convertUnitsRaw(array $options) {
 	static $power_table = ['', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y'];
 
 	$options += [
@@ -647,21 +675,37 @@ function convertUnits(array $options) {
 	$value = $options['value'] !== null ? $options['value'] : '';
 
 	if (!is_numeric($value)) {
-		return $value;
+		return [
+			'value' => $value,
+			'units' => '',
+			'is_numeric' => false
+		];
 	}
 
 	$units = $options['units'] !== null ? $options['units'] : '';
 
 	if ($units === 'unixtime') {
-		return zbx_date2str(DATE_TIME_FORMAT_SECONDS, $value);
+		return [
+			'value' => zbx_date2str(DATE_TIME_FORMAT_SECONDS, $value),
+			'units' => '',
+			'is_numeric' => false
+		];
 	}
 
 	if ($units === 'uptime') {
-		return convertUnitsUptime($value);
+		return [
+			'value' => convertUnitsUptime($value),
+			'units' => '',
+			'is_numeric' => false
+		];
 	}
 
 	if ($units === 's') {
-		return convertUnitsS($value, $options['ignore_milliseconds']);
+		return [
+			'value' => convertUnitsS($value, $options['ignore_milliseconds']),
+			'units' => '',
+			'is_numeric' => false
+		];
 	}
 
 	$blacklist = ['%', 'ms', 'rpm', 'RPM'];
@@ -677,16 +721,17 @@ function convertUnits(array $options) {
 	$do_convert = $units !== '' || $options['convert'] == ITEM_CONVERT_NO_UNITS;
 
 	if (in_array($units, $blacklist) || !$do_convert || $value_abs < 1) {
-		$result = formatFloat($value, $options['precision'], $options['decimals'] ?? ZBX_UNITS_ROUNDOFF_UNSUFFIXED,
-			$options['decimals_exact']
-		);
-
-		$result .= ($units === '' ? '' : ' '.$units);
-
-		return $result;
+		return [
+			'value' => formatFloat($value, $options['precision'], $options['decimals'] ?? ZBX_UNITS_ROUNDOFF_UNSUFFIXED,
+				$options['decimals_exact']
+			),
+			'units' => $units,
+			'is_numeric' => true
+		];
 	}
 
 	$unit_base = $options['unit_base'];
+
 	if ($unit_base != 1000 && $unit_base != ZBX_KIBIBYTE) {
 		$unit_base = ($units === 'B' || $units === 'Bps') ? ZBX_KIBIBYTE : 1000;
 	}
@@ -713,20 +758,23 @@ function convertUnits(array $options) {
 			$unit_prefix = $power_table[$unit_power];
 		}
 		else {
-			$unit_power = count($power_table);
+			$unit_power = count($power_table) - 1;
 			$unit_prefix = $power_table[$unit_power];
 		}
 
-		$result = formatFloat($value / pow($unit_base, $unit_power), $options['precision'], $options['decimals'] ??
-			($unit_prefix === '' ? ZBX_UNITS_ROUNDOFF_UNSUFFIXED : ZBX_UNITS_ROUNDOFF_SUFFIXED), $options['decimals_exact']
+		$result = formatFloat($value / pow($unit_base, $unit_power), $options['precision'],
+			$options['decimals'] ?? ($unit_prefix === '' ? ZBX_UNITS_ROUNDOFF_UNSUFFIXED : ZBX_UNITS_ROUNDOFF_SUFFIXED),
+			$options['decimals_exact']
 		);
 	}
 
 	$result_units = ($result == 0 ? '' : $unit_prefix).$units;
 
-	$result .= ($result_units === '' ? '' : ' '.$result_units);
-
-	return $result;
+	return [
+		'value' => $result,
+		'units' => $result_units,
+		'is_numeric' => true
+	];
 }
 
 /**
@@ -736,7 +784,7 @@ function convertUnits(array $options) {
  * @param string $time       Decimal integer with optional time suffix.
  * @param bool   $with_year  Additionally parse year suffixes.
  *
- * @return string|null  Decimal integer seconds or null on error.
+ * @return int|null  Decimal integer seconds or null on error.
  */
 function timeUnitToSeconds($time, $with_year = false) {
 	$suffixes = $with_year ? ZBX_TIME_SUFFIXES_WITH_YEAR : ZBX_TIME_SUFFIXES;
@@ -1514,14 +1562,12 @@ function access_deny($mode = ACCESS_DENY_OBJECT) {
 	else {
 		// url to redirect the user to after he logs in
 		$url = (new CUrl(!empty($_REQUEST['request']) ? $_REQUEST['request'] : ''))->removeArgument('sid');
-		$config = select_config();
 
-		if ($config['http_login_form'] == ZBX_AUTH_FORM_HTTP && $config['http_auth_enabled'] == ZBX_AUTH_HTTP_ENABLED
+		if (CAuthenticationHelper::get(CAuthenticationHelper::HTTP_LOGIN_FORM) == ZBX_AUTH_FORM_HTTP
+				&& CAuthenticationHelper::get(CAuthenticationHelper::HTTP_AUTH_ENABLED) == ZBX_AUTH_HTTP_ENABLED
 				&& (!CWebUser::isLoggedIn() || CWebUser::isGuest())) {
 			$redirect_to = (new CUrl('index_http.php'))->setArgument('request', $url->toString());
 			redirect($redirect_to->toString());
-
-			exit;
 		}
 
 		$url = urlencode($url->toString());
@@ -1531,18 +1577,13 @@ function access_deny($mode = ACCESS_DENY_OBJECT) {
 			$data = [
 				'header' => _('Access denied'),
 				'messages' => [
-					_s('You are logged in as "%1$s".', CWebUser::$data['alias']).' '._('You have no permissions to access this page.'),
+					_s('You are logged in as "%1$s".',
+						CWebUser::$data['username']).' '._('You have no permissions to access this page.'
+					),
 					_('If you think this message is wrong, please consult your administrators about getting the necessary permissions.')
 				],
 				'buttons' => []
 			];
-
-			// RSM specifics: add specific error message
-			$errors = CSession::getValue('messages');
-			if ($errors) {
-				array_unshift($data['messages'], reset($errors));
-			}
-			// RSM specifics: end
 
 			// display the login button only for guest users
 			if (CWebUser::isGuest()) {
@@ -1550,9 +1591,8 @@ function access_deny($mode = ACCESS_DENY_OBJECT) {
 					->onClick('javascript: document.location = "index.php?request='.$url.'";');
 			}
 
-			// RSM specifics: link to Rolling week status page instead of dashboard in case of error
-			$data['buttons'][] = (new CButton('back', _('Go to Rolling week status')))
-				->onClick('javascript: document.location = "zabbix.php?action=rsm.rollingweekstatus"');
+			$data['buttons'][] = (new CButton('back', _s('Go to "%1$s"', CMenuHelper::getFirstLabel())))
+				->onClick('javascript: document.location = "'.CMenuHelper::getFirstUrl().'"');
 		}
 		// if the user is not logged in - offer to login
 		else {
@@ -1576,7 +1616,8 @@ function access_deny($mode = ACCESS_DENY_OBJECT) {
 		else {
 			echo (new CView('general.warning', $data))->getOutput();
 		}
-		exit;
+		session_write_close();
+		exit();
 	}
 }
 
@@ -1639,7 +1680,7 @@ function makeMessageBox(string $class, array $messages, string $title = null, bo
 				);
 		}
 
-		$list = new CList();
+		$list = (new CList())->addClass(ZBX_STYLE_LIST_DASHED);
 		if ($title !== null) {
 			$list->addClass(ZBX_STYLE_MSG_DETAILS_BORDER);
 
@@ -1647,12 +1688,16 @@ function makeMessageBox(string $class, array $messages, string $title = null, bo
 				$list->setAttribute('style', 'display: none;');
 			}
 		}
+
 		foreach ($messages as $message) {
 			foreach (explode("\n", $message['message']) as $message_part) {
 				$list->addItem($message_part);
 			}
 		}
-		$msg_details = (new CDiv())->addClass(ZBX_STYLE_MSG_DETAILS)->addItem($list);
+
+		$msg_details = (new CDiv())
+			->addClass(ZBX_STYLE_MSG_DETAILS)
+			->addItem($list);
 	}
 
 	if ($title !== null) {
@@ -1682,33 +1727,32 @@ function makeMessageBox(string $class, array $messages, string $title = null, bo
 }
 
 /**
- * Filters messages that can be displayed to user based on defines (see ZBX_SHOW_TECHNICAL_ERRORS) and user settings.
- *
- * @param array $messages	List of messages to filter.
+ * Filters messages that can be displayed to user based on CSettingsHelper::SHOW_TECHNICAL_ERRORS and user settings.
  *
  * @return array
  */
-function filter_messages(array $messages = []) {
-	if (!ZBX_SHOW_TECHNICAL_ERRORS && CWebUser::getType() != USER_TYPE_SUPER_ADMIN && !CWebUser::getDebugMode()) {
-		$filtered_messages = [];
-		$generic_exists = false;
+function filter_messages(): array {
+	if (!CSettingsHelper::getGlobal(CSettingsHelper::SHOW_TECHNICAL_ERRORS)
+			&& CWebUser::getType() != USER_TYPE_SUPER_ADMIN && !CWebUser::getDebugMode()) {
+		$messages = CMessageHelper::getMessages();
+		CMessageHelper::clear(false);
 
+		$generic_exists = false;
 		foreach ($messages as $message) {
-			if (array_key_exists('src', $message) && ($message['src'] === 'sql' || $message['src'] === 'php')) {
+			if ($message['type'] === CMessageHelper::MESSAGE_TYPE_ERROR
+					&& ($message['source'] === 'sql' || $message['source'] === 'php')) {
 				if (!$generic_exists) {
-					$message['message'] = _('System error occurred. Please contact Zabbix administrator.');
-					$filtered_messages[] = $message;
+					CMessageHelper::addError(_('System error occurred. Please contact Zabbix administrator.'));
 					$generic_exists = true;
 				}
 			}
 			else {
-				$filtered_messages[] = $message;
+				CMessageHelper::addMessage($message);
 			}
 		}
-		$messages = $filtered_messages;
 	}
 
-	return $messages;
+	return CMessageHelper::getMessages();
 }
 
 /**
@@ -1717,32 +1761,27 @@ function filter_messages(array $messages = []) {
  * @param  bool    $good            Parameter passed to makeMessageBox to specify message box style.
  * @param  string  $title           Message box title.
  * @param  bool    $show_close_box  Show or hide close button in error message box.
- * @global array   $ZBX_MESSAGES
  *
  * @return CTag|null
  */
-function getMessages($good = false, $title = null, $show_close_box = true) {
-	global $ZBX_MESSAGES;
-
-	$messages = (isset($ZBX_MESSAGES) && $ZBX_MESSAGES) ? filter_messages($ZBX_MESSAGES) : [];
+function getMessages(bool $good = false, string $title = null, bool $show_close_box = true): ?CTag {
+	$messages = get_and_clear_messages();
 
 	$message_box = ($title || $messages)
-		? makeMessageBox($good ? ZBX_STYLE_MSG_GOOD : ZBX_STYLE_MSG_BAD, $messages, $title, $show_close_box)
+		? makeMessageBox($good ? ZBX_STYLE_MSG_GOOD : ZBX_STYLE_MSG_BAD, $messages, $title, $show_close_box, !$good)
 		: null;
-
-	$ZBX_MESSAGES = [];
 
 	return $message_box;
 }
 
 function show_messages($good = null, $okmsg = null, $errmsg = null) {
-	global $page, $ZBX_MESSAGES, $ZBX_MESSAGES_PREPARED;
+	global $page, $ZBX_MESSAGES_PREPARED;
 
 	if (defined('ZBX_API_REQUEST')) {
 		return null;
 	}
 
-	$messages = isset($ZBX_MESSAGES) ? filter_messages($ZBX_MESSAGES) : [];
+	$messages = get_and_clear_messages();
 
 	if ($good === null) {
 		$has_errors = false;
@@ -1771,8 +1810,6 @@ function show_messages($good = null, $okmsg = null, $errmsg = null) {
 	}
 
 	$title = $good ? $okmsg : $errmsg;
-
-	$ZBX_MESSAGES = [];
 
 	if ($title === null && !$messages) {
 		return;
@@ -1837,7 +1874,6 @@ function show_messages($good = null, $okmsg = null, $errmsg = null) {
 
 			imageOut($canvas);
 			imagedestroy($canvas);
-
 			break;
 
 		default:
@@ -1868,7 +1904,7 @@ function show_messages($good = null, $okmsg = null, $errmsg = null) {
  * @return string|null  One or several HTML message boxes.
  */
 function get_prepared_messages(array $options = []): ?string {
-	global $ZBX_MESSAGES, $ZBX_MESSAGES_PREPARED;
+	global $ZBX_MESSAGES_PREPARED;
 
 	if (!is_array($ZBX_MESSAGES_PREPARED)) {
 		$ZBX_MESSAGES_PREPARED = [];
@@ -1883,7 +1919,11 @@ function get_prepared_messages(array $options = []): ?string {
 	// Process messages of the current request.
 
 	if ($options['with_current_messages']) {
-		show_messages();
+		show_messages(
+			null,
+			CMessageHelper::getTitle(),
+			CMessageHelper::getTitle()
+		);
 
 		$messages_current = $ZBX_MESSAGES_PREPARED;
 		$restore_messages = [];
@@ -1891,11 +1931,11 @@ function get_prepared_messages(array $options = []): ?string {
 	}
 	else {
 		$messages_current = [];
-		$restore_messages = $ZBX_MESSAGES;
+		$restore_messages = CMessageHelper::getMessages();
 		$restore_messages_prepared = $ZBX_MESSAGES_PREPARED;
+		CMessageHelper::clear();
 	}
 
-	$ZBX_MESSAGES = [];
 	$ZBX_MESSAGES_PREPARED = [];
 
 	// Process authentication warning if user had unsuccessful authentication attempts.
@@ -1912,33 +1952,31 @@ function get_prepared_messages(array $options = []): ?string {
 			$failed_attempts
 		));
 
-		show_messages();
+		show_messages(
+			false, // Failed login can be only error message.
+			CMessageHelper::getTitle(),
+			CMessageHelper::getTitle()
+		);
 
 		CProfile::update('web.login.attempt.failed', 0, PROFILE_TYPE_INT);
 	}
 
 	$messages_authentication = $ZBX_MESSAGES_PREPARED;
-	$ZBX_MESSAGES = [];
 	$ZBX_MESSAGES_PREPARED = [];
 
 	// Process messages passed by the previous request.
 
-	if ($options['with_session_messages']
-			&& (CSession::keyExists('messageOk') || CSession::keyExists('messageError'))) {
-		if (CSession::keyExists('messages')) {
-			$ZBX_MESSAGES = CSession::getValue('messages');
-		}
+	if ($options['with_session_messages']) {
+		CMessageHelper::restoreScheduleMessages($messages_current);
 
-		if (CSession::keyExists('messageOk')) {
-			show_messages(true, CSession::getValue('messageOk'), null);
+		if (CMessageHelper::getTitle() !== null) {
+			show_messages(
+				CMessageHelper::getType() === CMessageHelper::MESSAGE_TYPE_SUCCESS,
+				CMessageHelper::getTitle(),
+				CMessageHelper::getTitle()
+			);
 		}
-		else {
-			show_messages(false, null, CSession::getValue('messageError'));
-		}
-
-		CSession::unsetValue(['messages', 'messageOk', 'messageError']);
 	}
-
 	$messages_session = $ZBX_MESSAGES_PREPARED;
 
 	// Create message boxes for all requested messages types in the correct order.
@@ -1950,31 +1988,28 @@ function get_prepared_messages(array $options = []): ?string {
 		)->toString();
 	}
 
-	$ZBX_MESSAGES = $restore_messages;
+	foreach ($restore_messages as $message) {
+		CMessageHelper::addMessage($message);
+	}
+
 	$ZBX_MESSAGES_PREPARED = $restore_messages_prepared;
 
 	return ($html === '') ? null : $html;
 }
 
-function show_message($msg) {
+function show_message(string $msg): void {
 	show_messages(true, $msg, '');
 }
 
-function show_error_message($msg) {
+function show_error_message(string $msg): void {
 	show_messages(false, '', $msg);
 }
 
-function info($msgs) {
-	global $ZBX_MESSAGES;
-
-	if (!isset($ZBX_MESSAGES)) {
-		$ZBX_MESSAGES = [];
-	}
-
+function info($msgs): void {
 	zbx_value2array($msgs);
 
 	foreach ($msgs as $msg) {
-		$ZBX_MESSAGES[] = ['type' => 'info', 'message' => $msg];
+		CMessageHelper::addSuccess($msg);
 	}
 }
 
@@ -1984,16 +2019,10 @@ function info($msgs) {
  * @param array|string $messages
  */
 function warning($messages): void {
-	global $ZBX_MESSAGES;
-
-	if (!isset($ZBX_MESSAGES)) {
-		$ZBX_MESSAGES = [];
-	}
-
 	zbx_value2array($messages);
 
 	foreach ($messages as $message) {
-		$ZBX_MESSAGES[] = ['type' => 'warning', 'message' => $message];
+		CMessageHelper::addWarning($message);
 	}
 }
 
@@ -2003,53 +2032,19 @@ function warning($messages): void {
  * @param string | array $msg	Error message text.
  * @param string		 $src	The source of error message.
  */
-function error($msgs, $src = '') {
-	global $ZBX_MESSAGES;
-
-	if (!isset($ZBX_MESSAGES)) {
-		$ZBX_MESSAGES = [];
-	}
-
+function error($msgs, string $src = ''): void {
 	$msgs = zbx_toArray($msgs);
 
 	foreach ($msgs as $msg) {
-		$ZBX_MESSAGES[] = [
-			'type' => 'error',
-			'message' => $msg,
-			'src' => $src
-		];
+		CMessageHelper::addError($msg, $src);
 	}
 }
 
-/**
- * Add multiple errors under single header.
- *
- * @param array  $data
- * @param string $data['header']  common header for all error messages
- * @param array  $data['msgs']    array of error messages
- */
-function error_group($data) {
-	foreach (zbx_toArray($data['msgs']) as $msg) {
-		error($data['header'] . ' ' . $msg);
-	}
-}
+function get_and_clear_messages(): array {
+	$messages = filter_messages();
+	CMessageHelper::clear();
 
-function clear_messages($count = null) {
-	global $ZBX_MESSAGES;
-
-	if ($count != null) {
-		$result = [];
-
-		while ($count-- > 0) {
-			array_unshift($result, array_pop($ZBX_MESSAGES));
-		}
-	}
-	else {
-		$result = $ZBX_MESSAGES;
-		$ZBX_MESSAGES = [];
-	}
-
-	return $result ? filter_messages($result) : $result;
+	return $messages;
 }
 
 function fatal_error($msg) {
@@ -2085,144 +2080,6 @@ function parse_period($str) {
 	}
 
 	return $out;
-}
-
-function get_status() {
-	global $ZBX_SERVER, $ZBX_SERVER_PORT;
-
-	$status = [
-		'is_running' => false,
-		'has_status' => false
-	];
-
-	$server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT, ZBX_SOCKET_TIMEOUT, ZBX_SOCKET_BYTES_LIMIT);
-	$status['is_running'] = $server->isRunning(get_cookie(ZBX_SESSION_NAME));
-
-	if ($status['is_running'] === false) {
-		return $status;
-	}
-
-	$server = new CZabbixServer($ZBX_SERVER, $ZBX_SERVER_PORT, 15, ZBX_SOCKET_BYTES_LIMIT);
-	$server_status = $server->getStatus(get_cookie(ZBX_SESSION_NAME));
-	$status['has_status'] = (bool) $server_status;
-
-	if ($server_status === false) {
-		error($server->getError());
-		return $status;
-	}
-
-	$status += [
-		'triggers_count_disabled' => 0,
-		'triggers_count_off' => 0,
-		'triggers_count_on' => 0,
-		'items_count_monitored' => 0,
-		'items_count_disabled' => 0,
-		'items_count_not_supported' => 0,
-		'hosts_count_monitored' => 0,
-		'hosts_count_not_monitored' => 0,
-		'hosts_count_template' => 0,
-		'users_count' => 0,
-		'users_online' => 0
-	];
-
-	// hosts
-	foreach ($server_status['template stats'] as $stats) {
-		$status['hosts_count_template'] += $stats['count'];
-	}
-
-	foreach ($server_status['host stats'] as $stats) {
-		if ($stats['attributes']['proxyid'] == 0) {
-			switch ($stats['attributes']['status']) {
-				case HOST_STATUS_MONITORED:
-					$status['hosts_count_monitored'] += $stats['count'];
-					break;
-
-				case HOST_STATUS_NOT_MONITORED:
-					$status['hosts_count_not_monitored'] += $stats['count'];
-					break;
-			}
-		}
-	}
-	$status['hosts_count'] = $status['hosts_count_monitored'] + $status['hosts_count_not_monitored'];
-
-	// items
-	foreach ($server_status['item stats'] as $stats) {
-		if ($stats['attributes']['proxyid'] == 0) {
-			switch ($stats['attributes']['status']) {
-				case ITEM_STATUS_ACTIVE:
-					if (array_key_exists('state', $stats['attributes'])) {
-						switch ($stats['attributes']['state']) {
-							case ITEM_STATE_NORMAL:
-								$status['items_count_monitored'] += $stats['count'];
-								break;
-
-							case ITEM_STATE_NOTSUPPORTED:
-								$status['items_count_not_supported'] += $stats['count'];
-								break;
-						}
-					}
-					break;
-
-				case ITEM_STATUS_DISABLED:
-					$status['items_count_disabled'] += $stats['count'];
-					break;
-			}
-		}
-	}
-	$status['items_count'] = $status['items_count_monitored'] + $status['items_count_disabled']
-			+ $status['items_count_not_supported'];
-
-	// triggers
-	foreach ($server_status['trigger stats'] as $stats) {
-		switch ($stats['attributes']['status']) {
-			case TRIGGER_STATUS_ENABLED:
-				if (array_key_exists('value', $stats['attributes'])) {
-					switch ($stats['attributes']['value']) {
-						case TRIGGER_VALUE_FALSE:
-							$status['triggers_count_off'] += $stats['count'];
-							break;
-
-						case TRIGGER_VALUE_TRUE:
-							$status['triggers_count_on'] += $stats['count'];
-							break;
-					}
-				}
-				break;
-
-			case TRIGGER_STATUS_DISABLED:
-				$status['triggers_count_disabled'] += $stats['count'];
-				break;
-		}
-	}
-	$status['triggers_count_enabled'] = $status['triggers_count_off'] + $status['triggers_count_on'];
-	$status['triggers_count'] = $status['triggers_count_enabled'] + $status['triggers_count_disabled'];
-
-	// users
-	foreach ($server_status['user stats'] as $stats) {
-		switch ($stats['attributes']['status']) {
-			case ZBX_SESSION_ACTIVE:
-				$status['users_online'] += $stats['count'];
-				break;
-
-			case ZBX_SESSION_PASSIVE:
-				$status['users_count'] += $stats['count'];
-				break;
-		}
-	}
-	$status['users_count'] += $status['users_online'];
-
-	// performance
-	if (array_key_exists('required performance', $server_status)) {
-		$status['vps_total'] = 0;
-
-		foreach ($server_status['required performance'] as $stats) {
-			if ($stats['attributes']['proxyid'] == 0) {
-				$status['vps_total'] += $stats['count'];
-			}
-		}
-	}
-
-	return $status;
 }
 
 /**
@@ -2274,7 +2131,7 @@ function imageOut(&$image, $format = null) {
 
 	if ($page['type'] != PAGE_TYPE_IMAGE) {
 		$imageId = md5(strlen($imageSource));
-		CSession::setValue('image_id', [$imageId => $imageSource]);
+		CSessionHelper::set('image_id', [$imageId => $imageSource]);
 	}
 
 	switch ($page['type']) {
@@ -2293,22 +2150,10 @@ function imageOut(&$image, $format = null) {
 /**
  * Check if we have error messages to display.
  *
- * @global array $ZBX_MESSAGES
- *
  * @return bool
  */
 function hasErrorMesssages() {
-	global $ZBX_MESSAGES;
-
-	if (isset($ZBX_MESSAGES)) {
-		foreach ($ZBX_MESSAGES as $message) {
-			if ($message['type'] === 'error') {
-				return true;
-			}
-		}
-	}
-
-	return false;
+	return CMessageHelper::getType() === CMessageHelper::MESSAGE_TYPE_ERROR;
 }
 
 /**
@@ -2560,13 +2405,16 @@ function getTimeSelectorPeriod(array $options) {
 	$profileIdx2 = array_key_exists('profileIdx2', $options) ? $options['profileIdx2'] : null;
 
 	if ($profileIdx === null) {
-		$options['from'] = ZBX_PERIOD_DEFAULT_FROM;
-		$options['to'] = ZBX_PERIOD_DEFAULT_TO;
+		$options['from'] = 'now-'.CSettingsHelper::get(CSettingsHelper::PERIOD_DEFAULT);
+		$options['to'] = 'now';
 	}
 	elseif (!array_key_exists('from', $options) || !array_key_exists('to', $options)
 			|| $options['from'] === null || $options['to'] === null) {
-		$options['from'] = CProfile::get($profileIdx.'.from', ZBX_PERIOD_DEFAULT_FROM, $profileIdx2);
-		$options['to'] = CProfile::get($profileIdx.'.to', ZBX_PERIOD_DEFAULT_TO, $profileIdx2);
+		$options['from'] = CProfile::get($profileIdx.'.from',
+			'now-'.CSettingsHelper::get(CSettingsHelper::PERIOD_DEFAULT),
+			$profileIdx2
+		);
+		$options['to'] = CProfile::get($profileIdx.'.to', 'now', $profileIdx2);
 	}
 
 	$range_time_parser = new CRangeTimeParser();
@@ -2577,6 +2425,31 @@ function getTimeSelectorPeriod(array $options) {
 	$options['to_ts'] = $range_time_parser->getDateTime(false)->getTimestamp();
 
 	return $options;
+}
+
+/**
+ * Get array of action statuses available for defined time range. For incorrect "from" or "to" all actions will be set
+ * to false.
+ *
+ * @param string $from      Relative or absolute time, cannot be null.
+ * @param string $to        Relative or absolute time, cannot be null.
+ *
+ * @return array
+ */
+function getTimeselectorActions($from, $to): array {
+	$ts_now = time();
+	$parser = new CRangeTimeParser();
+	$ts_from = ($parser->parse($from) !== CParser::PARSE_FAIL) ? $parser->getDateTime(true)->getTimestamp() : null;
+	$ts_to = ($parser->parse($to) !== CParser::PARSE_FAIL) ? $parser->getDateTime(false)->getTimestamp() : null;
+	$valid = ($ts_from !== null && $ts_to !== null);
+	$parser->parse('now-'.CSettingsHelper::get(CSettingsHelper::MAX_PERIOD));
+	$max_period = 1 + $ts_now - $parser->getDateTime(true)->getTimestamp();
+
+	return [
+		'can_zoomout' => ($valid && ($ts_to - $ts_from + 1 < $max_period)),
+		'can_decrement' => ($valid && ($ts_from > 0)),
+		'can_increment' => ($valid && ($ts_to < $ts_now - ZBX_MIN_PERIOD))
+	];
 }
 
 /**
@@ -2657,4 +2530,102 @@ function relativeDateToText($from, $to) {
 	}
 
 	return $from.' – '.$to;
+}
+
+/**
+ * Get human readable time period.
+ *
+ * @param int $seconds
+ *
+ * @return string
+ */
+function secondsToPeriod(int $seconds): string {
+	$hours = floor($seconds / 3600);
+	$seconds -= $hours * 3600;
+
+	$minutes = floor($seconds / 60);
+	$seconds -= $minutes * 60;
+
+	$period = ($hours > 0) ? _n('%1$s hour', '%1$s hours', $hours) : '';
+
+	if ($minutes > 0) {
+		if ($period !== '') {
+			$period .= ', ';
+		}
+		$period .= _n('%1$s minute', '%1$s minutes', $minutes);
+	}
+
+	if ($seconds > 0 || $period === '') {
+		if ($period !== '') {
+			$period .= ', ';
+		}
+		$period .= _n('%1$s second', '%1$s seconds', $seconds);
+	}
+
+	return $period;
+}
+
+/**
+ * Generates UUID version 4.
+ *
+ * @param string $seed   String to be hashed as md5 and used as UUID body.
+ *
+ * @return string
+ */
+function generateUuidV4($seed = '') {
+	$data = ($seed === '') ? random_bytes(16) : hex2bin(md5($seed));
+
+	// Set head of 7th byte to 0100 (0100xxxx)
+	$data[6] = chr(ord($data[6]) & 0x0f | 0x40);
+
+	// Set head of 9th byte to 10 (10xxxxxx)
+	$data[8] = chr(ord($data[8]) & 0x3f | 0x80);
+
+	return bin2hex($data);
+}
+
+/**
+ * Function returns predefined Leaflet Tile providers with parameters.
+ *
+ * @return array
+ */
+function getTileProviders(): array {
+	return [
+		'OpenStreetMap.Mapnik' => [
+			'name' => 'OpenStreetMap Mapnik',
+			'geomaps_tile_url' => 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+			'geomaps_max_zoom' => '19',
+			'geomaps_attribution' => '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+		],
+		'OpenTopoMap' => [
+			'name' => 'OpenTopoMap',
+			'geomaps_tile_url' => 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+			'geomaps_max_zoom' => '17',
+			'geomaps_attribution' => 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
+		],
+		'Stamen.TonerLite' => [
+			'name' => 'Stamen Toner Lite',
+			'geomaps_tile_url' => 'https://stamen-tiles-{s}.a.ssl.fastly.net/toner-lite/{z}/{x}/{y}{r}.png',
+			'geomaps_max_zoom' => '20',
+			'geomaps_attribution' => 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a> &mdash; Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+		],
+		'Stamen.Terrain' => [
+			'name' => 'Stamen Terrain',
+			'geomaps_tile_url' => 'https://stamen-tiles-{s}.a.ssl.fastly.net/terrain/{z}/{x}/{y}{r}.png',
+			'geomaps_max_zoom' => '18',
+			'geomaps_attribution' => 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a> &mdash; Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+		],
+		'USGS.USTopo' => [
+			'name' => 'USGS US Topo',
+			'geomaps_tile_url' => 'https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}',
+			'geomaps_max_zoom' => '20',
+			'geomaps_attribution' => 'Tiles courtesy of the <a href="https://usgs.gov/">U.S. Geological Survey</a>'
+		],
+		'USGS.USImagery' => [
+			'name' => 'USGS US Imagery',
+			'geomaps_tile_url' => 'https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}',
+			'geomaps_max_zoom' => '20',
+			'geomaps_attribution' => 'Tiles courtesy of the <a href="https://usgs.gov/">U.S. Geological Survey</a>'
+		]
+	];
 }

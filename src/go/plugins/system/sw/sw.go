@@ -1,8 +1,9 @@
+//go:build !windows
 // +build !windows
 
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -42,7 +43,8 @@ type Plugin struct {
 
 // Options -
 type Options struct {
-	Timeout int
+	plugin.SystemOptions `conf:"optional,name=System"`
+	Timeout              int
 }
 
 type manager struct {
@@ -106,12 +108,12 @@ func (p *Plugin) Export(key string, params []string, ctx plugin.ContextProvider)
 			continue
 		}
 
-		test, err := zbxcmd.Execute(m.testCmd, time.Second*time.Duration(p.options.Timeout))
+		test, err := zbxcmd.Execute(m.testCmd, time.Second*time.Duration(p.options.Timeout), "")
 		if err != nil || test == "" {
 			continue
 		}
 
-		tmp, err := zbxcmd.Execute(m.cmd, time.Second*time.Duration(p.options.Timeout))
+		tmp, err := zbxcmd.Execute(m.cmd, time.Second*time.Duration(p.options.Timeout), "")
 		if err != nil {
 			p.Errf("Failed to execute command '%s', err: %s", m.cmd, err.Error())
 

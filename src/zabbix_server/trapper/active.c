@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -25,14 +25,13 @@
 #include "zbxregexp.h"
 #include "zbxcompress.h"
 
-#include "active.h"
 #include "../../libs/zbxcrypto/tls_tcp_active.h"
+
+#include "active.h"
 
 extern unsigned char	program_type;
 
 /******************************************************************************
- *                                                                            *
- * Function: db_register_host                                                 *
  *                                                                            *
  * Purpose: perform active agent auto registration                            *
  *                                                                            *
@@ -139,8 +138,6 @@ out:
 
 /******************************************************************************
  *                                                                            *
- * Function: get_hostid_by_host                                               *
- *                                                                            *
  * Purpose: check for host name and return hostid                             *
  *                                                                            *
  * Parameters: sock          - [IN] open socket of server-agent connection    *
@@ -155,8 +152,6 @@ out:
  *                                                                            *
  * Return value:  SUCCEED - host is found                                     *
  *                FAIL - an error occurred or host not found                  *
- *                                                                            *
- * Author: Alexander Vladishev                                                *
  *                                                                            *
  * Comments: NB! adds host to the database if it does not exist or if it      *
  *           exists but metadata, interface, interface type or port has       *
@@ -340,8 +335,6 @@ static void	get_list_of_active_checks(zbx_uint64_t hostid, zbx_vector_uint64_t *
 
 /******************************************************************************
  *                                                                            *
- * Function: send_list_of_active_checks                                       *
- *                                                                            *
  * Purpose: send list of active checks to the host (older version agent)      *
  *                                                                            *
  * Parameters: sock - open socket of server-agent connection                  *
@@ -389,16 +382,12 @@ int	send_list_of_active_checks(zbx_socket_t *sock, char *request)
 	if (0 != itemids.values_num)
 	{
 		DC_ITEM		*dc_items;
-		int		*errcodes, now;
-		zbx_config_t	cfg;
+		int		*errcodes;
 
 		dc_items = (DC_ITEM *)zbx_malloc(NULL, sizeof(DC_ITEM) * itemids.values_num);
 		errcodes = (int *)zbx_malloc(NULL, sizeof(int) * itemids.values_num);
 
 		DCconfig_get_items_by_itemids(dc_items, itemids.values, errcodes, itemids.values_num);
-		zbx_config_get(&cfg, ZBX_CONFIG_FLAGS_REFRESH_UNSUPPORTED);
-
-		now = time(NULL);
 
 		for (i = 0; i < itemids.values_num; i++)
 		{
@@ -417,23 +406,12 @@ int	send_list_of_active_checks(zbx_socket_t *sock, char *request)
 			if (HOST_STATUS_MONITORED != dc_items[i].host.status)
 				continue;
 
-			if (ITEM_STATE_NOTSUPPORTED == dc_items[i].state)
-			{
-				if (0 == cfg.refresh_unsupported)
-					continue;
-
-				if (dc_items[i].lastclock + cfg.refresh_unsupported > now)
-					continue;
-			}
-
 			if (SUCCEED != zbx_interval_preproc(dc_items[i].delay, &delay, NULL, NULL))
 				continue;
 
 			zbx_snprintf_alloc(&buffer, &buffer_alloc, &buffer_offset, "%s:%d:" ZBX_FS_UI64 "\n",
 					dc_items[i].key_orig, delay, dc_items[i].lastlogsize);
 		}
-
-		zbx_config_clean(&cfg);
 
 		DCconfig_clean_items(dc_items, errcodes, itemids.values_num);
 
@@ -466,8 +444,6 @@ out:
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_vector_str_append_uniq                                       *
- *                                                                            *
  * Purpose: append non duplicate string to the string vector                  *
  *                                                                            *
  * Parameters: vector - [IN/OUT] the string vector                            *
@@ -481,8 +457,6 @@ static void	zbx_vector_str_append_uniq(zbx_vector_str_t *vector, const char *str
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_itemkey_extract_global_regexps                               *
  *                                                                            *
  * Purpose: extract global regular expression names from item key             *
  *                                                                            *
@@ -536,8 +510,6 @@ out:
 
 /******************************************************************************
  *                                                                            *
- * Function: send_list_of_active_checks_json                                  *
- *                                                                            *
  * Purpose: send list of active checks to the host                            *
  *                                                                            *
  * Parameters: sock - open socket of server-agent connection                  *
@@ -545,8 +517,6 @@ out:
  *                                                                            *
  * Return value:  SUCCEED - list of active checks sent successfully           *
  *                FAIL - an error occurred                                    *
- *                                                                            *
- * Author: Alexander Vladishev                                                *
  *                                                                            *
  ******************************************************************************/
 int	send_list_of_active_checks_json(zbx_socket_t *sock, struct zbx_json_parse *jp)
@@ -562,7 +532,6 @@ int	send_list_of_active_checks_json(zbx_socket_t *sock, struct zbx_json_parse *j
 	unsigned short		port;
 	zbx_vector_uint64_t	itemids;
 	zbx_conn_flags_t	flag = ZBX_CONN_DEFAULT;
-	zbx_config_t		cfg;
 
 	zbx_vector_ptr_t	regexps;
 	zbx_vector_str_t	names;
@@ -635,7 +604,6 @@ int	send_list_of_active_checks_json(zbx_socket_t *sock, struct zbx_json_parse *j
 	}
 
 	zbx_vector_uint64_create(&itemids);
-	zbx_config_get(&cfg, ZBX_CONFIG_FLAGS_REFRESH_UNSUPPORTED);
 
 	get_list_of_active_checks(hostid, &itemids);
 
@@ -646,14 +614,12 @@ int	send_list_of_active_checks_json(zbx_socket_t *sock, struct zbx_json_parse *j
 	if (0 != itemids.values_num)
 	{
 		DC_ITEM		*dc_items;
-		int		*errcodes, now, delay;
+		int		*errcodes, delay;
 
 		dc_items = (DC_ITEM *)zbx_malloc(NULL, sizeof(DC_ITEM) * itemids.values_num);
 		errcodes = (int *)zbx_malloc(NULL, sizeof(int) * itemids.values_num);
 
 		DCconfig_get_items_by_itemids(dc_items, itemids.values, errcodes, itemids.values_num);
-
-		now = time(NULL);
 
 		for (i = 0; i < itemids.values_num; i++)
 		{
@@ -670,18 +636,8 @@ int	send_list_of_active_checks_json(zbx_socket_t *sock, struct zbx_json_parse *j
 			if (HOST_STATUS_MONITORED != dc_items[i].host.status)
 				continue;
 
-			if (ZBX_COMPONENT_VERSION(4,4) > version && ITEM_STATE_NOTSUPPORTED == dc_items[i].state)
-			{
-				if (0 == cfg.refresh_unsupported)
-					continue;
-
-				if (dc_items[i].lastclock + cfg.refresh_unsupported > now)
-					continue;
-			}
-
 			if (SUCCEED != zbx_interval_preproc(dc_items[i].delay, &delay, NULL, NULL))
 				continue;
-
 
 			dc_items[i].key = zbx_strdup(dc_items[i].key, dc_items[i].key_orig);
 			substitute_key_macros_unmasked(&dc_items[i].key, NULL, &dc_items[i], NULL, NULL,
@@ -725,10 +681,9 @@ int	send_list_of_active_checks_json(zbx_socket_t *sock, struct zbx_json_parse *j
 
 	zbx_json_close(&json);
 
-	if (ZBX_COMPONENT_VERSION(4,4) <= version)
-		zbx_json_adduint64(&json, ZBX_PROTO_TAG_REFRESH_UNSUPPORTED, cfg.refresh_unsupported);
+	if (ZBX_COMPONENT_VERSION(4,4) == version || ZBX_COMPONENT_VERSION(5,0) == version)
+		zbx_json_adduint64(&json, ZBX_PROTO_TAG_REFRESH_UNSUPPORTED, 600);
 
-	zbx_config_clean(&cfg);
 	zbx_vector_uint64_destroy(&itemids);
 
 	DCget_expressions_by_names(&regexps, (const char * const *)names.values, names.values_num);

@@ -14,8 +14,7 @@ EXTRA_DIST = \
 	ui \
 	include \
 	conf \
-	sass \
-	api
+	sass
 
 EXTRA_DIST += opt
 
@@ -143,9 +142,9 @@ WRAP_IO_FUNCS = \
 WRAP_FS_FUNCS = \
 	-Wl,--wrap=opendir \
 	-Wl,--wrap=readdir \
-	-Wl,--wrap=stat \
 	-Wl,--wrap=__xstat \
-	-Wl,--wrap=__fxstat
+	-Wl,--wrap=__fxstat \
+	-Wl,--wrap=stat
 
 WRAP_EXIT = \
 	-Wl,--wrap=exit
@@ -172,6 +171,9 @@ tests_build:
 
 tests: tests_build
 	tests/tests_run.pl
+
+clean: clean-recursive
+	cd tests && $(MAKE) clean
 endif
 
-.PHONY: test tests
+.PHONY: test tests clean

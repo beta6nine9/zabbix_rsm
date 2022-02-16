@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -70,8 +70,8 @@ class testFormEventCorrelation extends CLegacyWebTest {
 	 * @dataProvider create
 	 */
 	public function testFormEventCorrelation_Create($data) {
-		$this->zbxTestLogin('correlation.php');
-		$this->zbxTestClickWait('form');
+		$this->zbxTestLogin('zabbix.php?action=correlation.list');
+		$this->query('button:Create correlation')->one()->click();
 		$this->zbxTestCheckHeader('Event correlation rules');
 		$this->zbxTestCheckTitle('Event correlation rules');
 
@@ -87,8 +87,6 @@ class testFormEventCorrelation extends CLegacyWebTest {
 		if (array_key_exists('description', $data)) {
 			$this->zbxTestInputType('description', $data['description']);
 		}
-
-		$this->zbxTestTabSwitch('Operations');
 
 		foreach($data['operation'] as $operation) {
 			$operation_id = ($operation === 'Close old event') ? 'operation_0_type' : 'operation_1_type';
@@ -107,22 +105,15 @@ class testFormEventCorrelation extends CLegacyWebTest {
 		return [
 			[
 				[
-					'error_header' => 'Page received incorrect data',
-					'error_message' => 'Incorrect value for field "Name": cannot be empty.'
-				]
-			],
-			[
-				[
-					'name' => 'Event correlation for update',
-					'error_header' => 'Cannot add correlation',
-					'error_message' => 'Correlation "Event correlation for update" already exists.'
+					'error_header' => 'Cannot update correlation',
+					'error_message' => 'Incorrect value for field "name": cannot be empty.'
 				]
 			],
 			[
 				[
 					'name' => 'Without conditions',
 					'error_header' => 'Cannot add correlation',
-					'error_message' => 'No "conditions" given for correlation "Without conditions".'
+					'error_message' => 'Invalid parameter "/1/filter/conditions": cannot be empty.'
 				]
 			],
 			[
@@ -130,7 +121,7 @@ class testFormEventCorrelation extends CLegacyWebTest {
 					'name' => 'Without operation',
 					'tag' => 'tag name',
 					'error_header' => 'Cannot add correlation',
-					'error_message' => 'No "operations" given for correlation "Without operation".'
+					'error_message' => 'Invalid parameter "/1/operations": cannot be empty.'
 				]
 			]
 		];
@@ -142,8 +133,8 @@ class testFormEventCorrelation extends CLegacyWebTest {
 	 * @dataProvider validation
 	 */
 	public function testFormEventCorrelation_CreateValidation($data) {
-		$this->zbxTestLogin('correlation.php');
-		$this->zbxTestClickWait('form');
+		$this->zbxTestLogin('zabbix.php?action=correlation.list');
+		$this->query('button:Create correlation')->one()->click();
 		$this->zbxTestCheckHeader('Event correlation rules');
 		$this->zbxTestCheckTitle('Event correlation rules');
 
@@ -161,10 +152,10 @@ class testFormEventCorrelation extends CLegacyWebTest {
 
 		$this->zbxTestClick('add');
 		$this->zbxTestWaitUntilMessageTextPresent('msg-bad', $data['error_header']);
-		$error = $this->zbxTestGetText('//ul[@class=\'msg-details-border\']');
-		$this->assertContains($data['error_message'], $error);
+		$error = $this->zbxTestGetText('//ul[@class=\'list-dashed msg-details-border\']');
+		$this->assertStringContainsString($data['error_message'], $error);
 
-		if 	(array_key_exists('name', $data) && $data['name'] === 'Event correlation for update') {
+		if (array_key_exists('name', $data) && $data['name'] === 'Event correlation for update') {
 			$sql = 'SELECT NULL FROM correlation WHERE name='.zbx_dbstr($data['name']);
 			$this->assertEquals(1, CDBHelper::getCount($sql));
 		}
@@ -183,8 +174,8 @@ class testFormEventCorrelation extends CLegacyWebTest {
 				. 'Test_With_Long_Name_Test_With_Long_Name_Test_With_Long_Name_Test_With_Long_Name_Test_With_Long_Name_'
 				. 'Test_With_Long_Name_Test_With_Long_Name_Test_With_Long_';
 
-		$this->zbxTestLogin('correlation.php');
-		$this->zbxTestClickWait('form');
+		$this->zbxTestLogin('zabbix.php?action=correlation.list');
+		$this->query('button:Create correlation')->one()->click();
 		$this->zbxTestCheckHeader('Event correlation rules');
 		$this->zbxTestCheckTitle('Event correlation rules');
 
@@ -195,7 +186,6 @@ class testFormEventCorrelation extends CLegacyWebTest {
 		$this->zbxTestClickXpath("//div[@class='overlay-dialogue-footer']//button[text()='Add']");
 		COverlayDialogElement::ensureNotPresent();
 
-		$this->zbxTestTabSwitch('Operations');
 		$this->zbxTestCheckboxSelect('operation_0_type');
 		$this->zbxTestClick('add');
 		$this->zbxTestWaitUntilMessageTextPresent('msg-good', 'Correlation added');
@@ -330,8 +320,8 @@ class testFormEventCorrelation extends CLegacyWebTest {
 	public function testFormEventCorrelation_TestTags($data) {
 		$host_group = 'Zabbix servers';
 
-		$this->zbxTestLogin('correlation.php');
-		$this->zbxTestClickWait('form');
+		$this->zbxTestLogin('zabbix.php?action=correlation.list');
+		$this->query('button:Create correlation')->one()->click();
 		$this->zbxTestCheckHeader('Event correlation rules');
 		$this->zbxTestCheckTitle('Event correlation rules');
 
@@ -364,7 +354,6 @@ class testFormEventCorrelation extends CLegacyWebTest {
 		$this->zbxTestClickXpath("//div[@class='overlay-dialogue-footer']//button[text()='Add']");
 		COverlayDialogElement::ensureNotPresent();
 
-		$this->zbxTestTabSwitch('Operations');
 		$this->zbxTestCheckboxSelect('operation_0_type');
 		$this->zbxTestClick('add');
 		$this->zbxTestWaitUntilMessageTextPresent('msg-good', 'Correlation added');
@@ -429,8 +418,8 @@ class testFormEventCorrelation extends CLegacyWebTest {
 	 * @dataProvider tagsValidation
 	 */
 	public function testFormEventCorrelation_CheckEmptyTagsValue($data) {
-		$this->zbxTestLogin('correlation.php');
-		$this->zbxTestClickWait('form');
+		$this->zbxTestLogin('zabbix.php?action=correlation.list');
+		$this->query('button:Create correlation')->one()->click();
 		$this->zbxTestCheckHeader('Event correlation rules');
 		$this->zbxTestCheckTitle('Event correlation rules');
 
@@ -509,8 +498,8 @@ class testFormEventCorrelation extends CLegacyWebTest {
 	 * @dataProvider calculation
 	 */
 	public function testFormEventCorrelation_CreateCalculation($data) {
-		$this->zbxTestLogin('correlation.php');
-		$this->zbxTestClickWait('form');
+		$this->zbxTestLogin('zabbix.php?action=correlation.list');
+		$this->query('button:Create correlation')->one()->click();
 		$this->zbxTestCheckHeader('Event correlation rules');
 		$this->zbxTestCheckTitle('Event correlation rules');
 
@@ -536,7 +525,6 @@ class testFormEventCorrelation extends CLegacyWebTest {
 			}
 		}
 
-		$this->zbxTestTabSwitch('Operations');
 		$this->zbxTestCheckboxSelect('operation_0_type');
 		$this->zbxTestClick('add');
 		$this->zbxTestWaitUntilMessageTextPresent('msg-good', 'Correlation added');
@@ -556,7 +544,7 @@ class testFormEventCorrelation extends CLegacyWebTest {
 						['select_tag' => 'New event tag name', 'tag_name' => 'Test tag2' ]
 					],
 					'formula'=> '',
-					'error_message' => 'Incorrect custom expression "" for correlation "Test create with empty expression": expression is empty.'
+					'error_message' => 'Invalid parameter "/1/filter/formula": cannot be empty.'
 				]
 			],
 			[
@@ -568,7 +556,7 @@ class testFormEventCorrelation extends CLegacyWebTest {
 						['select_tag' => 'Old event tag value', 'tag_name' => 'Test tag3', 'operator' => 'contains','value' => 'Value']
 					],
 					'formula'=> 'A or B',
-					'error_message' => 'Condition "C" is not used in formula "A or B" for correlation "Test create with missing argument".'
+					'error_message' => 'Invalid parameter "/1/operations": cannot be empty.'
 				]
 			],
 			[
@@ -580,7 +568,7 @@ class testFormEventCorrelation extends CLegacyWebTest {
 						['select_tag' => 'Old event tag value', 'tag_name' => 'Test tag3', 'operator' => 'contains','value' => 'Value']
 					],
 					'formula'=> '(A or B) and (C or D)',
-					'error_message' => 'Condition "D" used in formula "(A or B) and (C or D)" for correlation "Test create with extra argument" is not defined.'
+					'error_message' => 'Invalid parameter "/1/operations": cannot be empty.'
 				]
 			],
 			[
@@ -592,7 +580,7 @@ class testFormEventCorrelation extends CLegacyWebTest {
 						['select_tag' => 'Old event tag value', 'tag_name' => 'Test tag3', 'operator' => 'contains','value' => 'Value']
 					],
 					'formula'=> 'Wrong formula',
-					'error_message' => 'Incorrect custom expression "Wrong formula" for correlation "Test create with wrong formula": check expression starting from "Wrong formula".'
+					'error_message' => 'Invalid parameter "/1/filter/formula": check expression starting from "Wrong formula".'
 				]
 			],
 			[
@@ -603,7 +591,7 @@ class testFormEventCorrelation extends CLegacyWebTest {
 						['select_tag' => 'New event tag name', 'tag_name' => 'Test tag2' ]
 					],
 					'formula'=> 'A and Not B',
-					'error_message' => 'Incorrect custom expression "A and Not B" for correlation "Check case sensitive of operator in formula": check expression starting from "Not B".'
+					'error_message' => 'Invalid parameter "/1/filter/formula": check expression starting from "Not B".'
 				]
 			],
 			[
@@ -614,7 +602,7 @@ class testFormEventCorrelation extends CLegacyWebTest {
 						['select_tag' => 'New event tag name', 'tag_name' => 'Test tag2' ]
 					],
 					'formula'=> 'NOT A and not B',
-					'error_message' => 'Incorrect custom expression "NOT A and not B" for correlation "Check case sensitive of first operator in formula": check expression starting from " A and not B".'
+					'error_message' => 'Invalid parameter "/1/filter/formula": check expression starting from " A and not B".'
 				]
 			],
 			[
@@ -625,7 +613,7 @@ class testFormEventCorrelation extends CLegacyWebTest {
 						['select_tag' => 'New event tag name', 'tag_name' => 'Test tag2' ]
 					],
 					'formula'=> 'not A not B',
-					'error_message' => 'Incorrect custom expression "not A not B" for correlation "Test create with only NOT in formula": check expression starting from " not B".'
+					'error_message' => 'Invalid parameter "/1/filter/formula": check expression starting from " not B".'
 				]
 			]
 		];
@@ -637,8 +625,8 @@ class testFormEventCorrelation extends CLegacyWebTest {
 	 * @dataProvider formulaValidation
 	 */
 	public function testFormEventCorrelation_FormulaValidation($data) {
-		$this->zbxTestLogin('correlation.php');
-		$this->zbxTestClickWait('form');
+		$this->zbxTestLogin('zabbix.php?action=correlation.list');
+		$this->query('button:Create correlation')->one()->click();
 		$this->zbxTestCheckHeader('Event correlation rules');
 		$this->zbxTestCheckTitle('Event correlation rules');
 
@@ -667,15 +655,15 @@ class testFormEventCorrelation extends CLegacyWebTest {
 		$this->zbxTestClick('add');
 
 		$this->zbxTestWaitUntilMessageTextPresent('msg-bad', 'Cannot add correlation');
-		$error = $this->zbxTestGetText('//ul[@class=\'msg-details-border\']');
-		$this->assertContains($data['error_message'], $error);
+		$error = $this->zbxTestGetText('//ul[@class=\'list-dashed msg-details-border\']');
+		$this->assertStringContainsString($data['error_message'], $error);
 
 		$sql = 'SELECT NULL FROM correlation WHERE name='.zbx_dbstr($data['name']);
 		$this->assertEquals(0, CDBHelper::getCount($sql));
 	}
 
 	public function testFormEventCorrelation_Clone() {
-		$this->zbxTestLogin('correlation.php');
+		$this->zbxTestLogin('zabbix.php?action=correlation.list');
 		$this->zbxTestClickLinkTextWait('Event correlation for clone');
 		$this->zbxTestCheckHeader('Event correlation rules');
 		$this->zbxTestCheckTitle('Event correlation rules');
@@ -704,7 +692,7 @@ class testFormEventCorrelation extends CLegacyWebTest {
 		$sql_hash = 'SELECT * FROM correlation ORDER BY correlationid';
 		$old_hash = CDBHelper::getHash($sql_hash);
 
-		$this->zbxTestLogin('correlation.php');
+		$this->zbxTestLogin('zabbix.php?action=correlation.list');
 		$this->zbxTestClickLinkTextWait('Event correlation for update');
 		$this->zbxTestCheckHeader('Event correlation rules');
 		$this->zbxTestCheckTitle('Event correlation rules');
@@ -718,7 +706,7 @@ class testFormEventCorrelation extends CLegacyWebTest {
 	}
 
 	public function testFormEventCorrelation_UpdateAllFields() {
-		$this->zbxTestLogin('correlation.php');
+		$this->zbxTestLogin('zabbix.php?action=correlation.list');
 		$this->zbxTestClickLinkTextWait('Event correlation for update');
 		$this->zbxTestCheckHeader('Event correlation rules');
 		$this->zbxTestCheckTitle('Event correlation rules');
@@ -737,7 +725,6 @@ class testFormEventCorrelation extends CLegacyWebTest {
 
 		$this->zbxTestInputTypeOverwrite('description', 'New test description update');
 
-		$this->zbxTestTabSwitch('Operations');
 		$this->zbxTestCheckboxSelect('operation_0_type', false);
 		$this->zbxTestCheckboxSelect('operation_1_type');
 		$this->zbxTestClick('update');
@@ -759,7 +746,7 @@ class testFormEventCorrelation extends CLegacyWebTest {
 	}
 
 	public function testFormEventCorrelation_Delete() {
-		$this->zbxTestLogin('correlation.php');
+		$this->zbxTestLogin('zabbix.php?action=correlation.list');
 		$this->zbxTestClickLinkTextWait('Event correlation for delete');
 		$this->zbxTestCheckHeader('Event correlation rules');
 		$this->zbxTestCheckTitle('Event correlation rules');
@@ -777,7 +764,7 @@ class testFormEventCorrelation extends CLegacyWebTest {
 		$sql_hash = 'SELECT * FROM correlation ORDER BY correlationid';
 		$old_hash = CDBHelper::getHash($sql_hash);
 
-		$this->zbxTestLogin('correlation.php');
+		$this->zbxTestLogin('zabbix.php?action=correlation.list');
 		$this->zbxTestClickLinkTextWait('Event correlation for cancel');
 		$this->zbxTestCheckHeader('Event correlation rules');
 		$this->zbxTestCheckTitle('Event correlation rules');

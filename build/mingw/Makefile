@@ -16,6 +16,7 @@ OBJS = \
 	$(OUTPUTDIR)\threads.o \
 	$(OUTPUTDIR)\str.o \
 	$(OUTPUTDIR)\misc.o \
+	$(OUTPUTDIR)\time.o \
 	$(OUTPUTDIR)\fatal.o \
 	$(OUTPUTDIR)\disk.o \
 	$(OUTPUTDIR)\iprange.o \
@@ -28,8 +29,14 @@ OBJS = \
 	$(OUTPUTDIR)\file.o \
 	$(OUTPUTDIR)\alias.o \
 	$(OUTPUTDIR)\algodefs.o \
+	$(OUTPUTDIR)\json.o \
+	$(OUTPUTDIR)\json_parser.o \
+	$(OUTPUTDIR)\jsonpath.o \
+	$(OUTPUTDIR)\sha256crypt.o \
+	$(OUTPUTDIR)\variant.o \
 	$(OUTPUTDIR)\sysinfo_system.o \
 	$(OUTPUTDIR)\sysinfo_dns.o \
+	$(OUTPUTDIR)\sysinfo_file.o \
 	$(OUTPUTDIR)\sysinfo_dir.o \
 	$(OUTPUTDIR)\eventlog.o \
 	$(TARGETDIR)\resource.syso
@@ -69,8 +76,15 @@ ifneq ("$(OPENSSL)", "")
 endif
 
 ifneq ("$(PCRE)", "")
-	CFLAGS := $(CFLAGS) -I$(PCRE)\include
+	CFLAGS := $(CFLAGS) -DPCRE_STATIC -I$(PCRE)\include -DHAVE_PCRE_H=1
 	LDFLAGS := $(LDFLAGS) -L$(PCRE)\lib
+	TAGS := $(TAGS) pcre
+endif
+
+ifneq ("$(PCRE2)", "")
+	CFLAGS := $(CFLAGS) -DPCRE2_STATIC -I$(PCRE2)\include -DHAVE_PCRE2_H=1
+	LDFLAGS := $(LDFLAGS) -L$(PCRE2)\lib
+	TAGS := $(TAGS) pcre2
 endif
 
 CGO_CFLAGS += $(CFLAGS)
@@ -78,10 +92,10 @@ CGO_LDFLAGS += $(LDFLAGS)
 
 PKG=zabbix.com/pkg/version
 
-GOLDFLAGS = -X $(PKG).titleMessage=zabbix_agent2
-GOLDFLAGS += -X $(PKG).compileOs=windows
+GOLDFLAGS = -X $(PKG).compileOs=windows
 GOLDFLAGS += -X $(PKG).compileArch=$(GOARCH)
 GOLDFLAGS += -X main.confDefault=zabbix_agent2.win.conf
+GOLDFLAGS += -X main.applicationName=zabbix_agent2
 
 all: $(TARGETBIN)
 
@@ -100,6 +114,9 @@ $(OUTPUTDIR)\file.o: $(TOPDIR)\src\libs\zbxcommon\file.c
 $(OUTPUTDIR)\alias.o: $(TOPDIR)\src\libs\zbxcommon\alias.c
 	$(CC) $(CFLAGS) -DUNICODE -c $^ -o $@
 
+$(OUTPUTDIR)\time.o: $(TOPDIR)\src\libs\zbxcommon\time.c
+	$(CC) $(CFLAGS) -DUNICODE -c $^ -o $@
+
 $(OUTPUTDIR)\tls_version.o: $(TOPDIR)\src\libs\zbxcrypto\tls_version.c
 	$(CC) $(CFLAGS) -DUNICODE -c $^ -o $@
 
@@ -115,6 +132,21 @@ $(OUTPUTDIR)\threads.o: $(TOPDIR)\src\libs\zbxsys\threads.c
 $(OUTPUTDIR)\md5.o: $(TOPDIR)\src\libs\zbxcrypto\md5.c
 	$(CC) $(CFLAGS) -DUNICODE -c $^ -o $@
 
+$(OUTPUTDIR)\json_parser.o: $(TOPDIR)\src\libs\zbxjson\json_parser.c
+	$(CC) $(CFLAGS) -DUNICODE -DWITH_COMMON_METRICS -c $^ -o $@
+
+$(OUTPUTDIR)\jsonpath.o: $(TOPDIR)\src\libs\zbxjson\jsonpath.c
+	$(CC) $(CFLAGS) -DUNICODE -DWITH_COMMON_METRICS -c $^ -o $@
+
+$(OUTPUTDIR)\sha256crypt.o: $(TOPDIR)\src\libs\zbxcrypto\sha256crypt.c
+	$(CC) $(CFLAGS) -DUNICODE -DWITH_COMMON_METRICS -c $^ -o $@
+
+$(OUTPUTDIR)\variant.o: $(TOPDIR)\src\libs\zbxcommon\variant.c
+	$(CC) $(CFLAGS) -DUNICODE -DWITH_COMMON_METRICS -c $^ -o $@
+
+$(OUTPUTDIR)\json.o: $(TOPDIR)\src\libs\zbxjson\json.c
+	$(CC) $(CFLAGS) -DUNICODE -DWITH_COMMON_METRICS -c $^ -o $@
+
 $(OUTPUTDIR)\sysinfo.o: $(TOPDIR)\src\libs\zbxsysinfo\sysinfo.c
 	$(CC) $(CFLAGS) -DUNICODE -DWITH_COMMON_METRICS -c $^ -o $@
 
@@ -122,6 +154,9 @@ $(OUTPUTDIR)\sysinfo_system.o: $(TOPDIR)\src\libs\zbxsysinfo\common\system.c
 	$(CC) $(CFLAGS) -DUNICODE -c $^ -o $@
 
 $(OUTPUTDIR)\sysinfo_dns.o: $(TOPDIR)\src\libs\zbxsysinfo\common\dns.c
+	$(CC) $(CFLAGS) -DUNICODE -c $^ -o $@
+
+$(OUTPUTDIR)\sysinfo_file.o: $(TOPDIR)\src\libs\zbxsysinfo\common\file.c
 	$(CC) $(CFLAGS) -DUNICODE -c $^ -o $@
 
 $(OUTPUTDIR)\sysinfo_dir.o: $(TOPDIR)\src\libs\zbxsysinfo\common\dir.c
@@ -134,7 +169,7 @@ $(OUTPUTDIR)\algodefs.o: $(TOPDIR)\src\libs\zbxalgo\algodefs.c
 	$(CC) $(CFLAGS) -DUNICODE -c $^ -o $@
 
 $(OUTPUTDIR)\zbxregexp.o: $(TOPDIR)\src\libs\zbxregexp\zbxregexp.c
-	$(CC) $(CFLAGS) -DUNICODE -DPCRE_STATIC -c $^ -o $@
+	$(CC) $(CFLAGS) -DUNICODE -c $^ -o $@
 
 $(OUTPUTDIR)\persistent_state.o: $(TOPDIR)\src\zabbix_agent\logfiles\persistent_state.c
 	$(CC) $(CFLAGS) -DUNICODE -c $^ -o $@

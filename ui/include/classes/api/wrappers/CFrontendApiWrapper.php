@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -59,19 +59,6 @@ class CFrontendApiWrapper extends CApiWrapper {
 	 * @return mixed
 	 */
 	protected function callMethod($method, array $params) {
-		/* RSM specifics: warn if $options for get() method includes 'itemid', 'hostid', 'templateid' etc */
-		if (strtolower($method) === 'get')
-		{
-			foreach (array_keys($params) as $key)
-			{
-				if (preg_match('/id$/', $key))
-				{
-					trigger_error("\$options contains '{$key}', should be '{$key}s'", E_USER_WARNING);
-				}
-			}
-		}
-		/* RSM specifics: end */
-
 		API::setWrapper();
 		$response = parent::callMethod($method, $params);
 		API::setWrapper($this);
@@ -121,6 +108,7 @@ class CFrontendApiWrapper extends CApiWrapper {
 	protected function requiresAuthentication($api, $method) {
 		return !(($api === 'user' && $method === 'login')
 			|| ($api === 'user' && $method === 'checkAuthentication')
-			|| ($api === 'apiinfo' && $method === 'version'));
+			|| ($api === 'apiinfo' && $method === 'version')
+			|| ($api === 'settings' && $method === 'getGlobal'));
 	}
 }

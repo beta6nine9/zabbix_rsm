@@ -37,7 +37,7 @@ In the group chat send "/start@your_bot_name_here". If you skip this step, Teleg
 
 ## Zabbix setup
 
-1\. In the "Administration > Media types" section, import the media_telegram.xml.
+1\. In the "Administration > Media types" section, import the media_telegram.yaml.
 2\. Configure the added media type: 
 Copy and paste your Telegram bot token into the "telegramToken" field.
 
@@ -63,4 +63,4 @@ In the "Send to" field enter Telegram user chat ID or group ID obtained during T
 
 Make sure the user has access to all hosts for which you would like to receive Telegram notifications.
 
-Great, you can now start receivng Zabbix notifications in Telegram!
+Great, you can now start receiving Zabbix notifications in Telegram!

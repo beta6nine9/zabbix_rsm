@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -33,8 +33,6 @@
 
 /******************************************************************************
  *                                                                            *
- * Function: evaluate_history_func_min                                        *
- *                                                                            *
  * Purpose: calculate minimum value from the history value vector             *
  *                                                                            *
  * Parameters: values      - [IN] a vector containing history values          *
@@ -64,8 +62,6 @@ static void	evaluate_history_func_min(zbx_vector_history_record_t *values, int v
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: evaluate_history_func_max                                        *
  *                                                                            *
  * Purpose: calculate maximum value from the history value vector             *
  *                                                                            *
@@ -97,8 +93,6 @@ static void	evaluate_history_func_max(zbx_vector_history_record_t *values, int v
 
 /******************************************************************************
  *                                                                            *
- * Function: evaluate_history_func_sum                                        *
- *                                                                            *
  * Purpose: calculate sum of values from the history value vector             *
  *                                                                            *
  * Parameters: values      - [IN] a vector containing history values          *
@@ -127,8 +121,6 @@ static void	evaluate_history_func_sum(zbx_vector_history_record_t *values, int v
 
 /******************************************************************************
  *                                                                            *
- * Function: evaluate_history_func_avg                                        *
- *                                                                            *
  * Purpose: calculate average value of values from the history value vector   *
  *                                                                            *
  * Parameters: values      - [IN] a vector containing history values          *
@@ -149,8 +141,6 @@ static void	evaluate_history_func_avg(zbx_vector_history_record_t *values, int v
 
 /******************************************************************************
  *                                                                            *
- * Function: evaluate_history_func_count                                      *
- *                                                                            *
  * Purpose: calculate number of values in value vector                        *
  *                                                                            *
  * Parameters: values      - [IN] a vector containing history values          *
@@ -170,8 +160,6 @@ static void	evaluate_history_func_count(zbx_vector_history_record_t *values, int
 
 /******************************************************************************
  *                                                                            *
- * Function: evaluate_history_func_last                                       *
- *                                                                            *
  * Purpose: calculate the last (newest) value in value vector                 *
  *                                                                            *
  * Parameters: values      - [IN] a vector containing history values          *
@@ -184,8 +172,6 @@ static void	evaluate_history_func_last(zbx_vector_history_record_t *values, hist
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: evaluate_history_func                                            *
  *                                                                            *
  * Purpose: calculate function with values from value vector                  *
  *                                                                            *
@@ -228,8 +214,6 @@ static void	evaluate_history_func(zbx_vector_history_record_t *values, int value
 
 /******************************************************************************
  *                                                                            *
- * Function: quote_string                                                     *
- *                                                                            *
  * Purpose: quotes string by enclosing it in double quotes and escaping       *
  *          double quotes inside string with '\'.                             *
  *                                                                            *
@@ -264,8 +248,6 @@ static void	quote_string(char **str, size_t sz_src)
 
 /******************************************************************************
  *                                                                            *
- * Function: aggregate_quote_groups                                           *
- *                                                                            *
  * Purpose: quotes the individual groups in the list if necessary             *
  *                                                                            *
  ******************************************************************************/
@@ -287,8 +269,6 @@ static void	aggregate_quote_groups(char **str, size_t *str_alloc, size_t *str_of
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: aggregate_get_items                                              *
  *                                                                            *
  * Purpose: get array of items specified by key for selected groups           *
  *          (including nested groups)                                         *
@@ -377,8 +357,6 @@ out:
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: evaluate_aggregate                                               *
  *                                                                            *
  * Parameters: item      - [IN] aggregated item                               *
  *             grp_func  - [IN] one of ZBX_GRP_FUNC_*                         *
@@ -505,149 +483,6 @@ clean2:
 	zbx_history_record_vector_destroy(&group_values, item->value_type);
 clean1:
 	zbx_vector_uint64_destroy(&itemids);
-
-	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
-
-	return ret;
-}
-
-/******************************************************************************
- *                                                                            *
- * Function: get_value_aggregate                                              *
- *                                                                            *
- * Purpose: retrieve data from Zabbix server (aggregate items)                *
- *                                                                            *
- * Parameters: item - item we are interested in                               *
- *                                                                            *
- * Return value: SUCCEED - data successfully retrieved and stored in result   *
- *                         and result_str (as string)                         *
- *               NOTSUPPORTED - requested item is not supported               *
- *                                                                            *
- * Author: Alexei Vladishev                                                   *
- *                                                                            *
- ******************************************************************************/
-int	get_value_aggregate(const DC_ITEM *item, AGENT_RESULT *result)
-{
-	AGENT_REQUEST		request;
-	int			ret = NOTSUPPORTED;
-	const char		*tmp, *groups, *itemkey, *funcp = NULL;
-	int			grp_func, item_func, params_num;
-	zbx_vector_str_t	group_names;
-
-	zabbix_log(LOG_LEVEL_DEBUG, "In %s() key:'%s'", __func__, item->key_orig);
-
-	init_request(&request);
-	zbx_vector_str_create(&group_names);
-
-	if (ITEM_VALUE_TYPE_FLOAT != item->value_type && ITEM_VALUE_TYPE_UINT64 != item->value_type)
-	{
-		SET_MSG_RESULT(result, zbx_strdup(NULL, "Value type must be Numeric for aggregate items"));
-		goto out;
-	}
-
-	if (SUCCEED != parse_item_key(item->key, &request))
-	{
-		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid item key format."));
-		goto out;
-	}
-
-	if (0 == strcmp(get_rkey(&request), "grpmin"))
-	{
-		grp_func = ZBX_VALUE_FUNC_MIN;
-	}
-	else if (0 == strcmp(get_rkey(&request), "grpavg"))
-	{
-		grp_func = ZBX_VALUE_FUNC_AVG;
-	}
-	else if (0 == strcmp(get_rkey(&request), "grpmax"))
-	{
-		grp_func = ZBX_VALUE_FUNC_MAX;
-	}
-	else if (0 == strcmp(get_rkey(&request), "grpsum"))
-	{
-		grp_func = ZBX_VALUE_FUNC_SUM;
-	}
-	else
-	{
-		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid item key."));
-		goto out;
-	}
-
-	params_num = get_rparams_num(&request);
-
-	if (3 > params_num || params_num > 4)
-	{
-		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid number of parameters."));
-		goto out;
-	}
-
-	groups = get_rparam(&request, 0);
-	itemkey = get_rparam(&request, 1);
-	tmp = get_rparam(&request, 2);
-
-	if (REQUEST_PARAMETER_TYPE_ARRAY == get_rparam_type(&request, 0))
-	{
-		int				i, groups_num;
-		char				*group;
-		zbx_request_parameter_type_t	type;
-
-		groups_num = num_param(groups);
-
-		for (i = 1; i <= groups_num; i++)
-		{
-			if (NULL == (group = get_param_dyn(groups, i, &type)))
-				continue;
-
-			zbx_vector_str_append(&group_names, group);
-
-			if (REQUEST_PARAMETER_TYPE_STRING != type)
-			{
-				SET_MSG_RESULT(result, zbx_dsprintf(NULL, "Invalid host group list: %s", groups));
-				goto out;
-			}
-		}
-	}
-	else
-		zbx_vector_str_append(&group_names, zbx_strdup(NULL, groups));
-
-	zabbix_log(LOG_LEVEL_DEBUG, "Host groups: '%s', Item key: '%s', Item function: '%s'", groups, itemkey, tmp);
-
-	if (0 == strcmp(tmp, "min"))
-		item_func = ZBX_VALUE_FUNC_MIN;
-	else if (0 == strcmp(tmp, "avg"))
-		item_func = ZBX_VALUE_FUNC_AVG;
-	else if (0 == strcmp(tmp, "max"))
-		item_func = ZBX_VALUE_FUNC_MAX;
-	else if (0 == strcmp(tmp, "sum"))
-		item_func = ZBX_VALUE_FUNC_SUM;
-	else if (0 == strcmp(tmp, "count"))
-		item_func = ZBX_VALUE_FUNC_COUNT;
-	else if (0 == strcmp(tmp, "last"))
-		item_func = ZBX_VALUE_FUNC_LAST;
-	else
-	{
-		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid third parameter."));
-		goto out;
-	}
-
-	if (4 == params_num)
-	{
-		funcp = get_rparam(&request, 3);
-	}
-	else if (3 == params_num && ZBX_VALUE_FUNC_LAST != item_func)
-	{
-		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid number of parameters."));
-		goto out;
-	}
-
-	if (SUCCEED != evaluate_aggregate(item, result, grp_func, &group_names, itemkey, item_func, funcp))
-		goto out;
-
-	ret = SUCCEED;
-out:
-	zbx_vector_str_clear_ext(&group_names, zbx_str_free);
-	zbx_vector_str_destroy(&group_names);
-	free_request(&request);
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __func__, zbx_result_string(ret));
 

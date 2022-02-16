@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -33,7 +33,7 @@ class testPageSearch extends CLegacyWebTest {
 		$this->zbxTestTextPresent('ЗАББИКС Сервер');
 		$this->zbxTestTextNotPresent('Zabbix server');
 		$this->zbxTestTextPresent('127.0.0.1');
-		$this->zbxTestTextPresent(['Latest data', 'Triggers', 'Applications', 'Items', 'Triggers', 'Graphs', 'Problems']);
+		$this->zbxTestTextPresent(['Latest data', 'Triggers', 'Items', 'Triggers', 'Graphs', 'Problems']);
 	}
 
 	public function testPageSearch_FindNotExistingHost() {

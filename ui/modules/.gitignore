@@ -2,7 +2,3 @@
 *
 # Except this file
 !.gitignore
-!RSM/
-!RSM/**
-!RsmProvisioningApi/
-!RsmProvisioningApi/**

@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -29,8 +29,7 @@ class CControllerNotificationsGet extends CController {
 
 		$this->notifications = [];
 		$this->settings = getMessageSettings();
-		$config = select_config();
-		$ok_timeout = (int) timeUnitToSeconds($config['ok_period']);
+		$ok_timeout = (int) timeUnitToSeconds(CSettingsHelper::get(CSettingsHelper::OK_PERIOD));
 		$timeout = (int) timeUnitToSeconds($this->settings['timeout']);
 		$this->settings['timeout'] = $timeout;
 		$this->settings['ok_timeout'] = min([$timeout, $ok_timeout]);
@@ -192,14 +191,14 @@ class CControllerNotificationsGet extends CController {
 
 				$url_problems = (new CUrl('zabbix.php'))
 					->setArgument('action', 'problem.view')
-					->setArgument('filter_hostids[]', $trigger['hosts'][0]['hostid'])
-					->setArgument('filter_set', '1')
+					->setArgument('filter_name', '')
+					->setArgument('hostids[]', $trigger['hosts'][0]['hostid'])
 					->getUrl();
 
 				$url_events = (new CUrl('zabbix.php'))
 					->setArgument('action', 'problem.view')
-					->setArgument('filter_triggerids[]', $triggerid)
-					->setArgument('filter_set', '1')
+					->setArgument('filter_name', '')
+					->setArgument('triggerids[]', $triggerid)
 					->getUrl();
 
 				$url_trigger_events_pt = (new CUrl('tr_events.php'))->setArgument('triggerid', $triggerid);

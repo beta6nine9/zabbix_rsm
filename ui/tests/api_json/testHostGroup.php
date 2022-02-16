@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -254,7 +254,7 @@ class testHostGroup extends CAPITest {
 					'name' => 'API updated discovered group'
 					]
 				],
-				'expected_error' => 'Cannot update a discovered host group.'
+				'expected_error' => 'Cannot update a discovered host group "API discovery group {#HV.NAME}".'
 			],
 			// Check successfully update.
 			[
@@ -363,7 +363,7 @@ class testHostGroup extends CAPITest {
 				'hostgroup' => [
 					'50007'
 				],
-				'expected_error' => 'Host group "API host group delete internal" is internal and can not be deleted.'
+				'expected_error' => 'Host group "API host group delete internal" is internal and cannot be deleted.'
 			],
 			[
 				'hostgroup' => [
@@ -454,7 +454,7 @@ class testHostGroup extends CAPITest {
 				'hostgroup' => [
 					'name' => 'API host group create as zabbix admin'
 				],
-				'expected_error' => 'Only Super Admins can create host groups.'
+				'expected_error' => 'No permissions to call "hostgroup.create".'
 			],
 			[
 				'method' => 'hostgroup.update',
@@ -479,7 +479,7 @@ class testHostGroup extends CAPITest {
 				'valuemap' => [
 					'name' => 'API host group create as zabbix user'
 				],
-				'expected_error' => 'Only Super Admins can create host groups.'
+				'expected_error' => 'No permissions to call "hostgroup.create".'
 			],
 			[
 				'method' => 'hostgroup.update',
@@ -488,7 +488,7 @@ class testHostGroup extends CAPITest {
 					'groupid' => '50005',
 					'name' => 'API host group update as zabbix user without peremissions'
 				],
-				'expected_error' => 'No permissions to referred object or it does not exist!'
+				'expected_error' => 'No permissions to call "hostgroup.update".'
 			],
 			[
 				'method' => 'hostgroup.delete',
@@ -496,7 +496,7 @@ class testHostGroup extends CAPITest {
 				'hostgroup' => [
 					'50008'
 				],
-				'expected_error' => 'No permissions to referred object or it does not exist!'
+				'expected_error' => 'No permissions to call "hostgroup.delete".'
 			]
 		];
 	}

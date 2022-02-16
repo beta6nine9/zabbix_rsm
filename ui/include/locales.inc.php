@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -43,7 +43,6 @@ function init_mbstrings() {
  */
 function getLocales() {
 	return [
-		'en_GB' => ['name' => _('English (en_GB)'),	'display' => true],
 		'en_US' => ['name' => _('English (en_US)'),	'display' => true],
 		'bg_BG' => ['name' => _('Bulgarian (bg_BG)'),	'display' => false],
 		'ca_ES' => ['name' => _('Catalan (ca_ES)'),	'display' => false],
@@ -98,6 +97,26 @@ function getSupportUrl(string $language = null): string {
 	];
 
 	return array_key_exists($language, $urls) ? $urls[$language] : 'https://www.zabbix.com/support';
+}
+
+/**
+ * Get integrations URL for specified language.
+ *
+ * @param string|null $language  ISO639-1 code or null for English integrations URL.
+ *
+ * @return string
+ */
+function getIntegrationsUrl(string $language = null): string {
+	$urls = [
+		'cs' => 'https://www.zabbix.com/cz/integrations',
+		'fr' => 'https://www.zabbix.com/fr/integrations',
+		'ja' => 'https://www.zabbix.com/jp/integrations',
+		'pt' => 'https://www.zabbix.com/br/integrations',
+		'ru' => 'https://www.zabbix.com/ru/integrations',
+		'zh' => 'https://www.zabbix.com/cn/integrations'
+	];
+
+	return array_key_exists($language, $urls) ? $urls[$language] : 'https://www.zabbix.com/integrations';
 }
 
 /**
@@ -168,7 +187,6 @@ function zbx_locale_variants_win($language) {
 	// http://docs.moodle.org/dev/Table_of_locales#Table
 	// This array should contain all array keys from getLocales() function, but in lowercase.
 	$win_language_names = [
-		'en_gb' => ['English_United Kingdom.1252', 'english-uk'],
 		'en_us' => ['English_United States.1252', 'english-usa'],
 		'bg_bg' => ['Bulgarian_Bulgaria.1251'],
 		'ca_es' => ['Catalan_Spain.1252'],

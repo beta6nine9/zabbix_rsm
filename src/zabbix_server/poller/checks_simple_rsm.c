@@ -4947,6 +4947,13 @@ out:
 	return ret;
 }
 
+static void	str_base64_decode_dyn(const char *in, int in_size, char **out, int *out_size)
+{
+	*out = zbx_malloc(*out, in_size);
+
+	str_base64_decode(in, *out, in_size, out_size);
+}
+
 int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *result)
 {
 	ldns_resolver		*res = NULL;
