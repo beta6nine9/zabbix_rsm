@@ -28,7 +28,6 @@ our @EXPORT = qw(
 	str_starts_with
 	ltrim
 	rtrim
-	to_unixtimestamp
 	format_table
 	start_tool
 	stop_tool
@@ -37,7 +36,6 @@ our @EXPORT = qw(
 use Archive::Tar;
 use Cwd qw(cwd);
 use Data::Dumper;
-use Date::Parse;
 use File::Spec;
 use IO::Select;
 use IPC::Open3;
@@ -754,11 +752,6 @@ sub rtrim($;$)
 	my $chars  = shift // '\s';
 
 	return $string =~ s/[$chars]+$//r;
-}
-
-sub to_unixtimestamp($)
-{
-	return str2time(shift);
 }
 
 sub format_table($$)
