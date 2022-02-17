@@ -34,6 +34,8 @@ int	CONFIG_SELFMON_FORKS;
 int	CONFIG_WATCHDOG_FORKS;
 int	CONFIG_DATASENDER_FORKS;
 int	CONFIG_HEARTBEAT_FORKS;
+int	CONFIG_ODBCPOLLER_FORKS;
+int	CONFIG_HISTORYPOLLER_FORKS;
 int	CONFIG_LISTEN_PORT;
 char	*CONFIG_LISTEN_IP;
 char	*CONFIG_SOURCE_IP;
@@ -130,12 +132,20 @@ char	*CONFIG_EXPORT_DIR;
 char		*CONFIG_EXPORT_TYPE = NULL;
 zbx_uint64_t	*CONFIG_EXPORT_FILE_SIZE;
 
+zbx_uint64_t	CONFIG_TREND_FUNC_CACHE_SIZE;
+
 unsigned int	configured_tls_connect_mode;
 unsigned int	configured_tls_accept_mode;
 unsigned int	configured_tls_connect_modes;
 unsigned int	configured_tls_accept_modes;
 
 int	CONFIG_TCP_MAX_BACKLOG_SIZE	= SOMAXCONN;
+char	*CONFIG_VAULTTOKEN;
+char	*CONFIG_VAULTDBPATH;
+char	*CONFIG_VAULTURL;
+char	*CONFIG_SSL_KEY_LOCATION;
+char	*CONFIG_SSL_CA_LOCATION;
+char	*CONFIG_SSL_CERT_LOCATION;
 
 ZBX_METRIC      parameters_common_http[] =
 /*	KEY			FLAG		FUNCTION		TEST PARAMETERS */
