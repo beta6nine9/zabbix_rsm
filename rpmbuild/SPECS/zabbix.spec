@@ -1,7 +1,7 @@
-%define	namespace	50
+%define	namespace	60
 
 Name:		zabbix%{namespace}
-Version:	5.0.19%{rsmversion}
+Version:	6.0.0%{rsmversion}
 Release: 	%{?rsmprereleasetag:0.}1%{?rsmprereleasetag:%{rsmprereleasetag}}%{?dist}
 Summary:	The Enterprise-class open source monitoring solution
 Group:		Applications/Internet
