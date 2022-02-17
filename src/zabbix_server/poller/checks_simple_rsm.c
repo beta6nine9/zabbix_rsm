@@ -4676,14 +4676,14 @@ static int	zbx_ssl_attach_cert(SSL *ssl, char *cert, int cert_len, int *rtt, cha
 	if (NULL == (x509 = PEM_read_bio_X509(bio, NULL, NULL, NULL)))
 	{
 		*rtt = ZBX_EC_EPP_CRYPT;
-		zbx_ssl_get_error(err, err_size);
+		/*zbx_ssl_get_error(err, err_size);*/
 		goto out;
 	}
 
 	if (1 != SSL_use_certificate(ssl, x509))
 	{
 		*rtt = ZBX_EC_EPP_CRYPT;
-		zbx_ssl_get_error(err, err_size);
+		/*zbx_ssl_get_error(err, err_size);*/
 		goto out;
 	}
 
@@ -4714,14 +4714,14 @@ static int	zbx_ssl_attach_privkey(SSL *ssl, char *privkey, size_t privkey_len, i
 	if (NULL == (rsa = PEM_read_bio_RSAPrivateKey(bio, NULL, NULL, NULL)))
 	{
 		*rtt = ZBX_EC_EPP_CRYPT;
-		zbx_ssl_get_error(err, err_size);
+		/*zbx_ssl_get_error(err, err_size);*/
 		goto out;
 	}
 
 	if (1 != SSL_use_RSAPrivateKey(ssl, rsa))
 	{
 		*rtt = ZBX_EC_EPP_CRYPT;
-		zbx_ssl_get_error(err, err_size);
+		/*zbx_ssl_get_error(err, err_size);*/
 		goto out;
 	}
 
@@ -5047,7 +5047,7 @@ int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *
 	/* from this point item will not become NOTSUPPORTED */
 	ret = SYSINFO_RET_OK;
 
-	if (SUCCEED != rsm_ssl_init())
+	if (1)/*if (SUCCEED != rsm_ssl_init())*/
 	{
 		rtt1 = rtt2 = rtt3 = ZBX_EC_EPP_INTERNAL_GENERAL;
 		rsm_err(log_fd, "cannot initialize SSL library");
@@ -5160,7 +5160,7 @@ int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *
 	if (1 != SSL_connect(ssl))
 	{
 		rtt1 = rtt2 = rtt3 = ZBX_EC_EPP_INTERNAL_GENERAL;
-		zbx_ssl_get_error(err, sizeof(err));
+		/*zbx_ssl_get_error(err, sizeof(err));*/
 		rsm_errf(log_fd, "cannot build an SSL connection to %s:%d: %s", ip, epp_port, err);
 		goto out;
 	}

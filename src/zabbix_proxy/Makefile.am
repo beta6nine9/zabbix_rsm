@@ -62,10 +62,11 @@ zabbix_proxy_LDADD = \
 	$(top_builddir)/src/libs/zbxnix/libzbxnix.a \
 	$(top_builddir)/src/libs/zbxipcservice/libzbxipcservice.a \
 	$(top_builddir)/src/libs/zbxsys/libzbxsys.a \
-	$(top_builddir)/src/libs/zbxaudit/libzbxaudit.a \
 	$(top_builddir)/src/libs/zbxconf/libzbxconf.a \
+	$(top_builddir)/src/libs/zbxaudit/libzbxaudit.a \
 	$(top_builddir)/src/libs/zbxcommon/libzbxcommon.a \
 	$(top_builddir)/src/libs/zbxcrypto/libzbxcrypto.a \
+	$(top_builddir)/src/libs/zbxaudit/libzbxaudit.a \
 	$(top_builddir)/src/libs/zbxcomms/libzbxcomms.a \
 	$(top_builddir)/src/libs/zbxcommshigh/libzbxcommshigh.a \
 	$(top_builddir)/src/libs/zbxjson/libzbxjson.a \
@@ -74,6 +75,7 @@ zabbix_proxy_LDADD = \
 	$(top_builddir)/src/libs/zbxicmpping/libzbxicmpping.a \
 	$(top_builddir)/src/libs/zbxdbupgrade/libzbxdbupgrade.a \
 	$(top_builddir)/src/libs/zbxdbhigh/libzbxdbhigh.a \
+	$(top_builddir)/src/libs/zbxaudit/libzbxaudit.a \
 	$(top_builddir)/src/libs/zbxdb/libzbxdb.a \
 	$(top_builddir)/src/libs/zbxmodules/libzbxmodules.a \
 	$(top_builddir)/src/libs/zbxtasks/libzbxtasks.a \
@@ -90,8 +92,6 @@ zabbix_proxy_LDADD = \
 	libzbxproxy.a
 
 zabbix_proxy_LDADD += $(top_builddir)/src/libs/zbxalgo/libzbxalgo.a
-
-zabbix_proxy_LDADD += $(top_srcdir)/src/libs/zbxrsm/libzbxrsm.a
 
 if HAVE_IPMI
 zabbix_proxy_LDADD += $(top_builddir)/src/zabbix_server/ipmi/libipmi.a
