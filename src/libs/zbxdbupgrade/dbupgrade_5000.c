@@ -18,7 +18,9 @@
 **/
 
 #include "common.h"
+#include "db.h"
 #include "dbupgrade.h"
+#include "log.h"
 
 /*
  * Some common helpers that can be used as one-liners in patches to avoid copy-pasting.
