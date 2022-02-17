@@ -1,0 +1,14 @@
+[INF] Found TLD "tld1" on server "server_1"
+[INF] Value of macro: "2"
+[INF] 
+[INF] Current status:
+[INF] * time: 2022-01-01 12:00:00 (1641038400)
+[INF] * minns: 2
+[INF] 
+[INF] Scheduling status:
+[INF] * time: -
+[INF] * new minns: -
+[INF] 
+[INF] Previous change:
+[INF] * time: -
+[INF] * old minns: -
