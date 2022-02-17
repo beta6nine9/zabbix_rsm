@@ -16,7 +16,8 @@ EXTRA_DIST = \
 	conf \
 	sass
 
-EXTRA_DIST += opt
+# RSM specifics
+EXTRA_DIST += opt api
 
 ## "dist-hook" run after the distribution directory is filled, but before the actual tar (or shar) file is created.
 dist-hook:
