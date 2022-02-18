@@ -135,7 +135,7 @@ abstract class DbBackend {
 		}
 
 		/* RSM specifics: start */
-		$version += DBfetch(DBselect('SELECT mandatory_rsm,optional_rsm FROM dbversion'));
+		$version += DBfetch(DBselect('SELECT mandatory_rsm,optional,optional_rsm FROM dbversion'));
 
 		if ($version['mandatory_rsm'] != ZABBIX_DB_VERSION_RSM) {
 			$this->setError(_s('The frontend does not match Zabbix database.' .
