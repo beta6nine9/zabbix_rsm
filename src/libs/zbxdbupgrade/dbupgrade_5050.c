@@ -945,6 +945,9 @@ static int	DBpatch_5050092(void)
 
 static int	DBpatch_5050093(void)
 {
+	/* RSM specifics: we rely on having custom fields in dbversion table and may not drop them */
+
+	/*
 	const ZBX_TABLE	table =
 			{"dbversion", "dbversionid", 0,
 				{
@@ -964,6 +967,16 @@ static int	DBpatch_5050093(void)
 
 	if (ZBX_DB_OK > DBexecute("insert into dbversion (dbversionid,mandatory,optional) values (1,0,0)"))
 		return FAIL;
+	*/
+
+	if (ZBX_DB_OK > DBexecute(
+			"alter table dbversion"
+			" add column dbversionid bigint(20) unsigned not null first"))
+	{
+		return FAIL;
+	}
+
+	/* RSM specifics: end */
 
 	return SUCCEED;
 }

@@ -546,6 +546,21 @@ static int	DBpatch_5030045(void)
 	return DBdrop_foreign_key("items", 3);
 }
 
+/* 5030045, 1 - increase size of valuemap_mapping.newvalue field */
+static int	DBpatch_5030045_1(void)
+{
+	/* run on both server and proxy */
+
+	if (ZBX_DB_OK > DBexecute(
+			"alter table valuemap_mapping"
+			" modify column newvalue varchar(512) COLLATE utf8_bin NOT NULL DEFAULT ''"))
+	{
+		return FAIL;
+	}
+
+	return SUCCEED;
+}
+
 typedef struct
 {
 	zbx_uint64_t		valuemapid;
@@ -6595,6 +6610,7 @@ DBPATCH_ADD(5030042, 0, 1)
 DBPATCH_ADD(5030043, 0, 1)
 DBPATCH_ADD(5030044, 0, 1)
 DBPATCH_ADD(5030045, 0, 1)
+DBPATCH_RSM(5030045, 1, 0, 1)	/* 5030045, 1 - increase size of valuemap_mapping.newvalue field */
 DBPATCH_ADD(5030046, 0, 1)
 DBPATCH_ADD(5030047, 0, 1)
 DBPATCH_ADD(5030048, 0, 1)
