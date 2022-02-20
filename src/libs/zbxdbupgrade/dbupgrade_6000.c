@@ -523,6 +523,62 @@ out:
 	return ret;
 }
 
+/* 6000000, 10 - replace obsoleted positional macros $1 and $2 in item names */
+static int	DBpatch_6000000_10(void)
+{
+	int		ret = FAIL;
+
+	DB_RESULT	result = NULL;
+	DB_ROW		row;
+
+	ONLY_SERVER();
+
+#define SQL	"update items"								\
+		" set name=replace("							\
+			"name"								\
+			", '%s'"							\
+			", substring_index("						\
+				"substring_index("					\
+					"regexp_substr(key_, '(?<=\\\\[).*(?=\\\\])')"	\
+				", ',', %d)"						\
+			", ',', -1)"							\
+		")"									\
+		" where key_ like 'rsm.configvalue[%%'"					\
+			" or key_ like 'probe.configvalue[%%'"				\
+			" or key_ like 'resolver.status[%%'"				\
+			" or key_ like 'rsm.probe.status[%%'"				\
+			" or key_ like 'rsm.slv.dns.ns.avail[%%'"			\
+			" or key_ like 'rsm.slv.dns.ns.downtime[%%'"
+
+	/* replace positional macros $1 and $2 */
+	DB_EXEC(SQL, "$1", 1);
+	DB_EXEC(SQL, "$2", 2);
+
+#undef SQL
+
+	/* make sure we handled everything */
+	result = DBselect("select count(*) from items where name like '%%$1%%' or name like '%%$2%%'");
+
+	if (NULL == result)
+		goto out;
+
+	if (NULL == (row = DBfetch(result)))
+		goto out;
+
+	if (0 != atoi(row[0]))
+	{
+		zabbix_log(LOG_LEVEL_CRIT, "%s() on line %d: positional macros left after trying to replace them",
+				__func__, __LINE__);
+		goto out;
+	}
+
+	ret = SUCCEED;
+out:
+	DBfree_result(result);
+
+	return ret;
+}
+
 #endif
 
 DBPATCH_START(6000)
@@ -539,5 +595,6 @@ DBPATCH_RSM(6000000, 6, 0, 0)	/* update rsm.rdds[] items to use {$RSM.TLD.RDDS43
 DBPATCH_RSM(6000000, 7, 0, 0)	/* split {$RSM.TLD.RDDS.ENABLED} macro into {$RSM.TLD.RDDS43.ENABLED} and {$RSM.TLD.RDDS80.ENABLED} */
 DBPATCH_RSM(6000000, 8, 0, 0)	/* replace {$RSM.TLD.RDDS.ENABLED} macro with {$RSM.TLD.RDDS43.ENABLED} and {$RSM.TLD.RDDS80.ENABLED} in rsm.dns[] and rsm.rdds[] item keys */
 DBPATCH_RSM(6000000, 9, 0, 0)	/* split rdds.enabled item into rdds43.enabled and rdds80.enabled */
+DBPATCH_RSM(6000000, 10, 0, 0)	/* replace obsoleted positional macros $1 and $2 in item names */
 
 DBPATCH_END()
