@@ -91,7 +91,8 @@ class Module extends CModule {
 
 			// Force to send user session cookie only when user is logged in.
 			if (isset(CWebUser::$data['sessionid'])) {
-				CWebUser::setSessionCookie(CWebUser::$data['sessionid']);
+				CSessionHelper::set('sessionid', CWebUser::$data['sessionid']);
+				API::getWrapper()->auth = CWebUser::$data['sessionid'];
 			}
 		}
 	}

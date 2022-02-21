@@ -152,7 +152,7 @@ class RollingWeekStatusListAction extends Action {
 			'filter_registrar_name' => CProfile::get('web.rsm.rollingweekstatus.filter_registrar_name'),
 			'filter_registrar_family' => CProfile::get('web.rsm.rollingweekstatus.filter_registrar_family'),
 			'active_tab' => CProfile::get('web.rsm.rollingweekstatus.filter.active', 1),
-			'sid' => CWebUser::getSessionCookie(),
+			'sid' => CWebUser::$data['sessionid'],
 			'paging' => null
 		];
 
