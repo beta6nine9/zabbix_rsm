@@ -582,33 +582,44 @@ out:
 /* 6000000, 11 - register Provisioning API module and create its users */
 static int	DBpatch_6000000_11(void)
 {
-	int	ret = FAIL;
+	int		ret = FAIL;
+
+	zbx_uint64_t	userid_ro, userid_rw, roleid, usrgrpid, id_ro, id_rw, moduleid;
+
+	userid_ro = DBget_maxid_num("users"       , 2);
+	userid_rw = userid_ro + 1;
+	usrgrpid  = DBget_maxid_num("usrgrp"      , 1);
+	id_ro     = DBget_maxid_num("users_groups", 2);
+	id_rw     = id_ro + 1;
+	moduleid  = DBget_maxid_num("module"      , 1);
 
 	ONLY_SERVER();
 
-#define SQL	"insert into users set userid=%d,username='%s',passwd='%s',autologout=0,roleid=3"
+	SELECT_VALUE_UINT64(roleid, "select roleid from role where name='%s'", "Super admin role");
 
-	DB_EXEC(SQL, 101, "provisioning-api-readonly",  "5f4dcc3b5aa765d61d8327deb882cf99");
-	DB_EXEC(SQL, 102, "provisioning-api-readwrite", "5f4dcc3b5aa765d61d8327deb882cf99");
+#define SQL	"insert into users set userid=" ZBX_FS_UI64 ",username='%s',passwd='%s',autologout=0,roleid=" ZBX_FS_UI64
 
-#undef SQL
-
-#define SQL	"insert into usrgrp set usrgrpid=%d,name='%s',gui_access=3,users_status=0,debug_mode=0"
-
-	DB_EXEC(SQL, 130, "Provisioning API");
+	DB_EXEC(SQL, userid_ro, "provisioning-api-readonly",  "5f4dcc3b5aa765d61d8327deb882cf99", roleid);
+	DB_EXEC(SQL, userid_rw, "provisioning-api-readwrite", "5f4dcc3b5aa765d61d8327deb882cf99", roleid);
 
 #undef SQL
 
-#define SQL	"insert into users_groups set id=%d,usrgrpid=%d,userid=%d"
+#define SQL	"insert into usrgrp set usrgrpid=" ZBX_FS_UI64 ",name='%s',gui_access=3,users_status=0,debug_mode=0"
 
-	DB_EXEC(SQL, 101, 130, 101);
-	DB_EXEC(SQL, 102, 130, 102);
+	DB_EXEC(SQL, usrgrpid, "Provisioning API");
 
 #undef SQL
 
-#define SQL "insert into module set moduleid=%d,id='%s',relative_path='%s',status=1,config='[]'"
+#define SQL	"insert into users_groups set id=" ZBX_FS_UI64 ",usrgrpid=" ZBX_FS_UI64 ",userid=" ZBX_FS_UI64
 
-	DB_EXEC(SQL, 2, "RSM Provisioning API", "RsmProvisioningApi");
+	DB_EXEC(SQL, id_ro, usrgrpid, userid_ro);
+	DB_EXEC(SQL, id_rw, usrgrpid, userid_rw);
+
+#undef SQL
+
+#define SQL "insert into module set moduleid=" ZBX_FS_UI64 ",id='%s',relative_path='%s',status=1,config='[]'"
+
+	DB_EXEC(SQL, moduleid, "RSM Provisioning API", "RsmProvisioningApi");
 
 #undef SQL
 
