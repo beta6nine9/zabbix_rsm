@@ -579,6 +579,44 @@ out:
 	return ret;
 }
 
+/* 6000000, 11 - register Provisioning API module and create its users */
+static int	DBpatch_6000000_11(void)
+{
+	int	ret = FAIL;
+
+	ONLY_SERVER();
+
+#define SQL	"insert into users set userid=%d,username='%s',passwd='%s',autologout=0,roleid=3"
+
+	DB_EXEC(SQL, 101, "provisioning-api-readonly",  "5f4dcc3b5aa765d61d8327deb882cf99");
+	DB_EXEC(SQL, 102, "provisioning-api-readwrite", "5f4dcc3b5aa765d61d8327deb882cf99");
+
+#undef SQL
+
+#define SQL	"insert into usrgrp set usrgrpid=%d,name='%s',gui_access=3,users_status=0,debug_mode=0"
+
+	DB_EXEC(SQL, 130, "Provisioning API");
+
+#undef SQL
+
+#define SQL	"insert into users_groups set id=%d,usrgrpid=%d,userid=%d"
+
+	DB_EXEC(SQL, 101, 130, 101);
+	DB_EXEC(SQL, 102, 130, 102);
+
+#undef SQL
+
+#define SQL "insert into module set moduleid=%d,id='%s',relative_path='%s',status=1,config='[]'"
+
+	DB_EXEC(SQL, 2, "RSM Provisioning API", "RsmProvisioningApi");
+
+#undef SQL
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
 #endif
 
 DBPATCH_START(6000)
@@ -596,5 +634,7 @@ DBPATCH_RSM(6000000, 7, 0, 0)	/* split {$RSM.TLD.RDDS.ENABLED} macro into {$RSM.
 DBPATCH_RSM(6000000, 8, 0, 0)	/* replace {$RSM.TLD.RDDS.ENABLED} macro with {$RSM.TLD.RDDS43.ENABLED} and {$RSM.TLD.RDDS80.ENABLED} in rsm.dns[] and rsm.rdds[] item keys */
 DBPATCH_RSM(6000000, 9, 0, 0)	/* split rdds.enabled item into rdds43.enabled and rdds80.enabled */
 DBPATCH_RSM(6000000, 10, 0, 0)	/* replace obsoleted positional macros $1 and $2 in item names */
+DBPATCH_RSM(6000000, 11, 0, 0)	/* register Provisioning API module and create its users */
+
 
 DBPATCH_END()
