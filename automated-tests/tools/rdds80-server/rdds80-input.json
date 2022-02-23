@@ -1,7 +1,0 @@
-{
-	"expected-request" : "GET / HTTP/",
-	"reply-status"     : "HTTP/1.1 200 OK",
-	"reply-headers"    : {
-		"Content-type" : "Content-Type: text/html; charset=utf-8"
-	}
-}
