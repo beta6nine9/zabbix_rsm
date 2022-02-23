@@ -1,5 +1,5 @@
 {
-	"flags" : {
-	},
-	"owner" : "example"
+	"flags" : {},
+	"owner" : "example",
+	"rcode" : "NOERROR"
 }

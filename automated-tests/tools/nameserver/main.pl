@@ -27,8 +27,10 @@ die("usage $0 <pid file> <input file> (invalid input file $input_file)") unless 
 
 my $config = read_json_file($input_file);
 
-die("\"flags\" must be defined") unless ($config->{'flags'});
 die("\"owner\" must be defined") unless ($config->{'owner'});
+die("\"rcode\" must be defined") unless ($config->{'rcode'});
+die("\"flags\" must be defined") unless ($config->{'flags'});
+die("\"flags\" must be a hash")  unless (ref($config->{'flags'}) eq 'HASH');
 
 sub reply_handler
 {
@@ -40,7 +42,7 @@ sub reply_handler
 		die("unexpected query type \"$qtype\", expected A");
 	}
 
-	my ($rcode, @answer, @authority, @additional);
+	my (@answer, @authority, @additional);
 
 	my $rr;
 
@@ -104,15 +106,13 @@ sub reply_handler
 
 	push(@authority, $rr);
 
-	$rcode = $config->{'rcode'} // "NOERROR";
-
 	# specify EDNS options  { option => value }
 	my $optionmask =
 	{
 		nsid => 'foo-ns-id',
 	};
 
-	return ($rcode, \@answer, \@authority, \@additional, $config->{'flags'}, $optionmask);
+	return ($config->{'rcode'}, \@answer, \@authority, \@additional, $config->{'flags'}, $optionmask);
 }
 
 # name, port, pid_file, verbose, reply_handler, additional options to NameserverCustom

@@ -29,6 +29,8 @@ my $config = read_json_file($input_file);
 die("\"expected-qname\" must be defined")  unless ($config->{'expected-qname'});
 die("\"expected-qtypes\" must be defined") unless ($config->{'expected-qtypes'});
 die("\"rcode\" must be defined")           unless ($config->{'rcode'});
+die("\"flags\" must be defined")           unless ($config->{'flags'});
+die("\"flags\" must be a hash")            unless (ref($config->{'flags'}) eq 'HASH');
 
 sub reply_handler
 {
@@ -52,7 +54,7 @@ sub reply_handler
 
 	die("unexpected query type: \"$qtype\"") unless ($expected_qtype);
 
-	my ($rcode, @answer, @authority, @additional, $headermask, $optionmask);
+	my (@answer, @authority, @additional, $optionmask);
 
 	if ($qtype eq 'DNSKEY')
 	{
@@ -88,16 +90,6 @@ sub reply_handler
 			)
 		);
 
-		# mark the answer authoritative (by setting the 'aa' flag)
-		$headermask =
-		{
-			aa => 1,
-			ad => 1,
-			rd => 0,
-			#		tc => 0,
-			#		do => 0,
-		};
-
 		# specify EDNS options  { option => value }
 		$optionmask =
 		{
@@ -131,9 +123,7 @@ sub reply_handler
 		die("unsupported query type: \"$qtype\"");
 	}
 
-	$rcode = $config->{'rcode'};
-
-	return ($rcode, \@answer, \@authority, \@additional, $headermask, $optionmask);
+	return ($config->{'rcode'}, \@answer, \@authority, \@additional, $config->{'flags'}, $optionmask);
 }
 
 # name, port, pid_file, verbose, reply_handler, additional options to NameserverCustom
