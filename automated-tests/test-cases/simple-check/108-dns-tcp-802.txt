@@ -1,0 +1,22 @@
+[test-case]
+
+"DNS TCP - No AD bit from local resolver (-802)"
+
+[start-tool]
+
+"resolver","/tmp/resolver.pid","108-resolver-input.json"
+
+[execute]
+
+"","rm -f    /tmp/dns-test-metadata-example.bin"
+"","rm -rf   /tmp/simple-check-test"
+"","mkdir -p /tmp/simple-check-test"
+"","${cfg:paths:build_dir}/bin/t_rsm_dns -c -t example -n ns1.example -i 127.0.0.1 -4 -r 127.0.0.1 -o 5053 -s 5054 -d -j /tmp/simple-check-test/status.json"
+
+[stop-tool]
+
+"resolver","/tmp/resolver.pid"
+
+[compare-files]
+
+"/tmp/simple-check-test","108-output.tar.gz"
