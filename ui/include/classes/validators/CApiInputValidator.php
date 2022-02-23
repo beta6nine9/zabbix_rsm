@@ -227,6 +227,21 @@ class CApiInputValidator {
 
 			case API_TIMESTAMP:
 				return self::validateTimestamp($rule, $data, $path, $error);
+
+			/* RSM specifics */
+			case API_RSM_CUSTOM:
+				if (!array_key_exists('function', $rule))
+				{
+					$error = _s('Incorrect validation rules "%1$s": %2$s.', $path, _('function not specified'));
+					return false;
+				}
+				if (!is_callable($rule['function']))
+				{
+					$error = _s('Incorrect validation rules "%1$s": %2$s.', $path, _('specified function is not callable'));
+					return false;
+				}
+				return $rule['function']($rule, $data, $path, $error);
+			/* RSM specifics: end */
 		}
 
 		// This message can be untranslated because warn about incorrect validation rules at a development stage.
@@ -294,6 +309,9 @@ class CApiInputValidator {
 			case API_UNEXPECTED:
 			case API_LAT_LNG_ZOOM:
 			case API_TIMESTAMP:
+			/* RSM specifics */
+			case API_RSM_CUSTOM:
+			/* RSM specifics: end */
 				return true;
 
 			case API_OBJECT:

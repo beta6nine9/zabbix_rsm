@@ -1409,6 +1409,9 @@ define('API_UNEXPECTED',			51);
 define('API_INT32_RANGES',			53);
 define('API_LAT_LNG_ZOOM',			54);
 define('API_TIMESTAMP',				55);
+/* RSM specifics: specific defines */
+define('API_RSM_CUSTOM',			1024);
+/* RSM specifics: end */
 
 // flags
 define('API_REQUIRED',					0x00001);
