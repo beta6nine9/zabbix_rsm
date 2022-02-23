@@ -190,7 +190,7 @@ return [
 				'null' => false,
 				'type' => DB::FIELD_TYPE_INT,
 				'length' => 10,
-				'default' => '0',
+				'default' => '0'
 			],
 			'proxy_hostid' => [
 				'null' => true,
@@ -276,13 +276,13 @@ return [
 				'null' => false,
 				'type' => DB::FIELD_TYPE_CHAR,
 				'length' => 128,
-				'default' => '',
+				'default' => ''
 			],
 			'info_2' => [
 				'null' => false,
 				'type' => DB::FIELD_TYPE_CHAR,
 				'length' => 128,
-				'default' => '',
+				'default' => ''
 			],
 			'flags' => [
 				'null' => false,
@@ -2663,7 +2663,7 @@ return [
 				'null' => false,
 				'type' => DB::FIELD_TYPE_INT,
 				'length' => 10,
-				'default' => '0'
+				'default' => '1'
 			],
 			'validate_uri_schemes' => [
 				'null' => false,
@@ -3316,8 +3316,7 @@ return [
 			],
 			'value' => [
 				'null' => false,
-				'type' => DB::FIELD_TYPE_CHAR,
-				'length' => 2048,
+				'type' => DB::FIELD_TYPE_NCLOB,
 				'default' => ''
 			],
 			'description' => [
@@ -3356,8 +3355,7 @@ return [
 			],
 			'value' => [
 				'null' => false,
-				'type' => DB::FIELD_TYPE_CHAR,
-				'length' => 2048,
+				'type' => DB::FIELD_TYPE_NCLOB,
 				'default' => ''
 			],
 			'description' => [
@@ -3445,7 +3443,7 @@ return [
 			'newvalue' => [
 				'null' => false,
 				'type' => DB::FIELD_TYPE_CHAR,
-				'length' => 64,
+				'length' => 512,
 				'default' => ''
 			],
 			'type' => [
@@ -4622,7 +4620,8 @@ return [
 			],
 			'value' => [
 				'null' => false,
-				'type' => DB::FIELD_TYPE_NCLOB,
+				'type' => DB::FIELD_TYPE_CHAR,
+				'length' => 255,
 				'default' => ''
 			],
 			'ns' => [
@@ -4838,7 +4837,8 @@ return [
 			],
 			'value' => [
 				'null' => false,
-				'type' => DB::FIELD_TYPE_NCLOB,
+				'type' => DB::FIELD_TYPE_CHAR,
+				'length' => 255,
 				'default' => ''
 			],
 			'status' => [
@@ -4919,6 +4919,12 @@ return [
 				'default' => ''
 			],
 			'severity' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_INT,
+				'length' => 10,
+				'default' => '0'
+			],
+			'false_positive' => [
 				'null' => false,
 				'type' => DB::FIELD_TYPE_INT,
 				'length' => 10,
@@ -5529,7 +5535,7 @@ return [
 			'type' => [
 				'null' => false,
 				'type' => DB::FIELD_TYPE_CHAR,
-				'length' => 512,
+				'length' => 64,
 				'default' => ''
 			],
 			'type_full' => [
@@ -7152,12 +7158,6 @@ return [
 				'default' => ''
 			],
 			'zindex' => [
-				'null' => false,
-				'type' => DB::FIELD_TYPE_INT,
-				'length' => 10,
-				'default' => '0'
-			],
-			'false_positive' => [
 				'null' => false,
 				'type' => DB::FIELD_TYPE_INT,
 				'length' => 10,
@@ -8933,7 +8933,7 @@ return [
 				'null' => false,
 				'type' => DB::FIELD_TYPE_INT,
 				'length' => 10,
-				'default' => '0',
+				'default' => '0'
 			],
 			'optional' => [
 				'null' => false,
