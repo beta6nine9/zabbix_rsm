@@ -15,7 +15,7 @@ class Registrar extends MonitoringTarget
 
 	protected function checkMonitoringTarget(): bool
 	{
-		return $this->getMonitoringTarget() == MONITORING_TARGET_REGISTRAR;
+		return $this->getMonitoringTarget() == self::MONITORING_TARGET_REGISTRAR;
 	}
 
 	protected function getRequestInput(): array

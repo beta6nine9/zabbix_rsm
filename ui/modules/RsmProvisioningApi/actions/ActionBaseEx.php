@@ -1157,12 +1157,19 @@ abstract class ActionBaseEx extends ActionBase
 			return [];
 		}
 
-		$data = API::ValueMap()->get([
-			'output' => ['valuemapid', 'name'],
-			'filter' => ['name' => $valueMaps],
-		]);
+		$valueMapIds = [];
 
-		$valueMapIds = array_column($data, 'valuemapid', 'name');
+		foreach ($valueMaps as $hostid => $mapNames)
+		{
+			$data = API::ValueMap()->get([
+				'output' => ['valuemapid', 'name'],
+				'filter' => [
+					'hostid' => $hostid,
+					'name'   => $mapNames,
+				],
+			]);
+			$valueMapIds[$hostid] = array_column($data, 'valuemapid', 'name');
+		}
 
 		return $valueMapIds;
 	}
