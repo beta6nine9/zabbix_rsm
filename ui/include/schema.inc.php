@@ -8979,6 +8979,21 @@ return [
 			]
 		]
 	],
+	'rsm_nsid' => [
+		'key' => 'id',
+		'fields' => [
+			'id' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_UINT,
+				'length' => 20
+			],
+			'name' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_CHAR,
+				'length' => 255
+			]
+		]
+	],
 	'rsm_ns_name' => [
 		'key' => 'id',
 		'fields' => [
@@ -9227,6 +9242,66 @@ return [
 				'null' => false,
 				'type' => DB::FIELD_TYPE_INT,
 				'length' => 10
+			]
+		]
+	],
+	'provisioning_api_log' => [
+		'key' => 'provisioning_api_logid',
+		'fields' => [
+			'provisioning_api_logid' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_ID,
+				'length' => 20
+			],
+			'clock' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_INT,
+				'length' => 10
+			],
+			'user' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_CHAR,
+				'length' => 100
+			],
+			'interface' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_CHAR,
+				'length' => 8
+			],
+			'identifier' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_CHAR,
+				'length' => 255
+			],
+			'operation' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_CHAR,
+				'length' => 6
+			],
+			'object_type' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_CHAR,
+				'length' => 9
+			],
+			'object_before' => [
+				'null' => true,
+				'type' => DB::FIELD_TYPE_NCLOB,
+				'default' => NULL
+			],
+			'object_after' => [
+				'null' => true,
+				'type' => DB::FIELD_TYPE_NCLOB,
+				'default' => NULL
+			],
+			'remote_addr' => [
+				'null' => false,
+				'type' => DB::FIELD_TYPE_CHAR,
+				'length' => 45
+			],
+			'x_forwarded_for' => [
+				'null' => true,
+				'type' => DB::FIELD_TYPE_CHAR,
+				'length' => 255
 			]
 		]
 	]
