@@ -177,26 +177,26 @@ out:
 /* 6000000, 2 - create provisioning_api_log table */
 static int	DBpatch_6000000_2(void)
 {
-	int	ret = FAIL;
+	const ZBX_TABLE	table =
+			{"provisioning_api_log", "provisioning_api_logid", 0,
+				{
+					{"provisioning_api_logid", NULL, NULL, NULL, 0  , ZBX_TYPE_ID  , ZBX_NOTNULL, 0},
+					{"clock"                 , NULL, NULL, NULL, 0  , ZBX_TYPE_INT , ZBX_NOTNULL, 0},
+					{"user"                  , NULL, NULL, NULL, 100, ZBX_TYPE_CHAR, ZBX_NOTNULL, 0},
+					{"interface"             , NULL, NULL, NULL, 8  , ZBX_TYPE_CHAR, ZBX_NOTNULL, 0},
+					{"identifier"            , NULL, NULL, NULL, 255, ZBX_TYPE_CHAR, ZBX_NOTNULL, 0},
+					{"operation"             , NULL, NULL, NULL, 6  , ZBX_TYPE_CHAR, ZBX_NOTNULL, 0},
+					{"object_type"           , NULL, NULL, NULL, 9  , ZBX_TYPE_CHAR, ZBX_NOTNULL, 0},
+					{"object_before"         , NULL, NULL, NULL, 0  , ZBX_TYPE_TEXT, 0          , 0},
+					{"object_after"          , NULL, NULL, NULL, 0  , ZBX_TYPE_TEXT, 0          , 0},
+					{"remote_addr"           , NULL, NULL, NULL, 45 , ZBX_TYPE_CHAR, ZBX_NOTNULL, 0},
+					{"x_forwarded_for"       , NULL, NULL, NULL, 255, ZBX_TYPE_CHAR, 0          , 0},
+					{0}
+				},
+				NULL
+			};
 
-	DB_EXEC("create table provisioning_api_log ("
-			"provisioning_api_logid bigint(20) unsigned not null,"
-			"clock int(11) not null,"
-			"user varchar(100) not null,"
-			"interface varchar(8) not null,"
-			"identifier varchar(255) not null,"
-			"operation varchar(6) not null,"
-			"object_type varchar(9) not null,"
-			"object_before text default null,"
-			"object_after text default null,"
-			"remote_addr varchar(45) not null,"
-			"x_forwarded_for varchar(255) default null,"
-			"primary key (provisioning_api_logid)"
-		")");
-
-	ret = SUCCEED;
-out:
-	return ret;
+	return DBcreate_table(&table);
 }
 
 /* 6000000, 3 - remove {$RSM.EPP.ENABLED} and {$RSM.TLD.EPP.ENABLED} macros from rsm.dns[] and rsm.rdds[] items */
@@ -598,29 +598,21 @@ static int	DBpatch_6000000_11(void)
 	SELECT_VALUE_UINT64(roleid, "select roleid from role where name='%s'", "Super admin role");
 
 #define SQL	"insert into users set userid=" ZBX_FS_UI64 ",username='%s',passwd='%s',autologout=0,roleid=" ZBX_FS_UI64
-
 	DB_EXEC(SQL, userid_ro, "provisioning-api-readonly",  "5f4dcc3b5aa765d61d8327deb882cf99", roleid);
 	DB_EXEC(SQL, userid_rw, "provisioning-api-readwrite", "5f4dcc3b5aa765d61d8327deb882cf99", roleid);
-
 #undef SQL
 
 #define SQL	"insert into usrgrp set usrgrpid=" ZBX_FS_UI64 ",name='%s',gui_access=3,users_status=0,debug_mode=0"
-
 	DB_EXEC(SQL, usrgrpid, "Provisioning API");
-
 #undef SQL
 
 #define SQL	"insert into users_groups set id=" ZBX_FS_UI64 ",usrgrpid=" ZBX_FS_UI64 ",userid=" ZBX_FS_UI64
-
 	DB_EXEC(SQL, id_ro, usrgrpid, userid_ro);
 	DB_EXEC(SQL, id_rw, usrgrpid, userid_rw);
-
 #undef SQL
 
 #define SQL "insert into module set moduleid=" ZBX_FS_UI64 ",id='%s',relative_path='%s',status=1,config='[]'"
-
 	DB_EXEC(SQL, moduleid, "RSM Provisioning API", "RsmProvisioningApi");
-
 #undef SQL
 
 	ret = SUCCEED;
@@ -646,6 +638,5 @@ DBPATCH_RSM(6000000, 8, 0, 0)	/* replace {$RSM.TLD.RDDS.ENABLED} macro with {$RS
 DBPATCH_RSM(6000000, 9, 0, 0)	/* split rdds.enabled item into rdds43.enabled and rdds80.enabled */
 DBPATCH_RSM(6000000, 10, 0, 0)	/* replace obsoleted positional macros $1 and $2 in item names */
 DBPATCH_RSM(6000000, 11, 0, 0)	/* register Provisioning API module and create its users */
-
 
 DBPATCH_END()
