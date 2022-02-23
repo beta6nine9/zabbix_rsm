@@ -4,8 +4,8 @@
 
 [start-tool]
 
-"resolver","/tmp/resolver.pid","102-resolver-input.json"
-"rdds43-server","/tmp/rdds43-server.pid","102-rdds43-server-input.json"
+"resolver","/tmp/resolver.pid","202-resolver-input.json"
+"rdds43-server","/tmp/rdds43-server.pid","202-rdds43-server-input.json"
 
 [execute]
 
@@ -20,4 +20,4 @@
 
 [compare-files]
 
-"/tmp/simple-check-test","102-output.tar.gz"
+"/tmp/simple-check-test","202-output.tar.gz"

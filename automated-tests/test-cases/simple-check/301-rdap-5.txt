@@ -4,7 +4,7 @@
 
 [start-tool]
 
-"resolver","/tmp/resolver.pid","201-resolver-input.json"
+"resolver","/tmp/resolver.pid","301-resolver-input.json"
 
 [execute]
 
@@ -18,4 +18,4 @@
 
 [compare-files]
 
-"/tmp/simple-check-test","201-output.tar.gz"
+"/tmp/simple-check-test","301-output.tar.gz"

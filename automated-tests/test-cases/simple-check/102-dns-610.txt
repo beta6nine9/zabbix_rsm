@@ -4,7 +4,7 @@
 
 [start-tool]
 
-"nameserver","/tmp/nameserver.pid","006-nameserver-input.json"
+"nameserver","/tmp/nameserver.pid","102-nameserver-input.json"
 
 [execute]
 
@@ -19,4 +19,4 @@
 
 [compare-files]
 
-"/tmp/simple-check-test","006-output.tar.gz"
+"/tmp/simple-check-test","102-output.tar.gz"

@@ -1,11 +1,11 @@
 [test-case]
 
-"DNS TCP - Querying for a non existent domain - AA flag not present in response (-650)"
+"DNS TCP - Querying for a non existent domain - Domain name being queried not present in question section (-651)"
 
 [start-tool]
 
-"resolver","/tmp/resolver.pid","007-resolver-input.json"
-"nameserver","/tmp/nameserver.pid","007-nameserver-input.json"
+"resolver","/tmp/resolver.pid","104-resolver-input.json"
+"nameserver","/tmp/nameserver.pid","104-nameserver-input.json"
 
 [execute]
 
@@ -21,4 +21,4 @@
 
 [compare-files]
 
-"/tmp/simple-check-test","007-output.tar.gz"
+"/tmp/simple-check-test","104-output.tar.gz"

@@ -10,4 +10,4 @@
 
 [compare-files]
 
-"/tmp/simple-check-test","203-output.tar.gz"
+"/tmp/simple-check-test","303-output.tar.gz"
