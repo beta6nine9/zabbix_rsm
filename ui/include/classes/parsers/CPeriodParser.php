@@ -88,6 +88,12 @@ class CPeriodParser extends CParser {
 			$sec_num = $matches[0];
 			$p += strlen($matches[0]);
 		}
+		/* RSM specifics: allow hash symbol (#) prior to macro: start */
+		elseif (preg_match('/^#\{\$[A-Z0-9_\.]+\}/', substr($source, $p), $matches)) {
+			$sec_num = $matches[0];
+			$p += strlen($matches[0]);
+		}
+		/* RSM specifics: allow hash symbol (#) prior to macro: end */
 		elseif ($this->simple_interval_parser->parse($source, $p) !== self::PARSE_FAIL) {
 			$sec_num = $this->simple_interval_parser->match;
 			$p += $this->simple_interval_parser->length;
