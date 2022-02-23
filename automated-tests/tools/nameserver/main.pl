@@ -55,63 +55,56 @@ sub reply_handler
 		sleep($config->{'sleep'});
 	}
 
-	#	if ($qname eq EXISTING_DOMAIN)
-#	{
-		# ANSWER section
-		push(@answer, Net::DNS::RR->new
-			(
-				owner   => $config->{'owner'},
-				ttl     => 86400,
-				class   => 'IN',
-				type    => 'A',
-				address => '127.0.0.2'
-			)
-		);
+	# if ($qname eq EXISTING_DOMAIN)
 
-		my @rrsetref =
+	# ANSWER section
+	push(@answer, Net::DNS::RR->new
 		(
-			Net::DNS::RR->new
-			(
-				owner   => $config->{'owner'},
-				ttl     => 86400,
-				class   => 'IN',
-				type    => 'A',
-				address => '127.0.0.2'
-			)
-		);
+			owner   => $config->{'owner'},
+			ttl     => 86400,
+			class   => 'IN',
+			type    => 'A',
+			address => '127.0.0.2'
+		)
+	);
 
-		my $keypath = "$FindBin::RealBin/Krsa.$config->{'owner'}.+010+36026.private";
-		my $sigrr = Net::DNS::RR::RRSIG->create(\@rrsetref, $keypath);
+	my @rrsetref =
+	(
+		Net::DNS::RR->new
+		(
+			owner   => $config->{'owner'},
+			ttl     => 86400,
+			class   => 'IN',
+			type    => 'A',
+			address => '127.0.0.2'
+		)
+	);
 
-		push(@answer, $sigrr);
+	my $keypath = "$FindBin::RealBin/Krsa.$config->{'owner'}.+010+36026.private";
+	my $sigrr = Net::DNS::RR::RRSIG->create(\@rrsetref, $keypath);
 
-		# AUTHORITY section
-		my $name = $config->{'owner'};
-		my $type = 'NSEC';
-		my @attr = qw(nxtdname typelist);
-		my @hash = ("ns1.$config->{'owner'}.", q(A NS NSEC RRSIG SOA));
+	push(@answer, $sigrr);
 
-		my $hash = {};
-		@{$hash}{@attr} = @hash;
+	# AUTHORITY section
+	my $name = $config->{'owner'};
+	my $type = 'NSEC';
+	my @attr = qw(nxtdname typelist);
+	my @hash = ("ns1.$config->{'owner'}.", q(A NS NSEC RRSIG SOA));
 
-		$rr = Net::DNS::RR->new(
-			name  => $name,
-			type  => $type,
-			ttl   => 86400,
-			owner => $name,
-			%$hash
-		);
+	my $hash = {};
+	@{$hash}{@attr} = @hash;
 
-		push(@authority, $rr);
+	$rr = Net::DNS::RR->new(
+		name  => $name,
+		type  => $type,
+		ttl   => 86400,
+		owner => $name,
+		%$hash
+	);
 
-		$rcode = "NOERROR";
-#		$rcode = undef;
-#	}
-#	else
-#	{
-#		print("Warning: Non-existing domain!\n");
-#		$rcode = "NXDOMAIN";
-#	}
+	push(@authority, $rr);
+
+	$rcode = $config->{'rcode'} // "NOERROR";
 
 	# specify EDNS options  { option => value }
 	my $optionmask =
