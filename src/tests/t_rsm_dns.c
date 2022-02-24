@@ -177,6 +177,8 @@ int	main(int argc, char *argv[])
 
 	init_result(&result);
 
+	signal(SIGALRM, alarm_signal_handler);
+
 	check_rsm_dns(0, 0, "tld1 Probe1", 0, &request, &result, stdout);
 
 	if (ISSET_MSG(&result))

@@ -180,6 +180,8 @@ int	main(int argc, char *argv[])
 
 	init_result(&result);
 
+	signal(SIGALRM, alarm_signal_handler);
+
 	check_rsm_rdds("tld1 Probe1", &request, &result, stdout);
 
 	if (ISSET_MSG(&result))

@@ -1,5 +1,4 @@
 #include "common.h"
-#include "t_rsm.h"
 
 #include <stdio.h>
 #include <errno.h>
@@ -29,4 +28,9 @@ int	write_json_status(const char *json_file, const char *buffer, char **error)
 	fclose(f);
 
 	return SUCCEED;
+}
+
+void	alarm_signal_handler(int sig, siginfo_t *siginfo, void *context)
+{
+	zbx_alarm_flag_set(); /* set alarm flag */
 }

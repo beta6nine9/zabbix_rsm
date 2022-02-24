@@ -130,6 +130,8 @@ int	main(int argc, char *argv[])
 
 	init_result(&result);
 
+	signal(SIGALRM, alarm_signal_handler);
+
 	check_rsm_rdap("example Probe1", &request, &result, stdout);
 
 	if (ISSET_MSG(&result))
