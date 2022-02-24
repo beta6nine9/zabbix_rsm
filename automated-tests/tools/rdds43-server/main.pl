@@ -23,6 +23,7 @@ if (! -r $input_file)
 die("usage $0 <pid file> <input file> (invalid input file $input_file)") unless (-r $input_file);
 
 my $config = read_json_file($input_file);
+
 die("\"expected-domain\" must be defined")  unless ($config->{'expected-domain'});
 die("\"rdds43-ns-string\" must be defined") unless ($config->{'rdds43-ns-string'});
 die("\"name-servers\" must be defined")     unless ($config->{'name-servers'});
@@ -34,15 +35,27 @@ sub reply_handler()
 
 	my $data = <$client_socket>;
 
+	if (!defined($data))
+	{
+		err("remote connection closed without sending anything");
+		print $client_socket ("error");
+		goto OUT;
+	}
+
 	$data =~ s/[\r\n]$//g;
 
-	print("received [$data]\n");
+	inf("received [$data]");
 
 	if ($data ne $config->{'expected-domain'})
 	{
-		printf("Error: expected [%s] got [%s]\n", $config->{'expected-domain'}, $data);
+		err(sprintf("expected [%s] got [%s]", $config->{'expected-domain'}, $data));
 		print $client_socket ("error");
 		goto OUT;
+	}
+
+	if ($config->{'sleep'})
+	{
+		sleep($config->{'sleep'});
 	}
 
 	my $reply = "";
@@ -57,4 +70,4 @@ OUT:
 	$client_socket->close();
 }
 
-start_tcp_server("RDDS43 SERVER", RDDS43_PORT, $pid_file, \&reply_handler);
+start_tcp_server("RDDS43SERVER", RDDS43_PORT, $pid_file, \&reply_handler);

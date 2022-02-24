@@ -17,9 +17,12 @@ our @EXPORT = qw(
 	write_file
 	start_dns_server
 	start_tcp_server
+	inf err
 );
 
 use JSON::XS;
+
+my $_instance_name;
 
 sub read_json_file($)
 {
@@ -58,6 +61,8 @@ sub start_dns_server($$$$$$)
 	my $reply_handler = shift;
 	my $custom_opts   = shift;
 
+	$_instance_name = $name;
+
 	my $pid = fork();
 
 	if ($pid < 0)
@@ -68,7 +73,7 @@ sub start_dns_server($$$$$$)
 	if ($pid != 0)
 	{
 		# parent
-		print("writing pid $pid to $pid_file\n");
+		inf("writing pid $pid to $pid_file");
 		write_file($pid_file, $pid);
 
 		exit();
@@ -89,7 +94,7 @@ sub start_dns_server($$$$$$)
 
 	my $ns = Net::DNS::NameserverCustom->new(%opts) || die("cannot create nameserver object\n");
 
-	print("$name started\n");
+	inf("started");
 
 	$ns->main_loop();
 }
@@ -101,6 +106,8 @@ sub start_tcp_server($$$$)
 	my $pid_file      = shift;
 	my $reply_handler = shift;
 
+	$_instance_name = $name;
+
 	my $pid = fork();
 
 	if ($pid < 0)
@@ -111,7 +118,7 @@ sub start_tcp_server($$$$)
 	if ($pid != 0)
 	{
 		# parent
-		print("writing pid $pid to $pid_file\n");
+		inf("writing pid $pid to $pid_file");
 		write_file($pid_file, $pid);
 
 		exit();
@@ -126,7 +133,7 @@ sub start_tcp_server($$$$)
 		Reuse       =>  1
 	) or die("cannot create socket: $!");
 
-	print("$name started on port $port\n");
+	inf("started on port $port");
 
 	while (1)
 	{
@@ -134,10 +141,22 @@ sub start_tcp_server($$$$)
 		my $client_address = $client_socket->peerhost;
 		my $client_port    = $client_socket->peerport;
 
-		print("$client_address:$client_port connected\n");
+		inf("client $client_address:$client_port connected");
 
 		threads->create($reply_handler, $client_socket);
 	}
 
 	$socket->close();
 }
+
+sub inf(@)
+{
+	printf("%s INF: %s\n", $_instance_name, join(',', @_));
+}
+
+sub err(@)
+{
+	printf("%s ERR: %s\n", $_instance_name, join(',', @_));
+}
+
+1;

@@ -46,11 +46,11 @@ sub reply_handler
 
 	my $rr;
 
-	print("Received [$qname] query from $peerhost to " . $conn->{sockhost} . "\n");
+	inf("Received [$qname] query from $peerhost to ", $conn->{sockhost});
 
-	print("------------------------------ <QUERY> -----------------------------------\n");
+	inf("------------------------------ <QUERY> -----------------------------------");
 	$query->print();
-	print("------------------------------ </QUERY> ----------------------------------\n");
+	inf("------------------------------ </QUERY> ----------------------------------");
 
 	if ($config->{'sleep'})
 	{

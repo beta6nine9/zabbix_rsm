@@ -56,13 +56,18 @@ sub reply_handler
 
 	my (@answer, @authority, @additional, $optionmask);
 
+	if ($config->{'sleep'})
+	{
+		sleep($config->{'sleep'});
+	}
+
 	if ($qtype eq 'DNSKEY')
 	{
-		print("Received [$qname] query from $peerhost to " . $conn->{sockhost} . ":\n");
+		inf("received [$qname] query from $peerhost to ", $conn->{sockhost});
 
-		print("------------------------------ <QUERY> -----------------------------------\n");
+		inf("------------------------------ <QUERY> -----------------------------------");
 		$query->print();
-		print("------------------------------ </QUERY> ----------------------------------\n");
+		inf("------------------------------ </QUERY> ----------------------------------");
 
 		my @rrsetref =
 		(

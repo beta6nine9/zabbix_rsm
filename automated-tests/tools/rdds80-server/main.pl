@@ -7,14 +7,20 @@ use FindBin;
 use lib "$FindBin::RealBin/..";
 use Tools;
 
-use IO::Socket::INET;
-use threads;
-
 use constant RDDS80_PORT => 4380;
 
-my $input_file = $ARGV[0];
+my $pid_file   = $ARGV[0];
+my $input_file = $ARGV[1];
 
-die("usage $0 <input file>") unless ($input_file && -r $input_file);
+die("usage $0 <pid file> <input file>") unless ($pid_file);
+die("usage $0 <pid file> <input file>") unless ($input_file);
+
+if (! -r $input_file)
+{
+	$input_file = "$FindBin::RealBin/../../test-cases/simple-check/$input_file";
+}
+
+die("usage $0 <pid file> <input file> (invalid input file $input_file)") unless (-r $input_file);
 
 my $config = read_json_file($input_file);
 
@@ -23,47 +29,36 @@ die("\"reply-status\" must be defined")     unless ($config->{'reply-status'});
 die("\"reply-headers\" must be defined")    unless ($config->{'reply-headers'});
 die("\"reply-headers\" must be a hash")     unless (ref($config->{'reply-headers'}) eq 'HASH');
 
-my $socket = IO::Socket::INET->new(
-	LocalHost   => '0.0.0.0',
-	LocalPort   =>  RDDS80_PORT,
-	Proto       => 'tcp',
-	Listen      =>  5,
-	Reuse       =>  1
-) or die("cannot create socket: $!");
-
-print("Waiting for tcp connect to connect on port " . RDDS80_PORT . "\n");
-
-while (1)
-{
-	my $client_socket  = $socket->accept();
-	my $client_address = $client_socket->peerhost;
-	my $client_port    = $client_socket->peerport;
-
-	print("$client_address:$client_port connected\n");
-
-	threads->create(\&connection, $client_socket);
-}
-
-$socket->close();
-
-sub connection()
+sub reply_handler()
 {
 	my $client_socket = shift;
 
 	my $data = <$client_socket>;
 
-	$data =~ s/[\r\n]$//g;
-
-	print("received [$data]\n");
-
-	if ($data !~ /$config->{'expected-request'}/)
+	if (!defined($data))
 	{
-		printf("Error: expected [%s] got [%s]\n", $config->{'expected-request'}, $data);
+		err("remote connection closed without sending anything");
 		print $client_socket ("error");
 		goto OUT;
 	}
 
-	my $reply = "$config->{'reply-status'}";
+	$data =~ s/[\r\n]$//g;
+
+	inf("received [$data]");
+
+	if ($data !~ /$config->{'expected-request'}/)
+	{
+		err(sprintf("expected [%s] got [%s]", $config->{'expected-request'}, $data));
+		print $client_socket ("error");
+		goto OUT;
+	}
+
+	if ($config->{'sleep'})
+	{
+		sleep($config->{'sleep'});
+	}
+
+	my $reply = "HTTP/1.1 $config->{'reply-status'}";
 
 	foreach my $header (keys(%{$config->{'reply-headers'}}))
 	{
@@ -72,9 +67,11 @@ sub connection()
 
 	$reply .= "\r\n\r\n";
 
-	printf("replying with [%s]\n", $reply);
+	inf("replying with [$reply]");
 
 	print $client_socket ($reply);
 OUT:
 	$client_socket->close();
 }
+
+start_tcp_server("RDDS80SERVER", RDDS80_PORT, $pid_file, \&reply_handler);
