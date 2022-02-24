@@ -1,0 +1,25 @@
+[test-case]
+
+"RDDS43/RDDS80 - Timeout (-227/-255)"
+
+[start-tool]
+
+"rdds43-server","/tmp/rdds43-server.pid","206-rdds43-server-input.json"
+"rdds80-server","/tmp/rdds80-server.pid","206-rdds80-server-input.json"
+"resolver","/tmp/resolver.pid","206-resolver-input.json"
+
+[execute]
+
+"","rm -rf   /tmp/simple-check-test"
+"","mkdir -p /tmp/simple-check-test"
+"","${cfg:paths:build_dir}/bin/t_rsm_rdds -t example -a example.example -s 4343 -w http://example.example -g 4380 -p example.example -4 -r 127.0.0.1 -o 5053 -j /tmp/simple-check-test/status.json"
+
+[stop-tool]
+
+"resolver","/tmp/resolver.pid"
+"rdds80-server","/tmp/rdds80-server.pid"
+"rdds43-server","/tmp/rdds43-server.pid"
+
+[compare-files]
+
+"/tmp/simple-check-test","206-output.tar.gz"
