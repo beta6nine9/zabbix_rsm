@@ -464,12 +464,12 @@ class Tld extends MonitoringTarget
 		$this->updateMacros(
 			$this->getTemplateId('Template Rsmhost Config ' . $this->getInput('id')),
 			[
-				self::MACRO_TLD_DNS_UDP_ENABLED => 0,
-				self::MACRO_TLD_DNS_TCP_ENABLED => 0,
-				self::MACRO_TLD_DNSSEC_ENABLED => 0,
-				self::MACRO_TLD_RDAP_ENABLED => 0,
-				self::MACRO_TLD_RDDS43_ENABLED => 0,
-				self::MACRO_TLD_RDDS80_ENABLED => 0,
+				self::MACRO_TLD_DNS_UDP_ENABLED => "0",
+				self::MACRO_TLD_DNS_TCP_ENABLED => "0",
+				self::MACRO_TLD_DNSSEC_ENABLED  => "0",
+				self::MACRO_TLD_RDAP_ENABLED    => "0",
+				self::MACRO_TLD_RDDS43_ENABLED  => "0",
+				self::MACRO_TLD_RDDS80_ENABLED  => "0",
 			]
 		);
 	}

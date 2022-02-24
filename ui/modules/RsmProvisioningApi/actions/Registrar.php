@@ -218,9 +218,9 @@ class Registrar extends MonitoringTarget
 		$this->updateMacros(
 			$this->getTemplateId('Template Rsmhost Config ' . $this->getInput('id')),
 			[
-				self::MACRO_TLD_RDAP_ENABLED => 0,
-				self::MACRO_TLD_RDDS43_ENABLED => 0,
-				self::MACRO_TLD_RDDS80_ENABLED => 0,
+				self::MACRO_TLD_RDAP_ENABLED   => "0",
+				self::MACRO_TLD_RDDS43_ENABLED => "0",
+				self::MACRO_TLD_RDDS80_ENABLED => "0",
 			]
 		);
 	}
