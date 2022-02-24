@@ -10,6 +10,7 @@ use API;
 use CApiInputValidator;
 use CController;
 use CControllerResponseData;
+use CMessageHelper;
 use DB;
 use Exception;
 use ErrorException;
@@ -151,7 +152,7 @@ abstract class ActionBase extends CController
 		$username = $_SERVER['PHP_AUTH_USER'];
 		$password = $_SERVER['PHP_AUTH_PW'];
 
-		$userData = API::User()->login(['user' => $username, 'password' => $password, 'userData' => true]);
+		$userData = API::User()->login(['username' => $username, 'password' => $password, 'userData' => true]);
 
 		if ($userData === false)
 		{
@@ -449,7 +450,7 @@ abstract class ActionBase extends CController
 
 			$this->handleRequest();
 
-			if (!empty($GLOBALS['ZBX_MESSAGES']))
+			if (!empty(CMessageHelper::getMessages()))
 			{
 				throw new Exception('Internal error');
 			}
@@ -504,7 +505,7 @@ abstract class ActionBase extends CController
 		$details['file']     = $e->getFile();
 		$details['line']     = $e->getLine();
 		$details['trace']    = explode("\n", $e->getTraceAsString());
-		$details['messages'] = $GLOBALS['ZBX_MESSAGES'];
+		$details['messages'] = CMessageHelper::getMessages();
 
 		return $details;
 	}
@@ -553,8 +554,6 @@ abstract class ActionBase extends CController
 
 	private function handleDeleteRequest(): void
 	{
-		global $ZBX_MESSAGES;
-
 		$data = $this->getObjects($this->getInput('id'));
 
 		if (empty($data))
@@ -567,12 +566,21 @@ abstract class ActionBase extends CController
 		$this->deleteObject();
 		$this->requestConfigCacheReload();
 
-		// when deleting objects, API puts informative messages into $ZBX_MESSAGES; move them to $details of the response
+		// when deleting objects, API puts informative messages into CMessageHelper; move them to $details of the response
+		$messages = CMessageHelper::getMessages();
 		$details = [];
-		while (count($ZBX_MESSAGES) > 0 && $ZBX_MESSAGES[0]['type'] === 'info' && preg_match('/^Deleted: /', $ZBX_MESSAGES[0]['message']))
+		foreach ($messages as $i => $message)
 		{
-			$message = array_shift($ZBX_MESSAGES);
-			$details['info'][] = $message['message'];
+			if ($message['type'] === 'success' && preg_match('/^Deleted: /', $message['message']))
+			{
+				$details['info'][] = $message['message'];
+				unset($messages[$i]);
+			}
+		}
+		CMessageHelper::clear();
+		foreach ($messages as $message)
+		{
+			CMessageHelper::addMessage($message);
 		}
 
 		$this->setCommonResponse(200, 'Update executed successfully', null, $details, null);
@@ -582,8 +590,6 @@ abstract class ActionBase extends CController
 	{
 		// TODO: changes to Zabbix shall only be executed if the configuration information changes
 		// between the current configuration in Zabbix and the object provided to the API
-		global $ZBX_MESSAGES;
-
 		$this->newObject = $this->getInputAll();
 
 		$objects = $this->getObjects($this->newObject['id']);
@@ -612,16 +618,25 @@ abstract class ActionBase extends CController
 			}
 		}
 
-		// when disabling objects, API puts informative messages into $ZBX_MESSAGES; move them to $details of the response
+		// when disabling objects, API puts informative messages into CMessageHelper; move them to $details of the response
+		$messages = CMessageHelper::getMessages();
 		$details = null;
-		while (count($ZBX_MESSAGES) > 0 && $ZBX_MESSAGES[0]['type'] === 'info' && preg_match('/^Updated status of host /', $ZBX_MESSAGES[0]['message']))
+		foreach ($messages as $i => $message)
 		{
-			if (is_null($details))
+			if ($message['type'] === 'success' && preg_match('/^Updated status of host /', $message['message']))
 			{
-				$details = [];
+				if (is_null($details))
+				{
+					$details = [];
+				}
+				$details['info'][] = $message['message'];
+				unset($messages[$i]);
 			}
-			$message = array_shift($ZBX_MESSAGES);
-			$details['info'][] = $message['message'];
+		}
+		CMessageHelper::clear();
+		foreach ($messages as $message)
+		{
+			CMessageHelper::addMessage($message);
 		}
 
 		$objects = $this->getObjects($this->newObject['id']);
