@@ -17,7 +17,8 @@ our @EXPORT = qw(
 	write_file
 	start_dns_server
 	start_tcp_server
-	inf err
+	inf
+	err
 );
 
 use JSON::XS;
@@ -151,12 +152,12 @@ sub start_tcp_server($$$$)
 
 sub inf(@)
 {
-	printf("%s INF: %s\n", $_instance_name, join(',', @_));
+	printf STDOUT ("%s INF: %s\n", $_instance_name, join(',', @_));
 }
 
 sub err(@)
 {
-	printf("%s ERR: %s\n", $_instance_name, join(',', @_));
+	printf STDERR ("%s ERR: %s\n", $_instance_name, join(',', @_));
 }
 
 1;
