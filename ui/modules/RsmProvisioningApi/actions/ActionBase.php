@@ -313,6 +313,11 @@ abstract class ActionBase extends CController
 
 		$ret = exec("python -c $execCode $execJson 2>&1", $output, $result);
 
+		if ($ret !== false && strpos($ret, "python: not found") !== false)
+		{
+			throw new RsmException(500, 'General error', $ret);
+		}
+
 		if ($ret === false || $result !== 0)
 		{
 			return true;
@@ -337,7 +342,12 @@ abstract class ActionBase extends CController
 
 		$output = null;
 
-		exec("python -c $execCode $execJson 2>&1", $output);
+		$ret = exec("python -c $execCode $execJson 2>&1", $output);
+
+		if ($ret !== false && strpos($ret, "python: not found") !== false)
+		{
+			throw new RsmException(500, 'General error', $ret);
+		}
 
 		return implode("\n", $output);
 	}
