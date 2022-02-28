@@ -437,7 +437,7 @@ static int	DBpatch_6000000_9(void)
 			"ssl_cert_file,ssl_key_file,ssl_key_password,verify_peer,verify_host,allow_traps,discover"	\
 		" from items where itemid=" ZBX_FS_UI64
 
-	DB_EXEC(SQL, rdds80_templateid, "DDS80 enabled/disabled", "rdds80.enabled", "{$RSM.TLD.RDDS80.ENABLED}",
+	DB_EXEC(SQL, rdds80_templateid, "RDDS80 enabled/disabled", "rdds80.enabled", "{$RSM.TLD.RDDS80.ENABLED}",
 		"History of RDDS80 being enabled or disabled.", rdds43_templateid);
 
 #undef SQL
