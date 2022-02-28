@@ -1,3 +1,9 @@
+Changes for rsm2.2.4
+
+Bug fixes:
+....I..... [837] defined registrarID in the list of known fields (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.2.3
 
 Bug fixes:
