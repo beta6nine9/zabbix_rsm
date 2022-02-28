@@ -359,8 +359,11 @@ class TestsListAction extends Action {
 			'host' => $this->getInput('host'),
 			'type' => $this->getInput('type'),
 			'slvItemId' => $this->getInput('slvItemId'),
-			'from' => $this->getInput('from', ZBX_PERIOD_DEFAULT_FROM),
-			'to' => $this->getInput('to', ZBX_PERIOD_DEFAULT_TO),
+			// TODO-UPGRADE-6: default period
+			//'from' => $this->getInput('from', ZBX_PERIOD_DEFAULT_FROM),
+			//'to' => $this->getInput('to', ZBX_PERIOD_DEFAULT_TO),
+			'from' => $this->getInput('from'),
+			'to' => $this->getInput('to'),
 			'rollingweek_from' => 'now-'.$timeshift,
 			'rollingweek_to' => 'now',
 			'tests' => [],

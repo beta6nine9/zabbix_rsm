@@ -242,9 +242,11 @@ class ParticularTestsListAction extends Action {
 
 			// Get mapped value for test result.
 			if (in_array($data['type'], [RSM_RDDS, RSM_RDAP])) {
-				$test_result_label = ($test_result['value'] !== null)
-					? getMappedValue($test_result['value'], RSM_SERVICE_AVAIL_VALUE_MAP)
-					: false;
+				// TODO-UPGRADE-6: value maps
+				//$test_result_label = ($test_result['value'] !== null)
+					//? getMappedValue($test_result['value'], RSM_SERVICE_AVAIL_VALUE_MAP)
+					//: false;
+				$test_result_label = false;
 
 				if (!$test_result_label) {
 					$test_result_label = _('No result');
@@ -587,8 +589,10 @@ class ParticularTestsListAction extends Action {
 								//$rtt_value = convert_units(['value' => $itemValue['value'], 'units' => $item['units']]);
 								$rtt_value = convertUnits(['value' => $itemValue['value']]);
 								$hosts[$item['hostid']]['rdds43']['rtt'] = [
-									'description' => $rtt_value < 0 ? applyValueMap($rtt_value, $item['valuemapid']) : null,
-									'value' => $rtt_value
+									// TODO-UPGRADE-6: value maps
+									//'description' => $rtt_value < 0 ? applyValueMap($rtt_value, $item['valuemapid']) : null,
+									'description' => null,
+									'value' => $rtt_value,
 								];
 							}
 						}
@@ -600,8 +604,10 @@ class ParticularTestsListAction extends Action {
 								//$rtt_value = convert_units(['value' => $itemValue['value'], 'units' => $item['units']]);
 								$rtt_value = convertUnits(['value' => $itemValue['value']]);
 								$hosts[$item['hostid']]['rdds80']['rtt'] = [
-									'description' => $rtt_value < 0 ? applyValueMap($rtt_value, $item['valuemapid']) : null,
-									'value' => $rtt_value
+									// TODO-UPGRADE-6: value maps
+									//'description' => $rtt_value < 0 ? applyValueMap($rtt_value, $item['valuemapid']) : null,
+									'description' => null,
+									'value' => $rtt_value,
 								];
 							}
 						}
@@ -613,8 +619,10 @@ class ParticularTestsListAction extends Action {
 								//$rtt_value = convert_units(['value' => $itemValue['value'], 'units' => $item['units']]);
 								$rtt_value = convertUnits(['value' => $itemValue['value']]);
 								$hosts[$item['hostid']]['rdap']['rtt'] = [
-									'description' => $rtt_value < 0 ? applyValueMap($rtt_value, $item['valuemapid']) : null,
-									'value' => $rtt_value
+									// TODO-UPGRADE-6: value maps
+									//'description' => $rtt_value < 0 ? applyValueMap($rtt_value, $item['valuemapid']) : null,
+									'description' => null,
+									'value' => $rtt_value,
 								];
 							}
 						}
@@ -652,7 +660,9 @@ class ParticularTestsListAction extends Action {
 
 							if (!array_key_exists($error_code, $data['errors'])) {
 								$data['errors'][$error_code] = [
-									'description' => applyValueMap($error_code, $item['valuemapid'])
+									// TODO-UPGRADE-6: value maps
+									//'description' => applyValueMap($error_code, $item['valuemapid'])
+									'description' => null,
 								];
 							}
 							if (!array_key_exists('rdap', $data['errors'][$error_code])) {
@@ -669,7 +679,9 @@ class ParticularTestsListAction extends Action {
 
 								if (!array_key_exists($error_code, $data['errors'])) {
 									$data['errors'][$error_code] = [
-										'description' => applyValueMap($error_code, $item['valuemapid'])
+										// TODO-UPGRADE-6: value maps
+										//'description' => applyValueMap($error_code, $item['valuemapid'])
+										'description' => null,
 									];
 								}
 								if (!array_key_exists($column, $data['errors'][$error_code])) {
@@ -678,29 +690,6 @@ class ParticularTestsListAction extends Action {
 
 								$data['errors'][$error_code][$column]++;
 							}
-						}
-					}
-					elseif ($data['type'] == RSM_EPP) {
-						if ($item['key_'] == PROBE_EPP_IP) {
-							$hosts[$item['hostid']]['ip'] = $itemValue['value'];
-						}
-						elseif ($item['key_'] == PROBE_EPP_UPDATE) {
-							$hosts[$item['hostid']]['update'] = $itemValue['value']
-								? applyValueMap(convertUnits(['value' => $itemValue['value'], 'units' => $item['units']]), $item['valuemapid'])
-								: null;
-						}
-						elseif ($item['key_'] == PROBE_EPP_INFO) {
-							$hosts[$item['hostid']]['info'] = $itemValue['value']
-								? applyValueMap(convertUnits(['value' => $itemValue['value'], 'units' => $item['units']]), $item['valuemapid'])
-								: null;
-						}
-						elseif ($item['key_'] == PROBE_EPP_LOGIN) {
-							$hosts[$item['hostid']]['login'] = $itemValue['value']
-								? applyValueMap(convertUnits(['value' => $itemValue['value'], 'units' => $item['units']]), $item['valuemapid'])
-								: null;
-						}
-						else {
-							$hosts[$item['hostid']]['value'] = $itemValue['value'];
 						}
 					}
 				}

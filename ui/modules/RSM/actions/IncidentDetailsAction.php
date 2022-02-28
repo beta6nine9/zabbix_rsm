@@ -83,8 +83,9 @@ class IncidentDetailsAction extends Action {
 		}
 		elseif ($this->hasInput('filter_rst')) {
 			$data['filter_failing_tests'] = 0;
-			$data['from'] = ZBX_PERIOD_DEFAULT_FROM;
-			$data['to'] = ZBX_PERIOD_DEFAULT_TO;
+			// TODO-UPGRADE-6: default period
+			//$data['from'] = ZBX_PERIOD_DEFAULT_FROM;
+			//$data['to'] = ZBX_PERIOD_DEFAULT_TO;
 			updateTimeSelectorPeriod($data);
 			CProfile::delete('web.rsm.incidents.filter_failing_tests');
 		}

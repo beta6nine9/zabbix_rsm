@@ -62,8 +62,9 @@ class IncidentsListAction extends Action {
 		elseif ($this->hasInput('filter_rst')) {
 			$data += [
 				'filter_search' => '',
-				'from' => ZBX_PERIOD_DEFAULT_FROM,
-				'to' => ZBX_PERIOD_DEFAULT_TO
+				// TODO-UPGRADE-6: default period
+				//'from' => ZBX_PERIOD_DEFAULT_FROM,
+				//'to' => ZBX_PERIOD_DEFAULT_TO
 			];
 
 			CProfile::delete('web.rsm.incidents.filter.search');
