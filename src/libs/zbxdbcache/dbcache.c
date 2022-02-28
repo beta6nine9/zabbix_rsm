@@ -3027,6 +3027,9 @@ static void	proxy_prepare_history(ZBX_DC_HISTORY *history, int history_num)
 		if (0 != items[i].inventory_link)
 			continue;
 
+		/* RSM specifics: move preprocessing to server */
+		continue;
+
 		dc_history_clean_value(history + i);
 
 		/* all checks passed, item value must not be stored in proxy history/sent to server */
