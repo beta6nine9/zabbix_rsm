@@ -181,6 +181,24 @@ out:
 	return ret;
 }
 
+/* 5000002, 5 - move valuemaps to temporary tables before upgrade to Zabbix 6.0; make sure it is executed after all 5.0 patches */
+static int	DBpatch_5000999_1(void)
+{
+	int	ret = FAIL;
+
+	ONLY_SERVER();
+
+	DB_EXEC("create table valuemaps_tmp like valuemaps");
+	DB_EXEC("insert into valuemaps_tmp select * from valuemaps");
+	DB_EXEC("create table mappings_tmp like mappings");
+	DB_EXEC("insert into mappings_tmp select * from mappings");
+	DB_EXEC("update items set valuemapid=null where valuemapid is not null");
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
 #endif
 
 DBPATCH_START(5000)
@@ -192,5 +210,6 @@ DBPATCH_RSM(5000002, 1, 0, 1)	/* RSM FY21 */
 DBPATCH_RSM(5000002, 2, 0, 0)	/* move {$RSM.DNS.AVAIL.MINNS} from globalmacro to hostmacro, rename to {$RSM.TLD.DNS.AVAIL.MINNS} */
 DBPATCH_RSM(5000002, 3, 0, 0)	/* delete "rsm.configvalue[RSM.DNS.AVAIL.MINNS]" item */
 DBPATCH_RSM(5000002, 4, 0, 0)	/* replace "{$RSM.DNS.AVAIL.MINNS}" to "{$RSM.TLD.DNS.AVAIL.MINNS}" in item keys (template and hosts) */
+DBPATCH_RSM(5000999, 1, 0, 0)	/* move valuemaps to temporary tables before upgrade to Zabbix 6.0 */
 
 DBPATCH_END()

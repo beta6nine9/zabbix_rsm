@@ -103,6 +103,10 @@ do															\
 }															\
 while (0)
 
+/* gets groupid of the host group */
+#define GET_HOST_GROUP_ID(groupid, name)										\
+		SELECT_VALUE_UINT64(groupid, "select groupid from hstgrp where name='%s'", name)
+
 extern unsigned char	program_type;
 
 /*
@@ -620,6 +624,119 @@ out:
 	return ret;
 }
 
+/* 6000000, 12 - create a template for storing value maps */
+static int	DBpatch_6000000_12(void)
+{
+	int		ret = FAIL;
+
+	DB_RESULT	valuemap_result = NULL;
+	DB_ROW		valuemap_row;
+	DB_RESULT	mapping_result = NULL;
+	DB_ROW		mapping_row;
+
+	zbx_uint64_t	groupid;
+	zbx_uint64_t	hostid;
+	const char	*template_name = "Template Value Maps";
+	char		*template_uuid = NULL;
+	char		*valuemap_name = NULL;
+	char		*valuemap_uuid = NULL;
+	char		*old_value = NULL;
+	char		*new_value = NULL;
+
+	GET_HOST_GROUP_ID(groupid, "Templates");
+	hostid = DBget_maxid_num("hosts", 1);
+	template_uuid = zbx_gen_uuid4(template_name);
+
+	/* status 3 = HOST_STATUS_TEMPLATE */
+
+	DB_EXEC("insert into hosts set"
+			" hostid=" ZBX_FS_UI64 ",created=0,proxy_hostid=NULL,host='%s',status=%d,lastaccess=0,"
+			"ipmi_authtype=-1,ipmi_privilege=2,ipmi_username='',ipmi_password='',maintenanceid=NULL,"
+			"maintenance_status=0,maintenance_type=0,maintenance_from=0,name='%s',info_1='',info_2='',"
+			"flags=0,templateid=NULL,description='',tls_connect=1,tls_accept=1,tls_issuer='',"
+			"tls_subject='',tls_psk_identity='',tls_psk='',proxy_address='',auto_compress=1,discover=0,"
+			"custom_interfaces=0,uuid='%s'",
+		hostid, template_name, HOST_STATUS_TEMPLATE, template_name, template_uuid);
+
+	DB_EXEC("insert into hosts_groups set"
+			" hostgroupid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",groupid=" ZBX_FS_UI64,
+		DBget_maxid_num("hosts_groups", 1), hostid, groupid);
+
+	valuemap_result = DBselect("select valuemapid,name from valuemaps_tmp order by valuemapid");
+
+	if (NULL == valuemap_result)
+		goto out;
+
+	while (NULL != (valuemap_row = DBfetch(valuemap_result)))
+	{
+		zbx_uint64_t	valuemapid_old;
+		zbx_uint64_t	valuemapid_new;
+		unsigned int	sortorder = 0;
+
+		ZBX_STR2UINT64(valuemapid_old, valuemap_row[0]);
+		valuemap_name = DBdyn_escape_string(valuemap_row[1]);
+
+		valuemapid_new = DBget_maxid_num("valuemap", 1);
+		valuemap_uuid = zbx_gen_uuid4(valuemap_name);
+
+#define SQL	"insert into valuemap set valuemapid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",name='%s',uuid='%s'"
+		DB_EXEC(SQL, valuemapid_new, hostid, valuemap_name, valuemap_uuid);
+#undef SQL
+
+		mapping_result = DBselect("select value,newvalue from mappings_tmp where valuemapid=" ZBX_FS_UI64 " order by mappingid", valuemapid_old);
+
+		if (NULL == mapping_result)
+			goto out;
+
+		while (NULL != (mapping_row = DBfetch(mapping_result)))
+		{
+			old_value = DBdyn_escape_string(mapping_row[0]);
+			new_value = DBdyn_escape_string(mapping_row[1]);
+
+			/* type 0 = VALUEMAP_MAPPING_TYPE_EQUAL */
+
+			DB_EXEC("insert into valuemap_mapping set"
+					" valuemap_mappingid=" ZBX_FS_UI64 ",valuemapid=" ZBX_FS_UI64 ",value='%s',"
+					"newvalue='%s',type=0,sortorder=%d",
+				DBget_maxid_num("valuemap_mapping", 1), valuemapid_new, old_value, new_value, sortorder++);
+
+			zbx_free(old_value);
+			zbx_free(new_value);
+		}
+
+		zbx_free(valuemap_name);
+		zbx_free(valuemap_uuid);
+	}
+
+	DB_EXEC("drop table valuemaps_tmp");
+	DB_EXEC("drop table mappings_tmp");
+
+	ret = SUCCEED;
+out:
+	DBfree_result(valuemap_result);
+	DBfree_result(mapping_result);
+	zbx_free(template_uuid);
+	zbx_free(valuemap_name);
+	zbx_free(valuemap_uuid);
+	zbx_free(old_value);
+	zbx_free(new_value);
+
+	return ret;
+}
+
+/* 6000000, 13 - enable show_technical_errors */
+static int	DBpatch_6000000_13(void)
+{
+	int	ret = FAIL;
+
+	DB_EXEC("update config set show_technical_errors=1");
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
+
 #endif
 
 DBPATCH_START(6000)
@@ -638,5 +755,7 @@ DBPATCH_RSM(6000000, 8, 0, 0)	/* replace {$RSM.TLD.RDDS.ENABLED} macro with {$RS
 DBPATCH_RSM(6000000, 9, 0, 0)	/* split rdds.enabled item into rdds43.enabled and rdds80.enabled */
 DBPATCH_RSM(6000000, 10, 0, 0)	/* replace obsoleted positional macros $1 and $2 in item names */
 DBPATCH_RSM(6000000, 11, 0, 0)	/* register Provisioning API module and create its users */
+DBPATCH_RSM(6000000, 12, 0, 0)	/* create a template for storing value maps */
+DBPATCH_RSM(6000000, 13, 0, 0)	/* enable show_technical_errors */
 
 DBPATCH_END()
