@@ -111,7 +111,7 @@ sub run_test_case($)
 		copy(
 			$source_dir . "/opt/zabbix/scripts/rsm.conf.default",
 			$source_dir . "/opt/zabbix/scripts/rsm.conf",
-		) or fail("cannot copy rsm.conf file: %s", $!);;
+		) or fail("cannot copy rsm.conf file: %s", $!);
 
 		db_connect();
 	}
