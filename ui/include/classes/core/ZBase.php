@@ -675,16 +675,11 @@ class ZBase {
 		$modules_missing = [];
 
 		foreach ($db_modules as $db_module) {
-/* RSM specifics: don't check access for RsmProvisioningApi module, it has to be available without logging in */
-			if ($db_module['relative_path'] !== 'RsmProvisioningApi')
-			{
-/* RSM specifics: end */
-			if (!CWebUser::checkAccess('modules.module.'.$db_module['moduleid'])) {
-				continue;
-			}
-/* RSM specifics: RsmProvisioningApi module has to be available without logging in */
-			}
-/* RSM specifics: end */
+			/* RSM specifics: don't check access, modules have to be available without logging in */
+			//if (!CWebUser::checkAccess('modules.module.'.$db_module['moduleid'])) {
+			//	continue;
+			//}
+			/* RSM specifics: end */
 
 			$manifest = $this->module_manager->addModule($db_module['relative_path'], $db_module['id'],
 				$db_module['config']
