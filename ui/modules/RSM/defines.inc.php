@@ -234,12 +234,14 @@ define('RSM_RDDS_SUBSERVICE_RDDS43',	'RDDS43');
 define('RSM_RDDS_SUBSERVICE_RDDS80',	'RDDS80');
 define('RSM_RDDS_SUBSERVICE_RDAP',		'RDAP');
 
-// Value maps used for special purpose.
 define('PROBES_MON_GROUPID',					130);
-define('RSM_SERVICE_AVAIL_VALUE_MAP',			110);
-define('RSM_DNS_TRANSPORT_PROTOCOL_VALUE_MAP',	162);
-define('RSM_DNS_RTT_ERRORS_VALUE_MAP',			120);
-define('RSM_RDDS_RTT_ERRORS_VALUE_MAP',			130);
+
+// Value maps used for special purpose.
+define('RSM_VALUE_MAP_DNS_RTT',					"RSM DNS rtt");
+define('RSM_VALUE_MAP_RDDS_RTT',				"RSM RDDS rtt");
+define('RSM_VALUE_MAP_RDAP_RTT',				"RSM RDAP rtt");
+define('RSM_VALUE_MAP_TRANSPORT_PROTOCOL',		"Transport protocol");
+define('RSM_VALUE_MAP_SERVICE_AVAILABILITY',	"RSM Service Availability");
 
 define('RSM_MONITORING_TARGET',			'{$RSM.MONITORING.TARGET}');
 define('MONITORING_TARGET_REGISTRY',	'registry');

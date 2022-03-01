@@ -399,22 +399,6 @@ class IncidentDetailsAction extends Action {
 
 		$data['paging'] = CPagerHelper::paginate($this->getInput('page', 1), $data['tests'], ZBX_SORT_UP, new CUrl());
 
-		if ($data['tests']) {
-			$data['test_value_mapping'] = [];
-
-			$test_value_mapping = API::ValueMap()->get([
-				'output' => [],
-				'selectMappings' => ['value', 'newvalue'],
-				'valuemapids' => [RSM_SERVICE_AVAIL_VALUE_MAP]
-			]);
-
-			if ($test_value_mapping) {
-				foreach ($test_value_mapping[0]['mappings'] as $val) {
-					$data['test_value_mapping'][$val['value']] = $val['newvalue'];
-				}
-			}
-		}
-
 		$response = new CControllerResponseData($data);
 		$response->setTitle($data['title']);
 		$this->setResponse($response);
