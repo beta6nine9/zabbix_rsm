@@ -51,6 +51,7 @@
 [check-host-count]
 
 # Expected templates:
+# * "Template Value Maps"
 # * "Template Probe Status"
 # * "Template Proxy Health"
 # * "Template Config History"
@@ -65,8 +66,8 @@
 # * "Template Rsmhost Config <rsmhost>" for each rsmhost
 # * "Template DNS Test - <rsmhost>" for each rsmhost
 #
-# 10 + (2 probes * 1) + (1 rsmhost * 2) = 14
-"template",14
+# 11 + (2 probes * 1) + (1 rsmhost * 2) = 15
+"template",15
 
 # Expected proxies - one for each probe
 "proxy",2
