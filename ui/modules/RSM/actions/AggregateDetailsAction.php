@@ -248,7 +248,7 @@ class AggregateDetailsAction extends Action {
 			$ns = $key_parser->getParam(0);
 			$ip = $key_parser->getParam(1);
 			$item_transport = $key_parser->getParam(2);
-			$test_transport = VM::get(RSM_VALUE_MAP_TRANSPORT PROTOCOL, $this->probes[$probeid]['transport']);
+			$test_transport = VM::get(RSM_VALUE_MAP_TRANSPORT_PROTOCOL, $this->probes[$probeid]['transport']);
 			$ipv = filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) ? 'ipv4' : 'ipv6';
 			$dns_nameservers[$ns][$ipv][$ip] = true;
 			$rtt_max = ($item_transport == 'udp') ? $data['udp_rtt'] : $data['tcp_rtt'];
