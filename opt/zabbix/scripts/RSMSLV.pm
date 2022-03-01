@@ -4966,6 +4966,9 @@ sub recalculate_downtime($$$$$$)
 	my $incident_recover  = shift; # how many cycles have to succeed to recover from the incident
 	my $delay             = shift;
 
+	wrn("TODO-UPGRADE-6: recalculate_downtime() needs to be re-implemented because of changes in auditlog");
+	return;
+
 	fail("not supported when running in --dry-run mode") if (opt('dry-run'));
 
 	# get service from item's key ('DNS', 'DNS.NS', 'RDDS', 'RDAP')
