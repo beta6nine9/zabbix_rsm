@@ -31,6 +31,8 @@ use CControllerResponseData;
 use CControllerResponseRedirect;
 use Modules\RSM\Helpers\UrlHelper;
 
+use CSettingsHelper;
+
 class IncidentDetailsAction extends Action {
 
 	protected function checkInput() {
@@ -83,9 +85,9 @@ class IncidentDetailsAction extends Action {
 		}
 		elseif ($this->hasInput('filter_rst')) {
 			$data['filter_failing_tests'] = 0;
-			// TODO-UPGRADE-6: default period
-			//$data['from'] = ZBX_PERIOD_DEFAULT_FROM;
-			//$data['to'] = ZBX_PERIOD_DEFAULT_TO;
+			$data['from'] = 'now-'.CSettingsHelper::get(CSettingsHelper::PERIOD_DEFAULT);
+			$data['to'] = 'now';
+
 			updateTimeSelectorPeriod($data);
 			CProfile::delete('web.rsm.incidents.filter_failing_tests');
 		}

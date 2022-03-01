@@ -375,9 +375,8 @@ if ($data['tld']) {
 								'slvItemId' => $tld[$service]['itemid'],
 								'host' => $tld['host'],
 								'type' => $service,
-								// TODO-UPGRADE-6: default period
-								//'from' => ZBX_PERIOD_DEFAULT_FROM,
-								//'to' => ZBX_PERIOD_DEFAULT_TO,
+								'from' => 'now-'.CSettingsHelper::get(CSettingsHelper::PERIOD_DEFAULT),
+								'to' => 'now',
 							])
 						))
 						->addClass('icon-eye')

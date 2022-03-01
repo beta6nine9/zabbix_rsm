@@ -30,6 +30,8 @@ use CPagerHelper;
 use CControllerResponseData;
 use CControllerResponseFatal;
 
+use CSettingsHelper;
+
 class TestsListAction extends Action {
 
 	protected function checkInput() {
@@ -359,11 +361,8 @@ class TestsListAction extends Action {
 			'host' => $this->getInput('host'),
 			'type' => $this->getInput('type'),
 			'slvItemId' => $this->getInput('slvItemId'),
-			// TODO-UPGRADE-6: default period
-			//'from' => $this->getInput('from', ZBX_PERIOD_DEFAULT_FROM),
-			//'to' => $this->getInput('to', ZBX_PERIOD_DEFAULT_TO),
-			'from' => $this->getInput('from'),
-			'to' => $this->getInput('to'),
+			'from' => $this->getInput('from', 'now-'.CSettingsHelper::get(CSettingsHelper::PERIOD_DEFAULT)),
+			'to' => $this->getInput('to', 'now'),
 			'rollingweek_from' => 'now-'.$timeshift,
 			'rollingweek_to' => 'now',
 			'tests' => [],
