@@ -66,6 +66,7 @@ my $JSON_FIELDS = {
 	'lastUpdateApiDatabase'    => JSON_VALUE_NUMBER,
 	'minNameServersUp'         => JSON_VALUE_NUMBER,
 	'testDateTime'             => JSON_VALUE_NUMBER,
+	'registrarID'              => JSON_VALUE_NUMBER,
 	'version'                  => JSON_VALUE_NUMBER,
 	'alarmed'                  => JSON_VALUE_STRING,
 	'city'                     => JSON_VALUE_STRING,
