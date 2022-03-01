@@ -1487,7 +1487,7 @@ sub __cmd_check_host($)
 	__compare_db_row(
 		"hosts",
 		[["hostid", $hostid]],
-		["hostid", "created", "proxy_hostid", "host"],
+		["hostid", "created", "proxy_hostid", "host", "uuid"],
 		{
 			"status"      => $statuses->{$expected_status},
 			"name"        => $host,
@@ -1715,11 +1715,11 @@ sub __cmd_check_item($)
 
 	my $sql = "select" .
 			" master_items.key_," .
-			"valuemaps.name" .
+			"valuemap.name" .
 		 " from" .
 			" items" .
 			" left join items as master_items on master_items.itemid=items.master_itemid" .
-			" left join valuemaps on valuemaps.valuemapid=items.valuemapid" .
+			" left join valuemap on valuemap.valuemapid=items.valuemapid" .
 		" where" .
 			" items.itemid=?";
 	my $params = [$itemid];
