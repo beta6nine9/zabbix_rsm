@@ -11,7 +11,6 @@ use CControllerTimeSelectorUpdate as Action;
  * profiles key to CControllerTimeSelectorUpdate controller checkInput method for this we overwrite
  * native "timeselector.update" action and make "proxy" class for RSM custom profile keys validation.
  */
-
 class ProfileTimeselectorUpdateAction extends Action {
 
 	protected function checkInput() {
@@ -19,8 +18,10 @@ class ProfileTimeselectorUpdateAction extends Action {
 
 		if (!$ret) {
 			$ret = in_array($this->getInput('idx'), [
-					'web.rsm.incidents.filter', 'web.rsm.incidentsdetails.filter'
-				]) && $this->validateInputDateRange();
+				'web.rsm.incidents.filter',
+				'web.rsm.incidentsdetails.filter',
+				'web.rsm.tests.filter',
+			]) && $this->validateInputDateRange();
 		}
 
 		return $ret;
