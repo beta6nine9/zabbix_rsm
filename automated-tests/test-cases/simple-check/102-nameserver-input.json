@@ -1,0 +1,8 @@
+{
+	"owner"          : "example",
+	"override-reply" : "foo",
+	"rcode"          : "NOERROR",
+	"flags"          : {
+		"aa" : 1
+	}
+}

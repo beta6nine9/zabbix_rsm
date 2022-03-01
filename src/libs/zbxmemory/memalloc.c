@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -28,9 +28,7 @@
  *                     Some information on memory layout                      *
  *                  ---------------------------------------                   *
  *                                                                            *
- *                                                                            *
  * (*) chunk: a contiguous piece of memory that is either free or used        *
- *                                                                            *
  *                                                                            *
  *                    +-------- size of + --------------+                     *
  *                    |       (8 bytes) |               |                     *
@@ -47,7 +45,6 @@
  *                                                                            *
  *                     8-aligned               8-aligned                      *
  *                                                                            *
- *                                                                            *
  *     when a chunk is used, `size' fields have MEM_FLG_USED bit set          *
  *                                                                            *
  *     when a chunk is free, the first 2 * ZBX_PTR_SIZE bytes of allocatable  *
@@ -61,11 +58,9 @@
  *           (when freeing a chunk, we can quickly see if the previous        *
  *           and next chunks are free, those will not have MEM_FLG_USED)      *
  *                                                                            *
- *                                                                            *
  * (*) free chunks are stored in doubly-linked lists according to their sizes *
  *                                                                            *
  *     a typical situation is thus as follows (1 used chunk, 2 free chunks)   *
- *                                                                            *
  *                                                                            *
  *  +--------------------------- shared memory ----------------------------+  *
  *  |                         (can be misaligned)                          |  *
@@ -580,6 +575,7 @@ int	zbx_mem_create(zbx_mem_info_t **info, zbx_uint64_t size, const char *descr, 
 	/* allocate zbx_mem_info_t structure, its buckets, and description inside shared memory */
 
 	*info = (zbx_mem_info_t *)ALIGN8(base);
+	(*info)->base = base;
 	(*info)->shm_id = shm_id;
 	(*info)->orig_size = size;
 	size -= (char *)(*info + 1) - (char *)base;
@@ -627,6 +623,11 @@ out:
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __func__);
 
 	return ret;
+}
+
+void	zbx_mem_destroy(zbx_mem_info_t *info)
+{
+	(void)shmdt(info->base);
 }
 
 void	*__zbx_mem_malloc(const char *file, int line, zbx_mem_info_t *info, const void *old, size_t size)

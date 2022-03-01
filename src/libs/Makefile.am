@@ -31,15 +31,21 @@ DIST_SUBDIRS = \
 	zbxcompress \
 	zbxembed \
 	zbxprometheus \
+	zbxvault \
 	zbxdiag \
-	zbxxml
-
+	zbxtrends \
+	zbxavailability \
+	zbxservice \
+	zbxaudit \
+	zbxeval \
+	zbxxml \
+	zbxha \
+	zbxrtc
 
 DIST_SUBDIRS += zbxrsm
 
 if SERVER
 SERVER_SUBDIRS = \
-	zbxcommshigh \
 	zbxdb \
 	zbxdbupgrade \
 	zbxdbcache \
@@ -56,14 +62,21 @@ SERVER_SUBDIRS = \
 	zbxxml \
 	zbxembed \
 	zbxprometheus \
-	zbxdiag
+	zbxvault \
+	zbxdiag \
+	zbxtrends \
+	zbxavailability \
+	zbxservice \
+	zbxaudit \
+	zbxeval \
+	zbxha \
+	zbxrtc
 
 SERVER_SUBDIRS += zbxrsm
 
 else
 if PROXY
 PROXY_SUBDIRS = \
-	zbxcommshigh \
 	zbxdb \
 	zbxdbupgrade \
 	zbxdbcache \
@@ -79,7 +92,13 @@ PROXY_SUBDIRS = \
 	zbxxml \
 	zbxembed \
 	zbxprometheus \
-	zbxdiag
+	zbxvault \
+	zbxdiag \
+	zbxtrends \
+	zbxavailability \
+	zbxaudit \
+	zbxeval \
+	zbxrtc
 
 PROXY_SUBDIRS += zbxrsm
 
@@ -96,6 +115,7 @@ SUBDIRS = \
 	zbxhttp \
 	zbxsysinfo \
 	zbxsys \
+	zbxcommshigh \
 	zbxcomms \
 	zbxjson \
 	zbxexec \

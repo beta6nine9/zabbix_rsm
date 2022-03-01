@@ -1,6 +1,6 @@
 [test-case]
 
-"007 Active DNSSEC incident"
+"Active DNSSEC incident"
 
 [prepare-server-database]
 

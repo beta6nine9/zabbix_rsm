@@ -1,6 +1,6 @@
 [test-case]
 
-"301 DNS UDP RTT"
+"DNS UDP RTT"
 
 [prepare-server-database]
 

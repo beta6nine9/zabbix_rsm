@@ -1,6 +1,6 @@
 [test-case]
 
-"022 dns/dnssec up-inconclusive-no-data"
+"dns/dnssec up-inconclusive-no-data"
 
 [prepare-server-database]
 

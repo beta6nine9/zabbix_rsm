@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -115,14 +115,6 @@ class CTable extends CTag {
 
 		$value = new CTag('thead', true, $value);
 		$this->header = $value->toString();
-
-		return $this;
-	}
-
-	public function setMultirowHeader($row_items = null, $column_count = 1) {
-		$row_items = new CTag('thead', true, $row_items);
-		$this->header = $row_items->toString();
-		$this->colnum = $column_count;
 
 		return $this;
 	}

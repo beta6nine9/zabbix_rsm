@@ -1,0 +1,1014 @@
+<?php
+
+//declare(strict_types=1); // TODO: enable strict_types
+
+namespace Modules\RsmProvisioningApi\Actions;
+
+use API;
+use Exception;
+use Modules\RsmProvisioningApi\RsmException;
+
+class Tld extends MonitoringTarget
+{
+	private const RSMHOST_DNS_NS_LOG_ACTION_CREATE  = 0;
+	private const RSMHOST_DNS_NS_LOG_ACTION_ENABLE  = 1;
+	private const RSMHOST_DNS_NS_LOG_ACTION_DISABLE = 2;
+
+	private const NSID_THROTTLING_INTERVAL_SECONDS = 3600;
+
+	/******************************************************************************************************************
+	 * Functions for validation                                                                                       *
+	 ******************************************************************************************************************/
+
+	protected function checkMonitoringTarget(): bool
+	{
+		return $this->getMonitoringTarget() == self::MONITORING_TARGET_REGISTRY;
+	}
+
+	protected function getInputRules(): array
+	{
+		switch ($_SERVER['REQUEST_METHOD'])
+		{
+			case self::REQUEST_METHOD_GET:
+				return [
+					'type' => API_OBJECT, 'fields' => [
+						'id'                     => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateTldIdentifier', 'error' => 'A valid DNS label was not provided in the TLD field in the URL'],
+					]
+				];
+
+			case self::REQUEST_METHOD_DELETE:
+				return [
+					'type' => API_OBJECT, 'fields' => [
+						'id'                     => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateTldIdentifier', 'error' => 'A valid DNS label was not provided in the TLD field in the URL'],
+					]
+				];
+
+			case self::REQUEST_METHOD_PUT:
+				return [
+					'type' => API_OBJECT, 'fields' => [
+						'id'                     => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateTldIdentifier', 'error' => 'A valid DNS label was not provided in the TLD field in the URL'],
+						'tld'                    => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateInvalid', 'error' => 'The "tld" element included in a PUT request'],
+						'tldType'                => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateEnum', 'in' => ['gTLD', 'ccTLD', 'otherTLD', 'testTLD'], 'error' => 'TLD type is invalid'],
+						'dnsParameters'          => ['type' => API_OBJECT     , 'fields' => [
+							'nsIps'              => ['type' => API_OBJECTS    , 'uniq' => [['ns', 'ip']], 'fields' => [
+								'ns'             => ['type' => API_RSM_CUSTOM , 'flags' => API_REQUIRED, 'function' => 'RsmValidateHostname', 'error' => 'Invalid domain name provided in "tld", "ns", "rdds43Server", "rdds43TestedDomain", "rdapTestedDomain" or "nsTestPrefix" element'],
+								'ip'             => ['type' => API_RSM_CUSTOM , 'flags' => API_REQUIRED, 'function' => 'RsmValidateIP', 'error' => 'Invalid IP provided in the "ip" element'],
+							]],
+							'dnssecEnabled'      => ['type' => API_BOOLEAN    ],
+							'nsTestPrefix'       => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateDomainName', 'error' => 'Invalid domain name provided in "tld", "ns", "rdds43Server", "rdds43TestedDomain", "rdapTestedDomain" or "nsTestPrefix" element'],
+							'minNs'              => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateInt', 'min' => 1, 'error' => 'The "minNS" element must be a positive integer'],
+						]],
+						'servicesStatus'         => ['type' => API_OBJECTS    , 'uniq' => [['service']], 'fields' => [
+							'service'            => ['type' => API_RSM_CUSTOM , 'flags' => API_REQUIRED, 'function' => 'RsmValidateEnum', 'in' => ['dnsUDP', 'dnsTCP', 'rdap', 'rdds43', 'rdds80'], 'error' => 'Service is not supported'],
+							'enabled'            => ['type' => API_BOOLEAN    , 'flags' => API_REQUIRED],
+						]],
+						'rddsParameters'         => ['type' => API_OBJECT     , 'fields' => [
+							'rdds43Server'       => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateHostname', 'error' => 'Invalid domain name provided in "tld", "ns", "rdds43Server", "rdds43TestedDomain", "rdapTestedDomain" or "nsTestPrefix" element'],
+							'rdds43TestedDomain' => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateDomainName', 'error' => 'Invalid domain name provided in "tld", "ns", "rdds43Server", "rdds43TestedDomain", "rdapTestedDomain" or "nsTestPrefix" element'],
+							'rdds80Url'          => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateUrl', 'error' => 'Invalid URL provided on rdds80Url'],
+							'rdapUrl'            => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateRdapUrl', 'error' => 'The "rdapUrl" element can only be an URL or "not listed" or "no https"'],
+							'rdapTestedDomain'   => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateDomainName', 'error' => 'Invalid domain name provided in "tld", "ns", "rdds43Server", "rdds43TestedDomain", "rdapTestedDomain" or "nsTestPrefix" element'],
+							'rdds43NsString'     => ['type' => API_STRING_UTF8, 'flags' => API_NOT_EMPTY],
+						]],
+					]
+				];
+
+			default:
+				throw new Exception('Unsupported request method');
+		}
+	}
+
+	protected function rsmValidateInput(): void
+	{
+		parent::rsmValidateInput();
+
+		if ($_SERVER['REQUEST_METHOD'] == self::REQUEST_METHOD_PUT)
+		{
+			$this->requireArrayKeys(['tldType'], $this->input, 'JSON does not comply with definition');
+
+			$services = array_column($this->input['servicesStatus'], 'enabled', 'service');
+
+			if ($services['dnsUDP'] || $services['dnsTCP'])
+			{
+				$this->requireArrayKeys(['dnsParameters'], $this->input, 'dnsParameters object is missing and the DNS service is enabled');
+				$this->requireArrayKeys(['nsIps', 'dnssecEnabled', 'nsTestPrefix', 'minNs'], $this->input['dnsParameters'], 'JSON does not comply with definition');
+				if (empty($this->input['dnsParameters']['nsIps']))
+				{
+					throw new RsmException(400, 'At least one NS, IP pair is required');
+				}
+			}
+			else
+			{
+				if ($services['rdap'] || $services['rdds43'] || $services['rdds80'])
+				{
+					throw new RsmException(400, 'DNS service can only be disabled if all other services are disabled');
+				}
+				$this->forbidArrayKeys(['dnsParameters'], $this->input, 'An element within the dnsParameters object or the dnsParameters object is included but the status of the service is disabled');
+			}
+		}
+	}
+
+	/******************************************************************************************************************
+	 * Functions for retrieving object                                                                                *
+	 ******************************************************************************************************************/
+
+	protected function getObjects(?string $objectId): array
+	{
+		// get hosts
+
+		$data = $this->getHostsByHostGroup('TLDs', $objectId, null);
+
+		if (empty($data))
+		{
+			return [];
+		}
+
+		$hosts = array_column($data, 'host', 'hostid');
+
+		// get TLD types
+
+		$tldTypes = $this->getTldTypes(array_keys($hosts));
+
+		// get templates
+
+		$templateNames = array_values(array_map(fn($host) => 'Template Rsmhost Config ' . $host, $hosts));
+		$templates = array_flip($this->getTemplateIds($templateNames));
+
+		// get template macros
+
+		$macros = $this->getHostMacros(
+			array_map(fn($host) => str_replace('Template Rsmhost Config ', '', $host), $templates),
+			[
+				self::MACRO_TLD_DNS_UDP_ENABLED,
+				self::MACRO_TLD_DNS_TCP_ENABLED,
+				self::MACRO_TLD_DNSSEC_ENABLED,
+				self::MACRO_TLD_RDAP_ENABLED,
+				self::MACRO_TLD_RDDS43_ENABLED,
+				self::MACRO_TLD_RDDS80_ENABLED,
+				self::MACRO_TLD_DNS_NAME_SERVERS,
+				self::MACRO_TLD_DNS_AVAIL_MINNS,
+				self::MACRO_TLD_DNS_TESTPREFIX,
+				self::MACRO_TLD_RDAP_BASE_URL,
+				self::MACRO_TLD_RDAP_TEST_DOMAIN,
+				self::MACRO_TLD_RDDS43_SERVER,
+				self::MACRO_TLD_RDDS43_TEST_DOMAIN,
+				self::MACRO_TLD_RDDS80_URL,
+				self::MACRO_TLD_RDDS43_NS_STRING,
+			]
+		);
+
+		// get current minNs
+
+		foreach ($hosts as $host)
+		{
+			$matches = null;
+
+			if (!preg_match('/^(\d+)(?:;(\d+):(\d+))?$/', $macros[$host][self::MACRO_TLD_DNS_AVAIL_MINNS], $matches))
+			{
+				throw new Exception("Unexpected 'minNs' value in \$this->oldObject: '{$macros[$host][self::MACRO_TLD_DNS_AVAIL_MINNS]}'");
+			}
+
+			if (!isset($matches[2]) || (int)(time() / 60) * 60 < $matches[2])
+			{
+				$macros[$host][self::MACRO_TLD_DNS_AVAIL_MINNS] = $matches[1];
+			}
+			else
+			{
+				$macros[$host][self::MACRO_TLD_DNS_AVAIL_MINNS] = $matches[3];
+			}
+		}
+
+		// join data in a common data structure
+
+		$result = [];
+
+		foreach ($hosts as $host)
+		{
+			$result[] = [
+				'tld'                    => $host,
+				'tldType'                => $tldTypes[$host],
+				'dnsParameters'          => [
+					'nsIps'              => $this->nsipStrToList($macros[$host][self::MACRO_TLD_DNS_NAME_SERVERS]),
+					'dnssecEnabled'      => (bool)$macros[$host][self::MACRO_TLD_DNSSEC_ENABLED],
+					'nsTestPrefix'       => $macros[$host][self::MACRO_TLD_DNS_TESTPREFIX],
+					'minNs'              => (int)$macros[$host][self::MACRO_TLD_DNS_AVAIL_MINNS],
+				],
+				'servicesStatus'         => [
+					[
+						'service'        => 'dnsUDP',
+						'enabled'        => (bool)$macros[$host][self::MACRO_TLD_DNS_UDP_ENABLED],
+					],
+					[
+						'service'        => 'dnsTCP',
+						'enabled'        => (bool)$macros[$host][self::MACRO_TLD_DNS_TCP_ENABLED],
+					],
+					[
+						'service'        => 'rdap',
+						'enabled'        => (bool)$macros[$host][self::MACRO_TLD_RDAP_ENABLED],
+					],
+					[
+						'service'        => 'rdds43',
+						'enabled'        => (bool)$macros[$host][self::MACRO_TLD_RDDS43_ENABLED],
+					],
+					[
+						'service'        => 'rdds80',
+						'enabled'        => (bool)$macros[$host][self::MACRO_TLD_RDDS80_ENABLED],
+					],
+				],
+				'rddsParameters'         => [
+					'rdds43Server'       => $macros[$host][self::MACRO_TLD_RDDS43_SERVER]      ?: null,
+					'rdds43TestedDomain' => $macros[$host][self::MACRO_TLD_RDDS43_TEST_DOMAIN] ?: null,
+					'rdds80Url'          => $macros[$host][self::MACRO_TLD_RDDS80_URL]         ?: null,
+					'rdapUrl'            => $macros[$host][self::MACRO_TLD_RDAP_BASE_URL]      ?: null,
+					'rdapTestedDomain'   => $macros[$host][self::MACRO_TLD_RDAP_TEST_DOMAIN]   ?: null,
+					'rdds43NsString'     => $macros[$host][self::MACRO_TLD_RDDS43_NS_STRING]   ?: null,
+				],
+			];
+		}
+
+		return $result;
+	}
+
+	/******************************************************************************************************************
+	 * Functions for creating object                                                                                  *
+	 ******************************************************************************************************************/
+
+	protected function createObject(): void
+	{
+		parent::createObject();
+		$this->updateDnsNsItems();
+	}
+
+	protected function createStatusHost(): int
+	{
+		$config = [
+			'host'       => $this->newObject['id'],
+			'status'     => HOST_STATUS_MONITORED,
+			'interfaces' => [self::DEFAULT_MAIN_INTERFACE],
+			'groups'     => [
+				['groupid' => $this->getHostGroupId('TLDs')],
+				['groupid' => $this->getHostGroupId($this->newObject['tldType'])],
+			],
+			'templates'  => [
+				['templateid' => $this->getTemplateId('Template Rsmhost Config ' . $this->newObject['id'])],
+				['templateid' => $this->getTemplateId('Template Config History')],
+				['templateid' => $this->getTemplateId('Template DNS Status')],
+				['templateid' => $this->getTemplateId('Template DNSSEC Status')],
+				['templateid' => $this->getTemplateId('Template RDAP Status')],
+				['templateid' => $this->getTemplateId('Template RDDS Status')],
+			],
+		];
+		$data = API::Host()->create($config);
+		$hostid = $data["hostids"][0];
+
+		$config = [
+			"hostid"   => $hostid,
+			"name"     => "RSM Service Availability",
+			"mappings" => [
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "0", "newvalue" => "Down" ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "1", "newvalue" => "Up"   ],
+			],
+		];
+		$data = API::ValueMap()->create($config);
+
+		return $hostid;
+	}
+
+	protected function createTemplates(): void
+	{
+		parent::createTemplates();
+
+		$config = [
+			'host'      => 'Template DNS Test - ' . $this->newObject['id'],
+			'groups'    => [
+				['groupid' => $this->getHostGroupId('Templates - TLD')],
+			],
+			'templates' => [
+				['templateid' => $this->getTemplateId('Template DNS Test')],
+			],
+		];
+		$data = API::Template()->create($config);
+		$templateId = $data["templateids"][0];
+
+		$config = [
+			"hostid"   => $templateId,
+			"name"     => "Service state",
+			"mappings" => [
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "0", "newvalue" => "Down" ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "1", "newvalue" => "Up"   ],
+			],
+		];
+		$data = API::ValueMap()->create($config);
+
+		$config = [
+			"hostid"   => $templateId,
+			"name"     => "RSM DNS rtt",
+			"mappings" => [
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-1"  , "newvalue" => "Internal error"                                                                                           ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-200", "newvalue" => "DNS UDP - No reply from name server"                                                                      ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-201", "newvalue" => "Invalid reply from Name Server (obsolete)"                                                                ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-202", "newvalue" => "No UNIX timestamp (obsolete)"                                                                             ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-203", "newvalue" => "Invalid UNIX timestamp (obsolete)"                                                                        ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-204", "newvalue" => "DNSSEC error (obsolete)"                                                                                  ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-205", "newvalue" => "No reply from resolver (obsolete)"                                                                        ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-206", "newvalue" => "Keyset is not valid (obsolete)"                                                                           ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-207", "newvalue" => "DNS UDP - Expecting DNS CLASS IN but got CHAOS"                                                           ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-208", "newvalue" => "DNS UDP - Expecting DNS CLASS IN but got HESIOD"                                                          ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-209", "newvalue" => "DNS UDP - Expecting DNS CLASS IN but got something different than IN, CHAOS or HESIOD"                    ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-210", "newvalue" => "DNS UDP - Header section incomplete"                                                                      ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-211", "newvalue" => "DNS UDP - Question section incomplete"                                                                    ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-212", "newvalue" => "DNS UDP - Answer section incomplete"                                                                      ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-213", "newvalue" => "DNS UDP - Authority section incomplete"                                                                   ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-214", "newvalue" => "DNS UDP - Additional section incomplete"                                                                  ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-215", "newvalue" => "DNS UDP - Malformed DNS response"                                                                         ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-250", "newvalue" => "DNS UDP - Querying for a non existent domain - AA flag not present in response"                           ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-251", "newvalue" => "DNS UDP - Querying for a non existent domain - Domain name being queried not present in question section" ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-252", "newvalue" => "DNS UDP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got NOERROR (obsolete)"       ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-253", "newvalue" => "DNS UDP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got FORMERR"                  ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-254", "newvalue" => "DNS UDP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got SERVFAIL"                 ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-255", "newvalue" => "DNS UDP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got NOTIMP"                   ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-256", "newvalue" => "DNS UDP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got REFUSED"                  ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-257", "newvalue" => "DNS UDP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got YXDOMAIN"                 ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-258", "newvalue" => "DNS UDP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got YXRRSET"                  ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-259", "newvalue" => "DNS UDP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got NXRRSET"                  ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-260", "newvalue" => "DNS UDP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got NOTAUTH"                  ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-261", "newvalue" => "DNS UDP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got NOTZONE"                  ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-262", "newvalue" => "DNS UDP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got BADVERS or BADSIG"        ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-263", "newvalue" => "DNS UDP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got BADKEY"                   ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-264", "newvalue" => "DNS UDP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got BADTIME"                  ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-265", "newvalue" => "DNS UDP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got BADMODE"                  ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-266", "newvalue" => "DNS UDP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got BADNAME"                  ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-267", "newvalue" => "DNS UDP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got BADALG"                   ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-268", "newvalue" => "DNS UDP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got BADTRUNC"                 ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-269", "newvalue" => "DNS UDP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got BADCOOKIE"                ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-270", "newvalue" => "DNS UDP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got unexpected"               ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-400", "newvalue" => "DNS UDP - No server could be reached by local resolver"                                                   ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-401", "newvalue" => "DNS UDP - The TLD is configured as DNSSEC-enabled, but no DNSKEY was found in the apex"                   ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-402", "newvalue" => "DNS UDP - No AD bit from local resolver"                                                                  ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-403", "newvalue" => "DNS UDP - Expecting NOERROR RCODE but got NXDOMAIN from local resolver"                                   ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-2"  , "newvalue" => "DNS UDP - Expecting NOERROR RCODE but got unexpected from local resolver"                                 ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-405", "newvalue" => "DNS UDP - Unknown cryptographic algorithm"                                                                ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-406", "newvalue" => "DNS UDP - Cryptographic algorithm not implemented"                                                        ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-407", "newvalue" => "DNS UDP - No RRSIGs where found in any section, and the TLD has the DNSSEC flag enabled"                  ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-410", "newvalue" => "DNS UDP - The signature does not cover this RRset"                                                        ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-414", "newvalue" => "DNS UDP - The RRSIG found is not signed by a DNSKEY from the KEYSET of the TLD"                           ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-415", "newvalue" => "DNS UDP - Bogus DNSSEC signature"                                                                         ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-416", "newvalue" => "DNS UDP - DNSSEC signature has expired"                                                                   ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-417", "newvalue" => "DNS UDP - DNSSEC signature not incepted yet"                                                              ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-418", "newvalue" => "DNS UDP - DNSSEC signature has expiration date earlier than inception date"                               ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-419", "newvalue" => "DNS UDP - Error in NSEC3 denial of existence proof"                                                       ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-408", "newvalue" => "DNS UDP - Querying for a non existent domain - No NSEC/NSEC3 RRs were found in the authority section"     ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-422", "newvalue" => "DNS UDP - RR not covered by the given NSEC RRs"                                                           ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-423", "newvalue" => "DNS UDP - Wildcard not covered by the given NSEC RRs"                                                     ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-425", "newvalue" => "DNS UDP - The RRSIG has too few RDATA fields"                                                             ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-427", "newvalue" => "DNS UDP - Malformed DNSSEC response"                                                                      ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-600", "newvalue" => "DNS TCP - Timeout reply from name server"                                                                 ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-601", "newvalue" => "DNS TCP - Error opening connection to name server"                                                        ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-607", "newvalue" => "DNS TCP - Expecting DNS CLASS IN but got CHAOS"                                                           ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-608", "newvalue" => "DNS TCP - Expecting DNS CLASS IN but got HESIOD"                                                          ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-609", "newvalue" => "DNS TCP - Expecting DNS CLASS IN but got something different than IN, CHAOS or HESIOD"                    ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-610", "newvalue" => "DNS TCP - Header section incomplete"                                                                      ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-611", "newvalue" => "DNS TCP - Question section incomplete"                                                                    ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-612", "newvalue" => "DNS TCP - Answer section incomplete"                                                                      ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-613", "newvalue" => "DNS TCP - Authority section incomplete"                                                                   ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-614", "newvalue" => "DNS TCP - Additional section incomplete"                                                                  ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-615", "newvalue" => "DNS TCP - Malformed DNS response"                                                                         ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-650", "newvalue" => "DNS TCP - Querying for a non existent domain - AA flag not present in response"                           ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-651", "newvalue" => "DNS TCP - Querying for a non existent domain - Domain name being queried not present in question section" ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-652", "newvalue" => "DNS TCP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got NOERROR (obsolete)"       ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-653", "newvalue" => "DNS TCP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got FORMERR"                  ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-654", "newvalue" => "DNS TCP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got SERVFAIL"                 ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-655", "newvalue" => "DNS TCP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got NOTIMP"                   ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-656", "newvalue" => "DNS TCP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got REFUSED"                  ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-657", "newvalue" => "DNS TCP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got YXDOMAIN"                 ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-658", "newvalue" => "DNS TCP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got YXRRSET"                  ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-659", "newvalue" => "DNS TCP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got NXRRSET"                  ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-660", "newvalue" => "DNS TCP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got NOTAUTH"                  ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-661", "newvalue" => "DNS TCP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got NOTZONE"                  ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-662", "newvalue" => "DNS TCP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got BADVERS or BADSIG"        ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-663", "newvalue" => "DNS TCP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got BADKEY"                   ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-664", "newvalue" => "DNS TCP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got BADTIME"                  ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-665", "newvalue" => "DNS TCP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got BADMODE"                  ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-666", "newvalue" => "DNS TCP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got BADNAME"                  ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-667", "newvalue" => "DNS TCP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got BADALG"                   ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-668", "newvalue" => "DNS TCP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got BADTRUNC"                 ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-669", "newvalue" => "DNS TCP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got BADCOOKIE"                ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-670", "newvalue" => "DNS TCP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got unexpected"               ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-800", "newvalue" => "DNS TCP - No server could be reached by local resolver"                                                   ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-801", "newvalue" => "DNS TCP - The TLD is configured as DNSSEC-enabled, but no DNSKEY was found in the apex"                   ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-802", "newvalue" => "DNS TCP - No AD bit from local resolver"                                                                  ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-803", "newvalue" => "DNS TCP - Expecting NOERROR RCODE but got NXDOMAIN from local resolver"                                   ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-3"  , "newvalue" => "DNS TCP - Expecting NOERROR RCODE but got unexpected from local resolver"                                 ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-805", "newvalue" => "DNS TCP - Unknown cryptographic algorithm"                                                                ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-806", "newvalue" => "DNS TCP - Cryptographic algorithm not implemented"                                                        ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-807", "newvalue" => "DNS TCP - No RRSIGs where found in any section, and the TLD has the DNSSEC flag enabled"                  ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-810", "newvalue" => "DNS TCP - The signature does not cover this RRset"                                                        ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-814", "newvalue" => "DNS TCP - The RRSIG found is not signed by a DNSKEY from the KEYSET of the TLD"                           ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-815", "newvalue" => "DNS TCP - Bogus DNSSEC signature"                                                                         ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-816", "newvalue" => "DNS TCP - DNSSEC signature has expired"                                                                   ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-817", "newvalue" => "DNS TCP - DNSSEC signature not incepted yet"                                                              ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-818", "newvalue" => "DNS TCP - DNSSEC signature has expiration date earlier than inception date"                               ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-819", "newvalue" => "DNS TCP - Error in NSEC3 denial of existence proof"                                                       ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-808", "newvalue" => "DNS TCP - Querying for a non existent domain - No NSEC/NSEC3 RRs were found in the authority section"     ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-822", "newvalue" => "DNS TCP - RR not covered by the given NSEC RRs"                                                           ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-823", "newvalue" => "DNS TCP - Wildcard not covered by the given NSEC RRs"                                                     ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-825", "newvalue" => "DNS TCP - The RRSIG has too few RDATA fields"                                                             ],
+				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-827", "newvalue" => "DNS TCP - Malformed DNSSEC response"                                                                      ],
+			],
+		];
+		$data = API::ValueMap()->create($config);
+	}
+
+	/******************************************************************************************************************
+	 * Functions for updating object                                                                                  *
+	 ******************************************************************************************************************/
+
+	protected function updateObject(): void
+	{
+		$this->compareMinNsOnUpdate();
+		parent::updateObject();
+		$this->updateDnsNsItems();
+	}
+
+	private function compareMinNsOnUpdate()
+	{
+		$services = array_column($this->newObject['servicesStatus'], 'enabled', 'service');
+
+		if ($services['dnsUDP'] || $services['dnsTCP'])
+		{
+			if ($this->newObject['dnsParameters']['minNs'] != $this->oldObject['dnsParameters']['minNs'])
+			{
+				throw new RsmException(400, 'The minNS value is not the same as in the system');
+			}
+		}
+	}
+
+	protected function updateStatustHost(): int
+	{
+		$config = [
+			'hostid' => $this->getHostId($this->newObject['id']),
+			'status' => HOST_STATUS_MONITORED,
+			'groups' => [
+				['groupid' => $this->getHostGroupId('TLDs')],
+				['groupid' => $this->getHostGroupId($this->newObject['tldType'])],
+			],
+		];
+		$data = API::Host()->update($config);
+
+		return $data['hostids'][0];
+	}
+
+	protected function disableObject(): void {
+		parent::disableObject();
+
+		$this->updateMacros(
+			$this->getTemplateId('Template Rsmhost Config ' . $this->getInput('id')),
+			[
+				self::MACRO_TLD_DNS_UDP_ENABLED => "0",
+				self::MACRO_TLD_DNS_TCP_ENABLED => "0",
+				self::MACRO_TLD_DNSSEC_ENABLED  => "0",
+				self::MACRO_TLD_RDAP_ENABLED    => "0",
+				self::MACRO_TLD_RDDS43_ENABLED  => "0",
+				self::MACRO_TLD_RDDS80_ENABLED  => "0",
+			]
+		);
+	}
+
+	/******************************************************************************************************************
+	 * Functions for deleting object                                                                                  *
+	 ******************************************************************************************************************/
+
+	protected function deleteObject(): void
+	{
+		parent::deleteObject();
+
+		$templateId = $this->getTemplateId('Template DNS Test - ' . $this->getInput('id'));
+		$data = API::Template()->delete([$templateId]);
+	}
+
+	/******************************************************************************************************************
+	 * Misc functions                                                                                                 *
+	 ******************************************************************************************************************/
+
+	protected function getRsmhostConfigsFromInput(): array
+	{
+		$services = array_column($this->newObject['servicesStatus'], 'enabled', 'service');
+
+		$config = [
+			'tldType' => $this->newObject['tldType'],
+			'enabled' => null,
+			'dnsUdp'  => $services['dnsUDP'],
+			'dnsTcp'  => $services['dnsTCP'],
+			'dnssec'  => $this->newObject['dnsParameters']['dnssecEnabled'],
+			'rdap'    => $services['rdap'],
+			'rdds43'  => $services['rdds43'],
+			'rdds80'  => $services['rdds80'],
+		];
+
+		$config['enabled'] = $config['dnsUdp'] || $config['dnsTcp'];
+
+		return [
+			$this->newObject['id'] => $config,
+		];
+	}
+
+	protected function getMacrosConfig(): array
+	{
+		$minNs = null;
+
+		if (is_null($this->oldObject))
+		{
+			$minNs = $this->newObject['dnsParameters']['minNs'];
+		}
+		else
+		{
+			$templateId = $this->getTemplateId('Template Rsmhost Config ' . $this->newObject['id']);
+			$data = API::UserMacro()->get([
+				'output' => ['value'],
+				'hostids' => [$templateId],
+				'filter' => ['macro' => self::MACRO_TLD_DNS_AVAIL_MINNS],
+			]);
+			$minNs = $data[0]['value'];
+		}
+
+		$services = array_column($this->newObject['servicesStatus'], 'enabled', 'service');
+
+		// TODO: consider using $this->updateMacros() instead of building full list of macros
+		return [
+			$this->createMacroConfig(self::MACRO_TLD                   , $this->newObject['id']),
+			$this->createMacroConfig(self::MACRO_TLD_CONFIG_TIMES      , $_SERVER['REQUEST_TIME']),
+
+			$this->createMacroConfig(self::MACRO_TLD_DNS_UDP_ENABLED   , (int)$services['dnsUDP']),
+			$this->createMacroConfig(self::MACRO_TLD_DNS_TCP_ENABLED   , (int)$services['dnsTCP']),
+			$this->createMacroConfig(self::MACRO_TLD_DNSSEC_ENABLED    , (int)$this->newObject['dnsParameters']['dnssecEnabled']),
+			$this->createMacroConfig(self::MACRO_TLD_RDAP_ENABLED      , (int)$services['rdap']),
+			$this->createMacroConfig(self::MACRO_TLD_RDDS43_ENABLED    , (int)$services['rdds43']),
+			$this->createMacroConfig(self::MACRO_TLD_RDDS80_ENABLED    , (int)$services['rdds80']),
+
+			$this->createMacroConfig(self::MACRO_TLD_DNS_NAME_SERVERS  , $this->nsipListToStr($this->newObject['dnsParameters']['nsIps'])),
+			$this->createMacroConfig(self::MACRO_TLD_DNS_AVAIL_MINNS   , $minNs),
+			$this->createMacroConfig(self::MACRO_TLD_DNS_TESTPREFIX    , $this->newObject['dnsParameters']['nsTestPrefix']),
+
+			$this->createMacroConfig(self::MACRO_TLD_RDAP_BASE_URL     , $this->newObject['rddsParameters']['rdapUrl'] ??
+																		 $this->oldObject['rddsParameters']['rdapUrl'] ??
+																		 ''),
+			$this->createMacroConfig(self::MACRO_TLD_RDAP_TEST_DOMAIN  , $this->newObject['rddsParameters']['rdapTestedDomain'] ??
+																		 $this->oldObject['rddsParameters']['rdapTestedDomain'] ??
+																		 ''),
+			$this->createMacroConfig(self::MACRO_TLD_RDDS43_TEST_DOMAIN, $this->newObject['rddsParameters']['rdds43TestedDomain'] ??
+																		 $this->oldObject['rddsParameters']['rdds43TestedDomain'] ??
+																		 ''),
+			$this->createMacroConfig(self::MACRO_TLD_RDDS43_NS_STRING  , $this->newObject['rddsParameters']['rdds43NsString'] ??
+																		 $this->oldObject['rddsParameters']['rdds43NsString'] ??
+																		 ''),
+			$this->createMacroConfig(self::MACRO_TLD_RDDS43_SERVER     , $this->newObject['rddsParameters']['rdds43Server'] ??
+																		 $this->oldObject['rddsParameters']['rdds43Server'] ??
+																		 ''),
+			$this->createMacroConfig(self::MACRO_TLD_RDDS80_URL        , $this->newObject['rddsParameters']['rdds80Url'] ??
+																		 $this->oldObject['rddsParameters']['rdds80Url'] ??
+																		 ''),
+		];
+	}
+
+	/******************************************************************************************************************
+	 * Handling DNS NS items                                                                                          *
+	 ******************************************************************************************************************/
+
+	private function updateDnsNsItems(): void
+	{
+		$oldNsIpList = isset($this->oldObject['dnsParameters']) ? $this->oldObject['dnsParameters']['nsIps'] : [];
+		$newNsIpList = isset($this->newObject['dnsParameters']) ? $this->newObject['dnsParameters']['nsIps'] : [];
+		$oldNsList   = array_unique(array_column($oldNsIpList, 'ns'));
+		$newNsList   = array_unique(array_column($newNsIpList, 'ns'));
+
+		$createNsIp  = array_udiff($newNsIpList, $oldNsIpList, [$this, 'compareNsIp']);
+		$disableNsIp = array_udiff($oldNsIpList, $newNsIpList, [$this, 'compareNsIp']);
+		$createNs    = array_diff($newNsList, $oldNsList);
+		$disableNs   = array_diff($oldNsList, $newNsList);
+
+		$createNsIp  = $this->sortNsIpPairs($createNsIp);
+		$disableNsIp = $this->sortNsIpPairs($disableNsIp);
+		sort($createNs);
+		sort($disableNs);
+
+		$testTemplateId = $this->getTemplateId('Template DNS Test - ' . $this->newObject['id']);
+
+		if (!empty($createNsIp))
+		{
+			// get value maps
+
+			$valueMapIds = $this->getValueMapIds([
+				$this->statusHostId => ['RSM Service Availability'],
+				$testTemplateId => ['RSM DNS rtt', 'Service state'],
+			]);
+
+			// get itemid of "DNS Test" master item
+
+			$dnsTestItemId = $this->getTemplateItemId('Template DNS Test - ' . $this->newObject['id'], 'rsm.dns[');
+
+			// create item pseudo-configs
+
+			$statusItems = [];
+			$testItems = [];
+
+			foreach ($createNsIp as $nsip)
+			{
+				$ns = $nsip['ns'];
+				$ip = $nsip['ip'];
+
+				$statusItems += [
+					"rsm.slv.dns.ns.avail[$ns,$ip]" => [
+						'name'       => "DNS NS $ns ($ip) availability",
+						'valuemapid' => $valueMapIds[$this->statusHostId]['RSM Service Availability'],
+					],
+					"rsm.slv.dns.ns.downtime[$ns,$ip]" => [
+						'name'       => "DNS minutes of $ns ($ip) downtime",
+						'valuemapid' => null,
+					],
+				];
+
+				$testItems += [
+					"rsm.dns.nsid[$ns,$ip]" => [
+						'name'          => "DNS NSID of $ns,$ip",
+						'value_type'    => ITEM_VALUE_TYPE_STR,
+						'valuemapid'    => null,
+						'description'   => 'DNS Name Server Identifier of the target Name Server that was tested.',
+						'preprocessing' => [
+							[
+								'type'                 => ZBX_PREPROC_JSONPATH,
+								'params'               => "\$.nsips[?(@.['ns'] == '$ns' && @.['ip'] == '$ip')].nsid.first()",
+								'error_handler'        => ZBX_PREPROC_FAIL_DISCARD_VALUE,
+								'error_handler_params' => '',
+							],
+							[
+								'type'                 => ZBX_PREPROC_THROTTLE_TIMED_VALUE,
+								'params'               => self::NSID_THROTTLING_INTERVAL_SECONDS,
+								'error_handler'        => ZBX_PREPROC_FAIL_DEFAULT,
+								'error_handler_params' => '',
+							],
+						],
+					],
+					"rsm.dns.rtt[$ns,$ip,tcp]" => [
+						'name'          => "DNS NS RTT of $ns,$ip using tcp",
+						'value_type'    => ITEM_VALUE_TYPE_FLOAT,
+						'valuemapid'    => $valueMapIds[$testTemplateId]['RSM DNS rtt'],
+						'description'   => 'The Round-Time Trip returned when testing specific IP of Name Server using TCP protocol.',
+						'preprocessing' => [[
+							'type'                 => ZBX_PREPROC_JSONPATH,
+							'params'               => "\$.nsips[?(@.['ns'] == '$ns' && @.['ip'] == '$ip' && @.['protocol'] == 'tcp')].rtt.first()",
+							'error_handler'        => ZBX_PREPROC_FAIL_DISCARD_VALUE,
+							'error_handler_params' => '',
+						]],
+					],
+					"rsm.dns.rtt[$ns,$ip,udp]" => [
+						'name'          => "DNS NS RTT of $ns,$ip using udp",
+						'value_type'    => ITEM_VALUE_TYPE_FLOAT,
+						'valuemapid'    => $valueMapIds[$testTemplateId]['RSM DNS rtt'],
+						'description'   => 'The Round-Time Trip returned when testing specific IP of Name Server using UDP protocol.',
+						'preprocessing' => [[
+							'type'                 => ZBX_PREPROC_JSONPATH,
+							'params'               => "\$.nsips[?(@.['ns'] == '$ns' && @.['ip'] == '$ip' && @.['protocol'] == 'udp')].rtt.first()",
+							'error_handler'        => ZBX_PREPROC_FAIL_DISCARD_VALUE,
+							'error_handler_params' => '',
+						]],
+					],
+				];
+			}
+
+			foreach ($createNs as $ns)
+			{
+				$testItems += [
+					"rsm.dns.ns.status[$ns]" => [
+						'name'          => "DNS NS status of $ns",
+						'value_type'    => ITEM_VALUE_TYPE_UINT64,
+						'valuemapid'    => $valueMapIds[$testTemplateId]['Service state'],
+						'description'   => 'Status of Name Server: 0 (Down), 1 (Up). The Name Server is considered to be up if all its IPs returned successful RTTs.',
+						'preprocessing' => [[
+							'type'                 => ZBX_PREPROC_JSONPATH,
+							'params'               => "\$.nss[?(@.['ns'] == '$ns')].status.first()",
+							'error_handler'        => ZBX_PREPROC_FAIL_DISCARD_VALUE,
+							'error_handler_params' => '',
+						]],
+					],
+				];
+			}
+
+			// check which items already exist; enable them, remove from pseudo-configs
+
+			$enableItemIds = [];
+
+			$data = API::Item()->get([
+				'output'  => ['itemid', 'key_'],
+				'hostids' => $this->statusHostId,
+				'filter'  => ['key_' => array_keys($statusItems)],
+			]);
+			if (!empty($data))
+			{
+				$foundItems = array_column($data, 'itemid', 'key_');
+				$statusItems = array_diff_key($statusItems, $foundItems);
+				$enableItemIds = array_merge($enableItemIds, array_column($data, 'itemid'));
+
+				// update rsmhost_dns_ns_log table
+
+				foreach ($foundItems as $key => $itemid)
+				{
+					if (preg_match('/^rsm\.slv\.dns\.ns\.downtime\[.*,.*\]$/', $key))
+					{
+						$this->updateRsmhostDnsNsLog($itemid, self::RSMHOST_DNS_NS_LOG_ACTION_ENABLE);
+					}
+				}
+			}
+
+			$data = API::Item()->get([
+				'output'  => ['itemid', 'key_'],
+				'hostids' => $testTemplateId,
+				'filter'  => ['key_' => array_keys($testItems)],
+			]);
+			if (!empty($data))
+			{
+				$foundItems = array_column($data, 'itemid', 'key_');
+				$testItems = array_diff_key($testItems, $foundItems);
+				$enableItemIds = array_merge($enableItemIds, array_column($data, 'itemid'));
+			}
+
+			if (!empty($enableItemIds))
+			{
+				$config = array_map(fn($itemid) => ['itemid' => $itemid, 'status' => ITEM_STATUS_ACTIVE], $enableItemIds);
+				$data = API::Item()->update($config);
+			}
+
+			if (!empty($statusItems) || !empty($testItems))
+			{
+				if (empty($statusItems))
+				{
+					throw new Exception('both $statusItems and $testItems should have values, but $statusItems is empty');
+				}
+				if (empty($testItems))
+				{
+					throw new Exception('both $statusItems and $testItems should have values, but $testItems is empty');
+				}
+
+				// build configs for items that need to be created
+
+				$itemConfigs = [];
+
+				foreach ($statusItems as $key => $item)
+				{
+					$itemConfigs[] = [
+						'name'       => $item['name'],
+						'key_'       => $key,
+						'status'     => ITEM_STATUS_ACTIVE,
+						'hostid'     => $this->statusHostId,
+						'type'       => ITEM_TYPE_TRAPPER,
+						'value_type' => ITEM_VALUE_TYPE_UINT64,
+						'valuemapid' => $item['valuemapid'],
+					];
+				}
+
+				foreach ($testItems as $key => $item)
+				{
+					$itemConfigs[] = [
+						'name'          => $item['name'],
+						'key_'          => $key,
+						'status'        => ITEM_STATUS_ACTIVE,
+						'hostid'        => $testTemplateId,
+						'type'          => ITEM_TYPE_DEPENDENT,
+						'master_itemid' => $dnsTestItemId,
+						'value_type'    => $item['value_type'],
+						'valuemapid'    => $item['valuemapid'],
+						'description'   => $item['description'],
+						'preprocessing' => $item['preprocessing'],
+					];
+				}
+
+				// create items
+
+				$data = API::Item()->create($itemConfigs);
+
+				// update rsmhost_dns_ns_log table
+
+				foreach ($itemConfigs as $i => $itemConfig)
+				{
+					if (preg_match('/^rsm\.slv\.dns\.ns\.downtime\[.*,.*\]$/', $itemConfig['key_']))
+					{
+						$this->updateRsmhostDnsNsLog($data['itemids'][$i], self::RSMHOST_DNS_NS_LOG_ACTION_CREATE);
+					}
+				}
+
+				// create triggers
+
+				$thresholds = [
+					['threshold' =>  '10', 'priority' => 2],
+					['threshold' =>  '25', 'priority' => 3],
+					['threshold' =>  '50', 'priority' => 3],
+					['threshold' =>  '75', 'priority' => 4],
+					['threshold' => '100', 'priority' => 5],
+				];
+
+				$triggerConfigs = [];
+
+				foreach ($createNsIp as $nsip)
+				{
+					$ns  = $nsip['ns'];
+					$ip  = $nsip['ip'];
+					$key = "rsm.slv.dns.ns.downtime[$ns,$ip]";
+
+					foreach ($thresholds as $thresholdRow)
+					{
+						$threshold = $thresholdRow['threshold'];
+						$priority  = $thresholdRow['priority'];
+
+						$thresholdStr = $threshold < 100 ? '*' . ($threshold * 0.01) : '';
+
+						$triggerConfigs[] = [
+							'description' => "DNS $ns ($ip) downtime exceeded $threshold% of allowed \$1 minutes",
+							'expression'  => sprintf('last(/%s/%s)>{$RSM.SLV.NS.DOWNTIME}%s', $this->newObject['id'], $key, $thresholdStr),
+							'priority'    => $priority,
+						];
+					}
+				}
+
+				if (!empty($triggerConfigs))
+				{
+					$data = API::Trigger()->create($triggerConfigs);
+
+					$triggerDependencyConfigs = [];
+
+					foreach ($data['triggerids'] as $i => $triggerId)
+					{
+						if ($i % count($thresholds) === 0)
+						{
+							continue;
+						}
+
+						$triggerDependencyConfigs[] = [
+							'triggerid'          => $data['triggerids'][$i - 1],
+							'dependsOnTriggerid' => $triggerId,
+						];
+					}
+
+					$data = API::Trigger()->addDependencies($triggerDependencyConfigs);
+				}
+			}
+		}
+
+		if (!empty($disableNsIp))
+		{
+			$statusItems = [];
+			$testItems   = [];
+
+			foreach ($disableNsIp as $nsip)
+			{
+				$ns = $nsip['ns'];
+				$ip = $nsip['ip'];
+
+				$statusItems[] = "rsm.slv.dns.ns.avail[$ns,$ip]";
+				$statusItems[] = "rsm.slv.dns.ns.downtime[$ns,$ip]";
+
+				$testItems[] = "rsm.dns.nsid[$ns,$ip]";
+				$testItems[] = "rsm.dns.rtt[$ns,$ip,tcp]";
+				$testItems[] = "rsm.dns.rtt[$ns,$ip,udp]";
+
+			}
+			foreach ($disableNs as $ns)
+			{
+				$testItems[] = "rsm.dns.ns.status[$ns]";
+			}
+
+			$disableItemIds = [];
+			$disableItemIds += $this->getItemIds($this->statusHostId, $statusItems);
+			$disableItemIds += $this->getItemIds($testTemplateId, $testItems);
+
+			$config = array_map(fn($itemid) => ['itemid' => $itemid, 'status' => ITEM_STATUS_DISABLED], array_values($disableItemIds));
+			$data = API::Item()->update($config);
+
+			// update rsmhost_dns_ns_log table
+
+			foreach ($disableItemIds as $key => $itemid)
+			{
+				if (preg_match('/^rsm\.slv\.dns\.ns\.downtime\[.*,.*\]$/', $key))
+				{
+					$this->updateRsmhostDnsNsLog($itemid, self::RSMHOST_DNS_NS_LOG_ACTION_DISABLE);
+				}
+			}
+		}
+	}
+
+	private function updateRsmhostDnsNsLog(int $itemid, int $action): void
+	{
+		$sql = 'insert into rsmhost_dns_ns_log (itemid,clock,action) values (%d,%d,%d)';
+		$sql = sprintf($sql, $itemid, $_SERVER['REQUEST_TIME'], $action);
+		if (!DBexecute($sql))
+		{
+			throw new Exception('Query failed');
+		}
+	}
+
+	/******************************************************************************************************************
+	 * Functions for converting ns,ip strings to lists, lists to strings                                              *
+	 ******************************************************************************************************************/
+
+	private function nsipStrToList(string $str): array
+	{
+		$list = [];
+
+		if ($str === '')
+		{
+			return $list;
+		}
+
+		foreach (explode(' ', $str) as $nsip)
+		{
+			list($ns, $ip) = explode(',', $nsip);
+
+			$list[] = [
+				'ns' => $ns,
+				'ip' => $ip,
+			];
+		}
+
+		return $this->sortNsIpPairs($list);
+	}
+
+	private function nsipListToStr(array $list): string
+	{
+		$list = $this->sortNsIpPairs($list);
+
+		foreach ($list as &$nsip)
+		{
+			$nsip = $nsip['ns'] . ',' . $nsip['ip'];
+		}
+		unset($nsip);
+
+		return implode(' ', $list);
+	}
+
+	private function sortNsIpPairs(array $nsipList): array
+	{
+		// make [ns => [ip1, ip2, ...], ...] array
+
+		$nsipListGrouped = [];
+
+		foreach ($nsipList as $nsip)
+		{
+			$nsipListGrouped[$nsip['ns']][] = $nsip['ip'];
+		}
+
+		// sort ip addresses
+
+		foreach ($nsipListGrouped as &$ips)
+		{
+			usort($ips, [$this, 'compareIp']);
+		}
+		unset($ips);
+
+		// sort nameservers
+
+		ksort($nsipListGrouped, SORT_STRING);
+
+		// format output
+
+		$result = [];
+
+		foreach ($nsipListGrouped as $ns => $ips)
+		{
+			foreach ($ips as $ip)
+			{
+				$result[] = [
+					'ns' => $ns,
+					'ip' => $ip,
+				];
+			}
+		}
+
+		return $result;
+	}
+
+	private function compareIp(string $a, string $b): int
+	{
+		$a = inet_pton($a);
+		$b = inet_pton($b);
+
+		if (strlen($a) != strlen($b))
+		{
+			// put IPv4 before IPv6
+			return strlen($a) - strlen($b);
+		}
+		else
+		{
+			return strcmp($a, $b);
+		}
+	}
+
+	private function compareNsIp(array $a, array $b): int
+	{
+		if ($a['ns'] != $b['ns'])
+		{
+			return strcmp($a['ns'], $b['ns']);
+		}
+		else
+		{
+			return $this->compareIp($a['ip'], $b['ip']);
+		}
+	}
+}

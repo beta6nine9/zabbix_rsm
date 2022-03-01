@@ -1,0 +1,12 @@
+{
+    "registrarName": "Registrar Name 1",
+    "registrarFamily": "Registrar Family 1",
+    "rddsParameters": {
+        "rdds43Server": "whois.nic.example",
+        "rdds43TestedDomain": "nic.example",
+        "rdds80Url": "https://whois.nic.example",
+        "rdapUrl": "https://www.nic.example/domain",
+        "rdapTestedDomain": "nic.example",
+        "rdds43NsString": "Name Server:"
+    }
+}

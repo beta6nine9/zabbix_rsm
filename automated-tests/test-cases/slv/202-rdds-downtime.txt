@@ -1,6 +1,6 @@
 [test-case]
 
-"202 RDDS downtime"
+"RDDS downtime"
 
 [prepare-server-database]
 

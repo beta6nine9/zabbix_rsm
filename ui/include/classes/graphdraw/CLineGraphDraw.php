@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -66,6 +66,7 @@ class CLineGraphDraw extends CGraphDraw {
 
 		$this->intervals = [];
 		$this->power = [];
+		$this->is_binary = [];
 
 		$this->drawItemsLegend = false; // draw items legend
 		$this->drawExLegend = false; // draw percentile and triggers legend
@@ -179,9 +180,7 @@ class CLineGraphDraw extends CGraphDraw {
 	 * @return array
 	 */
 	private function getVerticalScalesInUse() {
-		return array_keys(array_filter($this->yaxis, function($value) {
-			return $value;
-		}));
+		return array_keys(array_filter($this->yaxis));
 	}
 
 	protected function selectData() {
@@ -198,7 +197,6 @@ class CLineGraphDraw extends CGraphDraw {
 
 		$this->itemsHost = null;
 
-		$config = select_config();
 		$items = [];
 
 		for ($i = 0; $i < $this->num; $i++) {
@@ -216,15 +214,15 @@ class CLineGraphDraw extends CGraphDraw {
 			$to_resolve = [];
 
 			// Override item history setting with housekeeping settings, if they are enabled in config.
-			if ($config['hk_history_global']) {
-				$item['history'] = timeUnitToSeconds($config['hk_history']);
+			if (CHousekeepingHelper::get(CHousekeepingHelper::HK_HISTORY_GLOBAL)) {
+				$item['history'] = timeUnitToSeconds(CHousekeepingHelper::get(CHousekeepingHelper::HK_HISTORY));
 			}
 			else {
 				$to_resolve[] = 'history';
 			}
 
-			if ($config['hk_trends_global']) {
-				$item['trends'] = timeUnitToSeconds($config['hk_trends']);
+			if (CHousekeepingHelper::get(CHousekeepingHelper::HK_TRENDS_GLOBAL)) {
+				$item['trends'] = timeUnitToSeconds(CHousekeepingHelper::get(CHousekeepingHelper::HK_TRENDS));
 			}
 			else {
 				$to_resolve[] = 'trends';
@@ -236,7 +234,7 @@ class CLineGraphDraw extends CGraphDraw {
 
 				$simple_interval_parser = new CSimpleIntervalParser();
 
-				if (!$config['hk_history_global']) {
+				if (!CHousekeepingHelper::get(CHousekeepingHelper::HK_HISTORY_GLOBAL)) {
 					if ($simple_interval_parser->parse($item['history']) != CParser::PARSE_SUCCESS) {
 						show_error_message(_s('Incorrect value for field "%1$s": %2$s.', 'history',
 							_('invalid history storage period')
@@ -246,7 +244,7 @@ class CLineGraphDraw extends CGraphDraw {
 					$item['history'] = timeUnitToSeconds($item['history']);
 				}
 
-				if (!$config['hk_trends_global']) {
+				if (!CHousekeepingHelper::get(CHousekeepingHelper::HK_TRENDS_GLOBAL)) {
 					if ($simple_interval_parser->parse($item['trends']) != CParser::PARSE_SUCCESS) {
 						show_error_message(_s('Incorrect value for field "%1$s": %2$s.', 'trends',
 							_('invalid trend storage period')
@@ -424,7 +422,7 @@ class CLineGraphDraw extends CGraphDraw {
 			return;
 		}
 
-		$number_parser = new CNumberParser(['with_suffix' => true]);
+		$number_parser = new CNumberParser(['with_size_suffix' => true, 'with_time_suffix' => true]);
 
 		$max = 3;
 		$cnt = 0;
@@ -469,7 +467,7 @@ class CLineGraphDraw extends CGraphDraw {
 				$this->triggers[] = [
 					'yaxisside' => $item['yaxisside'],
 					'val' => $number_parser->calcValue(),
-					'color' => getSeverityColor($trigger['priority']),
+					'color' => CSeverityHelper::getColor((int) $trigger['priority']),
 					'description' => _('Trigger').NAME_DELIMITER.CMacrosResolverHelper::resolveTriggerName($trigger),
 					'constant' => '['.$matches['operator'].' '.$matches['constant'].']'
 				];
@@ -1132,29 +1130,20 @@ class CLineGraphDraw extends CGraphDraw {
 		foreach ($this->getVerticalScalesInUse() as $side_index => $side) {
 			$units = null;
 			$units_long = '';
-			$is_binary = false;
 
-			for ($i = 0; $i < $this->num; $i++) {
-				if ($this->items[$i]['yaxisside'] == $side) {
-					if ($this->items[$i]['units'] === 'B' || $this->items[$i]['units'] === 'Bps') {
-						$is_binary = true;
-					}
-
+			foreach ($this->items as $item) {
+				if ($item['yaxisside'] == $side) {
 					if ($units === null) {
-						$units = $this->items[$i]['units'];
+						$units = $item['units'];
 					}
-					elseif ($this->items[$i]['units'] !== $units) {
+					elseif ($item['units'] !== $units) {
 						$units = '';
 					}
 
-					if ($this->items[$i]['units_long'] !== '') {
-						$units_long = $this->items[$i]['units_long'];
+					if ($item['units_long'] !== '') {
+						$units_long = $item['units_long'];
 					}
 				}
-			}
-
-			if ($units === null || $units === false) {
-				$units = '';
 			}
 
 			if ($units_long !== '') {
@@ -1180,7 +1169,7 @@ class CLineGraphDraw extends CGraphDraw {
 
 			$scale_values = calculateGraphScaleValues($this->m_minY[$side], $this->m_maxY[$side],
 				$this->ymin_type == GRAPH_YAXIS_TYPE_CALCULATED, $this->ymax_type == GRAPH_YAXIS_TYPE_CALCULATED,
-				$this->intervals[$side], $units, $is_binary, $this->power[$side], 8
+				$this->intervals[$side], $units, $this->is_binary[$side], $this->power[$side], 10
 			);
 
 			$line_color = $this->getColor($this->graphtheme['gridcolor'], 0);
@@ -1242,10 +1231,10 @@ class CLineGraphDraw extends CGraphDraw {
 			return;
 		}
 
-		$config = select_config();
-		$config = CMacrosResolverHelper::resolveTimeUnitMacros([$config], ['work_period'])[0];
+		$config = [CSettingsHelper::WORK_PERIOD => CSettingsHelper::get(CSettingsHelper::WORK_PERIOD)];
+		$config = CMacrosResolverHelper::resolveTimeUnitMacros([$config], [CSettingsHelper::WORK_PERIOD])[0];
 
-		$periods = parse_period($config['work_period']);
+		$periods = parse_period($config[CSettingsHelper::WORK_PERIOD]);
 		if (!$periods) {
 			return;
 		}
@@ -1416,8 +1405,8 @@ class CLineGraphDraw extends CGraphDraw {
 
 			// caption
 			$itemCaption = $this->itemsHost
-				? $this->items[$i]['name_expanded']
-				: $this->items[$i]['hostname'].NAME_DELIMITER.$this->items[$i]['name_expanded'];
+				? $this->items[$i]['name']
+				: $this->items[$i]['hostname'].NAME_DELIMITER.$this->items[$i]['name'];
 
 			// draw legend of an item with data
 			$data = array_key_exists($this->items[$i]['itemid'], $this->data)
@@ -1851,7 +1840,7 @@ class CLineGraphDraw extends CGraphDraw {
 		$rows_min = (int) max(1, floor($this->sizeY / $this->cell_height_min / 1.5));
 		$rows_max = (int) max(1, floor($this->sizeY / $this->cell_height_min));
 
-		foreach ($this->getVerticalScalesInUse() as $side_index => $side) {
+		foreach ($this->getVerticalScalesInUse() as $side) {
 			$min = $this->calculateMinY($side);
 			$max = $this->calculateMaxY($side);
 
@@ -1868,15 +1857,18 @@ class CLineGraphDraw extends CGraphDraw {
 			}
 
 			$is_binary = false;
+			$calc_power = false;
 
 			foreach ($this->items as $item) {
-				if ($side == $item['yaxisside'] && in_array($item['units'], ['B', 'Bps'])) {
-					$is_binary = true;
-					break;
+				if ($item['yaxisside'] == $side) {
+					$is_binary = $is_binary || in_array($item['units'], ['B', 'Bps']);
+					$calc_power = $calc_power || $item['units'] === '' || $item['units'][0] !== '!';
 				}
 			}
 
-			$result = calculateGraphScaleExtremes($min, $max, $is_binary, $calc_min, $calc_max, $rows_min, $rows_max);
+			$result = calculateGraphScaleExtremes($min, $max, $is_binary, $calc_power, $calc_min, $calc_max, $rows_min,
+				$rows_max
+			);
 
 			if ($result === null) {
 				show_error_message(_('Y axis MAX value must be greater than Y axis MIN value.'));
@@ -1890,13 +1882,15 @@ class CLineGraphDraw extends CGraphDraw {
 				'power' => $this->power[$side]
 			] = $result;
 
+			$this->is_binary[$side] = $is_binary;
+
 			if ($calc_min && $calc_max) {
 				$rows_min = $rows_max = $result['rows'];
 			}
 		}
 	}
 
-	private function calcDimentions() {
+	private function calcDimensions() {
 		$this->shiftXleft = $this->yaxis[GRAPH_YAXIS_SIDE_LEFT] ? 85 : 30;
 		$this->shiftXright = $this->yaxis[GRAPH_YAXIS_SIDE_RIGHT] ? 85 : 30;
 
@@ -2016,11 +2010,7 @@ class CLineGraphDraw extends CGraphDraw {
 				$graph_item['delay'] = $master_item['delay'];
 			}
 
-			$graph_items = CMacrosResolverHelper::resolveItemNames([$graph_item]);
-			$graph_items = CMacrosResolverHelper::resolveTimeUnitMacros($graph_items, ['delay']);
-			$graph_item = reset($graph_items);
-
-			$graph_item['name'] = $graph_item['name_expanded'];
+			$graph_item = CMacrosResolverHelper::resolveTimeUnitMacros([$graph_item], ['delay'])[0];
 
 			$update_interval_parser->parse($graph_item['delay']);
 			$graph_item['delay'] = getItemDelay($update_interval_parser->getDelay(),
@@ -2048,7 +2038,7 @@ class CLineGraphDraw extends CGraphDraw {
 
 		$this->calculateTopPadding();
 		$this->selectTriggers();
-		$this->calcDimentions();
+		$this->calcDimensions();
 
 		if (function_exists('imagecolorexactalpha') && function_exists('imagecreatetruecolor')
 				&& @imagecreatetruecolor(1, 1)
@@ -2076,7 +2066,7 @@ class CLineGraphDraw extends CGraphDraw {
 
 		$this->expandItems();
 		$this->selectTriggers();
-		$this->calcDimentions();
+		$this->calcDimensions();
 
 		$this->selectData();
 		if (hasErrorMesssages()) {

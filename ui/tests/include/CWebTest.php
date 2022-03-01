@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -20,10 +20,12 @@
 
 require_once 'vendor/autoload.php';
 
-require_once dirname(__FILE__).'/CTest.php';
-require_once dirname(__FILE__).'/web/CPage.php';
-require_once dirname(__FILE__).'/helpers/CXPathHelper.php';
-require_once dirname(__FILE__).'/helpers/CImageHelper.php';
+require_once __DIR__.'/CTest.php';
+require_once __DIR__.'/web/CPage.php';
+require_once __DIR__.'/helpers/CXPathHelper.php';
+require_once __DIR__.'/helpers/CImageHelper.php';
+require_once __DIR__.'/../../include/classes/helpers/CMessageHelper.php';
+require_once __DIR__.'/../../include/classes/routing/CUrl.php';
 
 define('TEST_GOOD', 0);
 define('TEST_BAD', 1);
@@ -39,6 +41,7 @@ class CWebTest extends CTest {
 	const NETWORK_THROTTLING_OFFLINE	= 'offline';
 	const NETWORK_THROTTLING_SLOW		= 'slow';
 	const NETWORK_THROTTLING_FAST		= 'fast';
+	const HOST_LIST_PAGE				= 'zabbix.php?action=host.list';
 
 	// Screenshot capture on error.
 	private $capture_screenshot = true;
@@ -68,7 +71,7 @@ class CWebTest extends CTest {
 	/**
 	 * @inheritdoc
 	 */
-	protected function onNotSuccessfulTest($exception) {
+	protected function onNotSuccessfulTest($exception): void {
 		if ($this->browser_errors !== null && $exception instanceof Exception) {
 			CExceptionHelper::setMessage($exception, $exception->getMessage()."\n\n".$this->browser_errors);
 		}
@@ -100,7 +103,7 @@ class CWebTest extends CTest {
 	/**
 	 * @inheritdoc
 	 */
-	protected function tearDown() {
+	protected function tearDown(): void {
 		// Check for JS errors.
 		$errors = [];
 		if (self::$shared_page !== null) {

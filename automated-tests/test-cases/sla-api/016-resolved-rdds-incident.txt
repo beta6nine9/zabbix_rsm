@@ -1,6 +1,6 @@
 [test-case]
 
-"016 Resolved rdds incident"
+"Resolved rdds incident"
 
 [prepare-server-database]
 

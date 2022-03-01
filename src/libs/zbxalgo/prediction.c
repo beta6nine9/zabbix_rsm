@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -737,9 +737,9 @@ static int	zbx_polynomial_minmax(double now, double time, zbx_mode_t mode, zbx_m
 	if (SUCCEED != (res = zbx_polynomial_roots(derivative, derivative_roots)))
 		goto out;
 
-	/* choose min and max among now, now + time and derivative roots inbetween (these are potential local extrema) */
-	/* we ignore imaginary part of roots, this means that more calculations will be made, */
-	/* but result will not be affected and we wont need a boundary on minimal imaginary part that differs from zero */
+	/* Choose min and max among now, now + time and derivative roots in between (these are potential local      */
+	/* extrema). We ignore imaginary part of roots. This means that more calculations will be made, but result  */
+	/* will not be affected and we won't need a boundary on minimal imaginary part that differs from zero.      */
 
 	min = zbx_polynomial_value(now, coefficients);
 	tmp = zbx_polynomial_value(now + time, coefficients);

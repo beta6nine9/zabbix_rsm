@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -36,14 +36,12 @@ static zbx_mutex_t	kstat_lock = ZBX_MUTEX_NULL;
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_kstat_refresh                                                *
- *                                                                            *
  * Purpose: refreshes kstat environment                                       *
  *                                                                            *
  * Parameters: error - [OUT] the error message                                *
  *                                                                            *
  * Return value: SUCCEED - the kstat environment was refreshed successfully   *
- *               FAIL - otherwose                                             *
+ *               FAIL - otherwise                                             *
  *                                                                            *
  ******************************************************************************/
 static int	zbx_kstat_refresh(char **error)
@@ -70,15 +68,13 @@ static int	zbx_kstat_refresh(char **error)
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_kstat_init                                                   *
- *                                                                            *
  * Purpose: initialize kstat environment                                      *
  *                                                                            *
  * Parameters: kstat - [IN] the kstat data storage                            *
  *             error - [OUT] the error message                                *
  *                                                                            *
  * Return value: SUCCEED - the kstat environment was initialized successfully *
- *               FAIL - otherwose                                             *
+ *               FAIL - otherwise                                             *
  *                                                                            *
  ******************************************************************************/
 int	zbx_kstat_init(zbx_kstat_t *kstat, char **error)
@@ -124,8 +120,6 @@ void	zbx_kstat_destroy(void)
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_kstat_collect                                                *
- *                                                                            *
  * Purpose: collect kstat stats                                               *
  *                                                                            *
  * Comments: This function is called every second to collect statistics.      *
@@ -157,8 +151,6 @@ void	zbx_kstat_collect(zbx_kstat_t *kstat)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_kstat_get_freemem                                            *
  *                                                                            *
  * Purpose: get free memory size                                              *
  *                                                                            *

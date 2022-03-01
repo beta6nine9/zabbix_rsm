@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -40,9 +40,7 @@ class CPieGraphDraw extends CGraphDraw {
 	/* PRE CONFIG: ADD / SET / APPLY
 	/********************************************************************************************************/
 	public function addItem($itemid, $calc_fnc = CALC_FNC_AVG, $color = null, $type = null) {
-		$items = CMacrosResolverHelper::resolveItemNames([get_item_by_itemid($itemid)]);
-
-		$this->items[$this->num] = reset($items);
+		$this->items[$this->num] = get_item_by_itemid($itemid);
 
 		$host = get_host_by_hostid($this->items[$this->num]['hostid']);
 
@@ -132,7 +130,6 @@ class CPieGraphDraw extends CGraphDraw {
 			$history = Manager::History()->getLastValues($lastValueItems);
 		}
 
-		$config = select_config();
 		$items = [];
 
 		for ($i = 0; $i < $this->num; $i++) {
@@ -143,15 +140,15 @@ class CPieGraphDraw extends CGraphDraw {
 			$to_resolve = [];
 
 			// Override item history setting with housekeeping settings, if they are enabled in config.
-			if ($config['hk_history_global']) {
-				$item['history'] = timeUnitToSeconds($config['hk_history']);
+			if (CHousekeepingHelper::get(CHousekeepingHelper::HK_HISTORY_GLOBAL)) {
+				$item['history'] = timeUnitToSeconds(CHousekeepingHelper::get(CHousekeepingHelper::HK_HISTORY));
 			}
 			else {
 				$to_resolve[] = 'history';
 			}
 
-			if ($config['hk_trends_global']) {
-				$item['trends'] = timeUnitToSeconds($config['hk_trends']);
+			if (CHousekeepingHelper::get(CHousekeepingHelper::HK_TRENDS_GLOBAL)) {
+				$item['trends'] = timeUnitToSeconds(CHousekeepingHelper::get(CHousekeepingHelper::HK_TRENDS));
 			}
 			else {
 				$to_resolve[] = 'trends';
@@ -163,7 +160,7 @@ class CPieGraphDraw extends CGraphDraw {
 
 				$simple_interval_parser = new CSimpleIntervalParser();
 
-				if (!$config['hk_history_global']) {
+				if (!CHousekeepingHelper::get(CHousekeepingHelper::HK_HISTORY_GLOBAL)) {
 					if ($simple_interval_parser->parse($item['history']) != CParser::PARSE_SUCCESS) {
 						show_error_message(_s('Incorrect value for field "%1$s": %2$s.', 'history',
 							_('invalid history storage period')
@@ -173,7 +170,7 @@ class CPieGraphDraw extends CGraphDraw {
 					$item['history'] = timeUnitToSeconds($item['history']);
 				}
 
-				if (!$config['hk_trends_global']) {
+				if (!CHousekeepingHelper::get(CHousekeepingHelper::HK_TRENDS_GLOBAL)) {
 					if ($simple_interval_parser->parse($item['trends']) != CParser::PARSE_SUCCESS) {
 						show_error_message(_s('Incorrect value for field "%1$s": %2$s.', 'trends',
 							_('invalid trend storage period')
@@ -267,7 +264,7 @@ class CPieGraphDraw extends CGraphDraw {
 		$functionNameXShift = 0;
 
 		foreach ($this->items as $item) {
-			$name = $displayHostName ? $item['hostname'].': '.$item['name_expanded'] : $item['name_expanded'];
+			$name = $displayHostName ? $item['hostname'].NAME_DELIMITER.$item['name'] : $item['name'];
 			$dims = imageTextSize($fontSize, 0, $name);
 
 			if ($dims['width'] > $functionNameXShift) {
@@ -331,7 +328,7 @@ class CPieGraphDraw extends CGraphDraw {
 				$this->shiftXleft + 15,
 				$this->sizeY + $shiftY + 14 * $i + 5,
 				$this->getColor($this->graphtheme['textcolor'], 0),
-				$displayHostName ? $item['hostname'].': '.$item['name_expanded'] : $item['name_expanded']
+				$displayHostName ? $item['hostname'].NAME_DELIMITER.$item['name'] : $item['name']
 			);
 
 			// function name

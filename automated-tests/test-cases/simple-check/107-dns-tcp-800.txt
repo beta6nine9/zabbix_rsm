@@ -1,0 +1,14 @@
+[test-case]
+
+"DNS TCP - No server could be reached by local resolver (-800)"
+
+[execute]
+
+"","rm -f    /tmp/dns-test-metadata-example.bin"
+"","rm -rf   /tmp/simple-check-test"
+"","mkdir -p /tmp/simple-check-test"
+"","${cfg:paths:build_dir}/bin/t_rsm_dns -c -t example -n ns1.example -i 127.0.0.1 -4 -r 127.0.0.1 -d -j /tmp/simple-check-test/status.json"
+
+[compare-files]
+
+"/tmp/simple-check-test","107-output.tar.gz"

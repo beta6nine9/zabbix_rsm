@@ -1,6 +1,6 @@
 [test-case]
 
-"011 No dnssec incident"
+"No dnssec incident"
 
 [prepare-server-database]
 

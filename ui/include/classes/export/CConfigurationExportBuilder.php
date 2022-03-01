@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -44,11 +44,11 @@ class CConfigurationExportBuilder {
 	}
 
 	/**
-	 * Build XML data.
+	 * Build data structure.
 	 *
 	 * @param array  $schema    Tag schema from validation class.
 	 * @param array  $data      Export data.
-	 * @param string $main_tag  XML tag (for error reporting).
+	 * @param string $main_tag  Main element (for error reporting).
 	 *
 	 * @return array
 	 */
@@ -66,10 +66,20 @@ class CConfigurationExportBuilder {
 			$store = [];
 			foreach ($rules as $tag => $val) {
 				$is_required = $val['type'] & XML_REQUIRED;
+				$is_string = $val['type'] & XML_STRING;
 				$is_array = $val['type'] & XML_ARRAY;
 				$is_indexed_array = $val['type'] & XML_INDEXED_ARRAY;
 				$has_data = array_key_exists($tag, $row);
-				$default_value = array_key_exists('default', $val) ? $val['default'] : null;
+
+				if (array_key_exists('ex_default', $val)) {
+					$default_value = (string) call_user_func($val['ex_default'], $row);
+				}
+				elseif (array_key_exists('default', $val)) {
+					$default_value = (string) $val['default'];
+				}
+				else {
+					$default_value = null;
+				}
 
 				if (!$default_value && !$has_data) {
 					if ($is_required) {
@@ -97,6 +107,10 @@ class CConfigurationExportBuilder {
 						$store[$tag] = $temp_store;
 					}
 					continue;
+				}
+
+				if ($is_string && $value !== null) {
+					$value = str_replace("\r\n", "\n", $value);
 				}
 
 				if (array_key_exists('in', $val)) {
@@ -187,15 +201,6 @@ class CConfigurationExportBuilder {
 	}
 
 	/**
-	 * Format screens.
-	 *
-	 * @param array $screens
-	 */
-	public function buildScreens(array $screens) {
-		$this->data['screens'] = $this->formatScreens($screens);
-	}
-
-	/**
 	 * Format media types.
 	 *
 	 * @param array $schema       Tag schema from validation class.
@@ -205,18 +210,6 @@ class CConfigurationExportBuilder {
 		$media_types = $this->formatMediaTypes($media_types);
 
 		$this->data['media_types'] = $this->build($schema, $media_types, 'media_types');
-	}
-
-	/**
-	 * Format valuemaps.
-	 *
-	 * @param array $schema     Tag schema from validation class.
-	 * @param array $valuemaps  Export data.
-	 */
-	public function buildValueMaps(array $schema, array $valuemaps) {
-		$valuemaps = $this->formatValueMaps($valuemaps);
-
-		$this->data['value_maps'] = $this->build($schema, $valuemaps, 'value_maps');
 	}
 
 	/**
@@ -253,18 +246,19 @@ class CConfigurationExportBuilder {
 
 		foreach ($templates as $template) {
 			$result[] = [
+				'uuid' => $template['uuid'],
 				'template' => $template['host'],
 				'name' => $template['name'],
 				'description' => $template['description'],
 				'groups' => $this->formatGroups($template['groups']),
-				'applications' => $this->formatApplications($template['applications']),
 				'items' => $this->formatItems($template['items'], $simple_triggers),
 				'discovery_rules' => $this->formatDiscoveryRules($template['discoveryRules']),
 				'httptests' => $this->formatHttpTests($template['httptests']),
 				'macros' => $this->formatMacros($template['macros']),
 				'templates' => $this->formatTemplateLinkage($template['parentTemplates']),
-				'screens' => $this->formatScreens($template['screens']),
-				'tags' => $this->formatTags($template['tags'])
+				'dashboards' => $this->formatDashboards($template['dashboards']),
+				'tags' => $this->formatTags($template['tags']),
+				'valuemaps' => $this->formatValueMaps($template['valuemaps'])
 			];
 		}
 
@@ -295,23 +289,17 @@ class CConfigurationExportBuilder {
 				'ipmi_privilege' => $host['ipmi_privilege'],
 				'ipmi_username' => $host['ipmi_username'],
 				'ipmi_password' => $host['ipmi_password'],
-				'tls_connect' => $host['tls_connect'],
-				'tls_accept' => $host['tls_accept'],
-				'tls_issuer' => $host['tls_issuer'],
-				'tls_subject' => $host['tls_subject'],
-				'tls_psk_identity' => $host['tls_psk_identity'],
-				'tls_psk' => $host['tls_psk'],
 				'templates' => $this->formatTemplateLinkage($host['parentTemplates']),
 				'groups' => $this->formatGroups($host['groups']),
 				'interfaces' => $this->formatHostInterfaces($host['interfaces']),
-				'applications' => $this->formatApplications($host['applications']),
 				'items' => $this->formatItems($host['items'], $simple_triggers),
 				'discovery_rules' => $this->formatDiscoveryRules($host['discoveryRules']),
 				'httptests' => $this->formatHttpTests($host['httptests']),
 				'macros' => $this->formatMacros($host['macros']),
 				'inventory_mode' => $host['inventory_mode'],
 				'inventory' => $this->formatHostInventory($host['inventory']),
-				'tags' => $this->formatTags($host['tags'])
+				'tags' => $this->formatTags($host['tags']),
+				'valuemaps' => $this->formatValueMaps($host['valuemaps'])
 			];
 		}
 
@@ -338,9 +326,10 @@ class CConfigurationExportBuilder {
 	/**
 	 * Format maps.
 	 *
-	 * @param array $maps
+	 * @param array $schema  Tag schema from validation class.
+	 * @param array $maps    Export data.
 	 */
-	public function buildMaps(array $maps) {
+	public function buildMaps(array $schema, array $maps) {
 		$this->data['maps'] = [];
 
 		CArrayHelper::sort($maps, ['name']);
@@ -383,28 +372,8 @@ class CConfigurationExportBuilder {
 				'links' => $this->formatMapLinks($map['links'], $tmpSelements)
 			];
 		}
-	}
 
-	/**
-	 * Format mappings.
-	 *
-	 * @param array $mappings
-	 *
-	 * @return array
-	 */
-	protected function formatMappings(array $mappings) {
-		$result = [];
-
-		CArrayHelper::sort($mappings, ['value']);
-
-		foreach ($mappings as $mapping) {
-			$result[] = [
-				'value' => $mapping['value'],
-				'newvalue' => $mapping['newvalue']
-			];
-		}
-
-		return $result;
+		$this->data['maps'] = $this->build($schema, $this->data['maps'], 'maps');
 	}
 
 	/**
@@ -508,18 +477,22 @@ class CConfigurationExportBuilder {
 	 * @param array $valuemaps
 	 */
 	protected function formatValueMaps(array $valuemaps) {
-		$result = [];
-
 		CArrayHelper::sort($valuemaps, ['name']);
 
-		foreach ($valuemaps as $valuemap) {
-			$result[] = [
-				'name' => $valuemap['name'],
-				'mappings' => $this->formatMappings($valuemap['mappings'])
-			];
+		foreach ($valuemaps as &$valuemap) {
+			foreach ($valuemap['mappings'] as &$mapping) {
+				if ($mapping['type'] == VALUEMAP_MAPPING_TYPE_EQUAL) {
+					unset($mapping['type']);
+				}
+				elseif ($mapping['type'] == VALUEMAP_MAPPING_TYPE_DEFAULT) {
+					unset($mapping['value']);
+				}
+			}
+			unset($mapping);
 		}
+		unset($valuemap);
 
-		return $result;
+		return $valuemaps;
 	}
 
 	/**
@@ -592,6 +565,7 @@ class CConfigurationExportBuilder {
 			}
 
 			$data = [
+				'uuid' => $discoveryRule['uuid'],
 				'name' => $discoveryRule['name'],
 				'type' => $discoveryRule['type'],
 				'snmp_oid' => $discoveryRule['snmp_oid'],
@@ -617,6 +591,7 @@ class CConfigurationExportBuilder {
 				'timeout' => $discoveryRule['timeout'],
 				'url' => $discoveryRule['url'],
 				'query_fields' => $discoveryRule['query_fields'],
+				'parameters' => $discoveryRule['parameters'],
 				'posts' => $discoveryRule['posts'],
 				'status_codes' => $discoveryRule['status_codes'],
 				'follow_redirects' => $discoveryRule['follow_redirects'],
@@ -632,7 +607,7 @@ class CConfigurationExportBuilder {
 				'verify_peer' => $discoveryRule['verify_peer'],
 				'verify_host' => $discoveryRule['verify_host'],
 				'lld_macro_paths' => $discoveryRule['lld_macro_paths'],
-				'preprocessing' => $discoveryRule['preprocessing'],
+				'preprocessing' => self::formatPreprocessingSteps($discoveryRule['preprocessing']),
 				'overrides' => $discoveryRule['overrides']
 			];
 
@@ -674,6 +649,27 @@ class CConfigurationExportBuilder {
 	}
 
 	/**
+	 * Format preprocessing steps.
+	 *
+	 * @param array $preprocessing_steps
+	 *
+	 * @static
+	 *
+	 * @return array
+	 */
+	private static function formatPreprocessingSteps(array $preprocessing_steps) {
+		foreach ($preprocessing_steps as &$preprocessing_step) {
+			$preprocessing_step['parameters'] = ($preprocessing_step['type'] == ZBX_PREPROC_SCRIPT)
+				? [$preprocessing_step['params']]
+				: explode("\n", $preprocessing_step['params']);
+			unset($preprocessing_step['params']);
+		}
+		unset($preprocessing_step);
+
+		return $preprocessing_steps;
+	}
+
+	/**
 	 * Format web scenarios.
 	 *
 	 * @param array $httptests
@@ -687,8 +683,8 @@ class CConfigurationExportBuilder {
 
 		foreach ($httptests as $httptest) {
 			$result[] = [
+				'uuid' => $httptest['uuid'],
 				'name' => $httptest['name'],
-				'application' => $httptest['application'],
 				'delay' => $httptest['delay'],
 				'attempts' => $httptest['retries'],
 				'agent' => $httptest['agent'],
@@ -704,7 +700,8 @@ class CConfigurationExportBuilder {
 				'ssl_cert_file' => $httptest['ssl_cert_file'],
 				'ssl_key_file' => $httptest['ssl_key_file'],
 				'ssl_key_password' => $httptest['ssl_key_password'],
-				'steps' => $this->formatHttpSteps($httptest['steps'])
+				'steps' => $this->formatHttpSteps($httptest['steps']),
+				'tags' => $this->formatTags($httptest['tags'])
 			];
 		}
 
@@ -788,6 +785,10 @@ class CConfigurationExportBuilder {
 				'graph_items' => $this->formatGraphItems($graph['gitems'])
 			];
 
+			if (array_key_exists('uuid', $graph)) {
+				$data['uuid'] = $graph['uuid'];
+			}
+
 			if ($graph['flags'] == ZBX_FLAG_DISCOVERY_PROTOTYPE) {
 				$data['discover'] = $graph['discover'];
 			}
@@ -812,6 +813,7 @@ class CConfigurationExportBuilder {
 
 		foreach ($hostPrototypes as $hostPrototype) {
 			$result[] = [
+				'uuid' => $hostPrototype['uuid'],
 				'host' => $hostPrototype['host'],
 				'name' => $hostPrototype['name'],
 				'status' => $hostPrototype['status'],
@@ -819,8 +821,11 @@ class CConfigurationExportBuilder {
 				'group_links' => $this->formatGroupLinks($hostPrototype['groupLinks']),
 				'group_prototypes' => $this->formatGroupPrototypes($hostPrototype['groupPrototypes']),
 				'macros' => $this->formatMacros($hostPrototype['macros']),
+				'tags' => $this->formatTags($hostPrototype['tags']),
 				'templates' => $this->formatTemplateLinkage($hostPrototype['templates']),
-				'inventory_mode' => $hostPrototype['inventory_mode']
+				'inventory_mode' => $hostPrototype['inventory_mode'],
+				'custom_interfaces' => $hostPrototype['custom_interfaces'],
+				'interfaces' => $this->formatHostPrototypeInterfaces($hostPrototype['interfaces'])
 			];
 		}
 
@@ -908,6 +913,7 @@ class CConfigurationExportBuilder {
 				'recovery_mode' => $trigger['recovery_mode'],
 				'recovery_expression' => $trigger['recovery_expression'],
 				'name' => $trigger['description'],
+				'event_name' => $trigger['event_name'],
 				'opdata' => $trigger['opdata'],
 				'correlation_mode' => $trigger['correlation_mode'],
 				'correlation_tag' => $trigger['correlation_tag'],
@@ -920,6 +926,10 @@ class CConfigurationExportBuilder {
 				'dependencies' => $this->formatDependencies($trigger['dependencies']),
 				'tags' => $this->formatTags($trigger['tags'])
 			];
+
+			if (array_key_exists('uuid', $trigger)) {
+				$data['uuid'] = $trigger['uuid'];
+			}
 
 			if ($trigger['flags'] == ZBX_FLAG_DISCOVERY_PROTOTYPE) {
 				$data['discover'] = $trigger['discover'];
@@ -960,6 +970,36 @@ class CConfigurationExportBuilder {
 	}
 
 	/**
+	 * Format host prototype interfaces.
+	 *
+	 * @param array $interfaces
+	 *
+	 * @return array
+	 */
+	protected function formatHostPrototypeInterfaces(array $interfaces): array {
+		$result = [];
+
+		CArrayHelper::sort($interfaces, ['type', 'ip', 'dns', 'port']);
+
+		foreach ($interfaces as $num => $interface) {
+			$result[$num] = [
+				'default' => $interface['main'],
+				'type' => $interface['type'],
+				'useip' => $interface['useip'],
+				'ip' => $interface['ip'],
+				'dns' => $interface['dns'],
+				'port' => $interface['port']
+			];
+
+			if ($interface['type'] == INTERFACE_TYPE_SNMP) {
+				$result[$num]['details'] = $interface['details'];
+			}
+		}
+
+		return $result;
+	}
+
+	/**
 	 * Format groups.
 	 *
 	 * @param array $groups
@@ -973,6 +1013,7 @@ class CConfigurationExportBuilder {
 
 		foreach ($groups as $group) {
 			$result[] = [
+				'uuid' => $group['uuid'],
 				'name' => $group['name']
 			];
 		}
@@ -990,12 +1031,12 @@ class CConfigurationExportBuilder {
 	 */
 	protected function formatItems(array $items, array $simple_triggers) {
 		$result = [];
-		$expression_data = $simple_triggers ? new CTriggerExpression() : null;
 
 		CArrayHelper::sort($items, ['key_']);
 
 		foreach ($items as $item) {
 			$data = [
+				'uuid' => $item['uuid'],
 				'name' => $item['name'],
 				'type' => $item['type'],
 				'snmp_oid' => $item['snmp_oid'],
@@ -1016,14 +1057,14 @@ class CConfigurationExportBuilder {
 				'privatekey' => $item['privatekey'],
 				'description' => $item['description'],
 				'inventory_link' => $item['inventory_link'],
-				'applications' => $this->formatApplications($item['applications']),
 				'valuemap' => $item['valuemap'],
 				'logtimefmt' => $item['logtimefmt'],
-				'preprocessing' => $item['preprocessing'],
+				'preprocessing' => self::formatPreprocessingSteps($item['preprocessing']),
 				'jmx_endpoint' => $item['jmx_endpoint'],
 				'timeout' => $item['timeout'],
 				'url' => $item['url'],
 				'query_fields' => $item['query_fields'],
+				'parameters' => $item['parameters'],
 				'posts' => $item['posts'],
 				'status_codes' => $item['status_codes'],
 				'follow_redirects' => $item['follow_redirects'],
@@ -1037,6 +1078,7 @@ class CConfigurationExportBuilder {
 				'ssl_cert_file' => $item['ssl_cert_file'],
 				'ssl_key_file' => $item['ssl_key_file'],
 				'ssl_key_password' => $item['ssl_key_password'],
+				'tags' => $this->formatTags($item['tags']),
 				'verify_peer' => $item['verify_peer'],
 				'verify_host' => $item['verify_host']
 			];
@@ -1044,7 +1086,6 @@ class CConfigurationExportBuilder {
 			$master_item = ($item['type'] == ITEM_TYPE_DEPENDENT) ? ['key' => $item['master_item']['key_']] : [];
 
 			if ($item['flags'] == ZBX_FLAG_DISCOVERY_PROTOTYPE) {
-				$data['application_prototypes'] = $this->formatApplications($item['applicationPrototypes']);
 				$data['discover'] = $item['discover'];
 			}
 
@@ -1079,32 +1120,8 @@ class CConfigurationExportBuilder {
 
 			if ($simple_triggers) {
 				$triggers = [];
-				$prefix_length = strlen($item['host'].':'.$item['key_'].'.');
-
 				foreach ($simple_triggers as $simple_trigger) {
 					if (bccomp($item['itemid'], $simple_trigger['items'][0]['itemid']) == 0) {
-						if ($expression_data->parse($simple_trigger['expression'])) {
-							foreach (array_reverse($expression_data->expressions) as $expression) {
-								if ($expression['host'] === $item['host'] && $expression['item'] === $item['key_']) {
-									$simple_trigger['expression'] = substr_replace($simple_trigger['expression'], '',
-										$expression['pos'] + 1, $prefix_length
-									);
-								}
-							}
-						}
-
-						if ($simple_trigger['recovery_mode'] == ZBX_RECOVERY_MODE_RECOVERY_EXPRESSION
-								&& $expression_data->parse($simple_trigger['recovery_expression'])) {
-							foreach (array_reverse($expression_data->expressions) as $expression) {
-								if ($expression['host'] === $item['host'] && $expression['item'] === $item['key_']) {
-									$simple_trigger['recovery_expression'] = substr_replace(
-										$simple_trigger['recovery_expression'], '', $expression['pos'] + 1,
-										$prefix_length
-									);
-								}
-							}
-						}
-
 						$triggers[] = $simple_trigger;
 					}
 				}
@@ -1116,27 +1133,6 @@ class CConfigurationExportBuilder {
 			}
 
 			$result[] = $data;
-		}
-
-		return $result;
-	}
-
-	/**
-	 * Format applications.
-	 *
-	 * @param array $applications
-	 *
-	 * @return array
-	 */
-	protected function formatApplications(array $applications) {
-		$result = [];
-
-		CArrayHelper::sort($applications, ['name']);
-
-		foreach ($applications as $application) {
-			$result[] = [
-				'name' => $application['name']
-			];
 		}
 
 		return $result;
@@ -1160,30 +1156,6 @@ class CConfigurationExportBuilder {
 				'type' => $macro['type'],
 				'value' => array_key_exists('value', $macro) ? $macro['value'] : '',
 				'description' => $macro['description']
-			];
-		}
-
-		return $result;
-	}
-
-	/**
-	 * Format screens.
-	 *
-	 * @param array $screens
-	 *
-	 * @return array
-	 */
-	protected function formatScreens(array $screens) {
-		$result = [];
-
-		CArrayHelper::sort($screens, ['name']);
-
-		foreach ($screens as $screen) {
-			$result[] = [
-				'name' => $screen['name'],
-				'hsize' => $screen['hsize'],
-				'vsize' => $screen['vsize'],
-				'screen_items' => $this->formatScreenItems($screen['screenitems'])
 			];
 		}
 
@@ -1222,13 +1194,40 @@ class CConfigurationExportBuilder {
 	 */
 	protected function formatTags(array $tags) {
 		$result = [];
+		$fields = [
+			'tag' => true,
+			'value' => true,
+			'operator' => true
+		];
 
 		CArrayHelper::sort($tags, ['tag', 'value']);
 
 		foreach ($tags as $tag) {
+			$result[] = array_intersect_key($tag, $fields);
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Format dashboards.
+	 *
+	 * @param array $dashboards
+	 *
+	 * @return array
+	 */
+	protected function formatDashboards(array $dashboards) {
+		$result = [];
+
+		CArrayHelper::sort($dashboards, ['name']);
+
+		foreach ($dashboards as $dashboard) {
 			$result[] = [
-				'tag' => $tag['tag'],
-				'value' => $tag['value']
+				'uuid' => $dashboard['uuid'],
+				'name' => $dashboard['name'],
+				'display_period' => $dashboard['display_period'],
+				'auto_start' => $dashboard['auto_start'],
+				'pages' => $this->formatDashboardPages($dashboard['pages'])
 			];
 		}
 
@@ -1236,36 +1235,71 @@ class CConfigurationExportBuilder {
 	}
 
 	/**
-	 * Format screen items.
+	 * Format dashboard pages.
 	 *
-	 * @param array $screenItems
+	 * @param array $dashboard_pages
 	 *
 	 * @return array
 	 */
-	protected function formatScreenItems(array $screenItems) {
+	protected function formatDashboardPages(array $dashboard_pages) {
 		$result = [];
 
-		CArrayHelper::sort($screenItems, ['y', 'x']);
-
-		foreach ($screenItems as $screenItem) {
+		foreach ($dashboard_pages as $dashboard_page) {
 			$result[] = [
-				'resourcetype' => $screenItem['resourcetype'],
-				'width' => $screenItem['width'],
-				'height' => $screenItem['height'],
-				'x' => $screenItem['x'],
-				'y' => $screenItem['y'],
-				'colspan' => $screenItem['colspan'],
-				'rowspan' => $screenItem['rowspan'],
-				'elements' => $screenItem['elements'],
-				'valign' => $screenItem['valign'],
-				'halign' => $screenItem['halign'],
-				'style' => $screenItem['style'],
-				'url' => $screenItem['url'],
-				'dynamic' => $screenItem['dynamic'],
-				'sort_triggers' => $screenItem['sort_triggers'],
-				'resource' => $screenItem['resourceid'],
-				'max_columns' => $screenItem['max_columns'],
-				'application' => $screenItem['application']
+				'name' => $dashboard_page['name'],
+				'display_period' => $dashboard_page['display_period'],
+				'widgets' => $this->formatWidgets($dashboard_page['widgets'])
+			];
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Format widgets.
+	 *
+	 * @param array $widgets
+	 *
+	 * @return array
+	 */
+	protected function formatWidgets(array $widgets) {
+		$result = [];
+
+		CArrayHelper::sort($widgets, ['name']);
+
+		foreach ($widgets as $widget) {
+			$result[] = [
+				'type' => $widget['type'],
+				'name' => $widget['name'],
+				'x' => $widget['x'],
+				'y' => $widget['y'],
+				'width' => $widget['width'],
+				'height' => $widget['height'],
+				'hide_header' => $widget['view_mode'],
+				'fields' => $this->formatWidgetFields($widget['fields'])
+			];
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Format widget fields.
+	 *
+	 * @param array $widgets
+	 *
+	 * @return array
+	 */
+	protected function formatWidgetFields(array $fields) {
+		$result = [];
+
+		CArrayHelper::sort($fields, ['type']);
+
+		foreach ($fields as $field) {
+			$result[] = [
+				'type' => $field['type'],
+				'name' => $field['name'],
+				'value' => $field['value']
 			];
 		}
 
@@ -1453,8 +1487,9 @@ class CConfigurationExportBuilder {
 				'icon_on' => $element['iconid_on'],
 				'icon_disabled' => $element['iconid_disabled'],
 				'icon_maintenance' => $element['iconid_maintenance'],
-				'application' => $element['application'],
-				'urls' => $this->formatMapElementUrls($element['urls'])
+				'urls' => $this->formatMapElementUrls($element['urls']),
+				'evaltype' => $element['evaltype'],
+				'tags' => $this->formatTags($element['tags'])
 			];
 		}
 

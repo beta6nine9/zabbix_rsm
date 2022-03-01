@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 #
 # Zabbix
-# Copyright (C) 2001-2021 Zabbix SIA
+# Copyright (C) 2001-2022 Zabbix SIA
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2 as
@@ -42,11 +42,12 @@ my %c = (
 	"t_shorttext"	=>	"ZBX_TYPE_SHORTTEXT",
 	"t_time"	=>	"ZBX_TYPE_INT",
 	"t_varchar"	=>	"ZBX_TYPE_CHAR",
+	"t_cuid"	=>	"ZBX_TYPE_CUID"
 );
 
 $c{"before"} = "/*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -97,6 +98,7 @@ my %mysql = (
 	"t_shorttext"	=>	"text",
 	"t_time"	=>	"integer",
 	"t_varchar"	=>	"varchar",
+	"t_cuid"	=>	"varchar(25)"
 );
 
 my %oracle = (
@@ -117,6 +119,7 @@ my %oracle = (
 	"t_shorttext"	=>	"nvarchar2(2048)",
 	"t_time"	=>	"number(10)",
 	"t_varchar"	=>	"nvarchar2",
+	"t_cuid"	=>	"nvarchar2(25)"
 );
 
 my %postgresql = (
@@ -137,6 +140,7 @@ my %postgresql = (
 	"t_shorttext"	=>	"text",
 	"t_time"	=>	"integer",
 	"t_varchar"	=>	"varchar",
+	"t_cuid"	=>	"varchar(25)"
 );
 
 my %sqlite3 = (
@@ -157,6 +161,7 @@ my %sqlite3 = (
 	"t_shorttext"	=>	"text",
 	"t_time"	=>	"integer",
 	"t_varchar"	=>	"varchar",
+	"t_cuid"	=>	"varchar(25)"
 );
 
 sub rtrim($)
@@ -250,7 +255,6 @@ sub process_field
 {
 	my $line = $_[0];
 	my $type_2;
-
 	newstate("field");
 
 	my $name = "";
@@ -269,7 +273,6 @@ sub process_field
 	if ($output{"type"} eq "code")
 	{
 		$type = $output{$type_short};
-
 		if ($type eq "ZBX_TYPE_CHAR")
 		{
 			for ($length)
@@ -288,6 +291,10 @@ sub process_field
 		elsif ($type eq "ZBX_TYPE_LONGTEXT")
 		{
 			$length = "ZBX_TYPE_LONGTEXT_LEN";
+		}
+		elsif ($type eq "ZBX_TYPE_CUID")
+		{
+			$length = 0;
 		}
 		else
 		{
@@ -597,24 +604,88 @@ sub process_row
 
 sub timescaledb
 {
+	print<<EOF
+DO \$\$
+DECLARE
+	minimum_postgres_version_major		INTEGER;
+	minimum_postgres_version_minor		INTEGER;
+	current_postgres_version_major		INTEGER;
+	current_postgres_version_minor		INTEGER;
+	current_postgres_version_full		VARCHAR;
+
+	minimum_timescaledb_version_major	INTEGER;
+	minimum_timescaledb_version_minor	INTEGER;
+	current_timescaledb_version_major	INTEGER;
+	current_timescaledb_version_minor	INTEGER;
+	current_timescaledb_version_full	VARCHAR;
+BEGIN
+	SELECT 10 INTO minimum_postgres_version_major;
+	SELECT 2 INTO minimum_postgres_version_minor;
+	SELECT 1 INTO minimum_timescaledb_version_major;
+	SELECT 5 INTO minimum_timescaledb_version_minor;
+
+	SHOW server_version INTO current_postgres_version_full;
+
+	IF NOT found THEN
+		RAISE EXCEPTION 'Cannot determine PostgreSQL version, aborting';
+	END IF;
+
+	SELECT substring(current_postgres_version_full, '^(\\d+).') INTO current_postgres_version_major;
+	SELECT substring(current_postgres_version_full, '^\\d+.(\\d+)') INTO current_postgres_version_minor;
+
+	IF (current_postgres_version_major < minimum_postgres_version_major OR
+			(current_postgres_version_major = minimum_postgres_version_major AND
+			current_postgres_version_minor < minimum_postgres_version_minor)) THEN
+			RAISE EXCEPTION 'PostgreSQL version % is NOT SUPPORTED (with TimescaleDB)! Minimum is %.%.0 !',
+					current_postgres_version_full, minimum_postgres_version_major,
+					minimum_postgres_version_minor;
+	ELSE
+		RAISE NOTICE 'PostgreSQL version % is valid', current_postgres_version_full;
+	END IF;
+
+	SELECT extversion INTO current_timescaledb_version_full FROM pg_extension WHERE extname = 'timescaledb';
+
+	IF NOT found THEN
+		RAISE EXCEPTION 'TimescaleDB extension is not installed';
+	ELSE
+		RAISE NOTICE 'TimescaleDB extension is detected';
+	END IF;
+
+	SELECT substring(current_timescaledb_version_full, '^(\\d+).') INTO current_timescaledb_version_major;
+	SELECT substring(current_timescaledb_version_full, '^\\d+.(\\d+)') INTO current_timescaledb_version_minor;
+
+	IF (current_timescaledb_version_major < minimum_timescaledb_version_major OR
+			(current_timescaledb_version_major = minimum_timescaledb_version_major AND
+			current_timescaledb_version_minor < minimum_timescaledb_version_minor)) THEN
+		RAISE EXCEPTION 'TimescaleDB version % is UNSUPPORTED! Minimum is %.%.0!',
+				current_timescaledb_version_full, minimum_timescaledb_version_major,
+				minimum_timescaledb_version_minor;
+	ELSE
+		RAISE NOTICE 'TimescaleDB version % is valid', current_timescaledb_version_full;
+	END IF;
+EOF
+	;
+
 	for ("history", "history_uint", "history_log", "history_text", "history_str")
 	{
 		print<<EOF
-SELECT create_hypertable('$_', 'clock', chunk_time_interval => 86400, migrate_data => true);
+	PERFORM create_hypertable('$_', 'clock', chunk_time_interval => 86400, migrate_data => true);
 EOF
-		;
+	;
 	}
 
 	for ("trends", "trends_uint")
 	{
 		print<<EOF
-SELECT create_hypertable('$_', 'clock', chunk_time_interval => 2592000, migrate_data => true);
+	PERFORM create_hypertable('$_', 'clock', chunk_time_interval => 2592000, migrate_data => true);
 EOF
-		;
+	;
 	}
 	print<<EOF
-UPDATE config SET db_extension='timescaledb',hk_history_global=1,hk_trends_global=1;
-UPDATE config SET compression_status=1,compress_older='7d';
+	UPDATE config SET db_extension='timescaledb',hk_history_global=1,hk_trends_global=1;
+	UPDATE config SET compression_status=1,compress_older='7d';
+	RAISE NOTICE 'TimescaleDB is configured successfully';
+END \$\$;
 EOF
 	;
 	exit;

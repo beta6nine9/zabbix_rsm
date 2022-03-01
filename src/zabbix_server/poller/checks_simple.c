@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -17,13 +17,16 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
+#include "common.h"
 #include "checks_simple_vmware.h"
-#include "checks_simple.h"
-#include "checks_simple_rsm.h"
 #include "simple.h"
 #include "log.h"
-
 #include "zbxself.h"
+
+#include "checks_simple.h"
+
+/* RSM specifics */
+#include "checks_simple_rsm.h"
 
 typedef int	(*vmfunc_t)(AGENT_REQUEST *, const char *, const char *, AGENT_RESULT *);
 
@@ -56,12 +59,15 @@ static zbx_vmcheck_t	vmchecks[] =
 
 	{"hv.cluster.name", VMCHECK_FUNC(check_vcenter_hv_cluster_name)},
 	{"hv.cpu.usage", VMCHECK_FUNC(check_vcenter_hv_cpu_usage)},
+	{"hv.cpu.usage.perf", VMCHECK_FUNC(check_vcenter_hv_cpu_usage_perf)},
+	{"hv.cpu.utilization", VMCHECK_FUNC(check_vcenter_hv_cpu_utilization)},
 	{"hv.datacenter.name", VMCHECK_FUNC(check_vcenter_hv_datacenter_name)},
 	{"hv.datastore.discovery", VMCHECK_FUNC(check_vcenter_hv_datastore_discovery)},
 	{"hv.datastore.read", VMCHECK_FUNC(check_vcenter_hv_datastore_read)},
 	{"hv.datastore.size", VMCHECK_FUNC(check_vcenter_hv_datastore_size)},
 	{"hv.datastore.write", VMCHECK_FUNC(check_vcenter_hv_datastore_write)},
 	{"hv.datastore.list", VMCHECK_FUNC(check_vcenter_hv_datastore_list)},
+	{"hv.datastore.multipath", VMCHECK_FUNC(check_vcenter_hv_datastore_multipath)},
 	{"hv.discovery", VMCHECK_FUNC(check_vcenter_hv_discovery)},
 	{"hv.fullname", VMCHECK_FUNC(check_vcenter_hv_fullname)},
 	{"hv.hw.cpu.num", VMCHECK_FUNC(check_vcenter_hv_hw_cpu_num)},
@@ -77,6 +83,7 @@ static zbx_vmcheck_t	vmchecks[] =
 	{"hv.network.in", VMCHECK_FUNC(check_vcenter_hv_network_in)},
 	{"hv.network.out", VMCHECK_FUNC(check_vcenter_hv_network_out)},
 	{"hv.perfcounter", VMCHECK_FUNC(check_vcenter_hv_perfcounter)},
+	{"hv.power", VMCHECK_FUNC(check_vcenter_hv_power)},
 	{"hv.sensor.health.state", VMCHECK_FUNC(check_vcenter_hv_sensor_health_state)},
 	{"hv.status", VMCHECK_FUNC(check_vcenter_hv_status)},
 	{"hv.maintenance", VMCHECK_FUNC(check_vcenter_hv_maintenance)},
@@ -89,8 +96,13 @@ static zbx_vmcheck_t	vmchecks[] =
 	{"vm.cpu.num", VMCHECK_FUNC(check_vcenter_vm_cpu_num)},
 	{"vm.cpu.ready", VMCHECK_FUNC(check_vcenter_vm_cpu_ready)},
 	{"vm.cpu.usage", VMCHECK_FUNC(check_vcenter_vm_cpu_usage)},
+	{"vm.cpu.usage.perf", VMCHECK_FUNC(check_vcenter_vm_cpu_usage_perf)},
+	{"vm.cpu.latency", VMCHECK_FUNC(check_vcenter_vm_cpu_latency)},
+	{"vm.cpu.readiness", VMCHECK_FUNC(check_vcenter_vm_cpu_readiness)},
+	{"vm.cpu.swapwait", VMCHECK_FUNC(check_vcenter_vm_cpu_swapwait)},
 	{"vm.datacenter.name", VMCHECK_FUNC(check_vcenter_vm_datacenter_name)},
 	{"vm.discovery", VMCHECK_FUNC(check_vcenter_vm_discovery)},
+	{"vm.guest.osuptime", VMCHECK_FUNC(check_vcenter_vm_guest_uptime)},
 	{"vm.hv.name", VMCHECK_FUNC(check_vcenter_vm_hv_name)},
 	{"vm.memory.size", VMCHECK_FUNC(check_vcenter_vm_memory_size)},
 	{"vm.memory.size.ballooned", VMCHECK_FUNC(check_vcenter_vm_memory_size_ballooned)},
@@ -100,14 +112,22 @@ static zbx_vmcheck_t	vmchecks[] =
 	{"vm.memory.size.usage.host", VMCHECK_FUNC(check_vcenter_vm_memory_size_usage_host)},
 	{"vm.memory.size.private", VMCHECK_FUNC(check_vcenter_vm_memory_size_private)},
 	{"vm.memory.size.shared", VMCHECK_FUNC(check_vcenter_vm_memory_size_shared)},
+	{"vm.memory.size.consumed", VMCHECK_FUNC(check_vcenter_vm_memory_size_consumed)},
+	{"vm.memory.usage", VMCHECK_FUNC(check_vcenter_vm_memory_usage)},
+	{"vm.guest.memory.size.swapped", VMCHECK_FUNC(check_vcenter_vm_guest_memory_size_swapped)},
 	{"vm.net.if.discovery", VMCHECK_FUNC(check_vcenter_vm_net_if_discovery)},
 	{"vm.net.if.in", VMCHECK_FUNC(check_vcenter_vm_net_if_in)},
 	{"vm.net.if.out", VMCHECK_FUNC(check_vcenter_vm_net_if_out)},
+	{"vm.net.if.usage", VMCHECK_FUNC(check_vcenter_vm_net_if_usage)},
 	{"vm.perfcounter", VMCHECK_FUNC(check_vcenter_vm_perfcounter)},
 	{"vm.powerstate", VMCHECK_FUNC(check_vcenter_vm_powerstate)},
 	{"vm.storage.committed", VMCHECK_FUNC(check_vcenter_vm_storage_committed)},
 	{"vm.storage.unshared", VMCHECK_FUNC(check_vcenter_vm_storage_unshared)},
 	{"vm.storage.uncommitted", VMCHECK_FUNC(check_vcenter_vm_storage_uncommitted)},
+	{"vm.storage.readoio", VMCHECK_FUNC(check_vcenter_vm_storage_readoio)},
+	{"vm.storage.writeoio", VMCHECK_FUNC(check_vcenter_vm_storage_writeoio)},
+	{"vm.storage.totalwritelatency", VMCHECK_FUNC(check_vcenter_vm_storage_totalwritelatency)},
+	{"vm.storage.totalreadlatency", VMCHECK_FUNC(check_vcenter_vm_storage_totalreadlatency)},
 	{"vm.uptime", VMCHECK_FUNC(check_vcenter_vm_uptime)},
 	{"vm.vfs.dev.discovery", VMCHECK_FUNC(check_vcenter_vm_vfs_dev_discovery)},
 	{"vm.vfs.dev.read", VMCHECK_FUNC(check_vcenter_vm_vfs_dev_read)},
@@ -117,12 +137,12 @@ static zbx_vmcheck_t	vmchecks[] =
 
 	{"dc.discovery", VMCHECK_FUNC(check_vcenter_dc_discovery)},
 
+	{"cl.perfcounter", VMCHECK_FUNC(check_vcenter_cl_perfcounter)},
+
 	{NULL, NULL}
 };
 
 /******************************************************************************
- *                                                                            *
- * Function: get_vmware_function                                              *
  *                                                                            *
  * Purpose: Retrieves a handler of the item key                               *
  *                                                                            *
@@ -176,19 +196,19 @@ int	get_value_simple(const DC_ITEM *item, AGENT_RESULT *result, zbx_vector_ptr_t
 		/* generate array of strings  */
 		/* pass it to check_rsm_dns() */
 		if (SYSINFO_RET_OK == check_rsm_dns(item->host.hostid, item->itemid, item->host.host, item->nextcheck,
-				&request, result))
+				&request, result, NULL))
 		{
 			ret = SUCCEED;
 		}
 	}
 	else if (0 == strcmp(request.key, "rsm.rdds"))
 	{
-		if (SYSINFO_RET_OK == check_rsm_rdds(item->host.host, &request, result))
+		if (SYSINFO_RET_OK == check_rsm_rdds(item->host.host, &request, result, NULL))
 			ret = SUCCEED;
 	}
 	else if (0 == strcmp(request.key, "rdap"))
 	{
-		if (SYSINFO_RET_OK == check_rsm_rdap(item->host.host, &request, result))
+		if (SYSINFO_RET_OK == check_rsm_rdap(item->host.host, &request, result, NULL))
 			ret = SUCCEED;
 	}
 	else if (0 == strcmp(request.key, "rsm.epp"))

@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -33,7 +33,7 @@ class CLegacyWebTest extends CWebTest {
 
 	// List of strings that SHOULD appear on every page.
 	public $failIfNotExists = [
-		'Zabbix Share',
+		'Zabbix Integrations',
 		'Help',
 		'Admin',
 		'Sign out'
@@ -442,7 +442,7 @@ class CLegacyWebTest extends CWebTest {
 		$caller = $trace[2];
 
 		if ($caller['class'] !== __CLASS__) {
-			self::addWarning('Web driver selector should not be used in test cases.');
+			self::zbxAddWarning('Web driver selector should not be used in test cases.');
 		}
 
 		return $this->query($type, $locator);
@@ -487,7 +487,7 @@ class CLegacyWebTest extends CWebTest {
 
 	public function zbxTestLaunchOverlayDialog($header) {
 		$this->zbxTestWaitUntilElementPresent(WebDriverBy::xpath("//div[contains(@class, 'overlay-dialogue modal')]".
-				"/div[@class='dashbrd-widget-head']/h4[text()='$header']"));
+				"/div[@class='dashboard-widget-head']/h4[text()='$header']"));
 	}
 
 	public function zbxTestClickAndAcceptAlert($id) {
@@ -694,7 +694,7 @@ class CLegacyWebTest extends CWebTest {
 
 	public function __get($attribute) {
 		if ($attribute === 'webDriver') {
-			self::addWarning('Web driver should not be accessed directly from test cases.');
+			self::zbxAddWarning('Web driver should not be accessed directly from test cases.');
 			return CElementQuery::getDriver();
 		}
 

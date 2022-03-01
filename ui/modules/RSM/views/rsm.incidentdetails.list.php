@@ -21,6 +21,7 @@
 
 use Modules\RSM\Helpers\UrlHelper as URL;
 use Modules\RSM\Helpers\DynamicContent;
+use Modules\RSM\Helpers\ValueMapHelper as VM;
 
 $object_label = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) ? _('Registrar ID') : _('TLD');
 
@@ -56,10 +57,8 @@ foreach ($data['tests'] as $test) {
 	$table->addRow([
 		$start_end_incident,
 		date(DATE_TIME_FORMAT_SECONDS, $test['clock']),
-		array_key_exists($test['value'], $data['test_value_mapping'])
-			? (new CSpan($data['test_value_mapping'][$test['value']]))
-				->setAttribute('class', $test['value'] == PROBE_DOWN ? 'red' : 'green')
-			: '',
+		(new CSpan(VM::get(RSM_VALUE_MAP_SERVICE_AVAILABILITY, $test['value'])))
+			->setAttribute('class', $test['value'] == PROBE_DOWN ? 'red' : 'green'),
 		isset($test['slv']) ? $test['slv'].'%' : '-',
 		$details_link
 	]);
@@ -103,7 +102,7 @@ if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
 }
 $details[_('Service')] = $data['slvItem']['name'];
 $details[_('Incident type')] = $incident_type;
-if ($data['type'] == RSM_RDDS && !$data['is_rdap_standalone']) {
+if ($data['type'] == RSM_RDDS) {
 	$details[_('Current testing interface')] = $data['testing_interfaces'];
 }
 

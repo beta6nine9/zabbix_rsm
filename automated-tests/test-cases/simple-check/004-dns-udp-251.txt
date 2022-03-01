@@ -1,0 +1,24 @@
+[test-case]
+
+"DNS UDP - Querying for a non existent domain - Domain name being queried not present in question section (-251)"
+
+[start-tool]
+
+"resolver","/tmp/resolver.pid","004-resolver-input.json"
+"nameserver","/tmp/nameserver.pid","004-nameserver-input.json"
+
+[execute]
+
+"","rm -f    /tmp/dns-test-metadata-example.bin"
+"","rm -rf   /tmp/simple-check-test"
+"","mkdir -p /tmp/simple-check-test"
+"","${cfg:paths:build_dir}/bin/t_rsm_dns -t example -n ns1.example -i 127.0.0.1 -4 -r 127.0.0.1 -o 5053 -s 5054 -d -j /tmp/simple-check-test/status.json"
+
+[stop-tool]
+
+"nameserver","/tmp/nameserver.pid"
+"resolver","/tmp/resolver.pid"
+
+[compare-files]
+
+"/tmp/simple-check-test","004-output.tar.gz"

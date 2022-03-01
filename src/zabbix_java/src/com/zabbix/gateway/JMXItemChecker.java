@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -187,8 +187,8 @@ class JMXItemChecker extends ItemChecker
 
 		if (item.getKeyId().equals("jmx"))
 		{
-			if (2 != argumentCount)
-				throw new ZabbixException("required key format: jmx[<object name>,<attribute name>]");
+			if (2 != argumentCount && 3 != argumentCount)
+				throw new ZabbixException("required key format: jmx[<object name>,<attribute name>,<unique short description>]");
 
 			ObjectName objectName = new ObjectName(item.getArgument(1));
 			String attributeName = item.getArgument(2);
@@ -241,14 +241,15 @@ class JMXItemChecker extends ItemChecker
 		}
 		else if (item.getKeyId().equals("jmx.discovery") || item.getKeyId().equals("jmx.get"))
 		{
-			if (2 < argumentCount)
-				throw new ZabbixException("required key format: " + item.getKeyId() + "[<discovery mode>,<object name>]");
+			if (3 < argumentCount)
+				throw new ZabbixException("required key format: " + item.getKeyId() +
+						"[<discovery mode>,<object name>,<unique short description>]");
 
 			ObjectName filter;
 
 			try
 			{
-				filter = (2 == argumentCount) ? new ObjectName(item.getArgument(2)) : null;
+				filter = (2 <= argumentCount) ? new ObjectName(item.getArgument(2)) : null;
 			}
 			catch (MalformedObjectNameException e)
 			{

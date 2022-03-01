@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -62,8 +62,6 @@ function authentication2str($type) {
  *
  * Comments:
  *		return true if permission is positive
- *
- * Author: Aly
  */
 function check_perm2system($userid) {
 	$sql = 'SELECT g.usrgrpid'.
@@ -95,8 +93,8 @@ function check_perm2login($userId) {
  *
  * @return int
  */
-function getUserGuiAccess($userid) {
-	if (bccomp($userid, CWebUser::$data['userid']) == 0 && isset(CWebUser::$data['gui_access'])) {
+function getUserGuiAccess(string $userid): int {
+	if (isset(CWebUser::$data['gui_access'])) {
 		return CWebUser::$data['gui_access'];
 	}
 
@@ -118,11 +116,9 @@ function getUserGuiAccess($userid) {
  * @return int
  */
 function getUserAuthenticationType($gui_access) {
-	$config = select_config();
-
 	switch ($gui_access) {
 		case GROUP_GUI_ACCESS_SYSTEM:
-			return $config['authentication_type'];
+			return CAuthenticationHelper::get(CAuthenticationHelper::AUTHENTICATION_TYPE);
 
 		case GROUP_GUI_ACCESS_INTERNAL:
 			return ZBX_AUTH_INTERNAL;
@@ -131,7 +127,7 @@ function getUserAuthenticationType($gui_access) {
 			return ZBX_AUTH_LDAP;
 
 		default:
-			return $config['authentication_type'];
+			return CAuthenticationHelper::get(CAuthenticationHelper::AUTHENTICATION_TYPE);
 	}
 }
 

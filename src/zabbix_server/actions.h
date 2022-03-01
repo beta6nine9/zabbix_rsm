@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -31,6 +31,8 @@ typedef struct
 	zbx_uint64_t	eventid;
 	zbx_uint64_t	acknowledgeid;
 	zbx_uint64_t	taskid;
+	int		old_severity;
+	int		new_severity;
 }
 zbx_ack_task_t;
 

@@ -1,0 +1,23 @@
+[test-case]
+
+"RDDS80 - Expecting HTTP status code 200 but got 500 (-349)"
+
+[start-tool]
+
+"resolver","/tmp/resolver.pid","208-resolver-input.json"
+"rdds80-server","/tmp/rdds80-server.pid","208-rdds80-server-input.json"
+
+[execute]
+
+"","rm -rf   /tmp/simple-check-test"
+"","mkdir -p /tmp/simple-check-test"
+"","${cfg:paths:build_dir}/bin/t_rsm_rdds -t example -a example.example -s 4343 -w http://example.example -g 4380 -p example.example -4 -r 127.0.0.1 -o 5053 -j /tmp/simple-check-test/status.json"
+
+[stop-tool]
+
+"rdds80-server","/tmp/rdds80-server.pid"
+"resolver","/tmp/resolver.pid"
+
+[compare-files]
+
+"/tmp/simple-check-test","208-output.tar.gz"

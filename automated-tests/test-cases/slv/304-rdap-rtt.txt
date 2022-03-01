@@ -1,6 +1,6 @@
 [test-case]
 
-"304 RDAP RTT"
+"RDAP RTT"
 
 [prepare-server-database]
 

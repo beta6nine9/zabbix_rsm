@@ -46,7 +46,6 @@ define('RSM_RDDS_ENABLED',			'{$RSM.RDDS.ENABLED}');
 define('RSM_RDAP_ENABLED',			'{$RSM.RDAP.ENABLED}');
 define('RSM_TLD_DNSSEC_ENABLED',	'{$RSM.TLD.DNSSEC.ENABLED}');
 define('RSM_TLD_EPP_ENABLED',		'{$RSM.TLD.EPP.ENABLED}');
-define('RSM_TLD_RDDS_ENABLED',		'{$RSM.TLD.RDDS.ENABLED}');
 define('RSM_TLD_RDDS43_ENABLED',	'{$RSM.TLD.RDDS43.ENABLED}');
 define('RSM_TLD_RDDS80_ENABLED',	'{$RSM.TLD.RDDS80.ENABLED}');
 define('RSM_PROBE_AVAIL_LIMIT',		'{$RSM.PROBE.AVAIL.LIMIT}');
@@ -54,7 +53,8 @@ define('RSM_RDAP_TLD_ENABLED',		'{$RDAP.TLD.ENABLED}');
 define('RSM_SLV_DNS_NS_UPD',		'{$RSM.SLV.DNS.NS.UPD}');
 define('RSM_DNS_UPDATE_TIME',		'{$RSM.DNS.UPDATE.TIME}');
 define('RDAP_BASE_URL',				'{$RDAP.BASE.URL}');
-define('RDDS_ENABLED',				'rdds.enabled');
+define('RDDS43_ENABLED',			'rdds43.enabled');
+define('RDDS80_ENABLED',			'rdds80.enabled');
 define('RDAP_ENABLED',				'rdap.enabled');
 
 // Wow often do we save history of Probe ONLINE status.
@@ -230,15 +230,18 @@ define('RSM_G_TLD_GROUP',		'gTLD');
 define('RSM_OTHER_TLD_GROUP',	'otherTLD');
 define('RSM_TEST_GROUP',		'testTLD');
 
-define('RSM_RDDS_SUBSERVICE_RDDS',	'RDDS43/80');
-define('RSM_RDDS_SUBSERVICE_RDAP',	'RDAP');
+define('RSM_RDDS_SUBSERVICE_RDDS43',	'RDDS43');
+define('RSM_RDDS_SUBSERVICE_RDDS80',	'RDDS80');
+define('RSM_RDDS_SUBSERVICE_RDAP',		'RDAP');
+
+define('PROBES_MON_GROUPID',					130);
 
 // Value maps used for special purpose.
-define('PROBES_MON_GROUPID',					130);
-define('RSM_SERVICE_AVAIL_VALUE_MAP',			110);
-define('RSM_DNS_TRANSPORT_PROTOCOL_VALUE_MAP',	162);
-define('RSM_DNS_RTT_ERRORS_VALUE_MAP',			120);
-define('RSM_RDDS_RTT_ERRORS_VALUE_MAP',			130);
+define('RSM_VALUE_MAP_DNS_RTT',					"RSM DNS rtt");
+define('RSM_VALUE_MAP_RDDS_RTT',				"RSM RDDS rtt");
+define('RSM_VALUE_MAP_RDAP_RTT',				"RSM RDAP rtt");
+define('RSM_VALUE_MAP_TRANSPORT_PROTOCOL',		"Transport protocol");
+define('RSM_VALUE_MAP_SERVICE_AVAILABILITY',	"RSM Service Availability");
 
 define('RSM_MONITORING_TARGET',			'{$RSM.MONITORING.TARGET}');
 define('MONITORING_TARGET_REGISTRY',	'registry');

@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -40,8 +40,9 @@ type process struct {
 
 var ntResumeProcess *syscall.Proc
 
-func execute(s string, timeout time.Duration, strict bool) (out string, err error) {
+func execute(s string, timeout time.Duration, path string, strict bool) (out string, err error) {
 	cmd := exec.Command("cmd")
+	cmd.Dir = path
 
 	var b bytes.Buffer
 	cmd.Stdout = &b
@@ -99,8 +100,8 @@ func execute(s string, timeout time.Duration, strict bool) (out string, err erro
 		return "", fmt.Errorf("Command execution failed: %s", werr)
 	}
 
-	if maxExecuteOutputLenB <= len(b.String()) {
-		return "", fmt.Errorf("Command output exceeded limit of %d KB", maxExecuteOutputLenB/1024)
+	if MaxExecuteOutputLenB <= len(b.String()) {
+		return "", fmt.Errorf("Command output exceeded limit of %d KB", MaxExecuteOutputLenB/1024)
 	}
 
 	return strings.TrimRight(b.String(), " \t\r\n"), nil

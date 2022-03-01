@@ -1,6 +1,6 @@
 [test-case]
 
-"003 RDDS availability up/down"
+"RDDS availability up/down"
 
 [prepare-server-database]
 

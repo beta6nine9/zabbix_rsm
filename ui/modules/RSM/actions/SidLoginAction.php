@@ -2,7 +2,9 @@
 
 namespace Modules\RSM\Actions;
 
+use API;
 use CWebUser;
+use CSessionHelper;
 use CControllerResponseRedirect;
 use Modules\RSM\Helpers\UrlHelper as Url;
 
@@ -27,7 +29,9 @@ class SidLoginAction extends Action {
 			 */
 			getMessages();
 
-			CWebUser::setSessionCookie($this->getInput('i'));
+			CSessionHelper::set('sessionid', $this->getInput('i'));
+			API::getWrapper()->auth = $this->getInput('i');
+
 			$redirect = $this->getInput('back');
 		}
 		else {

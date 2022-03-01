@@ -36,7 +36,7 @@ class UrlHelper {
 	 * @param array  $params        Array of $action params.
 	 */
 	static public function getFor(string $host, string $action, array $params = []): string {
-		$sid = CWebUser::getSessionCookie();
+		$sid = CWebUser::$data['sessionid'];
 
 		return static::get($host.'zabbix.php', [
 			'i' => $sid,

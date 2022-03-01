@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -25,11 +25,11 @@
 $this->addJsFile('flickerfreescreen.js');
 $this->addJsFile('gtlc.js');
 $this->addJsFile('class.calendar.js');
-$this->addJsFile('multiselect.js');
 
 $this->includeJsFile('reports.auditlog.list.js.php');
 
-$filter = (new CFilter((new CUrl('zabbix.php'))->setArgument('action', $data['action'])));
+$filter = (new CFilter())
+	->setResetUrl((new CUrl('zabbix.php'))->setArgument('action', $data['action']));
 
 $select_filter_resourcetype = (new CSelect('filter_resourcetype'))
 	->setId('resourcetype-select')
@@ -55,7 +55,7 @@ $filter_form = (new CFormList())
 					'srctbl' => 'users',
 					'srcfld1' => 'userid',
 					'srcfld2' => 'fullname',
-					'dstfrm' => $filter->getName(),
+					'dstfrm' => 'zbx_filter',
 					'dstfld1' => 'filter_userids_'
 				]
 			]
@@ -69,6 +69,9 @@ $filter_form = (new CFormList())
 	)
 	->addRow(new CLabel(_('Action'), $select_filter_action->getFocusableElementId()),
 		$select_filter_action
+	)
+	->addRow(_('Recordset ID'), (new CTextBox('filter_recordsetid', $data['recordsetid']))
+		->setWidth(ZBX_TEXTAREA_FILTER_STANDARD_WIDTH)
 	);
 
 $widget = (new CWidget())
@@ -87,34 +90,47 @@ $table = (new CTableInfo())
 		_('User'),
 		_('IP'),
 		_('Resource'),
-		_('Action'),
 		_('ID'),
-		_('Description'),
+		_('Action'),
+		_('Recordset ID'),
 		_('Details')
 	]);
 
 foreach ($data['auditlogs'] as $auditlog) {
-	$details = [];
-
-	foreach ($auditlog['details'] as $detail) {
-		$details[] = [$detail['table_name'].'.'.$detail['field_name'].': '.$detail['oldvalue'].
-			' => '.$detail['newvalue'], BR()
-		];
-	}
-
 	$table->addRow([
 		zbx_date2str(DATE_TIME_FORMAT_SECONDS, $auditlog['clock']),
-		$data['users'][$auditlog['userid']],
+		in_array($auditlog['userid'], $data['non_existent_userids'])
+			? new CTag('em', true, $auditlog['username'])
+			: $data['users'][$auditlog['userid']],
 		$auditlog['ip'],
 		array_key_exists($auditlog['resourcetype'], $data['resources'])
 			? $data['resources'][$auditlog['resourcetype']]
 			: _('Unknown resource'),
+		new CLink($auditlog['resourceid'],
+			(new CUrl('zabbix.php'))
+				->setArgument('action', $data['action'])
+				->setArgument('filter_resourceid', $auditlog['resourceid'])
+				->setArgument('filter_resourcetype', $auditlog['resourcetype'])
+				->setArgument('filter_set', 1)
+		),
 		array_key_exists($auditlog['action'], $data['actions'])
 			? $data['actions'][$auditlog['action']]
 			: _('Unknown action'),
-		$auditlog['resourceid'],
-		$auditlog['resourcename'],
-		$details ? $details : $auditlog['note']
+		new CLink($auditlog['recordsetid'],
+			(new CUrl('zabbix.php'))
+				->setArgument('action', $data['action'])
+				->setArgument('filter_recordsetid', $auditlog['recordsetid'])
+				->setArgument('filter_set', 1)
+		),
+		(new CDiv([
+			new CDiv(zbx_nl2br($auditlog['short_details'])),
+			($auditlog['details_button'] == 1)
+				? (new CDiv (
+					(new CLinkAction(_('Details')))->onClick('openAuditDetails('.json_encode($auditlog['details']).')')
+				))->addClass('audit-show-details-btn-wrapper')
+				: ''
+		]))->addClass('audit-details-wrapper')
+
 	]);
 }
 
@@ -123,8 +139,7 @@ $obj = [
 	'domid' => 'auditlog',
 	'loadSBox' => 0,
 	'loadImage' => 0,
-	'dynamic' => 0,
-	'mainObject' => 1
+	'dynamic' => 0
 ];
 
 (new CScriptTag('timeControl.addObject("auditlog", '.json_encode($data['timeline']).', '.json_encode($obj).');'.

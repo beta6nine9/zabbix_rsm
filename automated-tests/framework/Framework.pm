@@ -10,6 +10,7 @@ our @EXPORT = qw(
 	pushd
 	popd
 	execute
+	execute_ex
 	read_file
 	write_file
 	get_dir_tree
@@ -25,15 +26,19 @@ our @EXPORT = qw(
 	tar_unpack
 	tar_compare
 	str_starts_with
-	to_unixtimestamp
+	ltrim
+	rtrim
 	format_table
+	start_tool
+	stop_tool
 );
 
 use Archive::Tar;
 use Cwd qw(cwd);
 use Data::Dumper;
-use Date::Parse;
 use File::Spec;
+use IO::Select;
+use IPC::Open3;
 use List::Util qw(max);
 use Text::Diff;
 
@@ -41,6 +46,8 @@ use Configuration;
 use Database;
 use Options;
 use Output;
+
+use constant TOOLS_DIR => '../tools';
 
 my @prev_dir = undef;
 
@@ -96,6 +103,64 @@ sub execute
 			fail("child exited with value %d", $? >> 8);
 		}
 	}
+}
+
+sub execute_ex
+{
+	info("executing: " . join(" ", map('"' . $_ . '"', @_)));
+
+	my $stdout = "";
+	my $stderr = "";
+
+	my $stdout_handle;
+	my $stderr_handle;
+	open($stdout_handle, "+>", undef) or fail("open() failed: $!");
+	open($stderr_handle, "+>", undef) or fail("open() failed: $!");
+
+	my $select = IO::Select->new();
+	$select->add($stdout_handle);
+	$select->add($stderr_handle);
+
+	my $pid = open3(undef, $stdout_handle, $stderr_handle, @_);
+
+	while ($select->count())
+	{
+		my @ready = $select->can_read();
+
+		foreach my $handle (@ready)
+		{
+			my $line = <$handle>;
+
+			if (defined($line))
+			{
+				if ($handle == $stdout_handle)
+				{
+					print("[stdout] $line");
+					$stdout .= $line;
+				}
+				elsif ($handle == $stderr_handle)
+				{
+					print("[stderr] $line");
+					$stderr .= $line;
+				}
+				else
+				{
+					fail("internal error");
+				}
+			}
+			else
+			{
+				$select->remove($handle);
+				close($handle);
+			}
+		}
+	}
+
+	waitpid($pid, 0);
+
+	my $exit_status = $? >> 8;
+
+	return ($exit_status, $stdout, $stderr);
 }
 
 sub read_file($)
@@ -350,26 +415,7 @@ sub zbx_update_config($$$)
 
 sub zbx_get_server_pid()
 {
-	my $pid = undef;
-	my $pid_file = get_config('zabbix_server', 'pid_file');
-
-	if (-f $pid_file)
-	{
-		$pid = read_file($pid_file);
-
-		if ($pid !~ /^\d+$/)
-		{
-			fail("invalid format of server pid: '%s'", $pid);
-		}
-
-		if (!kill(0, $pid))
-		{
-			wrn("Zabbix server PID '$pid' found, but process does not accept signals");
-			$pid = undef;
-		}
-	}
-
-	return $pid;
+	return __get_pid(get_config('zabbix_server', 'pid_file'));
 }
 
 sub zbx_start_server(;$$$)
@@ -692,9 +738,20 @@ sub str_starts_with($$)
 	}
 }
 
-sub to_unixtimestamp($)
+sub ltrim($;$)
 {
-	return str2time(shift);
+	my $string = shift;
+	my $chars  = shift // '\s';
+
+	return $string =~ s/^[$chars]+//r;
+}
+
+sub rtrim($;$)
+{
+	my $string = shift;
+	my $chars  = shift // '\s';
+
+	return $string =~ s/[$chars]+$//r;
 }
 
 sub format_table($$)
@@ -752,6 +809,109 @@ sub format_table($$)
 	$table .= $line;
 
 	return $table;
+}
+
+sub start_tool($$$)
+{
+	my $tool       = shift;
+	my $pid_file   = shift;
+	my $input_file = shift;
+
+	info("starting $tool");
+
+	dbg("checking if $tool is running");
+
+	my $pid = __get_pid($pid_file);
+
+	if (defined($pid))
+	{
+		fail("$tool is already running, pid: '%d'", $pid);
+	}
+
+	dbg("starting the tool $tool");
+
+	my $executable = TOOLS_DIR . "/$tool/main.pl $pid_file $input_file";
+
+	execute("$executable");
+
+	dbg("waiting until pid file is created");
+	sleep(1);
+
+	dbg("getting pid of currently running $tool");
+	$pid = __get_pid($pid_file);
+
+	if (!defined($pid))
+	{
+		fail("$tool failed to start");
+	}
+}
+
+sub stop_tool($$)
+{
+	my $tool     = shift;
+	my $pid_file = shift;
+
+	my $pid = __get_pid($pid_file);
+
+	if (!defined($pid))
+	{
+		fail("$tool is not running");
+	}
+
+	info("stopping $tool");
+
+	if (!kill("SIGINT", $pid))
+	{
+		fail("failed to send SIGINT to $tool");
+	}
+
+	dbg("waiting until $tool is stopped");
+
+	my $stopped;
+
+	for (my $i = 0; $i < 3; $i++)
+	{
+		$stopped = !kill(0, $pid);
+
+		if ($stopped)
+		{
+			last;
+		}
+
+		sleep(1);
+	}
+
+	if (!$stopped)
+	{
+		fail("failed to stop the tool $tool");
+	}
+
+	unlink($pid_file);
+}
+
+sub __get_pid($)
+{
+	my $pid_file = shift;
+
+	my $pid = undef;
+
+	if (-f $pid_file)
+	{
+		$pid = read_file($pid_file);
+
+		if ($pid !~ /^\d+$/)
+		{
+			fail("invalid format of server pid: '%s'", $pid);
+		}
+
+		if (!kill(0, $pid))
+		{
+			wrn("The PID of requested process '$pid' found, but process does not accept signals: $!");
+			$pid = undef;
+		}
+	}
+
+	return $pid;
 }
 
 1;

@@ -53,7 +53,8 @@ class RollingWeekStatusListAction extends Action {
 			'filter_othertld_group'		=> 'in 1',
 			'filter_test_group'			=> 'in 1',
 			'filter_rdap_subgroup'		=> 'in 1',
-			'filter_rdds_subgroup'		=> 'in 1',
+			'filter_rdds43_subgroup'	=> 'in 1',
+			'filter_rdds80_subgroup'	=> 'in 1',
 			'filter_registrar_id'		=> 'string',
 			'filter_registrar_name'		=> 'string',
 			'filter_registrar_family'	=> 'string',
@@ -97,7 +98,8 @@ class RollingWeekStatusListAction extends Action {
 			CProfile::update('web.rsm.rollingweekstatus.filter_othertld_group', $this->getInput('filter_othertld_group', 0), PROFILE_TYPE_INT);
 			CProfile::update('web.rsm.rollingweekstatus.filter_test_group', $this->getInput('filter_test_group', 0), PROFILE_TYPE_INT);
 			CProfile::update('web.rsm.rollingweekstatus.filter_rdap_subgroup', $this->getInput('filter_rdap_subgroup', 0), PROFILE_TYPE_INT);
-			CProfile::update('web.rsm.rollingweekstatus.filter_rdds_subgroup', $this->getInput('filter_rdds_subgroup', 0), PROFILE_TYPE_INT);
+			CProfile::update('web.rsm.rollingweekstatus.filter_rdds43_subgroup', $this->getInput('filter_rdds43_subgroup', 0), PROFILE_TYPE_INT);
+			CProfile::update('web.rsm.rollingweekstatus.filter_rdds80_subgroup', $this->getInput('filter_rdds80_subgroup', 0), PROFILE_TYPE_INT);
 			CProfile::update('web.rsm.rollingweekstatus.filter_registrar_id', $this->getInput('filter_registrar_id', ''), PROFILE_TYPE_STR);
 			CProfile::update('web.rsm.rollingweekstatus.filter_registrar_name', $this->getInput('filter_registrar_name', ''), PROFILE_TYPE_STR);
 			CProfile::update('web.rsm.rollingweekstatus.filter_registrar_family', $this->getInput('filter_registrar_family', ''), PROFILE_TYPE_STR);
@@ -118,7 +120,8 @@ class RollingWeekStatusListAction extends Action {
 			CProfile::delete('web.rsm.rollingweekstatus.filter_othertld_group');
 			CProfile::delete('web.rsm.rollingweekstatus.filter_test_group');
 			CProfile::delete('web.rsm.rollingweekstatus.filter_rdap_subgroup');
-			CProfile::delete('web.rsm.rollingweekstatus.filter_rdds_subgroup');
+			CProfile::delete('web.rsm.rollingweekstatus.filter_rdds43_subgroup');
+			CProfile::delete('web.rsm.rollingweekstatus.filter_rdds80_subgroup');
 			CProfile::delete('web.rsm.rollingweekstatus.filter_registrar_id');
 			CProfile::delete('web.rsm.rollingweekstatus.filter_registrar_name');
 			CProfile::delete('web.rsm.rollingweekstatus.filter_registrar_family');
@@ -143,12 +146,13 @@ class RollingWeekStatusListAction extends Action {
 			'filter_othertld_group' => CProfile::get('web.rsm.rollingweekstatus.filter_othertld_group'),
 			'filter_test_group' => CProfile::get('web.rsm.rollingweekstatus.filter_test_group'),
 			'filter_rdap_subgroup' => CProfile::get('web.rsm.rollingweekstatus.filter_rdap_subgroup'),
-			'filter_rdds_subgroup' => CProfile::get('web.rsm.rollingweekstatus.filter_rdds_subgroup'),
+			'filter_rdds43_subgroup' => CProfile::get('web.rsm.rollingweekstatus.filter_rdds43_subgroup'),
+			'filter_rdds80_subgroup' => CProfile::get('web.rsm.rollingweekstatus.filter_rdds80_subgroup'),
 			'filter_registrar_id' => CProfile::get('web.rsm.rollingweekstatus.filter_registrar_id'),
 			'filter_registrar_name' => CProfile::get('web.rsm.rollingweekstatus.filter_registrar_name'),
 			'filter_registrar_family' => CProfile::get('web.rsm.rollingweekstatus.filter_registrar_family'),
 			'active_tab' => CProfile::get('web.rsm.rollingweekstatus.filter.active', 1),
-			'sid' => CWebUser::getSessionCookie(),
+			'sid' => CWebUser::$data['sessionid'],
 			'paging' => null
 		];
 
@@ -632,7 +636,7 @@ class RollingWeekStatusListAction extends Action {
 					}
 
 					$template_macros = [RSM_TLD_DNSSEC_ENABLED, RSM_TLD_EPP_ENABLED, RSM_TLD_RDDS43_ENABLED,
-						RSM_TLD_RDDS80_ENABLED, RSM_RDAP_TLD_ENABLED, RSM_TLD_RDDS_ENABLED];
+						RSM_TLD_RDDS80_ENABLED, RSM_RDAP_TLD_ENABLED];
 
 					$templateMacros = API::UserMacro()->get([
 						'output' => API_OUTPUT_EXTEND,
@@ -776,8 +780,13 @@ class RollingWeekStatusListAction extends Action {
 		}
 
 		// Filter RDDS subservices.
-		if ($data['filter_rdap_subgroup'] || $data['filter_rdds_subgroup']) {
+		if ($data['filter_rdap_subgroup'] || $data['filter_rdds43_subgroup'] || $data['filter_rdds80_subgroup']) {
 			foreach ($data['tld'] as $key => $tld) {
+				if (is_RDAP_standalone() && !array_key_exists(RSM_RDDS, $tld)) {
+					// do not let RDDS subservices affect RDAP-only enabled Rsmhosts in Standalone RDAP mode
+					continue;
+				}
+
 				if (!array_key_exists(RSM_RDDS, $tld) || !array_key_exists('subservices', $tld[RSM_RDDS])) {
 					unset($data['tld'][$key]);
 					continue;
@@ -789,7 +798,10 @@ class RollingWeekStatusListAction extends Action {
 				if ($data['filter_rdap_subgroup'] && array_key_exists(RSM_RDAP_TLD_ENABLED, $subservices) && $subservices[RSM_RDAP_TLD_ENABLED]) {
 					$available = true;
 				}
-				elseif ($data['filter_rdds_subgroup'] && array_key_exists(RSM_TLD_RDDS_ENABLED, $subservices) && $subservices[RSM_TLD_RDDS_ENABLED]) {
+				elseif ($data['filter_rdds43_subgroup'] && array_key_exists(RSM_TLD_RDDS43_ENABLED, $subservices) && $subservices[RSM_TLD_RDDS43_ENABLED]) {
+					$available = true;
+				}
+				elseif ($data['filter_rdds80_subgroup'] && array_key_exists(RSM_TLD_RDDS80_ENABLED, $subservices) && $subservices[RSM_TLD_RDDS80_ENABLED]) {
 					$available = true;
 				}
 

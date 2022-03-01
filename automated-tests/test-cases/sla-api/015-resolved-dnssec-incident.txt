@@ -1,6 +1,6 @@
 [test-case]
 
-"015 Resolved dnssec incident"
+"Resolved dnssec incident"
 
 [prepare-server-database]
 

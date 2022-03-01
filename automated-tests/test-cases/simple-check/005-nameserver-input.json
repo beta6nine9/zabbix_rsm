@@ -1,0 +1,7 @@
+{
+	"owner" : "example",
+	"rcode" : "SERVFAIL",
+	"flags" : {
+		"aa" : 1
+	}
+}

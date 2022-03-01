@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -135,7 +135,7 @@ ZBX_NotificationCollection.prototype.makeNodes = function() {
 
 	this.node.appendChild(this.btn_close);
 
-	header.className = 'dashbrd-widget-head cursor-move';
+	header.className = 'dashboard-widget-head cursor-move';
 	this.node.appendChild(header);
 
 	header.appendChild(controls);

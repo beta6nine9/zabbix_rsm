@@ -146,32 +146,6 @@ class Action extends CAction {
 	}
 
 	/**
-	 * Get value mapping by mapping id.
-	 *
-	 * @param int $valuemapid    Value map database id.
-	 * @return array
-	 */
-	protected function getValueMapping($valuemapid) {
-		static $valuemaps = [];
-
-		if (!isset($valuemaps[$valuemapid])) {
-			$db_mapping = API::ValueMap()->get([
-				'output' => [],
-				'selectMappings' => ['value', 'newvalue'],
-				'valuemapids' => [$valuemapid]
-			]);
-			$db_mapping = $db_mapping ? reset($db_mapping)['mappings'] : [];
-			$valuemaps[$valuemapid] = [];
-
-			foreach ($db_mapping as $mapping) {
-				$valuemaps[$valuemapid][$mapping['value']] = $mapping['newvalue'];
-			}
-		}
-
-		return $valuemaps[$valuemapid];
-	}
-
-	/**
 	 * Get item history value. Return array of items with history value in 'history_value' key. Key will be
 	 * set only for items having value in desired period. When multiple values exists for single item first value
 	 * will be set.

@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -18,11 +18,10 @@
 **/
 
 #include "common.h"
-
 #include "db.h"
 #include "log.h"
-#include "sysinfo.h"
 #include "zbxdbupgrade.h"
+
 #include "dbupgrade.h"
 
 typedef struct
@@ -54,49 +53,38 @@ zbx_db_version_t;
 
 /* NOTE: Do not forget to sync changes in ZBX_TYPE_*_STR defines for Oracle with zbx_oracle_column_type()! */
 
-#if defined(HAVE_POSTGRESQL)
-#	define ZBX_TYPE_ID_STR		"bigint"
-#elif defined(HAVE_MYSQL)
+#if defined(HAVE_MYSQL)
 #	define ZBX_TYPE_ID_STR		"bigint unsigned"
+#	define ZBX_TYPE_FLOAT_STR	"double precision"
+#	define ZBX_TYPE_UINT_STR	"bigint unsigned"
+#	define ZBX_TYPE_LONGTEXT_STR	"longtext"
 #elif defined(HAVE_ORACLE)
 #	define ZBX_TYPE_ID_STR		"number(20)"
+#	define ZBX_TYPE_FLOAT_STR	"binary_double"
+#	define ZBX_TYPE_UINT_STR	"number(20)"
+#	define ZBX_TYPE_LONGTEXT_STR	"nclob"
+#elif defined(HAVE_POSTGRESQL)
+#	define ZBX_TYPE_ID_STR		"bigint"
+#	define ZBX_TYPE_FLOAT_STR	"double precision"
+#	define ZBX_TYPE_UINT_STR	"numeric(20)"
+#	define ZBX_TYPE_LONGTEXT_STR	"text"
 #endif
 
-#ifdef HAVE_ORACLE
+#if defined(HAVE_ORACLE)
 #	define ZBX_TYPE_INT_STR		"number(10)"
 #	define ZBX_TYPE_CHAR_STR	"nvarchar2"
+#	define ZBX_TYPE_SHORTTEXT_STR	"nvarchar2(2048)"
+#	define ZBX_TYPE_TEXT_STR	"nclob"
 #else
 #	define ZBX_TYPE_INT_STR		"integer"
 #	define ZBX_TYPE_CHAR_STR	"varchar"
-#endif
-
-#if defined(HAVE_MYSQL)
-#	define ZBX_TYPE_FLOAT_STR	"double precision"
-#	define ZBX_TYPE_UINT_STR	"bigint unsigned"
-#elif defined(HAVE_ORACLE)
-#	define ZBX_TYPE_FLOAT_STR	"binary_double"
-#	define ZBX_TYPE_UINT_STR	"number(20)"
-#elif defined(HAVE_POSTGRESQL)
-#	define ZBX_TYPE_FLOAT_STR	"double precision"
-#	define ZBX_TYPE_UINT_STR	"numeric(20)"
-#endif
-
-#if defined(HAVE_ORACLE)
-#	define ZBX_TYPE_SHORTTEXT_STR	"nvarchar2(2048)"
-#else
 #	define ZBX_TYPE_SHORTTEXT_STR	"text"
-#endif
-
-#if defined(HAVE_ORACLE)
-#	define ZBX_TYPE_TEXT_STR	"nclob"
-#else
 #	define ZBX_TYPE_TEXT_STR	"text"
 #endif
 
 #define ZBX_FIRST_DB_VERSION		2010000
 
 extern unsigned char	program_type;
-
 
 #ifndef HAVE_SQLITE3
 static void	DBfield_type_string(char **sql, size_t *sql_alloc, size_t *sql_offset, const ZBX_FIELD *field)
@@ -118,11 +106,17 @@ static void	DBfield_type_string(char **sql, size_t *sql_alloc, size_t *sql_offse
 		case ZBX_TYPE_UINT:
 			zbx_strcpy_alloc(sql, sql_alloc, sql_offset, ZBX_TYPE_UINT_STR);
 			break;
+		case ZBX_TYPE_LONGTEXT:
+			zbx_strcpy_alloc(sql, sql_alloc, sql_offset, ZBX_TYPE_LONGTEXT_STR);
+			break;
 		case ZBX_TYPE_SHORTTEXT:
 			zbx_strcpy_alloc(sql, sql_alloc, sql_offset, ZBX_TYPE_SHORTTEXT_STR);
 			break;
 		case ZBX_TYPE_TEXT:
 			zbx_strcpy_alloc(sql, sql_alloc, sql_offset, ZBX_TYPE_TEXT_STR);
+			break;
+		case ZBX_TYPE_CUID:
+			zbx_snprintf_alloc(sql, sql_alloc, sql_offset, "%s(%d)", ZBX_TYPE_CHAR_STR, CUID_LEN - 1);
 			break;
 		default:
 			assert(0);
@@ -140,8 +134,6 @@ typedef enum
 zbx_oracle_column_type_t;
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_oracle_column_type                                           *
  *                                                                            *
  * Purpose: determine whether column type is character or numeric             *
  *                                                                            *
@@ -164,6 +156,7 @@ static zbx_oracle_column_type_t	zbx_oracle_column_type(unsigned char field_type)
 		case ZBX_TYPE_UINT:
 			return ZBX_ORACLE_COLUMN_TYPE_NUMERIC;
 		case ZBX_TYPE_CHAR:
+		case ZBX_TYPE_LONGTEXT:
 		case ZBX_TYPE_SHORTTEXT:
 		case ZBX_TYPE_TEXT:
 			return ZBX_ORACLE_COLUMN_TYPE_CHARACTER;
@@ -544,8 +537,11 @@ int	DBmodify_field_type(const char *table_name, const ZBX_FIELD *field, const ZB
 
 	if (NULL != old_field && (zbx_oracle_column_type(old_field->type) != zbx_oracle_column_type(field->type) ||
 			ZBX_ORACLE_COLUMN_TYPE_DOUBLE == zbx_oracle_column_type(field->type) ||
-			(ZBX_TYPE_TEXT == field->type && ZBX_TYPE_SHORTTEXT == old_field->type)))
+			((ZBX_TYPE_TEXT == field->type || ZBX_TYPE_LONGTEXT == field->type) &&
+				(ZBX_TYPE_SHORTTEXT == old_field->type || ZBX_TYPE_CHAR == old_field->type))))
+	{
 		return DBmodify_field_type_with_copy(table_name, field);
+	}
 #endif
 	DBmodify_field_type_sql(&sql, &sql_alloc, &sql_offset, table_name, field);
 
@@ -803,6 +799,12 @@ extern zbx_dbpatch_t	DBPATCH_VERSION(4030)[];
 extern zbx_dbpatch_t	DBPATCH_VERSION(4040)[];
 extern zbx_dbpatch_t	DBPATCH_VERSION(4050)[];
 extern zbx_dbpatch_t	DBPATCH_VERSION(5000)[];
+extern zbx_dbpatch_t	DBPATCH_VERSION(5010)[];
+extern zbx_dbpatch_t	DBPATCH_VERSION(5020)[];
+extern zbx_dbpatch_t	DBPATCH_VERSION(5030)[];
+extern zbx_dbpatch_t	DBPATCH_VERSION(5040)[];
+extern zbx_dbpatch_t	DBPATCH_VERSION(5050)[];
+extern zbx_dbpatch_t	DBPATCH_VERSION(6000)[];
 
 static zbx_db_version_t dbversions[] = {
 	{DBPATCH_VERSION(2010), "2.2 development"},
@@ -823,6 +825,12 @@ static zbx_db_version_t dbversions[] = {
 	{DBPATCH_VERSION(4040), "4.4 maintenance"},
 	{DBPATCH_VERSION(4050), "5.0 development"},
 	{DBPATCH_VERSION(5000), "5.0 maintenance"},
+	{DBPATCH_VERSION(5010), "5.2 development"},
+	{DBPATCH_VERSION(5020), "5.2 maintenance"},
+	{DBPATCH_VERSION(5030), "5.4 development"},
+	{DBPATCH_VERSION(5040), "5.4 maintenance"},
+	{DBPATCH_VERSION(5050), "6.0 development"},
+	{DBPATCH_VERSION(6000), "6.0 maintenance"},
 	{NULL}
 };
 

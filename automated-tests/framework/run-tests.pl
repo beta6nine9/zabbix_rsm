@@ -340,7 +340,7 @@ __END__
 
 =head1 NAME
 
-test.pl - execute test cases.
+run-tests.pl - execute test cases.
 
 =head1 SYNOPSIS
 

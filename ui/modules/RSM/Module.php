@@ -8,12 +8,13 @@ use CWebUser;
 use Core\CModule as CModule;
 use CTag;
 use CController as CAction;
-
+use CLegacyAction;
 use Modules\RSM\Actions\AuthAction;
 use Modules\RSM\Services\MacroService;
 use Modules\RSM\Services\DatabaseService;
 use Modules\RSM\Services\Navigation;
 use Modules\RSM\Security\Permission;
+use Modules\RSM\Actions\Action;
 use Modules\RSM\Helpers\UrlHelper as Url;
 
 require_once __DIR__.'/defines.inc.php';
@@ -72,7 +73,9 @@ class Module extends CModule {
 		if ($action instanceof AuthAction) {
 			$this->before_authaction_userid = CWebUser::$data['userid'];
 		}
-		else if (!$this->permission->canAccessRoute($action->getAction())) {
+		// Check permissions only for standart Zabbix actions and RSM module actionsю
+		else if (($action instanceof CLegacyAction || $action instanceof Action)
+				&& !$this->permission->canAccessRoute($action->getAction())) {
 			access_deny(ACCESS_DENY_PAGE);
 		}
 	}
@@ -88,7 +91,8 @@ class Module extends CModule {
 
 			// Force to send user session cookie only when user is logged in.
 			if (isset(CWebUser::$data['sessionid'])) {
-				CWebUser::setSessionCookie(CWebUser::$data['sessionid']);
+				CSessionHelper::set('sessionid', CWebUser::$data['sessionid']);
+				API::getWrapper()->auth = CWebUser::$data['sessionid'];
 			}
 		}
 	}

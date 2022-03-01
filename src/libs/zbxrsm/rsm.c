@@ -160,6 +160,13 @@ out:
 	return ret;
 }
 
+static void	str_base64_decode_dyn(const char *in, int in_size, char **out, int *out_size)
+{
+	*out = zbx_malloc(*out, in_size);
+
+	str_base64_decode(in, *out, in_size, out_size);
+}
+
 int	encrypt_cleartext(const char *passphrase, size_t passphrase_len, const char *secretkey_enc_b64,
 		size_t secretkey_enc_b64_len, const char *secretkey_salt_b64, size_t secretkey_salt_b64_len,
 		const char *cleartext, size_t cleartext_len, char **cleartext_enc_b64, char **cleartext_salt_b64,

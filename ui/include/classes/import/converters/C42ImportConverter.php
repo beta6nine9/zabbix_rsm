@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -30,10 +30,6 @@ class C42ImportConverter extends CConverter {
 		if (array_key_exists('hosts', $data['zabbix_export'])) {
 			$data['zabbix_export']['hosts'] = $this->convertInventoryMode($data['zabbix_export']['hosts']);
 			$data['zabbix_export']['hosts'] = $this->convertTlsAccept($data['zabbix_export']['hosts']);
-		}
-
-		if (array_key_exists('screens', $data['zabbix_export'])) {
-			$data['zabbix_export']['screens'] = $this->convertScreens($data['zabbix_export']['screens']);
 		}
 
 		$data['zabbix_export'] = $this->convertFormat($data['zabbix_export']);
@@ -93,41 +89,6 @@ class C42ImportConverter extends CConverter {
 	}
 
 	/**
-	 * Convert screens.
-	 *
-	 * @param array $screens
-	 *
-	 * @return array
-	 */
-	protected function convertScreens(array $screens) {
-		foreach ($screens as &$screen) {
-			if (array_key_exists('screen_items', $screen)) {
-				$screen['screen_items'] = $this->convertScreenItems($screen['screen_items']);
-			}
-		}
-		unset($screen);
-
-		return $screens;
-	}
-
-	/**
-	 * Convert screen items.
-	 *
-	 * @param array $screen_items
-	 *
-	 * @return array
-	 */
-	protected function convertScreenItems(array $screen_items) {
-		foreach ($screen_items as $index => $screen_item) {
-			if ($screen_item['resourcetype'] == SCREEN_RESOURCE_SCREEN) {
-				unset($screen_items[$index]);
-			}
-		}
-
-		return $screen_items;
-	}
-
-	/**
 	 * Update imported data array to format used starting from Zabbix version 4.4.
 	 *
 	 * @param array $data
@@ -158,7 +119,11 @@ class C42ImportConverter extends CConverter {
 	 */
 	protected function convertValueToConstant($data, array $rules) {
 		if ($rules['type'] & XML_STRING) {
-			if (!array_key_exists('in', $rules)) {
+			/*
+			 * Second condition may occur when, for example, item types are no longer supported, but previous validator
+			 * only checked the syntax, not the data.
+			 */
+			if (!array_key_exists('in', $rules) || !array_key_exists($data, $rules['in'])) {
 				return $data;
 			}
 
@@ -209,7 +174,7 @@ class C42ImportConverter extends CConverter {
 						continue;
 					}
 
-					if ($data[$tag] === '' || count($data[$tag]) == 0) {
+					if ($data[$tag] === '' || (is_array($data[$tag]) && !$data[$tag])) {
 						if ($tag_rules['type'] & XML_REQUIRED) {
 							continue;
 						}

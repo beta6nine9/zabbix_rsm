@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -28,6 +28,8 @@ class testPageTriggers extends CLegacyWebTest {
 
 	public $hostid = 99050;
 
+	private $selector = 'xpath://form[@name="triggersForm"]/table[@class="list-table"]';
+
 	use FilterTrait;
 	use TableTrait;
 
@@ -43,14 +45,15 @@ class testPageTriggers extends CLegacyWebTest {
 	 * @dataProvider data
 	 */
 	public function testPageTriggers_CheckLayout($data) {
-		$this->zbxTestLogin('triggers.php?filter_set=1&filter_hostids[0]='.$data['hostid']);
+		$context = ($data['status'] === '3') ? '&context=template' : '&context=host';
+		$this->zbxTestLogin('triggers.php?filter_set=1&filter_hostids[0]='.$data['hostid'].$context);
 		$this->zbxTestCheckTitle('Configuration of triggers');
 		$this->zbxTestCheckHeader('Triggers');
 
 		$this->zbxTestTextPresent('Displaying');
 		// Get table headers.
 		$result = [];
-		$elements = $this->webDriver->findElements(WebDriverBy::xpath("//thead/tr/th"));
+		$elements = $this->webDriver->findElements(WebDriverBy::xpath('//form[@name="triggersForm"]//thead/tr/th'));
 		foreach ($elements as $element) {
 			$result[] = $element->getText();
 		}
@@ -61,9 +64,10 @@ class testPageTriggers extends CLegacyWebTest {
 			$this->assertEquals(['', 'Severity', 'Value', 'Name', 'Operational data', 'Expression', 'Status', 'Info', 'Tags'], $result);
 
 			// Check the filter options text.
-			foreach (['Severity', 'State', 'Status', 'Value', 'Tags'] as $label) {
-				$this->zbxTestAssertElementPresentXpath('//label[text()="'.$label.'"]');
-			}
+			$labels = [
+				'Host groups', 'Hosts', 'Name', 'Severity', 'State', 'Status', 'Value', 'Tags', 'Inherited',
+				'Discovered', 'With dependencies'
+			];
 		}
 
 		if ($data['status'] == HOST_STATUS_TEMPLATE) {
@@ -72,9 +76,12 @@ class testPageTriggers extends CLegacyWebTest {
 			$this->assertEquals(['', 'Severity', 'Name', 'Operational data', 'Expression', 'Status', 'Tags'], $result);
 
 			// Check the filter options text.
-			foreach (['Severity', 'State', 'Status','Tags'] as $label) {
-				$this->zbxTestAssertElementPresentXpath('//label[text()="'.$label.'"]');
-			}
+			$labels = [
+				'Host groups', 'Templates', 'Name', 'Severity', 'Status', 'Tags', 'Inherited', 'With dependencies'
+			];
+		}
+		foreach ($labels as $label) {
+			$this->zbxTestAssertElementPresentXpath('//label[text()="'.$label.'"]');
 		}
 		// TODO someday should check that interval is not shown for trapper items, trends not shown for non-numeric items etc
 		$this->zbxTestTextPresent('Enable', 'Disable', 'Mass update', 'Copy', 'Delete');
@@ -174,6 +181,253 @@ class testPageTriggers extends CLegacyWebTest {
 						'Third trigger for tag filtering'
 					]
 				]
+			],
+			[
+				[
+					'tag_options' => [
+						'type' => 'And/Or',
+						'tags' => [
+							['name' => 'TagA', 'operator' => 'Exists']
+						]
+					],
+					'result' => [
+						'First trigger for tag filtering',
+						'Third trigger for tag filtering'
+					]
+				]
+			],
+			[
+				[
+					'tag_options' => [
+						'type' => 'Or',
+						'tags' => [
+							['name' => 'TagA', 'operator' => 'Exists']
+						]
+					],
+					'result' => [
+						'First trigger for tag filtering',
+						'Third trigger for tag filtering'
+					]
+				]
+			],
+			[
+				[
+					'tag_options' => [
+						'type' => 'And/Or',
+						'tags' => [
+							['name' => 'TagA', 'operator' => 'Exists'],
+							['name' => 'TagK', 'operator' => 'Exists']
+						]
+					],
+					'result' => [
+						'Third trigger for tag filtering'
+					]
+				]
+			],
+			[
+				[
+					'tag_options' => [
+						'type' => 'Or',
+						'tags' => [
+							['name' => 'TagA', 'operator' => 'Exists'],
+							['name' => 'TagK', 'operator' => 'Exists']
+						]
+					],
+					'result' => [
+						'First trigger for tag filtering',
+						'Third trigger for tag filtering'
+					]
+				]
+			],
+			[
+				[
+					'tag_options' => [
+						'type' => 'And/Or',
+						'tags' => [
+							['name' => 'TagA', 'operator' => 'Does not exist'],
+							['name' => 'TagK', 'operator' => 'Does not exist']
+						]
+					],
+					'result' => [
+						'Fifth trigger for tag filtering (no tags)',
+						'Fourth trigger for tag filtering',
+						'Second trigger for tag filtering'
+					]
+				]
+			],
+			[
+				[
+					'tag_options' => [
+						'type' => 'Or',
+						'tags' => [
+							['name' => 'TagA', 'operator' => 'Does not exist'],
+							['name' => 'TagK', 'operator' => 'Does not exist']
+						]
+					],
+					'result' => [
+						'Fifth trigger for tag filtering (no tags)',
+						'First trigger for tag filtering',
+						'Fourth trigger for tag filtering',
+						'Second trigger for tag filtering'
+					]
+				]
+			],
+			[
+				[
+					'tag_options' => [
+						'type' => 'And/Or',
+						'tags' => [
+							['name' => 'TagA', 'operator' => 'Does not exist']
+						]
+					],
+					'result' => [
+						'Fifth trigger for tag filtering (no tags)',
+						'Fourth trigger for tag filtering',
+						'Second trigger for tag filtering'
+					]
+				]
+			],
+			[
+				[
+					'tag_options' => [
+						'type' => 'Or',
+						'tags' => [
+							['name' => 'TagA', 'operator' => 'Does not exist']
+						]
+					],
+					'result' => [
+						'Fifth trigger for tag filtering (no tags)',
+						'Fourth trigger for tag filtering',
+						'Second trigger for tag filtering'
+					]
+				]
+			],
+			[
+				[
+					'tag_options' => [
+						'type' => 'And/Or',
+						'tags' => [
+							['name' => 'TagA', 'value' => 'A', 'operator' => 'Does not equal']
+						]
+					],
+					'result' => [
+						'Fifth trigger for tag filtering (no tags)',
+						'Fourth trigger for tag filtering',
+						'Second trigger for tag filtering',
+						'Third trigger for tag filtering'
+					]
+				]
+			],
+			[
+				[
+					'tag_options' => [
+						'type' => 'Or',
+						'tags' => [
+							['name' => 'TagA', 'value' => 'A', 'operator' => 'Does not equal']
+						]
+					],
+					'result' => [
+						'Fifth trigger for tag filtering (no tags)',
+						'Fourth trigger for tag filtering',
+						'Second trigger for tag filtering',
+						'Third trigger for tag filtering'
+					]
+				]
+			],
+			[
+				[
+					'tag_options' => [
+						'type' => 'And/Or',
+						'tags' => [
+							['name' => 'TagA', 'value' => 'A', 'operator' => 'Does not equal'],
+							['name' => 'TagT', 'value' => 't', 'operator' => 'Does not equal']
+						]
+					],
+					'result' => [
+						'Fifth trigger for tag filtering (no tags)',
+						'Second trigger for tag filtering'
+					]
+				]
+			],
+			[
+				[
+					'tag_options' => [
+						'type' => 'Or',
+						'tags' => [
+							['name' => 'TagA', 'value' => 'A', 'operator' => 'Does not equal'],
+							['name' => 'TagT', 'value' => 't', 'operator' => 'Does not equal']
+						]
+					],
+					'result' => [
+						'Fifth trigger for tag filtering (no tags)',
+						'First trigger for tag filtering',
+						'Fourth trigger for tag filtering',
+						'Second trigger for tag filtering',
+						'Third trigger for tag filtering'
+					]
+				]
+			],
+			[
+				[
+					'tag_options' => [
+						'type' => 'And/Or',
+						'tags' => [
+							['name' => 'TagA', 'value' => 'a', 'operator' => 'Does not contain']
+						]
+					],
+					'result' => [
+						'Fifth trigger for tag filtering (no tags)',
+						'Fourth trigger for tag filtering',
+						'Second trigger for tag filtering'
+					]
+				]
+			],
+			[
+				[
+					'tag_options' => [
+						'type' => 'Or',
+						'tags' => [
+							['name' => 'TagA', 'value' => 'a', 'operator' => 'Does not contain']
+						]
+					],
+					'result' => [
+						'Fifth trigger for tag filtering (no tags)',
+						'Fourth trigger for tag filtering',
+						'Second trigger for tag filtering'
+					]
+				]
+			],
+			[
+				[
+					'tag_options' => [
+						'type' => 'And/Or',
+						'tags' => [
+							['name' => 'TagA', 'value' => 'a', 'operator' => 'Does not contain'],
+							['name' => 'TagB', 'value' => 'b', 'operator' => 'Does not contain']
+						]
+					],
+					'result' => [
+						'Fifth trigger for tag filtering (no tags)',
+						'Fourth trigger for tag filtering'
+					]
+				]
+			],
+			[
+				[
+					'tag_options' => [
+						'type' => 'Or',
+						'tags' => [
+							['name' => 'TagA', 'value' => 'a', 'operator' => 'Does not contain'],
+							['name' => 'TagB', 'value' => 'b', 'operator' => 'Does not contain']
+						]
+					],
+					'result' => [
+						'Fifth trigger for tag filtering (no tags)',
+						'Fourth trigger for tag filtering',
+						'Second trigger for tag filtering',
+						'Third trigger for tag filtering'
+					]
+				]
 			]
 		];
 	}
@@ -182,13 +436,13 @@ class testPageTriggers extends CLegacyWebTest {
 	 * @dataProvider getTagsFilterData
 	 */
 	public function testPageTriggers_TagsFilter($data) {
-		$this->page->login()->open('triggers.php?filter_set=1&filter_hostids[0]='.$this->hostid);
+		$this->page->login()->open('triggers.php?filter_set=1&filter_hostids[0]='.$this->hostid.'&context=host');
 		$form = $this->query('name:zbx_filter')->waitUntilPresent()->asForm()->one();
 		$form->fill(['id:filter_evaltype' => $data['tag_options']['type']]);
 		$this->setTags($data['tag_options']['tags']);
 		$form->submit();
 		$this->page->waitUntilReady();
-		$this->assertTableDataColumn(CTestArrayHelper::get($data, 'result', []));
+		$this->assertTableDataColumn(CTestArrayHelper::get($data, 'result', []), 'Name', $this->selector);
 	}
 
 	public function testPageTriggers_ResetTagsFilter() {
@@ -200,16 +454,16 @@ class testPageTriggers extends CLegacyWebTest {
 			'Third trigger for tag filtering'
 		];
 
-		$this->zbxTestLogin('triggers.php?filter_set=1&filter_hostids[0]='.$this->hostid);
+		$this->zbxTestLogin('triggers.php?filter_set=1&filter_hostids[0]='.$this->hostid.'&context=host');
 		$form = $this->query('name:zbx_filter')->asForm()->one();
 		$form->getField('Tags')->query('id:filter_tags_0_tag')->one()->fill('Tag1234');
 		$form->submit();
 		$this->page->waitUntilReady();
-		$this->assertTableDataColumn();
+		$this->assertTableDataColumn([], 'Name', $this->selector);
 
 		$form->query('button:Reset')->one()->click();
 		$this->page->waitUntilReady();
-		$this->assertTableDataColumn($result);
+		$this->assertTableDataColumn($result, 'Name', $this->selector);
 	}
 
 	public static function getFilterData() {
@@ -427,7 +681,7 @@ class testPageTriggers extends CLegacyWebTest {
 	 * @dataProvider getFilterData
 	 */
 	public function testPageTriggers_Filter($data) {
-		$this->page->login()->open('triggers.php?filter_set=1&filter_hostids[0]=99062');
+		$this->page->login()->open('triggers.php?filter_set=1&filter_hostids[0]=99062&context=host');
 		$form = $this->query('name:zbx_filter')->asForm()->one();
 
 		$form->fill($data['filter_options']);
@@ -439,7 +693,7 @@ class testPageTriggers extends CLegacyWebTest {
 
 		$form->submit();
 		$this->page->waitUntilReady();
-		$this->assertTableDataColumn(CTestArrayHelper::get($data, 'result', []));
+		$this->assertTableDataColumn(CTestArrayHelper::get($data, 'result', []), 'Name', $this->selector);
 	}
 
 	public static function getHostAndGroupData() {
@@ -585,12 +839,12 @@ class testPageTriggers extends CLegacyWebTest {
 	 * @dataProvider getHostAndGroupData
 	 */
 	public function testPageTriggers_FilterHostAndGroups($data) {
-		$this->page->login()->open('triggers.php?filter_set=1&filter_hostids[0]=99062');
+		$this->page->login()->open('triggers.php?filter_set=1&filter_hostids[0]=99062&context=host');
 		$form = $this->query('name:zbx_filter')->asForm()->one();
 
 		// Trigger create button enabled and breadcrumbs exist.
 		$this->assertTrue($this->query('button:Create trigger')->one()->isEnabled());
-		$this->assertFalse($this->query('class:filter-breadcrumb')->all()->isEmpty());
+		$this->assertFalse($this->query('class:breadcrumbs')->all()->isEmpty());
 		// Clear hosts in filter fields.
 		if (!array_key_exists('Hosts', $data['filter_options'])) {
 			$form->getField('Hosts')->asMultiselect()->clear();
@@ -602,8 +856,8 @@ class testPageTriggers extends CLegacyWebTest {
 
 		// Trigger create button disabled and breadcrumbs not exist.
 		$this->assertFalse($this->query('button:Create trigger (select host first)')->one()->isEnabled());
-		$this->assertTrue($this->query('class:filter-breadcrumb')->all()->isEmpty());
+		$this->assertTrue($this->query('class:breadcrumb')->all()->isEmpty());
 		// Check results in table.
-		$this->assertTableData(CTestArrayHelper::get($data, 'result', []));
+		$this->assertTableData(CTestArrayHelper::get($data, 'result', []), $this->selector);
 	}
 }

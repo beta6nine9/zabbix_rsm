@@ -1,6 +1,6 @@
 [test-case]
 
-"024 rdap up-inconclusive-no-data"
+"rdap up-inconclusive-no-data"
 
 [prepare-server-database]
 

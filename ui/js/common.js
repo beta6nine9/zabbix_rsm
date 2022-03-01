@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -190,7 +190,6 @@ function checkAll(form_name, chkMain, shkName) {
 
 	chkbxRange.checkObjectAll(shkName, value);
 	chkbxRange.update(shkName);
-	chkbxRange.saveSessionStorage(shkName);
 
 	return true;
 }
@@ -326,47 +325,36 @@ function getPosition(obj) {
 /**
  * Opens popup content in overlay dialogue.
  *
- * @param {string} action         Popup controller related action.
- * @param {array}  options        (optional) Array with key/value pairs that will be used as query for popup request.
- * @param {string} dialogueid     (optional) id of overlay dialogue.
- * @param {object} trigger_elmnt  (optional) UI element which was clicked to open overlay dialogue.
+ * @param {string}           action           Popup controller related action.
+ * @param {array|object}     parameters       Array with key/value pairs that will be used as query for popup request.
+ *
+ * @param {string}           dialogue_class   CSS class, usually based on .modal-popup and .modal-popup-{size}.
+ * @param {string|null}      dialogueid       ID of overlay dialogue.
+ * @param {HTMLElement|null} trigger_element  UI element which was clicked to open overlay dialogue.
  *
  * @returns {Overlay}
  */
-function PopUp(action, options, dialogueid, trigger_elmnt) {
+function PopUp(action, parameters, {
+	dialogueid = null,
+	dialogue_class = '',
+	trigger_element = document.activeElement
+} = {}) {
 	var overlay = overlays_stack.getById(dialogueid);
+
 	if (!overlay) {
-		var wide_popup_actions = ['popup.generic', 'popup.scriptexec', 'dashboard.share.edit',
-				'dashboard.properties.edit', 'popup.services', 'popup.media', 'popup.lldoperation', 'popup.lldoverride',
-				'popup.preproctest.edit', 'popup.triggerexpr', 'popup.httpstep', 'popup.testtriggerexpr',
-				'popup.triggerwizard'
-			],
-			medium_popup_actions = ['popup.maintenance.period', 'popup.condition.actions', 'popup.condition.operations',
-				'popup.condition.event.corr', 'popup.discovery.check', 'popup.mediatypetest.edit',
-				'popup.mediatype.message'
-			],
-			dialogue_class = '';
-
-		if (wide_popup_actions.indexOf(action) !== -1) {
-			dialogue_class = ' modal-popup-generic';
-		}
-		else if (medium_popup_actions.indexOf(action) !== -1) {
-			dialogue_class = ' modal-popup-medium';
-		}
-
 		overlay = overlayDialogue({
-			'dialogueid': dialogueid,
-			'title': '',
-			'content': jQuery('<div>', {'height': '68px', class: 'is-loading'}),
-			'class': 'modal-popup' + dialogue_class,
-			'buttons': [],
-			'element': trigger_elmnt,
-			'type': 'popup'
+			dialogueid,
+			title: '',
+			content: jQuery('<div>', {'height': '68px', class: 'is-loading'}),
+			class: 'modal-popup ' + dialogue_class,
+			buttons: [],
+			element: trigger_element,
+			type: 'popup'
 		});
 	}
 
 	overlay
-		.load(action, options)
+		.load(action, parameters)
 		.then(function(resp) {
 			if (typeof resp.errors !== 'undefined') {
 				overlay.setProperties({
@@ -376,12 +364,25 @@ function PopUp(action, options, dialogueid, trigger_elmnt) {
 			else {
 				var buttons = resp.buttons !== null ? resp.buttons : [];
 
-				buttons.push({
-					'title': t('Cancel'),
-					'class': 'btn-alt',
-					'cancel': true,
-					'action': (typeof resp.cancel_action !== 'undefined') ? resp.cancel_action : function() {}
-				});
+				switch (action) {
+					case 'popup.scheduledreport.list':
+					case 'popup.scheduledreport.test':
+					case 'popup.scriptexec':
+						buttons.push({
+							'title': t('Ok'),
+							'cancel': true,
+							'action': (typeof resp.cancel_action !== 'undefined') ? resp.cancel_action : function() {}
+						});
+						break;
+
+					default:
+						buttons.push({
+							'title': t('Cancel'),
+							'class': 'btn-alt js-cancel',
+							'cancel': true,
+							'action': (typeof resp.cancel_action !== 'undefined') ? resp.cancel_action : function() {}
+						});
+				}
 
 				overlay.setProperties({
 					title: resp.header,
@@ -406,35 +407,30 @@ function PopUp(action, options, dialogueid, trigger_elmnt) {
 /**
  * Open "Update problem" dialog and manage URL change.
  *
- * @param {array}  options
- * @param {array}  options['eventids']  Eventids to update.
- * @param {object} trigger_elmnt        (optional) UI element which was clicked to open overlay dialogue.
+ * @param {Object} parameters
+ * @param {array}  parameters['eventids']  Eventids to update.
+ * @param {object} trigger_element        (optional) UI element which was clicked to open overlay dialogue.
  *
  * @returns {Overlay}
  */
-function acknowledgePopUp(options, trigger_elmnt) {
-	var overlay = PopUp('popup.acknowledge.edit', options, null, trigger_elmnt),
+function acknowledgePopUp(parameters, trigger_element) {
+	var overlay = PopUp('popup.acknowledge.edit', parameters, {trigger_element}),
 		backurl = location.href;
 
-	overlay.trigger_parents = $(trigger_elmnt).parents();
+	overlay.trigger_parents = $(trigger_element).parents();
 
 	overlay.xhr.then(function() {
 		var url = new Curl('zabbix.php', false);
 		url.setArgument('action', 'popup');
 		url.setArgument('popup_action', 'acknowledge.edit');
-		url.setArgument('eventids', options.eventids);
+		url.setArgument('eventids', parameters.eventids);
 
 		history.replaceState({}, '', url.getUrl());
 	});
 
-	var close = function(e, dialogue) {
-		if (dialogue.dialogueid === overlay.dialogueid) {
-			history.replaceState({}, '', backurl);
-			$.unsubscribe('overlay.close', close);
-		}
-	};
-
-	$.subscribe('overlay.close', close);
+	overlay.$dialogue[0].addEventListener('overlay.close', () => {
+		history.replaceState({}, '', backurl);
+	}, {once: true});
 
 	return overlay;
 }
@@ -469,11 +465,6 @@ function addToOverlaysStack(id, element, type, xhr) {
 // Keydown handler. Closes last opened overlay UI element.
 function closeDialogHandler(event) {
 	if (event.which == 27) { // ESC
-		// Do not catch multiselect events.
-		if (jQuery(event.target).closest('.multiselect').data('multiSelect') !== undefined) {
-			return;
-		}
-
 		var dialog = overlays_stack.end();
 		if (typeof dialog !== 'undefined') {
 			switch (dialog.type) {
@@ -554,15 +545,16 @@ function removeFromOverlaysStack(dialogueid, return_focus) {
  * @param {string} action	(optional) action value that is used in CRouter. Default value is 'popup.generic'.
  */
 function reloadPopup(form, action) {
-	var dialogueid = jQuery(form).closest('[data-dialogueid]').attr('data-dialogueid'),
+	var dialogueid = form.closest('[data-dialogueid]').dataset.dialogueid,
+		dialogue_class = jQuery(form).closest('[data-dialogueid]').prop('class'),
 		action = action || 'popup.generic',
-		options = {};
+		parameters = {};
 
-	jQuery(form.elements).each(function() {
-		options[this.name] = this.value;
-	});
+	for (const input of form.elements) {
+		parameters[input.name] = input.value;
+	};
 
-	PopUp(action, options, dialogueid);
+	PopUp(action, parameters, {dialogueid, dialogue_class});
 }
 
 /**
@@ -670,7 +662,7 @@ function addSelectedValues(object, parentid) {
  */
 function add_media(formname, media, mediatypeid, sendto, period, active, severity) {
 	var form = window.document.forms[formname];
-	var media_name = (media > -1) ? 'user_medias[' + media + ']' : 'new_media';
+	var media_name = (media > -1) ? 'medias[' + media + ']' : 'new_media';
 
 	window.create_var(form, media_name + '[mediatypeid]', mediatypeid);
 	if (typeof sendto === "object") {
@@ -796,6 +788,63 @@ function redirect(uri, method, needle, invert_needle, add_sid, allow_empty) {
 	}
 
 	return false;
+}
+
+/**
+ * Send parameters to given url using natural HTML form submission.
+ *
+ * @param {string} url
+ * @param {Object} params
+ * @param {boolean} allow_empty
+ *
+ * @return {boolean}
+ */
+function post(url, params) {
+	function addVars(post_form, name, value) {
+		if (Array.isArray(value)) {
+			for (let i = 0; i < value.length; i++) {
+				addVars(post_form, `${name}[]`, value[i]);
+			}
+		}
+		else if (typeof value === 'object' && value !== null) {
+			for (const [key, _value] of Object.entries(value)) {
+				addVars(post_form, `${name}[${key}]`, _value);
+			}
+		}
+		else {
+			addVar(post_form, name, value);
+		}
+	}
+
+	function addVar(post_form, name, value) {
+		const is_multiline = /\r|\n/.exec(value);
+		let input;
+
+		if (is_multiline) {
+			input = document.createElement('textarea');
+		}
+		else {
+			input = document.createElement('input');
+			input.type = 'hidden';
+		}
+
+		input.name = name;
+		input.value = value;
+		post_form.appendChild(input);
+	}
+
+	const dom_body = document.getElementsByTagName('body')[0];
+	const post_form = document.createElement('form');
+	post_form.setAttribute('action', url);
+	post_form.setAttribute('method', 'post');
+	post_form.style.display = 'none';
+
+	for (const [key, value] of Object.entries(params)) {
+		addVars(post_form, key, value);
+	}
+
+	dom_body.appendChild(post_form);
+	post_form.submit();
 }
 
 function showHide(obj) {
@@ -953,29 +1002,56 @@ Function.prototype.bindAsEventListener = function (context) {
 	};
 };
 
+function openMassupdatePopup(action, parameters = {}, {
+	dialogue_class = '',
+	trigger_element = document.activeElement
+}) {
+	const form = trigger_element.closest('form');
+
+	parameters.ids = chkbxRange.getSelectedIds();
+
+	switch (action) {
+		case 'popup.massupdate.item':
+			parameters.context = form.querySelector('#context').value;
+			parameters.prototype = 0;
+			break;
+
+		case 'popup.massupdate.trigger':
+			parameters.context = form.querySelector('#context').value;
+			break;
+
+		case 'popup.massupdate.itemprototype':
+		case 'popup.massupdate.triggerprototype':
+			parameters.parent_discoveryid = form.querySelector('#parent_discoveryid').value;
+			parameters.context = form.querySelector('#context').value;
+			parameters.prototype = 1;
+			break;
+	}
+
+	return PopUp(action, parameters, {dialogue_class, trigger_element});
+}
+
 /**
- * Get first selected host from multiselect field.
+ * Clears session storage from markers of checked table rows.
+ * Or keeps only accessible IDs in the list of checked rows.
  *
- * @param {string} host_field_id       Host field element ID.
- * @param {string} hostgroup_field_id  Host group field element ID.
- *
- * @return {object}
+ * @param {string}       page
+ * @param {array|Object} keepids
  */
-function getFirstMultiselectValue(host_field_id, hostgroup_field_id) {
-	var host_values = (typeof host_field_id !== 'undefined')
-			? jQuery('#'+host_field_id).multiSelect('getData')
-			: [],
-		hostgroup_values = (typeof hostgroup_field_id !== 'undefined')
-			? jQuery('#'+hostgroup_field_id).multiSelect('getData')
-			: [],
-		ret = {};
+function uncheckTableRows(page, keepids = []) {
+	// This key only works for new MVC pages.
+	const key = (page === '') ? 'cb_zabbix' : 'cb_zabbix_'+page;
 
-	if (host_values.length != 0) {
-		ret.hostid = host_values[0].id;
-	}
-	if (hostgroup_values.length != 0) {
-		ret.groupid = hostgroup_values[0].id;
-	}
+	if (keepids.length) {
+		// If keepids will not have same key as value, it will create mess, when new checkbox will be checked.
+		let keepids_formatted = {};
+		for (const id of Object.values(keepids)) {
+			keepids_formatted[id.toString()] = id.toString();
+		}
 
-	return ret;
+		sessionStorage.setItem(key, JSON.stringify(keepids_formatted));
+	}
+	else {
+		sessionStorage.removeItem(key);
+	}
 }

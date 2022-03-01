@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -70,21 +70,21 @@ function graph_item_drawtype2str($drawtype) {
 
 function graph_item_aggr_fnc2str($calc_fnc) {
 	switch ($calc_fnc) {
-		case GRAPH_AGGREGATE_NONE:
+		case AGGREGATE_NONE:
 			return _('none');
-		case GRAPH_AGGREGATE_MIN:
+		case AGGREGATE_MIN:
 			return _('min');
-		case GRAPH_AGGREGATE_MAX:
+		case AGGREGATE_MAX:
 			return _('max');
-		case GRAPH_AGGREGATE_AVG:
+		case AGGREGATE_AVG:
 			return _('avg');
-		case GRAPH_AGGREGATE_COUNT:
+		case AGGREGATE_COUNT:
 			return _('count');
-		case GRAPH_AGGREGATE_SUM:
+		case AGGREGATE_SUM:
 			return _('sum');
-		case GRAPH_AGGREGATE_FIRST:
+		case AGGREGATE_FIRST:
 			return _('first');
-		case GRAPH_AGGREGATE_LAST:
+		case AGGREGATE_LAST:
 			return _('last');
 	}
 }
@@ -150,7 +150,7 @@ function getGraphByGraphId($graphId) {
 		return $dbGraph;
 	}
 
-	error(_s('No graph item with graphid "%1$s".', $graphId));
+	error(_s('No graph item with graph ID "%1$s".', $graphId));
 
 	return false;
 }
@@ -286,10 +286,11 @@ function getGraphParentTemplates(array $graphs, $flag) {
  * @param string $graphid
  * @param array  $parent_templates  The list of the templates, prepared by getGraphParentTemplates() function.
  * @param int    $flag              Origin of the graph (ZBX_FLAG_DISCOVERY_NORMAL or ZBX_FLAG_DISCOVERY_PROTOTYPE).
+ * @param bool   $provide_links     If this parameter is false, prefix will not contain links.
  *
  * @return array|null
  */
-function makeGraphTemplatePrefix($graphid, array $parent_templates, $flag) {
+function makeGraphTemplatePrefix($graphid, array $parent_templates, $flag, bool $provide_links) {
 	if (!array_key_exists($graphid, $parent_templates['links'])) {
 		return null;
 	}
@@ -300,8 +301,8 @@ function makeGraphTemplatePrefix($graphid, array $parent_templates, $flag) {
 
 	$template = $parent_templates['templates'][$parent_templates['links'][$graphid]['hostid']];
 
-	if ($template['permission'] == PERM_READ_WRITE) {
-		$url = (new CUrl('graphs.php'));
+	if ($provide_links && $template['permission'] == PERM_READ_WRITE) {
+		$url = (new CUrl('graphs.php'))->setArgument('context', 'template');
 
 		if ($flag == ZBX_FLAG_DISCOVERY_PROTOTYPE) {
 			$url->setArgument('parent_discoveryid', $parent_templates['links'][$graphid]['lld_ruleid']);
@@ -328,17 +329,20 @@ function makeGraphTemplatePrefix($graphid, array $parent_templates, $flag) {
  * @param string $graphid
  * @param array  $parent_templates  The list of the templates, prepared by getGraphParentTemplates() function.
  * @param int    $flag              Origin of the item (ZBX_FLAG_DISCOVERY_NORMAL or ZBX_FLAG_DISCOVERY_PROTOTYPE).
+ * @param bool   $provide_links     If this parameter is false, prefix will not contain links.
  *
  * @return array
  */
-function makeGraphTemplatesHtml($graphid, array $parent_templates, $flag) {
+function makeGraphTemplatesHtml($graphid, array $parent_templates, $flag, bool $provide_links) {
 	$list = [];
 
 	while (array_key_exists($graphid, $parent_templates['links'])) {
 		$template = $parent_templates['templates'][$parent_templates['links'][$graphid]['hostid']];
 
-		if ($template['permission'] == PERM_READ_WRITE) {
-			$url = (new CUrl('graphs.php'))->setArgument('form', 'update');
+		if ($provide_links && $template['permission'] == PERM_READ_WRITE) {
+			$url = (new CUrl('graphs.php'))
+				->setArgument('form', 'update')
+				->setArgument('context', 'template');
 
 			if ($flag == ZBX_FLAG_DISCOVERY_PROTOTYPE) {
 				$url->setArgument('parent_discoveryid', $parent_templates['links'][$graphid]['lld_ruleid']);
@@ -752,6 +756,7 @@ function yieldGraphScaleInterval(float $min, float $max, bool $is_binary, int $p
 * @param float $data_min   Minimum extreme of the graph.
 * @param float $data_max   Maximum extreme of the graph.
 * @param bool  $is_binary  Is the scale binary (use 1024 base for units)?
+* @param bool  $calc_power Should scale power be calculated?
 * @param bool  $calc_min   Should scale minimum be calculated?
 * @param bool  $calc_max   Should scale maximum be calculated?
 * @param int   $rows_min   Minimum number of scale rows.
@@ -759,15 +764,15 @@ function yieldGraphScaleInterval(float $min, float $max, bool $is_binary, int $p
 *
 * @return array|null
 */
-function calculateGraphScaleExtremes(float $data_min, float $data_max, bool $is_binary, bool $calc_min, bool $calc_max,
-		int $rows_min, int $rows_max): ?array {
+function calculateGraphScaleExtremes(float $data_min, float $data_max, bool $is_binary, bool $calc_power,
+		bool $calc_min, bool $calc_max, int $rows_min, int $rows_max): ?array {
 	$scale_min = truncateFloat($data_min);
 	$scale_max = truncateFloat($data_max);
 
 	if ($scale_min >= $scale_max) {
 		if ($scale_max > 0) {
 			if ($calc_min) {
-				$scale_min = $scale_max > 0 ? 0 : ($scale_max == 0 ? -1 : $scale_max * 1.25);
+				$scale_min = 0;
 			}
 			elseif ($calc_max) {
 				$scale_max = $scale_min < 0 ? 0 : ($scale_min == 0 ? 1 : $scale_min * 1.25);
@@ -781,7 +786,7 @@ function calculateGraphScaleExtremes(float $data_min, float $data_max, bool $is_
 				$scale_max = $scale_min < 0 ? 0 : ($scale_min == 0 ? 1 : $scale_min * 1.25);
 			}
 			elseif ($calc_min) {
-				$scale_min = $scale_max > 0 ? 0 : ($scale_max == 0 ? -1 : $scale_max * 1.25);
+				$scale_min = $scale_max == 0 ? -1 : $scale_max * 1.25;
 			}
 			else {
 				return null;
@@ -789,7 +794,9 @@ function calculateGraphScaleExtremes(float $data_min, float $data_max, bool $is_
 		}
 	}
 
-	$power = (int) min(8, max(0, floor(log(max(abs($scale_min), abs($scale_max)), $is_binary ? ZBX_KIBIBYTE : 1000))));
+	$power = $calc_power
+		? (int) min(8, max(0, floor(log(max(abs($scale_min), abs($scale_max)), $is_binary ? ZBX_KIBIBYTE : 1000))))
+		: 0;
 
 	$best_result_value = null;
 	$best_result = [
@@ -885,7 +892,10 @@ function calculateGraphScaleValues(float $min, float $max, bool $min_calculated,
 		string $units, bool $is_binary, int $power, int $precision_max): array {
 	$unit_base = $is_binary ? ZBX_KIBIBYTE : 1000;
 
-	$units_length = ($units === '' && $power == 0) ? 0 : (1 + mb_strlen($units) + ($power > 0 ? 1 : 0));
+	$units_length = ($units !== '' && $units !== '!')
+		? ($power > 0 ? 1 : 0) + mb_strlen($units) + ($units[0] !== '!' ? 1 : 0)
+		: ($power > 0 ? 1 : 0);
+
 	$precision = max(3, $units_length == 0 ? $precision_max : ($precision_max - $units_length - ($min < 0 ? 1 : 0)));
 
 	$decimals = min(ZBX_UNITS_ROUNDOFF_SUFFIXED, $precision - 1);

@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -44,6 +44,22 @@ class CFormElement extends CElement {
 	 * @var CElementFilter
 	 */
 	protected $filter = null;
+
+	/**
+	 * @inheritdoc
+	 */
+	public static function createInstance(RemoteWebElement $element, $options = []) {
+		$instance = parent::createInstance($element, $options);
+
+		if (get_class($instance) !== CGridFormElement::class) {
+			$grid = $instance->query('xpath:.//div[contains(@class, "form-grid")]')->one(false);
+			if ($grid->isValid() && !$grid->parents('xpath:*[contains(@class, "table-forms-td-right")]')->exists()) {
+				return $instance->asGridForm($options);
+			}
+		}
+
+		return $instance;
+	}
 
 	/**
 	 * Get filter.
@@ -127,8 +143,7 @@ class CFormElement extends CElement {
 	 * @throws Exception
 	 */
 	public function getLabel($name) {
-		$prefix = 'xpath:.//'.self::TABLE_FORM.'/li/'.self::TABLE_FORM_LEFT;
-		$labels = $this->query($prefix.'/label[text()='.CXPathHelper::escapeQuotes($name).']')->all();
+		$labels = $this->findLabels($name);
 
 		if ($labels->isEmpty()) {
 			throw new Exception('Failed to find form label by name: "'.$name.'".');
@@ -142,11 +157,23 @@ class CFormElement extends CElement {
 			}
 
 			if ($labels->count() > 1) {
-				CTest::addWarning('Form label "'.$name.'" is not unique.');
+				CTest::zbxAddWarning('Form label "'.$name.'" is not unique.');
 			}
 		}
 
 		return $labels->first();
+	}
+
+	/**
+	 * Get label elements by text.
+	 *
+	 * @param string $name    field label text
+	 *
+	 * @return CElementCollection
+	 */
+	protected function findLabels($name) {
+		$prefix = 'xpath:.//'.self::TABLE_FORM.'/li/'.self::TABLE_FORM_LEFT;
+		return $this->query($prefix.'/label[text()='.CXPathHelper::escapeQuotes($name).']')->all();
 	}
 
 	/**
@@ -258,6 +285,15 @@ class CFormElement extends CElement {
 	}
 
 	/**
+	 * Get tabs from form.
+	 *
+	 * @return CElementCollection
+	 */
+	public function getTabs() {
+		return $this->query("xpath:.//li[@role='tab']")->all()->asText();
+	}
+
+	/**
 	 * Switch to tab by tab name.
 	 *
 	 * @return $this
@@ -322,7 +358,7 @@ class CFormElement extends CElement {
 	 * @return $this
 	 */
 	protected function setFieldValue($field, $values) {
-		$classes = [CMultifieldTableElement::class, CMultiselectElement::class, CCheckboxListElement::class];
+		$classes = [CMultifieldTableElement::class, CMultiselectElement::class, CCheckboxListElement::class, CHostInterfaceElement::class];
 		$element = $this->getField($field);
 
 		if (is_array($values) && !in_array(get_class($element), $classes)) {
@@ -334,7 +370,7 @@ class CFormElement extends CElement {
 
 				foreach ($values as $name => $value) {
 					$xpath = './/*[@id='.CXPathHelper::escapeQuotes($name).' or @name='.CXPathHelper::escapeQuotes($name).']';
-					$container->query('xpath', $xpath)->one()->detect()->fill($value);
+					$this->setUTFValue($container->query('xpath', $xpath)->one()->detect(), $value);
 				}
 			}
 
@@ -345,9 +381,24 @@ class CFormElement extends CElement {
 			return $this;
 		}
 
-		$element->fill($values);
+		$this->setUTFValue($element, $values);
 
 		return $this;
+	}
+
+	/**
+	 * Function for utf8mb4 values detection and filling.
+	 *
+	 * @param CElement $element   element to be filled
+	 * @param string   $value     value to be filled in
+	 */
+	protected function setUTFValue($element, $value) {
+		if (!is_array($value) && preg_match('/[\x{10000}-\x{10FFFF}]/u', $value) === 1) {
+			CElementQuery::getDriver()->executeScript('arguments[0].value = '.json_encode($value).';', [$element]);
+		}
+		else {
+			$element->fill($value);
+		}
 	}
 
 	/**
@@ -406,7 +457,7 @@ class CFormElement extends CElement {
 	 * @throws Exception
 	 */
 	protected function checkFieldValue($field, $values, $raise_exception = true) {
-		$classes = [CMultifieldTableElement::class, CMultiselectElement::class, CCheckboxListElement::class];
+		$classes = [CMultifieldTableElement::class, CMultiselectElement::class, CCheckboxListElement::class, CHostInterfaceElement::class];
 		$element = $this->getField($field);
 
 		if (is_array($values) && !in_array(get_class($element), $classes)) {
@@ -439,6 +490,12 @@ class CFormElement extends CElement {
 			return false;
 		}
 
-		return $element->checkValue($values, $raise_exception);
+		try {
+			return $element->checkValue($values, $raise_exception);
+		}
+		catch (\Exception $exception) {
+			CExceptionHelper::setMessage($exception, 'Failed to check value of field "'.$field.'":' . "\n" . $exception->getMessage());
+			throw $exception;
+		}
 	}
 }

@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -21,7 +21,6 @@
 #include "db.h"
 #include "dbupgrade.h"
 #include "log.h"
-#include "dbupgrade_macros.h"
 
 /*
  * Some common helpers that can be used as one-liners in patches to avoid copy-pasting.
@@ -72,44 +71,6 @@ extern unsigned char	program_type;
 static int	DBpatch_5000000(void)
 {
 	return SUCCEED;
-}
-
-static int	DBpatch_5000001(void)
-{
-	if (0 == (program_type & ZBX_PROGRAM_TYPE_SERVER))
-		return SUCCEED;
-
-	if (ZBX_DB_OK > DBexecute("delete from profiles where idx in ('web.latest.toggle','web.latest.toggle_other')"))
-		return FAIL;
-
-	return SUCCEED;
-}
-
-static int	DBpatch_5000002(void)
-{
-	DB_ROW		row;
-	DB_RESULT	result;
-	int		ret = SUCCEED;
-
-	if (0 == (program_type & ZBX_PROGRAM_TYPE_SERVER))
-		return SUCCEED;
-
-	result = DBselect("select userid from profiles where idx='web.latest.sort' and value_str='lastclock'");
-
-	while (NULL != (row = DBfetch(result)))
-	{
-		if (ZBX_DB_OK > DBexecute(
-			"delete from profiles"
-			" where userid='%s'"
-				" and idx in ('web.latest.sort','web.latest.sortorder')", row[0]))
-		{
-			ret = FAIL;
-			break;
-		}
-	}
-	DBfree_result(result);
-
-	return ret;
 }
 
 /* 5000002, 1 - RSM FY21 */
@@ -220,51 +181,22 @@ out:
 	return ret;
 }
 
-static int	DBpatch_5000003(void)
+/* 5000002, 5 - move valuemaps to temporary tables before upgrade to Zabbix 6.0; make sure it is executed after all 5.0 patches */
+static int	DBpatch_5000999_1(void)
 {
-	DB_RESULT		result;
-	int			ret;
-	zbx_field_len_t		fields[] = {
-			{"subject", 255},
-			{"message", 65535}
-	};
+	int	ret = FAIL;
 
-	result = DBselect("select om.operationid,om.subject,om.message"
-			" from opmessage om,operations o,actions a"
-			" where om.operationid=o.operationid"
-				" and o.actionid=a.actionid"
-				" and a.eventsource=0 and o.operationtype=11");
+	ONLY_SERVER();
 
-	ret = db_rename_macro(result, "opmessage", "operationid", fields, ARRSIZE(fields), "{EVENT.NAME}",
-			"{EVENT.RECOVERY.NAME}");
+	DB_EXEC("create table valuemaps_tmp like valuemaps");
+	DB_EXEC("insert into valuemaps_tmp select * from valuemaps");
+	DB_EXEC("create table mappings_tmp like mappings");
+	DB_EXEC("insert into mappings_tmp select * from mappings");
+	DB_EXEC("update items set valuemapid=null where valuemapid is not null");
 
-	DBfree_result(result);
-
+	ret = SUCCEED;
+out:
 	return ret;
-}
-
-static int	DBpatch_5000004(void)
-{
-	DB_RESULT		result;
-	int			ret;
-	zbx_field_len_t		fields[] = {
-			{"subject", 255},
-			{"message", 65535}
-	};
-
-	result = DBselect("select mediatype_messageid,subject,message from media_type_message where recovery=1");
-
-	ret = db_rename_macro(result, "media_type_message", "mediatype_messageid", fields, ARRSIZE(fields),
-			"{EVENT.NAME}", "{EVENT.RECOVERY.NAME}");
-
-	DBfree_result(result);
-
-	return ret;
-}
-
-static int	DBpatch_5000005(void)
-{
-	return DBcreate_index("alerts", "alerts_8", "acknowledgeid", 0);
 }
 
 #endif
@@ -274,14 +206,10 @@ DBPATCH_START(5000)
 /* version, duplicates flag, mandatory flag */
 
 DBPATCH_ADD(5000000, 0, 1)
-DBPATCH_ADD(5000001, 0, 0)
-DBPATCH_ADD(5000002, 0, 0)
 DBPATCH_RSM(5000002, 1, 0, 1)	/* RSM FY21 */
 DBPATCH_RSM(5000002, 2, 0, 0)	/* move {$RSM.DNS.AVAIL.MINNS} from globalmacro to hostmacro, rename to {$RSM.TLD.DNS.AVAIL.MINNS} */
 DBPATCH_RSM(5000002, 3, 0, 0)	/* delete "rsm.configvalue[RSM.DNS.AVAIL.MINNS]" item */
 DBPATCH_RSM(5000002, 4, 0, 0)	/* replace "{$RSM.DNS.AVAIL.MINNS}" to "{$RSM.TLD.DNS.AVAIL.MINNS}" in item keys (template and hosts) */
-DBPATCH_ADD(5000003, 0, 0)
-DBPATCH_ADD(5000004, 0, 0)
-DBPATCH_ADD(5000005, 0, 0)
+DBPATCH_RSM(5000999, 1, 0, 0)	/* move valuemaps to temporary tables before upgrade to Zabbix 6.0 */
 
 DBPATCH_END()

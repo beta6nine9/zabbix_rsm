@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -21,7 +21,9 @@ package resultcache
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"reflect"
 	"sync/atomic"
 	"time"
 
@@ -158,6 +160,7 @@ func (c *DiskCache) upload(u Uploader) (err error) {
 	var result *AgentData
 	var rows *sql.Rows
 	var maxDataId, maxLogId uint64
+	var errs []error
 
 	if rows, err = c.database.Query(fmt.Sprintf("SELECT "+
 		"id,itemid,lastlogsize,mtime,state,value,eventsource,eventid,eventseverity,eventtimestamp,clock,ns"+
@@ -167,9 +170,14 @@ func (c *DiskCache) upload(u Uploader) (err error) {
 	}
 
 	defer func() {
-		if err != nil && (c.lastError == nil || err.Error() != c.lastError.Error()) {
+		if nil == err || errs != nil { // report errors not related to Write
+			return
+		}
+
+		errs = append(errs, err)
+		if !reflect.DeepEqual(errs, c.lastErrors) {
 			c.Warningf("cannot upload history data: %s", err)
-			c.lastError = err
+			c.lastErrors = errs
 		}
 	}()
 
@@ -223,7 +231,7 @@ func (c *DiskCache) upload(u Uploader) (err error) {
 		Request: "agent data",
 		Data:    results,
 		Session: c.token,
-		Host:    agent.Options.Hostname,
+		Host:    u.Hostname(),
 		Version: version.Short(),
 	}
 
@@ -238,17 +246,21 @@ func (c *DiskCache) upload(u Uploader) (err error) {
 	if timeout > 60 {
 		timeout = 60
 	}
-	if err = u.Write(data, time.Duration(timeout)*time.Second); err != nil {
-		if c.lastError == nil || err.Error() != c.lastError.Error() {
-			c.Warningf("history upload to [%s] started to fail: %s", u.Addr(), err)
-			c.lastError = err
+	if errs = u.Write(data, time.Duration(timeout)*time.Second); errs != nil {
+		if !reflect.DeepEqual(errs, c.lastErrors) {
+			for i := 0; i < len(errs); i++ {
+				c.Warningf("%s", errs[i])
+			}
+			c.Warningf("history upload to [%s] [%s] started to fail", u.Addr(), u.Hostname())
+			c.lastErrors = errs
 		}
+		err = errors.New("history upload failed")
 		return
 	}
 
-	if c.lastError != nil {
-		c.Warningf("history upload to [%s] is working again", u.Addr())
-		c.lastError = nil
+	if c.lastErrors != nil {
+		c.Warningf("history upload to [%s] [%s] is working again", u.Addr(), u.Hostname())
+		c.lastErrors = nil
 	}
 	if maxDataId != 0 {
 		if _, err = c.database.Exec(fmt.Sprintf("DELETE FROM data_%d WHERE id<=?", c.serverID), maxDataId); err != nil {
@@ -431,7 +443,8 @@ func (c *DiskCache) init(options *agent.AgentOptions) {
 		return
 	}
 
-	rows, err := c.database.Query(fmt.Sprintf("SELECT id FROM registry WHERE address = '%s'", c.uploader.Addr()))
+	rows, err := c.database.Query(fmt.Sprintf("SELECT "+
+		"id FROM registry WHERE address = '%s' AND hostname = '%s'", c.uploader.Addr(), c.uploader.Hostname()))
 
 	if err == nil {
 		defer rows.Close()

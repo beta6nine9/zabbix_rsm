@@ -252,7 +252,6 @@ class SlaReportsListAction extends Action {
 			'module_style' => $this->module->getStyle(),
 			'tld' => [],
 			'url' => '',
-			'sid' => CWebUser::getSessionCookie(),
 			'filter_search' => $this->getInput('filter_search', ''),
 			'filter_year' => (int) $this->getInput('filter_year', date('Y')),
 			'filter_month' => (int) $this->getInput('filter_month', date('n')),

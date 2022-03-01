@@ -27,6 +27,7 @@ use CProfile;
 use CArrayHelper;
 use CControllerResponseData;
 use CControllerResponseFatal;
+use Modules\RSM\Helpers\ValueMapHelper as VM;
 
 class ParticularTestsListAction extends Action {
 
@@ -79,6 +80,9 @@ class ParticularTestsListAction extends Action {
 
 		$data['test_time_from'] = $test_time_from;
 		$data['is_rdap_standalone'] = is_RDAP_standalone($test_time_from);
+
+		$data['tld_rdds_enabled'] = false;
+		$data['tld_rdap_enabled'] = false;
 
 		if ($data['type'] == RSM_RDAP && !$data['is_rdap_standalone']) {
 			error(_('RDAP wasn\'t a standalone service at requested time!'));
@@ -167,7 +171,7 @@ class ParticularTestsListAction extends Action {
 				'preservekeys' => true
 			]);
 
-			$user_macros_filter = [RSM_TLD_RDDS_ENABLED];
+			$user_macros_filter = [RSM_TLD_RDDS43_ENABLED, RSM_TLD_RDDS80_ENABLED];
 			if ($data['type'] == RSM_RDDS || is_RDAP_standalone($test_time_from)) {
 				$user_macros_filter = array_merge($user_macros_filter, [RSM_RDAP_TLD_ENABLED]);
 			}
@@ -239,15 +243,12 @@ class ParticularTestsListAction extends Action {
 
 			// Get mapped value for test result.
 			if (in_array($data['type'], [RSM_RDDS, RSM_RDAP])) {
-				$test_result_label = ($test_result['value'] !== null)
-					? getMappedValue($test_result['value'], RSM_SERVICE_AVAIL_VALUE_MAP)
-					: false;
-
-				if (!$test_result_label) {
+				if ($test_result['value'] === null) {
 					$test_result_label = _('No result');
 					$test_result_color = ZBX_STYLE_GREY;
 				}
 				else {
+					$test_result_label = VM::get(RSM_VALUE_MAP_SERVICE_AVAILABILITY, $test_result['value']);
 					$test_result_color = ($test_result['value'] == PROBE_DOWN) ? ZBX_STYLE_RED : ZBX_STYLE_GREEN;
 				}
 
@@ -302,14 +303,15 @@ class ParticularTestsListAction extends Action {
 				'output' => ['itemid', 'key_'],
 				'hostids' => $data['tld']['hostid'],
 				'filter' => [
-					'key_' => [RDAP_ENABLED, RDDS_ENABLED]
+					'key_' => [RDAP_ENABLED, RDDS43_ENABLED, RDDS80_ENABLED]
 				]
 			]) : null;
 
 			if ($_enabled_itemid) {
 				$_enabled_item_map = [
 					RDAP_ENABLED => null,
-					RDDS_ENABLED => null
+					RDDS43_ENABLED => null,
+					RDDS80_ENABLED => null
 				];
 
 				foreach ($_enabled_itemid as $_enabled_itemid) {
@@ -325,7 +327,8 @@ class ParticularTestsListAction extends Action {
 				}
 				// Since RDAP is separate service, no need to process RDDS data anymore.
 				if ($data['type'] == RSM_RDAP) {
-					unset($_enabled_item_map[RDDS_ENABLED]);
+					unset($_enabled_item_map[RDDS43_ENABLED]);
+					unset($_enabled_item_map[RDDS80_ENABLED]);
 				}
 
 				foreach ($_enabled_item_map as $_enabled_item => $_enabled_itemid) {
@@ -350,8 +353,8 @@ class ParticularTestsListAction extends Action {
 						 * and assumes that service was enabled whole cycle if at least in one minute it was enabled.
 						 *
 						 * Example:
-						 * Historically RDDS_ENABLED is collected each minute. Historically test cycle was minute long.
-						 * Now test cycle is 5 minutes long during which RDDS_ENABLED can be both enabled and disabled. So,
+						 * Historically RDDS(43/80)_ENABLED is collected each minute. Historically test cycle was minute long.
+						 * Now test cycle is 5 minutes long during which RDDS(43/80)_ENABLED can be both enabled and disabled. So,
 						 * with this workaround we consider it as enabled if at least one minute it was enabled or disabled
 						 * if all 5 minutes it was disabled.
 						 */
@@ -360,8 +363,12 @@ class ParticularTestsListAction extends Action {
 							$history_value = $history_value[0];
 
 							switch ($history_value['itemid']) {
-								case $_enabled_item_map[RDDS_ENABLED]:
-									$data['tld']['macros'][RSM_TLD_RDDS_ENABLED] = $history_value['value'];
+								case $_enabled_item_map[RDDS43_ENABLED]:
+									$data['tld']['macros'][RSM_TLD_RDDS43_ENABLED] = $history_value['value'];
+									break;
+
+								case $_enabled_item_map[RDDS80_ENABLED]:
+									$data['tld']['macros'][RSM_TLD_RDDS80_ENABLED] = $history_value['value'];
 									break;
 
 								case $_enabled_item_map[RDAP_ENABLED]:
@@ -372,14 +379,6 @@ class ParticularTestsListAction extends Action {
 					}
 				}
 			}
-		}
-
-		if (array_key_exists(RSM_RDAP_TLD_ENABLED, $data['tld']['macros'])
-				&& $data['tld']['macros'][RSM_RDAP_TLD_ENABLED] != 0) {
-			$data['tld_rdap_enabled'] = true;
-		}
-		else {
-			$data['tld_rdap_enabled'] = false;
 		}
 
 		// Get probe status.
@@ -488,6 +487,8 @@ class ParticularTestsListAction extends Action {
 			$probe_item_key = [];
 
 			if (!isset($data['tld']['macros'][RSM_RDAP_TLD_ENABLED]) || $data['tld']['macros'][RSM_RDAP_TLD_ENABLED] != 0) {
+				$data['tld_rdap_enabled'] = true;
+
 				$items_to_check[] = PROBE_RDAP_IP;
 				$items_to_check[] = PROBE_RDAP_RTT;
 				$items_to_check[] = PROBE_RDAP_TARGET;
@@ -507,6 +508,8 @@ class ParticularTestsListAction extends Action {
 			// RDAP should be under type=RSM_RDDS only if it is not enabled as standalone service.
 			if ((!isset($data['tld']['macros'][RSM_RDAP_TLD_ENABLED]) || $data['tld']['macros'][RSM_RDAP_TLD_ENABLED] != 0)
 					&& !is_RDAP_standalone($test_time_from)) {
+				$data['tld_rdds_enabled'] = true;
+
 				$items_to_check[] = PROBE_RDAP_IP;
 				$items_to_check[] = PROBE_RDAP_RTT;
 				$items_to_check[] = PROBE_RDAP_TARGET;
@@ -514,12 +517,20 @@ class ParticularTestsListAction extends Action {
 				$items_to_check[] = PROBE_RDAP_STATUS;
 			}
 
-			if (!isset($data['tld']['macros'][RSM_TLD_RDDS_ENABLED]) || $data['tld']['macros'][RSM_TLD_RDDS_ENABLED] != 0) {
+			if (!isset($data['tld']['macros'][RSM_TLD_RDDS43_ENABLED]) || $data['tld']['macros'][RSM_TLD_RDDS43_ENABLED] != 0) {
+				$data['tld_rdds_enabled'] = true;
+
 				$items_to_check[] = PROBE_RDDS43_IP;
 				$items_to_check[] = PROBE_RDDS43_RTT;
 				$items_to_check[] = PROBE_RDDS43_TARGET;
 				$items_to_check[] = PROBE_RDDS43_TESTEDNAME;
 				$items_to_check[] = PROBE_RDDS43_STATUS;
+				$items_to_check[] = PROBE_RDDS_STATUS;
+			}
+
+			if (!isset($data['tld']['macros'][RSM_TLD_RDDS80_ENABLED]) || $data['tld']['macros'][RSM_TLD_RDDS80_ENABLED] != 0) {
+				$data['tld_rdds_enabled'] = true;
+
 				$items_to_check[] = PROBE_RDDS80_IP;
 				$items_to_check[] = PROBE_RDDS80_RTT;
 				$items_to_check[] = PROBE_RDDS80_TARGET;
@@ -537,19 +548,10 @@ class ParticularTestsListAction extends Action {
 			' OR '.dbConditionString('i.key_', [PROBE_EPP_IP, PROBE_EPP_UPDATE, PROBE_EPP_INFO, PROBE_EPP_LOGIN]).')';
 		}
 
-		// Set if RDDS is enabled on a TLD level
-		if (array_key_exists(RSM_TLD_RDDS_ENABLED, $data['tld']['macros'])
-						&& $data['tld']['macros'][RSM_TLD_RDDS_ENABLED] != 0) {
-			$data['tld_rdds_enabled'] = true;
-		}
-		else {
-			$data['tld_rdds_enabled'] = false;
-		}
-
 		if ($test_result['value'] != UP_INCONCLUSIVE_RECONFIG) {
 			// Get items.
 			$items = ($probe_item_key !== '') ? DBselect(
-				'SELECT i.itemid,i.key_,i.hostid,i.value_type,i.valuemapid,i.units'.
+				'SELECT i.itemid,i.key_,i.hostid,i.value_type'.
 				' FROM items i'.
 				' WHERE '.dbConditionInt('i.hostid', $hostids).
 					' AND i.status='.ITEM_STATUS_ACTIVE.
@@ -580,11 +582,10 @@ class ParticularTestsListAction extends Action {
 						}
 						elseif ($item['key_'] == PROBE_RDDS43_RTT) {
 							if (isset($itemValue['value'])) {
-								//$rtt_value = convert_units(['value' => $itemValue['value'], 'units' => $item['units']]);
 								$rtt_value = convertUnits(['value' => $itemValue['value']]);
 								$hosts[$item['hostid']]['rdds43']['rtt'] = [
-									'description' => $rtt_value < 0 ? applyValueMap($rtt_value, $item['valuemapid']) : null,
-									'value' => $rtt_value
+									'description' => $rtt_value < 0 ? VM::get(RSM_VALUE_MAP_RDDS_RTT, $rtt_value) : null,
+									'value' => $rtt_value,
 								];
 							}
 						}
@@ -593,11 +594,10 @@ class ParticularTestsListAction extends Action {
 						}
 						elseif ($item['key_'] == PROBE_RDDS80_RTT) {
 							if (isset($itemValue['value'])) {
-								//$rtt_value = convert_units(['value' => $itemValue['value'], 'units' => $item['units']]);
 								$rtt_value = convertUnits(['value' => $itemValue['value']]);
 								$hosts[$item['hostid']]['rdds80']['rtt'] = [
-									'description' => $rtt_value < 0 ? applyValueMap($rtt_value, $item['valuemapid']) : null,
-									'value' => $rtt_value
+									'description' => $rtt_value < 0 ? VM::get(RSM_VALUE_MAP_RDDS_RTT, $rtt_value) : null,
+									'value' => $rtt_value,
 								];
 							}
 						}
@@ -606,11 +606,10 @@ class ParticularTestsListAction extends Action {
 						}
 						elseif ($item['key_'] == PROBE_RDAP_RTT) {
 							if (isset($itemValue['value'])) {
-								//$rtt_value = convert_units(['value' => $itemValue['value'], 'units' => $item['units']]);
 								$rtt_value = convertUnits(['value' => $itemValue['value']]);
 								$hosts[$item['hostid']]['rdap']['rtt'] = [
-									'description' => $rtt_value < 0 ? applyValueMap($rtt_value, $item['valuemapid']) : null,
-									'value' => $rtt_value
+									'description' => $rtt_value < 0 ? VM::get(RSM_VALUE_MAP_RDAP_RTT, $rtt_value) : null,
+									'value' => $rtt_value,
 								];
 							}
 						}
@@ -648,7 +647,7 @@ class ParticularTestsListAction extends Action {
 
 							if (!array_key_exists($error_code, $data['errors'])) {
 								$data['errors'][$error_code] = [
-									'description' => applyValueMap($error_code, $item['valuemapid'])
+									'description' => VM::get(RSM_VALUE_MAP_RDAP_RTT, $error_code),
 								];
 							}
 							if (!array_key_exists('rdap', $data['errors'][$error_code])) {
@@ -665,7 +664,7 @@ class ParticularTestsListAction extends Action {
 
 								if (!array_key_exists($error_code, $data['errors'])) {
 									$data['errors'][$error_code] = [
-										'description' => applyValueMap($error_code, $item['valuemapid'])
+										'description' => VM::get(RSM_VALUE_MAP_RDAP_RTT, $error_code),
 									];
 								}
 								if (!array_key_exists($column, $data['errors'][$error_code])) {
@@ -674,29 +673,6 @@ class ParticularTestsListAction extends Action {
 
 								$data['errors'][$error_code][$column]++;
 							}
-						}
-					}
-					elseif ($data['type'] == RSM_EPP) {
-						if ($item['key_'] == PROBE_EPP_IP) {
-							$hosts[$item['hostid']]['ip'] = $itemValue['value'];
-						}
-						elseif ($item['key_'] == PROBE_EPP_UPDATE) {
-							$hosts[$item['hostid']]['update'] = $itemValue['value']
-								? applyValueMap(convertUnits(['value' => $itemValue['value'], 'units' => $item['units']]), $item['valuemapid'])
-								: null;
-						}
-						elseif ($item['key_'] == PROBE_EPP_INFO) {
-							$hosts[$item['hostid']]['info'] = $itemValue['value']
-								? applyValueMap(convertUnits(['value' => $itemValue['value'], 'units' => $item['units']]), $item['valuemapid'])
-								: null;
-						}
-						elseif ($item['key_'] == PROBE_EPP_LOGIN) {
-							$hosts[$item['hostid']]['login'] = $itemValue['value']
-								? applyValueMap(convertUnits(['value' => $itemValue['value'], 'units' => $item['units']]), $item['valuemapid'])
-								: null;
-						}
-						else {
-							$hosts[$item['hostid']]['value'] = $itemValue['value'];
 						}
 					}
 				}
@@ -737,21 +713,6 @@ class ParticularTestsListAction extends Action {
 		if ($data['host'] && $data['time'] && $data['slvItemId'] && $data['type'] !== null) {
 			$this->getReportData($data);
 			$data += $this->getMacroHistoryValue([CALCULATED_ITEM_RDDS_RTT_HIGH, CALCULATED_ITEM_RDAP_RTT_HIGH], $data['test_time_till']);
-
-			// Get value maps for error messages.
-			if ($data['type'] == RSM_RDDS) {
-				$error_msg_value_map = API::ValueMap()->get([
-					'output' => [],
-					'selectMappings' => ['value', 'newvalue'],
-					'valuemapids' => [RSM_DNS_RTT_ERRORS_VALUE_MAP]
-				]);
-
-				if ($error_msg_value_map) {
-					foreach ($error_msg_value_map[0]['mappings'] as $val) {
-						$data['error_msgs'][$val['value']] = $val['newvalue'];
-					}
-				}
-			}
 
 			$response = new CControllerResponseData($data);
 			$response->setTitle($data['title']);

@@ -1,13 +1,13 @@
 
-# Redis
+# Redis by Zabbix agent 2
 
 ## Overview
 
-For Zabbix version: 5.0 and higher  
+For Zabbix version: 6.0 and higher  
 The template to monitor Redis server by Zabbix that work without any external scripts.
 Most of the metrics are collected in one go, thanks to Zabbix bulk data collection.
 
-Template `Redis` — collects metrics by polling zabbix-agent2.
+Template `Redis by Zabbix agent 2` — collects metrics by polling zabbix-agent2.
 
 
 
@@ -17,7 +17,7 @@ This template was tested on:
 
 ## Setup
 
-> See [Zabbix template operation](https://www.zabbix.com/documentation/5.0/manual/config/templates_out_of_the_box/zabbix_agent2) for basic instructions.
+> See [Zabbix template operation](https://www.zabbix.com/documentation/6.0/manual/config/templates_out_of_the_box/zabbix_agent2) for basic instructions.
 
 Setup and configure zabbix-agent2 compiled with the Redis monitoring plugin (ZBXNEXT-5428-4.3).
 
@@ -51,11 +51,11 @@ There are no template links in this template.
 
 |Name|Description|Type|Key and additional info|
 |----|-----------|----|----|
-|Keyspace discovery |<p>Individual keyspace metrics</p> |DEPENDENT |redis.keyspace.discovery<p>**Preprocessing**:</p><p>- JAVASCRIPT: `Text is too long. Please see the template.`</p><p>**Filter**:</p>AND <p>- A: {#DB} MATCHES_REGEX `{$REDIS.LLD.FILTER.DB.MATCHES}`</p><p>- B: {#DB} NOT_MATCHES_REGEX `{$REDIS.LLD.FILTER.DB.NOT_MATCHES}`</p> |
-|AOF metrics discovery |<p>If AOF is activated, additional metrics will be added</p> |DEPENDENT |redis.persistence.aof.discovery<p>**Preprocessing**:</p><p>- JAVASCRIPT: `Text is too long. Please see the template.`</p> |
-|Slave metrics discovery |<p>If the instance is a replica, additional metrics are provided</p> |DEPENDENT |redis.replication.slave.discovery<p>**Preprocessing**:</p><p>- JAVASCRIPT: `Text is too long. Please see the template.`</p> |
-|Replication metrics discovery |<p>If the instance is the master and the slaves are connected, additional metrics are provided</p> |DEPENDENT |redis.replication.master.discovery<p>**Preprocessing**:</p><p>- JAVASCRIPT: `Text is too long. Please see the template.`</p> |
+|AOF metrics discovery |<p>If AOF is activated, additional metrics will be added</p> |DEPENDENT |redis.persistence.aof.discovery<p>**Preprocessing**:</p><p>- JAVASCRIPT: `The text is too long. Please see the template.`</p> |
+|Keyspace discovery |<p>Individual keyspace metrics</p> |DEPENDENT |redis.keyspace.discovery<p>**Preprocessing**:</p><p>- JAVASCRIPT: `The text is too long. Please see the template.`</p><p>**Filter**:</p>AND <p>- {#DB} MATCHES_REGEX `{$REDIS.LLD.FILTER.DB.MATCHES}`</p><p>- {#DB} NOT_MATCHES_REGEX `{$REDIS.LLD.FILTER.DB.NOT_MATCHES}`</p> |
 |Process metrics discovery |<p>Collect metrics by Zabbix agent if it exists</p> |ZABBIX_PASSIVE |proc.num["{$REDIS.LLD.PROCESS_NAME}"]<p>**Preprocessing**:</p><p>- JAVASCRIPT: `return JSON.stringify(value > 0 ? [{'{#SINGLETON}': ''}] : []);`</p> |
+|Replication metrics discovery |<p>If the instance is the master and the slaves are connected, additional metrics are provided</p> |DEPENDENT |redis.replication.master.discovery<p>**Preprocessing**:</p><p>- JAVASCRIPT: `The text is too long. Please see the template.`</p> |
+|Slave metrics discovery |<p>If the instance is a replica, additional metrics are provided</p> |DEPENDENT |redis.replication.slave.discovery<p>**Preprocessing**:</p><p>- JAVASCRIPT: `The text is too long. Please see the template.`</p> |
 |Version 4+ metrics discovery |<p>Additional metrics for versions 4+</p> |DEPENDENT |redis.metrics.v4.discovery<p>**Preprocessing**:</p><p>- JSONPATH: `$.Server.redis_version`</p><p>- JAVASCRIPT: `return JSON.stringify(parseInt(value.split('.')[0]) >= 4 ? [{'{#SINGLETON}': ''}] : []);`</p> |
 |Version 5+ metrics discovery |<p>Additional metrics for versions 5+</p> |DEPENDENT |redis.metrics.v5.discovery<p>**Preprocessing**:</p><p>- JSONPATH: `$.Server.redis_version`</p><p>- JAVASCRIPT: `return JSON.stringify(parseInt(value.split('.')[0]) >= 5 ? [{'{#SINGLETON}': ''}] : []);`</p> |
 
@@ -64,14 +64,14 @@ There are no template links in this template.
 |Group|Name|Description|Type|Key and additional info|
 |-----|----|-----------|----|---------------------|
 |Redis |Redis: Ping | |ZABBIX_PASSIVE |redis.ping["{$REDIS.CONN.URI}"]<p>**Preprocessing**:</p><p>- DISCARD_UNCHANGED_HEARTBEAT: `10m`</p> |
-|Redis |Redis: Slowlog entries per second | |ZABBIX_PASSIVE |redis.slowlog.count["{$REDIS.CONN.URI}"]<p>**Preprocessing**:</p><p>- CHANGE_PER_SECOND |
+|Redis |Redis: Slowlog entries per second | |ZABBIX_PASSIVE |redis.slowlog.count["{$REDIS.CONN.URI}"]<p>**Preprocessing**:</p><p>- CHANGE_PER_SECOND</p> |
 |Redis |Redis: CPU sys |<p>System CPU consumed by the Redis server</p> |DEPENDENT |redis.cpu.sys<p>**Preprocessing**:</p><p>- JSONPATH: `$.CPU.used_cpu_sys`</p> |
 |Redis |Redis: CPU sys children |<p>System CPU consumed by the background processes</p> |DEPENDENT |redis.cpu.sys_children<p>**Preprocessing**:</p><p>- JSONPATH: `$.CPU.used_cpu_sys_children`</p> |
 |Redis |Redis: CPU user |<p>User CPU consumed by the Redis server</p> |DEPENDENT |redis.cpu.user<p>**Preprocessing**:</p><p>- JSONPATH: `$.CPU.used_cpu_user`</p> |
 |Redis |Redis: CPU user children |<p>User CPU consumed by the background processes</p> |DEPENDENT |redis.cpu.user_children<p>**Preprocessing**:</p><p>- JSONPATH: `$.CPU.used_cpu_user_children`</p> |
 |Redis |Redis: Blocked clients |<p>The number of connections waiting on a blocking call</p> |DEPENDENT |redis.clients.blocked<p>**Preprocessing**:</p><p>- JSONPATH: `$.Clients.blocked_clients`</p> |
-|Redis |Redis: Max input buffer |<p>The biggest input buffer among current client connections</p> |DEPENDENT |redis.clients.max_input_buffer<p>**Preprocessing**:</p><p>- JAVASCRIPT: `Text is too long. Please see the template.`</p> |
-|Redis |Redis: Max output buffer |<p>The biggest output buffer among current client connections</p> |DEPENDENT |redis.clients.max_output_buffer<p>**Preprocessing**:</p><p>- JAVASCRIPT: `Text is too long. Please see the template.`</p> |
+|Redis |Redis: Max input buffer |<p>The biggest input buffer among current client connections</p> |DEPENDENT |redis.clients.max_input_buffer<p>**Preprocessing**:</p><p>- JAVASCRIPT: `The text is too long. Please see the template.`</p> |
+|Redis |Redis: Max output buffer |<p>The biggest output buffer among current client connections</p> |DEPENDENT |redis.clients.max_output_buffer<p>**Preprocessing**:</p><p>- JAVASCRIPT: `The text is too long. Please see the template.`</p> |
 |Redis |Redis: Connected clients |<p>The number of connected clients</p> |DEPENDENT |redis.clients.connected<p>**Preprocessing**:</p><p>- JSONPATH: `$.Clients.connected_clients`</p> |
 |Redis |Redis: Cluster enabled |<p>Indicate Redis cluster is enabled</p> |DEPENDENT |redis.cluster.enabled<p>**Preprocessing**:</p><p>- JSONPATH: `$.Cluster.cluster_enabled`</p> |
 |Redis |Redis: Memory used |<p>Total number of bytes allocated by Redis using its allocator</p> |DEPENDENT |redis.memory.used_memory<p>**Preprocessing**:</p><p>- JSONPATH: `$.Memory.used_memory`</p> |
@@ -81,16 +81,16 @@ There are no template links in this template.
 |Redis |Redis: Memory fragmentation ratio |<p>This ratio is an indication of memory mapping efficiency:</p><p>  — Value over 1.0 indicate that memory fragmentation is very likely. Consider restarting the Redis server so the operating system can recover fragmented memory, especially with a ratio over 1.5.</p><p>  — Value under 1.0 indicate that Redis likely has insufficient memory available. Consider optimizing memory usage or adding more RAM.</p><p>Note: If your peak memory usage is much higher than your current memory usage, the memory fragmentation ratio may be unreliable.</p><p>https://redis.io/topics/memory-optimization</p> |DEPENDENT |redis.memory.fragmentation_ratio<p>**Preprocessing**:</p><p>- JSONPATH: `$.Memory.mem_fragmentation_ratio`</p> |
 |Redis |Redis: AOF current rewrite time sec |<p>Duration of the on-going AOF rewrite operation if any</p> |DEPENDENT |redis.persistence.aof_current_rewrite_time_sec<p>**Preprocessing**:</p><p>- JSONPATH: `$.Persistence.aof_current_rewrite_time_sec`</p> |
 |Redis |Redis: AOF enabled |<p>Flag indicating AOF logging is activated</p> |DEPENDENT |redis.persistence.aof_enabled<p>**Preprocessing**:</p><p>- JSONPATH: `$.Persistence.aof_enabled`</p> |
-|Redis |Redis: AOF last bgrewrite status |<p>Status of the last AOF rewrite operation</p> |DEPENDENT |redis.persistence.aof_last_bgrewrite_status<p>**Preprocessing**:</p><p>- JSONPATH: `$.Persistence.aof_last_bgrewrite_status`</p><p>- BOOL_TO_DECIMAL |
+|Redis |Redis: AOF last bgrewrite status |<p>Status of the last AOF rewrite operation</p> |DEPENDENT |redis.persistence.aof_last_bgrewrite_status<p>**Preprocessing**:</p><p>- JSONPATH: `$.Persistence.aof_last_bgrewrite_status`</p><p>- BOOL_TO_DECIMAL</p> |
 |Redis |Redis: AOF last rewrite time sec |<p>Duration of the last AOF rewrite</p> |DEPENDENT |redis.persistence.aof_last_rewrite_time_sec<p>**Preprocessing**:</p><p>- JSONPATH: `$.Persistence.aof_last_rewrite_time_sec`</p> |
-|Redis |Redis: AOF last write status |<p>Status of the last write operation to the AOF</p> |DEPENDENT |redis.persistence.aof_last_write_status<p>**Preprocessing**:</p><p>- JSONPATH: `$.Persistence.aof_last_write_status`</p><p>- BOOL_TO_DECIMAL |
+|Redis |Redis: AOF last write status |<p>Status of the last write operation to the AOF</p> |DEPENDENT |redis.persistence.aof_last_write_status<p>**Preprocessing**:</p><p>- JSONPATH: `$.Persistence.aof_last_write_status`</p><p>- BOOL_TO_DECIMAL</p> |
 |Redis |Redis: AOF rewrite in progress |<p>Flag indicating a AOF rewrite operation is on-going</p> |DEPENDENT |redis.persistence.aof_rewrite_in_progress<p>**Preprocessing**:</p><p>- JSONPATH: `$.Persistence.aof_rewrite_in_progress`</p> |
 |Redis |Redis: AOF rewrite scheduled |<p>Flag indicating an AOF rewrite operation will be scheduled once the on-going RDB save is complete</p> |DEPENDENT |redis.persistence.aof_rewrite_scheduled<p>**Preprocessing**:</p><p>- JSONPATH: `$.Persistence.aof_rewrite_scheduled`</p> |
 |Redis |Redis: Dump loading |<p>Flag indicating if the load of a dump file is on-going</p> |DEPENDENT |redis.persistence.loading<p>**Preprocessing**:</p><p>- JSONPATH: `$.Persistence.loading`</p> |
 |Redis |Redis: RDB bgsave in progress |<p>"1" if bgsave is in progress and "0" otherwise</p> |DEPENDENT |redis.persistence.rdb_bgsave_in_progress<p>**Preprocessing**:</p><p>- JSONPATH: `$.Persistence.rdb_bgsave_in_progress`</p> |
 |Redis |Redis: RDB changes since last save |<p>Number of changes since the last background save</p> |DEPENDENT |redis.persistence.rdb_changes_since_last_save<p>**Preprocessing**:</p><p>- JSONPATH: `$.Persistence.rdb_changes_since_last_save`</p> |
 |Redis |Redis: RDB current bgsave time sec |<p>Duration of the on-going RDB save operation if any</p> |DEPENDENT |redis.persistence.rdb_current_bgsave_time_sec<p>**Preprocessing**:</p><p>- JSONPATH: `$.Persistence.rdb_current_bgsave_time_sec`</p> |
-|Redis |Redis: RDB last bgsave status |<p>Status of the last RDB save operation</p> |DEPENDENT |redis.persistence.rdb_last_bgsave_status<p>**Preprocessing**:</p><p>- JSONPATH: `$.Persistence.rdb_last_bgsave_status`</p><p>- BOOL_TO_DECIMAL |
+|Redis |Redis: RDB last bgsave status |<p>Status of the last RDB save operation</p> |DEPENDENT |redis.persistence.rdb_last_bgsave_status<p>**Preprocessing**:</p><p>- JSONPATH: `$.Persistence.rdb_last_bgsave_status`</p><p>- BOOL_TO_DECIMAL</p> |
 |Redis |Redis: RDB last bgsave time sec |<p>Duration of the last bg_save operation</p> |DEPENDENT |redis.persistence.rdb_last_bgsave_time_sec<p>**Preprocessing**:</p><p>- JSONPATH: `$.Persistence.rdb_last_bgsave_time_sec`</p> |
 |Redis |Redis: RDB last save time |<p>Epoch-based timestamp of last successful RDB save</p> |DEPENDENT |redis.persistence.rdb_last_save_time<p>**Preprocessing**:</p><p>- JSONPATH: `$.Persistence.rdb_last_save_time`</p> |
 |Redis |Redis: Connected slaves |<p>Number of connected slaves</p> |DEPENDENT |redis.replication.connected_slaves<p>**Preprocessing**:</p><p>- JSONPATH: `$.Replication.connected_slaves`</p> |
@@ -137,13 +137,13 @@ There are no template links in this template.
 |Redis |Redis: AOF delayed fsync{#SINGLETON} |<p>Delayed fsync counter</p> |DEPENDENT |redis.persistence.aof_delayed_fsync[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Persistence.aof_delayed_fsync`</p> |
 |Redis |Redis: Master host{#SINGLETON} |<p>Host or IP address of the master</p> |DEPENDENT |redis.replication.master_host[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Replication.master_host`</p><p>- DISCARD_UNCHANGED_HEARTBEAT: `1d`</p> |
 |Redis |Redis: Master port{#SINGLETON} |<p>Master listening TCP port</p> |DEPENDENT |redis.replication.master_port[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Replication.master_port`</p><p>- DISCARD_UNCHANGED_HEARTBEAT: `1d`</p> |
-|Redis |Redis: Master link status{#SINGLETON} |<p>Status of the link (up/down)</p> |DEPENDENT |redis.replication.master_link_status[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Replication.master_link_status`</p><p>- BOOL_TO_DECIMAL |
+|Redis |Redis: Master link status{#SINGLETON} |<p>Status of the link (up/down)</p> |DEPENDENT |redis.replication.master_link_status[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Replication.master_link_status`</p><p>- BOOL_TO_DECIMAL</p> |
 |Redis |Redis: Master last I/O seconds ago{#SINGLETON} |<p>Number of seconds since the last interaction with master</p> |DEPENDENT |redis.replication.master_last_io_seconds_ago[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Replication.master_last_io_seconds_ago`</p> |
 |Redis |Redis: Master sync in progress{#SINGLETON} |<p>Indicate the master is syncing to the replica</p> |DEPENDENT |redis.replication.master_sync_in_progress[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Replication.master_sync_in_progress`</p> |
 |Redis |Redis: Slave replication offset{#SINGLETON} |<p>The replication offset of the replica instance</p> |DEPENDENT |redis.replication.slave_repl_offset[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Replication.slave_repl_offset`</p> |
 |Redis |Redis: Slave priority{#SINGLETON} |<p>The priority of the instance as a candidate for failover</p> |DEPENDENT |redis.replication.slave_priority[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Replication.slave_priority`</p> |
 |Redis |Redis: Slave priority{#SINGLETON} |<p>Flag indicating if the replica is read-only</p> |DEPENDENT |redis.replication.slave_read_only[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Replication.slave_read_only`</p><p>- DISCARD_UNCHANGED_HEARTBEAT: `1d`</p> |
-|Redis |Redis slave {#SLAVE_IP}:{#SLAVE_PORT}: Replication lag in bytes |<p>Replication lag in bytes</p> |DEPENDENT |redis.replication.lag_bytes["{#SLAVE_IP}:{#SLAVE_PORT}"]<p>**Preprocessing**:</p><p>- JAVASCRIPT: `Text is too long. Please see the template.`</p> |
+|Redis |Redis slave {#SLAVE_IP}:{#SLAVE_PORT}: Replication lag in bytes |<p>Replication lag in bytes</p> |DEPENDENT |redis.replication.lag_bytes["{#SLAVE_IP}:{#SLAVE_PORT}"]<p>**Preprocessing**:</p><p>- JAVASCRIPT: `The text is too long. Please see the template.`</p> |
 |Redis |Redis: Number of processes running |<p>-</p> |ZABBIX_PASSIVE |proc.num["{$REDIS.PROCESS_NAME}{#SINGLETON}"] |
 |Redis |Redis: Memory usage (rss) |<p>Resident set size memory used by process in bytes.</p> |ZABBIX_PASSIVE |proc.mem["{$REDIS.PROCESS_NAME}{#SINGLETON}",,,,rss] |
 |Redis |Redis: Memory usage (vsize) |<p>Virtual memory size used by process in bytes.</p> |ZABBIX_PASSIVE |proc.mem["{$REDIS.PROCESS_NAME}{#SINGLETON}",,,,vsize] |
@@ -161,58 +161,58 @@ There are no template links in this template.
 |Redis |Redis: Lazyfree pending objects{#SINGLETON} |<p>The number of objects waiting to be freed (as a result of calling UNLINK, or FLUSHDB and FLUSHALL with the ASYNC option)</p> |DEPENDENT |redis.memory.lazyfree_pending_objects[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Memory.lazyfree_pending_objects`</p> |
 |Redis |Redis: RDB last CoW size{#SINGLETON} |<p>The size in bytes of copy-on-write allocations during the last RDB save operation</p> |DEPENDENT |redis.persistence.rdb_last_cow_size[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Persistence.rdb_last_cow_size`</p> |
 |Redis |Redis: AOF last CoW size{#SINGLETON} |<p>The size in bytes of copy-on-write allocations during the last AOF rewrite operation</p> |DEPENDENT |redis.persistence.aof_last_cow_size[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Persistence.aof_last_cow_size`</p> |
-|Redis |Redis: Expired stale %{#SINGLETON} | |DEPENDENT |redis.stats.expired_stale_perc[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Stats.expired_stale_perc`</p> |
-|Redis |Redis: Expired time cap reached count{#SINGLETON} | |DEPENDENT |redis.stats.expired_time_cap_reached_count[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Stats.expired_time_cap_reached_count`</p> |
+|Redis |Redis: Expired stale %{#SINGLETON} |<p>-</p> |DEPENDENT |redis.stats.expired_stale_perc[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Stats.expired_stale_perc`</p> |
+|Redis |Redis: Expired time cap reached count{#SINGLETON} |<p>-</p> |DEPENDENT |redis.stats.expired_time_cap_reached_count[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Stats.expired_time_cap_reached_count`</p> |
 |Redis |Redis: Slave expires tracked keys{#SINGLETON} |<p>The number of keys tracked for expiry purposes (applicable only to writable replicas)</p> |DEPENDENT |redis.stats.slave_expires_tracked_keys[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Stats.slave_expires_tracked_keys`</p> |
 |Redis |Redis: Active defrag hits{#SINGLETON} |<p>Number of value reallocations performed by active the defragmentation process</p> |DEPENDENT |redis.stats.active_defrag_hits[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Stats.active_defrag_hits`</p> |
 |Redis |Redis: Active defrag misses{#SINGLETON} |<p>Number of aborted value reallocations started by the active defragmentation process</p> |DEPENDENT |redis.stats.active_defrag_misses[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Stats.active_defrag_misses`</p> |
 |Redis |Redis: Active defrag key hits{#SINGLETON} |<p>Number of keys that were actively defragmented</p> |DEPENDENT |redis.stats.active_defrag_key_hits[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Stats.active_defrag_key_hits`</p> |
 |Redis |Redis: Active defrag key misses{#SINGLETON} |<p>Number of keys that were skipped by the active defragmentation process</p> |DEPENDENT |redis.stats.active_defrag_key_misses[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Stats.active_defrag_key_misses`</p> |
 |Redis |Redis: Replication second offset{#SINGLETON} |<p>Offset up to which replication IDs are accepted</p> |DEPENDENT |redis.replication.second_repl_offset[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Replication.second_repl_offset`</p> |
-|Redis |Redis: Allocator active{#SINGLETON} | |DEPENDENT |redis.memory.allocator_active[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Memory.allocator_active`</p> |
-|Redis |Redis: Allocator allocated{#SINGLETON} | |DEPENDENT |redis.memory.allocator_allocated[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Memory.allocator_allocated`</p> |
-|Redis |Redis: Allocator resident{#SINGLETON} | |DEPENDENT |redis.memory.allocator_resident[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Memory.allocator_resident`</p> |
-|Redis |Redis: Memory used scripts{#SINGLETON} | |DEPENDENT |redis.memory.used_memory_scripts[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Memory.used_memory_scripts`</p> |
-|Redis |Redis: Memory number of cached scripts{#SINGLETON} | |DEPENDENT |redis.memory.number_of_cached_scripts[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Memory.number_of_cached_scripts`</p> |
-|Redis |Redis: Allocator fragmentation bytes{#SINGLETON} | |DEPENDENT |redis.memory.allocator_frag_bytes[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Memory.allocator_frag_bytes`</p> |
-|Redis |Redis: Allocator fragmentation ratio{#SINGLETON} | |DEPENDENT |redis.memory.allocator_frag_ratio[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Memory.allocator_frag_ratio`</p> |
-|Redis |Redis: Allocator RSS bytes{#SINGLETON} | |DEPENDENT |redis.memory.allocator_rss_bytes[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Memory.allocator_rss_bytes`</p> |
-|Redis |Redis: Allocator RSS ratio{#SINGLETON} | |DEPENDENT |redis.memory.allocator_rss_ratio[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Memory.allocator_rss_ratio`</p> |
-|Redis |Redis: Memory RSS overhead bytes{#SINGLETON} | |DEPENDENT |redis.memory.rss_overhead_bytes[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Memory.rss_overhead_bytes`</p> |
-|Redis |Redis: Memory RSS overhead ratio{#SINGLETON} | |DEPENDENT |redis.memory.rss_overhead_ratio[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Memory.rss_overhead_ratio`</p> |
-|Redis |Redis: Memory fragmentation bytes{#SINGLETON} | |DEPENDENT |redis.memory.fragmentation_bytes[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Memory.mem_fragmentation_bytes`</p> |
-|Redis |Redis: Memory not counted for evict{#SINGLETON} | |DEPENDENT |redis.memory.not_counted_for_evict[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Memory.mem_not_counted_for_evict`</p> |
-|Redis |Redis: Memory replication backlog{#SINGLETON} | |DEPENDENT |redis.memory.replication_backlog[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Memory.mem_replication_backlog`</p> |
-|Redis |Redis: Memory clients normal{#SINGLETON} | |DEPENDENT |redis.memory.mem_clients_normal[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Memory.mem_clients_normal`</p> |
-|Redis |Redis: Memory clients slaves{#SINGLETON} | |DEPENDENT |redis.memory.mem_clients_slaves[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Memory.mem_clients_slaves`</p> |
+|Redis |Redis: Allocator active{#SINGLETON} |<p>-</p> |DEPENDENT |redis.memory.allocator_active[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Memory.allocator_active`</p> |
+|Redis |Redis: Allocator allocated{#SINGLETON} |<p>-</p> |DEPENDENT |redis.memory.allocator_allocated[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Memory.allocator_allocated`</p> |
+|Redis |Redis: Allocator resident{#SINGLETON} |<p>-</p> |DEPENDENT |redis.memory.allocator_resident[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Memory.allocator_resident`</p> |
+|Redis |Redis: Memory used scripts{#SINGLETON} |<p>-</p> |DEPENDENT |redis.memory.used_memory_scripts[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Memory.used_memory_scripts`</p> |
+|Redis |Redis: Memory number of cached scripts{#SINGLETON} |<p>-</p> |DEPENDENT |redis.memory.number_of_cached_scripts[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Memory.number_of_cached_scripts`</p> |
+|Redis |Redis: Allocator fragmentation bytes{#SINGLETON} |<p>-</p> |DEPENDENT |redis.memory.allocator_frag_bytes[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Memory.allocator_frag_bytes`</p> |
+|Redis |Redis: Allocator fragmentation ratio{#SINGLETON} |<p>-</p> |DEPENDENT |redis.memory.allocator_frag_ratio[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Memory.allocator_frag_ratio`</p> |
+|Redis |Redis: Allocator RSS bytes{#SINGLETON} |<p>-</p> |DEPENDENT |redis.memory.allocator_rss_bytes[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Memory.allocator_rss_bytes`</p> |
+|Redis |Redis: Allocator RSS ratio{#SINGLETON} |<p>-</p> |DEPENDENT |redis.memory.allocator_rss_ratio[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Memory.allocator_rss_ratio`</p> |
+|Redis |Redis: Memory RSS overhead bytes{#SINGLETON} |<p>-</p> |DEPENDENT |redis.memory.rss_overhead_bytes[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Memory.rss_overhead_bytes`</p> |
+|Redis |Redis: Memory RSS overhead ratio{#SINGLETON} |<p>-</p> |DEPENDENT |redis.memory.rss_overhead_ratio[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Memory.rss_overhead_ratio`</p> |
+|Redis |Redis: Memory fragmentation bytes{#SINGLETON} |<p>-</p> |DEPENDENT |redis.memory.fragmentation_bytes[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Memory.mem_fragmentation_bytes`</p> |
+|Redis |Redis: Memory not counted for evict{#SINGLETON} |<p>-</p> |DEPENDENT |redis.memory.not_counted_for_evict[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Memory.mem_not_counted_for_evict`</p> |
+|Redis |Redis: Memory replication backlog{#SINGLETON} |<p>-</p> |DEPENDENT |redis.memory.replication_backlog[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Memory.mem_replication_backlog`</p> |
+|Redis |Redis: Memory clients normal{#SINGLETON} |<p>-</p> |DEPENDENT |redis.memory.mem_clients_normal[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Memory.mem_clients_normal`</p> |
+|Redis |Redis: Memory clients slaves{#SINGLETON} |<p>-</p> |DEPENDENT |redis.memory.mem_clients_slaves[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Memory.mem_clients_slaves`</p> |
 |Redis |Redis: Memory AOF buffer{#SINGLETON} |<p>Size of the AOF buffer</p> |DEPENDENT |redis.memory.mem_aof_buffer[{#SINGLETON}]<p>**Preprocessing**:</p><p>- JSONPATH: `$.Memory.mem_aof_buffer`</p> |
-|Zabbix_raw_items |Redis: Get info | |ZABBIX_PASSIVE |redis.info["{$REDIS.CONN.URI}"] |
-|Zabbix_raw_items |Redis: Get config | |ZABBIX_PASSIVE |redis.config["{$REDIS.CONN.URI}"]<p>**Preprocessing**:</p><p>- DISCARD_UNCHANGED_HEARTBEAT: `1h`</p> |
+|Zabbix raw items |Redis: Get info | |ZABBIX_PASSIVE |redis.info["{$REDIS.CONN.URI}"] |
+|Zabbix raw items |Redis: Get config | |ZABBIX_PASSIVE |redis.config["{$REDIS.CONN.URI}"]<p>**Preprocessing**:</p><p>- DISCARD_UNCHANGED_HEARTBEAT: `1h`</p> |
 
 ## Triggers
 
 |Name|Description|Expression|Severity|Dependencies and additional info|
 |----|-----------|----|----|----|
-|Redis: Service is down |<p>-</p> |`{TEMPLATE_NAME:redis.ping["{$REDIS.CONN.URI}"].last()}=0` |AVERAGE |<p>Manual close: YES</p> |
-|Redis: Too many entries in the slowlog (over {$REDIS.SLOWLOG.COUNT.MAX.WARN} per second in 5m) |<p>-</p> |`{TEMPLATE_NAME:redis.slowlog.count["{$REDIS.CONN.URI}"].min(5m)}>{$REDIS.SLOWLOG.COUNT.MAX.WARN}` |INFO | |
-|Redis: Total number of connected clients is too high (over {$REDIS.CLIENTS.PRC.MAX.WARN}% in 5m) |<p>When the number of clients reaches the value of the "maxclients" parameter, new connections will be rejected.</p><p>https://redis.io/topics/clients#maximum-number-of-clients</p> |`{TEMPLATE_NAME:redis.clients.connected.min(5m)}/{Redis:redis.config.maxclients.last()}*100>{$REDIS.CLIENTS.PRC.MAX.WARN}` |WARNING | |
-|Redis: Memory fragmentation ratio is too high (over {$REDIS.MEM.FRAG_RATIO.MAX.WARN} in 15m) |<p>This ratio is an indication of memory mapping efficiency:</p><p>  — Value over 1.0 indicate that memory fragmentation is very likely. Consider restarting the Redis server so the operating system can recover fragmented memory, especially with a ratio over 1.5.</p><p>  — Value under 1.0 indicate that Redis likely has insufficient memory available. Consider optimizing memory usage or adding more RAM.</p><p>Note: If your peak memory usage is much higher than your current memory usage, the memory fragmentation ratio may be unreliable.</p><p>https://redis.io/topics/memory-optimization</p> |`{TEMPLATE_NAME:redis.memory.fragmentation_ratio.min(15m)}>{$REDIS.MEM.FRAG_RATIO.MAX.WARN}` |WARNING | |
-|Redis: Last AOF write operation failed |<p>Detailed information about persistence: https://redis.io/topics/persistence</p> |`{TEMPLATE_NAME:redis.persistence.aof_last_write_status.last()}=0` |WARNING | |
-|Redis: Last RDB save operation failed |<p>Detailed information about persistence: https://redis.io/topics/persistence</p> |`{TEMPLATE_NAME:redis.persistence.rdb_last_bgsave_status.last()}=0` |WARNING | |
-|Redis: Number of slaves has changed |<p>Redis number of slaves has changed. Ack to close.</p> |`{TEMPLATE_NAME:redis.replication.connected_slaves.diff()}=1` |INFO |<p>Manual close: YES</p> |
-|Redis: Replication role has changed (new role: {ITEM.VALUE}) |<p>Redis replication role has changed. Ack to close.</p> |`{TEMPLATE_NAME:redis.replication.role.diff()}=1 and {TEMPLATE_NAME:redis.replication.role.strlen()}>0` |WARNING |<p>Manual close: YES</p> |
-|Redis: Version has changed (new version: {ITEM.VALUE}) |<p>Redis version has changed. Ack to close.</p> |`{TEMPLATE_NAME:redis.server.redis_version.diff()}=1 and {TEMPLATE_NAME:redis.server.redis_version.strlen()}>0` |INFO |<p>Manual close: YES</p> |
-|Redis: has been restarted (uptime < 10m) |<p>Uptime is less than 10 minutes</p> |`{TEMPLATE_NAME:redis.server.uptime.last()}<10m` |INFO |<p>Manual close: YES</p> |
-|Redis: Connections are rejected |<p>The number of connections has reached the value of "maxclients".</p><p>https://redis.io/topics/clients</p> |`{TEMPLATE_NAME:redis.stats.rejected_connections.last()}>0` |HIGH | |
-|Redis: Replication lag with master is too high (over {$REDIS.REPL.LAG.MAX.WARN} in 5m) |<p>-</p> |`{TEMPLATE_NAME:redis.replication.master_last_io_seconds_ago[{#SINGLETON}].min(5m)}>{$REDIS.REPL.LAG.MAX.WARN}` |WARNING | |
-|Redis: Process is not running |<p>-</p> |`{TEMPLATE_NAME:proc.num["{$REDIS.PROCESS_NAME}{#SINGLETON}"].last()}=0` |HIGH | |
-|Redis: Memory usage is too high (over {$REDIS.MEM.PUSED.MAX.WARN}% in 5m) |<p>-</p> |`{TEMPLATE_NAME:redis.memory.used_memory.last()}/{TEMPLATE_NAME:redis.memory.maxmemory[{#SINGLETON}].min(5m)}*100>{$REDIS.MEM.PUSED.MAX.WARN}` |WARNING | |
-|Redis: Failed to fetch info data (or no data for 30m) |<p>Zabbix has not received data for items for the last 30 minutes</p> |`{TEMPLATE_NAME:redis.info["{$REDIS.CONN.URI}"].nodata(30m)}=1` |WARNING |<p>Manual close: YES</p><p>**Depends on**:</p><p>- Redis: Service is down</p> |
-|Redis: Configuration has changed |<p>Redis configuration has changed. Ack to close.</p> |`{TEMPLATE_NAME:redis.config["{$REDIS.CONN.URI}"].diff()}=1 and {TEMPLATE_NAME:redis.config["{$REDIS.CONN.URI}"].strlen()}>0` |INFO |<p>Manual close: YES</p> |
+|Redis: Service is down |<p>-</p> |`last(/Redis by Zabbix agent 2/redis.ping["{$REDIS.CONN.URI}"])=0` |AVERAGE |<p>Manual close: YES</p> |
+|Redis: Too many entries in the slowlog (over {$REDIS.SLOWLOG.COUNT.MAX.WARN} per second in 5m) |<p>-</p> |`min(/Redis by Zabbix agent 2/redis.slowlog.count["{$REDIS.CONN.URI}"],5m)>{$REDIS.SLOWLOG.COUNT.MAX.WARN}` |INFO | |
+|Redis: Total number of connected clients is too high (over {$REDIS.CLIENTS.PRC.MAX.WARN}% in 5m) |<p>When the number of clients reaches the value of the "maxclients" parameter, new connections will be rejected.</p><p>https://redis.io/topics/clients#maximum-number-of-clients</p> |`min(/Redis by Zabbix agent 2/redis.clients.connected,5m)/last(/Redis by Zabbix agent 2/redis.config.maxclients)*100>{$REDIS.CLIENTS.PRC.MAX.WARN}` |WARNING | |
+|Redis: Memory fragmentation ratio is too high (over {$REDIS.MEM.FRAG_RATIO.MAX.WARN} in 15m) |<p>This ratio is an indication of memory mapping efficiency:</p><p>  — Value over 1.0 indicate that memory fragmentation is very likely. Consider restarting the Redis server so the operating system can recover fragmented memory, especially with a ratio over 1.5.</p><p>  — Value under 1.0 indicate that Redis likely has insufficient memory available. Consider optimizing memory usage or adding more RAM.</p><p>Note: If your peak memory usage is much higher than your current memory usage, the memory fragmentation ratio may be unreliable.</p><p>https://redis.io/topics/memory-optimization</p> |`min(/Redis by Zabbix agent 2/redis.memory.fragmentation_ratio,15m)>{$REDIS.MEM.FRAG_RATIO.MAX.WARN}` |WARNING | |
+|Redis: Last AOF write operation failed |<p>Detailed information about persistence: https://redis.io/topics/persistence</p> |`last(/Redis by Zabbix agent 2/redis.persistence.aof_last_write_status)=0` |WARNING | |
+|Redis: Last RDB save operation failed |<p>Detailed information about persistence: https://redis.io/topics/persistence</p> |`last(/Redis by Zabbix agent 2/redis.persistence.rdb_last_bgsave_status)=0` |WARNING | |
+|Redis: Number of slaves has changed |<p>Redis number of slaves has changed. Ack to close.</p> |`last(/Redis by Zabbix agent 2/redis.replication.connected_slaves,#1)<>last(/Redis by Zabbix agent 2/redis.replication.connected_slaves,#2)` |INFO |<p>Manual close: YES</p> |
+|Redis: Replication role has changed (new role: {ITEM.VALUE}) |<p>Redis replication role has changed. Ack to close.</p> |`last(/Redis by Zabbix agent 2/redis.replication.role,#1)<>last(/Redis by Zabbix agent 2/redis.replication.role,#2) and length(last(/Redis by Zabbix agent 2/redis.replication.role))>0` |WARNING |<p>Manual close: YES</p> |
+|Redis: Version has changed (new version: {ITEM.VALUE}) |<p>Redis version has changed. Ack to close.</p> |`last(/Redis by Zabbix agent 2/redis.server.redis_version,#1)<>last(/Redis by Zabbix agent 2/redis.server.redis_version,#2) and length(last(/Redis by Zabbix agent 2/redis.server.redis_version))>0` |INFO |<p>Manual close: YES</p> |
+|Redis: has been restarted (uptime < 10m) |<p>Uptime is less than 10 minutes</p> |`last(/Redis by Zabbix agent 2/redis.server.uptime)<10m` |INFO |<p>Manual close: YES</p> |
+|Redis: Connections are rejected |<p>The number of connections has reached the value of "maxclients".</p><p>https://redis.io/topics/clients</p> |`last(/Redis by Zabbix agent 2/redis.stats.rejected_connections)>0` |HIGH | |
+|Redis: Replication lag with master is too high (over {$REDIS.REPL.LAG.MAX.WARN} in 5m) |<p>-</p> |`min(/Redis by Zabbix agent 2/redis.replication.master_last_io_seconds_ago[{#SINGLETON}],5m)>{$REDIS.REPL.LAG.MAX.WARN}` |WARNING | |
+|Redis: Process is not running |<p>-</p> |`last(/Redis by Zabbix agent 2/proc.num["{$REDIS.PROCESS_NAME}{#SINGLETON}"])=0` |HIGH | |
+|Redis: Memory usage is too high (over {$REDIS.MEM.PUSED.MAX.WARN}% in 5m) |<p>-</p> |`last(/Redis by Zabbix agent 2/redis.memory.used_memory)/min(/Redis by Zabbix agent 2/redis.memory.maxmemory[{#SINGLETON}],5m)*100>{$REDIS.MEM.PUSED.MAX.WARN}` |WARNING | |
+|Redis: Failed to fetch info data (or no data for 30m) |<p>Zabbix has not received data for items for the last 30 minutes</p> |`nodata(/Redis by Zabbix agent 2/redis.info["{$REDIS.CONN.URI}"],30m)=1` |WARNING |<p>Manual close: YES</p><p>**Depends on**:</p><p>- Redis: Service is down</p> |
+|Redis: Configuration has changed |<p>Redis configuration has changed. Ack to close.</p> |`last(/Redis by Zabbix agent 2/redis.config["{$REDIS.CONN.URI}"],#1)<>last(/Redis by Zabbix agent 2/redis.config["{$REDIS.CONN.URI}"],#2) and length(last(/Redis by Zabbix agent 2/redis.config["{$REDIS.CONN.URI}"]))>0` |INFO |<p>Manual close: YES</p> |
 
 ## Feedback
 
 Please report any issues with the template at https://support.zabbix.com
 
-You can also provide a feedback, discuss the template or ask for help with it at [ZABBIX forums](https://www.zabbix.com/forum/zabbix-suggestions-and-feedback/389050-discussion-thread-for-official-zabbix-template-redis).
+You can also provide feedback, discuss the template or ask for help with it at [ZABBIX forums](https://www.zabbix.com/forum/zabbix-suggestions-and-feedback/389050-discussion-thread-for-official-zabbix-template-redis).
 

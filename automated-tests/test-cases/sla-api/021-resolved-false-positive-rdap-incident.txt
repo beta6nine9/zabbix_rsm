@@ -1,6 +1,6 @@
 [test-case]
 
-"021 Resolved false positive rdap incident"
+"Resolved false positive rdap incident"
 
 [prepare-server-database]
 

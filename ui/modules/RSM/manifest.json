@@ -8,6 +8,46 @@
 	"namespace": "RSM",
 	"url": "https://zabbix.com",
 	"actions": {
+		"discovery.view": {
+			"class": "Zabbix\\CControllerDiscoveryView",
+			"layout": "layout.htmlpage",
+			"view": "monitoring.discovery.view"
+		},
+		"export.hosts.xml": {
+			"class": "Zabbix\\CControllerExportXml",
+			"layout": "layout.xml",
+			"view": null
+		},
+		"export.mediatypes.xml": {
+			"class": "Zabbix\\CControllerExportXml",
+			"layout": "layout.xml",
+			"view": null
+		},
+		"export.screens.xml": {
+			"class": "Zabbix\\CControllerExportXml",
+			"layout": "layout.xml",
+			"view": null
+		},
+		"export.sysmaps.xml": {
+			"class": "Zabbix\\CControllerExportXml",
+			"layout": "layout.xml",
+			"view": null
+		},
+		"export.templates.xml": {
+			"class": "Zabbix\\CControllerExportXml",
+			"layout": "layout.xml",
+			"view": null
+		},
+		"export.valuemaps.xml": {
+			"class": "Zabbix\\CControllerExportXml",
+			"layout": "layout.xml",
+			"view": null
+		},
+		"popup.media": {
+			"class": "Zabbix\\CControllerPopupMedia",
+			"layout": "layout.json",
+			"view": "popup.media"
+		},
 		"index.php": {
 			"class": "AuthAction",
 			"layout": null,

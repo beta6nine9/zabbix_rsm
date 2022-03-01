@@ -29,6 +29,7 @@ use Exception;
 use CControllerResponseFatal;
 use CControllerResponseData;
 use CControllerResponseRedirect;
+use Modules\RSM\Helpers\ValueMapHelper as VM;
 
 class AggregateDetailsAction extends Action {
 
@@ -246,14 +247,15 @@ class AggregateDetailsAction extends Action {
 
 			$ns = $key_parser->getParam(0);
 			$ip = $key_parser->getParam(1);
-			$transport = $key_parser->getParam(2);	// TODO: we have now special item for that "rsm.dns.transport"
+			$item_transport = $key_parser->getParam(2);
+			$test_transport = VM::get(RSM_VALUE_MAP_TRANSPORT_PROTOCOL, $this->probes[$probeid]['transport']);
 			$ipv = filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) ? 'ipv4' : 'ipv6';
 			$dns_nameservers[$ns][$ipv][$ip] = true;
-			$rtt_max = ($transport == 'udp') ? $data['udp_rtt'] : $data['tcp_rtt'];
+			$rtt_max = ($item_transport == 'udp') ? $data['udp_rtt'] : $data['tcp_rtt'];
 
-			if (strtolower($this->probes[$probeid]['transport']) != $transport) {
-				error(_s('Item transport value and probe transport value mismatch found for probe "%s" item "%s"',
-					$this->probes[$probeid]['host'], $rtt_item['key_']
+			if (strtolower($test_transport) != $item_transport) {
+				error(_s('Test transport protocol "%s" does not match item transport protocol "%s" on one of the probes',
+						$test_transport, $rtt_item['key_']
 				));
 			}
 
@@ -281,15 +283,12 @@ class AggregateDetailsAction extends Action {
 					];
 				}
 
-				$data['probes_above_max_rtt'][$error_key][$transport]++;
+				$data['probes_above_max_rtt'][$error_key][$item_transport]++;
 			}
 		}
 
 		$data['dns_nameservers'] = $dns_nameservers;
 		$data['nsids'] = $this->getNSIDdata($dns_nameservers, $time_from, $time_till);
-
-		if ($data['type'] == RSM_DNSSEC)
-			$data['dnssec_errors'] = $this->getDnssecErrorData();
 
 		$key_parser->parse(PROBE_DNS_NS_STATUS);
 		$ns_status_key = $key_parser->getKey();
@@ -387,8 +386,6 @@ class AggregateDetailsAction extends Action {
 			'time' => $time_from,
 			'udp_rtt' => $macro[CALCULATED_ITEM_DNS_UDP_RTT_HIGH],
 			'tcp_rtt' => $macro[CALCULATED_ITEM_DNS_TCP_RTT_HIGH],
-			'test_error_message' => $this->getValueMapping(RSM_DNS_RTT_ERRORS_VALUE_MAP),
-			'test_status_message' => $this->getValueMapping(RSM_SERVICE_AVAIL_VALUE_MAP)
 		];
 		$time_till = $time_from + ($macro[CALCULATED_ITEM_DNS_DELAY] - 1);
 
@@ -433,29 +430,21 @@ class AggregateDetailsAction extends Action {
 		}
 
 		if (array_key_exists('test_result', $data) && $data['test_result'] != UP_INCONCLUSIVE_RECONFIG) {
-			// Set probes test trasport.
-			$protocol_type = $this->getValueMapping(RSM_DNS_TRANSPORT_PROTOCOL_VALUE_MAP);
+			$tldprobeid_probeid = array_combine(array_column($this->probes, 'tldprobe_hostid'), array_keys($this->probes));
+			$tldprobe_values = $this->getItemsHistoryValue([
+				'output' => ['itemid', 'hostid'],
+				'hostids' => array_column($this->probes, 'tldprobe_hostid'),
+				'filter' => ['key_' => PROBE_DNS_PROTOCOL],
+				'time_from' => $time_from,
+				'time_till' => $time_till,
+				'history' => ITEM_VALUE_TYPE_UINT64
+			]);
 
-			if (!$protocol_type) {
-				error(_('Value mapping for "Transport protocol" not found.'));
-			}
-			else {
-				$tldprobeid_probeid = array_combine(array_column($this->probes, 'tldprobe_hostid'), array_keys($this->probes));
-				$tldprobe_values = $this->getItemsHistoryValue([
-					'output' => ['itemid', 'hostid'],
-					'hostids' => array_column($this->probes, 'tldprobe_hostid'),
-					'filter' => ['key_' => PROBE_DNS_PROTOCOL],
-					'time_from' => $time_from,
-					'time_till' => $time_till,
-					'history' => ITEM_VALUE_TYPE_UINT64
-				]);
-
-				foreach ($tldprobe_values as $tldprobe_value) {
-					if (isset($tldprobe_value['history_value'])) {
-						$tldprobeid = $tldprobe_value['hostid'];
-						$probeid = $tldprobeid_probeid[$tldprobeid];
-						$this->probes[$probeid]['transport'] = $protocol_type[$tldprobe_value['history_value']];
-					}
+			foreach ($tldprobe_values as $tldprobe_value) {
+				if (isset($tldprobe_value['history_value'])) {
+					$tldprobeid = $tldprobe_value['hostid'];
+					$probeid = $tldprobeid_probeid[$tldprobeid];
+					$this->probes[$probeid]['transport'] = $tldprobe_value['history_value'];
 				}
 			}
 
@@ -580,29 +569,5 @@ class AggregateDetailsAction extends Action {
 		}
 
 		return $nsids;
-	}
-
-	/**
-	 * Collects DNSSEC-specific errors. The errors will be returned as an array with error code as index
-	 * and error description as value.
-	 *
-	 * Return array of DNSSEC-specific errors.
-	 *
-	 * @return array
-	 */
-	protected function getDnssecErrorData() {
-		$dnssec_errors = [];
-
-		// These DNS error codes include DNSSEC
-		$errors = $this->getValueMapping(RSM_DNS_RTT_ERRORS_VALUE_MAP);
-
-		// Let's filter out DNSSEC ones
-		foreach ($errors as $code => $description) {
-			if (isServiceErrorCode($code, RSM_DNSSEC)) {
-				$dnssec_errors[$code] = $description;
-			}
-		}
-
-		return $dnssec_errors;
 	}
 }

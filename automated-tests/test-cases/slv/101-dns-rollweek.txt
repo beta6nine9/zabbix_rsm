@@ -1,6 +1,6 @@
 [test-case]
 
-"101 DNS rollweek"
+"DNS rollweek"
 
 [prepare-server-database]
 

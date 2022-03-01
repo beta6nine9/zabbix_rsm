@@ -155,7 +155,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		get_valuemaps get_statusmaps get_detailed_result
 		get_avail_valuemaps
 		get_result_string get_tld_by_trigger truncate_from truncate_till alerts_enabled
-		get_real_services_period dbg info wrn fail set_on_fail
+		get_real_services_period dbg info wrn fail set_on_fail log_only_message log_stacktrace
 		format_stats_time
 		init_process finalize_process
 		slv_exit
@@ -168,7 +168,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		str_starts_with_any
 		str_ends_with
 		parse_opts parse_slv_opts override_opts
-		opt getopt setopt unsetopt optkeys ts_str ts_full selected_period
+		opt getopt setopt unsetopt optkeys ts_str ts_full ts_ymd ts_hms selected_period
 		cycle_start
 		cycle_end
 		update_slv_rtt_monthly_stats
@@ -178,6 +178,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		get_test_results
 		set_log_tld unset_log_tld
 		convert_suffixed_number
+		var_dump
 		usage);
 
 # configuration, set in set_slv_config()
@@ -1238,6 +1239,7 @@ sub __tld_service_enabled($$$)
 	if ($service eq 'rdds')
 	{
 		return 1 if (tld_interface_enabled($tld, 'rdds43', $now));
+		return 1 if (tld_interface_enabled($tld, 'rdds80', $now));
 		return 1 if (tld_interface_enabled($tld, 'rdap', $now) && !is_rdap_standalone($now));
 		return 0;
 	}
@@ -1250,11 +1252,6 @@ sub __tld_service_enabled($$$)
 sub enabled_item_key_from_interface
 {
 	my $interface = shift;
-
-	if ($interface eq 'rdds43' || $interface eq 'rdds80')
-	{
-		return 'rdds.enabled';
-	}
 
 	return "$interface.enabled";
 }
@@ -1472,10 +1469,6 @@ sub tld_interface_enabled($$$)
 	if ($interface eq 'rdap')
 	{
 		$macro = '{$RDAP.TLD.ENABLED}';
-	}
-	elsif ($interface eq 'rdds43' || $interface eq 'rdds80')
-	{
-		$macro = '{$RSM.TLD.RDDS.ENABLED}';
 	}
 	else
 	{
@@ -4157,7 +4150,7 @@ sub slv_exit
 
 	finalize_process($rv);
 
-	if ($rv != SUCCESS)
+	if ($rv != SUCCESS && log_stacktrace())
 	{
 		map { __log('err', $_) } split("\n", Devel::StackTrace->new()->as_string());
 	}
@@ -4241,6 +4234,38 @@ my $on_fail_cb;
 sub set_on_fail
 {
 	$on_fail_cb = shift;
+}
+
+my $log_only_message = 0;
+
+sub log_only_message(;$)
+{
+	my $flag = shift;
+
+	my $prev = $log_only_message;
+
+	if (defined($flag))
+	{
+		$log_only_message = $flag;
+	}
+
+	return $prev;
+}
+
+my $log_stacktrace = 1;
+
+sub log_stacktrace(;$)
+{
+	my $flag = shift;
+
+	my $prev = $log_stacktrace;
+
+	if (defined($flag))
+	{
+		$log_stacktrace = $flag;
+	}
+
+	return $prev;
 }
 
 sub fail
@@ -4941,6 +4966,9 @@ sub recalculate_downtime($$$$$$)
 	my $incident_recover  = shift; # how many cycles have to succeed to recover from the incident
 	my $delay             = shift;
 
+	wrn("TODO-UPGRADE-6: recalculate_downtime() needs to be re-implemented because of changes in auditlog");
+	return;
+
 	fail("not supported when running in --dry-run mode") if (opt('dry-run'));
 
 	# get service from item's key ('DNS', 'DNS.NS', 'RDDS', 'RDAP')
@@ -5547,6 +5575,11 @@ sub convert_suffixed_number($)
 	substr($number, -1) = '';
 
 	return $number * $suffix_map{$suffix};
+}
+
+sub var_dump
+{
+	print Dumper @_;
 }
 
 sub usage
@@ -6242,7 +6275,14 @@ sub __log
 
 		flock($stdout_lock_handle, LOCK_EX) or die("cannot lock \"$stdout_lock_file\": $!");
 
-		print {$stdout ? *STDOUT : *STDERR} (sprintf("%6d:", $$), ts_str(), " [$priority] ", $server_str, ($cur_tld eq "" ? "" : "$cur_tld: "), __func(), "$msg\n");
+		if (log_only_message())
+		{
+			print {$stdout ? *STDOUT : *STDERR} ("[$priority] $msg\n");
+		}
+		else
+		{
+			print {$stdout ? *STDOUT : *STDERR} (sprintf("%6d:", $$), ts_str(), " [$priority] ", $server_str, ($cur_tld eq "" ? "" : "$cur_tld: "), __func(), "$msg\n");
+		}
 
 		# flush stdout
 		select()->flush();

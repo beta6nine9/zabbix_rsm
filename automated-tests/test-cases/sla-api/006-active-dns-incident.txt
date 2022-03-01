@@ -1,6 +1,6 @@
 [test-case]
 
-"006 Active DNS incident"
+"Active DNS incident"
 
 [prepare-server-database]
 

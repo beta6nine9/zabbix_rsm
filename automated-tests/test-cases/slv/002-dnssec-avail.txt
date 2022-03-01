@@ -1,6 +1,6 @@
 [test-case]
 
-"002 DNSSEC availability up/down"
+"DNSSEC availability up/down"
 
 [prepare-server-database]
 

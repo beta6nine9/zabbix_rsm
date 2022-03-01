@@ -62,8 +62,9 @@ class IncidentsListAction extends Action {
 		elseif ($this->hasInput('filter_rst')) {
 			$data += [
 				'filter_search' => '',
-				'from' => ZBX_PERIOD_DEFAULT_FROM,
-				'to' => ZBX_PERIOD_DEFAULT_TO
+				// TODO-UPGRADE-6: default period
+				//'from' => ZBX_PERIOD_DEFAULT_FROM,
+				//'to' => ZBX_PERIOD_DEFAULT_TO
 			];
 
 			CProfile::delete('web.rsm.incidents.filter.search');
@@ -962,7 +963,7 @@ class IncidentsListAction extends Action {
 			'incident_from' => date(DATE_TIME_FORMAT_SECONDS, $server_now - $macros[RSM_ROLLWEEK_SECONDS]),
 			'incident_to' => date(DATE_TIME_FORMAT_SECONDS, $server_now),
 			'active_tab' => CProfile::get('web.rsm.incidents.filter.active', 1),
-			'incidents_tab' => (int) get_cookie('incidents_tab', 0),
+			'incidents_tab' => (isset($_COOKIE['incidents_tab']) ? (int) $_COOKIE['incidents_tab'] : 0),
 		];
 
 		if (!$this->isAjaxRequest() && $this->hasInput('type')) {

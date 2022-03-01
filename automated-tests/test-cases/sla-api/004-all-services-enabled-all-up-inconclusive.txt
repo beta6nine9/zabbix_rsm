@@ -1,6 +1,6 @@
 [test-case]
 
-"004 All services enabled, all up-inconclusive"
+"All services enabled, all up-inconclusive"
 
 [prepare-server-database]
 

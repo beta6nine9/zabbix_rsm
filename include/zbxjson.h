@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -56,18 +56,12 @@
 #define ZBX_PROTO_TAG_SCRIPTID			"scriptid"
 #define ZBX_PROTO_TAG_HOSTID			"hostid"
 #define ZBX_PROTO_TAG_AVAILABLE			"available"
-#define ZBX_PROTO_TAG_SNMP_AVAILABLE		"snmp_available"
-#define ZBX_PROTO_TAG_IPMI_AVAILABLE		"ipmi_available"
-#define ZBX_PROTO_TAG_JMX_AVAILABLE		"jmx_available"
 #define ZBX_PROTO_TAG_ERROR			"error"
-#define ZBX_PROTO_TAG_SNMP_ERROR		"snmp_error"
-#define ZBX_PROTO_TAG_IPMI_ERROR		"ipmi_error"
-#define ZBX_PROTO_TAG_JMX_ERROR			"jmx_error"
 #define ZBX_PROTO_TAG_USERNAME			"username"
 #define ZBX_PROTO_TAG_PASSWORD			"password"
 #define ZBX_PROTO_TAG_SID			"sid"
 #define ZBX_PROTO_TAG_VERSION			"version"
-#define ZBX_PROTO_TAG_HOST_AVAILABILITY		"host availability"
+#define ZBX_PROTO_TAG_INTERFACE_AVAILABILITY	"interface availability"
 #define ZBX_PROTO_TAG_HISTORY_DATA		"history data"
 #define ZBX_PROTO_TAG_DISCOVERY_DATA		"discovery data"
 #define ZBX_PROTO_TAG_AUTOREGISTRATION		"auto registration"
@@ -89,7 +83,6 @@
 #define ZBX_PROTO_TAG_SEVERITY			"severity"
 #define ZBX_PROTO_TAG_HOSTS			"hosts"
 #define ZBX_PROTO_TAG_GROUPS			"groups"
-#define ZBX_PROTO_TAG_APPLICATIONS		"applications"
 #define ZBX_PROTO_TAG_TAGS			"tags"
 #define ZBX_PROTO_TAG_TAG			"tag"
 #define ZBX_PROTO_TAG_PROBLEM_EVENTID		"p_eventid"
@@ -164,19 +157,35 @@
 #define ZBX_PROTO_TAG_SSL_KEY_PASSWORD		"ssl_key_password"
 #define ZBX_PROTO_TAG_MAINTENANCE_STATUS	"maintenance_status"
 #define ZBX_PROTO_TAG_MAINTENANCE_TYPE		"maintenance_type"
-#define ZBX_PROTO_TAG_SNMP_AVAILABLE		"snmp_available"
-#define ZBX_PROTO_TAG_IPMI_AVAILABLE		"ipmi_available"
 #define ZBX_PROTO_TAG_IPMI_AUTHTYPE		"ipmi_authtype"
 #define ZBX_PROTO_TAG_IPMI_PRIVILEGE		"ipmi_privilege"
 #define ZBX_PROTO_TAG_IPMI_USERNAME		"ipmi_username"
 #define ZBX_PROTO_TAG_IPMI_PASSWORD		"ipmi_password"
-#define ZBX_PROTO_TAG_JMX_AVAILABLE		"jmx_available"
 #define ZBX_PROTO_TAG_DATA_TYPE			"datatype"
 #define ZBX_PROTO_TAG_PROXY_DELAY		"proxy_delay"
 #define ZBX_PROTO_TAG_EXPRESSIONS		"expressions"
 #define ZBX_PROTO_TAG_EXPRESSION		"expression"
 #define ZBX_PROTO_TAG_CLIENTIP			"clientip"
+#define ZBX_PROTO_TAG_ITEM_TAGS			"item_tags"
 #define ZBX_PROTO_TAG_PROXY_UPLOAD		"upload"
+#define ZBX_PROTO_TAG_DASHBOARDID		"dashboardid"
+#define ZBX_PROTO_TAG_USERID			"userid"
+#define ZBX_PROTO_TAG_PERIOD			"period"
+#define ZBX_PROTO_TAG_NOW			"now"
+#define ZBX_PROTO_TAG_SESSIONID			"sessionid"
+#define ZBX_PROTO_TAG_SIGN			"sign"
+#define ZBX_PROTO_TAG_DETAIL			"detail"
+#define ZBX_PROTO_TAG_RECIPIENT			"recipient"
+#define ZBX_PROTO_TAG_RECIPIENTS		"recipients"
+#define ZBX_PROTO_TAG_LASTACCESS		"lastaccess"
+#define ZBX_PROTO_TAG_LASTACCESS_AGE		"lastaccess_age"
+#define ZBX_PROTO_TAG_DB_TIMESTAMP		"db_timestamp"
+#define ZBX_PROTO_TAG_NODE			"node"
+#define ZBX_PROTO_TAG_FAILOVER_DELAY		"failover_delay"
+#define ZBX_PROTO_TAG_SECTION			"section"
+#define ZBX_PROTO_TAG_PID			"pid"
+#define ZBX_PROTO_TAG_PROCESS_NAME		"process_name"
+#define ZBX_PROTO_TAG_PROCESS_NUM		"process_num"
 
 #define ZBX_PROTO_VALUE_FAILED		"failed"
 #define ZBX_PROTO_VALUE_SUCCESS		"success"
@@ -211,6 +220,8 @@
 
 #define ZBX_PROTO_VALUE_PROXY_UPLOAD_ENABLED	"enabled"
 #define ZBX_PROTO_VALUE_PROXY_UPLOAD_DISABLED	"disabled"
+
+#define ZBX_PROTO_VALUE_REPORT_TEST		"report.test"
 
 typedef enum
 {
@@ -287,8 +298,7 @@ const char	*zbx_json_decodevalue(const char *p, char *string, size_t size, zbx_j
 const char	*zbx_json_decodevalue_dyn(const char *p, char **string, size_t *string_alloc, zbx_json_type_t *type);
 void		zbx_json_escape(char **string);
 int		zbx_json_open_path(const struct zbx_json_parse *jp, const char *path, struct zbx_json_parse *out);
-
-void	zbx_json_log(const struct zbx_json_parse *jp, int loglevel);
+zbx_json_type_t	zbx_json_valuetype(const char *p);
 
 /* jsonpath support */
 

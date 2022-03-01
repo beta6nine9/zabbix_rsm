@@ -1,6 +1,6 @@
 [test-case]
 
-"001 DNS availability up/down"
+"DNS availability up/down"
 
 [prepare-server-database]
 

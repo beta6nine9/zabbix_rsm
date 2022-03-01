@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -128,7 +128,7 @@ class testFormAdministrationGeneralRegexp extends CLegacyWebTest {
 		$this->zbxTestInputType('name', '1_regexp3');
 		$this->zbxTestClickWait('add');
 
-		$this->zbxTestTextPresent(['Cannot add regular expression', 'Expression cannot be empty']);
+		$this->zbxTestTextPresent(['Cannot add regular expression', 'Invalid parameter "/1/expressions/1/expression": cannot be empty.']);
 	}
 
 	public function testFormAdministrationGeneralRegexp_TestTrue() {

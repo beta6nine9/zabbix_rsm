@@ -1,6 +1,6 @@
 [test-case]
 
-"104 RDAP rollweek"
+"RDAP rollweek"
 
 [prepare-server-database]
 

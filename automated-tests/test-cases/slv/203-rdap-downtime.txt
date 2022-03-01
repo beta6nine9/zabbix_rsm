@@ -1,6 +1,6 @@
 [test-case]
 
-"203 RDAP downtime"
+"RDAP downtime"
 
 [prepare-server-database]
 
