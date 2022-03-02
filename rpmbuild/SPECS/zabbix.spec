@@ -1,4 +1,4 @@
-%define	namespace	60
+%define	namespace	50
 
 Name:		zabbix%{namespace}
 Version:	6.0.0%{rsmversion}
