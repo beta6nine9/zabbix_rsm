@@ -643,6 +643,8 @@ static int	DBpatch_6000000_12(void)
 	char		*old_value = NULL;
 	char		*new_value = NULL;
 
+	ONLY_SERVER();
+
 	GET_HOST_GROUP_ID(groupid, "Templates");
 	hostid = DBget_maxid_num("hosts", 1);
 	template_uuid = zbx_gen_uuid4(template_name);
