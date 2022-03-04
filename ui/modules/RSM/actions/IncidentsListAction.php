@@ -29,6 +29,7 @@ use CControllerResponseFatal;
 use CControllerResponseData;
 use CControllerResponseRedirect;
 use Modules\RSM\Helpers\UrlHelper;
+use CSettingsHelper;
 
 class IncidentsListAction extends Action {
 
