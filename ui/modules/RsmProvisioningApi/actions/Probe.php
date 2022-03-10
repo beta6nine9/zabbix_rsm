@@ -285,7 +285,6 @@ class Probe extends ActionBaseEx
 		// update proxy
 
 		$proxyId = $this->getProxyId($this->newObject['id']);
-		$interfaceId = $this->getInterfaceId($proxyId);
 
 		$config = [
 			'proxyid'          => $proxyId,
@@ -294,7 +293,6 @@ class Probe extends ActionBaseEx
 			'tls_psk_identity' => $this->newObject['zabbixProxyParameters']['proxyPskIdentity'],
 			'tls_psk'          => $this->newObject['zabbixProxyParameters']['proxyPsk'],
 			'interface'        => [
-				'interfaceid'  => $interfaceId,
 				'useip'        => INTERFACE_USE_IP,
 				'ip'           => $this->newObject['zabbixProxyParameters']['proxyIp'],
 				'dns'          => '',
@@ -391,8 +389,11 @@ class Probe extends ActionBaseEx
 
 		// "disable" proxy
 		$config = [
-			'proxyid' => $proxyId,
-			'status'  => HOST_STATUS_PROXY_ACTIVE,
+			'proxyid'          => $proxyId,
+			'status'           => HOST_STATUS_PROXY_ACTIVE,
+			'tls_accept'       => HOST_ENCRYPTION_PSK,
+			'tls_psk_identity' => $this->newObject['zabbixProxyParameters']['proxyPskIdentity'],
+			'tls_psk'          => $this->newObject['zabbixProxyParameters']['proxyPsk'],
 		];
 		$data = API::Proxy()->update($config);
 	}

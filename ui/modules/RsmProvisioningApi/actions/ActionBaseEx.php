@@ -1120,21 +1120,6 @@ abstract class ActionBaseEx extends ActionBase
 		return current($this->getProxyIds([$proxy]));
 	}
 
-	protected function getInterfaceId(int $hostid): ?int
-	{
-		$data = API::HostInterface()->get([
-			'output' => ['interfaceid'],
-			'hostids' => [$hostid],
-		]);
-
-		if (count($data) > 1)
-		{
-			throw new Exception('Found more than one interface');
-		}
-
-		return count($data) === 0 ? null : $data[0]['interfaceid'];
-	}
-
 	/**
 	 * Returns value map ids in the following format:
 	 * <pre>
