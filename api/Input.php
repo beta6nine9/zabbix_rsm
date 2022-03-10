@@ -10,8 +10,13 @@ class Input
 
 	public static function validate(): void
 	{
-		$urlBase = dirname($_SERVER['SCRIPT_NAME']) . '/';
+		$urlBase = dirname($_SERVER['SCRIPT_NAME']);
 		$url = $_SERVER['REQUEST_URI'];
+
+		if ($urlBase[-1] !== '/')
+		{
+			$urlBase .= '/';
+		}
 
 		if (strncmp($url, $urlBase, strlen($urlBase)))
 		{
