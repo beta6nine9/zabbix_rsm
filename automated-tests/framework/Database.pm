@@ -173,7 +173,7 @@ sub db_select_row($;$)
 
 	my $rows = db_select($query, $bind_values);
 
-	fail("query did not return any row: [$query] ".join(',', @{$bind_values})) if (scalar(@{$rows}) == 0);
+	fail("query did not return any row: [$query] ".join(',', map($_ // '<undef>', @{$bind_values}))) if (scalar(@{$rows}) == 0);
 	fail("query returned more than one row") if (scalar(@{$rows}) > 1);
 
 	return $rows->[0];

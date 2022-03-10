@@ -1393,9 +1393,17 @@ sub __cmd_check_proxy($)
 
 	my ($hostid, $status, $tls_connect, $tls_accept, $psk_identity, $psk) = @{$rows->[0]};
 
+	my $expected_tls_connect;
+	$expected_tls_connect = HOST_ENCRYPTION_PSK  if ($expected_status eq "enabled");
+	$expected_tls_connect = HOST_ENCRYPTION_NONE if ($expected_status eq "disabled");
+
+	my $expected_tls_accept;
+	$expected_tls_accept = HOST_ENCRYPTION_NONE if ($expected_status eq "enabled");
+	$expected_tls_accept = HOST_ENCRYPTION_PSK  if ($expected_status eq "disabled");
+
 	__expect($status        , $statuses->{$expected_status}, "unexpected status '%d', expected '%d'");
-	__expect($tls_connect   , HOST_ENCRYPTION_PSK          , "unexpected value of hosts.tls_connect '%d', expected '%d'");
-	__expect($tls_accept    , HOST_ENCRYPTION_NONE         , "unexpected value of hosts.tls_accept '%d', expected '%d'");
+	__expect($tls_connect   , $expected_tls_connect        , "unexpected value of hosts.tls_connect '%d', expected '%d'");
+	__expect($tls_accept    , $expected_tls_accept         , "unexpected value of hosts.tls_accept '%d', expected '%d'");
 	__expect($psk_identity  , $expected_psk_identity       , "unexpected psk identity '%s', expected '%s'");
 	__expect($psk           , $expected_psk                , "unexpected psk '%s', expected '%s'");
 
@@ -1825,7 +1833,7 @@ sub __cmd_check_trigger($)
 	# as checking other types of objects.
 	#
 	# Steps:
-	# * parse expression and replace all "{item.function(params)}" with "{functionid}"
+	# * parse expression and replace all "function(/host/item[,params])" with "{functionid}"
 	# * do the same for recovery_expression
 	# * compare row from "triggers" table with expected values, ignore expression and recovery_expression for now
 	# * compare expression
@@ -1852,9 +1860,17 @@ sub __cmd_check_trigger($)
 
 	my $callback = sub
 	{
-		my $item      = shift;
 		my $function  = shift;
+		my $host_expr = shift;
+		my $item      = shift;
 		my $parameter = shift;
+
+		if ($host_expr ne $host)
+		{
+			fail("host '$host_expr' used in expression differs from the host '$host' that is being checked");
+		}
+
+		$parameter = '$' . $parameter;
 
 		my $itemid = __get_itemid($host, $item);
 
@@ -1898,17 +1914,17 @@ sub __cmd_check_trigger($)
 
 	# replace textual function calls with functionids in $expression and $recovery_expression; set $triggerid via $callback
 
-	my $pattern = '\{([\w\.]+(?:\[[^\]]+\])?)\.(\w+)\((.*?)\)\}'; # extracting parts from {item.function(parameter)}
+	my $pattern = '(\w+)\(/([\w\- ]+)/([\w\.]+(?:\[[^\]]+\])?)((?:,.*?)?)\)'; # extracting parts from function(/host/item[,parameter])
 
 	$expression_field = "expression";
 	$expression_pattern = ($expression =~ s/$pattern/{%}/gr);
-	$expression =~ s/$pattern/$callback->($1,$2,$3)/ge;
+	$expression =~ s/$pattern/$callback->($1,$2,$3,$4)/ge;
 
 	if ($recovery_expression)
 	{
 		$expression_field = "recovery_expression";
 		$expression_pattern = ($recovery_expression =~ s/$pattern/{%}/gr);
-		$recovery_expression =~ s/$pattern/$callback->($1,$2,$3)/ge;
+		$recovery_expression =~ s/$pattern/$callback->($1,$2,$3,$4)/ge;
 	}
 
 	# now, when we have $triggerid, we can check most of the values in the database
