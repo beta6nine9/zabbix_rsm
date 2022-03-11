@@ -259,19 +259,8 @@ class Tld extends MonitoringTarget
 			],
 		];
 		$data = API::Host()->create($config);
-		$hostid = $data["hostids"][0];
 
-		$config = [
-			"hostid"   => $hostid,
-			"name"     => "RSM Service Availability",
-			"mappings" => [
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "0", "newvalue" => "Down" ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "1", "newvalue" => "Up"   ],
-			],
-		];
-		$data = API::ValueMap()->create($config);
-
-		return $hostid;
+		return $data["hostids"][0];
 	}
 
 	protected function createTemplates(): void
@@ -288,135 +277,6 @@ class Tld extends MonitoringTarget
 			],
 		];
 		$data = API::Template()->create($config);
-		$templateId = $data["templateids"][0];
-
-		$config = [
-			"hostid"   => $templateId,
-			"name"     => "Service state",
-			"mappings" => [
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "0", "newvalue" => "Down" ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "1", "newvalue" => "Up"   ],
-			],
-		];
-		$data = API::ValueMap()->create($config);
-
-		$config = [
-			"hostid"   => $templateId,
-			"name"     => "RSM DNS rtt",
-			"mappings" => [
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-1"  , "newvalue" => "Internal error"                                                                                           ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-200", "newvalue" => "DNS UDP - No reply from name server"                                                                      ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-201", "newvalue" => "Invalid reply from Name Server (obsolete)"                                                                ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-202", "newvalue" => "No UNIX timestamp (obsolete)"                                                                             ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-203", "newvalue" => "Invalid UNIX timestamp (obsolete)"                                                                        ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-204", "newvalue" => "DNSSEC error (obsolete)"                                                                                  ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-205", "newvalue" => "No reply from resolver (obsolete)"                                                                        ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-206", "newvalue" => "Keyset is not valid (obsolete)"                                                                           ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-207", "newvalue" => "DNS UDP - Expecting DNS CLASS IN but got CHAOS"                                                           ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-208", "newvalue" => "DNS UDP - Expecting DNS CLASS IN but got HESIOD"                                                          ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-209", "newvalue" => "DNS UDP - Expecting DNS CLASS IN but got something different than IN, CHAOS or HESIOD"                    ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-210", "newvalue" => "DNS UDP - Header section incomplete"                                                                      ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-211", "newvalue" => "DNS UDP - Question section incomplete"                                                                    ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-212", "newvalue" => "DNS UDP - Answer section incomplete"                                                                      ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-213", "newvalue" => "DNS UDP - Authority section incomplete"                                                                   ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-214", "newvalue" => "DNS UDP - Additional section incomplete"                                                                  ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-215", "newvalue" => "DNS UDP - Malformed DNS response"                                                                         ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-250", "newvalue" => "DNS UDP - Querying for a non existent domain - AA flag not present in response"                           ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-251", "newvalue" => "DNS UDP - Querying for a non existent domain - Domain name being queried not present in question section" ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-252", "newvalue" => "DNS UDP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got NOERROR (obsolete)"       ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-253", "newvalue" => "DNS UDP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got FORMERR"                  ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-254", "newvalue" => "DNS UDP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got SERVFAIL"                 ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-255", "newvalue" => "DNS UDP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got NOTIMP"                   ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-256", "newvalue" => "DNS UDP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got REFUSED"                  ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-257", "newvalue" => "DNS UDP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got YXDOMAIN"                 ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-258", "newvalue" => "DNS UDP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got YXRRSET"                  ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-259", "newvalue" => "DNS UDP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got NXRRSET"                  ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-260", "newvalue" => "DNS UDP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got NOTAUTH"                  ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-261", "newvalue" => "DNS UDP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got NOTZONE"                  ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-262", "newvalue" => "DNS UDP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got BADVERS or BADSIG"        ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-263", "newvalue" => "DNS UDP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got BADKEY"                   ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-264", "newvalue" => "DNS UDP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got BADTIME"                  ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-265", "newvalue" => "DNS UDP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got BADMODE"                  ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-266", "newvalue" => "DNS UDP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got BADNAME"                  ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-267", "newvalue" => "DNS UDP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got BADALG"                   ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-268", "newvalue" => "DNS UDP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got BADTRUNC"                 ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-269", "newvalue" => "DNS UDP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got BADCOOKIE"                ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-270", "newvalue" => "DNS UDP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got unexpected"               ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-400", "newvalue" => "DNS UDP - No server could be reached by local resolver"                                                   ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-401", "newvalue" => "DNS UDP - The TLD is configured as DNSSEC-enabled, but no DNSKEY was found in the apex"                   ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-402", "newvalue" => "DNS UDP - No AD bit from local resolver"                                                                  ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-403", "newvalue" => "DNS UDP - Expecting NOERROR RCODE but got NXDOMAIN from local resolver"                                   ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-2"  , "newvalue" => "DNS UDP - Expecting NOERROR RCODE but got unexpected from local resolver"                                 ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-405", "newvalue" => "DNS UDP - Unknown cryptographic algorithm"                                                                ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-406", "newvalue" => "DNS UDP - Cryptographic algorithm not implemented"                                                        ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-407", "newvalue" => "DNS UDP - No RRSIGs where found in any section, and the TLD has the DNSSEC flag enabled"                  ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-410", "newvalue" => "DNS UDP - The signature does not cover this RRset"                                                        ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-414", "newvalue" => "DNS UDP - The RRSIG found is not signed by a DNSKEY from the KEYSET of the TLD"                           ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-415", "newvalue" => "DNS UDP - Bogus DNSSEC signature"                                                                         ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-416", "newvalue" => "DNS UDP - DNSSEC signature has expired"                                                                   ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-417", "newvalue" => "DNS UDP - DNSSEC signature not incepted yet"                                                              ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-418", "newvalue" => "DNS UDP - DNSSEC signature has expiration date earlier than inception date"                               ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-419", "newvalue" => "DNS UDP - Error in NSEC3 denial of existence proof"                                                       ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-408", "newvalue" => "DNS UDP - Querying for a non existent domain - No NSEC/NSEC3 RRs were found in the authority section"     ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-422", "newvalue" => "DNS UDP - RR not covered by the given NSEC RRs"                                                           ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-423", "newvalue" => "DNS UDP - Wildcard not covered by the given NSEC RRs"                                                     ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-425", "newvalue" => "DNS UDP - The RRSIG has too few RDATA fields"                                                             ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-427", "newvalue" => "DNS UDP - Malformed DNSSEC response"                                                                      ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-600", "newvalue" => "DNS TCP - Timeout reply from name server"                                                                 ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-601", "newvalue" => "DNS TCP - Error opening connection to name server"                                                        ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-607", "newvalue" => "DNS TCP - Expecting DNS CLASS IN but got CHAOS"                                                           ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-608", "newvalue" => "DNS TCP - Expecting DNS CLASS IN but got HESIOD"                                                          ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-609", "newvalue" => "DNS TCP - Expecting DNS CLASS IN but got something different than IN, CHAOS or HESIOD"                    ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-610", "newvalue" => "DNS TCP - Header section incomplete"                                                                      ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-611", "newvalue" => "DNS TCP - Question section incomplete"                                                                    ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-612", "newvalue" => "DNS TCP - Answer section incomplete"                                                                      ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-613", "newvalue" => "DNS TCP - Authority section incomplete"                                                                   ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-614", "newvalue" => "DNS TCP - Additional section incomplete"                                                                  ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-615", "newvalue" => "DNS TCP - Malformed DNS response"                                                                         ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-650", "newvalue" => "DNS TCP - Querying for a non existent domain - AA flag not present in response"                           ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-651", "newvalue" => "DNS TCP - Querying for a non existent domain - Domain name being queried not present in question section" ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-652", "newvalue" => "DNS TCP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got NOERROR (obsolete)"       ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-653", "newvalue" => "DNS TCP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got FORMERR"                  ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-654", "newvalue" => "DNS TCP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got SERVFAIL"                 ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-655", "newvalue" => "DNS TCP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got NOTIMP"                   ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-656", "newvalue" => "DNS TCP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got REFUSED"                  ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-657", "newvalue" => "DNS TCP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got YXDOMAIN"                 ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-658", "newvalue" => "DNS TCP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got YXRRSET"                  ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-659", "newvalue" => "DNS TCP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got NXRRSET"                  ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-660", "newvalue" => "DNS TCP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got NOTAUTH"                  ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-661", "newvalue" => "DNS TCP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got NOTZONE"                  ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-662", "newvalue" => "DNS TCP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got BADVERS or BADSIG"        ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-663", "newvalue" => "DNS TCP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got BADKEY"                   ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-664", "newvalue" => "DNS TCP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got BADTIME"                  ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-665", "newvalue" => "DNS TCP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got BADMODE"                  ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-666", "newvalue" => "DNS TCP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got BADNAME"                  ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-667", "newvalue" => "DNS TCP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got BADALG"                   ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-668", "newvalue" => "DNS TCP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got BADTRUNC"                 ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-669", "newvalue" => "DNS TCP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got BADCOOKIE"                ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-670", "newvalue" => "DNS TCP - Querying for a non existent domain - Expecting NXDOMAIN RCODE but got unexpected"               ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-800", "newvalue" => "DNS TCP - No server could be reached by local resolver"                                                   ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-801", "newvalue" => "DNS TCP - The TLD is configured as DNSSEC-enabled, but no DNSKEY was found in the apex"                   ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-802", "newvalue" => "DNS TCP - No AD bit from local resolver"                                                                  ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-803", "newvalue" => "DNS TCP - Expecting NOERROR RCODE but got NXDOMAIN from local resolver"                                   ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-3"  , "newvalue" => "DNS TCP - Expecting NOERROR RCODE but got unexpected from local resolver"                                 ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-805", "newvalue" => "DNS TCP - Unknown cryptographic algorithm"                                                                ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-806", "newvalue" => "DNS TCP - Cryptographic algorithm not implemented"                                                        ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-807", "newvalue" => "DNS TCP - No RRSIGs where found in any section, and the TLD has the DNSSEC flag enabled"                  ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-810", "newvalue" => "DNS TCP - The signature does not cover this RRset"                                                        ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-814", "newvalue" => "DNS TCP - The RRSIG found is not signed by a DNSKEY from the KEYSET of the TLD"                           ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-815", "newvalue" => "DNS TCP - Bogus DNSSEC signature"                                                                         ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-816", "newvalue" => "DNS TCP - DNSSEC signature has expired"                                                                   ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-817", "newvalue" => "DNS TCP - DNSSEC signature not incepted yet"                                                              ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-818", "newvalue" => "DNS TCP - DNSSEC signature has expiration date earlier than inception date"                               ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-819", "newvalue" => "DNS TCP - Error in NSEC3 denial of existence proof"                                                       ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-808", "newvalue" => "DNS TCP - Querying for a non existent domain - No NSEC/NSEC3 RRs were found in the authority section"     ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-822", "newvalue" => "DNS TCP - RR not covered by the given NSEC RRs"                                                           ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-823", "newvalue" => "DNS TCP - Wildcard not covered by the given NSEC RRs"                                                     ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-825", "newvalue" => "DNS TCP - The RRSIG has too few RDATA fields"                                                             ],
-				[ "type" => VALUEMAP_MAPPING_TYPE_EQUAL, "value" => "-827", "newvalue" => "DNS TCP - Malformed DNSSEC response"                                                                      ],
-			],
-		];
-		$data = API::ValueMap()->create($config);
 	}
 
 	/******************************************************************************************************************
@@ -595,13 +455,6 @@ class Tld extends MonitoringTarget
 
 		if (!empty($createNsIp))
 		{
-			// get value maps
-
-			$valueMapIds = $this->getValueMapIds([
-				$this->statusHostId => ['RSM Service Availability'],
-				$testTemplateId => ['RSM DNS rtt', 'Service state'],
-			]);
-
 			// get itemid of "DNS Test" master item
 
 			$dnsTestItemId = $this->getTemplateItemId('Template DNS Test - ' . $this->newObject['id'], 'rsm.dns[');
@@ -619,11 +472,9 @@ class Tld extends MonitoringTarget
 				$statusItems += [
 					"rsm.slv.dns.ns.avail[$ns,$ip]" => [
 						'name'       => "DNS NS $ns ($ip) availability",
-						'valuemapid' => $valueMapIds[$this->statusHostId]['RSM Service Availability'],
 					],
 					"rsm.slv.dns.ns.downtime[$ns,$ip]" => [
 						'name'       => "DNS minutes of $ns ($ip) downtime",
-						'valuemapid' => null,
 					],
 				];
 
@@ -631,7 +482,6 @@ class Tld extends MonitoringTarget
 					"rsm.dns.nsid[$ns,$ip]" => [
 						'name'          => "DNS NSID of $ns,$ip",
 						'value_type'    => ITEM_VALUE_TYPE_STR,
-						'valuemapid'    => null,
 						'description'   => 'DNS Name Server Identifier of the target Name Server that was tested.',
 						'preprocessing' => [
 							[
@@ -651,7 +501,6 @@ class Tld extends MonitoringTarget
 					"rsm.dns.rtt[$ns,$ip,tcp]" => [
 						'name'          => "DNS NS RTT of $ns,$ip using tcp",
 						'value_type'    => ITEM_VALUE_TYPE_FLOAT,
-						'valuemapid'    => $valueMapIds[$testTemplateId]['RSM DNS rtt'],
 						'description'   => 'The Round-Time Trip returned when testing specific IP of Name Server using TCP protocol.',
 						'preprocessing' => [[
 							'type'                 => ZBX_PREPROC_JSONPATH,
@@ -663,7 +512,6 @@ class Tld extends MonitoringTarget
 					"rsm.dns.rtt[$ns,$ip,udp]" => [
 						'name'          => "DNS NS RTT of $ns,$ip using udp",
 						'value_type'    => ITEM_VALUE_TYPE_FLOAT,
-						'valuemapid'    => $valueMapIds[$testTemplateId]['RSM DNS rtt'],
 						'description'   => 'The Round-Time Trip returned when testing specific IP of Name Server using UDP protocol.',
 						'preprocessing' => [[
 							'type'                 => ZBX_PREPROC_JSONPATH,
@@ -681,7 +529,6 @@ class Tld extends MonitoringTarget
 					"rsm.dns.ns.status[$ns]" => [
 						'name'          => "DNS NS status of $ns",
 						'value_type'    => ITEM_VALUE_TYPE_UINT64,
-						'valuemapid'    => $valueMapIds[$testTemplateId]['Service state'],
 						'description'   => 'Status of Name Server: 0 (Down), 1 (Up). The Name Server is considered to be up if all its IPs returned successful RTTs.',
 						'preprocessing' => [[
 							'type'                 => ZBX_PREPROC_JSONPATH,
@@ -761,7 +608,6 @@ class Tld extends MonitoringTarget
 						'hostid'     => $this->statusHostId,
 						'type'       => ITEM_TYPE_TRAPPER,
 						'value_type' => ITEM_VALUE_TYPE_UINT64,
-						'valuemapid' => $item['valuemapid'],
 					];
 				}
 
@@ -775,7 +621,6 @@ class Tld extends MonitoringTarget
 						'type'          => ITEM_TYPE_DEPENDENT,
 						'master_itemid' => $dnsTestItemId,
 						'value_type'    => $item['value_type'],
-						'valuemapid'    => $item['valuemapid'],
 						'description'   => $item['description'],
 						'preprocessing' => $item['preprocessing'],
 					];

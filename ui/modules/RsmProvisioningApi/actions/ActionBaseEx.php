@@ -1121,45 +1121,6 @@ abstract class ActionBaseEx extends ActionBase
 	}
 
 	/**
-	 * Returns value map ids in the following format:
-	 * <pre>
-	 * &nbsp; [
-	 * &nbsp;     'value map 1' => '100001',
-	 * &nbsp;     'value map 2' => '100002',
-	 * &nbsp;     'value map 3' => '100003',
-	 * &nbsp;     ...,
-	 * &nbsp; ]
-	 * </pre>
-	 *
-	 * @param array $valueMaps
-	 *
-	 * @return array
-	 */
-	protected function getValueMapIds(array $valueMaps): array
-	{
-		if (empty($valueMaps))
-		{
-			return [];
-		}
-
-		$valueMapIds = [];
-
-		foreach ($valueMaps as $hostid => $mapNames)
-		{
-			$data = API::ValueMap()->get([
-				'output' => ['valuemapid', 'name'],
-				'filter' => [
-					'hostid' => $hostid,
-					'name'   => $mapNames,
-				],
-			]);
-			$valueMapIds[$hostid] = array_column($data, 'valuemapid', 'name');
-		}
-
-		return $valueMapIds;
-	}
-
-	/**
 	 * Returns host macros in the following format:
 	 * <pre>
 	 * &nbsp; [
