@@ -65,7 +65,7 @@ my %command_handlers = (
 	'check-host-template'     => [\&__cmd_check_host_template    , 1, 1], # host,template
 	'check-host-group'        => [\&__cmd_check_host_group       , 1, 1], # host,group
 	'check-host-macro'        => [\&__cmd_check_host_macro       , 1, 1], # host,macro,value
-	'check-item'              => [\&__cmd_check_item             , 1, 1], # host,key,name,status,item_type,value_type,delay,history,trends,units,params,master_item,valuemap,preproc_count,trigger_count
+	'check-item'              => [\&__cmd_check_item             , 1, 1], # host,key,name,status,item_type,value_type,delay,history,trends,units,params,master_item,preproc_count,trigger_count
 	'check-preproc'           => [\&__cmd_check_preproc          , 1, 1], # host,key,step,type,params,error_handler,error_handler_params
 	'check-trigger'           => [\&__cmd_check_trigger          , 1, 1], # host,status,priority,trigger,dependency,expression,recovery_expression
 );
@@ -1661,9 +1661,9 @@ sub __cmd_check_item($)
 	my $args = shift;
 
 	# [check-item]
-	# host,key,name,status,item_type,value_type,delay,history,trends,units,params,master_item,valuemap,preproc_count,trigger_count
+	# host,key,name,status,item_type,value_type,delay,history,trends,units,params,master_item,preproc_count,trigger_count
 
-	my ($host, $key, $name, $status, $item_type, $value_type, $delay, $history, $trends, $units, $expected_params, $master_item, $valuemap, $expected_preproc_count, $expected_trigger_count) = __unpack($args);
+	my ($host, $key, $name, $status, $item_type, $value_type, $delay, $history, $trends, $units, $expected_params, $expected_master_item, $expected_preproc_count, $expected_trigger_count) = __unpack($args);
 
 	info("checking host item (host: '$host', item: '$key')");
 
@@ -1705,7 +1705,7 @@ sub __cmd_check_item($)
 	__compare_db_row(
 		"items",
 		[["itemid", $itemid]],
-		["itemid", "key_", "hostid", "templateid", "interfaceid", "description", "valuemapid", "master_itemid"],
+		["itemid", "key_", "hostid", "templateid", "interfaceid", "description", "master_itemid"],
 		{
 			'headers'    => '',
 			'posts'      => '',
@@ -1722,19 +1722,15 @@ sub __cmd_check_item($)
 	);
 
 	my $sql = "select" .
-			" master_items.key_," .
-			"valuemap.name" .
+			" master_items.key_" .
 		 " from" .
 			" items" .
 			" left join items as master_items on master_items.itemid=items.master_itemid" .
-			" left join valuemap on valuemap.valuemapid=items.valuemapid" .
 		" where" .
 			" items.itemid=?";
 	my $params = [$itemid];
-	my $row = db_select_row($sql, $params);
-
-	__expect($row->[0] // "", $master_item, "unexpected master item '%s', expected '%s'");
-	__expect($row->[1] // "", $valuemap   , "unexpected valuemap '%s', expected '%s'");
+	my $master_item = db_select_value($sql, $params);
+	__expect($master_item // "", $expected_master_item, "unexpected master item '%s', expected '%s'");
 
 	my $preproc_count = db_select_value("select count(*) from item_preproc where itemid=?", [$itemid]);
 	__expect($preproc_count, $expected_preproc_count, "unexpected number of preproc steps '%d', expected '%d'");
