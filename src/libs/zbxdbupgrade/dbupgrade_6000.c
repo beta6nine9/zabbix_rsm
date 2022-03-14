@@ -738,6 +738,18 @@ out:
 	return ret;
 }
 
+/* 6000000, 14 - reset items.lifetime and items.request_method to default values */
+static int	DBpatch_6000000_14(void)
+{
+	int	ret = FAIL;
+
+	DB_EXEC("update items set lifetime=default(lifetime) where lifetime<>default(lifetime)");
+	DB_EXEC("update items set request_method=default(request_method) where request_method<>default(request_method)");
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
 
 #endif
 
@@ -759,5 +771,6 @@ DBPATCH_RSM(6000000, 10, 0, 0)	/* replace obsoleted positional macros $1 and $2 
 DBPATCH_RSM(6000000, 11, 0, 0)	/* register Provisioning API module and create its users */
 DBPATCH_RSM(6000000, 12, 0, 0)	/* create a template for storing value maps */
 DBPATCH_RSM(6000000, 13, 0, 0)	/* enable show_technical_errors */
+DBPATCH_RSM(6000000, 14, 0, 0)	/* reset items.lifetime and items.request_method to default values */
 
 DBPATCH_END()

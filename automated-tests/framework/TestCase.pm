@@ -2151,17 +2151,6 @@ sub __compare_db_row($$$$)
 		my $value    = $row->[$i];
 		my $expected = delete($expected_values->{$column});
 
-		# TODO: remove after fixing 'lifetime' values
-		if ($table eq 'items' && $column eq 'lifetime' && $value eq '0')
-		{
-			$value = '30d';
-		}
-		# TODO: remove after fixing 'request_method' values
-		if ($table eq 'items' && $column eq 'request_method' && $value eq '1')
-		{
-			$value = '0';
-		}
-
 		__expect($value, $expected, "unexpected value '%s', expected '%s' (column: '$column')");
 	}
 
