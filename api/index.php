@@ -16,6 +16,7 @@ function main(): void
 	{
 		User::validate();
 		Input::validate();
+		checkMonitoringTarget();
 		handleRequest();
 	}
 	catch (RsmException $e)
@@ -239,6 +240,40 @@ function sendResponse(int $resultCode, array $json)
 	header('Content-Type: application/json');
 	header('Cache-Control: no-store');
 	echo $api_output;
+}
+
+function checkMonitoringTarget(): void
+{
+	$config = getConfig('databases');
+
+	$monitoringTarget = null;
+
+	foreach ($config as $serverConfig)
+	{
+		$db = new Database($serverConfig);
+		$macroValue = $db->selectValue('select value from globalmacro where macro="{$RSM.MONITORING.TARGET}"');
+		unset($db);
+
+		if (is_null($monitoringTarget))
+		{
+			$monitoringTarget = $macroValue;
+		}
+		else if ($macroValue != $monitoringTarget)
+		{
+			throw new RsmException(500, 'General error', 'Monitoring targets between servers are different');
+		}
+	}
+
+	$objectType = Input::getObjectType();
+
+	if ($objectType === OBJECT_TYPE_TLDS && $monitoringTarget !== 'registry')
+	{
+		throw new Exception('Invalid monitoring target');
+	}
+	if ($objectType === OBJECT_TYPE_REGISTRARS && $monitoringTarget !== 'registrar')
+	{
+		throw new Exception('Invalid monitoring target');
+	}
 }
 
 function handleRequest(): void
