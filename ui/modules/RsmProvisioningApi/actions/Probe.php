@@ -154,7 +154,7 @@ class Probe extends ActionBaseEx
 					'ipv4Enable'                => (bool)$macros[$host][self::MACRO_PROBE_IP4_ENABLED],
 					'ipv6Enable'                => (bool)$macros[$host][self::MACRO_PROBE_IP6_ENABLED],
 					'proxyIp'                   => $macros[$host][self::MACRO_PROBE_PROXY_IP],
-					'proxyPort'                 => $macros[$host][self::MACRO_PROBE_PROXY_PORT],
+					'proxyPort'                 => (int)$macros[$host][self::MACRO_PROBE_PROXY_PORT],
 					'proxyPskIdentity'          => null,
 					'proxyPsk'                  => null,
 				],
