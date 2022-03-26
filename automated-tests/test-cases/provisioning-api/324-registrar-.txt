@@ -18,11 +18,11 @@
 
 [provisioning-api]
 
-"/probeNodes/probe1","PUT",200,"readwrite","300-input-probe1.json",""
-"/probeNodes/probe2","PUT",200,"readwrite","300-input-probe2-rdap.json",""
+"/probeNodes/probe1","PUT",200,"readwrite","3xx-inputs/300-probe1.json","3xx-outputs/300-probe1.json"
+"/probeNodes/probe2","PUT",200,"readwrite","3xx-inputs/300-probe2-rdap.json","3xx-outputs/300-probe2-rdap.json"
 
-"/registrars/1","PUT",200,"readwrite","300-input-rr1.json",""
-"/registrars/2","PUT",200,"readwrite","300-input-rr2-rdap.json",""
+"/registrars/1","PUT",200,"readwrite","3xx-inputs/300-rr1.json","3xx-outputs/300-rr1.json"
+"/registrars/2","PUT",200,"readwrite","3xx-inputs/300-rr2-rdap.json","3xx-outputs/300-rr2-rdap.json"
 
 [check-proxy]
 

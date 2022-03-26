@@ -18,32 +18,32 @@
 
 [provisioning-api]
 
-"/registrars"  ,"GET",200,"readonly","",""
-"/registrars/1","GET",404,"readonly","",""
+"/registrars"  ,"GET",200,"readonly","","0xx-error-outputs/013-get-list-empty.json"
+"/registrars/1","GET",404,"readonly","","0xx-error-outputs/013-get-single-not-found.json"
 
-"/registrars"  ,"GET",200,"readwrite","",""
-"/registrars/1","GET",404,"readwrite","",""
+"/registrars"  ,"GET",200,"readwrite","","0xx-error-outputs/013-get-list-empty.json"
+"/registrars/1","GET",404,"readwrite","","0xx-error-outputs/013-get-single-not-found.json"
 
-"/registrars/1","PUT",200,"readwrite","000-input-registrar.json",""
+"/registrars/1","PUT",200,"readwrite","000-input-registrar.json","0xx-error-outputs/013-put.json"
 
-"/registrars"  ,"GET",200,"readonly","",""
-"/registrars/1","GET",200,"readonly","",""
+"/registrars"  ,"GET",200,"readonly","","0xx-error-outputs/013-get-list-exists.json"
+"/registrars/1","GET",200,"readonly","","0xx-error-outputs/013-get-single-exists.json"
 
-"/registrars"  ,"GET",200,"readwrite","",""
-"/registrars/1","GET",200,"readwrite","",""
+"/registrars"  ,"GET",200,"readwrite","","0xx-error-outputs/013-get-list-exists.json"
+"/registrars/1","GET",200,"readwrite","","0xx-error-outputs/013-get-single-exists.json"
 
-"/registrars/1","PUT",200,"readwrite","000-input-registrar.json",""
+"/registrars/1","PUT",200,"readwrite","000-input-registrar.json","0xx-error-outputs/013-put.json"
 
-"/registrars"  ,"GET",200,"readonly","",""
-"/registrars/1","GET",200,"readonly","",""
+"/registrars"  ,"GET",200,"readonly","","0xx-error-outputs/013-get-list-exists.json"
+"/registrars/1","GET",200,"readonly","","0xx-error-outputs/013-get-single-exists.json"
 
-"/registrars"  ,"GET",200,"readwrite","",""
-"/registrars/1","GET",200,"readwrite","",""
+"/registrars"  ,"GET",200,"readwrite","","0xx-error-outputs/013-get-list-exists.json"
+"/registrars/1","GET",200,"readwrite","","0xx-error-outputs/013-get-single-exists.json"
 
-"/registrars/1","DELETE",200,"readwrite","",""
+"/registrars/1","DELETE",200,"readwrite","","0xx-error-outputs/013-delete.json"
 
-"/registrars"  ,"GET",200,"readonly","",""
-"/registrars/1","GET",404,"readonly","",""
+"/registrars"  ,"GET",200,"readonly","","0xx-error-outputs/013-get-list-empty.json"
+"/registrars/1","GET",404,"readonly","","0xx-error-outputs/013-get-single-not-found.json"
 
-"/registrars"  ,"GET",200,"readwrite","",""
-"/registrars/1","GET",404,"readwrite","",""
+"/registrars"  ,"GET",200,"readwrite","","0xx-error-outputs/013-get-list-empty.json"
+"/registrars/1","GET",404,"readwrite","","0xx-error-outputs/013-get-single-not-found.json"

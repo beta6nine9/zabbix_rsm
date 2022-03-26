@@ -18,12 +18,12 @@
 
 [provisioning-api]
 
-"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/105-int-params-ipv4.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/105-int-params-ipv6.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/105-int-params.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/105-int-params-proxy-ip.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/105-int-params-proxy-psk-id.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/105-int-params-proxy-psk-key.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/105-int-services.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/105-int-services-service.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/105-int-services-status.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/105-int-params-ipv4.json"         ,"1xx-probe-outputs/105-int-params-ipv4.json"
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/105-int-params-ipv6.json"         ,"1xx-probe-outputs/105-int-params-ipv6.json"
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/105-int-params.json"              ,"1xx-probe-outputs/105-int-params.json"
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/105-int-params-proxy-ip.json"     ,"1xx-probe-outputs/105-int-params-proxy-ip.json"
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/105-int-params-proxy-psk-id.json" ,"1xx-probe-outputs/105-int-params-proxy-psk-id.json"
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/105-int-params-proxy-psk-key.json","1xx-probe-outputs/105-int-params-proxy-psk-key.json"
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/105-int-services.json"            ,"1xx-probe-outputs/105-int-services.json"
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/105-int-services-service.json"    ,"1xx-probe-outputs/105-int-services-service.json"
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/105-int-services-status.json"     ,"1xx-probe-outputs/105-int-services-status.json"

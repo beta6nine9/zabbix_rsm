@@ -18,6 +18,6 @@
 
 [provisioning-api]
 
-"/registrars/1","PUT",400,"readwrite","1xx-invalid-registrar-inputs/144-str-params-rdds.json",""
-"/registrars/1","PUT",400,"readwrite","1xx-invalid-registrar-inputs/144-str-services.json",""
-"/registrars/1","PUT",400,"readwrite","1xx-invalid-registrar-inputs/144-str-services-status.json",""
+"/registrars/1","PUT",400,"readwrite","1xx-invalid-registrar-inputs/144-str-params-rdds.json"    ,"1xx-registrar-outputs/144-str-params-rdds.json"
+"/registrars/1","PUT",400,"readwrite","1xx-invalid-registrar-inputs/144-str-services.json"       ,"1xx-registrar-outputs/144-str-services.json"
+"/registrars/1","PUT",400,"readwrite","1xx-invalid-registrar-inputs/144-str-services-status.json","1xx-registrar-outputs/144-str-services-status.json"

@@ -18,10 +18,10 @@
 
 [provisioning-api]
 
-"/tlds/tld1","PUT",400,"readwrite","1xx-invalid-tld-inputs/124-str-params-dns-dnssec-enabled.json",""
-"/tlds/tld1","PUT",400,"readwrite","1xx-invalid-tld-inputs/124-str-params-dns.json",""
-"/tlds/tld1","PUT",400,"readwrite","1xx-invalid-tld-inputs/124-str-params-dns-min-ns.json",""
-"/tlds/tld1","PUT",400,"readwrite","1xx-invalid-tld-inputs/124-str-params-dns-nsips.json",""
-"/tlds/tld1","PUT",400,"readwrite","1xx-invalid-tld-inputs/124-str-params-rdds.json",""
-"/tlds/tld1","PUT",400,"readwrite","1xx-invalid-tld-inputs/124-str-services.json",""
-"/tlds/tld1","PUT",400,"readwrite","1xx-invalid-tld-inputs/124-str-services-status.json",""
+"/tlds/tld1","PUT",400,"readwrite","1xx-invalid-tld-inputs/124-str-params-dns-dnssec-enabled.json","1xx-tld-outputs/124-str-params-dns-dnssec-enabled.json"
+"/tlds/tld1","PUT",400,"readwrite","1xx-invalid-tld-inputs/124-str-params-dns.json"               ,"1xx-tld-outputs/124-str-params-dns.json"
+"/tlds/tld1","PUT",400,"readwrite","1xx-invalid-tld-inputs/124-str-params-dns-min-ns.json"        ,"1xx-tld-outputs/124-str-params-dns-min-ns.json"
+"/tlds/tld1","PUT",400,"readwrite","1xx-invalid-tld-inputs/124-str-params-dns-nsips.json"         ,"1xx-tld-outputs/124-str-params-dns-nsips.json"
+"/tlds/tld1","PUT",400,"readwrite","1xx-invalid-tld-inputs/124-str-params-rdds.json"              ,"1xx-tld-outputs/124-str-params-rdds.json"
+"/tlds/tld1","PUT",400,"readwrite","1xx-invalid-tld-inputs/124-str-services.json"                 ,"1xx-tld-outputs/124-str-services.json"
+"/tlds/tld1","PUT",400,"readwrite","1xx-invalid-tld-inputs/124-str-services-status.json"          ,"1xx-tld-outputs/124-str-services-status.json"

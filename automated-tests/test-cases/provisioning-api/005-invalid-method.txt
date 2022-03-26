@@ -18,14 +18,14 @@
 
 [provisioning-api]
 
-"/"           ,"TEST",405,"readonly","",""
-"/nonexistent","TEST",405,"readonly","",""
-"/tlds"       ,"TEST",405,"readonly","",""
-"/registrars" ,"TEST",405,"readonly","",""
-"/probeNodes" ,"TEST",405,"readonly","",""
+"/"           ,"TEST",405,"readonly","","0xx-error-outputs/005-invalid-method.json"
+"/nonexistent","TEST",405,"readonly","","0xx-error-outputs/005-invalid-method.json"
+"/tlds"       ,"TEST",405,"readonly","","0xx-error-outputs/005-invalid-method.json"
+"/registrars" ,"TEST",405,"readonly","","0xx-error-outputs/005-invalid-method.json"
+"/probeNodes" ,"TEST",405,"readonly","","0xx-error-outputs/005-invalid-method.json"
 
-"/"           ,"TEST",405,"readwrite","",""
-"/nonexistent","TEST",405,"readwrite","",""
-"/tlds"       ,"TEST",405,"readwrite","",""
-"/registrars" ,"TEST",405,"readwrite","",""
-"/probeNodes" ,"TEST",405,"readwrite","",""
+"/"           ,"TEST",405,"readwrite","","0xx-error-outputs/005-invalid-method.json"
+"/nonexistent","TEST",405,"readwrite","","0xx-error-outputs/005-invalid-method.json"
+"/tlds"       ,"TEST",405,"readwrite","","0xx-error-outputs/005-invalid-method.json"
+"/registrars" ,"TEST",405,"readwrite","","0xx-error-outputs/005-invalid-method.json"
+"/probeNodes" ,"TEST",405,"readwrite","","0xx-error-outputs/005-invalid-method.json"

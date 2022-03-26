@@ -18,14 +18,14 @@
 
 [provisioning-api]
 
-"/"           ,"PUT",403,"readonly","",""
-"/nonexistent","PUT",403,"readonly","",""
-"/tlds"       ,"PUT",403,"readonly","",""
-"/registrars" ,"PUT",403,"readonly","",""
-"/probeNodes" ,"PUT",403,"readonly","",""
+"/"           ,"PUT",403,"readonly","","0xx-error-outputs/004-forbidden.json"
+"/nonexistent","PUT",403,"readonly","","0xx-error-outputs/004-forbidden.json"
+"/tlds"       ,"PUT",403,"readonly","","0xx-error-outputs/004-forbidden.json"
+"/registrars" ,"PUT",403,"readonly","","0xx-error-outputs/004-forbidden.json"
+"/probeNodes" ,"PUT",403,"readonly","","0xx-error-outputs/004-forbidden.json"
 
-"/"           ,"DELETE",403,"readonly","",""
-"/nonexistent","DELETE",403,"readonly","",""
-"/tlds"       ,"DELETE",403,"readonly","",""
-"/registrars" ,"DELETE",403,"readonly","",""
-"/probeNodes" ,"DELETE",403,"readonly","",""
+"/"           ,"DELETE",403,"readonly","","0xx-error-outputs/004-forbidden.json"
+"/nonexistent","DELETE",403,"readonly","","0xx-error-outputs/004-forbidden.json"
+"/tlds"       ,"DELETE",403,"readonly","","0xx-error-outputs/004-forbidden.json"
+"/registrars" ,"DELETE",403,"readonly","","0xx-error-outputs/004-forbidden.json"
+"/probeNodes" ,"DELETE",403,"readonly","","0xx-error-outputs/004-forbidden.json"

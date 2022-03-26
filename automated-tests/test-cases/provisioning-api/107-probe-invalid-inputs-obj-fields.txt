@@ -18,13 +18,13 @@
 
 [provisioning-api]
 
-"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/107-obj-params-ipv4.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/107-obj-params-ipv6.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/107-obj-params-proxy-ip.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/107-obj-params-proxy-port.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/107-obj-params-proxy-psk-id.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/107-obj-params-proxy-psk-key.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/107-obj-server.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/107-obj-services.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/107-obj-services-service.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/107-obj-services-status.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/107-obj-params-ipv4.json"         ,"1xx-probe-outputs/107-obj-params-ipv4.json"
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/107-obj-params-ipv6.json"         ,"1xx-probe-outputs/107-obj-params-ipv6.json"
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/107-obj-params-proxy-ip.json"     ,"1xx-probe-outputs/107-obj-params-proxy-ip.json"
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/107-obj-params-proxy-port.json"   ,"1xx-probe-outputs/107-obj-params-proxy-port.json"
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/107-obj-params-proxy-psk-id.json" ,"1xx-probe-outputs/107-obj-params-proxy-psk-id.json"
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/107-obj-params-proxy-psk-key.json","1xx-probe-outputs/107-obj-params-proxy-psk-key.json"
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/107-obj-server.json"              ,"1xx-probe-outputs/107-obj-server.json"
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/107-obj-services.json"            ,"1xx-probe-outputs/107-obj-services.json"
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/107-obj-services-service.json"    ,"1xx-probe-outputs/107-obj-services-service.json"
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/107-obj-services-status.json"     ,"1xx-probe-outputs/107-obj-services-status.json"

@@ -18,7 +18,7 @@
 
 [provisioning-api]
 
-"/registrars" ,"GET",500,"readonly","",""
-"/registrars" ,"GET",500,"readwrite","",""
-"/registrars" ,"PUT",500,"readwrite","",""
-"/registrars" ,"DELETE",500,"readwrite","",""
+"/registrars"   ,"GET"   ,500,"readonly" ,""                        ,"0xx-error-outputs/009-invalid-monitoring-target.json"
+"/registrars"   ,"GET"   ,500,"readwrite",""                        ,"0xx-error-outputs/009-invalid-monitoring-target.json"
+"/registrars/1" ,"PUT"   ,500,"readwrite","000-input-registrar.json","0xx-error-outputs/009-invalid-monitoring-target.json"
+"/registrars/1" ,"DELETE",500,"readwrite","000-input-registrar.json","0xx-error-outputs/009-invalid-monitoring-target.json"

@@ -10,11 +10,11 @@
 
 [provisioning-api]
 
-"/probeNodes/probe1","PUT",200,"readwrite","200-input-probe1.json",""
-"/probeNodes/probe2","PUT",200,"readwrite","200-input-probe2.json",""
+"/probeNodes/probe1","PUT",200,"readwrite","2xx-inputs/200-probe1.json","2xx-outputs/200-probe1.json"
+"/probeNodes/probe2","PUT",200,"readwrite","2xx-inputs/200-probe2.json","2xx-outputs/200-probe2.json"
 
-"/tlds/tld1","PUT",200,"readwrite","200-input-tld1.json",""
-"/tlds/tld2","PUT",200,"readwrite","200-input-tld2.json",""
+"/tlds/tld1","PUT",200,"readwrite","2xx-inputs/200-tld1.json","2xx-outputs/200-tld1.json"
+"/tlds/tld2","PUT",200,"readwrite","2xx-inputs/200-tld2.json","2xx-outputs/200-tld2.json"
 
 [set-variable]
 
@@ -23,63 +23,63 @@
 [execute-ex]
 
 # [ERR] Missing option: --tld
-"2022-01-01 12:00:00",!0,"${empty-output}"                    ,"${file:246-set-minns-01-stderr.out}","/opt/zabbix/scripts/set-minns.pl --status"
+"2022-01-01 12:00:00",!0,"${empty-output}"                    ,"${file:2xx-inputs/246-set-minns-01-stderr.out}","/opt/zabbix/scripts/set-minns.pl --status"
 
 # [ERR] Missing option: --schedule, --cancel, --status
-"2022-01-01 12:00:00",!0,"${empty-output}"                    ,"${file:246-set-minns-02-stderr.out}","/opt/zabbix/scripts/set-minns.pl --tld 'some-tld'"
+"2022-01-01 12:00:00",!0,"${empty-output}"                    ,"${file:2xx-inputs/246-set-minns-02-stderr.out}","/opt/zabbix/scripts/set-minns.pl --tld 'some-tld'"
 
 # [ERR] Only one option may be used: --schedule, --cancel, --status
-"2022-01-01 12:00:00",!0,"${empty-output}"                    ,"${file:246-set-minns-03-stderr.out}","/opt/zabbix/scripts/set-minns.pl --tld 'some-tld' --schedule --cancel --status"
-"2022-01-01 12:00:00",!0,"${empty-output}"                    ,"${file:246-set-minns-03-stderr.out}","/opt/zabbix/scripts/set-minns.pl --tld 'some-tld' --schedule --cancel"
-"2022-01-01 12:00:00",!0,"${empty-output}"                    ,"${file:246-set-minns-03-stderr.out}","/opt/zabbix/scripts/set-minns.pl --tld 'some-tld' --schedule --status"
-"2022-01-01 12:00:00",!0,"${empty-output}"                    ,"${file:246-set-minns-03-stderr.out}","/opt/zabbix/scripts/set-minns.pl --tld 'some-tld' --cancel --status"
+"2022-01-01 12:00:00",!0,"${empty-output}"                    ,"${file:2xx-inputs/246-set-minns-03-stderr.out}","/opt/zabbix/scripts/set-minns.pl --tld 'some-tld' --schedule --cancel --status"
+"2022-01-01 12:00:00",!0,"${empty-output}"                    ,"${file:2xx-inputs/246-set-minns-03-stderr.out}","/opt/zabbix/scripts/set-minns.pl --tld 'some-tld' --schedule --cancel"
+"2022-01-01 12:00:00",!0,"${empty-output}"                    ,"${file:2xx-inputs/246-set-minns-03-stderr.out}","/opt/zabbix/scripts/set-minns.pl --tld 'some-tld' --schedule --status"
+"2022-01-01 12:00:00",!0,"${empty-output}"                    ,"${file:2xx-inputs/246-set-minns-03-stderr.out}","/opt/zabbix/scripts/set-minns.pl --tld 'some-tld' --cancel --status"
 
 # [ERR] Missing option: --value
-"2022-01-01 12:00:00",!0,"${empty-output}"                    ,"${file:246-set-minns-04-stderr.out}","/opt/zabbix/scripts/set-minns.pl --tld 'some-tld' --schedule"
+"2022-01-01 12:00:00",!0,"${empty-output}"                    ,"${file:2xx-inputs/246-set-minns-04-stderr.out}","/opt/zabbix/scripts/set-minns.pl --tld 'some-tld' --schedule"
 
 # [ERR] Option can be used only with --schedule: --value
-"2022-01-01 12:00:00",!0,"${empty-output}"                    ,"${file:246-set-minns-05-stderr.out}","/opt/zabbix/scripts/set-minns.pl --tld 'some-tld' --cancel --value 3"
-"2022-01-01 12:00:00",!0,"${empty-output}"                    ,"${file:246-set-minns-05-stderr.out}","/opt/zabbix/scripts/set-minns.pl --tld 'some-tld' --status --value 3"
+"2022-01-01 12:00:00",!0,"${empty-output}"                    ,"${file:2xx-inputs/246-set-minns-05-stderr.out}","/opt/zabbix/scripts/set-minns.pl --tld 'some-tld' --cancel --value 3"
+"2022-01-01 12:00:00",!0,"${empty-output}"                    ,"${file:2xx-inputs/246-set-minns-05-stderr.out}","/opt/zabbix/scripts/set-minns.pl --tld 'some-tld' --status --value 3"
 
 # [ERR] Option can be used only with --schedule: --timestamp
-"2022-01-01 12:00:00",!0,"${empty-output}"                    ,"${file:246-set-minns-06-stderr.out}","/opt/zabbix/scripts/set-minns.pl --tld 'some-tld' --cancel --timestamp ${ts:2022-01-01 00:00:00}"
-"2022-01-01 12:00:00",!0,"${empty-output}"                    ,"${file:246-set-minns-06-stderr.out}","/opt/zabbix/scripts/set-minns.pl --tld 'some-tld' --status --timestamp ${ts:2022-01-01 00:00:00}"
+"2022-01-01 12:00:00",!0,"${empty-output}"                    ,"${file:2xx-inputs/246-set-minns-06-stderr.out}","/opt/zabbix/scripts/set-minns.pl --tld 'some-tld' --cancel --timestamp ${ts:2022-01-01 00:00:00}"
+"2022-01-01 12:00:00",!0,"${empty-output}"                    ,"${file:2xx-inputs/246-set-minns-06-stderr.out}","/opt/zabbix/scripts/set-minns.pl --tld 'some-tld' --status --timestamp ${ts:2022-01-01 00:00:00}"
 
 # [ERR] Could not find tld "<tld>"
-"2022-01-01 12:00:00",!0,"${empty-output}"                    ,"${file:246-set-minns-07-stderr.out}","/opt/zabbix/scripts/set-minns.pl --tld 'some-tld' --status"
+"2022-01-01 12:00:00",!0,"${empty-output}"                    ,"${file:2xx-inputs/246-set-minns-07-stderr.out}","/opt/zabbix/scripts/set-minns.pl --tld 'some-tld' --status"
 
 # [WRN] Time of change is not specified, setting it to: <datetime> (<ts>)
 # [ERR] Specified value is the same as current value
-"2022-01-01 12:00:00",!0,"${file:246-set-minns-08-stdout.out}","${file:246-set-minns-08-stderr.out}","/opt/zabbix/scripts/set-minns.pl --tld 'tld1' --schedule --value 2"
+"2022-01-01 12:00:00",!0,"${file:2xx-inputs/246-set-minns-08-stdout.out}","${file:2xx-inputs/246-set-minns-08-stderr.out}","/opt/zabbix/scripts/set-minns.pl --tld 'tld1' --schedule --value 2"
 
 # [ERR] Specified time is in the past
-"2022-01-01 12:00:00",!0,"${file:246-set-minns-09-stdout.out}","${file:246-set-minns-09-stderr.out}","/opt/zabbix/scripts/set-minns.pl --tld 'tld1' --schedule --value 3 --timestamp ${ts:2022-01-01 11:00:00}"
+"2022-01-01 12:00:00",!0,"${file:2xx-inputs/246-set-minns-09-stdout.out}","${file:2xx-inputs/246-set-minns-09-stderr.out}","/opt/zabbix/scripts/set-minns.pl --tld 'tld1' --schedule --value 3 --timestamp ${ts:2022-01-01 11:00:00}"
 
 # [ERR] Specified time is within next <n> minutes
-"2022-01-01 12:00:00",!0,"${file:246-set-minns-10-stdout.out}","${file:246-set-minns-10-stderr.out}","/opt/zabbix/scripts/set-minns.pl --tld 'tld1' --schedule --value 3 --timestamp ${ts:2022-01-01 12:10:00}"
+"2022-01-01 12:00:00",!0,"${file:2xx-inputs/246-set-minns-10-stdout.out}","${file:2xx-inputs/246-set-minns-10-stderr.out}","/opt/zabbix/scripts/set-minns.pl --tld 'tld1' --schedule --value 3 --timestamp ${ts:2022-01-01 12:10:00}"
 
 # [ERR] Cannot cancel scheduling, updating minns is not scheduled
-"2022-01-01 12:00:00",!0,"${file:246-set-minns-11-stdout.out}","${file:246-set-minns-11-stderr.out}","/opt/zabbix/scripts/set-minns.pl --tld 'tld1' --cancel"
+"2022-01-01 12:00:00",!0,"${file:2xx-inputs/246-set-minns-11-stdout.out}","${file:2xx-inputs/246-set-minns-11-stderr.out}","/opt/zabbix/scripts/set-minns.pl --tld 'tld1' --cancel"
 
 # successful cases
-"2022-01-01 12:00:00", 0,"${file:246-set-minns-12-stdout.out}","${empty-output}"                    ,"/opt/zabbix/scripts/set-minns.pl --tld 'tld1' --status"
-"2022-01-01 12:00:00", 0,"${file:246-set-minns-13-stdout.out}","${empty-output}"                    ,"/opt/zabbix/scripts/set-minns.pl --tld 'tld1' --schedule --value 3 --timestamp ${ts:2022-01-01 12:20:00}"
-"2022-01-01 12:00:00", 0,"${file:246-set-minns-14-stdout.out}","${empty-output}"                    ,"/opt/zabbix/scripts/set-minns.pl --tld 'tld1' --status"
+"2022-01-01 12:00:00", 0,"${file:2xx-inputs/246-set-minns-12-stdout.out}","${empty-output}"                    ,"/opt/zabbix/scripts/set-minns.pl --tld 'tld1' --status"
+"2022-01-01 12:00:00", 0,"${file:2xx-inputs/246-set-minns-13-stdout.out}","${empty-output}"                    ,"/opt/zabbix/scripts/set-minns.pl --tld 'tld1' --schedule --value 3 --timestamp ${ts:2022-01-01 12:20:00}"
+"2022-01-01 12:00:00", 0,"${file:2xx-inputs/246-set-minns-14-stdout.out}","${empty-output}"                    ,"/opt/zabbix/scripts/set-minns.pl --tld 'tld1' --status"
 
 # [ERR] Cannot schedule the change, there already is a scheduled change within next <n> minutes
-"2022-01-01 12:10:00",!0,"${file:246-set-minns-15-stdout.out}","${file:246-set-minns-15-stderr.out}","/opt/zabbix/scripts/set-minns.pl --tld 'tld1' --schedule --value 3 --timestamp ${ts:2022-01-01 12:30:00}"
+"2022-01-01 12:10:00",!0,"${file:2xx-inputs/246-set-minns-15-stdout.out}","${file:2xx-inputs/246-set-minns-15-stderr.out}","/opt/zabbix/scripts/set-minns.pl --tld 'tld1' --schedule --value 3 --timestamp ${ts:2022-01-01 12:30:00}"
 
 # [ERR] Cannot cancel scheduling, scheduled change is within next <n> minutes
-"2022-01-01 12:10:00",!0,"${file:246-set-minns-16-stdout.out}","${file:246-set-minns-16-stderr.out}","/opt/zabbix/scripts/set-minns.pl --tld 'tld1' --cancel"
+"2022-01-01 12:10:00",!0,"${file:2xx-inputs/246-set-minns-16-stdout.out}","${file:2xx-inputs/246-set-minns-16-stderr.out}","/opt/zabbix/scripts/set-minns.pl --tld 'tld1' --cancel"
 
 # [ERR] There already was a change during last <n> days
-"2022-02-01 12:00:00",!0,"${file:246-set-minns-17-stdout.out}","${file:246-set-minns-17-stderr.out}","/opt/zabbix/scripts/set-minns.pl --tld 'tld1' --schedule --value 3 --timestamp ${ts:2022-02-01 12:20:00}"
+"2022-02-01 12:00:00",!0,"${file:2xx-inputs/246-set-minns-17-stdout.out}","${file:2xx-inputs/246-set-minns-17-stderr.out}","/opt/zabbix/scripts/set-minns.pl --tld 'tld1' --schedule --value 3 --timestamp ${ts:2022-02-01 12:20:00}"
 
 # [ERR] Cannot cancel scheduling, updating minns is not scheduled
-"2022-02-01 12:00:00",!0,"${file:246-set-minns-18-stdout.out}","${file:246-set-minns-18-stderr.out}","/opt/zabbix/scripts/set-minns.pl --tld 'tld1' --cancel"
+"2022-02-01 12:00:00",!0,"${file:2xx-inputs/246-set-minns-18-stdout.out}","${file:2xx-inputs/246-set-minns-18-stderr.out}","/opt/zabbix/scripts/set-minns.pl --tld 'tld1' --cancel"
 
 # successful cases
-"2022-01-01 12:00:00", 0,"${file:246-set-minns-19-stdout.out}","${empty-output}"                    ,"/opt/zabbix/scripts/set-minns.pl --tld 'tld1' --cancel"
+"2022-01-01 12:00:00", 0,"${file:2xx-inputs/246-set-minns-19-stdout.out}","${empty-output}"                    ,"/opt/zabbix/scripts/set-minns.pl --tld 'tld1' --cancel"
 
 [check-host-macro]
 

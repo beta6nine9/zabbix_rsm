@@ -18,10 +18,10 @@
 
 [provisioning-api]
 
-"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/104-str-params-ipv4.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/104-str-params-ipv6.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/104-str-params.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/104-str-params-proxy-port.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/104-str-server.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/104-str-services.json",""
-"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/104-str-services-status.json",""
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/104-str-params-ipv4.json"      ,"1xx-probe-outputs/104-str-params-ipv4.json"
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/104-str-params-ipv6.json"      ,"1xx-probe-outputs/104-str-params-ipv6.json"
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/104-str-params.json"           ,"1xx-probe-outputs/104-str-params.json"
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/104-str-params-proxy-port.json","1xx-probe-outputs/104-str-params-proxy-port.json"
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/104-str-server.json"           ,"1xx-probe-outputs/104-str-server.json"
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/104-str-services.json"         ,"1xx-probe-outputs/104-str-services.json"
+"/probeNodes/probe1","PUT",400,"readwrite","1xx-invalid-probe-inputs/104-str-services-status.json"  ,"1xx-probe-outputs/104-str-services-status.json"

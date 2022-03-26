@@ -6,7 +6,6 @@
 
 [set-global-macro]
 
-"{$RSM.MONITORING.TARGET}","registry"
 "{$RSM.IP4.ROOTSERVERS1}","193.0.14.129,192.5.5.241,199.7.83.42,198.41.0.4,192.112.36.4"
 "{$RSM.IP6.ROOTSERVERS1}","2001:7fe::53,2001:500:2f::f,2001:500:9f::42,2001:503:ba3e::2:30,2001:500:12::d0d"
 "{$RSM.DNS.PROBE.ONLINE}","2"
@@ -18,6 +17,20 @@
 
 [provisioning-api]
 
-"/tlds"       ,"PUT",500,"readwrite","",""
-"/registrars" ,"PUT",500,"readwrite","",""
-"/probeNodes" ,"PUT",500,"readwrite","",""
+"/probeNodes" ,"PUT",400,"readwrite","","0xx-error-outputs/007-empty-probe-object-id.json"
+
+[set-global-macro]
+
+"{$RSM.MONITORING.TARGET}","registry"
+
+[provisioning-api]
+
+"/tlds"       ,"PUT",400,"readwrite","","0xx-error-outputs/007-empty-tld-object-id.json"
+
+[set-global-macro]
+
+"{$RSM.MONITORING.TARGET}","registrar"
+
+[provisioning-api]
+
+"/registrars" ,"PUT",400,"readwrite","","0xx-error-outputs/007-empty-registrar-object-id.json"

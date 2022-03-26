@@ -18,32 +18,32 @@
 
 [provisioning-api]
 
-"/probeNodes"       ,"GET",200,"readonly","",""
-"/probeNodes/probe1","GET",404,"readonly","",""
+"/probeNodes"       ,"GET",200,"readonly","","0xx-error-outputs/012-get-list-empty.json"
+"/probeNodes/probe1","GET",404,"readonly","","0xx-error-outputs/012-get-single-not-found.json"
 
-"/probeNodes"       ,"GET",200,"readwrite","",""
-"/probeNodes/probe1","GET",404,"readwrite","",""
+"/probeNodes"       ,"GET",200,"readwrite","","0xx-error-outputs/012-get-list-empty.json"
+"/probeNodes/probe1","GET",404,"readwrite","","0xx-error-outputs/012-get-single-not-found.json"
 
-"/probeNodes/probe1","PUT",200,"readwrite","000-input-probe.json",""
+"/probeNodes/probe1","PUT",200,"readwrite","000-input-probe.json","0xx-error-outputs/012-put.json"
 
-"/probeNodes"       ,"GET",200,"readonly","",""
-"/probeNodes/probe1","GET",200,"readonly","",""
+"/probeNodes"       ,"GET",200,"readonly","","0xx-error-outputs/012-get-list-exists.json"
+"/probeNodes/probe1","GET",200,"readonly","","0xx-error-outputs/012-get-single-exists.json"
 
-"/probeNodes"       ,"GET",200,"readwrite","",""
-"/probeNodes/probe1","GET",200,"readwrite","",""
+"/probeNodes"       ,"GET",200,"readwrite","","0xx-error-outputs/012-get-list-exists.json"
+"/probeNodes/probe1","GET",200,"readwrite","","0xx-error-outputs/012-get-single-exists.json"
 
-"/probeNodes/probe1","PUT",200,"readwrite","000-input-probe.json",""
+"/probeNodes/probe1","PUT",200,"readwrite","000-input-probe.json","0xx-error-outputs/012-put.json"
 
-"/probeNodes"       ,"GET",200,"readonly","",""
-"/probeNodes/probe1","GET",200,"readonly","",""
+"/probeNodes"       ,"GET",200,"readonly","","0xx-error-outputs/012-get-list-exists.json"
+"/probeNodes/probe1","GET",200,"readonly","","0xx-error-outputs/012-get-single-exists.json"
 
-"/probeNodes"       ,"GET",200,"readwrite","",""
-"/probeNodes/probe1","GET",200,"readwrite","",""
+"/probeNodes"       ,"GET",200,"readwrite","","0xx-error-outputs/012-get-list-exists.json"
+"/probeNodes/probe1","GET",200,"readwrite","","0xx-error-outputs/012-get-single-exists.json"
 
-"/probeNodes/probe1","DELETE",200,"readwrite","",""
+"/probeNodes/probe1","DELETE",200,"readwrite","","0xx-error-outputs/012-delete.json"
 
-"/probeNodes"       ,"GET",200,"readonly","",""
-"/probeNodes/probe1","GET",404,"readonly","",""
+"/probeNodes"       ,"GET",200,"readonly","","0xx-error-outputs/012-get-list-empty.json"
+"/probeNodes/probe1","GET",404,"readonly","","0xx-error-outputs/012-get-single-not-found.json"
 
-"/probeNodes"       ,"GET",200,"readwrite","",""
-"/probeNodes/probe1","GET",404,"readwrite","",""
+"/probeNodes"       ,"GET",200,"readwrite","","0xx-error-outputs/012-get-list-empty.json"
+"/probeNodes/probe1","GET",404,"readwrite","","0xx-error-outputs/012-get-single-not-found.json"

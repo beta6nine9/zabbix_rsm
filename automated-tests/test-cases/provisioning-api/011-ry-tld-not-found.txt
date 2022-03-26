@@ -18,32 +18,32 @@
 
 [provisioning-api]
 
-"/tlds"     ,"GET",200,"readonly","",""
-"/tlds/tld1","GET",404,"readonly","",""
+"/tlds"     ,"GET",200,"readonly","","0xx-error-outputs/011-get-list-empty.json"
+"/tlds/tld1","GET",404,"readonly","","0xx-error-outputs/011-get-single-not-found.json"
 
-"/tlds"     ,"GET",200,"readwrite","",""
-"/tlds/tld1","GET",404,"readwrite","",""
+"/tlds"     ,"GET",200,"readwrite","","0xx-error-outputs/011-get-list-empty.json"
+"/tlds/tld1","GET",404,"readwrite","","0xx-error-outputs/011-get-single-not-found.json"
 
-"/tlds/tld1" ,"PUT",200,"readwrite","000-input-tld.json",""
+"/tlds/tld1" ,"PUT",200,"readwrite","000-input-tld.json","0xx-error-outputs/011-put.json"
 
-"/tlds"     ,"GET",200,"readonly","",""
-"/tlds/tld1","GET",200,"readonly","",""
+"/tlds"     ,"GET",200,"readonly","","0xx-error-outputs/011-get-list-exists.json"
+"/tlds/tld1","GET",200,"readonly","","0xx-error-outputs/011-get-single-exists.json"
 
-"/tlds"     ,"GET",200,"readwrite","",""
-"/tlds/tld1","GET",200,"readwrite","",""
+"/tlds"     ,"GET",200,"readwrite","","0xx-error-outputs/011-get-list-exists.json"
+"/tlds/tld1","GET",200,"readwrite","","0xx-error-outputs/011-get-single-exists.json"
 
-"/tlds/tld1" ,"PUT",200,"readwrite","000-input-tld.json",""
+"/tlds/tld1","PUT",200,"readwrite","000-input-tld.json","0xx-error-outputs/011-put.json"
 
-"/tlds"     ,"GET",200,"readonly","",""
-"/tlds/tld1","GET",200,"readonly","",""
+"/tlds"     ,"GET",200,"readonly","","0xx-error-outputs/011-get-list-exists.json"
+"/tlds/tld1","GET",200,"readonly","","0xx-error-outputs/011-get-single-exists.json"
 
-"/tlds"     ,"GET",200,"readwrite","",""
-"/tlds/tld1","GET",200,"readwrite","",""
+"/tlds"     ,"GET",200,"readwrite","","0xx-error-outputs/011-get-list-exists.json"
+"/tlds/tld1","GET",200,"readwrite","","0xx-error-outputs/011-get-single-exists.json"
 
-"/tlds/tld1","DELETE",200,"readwrite","",""
+"/tlds/tld1","DELETE",200,"readwrite","","0xx-error-outputs/011-delete.json"
 
-"/tlds"     ,"GET",200,"readonly","",""
-"/tlds/tld1","GET",404,"readonly","",""
+"/tlds"     ,"GET",200,"readonly","","0xx-error-outputs/011-get-list-empty.json"
+"/tlds/tld1","GET",404,"readonly","","0xx-error-outputs/011-get-single-not-found.json"
 
-"/tlds"     ,"GET",200,"readwrite","",""
-"/tlds/tld1","GET",404,"readwrite","",""
+"/tlds"     ,"GET",200,"readwrite","","0xx-error-outputs/011-get-list-empty.json"
+"/tlds/tld1","GET",404,"readwrite","","0xx-error-outputs/011-get-single-not-found.json"

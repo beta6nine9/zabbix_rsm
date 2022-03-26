@@ -18,7 +18,7 @@
 
 [provisioning-api]
 
-"/tlds" ,"GET",500,"readonly","",""
-"/tlds" ,"GET",500,"readwrite","",""
-"/tlds" ,"PUT",500,"readwrite","",""
-"/tlds" ,"DELETE",500,"readwrite","",""
+"/tlds"      ,"GET"   ,500,"readonly" ,""                  ,"0xx-error-outputs/010-invalid-monitoring-target.json"
+"/tlds"      ,"GET"   ,500,"readwrite",""                  ,"0xx-error-outputs/010-invalid-monitoring-target.json"
+"/tlds/tld1" ,"PUT"   ,500,"readwrite","000-input-tld.json","0xx-error-outputs/010-invalid-monitoring-target.json"
+"/tlds/tld1" ,"DELETE",500,"readwrite","000-input-tld.json","0xx-error-outputs/010-invalid-monitoring-target.json"

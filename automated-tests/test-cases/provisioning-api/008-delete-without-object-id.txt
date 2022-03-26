@@ -18,6 +18,20 @@
 
 [provisioning-api]
 
-"/tlds"       ,"DELETE",500,"readwrite","",""
-"/registrars" ,"DELETE",500,"readwrite","",""
-"/probeNodes" ,"DELETE",500,"readwrite","",""
+"/probeNodes" ,"DELETE",400,"readwrite","","0xx-error-outputs/008-empty-probe-object-id.json"
+
+[set-global-macro]
+
+"{$RSM.MONITORING.TARGET}","registry"
+
+[provisioning-api]
+
+"/tlds"       ,"DELETE",400,"readwrite","","0xx-error-outputs/008-tld-object-id.json"
+
+[set-global-macro]
+
+"{$RSM.MONITORING.TARGET}","registrar"
+
+[provisioning-api]
+
+"/registrars" ,"DELETE",400,"readwrite","","0xx-error-outputs/008-registrar-object-id.json"
