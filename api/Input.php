@@ -39,21 +39,25 @@ class Input
 		switch (self::$objectType)
 		{
 			case OBJECT_TYPE_TLDS:
-				if (!is_null(self::$objectId) && !self::isValidTldId(self::$objectId))
+
+				if (($_SERVER['REQUEST_METHOD'] !== REQUEST_METHOD_GET && is_null(self::$objectId)) ||
+					(!is_null(self::$objectId) && !self::isValidTldId(self::$objectId)))
 				{
 					throw new RsmException(400, 'A valid DNS label was not provided in the TLD field in the URL');
 				}
 				break;
 
 			case OBJECT_TYPE_REGISTRARS:
-				if (!is_null(self::$objectId) && !self::isValidRegistrarId(self::$objectId))
+				if (($_SERVER['REQUEST_METHOD'] !== REQUEST_METHOD_GET && is_null(self::$objectId)) ||
+					(!is_null(self::$objectId) && !self::isValidRegistrarId(self::$objectId)))
 				{
 					throw new RsmException(400, 'The IANAID must be a positive integer in the URL');
 				}
 				break;
 
 			case OBJECT_TYPE_PROBES:
-				if (!is_null(self::$objectId) && !self::isValidProbeId(self::$objectId))
+				if (($_SERVER['REQUEST_METHOD'] !== REQUEST_METHOD_GET && is_null(self::$objectId)) ||
+					(!is_null(self::$objectId) && !self::isValidProbeId(self::$objectId)))
 				{
 					throw new RsmException(400, 'The syntax of the probe node in the URL is invalid');
 				}
