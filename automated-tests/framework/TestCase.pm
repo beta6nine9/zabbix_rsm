@@ -10,13 +10,14 @@ our @EXPORT = qw(
 );
 
 use Data::Dumper;
-use DateTime;
 use Date::Parse;
-use File::Copy;
-use File::Spec;
+use DateTime;
 use File::Basename;
+use File::Copy;
 use File::Path qw(make_path);
+use File::Spec;
 use Text::CSV_XS qw(csv);
+use Text::Diff;
 
 use Configuration;
 use Database;
@@ -252,7 +253,7 @@ sub run_test_case_command($$)
 	my $ret = 0;
 
 	my $func = $command_handlers{$command}[0];
-	my $fork = $command_handlers{$command}[2];
+	my $fork = $command_handlers{$command}[2] && !opt("no-forks");
 
 	if ($fork)
 	{
@@ -1258,21 +1259,27 @@ sub __cmd_provisioning_api($)
 		fail("unsupported user '$user', supported users: '', 'nonexistent', 'invalid_password', 'readonly', 'readwrite'");
 	}
 
-	if ($request ne '' && !File::Spec->file_name_is_absolute($request))
+	if ($request ne '')
 	{
 		info("request payload file: '%s'", $request);
 
-		my (undef, $test_case_dir, undef) = File::Spec->splitpath($test_case_filename);
+		if (!File::Spec->file_name_is_absolute($request))
+		{
+			my (undef, $test_case_dir, undef) = File::Spec->splitpath($test_case_filename);
 
-		$request = File::Spec->catfile($test_case_dir, $request);
+			$request = File::Spec->catfile($test_case_dir, $request);
+		}
 	}
-	if ($response ne '' && !File::Spec->file_name_is_absolute($response))
+	if ($response ne '')
 	{
-		info("response payload file: '%s'", $request);
+		info("response payload file: '%s'", $response);
 
-		my (undef, $test_case_dir, undef) = File::Spec->splitpath($test_case_filename);
+		if (!File::Spec->file_name_is_absolute($response))
+		{
+			my (undef, $test_case_dir, undef) = File::Spec->splitpath($test_case_filename);
 
-		$response = File::Spec->catfile($test_case_dir, $response);
+			$response = File::Spec->catfile($test_case_dir, $response);
+		}
 	}
 
 	my $payload = $request eq '' ? undef : read_file($request);
@@ -1304,7 +1311,16 @@ sub __cmd_provisioning_api($)
 
 	if ($response ne '')
 	{
-		...;
+		# uncomment write_file() to update outputs after changes in Provisioning API implementation
+		#write_file($response, $response_body);
+
+		my $expected_response_body = read_file($response);
+
+		if ($response_body ne $expected_response_body)
+		{
+			print(diff(\$expected_response_body, \$response_body), "\n");
+			fail("unexpected response");
+		}
 	}
 }
 

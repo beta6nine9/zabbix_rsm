@@ -52,6 +52,7 @@ sub main()
 		"build-proxy",
 		"build-agent",
 		"stop-on-failure",
+		"no-forks",
 		"debug",
 		"help",
 	);
@@ -344,13 +345,13 @@ run-tests.pl - execute test cases.
 
 =head1 SYNOPSIS
 
-run-tests.pl [--test-case-file <file>] ... [--test-case-dir <dir>] ... [--skip-build] [--build-server] [--build-proxy] [--build-agent] [--stop-on-failure] [--debug] [--help]
+run-tests.pl [--test-case-file <file>] ... [--test-case-dir <dir>] ... [--skip-build] [--build-server] [--build-proxy] [--build-agent] [--stop-on-failure] [--no-forks] [--debug] [--help]
 
 =head1 EXAMPLES
 
 run-tests.pl --build-proxy --build-server
 
-run-tests.pl --skip-build --test-case-file <dir>/001-*.txt
+run-tests.pl --skip-build --no-forks --test-case-file <dir>/001-*.txt
 
 run-tests.pl --skip-build $(printf -- "--test-case-file %s " $(find <dir> -name '0??-*.txt'))
 
@@ -393,6 +394,11 @@ Build Zabbix agent.
 =item B<--stop-on-failure>
 
 Stop executing test cases on the first failure.
+
+=item B<--no-forks>
+
+Do not fork when executing commands that normally would be executed in a forked process.
+Improves performance, but instead of failing the test and reporting it as failed, the whole test framework will fail.
 
 =item B<--debug>
 
