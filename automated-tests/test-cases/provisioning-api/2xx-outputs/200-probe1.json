@@ -1,0 +1,23 @@
+{
+    "resultCode": 200,
+    "title": "Update executed successfully",
+    "description": null,
+    "details": null,
+    "updatedObject": {
+        "probe": "probe1",
+        "serviceStatus": [
+            { "service": "rdap", "enabled": true },
+            { "service": "rdds", "enabled": true }
+        ],
+        "zabbixProxyParameters": {
+            "ipv4Enable": true,
+            "ipv6Enable": true,
+            "proxyIp": "192.168.200.1",
+            "proxyPort": 10001,
+            "proxyPskIdentity": null,
+            "proxyPsk": null
+        },
+        "online": true,
+        "centralServer": 1
+    }
+}

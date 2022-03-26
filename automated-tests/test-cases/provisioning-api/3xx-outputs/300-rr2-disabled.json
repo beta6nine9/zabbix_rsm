@@ -1,0 +1,31 @@
+{
+    "resultCode": 200,
+    "title": "Update executed successfully",
+    "description": null,
+    "details": {
+        "info": [
+            "Updated status of host \"2\".",
+            "Updated status of host \"2 probe1\".",
+            "Updated status of host \"2 probe2\"."
+        ]
+    },
+    "updatedObject": {
+        "registrar": "2",
+        "registrarName": "Registrar Name 2",
+        "registrarFamily": "Registrar Family 2",
+        "servicesStatus": [
+            { "service": "rdap", "enabled": false },
+            { "service": "rdds43", "enabled": false },
+            { "service": "rdds80", "enabled": false }
+        ],
+        "rddsParameters": {
+            "rdds43Server": "whois.nic.example",
+            "rdds43TestedDomain": "nic.example",
+            "rdds80Url": "https://whois.nic.example",
+            "rdapUrl": "https://www.nic.example/domain",
+            "rdapTestedDomain": "nic.example",
+            "rdds43NsString": "Name Server:"
+        },
+        "centralServer": 1
+    }
+}

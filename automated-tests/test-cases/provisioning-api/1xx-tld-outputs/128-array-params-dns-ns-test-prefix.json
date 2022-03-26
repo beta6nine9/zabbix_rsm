@@ -1,0 +1,9 @@
+{
+    "resultCode": 400,
+    "title": "Invalid domain name provided in \"tld\", \"ns\", \"rdds43Server\", \"rdds43TestedDomain\", \"rdapTestedDomain\" or \"nsTestPrefix\" element",
+    "description": null,
+    "details": {
+        "centralServer": 1
+    },
+    "updatedObject": null
+}

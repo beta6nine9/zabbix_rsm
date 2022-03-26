@@ -1,0 +1,9 @@
+{
+    "resultCode": 400,
+    "title": "Invalid IP provided in the \"ip\" element",
+    "description": null,
+    "details": {
+        "centralServer": 1
+    },
+    "updatedObject": null
+}

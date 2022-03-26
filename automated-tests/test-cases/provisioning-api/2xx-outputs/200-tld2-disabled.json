@@ -1,0 +1,42 @@
+{
+    "resultCode": 200,
+    "title": "Update executed successfully",
+    "description": null,
+    "details": {
+        "info": [
+            "Updated status of host \"tld2\".",
+            "Updated status of host \"tld2 probe1\".",
+            "Updated status of host \"tld2 probe2\"."
+        ]
+    },
+    "updatedObject": {
+        "tld": "tld2",
+        "tldType": "gTLD",
+        "dnsParameters": {
+            "nsIps": [
+                { "ns": "a.ns.tld2", "ip": "192.168.2.1" },
+                { "ns": "b.ns.tld2", "ip": "192.168.2.2" },
+                { "ns": "b.ns.tld2", "ip": "192.168.2.3" }
+            ],
+            "dnssecEnabled": false,
+            "nsTestPrefix": "www.monitoring.example",
+            "minNs": 2
+        },
+        "servicesStatus": [
+            { "service": "dnsUDP", "enabled": false },
+            { "service": "dnsTCP", "enabled": false },
+            { "service": "rdap", "enabled": false },
+            { "service": "rdds43", "enabled": false },
+            { "service": "rdds80", "enabled": false }
+        ],
+        "rddsParameters": {
+            "rdds43Server": "whois.nic.example",
+            "rdds43TestedDomain": "nic.example",
+            "rdds80Url": "https://whois.nic.example",
+            "rdapUrl": "https://www.nic.example/domain",
+            "rdapTestedDomain": "nic.example",
+            "rdds43NsString": "Name Server:"
+        },
+        "centralServer": 1
+    }
+}

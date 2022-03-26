@@ -1,0 +1,9 @@
+{
+    "resultCode": 400,
+    "title": "rddsParameters object is missing and at least one RDDS service (i.e., rdds43, rdds80 or rdap) is enabled",
+    "description": null,
+    "details": {
+        "centralServer": 1
+    },
+    "updatedObject": null
+}

@@ -1,0 +1,29 @@
+{
+    "resultCode": 200,
+    "title": "Update executed successfully",
+    "description": null,
+    "details": {
+        "info": [
+            "Updated status of host \"probe2\".",
+            "Updated status of host \"1 probe2\".",
+            "Updated status of host \"probe2 - mon\"."
+        ]
+    },
+    "updatedObject": {
+        "probe": "probe2",
+        "serviceStatus": [
+            { "service": "rdap", "enabled": false },
+            { "service": "rdds", "enabled": false }
+        ],
+        "zabbixProxyParameters": {
+            "ipv4Enable": false,
+            "ipv6Enable": false,
+            "proxyIp": "192.168.200.2",
+            "proxyPort": 10002,
+            "proxyPskIdentity": null,
+            "proxyPsk": null
+        },
+        "online": true,
+        "centralServer": 1
+    }
+}

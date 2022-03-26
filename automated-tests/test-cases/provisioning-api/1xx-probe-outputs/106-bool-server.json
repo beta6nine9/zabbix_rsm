@@ -1,0 +1,7 @@
+{
+    "resultCode": 400,
+    "title": "JSON does not comply with definition",
+    "description": "centralServer should be an integer",
+    "details": null,
+    "updatedObject": null
+}

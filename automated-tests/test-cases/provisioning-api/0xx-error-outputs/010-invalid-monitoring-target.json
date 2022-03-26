@@ -1,0 +1,18 @@
+{
+    "resultCode": 500,
+    "title": "General error",
+    "description": "Invalid monitoring target",
+    "details": {
+        "exception": "Exception",
+        "code": 0,
+        "file": "/home/asitals/icann-git/qa/api/index.php",
+        "line": 271,
+        "trace": [
+            "#0 /home/asitals/icann-git/qa/api/index.php(19): checkMonitoringTarget()",
+            "#1 /home/asitals/icann-git/qa/api/index.php(919): main()",
+            "#2 {main}"
+        ],
+        "messages": []
+    },
+    "updatedObject": null
+}

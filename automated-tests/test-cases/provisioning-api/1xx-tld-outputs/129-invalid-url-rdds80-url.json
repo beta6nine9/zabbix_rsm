@@ -1,0 +1,9 @@
+{
+    "resultCode": 400,
+    "title": "Invalid URL provided on rdds80Url",
+    "description": null,
+    "details": {
+        "centralServer": 1
+    },
+    "updatedObject": null
+}

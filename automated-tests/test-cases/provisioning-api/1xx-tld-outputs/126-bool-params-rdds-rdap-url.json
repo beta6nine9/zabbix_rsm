@@ -1,0 +1,9 @@
+{
+    "resultCode": 400,
+    "title": "The \"rdapUrl\" element can only be an URL or \"not listed\" or \"no https\"",
+    "description": null,
+    "details": {
+        "centralServer": 1
+    },
+    "updatedObject": null
+}

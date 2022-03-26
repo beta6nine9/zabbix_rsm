@@ -1,0 +1,9 @@
+{
+    "resultCode": 400,
+    "title": "JSON does not comply with definition",
+    "description": "Invalid parameter \"zabbixProxyParameters.proxyPsk\": an even number of hexadecimal characters is expected.",
+    "details": {
+        "centralServer": 1
+    },
+    "updatedObject": null
+}

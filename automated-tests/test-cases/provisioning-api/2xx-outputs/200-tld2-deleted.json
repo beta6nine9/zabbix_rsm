@@ -1,0 +1,14 @@
+{
+    "resultCode": 200,
+    "title": "Update executed successfully",
+    "description": null,
+    "details": {
+        "info": [
+            "Deleted: Host \"tld2\".",
+            "Deleted: Host \"tld2 probe1\".",
+            "Deleted: Host \"tld2 probe2\"."
+        ],
+        "centralServer": 1
+    },
+    "updatedObject": null
+}

@@ -1,0 +1,25 @@
+{
+    "resultCode": 200,
+    "title": "Update executed successfully",
+    "description": null,
+    "details": null,
+    "updatedObject": {
+        "registrar": "2",
+        "registrarName": "Registrar Name 2",
+        "registrarFamily": "Registrar Family 2",
+        "servicesStatus": [
+            { "service": "rdap", "enabled": true },
+            { "service": "rdds43", "enabled": false },
+            { "service": "rdds80", "enabled": false }
+        ],
+        "rddsParameters": {
+            "rdds43Server": null,
+            "rdds43TestedDomain": null,
+            "rdds80Url": null,
+            "rdapUrl": "https://www.nic.example/domain",
+            "rdapTestedDomain": "nic.example",
+            "rdds43NsString": null
+        },
+        "centralServer": 1
+    }
+}
