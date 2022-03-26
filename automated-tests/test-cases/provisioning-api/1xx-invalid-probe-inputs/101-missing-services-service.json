@@ -1,7 +1,6 @@
 {
     "servicesStatus": [
         { "service": "rdds", "enabled": true },
-        { "service": "rdap", "enabled": true },
         { "enabled": true }
     ],
     "zabbixProxyParameters": {
