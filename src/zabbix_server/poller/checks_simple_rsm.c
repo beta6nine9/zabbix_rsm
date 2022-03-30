@@ -663,6 +663,7 @@ static int	zbx_get_covered_rrsigs(const ldns_pkt *pkt, const ldns_rdf *owner, ld
 	*result = ldns_rr_list_new();
 
 	count = ldns_rr_list_rr_count(rrsigs);
+
 	for (i = 0; i < count; i++)
 	{
 		if (NULL == (rr = ldns_rr_list_rr(rrsigs, i)))
@@ -1576,12 +1577,12 @@ static int	zbx_check_dnssec_no_epp(const ldns_pkt *pkt, const ldns_rr_list *keys
 	if (SUCCEED == ret && 1 == auth_has_nsec3)
 		ret = zbx_verify_rrsigs(pkt, LDNS_RR_TYPE_NSEC3, keys, ns, ip, dnssec_ec, err, err_size);
 
+	/* we want to override the previous ZBX_EC_DNSSEC_RRSIG_NOT_SIGNED error with this one, if it fails */
 	if (SUCCEED == ret || ZBX_EC_DNSSEC_RRSIG_NOT_SIGNED == *dnssec_ec)
 	{
 		char			err2[ZBX_ERR_BUF_SIZE];
 		zbx_dnssec_error_t	dnssec_ec2;
 
-		/* we do not set ret here because we already failed in one of previous function calls */
 		if (SUCCEED != zbx_verify_denial_of_existence(pkt, &dnssec_ec2, err2, sizeof(err2)))
 		{
 			zbx_strlcpy(err, err2, err_size);
@@ -2167,12 +2168,12 @@ static void	create_dns_json(struct zbx_json *json, zbx_ns_t *nss, size_t nss_num
 		for (j = 0; j < nss[i].ips_num; j++)
 		{
 			zbx_json_addobject(json, NULL);
-			zbx_json_addstring(json, "ns", nss[i].name, ZBX_JSON_TYPE_STRING);
-			zbx_json_addstring(json, "ip", nss[i].ips[j].ip, ZBX_JSON_TYPE_STRING);
-			zbx_json_addstring(json, "nsid", nss[i].ips[j].nsid, ZBX_JSON_TYPE_STRING);
+			zbx_json_addstring(json, "ns"      , nss[i].name, ZBX_JSON_TYPE_STRING);
+			zbx_json_addstring(json, "ip"      , nss[i].ips[j].ip, ZBX_JSON_TYPE_STRING);
+			zbx_json_addstring(json, "nsid"    , nss[i].ips[j].nsid, ZBX_JSON_TYPE_STRING);
 			zbx_json_addstring(json, "protocol", (protocol == RSM_UDP ? "udp" : "tcp"),
 					ZBX_JSON_TYPE_STRING);
-			zbx_json_addint64(json, "rtt", nss[i].ips[j].rtt);
+			zbx_json_addint64(json, "rtt"      , nss[i].ips[j].rtt);
 			zbx_json_close(json);
 		}
 	}
@@ -2795,7 +2796,7 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 		rsm_errf(log_fd, "internal error: %s", err);
 	}
 
-	SET_STR_RESULT(result, zbx_strdup(NULL, json.buffer));
+	SET_TEXT_RESULT(result, zbx_strdup(NULL, json.buffer));
 
 	rsm_infof(log_fd, "test result %s", json.buffer);
 
@@ -3919,7 +3920,7 @@ end:
 		create_rdds_json(&json, ip43, rtt43, upd43, rdds43_server, rdds43_testedname, ip80, rtt80, rdds80_url,
 				rdds43_status, rdds80_status, (rdds43_status && rdds80_status));
 
-		SET_STR_RESULT(result, zbx_strdup(NULL, json.buffer));
+		SET_TEXT_RESULT(result, zbx_strdup(NULL, json.buffer));
 
 		rsm_infof(log_fd, "%s", json.buffer);
 
@@ -4170,7 +4171,7 @@ end:
 
 		create_rdap_json(&json, ip, rtt, base_url, testedname, subtest_result);
 
-		SET_STR_RESULT(result, zbx_strdup(NULL, json.buffer));
+		SET_TEXT_RESULT(result, zbx_strdup(NULL, json.buffer));
 
 		rsm_infof(log_fd, "%s", json.buffer);
 
