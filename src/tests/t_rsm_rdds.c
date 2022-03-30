@@ -190,7 +190,7 @@ int	main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	printf("OK: %s\n",  result.str);
+	printf("OK: %s\n",  result.text);
 
 	if (json_file)
 	{
@@ -199,7 +199,7 @@ int	main(int argc, char *argv[])
 
 		rsm_infof(log_fd, "writing to %s...", json_file);
 
-		rv = write_json_status(json_file, result.str, &error);
+		rv = write_json_status(json_file, result.text, &error);
 
 		zbx_free(error);
 
