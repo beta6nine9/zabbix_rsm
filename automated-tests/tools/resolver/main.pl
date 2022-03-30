@@ -69,31 +69,20 @@ sub reply_handler
 		$query->print();
 		inf("------------------------------ </QUERY> ----------------------------------");
 
-		my @rrsetref =
-		(
-			Net::DNS::RR->new
-			(
-				owner   => $qname,
-				ttl     => 86400,
-				class   => 'IN',
-				type    => 'A',
-				address => '127.0.0.1'
-			)
-		);
-
 		my $keypath = "$FindBin::RealBin/Krsa.example.+010+36026.private";
-
 		die("cannot find key file \"$keypath\"") unless (-r $keypath);
 
-		my $rr = Net::DNS::RR::RRSIG->create(\@rrsetref, $keypath);
+		my $rr = Net::DNS::RR->new
+		(
+			owner   => $qname,
+			ttl     => 86400,
+			class   => 'IN',
+			type    => 'DNSKEY',
+		);
 
 		push(@answer, $rr);
 
-		push(@answer, Net::DNS::RR->new
-			(
-				"$qname DNSKEY 256 3 10 (AwEAAbaRT4gWfhOU7LLzG44c/IhhjrWxO/mYU8v6EQSWrlqRlShQ9PX3 p7tM4SvlGcv91JX60f5irAkg+1w2veeG6vnURcf+EbeY2Hu5LYfJ8QJV 3wySDu562CsY0CHaeYpRcFH2mqg/hqFntcQRWJyUy/H1XHfmkR6J2vFZ M9pA2V9t)"
-			)
-		);
+		push(@answer, Net::DNS::RR::RRSIG->create([$rr], $keypath));
 
 		# specify EDNS options  { option => value }
 		$optionmask =

@@ -44,8 +44,6 @@ sub reply_handler
 
 	my (@answer, @authority, @additional);
 
-	my $rr;
-
 	inf("Received [$qname] query from $peerhost to ", $conn->{sockhost});
 
 	inf("------------------------------ <QUERY> -----------------------------------");
@@ -70,41 +68,22 @@ sub reply_handler
 		)
 	);
 
-	my @rrsetref =
-	(
-		Net::DNS::RR->new
-		(
-			owner   => $config->{'owner'},
-			ttl     => 86400,
-			class   => 'IN',
-			type    => 'A',
-			address => '127.0.0.2'
-		)
-	);
-
-	my $keypath = "$FindBin::RealBin/Krsa.$config->{'owner'}.+010+36026.private";
-	my $sigrr = Net::DNS::RR::RRSIG->create(\@rrsetref, $keypath);
-
-	push(@answer, $sigrr);
-
 	# AUTHORITY section
-	my $name = $config->{'owner'};
-	my $type = 'NSEC';
-	my @attr = qw(nxtdname typelist);
-	my @hash = ("ns1.$config->{'owner'}.", q(A NS NSEC RRSIG SOA));
+	my $keypath = "$FindBin::RealBin/Krsa.$config->{'owner'}.+010+36026.private";
+	die("cannot find key file \"$keypath\"") unless (-r $keypath);
 
-	my $hash = {};
-	@{$hash}{@attr} = @hash;
-
-	$rr = Net::DNS::RR->new(
-		name  => $name,
-		type  => $type,
-		ttl   => 86400,
-		owner => $name,
-		%$hash
+	my $rr = Net::DNS::RR->new
+	(
+		owner   => $config->{'owner'},
+		name    => $config->{'owner'},
+		ttl     => 86400,
+		class   => 'IN',
+		type    => 'NSEC',
 	);
 
 	push(@authority, $rr);
+
+	push(@authority, Net::DNS::RR::RRSIG->create([$rr], $keypath));
 
 	# specify EDNS options  { option => value }
 	my $optionmask =
