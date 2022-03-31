@@ -285,6 +285,18 @@ class RollingWeekStatusListAction extends Action {
 		return [$selected_groupids, $included_groupids];
 	}
 
+	protected function getWhereHost($filter_search, $column_name, $wildcard_support) {
+		if (!$wildcard_support)
+			return ".$column_name=" . zbx_dbstr($filter_search);
+
+		$search = str_replace('*', '%', $filter_search, $count);
+
+		if ($count === 0)
+			return ".$column_name=" . zbx_dbstr($search);
+
+		return ".$column_name LIKE " . zbx_dbstr($search);
+	}
+
 	protected function getTLDs(array $data, array $selected_groupids, array $included_groupids, $db_nr, $key) {
 		global $DB;
 
@@ -294,16 +306,16 @@ class RollingWeekStatusListAction extends Action {
 
 		// Search by exact matching registrar id.
 		if ($data['filter_search'] !== '') {
-			$where_host[] = $hosts_table_alias.'.host LIKE ('.zbx_dbstr('%'.$data['filter_search'].'%').')';
+			$where_host[] = $hosts_table_alias . $this->getWhereHost($data['filter_search'], 'host', true);
 		}
 		if ($data['filter_registrar_id'] !== '') {
-			$where_host[] = dbConditionString($hosts_table_alias.'.host ', [$data['filter_registrar_id']]);
+			$where_host[] = $hosts_table_alias . $this->getWhereHost($data['filter_registrar_id'], 'host', false);
 		}
 		if ($data['filter_registrar_name'] !== '') {
-			$where_host[] = $hosts_table_alias.'.info_1 LIKE ('.zbx_dbstr('%'.$data['filter_registrar_name'].'%').')';
+			$where_host[] = $hosts_table_alias . $this->getWhereHost($data['filter_registrar_name'], 'info_1', true);
 		}
 		if ($data['filter_registrar_family'] !== '') {
-			$where_host[] = $hosts_table_alias.'.info_2 LIKE ('.zbx_dbstr('%'.$data['filter_registrar_family'].'%').')';
+			$where_host[] = $hosts_table_alias . $this->getWhereHost($data['filter_registrar_family'], 'info_2', true);
 		}
 
 		// Stringify query where conditions.
