@@ -898,6 +898,26 @@ class RollingWeekStatusListAction extends Action {
 		$this->fetchData($data);
 		$this->selectTLDAttributes($data);
 
+		// Generate CSV with Rsmhosts
+		if ($this->getAction() === 'rsm.rollingweekstatus.csv') {
+			$csv = [];
+
+			foreach ($data['tld'] as $tld) {
+				$csv[] = $tld['host'];
+			}
+
+			$response = new CControllerResponseData(
+				['main_block' => implode("\n", $csv) . "\n"]
+			);
+
+			$response->disableView();
+
+			$response->setFileName('zbx-rolling-week-status.csv');
+			$this->setResponse($response);
+
+			return;
+		}
+
 		unset($DB['DB']);
 		$DB = $master;
 		DBconnect($error);

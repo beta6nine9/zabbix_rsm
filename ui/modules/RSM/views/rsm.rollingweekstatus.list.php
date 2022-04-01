@@ -447,4 +447,11 @@ $widget = (new CWidget())
 			->setName('rollingweek')
 	)
 	->addItem($data['module_style'])
+	->setControls(
+		(new CTag('nav', true,
+			(new CList())
+				->addItem((new CRedirectButton(_('Export to CSV'),
+					(new CUrl())->setArgument('action', 'rsm.rollingweekstatus.csv')
+				))->setId('export-to-csv'))
+		))->setAttribute('aria-label', _('Content controls')))
 	->show();

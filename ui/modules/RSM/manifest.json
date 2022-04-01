@@ -77,6 +77,11 @@
 			"class": "RollingWeekStatusListAction",
 			"view": "rsm.rollingweekstatus.list"
 		},
+		"rsm.rollingweekstatus.csv": {
+			"class": "RollingWeekStatusListAction",
+			"layout": "layout.csv",
+			"view": null
+		},
 		"rsm.incidents": {
 			"class": "IncidentsListAction",
 			"view": "rsm.incidents.list"
