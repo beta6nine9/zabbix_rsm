@@ -227,7 +227,7 @@ class testRSM extends CWebTest {
 					$this->page->removeFocus();
 					$this->page->updateViewport();
 					$this->assertScreenshotExcept(null, ['query' => 'xpath://footer[text()]'], $data['tld'].' '.
-							tab.' Test details'
+							$tab.' Test details'
 					);
 				}
 			}
