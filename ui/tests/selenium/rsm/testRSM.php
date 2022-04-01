@@ -147,6 +147,7 @@ class testRSM extends CWebTest {
 			? $this->query('id:incidents_data')->waitUntilVisible()->one()
 			: $this->waitUntilGraphIsLoaded();
 
+		$this->page->refresh();
 		$this->assertScreenshot($area,
 				$data['column'].(($data['find'] === '%') ? ' TLD Rolling week status' : ' '.$data['header'].' graph')
 		);
