@@ -123,6 +123,8 @@ class testRSM extends CWebTest {
 				->getColumn($data['column'])->query('xpath:.//a[contains(text(), '.
 				CXPathHelper::escapeQuotes($data['find']).')]')->one()->click();
 		$this->page->waitUntilReady();
+		
+		sleep(5);
 
 		// Check the header of opened page.
 		if ($data['find'] === '%') {
@@ -135,6 +137,8 @@ class testRSM extends CWebTest {
 		else {
 			$this->page->assertHeader($tld.': '.$data['header']);
 		}
+		
+		sleep(5);
 
 		// Fill the necessary date period.
 		$form->fill([
@@ -144,6 +148,8 @@ class testRSM extends CWebTest {
 
 		$form->query('button:Apply')->waitUntilClickable()->one()->click();
 		$this->page->waitUntilReady();
+		
+		sleep(5);
 
 		// Take screenshot of Incidents detail page or Graph.
 		$this->page->removeFocus();
