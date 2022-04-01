@@ -143,7 +143,6 @@ class testRSM extends CWebTest {
 		$this->page->waitUntilReady();
 
 		// Take screenshot of Incidents detail page or Graph.
-		$this->page->refresh();
 		$this->page->removeFocus();
 		$this->page->updateViewport();
 		
