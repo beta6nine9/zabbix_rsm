@@ -912,7 +912,11 @@ class RollingWeekStatusListAction extends Action {
 
 			$response->disableView();
 
-			$response->setFileName('zbx-rolling-week-status.csv');
+			$csvFile = sprintf("slam-rolling-week-%s-%s.csv",
+				date("Ymd-His"),
+				($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR ? 'registrars' : 'tlds')
+			);
+			$response->setFileName($csvFile);
 			$this->setResponse($response);
 
 			return;
