@@ -94,6 +94,8 @@ class Navigation {
 	public function buildUserMenu(CMenu $node) {
 		$node->remove(_('Support'));
 		$node->remove(_('Share'));
+		$node->remove(_('Integrations'));
+		$node->remove(_('Help'));
 	}
 
 	/**
