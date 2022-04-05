@@ -3,12 +3,12 @@
 [INF] 
 [INF] Current status:
 [INF] * time: 2022-01-01 12:00:00 (1641038400)
-[INF] * minns: 2
+[INF] * minNs: 2
 [INF] 
 [INF] Scheduling status:
 [INF] * time: 2022-01-01 12:20:00 (1641039600)
-[INF] * new minns: 3
+[INF] * new minNs: 3
 [INF] 
 [INF] Previous change:
 [INF] * time: -
-[INF] * old minns: -
+[INF] * old minNs: -

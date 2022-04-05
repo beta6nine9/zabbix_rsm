@@ -260,7 +260,7 @@ sub cancel($$$)
 
 	if (!defined($minns->{'scheduled_clock'}))
 	{
-		pfail('Cannot cancel scheduling, updating minns is not scheduled');
+		pfail('Cannot cancel scheduling, updating minNs is not scheduled');
 	}
 	if (cycle_start($^T, 60) >= $minns->{'scheduled_clock'} - DNS_MINNS_OFFSET)
 	{
@@ -282,17 +282,17 @@ sub status($$)
 	info();
 	info('Current status:');
 	info('* time: '  . format_time($^T));
-	info('* minns: ' . $minns->{'current_value'});
+	info('* minNs: ' . $minns->{'current_value'});
 
 	info();
 	info('Scheduling status:');
 	info('* time: '  . (format_time($minns->{'scheduled_clock'}) // '-'));
-	info('* new minns: ' . ($minns->{'scheduled_value'} // '-'));
+	info('* new minNs: ' . ($minns->{'scheduled_value'} // '-'));
 
 	info();
 	info('Previous change:');
 	info('* time: '  . (format_time($minns->{'previous_clock'}) // '-'));
-	info('* old minns: ' . ($minns->{'previous_value'} // '-'));
+	info('* old minNs: ' . ($minns->{'previous_value'} // '-'));
 }
 
 sub parse_minns_macro($)

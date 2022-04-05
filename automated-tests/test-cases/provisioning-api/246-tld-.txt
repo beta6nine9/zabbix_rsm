@@ -58,7 +58,7 @@
 # [ERR] Specified time is within next <n> minutes
 "2022-01-01 12:00:00",!0,"${file:2xx-inputs/246-set-minns-10-stdout.out}","${file:2xx-inputs/246-set-minns-10-stderr.out}","/opt/zabbix/scripts/set-minns.pl --tld 'tld1' --schedule --value 3 --timestamp ${ts:2022-01-01 12:10:00}"
 
-# [ERR] Cannot cancel scheduling, updating minns is not scheduled
+# [ERR] Cannot cancel scheduling, updating minNs is not scheduled
 "2022-01-01 12:00:00",!0,"${file:2xx-inputs/246-set-minns-11-stdout.out}","${file:2xx-inputs/246-set-minns-11-stderr.out}","/opt/zabbix/scripts/set-minns.pl --tld 'tld1' --cancel"
 
 # successful cases
@@ -75,7 +75,7 @@
 # [ERR] There already was a change during last <n> days
 "2022-02-01 12:00:00",!0,"${file:2xx-inputs/246-set-minns-17-stdout.out}","${file:2xx-inputs/246-set-minns-17-stderr.out}","/opt/zabbix/scripts/set-minns.pl --tld 'tld1' --schedule --value 3 --timestamp ${ts:2022-02-01 12:20:00}"
 
-# [ERR] Cannot cancel scheduling, updating minns is not scheduled
+# [ERR] Cannot cancel scheduling, updating minNs is not scheduled
 "2022-02-01 12:00:00",!0,"${file:2xx-inputs/246-set-minns-18-stdout.out}","${file:2xx-inputs/246-set-minns-18-stderr.out}","/opt/zabbix/scripts/set-minns.pl --tld 'tld1' --cancel"
 
 # successful cases

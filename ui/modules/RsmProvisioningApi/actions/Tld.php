@@ -56,7 +56,7 @@ class Tld extends MonitoringTarget
 							]],
 							'dnssecEnabled'      => ['type' => API_BOOLEAN    ],
 							'nsTestPrefix'       => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateDomainName', 'error' => 'Invalid domain name provided in "tld", "ns", "rdds43Server", "rdds43TestedDomain", "rdapTestedDomain" or "nsTestPrefix" element'],
-							'minNs'              => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateInt', 'min' => 1, 'error' => 'The "minNS" element must be a positive integer'],
+							'minNs'              => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateInt', 'min' => 1, 'error' => 'The "minNs" element must be a positive integer'],
 						]],
 						'servicesStatus'         => ['type' => API_OBJECTS    , 'uniq' => [['service']], 'fields' => [
 							'service'            => ['type' => API_RSM_CUSTOM , 'flags' => API_REQUIRED, 'function' => 'RsmValidateEnum', 'in' => ['dnsUDP', 'dnsTCP', 'rdap', 'rdds43', 'rdds80'], 'error' => 'Service is not supported'],
@@ -298,7 +298,7 @@ class Tld extends MonitoringTarget
 		{
 			if ($this->newObject['dnsParameters']['minNs'] != $this->oldObject['dnsParameters']['minNs'])
 			{
-				throw new RsmException(400, 'The minNS value is not the same as in the system');
+				throw new RsmException(400, 'The minNs value is not the same as in the system');
 			}
 		}
 	}
