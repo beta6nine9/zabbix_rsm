@@ -1,3 +1,10 @@
+Changes for rsm2.2.5
+
+Bug fixes:
+..F....... [873] fixed showing test results on a "Test details" page even after changes to Rsmhost (dimir)
+....I..... [840] fixed "ratio of failed tests" calculation during Up-inconclusive-reconfig periods (asitals)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.2.4
 
 Bug fixes:
