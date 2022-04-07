@@ -3848,16 +3848,13 @@ sub __get_valuemappings
 {
 	my $vmname = shift;
 
-	my $rows_ref = db_select("select m.value,m.newvalue from valuemaps v,mappings m where v.valuemapid=m.valuemapid and v.name='$vmname'");
+	my $rows = db_select(
+		"select m.value,m.newvalue" .
+		" from valuemap v,valuemap_mapping m" .
+		" where v.valuemapid=m.valuemapid" .
+			" and v.name='$vmname'");
 
-	my $result = {};
-
-	foreach my $row_ref (@$rows_ref)
-	{
-		$result->{$row_ref->[0]} = $row_ref->[1];
-	}
-
-	return $result;
+	return {map {$_->[0] => $_->[1]} (@{$rows})};
 }
 
 # todo: the $vmname's must be fixed accordingly
