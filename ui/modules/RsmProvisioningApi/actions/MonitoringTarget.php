@@ -217,9 +217,9 @@ abstract class MonitoringTarget extends ActionBaseEx
 
 	private function getServerId(): int
 	{
-		$serverId = null;
+		$result = null;
 
-		foreach ($GLOBALS['DB']['SERVERS'] as $server)
+		foreach ($GLOBALS['DB']['SERVERS'] as $serverId => $server)
 		{
 			if ($GLOBALS['DB']['TYPE'    ] == $server['TYPE'    ] &&
 				$GLOBALS['DB']['SERVER'  ] == $server['SERVER'  ] &&
@@ -228,17 +228,17 @@ abstract class MonitoringTarget extends ActionBaseEx
 				$GLOBALS['DB']['PASSWORD'] == $server['PASSWORD'] &&
 				$GLOBALS['DB']['DATABASE'] == $server['DATABASE'])
 			{
-				$serverId = $server['NR'];
+				$result = $serverId;
 				break;
 			}
 		}
 
-		if (is_null($serverId))
+		if (is_null($result))
 		{
 			throw new RsmException(500, 'General error', 'Could not find server id');
 		}
 
-		return $serverId;
+		return $result;
 	}
 
 	/******************************************************************************************************************
