@@ -140,7 +140,7 @@ class Probe extends ActionBaseEx
 		{
 			$result[] = [
 				'probe'                         => $host,
-				'serviceStatus'                 => [
+				'servicesStatus'                => [
 					[
 						'service'               => 'rdap',
 						'enabled'               => (bool)$macros[$host][self::MACRO_PROBE_RDAP_ENABLED],

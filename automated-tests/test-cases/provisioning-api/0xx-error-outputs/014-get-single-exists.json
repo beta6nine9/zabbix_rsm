@@ -1,6 +1,6 @@
 {
     "probe": "probe1",
-    "serviceStatus": [
+    "servicesStatus": [
         { "service": "rdap", "enabled": true },
         { "service": "rdds", "enabled": true }
     ],

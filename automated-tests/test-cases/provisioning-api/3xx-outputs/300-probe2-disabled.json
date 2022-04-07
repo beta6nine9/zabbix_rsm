@@ -12,7 +12,7 @@
     },
     "updatedObject": {
         "probe": "probe2",
-        "serviceStatus": [
+        "servicesStatus": [
             { "service": "rdap", "enabled": false },
             { "service": "rdds", "enabled": false }
         ],
