@@ -212,7 +212,6 @@ class AggregateDetailsAction extends Action {
 				'key_' => $dns_rtt_key.'['
 			],
 			'startSearch' => true,
-			'monitored' => true
 		]);
 
 		if ($rtt_items) {
