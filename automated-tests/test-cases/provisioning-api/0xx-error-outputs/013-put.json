@@ -4,7 +4,7 @@
     "description": null,
     "details": null,
     "updatedObject": {
-        "registrar": "1",
+        "registrar": 1,
         "registrarName": "Registrar Name 1",
         "registrarFamily": "Registrar Family 1",
         "servicesStatus": [

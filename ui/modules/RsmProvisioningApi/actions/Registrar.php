@@ -131,8 +131,13 @@ class Registrar extends MonitoringTarget
 
 		foreach ($hosts as $host)
 		{
+			if (!ctype_digit($host))
+			{
+				throw new RsmException(500, 'General error', 'Host was expected to be numeric: "' . $host . '"');
+			}
+
 			$result[] = [
-				'registrar'                     => $host,
+				'registrar'                     => (int)$host,
 				'registrarName'                 => $info1[$host],
 				'registrarFamily'               => $info2[$host],
 				'servicesStatus'                => [

@@ -10,7 +10,7 @@
         ]
     },
     "updatedObject": {
-        "registrar": "2",
+        "registrar": 2,
         "registrarName": "Registrar Name 2",
         "registrarFamily": "Registrar Family 2",
         "servicesStatus": [
