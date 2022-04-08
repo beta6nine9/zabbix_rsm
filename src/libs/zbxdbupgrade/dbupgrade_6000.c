@@ -751,6 +751,65 @@ out:
 	return ret;
 }
 
+/* 6000000, 15 - add missing macros - {$RDAP.BASE.URL}, {$RDAP.TEST.DOMAIN}, {$RSM.RDDS43.TEST.DOMAIN} */
+static int	DBpatch_6000000_15(void)
+{
+	int		ret = FAIL;
+
+	DB_RESULT	result = NULL;
+	DB_ROW		row;
+	unsigned int 	i;
+
+	const char	*macros[][2] = {
+		{"{$RDAP.BASE.URL}"         , "Base URL for RDAP queries, e.g. http://whois.zabbix"},
+		{"{$RDAP.TEST.DOMAIN}"      , "Test domain for RDAP queries, e.g. whois.zabbix"},
+		{"{$RSM.RDDS43.TEST.DOMAIN}", "Domain name to use when querying RDDS43 server, e.g. \"whois.example\""},
+	};
+
+	ONLY_SERVER();
+
+	for (i = 0; i < sizeof(macros) / sizeof(*macros); i++)
+	{
+		const char	*macro = macros[i][0];
+		const char	*description = macros[i][1];
+
+		result = DBselect("select"
+					" hosts.hostid"
+				" from"
+					" hosts"
+					" left join hostmacro on"
+						" hostmacro.hostid=hosts.hostid and"
+						" hostmacro.macro='%s'"
+				" where"
+					" hosts.host like 'Template Rsmhost Config %%' and"
+					" hostmacro.hostmacroid is null",
+				macro);
+
+		if (NULL == result)
+			goto out;
+
+		while (NULL != (row = DBfetch(result)))
+		{
+			zbx_uint64_t	hostid;
+
+			ZBX_STR2UINT64(hostid, row[0]);
+
+#define SQL	"insert into hostmacro set hostmacroid=" ZBX_FS_UI64 ",hostid=" ZBX_FS_UI64 ",macro='%s',value='',description='%s',type=0"
+			DB_EXEC(SQL, DBget_maxid_num("hostmacro", 1), hostid, macro, description);
+#undef SQL
+		}
+
+		DBfree_result(result);
+		result = NULL;
+	}
+
+	ret = SUCCEED;
+out:
+	DBfree_result(result);
+
+	return ret;
+}
+
 #endif
 
 DBPATCH_START(6000)
@@ -772,5 +831,6 @@ DBPATCH_RSM(6000000, 11, 0, 0)	/* register Provisioning API module and create it
 DBPATCH_RSM(6000000, 12, 0, 0)	/* create a template for storing value maps */
 DBPATCH_RSM(6000000, 13, 0, 0)	/* enable show_technical_errors */
 DBPATCH_RSM(6000000, 14, 0, 0)	/* reset items.lifetime and items.request_method to default values */
+DBPATCH_RSM(6000000, 15, 0, 0)	/* add missing macros - {$RDAP.BASE.URL}, {$RDAP.TEST.DOMAIN}, {$RSM.RDDS43.TEST.DOMAIN} */
 
 DBPATCH_END()
