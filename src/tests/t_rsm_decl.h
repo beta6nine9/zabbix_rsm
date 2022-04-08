@@ -153,6 +153,9 @@ ZBX_METRIC      parameters_common_http[] =
 	{"web.page.get",	CF_HAVEPARAMS,	NULL,			"localhost,,80"}
 };
 
-void	xml_escape_xpath(char **data) {}
+void	xml_escape_xpath(char **data)
+{
+	ZBX_UNUSED(data);
+}
 
 #endif	/* _T_RSM_DECL_H_ */
