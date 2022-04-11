@@ -857,6 +857,12 @@ static int	DBpatch_6000000_20(void)
 	return DBadd_foreign_key("rsm_false_positive", 2, &field);
 }
 
+/* 6000000, 21 - drop column events.false_positive */
+static int	DBpatch_6000000_21(void)
+{
+	return DBdrop_field("events", "false_positive");
+}
+
 #endif
 
 DBPATCH_START(6000)
@@ -884,5 +890,6 @@ DBPATCH_RSM(6000000, 17, 0, 0)	/* add userid index to table rsm_false_positive *
 DBPATCH_RSM(6000000, 18, 0, 0)	/* add userid foreign key to table rsm_false_positive */
 DBPATCH_RSM(6000000, 19, 0, 0)	/* add eventid index to table rsm_false_positive */
 DBPATCH_RSM(6000000, 20, 0, 0)	/* add eventid foreign key to table rsm_false_positive */
+DBPATCH_RSM(6000000, 21, 0, 0)	/* drop column events.false_positive */
 
 DBPATCH_END()
