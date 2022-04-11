@@ -354,7 +354,8 @@ function handlePutRequest(string $objectType, ?string $objectId, string $payload
 		throw new RsmException(400, 'JSON does not comply with definition', 'JSON contains duplicate keys');
 	}
 
-	$serverIdRequested = array_key_exists('centralServer', $json) ? $json['centralServer'] : null;
+	$serverIdWasRequested = array_key_exists('centralServer', $json);
+	$serverIdRequested = $serverIdWasRequested ? $json['centralServer'] : null;
 	$serverIdActual = findObject($objectType, $objectId);
 
 	unset($json['centralServer']);
@@ -362,6 +363,10 @@ function handlePutRequest(string $objectType, ?string $objectId, string $payload
 
 	if (is_null($serverIdRequested))
 	{
+		if ($serverIdWasRequested)
+		{
+			throw new RsmException(400, 'JSON does not comply with definition', 'centralServer should be an integer');
+		}
 		if ($objectType === 'probeNodes')
 		{
 			throw new RsmException(400, 'The centralServer must be specified.');

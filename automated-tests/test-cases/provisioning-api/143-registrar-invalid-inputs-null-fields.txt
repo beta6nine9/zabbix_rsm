@@ -27,6 +27,7 @@
 "/registrars/1","PUT",400,"readwrite","1xx-invalid-registrar-inputs/143-null-params-rdds-rdds80-url.json"          ,"1xx-registrar-outputs/143-null-params-rdds-rdds80-url.json"
 "/registrars/1","PUT",400,"readwrite","1xx-invalid-registrar-inputs/143-null-registrar-family.json"                ,"1xx-registrar-outputs/143-null-registrar-family.json"
 "/registrars/1","PUT",400,"readwrite","1xx-invalid-registrar-inputs/143-null-registrar-name.json"                  ,"1xx-registrar-outputs/143-null-registrar-name.json"
+"/registrars/1","PUT",400,"readwrite","1xx-invalid-registrar-inputs/143-null-server.json"                          ,"1xx-registrar-outputs/143-null-server.json"
 "/registrars/1","PUT",400,"readwrite","1xx-invalid-registrar-inputs/143-null-services.json"                        ,"1xx-registrar-outputs/143-null-services.json"
 "/registrars/1","PUT",400,"readwrite","1xx-invalid-registrar-inputs/143-null-services-service.json"                ,"1xx-registrar-outputs/143-null-services-service.json"
 "/registrars/1","PUT",400,"readwrite","1xx-invalid-registrar-inputs/143-null-services-status.json"                 ,"1xx-registrar-outputs/143-null-services-status.json"

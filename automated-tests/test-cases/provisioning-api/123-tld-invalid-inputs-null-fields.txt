@@ -32,6 +32,7 @@
 "/tlds/tld1","PUT",400,"readwrite","1xx-invalid-tld-inputs/123-null-params-rdds-rdds43-server.json"       ,"1xx-tld-outputs/123-null-params-rdds-rdds43-server.json"
 "/tlds/tld1","PUT",400,"readwrite","1xx-invalid-tld-inputs/123-null-params-rdds-rdds43-tested-domain.json","1xx-tld-outputs/123-null-params-rdds-rdds43-tested-domain.json"
 "/tlds/tld1","PUT",400,"readwrite","1xx-invalid-tld-inputs/123-null-params-rdds-rdds80-url.json"          ,"1xx-tld-outputs/123-null-params-rdds-rdds80-url.json"
+"/tlds/tld1","PUT",400,"readwrite","1xx-invalid-tld-inputs/123-null-server.json"                          ,"1xx-tld-outputs/123-null-server.json"
 "/tlds/tld1","PUT",400,"readwrite","1xx-invalid-tld-inputs/123-null-services.json"                        ,"1xx-tld-outputs/123-null-services.json"
 "/tlds/tld1","PUT",400,"readwrite","1xx-invalid-tld-inputs/123-null-services-service.json"                ,"1xx-tld-outputs/123-null-services-service.json"
 "/tlds/tld1","PUT",400,"readwrite","1xx-invalid-tld-inputs/123-null-services-status.json"                 ,"1xx-tld-outputs/123-null-services-status.json"
