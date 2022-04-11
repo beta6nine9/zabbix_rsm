@@ -6298,16 +6298,15 @@ sub __log
 		}
 		else
 		{
-			print {$stdout ? *STDOUT : *STDERR} (
-				sprintf("%6d:%s [%s] %s %s%s%s\n",
-					$$,
-					ts_str(),
-					$priority,
-					$server_str,
-					($cur_tld eq "" ? "" : "$cur_tld: "),
-					__func(),
-					$msg
-				)
+			printf {$stdout ? *STDOUT : *STDERR} (
+				"%6d:%s [%s] %s %s%s%s\n",
+				$$,
+				ts_str(),
+				$priority,
+				$server_str,
+				($cur_tld eq "" ? "" : "$cur_tld: "),
+				__func(),
+				$msg
 			);
 		}
 
