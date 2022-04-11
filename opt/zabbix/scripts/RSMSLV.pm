@@ -655,7 +655,7 @@ sub __get_itemid_by_sql
 	return E_ID_NONEXIST if (scalar(@$rows_ref) == 0);
         return E_ID_MULTIPLE if (scalar(@$rows_ref) > 1);
 
-        return $rows_ref->[0]->[0];
+        return $rows_ref->[0][0];
 }
 
 # Return itemids of Name Server items in form:
@@ -808,7 +808,7 @@ sub get_lastclock($$$)
 
 	return E_FAIL if (scalar(@$rows_ref) == 0);
 
-	my $itemid = $rows_ref->[0]->[0];
+	my $itemid = $rows_ref->[0][0];
 	my $lastclock;
 
 	if (get_lastvalue($itemid, $value_type, undef, \$lastclock) != SUCCESS)
@@ -841,7 +841,7 @@ sub get_oldest_clock($$$$)
 
 	return E_FAIL if (scalar(@$rows_ref) == 0);
 
-	my $itemid = $rows_ref->[0]->[0];
+	my $itemid = $rows_ref->[0][0];
 
 	$rows_ref = db_select(
 		"select min(clock)".
@@ -850,7 +850,7 @@ sub get_oldest_clock($$$$)
 			" and clock>$clock_limit"
 	);
 
-	return $rows_ref->[0]->[0];
+	return $rows_ref->[0][0];
 }
 
 # $tlds_cache{$server_key}{$service}{$clock} = ["tld1", "tld2", ...];
@@ -1139,7 +1139,7 @@ sub get_hostid
 	fail("host \"$host\" not found") if (scalar(@$rows_ref) == 0);
 	fail("multiple hosts \"$host\" found") if (scalar(@$rows_ref) > 1);
 
-	return $rows_ref->[0]->[0];
+	return $rows_ref->[0][0];
 }
 
 sub tld_exists_locally($)
@@ -1486,7 +1486,7 @@ sub tld_interface_enabled($$$)
 
 	if (scalar(@{$rows_ref}) != 0)
 	{
-		return $rows_ref->[0]->[0];
+		return $rows_ref->[0][0];
 	}
 
 	wrn("macro \"$macro\" does not exist at \"$host\", assuming $interface disabled");
@@ -1671,9 +1671,9 @@ sub db_connect
 	{
 		my $rows_ref = db_select("show status like 'Ssl_cipher';");
 
-		fail("established connection is not secure") if ($rows_ref->[0]->[1] eq "");
+		fail("established connection is not secure") if ($rows_ref->[0][1] eq "");
 
-		dbg("established connection uses \"" . $rows_ref->[0]->[1] . "\" cipher");
+		dbg("established connection uses \"" . $rows_ref->[0][1] . "\" cipher");
 	}
 	else
 	{
@@ -3229,7 +3229,7 @@ sub uint_value_exists($$)
 
         my $rows_ref = db_select("select 1 from history_uint where itemid=$itemid and clock=$clock");
 
-        return 1 if (defined($rows_ref->[0]->[0]));
+        return 1 if (defined($rows_ref->[0][0]));
 
         return 0;
 }
@@ -3241,7 +3241,7 @@ sub float_value_exists($$)
 
         my $rows_ref = db_select("select 1 from history where itemid=$itemid and clock=$clock");
 
-        return 1 if (defined($rows_ref->[0]->[0]));
+        return 1 if (defined($rows_ref->[0][0]));
 
         return 0;
 }
@@ -3316,7 +3316,7 @@ sub get_event_false_positiveness($)
 
 	return 0 if (scalar(@{$rows}) == 0);	# not "false positive" by default
 
-	return $rows->[0]->[0];
+	return $rows->[0][0];
 }
 
 # return incidents as an array reference (sorted by time):
@@ -3369,7 +3369,7 @@ sub get_incidents
 		return \@incidents;
 	}
 
-	my $triggerid = $rows_ref->[0]->[0];
+	my $triggerid = $rows_ref->[0][0];
 
 	my $last_trigger_value = TRIGGER_VALUE_FALSE;
 
@@ -3734,8 +3734,8 @@ sub get_lastvalue($$$$)
 
 	if (@{$rows_ref})
 	{
-		$$value_ref = $rows_ref->[0]->[0] if ($value_ref);
-		$$clock_ref = $rows_ref->[0]->[1] if ($clock_ref);
+		$$value_ref = $rows_ref->[0][0] if ($value_ref);
+		$$clock_ref = $rows_ref->[0][1] if ($clock_ref);
 
 		return SUCCESS;
 	}
@@ -3978,7 +3978,7 @@ sub get_tld_by_trigger
 
 	my $rows_ref = db_select("select distinct itemid from functions where triggerid=$triggerid");
 
-	my $itemid = $rows_ref->[0]->[0];
+	my $itemid = $rows_ref->[0][0];
 
 	return (undef, undef) unless ($itemid);
 
@@ -3986,8 +3986,8 @@ sub get_tld_by_trigger
 
 	$rows_ref = db_select("select hostid,substring(key_,9,locate('.avail',key_)-9) as service from items where itemid=$itemid");
 
-	my $hostid = $rows_ref->[0]->[0];
-	my $service = $rows_ref->[0]->[1];
+	my $hostid = $rows_ref->[0][0];
+	my $service = $rows_ref->[0][1];
 
 	fail("cannot get TLD by itemid $itemid") unless ($hostid);
 
@@ -3995,7 +3995,7 @@ sub get_tld_by_trigger
 
 	$rows_ref = db_select("select host from hosts where hostid=$hostid");
 
-	return ($rows_ref->[0]->[0], $service);
+	return ($rows_ref->[0][0], $service);
 }
 
 # truncate specified unix timestamp to 0 seconds
