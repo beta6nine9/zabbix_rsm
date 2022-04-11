@@ -67,18 +67,20 @@ foreach ($data['tests'] as $test) {
 if ($data['incidentType'] == INCIDENT_ACTIVE) {
 	$incident_type = _('Active');
 	$change_incident_type = INCIDENT_FALSE_POSITIVE;
-	$change_incident_type_label = _('Mark incident as false positive');
+	$mark_action = 'mark';
 }
 elseif ($data['incidentType'] == INCIDENT_RESOLVED) {
 	$incident_type = _('Resolved');
 	$change_incident_type = INCIDENT_FALSE_POSITIVE;
-	$change_incident_type_label = _('Mark incident as false positive');
+	$mark_action = 'mark';
 }
 else {
 	$incident_type = _('False positive');
 	$change_incident_type = $data['active'] ? INCIDENT_ACTIVE : INCIDENT_RESOLVED;
-	$change_incident_type_label = _('Unmark incident as false positive');
+	$mark_action = 'unmark';
 }
+
+$change_incident_type_label = _(ucwords($mark_action) . ' incident as false positive');
 
 $mark_btn_on_click = (new CUrl('zabbix.php'))
 	->setArgument('action', 'rsm.markincident')
@@ -138,7 +140,7 @@ $dynamic_node = [
 	$data['paging'],
 	in_array(CWebUser::getType(), [USER_TYPE_ZABBIX_ADMIN, USER_TYPE_SUPER_ADMIN, USER_TYPE_POWER_USER])
 		? (new CButton('mark_incident', $change_incident_type_label))
-			->onClick(sprintf('javascript: location.href = "%s";', $mark_btn_on_click))
+			->onClick(sprintf('javascript: if (confirm("Really '.$mark_action.' this incident as false positive?")) location.href = "%s";', $mark_btn_on_click))
 			->addStyle('margin-top: 5px;')
 		: null
 ];

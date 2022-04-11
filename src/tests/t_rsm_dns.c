@@ -1,18 +1,14 @@
-#include "t_rsm.h"
-#include "t_rsm_decl.h"
 #include "../zabbix_server/poller/checks_simple_rsm.c"
+#include "t_rsm_decl.h"
+#include "t_rsm.h"
 
 #define DEFAULT_RES_IP		"127.0.0.1"
 #define DEFAULT_RES_PORT	53
 #define DEFAULT_NS_PORT		53
 #define DEFAULT_TESTPREFIX	"www.zz--rsm-monitoring"
-#define DEFAULT_RTT_LIMIT	20
-#define EXPECTED_NSS_NUM	1
 
 #define LOG_FILE1	"test1.log"
 #define LOG_FILE2	"test2.log"
-
-#define CURRENT_MODE_NORMAL	0
 
 void	zbx_on_exit(int ret)
 {
@@ -42,17 +38,18 @@ static void	exit_usage(const char *program)
 
 int	main(int argc, char *argv[])
 {
-	char		*res_ip = DEFAULT_RES_IP,
-			*tld = NULL, *ns = NULL, *ns_ip = NULL, proto = RSM_UDP,
-			ipv4_enabled = 0, ipv6_enabled = 0, *testprefix = DEFAULT_TESTPREFIX,
+	char		*tld = NULL, *ns = NULL, *ns_ip = NULL, proto = RSM_UDP,
+			ipv4_enabled = 0, ipv6_enabled = 0,
 			testedname[ZBX_HOST_BUF_SIZE], dnssec_enabled = 0,
 			*json_file = NULL,
 			res_host_buf[ZBX_HOST_BUF_SIZE],
 			nsip_buf[ZBX_HOST_BUF_SIZE],
 			key[8192];
+	const char	*res_ip = DEFAULT_RES_IP,
+			*testprefix = DEFAULT_TESTPREFIX;
 	int		c, index;
 	FILE		*log_fd = stdout;
-	uint16_t	res_port = DEFAULT_RES_PORT, ns_port = DEFAULT_NS_PORT;
+	int		res_port = DEFAULT_RES_PORT, ns_port = DEFAULT_NS_PORT;
 	AGENT_REQUEST	request;
 	AGENT_RESULT	result;
 
@@ -141,9 +138,9 @@ int	main(int argc, char *argv[])
 		exit_usage(argv[0]);
 	}
 
-	zbx_snprintf(res_host_buf, sizeof(res_host_buf), "%s;%hu",    res_ip,     res_port);
-	zbx_snprintf(nsip_buf,     sizeof(nsip_buf),     "%s,%s;%hu", ns,         ns_ip, ns_port);
-	zbx_snprintf(testedname,   sizeof(testedname),   "%s.%s.",    testprefix, tld);
+	zbx_snprintf(res_host_buf, sizeof(res_host_buf), "%s;%d",    res_ip, res_port);
+	zbx_snprintf(nsip_buf,     sizeof(nsip_buf),     "%s,%s;%d", ns, ns_ip, ns_port);
+	zbx_snprintf(testedname,   sizeof(testedname),   "%s.%s.",   testprefix, tld);
 
 	rsm_infof(log_fd, "tld:%s ns:%s ip:%s res:%s testprefix:%s", tld, ns, ns_ip, res_ip, testprefix);
 

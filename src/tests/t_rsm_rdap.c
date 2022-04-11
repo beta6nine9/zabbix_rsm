@@ -1,6 +1,6 @@
-#include "t_rsm.h"
-#include "t_rsm_decl.h"
 #include "../zabbix_server/poller/checks_simple_rsm.c"
+#include "t_rsm_decl.h"
+#include "t_rsm.h"
 
 #define DEFAULT_RES_PORT	53
 #define DEFAULT_MAXREDIRS	10
@@ -28,12 +28,12 @@ static void	exit_usage(const char *program)
 int	main(int argc, char *argv[])
 {
 	int		c, index,
-			maxredirs = DEFAULT_MAXREDIRS;
+			maxredirs = DEFAULT_MAXREDIRS,
+			res_port = DEFAULT_RES_PORT;
 	char		*testedname = NULL, *base_url = NULL, *res_ip = NULL,
 			ipv4_enabled = 0, ipv6_enabled = 0, *json_file = NULL,
 			key[8192],
 			res_host_buf[ZBX_HOST_BUF_SIZE];
-	uint16_t	res_port = DEFAULT_RES_PORT;
 	AGENT_REQUEST	request;
 	AGENT_RESULT	result;
 
@@ -105,7 +105,7 @@ int	main(int argc, char *argv[])
 		exit_usage(argv[0]);
 	}
 
-	zbx_snprintf(res_host_buf,  sizeof(res_host_buf),  "%s;%hu", res_ip, res_port);
+	zbx_snprintf(res_host_buf,  sizeof(res_host_buf),  "%s;%d", res_ip, res_port);
 
 	printf("IP: %s, URL: %s, Test domain: %s\n", res_host_buf, base_url, testedname);
 

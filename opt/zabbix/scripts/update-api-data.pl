@@ -1177,56 +1177,43 @@ sub __tld_ignored
 
 sub __update_false_positives
 {
-	my $last_audit = ah_get_last_audit($server_key);
-
-	# now check for possible false_positive change in front-end
-	my $maxclock = 0;
-
-	# should we update false positiveness later? (incident state file does not exist yet)
+	# should we update false positiveness later?
+	# we need to update 2 files but incident state file may not exist yet, in that case we will do it later
 	my $later = 0;
-	# select resourceid,note,clock from auditlog where resourcetype=32 and clock>0 order by clock;
-	my $rows_ref = db_select(
-		"select resourceid,note,clock".
-		" from auditlog".
-		" where resourcetype=".AUDIT_RESOURCE_INCIDENT.
-			" and clock>$last_audit".
-		" order by clock");
 
-	foreach my $row_ref (@$rows_ref)
+	# get last rsm_false_positiveid
+	my $last_rsm_false_positiveid = ah_get_last_false_positiveid($server_key);
+
+	dbg("last_rsm_false_positiveid = $last_rsm_false_positiveid");
+
+	# get list of events.eventid (incidents) that changed their "false positive" state
+	my @eventids = fp_get_updated_eventids(\$last_rsm_false_positiveid);
+
+	foreach my $eventid (@eventids)
 	{
-		my $eventid = $row_ref->[0];
-		my $note = $row_ref->[1];
-		my $clock = $row_ref->[2];
+		my $row = db_select_row(
+			"select clock,status" .
+			" from rsm_false_positive" .
+			" where eventid=$eventid" .
+			" order by rsm_false_positiveid desc" .
+			" limit 1"
+		);
 
-		if ($eventid == 0)
-		{
-			$eventid = $note;
-			$eventid =~ s/^([0-9]+): .*/$1/;
-		}
+		my ($clock, $status) = @{$row};
 
-		$maxclock = $clock if ($clock > $maxclock);
+		$row = db_select_row("select objectid,clock from events where eventid=$eventid");
 
-		my $rows_ref2 = db_select("select objectid,clock,false_positive from events where eventid=$eventid");
-
-		if (scalar(@$rows_ref2) != 1)
-		{
-			wrn("looks like event ID $eventid found in auditlog does not exist any more");
-			next;
-		}
-
-		my $triggerid = $rows_ref2->[0]->[0];
-		my $event_clock = $rows_ref2->[0]->[1];
-		my $false_positive = $rows_ref2->[0]->[2];
+		my ($triggerid, $event_clock) = @{$row};
 
 		my ($tld, $service) = get_tld_by_trigger($triggerid);
 
 		if (!$tld)
 		{
-			dbg("looks like trigger ID $triggerid found in auditlog does not exist any more");
+			dbg("looks like TLD with trigger ID $triggerid does not exist any more");
 			next;
 		}
 
-		dbg("auditlog: service:$service eventid:$eventid start:[".ts_str($event_clock)."] changed:[".ts_str($clock)."] false_positive:$false_positive");
+		dbg("service:$service eventid:$eventid start:[".ts_str($event_clock)."] changed:[".ts_str($clock)."] false_positive:$status");
 
 		my $ah_tld = ah_get_api_tld($tld);
 
@@ -1236,17 +1223,18 @@ sub __update_false_positives
 				$service,
 				$eventid,
 				$event_clock,
-				$false_positive,
+				$status,
 				$clock,
 				\$later) == AH_SUCCESS)
 		{
 			if ($later == 1)
 			{
 				wrn(ah_get_error());
+				last;
 			}
 			else
 			{
-				fail("cannot update false_positive state: ", ah_get_error());
+				fail("cannot update false_positive status: ", ah_get_error());
 			}
 		}
 
@@ -1258,17 +1246,18 @@ sub __update_false_positives
 					$service,
 					$eventid,
 					$event_clock,
-					$false_positive,
+					$status,
 					$clock,
 					\$later) == AH_SUCCESS)
 			{
 				if ($later == 1)
 				{
 					wrn(ah_get_error());
+					last;
 				}
 				else
 				{
-					fail("cannot update false_positive state: ", ah_get_error());
+					fail("cannot update false_positive status: ", ah_get_error());
 				}
 			}
 		}
@@ -1277,9 +1266,9 @@ sub __update_false_positives
 	# If the "later" flag is non-zero it means the incident for which we would like to change
 	# false positiveness was not processed yet and there is no incident state file. We cannot
 	# modify falsePositive file without making sure incident state file is also updated.
-	if ($maxclock != 0 && $later == 0)
+	if ($later == 0)
 	{
-		ah_save_audit($server_key, $maxclock);
+		ah_save_last_false_positiveid($server_key, $last_rsm_false_positiveid);
 	}
 }
 

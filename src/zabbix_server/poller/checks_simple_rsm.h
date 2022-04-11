@@ -238,11 +238,6 @@
 #define ZBX_MACRO_EPP_SERVERCERTMD5	"{$RSM.EPP.SERVERCERTMD5}"
 #define ZBX_MACRO_TLD_EPP_ENABLED	"{$RSM.TLD.EPP.ENABLED}"
 
-#define RSM_UDP_TIMEOUT	3	/* seconds */
-#define RSM_UDP_RETRY	1
-#define RSM_TCP_TIMEOUT	11	/* seconds (SLA: 5 times higher than max (2)) */
-#define RSM_TCP_RETRY	1
-
 #define RSM_DEFAULT_LOGDIR		"/var/log"		/* if Zabbix log dir is undefined */
 #define ZBX_DNS_LOG_PREFIX		"dns"			/* file will be <LOGDIR>/<PROBE>-<TLD>-ZBX_DNS_LOG_PREFIX-<udp|tcp>.log */
 #define ZBX_RDDS_LOG_PREFIX		"rdds"			/* file will be <LOGDIR>/<PROBE>-<TLD>-ZBX_RDDS_LOG_PREFIX.log */

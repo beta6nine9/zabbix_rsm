@@ -152,6 +152,8 @@ class IncidentDetailsAction extends Action {
 		if ($main_event) {
 			$data['main_event'] = reset($main_event);
 
+			$data['main_event']['false_positive'] = getEventFalsePositiveness($data['main_event']['eventid']);
+
 			$data['is_rdap_standalone'] = is_RDAP_standalone($data['main_event']['clock']);
 		}
 	}

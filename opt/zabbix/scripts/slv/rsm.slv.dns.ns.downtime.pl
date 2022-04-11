@@ -26,8 +26,17 @@ slv_exit(SUCCESS) if (get_monitoring_target() ne MONITORING_TARGET_REGISTRY);
 
 if (!opt('dry-run'))
 {
+	# TODO: this is one time operation, remove on the next project iteration
+	if (-f "/opt/zabbix/data/rsm.slv.dns.ns.downtime.auditlog.txt")
+	{
+		rename(
+			"/opt/zabbix/data/rsm.slv.dns.ns.downtime.auditlog.txt",
+			"/opt/zabbix/data/rsm.slv.dns.ns.downtime.false-positive.txt"
+		) or die("cannot rename file \"/opt/zabbix/data/rsm.slv.dns.ns.downtime.auditlog.txt\": $!");
+	}
+
 	recalculate_downtime(
-		"/opt/zabbix/data/rsm.slv.dns.ns.downtime.auditlog.txt",
+		"/opt/zabbix/data/rsm.slv.dns.ns.downtime.false-positive.txt",
 		AVAIL_KEY_PATTERN,
 		DOWNTIME_KEY_PATTERN,
 		1,

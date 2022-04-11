@@ -4,7 +4,7 @@
 #include <common.h>
 #include <zbxtypes.h>
 
-const char	epp_passphrase[];
+const char	epp_passphrase[128] = "";
 
 const char      *progname = "";
 const char      title_message[] = "";
@@ -147,11 +147,7 @@ char	*CONFIG_SSL_KEY_LOCATION;
 char	*CONFIG_SSL_CA_LOCATION;
 char	*CONFIG_SSL_CERT_LOCATION;
 
-ZBX_METRIC      parameters_common_http[] =
-/*	KEY			FLAG		FUNCTION		TEST PARAMETERS */
-{
-	{"web.page.get",	CF_HAVEPARAMS,	NULL,			"localhost,,80"}
-};
+ZBX_METRIC      parameters_common_http[] = {{NULL, CF_HAVEPARAMS, NULL, NULL}};
 
 void	xml_escape_xpath(char **data)
 {

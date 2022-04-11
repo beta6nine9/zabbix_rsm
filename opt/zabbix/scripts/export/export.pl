@@ -1288,28 +1288,26 @@ sub __get_false_positives
 	# go through all the databases
 	foreach (@local_server_keys)
 	{
-	$server_key = $_;
-	db_connect($server_key);
+		$server_key = $_;
+		db_connect($server_key);
 
-	# check for possible false_positive changes made in front-end
-	my $rows_ref = db_select(
-		"select resourceid,note,clock".
-		" from auditlog".
-		" where resourcetype=" . AUDIT_RESOURCE_INCIDENT.
-			" and clock between $from and $till".
-		" order by clock");
+		# check for possible false_positive changes made in front-end
+		my $rows = db_select(
+			"select eventid,clock,status".
+			" from rsm_false_positive".
+				" where clock between $from and $till".
+			" order by clock");
 
-	foreach my $row_ref (@$rows_ref)
-	{
-		my $eventid = $row_ref->[0];
-		my $note = $row_ref->[1];
-		my $clock = $row_ref->[2];
+		foreach my $row (@{$rows})
+		{
+			my ($eventid, $clock, $status) = @{$row};
 
-		my $status = ($note =~ m/unmarked/i ? 'Deactivated' : 'Activated');
+			my $status_str = ($status == 0 ? 'Deactivated' : 'Activated');
 
-		push(@result, {'clock' => $clock, 'eventid' => $eventid, 'status' => $status});
-	}
-	db_disconnect();
+			push(@result, {'eventid' => $eventid, 'clock' => $clock, 'status' => $status_str});
+		}
+
+		db_disconnect();
 	}
 	undef($server_key);
 
@@ -1539,7 +1537,7 @@ sub __get_incidents2
 			my $preincident_clock = $row_ref->[0];
 
 			$rows_ref = db_select(
-				"select eventid,clock,value,false_positive".
+				"select eventid,clock,value".
 				" from events".
 				" where object=".EVENT_OBJECT_TRIGGER.
 					" and source=".EVENT_SOURCE_TRIGGERS.
@@ -1553,7 +1551,8 @@ sub __get_incidents2
 			my $eventid = $row_ref->[0];
 			my $clock = $row_ref->[1];
 			my $value = $row_ref->[2];
-			my $false_positive = $row_ref->[3];
+
+			my $false_positive = get_event_false_positiveness($eventid);
 
 			dbg("reading pre-event $eventid: clock:" . ts_str($clock) . " ($clock), value:", ($value == 0 ? 'OK' : 'PROBLEM'), ", false_positive:$false_positive") if (opt('debug'));
 
@@ -1569,7 +1568,7 @@ sub __get_incidents2
 
 	# now check for incidents within given period
 	$rows_ref = db_select(
-		"select eventid,clock,value,false_positive".
+		"select eventid,clock,value".
 		" from events".
 		" where object=".EVENT_OBJECT_TRIGGER.
 			" and source=".EVENT_SOURCE_TRIGGERS.
@@ -1582,7 +1581,8 @@ sub __get_incidents2
 		my $eventid = $row_ref->[0];
 		my $clock = $row_ref->[1];
 		my $value = $row_ref->[2];
-		my $false_positive = $row_ref->[3];
+
+		my $false_positive = get_event_false_positiveness($eventid);
 
 		dbg("reading event $eventid: clock:" . ts_str($clock) . " ($clock), value:", ($value == 0 ? 'OK' : 'PROBLEM'), ", false_positive:$false_positive") if (opt('debug'));
 

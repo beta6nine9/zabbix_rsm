@@ -29,6 +29,11 @@
 #include "log.h"
 #include "rsm.h"
 
+#define RSM_UDP_TIMEOUT	3	/* seconds */
+#define RSM_UDP_RETRY	1
+#define RSM_TCP_TIMEOUT	11	/* seconds (SLA: 5 times higher than max (2)) */
+#define RSM_TCP_RETRY	1
+
 #define ZBX_HOST_BUF_SIZE	128
 #define ZBX_ERR_BUF_SIZE	8192
 #define ZBX_SEND_BUF_SIZE	128
@@ -705,7 +710,7 @@ out:
 
 static int	zbx_ldns_rdf_compare(const void *d1, const void *d2)
 {
-	return ldns_rdf_compare(*(const ldns_rdf **)d1, *(const ldns_rdf **)d2);
+	return ldns_rdf_compare((const ldns_rdf *)d1, (const ldns_rdf *)d2);
 }
 
 static void	zbx_get_owners(const ldns_rr_list *rr_list, zbx_vector_ptr_t *owners)
@@ -1719,7 +1724,7 @@ static int	zbx_get_ns_ip_values(ldns_resolver *res, const char *ns, const char *
 			if (0 > now - ts)
 			{
 				zbx_snprintf(err, err_size,
-						"Unix timestamp of %s is in the future (current: " ZBX_FS_UI64 ")",
+						"Unix timestamp of %s is in the future (current: %ld)",
 						host, now);
 				zbx_free(host);
 				*upd = ZBX_EC_EPP_NOT_IMPLEMENTED;
@@ -1879,7 +1884,7 @@ static void	get_host_and_port_from_str(const char *str, char delim, char *host, 
 	{
 		*p = '\0';
 		p++;
-		*port = atoi(p);
+		*port = (unsigned short)atoi(p);
 	}
 
 	zbx_snprintf(host, host_size, "%s", str_copy);
@@ -2383,7 +2388,7 @@ static int	update_metadata(int file_exists, const char *rsmhost, unsigned int te
 /*   <value>;<timestamp>:<newvalue>                                                        */
 /*                                                                                         */
 /* In the latter case the new value gets into effect after specified timestamp has passed. */
-static int	get_dns_minns_from_value(time_t now, const char *value, int *minns)
+static int	get_dns_minns_from_value(time_t now, const char *value, unsigned int *minns)
 {
 	const char	*p, *minns_p;
 	time_t		ts;
@@ -2402,7 +2407,7 @@ static int	get_dns_minns_from_value(time_t now, const char *value, int *minns)
 		minns_p = ++p;
 	}
 
-	*minns = atoi(minns_p);
+	*minns = (unsigned int)atoi(minns_p);
 
 	return SUCCEED;
 }
@@ -2420,7 +2425,12 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 	FILE			*log_fd;
 	zbx_ns_t		*nss = NULL;
 	size_t			i, j, nss_num = 0;
-	unsigned int		extras, current_mode, test_status, dnssec_status, nssok;
+	unsigned int		extras,
+				current_mode,
+				test_status,
+				dnssec_status,
+				nssok,
+				minns;
 	struct zbx_json		json;
 	uint16_t		resolver_port;
 	int			dnssec_enabled,
@@ -2439,7 +2449,6 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 				rtt_limit,
 				successful_tests,
 				test_recover,
-				minns,
 				file_exists = 0,
 				epp_enabled = 0,
 				ret = SYSINFO_RET_FAIL;
@@ -2507,7 +2516,7 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 	{
 		/* Add noise (hostid + itemid) to avoid using TCP by all proxies simultaneously. */
 		/* This should balance usage of TCP protocol and avoid abusing the Name Servers. */
-		protocol = ((nextcheck / 60 + hostid + itemid) % tcp_ratio) == 0 ? RSM_TCP : RSM_UDP;
+		protocol = (((zbx_uint64_t)nextcheck / 60 + hostid + itemid) % (zbx_uint64_t)tcp_ratio) == 0 ? RSM_TCP : RSM_UDP;
 	}
 	else
 	{
@@ -4661,13 +4670,13 @@ out:
 	return ret;
 }
 
-static int	zbx_ssl_attach_cert(SSL *ssl, char *cert, int cert_len, int *rtt, char *err, size_t err_size)
+static int	zbx_ssl_attach_cert(SSL *ssl, char *cert, size_t cert_len, int *rtt, char *err, size_t err_size)
 {
 	BIO	*bio = NULL;
 	X509	*x509 = NULL;
 	int	ret = FAIL;
 
-	if (NULL == (bio = BIO_new_mem_buf(cert, cert_len)))
+	if (NULL == (bio = BIO_new_mem_buf(cert, (int)cert_len)))
 	{
 		*rtt = ZBX_EC_EPP_INTERNAL_GENERAL;
 		zbx_strlcpy(err, "out of memory", err_size);
@@ -4948,11 +4957,11 @@ out:
 	return ret;
 }
 
-static void	str_base64_decode_dyn(const char *in, int in_size, char **out, int *out_size)
+static void	str_base64_decode_dyn(const char *in, size_t in_size, char **out, size_t *out_size)
 {
-	*out = zbx_malloc(*out, in_size);
+	*out = (char *)zbx_malloc(*out, in_size);
 
-	str_base64_decode(in, *out, in_size, out_size);
+	str_base64_decode(in, *out, (int)in_size, (int *)out_size);
 }
 
 int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *result)
@@ -4976,7 +4985,8 @@ int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *
 	zbx_vector_str_t	epp_hosts, epp_ips;
 	unsigned int		extras;
 	uint16_t		resolver_port = DEFAULT_RESOLVER_PORT;
-	int			rv, epp_cert_size, rtt, rtt1 = ZBX_NO_VALUE, rtt2 = ZBX_NO_VALUE,
+	size_t			epp_cert_size;
+	int			rv, rtt, rtt1 = ZBX_NO_VALUE, rtt2 = ZBX_NO_VALUE,
 				rtt3 = ZBX_NO_VALUE, ipv4_enabled = 0, ipv6_enabled = 0, ret = SYSINFO_RET_FAIL;
 
 	zbx_vector_str_create(&epp_hosts);
@@ -5126,7 +5136,7 @@ int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *
 		goto out;
 	}
 
-	str_base64_decode_dyn(epp_cert_b64, (int)strlen(epp_cert_b64), &epp_cert, &epp_cert_size);
+	str_base64_decode_dyn(epp_cert_b64, strlen(epp_cert_b64), &epp_cert, &epp_cert_size);
 
 	if (SUCCEED != zbx_ssl_attach_cert(ssl, epp_cert, epp_cert_size, &rtt, err, sizeof(err)))
 	{
@@ -5327,7 +5337,7 @@ static int	zbx_check_dns_connection(const ldns_resolver *res, ldns_rdf *query_rd
 
 	if (0 != (flags & CHECK_DNS_CONN_RTT) && ldns_pkt_querytime(pkt) > (uint32_t)reply_ms)
 	{
-		zbx_snprintf(err, err_size, "query RTT %d over limit (%d)", ldns_pkt_querytime(pkt), reply_ms);
+		zbx_snprintf(err, err_size, "query RTT %u over limit (%d)", ldns_pkt_querytime(pkt), reply_ms);
 		goto out;
 	}
 

@@ -84,3 +84,12 @@ FIELD		|object_before			|t_text		|NULL	|NULL		|0
 FIELD		|object_after			|t_text		|NULL	|NULL		|0
 FIELD		|remote_addr			|t_varchar(45)	|	|NOT NULL	|0
 FIELD		|x_forwarded_for		|t_varchar(255)	|	|NULL		|0
+
+TABLE|rsm_false_positive|rsm_false_positiveid|0
+FIELD		|rsm_false_positiveid		|t_id		|	|NOT NULL	|0
+FIELD		|userid				|t_id		|	|NOT NULL	|0			|1|users	|userid		|RESTRICT
+FIELD		|eventid			|t_id		|	|NOT NULL	|0			|2|events	|eventid
+FIELD		|clock				|t_time		|	|NOT NULL	|0
+FIELD		|status				|t_integer	|	|NOT NULL	|0
+INDEX		|1				|userid
+INDEX		|2				|eventid

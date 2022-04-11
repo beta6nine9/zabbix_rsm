@@ -150,6 +150,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		uint_value_exists
 		float_value_exists
 		sql_time_condition get_incidents get_downtime
+		get_event_false_positiveness
 		history_table
 		get_lastvalue get_itemids_by_hostids get_nsip_values
 		get_valuemaps get_statusmaps get_detailed_result
@@ -176,6 +177,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		generate_report
 		get_test_history
 		get_test_results
+		fp_get_updated_eventids
 		set_log_tld unset_log_tld
 		convert_suffixed_number
 		var_dump
@@ -3299,6 +3301,24 @@ sub sql_time_condition
 	return "1=1";
 }
 
+sub get_event_false_positiveness($)
+{
+	my $eventid = shift;
+
+	my $rows = db_select(
+		"select status".
+		" from rsm_false_positive".
+		" where eventid=?".
+		" order by rsm_false_positiveid desc".
+		" limit 1",
+		[$eventid]
+	);
+
+	return 0 if (scalar(@{$rows}) == 0);	# not "false positive" by default
+
+	return $rows->[0]->[0];
+}
+
 # return incidents as an array reference (sorted by time):
 #
 # [
@@ -3371,7 +3391,7 @@ sub get_incidents
 			my $preincident_clock = $row_ref->[0];
 
 			$rows_ref = db_select(
-				"select eventid,clock,value,false_positive".
+				"select eventid,clock,value".
 				" from events".
 				" where object=".EVENT_OBJECT_TRIGGER.
 					" and source=".EVENT_SOURCE_TRIGGERS.
@@ -3385,7 +3405,8 @@ sub get_incidents
 			my $eventid = $row_ref->[0];
 			my $clock = $row_ref->[1];
 			my $value = $row_ref->[2];
-			my $false_positive = $row_ref->[3];
+
+			my $false_positive = get_event_false_positiveness($eventid);
 
 			if (opt('debug'))
 			{
@@ -3405,7 +3426,7 @@ sub get_incidents
 
 	# now check for incidents within given period
 	$rows_ref = db_select(
-		"select eventid,clock,value,false_positive".
+		"select eventid,clock,value".
 		" from events".
 		" where object=".EVENT_OBJECT_TRIGGER.
 			" and source=".EVENT_SOURCE_TRIGGERS.
@@ -3418,7 +3439,8 @@ sub get_incidents
 		my $eventid = $row_ref->[0];
 		my $clock = $row_ref->[1];
 		my $value = $row_ref->[2];
-		my $false_positive = $row_ref->[3];
+
+		my $false_positive = get_event_false_positiveness($eventid);
 
 		# NB! Incident start/end times must not be truncated to first/last second
 		# of a minute (do not use truncate_from and truncate_till) because they
@@ -4956,27 +4978,24 @@ sub update_slv_rtt_monthly_stats($$$$$$$$;$)
 
 sub recalculate_downtime($$$$$$)
 {
-	my $auditlog_log_file = shift;
-	my $item_key_avail    = shift; # exact key for rdds and dns, pattern for dns.ns
-	my $item_key_downtime = shift; # exact key for rdds and dns, undef for dns.ns
-	my $incident_fail     = shift; # how many cycles have to fail to start the incident
-	my $incident_recover  = shift; # how many cycles have to succeed to recover from the incident
-	my $delay             = shift;
-
-	wrn("TODO-UPGRADE-6: recalculate_downtime() needs to be re-implemented because of changes in auditlog");
-	return;
+	my $rsm_false_positive_log_file = shift;
+	my $item_key_avail              = shift; # exact key for rdds and dns, pattern for dns.ns
+	my $item_key_downtime           = shift; # exact key for rdds and dns, undef for dns.ns
+	my $incident_fail               = shift; # how many cycles have to fail to start the incident
+	my $incident_recover            = shift; # how many cycles have to succeed to recover from the incident
+	my $delay                       = shift;
 
 	fail("not supported when running in --dry-run mode") if (opt('dry-run'));
 
 	# get service from item's key ('DNS', 'DNS.NS', 'RDDS', 'RDAP')
 	my $service = uc($item_key_avail =~ s/^rsm\.slv\.(.+)\.avail(?:\[.*\])?$/$1/r);
 
-	# get last auditid
-	my $last_auditlog_auditid = __fp_read_last_auditid($auditlog_log_file);
-	dbg("last_auditlog_auditid = $last_auditlog_auditid");
+	# get last rsm_false_positiveid
+	my $last_rsm_false_positiveid = fp_read_last_rsm_false_positiveid($rsm_false_positive_log_file);
+	dbg("last_rsm_false_positiveid = $last_rsm_false_positiveid");
 
 	# get list of events.eventid (incidents) that changed their "false positive" state
-	my @eventids = __fp_get_updated_eventids(\$last_auditlog_auditid);
+	my @eventids = fp_get_updated_eventids(\$last_rsm_false_positiveid);
 
 	# process incidents
 	if (@eventids)
@@ -5005,8 +5024,8 @@ sub recalculate_downtime($$$$$$)
 		__fp_regenerate_reports($service, \@report_updates);
 	}
 
-	# save last auditid (it may have changed even if @eventids is empty)
-	__fp_write_last_auditid($auditlog_log_file, $last_auditlog_auditid);
+	# save last rsm_false_positiveid (it may have changed even if @eventids is empty)
+	fp_write_last_rsm_false_positiveid($rsm_false_positive_log_file, $last_rsm_false_positiveid);
 }
 
 sub generate_report($$;$)
@@ -5539,6 +5558,53 @@ sub get_test_results($$;$)
 	return $result;
 }
 
+sub fp_get_updated_eventids($)
+{
+	my $last_rsm_false_positiveid_ref = shift;
+
+	# check integrity
+
+	my $max_rsm_false_positiveid = db_select_value("select max(rsm_false_positiveid) from rsm_false_positive") // 0;
+	if (${$last_rsm_false_positiveid_ref} > $max_rsm_false_positiveid)
+	{
+		fail("value of last processed rsm_false_positive.rsm_false_positiveid" .
+			" (${$last_rsm_false_positiveid_ref}) is larger than " .
+			"max rsm_false_positiveid in the database ($max_rsm_false_positiveid)");
+	}
+
+	# get unprocessed "false positive" entries
+
+	my $rows = db_select(
+		"select eventid,count(*),max(rsm_false_positiveid)" .
+		" from rsm_false_positive" .
+		" where rsm_false_positiveid>?" .
+		" group by eventid",
+		[${$last_rsm_false_positiveid_ref}]);
+
+	if (scalar(@{$rows}) == 0)
+	{
+		# all entries are processed already
+		return;
+	}
+
+	# get list of events.eventid (incidents) that changed their "false positive" state
+
+	my @eventids = ();
+
+	foreach my $row (@{$rows})
+	{
+		my ($eventid, $count, $max_rsm_false_positiveid) = @{$row};
+
+		${$last_rsm_false_positiveid_ref} = max(${$last_rsm_false_positiveid_ref}, $max_rsm_false_positiveid);
+
+		next if ($count % 2 == 0); # marked + unmarked, no need to recalculate
+
+		push(@eventids, $eventid);
+	}
+
+	return sort { $a <=> $b } @eventids;
+}
+
 sub set_log_tld($)
 {
 	$tld = shift;
@@ -5606,81 +5672,34 @@ sub __fp_log($$$)
 	close($fh)                        or fail("cannot close file '$__fp_logfile'");
 }
 
-sub __fp_read_last_auditid($)
+sub __fp_read_last_rsm_false_positiveid($)
 {
 	my $file = shift;
 
-	my $auditid = 0;
+	my $rsm_false_positiveid = 0;
 
 	if (-e $file)
 	{
 		my $error;
 
-		if (read_file($file, \$auditid, \$error) != SUCCESS)
+		if (read_file($file, \$rsm_false_positiveid, \$error) != SUCCESS)
 		{
 			fail("cannot read file \"$file\": $error");
 		}
 	}
 
-	return $auditid;
+	return $rsm_false_positiveid;
 }
 
-sub __fp_write_last_auditid($$)
+sub __fp_write_last_rsm_false_positiveid($$)
 {
-	my $file    = shift;
-	my $auditid = shift;
+	my $file                 = shift;
+	my $rsm_false_positiveid = shift;
 
-	if (write_file($file, $auditid) != SUCCESS)
+	if (write_file($file, $rsm_false_positiveid) != SUCCESS)
 	{
 		fail("cannot write file \"$file\"");
 	}
-}
-
-sub __fp_get_updated_eventids($)
-{
-	my $last_auditlog_auditid_ref = shift;
-
-	# check integrity
-
-	my $max_auditid = db_select_value("select max(auditid) from auditlog") // 0;
-	if (${$last_auditlog_auditid_ref} > $max_auditid)
-	{
-		fail("value of last processed auditlog.auditid (${$last_auditlog_auditid_ref}) is larger than max auditid in the database ($max_auditid)");
-	}
-
-	# get unprocessed auditlog entries
-
-	my $sql = "select if(resourcetype=?,resourceid,0) as auditlog_eventid,count(*),max(auditid)" .
-		" from auditlog" .
-		" where auditid > ?" .
-		" group by auditlog_eventid";
-
-	my $params = [AUDIT_RESOURCE_INCIDENT, ${$last_auditlog_auditid_ref}];
-	my $rows = db_select($sql, $params);
-
-	if (scalar(@{$rows}) == 0)
-	{
-		# all auditlog entries are processed already
-		return;
-	}
-
-	# get list of events.eventid (incidents) that changed their "false positive" state
-
-	my @eventids = ();
-
-	foreach my $row (@{$rows})
-	{
-		my ($eventid, $count, $max_auditid) = @{$row};
-
-		${$last_auditlog_auditid_ref} = max(${$last_auditlog_auditid_ref}, $max_auditid);
-
-		next if ($eventid == 0); # this is not AUDIT_RESOURCE_INCIDENT
-		next if ($count % 2 == 0); # marked + unmarked, no need to recalculate
-
-		push(@eventids, $eventid);
-	}
-
-	return sort { $a <=> $b } @eventids;
 }
 
 sub __fp_process_incident($$$$$$$)
@@ -5873,7 +5892,6 @@ sub __fp_get_incident_info($)
 			"events.object," .
 			"events.value," .
 			"events.objectid," .
-			"events.false_positive," .
 			"events.clock," .
 			"(" .
 				"select clock" .
@@ -5910,11 +5928,13 @@ sub __fp_get_incident_info($)
 	my $params = [TRIGGER_VALUE_FALSE, $eventid];
 	my $row = db_select_row($sql, $params);
 
-	my ($source, $object, $value, $triggerid, $false_positive, $from, $till, $rsmhostid, $rsmhost, $itemid, $key) = @{$row};
+	my ($source, $object, $value, $triggerid, $from, $till, $rsmhostid, $rsmhost, $itemid, $key) = @{$row};
 
 	fail("unexpected value of events.source for incident #$eventid: $source") if ($source != EVENT_SOURCE_TRIGGERS);
 	fail("unexpected value of events.object for incident #$eventid: $object") if ($object != EVENT_OBJECT_TRIGGER);
 	fail("unexpected value of events.value for incident #$eventid: $object")  if ($value  != TRIGGER_VALUE_TRUE);
+
+	my $false_positive = get_event_false_positiveness($eventid);
 
 	return ($triggerid, $from, $till, $rsmhostid, $rsmhost, $itemid, $key, $false_positive);
 }
@@ -6022,8 +6042,7 @@ sub __fp_get_false_positive_ranges($$$)
 	" where" .
 		" events.objectid=? and" .
 		" events.value=? and" .
-		" events.clock between ? and ? and" .
-		" events.false_positive=?";
+		" events.clock between ? and ?";
 
 	my $params = [
 		TRIGGER_VALUE_FALSE,
@@ -6031,7 +6050,6 @@ sub __fp_get_false_positive_ranges($$$)
 		TRIGGER_VALUE_TRUE,
 		$from,
 		$till,
-		1,
 	];
 
 	my $rows = db_select($sql, $params);
@@ -6041,6 +6059,8 @@ sub __fp_get_false_positive_ranges($$$)
 	for my $row (@{$rows})
 	{
 		my ($eventid, $source, $object, $from, $till) = @{$row};
+
+		next if (get_event_false_positiveness($eventid) == 0);
 
 		fail("unexpected value of events.source for incident #$eventid: $source") if ($source != EVENT_SOURCE_TRIGGERS);
 		fail("unexpected value of events.object for incident #$eventid: $object") if ($object != EVENT_OBJECT_TRIGGER);
@@ -6278,7 +6298,17 @@ sub __log
 		}
 		else
 		{
-			print {$stdout ? *STDOUT : *STDERR} (sprintf("%6d:", $$), ts_str(), " [$priority] ", $server_str, ($cur_tld eq "" ? "" : "$cur_tld: "), __func(), "$msg\n");
+			print {$stdout ? *STDOUT : *STDERR} (
+				sprintf("%6d:%s [%s] %s %s%s%s\n",
+					$$,
+					ts_str(),
+					$priority,
+					$server_str,
+					($cur_tld eq "" ? "" : "$cur_tld: "),
+					__func(),
+					$msg
+				)
+			);
 		}
 
 		# flush stdout

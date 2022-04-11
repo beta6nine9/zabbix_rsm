@@ -810,6 +810,53 @@ out:
 	return ret;
 }
 
+/* 6000000, 16 - create table rsm_false_positive, this is required by frontend */
+static int	DBpatch_6000000_16(void)
+{
+	const ZBX_TABLE	table =
+			{"rsm_false_positive", "rsm_false_positiveid", 0,
+				{
+					{"rsm_false_positiveid", NULL, NULL, NULL, 0  , ZBX_TYPE_ID  , ZBX_NOTNULL, 0},
+					{"userid"              , NULL, NULL, NULL, 0  , ZBX_TYPE_ID  , ZBX_NOTNULL, 0},
+					{"eventid"             , NULL, NULL, NULL, 0  , ZBX_TYPE_ID  , ZBX_NOTNULL, 0},
+					{"clock"               , NULL, NULL, NULL, 0  , ZBX_TYPE_INT , ZBX_NOTNULL, 0},
+					{"status"              , NULL, NULL, NULL, 0  , ZBX_TYPE_INT , ZBX_NOTNULL, 0},
+					{0}
+				},
+				NULL
+			};
+
+	return DBcreate_table(&table);
+}
+
+/* 6000000, 17 - add userid index to table rsm_false_positive */
+static int	DBpatch_6000000_17(void)
+{
+	return DBcreate_index("rsm_false_positive", "rsm_false_positive_1", "userid", 0);
+}
+
+/* 6000000, 18 - add userid foreign key to table rsm_false_positive */
+static int	DBpatch_6000000_18(void)
+{
+	const ZBX_FIELD field = {"userid", NULL, "users", "userid", 0, 0, 0, 0};
+
+	return DBadd_foreign_key("rsm_false_positive", 1, &field);
+}
+
+/* 6000000, 19 - add eventid index to table rsm_false_positive */
+static int	DBpatch_6000000_19(void)
+{
+	return DBcreate_index("rsm_false_positive", "rsm_false_positive_2", "eventid", 0);
+}
+
+/* 6000000, 20 - add eventid foreign key to table rsm_false_positive */
+static int	DBpatch_6000000_20(void)
+{
+	const ZBX_FIELD field = {"eventid", NULL, "events", "eventid", 0, 0, 0, ZBX_FK_CASCADE_DELETE};
+
+	return DBadd_foreign_key("rsm_false_positive", 2, &field);
+}
+
 #endif
 
 DBPATCH_START(6000)
@@ -832,5 +879,10 @@ DBPATCH_RSM(6000000, 12, 0, 0)	/* create a template for storing value maps */
 DBPATCH_RSM(6000000, 13, 0, 0)	/* enable show_technical_errors */
 DBPATCH_RSM(6000000, 14, 0, 0)	/* reset items.lifetime and items.request_method to default values */
 DBPATCH_RSM(6000000, 15, 0, 0)	/* add missing macros - {$RDAP.BASE.URL}, {$RDAP.TEST.DOMAIN}, {$RSM.RDDS43.TEST.DOMAIN} */
+DBPATCH_RSM(6000000, 16, 0, 1)	/* create table rsm_false_positive, this is required by frontend */
+DBPATCH_RSM(6000000, 17, 0, 0)	/* add userid index to table rsm_false_positive */
+DBPATCH_RSM(6000000, 18, 0, 0)	/* add userid foreign key to table rsm_false_positive */
+DBPATCH_RSM(6000000, 19, 0, 0)	/* add eventid index to table rsm_false_positive */
+DBPATCH_RSM(6000000, 20, 0, 0)	/* add eventid foreign key to table rsm_false_positive */
 
 DBPATCH_END()

@@ -356,7 +356,11 @@ sub process_server($)
 	$fm->wait_all_children();
 
 	# Do not update cache if something happened.
-	if (!opt('dry-run') && !opt('now'))
+	if (opt('dry-run') || opt('now'))
+	{
+		info("not updating sla-api cache because running with either --dry-run or --now");
+	}
+	else
 	{
 		if (ah_save_recent_cache($server_key, $lastvalues_cache) != AH_SUCCESS)
 		{
@@ -491,7 +495,12 @@ sub process_tld($$$$$$)
 			dbg("$service cycles to calculate: ", join(',', map {ts_str($_)} (@cycles_to_calculate)));
 		}
 
-		next if (scalar(@cycles_to_calculate) == 0);
+		if (scalar(@cycles_to_calculate) == 0)
+		{
+			
+			info(sprintf("selected no %6s period", $service)) if (opt('print-period'));
+			next;
+		}
 
 		my $cycles_from = $cycles_to_calculate[0];
 		my $cycles_till = cycle_end($cycles_to_calculate[-1], $delays{$service});
@@ -500,7 +509,7 @@ sub process_tld($$$$$$)
 
 		if (opt('print-period'))
 		{
-			info(sprintf("selected %6s period: %s", $service, selected_period($cycles_from, $cycles_till)));
+			info(sprintf("selected %9s period: %s", $service, selected_period($cycles_from, $cycles_till)));
 		}
 
 		# TODO: leave only next line after migrating to Standalone RDAP

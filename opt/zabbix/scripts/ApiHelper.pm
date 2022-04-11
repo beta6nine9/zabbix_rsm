@@ -39,9 +39,11 @@ use constant AH_DOWNTIME_FILE => 'downtime';
 use constant AH_ROOT_ZONE_DIR => 'zz--root';			# map root zone name (.) to something human readable
 
 use constant AH_CONTINUE_FILE		=> 'last_update.txt';	# file with timestamp of last run with --continue
-use constant AH_AUDIT_FILE_PREFIX	=> 'last_audit_';	# file containing timestamp of last auditlog entry that
-								# was processed, is saved per db (false_positive change):
-								# AH_AUDIT_FILE_PREFIX _ <SERVER_KEY> .txt
+
+use constant AH_FALSE_POSITIVEID_FILE_PREFIX	=> 'last_false_positive_';
+								# prefix for file containing the ID of the last
+								# rsm_false_positive enntry that was processed,
+								# last_false_positive_<SERVER_KEY>.txt
 
 use constant JSON_VALUE_INCIDENT_ACTIVE => 'Active';
 use constant JSON_VALUE_INCIDENT_RESOLVED => 'Resolved';
@@ -96,10 +98,10 @@ our @EXPORT = qw(
 	ah_save_alarmed ah_save_downtime ah_create_incident_json ah_save_incident
 	ah_save_false_positive
 	ah_continue_file_name ah_lock_continue_file ah_unlock_continue_file
-	ah_get_api_tld ah_get_last_audit
+	ah_get_api_tld ah_get_last_false_positiveid
 	ah_copy_measurement ah_save_measurement ah_save_recent_cache ah_read_recent_cache
 	ah_get_most_recent_measurement_ts
-	ah_save_audit ah_save_continue_file JSON_OBJECT_DISABLED_SERVICE
+	ah_save_last_false_positiveid ah_save_continue_file JSON_OBJECT_DISABLED_SERVICE
 	AH_INTERFACE_DNS AH_INTERFACE_DNSSEC AH_INTERFACE_RDDS43 AH_INTERFACE_RDDS80 AH_INTERFACE_RDAP AH_INTERFACE_EPP
 	AH_CITY_UP AH_CITY_DOWN AH_CITY_NO_RESULT AH_CITY_OFFLINE
 	AH_SLA_API_VERSION_1 AH_SLA_API_VERSION_2
@@ -866,11 +868,13 @@ sub ah_get_api_tld
 	return $tld;
 }
 
-sub __get_audit_file_path
+sub __get_false_positive_file_path
 {
 	my $server_key = shift;
 
-	return AH_SLA_API_DIR . '/' . AH_AUDIT_FILE_PREFIX . $server_key . '.txt';
+	die("server_key not specified") unless ($server_key);
+
+	return "@{[AH_SLA_API_DIR]}/@{[AH_FALSE_POSITIVEID_FILE_PREFIX]}$server_key.txt";
 }
 
 sub __encode_json($$$)
@@ -895,22 +899,20 @@ sub __encode_json($$$)
 	return $_json_xs->encode($json_ref);
 }
 
-# get the time of last audit log entry that was checked
-sub ah_get_last_audit
+# get id of the last "false positive" record that was processed
+sub ah_get_last_false_positiveid
 {
 	my $server_key = shift;
 
-	die("Internal error: ah_get_last_audit() server_key not specified") unless ($server_key);
-
-	my $audit_file = __get_audit_file_path($server_key);
+	my $file = __get_false_positive_file_path($server_key);
 
 	my $handle;
 
-	if (-e $audit_file)
+	if (-e $file)
 	{
-		if (!open($handle, '<', $audit_file))
+		if (!open($handle, '<', $file))
 		{
-			RSMSLV::fail("cannot open last audit check file $audit_file\": $!");
+			RSMSLV::fail("cannot open last false positive file $file\": $!");
 		}
 
 		chomp(my @lines = <$handle>);
@@ -923,14 +925,16 @@ sub ah_get_last_audit
 	return 0;
 }
 
-sub ah_save_audit
+sub ah_save_last_false_positiveid
 {
-	my $server_key = shift;
-	my $clock = shift;
+	my $server_key           = shift;
+	my $rsm_false_positiveid = shift;
 
-	die("Internal error: ah_save_audit() server_key not specified") unless ($server_key && $clock);
+	die("rsm_false_positiveid not specified") unless (defined($rsm_false_positiveid));
 
-	return __write_file(AH_SLA_API_TMP_DIR . '/' . AH_AUDIT_FILE_PREFIX . $server_key . '.txt', $clock);
+	my $file = __get_false_positive_file_path($server_key);
+
+	return __write_file($file, $rsm_false_positiveid);
 }
 
 sub int_or_null

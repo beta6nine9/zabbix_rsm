@@ -467,7 +467,7 @@ class IncidentsListAction extends Action {
 						'objectid' => $event['objectid'],
 						'status' => TRIGGER_VALUE_TRUE,
 						'startTime' => $event['clock'],
-						'false_positive' => $event['false_positive']
+						'false_positive' => getEventFalsePositiveness($event['eventid']),
 					);
 				}
 				else {

@@ -1,6 +1,6 @@
-#include "t_rsm.h"
-#include "t_rsm_decl.h"
 #include "../zabbix_server/poller/checks_simple_rsm.c"
+#include "t_rsm_decl.h"
+#include "t_rsm.h"
 
 #define DEFAULT_RES_IP		"127.0.0.1"
 #define DEFAULT_RES_PORT	53
@@ -8,8 +8,6 @@
 #define DEFAULT_RDDS80_PORT	80
 #define DEFAULT_TESTPREFIX	"whois.nic"
 #define DEFAULT_MAXREDIRS	10
-#define DEFAULT_RDDS_NS_STRING	"Name Server:"
-#define DEFAULT_RTT_LIMIT	2000
 
 #define LOG_FILE1	"test1.log"
 #define LOG_FILE2	"test2.log"
@@ -46,19 +44,21 @@ static void	exit_usage(const char *program)
 
 int	main(int argc, char *argv[])
 {
-	char			*tld = NULL, *testedname43 = NULL, *testedname80 = NULL,
-				*res_ip = DEFAULT_RES_IP, ipv4_enabled = 0,
-				ipv6_enabled = 0, *testprefix = DEFAULT_TESTPREFIX,
-				*json_file = NULL, key[8192],
-				res_host_buf[ZBX_HOST_BUF_SIZE], rdds43_host_buf[ZBX_HOST_BUF_SIZE],
-				rdds80_host_buf[ZBX_HOST_BUF_SIZE];
-	int			c, index,
-				maxredirs = DEFAULT_MAXREDIRS;
-	FILE			*log_fd = stdout;
-	uint16_t		res_port = DEFAULT_RES_PORT, rdds43_port = DEFAULT_RDDS43_PORT,
-				rdds80_port = DEFAULT_RDDS80_PORT;
-	AGENT_REQUEST		request;
-	AGENT_RESULT		result;
+	char		*tld = NULL, *testedname43 = NULL, *testedname80 = NULL,
+			ipv4_enabled = 0,
+			ipv6_enabled = 0,
+			*json_file = NULL, key[8192],
+			res_host_buf[ZBX_HOST_BUF_SIZE], rdds43_host_buf[ZBX_HOST_BUF_SIZE],
+			rdds80_host_buf[ZBX_HOST_BUF_SIZE];
+	const char	*res_ip = DEFAULT_RES_IP,
+			*testprefix = DEFAULT_TESTPREFIX;
+	int		c, index,
+			maxredirs = DEFAULT_MAXREDIRS;
+	FILE		*log_fd = stdout;
+	int		res_port = DEFAULT_RES_PORT, rdds43_port = DEFAULT_RDDS43_PORT,
+			rdds80_port = DEFAULT_RDDS80_PORT;
+	AGENT_REQUEST	request;
+	AGENT_RESULT	result;
 
 	opterr = 0;
 
@@ -152,9 +152,9 @@ int	main(int argc, char *argv[])
 
 	init_request(&request);
 
-	zbx_snprintf(rdds43_host_buf, sizeof(rdds43_host_buf), "%s;%hu", testedname43, rdds43_port);
-	zbx_snprintf(rdds80_host_buf, sizeof(rdds80_host_buf), "%s:%hu", testedname80, rdds80_port);
-	zbx_snprintf(res_host_buf,    sizeof(res_host_buf),    "%s;%hu", res_ip,       res_port);
+	zbx_snprintf(rdds43_host_buf, sizeof(rdds43_host_buf), "%s;%d", testedname43, rdds43_port);
+	zbx_snprintf(rdds80_host_buf, sizeof(rdds80_host_buf), "%s:%d", testedname80, rdds80_port);
+	zbx_snprintf(res_host_buf,    sizeof(res_host_buf),    "%s;%d", res_ip,       res_port);
 
 	zbx_snprintf(key, sizeof(key), "rsm.rdds[%s,%s,%s,%s,%s,%d,%d,%d,%d,%d,%s,%d,%d]",
 			tld,		/* Rsmhost */

@@ -24,8 +24,17 @@ db_connect();
 
 if (!opt('dry-run'))
 {
+	# TODO: this is one time operation, remove on the next project iteration
+	if (-f "/opt/zabbix/data/rsm.slv.rdds.downtime.auditlog.txt")
+	{
+		rename(
+			"/opt/zabbix/data/rsm.slv.rdds.downtime.auditlog.txt",
+			"/opt/zabbix/data/rsm.slv.rdds.downtime.false-positive.txt"
+		) or die("cannot rename file \"/opt/zabbix/data/rsm.slv.rdds.downtime.auditlog.txt\": $!");
+	}
+
 	recalculate_downtime(
-		"/opt/zabbix/data/rsm.slv.rdds.downtime.auditlog.txt",
+		"/opt/zabbix/data/rsm.slv.rdds.downtime.false-positive.txt",
 		$cfg_key_in,
 		$cfg_key_out,
 		get_macro_incident_rdds_fail(),

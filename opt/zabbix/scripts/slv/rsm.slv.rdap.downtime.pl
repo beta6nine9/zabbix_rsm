@@ -26,8 +26,17 @@ slv_exit(SUCCESS) if (!is_rdap_standalone(getopt('now')));
 
 if (!opt('dry-run'))
 {
+	# TODO: this is one time operation, remove on the next project iteration
+	if (-f "/opt/zabbix/data/rsm.slv.rdap.downtime.auditlog.txt")
+	{
+		rename(
+			"/opt/zabbix/data/rsm.slv.rdap.downtime.auditlog.txt",
+			"/opt/zabbix/data/rsm.slv.rdap.downtime.false-positive.txt"
+		) or die("cannot rename file \"/opt/zabbix/data/rsm.slv.rdap.downtime.auditlog.txt\": $!");
+	}
+
 	recalculate_downtime(
-		"/opt/zabbix/data/rsm.slv.rdap.downtime.auditlog.txt",
+		"/opt/zabbix/data/rsm.slv.rdap.downtime.false-positive.txt",
 		$cfg_key_in,
 		$cfg_key_out,
 		get_macro_incident_rdap_fail(),

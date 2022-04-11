@@ -93,6 +93,22 @@ function isServiceErrorCode($rtt, $type) {
 	return ($rtt < ZBX_EC_INTERNAL_LAST);
 }
 
+function getEventFalsePositiveness($eventid) {
+	$row = DBfetch(DBselect(
+		'SELECT status'.
+		' FROM rsm_false_positive'.
+		' WHERE eventid='.$eventid.
+		' ORDER BY rsm_false_positiveid DESC',
+		1
+	));
+
+	if ($row === false) {
+	    return INCIDENT_FLAG_NORMAL;
+	}
+
+	return $row['status'];
+}
+
 /**
  * Get last eventid from the events.
  *
@@ -104,7 +120,7 @@ function getLastEvent($problemTrigger) {
 	$result = null;
 
 	$lastProblemEvent = DBfetch(DBselect(
-		'SELECT e.eventid,e.clock,e.false_positive'.
+		'SELECT e.eventid,e.clock'.
 		' FROM events e'.
 		' WHERE e.objectid='.$problemTrigger.
 			' AND e.source='.EVENT_SOURCE_TRIGGERS.
@@ -113,6 +129,8 @@ function getLastEvent($problemTrigger) {
 		' ORDER BY e.clock DESC',
 		1
 	));
+
+	$lastProblemEvent['false_positive'] = getEventFalsePositiveness($lastProblemEvent['eventid']);
 
 	if ($lastProblemEvent && $lastProblemEvent['false_positive'] == INCIDENT_FLAG_NORMAL) {
 		$result = getPreEvents($problemTrigger, $lastProblemEvent['clock'], $lastProblemEvent['eventid']);
