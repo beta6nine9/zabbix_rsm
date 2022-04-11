@@ -398,7 +398,18 @@ function handlePutRequest(string $objectType, ?string $objectId, string $payload
 
 		if ($counts[$serverId] >= $maxCount)
 		{
-			throw new RsmException(400, 'The maximum number of objects has been reached in the central server', 'Maximum number: ' . $maxCount);
+			$message = null;
+
+			if ($serverIdWasRequested)
+			{
+				$message = 'The maximum number of objects has been reached in the central server';
+			}
+			else
+			{
+				$message = 'All central servers have reached the maximum number of objects supported per central server';
+			}
+
+			throw new RsmException(400, $message, 'Maximum number: ' . $maxCount);
 		}
 
 		forwardRequest($serverId, $objectType, $objectId, REQUEST_METHOD_PUT, $payload);
