@@ -118,19 +118,36 @@ class Probe extends ActionBaseEx
 			]
 		);
 
-		// get lastvalue of "rsm.probe.status[manual]" item
+		// get lastvalue of "rsm.probe.online" item
 
-		$data = DBfetchArray(DBselect(
+		$cursor = DBselect(
 			'SELECT' .
-				' items.hostid,' .
-				' COALESCE(lastvalue.value,1) as value' .
+				' probe_hosts.hostid,' .
+				'lastvalue.value' .
 			' FROM' .
-				' items' .
+				' hosts AS probe_hosts' .
+				' INNER JOIN hosts AS probe_mon_hosts ON probe_mon_hosts.host = CONCAT(probe_hosts.host, " - mon")' .
+				' INNER JOIN items ON items.hostid = probe_mon_hosts.hostid' .
 				' LEFT JOIN lastvalue ON lastvalue.itemid=items.itemid' .
 			' WHERE' .
-				' items.hostid IN (' . implode(',', array_keys($hosts)) . ')'
-		));
-		$status = array_column($data, 'value', 'hostid');
+				' items.key_="rsm.probe.online" AND' .
+				' probe_hosts.hostid IN (' . implode(',', array_keys($hosts)) . ')'
+		);
+
+		$status = [];
+
+		while ($row = DBfetch($cursor, false))
+		{
+			$hostid = $row['hostid'];
+			$value = $row['value'];
+
+			if (!is_null($value))
+			{
+				$value = (bool)$value;
+			}
+
+			$status[$hostid] = $value;
+		}
 
 		// join data in a common data structure
 
@@ -158,7 +175,7 @@ class Probe extends ActionBaseEx
 					'proxyPskIdentity'          => null,
 					'proxyPsk'                  => null,
 				],
-				'online'                        => (bool)$status[$hostid],
+				'online'                        => $status[$hostid],
 			];
 		}
 
