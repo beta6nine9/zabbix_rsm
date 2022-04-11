@@ -311,9 +311,9 @@ abstract class ActionBase extends CController
 		$output = null;
 		$result = null;
 
-		$ret = exec("python -c $execCode $execJson 2>&1", $output, $result);
+		$ret = exec("python3 -c $execCode $execJson 2>&1", $output, $result);
 
-		if ($ret !== false && strpos($ret, "python: not found") !== false)
+		if ($ret !== false && strpos($ret, "python3: not found") !== false)
 		{
 			throw new RsmException(500, 'General error', $ret);
 		}
@@ -328,23 +328,22 @@ abstract class ActionBase extends CController
 
 	private function jsonParsingError(string $json): string
 	{
-		$code = "import sys"                  . "\n"
-			  . "import json"                 . "\n"
-			  . ""                            . "\n"
-			  . "try:"                        . "\n"
-			  . "    json.loads(sys.argv[1])" . "\n"
-			  . "except ValueError as e:"     . "\n"
-			  . "    print(e.message)"        . "\n";
-
+		$code = "import sys"                                                                       . "\n"
+			  . "import json"                                                                      . "\n"
+			  . ""                                                                                 . "\n"
+			  . "try:"                                                                             . "\n"
+			  . "    json.loads(sys.argv[1])"                                                      . "\n"
+			  . "except json.decoder.JSONDecodeError as e:"                                        . "\n"
+			  . "    print('%s: line %d column %d (char %d)' % (e.msg, e.lineno, e.colno, e.pos))" . "\n";
 
 		$execCode = escapeshellarg($code);
 		$execJson = escapeshellarg($json);
 
 		$output = null;
 
-		$ret = exec("python -c $execCode $execJson 2>&1", $output);
+		$ret = exec("python3 -c $execCode $execJson 2>&1", $output);
 
-		if ($ret !== false && strpos($ret, "python: not found") !== false)
+		if ($ret !== false && strpos($ret, "python3: not found") !== false)
 		{
 			throw new RsmException(500, 'General error', $ret);
 		}
@@ -374,8 +373,7 @@ abstract class ActionBase extends CController
 
 				if (is_null($input))
 				{
-					$descr = json_last_error_msg() . "\n" . $this->jsonParsingError($json);
-					throw new RsmException(400, 'JSON syntax is invalid', $descr);
+					throw new RsmException(400, 'JSON syntax is invalid', $this->jsonParsingError($json));
 				}
 				if ($this->jsonHasDuplicateKeys($json))
 				{
