@@ -24,7 +24,7 @@
             "proxyPskIdentity": null,
             "proxyPsk": null
         },
-        "online": true,
+        "online": null,
         "centralServer": 1
     }
 }
