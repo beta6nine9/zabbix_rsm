@@ -18,6 +18,9 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
+require_once dirname(__FILE__).'/rsm/testRSM.php';
+
+/*
 require_once dirname(__FILE__).'/testGeneric.php';
 require_once dirname(__FILE__).'/testGraphAxis.php';
 require_once dirname(__FILE__).'/testPageDashboard.php';
@@ -59,11 +62,11 @@ require_once dirname(__FILE__).'/testPageMonitoringHosts.php';
 require_once dirname(__FILE__).'/testPageNetworkDiscovery.php';
 require_once dirname(__FILE__).'/lld/testPageLowLevelDiscovery.php';
 require_once dirname(__FILE__).'/testPasswordComplexity.php';
-/*
+
 require_once dirname(__FILE__).'/testPageQueueDetails.php';
 require_once dirname(__FILE__).'/testPageQueueOverview.php';
 require_once dirname(__FILE__).'/testPageQueueOverviewByProxy.php';
-*/
+
 require_once dirname(__FILE__).'/testPageSearch.php';
 require_once dirname(__FILE__).'/testPageStatusOfZabbix.php';
 require_once dirname(__FILE__).'/testPageTemplates.php';
@@ -79,7 +82,7 @@ require_once dirname(__FILE__).'/testFormAdministrationDMProxies.php';
 require_once dirname(__FILE__).'/testFormAdministrationGeneralGUI.php';
 require_once dirname(__FILE__).'/testFormAdministrationGeneralHousekeeper.php';
 require_once dirname(__FILE__).'/testFormAdministrationGeneralIconMapping.php';
-//require_once dirname(__FILE__).'/testFormAdministrationGeneralImages.php';
+require_once dirname(__FILE__).'/testFormAdministrationGeneralImages.php';
 require_once dirname(__FILE__).'/testFormAdministrationGeneralMacros.php';
 require_once dirname(__FILE__).'/testFormAdministrationGeneralOtherParams.php';
 require_once dirname(__FILE__).'/testFormAdministrationGeneralRegexp.php';
@@ -197,6 +200,7 @@ require_once dirname(__FILE__).'/reports/testFormScheduledReport.php';
 require_once dirname(__FILE__).'/reports/testPageScheduledReport.php';
 require_once dirname(__FILE__).'/reports/testScheduledReportPermissions.php';
 require_once dirname(__FILE__).'/testSID.php';
+*/
 
 use PHPUnit\Framework\TestSuite;
 
@@ -204,6 +208,9 @@ class SeleniumTests {
 	public static function suite() {
 		$suite = new TestSuite('selenium');
 
+		$suite->addTestSuite('testRSM');
+
+		/*
 		$suite->addTestSuite('testGeneric');
 		$suite->addTestSuite('testGraphAxis');
 		$suite->addTestSuite('testPageActions');
@@ -246,11 +253,11 @@ class SeleniumTests {
 		$suite->addTestSuite('testPageMonitoringServices');
 		$suite->addTestSuite('testPageMonitoringServicesMassUpdate');
 		$suite->addTestSuite('testPageNetworkDiscovery');
-/*
+
 		$suite->addTestSuite('testPageQueueDetails');
 		$suite->addTestSuite('testPageQueueOverview');
 		$suite->addTestSuite('testPageQueueOverviewByProxy');
-*/
+
 		$suite->addTestSuite('testPageReportsActionLog');
 		$suite->addTestSuite('testPageReportsAudit');
 		$suite->addTestSuite('testPageReportsNotifications');
@@ -272,7 +279,7 @@ class SeleniumTests {
 		$suite->addTestSuite('testFormAdministrationGeneralGUI');
 		$suite->addTestSuite('testFormAdministrationGeneralHousekeeper');
 		$suite->addTestSuite('testFormAdministrationGeneralIconMapping');
-//		$suite->addTestSuite('testFormAdministrationGeneralImages');
+		$suite->addTestSuite('testFormAdministrationGeneralImages');
 		$suite->addTestSuite('testFormAdministrationGeneralMacros');
 		$suite->addTestSuite('testFormAdministrationGeneralOtherParams');
 		$suite->addTestSuite('testFormAdministrationGeneralRegexp');
@@ -383,6 +390,7 @@ class SeleniumTests {
 		$suite->addTestSuite('testPageScheduledReport');
 		$suite->addTestSuite('testScheduledReportPermissions');
 		$suite->addTestSuite('testSID');
+		*/
 
 		return $suite;
 	}
