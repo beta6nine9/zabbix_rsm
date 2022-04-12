@@ -23,7 +23,57 @@ $ZBX_SERVER				= 'localhost';
 $ZBX_SERVER_PORT		= '{SERVER_PORT}';
 $ZBX_SERVER_NAME		= 'TEST_SERVER_NAME';
 
+// Vault configuration. Used if database credentials are stored in Vault secrets manager.
+$DB['VAULT_URL']		= '';
+$DB['VAULT_DB_PATH']	= '';
+$DB['VAULT_TOKEN']		= '';
+
+// Use IEEE754 compatible value range for 64-bit Numeric (float) history values.
+// This option is enabled by default for new Zabbix installations.
+// For upgraded installations, please read database upgrade notes before enabling this option.
+$DB['DOUBLE_IEEE754']	= true;
+
 $IMAGE_FORMAT_DEFAULT	= IMAGE_FORMAT_PNG;
+
+// Uncomment this block only if you are using Elasticsearch.
+// Elasticsearch url (can be string if same url is used for all types).
+//$HISTORY['url'] = [
+//	'uint' => 'http://localhost:9200',
+//	'text' => 'http://localhost:9200'
+//];
+// Value types stored in Elasticsearch.
+//$HISTORY['types'] = ['uint', 'text'];
+
+// Used for SAML authentication.
+// Uncomment to override the default paths to SP private key, SP and IdP X.509 certificates, and to set extra settings.
+//$SSO['SP_KEY']			= 'conf/certs/sp.key';
+//$SSO['SP_CERT']			= 'conf/certs/sp.crt';
+//$SSO['IDP_CERT']		= 'conf/certs/idp.crt';
+//$SSO['SETTINGS']		= [];
+
+$DB['DB_CONN_TIMEOUT']	= 5;
+
+$DB['SERVERS'] = [
+	'1' => [
+		'NR' => '1',
+		'NAME' => '',
+		'SERVER' => 'localhost',
+		'TYPE' => 'MYSQL',
+		'DB_CONN_TIMEOUT' => 5,
+		'PORT' => '0',
+		'DATABASE' => 'zabbix',
+		'USER' => 'zabbix',
+		'PASSWORD' => '',
+		'SCHEMA' => '',
+		'URL' => 'http://localhost/zabbix/',
+		'ENCRYPTION'	=> false,
+		'KEY_FILE'	=> '',
+		'CERT_FILE'	=> '',
+		'CA_FILE'	=> '',
+		'VERIFY_HOST'	=> false,
+		'CIPHER_LIST'	=> '',
+	]
+];
 
 // PHP runtime error log file for unit tests.
 define('PHPUNIT_ERROR_LOG', '{PHPUNIT_ERROR_LOG}');
