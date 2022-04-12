@@ -32,7 +32,7 @@ Test cases are described in text files with `.txt` extension (e.g., `001-test-ca
 
 Test framework sorts test cases in alphabetical order by filename before executing them. Test case files can be grouped by putting them into subdirectories.
 
-Each line in the test case file describes either a command, or arguments. Commands are enclosed in square brackets. Arguments are written in CSV format. Command can have multiple lines with arguments, in that case command will be executed multiple times. Some commands don't require any arguments. Comments start with `#`. Comments and empty lines are ignored.
+Each line in the test case file describes either a command, or arguments. Commands are enclosed in square brackets. Arguments are written in CSV format. Command can have multiple lines with arguments, in that case command will be executed multiple times. Arguments that are optional also must be specified. If value of an optional argument is an empty string, this argument is ignored. Some commands don't require any arguments. Comments start with `#`. Comments and empty lines are ignored.
 
 Each test case file must start with a `test-case` command.
 
@@ -50,6 +50,42 @@ Example test case:
 "2020-12-03 09:00:00","date","+'%F %T %Z'"
 ```
 
+## Variables
+
+When parsing the test case file, framework looks for any variables in command arguments and tries to expand them. The syntax of the variables is `${variable}`.
+
+There are two types of variables:
+* named variables - these variables can be set by using `set-variable` command and expand to a constant string;
+* special variables - these variables are available without using `set-variable` command and expand to a value that depends on the current environment (e.g., current time).
+
+Supported special variables are:
+* `${cfg:<section>:<property>}` - returns value from framework's configuration file;
+* `${file:<filename>}` - returns contents of the file, `filename` must be relative to the test case file;
+* `${ts:<datetime>}` - returns unix timestamp for the given datetime, see https://metacpan.org/pod/Date::Parse for supported formats.
+
+If named variable does not exist, it won't be expanded. If special variable cannot be expanded, the result is undefined (e.g., it can expand to unexpected values or fail the test case).
+
+Example test case:
+```
+[test-case]
+
+"Example test case 1"
+
+[set-variable]
+
+"str1","first string"
+"str2","second string"
+
+[execute]
+
+# execute "date" command
+"","echo 'this is ${str1}'"
+"","echo 'this is ${str2}'"
+"","echo 'this is ${str3}'"
+"","echo '${ts:2020-01-01 12:00:00}'"
+"","echo 'build_dir is ${cfg:paths:build_dir}'"
+```
+
 ## Commands
 
 ### test-case
@@ -57,6 +93,12 @@ Example test case:
 *name*
 
 Sets the name of the test case.
+
+### set-variable
+
+*name,value*
+
+Sets named variable that can later be used in command arguments.
 
 ### enable-debug-mode
 
@@ -88,6 +130,24 @@ Extracts archive file into a directory. Archive should be filename of a compress
 
 Compares contents of an archive file with contents on the filesystem. Archive should be filename of a compressed tar file, relative to the test case file (e.g., `001-test-case-input-files.tar.gz`).
 
+### prepare-server-database
+
+*(ignored)*
+
+Drops the database, then creates new database with initial data in it.
+
+### execute-sql-query
+
+*query,param,param,param,...*
+
+Executes query (update, insert, delete). Use `?` in the query as placeholders for params.
+
+### compare-sql-query
+
+*query,value,value,value,...*
+
+Selects data from the database and compares it with expected values.
+
 ### fill-history
 
 *host,item,delay,clock,value,value,value,...*
@@ -116,17 +176,11 @@ insert into history set itemid = 123, clock = 1000 + (3 * 3), value = 8
 
 Checks if history table contains specified values. See the meaning of arguments in the description of the `fill-history` command.
 
-### execute-sql-query
+### set-lastvalue
 
-*query,param,param,param,...*
+*host,item,clock,value*
 
-Executes query (update, insert, delete). Use `?` in the query as placeholders for params.
-
-### compare-sql-query
-
-*query,value,value,value,...*
-
-Selects data from the database and compares it with expected values.
+Sets custom last value for an item.
 
 ### fix-lastvalue-tables
 
@@ -134,11 +188,17 @@ Selects data from the database and compares it with expected values.
 
 Fixes database tables that hold last values of items.
 
-### set-lastvalue
+### set-global-macro
 
-*host,item,clock,value*
+*macro,value*
 
-Sets custom last value for an item.
+Sets global macro.
+
+### set-host-macro
+
+*host,macro,value*
+
+Sets host or template macro.
 
 ### execute
 
@@ -159,23 +219,13 @@ Examples:
 "2020-12-01 09:00:00","date","+'%F %T %Z'"
 ```
 
-### prepare-server-database
+### execute-ex
 
-*(ignored)*
+*datetime,status,expected_stdout,expected_stderr,command[,arg,arg,arg,...]*
 
-Drops the database, then creates new database with initial data in it.
+Executes external command and validates exit status, STDOUT and STDERR.
 
-### set-global-macro
-
-*macro,value*
-
-Sets global macro.
-
-### set-host-macro
-
-*host,macro,value*
-
-Sets host or template macro.
+Arguments `expected_stdout` and `expected_stderr` are optional. If they contain a string that is enclosed in `//`, this string is used as a regex pattern, otherwise the whole output has to be the same as the string (in this case, trailing newlines are ignored).
 
 ### start-server
 
@@ -193,23 +243,29 @@ Arguments `key=value` are optional key-value pairs to be updated in `zabbix_serv
 
 Stops Zabbix server.
 
-### create-probe
+### update-rsm-conf
 
-*probe,ip,port,ipv4,ipv6,rdds,rdap*
+*section,property,value*
 
-Onboards a probe.
+Updates configuration value in `rsm.conf`.
 
-### create-tld
+### ~~create-probe~~ (obsolete)
 
-*tld,dns_test_prefix,type,dnssec,dns_udp,dns_tcp,ns_servers_v4,ns_servers_v6,rdds43_servers,rdds80_servers,rdap_base_url,rdap_test_domain,rdds_test_prefix*
+~~*probe,ip,port,ipv4,ipv6,rdds,rdap*~~
 
-Onboards a TLD.
+~~Onboards a probe.~~
 
-### disable-tld
+### ~~create-tld~~ (obsolete)
 
-*tld*
+~~*tld,dns_test_prefix,type,dnssec,dns_udp,dns_tcp,ns_servers_v4,ns_servers_v6,rdds43_servers,rdds80_servers,rdap_base_url,rdap_test_domain,rdds_test_prefix*~~
 
-Disables a TLD.
+~~Onboards a TLD.~~
+
+### ~~disable-tld~~ (obsolete)
+
+~~*tld*~~
+
+~~Disables a TLD.~~
 
 ### create-incident
 
@@ -267,6 +323,133 @@ Checks the number of events. This command should be used in conjunction with `ch
 Argument `description` must match trigger's description rather than actual event's description.
 
 See the example in the description of the `check-incident` command.
+
+### provisioning-api
+
+*endpoint,method,expected_code,user,request,response*
+
+Sends request to Porvisioning API. For this to work, framework must be properly configured.
+
+Argument `endpoint` points to an endpoint of Provisioning API (e.g., `"/tlds/tld1"`).
+
+Argument `method` describes HTTP request method, usually `GET`, `PUT` or `DELETE`.
+
+Argument `expected_code` describes expected HTTP response status code, e.g., `200` (for "OK") or `404` (for "Not Found").
+
+Argument `user` specifies user for Basic Authentication. Exact usernames and passwords are configured in framework's configuration file. Supported users are:
+* `readonly` - user with "read only" permissions;
+* `readwrite` - user with "read and write" permissions;
+* `invalid_password` - user that is registered, but with invalid password;
+* `nonexistent` - user that is not registered in Provisioning API;
+* `''` (empty string) - for skipping authentication).
+
+Argument `request` specifies filename of the payload for the request. This argument is optional. It is usually used only with `PUT` requests.
+
+Argument `response` specifies filename of the expected response's payload. This argument is optional. If this argument is not specified, validation of the response's payload is skipped.
+
+Tip: when massive changes are required in expected responses, the handler of `provisioning-api` command can be modified to write the response files before doing the validation.
+
+### start-tool
+
+*tool_name,pid-file,input-file*
+
+Starts a tool that is shipped with the test framework.
+
+### stop-tool
+
+*tool_name,pid-file*
+
+Stops a tool that is shipped with the test framework.
+
+### check-proxy
+
+*proxy,status,ip,port,psk-identity,psk*
+
+Checks if proxy exists and has correct properties.
+
+Argument `status` must be either `enabled` or `disabled`. Value of this argument affects validation of IP, port and encryption.
+
+### check-host
+
+*host,status,info_1,info_2,proxy,template_count,host_group_count,macro_count,item_count*
+
+Checks if host or template exists and has correct properties.
+
+Argument `status` must be `enabled`, `disabled` or `template`.
+
+Arguments `info_1` and `info_2` are used for registrars (registrar name and registrar family).
+
+Argument `proxy` specifies name of the proxy.
+
+Arguments `template_count`, `host_group_count`, `macro_count` and `item_count` specify numbers of linked items of each type.
+
+### check-host-count
+
+*type,count*
+
+Validates number of hosts, templates or proxies in the database.
+
+Argument `type` must be `host`, `template` or `proxy`.
+
+### check-host-template
+
+*host,template*
+
+Check if template is linked to the host.
+
+### check-host-group
+
+*host,group*
+
+Check if host is linked to the host group.
+
+### check-host-macro
+
+*host,macro,value*
+
+Checks if host has a macro with specified name and value.
+
+### check-item
+
+*host,key,name,status,item_type,value_type,delay,history,trends,units,params,master_item,preproc_count,trigger_count*
+
+Checks if host has a specific item.
+
+Argument `status` must be either `enabled` or `disabled`.
+
+Argument `item_type` must be `trapper`, `simple`, `internal`, `external`, `calculated` or `dependent`.
+
+Argument `value_type` must be `float`, `str`, `uint64` or `text`.
+
+Argument `master_item` is optional and specifies the key of the master item.
+
+Arguments `preproc_count` and `trigger_count` specify numbers of preprocessing steps and triggers.
+
+### check-preproc
+
+*host,key,step,type,params,error_handler,error_handler_params*
+
+Checks if item has specified preprocessing step.
+
+Argument `type` must be `delta-speed`, `jsonpath` or `throttle-timed-value`.
+
+Argument `error_handler` must be either `default` or `discard-value`.
+
+### check-trigger
+
+*host,status,priority,trigger,dependency,expression,recovery_expression*
+
+Checks if host has specified trigger.
+
+Argument `status` must be either `enabled` or `disabled`.
+
+Argument `priority` must be `not-classified`, `information`, `warning`, `average`, `high` or `disaster`.
+
+Argument `trigger` specifies trigger's description.
+
+Argument `dependency` specifies description of the linked trigger.
+
+Arguments `expression` and `recovery_expression` sepcify trigger's expressions. Before validating the expression, all whitespaces in the expressions from the DB are "compressed" - converted into a single space. This also applies to the newlines (e.g., `"foo\n  bar"` is converted into `"foo bar"`).
 
 ## Running tests
 
