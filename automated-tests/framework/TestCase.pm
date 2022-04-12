@@ -325,7 +325,7 @@ sub __cmd_test_case($)
 	# [test-case]
 	# name
 
-	($test_case_name) = __unpack($args);
+	($test_case_name) = __unpack($args, 1);
 
 	if ($test_case_filename =~ /\/(\d+)[^\/]+$/)
 	{
@@ -342,7 +342,7 @@ sub __cmd_set_variable($)
 	# [set-variable]
 	# name,value
 
-	my ($name, $value) = __unpack($args);
+	my ($name, $value) = __unpack($args, 2);
 
 	info("storing variable (name: '$name', value: '$value')");
 
@@ -378,7 +378,7 @@ sub __cmd_empty_directory($)
 	# [empty-directory]
 	# directory
 
-	my ($directory) = __unpack($args);
+	my ($directory) = __unpack($args, 1);
 
 	info("preparing empty directory '$directory'");
 
@@ -397,7 +397,7 @@ sub __cmd_extract_files($)
 	# [extract-files]
 	# directory,archive
 
-	my ($directory, $archive) = __unpack($args);
+	my ($directory, $archive) = __unpack($args, 2);
 
 	info("extracting archive '$archive'");
 
@@ -418,7 +418,7 @@ sub __cmd_compare_files($)
 	# [compare-files]
 	# directory,archive
 
-	my ($directory, $archive) = __unpack($args);
+	my ($directory, $archive) = __unpack($args, 2);
 
 	info("comparing directory '%s' with archive '%s'", $directory, basename($archive));
 
@@ -451,7 +451,7 @@ sub __cmd_execute_sql_query($)
 	# [execute-sql-query]
 	# query,param,param,param,...
 
-	my ($sql, @params) = __unpack($args);
+	my ($sql, @params) = __unpack($args, 1, 1);
 
 	info("executing SQL [$sql] " . join(',', @params));
 
@@ -465,7 +465,7 @@ sub __cmd_compare_sql_query($)
 	# [compare-sql-query]
 	# query,value,value,value,...
 
-	my ($sql, @values) = __unpack($args);
+	my ($sql, @values) = __unpack($args, 2, 1);
 
 	info("comparing SQL [$sql]");
 
@@ -502,7 +502,7 @@ sub __cmd_fill_history($)
 	# [fill-history]
 	# host,item,delay,clock,value,value,value,...
 
-	my ($host, $item, $delay, $clock, @values) = __unpack($args);
+	my ($host, $item, $delay, $clock, @values) = __unpack($args, 5, 1);
 
 	info("filling history (host: '%s', item: '%s')", $host, $item);
 
@@ -539,7 +539,7 @@ sub __cmd_compare_history($)
 	# [compare-history]
 	# host,item,delay,clock,value,value,value,...
 
-	my ($host, $item, $delay, $first_clock, @values) = __unpack($args);
+	my ($host, $item, $delay, $first_clock, @values) = __unpack($args, 5, 1);
 
 	info("comparing history (host: '%s', item: '%s')", $host, $item);
 
@@ -659,7 +659,7 @@ sub __cmd_set_lastvalue($)
 	# [set-lastvalue]
 	# host,item,clock,value
 
-	my ($host, $item, $clock, $value) = __unpack($args);
+	my ($host, $item, $clock, $value) = __unpack($args, 4);
 
 	my $itemid = __get_itemid($host, $item);
 
@@ -721,7 +721,7 @@ sub __cmd_set_global_macro($)
 	# [set-global-macro]
 	# macro,value
 
-	my ($macro, $value) = __unpack($args);
+	my ($macro, $value) = __unpack($args, 2);
 
 	db_exec("update globalmacro set value=? where macro=?", [$value, $macro]);
 }
@@ -733,7 +733,7 @@ sub __cmd_set_host_macro($)
 	# [set-host-macro]
 	# host,macro,value
 
-	my ($host, $macro, $value) = __unpack($args);
+	my ($host, $macro, $value) = __unpack($args, 3);
 
 	db_exec("update hostmacro set value=? where hostid=? and macro=?", [$value, __get_hostid($host), $macro]);
 }
@@ -745,7 +745,7 @@ sub __cmd_execute($)
 	# [execute]
 	# datetime,command
 
-	my ($datetime, @command) = __unpack($args);
+	my ($datetime, @command) = __unpack($args, 2);
 
 	if ($datetime eq "")
 	{
@@ -779,7 +779,7 @@ sub __cmd_execute_ex($)
 	# [execute-ex]
 	# datetime,status,expected_stdout,expected_stderr,command[,arg,arg,arg,...]
 
-	my ($datetime, $status, $expected_stdout, $expected_stderr, @command) = __unpack($args);
+	my ($datetime, $status, $expected_stdout, $expected_stderr, @command) = __unpack($args, 5, 1);
 
 	my $exit_status;
 	my $stdout;
@@ -876,7 +876,7 @@ sub __cmd_start_server($)
 	# [start-server]
 	# datetime,key=value,key=value,...
 
-	my ($datetime, @kv_list) = __unpack($args);
+	my ($datetime, @kv_list) = __unpack($args, 1, 1);
 
 	my $logfile_suffix = '-' . $test_case_filename =~ s!^.*/([^/]*)\.txt$!$1!r;
 
@@ -900,7 +900,7 @@ sub __cmd_update_rsm_conf($)
 	# [update-rsm-conf]
 	# section,property,value
 
-	my ($section, $property, $value) = __unpack($args);
+	my ($section, $property, $value) = __unpack($args, 3);
 
 	my $source_dir = get_config('paths', 'source_dir');
 	my $config_file = $source_dir . "/opt/zabbix/scripts/rsm.conf";
@@ -915,7 +915,7 @@ sub __cmd_create_probe($)
 	# [create-probe]
 	# probe,ip,port,ipv4,ipv6,rdds,rdap
 
-	my ($probe, $ip, $port, $ipv4, $ipv6, $rdds, $rdap) = __unpack($args);
+	my ($probe, $ip, $port, $ipv4, $ipv6, $rdds, $rdap) = __unpack($args, 7);
 
 	db_begin();
 	create_probe(1, $probe, $ip, $port, $ipv4, $ipv6, $rdds, $rdap);
@@ -944,7 +944,7 @@ sub __cmd_create_tld($)
 	# tld,dns_test_prefix,type,dnssec,dns_udp,dns_tcp,ns_servers_v4,ns_servers_v6,rdds43_servers,rdds80_servers,rdap_base_url,rdap_test_domain,rdds_test_prefix
 
 	my ($tld, $dns_test_prefix, $type, $dnssec, $dns_udp, $dns_tcp, $ns_servers_v4, $ns_servers_v6, $rdds43_servers,
-			$rdds80_servers, $rdap_base_url, $rdap_test_domain, $rdds_test_prefix) = __unpack($args);
+			$rdds80_servers, $rdap_base_url, $rdap_test_domain, $rdds_test_prefix) = __unpack($args, 13);
 
 	db_begin();
 
@@ -1008,7 +1008,7 @@ sub __cmd_disable_tld($)
 	# [disable-tld]
 	# tld
 
-	my ($tld) = __unpack($args);
+	my ($tld) = __unpack($args, 1);
 
 	info("disabling tld '$tld'");
 
@@ -1054,7 +1054,7 @@ sub __cmd_create_incident($)
 	# [create-incident]
 	# rsmhost,description,from,till,false_positive
 
-	my ($rsmhost, $description, $from, $till, $false_positive) = __unpack($args);
+	my ($rsmhost, $description, $from, $till, $false_positive) = __unpack($args, 5);
 
 	info("creating incident '$description' for rsmhost '$rsmhost'");
 
@@ -1130,7 +1130,7 @@ sub __cmd_check_incident($)
 	# [check-incident]
 	# rsmhost,description,from,till
 
-	my ($rsmhost, $description, $from, $till) = __unpack($args);
+	my ($rsmhost, $description, $from, $till) = __unpack($args, 4);
 
 	info("checking incident '$description' for rsmhost '$rsmhost'");
 
@@ -1208,7 +1208,7 @@ sub __cmd_check_event_count($)
 	# [check-event-count]
 	# rsmhost,description,count
 
-	my ($rsmhost, $description, $expected_count) = __unpack($args);
+	my ($rsmhost, $description, $expected_count) = __unpack($args, 3);
 
 	info("checking event '$description' count for rsmhost '$rsmhost'");
 
@@ -1232,7 +1232,7 @@ sub __cmd_provisioning_api($)
 	# [provisioning-api]
 	# endpoint,method,expected_code,user,request,response
 
-	my ($endpoint, $method, $expected_code, $user, $request, $response) = __unpack($args);
+	my ($endpoint, $method, $expected_code, $user, $request, $response) = __unpack($args, 6);
 
 	my $users = {
 		'' => undef,
@@ -1331,7 +1331,7 @@ sub __cmd_start_tool($)
 	# [start-tool]
 	# tool_name,pid_file,input_file
 
-	my ($tool_name, $pid_file, $input_file) = __unpack($args);
+	my ($tool_name, $pid_file, $input_file) = __unpack($args, 3);
 
 	start_tool($tool_name, $pid_file, $input_file);
 }
@@ -1343,7 +1343,7 @@ sub __cmd_stop_tool($)
 	# [stop-tool]
 	# tool_name,pid_file
 
-	my ($tool_name, $pid_file) = __unpack($args);
+	my ($tool_name, $pid_file) = __unpack($args, 2);
 
 	stop_tool($tool_name, $pid_file);
 }
@@ -1355,7 +1355,7 @@ sub __cmd_check_proxy($)
 	# [check-proxy]
 	# proxy,status,ip,port,psk-identity,psk
 
-	my ($proxy, $expected_status, $expected_ip, $expected_port, $expected_psk_identity, $expected_psk) = __unpack($args);
+	my ($proxy, $expected_status, $expected_ip, $expected_port, $expected_psk_identity, $expected_psk) = __unpack($args, 6);
 
 	info("checking proxy '$proxy'");
 
@@ -1479,7 +1479,7 @@ sub __cmd_check_host($)
 		$expected_host_group_count,
 		$expected_macro_count,
 		$expected_item_count
-	) = __unpack($args);
+	) = __unpack($args, 9);
 
 	info("checking host '$host'");
 
@@ -1554,7 +1554,7 @@ sub __cmd_check_host_count($)
 	# [check-host-count]
 	# type,count
 
-	my ($type, $expected_count) = __unpack($args);
+	my ($type, $expected_count) = __unpack($args, 2);
 
 	info("checking number of hosts, type '$type'");
 
@@ -1584,7 +1584,7 @@ sub __cmd_check_host_template($)
 	# [check-host-template]
 	# host,template
 
-	my ($host, $template) = __unpack($args);
+	my ($host, $template) = __unpack($args, 2);
 
 	info("checking if template '$template' is linked to host '$host'");
 
@@ -1618,7 +1618,7 @@ sub __cmd_check_host_group($)
 	# [check-host-group]
 	# host,group
 
-	my ($host, $group) = __unpack($args);
+	my ($host, $group) = __unpack($args, 2);
 
 	info("checking if group '$group' is linked to host '$host'");
 
@@ -1652,7 +1652,7 @@ sub __cmd_check_host_macro($)
 	# [check-host-macro]
 	# host,macro,value
 
-	my ($host, $macro, $expected_value) = __unpack($args);
+	my ($host, $macro, $expected_value) = __unpack($args, 3);
 
 	info("checking host macro (host: '$host', macro: '$macro')");
 
@@ -1679,7 +1679,7 @@ sub __cmd_check_item($)
 	# [check-item]
 	# host,key,name,status,item_type,value_type,delay,history,trends,units,params,master_item,preproc_count,trigger_count
 
-	my ($host, $key, $name, $status, $item_type, $value_type, $delay, $history, $trends, $units, $expected_params, $expected_master_item, $expected_preproc_count, $expected_trigger_count) = __unpack($args);
+	my ($host, $key, $name, $status, $item_type, $value_type, $delay, $history, $trends, $units, $expected_params, $expected_master_item, $expected_preproc_count, $expected_trigger_count) = __unpack($args, 14);
 
 	info("checking host item (host: '$host', item: '$key')");
 
@@ -1762,7 +1762,7 @@ sub __cmd_check_preproc($)
 	# [check-preproc]
 	# host,key,step,type,params,error_handler,error_handler_params
 
-	my ($host, $key, $step, $expected_type, $expected_params, $expected_error_handler, $expected_error_handler_params) = __unpack($args);
+	my ($host, $key, $step, $expected_type, $expected_params, $expected_error_handler, $expected_error_handler_params) = __unpack($args, 7);
 
 	info("checking item preprocessing step (host: '$host', item: '$key', step: '$step')");
 
@@ -1813,7 +1813,7 @@ sub __cmd_check_trigger($)
 	# [check-trigger]
 	# host,status,priority,trigger,dependency,expression,recovery_expression
 
-	my ($host, $status, $priority, $trigger, $dependency, $expression, $recovery_expression) = __unpack($args);
+	my ($host, $status, $priority, $trigger, $dependency, $expression, $recovery_expression) = __unpack($args, 7);
 
 	info("checking trigger (host: '$host', trigger: '$trigger')");
 
@@ -1991,9 +1991,11 @@ sub __cmd_check_trigger($)
 # helper functions
 ################################################################################
 
-sub __unpack($)
+sub __unpack($$;$)
 {
-	my $args = shift;
+	my $args        = shift;
+	my $count       = shift;
+	my $has_varargs = shift;
 
 	my @values = @{csv('allow_whitespace' => 1, 'in' => \$args)->[0]};
 
@@ -2012,6 +2014,21 @@ sub __unpack($)
 	foreach (@values)
 	{
 		$_ =~ s!(\$\{(.*?)\})! $callback->($1, $2) !ge;
+	}
+
+	if ($has_varargs)
+	{
+		if (scalar(@values) < $count)
+		{
+			fail("invalid number of arguments (expected at least $count, got " . scalar(@values) . ")");
+		}
+	}
+	else
+	{
+		if (scalar(@values) != $count)
+		{
+			fail("invalid number of arguments (expected $count, got " . scalar(@values) . ")");
+		}
 	}
 
 	return @values;
