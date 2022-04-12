@@ -33,6 +33,7 @@ abstract class ActionBase extends CController
 	abstract protected function requestConfigCacheReload(): void;
 	abstract protected function getInputRules(): array;
 	abstract protected function isObjectDisabled(array $object): bool;
+	abstract protected function objectHasChanged(): bool;
 	abstract protected function getObjects(?string $objectId): array;
 	abstract protected function createObject(): void;
 	abstract protected function updateObject(): void;
@@ -611,18 +612,21 @@ abstract class ActionBase extends CController
 		{
 			$this->oldObject = $objects[0];
 
-			if ($this->isObjectDisabled($this->newObject))
+			if ($this->objectHasChanged())
 			{
-				if (!$this->isObjectDisabled($this->oldObject))
+				if ($this->isObjectDisabled($this->newObject))
 				{
-					$this->disableObject();
+					if (!$this->isObjectDisabled($this->oldObject))
+					{
+						$this->disableObject();
+						$this->requestConfigCacheReload();
+					}
+				}
+				else
+				{
+					$this->updateObject();
 					$this->requestConfigCacheReload();
 				}
-			}
-			else
-			{
-				$this->updateObject();
-				$this->requestConfigCacheReload();
 			}
 		}
 

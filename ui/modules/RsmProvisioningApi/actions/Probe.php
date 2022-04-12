@@ -297,6 +297,28 @@ class Probe extends ActionBaseEx
 		return !$params['ipv4Enable'] && !$params['ipv6Enable'];
 	}
 
+	protected function objectHasChanged(): bool
+	{
+		if ($this->oldObject['zabbixProxyParameters']['ipv4Enable'] != $this->newObject['zabbixProxyParameters']['ipv4Enable'] ||
+			$this->oldObject['zabbixProxyParameters']['ipv6Enable'] != $this->newObject['zabbixProxyParameters']['ipv6Enable'] ||
+			$this->oldObject['zabbixProxyParameters']['proxyIp']    != $this->newObject['zabbixProxyParameters']['proxyIp'] ||
+			$this->oldObject['zabbixProxyParameters']['proxyPort']  != $this->newObject['zabbixProxyParameters']['proxyPort'])
+		{
+			return true;
+		}
+
+		$oldServices = array_column($this->oldObject['servicesStatus'], 'enabled', 'service');
+		$newServices = array_column($this->newObject['servicesStatus'], 'enabled', 'service');
+
+		if ($oldServices['rdap'] != $newServices['rdap'] ||
+			$oldServices['rdds'] != $newServices['rdds'])
+		{
+			return true;
+		}
+
+		return false;
+	}
+
 	protected function updateObject(): void
 	{
 		// update proxy

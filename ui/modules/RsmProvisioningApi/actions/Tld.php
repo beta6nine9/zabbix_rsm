@@ -283,6 +283,82 @@ class Tld extends MonitoringTarget
 	 * Functions for updating object                                                                                  *
 	 ******************************************************************************************************************/
 
+	protected function objectHasChanged(): bool
+	{
+		if ($this->oldObject['tldType'] != $this->newObject['tldType'])
+		{
+			return true;
+		}
+
+		$oldServices = array_column($this->oldObject['servicesStatus'], 'enabled', 'service');
+		$newServices = array_column($this->newObject['servicesStatus'], 'enabled', 'service');
+
+		if ($oldServices['dnsUDP'] != $newServices['dnsUDP'] ||
+			$oldServices['dnsTCP'] != $newServices['dnsTCP'] ||
+			$oldServices['rdds43'] != $newServices['rdds43'] ||
+			$oldServices['rdds80'] != $newServices['rdds80'] ||
+			$oldServices['rdap']   != $newServices['rdap'])
+		{
+			return true;
+		}
+
+		if ($oldServices['dnsUDP'] || $oldServices['dnsTCP'])
+		{
+			$oldDnsParams = $this->oldObject['dnsParameters'];
+			$newDnsParams = $this->newObject['dnsParameters'];
+
+			if ($oldDnsParams['dnssecEnabled'] != $newDnsParams['dnssecEnabled'] ||
+				$oldDnsParams['nsTestPrefix']  != $newDnsParams['nsTestPrefix'] ||
+				$oldDnsParams['minNs']         != $newDnsParams['minNs'])
+			{
+				return true;
+			}
+
+			$oldNsIps = $this->sortNsIpPairs($oldDnsParams['nsIps']);
+			$newNsIps = $this->sortNsIpPairs($newDnsParams['nsIps']);
+
+			if ($oldNsIps !== $newNsIps)
+			{
+				return true;
+			}
+		}
+
+		if ($oldServices['rdds43'] || $oldServices['rdds80'] || $oldServices['rdap'])
+		{
+			$oldRddsParams = $this->oldObject['rddsParameters'];
+			$newRddsParams = $this->newObject['rddsParameters'];
+
+			if ($oldServices['rdds43'])
+			{
+				if ($oldRddsParams['rdds43Server']       != $newRddsParams['rdds43Server'] ||
+					$oldRddsParams['rdds43TestedDomain'] != $newRddsParams['rdds43TestedDomain'] ||
+					$oldRddsParams['rdds43NsString']     != $newRddsParams['rdds43NsString'])
+				{
+					return true;
+				}
+			}
+
+			if ($oldServices['rdds80'])
+			{
+				if ($oldRddsParams['rdds80Url'] != $newRddsParams['rdds80Url'])
+				{
+					return true;
+				}
+			}
+
+			if ($oldServices['rdap'])
+			{
+				if ($oldRddsParams['rdapUrl']          != $newRddsParams['rdapUrl'] ||
+					$oldRddsParams['rdapTestedDomain'] != $newRddsParams['rdapTestedDomain'])
+				{
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
+
 	protected function updateObject(): void
 	{
 		$this->compareMinNsOnUpdate();
