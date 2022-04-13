@@ -344,13 +344,13 @@ class testRSM extends CWebTest {
 		$this->page->waitUntilReady();
 		$this->page->assertHeader('Incidents details');
 
+		// Open filter tab if it is not opened.
 		$selected = $this->query('xpath://li[@aria-controls="tab_2"]')->one()->getAttribute('aria-selected');
 		if ($selected === "false") {
 			$this->query('xpath://li[@tabindex="-1"]')->waitUntilClickable()->one()->click();
 		}
 
-		$this->page->waitUntilReady();
-
+		// Select necessary filter and take sceenshot of page.
 		foreach (['Only failing tests', 'Show all'] as $filter) {
 			$this->query('id:filter_failing_tests')->asSegmentedRadio()->waitUntilVisible()->one()->select($filter);
 			$this->page->waitUntilReady();
