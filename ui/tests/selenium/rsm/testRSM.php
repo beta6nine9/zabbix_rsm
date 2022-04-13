@@ -389,14 +389,16 @@ class testRSM extends CWebTest {
 		$form = $this->query('name:zbx_filter')->asForm()->waitUntilVisible()->one();
 		$form->fill($data);
 		$form->submit();
+		
+		$this->assertScreenshot(null, $data['TLD'].' '.$data['name:filter_month'].' info block');
 
-		$this->assertScreenshot($this->query('class:table-forms-container')->waitUntilVisible()->one(),
-				$data['TLD'].' '.$data['name:filter_month'].' info block'
-		);
-
-		$this->assertScreenshot($this->query('class:list-table')->waitUntilVisible()->one(),
-				$data['TLD'].' '.$data['name:filter_month'].' table'
-		);
+//		$this->assertScreenshot($this->query('class:table-forms-container')->waitUntilVisible()->one(),
+//				$data['TLD'].' '.$data['name:filter_month'].' info block'
+//		);
+//
+//		$this->assertScreenshot($this->query('class:list-table')->waitUntilVisible()->one(),
+//				$data['TLD'].' '.$data['name:filter_month'].' table'
+//		);
 	}
 
 	/**
