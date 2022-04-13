@@ -63,11 +63,11 @@ class testRSM extends CWebTest {
 		foreach (self::FILTER_CHECKBOXES as $name => $checkboxes) {
 			foreach ($checkboxes as $checkbox) {
 				$form->fill([$checkbox => $data['filter_checkboxes']]);
-			}	
+			}
 		}
-		
+
 		$form->submit();
-		$this->assertScreenshot($this->query('class:list-table')->waitUntilVisible()->one(), 
+		$this->assertScreenshot($this->query('class:list-table')->waitUntilVisible()->one(),
 				$data['case'].' '.$name.' '.$data['filter_checkboxes']
 		);
 	}
@@ -160,11 +160,10 @@ class testRSM extends CWebTest {
 		$this->page->waitUntilReady();
 
 		// Take screenshot of Incidents detail page or Graph.
-		$this->page->removeFocus();
-		$area = ($data['find'] === '%')  
+		$area = ($data['find'] === '%')
 			? $this->query('id:incidents_data')->waitUntilVisible()->one()
 			: $this->waitUntilGraphIsLoaded();
-		
+
 		$this->assertScreenshot($area,
 				$data['column'].(($data['find'] === '%') ? ' TLD Rolling week status' : ' '.$data['header'].' graph')
 		);
@@ -176,7 +175,6 @@ class testRSM extends CWebTest {
 					->query('tag:a')->waitUntilClickable()->one()->click();
 
 			$this->page->assertHeader('Incidents details');
-			$this->page->removeFocus();
 			$this->assertScreenshot($this->query('id:incident_details')->waitUntilVisible()->one(), $data['column'].' Incident ID');
 		}
 	}
@@ -207,8 +205,7 @@ class testRSM extends CWebTest {
 		$tabs = ['DNS', 'DNSSEC', 'RDDS', 'EPP'];
 		foreach ($tabs as $tab) {
 			$this->query('link', $tab)->one()->waitUntilClickable()->click();
-			$this->page->removeFocus();
-			$this->assertScreenshot(null, $tab.' Incident page');
+			$this->assertScreenshot($this->query('id:incidents_data')->waitUntilVisible()->one(), $tab.' Incident page');
 
 			if ($tab !== 'EPP') {
 				// Click on tests count in incident info block for each Tab.
@@ -216,8 +213,7 @@ class testRSM extends CWebTest {
 						']//table[@class="incidents-info"]//a')->one()->waitUntilClickable()->click();
 				$this->page->waitUntilReady();
 				$this->page->assertHeader('Tests');
-				$this->page->removeFocus();
-				$this->assertScreenshot(null, $tab.' Tests page');
+				$this->assertScreenshot($this->query('id:rsm_tests')->waitUntilVisible()->one(), $tab.' Tests page');
 
 				// For tld6 DNSSEC tab there are no any tests.
 				if ($data['tld'] !== 'tld6' || $tab !== 'DNSSEC') {
@@ -226,7 +222,6 @@ class testRSM extends CWebTest {
 							->getRow(0)->getColumn('')->query('link:Details')->waitUntilClickable()->one()->click();
 
 					$this->page->assertHeader('Test details');
-					$this->page->removeFocus();
 					$this->assertScreenshot(null, $tab.' Test details');
 				}
 			}
@@ -392,7 +387,7 @@ class testRSM extends CWebTest {
 		$this->page->removeFocus();
 		$this->assertScreenshot(null, $data['TLD'].$data['name:filter_month']);
 	}
-	
+
 	/**
 	 * Function for waiting loader ring.
 	 */
