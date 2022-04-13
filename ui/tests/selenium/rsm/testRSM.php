@@ -352,7 +352,8 @@ class testRSM extends CWebTest {
 
 		foreach (['Only failing tests', 'Show all'] as $filter) {
 			$this->query('id:filter_failing_tests')->asSegmentedRadio()->waitUntilVisible()->one()->select($filter);
-			$this->assertScreenshot(null, $data['tld'].' '.$filter);
+			$this->page->waitUntilReady();
+			$this->assertScreenshot($this->query('id:incident_details')->waitUntilVisible()->one(), $data['tld'].' '.$filter);
 		}
 	}
 
