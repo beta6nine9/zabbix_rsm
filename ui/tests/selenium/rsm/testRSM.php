@@ -299,8 +299,8 @@ class testRSM extends CWebTest {
 		$this->query('xpath://table[@class="list-table"]')->asTable()->waitUntilVisible()->one()->getRow($data['row'])
 				->getColumn('')->query('link:Details')->waitUntilClickable()->one()->click();
 
+		$this->page->waitUntilReady();
 		$this->page->assertHeader('Test details');
-		$this->page->removeFocus();
 		$this->assertScreenshot(null, $data['tld'].' '.$data['tab'].' Test details page '.$data['color']);
 
 		// Check hints' texts on corresponding number.
@@ -352,8 +352,7 @@ class testRSM extends CWebTest {
 
 		foreach (['Only failing tests', 'Show all'] as $filter) {
 			$this->query('id:filter_failing_tests')->asSegmentedRadio()->waitUntilVisible()->one()->select($filter);
-			$this->page->removeFocus();
-			$this->assertScreenshot(null, $data['tld'].$filter);
+			$this->assertScreenshot(null, $data['tld'].' '.$filter);
 		}
 	}
 
