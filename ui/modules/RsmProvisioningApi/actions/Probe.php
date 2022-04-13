@@ -47,7 +47,7 @@ class Probe extends ActionBaseEx
 							'ipv6Enable'        => ['type' => API_BOOLEAN    ],
 							'proxyIp'           => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateIP', 'error' => 'Invalid IP provided in the "proxyIp" element'],
 							'proxyPort'         => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateInt', 'min' => 1, 'max' => 65535, 'error' => 'The "proxyPort" element must be a positive integer'],
-							'proxyPskIdentity'  => ['type' => API_STRING_UTF8, 'flags' => API_NOT_EMPTY],
+							'proxyPskIdentity'  => ['type' => API_STRING_UTF8, 'flags' => API_NOT_EMPTY, 'length' => 128],
 							'proxyPsk'          => ['type' => API_PSK        , 'flags' => API_NOT_EMPTY],
 						]],
 						'online'                => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateInvalid', 'error' => ' The "online" element was in the payload'],
