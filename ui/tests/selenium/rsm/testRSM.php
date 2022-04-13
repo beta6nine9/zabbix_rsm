@@ -205,7 +205,7 @@ class testRSM extends CWebTest {
 		$tabs = ['DNS', 'DNSSEC', 'RDDS', 'EPP'];
 		foreach ($tabs as $tab) {
 			$this->query('link', $tab)->one()->waitUntilClickable()->click();
-			$this->assertScreenshot($this->query('id:incidents_data')->waitUntilVisible()->one(), $data['tld'].''.$tab.' Incident page');
+			$this->assertScreenshot($this->query('id:incidents_data')->waitUntilVisible()->one(), $data['tld'].' '.$tab.' Incident page');
 
 			if ($tab !== 'EPP') {
 				// Click on tests count in incident info block for each Tab.
@@ -213,7 +213,7 @@ class testRSM extends CWebTest {
 						']//table[@class="incidents-info"]//a')->one()->waitUntilClickable()->click();
 				$this->page->waitUntilReady();
 				$this->page->assertHeader('Tests');
-				$this->assertScreenshot($this->query('id:rsm_tests')->waitUntilVisible()->one(), $data['tld'].''.$tab.' Tests page');
+				$this->assertScreenshot($this->query('id:rsm_tests')->waitUntilVisible()->one(), $data['tld'].' '.$tab.' Tests page');
 
 				// For tld6 DNSSEC tab there are no any tests.
 				if ($data['tld'] !== 'tld6' || $tab !== 'DNSSEC') {
@@ -222,7 +222,7 @@ class testRSM extends CWebTest {
 							->getRow(0)->getColumn('')->query('link:Details')->waitUntilClickable()->one()->click();
 
 					$this->page->assertHeader('Test details');
-					$this->assertScreenshot(null, $data['tld'].''.$tab.' Test details');
+					$this->assertScreenshot(null, $data['tld'].' '.$tab.' Test details');
 				}
 			}
 
@@ -292,7 +292,7 @@ class testRSM extends CWebTest {
 
 		$this->page->assertHeader('Incidents details');
 		$this->assertScreenshot($this->query('id:incident_details')->waitUntilVisible()->one(),
-				$data['tld'].''.$data['tab'].' Incidents details page'
+				$data['tld'].' '.$data['tab'].' Incidents details page'
 		);
 
 		// Click on Details link in a necessary row.
