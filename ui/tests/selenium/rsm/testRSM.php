@@ -63,11 +63,13 @@ class testRSM extends CWebTest {
 		foreach (self::FILTER_CHECKBOXES as $name => $checkboxes) {
 			foreach ($checkboxes as $checkbox) {
 				$form->fill([$checkbox => $data['filter_checkboxes']]);
-			}
-
-			$form->submit();
-			$this->assertScreenshot(null, $data['case'].' '.$name.' '.$data['filter_checkboxes']);
+			}	
 		}
+		
+		$form->submit();
+		$this->assertScreenshot($this->query('class:list-table')->waitUntilVisible()->one(), 
+				$data['case'].' '.$name.' '.$data['filter_checkboxes']
+		);
 	}
 
 	public static function getRollingWeekIncidentsGraphsData() {
@@ -146,7 +148,7 @@ class testRSM extends CWebTest {
 		// Check the header of opened page.
 		$this->page->assertHeader(($data['find'] === '%') ? 'Incidents' : $tld.': '.$data['header']);
 
-		// Select date filter tab if is not graph.
+		// Select date filter tab treshhold is checked.
 		if ($data['find'] === '%') {
 			$this->query('xpath://li[@tabindex="-1"]')->waitUntilClickable()->one()->click();
 			$form->invalidate();
@@ -159,7 +161,11 @@ class testRSM extends CWebTest {
 
 		// Take screenshot of Incidents detail page or Graph.
 		$this->page->removeFocus();
-		$this->assertScreenshot(null,
+		$area = ($data['find'] === '%')  
+			? $this->query('id:incidents_data')->waitUntilVisible()->one()
+			: $this->waitUntilGraphIsLoaded();
+		
+		$this->assertScreenshot($area,
 				$data['column'].(($data['find'] === '%') ? ' TLD Rolling week status' : ' '.$data['header'].' graph')
 		);
 
@@ -171,7 +177,7 @@ class testRSM extends CWebTest {
 
 			$this->page->assertHeader('Incidents details');
 			$this->page->removeFocus();
-			$this->assertScreenshot(null, $data['column'].' Incident ID');
+			$this->assertScreenshot($this->query('id:incident_details')->waitUntilVisible()->one(), $data['column'].' Incident ID');
 		}
 	}
 
@@ -385,5 +391,19 @@ class testRSM extends CWebTest {
 		$form->submit();
 		$this->page->removeFocus();
 		$this->assertScreenshot(null, $data['TLD'].$data['name:filter_month']);
+	}
+	
+	/**
+	 * Function for waiting loader ring.
+	 */
+	private function waitUntilGraphIsLoaded() {
+		try {
+			$this->query('xpath://div[contains(@class,"is-loading")]/img')->waitUntilPresent();
+		}
+		catch (\Exception $ex) {
+			// Code is not missing here.
+		}
+
+		return $this->query('xpath://div[not(contains(@class,"is-loading"))]/img')->waitUntilPresent()->one();
 	}
 }
