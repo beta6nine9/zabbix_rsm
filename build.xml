@@ -317,7 +317,7 @@
 			<arg line="--do-not-cache-result"/>
 			<arg line="--dont-report-useless-tests"/>
 			<arg line="${phpunit_filter}"/>
-			<arg line="frontend.php"/>
+			<arg line="selenium/SeleniumTests.php"/>
 		</exec>
 	</target>
 
