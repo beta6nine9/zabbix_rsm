@@ -305,12 +305,27 @@ class Registrar extends MonitoringTarget
 
 	protected function getMacrosConfig(): array
 	{
+		$oldConfigTimes = null;
+
+		if (!is_null($this->oldObject))
+		{
+			$templateId = $this->getTemplateId('Template Rsmhost Config ' . $this->newObject['id']);
+			$data = API::UserMacro()->get([
+				'output' => ['macro', 'value'],
+				'hostids' => [$templateId],
+				'filter' => ['macro' => [self::MACRO_TLD_CONFIG_TIMES]],
+			]);
+			$macros = array_column($data, 'value', 'macro');
+
+			$oldConfigTimes = $macros[self::MACRO_TLD_CONFIG_TIMES];
+		}
+
 		$services = array_column($this->newObject['servicesStatus'], 'enabled', 'service');
 
 		// TODO: consider using $this->updateMacros() instead of building full list of macros
 		return [
 			$this->createMacroConfig(self::MACRO_TLD                   , $this->newObject['id']),
-			$this->createMacroConfig(self::MACRO_TLD_CONFIG_TIMES      , $_SERVER['REQUEST_TIME']),
+			$this->createMacroConfig(self::MACRO_TLD_CONFIG_TIMES      , $this->getConfigTimesMacroValue($oldConfigTimes)),
 
 			$this->createMacroConfig(self::MACRO_TLD_RDAP_ENABLED      , (int)$services['rdap']),
 			$this->createMacroConfig(self::MACRO_TLD_RDDS43_ENABLED    , (int)$services['rdds43']),

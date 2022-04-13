@@ -134,6 +134,19 @@ abstract class MonitoringTarget extends ActionBaseEx
 		return empty(array_filter($services));
 	}
 
+	protected function getConfigTimesMacroValue(?string $oldValue): string
+	{
+		$times = is_null($oldValue) ? [] : explode(';', $oldValue);
+
+		# remove entries that are more than 6 months old
+		$times = array_filter($times, fn($t) => $t >= $_SERVER['REQUEST_TIME'] - 180 * 86400);
+
+		# add current time
+		$times[] = $_SERVER['REQUEST_TIME'];
+
+		return implode(';', $times);
+	}
+
 	protected function updateObject(): void
 	{
 		$this->updateTemplates();

@@ -451,6 +451,7 @@ class Tld extends MonitoringTarget
 	protected function getMacrosConfig(): array
 	{
 		$minNs = null;
+		$oldConfigTimes = null;
 
 		if (is_null($this->oldObject))
 		{
@@ -460,11 +461,14 @@ class Tld extends MonitoringTarget
 		{
 			$templateId = $this->getTemplateId('Template Rsmhost Config ' . $this->newObject['id']);
 			$data = API::UserMacro()->get([
-				'output' => ['value'],
+				'output' => ['macro', 'value'],
 				'hostids' => [$templateId],
-				'filter' => ['macro' => self::MACRO_TLD_DNS_AVAIL_MINNS],
+				'filter' => ['macro' => [self::MACRO_TLD_DNS_AVAIL_MINNS, self::MACRO_TLD_CONFIG_TIMES]],
 			]);
-			$minNs = $data[0]['value'];
+			$macros = array_column($data, 'value', 'macro');
+
+			$minNs = $macros[self::MACRO_TLD_DNS_AVAIL_MINNS];
+			$oldConfigTimes = $macros[self::MACRO_TLD_CONFIG_TIMES];
 		}
 
 		$services = array_column($this->newObject['servicesStatus'], 'enabled', 'service');
@@ -472,7 +476,7 @@ class Tld extends MonitoringTarget
 		// TODO: consider using $this->updateMacros() instead of building full list of macros
 		return [
 			$this->createMacroConfig(self::MACRO_TLD                   , $this->newObject['id']),
-			$this->createMacroConfig(self::MACRO_TLD_CONFIG_TIMES      , $_SERVER['REQUEST_TIME']),
+			$this->createMacroConfig(self::MACRO_TLD_CONFIG_TIMES      , $this->getConfigTimesMacroValue($oldConfigTimes)),
 
 			$this->createMacroConfig(self::MACRO_TLD_DNS_UDP_ENABLED   , (int)$services['dnsUDP']),
 			$this->createMacroConfig(self::MACRO_TLD_DNS_TCP_ENABLED   , (int)$services['dnsTCP']),
