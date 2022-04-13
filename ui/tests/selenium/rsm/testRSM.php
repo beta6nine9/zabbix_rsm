@@ -301,7 +301,7 @@ class testRSM extends CWebTest {
 
 		$this->page->assertHeader('Test details');
 		$this->page->removeFocus();
-		$this->assertScreenshot(null, $data['tab'].' Test details page '.$data['color']);
+		$this->assertScreenshot(null, $data['tld'].' '.$data['tab'].' Test details page '.$data['color']);
 
 		// Check hints' texts on corresponding number.
 		if (CTestArrayHelper::get($data, 'check_hints')) {
