@@ -333,7 +333,7 @@ class testRSM extends CWebTest {
 	 * @dataProvider getIncidentsDetailsFiltersData
 	 */
 	public function testRSM_IncidentsDetailsFilters($data) {
-		$this->page->login()->open('zabbix.php?type=0&filter_set=1&filter_search='.$data['tld'].
+		$this->page->login()->open('zabbix.php?type=0&filter_set=1&filter_search='.$data['id:filter_search'].
 				'&from=2022-02-01%2000%3A00%3A00&to=2022-03-31%2000%3A00%3A00&action=rsm.incidents')->waitUntilReady();
 		$this->page->assertHeader('Incidents');
 
