@@ -248,7 +248,7 @@ class testRSM extends CWebTest {
 					'row' => 3,
 					'color' => 'red', // Red: Down
 					'check_hints' =>	[
-						['number' => '-207', 'title' => 'DNS UDP - Expecting DNS CLASS IN but got CHAOS'],
+						['number' => '-201', 'title' => 'DNS UDP - Expecting DNS CLASS IN but got CHAOS'],
 						['number' => '-349', 'title' => 'RDDS80 - Expecting HTTP status code 200 but got 500']
 					]
 				]
