@@ -233,14 +233,14 @@ class testRSM extends CWebTest {
 
 	public static function getIncidentsIDTestData() {
 		return [
-//			[
-//				[
-//					'tld' => 'tld6',
-//					'tab' => 'DNS',
-//					'row' => 0,
-//					'color' => 'green' //Green: Up-inconclusive-reconfig,
-//				]
-//			],
+			[
+				[
+					'tld' => 'tld6',
+					'tab' => 'DNS',
+					'row' => 0,
+					'color' => 'green' //Green: Up-inconclusive-reconfig,
+				]
+			],
 			[
 				[
 					'tld' => 'tld6',
