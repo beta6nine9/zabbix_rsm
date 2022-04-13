@@ -290,6 +290,7 @@ class testRSM extends CWebTest {
 				']//table[@class="list-table"]')->asTable()->waitUntilVisible()->one()
 				->getRow(0)->getColumn('Incident ID')->query('tag:a')->waitUntilClickable()->one()->click();
 
+		$this->page->waitUntilReady();
 		$this->page->assertHeader('Incidents details');
 		$this->assertScreenshot($this->query('id:incident_details')->waitUntilVisible()->one(),
 				$data['tld'].' '.$data['tab'].' Incidents details page'
