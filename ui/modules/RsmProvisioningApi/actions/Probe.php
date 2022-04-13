@@ -316,6 +316,17 @@ class Probe extends ActionBaseEx
 			return true;
 		}
 
+		$data = API::Proxy()->get([
+			'output' => ['tls_psk_identity', 'tls_psk'],
+			'filter' => ['host' => $this->newObject['id']],
+		]);
+
+		if ($data[0]['tls_psk_identity'] != $this->newObject['zabbixProxyParameters']['proxyPskIdentity'] ||
+			$data[0]['tls_psk']          != $this->newObject['zabbixProxyParameters']['proxyPsk'])
+		{
+			return true;
+		}
+
 		return false;
 	}
 
