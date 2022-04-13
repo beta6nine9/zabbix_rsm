@@ -179,7 +179,7 @@ class testRSM extends CWebTest {
 		}
 	}
 
-	public static function getIncidentsTabsData() {
+	public static function getIncidentsTabsTestsData() {
 		return [
 			[
 				[
@@ -195,7 +195,7 @@ class testRSM extends CWebTest {
 	}
 
 	/**
-	 * @dataProvider getIncidentsTabsData
+	 * @dataProvider getIncidentsTabsTestsData
 	 */
 	public function testRSM_IncidentsTabsTests($data) {
 		$filtered_link = 'zabbix.php?type=0&filter_set=1&filter_search='.$data['tld'].'&from=2022-02-01%2000%3A00%3A00&'.
@@ -330,7 +330,7 @@ class testRSM extends CWebTest {
 	}
 
 	/**
-	 * @dataProvider getIncidentsIDTestData
+	 * @dataProvider getIncidentsDetailsFiltersData
 	 */
 	public function testRSM_IncidentsDetailsFilters($data) {
 		$this->page->login()->open('zabbix.php?type=0&filter_set=1&filter_search='.$data['tld'].
