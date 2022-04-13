@@ -237,15 +237,16 @@ class testRSM extends CWebTest {
 				[
 					'tld' => 'tld6',
 					'tab' => 'DNS',
-					'row' => 0 // Green: Up-inconclusive-reconfig,
-
+					'row' => 0,
+					'color' => 'green' //Green: Up-inconclusive-reconfig,
 				]
 			],
 			[
 				[
 					'tld' => 'tld6',
 					'tab' => 'RDDS',
-					'row' => 3, // Red: Down
+					'row' => 3,
+					'color' => 'red', // Red: Down
 					'check_hints' =>	[
 						['number' => '-207', 'title' => 'DNS UDP - Expecting DNS CLASS IN but got CHAOS'],
 						['number' => '-349', 'title' => 'RDDS80 - Expecting HTTP status code 200 but got 500']
@@ -256,14 +257,16 @@ class testRSM extends CWebTest {
 				[
 					'tld' => 'tld105',
 					'tab' => 'DNS',
-					'row' => 0 // Green: Up
+					'row' => 0,
+					'color' => 'green' // Green: Up
 				]
 			],
 			[
 				[
 					'tld' => 'tld105',
 					'tab' => 'DNSSEC',
-					'row' => 4, // Red: Down
+					'row' => 4,
+					'color' => 'red', // Red: Down
 					'check_hints' => [
 						['number' => '-405', 'title' => 'DNS UDP - Unknown cryptographic algorithm']
 					]
@@ -288,8 +291,9 @@ class testRSM extends CWebTest {
 				->getRow(0)->getColumn('Incident ID')->query('tag:a')->waitUntilClickable()->one()->click();
 
 		$this->page->assertHeader('Incidents details');
-		$this->page->removeFocus();
-		$this->assertScreenshot(null, $data['tab'].' Incidents details page');
+		$this->assertScreenshot($this->query('id:incident_details')->waitUntilVisible()->one(),
+				$data['tld'].''.$data['tab'].' Incidents details page'
+		);
 
 		// Click on Details link in a necessary row.
 		$this->query('xpath://table[@class="list-table"]')->asTable()->waitUntilVisible()->one()->getRow($data['row'])
@@ -297,7 +301,7 @@ class testRSM extends CWebTest {
 
 		$this->page->assertHeader('Test details');
 		$this->page->removeFocus();
-		$this->assertScreenshot(null, $data['tab'].' Test details page');
+		$this->assertScreenshot(null, $data['tab'].' Test details page '.$data['color']);
 
 		// Check hints' texts on corresponding number.
 		if (CTestArrayHelper::get($data, 'check_hints')) {
