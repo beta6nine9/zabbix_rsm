@@ -1,27 +1,23 @@
 <?php
 // Zabbix GUI configuration file.
-global $DB;
 
-$DB['TYPE']				= '{DBTYPE}';
-$DB['SERVER']			= '{DBHOST}';
-$DB['PORT']				= '0';
-$DB['DATABASE']			= '{DBNAME}';
-$DB['USER']				= '{DBUSER}';
-$DB['PASSWORD']			= '{DBPASSWORD}';
+// $DB['TYPE']				= 'MYSQL';
+// $DB['SERVER']			= '127.0.0.1';
+// $DB['PORT']				= '33006';
+// $DB['DATABASE']			= 'fr1.ica.local';
+// $DB['USER']				= 'root';
+// $DB['PASSWORD']			= 'zabbix';
+
 // Schema name. Used for PostgreSQL.
-$DB['SCHEMA']			= '';
+// $DB['SCHEMA']			= '';
 
 // Used for TLS connection.
-$DB['ENCRYPTION']		= false;
-$DB['KEY_FILE']			= '';
-$DB['CERT_FILE']		= '';
-$DB['CA_FILE']			= '';
-$DB['VERIFY_HOST']		= false;
-$DB['CIPHER_LIST']		= '';
-
-$ZBX_SERVER				= 'localhost';
-$ZBX_SERVER_PORT		= '{SERVER_PORT}';
-$ZBX_SERVER_NAME		= 'TEST_SERVER_NAME';
+// $DB['ENCRYPTION']		= false;
+// $DB['KEY_FILE']			= '';
+// $DB['CERT_FILE']		= '';
+// $DB['CA_FILE']			= '';
+// $DB['VERIFY_HOST']		= false;
+// $DB['CIPHER_LIST']		= '';
 
 // Vault configuration. Used if database credentials are stored in Vault secrets manager.
 $DB['VAULT_URL']		= '';
@@ -32,6 +28,12 @@ $DB['VAULT_TOKEN']		= '';
 // This option is enabled by default for new Zabbix installations.
 // For upgraded installations, please read database upgrade notes before enabling this option.
 $DB['DOUBLE_IEEE754']	= true;
+
+// Uncomment and set to desired values to override Zabbix hostname/IP and port.
+// $ZBX_SERVER				= 'localhost';
+// $ZBX_SERVER_PORT		= '{SERVER_PORT}';
+
+$ZBX_SERVER_NAME		= '';
 
 $IMAGE_FORMAT_DEFAULT	= IMAGE_FORMAT_PNG;
 
@@ -51,21 +53,21 @@ $IMAGE_FORMAT_DEFAULT	= IMAGE_FORMAT_PNG;
 //$SSO['IDP_CERT']		= 'conf/certs/idp.crt';
 //$SSO['SETTINGS']		= [];
 
-$DB['DB_CONN_TIMEOUT']	= 5;
+// $DB['DB_CONN_TIMEOUT']	= 5;
 
 $DB['SERVERS'] = [
 	'1' => [
 		'NR' => '1',
-		'NAME' => '',
-		'SERVER' => 'localhost',
-		'TYPE' => 'MYSQL',
+		'NAME' => 'fr1',
+		'SERVER' => '{DBHOST}',
+		'TYPE' => '{DBTYPE}',
 		'DB_CONN_TIMEOUT' => 5,
 		'PORT' => '0',
-		'DATABASE' => 'zabbix',
-		'USER' => 'zabbix',
-		'PASSWORD' => '',
+		'DATABASE' => '{DBNAME}',
+		'USER' => '{DBUSER}',
+		'PASSWORD' => '{DBPASSWORD}',
 		'SCHEMA' => '',
-		'URL' => 'http://localhost/zabbix/',
+		'URL' => '{URL}',
 		'ENCRYPTION'	=> false,
 		'KEY_FILE'	=> '',
 		'CERT_FILE'	=> '',
@@ -74,6 +76,9 @@ $DB['SERVERS'] = [
 		'CIPHER_LIST'	=> '',
 	]
 ];
+
+// Select current server
+$DB += $DB['SERVERS']['1'];
 
 // PHP runtime error log file for unit tests.
 define('PHPUNIT_ERROR_LOG', '{PHPUNIT_ERROR_LOG}');
