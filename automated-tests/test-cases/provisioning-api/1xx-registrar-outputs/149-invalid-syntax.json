@@ -1,7 +1,7 @@
 {
     "resultCode": 400,
     "title": "JSON syntax is invalid",
-    "description": "No JSON object could be decoded",
+    "description": "Expecting value: line 8 column 5 (char 266)",
     "details": null,
     "updatedObject": null
 }

@@ -6,10 +6,10 @@
         "exception": "Exception",
         "code": 0,
         "file": "/home/asitals/icann-git/qa/api/index.php",
-        "line": 271,
+        "line": 270,
         "trace": [
             "#0 /home/asitals/icann-git/qa/api/index.php(19): checkMonitoringTarget()",
-            "#1 /home/asitals/icann-git/qa/api/index.php(919): main()",
+            "#1 /home/asitals/icann-git/qa/api/index.php(934): main()",
             "#2 {main}"
         ],
         "messages": []

@@ -20,6 +20,6 @@
     "rddsParameters": {
         "rdds80Url": "https://whois.nic.example",
         "rdapUrl": "https://www.nic.example/domain",
-        "rdapTestedDomain": "nic.example",
+        "rdapTestedDomain": "nic.example"
     }
 }
