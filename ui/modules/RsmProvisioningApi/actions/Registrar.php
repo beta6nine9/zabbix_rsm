@@ -52,8 +52,8 @@ class Registrar extends MonitoringTarget
 				return [
 					'type' => API_OBJECT, 'fields' => [
 						'id'                     => ['type' => API_RSM_CUSTOM , 'function' => 'RsmValidateInt', 'min' => 1, 'error' => 'The IANAID must be a positive integer in the URL'],
-						'registrarName'          => ['type' => API_STRING_UTF8],
-						'registrarFamily'        => ['type' => API_STRING_UTF8],
+						'registrarName'          => ['type' => API_STRING_UTF8, 'flags' => API_NOT_EMPTY, 'length' => 128],
+						'registrarFamily'        => ['type' => API_STRING_UTF8, 'flags' => API_NOT_EMPTY, 'length' => 128],
 						'servicesStatus'         => ['type' => API_OBJECTS    , 'uniq' => [['service']], 'fields' => [
 							'service'            => ['type' => API_RSM_CUSTOM , 'flags' => API_REQUIRED, 'function' => 'RsmValidateEnum', 'in' => ['rdap', 'rdds43', 'rdds80'], 'error' => 'Service is not supported'],
 							'enabled'            => ['type' => API_BOOLEAN    , 'flags' => API_REQUIRED],
