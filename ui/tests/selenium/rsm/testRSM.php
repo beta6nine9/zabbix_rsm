@@ -126,16 +126,15 @@ class testRSM extends CWebTest {
 		$tld = 'tld105';
 
 		$this->page->login()->open('zabbix.php?action=rsm.rollingweekstatus')->waitUntilReady();
-		// This line is commented because of DEV-2112 (1).
-//		$this->query('button:Reset')->waitUntilClickable()->one()->click();
-
-		// Tick all checkboxes, because Reset filter does not work.
 		$form = $this->query('name:zbx_filter')->asForm()->waitUntilVisible()->one();
-		foreach (self::FILTER_CHECKBOXES as $name => $checkboxes) {
-			foreach ($checkboxes as $checkbox) {
-				$form->fill([$checkbox => true]);
-			}
+
+		//Reset filter and set all filters to true.
+		$form->query('button:Reset')->waitUntilClickable()->one()->click();
+
+		foreach (self::FILTER_CHECKBOXES as $name => $button) {
+			$form->query($button)->waitUntilClickable()->one()->click();
 		}
+
 		$form->submit();
 		$this->page->waitUntilReady();
 
