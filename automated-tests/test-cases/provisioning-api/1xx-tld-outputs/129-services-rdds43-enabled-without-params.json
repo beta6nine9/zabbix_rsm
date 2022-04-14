@@ -1,7 +1,9 @@
 {
     "resultCode": 400,
-    "title": "JSON syntax is invalid",
-    "description": "Expecting property name: line 24 column 5 (char 806)",
-    "details": null,
+    "title": "An element within the rddsParameters object is missing based on the enabled status of a service to be monitored",
+    "description": null,
+    "details": {
+        "centralServer": 1
+    },
     "updatedObject": null
 }
