@@ -31,9 +31,9 @@ class testRSM extends CWebTest {
 	];
 
 	const FILTER_CHECKBOXES = [
-		'Services' => ['id:filter_dns', 'id:filter_dnssec', 'id:filter_rdds', 'id:filter_epp'],
-		'TLD types' => ['id:filter_cctld_group', 'id:filter_gtld_group', 'id:filter_othertld_group', 'id:filter_test_group'],
-		'Enabled subservices' => ['id:filter_rdds43_subgroup', 'id:filter_rdds80_subgroup', 'id:filter_rdap_subgroup']
+		'Services' => 'id:checkAllServices',
+		'TLD types' => 'id:checkAllGroups',
+		'Enabled subservices' => 'id:checkAllSubservices'
 	];
 
 	public static function getRollingWeekPageData() {
@@ -59,17 +59,19 @@ class testRSM extends CWebTest {
 	public function testRSM_RollingWeekFilter($data) {
 		$this->page->login()->open('zabbix.php?action=rsm.rollingweekstatus')->waitUntilReady();
 		$form = $this->query('name:zbx_filter')->asForm()->waitUntilVisible()->one();
+		$form->query('button:Reset')->waitUntilClickable()->one()->click();
 
-		foreach (self::FILTER_CHECKBOXES as $name => $checkboxes) {
-			foreach ($checkboxes as $checkbox) {
-				$form->fill([$checkbox => $data['filter_checkboxes']]);
-			}
+		// Check table screenshot when all filter checkboxes are false.
+//		$this->assertScreenshot($this->query('class:list-table')->waitUntilVisible()->one(), 'Filter all false');
+		$this->assertScreenshot(null, 'Filter all false');
+
+		// Check table screenshots with every filter checkbox lines true.
+		foreach (self::FILTER_CHECKBOXES as $name => $button) {
+			$form->query($button)->waitUntilClickable()->one()->click();
+			$form->submit();
+//			$this->assertScreenshot($this->query('class:list-table')->waitUntilVisible()->one(), $name.' true');
+			$this->assertScreenshot(null, $name.' true');
 		}
-
-		$form->submit();
-		$this->assertScreenshot($this->query('class:list-table')->waitUntilVisible()->one(),
-				$data['case'].' '.$name.' '.$data['filter_checkboxes']
-		);
 	}
 
 	public static function getRollingWeekIncidentsGraphsData() {
