@@ -18,8 +18,8 @@
 
 [provisioning-api]
 
-"/"           ,"GET",400,"readonly","","0xx-error-outputs/006-invalid-endpoint.json"
-"/nonexistent","GET",400,"readonly","","0xx-error-outputs/006-invalid-endpoint.json"
+"/"           ,"GET",404,"readonly","","0xx-error-outputs/006-invalid-endpoint.json"
+"/nonexistent","GET",404,"readonly","","0xx-error-outputs/006-invalid-endpoint.json"
 
-"/"           ,"GET",400,"readwrite","","0xx-error-outputs/006-invalid-endpoint.json"
-"/nonexistent","GET",400,"readwrite","","0xx-error-outputs/006-invalid-endpoint.json"
+"/"           ,"GET",404,"readwrite","","0xx-error-outputs/006-invalid-endpoint.json"
+"/nonexistent","GET",404,"readwrite","","0xx-error-outputs/006-invalid-endpoint.json"

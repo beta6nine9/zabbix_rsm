@@ -1,6 +1,6 @@
 {
-    "resultCode": 400,
-    "title": "The end-point does not exist",
+    "resultCode": 404,
+    "title": "Resource not found",
     "description": null,
     "details": null,
     "updatedObject": null

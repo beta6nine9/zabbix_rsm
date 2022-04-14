@@ -30,7 +30,7 @@ class Input
 
 		if (count($endPoint) > 2)
 		{
-			throw new RsmException(400, 'The end-point does not exist');
+			throw new RsmException(404, 'Resource not found');
 		}
 
 		self::$objectType = $endPoint[0];
@@ -64,7 +64,7 @@ class Input
 				break;
 
 			default:
-				throw new RsmException(400, 'The end-point does not exist');
+				throw new RsmException(404, 'Resource not found');
 		}
 
 		if (array_key_exists('query', $urlComponents))
