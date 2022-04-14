@@ -62,14 +62,12 @@ class testRSM extends CWebTest {
 		$form->query('button:Reset')->waitUntilClickable()->one()->click();
 
 		// Check table screenshot when all filter checkboxes are false.
-//		$this->assertScreenshot($this->query('class:list-table')->waitUntilVisible()->one(), 'Filter all false');
 		$this->assertScreenshot(null, 'Filter all false');
 
 		// Check table screenshots with every filter checkbox lines true.
 		foreach (self::FILTER_CHECKBOXES as $name => $button) {
 			$form->query($button)->waitUntilClickable()->one()->click();
 			$form->submit();
-//			$this->assertScreenshot($this->query('class:list-table')->waitUntilVisible()->one(), $name.' true');
 			$this->assertScreenshot(null, $name.' true');
 		}
 	}
