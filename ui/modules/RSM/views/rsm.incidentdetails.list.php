@@ -109,13 +109,6 @@ if ($data['type'] == RSM_RDDS) {
 }
 
 // Make widget object.
-$filter_url = Url::get('rsm.incidentdetails', [
-	'host' => $data['host'],
-	'eventid' => $data['eventid'],
-	'slvItemId' => $data['slvItemId'],
-	'availItemId' => $data['availItemId'],
-	'filter_set' => 1,
-]);
 $filter_buttons = (new CDiv())
 	->addClass(ZBX_STYLE_FILTER_FORMS)
 	->addItem((new CSubmitButton(_('Rolling week'), 'rolling_week', 1)));
@@ -159,7 +152,7 @@ else {
 
 (new CWidget())
 	->setTitle($data['title'])
-	->addItem((new CFilter(new CUrl($filter_url)))
+	->addItem((new CFilter())
 		->setProfile($data['profileIdx'])
 		->setActiveTab($data['active_tab'])
 		->addTimeSelector($data['from'], $data['to'])

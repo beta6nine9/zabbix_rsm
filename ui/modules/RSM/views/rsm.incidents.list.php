@@ -548,7 +548,6 @@ else {
 }
 
 // Assemble everything together.
-$filter_url = (new CUrl($data['url'].'zabbix.php'))->setArgument('action', 'rsm.incidents');
 $filter_buttons = (new CDiv())
 	->addClass(ZBX_STYLE_FILTER_FORMS)
 	->addItem((new CSubmitButton(_('Rolling week'), 'filter_set', 1)));
@@ -575,7 +574,7 @@ else {
 
 (new CWidget())
 	->setTitle($data['title'])
-	->addItem((new CFilter($filter_url))
+	->addItem((new CFilter())
 		->setProfile($data['profileIdx'])
 		->setActiveTab($data['active_tab'])
 		->hideFilterButtons()

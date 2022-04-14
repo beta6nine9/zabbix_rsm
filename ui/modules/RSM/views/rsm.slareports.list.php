@@ -22,12 +22,11 @@
 $months = range(1, 12);
 $years = range(SLA_MONITORING_START_YEAR, date('Y', time()));
 $object_label = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) ? _('Registrar ID') : _('TLD');
-$url = (new CUrl('zabbix.php'))->setArgument('action', 'rsm.slareports');
 
 $widget = (new CWidget())
 	->setTitle($data['title'])
 	->addItem(
-		(new CFilter($url))
+		(new CFilter())
 			->setProfile('web.rsm.slareports.filter')
 			->setActiveTab($data['active_tab'])
 			->addFilterTab(_('Filter'), [
