@@ -129,6 +129,8 @@ class TestsListAction extends Action {
 			$incidents_data = [];
 
 			foreach ($events as $event) {
+				$event['false_positive'] = getEventFalsePositiveness($event['eventid']);
+
 				if ($event['value'] == TRIGGER_VALUE_TRUE) {
 					if (isset($incidents[$i]) && $incidents[$i]['status'] == TRIGGER_VALUE_TRUE) {
 						// Get event end time.
