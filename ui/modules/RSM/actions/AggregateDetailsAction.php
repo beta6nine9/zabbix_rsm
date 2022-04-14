@@ -202,134 +202,57 @@ class AggregateDetailsAction extends Action {
 			return;
 		}
 
-		// Keys for PROBE_DNS_UDP_RTT and PROBE_DNS_TCP_RTT differs only by last parameter value.
-		$key_parser->parse(PROBE_DNS_UDP_RTT);
-		$dns_rtt_key = $key_parser->getKey();
-		$rtt_items = API::Item()->get([
+		// Get all the test items.
+		$test_items = API::Item()->get([
 			'output' => ['key_', 'itemid', 'hostid'],
 			'hostids' => array_keys($tldprobeid_probeid),
 			'search' => [
-				'key_' => $dns_rtt_key.'['
+				'key_' => 'rsm.dns.'
 			],
 			'startSearch' => true,
 		]);
 
-		if ($rtt_items) {
-			$rtt_values = API::History()->get([
+		if ($test_items) {
+			// Get all the test results, from both history tables.
+			$test_values = API::History()->get([
 				'output' => API_OUTPUT_EXTEND,
-				'itemids' => array_column($rtt_items, 'itemid'),
+				'itemids' => array_column($test_items, 'itemid'),
 				'time_from' => $time_from,
 				'time_till' => $time_till,
-				'history' => ITEM_VALUE_TYPE_FLOAT
+				'history' => ITEM_VALUE_TYPE_UINT64,
 			]);
-			$rtt_values = array_column($rtt_values, 'value', 'itemid');
+
+			$test_values = array_merge($test_values, API::History()->get([
+				'output' => API_OUTPUT_EXTEND,
+				'itemids' => array_column($test_items, 'itemid'),
+				'time_from' => $time_from,
+				'time_till' => $time_till,
+				'history' => ITEM_VALUE_TYPE_FLOAT,
+			]));
+
+			$test_values = array_column($test_values, 'value', 'itemid');
 		}
 
-		foreach ($rtt_items as $rtt_item) {
-			if (!array_key_exists($rtt_item['itemid'], $rtt_values)) {
+		$probe_nstotal = [];
+
+		$transport_map = $this->getValueMapping(RSM_TRANSPORT_PROTOCOL_VALUE_MAP);
+
+		foreach ($test_items as $test_item) {
+			if (!array_key_exists($test_item['itemid'], $test_values)) {
 				continue;
 			}
 
-			$tldprobeid = $rtt_item['hostid'];
-			$probeid = $tldprobeid_probeid[$tldprobeid];
+			$probeid = $tldprobeid_probeid[$test_item['hostid']];
 
-			$item_value = !array_key_exists('online_status', $this->probes[$probeid])	// Skip offline probes
-					&& array_key_exists($rtt_item['itemid'], $rtt_values)
-				? (int) $rtt_values[$rtt_item['itemid']]
-				: null;
+			$key_parser->parse($test_item['key_']);
 
-			if ($key_parser->parse($rtt_item['key_']) != CItemKey::PARSE_SUCCESS || $key_parser->getParamsNum() != 3) {
-				error(_s('Unexpected item key "%1$s".', $rtt_item['key_']));
-				continue;
-			}
+			$value = $test_values[$test_item['itemid']];
 
-			$ns = $key_parser->getParam(0);
-			$ip = $key_parser->getParam(1);
-			$transport = $key_parser->getParam(2);	// TODO: we have now special item for that "rsm.dns.transport"
-			$ipv = filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) ? 'ipv4' : 'ipv6';
-			$dns_nameservers[$ns][$ipv][$ip] = true;
-			$rtt_max = ($transport == 'udp') ? $data['udp_rtt'] : $data['tcp_rtt'];
+			switch ($key_parser->getKey()) {
+				case PROBE_DNS_MODE:
+					// This is informational item, we do not use it.
+					break;
 
-			if (strtolower($this->probes[$probeid]['transport']) != $transport) {
-				error(_s('Item transport value and probe transport value mismatch found for probe "%s" item "%s"',
-					$this->probes[$probeid]['host'], $rtt_item['key_']
-				));
-			}
-
-			$this->probes[$probeid]['results'][$ns][$ipv][$ip] = $item_value;
-			$error_key = $ns.$ip;
-
-			if ($item_value < 0) {
-				if (isServiceErrorCode($item_value, $data['type'])) {
-					$this->probes[$probeid]['dns_error'][$error_key] = true;
-				}
-
-				if (!isset($this->probe_errors[$item_value][$error_key])) {
-					$this->probe_errors[$item_value][$error_key] = 0;
-				}
-
-				$this->probe_errors[$item_value][$error_key]++;
-			}
-			elseif ($item_value > $rtt_max && $data['type'] == RSM_DNS) {
-				$this->probes[$probeid]['above_max_rtt'][$error_key] = true;
-
-				if (!isset($data['probes_above_max_rtt'][$error_key])) {
-					$data['probes_above_max_rtt'][$error_key] = [
-						'tcp' => 0,
-						'udp' => 0,
-					];
-				}
-
-				$data['probes_above_max_rtt'][$error_key][$transport]++;
-			}
-		}
-
-		$data['dns_nameservers'] = $dns_nameservers;
-		$data['nsids'] = $this->getNSIDdata($dns_nameservers, $time_from, $time_till);
-
-		if ($data['type'] == RSM_DNSSEC)
-			$data['dnssec_errors'] = $this->getDnssecErrorData();
-
-		$key_parser->parse(PROBE_DNS_NS_STATUS);
-		$ns_status_key = $key_parser->getKey();
-		$tldprobe_values = $this->getItemsHistoryValue([
-			'output' => ['key_', 'itemid', 'hostid'],
-			'hostids' => array_column($this->probes, 'tldprobe_hostid'),
-			'search' => [
-				'key_' => [
-					$ns_status_key.'[',
-					PROBE_DNS_NSSOK,
-					($data['type'] == RSM_DNS ? PROBE_DNS_STATUS : PROBE_DNSSEC_STATUS),
-					CALCULATED_PROBE_RSM_IP4_ENABLED,
-					CALCULATED_PROBE_RSM_IP6_ENABLED
-				]
-			],
-			'startSearch' => true,
-			'searchByAny' => true,
-			'monitored' => true,
-			'time_from' => $time_from,
-			'time_till' => $time_till,
-			'history' => ITEM_VALUE_TYPE_UINT64
-		]);
-		$probe_nscount = [];
-
-		foreach ($tldprobe_values as $tldprobe_value) {
-			$key_parser->parse($tldprobe_value['key_']);
-			$key = $key_parser->getKey();
-
-			if (!array_key_exists($tldprobe_value['hostid'], $tldprobeid_probeid)) {
-				continue;
-			}
-
-			$probeid = $tldprobeid_probeid[$tldprobe_value['hostid']];
-
-			if (!array_key_exists('history_value', $tldprobe_value)) {
-				continue;
-			}
-
-			$value = $tldprobe_value['history_value'];
-
-			switch ($key) {
 				case PROBE_DNS_NSSOK:
 					// Set Name servers up count.
 					$this->probes[$probeid]['ns_up'] = $value;
@@ -341,23 +264,98 @@ class AggregateDetailsAction extends Action {
 					$this->probes[$probeid]['online_status'] = $value;
 					break;
 
-				case $ns_status_key:
+				case PROBE_DNS_NS_STATUS:
 					// Set Name server status.
 					$this->probes[$probeid]['results'][$key_parser->getParam(0)]['status'] = $value;
-					$probe_nscount[$probeid] = isset($probe_nscount[$probeid]) ? $probe_nscount[$probeid] + 1 : 1;
+					$probe_nstotal[$probeid] = isset($probe_nstotal[$probeid]) ? $probe_nstotal[$probeid] + 1 : 1;
 					break;
 
-				case 'probe.configvalue':
-					$ipv = ($tldprobe_value['key_'] == CALCULATED_PROBE_RSM_IP4_ENABLED) ? 'ipv4' : 'ipv6';
-					$this->probes[$probeid][$ipv] = $value;
+				case CALCULATED_PROBE_RSM_IP4_ENABLED:
+					$this->probes[$probeid]['ipv4'] = $value;
+					break;
+
+				case CALCULATED_PROBE_RSM_IP6_ENABLED:
+					$this->probes[$probeid]['ipv6'] = $value;
+					break;
+
+				case PROBE_DNS_TRANSPORT:
+					$this->probes[$probeid]['transport'] = $transport_map[$value];
+					break;
+
+				case PROBE_DNS_RTT:
+					if ($key_parser->getParamsNum() != 3) {
+						error(_s('Unexpected item key "%1$s".', $test_item['key_']));
+						break;
+					}
+
+					$ns = $key_parser->getParam(0);
+					$ip = $key_parser->getParam(1);
+
+					$ipv = filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) ? 'ipv4' : 'ipv6';
+					$dns_nameservers[$ns][$ipv][$ip] = true;
+
+					$this->probes[$probeid]['results'][$ns][$ipv][$ip] = $value;
+					break;
+
+				default:
+					error(_s('Unexpected item key "%1$s".', $test_item['key_']));
 					break;
 			}
 		}
 
-		// Calculate Name servers down value for tld probe.
-		foreach ($probe_nscount as $probeid => $count) {
-			$nssok = isset($this->probes[$probeid]['ns_up']) ? $this->probes[$probeid]['ns_up'] : 0;
-			$this->probes[$probeid]['ns_down'] = $count - $nssok;
+		$data['dns_nameservers'] = $dns_nameservers;
+		$data['nsids'] = $this->getNSIDdata($dns_nameservers, $time_from, $time_till);
+
+		if ($data['type'] == RSM_DNSSEC) {
+			$data['dnssec_errors'] = $this->getDnssecErrorData();
+		}
+
+		// Set Name servers down for each probe.
+		foreach ($probe_nstotal as $probeid => $total) {
+			$this->probes[$probeid]['ns_down'] = $total - $this->probes[$probeid]['ns_up'];
+		}
+
+		// Collect all the RTTs that are either errors or above the limit.
+		//sdii($this->probes);
+		foreach ($this->probes as $probeid => $probe) {
+
+			$transport = $this->probes[$probeid]['transport'];
+			$rtt_max = ($transport == 'udp') ? $data['udp_rtt'] : $data['tcp_rtt'];
+
+			foreach ($probe['results'] as $ns => $values) {
+				foreach ($values as $ipv => $ipdata) {
+					if (substr($ipv, 0, 3) !== "ipv")
+						continue;
+
+					foreach ($ipdata as $ip => $value) {
+						$error_key = $ns . $ip;
+
+						if ($value < 0) {
+							if (isServiceErrorCode($value, $data['type'])) {
+								$this->probes[$probeid]['dns_error'][$error_key] = true;
+							}
+
+							if (!isset($this->probe_errors[$value][$error_key])) {
+								$this->probe_errors[$value][$error_key] = 0;
+							}
+
+							$this->probe_errors[$value][$error_key]++;
+						}
+						elseif ($value > $rtt_max && $data['type'] == RSM_DNS) {
+							$this->probes[$probeid]['above_max_rtt'][$error_key] = true;
+
+							if (!isset($data['probes_above_max_rtt'][$error_key])) {
+								$data['probes_above_max_rtt'][$error_key] = [
+									'tcp' => 0,
+									'udp' => 0,
+								];
+							}
+
+							$data['probes_above_max_rtt'][$error_key][$transport]++;
+						}
+					}
+				}
+			}
 		}
 
 		CArrayHelper::sort($this->probes, ['host']);
@@ -432,32 +430,6 @@ class AggregateDetailsAction extends Action {
 		}
 
 		if (array_key_exists('test_result', $data) && $data['test_result'] != UP_INCONCLUSIVE_RECONFIG) {
-			// Set probes test trasport.
-			$protocol_type = $this->getValueMapping(RSM_DNS_TRANSPORT_PROTOCOL_VALUE_MAP);
-
-			if (!$protocol_type) {
-				error(_('Value mapping for "Transport protocol" not found.'));
-			}
-			else {
-				$tldprobeid_probeid = array_combine(array_column($this->probes, 'tldprobe_hostid'), array_keys($this->probes));
-				$tldprobe_values = $this->getItemsHistoryValue([
-					'output' => ['itemid', 'hostid'],
-					'hostids' => array_column($this->probes, 'tldprobe_hostid'),
-					'filter' => ['key_' => PROBE_DNS_PROTOCOL],
-					'time_from' => $time_from,
-					'time_till' => $time_till,
-					'history' => ITEM_VALUE_TYPE_UINT64
-				]);
-
-				foreach ($tldprobe_values as $tldprobe_value) {
-					if (isset($tldprobe_value['history_value'])) {
-						$tldprobeid = $tldprobe_value['hostid'];
-						$probeid = $tldprobeid_probeid[$tldprobeid];
-						$this->probes[$probeid]['transport'] = $protocol_type[$tldprobe_value['history_value']];
-					}
-				}
-			}
-
 			$this->getReportData($data, $time_from, $time_till);
 		}
 
