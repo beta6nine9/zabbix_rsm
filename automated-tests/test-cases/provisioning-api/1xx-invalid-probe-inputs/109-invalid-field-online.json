@@ -11,6 +11,6 @@
         "proxyPskIdentity": "test",
         "proxyPsk": "b23f30b5aa0d274c88c2d1ebf17ee48e"
     },
-    "online": null,
+    "online": true,
     "centralServer": 1
 }
