@@ -885,7 +885,7 @@ systemctl restart rsyslog
 
 %files rsm-api
 %defattr(-,root,root,-)
-%config(noreplace) %{_datadir}/rsm-api/config.php
+%{_datadir}/rsm-api/config.php.example
 %{_datadir}/rsm-api/Database.php
 %{_datadir}/rsm-api/Input.php
 %{_datadir}/rsm-api/RsmException.php
