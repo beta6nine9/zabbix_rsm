@@ -143,13 +143,14 @@ class testRSM extends CWebTest {
 		$this->page->waitUntilReady();
 
 		// Take screenshot of Incidents detail page or Graph.
-		$area = ($data['find'] === '%')
-			? $this->query('id:incidents_data')->waitUntilVisible()->one()
-			: $this->waitUntilGraphIsLoaded();
-
 		$this->page->refresh();
 		$this->page->removeFocus();
 		$this->page->updateViewport();
+		
+		$area = ($data['find'] === '%')
+			? $this->query('id:incidents_data')->waitUntilVisible()->one()
+			: $this->waitUntilGraphIsLoaded();
+		
 		$this->assertScreenshot($area,
 				$data['column'].(($data['find'] === '%') ? ' TLD Rolling week status' : ' '.$data['header'].' graph')
 		);
