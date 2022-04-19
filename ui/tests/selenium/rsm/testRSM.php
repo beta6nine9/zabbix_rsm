@@ -280,8 +280,9 @@ class testRSM extends CWebTest {
 				']//table[@class="list-table"]')->asTable()->waitUntilVisible()->one()
 				->getRow(0)->getColumn('Incident ID')->query('tag:a')->waitUntilClickable()->one()->click();
 
-		sleep(2);
 		$this->page->assertHeader('Incidents details');
+		$this->page->removeFocus();
+		$this->page->updateViewport();
 		$this->assertScreenshot($this->query('id:incident_details')->waitUntilVisible()->one(),
 				$data['tld'].' '.$data['tab'].' Incidents details page'
 		);
@@ -292,6 +293,9 @@ class testRSM extends CWebTest {
 
 		$this->page->waitUntilReady();
 		$this->page->assertHeader('Test details');
+
+		$this->page->removeFocus();
+		$this->page->updateViewport();
 		$this->assertScreenshot(null, $data['tld'].' '.$data['tab'].' Test details page '.$data['color']);
 
 		// Check hints' texts on corresponding number.
