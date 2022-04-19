@@ -101,6 +101,12 @@ function RsmValidateDomainName($rule, &$data, $path, &$error): bool
 		$error = $rule['error'];
 		return false;
 	}
+	$pattern = '/^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*\.?$/';
+	if (!preg_match($pattern, $data))
+	{
+		$error = $rule['error'];
+		return false;
+	}
 	return true;
 }
 
@@ -117,13 +123,23 @@ function RsmValidateHostname($rule, &$data, $path, &$error): bool
 		$error = $rule['error'];
 		return false;
 	}
+	$pattern = '/^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*\.?$/';
+	if (!preg_match($pattern, $data))
+	{
+		$error = $rule['error'];
+		return false;
+	}
 	return true;
 }
 
-function RsmValidateUrl($rule, &$data, $path, &$error): bool
+function RsmValidateRddsUrl($rule, &$data, $path, &$error): bool
 {
-	// see rfc3986 for the definition of a URL
 	if (filter_var($data, FILTER_VALIDATE_URL) === false)
+	{
+		$error = $rule['error'];
+		return false;
+	}
+	if (!in_array(parse_url($data, PHP_URL_SCHEME), ['http', 'https']))
 	{
 		$error = $rule['error'];
 		return false;
@@ -141,7 +157,17 @@ function RsmValidateRdapUrl($rule, &$data, $path, &$error): bool
 	{
 		return true;
 	}
-	return RsmValidateUrl($rule, $data, $path, $error);
+	if (filter_var($data, FILTER_VALIDATE_URL) === false)
+	{
+		$error = $rule['error'];
+		return false;
+	}
+	if (!in_array(parse_url($data, PHP_URL_SCHEME), ['http', 'https']))
+	{
+		$error = $rule['error'];
+		return false;
+	}
+	return true;
 }
 
 function RsmValidateProbeIdentifier($rule, &$data, $path, &$error): bool
