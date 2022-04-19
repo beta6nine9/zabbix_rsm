@@ -148,6 +148,8 @@ class testRSM extends CWebTest {
 			: $this->waitUntilGraphIsLoaded();
 
 		$this->page->refresh();
+		$this->page->removeFocus();
+		$this->page->updateViewport();
 		$this->assertScreenshot($area,
 				$data['column'].(($data['find'] === '%') ? ' TLD Rolling week status' : ' '.$data['header'].' graph')
 		);
