@@ -27,7 +27,7 @@ class testRSM extends CWebTest {
 
 	const DATES = [
 		'id:from' => '2022-02-01 00:00:00',
-		'id:to' => '2022-03-31 00:00:00'
+		'id:to' => '2022-03-24 00:00:00'
 	];
 
 	const FILTER_CHECKBOXES = [
@@ -204,6 +204,8 @@ class testRSM extends CWebTest {
 		$tabs = ['DNS', 'DNSSEC', 'RDDS', 'EPP'];
 		foreach ($tabs as $tab) {
 			$this->query('link', $tab)->one()->waitUntilClickable()->click();
+			$this->page->removeFocus();
+			$this->page->updateViewport();
 			$this->assertScreenshot($this->query('id:incidents_data')->waitUntilVisible()->one(), $data['tld'].' '.$tab.' Incident page');
 
 			if ($tab !== 'EPP') {
@@ -212,6 +214,8 @@ class testRSM extends CWebTest {
 						']//table[@class="incidents-info"]//a')->one()->waitUntilClickable()->click();
 				$this->page->waitUntilReady();
 				$this->page->assertHeader('Tests');
+				$this->page->removeFocus();
+				$this->page->updateViewport();
 				$this->assertScreenshot($this->query('id:rsm_tests')->waitUntilVisible()->one(), $data['tld'].' '.$tab.' Tests page');
 
 				// For tld6 DNSSEC tab there are no any tests.
@@ -221,6 +225,8 @@ class testRSM extends CWebTest {
 							->getRow(0)->getColumn('')->query('link:Details')->waitUntilClickable()->one()->click();
 
 					$this->page->assertHeader('Test details');
+					$this->page->removeFocus();
+					$this->page->updateViewport();
 					$this->assertScreenshot(null, $data['tld'].' '.$tab.' Test details');
 				}
 			}
