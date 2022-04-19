@@ -470,19 +470,14 @@ abstract class ActionBase extends CController
 		}
 		catch (RsmException $e)
 		{
-			$details = $e->getDetails();
-
-			if (is_null($details) && $e->getResultCode() === 500)
-			{
-				$details = $this->getExceptionDetails($e);
-			}
+			$details = $e->getResultCode() === 500 ? $this->getExceptionDetails($e) : null;
 
 			$this->setCommonResponse(
 				$e->getResultCode(),
 				$e->getTitle(),
 				$e->getDescription(),
 				$details,
-				$e->getUpdatedObject()
+				null
 			);
 
 			DBend(false);
@@ -597,8 +592,6 @@ abstract class ActionBase extends CController
 
 	private function handlePutRequest(): void
 	{
-		// TODO: changes to Zabbix shall only be executed if the configuration information changes
-		// between the current configuration in Zabbix and the object provided to the API
 		$this->newObject = $this->getInputAll();
 
 		$objects = $this->getObjects($this->newObject['id']);
