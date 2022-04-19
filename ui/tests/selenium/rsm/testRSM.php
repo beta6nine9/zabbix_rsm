@@ -289,7 +289,7 @@ class testRSM extends CWebTest {
 	 */
 	public function testRSM_IncidentsIDTestDetails($data) {
 		$this->page->login()->open('zabbix.php?type=0&filter_set=1&filter_search='.$data['tld'].'&from='.
-				self::DATES['from']['date'].'%2000%3A00%3A00&to='.self::DATES['TO']['date'].
+				self::DATES['from']['date'].'%2000%3A00%3A00&to='.self::DATES['to']['date'].
 				'%2000%3A00%3A00&action=rsm.incidents')->waitUntilReady();
 
 		// Click on necessary Tab.
