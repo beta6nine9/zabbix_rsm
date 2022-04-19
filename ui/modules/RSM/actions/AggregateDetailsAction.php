@@ -164,13 +164,12 @@ class AggregateDetailsAction extends Action {
 				]
 			]);
 
-			foreach ($tld_probes as $tld_probe) {
-				$probeid = $tld_probe_names[$tld_probe['host']];
+			foreach ($tld_probes as $res) {
+				$probeid = $tld_probe_names[$res['host']];
 				$this->probes[$probeid] += [
-					'tldprobe_hostid' => $tld_probe['hostid'],
-					'tldprobe_host' => $tld_probe['host'],
-					'tldprobe_name' => $tld_probe['name'],
-					'tldprobe_status' => $tld_probe['status'],
+					'tldprobe_hostid' => $res['hostid'],
+					'tldprobe_host' => $res['host'],
+					'probe_status' => ($res['status'] == HOST_STATUS_NOT_MONITORED ? PROBE_DISABLED : PROBE_UNKNOWN),
 				];
 			}
 		}
@@ -187,15 +186,8 @@ class AggregateDetailsAction extends Action {
 		# map of '<TLD> <Probe>' hostid => '<Probe>' hostid
 		$tldprobeid_probeid = [];
 
-		# '<Probe>' => status
-		$data['probes_status'] = [];
-
-		foreach ($this->probes as $hostid => $hash) {
-			// Only take data from Probes that are ONLINE
-			if (!isset($hash['online_status']) || $hash['online_status'] != PROBE_OFFLINE) {
-				$tldprobeid_probeid[$hash['tldprobe_hostid']] = $hostid;
-				$data['probes_status'][$hash['host']] = $hash['tldprobe_status'];
-			}
+		foreach ($this->probes as $probeid => $probe) {
+			$tldprobeid_probeid[$probe['tldprobe_hostid']] = $probeid;
 		}
 
 		if (!$tldprobeid_probeid) {
@@ -261,7 +253,9 @@ class AggregateDetailsAction extends Action {
 				case PROBE_DNS_STATUS:
 				case PROBE_DNSSEC_STATUS:
 					// Set DNS/DNSSEC Test status.
-					$this->probes[$probeid]['online_status'] = $value;
+					if ($this->probes[$probeid]['probe_status'] != PROBE_OFFLINE) {
+						$this->probes[$probeid]['probe_status'] = $value;
+					}
 					break;
 
 				case PROBE_DNS_NS_STATUS:
@@ -315,9 +309,16 @@ class AggregateDetailsAction extends Action {
 			$this->probes[$probeid]['ns_down'] = $total - $this->probes[$probeid]['ns_up'];
 		}
 
-		// Collect all the RTTs that are either errors or above the limit.
-		//sdii($this->probes);
+		// Collect all the RTTs that are either errors or above the limit and set "No result" for probes that have no result.
 		foreach ($this->probes as $probeid => $probe) {
+			if ($probe['probe_status'] == PROBE_UNKNOWN) {
+				$this->probes[$probeid]['probe_status'] = PROBE_NORESULT;
+				continue;
+			}
+
+			if ($probe['probe_status'] == PROBE_DISABLED || $probe['probe_status'] == PROBE_OFFLINE) {
+				continue;
+			}
 
 			$transport = $this->probes[$probeid]['transport'];
 			$rtt_max = ($transport == 'udp') ? $data['udp_rtt'] : $data['tcp_rtt'];
@@ -425,7 +426,7 @@ class AggregateDetailsAction extends Action {
 			 * Value of probe item PROBE_KEY_ONLINE == PROBE_DOWN means that Probe is OFFLINE
 			 */
 			if (isset($probe['history_value']) && $probe['history_value'] == PROBE_DOWN) {
-				$this->probes[$probe['hostid']]['online_status'] = PROBE_OFFLINE;
+				$this->probes[$probe['hostid']]['probe_status'] = PROBE_OFFLINE;
 			}
 		}
 

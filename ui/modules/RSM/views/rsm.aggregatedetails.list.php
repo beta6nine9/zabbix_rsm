@@ -66,11 +66,11 @@ $table = (new CTableInfo())
 	->setMultirowHeader($rows, $column_count)
 	->addClass('table-bordered-head');
 
+$up = (new CSpan(_('Up')))->addClass(ZBX_STYLE_GREEN);
 $down = (new CSpan(_('Down')))->addClass(ZBX_STYLE_RED);
 $offline = (new CSpan(_('Offline')))->addClass(ZBX_STYLE_GREY);
 $no_result = (new CSpan(_('No result')))->addClass(ZBX_STYLE_GREY);
 $disabled = (new CSpan(_('Disabled')))->addClass(ZBX_STYLE_GREY);
-$up = (new CSpan(_('Up')))->addClass(ZBX_STYLE_GREEN);
 
 // Results summary.
 $offline_probes = 0;
@@ -79,48 +79,43 @@ $down_probes = 0;
 
 // Add results for each probe.
 foreach ($data['probes'] as $probe) {
-	$probe_disabled = 0;
-
-	if (isset($data['probes_status'])) {
-		$probe_disabled = (array_key_exists($probe['host'], $data['probes_status']) && $data['probes_status'][$probe['host']] == 1);
-	}
-
-	if ($probe_disabled) {
+	if ($probe['probe_status'] == PROBE_DISABLED) {
 		$probe_status = $disabled;
 		$probe_status_color = ZBX_STYLE_GREY;
 		$no_result_probes++;
 	}
-	elseif (array_key_exists('online_status', $probe)) {
-		if ($probe['online_status'] == PROBE_OFFLINE) {
-			$probe_status_color = ZBX_STYLE_GREY;
-			$probe_status = $offline;
-			$offline_probes++;
+	elseif ($probe['probe_status'] == PROBE_OFFLINE) {
+		$probe_status = $offline;
+		$probe_status_color = ZBX_STYLE_GREY;
+		$offline_probes++;
 
-			unset($probe['results']);
-			unset($probe['transport']);
-		}
-		elseif ($probe['online_status'] == PROBE_DOWN) {
-			$probe_status_color = ZBX_STYLE_RED;
-			$probe_status = $down;
-			$down_probes++;
-		}
-		elseif ($probe['online_status'] == PROBE_UP) {
-			$probe_status_color = ZBX_STYLE_GREEN;
-			$probe_status = $up;
-		}
+		unset($probe['results']);
+		unset($probe['transport']);
 	}
-	else {
+	elseif ($probe['probe_status'] == PROBE_DOWN) {
+		$probe_status = $down;
+		$probe_status_color = ZBX_STYLE_RED;
+		$down_probes++;
+	}
+	elseif ($probe['probe_status'] == PROBE_UP) {
+		$probe_status = $up;
+		$probe_status_color = ZBX_STYLE_GREEN;
+	}
+	elseif ($probe['probe_status'] == PROBE_NORESULT) {
 		$probe_status = $no_result;
 		$probe_status_color = ZBX_STYLE_GREY;
 		$no_result_probes++;
+	}
+	else {
+		error("Internal error: unknown probe_status of probe \"" . $probe['host'] . "\": " . $probe['probe_status']);
 	}
 
 	$row = [
 		(new CSpan($probe['host']))->addClass($probe_status_color),
 		$probe_status,
 		isset($probe['transport']) ? $probe['transport'] : '',
-		($probe_disabled || $probe_status == $no_result || $probe['online_status'] == PROBE_OFFLINE) ? '' : $probe['ns_up'],
-		($probe_disabled || $probe_status == $no_result || $probe['online_status'] == PROBE_OFFLINE) ? '' : $probe['ns_down']
+		($probe['probe_status'] == PROBE_DISABLED || $probe['probe_status'] == PROBE_NORESULT || $probe['probe_status'] == PROBE_OFFLINE) ? '' : $probe['ns_up'],
+		($probe['probe_status'] == PROBE_DISABLED || $probe['probe_status'] == PROBE_NORESULT || $probe['probe_status'] == PROBE_OFFLINE) ? '' : $probe['ns_down'],
 	];
 
 	if (isset($data['dns_nameservers'])) {

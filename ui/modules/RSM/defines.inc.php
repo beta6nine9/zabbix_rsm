@@ -208,8 +208,11 @@ define('NS_UP',			2);
 
 // SLA monitoring probe status.
 define('PROBE_OFFLINE',	-1);
-define('PROBE_DOWN',	0);
-define('PROBE_UP',		1);
+define('PROBE_DOWN',	 0); // in the database, result of the test
+define('PROBE_UP',		 1); // in the database, result of the test
+define('PROBE_DISABLED', 2);
+define('PROBE_NORESULT', 3);
+define('PROBE_UNKNOWN',  4); // not disabled is the only thing known so far, temporary status
 
 // NameServer status.
 define('NAMESERVER_DOWN',	0);
