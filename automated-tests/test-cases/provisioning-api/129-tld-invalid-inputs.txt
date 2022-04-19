@@ -41,6 +41,8 @@
 "/tlds/tld1","PUT",400,"readwrite","1xx-invalid-tld-inputs/129-invalid-tld-type.json"                      ,"1xx-tld-outputs/129-invalid-tld-type.json"
 "/tlds/tld1","PUT",400,"readwrite","1xx-invalid-tld-inputs/129-invalid-url-rdap-url.json"                  ,"1xx-tld-outputs/129-invalid-url-rdap-url.json"
 "/tlds/tld1","PUT",400,"readwrite","1xx-invalid-tld-inputs/129-invalid-url-rdds80-url.json"                ,"1xx-tld-outputs/129-invalid-url-rdds80-url.json"
+"/tlds/tld1","PUT",400,"readwrite","1xx-invalid-tld-inputs/129-invalid-url-scheme-rdap-url.json"           ,"1xx-tld-outputs/129-invalid-url-rdap-url.json"
+"/tlds/tld1","PUT",400,"readwrite","1xx-invalid-tld-inputs/129-invalid-url-scheme-rdds80-url.json"         ,"1xx-tld-outputs/129-invalid-url-rdds80-url.json"
 "/tlds/tld1","PUT",400,"readwrite","1xx-invalid-tld-inputs/129-minns-negative.json"                        ,"1xx-tld-outputs/129-minns-negative.json"
 "/tlds/tld1","PUT",400,"readwrite","1xx-invalid-tld-inputs/129-minns-zero.json"                            ,"1xx-tld-outputs/129-minns-zero.json"
 "/tlds/tld1","PUT",400,"readwrite","1xx-invalid-tld-inputs/129-nsip-duplication.json"                      ,"1xx-tld-outputs/129-nsip-duplication.json"

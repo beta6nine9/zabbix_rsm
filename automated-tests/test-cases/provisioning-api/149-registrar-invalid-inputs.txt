@@ -37,6 +37,8 @@
 "/registrars/1","PUT",400,"readwrite","1xx-invalid-registrar-inputs/149-invalid-tld-type.json"                      ,"1xx-registrar-outputs/149-invalid-tld-type.json"
 "/registrars/1","PUT",400,"readwrite","1xx-invalid-registrar-inputs/149-invalid-url-rdap-url.json"                  ,"1xx-registrar-outputs/149-invalid-url-rdap-url.json"
 "/registrars/1","PUT",400,"readwrite","1xx-invalid-registrar-inputs/149-invalid-url-rdds80-url.json"                ,"1xx-registrar-outputs/149-invalid-url-rdds80-url.json"
+"/registrars/1","PUT",400,"readwrite","1xx-invalid-registrar-inputs/149-invalid-url-scheme-rdap-url.json"           ,"1xx-registrar-outputs/149-invalid-url-rdap-url.json"
+"/registrars/1","PUT",400,"readwrite","1xx-invalid-registrar-inputs/149-invalid-url-scheme-rdds80-url.json"         ,"1xx-registrar-outputs/149-invalid-url-rdds80-url.json"
 "/registrars/1","PUT",400,"readwrite","1xx-invalid-registrar-inputs/149-object-id-specified.json"                   ,"1xx-registrar-outputs/149-object-id-specified.json"
 "/registrars/1","PUT",400,"readwrite","1xx-invalid-registrar-inputs/149-services-duplication.json"                  ,"1xx-registrar-outputs/149-services-duplication.json"
 "/registrars/1","PUT",400,"readwrite","1xx-invalid-registrar-inputs/149-services-invalid-service.json"              ,"1xx-registrar-outputs/149-services-invalid-service.json"
