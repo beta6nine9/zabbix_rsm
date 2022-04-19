@@ -26,8 +26,8 @@ require_once dirname(__FILE__).'/../../include/CWebTest.php';
 class testRSM extends CWebTest {
 
 	const DATES = [
-		'from' => ['date' => '2022-03-01', 'time' => ' 00:00:00'],
-		'to' => ['date' => '2022-03-25', 'time' => ' 00:00:00']
+		'from' => ['date' => '2022-03-10', 'time' => ' 00:00:00'],
+		'to' => ['date' => '2022-03-31', 'time' => ' 00:00:00']
 	];
 
 	const FILTER_CHECKBOXES = [
