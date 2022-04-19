@@ -145,11 +145,11 @@ class testRSM extends CWebTest {
 		// Take screenshot of Incidents detail page or Graph.
 		$this->page->removeFocus();
 		$this->page->updateViewport();
-		
+
 		$area = ($data['find'] === '%')
 			? $this->query('id:incidents_data')->waitUntilVisible()->one()
 			: $this->waitUntilGraphIsLoaded();
-		
+
 		$this->assertScreenshot($area,
 				$data['column'].(($data['find'] === '%') ? ' TLD Rolling week status' : ' '.$data['header'].' graph')
 		);
@@ -388,6 +388,7 @@ class testRSM extends CWebTest {
 		$form->fill($data);
 		$form->submit();
 
+		$this->page->updateViewport();
 		$this->assertScreenshot(null, $data['TLD'].' '.$data['name:filter_month'].' info block');
 	}
 
