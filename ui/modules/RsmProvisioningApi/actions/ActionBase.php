@@ -26,8 +26,9 @@ abstract class ActionBase extends CController
 	protected const REQUEST_METHOD_DELETE = 'DELETE';
 	protected const REQUEST_METHOD_PUT    = 'PUT';
 
-	protected $oldObject = null;
-	protected $newObject = null;
+	protected $oldObject = null;         // object that existed in the database before the request
+	protected $newObject = null;         // internal structure built from the request's payload
+	protected $objectAfterUpdate = null; // object that exists in the database after the PUT request
 
 	abstract protected function checkMonitoringTarget(): bool;
 	abstract protected function requestConfigCacheReload(): void;
@@ -645,6 +646,7 @@ abstract class ActionBase extends CController
 		}
 
 		$objects = $this->getObjects($this->newObject['id']);
+		$this->objectAfterUpdate = $objects[0];
 		$this->setCommonResponse(200, 'Update executed successfully', null, $details, $objects[0]);
 	}
 
@@ -690,7 +692,7 @@ abstract class ActionBase extends CController
 				'operation'              => $operation,
 				'object_type'            => $objectType,
 				'object_before'          => is_null($this->oldObject) ? null : json_encode($this->oldObject, JSON_UNESCAPED_SLASHES),
-				'object_after'           => is_null($this->newObject) ? null : json_encode($this->newObject, JSON_UNESCAPED_SLASHES),
+				'object_after'           => is_null($this->objectAfterUpdate) ? null : json_encode($this->objectAfterUpdate, JSON_UNESCAPED_SLASHES),
 				'remote_addr'            => $_SERVER['REMOTE_ADDR'],
 				'x_forwarded_for'        => array_key_exists('HTTP_X_FORWARDED_FOR', $_SERVER) ? $_SERVER['HTTP_X_FORWARDED_FOR'] : null,
 			];
