@@ -132,7 +132,7 @@ class SlaReportsListAction extends Action {
 			}
 		}
 		elseif (!class_exists('CSlaReport', true)) {
-			error(_('Cannot generate SLA Report: CSlaReport.php is missing.');
+			error(_('Cannot generate SLA Report: CSlaReport.php is missing.'));
 		}
 		else {
 			// CSlaReport class file path: ./include/classes/services/CSlaReport.php
