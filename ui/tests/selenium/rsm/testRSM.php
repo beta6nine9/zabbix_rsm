@@ -26,8 +26,8 @@ require_once dirname(__FILE__).'/../../include/CWebTest.php';
 class testRSM extends CWebTest {
 
 	const DATES = [
-		'from' => ['date' => '2022-02-01', 'time' => ' 00:00:00'],
-		'to' => ['date' => '2022-03-24', 'time' => ' 00:00:00']
+		'from' => ['date' => '2022-03-01', 'time' => ' 00:00:00'],
+		'to' => ['date' => '2022-03-25', 'time' => ' 00:00:00']
 	];
 
 	const FILTER_CHECKBOXES = [
@@ -159,7 +159,6 @@ class testRSM extends CWebTest {
 			'id:to' => self::DATES['to']['date'].self::DATES['to']['time']
 		]);
 
-//		$form->fill(self::DATES);
 		$form->query('button:Apply')->waitUntilClickable()->one()->click();
 		$this->page->waitUntilReady();
 
