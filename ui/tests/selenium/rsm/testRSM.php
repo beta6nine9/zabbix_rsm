@@ -26,8 +26,8 @@ require_once dirname(__FILE__).'/../../include/CWebTest.php';
 class testRSM extends CWebTest {
 
 	const DATES = [
-		'id:from' => '2022-02-01 00:00:00',
-		'id:to' => '2022-03-24 00:00:00'
+		'from' => ['date' => '2022-02-01', 'time' => ' 00:00:00'],
+		'to' => ['date' => '2022-03-24', 'time' => ' 00:00:00']
 	];
 
 	const FILTER_CHECKBOXES = [
@@ -154,7 +154,12 @@ class testRSM extends CWebTest {
 		}
 
 		// Fill the necessary date period.
-		$form->fill(self::DATES);
+		$form->fill([
+			'id:from' => self::DATES['from']['date'].self::DATES['from']['time'],
+			'id:to' => self::DATES['to']['date'].self::DATES['to']['time']
+		]);
+
+//		$form->fill(self::DATES);
 		$form->query('button:Apply')->waitUntilClickable()->one()->click();
 		$this->page->waitUntilReady();
 
@@ -197,8 +202,8 @@ class testRSM extends CWebTest {
 	 * @dataProvider getIncidentsTabsTestsData
 	 */
 	public function testRSM_IncidentsTabsTests($data) {
-		$filtered_link = 'zabbix.php?type=0&filter_set=1&filter_search='.$data['tld'].'&from=2022-02-01%2000%3A00%3A00&'.
-				'to=2022-03-31%2000%3A00%3A00&action=rsm.incidents';
+		$filtered_link = 'zabbix.php?type=0&filter_set=1&filter_search='.$data['tld'].'&from='.self::DATES['from']['date'].
+				'%2000%3A00%3A00&to='.self::DATES['to']['date'].'%2000%3A00%3A00&action=rsm.incidents';
 		$this->page->login()->open($filtered_link)->waitUntilReady();
 
 		$tabs = ['DNS', 'DNSSEC', 'RDDS', 'EPP'];
@@ -284,8 +289,9 @@ class testRSM extends CWebTest {
 	 * @dataProvider getIncidentsIDTestData
 	 */
 	public function testRSM_IncidentsIDTestDetails($data) {
-		$this->page->login()->open('zabbix.php?type=0&filter_set=1&filter_search='.$data['tld'].'&from=2022-02-01%2000%3A00%3A00&'.
-				'to=2022-03-31%2000%3A00%3A00&action=rsm.incidents')->waitUntilReady();
+		$this->page->login()->open('zabbix.php?type=0&filter_set=1&filter_search='.$data['tld'].'&from='.
+				self::DATES['from']['date'].'%2000%3A00%3A00&to='.self::DATES['TO']['date'].
+				'%2000%3A00%3A00&action=rsm.incidents')->waitUntilReady();
 
 		// Click on necessary Tab.
 		$this->query('link', $data['tab'])->one()->waitUntilClickable()->click();
@@ -339,7 +345,8 @@ class testRSM extends CWebTest {
 	 */
 	public function testRSM_IncidentsDetailsFilters($data) {
 		$this->page->login()->open('zabbix.php?type=0&filter_set=1&filter_search='.$data['id:filter_search'].
-				'&from=2022-02-01%2000%3A00%3A00&to=2022-03-31%2000%3A00%3A00&action=rsm.incidents')->waitUntilReady();
+				'&from='.self::DATES['from']['date'].'%2000%3A00%3A00&to='.self::DATES['to']['date'].
+				'%2000%3A00%3A00&action=rsm.incidents')->waitUntilReady();
 		$this->page->assertHeader('Incidents');
 
 		// Click on IncidentID in table.
