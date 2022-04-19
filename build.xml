@@ -320,6 +320,7 @@
 			<arg line="${phpunit_filter}"/>
 			<arg line="selenium/SeleniumTests.php"/>
 		</exec>
+		<symlink link="${basedir}/ui/include/classes/services/CSlaReport.php" resource="${basedir}/opt/zabbix/scripts/CSlaReport.php"/>
 	</target>
 
 	<target name="test-api">
