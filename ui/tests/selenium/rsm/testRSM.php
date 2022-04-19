@@ -36,27 +36,7 @@ class testRSM extends CWebTest {
 		'Enabled subservices' => 'id:checkAllSubservices'
 	];
 
-	public static function getRollingWeekPageData() {
-		return [
-			[
-				[
-					'case' => 'empty_filter',
-					'filter_checkboxes' => false
-				]
-			],
-			[
-				[
-					'case' => 'filter_with_data',
-					'filter_checkboxes' => true
-				]
-			]
-		];
-	}
-
-	/**
-	 * @dataProvider getRollingWeekPageData
-	 */
-	public function testRSM_RollingWeekFilter($data) {
+	public function testRSM_RollingWeekFilter() {
 		$this->page->login()->open('zabbix.php?action=rsm.rollingweekstatus')->waitUntilReady();
 		$form = $this->query('name:zbx_filter')->asForm()->waitUntilVisible()->one();
 		$form->query('button:Reset')->waitUntilClickable()->one()->click();
