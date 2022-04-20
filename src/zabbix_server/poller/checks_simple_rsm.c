@@ -3592,31 +3592,37 @@ static void	create_rdds_json(struct zbx_json *json, const char *ip43, int rtt43,
 {
 	zbx_json_init(json, 2 * ZBX_KIBIBYTE);
 
-	zbx_json_addobject(json, "rdds43");
+	if (ZBX_NO_VALUE != rtt43)
+	{
+		zbx_json_addobject(json, "rdds43");
 
-	zbx_json_addint64(json, "rtt", rtt43);
-	if (NULL != ip43)
-		zbx_json_addstring(json, "ip", ip43, ZBX_JSON_TYPE_STRING);
-	if (ZBX_NO_VALUE != upd43)
-		zbx_json_addint64(json, "upd", upd43);
-	if (NULL != rdds43_server)
-		zbx_json_addstring(json, "target", rdds43_server, ZBX_JSON_TYPE_STRING);
-	if (0 != strcmp(rdds43_testedname, ""))
-		zbx_json_addstring(json, "testedname", rdds43_testedname, ZBX_JSON_TYPE_STRING);
-	zbx_json_addint64(json, "status", rdds43_status);
+		zbx_json_addint64(json, "rtt", rtt43);
+		if (NULL != ip43)
+			zbx_json_addstring(json, "ip", ip43, ZBX_JSON_TYPE_STRING);
+		if (ZBX_NO_VALUE != upd43)
+			zbx_json_addint64(json, "upd", upd43);
+		if (NULL != rdds43_server)
+			zbx_json_addstring(json, "target", rdds43_server, ZBX_JSON_TYPE_STRING);
+		if (0 != strcmp(rdds43_testedname, ""))
+			zbx_json_addstring(json, "testedname", rdds43_testedname, ZBX_JSON_TYPE_STRING);
+		zbx_json_addint64(json, "status", rdds43_status);
 
-	zbx_json_close(json);
+		zbx_json_close(json);
+	}
 
-	zbx_json_addobject(json, "rdds80");
+	if (ZBX_NO_VALUE != rtt80)
+	{
+		zbx_json_addobject(json, "rdds80");
 
-	zbx_json_addint64(json, "rtt", rtt80);
-	if (NULL != ip80)
-		zbx_json_addstring(json, "ip", ip80, ZBX_JSON_TYPE_STRING);
-	if (NULL != rdds80_url)
-		zbx_json_addstring(json, "target", rdds80_url, ZBX_JSON_TYPE_STRING);
-	zbx_json_addint64(json, "status", rdds80_status);
+		zbx_json_addint64(json, "rtt", rtt80);
+		if (NULL != ip80)
+			zbx_json_addstring(json, "ip", ip80, ZBX_JSON_TYPE_STRING);
+		if (NULL != rdds80_url)
+			zbx_json_addstring(json, "target", rdds80_url, ZBX_JSON_TYPE_STRING);
+		zbx_json_addint64(json, "status", rdds80_status);
 
-	zbx_json_close(json);
+		zbx_json_close(json);
+	}
 
 	zbx_json_addint64(json, "status", rdds_status);
 }
