@@ -236,6 +236,11 @@ class AggregateDetailsAction extends Action {
 
 			$probeid = $tldprobeid_probeid[$test_item['hostid']];
 
+			// If probe status is already set it's either OFFLINE or DISABLED, disregard data from them.
+			if ($this->probes[$probeid]['probe_status'] == PROBE_OFFLINE || $this->probes[$probeid]['probe_status'] == PROBE_DISABLED) {
+				continue;
+			}
+
 			$key_parser->parse($test_item['key_']);
 
 			$value = $test_values[$test_item['itemid']];
@@ -251,9 +256,15 @@ class AggregateDetailsAction extends Action {
 					break;
 
 				case PROBE_DNS_STATUS:
+					// Set DNSSEC Test status.
+					if ($data['type'] == RSM_DNS) {
+						$this->probes[$probeid]['probe_status'] = $value;
+					}
+					break;
+
 				case PROBE_DNSSEC_STATUS:
-					// Set DNS/DNSSEC Test status.
-					if ($this->probes[$probeid]['probe_status'] != PROBE_OFFLINE) {
+					// Set DNSSEC Test status.
+					if ($data['type'] == RSM_DNSSEC) {
 						$this->probes[$probeid]['probe_status'] = $value;
 					}
 					break;

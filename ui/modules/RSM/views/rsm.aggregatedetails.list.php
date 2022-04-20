@@ -84,13 +84,15 @@ foreach ($data['probes'] as $probe) {
 		$probe_status_color = ZBX_STYLE_GREY;
 		$no_result_probes++;
 	}
+	elseif ($probe['probe_status'] == PROBE_UNKNOWN) {
+		$probe_status = '';
+		$probe_status_color = '';
+		$no_result_probes++;
+	}
 	elseif ($probe['probe_status'] == PROBE_OFFLINE) {
 		$probe_status = $offline;
 		$probe_status_color = ZBX_STYLE_GREY;
 		$offline_probes++;
-
-		unset($probe['results']);
-		unset($probe['transport']);
 	}
 	elseif ($probe['probe_status'] == PROBE_DOWN) {
 		$probe_status = $down;
@@ -114,8 +116,8 @@ foreach ($data['probes'] as $probe) {
 		(new CSpan($probe['host']))->addClass($probe_status_color),
 		$probe_status,
 		isset($probe['transport']) ? $probe['transport'] : '',
-		($probe['probe_status'] == PROBE_DISABLED || $probe['probe_status'] == PROBE_NORESULT || $probe['probe_status'] == PROBE_OFFLINE) ? '' : $probe['ns_up'],
-		($probe['probe_status'] == PROBE_DISABLED || $probe['probe_status'] == PROBE_NORESULT || $probe['probe_status'] == PROBE_OFFLINE) ? '' : $probe['ns_down'],
+		($probe['probe_status'] == PROBE_UP || $probe['probe_status'] == PROBE_DOWN) ? $probe['ns_up'] : '',
+		($probe['probe_status'] == PROBE_UP || $probe['probe_status'] == PROBE_DOWN) ? $probe['ns_down'] : '',
 	];
 
 	if (isset($data['dns_nameservers'])) {
@@ -234,7 +236,7 @@ $test_result = (new CSpan(_('No result')))->addClass(ZBX_STYLE_GREY);
 
 if (array_key_exists('test_result', $data)) {
 	$test_result = (new CSpan($data['test_status_message'][$data['test_result']]))
-		->addClass($data['test_result'] == PROBE_DOWN ? ZBX_STYLE_RED : ZBX_STYLE_GREEN);
+		->addClass($data['test_result'] == DOWN ? ZBX_STYLE_RED : ZBX_STYLE_GREEN);
 }
 
 // NSID index/value table
