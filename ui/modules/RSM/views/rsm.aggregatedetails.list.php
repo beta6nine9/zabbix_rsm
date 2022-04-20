@@ -84,11 +84,6 @@ foreach ($data['probes'] as $probe) {
 		$probe_status_color = ZBX_STYLE_GREY;
 		$no_result_probes++;
 	}
-	elseif ($probe['probe_status'] == PROBE_UNKNOWN) {
-		$probe_status = '';
-		$probe_status_color = '';
-		$no_result_probes++;
-	}
 	elseif ($probe['probe_status'] == PROBE_OFFLINE) {
 		$probe_status = $offline;
 		$probe_status_color = ZBX_STYLE_GREY;

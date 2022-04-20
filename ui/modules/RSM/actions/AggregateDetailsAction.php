@@ -419,29 +419,35 @@ class AggregateDetailsAction extends Action {
 			$data['test_result'] = $test_result['value'];
 		}
 
-		// Initialize probes data for probes with offline status.
-		$probes = $this->getItemsHistoryValue([
-			'output' => ['itemid', 'key_', 'hostid'],
-			'hostids' => array_keys($this->probes),
-			'filter' => [
-				'key_' => PROBE_KEY_ONLINE
-			],
-			'monitored' => true,
-			'time_from' => $time_from,
-			'time_till' => $time_till,
-			'history' => ITEM_VALUE_TYPE_UINT64
-		]);
-
-		foreach ($probes as $probe) {
-			/**
-			 * Value of probe item PROBE_KEY_ONLINE == PROBE_DOWN means that Probe is OFFLINE
-			 */
-			if (isset($probe['history_value']) && $probe['history_value'] == PROBE_DOWN) {
-				$this->probes[$probe['hostid']]['probe_status'] = PROBE_OFFLINE;
+		if (!array_key_exists('test_result', $data) || $data['test_result'] == UP_INCONCLUSIVE_RECONFIG) {
+			// In case of UP_INCONCLUSIVE_RECONFIG set all probes to "No result".
+			foreach ($this->probes as $probeid => $probe) {
+				$this->probes[$probeid]['probe_status'] = PROBE_NORESULT;
 			}
 		}
+		else {
+			// "Offline" probes get status right away.
+			$probes = $this->getItemsHistoryValue([
+				'output' => ['itemid', 'key_', 'hostid'],
+				'hostids' => array_keys($this->probes),
+				'filter' => [
+					'key_' => PROBE_KEY_ONLINE
+				],
+				'monitored' => true,
+				'time_from' => $time_from,
+				'time_till' => $time_till,
+				'history' => ITEM_VALUE_TYPE_UINT64
+			]);
 
-		if (array_key_exists('test_result', $data) && $data['test_result'] != UP_INCONCLUSIVE_RECONFIG) {
+			foreach ($probes as $probe) {
+				/**
+				 * Value of probe item PROBE_KEY_ONLINE == PROBE_DOWN means that Probe is OFFLINE
+				 */
+				if (isset($probe['history_value']) && $probe['history_value'] == PROBE_DOWN) {
+					$this->probes[$probe['hostid']]['probe_status'] = PROBE_OFFLINE;
+				}
+			}
+
 			$this->getReportData($data, $time_from, $time_till);
 		}
 
