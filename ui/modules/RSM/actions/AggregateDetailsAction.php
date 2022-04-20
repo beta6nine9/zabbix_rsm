@@ -199,7 +199,7 @@ class AggregateDetailsAction extends Action {
 			'output' => ['key_', 'itemid', 'hostid'],
 			'hostids' => array_keys($tldprobeid_probeid),
 			'search' => [
-				'key_' => 'rsm.dns.'
+				'key_' => 'rsm.dns'
 			],
 			'startSearch' => true,
 		]);
@@ -256,7 +256,7 @@ class AggregateDetailsAction extends Action {
 					break;
 
 				case PROBE_DNS_STATUS:
-					// Set DNSSEC Test status.
+					// Set DNS Test status.
 					if ($data['type'] == RSM_DNS) {
 						$this->probes[$probeid]['probe_status'] = $value;
 					}
