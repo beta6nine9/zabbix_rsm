@@ -323,7 +323,7 @@ class TestsListAction extends Action {
 
 			$item_value = reset($item_value);
 
-			$time_step = $item_value['value'] ?  $item_value['value'] / SEC_PER_MIN : 1;
+			$time_step = $item_value ? $item_value['value'] / SEC_PER_MIN : 1;
 
 			$data['downTimeMinutes'] = $data['downTests'] * $time_step;
 
