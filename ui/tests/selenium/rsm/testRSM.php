@@ -150,7 +150,7 @@ class testRSM extends CWebTest {
 		$this->page->updateViewport();
 
 		if ($data['find'] === '%') {
-			$this->query('id:incidents_data')->waitUntilVisible()->one();
+			$area = $this->query('id:incidents_data')->waitUntilVisible()->one();
 		}
 		else {
 			try {
@@ -160,7 +160,7 @@ class testRSM extends CWebTest {
 				// Code is not missing here.
 			}
 
-			return $this->query('xpath://div[not(contains(@class,"is-loading"))]/img')->waitUntilPresent()->one();
+			$area = $this->query('xpath://div[not(contains(@class,"is-loading"))]/img')->waitUntilPresent()->one();
 		}
 
 		$this->assertScreenshot($area,
