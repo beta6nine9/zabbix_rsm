@@ -16,25 +16,33 @@
 "{$RSM.IP6.MIN.PROBE.ONLINE}","2"
 "{$RSM.RDAP.STANDALONE}","1609459200"
 
-[create-probe]
+[provisioning-api]
 
-"Probe1-Server1","127.0.0.1","10061",1,1,1,1
-"Probe2-Server1","127.0.0.1","10062",1,1,1,1
-"Probe3-Server1","127.0.0.1","10063",1,1,1,1
-"Probe4-Server1","127.0.0.1","10064",1,1,1,1
+"/probeNodes/Probe1-Server1","PUT",200,"readwrite","000-input-probe1.json",""
+"/probeNodes/Probe2-Server1","PUT",200,"readwrite","000-input-probe2.json",""
+"/probeNodes/Probe3-Server1","PUT",200,"readwrite","000-input-probe3.json",""
+"/probeNodes/Probe4-Server1","PUT",200,"readwrite","000-input-probe4.json",""
 
-[create-tld]
+"/tlds/tld1","PUT",200,"readwrite","000-input-tld1-rdap.json",""
+"/tlds/tld2","PUT",200,"readwrite","000-input-tld2-rdap.json",""
+"/tlds/tld3","PUT",200,"readwrite","000-input-tld3-rdap.json",""
+"/tlds/tld4","PUT",200,"readwrite","000-input-tld4.json",""
 
-# tld,dns_test_prefix,type,dnssec,dns_udp,dns_tcp,ns_servers_v4,ns_servers_v6,rdds43_servers,rdds80_servers,rdap_base_url,rdap_test_domain,rdds_test_prefix
+[fill-history]
 
-"tld1","test","ccTLD",1,1,1,"ns1.tld1,192.168.1.1","","","","rdap_base_url","rdap_test_domain",""
-"tld2","test","ccTLD",1,1,1,"ns1.tld2,192.168.2.1","","","","rdap_base_url","rdap_test_domain",""
-"tld3","test","ccTLD",1,1,1,"ns1.tld3,192.168.3.1","","","","rdap_base_url","rdap_test_domain",""
-"tld4","test","ccTLD",1,1,1,"ns1.tld4,192.168.4.1","","","","","",""
+"tld3","rsm.slv.dns.downtime"                         ,60,0,1
+"tld3","rsm.slv.dns.ns.downtime[ns1.tld3,192.168.3.1]",60,0,1
+"tld3","rsm.slv.dns.tcp.rtt.pfailed"                  ,60,0,1
+"tld3","rsm.slv.dns.udp.rtt.pfailed"                  ,60,0,1
 
-[disable-tld]
+[execute-sql-query]
 
-"tld3"
+"update history      set clock=floor(unix_timestamp()/300)*300 where clock=0"
+"update history_uint set clock=floor(unix_timestamp()/300)*300 where clock=0"
+
+[provisioning-api]
+
+"/tlds/tld3","PUT",200,"readwrite","000-input-tld-disabled.json",""
 
 [set-host-macro]
 

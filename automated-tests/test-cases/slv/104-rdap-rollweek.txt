@@ -21,22 +21,32 @@
 # reduce RDAP rollweek SLA to 200 minutes; 10% - 20, 25% - 50, 50% - 100, 75% - 150, 100% - 200
 "{$RSM.RDAP.ROLLWEEK.SLA}","200"
 
-[create-probe]
+[provisioning-api]
 
-"Probe1-Server1","127.0.0.1","10061",1,1,1,1
+"/probeNodes/Probe1-Server1","PUT",200,"readwrite","000-input-probe1.json",""
 
-[create-tld]
+"/tlds/tld1","PUT",200,"readwrite","000-input-tld1-rdap.json",""
+"/tlds/tld2","PUT",200,"readwrite","000-input-tld2-rdap.json",""
+"/tlds/tld3","PUT",200,"readwrite","000-input-tld3-rdap.json",""
+"/tlds/tld4","PUT",200,"readwrite","000-input-tld4-rdap.json",""
+"/tlds/tld5","PUT",200,"readwrite","000-input-tld5-rdap.json",""
+"/tlds/tld6","PUT",200,"readwrite","000-input-tld6-rdap.json",""
 
-"tld1","test","ccTLD",1,1,1,"ns1.tld1,192.168.1.1","","","","rdap_base_url","rdap_test_domain",""
-"tld2","test","ccTLD",1,1,1,"ns1.tld2,192.168.2.1","","","","rdap_base_url","rdap_test_domain",""
-"tld3","test","ccTLD",1,1,1,"ns1.tld3,192.168.3.1","","","","rdap_base_url","rdap_test_domain",""
-"tld4","test","ccTLD",1,1,1,"ns1.tld4,192.168.4.1","","","","rdap_base_url","rdap_test_domain",""
-"tld5","test","ccTLD",1,1,1,"ns1.tld5,192.168.5.1","","","","rdap_base_url","rdap_test_domain",""
-"tld6","test","ccTLD",1,1,1,"ns1.tld5,192.168.5.1","","","","rdap_base_url","rdap_test_domain",""
+[fill-history]
 
-[disable-tld]
+"tld6","rsm.slv.dns.downtime"                         ,60,0,1
+"tld6","rsm.slv.dns.ns.downtime[ns1.tld5,192.168.5.1]",60,0,1
+"tld6","rsm.slv.dns.tcp.rtt.pfailed"                  ,60,0,1
+"tld6","rsm.slv.dns.udp.rtt.pfailed"                  ,60,0,1
 
-"tld6"
+[execute-sql-query]
+
+"update history      set clock=floor(unix_timestamp()/300)*300 where clock=0"
+"update history_uint set clock=floor(unix_timestamp()/300)*300 where clock=0"
+
+[provisioning-api]
+
+"/tlds/tld6","PUT",200,"readwrite","000-input-tld-disabled.json",""
 
 [fill-history]
 

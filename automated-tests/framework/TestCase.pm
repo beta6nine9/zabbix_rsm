@@ -1067,12 +1067,11 @@ sub __cmd_create_incident($)
 			"object=0," .           # EVENT_OBJECT_TRIGGER
 			"objectid=?," .
 			"clock=?," .
-			"value=?," .            # 0 => TRIGGER_VALUE_OK , 1 => TRIGGER_VALUE_PROBLEM
+			"value=?," .
 			"acknowledged=0," .     # EVENT_NOT_ACKNOWLEDGED
 			"ns=0," .
 			"name=?," .
-			"severity=0," .
-			"false_positive=?";
+			"severity=0";
 
 	my $triggerid = __get_triggerid($rsmhost, $description);
 
@@ -1086,9 +1085,8 @@ sub __cmd_create_incident($)
 			$eventid_problem,
 			$triggerid,
 			$clock,
-			1,                      # TRIGGER_VALUE_PROBLEM
+			TRIGGER_VALUE_PROBLEM,
 			$description,
-			$false_positive,
 		];
 		db_exec($sql, $params);
 	}
@@ -1103,9 +1101,8 @@ sub __cmd_create_incident($)
 			$eventid_recovery,
 			$triggerid,
 			$clock,
-			0,                      # TRIGGER_VALUE_OK
+			TRIGGER_VALUE_OK,
 			$description,
-			0,
 		];
 		db_exec($sql, $params);
 	}
@@ -1119,6 +1116,22 @@ sub __cmd_create_incident($)
 				"correlationid=null," .
 				"userid=null";
 		my $params = [$eventid_problem, $eventid_recovery];
+		db_exec($sql, $params);
+	}
+
+	if ($eventid_problem && $false_positive)
+	{
+		my $id = db_select_value('select coalesce(max(rsm_false_positiveid), 0) + 1 from rsm_false_positive');
+		my $userid = db_select_value('select userid from users where username="Admin"');
+		my $clock = str2time($from);
+
+		my $sql = "insert into rsm_false_positive set" .
+				" rsm_false_positiveid=?," .
+				"userid=?," .
+				"eventid=?," .
+				"clock=?," .
+				"status=?";
+		my $params = [$id, $userid, $eventid_problem, $clock, 1];
 		db_exec($sql, $params);
 	}
 }
@@ -1215,7 +1228,7 @@ sub __cmd_check_event_count($)
 	my $sql = "select count(*) from events where" .
 			" source=0 and" .       # EVENT_SOURCE_TRIGGERS
 			" object=0 and" .       # EVENT_OBJECT_TRIGGER
-			" objectid=?";          # 0 => TRIGGER_VALUE_OK , 1 => TRIGGER_VALUE_PROBLEM
+			" objectid=?";
 
 	my $count = db_select_value($sql, [__get_triggerid($rsmhost, $description)]);
 

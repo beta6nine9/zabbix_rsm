@@ -19,21 +19,39 @@
 # reduce DNS NS downtime SLA to 50 minutes; 10% - 5, 25% - 12.5, 50% - 25, 75% - 37.5, 100% - 50
 "{$RSM.SLV.NS.DOWNTIME}","50"
 
-[create-probe]
+[provisioning-api]
 
-"Probe1-Server1","127.0.0.1","10061",1,1,1,1
-
-[create-tld]
+"/probeNodes/Probe1-Server1","PUT",200,"readwrite","000-input-probe1.json",""
 
 # main TLD with one NS,IP being disabled
-"tld1","test","ccTLD",1,1,1,"ns1.tld1,192.168.1.1 ns2.tld1,192.168.1.2 ns3.tld1,192.168.1.3","","","","","",""
-"tld1","test","ccTLD",1,1,1,"ns1.tld1,192.168.1.1 ns2.tld1,192.168.1.2","","","","","",""
+"/tlds/tld1","PUT",200,"readwrite","000-input-tld1-3ns.json",""
+
 # disabled TLD
-"tld2","test","ccTLD",1,1,1,"ns1.tld2,192.168.2.1","","","","","",""
+"/tlds/tld2","PUT",200,"readwrite","000-input-tld2.json",""
 
-[disable-tld]
+[execute]
 
-"tld2"
+"","sleep 3"
+
+[provisioning-api]
+
+"/tlds/tld1","PUT",200,"readwrite","000-input-tld1-2ns.json",""
+
+[fill-history]
+
+"tld2","rsm.slv.dns.downtime"                         ,60,0,1
+"tld2","rsm.slv.dns.ns.downtime[ns1.tld2,192.168.2.1]",60,0,1
+"tld2","rsm.slv.dns.tcp.rtt.pfailed"                  ,60,0,1
+"tld2","rsm.slv.dns.udp.rtt.pfailed"                  ,60,0,1
+
+[execute-sql-query]
+
+"update history      set clock=floor(unix_timestamp()/300)*300 where clock=0"
+"update history_uint set clock=floor(unix_timestamp()/300)*300 where clock=0"
+
+[provisioning-api]
+
+"/tlds/tld2","PUT",200,"readwrite","000-input-tld-disabled.json",""
 
 [fill-history]
 

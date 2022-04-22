@@ -497,7 +497,7 @@ sub zbx_start_server(;$$$)
 
 	if (!defined($pid))
 	{
-		fail("zabbix server failed to start, check '%s'", get_config('paths', 'logs_dir') . "/zabbix_server.log");
+		fail("zabbix server failed to start, check '%s'", $log_file);
 	}
 
 	dbg("waiting until server reports 'main process started' in the log file");

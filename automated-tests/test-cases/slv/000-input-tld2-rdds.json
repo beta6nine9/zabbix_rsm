@@ -1,0 +1,24 @@
+{
+    "tldType": "ccTLD",
+    "servicesStatus": [
+        { "service": "dnsUDP", "enabled": true },
+        { "service": "dnsTCP", "enabled": true },
+        { "service": "rdds43", "enabled": true },
+        { "service": "rdds80", "enabled": true },
+        { "service": "rdap"  , "enabled": false }
+    ],
+    "dnsParameters": {
+        "nsIps": [
+            { "ns": "ns1.tld2", "ip": "192.168.2.1" }
+        ],
+        "dnssecEnabled": true,
+        "nsTestPrefix": "test",
+        "minNs": 2
+    },
+    "rddsParameters": {
+        "rdds43Server": "whois.nic.example",
+        "rdds43TestedDomain": "nic.example",
+        "rdds80Url": "https://whois.nic.example",
+        "rdds43NsString": "Name Server:"
+    }
+}

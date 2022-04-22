@@ -19,21 +19,19 @@
 # override RTT macros
 "{$RSM.RDAP.RTT.LOW}","700"
 
-[create-probe]
+[provisioning-api]
 
-"Probe1-Server1","127.0.0.1","10061",1,1,1,1
-"Probe2-Server1","127.0.0.1","10062",1,1,1,1
-
-[create-tld]
+"/probeNodes/Probe1-Server1","PUT",200,"readwrite","000-input-probe1.json",""
+"/probeNodes/Probe2-Server1","PUT",200,"readwrite","000-input-probe2.json",""
 
 # main TLD
-"tld1","test","ccTLD",1,1,1,"ns1.tld1,192.168.1.1","","","","rdap_base_url","rdap_test_domain",""
+"/tlds/tld1","PUT",200,"readwrite","000-input-tld1-rdap.json",""
 
 # reconfigured TLD
-"tld2","test","ccTLD",1,1,1,"ns1.tld2,192.168.2.1","","","","rdap_base_url","rdap_test_domain",""
+"/tlds/tld2","PUT",200,"readwrite","000-input-tld2-rdap.json",""
 
 # disabled TLD
-"tld3","test","ccTLD",1,1,1,"ns1.tld3,192.168.3.1","","","","rdap_base_url","rdap_test_domain",""
+"/tlds/tld3","PUT",200,"readwrite","000-input-tld3-rdap.json",""
 
 [set-host-macro]
 
@@ -64,9 +62,21 @@
 
 "2021-03-31 23:50:00","/opt/zabbix/scripts/slv/rsm.slv.rdap.rtt.pl --nolog --cycles 30"
 
-[disable-tld]
+[fill-history]
 
-"tld3"
+"tld3","rsm.slv.dns.downtime"                         ,60,0,1
+"tld3","rsm.slv.dns.ns.downtime[ns1.tld3,192.168.3.1]",60,0,1
+"tld3","rsm.slv.dns.tcp.rtt.pfailed"                  ,60,0,1
+"tld3","rsm.slv.dns.udp.rtt.pfailed"                  ,60,0,1
+
+[execute-sql-query]
+
+"update history      set clock=floor(unix_timestamp()/300)*300 where clock=0"
+"update history_uint set clock=floor(unix_timestamp()/300)*300 where clock=0"
+
+[provisioning-api]
+
+"/tlds/tld3","PUT",200,"readwrite","000-input-tld-disabled.json",""
 
 [execute]
 
