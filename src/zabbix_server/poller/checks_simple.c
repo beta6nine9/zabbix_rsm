@@ -17,13 +17,12 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "common.h"
+#include "checks_simple.h"
+
 #include "checks_simple_vmware.h"
 #include "simple.h"
 #include "log.h"
 #include "zbxself.h"
-
-#include "checks_simple.h"
 
 /* RSM specifics */
 #include "checks_simple_rsm.h"

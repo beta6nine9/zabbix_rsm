@@ -17,30 +17,22 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
+#include "dbcache.h"
+
 #include "common.h"
 #include "log.h"
-#include "threads.h"
-
-#include "db.h"
-#include "ipc.h"
 #include "mutexs.h"
 #include "zbxserver.h"
-#include "proxy.h"
 #include "events.h"
-#include "memalloc.h"
 #include "valuecache.h"
 #include "zbxmodules.h"
 #include "module.h"
 #include "export.h"
-#include "zbxjson.h"
 #include "zbxhistory.h"
 #include "daemon.h"
 #include "zbxavailability.h"
 #include "zbxtrends.h"
-#include "zbxalgo.h"
 #include "../zbxalgo/vectorimpl.h"
-
-#include "dbcache.h"
 
 static zbx_mem_info_t	*hc_index_mem = NULL;
 static zbx_mem_info_t	*hc_mem = NULL;
@@ -2379,7 +2371,7 @@ static int	DBmass_add_history(ZBX_DC_HISTORY *history, int history_num)
  *                                                                            *
  * Purpose: helper function for DCmass_proxy_add_history()                    *
  *                                                                            *
- * Comment: this function is meant for items with value_type other other than *
+ * Comment: this function is meant for items with value_type other than       *
  *          ITEM_VALUE_TYPE_LOG not containing meta information in result     *
  *                                                                            *
  ******************************************************************************/
@@ -2446,7 +2438,7 @@ static void	dc_add_proxy_history(ZBX_DC_HISTORY *history, int history_num)
  *                                                                            *
  * Purpose: helper function for DCmass_proxy_add_history()                    *
  *                                                                            *
- * Comment: this function is meant for items with value_type other other than *
+ * Comment: this function is meant for items with value_type other than       *
  *          ITEM_VALUE_TYPE_LOG containing meta information in result         *
  *                                                                            *
  ******************************************************************************/
@@ -4447,7 +4439,7 @@ static void	hc_pop_items(zbx_vector_ptr_t *history_items)
  *                                                                            *
  * Purpose: gets item history values                                          *
  *                                                                            *
- * Parameters: history       - [OUT] the history valeus                       *
+ * Parameters: history       - [OUT] the history values                       *
  *             history_items - [IN] the history items                         *
  *                                                                            *
  ******************************************************************************/
