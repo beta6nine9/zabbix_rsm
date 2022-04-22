@@ -5021,7 +5021,7 @@ sub recalculate_downtime($$$$$$)
 	}
 
 	# save last rsm_false_positiveid (it may have changed even if @eventids is empty)
-	fp_write_last_rsm_false_positiveid($rsm_false_positive_log_file, $last_rsm_false_positiveid);
+	__fp_write_last_rsm_false_positiveid($rsm_false_positive_log_file, $last_rsm_false_positiveid);
 }
 
 sub generate_report($$;$)
