@@ -172,16 +172,13 @@ define('DISPLAY_CYCLES_AFTER_RECOVERY',		6);
 
 // SLA monitoring probe status items keys.
 define('PROBE_KEY_ONLINE',			'rsm.probe.online');
-define('PROBE_DNS_UDP_ITEM',		'rsm.dns.udp[{$RSM.TLD}]');
-define('PROBE_DNS_UDP_ITEM_RTT',	'rsm.dns.udp.rtt[');
-define('PROBE_DNS_TEST',			'rsm.dns[{$RSM.TLD},{$RSM.DNS.TESTPREFIX},{$RSM.DNS.NAME.SERVERS},{$RSM.TLD.DNSSEC.ENABLED},{$RSM.TLD.RDDS.ENABLED},{$RSM.TLD.EPP.ENABLED},{$RSM.TLD.DNS.UDP.ENABLED},{$RSM.TLD.DNS.TCP.ENABLED},{$RSM.IP4.ENABLED},{$RSM.IP6.ENABLED},{$RSM.RESOLVER},{$RSM.DNS.UDP.RTT.HIGH},{$RSM.DNS.TCP.RTT.HIGH}]');
-define('PROBE_DNS_TCP_RTT',			'rsm.dns.rtt[{#NS},{#IP},tcp]');
-define('PROBE_DNS_UDP_RTT',			'rsm.dns.rtt[{#NS},{#IP},udp]');
+define('PROBE_DNS_MODE',			'rsm.dns.mode');
+define('PROBE_DNS_NS_STATUS',		'rsm.dns.ns.status');
 define('PROBE_DNS_NSID',			'rsm.dns.nsid[{#NS},{#IP}]');
-define('PROBE_DNS_PROTOCOL',		'rsm.dns.protocol');
 define('PROBE_DNS_NSSOK',			'rsm.dns.nssok');
+define('PROBE_DNS_RTT',				'rsm.dns.rtt');
 define('PROBE_DNS_STATUS',			'rsm.dns.status');
-define('PROBE_DNS_NS_STATUS',		'rsm.dns.ns.status[{#NS}]');
+define('PROBE_DNS_TRANSPORT',		'rsm.dns.protocol');
 define('PROBE_DNSSEC_STATUS',		'rsm.dnssec.status');
 define('PROBE_EPP_RESULT',			'rsm.epp[');
 define('PROBE_EPP_IP',				'rsm.epp.ip[{$RSM.TLD}]');
@@ -211,8 +208,11 @@ define('NS_UP',			2);
 
 // SLA monitoring probe status.
 define('PROBE_OFFLINE',	-1);
-define('PROBE_DOWN',	0);
-define('PROBE_UP',		1);
+define('PROBE_DOWN',	 0); // in the database, result of the test
+define('PROBE_UP',		 1); // in the database, result of the test
+define('PROBE_DISABLED', 2);
+define('PROBE_NORESULT', 3);
+define('PROBE_UNKNOWN',  4); // not disabled is the only thing known so far, temporary status
 
 // NameServer status.
 define('NAMESERVER_DOWN',	0);

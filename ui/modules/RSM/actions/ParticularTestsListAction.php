@@ -484,7 +484,7 @@ class ParticularTestsListAction extends Action {
 		// get only used items
 		if ($data['type'] == RSM_RDAP) {
 			$items_to_check = [];
-			$probe_item_key = [];
+			$probe_item_key_condition = [];
 
 			if (!isset($data['tld']['macros'][RSM_RDAP_TLD_ENABLED]) || $data['tld']['macros'][RSM_RDAP_TLD_ENABLED] != 0) {
 				$data['tld_rdap_enabled'] = true;
@@ -497,13 +497,13 @@ class ParticularTestsListAction extends Action {
 			}
 
 			if ($items_to_check) {
-				$probe_item_key[] = dbConditionString('i.key_', $items_to_check);
+				$probe_item_key_condition[] = dbConditionString('i.key_', $items_to_check);
 			}
-			$probe_item_key = $probe_item_key ? ' AND ('.implode(' OR ', $probe_item_key).')' : '';
+			$probe_item_key_condition = $probe_item_key_condition ? ' AND ('.implode(' OR ', $probe_item_key_condition).')' : '';
 		}
 		elseif ($data['type'] == RSM_RDDS) {
 			$items_to_check = [];
-			$probe_item_key = [];
+			$probe_item_key_condition = [];
 
 			// RDAP should be under type=RSM_RDDS only if it is not enabled as standalone service.
 			if ((!isset($data['tld']['macros'][RSM_RDAP_TLD_ENABLED]) || $data['tld']['macros'][RSM_RDAP_TLD_ENABLED] != 0)
@@ -539,23 +539,22 @@ class ParticularTestsListAction extends Action {
 			}
 
 			if ($items_to_check) {
-				$probe_item_key[] = dbConditionString('i.key_', $items_to_check);
+				$probe_item_key_condition[] = dbConditionString('i.key_', $items_to_check);
 			}
-			$probe_item_key = $probe_item_key ? ' AND ('.implode(' OR ', $probe_item_key).')' : '';
+			$probe_item_key_condition = $probe_item_key_condition ? ' AND ('.implode(' OR ', $probe_item_key_condition).')' : '';
 		}
 		else {
-			$probe_item_key = ' AND (i.key_ LIKE ('.zbx_dbstr(PROBE_EPP_RESULT.'%').')'.
+			$probe_item_key_condition = ' AND (i.key_ LIKE ('.zbx_dbstr(PROBE_EPP_RESULT.'%').')'.
 			' OR '.dbConditionString('i.key_', [PROBE_EPP_IP, PROBE_EPP_UPDATE, PROBE_EPP_INFO, PROBE_EPP_LOGIN]).')';
 		}
 
 		if ($test_result['value'] != UP_INCONCLUSIVE_RECONFIG) {
 			// Get items.
-			$items = ($probe_item_key !== '') ? DBselect(
+			$items = ($probe_item_key_condition !== '') ? DBselect(
 				'SELECT i.itemid,i.key_,i.hostid,i.value_type'.
 				' FROM items i'.
 				' WHERE '.dbConditionInt('i.hostid', $hostids).
-					' AND i.status='.ITEM_STATUS_ACTIVE.
-					$probe_item_key
+					$probe_item_key_condition
 			) : null;
 
 			$nsArray = [];

@@ -4619,6 +4619,16 @@ sub get_slv_rtt_cycle_stats($$$$$$)
 		};
 	}
 
+	if (is_rsmhost_reconfigured($tld, $cycle_end - $cycle_start + 1, $cycle_start))
+	{
+		return {
+			'expected'   => scalar(@{$tld_itemids}),
+			'performed'  => 0,
+			'failed'     => 0,
+			'successful' => 0
+		};
+	}
+
 	my $row = db_select_row(
 			"select count(*)," .
 				" count(if(value=$timeout_error_value || value>$timeout_threshold_value,1,null))," .
@@ -4892,26 +4902,12 @@ sub update_slv_rtt_monthly_stats($$$$$$$$;$)
 				$params_list = $rdap_standalone_params_list;
 			}
 
-			my $rtt_stats;
+			my $rtt_stats = get_slv_rtt_cycle_stats_aggregated($params_list, $cycle_start, $cycle_end, $tld, $now, $max_nodata_time);
 
-			if (is_rsmhost_reconfigured($tld, $cycle_delay, $cycle_start))
+			if (!defined($rtt_stats))
 			{
-				$rtt_stats = {
-					'expected'   => 0,
-					'performed'  => 0,
-					'failed'     => 0,
-					'successful' => 0
-				};
-			}
-			else
-			{
-				$rtt_stats = get_slv_rtt_cycle_stats_aggregated($params_list, $cycle_start, $cycle_end, $tld, $now, $max_nodata_time);
-
-				if (!defined($rtt_stats))
-				{
-					dbg("stopping updatig TLD '$tld' because of missing data, cycle from $cycle_start till $cycle_end");
-					next TLD_LOOP;
-				}
+				dbg("stopping updatig TLD '$tld' because of missing data, cycle from $cycle_start till $cycle_end");
+				next TLD_LOOP;
 			}
 
 			$cycles_till_end_of_month--;
