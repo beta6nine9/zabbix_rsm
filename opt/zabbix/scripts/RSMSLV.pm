@@ -4987,7 +4987,7 @@ sub recalculate_downtime($$$$$$)
 	my $service = uc($item_key_avail =~ s/^rsm\.slv\.(.+)\.avail(?:\[.*\])?$/$1/r);
 
 	# get last rsm_false_positiveid
-	my $last_rsm_false_positiveid = fp_read_last_rsm_false_positiveid($rsm_false_positive_log_file);
+	my $last_rsm_false_positiveid = __fp_read_last_rsm_false_positiveid($rsm_false_positive_log_file);
 	dbg("last_rsm_false_positiveid = $last_rsm_false_positiveid");
 
 	# get list of events.eventid (incidents) that changed their "false positive" state
