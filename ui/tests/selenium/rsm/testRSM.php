@@ -42,13 +42,13 @@ class testRSM extends CWebTest {
 		$form->query('button:Reset')->waitUntilClickable()->one()->click();
 
 		// Check table screenshot when all filter checkboxes are false.
-		$this->assertScreenshot(null, 'Filter all false');
+		$this->assertScreenshotExcept(null, ['query' => 'xpath://footer[text()]'], 'Filter all false');
 
 		// Check table screenshots with every filter checkbox lines true.
 		foreach (self::FILTER_CHECKBOXES as $name => $button) {
 			$form->query($button)->waitUntilClickable()->one()->click();
 			$form->submit();
-			$this->assertScreenshot(null, $name.' true');
+			$this->assertScreenshotExcept(null, ['query' => 'xpath://footer[text()]'], $name.' true');
 		}
 	}
 
@@ -125,12 +125,15 @@ class testRSM extends CWebTest {
 		$this->page->waitUntilReady();
 
 		// Check the header of opened page.
-		$this->page->assertHeader(($data['find'] === '%') ? 'Incidents' : $tld.': '.$data['header']);
-
-		// Select date filter tab treshhold is checked.
 		if ($data['find'] === '%') {
+			$this->page->assertHeader('Incidents');
+
+			// Select date filter tab.
 			$this->query('xpath://li[@tabindex="-1"]')->waitUntilClickable()->one()->click();
 			$form->invalidate();
+		}
+		else {
+			$this->page->assertHeader($tld.': '.$data['header']);
 		}
 
 		// Fill the necessary date period.
@@ -146,9 +149,19 @@ class testRSM extends CWebTest {
 		$this->page->removeFocus();
 		$this->page->updateViewport();
 
-		$area = ($data['find'] === '%')
-			? $this->query('id:incidents_data')->waitUntilVisible()->one()
-			: $this->waitUntilGraphIsLoaded();
+		if ($data['find'] === '%') {
+			$this->query('id:incidents_data')->waitUntilVisible()->one();
+		}
+		else {
+			try {
+				$this->query('xpath://div[contains(@class,"is-loading")]/img')->waitUntilPresent();
+			}
+			catch (\Exception $ex) {
+				// Code is not missing here.
+			}
+
+			return $this->query('xpath://div[not(contains(@class,"is-loading"))]/img')->waitUntilPresent()->one();
+		}
 
 		$this->assertScreenshot($area,
 				$data['column'].(($data['find'] === '%') ? ' TLD Rolling week status' : ' '.$data['header'].' graph')
@@ -188,8 +201,7 @@ class testRSM extends CWebTest {
 				'%2000%3A00%3A00&to='.self::DATES['to']['date'].'%2000%3A00%3A00&action=rsm.incidents';
 		$this->page->login()->open($filtered_link)->waitUntilReady();
 
-		$tabs = ['DNS', 'DNSSEC', 'RDDS', 'EPP'];
-		foreach ($tabs as $tab) {
+		foreach (['DNS', 'DNSSEC', 'RDDS', 'EPP'] as $tab) {
 			$this->query('link', $tab)->one()->waitUntilClickable()->click();
 			$this->page->removeFocus();
 			$this->page->updateViewport();
@@ -214,7 +226,9 @@ class testRSM extends CWebTest {
 					$this->page->assertHeader('Test details');
 					$this->page->removeFocus();
 					$this->page->updateViewport();
-					$this->assertScreenshot(null, $data['tld'].' '.$tab.' Test details');
+					$this->assertScreenshotExcept(null, ['query' => 'xpath://footer[text()]'], $data['tld'].' '.
+							tab.' Test details'
+					);
 				}
 			}
 
@@ -299,7 +313,9 @@ class testRSM extends CWebTest {
 
 		$this->page->removeFocus();
 		$this->page->updateViewport();
-		$this->assertScreenshot(null, $data['tld'].' '.$data['tab'].' Test details page '.$data['color']);
+		$this->assertScreenshotExcept(null, ['query' => 'xpath://footer[text()]'], $data['tld'].' '.$data['tab'].
+				' Test details page '.$data['color']
+		);
 
 		// Check hints' texts on corresponding number.
 		if (CTestArrayHelper::get($data, 'check_hints')) {
@@ -388,21 +404,8 @@ class testRSM extends CWebTest {
 		$form->fill($data);
 		$form->submit();
 
-		$this->page->updateViewport();
-		$this->assertScreenshot(null, $data['TLD'].' '.$data['name:filter_month'].' info block');
-	}
-
-	/**
-	 * Function for waiting loader ring.
-	 */
-	private function waitUntilGraphIsLoaded() {
-		try {
-			$this->query('xpath://div[contains(@class,"is-loading")]/img')->waitUntilPresent();
-		}
-		catch (\Exception $ex) {
-			// Code is not missing here.
-		}
-
-		return $this->query('xpath://div[not(contains(@class,"is-loading"))]/img')->waitUntilPresent()->one();
+		$this->assertScreenshotExcept(null, ['query' => 'xpath://footer[text()]'],  $data['TLD'].' '.
+				$data['name:filter_month'].' info block'
+		);
 	}
 }
