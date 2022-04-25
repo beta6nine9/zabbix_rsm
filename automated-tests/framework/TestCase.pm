@@ -25,7 +25,6 @@ use Framework;
 use HttpClient;
 use Options;
 use Output;
-use ProvisioningApi;
 use ZabbixConstants;
 
 my %command_handlers = (
@@ -51,9 +50,6 @@ my %command_handlers = (
 	'start-server'            => [\&__cmd_start_server           , 1, 1], # datetime,key=value,key=value,...
 	'stop-server'             => [\&__cmd_stop_server            , 0, 1], # (void)
 	'update-rsm-conf'         => [\&__cmd_update_rsm_conf        , 1, 1], # section,property,value
-	'create-probe'            => [\&__cmd_create_probe           , 1, 1], # probe,ip,port,ipv4,ipv6,rdds,rdap
-	'create-tld'              => [\&__cmd_create_tld             , 1, 1], # tld,dns_test_prefix,type,dnssec,dns_udp,dns_tcp,ns_servers_v4,ns_servers_v6,rdds43_servers,rdds80_servers,rdap_base_url,rdap_test_domain,rdds_test_prefix
-	'disable-tld'             => [\&__cmd_disable_tld            , 1, 1], # tld
 	'create-incident'         => [\&__cmd_create_incident        , 1, 1], # rsmhost,description,from,till,false_positive
 	'check-incident'          => [\&__cmd_check_incident         , 1, 1], # rsmhost,description,from,till
 	'check-event-count'       => [\&__cmd_check_event_count      , 1, 1], # rsmhost,description,count
@@ -906,145 +902,6 @@ sub __cmd_update_rsm_conf($)
 	my $config_file = $source_dir . "/opt/zabbix/scripts/rsm.conf";
 
 	rsm_update_config($config_file, $config_file, {"$section.$property" => $value});
-}
-
-sub __cmd_create_probe($)
-{
-	my $args = shift;
-
-	# [create-probe]
-	# probe,ip,port,ipv4,ipv6,rdds,rdap
-
-	my ($probe, $ip, $port, $ipv4, $ipv6, $rdds, $rdap) = __unpack($args, 7);
-
-	db_begin();
-	create_probe(1, $probe, $ip, $port, $ipv4, $ipv6, $rdds, $rdap);
-	db_commit();
-
-	my $build_dir = get_config('paths', 'build_dir');
-
-	if (-f $build_dir . "/etc/zabbix_proxy.conf.example")
-	{
-		zbx_update_config(
-			$build_dir . "/etc/zabbix_proxy.conf.example",
-			$build_dir . "/etc/zabbix_proxy_$probe.conf",
-			{
-				"Hostname"   => $probe,
-				"ListenPort" => $port,
-			}
-		);
-	}
-}
-
-sub __cmd_create_tld($)
-{
-	my $args = shift;
-
-	# [create-tld]
-	# tld,dns_test_prefix,type,dnssec,dns_udp,dns_tcp,ns_servers_v4,ns_servers_v6,rdds43_servers,rdds80_servers,rdap_base_url,rdap_test_domain,rdds_test_prefix
-
-	my ($tld, $dns_test_prefix, $type, $dnssec, $dns_udp, $dns_tcp, $ns_servers_v4, $ns_servers_v6, $rdds43_servers,
-			$rdds80_servers, $rdap_base_url, $rdap_test_domain, $rdds_test_prefix) = __unpack($args, 13);
-
-	db_begin();
-
-	create_tld(
-		1,
-		$tld,
-		$dns_test_prefix,
-		$type,
-		$dnssec,
-		$dns_udp,
-		$dns_tcp,
-		$ns_servers_v4,
-		$ns_servers_v6,
-		$rdds43_servers,
-		$rdds80_servers,
-		$rdap_base_url,
-		$rdap_test_domain,
-		$rdds_test_prefix
-	);
-
-	my $probes = db_select_col(
-			"select" .
-				" hosts.host" .
-			" from" .
-				" hosts" .
-				" inner join hosts_groups on hosts_groups.hostid=hosts.hostid" .
-				" inner join hstgrp on hstgrp.groupid=hosts_groups.groupid" .
-			" where" .
-				" hstgrp.name='Probes'" .
-			" order by" .
-				" hosts.host");
-
-	foreach my $probe (@{$probes})
-	{
-		create_tld_probe(
-			$tld,
-			$probe,
-			$type,
-			$rdds43_servers || $rdds80_servers,
-			$rdap_base_url || $rdap_test_domain
-		);
-	}
-
-	foreach my $probe (@{$probes})
-	{
-		create_tld_probe_nsip(
-			$tld,
-			$probe,
-			$ns_servers_v4,
-			$ns_servers_v6
-		);
-	}
-
-	db_commit();
-}
-
-sub __cmd_disable_tld($)
-{
-	my $args = shift;
-
-	# [disable-tld]
-	# tld
-
-	my ($tld) = __unpack($args, 1);
-
-	info("disabling tld '$tld'");
-
-	my $sql = "select" .
-			" hosts.hostid," .
-			"hosts.host," .
-			"hstgrp.name" .
-		" from" .
-			" hosts" .
-			" inner join hosts_templates on hosts.hostid=hosts_templates.hostid" .
-			" inner join hosts as templates on templates.hostid=hosts_templates.templateid" .
-			" inner join hosts_groups on hosts_groups.hostid=hosts.hostid" .
-			" inner join hstgrp on hstgrp.groupid=hosts_groups.groupid" .
-		" where" .
-			" hstgrp.name in ('TLDs', 'TLD Probe results') and" .
-			" templates.host=?" .
-		" order by" .
-			" field(hstgrp.name, 'TLDs', 'TLD Probe results')," .
-			" hosts.host";
-	my $params = ["Template Rsmhost Config $tld"];
-
-	my $rows = db_select($sql, $params);
-
-	if (!@{$rows})
-	{
-		fail("tld '%s' not found", $tld);
-	}
-
-	foreach my $row (@{$rows})
-	{
-		my ($hostid, $host, $group) = @{$row};
-
-		info("disabling host '%s' from group '%s'", $host, $group);
-
-		db_exec("update hosts set status=? where hostid=?", [1, $hostid]);
-	}
 }
 
 sub __cmd_create_incident($)

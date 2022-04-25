@@ -249,24 +249,6 @@ Stops Zabbix server.
 
 Updates configuration value in `rsm.conf`.
 
-### ~~create-probe~~ (obsolete)
-
-~~*probe,ip,port,ipv4,ipv6,rdds,rdap*~~
-
-~~Onboards a probe.~~
-
-### ~~create-tld~~ (obsolete)
-
-~~*tld,dns_test_prefix,type,dnssec,dns_udp,dns_tcp,ns_servers_v4,ns_servers_v6,rdds43_servers,rdds80_servers,rdap_base_url,rdap_test_domain,rdds_test_prefix*~~
-
-~~Onboards a TLD.~~
-
-### ~~disable-tld~~ (obsolete)
-
-~~*tld*~~
-
-~~Disables a TLD.~~
-
 ### create-incident
 
 *rsmhost,description,from,till,false_positive*

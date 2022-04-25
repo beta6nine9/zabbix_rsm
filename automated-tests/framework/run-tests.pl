@@ -30,7 +30,6 @@ use Configuration;
 use Options;
 use Database;
 use Framework;
-use ProvisioningApi;
 use TestCase;
 
 use constant XML_REPORT_FILE => "test-results.xml";
@@ -41,9 +40,6 @@ use constant XML_REPORT_FILE => "test-results.xml";
 
 sub main()
 {
-	#use_probes_pl(1);
-	#use_tld_pl(1);
-
 	parse_opts(
 		"test-case-file=s@",
 		"test-case-dir=s@",
@@ -226,109 +222,6 @@ sub get_xml_report($$)
 	$xml->setDocumentElement($testsuite);
 
 	return $xml->toString(1);
-}
-
-################################################################################
-# dev stuff
-################################################################################
-
-sub test_onboarding($$)
-{
-	my $probes = shift;
-	my $tlds   = shift;
-
-	my $db_dump = [];
-
-	db_connect();
-
-	for (my $i = 0; $i < 2; $i++)
-	{
-		if ($i == 0)
-		{
-			use_probes_pl(1);
-			use_tld_pl(1);
-		}
-		if ($i == 1)
-		{
-			use_probes_pl(0);
-			use_tld_pl(0);
-		}
-
-		zbx_drop_db();
-		zbx_create_db();
-
-		my $sql = "update globalmacro set value=? where macro=?";
-
-		db_exec($sql, ['registry'                                                                        , '{$RSM.MONITORING.TARGET}'   ]);
-		db_exec($sql, [0                                                                                 , '{$RSM.DNS.PROBE.ONLINE}'    ]);
-		db_exec($sql, [0                                                                                 , '{$RSM.RDDS.PROBE.ONLINE}'   ]);
-		db_exec($sql, [0                                                                                 , '{$RSM.RDAP.PROBE.ONLINE}'   ]);
-		db_exec($sql, [0                                                                                 , '{$RSM.EPP.PROBE.ONLINE}'    ]);
-		db_exec($sql, [0                                                                                 , '{$RSM.IP4.MIN.PROBE.ONLINE}']);
-		db_exec($sql, [0                                                                                 , '{$RSM.IP6.MIN.PROBE.ONLINE}']);
-		db_exec($sql, ['193.0.14.129,192.5.5.241,199.7.83.42,198.41.0.4,192.112.36.4'                    , '{$RSM.IP4.ROOTSERVERS1}'    ]);
-		db_exec($sql, ['2001:7fe::53,2001:500:2f::f,2001:500:9f::42,2001:503:ba3e::2:30,2001:500:12::d0d', '{$RSM.IP6.ROOTSERVERS1}'    ]);
-
-		foreach my $probe (@{$probes})
-		{
-			create_probe(1, $probe->{"Hostname"}, "127.0.0.1", $probe->{"ListenPort"}, 1, 1, 1, 1);
-		}
-
-		foreach my $tld (@{$tlds})
-		{
-			create_tld(
-				1,
-				$tld->{'tld'},
-				$tld->{'dns_test_prefix'},
-				$tld->{'type'},
-				$tld->{'dnssec'},
-				$tld->{'dns_udp'},
-				$tld->{'dns_tcp'},
-				$tld->{'ns_servers_v4'},
-				$tld->{'ns_servers_v6'},
-				$tld->{'rdds43_servers'},
-				$tld->{'rdds80_servers'},
-				$tld->{'rdap_base_url'},
-				$tld->{'rdap_test_domain'},
-				$tld->{'rdds_test_prefix'}
-			);
-			foreach my $probe (@{$probes})
-			{
-				create_tld_probe(
-					$tld->{'tld'},
-					$probe->{"Hostname"},
-					$tld->{'type'},
-					$tld->{'rdds43_servers'} || $tld->{'rdds80_servers'},
-					$tld->{'rdap_base_url'} || $tld->{'rdap_test_domain'}
-				);
-			}
-			foreach my $probe (@{$probes})
-			{
-				create_tld_probe_nsip(
-					$tld->{'tld'},
-					$probe->{"Hostname"},
-					$tld->{'ns_servers_v4'},
-					$tld->{'ns_servers_v6'}
-				);
-			}
-		}
-
-		if ($i == 0)
-		{
-			#zbx_start_server();
-			#
-			#print "Press ENTER to continue:";
-			#<STDIN>;
-			#
-			#zbx_stop_server();
-		}
-
-		$db_dump->[$i] = db_create_dump();
-	}
-
-	db_disconnect();
-
-	db_compare_dumps($db_dump->[0], $db_dump->[1]);
 }
 
 ################################################################################
