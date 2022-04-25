@@ -364,11 +364,11 @@
 "/opt/zabbix/sla","001-sla-output.tar.gz"
 "/opt/zabbix/cache","001-cache-output.tar.gz"
 
-[disable-tld]
+[provisioning-api]
 
-"tld1"
-"tld2"
-"tld3"
+"/tlds/tld1","PUT",200,"readwrite","000-input-tld-disabled.json",""
+"/tlds/tld2","PUT",200,"readwrite","000-input-tld-disabled.json",""
+"/tlds/tld3","PUT",200,"readwrite","000-input-tld-disabled.json",""
 
 [execute]
 
