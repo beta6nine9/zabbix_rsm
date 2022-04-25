@@ -1,0 +1,21 @@
+{
+    "tldType": "ccTLD",
+    "servicesStatus": [
+        { "service": "dnsUDP", "enabled": true },
+        { "service": "dnsTCP", "enabled": true },
+        { "service": "rdds43", "enabled": false },
+        { "service": "rdds80", "enabled": false },
+        { "service": "rdap"  , "enabled": false }
+    ],
+    "dnsParameters": {
+        "nsIps": [
+            { "ns": "ns1.tld1", "ip": "192.0.2.11" },
+            { "ns": "ns2.tld1", "ip": "192.0.2.12" },
+            { "ns": "ns3.tld1", "ip": "192.0.2.13" },
+            { "ns": "ns4.tld1", "ip": "192.0.2.14" }
+        ],
+        "dnssecEnabled": false,
+        "nsTestPrefix": "test",
+        "minNs": 2
+    }
+}
