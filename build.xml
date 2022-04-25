@@ -330,7 +330,7 @@
 	</target>
 
 	<target name="init-frontend-mysql" depends="create-configs,make-dbschema,make-gettext,create-db-mysql,init-frontend-modules">
-		<exec executable="mysql" input="ui/tests/selenium/data/data_test.sql" failonerror="on">
+		<exec executable="mysql" input="ui/tests/selenium/data/icann_data.dump" failonerror="on">
 			<env key="MYSQL_PWD" value="${dbpassword}"/>
 			<arg line="--host=${dbhost}"/>
 			<arg line="--user=${dbuser}"/>
