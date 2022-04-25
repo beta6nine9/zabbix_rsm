@@ -832,24 +832,26 @@ class IncidentsListAction extends Action {
 							'limit' => 1
 						]);
 
-						$item_value = reset($item_value);
+						if ($item_value) {
+							$item_value = reset($item_value);
 
-						if ($item['key_'] === CALCULATED_DNS_ROLLWEEK_SLA) {
-							if (isset($services['dns'])) {
-								$services['dns']['slaValue'] = $item_value['value'];
+							if ($item['key_'] === CALCULATED_DNS_ROLLWEEK_SLA) {
+								if (isset($services['dns'])) {
+									$services['dns']['slaValue'] = $item_value['value'];
+								}
+								if (isset($services['dnssec'])) {
+									$services['dnssec']['slaValue'] = $item_value['value'];
+								}
 							}
-							if (isset($services['dnssec'])) {
-								$services['dnssec']['slaValue'] = $item_value['value'];
+							elseif ($item['key_'] === CALCULATED_RDDS_ROLLWEEK_SLA) {
+								$services['rdds']['slaValue'] = $item_value['value'];
 							}
-						}
-						elseif ($item['key_'] === CALCULATED_RDDS_ROLLWEEK_SLA) {
-							$services['rdds']['slaValue'] = $item_value['value'];
-						}
-						elseif ($item['key_'] === CALCULATED_RDAP_ROLLWEEK_SLA) {
-							$services['rdap']['slaValue'] = $item_value['value'];
-						}
-						else {
-							$services['epp']['slaValue'] = $item_value['value'];
+							elseif ($item['key_'] === CALCULATED_RDAP_ROLLWEEK_SLA) {
+								$services['rdap']['slaValue'] = $item_value['value'];
+							}
+							else {
+								$services['epp']['slaValue'] = $item_value['value'];
+							}
 						}
 					}
 					else {
