@@ -15,6 +15,7 @@
 	</target>
 
 	<target name="create-frontend-configs">
+		<property name="url" value="${URL}"/>
 		<property name="dbtype" value="${DBTYPE}"/>
 		<property name="dbhost" value="${DBHOST}"/>
 		<property name="dbname" value="${DBNAME}"/>
