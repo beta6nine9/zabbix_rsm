@@ -10,7 +10,6 @@ use CControllerResponseFatal;
 class Action extends CAction {
 
 	protected $rsm_monitoring_mode;
-	protected $is_rdap_standalone;
 
 	protected $preload_macros = [];
 
@@ -40,23 +39,6 @@ class Action extends CAction {
 	 */
 	public function isAjaxRequest(): bool {
 		return strtolower($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'xmlhttprequest';
-	}
-
-	/**
-	 * Based on timestamp value stored in {$RSM.RDAP.STANDALONE}, check if RDAP at given time $timestamp is configured as
-	 * standalone service or as dependent sub-service of RDDS. It is expected that switch from RDAP as sub-service of RDDS
-	 * to RDAP as standalone service will be done only once and will never be switched back to initial state.
-	 *
-	 * @param integer|string  $timestamp  Optional timestamp value.
-	 *
-	 * @return bool
-	 */
-	protected function isRdapStandalone($timestamp = null) {
-		$value = $this->macro->get(RSM_RDAP_STANDALONE);
-		$rsm_rdap_standalone_ts = is_null($value) ? 0 : (int) $value;
-		$timestamp = is_null($timestamp) ? time() : (int) $timestamp;
-
-		return ($rsm_rdap_standalone_ts > 0 && $rsm_rdap_standalone_ts <= $timestamp);
 	}
 
 	protected function checkInput() {

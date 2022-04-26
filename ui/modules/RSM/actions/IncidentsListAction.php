@@ -90,7 +90,7 @@ class IncidentsListAction extends Action {
 			? [RSM_SLV_RDDS_AVAIL]
 			: [RSM_SLV_DNSSEC_AVAIL, RSM_SLV_RDDS_AVAIL, RSM_SLV_EPP_AVAIL];
 
-		if (is_RDAP_standalone($this->filter_time_from) || is_RDAP_standalone($this->filter_time_till)) {
+		if (isRdapStandalone($this->filter_time_from) || isRdapStandalone($this->filter_time_till)) {
 			$avail_item_keys[] = RSM_SLV_RDAP_AVAIL;
 			$item_keys[] = RSM_SLV_RDAP_ROLLWEEK;
 		}
@@ -196,10 +196,10 @@ class IncidentsListAction extends Action {
 				}
 
 				if ($service !== null) {
-					$data[$service]['itemid'] = $item['itemid'];
-					$data[$service]['slv'] = sprintf('%.3f', $item['lastvalue']);
-					$data[$service]['slvTestTime'] = $item['lastclock'];
-					$data[$service]['events'] = [];
+					$data['services'][$service]['itemid'] = $item['itemid'];
+					$data['services'][$service]['slv'] = sprintf('%.3f', $item['lastvalue']);
+					$data['services'][$service]['slvTestTime'] = $item['lastclock'];
+					$data['services'][$service]['events'] = [];
 				}
 			}
 
@@ -226,7 +226,7 @@ class IncidentsListAction extends Action {
 				}
 
 				if ($service !== null) {
-					$data[$service]['availItemId'] = $item['itemid'];
+					$data['services'][$service]['availItemId'] = $item['itemid'];
 					$avail_itemid[$service] = $item['itemid'];
 					$itemids[] = $item['itemid'];
 				}
@@ -320,7 +320,6 @@ class IncidentsListAction extends Action {
 			foreach ($events as $event) {
 				$event_triggerid = null;
 				$get_history = false;
-				$item_info = [];
 
 				// Ignore event duplicates.
 				$currentValue = ($event['value'] == TRIGGER_VALUE_FALSE) ? TRIGGER_VALUE_FALSE : $event['value'];
@@ -361,99 +360,81 @@ class IncidentsListAction extends Action {
 									|| in_array($event_triggerid, $rdap_triggers)
 									|| in_array($event_triggerid, $epp_triggers)) {
 								if (in_array($event_triggerid, $dns_triggers)) {
-									unset($data['dns']['events'][$i]['status']);
-									$item_type = 'dns';
-									$itemid = $avail_itemid['dns'];
-									$data['dns']['events'][$i] = array_merge($data['dns']['events'][$i], $newData[$i]);
+									$service = 'dns';
 								}
 								elseif (in_array($event_triggerid, $dnssec_triggers)) {
-									unset($data['dnssec']['events'][$i]['status']);
-									$item_type = 'dnssec';
-									$itemid = $avail_itemid['dnssec'];
-									$data['dnssec']['events'][$i] = array_merge(
-										$data['dnssec']['events'][$i],
+									$service = 'dnssec';
+								}
+								elseif (in_array($event_triggerid, $rdds_triggers)) {
+									$service = 'rdds';
+								}
+								elseif (in_array($event_triggerid, $rdap_triggers)) {
+									$service = 'rdap';
+								}
+								elseif (in_array($event_triggerid, $epp_triggers)) {
+									$service = 'epp';
+								}
+								else {
+									$service = null;
+								}
+
+								if ($service !== null) {
+									unset($data['services'][$service]['events'][$i]['status']);
+									$itemid = $avail_itemid[$service];
+									$data['services'][$service]['events'][$i] = array_merge(
+										$data['services'][$service]['events'][$i],
 										$newData[$i]
 									);
 								}
-								elseif (in_array($event_triggerid, $rdds_triggers)) {
-									unset($data['rdds']['events'][$i]['status']);
-									$item_type = 'rdds';
-									$itemid = $avail_itemid['rdds'];
-									$data['rdds']['events'][$i] = array_merge($data['rdds']['events'][$i], $newData[$i]);
-								}
-								elseif (in_array($event_triggerid, $rdap_triggers)) {
-									unset($data['rdap']['events'][$i]['status']);
-									$item_type = 'rdap';
-									$itemid = $avail_itemid['rdap'];
-									$data['rdap']['events'][$i] = array_merge($data['rdap']['events'][$i], $newData[$i]);
-								}
-								elseif (in_array($event_triggerid, $epp_triggers)) {
-									unset($data['epp']['events'][$i]['status']);
-									$item_type = 'epp';
-									$itemid = $avail_itemid['epp'];
-									$data['epp']['events'][$i] = array_merge($data['epp']['events'][$i], $newData[$i]);
-								}
 
-								$data[$item_type]['events'][$i]['incidentTotalTests'] = getTotalTestsCount(
+								$data['services'][$service]['events'][$i]['incidentTotalTests'] = getTotalTestsCount(
 									$itemid,
 									$this->filter_time_from,
 									$this->filter_time_till,
-									$data[$item_type]['events'][$i]['startTime'],
-									$data[$item_type]['events'][$i]['endTime']
+									$data['services'][$service]['events'][$i]['startTime'],
+									$data['services'][$service]['events'][$i]['endTime']
 								);
 
-								$data[$item_type]['events'][$i]['incidentFailedTests'] = getFailedTestsCount(
+								$data['services'][$service]['events'][$i]['incidentFailedTests'] = getFailedTestsCount(
 									$itemid,
 									$this->filter_time_till,
-									$data[$item_type]['events'][$i]['startTime'],
-									$data[$item_type]['events'][$i]['endTime']
+									$data['services'][$service]['events'][$i]['startTime'],
+									$data['services'][$service]['events'][$i]['endTime']
 								);
 							}
 						}
 						else {
-							if (isset($data['dns']['events'][$i])) {
-								$item_info = [
-									'itemType' => 'dns',
-									'itemId' => $avail_itemid['dns']
-								];
+							if (isset($data['services']['dns']['events'][$i])) {
+								$service = 'dns';
 							}
-							elseif (isset($data['dnssec']['events'][$i])) {
-								$item_info = [
-									'itemType' => 'dnssec',
-									'itemId' => $avail_itemid['dnssec']
-								];
+							elseif (isset($data['services']['dnssec']['events'][$i])) {
+								$service = 'dnssec';
 							}
-							elseif (isset($data['rdds']['events'][$i])) {
-								$item_info = [
-									'itemType' => 'rdds',
-									'itemId' => $avail_itemid['rdds']
-								];
+							elseif (isset($data['services']['rdds']['events'][$i])) {
+								$service = 'rdds';
 							}
-							elseif (isset($data['rdap']['events'][$i])) {
-								$item_info = [
-									'itemType' => 'rdap',
-									'itemId' => $avail_itemid['rdap']
-								];
+							elseif (isset($data['services']['rdap']['events'][$i])) {
+								$service = 'rdap';
 							}
-							elseif (isset($data['epp']['events'][$i])) {
-								$item_info = [
-									'itemType' => 'epp',
-									'itemId' => $avail_itemid['epp']
-								];
+							elseif (isset($data['services']['epp']['events'][$i])) {
+								$service = 'epp';
+							}
+							else {
+								$service = null;
 							}
 
-							if ($item_info) {
-								$data[$item_info['itemType']]['events'][$i]['incidentTotalTests'] = getTotalTestsCount(
-									$item_info['itemId'],
+							if ($service !== null) {
+								$data['services'][$service]['events'][$i]['incidentTotalTests'] = getTotalTestsCount(
+									$avail_itemid[$service],
 									$this->filter_time_from,
 									$this->filter_time_till,
-									$data[$item_info['itemType']]['events'][$i]['startTime']
+									$data['services'][$service]['events'][$i]['startTime']
 								);
 
-								$data[$item_info['itemType']]['events'][$i]['incidentFailedTests'] = getFailedTestsCount(
-									$item_info['itemId'],
+								$data['services'][$service]['events'][$i]['incidentFailedTests'] = getFailedTestsCount(
+									$avail_itemid[$service],
 									$this->filter_time_till,
-									$data[$item_info['itemType']]['events'][$i]['startTime']
+									$data['services'][$service]['events'][$i]['startTime']
 								);
 							}
 						}
@@ -543,100 +524,54 @@ class IncidentsListAction extends Action {
 				}
 
 				if (in_array($event_triggerid, $dns_triggers)) {
-					if (isset($data['dns']['events'][$i])) {
-						unset($data['dns']['events'][$i]['status']);
-
-						$item_type = 'dns';
-						$itemid = $avail_itemid['dns'];
-						$get_history = true;
-
-						$data['dns']['events'][$i] = array_merge($data['dns']['events'][$i], $incidents[$i]);
-					}
-					else {
-						if (isset($incidents[$i])) {
-							$data['dns']['events'][$i] = $incidents[$i];
-						}
-					}
+					$service = 'dns';
 				}
 				elseif (in_array($event_triggerid, $dnssec_triggers)) {
-					if (isset($data['dnssec']['events'][$i])) {
-						unset($data['dnssec']['events'][$i]['status']);
-
-						$item_type = 'dnssec';
-						$itemid = $avail_itemid['dnssec'];
-						$get_history = true;
-
-						$data['dnssec']['events'][$i] = array_merge($data['dnssec']['events'][$i], $incidents[$i]);
-					}
-					else {
-						if (isset($incidents[$i])) {
-							$data['dnssec']['events'][$i] = $incidents[$i];
-						}
-					}
+					$service = 'dnssec';
 				}
 				elseif (in_array($event_triggerid, $rdds_triggers)) {
-					if (isset($data['rdds']['events'][$i]) && $data['rdds']['events'][$i]) {
-						unset($data['rdds']['events'][$i]['status']);
-
-						$item_type = 'rdds';
-						$itemid = $avail_itemid['rdds'];
-						$get_history = true;
-
-						$data['rdds']['events'][$i] = array_merge($data['rdds']['events'][$i], $incidents[$i]);
-					}
-					else {
-						if (isset($incidents[$i])) {
-							$data['rdds']['events'][$i] = $incidents[$i];
-						}
-					}
+					$service = 'rdds';
 				}
 				elseif (in_array($event_triggerid, $rdap_triggers)) {
-					if (isset($data['rdap']['events'][$i]) && $data['rdap']['events'][$i]) {
-						unset($data['rdap']['events'][$i]['status']);
-
-						$item_type = 'rdap';
-						$itemid = $avail_itemid['rdap'];
-						$get_history = true;
-
-						$data['rdap']['events'][$i] = array_merge($data['rdap']['events'][$i], $incidents[$i]);
-					}
-					else {
-						if (isset($incidents[$i])) {
-							$data['rdap']['events'][$i] = $incidents[$i];
-						}
-					}
+					$service = 'rdap';
 				}
 				elseif (in_array($event_triggerid, $epp_triggers)) {
-					if (isset($data['epp']['events'][$i]) && $data['epp']['events'][$i]) {
-						unset($data['epp']['events'][$i]['status']);
+					$service = 'epp';
+				}
+				else {
+					$service = null;
+				}
 
-						$item_type = 'epp';
-						$itemid = $avail_itemid['epp'];
+				if ($service !== null) {
+					if (isset($data['services'][$service]['events'][$i])) {
+						unset($data['services'][$service]['events'][$i]['status']);
+
+						$itemid = $avail_itemid[$service];
 						$get_history = true;
 
-						$data['epp']['events'][$i] = array_merge($data['epp']['events'][$i], $incidents[$i]);
+						$data['services'][$service]['events'][$i] = array_merge($data['services'][$service]['events'][$i], $incidents[$i]);
 					}
 					else {
 						if (isset($incidents[$i])) {
-							$data['epp']['events'][$i] = $incidents[$i];
+							$data['services'][$service]['events'][$i] = $incidents[$i];
 						}
 					}
 				}
 
 				if ($get_history) {
-					$data[$item_type]['events'][$i]['incidentTotalTests'] = getTotalTestsCount(
+					$data['services'][$service]['events'][$i]['incidentTotalTests'] = getTotalTestsCount(
 						$itemid,
 						$this->filter_time_from,
 						$this->filter_time_till,
-						$data[$item_type]['events'][$i]['startTime'],
-						$data[$item_type]['events'][$i]['endTime']
+						$data['services'][$service]['events'][$i]['startTime'],
+						$data['services'][$service]['events'][$i]['endTime']
 					);
 
-					$data[$item_type]['events'][$i]['incidentFailedTests'] = getFailedTestsCount(
+					$data['services'][$service]['events'][$i]['incidentFailedTests'] = getFailedTestsCount(
 						$itemid,
 						$this->filter_time_till,
-						$data[$item_type]['events'][$i]['startTime'],
-						$data[$item_type]['events'][$i]['endTime']
+						$data['services'][$service]['events'][$i]['startTime'],
+						$data['services'][$service]['events'][$i]['endTime']
 					);
 
 					unset($get_history);
@@ -659,56 +594,59 @@ class IncidentsListAction extends Action {
 				));
 
 				if (in_array($objectid, $dns_triggers)) {
-					$item_type = 'dns';
+					$service = 'dns';
 					$itemid = $avail_itemid['dns'];
 				}
 				elseif (in_array($objectid, $dnssec_triggers)) {
-					$item_type = 'dnssec';
+					$service = 'dnssec';
 					$itemid = $avail_itemid['dnssec'];
 				}
 				elseif (in_array($objectid, $rdds_triggers)) {
-					$item_type = 'rdds';
+					$service = 'rdds';
 					$itemid = $avail_itemid['rdds'];
 				}
 				elseif (in_array($objectid, $rdap_triggers)) {
-					$item_type = 'rdap';
+					$service = 'rdap';
 					$itemid = $avail_itemid['rdap'];
 				}
 				elseif (in_array($objectid, $epp_triggers)) {
-					$item_type = 'epp';
+					$service = 'epp';
 					$itemid = $avail_itemid['epp'];
 				}
 
 				if ($event) {
-					$data[$item_type]['events'][$i]['status'] = TRIGGER_VALUE_FALSE;
-					$data[$item_type]['events'][$i]['endTime'] = $event['clock'];
+					$data['services'][$service]['events'][$i]['status'] = TRIGGER_VALUE_FALSE;
+					$data['services'][$service]['events'][$i]['endTime'] = $event['clock'];
 				}
 
-				$data[$item_type]['events'][$i]['incidentTotalTests'] = getTotalTestsCount(
+				$data['services'][$service]['events'][$i]['incidentTotalTests'] = getTotalTestsCount(
 					$itemid,
 					$this->filter_time_from,
 					$this->filter_time_till,
-					$data[$item_type]['events'][$i]['startTime'],
+					$data['services'][$service]['events'][$i]['startTime'],
 					$event ? $event['clock'] : null
 				);
-				$data[$item_type]['events'][$i]['incidentFailedTests'] = getFailedTestsCount(
+				$data['services'][$service]['events'][$i]['incidentFailedTests'] = getFailedTestsCount(
 					$itemid,
 					$this->filter_time_till,
-					$data[$item_type]['events'][$i]['startTime'],
+					$data['services'][$service]['events'][$i]['startTime'],
 					$event ? $event['clock'] : null
 				);
 			}
 
-			$data['dns']['totalTests'] = 0;
-			$data['dnssec']['totalTests'] = 0;
-			$data['rdds']['totalTests'] = 0;
-			$data['rdap']['totalTests'] = 0;
-			$data['epp']['totalTests'] = 0;
-			$data['dns']['inIncident'] = 0;
-			$data['dnssec']['inIncident'] = 0;
-			$data['rdds']['inIncident'] = 0;
-			$data['rdap']['inIncident'] = 0;
-			$data['epp']['inIncident'] = 0;
+			$data['services']['dns']['totalTests'] = 0;
+			$data['services']['dnssec']['totalTests'] = 0;
+			$data['services']['rdds']['totalTests'] = 0;
+			$data['services']['epp']['totalTests'] = 0;
+			$data['services']['dns']['inIncident'] = 0;
+			$data['services']['dnssec']['inIncident'] = 0;
+			$data['services']['rdds']['inIncident'] = 0;
+			$data['services']['epp']['inIncident'] = 0;
+
+			if (isRdapStandalone($this->filter_time_from) || isRdapStandalone($this->filter_time_till)) {
+				$data['services']['rdap']['totalTests'] = 0;
+				$data['services']['rdap']['inIncident'] = 0;
+			}
 
 			$avail_items = [];
 			if ($avail_itemid['dns']) {
@@ -738,52 +676,43 @@ class IncidentsListAction extends Action {
 
 			while ($items_history = DBfetch($items_histories)) {
 				if ($items_history['itemid'] == $avail_itemid['dns']) {
-					$type = 'dns';
+					$service = 'dns';
 				}
 				elseif ($items_history['itemid'] == $avail_itemid['dnssec']) {
-					$type = 'dnssec';
+					$service = 'dnssec';
 				}
 				elseif ($items_history['itemid'] == $avail_itemid['rdds']) {
-					$type = 'rdds';
+					$service = 'rdds';
 				}
 				elseif ($items_history['itemid'] == $avail_itemid['rdap']) {
-					$type = 'rdap';
+					$service = 'rdap';
 				}
 				elseif ($items_history['itemid'] == $avail_itemid['epp']) {
-					$type = 'epp';
+					$service = 'epp';
 				}
 
-				$data[$type]['totalTests']++;
+				$data['services'][$service]['totalTests']++;
 
-				foreach ($data[$type]['events'] as $incident) {
+				foreach ($data['services'][$service]['events'] as $incident) {
 					if ($items_history['clock'] >= $incident['startTime'] && (!isset($incident['endTime'])
 							|| (isset($incident['endTime']) && $items_history['clock'] <= $incident['endTime']))) {
-						$data[$type]['inIncident']++;
+						$data['services'][$service]['inIncident']++;
 					}
 				}
 			}
 
-			// Input into rolling week calculation block.
-			$services = [];
-
 			// Get delay items.
 			$item_keys = [];
-			if (isset($data['dns']['events']) || isset($data['dnssec']['events'])) {
+			if (isset($data['services']['dns']['events']) || isset($data['services']['dnssec']['events'])) {
 				array_push($item_keys, CALCULATED_ITEM_DNS_DELAY, CALCULATED_DNS_ROLLWEEK_SLA);
-				if (isset($data['dns']['events'])) {
-					$services['dns'] = [];
-				}
-				if (isset($data['dnssec']['events'])) {
-					$services['dnssec'] = [];
-				}
 			}
-			if (isset($data['rdds']['events'])) {
+			if (isset($data['services']['rdds']['events'])) {
 				array_push($item_keys, CALCULATED_ITEM_RDDS_DELAY, CALCULATED_RDDS_ROLLWEEK_SLA);
 			}
-			if (isset($data['rdap']['events'])) {
+			if (isset($data['services']['rdap']['events'])) {
 				array_push($item_keys, CALCULATED_ITEM_RDAP_DELAY, CALCULATED_RDAP_ROLLWEEK_SLA);
 			}
-			if (isset($data['epp']['events'])) {
+			if (isset($data['services']['epp']['events'])) {
 				array_push($item_keys, CALCULATED_ITEM_EPP_DELAY, CALCULATED_EPP_ROLLWEEK_SLA);
 			}
 
@@ -836,21 +765,19 @@ class IncidentsListAction extends Action {
 							$item_value = reset($item_value);
 
 							if ($item['key_'] === CALCULATED_DNS_ROLLWEEK_SLA) {
-								if (isset($services['dns'])) {
-									$services['dns']['slaValue'] = $item_value['value'];
-								}
-								if (isset($services['dnssec'])) {
-									$services['dnssec']['slaValue'] = $item_value['value'];
+								$data['services']['dns']['slaValue'] = $item_value['value'] * 60;
+								if (isset($data['services']['dnssec']['events'])) {
+									$data['services']['dnssec']['slaValue'] = $item_value['value'] * 60;
 								}
 							}
 							elseif ($item['key_'] === CALCULATED_RDDS_ROLLWEEK_SLA) {
-								$services['rdds']['slaValue'] = $item_value['value'];
+								$data['services']['rdds']['slaValue'] = $item_value['value'] * 60;
 							}
 							elseif ($item['key_'] === CALCULATED_RDAP_ROLLWEEK_SLA) {
-								$services['rdap']['slaValue'] = $item_value['value'];
+								$data['services']['rdap']['slaValue'] = $item_value['value'] * 60;
 							}
 							else {
-								$services['epp']['slaValue'] = $item_value['value'];
+								$data['services']['epp']['slaValue'] = $item_value['value'] * 60;
 							}
 						}
 					}
@@ -865,36 +792,33 @@ class IncidentsListAction extends Action {
 							'sortfield' => ['clock'],
 							'limit' => 1
 						]);
+
 						$item_value = reset($item_value);
 
-						if ($item['key_'] == CALCULATED_ITEM_DNS_DELAY) {
-							if (isset($services['dns'])) {
-								$services['dns']['delay'] = $item_value['value'];
-								$services['dns']['itemId'] = $avail_itemid['dns'];
+						if ($item_value) {
+							if ($item['key_'] == CALCULATED_ITEM_DNS_DELAY) {
+								$data['services']['dns']['delay'] = $item_value['value'];
+								$data['services']['dns']['itemId'] = $avail_itemid['dns'];
+
+								if (isset($data['services']['dnssec']['events'])) {
+									$data['services']['dnssec']['delay'] = $item_value['value'];
+									$data['services']['dnssec']['itemId'] = $avail_itemid['dnssec'];
+								}
 							}
-							if (isset($services['dnssec'])) {
-								$services['dnssec']['delay'] = $item_value['value'];
-								$services['dnssec']['itemId'] = $avail_itemid['dnssec'];
+							elseif ($item['key_'] == CALCULATED_ITEM_RDDS_DELAY) {
+								$data['services']['rdds']['delay'] = $item_value['value'];
+								$data['services']['rdds']['itemId'] = $avail_itemid['rdds'];
 							}
-						}
-						elseif ($item['key_'] == CALCULATED_ITEM_RDDS_DELAY) {
-							$services['rdds']['delay'] = $item_value['value'];
-							$services['rdds']['itemId'] = $avail_itemid['rdds'];
-						}
-						elseif ($item['key_'] == CALCULATED_ITEM_RDAP_DELAY) {
-							$services['rdap']['delay'] = $item_value['value'];
-							$services['rdap']['itemId'] = $avail_itemid['rdap'];
-						}
-						elseif ($item['key_'] == CALCULATED_ITEM_EPP_DELAY) {
-							$services['epp']['delay'] = $item_value['value'];
-							$services['epp']['itemId'] = $avail_itemid['epp'];
+							elseif ($item['key_'] == CALCULATED_ITEM_RDAP_DELAY) {
+								$data['services']['rdap']['delay'] = $item_value['value'];
+								$data['services']['rdap']['itemId'] = $avail_itemid['rdap'];
+							}
+							elseif ($item['key_'] == CALCULATED_ITEM_EPP_DELAY) {
+								$data['services']['epp']['delay'] = $item_value['value'];
+								$data['services']['epp']['itemId'] = $avail_itemid['epp'];
+							}
 						}
 					}
-				}
-
-				foreach ($services as $key => $service) {
-					$data[$key]['slaValue'] = $service['slaValue'] * 60;
-					$data[$key]['delay'] = $service['delay'];
 				}
 			}
 		}
@@ -903,20 +827,20 @@ class IncidentsListAction extends Action {
 	}
 
 	protected function sortResults(array &$data) {
-		if (isset($data['dns']['events'])) {
-			$data['dns']['events'] = array_reverse($data['dns']['events']);
+		if (isset($data['services']['dns']['events'])) {
+			$data['services']['dns']['events'] = array_reverse($data['services']['dns']['events']);
 		}
-		if (isset($data['dnssec']['events'])) {
-			$data['dnssec']['events'] = array_reverse($data['dnssec']['events']);
+		if (isset($data['services']['dnssec']['events'])) {
+			$data['services']['dnssec']['events'] = array_reverse($data['services']['dnssec']['events']);
 		}
-		if (isset($data['rdds']['events'])) {
-			$data['rdds']['events'] = array_reverse($data['rdds']['events']);
+		if (isset($data['services']['rdds']['events'])) {
+			$data['services']['rdds']['events'] = array_reverse($data['services']['rdds']['events']);
 		}
-		if (isset($data['rdap']['events'])) {
-			$data['rdap']['events'] = array_reverse($data['rdap']['events']);
+		if (isset($data['services']['rdap']['events'])) {
+			$data['services']['rdap']['events'] = array_reverse($data['services']['rdap']['events']);
 		}
-		if (isset($data['epp']['events'])) {
-			$data['epp']['events'] = array_reverse($data['epp']['events']);
+		if (isset($data['services']['epp']['events'])) {
+			$data['services']['epp']['events'] = array_reverse($data['services']['epp']['events']);
 		}
 	}
 
@@ -948,24 +872,24 @@ class IncidentsListAction extends Action {
 		$server_now = time();
 
 		$data = [
-			'title' => _('Incidents'),
-			'ajax_request' => $this->isAjaxRequest(),
-			'refresh' => CWebUser::$data['refresh'] ? timeUnitToSeconds(CWebUser::$data['refresh']) : null,
-			'module_style' => $this->module->getStyle(),
-			'type' => $this->getInput('type', 0),
-			'host' => $this->getInput('host', false),
-			'tld' => null,
-			'url' => '',
-			'rdap_standalone_start_ts' => 0,
-			'rsm_monitoring_mode' => get_rsm_monitoring_type(),
-			'profileIdx' => 'web.rsm.incidents.filter',
-			'profileIdx2' => 0,
-			'from' => $this->hasInput('from') ? $this->getInput('from') : null,
-			'to' => $this->hasInput('to') ? $this->getInput('to') : null,
-			'incident_from' => date(DATE_TIME_FORMAT_SECONDS, $server_now - $macros[RSM_ROLLWEEK_SECONDS]),
-			'incident_to' => date(DATE_TIME_FORMAT_SECONDS, $server_now),
-			'active_tab' => CProfile::get('web.rsm.incidents.filter.active', 1),
-			'incidents_tab' => (isset($_COOKIE['incidents_tab']) ? (int) $_COOKIE['incidents_tab'] : 0),
+			'title'                    => _('Incidents'),
+			'ajax_request'             => $this->isAjaxRequest(),
+			'refresh'                  => CWebUser::$data['refresh'] ? timeUnitToSeconds(CWebUser::$data['refresh']) : null,
+			'module_style'             => $this->module->getStyle(),
+			'type'                     => $this->getInput('type', 0),
+			'host'                     => $this->getInput('host', false),
+			'tld'                      => null,
+			'url'                      => '',
+			'rdap_standalone_start_ts' => getRdapStandaloneTs(),
+			'rsm_monitoring_mode'      => get_rsm_monitoring_type(),
+			'profileIdx'               => 'web.rsm.incidents.filter',
+			'profileIdx2'              => 0,
+			'from'                     => $this->hasInput('from') ? $this->getInput('from') : null,
+			'to'                       => $this->hasInput('to') ? $this->getInput('to') : null,
+			'incident_from'            => date(DATE_TIME_FORMAT_SECONDS, $server_now - $macros[RSM_ROLLWEEK_SECONDS]),
+			'incident_to'              => date(DATE_TIME_FORMAT_SECONDS, $server_now),
+			'active_tab'               => CProfile::get('web.rsm.incidents.filter.active', 1),
+			'incidents_tab'            => (isset($_COOKIE['incidents_tab']) ? (int) $_COOKIE['incidents_tab'] : 0),
 		];
 
 		if (!$this->isAjaxRequest() && $this->hasInput('type')) {
@@ -1010,16 +934,6 @@ class IncidentsListAction extends Action {
 			$DB = $master;
 			DBconnect($error);
 		}
-
-		$rdap_standalone_ts = API::UserMacro()->get([
-			'output' => ['value'],
-			'filter' => [
-				'macro' => RSM_RDAP_STANDALONE
-			],
-			'globalmacro' => true
-		]);
-
-		$data['rdap_standalone_start_ts'] = $rdap_standalone_ts ? $rdap_standalone_ts[0]['value'] : 0;
 
 		// Show error if no matching hosts found.
 		if ($data['filter_search'] && !$data['tld']) {

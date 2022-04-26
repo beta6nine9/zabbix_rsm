@@ -43,7 +43,7 @@ class Module extends CModule {
 			return;
 		}
 
-		$macro->read([RSM_MONITORING_TARGET, RSM_RDAP_STANDALONE]);
+		$macro->read([RSM_MONITORING_TARGET]);
 		$this->rsm_monitoring_mode = $macro->get(RSM_MONITORING_TARGET);
 		$actions = $this->getZabbixActions();
 		$cmenu = APP::Component()->get('menu.main');

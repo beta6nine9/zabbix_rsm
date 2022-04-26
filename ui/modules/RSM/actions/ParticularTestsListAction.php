@@ -79,12 +79,11 @@ class ParticularTestsListAction extends Action {
 		);
 
 		$data['test_time_from'] = $test_time_from;
-		$data['is_rdap_standalone'] = is_RDAP_standalone($test_time_from);
 
 		$data['tld_rdds_enabled'] = false;
 		$data['tld_rdap_enabled'] = false;
 
-		if ($data['type'] == RSM_RDAP && !$data['is_rdap_standalone']) {
+		if ($data['type'] == RSM_RDAP && !isRdapStandalone($test_time_from)) {
 			error(_('RDAP wasn\'t a standalone service at requested time!'));
 			return;
 		}
@@ -172,7 +171,7 @@ class ParticularTestsListAction extends Action {
 			]);
 
 			$user_macros_filter = [RSM_TLD_RDDS43_ENABLED, RSM_TLD_RDDS80_ENABLED];
-			if ($data['type'] == RSM_RDDS || is_RDAP_standalone($test_time_from)) {
+			if ($data['type'] == RSM_RDDS || isRdapStandalone($test_time_from)) {
 				$user_macros_filter = array_merge($user_macros_filter, [RSM_RDAP_TLD_ENABLED]);
 			}
 
@@ -322,7 +321,7 @@ class ParticularTestsListAction extends Action {
 				}
 
 				// No need to show RDAP integrated in RDDS if it is enabled as standalone service.
-				if (is_RDAP_standalone($test_time_from)) {
+				if (isRdapStandalone($test_time_from)) {
 					unset($_enabled_item_map[RDAP_ENABLED]);
 				}
 				// Since RDAP is separate service, no need to process RDDS data anymore.
@@ -507,7 +506,7 @@ class ParticularTestsListAction extends Action {
 
 			// RDAP should be under type=RSM_RDDS only if it is not enabled as standalone service.
 			if ((!isset($data['tld']['macros'][RSM_RDAP_TLD_ENABLED]) || $data['tld']['macros'][RSM_RDAP_TLD_ENABLED] != 0)
-					&& !is_RDAP_standalone($test_time_from)) {
+					&& !isRdapStandalone($test_time_from)) {
 				$data['tld_rdds_enabled'] = true;
 
 				$items_to_check[] = PROBE_RDAP_IP;

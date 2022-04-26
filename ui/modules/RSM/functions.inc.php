@@ -9,8 +9,23 @@
  *
  * @return bool
  */
-function is_rdap_standalone($timestamp = null) {
-	static $rsm_rdap_standalone_ts;
+function isRdapStandalone($timestamp = null) {
+	$timestamp = is_null($timestamp) ? time() : (int) $timestamp;
+
+	return (__getRdapStandaloneTs() > 0 && __getRdapStandaloneTs() <= $timestamp);
+}
+
+/**
+ * Get the value of macro RSM_RDAP_STANDALONE.
+ *
+ * @return string unix timestamp
+ */
+function getRdapStandaloneTs() {
+	return __getRdapStandaloneTs();
+}
+
+function __getRdapStandaloneTs() {
+	static $rsm_rdap_standalone_ts = null;
 
 	if (is_null($rsm_rdap_standalone_ts)) {
 		$db_macro = API::UserMacro()->get([
@@ -19,26 +34,24 @@ function is_rdap_standalone($timestamp = null) {
 			'globalmacro' => true
 		]);
 
-		$rsm_rdap_standalone_ts = $db_macro ? (int) $db_macro[0]['value'] : 0;
+		$rsm_rdap_standalone_ts = $db_macro ? (int) $db_macro[0]['value'] : '0';
 	}
 
-	$timestamp = is_null($timestamp) ? time() : (int) $timestamp;
-
-	return ($rsm_rdap_standalone_ts > 0 && $rsm_rdap_standalone_ts <= $timestamp);
+	return $rsm_rdap_standalone_ts;
 }
 
 /**
  * Return current type of RSM monitoring.
  *
- * @return int
+ * @return int One of MONITORING_TARGET_* defines or an empty string, if undefined.
  */
 function get_rsm_monitoring_type() {
 	static $type;
 
 	if ($type === null) {
 		$db_macro = API::UserMacro()->get([
-			'output' => ['value'],
-			'filter' => ['macro' => RSM_MONITORING_TARGET],
+			'output'      => ['value'],
+			'filter'      => ['macro' => RSM_MONITORING_TARGET],
 			'globalmacro' => true
 		]);
 

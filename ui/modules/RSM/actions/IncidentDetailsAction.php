@@ -153,8 +153,6 @@ class IncidentDetailsAction extends Action {
 			$data['main_event'] = reset($main_event);
 
 			$data['main_event']['false_positive'] = getEventFalsePositiveness($data['main_event']['eventid']);
-
-			$data['is_rdap_standalone'] = is_RDAP_standalone($data['main_event']['clock']);
 		}
 	}
 
@@ -225,7 +223,7 @@ class IncidentDetailsAction extends Action {
 						'output' => ['macro', 'value'],
 						'hostids' => $template['templateid'],
 						'filter' => [
-							'macro' => $data['is_rdap_standalone']
+							'macro' => isRdapStandalone($data['main_event']['clock'])
 								? [RSM_TLD_RDDS43_ENABLED, RSM_TLD_RDDS80_ENABLED]
 								: [RSM_TLD_RDDS43_ENABLED, RSM_TLD_RDDS80_ENABLED, RSM_RDAP_TLD_ENABLED]
 						]

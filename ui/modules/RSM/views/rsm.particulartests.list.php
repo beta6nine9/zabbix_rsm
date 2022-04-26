@@ -22,7 +22,7 @@
 use Modules\RSM\Helpers\CTableInfo;
 
 $object_label = ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) ? _('Registrar ID') : _('TLD');
-$rdap_is_part_of_rdds = ($data['type'] == RSM_RDDS && !is_RDAP_standalone($data['test_time_from']));
+$rdap_is_part_of_rdds = ($data['type'] == RSM_RDDS && !isRdapStandalone($data['test_time_from']));
 
 if ($data['type'] == RSM_RDAP) {
 	/*
@@ -527,7 +527,7 @@ if ($data['type'] == RSM_RDAP) {
 		? sprintf('%s ms', $data[CALCULATED_ITEM_RDAP_RTT_HIGH])
 		: _('No data');
 }
-elseif ($data['is_rdap_standalone']) {
+elseif (isRdapStandalone($data['test_time_from'])) {
 	$allowed_rtt_str = isset($data[CALCULATED_ITEM_RDDS_RTT_HIGH])
 		? sprintf('%s ms', $data[CALCULATED_ITEM_RDDS_RTT_HIGH])
 		: _('No data');

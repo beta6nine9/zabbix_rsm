@@ -184,7 +184,7 @@ class RollingWeekStatusListAction extends Action {
 			$data['filter_registrar_family'] = '';
 		}
 
-		if (is_RDAP_standalone()) {
+		if (isRdapStandalone()) {
 			$data['filter_rdap_subgroup'] = false;
 		}
 		else {
@@ -498,7 +498,7 @@ class RollingWeekStatusListAction extends Action {
 			? [RSM_SLV_DNS_AVAIL, RSM_SLV_DNSSEC_AVAIL, RSM_SLV_RDDS_AVAIL, RSM_SLV_EPP_AVAIL]
 			: [RSM_SLV_RDDS_AVAIL];
 
-		if (is_RDAP_standalone()) {
+		if (isRdapStandalone()) {
 			$rollweek_keys[] = RSM_SLV_RDAP_ROLLWEEK;
 			$avail_keys[] = RSM_SLV_RDAP_AVAIL;
 		}
@@ -669,7 +669,7 @@ class RollingWeekStatusListAction extends Action {
 								if ($template_macro['macro'] === RSM_TLD_DNSSEC_ENABLED) {
 									$service_type = RSM_DNSSEC;
 								}
-								elseif (is_RDAP_standalone() && $template_macro['macro'] === RSM_RDAP_TLD_ENABLED) {
+								elseif (isRdapStandalone() && $template_macro['macro'] === RSM_RDAP_TLD_ENABLED) {
 									$service_type = RSM_RDAP;
 								}
 								else {
@@ -686,7 +686,7 @@ class RollingWeekStatusListAction extends Action {
 									unset($data['tld'][$DB['SERVERS'][$key]['NR'].$current_hostid][$service_type]);
 								}
 							}
-							elseif ($template_macro['macro'] === RSM_RDAP_TLD_ENABLED && !is_RDAP_standalone()) {
+							elseif ($template_macro['macro'] === RSM_RDAP_TLD_ENABLED && !isRdapStandalone()) {
 								// handle enabled RDAP when it's part of RDDS
 								if (array_key_exists(RSM_RDDS, $data['tld'][$DB['SERVERS'][$key]['NR'].$current_hostid])) {
 									$data['tld'][$DB['SERVERS'][$key]['NR'].$current_hostid][RSM_RDDS]['subservices'][$template_macro['macro']] = $template_macro['value'];
@@ -794,7 +794,7 @@ class RollingWeekStatusListAction extends Action {
 		// Filter RDDS subservices.
 		if ($data['filter_rdap_subgroup'] || $data['filter_rdds43_subgroup'] || $data['filter_rdds80_subgroup']) {
 			foreach ($data['tld'] as $key => $tld) {
-				if (is_RDAP_standalone() && !array_key_exists(RSM_RDDS, $tld)) {
+				if (isRdapStandalone() && !array_key_exists(RSM_RDDS, $tld)) {
 					// do not let RDDS subservices affect RDAP-only enabled Rsmhosts in Standalone RDAP mode
 					continue;
 				}

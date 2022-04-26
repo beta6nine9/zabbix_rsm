@@ -75,7 +75,7 @@ else {
 		SPACE
 	];
 
-	if (is_RDAP_standalone()) {
+	if (isRdapStandalone()) {
 		$services_filter = array_merge($services_filter, [
 			new CSpan([
 				(new CCheckBox('filter_rdap'))->setChecked($data['filter_rdap']),
@@ -111,7 +111,7 @@ else {
 		], 'checkbox-block')
 	];
 
-	if (!is_RDAP_standalone()) {
+	if (!isRdapStandalone()) {
 		$subservices_components = array_merge($subservices_components, [
 			SPACE,
 			new CSpan([
@@ -214,7 +214,7 @@ $filter_fields[] = (new CFormList())
 
 // Create data table.
 if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
-	if (is_RDAP_standalone()) {
+	if (isRdapStandalone()) {
 		$header_columns = [
 			make_sorting_header(_('Registrar ID'), 'host', $data['sort_field'], $data['sort_order']),
 			make_sorting_header(_('Registrar name'), 'info_1', $data['sort_field'], $data['sort_order']),
@@ -235,7 +235,7 @@ if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
 	}
 }
 else {
-	if (is_RDAP_standalone()) {
+	if (isRdapStandalone()) {
 		$header_columns = [
 			make_sorting_header(_('TLD'), 'host', $data['sort_field'], $data['sort_order']),
 			make_sorting_header(_('Type'), 'type', $data['sort_field'], $data['sort_order']),
@@ -273,7 +273,7 @@ if ($data['tld']) {
 
 	$services[RSM_RDDS] = "RDDS";
 
-	if (is_RDAP_standalone())
+	if (isRdapStandalone())
 		$services[RSM_RDAP] = "RDAP";
 
 	$services[RSM_EPP] = "EPP";
@@ -313,7 +313,7 @@ if ($data['tld']) {
 						$subservices[] = 'RDDS80';
 					}
 
-					if (!is_RDAP_standalone()) {
+					if (!isRdapStandalone()) {
 						if (array_key_exists(RSM_RDAP_TLD_ENABLED, ($tld[$service]['subservices']))
 										&& $tld[RSM_RDDS]['subservices'][RSM_RDAP_TLD_ENABLED] != 0) {
 							$subservices[] = 'RDAP';

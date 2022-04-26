@@ -217,7 +217,7 @@ class SlaReportsListAction extends Action {
 			];
 
 			if (isset($xml->RDAP)) {
-				if (!is_RDAP_standalone($data['details']['from'])) {
+				if (!isRdapStandalone($data['details']['from'])) {
 					error(_('RDAP values exists for time when service was not standalone.'));
 				}
 
@@ -232,7 +232,7 @@ class SlaReportsListAction extends Action {
 					'slr_rdap_rtt_ms'			=> (string) $rdap->rtt->attributes()->rttSLR
 				];
 			}
-			else if (is_RDAP_standalone($data['details']['from'])) {
+			else if (isRdapStandalone($data['details']['from'])) {
 				error(_('Cannot find RDAP values.'));
 			}
 
