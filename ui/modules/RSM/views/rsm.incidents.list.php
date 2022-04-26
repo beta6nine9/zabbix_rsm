@@ -85,42 +85,42 @@ if ($data['tld']) {
 	$services[] = 'epp';
 
 	foreach ($services as $service) {
-		if (array_key_exists($service, $data['services'])) {
-			$service_data = $data['services'][$service];
+		if (!array_key_exists($service, $data['services']))
+			continue;
 
+		$service_data = $data['services'][$service];
+
+		if (array_key_exists('events', $service_data)) {
 			$table = (new CTableInfo())
 				->setNoDataMessage(_('No incidents found.'))
 				->setHeader($headers);
 
 			$delay_time = (array_key_exists('delay', $service_data) ? $service_data['delay'] : 60);
 
-			if (array_key_exists('events', $service_data)) {
-				foreach ($service_data['events'] as $event) {
-					$incident_status = getIncidentStatus($event['false_positive'], $event['status']);
-					$start_time = date(DATE_TIME_FORMAT_SECONDS, $event['startTime'] - $event['startTime'] % $delay_time);
-					$end_time = array_key_exists('endTime', $event)
-						? date(DATE_TIME_FORMAT_SECONDS, $event['endTime'] - $event['endTime'] % $delay_time + $delay_time - 1)
-						: '-';
+			foreach ($service_data['events'] as $event) {
+				$incident_status = getIncidentStatus($event['false_positive'], $event['status']);
+				$start_time = date(DATE_TIME_FORMAT_SECONDS, $event['startTime'] - $event['startTime'] % $delay_time);
+				$end_time = array_key_exists('endTime', $event)
+					? date(DATE_TIME_FORMAT_SECONDS, $event['endTime'] - $event['endTime'] % $delay_time + $delay_time - 1)
+					: '-';
 
-					$table->addRow([
-						new CLink(
-							$event['eventid'],
-							Url::getFor($data['url'], 'rsm.incidentdetails', [
-								'host'        => $data['tld']['host'],
-								'eventid'     => $event['eventid'],
-								'slvItemId'   => $service_data['itemid'],
-								'eventid'     => $event['eventid'],
-								'availItemId' => $service_data['availItemId'],
-							])
-						),
-						$incident_status,
-						$start_time,
-						$end_time,
-						$event['incidentFailedTests'],
-						$event['incidentTotalTests']
-					]);
-				}
-
+				$table->addRow([
+					new CLink(
+						$event['eventid'],
+						Url::getFor($data['url'], 'rsm.incidentdetails', [
+							'host'        => $data['tld']['host'],
+							'eventid'     => $event['eventid'],
+							'slvItemId'   => $service_data['itemid'],
+							'eventid'     => $event['eventid'],
+							'availItemId' => $service_data['availItemId'],
+						])
+					),
+					$incident_status,
+					$start_time,
+					$end_time,
+					$event['incidentFailedTests'],
+					$event['incidentTotalTests']
+				]);
 			}
 
 			$tests_down =
