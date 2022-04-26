@@ -326,7 +326,7 @@ class AggregateDetailsAction extends Action {
 				continue;
 			}
 
-			$transport = $this->probes[$probeid]['transport'];
+			$transport = strtolower($this->probes[$probeid]['transport']);
 			$rtt_max = ($transport == 'udp') ? $data['udp_rtt'] : $data['tcp_rtt'];
 
 			foreach ($probe['results'] as $ns => $values) {
