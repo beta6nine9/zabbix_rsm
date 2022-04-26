@@ -152,7 +152,7 @@ if ($data['tld']) {
 				).')'
 			];
 
-			$rolling_week = !array_key_exists('slvTestTime', $service_data)
+			$rolling_week = is_null($service_data['slvTestTime'])
 				? []
 				: [
 					(new CSpan(_s('%1$s Rolling week status', $service_data['slv'].'%')))->addClass('rolling-week-status'),

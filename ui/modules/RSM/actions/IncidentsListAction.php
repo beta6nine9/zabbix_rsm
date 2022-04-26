@@ -798,24 +798,19 @@ class IncidentsListAction extends Action {
 						if ($item_value) {
 							if ($item['key_'] == CALCULATED_ITEM_DNS_DELAY) {
 								$data['services']['dns']['delay'] = $item_value['value'];
-								$data['services']['dns']['itemId'] = $avail_itemid['dns'];
 
 								if (isset($data['services']['dnssec']['events'])) {
 									$data['services']['dnssec']['delay'] = $item_value['value'];
-									$data['services']['dnssec']['itemId'] = $avail_itemid['dnssec'];
 								}
 							}
 							elseif ($item['key_'] == CALCULATED_ITEM_RDDS_DELAY) {
 								$data['services']['rdds']['delay'] = $item_value['value'];
-								$data['services']['rdds']['itemId'] = $avail_itemid['rdds'];
 							}
 							elseif ($item['key_'] == CALCULATED_ITEM_RDAP_DELAY) {
 								$data['services']['rdap']['delay'] = $item_value['value'];
-								$data['services']['rdap']['itemId'] = $avail_itemid['rdap'];
 							}
 							elseif ($item['key_'] == CALCULATED_ITEM_EPP_DELAY) {
 								$data['services']['epp']['delay'] = $item_value['value'];
-								$data['services']['epp']['itemId'] = $avail_itemid['epp'];
 							}
 						}
 					}
