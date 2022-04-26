@@ -82,6 +82,8 @@ if ($data['tld']) {
 	if ($data['rdap_standalone_start_ts'] != 0)
 		$services[] = 'rdap';
 
+	$services[] = 'epp';
+
 	foreach ($services as $service) {
 		if (array_key_exists($service, $data['services'])) {
 			$service_data = $data['services'][$service];
