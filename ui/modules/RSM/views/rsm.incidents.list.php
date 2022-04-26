@@ -132,7 +132,7 @@ if ($data['tld']) {
 						'from'       => $data['from'],
 						'to'         => $data['to'],
 						'filter_set' => 1,
-						'type'       => $data['type'],
+						'type'       => convertSlaServiceName($service),
 						'slvItemId'  => $service_data['itemid'],
 					]))
 				: 0;
