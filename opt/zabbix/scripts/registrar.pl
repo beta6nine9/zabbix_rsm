@@ -36,6 +36,13 @@ sub main($)
 
 	$provisioning_api_config = get_rsm_config()->{'provisioning_api'};
 
+	fail('section "provisioning_api" not found in rsm.conf')                     if (!defined($provisioning_api_config));
+	fail('property "provisioning_api.url" not found in rsm.conf')                if (!defined($provisioning_api_config->{'url'}));
+	fail('property "provisioning_api.readonly_username" not found in rsm.conf')  if (!defined($provisioning_api_config->{'readonly_username'}));
+	fail('property "provisioning_api.readwrite_username" not found in rsm.conf') if (!defined($provisioning_api_config->{'readwrite_username'}));
+	fail('property "provisioning_api.readonly_password" not found in rsm.conf')  if (!defined($provisioning_api_config->{'readonly_password'}));
+	fail('property "provisioning_api.readwrite_password" not found in rsm.conf') if (!defined($provisioning_api_config->{'readwrite_password'}));
+
 	if (opt('list-services'))
 	{
 		cmd_list_services();
