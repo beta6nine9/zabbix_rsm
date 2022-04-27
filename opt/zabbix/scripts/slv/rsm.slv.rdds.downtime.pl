@@ -24,13 +24,6 @@ db_connect();
 
 if (!opt('dry-run'))
 {
-	# TODO: this is one time operation, remove on the next project iteration
-	if (-f "/opt/zabbix/data/rsm.slv.rdds.downtime.auditlog.txt")
-	{
-		unlink("/opt/zabbix/data/rsm.slv.rdds.downtime.auditlog.txt") or
-			die("cannot remove file \"/opt/zabbix/data/rsm.slv.rdds.downtime.auditlog.txt\": $!");
-	}
-
 	recalculate_downtime(
 		"/opt/zabbix/data/rsm.slv.rdds.downtime.false-positive.txt",
 		$cfg_key_in,

@@ -26,13 +26,6 @@ slv_exit(SUCCESS) if (get_monitoring_target() ne MONITORING_TARGET_REGISTRY);
 
 if (!opt('dry-run'))
 {
-	# TODO: this is one time operation, remove on the next project iteration
-	if (-f "/opt/zabbix/data/rsm.slv.dns.ns.downtime.auditlog.txt")
-	{
-		unlink("/opt/zabbix/data/rsm.slv.dns.ns.downtime.auditlog.txt") or
-			die("cannot remove file \"/opt/zabbix/data/rsm.slv.dns.ns.downtime.auditlog.txt\": $!");
-	}
-
 	recalculate_downtime(
 		"/opt/zabbix/data/rsm.slv.dns.ns.downtime.false-positive.txt",
 		AVAIL_KEY_PATTERN,

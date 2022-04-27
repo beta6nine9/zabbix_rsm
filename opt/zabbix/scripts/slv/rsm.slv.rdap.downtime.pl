@@ -26,13 +26,6 @@ slv_exit(SUCCESS) if (!is_rdap_standalone(getopt('now')));
 
 if (!opt('dry-run'))
 {
-	# TODO: this is one time operation, remove on the next project iteration
-	if (-f "/opt/zabbix/data/rsm.slv.rdap.downtime.auditlog.txt")
-	{
-		unlink("/opt/zabbix/data/rsm.slv.rdap.downtime.auditlog.txt") or
-			die("cannot remove file \"/opt/zabbix/data/rsm.slv.rdap.downtime.auditlog.txt\": $!");
-	}
-
 	recalculate_downtime(
 		"/opt/zabbix/data/rsm.slv.rdap.downtime.false-positive.txt",
 		$cfg_key_in,
