@@ -1,3 +1,9 @@
+Changes for rsm2.2.7
+
+Bug fixes:
+..F....... [sub-873] fixed calculation of targets above RTT limit on the Aggregated Details page (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.2.6
 
 Bug fixes:
