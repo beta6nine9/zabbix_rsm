@@ -93,33 +93,32 @@ class TestsListAction extends Action {
 
 		// get items
 		$items = API::Item()->get([
-			'output' => ['itemid', 'hostid', 'key_'],
-			'hostids' => $data['tld']['hostid'],
-			'filter' => [
-				'key_' => $key
-			],
-			'preservekeys' => true
+			'output'       => ['itemid', 'hostid', 'key_'],
+			'hostids'      => $data['tld']['hostid'],
+			'preservekeys' => true,
+			'filter'       => ['key_' => $key],
 		]);
 
 		if ($items) {
 			$item = reset($items);
+
 			$avail_item = $item['itemid'];
 
 			// Get triggers.
 			$triggers = API::Trigger()->get([
-				'output' => ['triggerids'],
-				'itemids' => $avail_item,
+				'output'       => ['triggerids'],
+				'itemids'      => $avail_item,
 				'preservekeys' => true
 			]);
 
 			$events = API::Event()->get([
-				'output' => API_OUTPUT_EXTEND,
+				'output'         => API_OUTPUT_EXTEND,
 				'selectTriggers' => API_OUTPUT_EXTEND,
-				'objectids' => array_keys($triggers),
-				'source' => EVENT_SOURCE_TRIGGERS,
-				'object' => EVENT_OBJECT_TRIGGER,
-				'time_from' => $data['from_ts'],
-				'time_till' => $data['to_ts']
+				'source'         => EVENT_SOURCE_TRIGGERS,
+				'object'         => EVENT_OBJECT_TRIGGER,
+				'objectids'      => array_keys($triggers),
+				'time_from'      => $data['from_ts'],
+				'time_till'      => $data['to_ts'],
 			]);
 
 			CArrayHelper::sort($events, ['objectid', 'clock']);
@@ -148,22 +147,22 @@ class TestsListAction extends Action {
 
 						if ($add_event) {
 							$incidents_data[$i]['endTime'] = $add_event['clock'];
-							$incidents_data[$i]['status'] = TRIGGER_VALUE_FALSE;
+							$incidents_data[$i]['status']  = TRIGGER_VALUE_FALSE;
 						}
 					}
 
 					$i++;
 					$incidents[$i] = [
-						'objectid' => $event['objectid'],
-						'status' => TRIGGER_VALUE_TRUE,
-						'startTime' => $event['clock'],
-						'false_positive' => $event['false_positive']
+						'objectid'       => $event['objectid'],
+						'status'         => TRIGGER_VALUE_TRUE,
+						'startTime'      => $event['clock'],
+						'false_positive' => $event['false_positive'],
 					];
 				}
 				else {
 					if (isset($incidents[$i])) {
 						$incidents[$i] = [
-							'status' => TRIGGER_VALUE_FALSE,
+							'status'  => TRIGGER_VALUE_FALSE,
 							'endTime' => $event['clock']
 						];
 					}
@@ -171,26 +170,26 @@ class TestsListAction extends Action {
 						$i++;
 						// Get event start time.
 						$add_event = API::Event()->get([
-							'output' => API_OUTPUT_EXTEND,
-							'objectids' => [$event['objectid']],
-							'source' => EVENT_SOURCE_TRIGGERS,
-							'object' => EVENT_OBJECT_TRIGGER,
+							'output'         => API_OUTPUT_EXTEND,
+							'objectids'      => [$event['objectid']],
+							'source'         => EVENT_SOURCE_TRIGGERS,
+							'object'         => EVENT_OBJECT_TRIGGER,
 							'selectTriggers' => API_OUTPUT_EXTEND,
-							'time_till' => $event['clock'] - 1,
-							'filter' => ['value' => TRIGGER_VALUE_TRUE],
-							'limit' => 1,
-							'sortorder' => ZBX_SORT_DOWN
+							'time_till'      => $event['clock'] - 1,
+							'filter'         => ['value' => TRIGGER_VALUE_TRUE],
+							'limit'          => 1,
+							'sortorder'      => ZBX_SORT_DOWN
 						]);
 
 						if ($add_event) {
 							$add_event = reset($add_event);
 
 							$incidents[$i] = [
-								'objectid' => $event['objectid'],
-								'status' => TRIGGER_VALUE_FALSE,
-								'startTime' => $add_event['clock'],
-								'endTime' => $event['clock'],
-								'false_positive' => $add_event['false_positive']
+								'objectid'       => $event['objectid'],
+								'status'         => TRIGGER_VALUE_FALSE,
+								'startTime'      => $add_event['clock'],
+								'endTime'        => $event['clock'],
+								'false_positive' => getEventFalsePositiveness($add_event['eventid']),
 							];
 						}
 					}
