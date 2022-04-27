@@ -29,10 +29,8 @@ if (!opt('dry-run'))
 	# TODO: this is one time operation, remove on the next project iteration
 	if (-f "/opt/zabbix/data/rsm.slv.dns.downtime.auditlog.txt")
 	{
-		rename(
-			"/opt/zabbix/data/rsm.slv.dns.downtime.auditlog.txt",
-			"/opt/zabbix/data/rsm.slv.dns.downtime.false-positive.txt"
-		) or die("cannot rename file \"/opt/zabbix/data/rsm.slv.dns.downtime.auditlog.txt\": $!");
+		unlink("/opt/zabbix/data/rsm.slv.dns.downtime.auditlog.txt") or
+			die("cannot remove file \"/opt/zabbix/data/rsm.slv.dns.downtime.auditlog.txt\": $!");
 	}
 
 	recalculate_downtime(
