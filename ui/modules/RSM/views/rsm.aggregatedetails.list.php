@@ -211,10 +211,10 @@ if ($data['type'] == RSM_DNS && array_key_exists('dns_nameservers', $data)) {
 			$error_key = $ns_name.$ip;
 			// 'IP' column
 			$row_udp[] = array_key_exists($error_key, $data['probes_above_max_rtt'])
-				? $data['probes_above_max_rtt'][$error_key]['udp']
+				? $data['probes_above_max_rtt'][$error_key]['UDP']
 				: '0';
 			$row_tcp[] = array_key_exists($error_key, $data['probes_above_max_rtt'])
-				? $data['probes_above_max_rtt'][$error_key]['tcp']
+				? $data['probes_above_max_rtt'][$error_key]['TCP']
 				: '0';
 			// 'NSID' column
 			$row_udp[] = '';
