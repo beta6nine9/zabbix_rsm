@@ -128,6 +128,10 @@ sub check_opts()
 		{
 			pfail('Missing option: --value');
 		}
+		if (getopt('value') <= 0)
+		{
+			pfail('Invalid value for option --value (positive number expected): ' . getopt('value'));
+		}
 	}
 	else
 	{
