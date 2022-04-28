@@ -70,6 +70,10 @@ class Module extends CModule {
 	 * @param CAction $action    Current request handler object.
 	 */
 	public function onBeforeAction(CAction $action): void {
+		if (in_array($action->getAction(), ['index.php', 'index_http.php', 'index_sso.php'])) {
+			return;
+		}
+
 		if ($action instanceof AuthAction) {
 			$this->before_authaction_userid = CWebUser::$data['userid'];
 		}
