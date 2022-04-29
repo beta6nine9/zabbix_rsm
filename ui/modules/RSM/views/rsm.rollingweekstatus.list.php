@@ -278,7 +278,7 @@ if ($data['tld']) {
 
 	$services[RSM_EPP] = "EPP";
 
-	foreach ($data['tld'] as $key => $tld) {
+	foreach ($data['tld'] as $rsmhost_key => $tld) {
 		// REGISTRAR type.
 		if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
 			$row = [
