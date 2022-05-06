@@ -621,7 +621,7 @@ class RollingWeekStatusListAction extends Action {
 
 				$items += $avail_items;
 
-				if ($data['filter_slv'] !== SLA_MONITORING_SLV_FILTER_ANY) {
+				if ($data['filter_slv'] != SLA_MONITORING_SLV_FILTER_ANY) {
 					foreach ($filter_slv as $filtred_hostid => $value) {
 						if ($value === false) {
 							$rsmhost_key = $this->rsmhostKey($server_id, $filtred_hostid);
@@ -735,7 +735,7 @@ class RollingWeekStatusListAction extends Action {
 					 * Only hosts with disabled items are re-tested.
 					 * Only if filter 'Exceeding or equal to' is not set to 'any'.
 					 */
-					if ($hosts_with_disabled_items && $data['filter_slv'] !== SLA_MONITORING_SLV_FILTER_ANY) {
+					if ($hosts_with_disabled_items && $data['filter_slv'] != SLA_MONITORING_SLV_FILTER_ANY) {
 						foreach ($hosts_with_disabled_items as $hostid => $value) {
 							$rsmhost_key = $this->rsmhostKey($server_id, $hostid);
 
@@ -790,11 +790,13 @@ class RollingWeekStatusListAction extends Action {
 		if ($data['filter_status']) {
 			foreach ($data['tld'] as $rsmhost_key => $tld) {
 				if ($data['filter_status'] == 1) { // Current status == fail
-					if ((!$data['filter_dns'] || (!array_key_exists(RSM_DNS, $tld) || !$tld[RSM_DNS]['trigger']))
-							&& (!$data['filter_dnssec'] || (!array_key_exists(RSM_DNSSEC, $tld) || !$tld[RSM_DNSSEC]['trigger']))
-							&& (!$data['filter_rdds'] || (!array_key_exists(RSM_RDDS, $tld) || !$tld[RSM_RDDS]['trigger']))
-							&& (!$data['filter_rdap'] || (!array_key_exists(RSM_RDAP, $tld) || !$tld[RSM_RDAP]['trigger']))
-							&& (!$data['filter_epp'] || (!array_key_exists(RSM_EPP, $tld) || !$tld[RSM_EPP]['trigger']))) {
+					if (
+							(!$data['filter_dns'   ] || (!array_key_exists(RSM_DNS,    $tld) || !$tld[RSM_DNS   ]['trigger'])) &&
+							(!$data['filter_dnssec'] || (!array_key_exists(RSM_DNSSEC, $tld) || !$tld[RSM_DNSSEC]['trigger'])) &&
+							(!$data['filter_rdds'  ] || (!array_key_exists(RSM_RDDS,   $tld) || !$tld[RSM_RDDS  ]['trigger'])) &&
+							(!$data['filter_rdap'  ] || (!array_key_exists(RSM_RDAP,   $tld) || !$tld[RSM_RDAP  ]['trigger'])) &&
+							(!$data['filter_epp'   ] || (!array_key_exists(RSM_EPP,    $tld) || !$tld[RSM_EPP   ]['trigger']))
+					) {
 						unset($data['tld'][$rsmhost_key]);
 					}
 				}
