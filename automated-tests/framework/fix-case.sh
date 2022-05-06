@@ -5,6 +5,8 @@ set -o nounset
 set -o pipefail
 #set -o xtrace
 
+FRAMEWORK_DIR=$(realpath $(dirname $0))
+
 if [ $# -lt 1 ]; then
 	echo "usage: $0 <test-case-file>"
 	echo
@@ -30,9 +32,9 @@ num=${num%%-*}
 
 create_script=
 if [[ $new_test_case_file =~ /sla-api/ ]]; then
-	create_script="/home/vl/git/icann/qa/automated-tests/test-cases/sla-api/create-sla-and-cache-output.sh"
+	create_script="$FRAMEWORK_DIR/../test-cases/sla-api/create-sla-and-cache-output.sh"
 elif [[ $new_test_case_file =~ /data-export/ ]]; then
-	create_script="/home/vl/git/icann/qa/automated-tests/test-cases/data-export/create-output.sh"
+	create_script="$FRAMEWORK_DIR/../test-cases/data-export/create-output.sh"
 else
 	echo "unexpected test case file \"$test_case_file\""
 	exit 1
