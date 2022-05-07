@@ -547,7 +547,12 @@ class ParticularTestsListAction extends Action {
 			' OR '.dbConditionString('i.key_', [PROBE_EPP_IP, PROBE_EPP_UPDATE, PROBE_EPP_INFO, PROBE_EPP_LOGIN]).')';
 		}
 
-		if ($test_result['value'] != UP_INCONCLUSIVE_RECONFIG) {
+		if ($test_result['value'] == UP_INCONCLUSIVE_RECONFIG) {
+			foreach ($data['probes'] as &$probe) {
+				$probe['status'] = PROBE_NORESULT;
+			}
+		}
+		else {
 			// Get items.
 			$items = ($probe_item_key_condition !== '') ? DBselect(
 				'SELECT i.itemid,i.key_,i.hostid,i.value_type'.

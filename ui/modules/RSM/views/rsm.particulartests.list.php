@@ -131,7 +131,19 @@ foreach ($data['probes'] as $probe) {
 		$show_totals = true;
 	}
 
-	if (isset($probe['status']) && $probe['status'] === PROBE_DOWN) {
+	if (isset($probe['status']) && $probe['status'] === PROBE_NORESULT) {
+		$probe_no_result = true;
+		if ($data['type'] == RSM_RDAP) {
+			$rdap = $no_result;
+		}
+		elseif ($data['type'] == RSM_RDDS) {
+			$rdds = ZBX_STYLE_GREY;
+			$rdds43 = $no_result;
+			$rdds80 = $no_result;
+			$rdap   = $no_result;
+		}
+	}
+	elseif (isset($probe['status']) && $probe['status'] === PROBE_DOWN) {
 		if ($data['type'] == RSM_RDAP) {
 			$rdap = $offline;
 		}
