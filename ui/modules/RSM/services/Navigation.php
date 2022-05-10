@@ -43,8 +43,11 @@ class Navigation {
 			$menu[] = (new CMenuItem(_('Incidents')))
 				->setUrl($url, 'rsm.incidents')
 				->setAliases([
-					'rsm.incidents', 'rsm.incidentdetails', 'rsm.tests',
-					'rsm.particulartests', 'rsm.aggregatedetails'
+					'rsm.incidents',
+					'rsm.incidentdetails',
+					'rsm.tests',
+					'rsm.particulartests',
+					'rsm.aggregatedetails',
 				]);
 		}
 
@@ -66,17 +69,17 @@ class Navigation {
 
 		// Remove Zabbix default menu entries if not available.
 		$this->modify($node, _('Monitoring'), [
-			_('Dashboard') => 'dashboard.view',
-			_('Discovery') => 'discovery.view',
+			_('Dashboard')   => 'dashboard.view',
+			_('Discovery')   => 'discovery.view',
 		]);
 		$this->modify($node, _('Inventory'), [
 			_('Overview') => 'hostinventoriesoverview.php',
 		]);
 		$this->modify($node, _('Reports'), [
 			_('Availability report') => 'report2.php',
-			_('Notifications') => 'report4.php',
-			_('System information') => 'report.status',
-			_('Audit') => 'auditlog.list',
+			_('Notifications')       => 'report4.php',
+			_('System information')  => 'report.status',
+			_('Audit')               => 'auditlog.list',
 		]);
 		$this->modify($node, _('Configuration'), [
 			_('Host groups') => 'hostgroups.php',

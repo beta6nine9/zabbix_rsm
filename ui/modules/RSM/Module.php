@@ -3,12 +3,14 @@
 namespace Modules\RSM;
 
 use APP;
+use API;
 use DB;
 use CWebUser;
 use Core\CModule as CModule;
 use CTag;
 use CController as CAction;
 use CLegacyAction;
+use CSessionHelper;
 use Modules\RSM\Actions\AuthAction;
 use Modules\RSM\Services\MacroService;
 use Modules\RSM\Services\DatabaseService;
@@ -58,9 +60,22 @@ class Module extends CModule {
 		}
 
 		$actions = array_filter($actions, [$this->permission, 'canAccessRoute']);
+
 		$nav = new Navigation($actions);
 		$nav->build($cmenu);
-		$nav->addServersMenu($this->getServersList(), $cmenu);
+
+		// Add "Servers" sub-menu for admins and remove "Monitoring" section for non-admins.
+		if (in_array(CWebUser::getType(), [
+				USER_TYPE_ZABBIX_USER,
+				USER_TYPE_ZABBIX_ADMIN,
+				USER_TYPE_SUPER_ADMIN
+			])) {
+			$nav->addServersMenu($this->getServersList(), $cmenu);
+		}
+		else {
+			$cmenu->remove('Monitoring');
+		}
+
 		$nav->buildUserMenu(APP::Component()->get('menu.user'));
 	}
 
