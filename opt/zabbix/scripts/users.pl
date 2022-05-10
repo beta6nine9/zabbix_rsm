@@ -10,9 +10,9 @@ use Zabbix;
 use RSM;
 use RSMSLV;
 
-use constant USER_TYPE_READ_ONLY_USER => 4;	# User type "Read-only user"
-use constant USER_TYPE_POWER_USER     => 5;	# User type "Power user"
-use constant USER_TYPE_SUPER_ADMIN    => 3;	# User type "Zabbix Super Admin"
+use constant USER_ROLE_READ_ONLY   => 100;	# User type "Read-only user"
+use constant USER_ROLE_POWER_USER  => 110;	# User type "Power user"
+use constant USER_ROLE_SUPER_ADMIN => 3;	# User type "Zabbix Super Admin"
 
 # NB! Keep these values in sync with DB schema!
 use constant READ_ONLY_USER_GROUPID => 100;	# User group "Read-only user"
@@ -23,19 +23,19 @@ use constant USER_TYPES =>
 {
 	'read-only-user' =>
 	{
-		'type'     => USER_TYPE_READ_ONLY_USER,
+		'roleid'   => USER_ROLE_READ_ONLY,
 		'usrgrpid' => READ_ONLY_USER_GROUPID,
 		'url'      => 'zabbix.php?action=rsm.rollingweekstatus',
 	},
 	'power-user' =>
 	{
-		'type'     => USER_TYPE_POWER_USER,
+		'roleid'   => USER_ROLE_POWER_USER,
 		'usrgrpid' => POWER_USER_GROUPID,
 		'url'      => 'zabbix.php?action=rsm.rollingweekstatus',
 	},
 	'admin' =>
 	{
-		'type'     => USER_TYPE_SUPER_ADMIN,
+		'roleid'   => USER_ROLE_SUPER_ADMIN,
 		'usrgrpid' => SUPER_ADMIN_GROUPID,
 		'url'      => 'zabbix.php?action=dashboard.view',
 	}
@@ -65,19 +65,24 @@ foreach my $server_key (@server_keys)
 
 	print("Processing $server_key\n");
 
-	my $zabbix = Zabbix->new({'url' => $section->{'za_url'}, 'user' => $section->{'za_user'},
-			'password' => $section->{'za_password'}, 'debug' => getopt('debug')});
+	my $zabbix = Zabbix->new({
+		'url'      => $section->{'za_url'},
+		'user'     => $section->{'za_user'},
+		'password' => $section->{'za_password'},
+		'debug'    => getopt('debug'),
+	});
 
 	if (opt('add'))
 	{
 		my $options = {
-			'alias' => getopt('user'),
-			'type' => USER_TYPES->{getopt('type')}->{'type'},
-			'passwd' => getopt('password'),
-			'name' => getopt('firstname'),
-			'surname' => getopt('lastname'),
-			'url' => USER_TYPES->{getopt('type')}->{'url'},
-			'usrgrps' => [{'usrgrpid' => USER_TYPES->{getopt('type')}->{'usrgrpid'}}]};
+			'username' => getopt('user'),
+			'roleid'   => USER_TYPES->{getopt('type')}->{'roleid'},
+			'passwd'   => getopt('password'),
+			'name'     => getopt('firstname'),
+			'surname'  => getopt('lastname'),
+			'url'      => USER_TYPES->{getopt('type')}->{'url'},
+			'usrgrps'  => [{'usrgrpid' => USER_TYPES->{getopt('type')}->{'usrgrpid'}}],
+		};
 
 		my $result = $zabbix->create('user', $options);
 

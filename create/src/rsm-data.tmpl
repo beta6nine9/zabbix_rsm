@@ -23,6 +23,8 @@ ROW   |1     |User role       |1   |0       |
 ROW   |2     |Admin role      |2   |0       |
 ROW   |3     |Super admin role|3   |1       |
 ROW   |4     |Guest role      |1   |0       |
+ROW   |100   |Read-only user  |100 |1       |
+ROW   |110   |Power user      |110 |1       |
 
 TABLE |users
 FIELDS|userid|username                  |name   |surname      |passwd                                                      |url |autologin|autologout|refresh|rows_per_page|roleid|
@@ -179,8 +181,8 @@ ROW   |143        |140     |0            |0       |120   |      |
 ROW   |144        |140     |2            |0       |100166|      |
 
 TABLE |config
-FIELDS|configid|work_period    |alert_usrgrpid|discovery_groupid|dbversion_status|
-ROW   |1       |1-5,09:00-18:00|7             |5                |                |
+FIELDS|configid|work_period    |alert_usrgrpid|discovery_groupid|dbversion_status|geomaps_tile_provider|
+ROW   |1       |1-5,09:00-18:00|7             |5                |                |OpenStreetMap.Mapnik |
 
 TABLE |graph_theme
 FIELDS|graphthemeid|theme     |backgroundcolor|graphcolor|gridcolor|maingridcolor|gridbordercolor|textcolor|highlightcolor|leftpercentilecolor|rightpercentilecolor|nonworktimecolor|colorpalette                                                                                                                                      |
@@ -359,6 +361,26 @@ ROW   |21         |3     |0   |service.read          |1        |         |NULL  
 ROW   |22         |3     |0   |services.write        |1        |         |NULL          |NULL           |
 ROW   |23         |4     |0   |service.read          |1        |         |NULL          |NULL           |
 ROW   |24         |4     |0   |services.write        |0        |         |NULL          |NULL           |
+ROW   |10000      |100   |0   |ui.monitoring.hosts   |1        |         |NULL          |NULL           |
+ROW   |10001      |100   |0   |ui.default_access     |0        |         |NULL          |NULL           |
+ROW   |10002      |100   |0   |services.read         |0        |         |NULL          |NULL           |
+ROW   |10003      |100   |0   |services.write        |0        |         |NULL          |NULL           |
+ROW   |10004      |100   |0   |modules.default_access|0        |         |NULL          |NULL           |
+ROW   |10005      |100   |0   |api.access            |0        |         |NULL          |NULL           |
+ROW   |10006      |100   |0   |actions.default_access|0        |         |NULL          |NULL           |
+ROW   |10007      |100   |2   |modules.module.0      |0        |         |1             |NULL           |
+ROW   |10008      |110   |0   |ui.monitoring.hosts   |1        |         |NULL          |NULL           |
+ROW   |10009      |110   |0   |ui.default_access     |0        |         |NULL          |NULL           |
+ROW   |10010      |110   |0   |services.read         |0        |         |NULL          |NULL           |
+ROW   |10011      |110   |0   |services.write        |0        |         |NULL          |NULL           |
+ROW   |10012      |110   |0   |modules.default_access|0        |         |NULL          |NULL           |
+ROW   |10013      |110   |0   |api.access            |0        |         |NULL          |NULL           |
+ROW   |10014      |110   |0   |actions.default_access|0        |         |NULL          |NULL           |
+ROW   |10015      |110   |2   |modules.module.0      |0        |         |1             |NULL           |
+
+TABLE |ha_node
+FIELDS|ha_nodeid                |name|address  |port |lastaccess|status|ha_sessionid             |
+ROW   |cl3067yy70001dpi5ahhavdy7|    |localhost|10051|1652188244|1     |cl3067uqv0000d9i5rvx9lwd3|
 
 TABLE |rsm_ip_version
 FIELDS|id  |name|

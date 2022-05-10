@@ -107,6 +107,8 @@ while (0)
 #define GET_HOST_GROUP_ID(groupid, name)										\
 		SELECT_VALUE_UINT64(groupid, "select groupid from hstgrp where name='%s'", name)
 
+#define zbx_db_dyn_escape_string(src)	zbx_db_dyn_escape_string(src, ZBX_SIZE_T_MAX, ZBX_SIZE_T_MAX, ESCAPE_SEQUENCE_ON)
+
 extern unsigned char	program_type;
 
 /*
@@ -863,6 +865,137 @@ static int	DBpatch_6000000_21(void)
 	return DBdrop_field("events", "false_positive");
 }
 
+/* 6000000, 22 - create roles for "Read-only user", "Power user" and "Compliance user" */
+static int	DBpatch_6000000_22(void)
+{
+	/* this is just a direct paste from data.tmpl, with each line quoted and properly indented */
+	static const char	*const data[] = {
+		"ROW   |100   |Read-only user  |100 |1       |",
+		"ROW   |110   |Power user      |110 |1       |",
+		NULL
+	};
+	int			i;
+
+	ONLY_SERVER();
+
+	for (i = 0; NULL != data[i]; i++)
+	{
+		zbx_uint64_t	roleid;
+		char		*name = NULL, *name_esc;
+		int		type, readonly;
+
+		if (0 == strncmp(data[i], "--", ZBX_CONST_STRLEN("--")))
+			continue;
+
+		if (4 != sscanf(data[i], "ROW |" ZBX_FS_UI64 " |%m[^|]|%d |%d |",
+				&roleid, &name, &type, &readonly))
+		{
+			zabbix_log(LOG_LEVEL_CRIT, "failed to parse the following line:\n%s", data[i]);
+			zbx_free(name);
+			return FAIL;
+		}
+
+		zbx_rtrim(name, ZBX_WHITESPACE);
+
+		/* NOTE: to keep it simple assume that data does not contain sequences "&pipe;", "&eol;" or "&bsn;" */
+
+		name_esc = zbx_db_dyn_escape_string(name);
+		zbx_free(name);
+
+		if (ZBX_DB_OK > DBexecute("insert into role (roleid,name,type,readonly)"
+				" values (" ZBX_FS_UI64 ",'%s',%d,%d)",
+				roleid, name_esc, type, readonly))
+		{
+			zbx_free(name_esc);
+			return FAIL;
+		}
+
+		zbx_free(name_esc);
+	}
+
+	if (ZBX_DB_OK > DBexecute("delete from ids where table_name='role'"))
+		return FAIL;
+
+	return SUCCEED;
+}
+
+/* 6000000, 23 - add settings for "Read-only user", "Power user" and "Compliance user" roles */
+static int	DBpatch_6000000_23(void)
+{
+	/* this is just a direct paste from data.tmpl, with each line quoted and properly indented */
+	static const char	*const data[] = {
+		"ROW   |10000      |100   |0   |ui.monitoring.hosts   |1        |         |NULL          |NULL           |",
+		"ROW   |10001      |100   |0   |ui.default_access     |0        |         |NULL          |NULL           |",
+		"ROW   |10002      |100   |0   |services.read         |0        |         |NULL          |NULL           |",
+		"ROW   |10003      |100   |0   |services.write        |0        |         |NULL          |NULL           |",
+		"ROW   |10004      |100   |0   |modules.default_access|0        |         |NULL          |NULL           |",
+		"ROW   |10005      |100   |0   |api.access            |0        |         |NULL          |NULL           |",
+		"ROW   |10006      |100   |0   |actions.default_access|0        |         |NULL          |NULL           |",
+		"ROW   |10007      |100   |2   |modules.module.0      |0        |         |1             |NULL           |",
+		"ROW   |10008      |110   |0   |ui.monitoring.hosts   |1        |         |NULL          |NULL           |",
+		"ROW   |10009      |110   |0   |ui.default_access     |0        |         |NULL          |NULL           |",
+		"ROW   |10010      |110   |0   |services.read         |0        |         |NULL          |NULL           |",
+		"ROW   |10011      |110   |0   |services.write        |0        |         |NULL          |NULL           |",
+		"ROW   |10012      |110   |0   |modules.default_access|0        |         |NULL          |NULL           |",
+		"ROW   |10013      |110   |0   |api.access            |0        |         |NULL          |NULL           |",
+		"ROW   |10014      |110   |0   |actions.default_access|0        |         |NULL          |NULL           |",
+		"ROW   |10015      |110   |2   |modules.module.0      |0        |         |1             |NULL           |",
+		NULL
+	};
+	int			i;
+
+	ONLY_SERVER();
+
+	for (i = 0; NULL != data[i]; i++)
+	{
+		zbx_uint64_t	role_ruleid, roleid;
+		char		*name = NULL, *value_str = NULL, *value_moduleid = NULL, *name_esc;
+		int		type, value_int;
+
+		if (0 == strncmp(data[i], "--", ZBX_CONST_STRLEN("--")))
+			continue;
+
+		if (7 != sscanf(data[i], "ROW |" ZBX_FS_UI64 " |" ZBX_FS_UI64 " |%d |%m[^|]|%d |%m[^|]|%m[^|]|",
+				&role_ruleid, &roleid, &type, &name, &value_int, &value_str, &value_moduleid))
+		{
+			zabbix_log(LOG_LEVEL_CRIT, "failed to parse the following line:\n%s", data[i]);
+			zbx_free(name);
+			zbx_free(value_str);
+			zbx_free(value_moduleid);
+			return FAIL;
+		}
+
+		/* this one is unused */
+		zbx_free(value_str);
+
+		zbx_rtrim(name, ZBX_WHITESPACE);
+		zbx_rtrim(value_moduleid, ZBX_WHITESPACE);
+
+		/* NOTE: to keep it simple assume that data does not contain sequences "&pipe;", "&eol;" or "&bsn;" */
+
+		name_esc = zbx_db_dyn_escape_string(name);
+		zbx_free(name);
+
+		if (ZBX_DB_OK > DBexecute(
+				"insert into role_rule (role_ruleid,roleid,type,name,value_int,value_moduleid)"
+				" values (" ZBX_FS_UI64 "," ZBX_FS_UI64 ",%d,'%s',%d,%s)",
+				role_ruleid, roleid, type, name_esc, value_int, value_moduleid))
+		{
+			zbx_free(name_esc);
+			zbx_free(value_moduleid);
+			return FAIL;
+		}
+
+		zbx_free(name_esc);
+		zbx_free(value_moduleid);
+	}
+
+	if (ZBX_DB_OK > DBexecute("delete from ids where table_name='role_rule'"))
+		return FAIL;
+
+	return SUCCEED;
+}
+
 #endif
 
 DBPATCH_START(6000)
@@ -891,5 +1024,7 @@ DBPATCH_RSM(6000000, 18, 0, 0)	/* add userid foreign key to table rsm_false_posi
 DBPATCH_RSM(6000000, 19, 0, 0)	/* add eventid index to table rsm_false_positive */
 DBPATCH_RSM(6000000, 20, 0, 0)	/* add eventid foreign key to table rsm_false_positive */
 DBPATCH_RSM(6000000, 21, 0, 0)	/* drop column events.false_positive */
+DBPATCH_RSM(6000000, 22, 0, 1)  /* create roles for "Read-only user", "Power user" and "Compliance user" */
+DBPATCH_RSM(6000000, 23, 0, 1)  /* add settings for "Read-only user", "Power user" and "Compliance user" roles */
 
 DBPATCH_END()

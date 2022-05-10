@@ -19,13 +19,7 @@
 **/
 
 /* RSM specifics: specific defines */
-define('ZABBIX_DB_VERSION_RSM',		16);
-
-// Additional users.
-define('USER_TYPE_ZABBIX_GUEST',	0);
-define('USER_TYPE_READ_ONLY',		4);
-define('USER_TYPE_POWER_USER',		5);
-define('USER_TYPE_COMPLIANCE',		6);
+define('ZABBIX_DB_VERSION_RSM',		23);
 /* RSM specifics: end */
 
 define('ZABBIX_VERSION',		'6.0.3');

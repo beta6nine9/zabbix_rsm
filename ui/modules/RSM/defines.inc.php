@@ -19,6 +19,11 @@
 **/
 
 
+define('USER_TYPE_ZABBIX_GUEST',	0);
+define('USER_TYPE_READ_ONLY',		100); /* keep the same ID as the role */
+define('USER_TYPE_POWER_USER',		110); /* keep the same ID as the role */
+define('USER_TYPE_COMPLIANCE',		120);
+
 /*
  * These numbers must be in sync with Backend!
  */

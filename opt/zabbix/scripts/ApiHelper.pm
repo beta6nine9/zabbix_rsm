@@ -900,6 +900,9 @@ sub __encode_json($$$)
 }
 
 # get id of the last "false positive" record that was processed
+# returns:
+# 0         - no "last false positiveid" file
+# otherwise - the contents of that file
 sub ah_get_last_false_positiveid
 {
 	my $server_key = shift;
