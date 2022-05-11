@@ -15,7 +15,11 @@ use List::Util qw(max);
 
 parse_slv_opts();
 fail_if_running();
+
+log_execution_time(1);
+
 set_slv_config(get_rsm_config());
+
 db_connect();
 
 slv_exit(SUCCESS) if (get_monitoring_target() ne MONITORING_TARGET_REGISTRY);

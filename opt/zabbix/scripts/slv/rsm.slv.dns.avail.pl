@@ -19,6 +19,8 @@ my $cfg_value_type = ITEM_VALUE_TYPE_UINT64;
 parse_slv_opts();
 fail_if_running();
 
+log_execution_time(1);
+
 set_slv_config(get_rsm_config());
 
 db_connect();

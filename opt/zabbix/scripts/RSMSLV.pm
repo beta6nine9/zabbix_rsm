@@ -12,6 +12,8 @@ use Exporter qw(import);
 use Zabbix;
 use Alerts;
 use TLD_constants qw(:api :items :ec :groups :config :templates);
+use DateTime;
+use File::Basename;
 use File::Pid;
 use POSIX qw(floor);
 use Sys::Syslog;
@@ -91,6 +93,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		PROBE_DELAY
 		ONLINE OFFLINE
 		USE_CACHE_FALSE USE_CACHE_TRUE
+		log_execution_time
 		get_macro_dns_probe_online
 		get_macro_rdds_probe_online
 		get_macro_rdap_probe_online
@@ -182,6 +185,20 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		convert_suffixed_number
 		var_dump
 		usage);
+
+# for logging script execution times
+
+my $log_execution_time = undef;
+my $execution_time_start;
+my $execution_time_end;
+my $execution_time_sending_values_start;
+my $execution_time_sending_values_end;
+my $execution_time_value_count = 0;
+
+sub log_execution_time($)
+{
+	$log_execution_time = shift;
+}
 
 # configuration, set in set_slv_config()
 my $config = undef;
@@ -1722,6 +1739,7 @@ sub db_disconnect
 
 		$dbh->disconnect() || wrn($dbh->errstr);
 		undef($dbh);
+		undef($server_key);
 	}
 }
 
@@ -2111,8 +2129,6 @@ sub current_month_first_cycle
 
 sub month_start
 {
-	require DateTime;
-
 	my $dt = DateTime->from_epoch('epoch' => shift());
 	$dt->truncate('to' => 'month');
 	return $dt->epoch();
@@ -2136,8 +2152,6 @@ sub get_downtime_bounds
 {
 	my $delay = shift;
 	my $now = shift || (time() - $delay);
-
-	require DateTime;
 
 	my $till = cycle_end($now, $delay);
 
@@ -2413,6 +2427,8 @@ sub send_values
 
 		my $data = [map($_->{'data'}, @{$_sender_values->{'data'}})];
 
+		$execution_time_sending_values_start = Time::HiRes::time();
+
 		if (opt('output-file'))
 		{
 			my $output_file = getopt('output-file');
@@ -2424,6 +2440,9 @@ sub send_values
 			dbg("sending $total_values values");	# send everything in one batch since server should be local
 			push_to_trapper($config->{'slv'}->{'zserver'}, $config->{'slv'}->{'zport'}, 10, 5, $data);
 		}
+
+		$execution_time_sending_values_end = Time::HiRes::time();
+		$execution_time_value_count += $total_values;
 	}
 
 	# $tld is a global variable which is used in info()
@@ -4521,8 +4540,6 @@ sub cycles_till_end_of_month($$)
 
 	if (opt('debug'))
 	{
-		require DateTime;
-
 		dbg('now              - ', DateTime->from_epoch('epoch' => $now));
 		dbg('this cycle start - ', DateTime->from_epoch('epoch' => $this_cycle_start));
 		dbg('end of month     - ', DateTime->from_epoch('epoch' => $end_of_month));
@@ -4538,8 +4555,6 @@ sub get_end_of_month($)
 {
 	my $now = shift;
 
-	require DateTime;
-
 	my $dt = DateTime->from_epoch('epoch' => $now);
 	$dt->truncate('to' => 'month');
 	$dt->add('months' => 1);
@@ -4551,8 +4566,6 @@ sub get_end_of_prev_month($)
 {
 	my $now = shift;
 
-	require DateTime;
-
 	my $dt = DateTime->from_epoch('epoch' => $now);
 	$dt->truncate('to' => 'month');
 	$dt->subtract('seconds' => 1);
@@ -4562,8 +4575,6 @@ sub get_end_of_prev_month($)
 sub get_month_bounds(;$)
 {
 	my $now = shift // time();
-
-	require DateTime;
 
 	my $from;
 	my $till;
@@ -6120,8 +6131,6 @@ sub __fp_regenerate_reports($$)
 	my $service            = shift;
 	my $report_updates_ref = shift;
 
-	require DateTime;
-
 	my %report_updates = ();
 
 	my $curr_month = DateTime->now()->truncate('to' => 'month')->epoch();
@@ -6211,6 +6220,49 @@ $program     =~ s,(rsm)\.(slv|probe)\.,${1}@{[ZABBIX_NAMESPACE]}.${2}.,g;
 my $logopt   = 'pid';
 my $facility = 'user';
 my $prev_tld = "";
+
+BEGIN {
+	$execution_time_start = Time::HiRes::time();
+}
+
+END {
+	if ($log_execution_time)
+	{
+		$execution_time_end = Time::HiRes::time();
+
+		my $script = basename($0);
+		my $start  = DateTime->from_epoch('epoch' => $execution_time_start // 0)->hms();
+		my $end    = DateTime->from_epoch('epoch' => $execution_time_end // 0)->hms();
+		my $values = $execution_time_value_count;
+		my $times;
+
+		if ($values)
+		{
+			my $total = $execution_time_end - $execution_time_start;
+			my $calc  = $execution_time_sending_values_start - $execution_time_start;
+			my $send  = $execution_time_sending_values_end - $execution_time_sending_values_start;
+			my $wait  = $execution_time_end - $execution_time_sending_values_end;
+
+			$times = sprintf("total %.3fs (calculations %.3fs, sending %.3fs, waiting %.3fs)", $total, $calc, $send, $wait);
+		}
+		else
+		{
+			$times = sprintf("total %.3fs", $execution_time_end - $execution_time_start);
+		}
+
+		# override $program to write to the same log file
+		$program = 'rsm.execution.times';
+
+		# force reopening the log
+		if ($log_open)
+		{
+			closelog();
+			$log_open = 0;
+		}
+
+		info(sprintf("%s, status %d, %s-%s, %d values, %s", $script, $?, $start, $end, $values, $times));
+	}
+}
 
 sub __func
 {

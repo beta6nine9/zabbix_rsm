@@ -68,6 +68,8 @@ usage() if (opt('help'));
 
 exit_if_running();	# exit with 0 exit code
 
+log_execution_time(1);
+
 my $max_wait = getopt('max-wait') // DEFAULT_MAX_WAIT;
 
 if (opt('debug'))
@@ -497,7 +499,7 @@ sub process_tld($$$$$$)
 
 		if (scalar(@cycles_to_calculate) == 0)
 		{
-			
+
 			info(sprintf("selected no %6s period", $service)) if (opt('print-period'));
 			next;
 		}
