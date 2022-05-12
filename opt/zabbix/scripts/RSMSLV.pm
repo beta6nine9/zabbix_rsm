@@ -188,16 +188,18 @@ our @EXPORT = qw($result $dbh $tld $server_key
 
 # for logging script execution times
 
-my $log_execution_time = undef;
+my $log_execution_time = undef; # should execution time be logged?
+my $log_execution_time_ext = undef; # should detailed execution times be logged?
 my $execution_time_start;
 my $execution_time_end;
 my $execution_time_sending_values_start;
 my $execution_time_sending_values_end;
 my $execution_time_value_count = 0;
 
-sub log_execution_time($)
+sub log_execution_time($$)
 {
-	$log_execution_time = shift;
+	$log_execution_time     = shift;
+	$log_execution_time_ext = shift;
 }
 
 # configuration, set in set_slv_config()
@@ -6236,12 +6238,19 @@ END {
 		my $values = $execution_time_value_count;
 		my $times;
 
-		if ($values)
+		if ($log_execution_time_ext)
 		{
 			my $total = $execution_time_end - $execution_time_start;
-			my $calc  = $execution_time_sending_values_start - $execution_time_start;
-			my $send  = $execution_time_sending_values_end - $execution_time_sending_values_start;
-			my $wait  = $execution_time_end - $execution_time_sending_values_end;
+			my $calc  = $total;
+			my $send  = 0.0;
+			my $wait  = 0.0;
+
+			if ($values)
+			{
+				$calc  = $execution_time_sending_values_start - $execution_time_start;
+				$send  = $execution_time_sending_values_end - $execution_time_sending_values_start;
+				$wait  = $execution_time_end - $execution_time_sending_values_end;
+			}
 
 			$times = sprintf("total %.3fs (calculations %.3fs, sending %.3fs, waiting %.3fs)", $total, $calc, $send, $wait);
 		}

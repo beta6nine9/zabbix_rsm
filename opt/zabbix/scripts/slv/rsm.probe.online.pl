@@ -18,7 +18,7 @@ sub main()
 {
 	parse_opts('now=i');
 	fail_if_running();
-	log_execution_time(1);
+	log_execution_time(1, 1);
 	set_slv_config(get_rsm_config());
 
 	db_connect();

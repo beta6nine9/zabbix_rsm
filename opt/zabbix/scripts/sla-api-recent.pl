@@ -68,7 +68,7 @@ usage() if (opt('help'));
 
 exit_if_running();	# exit with 0 exit code
 
-log_execution_time(1);
+log_execution_time(1, 0);
 
 my $max_wait = getopt('max-wait') // DEFAULT_MAX_WAIT;
 

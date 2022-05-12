@@ -49,7 +49,7 @@ setopt('nolog');
 
 fail_if_running();
 
-log_execution_time(1);
+log_execution_time(1, 0);
 
 if (opt('debug'))
 {
