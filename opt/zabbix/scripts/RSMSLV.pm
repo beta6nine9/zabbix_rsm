@@ -4800,9 +4800,9 @@ sub get_slv_rtt_monthly_items($$$$)
 				fail("Items '$slv_item_key_performed', '$slv_item_key_failed' and '$slv_item_key_pfailed' have different lastvalue clocks on TLD '$tld'");
 			}
 		}
-
-		unset_log_tld();
 	}
+
+	unset_log_tld();
 
 	return \%slv_items_by_tld;
 }
@@ -4978,9 +4978,9 @@ sub update_slv_rtt_monthly_stats($$$$$$$$;$)
 
 			$last_clock = $cycle_start;
 		}
-
-		unset_log_tld();
 	}
+
+	unset_log_tld();
 
 	send_values();
 }
@@ -6268,6 +6268,9 @@ END {
 			closelog();
 			$log_open = 0;
 		}
+
+		# make sure that TLD for logging is not specified (e.g., in case of fail())
+		unset_log_tld();
 
 		info(sprintf("%s, status %d, %s-%s, %d values, %s", $script, $?, $start, $end, $values, $times));
 	}
