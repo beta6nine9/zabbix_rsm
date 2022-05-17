@@ -72,7 +72,13 @@ sub main()
 
 	if (!opt("skip-build"))
 	{
-		foreach my $directory (get_config('paths', 'build_dir'), get_config('paths', 'logs_dir'))
+		my @directories = (
+			get_config('paths', 'source_dir') . "/database/mysql",
+			get_config('paths', 'build_dir'),
+			get_config('paths', 'logs_dir'),
+		);
+
+		foreach my $directory (@directories)
 		{
 			if (-d $directory)
 			{
