@@ -6233,8 +6233,8 @@ END {
 		$execution_time_end = Time::HiRes::time();
 
 		my $script = basename($0);
-		my $start  = DateTime->from_epoch('epoch' => $execution_time_start // 0)->hms();
-		my $end    = DateTime->from_epoch('epoch' => $execution_time_end // 0)->hms();
+		my $start  = ts_hms($execution_time_start // 0, ':');
+		my $end    = ts_hms($execution_time_end   // 0, ':');
 		my $values = $execution_time_value_count;
 		my $times;
 
