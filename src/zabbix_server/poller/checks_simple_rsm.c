@@ -708,22 +708,29 @@ out:
 	return ret;
 }
 
-static int	zbx_ldns_rdf_compare(const void *d1, const void *d2)
-{
-	return ldns_rdf_compare((const ldns_rdf *)d1, (const ldns_rdf *)d2);
-}
-
 static void	zbx_get_owners(const ldns_rr_list *rr_list, zbx_vector_ptr_t *owners)
 {
-	size_t		i, count;
+	size_t	i, count;
 
 	count = ldns_rr_list_rr_count(rr_list);
 
 	for (i = 0; i < count; i++)
-		zbx_vector_ptr_append(owners, ldns_rdf_clone(ldns_rr_owner(ldns_rr_list_rr(rr_list, i))));
+	{
+		int		j;
+		ldns_rdf	*owner = ldns_rr_owner(ldns_rr_list_rr(rr_list, i));
 
-	zbx_vector_ptr_sort(owners, zbx_ldns_rdf_compare);
-	zbx_vector_ptr_uniq(owners, zbx_ldns_rdf_compare);
+		if (owner == NULL)
+			continue;
+
+		for (j = 0; j < owners->values_num; j++)
+		{
+			if (ldns_rdf_compare(owner, *(const ldns_rdf **)owners->values[j]))
+				break;
+		}
+
+		if (j == owners->values_num)
+			zbx_vector_ptr_append(owners, ldns_rdf_clone(owner));
+	}
 }
 
 static void	zbx_destroy_owners(zbx_vector_ptr_t *owners)
