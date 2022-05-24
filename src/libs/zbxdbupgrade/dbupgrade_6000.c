@@ -996,6 +996,152 @@ static int	DBpatch_6000000_23(void)
 	return SUCCEED;
 }
 
+/* 6000000, 24 add script "DNSViz webhook" */
+static int	DBpatch_6000000_24(void)
+{
+	zbx_uint64_t	scriptid;
+
+	ONLY_SERVER();
+
+	scriptid = DBget_maxid_num("scripts", 1);
+
+	if (ZBX_DB_OK > DBexecute(
+			"insert into scripts"
+			" set scriptid=" ZBX_FS_UI64 ",name='DNSViz webhook',command='%s',host_access=2,description=''"
+			",type=5,execute_on=2,timeout='1m',scope=1,authtype=0",
+			scriptid,
+"try {\r\n\
+    var req = new HttpRequest(), response, script_params = JSON.parse(value), uri_params = {}, payload;\r\n\
+\r\n\
+    // Set up headers.\r\n\
+    req.addHeader(''Content-Type: application/x-www-form-urlencoded; charset=UTF-8'');\r\n\
+    req.addHeader(''Cache-Control: no-cache'');\r\n\
+    req.addHeader(''Connection: keep-alive'');\r\n\
+    req.addHeader(''Pragma: no-cache'');\r\n\
+\r\n\
+    // These ones are important in order to get HTTP status code 200 instead of 403.\r\n\
+    req.addHeader(''Referer: '' + script_params.url);\r\n\
+    req.addHeader(''X-Requested-With: XMLHttpRequest'');\r\n\
+\r\n\
+    // Form elements.\r\n\
+    payload = ''force_ancestor=.&analysis_type=0&perspective=server'';\r\n\
+\r\n\
+    Zabbix.log(3, ''[ DNSViz webhook ] POST \"'' + script_params.url + ''\" with \"'' + payload + ''\"'');\r\n\
+\r\n\
+    // Perform the POST request.\r\n\
+    response = req.post(script_params.url, payload);\r\n\
+\r\n\
+    Zabbix.log(3, ''[ DNSViz webhook ] Responded with code: '' + req.getStatus() + ''. Response: '' + response);\r\n\
+\r\n\
+    if (req.getStatus() !== 200) {\r\n\
+        throw response.error;\r\n\
+    }\r\n\
+\r\n\
+    return ''OK'';\r\n\
+}\r\n\
+catch (error) {\r\n\
+    Zabbix.log(3, ''[ DNSViz webhook ] Sending failed. Error: '' + error);\r\n\
+    throw ''Failed with error: '' + error;\r\n\
+}"))
+	{
+		return FAIL;
+	}
+
+	if (ZBX_DB_OK > DBexecute(
+			"insert into script_param"
+			" set script_paramid=" ZBX_FS_UI64 ",scriptid=" ZBX_FS_UI64 ",name='url'"
+				",value='https://dnsviz.net/d/{$RSM.DNS.TESTPREFIX}.{$RSM.TLD}/analyze/'",
+			DBget_maxid_num("script_param", 1), scriptid))
+	{
+		return FAIL;
+	}
+
+	if (ZBX_DB_OK > DBexecute("delete from ids where table_name='scripts'"))
+		return FAIL;
+
+	if (ZBX_DB_OK > DBexecute("delete from ids where table_name='script_param'"))
+		return FAIL;
+
+	return SUCCEED;
+}
+
+/* 6000000, 25 - add action "Create DNSViz report" for DNSSEC accidents */
+static int	DBpatch_6000000_25(void)
+{
+	zbx_uint64_t	actionid, operationid, scriptid;
+	int		ret = FAIL;
+
+	ONLY_SERVER();
+
+	actionid    = DBget_maxid_num("actions", 1);
+	operationid = DBget_maxid_num("operations", 1);
+
+	SELECT_VALUE_UINT64(scriptid, "select scriptid from scripts where name='%s'", "DNSViz webhook");
+
+	if (ZBX_DB_OK > DBexecute(
+			"insert into actions"
+			" set actionid=" ZBX_FS_UI64 ",name='Create DNSViz report',eventsource=0,evaltype=0,status=0"
+				",esc_period='1h',pause_suppressed=1,notify_if_canceled=1",
+			actionid))
+	{
+		goto out;
+	}
+
+	if (ZBX_DB_OK > DBexecute(
+			"insert into conditions"
+			" set conditionid=" ZBX_FS_UI64 ",actionid=" ZBX_FS_UI64 ",conditiontype=3,operator=2"
+			",value='DNSSEC service is down'",
+			DBget_maxid_num("conditions", 1), actionid))
+	{
+		goto out;
+	}
+
+
+	if (ZBX_DB_OK > DBexecute(
+			"insert into operations"
+			" set operationid=" ZBX_FS_UI64 ",actionid=" ZBX_FS_UI64 ",operationtype=1"
+				",esc_period='0',esc_step_from=1,esc_step_to=1,evaltype=0,recovery=0",
+			operationid, actionid))
+	{
+		goto out;
+	}
+
+	if (ZBX_DB_OK > DBexecute(
+			"insert into opcommand"
+			" set operationid=" ZBX_FS_UI64 ",scriptid=" ZBX_FS_UI64,
+			operationid, scriptid))
+	{
+		goto out;
+	}
+
+	if (ZBX_DB_OK > DBexecute(
+			"insert into opcommand_hst"
+			" set opcommand_hstid=" ZBX_FS_UI64 ",operationid=" ZBX_FS_UI64,
+			DBget_maxid_num("opcommand_hst", 1), operationid))
+	{
+		goto out;
+	}
+
+	if (ZBX_DB_OK > DBexecute("delete from ids where table_name='actions'"))
+		goto out;
+
+	if (ZBX_DB_OK > DBexecute("delete from ids where table_name='conditions'"))
+		goto out;
+
+	if (ZBX_DB_OK > DBexecute("delete from ids where table_name='operations'"))
+		goto out;
+
+	if (ZBX_DB_OK > DBexecute("delete from ids where table_name='opcommand'"))
+		goto out;
+
+	if (ZBX_DB_OK > DBexecute("delete from ids where table_name='opcommand_hst'"))
+		goto out;
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
 #endif
 
 DBPATCH_START(6000)
@@ -1026,5 +1172,7 @@ DBPATCH_RSM(6000000, 20, 0, 0)	/* add eventid foreign key to table rsm_false_pos
 DBPATCH_RSM(6000000, 21, 0, 0)	/* drop column events.false_positive */
 DBPATCH_RSM(6000000, 22, 0, 1)  /* create roles for "Read-only user", "Power user" and "Compliance user" */
 DBPATCH_RSM(6000000, 23, 0, 1)  /* add settings for "Read-only user", "Power user" and "Compliance user" roles */
+DBPATCH_RSM(6000000, 24, 0, 0)  /* add script "DNSViz webhook" */
+DBPATCH_RSM(6000000, 25, 0, 0)  /* add action "Create DNSViz report" for DNSSEC accidents */
 
 DBPATCH_END()
