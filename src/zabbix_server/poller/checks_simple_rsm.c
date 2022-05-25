@@ -724,7 +724,7 @@ static void	zbx_get_owners(const ldns_rr_list *rr_list, zbx_vector_ptr_t *owners
 
 		for (j = 0; j < owners->values_num; j++)
 		{
-			if (ldns_rdf_compare(owner, *(const ldns_rdf **)owners->values[j]))
+			if (ldns_rdf_compare(owner, (const ldns_rdf *)owners->values[j]))
 				break;
 		}
 
