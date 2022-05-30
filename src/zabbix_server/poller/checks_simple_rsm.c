@@ -419,7 +419,7 @@ static int	zbx_set_resolver_ns(ldns_resolver *res, const char *name, const char 
 		return FAIL;
 	}
 
-	rsm_infof(log_fd, "successfully using %s (%s, port:%hu)", name, ip, port);
+	rsm_infof(log_fd, "using %s (%s, port:%hu)", name, ip, port);
 	return SUCCEED;
 }
 
