@@ -501,3 +501,9 @@ rm -rf "$WORK_DIR/*"
 # show results
 cat test-results.xml
 ```
+
+## Simple check
+
+For information on Simple check tests see
+
+    automated-tests/framework/README-simple-checks.md
