@@ -73,7 +73,6 @@ sub main()
 	if (!opt("skip-build"))
 	{
 		my @directories = (
-			get_config('paths', 'source_dir') . "/database/mysql",
 			get_config('paths', 'build_dir'),
 			get_config('paths', 'logs_dir'),
 		);
