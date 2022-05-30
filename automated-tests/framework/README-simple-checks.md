@@ -7,11 +7,7 @@ Checkout `qa` branch:
     git clone -b qa --single-branch ssh://git@git.zabbix.lan:7999/icann/icann.git icann-qa
     cd icann-qa
 
-Go to test framework directory:
-
-    cd 
-
-Prepare create file `tests.conf` and edit it:
+Create configuration file `tests.conf` and edit it:
 
     cp automated-tests/framework/tests.conf.example automated-tests/framework/tests.conf
     vi automated-tests/framework/tests.conf
@@ -23,7 +19,7 @@ Build Zabbix:
 Running tests
 =============
 
-Being in the test framework directory, execute all the Simple Check tests:
+In order to run all the simple check test cases run the following command:
 
     automated-tests/framework/run-tests.pl --skip-build --test-case-dir automated-tests/test-cases/simple-check
 
