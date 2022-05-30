@@ -76,6 +76,9 @@ sub main()
 			get_config('paths', 'build_dir'),
 			get_config('paths', 'logs_dir'),
 		);
+		my @files = (
+			get_config('paths', 'source_dir') . "/database/mysql/dump.sql",
+		);
 
 		foreach my $directory (@directories)
 		{
@@ -86,6 +89,13 @@ sub main()
 			else
 			{
 				mkdir($directory) or fail("cannot create dir '%s': %s", $directory, $!);
+			}
+		}
+		foreach my $file (@files)
+		{
+			if (-f $file)
+			{
+				execute("unlink $file");
 			}
 		}
 
