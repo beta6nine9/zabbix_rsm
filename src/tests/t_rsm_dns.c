@@ -18,7 +18,7 @@ void	zbx_on_exit(int ret)
 static void	exit_usage(const char *program)
 {
 	fprintf(stderr, "usage: %s -t <tld> -n <ns> -i <ip> <[-4] [-6]> [-r <res_ip>] [-o <res/_port>] [-p <testprefix>]"
-			" [-d] [-c] [-j <file>] [-f] [-h]\n", program);
+			" [-d] [-c] [-j <file>] [-f] [-m] [-h]\n", program);
 	fprintf(stderr, "       -t <tld>          TLD to test\n");
 	fprintf(stderr, "       -n <ns>           Name Server to test\n");
 	fprintf(stderr, "       -i <ip>           IP address of the Name Server to test\n");
@@ -31,7 +31,7 @@ static void	exit_usage(const char *program)
 	fprintf(stderr, "       -d                enable DNSSEC\n");
 	fprintf(stderr, "       -c                use TCP instead of UDP\n");
 	fprintf(stderr, "       -j <file>         write resulting json to the file\n");
-	fprintf(stderr, "       -f                log packets to files (%s, %s) instead of stdout\n", LOG_FILE1, LOG_FILE2);
+	fprintf(stderr, "       -m                remove proxy metadata file prior to execution\n");
 	fprintf(stderr, "       -h                show this message and quit\n");
 	exit(EXIT_FAILURE);
 }
@@ -40,10 +40,12 @@ int	main(int argc, char *argv[])
 {
 	char		*tld = NULL, *ns = NULL, *ns_ip = NULL, proto = RSM_UDP,
 			ipv4_enabled = 0, ipv6_enabled = 0,
+			delete_metadata_file = 0,
 			testedname[ZBX_HOST_BUF_SIZE], dnssec_enabled = 0,
 			*json_file = NULL,
 			res_host_buf[ZBX_HOST_BUF_SIZE],
 			nsip_buf[ZBX_HOST_BUF_SIZE],
+			err_buf[1024],
 			key[8192];
 	const char	*res_ip = DEFAULT_RES_IP,
 			*testprefix = DEFAULT_TESTPREFIX;
@@ -55,7 +57,7 @@ int	main(int argc, char *argv[])
 
 	opterr = 0;
 
-	while ((c = getopt(argc, argv, "t:n:i:46r:o:s:p:dcj:fh")) != -1)
+	while ((c = getopt(argc, argv, "t:n:i:46r:o:s:p:dcj:mh")) != -1)
 	{
 		switch (c)
 		{
@@ -94,6 +96,9 @@ int	main(int argc, char *argv[])
 				break;
 			case 'j':
 				json_file = optarg;
+				break;
+			case 'm':
+				delete_metadata_file = 1;
 				break;
 			case 'h':
 				exit_usage(argv[0]);
@@ -136,6 +141,12 @@ int	main(int argc, char *argv[])
 	{
 		fprintf(stderr, "at least one IP version [-4, -6] must be specified\n");
 		exit_usage(argv[0]);
+	}
+
+	if (delete_metadata_file && delete_metadata(tld, err_buf, 1024) != SUCCEED)
+	{
+		fprintf(stderr, "%s", err_buf);
+		exit(-1);
 	}
 
 	zbx_snprintf(res_host_buf, sizeof(res_host_buf), "%s;%d",    res_ip, res_port);

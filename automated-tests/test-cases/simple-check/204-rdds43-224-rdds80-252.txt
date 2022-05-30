@@ -4,7 +4,7 @@
 
 [start-tool]
 
-"resolver","/tmp/resolver.pid","204-resolver-input.json"
+"resolver","/tmp/resolver.pid","000-resolver-servfail.json"
 
 [execute]
 

@@ -1,0 +1,6 @@
+{
+	"expected-request" : "GET /rdap/domain/example.example HTTP/1.1",
+	"reply-headers"    : {},
+	"reply-data"       : "",
+	"reply-status"     : 500
+}

@@ -10,7 +10,7 @@
 
 "","rm -rf   /tmp/simple-check-test"
 "","mkdir -p /tmp/simple-check-test"
-"","${cfg:paths:build_dir}/bin/t_rsm_dns -t example -n ns1.example -i 127.0.0.1 -4 -r 127.0.0.1 -s 5054 -j /tmp/simple-check-test/status.json"
+"","${cfg:paths:build_dir}/bin/t_rsm_dns -m -t example -n ns1.example -i 127.0.0.1 -4 -r 127.0.0.1 -s 5054 -j /tmp/simple-check-test/status.json"
 
 [stop-tool]
 
