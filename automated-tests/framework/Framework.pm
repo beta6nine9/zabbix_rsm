@@ -35,6 +35,7 @@ our @EXPORT = qw(
 
 use Archive::Tar;
 use Cwd qw(cwd);
+use File::Basename;
 use Data::Dumper;
 use File::Spec;
 use IO::Select;
@@ -830,7 +831,7 @@ sub start_tool($$$)
 
 	dbg("starting the tool $tool");
 
-	my $executable = TOOLS_DIR . "/$tool/main.pl $pid_file $input_file";
+	my $executable = dirname(__FILE__) . "/@{[TOOLS_DIR]}/$tool/main.pl $pid_file $input_file";
 
 	execute("$executable");
 
