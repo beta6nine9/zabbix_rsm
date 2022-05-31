@@ -76,11 +76,13 @@ use constant USE_CACHE_TRUE			=> 1;
 # for packaging, use this as part of the "ident" for syslog
 use constant ZABBIX_NAMESPACE			=> '';
 
-our ($result, $dbh, $tld, $server_key);
+my $_server_key;
+
+our ($result, $dbh, $tld);
 
 our %OPTS; # specified command-line options
 
-our @EXPORT = qw($result $dbh $tld $server_key
+our @EXPORT = qw($result $dbh $tld
 		E_ID_NONEXIST E_ID_MULTIPLE UP DOWN SLV_UNAVAILABILITY_LIMIT MIN_LOGIN_ERROR
 		UP_INCONCLUSIVE_NO_PROBES
 		UP_INCONCLUSIVE_NO_DATA
@@ -872,7 +874,7 @@ sub get_oldest_clock($$$$)
 	return $rows_ref->[0][0];
 }
 
-# $tlds_cache{$server_key}{$service}{$clock} = ["tld1", "tld2", ...];
+# $tlds_cache{$_server_key}{$service}{$clock} = ["tld1", "tld2", ...];
 my %tlds_cache = ();
 
 sub get_tlds(;$$$)
@@ -886,9 +888,9 @@ sub get_tlds(;$$$)
 		fail("invalid value for \$use_cache argument - '$use_cache'");
 	}
 
-	if ($use_cache == USE_CACHE_TRUE && exists($tlds_cache{$server_key}{$service // ''}{$clock // 0}))
+	if ($use_cache == USE_CACHE_TRUE && exists($tlds_cache{$_server_key}{$service // ''}{$clock // 0}))
 	{
-		return $tlds_cache{$server_key}{$service // ''}{$clock // 0};
+		return $tlds_cache{$_server_key}{$service // ''}{$clock // 0};
 	}
 
 	my $rows_ref = db_select(
@@ -914,7 +916,7 @@ sub get_tlds(;$$$)
 
 	if ($use_cache == USE_CACHE_TRUE)
 	{
-		$tlds_cache{$server_key}{$service // ''}{$clock // 0} = \@tlds;
+		$tlds_cache{$_server_key}{$service // ''}{$clock // 0} = \@tlds;
 	}
 
 	return \@tlds;
@@ -941,7 +943,7 @@ sub get_tlds_and_hostids(;$)
 		" order by h.host");
 }
 
-# $probes_cache{$server_key}{$name}{$service} = {$host => $hostid, ...}
+# $probes_cache{$_server_key}{$name}{$service} = {$host => $hostid, ...}
 my %probes_cache = ();
 
 # Returns a reference to hash of all probes (host => {'hostid' => hostid, 'status' => status}).
@@ -958,12 +960,12 @@ sub get_probes(;$$)
 		$service = "ALL";
 	}
 
-	if (!exists($probes_cache{$server_key}{$name}))
+	if (!exists($probes_cache{$_server_key}{$name}))
 	{
-		$probes_cache{$server_key}{$name} = __get_probes($name);
+		$probes_cache{$_server_key}{$name} = __get_probes($name);
 	}
 
-	return $probes_cache{$server_key}{$name}{$service};
+	return $probes_cache{$_server_key}{$name}{$service};
 }
 
 sub __get_probes($)
@@ -1206,6 +1208,12 @@ sub validate_tld($$)
 		}
 	}
 
+	if (scalar(@{$server_keys}) && defined($_server_key))
+	{
+		# connect back
+		db_connect($_server_key);
+	}
+
 	fail("tld \"$tld\" does not exist");
 }
 
@@ -1243,12 +1251,12 @@ sub tld_service_enabled($$$)
 
 	$service = lc($service);
 
-	if (!defined($tld_service_enabled_cache{$server_key}{$tld}{$service}{$now}))
+	if (!defined($tld_service_enabled_cache{$_server_key}{$tld}{$service}{$now}))
 	{
-		$tld_service_enabled_cache{$server_key}{$tld}{$service}{$now} = __tld_service_enabled($tld, $service, $now);
+		$tld_service_enabled_cache{$_server_key}{$tld}{$service}{$now} = __tld_service_enabled($tld, $service, $now);
 	}
 
-	return $tld_service_enabled_cache{$server_key}{$tld}{$service}{$now};
+	return $tld_service_enabled_cache{$_server_key}{$tld}{$service}{$now};
 }
 
 sub __tld_service_enabled($$$)
@@ -1628,23 +1636,23 @@ sub handle_db_error($$$)
 
 sub db_connect
 {
-	$server_key = shift;
-
-	dbg("server_key:", ($server_key ? $server_key : "UNDEF"));
+	$_server_key = shift;
 
 	fail("Error: no database configuration") unless (defined($config));
 
 	db_disconnect() if (defined($dbh));
 
-	$server_key = get_rsm_local_key($config) unless ($server_key);
+	$_server_key //= get_rsm_local_key($config);
 
-	fail("Configuration error: section \"$server_key\" not found") unless (defined($config->{$server_key}));
+	dbg("server_key:", ($_server_key // "UNDEF"));
 
-	my $section = $config->{$server_key};
+	fail("Configuration error: section \"$_server_key\" not found") unless (defined($config->{$_server_key}));
+
+	my $section = $config->{$_server_key};
 
 	foreach my $key ('db_name', 'db_user')
 	{
-		fail("configuration error: database $key not specified in section \"$server_key\"")
+		fail("configuration error: database $key not specified in section \"$_server_key\"")
 			unless (defined($section->{$key}));
 	}
 
@@ -1741,7 +1749,7 @@ sub db_disconnect
 
 		$dbh->disconnect() || wrn($dbh->errstr);
 		undef($dbh);
-		undef($server_key);
+		undef($_server_key);
 	}
 }
 
@@ -6344,7 +6352,7 @@ sub __log
 	}
 
 	my $cur_tld = $tld // "";
-	my $server_str = ($server_key ? "\@$server_key " : "");
+	my $server_str = ($_server_key ? "\@$_server_key " : "");
 
 	if (opt('dry-run') or opt('nolog'))
 	{

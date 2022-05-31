@@ -337,10 +337,8 @@ $fm->run_on_finish(
 );
 
 # go through all the databases
-foreach (@server_keys)
+foreach my $server_key (@server_keys)
 {
-	$server_key = $_;
-
 	dbg("getting probe statuses for period:", selected_period($from, $till));
 
 	db_connect($server_key);
@@ -498,7 +496,7 @@ foreach (@server_keys)
 				{
 					if (opt('dry-run'))
 					{
-						__prnt(uc($service), " DISABLED");
+						__prnt($server_key, uc($service), " DISABLED");
 					}
 					else
 					{
@@ -541,7 +539,7 @@ foreach (@server_keys)
 
 					if (opt('dry-run'))
 					{
-						__prnt(uc($service), " UP (configuration error)");
+						__prnt($server_key, uc($service), " UP (configuration error)");
 					}
 					else
 					{
@@ -582,7 +580,7 @@ foreach (@server_keys)
 
 					if (opt('dry-run'))
 					{
-						__prnt(uc($service), " UP (no rolling week data in the database)");
+						__prnt($server_key, uc($service), " UP (no rolling week data in the database)");
 					}
 					else
 					{
@@ -639,7 +637,7 @@ foreach (@server_keys)
 
 					if (opt('dry-run'))
 					{
-						__prnt(uc($service), " UP (configuration error)");
+						__prnt($server_key, uc($service), " UP (configuration error)");
 					}
 					else
 					{
@@ -693,7 +691,7 @@ foreach (@server_keys)
 
 					if (opt('dry-run'))
 					{
-						__prnt(uc($service), " UP (configuration error)");
+						__prnt($server_key, uc($service), " UP (configuration error)");
 					}
 					else
 					{
@@ -735,11 +733,11 @@ foreach (@server_keys)
 
 				my $downtime = get_downtime($avail_itemid, $rollweek_from, $rollweek_till, 0, $rollweek_incidents, $delay);
 
-				__prnt(uc($service), " period: ", selected_period($service_from, $service_till)) if (opt('dry-run') or opt('debug'));
+				__prnt($server_key, uc($service), " period: ", selected_period($service_from, $service_till)) if (opt('dry-run') or opt('debug'));
 
 				if (opt('dry-run'))
 				{
-					__prnt(uc($service), " downtime: $downtime (", ts_str($lastclock), ")");
+					__prnt($server_key, uc($service), " downtime: $downtime (", ts_str($lastclock), ")");
 				}
 				else
 				{
@@ -786,7 +784,7 @@ foreach (@server_keys)
 
 				if (opt('dry-run'))
 				{
-					__prnt(uc($service), " alarmed:$alarmed_status");
+					__prnt($server_key, uc($service), " alarmed:$alarmed_status");
 				}
 				else
 				{
@@ -821,7 +819,7 @@ foreach (@server_keys)
 
 					if (opt('dry-run'))
 					{
-						__prnt(uc($service), " UP (no rolling week data in the database)");
+						__prnt($server_key, uc($service), " UP (no rolling week data in the database)");
 					}
 					else
 					{
@@ -908,7 +906,7 @@ foreach (@server_keys)
 
 					if (opt('dry-run'))
 					{
-						__prnt(uc($service), " incident id:$eventid start:", ts_str($event_start), " end:" . ($event_end ? ts_str($event_end) : "ACTIVE") . " fp:$false_positive");
+						__prnt($server_key, uc($service), " incident id:$eventid start:", ts_str($event_start), " end:" . ($event_end ? ts_str($event_end) : "ACTIVE") . " fp:$false_positive");
 					}
 					else
 					{
@@ -1093,14 +1091,13 @@ foreach (@server_keys)
 
 	if (!opt('dry-run') && !opt('tld'))
 	{
-		__update_false_positives();
+		__update_false_positives($server_key);
 	}
 
 	db_disconnect();
 
 	last if (opt('tld'));
 } # foreach (@server_keys)
-undef($server_key);
 
 WAIT_CHILDREN:
 
@@ -1164,8 +1161,8 @@ sub __wait_all_children_cb
 
 sub __prnt
 {
-	my $server_str = ($server_key ? "\@$server_key " : "");
-	print($server_str, (defined($tld) ? "$tld: " : ''), join('', @_), "\n");
+	my $server_key = shift;
+	print("\@$server_key ", (defined($tld) ? "$tld: " : ''), join('', @_), "\n");
 }
 
 sub __tld_ignored
@@ -1179,6 +1176,8 @@ sub __tld_ignored
 
 sub __update_false_positives
 {
+	my $server_key = shift;
+
 	# should we update false positiveness later?
 	# we need to update 2 files but incident state file may not exist yet, in that case we will do it later
 	my $later = 0;
@@ -1303,9 +1302,8 @@ sub __get_config_minclock
 {
 	my $minclock;
 
-	foreach (@server_keys)
+	foreach my $server_key (@server_keys)
 	{
-		$server_key = $_;
 		db_connect($server_key);
 
 		my $rows_ref = db_select(
@@ -1325,7 +1323,6 @@ sub __get_config_minclock
 		$minclock = $newclock if (!defined($minclock) || $newclock < $minclock);
 		db_disconnect();
 	}
-	undef($server_key);
 
 	return undef if (!defined($minclock));
 

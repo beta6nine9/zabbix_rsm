@@ -47,7 +47,7 @@ my %service_status_to_str = (
 
 sub main_process_signal_handler();
 sub process_server($);
-sub process_tld_batch($$$);
+sub process_tld_batch($$$$);
 sub process_tld($$$$$$);
 sub cycles_to_calculate($$$$$$$$);
 sub get_lastvalues_from_db($$$$);
@@ -283,7 +283,7 @@ sub process_server($)
 		$server_tlds = get_tlds();
 	}
 
-	db_disconnect($server_key);
+	db_disconnect();
 
 	return unless (scalar(@{$server_tlds}));
 
@@ -316,7 +316,7 @@ sub process_server($)
 
 			init_process();
 
-			process_tld_batch($child, \%child_data, $all_probes_ref);
+			process_tld_batch($child, \%child_data, $all_probes_ref, $server_key);
 
 			finalize_process();
 
@@ -371,11 +371,12 @@ sub process_server($)
 	}
 }
 
-sub process_tld_batch($$$)
+sub process_tld_batch($$$$)
 {
 	my $socket         = shift;
 	my $child_data_ref = shift;
 	my $all_probes_ref = shift;	# all available probes in the system
+	my $server_key     = shift;
 
 	my $probes_ref;	# probes by services
 

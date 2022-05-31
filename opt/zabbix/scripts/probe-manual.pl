@@ -31,7 +31,7 @@ set_slv_config($config);
 
 my $server_id = getopt('server-id');
 
-$server_key = defined($server_id) ? get_rsm_server_key($server_id) : get_rsm_local_key($config);
+my $server_key = defined($server_id) ? get_rsm_server_key($server_id) : get_rsm_local_key($config);
 
 my $section = $config->{$server_key};
 

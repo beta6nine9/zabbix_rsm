@@ -28,10 +28,8 @@ sub main()
 
 	my @server_keys = get_rsm_server_keys($config);
 
-	foreach (@server_keys)
+	foreach my $server_key (@server_keys)
 	{
-		$server_key = $_;
-
 		print("$server_key: ") if (opt('dry-run'));
 
 		db_connect($server_key);

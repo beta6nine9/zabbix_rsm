@@ -132,10 +132,8 @@ db_disconnect();
 
 my @server_keys = get_rsm_server_keys($config);
 
-foreach (@server_keys)
+foreach my $server_key (@server_keys)
 {
-	$server_key = $_;
-
 	db_connect($server_key);
 
 	tld_interface_enabled_delete_cache();   # delete cache of previous server_key
