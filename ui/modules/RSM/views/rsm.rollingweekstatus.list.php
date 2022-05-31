@@ -23,30 +23,35 @@ use Modules\RSM\Helpers\UrlHelper as URL;
 use Modules\RSM\Helpers\DynamicContent;
 $this->includeJSfile('rsm.rollingweekstatus.list.js.php');
 
+function createSearchFilterRow($field_id, $field_value, $label) {
+	global $data;
+
+	return [
+		(new CTextBox($field_id, $field_value))
+			->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH)
+			->setAttribute('autocomplete', 'off'),
+		(new CDiv($label))
+			->addClass('rolling-week-search-label')
+	];
+}
+
 // Build filter.
 if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRAR) {
 	$filter_fields = [
 		(new CFormList())
-			->addRow(_('Registrar ID'), (new CTextBox('filter_registrar_id', $data['filter_registrar_id']))
-				->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH)
-				->setAttribute('autocomplete', 'off')
-			)
-			->addRow(_('Registrar name'), (new CTextBox('filter_registrar_name', $data['filter_registrar_name']))
-				->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH)
-				->setAttribute('autocomplete', 'off')
-			)
-			->addRow(_('Registrar family'), (new CTextBox('filter_registrar_family', $data['filter_registrar_family']))
-				->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH)
-				->setAttribute('autocomplete', 'off')
-			)
+			->addRow(_('Registrar ID'),     createSearchFilterRow(
+				'filter_registrar_id',     $data['filter_registrar_id'],     'Exact match'))
+			->addRow(_('Registrar name'),   createSearchFilterRow(
+				'filter_registrar_name',   $data['filter_registrar_name'],   'Exact match, wildcard (*) supported'))
+			->addRow(_('Registrar family'), createSearchFilterRow(
+				'filter_registrar_family', $data['filter_registrar_family'], 'Exact match, wildcard (*) supported'))
 	];
 }
 else {
 	$filter_fields = [
-		(new CFormList())->addRow(_('TLD'), (new CTextBox('filter_search', $data['filter_search']))
-			->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH)
-			->setAttribute('autocomplete', 'off')
-		)
+		(new CFormList())
+			->addRow(_('TLD'), createSearchFilterRow(
+				'filter_search', $data['filter_search'], 'Exact match, wildcard (*) supported'))
 	];
 
 	$services_filter = [
