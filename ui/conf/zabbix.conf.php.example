@@ -56,7 +56,7 @@ $IMAGE_FORMAT_DEFAULT	= IMAGE_FORMAT_PNG;
 $DB['DB_CONN_TIMEOUT']	= 5;
 
 $DB['SERVERS'] = [
-	'1' => [
+	[
 		'NAME'            => '',
 		'SERVER'          => 'localhost',
 		'TYPE'            => 'MYSQL',
