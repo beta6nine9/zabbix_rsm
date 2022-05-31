@@ -506,4 +506,4 @@ cat test-results.xml
 
 For information on Simple check tests see
 
-    automated-tests/framework/README-simple-checks.md
+    README-simple-checks.md

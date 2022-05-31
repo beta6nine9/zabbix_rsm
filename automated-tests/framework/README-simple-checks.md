@@ -121,6 +121,19 @@ This is unexpected to Zabbix and the corresponding error code is set. Then, we m
 
 The outputs match, thus, the test case is considered successful.
 
+In case a tool input file is the same in multiple test cases it is untied from the specific test case number, instead it is given a general name with `000-` prefix:
+
+    $ grep 000-resolver-example.example-noerror.json *.txt
+	206-rdds43-227-rdds80-255.txt:"resolver","/tmp/resolver.pid","000-resolver-example.example-noerror.json"
+	207-rdds43-228-rdds80-256.txt:"resolver","/tmp/resolver.pid","000-resolver-example.example-noerror.json"
+	208-rdds80-349.txt           :"resolver","/tmp/resolver.pid","000-resolver-example.example-noerror.json"
+	307-rdap-405.txt             :"resolver","/tmp/resolver.pid","000-resolver-example.example-noerror.json"
+	308-rdap-406.txt             :"resolver","/tmp/resolver.pid","000-resolver-example.example-noerror.json"
+	309-rdap-407.txt             :"resolver","/tmp/resolver.pid","000-resolver-example.example-noerror.json"
+	310-rdap-408.txt             :"resolver","/tmp/resolver.pid","000-resolver-example.example-noerror.json"
+	311-rdap-409.txt             :"resolver","/tmp/resolver.pid","000-resolver-example.example-noerror.json"
+	312-rdap-549.txt             :"resolver","/tmp/resolver.pid","000-resolver-example.example-noerror.json"
+
 How does it work
 ================
 
