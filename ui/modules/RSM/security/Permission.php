@@ -19,7 +19,7 @@ class Permission {
 	const MODULE_ROUTES = [
 		'rsm.rollingweekstatus', 'rsm.incidents', 'rsm.slareports', 'rsm.incidentdetails', 'rsm.tests',
 		'rsm.particulartests', 'rsm.aggregatedetails', 'export.rsm.slareports',
-		'rsm.markincident',
+		'rsm.markincident', 'rsm.rollingweekstatus.csv',
 	];
 
 	/** @var array $user    Logged in user data array. */
