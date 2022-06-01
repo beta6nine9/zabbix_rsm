@@ -16,7 +16,7 @@ trap cleanup EXIT
 
 LOGFILE="/tmp/git-diff-tarball.txt"
 
-git diff --name-only | grep --color=none '\.tar.gz' > $LOGFILE
+git diff --name-only | grep --color=none "$@.*\.tar.gz" > $LOGFILE
 
 for orig_tarball in $(cat $LOGFILE); do
 	orig_tarball=$(git rev-parse --show-toplevel)/$orig_tarball
@@ -40,12 +40,24 @@ for orig_tarball in $(cat $LOGFILE); do
 	diff -ur $orig_output_dir $new_output_dir | less
 
 	echo
-	echo -n "$orig_tarball: discard changes? [Y/n] "
+	echo -n "$orig_tarball: keep it? [Y/n] "
 	read ans
 
-	if [ -z "$ans" ]; then
-		rm -f $new_tarball
-	else
+	ans=$(echo $ans | tr [A-Z] [a-z])
+
+	if [[ -z "$ans" ]] || [[ $ans = "y" ]] || [[ $ans = "yes" ]]; then
 		mv $new_tarball $orig_tarball
+
+		echo
+		echo -n "$orig_tarball: stage it? [Y/n] "
+		read ans
+
+		ans=$(echo $ans | tr [A-Z] [a-z])
+
+		if [[ -z "$ans" ]] || [[ $ans = "y" ]] || [[ $ans = "yes" ]]; then
+			git add -u $orig_tarball
+		fi
+	else
+		rm -f $new_tarball
 	fi
 done

@@ -30,16 +30,21 @@ cp -f $test_case_file $new_test_case_file
 num=$(basename $test_case_file)
 num=${num%%-*}
 
+sed -i '/\[compare-files\]/d' $new_test_case_file
+
 create_script=
 if [[ $new_test_case_file =~ /sla-api/ ]]; then
 	create_script="$FRAMEWORK_DIR/../test-cases/sla-api/create-sla-and-cache-output.sh"
+
+	sed -i -r 's|^("/opt/zabbix/sla","'$num'-sla-output.tar.gz")$|[execute]\n"","'$create_script' '$num'"\n[compare-files]\n\1|' $new_test_case_file
+	sed -i -r 's|^("/opt/zabbix/sla","'$num'-sla-output-2.tar.gz")$|[execute]\n"","'$create_script' '$num' 2"\n[compare-files]\n\1|' $new_test_case_file
 elif [[ $new_test_case_file =~ /data-export/ ]]; then
 	create_script="$FRAMEWORK_DIR/../test-cases/data-export/create-output.sh"
+
+	sed -i -r 's|^("/opt/zabbix/export","'$num'-output.tar.gz")$|[execute]\n"","'$create_script' '$num'"\n[compare-files]\n\1|' $new_test_case_file
 else
 	echo "unexpected test case file \"$test_case_file\""
 	exit 1
 fi
-
-sed -i -r "s|(\[compare-files\])|\"\",\"$create_script $num\"\n\1|" $new_test_case_file
 
 TZ=UTC automated-tests/framework/run-tests.pl --skip-build --test-case-file $new_test_case_file $*
