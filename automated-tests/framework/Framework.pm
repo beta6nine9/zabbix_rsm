@@ -240,7 +240,11 @@ sub get_libfaketime_so_path()
 {
 	my $path = undef;
 
-	$path = qx(find /usr/lib /usr/lib64 -name "libfaketime.so.*");
+	my $search_path = '/usr/lib';
+
+	$search_path .= ' /usr/lib64' if (-d '/usr/lib64');
+
+	$path = qx(find $search_path -name "libfaketime.so.*");
 	$path = (split(/\n/, $path))[0];
 
 	if (!defined($path))
