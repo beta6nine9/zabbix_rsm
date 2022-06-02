@@ -1646,6 +1646,10 @@ static int	DBpatch_5010058(void)
 			"2,'Admin role',2,0",
 			"3,'Super admin role',3,1",
 			"4,'Guest role',1,0",
+			/* RSM specifics: custom roles start */
+			"100,'Read-only user',100,1",
+			"110,'Power user',110,1",
+			/* RSM specifics: custom roles end */
 			NULL
 		};
 
@@ -1716,6 +1720,13 @@ static int	DBpatch_5010061(void)
 		if (ZBX_DB_OK > DBexecute("update users set roleid=%d where type=%d", i, i))
 			return FAIL;
 	}
+
+	/* RSM specifics: custom roles start */
+	if (ZBX_DB_OK > DBexecute("update users set roleid=%d where type=%d", 100, 4))
+		return FAIL;
+	if (ZBX_DB_OK > DBexecute("update users set roleid=%d where type=%d", 110, 5))
+		return FAIL;
+	/* RSM specifics: custom roles end */
 
 	return SUCCEED;
 }

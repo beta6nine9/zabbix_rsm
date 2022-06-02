@@ -41,6 +41,8 @@ use constant USER_TYPES =>
 	}
 };
 
+sub __get_userid($$$$$);
+
 parse_opts('add', 'delete', 'modify', 'user=s', 'type=s', 'password=s', 'firstname=s', 'lastname=s', 'server-id=i');
 
 __validate_opts();
@@ -111,7 +113,7 @@ foreach my $server_key (@server_keys)
 	}
 	elsif (opt('modify'))
 	{
-		my $userid = __get_userid($zabbix, $server_id, getopt('user'), $modified);
+		my $userid = __get_userid($server_key, $zabbix, $server_id, getopt('user'), $modified);
 
 		my $result = $zabbix->update('user', {'userid' => $userid, 'passwd' => getopt('password')});
 
@@ -131,7 +133,7 @@ foreach my $server_key (@server_keys)
 	}
 	else
 	{
-		my $userid = __get_userid($zabbix, $server_id, getopt('user'), $modified);
+		my $userid = __get_userid($server_key, $zabbix, $server_id, getopt('user'), $modified);
 
 		my $result = $zabbix->remove('user', [$userid]);
 
@@ -153,12 +155,13 @@ foreach my $server_key (@server_keys)
 	$modified = 1;
 }
 
-sub __get_userid
+sub __get_userid($$$$$)
 {
-	my $zabbix = shift;
-	my $server_id = shift;
-	my $alias = shift;
-	my $modified = shift;
+	my $server_key = shift;
+	my $zabbix     = shift;
+	my $server_id  = shift;
+	my $alias      = shift;
+	my $modified   = shift;
 
 	my $options = {'output' => ['userid'], 'filter' => {'alias' => $alias}};
 

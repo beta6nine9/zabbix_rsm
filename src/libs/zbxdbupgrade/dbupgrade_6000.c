@@ -865,62 +865,8 @@ static int	DBpatch_6000000_21(void)
 	return DBdrop_field("events", "false_positive");
 }
 
-/* 6000000, 22 - create roles for "Read-only user", "Power user" and "Compliance user" */
+/* 6000000, 22 - add settings for "Read-only user" and "Power user" roles */
 static int	DBpatch_6000000_22(void)
-{
-	/* this is just a direct paste from data.tmpl, with each line quoted and properly indented */
-	static const char	*const data[] = {
-		"ROW   |100   |Read-only user  |100 |1       |",
-		"ROW   |110   |Power user      |110 |1       |",
-		NULL
-	};
-	int			i;
-
-	ONLY_SERVER();
-
-	for (i = 0; NULL != data[i]; i++)
-	{
-		zbx_uint64_t	roleid;
-		char		*name = NULL, *name_esc;
-		int		type, readonly;
-
-		if (0 == strncmp(data[i], "--", ZBX_CONST_STRLEN("--")))
-			continue;
-
-		if (4 != sscanf(data[i], "ROW |" ZBX_FS_UI64 " |%m[^|]|%d |%d |",
-				&roleid, &name, &type, &readonly))
-		{
-			zabbix_log(LOG_LEVEL_CRIT, "failed to parse the following line:\n%s", data[i]);
-			zbx_free(name);
-			return FAIL;
-		}
-
-		zbx_rtrim(name, ZBX_WHITESPACE);
-
-		/* NOTE: to keep it simple assume that data does not contain sequences "&pipe;", "&eol;" or "&bsn;" */
-
-		name_esc = zbx_db_dyn_escape_string(name);
-		zbx_free(name);
-
-		if (ZBX_DB_OK > DBexecute("insert into role (roleid,name,type,readonly)"
-				" values (" ZBX_FS_UI64 ",'%s',%d,%d)",
-				roleid, name_esc, type, readonly))
-		{
-			zbx_free(name_esc);
-			return FAIL;
-		}
-
-		zbx_free(name_esc);
-	}
-
-	if (ZBX_DB_OK > DBexecute("delete from ids where table_name='role'"))
-		return FAIL;
-
-	return SUCCEED;
-}
-
-/* 6000000, 23 - add settings for "Read-only user", "Power user" and "Compliance user" roles */
-static int	DBpatch_6000000_23(void)
 {
 	/* this is just a direct paste from data.tmpl, with each line quoted and properly indented */
 	static const char	*const data[] = {
@@ -996,8 +942,8 @@ static int	DBpatch_6000000_23(void)
 	return SUCCEED;
 }
 
-/* 6000000, 24 add script "DNSViz webhook" */
-static int	DBpatch_6000000_24(void)
+/* 6000000, 23 add script "DNSViz webhook" */
+static int	DBpatch_6000000_23(void)
 {
 	zbx_uint64_t	scriptid;
 	int		ret = FAIL;
@@ -1059,8 +1005,8 @@ out:
 	return ret;
 }
 
-/* 6000000, 25 - add action "Create DNSViz report" for DNSSEC accidents */
-static int	DBpatch_6000000_25(void)
+/* 6000000, 24 - add action "Create DNSViz report" for DNSSEC accidents */
+static int	DBpatch_6000000_24(void)
 {
 	zbx_uint64_t	actionid, operationid, scriptid;
 	int		ret = FAIL;
@@ -1139,9 +1085,8 @@ DBPATCH_RSM(6000000, 18, 0, 0)	/* add userid foreign key to table rsm_false_posi
 DBPATCH_RSM(6000000, 19, 0, 0)	/* add eventid index to table rsm_false_positive */
 DBPATCH_RSM(6000000, 20, 0, 0)	/* add eventid foreign key to table rsm_false_positive */
 DBPATCH_RSM(6000000, 21, 0, 0)	/* drop column events.false_positive */
-DBPATCH_RSM(6000000, 22, 0, 1)  /* create roles for "Read-only user", "Power user" and "Compliance user" */
-DBPATCH_RSM(6000000, 23, 0, 1)  /* add settings for "Read-only user", "Power user" and "Compliance user" roles */
-DBPATCH_RSM(6000000, 24, 0, 0)  /* add script "DNSViz webhook" */
-DBPATCH_RSM(6000000, 25, 0, 0)  /* add action "Create DNSViz report" for DNSSEC accidents */
+DBPATCH_RSM(6000000, 22, 0, 1)  /* add settings for "Read-only user" and "Power user" roles */
+DBPATCH_RSM(6000000, 23, 0, 0)  /* add script "DNSViz webhook" */
+DBPATCH_RSM(6000000, 24, 0, 0)  /* add action "Create DNSViz report" for DNSSEC accidents */
 
 DBPATCH_END()

@@ -181,7 +181,7 @@ out:
 	return ret;
 }
 
-/* 5000002, 5 - move valuemaps to temporary tables before upgrade to Zabbix 6.0; make sure it is executed after all 5.0 patches */
+/* 5000999, 1 - move valuemaps to temporary tables before upgrade to Zabbix 6.0; make sure it is executed after all 5.0 patches */
 static int	DBpatch_5000999_1(void)
 {
 	int	ret = FAIL;
