@@ -1,3 +1,16 @@
+Changes for rsm2.2.8
+
+New features:
+..F....... [864] added "Save to CSV" button to the Rolling week status page (dimir)
+..F....... [860] added support for wildcard search on the Rolling week status page (dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm2.2.7
+
+Bug fixes:
+..F....... [sub-873] fixed calculation of targets above RTT limit on the Aggregated Details page (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.2.6
 
 Bug fixes:

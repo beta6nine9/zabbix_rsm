@@ -36,6 +36,7 @@ class Permission {
 		'rsm.aggregatedetails',
 		'export.rsm.slareports',
 		'rsm.markincident',
+		'rsm.rollingweekstatus.csv',
 	];
 
 	/** @var array $user    Logged in user data array. */

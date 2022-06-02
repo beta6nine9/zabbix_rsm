@@ -326,8 +326,8 @@ class AggregateDetailsAction extends Action {
 				continue;
 			}
 
-			$transport = strtolower($this->probes[$probeid]['transport']);
-			$rtt_max = ($transport == 'udp') ? $data['udp_rtt'] : $data['tcp_rtt'];
+			$transport = $this->probes[$probeid]['transport'];
+			$rtt_max = ($transport == 'UDP') ? $data['udp_rtt'] : $data['tcp_rtt'];
 
 			foreach ($probe['results'] as $ns => $values) {
 				foreach ($values as $ipv => $ipdata) {
@@ -353,8 +353,8 @@ class AggregateDetailsAction extends Action {
 
 							if (!isset($data['probes_above_max_rtt'][$error_key])) {
 								$data['probes_above_max_rtt'][$error_key] = [
-									'tcp' => 0,
-									'udp' => 0,
+									'TCP' => 0,
+									'UDP' => 0,
 								];
 							}
 
