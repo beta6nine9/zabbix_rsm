@@ -192,10 +192,11 @@ function getPreEvents($objectid, $clock, $eventid) {
  */
 function convertSlaServiceName($name) {
 	$services = array(
-		'dns' => RSM_DNS,
+		'dns'    => RSM_DNS,
 		'dnssec' => RSM_DNSSEC,
-		'rdds' => RSM_RDDS,
-		'epp' => RSM_EPP
+		'rdds'   => RSM_RDDS,
+		'rdap'   => RSM_RDAP,
+		'epp'    => RSM_EPP,
 	);
 
 	return $services[$name];
