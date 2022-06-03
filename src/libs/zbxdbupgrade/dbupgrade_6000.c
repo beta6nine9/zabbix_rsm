@@ -1057,6 +1057,82 @@ out:
 	return ret;
 }
 
+/* 6000000, 25 - create host group "Value maps" */
+static int	DBpatch_6000000_25(void)
+{
+	zbx_uint64_t	groupid;
+	int		ret = FAIL;
+
+	ONLY_SERVER();
+
+	groupid = DBget_maxid_num("hstgrp", 1);
+
+	DB_EXEC(
+			"insert into hstgrp (groupid,name,internal,flags,uuid)"
+			" values (" ZBX_FS_UI64 ",'%s',%d,%d,'%s')",
+			groupid, "Value Maps", 0, 0, "5f022f8b797d44c69dbbcecc1e7fcd30");
+
+	DB_EXEC("delete from ids where table_name='hstgrp'");
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
+/* 6000000, 26 - add "Value Maps" host group to "Template Value Maps" */
+static int	DBpatch_6000000_26(void)
+{
+	zbx_uint64_t	hostgroupid, hostid, groupid;
+	int		ret = FAIL;
+
+	ONLY_SERVER();
+
+	hostgroupid = DBget_maxid_num("hosts_groups", 1);
+
+	SELECT_VALUE_UINT64(groupid, "select groupid from hstgrp where name='%s'", "Value Maps");
+	SELECT_VALUE_UINT64(hostid,  "select hostid from hosts where name='%s'", "Template Value Maps");
+
+	DB_EXEC(
+			"insert into hosts_groups (hostgroupid,hostid,groupid)"
+			" values (" ZBX_FS_UI64 "," ZBX_FS_UI64 "," ZBX_FS_UI64 ")",
+			hostgroupid, hostid, groupid);
+
+	DB_EXEC("delete from ids where table_name='hosts_groups'");
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
+/* 6000000, 27 - allow "Power user" and "Read-only user" user groups to access "Value Maps" host group */
+static int	DBpatch_6000000_27(void)
+{
+	zbx_uint64_t	rightid, hstgrp_groupid;
+	int		ret = FAIL;
+
+	ONLY_SERVER();
+
+	rightid = DBget_maxid_num("rights", 2);
+
+	SELECT_VALUE_UINT64(hstgrp_groupid, "select groupid from hstgrp where name='%s'", "Value Maps");
+
+	DB_EXEC(
+			"insert into rights (rightid,groupid,permission,id)"
+			" values (" ZBX_FS_UI64 ",%d,%d," ZBX_FS_UI64 ")",
+			rightid, 100, 2, hstgrp_groupid);
+
+	DB_EXEC(
+			"insert into rights (rightid,groupid,permission,id)"
+			" values (" ZBX_FS_UI64 ",%d,%d," ZBX_FS_UI64 ")",
+			++rightid, 110, 2, hstgrp_groupid);
+
+	DB_EXEC("delete from ids where table_name='rights'");
+
+	ret = SUCCEED;
+out:
+	return ret;
+}
+
 #endif
 
 DBPATCH_START(6000)
@@ -1088,5 +1164,8 @@ DBPATCH_RSM(6000000, 21, 0, 0)	/* drop column events.false_positive */
 DBPATCH_RSM(6000000, 22, 0, 1)  /* add settings for "Read-only user" and "Power user" roles */
 DBPATCH_RSM(6000000, 23, 0, 0)  /* add script "DNSViz webhook" */
 DBPATCH_RSM(6000000, 24, 0, 0)  /* add action "Create DNSViz report" for DNSSEC accidents */
+DBPATCH_RSM(6000000, 25, 0, 0)  /* create host group "Value Maps" */
+DBPATCH_RSM(6000000, 26, 0, 0)  /* add "Value Maps" host group to "Template Value Maps" */
+DBPATCH_RSM(6000000, 27, 0, 0)  /* allow "Power user" and "Read-only user" user groups to access "Value Maps" host group */
 
 DBPATCH_END()
