@@ -1591,8 +1591,15 @@ function access_deny($mode = ACCESS_DENY_OBJECT) {
 					->onClick('javascript: document.location = "index.php?request='.$url.'";');
 			}
 
-			$data['buttons'][] = (new CButton('back', _s('Go to "%1$s"', CMenuHelper::getFirstLabel())))
-				->onClick('javascript: document.location = "'.CMenuHelper::getFirstUrl().'"');
+			/* RSM specifics: we want to try profile URL first */
+			if (CWebUser::$data['url']) {
+				$data['buttons'][] = (new CButton('back', _('Go to the home page')))
+					->onClick('javascript: document.location = "'.CWebUser::$data['url'].'"');
+			}
+			else {
+				$data['buttons'][] = (new CButton('back', _s('Go to "%1$s"', CMenuHelper::getFirstLabel())))
+					->onClick('javascript: document.location = "'.CMenuHelper::getFirstUrl().'"');
+			}
 		}
 		// if the user is not logged in - offer to login
 		else {
