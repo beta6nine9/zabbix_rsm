@@ -160,16 +160,22 @@ sub __get_userid($$$$$)
 	my $server_key = shift;
 	my $zabbix     = shift;
 	my $server_id  = shift;
-	my $alias      = shift;
+	my $username   = shift;
 	my $modified   = shift;
 
-	my $options = {'output' => ['userid'], 'filter' => {'alias' => $alias}};
+	my $options = {'output' => ['userid'], 'filter' => {'username' => $username}};
 
 	my $result = $zabbix->get('user', $options);
 
+	if (ref($result) ne "HASH")
+	{
+		print("Error: cannot get user \"$username\": reply is not a HASH reference. Please run with \"--debug\"");
+		exit(-1);
+	}
+
 	if ($result->{'error'})
 	{
-		if ($result->{'error'}->{'data'} =~ /Session terminated/)
+		if ($result->{'error'}{'data'} =~ /Session terminated/)
 		{
 			print("Session terminated. Please re-run the same command again");
 			print(" with option \"--server-id $server_id\"") if ($modified == 1);
@@ -177,7 +183,7 @@ sub __get_userid($$$$$)
 		}
 		else
 		{
-			print("Error: cannot get user \"$alias\". ", $result->{'error'}->{'data'}, "\n");
+			print("Error: cannot get user \"$username\". ", $result->{'error'}{'data'}, "\n");
 
 			if ($modified == 1)
 			{
@@ -192,7 +198,7 @@ sub __get_userid($$$$$)
 
 	if (!$userid)
 	{
-		print("Error: user \"$alias\" not found on $server_key\n");
+		print("Error: user \"$username\" not found on $server_key\n");
 
 		if ($modified == 1)
 		{
