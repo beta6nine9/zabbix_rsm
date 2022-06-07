@@ -184,25 +184,6 @@ function getPreEvents($objectid, $clock, $eventid) {
 }
 
 /**
- * Convert SLA service name.
- *
- * @param string $name
- *
- * @return int
- */
-function convertSlaServiceName($name) {
-	$services = array(
-		'dns'    => RSM_DNS,
-		'dnssec' => RSM_DNSSEC,
-		'rdds'   => RSM_RDDS,
-		'rdap'   => RSM_RDAP,
-		'epp'    => RSM_EPP,
-	);
-
-	return $services[$name];
-}
-
-/**
  * Get failed tests count.
  *
  * @param int 		$itemId
@@ -367,4 +348,43 @@ function elapsedTime($datetime, $full = false) {
 	}
 
 	return $string ? implode(', ', $string) . ' ago' : 'just now';
+}
+
+// "service" <=> "tab index" on an Incidents page, has special order
+function serviceTabs() {
+	if (get_rsm_monitoring_type() == MONITORING_TARGET_REGISTRY) {
+		return array(
+			['type' => RSM_DNS,    'name' => 'dns'   ],
+			['type' => RSM_DNSSEC, 'name' => 'dnssec'],
+			['type' => RSM_RDDS,   'name' => 'rdds'  ],
+			['type' => RSM_RDAP,   'name' => 'rdap'  ],
+			['type' => RSM_EPP,    'name' => 'epp'   ],
+		);
+	}
+
+	return array(
+		['type' => RSM_RDDS, 'name' => 'rdds'  ],
+		['type' => RSM_RDAP, 'name' => 'rdap'  ],
+	);
+}
+
+function serviceId($name) {
+	foreach (serviceTabs() as $tabIndex => $service) {
+		if ($service['name'] == $name)
+			return $service['type'];
+	}
+
+	return -1;
+}
+
+function serviceTabIndex($type = 0) {
+	if ($type === null)
+		return 0;
+
+	foreach (serviceTabs() as $tabIndex => $service) {
+		if ($service['type'] == $type)
+			return $tabIndex;
+	}
+
+	return 0;
 }

@@ -69,22 +69,9 @@ if ($data['tld']) {
 		->setCookieName('incidents_tab')
 		->setSelected($data['incidents_tab']);
 
-	// We need specific order of the tabs.
-	$services = array();
+	foreach (serviceTabs() as $s) {
+		$service = $s['name'];
 
-	if ($data['rsm_monitoring_mode'] === MONITORING_TARGET_REGISTRY) {
-		$services[] = 'dns';
-		$services[] = 'dnssec';
-	}
-
-	$services[] = 'rdds';
-
-	if ($data['rdap_standalone_start_ts'] != 0)
-		$services[] = 'rdap';
-
-	$services[] = 'epp';
-
-	foreach ($services as $service) {
 		if (!array_key_exists($service, $data['services']))
 			continue;
 
@@ -132,7 +119,7 @@ if ($data['tld']) {
 						'from'       => $data['from'],
 						'to'         => $data['to'],
 						'filter_set' => 1,
-						'type'       => convertSlaServiceName($service),
+						'type'       => serviceId($service),
 						'slvItemId'  => $service_data['itemid'],
 					]))
 				: 0;

@@ -888,10 +888,7 @@ class IncidentsListAction extends Action {
 		];
 
 		if (!$this->isAjaxRequest() && $this->hasInput('type')) {
-			$tabs_map = (get_rsm_monitoring_type() === MONITORING_TARGET_REGISTRAR)
-				? [RSM_RDDS, RSM_RDAP]
-				: [RSM_DNS, RSM_DNSSEC, RSM_RDDS, RSM_EPP, RSM_RDAP];
-			$data['incidents_tab'] = (int) array_search($this->getInput('type'), $tabs_map);
+			$data['incidents_tab'] = serviceTabIndex($this->getInput('type'));
 			setcookie('incidents_tab', $data['incidents_tab']);
 		}
 
