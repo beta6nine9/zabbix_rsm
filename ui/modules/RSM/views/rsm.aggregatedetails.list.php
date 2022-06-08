@@ -129,16 +129,16 @@ foreach ($data['probes'] as $probe) {
 					if (array_key_exists($ipv, $probe['results'][$dns_udp_ns]) && $probe['results'][$dns_udp_ns][$ipv]) {
 						foreach (array_keys($ipvs[$ipv]) as $ip) {
 							if (array_key_exists($ip, $probe['results'][$dns_udp_ns][$ipv])) {
-								$result = $probe['results'][$dns_udp_ns][$ipv][$ip];
+								$rtt = $probe['results'][$dns_udp_ns][$ipv][$ip];
 
 								$nskey = $dns_udp_ns.$ip;
-								$span = new CSpan($result);
+								$span = new CSpan($rtt);
 								$class = isset($probe['above_max_rtt'][$nskey]) ? ZBX_STYLE_RED : ZBX_STYLE_GREEN;
 
-								if ($result < 0) {
+								if ($rtt < 0) {
 									$class = ($class == ZBX_STYLE_GREEN && !isset($probe['dns_error'][$nskey]))
 											? ZBX_STYLE_GREEN : ZBX_STYLE_RED;
-									$span->setAttribute('title', $data['test_error_message'][$result]);
+									$span->setHint($data['test_error_message'][$rtt]);
 								}
 
 								$span->addClass($class);
@@ -146,7 +146,7 @@ foreach ($data['probes'] as $probe) {
 
 								if (isset($probe['results_nsid'][$dns_udp_ns][$ip]) && is_numeric($probe['results_nsid'][$dns_udp_ns][$ip])) {
 									$nsid_index = $probe['results_nsid'][$dns_udp_ns][$ip];
-									$row[] = (new CDiv($nsid_index + 1))->setAttribute('title', $nsids_converted[$nsid_index]);
+									$row[] = (new CDiv($nsid_index + 1))->setHint($nsids_converted[$nsid_index]);
 								}
 								else {
 									$row[] = '';
@@ -177,19 +177,19 @@ foreach ($data['probes'] as $probe) {
 	$table->addRow($row);
 }
 
-// Add error rows at the bottom of table.
+// Add total of errors at the bottom of the table.
 foreach ($data['errors'] as $error_code => $errors) {
-	$row = [(new CSpan(_('Total ') . $error_code))->setAttribute('title', $data['test_error_message'][$error_code]), '', '', '', ''];
+	$row = [(new CSpan(_('Total ') . $error_code))->setHint($data['test_error_message'][$error_code]), '', '', '', ''];
 
 	foreach ($data['dns_nameservers'] as $ns_name => $ns_ips) {
-		// 'Status' column
+		// 'Status' column is unused.
 		$row[] = '';
 
 		foreach (array_keys(array_reduce($ns_ips, 'array_merge', [])) as $ip) {
 			$error_key = $ns_name.$ip;
 			// 'IP' column.
 			$row[] = array_key_exists($error_key, $errors) ? $errors[$error_key] : '';
-			// 'NSID' column.
+			// 'NSID' column is unused.
 			$row[] = '';
 		}
 	}
