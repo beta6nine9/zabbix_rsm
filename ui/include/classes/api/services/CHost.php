@@ -657,6 +657,13 @@ class CHost extends CHostGeneral {
 	public function create($hosts) {
 		$this->validateCreate($hosts);
 
+		foreach ($hosts as $index => &$host) {
+			// RSM specifics: store time when host was created
+			$host['created'] = time();
+			// RSM specifics: end
+		}
+		unset($host);
+
 		$hosts_groups = [];
 		$hosts_tags = [];
 		$hosts_interfaces = [];
@@ -706,10 +713,6 @@ class CHost extends CHostGeneral {
 			if (array_key_exists('inventory_mode', $host_inventory)) {
 				$hosts_inventory[] = ['hostid' => $host['hostid']] + $host_inventory;
 			}
-
-			// RSM specifics: store time when host was created
-			$host['created'] = time();
-			// RSM specifics: end
 		}
 		unset($host);
 
