@@ -1,3 +1,9 @@
+Changes for rsm2.2.9
+
+New features:
+..F....... [884] replaced standard browser hint box with Zabbix one to make hints available on mobile devices
+
+--------------------------------------------------------------------------------
 Changes for rsm2.2.8
 
 New features:
