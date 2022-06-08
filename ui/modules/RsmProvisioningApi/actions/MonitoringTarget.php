@@ -228,32 +228,6 @@ abstract class MonitoringTarget extends ActionBaseEx
 		}
 	}
 
-	private function getServerId(): int
-	{
-		$result = null;
-
-		foreach ($GLOBALS['DB']['SERVERS'] as $serverId => $server)
-		{
-			if ($GLOBALS['DB']['TYPE'    ] == $server['TYPE'    ] &&
-				$GLOBALS['DB']['SERVER'  ] == $server['SERVER'  ] &&
-				$GLOBALS['DB']['PORT'    ] == $server['PORT'    ] &&
-				$GLOBALS['DB']['USER'    ] == $server['USER'    ] &&
-				$GLOBALS['DB']['PASSWORD'] == $server['PASSWORD'] &&
-				$GLOBALS['DB']['DATABASE'] == $server['DATABASE'])
-			{
-				$result = $serverId;
-				break;
-			}
-		}
-
-		if (is_null($result))
-		{
-			throw new RsmException(500, 'General error', 'Could not find server id');
-		}
-
-		return $result;
-	}
-
 	/******************************************************************************************************************
 	 * Functions for deleting object                                                                                  *
 	 ******************************************************************************************************************/

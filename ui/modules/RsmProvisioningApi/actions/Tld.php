@@ -366,7 +366,7 @@ class Tld extends MonitoringTarget
 		$this->updateDnsNsItems();
 	}
 
-	private function compareMinNsOnUpdate()
+	private function compareMinNsOnUpdate(): void
 	{
 		$services = array_column($this->newObject['servicesStatus'], 'enabled', 'service');
 

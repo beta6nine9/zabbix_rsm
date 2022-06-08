@@ -497,7 +497,7 @@ abstract class ActionBase extends CController
 		restore_error_handler();
 	}
 
-	private function getExceptionDetails(Throwable $e)
+	private function getExceptionDetails(Throwable $e): array
 	{
 		$details = [];
 
@@ -683,6 +683,20 @@ abstract class ActionBase extends CController
 				$objectType = 'probeNode';
 			}
 
+			$objectBefore = $this->oldObject;
+			$objectAfter = $this->objectAfterUpdate;
+
+			if (!is_null($objectBefore))
+			{
+				$objectBefore['centralServer'] = $this->getServerId() + 1;
+				$objectBefore = json_encode($objectBefore, JSON_UNESCAPED_SLASHES);
+			}
+			if (!is_null($objectAfter))
+			{
+				$objectAfter['centralServer'] = $this->getServerId() + 1;
+				$objectAfter = json_encode($objectAfter, JSON_UNESCAPED_SLASHES);
+			}
+
 			$values = [
 				'provisioning_api_logid' => DB::reserveIds('provisioning_api_log', 1),
 				'clock'                  => $_SERVER['REQUEST_TIME'],
@@ -691,8 +705,8 @@ abstract class ActionBase extends CController
 				'identifier'             => $this->getInput('id'),
 				'operation'              => $operation,
 				'object_type'            => $objectType,
-				'object_before'          => is_null($this->oldObject) ? null : json_encode($this->oldObject, JSON_UNESCAPED_SLASHES),
-				'object_after'           => is_null($this->objectAfterUpdate) ? null : json_encode($this->objectAfterUpdate, JSON_UNESCAPED_SLASHES),
+				'object_before'          => $objectBefore,
+				'object_after'           => $objectAfter,
 				'remote_addr'            => $_SERVER['REMOTE_ADDR'],
 				'x_forwarded_for'        => array_key_exists('HTTP_X_FORWARDED_FOR', $_SERVER) ? $_SERVER['HTTP_X_FORWARDED_FOR'] : null,
 			];
@@ -701,7 +715,33 @@ abstract class ActionBase extends CController
 		}
 	}
 
-	private function logFailure()
+	protected function getServerId(): int
+	{
+		$result = null;
+
+		foreach ($GLOBALS['DB']['SERVERS'] as $serverId => $server)
+		{
+			if ($GLOBALS['DB']['TYPE'    ] == $server['TYPE'    ] &&
+				$GLOBALS['DB']['SERVER'  ] == $server['SERVER'  ] &&
+				$GLOBALS['DB']['PORT'    ] == $server['PORT'    ] &&
+				$GLOBALS['DB']['USER'    ] == $server['USER'    ] &&
+				$GLOBALS['DB']['PASSWORD'] == $server['PASSWORD'] &&
+				$GLOBALS['DB']['DATABASE'] == $server['DATABASE'])
+			{
+				$result = $serverId;
+				break;
+			}
+		}
+
+		if (is_null($result))
+		{
+			throw new RsmException(500, 'General error', 'Could not find server id');
+		}
+
+		return $result;
+	}
+
+	private function logFailure(): void
 	{
 		openlog('ProvisioningAPI', LOG_CONS | LOG_NDELAY | LOG_PID | LOG_PERROR, LOG_LOCAL0);
 
@@ -775,7 +815,7 @@ abstract class ActionBase extends CController
 		]));
 	}
 
-	protected function setCommonResponse(int $resultCode, string $title, ?string $description, ?array $details, ?array $updatedObject)
+	protected function setCommonResponse(int $resultCode, string $title, ?string $description, ?array $details, ?array $updatedObject): void
 	{
 		$supportedResultCodes = [
 			200, // OK
