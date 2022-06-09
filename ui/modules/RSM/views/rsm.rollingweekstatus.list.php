@@ -336,7 +336,7 @@ if ($data['tld']) {
 						: new CSpan('0.000%');
 
 					if ($tld[$service]['clock']) {
-						$rollweek_value->setAttribute('title', date(DATE_TIME_FORMAT_SECONDS, $tld[$service]['clock']), '', false);
+						$rollweek_value->setHint(date(DATE_TIME_FORMAT_SECONDS, $tld[$service]['clock']), '', false);
 					}
 
 					$rollweek_graph = ($tld[$service]['lastvalue'] > 0)
@@ -363,7 +363,7 @@ if ($data['tld']) {
 							])
 						))
 						->addClass('icon-eye')
-						->setAttribute('title', date(DATE_TIME_FORMAT_SECONDS, $tld[$service]['availClock']), '', false),
+						->setHint(date(DATE_TIME_FORMAT_SECONDS, $tld[$service]['availClock']), '', false),
 						SPACE,
 						(new CSpan($rollweek_graph))->addClass('rolling-week-graph'),
 						$rdds_subservices
@@ -374,7 +374,7 @@ if ($data['tld']) {
 						(new CSpan(''))->addClass('rolling-week-value'),
 						(new CDiv())
 							->addClass('service-icon status_icon_extra iconrollingweeknodata disabled-service')
-							->setAttribute('title', _('No data yet'), '', false),
+							->setHint(_('No data yet'), '', false),
 						(new CSpan(null))->addClass('rolling-week-graph'),
 						$rdds_subservices,
 					];
@@ -385,7 +385,7 @@ if ($data['tld']) {
 					(new CSpan(null))->addClass('rolling-week-value'),
 					(new CDiv())
 						->addClass('service-icon status_icon_extra iconrollingweekdisabled disabled-service')
-						->setAttribute('title', _("$service_name is disabled"), '', false)
+						->setHint(_("$service_name is disabled"), '', false)
 				];
 			}
 		}
