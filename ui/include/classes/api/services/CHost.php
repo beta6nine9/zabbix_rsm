@@ -657,12 +657,12 @@ class CHost extends CHostGeneral {
 	public function create($hosts) {
 		$this->validateCreate($hosts);
 
+		// RSM specifics: store time when host was created
 		foreach ($hosts as $index => &$host) {
-			// RSM specifics: store time when host was created
 			$host['created'] = time();
-			// RSM specifics: end
 		}
 		unset($host);
+		// RSM specifics: end
 
 		$hosts_groups = [];
 		$hosts_tags = [];
