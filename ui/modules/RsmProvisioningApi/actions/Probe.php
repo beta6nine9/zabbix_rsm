@@ -460,7 +460,7 @@ class Probe extends ActionBaseEx
 		$hostids += $this->getHostIds([$this->input['id'] . ' - mon']);
 
 		// delete "<probe>", "<probe> - mon", "<rsmhost> <probe>" hosts
-		$data = API::Host()->delete(array_values($hostids));
+		$this->deleteHosts($hostids);
 
 		// delete "Template Probe Config <probe>" template
 		$data = API::Template()->delete([$templateId]);

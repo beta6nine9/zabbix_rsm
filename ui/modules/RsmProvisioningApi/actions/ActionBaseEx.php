@@ -7,6 +7,7 @@ namespace Modules\RsmProvisioningApi\Actions;
 require_once __DIR__ . '/../validators/validators.inc.php';
 
 use API;
+use CMessageHelper;
 use Exception;
 
 abstract class ActionBaseEx extends ActionBase
@@ -666,6 +667,24 @@ abstract class ActionBaseEx extends ActionBase
 		if (!empty($config))
 		{
 			API::UserMacro()->update($config);
+		}
+	}
+
+	/**
+	 * Deletes hosts.
+	 *
+	 * @param array $hostids
+	 */
+	protected function deleteHosts(array $hostids): void
+	{
+		$data = API::Host()->delete(array_values($hostids));
+
+		asort($hostids);
+		$hosts = array_keys($hostids);
+
+		foreach ($hosts as $host)
+		{
+			CMessageHelper::addSuccess('Deleted: Host "' . $host . '".');
 		}
 	}
 

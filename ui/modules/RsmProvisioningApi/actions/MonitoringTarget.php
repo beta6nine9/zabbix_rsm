@@ -239,7 +239,7 @@ abstract class MonitoringTarget extends ActionBaseEx
 		$hostids = array_column($this->getHostsByTemplateId($templateId, null, null), 'hostid', 'host');
 
 		// delete "<rsmhost>", "<rsmhost> <probe>" hosts
-		$data = API::Host()->delete(array_values($hostids));
+		$this->deleteHosts($hostids);
 
 		// delete "Template Rsmhost Config <rsmhost>" template
 		$data = API::Template()->delete([$templateId]);
