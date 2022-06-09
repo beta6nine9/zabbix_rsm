@@ -58,7 +58,7 @@ foreach ($data['probes'] as $probe => $values) {
 		$style = $values['automatic']['value'] == 0 ? ZBX_STYLE_RED : null;
 		$time = elapsedTime('@'.$values['automatic']['clock']);
 
-		$elements['automatic'] = (new CSpan($value))->addClass($style)->setAttribute('title', $time);
+		$elements['automatic'] = (new CSpan($value))->addClass($style)->setHint($time);
 	}
 
 	if (isset($values['manual']['value'])) {
@@ -66,7 +66,7 @@ foreach ($data['probes'] as $probe => $values) {
 		$style = $values['manual']['value'] == 0 ? ZBX_STYLE_GREY : null;
 		$time = elapsedTime('@'.$values['manual']['clock']);
 
-		$elements['manual'] = (new CSpan($value))->addClass($style)->setAttribute('title', $time);
+		$elements['manual'] = (new CSpan($value))->addClass($style)->setHint($time);
 	}
 
 	if (isset($values['lastaccess']['value'])) {
@@ -76,7 +76,7 @@ foreach ($data['probes'] as $probe => $values) {
 		$style = (time() - $values['lastaccess']['value']) > $lastaccess_limit ? ZBX_STYLE_RED : null;
 		$time = elapsedTime('@'.$values['lastaccess']['clock']);
 
-		$elements['lastaccess'] = (new CSpan($value))->addClass($style)->setAttribute('title', $time);
+		$elements['lastaccess'] = (new CSpan($value))->addClass($style)->setHint($time);
 	}
 
 	if (isset($values['resolver']['value'])) {
@@ -84,7 +84,7 @@ foreach ($data['probes'] as $probe => $values) {
 		$style = $values['resolver']['value'] == 0 ? ZBX_STYLE_RED : null;
 		$time = elapsedTime('@'.$values['resolver']['clock']);
 
-		$elements['resolver'] = (new CSpan($value))->addClass($style)->setAttribute('title', $time);
+		$elements['resolver'] = (new CSpan($value))->addClass($style)->setHint($time);
 	}
 
 	if (isset($values['errors']['value'])) {
@@ -92,7 +92,7 @@ foreach ($data['probes'] as $probe => $values) {
 		$style = $values['errors']['value'] ? ZBX_STYLE_RED : null;
 		$time = elapsedTime('@'.$values['errors']['clock']);
 
-		$elements['errors'] = (new CSpan($value))->addClass($style)->setAttribute('title', $time);
+		$elements['errors'] = (new CSpan($value))->addClass($style)->setHint($time);
 	}
 
 	$table->addRow([
