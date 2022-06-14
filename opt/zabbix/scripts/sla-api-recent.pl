@@ -1595,21 +1595,25 @@ sub calculate_cycle($$$$$$$$$$)
 	# add "Offline" and "No results"
 	foreach my $probe (keys(%{$all_probes_ref}))
 	{
-		my $probe_online;
+		my $is_probe_online;	# 0 or 1, just for storing the correct value later
 
 		if (defined($service_probes_ref->{$probe}) &&
 				$service_probes_ref->{$probe}{'status'} == HOST_STATUS_MONITORED)
 		{
-			$probe_online = probe_online_at($probe, $from, $delay);
+			$is_probe_online = probe_online_at($probe, $from, $delay);
 		}
 		else
 		{
-			$probe_online = 0;
+			$is_probe_online = 0;
 		}
 
 		foreach my $interface (@{$interfaces_ref})
 		{
-			if (!$probe_online)
+			if ($rawstatus == UP_INCONCLUSIVE_RECONFIG)
+			{
+				$tested_interfaces{$interface}{$probe}{'status'} = AH_CITY_NO_RESULT;
+			}
+			elsif (!$is_probe_online)
 			{
 				$tested_interfaces{$interface}{$probe}{'status'} = AH_CITY_OFFLINE;
 
