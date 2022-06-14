@@ -5584,9 +5584,9 @@ sub fp_get_updated_eventids($)
 	my $max_rsm_false_positiveid = db_select_value("select max(rsm_false_positiveid) from rsm_false_positive") // 0;
 	if (${$last_rsm_false_positiveid_ref} > $max_rsm_false_positiveid)
 	{
-		fail("value of false_positive ID in one of the files under /opt/zabbix/data" .
-			" (${$last_rsm_false_positiveid_ref}) is larger than" .
-			" last false_positive ID in the database ($max_rsm_false_positiveid)");
+		fail("the false_positive ID (${$last_rsm_false_positiveid_ref})".
+			" in one of the data files is larger than" .
+			" the last rsm_false_positiveid in the database ($max_rsm_false_positiveid)");
 	}
 
 	# get unprocessed "false positive" entries
