@@ -453,6 +453,13 @@ abstract class ActionBase extends CController
 
 			DBstart();
 
+			// Acquire some kind of lock for the transaction.
+			// Multiple requests should not be handled at the same time because:
+			// * Zabbix API doesn't guarantee that the hosts will be unique, thus it is possible to create multiple
+			//   probes or rsmhosts with the same name in parallel transactions;
+			// * when onboarding an rsmhost and a probe at the same time, "<rsmhost> <probe>" host might be missing.
+			DBselect("SELECT NULL FROM ids WHERE table_name='hosts' FOR UPDATE");
+
 			if (!$this->checkMonitoringTarget())
 			{
 				throw new Exception('Invalid monitoring target');
