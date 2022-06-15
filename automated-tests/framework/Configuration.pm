@@ -50,7 +50,7 @@ sub get_config($$)
 
 	my $value = $config->{$section}{$property};
 
-	if ($section eq 'paths' && $value eq '')
+	if ($value eq '')
 	{
 		fail("property '$section.$property' is empty in the config file");
 	}

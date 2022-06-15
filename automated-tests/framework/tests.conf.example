@@ -8,12 +8,12 @@ db_dumps_dir=
 socket_dir=
 pid_file=
 db_host=localhost
-db_name=rsm_server
-db_username=zabbix
-db_password=password
+db_name=
+db_username=
+db_password=
 
 [frontend]
-url=http://127.0.0.1/ui/
+url=
 password=zabbix
 username=Admin
 
