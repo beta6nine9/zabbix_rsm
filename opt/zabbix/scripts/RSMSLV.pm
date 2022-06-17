@@ -4995,12 +4995,12 @@ sub update_slv_rtt_monthly_stats($$$$$$$$;$)
 
 sub recalculate_downtime($$$$$$)
 {
-	my $rsm_false_positive_log_file = shift;
-	my $item_key_avail              = shift; # exact key for rdds and dns, pattern for dns.ns
-	my $item_key_downtime           = shift; # exact key for rdds and dns, undef for dns.ns
-	my $incident_fail               = shift; # how many cycles have to fail to start the incident
-	my $incident_recover            = shift; # how many cycles have to succeed to recover from the incident
-	my $delay                       = shift;
+	my $false_positive_log_file = shift;
+	my $item_key_avail          = shift; # exact key for rdds and dns, pattern for dns.ns
+	my $item_key_downtime       = shift; # exact key for rdds and dns, undef for dns.ns
+	my $incident_fail           = shift; # how many cycles have to fail to start the incident
+	my $incident_recover        = shift; # how many cycles have to succeed to recover from the incident
+	my $delay                   = shift;
 
 	fail("not supported when running in --dry-run mode") if (opt('dry-run'));
 
@@ -5008,7 +5008,7 @@ sub recalculate_downtime($$$$$$)
 	my $service = uc($item_key_avail =~ s/^rsm\.slv\.(.+)\.avail(?:\[.*\])?$/$1/r);
 
 	# get last rsm_false_positiveid
-	my $last_rsm_false_positiveid = __fp_read_last_rsm_false_positiveid($rsm_false_positive_log_file);
+	my $last_rsm_false_positiveid = __fp_read_last_rsm_false_positiveid($false_positive_log_file);
 	dbg("last_rsm_false_positiveid = $last_rsm_false_positiveid");
 
 	# get list of events.eventid (incidents) that changed their "false positive" state
@@ -5042,7 +5042,7 @@ sub recalculate_downtime($$$$$$)
 	}
 
 	# save last rsm_false_positiveid (it may have changed even if @eventids is empty)
-	__fp_write_last_rsm_false_positiveid($rsm_false_positive_log_file, $last_rsm_false_positiveid);
+	__fp_write_last_rsm_false_positiveid($false_positive_log_file, $last_rsm_false_positiveid);
 }
 
 sub generate_report($$;$)

@@ -27,7 +27,7 @@ use constant DEFAULT_INCIDENT_MEASUREMENTS_LIMIT => 3600;	# seconds, maximum per
 # We must wait for the maximum period when Service Availability and Rolling Week
 # values are calculated, sent to the server and saved in the database. Here we
 # specify the minimum age of latest cycle we are able to process.
-use constant LATEST_CYCLE_AGE	=> 240;	# seconds (must be divisible by 60)
+use constant SLV_VALUES_AVAILABLE	=> 240;	# seconds (must be divisible by 60)
 
 parse_opts(
 	'tld=s',
@@ -83,9 +83,11 @@ if (defined($opt_from))
 	dbg("option \"from\" truncated to the start of a minute: $opt_from") if ($opt_from != getopt('from'));
 }
 
+my $max_till = truncate_till(time() - SLV_VALUES_AVAILABLE);
+
 db_connect();
 my $monitoring_target = get_monitoring_target();
-my $rdap_is_standalone = is_rdap_standalone();
+my $rdap_is_standalone = is_rdap_standalone($max_till);
 db_disconnect();
 
 dbg("RDAP ", ($rdap_is_standalone ? "is" : "is NOT"), " standalone");
@@ -146,8 +148,6 @@ if (opt('ignore-file'))
 db_connect();
 my $cfg_avail_valuemaps = get_avail_valuemaps();
 db_disconnect();
-
-my $max_till = truncate_till(time() - LATEST_CYCLE_AGE);
 
 my ($check_from, $check_till, $continue_file);
 
@@ -256,7 +256,7 @@ foreach my $service (keys(%services))
 	$services{$service}{'delay'} = get_rdap_delay() if ($service eq 'rdap');
 	$services{$service}{'delay'} = get_epp_delay()  if ($service eq 'epp');
 
-	$services{$service}{'avail_key'} = "rsm.slv.$service.avail";
+	$services{$service}{'avail_key'}    = "rsm.slv.$service.avail";
 	$services{$service}{'rollweek_key'} = "rsm.slv.$service.rollweek";
 
 	dbg("$service delay: ", $services{$service}{'delay'});
@@ -269,10 +269,17 @@ if (opt('print-period'))
 {
 	foreach my $service (sort(keys(%services)))
 	{
-		next if (!defined($services{$service}{'from'}));
-		info(sprintf("selected %6s period: %s",
-				$service,
-				selected_period($services{$service}{'from'}, $services{$service}{'till'})));
+		if (!defined($services{$service}{'from'}))
+		{
+			info(sprintf("selected %6s period: -",
+					$service));
+		}
+		else
+		{
+			info(sprintf("selected %6s period: %s",
+					$service,
+					selected_period($services{$service}{'from'}, $services{$service}{'till'})));
+		}
 	}
 }
 else
@@ -470,8 +477,8 @@ foreach my $server_key (@server_keys)
 			# find out which services are disabled, for others get lastclock
 			foreach my $service (keys(%services))
 			{
-				my $service_from = $services{$service}{'from'};
-				my $service_till = $services{$service}{'till'};
+				my $incidents_from = $services{$service}{'from'};
+				my $incidents_till = $services{$service}{'till'};
 
 				my $delay = $services{$service}{'delay'};
 
@@ -479,18 +486,18 @@ foreach my $server_key (@server_keys)
 				my $rollweek_key = $services{$service}{'rollweek_key'};
 
 				# not the right time for this service/delay yet
-				if (!$service_from || !$service_till)
+				if (!$incidents_from || !$incidents_till)
 				{
 					next unless ($state_file_exists == 0);
 
 					dbg("$service: there is no state file, consider previous cycle");
 
 					# but since there is no state file we need to consider previous cycle
-					$service_from = cycle_start($till - $delay, $delay);
-					$service_till = cycle_end($till - $delay, $delay);
+					$incidents_from = cycle_start($till - $delay, $delay);
+					$incidents_till = cycle_end($till - $delay, $delay);
 				}
 
-				if (!tld_service_enabled($tld, $service, $service_till))
+				if (!tld_service_enabled($tld, $service, $max_till))
 				{
 					if (opt('dry-run'))
 					{
@@ -724,14 +731,14 @@ foreach my $server_key (@server_keys)
 					next;
 				}
 
-				# we need down time in minutes, not percent, that's why we can't use "rsm.slv.$service.rollweek" value
-				my ($rollweek_from, $rollweek_till) = get_rollweek_bounds($delay, $service_till);
+				# besides weekly unavailability we need downtime
+				my ($rollweek_from, $rollweek_till) = get_rollweek_bounds($delay, $max_till);
 
 				my $rollweek_incidents = get_incidents($avail_itemid, $delay, $rollweek_from, $rollweek_till);
 
 				my $downtime = get_downtime($avail_itemid, $rollweek_from, $rollweek_till, 0, $rollweek_incidents, $delay);
 
-				__prnt($server_key, uc($service), " period: ", selected_period($service_from, $service_till)) if (opt('dry-run') or opt('debug'));
+				__prnt($server_key, uc($service), " period: ", selected_period($incidents_from, $incidents_till)) if (opt('dry-run') or opt('debug'));
 
 				if (opt('dry-run'))
 				{
@@ -766,7 +773,7 @@ foreach my $server_key (@server_keys)
 				dbg("getting current $service service availability (delay:$delay)");
 
 				# get alarmed
-				my $incidents = get_incidents($avail_itemid, $delay, $service_from);
+				my $incidents = get_incidents($avail_itemid, $delay, $incidents_from);
 
 				my $alarmed_status;
 
@@ -852,18 +859,19 @@ foreach my $server_key (@server_keys)
 					next;
 				}
 
-				my $latest_avail_select = db_select(
+				my $rows = db_select(
 						"select value from history_uint" .
 							" where itemid=$avail_itemid" .
-							" and clock<=$service_till" .
-						" order by clock desc limit 1");
+							" and clock<=$max_till" .
+						" order by clock desc" .
+						" limit 1");
 
-				my $latest_avail_value = scalar(@{$latest_avail_select}) == 0 ?
-						UP_INCONCLUSIVE_NO_DATA : $latest_avail_select->[0]->[0];
+				my $service_availability = scalar(@{$rows}) == 0 ?
+						UP_INCONCLUSIVE_NO_DATA : $rows->[0]->[0];
 
 				if (opt('dry-run'))
 				{
-					unless (exists($cfg_avail_valuemaps->{int($latest_avail_value)}))
+					unless (exists($cfg_avail_valuemaps->{int($service_availability)}))
 					{
 						my $expected_list;
 
@@ -881,17 +889,17 @@ foreach my $server_key (@server_keys)
 							$expected_list .= "$status ($description)";
 						}
 
-						wrn("unknown availability result: $latest_avail_value (expected $expected_list)");
+						wrn("unknown availability result: $service_availability (expected $expected_list)");
 					}
 				}
 
 				$json_state_ref->{'testedServices'}->{uc($service)} = {
-					'status' => get_result_string($cfg_avail_valuemaps, $latest_avail_value),
+					'status' => get_result_string($cfg_avail_valuemaps, $service_availability),
 					'emergencyThreshold' => $rollweek,
 					'incidents' => []
 				};
 
-				foreach my $incident (@{get_incidents($avail_itemid, $delay, $service_from, $service_till)})
+				foreach my $incident (@{get_incidents($avail_itemid, $delay, $incidents_from, $incidents_till)})
 				{
 					my $eventid = $incident->{'eventid'};
 					my $event_start = $incident->{'start'};
@@ -899,8 +907,8 @@ foreach my $server_key (@server_keys)
 					my $false_positive = $incident->{'false_positive'};
 					my $event_clock = $incident->{'event_clock'};
 
-					my $start = (defined($service_from) && ($service_from > $event_start) ?
-							$service_from : $event_start);
+					my $start = (defined($incidents_from) && ($incidents_from > $event_start) ?
+							$incidents_from : $event_start);
 
 					if (opt('dry-run'))
 					{
@@ -943,11 +951,11 @@ foreach my $server_key (@server_keys)
 					# Check if we have missing measurement files for processed incident.
 					# Don't go back further than $incident_measurements_limit.
 
-					my $limit = cycle_start($service_from - $incident_measurements_limit, $delay);
+					my $limit = cycle_start($incidents_from - $incident_measurements_limit, $delay);
 
 					my $clock = ($event_start > $limit ? $event_start : $limit);
 
-					while ($clock < ($event_end // $service_till))
+					while ($clock < ($event_end // $incidents_till))
 					{
 						# wait for 30 seconds at most until measurement file appears
 						my $max_wait = time() + 30;
