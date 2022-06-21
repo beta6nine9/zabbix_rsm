@@ -368,9 +368,9 @@
 "2021-01-21 18:40:00","/opt/zabbix/scripts/slv/rsm.slv.dns.rollweek.pl    --cycles 30"
 "2021-01-21 18:40:00","/opt/zabbix/scripts/slv/rsm.slv.dnssec.avail.pl    --cycles 30"
 "2021-01-21 18:40:00","/opt/zabbix/scripts/slv/rsm.slv.dnssec.rollweek.pl --cycles 30"
-"2021-01-21 18:40:00","/opt/zabbix/scripts/slv/rsm.slv.rdds.avail.pl      --cycles 6 --debug"
+"2021-01-21 18:40:00","/opt/zabbix/scripts/slv/rsm.slv.rdds.avail.pl      --cycles 6"
 "2021-01-21 18:40:00","/opt/zabbix/scripts/slv/rsm.slv.rdds.rollweek.pl   --cycles 6"
-"2021-01-21 18:40:00","/opt/zabbix/scripts/slv/rsm.slv.rdap.avail.pl      --cycles 6 --debug"
+"2021-01-21 18:40:00","/opt/zabbix/scripts/slv/rsm.slv.rdap.avail.pl      --cycles 6"
 "2021-01-21 18:40:00","/opt/zabbix/scripts/slv/rsm.slv.rdap.rollweek.pl   --cycles 6"
 "2021-01-21 18:40:00","/opt/zabbix/scripts/slv/rsm.slv.dns.ns.avail.pl    --cycles 30"
 
