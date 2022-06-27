@@ -1298,7 +1298,7 @@ out:
 	return ret;
 }
 
-static void extract_nsid(ldns_rdf *edns_data, char **nsid)
+static void	extract_nsid(ldns_rdf *edns_data, char **nsid)
 {
 	uint8_t	*rdf_data;
 	size_t	rdf_size;
@@ -2075,24 +2075,47 @@ static FILE	*open_item_log(const char *host, const char *tld, const char *name, 
 	return fd;
 }
 
-static void	set_dns_test_results(zbx_ns_t *nss, size_t nss_num, int rtt_limit, unsigned int minns,
-		unsigned int *nssok, unsigned int *test_status, unsigned int *dnssec_status, int dnssec_enabled,
-		FILE *log_fd)
-{
-	unsigned int	dnssec_nssok = 0;
-	size_t		i, j;
+/**
+ * previously, there was only DNS status (0/1) of the Name Server:
+ *
+ * 0: DNS_DOWN
+ * 1: DNS_UP
+ *
+ * later we added DNSSEC status and the values changed:
+ *
+ * value | DNS status | DNSSEC status
+ * ------|------------|--------------
+ *  0    | Old Down   |
+ *  1    | Old Up     |
+ *  2    | Down       | Disabled
+ *  3    | Down       | Down
+ *  4    | Down       | Up
+ *  5    | Up         | Disabled
+ * -5----|-Up---------|-Down-           <-- not possible
+ *  6    | Up         | Up
+ */
 
-	*nssok = 0;
+#define DNS_DOWN_DNSSEC_DISABLED	2;
+#define DNS_DOWN_DNSSEC_DOWN		3;
+#define DNS_DOWN_DNSSEC_UP		4;
+#define DNS_UP_DNSSEC_DISABLED		5;
+#define DNS_UP_DNSSEC_UP		6;
+
+static void	set_dns_test_results(zbx_ns_t *nss, size_t nss_num, int rtt_limit, unsigned int minns,
+		unsigned int *dns_status, unsigned int *dnssec_status, int dnssec_enabled, FILE *log_fd)
+{
+	unsigned int	dns_nssok = 0, dnssec_nssok = 0;
+	size_t		i, j;
 
 	for (i = 0; i < nss_num; i++)
 	{
-		int	ns_dnssec_status = SUCCEED;
+		int	ip_dns_result = SUCCEED, ip_dnssec_result = SUCCEED;
 
 		for (j = 0; j < nss[i].ips_num; j++)
 		{
 			/* if a single IP of the Name Server fails, consider the whole Name Server down */
 			if (ZBX_SUBTEST_SUCCESS != zbx_subtest_result(nss[i].ips[j].rtt, rtt_limit))
-				nss[i].result = FAIL;
+				ip_dns_result = FAIL;
 
 			if (dnssec_enabled && (
 					(ZBX_EC_DNS_UDP_DNSSEC_FIRST >= nss[i].ips[j].rtt &&
@@ -2101,16 +2124,41 @@ static void	set_dns_test_results(zbx_ns_t *nss, size_t nss_num, int rtt_limit, u
 						nss[i].ips[j].rtt >= ZBX_EC_DNS_TCP_DNSSEC_LAST)
 			))
 			{
-				ns_dnssec_status = FAIL;	/* this name server received dnssec error */
+				ip_dnssec_result = FAIL;	/* this name server failed dnssec check */
 			}
 		}
 
-		if (SUCCEED == nss[i].result)
-			(*nssok)++;
+		/* Name Server status (minding all its IPs) */
+		if (ip_dns_result == FAIL)
+		{
+			/* DNS DOWN, DNSSEC varies */
+			if (!dnssec_enabled)
+			{
+				nss[i].result = DNS_DOWN_DNSSEC_DISABLED;
+			}
+			else if (ip_dnssec_result == FAIL)
+			{
+				nss[i].result = DNS_DOWN_DNSSEC_DOWN;
+			}
+			else
+				nss[i].result = DNS_DOWN_DNSSEC_UP;
+		}
+		else
+		{
+			/* DNS UP, DNSSEC varies */
+			dns_nssok++;
+
+			if (!dnssec_enabled)
+			{
+				nss[i].result = DNS_UP_DNSSEC_DISABLED;
+			}
+			else
+				nss[i].result = DNS_UP_DNSSEC_UP;
+		}
 
 		if (dnssec_enabled)
 		{
-			if (SUCCEED == ns_dnssec_status)
+			if (SUCCEED == ip_dnssec_result)
 			{
 				rsm_infof(log_fd, "%s: DNSSEC OK", nss[i].name);
 				dnssec_nssok++;
@@ -2120,15 +2168,15 @@ static void	set_dns_test_results(zbx_ns_t *nss, size_t nss_num, int rtt_limit, u
 		}
 	}
 
-	*test_status = (*nssok >= minns ? 1 : 0);
+	*dns_status = (dns_nssok >= minns ? 1 : 0);
 
 	if (dnssec_enabled)
 		*dnssec_status = (dnssec_nssok >= minns ? 1 : 0);
 }
 
 static void	create_dns_json(struct zbx_json *json, zbx_ns_t *nss, size_t nss_num, unsigned int current_mode,
-		unsigned int nssok, unsigned int test_status, unsigned int dnssec_status, char protocol,
-		const char *testedname, int dnssec_enabled)
+		unsigned int dns_status, unsigned int dnssec_status, char protocol, const char *testedname,
+		int dnssec_enabled)
 {
 	size_t	i, j;
 
@@ -2159,15 +2207,14 @@ static void	create_dns_json(struct zbx_json *json, zbx_ns_t *nss, size_t nss_num
 	{
 		zbx_json_addobject(json, NULL);
 		zbx_json_addstring(json, "ns", nss[i].name, ZBX_JSON_TYPE_STRING);
-		zbx_json_adduint64(json, "status", (SUCCEED == nss[i].result ? 1 : 0));
+		zbx_json_adduint64(json, "status", nss[i].result);
 		zbx_json_close(json);
 	}
 
 	zbx_json_close(json);
 
-	zbx_json_adduint64(json, "nssok", nssok);
 	zbx_json_adduint64(json, "mode", current_mode);
-	zbx_json_adduint64(json, "status", test_status);
+	zbx_json_adduint64(json, "status", dns_status);
 	zbx_json_adduint64(json, "protocol", (protocol == RSM_UDP ? 0 : 1));
 	zbx_json_addstring(json, "testedname", testedname, ZBX_JSON_TYPE_STRING);
 
@@ -2391,7 +2438,7 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 	FILE			*log_fd;
 	zbx_ns_t		*nss = NULL;
 	size_t			i, j, nss_num = 0;
-	unsigned int		extras, current_mode, test_status, dnssec_status, nssok;
+	unsigned int		extras, current_mode, test_status, dnssec_status;
 	struct zbx_json		json;
 	int			dnssec_enabled, rdds_enabled, epp_enabled, udp_enabled, tcp_enabled, ipv4_enabled,
 				ipv6_enabled, udp_rtt_limit, tcp_rtt_limit, rtt_limit, successful_tests, file_exists = 0,
@@ -2726,10 +2773,10 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 		zbx_free(threads);
 	}
 
-	set_dns_test_results(nss, nss_num, rtt_limit, minns, &nssok, &test_status, &dnssec_status, dnssec_enabled,
+	set_dns_test_results(nss, nss_num, rtt_limit, minns, &test_status, &dnssec_status, dnssec_enabled,
 			log_fd);
 
-	create_dns_json(&json, nss, nss_num, current_mode, nssok, test_status, dnssec_status, protocol, testedname,
+	create_dns_json(&json, nss, nss_num, current_mode, test_status, dnssec_status, protocol, testedname,
 			dnssec_enabled);
 
 	if (SUCCEED != update_metadata(file_exists, domain, test_status, test_recover, protocol, &current_mode,

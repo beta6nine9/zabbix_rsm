@@ -508,7 +508,6 @@ add_probe_history()
 					set_and_append_repeat '"'$tld' '$probe'","rsm.dns.ns.status['$ns']",60,'$ts 0 $fail_cycles
 				done
 
-				set_and_append_repeat '"'$tld' '$probe'","rsm.dns.nssok",60,'$ts 0 $fail_cycles
 				set_and_append_repeat '"'$tld' '$probe'","rsm.dns.protocol",60,'$ts $nprotocol $fail_cycles
 
 				for nsip in "${nsips[@]}"; do
@@ -544,7 +543,6 @@ add_probe_history()
 				set_and_append_repeat '"'$tld' '$probe'","rsm.dns.ns.status['$ns']",60,'$ts 1 $ok_cycles
 			done
 
-			set_and_append_repeat '"'$tld' '$probe'","rsm.dns.nssok",60,'$ts "${#p[@]}" $ok_cycles
 			set_and_append_multi_repeat '"'$tld' '$probe'","rsm.dns.protocol",60,'$ts 1 0 9 $dns_cycles_period
 
 			for nsip in "${nsips[@]}"; do

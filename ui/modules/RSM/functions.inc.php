@@ -336,3 +336,49 @@ function elapsedTime($datetime, $full = false) {
 
 	return $string ? implode(', ', $string) . ' ago' : 'just now';
 }
+
+function dnsNsStatus($service, $value)
+{
+	/**
+	 * previously, there was only DNS status (0/1) of the Name Server:
+	 *
+	 * 0: DNS_DOWN
+	 * 1: DNS_UP
+	 */
+	if ($value == 0 || $value == 1)
+		return $value;
+
+	/**
+	 * later we added DNSSEC status and the values changed:
+	 *
+	 * 2: DNS_DOWN_DNSSEC_DISABLED
+	 * 3: DNS_DOWN_DNSSEC_DOWN
+	 * 4: DNS_DOWN_DNSSEC_UP
+	 * 5: DNS_UP_DNSSEC_DISABLED
+	 * 6: DNS_UP_DNSSEC_UP
+	 */
+
+	if ($value < 2 || 6 < $value)
+		die("dnsNsStatus() Name Server status cannot be calculated based on value \"$value\"");
+
+	if ($service == RSM_DNS) {
+		if ($value <= 4) {
+			/* DNS down */
+			return 0;
+		}
+
+		/* DNS up */
+		return 1;
+	}
+
+	if ($value == 2 || $value == 5)
+		die("dnsNsStatus() Name Server status cannot be calculated for disabled DNSSEC service");
+
+	if ($value == 3) {
+		/* DNSSEC down */
+		return 0;
+	}
+
+	/* DNSSEC up */
+	return 1;
+}
