@@ -23,11 +23,6 @@ function main(): void
 	{
 		$details = $e->getDetails();
 
-		if (is_null($details) && $e->getResultCode() === 500)
-		{
-			$details = getExceptionDetails($e);
-		}
-
 		setCommonResponse(
 			$e->getResultCode(),
 			$e->getTitle(),
@@ -36,12 +31,12 @@ function main(): void
 			$e->getUpdatedObject()
 		);
 
-		logFailure();
+		logFailure(getExceptionDetails($e));
 	}
 	catch (Throwable $e)
 	{
-		setCommonResponse(500, 'General error', $e->getMessage(), getExceptionDetails($e), null);
-		logFailure();
+		setCommonResponse(500, 'General error', $e->getMessage(), null, null);
+		logFailure(getExceptionDetails($e));
 	}
 }
 
@@ -878,13 +873,17 @@ function getMaxObjectCount(string $objectType): int
 	}
 }
 
-function logFailure()
+function logFailure(array $exceptionDetails): void
 {
 	openlog('ProvisioningAPI', LOG_CONS | LOG_NDELAY | LOG_PID | LOG_PERROR, LOG_LOCAL0);
 
 	writeLog($_SERVER['REQUEST_METHOD'] . ' ' . $_SERVER['REQUEST_URI']);
 
 	$input = file_get_contents('php://input');
+
+	writeLog('');
+	writeLog('EXCEPTION:');
+	writeLog(json_encode($exceptionDetails, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT));
 
 	if ($input !== '')
 	{
