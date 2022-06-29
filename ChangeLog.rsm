@@ -1,7 +1,13 @@
+Changes for rsm2.2.10
+
+New features:
+....I..... [906] added SQLite support to Zabbix proxy package (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.2.9
 
 New features:
-..F....... [884] replaced standard browser hint box with Zabbix one to make hints available on mobile devices
+..F....... [884] replaced standard browser hint box with Zabbix one to make hints available on mobile devices (dimir)
 
 --------------------------------------------------------------------------------
 Changes for rsm2.2.8
