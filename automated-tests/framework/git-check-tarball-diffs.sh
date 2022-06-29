@@ -23,7 +23,7 @@ for orig_tarball in $(cat $LOGFILE); do
 	new_tarball=$orig_tarball.tar.gz
 
 	mv $orig_tarball $new_tarball
-	git checkout $orig_tarball
+	git checkout -q -- $orig_tarball
 
 	new_output_dir="/tmp/git-diff-new"
 	orig_output_dir="/tmp/git-diff-orig"
@@ -40,7 +40,7 @@ for orig_tarball in $(cat $LOGFILE); do
 	diff -ur $orig_output_dir $new_output_dir | less
 
 	echo
-	echo -n "$orig_tarball: keep it? [Y/n] "
+	echo -n "$orig_tarball:  keep it? [Y/n] "
 	read ans
 
 	ans=$(echo $ans | tr [A-Z] [a-z])
@@ -48,7 +48,6 @@ for orig_tarball in $(cat $LOGFILE); do
 	if [[ -z "$ans" ]] || [[ $ans = "y" ]] || [[ $ans = "yes" ]]; then
 		mv $new_tarball $orig_tarball
 
-		echo
 		echo -n "$orig_tarball: stage it? [Y/n] "
 		read ans
 

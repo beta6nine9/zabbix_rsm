@@ -143,10 +143,21 @@ int	main(int argc, char *argv[])
 		exit_usage(argv[0]);
 	}
 
-	if (delete_metadata_file && delete_metadata(tld, err_buf, 1024) != SUCCEED)
+	if (delete_metadata_file)
 	{
-		fprintf(stderr, "%s", err_buf);
-		exit(-1);
+		int	file_exists;
+
+		if (metadata_file_exists(tld, &file_exists, err_buf, 1024) != SUCCEED)
+		{
+			fprintf(stderr, "%s", err_buf);
+			exit(-1);
+		}
+
+		if (file_exists && delete_metadata(tld, err_buf, 1024) != SUCCEED)
+		{
+			fprintf(stderr, "%s", err_buf);
+			exit(-1);
+		}
 	}
 
 	zbx_snprintf(res_host_buf, sizeof(res_host_buf), "%s;%d",    res_ip, res_port);
