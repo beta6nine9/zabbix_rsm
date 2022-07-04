@@ -382,10 +382,6 @@
 
 [stop-server]
 
-[execute-sql-query]
-
-"insert into rsm_false_positive (rsm_false_positiveid,userid,eventid,clock,status) values (?,?,?,?,?)","1000000","1","1","1611252840","1"
-
 [empty-directory]
 
 "/opt/zabbix/sla"
@@ -401,6 +397,12 @@
 
 "2021-01-21 18:00:00","/opt/zabbix/scripts/sla-api-recent.pl --prettify-json --max-children 1 --print-period --period 5 --now 1611252000"
 "2021-01-21 18:08:00","/opt/zabbix/scripts/update-api-data.pl --prettify-json --max-children 1 --print-period --period 5 --continue"
+
+[execute-sql-query]
+
+"insert into rsm_false_positive (rsm_false_positiveid,userid,eventid,clock,status) values (?,?,?,?,?)","1000000","1","1","1611252840","1"
+
+[execute]
 
 "2021-01-21 18:04:00","/opt/zabbix/scripts/sla-api-recent.pl --prettify-json --max-children 1 --print-period --period 5"
 "2021-01-21 18:13:00","/opt/zabbix/scripts/update-api-data.pl --prettify-json --max-children 1 --print-period --period 5 --continue"
