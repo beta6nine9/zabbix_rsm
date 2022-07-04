@@ -1,3 +1,5 @@
+## THE DIRECTORY IS CURRENTLY UNUSED
+
 ## Onboarding Test Automation
 
 Scripts in this directory is a Proof-of-Concept for test automation for onboarding.

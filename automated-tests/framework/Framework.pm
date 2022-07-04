@@ -430,14 +430,15 @@ sub zbx_start_server(;$$$)
 	my $config_overrides = shift // {};
 
 	my $executable     = get_config('paths', 'build_dir') . "/sbin/zabbix_server";
+	my $conf_file      = get_config('paths', 'build_dir') . "/etc/zabbix_server.conf";
 	my $log_file       = get_config('paths', 'logs_dir') . "/zabbix_server" . $logfile_suffix . ".log";
 	my $libfaketime_so = get_libfaketime_so_path();
 
-	info("updating zabbix_server.conf");
+	info("updating $conf_file");
 
 	zbx_update_config(
 		get_config('paths', 'source_dir') . "/conf/zabbix_server.conf",
-		get_config('paths', 'build_dir') . "/etc/zabbix_server.conf",
+		$conf_file,
 		{
 			(
 				"ListenPort"              => "10051",
