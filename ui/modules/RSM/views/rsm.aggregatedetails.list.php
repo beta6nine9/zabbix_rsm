@@ -139,7 +139,7 @@ foreach ($data['probes'] as $probe) {
 								if ($rtt < 0) {
 									$class = ($class == ZBX_STYLE_GREEN && !isset($probe['dns_error'][$nskey]))
 											? ZBX_STYLE_GREEN : ZBX_STYLE_RED;
-									$span->setHint(VM::get(RSM_VALUE_MAP_DNS_RTT, $result));
+									$span->setHint(VM::get(RSM_VALUE_MAP_DNS_RTT, $rtt));
 								}
 
 								$span->addClass($class);
