@@ -320,8 +320,8 @@ class testRSM extends CWebTest {
 		// Check hints' texts on corresponding number.
 		if (CTestArrayHelper::get($data, 'check_hints')) {
 			foreach ($data['check_hints'] as $hint) {
-				$this->assertTrue($this->query('xpath://span[@title='.CXPathHelper::escapeQuotes($hint['title']).
-						' and text() ='.CXPathHelper::escapeQuotes($hint['number']).']')->exists()
+				$this->assertTrue($this->query('xpath://span[text() ='.CXPathHelper::escapeQuotes($hint['number']).
+						']/following-sibling::div[@class="hint-box" and text()='.CXPathHelper::escapeQuotes($hint['title']).']')->exists()
 				);
 			}
 		}
