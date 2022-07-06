@@ -1,5 +1,8 @@
 %define	namespace	50
 
+# we don't need the build-id files
+%define _build_id_links none
+
 Name:		zabbix%{namespace}
 Version:	6.0.3%{rsmversion}
 Release: 	%{?rsmprereleasetag:0.}1%{?rsmprereleasetag:%{rsmprereleasetag}}%{?dist}
@@ -397,19 +400,18 @@ export CFLAGS
 export CXXFLAGS
 
 #
-# Build proxy
+# Build proxy with SQLite support
 #
 
-# --enable-server is needed just to build t_rsm_* utilities
 set -x
 %configure $build_flags --with-sqlite3 --enable-proxy
 make -s %{?_smp_mflags}
 
-# save zabbix_proxy binary for later install section
+# save binary compiled with SQLite
 mv src/zabbix_proxy/zabbix_proxy src/zabbix_proxy/zabbix%{namespace}_proxy_sqlite
 
 #
-# Build everything else
+# Build server with MySQL support and everything else
 #
 
 %if 0%{?rhel} >= 8
@@ -463,17 +465,15 @@ rm $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_server.conf
 # add namespace prefix to the man pages
 mv $RPM_BUILD_ROOT%{_mandir}/man8/zabbix_server.8 $RPM_BUILD_ROOT%{_mandir}/man8/zabbix%{namespace}_server.8
 
-# remove unneeded EPP utilities
+# remove unneeded utilities
 rm -f $RPM_BUILD_ROOT%{_bindir}/rsm_epp_dec
 rm -f $RPM_BUILD_ROOT%{_bindir}/rsm_epp_enc
 rm -f $RPM_BUILD_ROOT%{_bindir}/rsm_epp_gen
+rm -f $RPM_BUILD_ROOT%{_bindir}/t_rsm_dns
+rm -f $RPM_BUILD_ROOT%{_bindir}/t_rsm_rdds
+rm -f $RPM_BUILD_ROOT%{_bindir}/t_rsm_rdap
 rm -f $RPM_BUILD_ROOT%{_libdir}/debug/%{_bindir}/rsm_epp_*.debug
 rm -f $RPM_BUILD_ROOT%{_libdir}/debug/%{_bindir}/t_rsm_*.debug
-
-# add namespace prefix to the testing utilities
-mv $RPM_BUILD_ROOT%{_bindir}/t_rsm_dns  $RPM_BUILD_ROOT%{_bindir}/zabbix%{namespace}_t_rsm_dns
-mv $RPM_BUILD_ROOT%{_bindir}/t_rsm_rdds $RPM_BUILD_ROOT%{_bindir}/zabbix%{namespace}_t_rsm_rdds
-mv $RPM_BUILD_ROOT%{_bindir}/t_rsm_rdap $RPM_BUILD_ROOT%{_bindir}/zabbix%{namespace}_t_rsm_rdap
 
 # install directories for scripts
 mkdir -p $RPM_BUILD_ROOT%{_libdir}/zabbix%{namespace}
@@ -819,7 +819,6 @@ systemctl restart rsyslog
 %{_unitdir}/zabbix%{namespace}-proxy.service
 %{_prefix}/lib/tmpfiles.d/zabbix%{namespace}-proxy.conf
 %{_sbindir}/zabbix%{namespace}_proxy_sqlite
-%{_bindir}/zabbix%{namespace}_t_rsm_*
 
 %files proxy-sqlite-selinux
 %defattr(-,root,root,0755)
