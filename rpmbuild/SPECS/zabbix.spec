@@ -51,6 +51,7 @@ Buildroot:	%{_tmppath}/zabbix-%{version}-%{release}-root-%(%{__id_u} -n)
 
 %if 0%{?rhel} >= 8
 BuildRequires:	mariadb-connector-c-devel
+BuildRequires:	sqlite-devel
 # TODO: temporary solution for deployment, add ldns version back after DNS Reboot is deployed
 #BuildRequires:	ldns-devel >= 1.7.1
 BuildRequires:	ldns%{namespace}-devel
@@ -72,8 +73,8 @@ Zabbix is the ultimate enterprise-level software designed for
 real-time monitoring of millions of metrics collected from tens of
 thousands of servers, virtual machines and network devices.
 
-%package proxy-mysql
-Summary:			Zabbix proxy for MySQL or MariaDB database
+%package proxy-sqlite
+Summary:			Zabbix proxy for SQLite database
 Group:				Applications/Internet
 Requires(post):		systemd
 Requires(preun):	systemd
@@ -92,10 +93,10 @@ Provides:		zabbix%{namespace}-proxy-implementation = %{version}-%{release}
 Obsoletes:		zabbix%{namespace}
 Obsoletes:		zabbix%{namespace}-proxy
 
-%description proxy-mysql
-Zabbix proxy with MySQL or MariaDB database support.
+%description proxy-sqlite
+Zabbix proxy with SQLite database support.
 
-%package proxy-mysql-selinux
+%package proxy-sqlite-selinux
 Summary:		SELinux Policies for Zabbix proxy
 Group:			System Environment/Base
 Requires(post):		selinux-policy-base >= %{selinux_policyver}, selinux-policy-targeted >= %{selinux_policyver}, policycoreutils, libselinux-utils
@@ -106,7 +107,7 @@ Requires(post):		policycoreutils-python
 %endif
 Requires:		zabbix%{namespace}-proxy = %{version}-%{release}
 
-%description proxy-mysql-selinux
+%description proxy-sqlite-selinux
 SELinux policy modules for use with Zabbix proxy.
 
 %package server-mysql
@@ -353,11 +354,14 @@ sed -i -r "s/(define\(.*_FONT_NAME.*)DejaVuSans/\1graphfont/" \
 # traceroute command path for global script
 sed -i -e 's|/usr/bin/traceroute|/bin/traceroute|' database/mysql/data.sql
 
-# copy sql files for servers
+# copy sql files for server
 cat database/mysql/schema.sql > database/mysql/create.sql
 cat database/mysql/images.sql >> database/mysql/create.sql
 cat database/mysql/data.sql >> database/mysql/create.sql
 cat %{SOURCE16} >> database/mysql/create.sql
+
+# copy sql file for proxy
+mv database/sqlite3/schema.sql database/sqlite3/proxy.sql
 
 # fix scripts path
 sed -i "$NAMESPACE_PATTERN" database/mysql/create.sql
@@ -366,9 +370,6 @@ gzip database/mysql/create.sql
 
 cp %{SOURCE19} nginx.conf
 
-# sql files for proxyes
-gzip database/mysql/schema.sql
-
 %build
 build_flags="
 	-q
@@ -376,19 +377,11 @@ build_flags="
 	--sysconfdir=/etc/zabbix%{namespace}
 	--libdir=%{_libdir}/zabbix%{namespace}
 	--with-libcurl
-	--enable-proxy
 	--enable-ipv6
 	--with-openssl
-	--enable-server
+	--with-libevent
+	--with-libpcre
 "
-
-build_flags="$build_flags --with-openssl"
-
-build_flags="$build_flags --enable-server --with-libevent --with-libpcre"
-
-%if 0%{?rhel} >= 8
-build_flags="$build_flags --enable-agent"
-%endif
 
 CFLAGS="$RPM_OPT_FLAGS -fPIC -pie -Wl,-z,relro -Wl,-z,now"
 # GCC 9
@@ -402,14 +395,33 @@ CXXFLAGS="$CFLAGS"
 
 export CFLAGS
 export CXXFLAGS
-%configure $build_flags --with-mysql
+
+#
+# Build proxy
+#
+
+# --enable-server is needed just to build t_rsm_* utilities
+set -x
+%configure $build_flags --with-sqlite3 --enable-proxy
+make -s %{?_smp_mflags}
+
+# save zabbix_proxy binary for later install section
+mv src/zabbix_proxy/zabbix_proxy src/zabbix_proxy/zabbix%{namespace}_proxy_sqlite
+
+#
+# Build everything else
+#
+
+%if 0%{?rhel} >= 8
+build_flags="$build_flags --enable-agent"
+%endif
+
+%configure $build_flags --with-mysql --enable-server
 make -s %{?_smp_mflags}
 
 mv src/zabbix_server/zabbix_server src/zabbix_server/zabbix%{namespace}_server_mysql
-mv src/zabbix_proxy/zabbix_proxy src/zabbix_proxy/zabbix%{namespace}_proxy_mysql
 
 touch src/zabbix_server/zabbix%{namespace}_server
-touch src/zabbix_proxy/zabbix%{namespace}_proxy
 
 # add namespace to selinux modules
 cd selinux
@@ -438,17 +450,17 @@ mkdir -p $RPM_BUILD_ROOT%{_localstatedir}/log/zabbix%{namespace}
 mkdir -p $RPM_BUILD_ROOT%{_localstatedir}/log/zabbix%{namespace}/slv
 mkdir -p $RPM_BUILD_ROOT%{_localstatedir}/run/zabbix%{namespace}
 
-# install server and proxy binaries
+# install proxy stuff
+mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_proxy.d
+mv man/zabbix_proxy.man     $RPM_BUILD_ROOT%{_mandir}/man8/zabbix%{namespace}_proxy.8
+install -m 0755 -p src/zabbix_proxy/zabbix%{namespace}_proxy_sqlite $RPM_BUILD_ROOT%{_sbindir}/
+
+# install server binaries
 install -m 0755 -p src/zabbix_server/zabbix%{namespace}_server_* $RPM_BUILD_ROOT%{_sbindir}/
 rm $RPM_BUILD_ROOT%{_sbindir}/zabbix_server
 rm $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_server.conf
 
-install -m 0755 -p src/zabbix_proxy/zabbix%{namespace}_proxy_* $RPM_BUILD_ROOT%{_sbindir}/
-rm $RPM_BUILD_ROOT%{_sbindir}/zabbix_proxy
-rm $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_proxy.conf
-
 # add namespace prefix to the man pages
-mv $RPM_BUILD_ROOT%{_mandir}/man8/zabbix_proxy.8  $RPM_BUILD_ROOT%{_mandir}/man8/zabbix%{namespace}_proxy.8
 mv $RPM_BUILD_ROOT%{_mandir}/man8/zabbix_server.8 $RPM_BUILD_ROOT%{_mandir}/man8/zabbix%{namespace}_server.8
 
 # remove unneeded EPP utilities
@@ -458,7 +470,7 @@ rm -f $RPM_BUILD_ROOT%{_bindir}/rsm_epp_gen
 rm -f $RPM_BUILD_ROOT%{_libdir}/debug/%{_bindir}/rsm_epp_*.debug
 rm -f $RPM_BUILD_ROOT%{_libdir}/debug/%{_bindir}/t_rsm_*.debug
 
-# add namespace prefix to the proxy testing utilities
+# add namespace prefix to the testing utilities
 mv $RPM_BUILD_ROOT%{_bindir}/t_rsm_dns  $RPM_BUILD_ROOT%{_bindir}/zabbix%{namespace}_t_rsm_dns
 mv $RPM_BUILD_ROOT%{_bindir}/t_rsm_rdds $RPM_BUILD_ROOT%{_bindir}/zabbix%{namespace}_t_rsm_rdds
 mv $RPM_BUILD_ROOT%{_bindir}/t_rsm_rdap $RPM_BUILD_ROOT%{_bindir}/zabbix%{namespace}_t_rsm_rdap
@@ -496,8 +508,7 @@ install -Dm 0644 -p %{SOURCE18} $RPM_BUILD_ROOT%{_sysconfdir}/opt/rh/rh-php73/ph
 # CentOS 7 specifics end
 %endif
 
-# install configuration files
-mv $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_proxy.conf.d  $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_proxy.d
+# rename configuration directories
 mv $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_server.conf.d $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_server.d
 
 %if 0%{?rhel} >= 8
@@ -628,7 +639,7 @@ fi
 %{_mandir}/man1/zabbix_sender.1*
 %endif
 
-%pre proxy-mysql
+%pre proxy-sqlite
 getent group zabbix > /dev/null || groupadd -r zabbix
 getent passwd zabbix > /dev/null || \
 	useradd -r -g zabbix -d %{_localstatedir}/lib/zabbix%{namespace} -s /sbin/nologin \
@@ -651,13 +662,13 @@ getent passwd zabbix > /dev/null || \
 	-c "Zabbix Monitoring System" zabbix
 :
 
-%post proxy-mysql
+%post proxy-sqlite
 %systemd_post zabbix%{namespace}-proxy.service
 /usr/sbin/update-alternatives --install %{_sbindir}/zabbix%{namespace}_proxy \
-	zabbix%{namespace}-proxy %{_sbindir}/zabbix%{namespace}_proxy_mysql 10
+	zabbix%{namespace}-proxy %{_sbindir}/zabbix%{namespace}_proxy_sqlite 10
 :
 
-%post proxy-mysql-selinux
+%post proxy-sqlite-selinux
 %{_sbindir}/semodule -n -s %{selinuxtype} -i %{_datadir}/selinux/packages/zabbix%{namespace}_agent.pp.bz2
 %{_sbindir}/semodule -n -s %{selinuxtype} -i %{_datadir}/selinux/packages/zabbix%{namespace}_proxy.pp.bz2
 if %{_sbindir}/selinuxenabled ; then
@@ -722,11 +733,11 @@ fi
 rm -f /etc/rsyslog.d/zabbix50-rsm.slv.conf*
 systemctl restart rsyslog
 
-%preun proxy-mysql
+%preun proxy-sqlite
 if [ "$1" = 0 ]; then
 %systemd_preun zabbix-proxy.service
 /usr/sbin/update-alternatives --remove zabbix%{namespace}-proxy \
-%{_sbindir}/zabbix%{namespace}_proxy_mysql
+%{_sbindir}/zabbix%{namespace}_proxy_sqlite
 fi
 :
 
@@ -745,10 +756,10 @@ if [ "$1" = 0 ]; then
 fi
 :
 
-%postun proxy-mysql
+%postun proxy-sqlite
 %systemd_postun_with_restart zabbix%{namespace}-proxy.service
 
-%postun proxy-mysql-selinux
+%postun proxy-sqlite-selinux
 if [ $1 -eq 0 ]; then
     %{_sbindir}/semodule -n -r zabbix-proxy &> /dev/null || :
     %{_sbindir}/semodule -n -r zabbix-agent &> /dev/null || :
@@ -794,10 +805,10 @@ fi
 %postun scripts
 systemctl restart rsyslog
 
-%files proxy-mysql
+%files proxy-sqlite
 %defattr(-,root,root,-)
 %doc AUTHORS ChangeLog COPYING NEWS README
-%doc database/mysql/schema.sql.gz
+%doc database/sqlite3/proxy.sql
 %attr(0640,root,zabbix) %config(noreplace) %{_sysconfdir}/zabbix%{namespace}/zabbix_proxy_common.conf
 %attr(0640,root,zabbix) %config(noreplace) %{_sysconfdir}/zabbix%{namespace}/zabbix_proxy_N.conf
 %dir %{_libdir}/zabbix%{namespace}/externalscripts
@@ -807,10 +818,10 @@ systemctl restart rsyslog
 %{_mandir}/man8/zabbix%{namespace}_proxy.8*
 %{_unitdir}/zabbix%{namespace}-proxy.service
 %{_prefix}/lib/tmpfiles.d/zabbix%{namespace}-proxy.conf
-%{_sbindir}/zabbix%{namespace}_proxy_mysql
+%{_sbindir}/zabbix%{namespace}_proxy_sqlite
 %{_bindir}/zabbix%{namespace}_t_rsm_*
 
-%files proxy-mysql-selinux
+%files proxy-sqlite-selinux
 %defattr(-,root,root,0755)
 %attr(0644,root,root) %{_datadir}/selinux/packages/zabbix%{namespace}_proxy.pp.bz2
 %attr(0644,root,root) %{_datadir}/selinux/packages/zabbix%{namespace}_agent.pp.bz2
