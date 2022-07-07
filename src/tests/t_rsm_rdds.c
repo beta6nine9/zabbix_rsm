@@ -115,7 +115,7 @@ int	main(int argc, char *argv[])
 					fprintf(stderr, "Unknown option `-%c'.\n", optopt);
 				}
 				else
-					fprintf(stderr, "Unknown option character `\\x%x'.\n", optopt);
+					fprintf(stderr, "Unknown option character `\\x%d'.\n", optopt);
 
 				exit(EXIT_FAILURE);
 			default:

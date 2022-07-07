@@ -2115,8 +2115,7 @@ static FILE	*open_item_log(const char *host, const char *tld, const char *name, 
 }
 
 static void	set_dns_test_results(zbx_ns_t *nss, size_t nss_num, int rtt_limit, unsigned int minns,
-		unsigned int *nssok, unsigned int *test_status, unsigned int *dnssec_status, int dnssec_enabled,
-		FILE *log_fd)
+		unsigned int *nssok, unsigned int *dns_status, unsigned int *dnssec_status, FILE *log_fd)
 {
 	unsigned int	dnssec_nssok = 0;
 	size_t		i, j;
@@ -2133,7 +2132,7 @@ static void	set_dns_test_results(zbx_ns_t *nss, size_t nss_num, int rtt_limit, u
 			if (ZBX_SUBTEST_SUCCESS != zbx_subtest_result(nss[i].ips[j].rtt, rtt_limit))
 				nss[i].result = FAIL;
 
-			if (dnssec_enabled && (
+			if (dnssec_status != NULL && (
 					(ZBX_EC_DNS_UDP_DNSSEC_FIRST >= nss[i].ips[j].rtt &&
 						nss[i].ips[j].rtt >= ZBX_EC_DNS_UDP_DNSSEC_LAST) ||
 					(ZBX_EC_DNS_TCP_DNSSEC_FIRST >= nss[i].ips[j].rtt &&
@@ -2147,7 +2146,7 @@ static void	set_dns_test_results(zbx_ns_t *nss, size_t nss_num, int rtt_limit, u
 		if (SUCCEED == nss[i].result)
 			(*nssok)++;
 
-		if (dnssec_enabled)
+		if (dnssec_status != NULL)
 		{
 			if (SUCCEED == ns_dnssec_status)
 			{
@@ -2159,15 +2158,15 @@ static void	set_dns_test_results(zbx_ns_t *nss, size_t nss_num, int rtt_limit, u
 		}
 	}
 
-	*test_status = (*nssok >= minns ? 1 : 0);
+	*dns_status = (*nssok >= minns ? 1 : 0);
 
-	if (dnssec_enabled)
+	if (dnssec_status != NULL)
 		*dnssec_status = (dnssec_nssok >= minns ? 1 : 0);
 }
 
 static void	create_dns_json(struct zbx_json *json, zbx_ns_t *nss, size_t nss_num, unsigned int current_mode,
-		unsigned int nssok, unsigned int test_status, unsigned int dnssec_status, char protocol,
-		const char *testedname, int dnssec_enabled)
+		unsigned int nssok, unsigned int dns_status, const unsigned int *dnssec_status, char protocol,
+		const char *testedname)
 {
 	size_t	i, j;
 
@@ -2206,12 +2205,12 @@ static void	create_dns_json(struct zbx_json *json, zbx_ns_t *nss, size_t nss_num
 
 	zbx_json_adduint64(json, "nssok", nssok);
 	zbx_json_adduint64(json, "mode", current_mode);
-	zbx_json_adduint64(json, "status", test_status);
+	zbx_json_adduint64(json, "status", dns_status);
 	zbx_json_adduint64(json, "protocol", (protocol == RSM_UDP ? 0 : 1));
 	zbx_json_addstring(json, "testedname", testedname, ZBX_JSON_TYPE_STRING);
 
-	if (dnssec_enabled)
-		zbx_json_adduint64(json, "dnssecstatus", dnssec_status);
+	if (dnssec_status != NULL)
+		zbx_json_adduint64(json, "dnssecstatus", *dnssec_status);
 
 	zbx_json_close(json);
 }
@@ -2333,11 +2332,11 @@ out:
 #define CURRENT_MODE_CRITICAL_UDP	1
 #define CURRENT_MODE_CRITICAL_TCP	2
 
-static int	update_metadata(int file_exists, const char *rsmhost, unsigned int test_status, int test_recover,
+static int	update_metadata(int file_exists, const char *rsmhost, unsigned int dns_status, int test_recover,
 		char protocol, unsigned int *current_mode, int *successful_tests, FILE *log_fd, char *err,
 		size_t err_size)
 {
-	if (1 == test_status)
+	if (1 == dns_status)
 	{
 		/* test successful */
 		if (CURRENT_MODE_NORMAL != *current_mode)
@@ -2434,7 +2433,7 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 	size_t			i, j, nss_num = 0;
 	unsigned int		extras,
 				current_mode,
-				test_status,
+				dns_status,
 				dnssec_status,
 				nssok,
 				minns;
@@ -2800,13 +2799,11 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 		zbx_free(threads);
 	}
 
-	set_dns_test_results(nss, nss_num, rtt_limit, minns, &nssok, &test_status, &dnssec_status, dnssec_enabled,
-			log_fd);
+	set_dns_test_results(nss, nss_num, rtt_limit, minns, &nssok, &dns_status, &dnssec_status, log_fd);
 
-	create_dns_json(&json, nss, nss_num, current_mode, nssok, test_status, dnssec_status, protocol, testedname,
-			dnssec_enabled);
+	create_dns_json(&json, nss, nss_num, current_mode, nssok, dns_status, &dnssec_status, protocol, testedname);
 
-	if (SUCCEED != update_metadata(file_exists, rsmhost, test_status, test_recover, protocol, &current_mode,
+	if (SUCCEED != update_metadata(file_exists, rsmhost, dns_status, test_recover, protocol, &current_mode,
 			&successful_tests, log_fd, err, sizeof(err)))
 	{
 		rsm_errf(log_fd, "internal error: %s", err);
