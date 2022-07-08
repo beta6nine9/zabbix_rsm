@@ -449,9 +449,13 @@ foreach my $server_key (@server_keys)
 			my $state_file_exists;
 			my $json_state_ref;
 
-			# for services that we do not process at this time
-			# (e. g. RDDS) keep their current state
-			if (ah_read_state(AH_SLA_API_VERSION_1, $tld, \$json_state_ref) != AH_SUCCESS)
+			# for services that are not processed every minute
+			# (e. g. RDDS, RDAP) current state should not be overwritten
+			if (ah_read_state(AH_SLA_API_VERSION_CURRENT, $tld, \$json_state_ref) == AH_SUCCESS)
+			{
+				$state_file_exists = 1;
+			}
+			else
 			{
 				# if there is no state file we need to consider full
 				# cycle for each of the services to get correct states
@@ -468,10 +472,6 @@ foreach my $server_key (@server_keys)
 				}
 
 				$json_state_ref->{'testedServices'} = {};
-			}
-			else
-			{
-				$state_file_exists = 1;
 			}
 
 			# find out which services are disabled, for others get lastclock

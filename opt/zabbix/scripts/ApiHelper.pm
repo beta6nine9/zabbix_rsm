@@ -91,6 +91,11 @@ my $JSON_FIELDS = {
 	'updateTime'               => JSON_VALUE_NUMBER_OR_NULL,
 };
 
+use constant AH_SLA_API_VERSION_1       => 1;
+use constant AH_SLA_API_VERSION_2       => 2;
+use constant AH_SLA_API_VERSION_CURRENT => AH_SLA_API_VERSION_2;
+use constant AH_SLA_API_VERSIONS        => [+AH_SLA_API_VERSION_1, +AH_SLA_API_VERSION_2];
+
 our @EXPORT = qw(
 	AH_SUCCESS AH_FAIL
 	AH_SLA_API_DIR
@@ -104,11 +109,8 @@ our @EXPORT = qw(
 	ah_save_last_false_positiveid ah_save_continue_file JSON_OBJECT_DISABLED_SERVICE
 	AH_INTERFACE_DNS AH_INTERFACE_DNSSEC AH_INTERFACE_RDDS43 AH_INTERFACE_RDDS80 AH_INTERFACE_RDAP AH_INTERFACE_EPP
 	AH_CITY_UP AH_CITY_DOWN AH_CITY_NO_RESULT AH_CITY_OFFLINE
-	AH_SLA_API_VERSION_1 AH_SLA_API_VERSION_2
+	AH_SLA_API_VERSION_1 AH_SLA_API_VERSION_2 AH_SLA_API_VERSION_CURRENT AH_SLA_API_VERSIONS
 );
-
-use constant AH_SLA_API_VERSION_1 => 1;
-use constant AH_SLA_API_VERSION_2 => 2;
 
 my $_error_string = "";
 my $_debug = 0;
@@ -768,7 +770,8 @@ sub ah_save_recent_cache($$)
 
 	return AH_FAIL unless (__gen_recent_cache_path($server_key, \$path) == AH_SUCCESS);
 
-	return __write_file($path, __encode_json(AH_SLA_API_VERSION_1, $json, 0));	# do not attempt to fix JSON values
+	# in the cache file we do not care about the version
+	return __write_file($path, __encode_json(AH_SLA_API_VERSION_1, $json, 0)); # do not attempt to fix JSON values
 }
 
 sub ah_read_recent_cache($$)
