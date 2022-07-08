@@ -2799,9 +2799,11 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 		zbx_free(threads);
 	}
 
-	set_dns_test_results(nss, nss_num, rtt_limit, minns, &nssok, &dns_status, &dnssec_status, log_fd);
+	set_dns_test_results(nss, nss_num, rtt_limit, minns, &nssok, &dns_status,
+			(dnssec_enabled ? &dnssec_status : NULL), log_fd);
 
-	create_dns_json(&json, nss, nss_num, current_mode, nssok, dns_status, &dnssec_status, protocol, testedname);
+	create_dns_json(&json, nss, nss_num, current_mode, nssok, dns_status,
+			(dnssec_enabled ? &dnssec_status : NULL), protocol, testedname);
 
 	if (SUCCEED != update_metadata(file_exists, rsmhost, dns_status, test_recover, protocol, &current_mode,
 			&successful_tests, log_fd, err, sizeof(err)))
