@@ -1494,17 +1494,17 @@ sub calculate_cycle($$$$$$$$$$)
 				foreach my $target (keys(%{$results->{$service}{$cycleclock}{'interfaces'}{$interface}{'targets'}}))
 				{
 					# go through DNS target statuses on Probes and aggregate them
-					if ($interface eq 'dns')
+					if ($interface eq 'dns' || $interface eq 'dnssec')
 					{
 						my $city_status = $results->{$service}{$cycleclock}{'interfaces'}{$interface}{'targets'}{$target}{'status'};
 
-						if (!defined($name_server_availability_data->{'targets'}{$target}) ||
-								$name_server_availability_data->{'targets'}{$target} != DOWN)
+						if (!defined($name_server_availability_data->{$interface}{'targets'}{$target}) ||
+								$name_server_availability_data->{$interface}{'targets'}{$target} != DOWN)
 						{
-							$name_server_availability_data->{'targets'}{$target} = $city_status;
+							$name_server_availability_data->{$interface}{'targets'}{$target} = $city_status;
 						}
 
-						$name_server_availability_data->{'probes'}{$probe}{$target} = $city_status;
+						$name_server_availability_data->{$interface}{'probes'}{$probe}{$target} = $city_status;
 					}
 
 					foreach my $metric (@{$results->{$service}{$cycleclock}{'interfaces'}{$interface}{'targets'}{$target}{'metrics'}})
@@ -1665,18 +1665,21 @@ sub calculate_cycle($$$$$$$$$$)
 	# 	]
 	# }
 
-	foreach my $target (sort(keys(%{$name_server_availability_data->{'targets'}})))
+	foreach my $interface (%{$name_server_availability_data})
 	{
-		my $status = $name_server_availability_data->{'targets'}{$target};
+		foreach my $target (sort(keys(%{$name_server_availability_data->{$interface}{'targets'}})))
+		{
+			my $status = $name_server_availability_data->{$interface}{'targets'}{$target};
 
-		next unless (defined($status));
+			next unless (defined($status));
 
-		push(@{$json->{'nameServerAvailability'}{'nameServerStatus'}},
-			{
-				'target' => $target,
-				'status' => ($status == UP ? 'Up' : 'Down'),
-			}
-		);
+			push(@{$json->{'nameServerAvailability'}{'nameServerStatus'}},
+				{
+					'target' => $target,
+					'status' => ($status == UP ? 'Up' : 'Down'),
+				}
+			);
+		}
 	}
 
 	foreach my $probe (sort(keys(%{$name_server_availability_data->{'probes'}})))
