@@ -1498,13 +1498,13 @@ sub calculate_cycle($$$$$$$$$$)
 					{
 						my $city_status = $results->{$service}{$cycleclock}{'interfaces'}{$interface}{'targets'}{$target}{'status'};
 
-						if (!defined($name_server_availability_data->{$interface}{'targets'}{$target}) ||
-								$name_server_availability_data->{$interface}{'targets'}{$target} != DOWN)
+						if (!defined($name_server_availability_data->{'interfaces'}{$interface}{'targets'}{$target}) ||
+								$name_server_availability_data->{'interfaces'}{$interface}{'targets'}{$target} != DOWN)
 						{
-							$name_server_availability_data->{$interface}{'targets'}{$target} = $city_status;
+							$name_server_availability_data->{'interfaces'}{$interface}{'targets'}{$target} = $city_status;
 						}
 
-						$name_server_availability_data->{$interface}{'probes'}{$probe}{$target} = $city_status;
+						$name_server_availability_data->{'probes'}{$probe}{$target} = $city_status;
 					}
 
 					foreach my $metric (@{$results->{$service}{$cycleclock}{'interfaces'}{$interface}{'targets'}{$target}{'metrics'}})
@@ -1665,11 +1665,11 @@ sub calculate_cycle($$$$$$$$$$)
 	# 	]
 	# }
 
-	foreach my $interface (%{$name_server_availability_data})
+	foreach my $interface (%{$name_server_availability_data->{'interfaces'}})
 	{
-		foreach my $target (sort(keys(%{$name_server_availability_data->{$interface}{'targets'}})))
+		foreach my $target (sort(keys(%{$name_server_availability_data->{'interfaces'}{$interface}{'targets'}})))
 		{
-			my $status = $name_server_availability_data->{$interface}{'targets'}{$target};
+			my $status = $name_server_availability_data->{'interfaces'}{$interface}{'targets'}{$target};
 
 			next unless (defined($status));
 
