@@ -1,3 +1,9 @@
+Changes for rsm2.2.11
+
+New features:
+....I..... [876] fixed Name Server Availability calculation for DNSSEC service (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.2.10
 
 New features:
