@@ -44,7 +44,7 @@ int	main(int argc, char *argv[])
 	ldns_resolver	*res = NULL;
 	ldns_rr_list	*keys = NULL;
 	FILE		*log_fd = stdout;
-	unsigned int	extras, nssok, test_status, dnssec_status;
+	unsigned int	extras, test_status, dnssec_status;
 	size_t		size_one_unpacked, size_two_unpacked, nss_num = 0;
 	zbx_ns_t	*nss = NULL;
 	struct zbx_json	json;
@@ -227,10 +227,10 @@ int	main(int argc, char *argv[])
 	nss[0].ips[0].nsid = zbx_strdup(NULL, (nsid ? nsid : ""));
 	nss[0].ips[0].upd = upd_unpacked;
 
-	set_dns_test_results(nss, nss_num, DEFAULT_RTT_LIMIT, 2, &nssok, &test_status, &dnssec_status, dnssec_enabled,
+	set_dns_test_results(nss, nss_num, DEFAULT_RTT_LIMIT, 2, &test_status, &dnssec_status, dnssec_enabled,
 			stdout);
 
-	create_dns_json(&json, nss, nss_num, CURRENT_MODE_NORMAL, nssok, test_status, dnssec_status, proto, testedname,
+	create_dns_json(&json, nss, nss_num, CURRENT_MODE_NORMAL, test_status, dnssec_status, proto, testedname,
 			dnssec_enabled);
 
 	printf("OK (RTT:%d)\n", rtt_unpacked);

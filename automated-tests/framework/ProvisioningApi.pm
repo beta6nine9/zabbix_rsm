@@ -795,7 +795,6 @@ sub create_tld_probe($$$$$)
 
 	my $itemid_rsm_dns                     = __get_nextid('items'); # 100220
 	my $itemid_rsm_dns_mode                = __get_nextid('items'); # 100220  | 100221 | rsm.dns.mode                 |
-	my $itemid_rsm_dns_nssok               = __get_nextid('items'); # 100221  | 100222 | rsm.dns.nssok                |
 	my $itemid_rsm_dns_protocol            = __get_nextid('items'); # 100222  | 100223 | rsm.dns.protocol             |
 	my $itemid_rsm_dns_status              = __get_nextid('items'); # 100223  | 100224 | rsm.dns.status               |
 	my $itemid_rsm_dns_testedname          = __get_nextid('items'); # 100225  | 100225 | rsm.dns.testedname           |
@@ -830,7 +829,6 @@ sub create_tld_probe($$$$$)
 
 	__create_item_from_template($itemid_rsm_dns                    , $hostid, __get_itemid('Template DNS Test' , $key_rsm_dns                  ), $interfaceid, undef          );
 	__create_item_from_template($itemid_rsm_dns_mode               , $hostid, __get_itemid('Template DNS Test' , 'rsm.dns.mode'                ), undef       , $itemid_rsm_dns );
-	__create_item_from_template($itemid_rsm_dns_nssok              , $hostid, __get_itemid('Template DNS Test' , 'rsm.dns.nssok'               ), undef       , $itemid_rsm_dns );
 	__create_item_from_template($itemid_rsm_dns_protocol           , $hostid, __get_itemid('Template DNS Test' , 'rsm.dns.protocol'            ), undef       , $itemid_rsm_dns );
 	__create_item_from_template($itemid_rsm_dns_status             , $hostid, __get_itemid('Template DNS Test' , 'rsm.dns.status'              ), undef       , $itemid_rsm_dns );
 	__create_item_from_template($itemid_rsm_dns_testedname         , $hostid, __get_itemid('Template DNS Test' , 'rsm.dns.testedname'          ), undef       , $itemid_rsm_dns );
@@ -886,7 +884,6 @@ sub create_tld_probe($$$$$)
 
 	__create_item_rtdata($itemid_rsm_dns);
 	__create_item_rtdata($itemid_rsm_dns_mode);
-	__create_item_rtdata($itemid_rsm_dns_nssok);
 	__create_item_rtdata($itemid_rsm_dns_protocol);
 	__create_item_rtdata($itemid_rsm_dns_status);
 	__create_item_rtdata($itemid_rsm_dns_testedname);
@@ -912,7 +909,6 @@ sub create_tld_probe($$$$$)
 	__create_item_rtdata($itemid_rdap_testedname);
 
 	__create_item_preproc($itemid_rsm_dns_mode               , 1, 12, '$.mode'                                                                                                   , 0);
-	__create_item_preproc($itemid_rsm_dns_nssok              , 1, 12, '$.nssok'                                                                                                  , 0);
 	__create_item_preproc($itemid_rsm_dns_protocol           , 1, 12, '$.protocol'                                                                                               , 0);
 	__create_item_preproc($itemid_rsm_dns_status             , 1, 12, '$.status'                                                                                                 , 0);
 	__create_item_preproc($itemid_rsm_dns_testedname         , 1, 12, '$.testedname'                                                                                             , 0);

@@ -441,14 +441,6 @@ sub process_tld_batch($$$)
 	db_disconnect();
 }
 
-# dns-results-cache:
-# As we know there is no real DNSSEC service. It is not tested the same way as
-# DNS, RDDS and RDAP are. It is part of DNS and it uses DNS results from the
-# database. In order to avoid double selects of the same data we'll keep the
-# DNS results cached. This is hack that needs to be removed some day when we
-# implement DNSSEC service handling in all the places/scripts properly.
-my $dns_results_cache;
-
 my $nsids_cache;
 
 sub process_tld($$$$$$)
@@ -460,12 +452,10 @@ sub process_tld($$$$$$)
 	my $lastvalues_nsids_tld = shift;
 	my $lastvalues_cache_tld = shift;
 
-	$dns_results_cache = {};
 	$nsids_cache = {};
 
-	# dns-results-cache:
 	# ensure 'dnssec' comes after 'dns' by using sort(), because
-	# 'dnssec' will use a copy of 'dns' results saved to the cache
+	# 'dnssec' will partly use 'dns' results
 	foreach my $service (sort(keys(%{$lastvalues_db_tld})))
 	{
 		next if (opt('service') && $service ne getopt('service'));
@@ -988,11 +978,10 @@ sub get_lastvalues_from_db($$$$)
 			next if (str_starts_with($key, "rsm.conf"));
 			next if (str_starts_with($key, "rsm.probe"));
 
-			# not interested in master items that return JSON, nssok and mode items
+			# not interested in master items that return JSON and mode
 			next if (str_starts_with($key, "rsm.dns["));
 			next if (str_starts_with($key, "rsm.rdds["));
 			next if (str_starts_with($key, "rdap["));
-			next if (str_starts_with($key, "rsm.dns.nssok"));
 			next if (str_starts_with($key, "rsm.dns.mode"));
 
 			# from what's left, only interested in those
@@ -1492,17 +1481,6 @@ sub calculate_cycle($$$$$$$$$$)
 			$results = get_test_results(\@results, $probes_data->{$probe}, $service);
 		}
 
-		# dns-results-cache:
-		if ($service eq 'dns')
-		{
-			# remember this for the cycle where we'll handle DNSSEC service
-			$dns_results_cache->{$cycle_clock}{$probe} = $results->{'dns'};
-		}
-		elsif ($service eq 'dnssec')
-		{
-			$results->{'dnssec'} = $dns_results_cache->{$cycle_clock}{$probe};
-		}
-
 		foreach my $cycleclock (keys(%{$results->{$service}}))
 		{
 			foreach my $interface (keys(%{$results->{$service}{$cycleclock}{'interfaces'}}))
@@ -1511,29 +1489,19 @@ sub calculate_cycle($$$$$$$$$$)
 
 				next unless ($clock);
 
-				my $tested_interface;
-
-				# dns-results-cache:
-				if ($service eq 'dnssec')
-				{
-					$tested_interface = translate_interface('dnssec');
-				}
-				else
-				{
-					$tested_interface = translate_interface($interface);
-				}
+				my $tested_interface = translate_interface($interface);
 
 				foreach my $target (keys(%{$results->{$service}{$cycleclock}{'interfaces'}{$interface}{'targets'}}))
 				{
 					# go through DNS target statuses on Probes and aggregate them
-					if ($interface eq 'dns')
+					if ($interface eq 'dns' || $interface eq 'dnssec')
 					{
 						my $city_status = $results->{$service}{$cycleclock}{'interfaces'}{$interface}{'targets'}{$target}{'status'};
 
-						if (!defined($name_server_availability_data->{'targets'}{$target}) ||
-								$name_server_availability_data->{'targets'}{$target} != DOWN)
+						if (!defined($name_server_availability_data->{'interfaces'}{$interface}{'targets'}{$target}) ||
+								$name_server_availability_data->{'interfaces'}{$interface}{'targets'}{$target} != DOWN)
 						{
-							$name_server_availability_data->{'targets'}{$target} = $city_status;
+							$name_server_availability_data->{'interfaces'}{$interface}{'targets'}{$target} = $city_status;
 						}
 
 						$name_server_availability_data->{'probes'}{$probe}{$target} = $city_status;
@@ -1697,18 +1665,21 @@ sub calculate_cycle($$$$$$$$$$)
 	# 	]
 	# }
 
-	foreach my $target (sort(keys(%{$name_server_availability_data->{'targets'}})))
+	foreach my $interface (%{$name_server_availability_data->{'interfaces'}})
 	{
-		my $status = $name_server_availability_data->{'targets'}{$target};
+		foreach my $target (sort(keys(%{$name_server_availability_data->{'interfaces'}{$interface}{'targets'}})))
+		{
+			my $status = $name_server_availability_data->{'interfaces'}{$interface}{'targets'}{$target};
 
-		next unless (defined($status));
+			next unless (defined($status));
 
-		push(@{$json->{'nameServerAvailability'}{'nameServerStatus'}},
-			{
-				'target' => $target,
-				'status' => ($status == UP ? 'Up' : 'Down'),
-			}
-		);
+			push(@{$json->{'nameServerAvailability'}{'nameServerStatus'}},
+				{
+					'target' => $target,
+					'status' => ($status == UP ? 'Up' : 'Down'),
+				}
+			);
+		}
 	}
 
 	foreach my $probe (sort(keys(%{$name_server_availability_data->{'probes'}})))

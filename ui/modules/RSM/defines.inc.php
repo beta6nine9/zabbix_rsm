@@ -175,7 +175,6 @@ define('PROBE_KEY_ONLINE',			'rsm.probe.online');
 define('PROBE_DNS_MODE',			'rsm.dns.mode');
 define('PROBE_DNS_NS_STATUS',		'rsm.dns.ns.status');
 define('PROBE_DNS_NSID',			'rsm.dns.nsid[{#NS},{#IP}]');
-define('PROBE_DNS_NSSOK',			'rsm.dns.nssok');
 define('PROBE_DNS_RTT',				'rsm.dns.rtt');
 define('PROBE_DNS_STATUS',			'rsm.dns.status');
 define('PROBE_DNS_TRANSPORT',		'rsm.dns.protocol');
