@@ -38,7 +38,7 @@
 "Template Probe Config probe1","template","","","",0,1,7,0
 "Template Probe Config probe2","template","","","",0,1,7,0
 "Template Rsmhost Config tld1","template","","","",0,1,17,0
-"Template DNS Test - tld1"    ,"template","","","",1,1,0,18
+"Template DNS Test - tld1"    ,"template","","","",1,1,0,17
 
 "probe1"      ,"enabled","","","probe1",2,1,0,6
 "probe1 - mon","enabled","","",        ,1,1,1,2
