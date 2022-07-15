@@ -121,7 +121,6 @@
 "tld1 Probe1-Server1","rsm.dns.ns.status[ns2.tld1]",60,1611252030,0,0,0,0,0,0,0,0,0,0
 "tld1 Probe1-Server1","rsm.dns.ns.status[ns3.tld1]",60,1611252030,0,0,0,0,0,0,0,0,0,0
 "tld1 Probe1-Server1","rsm.dns.ns.status[ns4.tld1]",60,1611252030,0,0,0,0,0,0,0,0,0,0
-"tld1 Probe1-Server1","rsm.dns.nssok",60,1611252030,0,0,0,0,0,0,0,0,0,0
 "tld1 Probe1-Server1","rsm.dns.protocol",60,1611252030,0,0,0,0,0,0,0,0,0,0
 "tld1 Probe1-Server1","rsm.dns.rtt[ns1.tld1,192.0.2.11,udp]",60,1611252030,-416,-416,-416,-416,-416,-416,-416,-416,-416,-416
 "tld1 Probe1-Server1","rsm.dns.rtt[ns1.tld1,192.0.2.11,tcp]",60,1611252030,,,,,,,,,,
@@ -137,7 +136,6 @@
 "tld1 Probe1-Server1","rsm.dns.ns.status[ns2.tld1]",60,1611252630,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
 "tld1 Probe1-Server1","rsm.dns.ns.status[ns3.tld1]",60,1611252630,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
 "tld1 Probe1-Server1","rsm.dns.ns.status[ns4.tld1]",60,1611252630,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
-"tld1 Probe1-Server1","rsm.dns.nssok",60,1611252630,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 "tld1 Probe1-Server1","rsm.dns.protocol",60,1611252630,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0
 "tld1 Probe1-Server1","rsm.dns.rtt[ns1.tld1,192.0.2.11,udp]",60,1611252630,,5,5,5,5,5,5,5,5,5,,5,5,5,5,5,5,5,5,5
 "tld1 Probe1-Server1","rsm.dns.rtt[ns1.tld1,192.0.2.11,tcp]",60,1611252630,5,,,,,,,,,,5,,,,,,,,,
@@ -153,7 +151,6 @@
 "tld1 Probe2-Server1","rsm.dns.ns.status[ns2.tld1]",60,1611252030,0,0,0,0,0,0,0,0,0,0
 "tld1 Probe2-Server1","rsm.dns.ns.status[ns3.tld1]",60,1611252030,0,0,0,0,0,0,0,0,0,0
 "tld1 Probe2-Server1","rsm.dns.ns.status[ns4.tld1]",60,1611252030,0,0,0,0,0,0,0,0,0,0
-"tld1 Probe2-Server1","rsm.dns.nssok",60,1611252030,0,0,0,0,0,0,0,0,0,0
 "tld1 Probe2-Server1","rsm.dns.protocol",60,1611252030,0,0,0,0,0,0,0,0,0,0
 "tld1 Probe2-Server1","rsm.dns.rtt[ns1.tld1,192.0.2.11,udp]",60,1611252030,-416,-416,-416,-416,-416,-416,-416,-416,-416,-416
 "tld1 Probe2-Server1","rsm.dns.rtt[ns1.tld1,192.0.2.11,tcp]",60,1611252030,,,,,,,,,,
@@ -169,7 +166,6 @@
 "tld1 Probe2-Server1","rsm.dns.ns.status[ns2.tld1]",60,1611252630,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
 "tld1 Probe2-Server1","rsm.dns.ns.status[ns3.tld1]",60,1611252630,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
 "tld1 Probe2-Server1","rsm.dns.ns.status[ns4.tld1]",60,1611252630,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
-"tld1 Probe2-Server1","rsm.dns.nssok",60,1611252630,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 "tld1 Probe2-Server1","rsm.dns.protocol",60,1611252630,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0
 "tld1 Probe2-Server1","rsm.dns.rtt[ns1.tld1,192.0.2.11,udp]",60,1611252630,,5,5,5,5,5,5,5,5,5,,5,5,5,5,5,5,5,5,5
 "tld1 Probe2-Server1","rsm.dns.rtt[ns1.tld1,192.0.2.11,tcp]",60,1611252630,5,,,,,,,,,,5,,,,,,,,,
@@ -186,7 +182,6 @@
 "tld2 Probe1-Server1","rsm.dns.ns.status[ns3.tld2]",60,1611252030,0,0,0,0,0,0,0,0,0,0
 "tld2 Probe1-Server1","rsm.dns.ns.status[ns4.tld2]",60,1611252030,0,0,0,0,0,0,0,0,0,0
 "tld2 Probe1-Server1","rsm.dns.ns.status[ns5.tld2]",60,1611252030,0,0,0,0,0,0,0,0,0,0
-"tld2 Probe1-Server1","rsm.dns.nssok",60,1611252030,0,0,0,0,0,0,0,0,0,0
 "tld2 Probe1-Server1","rsm.dns.protocol",60,1611252030,1,1,1,1,1,1,1,1,1,1
 "tld2 Probe1-Server1","rsm.dns.rtt[ns1.tld2,192.0.2.31,tcp]",60,1611252030,-816,-816,-816,-816,-816,-816,-816,-816,-816,-816
 "tld2 Probe1-Server1","rsm.dns.rtt[ns1.tld2,192.0.2.31,udp]",60,1611252030,,,,,,,,,,
@@ -205,7 +200,6 @@
 "tld2 Probe1-Server1","rsm.dns.ns.status[ns3.tld2]",60,1611252630,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
 "tld2 Probe1-Server1","rsm.dns.ns.status[ns4.tld2]",60,1611252630,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
 "tld2 Probe1-Server1","rsm.dns.ns.status[ns5.tld2]",60,1611252630,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
-"tld2 Probe1-Server1","rsm.dns.nssok",60,1611252630,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 "tld2 Probe1-Server1","rsm.dns.protocol",60,1611252630,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0
 "tld2 Probe1-Server1","rsm.dns.rtt[ns1.tld2,192.0.2.31,udp]",60,1611252630,,5,5,5,5,5,5,5,5,5,,5,5,5,5,5,5,5,5,5
 "tld2 Probe1-Server1","rsm.dns.rtt[ns1.tld2,192.0.2.31,tcp]",60,1611252630,5,,,,,,,,,,5,,,,,,,,,
@@ -224,7 +218,6 @@
 "tld2 Probe2-Server1","rsm.dns.ns.status[ns3.tld2]",60,1611252030,0,0,0,0,0,0,0,0,0,0
 "tld2 Probe2-Server1","rsm.dns.ns.status[ns4.tld2]",60,1611252030,0,0,0,0,0,0,0,0,0,0
 "tld2 Probe2-Server1","rsm.dns.ns.status[ns5.tld2]",60,1611252030,0,0,0,0,0,0,0,0,0,0
-"tld2 Probe2-Server1","rsm.dns.nssok",60,1611252030,0,0,0,0,0,0,0,0,0,0
 "tld2 Probe2-Server1","rsm.dns.protocol",60,1611252030,1,1,1,1,1,1,1,1,1,1
 "tld2 Probe2-Server1","rsm.dns.rtt[ns1.tld2,192.0.2.31,tcp]",60,1611252030,-816,-816,-816,-816,-816,-816,-816,-816,-816,-816
 "tld2 Probe2-Server1","rsm.dns.rtt[ns1.tld2,192.0.2.31,udp]",60,1611252030,,,,,,,,,,
@@ -243,7 +236,6 @@
 "tld2 Probe2-Server1","rsm.dns.ns.status[ns3.tld2]",60,1611252630,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
 "tld2 Probe2-Server1","rsm.dns.ns.status[ns4.tld2]",60,1611252630,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
 "tld2 Probe2-Server1","rsm.dns.ns.status[ns5.tld2]",60,1611252630,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
-"tld2 Probe2-Server1","rsm.dns.nssok",60,1611252630,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 "tld2 Probe2-Server1","rsm.dns.protocol",60,1611252630,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0
 "tld2 Probe2-Server1","rsm.dns.rtt[ns1.tld2,192.0.2.31,udp]",60,1611252630,,5,5,5,5,5,5,5,5,5,,5,5,5,5,5,5,5,5,5
 "tld2 Probe2-Server1","rsm.dns.rtt[ns1.tld2,192.0.2.31,tcp]",60,1611252630,5,,,,,,,,,,5,,,,,,,,,
@@ -263,7 +255,6 @@
 "tld3 Probe1-Server1","rsm.dns.ns.status[ns4.tld3]",60,1611252030,0,0,0,0,0,0,0,0,0,0
 "tld3 Probe1-Server1","rsm.dns.ns.status[ns5.tld3]",60,1611252030,0,0,0,0,0,0,0,0,0,0
 "tld3 Probe1-Server1","rsm.dns.ns.status[ns6.tld3]",60,1611252030,0,0,0,0,0,0,0,0,0,0
-"tld3 Probe1-Server1","rsm.dns.nssok",60,1611252030,0,0,0,0,0,0,0,0,0,0
 "tld3 Probe1-Server1","rsm.dns.protocol",60,1611252030,0,0,0,0,0,0,0,0,0,0
 "tld3 Probe1-Server1","rsm.dns.rtt[ns1.tld3,192.0.2.51,udp]",60,1611252030,-416,-416,-416,-416,-416,-416,-416,-416,-416,-416
 "tld3 Probe1-Server1","rsm.dns.rtt[ns1.tld3,192.0.2.51,tcp]",60,1611252030,,,,,,,,,,
@@ -285,7 +276,6 @@
 "tld3 Probe1-Server1","rsm.dns.ns.status[ns4.tld3]",60,1611252630,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
 "tld3 Probe1-Server1","rsm.dns.ns.status[ns5.tld3]",60,1611252630,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
 "tld3 Probe1-Server1","rsm.dns.ns.status[ns6.tld3]",60,1611252630,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
-"tld3 Probe1-Server1","rsm.dns.nssok",60,1611252630,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 "tld3 Probe1-Server1","rsm.dns.protocol",60,1611252630,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0
 "tld3 Probe1-Server1","rsm.dns.rtt[ns1.tld3,192.0.2.51,udp]",60,1611252630,,5,5,5,5,5,5,5,5,5,,5,5,5,5,5,5,5,5,5
 "tld3 Probe1-Server1","rsm.dns.rtt[ns1.tld3,192.0.2.51,tcp]",60,1611252630,5,,,,,,,,,,5,,,,,,,,,
@@ -329,7 +319,6 @@
 "tld3 Probe2-Server1","rsm.dns.ns.status[ns4.tld3]",60,1611252030,0,0,0,0,0,0,0,0,0,0
 "tld3 Probe2-Server1","rsm.dns.ns.status[ns5.tld3]",60,1611252030,0,0,0,0,0,0,0,0,0,0
 "tld3 Probe2-Server1","rsm.dns.ns.status[ns6.tld3]",60,1611252030,0,0,0,0,0,0,0,0,0,0
-"tld3 Probe2-Server1","rsm.dns.nssok",60,1611252030,0,0,0,0,0,0,0,0,0,0
 "tld3 Probe2-Server1","rsm.dns.protocol",60,1611252030,0,0,0,0,0,0,0,0,0,0
 "tld3 Probe2-Server1","rsm.dns.rtt[ns1.tld3,192.0.2.51,udp]",60,1611252030,-416,-416,-416,-416,-416,-416,-416,-416,-416,-416
 "tld3 Probe2-Server1","rsm.dns.rtt[ns1.tld3,192.0.2.51,tcp]",60,1611252030,,,,,,,,,,
@@ -351,7 +340,6 @@
 "tld3 Probe2-Server1","rsm.dns.ns.status[ns4.tld3]",60,1611252630,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
 "tld3 Probe2-Server1","rsm.dns.ns.status[ns5.tld3]",60,1611252630,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
 "tld3 Probe2-Server1","rsm.dns.ns.status[ns6.tld3]",60,1611252630,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
-"tld3 Probe2-Server1","rsm.dns.nssok",60,1611252630,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 "tld3 Probe2-Server1","rsm.dns.protocol",60,1611252630,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0
 "tld3 Probe2-Server1","rsm.dns.rtt[ns1.tld3,192.0.2.51,udp]",60,1611252630,,5,5,5,5,5,5,5,5,5,,5,5,5,5,5,5,5,5,5
 "tld3 Probe2-Server1","rsm.dns.rtt[ns1.tld3,192.0.2.51,tcp]",60,1611252630,5,,,,,,,,,,5,,,,,,,,,

@@ -92,7 +92,7 @@ As you can see the resolver expects query name "example", query type "DNSKEY" an
 
 After success with the resolver we query nameserver with "example". We tell it to reply with rcode "NOERROR", with "aa" flag set and with the original owner in the question section overridden with "foo".
 
-This is unexpected to Zabbix and the corresponding error code is set. Then, we make sure that Zabbix has generated exactly what we have in the `output.tar.gz` archive:
+This is unexpected to Zabbix and the corresponding error code is set. Then, we make sure that Zabbix has generated exactly what we have in the `output.tar.gz` archive:
 
     $ cat status.json | jq -SC .
     {
@@ -110,10 +110,9 @@ This is unexpected to Zabbix and the corresponding error code is set. Then, we m
         "nss": [
             {
                 "ns": "ns1.example",
-                "status": 0
+                "status": 4
             }
         ],
-        "nssok": 0,
         "protocol": 0,
         "status": 0,
         "testedname": "www.zz--rsm-monitoring.example."

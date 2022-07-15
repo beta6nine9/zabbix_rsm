@@ -249,11 +249,6 @@ class AggregateDetailsAction extends Action {
 					// This is informational item, we do not use it.
 					break;
 
-				case PROBE_DNS_NSSOK:
-					// Set Name servers up count.
-					$this->probes[$probeid]['ns_up'] = $value;
-					break;
-
 				case PROBE_DNS_STATUS:
 					// Set DNS Test status.
 					if ($data['type'] == RSM_DNS) {
@@ -270,8 +265,11 @@ class AggregateDetailsAction extends Action {
 
 				case PROBE_DNS_NS_STATUS:
 					// Set Name server status.
-					$this->probes[$probeid]['results'][$key_parser->getParam(0)]['status'] = $value;
+					$this->probes[$probeid]['results'][$key_parser->getParam(0)]['status'] = dnsNsStatus($data['type'], $value);
 					$probe_nstotal[$probeid] = isset($probe_nstotal[$probeid]) ? $probe_nstotal[$probeid] + 1 : 1;
+
+					if ($this->probes[$probeid]['results'][$key_parser->getParam(0)]['status'] == 1)
+						$this->probes[$probeid]['ns_up']++;
 					break;
 
 				case CALCULATED_PROBE_RSM_IP4_ENABLED:
