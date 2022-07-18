@@ -42,6 +42,10 @@ elif [[ $new_test_case_file =~ /data-export/ ]]; then
 	create_script="$FRAMEWORK_DIR/../test-cases/data-export/create-output.sh"
 
 	sed -i -r 's|^("/opt/zabbix/export","'$num'-output.tar.gz")$|[execute]\n"","'$create_script' '$num'"\n[compare-files]\n\1|' $new_test_case_file
+elif [[ $new_test_case_file =~ /simple-check/ ]]; then
+	create_script="$FRAMEWORK_DIR/../test-cases/simple-check/create-output.sh"
+
+	sed -i -r 's|^("/tmp/simple-check-test","'$num'-output.tar.gz")$|[execute]\n"","'$create_script' '$num'"\n[compare-files]\n\1|' $new_test_case_file
 else
 	echo "unexpected test case file \"$test_case_file\""
 	exit 1
