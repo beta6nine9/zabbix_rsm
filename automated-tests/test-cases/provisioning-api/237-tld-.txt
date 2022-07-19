@@ -43,9 +43,9 @@
 "probe1"      ,"enabled","","","probe1",2,1,0,6
 "probe1 - mon","enabled","","",        ,1,1,1,2
 "tld1"        ,"enabled","","",        ,6,2,0,35
-"tld1 probe1" ,"enabled","","","probe1",5,4,0,35
+"tld1 probe1" ,"enabled","","","probe1",5,4,0,34
 "tld2"        ,"enabled","","",        ,6,2,0,35
-"tld2 probe1" ,"enabled","","","probe1",5,4,0,35
+"tld2 probe1" ,"enabled","","","probe1",5,4,0,34
 
 [check-host-count]
 

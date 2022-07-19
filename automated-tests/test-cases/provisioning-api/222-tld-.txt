@@ -54,18 +54,18 @@
 "Template Rsmhost Config tld1","template","","","",0,1,17,0
 "Template DNS Test - tld1"    ,"template","","","",1,1,0,17
 "Template Rsmhost Config tld2","template","","","",0,1,17,0
-"Template DNS Test - tld2"    ,"template","","","",1,1,0,25
+"Template DNS Test - tld2"    ,"template","","","",1,1,0,24
 
 "probe1"      ,"enabled","","","probe1",2,1,0,6
 "probe1 - mon","enabled","","",        ,1,1,1,2
 "probe2"      ,"enabled","","","probe2",2,1,0,6
 "probe2 - mon","enabled","","",        ,1,1,1,2
 "tld1"        ,"enabled","","",        ,6,2,0,35
-"tld1 probe1" ,"enabled","","","probe1",5,4,0,35
-"tld1 probe2" ,"enabled","","","probe2",5,4,0,35
+"tld1 probe1" ,"enabled","","","probe1",5,4,0,34
+"tld1 probe2" ,"enabled","","","probe2",5,4,0,34
 "tld2"        ,"enabled","","",        ,6,2,0,39
-"tld2 probe1" ,"enabled","","","probe1",5,4,0,42
-"tld2 probe2" ,"enabled","","","probe2",5,4,0,42
+"tld2 probe1" ,"enabled","","","probe1",5,4,0,41
+"tld2 probe2" ,"enabled","","","probe2",5,4,0,41
 
 [check-host-count]
 

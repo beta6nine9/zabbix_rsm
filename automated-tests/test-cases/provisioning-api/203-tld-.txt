@@ -62,11 +62,11 @@
 "probe2"      ,"enabled" ,"","","probe2",2,1,0,6
 "probe2 - mon","enabled" ,"","",        ,1,1,1,2
 "tld1"        ,"enabled" ,"","",        ,6,2,0,35
-"tld1 probe1" ,"enabled" ,"","","probe1",5,4,0,35
-"tld1 probe2" ,"enabled" ,"","","probe2",5,4,0,35
+"tld1 probe1" ,"enabled" ,"","","probe1",5,4,0,34
+"tld1 probe2" ,"enabled" ,"","","probe2",5,4,0,34
 "tld2"        ,"disabled","","",        ,6,2,0,35
-"tld2 probe1" ,"disabled","","","probe1",5,4,0,35
-"tld2 probe2" ,"disabled","","","probe2",5,4,0,35
+"tld2 probe1" ,"disabled","","","probe1",5,4,0,34
+"tld2 probe2" ,"disabled","","","probe2",5,4,0,34
 
 [check-host-count]
 
