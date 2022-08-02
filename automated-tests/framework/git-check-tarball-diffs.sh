@@ -4,6 +4,8 @@ set -o errexit
 set -o nounset
 #set -o xtrace
 
+colordiff=$(which colordiff)
+
 new_tarball=
 
 function cleanup {
@@ -37,7 +39,18 @@ for orig_tarball in $(cat $LOGFILE); do
 	tar -C $new_output_dir  -xzvf $new_tarball  > /dev/null
 	tar -C $orig_output_dir -xzvf $orig_tarball > /dev/null
 
-	diff -ur $orig_output_dir $new_output_dir | less
+	diff -ur $orig_output_dir $new_output_dir > /dev/null | true
+
+	if [ ${PIPESTATUS[0]} -eq 0 ]; then
+		rm -f $new_tarball
+		continue
+	fi
+
+	if [ -n "$colordiff" ]; then
+		diff -ur $orig_output_dir $new_output_dir | $colordiff | less -R
+	else
+		diff -ur $orig_output_dir $new_output_dir | less -R
+	fi
 
 	echo
 	echo -n "$orig_tarball:  keep it? [Y/n] "
