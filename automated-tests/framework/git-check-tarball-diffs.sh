@@ -4,6 +4,8 @@ set -o errexit
 set -o nounset
 #set -o xtrace
 
+colordiff=$(which colordiff)
+
 new_tarball=
 
 function cleanup {
@@ -16,14 +18,14 @@ trap cleanup EXIT
 
 LOGFILE="/tmp/git-diff-tarball.txt"
 
-git diff --name-only | grep --color=none '\.tar.gz' > $LOGFILE
+git diff --name-only | grep --color=none "$@.*\.tar.gz" > $LOGFILE
 
 for orig_tarball in $(cat $LOGFILE); do
 	orig_tarball=$(git rev-parse --show-toplevel)/$orig_tarball
 	new_tarball=$orig_tarball.tar.gz
 
 	mv $orig_tarball $new_tarball
-	git checkout $orig_tarball
+	git checkout -q -- $orig_tarball
 
 	new_output_dir="/tmp/git-diff-new"
 	orig_output_dir="/tmp/git-diff-orig"
@@ -37,15 +39,37 @@ for orig_tarball in $(cat $LOGFILE); do
 	tar -C $new_output_dir  -xzvf $new_tarball  > /dev/null
 	tar -C $orig_output_dir -xzvf $orig_tarball > /dev/null
 
-	diff -ur $orig_output_dir $new_output_dir | less
+	diff -ur $orig_output_dir $new_output_dir > /dev/null | true
+
+	if [ ${PIPESTATUS[0]} -eq 0 ]; then
+		rm -f $new_tarball
+		continue
+	fi
+
+	if [ -n "$colordiff" ]; then
+		diff -ur $orig_output_dir $new_output_dir | $colordiff | less -R
+	else
+		diff -ur $orig_output_dir $new_output_dir | less -R
+	fi
 
 	echo
-	echo -n "$orig_tarball: discard changes? [Y/n] "
+	echo -n "$orig_tarball:  keep it? [Y/n] "
 	read ans
 
-	if [ -z "$ans" ]; then
-		rm -f $new_tarball
-	else
+	ans=$(echo $ans | tr [A-Z] [a-z])
+
+	if [[ -z "$ans" ]] || [[ $ans = "y" ]] || [[ $ans = "yes" ]]; then
 		mv $new_tarball $orig_tarball
+
+		echo -n "$orig_tarball: stage it? [Y/n] "
+		read ans
+
+		ans=$(echo $ans | tr [A-Z] [a-z])
+
+		if [[ -z "$ans" ]] || [[ $ans = "y" ]] || [[ $ans = "yes" ]]; then
+			git add -u $orig_tarball
+		fi
+	else
+		rm -f $new_tarball
 	fi
 done

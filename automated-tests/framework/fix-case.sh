@@ -5,6 +5,8 @@ set -o nounset
 set -o pipefail
 #set -o xtrace
 
+FRAMEWORK_DIR=$(realpath $(dirname $0))
+
 if [ $# -lt 1 ]; then
 	echo "usage: $0 <test-case-file>"
 	echo
@@ -30,14 +32,17 @@ num=${num%%-*}
 
 create_script=
 if [[ $new_test_case_file =~ /sla-api/ ]]; then
-	create_script="/home/vl/git/icann/qa/automated-tests/test-cases/sla-api/create-sla-and-cache-output.sh"
+	create_script="$FRAMEWORK_DIR/../test-cases/sla-api/create-sla-and-cache-output.sh"
+
+	sed -i -r 's|^("/opt/zabbix/sla","'$num'-sla-output.tar.gz")$|[execute]\n"","'$create_script' '$num'"\n[compare-files]\n\1|' $new_test_case_file
+	sed -i -r 's|^("/opt/zabbix/sla","'$num'-sla-output-2.tar.gz")$|[execute]\n"","'$create_script' '$num' 2"\n[compare-files]\n\1|' $new_test_case_file
 elif [[ $new_test_case_file =~ /data-export/ ]]; then
-	create_script="/home/vl/git/icann/qa/automated-tests/test-cases/data-export/create-output.sh"
+	create_script="$FRAMEWORK_DIR/../test-cases/data-export/create-output.sh"
+
+	sed -i -r 's|^("/opt/zabbix/export","'$num'-output.tar.gz")$|[execute]\n"","'$create_script' '$num'"\n[compare-files]\n\1|' $new_test_case_file
 else
 	echo "unexpected test case file \"$test_case_file\""
 	exit 1
 fi
-
-sed -i -r "s|(\[compare-files\])|\"\",\"$create_script $num\"\n\1|" $new_test_case_file
 
 TZ=UTC automated-tests/framework/run-tests.pl --skip-build --test-case-file $new_test_case_file $*
