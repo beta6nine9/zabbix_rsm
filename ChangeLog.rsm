@@ -1,3 +1,17 @@
+Changes for rsm2.3.0
+
+New features:
+..F.I..PS. [839] upgraded to Zabbix 6.0.3 (dimir)
+..F.I..PS. [720] implemented Separation of RDDS43 and RDDS80 (dimir)
+..F.I..... [721] implemented Provisioning API (asitals)
+....I..... [883] implemented DNSViz report for DNSSEC incidents (dimir)
+..F....... [860] added wildcard support on the search form of Rolling week status page (dimir)
+..F....... [864] added functionality to download the list of Rsmhosts in CSV format to Rolling week status page (dimir)
+....I..... [797] added Simple Check automated tests (dimir)
+....I..... [920] added UI automated tests (Larisa Grigorjeva)
+....I..... [911] added Provisioning API automated tests (asitals)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.2.11
 
 New features:
