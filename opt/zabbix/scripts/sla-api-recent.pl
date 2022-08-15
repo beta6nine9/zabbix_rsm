@@ -47,7 +47,7 @@ my %service_status_to_str = (
 
 sub main_process_signal_handler();
 sub process_server($);
-sub process_tld_batch($$$);
+sub process_tld_batch($$$$);
 sub process_tld($$$$$$);
 sub cycles_to_calculate($$$$$$$$);
 sub get_lastvalues_from_db($$$$);
@@ -281,7 +281,7 @@ sub process_server($)
 		$server_tlds = get_tlds();
 	}
 
-	db_disconnect($server_key);
+	db_disconnect();
 
 	return unless (scalar(@{$server_tlds}));
 
@@ -314,7 +314,7 @@ sub process_server($)
 
 			init_process();
 
-			process_tld_batch($child, \%child_data, $all_probes_ref);
+			process_tld_batch($child, \%child_data, $all_probes_ref, $server_key);
 
 			finalize_process();
 
@@ -356,7 +356,11 @@ sub process_server($)
 	$fm->wait_all_children();
 
 	# Do not update cache if something happened.
-	if (!opt('dry-run') && !opt('now'))
+	if (opt('dry-run') || opt('now'))
+	{
+		info("not updating sla-api cache because running with either --dry-run or --now");
+	}
+	else
 	{
 		if (ah_save_recent_cache($server_key, $lastvalues_cache) != AH_SUCCESS)
 		{
@@ -365,11 +369,12 @@ sub process_server($)
 	}
 }
 
-sub process_tld_batch($$$)
+sub process_tld_batch($$$$)
 {
 	my $socket         = shift;
 	my $child_data_ref = shift;
 	my $all_probes_ref = shift;	# all available probes in the system
+	my $server_key     = shift;
 
 	my $probes_ref;	# probes by services
 
@@ -481,7 +486,12 @@ sub process_tld($$$$$$)
 			dbg("$service cycles to calculate: ", join(',', map {ts_str($_)} (@cycles_to_calculate)));
 		}
 
-		next if (scalar(@cycles_to_calculate) == 0);
+		if (scalar(@cycles_to_calculate) == 0)
+		{
+
+			info(sprintf("selected %6s period: -", $service)) if (opt('print-period'));
+			next;
+		}
 
 		my $cycles_from = $cycles_to_calculate[0];
 		my $cycles_till = cycle_end($cycles_to_calculate[-1], $delays{$service});
@@ -1553,21 +1563,25 @@ sub calculate_cycle($$$$$$$$$$)
 	# add "Offline" and "No results"
 	foreach my $probe (keys(%{$all_probes_ref}))
 	{
-		my $probe_online;
+		my $is_probe_online;	# 0 or 1, just for storing the correct value later
 
 		if (defined($service_probes_ref->{$probe}) &&
 				$service_probes_ref->{$probe}{'status'} == HOST_STATUS_MONITORED)
 		{
-			$probe_online = probe_online_at($probe, $from, $delay);
+			$is_probe_online = probe_online_at($probe, $from, $delay);
 		}
 		else
 		{
-			$probe_online = 0;
+			$is_probe_online = 0;
 		}
 
 		foreach my $interface (@{$interfaces_ref})
 		{
-			if (!$probe_online)
+			if ($rawstatus == UP_INCONCLUSIVE_RECONFIG)
+			{
+				$tested_interfaces{$interface}{$probe}{'status'} = AH_CITY_NO_RESULT;
+			}
+			elsif (!$is_probe_online)
 			{
 				$tested_interfaces{$interface}{$probe}{'status'} = AH_CITY_OFFLINE;
 

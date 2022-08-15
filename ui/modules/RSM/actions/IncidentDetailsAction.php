@@ -31,6 +31,8 @@ use CControllerResponseData;
 use CControllerResponseRedirect;
 use Modules\RSM\Helpers\UrlHelper;
 
+use CSettingsHelper;
+
 class IncidentDetailsAction extends Action {
 
 	protected function checkInput() {
@@ -83,8 +85,9 @@ class IncidentDetailsAction extends Action {
 		}
 		elseif ($this->hasInput('filter_rst')) {
 			$data['filter_failing_tests'] = 0;
-			$data['from'] = ZBX_PERIOD_DEFAULT_FROM;
-			$data['to'] = ZBX_PERIOD_DEFAULT_TO;
+			$data['from'] = 'now-'.CSettingsHelper::get(CSettingsHelper::PERIOD_DEFAULT);
+			$data['to'] = 'now';
+
 			updateTimeSelectorPeriod($data);
 			CProfile::delete('web.rsm.incidents.filter_failing_tests');
 		}
@@ -149,7 +152,7 @@ class IncidentDetailsAction extends Action {
 		if ($main_event) {
 			$data['main_event'] = reset($main_event);
 
-			$data['is_rdap_standalone'] = is_RDAP_standalone($data['main_event']['clock']);
+			$data['main_event']['false_positive'] = getEventFalsePositiveness($data['main_event']['eventid']);
 		}
 	}
 
@@ -220,18 +223,20 @@ class IncidentDetailsAction extends Action {
 						'output' => ['macro', 'value'],
 						'hostids' => $template['templateid'],
 						'filter' => [
-							'macro' => $data['is_rdap_standalone']
-								? [RSM_TLD_RDDS43_ENABLED, RSM_TLD_RDDS80_ENABLED, RSM_TLD_RDDS_ENABLED]
-								: [RSM_TLD_RDDS43_ENABLED, RSM_TLD_RDDS80_ENABLED, RSM_RDAP_TLD_ENABLED,
-										RSM_RDAP_TLD_ENABLED, RSM_TLD_RDDS_ENABLED]
+							'macro' => isRdapStandalone($data['main_event']['clock'])
+								? [RSM_TLD_RDDS43_ENABLED, RSM_TLD_RDDS80_ENABLED]
+								: [RSM_TLD_RDDS43_ENABLED, RSM_TLD_RDDS80_ENABLED, RSM_RDAP_TLD_ENABLED]
 						]
 					]);
 
 					foreach ($template_macros as $template_macro) {
 						$data['tld']['subservices'][$template_macro['macro']] = $template_macro['value'];
 
-						if ($template_macro['macro'] === RSM_TLD_RDDS_ENABLED && $template_macro['value'] != 0) {
-							$ok_rdds_services[] = 'RDDS';
+						if ($template_macro['macro'] === RSM_TLD_RDDS43_ENABLED && $template_macro['value'] != 0) {
+							$ok_rdds_services[] = 'RDDS43';
+						}
+						elseif ($template_macro['macro'] === RSM_TLD_RDDS80_ENABLED && $template_macro['value'] != 0) {
+							$ok_rdds_services[] = 'RDDS80';
 						}
 						elseif ($template_macro['macro'] === RSM_RDAP_TLD_ENABLED && $template_macro['value'] != 0) {
 							$ok_rdds_services[] = 'RDAP';
@@ -395,22 +400,6 @@ class IncidentDetailsAction extends Action {
 		$this->getData($data);
 
 		$data['paging'] = CPagerHelper::paginate($this->getInput('page', 1), $data['tests'], ZBX_SORT_UP, new CUrl());
-
-		if ($data['tests']) {
-			$data['test_value_mapping'] = [];
-
-			$test_value_mapping = API::ValueMap()->get([
-				'output' => [],
-				'selectMappings' => ['value', 'newvalue'],
-				'valuemapids' => [RSM_SERVICE_AVAIL_VALUE_MAP]
-			]);
-
-			if ($test_value_mapping) {
-				foreach ($test_value_mapping[0]['mappings'] as $val) {
-					$data['test_value_mapping'][$val['value']] = $val['newvalue'];
-				}
-			}
-		}
 
 		$response = new CControllerResponseData($data);
 		$response->setTitle($data['title']);

@@ -1,0 +1,13 @@
+[test-case]
+
+"RDDS43/RDDS80 - No server could be reached by local resolver (-222/-250)"
+
+[execute]
+
+"","rm -rf   /tmp/simple-check-test"
+"","mkdir -p /tmp/simple-check-test"
+"","${cfg:paths:build_dir}/bin/t_rsm_rdds -t example -a example.example -w http://example.example -g 4380 -p example -4 -r 127.0.0.1 -o 5053 -j /tmp/simple-check-test/status.json"
+
+[compare-files]
+
+"/tmp/simple-check-test","203-output.tar.gz"

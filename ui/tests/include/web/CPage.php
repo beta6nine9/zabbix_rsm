@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -126,11 +126,13 @@ class CPage {
 		$this->resetViewport();
 
 		if (self::$cookie !== null) {
-			$session_id = $this->driver->manage()->getCookieNamed('zbx_sessionid');
-
-			if ($session_id === null || !array_key_exists('value', $session_id)
-					|| $session_id['value'] !== self::$cookie['value']) {
-				self::$cookie = null;
+			foreach ($this->driver->manage()->getCookies() as $cookie) {
+				if ($cookie->getName() === 'zbx_session') {
+					if ($cookie->getValue() !== self::$cookie['value']) {
+						self::$cookie = null;
+					}
+					break;
+				}
 			}
 		}
 
@@ -202,11 +204,20 @@ class CPage {
 			DBexecute('UPDATE sessions SET status=0 WHERE sessionid='.zbx_dbstr($sessionid));
 		}
 
-		$path = parse_url(PHPUNIT_URL, PHP_URL_PATH);
-		if (self::$cookie === null || $sessionid !== self::$cookie['value']) {
+		if (self::$cookie !== null) {
+			$cookie = json_decode(base64_decode(urldecode(self::$cookie['value'])), true);
+		}
+
+		if (self::$cookie === null || $sessionid !== $cookie['sessionid']) {
+			$data = ['sessionid' => $sessionid];
+
+			$config = CDBHelper::getRow('SELECT session_key FROM config WHERE configid=1');
+			$data['sign'] = hash_hmac('sha256', json_encode($data), $config['session_key'], false);
+
+			$path = parse_url(PHPUNIT_URL, PHP_URL_PATH);
 			self::$cookie = [
-				'name' => 'zbx_sessionid',
-				'value' => $sessionid,
+				'name' => 'zbx_session',
+				'value' => base64_encode(json_encode($data)),
 				'domain' => parse_url(PHPUNIT_URL, PHP_URL_HOST),
 				'path' => rtrim(substr($path, 0, strrpos($path, '/')), '/')
 			];
@@ -227,9 +238,19 @@ class CPage {
 			// Before logout open page without any scripts, otherwise session might be restored and logout won't work.
 			$this->open('setup.php');
 
-			$session = (self::$cookie === null)
-					? CTestArrayHelper::get($this->driver->manage()->getCookieNamed('zbx_sessionid'), 'value')
-					: self::$cookie['value'];
+			$session = null;
+
+			if (self::$cookie === null) {
+				foreach ($this->driver->manage()->getCookies() as $cookie) {
+					if ($cookie->getName() === 'zbx_session') {
+						$session = $cookie->getValue();
+						break;
+					}
+				}
+			}
+			else {
+				$session = self::$cookie['value'];
+			}
 
 			if ($session !== null) {
 				DBExecute('DELETE FROM sessions WHERE sessionid='.zbx_dbstr($session));
@@ -568,12 +589,24 @@ class CPage {
 	 * @param string $password  Password on login screen
 	 */
 	public function userLogin($alias, $password) {
+		if (self::$cookie === null) {
+			$this->driver->get(PHPUNIT_URL);
+		}
+
 		$this->logout();
 		$this->open('index.php');
 		$this->query('id:name')->waitUntilVisible()->one()->fill($alias);
 		$this->query('id:password')->one()->fill($password);
 		$this->query('id:enter')->one()->click();
 		$this->waitUntilReady();
+
+		// Make sure that logged in page is opened.
+		try {
+			$this->query('xpath://aside[@class="sidebar"]//a[text()="User settings"]')->exists();
+		}
+		catch (\Exception $ex) {
+			throw new \Exception('"User settings" menu is not found on page. Probably user is not logged in.');
+		}
 	}
 
 	/**
@@ -609,5 +642,12 @@ class CPage {
 		if ($text !== $header) {
 			throw new \Exception('Header of the page "'.$text.'" is not equal to "'.$header.'".');
 		}
+	}
+
+	/**
+	 * Scroll page to the top position.
+	 */
+	public function scrollToTop() {
+		$this->getDriver()->executeScript('document.getElementsByClassName(\'wrapper\')[0].scrollTo(0, 0)');
 	}
 }

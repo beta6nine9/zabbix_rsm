@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -64,7 +64,7 @@ class CPageHeader {
 	 */
 	public function __construct($title = '') {
 		$this->title = CHtml::encode($title);
-		$this->sid = substr(get_cookie(ZBX_SESSION_NAME), 16, 16);
+		$this->sid = substr(CSessionHelper::getId(), 16, 16);
 	}
 
 	/**

@@ -1,0 +1,5 @@
+{
+	"expected-domain"  : "example.example",
+	"rdds43-ns-string" : "Name server:",
+	"name-servers"     : []
+}

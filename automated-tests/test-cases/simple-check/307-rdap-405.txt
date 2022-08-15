@@ -1,0 +1,23 @@
+[test-case]
+
+"RDAP - Timeout (-405)"
+
+[start-tool]
+
+"resolver","/tmp/resolver.pid","000-resolver-example.example-noerror.json"
+"rdap-server","/tmp/rdap-server.pid","307-rdap-server-input.json"
+
+[execute]
+
+"","rm -rf   /tmp/simple-check-test"
+"","mkdir -p /tmp/simple-check-test"
+"","${cfg:paths:build_dir}/bin/t_rsm_rdap -r 127.0.0.1 -o 5053 -u http://example.example:4380/rdap -d example.example -4 -j /tmp/simple-check-test/status.json"
+
+[stop-tool]
+
+"rdap-server","/tmp/rdap-server.pid"
+"resolver","/tmp/resolver.pid"
+
+[compare-files]
+
+"/tmp/simple-check-test","307-output.tar.gz"

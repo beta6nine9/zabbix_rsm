@@ -1,0 +1,6 @@
+{
+	"expected-request" : "GET / HTTP/1.1",
+	"reply-status"     : 200,
+	"reply-headers"    : {},
+	"sleep"            : 12
+}

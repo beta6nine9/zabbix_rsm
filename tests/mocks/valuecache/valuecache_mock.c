@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -45,6 +45,7 @@ int	__wrap_zbx_mutex_create(zbx_mutex_t *mutex, zbx_mutex_name_t name, char **er
 void	__wrap_zbx_mutex_destroy(zbx_mutex_t *mutex);
 int	__wrap_zbx_mem_create(zbx_mem_info_t **info, zbx_uint64_t size, const char *descr, const char *param,
 		int allow_oom, char **error);
+void	__wrap_zbx_mem_destroy(zbx_mem_info_t *info);
 void	*__wrap___zbx_mem_malloc(const char *file, int line, zbx_mem_info_t *info, const void *old, size_t size);
 void	*__wrap___zbx_mem_realloc(const char *file, int line, zbx_mem_info_t *info, void *old, size_t size);
 void	__wrap___zbx_mem_free(const char *file, int line, zbx_mem_info_t *info, void *ptr);
@@ -54,7 +55,10 @@ int	__wrap_zbx_history_get_values(zbx_uint64_t itemid, int value_type, int start
 int	__wrap_zbx_history_add_values(const zbx_vector_ptr_t *history);
 int	__wrap_zbx_history_sql_init(zbx_history_iface_t *hist, unsigned char value_type, char **error);
 int	__wrap_zbx_history_elastic_init(zbx_history_iface_t *hist, unsigned char value_type, char **error);
+void	__wrap_zbx_elastic_version_extract(void);
+int	__wrap_zbx_elastic_version_get(void);
 time_t	__wrap_time(time_t *ptr);
+void	__wrap_zbx_timespec(zbx_timespec_t *ts);
 
 void	zbx_vc_set_mode(int mode);
 
@@ -68,8 +72,6 @@ static int	history_compare(const void *d1, const void *d2)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_vcmock_read_history_value                                    *
  *                                                                            *
  * Purpose: reads history value and timestamp from input data                 *
  *                                                                            *
@@ -138,8 +140,6 @@ static void	zbx_vcmock_read_history_value(zbx_mock_handle_t hvalue, unsigned cha
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_vcmock_ds_read_item                                          *
- *                                                                            *
  * Purpose: reads value cache data store item                                 *
  *                                                                            *
  * Parameters: hvalue - [IN] handle to the history record mapping             *
@@ -162,8 +162,6 @@ static void	zbx_vcmock_ds_read_item(zbx_mock_handle_t hitem, zbx_vcmock_ds_item_
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_vcmock_ds_clone_record                                       *
  *                                                                            *
  * Purpose: duplicates history record                                         *
  *                                                                            *
@@ -203,8 +201,6 @@ static void	zbx_vcmock_ds_clone_record(const zbx_history_record_t *src, unsigned
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_vcmock_read_values                                           *
- *                                                                            *
  * Purpose: reads historical values from input data                           *
  *                                                                            *
  * Parameters: hdata      - [IN] handle to the history values in input data   *
@@ -226,8 +222,6 @@ void	zbx_vcmock_read_values(zbx_mock_handle_t hdata, unsigned char value_type, z
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_vcmock_ds_init                                               *
  *                                                                            *
  * Purpose: initializes history data storage                                  *
  *                                                                            *
@@ -264,8 +258,6 @@ void	zbx_vcmock_ds_init(void)
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_vcmock_ds_destroy                                            *
- *                                                                            *
  * Purpose: destroys history data storage                                     *
  *                                                                            *
  ******************************************************************************/
@@ -282,8 +274,6 @@ void	zbx_vcmock_ds_destroy(void)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_vcmock_history_dump                                          *
  *                                                                            *
  * Purpose: dumps history record vector contents to standard output           *
  *                                                                            *
@@ -306,8 +296,6 @@ static void	zbx_vcmock_history_dump(unsigned char value_type, const zbx_vector_h
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_vcmock_ds_dump                                               *
- *                                                                            *
  * Purpose: dumps history data store to standard output                       *
  *                                                                            *
  ******************************************************************************/
@@ -326,8 +314,6 @@ void	zbx_vcmock_ds_dump(void)
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_vcmock_ds_first_item                                         *
- *                                                                            *
  * Purpose: returns first item in value cache mock data source                *
  *                                                                            *
  ******************************************************************************/
@@ -340,8 +326,6 @@ zbx_vcmock_ds_item_t	*zbx_vcmock_ds_first_item(void)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_vcmock_get_cache_mode                                        *
  *                                                                            *
  * Purpose: converts value cache mode from text format                        *
  *                                                                            *
@@ -360,8 +344,6 @@ int	zbx_vcmock_str_to_cache_mode(const char *mode)
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_vcmock_str_to_item_status                                    *
- *                                                                            *
  * Purpose: converts value cache item status from text format                 *
  *                                                                            *
  ******************************************************************************/
@@ -374,8 +356,6 @@ int	zbx_vcmock_str_to_item_status(const char *str)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_vcmock_check_records                                         *
  *                                                                            *
  * Purpose: Compares two history record vectors and throw assertion if either *
  *          values or timestamps don't match                                  *
@@ -433,8 +413,6 @@ void	zbx_vcmock_check_records(const char *prefix, unsigned char value_type,
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_vcmock_get_dc_history                                        *
- *                                                                            *
  * Purpose: reads ZBX_DC_HISTORY vector from input data                       *
  *                                                                            *
  * Parameters: handle  - [IN] the history data handle in input data           *
@@ -472,8 +450,6 @@ void	zbx_vcmock_get_dc_history(zbx_mock_handle_t handle, zbx_vector_ptr_t *histo
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_vcmock_free_dc_history                                       *
  *                                                                            *
  * Purpose: frees ZBX_DC_HISTORY structure                                    *
  *                                                                            *
@@ -532,6 +508,11 @@ int	__wrap_zbx_mem_create(zbx_mem_info_t **info, zbx_uint64_t size, const char *
 	ZBX_UNUSED(error);
 
 	return SUCCEED;
+}
+
+void	__wrap_zbx_mem_destroy(zbx_mem_info_t *info)
+{
+	zbx_free(info);
 }
 
 void	*__wrap___zbx_mem_malloc(const char *file, int line, zbx_mem_info_t *info, const void *old, size_t size)
@@ -684,13 +665,20 @@ int	__wrap_zbx_history_elastic_init(zbx_history_iface_t *hist, unsigned char val
 	return SUCCEED;
 }
 
+void	__wrap_zbx_elastic_version_extract(void)
+{
+}
+
+int	__wrap_zbx_elastic_version_get(void)
+{
+	return ZBX_DBVERSION_UNDEFINED;
+}
+
 /*
  * cache allocator size limit handling
  */
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_vcmock_set_available_mem                                     *
  *                                                                            *
  * Purpose:  sets the available memory for the wrapped memory allocator       *
  *                                                                            *
@@ -702,8 +690,6 @@ void	zbx_vcmock_set_available_mem(size_t size)
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_vcmock_mem_get_available                                     *
- *                                                                            *
  * Purpose:  retrieves the memory available in the wrapped memory allocator   *
  *                                                                            *
  ******************************************************************************/
@@ -713,8 +699,6 @@ size_t	zbx_vcmock_get_available_mem(void)
 }
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_vcmock_set_cache_size                                        *
  *                                                                            *
  * Purpose: sets the available size in value cache if the specified key is    *
  *          present in input data                                             *
@@ -730,8 +714,8 @@ void	zbx_vcmock_set_cache_size(zbx_mock_handle_t hitem, const char *key)
 	{
 		if (ZBX_MOCK_SUCCESS != zbx_mock_string(hmem, &data) || SUCCEED != is_uint64(data, &cache_size))
 			fail_msg("Cannot read \"%s\" parameter", key);
-
-		zbx_vcmock_set_available_mem(cache_size);
+		else
+			zbx_vcmock_set_available_mem(cache_size);
 	}
 }
 
@@ -740,8 +724,6 @@ void	zbx_vcmock_set_cache_size(zbx_mock_handle_t hitem, const char *key)
  */
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_vcmock_get_request_params                                    *
  *                                                                            *
  * Purpose: gets value cache precache or requests parameters from input data  *
  *                                                                            *
@@ -763,8 +745,6 @@ void	zbx_vcmock_get_request_params(zbx_mock_handle_t handle, zbx_uint64_t *itemi
  */
 
 /******************************************************************************
- *                                                                            *
- * Function: zbx_vcmock_set_mode                                              *
  *                                                                            *
  * Purpose: sets value cache mode if the specified key is present in input    *
  *          data                                                              *
@@ -806,8 +786,6 @@ void	__wrap_zbx_timespec(zbx_timespec_t *ts)
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_vcmock_set_time                                              *
- *                                                                            *
  * Purpose: sets the current time. The key must be present in input data or   *
  *          the test case will fail                                           *
  *                                                                            *
@@ -825,12 +803,10 @@ void	zbx_vcmock_set_time(zbx_mock_handle_t hitem, const char *key)
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_vcmock_get_ts                                                *
- *                                                                            *
  * Purpose: returns the mocked current time                                   *
  *                                                                            *
  ******************************************************************************/
-zbx_timespec_t	zbx_vcmock_get_ts()
+zbx_timespec_t	zbx_vcmock_get_ts(void)
 {
 	return vcmock_ts;
 }

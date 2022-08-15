@@ -12,4 +12,6 @@ SUBDIRS = \
 	zbxprometheus \
 	zbxcomms \
 	zbxregexp \
-	zbxserver
+	zbxserver \
+	zbxtrends \
+	zbxeval

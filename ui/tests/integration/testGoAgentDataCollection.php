@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -20,15 +20,15 @@
 
 require_once dirname(__FILE__).'/../include/CIntegrationTest.php';
 
-define('COMPARE_AVERAGE', 0);
-define('COMPARE_LAST', 1);
-
 /**
  * Test suite for agent2 (GO agent) metric collection.
  *
  * @backup history
  */
 class testGoAgentDataCollection extends CIntegrationTest {
+
+	const COMPARE_AVERAGE = 0;
+	const COMPARE_LAST = 1;
 
 	private static $hostids = [];
 	private static $itemids = [];
@@ -237,14 +237,14 @@ class testGoAgentDataCollection extends CIntegrationTest {
 			'key' => 'vfs.dev.write[,operations]',
 			'type' => ITEM_TYPE_ZABBIX,
 			'valueType' => ITEM_VALUE_TYPE_UINT64,
-			'threshold' => 500
+			'threshold' => 100
 		],
 		[
 			'key' => 'proc.cpu.util[,,,,avg1]',
 			'type' => ITEM_TYPE_ZABBIX,
 			'valueType' => ITEM_VALUE_TYPE_FLOAT,
 			'threshold' => 10.0,
-			'compareType' => COMPARE_AVERAGE
+			'compareType' => self::COMPARE_AVERAGE
 		],
 		[
 			'key' => 'system.swap.in[,pages]',
@@ -269,7 +269,7 @@ class testGoAgentDataCollection extends CIntegrationTest {
 			'type' => ITEM_TYPE_ZABBIX,
 			'valueType' => ITEM_VALUE_TYPE_FLOAT,
 			'threshold' => 1.0,
-			'compareType' => COMPARE_AVERAGE
+			'compareType' => self::COMPARE_AVERAGE
 		],
 		[
 			'key' => 'net.tcp.service.perf[ssh]',
@@ -322,7 +322,7 @@ class testGoAgentDataCollection extends CIntegrationTest {
 	public function prepareData() {
 		// Create host "agentd" and "agent2".
 		$hosts = [];
-		foreach ([self::COMPONENT_AGENT => self::AGENT_PORT_SUFFIX, self::COMPONENT_AGENT2 => 53] as $component => $port) {
+		foreach ([self::COMPONENT_AGENT => self::AGENT_PORT_SUFFIX, self::COMPONENT_AGENT2 => self::AGENT2_PORT_SUFFIX] as $component => $port) {
 			$hosts[] = [
 				'host' => $component,
 				'interfaces' => [
@@ -419,7 +419,7 @@ class testGoAgentDataCollection extends CIntegrationTest {
 			self::COMPONENT_AGENT2 => [
 				'Hostname' => self::COMPONENT_AGENT2,
 				'ServerActive' => '127.0.0.1:'.self::getConfigurationValue(self::COMPONENT_SERVER, 'ListenPort'),
-				'ListenPort' => PHPUNIT_PORT_PREFIX.'53',
+				'ListenPort' => PHPUNIT_PORT_PREFIX.self::AGENT2_PORT_SUFFIX,
 				'AllowKey' => 'system.run[*]',
 				'Plugins.Uptime.Capacity' => '10'
 			]
@@ -435,8 +435,8 @@ class testGoAgentDataCollection extends CIntegrationTest {
 	 */
 	public function testGoAgentDataCollection_checkDataCollection() {
 		foreach ([self::COMPONENT_AGENT, self::COMPONENT_AGENT2] as $component) {
-			$this->waitForLogLineToBePresent(self::COMPONENT_SERVER, 'enabling Zabbix agent checks on host "'.
-					$component.'": host became available', false
+			$this->waitForLogLineToBePresent(self::COMPONENT_SERVER,
+				'enabling Zabbix agent checks on host "'.$component.'": interface became available', false
 			);
 		}
 
@@ -546,7 +546,7 @@ class testGoAgentDataCollection extends CIntegrationTest {
 
 			case ITEM_VALUE_TYPE_FLOAT:
 			case ITEM_VALUE_TYPE_UINT64:
-				if (CTestArrayHelper::get($item, 'compareType', COMPARE_LAST) === COMPARE_AVERAGE) {
+				if (CTestArrayHelper::get($item, 'compareType', self::COMPARE_LAST) === self::COMPARE_AVERAGE) {
 					$value = [];
 					foreach ([self::COMPONENT_AGENT, self::COMPONENT_AGENT2] as $component) {
 						$value[$component] = 0;

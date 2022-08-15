@@ -18,6 +18,8 @@ my $cfg_key_out = 'rsm.slv.rdds.rollweek';
 parse_slv_opts();
 fail_if_running();
 
+log_execution_time(1, 1);
+
 set_slv_config(get_rsm_config());
 
 db_connect();

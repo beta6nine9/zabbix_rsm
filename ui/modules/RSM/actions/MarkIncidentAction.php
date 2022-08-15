@@ -25,6 +25,9 @@ use API;
 use CUrl;
 use CControllerResponseFatal;
 use CControllerResponseRedirect;
+use DB;
+use CWebUser;
+use CMessageHelper;
 
 Class MarkIncidentAction extends Action {
 	/**
@@ -57,7 +60,7 @@ Class MarkIncidentAction extends Action {
 		$valid_users = [USER_TYPE_ZABBIX_ADMIN, USER_TYPE_SUPER_ADMIN, USER_TYPE_POWER_USER];
 
 		$event = API::Event()->get([
-			'output' => ['eventid', 'objectid', 'clock', 'false_positive'],
+			'output' => ['eventid', 'objectid', 'clock'],
 			'eventids' => $this->getInput('eventid'),
 			'filter' => [
 				'value' => TRIGGER_VALUE_TRUE
@@ -66,17 +69,17 @@ Class MarkIncidentAction extends Action {
 
 		$this->event = reset($event);
 
+		$this->event['false_positive'] = getEventFalsePositiveness($this->getInput('eventid'));
+
 		return $this->event && in_array($this->getUserType(), $valid_users);
 	}
 
 	protected function doAction() {
 		if ($this->getInput('mark_as') == INCIDENT_ACTIVE || $this->getInput('mark_as') == INCIDENT_RESOLVED) {
 			$change_incident_type = INCIDENT_FLAG_NORMAL;
-			$audit_log = _('Unmarked as false positive');
 		}
 		else {
 			$change_incident_type = INCIDENT_FLAG_FALSE_POSITIVE;
-			$audit_log = _('Marked as false positive');
 		}
 
 		if ($this->event['false_positive'] != $change_incident_type) {
@@ -114,20 +117,14 @@ Class MarkIncidentAction extends Action {
 			}
 
 			DBstart();
-			$res = DBexecute('UPDATE events SET false_positive='.zbx_dbstr($change_incident_type).' WHERE '.
-				dbConditionInt('eventid', $eventids)
-			);
-			$result = DBend($res);
-
-			if ($res) {
-				add_audit_details(
-					AUDIT_ACTION_UPDATE,
-					AUDIT_RESOURCE_INCIDENT,
-					$this->event['eventid'],
-					$this->getInput('host'),
-					$this->event['eventid'].': '.$audit_log
+			foreach ($eventids as $eventid) {
+				$rsmFalsePositiveid = DB::reserveIds('rsm_false_positive', 1);
+				$res = DBexecute(
+						'INSERT INTO rsm_false_positive (rsm_false_positiveid,userid,eventid,clock,status)'.
+						' VALUES ('.$rsmFalsePositiveid.','.CWebuser::$data['userid'].','.$eventid.','.time().','.zbx_dbstr($change_incident_type).')'
 				);
 			}
+			$result = DBend($res);
 
 			$response = new CControllerResponseRedirect((new CUrl('zabbix.php'))
 				->setArgument('action', 'rsm.incidentdetails')
@@ -140,11 +137,8 @@ Class MarkIncidentAction extends Action {
 				->getUrl()
 			);
 
-			if ($result) {
-				$response->setMessageOk(_('Status updated'));
-			}
-			else {
-				$response->setMessageError(_('Cannot update status'));
+			if (!$result) {
+				CMessageHelper::addError(_('Cannot update status'));
 			}
 			$this->setResponse($response);
 		}

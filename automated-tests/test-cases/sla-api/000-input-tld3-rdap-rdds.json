@@ -1,0 +1,31 @@
+{
+    "tldType": "ccTLD",
+    "servicesStatus": [
+        { "service": "dnsUDP", "enabled": true },
+        { "service": "dnsTCP", "enabled": true },
+        { "service": "rdds43", "enabled": true },
+        { "service": "rdds80", "enabled": true },
+        { "service": "rdap"  , "enabled": true }
+    ],
+    "dnsParameters": {
+        "nsIps": [
+            { "ns": "ns1.tld3", "ip": "192.0.2.51" },
+            { "ns": "ns2.tld3", "ip": "192.0.2.52" },
+            { "ns": "ns3.tld3", "ip": "192.0.2.53" },
+            { "ns": "ns4.tld3", "ip": "192.0.2.54" },
+            { "ns": "ns5.tld3", "ip": "192.0.2.55" },
+            { "ns": "ns6.tld3", "ip": "192.0.2.56" }
+        ],
+        "dnssecEnabled": false,
+        "nsTestPrefix": "test",
+        "minNs": 2
+    },
+    "rddsParameters": {
+        "rdds43Server": "whois.nic.tld3",
+        "rdds43TestedDomain": "nic.tld3.tld3",
+        "rdds80Url": "https://whois.nic.tld3",
+        "rdapUrl": "https://rdap.nic.tld3:8443/rdap/",
+        "rdapTestedDomain": "nic.tld3.",
+        "rdds43NsString": "Name Server:"
+    }
+}

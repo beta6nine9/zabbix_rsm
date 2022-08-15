@@ -1,0 +1,9 @@
+{
+    "resultCode": 400,
+    "title": "JSON does not comply with definition",
+    "description": "Invalid parameter \"dnsParameters.nsIps\": an array is expected.",
+    "details": {
+        "centralServer": 1
+    },
+    "updatedObject": null
+}

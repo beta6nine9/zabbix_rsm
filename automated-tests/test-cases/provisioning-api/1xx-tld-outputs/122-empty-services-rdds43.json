@@ -1,0 +1,9 @@
+{
+    "resultCode": 400,
+    "title": "All services (i.e., dnsUDP, dnsTCP, rdap, rdds43 and rdds80) must be specified",
+    "description": "Missing services: rdds43",
+    "details": {
+        "centralServer": 1
+    },
+    "updatedObject": null
+}

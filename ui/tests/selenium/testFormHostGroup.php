@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -33,7 +33,6 @@ class testFormHostGroup extends CLegacyWebTest {
 		$this->zbxTestTextPresent(['Group name']);
 
 		$this->zbxTestAssertElementPresentId('name');
-		$this->zbxTestAssertAttribute("//input[@id='name']", 'size', 20);
 		$this->zbxTestAssertAttribute("//input[@id='name']", 'maxlength', 255);
 
 		$this->zbxTestAssertElementPresentXpath("//button[@id='add' and @type='submit']");
@@ -75,7 +74,8 @@ class testFormHostGroup extends CLegacyWebTest {
 
 	public function testFormHostGroup_UpdateEmpty() {
 		$this->zbxTestLogin('hostgroups.php');
-		$this->zbxTestClickLinkTextWait($this->hostGroup);
+		$this->page->waitUntilReady();
+		$this->query('link', $this->hostGroup)->waitUntilVisible()->one()->forceClick();
 
 		$this->zbxTestInputTypeOverwrite('name', ' ');
 		$this->zbxTestClickWait('update');
@@ -90,7 +90,8 @@ class testFormHostGroup extends CLegacyWebTest {
 		));
 
 		$this->zbxTestLogin('hostgroups.php');
-		$this->zbxTestClickLinkTextWait($this->hostGroup);
+		$this->page->waitUntilReady();
+		$this->query('link', $this->hostGroup)->waitUntilVisible()->one()->forceClick();
 
 		$this->zbxTestInputTypeOverwrite('name', $hostGroup['name']);
 		$this->zbxTestClickWait('update');
@@ -100,7 +101,8 @@ class testFormHostGroup extends CLegacyWebTest {
 
 	public function testFormHostGroup_Update() {
 		$this->zbxTestLogin('hostgroups.php');
-		$this->zbxTestClickLinkTextWait($this->hostGroup);
+		$this->page->waitUntilReady();
+		$this->query('link', $this->hostGroup)->waitUntilVisible()->one()->forceClick();
 
 		$this->zbxTestInputTypeOverwrite('name', $this->hostGroup.' 2');
 		$this->zbxTestClickWait('update');
@@ -115,7 +117,8 @@ class testFormHostGroup extends CLegacyWebTest {
 	 */
 	public function testFormHostGroup_Delete() {
 		$this->zbxTestLogin('hostgroups.php');
-		$this->zbxTestClickLinkTextWait($this->hostGroup.' 2');
+		$this->page->waitUntilReady();
+		$this->query('link', $this->hostGroup.' 2')->waitUntilVisible()->one()->forceClick();
 
 		$this->zbxTestClickWait('delete');
 		$this->zbxTestAcceptAlert();

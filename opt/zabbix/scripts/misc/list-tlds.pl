@@ -35,10 +35,8 @@ my $total_tlds = 0;
 
 my $now = time();
 
-foreach (@server_keys)
+foreach my $server_key (@server_keys)
 {
-	$server_key = $_;
-
 	db_connect($server_key);
 
 	my $tlds_ref = get_tlds(opt('service') ? getopt('service') : 'dns', $now);

@@ -1,7 +1,7 @@
 // JavaScript Document
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -336,7 +336,10 @@ calendar.prototype = {
 
 	setSDateFromOuterObj: function() {
 		var val = this.timeobject.value,
-			// Date and Time separator must be synced with ZBX_FULL_DATE_TIME and ZBX_DATE_TIME in defines.inc.php.
+			/**
+			 * Date and time format separators must be synced with ZBX_FULL_DATE_TIME, ZBX_DATE_TIME and ZBX_DATE in
+			 * defines.inc.php.
+			 */
 			datetime = val.split(' '),
 			date = datetime[0].split('-'),
 			time = (datetime.length > 1) ? datetime[1].split(':') : new Array();
@@ -346,6 +349,10 @@ calendar.prototype = {
 		this.has_user_time = false;
 
 		if (date.length === 3 && this.setSDateDMY(date[2], date[1], date[0])) {
+			if (!time.length) {
+				return;
+			}
+
 			this.sdt.setTimeObject(null, null, null, 0, 0, 0);
 
 			// Set time to calendar, so time doesn't change when selecting different date.

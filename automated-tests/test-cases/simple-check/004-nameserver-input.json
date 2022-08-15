@@ -1,0 +1,8 @@
+{
+	"owner"          : "example",
+	"override-owner" : "foo",
+	"rcode"          : "NOERROR",
+	"flags"          : {
+		"aa" : 1
+	}
+}

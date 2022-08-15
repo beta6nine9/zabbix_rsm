@@ -1,0 +1,13 @@
+[test-case]
+
+"RDAP - No server could be reached by local resolver (-400)"
+
+[execute]
+
+"","rm -rf   /tmp/simple-check-test"
+"","mkdir -p /tmp/simple-check-test"
+"","${cfg:paths:build_dir}/bin/t_rsm_rdap -r 127.0.0.1 -o 5053 -u http://example.example:4380/rdap -d example.example -4 -j /tmp/simple-check-test/status.json"
+
+[compare-files]
+
+"/tmp/simple-check-test","304-output.tar.gz"

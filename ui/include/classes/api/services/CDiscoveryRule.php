@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -24,6 +24,10 @@
  */
 class CDiscoveryRule extends CItemGeneral {
 
+	public const ACCESS_RULES = parent::ACCESS_RULES + [
+		'copy' => ['min_user_type' => USER_TYPE_ZABBIX_ADMIN]
+	];
+
 	protected $tableName = 'items';
 	protected $tableAlias = 'i';
 	protected $sortColumns = ['itemid', 'name', 'key_', 'delay', 'type', 'status'];
@@ -32,13 +36,11 @@ class CDiscoveryRule extends CItemGeneral {
 	 * Define a set of supported pre-processing rules.
 	 *
 	 * @var array
-	 *
-	 * 5.6 would allow this to be defined constant.
 	 */
-	public static $supported_preprocessing_types = [ZBX_PREPROC_REGSUB, ZBX_PREPROC_JSONPATH,
+	const SUPPORTED_PREPROCESSING_TYPES = [ZBX_PREPROC_REGSUB, ZBX_PREPROC_JSONPATH,
 		ZBX_PREPROC_VALIDATE_NOT_REGEX, ZBX_PREPROC_ERROR_FIELD_JSON, ZBX_PREPROC_THROTTLE_TIMED_VALUE,
 		ZBX_PREPROC_SCRIPT, ZBX_PREPROC_PROMETHEUS_TO_JSON, ZBX_PREPROC_XPATH, ZBX_PREPROC_ERROR_FIELD_XML,
-		ZBX_PREPROC_CSV_TO_JSON, ZBX_PREPROC_STR_REPLACE
+		ZBX_PREPROC_CSV_TO_JSON, ZBX_PREPROC_STR_REPLACE, ZBX_PREPROC_XML_TO_JSON
 	];
 
 	/**
@@ -48,7 +50,7 @@ class CDiscoveryRule extends CItemGeneral {
 	 */
 	const SUPPORTED_ITEM_TYPES = [ITEM_TYPE_ZABBIX, ITEM_TYPE_TRAPPER, ITEM_TYPE_SIMPLE, ITEM_TYPE_INTERNAL,
 		ITEM_TYPE_ZABBIX_ACTIVE, ITEM_TYPE_EXTERNAL, ITEM_TYPE_DB_MONITOR, ITEM_TYPE_IPMI, ITEM_TYPE_SSH,
-		ITEM_TYPE_TELNET, ITEM_TYPE_JMX, ITEM_TYPE_DEPENDENT, ITEM_TYPE_HTTPAGENT, ITEM_TYPE_SNMP
+		ITEM_TYPE_TELNET, ITEM_TYPE_JMX, ITEM_TYPE_DEPENDENT, ITEM_TYPE_HTTPAGENT, ITEM_TYPE_SNMP, ITEM_TYPE_SCRIPT
 	];
 
 	public function __construct() {
@@ -101,7 +103,6 @@ class CDiscoveryRule extends CItemGeneral {
 			'selectTriggers'				=> null,
 			'selectGraphs'					=> null,
 			'selectHostPrototypes'			=> null,
-			'selectApplicationPrototypes'	=> null,
 			'selectFilter'					=> null,
 			'selectLLDMacroPaths'			=> null,
 			'selectPreprocessing'			=> null,
@@ -292,6 +293,10 @@ class CDiscoveryRule extends CItemGeneral {
 		}
 
 		if ($result) {
+			if (self::dbDistinct($sqlParts)) {
+				$result = $this->addNclobFieldValues($options, $result);
+			}
+
 			$result = $this->addRelatedObjects($options, $result);
 			$result = $this->unsetExtraFields($result, ['hostid'], $options['output']);
 
@@ -505,6 +510,17 @@ class CDiscoveryRule extends CItemGeneral {
 				$item['headers'] = '';
 			}
 
+			if ($type_change && $db_items[$item['itemid']]['type'] == ITEM_TYPE_SCRIPT) {
+				if ($item['type'] != ITEM_TYPE_SSH && $item['type'] != ITEM_TYPE_DB_MONITOR
+						&& $item['type'] != ITEM_TYPE_TELNET && $item['type'] != ITEM_TYPE_CALCULATED) {
+					$item['params'] = '';
+				}
+
+				if ($item['type'] != ITEM_TYPE_HTTPAGENT) {
+					$item['timeout'] = $defaults['timeout'];
+				}
+			}
+
 			// Option 'Convert to JSON' is not supported for discovery rule.
 			unset($item['output_format']);
 		}
@@ -645,10 +661,13 @@ class CDiscoveryRule extends CItemGeneral {
 		return true;
 	}
 
-	public function syncTemplates($data) {
-		$data['templateids'] = zbx_toArray($data['templateids']);
-		$data['hostids'] = zbx_toArray($data['hostids']);
-
+	/**
+	 * @param array $templateids
+	 * @param array $hostids
+	 *
+	 * @return array Array of discovery rule IDs.
+	 */
+	public function syncTemplates(array $templateids, array $hostids): array {
 		$output = [];
 		foreach ($this->fieldRules as $field_name => $rules) {
 			if (!array_key_exists('system', $rules) && !array_key_exists('host', $rules)) {
@@ -658,12 +677,13 @@ class CDiscoveryRule extends CItemGeneral {
 
 		$tpl_items = $this->get([
 			'output' => $output,
-			'hostids' => $data['templateids'],
 			'selectFilter' => ['formula', 'evaltype', 'conditions'],
 			'selectLLDMacroPaths' => ['lld_macro', 'path'],
 			'selectPreprocessing' => ['type', 'params', 'error_handler', 'error_handler_params'],
 			'selectOverrides' => ['name', 'step', 'stop', 'filter', 'operations'],
-			'preservekeys' => true
+			'hostids' => $templateids,
+			'preservekeys' => true,
+			'nopermissions' => true
 		]);
 
 		foreach ($tpl_items as &$item) {
@@ -686,9 +706,9 @@ class CDiscoveryRule extends CItemGeneral {
 		}
 		unset($item);
 
-		$this->inherit($tpl_items, $data['hostids']);
+		$this->inherit($tpl_items, $hostids);
 
-		return true;
+		return array_keys($tpl_items);
 	}
 
 	/**
@@ -707,7 +727,7 @@ class CDiscoveryRule extends CItemGeneral {
 			'discoveryids' => $srcDiscovery['itemid'],
 			'output' => ['triggerid', 'expression', 'description', 'url', 'status', 'priority', 'comments',
 				'templateid', 'type', 'recovery_mode', 'recovery_expression', 'correlation_mode', 'correlation_tag',
-				'opdata', 'discover'
+				'opdata', 'discover', 'event_name'
 			],
 			'selectHosts' => API_OUTPUT_EXTEND,
 			'selectItems' => ['itemid', 'type'],
@@ -917,8 +937,11 @@ class CDiscoveryRule extends CItemGeneral {
 		DB::insert('item_rtdata', $items_rtdata, false);
 
 		$conditions = [];
+		$itemids = [];
+
 		foreach ($items as $key => &$item) {
 			$item['itemid'] = $create_items[$key]['itemid'];
+			$itemids[$key] = $item['itemid'];
 
 			// conditions
 			if (isset($item['filter'])) {
@@ -957,8 +980,8 @@ class CDiscoveryRule extends CItemGeneral {
 
 		DB::insertBatch('lld_macro_path', $lld_macro_paths);
 
+		$this->createItemParameters($items, $itemids);
 		$this->createItemPreprocessing($items);
-
 		$this->createOverrides($items);
 	}
 
@@ -1138,6 +1161,17 @@ class CDiscoveryRule extends CItemGeneral {
 												'trends' => $operation['optrends']['trends']
 											];
 										}
+
+										if (array_key_exists('optag', $operation)) {
+											foreach ($operation['optag'] as $tag) {
+												$optag[] = [
+													'lld_override_operationid' =>
+														$operation['lld_override_operationid'],
+													'tag' => $tag['tag'],
+													'value'	=> array_key_exists('value', $tag) ? $tag['value'] : ''
+												];
+											}
+										}
 										break;
 
 									case OPERATION_OBJECT_TRIGGER_PROTOTYPE:
@@ -1181,6 +1215,17 @@ class CDiscoveryRule extends CItemGeneral {
 													'lld_override_operationid' =>
 														$operation['lld_override_operationid'],
 													'templateid' => $template['templateid']
+												];
+											}
+										}
+
+										if (array_key_exists('optag', $operation)) {
+											foreach ($operation['optag'] as $tag) {
+												$optag[] = [
+													'lld_override_operationid' =>
+														$operation['lld_override_operationid'],
+													'tag' => $tag['tag'],
+													'value'	=> array_key_exists('value', $tag) ? $tag['value'] : ''
 												];
 											}
 										}
@@ -1410,6 +1455,7 @@ class CDiscoveryRule extends CItemGeneral {
 
 		DB::insertBatch('lld_macro_path', $lld_macro_paths);
 
+		$this->updateItemParameters($items);
 		$this->updateItemPreprocessing($items);
 
 		// Delete old overrides and replace with new ones if any.
@@ -1510,7 +1556,7 @@ class CDiscoveryRule extends CItemGeneral {
 				'formula' =>		['type' => API_STRING_UTF8],
 				'conditions' =>		['type' => API_OBJECTS, 'flags' => API_REQUIRED | API_NOT_EMPTY, 'fields' => [
 					'macro' =>			['type' => API_STRING_UTF8, 'flags' => API_REQUIRED | API_NOT_EMPTY, 'length' => DB::getFieldLength('lld_override_condition', 'macro')],
-					'operator' =>		['type' => API_INT32, 'in' => implode(',', [CONDITION_OPERATOR_REGEXP, CONDITION_OPERATOR_NOT_REGEXP]), 'default' => DB::getDefault('lld_override_condition', 'operator')],
+					'operator' =>		['type' => API_INT32, 'in' => implode(',', [CONDITION_OPERATOR_REGEXP, CONDITION_OPERATOR_NOT_REGEXP, CONDITION_OPERATOR_EXISTS, CONDITION_OPERATOR_NOT_EXISTS]), 'default' => DB::getDefault('lld_override_condition', 'operator')],
 					'value' =>			['type' => API_STRING_UTF8, 'flags' => API_REQUIRED, 'length' => DB::getFieldLength('lld_override_condition', 'value')],
 					'formulaid' =>		['type' => API_STRING_UTF8]
 				]]
@@ -1617,7 +1663,7 @@ class CDiscoveryRule extends CItemGeneral {
 
 							switch ($operation['operationobject']) {
 								case OPERATION_OBJECT_ITEM_PROTOTYPE:
-									foreach (['opseverity', 'optag', 'optemplate', 'opinventory'] as $field) {
+									foreach (['opseverity', 'optemplate', 'opinventory'] as $field) {
 										if (array_key_exists($field, $operation)) {
 											self::exception(ZBX_API_ERROR_PARAMETERS,
 												_s('Invalid parameter "%1$s": %2$s.', $opr_path,
@@ -1631,10 +1677,11 @@ class CDiscoveryRule extends CItemGeneral {
 											&& !array_key_exists('opperiod', $operation)
 											&& !array_key_exists('ophistory', $operation)
 											&& !array_key_exists('optrends', $operation)
+											&& !array_key_exists('optag', $operation)
 											&& !array_key_exists('opdiscover', $operation)) {
 										self::exception(ZBX_API_ERROR_PARAMETERS, _s('Invalid parameter "%1$s": %2$s.',
 											$opr_path, _s('value must be one of %1$s',
-												'opstatus, opdiscover, opperiod, ophistory, optrends'
+												'opstatus, opdiscover, opperiod, ophistory, optrends, optag'
 											)
 										));
 									}
@@ -1690,7 +1737,7 @@ class CDiscoveryRule extends CItemGeneral {
 									break;
 
 								case OPERATION_OBJECT_HOST_PROTOTYPE:
-									foreach (['opperiod', 'ophistory', 'optrends', 'opseverity', 'optag'] as $field) {
+									foreach (['opperiod', 'ophistory', 'optrends', 'opseverity'] as $field) {
 										if (array_key_exists($field, $operation)) {
 											self::exception(ZBX_API_ERROR_PARAMETERS,
 												_s('Invalid parameter "%1$s": %2$s.', $opr_path,
@@ -1702,11 +1749,12 @@ class CDiscoveryRule extends CItemGeneral {
 
 									if (!array_key_exists('opstatus', $operation)
 											&& !array_key_exists('optemplate', $operation)
+											&& !array_key_exists('optag', $operation)
 											&& !array_key_exists('opinventory', $operation)
 											&& !array_key_exists('opdiscover', $operation)) {
 										self::exception(ZBX_API_ERROR_PARAMETERS, _s('Invalid parameter "%1$s": %2$s.',
 											$opr_path, _s('value must be one of %1$s',
-												'opstatus, opdiscover, optemplate, opinventory'
+												'opstatus, opdiscover, optemplate, optag, opinventory'
 											)
 										));
 									}
@@ -1793,7 +1841,9 @@ class CDiscoveryRule extends CItemGeneral {
 					'messageRegex' => _('Incorrect filter condition formula ID for discovery rule "%1$s".')
 				]),
 				'operator' => new CLimitedSetValidator([
-					'values' => [CONDITION_OPERATOR_REGEXP, CONDITION_OPERATOR_NOT_REGEXP],
+					'values' => [CONDITION_OPERATOR_REGEXP, CONDITION_OPERATOR_NOT_REGEXP, CONDITION_OPERATOR_EXISTS,
+						CONDITION_OPERATOR_NOT_EXISTS
+					],
 					'messageInvalid' => _('Incorrect filter condition operator for discovery rule "%1$s".')
 				])
 			],
@@ -2027,11 +2077,11 @@ class CDiscoveryRule extends CItemGeneral {
 		// fetch discovery to clone
 		$srcDiscovery = $this->get([
 			'itemids' => $discoveryid,
-			'output' => ['itemid', 'type', 'snmp_oid', 'hostid', 'name', 'key_', 'delay', 'history',
-				'trends', 'status', 'value_type', 'trapper_hosts', 'units', 'lastlogsize', 'logtimefmt',
-				'valuemapid', 'params', 'ipmi_sensor', 'authtype', 'username', 'password', 'publickey', 'privatekey',
-				'mtime', 'flags', 'interfaceid', 'description', 'inventory_link', 'lifetime', 'jmx_endpoint', 'url',
-				'query_fields', 'timeout', 'posts', 'status_codes', 'follow_redirects', 'post_type', 'http_proxy',
+			'output' => ['itemid', 'type', 'snmp_oid', 'hostid', 'name', 'key_', 'delay', 'history', 'trends', 'status',
+				'value_type', 'trapper_hosts', 'units', 'lastlogsize', 'logtimefmt', 'valuemapid', 'params',
+				'ipmi_sensor', 'authtype', 'username', 'password', 'publickey', 'privatekey', 'mtime', 'flags',
+				'interfaceid', 'description', 'inventory_link', 'lifetime', 'jmx_endpoint', 'url', 'query_fields',
+				'parameters', 'timeout', 'posts', 'status_codes', 'follow_redirects', 'post_type', 'http_proxy',
 				'headers', 'retrieve_mode', 'request_method', 'ssl_cert_file', 'ssl_key_file', 'ssl_key_password',
 				'verify_peer', 'verify_host', 'allow_traps', 'master_itemid'
 			],
@@ -2143,7 +2193,7 @@ class CDiscoveryRule extends CItemGeneral {
 		}
 
 		// copy host prototypes
-		$this->copyHostPrototypes($discoveryid, $dstDiscovery);
+		$this->copyHostPrototypes($discoveryid, $dstDiscovery['itemid']);
 
 		return true;
 	}
@@ -2168,17 +2218,33 @@ class CDiscoveryRule extends CItemGeneral {
 				'master_itemid', 'templateid', 'url', 'query_fields', 'timeout', 'posts', 'status_codes',
 				'follow_redirects', 'post_type', 'http_proxy', 'headers', 'retrieve_mode', 'request_method',
 				'output_format', 'ssl_cert_file', 'ssl_key_file', 'ssl_key_password', 'verify_peer', 'verify_host',
-				'allow_traps', 'discover'
+				'allow_traps', 'discover', 'parameters'
 			],
-			'selectApplications' => ['applicationid'],
-			'selectApplicationPrototypes' => ['name'],
 			'selectPreprocessing' => ['type', 'params', 'error_handler', 'error_handler_params'],
+			'selectTags' => ['tag', 'value'],
+			'selectValueMap' => ['name'],
 			'discoveryids' => $srcDiscovery['itemid'],
 			'preservekeys' => true
 		]);
 		$new_itemids = [];
 		$itemkey_to_id = [];
 		$create_items = [];
+		$src_valuemap_names = [];
+		$valuemap_map = [];
+
+		foreach ($item_prototypes as $item_prototype) {
+			if ($item_prototype['valuemap']) {
+				$src_valuemap_names[] = $item_prototype['valuemap']['name'];
+			}
+		}
+
+		if ($src_valuemap_names) {
+			$valuemap_map = array_column(API::ValueMap()->get([
+				'output' => ['valuemapid', 'name'],
+				'hostids' => $dstHost['hostid'],
+				'filter' => ['name' => $src_valuemap_names]
+			]), 'valuemapid', 'name');
+		}
 
 		if ($item_prototypes) {
 			$create_order = [];
@@ -2265,6 +2331,12 @@ class CDiscoveryRule extends CItemGeneral {
 				$item_prototype['ruleid'] = $dstDiscovery['itemid'];
 				$item_prototype['hostid'] = $dstDiscovery['hostid'];
 
+				if ($item_prototype['valuemapid'] != 0) {
+					$item_prototype['valuemapid'] = array_key_exists($item_prototype['valuemap']['name'], $valuemap_map)
+						? $valuemap_map[$item_prototype['valuemap']['name']]
+						: 0;
+				}
+
 				// map prototype interfaces
 				if ($dstHost['status'] != HOST_STATUS_TEMPLATE) {
 					// find a matching interface
@@ -2281,12 +2353,6 @@ class CDiscoveryRule extends CItemGeneral {
 						));
 					}
 				}
-
-				// add new applications
-				$item_prototype['applications'] = get_same_applications_for_host(
-					zbx_objectValues($item_prototype['applications'], 'applicationid'),
-					$dstHost['hostid']
-				);
 
 				if (!$item_prototype['preprocessing']) {
 					unset($item_prototype['preprocessing']);
@@ -2452,57 +2518,88 @@ class CDiscoveryRule extends CItemGeneral {
 	}
 
 	/**
-	 * Copies all of the host prototypes from the source discovery to the target
-	 * discovery rule.
+	 * Copy all of the host prototypes from the source discovery rule to the target discovery rule.
 	 *
-	 * @throws APIException if prototype saving fails.
+	 * @param string $src_discoveryid
+	 * @param string $dst_discoveryid
 	 *
-	 * @param int   $srcid          The source discovery rule id to copy from.
-	 * @param array $dstDiscovery   The target discovery rule to copy to.
-	 *
-	 * @return array
+	 * @throws APIException
 	 */
-	protected function copyHostPrototypes($srcid, array $dstDiscovery) {
-		$prototypes = API::HostPrototype()->get([
-			'discoveryids' => $srcid,
-			'output' => ['host', 'name', 'status', 'inventory_mode', 'discover'],
+	protected function copyHostPrototypes(string $src_discoveryid, string $dst_discoveryid): void {
+		$src_host_prototypes = API::HostPrototype()->get([
+			'output' => ['host', 'name', 'custom_interfaces', 'status', 'discover', 'inventory_mode'],
+			'selectInterfaces' => ['type', 'useip', 'ip', 'dns', 'port', 'main', 'details'],
 			'selectGroupLinks' => ['groupid'],
 			'selectGroupPrototypes' => ['name'],
 			'selectTemplates' => ['templateid'],
+			'selectTags' => ['tag', 'value'],
 			'selectMacros' => ['macro', 'type', 'value', 'description'],
-			'preservekeys' => true
+			'discoveryids' => $src_discoveryid
 		]);
 
-		$rs = [];
-		if ($prototypes) {
-			foreach ($prototypes as &$prototype) {
-				$prototype['ruleid'] = $dstDiscovery['itemid'];
-				unset($prototype['hostid'], $prototype['inventory']['hostid']);
-
-				foreach ($prototype['groupLinks'] as &$groupLinks) {
-					unset($groupLinks['group_prototypeid']);
-				}
-				unset($groupLinks);
-
-				foreach ($prototype['groupPrototypes'] as &$groupPrototype) {
-					unset($groupPrototype['group_prototypeid']);
-				}
-				unset($groupPrototype);
-
-				foreach ($prototype['macros'] as &$macro) {
-					$macro['type'] = ($macro['type'] == ZBX_MACRO_TYPE_SECRET) ? ZBX_MACRO_TYPE_TEXT : $macro['type'];
-					$macro += ['value' => ''];
-				}
-				unset($macro);
-			}
-			unset($prototype);
-
-			$rs = API::HostPrototype()->create($prototypes);
-			if (!$rs) {
-				self::exception(ZBX_API_ERROR_PARAMETERS, _('Cannot clone host prototypes.'));
-			}
+		if (!$src_host_prototypes) {
+			return;
 		}
-		return $rs;
+
+		$dst_host_prototypes = [];
+
+		foreach ($src_host_prototypes as $i => $src_host_prototype) {
+			unset($src_host_prototypes[$i]);
+
+			$dst_host_prototype = ['ruleid' => $dst_discoveryid] + array_intersect_key($src_host_prototype, array_flip([
+				'host', 'name', 'custom_interfaces', 'status', 'discover', 'inventory_mode', 'groupLinks',
+				'groupPrototypes', 'templates', 'tags'
+			]));
+
+			if ($src_host_prototype['custom_interfaces'] == HOST_PROT_INTERFACES_CUSTOM) {
+				foreach ($src_host_prototype['interfaces'] as $src_interface) {
+					$dst_interface =
+						array_intersect_key($src_interface, array_flip(['type', 'useip', 'ip', 'dns', 'port', 'main']));
+
+					if ($src_interface['type'] == INTERFACE_TYPE_SNMP) {
+						switch ($src_interface['details']['version']) {
+							case SNMP_V1:
+							case SNMP_V2C:
+								$dst_interface['details'] = array_intersect_key($src_interface['details'],
+									array_flip(['version', 'bulk', 'community'])
+								);
+								break;
+
+							case SNMP_V3:
+								$field_names = array_flip(['version', 'bulk', 'contextname', 'securityname',
+									'securitylevel'
+								]);
+
+								if ($src_interface['details']['securitylevel'] == ITEM_SNMPV3_SECURITYLEVEL_AUTHNOPRIV) {
+									$field_names += array_flip(['authprotocol', 'authpassphrase']);
+								}
+								elseif ($src_interface['details']['securitylevel'] == ITEM_SNMPV3_SECURITYLEVEL_AUTHPRIV) {
+									$field_names +=
+										array_flip(['authprotocol', 'authpassphrase', 'privprotocol', 'privpassphrase']);
+								}
+
+								$dst_interface['details'] = array_intersect_key($src_interface['details'], $field_names);
+								break;
+						}
+					}
+
+					$dst_host_prototype['interfaces'][] = $dst_interface;
+				}
+			}
+
+			foreach ($src_host_prototype['macros'] as $src_macro) {
+				if ($src_macro['type'] == ZBX_MACRO_TYPE_SECRET) {
+					$dst_host_prototype['macros'][] = ['type' => ZBX_MACRO_TYPE_TEXT, 'value' => ''] + $src_macro;
+				}
+				else {
+					$dst_host_prototype['macros'][] = $src_macro;
+				}
+			}
+
+			$dst_host_prototypes[] = $dst_host_prototype;
+		}
+
+		API::HostPrototype()->create($dst_host_prototypes);
 	}
 
 	protected function applyQueryOutputOptions($tableName, $tableAlias, array $options, array $sqlParts) {
@@ -2707,28 +2804,6 @@ class CDiscoveryRule extends CItemGeneral {
 						: '0';
 				}
 			}
-		}
-
-		if ($options['selectApplicationPrototypes'] !== null
-				&& $options['selectApplicationPrototypes'] != API_OUTPUT_COUNT) {
-			$application_prototypes = [];
-			$relation_map = $this->createRelationMap($result, 'itemid', 'application_prototypeid',
-				'application_prototype'
-			);
-			$related_ids = $relation_map->getRelatedIds();
-
-			if ($related_ids) {
-				$application_prototypes = API::getApiService()->select('application_prototype', [
-					'output' => $options['selectApplicationPrototypes'],
-					'application_prototypeids' => $related_ids,
-					'limit' => $options['limitSelects'],
-					'preservekeys' => true
-				]);
-			}
-
-			$result = $relation_map->mapMany($result, $application_prototypes, 'applicationPrototypes',
-				$options['limitSelects']
-			);
 		}
 
 		if ($options['selectFilter'] !== null) {
@@ -2964,9 +3039,14 @@ class CDiscoveryRule extends CItemGeneral {
 							'output' => ['lld_override_operationid', 'severity'],
 							'filter' => ['lld_override_operationid' => array_keys($trigger_prototype_objectids)]
 						]);
+					}
+
+					if ($trigger_prototype_objectids || $host_prototype_objectids || $item_prototype_objectids) {
 						$optag = DB::select('lld_override_optag', [
 							'output' => ['lld_override_operationid', 'tag', 'value'],
-							'filter' => ['lld_override_operationid' => array_keys($trigger_prototype_objectids)]
+							'filter' => ['lld_override_operationid' => array_keys(
+								$trigger_prototype_objectids + $host_prototype_objectids + $item_prototype_objectids
+							)]
 						]);
 					}
 
@@ -3024,7 +3104,9 @@ class CDiscoveryRule extends CItemGeneral {
 									$operation['opseverity']['severity'] = $row['severity'];
 								}
 							}
+						}
 
+						if ($trigger_prototype_objectids || $host_prototype_objectids || $item_prototype_objectids) {
 							foreach ($optag as $row) {
 								if (bccomp($lld_override_operationid, $row['lld_override_operationid']) == 0) {
 									$operation['optag'][] = ['tag' => $row['tag'], 'value' => $row['value']];

@@ -1,0 +1,9 @@
+{
+    "resultCode": 400,
+    "title": "JSON does not comply with definition",
+    "description": "Value of the \"zabbixProxyParameters\" element is NULL",
+    "details": {
+        "centralServer": 1
+    },
+    "updatedObject": null
+}

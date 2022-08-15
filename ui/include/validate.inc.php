@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -168,7 +168,7 @@ function check_type(&$field, $flags, &$var, $type, $caption = null) {
 		}
 	}
 	elseif ($type == T_ZBX_DBL) {
-		$number_parser = new CNumberParser(['with_suffix' => false]);
+		$number_parser = new CNumberParser();
 
 		if ($number_parser->parse($var) != CParser::PARSE_SUCCESS) {
 			$error = true;
@@ -304,9 +304,7 @@ function check_field(&$fields, &$field, $checks) {
 			return ZBX_VALID_OK;
 		}
 		elseif ($flags & P_ACT) {
-			if (!isset($_REQUEST['sid'])
-					|| (array_key_exists(ZBX_SESSION_NAME, $_COOKIE)
-							&& $_REQUEST['sid'] != substr($_COOKIE[ZBX_SESSION_NAME], 16, 16))) {
+			if (!hasRequest('sid') || getRequest('sid') != substr(CSessionHelper::getId(), 16, 16)) {
 				info(_('Operation cannot be performed due to unauthorized request.'));
 				return ZBX_VALID_ERROR;
 			}
@@ -364,16 +362,18 @@ function invalid_url($msg = null) {
 	}
 
 	// required global parameters for correct including page_header.php
-	global $DB, $ZBX_MESSAGES, $page;
+	global $DB;
 
 	// backup messages before including page_header.php
-	$temp = $ZBX_MESSAGES;
-	$ZBX_MESSAGES = [];
+	$messages_backup = CMessageHelper::getMessages();
+	CMessageHelper::clear();
 
 	require_once dirname(__FILE__).'/page_header.php';
 
 	// Rollback reset messages.
-	$ZBX_MESSAGES = $temp;
+	foreach ($messages_backup as $message) {
+		CMessageHelper::addMessage($message);
+	}
 
 	unset_all();
 	show_error_message($msg);
@@ -450,14 +450,21 @@ function validateTimeSelectorPeriod($from, $to) {
 	}
 
 	$ts = [];
+	$ts['now'] = time();
 	$range_time_parser = new CRangeTimeParser();
 
 	foreach (['from' => $from, 'to' => $to] as $field => $value) {
 		$range_time_parser->parse($value);
-		$ts[$field] = $range_time_parser->getDateTime($field === 'from')->getTimestamp();
+		$ts[$field] = $range_time_parser
+			->getDateTime($field === 'from')
+			->getTimestamp();
 	}
 
 	$period = $ts['to'] - $ts['from'] + 1;
+	$range_time_parser->parse('now-'.CSettingsHelper::get(CSettingsHelper::MAX_PERIOD));
+	$max_period = 1 + $ts['now'] - $range_time_parser
+		->getDateTime(true)
+		->getTimestamp();
 
 	if ($period < ZBX_MIN_PERIOD) {
 		error(_n('Minimum time period to display is %1$s minute.',
@@ -466,9 +473,9 @@ function validateTimeSelectorPeriod($from, $to) {
 
 		invalid_url();
 	}
-	elseif ($period > ZBX_MAX_PERIOD) {
+	elseif ($period > $max_period) {
 		error(_n('Maximum time period to display is %1$s day.',
-			'Maximum time period to display is %1$s days.', (int) (ZBX_MAX_PERIOD / SEC_PER_DAY)
+			'Maximum time period to display is %1$s days.', (int) round($max_period / SEC_PER_DAY)
 		));
 
 		invalid_url();
@@ -560,6 +567,7 @@ function validateDateInterval($year, $month, $day) {
  * @param array  $options
  * @param bool   $options['usermacros']
  * @param bool   $options['lldmacros']
+ * @param bool   $options['with_year']
  *
  * @return bool
  */
@@ -569,7 +577,7 @@ function validateTimeUnit($value, $min, $max, $allow_zero, &$error, array $optio
 
 	if ($simple_interval_parser->parse($value) == CParser::PARSE_SUCCESS) {
 		if ($value[0] !== '{') {
-			$value = timeUnitToSeconds($value);
+			$value = timeUnitToSeconds($value, array_key_exists('with_year', $options) ? $options['with_year'] : false);
 
 			if ($allow_zero && $value == 0) {
 				return true;

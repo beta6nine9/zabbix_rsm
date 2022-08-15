@@ -1,0 +1,25 @@
+{
+    "tldType": "gTLD",
+    "servicesStatus": [
+        { "service": "dnsUDP", "enabled": true },
+        { "service": "dnsTCP", "enabled": true },
+        { "service": "rdds43", "enabled": true },
+        { "service": "rdds80", "enabled": false },
+        { "service": "rdap"  , "enabled": false }
+    ],
+    "dnsParameters": {
+        "nsIps": [
+            { "ns": "a.ns.tld2", "ip": "192.168.2.1" },
+            { "ns": "b.ns.tld2", "ip": "192.168.2.2" },
+            { "ns": "b.ns.tld2", "ip": "192.168.2.3" }
+        ],
+        "dnssecEnabled": true,
+        "nsTestPrefix": "www.monitoring.example",
+        "minNs": 2
+    },
+    "rddsParameters": {
+        "rdds43Server": "whois.nic.example",
+        "rdds43TestedDomain": "nic.example",
+        "rdds43NsString": "Name Server:"
+    }
+}

@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -103,7 +103,10 @@ class CMultiSelect extends CTag {
 			}
 		}
 
-		if (array_key_exists('popup', $options)) {
+		if (array_key_exists('custom_select', $options)) {
+			$params['custom_select'] = $options['custom_select'];
+		}
+		elseif (array_key_exists('popup', $options)) {
 			if (array_key_exists('filter_preselect_fields', $options['popup'])) {
 				$params['popup']['filter_preselect_fields'] = $options['popup']['filter_preselect_fields'];
 			}
@@ -150,7 +153,7 @@ class CMultiSelect extends CTag {
 	 */
 	protected function mapOptions(array $options) {
 		$valid_fields = ['name', 'object_name', 'multiple', 'disabled', 'default_value', 'data', 'add_new',
-			'add_post_js', 'styles', 'popup', 'placeholder', 'autosuggest'
+			'add_post_js', 'styles', 'popup', 'custom_select', 'placeholder', 'autosuggest'
 		];
 
 		foreach ($options as $field => $value) {
@@ -183,9 +186,6 @@ class CMultiSelect extends CTag {
 			$mapped_options['selectedLimit'] = '1';
 		}
 
-		$autocomplete_parameters = [];
-		$popup_parameters = [];
-
 		if (array_key_exists('autosuggest', $options)) {
 			$valid_fields = ['filter_preselect_fields'];
 
@@ -212,7 +212,14 @@ class CMultiSelect extends CTag {
 			}
 		}
 
-		if (array_key_exists('popup', $options)) {
+		$autocomplete_parameters = [];
+
+		if (array_key_exists('custom_select', $options)) {
+			$mapped_options['custom_select'] = true;
+		}
+		elseif (array_key_exists('popup', $options)) {
+			$popup_parameters = [];
+
 			$valid_fields = ['parameters', 'filter_preselect_fields'];
 
 			foreach ($options['popup'] as $field => $value) {
@@ -244,8 +251,9 @@ class CMultiSelect extends CTag {
 					'with_monitored_triggers', 'noempty', 'editable', 'templated_hosts', 'hostid', 'parent_discoveryid',
 					'webitems', 'normal_only', 'numeric', 'with_graphs', 'with_graph_prototypes', 'with_items',
 					'with_simple_graph_items', 'with_simple_graph_item_prototypes', 'with_triggers', 'value_types',
-					'excludeids', 'disableids', 'enrich_parent_groups', 'orig_names', 'with_monitored_items',
-					'with_httptests', 'with_hosts_and_templates'
+					'excludeids', 'disableids', 'enrich_parent_groups', 'with_monitored_items',
+					'with_httptests', 'with_hosts_and_templates', 'user_type', 'disable_selected', 'hostids',
+					'with_inherited', 'context', 'enabled_only'
 				];
 
 				foreach ($parameters as $field => $value) {
@@ -321,7 +329,7 @@ class CMultiSelect extends CTag {
 				}
 
 				foreach (['with_graphs', 'with_graph_prototypes', 'with_simple_graph_items',
-						'with_simple_graph_item_prototypes', 'with_triggers'] as $name) {
+						'with_simple_graph_item_prototypes', 'with_triggers', 'with_inherited'] as $name) {
 					if (array_key_exists($name, $parameters) && $parameters[$name]) {
 						$popup_parameters[$name] = '1';
 						$autocomplete_parameters[$name] = true;
@@ -382,13 +390,34 @@ class CMultiSelect extends CTag {
 					$autocomplete_parameters['enrich_parent_groups'] = true;
 				}
 
-				if (array_key_exists('orig_names', $parameters) && $parameters['orig_names']) {
-					$popup_parameters['orig_names'] = '1';
+				if (array_key_exists('user_type', $parameters) && $parameters['user_type']) {
+					$popup_parameters['user_type'] = (int) $parameters['user_type'];
+					$autocomplete_parameters['user_type'] = (int) $parameters['user_type'];
+				}
+
+				if (array_key_exists('disable_selected', $parameters) && $parameters['disable_selected']) {
+					$popup_parameters['disable_selected'] = '1';
+				}
+
+				if (array_key_exists('hostids', $parameters) && $parameters['hostids']) {
+					$popup_parameters['hostids'] = $parameters['hostids'];
+					$autocomplete_parameters['hostids'] = $parameters['hostids'];
+				}
+
+				if (array_key_exists('context', $parameters)) {
+					$popup_parameters['context'] = $parameters['context'];
+					$autocomplete_parameters['context'] = $parameters['context'];
+				}
+
+				if (array_key_exists('enabled_only', $parameters) && $parameters['enabled_only']) {
+					$popup_parameters['enabled_only'] = '1';
+					$autocomplete_parameters['enabled_only'] = true;
 				}
 			}
+
+			$mapped_options['popup']['parameters'] = $popup_parameters;
 		}
 
-		$mapped_options['popup']['parameters'] = $popup_parameters;
 		$mapped_options['objectOptions'] = $autocomplete_parameters;
 
 		return $mapped_options;

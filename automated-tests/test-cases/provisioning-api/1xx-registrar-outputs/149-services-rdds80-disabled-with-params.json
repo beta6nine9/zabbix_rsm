@@ -1,0 +1,9 @@
+{
+    "resultCode": 400,
+    "title": "An element within the rddsParameter object or the rddsParameter object is included but the status of the service is disabled",
+    "description": null,
+    "details": {
+        "centralServer": 1
+    },
+    "updatedObject": null
+}

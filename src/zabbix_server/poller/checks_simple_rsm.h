@@ -238,11 +238,6 @@
 #define ZBX_MACRO_EPP_SERVERCERTMD5	"{$RSM.EPP.SERVERCERTMD5}"
 #define ZBX_MACRO_TLD_EPP_ENABLED	"{$RSM.TLD.EPP.ENABLED}"
 
-#define RSM_UDP_TIMEOUT	3	/* seconds */
-#define RSM_UDP_RETRY	1
-#define RSM_TCP_TIMEOUT	11	/* seconds (SLA: 5 times higher than max (2)) */
-#define RSM_TCP_RETRY	1
-
 #define RSM_DEFAULT_LOGDIR		"/var/log"		/* if Zabbix log dir is undefined */
 #define ZBX_DNS_LOG_PREFIX		"dns"			/* file will be <LOGDIR>/<PROBE>-<TLD>-ZBX_DNS_LOG_PREFIX-<udp|tcp>.log */
 #define ZBX_RDDS_LOG_PREFIX		"rdds"			/* file will be <LOGDIR>/<PROBE>-<TLD>-ZBX_RDDS_LOG_PREFIX.log */
@@ -252,9 +247,9 @@
 #define ZBX_RESOLVERSTATUS_LOG_PREFIX	"resolverstatus"	/* file will be <LOGDIR>/<PROBE>-ZBX_RESOLVERSTATUS_LOG_PREFIX.log */
 
 int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, int nextcheck,
-		const AGENT_REQUEST *request, AGENT_RESULT *result);
-int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *result);
-int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *result);
+		const AGENT_REQUEST *request, AGENT_RESULT *result, FILE *output_fd);
+int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *result, FILE *output_fd);
+int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *result, FILE *output_fd);
 int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *result);
 int	check_rsm_probe_status(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *result);
 int	check_rsm_resolver_status(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *result);

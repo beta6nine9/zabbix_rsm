@@ -1,0 +1,7 @@
+{
+    "resultCode": 500,
+    "title": "General error",
+    "description": "Invalid monitoring target",
+    "details": null,
+    "updatedObject": null
+}

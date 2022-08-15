@@ -1,0 +1,9 @@
+{
+    "resultCode": 400,
+    "title": "JSON does not comply with definition",
+    "description": "Invalid parameter \"servicesStatus.2.enabled\": a boolean is expected.",
+    "details": {
+        "centralServer": 1
+    },
+    "updatedObject": null
+}

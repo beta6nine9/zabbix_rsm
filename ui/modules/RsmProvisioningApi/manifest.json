@@ -1,0 +1,27 @@
+{
+	"manifest_version": 1,
+	"id": "RSM Provisioning API",
+	"name": "RSM Provisioning API module",
+	"author": "Zabbix",
+	"description": "RSM Provisioning API module",
+	"version": "1.0",
+	"namespace": "RsmProvisioningApi",
+	"url": "https://zabbix.com",
+	"actions": {
+		"rsm.provisioningapi.probe": {
+			"class": "Probe",
+			"layout": "layout.json",
+			"view": null
+		},
+		"rsm.provisioningapi.tld": {
+			"class": "Tld",
+			"layout": "layout.json",
+			"view": null
+		},
+		"rsm.provisioningapi.registrar": {
+			"class": "Registrar",
+			"layout": "layout.json",
+			"view": null
+		}
+	}
+}

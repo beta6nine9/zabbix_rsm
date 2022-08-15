@@ -1,0 +1,9 @@
+{
+    "resultCode": 400,
+    "title": "dnsParameters object is missing and the DNS service is enabled",
+    "description": null,
+    "details": {
+        "centralServer": 1
+    },
+    "updatedObject": null
+}

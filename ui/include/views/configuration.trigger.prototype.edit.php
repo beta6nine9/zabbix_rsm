@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -27,10 +27,16 @@ require_once dirname(__FILE__).'/js/configuration.triggers.edit.js.php';
 
 $triggersWidget = (new CWidget())
 	->setTitle(_('Trigger prototypes'))
-	->addItem(get_header_host_table('triggers', $data['hostid'], $data['parent_discoveryid']));
+	->setNavigation(getHostNavigation('triggers', $data['hostid'], $data['parent_discoveryid']));
+
+$url = (new CUrl('trigger_prototypes.php'))
+	->setArgument('parent_discoveryid', $data['parent_discoveryid'])
+	->setArgument('context', $data['context'])
+	->getUrl();
 
 // create form
-$triggersForm = (new CForm())
+$triggersForm = (new CForm('post', $url))
+	->setId('triggers-prototype-form')
 	->setName('triggersForm')
 	->setAttribute('aria-labeledby', ZBX_STYLE_PAGE_TITLE)
 	->addVar('form', $data['form'])
@@ -40,7 +46,8 @@ $triggersForm = (new CForm())
 	->addVar('toggle_expression_constructor', '')
 	->addVar('toggle_recovery_expression_constructor', '')
 	->addVar('remove_expression', '')
-	->addVar('remove_recovery_expression', '');
+	->addVar('remove_recovery_expression', '')
+	->addVar('backurl', $data['backurl']);
 
 if ($data['triggerid'] !== null) {
 	$triggersForm->addVar('triggerid', $data['triggerid']);
@@ -69,12 +76,19 @@ $triggersFormList
 			->setAttribute('autofocus', 'autofocus')
 	)
 	->addRow(
+		(new CLabel(_('Event name'), 'event_name')),
+		(new CTextAreaFlexible('event_name', $data['event_name']))
+			->setReadonly($data['limited'])
+			->setMaxlength(DB::getFieldLength('triggers', 'event_name'))
+			->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
+	)
+	->addRow(
 		new CLabel(_('Operational data'), 'opdata'),
 		(new CTextBox('opdata', $data['opdata'], $data['limited']))->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
 	)
 	->addRow(
 		_('Severity'),
-		new CSeverity(['name' => 'priority', 'value' => (int) $data['priority']])
+		new CSeverity('priority', (int) $data['priority'])
 	);
 
 // append expression to form list
@@ -98,9 +112,11 @@ if ($data['hostid']) {
 }
 $add_expression_button = (new CButton('insert', ($data['expression_constructor'] == IM_TREE) ? _('Edit') : _('Add')))
 	->addClass(ZBX_STYLE_BTN_GREY)
-	->onClick('return PopUp("popup.triggerexpr",jQuery.extend('.
-		json_encode($popup_options).
-			',{expression: jQuery(\'[name="'.$data['expression_field_name'].'"]\').val()}), null, this);'
+	->onClick(
+		'return PopUp("popup.triggerexpr", jQuery.extend('.json_encode($popup_options).', {
+				expression: jQuery(\'[name="'.$data['expression_field_name'].'"]\').val()
+			}), {dialogue_class: "modal-popup-generic"}
+		);'
 	)
 	->removeId();
 if ($data['limited']) {
@@ -250,8 +266,11 @@ if ($data['expression_constructor'] == IM_TREE) {
 	}
 
 	$testButton = (new CButton('test_expression', _('Test')))
-		->onClick('return PopUp("popup.testtriggerexpr",{expression: this.form.elements["expression"].value}, null,'.
-					'this);')
+		->onClick(
+			'return PopUp("popup.testtriggerexpr", {expression: this.form.elements["expression"].value}, {
+				dialogue_class: "modal-popup-generic"
+			});'
+		)
 		->addClass(ZBX_STYLE_BTN_LINK)
 		->removeId();
 	if (!$allowed_testing) {
@@ -293,15 +312,16 @@ $add_recovery_expression_button = (new CButton('insert',
 		($data['recovery_expression_constructor'] == IM_TREE) ? _('Edit') : _('Add'))
 	)
 	->addClass(ZBX_STYLE_BTN_GREY)
-	->onClick('return PopUp("popup.triggerexpr",jQuery.extend('.
-		json_encode([
+	->onClick(
+		'return PopUp("popup.triggerexpr", jQuery.extend('.json_encode([
 			'srctbl' => $data['recovery_expression_field_name'],
 			'srcfld1' => $data['recovery_expression_field_name'],
 			'dstfrm' => $triggersForm->getName(),
 			'dstfld1' => $data['recovery_expression_field_name'],
 			'parent_discoveryid' => $data['parent_discoveryid']
-		]).
-			',{expression: jQuery(\'[name="'.$data['recovery_expression_field_name'].'"]\').val()}), null, this);'
+		]).', {expression: jQuery(\'[name="'.$data['recovery_expression_field_name'].'"]\').val()}),
+			{dialogue_class: "modal-popup-generic"}
+		);'
 	);
 
 if ($data['limited']) {
@@ -446,8 +466,11 @@ if ($data['recovery_expression_constructor'] == IM_TREE) {
 	}
 
 	$testButton = (new CButton('test_expression', _('Test')))
-		->onClick('return PopUp("popup.testtriggerexpr",'.
-			'{expression: this.form.elements["recovery_expression"].value}, null, this);')
+		->onClick(
+			'return PopUp("popup.testtriggerexpr", {expression: this.form.elements["recovery_expression"].value}, {
+				dialogue_class: "modal-popup-generic"
+			});'
+		)
 		->addClass(ZBX_STYLE_BTN_LINK)
 		->removeId();
 	if (!$allowed_testing) {
@@ -537,17 +560,20 @@ $triggersTab->addTab('triggersTab',	_('Trigger prototype'), $triggersFormList);
 
 // tags
 $triggersTab->addTab('tags-tab', _('Tags'), new CPartial('configuration.tags.tab', [
-	'source' => 'trigger_prototype',
-	'tags' => $data['tags'],
-	'show_inherited_tags' => $data['show_inherited_tags'],
-	'readonly' => false
-]));
+		'source' => 'trigger_prototype',
+		'tags' => $data['tags'],
+		'show_inherited_tags' => $data['show_inherited_tags'],
+		'readonly' => false,
+		'tabs_id' => 'tabs'
+	]), TAB_INDICATOR_TAGS
+);
 
 /*
  * Dependencies tab
  */
 $dependenciesFormList = new CFormList('dependenciesFormList');
 $dependenciesTable = (new CTable())
+	->setId('dependency-table')
 	->setAttribute('style', 'width: 100%;')
 	->setHeader([_('Name'), _('Action')]);
 
@@ -560,19 +586,26 @@ foreach ($data['db_dependencies'] as $dependency) {
 
 	if ($dependency['flags'] == ZBX_FLAG_DISCOVERY_PROTOTYPE) {
 		$description = (new CLink($depTriggerDescription,
-			'trigger_prototypes.php?form=update'.url_param('parent_discoveryid').'&triggerid='.$dependency['triggerid']
+			(new CUrl('trigger_prototypes.php'))
+				->setArgument('form', 'update')
+				->setArgument('parent_discoveryid', $data['parent_discoveryid'])
+				->setArgument('triggerid', $dependency['triggerid'])
+				->setArgument('context', $data['context'])
 		))->setTarget('_blank');
 	}
 	elseif ($dependency['flags'] == ZBX_FLAG_DISCOVERY_NORMAL) {
 		$description = (new CLink($depTriggerDescription,
-			'triggers.php?form=update&triggerid='.$dependency['triggerid']
+			(new CUrl('triggers.php'))
+				->setArgument('form', 'update')
+				->setArgument('triggerid', $dependency['triggerid'])
+				->setArgument('context', $data['context'])
 		))->setTarget('_blank');
 	}
 
 	$row = new CRow([$description,
 		(new CCol(
 			(new CButton('remove', _('Remove')))
-				->onClick('javascript: removeDependency("'.$dependency['triggerid'].'");')
+				->onClick('view.removeDependency('.json_encode($dependency['triggerid']).')')
 				->addClass(ZBX_STYLE_BTN_LINK)
 				->removeId()
 		))->addClass(ZBX_STYLE_NOWRAP)
@@ -587,8 +620,8 @@ $dependenciesFormList->addRow(_('Dependencies'),
 		$dependenciesTable,
 		new CHorList([
 			(new CButton('add_dep_trigger', _('Add')))
-				->onClick('return PopUp("popup.generic",'.
-					json_encode([
+				->onClick(
+					'return PopUp("popup.generic", '.json_encode([
 						'srctbl' => 'triggers',
 						'srcfld1' => 'triggerid',
 						'reference' => 'deptrigger',
@@ -597,18 +630,18 @@ $dependenciesFormList->addRow(_('Dependencies'),
 						'normal_only' => '1',
 						'noempty' => '1',
 						'hostid' => $data['hostid']
-					]).', null, this);'
+					]).', {dialogue_class: "modal-popup-generic"});'
 				)
 				->addClass(ZBX_STYLE_BTN_LINK),
 			(new CButton('add_dep_trigger_prototype', _('Add prototype')))
-				->onClick('return PopUp("popup.generic",'.
-					json_encode([
+				->onClick(
+					'return PopUp("popup.generic", '.json_encode([
 						'srctbl' => 'trigger_prototypes',
 						'srcfld1' => 'triggerid',
 						'reference' => 'deptrigger',
 						'multiselect' => '1',
 						'parent_discoveryid' => $data['parent_discoveryid']
-					]).', null, this);'
+					]).', {dialogue_class: "modal-popup-generic"});'
 				)
 				->addClass(ZBX_STYLE_BTN_LINK)
 		])
@@ -616,12 +649,16 @@ $dependenciesFormList->addRow(_('Dependencies'),
 		->addClass(ZBX_STYLE_TABLE_FORMS_SEPARATOR)
 		->setAttribute('style', 'min-width: '.ZBX_TEXTAREA_BIG_WIDTH.'px;')
 );
-$triggersTab->addTab('dependenciesTab', _('Dependencies'), $dependenciesFormList);
+$triggersTab->addTab('dependenciesTab', _('Dependencies'), $dependenciesFormList, TAB_INDICATOR_DEPENDENCY);
+
+$cancelButton = $data['backurl'] !== null
+	? new CButtonCancel(null, "redirect('".$data['backurl']."');")
+	: new CButtonCancel(url_params(['parent_discoveryid', 'context']));
 
 // append buttons to form
 if (!empty($data['triggerid'])) {
 	$deleteButton = new CButtonDelete(_('Delete trigger prototype?'),
-		url_params(['form', 'triggerid', 'parent_discoveryid'])
+		url_params(['form', 'triggerid', 'parent_discoveryid', 'context', 'backurl']), 'context'
 	);
 
 	if ($data['limited']) {
@@ -632,15 +669,14 @@ if (!empty($data['triggerid'])) {
 		new CSubmit('update', _('Update')), [
 			new CSubmit('clone', _('Clone')),
 			$deleteButton,
-			new CButtonCancel(url_param('parent_discoveryid'))
+			$cancelButton
 		]
 	));
 }
 else {
 	$triggersTab->setFooter(makeFormFooter(
 		new CSubmit('add', _('Add')),
-		[new CButtonCancel(url_param('parent_discoveryid'))]
-	));
+		[$cancelButton]));
 }
 
 // append tabs to form
@@ -649,3 +685,11 @@ $triggersForm->addItem($triggersTab);
 $triggersWidget->addItem($triggersForm);
 
 $triggersWidget->show();
+
+(new CScriptTag('
+	view.init('.json_encode([
+		'form_name' => $triggersForm->getName()
+	]).');
+'))
+	->setOnDocumentReady()
+	->show();

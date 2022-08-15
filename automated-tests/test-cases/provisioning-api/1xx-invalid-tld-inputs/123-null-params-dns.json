@@ -1,0 +1,19 @@
+{
+    "tldType": "gTLD",
+    "servicesStatus": [
+        { "service": "dnsUDP", "enabled": true },
+        { "service": "dnsTCP", "enabled": true },
+        { "service": "rdds43", "enabled": true },
+        { "service": "rdds80", "enabled": true },
+        { "service": "rdap"  , "enabled": true }
+    ],
+    "dnsParameters": null,
+    "rddsParameters": {
+        "rdds43Server": "whois.nic.example",
+        "rdds43TestedDomain": "nic.example",
+        "rdds80Url": "https://whois.nic.example",
+        "rdapUrl": "https://www.nic.example/domain",
+        "rdapTestedDomain": "nic.example",
+        "rdds43NsString": "Name Server:"
+    }
+}

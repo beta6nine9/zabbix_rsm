@@ -4,7 +4,7 @@
 %define _build_id_links none
 
 Name:		zabbix%{namespace}
-Version:	5.0.19%{rsmversion}
+Version:	6.0.3%{rsmversion}
 Release: 	%{?rsmprereleasetag:0.}1%{?rsmprereleasetag:%{rsmprereleasetag}}%{?dist}
 Summary:	The Enterprise-class open source monitoring solution
 Group:		Applications/Internet
@@ -320,6 +320,15 @@ Group:				Applications/Internet
 %description js
 Zabbix js command line utility.
 
+%package rsm-api
+Summary:			Zabbix RSM API
+Group:				Applications/Internet
+BuildArch:			noarch
+
+%description rsm-api
+This package provides RSM API for managing SLAM configuration.
+
+
 %prep
 
 # set NAMESPACE_PATTERN for prep section
@@ -338,7 +347,7 @@ sed -r -i.bak 's,^(\s*\$configFile =).*CONFIG_FILE_PATH.*,\1 CConfigFile::CONFIG
 
 cp -r %{SOURCE1}/ ./
 
-## remove font file
+# remove font file
 rm -f ui/assets/fonts/DejaVuSans.ttf
 
 # replace font in defines.inc.php
@@ -575,6 +584,9 @@ sed -i "$NAMESPACE_PATTERN"     $RPM_BUILD_ROOT%{_prefix}/lib/tmpfiles.d/*
 install -d $RPM_BUILD_ROOT%{_datadir}/selinux/packages
 install -m 0644 $MODULES \
     $RPM_BUILD_ROOT%{_datadir}/selinux/packages
+
+# Provisioning API
+mv api $RPM_BUILD_ROOT%{_datadir}/rsm-api
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -880,6 +892,17 @@ systemctl restart rsyslog
 %defattr(-,root,root,-)
 %doc AUTHORS ChangeLog COPYING NEWS README
 %{_bindir}/zabbix_js
+
+%files rsm-api
+%defattr(-,root,root,-)
+%{_datadir}/rsm-api/config.php.example
+%{_datadir}/rsm-api/Database.php
+%{_datadir}/rsm-api/Input.php
+%{_datadir}/rsm-api/RsmException.php
+%{_datadir}/rsm-api/User.php
+%{_datadir}/rsm-api/constants.php
+%{_datadir}/rsm-api/index.php
+%{_datadir}/rsm-api/example
 
 
 %changelog

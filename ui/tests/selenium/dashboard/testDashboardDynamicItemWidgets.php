@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -280,7 +280,7 @@ class testDashboardDynamicItemWidgets extends CWebTest {
 	 * @dataProvider getWidgetsData
 	 */
 	public function testDashboardDynamicItemWidgets_Layout($data) {
-		$this->page->login()->open('zabbix.php?action=dashboard.view&dashboardid=105');
+		$this->page->login()->open('zabbix.php?action=dashboard.view&dashboardid=1050');
 		$dashboard = CDashboardElement::find()->one();
 
 		if (CTestArrayHelper::get($data, 'host_filter', false)) {
@@ -294,9 +294,10 @@ class testDashboardDynamicItemWidgets extends CWebTest {
 			}
 			$this->page->waitUntilReady();
 		}
+		$this->query('xpath://div[contains(@class, "is-loading")]')->waitUntilNotPresent();
 		// Show hidden headings of graph prototype.
-		$this->page->getDriver()->executeScript('var elements = document.getElementsByClassName("dashbrd-grid-iterator");'.
-				' for (var i = 0; i < elements.length; i++) elements[i].className+=" dashbrd-grid-iterator-focus";'
+		$this->page->getDriver()->executeScript('var elements = document.getElementsByClassName("dashboard-grid-iterator");'.
+				' for (var i = 0; i < elements.length; i++) elements[i].className+=" dashboard-grid-iterator-focus";'
 		);
 
 		$this->assertWidgetContent($data['widgets']);

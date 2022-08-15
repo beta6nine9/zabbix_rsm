@@ -1,0 +1,9 @@
+{
+    "resultCode": 400,
+    "title": "DNS service can only be disabled if all other services are disabled",
+    "description": null,
+    "details": {
+        "centralServer": 1
+    },
+    "updatedObject": null
+}

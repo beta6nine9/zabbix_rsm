@@ -1,0 +1,9 @@
+{
+    "resultCode": 400,
+    "title": "The \"probe\" element was included in a PUT request",
+    "description": null,
+    "details": {
+        "centralServer": 1
+    },
+    "updatedObject": null
+}

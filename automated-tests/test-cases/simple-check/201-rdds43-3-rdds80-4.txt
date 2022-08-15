@@ -1,0 +1,21 @@
+[test-case]
+
+"RDDS43/RDDS80 - Expecting NOERROR RCODE but got unexpected error when resolving hostname (-3/-4)"
+
+[start-tool]
+
+"resolver","/tmp/resolver.pid","201-resolver-input.json"
+
+[execute]
+
+"","rm -rf   /tmp/simple-check-test"
+"","mkdir -p /tmp/simple-check-test"
+"","${cfg:paths:build_dir}/bin/t_rsm_rdds -t example -a example.example -w http://example.example -g 4380 -p example -4 -r 127.0.0.1 -o 5053 -j /tmp/simple-check-test/status.json"
+
+[stop-tool]
+
+"resolver","/tmp/resolver.pid"
+
+[compare-files]
+
+"/tmp/simple-check-test","201-output.tar.gz"

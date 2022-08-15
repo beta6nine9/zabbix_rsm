@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -24,13 +24,26 @@ class CMenuPopupHelper {
 	/**
 	 * Prepare data for dashboard popup menu.
 	 *
-	 * @param string $dashboardid
+	 * @param string|null $dashboardid
+	 * @param bool        $editable
+	 * @param bool        $has_related_reports
+	 * @param bool        $can_edit_dashboards
+	 * @param bool        $can_view_reports
+	 * @param bool        $can_create_reports
+	 *
+	 * @return array
 	 */
-	public static function getDashboard($dashboardid) {
+	public static function getDashboard(?string $dashboardid, bool $editable, bool $has_related_reports,
+			bool $can_edit_dashboards, bool $can_view_reports, bool $can_create_reports): array {
 		return [
 			'type' => 'dashboard',
 			'data' => [
-				'dashboardid' => $dashboardid
+				'dashboardid' => $dashboardid,
+				'editable' => $editable,
+				'has_related_reports' => $has_related_reports,
+				'can_edit_dashboards' => $can_edit_dashboards,
+				'can_view_reports' => $can_view_reports,
+				'can_create_reports' => $can_create_reports
 			]
 		];
 	}
@@ -98,38 +111,15 @@ class CMenuPopupHelper {
 			]
 		];
 
+		if (array_key_exists('unique_id', $selement)) {
+			$data['data']['unique_id'] = $selement['unique_id'];
+		}
+
 		if ($severity_min != TRIGGER_SEVERITY_NOT_CLASSIFIED) {
 			$data['data']['severity_min'] = $severity_min;
 		}
 		if ($hostid != 0) {
 			$data['data']['hostid'] = $hostid;
-		}
-
-		return $data;
-	}
-
-	/**
-	 * Prepare data for refresh time menu popup.
-	 *
-	 * @param string $widgetName
-	 * @param string $currentRate
-	 * @param bool   $multiplier   Multiplier or time mode.
-	 * @param array  $params       (optional) URL parameters.
-	 *
-	 * @return array
-	 */
-	public static function getRefresh($widgetName, $currentRate, $multiplier = false, array $params = []) {
-		$data = [
-			'type' => 'refresh',
-			'data' => [
-				'widgetName' => $widgetName,
-				'currentRate' => $currentRate,
-				'multiplier' => $multiplier ? '1' : '0'
-			]
-		];
-
-		if ($params) {
-			$data['data']['params'] = $params;
 		}
 
 		return $data;
@@ -172,32 +162,61 @@ class CMenuPopupHelper {
 	}
 
 	/**
-	 * Prepare data for item popup menu.
+	 * Prepare data for item latest data popup menu.
 	 *
-	 * @param string $itemid
+	 * @param array  $data
+	 * @param string $data['itemid']   Item ID.
 	 *
 	 * @return array
 	 */
-	public static function getItem($itemid) {
+	public static function getItem(array $data): array {
 		return [
 			'type' => 'item',
 			'data' => [
-				'itemid' => $itemid
+				'itemid' => $data['itemid']
 			]
 		];
 	}
 
 	/**
-	 * Prepare data for item prototype popup menu.
+	 * Prepare data for item configuration popup menu.
 	 *
-	 * @param string $itemid
+	 * @param array  $data
+	 * @param string $data['itemid']   Item ID.
+	 * @param string $data['context']  Additional parameter in URL to identify main section.
+	 * @param string $data['backurl']  Url from where the function was called.
+	 *
+	 * @return array
 	 */
-	public static function getItemPrototype($itemid) {
+	public static function getItemConfiguration(array $data): array {
 		return [
-			'type' => 'item_prototype',
+			'type' => 'item_configuration',
 			'data' => [
-				'itemid' => $itemid
-			]
+				'itemid' => $data['itemid'],
+				'backurl' => $data['backurl']
+			],
+			'context' => $data['context']
+		];
+	}
+
+	/**
+	 * Prepare data for item prototype configuration popup menu.
+	 *
+	 * @param array  $data
+	 * @param string $data['itemid']   Item ID.
+	 * @param string $data['context']  Additional parameter in URL to identify main section.
+	 * @param string $data['backurl']  Url from where the function was called.
+	 *
+	 * @return array
+	 */
+	public static function getItemPrototypeConfiguration(array $data): array {
+		return [
+			'type' => 'item_prototype_configuration',
+			'data' => [
+				'itemid' => $data['itemid'],
+				'backurl' => $data['backurl']
+			],
+			'context' => $data['context']
 		];
 	}
 }

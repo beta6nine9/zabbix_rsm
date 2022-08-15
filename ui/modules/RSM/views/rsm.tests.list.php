@@ -114,13 +114,12 @@ else {
 	$this->addJsFile('gtlc.js');
 	$this->addJsFile('class.calendar.js');
 
-	$filter_url = (new CUrl('zabbix.php'))->setArgument('action', 'rsm.tests');
 	$dynamic_node = (new DynamicContent($dynamic_node))->setId('rsm_tests');
 	$dynamic_node->refresh_seconds = $data['refresh'];
 
 	(new CWidget())
 		->setTitle($data['title'])
-		->addItem((new CFilter($filter_url))
+		->addItem((new CFilter())
 			->setProfile($data['profileIdx'])
 			->setActiveTab($data['active_tab'])
 			->addTimeSelector($data['from'], $data['to'])

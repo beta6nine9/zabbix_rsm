@@ -18,6 +18,8 @@ my $cfg_key_out = 'rsm.slv.rdds.downtime';
 parse_slv_opts();
 fail_if_running();
 
+log_execution_time(1, 1);
+
 set_slv_config(get_rsm_config());
 
 db_connect();
@@ -25,7 +27,7 @@ db_connect();
 if (!opt('dry-run'))
 {
 	recalculate_downtime(
-		"/opt/zabbix/data/rsm.slv.rdds.downtime.auditlog.txt",
+		"/opt/zabbix/data/rsm.slv.rdds.downtime.false-positive.txt",
 		$cfg_key_in,
 		$cfg_key_out,
 		get_macro_incident_rdds_fail(),

@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -128,8 +128,9 @@ class CScreenHistory extends CScreenBase {
 		$output = [];
 
 		$items = API::Item()->get([
-			'output' => ['itemid', 'hostid', 'name', 'key_', 'value_type', 'valuemapid', 'history', 'trends'],
+			'output' => ['itemid', 'name', 'key_', 'value_type'],
 			'selectHosts' => ['name'],
+			'selectValueMap' => ['mappings'],
 			'itemids' => $this->itemids,
 			'webitems' => true,
 			'preservekeys' => true
@@ -140,8 +141,6 @@ class CScreenHistory extends CScreenBase {
 
 			return;
 		}
-
-		$items = CMacrosResolverHelper::resolveItemNames($items);
 
 		$iv_string = [
 			ITEM_VALUE_TYPE_LOG => 1,
@@ -159,12 +158,10 @@ class CScreenHistory extends CScreenBase {
 				$options['limit'] = 500;
 			}
 			else {
-				$config = select_config();
-
 				$options += [
 					'time_from' => $this->timeline['from_ts'],
 					'time_till' => $this->timeline['to_ts'],
-					'limit' => $config['search_limit']
+					'limit' => CSettingsHelper::get(CSettingsHelper::SEARCH_LIMIT)
 				];
 			}
 
@@ -233,7 +230,7 @@ class CScreenHistory extends CScreenBase {
 
 					if ($is_many_items) {
 						$row .= ' "'.$items[$history_row['itemid']]['hosts'][0]['name'].NAME_DELIMITER.
-							$items[$history_row['itemid']]['name_expanded'].'"';
+							$items[$history_row['itemid']]['name'].'"';
 					}
 					$output[] = $row;
 				}
@@ -346,7 +343,7 @@ class CScreenHistory extends CScreenBase {
 						->addClass($color);
 
 					if ($is_many_items) {
-						$row[] = (new CCol($host['name'].NAME_DELIMITER.$item['name_expanded']))
+						$row[] = (new CCol($host['name'].NAME_DELIMITER.$item['name']))
 							->addClass($color);
 					}
 
@@ -425,9 +422,7 @@ class CScreenHistory extends CScreenBase {
 						$value = formatFloat($value, null, ZBX_UNITS_ROUNDOFF_UNSUFFIXED);
 					}
 
-					if ($item['valuemapid']) {
-						$value = applyValueMap($value, $item['valuemapid']);
-					}
+					$value = CValueMapHelper::applyValueMap($item['value_type'], $value, $item['valuemap']);
 
 					$history_table->addRow([
 						(new CCol(zbx_date2str(DATE_TIME_FORMAT_SECONDS, $history_row['clock'])))
@@ -444,7 +439,7 @@ class CScreenHistory extends CScreenBase {
 			 */
 			else {
 				CArrayHelper::sort($items, [
-					['field' => 'name_expanded', 'order' => ZBX_SORT_UP]
+					['field' => 'name', 'order' => ZBX_SORT_UP]
 				]);
 				$table_header = [(new CColHeader(_('Timestamp')))->addClass(ZBX_STYLE_CELL_WIDTH)];
 				$history_data = [];
@@ -459,9 +454,9 @@ class CScreenHistory extends CScreenBase {
 						['field' => 'ns', 'order' => ZBX_SORT_DOWN]
 					]);
 
-					$table_header[] = (new CColHeader($item['name_expanded']))
+					$table_header[] = (new CColHeader($item['name']))
 						->addClass('vertical_rotation')
-						->setTitle($item['name_expanded']);
+						->setTitle($item['name']);
 					$history_data_index = 0;
 
 					foreach ($item_data as $item_data_row) {
@@ -511,9 +506,7 @@ class CScreenHistory extends CScreenBase {
 							$value = formatFloat($value, null, ZBX_UNITS_ROUNDOFF_UNSUFFIXED);
 						}
 
-						if ($item['valuemapid']) {
-							$value = applyValueMap($value, $item['valuemapid']);
-						}
+						$value = CValueMapHelper::applyValueMap($item['value_type'], $value, $item['valuemap']);
 
 						$row[] = ($value === '') ? '' : new CPre($value);
 					}
@@ -549,7 +542,6 @@ class CScreenHistory extends CScreenBase {
 			}
 			else {
 				$timeControlData['id'] = $this->getDataId();
-				$timeControlData['mainObject'] = 1;
 			}
 
 			if ($this->mode == SCREEN_MODE_JS) {

@@ -1,0 +1,9 @@
+{
+    "resultCode": 400,
+    "title": "An element within the rddsParameters object is missing based on the enabled status of a service to be monitored",
+    "description": null,
+    "details": {
+        "centralServer": 1
+    },
+    "updatedObject": null
+}

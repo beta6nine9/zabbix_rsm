@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -171,7 +171,7 @@ class testFormAdministrationAuthenticationHttp extends CLegacyWebTest {
 						],
 						// Couldn't open Hosts page due access.
 						[
-							'page' => 'hosts.php',
+							'page' => self::HOST_LIST_PAGE,
 							'error' => 'Access denied'
 						],
 						// Couldn't open GUI page due access.
@@ -209,7 +209,7 @@ class testFormAdministrationAuthenticationHttp extends CLegacyWebTest {
 //						// wait for ZBX-14774.
 //						// Redirect to HTTP login form and user is signed on hosts page.
 //						[
-//							'page' => 'hosts.php',
+//							'page' => self::HOST_LIST_PAGE,
 //							'action' => self::LOGIN_HTTP,
 //							'target' => 'Hosts'
 //						],
@@ -317,7 +317,7 @@ class testFormAdministrationAuthenticationHttp extends CLegacyWebTest {
 //						// Redirect to HTTP login form and user is signed on hosts page.
 //						// wait for ZBX-14774.
 //						[
-//							'page' => 'hosts.php',
+//							'page' => self::HOST_LIST_PAGE,
 //							'action' => self::LOGIN_HTTP,
 //							'target' => 'Hosts'
 //						],
@@ -371,7 +371,7 @@ class testFormAdministrationAuthenticationHttp extends CLegacyWebTest {
 						],
 //						// wait for ZBX-14774.
 //						[
-//							'page' => 'hosts.php',
+//							'page' => self::HOST_LIST_PAGE,
 //							'action' => self::LOGIN_HTTP,
 //							'target' => 'hosts'
 //						],
@@ -413,7 +413,7 @@ class testFormAdministrationAuthenticationHttp extends CLegacyWebTest {
 					'http_authentication' => [
 						'Enable HTTP authentication' => true,
 						'Default login form' => 'Zabbix login form',
-						'Case sensitive login' => true
+						'Case-sensitive login' => true
 					],
 					'pages' => [
 						[
@@ -438,7 +438,7 @@ class testFormAdministrationAuthenticationHttp extends CLegacyWebTest {
 					'http_authentication' => [
 						'Enable HTTP authentication' => true,
 						'Default login form' => 'Zabbix login form',
-						'Case sensitive login' => false
+						'Case-sensitive login' => false
 					],
 					'pages' => [
 						[
@@ -526,7 +526,7 @@ class testFormAdministrationAuthenticationHttp extends CLegacyWebTest {
 					$message = CMessageElement::find()->one();
 					$this->assertEquals('msg-bad msg-global', $message->getAttribute('class'));
 					$message_title= $message->getText();
-					$this->assertContains($check['error'], $message_title);
+					$this->assertStringContainsString($check['error'], $message_title);
 				}
 
 				continue;
@@ -537,18 +537,21 @@ class testFormAdministrationAuthenticationHttp extends CLegacyWebTest {
 			}
 
 			// Check user data in DB after login.
-			$session = $this->webDriver->manage()->getCookieNamed(ZBX_SESSION_NAME);
+			$session_cookie = $this->webDriver->manage()->getCookieNamed(ZBX_SESSION_NAME);
+			$session_cookie = json_decode(base64_decode(urldecode($session_cookie['value'])), true);
+			$session = $session_cookie['sessionid'];
+
 			$user_data = CDBHelper::getRow(
-				'SELECT u.alias'.
+				'SELECT u.username'.
 				' FROM users u,sessions s'.
 				' WHERE u.userid=s.userid'.
-					' AND sessionid='.zbx_dbstr($session['value'])
+					' AND sessionid='.zbx_dbstr($session)
 			);
 			if (array_key_exists('user_case_sensitive', $data)) {
-				$this->assertEquals($user_data['alias'], $data['user_case_sensitive']);
+				$this->assertEquals($user_data['username'], $data['user_case_sensitive']);
 			}
 			else {
-				$this->assertEquals($user_data['alias'], $alias);
+				$this->assertEquals($user_data['username'], $alias);
 			}
 
 			$this->page->logout();
@@ -602,7 +605,7 @@ class testFormAdministrationAuthenticationHttp extends CLegacyWebTest {
 		$form->fill($http_options);
 
 		// Check disabled or enabled fields.
-		$fields = ['Default login form', 'Remove domain name', 'Case sensitive login'];
+		$fields = ['Default login form', 'Remove domain name', 'Case-sensitive login'];
 		foreach ($fields as $field) {
 			$this->assertTrue($form->getField($field)->isEnabled($http_options['Enable HTTP authentication']));
 		}

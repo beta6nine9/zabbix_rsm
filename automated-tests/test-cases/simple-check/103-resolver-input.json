@@ -1,0 +1,8 @@
+{
+	"expected-qname"  : "example",
+	"expected-qtypes" : ["DNSKEY"],
+	"rcode"           : "NOERROR",
+	"flags"           : {
+		"ad" : 1
+	}
+}

@@ -10,7 +10,6 @@ use CControllerResponseFatal;
 class Action extends CAction {
 
 	protected $rsm_monitoring_mode;
-	protected $is_rdap_standalone;
 
 	protected $preload_macros = [];
 
@@ -40,23 +39,6 @@ class Action extends CAction {
 	 */
 	public function isAjaxRequest(): bool {
 		return strtolower($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'xmlhttprequest';
-	}
-
-	/**
-	 * Based on timestamp value stored in {$RSM.RDAP.STANDALONE}, check if RDAP at given time $timestamp is configured as
-	 * standalone service or as dependent sub-service of RDDS. It is expected that switch from RDAP as sub-service of RDDS
-	 * to RDAP as standalone service will be done only once and will never be switched back to initial state.
-	 *
-	 * @param integer|string  $timestamp  Optional timestamp value.
-	 *
-	 * @return bool
-	 */
-	protected function isRdapStandalone($timestamp = null) {
-		$value = $this->macro->get(RSM_RDAP_STANDALONE);
-		$rsm_rdap_standalone_ts = is_null($value) ? 0 : (int) $value;
-		$timestamp = is_null($timestamp) ? time() : (int) $timestamp;
-
-		return ($rsm_rdap_standalone_ts > 0 && $rsm_rdap_standalone_ts <= $timestamp);
 	}
 
 	protected function checkInput() {
@@ -143,32 +125,6 @@ class Action extends CAction {
 		}
 
 		return $values;
-	}
-
-	/**
-	 * Get value mapping by mapping id.
-	 *
-	 * @param int $valuemapid    Value map database id.
-	 * @return array
-	 */
-	protected function getValueMapping($valuemapid) {
-		static $valuemaps = [];
-
-		if (!isset($valuemaps[$valuemapid])) {
-			$db_mapping = API::ValueMap()->get([
-				'output' => [],
-				'selectMappings' => ['value', 'newvalue'],
-				'valuemapids' => [$valuemapid]
-			]);
-			$db_mapping = $db_mapping ? reset($db_mapping)['mappings'] : [];
-			$valuemaps[$valuemapid] = [];
-
-			foreach ($db_mapping as $mapping) {
-				$valuemaps[$valuemapid][$mapping['value']] = $mapping['newvalue'];
-			}
-		}
-
-		return $valuemaps[$valuemapid];
 	}
 
 	/**

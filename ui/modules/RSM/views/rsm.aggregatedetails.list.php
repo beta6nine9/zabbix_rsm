@@ -20,6 +20,7 @@
 
 
 use Modules\RSM\Helpers\CTableInfo;
+use Modules\RSM\Helpers\ValueMapHelper as VM;
 
 // NSIDs converted from hex to ASCII
 $nsids_converted = [];
@@ -138,7 +139,7 @@ foreach ($data['probes'] as $probe) {
 								if ($rtt < 0) {
 									$class = ($class == ZBX_STYLE_GREEN && !isset($probe['dns_error'][$nskey]))
 											? ZBX_STYLE_GREEN : ZBX_STYLE_RED;
-									$span->setHint($data['test_error_message'][$rtt]);
+									$span->setHint(VM::get(RSM_VALUE_MAP_DNS_RTT, $rtt));
 								}
 
 								$span->addClass($class);
@@ -179,7 +180,7 @@ foreach ($data['probes'] as $probe) {
 
 // Add total of errors at the bottom of the table.
 foreach ($data['errors'] as $error_code => $errors) {
-	$row = [(new CSpan(_('Total ') . $error_code))->setHint($data['test_error_message'][$error_code]), '', '', '', ''];
+	$row = [(new CSpan(_('Total ') . $error_code))->setHint(VM::get(RSM_VALUE_MAP_DNS_RTT, $error_code)), '', '', '', ''];
 
 	foreach ($data['dns_nameservers'] as $ns_name => $ns_ips) {
 		// 'Status' column is unused.
@@ -230,7 +231,7 @@ if ($data['type'] == RSM_DNS && array_key_exists('dns_nameservers', $data)) {
 $test_result = (new CSpan(_('No result')))->addClass(ZBX_STYLE_GREY);
 
 if (array_key_exists('test_result', $data)) {
-	$test_result = (new CSpan($data['test_status_message'][$data['test_result']]))
+	$test_result = (new CSpan(VM::get(RSM_VALUE_MAP_SERVICE_AVAILABILITY, $data['test_result'])))
 		->addClass($data['test_result'] == DOWN ? ZBX_STYLE_RED : ZBX_STYLE_GREEN);
 }
 
@@ -248,7 +249,7 @@ if (isset($data['nsids']) && count($data['nsids']) != 0) {
 }
 
 // for DNSSEC service, display specific DNSSEC errors
-if (isset($data['dnssec_errors']) && count($data['dnssec_errors']) != 0) {
+if (array_key_exists('dnssec_errors', $data)) {
 	$dnssec_errors_table = (new CTable())
 		->setHeader([(new CColHeader(_('Error code')))->setWidth('1%'), _('Description')])
 		->setAttribute('class', ZBX_STYLE_LIST_TABLE);

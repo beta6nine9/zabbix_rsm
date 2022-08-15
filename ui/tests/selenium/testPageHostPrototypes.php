@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -19,11 +19,47 @@
 **/
 
 require_once dirname(__FILE__).'/../include/CLegacyWebTest.php';
+require_once dirname(__FILE__).'/traits/TableTrait.php';
 
 /**
  * @backup hosts
  */
 class testPageHostPrototypes extends CLegacyWebTest {
+
+	use TableTrait;
+
+	const DICROVERY_RULE_ID = 90001;
+	const HOST_PROTOTYPES_COUNT = 8;
+
+	public function testPageHostPrototypes_CheckLayout() {
+		$this->zbxTestLogin('host_prototypes.php?parent_discoveryid='.self::DICROVERY_RULE_ID.'&context=host');
+		$this->zbxTestCheckTitle('Configuration of host prototypes');
+		$this->zbxTestCheckHeader('Host prototypes');
+
+		$table = $this->query('xpath://form[@name="hosts"]/table[@class="list-table"]')->asTable()->one();
+		$headers = ['', 'Name', 'Templates', 'Create enabled', 'Discover', 'Tags'];
+		$this->assertSame($headers, $table->getHeadersText());
+
+		foreach (['Create enabled', 'Create disabled', 'Delete'] as $button) {
+			$element = $this->query('button', $button)->one();
+			$this->assertTrue($element->isPresent());
+			$this->assertFalse($element->isEnabled());
+		}
+
+		$this->assertTableStats(self::HOST_PROTOTYPES_COUNT);
+
+		// Check tags on the specific host prototype.
+		$tags = $table->findRow('Name', 'Host prototype {#1}')->getColumn('Tags')->query('class:tag')->all();
+		$this->assertEquals(['host_proto_tag_1: value1', 'host_proto_tag_2: value2'], $tags->asText());
+
+		foreach ($tags as $tag) {
+			$tag->click();
+			$hint = $this->query('xpath://div[@data-hintboxid]')
+					->asOverlayDialog()->waitUntilPresent()->all()->last();
+			$this->assertEquals($tag->getText(), $hint->getText());
+			$hint->close();
+		}
+	}
 
 	public static function getSelectedData() {
 		return [
@@ -61,7 +97,7 @@ class testPageHostPrototypes extends CLegacyWebTest {
 	 */
 	private function selectHostPrototype($data) {
 		$discoveryid = DBfetch(DBselect("SELECT itemid FROM items WHERE name=".zbx_dbstr($data['item'])));
-		$this->zbxTestLogin("host_prototypes.php?parent_discoveryid=".$discoveryid['itemid']);
+		$this->zbxTestLogin("host_prototypes.php?parent_discoveryid=".$discoveryid['itemid'].'&context=host');
 
 		if ($data['hosts'] === 'all') {
 			$this->zbxTestCheckboxSelect('all_hosts');
@@ -182,7 +218,7 @@ class testPageHostPrototypes extends CLegacyWebTest {
 	 */
 	public function testPageHostPrototypes_SingleEnableDisable($data) {
 		$discoveryid = DBfetch(DBselect("SELECT itemid FROM items WHERE name=".zbx_dbstr($data['item'])));
-		$this->zbxTestLogin("host_prototypes.php?parent_discoveryid=".$discoveryid['itemid']);
+		$this->zbxTestLogin("host_prototypes.php?parent_discoveryid=".$discoveryid['itemid'].'&context=host');
 
 		$this->checkPageAction($data, 'Click on state', $data['status']);
 	}

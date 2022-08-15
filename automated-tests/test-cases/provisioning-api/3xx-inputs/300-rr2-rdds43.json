@@ -1,0 +1,14 @@
+{
+    "registrarName": "Registrar Name 2",
+    "registrarFamily": "Registrar Family 2",
+    "servicesStatus": [
+        { "service": "rdds43", "enabled": true },
+        { "service": "rdds80", "enabled": false },
+        { "service": "rdap"  , "enabled": false }
+    ],
+    "rddsParameters": {
+        "rdds43Server": "whois.nic.example",
+        "rdds43TestedDomain": "nic.example",
+        "rdds43NsString": "Name Server:"
+    }
+}

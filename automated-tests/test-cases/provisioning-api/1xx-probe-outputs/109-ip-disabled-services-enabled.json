@@ -1,0 +1,9 @@
+{
+    "resultCode": 400,
+    "title": "If ipv4Enable and ipv6Enable are disabled, then all services also must be disabled",
+    "description": null,
+    "details": {
+        "centralServer": 1
+    },
+    "updatedObject": null
+}

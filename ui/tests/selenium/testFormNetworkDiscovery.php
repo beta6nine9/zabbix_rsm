@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -86,7 +86,7 @@ class testFormNetworkDiscovery extends CLegacyWebTest {
 					'checks' => [
 						['check_action' => 'Add', 'type' => 'HTTP', 'ports' => '7555']
 					],
-					'error' => 'Field "Update interval" is not correct: a time unit is expected'
+					'error' => 'Incorrect value for field "delay": a time unit is expected'
 				]
 			],
 			// Error in checks.
@@ -96,7 +96,7 @@ class testFormNetworkDiscovery extends CLegacyWebTest {
 					'proxy' => 'Active proxy 3',
 					'iprange' => '192.168.0.1-25',
 					'delay' => '1m',
-					'error' => 'Cannot save discovery rule without checks.'
+					'error' => 'Field "dchecks" is mandatory.'
 				]
 			],
 			[
@@ -106,7 +106,7 @@ class testFormNetworkDiscovery extends CLegacyWebTest {
 						['check_action' => 'Add', 'type' => 'POP'],
 						['check_action' => 'Remove']
 					],
-					'error' => 'Cannot save discovery rule without checks.'
+					'error' => 'Field "dchecks" is mandatory.'
 				]
 			],
 			[
@@ -160,7 +160,7 @@ class testFormNetworkDiscovery extends CLegacyWebTest {
 		$sql_dchecks = 'SELECT * FROM dchecks ORDER BY druleid, dcheckid';
 		$old_dchecks = CDBHelper::getHash($sql_dchecks);
 
-		$this->zbxTestLogin('discoveryconf.php');
+		$this->zbxTestLogin('zabbix.php?action=discovery.list');
 		$this->zbxTestClickButtonText('Create discovery rule');
 		$this->fillInFields($data);
 
@@ -287,8 +287,17 @@ class testFormNetworkDiscovery extends CLegacyWebTest {
 							'context_name' => '2',
 							'security_name' => '2',
 							'security_level' => 'authNoPriv',
-							'auth_protocol' => 'SHA',
+							'auth_protocol' => 'SHA1',
 							'auth_passphrase' => '2'
+						],
+						[
+							'check_action' => 'Add',
+							'type' => 'SNMPv3 agent',
+							'snmp_oid' => '4',
+							'security_level' => 'authPriv',
+							'auth_protocol' => 'SHA512',
+							'priv_protocol' => 'AES256C',
+							'priv_passphrase' => '4'
 						],
 						[
 							'check_action' => 'Add',
@@ -300,7 +309,7 @@ class testFormNetworkDiscovery extends CLegacyWebTest {
 							'security_level' => 'authPriv',
 							'auth_protocol' => 'MD5',
 							'auth_passphrase' => '3',
-							'priv_protocol' => 'AES',
+							'priv_protocol' => 'AES128',
 							'priv_passphrase' => '3'
 						]
 					],
@@ -318,7 +327,7 @@ class testFormNetworkDiscovery extends CLegacyWebTest {
 	 * @dataProvider getCreateData
 	 */
 	public function testFormNetworkDiscovery_Create($data) {
-		$this->zbxTestLogin('discoveryconf.php');
+		$this->zbxTestLogin('zabbix.php?action=discovery.list');
 		$this->zbxTestClickButtonText('Create discovery rule');
 		$this->fillInFields($data);
 
@@ -354,7 +363,7 @@ class testFormNetworkDiscovery extends CLegacyWebTest {
 				[
 					'old_name' => 'Discovery rule for update',
 					'delay' => 'text',
-					'error' => 'Field "Update interval" is not correct: a time unit is expected'
+					'error' => 'Incorrect value for field "delay": a time unit is expected'
 				]
 			],
 			[
@@ -363,7 +372,7 @@ class testFormNetworkDiscovery extends CLegacyWebTest {
 					'checks' => [
 						['check_action' => 'Remove']
 					],
-					'error' => 'Cannot save discovery rule without checks.'
+					'error' => 'Field "dchecks" is mandatory.'
 				]
 			],
 			[
@@ -398,7 +407,7 @@ class testFormNetworkDiscovery extends CLegacyWebTest {
 		$sql_dchecks = 'SELECT * FROM dchecks ORDER BY druleid, dcheckid';
 		$old_dchecks = CDBHelper::getHash($sql_dchecks);
 
-		$this->zbxTestLogin('discoveryconf.php');
+		$this->zbxTestLogin('zabbix.php?action=discovery.list');
 		$this->zbxTestClickLinkText($data['old_name']);
 		$this->fillInFields($data);
 
@@ -473,7 +482,7 @@ class testFormNetworkDiscovery extends CLegacyWebTest {
 	 * @dataProvider getUpdateData
 	 */
 	public function testFormNetworkDiscovery_Update($data) {
-		$this->zbxTestLogin('discoveryconf.php');
+		$this->zbxTestLogin('zabbix.php?action=discovery.list');
 		$this->zbxTestClickLinkText($data['old_name']);
 		$this->fillInFields($data);
 
@@ -525,7 +534,7 @@ class testFormNetworkDiscovery extends CLegacyWebTest {
 		$sql_dchecks = 'SELECT * FROM dchecks ORDER BY druleid, dcheckid';
 		$old_dchecks = CDBHelper::getHash($sql_dchecks);
 
-		$this->zbxTestLogin('discoveryconf.php');
+		$this->zbxTestLogin('zabbix.php?action=discovery.list');
 		foreach (CDBHelper::getRandom('SELECT name FROM drules', 3) as $discovery) {
 			$this->zbxTestClickLinkTextWait($discovery['name']);
 			$this->zbxTestClickWait('update');
@@ -568,7 +577,7 @@ class testFormNetworkDiscovery extends CLegacyWebTest {
 							break;
 						case 'type':
 							$this->zbxTestWaitUntilElementClickable(WebDriverBy::id('type'));
-							$this->zbxTestDropdownSelectWait('type', $value);
+							$this->query('name:type')->asZDropdown()->one()->select($value);
 							break;
 						case 'ports':
 							$this->zbxTestInputTypeOverwrite('ports', $value);
@@ -592,13 +601,13 @@ class testFormNetworkDiscovery extends CLegacyWebTest {
 							$this->zbxTestDropdownSelect('snmpv3_securitylevel', $value);
 							break;
 						case 'auth_protocol':
-							$this->zbxTestClickXpathWait('//input[@name="snmpv3_authprotocol"]/../label[text()="'.$value.'"]');
+							$this->zbxTestDropdownSelect('snmpv3_authprotocol', $value);
 							break;
 						case 'auth_passphrase':
 							$this->zbxTestInputTypeOverwrite('snmpv3_authpassphrase', $value);
 							break;
 						case 'priv_protocol':
-							$this->zbxTestClickXpathWait('//input[@name="snmpv3_privprotocol"]/../label[text()="'.$value.'"]');
+							$this->zbxTestDropdownSelect('snmpv3_privprotocol', $value);
 							break;
 						case 'priv_passphrase':
 							$this->zbxTestInputTypeOverwrite('snmpv3_privpassphrase', $value);
@@ -632,7 +641,7 @@ class testFormNetworkDiscovery extends CLegacyWebTest {
 
 	public function testFormNetworkDiscovery_Delete() {
 		$name = 'Discovery rule to check delete';
-		$this->zbxTestLogin('discoveryconf.php');
+		$this->zbxTestLogin('zabbix.php?action=discovery.list');
 		$this->zbxTestClickLinkTextWait($name);
 		$this->zbxTestWaitForPageToLoad();
 		$this->zbxTestClickAndAcceptAlert('delete');
@@ -645,7 +654,7 @@ class testFormNetworkDiscovery extends CLegacyWebTest {
 	}
 
 	public function testFormNetworkDiscovery_Clone() {
-		$this->zbxTestLogin('discoveryconf.php');
+		$this->zbxTestLogin('zabbix.php?action=discovery.list');
 		foreach (CDBHelper::getRandom('SELECT name FROM drules WHERE druleid IN (2,3)', 2) as $drule) {
 			$this->zbxTestClickLinkTextWait($drule['name']);
 			$this->zbxTestWaitForPageToLoad();
@@ -707,7 +716,7 @@ class testFormNetworkDiscovery extends CLegacyWebTest {
 		$sql_dchecks = 'SELECT * FROM dchecks ORDER BY druleid, dcheckid';
 		$old_dchecks = CDBHelper::getHash($sql_dchecks);
 
-		$this->zbxTestLogin('discoveryconf.php');
+		$this->zbxTestLogin('zabbix.php?action=discovery.list');
 
 		if ($action === 'create') {
 			$discovery = [

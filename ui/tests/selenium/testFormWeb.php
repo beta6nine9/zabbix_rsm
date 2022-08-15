@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -24,7 +24,7 @@ require_once dirname(__FILE__).'/../../include/items.inc.php';
 use Facebook\WebDriver\WebDriverBy;
 
 /**
- * @backup httptest
+ * @backup httptest, profiles
  */
 class testFormWeb extends CLegacyWebTest {
 
@@ -178,15 +178,24 @@ class testFormWeb extends CLegacyWebTest {
 	public function testFormWeb_CheckLayout($data) {
 		if (isset($data['template'])) {
 			$this->zbxTestLogin('templates.php');
+
+			// If the template is not present on this page anymore - check on next page.
+			for ($i = 0; $i < 2; $i++) {
+				if ($this->query('link', $data['template'])->one(false)->isValid() === true) {
+					break;
+				}
+				$this->query('xpath://div[@class="table-paging"]//span[@class="arrow-right"]/..')->one()->click();
+				$this->page->waitUntilReady();
+			}
+
 			$this->zbxTestClickLinkTextWait($data['template']);
+			$this->zbxTestClickLinkTextWait('Web scenarios');
 		}
 
 		if (isset($data['host'])) {
-			$this->zbxTestLogin('hosts.php');
-			$this->zbxTestClickLinkTextWait($data['host']);
+			$this->zbxTestLogin(self::HOST_LIST_PAGE);
+			$this->filterEntriesAndOpenWeb($data['host']);
 		}
-
-		$this->zbxTestClickLinkTextWait('Web scenarios');
 
 		$this->zbxTestCheckTitle('Configuration of web monitoring');
 		$this->zbxTestCheckHeader('Web monitoring');
@@ -222,7 +231,6 @@ class testFormWeb extends CLegacyWebTest {
 		$this->zbxTestTextPresent('Name');
 		$this->zbxTestAssertVisibleId('name');
 		$this->zbxTestAssertAttribute("//input[@id='name']", 'maxlength', 64);
-		$this->zbxTestAssertAttribute("//input[@id='name']", 'size', 20);
 		if (isset($data['templatedHost'])) {
 			$this->zbxTestAssertAttribute("//input[@id='name']", 'readonly');
 		}
@@ -230,23 +238,16 @@ class testFormWeb extends CLegacyWebTest {
 			$this->zbxTestAssertAttribute("//input[@id='name']", 'autofocus');
 		}
 
-		$this->zbxTestTextPresent('Application');
-
-		$this->zbxTestTextPresent('New application');
-		$this->zbxTestAssertVisibleId('new_application');
-		$this->zbxTestAssertAttribute("//input[@id='new_application']", 'maxlength', 255);
-		$this->zbxTestAssertAttribute("//input[@id='new_application']", 'size', 20);
+		$this->zbxTestTextNotPresent(['Application', 'New application']);
 
 		$this->zbxTestTextPresent('Update interval');
 		$this->zbxTestAssertVisibleId('delay');
 		$this->zbxTestAssertAttribute("//input[@id='delay']", 'maxlength', 255);
-		$this->zbxTestAssertAttribute("//input[@id='delay']", 'size', 20);
 		$this->zbxTestAssertElementValue('delay', '1m');
 
 		$this->zbxTestTextPresent('Attempts');
 		$this->zbxTestAssertVisibleId('retries');
 		$this->zbxTestAssertAttribute("//input[@id='retries']", 'maxlength', 2);
-		$this->zbxTestAssertAttribute("//input[@id='retries']", 'size', 20);
 		$this->zbxTestAssertElementValue('retries', 1);
 
 		$this->zbxTestTextPresent('Agent');
@@ -275,7 +276,6 @@ class testFormWeb extends CLegacyWebTest {
 		$this->zbxTestTextPresent('HTTP proxy');
 		$this->zbxTestAssertVisibleId('http_proxy');
 		$this->zbxTestAssertAttribute("//input[@id='http_proxy']", 'maxlength', 255);
-		$this->zbxTestAssertAttribute("//input[@id='http_proxy']", 'size', 20);
 		$this->zbxTestAssertAttribute("//input[@id='http_proxy']", 'placeholder', '[protocol://][user[:password]@]proxy.example.com[:port]');
 
 		$this->zbxTestTextPresent('Variables');
@@ -323,7 +323,7 @@ class testFormWeb extends CLegacyWebTest {
 		$this->zbxTestWaitUntilElementVisible(WebDriverBy::id('authentication'));
 
 		$this->zbxTestTextPresent('Authentication');
-		$this->zbxTestDropdownHasOptions('authentication', ['None',	'Basic', 'NTLM', 'Kerberos']);
+		$this->zbxTestDropdownHasOptions('authentication', ['None', 'Basic', 'NTLM', 'Kerberos', 'Digest']);
 
 		if (isset($data['authentication'])) {
 			$this->zbxTestDropdownSelect('authentication', $data['authentication']);
@@ -337,12 +337,10 @@ class testFormWeb extends CLegacyWebTest {
 			$this->zbxTestTextPresent('User');
 			$this->zbxTestAssertVisibleId('http_user');
 			$this->zbxTestAssertAttribute("//input[@id='http_user']", 'maxlength', 64);
-			$this->zbxTestAssertAttribute("//input[@id='http_user']", 'size', 20);
 
 			$this->zbxTestTextPresent('Password');
 			$this->zbxTestAssertVisibleId('http_password');
 			$this->zbxTestAssertAttribute("//input[@id='http_password']", 'maxlength', 64);
-			$this->zbxTestAssertAttribute("//input[@id='http_password']", 'size', 20);
 		}
 		else {
 			$this->zbxTestTextNotVisible(['User', 'Password'], $this->query('id:authenticationTab')->one());
@@ -386,9 +384,8 @@ class testFormWeb extends CLegacyWebTest {
 		$sqlItems = "select * from items ORDER BY itemid";
 		$oldHashItems = CDBHelper::getHash($sqlItems);
 
-		$this->zbxTestLogin('hosts.php');
-		$this->zbxTestClickLinkTextWait($this->host);
-		$this->zbxTestClickLinkTextWait('Web scenarios');
+		$this->zbxTestLogin(self::HOST_LIST_PAGE);
+		$this->filterEntriesAndOpenWeb($this->host);
 		$this->zbxTestClickLinkTextWait($name);
 		$this->zbxTestClickWait('update');
 
@@ -473,43 +470,6 @@ class testFormWeb extends CLegacyWebTest {
 					'name' => 'qwertyuiopqwertyuiopqwertyuiopqwertyuiopqwertyuiopqwertyuiop1234',
 					'add_step' => [
 						['step' => 'qwertyuiopqwertyuiopqwertyuiopqwertyuiopqwertyuiopqwertyuiop']
-					]
-				]
-			],
-			// Application -numbers
-			[
-				[
-					'expected' => TEST_GOOD,
-					'name' => 'Application numbers only',
-					'new_application' => '1234567890',
-					'add_step' => [
-						['step' => 'Application numbers only']
-					]
-				]
-			],
-			// Application -symbols
-			[
-				[
-					'expected' => TEST_GOOD,
-					'name' => 'Application symbols only',
-					'new_application' => '!@#$%^&*()_+{}:"|<>?,./',
-					'add_step' => [
-						['step' => 'Application symbols only']
-					]
-				]
-			],
-			// Application -max length
-			[
-				[
-					'expected' => TEST_GOOD,
-					'name' => 'Application max length',
-					'new_application' => 'qwertyuiopqwertyuiopqwertyuiopqwertyui'.
-						'opqwertyuiopqwertyuiopqwertyuiopqwertyuiopqwe.'.
-						'rtyuiopqwertyuiopqwertyuiopqwertyuiopqwertyuiopqw'.
-						'ertyuiopqwertyuiopqwertyuiopqwertyuiopqwertyuiopqwer'.
-						'tyuiopqwertyuiopqwertyuiopqwertyuiopqwertyuiopqwertyuiop123456789012345',
-					'add_step' => [
-						['step' => 'Application max length']
 					]
 				]
 			],
@@ -1402,12 +1362,10 @@ class testFormWeb extends CLegacyWebTest {
 	 * @dataProvider create
 	 */
 	public function testFormWeb_SimpleCreate($data) {
-		$this->zbxTestLogin('hosts.php');
-		$this->zbxTestClickLinkTextWait($this->host);
-		$this->zbxTestClickLinkTextWait('Web scenarios');
+		$this->zbxTestLogin(self::HOST_LIST_PAGE);
+		$this->filterEntriesAndOpenWeb($this->host);
 
 		$this->zbxTestCheckTitle('Configuration of web monitoring');
-
 		$this->zbxTestContentControlButtonClickTextWait('Create web scenario');
 		$this->zbxTestCheckTitle('Configuration of web monitoring');
 		$this->zbxTestCheckHeader('Web monitoring');
@@ -1429,11 +1387,6 @@ class testFormWeb extends CLegacyWebTest {
 			$this->zbxTestInputTypeWait('name', $data['name']);
 		}
 		$name = $this->zbxTestGetValue("//input[@id='name']");
-
-		if (isset($data['new_application'])) {
-			$this->zbxTestInputType('new_application', $data['new_application']);
-		}
-		$new_application = $this->zbxTestGetValue("//input[@id='new_application']");
 
 		if (isset($data['delay']))	{
 			$this->zbxTestInputTypeOverwrite('delay', $data['delay']);
@@ -1562,7 +1515,6 @@ class testFormWeb extends CLegacyWebTest {
 					$this->zbxTestTextPresent($step);
 				}
 			}
-			$this->zbxTestClickLinkTextWait($this->host);
 			$this->zbxTestClickLinkTextWait('Web scenarios');
 			$this->zbxTestCheckHeader('Web monitoring');
 			$this->zbxTestTextPresent($name);
@@ -1575,7 +1527,7 @@ class testFormWeb extends CLegacyWebTest {
 				$this->zbxTestContentControlButtonClickTextWait('Create trigger');
 
 				$this->zbxTestInputType('description', $trigger);
-				$expressionTrigger = '{'.$this->host.':'.$trigger.'.last(0)}=0';
+				$expressionTrigger = 'last(/'.$this->host.'/'.$trigger.')=0';
 				$this->zbxTestInputTypeWait('expression', $expressionTrigger);
 				$this->zbxTestClickWait('add');
 
@@ -1596,5 +1548,19 @@ class testFormWeb extends CLegacyWebTest {
 				"step.httptestid = test.httptestid ".
 				"WHERE test.name = '".$name."' AND step.name = '".$step."'"));
 		}
+	}
+
+	/**
+	 * Function for filtering necessary hosts and opening their Web scenarios.
+	 *
+	 * @param string    $host    name of a host where web scenarios are opened
+	 */
+	private function filterEntriesAndOpenWeb($host) {
+		$this->query('button:Reset')->one()->click();
+		$form = $this->query('name:zbx_filter')->asForm()->waitUntilReady()->one();
+		$form->fill(['Name' => $host]);
+		$this->query('button:Apply')->one()->waitUntilClickable()->click();
+		$this->query('xpath://table[@class="list-table"]')->asTable()->one()->findRow('Name', $host)
+				->getColumn('Web')->query('link:Web')->one()->click();
 	}
 }

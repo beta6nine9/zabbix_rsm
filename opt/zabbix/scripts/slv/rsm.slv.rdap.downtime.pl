@@ -18,6 +18,8 @@ my $cfg_key_out = 'rsm.slv.rdap.downtime';
 parse_slv_opts();
 fail_if_running();
 
+log_execution_time(1, 1);
+
 set_slv_config(get_rsm_config());
 
 db_connect();
@@ -27,7 +29,7 @@ slv_exit(SUCCESS) if (!is_rdap_standalone(getopt('now')));
 if (!opt('dry-run'))
 {
 	recalculate_downtime(
-		"/opt/zabbix/data/rsm.slv.rdap.downtime.auditlog.txt",
+		"/opt/zabbix/data/rsm.slv.rdap.downtime.false-positive.txt",
 		$cfg_key_in,
 		$cfg_key_out,
 		get_macro_incident_rdap_fail(),

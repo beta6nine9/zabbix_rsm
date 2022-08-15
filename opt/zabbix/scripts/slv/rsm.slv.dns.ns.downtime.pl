@@ -19,7 +19,11 @@ use constant DOWNTIME_KEY_PATTERN => 'rsm.slv.dns.ns.downtime[%,%]';
 
 parse_slv_opts();
 fail_if_running();
+
+log_execution_time(1, 1);
+
 set_slv_config(get_rsm_config());
+
 db_connect();
 
 slv_exit(SUCCESS) if (get_monitoring_target() ne MONITORING_TARGET_REGISTRY);
@@ -27,7 +31,7 @@ slv_exit(SUCCESS) if (get_monitoring_target() ne MONITORING_TARGET_REGISTRY);
 if (!opt('dry-run'))
 {
 	recalculate_downtime(
-		"/opt/zabbix/data/rsm.slv.dns.ns.downtime.auditlog.txt",
+		"/opt/zabbix/data/rsm.slv.dns.ns.downtime.false-positive.txt",
 		AVAIL_KEY_PATTERN,
 		DOWNTIME_KEY_PATTERN,
 		1,

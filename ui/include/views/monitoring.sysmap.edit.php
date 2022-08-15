@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -35,6 +35,7 @@ if (!$data['form_refresh']) {
 
 // Create sysmap form.
 $form = (new CForm())
+	->setId('sysmap-form')
 	->setName('map.edit.php')
 	->addVar('form', getRequest('form', 1))
 	->addVar('current_user_userid', $data['current_user_userid'])
@@ -264,7 +265,7 @@ $map_tab->addRow(new CLabel(_('Problem display'), 'label-show-unack'),
 );
 
 $map_tab->addRow(_('Minimum severity'),
-	new CSeverity(['name' => 'severity_min', 'value' => (int) $data['sysmap']['severity_min']])
+	new CSeverity('severity_min', (int) $data['sysmap']['severity_min'])
 );
 
 $map_tab->addRow(_('Show suppressed problems'),
@@ -317,18 +318,19 @@ $tabs->addTab('sysmap_tab', _('Map'), $map_tab);
 
 // User group sharing table.
 $user_group_shares_table = (new CTable())
+	->setId('user-group-share-table')
 	->setHeader([_('User groups'), _('Permissions'), _('Action')])
 	->setAttribute('style', 'width: 100%;');
 
 $add_user_group_btn = ([(new CButton(null, _('Add')))
-	->onClick('return PopUp("popup.generic",'.
-		json_encode([
+	->onClick(
+		'return PopUp("popup.generic", '.json_encode([
 			'srctbl' => 'usrgrp',
 			'srcfld1' => 'usrgrpid',
 			'srcfld2' => 'name',
 			'dstfrm' => $form->getName(),
 			'multiselect' => '1'
-		]).', null, this);'
+		]).', {dialogue_class: "modal-popup-generic"});'
 	)
 	->addClass(ZBX_STYLE_BTN_LINK)]);
 
@@ -349,22 +351,23 @@ foreach ($data['sysmap']['userGroups'] as $user_group) {
 	];
 }
 
-$js_insert = 'addPopupValues('.zbx_jsvalue(['object' => 'usrgrpid', 'values' => $user_groups]).');';
+$js_insert = 'window.addPopupValues('.json_encode(['object' => 'usrgrpid', 'values' => $user_groups]).');';
 
 // User sharing table.
 $user_shares_table = (new CTable())
+	->setId('user-share-table')
 	->setHeader([_('Users'), _('Permissions'), _('Action')])
 	->setAttribute('style', 'width: 100%;');
 
 $add_user_btn = ([(new CButton(null, _('Add')))
-	->onClick('return PopUp("popup.generic",'.
-		json_encode([
+	->onClick(
+		'return PopUp("popup.generic", '.json_encode([
 			'srctbl' => 'users',
 			'srcfld1' => 'userid',
 			'srcfld2' => 'fullname',
 			'dstfrm' => $form->getName(),
 			'multiselect' => '1'
-		]).', null, this);'
+		]).', {dialogue_class: "modal-popup-generic"});'
 	)
 	->addClass(ZBX_STYLE_BTN_LINK)]);
 
@@ -385,7 +388,7 @@ foreach ($data['sysmap']['users'] as $user) {
 	];
 }
 
-$js_insert .= 'addPopupValues('.zbx_jsvalue(['object' => 'userid', 'values' => $users]).');';
+$js_insert .= 'window.addPopupValues('.zbx_jsvalue(['object' => 'userid', 'values' => $users]).');';
 
 zbx_add_post_js($js_insert);
 
@@ -408,7 +411,7 @@ $sharing_tab = (new CFormList('sharing_form'))
 	);
 
 // Append data to form.
-$tabs->addTab('sharing_tab', _('Sharing'), $sharing_tab);
+$tabs->addTab('sharing_tab', _('Sharing'), $sharing_tab, TAB_INDICATOR_SHARING);
 
 // Append buttons to form.
 if (hasRequest('sysmapid') && getRequest('sysmapid') > 0 && getRequest('form') !== 'full_clone') {

@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -24,9 +24,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"os/signal"
 	"strings"
-	"syscall"
 	"time"
 
 	_ "zabbix.com/plugins"
@@ -47,6 +45,10 @@ import (
 	"zabbix.com/pkg/version"
 	"zabbix.com/pkg/zbxlib"
 )
+
+type AgentUserParamOption struct {
+	UserParameter []string `conf:"optional"`
+}
 
 const remoteCommandSendingTimeout = time.Second
 
@@ -96,10 +98,35 @@ func processHelpCommand(c *remotecontrol.Client) (err error) {
 	help := `Remote control interface, available commands:
 	log_level_increase - Increase log level
 	log_level_decrease - Decrease log level
+	userparameter_reload - Reload user parameters
 	metrics - List available metrics
 	version - Display Agent version
 	help - Display this help message`
 	return c.Reply(help)
+}
+
+func processUserParamReloadCommand(c *remotecontrol.Client) (err error) {
+	var userparams AgentUserParamOption
+
+	if err = conf.LoadUserParams(&userparams); err != nil {
+		err = fmt.Errorf("Cannot load user parameters: %s", err)
+		log.Infof(err.Error())
+		return
+	}
+
+	agent.Options.UserParameter = userparams.UserParameter
+
+	if res := manager.QueryUserParams(); res != "ok" {
+		err = fmt.Errorf("Failed to reload user parameters: %s", res)
+		log.Infof(err.Error())
+		return
+	}
+
+	message := "User parameters reloaded"
+	log.Infof(message)
+	err = c.Reply(message)
+
+	return
 }
 
 func processRemoteCommand(c *remotecontrol.Client) (err error) {
@@ -123,6 +150,8 @@ func processRemoteCommand(c *remotecontrol.Client) (err error) {
 		err = processMetricsCommand(c)
 	case "version":
 		err = processVersionCommand(c)
+	case "userparameter_reload":
+		err = processUserParamReloadCommand(c)
 	default:
 		return errors.New("Unknown command")
 	}
@@ -132,8 +161,7 @@ func processRemoteCommand(c *remotecontrol.Client) (err error) {
 var pidFile *pidfile.File
 
 func run() (err error) {
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	sigs := createSigsChan()
 
 	var control *remotecontrol.Conn
 	if control, err = remotecontrol.New(agent.Options.ControlSocket, remoteCommandSendingTimeout); err != nil {
@@ -146,9 +174,7 @@ loop:
 	for {
 		select {
 		case sig := <-sigs:
-			switch sig {
-			case syscall.SIGINT, syscall.SIGTERM:
-				sendServiceStop()
+			if !handleSig(sig) {
 				break loop
 			}
 		case client := <-control.Client():
@@ -170,7 +196,9 @@ loop:
 }
 
 var (
-	confDefault string
+	confDefault     string
+	applicationName string
+	pluginsocket    string
 
 	argConfig  bool
 	argTest    bool
@@ -180,6 +208,8 @@ var (
 )
 
 func main() {
+	version.Init(applicationName, tls.CopyrightMessage(), copyrightMessageMQTT(), copyrightMessageModbus())
+
 	var confFlag string
 	const (
 		confDescription = "Path to the configuration file"
@@ -274,18 +304,19 @@ func main() {
 		os.Exit(0)
 	}
 
-	if err := openEventLog(); err != nil {
+	var err error
+	if err = openEventLog(); err != nil {
 		fatalExit("", err)
 	}
 
-	if err := validateExclusiveFlags(); err != nil {
+	if err = validateExclusiveFlags(); err != nil {
 		if eerr := eventLogErr(err); eerr != nil {
 			err = fmt.Errorf("%s and %s", err, eerr)
 		}
 		fatalExit("", err)
 	}
 
-	if err := conf.Load(confFlag, &agent.Options); err != nil {
+	if err = conf.Load(confFlag, &agent.Options); err != nil {
 		if argConfig || !(argTest || argPrint) {
 			if eerr := eventLogErr(err); eerr != nil {
 				err = fmt.Errorf("%s and %s", err, eerr)
@@ -298,23 +329,28 @@ func main() {
 		}
 	}
 
-	if err := agent.ValidateOptions(agent.Options); err != nil {
+	if err = agent.ValidateOptions(&agent.Options); err != nil {
 		if eerr := eventLogErr(err); eerr != nil {
 			err = fmt.Errorf("%s and %s", err, eerr)
 		}
 		fatalExit("cannot validate configuration", err)
 	}
 
-	if err := handleWindowsService(confFlag); err != nil {
+	if err = handleWindowsService(confFlag); err != nil {
 		if eerr := eventLogErr(err); eerr != nil {
 			err = fmt.Errorf("%s and %s", err, eerr)
 		}
 		fatalExit("", err)
 	}
 
-	if err := log.Open(log.Console, log.Warning, "", 0); err != nil {
+	if err = log.Open(log.Console, log.Warning, "", 0); err != nil {
 		fatalExit("cannot initialize logger", err)
 	}
+
+	if pluginsocket, err = initExternalPlugins(&agent.Options); err != nil {
+		fatalExit("cannot register plugins", err)
+	}
+	defer cleanUpExternal()
 
 	if argTest || argPrint {
 		var level int
@@ -323,16 +359,16 @@ func main() {
 		} else {
 			level = log.None
 		}
-		if err := log.Open(log.Console, level, "", 0); err != nil {
+		if err = log.Open(log.Console, level, "", 0); err != nil {
 			fatalExit("cannot initialize logger", err)
 		}
 
-		if err := keyaccess.LoadRules(agent.Options.AllowKey, agent.Options.DenyKey); err != nil {
+		if err = keyaccess.LoadRules(agent.Options.AllowKey, agent.Options.DenyKey); err != nil {
 			fatalExit("failed to load key access rules", err)
 		}
 
-		var err error
-		if err = agent.InitUserParameterPlugin(agent.Options.UserParameter, agent.Options.UnsafeUserParameters); err != nil {
+		if _, err = agent.InitUserParameterPlugin(agent.Options.UserParameter, agent.Options.UnsafeUserParameters,
+			agent.Options.UserParameterDir); err != nil {
 			fatalExit("cannot initialize user parameters", err)
 		}
 
@@ -340,11 +376,23 @@ func main() {
 		if m, err = scheduler.NewManager(&agent.Options); err != nil {
 			fatalExit("cannot create scheduling manager", err)
 		}
+
 		m.Start()
 
 		if err = configUpdateItemParameters(m, &agent.Options); err != nil {
 			fatalExit("cannot process configuration", err)
 		}
+		hostnames, err := agent.ValidateHostnames(agent.Options.Hostname)
+		if err != nil {
+			fatalExit("cannot parse the \"Hostname\" parameter", err)
+		}
+		agent.FirstHostname = hostnames[0]
+
+		if err = configUpdateItemParameters(m, &agent.Options); err != nil {
+			fatalExit("cannot process configuration", err)
+		}
+
+		agent.SetPerformTask(scheduler.Scheduler(m).PerformTask)
 
 		if argTest {
 			checkMetric(m, testFlag)
@@ -353,7 +401,11 @@ func main() {
 		}
 
 		m.Stop()
+
 		monitor.Wait(monitor.Scheduler)
+
+		cleanUpExternal()
+
 		os.Exit(0)
 	}
 
@@ -400,13 +452,13 @@ func main() {
 		logLevel = log.Trace
 	}
 
-	if err := log.Open(logType, logLevel, agent.Options.LogFile, agent.Options.LogFileSize); err != nil {
+	if err = log.Open(logType, logLevel, agent.Options.LogFile, agent.Options.LogFileSize); err != nil {
 		fatalExit("cannot initialize logger", err)
 	}
 
 	zbxlib.SetLogLevel(logLevel)
 
-	greeting := fmt.Sprintf("Starting Zabbix Agent 2 [%s]. (%s)", agent.Options.Hostname, version.Long())
+	greeting := fmt.Sprintf("Starting Zabbix Agent 2 (%s)", version.Long())
 	log.Infof(greeting)
 
 	addresses, err := serverconnector.ParseServerActive()
@@ -414,15 +466,11 @@ func main() {
 		fatalExit("cannot parse the \"ServerActive\" parameter", err)
 	}
 
-	if err = resultcache.Prepare(&agent.Options, addresses); err != nil {
-		fatalExit("cannot prepare result cache", err)
-	}
-
 	if tlsConfig, err := agent.GetTLSConfig(&agent.Options); err != nil {
 		fatalExit("cannot use encryption configuration", err)
 	} else {
 		if tlsConfig != nil {
-			if err := tls.Init(tlsConfig); err != nil {
+			if err = tls.Init(tlsConfig); err != nil {
 				fatalExit("cannot configure encryption", err)
 			}
 		}
@@ -435,12 +483,13 @@ func main() {
 
 	log.Infof("using configuration file: %s", confFlag)
 
-	if err := keyaccess.LoadRules(agent.Options.AllowKey, agent.Options.DenyKey); err != nil {
-		log.Errf("Failed to load key access rules: %s", err.Error())
+	if err = keyaccess.LoadRules(agent.Options.AllowKey, agent.Options.DenyKey); err != nil {
+		fatalExit("Failed to load key access rules", err)
 		os.Exit(1)
 	}
 
-	if err = agent.InitUserParameterPlugin(agent.Options.UserParameter, agent.Options.UnsafeUserParameters); err != nil {
+	if _, err = agent.InitUserParameterPlugin(agent.Options.UserParameter, agent.Options.UnsafeUserParameters,
+		agent.Options.UserParameterDir); err != nil {
 		fatalExit("cannot initialize user parameters", err)
 	}
 
@@ -467,7 +516,6 @@ func main() {
 		if agent.Options.LogType != "console" {
 			fmt.Println(greeting)
 		}
-		fmt.Println("Press Ctrl+C to exit.")
 	}
 
 	manager.Start()
@@ -476,14 +524,37 @@ func main() {
 		fatalExit("cannot process configuration", err)
 	}
 
-	serverConnectors = make([]*serverconnector.Connector, len(addresses))
-
-	for i := 0; i < len(serverConnectors); i++ {
-		if serverConnectors[i], err = serverconnector.New(manager, addresses[i], &agent.Options); err != nil {
-			fatalExit("cannot create server connector", err)
-		}
-		serverConnectors[i].Start()
+	hostnames, err := agent.ValidateHostnames(agent.Options.Hostname)
+	if err != nil {
+		fatalExit("cannot parse the \"Hostname\" parameter", err)
 	}
+	agent.FirstHostname = hostnames[0]
+	hostmessage := fmt.Sprintf("Zabbix Agent2 hostname: [%s]", agent.Options.Hostname)
+	log.Infof(hostmessage)
+	if foregroundFlag {
+		if agent.Options.LogType != "console" {
+			fmt.Println(hostmessage)
+		}
+		fmt.Println("Press Ctrl+C to exit.")
+	}
+	if err = resultcache.Prepare(&agent.Options, addresses, hostnames); err != nil {
+		fatalExit("cannot prepare result cache", err)
+	}
+
+	serverConnectors = make([]*serverconnector.Connector, len(addresses)*len(hostnames))
+
+	var idx int
+	for i := 0; i < len(addresses); i++ {
+		for j := 0; j < len(hostnames); j++ {
+			if serverConnectors[idx], err = serverconnector.New(manager, addresses[i], hostnames[j], &agent.Options); err != nil {
+				fatalExit("cannot create server connector", err)
+			}
+			serverConnectors[idx].Start()
+			agent.SetHostname(serverConnectors[idx].ClientID(), hostnames[j])
+			idx++
+		}
+	}
+	agent.SetPerformTask(manager.PerformTask)
 
 	for _, listener := range listeners {
 		if err = listener.Start(); err != nil {
@@ -516,6 +587,7 @@ func main() {
 	monitor.Wait(monitor.Input)
 
 	manager.Stop()
+
 	monitor.Wait(monitor.Scheduler)
 
 	// split shutdown in two steps to ensure that result cache is still running while manager is
@@ -531,11 +603,17 @@ func main() {
 	if foregroundFlag && agent.Options.LogType != "console" {
 		fmt.Println(farewell)
 	}
+
 	waitServiceClose()
 }
 
 func fatalExit(message string, err error) {
 	fatalCloseOSItems()
+
+	if pluginsocket != "" {
+		cleanUpExternal()
+	}
+
 	if len(message) == 0 {
 		message = err.Error()
 	} else {

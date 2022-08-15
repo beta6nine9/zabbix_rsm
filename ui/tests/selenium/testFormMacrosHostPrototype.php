@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -51,6 +51,15 @@ class testFormMacrosHostPrototype extends testFormMacros {
 	 * @var integer
 	 */
 	protected static $host_prototoypeid_remove_inherited;
+
+	public $vault_object = 'host prototype';
+	public $vault_error_field = '/1/macros/6/value';
+	public $update_vault_macro = '{$VAULT_HOST_MACRO3_CHANGED}';
+	public $vault_macro_index = 0;
+
+	public $revert_macro_1 = '{$Z_HOST_PROTOTYPE_MACRO_REVERT}';
+	public $revert_macro_2 = '{$Z_HOST_PROTOTYPE_MACRO_2_TEXT_REVERT}';
+	public $revert_macro_object = 'host';
 
 	/**
 	 * @dataProvider getCreateMacrosData
@@ -129,7 +138,7 @@ class testFormMacrosHostPrototype extends testFormMacros {
 	 * @onBeforeOnce prepareHostPrototypeRemoveMacrosData
 	 */
 	public function testFormMacrosHostPrototype_RemoveInheritedMacro($data) {
-		$this->checkRemoveInheritedMacros($data, self::$host_prototoypeid_remove_inherited, 'host prototype',
+		$this->checkRemoveInheritedMacros($data, 'host prototype', self::$host_prototoypeid_remove_inherited,
 				self::IS_PROTOTYPE, self::LLD_ID);
 	}
 
@@ -180,7 +189,9 @@ class testFormMacrosHostPrototype extends testFormMacros {
 	 * @dataProvider getCreateSecretMacrosData
 	 */
 	public function testFormMacrosHostPrototype_CreateSecretMacros($data) {
-		$this->createSecretMacros($data, 'host_prototypes.php?form=update&parent_discoveryid=90001&hostid=99205', 'hostPrototype');
+		$this->createSecretMacros($data, 'host_prototypes.php?form=update&context=host&parent_discoveryid=90001&hostid=99205',
+				'host-prototype'
+		);
 	}
 
 	public function getUpdateSecretMacrosData() {
@@ -224,35 +235,27 @@ class testFormMacrosHostPrototype extends testFormMacros {
 	 * @dataProvider getUpdateSecretMacrosData
 	 */
 	public function testFormMacrosHostPrototype_UpdateSecretMacros($data) {
-		$this->updateSecretMacros($data, 'host_prototypes.php?form=update&parent_discoveryid=90001&hostid=99206', 'hostPrototype');
-	}
-
-	public function getRevertSecretMacrosData() {
-		return [
-			[
-				[
-					'macro_fields' => [
-						'macro' => '{$Z_HOST_PROTOTYPE_MACRO_REVERT}',
-						'value' => 'Secret host value'
-					]
-				]
-			],
-			[
-				[
-					'macro_fields' => [
-						'macro' => '{$Z_HOST_PROTOTYPE_MACRO_2_TEXT_REVERT}',
-						'value' => 'Secret host value 2'
-					],
-					'set_to_text' => true
-				]
-			]
-		];
+		$this->updateSecretMacros($data, 'host_prototypes.php?form=update&context=host&parent_discoveryid=90001&hostid=99206', 'host-prototype');
 	}
 
 	/**
 	 * @dataProvider getRevertSecretMacrosData
 	 */
 	public function testFormMacrosHostPrototype_RevertSecretMacroChanges($data) {
-		$this->revertSecretMacroChanges($data, 'host_prototypes.php?form=update&parent_discoveryid=90001&hostid=99206', 'hostPrototype');
+		$this->revertSecretMacroChanges($data, 'host_prototypes.php?form=update&context=host&parent_discoveryid=90001&hostid=99206', 'host-prototype');
+	}
+
+	/**
+	 * @dataProvider getCreateVaultMacrosData
+	 */
+	public function testFormMacrosHostPrototype_CreateVaultMacros($data) {
+		$this->createVaultMacros($data, 'host_prototypes.php?form=update&context=host&parent_discoveryid=90001&hostid=99205', 'host-prototype');
+	}
+
+	/**
+	 * @dataProvider getUpdateVaultMacrosData
+	 */
+	public function testFormMacrosHostPrototype_UpdateVaultMacros($data) {
+		$this->updateVaultMacros($data, 'host_prototypes.php?form=update&context=host&parent_discoveryid=90003&hostid=90008', 'host-prototype');
 	}
 }

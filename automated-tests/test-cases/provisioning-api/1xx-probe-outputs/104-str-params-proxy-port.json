@@ -1,0 +1,9 @@
+{
+    "resultCode": 400,
+    "title": "The \"proxyPort\" element must be a positive integer",
+    "description": null,
+    "details": {
+        "centralServer": 1
+    },
+    "updatedObject": null
+}

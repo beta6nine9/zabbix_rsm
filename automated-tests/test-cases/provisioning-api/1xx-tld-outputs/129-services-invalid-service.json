@@ -1,0 +1,9 @@
+{
+    "resultCode": 400,
+    "title": "Service is not supported",
+    "description": null,
+    "details": {
+        "centralServer": 1
+    },
+    "updatedObject": null
+}

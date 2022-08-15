@@ -27,7 +27,7 @@ use constant DEFAULT_INCIDENT_MEASUREMENTS_LIMIT => 3600;	# seconds, maximum per
 # We must wait for the maximum period when Service Availability and Rolling Week
 # values are calculated, sent to the server and saved in the database. Here we
 # specify the minimum age of latest cycle we are able to process.
-use constant LATEST_CYCLE_AGE	=> 240;	# seconds (must be divisible by 60)
+use constant SLV_VALUES_AVAILABLE	=> 240;	# seconds (must be divisible by 60)
 
 parse_opts(
 	'tld=s',
@@ -83,9 +83,11 @@ if (defined($opt_from))
 	dbg("option \"from\" truncated to the start of a minute: $opt_from") if ($opt_from != getopt('from'));
 }
 
+my $max_till = truncate_till(time() - SLV_VALUES_AVAILABLE);
+
 db_connect();
 my $monitoring_target = get_monitoring_target();
-my $rdap_is_standalone = is_rdap_standalone();
+my $rdap_is_standalone = is_rdap_standalone($max_till);
 db_disconnect();
 
 dbg("RDAP ", ($rdap_is_standalone ? "is" : "is NOT"), " standalone");
@@ -146,8 +148,6 @@ if (opt('ignore-file'))
 db_connect();
 my $cfg_avail_valuemaps = get_avail_valuemaps();
 db_disconnect();
-
-my $max_till = truncate_till(time() - LATEST_CYCLE_AGE);
 
 my ($check_from, $check_till, $continue_file);
 
@@ -256,7 +256,7 @@ foreach my $service (keys(%services))
 	$services{$service}{'delay'} = get_rdap_delay() if ($service eq 'rdap');
 	$services{$service}{'delay'} = get_epp_delay()  if ($service eq 'epp');
 
-	$services{$service}{'avail_key'} = "rsm.slv.$service.avail";
+	$services{$service}{'avail_key'}    = "rsm.slv.$service.avail";
 	$services{$service}{'rollweek_key'} = "rsm.slv.$service.rollweek";
 
 	dbg("$service delay: ", $services{$service}{'delay'});
@@ -269,10 +269,17 @@ if (opt('print-period'))
 {
 	foreach my $service (sort(keys(%services)))
 	{
-		next if (!defined($services{$service}{'from'}));
-		info(sprintf("selected %6s period: %s",
-				$service,
-				selected_period($services{$service}{'from'}, $services{$service}{'till'})));
+		if (!defined($services{$service}{'from'}))
+		{
+			info(sprintf("selected %6s period: -",
+					$service));
+		}
+		else
+		{
+			info(sprintf("selected %6s period: %s",
+					$service,
+					selected_period($services{$service}{'from'}, $services{$service}{'till'})));
+		}
 	}
 }
 else
@@ -335,10 +342,8 @@ $fm->run_on_finish(
 );
 
 # go through all the databases
-foreach (@server_keys)
+foreach my $server_key (@server_keys)
 {
-	$server_key = $_;
-
 	dbg("getting probe statuses for period:", selected_period($from, $till));
 
 	db_connect($server_key);
@@ -444,9 +449,13 @@ foreach (@server_keys)
 			my $state_file_exists;
 			my $json_state_ref;
 
-			# for services that we do not process at this time
-			# (e. g. RDDS) keep their current state
-			if (ah_read_state(AH_SLA_API_VERSION_1, $tld, \$json_state_ref) != AH_SUCCESS)
+			# for services that are not processed every minute
+			# (e. g. RDDS, RDAP) current state should not be overwritten
+			if (ah_read_state(AH_SLA_API_VERSION_CURRENT, $tld, \$json_state_ref) == AH_SUCCESS)
+			{
+				$state_file_exists = 1;
+			}
+			else
 			{
 				# if there is no state file we need to consider full
 				# cycle for each of the services to get correct states
@@ -464,16 +473,12 @@ foreach (@server_keys)
 
 				$json_state_ref->{'testedServices'} = {};
 			}
-			else
-			{
-				$state_file_exists = 1;
-			}
 
 			# find out which services are disabled, for others get lastclock
 			foreach my $service (keys(%services))
 			{
-				my $service_from = $services{$service}{'from'};
-				my $service_till = $services{$service}{'till'};
+				my $incidents_from = $services{$service}{'from'};
+				my $incidents_till = $services{$service}{'till'};
 
 				my $delay = $services{$service}{'delay'};
 
@@ -481,22 +486,22 @@ foreach (@server_keys)
 				my $rollweek_key = $services{$service}{'rollweek_key'};
 
 				# not the right time for this service/delay yet
-				if (!$service_from || !$service_till)
+				if (!$incidents_from || !$incidents_till)
 				{
 					next unless ($state_file_exists == 0);
 
 					dbg("$service: there is no state file, consider previous cycle");
 
 					# but since there is no state file we need to consider previous cycle
-					$service_from = cycle_start($till - $delay, $delay);
-					$service_till = cycle_end($till - $delay, $delay);
+					$incidents_from = cycle_start($till - $delay, $delay);
+					$incidents_till = cycle_end($till - $delay, $delay);
 				}
 
-				if (!tld_service_enabled($tld, $service, $service_till))
+				if (!tld_service_enabled($tld, $service, $max_till))
 				{
 					if (opt('dry-run'))
 					{
-						__prnt(uc($service), " DISABLED");
+						__prnt($server_key, uc($service), " DISABLED");
 					}
 					else
 					{
@@ -539,7 +544,7 @@ foreach (@server_keys)
 
 					if (opt('dry-run'))
 					{
-						__prnt(uc($service), " UP (configuration error)");
+						__prnt($server_key, uc($service), " UP (configuration error)");
 					}
 					else
 					{
@@ -580,7 +585,7 @@ foreach (@server_keys)
 
 					if (opt('dry-run'))
 					{
-						__prnt(uc($service), " UP (no rolling week data in the database)");
+						__prnt($server_key, uc($service), " UP (no rolling week data in the database)");
 					}
 					else
 					{
@@ -637,7 +642,7 @@ foreach (@server_keys)
 
 					if (opt('dry-run'))
 					{
-						__prnt(uc($service), " UP (configuration error)");
+						__prnt($server_key, uc($service), " UP (configuration error)");
 					}
 					else
 					{
@@ -691,7 +696,7 @@ foreach (@server_keys)
 
 					if (opt('dry-run'))
 					{
-						__prnt(uc($service), " UP (configuration error)");
+						__prnt($server_key, uc($service), " UP (configuration error)");
 					}
 					else
 					{
@@ -726,18 +731,18 @@ foreach (@server_keys)
 					next;
 				}
 
-				# we need down time in minutes, not percent, that's why we can't use "rsm.slv.$service.rollweek" value
-				my ($rollweek_from, $rollweek_till) = get_rollweek_bounds($delay, $service_till);
+				# besides weekly unavailability we need downtime
+				my ($rollweek_from, $rollweek_till) = get_rollweek_bounds($delay, $max_till);
 
 				my $rollweek_incidents = get_incidents($avail_itemid, $delay, $rollweek_from, $rollweek_till);
 
 				my $downtime = get_downtime($avail_itemid, $rollweek_from, $rollweek_till, 0, $rollweek_incidents, $delay);
 
-				__prnt(uc($service), " period: ", selected_period($service_from, $service_till)) if (opt('dry-run') or opt('debug'));
+				__prnt($server_key, uc($service), " period: ", selected_period($incidents_from, $incidents_till)) if (opt('dry-run') or opt('debug'));
 
 				if (opt('dry-run'))
 				{
-					__prnt(uc($service), " downtime: $downtime (", ts_str($lastclock), ")");
+					__prnt($server_key, uc($service), " downtime: $downtime (", ts_str($lastclock), ")");
 				}
 				else
 				{
@@ -768,7 +773,7 @@ foreach (@server_keys)
 				dbg("getting current $service service availability (delay:$delay)");
 
 				# get alarmed
-				my $incidents = get_incidents($avail_itemid, $delay, $service_from);
+				my $incidents = get_incidents($avail_itemid, $delay, $incidents_from);
 
 				my $alarmed_status;
 
@@ -784,7 +789,7 @@ foreach (@server_keys)
 
 				if (opt('dry-run'))
 				{
-					__prnt(uc($service), " alarmed:$alarmed_status");
+					__prnt($server_key, uc($service), " alarmed:$alarmed_status");
 				}
 				else
 				{
@@ -819,7 +824,7 @@ foreach (@server_keys)
 
 					if (opt('dry-run'))
 					{
-						__prnt(uc($service), " UP (no rolling week data in the database)");
+						__prnt($server_key, uc($service), " UP (no rolling week data in the database)");
 					}
 					else
 					{
@@ -854,18 +859,19 @@ foreach (@server_keys)
 					next;
 				}
 
-				my $latest_avail_select = db_select(
+				my $rows = db_select(
 						"select value from history_uint" .
 							" where itemid=$avail_itemid" .
-							" and clock<=$service_till" .
-						" order by clock desc limit 1");
+							" and clock<=$max_till" .
+						" order by clock desc" .
+						" limit 1");
 
-				my $latest_avail_value = scalar(@{$latest_avail_select}) == 0 ?
-						UP_INCONCLUSIVE_NO_DATA : $latest_avail_select->[0]->[0];
+				my $service_availability = scalar(@{$rows}) == 0 ?
+						UP_INCONCLUSIVE_NO_DATA : $rows->[0]->[0];
 
 				if (opt('dry-run'))
 				{
-					unless (exists($cfg_avail_valuemaps->{int($latest_avail_value)}))
+					unless (exists($cfg_avail_valuemaps->{int($service_availability)}))
 					{
 						my $expected_list;
 
@@ -883,17 +889,17 @@ foreach (@server_keys)
 							$expected_list .= "$status ($description)";
 						}
 
-						wrn("unknown availability result: $latest_avail_value (expected $expected_list)");
+						wrn("unknown availability result: $service_availability (expected $expected_list)");
 					}
 				}
 
 				$json_state_ref->{'testedServices'}->{uc($service)} = {
-					'status' => get_result_string($cfg_avail_valuemaps, $latest_avail_value),
+					'status' => get_result_string($cfg_avail_valuemaps, $service_availability),
 					'emergencyThreshold' => $rollweek,
 					'incidents' => []
 				};
 
-				foreach my $incident (@{get_incidents($avail_itemid, $delay, $service_from, $service_till)})
+				foreach my $incident (@{get_incidents($avail_itemid, $delay, $incidents_from, $incidents_till)})
 				{
 					my $eventid = $incident->{'eventid'};
 					my $event_start = $incident->{'start'};
@@ -901,12 +907,12 @@ foreach (@server_keys)
 					my $false_positive = $incident->{'false_positive'};
 					my $event_clock = $incident->{'event_clock'};
 
-					my $start = (defined($service_from) && ($service_from > $event_start) ?
-							$service_from : $event_start);
+					my $start = (defined($incidents_from) && ($incidents_from > $event_start) ?
+							$incidents_from : $event_start);
 
 					if (opt('dry-run'))
 					{
-						__prnt(uc($service), " incident id:$eventid start:", ts_str($event_start), " end:" . ($event_end ? ts_str($event_end) : "ACTIVE") . " fp:$false_positive");
+						__prnt($server_key, uc($service), " incident id:$eventid start:", ts_str($event_start), " end:" . ($event_end ? ts_str($event_end) : "ACTIVE") . " fp:$false_positive");
 					}
 					else
 					{
@@ -945,11 +951,11 @@ foreach (@server_keys)
 					# Check if we have missing measurement files for processed incident.
 					# Don't go back further than $incident_measurements_limit.
 
-					my $limit = cycle_start($service_from - $incident_measurements_limit, $delay);
+					my $limit = cycle_start($incidents_from - $incident_measurements_limit, $delay);
 
 					my $clock = ($event_start > $limit ? $event_start : $limit);
 
-					while ($clock < ($event_end // $service_till))
+					while ($clock < ($event_end // $incidents_till))
 					{
 						# wait for 30 seconds at most until measurement file appears
 						my $max_wait = time() + 30;
@@ -1091,14 +1097,13 @@ foreach (@server_keys)
 
 	if (!opt('dry-run') && !opt('tld'))
 	{
-		__update_false_positives();
+		__update_false_positives($server_key);
 	}
 
 	db_disconnect();
 
 	last if (opt('tld'));
 } # foreach (@server_keys)
-undef($server_key);
 
 WAIT_CHILDREN:
 
@@ -1162,8 +1167,8 @@ sub __wait_all_children_cb
 
 sub __prnt
 {
-	my $server_str = ($server_key ? "\@$server_key " : "");
-	print($server_str, (defined($tld) ? "$tld: " : ''), join('', @_), "\n");
+	my $server_key = shift;
+	print("\@$server_key ", (defined($tld) ? "$tld: " : ''), join('', @_), "\n");
 }
 
 sub __tld_ignored
@@ -1177,56 +1182,45 @@ sub __tld_ignored
 
 sub __update_false_positives
 {
-	my $last_audit = ah_get_last_audit($server_key);
+	my $server_key = shift;
 
-	# now check for possible false_positive change in front-end
-	my $maxclock = 0;
-
-	# should we update false positiveness later? (incident state file does not exist yet)
+	# should we update false positiveness later?
+	# we need to update 2 files but incident state file may not exist yet, in that case we will do it later
 	my $later = 0;
-	# select resourceid,note,clock from auditlog where resourcetype=32 and clock>0 order by clock;
-	my $rows_ref = db_select(
-		"select resourceid,note,clock".
-		" from auditlog".
-		" where resourcetype=".AUDIT_RESOURCE_INCIDENT.
-			" and clock>$last_audit".
-		" order by clock");
 
-	foreach my $row_ref (@$rows_ref)
+	# get last rsm_false_positiveid
+	my $last_rsm_false_positiveid = ah_get_last_false_positiveid($server_key);
+
+	dbg("last_rsm_false_positiveid = $last_rsm_false_positiveid");
+
+	# get list of events.eventid (incidents) that changed their "false positive" state
+	my @eventids = fp_get_updated_eventids(\$last_rsm_false_positiveid);
+
+	foreach my $eventid (@eventids)
 	{
-		my $eventid = $row_ref->[0];
-		my $note = $row_ref->[1];
-		my $clock = $row_ref->[2];
+		my $row = db_select_row(
+			"select clock,status" .
+			" from rsm_false_positive" .
+			" where eventid=$eventid" .
+			" order by rsm_false_positiveid desc" .
+			" limit 1"
+		);
 
-		if ($eventid == 0)
-		{
-			$eventid = $note;
-			$eventid =~ s/^([0-9]+): .*/$1/;
-		}
+		my ($clock, $status) = @{$row};
 
-		$maxclock = $clock if ($clock > $maxclock);
+		$row = db_select_row("select objectid,clock from events where eventid=$eventid");
 
-		my $rows_ref2 = db_select("select objectid,clock,false_positive from events where eventid=$eventid");
-
-		if (scalar(@$rows_ref2) != 1)
-		{
-			wrn("looks like event ID $eventid found in auditlog does not exist any more");
-			next;
-		}
-
-		my $triggerid = $rows_ref2->[0]->[0];
-		my $event_clock = $rows_ref2->[0]->[1];
-		my $false_positive = $rows_ref2->[0]->[2];
+		my ($triggerid, $event_clock) = @{$row};
 
 		my ($tld, $service) = get_tld_by_trigger($triggerid);
 
 		if (!$tld)
 		{
-			dbg("looks like trigger ID $triggerid found in auditlog does not exist any more");
+			dbg("looks like TLD with trigger ID $triggerid does not exist any more");
 			next;
 		}
 
-		dbg("auditlog: service:$service eventid:$eventid start:[".ts_str($event_clock)."] changed:[".ts_str($clock)."] false_positive:$false_positive");
+		dbg("service:$service eventid:$eventid start:[".ts_str($event_clock)."] changed:[".ts_str($clock)."] false_positive:$status");
 
 		my $ah_tld = ah_get_api_tld($tld);
 
@@ -1236,17 +1230,18 @@ sub __update_false_positives
 				$service,
 				$eventid,
 				$event_clock,
-				$false_positive,
+				$status,
 				$clock,
 				\$later) == AH_SUCCESS)
 		{
 			if ($later == 1)
 			{
 				wrn(ah_get_error());
+				last;
 			}
 			else
 			{
-				fail("cannot update false_positive state: ", ah_get_error());
+				fail("cannot update false_positive status: ", ah_get_error());
 			}
 		}
 
@@ -1258,17 +1253,18 @@ sub __update_false_positives
 					$service,
 					$eventid,
 					$event_clock,
-					$false_positive,
+					$status,
 					$clock,
 					\$later) == AH_SUCCESS)
 			{
 				if ($later == 1)
 				{
 					wrn(ah_get_error());
+					last;
 				}
 				else
 				{
-					fail("cannot update false_positive state: ", ah_get_error());
+					fail("cannot update false_positive status: ", ah_get_error());
 				}
 			}
 		}
@@ -1277,9 +1273,9 @@ sub __update_false_positives
 	# If the "later" flag is non-zero it means the incident for which we would like to change
 	# false positiveness was not processed yet and there is no incident state file. We cannot
 	# modify falsePositive file without making sure incident state file is also updated.
-	if ($maxclock != 0 && $later == 0)
+	if ($later == 0)
 	{
-		ah_save_audit($server_key, $maxclock);
+		ah_save_last_false_positiveid($server_key, $last_rsm_false_positiveid);
 	}
 }
 
@@ -1312,9 +1308,8 @@ sub __get_config_minclock
 {
 	my $minclock;
 
-	foreach (@server_keys)
+	foreach my $server_key (@server_keys)
 	{
-		$server_key = $_;
 		db_connect($server_key);
 
 		my $rows_ref = db_select(
@@ -1334,7 +1329,6 @@ sub __get_config_minclock
 		$minclock = $newclock if (!defined($minclock) || $newclock < $minclock);
 		db_disconnect();
 	}
-	undef($server_key);
 
 	return undef if (!defined($minclock));
 

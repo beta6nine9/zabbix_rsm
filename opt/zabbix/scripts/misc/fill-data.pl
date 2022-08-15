@@ -156,10 +156,8 @@ my $tld_start_time;
 my $prev_tld = "";	# see if we did anything
 my $prev_host = "";
 
-foreach (@server_keys)
+foreach my $server_key (@server_keys)
 {
-	$server_key = $_;
-
 	db_connect($server_key);
 
 	text_print("collecting $server_key itemids...");

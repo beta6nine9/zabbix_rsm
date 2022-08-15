@@ -1,0 +1,7 @@
+{
+    "resultCode": 400,
+    "title": "A valid DNS label was not provided in the TLD field in the URL",
+    "description": null,
+    "details": null,
+    "updatedObject": null
+}

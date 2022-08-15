@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -29,23 +29,46 @@ class CWidgetHelper {
 	public static function createForm() {
 		return (new CForm('post'))
 			->cleanItems()
-			->setId('widget_dialogue_form')
+			->setId('widget-dialogue-form')
 			->setName('widget_dialogue_form');
 	}
 
 	/**
 	 * Create CFormList for widget configuration form with default fields in it.
 	 *
-	 * @param string $dialogue_name
-	 * @param string $type
-	 * @param int $view_mode (ZBX_WIDGET_VIEW_MODE_NORMAL|ZBX_WIDGET_VIEW_MODE_HIDDEN_HEADER)
-	 * @param array $known_widget_types
-	 * @param CWidgetFieldSelect $field_rf_rate
+	 * @param string  $name
+	 * @param string  $type
+	 * @param int     $view_mode  ZBX_WIDGET_VIEW_MODE_NORMAL | ZBX_WIDGET_VIEW_MODE_HIDDEN_HEADER
+	 * @param array   $known_widget_types
+	 * @param CWidgetFieldSelect|null  $field_rf_rate
 	 *
 	 * @return CFormList
 	 */
-	public static function createFormList($dialogue_name, $type, $view_mode, $known_widget_types, $field_rf_rate) {
-		return (new CFormList())
+	public static function createFormList($name, $type, $view_mode, $known_widget_types, $field_rf_rate) {
+		$deprecated_types = array_intersect_key(
+			$known_widget_types,
+			array_flip(CWidgetConfig::DEPRECATED_WIDGETS)
+		);
+		$known_widget_types = array_diff_key($known_widget_types, $deprecated_types);
+		$types_select = (new CSelect('type'))
+			->setFocusableElementId('label-type')
+			->setId('type')
+			->setValue($type)
+			->setAttribute('autofocus', 'autofocus')
+			->addOptions(CSelect::createOptionsFromArray($known_widget_types));
+
+		if ($deprecated_types) {
+			$types_select->addOptionGroup(
+				(new CSelectOptionGroup(_('Deprecated')))->addOptions(
+					CSelect::createOptionsFromArray($deprecated_types)
+			));
+		}
+
+		if (array_key_exists($type, $deprecated_types)) {
+			$types_select = [$types_select, ' ', makeWarningIcon(_('Widget is deprecated.'))];
+		}
+
+		$form_list = (new CFormList())
 			->addItem((new CListItem([
 					(new CDiv(new CLabel(_('Type'), 'label-type')))->addClass(ZBX_STYLE_TABLE_FORMS_TD_LEFT),
 					(new CDiv([
@@ -55,28 +78,21 @@ class CWidgetHelper {
 							->setId('show_header')
 							->setChecked($view_mode == ZBX_WIDGET_VIEW_MODE_NORMAL)
 						))->addClass(ZBX_STYLE_TABLE_FORMS_SECOND_COLUMN),
-						(new CSelect('type'))
-							->setFocusableElementId('label-type')
-							->setId('type')
-							->setValue($type)
-							->setAttribute('autofocus', 'autofocus')
-							->addOptions(CSelect::createOptionsFromArray($known_widget_types))
+						$types_select
 					]))->addClass(ZBX_STYLE_TABLE_FORMS_TD_RIGHT)
-				]))
-				->addClass('table-forms-row-with-second-field')
+				]))->addClass('table-forms-row-with-second-field')
 			)
 			->addRow(_('Name'),
-				(new CTextBox('name', $dialogue_name))
+				(new CTextBox('name', $name))
 					->setAttribute('placeholder', _('default'))
 					->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
 			)
-			->addRow(self::getLabel($field_rf_rate), self::getSelect($field_rf_rate))
 			->addItem(
 				(new CScriptTag('
-					$("z-select#type").on("change", updateWidgetConfigDialogue);
+					$("z-select#type").on("change", () => ZABBIX.Dashboard.reloadWidgetProperties());
 
 					document
-						.getElementById("widget_dialogue_form")
+						.getElementById("widget-dialogue-form")
 						.addEventListener("change", (e) => {
 							const is_trimmable = e.target.matches(
 								\'input[type="text"]:not([data-no-trim="1"]), textarea:not([data-no-trim="1"])\'
@@ -88,6 +104,12 @@ class CWidgetHelper {
 						}, {capture: true});
 				'))->setOnDocumentReady()
 			);
+
+		if ($field_rf_rate !== null) {
+			$form_list->addRow(self::getLabel($field_rf_rate), self::getSelect($field_rf_rate));
+		}
+
+		return $form_list;
 	}
 
 	/**
@@ -107,17 +129,25 @@ class CWidgetHelper {
 	 * Creates label linked to the field.
 	 *
 	 * @param CWidgetField $field
+	 * @param string       $class	Custom CSS class for label.
+	 * @param mixed        $hint	Hint box text.
 	 *
 	 * @return CLabel
 	 */
-	public static function getLabel($field) {
+	public static function getLabel($field, $class = null, $hint = null) {
 		if ($field instanceof CWidgetFieldSelect) {
 			return (new CLabel($field->getLabel(), 'label-'.$field->getName()))
-				->setAsteriskMark(self::isAriaRequired($field));
+				->setAsteriskMark(self::isAriaRequired($field))
+				->addClass($class);
 		}
 
-		return (new CLabel($field->getLabel(), $field->getName()))
-			->setAsteriskMark(self::isAriaRequired($field));
+		$help_icon = ($hint !== null)
+			? makeHelpIcon($hint)
+			: null;
+
+		return (new CLabel([$field->getLabel(), $help_icon], $field->getName()))
+			->setAsteriskMark(self::isAriaRequired($field))
+			->addClass($class);
 	}
 
 	/**
@@ -136,6 +166,18 @@ class CWidgetHelper {
 	}
 
 	/**
+	 * @param CWidgetFieldTextArea $field
+	 *
+	 * @return CTextBox
+	 */
+	public static function getTextArea($field) {
+		return (new CTextArea($field->getName(), $field->getValue()))
+			->setAriaRequired(self::isAriaRequired($field))
+			->setEnabled(!($field->getFlags() & CWidgetField::FLAG_DISABLED))
+			->setAdaptiveWidth($field->getWidth());
+	}
+
+	/**
 	 * @param CWidgetFieldTextBox $field
 	 *
 	 * @return CTextBox
@@ -144,6 +186,17 @@ class CWidgetHelper {
 		return (new CTextBox($field->getName(), $field->getValue()))
 			->setAriaRequired(self::isAriaRequired($field))
 			->setEnabled(!($field->getFlags() & CWidgetField::FLAG_DISABLED))
+			->setAttribute('placeholder', $field->getPlaceholder())
+			->setWidth($field->getWidth());
+	}
+
+	/**
+	 * @param CWidgetFieldLatLng $field
+	 *
+	 * @return CTextBox
+	 */
+	public static function getLatLngZoomBox($field) {
+		return (new CTextBox($field->getName(), $field->getValue()))
 			->setAttribute('placeholder', $field->getPlaceholder())
 			->setWidth($field->getWidth());
 	}
@@ -212,6 +265,21 @@ class CWidgetHelper {
 			->setLabel($field->getCaption())
 			->onChange($field->getAction())
 		];
+	}
+
+	/**
+	 * @param CWidgetFieldColor $field
+	 * @param bool              $use_default  Tell the Color picker whether to use Default color feature or not.
+	 *
+	 * @return CColor
+	 */
+	public static function getColor($field, $use_default = false) {
+		// appendColorPickerJs(false), because the script responsible for it is in widget.item.form.view.
+		$color_picker = (new CColor($field->getName(), $field->getValue()))->appendColorPickerJs(false);
+		if ($use_default) {
+			$color_picker->enableUseDefault();
+		}
+		return $color_picker;
 	}
 
 	/**
@@ -308,7 +376,6 @@ class CWidgetHelper {
 		return self::getMultiselectField($field, $captions, $form_name, 'items', [
 			'srctbl' => 'items',
 			'srcfld1' => 'itemid',
-			'real_hosts' => true,
 			'webitems' => true
 		] + $field->getFilterParameters());
 	}
@@ -325,7 +392,6 @@ class CWidgetHelper {
 			'srctbl' => 'graphs',
 			'srcfld1' => 'graphid',
 			'srcfld2' => 'name',
-			'real_hosts' => true,
 			'with_graphs' => true
 		] + $field->getFilterParameters());
 	}
@@ -340,8 +406,7 @@ class CWidgetHelper {
 	public static function getItemPrototype($field, $captions, $form_name) {
 		return self::getMultiselectField($field, $captions, $form_name, 'item_prototypes', [
 			'srctbl' => 'item_prototypes',
-			'srcfld1' => 'itemid',
-			'real_hosts' => true
+			'srcfld1' => 'itemid'
 		] + $field->getFilterParameters());
 	}
 
@@ -357,9 +422,42 @@ class CWidgetHelper {
 			'srctbl' => 'graph_prototypes',
 			'srcfld1' => 'graphid',
 			'srcfld2' => 'name',
-			'real_hosts' => true,
 			'with_graph_prototypes' => true
 		] + $field->getFilterParameters());
+	}
+
+	/**
+	 * @param CWidgetFieldMsService $field
+	 * @param array $captions
+	 * @param string $form_name
+	 *
+	 * @return CMultiSelect
+	 */
+	public static function getService($field, $captions, $form_name) {
+		return (new CMultiSelect([
+			'name' => $field->getName().($field->isMultiple() ? '[]' : ''),
+			'object_name' => 'services',
+			'multiple' => $field->isMultiple(),
+			'data' => $captions,
+			'custom_select' => true,
+			'add_post_js' => false
+		]))
+			->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
+			->setAriaRequired(self::isAriaRequired($field));
+	}
+
+	/**
+	 * @param CWidgetFieldMsSla $field
+	 * @param array $captions
+	 * @param string $form_name
+	 *
+	 * @return CMultiSelect
+	 */
+	public static function getSla($field, $captions, $form_name) {
+		return self::getMultiselectField($field, $captions, $form_name, 'sla', [
+				'srctbl' => 'sla',
+				'srcfld1' => 'slaid'
+			] + $field->getFilterParameters());
 	}
 
 	public static function getSelectResource($field, $caption, $form_name) {
@@ -370,8 +468,9 @@ class CWidgetHelper {
 			(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
 			(new CButton('select', _('Select')))
 				->addClass(ZBX_STYLE_BTN_GREY)
-				->onClick('return PopUp("popup.generic",'.
-					json_encode($field->getPopupOptions($form_name)).', null, this);')
+				->onClick('return PopUp("popup.generic", '.json_encode($field->getPopupOptions($form_name)).',
+					{dialogue_class: "modal-popup-generic"}
+				);')
 		];
 	}
 
@@ -395,8 +494,10 @@ class CWidgetHelper {
 	 *
 	 * @return CNumericBox
 	 */
-	public static function getIntegerBox($field) {
-		return (new CNumericBox($field->getName(), $field->getValue(), $field->getMaxLength()))
+	public static function getIntegerBox(CWidgetFieldIntegerBox $field): CNumericBox {
+		return (new CNumericBox($field->getName(), $field->getValue(), $field->getMaxLength(), false,
+			($field->getFlags() & CWidgetField::FLAG_NOT_EMPTY) == 0
+		))
 			->setWidth(ZBX_TEXTAREA_NUMERIC_STANDARD_WIDTH)
 			->setAriaRequired(self::isAriaRequired($field));
 	}
@@ -447,12 +548,18 @@ class CWidgetHelper {
 
 	/**
 	 * @param CWidgetFieldCheckBoxList $field
-	 * @param array                    $list  Option list array.
+	 * @param array                    $list        Option list array.
+	 * @param array                    $class_list  List of additional CSS classes.
 	 *
 	 * @return CList
 	 */
-	public static function getCheckBoxList($field, array $list) {
+	public static function getCheckBoxList($field, array $list, array $class_list = []) {
 		$checkbox_list = (new CList())->addClass(ZBX_STYLE_LIST_CHECK_RADIO);
+		if ($class_list) {
+			foreach ($class_list as $class) {
+				$checkbox_list->addClass($class);
+			}
+		}
 
 		foreach ($list as $key => $label) {
 			$checkbox_list->addItem(
@@ -465,6 +572,69 @@ class CWidgetHelper {
 		}
 
 		return $checkbox_list;
+	}
+
+	/**
+	 * @param CWidgetFieldColumnsList $field  Widget columns field.
+	 *
+	 * @return CDiv
+	 */
+	public static function getWidgetColumns(CWidgetFieldColumnsList $field) {
+		$columns = $field->getValue();
+		$header = [
+			'',
+			(new CColHeader(_('Name')))->addStyle('width: 39%'),
+			(new CColHeader(_('Data')))->addStyle('width: 59%'),
+			_('Action')
+		];
+		$row_actions = [
+			(new CButton('edit', _('Edit')))
+				->addClass(ZBX_STYLE_BTN_LINK)
+				->removeId(),
+			(new CButton('remove', _('Remove')))
+				->addClass(ZBX_STYLE_BTN_LINK)
+				->removeId()
+		];
+		$table = (new CTable())
+			->setId('list_'.$field->getName())
+			->setHeader((new CRowHeader($header))->addClass($columns ? null : ZBX_STYLE_DISPLAY_NONE));
+		$enabled = !($field->getFlags() & CWidgetField::FLAG_DISABLED);
+
+		foreach ($columns as $column_index => $column) {
+			$column_data = [new CVar('sortorder['.$field->getName().'][]', $column_index)];
+
+			foreach ($column as $key => $value) {
+				$column_data[] = new CVar($field->getName().'['.$column_index.']['.$key.']', $value);
+			}
+
+			$label = array_key_exists('item', $column) ? $column['item'] : '';
+
+			if ($column['data'] == CWidgetFieldColumnsList::DATA_HOST_NAME) {
+				$label = new CTag('em', true, _('Host name'));
+			}
+			else if ($column['data'] == CWidgetFieldColumnsList::DATA_TEXT) {
+				$label = new CTag('em', true, $column['text']);
+			}
+
+			$table->addRow((new CRow([
+				(new CCol((new CDiv)->addClass(ZBX_STYLE_DRAG_ICON)))->addClass(ZBX_STYLE_TD_DRAG_ICON),
+				(new CDiv($column['name']))->addClass('text'),
+				(new CDiv($label))->addClass('text'),
+				(new CList(array_merge($row_actions, [$column_data])))->addClass(ZBX_STYLE_HOR_LIST)
+			]))->addClass('sortable'));
+		}
+
+		$table->addRow(
+			(new CCol(
+				(new CButton('add', _('Add')))
+					->addClass(ZBX_STYLE_BTN_LINK)
+					->setEnabled($enabled)
+			))->setColSpan(count($header))
+		);
+
+		return (new CDiv($table))
+			->addStyle('width: '.ZBX_TEXTAREA_STANDARD_WIDTH.'px')
+			->addClass(ZBX_STYLE_TABLE_FORMS_SEPARATOR);
 	}
 
 	/**
@@ -484,21 +654,35 @@ class CWidgetHelper {
 		$i = 0;
 
 		foreach ($tags as $tag) {
+			$zselect_operator = (new CSelect($field->getName().'['.$i.'][operator]'))
+				->addOptions(CSelect::createOptionsFromArray([
+					TAG_OPERATOR_EXISTS => _('Exists'),
+					TAG_OPERATOR_EQUAL => _('Equals'),
+					TAG_OPERATOR_LIKE => _('Contains'),
+					TAG_OPERATOR_NOT_EXISTS => _('Does not exist'),
+					TAG_OPERATOR_NOT_EQUAL => _('Does not equal'),
+					TAG_OPERATOR_NOT_LIKE => _('Does not contain')
+				]))
+				->setValue($tag['operator'])
+				->setFocusableElementId($field->getName().'-'.$i.'-operator-select')
+				->setId($field->getName().'_'.$i.'_operator');
+
+			if (!$enabled) {
+				$zselect_operator->setDisabled();
+			}
+
 			$tags_table->addRow([
 				(new CTextBox($field->getName().'['.$i.'][tag]', $tag['tag']))
 					->setAttribute('placeholder', _('tag'))
 					->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH)
 					->setAriaRequired(self::isAriaRequired($field))
 					->setEnabled($enabled),
-				(new CRadioButtonList($field->getName().'['.$i.'][operator]', (int) $tag['operator']))
-					->addValue(_('Contains'), TAG_OPERATOR_LIKE)
-					->addValue(_('Equals'), TAG_OPERATOR_EQUAL)
-					->setModern(true)
-					->setEnabled($enabled),
+				$zselect_operator,
 				(new CTextBox($field->getName().'['.$i.'][value]', $tag['value']))
 					->setAttribute('placeholder', _('value'))
 					->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH)
 					->setAriaRequired(self::isAriaRequired($field))
+					->setId($field->getName().'_'.$i.'_value')
 					->setEnabled($enabled),
 				(new CCol(
 					(new CButton($field->getName().'['.$i.'][remove]', _('Remove')))
@@ -536,14 +720,23 @@ class CWidgetHelper {
 				->setAttribute('placeholder', _('tag'))
 				->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH)
 				->setAriaRequired(self::isAriaRequired($field)),
-			(new CRadioButtonList($field->getName().'[#{rowNum}][operator]', TAG_OPERATOR_LIKE))
-				->addValue(_('Contains'), TAG_OPERATOR_LIKE)
-				->addValue(_('Equals'), TAG_OPERATOR_EQUAL)
-				->setModern(true),
+			(new CSelect($field->getName().'[#{rowNum}][operator]'))
+				->addOptions(CSelect::createOptionsFromArray([
+					TAG_OPERATOR_EXISTS => _('Exists'),
+					TAG_OPERATOR_EQUAL => _('Equals'),
+					TAG_OPERATOR_LIKE => _('Contains'),
+					TAG_OPERATOR_NOT_EXISTS => _('Does not exist'),
+					TAG_OPERATOR_NOT_EQUAL => _('Does not equal'),
+					TAG_OPERATOR_NOT_LIKE => _('Does not contain')
+				]))
+				->setValue(TAG_OPERATOR_LIKE)
+				->setFocusableElementId($field->getName().'-#{rowNum}-operator-select')
+				->setId($field->getName().'_#{rowNum}_operator'),
 			(new CTextBox($field->getName().'[#{rowNum}][value]'))
 				->setAttribute('placeholder', _('value'))
 				->setWidth(ZBX_TEXTAREA_FILTER_SMALL_WIDTH)
-				->setAriaRequired(self::isAriaRequired($field)),
+				->setAriaRequired(self::isAriaRequired($field))
+				->setId($field->getName().'_#{rowNum}_value'),
 			(new CCol(
 				(new CButton($field->getName().'[#{rowNum}][remove]', _('Remove')))
 					->addClass(ZBX_STYLE_BTN_LINK)
@@ -559,35 +752,11 @@ class CWidgetHelper {
 	 *
 	 * @return CDateSelector
 	 */
-	public static function getDatePicker($field) {
+	public static function getDatePicker(CWidgetFieldDatePicker $field): CDateSelector {
 		return (new CDateSelector($field->getName(), $field->getValue()))
 			->setAriaRequired(self::isAriaRequired($field))
-			->setEnabled(!($field->getFlags() & CWidgetField::FLAG_DISABLED));
-	}
-
-	/**
-	 * @param CWidgetFieldApplication $field
-	 *
-	 * @return array
-	 */
-	public static function getApplicationSelector($field) {
-		$popup_options = json_encode($field->getFilterParameters());
-
-		if ($field->filter_preselect_host_field) {
-			$popup_options = 'jQuery.extend('.
-				$popup_options.', getFirstMultiselectValue("'.$field->filter_preselect_host_field.'"))';
-		}
-
-		return [
-			(new CTextBox($field->getName(), $field->getValue()))
-				->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
-				->setAriaRequired(self::isAriaRequired($field))
-				->addClass('simple-textbox'),
-			(new CDiv())->addClass(ZBX_STYLE_FORM_INPUT_MARGIN),
-			(new CButton($field->getName().'_select', _('Select')))
-				->addClass(ZBX_STYLE_BTN_GREY)
-				->onClick('return PopUp("popup.generic", '.$popup_options.', null, this);')
-		];
+			->setMaxLength(DB::getFieldLength('widget_field', 'value_str'))
+			->setEnabled(($field->getFlags() & CWidgetField::FLAG_DISABLED) == 0);
 	}
 
 	/**
@@ -656,7 +825,6 @@ class CWidgetHelper {
 									'real_hosts' => 1,
 									'numeric' => 1,
 									'webitems' => 1,
-									'orig_names' => 1,
 									'dstfrm' => $form_name,
 									'dstfld1' => zbx_formatDomId($field->getName().'['.$row_num.'][items][]')
 								]
@@ -675,7 +843,7 @@ class CWidgetHelper {
 				(new CDiv(
 					(new CButton())
 						->setAttribute('title', _('Delete'))
-						->addClass(ZBX_STYLE_REMOVE_BTN)
+						->addClass(ZBX_STYLE_BTN_REMOVE)
 						->removeId()
 				))
 					->addClass(ZBX_STYLE_COLUMN_5)
@@ -783,7 +951,7 @@ class CWidgetHelper {
 				[
 					'name' => _('ADD OVERRIDE'),
 					'options' => [
-						['name' => _('Base colour'), 'callback' => 'addOverride', 'args' => ['color', '']],
+						['name' => _('Base color'), 'callback' => 'addOverride', 'args' => ['color', '']],
 
 						['name' => _('Width').'/0', 'callback' => 'addOverride', 'args' => ['width', 0]],
 						['name' => _('Width').'/1', 'callback' => 'addOverride', 'args' => ['width', 1]],
@@ -886,14 +1054,14 @@ class CWidgetHelper {
 				'.dynamicRows({'.
 					'template: "#overrides-row",'.
 					'beforeRow: ".overrides-foot",'.
-					'remove: ".'.ZBX_STYLE_REMOVE_BTN.'",'.
+					'remove: ".'.ZBX_STYLE_BTN_REMOVE.'",'.
 					'add: "#override-add",'.
 					'row: ".'.ZBX_STYLE_OVERRIDES_LIST_ITEM.'"'.
 				'})'.
 				'.bind("afteradd.dynamicRows", function(event, options) {'.
 					'var container = jQuery(".overlay-dialogue-body");'.
 					'container.scrollTop(Math.max(container.scrollTop(),
-						jQuery("#widget_dialogue_form")[0].scrollHeight - container.height()
+						jQuery("#widget-dialogue-form")[0].scrollHeight - container.height()
 					));'.
 
 					'jQuery(".multiselect", jQuery("#overrides")).each(function() {'.
@@ -1012,7 +1180,6 @@ class CWidgetHelper {
 									'real_hosts' => 1,
 									'numeric' => 1,
 									'webitems' => 1,
-									'orig_names' => 1,
 									'dstfrm' => $form_name,
 									'dstfld1' => zbx_formatDomId($field_name.'['.$row_num.'][items][]')
 								]
@@ -1027,7 +1194,7 @@ class CWidgetHelper {
 				(new CDiv([
 					(new CButton())
 						->setAttribute('title', _('Delete'))
-						->addClass(ZBX_STYLE_REMOVE_BTN)
+						->addClass(ZBX_STYLE_BTN_REMOVE)
 						->removeId()
 				]))->addClass(ZBX_STYLE_COLUMN_5)
 			]))
@@ -1040,7 +1207,7 @@ class CWidgetHelper {
 					// Left column fields.
 					(new CDiv(
 						(new CFormList())
-							->addRow(_('Base colour'),
+							->addRow(_('Base color'),
 								(new CColor($field_name.'['.$row_num.'][color]', $value['color']))
 									->appendColorPickerJs(false)
 							)
@@ -1127,14 +1294,14 @@ class CWidgetHelper {
 									->setFocusableElementId('label-'.$field_name.'_'.$row_num.'_aggregate_function')
 									->setValue((int) $value['aggregate_function'])
 									->addOptions(CSelect::createOptionsFromArray([
-										GRAPH_AGGREGATE_NONE => graph_item_aggr_fnc2str(GRAPH_AGGREGATE_NONE),
-										GRAPH_AGGREGATE_MIN => graph_item_aggr_fnc2str(GRAPH_AGGREGATE_MIN),
-										GRAPH_AGGREGATE_MAX => graph_item_aggr_fnc2str(GRAPH_AGGREGATE_MAX),
-										GRAPH_AGGREGATE_AVG => graph_item_aggr_fnc2str(GRAPH_AGGREGATE_AVG),
-										GRAPH_AGGREGATE_COUNT => graph_item_aggr_fnc2str(GRAPH_AGGREGATE_COUNT),
-										GRAPH_AGGREGATE_SUM => graph_item_aggr_fnc2str(GRAPH_AGGREGATE_SUM),
-										GRAPH_AGGREGATE_FIRST => graph_item_aggr_fnc2str(GRAPH_AGGREGATE_FIRST),
-										GRAPH_AGGREGATE_LAST => graph_item_aggr_fnc2str(GRAPH_AGGREGATE_LAST)
+										AGGREGATE_NONE => graph_item_aggr_fnc2str(AGGREGATE_NONE),
+										AGGREGATE_MIN => graph_item_aggr_fnc2str(AGGREGATE_MIN),
+										AGGREGATE_MAX => graph_item_aggr_fnc2str(AGGREGATE_MAX),
+										AGGREGATE_AVG => graph_item_aggr_fnc2str(AGGREGATE_AVG),
+										AGGREGATE_COUNT => graph_item_aggr_fnc2str(AGGREGATE_COUNT),
+										AGGREGATE_SUM => graph_item_aggr_fnc2str(AGGREGATE_SUM),
+										AGGREGATE_FIRST => graph_item_aggr_fnc2str(AGGREGATE_FIRST),
+										AGGREGATE_LAST => graph_item_aggr_fnc2str(AGGREGATE_LAST)
 									]))
 									->setWidth(ZBX_TEXTAREA_TINY_WIDTH)
 							)
@@ -1143,7 +1310,7 @@ class CWidgetHelper {
 									$field_name.'['.$row_num.'][aggregate_interval]',
 									$value['aggregate_interval']
 								))
-									->setEnabled($value['aggregate_function'] != GRAPH_AGGREGATE_NONE)
+									->setEnabled($value['aggregate_function'] != AGGREGATE_NONE)
 									->setAttribute('placeholder', GRAPH_AGGREGATE_DEFAULT_INTERVAL)
 									->setWidth(ZBX_TEXTAREA_TINY_WIDTH)
 							)
@@ -1154,7 +1321,7 @@ class CWidgetHelper {
 								)
 									->addValue(_('Each item'), GRAPH_AGGREGATE_BY_ITEM)
 									->addValue(_('Data set'), GRAPH_AGGREGATE_BY_DATASET)
-									->setEnabled($value['aggregate_function'] != GRAPH_AGGREGATE_NONE)
+									->setEnabled($value['aggregate_function'] != AGGREGATE_NONE)
 									->setModern(true)
 							)
 					))
@@ -1260,7 +1427,7 @@ class CWidgetHelper {
 
 			'function changeDataSetAggregateFunction(obj) {'.
 				'var row_num = obj.id.replace("ds_", "").replace("_aggregate_function", "");'.
-				'var no_aggregation = (jQuery(obj).val() == '.GRAPH_AGGREGATE_NONE.');'.
+				'var no_aggregation = (jQuery(obj).val() == '.AGGREGATE_NONE.');'.
 				'jQuery("#ds_" + row_num + "_aggregate_interval").prop("disabled", no_aggregation);'.
 				'jQuery("#ds_" + row_num + "_aggregate_grouping_0").prop("disabled", no_aggregation);'.
 				'jQuery("#ds_" + row_num + "_aggregate_grouping_1").prop("disabled", no_aggregation);'.
@@ -1271,7 +1438,7 @@ class CWidgetHelper {
 				'.dynamicRows({'.
 					'template: "#dataset-row",'.
 					'beforeRow: ".'.ZBX_STYLE_LIST_ACCORDION_FOOT.'",'.
-					'remove: ".'.ZBX_STYLE_REMOVE_BTN.'",'.
+					'remove: ".'.ZBX_STYLE_BTN_REMOVE.'",'.
 					'add: "#dataset-add",'.
 					'row: ".'.ZBX_STYLE_LIST_ACCORDION_ITEM.'",'.
 					'dataCallback: function(data) {'.
@@ -1288,10 +1455,10 @@ class CWidgetHelper {
 				'.bind("afteradd.dynamicRows", function(event, options) {'.
 					'var container = jQuery(".overlay-dialogue-body");'.
 					'container.scrollTop(Math.max(container.scrollTop(),
-						jQuery("#widget_dialogue_form")[0].scrollHeight - container.height()
+						jQuery("#widget-dialogue-form")[0].scrollHeight - container.height()
 					));'.
 
-					'jQuery(".input-color-picker input").colorpicker({onUpdate: function(color) {'.
+					'jQuery(".'.ZBX_STYLE_COLOR_PICKER.' input").colorpicker({onUpdate: function(color) {'.
 						'var ds = jQuery(this).closest(".'.ZBX_STYLE_LIST_ACCORDION_ITEM.'");'.
 						'jQuery(".'.ZBX_STYLE_COLOR_PREVIEW_BOX.'", ds).css("background-color", "#"+color);'.
 					'}, appendTo: ".overlay-dialogue-body"});'.
@@ -1353,7 +1520,7 @@ class CWidgetHelper {
 			'});',
 
 			// Initialize color-picker UI elements.
-			'jQuery(".input-color-picker input").colorpicker({onUpdate: function(color){'.
+			'jQuery(".'.ZBX_STYLE_COLOR_PICKER.' input").colorpicker({onUpdate: function(color){'.
 				'var ds = jQuery(this).closest(".'.ZBX_STYLE_LIST_ACCORDION_ITEM.'");'.
 				'jQuery(".'.ZBX_STYLE_COLOR_PREVIEW_BOX.'", ds).css("background-color", "#"+color);'.
 			'}, appendTo: ".overlay-dialogue-body"});',

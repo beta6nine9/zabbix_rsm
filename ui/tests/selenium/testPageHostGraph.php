@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -48,7 +48,7 @@ class testPageHostGraph extends CLegacyWebTest {
 					')'.
 				'ORDER BY name';
 
-		$hostid = $this->openPageHostGraphs($host_name);
+		$hostid = $this->openPageHostGraphs($host_name, 'host');
 		$this->zbxTestCheckTitle('Configuration of graphs');
 		$this->zbxTestCheckHeader('Graphs');
 
@@ -57,22 +57,22 @@ class testPageHostGraph extends CLegacyWebTest {
 
 		$this->zbxTestAssertElementPresentXpath('//button[@type="button"][text()="Create graph"]');
 		$this->zbxTestAssertElementPresentXpath('//span[@class="green"][text()="Enabled"]');
-		foreach (['zbx', 'snmp', 'jmx', 'ipmi'] as $text) {
-			$this->zbxTestAssertElementPresentXpath('//span[@class="status-grey"][text()="'.$text.'"]');
-		}
+		$this->zbxTestAssertElementPresentXpath('//span[@class="status-grey"][text()="ZBX"]');
 
 		// Check host breadcrumbs text and url.
 		$filter->getField('Hosts')->fill($host_name);
 		$filter->submit();
 		$breadcrumbs = [
-			'hosts.php' => 'All hosts',
-			'hosts.php?form=update&hostid='.$hostid => $host_name,
-			'applications.php?filter_set=1&filter_hostids%5B0%5D='.$hostid => 'Applications',
-			'items.php?filter_set=1&filter_hostids%5B0%5D='.$hostid => 'Items',
-			'triggers.php?filter_set=1&filter_hostids%5B0%5D='.$hostid => 'Triggers',
-			'graphs.php?filter_set=1&filter_hostids%5B0%5D='.$hostid => 'Graphs',
-			'host_discovery.php?filter_set=1&filter_hostids%5B0%5D='.$hostid => 'Discovery rules',
-			'httpconf.php?filter_set=1&filter_hostids%5B0%5D='.$hostid => 'Web scenarios'
+			self::HOST_LIST_PAGE => 'All hosts',
+			(new CUrl('zabbix.php'))
+				->setArgument('action', 'host.edit')
+				->setArgument('hostid', $hostid)
+				->getUrl() => $host_name,
+			'items.php?filter_set=1&filter_hostids%5B0%5D='.$hostid.'&context=host' => 'Items',
+			'triggers.php?filter_set=1&filter_hostids%5B0%5D='.$hostid.'&context=host' => 'Triggers',
+			'graphs.php?filter_set=1&filter_hostids%5B0%5D='.$hostid.'&context=host' => 'Graphs',
+			'host_discovery.php?filter_set=1&filter_hostids%5B0%5D='.$hostid.'&context=host' => 'Discovery rules',
+			'httpconf.php?filter_set=1&filter_hostids%5B0%5D='.$hostid.'&context=host' => 'Web scenarios'
 		];
 		$count_items = CDBHelper::getValue('SELECT COUNT(*) FROM items WHERE hostid='.$hostid);
 		$count_graphs = CDBHelper::getCount($sql);
@@ -88,7 +88,8 @@ class testPageHostGraph extends CLegacyWebTest {
 		}
 
 		// Check table headers on page.
-		$get_headers = $this->webDriver->findElements(WebDriverBy::xpath('//thead/tr/th[not(@class)]'));
+		$xpath = '//form[@name="graphForm"]//thead/tr/th[not(@class)]';
+		$get_headers = $this->webDriver->findElements(WebDriverBy::xpath($xpath));
 		foreach ($get_headers as $row) {
 			$table_headers[] = $row->getText();
 		}
@@ -105,8 +106,8 @@ class testPageHostGraph extends CLegacyWebTest {
 
 			// Check name value.
 			$this->assertEquals($graph['name'],
-					$element->findElement(WebDriverBy::xpath('./td/a[@href="graphs.php?form=update&graphid='
-					.$graph['graphid'].'&filter_hostids%5B0%5D='.$hostid.'"]'))->getText()
+					$element->findElement(WebDriverBy::xpath('./td/a[@href="graphs.php?form=update&graphid='.
+							$graph['graphid'].'&context=host&filter_hostids%5B0%5D='.$hostid.'"]'))->getText()
 			);
 
 			// Check width value.
@@ -330,6 +331,7 @@ class testPageHostGraph extends CLegacyWebTest {
 			[
 				[
 					'host' => 'Template to test graphs',
+					'copy_from_template' => true,
 					'graph' => [
 						'Graph to check copy'
 					],
@@ -661,7 +663,8 @@ class testPageHostGraph extends CLegacyWebTest {
 			[
 				[
 					'group' => 'Templates',
-					'host' => 'Empty template'
+					'host' => 'Empty template',
+					'context' => 'template'
 				]
 			],
 			[
@@ -693,7 +696,8 @@ class testPageHostGraph extends CLegacyWebTest {
 	 * @dataProvider getFilterData
 	 */
 	public function testPageHostGraph_CheckFilter($data) {
-		$this->openPageHostGraphs($data['host']);
+		$context = CTestArrayHelper::get($data, 'context', 'host');
+		$this->openPageHostGraphs($data['host'], $context);
 
 		$filter = $this->query('name:zbx_filter')->asForm()->one();
 		if (array_key_exists('group', $data)) {
@@ -704,12 +708,15 @@ class testPageHostGraph extends CLegacyWebTest {
 				$filter->getField('Host groups')->select($data['group']);
 			}
 		}
+
+		$field_label = ucfirst($context).'s';
+
 		if (array_key_exists('host', $data)) {
 			if ($data['host'] === 'all') {
-				$filter->getField('Hosts')->clear();
+				$filter->getField($field_label)->clear();
 			}
 			else {
-				$filter->getField('Hosts')->fill($data['host']);
+				$filter->getField($field_label)->fill($data['host']);
 			}
 			if (array_key_exists('change_group', $data)) {
 				$filter->getField('Host groups')->clear();
@@ -736,10 +743,10 @@ class testPageHostGraph extends CLegacyWebTest {
 		}
 	}
 
-	private function openPageHostGraphs($host) {
+	private function openPageHostGraphs($host, $context) {
 		$hostid = ($host !== 'all') ? CDBHelper::getValue('SELECT hostid FROM hosts where host='.zbx_dbstr($host)) : 0;
 
-		$this->zbxTestLogin('graphs.php?filter_set=1&filter_hostids%5B%5D='.$hostid);
+		$this->zbxTestLogin('graphs.php?filter_set=1&filter_hostids%5B0%5D='.$hostid.'&context='.$context);
 
 		return $hostid;
 	}
@@ -750,7 +757,8 @@ class testPageHostGraph extends CLegacyWebTest {
 	 * @param array $data	test case data from data provider
 	 */
 	private function selectGraph($data) {
-		$hostid = $this->openPageHostGraphs($data['host']);
+		$context = (CTestArrayHelper::get($data, 'copy_from_template')) ? 'template' : 'host';
+		$hostid = $this->openPageHostGraphs($data['host'], $context);
 
 		if ($data['graph'] === 'all') {
 			$this->zbxTestCheckboxSelect('all_graphs');

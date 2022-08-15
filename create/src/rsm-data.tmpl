@@ -1,6 +1,6 @@
 --
 -- Zabbix
--- Copyright (C) 2001-2021 Zabbix SIA
+-- Copyright (C) 2001-2022 Zabbix SIA
 --
 -- This program is free software; you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License as published by
@@ -17,31 +17,43 @@
 -- Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 --
 
+TABLE |role
+FIELDS|roleid|name            |type|readonly|
+ROW   |1     |User role       |1   |0       |
+ROW   |2     |Admin role      |2   |0       |
+ROW   |3     |Super admin role|3   |1       |
+ROW   |4     |Guest role      |1   |0       |
+ROW   |100   |Read-only user  |100 |1       |
+ROW   |110   |Power user      |110 |1       |
+
 TABLE |users
-FIELDS|userid|alias      |name   |surname      |passwd                                                      |url |autologin|autologout|lang |refresh|type|theme  |rows_per_page|
-ROW   |1     |Admin      |Zabbix |Administrator|$2y$10$MMIRMGp1H8b6eslOGWlGgOXVt4enC.Jlv1tLgb7MyBEGzL3AnJoJ2|    |1        |0         |en_GB|30s    |3   |default|50           |
-ROW   |2     |guest      |Default|User         |d41d8cd98f00b204e9800998ecf8427e                            |    |0        |15m       |en_GB|30s    |1   |default|50           |
-ROW   |100   |tld-monitor|tld    |monitor      |fedcba9876543210fedcba9876543210                            |    |1        |0         |en_GB|30s    |1   |default|50           |
+FIELDS|userid|username                  |name   |surname      |passwd                                                      |url |autologin|autologout|refresh|rows_per_page|roleid|
+ROW   |1     |Admin                     |Zabbix |Administrator|$2y$10$MMIRMGp1H8b6eslOGWlGgOXVt4enC.Jlv1tLgb7MyBEGzL3AnJoJ2|    |1        |0         |30s    |50           |3     |
+ROW   |2     |guest                     |Default|User         |d41d8cd98f00b204e9800998ecf8427e                            |    |0        |15m       |30s    |50           |1     |
+ROW   |100   |tld-monitor               |tld    |monitor      |fedcba9876543210fedcba9876543210                            |    |1        |0         |30s    |50           |1     |
+ROW   |101   |provisioning-api-readonly |       |             |5f4dcc3b5aa765d61d8327deb882cf99                            |    |0        |0         |30s    |50           |3     |
+ROW   |102   |provisioning-api-readwrite|       |             |5f4dcc3b5aa765d61d8327deb882cf99                            |    |0        |0         |30s    |50           |3     |
 
 TABLE |hstgrp
-FIELDS|groupid|name                  |internal|flags|
-ROW   |1      |Templates             |0       |0    |
-ROW   |5      |Discovered hosts      |1       |0    |
-ROW   |100    |Global macro history  |0       |0    |
-ROW   |110    |Mon                   |0       |0    |
-ROW   |120    |Probes                |0       |0    |
-ROW   |130    |Probes - Mon          |0       |0    |
-ROW   |140    |TLDs                  |0       |0    |
-ROW   |150    |gTLD                  |0       |0    |
-ROW   |160    |ccTLD                 |0       |0    |
-ROW   |170    |testTLD               |0       |0    |
-ROW   |180    |otherTLD              |0       |0    |
-ROW   |190    |TLD Probe results     |0       |0    |
-ROW   |200    |gTLD Probe results    |0       |0    |
-ROW   |210    |ccTLD Probe results   |0       |0    |
-ROW   |220    |testTLD Probe results |0       |0    |
-ROW   |230    |otherTLD Probe results|0       |0    |
-ROW   |240    |Templates - TLD       |0       |0    |
+FIELDS|groupid|name                  |internal|flags|uuid                            |
+ROW   |1      |Templates             |0       |0    |7df96b18c230490a9a0a9e2307226338|
+ROW   |5      |Discovered hosts      |1       |0    |f2481361f99448eea617b7b1d4765566|
+ROW   |100    |Global macro history  |0       |0    |66e672fe1f5d4cad9a907b127713bcf6|
+ROW   |110    |Mon                   |0       |0    |fd29458ae58a432aad8734ed90ad51ec|
+ROW   |120    |Probes                |0       |0    |b62b910dfac54f7c9dced3a0fe252a59|
+ROW   |130    |Probes - Mon          |0       |0    |20af788f6bbb4557a5cb20411d824ac3|
+ROW   |140    |TLDs                  |0       |0    |e800122d43584e63a1740a15d5fa5183|
+ROW   |150    |gTLD                  |0       |0    |594cb7a6563a45c889d951982d4f996e|
+ROW   |160    |ccTLD                 |0       |0    |a7bd4b3f417b46c4b0afe50d4c8ecff3|
+ROW   |170    |testTLD               |0       |0    |b89c7a2fdf2d413e8f528ea15095f74e|
+ROW   |180    |otherTLD              |0       |0    |341fce9f1939489dba64170a4a291fc8|
+ROW   |190    |TLD Probe results     |0       |0    |fe2c2afc7b1c467d91b2227f2e3774db|
+ROW   |200    |gTLD Probe results    |0       |0    |2600caeac4fa41dd8af5ae481f1fd9a0|
+ROW   |210    |ccTLD Probe results   |0       |0    |0d3aa35936414218887fff99d65c6d00|
+ROW   |220    |testTLD Probe results |0       |0    |b92a10f734b5499495bc2d5a79e8098d|
+ROW   |230    |otherTLD Probe results|0       |0    |7235d35178d24632a6410e4b55db4eb9|
+ROW   |240    |Templates - TLD       |0       |0    |de6b4c024d5e496a86667532913e1c5d|
+ROW   |241    |Value Maps            |0       |0    |5f022f8b797d44c69dbbcecc1e7fcd30|
 
 TABLE |media_type
 FIELDS|mediatypeid|type|name  |smtp_server     |smtp_helo  |smtp_email        |exec_path|gsm_modem |username|passwd|status|smtp_port|smtp_security|smtp_verify_peer|smtp_verify_host|smtp_authentication|exec_params                                                |maxsessions|maxattempts|attempt_interval|content_type|script|timeout|process_tags|show_event_menu|event_menu_url|event_menu_name|description|
@@ -52,17 +64,17 @@ ROW   |10         |1   |Script|                |           |                  |s
 TABLE |media_type_message
 FIELDS|mediatype_messageid|mediatypeid|eventsource|recovery|subject                                                          |message                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 ROW   |1                  |1          |0          |0       |Problem: {EVENT.NAME}                                            |Problem started at {EVENT.TIME} on {EVENT.DATE}&bsn;Problem name: {EVENT.NAME}&bsn;Host: {HOST.NAME}&bsn;Severity: {EVENT.SEVERITY}&bsn;Operational data: {EVENT.OPDATA}&bsn;Original problem ID: {EVENT.ID}&bsn;{TRIGGER.URL}                                                                                                                                                                                                              |
-ROW   |2                  |1          |0          |1       |Resolved: {EVENT.NAME}                                           |Problem has been resolved at {EVENT.RECOVERY.TIME} on {EVENT.RECOVERY.DATE}&bsn;Problem name: {EVENT.NAME}&bsn;Host: {HOST.NAME}&bsn;Severity: {EVENT.SEVERITY}&bsn;Original problem ID: {EVENT.ID}&bsn;{TRIGGER.URL}                                                                                                                                                                                                                       |
+ROW   |2                  |1          |0          |1       |Resolved: {EVENT.RECOVERY.NAME}                                  |Problem has been resolved at {EVENT.RECOVERY.TIME} on {EVENT.RECOVERY.DATE}&bsn;Problem name: {EVENT.RECOVERY.NAME}&bsn;Host: {HOST.NAME}&bsn;Severity: {EVENT.SEVERITY}&bsn;Original problem ID: {EVENT.ID}&bsn;{TRIGGER.URL}                                                                                                                                                                                                              |
 ROW   |3                  |1          |0          |2       |Updated problem: {EVENT.NAME}                                    |{USER.FULLNAME} {EVENT.UPDATE.ACTION} problem at {EVENT.UPDATE.DATE} {EVENT.UPDATE.TIME}.&bsn;{EVENT.UPDATE.MESSAGE}&bsn;&bsn;Current problem status is {EVENT.STATUS}, acknowledged: {EVENT.ACK.STATUS}.                                                                                                                                                                                                                                   |
 ROW   |4                  |1          |1          |0       |Discovery: {DISCOVERY.DEVICE.STATUS} {DISCOVERY.DEVICE.IPADDRESS}|Discovery rule: {DISCOVERY.RULE.NAME}&bsn;&bsn;Device IP: {DISCOVERY.DEVICE.IPADDRESS}&bsn;Device DNS: {DISCOVERY.DEVICE.DNS}&bsn;Device status: {DISCOVERY.DEVICE.STATUS}&bsn;Device uptime: {DISCOVERY.DEVICE.UPTIME}&bsn;&bsn;Device service name: {DISCOVERY.SERVICE.NAME}&bsn;Device service port: {DISCOVERY.SERVICE.PORT}&bsn;Device service status: {DISCOVERY.SERVICE.STATUS}&bsn;Device service uptime: {DISCOVERY.SERVICE.UPTIME}|
 ROW   |5                  |1          |2          |0       |Autoregistration: {HOST.HOST}                                    |Host name: {HOST.HOST}&bsn;Host IP: {HOST.IP}&bsn;Agent port: {HOST.PORT}                                                                                                                                                                                                                                                                                                                                                                   |
 ROW   |6                  |3          |0          |0       |                                                                 |{EVENT.SEVERITY}: {EVENT.NAME}&bsn;Host: {HOST.NAME}&bsn;{EVENT.DATE} {EVENT.TIME}                                                                                                                                                                                                                                                                                                                                                          |
-ROW   |7                  |3          |0          |1       |                                                                 |RESOLVED: {EVENT.NAME}&bsn;Host: {HOST.NAME}&bsn;{EVENT.DATE} {EVENT.TIME}                                                                                                                                                                                                                                                                                                                                                                  |
+ROW   |7                  |3          |0          |1       |                                                                 |RESOLVED: {EVENT.RECOVERY.NAME}&bsn;Host: {HOST.NAME}&bsn;{EVENT.DATE} {EVENT.TIME}                                                                                                                                                                                                                                                                                                                                                         |
 ROW   |8                  |3          |0          |2       |                                                                 |{USER.FULLNAME} {EVENT.UPDATE.ACTION} problem at {EVENT.UPDATE.DATE} {EVENT.UPDATE.TIME}                                                                                                                                                                                                                                                                                                                                                    |
 ROW   |9                  |3          |1          |0       |                                                                 |Discovery: {DISCOVERY.DEVICE.STATUS} {DISCOVERY.DEVICE.IPADDRESS}                                                                                                                                                                                                                                                                                                                                                                           |
 ROW   |10                 |3          |2          |0       |                                                                 |Autoregistration: {HOST.HOST}&bsn;Host IP: {HOST.IP}&bsn;Agent port: {HOST.PORT}                                                                                                                                                                                                                                                                                                                                                            |
 ROW   |11                 |10         |0          |0       |Problem: {EVENT.NAME}                                            |Problem started at {EVENT.TIME} on {EVENT.DATE}&bsn;Problem name: {EVENT.NAME}&bsn;Host: {HOST.NAME}&bsn;Severity: {EVENT.SEVERITY}&bsn;Operational data: {EVENT.OPDATA}&bsn;Original problem ID: {EVENT.ID}&bsn;{TRIGGER.URL}                                                                                                                                                                                                              |
-ROW   |12                 |10         |0          |1       |Resolved: {EVENT.NAME}                                           |Problem has been resolved at {EVENT.RECOVERY.TIME} on {EVENT.RECOVERY.DATE}&bsn;Problem name: {EVENT.NAME}&bsn;Host: {HOST.NAME}&bsn;Severity: {EVENT.SEVERITY}&bsn;Original problem ID: {EVENT.ID}&bsn;{TRIGGER.URL}                                                                                                                                                                                                                       |
+ROW   |12                 |10         |0          |1       |Resolved: {EVENT.RECOVERY.NAME}                                  |Problem has been resolved at {EVENT.RECOVERY.TIME} on {EVENT.RECOVERY.DATE}&bsn;Problem name: {EVENT.RECOVERY.NAME}&bsn;Host: {HOST.NAME}&bsn;Severity: {EVENT.SEVERITY}&bsn;Original problem ID: {EVENT.ID}&bsn;{TRIGGER.URL}                                                                                                                                                                                                              |
 ROW   |13                 |10         |0          |2       |Updated problem: {EVENT.NAME}                                    |{USER.FULLNAME} {EVENT.UPDATE.ACTION} problem at {EVENT.UPDATE.DATE} {EVENT.UPDATE.TIME}.&bsn;{EVENT.UPDATE.MESSAGE}&bsn;&bsn;Current problem status is {EVENT.STATUS}, acknowledged: {EVENT.ACK.STATUS}.                                                                                                                                                                                                                                   |
 ROW   |14                 |10         |1          |0       |Discovery: {DISCOVERY.DEVICE.STATUS} {DISCOVERY.DEVICE.IPADDRESS}|Discovery rule: {DISCOVERY.RULE.NAME}&bsn;&bsn;Device IP: {DISCOVERY.DEVICE.IPADDRESS}&bsn;Device DNS: {DISCOVERY.DEVICE.DNS}&bsn;Device status: {DISCOVERY.DEVICE.STATUS}&bsn;Device uptime: {DISCOVERY.DEVICE.UPTIME}&bsn;&bsn;Device service name: {DISCOVERY.SERVICE.NAME}&bsn;Device service port: {DISCOVERY.SERVICE.PORT}&bsn;Device service status: {DISCOVERY.SERVICE.STATUS}&bsn;Device service uptime: {DISCOVERY.SERVICE.UPTIME}|
 ROW   |15                 |10         |2          |0       |Autoregistration: {HOST.HOST}                                    |Host name: {HOST.HOST}&bsn;Host IP: {HOST.IP}&bsn;Agent port: {HOST.PORT}                                                                                                                                                                                                                                                                                                                                                                   |
@@ -77,21 +89,36 @@ ROW   |12      |No access to the frontend|3         |0           |0         |
 ROW   |100     |Read-only user           |0         |0           |0         |
 ROW   |110     |Power user               |0         |0           |0         |
 ROW   |120     |Auxiliary action users   |3         |0           |0         |
+ROW   |121     |Provisioning API         |3         |0           |0         |
 
 TABLE |users_groups
 FIELDS|id  |usrgrpid|userid|
 ROW   |2   |8       |2     |
 ROW   |4   |7       |1     |
 ROW   |100 |120     |100   |
+ROW   |101 |121     |101   |
+ROW   |102 |121     |102   |
+
+TABLE |scripts
+FIELDS|scriptid|name          |command                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |host_access|usrgrpid|groupid|description|confirmation|type|execute_on|timeout|scope|port|authtype|username|password|publickey|privatekey|menu_path|
+ROW   |1       |Script 1      |/opt/zabbix/scripts/probe-manual.pl --probe '{HOST.HOST}' --set 0                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |2          |NULL    |NULL   |           |            |0   |1         |30s    |1    |    |0       |        |        |         |          |         |
+ROW   |2       |Script 2      |/opt/zabbix/scripts/tlds-notification.pl --send-to 'zabbix alert' --event-id '{EVENT.ID}' &                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |2          |NULL    |NULL   |           |            |0   |1         |30s    |1    |    |0       |        |        |         |          |         |
+ROW   |3       |Script 3      |/opt/zabbix/scripts/tlds-notification.pl --send-to 'zabbix alert' --event-id '{EVENT.RECOVERY.ID}' &                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |2          |NULL    |NULL   |           |            |0   |1         |30s    |1    |    |0       |        |        |         |          |         |
+ROW   |4       |DNSViz webhook|try {&eol;    var req = new HttpRequest(), response, script_params = JSON.parse(value), uri_params = {}, payload;&eol;&eol;    // Set up headers.&eol;    req.addHeader('Content-Type: application/x-www-form-urlencoded; charset=UTF-8');&eol;    req.addHeader('Cache-Control: no-cache');&eol;    req.addHeader('Connection: keep-alive');&eol;    req.addHeader('Pragma: no-cache');&eol;&eol;    // These ones are important in order to get HTTP status code 200 instead of 403.&eol;    req.addHeader('Referer: ' + script_params.url);&eol;    req.addHeader('X-Requested-With: XMLHttpRequest');&eol;&eol;    // Form elements.&eol;    payload = 'force_ancestor=.&analysis_type=0&perspective=server';&eol;&eol;    Zabbix.log(3, '[ DNSViz webhook ] POST "' + script_params.url + '" with "' + payload + '"');&eol;&eol;    // Perform the POST request.&eol;    response = req.post(script_params.url, payload);&eol;&eol;    Zabbix.log(3, '[ DNSViz webhook ] Responded with code: ' + req.getStatus() + '. Response: ' + response);&eol;&eol;    if (req.getStatus() !== 200) {&eol;        throw response.error;&eol;    }&eol;&eol;    return 'OK';&eol;}&eol;catch (error) {&eol;    Zabbix.log(3, '[ DNSViz webhook ] Sending failed. Error: ' + error);&eol;    throw 'Failed with error: ' + error;&eol;}|2          |NULL    |NULL   |           |            |5   |2         |30s    |1    |    |0       |        |        |         |          |         |
+
+TABLE |script_param
+FIELDS|script_paramid|scriptid|name|value                                                         |
+ROW   |1             |4       |url |https://dnsviz.net/d/{$RSM.DNS.TESTPREFIX}.{$RSM.TLD}/analyze/|
 
 TABLE |actions
-FIELDS|actionid|name           |eventsource|evaltype|status|esc_period|formula|pause_suppressed|
-ROW   |100     |Probes-Critical|0          |0       |0     |1h        |       |1               |
-ROW   |110     |Probes-Mon     |0          |0       |0     |1h        |       |1               |
-ROW   |115     |Probes         |0          |0       |0     |1h        |       |1               |
-ROW   |120     |Central-Server |0          |0       |0     |1h        |       |1               |
-ROW   |130     |TLDs           |0          |0       |0     |1h        |       |1               |
-ROW   |140     |Probes-Knockout|0          |0       |0     |1h        |       |1               |
+FIELDS|actionid|name                |eventsource|evaltype|status|esc_period|formula|pause_suppressed|notify_if_canceled|
+ROW   |100     |Probes-Critical     |0          |0       |0     |1h        |       |1               |1                 |
+ROW   |110     |Probes-Mon          |0          |0       |0     |1h        |       |1               |1                 |
+ROW   |115     |Probes              |0          |0       |0     |1h        |       |1               |1                 |
+ROW   |120     |Central-Server      |0          |0       |0     |1h        |       |1               |1                 |
+ROW   |130     |TLDs                |0          |0       |0     |1h        |       |1               |1                 |
+ROW   |140     |Probes-Knockout     |0          |0       |0     |1h        |       |1               |1                 |
+ROW   |141     |Create DNSViz report|0          |0       |1     |1h        |       |1               |1                 |
 
 TABLE |operations
 FIELDS|operationid|actionid|operationtype|esc_period|esc_step_from|esc_step_to|evaltype|recovery|
@@ -107,6 +134,7 @@ ROW   |142        |110     |11           |0         |1            |1          |0
 ROW   |143        |115     |11           |0         |1            |1          |0       |1       |
 ROW   |144        |120     |11           |0         |1            |1          |0       |1       |
 ROW   |145        |140     |11           |0         |1            |1          |0       |1       |
+ROW   |146        |141     |1            |0         |1            |1          |0       |0       |
 
 TABLE |opmessage
 FIELDS|operationid|default_msg|subject                                                                 |message                                        |mediatypeid|
@@ -128,41 +156,44 @@ ROW   |115            |115        |100   |
 ROW   |120            |120        |100   |
 
 TABLE |opcommand
-FIELDS|operationid|type|scriptid|execute_on|port|authtype|username|password|publickey|privatekey|command                                                                                             |
-ROW   |130        |0   |NULL    |1         |    |0       |        |        |         |          |/opt/zabbix/scripts/tlds-notification.pl --send-to 'zabbix alert' --event-id '{EVENT.ID}' &         |
-ROW   |131        |0   |NULL    |1         |    |0       |        |        |         |          |/opt/zabbix/scripts/tlds-notification.pl --send-to 'zabbix alert' --event-id '{EVENT.RECOVERY.ID}' &|
-ROW   |140        |0   |NULL    |1         |    |0       |        |        |         |          |/opt/zabbix/scripts/probe-manual.pl --probe '{HOST.HOST}' --set 0                                   |
+FIELDS|operationid|scriptid|
+ROW   |130        |2       |
+ROW   |131        |3       |
+ROW   |140        |1       |
+ROW   |146        |4       |
 
 TABLE |opcommand_hst
 FIELDS|opcommand_hstid|operationid|hostid|
 ROW   |130            |130        |NULL  |
 ROW   |131            |131        |NULL  |
 ROW   |140            |140        |NULL  |
+ROW   |141            |146        |NULL  |
 
 TABLE |conditions
-FIELDS|conditionid|actionid|conditiontype|operator|value |value2|
-ROW   |101        |100     |16           |11      |      |      |
-ROW   |103        |100     |4            |5       |2     |      |
-ROW   |104        |100     |1            |0       |100001|      |
-ROW   |110        |110     |16           |11      |      |      |
-ROW   |112        |110     |4            |5       |2     |      |
-ROW   |113        |110     |0            |0       |130   |      |
-ROW   |115        |115     |16           |11      |      |      |
-ROW   |117        |115     |4            |5       |2     |      |
-ROW   |118        |115     |0            |0       |120   |      |
-ROW   |120        |120     |16           |11      |      |      |
-ROW   |122        |120     |4            |5       |2     |      |
-ROW   |123        |120     |0            |0       |110   |      |
-ROW   |130        |130     |16           |11      |      |      |
-ROW   |132        |130     |0            |0       |140   |      |
-ROW   |140        |140     |16           |11      |      |      |
-ROW   |142        |140     |4            |5       |2     |      |
-ROW   |143        |140     |0            |0       |120   |      |
-ROW   |144        |140     |2            |0       |100166|      |
+FIELDS|conditionid|actionid|conditiontype|operator|value                 |value2|
+ROW   |101        |100     |16           |11      |                      |      |
+ROW   |103        |100     |4            |5       |2                     |      |
+ROW   |104        |100     |1            |0       |100001                |      |
+ROW   |110        |110     |16           |11      |                      |      |
+ROW   |112        |110     |4            |5       |2                     |      |
+ROW   |113        |110     |0            |0       |130                   |      |
+ROW   |115        |115     |16           |11      |                      |      |
+ROW   |117        |115     |4            |5       |2                     |      |
+ROW   |118        |115     |0            |0       |120                   |      |
+ROW   |120        |120     |16           |11      |                      |      |
+ROW   |122        |120     |4            |5       |2                     |      |
+ROW   |123        |120     |0            |0       |110                   |      |
+ROW   |130        |130     |16           |11      |                      |      |
+ROW   |132        |130     |0            |0       |140                   |      |
+ROW   |140        |140     |16           |11      |                      |      |
+ROW   |142        |140     |4            |5       |2                     |      |
+ROW   |143        |140     |0            |0       |120                   |      |
+ROW   |144        |140     |2            |0       |100166                |      |
+ROW   |145        |141     |3            |2       |DNSSEC service is down|      |
 
 TABLE |config
-FIELDS|configid|refresh_unsupported|work_period    |alert_usrgrpid|discovery_groupid|
-ROW   |1       |1m                 |1-5,09:00-18:00|7             |5                |
+FIELDS|configid|work_period    |alert_usrgrpid|discovery_groupid|dbversion_status|geomaps_tile_provider|
+ROW   |1       |1-5,09:00-18:00|7             |5                |                |OpenStreetMap.Mapnik |
 
 TABLE |graph_theme
 FIELDS|graphthemeid|theme     |backgroundcolor|graphcolor|gridcolor|maingridcolor|gridbordercolor|textcolor|highlightcolor|leftpercentilecolor|rightpercentilecolor|nonworktimecolor|colorpalette                                                                                                                                      |
@@ -267,12 +298,11 @@ TABLE |rights
 FIELDS|rightid|groupid|permission|id  |
 ROW   |100    |100    |2         |140 |
 ROW   |101    |100    |2         |150 |
-ROW   |102    |100    |0         |160 |
-ROW   |103    |100    |0         |170 |
-ROW   |104    |100    |0         |180 |
+ROW   |102    |100    |2         |160 |
+ROW   |103    |100    |2         |170 |
+ROW   |104    |100    |2         |180 |
 ROW   |105    |100    |2         |100 |
 ROW   |106    |100    |2         |130 |
-ROW   |107    |100    |2         |200 |
 ROW   |108    |100    |2         |240 |
 ROW   |109    |110    |2         |130 |
 ROW   |110    |110    |2         |140 |
@@ -291,6 +321,11 @@ ROW   |122    |120    |2         |120 |
 ROW   |123    |120    |2         |130 |
 ROW   |124    |120    |2         |140 |
 ROW   |125    |120    |2         |190 |
+ROW   |126    |100    |2         |241 |
+ROW   |127    |110    |2         |241 |
+ROW   |128    |100    |2         |110 |
+ROW   |129    |100    |2         |120 |
+ROW   |130    |100    |2         |190 |
 
 TABLE |regexps
 FIELDS|regexpid|name                              |test_string|
@@ -311,8 +346,56 @@ FIELDS|autoreg_tlsid|tls_psk_identity|tls_psk|
 ROW   |1            |                |       |
 
 TABLE |module
-FIELDS|moduleid|id  |relative_path|status|config|
-ROW   |1       |RSM |RSM          |1     |[]    |
+FIELDS|moduleid|id                  |relative_path     |status|config|
+ROW   |1       |RSM                 |RSM               |1     |[]    |
+ROW   |2       |RSM Provisioning API|RsmProvisioningApi|1     |[]    |
+
+TABLE |role_rule
+FIELDS|role_ruleid|roleid|type|name                  |value_int|value_str|value_moduleid|value_serviceid|
+ROW   |1          |1     |0   |ui.default_access     |1        |         |NULL          |NULL           |
+ROW   |2          |1     |0   |modules.default_access|1        |         |NULL          |NULL           |
+ROW   |3          |1     |0   |api.access            |1        |         |NULL          |NULL           |
+ROW   |4          |1     |0   |actions.default_access|1        |         |NULL          |NULL           |
+ROW   |5          |2     |0   |ui.default_access     |1        |         |NULL          |NULL           |
+ROW   |6          |2     |0   |modules.default_access|1        |         |NULL          |NULL           |
+ROW   |7          |2     |0   |api.access            |1        |         |NULL          |NULL           |
+ROW   |8          |2     |0   |actions.default_access|1        |         |NULL          |NULL           |
+ROW   |9          |3     |0   |ui.default_access     |1        |         |NULL          |NULL           |
+ROW   |10         |3     |0   |modules.default_access|1        |         |NULL          |NULL           |
+ROW   |11         |3     |0   |api.access            |1        |         |NULL          |NULL           |
+ROW   |12         |3     |0   |actions.default_access|1        |         |NULL          |NULL           |
+ROW   |13         |4     |0   |ui.default_access     |1        |         |NULL          |NULL           |
+ROW   |14         |4     |0   |modules.default_access|1        |         |NULL          |NULL           |
+ROW   |15         |4     |0   |api.access            |0        |         |NULL          |NULL           |
+ROW   |16         |4     |0   |actions.default_access|0        |         |NULL          |NULL           |
+ROW   |17         |1     |0   |service.read          |1        |         |NULL          |NULL           |
+ROW   |18         |1     |0   |services.write        |0        |         |NULL          |NULL           |
+ROW   |19         |2     |0   |service.read          |1        |         |NULL          |NULL           |
+ROW   |20         |2     |0   |services.write        |1        |         |NULL          |NULL           |
+ROW   |21         |3     |0   |service.read          |1        |         |NULL          |NULL           |
+ROW   |22         |3     |0   |services.write        |1        |         |NULL          |NULL           |
+ROW   |23         |4     |0   |service.read          |1        |         |NULL          |NULL           |
+ROW   |24         |4     |0   |services.write        |0        |         |NULL          |NULL           |
+ROW   |10000      |100   |0   |ui.monitoring.hosts   |1        |         |NULL          |NULL           |
+ROW   |10001      |100   |0   |ui.default_access     |0        |         |NULL          |NULL           |
+ROW   |10002      |100   |0   |services.read         |0        |         |NULL          |NULL           |
+ROW   |10003      |100   |0   |services.write        |0        |         |NULL          |NULL           |
+ROW   |10004      |100   |0   |modules.default_access|0        |         |NULL          |NULL           |
+ROW   |10005      |100   |0   |api.access            |0        |         |NULL          |NULL           |
+ROW   |10006      |100   |0   |actions.default_access|0        |         |NULL          |NULL           |
+ROW   |10007      |100   |2   |modules.module.0      |0        |         |1             |NULL           |
+ROW   |10008      |110   |0   |ui.monitoring.hosts   |1        |         |NULL          |NULL           |
+ROW   |10009      |110   |0   |ui.default_access     |0        |         |NULL          |NULL           |
+ROW   |10010      |110   |0   |services.read         |0        |         |NULL          |NULL           |
+ROW   |10011      |110   |0   |services.write        |0        |         |NULL          |NULL           |
+ROW   |10012      |110   |0   |modules.default_access|0        |         |NULL          |NULL           |
+ROW   |10013      |110   |0   |api.access            |0        |         |NULL          |NULL           |
+ROW   |10014      |110   |0   |actions.default_access|0        |         |NULL          |NULL           |
+ROW   |10015      |110   |2   |modules.module.0      |0        |         |1             |NULL           |
+
+TABLE |ha_node
+FIELDS|ha_nodeid                |name|address  |port |lastaccess|status|ha_sessionid             |
+ROW   |cl3067yy70001dpi5ahhavdy7|    |localhost|10051|1652188244|1     |cl3067uqv0000d9i5rvx9lwd3|
 
 TABLE |rsm_ip_version
 FIELDS|id  |name|

@@ -231,11 +231,9 @@ $fm->run_on_finish(
 
 # go through all the databases
 
-foreach (@server_keys)
+my $server_key;
+foreach $server_key (@server_keys)
 {
-$server_key = $_;
-
-db_disconnect();
 db_connect($server_key);
 
 # NB! We need previous value for probeChanges file (see __get_probe_changes())
@@ -1270,13 +1268,13 @@ sub __get_false_positives
 {
 	my $from = shift;
 	my $till = shift;
-	my $_server_key = shift;	# if --tld was specified
+	my $server_key = shift;	# if --tld was specified
 
 	my @local_server_keys;
 
-	if ($_server_key)
+	if ($server_key)
 	{
-		push(@local_server_keys, $_server_key)
+		push(@local_server_keys, $server_key)
 	}
 	else
 	{
@@ -1286,32 +1284,28 @@ sub __get_false_positives
 	my @result;
 
 	# go through all the databases
-	foreach (@local_server_keys)
+	foreach my $server_key (@local_server_keys)
 	{
-	$server_key = $_;
-	db_connect($server_key);
+		db_connect($server_key);
 
-	# check for possible false_positive changes made in front-end
-	my $rows_ref = db_select(
-		"select resourceid,note,clock".
-		" from auditlog".
-		" where resourcetype=" . AUDIT_RESOURCE_INCIDENT.
-			" and clock between $from and $till".
-		" order by clock");
+		# check for possible false_positive changes made in front-end
+		my $rows = db_select(
+			"select eventid,clock,status".
+			" from rsm_false_positive".
+				" where clock between $from and $till".
+			" order by clock");
 
-	foreach my $row_ref (@$rows_ref)
-	{
-		my $eventid = $row_ref->[0];
-		my $note = $row_ref->[1];
-		my $clock = $row_ref->[2];
+		foreach my $row (@{$rows})
+		{
+			my ($eventid, $clock, $status) = @{$row};
 
-		my $status = ($note =~ m/unmarked/i ? 'Deactivated' : 'Activated');
+			my $status_str = ($status == 0 ? 'Deactivated' : 'Activated');
 
-		push(@result, {'clock' => $clock, 'eventid' => $eventid, 'status' => $status});
+			push(@result, {'eventid' => $eventid, 'clock' => $clock, 'status' => $status_str});
+		}
+
+		db_disconnect();
 	}
-	db_disconnect();
-	}
-	undef($server_key);
 
 	return \@result;
 }
@@ -1380,9 +1374,9 @@ sub __get_probe_changes($$)
 
 	my @result;
 
-	foreach my $_server_key (sort(keys(%{$probes_data})))
+	foreach my $server_key (sort(keys(%{$probes_data})))
 	{
-		db_connect($_server_key);
+		db_connect($server_key);
 
 		# cache probe online statuses
 		# TODO: FIXME, we have done that already in other processes! (search for this message in this file)
@@ -1392,7 +1386,7 @@ sub __get_probe_changes($$)
 			probe_online_at($probe, $from, ($till + 1 - $from));
 		}
 
-		my $probe_times = __get_probe_times($from, $till, $probes_data->{$_server_key});
+		my $probe_times = __get_probe_times($from, $till, $probes_data->{$server_key});
 
 		db_disconnect();
 
@@ -1539,7 +1533,7 @@ sub __get_incidents2
 			my $preincident_clock = $row_ref->[0];
 
 			$rows_ref = db_select(
-				"select eventid,clock,value,false_positive".
+				"select eventid,clock,value".
 				" from events".
 				" where object=".EVENT_OBJECT_TRIGGER.
 					" and source=".EVENT_SOURCE_TRIGGERS.
@@ -1553,7 +1547,8 @@ sub __get_incidents2
 			my $eventid = $row_ref->[0];
 			my $clock = $row_ref->[1];
 			my $value = $row_ref->[2];
-			my $false_positive = $row_ref->[3];
+
+			my $false_positive = get_event_false_positiveness($eventid);
 
 			dbg("reading pre-event $eventid: clock:" . ts_str($clock) . " ($clock), value:", ($value == 0 ? 'OK' : 'PROBLEM'), ", false_positive:$false_positive") if (opt('debug'));
 
@@ -1569,7 +1564,7 @@ sub __get_incidents2
 
 	# now check for incidents within given period
 	$rows_ref = db_select(
-		"select eventid,clock,value,false_positive".
+		"select eventid,clock,value".
 		" from events".
 		" where object=".EVENT_OBJECT_TRIGGER.
 			" and source=".EVENT_SOURCE_TRIGGERS.
@@ -1582,7 +1577,8 @@ sub __get_incidents2
 		my $eventid = $row_ref->[0];
 		my $clock = $row_ref->[1];
 		my $value = $row_ref->[2];
-		my $false_positive = $row_ref->[3];
+
+		my $false_positive = get_event_false_positiveness($eventid);
 
 		dbg("reading event $eventid: clock:" . ts_str($clock) . " ($clock), value:", ($value == 0 ? 'OK' : 'PROBLEM'), ", false_positive:$false_positive") if (opt('debug'));
 

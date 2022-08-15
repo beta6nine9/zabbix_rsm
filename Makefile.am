@@ -16,7 +16,8 @@ EXTRA_DIST = \
 	conf \
 	sass
 
-EXTRA_DIST += opt
+# RSM specifics
+EXTRA_DIST += opt api
 
 ## "dist-hook" run after the distribution directory is filled, but before the actual tar (or shar) file is created.
 dist-hook:
@@ -142,9 +143,9 @@ WRAP_IO_FUNCS = \
 WRAP_FS_FUNCS = \
 	-Wl,--wrap=opendir \
 	-Wl,--wrap=readdir \
-	-Wl,--wrap=stat \
 	-Wl,--wrap=__xstat \
-	-Wl,--wrap=__fxstat
+	-Wl,--wrap=__fxstat \
+	-Wl,--wrap=stat
 
 WRAP_EXIT = \
 	-Wl,--wrap=exit
@@ -171,6 +172,9 @@ tests_build:
 
 tests: tests_build
 	tests/tests_run.pl
+
+clean: clean-recursive
+	cd tests && $(MAKE) clean
 endif
 
-.PHONY: test tests
+.PHONY: test tests clean

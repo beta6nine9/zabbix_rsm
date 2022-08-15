@@ -1,0 +1,9 @@
+{
+    "resultCode": 400,
+    "title": "JSON does not comply with definition",
+    "description": "Invalid parameter \"dnsParameters.nsIps.4\": value (ns, ip)=(c.ns.tld1, 192.168.1.3) already exists.",
+    "details": {
+        "centralServer": 1
+    },
+    "updatedObject": null
+}

@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -45,7 +45,7 @@ class CControllerWidgetActionLogView extends CControllerWidget {
 		]);
 
 		$this->setResponse(new CControllerResponseData([
-			'name' => $this->getInput('name', $this->getDefaultHeader()),
+			'name' => $this->getInput('name', $this->getDefaultName()),
 			'actions' => $actions,
 			'alerts'  => $alerts,
 			'db_users' => $db_users,
@@ -109,7 +109,7 @@ class CControllerWidgetActionLogView extends CControllerWidget {
 
 		return $userids
 			? API::User()->get([
-				'output' => ['userid', 'alias', 'name', 'surname'],
+				'output' => ['userid', 'username', 'name', 'surname'],
 				'userids' => array_keys($userids),
 				'preservekeys' => true
 			])

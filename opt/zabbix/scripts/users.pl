@@ -10,9 +10,9 @@ use Zabbix;
 use RSM;
 use RSMSLV;
 
-use constant USER_TYPE_READ_ONLY_USER => 4;	# User type "Read-only user"
-use constant USER_TYPE_POWER_USER     => 5;	# User type "Power user"
-use constant USER_TYPE_SUPER_ADMIN    => 3;	# User type "Zabbix Super Admin"
+use constant USER_ROLE_READ_ONLY   => 100;	# User type "Read-only user"
+use constant USER_ROLE_POWER_USER  => 110;	# User type "Power user"
+use constant USER_ROLE_SUPER_ADMIN => 3;	# User type "Zabbix Super Admin"
 
 # NB! Keep these values in sync with DB schema!
 use constant READ_ONLY_USER_GROUPID => 100;	# User group "Read-only user"
@@ -23,23 +23,25 @@ use constant USER_TYPES =>
 {
 	'read-only-user' =>
 	{
-		'type'     => USER_TYPE_READ_ONLY_USER,
+		'roleid'   => USER_ROLE_READ_ONLY,
 		'usrgrpid' => READ_ONLY_USER_GROUPID,
 		'url'      => 'zabbix.php?action=rsm.rollingweekstatus',
 	},
 	'power-user' =>
 	{
-		'type'     => USER_TYPE_POWER_USER,
+		'roleid'   => USER_ROLE_POWER_USER,
 		'usrgrpid' => POWER_USER_GROUPID,
 		'url'      => 'zabbix.php?action=rsm.rollingweekstatus',
 	},
 	'admin' =>
 	{
-		'type'     => USER_TYPE_SUPER_ADMIN,
+		'roleid'   => USER_ROLE_SUPER_ADMIN,
 		'usrgrpid' => SUPER_ADMIN_GROUPID,
 		'url'      => 'zabbix.php?action=dashboard.view',
 	}
 };
+
+sub __get_userid($$$$$);
 
 parse_opts('add', 'delete', 'modify', 'user=s', 'type=s', 'password=s', 'firstname=s', 'lastname=s', 'server-id=i');
 
@@ -65,19 +67,24 @@ foreach my $server_key (@server_keys)
 
 	print("Processing $server_key\n");
 
-	my $zabbix = Zabbix->new({'url' => $section->{'za_url'}, 'user' => $section->{'za_user'},
-			'password' => $section->{'za_password'}, 'debug' => getopt('debug')});
+	my $zabbix = Zabbix->new({
+		'url'      => $section->{'za_url'},
+		'user'     => $section->{'za_user'},
+		'password' => $section->{'za_password'},
+		'debug'    => getopt('debug'),
+	});
 
 	if (opt('add'))
 	{
 		my $options = {
-			'alias' => getopt('user'),
-			'type' => USER_TYPES->{getopt('type')}->{'type'},
-			'passwd' => getopt('password'),
-			'name' => getopt('firstname'),
-			'surname' => getopt('lastname'),
-			'url' => USER_TYPES->{getopt('type')}->{'url'},
-			'usrgrps' => [{'usrgrpid' => USER_TYPES->{getopt('type')}->{'usrgrpid'}}]};
+			'username' => getopt('user'),
+			'roleid'   => USER_TYPES->{getopt('type')}->{'roleid'},
+			'passwd'   => getopt('password'),
+			'name'     => getopt('firstname'),
+			'surname'  => getopt('lastname'),
+			'url'      => USER_TYPES->{getopt('type')}->{'url'},
+			'usrgrps'  => [{'usrgrpid' => USER_TYPES->{getopt('type')}->{'usrgrpid'}}],
+		};
 
 		my $result = $zabbix->create('user', $options);
 
@@ -106,7 +113,7 @@ foreach my $server_key (@server_keys)
 	}
 	elsif (opt('modify'))
 	{
-		my $userid = __get_userid($zabbix, $server_id, getopt('user'), $modified);
+		my $userid = __get_userid($server_key, $zabbix, $server_id, getopt('user'), $modified);
 
 		my $result = $zabbix->update('user', {'userid' => $userid, 'passwd' => getopt('password')});
 
@@ -126,7 +133,7 @@ foreach my $server_key (@server_keys)
 	}
 	else
 	{
-		my $userid = __get_userid($zabbix, $server_id, getopt('user'), $modified);
+		my $userid = __get_userid($server_key, $zabbix, $server_id, getopt('user'), $modified);
 
 		my $result = $zabbix->remove('user', [$userid]);
 
@@ -148,20 +155,27 @@ foreach my $server_key (@server_keys)
 	$modified = 1;
 }
 
-sub __get_userid
+sub __get_userid($$$$$)
 {
-	my $zabbix = shift;
-	my $server_id = shift;
-	my $alias = shift;
-	my $modified = shift;
+	my $server_key = shift;
+	my $zabbix     = shift;
+	my $server_id  = shift;
+	my $username   = shift;
+	my $modified   = shift;
 
-	my $options = {'output' => ['userid'], 'filter' => {'alias' => $alias}};
+	my $options = {'output' => ['userid'], 'filter' => {'username' => $username}};
 
 	my $result = $zabbix->get('user', $options);
 
+	if (ref($result) ne "HASH")
+	{
+		print("Error: cannot get user \"$username\": reply is not a HASH reference. Please run with \"--debug\"");
+		exit(-1);
+	}
+
 	if ($result->{'error'})
 	{
-		if ($result->{'error'}->{'data'} =~ /Session terminated/)
+		if ($result->{'error'}{'data'} =~ /Session terminated/)
 		{
 			print("Session terminated. Please re-run the same command again");
 			print(" with option \"--server-id $server_id\"") if ($modified == 1);
@@ -169,7 +183,7 @@ sub __get_userid
 		}
 		else
 		{
-			print("Error: cannot get user \"$alias\". ", $result->{'error'}->{'data'}, "\n");
+			print("Error: cannot get user \"$username\". ", $result->{'error'}{'data'}, "\n");
 
 			if ($modified == 1)
 			{
@@ -184,7 +198,7 @@ sub __get_userid
 
 	if (!$userid)
 	{
-		print("Error: user \"$alias\" not found on $server_key\n");
+		print("Error: user \"$username\" not found on $server_key\n");
 
 		if ($modified == 1)
 		{

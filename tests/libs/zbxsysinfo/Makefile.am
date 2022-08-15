@@ -81,7 +81,6 @@ parse_item_key_LDADD = \
 	$(top_srcdir)/src/libs/zbxmodules/libzbxmodules.a \
 	$(top_srcdir)/src/libs/zbxtasks/libzbxtasks.a \
 	$(top_srcdir)/src/zabbix_server/libzbxserver.a \
-	$(top_srcdir)/src/libs/zbxxml/libzbxxml.a \
 	$(top_srcdir)/tests/libzbxmocktest.a \
 	$(top_srcdir)/tests/libzbxmockdata.a
 
@@ -144,9 +143,9 @@ process_WRAP_FUNCS = \
 
 process_LDADD += @AGENT_LIBS@
 
-process_LDFLAGS = @AGENT_LDFLAGS@
+process_LDFLAGS = @AGENT_LDFLAGS@ $(process_WRAP_FUNCS)
 
-process_CFLAGS = $(process_WRAP_FUNCS) -DZABBIX_DAEMON -I@top_srcdir@/tests
+process_CFLAGS = -DZABBIX_DAEMON -I@top_srcdir@/tests
 
 # process_http
 

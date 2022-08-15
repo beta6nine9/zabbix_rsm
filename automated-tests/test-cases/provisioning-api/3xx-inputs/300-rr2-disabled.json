@@ -1,0 +1,9 @@
+{
+    "registrarName": "Registrar Name 2",
+    "registrarFamily": "Registrar Family 2",
+    "servicesStatus": [
+        { "service": "rdds43", "enabled": false },
+        { "service": "rdds80", "enabled": false },
+        { "service": "rdap"  , "enabled": false }
+    ]
+}

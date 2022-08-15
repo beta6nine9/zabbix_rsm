@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -228,26 +228,10 @@ $operations_popup_form_list
 			->setChecked(array_key_exists('opseverity', $options))
 			->setReadonly($options['templated']),
 		(new CDiv(
-			(new CSeverity([
-				'name' => 'opseverity[severity]',
-				'value' => (int) $field_values['opseverity']['severity']
-			]))->setReadonly($options['templated'])
+			(new CSeverity('opseverity[severity]', (int) $field_values['opseverity']['severity']))
+				->setReadonly($options['templated'])
 		))->setId('opseverity_div'),
 		'opseverity_row'
-	)
-	->addRow(
-		(new CVisibilityBox('visible[optag]', 'optag_div', _('Original')))
-			->setLabel(_('Tags'))
-			->setChecked(array_key_exists('optag', $options))
-			->setReadonly($options['templated']),
-		(new CDiv(
-			renderTagTable($field_values['optag'], $options['templated'],
-					['field_name' => 'optag', 'add_post_js' => false])
-				->setHeader([_('Name'), _('Value'), _('Action')])
-				->addClass(ZBX_STYLE_TABLE_FORMS_SEPARATOR)
-				->setId('tags-table')
-		))->setId('optag_div'),
-		'optag_row'
 	)
 	->addRow(
 		(new CVisibilityBox('visible[optemplate]', 'optemplate_div', _('Original')))
@@ -272,6 +256,20 @@ $operations_popup_form_list
 			]))->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
 		]))->setId('optemplate_div'),
 		'optemplate_row'
+	)
+	->addRow(
+		(new CVisibilityBox('visible[optag]', 'optag_div', _('Original')))
+			->setLabel(_('Tags'))
+			->setChecked(array_key_exists('optag', $options))
+			->setReadonly($options['templated']),
+		(new CDiv(
+			renderTagTable($field_values['optag'], $options['templated'],
+					['field_name' => 'optag', 'add_post_js' => false])
+				->setHeader([_('Name'), _('Value'), _('Action')])
+				->addClass(ZBX_STYLE_TABLE_FORMS_SEPARATOR)
+				->setId('tags-table')
+		))->setId('optag_div'),
+		'optag_row'
 	)
 	->addRow(
 		(new CVisibilityBox('visible[opinventory]', 'opinventory_inventory_mode', _('Original')))

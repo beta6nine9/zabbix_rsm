@@ -13,6 +13,8 @@ use TLD_constants qw(:api);
 parse_slv_opts();
 fail_if_running();
 
+log_execution_time(1, 1);
+
 set_slv_config(get_rsm_config());
 
 db_connect();
@@ -52,7 +54,7 @@ my $rtt_params_list =
 	},
 	{
 		'probes'                     => get_probes("RDDS"),
-		'tlds_service'               => "rdds43",
+		'tlds_service'               => "rdds80",
 		'rtt_item_key_pattern'       => RTT_ITEM_KEY_PATTERN_RDDS80,
 		'lastclock_control_item_key' => undef,
 		'timeout_error_value'        => RTT_TIMEOUT_ERROR_RDDS80,

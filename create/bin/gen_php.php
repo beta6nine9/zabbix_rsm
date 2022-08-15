@@ -7,6 +7,13 @@ function parse_schema($path) {
 	$schema = [];
 	$lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
 
+	/* RSM specifics: add RSM-specific tables */
+	$lines = array_merge(
+		$lines,
+		file(str_replace('/schema.tmpl', '/rsm-schema.tmpl', $path), FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES)
+	);
+	/* RSM specifics: end */
+
 	foreach ($lines as $line) {
 		$str = explode('|', $line, 2);
 		$part = trim($str[0]);
@@ -24,6 +31,9 @@ function parse_schema($path) {
 
 				$field = trim($str[0]);
 				$type = trim($str[1]);
+				if ($table === 'triggers' && $field === 'description' && $type === 't_shorttext') {
+					$type = 't_varchar(255)';
+				}
 				$default = trim($str[2]);
 				$null = trim($str[3]);
 				$ref_table = isset($str[6]) ? trim($str[6]) : null;
@@ -66,6 +76,10 @@ function parse_schema($path) {
 					case 't_image':
 						$type = 'DB::FIELD_TYPE_BLOB';
 						$length = 2048;
+						break;
+					case 't_cuid':
+						$type = 'DB::FIELD_TYPE_CUID';
+						$length = 25;
 						break;
 				}
 

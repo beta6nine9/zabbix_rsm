@@ -1,6 +1,6 @@
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -41,6 +41,7 @@ type UserParameterPlugin struct {
 	plugin.Base
 	parameters           map[string]*parameterInfo
 	unsafeUserParameters int
+	userParameterDir     string
 }
 
 var userParameter UserParameterPlugin
@@ -113,7 +114,7 @@ func (p *UserParameterPlugin) Export(key string, params []string, ctx plugin.Con
 
 	p.Debugf("executing command:'%s'", s)
 
-	stdoutStderr, err := zbxcmd.Execute(s, time.Second*time.Duration(Options.Timeout))
+	stdoutStderr, err := zbxcmd.Execute(s, time.Second*time.Duration(Options.Timeout), p.userParameterDir)
 	if err != nil {
 		return nil, err
 	}
@@ -123,28 +124,26 @@ func (p *UserParameterPlugin) Export(key string, params []string, ctx plugin.Con
 	return stdoutStderr, nil
 }
 
-func InitUserParameterPlugin(userParameterConfig []string, unsafeUserParameters int) error {
-	userParameter.parameters = make(map[string]*parameterInfo)
-	userParameter.unsafeUserParameters = unsafeUserParameters
+func InitUserParameterPlugin(userParameterConfig []string, unsafeUserParameters int, userParameterDir string) (keys []string, err error) {
+	params := make(map[string]*parameterInfo)
 
 	for i := 0; i < len(userParameterConfig); i++ {
 		s := strings.SplitN(userParameterConfig[i], ",", 2)
-
 		if len(s) != 2 {
-			return fmt.Errorf("cannot add user parameter \"%s\": not comma-separated", userParameterConfig[i])
+			return nil, fmt.Errorf("cannot add user parameter \"%s\": not comma-separated", userParameterConfig[i])
 		}
 
 		key, p, err := itemutil.ParseKey(s[0])
 		if err != nil {
-			return fmt.Errorf("cannot add user parameter \"%s\": %s", userParameterConfig[i], err)
+			return nil, fmt.Errorf("cannot add user parameter \"%s\": %s", userParameterConfig[i], err)
 		}
 
 		if acc, _ := plugin.Get(key); acc != nil {
-			return fmt.Errorf(`cannot register user parameter "%s": key already used`, userParameterConfig[i])
+			return nil, fmt.Errorf(`cannot register user parameter "%s": key already used`, userParameterConfig[i])
 		}
 
 		if len(strings.TrimSpace(s[1])) == 0 {
-			return fmt.Errorf("cannot add user parameter \"%s\": command is missing", userParameterConfig[i])
+			return nil, fmt.Errorf("cannot add user parameter \"%s\": command is missing", userParameterConfig[i])
 		}
 
 		parameter := &parameterInfo{cmd: s[1]}
@@ -152,12 +151,20 @@ func InitUserParameterPlugin(userParameterConfig []string, unsafeUserParameters 
 		if len(p) == 1 && p[0] == "*" {
 			parameter.flexible = true
 		} else if len(p) != 0 {
-			return fmt.Errorf("cannot add user parameter \"%s\": syntax error", userParameterConfig[i])
+			return nil, fmt.Errorf("cannot add user parameter \"%s\": syntax error", userParameterConfig[i])
 		}
 
-		userParameter.parameters[key] = parameter
-		plugin.RegisterMetrics(&userParameter, "UserParameter", key, fmt.Sprintf("User parameter: %s.", s[1]))
+		params[key] = parameter
+		keys = append(keys, key)
 	}
 
-	return nil
+	userParameter.parameters = params
+	userParameter.unsafeUserParameters = unsafeUserParameters
+	userParameter.userParameterDir = userParameterDir
+
+	for _, key := range keys {
+		plugin.RegisterMetrics(&userParameter, "UserParameter", key, fmt.Sprintf("User parameter: %s.", userParameter.parameters[key].cmd))
+	}
+
+	return keys, nil
 }

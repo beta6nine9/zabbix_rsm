@@ -29,6 +29,7 @@ use Exception;
 use CControllerResponseFatal;
 use CControllerResponseData;
 use CControllerResponseRedirect;
+use Modules\RSM\Helpers\ValueMapHelper as VM;
 
 class AggregateDetailsAction extends Action {
 
@@ -227,8 +228,6 @@ class AggregateDetailsAction extends Action {
 
 		$probe_nstotal = [];
 
-		$transport_map = $this->getValueMapping(RSM_TRANSPORT_PROTOCOL_VALUE_MAP);
-
 		foreach ($test_items as $test_item) {
 			if (!array_key_exists($test_item['itemid'], $test_values)) {
 				continue;
@@ -282,7 +281,7 @@ class AggregateDetailsAction extends Action {
 					break;
 
 				case PROBE_DNS_TRANSPORT:
-					$this->probes[$probeid]['transport'] = $transport_map[$value];
+					$this->probes[$probeid]['transport'] = VM::get(RSM_VALUE_MAP_TRANSPORT_PROTOCOL, $value);
 					break;
 
 				case PROBE_DNS_RTT:
@@ -308,10 +307,6 @@ class AggregateDetailsAction extends Action {
 
 		$data['dns_nameservers'] = $dns_nameservers;
 		$data['nsids'] = $this->getNSIDdata($dns_nameservers, $time_from, $time_till);
-
-		if ($data['type'] == RSM_DNSSEC) {
-			$data['dnssec_errors'] = $this->getDnssecErrorData();
-		}
 
 		// Set Name servers down for each probe.
 		foreach ($probe_nstotal as $probeid => $total) {
@@ -394,8 +389,6 @@ class AggregateDetailsAction extends Action {
 			'time' => $time_from,
 			'udp_rtt' => $macro[CALCULATED_ITEM_DNS_UDP_RTT_HIGH],
 			'tcp_rtt' => $macro[CALCULATED_ITEM_DNS_TCP_RTT_HIGH],
-			'test_error_message' => $this->getValueMapping(RSM_DNS_RTT_ERRORS_VALUE_MAP),
-			'test_status_message' => $this->getValueMapping(RSM_SERVICE_AVAIL_VALUE_MAP)
 		];
 		$time_till = $time_from + ($macro[CALCULATED_ITEM_DNS_DELAY] - 1);
 
@@ -443,6 +436,15 @@ class AggregateDetailsAction extends Action {
 				 */
 				if (isset($probe['history_value']) && $probe['history_value'] == PROBE_DOWN) {
 					$this->probes[$probe['hostid']]['probe_status'] = PROBE_OFFLINE;
+				}
+			}
+
+			// DNSSEC-specific errors for displaying in a table
+			if ($data['type'] == RSM_DNSSEC) {
+				foreach (VM::getMapping(RSM_VALUE_MAP_DNS_RTT) as $code => $description) {
+					if (isServiceErrorCode($code, RSM_DNSSEC)) {
+						$data['dnssec_errors'][$code] = $description;
+					}
 				}
 			}
 
@@ -567,29 +569,5 @@ class AggregateDetailsAction extends Action {
 		}
 
 		return $nsids;
-	}
-
-	/**
-	 * Collects DNSSEC-specific errors. The errors will be returned as an array with error code as index
-	 * and error description as value.
-	 *
-	 * Return array of DNSSEC-specific errors.
-	 *
-	 * @return array
-	 */
-	protected function getDnssecErrorData() {
-		$dnssec_errors = [];
-
-		// These DNS error codes include DNSSEC
-		$errors = $this->getValueMapping(RSM_DNS_RTT_ERRORS_VALUE_MAP);
-
-		// Let's filter out DNSSEC ones
-		foreach ($errors as $code => $description) {
-			if (isServiceErrorCode($code, RSM_DNSSEC)) {
-				$dnssec_errors[$code] = $description;
-			}
-		}
-
-		return $dnssec_errors;
 	}
 }

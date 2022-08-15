@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+
+set -o errexit
+set -o nounset
+set -o pipefail
+#set -o xtrace
+
+. 'config'
+
+if [[ "$0" == *"-update"* || "$0" == *"-disable"* || "$0" == *"-delete"* ]]; then
+	declare -i min
+	declare -i max
+
+	if [[ $# -eq 0 ]]; then
+		min=1
+		max=1
+	elif [[ $# -eq 1 ]]; then
+		min=$1
+		max=$1
+	elif [[ $# -eq 2 ]]; then
+		min=$1
+		max=$2
+	else
+		echo "Usage:"
+		echo "$0 [min] [max]"
+		exit 1
+	fi
+fi
+
+function generate_url()
+{
+	declare -r OBJECT_TYPE="${1}"
+	declare -r OBJECT_ID="${2:-}"
+
+	declare url
+
+	if [[ $USE_FORWARDER -ne 0 ]]; then
+		url="${FORWARDER_URL}/${OBJECT_TYPE}${OBJECT_ID:+/$OBJECT_ID}"
+	else
+		declare -rA ACTIONS=(
+			["tlds"]="rsm.provisioningapi.tld"
+			["registrars"]="rsm.provisioningapi.registrar"
+			["probeNodes"]="rsm.provisioningapi.probe"
+		)
+		url="${FRONTEND_URL}/zabbix.php?action=${ACTIONS[$OBJECT_TYPE]}${OBJECT_ID:+&id=$OBJECT_ID}"
+	fi
+
+	echo "$url"
+}
+
+function provisioning_api()
+{
+	declare -r USER="provisioning-api-${1,,}"
+	declare -r REQUEST="${2^^}"
+	declare -r OBJECT_TYPE="${3}"
+	declare -r OBJECT_ID="${4:-}"
+	declare    JSON="${5:-}"
+
+	declare -r URL="$(generate_url $OBJECT_TYPE $OBJECT_ID)"
+
+	declare -r LINE="$(printf "=%.0s" {1..120})"
+
+	echo "${LINE}"
+	echo "${REQUEST} ${URL}"
+	echo "${LINE}"
+
+	if [[ -n "${JSON}" ]]; then
+		if [[ $USE_FORWARDER -eq 0 ]]; then
+			JSON="${JSON/$',\n    "centralServer": 1'/''}"
+		fi
+
+		echo "${JSON}"
+		echo "${LINE}"
+	fi
+
+	curl                                         \
+		--no-progress-meter                  \
+		--no-buffer                          \
+		--include                            \
+		--styled-output                      \
+		--header 'Expect:'                   \
+		--basic                              \
+		--user "${USER}:password"            \
+		--request "${REQUEST}"               \
+		${JSON:+"--data"} ${JSON:+"${JSON}"} \
+		"${URL}"
+	echo
+	echo "${LINE}"
+}

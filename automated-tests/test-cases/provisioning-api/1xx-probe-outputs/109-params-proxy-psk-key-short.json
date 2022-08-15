@@ -1,0 +1,9 @@
+{
+    "resultCode": 400,
+    "title": "JSON does not comply with definition",
+    "description": "Invalid parameter \"zabbixProxyParameters.proxyPsk\": minimum length is 32 characters.",
+    "details": {
+        "centralServer": 1
+    },
+    "updatedObject": null
+}

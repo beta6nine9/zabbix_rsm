@@ -12,6 +12,8 @@ use Exporter qw(import);
 use Zabbix;
 use Alerts;
 use TLD_constants qw(:api :items :ec :groups :config :templates);
+use DateTime;
+use File::Basename;
 use File::Pid;
 use POSIX qw(floor);
 use Sys::Syslog;
@@ -74,11 +76,13 @@ use constant USE_CACHE_TRUE			=> 1;
 # for packaging, use this as part of the "ident" for syslog
 use constant ZABBIX_NAMESPACE			=> '';
 
-our ($result, $dbh, $tld, $server_key);
+my $_server_key;
+
+our ($result, $dbh, $tld);
 
 our %OPTS; # specified command-line options
 
-our @EXPORT = qw($result $dbh $tld $server_key
+our @EXPORT = qw($result $dbh $tld
 		E_ID_NONEXIST E_ID_MULTIPLE UP DOWN SLV_UNAVAILABILITY_LIMIT MIN_LOGIN_ERROR
 		UP_INCONCLUSIVE_NO_PROBES
 		UP_INCONCLUSIVE_NO_DATA
@@ -91,6 +95,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		PROBE_DELAY
 		ONLINE OFFLINE
 		USE_CACHE_FALSE USE_CACHE_TRUE
+		log_execution_time
 		get_macro_dns_probe_online
 		get_macro_rdds_probe_online
 		get_macro_rdap_probe_online
@@ -150,12 +155,13 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		uint_value_exists
 		float_value_exists
 		sql_time_condition get_incidents get_downtime
+		get_event_false_positiveness
 		history_table
 		get_lastvalue get_itemids_by_hostids get_nsip_values
 		get_valuemaps get_statusmaps get_detailed_result
 		get_avail_valuemaps
 		get_result_string get_tld_by_trigger truncate_from truncate_till alerts_enabled
-		get_real_services_period dbg info wrn fail set_on_fail
+		get_real_services_period dbg info wrn fail set_on_fail log_only_message log_stacktrace
 		format_stats_time
 		init_process finalize_process
 		slv_exit
@@ -168,7 +174,7 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		str_starts_with_any
 		str_ends_with
 		parse_opts parse_slv_opts override_opts
-		opt getopt setopt unsetopt optkeys ts_str ts_full selected_period
+		opt getopt setopt unsetopt optkeys ts_str ts_full ts_ymd ts_hms selected_period
 		cycle_start
 		cycle_end
 		update_slv_rtt_monthly_stats
@@ -176,9 +182,27 @@ our @EXPORT = qw($result $dbh $tld $server_key
 		generate_report
 		get_test_history
 		get_test_results
+		fp_get_updated_eventids
 		set_log_tld unset_log_tld
 		convert_suffixed_number
+		var_dump
 		usage);
+
+# for logging script execution times
+
+my $log_execution_time = undef; # should execution time be logged?
+my $log_execution_time_ext = undef; # should detailed execution times be logged?
+my $execution_time_start;
+my $execution_time_end;
+my $execution_time_sending_values_start;
+my $execution_time_sending_values_end;
+my $execution_time_value_count = 0;
+
+sub log_execution_time($$)
+{
+	$log_execution_time     = shift;
+	$log_execution_time_ext = shift;
+}
 
 # configuration, set in set_slv_config()
 my $config = undef;
@@ -652,7 +676,7 @@ sub __get_itemid_by_sql
 	return E_ID_NONEXIST if (scalar(@$rows_ref) == 0);
         return E_ID_MULTIPLE if (scalar(@$rows_ref) > 1);
 
-        return $rows_ref->[0]->[0];
+        return $rows_ref->[0][0];
 }
 
 # Return itemids of Name Server items in form:
@@ -805,7 +829,7 @@ sub get_lastclock($$$)
 
 	return E_FAIL if (scalar(@$rows_ref) == 0);
 
-	my $itemid = $rows_ref->[0]->[0];
+	my $itemid = $rows_ref->[0][0];
 	my $lastclock;
 
 	if (get_lastvalue($itemid, $value_type, undef, \$lastclock) != SUCCESS)
@@ -838,7 +862,7 @@ sub get_oldest_clock($$$$)
 
 	return E_FAIL if (scalar(@$rows_ref) == 0);
 
-	my $itemid = $rows_ref->[0]->[0];
+	my $itemid = $rows_ref->[0][0];
 
 	$rows_ref = db_select(
 		"select min(clock)".
@@ -847,10 +871,10 @@ sub get_oldest_clock($$$$)
 			" and clock>$clock_limit"
 	);
 
-	return $rows_ref->[0]->[0];
+	return $rows_ref->[0][0];
 }
 
-# $tlds_cache{$server_key}{$service}{$clock} = ["tld1", "tld2", ...];
+# $tlds_cache{$_server_key}{$service}{$clock} = ["tld1", "tld2", ...];
 my %tlds_cache = ();
 
 sub get_tlds(;$$$)
@@ -864,9 +888,9 @@ sub get_tlds(;$$$)
 		fail("invalid value for \$use_cache argument - '$use_cache'");
 	}
 
-	if ($use_cache == USE_CACHE_TRUE && exists($tlds_cache{$server_key}{$service // ''}{$clock // 0}))
+	if ($use_cache == USE_CACHE_TRUE && exists($tlds_cache{$_server_key}{$service // ''}{$clock // 0}))
 	{
-		return $tlds_cache{$server_key}{$service // ''}{$clock // 0};
+		return $tlds_cache{$_server_key}{$service // ''}{$clock // 0};
 	}
 
 	my $rows_ref = db_select(
@@ -892,7 +916,7 @@ sub get_tlds(;$$$)
 
 	if ($use_cache == USE_CACHE_TRUE)
 	{
-		$tlds_cache{$server_key}{$service // ''}{$clock // 0} = \@tlds;
+		$tlds_cache{$_server_key}{$service // ''}{$clock // 0} = \@tlds;
 	}
 
 	return \@tlds;
@@ -919,7 +943,7 @@ sub get_tlds_and_hostids(;$)
 		" order by h.host");
 }
 
-# $probes_cache{$server_key}{$name}{$service} = {$host => $hostid, ...}
+# $probes_cache{$_server_key}{$name}{$service} = {$host => $hostid, ...}
 my %probes_cache = ();
 
 # Returns a reference to hash of all probes (host => {'hostid' => hostid, 'status' => status}).
@@ -936,12 +960,12 @@ sub get_probes(;$$)
 		$service = "ALL";
 	}
 
-	if (!exists($probes_cache{$server_key}{$name}))
+	if (!exists($probes_cache{$_server_key}{$name}))
 	{
-		$probes_cache{$server_key}{$name} = __get_probes($name);
+		$probes_cache{$_server_key}{$name} = __get_probes($name);
 	}
 
-	return $probes_cache{$server_key}{$name}{$service};
+	return $probes_cache{$_server_key}{$name}{$service};
 }
 
 sub __get_probes($)
@@ -1136,7 +1160,7 @@ sub get_hostid
 	fail("host \"$host\" not found") if (scalar(@$rows_ref) == 0);
 	fail("multiple hosts \"$host\" found") if (scalar(@$rows_ref) > 1);
 
-	return $rows_ref->[0]->[0];
+	return $rows_ref->[0][0];
 }
 
 sub tld_exists_locally($)
@@ -1184,6 +1208,12 @@ sub validate_tld($$)
 		}
 	}
 
+	if (scalar(@{$server_keys}) && defined($_server_key))
+	{
+		# connect back
+		db_connect($_server_key);
+	}
+
 	fail("tld \"$tld\" does not exist");
 }
 
@@ -1221,12 +1251,12 @@ sub tld_service_enabled($$$)
 
 	$service = lc($service);
 
-	if (!defined($tld_service_enabled_cache{$server_key}{$tld}{$service}{$now}))
+	if (!defined($tld_service_enabled_cache{$_server_key}{$tld}{$service}{$now}))
 	{
-		$tld_service_enabled_cache{$server_key}{$tld}{$service}{$now} = __tld_service_enabled($tld, $service, $now);
+		$tld_service_enabled_cache{$_server_key}{$tld}{$service}{$now} = __tld_service_enabled($tld, $service, $now);
 	}
 
-	return $tld_service_enabled_cache{$server_key}{$tld}{$service}{$now};
+	return $tld_service_enabled_cache{$_server_key}{$tld}{$service}{$now};
 }
 
 sub __tld_service_enabled($$$)
@@ -1238,6 +1268,7 @@ sub __tld_service_enabled($$$)
 	if ($service eq 'rdds')
 	{
 		return 1 if (tld_interface_enabled($tld, 'rdds43', $now));
+		return 1 if (tld_interface_enabled($tld, 'rdds80', $now));
 		return 1 if (tld_interface_enabled($tld, 'rdap', $now) && !is_rdap_standalone($now));
 		return 0;
 	}
@@ -1250,11 +1281,6 @@ sub __tld_service_enabled($$$)
 sub enabled_item_key_from_interface
 {
 	my $interface = shift;
-
-	if ($interface eq 'rdds43' || $interface eq 'rdds80')
-	{
-		return 'rdds.enabled';
-	}
 
 	return "$interface.enabled";
 }
@@ -1473,10 +1499,6 @@ sub tld_interface_enabled($$$)
 	{
 		$macro = '{$RDAP.TLD.ENABLED}';
 	}
-	elsif ($interface eq 'rdds43' || $interface eq 'rdds80')
-	{
-		$macro = '{$RSM.TLD.RDDS.ENABLED}';
-	}
 	else
 	{
 		$macro = '{$RSM.TLD.' . uc($interface) . '.ENABLED}';
@@ -1491,7 +1513,7 @@ sub tld_interface_enabled($$$)
 
 	if (scalar(@{$rows_ref}) != 0)
 	{
-		return $rows_ref->[0]->[0];
+		return $rows_ref->[0][0];
 	}
 
 	wrn("macro \"$macro\" does not exist at \"$host\", assuming $interface disabled");
@@ -1614,23 +1636,23 @@ sub handle_db_error($$$)
 
 sub db_connect
 {
-	$server_key = shift;
-
-	dbg("server_key:", ($server_key ? $server_key : "UNDEF"));
+	$_server_key = shift;
 
 	fail("Error: no database configuration") unless (defined($config));
 
 	db_disconnect() if (defined($dbh));
 
-	$server_key = get_rsm_local_key($config) unless ($server_key);
+	$_server_key //= get_rsm_local_key($config);
 
-	fail("Configuration error: section \"$server_key\" not found") unless (defined($config->{$server_key}));
+	dbg("server_key:", ($_server_key // "UNDEF"));
 
-	my $section = $config->{$server_key};
+	fail("Configuration error: section \"$_server_key\" not found") unless (defined($config->{$_server_key}));
+
+	my $section = $config->{$_server_key};
 
 	foreach my $key ('db_name', 'db_user')
 	{
-		fail("configuration error: database $key not specified in section \"$server_key\"")
+		fail("configuration error: database $key not specified in section \"$_server_key\"")
 			unless (defined($section->{$key}));
 	}
 
@@ -1676,9 +1698,9 @@ sub db_connect
 	{
 		my $rows_ref = db_select("show status like 'Ssl_cipher';");
 
-		fail("established connection is not secure") if ($rows_ref->[0]->[1] eq "");
+		fail("established connection is not secure") if ($rows_ref->[0][1] eq "");
 
-		dbg("established connection uses \"" . $rows_ref->[0]->[1] . "\" cipher");
+		dbg("established connection uses \"" . $rows_ref->[0][1] . "\" cipher");
 	}
 	else
 	{
@@ -1727,6 +1749,7 @@ sub db_disconnect
 
 		$dbh->disconnect() || wrn($dbh->errstr);
 		undef($dbh);
+		undef($_server_key);
 	}
 }
 
@@ -2116,8 +2139,6 @@ sub current_month_first_cycle
 
 sub month_start
 {
-	require DateTime;
-
 	my $dt = DateTime->from_epoch('epoch' => shift());
 	$dt->truncate('to' => 'month');
 	return $dt->epoch();
@@ -2141,8 +2162,6 @@ sub get_downtime_bounds
 {
 	my $delay = shift;
 	my $now = shift || (time() - $delay);
-
-	require DateTime;
 
 	my $till = cycle_end($now, $delay);
 
@@ -2418,6 +2437,8 @@ sub send_values
 
 		my $data = [map($_->{'data'}, @{$_sender_values->{'data'}})];
 
+		$execution_time_sending_values_start = Time::HiRes::time();
+
 		if (opt('output-file'))
 		{
 			my $output_file = getopt('output-file');
@@ -2429,6 +2450,9 @@ sub send_values
 			dbg("sending $total_values values");	# send everything in one batch since server should be local
 			push_to_trapper($config->{'slv'}->{'zserver'}, $config->{'slv'}->{'zport'}, 10, 5, $data);
 		}
+
+		$execution_time_sending_values_end = Time::HiRes::time();
+		$execution_time_value_count += $total_values;
 	}
 
 	# $tld is a global variable which is used in info()
@@ -3234,7 +3258,7 @@ sub uint_value_exists($$)
 
         my $rows_ref = db_select("select 1 from history_uint where itemid=$itemid and clock=$clock");
 
-        return 1 if (defined($rows_ref->[0]->[0]));
+        return 1 if (defined($rows_ref->[0][0]));
 
         return 0;
 }
@@ -3246,7 +3270,7 @@ sub float_value_exists($$)
 
         my $rows_ref = db_select("select 1 from history where itemid=$itemid and clock=$clock");
 
-        return 1 if (defined($rows_ref->[0]->[0]));
+        return 1 if (defined($rows_ref->[0][0]));
 
         return 0;
 }
@@ -3306,6 +3330,24 @@ sub sql_time_condition
 	return "1=1";
 }
 
+sub get_event_false_positiveness($)
+{
+	my $eventid = shift;
+
+	my $rows = db_select(
+		"select status".
+		" from rsm_false_positive".
+		" where eventid=?".
+		" order by rsm_false_positiveid desc".
+		" limit 1",
+		[$eventid]
+	);
+
+	return 0 if (scalar(@{$rows}) == 0);	# not "false positive" by default
+
+	return $rows->[0][0];
+}
+
 # return incidents as an array reference (sorted by time):
 #
 # [
@@ -3356,7 +3398,7 @@ sub get_incidents
 		return \@incidents;
 	}
 
-	my $triggerid = $rows_ref->[0]->[0];
+	my $triggerid = $rows_ref->[0][0];
 
 	my $last_trigger_value = TRIGGER_VALUE_FALSE;
 
@@ -3378,7 +3420,7 @@ sub get_incidents
 			my $preincident_clock = $row_ref->[0];
 
 			$rows_ref = db_select(
-				"select eventid,clock,value,false_positive".
+				"select eventid,clock,value".
 				" from events".
 				" where object=".EVENT_OBJECT_TRIGGER.
 					" and source=".EVENT_SOURCE_TRIGGERS.
@@ -3392,7 +3434,8 @@ sub get_incidents
 			my $eventid = $row_ref->[0];
 			my $clock = $row_ref->[1];
 			my $value = $row_ref->[2];
-			my $false_positive = $row_ref->[3];
+
+			my $false_positive = get_event_false_positiveness($eventid);
 
 			if (opt('debug'))
 			{
@@ -3412,7 +3455,7 @@ sub get_incidents
 
 	# now check for incidents within given period
 	$rows_ref = db_select(
-		"select eventid,clock,value,false_positive".
+		"select eventid,clock,value".
 		" from events".
 		" where object=".EVENT_OBJECT_TRIGGER.
 			" and source=".EVENT_SOURCE_TRIGGERS.
@@ -3425,7 +3468,8 @@ sub get_incidents
 		my $eventid = $row_ref->[0];
 		my $clock = $row_ref->[1];
 		my $value = $row_ref->[2];
-		my $false_positive = $row_ref->[3];
+
+		my $false_positive = get_event_false_positiveness($eventid);
 
 		# NB! Incident start/end times must not be truncated to first/last second
 		# of a minute (do not use truncate_from and truncate_till) because they
@@ -3719,8 +3763,8 @@ sub get_lastvalue($$$$)
 
 	if (@{$rows_ref})
 	{
-		$$value_ref = $rows_ref->[0]->[0] if ($value_ref);
-		$$clock_ref = $rows_ref->[0]->[1] if ($clock_ref);
+		$$value_ref = $rows_ref->[0][0] if ($value_ref);
+		$$clock_ref = $rows_ref->[0][1] if ($clock_ref);
 
 		return SUCCESS;
 	}
@@ -3855,16 +3899,13 @@ sub __get_valuemappings
 {
 	my $vmname = shift;
 
-	my $rows_ref = db_select("select m.value,m.newvalue from valuemaps v,mappings m where v.valuemapid=m.valuemapid and v.name='$vmname'");
+	my $rows = db_select(
+		"select m.value,m.newvalue" .
+		" from valuemap v,valuemap_mapping m" .
+		" where v.valuemapid=m.valuemapid" .
+			" and v.name='$vmname'");
 
-	my $result = {};
-
-	foreach my $row_ref (@$rows_ref)
-	{
-		$result->{$row_ref->[0]} = $row_ref->[1];
-	}
-
-	return $result;
+	return {map {$_->[0] => $_->[1]} (@{$rows})};
 }
 
 # todo: the $vmname's must be fixed accordingly
@@ -3966,7 +4007,7 @@ sub get_tld_by_trigger
 
 	my $rows_ref = db_select("select distinct itemid from functions where triggerid=$triggerid");
 
-	my $itemid = $rows_ref->[0]->[0];
+	my $itemid = $rows_ref->[0][0];
 
 	return (undef, undef) unless ($itemid);
 
@@ -3974,8 +4015,8 @@ sub get_tld_by_trigger
 
 	$rows_ref = db_select("select hostid,substring(key_,9,locate('.avail',key_)-9) as service from items where itemid=$itemid");
 
-	my $hostid = $rows_ref->[0]->[0];
-	my $service = $rows_ref->[0]->[1];
+	my $hostid = $rows_ref->[0][0];
+	my $service = $rows_ref->[0][1];
 
 	fail("cannot get TLD by itemid $itemid") unless ($hostid);
 
@@ -3983,7 +4024,7 @@ sub get_tld_by_trigger
 
 	$rows_ref = db_select("select host from hosts where hostid=$hostid");
 
-	return ($rows_ref->[0]->[0], $service);
+	return ($rows_ref->[0][0], $service);
 }
 
 # truncate specified unix timestamp to 0 seconds
@@ -4157,7 +4198,7 @@ sub slv_exit
 
 	finalize_process($rv);
 
-	if ($rv != SUCCESS)
+	if ($rv != SUCCESS && log_stacktrace())
 	{
 		map { __log('err', $_) } split("\n", Devel::StackTrace->new()->as_string());
 	}
@@ -4241,6 +4282,38 @@ my $on_fail_cb;
 sub set_on_fail
 {
 	$on_fail_cb = shift;
+}
+
+my $log_only_message = 0;
+
+sub log_only_message(;$)
+{
+	my $flag = shift;
+
+	my $prev = $log_only_message;
+
+	if (defined($flag))
+	{
+		$log_only_message = $flag;
+	}
+
+	return $prev;
+}
+
+my $log_stacktrace = 1;
+
+sub log_stacktrace(;$)
+{
+	my $flag = shift;
+
+	my $prev = $log_stacktrace;
+
+	if (defined($flag))
+	{
+		$log_stacktrace = $flag;
+	}
+
+	return $prev;
 }
 
 sub fail
@@ -4477,8 +4550,6 @@ sub cycles_till_end_of_month($$)
 
 	if (opt('debug'))
 	{
-		require DateTime;
-
 		dbg('now              - ', DateTime->from_epoch('epoch' => $now));
 		dbg('this cycle start - ', DateTime->from_epoch('epoch' => $this_cycle_start));
 		dbg('end of month     - ', DateTime->from_epoch('epoch' => $end_of_month));
@@ -4494,8 +4565,6 @@ sub get_end_of_month($)
 {
 	my $now = shift;
 
-	require DateTime;
-
 	my $dt = DateTime->from_epoch('epoch' => $now);
 	$dt->truncate('to' => 'month');
 	$dt->add('months' => 1);
@@ -4507,8 +4576,6 @@ sub get_end_of_prev_month($)
 {
 	my $now = shift;
 
-	require DateTime;
-
 	my $dt = DateTime->from_epoch('epoch' => $now);
 	$dt->truncate('to' => 'month');
 	$dt->subtract('seconds' => 1);
@@ -4518,8 +4585,6 @@ sub get_end_of_prev_month($)
 sub get_month_bounds(;$)
 {
 	my $now = shift // time();
-
-	require DateTime;
 
 	my $from;
 	my $till;
@@ -4743,9 +4808,9 @@ sub get_slv_rtt_monthly_items($$$$)
 				fail("Items '$slv_item_key_performed', '$slv_item_key_failed' and '$slv_item_key_pfailed' have different lastvalue clocks on TLD '$tld'");
 			}
 		}
-
-		unset_log_tld();
 	}
+
+	unset_log_tld();
 
 	return \%slv_items_by_tld;
 }
@@ -4921,33 +4986,33 @@ sub update_slv_rtt_monthly_stats($$$$$$$$;$)
 
 			$last_clock = $cycle_start;
 		}
-
-		unset_log_tld();
 	}
+
+	unset_log_tld();
 
 	send_values();
 }
 
 sub recalculate_downtime($$$$$$)
 {
-	my $auditlog_log_file = shift;
-	my $item_key_avail    = shift; # exact key for rdds and dns, pattern for dns.ns
-	my $item_key_downtime = shift; # exact key for rdds and dns, undef for dns.ns
-	my $incident_fail     = shift; # how many cycles have to fail to start the incident
-	my $incident_recover  = shift; # how many cycles have to succeed to recover from the incident
-	my $delay             = shift;
+	my $false_positive_log_file = shift;
+	my $item_key_avail          = shift; # exact key for rdds and dns, pattern for dns.ns
+	my $item_key_downtime       = shift; # exact key for rdds and dns, undef for dns.ns
+	my $incident_fail           = shift; # how many cycles have to fail to start the incident
+	my $incident_recover        = shift; # how many cycles have to succeed to recover from the incident
+	my $delay                   = shift;
 
 	fail("not supported when running in --dry-run mode") if (opt('dry-run'));
 
 	# get service from item's key ('DNS', 'DNS.NS', 'RDDS', 'RDAP')
 	my $service = uc($item_key_avail =~ s/^rsm\.slv\.(.+)\.avail(?:\[.*\])?$/$1/r);
 
-	# get last auditid
-	my $last_auditlog_auditid = __fp_read_last_auditid($auditlog_log_file);
-	dbg("last_auditlog_auditid = $last_auditlog_auditid");
+	# get last rsm_false_positiveid
+	my $last_rsm_false_positiveid = __fp_read_last_rsm_false_positiveid($false_positive_log_file);
+	dbg("last_rsm_false_positiveid = $last_rsm_false_positiveid");
 
 	# get list of events.eventid (incidents) that changed their "false positive" state
-	my @eventids = __fp_get_updated_eventids(\$last_auditlog_auditid);
+	my @eventids = fp_get_updated_eventids(\$last_rsm_false_positiveid);
 
 	# process incidents
 	if (@eventids)
@@ -4976,8 +5041,8 @@ sub recalculate_downtime($$$$$$)
 		__fp_regenerate_reports($service, \@report_updates);
 	}
 
-	# save last auditid (it may have changed even if @eventids is empty)
-	__fp_write_last_auditid($auditlog_log_file, $last_auditlog_auditid);
+	# save last rsm_false_positiveid (it may have changed even if @eventids is empty)
+	__fp_write_last_rsm_false_positiveid($false_positive_log_file, $last_rsm_false_positiveid);
 }
 
 sub generate_report($$;$)
@@ -5568,6 +5633,53 @@ sub get_test_results($$;$)
 	return $result;
 }
 
+sub fp_get_updated_eventids($)
+{
+	my $last_rsm_false_positiveid_ref = shift;
+
+	# check integrity
+
+	my $max_rsm_false_positiveid = db_select_value("select max(rsm_false_positiveid) from rsm_false_positive") // 0;
+	if (${$last_rsm_false_positiveid_ref} > $max_rsm_false_positiveid)
+	{
+		fail("the false_positive ID (${$last_rsm_false_positiveid_ref})".
+			" in one of the data files is larger than" .
+			" the last rsm_false_positiveid in the database ($max_rsm_false_positiveid)");
+	}
+
+	# get unprocessed "false positive" entries
+
+	my $rows = db_select(
+		"select eventid,count(*),max(rsm_false_positiveid)" .
+		" from rsm_false_positive" .
+		" where rsm_false_positiveid>?" .
+		" group by eventid",
+		[${$last_rsm_false_positiveid_ref}]);
+
+	if (scalar(@{$rows}) == 0)
+	{
+		# all entries are processed already
+		return;
+	}
+
+	# get list of events.eventid (incidents) that changed their "false positive" state
+
+	my @eventids = ();
+
+	foreach my $row (@{$rows})
+	{
+		my ($eventid, $count, $max_rsm_false_positiveid) = @{$row};
+
+		${$last_rsm_false_positiveid_ref} = max(${$last_rsm_false_positiveid_ref}, $max_rsm_false_positiveid);
+
+		next if ($count % 2 == 0); # marked + unmarked, no need to recalculate
+
+		push(@eventids, $eventid);
+	}
+
+	return sort { $a <=> $b } @eventids;
+}
+
 sub set_log_tld($)
 {
 	$tld = shift;
@@ -5603,6 +5715,11 @@ sub convert_suffixed_number($)
 	return $number * $suffix_map{$suffix};
 }
 
+sub var_dump
+{
+	print Dumper @_;
+}
+
 sub usage
 {
 	pod2usage(shift);
@@ -5630,81 +5747,34 @@ sub __fp_log($$$)
 	close($fh)                        or fail("cannot close file '$__fp_logfile'");
 }
 
-sub __fp_read_last_auditid($)
+sub __fp_read_last_rsm_false_positiveid($)
 {
 	my $file = shift;
 
-	my $auditid = 0;
+	my $rsm_false_positiveid = 0;
 
 	if (-e $file)
 	{
 		my $error;
 
-		if (read_file($file, \$auditid, \$error) != SUCCESS)
+		if (read_file($file, \$rsm_false_positiveid, \$error) != SUCCESS)
 		{
 			fail("cannot read file \"$file\": $error");
 		}
 	}
 
-	return $auditid;
+	return $rsm_false_positiveid;
 }
 
-sub __fp_write_last_auditid($$)
+sub __fp_write_last_rsm_false_positiveid($$)
 {
-	my $file    = shift;
-	my $auditid = shift;
+	my $file                 = shift;
+	my $rsm_false_positiveid = shift;
 
-	if (write_file($file, $auditid) != SUCCESS)
+	if (write_file($file, $rsm_false_positiveid) != SUCCESS)
 	{
 		fail("cannot write file \"$file\"");
 	}
-}
-
-sub __fp_get_updated_eventids($)
-{
-	my $last_auditlog_auditid_ref = shift;
-
-	# check integrity
-
-	my $max_auditid = db_select_value("select max(auditid) from auditlog") // 0;
-	if (${$last_auditlog_auditid_ref} > $max_auditid)
-	{
-		fail("value of last processed auditlog.auditid (${$last_auditlog_auditid_ref}) is larger than max auditid in the database ($max_auditid)");
-	}
-
-	# get unprocessed auditlog entries
-
-	my $sql = "select if(resourcetype=?,resourceid,0) as auditlog_eventid,count(*),max(auditid)" .
-		" from auditlog" .
-		" where auditid > ?" .
-		" group by auditlog_eventid";
-
-	my $params = [AUDIT_RESOURCE_INCIDENT, ${$last_auditlog_auditid_ref}];
-	my $rows = db_select($sql, $params);
-
-	if (scalar(@{$rows}) == 0)
-	{
-		# all auditlog entries are processed already
-		return;
-	}
-
-	# get list of events.eventid (incidents) that changed their "false positive" state
-
-	my @eventids = ();
-
-	foreach my $row (@{$rows})
-	{
-		my ($eventid, $count, $max_auditid) = @{$row};
-
-		${$last_auditlog_auditid_ref} = max(${$last_auditlog_auditid_ref}, $max_auditid);
-
-		next if ($eventid == 0); # this is not AUDIT_RESOURCE_INCIDENT
-		next if ($count % 2 == 0); # marked + unmarked, no need to recalculate
-
-		push(@eventids, $eventid);
-	}
-
-	return sort { $a <=> $b } @eventids;
 }
 
 sub __fp_process_incident($$$$$$$)
@@ -5897,7 +5967,6 @@ sub __fp_get_incident_info($)
 			"events.object," .
 			"events.value," .
 			"events.objectid," .
-			"events.false_positive," .
 			"events.clock," .
 			"(" .
 				"select clock" .
@@ -5934,11 +6003,13 @@ sub __fp_get_incident_info($)
 	my $params = [TRIGGER_VALUE_FALSE, $eventid];
 	my $row = db_select_row($sql, $params);
 
-	my ($source, $object, $value, $triggerid, $false_positive, $from, $till, $rsmhostid, $rsmhost, $itemid, $key) = @{$row};
+	my ($source, $object, $value, $triggerid, $from, $till, $rsmhostid, $rsmhost, $itemid, $key) = @{$row};
 
 	fail("unexpected value of events.source for incident #$eventid: $source") if ($source != EVENT_SOURCE_TRIGGERS);
 	fail("unexpected value of events.object for incident #$eventid: $object") if ($object != EVENT_OBJECT_TRIGGER);
 	fail("unexpected value of events.value for incident #$eventid: $object")  if ($value  != TRIGGER_VALUE_TRUE);
+
+	my $false_positive = get_event_false_positiveness($eventid);
 
 	return ($triggerid, $from, $till, $rsmhostid, $rsmhost, $itemid, $key, $false_positive);
 }
@@ -6046,8 +6117,7 @@ sub __fp_get_false_positive_ranges($$$)
 	" where" .
 		" events.objectid=? and" .
 		" events.value=? and" .
-		" events.clock between ? and ? and" .
-		" events.false_positive=?";
+		" events.clock between ? and ?";
 
 	my $params = [
 		TRIGGER_VALUE_FALSE,
@@ -6055,7 +6125,6 @@ sub __fp_get_false_positive_ranges($$$)
 		TRIGGER_VALUE_TRUE,
 		$from,
 		$till,
-		1,
 	];
 
 	my $rows = db_select($sql, $params);
@@ -6065,6 +6134,8 @@ sub __fp_get_false_positive_ranges($$$)
 	for my $row (@{$rows})
 	{
 		my ($eventid, $source, $object, $from, $till) = @{$row};
+
+		next if (get_event_false_positiveness($eventid) == 0);
 
 		fail("unexpected value of events.source for incident #$eventid: $source") if ($source != EVENT_SOURCE_TRIGGERS);
 		fail("unexpected value of events.object for incident #$eventid: $object") if ($object != EVENT_OBJECT_TRIGGER);
@@ -6127,8 +6198,6 @@ sub __fp_regenerate_reports($$)
 {
 	my $service            = shift;
 	my $report_updates_ref = shift;
-
-	require DateTime;
 
 	my %report_updates = ();
 
@@ -6220,6 +6289,59 @@ my $logopt   = 'pid';
 my $facility = 'user';
 my $prev_tld = "";
 
+BEGIN {
+	$execution_time_start = Time::HiRes::time();
+}
+
+END {
+	if ($log_execution_time)
+	{
+		$execution_time_end = Time::HiRes::time();
+
+		my $script = basename($0);
+		my $start  = ts_hms($execution_time_start // 0, ':');
+		my $end    = ts_hms($execution_time_end   // 0, ':');
+		my $values = $execution_time_value_count;
+		my $times;
+
+		if ($log_execution_time_ext)
+		{
+			my $total = $execution_time_end - $execution_time_start;
+			my $calc  = $total;
+			my $send  = 0.0;
+			my $wait  = 0.0;
+
+			if ($values)
+			{
+				$calc  = $execution_time_sending_values_start - $execution_time_start;
+				$send  = $execution_time_sending_values_end - $execution_time_sending_values_start;
+				$wait  = $execution_time_end - $execution_time_sending_values_end;
+			}
+
+			$times = sprintf("total %.3fs (calculations %.3fs, sending %.3fs, waiting %.3fs)", $total, $calc, $send, $wait);
+		}
+		else
+		{
+			$times = sprintf("total %.3fs", $execution_time_end - $execution_time_start);
+		}
+
+		# override $program to write to the same log file
+		$program = 'rsm.execution.times';
+
+		# force reopening the log
+		if ($log_open)
+		{
+			closelog();
+			$log_open = 0;
+		}
+
+		# make sure that TLD for logging is not specified (e.g., in case of fail())
+		unset_log_tld();
+
+		info(sprintf("%s, status %d, %s-%s, %d values, %s", $script, $?, $start, $end, $values, $times));
+	}
+}
+
 sub __func
 {
 	my $depth = 3;
@@ -6288,7 +6410,7 @@ sub __log
 	}
 
 	my $cur_tld = $tld // "";
-	my $server_str = ($server_key ? "\@$server_key " : "");
+	my $server_str = ($_server_key ? "\@$_server_key " : "");
 
 	if (opt('dry-run') or opt('nolog'))
 	{
@@ -6296,7 +6418,23 @@ sub __log
 
 		flock($stdout_lock_handle, LOCK_EX) or die("cannot lock \"$stdout_lock_file\": $!");
 
-		print {$stdout ? *STDOUT : *STDERR} (sprintf("%6d:", $$), ts_str(), " [$priority] ", $server_str, ($cur_tld eq "" ? "" : "$cur_tld: "), __func(), "$msg\n");
+		if (log_only_message())
+		{
+			print {$stdout ? *STDOUT : *STDERR} ("[$priority] $msg\n");
+		}
+		else
+		{
+			printf {$stdout ? *STDOUT : *STDERR} (
+				"%6d:%s [%s] %s %s%s%s\n",
+				$$,
+				ts_str(),
+				$priority,
+				$server_str,
+				($cur_tld eq "" ? "" : "$cur_tld: "),
+				__func(),
+				$msg
+			);
+		}
 
 		# flush stdout
 		select()->flush();

@@ -1,7 +1,7 @@
 <?php
 /*
 ** Zabbix
-** Copyright (C) 2001-2021 Zabbix SIA
+** Copyright (C) 2001-2022 Zabbix SIA
 **
 ** This program is free software; you can redistribute it and/or modify
 ** it under the terms of the GNU General Public License as published by
@@ -171,6 +171,24 @@ class CDBHelper {
 		}
 
 		return reset($row);
+	}
+
+	/**
+	 * Get all values of database column.
+	 *
+	 * @param type $sql			 query to be executed
+	 * @param type $column		 column name
+	 *
+	 * @return array
+	 */
+	public static function getColumn($sql, $column) {
+		$data = [];
+
+		foreach (CDBHelper::getAll($sql) as $row) {
+			$data[] = $row[$column];
+		}
+
+		return $data;
 	}
 
 	/**

@@ -1,0 +1,8 @@
+{
+	"expected-qname"  : "example.example",
+	"expected-qtypes" : ["A", "AAAA"],
+	"flags"           : {
+		"ad" : 1
+	},
+	"rcode"           : "FORMERR"
+}

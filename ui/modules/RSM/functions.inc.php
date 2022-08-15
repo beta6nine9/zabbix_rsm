@@ -9,8 +9,23 @@
  *
  * @return bool
  */
-function is_rdap_standalone($timestamp = null) {
-	static $rsm_rdap_standalone_ts;
+function isRdapStandalone($timestamp = null) {
+	$timestamp = is_null($timestamp) ? time() : (int) $timestamp;
+
+	return (__getRdapStandaloneTs() > 0 && __getRdapStandaloneTs() <= $timestamp);
+}
+
+/**
+ * Get the value of macro RSM_RDAP_STANDALONE.
+ *
+ * @return string unix timestamp
+ */
+function getRdapStandaloneTs() {
+	return __getRdapStandaloneTs();
+}
+
+function __getRdapStandaloneTs() {
+	static $rsm_rdap_standalone_ts = null;
 
 	if (is_null($rsm_rdap_standalone_ts)) {
 		$db_macro = API::UserMacro()->get([
@@ -19,26 +34,24 @@ function is_rdap_standalone($timestamp = null) {
 			'globalmacro' => true
 		]);
 
-		$rsm_rdap_standalone_ts = $db_macro ? (int) $db_macro[0]['value'] : 0;
+		$rsm_rdap_standalone_ts = $db_macro ? (int) $db_macro[0]['value'] : '0';
 	}
 
-	$timestamp = is_null($timestamp) ? time() : (int) $timestamp;
-
-	return ($rsm_rdap_standalone_ts > 0 && $rsm_rdap_standalone_ts <= $timestamp);
+	return $rsm_rdap_standalone_ts;
 }
 
 /**
  * Return current type of RSM monitoring.
  *
- * @return int
+ * @return int One of MONITORING_TARGET_* defines or an empty string, if undefined.
  */
 function get_rsm_monitoring_type() {
 	static $type;
 
 	if ($type === null) {
 		$db_macro = API::UserMacro()->get([
-			'output' => ['value'],
-			'filter' => ['macro' => RSM_MONITORING_TARGET],
+			'output'      => ['value'],
+			'filter'      => ['macro' => RSM_MONITORING_TARGET],
 			'globalmacro' => true
 		]);
 
@@ -93,6 +106,22 @@ function isServiceErrorCode($rtt, $type) {
 	return ($rtt < ZBX_EC_INTERNAL_LAST);
 }
 
+function getEventFalsePositiveness($eventid) {
+	$row = DBfetch(DBselect(
+		'SELECT status'.
+		' FROM rsm_false_positive'.
+		' WHERE eventid='.$eventid.
+		' ORDER BY rsm_false_positiveid DESC',
+		1
+	));
+
+	if ($row === false) {
+	    return INCIDENT_FLAG_NORMAL;
+	}
+
+	return $row['status'];
+}
+
 /**
  * Get last eventid from the events.
  *
@@ -104,7 +133,7 @@ function getLastEvent($problemTrigger) {
 	$result = null;
 
 	$lastProblemEvent = DBfetch(DBselect(
-		'SELECT e.eventid,e.clock,e.false_positive'.
+		'SELECT e.eventid,e.clock'.
 		' FROM events e'.
 		' WHERE e.objectid='.$problemTrigger.
 			' AND e.source='.EVENT_SOURCE_TRIGGERS.
@@ -113,6 +142,8 @@ function getLastEvent($problemTrigger) {
 		' ORDER BY e.clock DESC',
 		1
 	));
+
+	$lastProblemEvent['false_positive'] = getEventFalsePositiveness($lastProblemEvent['eventid']);
 
 	if ($lastProblemEvent && $lastProblemEvent['false_positive'] == INCIDENT_FLAG_NORMAL) {
 		$result = getPreEvents($problemTrigger, $lastProblemEvent['clock'], $lastProblemEvent['eventid']);
@@ -150,24 +181,6 @@ function getPreEvents($objectid, $clock, $eventid) {
 	}
 
 	return $result;
-}
-
-/**
- * Convert SLA service name.
- *
- * @param string $name
- *
- * @return int
- */
-function convertSlaServiceName($name) {
-	$services = array(
-		'dns' => RSM_DNS,
-		'dnssec' => RSM_DNSSEC,
-		'rdds' => RSM_RDDS,
-		'epp' => RSM_EPP
-	);
-
-	return $services[$name];
 }
 
 /**
@@ -335,6 +348,45 @@ function elapsedTime($datetime, $full = false) {
 	}
 
 	return $string ? implode(', ', $string) . ' ago' : 'just now';
+}
+
+// "service" <=> "tab index" on an Incidents page, has special order
+function serviceTabs() {
+	if (get_rsm_monitoring_type() == MONITORING_TARGET_REGISTRY) {
+		return array(
+			['type' => RSM_DNS,    'name' => 'dns'   ],
+			['type' => RSM_DNSSEC, 'name' => 'dnssec'],
+			['type' => RSM_RDDS,   'name' => 'rdds'  ],
+			['type' => RSM_RDAP,   'name' => 'rdap'  ],
+			['type' => RSM_EPP,    'name' => 'epp'   ],
+		);
+	}
+
+	return array(
+		['type' => RSM_RDDS, 'name' => 'rdds'  ],
+		['type' => RSM_RDAP, 'name' => 'rdap'  ],
+	);
+}
+
+function serviceId($name) {
+	foreach (serviceTabs() as $tabIndex => $service) {
+		if ($service['name'] == $name)
+			return $service['type'];
+	}
+
+	return -1;
+}
+
+function serviceTabIndex($type = 0) {
+	if ($type === null)
+		return 0;
+
+	foreach (serviceTabs() as $tabIndex => $service) {
+		if ($service['type'] == $type)
+			return $tabIndex;
+	}
+
+	return 0;
 }
 
 function dnsNsStatus($service, $value)

@@ -1,0 +1,15 @@
+{
+    "servicesStatus": [
+        { "service": "rdds", "enabled": true },
+        { "service": "rdap", "enabled": true }
+    ],
+    "zabbixProxyParameters": {
+        "ipv4Enable": [],
+        "ipv6Enable": true,
+        "proxyIp": "127.0.1.1",
+        "proxyPort": 1234,
+        "proxyPskIdentity": "test",
+        "proxyPsk": "b23f30b5aa0d274c88c2d1ebf17ee48e"
+    },
+    "centralServer": 1
+}
