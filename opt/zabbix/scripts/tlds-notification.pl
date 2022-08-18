@@ -24,6 +24,31 @@ use constant TRIGGER_VALUE_TRUE           => 1; # trigger changed state to PROBL
 use constant ITEM_VALUE_TYPE_FLOAT        => 0; # float
 use constant ITEM_VALUE_TYPE_UINT64       => 3; # unsigned integer
 
+my $item_key_local_resolver_statys = 'resolver.status[{$RSM.RESOLVER},{$RESOLVER.STATUS.TIMEOUT},{$RESOLVER.STATUS.TRIES},{$RSM.IP4.ENABLED},{$RSM.IP6.ENABLED}]';
+my $item_key_probe_status_automatic = 'rsm.probe.status[automatic,"{$RSM.IP4.ENABLED}","{$RSM.IP6.ENABLED}","{$RSM.IP4.ROOTSERVERS1}","{$RSM.IP6.ROOTSERVERS1}","{$RSM.IP4.MIN.SERVERS}","{$RSM.IP6.MIN.SERVERS}","{$RSM.IP4.REPLY.MS}","{$RSM.IP6.REPLY.MS}","{$RSM.PROBE.ONLINE.DELAY}"]';
+
+my %value_maps = (
+	'rsm.slv.dns.avail'               => 'RSM Service Availability',
+	'rsm.slv.dnssec.avail'            => 'RSM Service Availability',
+	'rsm.slv.rdap.avail'              => 'RSM Service Availability',
+	'rsm.slv.rdds.avail'              => 'RSM Service Availability',
+	$item_key_local_resolver_statys   => 'Service state',
+	$item_key_probe_status_automatic  => 'RSM Probe status',
+	'rsm.probe.status[manual]'        => 'RSM Probe status',
+	'rsm.probe.online'                => 'RSM Probe status',
+	'rdap.rtt'                        => 'RSM RDAP rtt',
+	'rdap.status'                     => 'Service state',
+	'rsm.dns.mode'                    => 'DNS test mode',
+	'rsm.dns.protocol'                => 'Transport protocol',
+	'rsm.dns.status'                  => 'Service state',
+	'rsm.rdds.43.rtt'                 => 'RSM RDDS rtt',
+	'rsm.rdds.status'                 => 'Service state',
+	'rsm.rdds.80.rtt'                 => 'RSM RDDS rtt',
+	'rsm.rdds.43.status'              => 'Service state',
+	'rsm.rdds.80.status'              => 'Service state',
+	'rsm.dnssec.status'               => 'Service state',
+);
+
 ################################################################################
 # main
 ################################################################################
@@ -200,9 +225,9 @@ sub get_trigger_data($$$$)
 	}
 	else
 	{
-		my $row = db_select_row("select name,value_type,units,valuemapid from items where itemid=?", [$item_id]);
+		my $row = db_select_row("select name,value_type,units from items where itemid=?", [$item_id]);
 
-		my ($item_name, $item_value_type, $item_units, $value_map_id) = @{$row};
+		my ($item_name, $item_value_type, $item_units) = @{$row};
 
 		my $history_table = {
 			ITEM_VALUE_TYPE_FLOAT , 'history',
@@ -215,9 +240,11 @@ sub get_trigger_data($$$$)
 		{
 			$value = format_float($value, $item_units);
 		}
-		elsif ($item_value_type == ITEM_VALUE_TYPE_UINT64 && defined($value_map_id))
+		elsif ($item_value_type == ITEM_VALUE_TYPE_UINT64 && exists($value_maps{$item_key}))
 		{
-			my $query = "select newvalue from mappings where valuemapid=? and value=?";
+			my $value_map_id = get_value_map_id($value_maps{$item_key});
+
+			my $query = "select newvalue from valuemap_mapping where valuemapid=? and value=?";
 			my $params = [$value_map_id, $value];
 
 			my $new_value = db_select_value($query, $params);
@@ -229,6 +256,23 @@ sub get_trigger_data($$$$)
 	}
 
 	return $data;
+}
+
+sub get_value_map_id($)
+{
+	my $value_map = shift;
+
+	my $query = 'select' .
+			' valuemap.valuemapid' .
+		' from' .
+			' hosts' .
+			' inner join valuemap on valuemap.hostid=hosts.hostid' .
+		' where' .
+			' hosts.host=? and' .
+			' valuemap.name=?';
+	my $params = ['Template Value Maps', $value_map];
+
+	return db_select_value($query, $params);
 }
 
 sub set_max_execution_time($)
