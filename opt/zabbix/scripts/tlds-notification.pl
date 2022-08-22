@@ -24,7 +24,7 @@ use constant TRIGGER_VALUE_TRUE           => 1; # trigger changed state to PROBL
 use constant ITEM_VALUE_TYPE_FLOAT        => 0; # float
 use constant ITEM_VALUE_TYPE_UINT64       => 3; # unsigned integer
 
-my $item_key_local_resolver_statys = 'resolver.status[{$RSM.RESOLVER},{$RESOLVER.STATUS.TIMEOUT},{$RESOLVER.STATUS.TRIES},{$RSM.IP4.ENABLED},{$RSM.IP6.ENABLED}]';
+my $item_key_local_resolver_status = 'resolver.status[{$RSM.RESOLVER},{$RESOLVER.STATUS.TIMEOUT},{$RESOLVER.STATUS.TRIES},{$RSM.IP4.ENABLED},{$RSM.IP6.ENABLED}]';
 my $item_key_probe_status_automatic = 'rsm.probe.status[automatic,"{$RSM.IP4.ENABLED}","{$RSM.IP6.ENABLED}","{$RSM.IP4.ROOTSERVERS1}","{$RSM.IP6.ROOTSERVERS1}","{$RSM.IP4.MIN.SERVERS}","{$RSM.IP6.MIN.SERVERS}","{$RSM.IP4.REPLY.MS}","{$RSM.IP6.REPLY.MS}","{$RSM.PROBE.ONLINE.DELAY}"]';
 
 my %value_maps = (
@@ -32,7 +32,7 @@ my %value_maps = (
 	'rsm.slv.dnssec.avail'            => 'RSM Service Availability',
 	'rsm.slv.rdap.avail'              => 'RSM Service Availability',
 	'rsm.slv.rdds.avail'              => 'RSM Service Availability',
-	$item_key_local_resolver_statys   => 'Service state',
+	$item_key_local_resolver_status   => 'Service state',
 	$item_key_probe_status_automatic  => 'RSM Probe status',
 	'rsm.probe.status[manual]'        => 'RSM Probe status',
 	'rsm.probe.online'                => 'RSM Probe status',
