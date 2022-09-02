@@ -60,7 +60,7 @@ my @cron_jobs = (
 	['main', '* * * * *' , 0, SCRIPTS_DIR . '/slv/rsm.slv.rdap.rtt.pl'                                                                                    , SLV_LOG_FILE],
 	'',
 	['main', '0 1 1 * *' , 0, SCRIPTS_DIR . '/disable-rdds-for-rdap-hosts.pl'                                                                             , LOG_DIR . '/disable-rdds-for-rdap-hosts.err'],
-	['main', '0 15 1 * *', 0, SCRIPTS_DIR . '/sla-monthly-status.pl'                                                                                      , LOG_DIR . '/sla-monthly-status.err'],
+	['main', '20 0 1 * *', 0, SCRIPTS_DIR . '/sla-monthly-status.pl'                                                                                      , LOG_DIR . '/sla-monthly-status.err'],
 	['main', '0 15 1 * *', 0, SCRIPTS_DIR . '/sla-report.php'                                                                                             , LOG_DIR . '/sla-report.err'],
 	'',
 	['main', '* * * * *' , 0, 'sleep 15; ' . SCRIPTS_DIR . '/config-cache-reload.pl'                                                                      , LOG_DIR . '/config-cache-reload.log'],
