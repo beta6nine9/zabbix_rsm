@@ -1,6 +1,6 @@
 zabbix_export:
   version: '6.0'
-  date: '2022-01-26T10:34:37Z'
+  date: '2022-08-16T05:20:39Z'
   groups:
     -
       uuid: e960332b3f6c46a1956486d4f3f99fce
@@ -14,6 +14,7 @@ zabbix_export:
         Template Server iDRAC
         
         MIBs used:
+        HOST-RESOURCES-MIB
         IDRAC-MIB-SMIv2
         SNMPv2-MIB
         
@@ -263,7 +264,8 @@ zabbix_export:
             -
               uuid: 6f5b00a889804fbeb41c4246b29bd5f1
               expression: 'last(/Dell iDRAC SNMP/system.hw.serialnumber,#1)<>last(/Dell iDRAC SNMP/system.hw.serialnumber,#2) and length(last(/Dell iDRAC SNMP/system.hw.serialnumber))>0'
-              name: 'Device has been replaced (new serial number received)'
+              name: 'Device has been replaced'
+              event_name: 'Device has been replaced (new serial number received)'
               priority: INFO
               description: 'Device serial number has changed. Ack to close'
               manual_close: 'YES'
@@ -271,6 +273,34 @@ zabbix_export:
                 -
                   tag: scope
                   value: notice
+        -
+          uuid: 935e3509834844d38a3a8df4d5f698d8
+          name: 'Uptime (hardware)'
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.2.1.25.1.1.0
+          key: 'system.hw.uptime[hrSystemUptime.0]'
+          delay: 30s
+          history: 2w
+          trends: 0d
+          units: uptime
+          description: |
+            MIB: HOST-RESOURCES-MIB
+            The amount of time since this host was last initialized. Note that this is different from sysUpTime in the SNMPv2-MIB [RFC1907] because sysUpTime is the uptime of the network management portion of the system.
+          preprocessing:
+            -
+              type: CHECK_NOT_SUPPORTED
+              parameters:
+                - ''
+              error_handler: CUSTOM_VALUE
+              error_handler_params: '0'
+            -
+              type: MULTIPLIER
+              parameters:
+                - '0.01'
+          tags:
+            -
+              tag: component
+              value: system
         -
           uuid: 59a77e7fe66f4412bb117f8283216ce3
           name: 'System location'
@@ -321,7 +351,8 @@ zabbix_export:
             -
               uuid: ce1b064b2a07450d9b51b6b12bd752a9
               expression: 'last(/Dell iDRAC SNMP/system.name,#1)<>last(/Dell iDRAC SNMP/system.name,#2) and length(last(/Dell iDRAC SNMP/system.name))>0'
-              name: 'System name has changed (new name: {ITEM.VALUE})'
+              name: 'System name has changed'
+              event_name: 'System name has changed (new name: {ITEM.VALUE})'
               priority: INFO
               description: 'System name has changed. Ack to close.'
               manual_close: 'YES'
@@ -332,6 +363,28 @@ zabbix_export:
                 -
                   tag: scope
                   value: security
+        -
+          uuid: 522c04c2c624478b8de4287f863ea67a
+          name: 'Uptime (network)'
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.2.1.1.3.0
+          key: 'system.net.uptime[sysUpTime.0]'
+          delay: 30s
+          history: 2w
+          trends: 0d
+          units: uptime
+          description: |
+            MIB: SNMPv2-MIB
+            The time (in hundredths of a second) since the network management portion of the system was last re-initialized.
+          preprocessing:
+            -
+              type: MULTIPLIER
+              parameters:
+                - '0.01'
+          tags:
+            -
+              tag: component
+              value: system
         -
           uuid: 737d790ef008450b81a69559ed1ee963
           name: 'System object ID'
@@ -459,46 +512,8 @@ zabbix_export:
               manual_close: 'YES'
               dependencies:
                 -
-                  name: 'System name has changed (new name: {ITEM.VALUE})'
+                  name: 'System name has changed'
                   expression: 'last(/Dell iDRAC SNMP/system.name,#1)<>last(/Dell iDRAC SNMP/system.name,#2) and length(last(/Dell iDRAC SNMP/system.name))>0'
-              tags:
-                -
-                  tag: scope
-                  value: notice
-        -
-          uuid: 522c04c2c624478b8de4287f863ea67a
-          name: Uptime
-          type: SNMP_AGENT
-          snmp_oid: 1.3.6.1.2.1.1.3.0
-          key: 'system.uptime[sysUpTime.0]'
-          delay: 30s
-          history: 2w
-          trends: 0d
-          units: uptime
-          description: |
-            MIB: SNMPv2-MIB
-            The time (in hundredths of a second) since the network management portion of the system was last re-initialized.
-          preprocessing:
-            -
-              type: MULTIPLIER
-              parameters:
-                - '0.01'
-          tags:
-            -
-              tag: component
-              value: system
-          triggers:
-            -
-              uuid: c0efbe61effc494a970e0e02b9ce8f55
-              expression: 'last(/Dell iDRAC SNMP/system.uptime[sysUpTime.0])<10m'
-              name: '{HOST.NAME} has been restarted (uptime < 10m)'
-              priority: WARNING
-              description: 'Uptime is less than 10 minutes'
-              manual_close: 'YES'
-              dependencies:
-                -
-                  name: 'No SNMP data collection'
-                  expression: 'max(/Dell iDRAC SNMP/zabbix[host,snmp,available],{$SNMP.TIMEOUT})=0'
               tags:
                 -
                   tag: scope
@@ -931,7 +946,8 @@ zabbix_export:
                 -
                   uuid: eb26b6915b9f4ce6983566df9ee4db96
                   expression: 'last(/Dell iDRAC SNMP/system.hw.physicaldisk.serialnumber[physicalDiskSerialNo.{#SNMPINDEX}],#1)<>last(/Dell iDRAC SNMP/system.hw.physicaldisk.serialnumber[physicalDiskSerialNo.{#SNMPINDEX}],#2) and length(last(/Dell iDRAC SNMP/system.hw.physicaldisk.serialnumber[physicalDiskSerialNo.{#SNMPINDEX}]))>0'
-                  name: '{#DISK_NAME}: Disk has been replaced (new serial number received)'
+                  name: '{#DISK_NAME}: Disk has been replaced'
+                  event_name: '{#DISK_NAME}: Disk has been replaced (new serial number received)'
                   priority: INFO
                   description: 'Disk serial number has changed. Ack to close'
                   manual_close: 'YES'
@@ -1185,7 +1201,8 @@ zabbix_export:
                   expression: 'avg(/Dell iDRAC SNMP/sensor.temp.value[temperatureProbeReading.Ambient.{#SNMPINDEX}],5m)<{$TEMP_CRIT_LOW:"Ambient"}'
                   recovery_mode: RECOVERY_EXPRESSION
                   recovery_expression: 'min(/Dell iDRAC SNMP/sensor.temp.value[temperatureProbeReading.Ambient.{#SNMPINDEX}],5m)>{$TEMP_CRIT_LOW:"Ambient"}+3'
-                  name: '{#SENSOR_LOCALE}: Temperature is too low: <{$TEMP_CRIT_LOW:"Ambient"}'
+                  name: '{#SENSOR_LOCALE}: Temperature is too low'
+                  event_name: '{#SENSOR_LOCALE}: Temperature is too low: <{$TEMP_CRIT_LOW:"Ambient"}'
                   opdata: 'Current value: {ITEM.LASTVALUE1}'
                   priority: AVERAGE
                   tags:
@@ -1206,7 +1223,8 @@ zabbix_export:
                 last(/Dell iDRAC SNMP/sensor.temp.status[temperatureProbeStatus.Ambient.{#SNMPINDEX}])={$TEMP_DISASTER_STATUS}
               recovery_mode: RECOVERY_EXPRESSION
               recovery_expression: 'max(/Dell iDRAC SNMP/sensor.temp.value[temperatureProbeReading.Ambient.{#SNMPINDEX}],5m)<{$TEMP_CRIT:"Ambient"}-3'
-              name: '{#SENSOR_LOCALE}: Temperature is above critical threshold: >{$TEMP_CRIT:"Ambient"}'
+              name: '{#SENSOR_LOCALE}: Temperature is above critical threshold'
+              event_name: '{#SENSOR_LOCALE}: Temperature is above critical threshold: >{$TEMP_CRIT:"Ambient"}'
               opdata: 'Current value: {ITEM.LASTVALUE1}'
               priority: HIGH
               description: 'This trigger uses temperature sensor values as well as temperature sensor status if available'
@@ -1225,13 +1243,14 @@ zabbix_export:
                 last(/Dell iDRAC SNMP/sensor.temp.status[temperatureProbeStatus.Ambient.{#SNMPINDEX}])={$TEMP_WARN_STATUS}
               recovery_mode: RECOVERY_EXPRESSION
               recovery_expression: 'max(/Dell iDRAC SNMP/sensor.temp.value[temperatureProbeReading.Ambient.{#SNMPINDEX}],5m)<{$TEMP_WARN:"Ambient"}-3'
-              name: '{#SENSOR_LOCALE}: Temperature is above warning threshold: >{$TEMP_WARN:"Ambient"}'
+              name: '{#SENSOR_LOCALE}: Temperature is above warning threshold'
+              event_name: '{#SENSOR_LOCALE}: Temperature is above warning threshold: >{$TEMP_WARN:"Ambient"}'
               opdata: 'Current value: {ITEM.LASTVALUE1}'
               priority: WARNING
               description: 'This trigger uses temperature sensor values as well as temperature sensor status if available'
               dependencies:
                 -
-                  name: '{#SENSOR_LOCALE}: Temperature is above critical threshold: >{$TEMP_CRIT:"Ambient"}'
+                  name: '{#SENSOR_LOCALE}: Temperature is above critical threshold'
                   expression: |
                     avg(/Dell iDRAC SNMP/sensor.temp.value[temperatureProbeReading.Ambient.{#SNMPINDEX}],5m)>{$TEMP_CRIT:"Ambient"}
                     or
@@ -1308,7 +1327,8 @@ zabbix_export:
                   expression: 'avg(/Dell iDRAC SNMP/sensor.temp.value[temperatureProbeReading.CPU.{#SNMPINDEX}],5m)<{$TEMP_CRIT_LOW:"CPU"}'
                   recovery_mode: RECOVERY_EXPRESSION
                   recovery_expression: 'min(/Dell iDRAC SNMP/sensor.temp.value[temperatureProbeReading.CPU.{#SNMPINDEX}],5m)>{$TEMP_CRIT_LOW:"CPU"}+3'
-                  name: '{#SENSOR_LOCALE}: Temperature is too low: <{$TEMP_CRIT_LOW:"CPU"}'
+                  name: '{#SENSOR_LOCALE}: Temperature is too low'
+                  event_name: '{#SENSOR_LOCALE}: Temperature is too low: <{$TEMP_CRIT_LOW:"CPU"}'
                   opdata: 'Current value: {ITEM.LASTVALUE1}'
                   priority: AVERAGE
                   tags:
@@ -1329,7 +1349,8 @@ zabbix_export:
                 last(/Dell iDRAC SNMP/sensor.temp.status[temperatureProbeStatus.CPU.{#SNMPINDEX}])={$TEMP_DISASTER_STATUS}
               recovery_mode: RECOVERY_EXPRESSION
               recovery_expression: 'max(/Dell iDRAC SNMP/sensor.temp.value[temperatureProbeReading.CPU.{#SNMPINDEX}],5m)<{$TEMP_CRIT:"CPU"}-3'
-              name: '{#SENSOR_LOCALE}: Temperature is above critical threshold: >{$TEMP_CRIT:"CPU"}'
+              name: '{#SENSOR_LOCALE}: Temperature is above critical threshold'
+              event_name: '{#SENSOR_LOCALE}: Temperature is above critical threshold: >{$TEMP_CRIT:"CPU"}'
               opdata: 'Current value: {ITEM.LASTVALUE1}'
               priority: HIGH
               description: 'This trigger uses temperature sensor values as well as temperature sensor status if available'
@@ -1348,13 +1369,14 @@ zabbix_export:
                 last(/Dell iDRAC SNMP/sensor.temp.status[temperatureProbeStatus.CPU.{#SNMPINDEX}])={$TEMP_WARN_STATUS}
               recovery_mode: RECOVERY_EXPRESSION
               recovery_expression: 'max(/Dell iDRAC SNMP/sensor.temp.value[temperatureProbeReading.CPU.{#SNMPINDEX}],5m)<{$TEMP_WARN:"CPU"}-3'
-              name: '{#SENSOR_LOCALE}: Temperature is above warning threshold: >{$TEMP_WARN:"CPU"}'
+              name: '{#SENSOR_LOCALE}: Temperature is above warning threshold'
+              event_name: '{#SENSOR_LOCALE}: Temperature is above warning threshold: >{$TEMP_WARN:"CPU"}'
               opdata: 'Current value: {ITEM.LASTVALUE1}'
               priority: WARNING
               description: 'This trigger uses temperature sensor values as well as temperature sensor status if available'
               dependencies:
                 -
-                  name: '{#SENSOR_LOCALE}: Temperature is above critical threshold: >{$TEMP_CRIT:"CPU"}'
+                  name: '{#SENSOR_LOCALE}: Temperature is above critical threshold'
                   expression: |
                     avg(/Dell iDRAC SNMP/sensor.temp.value[temperatureProbeReading.CPU.{#SNMPINDEX}],5m)>{$TEMP_CRIT:"CPU"}
                     or
@@ -1922,3 +1944,20 @@ zabbix_export:
             -
               value: '2'
               newvalue: unknown
+  triggers:
+    -
+      uuid: c0efbe61effc494a970e0e02b9ce8f55
+      expression: '(last(/Dell iDRAC SNMP/system.hw.uptime[hrSystemUptime.0])>0 and last(/Dell iDRAC SNMP/system.hw.uptime[hrSystemUptime.0])<10m) or (last(/Dell iDRAC SNMP/system.hw.uptime[hrSystemUptime.0])=0 and last(/Dell iDRAC SNMP/system.net.uptime[sysUpTime.0])<10m)'
+      name: 'Host has been restarted'
+      event_name: '{HOST.NAME} has been restarted (uptime < 10m)'
+      priority: WARNING
+      description: 'Uptime is less than 10 minutes.'
+      manual_close: 'YES'
+      dependencies:
+        -
+          name: 'No SNMP data collection'
+          expression: 'max(/Dell iDRAC SNMP/zabbix[host,snmp,available],{$SNMP.TIMEOUT})=0'
+      tags:
+        -
+          tag: scope
+          value: notice

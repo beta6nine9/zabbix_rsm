@@ -10,7 +10,7 @@ This template was tested on:
 
 - MySQL, version 5.7, 8.0
 - Percona, version 8.0
-- MariaDB, version 10.4
+- MariaDB, version 10.4, 10.6.8
 
 ## Setup
 
@@ -81,7 +81,7 @@ No specific Zabbix configuration is required.
 |{$MYSQL.CREATED_TMP_DISK_TABLES.MAX.WARN} |<p>The maximum number of created tmp tables on a disk per second for trigger expressions.</p> |`10` |
 |{$MYSQL.CREATED_TMP_FILES.MAX.WARN} |<p>The maximum number of created tmp files on a disk per second for trigger expressions.</p> |`10` |
 |{$MYSQL.CREATED_TMP_TABLES.MAX.WARN} |<p>The maximum number of created tmp tables in memory per second for trigger expressions.</p> |`30` |
-|{$MYSQL.HOST} |<p>Hostname or IP of MySQL host or container.</p> |`localhost` |
+|{$MYSQL.HOST} |<p>Hostname or IP of MySQL host or container.</p> |`127.0.0.1` |
 |{$MYSQL.INNODB_LOG_FILES} |<p>Number of physical files in the InnoDB redo log for calculating innodb_log_file_size.</p> |`2` |
 |{$MYSQL.PORT} |<p>MySQL service port.</p> |`3306` |
 |{$MYSQL.REPL_LAG.MAX.WARN} |<p>The lag of slave from master for trigger expression.</p> |`30m` |
@@ -168,17 +168,17 @@ There are no template links in this template.
 |Name|Description|Expression|Severity|Dependencies and additional info|
 |----|-----------|----|----|----|
 |MySQL: Service is down |<p>-</p> |`last(/MySQL by Zabbix agent/mysql.ping["{$MYSQL.HOST}","{$MYSQL.PORT}"])=0` |HIGH | |
-|MySQL: Version has changed (new version value received: {ITEM.VALUE}) |<p>MySQL version has changed. Ack to close.</p> |`last(/MySQL by Zabbix agent/mysql.version["{$MYSQL.HOST}","{$MYSQL.PORT}"],#1)<>last(/MySQL by Zabbix agent/mysql.version["{$MYSQL.HOST}","{$MYSQL.PORT}"],#2) and length(last(/MySQL by Zabbix agent/mysql.version["{$MYSQL.HOST}","{$MYSQL.PORT}"]))>0` |INFO |<p>Manual close: YES</p> |
-|MySQL: Service has been restarted (uptime < 10m) |<p>MySQL uptime is less than 10 minutes.</p> |`last(/MySQL by Zabbix agent/mysql.uptime)<10m` |INFO | |
-|MySQL: Failed to fetch info data (or no data for 30m) |<p>Zabbix has not received data for items for the last 30 minutes.</p> |`nodata(/MySQL by Zabbix agent/mysql.uptime,30m)=1` |INFO |<p>**Depends on**:</p><p>- MySQL: Service is down</p> |
-|MySQL: Server has aborted connections (over {$MYSQL.ABORTED_CONN.MAX.WARN} for 5m) |<p>The number of failed attempts to connect to the MySQL server is more than {$MYSQL.ABORTED_CONN.MAX.WARN} in the last 5 minutes.</p> |`min(/MySQL by Zabbix agent/mysql.aborted_connects.rate,5m)>{$MYSQL.ABORTED_CONN.MAX.WARN}` |AVERAGE |<p>**Depends on**:</p><p>- MySQL: Refused connections (max_connections limit reached)</p> |
-|MySQL: Refused connections (max_connections limit reached) |<p>Number of refused connections due to the max_connections limit being reached.</p> |`last(/MySQL by Zabbix agent/mysql.connection_errors_max_connections.rate)>0` |AVERAGE | |
-|MySQL: Buffer pool utilization is too low (less than {$MYSQL.BUFF_UTIL.MIN.WARN}% for 5m) |<p>The buffer pool utilization is less than {$MYSQL.BUFF_UTIL.MIN.WARN}% in the last 5 minutes. This means that there is a lot of unused RAM allocated for the buffer pool, which you can easily reallocate at the moment.</p> |`max(/MySQL by Zabbix agent/mysql.buffer_pool_utilization,5m)<{$MYSQL.BUFF_UTIL.MIN.WARN}` |WARNING | |
-|MySQL: Number of temporary files created per second is high (over {$MYSQL.CREATED_TMP_FILES.MAX.WARN} for 5m) |<p>Possibly the application using the database is in need of query optimization.</p> |`min(/MySQL by Zabbix agent/mysql.created_tmp_files.rate,5m)>{$MYSQL.CREATED_TMP_FILES.MAX.WARN}` |WARNING | |
-|MySQL: Number of on-disk temporary tables created per second is high (over {$MYSQL.CREATED_TMP_DISK_TABLES.MAX.WARN} for 5m) |<p>Possibly the application using the database is in need of query optimization.</p> |`min(/MySQL by Zabbix agent/mysql.created_tmp_disk_tables.rate,5m)>{$MYSQL.CREATED_TMP_DISK_TABLES.MAX.WARN}` |WARNING | |
-|MySQL: Number of internal temporary tables created per second is high (over {$MYSQL.CREATED_TMP_TABLES.MAX.WARN} for 5m) |<p>Possibly the application using the database is in need of query optimization.</p> |`min(/MySQL by Zabbix agent/mysql.created_tmp_tables.rate,5m)>{$MYSQL.CREATED_TMP_TABLES.MAX.WARN}` |WARNING | |
-|MySQL: Server has slow queries (over {$MYSQL.SLOW_QUERIES.MAX.WARN} for 5m) |<p>The number of slow queries is more than {$MYSQL.SLOW_QUERIES.MAX.WARN} in the last 5 minutes.</p> |`min(/MySQL by Zabbix agent/mysql.slow_queries.rate,5m)>{$MYSQL.SLOW_QUERIES.MAX.WARN}` |WARNING | |
-|MySQL: Replication lag is too high (over {$MYSQL.REPL_LAG.MAX.WARN} for 5m) |<p>-</p> |`min(/MySQL by Zabbix agent/mysql.seconds_behind_master["{#MASTERHOST}"],5m)>{$MYSQL.REPL_LAG.MAX.WARN}` |WARNING | |
+|MySQL: Version has changed |<p>MySQL version has changed. Ack to close.</p> |`last(/MySQL by Zabbix agent/mysql.version["{$MYSQL.HOST}","{$MYSQL.PORT}"],#1)<>last(/MySQL by Zabbix agent/mysql.version["{$MYSQL.HOST}","{$MYSQL.PORT}"],#2) and length(last(/MySQL by Zabbix agent/mysql.version["{$MYSQL.HOST}","{$MYSQL.PORT}"]))>0` |INFO |<p>Manual close: YES</p> |
+|MySQL: Service has been restarted |<p>MySQL uptime is less than 10 minutes.</p> |`last(/MySQL by Zabbix agent/mysql.uptime)<10m` |INFO | |
+|MySQL: Failed to fetch info data |<p>Zabbix has not received data for items for the last 30 minutes.</p> |`nodata(/MySQL by Zabbix agent/mysql.uptime,30m)=1` |INFO |<p>**Depends on**:</p><p>- MySQL: Service is down</p> |
+|MySQL: Server has aborted connections |<p>The number of failed attempts to connect to the MySQL server is more than {$MYSQL.ABORTED_CONN.MAX.WARN} in the last 5 minutes.</p> |`min(/MySQL by Zabbix agent/mysql.aborted_connects.rate,5m)>{$MYSQL.ABORTED_CONN.MAX.WARN}` |AVERAGE |<p>**Depends on**:</p><p>- MySQL: Refused connections</p> |
+|MySQL: Refused connections |<p>Number of refused connections due to the max_connections limit being reached.</p> |`last(/MySQL by Zabbix agent/mysql.connection_errors_max_connections.rate)>0` |AVERAGE | |
+|MySQL: Buffer pool utilization is too low |<p>The buffer pool utilization is less than {$MYSQL.BUFF_UTIL.MIN.WARN}% in the last 5 minutes. This means that there is a lot of unused RAM allocated for the buffer pool, which you can easily reallocate at the moment.</p> |`max(/MySQL by Zabbix agent/mysql.buffer_pool_utilization,5m)<{$MYSQL.BUFF_UTIL.MIN.WARN}` |WARNING | |
+|MySQL: Number of temporary files created per second is high |<p>Possibly the application using the database is in need of query optimization.</p> |`min(/MySQL by Zabbix agent/mysql.created_tmp_files.rate,5m)>{$MYSQL.CREATED_TMP_FILES.MAX.WARN}` |WARNING | |
+|MySQL: Number of on-disk temporary tables created per second is high |<p>Possibly the application using the database is in need of query optimization.</p> |`min(/MySQL by Zabbix agent/mysql.created_tmp_disk_tables.rate,5m)>{$MYSQL.CREATED_TMP_DISK_TABLES.MAX.WARN}` |WARNING | |
+|MySQL: Number of internal temporary tables created per second is high |<p>Possibly the application using the database is in need of query optimization.</p> |`min(/MySQL by Zabbix agent/mysql.created_tmp_tables.rate,5m)>{$MYSQL.CREATED_TMP_TABLES.MAX.WARN}` |WARNING | |
+|MySQL: Server has slow queries |<p>The number of slow queries is more than {$MYSQL.SLOW_QUERIES.MAX.WARN} in the last 5 minutes.</p> |`min(/MySQL by Zabbix agent/mysql.slow_queries.rate,5m)>{$MYSQL.SLOW_QUERIES.MAX.WARN}` |WARNING | |
+|MySQL: Replication lag is too high |<p>-</p> |`min(/MySQL by Zabbix agent/mysql.seconds_behind_master["{#MASTERHOST}"],5m)>{$MYSQL.REPL_LAG.MAX.WARN}` |WARNING | |
 |MySQL: The slave I/O thread is not running |<p>Whether the I/O thread for reading the master's binary log is running.</p> |`count(/MySQL by Zabbix agent/mysql.slave_io_running["{#MASTERHOST}"],#1,"eq","No")=1` |AVERAGE | |
 |MySQL: The slave I/O thread is not connected to a replication master |<p>-</p> |`count(/MySQL by Zabbix agent/mysql.slave_io_running["{#MASTERHOST}"],#1,"ne","Yes")=1` |WARNING |<p>**Depends on**:</p><p>- MySQL: The slave I/O thread is not running</p> |
 |MySQL: The SQL thread is not running |<p>Whether the SQL thread for executing events in the relay log is running.</p> |`count(/MySQL by Zabbix agent/mysql.slave_sql_running["{#MASTERHOST}"],#1,"eq","No")=1` |WARNING |<p>**Depends on**:</p><p>- MySQL: The slave I/O thread is not running</p> |

@@ -243,8 +243,6 @@ class CTest extends TestCase {
 		if (!self::executeCallbacks($this, $callbacks)) {
 			self::markTestSuiteSkipped();
 			throw new Exception(implode("\n", static::$warnings));
-
-			return;
 		}
 
 		// Store callback to be executed later.
@@ -383,6 +381,14 @@ class CTest extends TestCase {
 		if ($this->case_backup_config) {
 			CConfigHelper::restoreConfig();
 			$this->case_backup_config = false;
+		}
+
+		if (CDataHelper::getSessionId() !== null) {
+			foreach (CDBHelper::$backups as $backup) {
+				if (in_array('sessions', $backup)) {
+					CDataHelper::reset();
+				}
+			}
 		}
 
 		if ($this->case_backup !== null) {

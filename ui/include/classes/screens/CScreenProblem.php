@@ -695,8 +695,8 @@ class CScreenProblem extends CScreenBase {
 			if ($clock < $today) {
 				$breakpoint = _('Today');
 			}
-			elseif (strftime('%H', $last_clock) != strftime('%H', $clock)) {
-				$breakpoint = strftime('%H:00', $last_clock);
+			elseif (date('H', $last_clock) != date('H', $clock)) {
+				$breakpoint = date('H:00', $last_clock);
 			}
 		}
 		elseif ($last_clock >= $yesterday) {
@@ -705,10 +705,10 @@ class CScreenProblem extends CScreenBase {
 			}
 		}
 		elseif ($last_clock >= $this_year && $clock < $this_year) {
-			$breakpoint = strftime('%Y', $last_clock);
+			$breakpoint = date('Y', $last_clock);
 		}
-		elseif (strftime('%Y%m', $last_clock) != strftime('%Y%m', $clock)) {
-			$breakpoint = getMonthCaption(strftime('%m', $last_clock));
+		elseif (date('Ym', $last_clock) != date('Ym', $clock)) {
+			$breakpoint = getMonthCaption(date('m', $last_clock));
 		}
 
 		if ($breakpoint !== null) {
@@ -1004,7 +1004,7 @@ class CScreenProblem extends CScreenBase {
 				if ($this->data['filter']['compact_view'] && $this->data['filter']['show_suppressed']
 						&& count($info_icons) > 1) {
 					$cell_info = (new CButton(null))
-						->addClass(ZBX_STYLE_ICON_WZRD_ACTION)
+						->addClass(ZBX_STYLE_ICON_WIZARD_ACTION)
 						->addStyle('margin-left: -3px;')
 						->setHint(makeInformationList($info_icons));
 				}
@@ -1016,8 +1016,8 @@ class CScreenProblem extends CScreenBase {
 					? makeTriggerDependencies($dependencies[$trigger['triggerid']])
 					: [];
 				$description[] = (new CLinkAction($problem['name']))
-					->addClass(ZBX_STYLE_WORDWRAP)
-					->setMenuPopup(CMenuPopupHelper::getTrigger($trigger['triggerid'], $problem['eventid']));
+					->setMenuPopup(CMenuPopupHelper::getTrigger($trigger['triggerid'], $problem['eventid']))
+					->addClass(ZBX_STYLE_WORDBREAK);
 
 				$opdata = null;
 
@@ -1040,9 +1040,7 @@ class CScreenProblem extends CScreenBase {
 								'events' => true,
 								'html' => true
 							]
-						)))
-							->addClass('opdata')
-							->addClass(ZBX_STYLE_WORDWRAP);
+						)))->addClass('opdata');
 
 						if ($show_opdata == OPERATIONAL_DATA_SHOW_WITH_PROBLEM) {
 							$description[] = ' (';
@@ -1058,8 +1056,10 @@ class CScreenProblem extends CScreenBase {
 					$description[] = BR();
 
 					if ($trigger['recovery_mode'] == ZBX_RECOVERY_MODE_RECOVERY_EXPRESSION) {
-						$description[] = [_('Problem'), ': ', (new CDiv($trigger['expression_html']))->addClass(ZBX_STYLE_WORDWRAP), BR()];
-						$description[] = [_('Recovery'), ': ', (new CDiv($trigger['recovery_expression_html']))->addClass(ZBX_STYLE_WORDWRAP)];
+						$description[] = [_('Problem'), ': ', (new CDiv($trigger['expression_html']))
+							->addClass(ZBX_STYLE_WORDWRAP), BR()];
+						$description[] = [_('Recovery'), ': ', (new CDiv($trigger['recovery_expression_html']))
+							->addClass(ZBX_STYLE_WORDWRAP)];
 					}
 					else {
 						$description[] = (new CDiv($trigger['expression_html']))->addClass(ZBX_STYLE_WORDWRAP);
@@ -1112,7 +1112,7 @@ class CScreenProblem extends CScreenBase {
 					$this->data['filter']['compact_view']
 						? (new CDiv($description))->addClass(ZBX_STYLE_ACTION_CONTAINER)
 						: $description,
-					($show_opdata == OPERATIONAL_DATA_SHOW_SEPARATELY) ? $opdata : null,
+					($show_opdata == OPERATIONAL_DATA_SHOW_SEPARATELY) ? $opdata->addClass(ZBX_STYLE_WORDBREAK) : null,
 					($problem['r_eventid'] != 0)
 						? zbx_date2age($problem['clock'], $problem['r_clock'])
 						: zbx_date2age($problem['clock']),

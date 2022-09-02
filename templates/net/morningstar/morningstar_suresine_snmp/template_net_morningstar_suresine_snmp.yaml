@@ -1,6 +1,6 @@
 zabbix_export:
   version: '6.0'
-  date: '2022-01-31T08:52:03Z'
+  date: '2022-08-16T02:55:51Z'
   groups:
     -
       uuid: 36bff6c29af64692839d077febfc7079
@@ -350,14 +350,38 @@ zabbix_export:
                   tag: scope
                   value: notice
         -
-          uuid: cb4a5c3033f84baa8260a8199265e5a9
-          name: 'Status: Uptime'
+          uuid: d1e50f16fab54a8e97372b52cebae18d
+          name: 'Status: Uptime (hardware)'
           type: SNMP_AGENT
-          snmp_oid: 1.3.6.1.2.1.1.3.0
-          key: status.uptime
+          snmp_oid: 1.3.6.1.2.1.25.1.1.0
+          key: status.hw.uptime
           history: 7d
           units: uptime
-          description: 'Device uptime in seconds'
+          description: 'The amount of time since this host was last initialized. Note that this is different from sysUpTime in the SNMPv2-MIB [RFC1907] because sysUpTime is the uptime of the network management portion of the system.'
+          preprocessing:
+            -
+              type: CHECK_NOT_SUPPORTED
+              parameters:
+                - ''
+              error_handler: CUSTOM_VALUE
+              error_handler_params: '0'
+            -
+              type: MULTIPLIER
+              parameters:
+                - '0.01'
+          tags:
+            -
+              tag: component
+              value: status
+        -
+          uuid: cb4a5c3033f84baa8260a8199265e5a9
+          name: 'Status: Uptime (network)'
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.2.1.1.3.0
+          key: status.net.uptime
+          history: 7d
+          units: uptime
+          description: 'The time (in hundredths of a second) since the network management portion of the system was last re-initialized.'
           preprocessing:
             -
               type: MULTIPLIER
@@ -369,22 +393,12 @@ zabbix_export:
               value: status
           triggers:
             -
-              uuid: f9404001de4c4c1d8438e0b560977398
-              expression: 'last(/Morningstar SureSine SNMP/status.uptime)<10m'
-              name: 'Status: Device has been restarted (uptime < 10m)'
-              priority: INFO
-              description: 'Uptime is less than 10 minutes'
-              manual_close: 'YES'
-              tags:
-                -
-                  tag: scope
-                  value: notice
-            -
               uuid: db5506294fd945659eae945014332a62
-              expression: 'nodata(/Morningstar SureSine SNMP/status.uptime,5m)=1'
-              name: 'Status: Failed to fetch data (or no data for 5m)'
+              expression: 'nodata(/Morningstar SureSine SNMP/status.net.uptime,5m)=1'
+              name: 'Status: Failed to fetch data'
+              event_name: 'Status: Failed to fetch data (or no data for 5m)'
               priority: WARNING
-              description: 'Zabbix has not received data for items for the last 5 minutes'
+              description: 'Zabbix has not received data for items for the last 5 minutes.'
               manual_close: 'YES'
               tags:
                 -
@@ -453,7 +467,8 @@ zabbix_export:
                 -
                   uuid: 4b27f6ecdc674803a883a8a60e3ddce2
                   expression: 'min(/Morningstar SureSine SNMP/battery.voltage[batteryVoltageSlow.0{#SINGLETON}],5m)>{#VOLTAGE.MAX.CRIT}'
-                  name: 'Battery: Critically high battery voltage (over {#VOLTAGE.MAX.CRIT}V for 5m)'
+                  name: 'Battery: Critically high battery voltage'
+                  event_name: 'Battery: Critically high battery voltage (over {#VOLTAGE.MAX.CRIT}V for 5m)'
                   opdata: 'Current value: {ITEM.LASTVALUE1}'
                   priority: HIGH
                   tags:
@@ -463,7 +478,8 @@ zabbix_export:
                 -
                   uuid: dfbcd455a92d423fbb841f2d6b6293a8
                   expression: 'max(/Morningstar SureSine SNMP/battery.voltage[batteryVoltageSlow.0{#SINGLETON}],5m)<{#VOLTAGE.MIN.CRIT}'
-                  name: 'Battery: Critically low battery voltage (below {#VOLTAGE.MIN.CRIT}V for 5m)'
+                  name: 'Battery: Critically low battery voltage'
+                  event_name: 'Battery: Critically low battery voltage (below {#VOLTAGE.MIN.CRIT}V for 5m)'
                   opdata: 'Current value: {ITEM.LASTVALUE1}'
                   priority: HIGH
                   tags:
@@ -473,12 +489,13 @@ zabbix_export:
                 -
                   uuid: e0173479978841ec8607430cf2fb356e
                   expression: 'min(/Morningstar SureSine SNMP/battery.voltage[batteryVoltageSlow.0{#SINGLETON}],5m)>{#VOLTAGE.MAX.WARN}'
-                  name: 'Battery: High battery voltage (over {#VOLTAGE.MAX.WARN}V for 5m)'
+                  name: 'Battery: High battery voltage'
+                  event_name: 'Battery: High battery voltage (over {#VOLTAGE.MAX.WARN}V for 5m)'
                   opdata: 'Current value: {ITEM.LASTVALUE1}'
                   priority: WARNING
                   dependencies:
                     -
-                      name: 'Battery: Critically high battery voltage (over {#VOLTAGE.MAX.CRIT}V for 5m)'
+                      name: 'Battery: Critically high battery voltage'
                       expression: 'min(/Morningstar SureSine SNMP/battery.voltage[batteryVoltageSlow.0{#SINGLETON}],5m)>{#VOLTAGE.MAX.CRIT}'
                   tags:
                     -
@@ -487,12 +504,13 @@ zabbix_export:
                 -
                   uuid: 75a433d7ec28440f947a4aaed3aed33d
                   expression: 'max(/Morningstar SureSine SNMP/battery.voltage[batteryVoltageSlow.0{#SINGLETON}],5m)<{#VOLTAGE.MIN.WARN}'
-                  name: 'Battery: Low battery voltage (below {#VOLTAGE.MIN.WARN}V for 5m)'
+                  name: 'Battery: Low battery voltage'
+                  event_name: 'Battery: Low battery voltage (below {#VOLTAGE.MIN.WARN}V for 5m)'
                   opdata: 'Current value: {ITEM.LASTVALUE1}'
                   priority: WARNING
                   dependencies:
                     -
-                      name: 'Battery: Critically low battery voltage (below {#VOLTAGE.MIN.CRIT}V for 5m)'
+                      name: 'Battery: Critically low battery voltage'
                       expression: 'max(/Morningstar SureSine SNMP/battery.voltage[batteryVoltageSlow.0{#SINGLETON}],5m)<{#VOLTAGE.MIN.CRIT}'
                   tags:
                     -
@@ -629,6 +647,19 @@ zabbix_export:
             -
               value: '8'
               newvalue: Standby
+  triggers:
+    -
+      uuid: f9404001de4c4c1d8438e0b560977398
+      expression: '(last(/Morningstar SureSine SNMP/status.hw.uptime)>0 and last(/Morningstar SureSine SNMP/status.hw.uptime)<10m) or (last(/Morningstar SureSine SNMP/status.hw.uptime)=0 and last(/Morningstar SureSine SNMP/status.net.uptime)<10m)'
+      name: 'Status: Device has been restarted'
+      event_name: 'Status: Device has been restarted (uptime < 10m)'
+      priority: INFO
+      description: 'Uptime is less than 10 minutes.'
+      manual_close: 'YES'
+      tags:
+        -
+          tag: scope
+          value: notice
   graphs:
     -
       uuid: 45df99d33eb0472e946d2f6f7a5a2745

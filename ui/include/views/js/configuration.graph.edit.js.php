@@ -39,6 +39,7 @@
 			<input type="hidden" id="items_#{number}_sortorder" name="items[#{number}][sortorder]" value="#{sortorder}">
 			<input type="hidden" id="items_#{number}_flags" name="items[#{number}][flags]" value="#{flags}">
 			<input type="hidden" id="items_#{number}_type" name="items[#{number}][type]" value="<?= GRAPH_ITEM_SIMPLE ?>">
+			<input type="hidden" id="items_#{number}_calc_fnc" name="items[#{number}][calc_fnc]" value="#{calc_fnc}">
 			<input type="hidden" id="items_#{number}_drawtype" name="items[#{number}][drawtype]" value="#{drawtype}">
 			<input type="hidden" id="items_#{number}_yaxisside" name="items[#{number}][yaxisside]" value="#{yaxisside}">
 		</td>
@@ -60,12 +61,12 @@
 		<!-- function -->
 		<td>
 			<?= (new CSelect('items[#{number}][calc_fnc]'))
-					->setId('items_#{number}_calc_fnc')
+					->setValue('#{calc_fnc}')
 					->addOptions(CSelect::createOptionsFromArray([
-						CALC_FNC_ALL =>_('all'),
-						CALC_FNC_MIN =>_('min'),
-						CALC_FNC_AVG =>_('avg'),
-						CALC_FNC_MAX =>_('max')
+						CALC_FNC_ALL => _('all'),
+						CALC_FNC_MIN => _('min'),
+						CALC_FNC_AVG => _('avg'),
+						CALC_FNC_MAX => _('max')
 					]))
 			?>
 		</td>
@@ -73,6 +74,7 @@
 		<!-- drawtype -->
 		<td>
 			<?= (new CSelect('items[#{number}][drawtype]'))
+					->setValue('#{drawtype}')
 					->addOptions(CSelect::createOptionsFromArray($graph_item_drawtypes))
 			?>
 		</td>
@@ -80,9 +82,10 @@
 		<!-- yaxisside -->
 		<td>
 			<?= (new CSelect('items[#{number}][yaxisside]'))
+					->setValue('#{yaxisside}')
 					->addOptions(CSelect::createOptionsFromArray([
-						GRAPH_YAXIS_SIDE_LEFT =>_('Left'),
-						GRAPH_YAXIS_SIDE_RIGHT =>_('Right')
+						GRAPH_YAXIS_SIDE_LEFT => _('Left'),
+						GRAPH_YAXIS_SIDE_RIGHT => _('Right')
 					]))
 			?>
 		</td>
@@ -116,6 +119,7 @@
 			<input type="hidden" id="items_#{number}_sortorder" name="items[#{number}][sortorder]" value="#{sortorder}">
 			<input type="hidden" id="items_#{number}_flags" name="items[#{number}][flags]" value="#{flags}">
 			<input type="hidden" id="items_#{number}_type" name="items[#{number}][type]" value="<?= GRAPH_ITEM_SIMPLE ?>">
+			<input type="hidden" id="items_#{number}_calc_fnc" name="items[#{number}][calc_fnc]" value="#{calc_fnc}">
 			<input type="hidden" id="items_#{number}_drawtype" name="items[#{number}][drawtype]" value="#{drawtype}">
 			<input type="hidden" id="items_#{number}_yaxisside" name="items[#{number}][yaxisside]" value="#{yaxisside}">
 		</td>
@@ -137,21 +141,23 @@
 		<!-- function -->
 		<td>
 			<?= (new CSelect('items[#{number}][calc_fnc]'))
-				->setId('items_#{number}_calc_fnc')
-				->addOptions(CSelect::createOptionsFromArray([
-					CALC_FNC_MIN =>_('min'),
-					CALC_FNC_AVG =>_('avg'),
-					CALC_FNC_MAX =>_('max')
-				]))
+					->setValue('#{calc_fnc}')
+					->addOptions(CSelect::createOptionsFromArray([
+						CALC_FNC_MIN => _('min'),
+						CALC_FNC_AVG => _('avg'),
+						CALC_FNC_MAX => _('max')
+					]))
 			?>
 		</td>
 
 		<!-- yaxisside -->
 		<td>
-			<?= (new CSelect('items[#{number}][yaxisside]'))->addOptions(CSelect::createOptionsFromArray([
-					GRAPH_YAXIS_SIDE_LEFT =>_('Left'),
-					GRAPH_YAXIS_SIDE_RIGHT =>_('Right')
-				]))
+			<?= (new CSelect('items[#{number}][yaxisside]'))
+					->setValue('#{yaxisside}')
+					->addOptions(CSelect::createOptionsFromArray([
+						GRAPH_YAXIS_SIDE_LEFT => _('Left'),
+						GRAPH_YAXIS_SIDE_RIGHT => _('Right')
+					]))
 			?>
 		</td>
 
@@ -183,9 +189,10 @@
 			<input type="hidden" id="items_#{number}_itemid" name="items[#{number}][itemid]" value="#{itemid}">
 			<input type="hidden" id="items_#{number}_sortorder" name="items[#{number}][sortorder]" value="#{sortorder}">
 			<input type="hidden" id="items_#{number}_flags" name="items[#{number}][flags]" value="#{flags}">
-			<input type="hidden" id="items_#{number}_type" name="items[#{number}][type]" value="<?= GRAPH_ITEM_SIMPLE ?>">
-			<input type="hidden" id="items_#{number}_drawtype" name="items[#{number}][drawtype]" value="#{drawtype}">
-			<input type="hidden" id="items_#{number}_yaxisside" name="items[#{number}][yaxisside]" value="#{yaxisside}">
+			<input type="hidden" id="items_#{number}_type" name="items[#{number}][type]" value="#{type}">
+			<input type="hidden" id="items_#{number}_calc_fnc" name="items[#{number}][calc_fnc]" value="#{calc_fnc}">
+			<input type="hidden" id="items_#{number}_drawtype" name="items[#{number}][drawtype]" value="<?= GRAPH_ITEM_DRAWTYPE_LINE ?>">
+			<input type="hidden" id="items_#{number}_yaxisside" name="items[#{number}][yaxisside]" value="<?= GRAPH_YAXIS_SIDE_LEFT ?>">
 		</td>
 
 		<!-- row number -->
@@ -204,23 +211,25 @@
 
 		<!-- type -->
 		<td>
-			<?= (new CSelect('items[#{number}][type]'))->addOptions(CSelect::createOptionsFromArray([
-					GRAPH_ITEM_SIMPLE =>_('Simple'),
-					GRAPH_ITEM_SUM =>_('Graph sum')
-				]))
+			<?= (new CSelect('items[#{number}][type]'))
+					->setValue('#{type}')
+					->addOptions(CSelect::createOptionsFromArray([
+						GRAPH_ITEM_SIMPLE =>_('Simple'),
+						GRAPH_ITEM_SUM =>_('Graph sum')
+					]))
 			?>
 		</td>
 
 		<!-- function -->
 		<td>
 			<?= (new CSelect('items[#{number}][calc_fnc]'))
-				->setId('items_#{number}_calc_fnc')
-				->addOptions(CSelect::createOptionsFromArray([
-					CALC_FNC_MIN =>_('min'),
-					CALC_FNC_AVG =>_('avg'),
-					CALC_FNC_MAX =>_('max'),
-					CALC_FNC_LST =>_('last')
-				]))
+					->setValue('#{calc_fnc}')
+					->addOptions(CSelect::createOptionsFromArray([
+						CALC_FNC_MIN => _('min'),
+						CALC_FNC_AVG => _('avg'),
+						CALC_FNC_MAX => _('max'),
+						CALC_FNC_LST => _('last')
+					]))
 			?>
 		</td>
 
@@ -252,9 +261,10 @@
 			<input type="hidden" id="items_#{number}_itemid" name="items[#{number}][itemid]" value="#{itemid}">
 			<input type="hidden" id="items_#{number}_sortorder" name="items[#{number}][sortorder]" value="#{sortorder}">
 			<input type="hidden" id="items_#{number}_flags" name="items[#{number}][flags]" value="#{flags}">
-			<input type="hidden" id="items_#{number}_type" name="items[#{number}][type]" value="<?= GRAPH_ITEM_SIMPLE ?>">
-			<input type="hidden" id="items_#{number}_drawtype" name="items[#{number}][drawtype]" value="#{drawtype}">
-			<input type="hidden" id="items_#{number}_yaxisside" name="items[#{number}][yaxisside]" value="#{yaxisside}">
+			<input type="hidden" id="items_#{number}_type" name="items[#{number}][type]" value="#{type}">
+			<input type="hidden" id="items_#{number}_calc_fnc" name="items[#{number}][calc_fnc]" value="#{calc_fnc}">
+			<input type="hidden" id="items_#{number}_drawtype" name="items[#{number}][drawtype]" value="<?= GRAPH_ITEM_DRAWTYPE_LINE ?>">
+			<input type="hidden" id="items_#{number}_yaxisside" name="items[#{number}][yaxisside]" value="<?= GRAPH_YAXIS_SIDE_LEFT ?>">
 		</td>
 
 		<!-- row number -->
@@ -273,23 +283,25 @@
 
 		<!-- type -->
 		<td>
-			<?= (new CSelect('items[#{number}][type]'))->addOptions(CSelect::createOptionsFromArray([
-					GRAPH_ITEM_SIMPLE =>_('Simple'),
-					GRAPH_ITEM_SUM =>_('Graph sum')
-				]))
+			<?= (new CSelect('items[#{number}][type]'))
+					->setValue('#{type}')
+					->addOptions(CSelect::createOptionsFromArray([
+						GRAPH_ITEM_SIMPLE => _('Simple'),
+						GRAPH_ITEM_SUM => _('Graph sum')
+					]))
 			?>
 		</td>
 
 		<!-- function -->
 		<td>
 			<?= (new CSelect('items[#{number}][calc_fnc]'))
-				->setId('items_#{number}_calc_fnc')
-				->addOptions(CSelect::createOptionsFromArray([
-					CALC_FNC_MIN =>_('min'),
-					CALC_FNC_AVG =>_('avg'),
-					CALC_FNC_MAX =>_('max'),
-					CALC_FNC_LST =>_('last')
-				]))
+					->setValue('#{calc_fnc}')
+					->addOptions(CSelect::createOptionsFromArray([
+						CALC_FNC_MIN => _('min'),
+						CALC_FNC_AVG => _('avg'),
+						CALC_FNC_MAX => _('max'),
+						CALC_FNC_LST => _('last')
+					]))
 			?>
 		</td>
 
@@ -317,16 +329,18 @@
 			colorPalette.setThemeColors(theme_colors);
 			this.graphs = graphs;
 
-			for (let i = 0; i < items.length; i++) {
-				const name = items[i].host + '<?= NAME_DELIMITER ?>' + items[i].name;
+			items.forEach((item, i) => {
+				item.number = i;
+				item.number_nr = i + 1;
+				item.name = item.host + '<?= NAME_DELIMITER ?>' + item.name;
 
-				this.loadItem(i, items[i].gitemid, items[i].itemid, name, items[i].type, items[i].calc_fnc,
-					items[i].drawtype, items[i].yaxisside, items[i].color, items[i].flags
-				);
-			}
+				this.loadItem(item);
+			});
 
-			$('#tabs').on('tabsactivate', (event, ui) => {
-				if (ui.newPanel.attr('id') === 'previewTab') {
+			$('#tabs').on('tabscreate tabsactivate', (event, ui) => {
+				const $panel = (event.type === 'tabscreate') ? ui.panel : ui.newPanel;
+
+				if ($panel.attr('id') === 'previewTab') {
 					const $preview_chart = $('#previewChart');
 					const src = new Curl('chart3.php');
 
@@ -355,8 +369,23 @@
 						src.setArgument('ymax_type', $('#ymax_type').val());
 						src.setArgument('yaxismin', $('#yaxismin').val());
 						src.setArgument('yaxismax', $('#yaxismax').val());
-						src.setArgument('ymin_itemid', $('#ymin_itemid').val());
-						src.setArgument('ymax_itemid', $('#ymax_itemid').val());
+
+						if ($('#ymin_type').val() == <?= GRAPH_YAXIS_TYPE_ITEM_VALUE ?>) {
+							const ymin_item_data = $('#ymin_itemid').multiSelect('getData');
+
+							if (ymin_item_data.length) {
+								src.setArgument('ymin_itemid', ymin_item_data[0]['id']);
+							}
+						}
+
+						if ($('#ymax_type').val() == <?= GRAPH_YAXIS_TYPE_ITEM_VALUE ?>) {
+							const ymax_item_data = $('#ymax_itemid').multiSelect('getData');
+
+							if (ymax_item_data.length) {
+								src.setArgument('ymax_itemid', ymax_item_data[0]['id']);
+							}
+						}
+
 						src.setArgument('showworkperiod', $('#show_work_period').is(':checked') ? 1 : 0);
 						src.setArgument('showtriggers', $('#show_triggers').is(':checked') ? 1 : 0);
 					}
@@ -454,32 +483,9 @@
 			!this.graphs.readonly && this.initSortable();
 		},
 
-		loadItem(number, gitemid, itemid, name, type, calc_fnc, drawtype, yaxisside, color, flags) {
-			const item = {
-				number: number,
-				number_nr: number + 1,
-				gitemid: gitemid,
-				itemid: itemid,
-				calc_fnc: calc_fnc,
-				color: color,
-				sortorder: number,
-				flags: flags,
-				name: name
-			};
+		loadItem(item) {
 			const itemTpl = new Template($('#tmpl-item-row-' + this.graphs.graphtype).html());
 			const $row = $(itemTpl.evaluate(item));
-
-			$row.find('#items_' + number + '_type').val(type);
-			$row.find('#items_' + number + '_drawtype').val(drawtype);
-			$row.find('#items_' + number + '_yaxisside').val(yaxisside);
-
-			const $calc_fnc = $row.find('#items_' + number + '_calc_fnc');
-
-			$calc_fnc.val(calc_fnc);
-
-			if ($calc_fnc[0].selectedIndex < 0) {
-				$calc_fnc[0].selectedIndex = 0;
-			}
 
 			$('#itemButtonsRow').before($row);
 			$row.find('.<?= ZBX_STYLE_COLOR_PICKER ?> input').colorpicker();

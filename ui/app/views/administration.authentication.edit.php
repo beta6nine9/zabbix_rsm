@@ -123,7 +123,9 @@ $http_tab = (new CFormList('list_http'))
 			->setDisabled($data['http_auth_enabled'] != ZBX_AUTH_HTTP_ENABLED)
 	)
 	->addRow(new CLabel(_('Remove domain name'), 'http_strip_domains'),
-		(new CTextBox('http_strip_domains', $data['http_strip_domains']))
+		(new CTextBox('http_strip_domains', $data['http_strip_domains'], false,
+				DB::getFieldLength('config', 'http_strip_domains')
+		))
 			->setEnabled($data['http_auth_enabled'])
 			->setWidth(ZBX_TEXTAREA_STANDARD_WIDTH)
 	)
@@ -136,19 +138,23 @@ $http_tab = (new CFormList('list_http'))
 
 // LDAP configuration fields.
 if ($data['change_bind_password']) {
-	$password_box = [
-		new CVar('change_bind_password', 1),
-		(new CPassBox('ldap_bind_password', $data['ldap_bind_password']))
-			->setEnabled($data['ldap_enabled'])
-			->setWidth(ZBX_TEXTAREA_SMALL_WIDTH)
-	];
+	$password_box = (new CPassBox('ldap_bind_password', $data['ldap_bind_password'],
+		DB::getFieldLength('config', 'ldap_bind_password'))
+	)
+		->setEnabled($data['ldap_enabled'])
+		->setWidth(ZBX_TEXTAREA_SMALL_WIDTH)
+	;
 }
 else {
 	$password_box = [
-		new CVar('action_passw_change', $data['action_passw_change']),
-		(new CButton('change_bind_password', _('Change password')))
+		(new CSimpleButton(_('Change password')))
+			->setId('bind-password-btn')
 			->setEnabled($data['ldap_enabled'])
-			->addClass(ZBX_STYLE_BTN_GREY)
+			->addClass(ZBX_STYLE_BTN_GREY),
+		(new CPassBox('ldap_bind_password', '', DB::getFieldLength('config', 'ldap_bind_password')))
+			->setWidth(ZBX_TEXTAREA_SMALL_WIDTH)
+			->addClass(ZBX_STYLE_DISPLAY_NONE)
+			->setEnabled(false)
 	];
 }
 
@@ -322,7 +328,8 @@ $saml_tab = (new CFormList('list_saml'))
 (new CWidget())
 	->setTitle(_('Authentication'))
 	->addItem((new CForm())
-		->addVar('action', $data['action_submit'])
+		->addVar('action', 'authentication.update')
+		->addVar('change_bind_password', $data['change_bind_password'])
 		->addVar('db_authentication_type', $data['db_authentication_type'])
 		->setId('authentication-form')
 		->setName('form_auth')

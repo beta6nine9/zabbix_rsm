@@ -46,7 +46,7 @@ class HostInterfaceManager {
 	static ZBX_STYLE_HOST_INTERFACE_CONTAINER_HEADER = 'interface-container-header';
 	static ZBX_STYLE_HOST_INTERFACE_INPUT_EXPAND = 'interface-input-expand';
 	static ZBX_STYLE_HOST_INTERFACE_ROW = 'interface-row';
-	static ZBX_STYLE_GREY = 'grey';
+	static ZBX_STYLE_HOST_NO_INTERFACE = 'no-interface';
 	static ZBX_STYLE_LIST_ACCORDION_ITEM = 'list-accordion-item';
 	static ZBX_STYLE_LIST_ACCORDION_ITEM_OPENED = 'list-accordion-item-opened';
 
@@ -82,10 +82,7 @@ class HostInterfaceManager {
 
 		this.$noInterfacesMsg = jQuery('<div>', {
 			html: t('No interfaces are defined.'),
-			class: HostInterfaceManager.ZBX_STYLE_GREY,
-			css: {
-				'padding': '5px 0px'
-			}
+			class: HostInterfaceManager.ZBX_STYLE_HOST_NO_INTERFACE
 		})
 			.insertAfter(jQuery('.' + HostInterfaceManager.ZBX_STYLE_HOST_INTERFACE_CONTAINER_HEADER));
 
@@ -112,8 +109,6 @@ class HostInterfaceManager {
 
 				this.interfaces[value.interfaceid] = value;
 			});
-
-		return this;
 	}
 
 	/**
@@ -410,10 +405,9 @@ class HostInterfaceManager {
 
 		this.data[interfaceid].useip = use_ip;
 
-		[...elem.querySelectorAll('input[name$="[ip]"], input[name$="[dns]"]')].map((el) => {
+		[...elem.querySelectorAll('input[name$="[ip]"], input[name$="[dns]"]')].map((el) =>
 			el.removeAttribute('aria-required')
-			return el;
-		});
+		);
 
 		elem
 			.querySelector((use_ip == HostInterfaceManager.INTERFACE_USE_IP) ? '[name$="[ip]"]' : '[name$="[dns]"]')
@@ -515,7 +509,7 @@ class HostInterfaceManager {
 	}
 
 	makeReadonly() {
-		[...document.querySelectorAll('.' + HostInterfaceManager.ZBX_STYLE_HOST_INTERFACE_ROW)].map((row) => {
+		[...document.querySelectorAll('.' + HostInterfaceManager.ZBX_STYLE_HOST_INTERFACE_ROW)].forEach((row) => {
 			[...row.querySelectorAll('input, z-select')].map((el) => {
 				this.setReadonly(el);
 			});
@@ -526,4 +520,4 @@ class HostInterfaceManager {
 
 		return true;
 	}
-};
+}

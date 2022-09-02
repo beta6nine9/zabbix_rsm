@@ -57,7 +57,7 @@ class testDashboardGeomapWidget extends CWebTest {
 			' FROM widget_field wf'.
 			' INNER JOIN widget w'.
 			' ON w.widgetid=wf.widgetid ORDER BY wf.widgetid, wf.name, wf.value_int, wf.value_str, wf.value_groupid,'.
-			' wf.value_itemid, wf.value_graphid';
+			' wf.value_itemid, wf.value_graphid, wf.value_hostid';
 
 	public function prepareDashboardData() {
 		$response = CDataHelper::call('dashboard.create', [
@@ -166,7 +166,7 @@ class testDashboardGeomapWidget extends CWebTest {
 
 		// Check operator's dropdown options presence.
 		$this->assertEquals(['Exists', 'Equals', 'Contains', 'Does not exist', 'Does not equal',
-				'Does not contain'], $form->getField('id:tags_0_operator')->asZDropdown()->getOptions()->asText()
+				'Does not contain'], $form->getField('id:tags_0_operator')->asDropdown()->getOptions()->asText()
 		);
 
 		$hint_text = "Comma separated center coordinates and zoom level to display when the widget is initially loaded.".
