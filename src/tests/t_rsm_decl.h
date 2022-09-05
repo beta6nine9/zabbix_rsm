@@ -147,6 +147,8 @@ char	*CONFIG_SSL_KEY_LOCATION;
 char	*CONFIG_SSL_CA_LOCATION;
 char	*CONFIG_SSL_CERT_LOCATION;
 
+int	CONFIG_ALLOW_UNSUPPORTED_DB_VERSIONS = 0;
+
 ZBX_METRIC      parameters_common_http[] = {{NULL, CF_HAVEPARAMS, NULL, NULL}};
 
 void	xml_escape_xpath(char **data)
