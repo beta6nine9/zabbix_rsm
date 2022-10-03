@@ -4879,7 +4879,10 @@ sub update_slv_rtt_monthly_stats($$$$$$$$;$)
 			{
 				my $itemids_placeholder = join(",", ("?") x scalar(@itemids));
 
-				$min_clock = db_select_value("select min(clock) from history where itemid in ($itemids_placeholder)", [@itemids]);
+				my $sql = "select min(clock) from history where itemid in ($itemids_placeholder) and clock>=?";
+				my $params = [@itemids, $end_of_prev_month + $cycle_delay];
+
+				$min_clock = db_select_value($sql, $params);
 			}
 
 			if (defined($min_clock))

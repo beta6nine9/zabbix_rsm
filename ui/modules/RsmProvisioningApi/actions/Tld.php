@@ -430,12 +430,14 @@ class Tld extends MonitoringTarget
 	{
 		$services = array_column($this->newObject['servicesStatus'], 'enabled', 'service');
 
+		$dnssec = $services['dnsUDP'] || $services['dnsTCP'] ? $this->newObject['dnsParameters']['dnssecEnabled'] : false;
+
 		$config = [
 			'tldType' => $this->newObject['tldType'],
 			'enabled' => null,
 			'dnsUdp'  => $services['dnsUDP'],
 			'dnsTcp'  => $services['dnsTCP'],
-			'dnssec'  => $this->newObject['dnsParameters']['dnssecEnabled'],
+			'dnssec'  => $dnssec,
 			'rdap'    => $services['rdap'],
 			'rdds43'  => $services['rdds43'],
 			'rdds80'  => $services['rdds80'],
@@ -821,7 +823,7 @@ class Tld extends MonitoringTarget
 
 	private function updateRsmhostDnsNsLog(int $itemid, int $action): void
 	{
-		$sql = 'insert into rsmhost_dns_ns_log (itemid,clock,action) values (%d,%d,%d)';
+		$sql = 'INSERT INTO rsmhost_dns_ns_log (itemid,clock,action) VALUES (%d,%d,%d)';
 		$sql = sprintf($sql, $itemid, $_SERVER['REQUEST_TIME'], $action);
 		if (!DBexecute($sql))
 		{

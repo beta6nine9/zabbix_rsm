@@ -209,8 +209,8 @@ abstract class MonitoringTarget extends ActionBaseEx
 
 		foreach ($reports as $report)
 		{
-			$sql = 'insert into sla_reports (hostid,year,month,report_xml,report_json) values (%s,%s,%s,%s,%s)' .
-					' on duplicate key update report_xml=%s,report_json=%s';
+			$sql = 'INSERT INTO sla_reports (hostid,year,month,report_xml,report_json) VALUES (%s,%s,%s,%s,%s)' .
+					' ON DUPLICATE KEY UPDATE report_xml=%s,report_json=%s';
 			$sql = sprintf(
 				$sql,
 				zbx_dbstr($report['hostid']),
@@ -247,5 +247,217 @@ abstract class MonitoringTarget extends ActionBaseEx
 		// delete "TLD <rsmhost>" host group
 		$hostGroupId = $this->getHostGroupId('TLD ' . $this->input['id']);
 		$data = API::HostGroup()->delete([$hostGroupId]);
+	}
+
+	/******************************************************************************************************************
+	 * Functions for updating lastvalue table                                                                         *
+	 ******************************************************************************************************************/
+
+	protected function updateLastValues(): void
+	{
+		$oldServices = array_column($this->oldObject['servicesStatus'], 'enabled', 'service');
+		$newServices = array_column($this->newObject['servicesStatus'], 'enabled', 'service');
+
+		$beginningOfMonth = strtotime(date('Y-m-01T00:00:00+0000'));
+
+		if ($this->getMonitoringTarget() === self::MONITORING_TARGET_REGISTRY)
+		{
+			$oldDns = $oldServices['dnsUDP'] || $oldServices['dnsTCP'];
+			$newDns = $newServices['dnsUDP'] || $newServices['dnsTCP'];
+
+			$oldDnssec = $oldDns && $this->oldObject['dnsParameters']['dnssecEnabled'];
+			$newDnssec = $this->newObject['dnsParameters']['dnssecEnabled'];
+
+			if (!$oldServices['dnsUDP'] && $newServices['dnsUDP'])
+			{
+				$this->updateLastValuesDnsUdp($beginningOfMonth);
+			}
+			if (!$oldServices['dnsTCP'] && $newServices['dnsTCP'])
+			{
+				$this->updateLastValuesDnsTcp($beginningOfMonth);
+			}
+			if (!$oldDns && $newDns)
+			{
+				$this->updateLastValuesDns($beginningOfMonth);
+			}
+			if (!$oldDnssec && $newDnssec)
+			{
+				$this->updateLastValuesDnssec($beginningOfMonth);
+			}
+			$this->updateLastValuesDnsNsIp($beginningOfMonth);
+		}
+
+		if ($this->isStandaloneRdap())
+		{
+			$oldRddsStatus = $oldServices['rdds43'] || $oldServices['rdds80'];
+			$newRddsStatus = $newServices['rdds43'] || $newServices['rdds80'];
+
+			if (!$oldServices['rdap'] && $newServices['rdap'])
+			{
+				$this->updateLastValuesRdap($beginningOfMonth);
+			}
+			if (!$oldRddsStatus && $newRddsStatus)
+			{
+				$this->updateLastValuesRdds($beginningOfMonth);
+			}
+		}
+		else
+		{
+			$oldRddsStatus = $oldServices['rdap'] || $oldServices['rdds43'] || $oldServices['rdds80'];
+			$newRddsStatus = $newServices['rdap'] || $newServices['rdds43'] || $newServices['rdds80'];
+
+			if (!$oldRddsStatus && $newRddsStatus)
+			{
+				$this->updateLastValuesRdds($beginningOfMonth);
+			}
+		}
+	}
+
+	protected function updateLastValuesForItems(array $itemIds, int $beginningOfMonth, int $interval): void
+	{
+		// set $clock to the beginning of current cycle
+		$clock = (int)($_SERVER['REQUEST_TIME'] / $interval) * $interval;
+
+		// prepare "%d,%d,%d,..." format for all itemids
+		$itemiIdsFormat = str_repeat('%d,', count($itemIds) - 1) . '%d';
+
+		// delete lastvalues that are older than current month
+		$sql = "DELETE FROM lastvalue WHERE itemid IN ($itemiIdsFormat) AND clock<%d";
+		$sql = vsprintf($sql, array_merge($itemIds, [$beginningOfMonth]));
+		if (!DBexecute($sql))
+		{
+			throw new Exception('Query failed');
+		}
+
+		// update clock for lastvalues that were updated during this month
+		$sql = "UPDATE lastvalue SET clock=%d WHERE itemid IN ($itemiIdsFormat)";
+		$sql = vsprintf($sql, array_merge([$clock], $itemIds));
+		if (!DBexecute($sql))
+		{
+			throw new Exception('Query failed');
+		}
+	}
+
+	private function updateLastValuesDnsUdp(int $beginningOfMonth): void
+	{
+		$itemIds = $this->getItemIds(
+			$this->statusHostId,
+			[
+				'rsm.slv.dns.udp.rtt.performed',
+				'rsm.slv.dns.udp.rtt.failed',
+				'rsm.slv.dns.udp.rtt.pfailed',
+			]
+		);
+		$this->updateLastValuesForItems($itemIds, $beginningOfMonth, $this->getGlobalMacro(self::MACRO_GLOBAL_DNS_DELAY));
+	}
+
+	private function updateLastValuesDnsTcp(int $beginningOfMonth): void
+	{
+		$itemIds = $this->getItemIds(
+			$this->statusHostId,
+			[
+				'rsm.slv.dns.tcp.rtt.performed',
+				'rsm.slv.dns.tcp.rtt.failed',
+				'rsm.slv.dns.tcp.rtt.pfailed',
+			]
+		);
+		$this->updateLastValuesForItems($itemIds, $beginningOfMonth, $this->getGlobalMacro(self::MACRO_GLOBAL_DNS_DELAY));
+	}
+
+	private function updateLastValuesDns(int $beginningOfMonth): void
+	{
+		$itemIds = $this->getItemIds(
+			$this->statusHostId,
+			[
+				'rsm.slv.dns.avail',
+				'rsm.slv.dns.downtime',
+				'rsm.slv.dns.rollweek',
+			]
+		);
+		$this->updateLastValuesForItems($itemIds, $beginningOfMonth, $this->getGlobalMacro(self::MACRO_GLOBAL_DNS_DELAY));
+	}
+
+	private function updateLastValuesDnssec(int $beginningOfMonth): void
+	{
+		$itemIds = $this->getItemIds(
+			$this->statusHostId,
+			[
+				'rsm.slv.dnssec.avail',
+				'rsm.slv.dnssec.rollweek',
+			]
+		);
+		$this->updateLastValuesForItems($itemIds, $beginningOfMonth, $this->getGlobalMacro(self::MACRO_GLOBAL_DNS_DELAY));
+	}
+
+	private function updateLastValuesDnsNsIp(int $beginningOfMonth): void
+	{
+		$itemIds = [];
+
+		if ($this->isObjectDisabled($this->oldObject))
+		{
+			$itemIds = $this->findItemIds(
+				$this->statusHostId,
+				[
+					'rsm.slv.dns.ns.avail[*,*]',
+					'rsm.slv.dns.ns.downtime[*,*]',
+				]
+			);
+		}
+		else
+		{
+			$nsipToString = fn(array $nsip): string => $nsip['ns'] . ',' . $nsip['ip'];
+
+			$nsipList = array_diff(
+				array_map($nsipToString, $this->newObject['dnsParameters']['nsIps']),
+				array_map($nsipToString, $this->oldObject['dnsParameters']['nsIps'])
+			);
+
+			if ($nsipList)
+			{
+				$keys = array_merge(
+					array_map(fn(string $nsip): string => "rsm.slv.dns.ns.avail[$nsip]", $nsipList),
+					array_map(fn(string $nsip): string => "rsm.slv.dns.ns.downtime[$nsip]", $nsipList)
+				);
+
+				$itemIds = $this->getItemIds($this->statusHostId, $keys);
+			}
+		}
+
+		if ($itemIds)
+		{
+			$this->updateLastValuesForItems($itemIds, $beginningOfMonth, $this->getGlobalMacro(self::MACRO_GLOBAL_DNS_DELAY));
+		}
+	}
+
+	private function updateLastValuesRdap(int $beginningOfMonth): void
+	{
+		$itemIds = $this->getItemIds(
+			$this->statusHostId,
+			[
+				'rsm.slv.rdap.avail',
+				'rsm.slv.rdap.downtime',
+				'rsm.slv.rdap.rollweek',
+				'rsm.slv.rdap.rtt.performed',
+				'rsm.slv.rdap.rtt.failed',
+				'rsm.slv.rdap.rtt.pfailed',
+			]
+		);
+		$this->updateLastValuesForItems($itemIds, $beginningOfMonth, $this->getGlobalMacro(self::MACRO_GLOBAL_RDAP_DELAY));
+	}
+
+	private function updateLastValuesRdds(int $beginningOfMonth): void
+	{
+		$itemIds = $this->getItemIds(
+			$this->statusHostId,
+			[
+				'rsm.slv.rdds.avail',
+				'rsm.slv.rdds.downtime',
+				'rsm.slv.rdds.rollweek',
+				'rsm.slv.rdds.rtt.performed',
+				'rsm.slv.rdds.rtt.failed',
+				'rsm.slv.rdds.rtt.pfailed',
+			]
+		);
+		$this->updateLastValuesForItems($itemIds, $beginningOfMonth, $this->getGlobalMacro(self::MACRO_GLOBAL_RDDS_DELAY));
 	}
 }
