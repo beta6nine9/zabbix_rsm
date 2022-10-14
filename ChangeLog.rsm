@@ -1,3 +1,13 @@
+Changes for rsm2.3.1
+
+New features:
+..F....... [914] fixed valuemapping on the RDDS "Test details" page (asitals)
+....I..... [908] fixed SLV calculations for periods when service or ns,ip pair was disabled (asitals)
+....I..... [913] modified time schedule of the cron job for sla-monthly-status.pl (dimir)
+..F.I..PS. [839] upgraded to Zabbix 6.0.8 (dimir)
+....I..... [912] added value mappings in tlds-notification.pl (asitals)
+
+--------------------------------------------------------------------------------
 Changes for rsm2.3.0
 
 New features:
