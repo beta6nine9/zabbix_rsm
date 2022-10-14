@@ -645,37 +645,27 @@ class ParticularTestsListAction extends Action {
 						}
 
 						// Count result for table bottom summary rows.
-						if ($item['key_'] == PROBE_RDAP_RTT && 0 > $itemValue['value']) {
+						$rtt_item_mappings = [
+							PROBE_RDAP_RTT   => ['column' => 'rdap'  , 'valuemap' => RSM_VALUE_MAP_RDAP_RTT],
+							PROBE_RDDS43_RTT => ['column' => 'rdds43', 'valuemap' => RSM_VALUE_MAP_RDDS_RTT],
+							PROBE_RDDS80_RTT => ['column' => 'rdds80', 'valuemap' => RSM_VALUE_MAP_RDDS_RTT],
+						];
+						if (array_key_exists($item['key_'], $rtt_item_mappings) && $itemValue['value'] < 0) {
+							$column   = $rtt_item_mappings[$item['key_']]['column'];
+							$valuemap = $rtt_item_mappings[$item['key_']]['valuemap'];
+
 							$error_code = (int)$itemValue['value'];
 
 							if (!array_key_exists($error_code, $data['errors'])) {
 								$data['errors'][$error_code] = [
-									'description' => VM::get(RSM_VALUE_MAP_RDAP_RTT, $error_code),
+									'description' => VM::get($valuemap, $error_code),
 								];
 							}
-							if (!array_key_exists('rdap', $data['errors'][$error_code])) {
-								$data['errors'][$error_code]['rdap'] = 0;
+							if (!array_key_exists($column, $data['errors'][$error_code])) {
+								$data['errors'][$error_code][$column] = 0;
 							}
 
-							$data['errors'][$error_code]['rdap']++;
-						}
-						elseif ($item['key_'] == PROBE_RDDS43_RTT || $item['key_'] == PROBE_RDDS80_RTT) {
-							$column = $item['key_'] == PROBE_RDDS43_RTT ? 'rdds43' : 'rdds80';
-
-							if (0 > $itemValue['value']) {
-								$error_code = (int)$itemValue['value'];
-
-								if (!array_key_exists($error_code, $data['errors'])) {
-									$data['errors'][$error_code] = [
-										'description' => VM::get(RSM_VALUE_MAP_RDAP_RTT, $error_code),
-									];
-								}
-								if (!array_key_exists($column, $data['errors'][$error_code])) {
-									$data['errors'][$error_code][$column] = 0;
-								}
-
-								$data['errors'][$error_code][$column]++;
-							}
+							$data['errors'][$error_code][$column]++;
 						}
 					}
 				}

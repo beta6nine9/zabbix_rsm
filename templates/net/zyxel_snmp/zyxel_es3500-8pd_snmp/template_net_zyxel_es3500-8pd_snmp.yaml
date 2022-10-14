@@ -1,6 +1,6 @@
 zabbix_export:
   version: '6.0'
-  date: '2022-01-26T19:42:08Z'
+  date: '2022-08-16T04:05:41Z'
   groups:
     -
       uuid: 36bff6c29af64692839d077febfc7079
@@ -15,6 +15,7 @@ zabbix_export:
         
         MIBs used:
         RFC1213-MIB
+        HOST-RESOURCES-MIB
          ZYXEL-ES3500-8PD-MIB
         IF-MIB
         ZYXEL-ES3500-8PD-MIB
@@ -107,7 +108,8 @@ zabbix_export:
             -
               uuid: 3cf67f911a854d2ebeb9e006f3f97738
               expression: 'min(/ZYXEL ES3500-8PD SNMP/zyxel.3500_8pd.cpuusage,5m)>{$CPU.UTIL.CRIT}'
-              name: 'ZYXEL ES3500-8PD: High CPU utilization (over {$CPU.UTIL.CRIT}% for 5m)'
+              name: 'ZYXEL ES3500-8PD: High CPU utilization'
+              event_name: 'ZYXEL ES3500-8PD: High CPU utilization (over {$CPU.UTIL.CRIT}% for 5m)'
               opdata: 'Current utilization: {ITEM.LASTVALUE1}'
               priority: WARNING
               description: 'CPU utilization is too high. The system might be slow to respond.'
@@ -162,6 +164,37 @@ zabbix_export:
                 -
                   tag: scope
                   value: notice
+        -
+          uuid: ef45d91672ea43c3aa24cbc21f37d391
+          name: 'ZYXEL ES3500-8PD: Uptime (hardware)'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.25.1.1.0
+          key: zyxel.3500_8pd.hw.uptime
+          delay: 30s
+          history: 2w
+          trends: 0d
+          units: uptime
+          description: |
+            MIB: HOST-RESOURCES-MIB
+            The amount of time since this host was last initialized.
+            Note that this is different from sysUpTime in the SNMPv2-MIB
+            [RFC1907] because sysUpTime is the uptime of the
+            network management portion of the system.
+          preprocessing:
+            -
+              type: CHECK_NOT_SUPPORTED
+              parameters:
+                - ''
+              error_handler: CUSTOM_VALUE
+              error_handler_params: '0'
+            -
+              type: MULTIPLIER
+              parameters:
+                - '0.01'
+          tags:
+            -
+              tag: component
+              value: system
         -
           uuid: cbccb45e9d1d4b529cce2d43e6c96a24
           name: 'ZYXEL ES3500-8PD: Location'
@@ -278,6 +311,30 @@ zabbix_export:
               tag: component
               value: inventory
         -
+          uuid: bbd24719955740e0acc2316a945dac38
+          name: 'ZYXEL ES3500-8PD: Uptime (network)'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.1.3.0
+          key: zyxel.3500_8pd.net.uptime
+          delay: 30s
+          history: 2w
+          trends: 0d
+          units: uptime
+          description: |
+            MIB: RFC1213-MIB
+            The time (in hundredths of a second) since the
+            network management portion of the system was last
+            re-initialized.
+          preprocessing:
+            -
+              type: MULTIPLIER
+              parameters:
+                - '0.01'
+          tags:
+            -
+              tag: component
+              value: system
+        -
           uuid: 93a3b8ef959e41fe822abb959f090939
           name: 'ZYXEL ES3500-8PD: Hardware serial number'
           type: SNMP_AGENT
@@ -304,45 +361,10 @@ zabbix_export:
             -
               uuid: 83548aba74c148e28e6611d5abfb9694
               expression: 'last(/ZYXEL ES3500-8PD SNMP/zyxel.3500_8pd.serialnumber,#1)<>last(/ZYXEL ES3500-8PD SNMP/zyxel.3500_8pd.serialnumber,#2) and length(last(/ZYXEL ES3500-8PD SNMP/zyxel.3500_8pd.serialnumber))>0'
-              name: 'ZYXEL ES3500-8PD: Device has been replaced (new serial number received)'
+              name: 'ZYXEL ES3500-8PD: Device has been replaced'
+              event_name: 'ZYXEL ES3500-8PD: Device has been replaced (new serial number received)'
               priority: INFO
               description: 'Device serial number has changed. Ack to close'
-              manual_close: 'YES'
-              tags:
-                -
-                  tag: scope
-                  value: notice
-        -
-          uuid: bbd24719955740e0acc2316a945dac38
-          name: 'ZYXEL ES3500-8PD: Uptime'
-          type: SNMP_AGENT
-          snmp_oid: .1.3.6.1.2.1.1.3.0
-          key: zyxel.3500_8pd.uptime
-          delay: 30s
-          history: 2w
-          trends: 0d
-          units: uptime
-          description: |
-            MIB: RFC1213-MIB
-            The time (in hundredths of a second) since the
-            network management portion of the system was last
-            re-initialized.
-          preprocessing:
-            -
-              type: MULTIPLIER
-              parameters:
-                - '0.01'
-          tags:
-            -
-              tag: component
-              value: system
-          triggers:
-            -
-              uuid: eb7a268bfa324366953221e3c1788127
-              expression: 'last(/ZYXEL ES3500-8PD SNMP/zyxel.3500_8pd.uptime)<10m'
-              name: 'ZYXEL ES3500-8PD: has been restarted (uptime < 10m)'
-              priority: INFO
-              description: 'Uptime is less than 10 minutes'
               manual_close: 'YES'
               tags:
                 -
@@ -381,7 +403,8 @@ zabbix_export:
                 -
                   uuid: c59c3730eea44cf7a842fe46aa12fa3d
                   expression: 'min(/ZYXEL ES3500-8PD SNMP/zyxel.3500_8pd.memory[{#SNMPINDEX}],5m)>{$MEMORY.UTIL.MAX}'
-                  name: 'ZYXEL ES3500-8PD: High memory utilization in "{#ZYXEL.MEMORY.NAME}" pool (>{$MEMORY.UTIL.MAX}% for 5m)'
+                  name: 'ZYXEL ES3500-8PD: High memory utilization in "{#ZYXEL.MEMORY.NAME}" pool'
+                  event_name: 'ZYXEL ES3500-8PD: High memory utilization in "{#ZYXEL.MEMORY.NAME}" pool (>{$MEMORY.UTIL.MAX}% for 5m)'
                   priority: AVERAGE
                   description: 'The system is running out of free memory.'
                   tags:
@@ -1078,7 +1101,8 @@ zabbix_export:
                 -
                   uuid: 8ce109a9f09b41458a4e9d8698238ad0
                   expression: 'last(/ZYXEL ES3500-8PD SNMP/zyxel.3500_8pd.sfp.ddm[{#SNMPINDEX}]) > {#ZYXEL.SFP.WARN.MAX}'
-                  name: 'ZYXEL ES3500-8PD: SFP {#ZYXEL.SFP.PORT}: High {#ZYXEL.SFP.DESCRIPTION} (over {#ZYXEL.SFP.WARN.MAX}{#ZYXEL.SFP.UNIT})'
+                  name: 'ZYXEL ES3500-8PD: SFP {#ZYXEL.SFP.PORT}: High {#ZYXEL.SFP.DESCRIPTION}'
+                  event_name: 'ZYXEL ES3500-8PD: SFP {#ZYXEL.SFP.PORT}: High {#ZYXEL.SFP.DESCRIPTION} (over {#ZYXEL.SFP.WARN.MAX}{#ZYXEL.SFP.UNIT})'
                   priority: WARNING
                   description: 'The upper threshold value of the parameter is exceeded'
                   tags:
@@ -1088,7 +1112,8 @@ zabbix_export:
                 -
                   uuid: 6ecef48a1fdd4e16afe9472f59e0ad1a
                   expression: 'last(/ZYXEL ES3500-8PD SNMP/zyxel.3500_8pd.sfp.ddm[{#SNMPINDEX}]) < {#ZYXEL.SFP.WARN.MIN}'
-                  name: 'ZYXEL ES3500-8PD: SFP {#ZYXEL.SFP.PORT}: Low {#ZYXEL.SFP.DESCRIPTION} (less than {#ZYXEL.SFP.WARN.MIN}{#ZYXEL.SFP.UNIT})'
+                  name: 'ZYXEL ES3500-8PD: SFP {#ZYXEL.SFP.PORT}: Low {#ZYXEL.SFP.DESCRIPTION}'
+                  event_name: 'ZYXEL ES3500-8PD: SFP {#ZYXEL.SFP.PORT}: Low {#ZYXEL.SFP.DESCRIPTION} (less than {#ZYXEL.SFP.WARN.MIN}{#ZYXEL.SFP.UNIT})'
                   priority: WARNING
                   description: 'The parameter values are less than the lower threshold'
                   tags:
@@ -1264,7 +1289,8 @@ zabbix_export:
                 -
                   uuid: 46739144d51b441886d544829749cf21
                   expression: 'last(/ZYXEL ES3500-8PD SNMP/zyxel.3500_8pd.sfp.serialnumber[{#SNMPINDEX}],#1)<>last(/ZYXEL ES3500-8PD SNMP/zyxel.3500_8pd.sfp.serialnumber[{#SNMPINDEX}],#2) and length(last(/ZYXEL ES3500-8PD SNMP/zyxel.3500_8pd.sfp.serialnumber[{#SNMPINDEX}]))>0'
-                  name: 'ZYXEL ES3500-8PD: SFP {#SNMPINDEX} has been replaced (new serial number received)'
+                  name: 'ZYXEL ES3500-8PD: SFP {#SNMPINDEX} has been replaced'
+                  event_name: 'ZYXEL ES3500-8PD: SFP {#SNMPINDEX} has been replaced (new serial number received)'
                   priority: INFO
                   description: 'SFP {#SNMPINDEX} serial number has changed. Ack to close'
                   manual_close: 'YES'
@@ -1669,6 +1695,19 @@ zabbix_export:
             -
               value: '3'
               newvalue: nonoperational
+  triggers:
+    -
+      uuid: eb7a268bfa324366953221e3c1788127
+      expression: '(last(/ZYXEL ES3500-8PD SNMP/zyxel.3500_8pd.hw.uptime)>0 and last(/ZYXEL ES3500-8PD SNMP/zyxel.3500_8pd.hw.uptime)<10m) or (last(/ZYXEL ES3500-8PD SNMP/zyxel.3500_8pd.hw.uptime)=0 and last(/ZYXEL ES3500-8PD SNMP/zyxel.3500_8pd.net.uptime)<10m)'
+      name: 'ZYXEL ES3500-8PD: Host has been restarted'
+      event_name: 'ZYXEL ES3500-8PD: {HOST.NAME} has been restarted (uptime < 10m)'
+      priority: INFO
+      description: 'Uptime is less than 10 minutes.'
+      manual_close: 'YES'
+      tags:
+        -
+          tag: scope
+          value: notice
   graphs:
     -
       uuid: 2d266c1cab6e462b89975538acc18266

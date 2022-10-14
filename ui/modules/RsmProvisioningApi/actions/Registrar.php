@@ -285,7 +285,7 @@ class Registrar extends MonitoringTarget
 	}
 
 	/******************************************************************************************************************
-	 * Misc functions                                                                                               *
+	 * Misc functions                                                                                                 *
 	 ******************************************************************************************************************/
 
 	protected function getRsmhostConfigsFromInput(): array

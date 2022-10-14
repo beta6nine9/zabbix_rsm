@@ -31,8 +31,8 @@ require_once dirname(__FILE__).'/elements/CTableElement.php';
 require_once dirname(__FILE__).'/elements/CTableRowElement.php';
 require_once dirname(__FILE__).'/elements/CWidgetElement.php';
 require_once dirname(__FILE__).'/elements/CDashboardElement.php';
+require_once dirname(__FILE__).'/elements/CListElement.php';
 require_once dirname(__FILE__).'/elements/CDropdownElement.php';
-require_once dirname(__FILE__).'/elements/CZDropdownElement.php';
 require_once dirname(__FILE__).'/elements/CCheckboxElement.php';
 require_once dirname(__FILE__).'/elements/COverlayDialogElement.php';
 require_once dirname(__FILE__).'/elements/CMainMenuElement.php';
@@ -56,6 +56,7 @@ require_once dirname(__FILE__).'/CastableTrait.php';
 
 use Facebook\WebDriver\WebDriverBy;
 use Facebook\WebDriver\Exception\NoSuchElementException;
+use Facebook\WebDriver\Exception\WebDriverException;
 
 /**
  * Element selection query.
@@ -312,8 +313,12 @@ class CElementQuery implements IWaitable {
 	 *
 	 * @return WebDriverWait
 	 */
-	public static function wait() {
-		return static::getDriver()->wait(20, self::WAIT_ITERATION);
+	public static function wait($timeout = 20, $iteration = null) {
+		if ($iteration === null) {
+			$iteration = self::WAIT_ITERATION;
+		}
+
+		return static::getDriver()->wait($timeout, self::WAIT_ITERATION);
 	}
 
 	/**
@@ -344,25 +349,35 @@ class CElementQuery implements IWaitable {
 		$class = $this->class;
 		$parent = ($this->context !== static::getDriver()) ? $this->context : null;
 
-		try {
-			if (!$this->reverse_order) {
-				$element = $this->context->findElement($this->by);
-			}
-			else {
-				$elements = $this->context->findElements($this->by);
-				if (!$elements) {
-					throw new NoSuchElementException(null);
+		for ($i = 0; $i < 2; $i++) {
+			try {
+				if (!$this->reverse_order) {
+					$element = $this->context->findElement($this->by);
+				}
+				else {
+					$elements = $this->context->findElements($this->by);
+					if (!$elements) {
+						throw new NoSuchElementException(null);
+					}
+
+					$element = end($elements);
 				}
 
-				$element = end($elements);
+				break;
 			}
-		}
-		catch (NoSuchElementException $exception) {
-			if (!$should_exist) {
-				return new CNullElement(array_merge($this->options, ['parent' => $parent, 'by' => $this->by]));
-			}
+			catch (NoSuchElementException $exception) {
+				if (!$should_exist) {
+					return new CNullElement(array_merge($this->options, ['parent' => $parent, 'by' => $this->by]));
+				}
 
-			throw $exception;
+				throw $exception;
+			}
+			// Workaround for communication errors present on Jenkins
+			catch (WebDriverException $exception) {
+				if (strpos($exception->getMessage(), 'START_MAP') === false) {
+					throw $exception;
+				}
+			}
 		}
 
 		return call_user_func([$class, 'createInstance'], $element, array_merge($this->options, [
@@ -379,7 +394,18 @@ class CElementQuery implements IWaitable {
 	public function all() {
 		$class = $this->class;
 
-		$elements = $this->context->findElements($this->by);
+		try {
+			$elements = $this->context->findElements($this->by);
+		}
+		// Workaround for communication errors present on Jenkins
+		catch (WebDriverException $exception) {
+			if (strpos($exception->getMessage(), 'START_MAP') === false) {
+				throw $exception;
+			}
+
+			$elements = $this->context->findElements($this->by);
+		}
+
 		if ($this->reverse_order) {
 			$elements = array_reverse($elements);
 		}
@@ -539,8 +565,8 @@ class CElementQuery implements IWaitable {
 				'/input[@name][not(@type) or @type="text" or @type="password"][not(@style) or not(contains(@style,"display: none"))]',
 				'/textarea[@name]'
 			],
-			'CDropdownElement'			=> '/select[@name]',
-			'CZDropdownElement'			=> '/z-select[@name]',
+			'CListElement'				=> '/select[@name]',
+			'CDropdownElement'			=> '/z-select[@name]',
 			'CCheckboxElement'			=> '/input[@name][@type="checkbox" or @type="radio"]',
 			'CMultiselectElement'		=> [
 				'/div[contains(@class, "multiselect-control")]',

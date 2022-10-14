@@ -1,6 +1,6 @@
 zabbix_export:
   version: '6.0'
-  date: '2022-03-04T11:41:20Z'
+  date: '2022-08-15T17:57:54Z'
   groups:
     -
       uuid: 36bff6c29af64692839d077febfc7079
@@ -17,6 +17,7 @@ zabbix_export:
         ENTITY-MIBdescription has changed
         IF-MIB
         MY-PROCESS-MIB
+        HOST-RESOURCES-MIB
         SNMPv2-MIB
         MY-MEMORY-MIB
         ENTITY-MIB
@@ -170,7 +171,7 @@ zabbix_export:
           units: '%'
           description: |
             MIB: MY-PROCESS-MIB
-            CPU utilization in %
+            CPU utilization in %.
           tags:
             -
               tag: component
@@ -179,7 +180,8 @@ zabbix_export:
             -
               uuid: 6e12ba6b60b94ec6bf531b4bb234dc80
               expression: 'min(/D-Link DES 7200 SNMP/system.cpu.util[myCPUUtilization5Min.0],5m)>{$CPU.UTIL.CRIT}'
-              name: 'High CPU utilization (over {$CPU.UTIL.CRIT}% for 5m)'
+              name: 'High CPU utilization'
+              event_name: 'High CPU utilization (over {$CPU.UTIL.CRIT}% for 5m)'
               opdata: 'Current utilization: {ITEM.LASTVALUE1}'
               priority: WARNING
               description: 'CPU utilization is too high. The system might be slow to respond.'
@@ -270,6 +272,34 @@ zabbix_export:
               tag: component
               value: system
         -
+          uuid: 68631d04f4a94b83901bad116fe68198
+          name: 'Uptime (hardware)'
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.2.1.25.1.1.0
+          key: 'system.hw.uptime[hrSystemUptime.0]'
+          delay: 30s
+          history: 2w
+          trends: 0d
+          units: uptime
+          description: |
+            MIB: HOST-RESOURCES-MIB
+            The amount of time since this host was last initialized. Note that this is different from sysUpTime in the SNMPv2-MIB [RFC1907] because sysUpTime is the uptime of the network management portion of the system.
+          preprocessing:
+            -
+              type: CHECK_NOT_SUPPORTED
+              parameters:
+                - ''
+              error_handler: CUSTOM_VALUE
+              error_handler_params: '0'
+            -
+              type: MULTIPLIER
+              parameters:
+                - '0.01'
+          tags:
+            -
+              tag: component
+              value: system
+        -
           uuid: fd86860f9ebc42b1970a845b7940daed
           name: 'Hardware version(revision)'
           type: SNMP_AGENT
@@ -339,7 +369,8 @@ zabbix_export:
             -
               uuid: 0c7a629e028e489c89647bf3ca51850e
               expression: 'last(/D-Link DES 7200 SNMP/system.name,#1)<>last(/D-Link DES 7200 SNMP/system.name,#2) and length(last(/D-Link DES 7200 SNMP/system.name))>0'
-              name: 'System name has changed (new name: {ITEM.VALUE})'
+              name: 'System name has changed'
+              event_name: 'System name has changed (new name: {ITEM.VALUE})'
               priority: INFO
               description: 'System name has changed. Ack to close.'
               manual_close: 'YES'
@@ -350,6 +381,28 @@ zabbix_export:
                 -
                   tag: scope
                   value: security
+        -
+          uuid: fb250daeb7e643f4b2f78ede9e26b8ec
+          name: 'Uptime (network)'
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.2.1.1.3.0
+          key: 'system.net.uptime[sysUpTime.0]'
+          delay: 30s
+          history: 2w
+          trends: 0d
+          units: uptime
+          description: |
+            MIB: SNMPv2-MIB
+            The time (in hundredths of a second) since the network management portion of the system was last re-initialized.
+          preprocessing:
+            -
+              type: MULTIPLIER
+              parameters:
+                - '0.01'
+          tags:
+            -
+              tag: component
+              value: system
         -
           uuid: f50184058d4549a1be9bae19c0743a84
           name: 'System object ID'
@@ -403,46 +456,8 @@ zabbix_export:
               manual_close: 'YES'
               dependencies:
                 -
-                  name: 'System name has changed (new name: {ITEM.VALUE})'
+                  name: 'System name has changed'
                   expression: 'last(/D-Link DES 7200 SNMP/system.name,#1)<>last(/D-Link DES 7200 SNMP/system.name,#2) and length(last(/D-Link DES 7200 SNMP/system.name))>0'
-              tags:
-                -
-                  tag: scope
-                  value: notice
-        -
-          uuid: fb250daeb7e643f4b2f78ede9e26b8ec
-          name: Uptime
-          type: SNMP_AGENT
-          snmp_oid: 1.3.6.1.2.1.1.3.0
-          key: 'system.uptime[sysUpTime.0]'
-          delay: 30s
-          history: 2w
-          trends: 0d
-          units: uptime
-          description: |
-            MIB: SNMPv2-MIB
-            The time (in hundredths of a second) since the network management portion of the system was last re-initialized.
-          preprocessing:
-            -
-              type: MULTIPLIER
-              parameters:
-                - '0.01'
-          tags:
-            -
-              tag: component
-              value: system
-          triggers:
-            -
-              uuid: 6b200163bfcd4899a82bcf98aa026aa2
-              expression: 'last(/D-Link DES 7200 SNMP/system.uptime[sysUpTime.0])<10m'
-              name: '{HOST.NAME} has been restarted (uptime < 10m)'
-              priority: WARNING
-              description: 'Uptime is less than 10 minutes'
-              manual_close: 'YES'
-              dependencies:
-                -
-                  name: 'No SNMP data collection'
-                  expression: 'max(/D-Link DES 7200 SNMP/zabbix[host,snmp,available],{$SNMP.TIMEOUT})=0'
               tags:
                 -
                   tag: scope
@@ -552,7 +567,8 @@ zabbix_export:
                 -
                   uuid: fd484f9b3a6a414fb2bba47d5804cc62
                   expression: 'min(/D-Link DES 7200 SNMP/vm.memory.util[myMemoryPoolCurrentUtilization.{#SNMPINDEX}],5m)>{$MEMORY.UTIL.MAX}'
-                  name: '{#SNMPINDEX}: High memory utilization (>{$MEMORY.UTIL.MAX}% for 5m)'
+                  name: '{#SNMPINDEX}: High memory utilization'
+                  event_name: '{#SNMPINDEX}: High memory utilization (>{$MEMORY.UTIL.MAX}% for 5m)'
                   priority: AVERAGE
                   description: 'The system is running out of free memory.'
                   tags:
@@ -971,7 +987,8 @@ zabbix_export:
               recovery_expression: |
                 avg(/D-Link DES 7200 SNMP/net.if.in[ifHCInOctets.{#SNMPINDEX}],15m)<(({$IF.UTIL.MAX:"{#IFNAME}"}-3)/100)*last(/D-Link DES 7200 SNMP/net.if.speed[ifHighSpeed.{#SNMPINDEX}]) and
                 avg(/D-Link DES 7200 SNMP/net.if.out[ifHCOutOctets.{#SNMPINDEX}],15m)<(({$IF.UTIL.MAX:"{#IFNAME}"}-3)/100)*last(/D-Link DES 7200 SNMP/net.if.speed[ifHighSpeed.{#SNMPINDEX}])
-              name: 'Interface {#IFNAME}({#IFALIAS}): High bandwidth usage (>{$IF.UTIL.MAX:"{#IFNAME}"}%)'
+              name: 'Interface {#IFNAME}({#IFALIAS}): High bandwidth usage'
+              event_name: 'Interface {#IFNAME}({#IFALIAS}): High bandwidth usage (>{$IF.UTIL.MAX:"{#IFNAME}"}%)'
               opdata: 'In: {ITEM.LASTVALUE1}, out: {ITEM.LASTVALUE3}, speed: {ITEM.LASTVALUE2}'
               priority: WARNING
               description: 'The network interface utilization is close to its estimated maximum bandwidth.'
@@ -994,7 +1011,8 @@ zabbix_export:
               recovery_expression: |
                 max(/D-Link DES 7200 SNMP/net.if.in.errors[ifInErrors.{#SNMPINDEX}],5m)<{$IF.ERRORS.WARN:"{#IFNAME}"}*0.8
                 and max(/D-Link DES 7200 SNMP/net.if.out.errors[ifOutErrors.{#SNMPINDEX}],5m)<{$IF.ERRORS.WARN:"{#IFNAME}"}*0.8
-              name: 'Interface {#IFNAME}({#IFALIAS}): High error rate (>{$IF.ERRORS.WARN:"{#IFNAME}"} for 5m)'
+              name: 'Interface {#IFNAME}({#IFALIAS}): High error rate'
+              event_name: 'Interface {#IFNAME}({#IFALIAS}): High error rate (>{$IF.ERRORS.WARN:"{#IFNAME}"} for 5m)'
               opdata: 'errors in: {ITEM.LASTVALUE1}, errors out: {ITEM.LASTVALUE2}'
               priority: WARNING
               description: 'Recovers when below 80% of {$IF.ERRORS.WARN:"{#IFNAME}"} threshold'
@@ -1123,10 +1141,11 @@ zabbix_export:
               trigger_prototypes:
                 -
                   uuid: b675df20392d458f9a53dace6bde978a
-                  expression: 'avg(/D-Link DES 7200 SNMP/sensor.temp.value[mySystemTemperatureCurrent.{#SNMPINDEX}],5m)>{$TEMP_CRIT:""}'
+                  expression: 'avg(/D-Link DES 7200 SNMP/sensor.temp.value[mySystemTemperatureCurrent.{#SNMPINDEX}],5m)>{$TEMP_CRIT:"{#SNMPVALUE}"}'
                   recovery_mode: RECOVERY_EXPRESSION
-                  recovery_expression: 'max(/D-Link DES 7200 SNMP/sensor.temp.value[mySystemTemperatureCurrent.{#SNMPINDEX}],5m)<{$TEMP_CRIT:""}-3'
-                  name: '{#SNMPVALUE}: Temperature is above critical threshold: >{$TEMP_CRIT:""}'
+                  recovery_expression: 'max(/D-Link DES 7200 SNMP/sensor.temp.value[mySystemTemperatureCurrent.{#SNMPINDEX}],5m)<{$TEMP_CRIT:"{#SNMPVALUE}"}-3'
+                  name: '{#SNMPVALUE}: Temperature is above critical threshold'
+                  event_name: '{#SNMPVALUE}: Temperature is above critical threshold: >{$TEMP_CRIT:"{#SNMPVALUE}"}'
                   opdata: 'Current value: {ITEM.LASTVALUE1}'
                   priority: HIGH
                   description: 'This trigger uses temperature sensor values as well as temperature sensor status if available'
@@ -1139,18 +1158,19 @@ zabbix_export:
                       value: performance
                 -
                   uuid: 8486ed430ee24b13b65786e5b4857684
-                  expression: 'avg(/D-Link DES 7200 SNMP/sensor.temp.value[mySystemTemperatureCurrent.{#SNMPINDEX}],5m)>{$TEMP_WARN:""}'
+                  expression: 'avg(/D-Link DES 7200 SNMP/sensor.temp.value[mySystemTemperatureCurrent.{#SNMPINDEX}],5m)>{$TEMP_WARN:"{#SNMPVALUE}"}'
                   recovery_mode: RECOVERY_EXPRESSION
-                  recovery_expression: 'max(/D-Link DES 7200 SNMP/sensor.temp.value[mySystemTemperatureCurrent.{#SNMPINDEX}],5m)<{$TEMP_WARN:""}-3'
-                  name: '{#SNMPVALUE}: Temperature is above warning threshold: >{$TEMP_WARN:""}'
+                  recovery_expression: 'max(/D-Link DES 7200 SNMP/sensor.temp.value[mySystemTemperatureCurrent.{#SNMPINDEX}],5m)<{$TEMP_WARN:"{#SNMPVALUE}"}-3'
+                  name: '{#SNMPVALUE}: Temperature is above warning threshold'
+                  event_name: '{#SNMPVALUE}: Temperature is above warning threshold: >{$TEMP_WARN:"{#SNMPVALUE}"}'
                   opdata: 'Current value: {ITEM.LASTVALUE1}'
                   priority: WARNING
                   description: 'This trigger uses temperature sensor values as well as temperature sensor status if available'
                   dependencies:
                     -
-                      name: '{#SNMPVALUE}: Temperature is above critical threshold: >{$TEMP_CRIT:""}'
-                      expression: 'avg(/D-Link DES 7200 SNMP/sensor.temp.value[mySystemTemperatureCurrent.{#SNMPINDEX}],5m)>{$TEMP_CRIT:""}'
-                      recovery_expression: 'max(/D-Link DES 7200 SNMP/sensor.temp.value[mySystemTemperatureCurrent.{#SNMPINDEX}],5m)<{$TEMP_CRIT:""}-3'
+                      name: '{#SNMPVALUE}: Temperature is above critical threshold'
+                      expression: 'avg(/D-Link DES 7200 SNMP/sensor.temp.value[mySystemTemperatureCurrent.{#SNMPINDEX}],5m)>{$TEMP_CRIT:"{#SNMPVALUE}"}'
+                      recovery_expression: 'max(/D-Link DES 7200 SNMP/sensor.temp.value[mySystemTemperatureCurrent.{#SNMPINDEX}],5m)<{$TEMP_CRIT:"{#SNMPVALUE}"}-3'
                   tags:
                     -
                       tag: scope
@@ -1160,10 +1180,11 @@ zabbix_export:
                       value: performance
                 -
                   uuid: ef5a9113e96d4cc095d384cbeeef9bc5
-                  expression: 'avg(/D-Link DES 7200 SNMP/sensor.temp.value[mySystemTemperatureCurrent.{#SNMPINDEX}],5m)<{$TEMP_CRIT_LOW:""}'
+                  expression: 'avg(/D-Link DES 7200 SNMP/sensor.temp.value[mySystemTemperatureCurrent.{#SNMPINDEX}],5m)<{$TEMP_CRIT_LOW:"{#SNMPVALUE}"}'
                   recovery_mode: RECOVERY_EXPRESSION
-                  recovery_expression: 'min(/D-Link DES 7200 SNMP/sensor.temp.value[mySystemTemperatureCurrent.{#SNMPINDEX}],5m)>{$TEMP_CRIT_LOW:""}+3'
-                  name: '{#SNMPVALUE}: Temperature is too low: <{$TEMP_CRIT_LOW:""}'
+                  recovery_expression: 'min(/D-Link DES 7200 SNMP/sensor.temp.value[mySystemTemperatureCurrent.{#SNMPINDEX}],5m)>{$TEMP_CRIT_LOW:"{#SNMPVALUE}"}+3'
+                  name: '{#SNMPVALUE}: Temperature is too low'
+                  event_name: '{#SNMPVALUE}: Temperature is too low: <{$TEMP_CRIT_LOW:"{#SNMPVALUE}"}'
                   opdata: 'Current value: {ITEM.LASTVALUE1}'
                   priority: AVERAGE
                   tags:
@@ -1291,8 +1312,8 @@ zabbix_export:
                       type: GRAPH_PROTOTYPE
                       name: graphid
                       value:
-                        name: 'Interface {#IFNAME}({#IFALIAS}): Network traffic'
                         host: 'D-Link DES 7200 SNMP'
+                        name: 'Interface {#IFNAME}({#IFALIAS}): Network traffic'
       valuemaps:
         -
           uuid: 538fac0622da44f6983715e4ab5174d8
@@ -2223,6 +2244,23 @@ zabbix_export:
             -
               value: '2'
               newvalue: unknown
+  triggers:
+    -
+      uuid: 6b200163bfcd4899a82bcf98aa026aa2
+      expression: '(last(/D-Link DES 7200 SNMP/system.hw.uptime[hrSystemUptime.0])>0 and last(/D-Link DES 7200 SNMP/system.hw.uptime[hrSystemUptime.0])<10m) or (last(/D-Link DES 7200 SNMP/system.hw.uptime[hrSystemUptime.0])=0 and last(/D-Link DES 7200 SNMP/system.net.uptime[sysUpTime.0])<10m)'
+      name: 'Host has been restarted'
+      event_name: '{HOST.NAME} has been restarted (uptime < 10m)'
+      priority: WARNING
+      description: 'Uptime is less than 10 minutes.'
+      manual_close: 'YES'
+      dependencies:
+        -
+          name: 'No SNMP data collection'
+          expression: 'max(/D-Link DES 7200 SNMP/zabbix[host,snmp,available],{$SNMP.TIMEOUT})=0'
+      tags:
+        -
+          tag: scope
+          value: notice
   graphs:
     -
       uuid: 7d05108847574098a7a15db5faf12b7c

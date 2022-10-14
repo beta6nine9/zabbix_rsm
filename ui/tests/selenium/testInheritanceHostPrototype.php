@@ -84,7 +84,7 @@ class testInheritanceHostPrototype extends CLegacyWebTest {
 
 		// Check layout at IPMI tab.
 		$this->zbxTestTabSwitch('IPMI');
-		foreach (['ipmi_authtype', 'ipmi_privilege', 'ipmi_username', 'ipmi_password'] as $id) {
+		foreach (['ipmi_authtype_name', 'ipmi_privilege_name', 'ipmi_username', 'ipmi_password'] as $id) {
 			$this->zbxTestAssertElementPresentXpath('//input[@id="'.$id.'"][@readonly]');
 		}
 
@@ -574,8 +574,8 @@ class testInheritanceHostPrototype extends CLegacyWebTest {
 		}
 
 		$sql = 'SELECT macro,type,value,description FROM hostmacro WHERE hostid=%d ORDER BY hostmacroid';
-		$this->assertSame(CDBHelper::getHash(vsprintf($sql, $template_prototype_id)),
-			CDBHelper::getHash(vsprintf($sql, $host_prototype_id))
+		$this->assertSame(CDBHelper::getHash(vsprintf($sql, [$template_prototype_id])),
+			CDBHelper::getHash(vsprintf($sql, [$host_prototype_id]))
 		);
 	}
 

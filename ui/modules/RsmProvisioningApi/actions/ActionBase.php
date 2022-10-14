@@ -40,6 +40,7 @@ abstract class ActionBase extends CController
 	abstract protected function updateObject(): void;
 	abstract protected function disableObject(): void;
 	abstract protected function deleteObject(): void;
+	abstract protected function updateLastValues(): void;
 
 	public function __construct()
 	{
@@ -626,6 +627,7 @@ abstract class ActionBase extends CController
 				else
 				{
 					$this->updateObject();
+					$this->updateLastValues();
 					$this->requestConfigCacheReload();
 				}
 			}

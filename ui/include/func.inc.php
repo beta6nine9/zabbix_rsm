@@ -202,7 +202,7 @@ function zbx_date2str($format, $time = null, string $timezone = null) {
 	}
 	else {
 		$prefix = '';
-		$datetime = new DateTime('@'.$time);
+		$datetime = new DateTime('@'.(int) $time);
 	}
 
 	$datetime->setTimezone(new DateTimeZone($timezone ?? date_default_timezone_get()));
@@ -589,7 +589,7 @@ function convertUnitsS($value, $ignore_millisec = false) {
 
 	$units = [
 		'years' => _x('y', 'year short'),
-		'months' => _x('m', 'month short'),
+		'months' => _x('M', 'month short'),
 		'days' => _x('d', 'day short'),
 		'hours' => _x('h', 'hour short'),
 		'minutes' => _x('m', 'minute short'),
@@ -1388,7 +1388,7 @@ function make_sorting_header($obj, $tabfield, $sortField, $sortOrder, $link = nu
  *
  * @param string   $number     Valid number in decimal or scientific notation.
  * @param int|null $precision  Max number of significant digits to take into account. Default: ZBX_FLOAT_DIG.
- * @param int|null $decimals   Max number of first non-zero decimals decimals to display. Default: 0.
+ * @param int|null $decimals   Max number of first non-zero decimals to display. Default: 0.
  * @param bool     $exact      Display exactly this number of decimals instead of first non-zeros.
  *
  * Note: $decimals must be less than $precision.
@@ -2166,11 +2166,11 @@ function hasErrorMessages() {
 /**
  * Clears table rows selection's cookies.
  *
- * @param string $parentid  parent ID, is used as sessionStorage suffix
- * @param array  $keepids   checked rows ids
+ * @param string $name     entity name, used as sessionStorage suffix
+ * @param array  $keepids  checked rows ids
  */
-function uncheckTableRows($parentid = null, $keepids = []) {
-	$key = implode('_', array_filter(['cb', basename($_SERVER['SCRIPT_NAME'], '.php'), $parentid]));
+function uncheckTableRows($name = null, $keepids = []) {
+	$key = 'cb_'.basename($_SERVER['SCRIPT_NAME'], '.php').($name !== null ? '_'.$name : '');
 
 	if ($keepids) {
 		// If $keepids will not have same key as value, it will create mess, when new checkbox will be checked.
@@ -2238,19 +2238,14 @@ function splitPath($path) {
  * @param string   $color  a hexadecimal color identifier like "1F2C33"
  * @param int      $alpha
  *
- * @return int|false
+ * @return int
  */
 function get_color($image, $color, $alpha = 0) {
 	$red = hexdec('0x'.substr($color, 0, 2));
 	$green = hexdec('0x'.substr($color, 2, 2));
 	$blue = hexdec('0x'.substr($color, 4, 2));
 
-	if (function_exists('imagecolorexactalpha') && function_exists('imagecreatetruecolor')
-			&& @imagecreatetruecolor(1, 1)) {
-		return imagecolorexactalpha($image, $red, $green, $blue, $alpha);
-	}
-
-	return imagecolorallocate($image, $red, $green, $blue);
+	return imagecolorexactalpha($image, $red, $green, $blue, $alpha);
 }
 
 /**
@@ -2287,16 +2282,17 @@ function getUserGraphTheme() {
 /**
  * Custom error handler for PHP errors.
  *
- * @param int     $errno Level of the error raised.
- * @param string  $errstr Error message.
- * @param string  $errfile Filename that the error was raised in.
- * @param int     $errline Line number the error was raised in.
+ * @param int    $errno    Level of the error raised.
+ * @param string $errstr   Error message.
+ * @param string $errfile  Filename that the error was raised in.
+ * @param int    $errline  Line number the error was raised in.
  *
- * @return bool  False, to continue with the default error handler.
+ * @return bool
  */
 function zbx_err_handler($errno, $errstr, $errfile, $errline) {
-	// Necessary to suppress errors when calling with error control operator like @function_name().
-	if (error_reporting() === 0) {
+	// Suppress errors when calling with error control operator @function_name().
+	if ((error_reporting()
+			& ~(E_ERROR | E_PARSE | E_CORE_ERROR | E_COMPILE_ERROR | E_USER_ERROR | E_RECOVERABLE_ERROR)) == 0) {
 		return true;
 	}
 

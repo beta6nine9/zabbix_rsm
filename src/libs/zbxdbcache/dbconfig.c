@@ -1028,7 +1028,7 @@ static int	DCsync_config(zbx_dbsync_t *sync, int *flags)
 #ifdef HAVE_POSTGRESQL
 	if (ZBX_HK_MODE_DISABLED != config->config->hk.history_mode &&
 			ZBX_HK_OPTION_ENABLED == config->config->hk.history_global &&
-			0 == zbx_strcmp_null(config->config->db.extension, ZBX_CONFIG_DB_EXTENSION_TIMESCALE))
+			0 == zbx_strcmp_null(config->config->db.extension, ZBX_DB_EXTENSION_TIMESCALEDB))
 	{
 		config->config->hk.history_mode = ZBX_HK_MODE_PARTITION;
 	}
@@ -1047,7 +1047,7 @@ static int	DCsync_config(zbx_dbsync_t *sync, int *flags)
 #ifdef HAVE_POSTGRESQL
 	if (ZBX_HK_MODE_DISABLED != config->config->hk.trends_mode &&
 			ZBX_HK_OPTION_ENABLED == config->config->hk.trends_global &&
-			0 == zbx_strcmp_null(config->config->db.extension, ZBX_CONFIG_DB_EXTENSION_TIMESCALE))
+			0 == zbx_strcmp_null(config->config->db.extension, ZBX_DB_EXTENSION_TIMESCALEDB))
 	{
 		config->config->hk.trends_mode = ZBX_HK_MODE_PARTITION;
 	}
@@ -7359,7 +7359,7 @@ static void	DCget_host(DC_HOST *dst_host, const ZBX_DC_HOST *src_host, unsigned 
 	if (ZBX_ITEM_GET_INVENTORY & mode)
 	{
 		if (NULL != (host_inventory = (ZBX_DC_HOST_INVENTORY *)zbx_hashset_search(&config->host_inventories, &src_host->hostid)))
-			dst_host->inventory_mode = (char)host_inventory->inventory_mode;
+			dst_host->inventory_mode = (signed char)host_inventory->inventory_mode;
 		else
 			dst_host->inventory_mode = HOST_INVENTORY_DISABLED;
 	}
@@ -9817,6 +9817,7 @@ static void	dc_requeue_items(const zbx_uint64_t *itemids, const int *lastclocks,
 			case NOTSUPPORTED:
 			case AGENT_ERROR:
 			case CONFIG_ERROR:
+			case SIG_ERROR:
 				dc_item->queue_priority = ZBX_QUEUE_PRIORITY_NORMAL;
 				dc_requeue_item(dc_item, dc_host, dc_interface, ZBX_ITEM_COLLECTED, lastclocks[i]);
 				break;
@@ -10507,8 +10508,11 @@ static void	DCconfig_sort_triggers_topologically(void)
 	{
 		trigger = trigdep->trigger;
 
-		if (NULL == trigger || 1 < trigger->topoindex || 0 == trigdep->dependencies.values_num)
+		if (NULL == trigger || ZBX_FLAG_DISCOVERY_PROTOTYPE == trigger->flags || 1 < trigger->topoindex ||
+				0 == trigdep->dependencies.values_num)
+		{
 			continue;
+		}
 
 		DCconfig_sort_triggers_topologically_rec(trigdep, 0);
 	}

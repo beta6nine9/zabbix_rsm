@@ -1,6 +1,6 @@
 zabbix_export:
   version: '6.0'
-  date: '2022-03-04T11:41:10Z'
+  date: '2022-08-15T18:01:20Z'
   groups:
     -
       uuid: 36bff6c29af64692839d077febfc7079
@@ -20,6 +20,7 @@ zabbix_export:
         IF-MIB
         EtherLike-MIB
         SEMI-MIB
+        HOST-RESOURCES-MIB
         SNMPv2-MIB
         ENTITY-MIB
         STATISTICS-MIB
@@ -182,7 +183,8 @@ zabbix_export:
             -
               uuid: 883e49e933bd4cfda0e7dde774604a0a
               expression: 'min(/HP Enterprise Switch SNMP/system.cpu.util[hpSwitchCpuStat.0],5m)>{$CPU.UTIL.CRIT}'
-              name: 'High CPU utilization (over {$CPU.UTIL.CRIT}% for 5m)'
+              name: 'High CPU utilization'
+              event_name: 'High CPU utilization (over {$CPU.UTIL.CRIT}% for 5m)'
               opdata: 'Current utilization: {ITEM.LASTVALUE1}'
               priority: WARNING
               description: 'CPU utilization is too high. The system might be slow to respond.'
@@ -278,7 +280,8 @@ zabbix_export:
             -
               uuid: 6b9b9b0d1ff24074bb344d04efe53444
               expression: 'last(/HP Enterprise Switch SNMP/system.hw.serialnumber,#1)<>last(/HP Enterprise Switch SNMP/system.hw.serialnumber,#2) and length(last(/HP Enterprise Switch SNMP/system.hw.serialnumber))>0'
-              name: 'Device has been replaced (new serial number received)'
+              name: 'Device has been replaced'
+              event_name: 'Device has been replaced (new serial number received)'
               priority: INFO
               description: 'Device serial number has changed. Ack to close'
               manual_close: 'YES'
@@ -286,6 +289,34 @@ zabbix_export:
                 -
                   tag: scope
                   value: notice
+        -
+          uuid: a0659dadbef14fb1ac9be45d47388aa2
+          name: 'Uptime (hardware)'
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.2.1.25.1.1.0
+          key: 'system.hw.uptime[hrSystemUptime.0]'
+          delay: 30s
+          history: 2w
+          trends: 0d
+          units: uptime
+          description: |
+            MIB: HOST-RESOURCES-MIB
+            The amount of time since this host was last initialized. Note that this is different from sysUpTime in the SNMPv2-MIB [RFC1907] because sysUpTime is the uptime of the network management portion of the system.
+          preprocessing:
+            -
+              type: CHECK_NOT_SUPPORTED
+              parameters:
+                - ''
+              error_handler: CUSTOM_VALUE
+              error_handler_params: '0'
+            -
+              type: MULTIPLIER
+              parameters:
+                - '0.01'
+          tags:
+            -
+              tag: component
+              value: system
         -
           uuid: ad2dc1149eb546309657928b944c49fb
           name: 'System location'
@@ -336,7 +367,8 @@ zabbix_export:
             -
               uuid: 63f6f85bfed94821a8339c46544dde0e
               expression: 'last(/HP Enterprise Switch SNMP/system.name,#1)<>last(/HP Enterprise Switch SNMP/system.name,#2) and length(last(/HP Enterprise Switch SNMP/system.name))>0'
-              name: 'System name has changed (new name: {ITEM.VALUE})'
+              name: 'System name has changed'
+              event_name: 'System name has changed (new name: {ITEM.VALUE})'
               priority: INFO
               description: 'System name has changed. Ack to close.'
               manual_close: 'YES'
@@ -347,6 +379,28 @@ zabbix_export:
                 -
                   tag: scope
                   value: security
+        -
+          uuid: 02e67b092ccf478ba13537ba6471f3fd
+          name: 'Uptime (network)'
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.2.1.1.3.0
+          key: 'system.net.uptime[sysUpTime.0]'
+          delay: 30s
+          history: 2w
+          trends: 0d
+          units: uptime
+          description: |
+            MIB: SNMPv2-MIB
+            The time (in hundredths of a second) since the network management portion of the system was last re-initialized.
+          preprocessing:
+            -
+              type: MULTIPLIER
+              parameters:
+                - '0.01'
+          tags:
+            -
+              tag: component
+              value: system
         -
           uuid: 74fd9c1bd546497aa20b9af09b951e98
           name: 'System object ID'
@@ -369,44 +423,6 @@ zabbix_export:
             -
               tag: component
               value: system
-        -
-          uuid: 02e67b092ccf478ba13537ba6471f3fd
-          name: Uptime
-          type: SNMP_AGENT
-          snmp_oid: 1.3.6.1.2.1.1.3.0
-          key: 'system.uptime[sysUpTime.0]'
-          delay: 30s
-          history: 2w
-          trends: 0d
-          units: uptime
-          description: |
-            MIB: SNMPv2-MIB
-            The time (in hundredths of a second) since the network management portion of the system was last re-initialized.
-          preprocessing:
-            -
-              type: MULTIPLIER
-              parameters:
-                - '0.01'
-          tags:
-            -
-              tag: component
-              value: system
-          triggers:
-            -
-              uuid: 1395e02bc63e48daa779b8b685e91868
-              expression: 'last(/HP Enterprise Switch SNMP/system.uptime[sysUpTime.0])<10m'
-              name: '{HOST.NAME} has been restarted (uptime < 10m)'
-              priority: WARNING
-              description: 'Uptime is less than 10 minutes'
-              manual_close: 'YES'
-              dependencies:
-                -
-                  name: 'No SNMP data collection'
-                  expression: 'max(/HP Enterprise Switch SNMP/zabbix[host,snmp,available],{$SNMP.TIMEOUT})=0'
-              tags:
-                -
-                  tag: scope
-                  value: notice
         -
           uuid: af855c1e75304c26b11a86c2a86f08f2
           name: 'SNMP agent availability'
@@ -633,7 +649,7 @@ zabbix_export:
               value_type: FLOAT
               units: '%'
               params: 'last(//vm.memory.used[hpLocalMemAllocBytes.{#SNMPINDEX}])/last(//vm.memory.total[hpLocalMemTotalBytes.{#SNMPINDEX}])*100'
-              description: 'Memory utilization in %'
+              description: 'Memory utilization in %.'
               tags:
                 -
                   tag: component
@@ -642,7 +658,8 @@ zabbix_export:
                 -
                   uuid: 4fe0382fdee141adac03788c8810e387
                   expression: 'min(/HP Enterprise Switch SNMP/vm.memory.util[snmp.{#SNMPINDEX}],5m)>{$MEMORY.UTIL.MAX}'
-                  name: '#{#SNMPVALUE}: High memory utilization (>{$MEMORY.UTIL.MAX}% for 5m)'
+                  name: '#{#SNMPVALUE}: High memory utilization'
+                  event_name: '#{#SNMPVALUE}: High memory utilization (>{$MEMORY.UTIL.MAX}% for 5m)'
                   priority: AVERAGE
                   description: 'The system is running out of free memory.'
                   tags:
@@ -1079,7 +1096,8 @@ zabbix_export:
               recovery_expression: |
                 avg(/HP Enterprise Switch SNMP/net.if.in[ifHCInOctets.{#SNMPINDEX}],15m)<(({$IF.UTIL.MAX:"{#IFNAME}"}-3)/100)*last(/HP Enterprise Switch SNMP/net.if.speed[ifHighSpeed.{#SNMPINDEX}]) and
                 avg(/HP Enterprise Switch SNMP/net.if.out[ifHCOutOctets.{#SNMPINDEX}],15m)<(({$IF.UTIL.MAX:"{#IFNAME}"}-3)/100)*last(/HP Enterprise Switch SNMP/net.if.speed[ifHighSpeed.{#SNMPINDEX}])
-              name: 'Interface {#IFNAME}({#IFALIAS}): High bandwidth usage (>{$IF.UTIL.MAX:"{#IFNAME}"}%)'
+              name: 'Interface {#IFNAME}({#IFALIAS}): High bandwidth usage'
+              event_name: 'Interface {#IFNAME}({#IFALIAS}): High bandwidth usage (>{$IF.UTIL.MAX:"{#IFNAME}"}%)'
               opdata: 'In: {ITEM.LASTVALUE1}, out: {ITEM.LASTVALUE3}, speed: {ITEM.LASTVALUE2}'
               priority: WARNING
               description: 'The network interface utilization is close to its estimated maximum bandwidth.'
@@ -1102,7 +1120,8 @@ zabbix_export:
               recovery_expression: |
                 max(/HP Enterprise Switch SNMP/net.if.in.errors[ifInErrors.{#SNMPINDEX}],5m)<{$IF.ERRORS.WARN:"{#IFNAME}"}*0.8
                 and max(/HP Enterprise Switch SNMP/net.if.out.errors[ifOutErrors.{#SNMPINDEX}],5m)<{$IF.ERRORS.WARN:"{#IFNAME}"}*0.8
-              name: 'Interface {#IFNAME}({#IFALIAS}): High error rate (>{$IF.ERRORS.WARN:"{#IFNAME}"} for 5m)'
+              name: 'Interface {#IFNAME}({#IFALIAS}): High error rate'
+              event_name: 'Interface {#IFNAME}({#IFALIAS}): High error rate (>{$IF.ERRORS.WARN:"{#IFNAME}"} for 5m)'
               opdata: 'errors in: {ITEM.LASTVALUE1}, errors out: {ITEM.LASTVALUE2}'
               priority: WARNING
               description: 'Recovers when below 80% of {$IF.ERRORS.WARN:"{#IFNAME}"} threshold'
@@ -1372,10 +1391,11 @@ zabbix_export:
               trigger_prototypes:
                 -
                   uuid: 5d0d743c7f5449f4a429845ab3894d19
-                  expression: 'avg(/HP Enterprise Switch SNMP/sensor.temp.value[entPhySensorValue.{#SNMPINDEX}],5m)>{$TEMP_CRIT:""}'
+                  expression: 'avg(/HP Enterprise Switch SNMP/sensor.temp.value[entPhySensorValue.{#SNMPINDEX}],5m)>{$TEMP_CRIT:"{#SENSOR_INFO}"}'
                   recovery_mode: RECOVERY_EXPRESSION
-                  recovery_expression: 'max(/HP Enterprise Switch SNMP/sensor.temp.value[entPhySensorValue.{#SNMPINDEX}],5m)<{$TEMP_CRIT:""}-3'
-                  name: '{#SENSOR_INFO}: Temperature is above critical threshold: >{$TEMP_CRIT:""}'
+                  recovery_expression: 'max(/HP Enterprise Switch SNMP/sensor.temp.value[entPhySensorValue.{#SNMPINDEX}],5m)<{$TEMP_CRIT:"{#SENSOR_INFO}"}-3'
+                  name: '{#SENSOR_INFO}: Temperature is above critical threshold'
+                  event_name: '{#SENSOR_INFO}: Temperature is above critical threshold: >{$TEMP_CRIT:"{#SENSOR_INFO}"}'
                   opdata: 'Current value: {ITEM.LASTVALUE1}'
                   priority: HIGH
                   description: 'This trigger uses temperature sensor values as well as temperature sensor status if available'
@@ -1388,18 +1408,19 @@ zabbix_export:
                       value: performance
                 -
                   uuid: b549cc5016884818bf416c415618171f
-                  expression: 'avg(/HP Enterprise Switch SNMP/sensor.temp.value[entPhySensorValue.{#SNMPINDEX}],5m)>{$TEMP_WARN:""}'
+                  expression: 'avg(/HP Enterprise Switch SNMP/sensor.temp.value[entPhySensorValue.{#SNMPINDEX}],5m)>{$TEMP_WARN:"{#SENSOR_INFO}"}'
                   recovery_mode: RECOVERY_EXPRESSION
-                  recovery_expression: 'max(/HP Enterprise Switch SNMP/sensor.temp.value[entPhySensorValue.{#SNMPINDEX}],5m)<{$TEMP_WARN:""}-3'
-                  name: '{#SENSOR_INFO}: Temperature is above warning threshold: >{$TEMP_WARN:""}'
+                  recovery_expression: 'max(/HP Enterprise Switch SNMP/sensor.temp.value[entPhySensorValue.{#SNMPINDEX}],5m)<{$TEMP_WARN:"{#SENSOR_INFO}"}-3'
+                  name: '{#SENSOR_INFO}: Temperature is above warning threshold'
+                  event_name: '{#SENSOR_INFO}: Temperature is above warning threshold: >{$TEMP_WARN:"{#SENSOR_INFO}"}'
                   opdata: 'Current value: {ITEM.LASTVALUE1}'
                   priority: WARNING
                   description: 'This trigger uses temperature sensor values as well as temperature sensor status if available'
                   dependencies:
                     -
-                      name: '{#SENSOR_INFO}: Temperature is above critical threshold: >{$TEMP_CRIT:""}'
-                      expression: 'avg(/HP Enterprise Switch SNMP/sensor.temp.value[entPhySensorValue.{#SNMPINDEX}],5m)>{$TEMP_CRIT:""}'
-                      recovery_expression: 'max(/HP Enterprise Switch SNMP/sensor.temp.value[entPhySensorValue.{#SNMPINDEX}],5m)<{$TEMP_CRIT:""}-3'
+                      name: '{#SENSOR_INFO}: Temperature is above critical threshold'
+                      expression: 'avg(/HP Enterprise Switch SNMP/sensor.temp.value[entPhySensorValue.{#SNMPINDEX}],5m)>{$TEMP_CRIT:"{#SENSOR_INFO}"}'
+                      recovery_expression: 'max(/HP Enterprise Switch SNMP/sensor.temp.value[entPhySensorValue.{#SNMPINDEX}],5m)<{$TEMP_CRIT:"{#SENSOR_INFO}"}-3'
                   tags:
                     -
                       tag: scope
@@ -1409,10 +1430,11 @@ zabbix_export:
                       value: performance
                 -
                   uuid: a4294d3ad024438aaba4234811d65582
-                  expression: 'avg(/HP Enterprise Switch SNMP/sensor.temp.value[entPhySensorValue.{#SNMPINDEX}],5m)<{$TEMP_CRIT_LOW:""}'
+                  expression: 'avg(/HP Enterprise Switch SNMP/sensor.temp.value[entPhySensorValue.{#SNMPINDEX}],5m)<{$TEMP_CRIT_LOW:"{#SENSOR_INFO}"}'
                   recovery_mode: RECOVERY_EXPRESSION
-                  recovery_expression: 'min(/HP Enterprise Switch SNMP/sensor.temp.value[entPhySensorValue.{#SNMPINDEX}],5m)>{$TEMP_CRIT_LOW:""}+3'
-                  name: '{#SENSOR_INFO}: Temperature is too low: <{$TEMP_CRIT_LOW:""}'
+                  recovery_expression: 'min(/HP Enterprise Switch SNMP/sensor.temp.value[entPhySensorValue.{#SNMPINDEX}],5m)>{$TEMP_CRIT_LOW:"{#SENSOR_INFO}"}+3'
+                  name: '{#SENSOR_INFO}: Temperature is too low'
+                  event_name: '{#SENSOR_INFO}: Temperature is too low: <{$TEMP_CRIT_LOW:"{#SENSOR_INFO}"}'
                   opdata: 'Current value: {ITEM.LASTVALUE1}'
                   priority: AVERAGE
                   tags:
@@ -1584,8 +1606,8 @@ zabbix_export:
                       type: GRAPH_PROTOTYPE
                       name: graphid
                       value:
-                        name: 'Interface {#IFNAME}({#IFALIAS}): Network traffic'
                         host: 'HP Enterprise Switch SNMP'
+                        name: 'Interface {#IFNAME}({#IFALIAS}): Network traffic'
       valuemaps:
         -
           uuid: 846197beea984cc783b84822437bbace
@@ -2526,6 +2548,23 @@ zabbix_export:
             -
               value: '2'
               newvalue: unknown
+  triggers:
+    -
+      uuid: 1395e02bc63e48daa779b8b685e91868
+      expression: '(last(/HP Enterprise Switch SNMP/system.hw.uptime[hrSystemUptime.0])>0 and last(/HP Enterprise Switch SNMP/system.hw.uptime[hrSystemUptime.0])<10m) or (last(/HP Enterprise Switch SNMP/system.hw.uptime[hrSystemUptime.0])=0 and last(/HP Enterprise Switch SNMP/system.net.uptime[sysUpTime.0])<10m)'
+      name: 'Host has been restarted'
+      event_name: '{HOST.NAME} has been restarted (uptime < 10m)'
+      priority: WARNING
+      description: 'Uptime is less than 10 minutes.'
+      manual_close: 'YES'
+      dependencies:
+        -
+          name: 'No SNMP data collection'
+          expression: 'max(/HP Enterprise Switch SNMP/zabbix[host,snmp,available],{$SNMP.TIMEOUT})=0'
+      tags:
+        -
+          tag: scope
+          value: notice
   graphs:
     -
       uuid: d282b8d685c547a58645c1cc63b00571

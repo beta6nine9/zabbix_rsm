@@ -1,4 +1,4 @@
-<?php declare(strict_types=1);
+<?php declare(strict_types = 0);
 /*
 ** Zabbix
 ** Copyright (C) 2001-2022 Zabbix SIA
@@ -253,6 +253,18 @@ class CSelect extends CTag {
 		}
 
 		return $options;
+	}
+
+	protected function startToString() {
+		$attributes = '';
+
+		foreach ($this->attributes as $key => $value) {
+			if ($value !== null) {
+				$attributes .= ' '.$key.'="'.$this->encode($value, $this->attrEncStrategy).'"';
+			}
+		}
+
+		return '<'.$this->tagname.$attributes.'>';
 	}
 
 	public function toString($destroy = true) {

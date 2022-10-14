@@ -1,6 +1,6 @@
 zabbix_export:
   version: '6.0'
-  date: '2022-01-26T10:39:52Z'
+  date: '2022-08-16T04:50:13Z'
   groups:
     -
       uuid: 7c2cb727f85b492d88cd56e17127c64d
@@ -14,6 +14,7 @@ zabbix_export:
         The template to monitor SAN Huawei OceanStor 5300 V5 by Zabbix SNMP agent.
         
         MIBs used:
+        HOST-RESOURCES-MIB
         SNMPv2-MIB
         
         You can discuss this template or leave feedback on our forum https://www.zabbix.com/forum/zabbix-suggestions-and-feedback/418855-discussion-thread-for-official-zabbix-template-huawei-oceanstor
@@ -107,6 +108,7 @@ zabbix_export:
               uuid: b6eb791cc14644dfb0a69a2cce150ab1
               expression: 'last(/Huawei OceanStor 5300 V5 SNMP/huawei.5300.v5[version],#1)<>last(/Huawei OceanStor 5300 V5 SNMP/huawei.5300.v5[version],#2) and length(last(/Huawei OceanStor 5300 V5 SNMP/huawei.5300.v5[version]))>0'
               name: 'OceanStor 5300 V5: Storage version has been changed'
+              event_name: 'OceanStor 5300 V5: Version has changed (new version: {ITEM.VALUE})'
               priority: INFO
               description: 'OceanStor 5300 V5 version has changed. Ack to close.'
               manual_close: 'YES'
@@ -271,6 +273,34 @@ zabbix_export:
               tag: component
               value: system
         -
+          uuid: f54aca2b926e4d4d980f980acb0aefac
+          name: 'Uptime (hardware)'
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.2.1.25.1.1.0
+          key: 'system.hw.uptime[hrSystemUptime.0]'
+          delay: 30s
+          history: 2w
+          trends: 0d
+          units: uptime
+          description: |
+            MIB: HOST-RESOURCES-MIB
+            The amount of time since this host was last initialized. Note that this is different from sysUpTime in the SNMPv2-MIB [RFC1907] because sysUpTime is the uptime of the network management portion of the system.
+          preprocessing:
+            -
+              type: CHECK_NOT_SUPPORTED
+              parameters:
+                - ''
+              error_handler: CUSTOM_VALUE
+              error_handler_params: '0'
+            -
+              type: MULTIPLIER
+              parameters:
+                - '0.01'
+          tags:
+            -
+              tag: component
+              value: system
+        -
           uuid: fed7a954ea614cb086b901b2e6957621
           name: 'System location'
           type: SNMP_AGENT
@@ -320,7 +350,8 @@ zabbix_export:
             -
               uuid: 72a31faa805b40e795a57649c724da1e
               expression: 'last(/Huawei OceanStor 5300 V5 SNMP/system.name,#1)<>last(/Huawei OceanStor 5300 V5 SNMP/system.name,#2) and length(last(/Huawei OceanStor 5300 V5 SNMP/system.name))>0'
-              name: 'System name has changed (new name: {ITEM.VALUE})'
+              name: 'System name has changed'
+              event_name: 'System name has changed (new name: {ITEM.VALUE})'
               priority: INFO
               description: 'System name has changed. Ack to close.'
               manual_close: 'YES'
@@ -331,6 +362,28 @@ zabbix_export:
                 -
                   tag: scope
                   value: security
+        -
+          uuid: f14eaa207ac9480995d2a2a10bea1467
+          name: 'Uptime (network)'
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.2.1.1.3.0
+          key: 'system.net.uptime[sysUpTime.0]'
+          delay: 30s
+          history: 2w
+          trends: 0d
+          units: uptime
+          description: |
+            MIB: SNMPv2-MIB
+            The time (in hundredths of a second) since the network management portion of the system was last re-initialized.
+          preprocessing:
+            -
+              type: MULTIPLIER
+              parameters:
+                - '0.01'
+          tags:
+            -
+              tag: component
+              value: system
         -
           uuid: bf571c06cc264eca89d68f0b0b7559f7
           name: 'System object ID'
@@ -353,44 +406,6 @@ zabbix_export:
             -
               tag: component
               value: system
-        -
-          uuid: f14eaa207ac9480995d2a2a10bea1467
-          name: Uptime
-          type: SNMP_AGENT
-          snmp_oid: 1.3.6.1.2.1.1.3.0
-          key: 'system.uptime[sysUpTime.0]'
-          delay: 30s
-          history: 2w
-          trends: 0d
-          units: uptime
-          description: |
-            MIB: SNMPv2-MIB
-            The time (in hundredths of a second) since the network management portion of the system was last re-initialized.
-          preprocessing:
-            -
-              type: MULTIPLIER
-              parameters:
-                - '0.01'
-          tags:
-            -
-              tag: component
-              value: system
-          triggers:
-            -
-              uuid: 0e3713bdf52e40d692cf256ac2a01988
-              expression: 'last(/Huawei OceanStor 5300 V5 SNMP/system.uptime[sysUpTime.0])<10m'
-              name: '{HOST.NAME} has been restarted (uptime < 10m)'
-              priority: WARNING
-              description: 'Uptime is less than 10 minutes'
-              manual_close: 'YES'
-              dependencies:
-                -
-                  name: 'No SNMP data collection'
-                  expression: 'max(/Huawei OceanStor 5300 V5 SNMP/zabbix[host,snmp,available],{$SNMP.TIMEOUT})=0'
-              tags:
-                -
-                  tag: scope
-                  value: notice
         -
           uuid: 197767da1b3c4c4f8f3c59ab3c3fc5b8
           name: 'SNMP agent availability'
@@ -548,7 +563,8 @@ zabbix_export:
                 -
                   uuid: a51b4e42efaa4924b6c2990c9c0abf30
                   expression: 'min(/Huawei OceanStor 5300 V5 SNMP/huawei.5300.v5[hwInfoControllerCPUUsage, "{#ID}"],5m)>{$CPU.UTIL.CRIT}'
-                  name: 'Controller {#ID}: High CPU utilization (over {$CPU.UTIL.CRIT}% for 5m)'
+                  name: 'Controller {#ID}: High CPU utilization'
+                  event_name: 'Controller {#ID}: High CPU utilization (over {$CPU.UTIL.CRIT}% for 5m)'
                   opdata: 'Current utilization: {ITEM.LASTVALUE1}'
                   priority: WARNING
                   description: 'CPU utilization is too high. The system might be slow to respond.'
@@ -610,7 +626,8 @@ zabbix_export:
                 -
                   uuid: 8d4fe305737f41a595c1d2efb3e8a153
                   expression: 'min(/Huawei OceanStor 5300 V5 SNMP/huawei.5300.v5[hwInfoControllerMemoryUsage, "{#ID}"],{$HUAWEI.5300.MEM.MAX.TIME})>{$HUAWEI.5300.MEM.MAX.WARN}'
-                  name: 'Controller {#ID}: Memory usage is too high (over {$HUAWEI.5300.MEM.MAX.WARN} for {$HUAWEI.5300.MEM.MAX.TIME})'
+                  name: 'Controller {#ID}: Memory usage is too high'
+                  event_name: 'Controller {#ID}: Memory usage is too high (over {$HUAWEI.5300.MEM.MAX.WARN} for {$HUAWEI.5300.MEM.MAX.TIME})'
                   priority: AVERAGE
                   tags:
                     -
@@ -825,7 +842,8 @@ zabbix_export:
                 -
                   uuid: 906de152d3594f1d8cc15b4b717d6202
                   expression: 'min(/Huawei OceanStor 5300 V5 SNMP/huawei.5300.v5[hwInfoDiskTemperature, "{#ID}"],{$HUAWEI.5300.DISK.TEMP.MAX.TIME})>{$HUAWEI.5300.DISK.TEMP.MAX.WARN:"{#MODEL}"}'
-                  name: 'Disk {#MODEL} on {#LOCATION}: Temperature is too high (over {$HUAWEI.5300.DISK.TEMP.MAX.WARN:"{#MODEL}"} for {$HUAWEI.5300.DISK.TEMP.MAX.TIME})'
+                  name: 'Disk {#MODEL} on {#LOCATION}: Temperature is too high'
+                  event_name: 'Disk {#MODEL} on {#LOCATION}: Temperature is too high (over {$HUAWEI.5300.DISK.TEMP.MAX.WARN:"{#MODEL}"} for {$HUAWEI.5300.DISK.TEMP.MAX.TIME})'
                   opdata: 'Current value: {ITEM.LASTVALUE}'
                   priority: HIGH
                   tags:
@@ -932,7 +950,8 @@ zabbix_export:
                 -
                   uuid: 622fcc16c03e4ba4ad8371ea5c1c314f
                   expression: 'min(/Huawei OceanStor 5300 V5 SNMP/huawei.5300.v5[hwInfoEnclosureTemperature, "{#NAME}"],{$HUAWEI.5300.TEMP.MAX.TIME})>{$HUAWEI.5300.TEMP.MAX.WARN}'
-                  name: 'Enclosure {#NAME}: Temperature is too high (over {$HUAWEI.5300.TEMP.MAX.WARN} for {$HUAWEI.5300.TEMP.MAX.TIME})'
+                  name: 'Enclosure {#NAME}: Temperature is too high'
+                  event_name: 'Enclosure {#NAME}: Temperature is too high (over {$HUAWEI.5300.TEMP.MAX.WARN} for {$HUAWEI.5300.TEMP.MAX.TIME})'
                   opdata: 'Current value: {ITEM.LASTVALUE}'
                   priority: HIGH
                   tags:
@@ -1059,7 +1078,8 @@ zabbix_export:
                 -
                   uuid: aae494cb840049fb83df354c13daaf53
                   expression: 'min(/Huawei OceanStor 5300 V5 SNMP/huawei.5300.v5[hwPerfLunAverageIOResponseTime, "{#NAME}"],{$HUAWEI.5300.LUN.IO.TIME.MAX.TIME})>{$HUAWEI.5300.LUN.IO.TIME.MAX.WARN}'
-                  name: 'LUN {#NAME}: Average I/O response time is too high (over {$HUAWEI.5300.LUN.IO.TIME.MAX.WARN}ms for {$HUAWEI.5300.LUN.IO.TIME.MAX.TIME})'
+                  name: 'LUN {#NAME}: Average I/O response time is too high'
+                  event_name: 'LUN {#NAME}: Average I/O response time is too high (over {$HUAWEI.5300.LUN.IO.TIME.MAX.WARN}ms for {$HUAWEI.5300.LUN.IO.TIME.MAX.TIME})'
                   priority: WARNING
                   tags:
                     -
@@ -1369,7 +1389,8 @@ zabbix_export:
                 -
                   uuid: 8495a55d6549460d9b132675a39b818b
                   expression: 'min(/Huawei OceanStor 5300 V5 SNMP/huawei.5300.v5[hwPerfNodeCPUUsage, "{#NODE}"],5m)>{$CPU.UTIL.CRIT}'
-                  name: 'Node {#NODE}: High CPU utilization (over {$CPU.UTIL.CRIT}% for 5m)'
+                  name: 'Node {#NODE}: High CPU utilization'
+                  event_name: 'Node {#NODE}: High CPU utilization (over {$CPU.UTIL.CRIT}% for 5m)'
                   opdata: 'Current utilization: {ITEM.LASTVALUE1}'
                   priority: WARNING
                   description: 'CPU utilization is too high. The system might be slow to respond.'
@@ -1398,7 +1419,8 @@ zabbix_export:
                 -
                   uuid: 8f54bfe029fe43c7a049c6a97c8598bf
                   expression: 'min(/Huawei OceanStor 5300 V5 SNMP/huawei.5300.v5[hwPerfNodeDelay, "{#NODE}"],{$HUAWEI.5300.NODE.IO.DELAY.MAX.TIME})>{$HUAWEI.5300.NODE.IO.DELAY.MAX.WARN}'
-                  name: 'Node {#NODE}: Average I/O latency is too high (over {$HUAWEI.5300.NODE.IO.DELAY.MAX.WARN}ms for {$HUAWEI.5300.NODE.IO.DELAY.MAX.TIME})'
+                  name: 'Node {#NODE}: Average I/O latency is too high'
+                  event_name: 'Node {#NODE}: Average I/O latency is too high (over {$HUAWEI.5300.NODE.IO.DELAY.MAX.WARN}ms for {$HUAWEI.5300.NODE.IO.DELAY.MAX.TIME})'
                   priority: WARNING
                   tags:
                     -
@@ -1620,7 +1642,8 @@ zabbix_export:
                 -
                   uuid: 2ea46713fe664a64a851edca422257f8
                   expression: 'min(/Huawei OceanStor 5300 V5 SNMP/huawei.5300.v5[hwInfoStoragePoolFreeCapacityPct, "{#NAME}"],{$HUAWEI.5300.POOL.CAPACITY.THRESH.TIME})>{#THRESHOLD}'
-                  name: 'Pool {#NAME}: Used capacity is too high (over {#THRESHOLD}%)'
+                  name: 'Pool {#NAME}: Used capacity is too high'
+                  event_name: 'Pool {#NAME}: Used capacity is too high (over {#THRESHOLD}%)'
                   priority: AVERAGE
                   tags:
                     -
@@ -1807,7 +1830,7 @@ zabbix_export:
         -
           macro: '{$HUAWEI.5300.NODE.IO.DELAY.MAX.TIME}'
           value: 5m
-          description: 'The time during which verage I/O latency of node may exceed the threshold.'
+          description: 'The time during which average I/O latency of node may exceed the threshold.'
         -
           macro: '{$HUAWEI.5300.NODE.IO.DELAY.MAX.WARN}'
           value: '20'
@@ -2272,6 +2295,23 @@ zabbix_export:
             -
               value: '2'
               newvalue: unknown
+  triggers:
+    -
+      uuid: 0e3713bdf52e40d692cf256ac2a01988
+      expression: '(last(/Huawei OceanStor 5300 V5 SNMP/system.hw.uptime[hrSystemUptime.0])>0 and last(/Huawei OceanStor 5300 V5 SNMP/system.hw.uptime[hrSystemUptime.0])<10m) or (last(/Huawei OceanStor 5300 V5 SNMP/system.hw.uptime[hrSystemUptime.0])=0 and last(/Huawei OceanStor 5300 V5 SNMP/system.net.uptime[sysUpTime.0])<10m)'
+      name: 'Host has been restarted'
+      event_name: '{HOST.NAME} has been restarted (uptime < 10m)'
+      priority: WARNING
+      description: 'Uptime is less than 10 minutes.'
+      manual_close: 'YES'
+      dependencies:
+        -
+          name: 'No SNMP data collection'
+          expression: 'max(/Huawei OceanStor 5300 V5 SNMP/zabbix[host,snmp,available],{$SNMP.TIMEOUT})=0'
+      tags:
+        -
+          tag: scope
+          value: notice
   graphs:
     -
       uuid: 9401d60314c441a5a04d7a9709c6970e

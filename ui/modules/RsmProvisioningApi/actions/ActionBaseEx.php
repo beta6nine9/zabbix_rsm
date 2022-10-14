@@ -81,6 +81,10 @@ abstract class ActionBaseEx extends ActionBase
 		self::MACRO_TLD_RDDS43_NS_STRING   => 'What to look for in RDDS output, e.g. "Name Server:"',
 	];
 
+	protected const MACRO_GLOBAL_DNS_DELAY  = '{$RSM.DNS.DELAY}';
+	protected const MACRO_GLOBAL_RDAP_DELAY = '{$RSM.RDAP.DELAY}';
+	protected const MACRO_GLOBAL_RDDS_DELAY = '{$RSM.RDDS.DELAY}';
+
 	protected const MONITORING_TARGET_REGISTRY  = 'registry';
 	protected const MONITORING_TARGET_REGISTRAR = 'registrar';
 
@@ -1182,13 +1186,20 @@ abstract class ActionBaseEx extends ActionBase
 
 	protected function getGlobalMacro(string $macro): string
 	{
-		$data = API::UserMacro()->get([
-			'output'      => ['value'],
-			'globalmacro' => true,
-			'filter'      => ['macro' => $macro],
-		]);
+		static $cache = [];
 
-		return $data[0]['value'];
+		if (!array_key_exists($macro, $cache))
+		{
+			$data = API::UserMacro()->get([
+				'output'      => ['value'],
+				'globalmacro' => true,
+				'filter'      => ['macro' => $macro],
+			]);
+
+			$cache[$macro] = $data[0]['value'];
+		}
+
+		return $cache[$macro];
 	}
 
 	protected function setGlobalMacro(string $macro, string $value): void
