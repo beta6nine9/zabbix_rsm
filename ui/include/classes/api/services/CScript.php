@@ -706,7 +706,7 @@ class CScript extends CApiService {
 
 			case ZBX_SCRIPT_TYPE_WEBHOOK:
 				$api_input_rules['fields'] += [
-					'timeout' =>		['type' => API_TIME_UNIT, 'in' => '1:'.SEC_PER_MIN],
+					'timeout' =>		['type' => API_TIME_UNIT, 'in' => '1:'.(3*SEC_PER_MIN)], /* RSM specifics: increase by 3 minutes */
 					'parameters' =>			['type' => API_OBJECTS, 'uniq' => [['name']], 'fields' => [
 						'name' =>				['type' => API_STRING_UTF8, 'flags' => API_REQUIRED | API_NOT_EMPTY, 'length' => DB::getFieldLength('script_param', 'name')],
 						'value' =>				['type' => API_STRING_UTF8, 'flags' => API_REQUIRED, 'length' => DB::getFieldLength('script_param', 'value')]
