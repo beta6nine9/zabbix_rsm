@@ -39,7 +39,7 @@ class CControllerScriptCreate extends CController {
 			'commandipmi' =>			'db scripts.command|flags '.P_CRLF,
 			'parameters' =>				'array',
 			'script' => 				'db scripts.command|flags '.P_CRLF,
-			'timeout' => 				'db scripts.timeout|time_unit '.implode(':', [1, SEC_PER_MIN]),
+			'timeout' => 				'db scripts.timeout|time_unit '.implode(':', [1, 3*SEC_PER_MIN]), /* RSM specifics: increase by 3 minutes */
 			'description' =>			'db scripts.description',
 			'host_access' =>			'db scripts.host_access|in '.implode(',', [PERM_READ, PERM_READ_WRITE]),
 			'groupid' =>				'db scripts.groupid',
