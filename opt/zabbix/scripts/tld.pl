@@ -242,7 +242,7 @@ sub cmd_update_nsservers()
 
 	if ($services{'rdds43'})
 	{
-		$config->{'rddsParameters'}{'rdds43Server'}       = $json->{'rddsParameters'}('rdds43Server');
+		$config->{'rddsParameters'}{'rdds43Server'}       = $json->{'rddsParameters'}{'rdds43Server'};
 		$config->{'rddsParameters'}{'rdds43TestedDomain'} = $json->{'rddsParameters'}{'rdds43TestedDomain'};
 		$config->{'rddsParameters'}{'rdds43NsString'}     = $json->{'rddsParameters'}{'rdds43NsString'};
 	}
