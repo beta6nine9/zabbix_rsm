@@ -2,6 +2,7 @@ Changes for rsm2.3.2
 
 New features:
 ..F....... [915] increased the webhook timeout limit to 3 minutes (dimir)
+....I..... [916] fixed syntax error in tld.pl when handling RDDS43 server option (dimir)
 
 --------------------------------------------------------------------------------
 Changes for rsm2.3.1
