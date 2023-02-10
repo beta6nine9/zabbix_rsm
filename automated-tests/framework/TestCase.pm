@@ -36,6 +36,7 @@ my %command_handlers = (
 	'empty-directory'         => [\&__cmd_empty_directory        , 1, 1], # directory
 	'extract-files'           => [\&__cmd_extract_files          , 1, 1], # directory,archive
 	'compare-files'           => [\&__cmd_compare_files          , 1, 1], # directory,archive
+	'compare-file'            => [\&__cmd_compare_file           , 1, 1], # filename,contents
 	'prepare-server-database' => [\&__cmd_prepare_server_database, 0, 1], # (void)
 	'execute-sql-query'       => [\&__cmd_execute_sql_query      , 1, 1], # query,param,param,param,...
 	'compare-sql-query'       => [\&__cmd_compare_sql_query      , 1, 1], # query,value,value,value,...
@@ -431,6 +432,34 @@ sub __cmd_compare_files($)
 	}
 }
 
+sub __cmd_compare_file($)
+{
+	my $args = shift;
+
+	# [compare-file]
+	# filename,contents
+
+	my ($filename, $expected_contents) = __unpack($args, 2);
+
+	info("comparing contents of file '%s'", $filename);
+
+	if (!File::Spec->file_name_is_absolute($filename))
+	{
+		my (undef, $test_case_dir, undef) = File::Spec->splitpath($test_case_filename);
+
+		$filename = File::Spec->catfile($test_case_dir, $filename);
+	}
+
+	my $contents = read_file($filename);
+
+	if ($expected_contents ne "" && !str_matches($contents, $expected_contents))
+	{
+		print("--- expected VS generated:\n");
+		print(diff(\$expected_contents, \$contents), "\n");
+		fail("file contents don't match expected pattern")
+	}
+}
+
 sub __cmd_prepare_server_database()
 {
 	# [prepare-server-database]
@@ -820,48 +849,17 @@ sub __cmd_execute_ex($)
 		}
 	}
 
-	if ($expected_stdout ne "" || $expected_stderr ne "")
+	if ($expected_stdout ne "" && !str_matches($stdout, $expected_stdout))
 	{
-		# store outputs in hash to avoid having huge amounts of text in stacktrace in case of failure
-		my %outputs = (
-			'stdout' => [$stdout, $expected_stdout],
-			'stderr' => [$stderr, $expected_stderr],
-		);
-
-		my $compare = sub
-		{
-			my $stream = shift;
-
-			my $output   = $outputs{$stream}[0];
-			my $expected = $outputs{$stream}[1];
-
-			if ($expected =~ m{^/(.*)/$})
-			{
-				# if pattern is enclosed in //, treat it as regex pattern
-				if ($output !~ /$1/)
-				{
-					fail("$stream doesn't match expected pattern");
-				}
-			}
-			else
-			{
-				# if pattern is not enclosed in //, treat it as a substring
-				if (index($output, $expected) == -1)
-				{
-					# substring was not found, trim trailing newlines and try again
-					$output   =~ s/\s+$//mg;
-					$expected =~ s/\s+$//mg;
-
-					if (index($output, $expected) == -1)
-					{
-						fail("$stream doesn't contain expected substring");
-					}
-				}
-			}
-		};
-
-		$compare->("stdout") if ($expected_stdout ne "");
-		$compare->("stderr") if ($expected_stderr ne "");
+		print("--- expected VS generated:\n");
+		print(diff(\$expected_stdout, \$stdout), "\n");
+		fail("stdout doesn't match expected pattern")
+	}
+	if ($expected_stderr ne "" && !str_matches($stderr, $expected_stderr))
+	{
+		print("--- expected VS generated:\n");
+		print(diff(\$expected_stderr, \$stderr), "\n");
+		fail("stderr doesn't match expected pattern")
 	}
 }
 

@@ -130,6 +130,14 @@ Extracts archive file into a directory. Archive should be filename of a compress
 
 Compares contents of an archive file with contents on the filesystem. Archive should be filename of a compressed tar file, relative to the test case file (e.g., `001-test-case-input-files.tar.gz`).
 
+### compare-file
+
+*filename,contents*
+
+Compares contents of the file with expected contents.
+
+Argument `contents` is optional. If it contains a string that is enclosed in `//`, this string is used as a regex pattern, otherwise contents of the file have to be the same as the string (in this case, trailing whitespaces are ignored).
+
 ### prepare-server-database
 
 *(ignored)*
@@ -225,7 +233,7 @@ Examples:
 
 Executes external command and validates exit status, STDOUT and STDERR.
 
-Arguments `expected_stdout` and `expected_stderr` are optional. If they contain a string that is enclosed in `//`, this string is used as a regex pattern, otherwise the whole output has to be the same as the string (in this case, trailing newlines are ignored).
+Arguments `expected_stdout` and `expected_stderr` are optional. If they contain a string that is enclosed in `//`, this string is used as a regex pattern, otherwise the whole output has to be the same as the string (in this case, trailing whitespaces are ignored).
 
 ### start-server
 
