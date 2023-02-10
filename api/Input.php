@@ -92,10 +92,13 @@ class Input
 		{
 			return false;
 		}
-		// if 3rd and 4th characters are '--', then 1st and 2nd characters must be 'xn' (i.e., 'xn--')
-		if (strlen($id) >= 4 && ($id[0] != 'x' || $id[1] != 'n') && $id[2] == '-' && $id[3] == '-')
+		// if 3rd and 4th characters are '--', then 1st and 2nd characters must be 'xn' or 'zz' (i.e., 'xn--' or 'zz--')
+		if (strlen($id) >= 4 && $id[2] == '-' && $id[3] == '-')
 		{
-			return false;
+			if (($id[0] != 'x' || $id[1] != 'n') && ($id[0] != 'z' || $id[1] != 'z'))
+			{
+				return false;
+			}
 		}
 		return true;
 	}
