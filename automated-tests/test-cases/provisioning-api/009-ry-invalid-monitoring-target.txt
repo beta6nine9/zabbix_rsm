@@ -16,7 +16,7 @@
 "{$RSM.IP6.MIN.PROBE.ONLINE}","2"
 "{$RSM.RDAP.STANDALONE}","1609459200"
 
-[provisioning-api]
+[rsm-api]
 
 "/registrars"   ,"GET"   ,500,"readonly" ,""                        ,"0xx-error-outputs/009-invalid-monitoring-target.json"
 "/registrars"   ,"GET"   ,500,"readwrite",""                        ,"0xx-error-outputs/009-invalid-monitoring-target.json"

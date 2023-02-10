@@ -53,7 +53,7 @@ my %command_handlers = (
 	'create-incident'         => [\&__cmd_create_incident        , 1, 1], # rsmhost,description,from,till,false_positive
 	'check-incident'          => [\&__cmd_check_incident         , 1, 1], # rsmhost,description,from,till
 	'check-event-count'       => [\&__cmd_check_event_count      , 1, 1], # rsmhost,description,count
-	'provisioning-api'        => [\&__cmd_provisioning_api       , 1, 1], # endpoint,method,expected_code,user,request,response
+	'rsm-api'                 => [\&__cmd_rsm_api                , 1, 1], # endpoint,method,expected_code,user,request,response
 	'start-tool'              => [\&__cmd_start_tool             , 1, 1], # tool_name,pid-file,input-file
 	'stop-tool'               => [\&__cmd_stop_tool              , 1, 1], # tool_name,pid-file
 	'check-proxy'             => [\&__cmd_check_proxy            , 1, 1], # proxy,status,ip,port,psk-identity,psk
@@ -741,7 +741,7 @@ sub __cmd_execute($)
 	# [execute]
 	# datetime,command
 
-	my ($datetime, @command) = __unpack($args, 2);
+	my ($datetime, @command) = __unpack($args, 2, 1);
 
 	if ($datetime eq "")
 	{
@@ -1095,11 +1095,11 @@ sub __cmd_check_event_count($)
 	}
 }
 
-sub __cmd_provisioning_api($)
+sub __cmd_rsm_api($)
 {
 	my $args = shift;
 
-	# [provisioning-api]
+	# [rsm-api]
 	# endpoint,method,expected_code,user,request,response
 
 	my ($endpoint, $method, $expected_code, $user, $request, $response) = __unpack($args, 6);
@@ -1111,16 +1111,17 @@ sub __cmd_provisioning_api($)
 			'password' => 'nonexistent',
 		},
 		'invalid_password' => {
-			'username' => get_config('provisioning-api', 'username_readonly'),
-			'password' => get_config('provisioning-api', 'password_readonly') . '_invalid',
+			'username' => get_config('rsm-api', 'username_readonly'),
+			'password' => get_config('rsm-api', 'password_readonly') . '_invalid',
 		},
 		'readonly' => {
-			'username' => get_config('provisioning-api', 'username_readonly'),
-			'password' => get_config('provisioning-api', 'password_readonly'),
+			'username' => get_config('rsm-api', 'username_readonly'),
+			'password' => get_config('rsm-api', 'password_readonly'),
 		},
 		'readwrite' => {
-			'username' => get_config('provisioning-api', 'username_readwrite'),
-			'password' => get_config('provisioning-api', 'password_readwrite'),
+			'username' => get_config('rsm-api', 'username_readwrite'),
+			'password' => get_config('rsm-api', 'password_readwrite'),
+		},
 		},
 	};
 
@@ -1154,7 +1155,7 @@ sub __cmd_provisioning_api($)
 
 	my $payload = $request eq '' ? undef : read_file($request);
 
-	my $url = rtrim(get_config('provisioning-api', 'url'), '/') . '/' . ltrim($endpoint, '/');
+	my $url = rtrim(get_config('rsm-api', 'url'), '/') . '/' . ltrim($endpoint, '/');
 
 	my ($status_code, $content_type, $response_body) = http_request($url, $method, $users->{$user}, $payload);
 
@@ -1348,7 +1349,7 @@ sub __cmd_check_host($)
 		$expected_template_count,
 		$expected_host_group_count,
 		$expected_macro_count,
-		$expected_item_count
+		$expected_item_count,
 	) = __unpack($args, 9);
 
 	info("checking host '$host'");
@@ -1549,7 +1550,22 @@ sub __cmd_check_item($)
 	# [check-item]
 	# host,key,name,status,item_type,value_type,delay,history,trends,units,params,master_item,preproc_count,trigger_count
 
-	my ($host, $key, $name, $status, $item_type, $value_type, $delay, $history, $trends, $units, $expected_params, $expected_master_item, $expected_preproc_count, $expected_trigger_count) = __unpack($args, 14);
+	my (
+		$host,
+		$key,
+		$name,
+		$status,
+		$item_type,
+		$value_type,
+		$delay,
+		$history,
+		$trends,
+		$units,
+		$expected_params,
+		$expected_master_item,
+		$expected_preproc_count,
+		$expected_trigger_count,
+	) = __unpack($args, 14);
 
 	info("checking host item (host: '$host', item: '$key')");
 
@@ -1632,7 +1648,15 @@ sub __cmd_check_preproc($)
 	# [check-preproc]
 	# host,key,step,type,params,error_handler,error_handler_params
 
-	my ($host, $key, $step, $expected_type, $expected_params, $expected_error_handler, $expected_error_handler_params) = __unpack($args, 7);
+	my (
+		$host,
+		$key,
+		$step,
+		$expected_type,
+		$expected_params,
+		$expected_error_handler,
+		$expected_error_handler_params,
+	) = __unpack($args, 7);
 
 	info("checking item preprocessing step (host: '$host', item: '$key', step: '$step')");
 

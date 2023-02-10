@@ -16,7 +16,7 @@
 "{$RSM.IP6.MIN.PROBE.ONLINE}","2"
 "{$RSM.RDAP.STANDALONE}","1609459200"
 
-[provisioning-api]
+[rsm-api]
 
 "/tlds/sometld$","PUT",400,"readwrite","000-input-tld.json"                                                ,"1xx-tld-outputs/129-000-invalid-object-id.json"
 "/tlds/som tld1","PUT",400,"readwrite","000-input-tld.json"                                                ,"1xx-tld-outputs/129-000-invalid-object-id.json"

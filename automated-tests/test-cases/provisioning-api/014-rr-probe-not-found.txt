@@ -16,7 +16,7 @@
 "{$RSM.IP6.MIN.PROBE.ONLINE}","2"
 "{$RSM.RDAP.STANDALONE}","1609459200"
 
-[provisioning-api]
+[rsm-api]
 
 "/probeNodes"       ,"GET",200,"readonly","","0xx-error-outputs/014-get-list-empty.json"
 "/probeNodes/probe1","GET",404,"readonly","","0xx-error-outputs/014-get-single-not-found.json"

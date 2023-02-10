@@ -16,7 +16,7 @@
 "{$RSM.IP6.MIN.PROBE.ONLINE}","2"
 "{$RSM.RDAP.STANDALONE}","1609459200"
 
-[provisioning-api]
+[rsm-api]
 
 "/"           ,"GET",404,"readonly","","0xx-error-outputs/006-invalid-endpoint.json"
 "/nonexistent","GET",404,"readonly","","0xx-error-outputs/006-invalid-endpoint.json"

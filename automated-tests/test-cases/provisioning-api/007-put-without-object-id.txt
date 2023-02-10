@@ -15,7 +15,7 @@
 "{$RSM.IP6.MIN.PROBE.ONLINE}","2"
 "{$RSM.RDAP.STANDALONE}","1609459200"
 
-[provisioning-api]
+[rsm-api]
 
 "/probeNodes" ,"PUT",400,"readwrite","","0xx-error-outputs/007-empty-probe-object-id.json"
 
@@ -23,7 +23,7 @@
 
 "{$RSM.MONITORING.TARGET}","registry"
 
-[provisioning-api]
+[rsm-api]
 
 "/tlds"       ,"PUT",400,"readwrite","","0xx-error-outputs/007-empty-tld-object-id.json"
 
@@ -31,6 +31,6 @@
 
 "{$RSM.MONITORING.TARGET}","registrar"
 
-[provisioning-api]
+[rsm-api]
 
 "/registrars" ,"PUT",400,"readwrite","","0xx-error-outputs/007-empty-registrar-object-id.json"

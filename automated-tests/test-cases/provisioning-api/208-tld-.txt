@@ -16,7 +16,7 @@
 "{$RSM.IP6.MIN.PROBE.ONLINE}","2"
 "{$RSM.RDAP.STANDALONE}","1609459200"
 
-[provisioning-api]
+[rsm-api]
 
 "/probeNodes/probe1","PUT",200,"readwrite","2xx-inputs/200-probe1.json","2xx-outputs/200-probe1.json"
 "/probeNodes/probe2","PUT",200,"readwrite","2xx-inputs/200-probe2.json","2xx-outputs/200-probe2.json"
@@ -36,7 +36,7 @@
 "update history      set clock=floor(unix_timestamp()/300)*300 where clock=0"
 "update history_uint set clock=floor(unix_timestamp()/300)*300 where clock=0"
 
-[provisioning-api]
+[rsm-api]
 
 "/tlds/tld2","PUT",200,"readwrite","2xx-inputs/200-tld-disabled.json","2xx-outputs/200-tld2-disabled.json"
 

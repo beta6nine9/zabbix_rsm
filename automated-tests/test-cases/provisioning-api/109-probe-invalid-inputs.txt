@@ -16,7 +16,7 @@
 "{$RSM.IP6.MIN.PROBE.ONLINE}","2"
 "{$RSM.RDAP.STANDALONE}","1609459200"
 
-[provisioning-api]
+[rsm-api]
 
 "/probeNodes/probe$","PUT",400,"readwrite","000-input-probe.json"                                                 ,"1xx-probe-outputs/109-000-invalid-object-id.json"
 "/probeNodes/p obe1","PUT",400,"readwrite","000-input-probe.json"                                                 ,"1xx-probe-outputs/109-000-invalid-object-id.json"

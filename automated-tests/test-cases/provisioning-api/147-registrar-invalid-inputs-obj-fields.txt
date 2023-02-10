@@ -16,7 +16,7 @@
 "{$RSM.IP6.MIN.PROBE.ONLINE}","2"
 "{$RSM.RDAP.STANDALONE}","1609459200"
 
-[provisioning-api]
+[rsm-api]
 
 "/registrars/1","PUT",400,"readwrite","1xx-invalid-registrar-inputs/147-obj-params-rdds-rdap-tested-domain.json"  ,"1xx-registrar-outputs/147-obj-params-rdds-rdap-tested-domain.json"
 "/registrars/1","PUT",400,"readwrite","1xx-invalid-registrar-inputs/147-obj-params-rdds-rdap-url.json"            ,"1xx-registrar-outputs/147-obj-params-rdds-rdap-url.json"

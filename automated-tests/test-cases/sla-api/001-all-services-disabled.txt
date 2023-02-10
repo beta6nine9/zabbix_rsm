@@ -16,7 +16,7 @@
 "{$RSM.IP4.MIN.PROBE.ONLINE}","1"
 "{$RSM.IP6.MIN.PROBE.ONLINE}","1"
 
-[provisioning-api]
+[rsm-api]
 
 "/probeNodes/Probe1-Server1","PUT",200,"readwrite","000-input-probe1-rdap-rdds.json",""
 "/probeNodes/Probe2-Server1","PUT",200,"readwrite","000-input-probe2-rdap-rdds.json",""
@@ -363,7 +363,7 @@
 "/opt/zabbix/sla","001-sla-output.tar.gz"
 "/opt/zabbix/cache","001-cache-output.tar.gz"
 
-[provisioning-api]
+[rsm-api]
 
 "/tlds/tld1","PUT",200,"readwrite","000-input-tld-disabled.json",""
 "/tlds/tld2","PUT",200,"readwrite","000-input-tld-disabled.json",""

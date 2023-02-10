@@ -16,7 +16,7 @@
 "{$RSM.IP4.MIN.PROBE.ONLINE}","2"
 "{$RSM.IP6.MIN.PROBE.ONLINE}","2"
 
-[provisioning-api]
+[rsm-api]
 
 "/probeNodes/Probe1-Server1","PUT",200,"readwrite","000-input-probe1-rdap-rdds.json",""
 "/probeNodes/Probe2-Server1","PUT",200,"readwrite","000-input-probe2-rdap-rdds.json",""

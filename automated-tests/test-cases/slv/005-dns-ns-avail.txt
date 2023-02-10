@@ -20,7 +20,7 @@
 "{$RSM.DNS.UDP.RTT.HIGH}","5"
 "{$RSM.DNS.TCP.RTT.HIGH}","5"
 
-[provisioning-api]
+[rsm-api]
 
 "/probeNodes/Probe1-Server1","PUT",200,"readwrite","000-input-probe1.json",""
 "/probeNodes/Probe2-Server1","PUT",200,"readwrite","000-input-probe2.json",""
@@ -40,7 +40,7 @@
 
 "","sleep 3"
 
-[provisioning-api]
+[rsm-api]
 
 "/tlds/tld1","PUT",200,"readwrite","000-input-tld1-3ns.json",""
 
@@ -56,7 +56,7 @@
 "update history      set clock=floor(unix_timestamp()/300)*300 where clock=0"
 "update history_uint set clock=floor(unix_timestamp()/300)*300 where clock=0"
 
-[provisioning-api]
+[rsm-api]
 
 "/tlds/tld3","PUT",200,"readwrite","000-input-tld-disabled.json",""
 

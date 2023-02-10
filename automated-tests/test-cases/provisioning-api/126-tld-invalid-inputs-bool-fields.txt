@@ -16,7 +16,7 @@
 "{$RSM.IP6.MIN.PROBE.ONLINE}","2"
 "{$RSM.RDAP.STANDALONE}","1609459200"
 
-[provisioning-api]
+[rsm-api]
 
 "/tlds/tld1","PUT",400,"readwrite","1xx-invalid-tld-inputs/126-bool-params-dns.json"                      ,"1xx-tld-outputs/126-bool-params-dns.json"
 "/tlds/tld1","PUT",400,"readwrite","1xx-invalid-tld-inputs/126-bool-params-dns-min-ns.json"               ,"1xx-tld-outputs/126-bool-params-dns-min-ns.json"

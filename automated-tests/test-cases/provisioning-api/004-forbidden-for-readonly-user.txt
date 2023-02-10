@@ -16,7 +16,7 @@
 "{$RSM.IP6.MIN.PROBE.ONLINE}","2"
 "{$RSM.RDAP.STANDALONE}","1609459200"
 
-[provisioning-api]
+[rsm-api]
 
 "/"           ,"PUT",403,"readonly","","0xx-error-outputs/004-forbidden.json"
 "/nonexistent","PUT",403,"readonly","","0xx-error-outputs/004-forbidden.json"

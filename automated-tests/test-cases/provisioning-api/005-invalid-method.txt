@@ -16,7 +16,7 @@
 "{$RSM.IP6.MIN.PROBE.ONLINE}","2"
 "{$RSM.RDAP.STANDALONE}","1609459200"
 
-[provisioning-api]
+[rsm-api]
 
 "/"           ,"TEST",405,"readonly","","0xx-error-outputs/005-invalid-method.json"
 "/nonexistent","TEST",405,"readonly","","0xx-error-outputs/005-invalid-method.json"

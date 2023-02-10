@@ -8,7 +8,7 @@
 
 "{$RSM.MONITORING.TARGET}","registry"
 
-[provisioning-api]
+[rsm-api]
 
 "/probeNodes/probe1","PUT",200,"readwrite","2xx-inputs/200-probe1.json","2xx-outputs/200-probe1.json"
 "/probeNodes/probe2","PUT",200,"readwrite","2xx-inputs/200-probe2.json","2xx-outputs/200-probe2.json"

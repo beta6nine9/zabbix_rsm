@@ -306,30 +306,30 @@ Argument `description` must match trigger's description rather than actual event
 
 See the example in the description of the `check-incident` command.
 
-### provisioning-api
+### rsm-api
 
 *endpoint,method,expected_code,user,request,response*
 
-Sends request to Porvisioning API. For this to work, framework must be properly configured.
+Sends request to RSM API. For this to work, framework must be properly configured.
 
-Argument `endpoint` points to an endpoint of Provisioning API (e.g., `"/tlds/tld1"`).
+Argument `endpoint` points to an endpoint of RSM API (e.g., `"/tlds/tld1"`).
 
 Argument `method` describes HTTP request method, usually `GET`, `PUT` or `DELETE`.
 
 Argument `expected_code` describes expected HTTP response status code, e.g., `200` (for "OK") or `404` (for "Not Found").
 
 Argument `user` specifies user for Basic Authentication. Exact usernames and passwords are configured in framework's configuration file. Supported users are:
-* `readonly` - user with "read only" permissions;
-* `readwrite` - user with "read and write" permissions;
+* `readonly` - user with Provisioning API "read only" permissions;
+* `readwrite` - user with Provisioning API "read and write" permissions;
 * `invalid_password` - user that is registered, but with invalid password;
-* `nonexistent` - user that is not registered in Provisioning API;
+* `nonexistent` - user that is not registered in RSM API;
 * `''` (empty string) - for skipping authentication).
 
 Argument `request` specifies filename of the payload for the request. This argument is optional. It is usually used only with `PUT` requests.
 
 Argument `response` specifies filename of the expected response's payload. This argument is optional. If this argument is not specified, validation of the response's payload is skipped.
 
-Tip: when massive changes are required in expected responses, the handler of `provisioning-api` command can be modified to write the response files before doing the validation.
+Tip: when massive changes are required in expected responses, the handler of `rsm-api` command can be modified to write the response files before doing the validation.
 
 ### start-tool
 

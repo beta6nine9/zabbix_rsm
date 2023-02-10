@@ -17,7 +17,7 @@ url=
 password=zabbix
 username=Admin
 
-[provisioning-api]
+[rsm-api]
 url=
 username_readonly=provisioning-api-readonly
 password_readonly=password
