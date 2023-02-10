@@ -357,11 +357,9 @@
 "/opt/zabbix/cache"
 "/opt/zabbix/data"
 
-[extract-files]
-
-"/opt/zabbix/sla","006-sla-input.tar.gz"
-
 [execute]
+
+"","echo -n ${ts:2021-01-21 17:59:59} > /opt/zabbix/sla/last_update.txt"
 
 "2021-01-21 18:00:00","/opt/zabbix/scripts/sla-api-recent.pl --prettify-json --max-children 1 --print-period --period 5 --now 1611252000"
 "2021-01-21 18:08:00","/opt/zabbix/scripts/update-api-data.pl --prettify-json --max-children 1 --print-period --period 5 --continue"
@@ -380,4 +378,7 @@
 [compare-files]
 
 "/opt/zabbix/sla","006-sla-output.tar.gz"
-"/opt/zabbix/cache","006-cache-output.tar.gz"
+
+[compare-file]
+
+"/opt/zabbix/cache/sla-api/server_1.json","${file:006-output-cache-server_1.json}"

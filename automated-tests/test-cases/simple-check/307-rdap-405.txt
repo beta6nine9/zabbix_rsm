@@ -18,6 +18,6 @@
 "rdap-server","/tmp/rdap-server.pid"
 "resolver","/tmp/resolver.pid"
 
-[compare-files]
+[compare-file]
 
-"/tmp/simple-check-test","307-output.tar.gz"
+"/tmp/simple-check-test/status.json","${file:307-status-output.json}"
