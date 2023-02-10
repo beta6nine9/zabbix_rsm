@@ -14,6 +14,8 @@ function main(): void
 
 	try
 	{
+		User::initialize();
+		Input::initialize();
 		User::validate();
 		Input::validate();
 		checkMonitoringTarget();
@@ -52,7 +54,7 @@ function setErrorHandler()
 	);
 }
 
-function getConfig(string $section): array
+function getConfig(string ...$sectionTree): array
 {
 	static $config = null;
 
@@ -61,7 +63,12 @@ function getConfig(string $section): array
 		$config = require('config.php');
 	}
 
-	return $config[$section];
+	$result = $config;
+	foreach ($sectionTree as $section)
+	{
+		$result = $result[$section];
+	}
+	return $result;
 }
 
 function getExceptionDetails(Throwable $e)
@@ -289,6 +296,10 @@ function handleRequest(): void
 			handlePutRequest($objectType, $objectId, Input::getPayload());
 			break;
 
+		case REQUEST_METHOD_POST:
+			handlePostRequest($objectType, $objectId, Input::getPayload());
+			break;
+
 		default:
 			// this should have been handled by User::validate()
 			throw new RsmException(500, 'General error');
@@ -412,6 +423,91 @@ function handlePutRequest(string $objectType, ?string $objectId, string $payload
 	{
 		forwardRequest($serverIdActual, $objectType, $objectId, REQUEST_METHOD_PUT, $payload);
 	}
+}
+
+function handlePostRequest(string $objectType, ?string $objectId, $payload)
+{
+	if ($objectType != OBJECT_TYPE_ALERTS)
+	{
+		throw new RsmException(500, 'General error');
+	}
+	if (is_null($objectId))
+	{
+		throw new RsmException(500, 'General error');
+	}
+
+	$alerts = getConfig('alerts');
+
+	if (is_null($alerts['directory']))
+	{
+		throw new RsmException(500, 'General error');
+	}
+
+	$directory = realpath($alerts['directory']);
+	if ($directory[-1] !== '/')
+	{
+		$directory .= '/';
+	}
+
+	if (!is_dir($directory))
+	{
+		throw new RsmException(500, 'General error');
+	}
+	if (!is_writable($directory))
+	{
+		throw new RsmException(500, 'General error');
+	}
+
+	$json = json_decode($payload, true);
+	if (is_null($json))
+	{
+		throw new RsmException(400, 'JSON syntax is invalid', getJsonParsingError($payload));
+	}
+	if (jsonHasDuplicateKeys($payload))
+	{
+		throw new RsmException(400, 'JSON does not comply with definition', 'JSON contains duplicate keys');
+	}
+
+	if (count($json) !== 1)
+	{
+		throw new RsmException(400, 'JSON does not comply with definition', 'JSON must contain only "value" element');
+	}
+	if (!array_key_exists('value', $json))
+	{
+		throw new RsmException(400, 'JSON does not comply with definition', 'JSON must contain only "value" element');
+	}
+	if (!is_string($json['value']))
+	{
+		throw new RsmException(400, 'JSON does not comply with definition', 'The "value" element must be a string');
+	}
+
+	if (!in_array($objectId, $alerts['types']))
+	{
+		throw new RsmException(404, 'The object does not exist in Zabbix');
+	}
+
+	$filename = $directory . $objectId . '.log';
+
+	$value = sprintf("[%s] %s", date("Y-m-d H:i:s"), $json['value']);
+	$value = str_replace("\r", '', $value);
+	$value = str_replace("\n", '', $value);
+	$value .= "\n";
+
+	if (file_put_contents($filename, $value, FILE_APPEND | LOCK_EX) === false)
+	{
+		throw new RsmException(500, 'General error');
+	}
+
+	sendResponse(
+		200,
+		[
+			'resultCode'    => 200,
+			'title'         => 'The value accepted successfully',
+			'description'   => null,
+			'details'       => null,
+			'updatedObject' => null,
+		]
+	);
 }
 
 function forwardRequest(int $serverId, string $objectType, ?string $objectId, string $method, ?string $payload): void

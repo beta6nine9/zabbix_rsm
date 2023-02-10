@@ -5,10 +5,11 @@ require_once('RsmException.php');
 
 class Input
 {
+	private static string $endpoint;
 	private static string $objectType;
 	private static ?string $objectId;
 
-	public static function validate(): void
+	public static function initialize(): void
 	{
 		$urlBase = dirname($_SERVER['SCRIPT_NAME']);
 		$url = $_SERVER['REQUEST_URI'];
@@ -25,17 +26,25 @@ class Input
 		}
 
 		$urlComponents = parse_url(substr($url, strlen($urlBase)));
+		self::$endpoint = $urlComponents['path'];
 
-		$endPoint = explode('/', $urlComponents['path']);
+		$endPointParts = explode('/', self::$endpoint);
 
-		if (count($endPoint) > 2)
+		if (count($endPointParts) > 2)
 		{
 			throw new RsmException(404, 'Resource not found');
 		}
+		if (array_key_exists('query', $urlComponents))
+		{
+			throw new RsmException(400, 'The end-point does not support parameters');
+		}
 
-		self::$objectType = $endPoint[0];
-		self::$objectId   = $endPoint[1] ?? null;
+		self::$objectType = $endPointParts[0];
+		self::$objectId   = $endPointParts[1] ?? null;
+	}
 
+	public static function validate(): void
+	{
 		switch (self::$objectType)
 		{
 			case OBJECT_TYPE_TLDS:
@@ -63,13 +72,15 @@ class Input
 				}
 				break;
 
+			case OBJECT_TYPE_ALERTS:
+				if (is_null(self::$objectId) || !self::isValidAlertId(self::$objectId))
+				{
+					throw new RsmException(400, 'The syntax of the alert type in the URL is invalid');
+				}
+				break;
+
 			default:
 				throw new RsmException(404, 'Resource not found');
-		}
-
-		if (array_key_exists('query', $urlComponents))
-		{
-			throw new RsmException(400, 'The end-point does not support parameters');
 		}
 	}
 
@@ -112,6 +123,16 @@ class Input
 		// Must be kept in sync with checks in module's RsmValidateProbeIdentifier().
 
 		return preg_match('/^[a-zA-Z0-9_\-]+$/', $id);
+	}
+
+	private static function isValidAlertId(string $id): bool
+	{
+		return preg_match('/^.+$/', $id);
+	}
+
+	public static function getEndpoint(): string
+	{
+		return self::$endpoint;
 	}
 
 	public static function getObjectType(): string

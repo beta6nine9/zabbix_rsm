@@ -1,14 +1,16 @@
 <?php
 
 require_once('constants.php');
+require_once('Input.php');
 require_once('RsmException.php');
 
 class User
 {
-	private static ?string $username = null;
-	private static ?string $password = null;
+	private static string $user;
+	private static string $username;
+	private static string $password;
 
-	public static function validate(): void
+	public static function initialize(): void
 	{
 		if (!isset($_SERVER['PHP_AUTH_USER']) || $_SERVER['PHP_AUTH_USER'] === '')
 		{
@@ -21,42 +23,12 @@ class User
 
 		self::$username = $_SERVER['PHP_AUTH_USER'];
 		self::$password = $_SERVER['PHP_AUTH_PW'];
+	}
 
-		$config = getConfig('users');
-
-		if (!(self::$username == $config['readonly']['username'] && password_verify(self::$password, $config['readonly']['password']) === true) &&
-			!(self::$username == $config['readwrite']['username'] && password_verify(self::$password, $config['readwrite']['password']) === true))
-		{
-			throw new RsmException(401, 'Invalid username or password');
-		}
-
-		switch ($_SERVER['REQUEST_METHOD'])
-		{
-			case REQUEST_METHOD_GET:
-				if (self::$username !== $config['readwrite']['username'] && self::$username !== $config['readonly']['username'])
-				{
-					throw new RsmException(403, 'Forbidden');
-				}
-				break;
-
-			case REQUEST_METHOD_DELETE:
-				if (self::$username !== $config['readwrite']['username'])
-				{
-					throw new RsmException(403, 'Forbidden');
-				}
-				break;
-
-			case REQUEST_METHOD_PUT:
-				if (self::$username !== $config['readwrite']['username'])
-				{
-					throw new RsmException(403, 'Forbidden');
-				}
-				break;
-
-			default:
-				header('Allow: GET,DELETE,PUT');
-				throw new RsmException(405, 'Method Not Allowed');
-		}
+	public static function validate(): void
+	{
+		self::validateCredentials();
+		self::validatePermissions();
 	}
 
 	public static function getUsername(): string
@@ -67,5 +39,55 @@ class User
 	public static function getPassword(): string
 	{
 		return self::$password;
+	}
+
+	private static function validateCredentials(): void
+	{
+		$config = getConfig('users');
+
+		foreach ($config as $user => $credentials)
+		{
+			if (self::$username == $credentials['username'] && password_verify(self::$password, $credentials['password']) === true)
+			{
+				self::$user = $user;
+				break;
+			}
+		}
+
+		if (!isset(self::$user))
+		{
+			throw new RsmException(401, 'Invalid username or password');
+		}
+	}
+
+	private static function validatePermissions(): void
+	{
+		$permissions = getConfig('users', self::$user, 'permissions');
+
+		if (!self::isRequestMethodAllowed($permissions) || !self::isEndpointAllowed($permissions))
+		{
+			throw new RsmException(403, 'Forbidden');
+		}
+	}
+
+	private static function isRequestMethodAllowed(array $permissions): bool
+	{
+		return in_array($_SERVER['REQUEST_METHOD'], $permissions['request_methods'], true);
+	}
+
+	private static function isEndpointAllowed(array $permissions): bool
+	{
+		$forbidden = false;
+
+		foreach ($permissions['endpoints'] as $endpointPattern)
+		{
+			if (preg_match('#^' . $endpointPattern . '$#', Input::getEndpoint()) === 1)
+			{
+				$forbidden = false;
+				break;
+			}
+		}
+
+		return !$forbidden;
 	}
 }
