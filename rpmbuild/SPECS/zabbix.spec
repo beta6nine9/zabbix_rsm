@@ -1,5 +1,3 @@
-%define	namespace	50
-
 # we don't need the build-id files
 %define _build_id_links none
 
@@ -403,7 +401,6 @@ export CXXFLAGS
 # Build proxy with SQLite support
 #
 
-set -x
 %configure $build_flags --with-sqlite3 --enable-proxy
 make -s %{?_smp_mflags}
 
@@ -425,8 +422,10 @@ mv src/zabbix_server/zabbix_server src/zabbix_server/zabbix%{namespace}_server_m
 
 touch src/zabbix_server/zabbix%{namespace}_server
 
-# add namespace to selinux modules
 cd selinux
+
+# add namespace to selinux modules
+%if "%{namespace}" != "%{nil}"
 sed -i "s,module zabbix_proxy,module zabbix%{namespace}_proxy,"   zabbix_proxy.te
 sed -i "s,module zabbix_server,module zabbix%{namespace}_server," zabbix_server.te
 sed -i "s,module zabbix_agent,module zabbix%{namespace}_agent,"   zabbix_agent.te
@@ -434,6 +433,7 @@ sed -i "s,module zabbix_agent,module zabbix%{namespace}_agent,"   zabbix_agent.t
 mv zabbix_proxy.te zabbix%{namespace}_proxy.te
 mv zabbix_server.te zabbix%{namespace}_server.te
 mv zabbix_agent.te zabbix%{namespace}_agent.te
+%endif
 
 make SHARE="%{_datadir}" TARGETS="%{modulenames}"
 
@@ -463,7 +463,9 @@ rm $RPM_BUILD_ROOT%{_sbindir}/zabbix_server
 rm $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_server.conf
 
 # add namespace prefix to the man pages
+%if "%{namespace}" != "%{nil}"
 mv $RPM_BUILD_ROOT%{_mandir}/man8/zabbix_server.8 $RPM_BUILD_ROOT%{_mandir}/man8/zabbix%{namespace}_server.8
+%endif
 
 # remove unneeded utilities
 rm -f $RPM_BUILD_ROOT%{_bindir}/rsm_epp_dec

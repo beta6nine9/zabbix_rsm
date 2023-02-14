@@ -1,6 +1,7 @@
 #!/bin/bash
 
 RSM_VERSION="rsm2.3.2"	# MAJOR.PROD.QA
+RPM_NAMESPACE="50"
 RPMDIR="rpmbuild"
 SRV_VERSION_FILE="include/version.h"
 FE_VERSION_FILE="ui/include/defines.inc.php"
@@ -14,13 +15,14 @@ usage()
 	[ -n "$1" ] && echo "$*"
 
 	echo "usage: $0 [-f] [-c] [-r] [-h]"
-	echo "       -f|--force      force all compilation steps"
-	echo "       -c|--clean      clean all previously generated files"
-	echo "       -r|--restore    restore the versions and exit"
-	echo "       -s|--set-only   set versions and exit, do not build anything"
-	echo "       -d|--dry-run    show generated package version and exit"
-	echo "       -v|--verbose    be verbose"
-	echo "       -h|--help       print this help message"
+	echo "       -f|--force           force all compilation steps"
+	echo "       -c|--clean           clean all previously generated files"
+	echo "       -r|--restore         restore the versions and exit"
+	echo "       -s|--set-only        set versions and exit, do not build anything"
+	echo "       -d|--dry-run         show generated package version and exit"
+	echo "       -n|--no-namespace    do not use namespace \"${RPM_NAMESPACE}\" in package names"
+	echo "       -v|--verbose         be verbose"
+	echo "       -h|--help            print this help message"
 
 	exit $FAILURE
 }
@@ -58,6 +60,7 @@ OPT_CLEAN=0
 OPT_SET_ONLY=0
 OPT_DRY_RUN=0
 OPT_VERBOSE=0
+OPT_NO_NAMESPACE=0
 while [ -n "$1" ]; do
 	case "$1" in
 		-f|--force)
@@ -75,6 +78,9 @@ while [ -n "$1" ]; do
 			;;
 		-d|--dry-run)
 			OPT_DRY_RUN=1
+			;;
+		-n|--no-namespace)
+			OPT_NO_NAMESPACE=1
 			;;
 		-v|--verbose)
 			OPT_VERBOSE=1
@@ -97,12 +103,15 @@ done
 [ ! -f $FE_VERSION_FILE ] && echo "Error: frontend file \"$FE_VERSION_FILE\" not found" && fail
 [ ! -f $AC_VERSION_FILE ] && echo "Error: autoconf file \"$AC_VERSION_FILE\" not found" && fail
 
-MAKE_OPTS="-s"
-RPM_OPTS="--quiet"
+MAKE_OPTS=
+RPM_OPTS=
 
 if [[ $OPT_VERBOSE -eq 1 ]]; then
 	MAKE_OPTS=
 	RPM_OPTS="-v"
+else
+	MAKE_OPTS="-s"
+	RPM_OPTS="--quiet"
 fi
 
 remove_bak_files
@@ -115,6 +124,10 @@ if [[ $OPT_CLEAN -eq 1 ]]; then
 	for i in RPMS SRPMS BUILD BUILDROOT; do
 		rm -rf $RPMDIR/$i || fail
 	done
+fi
+
+if [[ $OPT_NO_NAMESPACE -eq 1 ]]; then
+	RPM_NAMESPACE="%{nil}"
 fi
 
 rsmversion=$(echo $RSM_VERSION | sed -r 's/^(rsm[1-9][0-9]*\.[0-9]+\.[0-9]+).*/\1/')
@@ -163,14 +176,14 @@ mv zabbix-*.tar.gz $RPMDIR/SOURCES/ || fail
 
 if [[ -x /usr/bin/yum-builddep ]]; then
 	msg "installing build dependencies"
-	/usr/bin/yum-builddep $RPM_OPTS --assumeyes --quiet $SPEC > /tmp/yum-builddep.log || (cat /tmp/yum-builddep.log && fail)
+	/usr/bin/yum-builddep $RPM_OPTS --define "namespace ${RPM_NAMESPACE}" --assumeyes $SPEC > /tmp/yum-builddep.log || (cat /tmp/yum-builddep.log && fail)
 fi
 
 msg "building RPMs, this can take a while"
 if [ -z "$rsmprereleasetag" ]; then
-	rpmbuild $RPM_OPTS -ba $SPEC --define "_topdir ${PWD}/$RPMDIR" --define "rsmversion $rsmversion" >/dev/null || fail
+	rpmbuild $RPM_OPTS -ba $SPEC --define "_topdir ${PWD}/$RPMDIR" --define "rsmversion $rsmversion" --define "namespace ${RPM_NAMESPACE}" >/dev/null || fail
 else
-	rpmbuild $RPM_OPTS -ba $SPEC --define "_topdir ${PWD}/$RPMDIR" --define "rsmversion $rsmversion" --define "rsmprereleasetag $rsmprereleasetag" >/dev/null || fail
+	rpmbuild $RPM_OPTS -ba $SPEC --define "_topdir ${PWD}/$RPMDIR" --define "rsmversion $rsmversion" --define "namespace ${RPM_NAMESPACE}" --define "rsmprereleasetag $rsmprereleasetag" >/dev/null || fail
 fi
 
 msg "RPM files are available in $RPMDIR/RPMS/x86_64 and $RPMDIR/RPMS/noarch"
