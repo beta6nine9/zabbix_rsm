@@ -392,12 +392,19 @@ void	get_host_and_port_from_str(const char *str, char delim, char *host, size_t 
 int	zbx_change_resolver(ldns_resolver *res, const char *name, const char *ip, uint16_t port, int ipv4_enabled,
 		int ipv6_enabled, FILE *log_fd, char *err, size_t err_size);
 int	zbx_get_ts_from_host(const char *host, time_t *ts);
+int	rsm_split_url(const char *url, char **scheme, char **domain, int *port, char **path, char *err, size_t err_size);
 
 int	zbx_http_test(const char *host, const char *url, long timeout, long maxredirs, zbx_http_error_t *ec_http,
 		int *rtt, void *writedata, size_t (*writefunction)(char *, size_t, size_t, void *),
 		int curl_flags, char *err, size_t err_size);
 int	map_http_code(long http_code);
-int	rsm_split_url(const char *url, char **scheme, char **domain, int *port, char **path, char *err, size_t err_size);
+
+#define CHECK_DNS_CONN_RRSIGS		0x1u
+#define	CHECK_DNS_CONN_RTT		0x2u
+#define	CHECK_DNS_CONN_RECURSIVE	0x4u
+
+int	zbx_check_dns_connection(const ldns_resolver *res, ldns_rdf *query_rdf, unsigned int flags, int reply_ms,
+		FILE *log_fd, char *err, size_t err_size);
 
 rsm_subtest_result_t	rsm_subtest_result(int rtt, int rtt_limit);
 

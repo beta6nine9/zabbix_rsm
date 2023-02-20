@@ -39,9 +39,9 @@ libzbxpoller_a_SOURCES += \
 	checks_simple_rsm_epp.c \
 	checks_simple_rsm_dns.c \
 	checks_simple_rsm_rdds.c \
-	checks_simple_rsm_rdap.c
-#	checks_simple_rsm_probe_status.c \
-#	checks_simple_rsm_resolver_status.c
+	checks_simple_rsm_rdap.c \
+	checks_simple_rsm_probe.c \
+	checks_simple_rsm_resolver.c
 
 libzbxpoller_server_a_SOURCES = \
 	checks_internal.h \
