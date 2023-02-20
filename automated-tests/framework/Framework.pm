@@ -56,6 +56,7 @@ sub initialize()
 {
 	initialize_log(!opt('nolog'), 1, \&finalize);
 	initialize_config();
+	initialize_tools();
 	info("command line: %s %s", $0, join(' ', map(index($_, ' ') == -1 ? $_ : "'$_'", @ARGV)));
 }
 
@@ -815,6 +816,11 @@ sub format_table($$)
 	$table .= $line;
 
 	return $table;
+}
+
+sub initialize_tools()
+{
+	execute(dirname(__FILE__) . "/@{[TOOLS_DIR]}/stop-tools.sh");
 }
 
 sub start_tool($$$)
