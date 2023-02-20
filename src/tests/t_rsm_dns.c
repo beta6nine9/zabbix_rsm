@@ -1,4 +1,5 @@
 #include "../zabbix_server/poller/checks_simple_rsm.c"
+#include "../zabbix_server/poller/checks_simple_rsm_dns.c"
 #include "t_rsm_decl.h"
 #include "t_rsm.h"
 
