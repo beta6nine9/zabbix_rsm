@@ -53,7 +53,7 @@ int	check_rsm_resolver_status(const char *host, const AGENT_REQUEST *request, AG
 	extras = RESOLVER_EXTRAS_DNSSEC;
 
 	/* create resolver */
-	if (SUCCEED != zbx_create_resolver(&res, "resolver", resolver_ip, resolver_port, RSM_UDP, ipv4_enabled,
+	if (SUCCEED != rsm_create_resolver(&res, "resolver", resolver_ip, resolver_port, RSM_UDP, ipv4_enabled,
 			ipv6_enabled, extras, RSM_UDP_TIMEOUT, RSM_UDP_RETRY, log_fd, err, sizeof(err)))
 	{
 		SET_MSG_RESULT(result, zbx_dsprintf(NULL, "Cannot create resolver: %s.", err));
@@ -77,7 +77,7 @@ int	check_rsm_resolver_status(const char *host, const AGENT_REQUEST *request, AG
 
 	while (tries--)
 	{
-		if (SUCCEED == zbx_check_dns_connection(res, query_rdf, CHECK_DNS_CONN_RECURSIVE, 0, log_fd,
+		if (SUCCEED == rsm_check_dns_connection(res, query_rdf, CHECK_DNS_CONN_RECURSIVE, 0, log_fd,
 				err, sizeof(err)))
 		{
 			break;
@@ -109,7 +109,7 @@ end:
 
 		/* knock-down the probe if local resolver non-functional */
 		if (0 == status)
-			zbx_dc_rsm_errors_inc();
+			rsm_dc_errors_inc();
 	}
 
 	if (NULL != query_rdf)

@@ -255,7 +255,7 @@ typedef enum
 	ZBX_RESOLVER_NXDOMAIN,
 	ZBX_RESOLVER_CATCHALL
 }
-zbx_resolver_error_t;
+rsm_resolver_error_t;
 
 typedef enum
 {
@@ -263,7 +263,7 @@ typedef enum
 	ZBX_INTERNAL_IP_UNSUP,
 	ZBX_INTERNAL_RES_CATCHALL
 }
-zbx_internal_error_t;
+rsm_internal_error_t;
 
 typedef enum
 {
@@ -274,7 +274,7 @@ typedef enum
 	ZBX_DNSKEYS_NXDOMAIN,
 	ZBX_DNSKEYS_CATCHALL
 }
-zbx_dnskeys_error_t;
+rsm_dnskeys_error_t;
 
 typedef enum
 {
@@ -282,7 +282,7 @@ typedef enum
 	ZBX_NS_ANSWER_ERROR_NOAAFLAG,
 	ZBX_NS_ANSWER_ERROR_NODOMAIN
 }
-zbx_ns_answer_error_t;
+rsm_ns_answer_error_t;
 
 typedef enum
 {
@@ -297,7 +297,7 @@ typedef enum
 	ZBX_NS_QUERY_INC_ADDITIONAL,
 	ZBX_NS_QUERY_CATCHALL
 }
-zbx_ns_query_error_t;
+rsm_ns_query_error_t;
 
 typedef enum
 {
@@ -306,7 +306,7 @@ typedef enum
 	ZBX_EC_RR_CLASS_HESIOD,
 	ZBX_EC_RR_CLASS_CATCHALL
 }
-zbx_rr_class_error_t;
+rsm_rr_class_error_t;
 
 typedef enum
 {
@@ -327,7 +327,7 @@ typedef enum
 	ZBX_EC_DNSSEC_RRSIG_MISS_RDATA,	/* ldns status: LDNS_STATUS_MISSING_RDATA_FIELDS_RRSIG */
 	ZBX_EC_DNSSEC_CATCHALL		/* ldns status: catch all */
 }
-zbx_dnssec_error_t;
+rsm_dnssec_error_t;
 
 typedef enum
 {
@@ -346,21 +346,21 @@ typedef enum
 	PRE_HTTP_STATUS_ERROR,
 	HTTP_STATUS_ERROR
 }
-zbx_http_error_type_t;
+rsm_http_error_type_t;
 
 typedef union
 {
 	pre_status_error_t	pre_status_error;
 	long			response_code;
 }
-zbx_http_error_data_t;
+rsm_http_error_data_t;
 
 typedef struct
 {
-	zbx_http_error_type_t type;
-	zbx_http_error_data_t error;
+	rsm_http_error_type_t type;
+	rsm_http_error_data_t error;
 }
-zbx_http_error_t;
+rsm_http_error_t;
 
 typedef enum
 {
@@ -377,24 +377,24 @@ int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *
 int	check_rsm_probe_status(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *result);
 int	check_rsm_resolver_status(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *result);
 
-int	zbx_validate_ip(const char *ip, int ipv4_enabled, int ipv6_enabled, ldns_rdf **ip_rdf_out, char *is_ipv4);
+int	rsm_validate_ip(const char *ip, int ipv4_enabled, int ipv6_enabled, ldns_rdf **ip_rdf_out, char *is_ipv4);
 FILE	*open_item_log(const char *host, const char *tld, const char *name, char *err, size_t err_size);
-void	zbx_get_strings_from_list(zbx_vector_str_t *strings, char *list, char delim);
-int	zbx_create_resolver(ldns_resolver **res, const char *name, const char *ip, uint16_t port, char protocol,
+void	rsm_get_strings_from_list(zbx_vector_str_t *strings, char *list, char delim);
+int	rsm_create_resolver(ldns_resolver **res, const char *name, const char *ip, uint16_t port, char protocol,
 		int ipv4_enabled, int ipv6_enabled, unsigned int extras, int timeout, unsigned char tries, FILE *log_fd,
 		char *err, size_t err_size);
 size_t	rsm_random(size_t max_values);
-int	zbx_resolver_resolve_host(ldns_resolver *res, const char *host, zbx_vector_str_t *ips, int ipv_flags,
-		FILE *log_fd, zbx_resolver_error_t *ec_res, char *err, size_t err_size);
+int	rsm_resolve_host(ldns_resolver *res, const char *host, zbx_vector_str_t *ips, int ipv_flags,
+		FILE *log_fd, rsm_resolver_error_t *ec_res, char *err, size_t err_size);
 void	rsm_vector_str_clean_and_destroy(zbx_vector_str_t *v);
 void	get_host_and_port_from_str(const char *str, char delim, char *host, size_t host_size, unsigned short *port,
 		unsigned short default_port);
-int	zbx_change_resolver(ldns_resolver *res, const char *name, const char *ip, uint16_t port, int ipv4_enabled,
+int	rsm_change_resolver(ldns_resolver *res, const char *name, const char *ip, uint16_t port, int ipv4_enabled,
 		int ipv6_enabled, FILE *log_fd, char *err, size_t err_size);
-int	zbx_get_ts_from_host(const char *host, time_t *ts);
+int	rsm_get_ts_from_host(const char *host, time_t *ts);
 int	rsm_split_url(const char *url, char **scheme, char **domain, int *port, char **path, char *err, size_t err_size);
 
-int	zbx_http_test(const char *host, const char *url, long timeout, long maxredirs, zbx_http_error_t *ec_http,
+int	rsm_http_test(const char *host, const char *url, long timeout, long maxredirs, rsm_http_error_t *ec_http,
 		int *rtt, void *writedata, size_t (*writefunction)(char *, size_t, size_t, void *),
 		int curl_flags, char *err, size_t err_size);
 int	map_http_code(long http_code);
@@ -403,7 +403,7 @@ int	map_http_code(long http_code);
 #define	CHECK_DNS_CONN_RTT		0x2u
 #define	CHECK_DNS_CONN_RECURSIVE	0x4u
 
-int	zbx_check_dns_connection(const ldns_resolver *res, ldns_rdf *query_rdf, unsigned int flags, int reply_ms,
+int	rsm_check_dns_connection(const ldns_resolver *res, ldns_rdf *query_rdf, unsigned int flags, int reply_ms,
 		FILE *log_fd, char *err, size_t err_size);
 
 rsm_subtest_result_t	rsm_subtest_result(int rtt, int rtt_limit);
@@ -450,23 +450,23 @@ extern const char	*CONFIG_LOG_FILE;
 
 #define RESPONSE_PREVIEW_SIZE	100
 
-typedef int	(*zbx_ns_query_error_func_t)(zbx_ns_query_error_t);
-typedef int	(*zbx_ns_answer_error_func_t)(zbx_ns_answer_error_t);
-typedef int	(*zbx_dnskeys_error_func_t)(zbx_dnskeys_error_t);
-typedef int	(*zbx_dnssec_error_func_t)(zbx_dnssec_error_t);
-typedef int	(*zbx_rr_class_error_func_t)(zbx_rr_class_error_t);
-typedef int	(*zbx_rcode_not_nxdomain_func_t)(ldns_pkt_rcode);
+typedef int	(*rsm_ns_query_error_func_t)(rsm_ns_query_error_t);
+typedef int	(*rsm_ns_answer_error_func_t)(rsm_ns_answer_error_t);
+typedef int	(*rsm_dnskeys_error_func_t)(rsm_dnskeys_error_t);
+typedef int	(*rsm_dnssec_error_func_t)(rsm_dnssec_error_t);
+typedef int	(*rsm_rr_class_error_func_t)(rsm_rr_class_error_t);
+typedef int	(*rsm_rcode_not_nxdomain_func_t)(ldns_pkt_rcode);
 
 typedef struct
 {
-	zbx_dnskeys_error_func_t	dnskeys_error;
-	zbx_ns_answer_error_func_t	ns_answer_error;
-	zbx_dnssec_error_func_t		dnssec_error;
-	zbx_rr_class_error_func_t	rr_class_error;
-	zbx_ns_query_error_func_t	ns_query_error;
-	zbx_rcode_not_nxdomain_func_t	rcode_not_nxdomain;
+	rsm_dnskeys_error_func_t	dnskeys_error;
+	rsm_ns_answer_error_func_t	ns_answer_error;
+	rsm_dnssec_error_func_t		dnssec_error;
+	rsm_rr_class_error_func_t	rr_class_error;
+	rsm_ns_query_error_func_t	ns_query_error;
+	rsm_rcode_not_nxdomain_func_t	rcode_not_nxdomain;
 }
-zbx_error_functions_t;
+rsm_error_functions_t;
 
 #define GET_PARAM(output_var, param_num)										\
 															\
@@ -510,7 +510,7 @@ while (0)
 /* map generic local resolver errors to interface specific ones */
 
 #define ZBX_DEFINE_RESOLVER_ERROR_TO(__interface)					\
-static int	zbx_resolver_error_to_ ## __interface (zbx_resolver_error_t err)	\
+static int	rsm_resolver_error_to_ ## __interface (rsm_resolver_error_t err)	\
 {											\
 	switch (err)									\
 	{										\
@@ -533,7 +533,7 @@ static int	zbx_resolver_error_to_ ## __interface (zbx_resolver_error_t err)	\
 /* maps generic HTTP errors to RDDS interface specific ones */
 
 #define ZBX_DEFINE_HTTP_PRE_STATUS_ERROR_TO(__interface)					\
-static int	zbx_pre_status_error_to_ ## __interface (pre_status_error_t ec_pre_status)	\
+static int	rsm_pre_status_error_to_ ## __interface (pre_status_error_t ec_pre_status)	\
 {												\
 	switch (ec_pre_status)									\
 	{											\
@@ -557,12 +557,12 @@ static int	zbx_pre_status_error_to_ ## __interface (pre_status_error_t ec_pre_st
 }
 
 #define ZBX_DEFINE_HTTP_ERROR_TO(__interface)										\
-static int	zbx_http_error_to_ ## __interface (zbx_http_error_t ec_http)						\
+static int	rsm_http_error_to_ ## __interface (rsm_http_error_t ec_http)						\
 {															\
 	switch (ec_http.type)												\
 	{														\
 		case PRE_HTTP_STATUS_ERROR:										\
-			return zbx_pre_status_error_to_ ## __interface (ec_http.error.pre_status_error);		\
+			return rsm_pre_status_error_to_ ## __interface (ec_http.error.pre_status_error);		\
 		case HTTP_STATUS_ERROR:											\
 			return ZBX_EC_ ## __interface ## _HTTP_BASE - map_http_code(ec_http.error.response_code);	\
 	}														\

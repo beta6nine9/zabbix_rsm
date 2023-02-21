@@ -32,9 +32,9 @@ typedef struct
 	int		flag;
 	ldns_rr_type	rr_type;
 }
-zbx_ipv_t;
+rsm_ipv_t;
 
-static const zbx_ipv_t	ipvs[] =
+static const rsm_ipv_t	ipvs[] =
 {
 	{"IPv4",	ZBX_FLAG_IPV4_ENABLED,	LDNS_RR_TYPE_A},
 	{"IPv6",	ZBX_FLAG_IPV6_ENABLED,	LDNS_RR_TYPE_AAAA},
@@ -131,7 +131,7 @@ void	end_test(FILE *log_fd)
 	rsm_info(log_fd, ">>> END TEST <<<");
 }
 
-int	zbx_validate_ip(const char *ip, int ipv4_enabled, int ipv6_enabled, ldns_rdf **ip_rdf_out, char *is_ipv4)
+int	rsm_validate_ip(const char *ip, int ipv4_enabled, int ipv6_enabled, ldns_rdf **ip_rdf_out, char *is_ipv4)
 {
 	ldns_rdf	*ip_rdf;
 
@@ -184,9 +184,9 @@ rsm_subtest_result_t	rsm_subtest_result(int rtt, int rtt_limit)
 	if (ZBX_NO_VALUE == rtt)
 		return RSM_SUBTEST_SUCCESS;
 
-	/* probe knock-down on -1 */
+	/* knock-down the probe if we are hitting internal errors */
 	if (ZBX_EC_DNS_UDP_INTERNAL_GENERAL == rtt)
-		zbx_dc_rsm_errors_inc();
+		rsm_dc_errors_inc();
 
 	if (rtt <= ZBX_EC_DNS_UDP_INTERNAL_GENERAL && ZBX_EC_INTERNAL_LAST <= rtt)
 		return RSM_SUBTEST_SUCCESS;
@@ -194,24 +194,13 @@ rsm_subtest_result_t	rsm_subtest_result(int rtt, int rtt_limit)
 	return (0 > rtt || rtt > rtt_limit ? RSM_SUBTEST_FAIL : RSM_SUBTEST_SUCCESS);
 }
 
-static unsigned char	ip_support(int ipv4_enabled, int ipv6_enabled)
-{
-	if (0 == ipv4_enabled)
-		return 2;	/* IPv6 only, assuming ipv6_enabled and ipv4_enabled cannot be both 0 */
-
-	if (0 == ipv6_enabled)
-		return 1;	/* IPv4 only */
-
-	return 0;	/* no preference */
-}
-
-static int	zbx_set_resolver_ns(ldns_resolver *res, const char *name, const char *ip, uint16_t port,
+static int	rsm_set_resolver(ldns_resolver *res, const char *name, const char *ip, uint16_t port,
 		int ipv4_enabled, int ipv6_enabled, FILE *log_fd, char *err, size_t err_size)
 {
 	ldns_rdf	*ip_rdf;
 	ldns_status	status;
 
-	if (SUCCEED != zbx_validate_ip(ip, ipv4_enabled, ipv6_enabled, &ip_rdf, NULL))
+	if (SUCCEED != rsm_validate_ip(ip, ipv4_enabled, ipv6_enabled, &ip_rdf, NULL))
 	{
 		zbx_snprintf(err, err_size, "invalid or unsupported IP of \"%s\": \"%s\"", name, ip);
 		return FAIL;
@@ -230,10 +219,11 @@ static int	zbx_set_resolver_ns(ldns_resolver *res, const char *name, const char 
 	}
 
 	rsm_infof(log_fd, "using %s (%s, port:%hu)", name, ip, port);
+
 	return SUCCEED;
 }
 
-int	zbx_change_resolver(ldns_resolver *res, const char *name, const char *ip, uint16_t port, int ipv4_enabled,
+int	rsm_change_resolver(ldns_resolver *res, const char *name, const char *ip, uint16_t port, int ipv4_enabled,
 		int ipv6_enabled, FILE *log_fd, char *err, size_t err_size)
 {
 	ldns_rdf	*pop;
@@ -242,17 +232,28 @@ int	zbx_change_resolver(ldns_resolver *res, const char *name, const char *ip, ui
 	while (NULL != (pop = ldns_resolver_pop_nameserver(res)))
 		ldns_rdf_deep_free(pop);
 
-	return zbx_set_resolver_ns(res, name, ip, port, ipv4_enabled, ipv6_enabled, log_fd, err, err_size);
+	return rsm_set_resolver(res, name, ip, port, ipv4_enabled, ipv6_enabled, log_fd, err, err_size);
 }
 
-int	zbx_create_resolver(ldns_resolver **res, const char *name, const char *ip, uint16_t port, char protocol,
+static unsigned char	ip_support(int ipv4_enabled, int ipv6_enabled)
+{
+	if (0 == ipv4_enabled)
+		return 2;	/* IPv6 only, assuming ipv6_enabled and ipv4_enabled cannot be both 0 */
+
+	if (0 == ipv6_enabled)
+		return 1;	/* IPv4 only */
+
+	return 0;	/* no preference */
+}
+
+int	rsm_create_resolver(ldns_resolver **res, const char *name, const char *ip, uint16_t port, char protocol,
 		int ipv4_enabled, int ipv6_enabled, unsigned int extras, int timeout, unsigned char tries, FILE *log_fd,
 		char *err, size_t err_size)
 {
 	struct timeval	tv = {.tv_usec = 0, .tv_sec = timeout};
 
 	if (NULL != *res)
-		return zbx_change_resolver(*res, name, ip, port, ipv4_enabled, ipv6_enabled, log_fd, err, err_size);
+		return rsm_change_resolver(*res, name, ip, port, ipv4_enabled, ipv6_enabled, log_fd, err, err_size);
 
 	/* create a new resolver */
 	if (NULL == (*res = ldns_resolver_new()))
@@ -262,7 +263,7 @@ int	zbx_create_resolver(ldns_resolver **res, const char *name, const char *ip, u
 	}
 
 	/* push nameserver to it */
-	if (SUCCEED != zbx_set_resolver_ns(*res, name, ip, port, ipv4_enabled, ipv6_enabled, log_fd, err, err_size))
+	if (SUCCEED != rsm_set_resolver(*res, name, ip, port, ipv4_enabled, ipv6_enabled, log_fd, err, err_size))
 		return FAIL;
 
 	/* set timeout of one try */
@@ -291,7 +292,7 @@ int	zbx_create_resolver(ldns_resolver **res, const char *name, const char *ip, u
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_get_ts_from_host                                             *
+ * Function: rsm_get_ts_from_host                                             *
  *                                                                            *
  * Purpose: Extract the Unix timestamp from the host name. Expected format of *
  *          the host: ns<optional digits><DOT or DASH><Unix timestamp>.       *
@@ -303,7 +304,7 @@ int	zbx_create_resolver(ldns_resolver **res, const char *name, const char *ip, u
  * Author: Vladimir Levijev                                                   *
  *                                                                            *
  ******************************************************************************/
-int	zbx_get_ts_from_host(const char *host, time_t *ts)
+int	rsm_get_ts_from_host(const char *host, time_t *ts)
 {
 	const char	*p, *p2;
 
@@ -351,7 +352,7 @@ size_t	rsm_random(size_t max_values)
 
 /******************************************************************************
  *                                                                            *
- * Function: zbx_resolver_resolve_host                                        *
+ * Function: rsm_resolve_host                                                 *
  *                                                                            *
  * Purpose: resolve specified host to IPs                                     *
  *                                                                            *
@@ -372,10 +373,10 @@ size_t	rsm_random(size_t max_values)
  *               FAIL - otherwise                                             *
  *                                                                            *
  ******************************************************************************/
-int	zbx_resolver_resolve_host(ldns_resolver *res, const char *host, zbx_vector_str_t *ips, int ipv_flags,
-		FILE *log_fd, zbx_resolver_error_t *ec_res, char *err, size_t err_size)
+int	rsm_resolve_host(ldns_resolver *res, const char *host, zbx_vector_str_t *ips, int ipv_flags,
+		FILE *log_fd, rsm_resolver_error_t *ec_res, char *err, size_t err_size)
 {
-	const zbx_ipv_t	*ipv;
+	const rsm_ipv_t	*ipv;
 	ldns_rdf	*rdf;
 	int		ret = FAIL;
 
@@ -458,7 +459,7 @@ out:
 	return ret;
 }
 
-void	zbx_get_strings_from_list(zbx_vector_str_t *strings, char *list, char delim)
+void	rsm_get_strings_from_list(zbx_vector_str_t *strings, char *list, char delim)
 {
 	char	*p, *p_end;
 
@@ -635,7 +636,7 @@ int	map_http_code(long http_code)
 /* max redirect settings, stores web page contents using provided callback, checks for OK response and calculates */
 /* round-trip time. When function succeeds it returns RTT in milliseconds. When function fails it returns source  */
 /* of error in provided RTT parameter. Does not verify certificates.                                              */
-int	zbx_http_test(const char *host, const char *url, long timeout, long maxredirs, zbx_http_error_t *ec_http,
+int	rsm_http_test(const char *host, const char *url, long timeout, long maxredirs, rsm_http_error_t *ec_http,
 		int *rtt, void *writedata, size_t (*writefunction)(char *, size_t, size_t, void *),
 		int curl_flags, char *err, size_t err_size)
 {
@@ -842,7 +843,7 @@ int	rsm_split_url(const char *url, char **scheme, char **domain, int *port, char
 	return SUCCEED;
 }
 
-int	zbx_check_dns_connection(const ldns_resolver *res, ldns_rdf *query_rdf, unsigned int flags, int reply_ms,
+int	rsm_check_dns_connection(const ldns_resolver *res, ldns_rdf *query_rdf, unsigned int flags, int reply_ms,
 		FILE *log_fd, char *err, size_t err_size)
 {
 	ldns_pkt	*pkt = NULL;

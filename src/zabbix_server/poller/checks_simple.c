@@ -222,7 +222,7 @@ int	get_value_simple(const DC_ITEM *item, AGENT_RESULT *result, zbx_vector_ptr_t
 	}
 	else if (0 == strcmp(request.key, "rsm.errors"))
 	{
-		SET_UI64_RESULT(result, zbx_dc_rsm_errors_get());
+		SET_UI64_RESULT(result, rsm_dc_errors_get());
 		ret = SUCCEED;
 	}
 	else if (0 == strcmp(request.key, "resolver.status"))

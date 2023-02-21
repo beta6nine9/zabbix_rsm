@@ -252,7 +252,7 @@ out:
 	return ret;
 }
 
-static void	zbx_tmpl_replace(char **tmpl, const char *variable, const char *value)
+static void	rsm_tmpl_replace(char **tmpl, const char *variable, const char *value)
 {
 	const char	*p;
 	size_t		variable_size, l_pos, r_pos;
@@ -283,8 +283,8 @@ static int	command_login(const char *epp_commands, const char *name, SSL *ssl, i
 		goto out;
 	}
 
-	zbx_tmpl_replace(&tmpl, "{TMPL_EPP_USER}", epp_user);
-	zbx_tmpl_replace(&tmpl, "{TMPL_EPP_PASSWD}", epp_passwd);
+	rsm_tmpl_replace(&tmpl, "{TMPL_EPP_USER}", epp_user);
+	rsm_tmpl_replace(&tmpl, "{TMPL_EPP_PASSWD}", epp_passwd);
 
 	zbx_timespec(&start);
 
@@ -349,8 +349,8 @@ static int	command_update(const char *epp_commands, const char *name, SSL *ssl, 
 
 	zbx_snprintf(buf, sizeof(buf), "%s.%s", epp_testprefix, domain);
 
-	zbx_tmpl_replace(&tmpl, "{TMPL_DOMAIN}", buf);
-	zbx_tmpl_replace(&tmpl, "{TMPL_TIMESTAMP}", tsbuf);
+	rsm_tmpl_replace(&tmpl, "{TMPL_DOMAIN}", buf);
+	rsm_tmpl_replace(&tmpl, "{TMPL_TIMESTAMP}", tsbuf);
 
 	zbx_timespec(&start);
 
@@ -411,7 +411,7 @@ static int	command_info(const char *epp_commands, const char *name, SSL *ssl, in
 
 	zbx_snprintf(buf, sizeof(buf), "%s.%s", epp_testprefix, domain);
 
-	zbx_tmpl_replace(&tmpl, "{TMPL_DOMAIN}", buf);
+	rsm_tmpl_replace(&tmpl, "{TMPL_DOMAIN}", buf);
 
 	zbx_timespec(&start);
 
@@ -500,7 +500,7 @@ out:
 	return ret;
 }
 
-static int	zbx_ssl_attach_cert(SSL *ssl, char *cert, size_t cert_len, int *rtt, char *err, size_t err_size)
+static int	rsm_ssl_attach_cert(SSL *ssl, char *cert, size_t cert_len, int *rtt, char *err, size_t err_size)
 {
 	BIO	*bio = NULL;
 	X509	*x509 = NULL;
@@ -516,14 +516,14 @@ static int	zbx_ssl_attach_cert(SSL *ssl, char *cert, size_t cert_len, int *rtt, 
 	if (NULL == (x509 = PEM_read_bio_X509(bio, NULL, NULL, NULL)))
 	{
 		*rtt = ZBX_EC_EPP_CRYPT;
-		/*zbx_ssl_get_error(err, err_size);*/
+		/*rsm_ssl_get_error(err, err_size);*/
 		goto out;
 	}
 
 	if (1 != SSL_use_certificate(ssl, x509))
 	{
 		*rtt = ZBX_EC_EPP_CRYPT;
-		/*zbx_ssl_get_error(err, err_size);*/
+		/*rsm_ssl_get_error(err, err_size);*/
 		goto out;
 	}
 
@@ -538,7 +538,7 @@ out:
 	return ret;
 }
 
-static int	zbx_ssl_attach_privkey(SSL *ssl, char *privkey, size_t privkey_len, int *rtt, char *err, size_t err_size)
+static int	rsm_ssl_attach_privkey(SSL *ssl, char *privkey, size_t privkey_len, int *rtt, char *err, size_t err_size)
 {
 	BIO	*bio = NULL;
 	RSA	*rsa = NULL;
@@ -554,14 +554,14 @@ static int	zbx_ssl_attach_privkey(SSL *ssl, char *privkey, size_t privkey_len, i
 	if (NULL == (rsa = PEM_read_bio_RSAPrivateKey(bio, NULL, NULL, NULL)))
 	{
 		*rtt = ZBX_EC_EPP_CRYPT;
-		/*zbx_ssl_get_error(err, err_size);*/
+		/*rsm_ssl_get_error(err, err_size);*/
 		goto out;
 	}
 
 	if (1 != SSL_use_RSAPrivateKey(ssl, rsa))
 	{
 		*rtt = ZBX_EC_EPP_CRYPT;
-		/*zbx_ssl_get_error(err, err_size);*/
+		/*rsm_ssl_get_error(err, err_size);*/
 		goto out;
 	}
 
@@ -576,7 +576,7 @@ out:
 	return ret;
 }
 
-static char	*zbx_parse_time(char *str, size_t str_size, int *i)
+static char	*rsm_parse_time(char *str, size_t str_size, int *i)
 {
 	char	*p_end;
 	char	c;
@@ -604,7 +604,7 @@ static char	*zbx_parse_time(char *str, size_t str_size, int *i)
 	return p_end;
 }
 
-static int	zbx_parse_asn1time(ASN1_TIME *asn1time, time_t *time, char *err, size_t err_size)
+static int	rsm_parse_asn1time(ASN1_TIME *asn1time, time_t *time, char *err, size_t err_size)
 {
 	struct tm	tm;
 	char		buf[15], *p;
@@ -640,42 +640,42 @@ static int	zbx_parse_asn1time(ASN1_TIME *asn1time, time_t *time, char *err, size
 	memset(&tm, 0, sizeof(tm));
 
 	/* year */
-	if (NULL == (p = zbx_parse_time(buf, 4, &tm.tm_year)) || '\0' == *p)
+	if (NULL == (p = rsm_parse_time(buf, 4, &tm.tm_year)) || '\0' == *p)
 	{
 		zbx_strlcpy(err, "invalid year", err_size);
 		goto out;
 	}
 
 	/* month */
-	if (NULL == (p = zbx_parse_time(p, 2, &tm.tm_mon)) || '\0' == *p)
+	if (NULL == (p = rsm_parse_time(p, 2, &tm.tm_mon)) || '\0' == *p)
 	{
 		zbx_strlcpy(err, "invalid month", err_size);
 		goto out;
 	}
 
 	/* day of month */
-	if (NULL == (p = zbx_parse_time(p, 2, &tm.tm_mday)) || '\0' == *p)
+	if (NULL == (p = rsm_parse_time(p, 2, &tm.tm_mday)) || '\0' == *p)
 	{
 		zbx_strlcpy(err, "invalid day of month", err_size);
 		goto out;
 	}
 
 	/* hours */
-	if (NULL == (p = zbx_parse_time(p, 2, &tm.tm_hour)) || '\0' == *p)
+	if (NULL == (p = rsm_parse_time(p, 2, &tm.tm_hour)) || '\0' == *p)
 	{
 		zbx_strlcpy(err, "invalid hours", err_size);
 		goto out;
 	}
 
 	/* minutes */
-	if (NULL == (p = zbx_parse_time(p, 2, &tm.tm_min)) || '\0' == *p)
+	if (NULL == (p = rsm_parse_time(p, 2, &tm.tm_min)) || '\0' == *p)
 	{
 		zbx_strlcpy(err, "invalid minutes", err_size);
 		goto out;
 	}
 
 	/* seconds */
-	if (NULL == (p = zbx_parse_time(p, 2, &tm.tm_sec)) || '\0' != *p)
+	if (NULL == (p = rsm_parse_time(p, 2, &tm.tm_sec)) || '\0' != *p)
 	{
 		zbx_strlcpy(err, "invalid seconds", err_size);
 		goto out;
@@ -691,7 +691,7 @@ out:
 	return ret;
 }
 
-static int	zbx_get_cert_md5(X509 *cert, char **md5, char *err, size_t err_size)
+static int	rsm_get_cert_md5(X509 *cert, char **md5, char *err, size_t err_size)
 {
 	char		*data;
 	BIO		*bio;
@@ -733,20 +733,20 @@ out:
 	return ret;
 }
 
-static int	zbx_validate_cert(X509 *cert, const char *md5_macro, int *rtt, char *err, size_t err_size)
+static int	rsm_validate_cert(X509 *cert, const char *md5_macro, int *rtt, char *err, size_t err_size)
 {
 	time_t	now, not_before, not_after;
 	char	*md5 = NULL;
 	int	ret = FAIL;
 
 	/* get certificate validity dates */
-	if (SUCCEED != zbx_parse_asn1time(X509_get_notBefore(cert), &not_before, err, err_size))
+	if (SUCCEED != rsm_parse_asn1time(X509_get_notBefore(cert), &not_before, err, err_size))
 	{
 		*rtt = ZBX_EC_EPP_SERVERCERT;
 		goto out;
 	}
 
-	if (SUCCEED != zbx_parse_asn1time(X509_get_notAfter(cert), &not_after, err, err_size))
+	if (SUCCEED != rsm_parse_asn1time(X509_get_notAfter(cert), &not_after, err, err_size))
 	{
 		*rtt = ZBX_EC_EPP_SERVERCERT;
 		goto out;
@@ -767,7 +767,7 @@ static int	zbx_validate_cert(X509 *cert, const char *md5_macro, int *rtt, char *
 		goto out;
 	}
 
-	if (SUCCEED != zbx_get_cert_md5(cert, &md5, err, err_size))
+	if (SUCCEED != rsm_get_cert_md5(cert, &md5, err, err_size))
 	{
 		*rtt = ZBX_EC_EPP_INTERNAL_GENERAL;
 		goto out;
@@ -794,14 +794,14 @@ static void	str_base64_decode_dyn(const char *in, size_t in_size, char **out, si
 	str_base64_decode(in, *out, (int)in_size, (int *)out_size);
 }
 
-static void	zbx_delete_unsupported_ips(zbx_vector_str_t *ips, int ipv4_enabled, int ipv6_enabled)
+static void	rsm_delete_unsupported_ips(zbx_vector_str_t *ips, int ipv4_enabled, int ipv6_enabled)
 {
 	int	i;
 	char	is_ipv4;
 
 	for (i = 0; i < ips->values_num; i++)
 	{
-		if (SUCCEED != zbx_validate_ip(ips->values[i], ipv4_enabled, ipv6_enabled, NULL, &is_ipv4))
+		if (SUCCEED != rsm_validate_ip(ips->values[i], ipv4_enabled, ipv6_enabled, NULL, &is_ipv4))
 		{
 			zbx_free(ips->values[i]);
 			zbx_vector_str_remove(ips, i--);
@@ -820,7 +820,7 @@ static void	zbx_delete_unsupported_ips(zbx_vector_str_t *ips, int ipv4_enabled, 
 int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *result)
 {
 	ldns_resolver		*res = NULL;
-	zbx_resolver_error_t	ec_res;
+	rsm_resolver_error_t	ec_res;
 	char			*domain, err[ZBX_ERR_BUF_SIZE], *value_str = NULL, *res_ip = NULL,
 				*secretkey_enc_b64 = NULL, *secretkey_salt_b64 = NULL, *epp_passwd_enc_b64 = NULL,
 				*epp_passwd_salt_b64 = NULL, *epp_privkey_enc_b64 = NULL, *epp_privkey_salt_b64 = NULL,
@@ -884,7 +884,7 @@ int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *
 		goto out;
 	}
 
-	zbx_get_strings_from_list(&epp_hosts, value_str, ',');
+	rsm_get_strings_from_list(&epp_hosts, value_str, ',');
 
 	if (0 == epp_hosts.values_num)
 	{
@@ -901,7 +901,7 @@ int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *
 	extras = RESOLVER_EXTRAS_DNSSEC;
 
 	/* create resolver */
-	if (SUCCEED != zbx_create_resolver(&res, "resolver", res_ip, resolver_port, RSM_TCP, ipv4_enabled, ipv6_enabled,
+	if (SUCCEED != rsm_create_resolver(&res, "resolver", res_ip, resolver_port, RSM_TCP, ipv4_enabled, ipv6_enabled,
 			extras, RSM_TCP_TIMEOUT, RSM_TCP_RETRY, log_fd, err, sizeof(err)))
 	{
 		SET_MSG_RESULT(result, zbx_dsprintf(NULL, "cannot create resolver: %s", err));
@@ -944,7 +944,7 @@ int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *
 	random_host = epp_hosts.values[rsm_random((size_t)epp_hosts.values_num)];
 
 	/* resolve host to ips: TODO! error handler functions not implemented (see NULLs below) */
-	if (SUCCEED != zbx_resolver_resolve_host(res, random_host, &epp_ips,
+	if (SUCCEED != rsm_resolve_host(res, random_host, &epp_ips,
 			(0 != ipv4_enabled ? ZBX_FLAG_IPV4_ENABLED : 0) | (0 != ipv6_enabled ? ZBX_FLAG_IPV6_ENABLED : 0),
 			log_fd, &ec_res, err, sizeof(err)))
 	{
@@ -953,7 +953,7 @@ int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *
 		goto out;
 	}
 
-	zbx_delete_unsupported_ips(&epp_ips, ipv4_enabled, ipv6_enabled);
+	rsm_delete_unsupported_ips(&epp_ips, ipv4_enabled, ipv6_enabled);
 
 	if (0 == epp_ips.values_num)
 	{
@@ -991,7 +991,7 @@ int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *
 
 	str_base64_decode_dyn(epp_cert_b64, strlen(epp_cert_b64), &epp_cert, &epp_cert_size);
 
-	if (SUCCEED != zbx_ssl_attach_cert(ssl, epp_cert, epp_cert_size, &rtt, err, sizeof(err)))
+	if (SUCCEED != rsm_ssl_attach_cert(ssl, epp_cert, epp_cert_size, &rtt, err, sizeof(err)))
 	{
 		rtt1 = rtt2 = rtt3 = rtt;
 		rsm_errf(log_fd, "cannot attach client certificate to SSL session: %s", err);
@@ -1008,7 +1008,7 @@ int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *
 		goto out;
 	}
 
-	rv = zbx_ssl_attach_privkey(ssl, epp_privkey, strlen(epp_privkey), &rtt, err, sizeof(err));
+	rv = rsm_ssl_attach_privkey(ssl, epp_privkey, strlen(epp_privkey), &rtt, err, sizeof(err));
 
 	memset(epp_privkey, 0, strlen(epp_privkey));
 	zbx_free(epp_privkey);
@@ -1024,7 +1024,7 @@ int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *
 	if (1 != SSL_connect(ssl))
 	{
 		rtt1 = rtt2 = rtt3 = ZBX_EC_EPP_INTERNAL_GENERAL;
-		/*zbx_ssl_get_error(err, sizeof(err));*/
+		/*rsm_ssl_get_error(err, sizeof(err));*/
 		rsm_errf(log_fd, "cannot build an SSL connection to %s:%d: %s", ip, epp_port, err);
 		goto out;
 	}
@@ -1037,7 +1037,7 @@ int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *
 		goto out;
 	}
 
-	if (SUCCEED != zbx_validate_cert(epp_server_x509, epp_servercertmd5, &rtt, err, sizeof(err)))
+	if (SUCCEED != rsm_validate_cert(epp_server_x509, epp_servercertmd5, &rtt, err, sizeof(err)))
 	{
 		rtt1 = rtt2 = rtt3 = rtt;
 		rsm_errf(log_fd, "Server certificate validation failed: %s", err);

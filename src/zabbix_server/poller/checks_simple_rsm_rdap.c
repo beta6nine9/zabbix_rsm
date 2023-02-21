@@ -69,7 +69,7 @@ static void	create_rdap_json(struct zbx_json *json, const char *ip, int rtt, con
 int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *result, FILE *output_fd)
 {
 	ldns_resolver		*res = NULL;
-	zbx_resolver_error_t	ec_res;
+	rsm_resolver_error_t	ec_res;
 	curl_data_t		data = {NULL, 0, 0};
 	zbx_vector_str_t	ips;
 	struct zbx_json_parse	jp;
@@ -80,7 +80,7 @@ int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 				resolver_ip[ZBX_HOST_BUF_SIZE];
 	const char		*ip = NULL;
 	size_t			value_alloc = 0;
-	zbx_http_error_t	ec_http;
+	rsm_http_error_t	ec_http;
 	uint16_t		resolver_port;
 	int			maxredirs, rtt_limit, tld_enabled, probe_enabled, ipv4_enabled, ipv6_enabled,
 				ipv_flags = 0, curl_flags = 0, port, rtt = ZBX_NO_VALUE, ret = SYSINFO_RET_FAIL;
@@ -143,7 +143,7 @@ int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 				DEFAULT_RESOLVER_PORT);
 
 		/* create resolver */
-		if (SUCCEED != zbx_create_resolver(&res, "resolver", resolver_ip, resolver_port, RSM_TCP, ipv4_enabled,
+		if (SUCCEED != rsm_create_resolver(&res, "resolver", resolver_ip, resolver_port, RSM_TCP, ipv4_enabled,
 				ipv6_enabled, RESOLVER_EXTRAS_DNSSEC, RSM_TCP_TIMEOUT, RSM_TCP_RETRY, log_fd,
 				err, sizeof(err)))
 		{
@@ -180,9 +180,9 @@ int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 		ipv_flags |= ZBX_FLAG_IPV6_ENABLED;
 
 	/* resolve domain to IPs */
-	if (SUCCEED != zbx_resolver_resolve_host(res, domain, &ips, ipv_flags, log_fd, &ec_res, err, sizeof(err)))
+	if (SUCCEED != rsm_resolve_host(res, domain, &ips, ipv_flags, log_fd, &ec_res, err, sizeof(err)))
 	{
-		rtt = zbx_resolver_error_to_RDAP(ec_res);
+		rtt = rsm_resolver_error_to_RDAP(ec_res);
 		rsm_errf(log_fd, "trying to resolve \"%s\": %s", domain, err);
 		goto end;
 	}
@@ -197,7 +197,7 @@ int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 	/* choose random IP */
 	ip = ips.values[rsm_random((size_t)ips.values_num)];
 
-	if (SUCCEED != zbx_validate_ip(ip, ipv4_enabled, ipv6_enabled, NULL, &is_ipv4))
+	if (SUCCEED != rsm_validate_ip(ip, ipv4_enabled, ipv6_enabled, NULL, &is_ipv4))
 	{
 		rtt = ZBX_EC_RDAP_INTERNAL_GENERAL;
 		rsm_errf(log_fd, "internal error, selected unsupported IP of \"%s\": \"%s\"", domain, ip);
@@ -216,10 +216,10 @@ int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 
 	rsm_infof(log_fd, "domain \"%s\" was resolved to %s, using URL \"%s\".", domain, ip, formed_url);
 
-	if (SUCCEED != zbx_http_test(domain, formed_url, RSM_TCP_TIMEOUT, maxredirs, &ec_http, &rtt, &data,
+	if (SUCCEED != rsm_http_test(domain, formed_url, RSM_TCP_TIMEOUT, maxredirs, &ec_http, &rtt, &data,
 			curl_memory, curl_flags, err, sizeof(err)))
 	{
-		rtt = zbx_http_error_to_RDAP(ec_http);
+		rtt = rsm_http_error_to_RDAP(ec_http);
 		rsm_errf(log_fd, "test of \"%s\" (%s) failed: %s (%d)", base_url, formed_url, err, rtt);
 		goto end;
 	}

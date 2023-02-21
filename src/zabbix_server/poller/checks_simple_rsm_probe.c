@@ -20,7 +20,7 @@
 #include "log.h"
 #include "checks_simple_rsm.h"
 
-static char	zbx_validate_host_list(const char *list, char delim)
+static char	rsm_validate_host_list(const char *list, char delim)
 {
 	const char	*p;
 
@@ -95,13 +95,13 @@ int	check_rsm_probe_status(const char *host, const AGENT_REQUEST *request, AGENT
 		zbx_vector_str_create(&ips4);
 		ips4_init = 1;
 
-		if ('\0' != (c = zbx_validate_host_list(ipv4_rootservers, ',')))
+		if ('\0' != (c = rsm_validate_host_list(ipv4_rootservers, ',')))
 		{
 			SET_MSG_RESULT(result, zbx_dsprintf(NULL, "invalid character in IPv4 root servers list: %c", c));
 			goto out;
 		}
 
-		zbx_get_strings_from_list(&ips4, ipv4_rootservers, ',');
+		rsm_get_strings_from_list(&ips4, ipv4_rootservers, ',');
 
 		ok_servers = 0;
 
@@ -109,14 +109,14 @@ int	check_rsm_probe_status(const char *host, const AGENT_REQUEST *request, AGENT
 		{
 			ip = ips4.values[i];
 
-			if (SUCCEED != zbx_create_resolver(&res, "root server", ip, resolver_port, RSM_UDP, ipv4_enabled,
+			if (SUCCEED != rsm_create_resolver(&res, "root server", ip, resolver_port, RSM_UDP, ipv4_enabled,
 					ipv6_enabled, extras, RSM_UDP_TIMEOUT, RSM_UDP_RETRY, log_fd, err, sizeof(err)))
 			{
 				SET_MSG_RESULT(result, zbx_dsprintf(NULL, "cannot instantiate LDNS resolver: %s", err));
 				goto out;
 			}
 
-			if (SUCCEED == zbx_check_dns_connection(res, query_rdf,
+			if (SUCCEED == rsm_check_dns_connection(res, query_rdf,
 					(CHECK_DNS_CONN_RRSIGS | CHECK_DNS_CONN_RTT),
 					ipv4_reply_ms, log_fd, err, sizeof(err)))
 			{
@@ -150,13 +150,13 @@ int	check_rsm_probe_status(const char *host, const AGENT_REQUEST *request, AGENT
 		zbx_vector_str_create(&ips6);
 		ips6_init = 1;
 
-		if ('\0' != (c = zbx_validate_host_list(ipv6_rootservers, ',')))
+		if ('\0' != (c = rsm_validate_host_list(ipv6_rootservers, ',')))
 		{
 			SET_MSG_RESULT(result, zbx_dsprintf(NULL, "invalid character in IPv6 root servers list: %c", c));
 			goto out;
 		}
 
-		zbx_get_strings_from_list(&ips6, ipv6_rootservers, ',');
+		rsm_get_strings_from_list(&ips6, ipv6_rootservers, ',');
 
 		ok_servers = 0;
 
@@ -164,14 +164,14 @@ int	check_rsm_probe_status(const char *host, const AGENT_REQUEST *request, AGENT
 		{
 			ip = ips6.values[i];
 
-			if (SUCCEED != zbx_create_resolver(&res, "root server", ip, resolver_port, RSM_UDP, ipv4_enabled,
+			if (SUCCEED != rsm_create_resolver(&res, "root server", ip, resolver_port, RSM_UDP, ipv4_enabled,
 					ipv6_enabled, extras, RSM_UDP_TIMEOUT, RSM_UDP_RETRY, log_fd, err, sizeof(err)))
 			{
 				SET_MSG_RESULT(result, zbx_dsprintf(NULL, "cannot instantiate LDNS resolver: %s", err));
 				goto out;
 			}
 
-			if (SUCCEED == zbx_check_dns_connection(res, query_rdf,
+			if (SUCCEED == rsm_check_dns_connection(res, query_rdf,
 					(CHECK_DNS_CONN_RRSIGS | CHECK_DNS_CONN_RTT),
 					ipv6_reply_ms, log_fd, err, sizeof(err)))
 			{
