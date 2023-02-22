@@ -20,6 +20,8 @@
 #include "log.h"
 #include "checks_simple_rsm.h"
 
+#define ZBX_PROBESTATUS_LOG_PREFIX	"probestatus"	/* file will be <LOGDIR>/<PROBE>-ZBX_PROBESTATUS_LOG_PREFIX.log */
+
 static char	rsm_validate_host_list(const char *list, char delim)
 {
 	const char	*p;

@@ -20,6 +20,8 @@
 #include "log.h"
 #include "checks_simple_rsm.h"
 
+#define ZBX_RESOLVERSTATUS_LOG_PREFIX	"resolverstatus"	/* file will be <LOGDIR>/<PROBE>-ZBX_RESOLVERSTATUS_LOG_PREFIX.log */
+
 int	check_rsm_resolver_status(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *result)
 {
 	char		*resolver_ip, err[ZBX_ERR_BUF_SIZE];

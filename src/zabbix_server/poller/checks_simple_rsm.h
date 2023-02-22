@@ -240,12 +240,6 @@
 #define ZBX_MACRO_TLD_EPP_ENABLED	"{$RSM.TLD.EPP.ENABLED}"
 
 #define RSM_DEFAULT_LOGDIR		"/var/log"		/* if Zabbix log dir is undefined */
-#define ZBX_DNS_LOG_PREFIX		"dns"			/* file will be <LOGDIR>/<PROBE>-<TLD>-ZBX_DNS_LOG_PREFIX-<udp|tcp>.log */
-#define ZBX_RDDS_LOG_PREFIX		"rdds"			/* file will be <LOGDIR>/<PROBE>-<TLD>-ZBX_RDDS_LOG_PREFIX.log */
-#define ZBX_RDAP_LOG_PREFIX		"rdap"			/* file will be <LOGDIR>/<PROBE>-<TLD>-ZBX_RDAP_LOG_PREFIX.log */
-#define ZBX_EPP_LOG_PREFIX		"epp"			/* file will be <LOGDIR>/<PROBE>-<TLD>-ZBX_EPP_LOG_PREFIX.log */
-#define ZBX_PROBESTATUS_LOG_PREFIX	"probestatus"		/* file will be <LOGDIR>/<PROBE>-ZBX_PROBESTATUS_LOG_PREFIX.log */
-#define ZBX_RESOLVERSTATUS_LOG_PREFIX	"resolverstatus"	/* file will be <LOGDIR>/<PROBE>-ZBX_RESOLVERSTATUS_LOG_PREFIX.log */
 
 typedef enum
 {

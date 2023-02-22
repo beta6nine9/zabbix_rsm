@@ -26,6 +26,8 @@
 
 #include <openssl/ssl.h>
 
+#define ZBX_EPP_LOG_PREFIX	"epp"	/* file will be <LOGDIR>/<PROBE>-<TLD>-ZBX_EPP_LOG_PREFIX.log */
+
 #define XML_PATH_SERVER_ID	0
 #define XML_PATH_RESULT_CODE	1
 

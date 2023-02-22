@@ -20,6 +20,8 @@
 #include "log.h"
 #include "checks_simple_rsm.h"
 
+#define ZBX_RDDS_LOG_PREFIX	"rdds"	/* file will be <LOGDIR>/<PROBE>-<TLD>-ZBX_RDDS_LOG_PREFIX.log */
+
 #define ZBX_SEND_BUF_SIZE	128
 #define DEFAULT_RDDS43_PORT	43
 

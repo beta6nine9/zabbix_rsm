@@ -20,6 +20,8 @@
 #include "log.h"
 #include "checks_simple_rsm.h"
 
+#define ZBX_RDAP_LOG_PREFIX	"rdap"	/* file will be <LOGDIR>/<PROBE>-<TLD>-ZBX_RDAP_LOG_PREFIX.log */
+
 /* FIXME Currently this error code is missing in specification for RDAP. Hopefully, it will be introduced later. */
 #ifdef ZBX_EC_RDAP_NOCODE
 #	error "please remove temporary definition of ZBX_EC_RDAP_NOCODE, seems like it was added to the header file"
@@ -106,7 +108,7 @@ int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 	/* open log file */
 	if (NULL == output_fd)
 	{
-		if (NULL == (log_fd = open_item_log(host, rsmhost, ZBX_RDDS_LOG_PREFIX, err, sizeof(err))))
+		if (NULL == (log_fd = open_item_log(host, rsmhost, ZBX_RDAP_LOG_PREFIX, err, sizeof(err))))
 		{
 			SET_MSG_RESULT(result, zbx_strdup(NULL, err));
 			goto out;

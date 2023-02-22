@@ -21,6 +21,8 @@
 #include "log.h"
 #include "checks_simple_rsm.h"
 
+#define ZBX_DNS_LOG_PREFIX	"dns"	/* file will be <LOGDIR>/<PROBE>-<TLD>-ZBX_DNS_LOG_PREFIX-<udp|tcp>.log */
+
 #define LDNS_EDNS_NSID		3	/* NSID option code, from RFC5001 */
 #define NSID_MAX_LENGTH		127	/* hex representation of NSID must fit into 255 characters */
 
