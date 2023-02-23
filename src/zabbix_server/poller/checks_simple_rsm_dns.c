@@ -1955,18 +1955,43 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 		test_recover = test_recover_tcp;
 	}
 
-	rsm_infof(log_fd, "mode: %s, protocol: %s, rtt limit: %d, tcp ratio: %d, minns: %d, UDP: %d, TCP: %d"
-			" (for critical mode: successful: %d, required for recovery: %d for UDP, %d for TCP)",
+	/* print test details */
+	rsm_infof(log_fd, "mode:%s"
+			", protocol:%s"
+			", rtt_limit:%d"
+			", tcp_ratio:%d"
+			", minns:%d"
+			", DNSSEC:%s"
+			", RDDS43:%s"
+			", RDDS80:%s"
+			", UDP:%s"
+			", TCP:%s"
+			", IPv4:%s"
+			", IPv6:%s"
+			", testprefix:%s",
 			(CURRENT_MODE_NORMAL == current_mode ? "normal" : "critical"),
 			(protocol == RSM_UDP ? "UDP" : "TCP"),
 			rtt_limit,
 			tcp_ratio,
 			minns,
-			udp_enabled,
-			tcp_enabled,
-			successful_tests,
-			test_recover_udp,
-			test_recover_tcp);
+			ENABLED(dnssec_enabled),
+			ENABLED(rdds43_enabled),
+			ENABLED(rdds80_enabled),
+			ENABLED(udp_enabled),
+			ENABLED(tcp_enabled),
+			ENABLED(ipv4_enabled),
+			ENABLED(ipv6_enabled),
+			testprefix);
+
+	if (current_mode != CURRENT_MODE_NORMAL)
+	{
+		rsm_infof(log_fd, "successful_so_far:%d"
+				", required_for_udp:%d"
+				", required_for_tcp:%d",
+				successful_tests,
+				test_recover_udp,
+				test_recover_tcp);
+	}
 
 	extras = (dnssec_enabled ? RESOLVER_EXTRAS_DNSSEC : RESOLVER_EXTRAS_NONE);
 

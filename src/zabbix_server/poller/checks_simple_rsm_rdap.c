@@ -132,6 +132,24 @@ int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 		goto out;
 	}
 
+	/* print test details */
+	rsm_infof(log_fd, "probe_RDAP:%s"
+			", RDAP:%s"
+			", base_url:%s"
+			", testedname:%s"
+			", rtt_limit:%d"
+			", maxredirs:%d"
+			", IPv4:%s"
+			", IPv6:%s",
+			ENABLED(probe_rdap_enabled),
+			ENABLED(rsmhost_rdap_enabled),
+			base_url,
+			testedname,
+			rtt_limit,
+			maxredirs,
+			ENABLED(ipv4_enabled),
+			ENABLED(ipv6_enabled));
+
 	if (SUCCEED != str_in_list("not listed,no https", base_url, ','))
 	{
 		if (SUCCEED != rsm_split_url(base_url, &scheme, &domain, &port, &path, err, sizeof(err)))

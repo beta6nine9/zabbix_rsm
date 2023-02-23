@@ -444,6 +444,8 @@ extern const char	*CONFIG_LOG_FILE;
 
 #define RESPONSE_PREVIEW_SIZE	100
 
+#define ENABLED(state)	((state) ? "ENABLED" : "DISABLED")
+
 typedef int	(*rsm_ns_query_error_func_t)(rsm_ns_query_error_t);
 typedef int	(*rsm_ns_answer_error_func_t)(rsm_ns_answer_error_t);
 typedef int	(*rsm_dnskeys_error_func_t)(rsm_dnskeys_error_t);

@@ -92,15 +92,28 @@ int	check_rsm_probe_status(const char *host, const AGENT_REQUEST *request, AGENT
 		goto out;
 	}
 
+	/* print test details */
+	rsm_infof(log_fd, "IPv4:%s"
+			", IPv6:%s"
+			", IPv4_min_servers:%d"
+			", IPv6_min_servers:%d"
+			", IPv4_reply_ms:%d"
+			", IPv6_reply_ms:%d"
+			", online_delay:%d",
+			ENABLED(ipv4_enabled),
+			ENABLED(ipv6_enabled),
+			ipv4_min_servers,
+			ipv6_min_servers,
+			ipv4_reply_ms,
+			ipv6_reply_ms,
+			online_delay);
+
 	/* create query to check the connection */
 	if (NULL == (query_rdf = ldns_rdf_new_frm_str(LDNS_RDF_TYPE_DNAME, ".")))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "cannot create DNS request"));
 		goto out;
 	}
-
-	rsm_infof(log_fd, "IPv4:%s IPv6:%s", 0 == ipv4_enabled ? "DISABLED" : "ENABLED",
-			0 == ipv6_enabled ? "DISABLED" : "ENABLED");
 
 	if (0 != ipv4_enabled)
 	{
