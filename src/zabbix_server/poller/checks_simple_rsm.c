@@ -82,8 +82,8 @@ void	rsm_logf(FILE *log_fd, int level, const char *fmt, ...)
 
 	vfprintf(log_fd, fmt_buf, args);
 
-	/* in the future consider uncommenting this for instant log entries */
-	/* fflush(log_fd); */
+	/* for instant log entries */
+	fflush(log_fd);
 out:
 	va_end(args);
 }
@@ -146,7 +146,7 @@ static const char	*get_probe_from_host(const char *host)
  * Return value: file descriptor in case of success, NULL otherwise           *
  *                                                                            *
  ******************************************************************************/
-FILE	*open_item_log(const char *host, const char *tld, const char *name, char *err, size_t err_size)
+static FILE	*open_item_log(const char *host, const char *tld, const char *name, char *err, size_t err_size)
 {
 	FILE		*fd;
 	char		*file_name;
@@ -185,14 +185,39 @@ FILE	*open_item_log(const char *host, const char *tld, const char *name, char *e
 	return fd;
 }
 
-void	start_test(FILE *log_fd)
+int	start_test(FILE **log_fd, FILE *output_fd, const char *probe, const char *rsmhost, const char *suffix,
+		char *err, size_t err_size)
 {
-	rsm_info(log_fd, ">>> START TEST <<<");
+	if (NULL == output_fd)
+	{
+		if (NULL == (*log_fd = open_item_log(probe, rsmhost, suffix, err, err_size)))
+		{
+			return FAIL;
+		}
+	}
+	else
+		*log_fd = output_fd;
+
+	rsm_info(*log_fd, ">>> START TEST <<<");
+
+	return SUCCEED;
 }
 
-void	end_test(FILE *log_fd)
+void	end_test(FILE *log_fd, FILE *output_fd)
 {
+	/* no need to log if the log file wasn't opened */
+	if (log_fd == NULL)
+		return;
+
 	rsm_info(log_fd, ">>> END TEST <<<");
+
+	fflush(log_fd);
+
+	/* no need to close the stdout file descriptor */
+	if (log_fd == output_fd)
+		return;
+
+	fclose(log_fd);
 }
 
 int	rsm_validate_ip(const char *ip, int ipv4_enabled, int ipv6_enabled, ldns_rdf **ip_rdf_out, char *is_ipv4)

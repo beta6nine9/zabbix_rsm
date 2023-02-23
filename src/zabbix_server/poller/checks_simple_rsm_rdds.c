@@ -186,22 +186,36 @@ static void	rsm_get_rdds43_nss(zbx_vector_str_t *nss, const char *recv_buf, cons
 
 int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *result, FILE *output_fd)
 {
-	char			*rsmhost, *rdds43_server_str, *rdds80_url, *resolver_str, *rdds43_ns_string, *answer = NULL,
+	char			*rsmhost,
+				*rdds43_server_str,
+				*rdds80_url,
+				*resolver_str,
+				*rdds43_ns_string,
+				*answer = NULL,
+				*scheme = NULL,
+				*domain = NULL,
+				*path = NULL,
+				*formed_url = NULL,
 				is_ipv4, err[ZBX_ERR_BUF_SIZE],
-				*scheme = NULL, *domain = NULL, *path = NULL, *formed_url = NULL,
-				rdds43_server[ZBX_HOST_BUF_SIZE], resolver_ip[ZBX_HOST_BUF_SIZE];
-	const char		*rdds43_testedname = NULL, *ip43 = NULL, *ip80 = NULL;
-	zbx_vector_str_t	ips43, ips80, nss;
+				rdds43_server[ZBX_HOST_BUF_SIZE],
+				resolver_ip[ZBX_HOST_BUF_SIZE];
+	const char		*rdds43_testedname = NULL,
+				*ip43 = NULL,
+				*ip80 = NULL;
+	zbx_vector_str_t	ips43,
+				ips80,
+				nss;
 	FILE			*log_fd = NULL;
 	ldns_resolver		*res = NULL;
 	rsm_resolver_error_t	ec_res;
 	time_t			ts, now;
 	rsm_http_error_t	ec_http;
+	struct zbx_json		json;
 	uint16_t		resolver_port,
 				rdds43_port;
 	int			probe_rdds_enabled,
-				rdds43_enabled,
-				rdds80_enabled,
+				rsmhost_rdds43_enabled,
+				rsmhost_rdds80_enabled,
 				ipv4_enabled,
 				ipv6_enabled,
 				rtt_limit,
@@ -209,42 +223,44 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 				rtt43 = ZBX_NO_VALUE,
 				upd43 = ZBX_NO_VALUE,
 				rtt80 = ZBX_NO_VALUE,
-				rdds_enabled,
 				epp_enabled = 0,
 				ipv_flags = 0,
 				curl_flags = 0,
 				port,
 				ret = SYSINFO_RET_FAIL;
-	struct zbx_json		json;
-
-	fflush(stdout);
-	if (13 != request->nparam)
-	{
-		SET_MSG_RESULT(result, zbx_strdup(NULL, "item must contain 13 parameters"));
-		return ret;
-	}
 
 	zbx_vector_str_create(&ips43);
 	zbx_vector_str_create(&ips80);
 	zbx_vector_str_create(&nss);
 
-	GET_PARAM_NEMPTY(rsmhost           , 0 ,   "Rsmhost");
-	GET_PARAM       (rdds43_server_str , 1); /* RDDS43 server      */
-	GET_PARAM       (rdds80_url        , 2); /* RDDS80 url         */
-	GET_PARAM       (rdds43_testedname , 3); /* RDDS43 test domain */
-	GET_PARAM       (rdds43_ns_string  , 4); /* RDDS43 ns string   */
-	GET_PARAM_UINT  (probe_rdds_enabled, 5 ,   "RDDS enabled on probe");
-	GET_PARAM_UINT  (rdds43_enabled    , 6 ,   "RDDS43 enabled on rsmhost");
-	GET_PARAM_UINT  (rdds80_enabled    , 7 ,   "RDDS80 enabled on rsmhost");
-	GET_PARAM_UINT  (ipv4_enabled      , 8 ,   "IPv4 enabled");
-	GET_PARAM_UINT  (ipv6_enabled      , 9 ,   "IPv6 enabled");
-	GET_PARAM_NEMPTY(resolver_str      , 10,   "IP address of local resolver");
-	GET_PARAM_UINT  (rtt_limit         , 11,   "RTT limit");
-	GET_PARAM_UINT  (maxredirs         , 12,   "max redirects");
+	if (13 != request->nparam)
+	{
+		SET_MSG_RESULT(result, zbx_strdup(NULL, "item must contain 13 parameters"));
+		goto out;
+	}
 
-	rdds_enabled = (rdds43_enabled || rdds80_enabled);
+	GET_PARAM_NEMPTY(rsmhost               , 0 ,   "Rsmhost");
+	GET_PARAM       (rdds43_server_str     , 1); /* RDDS43 server      */
+	GET_PARAM       (rdds80_url            , 2); /* RDDS80 url         */
+	GET_PARAM       (rdds43_testedname     , 3); /* RDDS43 test domain */
+	GET_PARAM       (rdds43_ns_string      , 4); /* RDDS43 ns string   */
+	GET_PARAM_UINT  (probe_rdds_enabled    , 5 ,   "RDDS enabled on probe");
+	GET_PARAM_UINT  (rsmhost_rdds43_enabled, 6 ,   "RDDS43 enabled on rsmhost");
+	GET_PARAM_UINT  (rsmhost_rdds80_enabled, 7 ,   "RDDS80 enabled on rsmhost");
+	GET_PARAM_UINT  (ipv4_enabled          , 8 ,   "IPv4 enabled");
+	GET_PARAM_UINT  (ipv6_enabled          , 9 ,   "IPv6 enabled");
+	GET_PARAM_NEMPTY(resolver_str          , 10,   "IP address of local resolver");
+	GET_PARAM_UINT  (rtt_limit             , 11,   "RTT limit");
+	GET_PARAM_UINT  (maxredirs             , 12,   "max redirects");
 
-	if (0 != rdds43_enabled)
+	/* open log file */
+	if (SUCCEED != start_test(&log_fd, output_fd, host, rsmhost, ZBX_RDDS_LOG_PREFIX, err, sizeof(err)))
+	{
+		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
+		goto out;
+	}
+
+	if (0 != rsmhost_rdds43_enabled)
 	{
 		if ('\0' == *rdds43_server_str)
 		{
@@ -253,7 +269,7 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 		}
 	}
 
-	if (0 != rdds80_enabled)
+	if (0 != rsmhost_rdds80_enabled)
 	{
 		if  ('\0' == *rdds80_url)
 		{
@@ -274,18 +290,6 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 	get_host_and_port_from_str(rdds43_server_str, ';', rdds43_server, sizeof(rdds43_server), &rdds43_port,
 			DEFAULT_RDDS43_PORT);
 
-	/* open log file */
-	if (NULL == output_fd)
-	{
-		if (NULL == (log_fd = open_item_log(host, rsmhost, ZBX_RDDS_LOG_PREFIX, err, sizeof(err))))
-		{
-			SET_MSG_RESULT(result, zbx_strdup(NULL, err));
-			goto out;
-		}
-	}
-	else
-		log_fd = output_fd;
-
 	/* create resolver, note: it's used in both RDDS43 and RDDS80 tests */
 	if (SUCCEED != rsm_create_resolver(&res, "resolver", resolver_ip, resolver_port, RSM_TCP, ipv4_enabled,
 			ipv6_enabled, RESOLVER_EXTRAS_NONE, RSM_TCP_TIMEOUT, RSM_TCP_RETRY, log_fd, err, sizeof(err)))
@@ -294,8 +298,6 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 		SET_MSG_RESULT(result, zbx_dsprintf(NULL, "cannot create resolver: %s", err));
 		goto out;
 	}
-
-	start_test(log_fd);
 
 	/* from this point item will not become NOTSUPPORTED */
 	ret = SYSINFO_RET_OK;
@@ -308,166 +310,163 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 	if (0 == probe_rdds_enabled)
 	{
 		rsm_info(log_fd, "RDDS disabled on this probe");
-		rdds_enabled = 0;
-		goto end;
+		goto out;
 	}
 
-	if (0 == rdds_enabled)
+	if (0 == rsmhost_rdds43_enabled && 0 == rsmhost_rdds80_enabled)
 	{
 		rsm_info(log_fd, "RDDS disabled on this RSM host");
-		goto end;
+		goto out;
 	}
 
-	if (0 == rdds43_enabled)
-		goto rdds80_test;
-
-	/* start RDDS43 test, resolve host to ips */
-	if (SUCCEED != rsm_resolve_host(res, rdds43_server, &ips43, ipv_flags, log_fd, &ec_res,
-			err, sizeof(err)))
+	if (0 != rsmhost_rdds43_enabled)
 	{
-		rtt43 = rsm_resolver_error_to_RDDS43(ec_res);
-		rsm_errf(log_fd, "RDDS43 \"%s\": %s", rdds43_server, err);
-	}
-
-	/* if RDDS43 fails we should still process RDDS80 */
-
-	if (SUCCEED == rsm_ec_noerror(rtt43))
-	{
-		if (0 == ips43.values_num)
-		{
-			rtt43 = ZBX_EC_RDDS43_INTERNAL_IP_UNSUP;
-			rsm_errf(log_fd, "RDDS43 \"%s\": IP address(es) of host not supported by the Probe",
-					rdds43_server);
-		}
-	}
-
-	if (SUCCEED == rsm_ec_noerror(rtt43))
-	{
-		/* choose random IP */
-		ip43 = ips43.values[rsm_random((size_t)ips43.values_num)];
-
-		rsm_infof(log_fd, "start RDDS43 test (ip %s, request \"%s\", expected NS string \"%s\")",
-				ip43, rdds43_testedname, rdds43_ns_string);
-
-		if (SUCCEED != rsm_rdds43_test(rdds43_testedname, ip43, rdds43_port, RSM_TCP_TIMEOUT, &answer, &rtt43,
+		/* start RDDS43 test, resolve host to ips */
+		if (SUCCEED != rsm_resolve_host(res, rdds43_server, &ips43, ipv_flags, log_fd, &ec_res,
 				err, sizeof(err)))
 		{
-			rsm_errf(log_fd, "RDDS43 of \"%s\" (%s) failed: %s", rdds43_server, ip43, err);
+			rtt43 = rsm_resolver_error_to_RDDS43(ec_res);
+			rsm_errf(log_fd, "RDDS43 \"%s\": %s", rdds43_server, err);
 		}
-	}
 
-	if (SUCCEED == rsm_ec_noerror(rtt43))
-	{
-		rsm_get_rdds43_nss(&nss, answer, rdds43_ns_string, log_fd);
+		/* if RDDS43 fails we should still process RDDS80 */
 
-		if (0 == nss.values_num)
+		if (SUCCEED == rsm_ec_noerror(rtt43))
 		{
-			rtt43 = ZBX_EC_RDDS43_NONS;
-			rsm_errf(log_fd, "no Name Servers found in the output of RDDS43 server \"%s\""
-					" (%s) for query \"%s\" (expecting prefix \"%s\")",
-					rdds43_server, ip43, rdds43_testedname, rdds43_ns_string);
-		}
-	}
-
-	if (SUCCEED == rsm_ec_noerror(rtt43))
-	{
-		if (0 != epp_enabled)
-		{
-			/* start RDDS UPD test, get timestamp from the host name */
-			char	*random_ns;
-
-			/* choose random NS from the output */
-			random_ns = nss.values[rsm_random((size_t)nss.values_num)];
-
-			rsm_infof(log_fd, "randomly selected Name Server server \"%s\"", random_ns);
-
-			if (SUCCEED != rsm_get_ts_from_host(random_ns, &ts))
+			if (0 == ips43.values_num)
 			{
-				upd43 = ZBX_EC_RDDS43_INTERNAL_GENERAL;
-				rsm_errf(log_fd, "cannot extract Unix timestamp from Name Server \"%s\"", random_ns);
+				rtt43 = ZBX_EC_RDDS43_INTERNAL_IP_UNSUP;
+				rsm_errf(log_fd, "RDDS43 \"%s\": IP address(es) of host not supported by the Probe",
+						rdds43_server);
 			}
+		}
 
-			if (upd43 == ZBX_NO_VALUE)
+		if (SUCCEED == rsm_ec_noerror(rtt43))
+		{
+			/* choose random IP */
+			ip43 = ips43.values[rsm_random((size_t)ips43.values_num)];
+
+			rsm_infof(log_fd, "start RDDS43 test (ip %s, request \"%s\", expected NS string \"%s\")",
+					ip43, rdds43_testedname, rdds43_ns_string);
+
+			if (SUCCEED != rsm_rdds43_test(rdds43_testedname, ip43, rdds43_port, RSM_TCP_TIMEOUT, &answer,
+					&rtt43, err, sizeof(err)))
 			{
-				now = time(NULL);
+				rsm_errf(log_fd, "RDDS43 of \"%s\" (%s) failed: %s", rdds43_server, ip43, err);
+			}
+		}
 
-				if (0 > now - ts)
+		if (SUCCEED == rsm_ec_noerror(rtt43))
+		{
+			rsm_get_rdds43_nss(&nss, answer, rdds43_ns_string, log_fd);
+
+			if (0 == nss.values_num)
+			{
+				rtt43 = ZBX_EC_RDDS43_NONS;
+				rsm_errf(log_fd, "no Name Servers found in the output of RDDS43 server \"%s\""
+						" (%s) for query \"%s\" (expecting prefix \"%s\")",
+						rdds43_server, ip43, rdds43_testedname, rdds43_ns_string);
+			}
+		}
+
+		if (SUCCEED == rsm_ec_noerror(rtt43))
+		{
+			if (0 != epp_enabled)
+			{
+				/* start RDDS UPD test, get timestamp from the host name */
+				char	*random_ns;
+
+				/* choose random NS from the output */
+				random_ns = nss.values[rsm_random((size_t)nss.values_num)];
+
+				rsm_infof(log_fd, "randomly selected Name Server server \"%s\"", random_ns);
+
+				if (SUCCEED != rsm_get_ts_from_host(random_ns, &ts))
 				{
-					rsm_errf(log_fd, "Unix timestamp of Name Server \"%s\" is in the future"
-							" (current: %u)", random_ns, now);
 					upd43 = ZBX_EC_RDDS43_INTERNAL_GENERAL;
+					rsm_errf(log_fd, "cannot extract Unix timestamp from Name Server \"%s\"",
+							random_ns);
 				}
-			}
 
-			if (upd43 == ZBX_NO_VALUE)
+				if (upd43 == ZBX_NO_VALUE)
+				{
+					now = time(NULL);
+
+					if (0 > now - ts)
+					{
+						rsm_errf(log_fd, "Unix timestamp of Name Server \"%s\" is in the future"
+								" (current: %u)", random_ns, now);
+						upd43 = ZBX_EC_RDDS43_INTERNAL_GENERAL;
+					}
+				}
+
+				if (upd43 == ZBX_NO_VALUE)
+				{
+					/* successful UPD */
+					upd43 = (int)(now - ts);
+				}
+
+				rsm_infof(log_fd, "===>\n%.*s\n<=== end RDDS43 test (rtt:%d upd43:%d)",
+						RESPONSE_PREVIEW_SIZE, answer, rtt43, upd43);
+			}
+			else
 			{
-				/* successful UPD */
-				upd43 = (int)(now - ts);
+				rsm_infof(log_fd, "===>\n%.*s\n<=== end RDDS43 test (rtt:%d)",
+						RESPONSE_PREVIEW_SIZE, answer, rtt43);
 			}
-
-			rsm_infof(log_fd, "===>\n%.*s\n<=== end RDDS43 test (rtt:%d upd43:%d)",
-					RESPONSE_PREVIEW_SIZE, answer, rtt43, upd43);
 		}
-		else
+	}
+
+	if (0 != rsmhost_rdds80_enabled)
+	{
+		rsm_infof(log_fd, "start RDDS80 test (url %s)", rdds80_url);
+
+		/* start RDDS80 test, resolve domain to ips */
+		if (SUCCEED != rsm_resolve_host(res, domain, &ips80, ipv_flags, log_fd, &ec_res, err, sizeof(err)))
 		{
-			rsm_infof(log_fd, "===>\n%.*s\n<=== end RDDS43 test (rtt:%d)",
-					RESPONSE_PREVIEW_SIZE, answer, rtt43);
+			rtt80 = rsm_resolver_error_to_RDDS80(ec_res);
+			rsm_errf(log_fd, "RDDS80 \"%s\": %s", domain, err);
+			goto out;
 		}
+
+		if (0 == ips80.values_num)
+		{
+			rtt80 = ZBX_EC_RDDS80_INTERNAL_IP_UNSUP;
+			rsm_errf(log_fd, "RDDS80 \"%s\": IP address(es) of host not supported by the Probe", rdds80_url);
+			goto out;
+		}
+
+		/* choose random IP */
+		ip80 = ips80.values[rsm_random((size_t)ips80.values_num)];
+
+		if (SUCCEED != rsm_validate_ip(ip80, ipv4_enabled, ipv6_enabled, NULL, &is_ipv4))
+		{
+			rtt80 = ZBX_EC_RDDS80_INTERNAL_GENERAL;
+			rsm_errf(log_fd, "internal error, selected unsupported IP of \"%s\": \"%s\"", rdds80_url, ip80);
+			goto out;
+		}
+
+		if (0 == is_ipv4)
+			formed_url = zbx_dsprintf(formed_url, "%s[%s]:%d%s", scheme, ip80, port, path);
+		else
+			formed_url = zbx_dsprintf(formed_url, "%s%s:%d%s", scheme, ip80, port, path);
+
+		rsm_infof(log_fd, "domain \"%s\" was resolved to %s, using URL \"%s\".", domain, ip80, formed_url);
+
+		if (SUCCEED != rsm_http_test(domain, formed_url, RSM_TCP_TIMEOUT, maxredirs, &ec_http, &rtt80, NULL,
+						curl_devnull, curl_flags, err, sizeof(err)))
+		{
+			rtt80 = rsm_http_error_to_RDDS80(ec_http);
+			rsm_errf(log_fd, "RDDS80 of \"%s\" (%s) failed: %s (%d)", rdds80_url, formed_url, err, rtt80);
+		}
+
+		rsm_infof(log_fd, "end RDDS80 test (rtt:%d)", rtt80);
 	}
-
-	if (0 == rdds80_enabled)
-		goto end;
-
-rdds80_test:
-	rsm_infof(log_fd, "start RDDS80 test (url %s)", rdds80_url);
-
-	/* start RDDS80 test, resolve domain to ips */
-	if (SUCCEED != rsm_resolve_host(res, domain, &ips80, ipv_flags, log_fd, &ec_res, err, sizeof(err)))
-	{
-		rtt80 = rsm_resolver_error_to_RDDS80(ec_res);
-		rsm_errf(log_fd, "RDDS80 \"%s\": %s", domain, err);
-		goto end;
-	}
-
-	if (0 == ips80.values_num)
-	{
-		rtt80 = ZBX_EC_RDDS80_INTERNAL_IP_UNSUP;
-		rsm_errf(log_fd, "RDDS80 \"%s\": IP address(es) of host not supported by the Probe", rdds80_url);
-		goto end;
-	}
-
-	/* choose random IP */
-	ip80 = ips80.values[rsm_random((size_t)ips80.values_num)];
-
-	if (SUCCEED != rsm_validate_ip(ip80, ipv4_enabled, ipv6_enabled, NULL, &is_ipv4))
-	{
-		rtt80 = ZBX_EC_RDDS80_INTERNAL_GENERAL;
-		rsm_errf(log_fd, "internal error, selected unsupported IP of \"%s\": \"%s\"", rdds80_url, ip80);
-		goto end;
-	}
-
-	if (0 == is_ipv4)
-		formed_url = zbx_dsprintf(formed_url, "%s[%s]:%d%s", scheme, ip80, port, path);
-	else
-		formed_url = zbx_dsprintf(formed_url, "%s%s:%d%s", scheme, ip80, port, path);
-
-	rsm_infof(log_fd, "domain \"%s\" was resolved to %s, using URL \"%s\".", domain, ip80, formed_url);
-
-	if (SUCCEED != rsm_http_test(domain, formed_url, RSM_TCP_TIMEOUT, maxredirs, &ec_http, &rtt80, NULL,
-			curl_devnull, curl_flags, err, sizeof(err)))
-	{
-		rtt80 = rsm_http_error_to_RDDS80(ec_http);
-		rsm_errf(log_fd, "RDDS80 of \"%s\" (%s) failed: %s (%d)", rdds80_url, formed_url, err, rtt80);
-	}
-
-	rsm_infof(log_fd, "end RDDS80 test (rtt:%d)", rtt80);
-end:
+out:
 	if (0 != ISSET_MSG(result))
 		rsm_err(log_fd, result->msg);
 
-	end_test(log_fd);
-
-	if (SYSINFO_RET_OK == ret && 0 != rdds_enabled)
+	if (SYSINFO_RET_OK == ret && (0 != rsmhost_rdds43_enabled || 0 != rsmhost_rdds80_enabled) && 0 != probe_rdds_enabled)
 	{
 		int	rdds43_status, rdds80_status;
 
@@ -508,10 +507,6 @@ end:
 	}
 
 	zbx_free(answer);
-
-	if (NULL == output_fd && NULL != log_fd)
-		fclose(log_fd);
-out:
 	zbx_free(scheme);
 	zbx_free(domain);
 	zbx_free(path);
@@ -520,6 +515,8 @@ out:
 	rsm_vector_str_clean_and_destroy(&nss);
 	rsm_vector_str_clean_and_destroy(&ips80);
 	rsm_vector_str_clean_and_destroy(&ips43);
+
+	end_test(log_fd, output_fd);
 
 	return ret;
 }

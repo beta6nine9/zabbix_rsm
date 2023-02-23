@@ -75,17 +75,37 @@ int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 	curl_data_t		data = {NULL, 0, 0};
 	zbx_vector_str_t	ips;
 	struct zbx_json_parse	jp;
-	FILE			*log_fd;
-	char			*rsmhost, *testedname, *base_url, *resolver_str, *scheme = NULL,
-				*domain = NULL, *path = NULL, *formed_url = NULL, *value_str = NULL,
-				err[ZBX_ERR_BUF_SIZE], is_ipv4, query[64],
+	FILE			*log_fd = NULL;
+	char			*rsmhost,
+				*testedname,
+				*base_url,
+				*resolver_str,
+				*scheme = NULL,
+				*domain = NULL,
+				*path = NULL,
+				*formed_url = NULL,
+				*value_str = NULL,
+				err[ZBX_ERR_BUF_SIZE],
+				is_ipv4,
+				query[64],
 				resolver_ip[ZBX_HOST_BUF_SIZE];
 	const char		*ip = NULL;
 	size_t			value_alloc = 0;
 	rsm_http_error_t	ec_http;
 	uint16_t		resolver_port;
-	int			maxredirs, rtt_limit, tld_enabled, probe_enabled, ipv4_enabled, ipv6_enabled,
-				ipv_flags = 0, curl_flags = 0, port, rtt = ZBX_NO_VALUE, ret = SYSINFO_RET_FAIL;
+	int			maxredirs,
+				rtt_limit,
+				rsmhost_rdap_enabled,
+				probe_rdap_enabled,
+				ipv4_enabled,
+				ipv6_enabled,
+				ipv_flags = 0,
+				curl_flags = 0,
+				port,
+				rtt = ZBX_NO_VALUE,
+				ret = SYSINFO_RET_FAIL;
+
+	zbx_vector_str_create(&ips);
 
 	if (10 != request->nparam)
 	{
@@ -94,44 +114,23 @@ int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 	}
 
 	/* TLD goes first, then RDAP specific parameters, then TLD options, probe options and global settings */
-	GET_PARAM_NEMPTY(rsmhost      , 0, "Rsmhost");
-	GET_PARAM_NEMPTY(testedname   , 1, "Test domain");
-	GET_PARAM_NEMPTY(base_url     , 2, "RDAP service endpoint");
-	GET_PARAM_UINT  (maxredirs    , 3, "maximal number of redirections allowed");
-	GET_PARAM_UINT  (rtt_limit    , 4, "maximum allowed RTT");
-	GET_PARAM_UINT  (tld_enabled  , 5, "RDAP enabled for TLD");
-	GET_PARAM_UINT  (probe_enabled, 6, "RDAP enabled for probe");
-	GET_PARAM_UINT  (ipv4_enabled , 7, "IPv4 enabled");
-	GET_PARAM_UINT  (ipv6_enabled , 8, "IPv6 enabled");
-	GET_PARAM_NEMPTY(resolver_str , 9, "IP address of local resolver");
+	GET_PARAM_NEMPTY(rsmhost             , 0, "Rsmhost");
+	GET_PARAM_NEMPTY(testedname          , 1, "Test domain");
+	GET_PARAM_NEMPTY(base_url            , 2, "RDAP service endpoint");
+	GET_PARAM_UINT  (maxredirs           , 3, "maximal number of redirections allowed");
+	GET_PARAM_UINT  (rtt_limit           , 4, "maximum allowed RTT");
+	GET_PARAM_UINT  (rsmhost_rdap_enabled, 5, "RDAP enabled for TLD");
+	GET_PARAM_UINT  (probe_rdap_enabled  , 6, "RDAP enabled for probe");
+	GET_PARAM_UINT  (ipv4_enabled        , 7, "IPv4 enabled");
+	GET_PARAM_UINT  (ipv6_enabled        , 8, "IPv6 enabled");
+	GET_PARAM_NEMPTY(resolver_str        , 9, "IP address of local resolver");
 
 	/* open log file */
-	if (NULL == output_fd)
+	if (SUCCEED != start_test(&log_fd, output_fd, host, rsmhost, ZBX_RDAP_LOG_PREFIX, err, sizeof(err)))
 	{
-		if (NULL == (log_fd = open_item_log(host, rsmhost, ZBX_RDAP_LOG_PREFIX, err, sizeof(err))))
-		{
-			SET_MSG_RESULT(result, zbx_strdup(NULL, err));
-			goto out;
-		}
-	}
-	else
-		log_fd = output_fd;
-
-	if (0 == probe_enabled)
-	{
-		rsm_info(log_fd, "RDAP disabled on this probe");
-		ret = SYSINFO_RET_OK;
+		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
 		goto out;
 	}
-
-	if (0 == tld_enabled)
-	{
-		rsm_info(log_fd, "RDAP disabled on this TLD");
-		ret = SYSINFO_RET_OK;
-		goto out;
-	}
-
-	zbx_vector_str_create(&ips);
 
 	if (SUCCEED != str_in_list("not listed,no https", base_url, ','))
 	{
@@ -154,10 +153,20 @@ int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 		}
 	}
 
-	start_test(log_fd);
-
 	/* from this point item will not become NOTSUPPORTED */
 	ret = SYSINFO_RET_OK;
+
+	if (0 == probe_rdap_enabled)
+	{
+		rsm_info(log_fd, "RDAP disabled on this probe");
+		goto out;
+	}
+
+	if (0 == rsmhost_rdap_enabled)
+	{
+		rsm_info(log_fd, "RDAP disabled on this TLD");
+		goto out;
+	}
 
 	/* skip the test itself in case of two special values in RDAP base URL parameter */
 
@@ -165,7 +174,7 @@ int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 	{
 		rsm_err(log_fd, "The TLD is not listed in the Bootstrap Service Registry for Domain Name Space");
 		rtt = ZBX_EC_RDAP_NOTLISTED;
-		goto end;
+		goto out;
 	}
 
 	if (0 == strcmp(base_url, "no https"))
@@ -173,7 +182,7 @@ int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 		rsm_err(log_fd, "The RDAP base URL obtained from Bootstrap Service Registry for Domain Name Space"
 				" does not use HTTPS");
 		rtt = ZBX_EC_RDAP_NOHTTPS;
-		goto end;
+		goto out;
 	}
 
 	if (0 != ipv4_enabled)
@@ -186,14 +195,14 @@ int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 	{
 		rtt = rsm_resolver_error_to_RDAP(ec_res);
 		rsm_errf(log_fd, "trying to resolve \"%s\": %s", domain, err);
-		goto end;
+		goto out;
 	}
 
 	if (0 == ips.values_num)
 	{
 		rtt = ZBX_EC_RDAP_INTERNAL_IP_UNSUP;
 		rsm_errf(log_fd, "IP address(es) of host \"%s\" are not supported on this Probe", domain);
-		goto end;
+		goto out;
 	}
 
 	/* choose random IP */
@@ -203,7 +212,7 @@ int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 	{
 		rtt = ZBX_EC_RDAP_INTERNAL_GENERAL;
 		rsm_errf(log_fd, "internal error, selected unsupported IP of \"%s\": \"%s\"", domain, ip);
-		goto end;
+		goto out;
 	}
 
 	if ('\0' != *path && path[strlen(path) - 1] == '/')
@@ -223,7 +232,7 @@ int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 	{
 		rtt = rsm_http_error_to_RDAP(ec_http);
 		rsm_errf(log_fd, "test of \"%s\" (%s) failed: %s (%d)", base_url, formed_url, err, rtt);
-		goto end;
+		goto out;
 	}
 
 	rsm_infof(log_fd, "got response ===>\n%.*s\n<===", RESPONSE_PREVIEW_SIZE, ZBX_NULL2STR(data.buf));
@@ -232,31 +241,29 @@ int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 	{
 		rtt = ZBX_EC_RDAP_EJSON;
 		rsm_errf(log_fd, "invalid JSON format in response of \"%s\" (%s)", base_url, ip);
-		goto end;
+		goto out;
 	}
 
 	if (SUCCEED != zbx_json_value_by_name_dyn(&jp, "ldhName", &value_str, &value_alloc, NULL))
 	{
 		rtt = ZBX_EC_RDAP_NONAME;
 		rsm_errf(log_fd, "ldhName member not found in response of \"%s\" (%s)", base_url, ip);
-		goto end;
+		goto out;
 	}
 
 	if (NULL == value_str || 0 != strcmp(value_str, testedname))
 	{
 		rtt = ZBX_EC_RDAP_ENAME;
 		rsm_errf(log_fd, "ldhName member doesn't match query in response of \"%s\" (%s)", base_url, ip);
-		goto end;
+		goto out;
 	}
 
 	rsm_infof(log_fd, "end test of \"%s\" (%s) (rtt:%d)", base_url, ZBX_NULL2STR(ip), rtt);
-end:
+out:
 	if (0 != ISSET_MSG(result))
 		rsm_err(log_fd, result->msg);
 
-	end_test(log_fd);
-
-	if (SYSINFO_RET_OK == ret && ZBX_NO_VALUE != rtt)
+	if (SYSINFO_RET_OK == ret && 0 != rsmhost_rdap_enabled && 0 != probe_rdap_enabled)
 	{
 		int		subtest_result;
 		struct zbx_json	json;
@@ -287,18 +294,16 @@ end:
 			ldns_resolver_free(res);
 	}
 
+	zbx_free(scheme);
+	zbx_free(domain);
+	zbx_free(path);
+	zbx_free(formed_url);
 	zbx_free(value_str);
 	zbx_free(data.buf);
 
 	rsm_vector_str_clean_and_destroy(&ips);
 
-	if (NULL == output_fd && NULL != log_fd)
-		fclose(log_fd);
-out:
-	zbx_free(scheme);
-	zbx_free(domain);
-	zbx_free(path);
-	zbx_free(formed_url);
+	end_test(log_fd, output_fd);
 
 	return ret;
 }

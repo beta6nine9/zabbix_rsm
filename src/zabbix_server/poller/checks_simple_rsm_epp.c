@@ -823,26 +823,47 @@ int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *
 {
 	ldns_resolver		*res = NULL;
 	rsm_resolver_error_t	ec_res;
-	char			*domain, err[ZBX_ERR_BUF_SIZE], *value_str = NULL, *res_ip = NULL,
-				*secretkey_enc_b64 = NULL, *secretkey_salt_b64 = NULL, *epp_passwd_enc_b64 = NULL,
-				*epp_passwd_salt_b64 = NULL, *epp_privkey_enc_b64 = NULL, *epp_privkey_salt_b64 = NULL,
-				*epp_user = NULL, *epp_passwd = NULL, *epp_privkey = NULL, *epp_cert_b64 = NULL,
-				*epp_cert = NULL, *epp_commands = NULL, *epp_serverid = NULL, *epp_testprefix = NULL,
+	char			*rsmhost,
+				err[ZBX_ERR_BUF_SIZE],
+				*value_str = NULL,
+				*res_ip = NULL,
+				*secretkey_enc_b64 = NULL,
+				*secretkey_salt_b64 = NULL,
+				*epp_passwd_enc_b64 = NULL,
+				*epp_passwd_salt_b64 = NULL,
+				*epp_privkey_enc_b64 = NULL,
+				*epp_privkey_salt_b64 = NULL,
+				*epp_user = NULL,
+				*epp_passwd = NULL,
+				*epp_privkey = NULL,
+				*epp_cert_b64 = NULL,
+				*epp_cert = NULL,
+				*epp_commands = NULL,
+				*epp_serverid = NULL,
+				*epp_testprefix = NULL,
 				*epp_servercertmd5 = NULL;
 	unsigned short		epp_port = 700;
 	X509			*epp_server_x509 = NULL;
 	const SSL_METHOD	*method;
-	const char		*ip = NULL, *random_host;
+	const char		*ip = NULL,
+				*random_host;
 	SSL_CTX			*ctx = NULL;
 	SSL			*ssl = NULL;
 	FILE			*log_fd = NULL;
 	zbx_socket_t		sock;
-	zbx_vector_str_t	epp_hosts, epp_ips;
+	zbx_vector_str_t	epp_hosts,
+				epp_ips;
 	unsigned int		extras;
 	uint16_t		resolver_port = DEFAULT_RESOLVER_PORT;
 	size_t			epp_cert_size;
-	int			rv, rtt, rtt1 = ZBX_NO_VALUE, rtt2 = ZBX_NO_VALUE,
-				rtt3 = ZBX_NO_VALUE, ipv4_enabled = 0, ipv6_enabled = 0, ret = SYSINFO_RET_FAIL;
+	int			rv,
+				rtt,
+				rtt1 = ZBX_NO_VALUE,
+				rtt2 = ZBX_NO_VALUE,
+				rtt3 = ZBX_NO_VALUE,
+				ipv4_enabled = 0,
+				ipv6_enabled = 0,
+				ret = SYSINFO_RET_FAIL;
 
 	zbx_vector_str_create(&epp_hosts);
 	zbx_vector_str_create(&epp_ips);
@@ -850,25 +871,23 @@ int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *
 	if (2 != request->nparam)
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "item must contain 2 parameters"));
-		return SYSINFO_RET_FAIL;
+		goto out;
 	}
 
-	domain = get_rparam(request, 0);
+	rsmhost = get_rparam(request, 0);
 
-	if ('\0' == *domain)
+	if ('\0' == *rsmhost)
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "first parameter missing"));
-		return SYSINFO_RET_FAIL;
+		goto out;
 	}
 
 	/* open log file */
-	if (NULL == (log_fd = open_item_log(host, domain, ZBX_EPP_LOG_PREFIX, err, sizeof(err))))
+	if (SUCCEED != start_test(&log_fd, NULL, host, rsmhost, ZBX_EPP_LOG_PREFIX, err, sizeof(err)))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
-		return SYSINFO_RET_FAIL;
+		goto out;
 	}
-
-	start_test(log_fd);
 
 	if ('\0' == *epp_passphrase)
 	{
@@ -1079,7 +1098,7 @@ int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *
 		goto out;
 	}
 
-	if (SUCCEED != command_update(epp_commands, COMMAND_UPDATE, ssl, &rtt2, log_fd, epp_testprefix, domain,
+	if (SUCCEED != command_update(epp_commands, COMMAND_UPDATE, ssl, &rtt2, log_fd, epp_testprefix, rsmhost,
 			err, sizeof(err)))
 	{
 		rtt3 = rtt2;
@@ -1087,7 +1106,7 @@ int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *
 		goto out;
 	}
 
-	if (SUCCEED != command_info(epp_commands, COMMAND_INFO, ssl, &rtt3, log_fd, epp_testprefix, domain, err,
+	if (SUCCEED != command_info(epp_commands, COMMAND_INFO, ssl, &rtt3, log_fd, epp_testprefix, rsmhost, err,
 			sizeof(err)))
 	{
 		rsm_err(log_fd, err);
@@ -1108,8 +1127,6 @@ out:
 	{
 		/* TODO: save result: ip, rtt1, rtt2, rtt3 */
 	}
-
-	end_test(log_fd);
 
 	zbx_free(epp_servercertmd5);
 	zbx_free(epp_testprefix);
@@ -1145,8 +1162,7 @@ out:
 	rsm_vector_str_clean_and_destroy(&epp_ips);
 	rsm_vector_str_clean_and_destroy(&epp_hosts);
 
-	if (NULL != log_fd)
-		fclose(log_fd);
+	end_test(log_fd, NULL);
 
 	return ret;
 }

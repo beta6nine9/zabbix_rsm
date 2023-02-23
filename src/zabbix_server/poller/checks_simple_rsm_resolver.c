@@ -24,13 +24,26 @@
 
 int	check_rsm_resolver_status(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *result)
 {
-	char		*resolver_ip, err[ZBX_ERR_BUF_SIZE];
+	char		*resolver_ip,
+			err[ZBX_ERR_BUF_SIZE];
 	ldns_resolver	*res = NULL;
 	ldns_rdf	*query_rdf = NULL;
 	FILE		*log_fd = NULL;
 	unsigned int	extras;
 	uint16_t	resolver_port = DEFAULT_RESOLVER_PORT;
-	int		timeout, tries, ipv4_enabled, ipv6_enabled, status = 0, ret = SYSINFO_RET_FAIL;
+	int		timeout,
+			tries,
+			ipv4_enabled,
+			ipv6_enabled,
+			test_status = 0,
+			ret = SYSINFO_RET_FAIL;
+
+	/* open log file */
+	if (SUCCEED != start_test(&log_fd, NULL, host, NULL, ZBX_RESOLVERSTATUS_LOG_PREFIX, err, sizeof(err)))
+	{
+		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
+		goto out;
+	}
 
 	if (5 != request->nparam)
 	{
@@ -45,13 +58,6 @@ int	check_rsm_resolver_status(const char *host, const AGENT_REQUEST *request, AG
 	GET_PARAM_UINT  (ipv4_enabled, 3, "IPv4 enabled");
 	GET_PARAM_UINT  (ipv6_enabled, 4, "IPv6 enabled");
 
-	/* open log file */
-	if (NULL == (log_fd = open_item_log(host, NULL, ZBX_RESOLVERSTATUS_LOG_PREFIX, err, sizeof(err))))
-	{
-		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
-		goto out;
-	}
-
 	extras = RESOLVER_EXTRAS_DNSSEC;
 
 	/* create resolver */
@@ -59,20 +65,18 @@ int	check_rsm_resolver_status(const char *host, const AGENT_REQUEST *request, AG
 			ipv6_enabled, extras, RSM_UDP_TIMEOUT, RSM_UDP_RETRY, log_fd, err, sizeof(err)))
 	{
 		SET_MSG_RESULT(result, zbx_dsprintf(NULL, "Cannot create resolver: %s.", err));
-		goto end;
+		goto out;
 	}
 
 	/* create query to check the connection */
 	if (NULL == (query_rdf = ldns_rdf_new_frm_str(LDNS_RDF_TYPE_DNAME, ".")))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "cannot create DNS request"));
-		goto end;
+		goto out;
 	}
 
 	/* from this point item will not become NOTSUPPORTED */
 	ret = SYSINFO_RET_OK;
-
-	start_test(log_fd);
 
 	rsm_infof(log_fd, "IPv4:%s IPv6:%s", 0 == ipv4_enabled ? "DISABLED" : "ENABLED",
 			0 == ipv6_enabled ? "DISABLED" : "ENABLED");
@@ -88,7 +92,7 @@ int	check_rsm_resolver_status(const char *host, const AGENT_REQUEST *request, AG
 		if (!tries)
 		{
 			rsm_errf(log_fd, "dns check of local resolver %s failed: %s", resolver_ip, err);
-			goto end;
+			goto out;
 		}
 
 		/* will try again */
@@ -96,21 +100,19 @@ int	check_rsm_resolver_status(const char *host, const AGENT_REQUEST *request, AG
 				resolver_ip, err, tries, (tries == 1 ? "" : "s"));
 	}
 
-	status = 1;
-end:
+	test_status = 1;
+out:
 	if (0 != ISSET_MSG(result))
 		rsm_err(log_fd, result->msg);
 
 	if (SYSINFO_RET_OK == ret)
 	{
-		rsm_infof(log_fd, "status of \"%s\": %d", resolver_ip, status);
+		rsm_infof(log_fd, "status of \"%s\": %d", resolver_ip, test_status);
 
-		end_test(log_fd);
-
-		SET_UI64_RESULT(result, status);
+		SET_UI64_RESULT(result, test_status);
 
 		/* knock-down the probe if local resolver non-functional */
-		if (0 == status)
+		if (0 == test_status)
 			rsm_dc_errors_inc();
 	}
 
@@ -125,8 +127,7 @@ end:
 			ldns_resolver_free(res);
 	}
 
-	if (NULL != log_fd)
-		fclose(log_fd);
-out:
+	end_test(log_fd, NULL);
+
 	return ret;
 }

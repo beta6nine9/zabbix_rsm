@@ -36,7 +36,11 @@ static char	rsm_validate_host_list(const char *list, char delim)
 
 int	check_rsm_probe_status(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *result)
 {
-	char			err[ZBX_ERR_BUF_SIZE], ips4_init = 0, ips6_init = 0;
+	char			err[ZBX_ERR_BUF_SIZE],
+				*check_mode,
+				*ipv4_rootservers,
+				*ipv6_rootservers,
+				test_status = ZBX_EC_PROBE_UNSUPPORTED;
 	const char		*ip;
 	zbx_vector_str_t	ips4, ips6;
 	ldns_resolver		*res = NULL;
@@ -44,9 +48,26 @@ int	check_rsm_probe_status(const char *host, const AGENT_REQUEST *request, AGENT
 	FILE			*log_fd = NULL;
 	unsigned int		extras = RESOLVER_EXTRAS_DNSSEC;
 	uint16_t		resolver_port = DEFAULT_RESOLVER_PORT;
-	int			i, ipv4_enabled = 0, ipv6_enabled = 0, ipv4_min_servers, ipv6_min_servers, ipv4_reply_ms,
-				ipv6_reply_ms, online_delay, ok_servers, ret;
-	char			*check_mode, *ipv4_rootservers, *ipv6_rootservers, status = ZBX_EC_PROBE_UNSUPPORTED;
+	int			i,
+				ipv4_enabled = 0,
+				ipv6_enabled = 0,
+				ipv4_min_servers,
+				ipv6_min_servers,
+				ipv4_reply_ms,
+				ipv6_reply_ms,
+				online_delay,
+				ok_servers,
+				ret = SYSINFO_RET_FAIL;
+
+	zbx_vector_str_create(&ips4);
+	zbx_vector_str_create(&ips6);
+
+	/* open log file */
+	if (SUCCEED != start_test(&log_fd, NULL, host, NULL, ZBX_PROBESTATUS_LOG_PREFIX, err, sizeof(err)))
+	{
+		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
+		goto out;
+	}
 
 	if (10 != request->nparam)
 	{
@@ -68,17 +89,8 @@ int	check_rsm_probe_status(const char *host, const AGENT_REQUEST *request, AGENT
 	if (0 != strcmp("automatic", check_mode))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "first parameter has to be \"automatic\""));
-		return SYSINFO_RET_FAIL;
+		goto out;
 	}
-
-	/* open probestatus log file */
-	if (NULL == (log_fd = open_item_log(host, NULL, ZBX_PROBESTATUS_LOG_PREFIX, err, sizeof(err))))
-	{
-		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
-		return SYSINFO_RET_FAIL;
-	}
-
-	start_test(log_fd);
 
 	/* create query to check the connection */
 	if (NULL == (query_rdf = ldns_rdf_new_frm_str(LDNS_RDF_TYPE_DNAME, ".")))
@@ -93,9 +105,6 @@ int	check_rsm_probe_status(const char *host, const AGENT_REQUEST *request, AGENT
 	if (0 != ipv4_enabled)
 	{
 		char	c;
-
-		zbx_vector_str_create(&ips4);
-		ips4_init = 1;
 
 		if ('\0' != (c = rsm_validate_host_list(ipv4_rootservers, ',')))
 		{
@@ -140,7 +149,7 @@ int	check_rsm_probe_status(const char *host, const AGENT_REQUEST *request, AGENT
 			rsm_warnf(log_fd, "status OFFLINE. IPv4 protocol check failed, %d out of %d root servers"
 					" replied successfully, minimum required %d",
 					ok_servers, ips4.values_num, ipv4_min_servers);
-			status = ZBX_EC_PROBE_OFFLINE;
+			test_status = ZBX_EC_PROBE_OFFLINE;
 			goto out;
 		}
 	}
@@ -148,9 +157,6 @@ int	check_rsm_probe_status(const char *host, const AGENT_REQUEST *request, AGENT
 	if (0 != ipv6_enabled)
 	{
 		char	c;
-
-		zbx_vector_str_create(&ips6);
-		ips6_init = 1;
 
 		if ('\0' != (c = rsm_validate_host_list(ipv6_rootservers, ',')))
 		{
@@ -195,27 +201,27 @@ int	check_rsm_probe_status(const char *host, const AGENT_REQUEST *request, AGENT
 			rsm_warnf(log_fd, "status OFFLINE. IPv6 protocol check failed, %d out of %d root servers"
 					" replied successfully, minimum required %d",
 					ok_servers, ips6.values_num, ipv6_min_servers);
-			status = ZBX_EC_PROBE_OFFLINE;
+			test_status = ZBX_EC_PROBE_OFFLINE;
 			goto out;
 		}
 	}
 
-	status = ZBX_EC_PROBE_ONLINE;
+	test_status = ZBX_EC_PROBE_ONLINE;
 out:
 	if (0 != ISSET_MSG(result))
 		rsm_err(log_fd, result->msg);
 
 	/* The value @online_delay controlls how many seconds must the check be successful in order */
 	/* to switch from OFFLINE to ONLINE. This is why we keep last online time in the cache.     */
-	if (ZBX_EC_PROBE_UNSUPPORTED != status)
+	if (ZBX_EC_PROBE_UNSUPPORTED != test_status)
 	{
 		ret = SYSINFO_RET_OK;
 
-		if (ZBX_EC_PROBE_OFFLINE == status)
+		if (ZBX_EC_PROBE_OFFLINE == test_status)
 		{
 			DCset_probe_online_since(0);
 		}
-		else if (ZBX_EC_PROBE_ONLINE == status && ZBX_EC_PROBE_OFFLINE == DCget_probe_last_status())
+		else if (ZBX_EC_PROBE_ONLINE == test_status && ZBX_EC_PROBE_OFFLINE == DCget_probe_last_status())
 		{
 			time_t	probe_online_since, now;
 
@@ -232,7 +238,7 @@ out:
 				{
 					rsm_warnf(log_fd, "probe status successful for % seconds, still OFFLINE",
 							now - probe_online_since);
-					status = ZBX_EC_PROBE_OFFLINE;
+					test_status = ZBX_EC_PROBE_OFFLINE;
 				}
 				else
 				{
@@ -242,7 +248,7 @@ out:
 			}
 		}
 
-		SET_UI64_RESULT(result, status);
+		SET_UI64_RESULT(result, test_status);
 	}
 	else
 	{
@@ -250,9 +256,7 @@ out:
 		DCset_probe_online_since(0);
 	}
 
-	DCset_probe_last_status(status);
-
-	end_test(log_fd);
+	DCset_probe_last_status(test_status);
 
 	if (NULL != res)
 	{
@@ -262,17 +266,13 @@ out:
 			ldns_resolver_free(res);
 	}
 
-	if (0 != ips6_init)
-		rsm_vector_str_clean_and_destroy(&ips6);
-
-	if (0 != ips4_init)
-		rsm_vector_str_clean_and_destroy(&ips4);
+	rsm_vector_str_clean_and_destroy(&ips6);
+	rsm_vector_str_clean_and_destroy(&ips4);
 
 	if (NULL != query_rdf)
 		ldns_rdf_deep_free(query_rdf);
 
-	if (NULL != log_fd)
-		fclose(log_fd);
+	end_test(log_fd, NULL);
 
 	return ret;
 }

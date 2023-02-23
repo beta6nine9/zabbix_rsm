@@ -1839,7 +1839,7 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 	rsm_dnskeys_error_t	ec_dnskeys;
 	ldns_resolver		*res = NULL;
 	ldns_rr_list		*keys = NULL;
-	FILE			*log_fd;
+	FILE			*log_fd = NULL;
 	rsm_ns_t		*nss = NULL;
 	size_t			i, j, nss_num = 0;
 	unsigned int		extras,
@@ -1872,7 +1872,7 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 	if (17 != request->nparam)
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "item must contain 17 parameters"));
-		return ret;
+		goto out;
 	}
 
 	/* TLD goes first, then DNS specific parameters, then TLD options, probe options and global settings */
@@ -1894,18 +1894,23 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 	GET_PARAM_UINT  (test_recover_tcp , 15, "successful tests to recover from critical mode (TCP)");
 	GET_PARAM_NEMPTY(minns_value      , 16, "minimum number of working name servers");
 
-	rdds_enabled = (rdds43_enabled || rdds80_enabled);
+	/* open log file */
+	if (SUCCEED != start_test(&log_fd, output_fd, host, rsmhost, ZBX_DNS_LOG_PREFIX, err, sizeof(err)))
+	{
+		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
+		goto out;
+	}
 
 	if (SUCCEED != get_dns_minns_from_value((time_t)nextcheck, minns_value, &minns))
 	{
 		SET_MSG_RESULT(result, zbx_dsprintf(NULL, "unexpected format of parameter #17: %s", minns_value));
-		return ret;
+		goto out;
 	}
 
 	if (SUCCEED != metadata_file_exists(rsmhost, &file_exists, err, sizeof(err)))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
-		return ret;
+		goto out;
 	}
 
 	if (0 == file_exists)
@@ -1916,7 +1921,7 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 	else if (SUCCEED != read_metadata(rsmhost, &current_mode, &successful_tests, err, sizeof(err)))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
-		return ret;
+		goto out;
 	}
 
 	/* choose test protocol: if only one is enabled, select that one, otherwise select based on the ratio */
@@ -1950,20 +1955,6 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 		test_recover = test_recover_tcp;
 	}
 
-	/* open log file */
-	if (NULL == output_fd)
-	{
-		if (NULL == (log_fd = open_item_log(host, rsmhost, ZBX_DNS_LOG_PREFIX, err, sizeof(err))))
-		{
-			SET_MSG_RESULT(result, zbx_strdup(NULL, err));
-			return ret;
-		}
-	}
-	else
-		log_fd = output_fd;
-		
-	start_test(log_fd);
-
 	rsm_infof(log_fd, "mode: %s, protocol: %s, rtt limit: %d, tcp ratio: %d, minns: %d, UDP: %d, TCP: %d"
 			" (for critical mode: successful: %d, required for recovery: %d for UDP, %d for TCP)",
 			(CURRENT_MODE_NORMAL == current_mode ? "normal" : "critical"),
@@ -1990,7 +1981,7 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 			log_fd, err, sizeof(err)))
 	{
 		SET_MSG_RESULT(result, zbx_dsprintf(NULL, "cannot create resolver: %s", err));
-		goto end;
+		goto out;
 	}
 
 	/* get list of Name Servers and IPs, by default it will set every Name Server */
@@ -1999,13 +1990,13 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 			DEFAULT_NAMESERVER_PORT, log_fd, err, sizeof(err)))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
-		goto end;
+		goto out;
 	}
 
 	if (nss_num == 0)
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "nothing to do, no Name Servers to test"));
-		goto end;
+		goto out;
 	}
 
 	/* from this point item will not become NOTSUPPORTED */
@@ -2016,6 +2007,8 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 		zbx_snprintf(testedname, sizeof(testedname), "%s.%s.", testprefix, rsmhost);
 	else
 		zbx_snprintf(testedname, sizeof(testedname), "%s.", testprefix);
+
+	rdds_enabled = (rdds43_enabled || rdds80_enabled);
 
 	if (0 != dnssec_enabled && SUCCEED != rsm_get_dnskeys(res, rsmhost, resolver_ip, &keys, log_fd, &ec_dnskeys,
 			err, sizeof(err)))
@@ -2226,11 +2219,9 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 	rsm_infof(log_fd, "test result %s", json.buffer);
 
 	zbx_json_free(&json);
-end:
+out:
 	if (0 != ISSET_MSG(result))
 		rsm_err(log_fd, result->msg);
-
-	end_test(log_fd);
 
 	if (0 != nss_num)
 	{
@@ -2249,9 +2240,8 @@ end:
 			ldns_resolver_free(res);
 	}
 
-	if (NULL == output_fd && NULL != log_fd)
-		fclose(log_fd);
-out:
+	end_test(log_fd, output_fd);
+
 	return ret;
 }
 

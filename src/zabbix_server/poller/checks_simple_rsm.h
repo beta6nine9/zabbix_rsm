@@ -205,8 +205,8 @@
 #define ZBX_EC_EPP_INFOINVAL		-210	/* invalid reply to INFO command */
 #define ZBX_EC_EPP_SERVERCERT		-211	/* Server certificate validation failed */
 
-#define ZBX_EC_PROBE_OFFLINE		0	/* probe in automatic offline mode */
-#define ZBX_EC_PROBE_ONLINE		1	/* probe in automatic online mode */
+#define ZBX_EC_PROBE_OFFLINE		0	/* rsm.probe.status[automatic,...] result: offline */
+#define ZBX_EC_PROBE_ONLINE		1	/* rsm.probe.status[automatic,...] result: online  */
 #define ZBX_EC_PROBE_UNSUPPORTED	2	/* internal use only */
 
 #define ZBX_NO_VALUE			-1000	/* no value was obtained during the check, used in the code only */
@@ -371,8 +371,11 @@ int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *
 int	check_rsm_probe_status(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *result);
 int	check_rsm_resolver_status(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *result);
 
+int	start_test(FILE **log_fd, FILE *output_fd, const char *probe, const char *rsmhost, const char *suffix,
+		char *err, size_t err_size);
+void	end_test(FILE *log_fd, FILE *output_fd);
+
 int	rsm_validate_ip(const char *ip, int ipv4_enabled, int ipv6_enabled, ldns_rdf **ip_rdf_out, char *is_ipv4);
-FILE	*open_item_log(const char *host, const char *tld, const char *name, char *err, size_t err_size);
 void	rsm_get_strings_from_list(zbx_vector_str_t *strings, char *list, char delim);
 int	rsm_create_resolver(ldns_resolver **res, const char *name, const char *ip, uint16_t port, char protocol,
 		int ipv4_enabled, int ipv6_enabled, unsigned int extras, int timeout, unsigned char tries, FILE *log_fd,
@@ -401,9 +404,6 @@ int	rsm_check_dns_connection(const ldns_resolver *res, ldns_rdf *query_rdf, unsi
 		FILE *log_fd, char *err, size_t err_size);
 
 rsm_subtest_result_t	rsm_subtest_result(int rtt, int rtt_limit);
-
-void	start_test(FILE *log_fd);
-void	end_test(FILE *log_fd);
 
 #define rsm_dump(log_fd, fmt, ...)	fprintf(log_fd, ZBX_CONST_STRING(fmt), ##__VA_ARGS__)
 #define rsm_errf(log_fd, fmt, ...)	rsm_logf(log_fd, LOG_LEVEL_ERR, ZBX_CONST_STRING(fmt), ##__VA_ARGS__)
