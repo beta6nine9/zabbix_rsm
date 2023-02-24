@@ -26,7 +26,7 @@
 
 #include <openssl/ssl.h>
 
-#define ZBX_EPP_LOG_PREFIX	"epp"	/* file will be <LOGDIR>/<PROBE>-<TLD>-ZBX_EPP_LOG_PREFIX.log */
+#define RSM_EPP_LOG_PREFIX	"epp"	/* file will be <LOGDIR>/<PROBE>-<TLD>-RSM_EPP_LOG_PREFIX.log */
 
 #define XML_PATH_SERVER_ID	0
 #define XML_PATH_RESULT_CODE	1
@@ -227,14 +227,14 @@ static int	get_first_message(SSL *ssl, int *res, FILE *log_fd, const char *epp_s
 	if (SUCCEED != epp_recv_message(ssl, &data, &data_len, log_fd))
 	{
 		zbx_strlcpy(err, "cannot receive first message from server", err_size);
-		*res = ZBX_EC_EPP_FIRSTTO;
+		*res = RSM_EC_EPP_FIRSTTO;
 		goto out;
 	}
 
 	if (SUCCEED != get_xml_value(data, XML_PATH_SERVER_ID, xml_value, sizeof(xml_value)))
 	{
 		zbx_snprintf(err, err_size, "no Server ID in first message from server");
-		*res = ZBX_EC_EPP_FIRSTINVAL;
+		*res = RSM_EC_EPP_FIRSTINVAL;
 		goto out;
 	}
 
@@ -242,7 +242,7 @@ static int	get_first_message(SSL *ssl, int *res, FILE *log_fd, const char *epp_s
 	{
 		zbx_snprintf(err, err_size, "invalid Server ID in the first message from server: \"%s\""
 				" (expected \"%s\")", xml_value, epp_serverid);
-		*res = ZBX_EC_EPP_FIRSTINVAL;
+		*res = RSM_EC_EPP_FIRSTINVAL;
 		goto out;
 	}
 
@@ -281,7 +281,7 @@ static int	command_login(const char *epp_commands, const char *name, SSL *ssl, i
 	if (SUCCEED != get_tmpl(epp_commands, name, &tmpl))
 	{
 		zbx_snprintf(err, err_size, "cannot load template \"%s\"", name);
-		*rtt = ZBX_EC_EPP_INTERNAL_GENERAL;
+		*rtt = RSM_EC_EPP_INTERNAL_GENERAL;
 		goto out;
 	}
 
@@ -293,21 +293,21 @@ static int	command_login(const char *epp_commands, const char *name, SSL *ssl, i
 	if (SUCCEED != epp_send_message(ssl, tmpl, strlen(tmpl), log_fd))
 	{
 		zbx_snprintf(err, err_size, "cannot send command \"%s\"", name);
-		*rtt = ZBX_EC_EPP_LOGINTO;
+		*rtt = RSM_EC_EPP_LOGINTO;
 		goto out;
 	}
 
 	if (SUCCEED != epp_recv_message(ssl, &data, &data_len, log_fd))
 	{
 		zbx_snprintf(err, err_size, "cannot receive reply to command \"%s\"", name);
-		*rtt = ZBX_EC_EPP_LOGINTO;
+		*rtt = RSM_EC_EPP_LOGINTO;
 		goto out;
 	}
 
 	if (SUCCEED != get_xml_value(data, XML_PATH_RESULT_CODE, xml_value, sizeof(xml_value)))
 	{
 		zbx_snprintf(err, err_size, "no result code in reply");
-		*rtt = ZBX_EC_EPP_LOGININVAL;
+		*rtt = RSM_EC_EPP_LOGININVAL;
 		goto out;
 	}
 
@@ -315,7 +315,7 @@ static int	command_login(const char *epp_commands, const char *name, SSL *ssl, i
 	{
 		zbx_snprintf(err, err_size, "invalid result code in reply to \"%s\": \"%s\" (expected \"%s\")",
 				name, xml_value, EPP_SUCCESS_CODE_GENERAL);
-		*rtt = ZBX_EC_EPP_LOGININVAL;
+		*rtt = RSM_EC_EPP_LOGININVAL;
 		goto out;
 	}
 
@@ -333,7 +333,7 @@ out:
 static int	command_update(const char *epp_commands, const char *name, SSL *ssl, int *rtt, FILE *log_fd,
 		const char *epp_testprefix, const char *domain, char *err, size_t err_size)
 {
-	char		*tmpl = NULL, xml_value[XML_VALUE_BUF_SIZE], *data = NULL, tsbuf[32], buf[ZBX_HOST_BUF_SIZE];
+	char		*tmpl = NULL, xml_value[XML_VALUE_BUF_SIZE], *data = NULL, tsbuf[32], buf[RSM_BUF_SIZE];
 	size_t		data_len;
 	time_t		now;
 	zbx_timespec_t	start, end;
@@ -342,7 +342,7 @@ static int	command_update(const char *epp_commands, const char *name, SSL *ssl, 
 	if (SUCCEED != get_tmpl(epp_commands, name, &tmpl))
 	{
 		zbx_snprintf(err, err_size, "cannot load template \"%s\"", name);
-		*rtt = ZBX_EC_EPP_INTERNAL_GENERAL;
+		*rtt = RSM_EC_EPP_INTERNAL_GENERAL;
 		goto out;
 	}
 
@@ -359,21 +359,21 @@ static int	command_update(const char *epp_commands, const char *name, SSL *ssl, 
 	if (SUCCEED != epp_send_message(ssl, tmpl, strlen(tmpl), log_fd))
 	{
 		zbx_snprintf(err, err_size, "cannot send command \"%s\"", name);
-		*rtt = ZBX_EC_EPP_UPDATETO;
+		*rtt = RSM_EC_EPP_UPDATETO;
 		goto out;
 	}
 
 	if (SUCCEED != epp_recv_message(ssl, &data, &data_len, log_fd))
 	{
 		zbx_snprintf(err, err_size, "cannot receive reply to command \"%s\"", name);
-		*rtt = ZBX_EC_EPP_UPDATETO;
+		*rtt = RSM_EC_EPP_UPDATETO;
 		goto out;
 	}
 
 	if (SUCCEED != get_xml_value(data, XML_PATH_RESULT_CODE, xml_value, sizeof(xml_value)))
 	{
 		zbx_snprintf(err, err_size, "no result code in reply");
-		*rtt = ZBX_EC_EPP_UPDATEINVAL;
+		*rtt = RSM_EC_EPP_UPDATEINVAL;
 		goto out;
 	}
 
@@ -381,7 +381,7 @@ static int	command_update(const char *epp_commands, const char *name, SSL *ssl, 
 	{
 		zbx_snprintf(err, err_size, "invalid result code in reply to \"%s\": \"%s\" (expected \"%s\")",
 				name, xml_value, EPP_SUCCESS_CODE_GENERAL);
-		*rtt = ZBX_EC_EPP_UPDATEINVAL;
+		*rtt = RSM_EC_EPP_UPDATEINVAL;
 		goto out;
 	}
 
@@ -399,7 +399,7 @@ out:
 static int	command_info(const char *epp_commands, const char *name, SSL *ssl, int *rtt, FILE *log_fd,
 		const char *epp_testprefix, const char *domain, char *err, size_t err_size)
 {
-	char		*tmpl = NULL, xml_value[XML_VALUE_BUF_SIZE], *data = NULL, buf[ZBX_HOST_BUF_SIZE];
+	char		*tmpl = NULL, xml_value[XML_VALUE_BUF_SIZE], *data = NULL, buf[RSM_BUF_SIZE];
 	size_t		data_len;
 	zbx_timespec_t	start, end;
 	int		ret = FAIL;
@@ -407,7 +407,7 @@ static int	command_info(const char *epp_commands, const char *name, SSL *ssl, in
 	if (SUCCEED != get_tmpl(epp_commands, name, &tmpl))
 	{
 		zbx_snprintf(err, err_size, "cannot load template \"%s\"", name);
-		*rtt = ZBX_EC_EPP_INTERNAL_GENERAL;
+		*rtt = RSM_EC_EPP_INTERNAL_GENERAL;
 		goto out;
 	}
 
@@ -420,21 +420,21 @@ static int	command_info(const char *epp_commands, const char *name, SSL *ssl, in
 	if (SUCCEED != epp_send_message(ssl, tmpl, strlen(tmpl), log_fd))
 	{
 		zbx_snprintf(err, err_size, "cannot send command \"%s\"", name);
-		*rtt = ZBX_EC_EPP_INFOTO;
+		*rtt = RSM_EC_EPP_INFOTO;
 		goto out;
 	}
 
 	if (SUCCEED != epp_recv_message(ssl, &data, &data_len, log_fd))
 	{
 		zbx_snprintf(err, err_size, "cannot receive reply to command \"%s\"", name);
-		*rtt = ZBX_EC_EPP_INFOTO;
+		*rtt = RSM_EC_EPP_INFOTO;
 		goto out;
 	}
 
 	if (SUCCEED != get_xml_value(data, XML_PATH_RESULT_CODE, xml_value, sizeof(xml_value)))
 	{
 		zbx_snprintf(err, err_size, "no result code in reply");
-		*rtt = ZBX_EC_EPP_INFOINVAL;
+		*rtt = RSM_EC_EPP_INFOINVAL;
 		goto out;
 	}
 
@@ -442,7 +442,7 @@ static int	command_info(const char *epp_commands, const char *name, SSL *ssl, in
 	{
 		zbx_snprintf(err, err_size, "invalid result code in reply to \"%s\": \"%s\" (expected \"%s\")",
 				name, xml_value, EPP_SUCCESS_CODE_GENERAL);
-		*rtt = ZBX_EC_EPP_INFOINVAL;
+		*rtt = RSM_EC_EPP_INFOINVAL;
 		goto out;
 	}
 
@@ -510,21 +510,21 @@ static int	rsm_ssl_attach_cert(SSL *ssl, char *cert, size_t cert_len, int *rtt, 
 
 	if (NULL == (bio = BIO_new_mem_buf(cert, (int)cert_len)))
 	{
-		*rtt = ZBX_EC_EPP_INTERNAL_GENERAL;
+		*rtt = RSM_EC_EPP_INTERNAL_GENERAL;
 		zbx_strlcpy(err, "out of memory", err_size);
 		goto out;
 	}
 
 	if (NULL == (x509 = PEM_read_bio_X509(bio, NULL, NULL, NULL)))
 	{
-		*rtt = ZBX_EC_EPP_CRYPT;
+		*rtt = RSM_EC_EPP_CRYPT;
 		/*rsm_ssl_get_error(err, err_size);*/
 		goto out;
 	}
 
 	if (1 != SSL_use_certificate(ssl, x509))
 	{
-		*rtt = ZBX_EC_EPP_CRYPT;
+		*rtt = RSM_EC_EPP_CRYPT;
 		/*rsm_ssl_get_error(err, err_size);*/
 		goto out;
 	}
@@ -548,21 +548,21 @@ static int	rsm_ssl_attach_privkey(SSL *ssl, char *privkey, size_t privkey_len, i
 
 	if (NULL == (bio = BIO_new_mem_buf(privkey, (int)privkey_len)))
 	{
-		*rtt = ZBX_EC_EPP_INTERNAL_GENERAL;
+		*rtt = RSM_EC_EPP_INTERNAL_GENERAL;
 		zbx_strlcpy(err, "out of memory", err_size);
 		goto out;
 	}
 
 	if (NULL == (rsa = PEM_read_bio_RSAPrivateKey(bio, NULL, NULL, NULL)))
 	{
-		*rtt = ZBX_EC_EPP_CRYPT;
+		*rtt = RSM_EC_EPP_CRYPT;
 		/*rsm_ssl_get_error(err, err_size);*/
 		goto out;
 	}
 
 	if (1 != SSL_use_RSAPrivateKey(ssl, rsa))
 	{
-		*rtt = ZBX_EC_EPP_CRYPT;
+		*rtt = RSM_EC_EPP_CRYPT;
 		/*rsm_ssl_get_error(err, err_size);*/
 		goto out;
 	}
@@ -744,40 +744,40 @@ static int	rsm_validate_cert(X509 *cert, const char *md5_macro, int *rtt, char *
 	/* get certificate validity dates */
 	if (SUCCEED != rsm_parse_asn1time(X509_get_notBefore(cert), &not_before, err, err_size))
 	{
-		*rtt = ZBX_EC_EPP_SERVERCERT;
+		*rtt = RSM_EC_EPP_SERVERCERT;
 		goto out;
 	}
 
 	if (SUCCEED != rsm_parse_asn1time(X509_get_notAfter(cert), &not_after, err, err_size))
 	{
-		*rtt = ZBX_EC_EPP_SERVERCERT;
+		*rtt = RSM_EC_EPP_SERVERCERT;
 		goto out;
 	}
 
 	now = time(NULL);
 	if (now > not_after)
 	{
-		*rtt = ZBX_EC_EPP_SERVERCERT;
+		*rtt = RSM_EC_EPP_SERVERCERT;
 		zbx_strlcpy(err, "the certificate has expired", err_size);
 		goto out;
 	}
 
 	if (now < not_before)
 	{
-		*rtt = ZBX_EC_EPP_SERVERCERT;
+		*rtt = RSM_EC_EPP_SERVERCERT;
 		zbx_strlcpy(err, "the validity date is in the future", err_size);
 		goto out;
 	}
 
 	if (SUCCEED != rsm_get_cert_md5(cert, &md5, err, err_size))
 	{
-		*rtt = ZBX_EC_EPP_INTERNAL_GENERAL;
+		*rtt = RSM_EC_EPP_INTERNAL_GENERAL;
 		goto out;
 	}
 
 	if (0 != strcmp(md5_macro, md5))
 	{
-		*rtt = ZBX_EC_EPP_SERVERCERT;
+		*rtt = RSM_EC_EPP_SERVERCERT;
 		zbx_snprintf(err, err_size, "MD5 sum set in a macro (%s) differs from what we got (%s)", md5_macro, md5);
 		goto out;
 	}
@@ -824,7 +824,7 @@ int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *
 	ldns_resolver		*res = NULL;
 	rsm_resolver_error_t	ec_res;
 	char			*rsmhost,
-				err[ZBX_ERR_BUF_SIZE],
+				err[RSM_ERR_BUF_SIZE],
 				*value_str = NULL,
 				*res_ip = NULL,
 				*secretkey_enc_b64 = NULL,
@@ -858,9 +858,9 @@ int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *
 	size_t			epp_cert_size;
 	int			rv,
 				rtt,
-				rtt1 = ZBX_NO_VALUE,
-				rtt2 = ZBX_NO_VALUE,
-				rtt3 = ZBX_NO_VALUE,
+				rtt1 = RSM_NO_VALUE,
+				rtt2 = RSM_NO_VALUE,
+				rtt3 = RSM_NO_VALUE,
 				ipv4_enabled = 0,
 				ipv6_enabled = 0,
 				ret = SYSINFO_RET_FAIL;
@@ -883,7 +883,7 @@ int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *
 	}
 
 	/* open log file */
-	if (SUCCEED != start_test(&log_fd, NULL, host, rsmhost, ZBX_EPP_LOG_PREFIX, err, sizeof(err)))
+	if (SUCCEED != start_test(&log_fd, NULL, host, rsmhost, RSM_EPP_LOG_PREFIX, err, sizeof(err)))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
 		goto out;
@@ -934,7 +934,7 @@ int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *
 
 	if (1)/*if (SUCCEED != rsm_ssl_init())*/
 	{
-		rtt1 = rtt2 = rtt3 = ZBX_EC_EPP_INTERNAL_GENERAL;
+		rtt1 = rtt2 = rtt3 = RSM_EC_EPP_INTERNAL_GENERAL;
 		rsm_err(log_fd, "cannot initialize SSL library");
 		goto out;
 	}
@@ -945,7 +945,7 @@ int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *
 	/* create a new SSL context */
 	if (NULL == (ctx = SSL_CTX_new(method)))
 	{
-		rtt1 = rtt2 = rtt3 = ZBX_EC_EPP_INTERNAL_GENERAL;
+		rtt1 = rtt2 = rtt3 = RSM_EC_EPP_INTERNAL_GENERAL;
 		rsm_err(log_fd, "cannot create a new SSL context structure");
 		goto out;
 	}
@@ -956,7 +956,7 @@ int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *
 	/* create new SSL connection state object */
 	if (NULL == (ssl = SSL_new(ctx)))
 	{
-		rtt1 = rtt2 = rtt3 = ZBX_EC_EPP_INTERNAL_GENERAL;
+		rtt1 = rtt2 = rtt3 = RSM_EC_EPP_INTERNAL_GENERAL;
 		rsm_err(log_fd, "cannot create a new SSL context structure");
 		goto out;
 	}
@@ -966,10 +966,10 @@ int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *
 
 	/* resolve host to ips: TODO! error handler functions not implemented (see NULLs below) */
 	if (SUCCEED != rsm_resolve_host(res, random_host, &epp_ips,
-			(0 != ipv4_enabled ? ZBX_FLAG_IPV4_ENABLED : 0) | (0 != ipv6_enabled ? ZBX_FLAG_IPV6_ENABLED : 0),
+			(0 != ipv4_enabled ? RSM_FLAG_IPV4_ENABLED : 0) | (0 != ipv6_enabled ? RSM_FLAG_IPV6_ENABLED : 0),
 			log_fd, &ec_res, err, sizeof(err)))
 	{
-		rtt1 = rtt2 = rtt3 = (ZBX_RESOLVER_NOREPLY != ec_res ? ZBX_EC_EPP_NO_IP : ZBX_EC_EPP_INTERNAL_GENERAL);
+		rtt1 = rtt2 = rtt3 = (RSM_RESOLVER_NOREPLY != ec_res ? RSM_EC_EPP_NO_IP : RSM_EC_EPP_INTERNAL_GENERAL);
 		rsm_errf(log_fd, "\"%s\": %s", random_host, err);
 		goto out;
 	}
@@ -978,7 +978,7 @@ int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *
 
 	if (0 == epp_ips.values_num)
 	{
-		rtt1 = rtt2 = rtt3 = ZBX_EC_RDAP_INTERNAL_IP_UNSUP;
+		rtt1 = rtt2 = rtt3 = RSM_EC_RDAP_INTERNAL_IP_UNSUP;
 		rsm_errf(log_fd, "EPP \"%s\": IP address(es) of host not supported by this probe", random_host);
 		goto out;
 	}
@@ -990,7 +990,7 @@ int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *
 	if (SUCCEED != zbx_tcp_connect(&sock, NULL, ip, epp_port, RSM_TCP_TIMEOUT,
 			ZBX_TCP_SEC_UNENCRYPTED, NULL, NULL))
 	{
-		rtt1 = rtt2 = rtt3 = ZBX_EC_EPP_CONNECT;
+		rtt1 = rtt2 = rtt3 = RSM_EC_EPP_CONNECT;
 		rsm_errf(log_fd, "cannot connect to EPP server %s:%d", ip, epp_port);
 		goto out;
 	}
@@ -998,14 +998,14 @@ int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *
 	/* attach the socket descriptor to SSL session */
 	if (1 != SSL_set_fd(ssl, sock.socket))
 	{
-		rtt1 = rtt2 = rtt3 = ZBX_EC_EPP_INTERNAL_GENERAL;
+		rtt1 = rtt2 = rtt3 = RSM_EC_EPP_INTERNAL_GENERAL;
 		rsm_err(log_fd, "cannot attach TCP socket to SSL session");
 		goto out;
 	}
 
 	if (epp_cert_b64 == NULL)
 	{
-		rtt1 = rtt2 = rtt3 = ZBX_EC_EPP_INTERNAL_GENERAL;
+		rtt1 = rtt2 = rtt3 = RSM_EC_EPP_INTERNAL_GENERAL;
 		rsm_err(log_fd, "no EPP certificate");
 		goto out;
 	}
@@ -1024,7 +1024,7 @@ int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *
 			strlen(epp_privkey_enc_b64), epp_privkey_salt_b64, strlen(epp_privkey_salt_b64), &epp_privkey,
 			err, sizeof(err)))
 	{
-		rtt1 = rtt2 = rtt3 = ZBX_EC_EPP_INTERNAL_GENERAL;
+		rtt1 = rtt2 = rtt3 = RSM_EC_EPP_INTERNAL_GENERAL;
 		rsm_errf(log_fd, "cannot decrypt client private key: %s", err);
 		goto out;
 	}
@@ -1044,7 +1044,7 @@ int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *
 	/* try to SSL-connect, returns 1 on success */
 	if (1 != SSL_connect(ssl))
 	{
-		rtt1 = rtt2 = rtt3 = ZBX_EC_EPP_INTERNAL_GENERAL;
+		rtt1 = rtt2 = rtt3 = RSM_EC_EPP_INTERNAL_GENERAL;
 		/*rsm_ssl_get_error(err, sizeof(err));*/
 		rsm_errf(log_fd, "cannot build an SSL connection to %s:%d: %s", ip, epp_port, err);
 		goto out;
@@ -1053,7 +1053,7 @@ int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *
 	/* get the remote certificate into the X509 structure */
 	if (NULL == (epp_server_x509 = SSL_get_peer_certificate(ssl)))
 	{
-		rtt1 = rtt2 = rtt3 = ZBX_EC_EPP_SERVERCERT;
+		rtt1 = rtt2 = rtt3 = RSM_EC_EPP_SERVERCERT;
 		rsm_errf(log_fd, "cannot get Server certificate from %s:%d", ip, epp_port);
 		goto out;
 	}
@@ -1081,7 +1081,7 @@ int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *
 			strlen(epp_passwd_enc_b64), epp_passwd_salt_b64, strlen(epp_passwd_salt_b64), &epp_passwd,
 			err, sizeof(err)))
 	{
-		rtt1 = rtt2 = rtt3 = ZBX_EC_EPP_INTERNAL_GENERAL;
+		rtt1 = rtt2 = rtt3 = RSM_EC_EPP_INTERNAL_GENERAL;
 		rsm_errf(log_fd, "cannot decrypt EPP password: %s", err);
 		goto out;
 	}

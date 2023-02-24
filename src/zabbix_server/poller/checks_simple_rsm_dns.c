@@ -21,7 +21,7 @@
 #include "log.h"
 #include "checks_simple_rsm.h"
 
-#define ZBX_DNS_LOG_PREFIX	"dns"	/* file will be <LOGDIR>/<PROBE>-<TLD>-ZBX_DNS_LOG_PREFIX-<udp|tcp>.log */
+#define RSM_DNS_LOGPREFIX	"dns"	/* file will be <LOGDIR>/<PROBE>-<TLD>-RSM_DNS_LOGPREFIX-<udp|tcp>.log */
 
 #define LDNS_EDNS_NSID		3	/* NSID option code, from RFC5001 */
 #define NSID_MAX_LENGTH		127	/* hex representation of NSID must fit into 255 characters */
@@ -60,195 +60,195 @@ typedef struct
 }
 writer_thread_t;
 
-#define ZBX_DEFINE_ZBX_NS_QUERY_ERROR_TO(__interface)					\
+#define RSM_DEFINE_NS_QUERY_ERROR_TO(__interface)					\
 static int	rsm_ns_query_error_to_ ## __interface (rsm_ns_query_error_t err)	\
 {											\
 	switch (err)									\
 	{										\
-		case ZBX_NS_QUERY_INTERNAL:						\
-			return ZBX_EC_ ## __interface ## _INTERNAL_GENERAL;		\
-		case ZBX_NS_QUERY_NOREPLY:						\
-			return ZBX_EC_ ## __interface ## _NS_NOREPLY;			\
-		case ZBX_NS_QUERY_TO:							\
-			return ZBX_EC_ ## __interface ## _NS_TO;			\
-		case ZBX_NS_QUERY_ECON:							\
-			return ZBX_EC_ ## __interface ## _NS_ECON;			\
-		case ZBX_NS_QUERY_INC_HEADER:						\
-			return ZBX_EC_ ## __interface ## _HEADER;			\
-		case ZBX_NS_QUERY_INC_QUESTION:						\
-			return ZBX_EC_ ## __interface ## _QUESTION;			\
-		case ZBX_NS_QUERY_INC_ANSWER:						\
-			return ZBX_EC_ ## __interface ## _ANSWER;			\
-		case ZBX_NS_QUERY_INC_AUTHORITY:					\
-			return ZBX_EC_ ## __interface ## _AUTHORITY;			\
-		case ZBX_NS_QUERY_INC_ADDITIONAL:					\
-			return ZBX_EC_ ## __interface ## _ADDITIONAL;			\
+		case RSM_NS_QUERY_INTERNAL:						\
+			return RSM_EC_ ## __interface ## _INTERNAL_GENERAL;		\
+		case RSM_NS_QUERY_NOREPLY:						\
+			return RSM_EC_ ## __interface ## _NS_NOREPLY;			\
+		case RSM_NS_QUERY_TO:							\
+			return RSM_EC_ ## __interface ## _NS_TO;			\
+		case RSM_NS_QUERY_ECON:							\
+			return RSM_EC_ ## __interface ## _NS_ECON;			\
+		case RSM_NS_QUERY_INC_HEADER:						\
+			return RSM_EC_ ## __interface ## _HEADER;			\
+		case RSM_NS_QUERY_INC_QUESTION:						\
+			return RSM_EC_ ## __interface ## _QUESTION;			\
+		case RSM_NS_QUERY_INC_ANSWER:						\
+			return RSM_EC_ ## __interface ## _ANSWER;			\
+		case RSM_NS_QUERY_INC_AUTHORITY:					\
+			return RSM_EC_ ## __interface ## _AUTHORITY;			\
+		case RSM_NS_QUERY_INC_ADDITIONAL:					\
+			return RSM_EC_ ## __interface ## _ADDITIONAL;			\
 		default:								\
-			return ZBX_EC_ ## __interface ## _CATCHALL;			\
+			return RSM_EC_ ## __interface ## _CATCHALL;			\
 	}										\
 }
 
-ZBX_DEFINE_ZBX_NS_QUERY_ERROR_TO(DNS_UDP)
-ZBX_DEFINE_ZBX_NS_QUERY_ERROR_TO(DNS_TCP)
+RSM_DEFINE_NS_QUERY_ERROR_TO(DNS_UDP)
+RSM_DEFINE_NS_QUERY_ERROR_TO(DNS_TCP)
 
-#undef ZBX_DEFINE_ZBX_NS_QUERY_ERROR_TO
+#undef RSM_DEFINE_NS_QUERY_ERROR_TO
 
-#define ZBX_DEFINE_ZBX_DNSSEC_ERROR_TO(__interface)					\
+#define RSM_DEFINE_DNSSEC_ERROR_TO(__interface)					\
 static int	rsm_dnssec_error_to_ ## __interface (rsm_dnssec_error_t err)		\
 {											\
 	switch (err)									\
 	{										\
-		case ZBX_EC_DNSSEC_INTERNAL:						\
-			return ZBX_EC_ ## __interface ## _INTERNAL_GENERAL;		\
-		case ZBX_EC_DNSSEC_ALGO_UNKNOWN:					\
-			return ZBX_EC_ ## __interface ## _ALGO_UNKNOWN;			\
-		case ZBX_EC_DNSSEC_ALGO_NOT_IMPL:					\
-			return ZBX_EC_ ## __interface ## _ALGO_NOT_IMPL;		\
-		case ZBX_EC_DNSSEC_RRSIG_NONE:						\
-			return ZBX_EC_ ## __interface ## _RRSIG_NONE;			\
-		case ZBX_EC_DNSSEC_NO_NSEC_IN_AUTH:					\
-			return ZBX_EC_ ## __interface ## _NO_NSEC_IN_AUTH;		\
-		case ZBX_EC_DNSSEC_RRSIG_NOTCOVERED:					\
-			return ZBX_EC_ ## __interface ## _RRSIG_NOTCOVERED;		\
-		case ZBX_EC_DNSSEC_RRSIG_NOT_SIGNED:					\
-			return ZBX_EC_ ## __interface ## _RRSIG_NOT_SIGNED;		\
-		case ZBX_EC_DNSSEC_SIG_BOGUS:						\
-			return ZBX_EC_ ## __interface ## _SIG_BOGUS;			\
-		case ZBX_EC_DNSSEC_SIG_EXPIRED:						\
-			return ZBX_EC_ ## __interface ## _SIG_EXPIRED;			\
-		case ZBX_EC_DNSSEC_SIG_NOT_INCEPTED:					\
-			return ZBX_EC_ ## __interface ## _SIG_NOT_INCEPTED;		\
-		case ZBX_EC_DNSSEC_SIG_EX_BEFORE_IN:					\
-			return ZBX_EC_ ## __interface ## _SIG_EX_BEFORE_IN;		\
-		case ZBX_EC_DNSSEC_NSEC3_ERROR:						\
-			return ZBX_EC_ ## __interface ## _NSEC3_ERROR;			\
-		case ZBX_EC_DNSSEC_RR_NOTCOVERED:					\
-			return ZBX_EC_ ## __interface ## _RR_NOTCOVERED;		\
-		case ZBX_EC_DNSSEC_WILD_NOTCOVERED:					\
-			return ZBX_EC_ ## __interface ## _WILD_NOTCOVERED;		\
-		case ZBX_EC_DNSSEC_RRSIG_MISS_RDATA:					\
-			return ZBX_EC_ ## __interface ## _RRSIG_MISS_RDATA;		\
+		case RSM_EC_DNSSEC_INTERNAL:						\
+			return RSM_EC_ ## __interface ## _INTERNAL_GENERAL;		\
+		case RSM_EC_DNSSEC_ALGO_UNKNOWN:					\
+			return RSM_EC_ ## __interface ## _ALGO_UNKNOWN;			\
+		case RSM_EC_DNSSEC_ALGO_NOT_IMPL:					\
+			return RSM_EC_ ## __interface ## _ALGO_NOT_IMPL;		\
+		case RSM_EC_DNSSEC_RRSIG_NONE:						\
+			return RSM_EC_ ## __interface ## _RRSIG_NONE;			\
+		case RSM_EC_DNSSEC_NO_NSEC_IN_AUTH:					\
+			return RSM_EC_ ## __interface ## _NO_NSEC_IN_AUTH;		\
+		case RSM_EC_DNSSEC_RRSIG_NOTCOVERED:					\
+			return RSM_EC_ ## __interface ## _RRSIG_NOTCOVERED;		\
+		case RSM_EC_DNSSEC_RRSIG_NOT_SIGNED:					\
+			return RSM_EC_ ## __interface ## _RRSIG_NOT_SIGNED;		\
+		case RSM_EC_DNSSEC_SIG_BOGUS:						\
+			return RSM_EC_ ## __interface ## _SIG_BOGUS;			\
+		case RSM_EC_DNSSEC_SIG_EXPIRED:						\
+			return RSM_EC_ ## __interface ## _SIG_EXPIRED;			\
+		case RSM_EC_DNSSEC_SIG_NOT_INCEPTED:					\
+			return RSM_EC_ ## __interface ## _SIG_NOT_INCEPTED;		\
+		case RSM_EC_DNSSEC_SIG_EX_BEFORE_IN:					\
+			return RSM_EC_ ## __interface ## _SIG_EX_BEFORE_IN;		\
+		case RSM_EC_DNSSEC_NSEC3_ERROR:						\
+			return RSM_EC_ ## __interface ## _NSEC3_ERROR;			\
+		case RSM_EC_DNSSEC_RR_NOTCOVERED:					\
+			return RSM_EC_ ## __interface ## _RR_NOTCOVERED;		\
+		case RSM_EC_DNSSEC_WILD_NOTCOVERED:					\
+			return RSM_EC_ ## __interface ## _WILD_NOTCOVERED;		\
+		case RSM_EC_DNSSEC_RRSIG_MISS_RDATA:					\
+			return RSM_EC_ ## __interface ## _RRSIG_MISS_RDATA;		\
 		default:								\
-			return ZBX_EC_ ## __interface ## _DNSSEC_CATCHALL;		\
+			return RSM_EC_ ## __interface ## _DNSSEC_CATCHALL;		\
 	}										\
 }
 
-ZBX_DEFINE_ZBX_DNSSEC_ERROR_TO(DNS_UDP)
-ZBX_DEFINE_ZBX_DNSSEC_ERROR_TO(DNS_TCP)
+RSM_DEFINE_DNSSEC_ERROR_TO(DNS_UDP)
+RSM_DEFINE_DNSSEC_ERROR_TO(DNS_TCP)
 
-#undef ZBX_DEFINE_ZBX_DNSSEC_ERROR_TO
+#undef RSM_DEFINE_DNSSEC_ERROR_TO
 
-#define ZBX_DEFINE_ZBX_RR_CLASS_ERROR_TO(__interface)					\
+#define RSM_DEFINE_RR_CLASS_ERROR_TO(__interface)					\
 static int	rsm_rr_class_error_to_ ## __interface (rsm_rr_class_error_t err)	\
 {											\
 	switch (err)									\
 	{										\
-		case ZBX_EC_RR_CLASS_INTERNAL:						\
-			return ZBX_EC_ ## __interface ## _INTERNAL_GENERAL;		\
-		case ZBX_EC_RR_CLASS_CHAOS:						\
-			return ZBX_EC_ ## __interface ## _CLASS_CHAOS;			\
-		case ZBX_EC_RR_CLASS_HESIOD:						\
-			return ZBX_EC_ ## __interface ## _CLASS_HESIOD;			\
-		case ZBX_EC_RR_CLASS_CATCHALL:						\
-			return ZBX_EC_ ## __interface ## _CLASS_CATCHALL;		\
+		case RSM_EC_RR_CLASS_INTERNAL:						\
+			return RSM_EC_ ## __interface ## _INTERNAL_GENERAL;		\
+		case RSM_EC_RR_CLASS_CHAOS:						\
+			return RSM_EC_ ## __interface ## _CLASS_CHAOS;			\
+		case RSM_EC_RR_CLASS_HESIOD:						\
+			return RSM_EC_ ## __interface ## _CLASS_HESIOD;			\
+		case RSM_EC_RR_CLASS_CATCHALL:						\
+			return RSM_EC_ ## __interface ## _CLASS_CATCHALL;		\
 		default:								\
 			THIS_SHOULD_NEVER_HAPPEN;					\
-			return ZBX_EC_ ## __interface ## _INTERNAL_GENERAL;		\
+			return RSM_EC_ ## __interface ## _INTERNAL_GENERAL;		\
 	}										\
 }
 
-ZBX_DEFINE_ZBX_RR_CLASS_ERROR_TO(DNS_UDP)
-ZBX_DEFINE_ZBX_RR_CLASS_ERROR_TO(DNS_TCP)
+RSM_DEFINE_RR_CLASS_ERROR_TO(DNS_UDP)
+RSM_DEFINE_RR_CLASS_ERROR_TO(DNS_TCP)
 
-#undef ZBX_DEFINE_ZBX_RR_CLASS_ERROR_TO
+#undef RSM_DEFINE_RR_CLASS_ERROR_TO
 
-#define ZBX_DEFINE_DNSKEYS_ERROR_TO(__interface)					\
+#define RSM_DEFINE_DNSKEYS_ERROR_TO(__interface)					\
 static int	rsm_dnskeys_error_to_ ## __interface (rsm_dnskeys_error_t err)		\
 {											\
 	switch (err)									\
 	{										\
-		case ZBX_DNSKEYS_INTERNAL:						\
-			return ZBX_EC_ ## __interface ## _INTERNAL_GENERAL;		\
-		case ZBX_DNSKEYS_NOREPLY:						\
-			return ZBX_EC_ ## __interface ## _RES_NOREPLY;			\
-		case ZBX_DNSKEYS_NONE:							\
-			return ZBX_EC_ ## __interface ## _DNSKEY_NONE;			\
-		case ZBX_DNSKEYS_NOADBIT:						\
-			return ZBX_EC_ ## __interface ## _DNSKEY_NOADBIT;		\
-		case ZBX_DNSKEYS_NXDOMAIN:						\
-			return ZBX_EC_ ## __interface ## _RES_NXDOMAIN;			\
-		case ZBX_DNSKEYS_CATCHALL:						\
-			return ZBX_EC_ ## __interface ## _INTERNAL_RES_CATCHALL;	\
+		case RSM_DNSKEYS_INTERNAL:						\
+			return RSM_EC_ ## __interface ## _INTERNAL_GENERAL;		\
+		case RSM_DNSKEYS_NOREPLY:						\
+			return RSM_EC_ ## __interface ## _RES_NOREPLY;			\
+		case RSM_DNSKEYS_NONE:							\
+			return RSM_EC_ ## __interface ## _DNSKEY_NONE;			\
+		case RSM_DNSKEYS_NOADBIT:						\
+			return RSM_EC_ ## __interface ## _DNSKEY_NOADBIT;		\
+		case RSM_DNSKEYS_NXDOMAIN:						\
+			return RSM_EC_ ## __interface ## _RES_NXDOMAIN;			\
+		case RSM_DNSKEYS_CATCHALL:						\
+			return RSM_EC_ ## __interface ## _INTERNAL_RES_CATCHALL;	\
 		default:								\
 			THIS_SHOULD_NEVER_HAPPEN;					\
-			return ZBX_EC_ ## __interface ## _INTERNAL_GENERAL;		\
+			return RSM_EC_ ## __interface ## _INTERNAL_GENERAL;		\
 	}										\
 }
 
-ZBX_DEFINE_DNSKEYS_ERROR_TO(DNS_UDP)
-ZBX_DEFINE_DNSKEYS_ERROR_TO(DNS_TCP)
+RSM_DEFINE_DNSKEYS_ERROR_TO(DNS_UDP)
+RSM_DEFINE_DNSKEYS_ERROR_TO(DNS_TCP)
 
-#undef ZBX_DEFINE_DNSKEYS_ERROR_TO
+#undef RSM_DEFINE_DNSKEYS_ERROR_TO
 
 /* map generic name server errors to interface specific ones */
 
-#define ZBX_DEFINE_NS_ANSWER_ERROR_TO(__interface)					\
+#define RSM_DEFINE_NS_ANSWER_ERROR_TO(__interface)					\
 static int	rsm_ns_answer_error_to_ ## __interface (rsm_ns_answer_error_t err)	\
 {											\
 	switch (err)									\
 	{										\
-		case ZBX_NS_ANSWER_INTERNAL:						\
-			return ZBX_EC_ ## __interface ## _INTERNAL_GENERAL;		\
-		case ZBX_NS_ANSWER_ERROR_NOAAFLAG:					\
-			return ZBX_EC_ ## __interface ## _NOAAFLAG;			\
-		case ZBX_NS_ANSWER_ERROR_NODOMAIN:					\
-			return ZBX_EC_ ## __interface ## _NODOMAIN;			\
+		case RSM_NS_ANSWER_INTERNAL:						\
+			return RSM_EC_ ## __interface ## _INTERNAL_GENERAL;		\
+		case RSM_NS_ANSWER_ERROR_NOAAFLAG:					\
+			return RSM_EC_ ## __interface ## _NOAAFLAG;			\
+		case RSM_NS_ANSWER_ERROR_NODOMAIN:					\
+			return RSM_EC_ ## __interface ## _NODOMAIN;			\
 		default:								\
 			THIS_SHOULD_NEVER_HAPPEN;					\
-			return ZBX_EC_ ## __interface ## _INTERNAL_GENERAL;		\
+			return RSM_EC_ ## __interface ## _INTERNAL_GENERAL;		\
 	}										\
 }
 
-ZBX_DEFINE_NS_ANSWER_ERROR_TO(DNS_UDP)
-ZBX_DEFINE_NS_ANSWER_ERROR_TO(DNS_TCP)
+RSM_DEFINE_NS_ANSWER_ERROR_TO(DNS_UDP)
+RSM_DEFINE_NS_ANSWER_ERROR_TO(DNS_TCP)
 
-#undef ZBX_DEFINE_NS_ANSWER_ERROR_TO
+#undef RSM_DEFINE_NS_ANSWER_ERROR_TO
 
 /* definitions of RCODE 16-23 are missing from ldns library */
 /* https://open.nlnetlabs.nl/pipermail/ldns-users/2018-March/000912.html */
 
-#define ZBX_DEFINE_ZBX_RCODE_NOT_NXDOMAIN_TO(__interface)			\
+#define RSM_DEFINE_RCODE_NOT_NXDOMAIN_TO(__interface)			\
 static int	rsm_rcode_not_nxdomain_to_ ## __interface (ldns_pkt_rcode rcode)\
 {										\
 	switch (rcode)								\
 	{									\
 		case LDNS_RCODE_FORMERR:					\
-			return ZBX_EC_ ## __interface ## _RCODE_FORMERR;	\
+			return RSM_EC_ ## __interface ## _RCODE_FORMERR;	\
 		case LDNS_RCODE_SERVFAIL:					\
-			return ZBX_EC_ ## __interface ## _RCODE_SERVFAIL;	\
+			return RSM_EC_ ## __interface ## _RCODE_SERVFAIL;	\
 		case LDNS_RCODE_NOTIMPL:					\
-			return ZBX_EC_ ## __interface ## _RCODE_NOTIMP;		\
+			return RSM_EC_ ## __interface ## _RCODE_NOTIMP;		\
 		case LDNS_RCODE_REFUSED:					\
-			return ZBX_EC_ ## __interface ## _RCODE_REFUSED;	\
+			return RSM_EC_ ## __interface ## _RCODE_REFUSED;	\
 		case LDNS_RCODE_YXDOMAIN:					\
-			return ZBX_EC_ ## __interface ## _RCODE_YXDOMAIN;	\
+			return RSM_EC_ ## __interface ## _RCODE_YXDOMAIN;	\
 		case LDNS_RCODE_YXRRSET:					\
-			return ZBX_EC_ ## __interface ## _RCODE_YXRRSET;	\
+			return RSM_EC_ ## __interface ## _RCODE_YXRRSET;	\
 		case LDNS_RCODE_NXRRSET:					\
-			return ZBX_EC_ ## __interface ## _RCODE_NXRRSET;	\
+			return RSM_EC_ ## __interface ## _RCODE_NXRRSET;	\
 		case LDNS_RCODE_NOTAUTH:					\
-			return ZBX_EC_ ## __interface ## _RCODE_NOTAUTH;	\
+			return RSM_EC_ ## __interface ## _RCODE_NOTAUTH;	\
 		case LDNS_RCODE_NOTZONE:					\
-			return ZBX_EC_ ## __interface ## _RCODE_NOTZONE;	\
+			return RSM_EC_ ## __interface ## _RCODE_NOTZONE;	\
 		default:							\
-			return ZBX_EC_ ## __interface ## _RCODE_CATCHALL;	\
+			return RSM_EC_ ## __interface ## _RCODE_CATCHALL;	\
 	}									\
 }
 
-ZBX_DEFINE_ZBX_RCODE_NOT_NXDOMAIN_TO(DNS_UDP)
-ZBX_DEFINE_ZBX_RCODE_NOT_NXDOMAIN_TO(DNS_TCP)
+RSM_DEFINE_RCODE_NOT_NXDOMAIN_TO(DNS_UDP)
+RSM_DEFINE_RCODE_NOT_NXDOMAIN_TO(DNS_TCP)
 
-#undef ZBX_DEFINE_ZBX_RCODE_NOT_NXDOMAIN_TO
+#undef RSM_DEFINE_RCODE_NOT_NXDOMAIN_TO
 
 const rsm_error_functions_t DNS[] = {
 	{
@@ -326,13 +326,13 @@ static int	rsm_get_covered_rrsigs(const ldns_pkt *pkt, const ldns_rdf *owner, ld
 			if (NULL == (owner_str = ldns_rdf2str(owner)))
 			{
 				zbx_snprintf(err, err_size, "ldns_rdf2str() returned NULL");
-				*dnssec_ec = ZBX_EC_DNSSEC_INTERNAL;
+				*dnssec_ec = RSM_EC_DNSSEC_INTERNAL;
 			}
 			else
 			{
 				zbx_snprintf(err, err_size, "no %s RRSIG records for owner \"%s\" found in reply",
 						rsm_covered_to_str(covered_type), owner_str);
-				*dnssec_ec = ZBX_EC_DNSSEC_RRSIG_NONE;
+				*dnssec_ec = RSM_EC_DNSSEC_RRSIG_NONE;
 			}
 
 			return FAIL;
@@ -344,7 +344,7 @@ static int	rsm_get_covered_rrsigs(const ldns_pkt *pkt, const ldns_rdf *owner, ld
 		{
 			zbx_snprintf(err, err_size, "no %s RRSIG records found in reply",
 					rsm_covered_to_str(covered_type));
-			*dnssec_ec = ZBX_EC_DNSSEC_RRSIG_NONE;
+			*dnssec_ec = RSM_EC_DNSSEC_RRSIG_NONE;
 			return FAIL;
 		}
 	}
@@ -358,14 +358,14 @@ static int	rsm_get_covered_rrsigs(const ldns_pkt *pkt, const ldns_rdf *owner, ld
 		if (NULL == (rr = ldns_rr_list_rr(rrsigs, i)))
 		{
 			zbx_strlcpy(err, UNEXPECTED_LDNS_MEM_ERROR, err_size);
-			*dnssec_ec = ZBX_EC_DNSSEC_INTERNAL;
+			*dnssec_ec = RSM_EC_DNSSEC_INTERNAL;
 			goto out;
 		}
 
 		if (NULL == (covered_type_rdf = ldns_rr_rrsig_typecovered(rr)))
 		{
 			zbx_snprintf(err, err_size, "cannot get the type covered of a LDNS_RR_TYPE_RRSIG rr");
-			*dnssec_ec = ZBX_EC_DNSSEC_INTERNAL;
+			*dnssec_ec = RSM_EC_DNSSEC_INTERNAL;
 			goto out;
 		}
 
@@ -373,7 +373,7 @@ static int	rsm_get_covered_rrsigs(const ldns_pkt *pkt, const ldns_rdf *owner, ld
 				0 == ldns_rr_list_push_rr(*result, ldns_rr_clone(rr)))
 		{
 			zbx_strlcpy(err, UNEXPECTED_LDNS_MEM_ERROR, err_size);
-			*dnssec_ec = ZBX_EC_DNSSEC_INTERNAL;
+			*dnssec_ec = RSM_EC_DNSSEC_INTERNAL;
 			goto out;
 		}
 	}
@@ -451,7 +451,7 @@ static int	rsm_verify_rrsigs(const ldns_pkt *pkt, ldns_rr_type covered_type, con
 	{
 		zbx_snprintf(err, err_size, "no RRSIG records covering %s found at nameserver \"%s\" (%s)",
 				rsm_covered_to_str(covered_type), ns, ip);
-		*dnssec_ec = ZBX_EC_DNSSEC_RRSIG_NOTCOVERED;
+		*dnssec_ec = RSM_EC_DNSSEC_RRSIG_NOTCOVERED;
 		goto out;
 	}
 
@@ -462,7 +462,7 @@ static int	rsm_verify_rrsigs(const ldns_pkt *pkt, ldns_rr_type covered_type, con
 		if (NULL == (owner_str = ldns_rdf2str(owner_rdf)))
 		{
 			zbx_strlcpy(err, UNEXPECTED_LDNS_MEM_ERROR, err_size);
-			*dnssec_ec = ZBX_EC_DNSSEC_INTERNAL;
+			*dnssec_ec = RSM_EC_DNSSEC_INTERNAL;
 			goto out;
 		}
 
@@ -482,7 +482,7 @@ static int	rsm_verify_rrsigs(const ldns_pkt *pkt, ldns_rr_type covered_type, con
 			zbx_snprintf(err, err_size, "no %s records covering RRSIG of \"%s\""
 					" found at nameserver \"%s\" (%s)",
 					rsm_covered_to_str(covered_type), owner_buf, ns, ip);
-			*dnssec_ec = ZBX_EC_DNSSEC_RRSIG_NOTCOVERED;
+			*dnssec_ec = RSM_EC_DNSSEC_RRSIG_NOTCOVERED;
 			goto out;
 		}
 
@@ -510,51 +510,51 @@ static int	rsm_verify_rrsigs(const ldns_pkt *pkt, ldns_rr_type covered_type, con
 			switch (status)
 			{
 				case LDNS_STATUS_CRYPTO_UNKNOWN_ALGO:
-					*dnssec_ec = ZBX_EC_DNSSEC_ALGO_UNKNOWN;
+					*dnssec_ec = RSM_EC_DNSSEC_ALGO_UNKNOWN;
 					error_description = "unknown cryptographic algorithm";
 					break;
 				case LDNS_STATUS_CRYPTO_ALGO_NOT_IMPL:
-					*dnssec_ec = ZBX_EC_DNSSEC_ALGO_NOT_IMPL;
+					*dnssec_ec = RSM_EC_DNSSEC_ALGO_NOT_IMPL;
 					error_description = "cryptographic algorithm not implemented";
 					break;
 				case LDNS_STATUS_CRYPTO_NO_MATCHING_KEYTAG_DNSKEY:
-					*dnssec_ec = ZBX_EC_DNSSEC_RRSIG_NOT_SIGNED;
+					*dnssec_ec = RSM_EC_DNSSEC_RRSIG_NOT_SIGNED;
 					error_description = "the RRSIG found is not signed by a DNSKEY";
 					break;
 				case LDNS_STATUS_CRYPTO_BOGUS:
-					*dnssec_ec = ZBX_EC_DNSSEC_SIG_BOGUS;
+					*dnssec_ec = RSM_EC_DNSSEC_SIG_BOGUS;
 					error_description = "bogus DNSSEC signature";
 					break;
 				case LDNS_STATUS_CRYPTO_SIG_EXPIRED:
-					*dnssec_ec = ZBX_EC_DNSSEC_SIG_EXPIRED;
+					*dnssec_ec = RSM_EC_DNSSEC_SIG_EXPIRED;
 					error_description = "DNSSEC signature has expired";
 					break;
 				case LDNS_STATUS_CRYPTO_SIG_NOT_INCEPTED:
-					*dnssec_ec = ZBX_EC_DNSSEC_SIG_NOT_INCEPTED;
+					*dnssec_ec = RSM_EC_DNSSEC_SIG_NOT_INCEPTED;
 					error_description = "DNSSEC signature not incepted yet";
 					break;
 				case LDNS_STATUS_CRYPTO_EXPIRATION_BEFORE_INCEPTION:
-					*dnssec_ec = ZBX_EC_DNSSEC_SIG_EX_BEFORE_IN;
+					*dnssec_ec = RSM_EC_DNSSEC_SIG_EX_BEFORE_IN;
 					error_description = "DNSSEC signature has expiration date earlier than inception date";
 					break;
 				case LDNS_STATUS_NSEC3_ERR:				/* TODO: candidate for removal */
-					*dnssec_ec = ZBX_EC_DNSSEC_NSEC3_ERROR;
+					*dnssec_ec = RSM_EC_DNSSEC_NSEC3_ERROR;
 					error_description = "error in NSEC3 denial of existence";
 					break;
 				case LDNS_STATUS_DNSSEC_NSEC_RR_NOT_COVERED:		/* TODO: candidate for removal */
-					*dnssec_ec = ZBX_EC_DNSSEC_RR_NOTCOVERED;
+					*dnssec_ec = RSM_EC_DNSSEC_RR_NOTCOVERED;
 					error_description = "RR not covered by the given NSEC RRs";
 					break;
 				case LDNS_STATUS_DNSSEC_NSEC_WILDCARD_NOT_COVERED:	/* TODO: candidate for removal */
-					*dnssec_ec = ZBX_EC_DNSSEC_WILD_NOTCOVERED;
+					*dnssec_ec = RSM_EC_DNSSEC_WILD_NOTCOVERED;
 					error_description = "wildcard not covered by the given NSEC RRs";
 					break;
 				case LDNS_STATUS_MISSING_RDATA_FIELDS_RRSIG:
-					*dnssec_ec = ZBX_EC_DNSSEC_RRSIG_MISS_RDATA;
+					*dnssec_ec = RSM_EC_DNSSEC_RRSIG_MISS_RDATA;
 					error_description = "RRSIG has too few RDATA fields";
 					break;
 				default:
-					*dnssec_ec = ZBX_EC_DNSSEC_CATCHALL;
+					*dnssec_ec = RSM_EC_DNSSEC_CATCHALL;
 					error_description = "malformed DNSSEC response";
 			}
 
@@ -607,14 +607,14 @@ static int	rsm_verify_denial_of_existence(const ldns_pkt *pkt, rsm_dnssec_error_
 	if (NULL == (question = ldns_pkt_rr_list_by_type(pkt, LDNS_RR_TYPE_A, LDNS_SECTION_QUESTION)))
 	{
 		zbx_snprintf(err, err_size, "cannot obtain query section");
-		*dnssec_ec = ZBX_EC_DNSSEC_INTERNAL;
+		*dnssec_ec = RSM_EC_DNSSEC_INTERNAL;
 		goto out;
 	}
 
 	if (0 == ldns_rr_list_rr_count(question))
 	{
 		zbx_snprintf(err, err_size, "question section is empty");
-		*dnssec_ec = ZBX_EC_DNSSEC_INTERNAL;
+		*dnssec_ec = RSM_EC_DNSSEC_INTERNAL;
 		goto out;
 	}
 
@@ -627,7 +627,7 @@ static int	rsm_verify_denial_of_existence(const ldns_pkt *pkt, rsm_dnssec_error_
 		if (NULL == rrsigs)
 		{
 			zbx_snprintf(err, err_size, "missing rrsigs");
-			*dnssec_ec = ZBX_EC_DNSSEC_RRSIG_NONE;
+			*dnssec_ec = RSM_EC_DNSSEC_RRSIG_NONE;
 			goto out;
 		}
 
@@ -641,19 +641,19 @@ static int	rsm_verify_denial_of_existence(const ldns_pkt *pkt, rsm_dnssec_error_
 		if (LDNS_STATUS_DNSSEC_NSEC_RR_NOT_COVERED == status)
 		{
 			zbx_snprintf(err, err_size, "RR not covered by the given NSEC RRs");
-			*dnssec_ec = ZBX_EC_DNSSEC_RR_NOTCOVERED;
+			*dnssec_ec = RSM_EC_DNSSEC_RR_NOTCOVERED;
 			goto out;
 		}
 		else if (LDNS_STATUS_DNSSEC_NSEC_WILDCARD_NOT_COVERED == status)
 		{
 			zbx_snprintf(err, err_size, "wildcard not covered by the given NSEC RRs");
-			*dnssec_ec = ZBX_EC_DNSSEC_WILD_NOTCOVERED;
+			*dnssec_ec = RSM_EC_DNSSEC_WILD_NOTCOVERED;
 			goto out;
 		}
 		else if (LDNS_STATUS_OK != status)
 		{
 			zbx_snprintf(err, err_size, UNEXPECTED_LDNS_ERROR " \"%s\"", ldns_get_errorstr_by_id(status));
-			*dnssec_ec = ZBX_EC_DNSSEC_INTERNAL;
+			*dnssec_ec = RSM_EC_DNSSEC_INTERNAL;
 			goto out;
 		}
 	}
@@ -663,7 +663,7 @@ static int	rsm_verify_denial_of_existence(const ldns_pkt *pkt, rsm_dnssec_error_
 		if (NULL == rrsigs)
 		{
 			zbx_snprintf(err, err_size, "missing rrsigs");
-			*dnssec_ec = ZBX_EC_DNSSEC_RRSIG_NONE;
+			*dnssec_ec = RSM_EC_DNSSEC_RRSIG_NONE;
 			goto out;
 		}
 
@@ -678,25 +678,25 @@ static int	rsm_verify_denial_of_existence(const ldns_pkt *pkt, rsm_dnssec_error_
 		if (LDNS_STATUS_DNSSEC_NSEC_RR_NOT_COVERED == status)
 		{
 			zbx_snprintf(err, err_size, "RR not covered by the given NSEC RRs");
-			*dnssec_ec = ZBX_EC_DNSSEC_RR_NOTCOVERED;
+			*dnssec_ec = RSM_EC_DNSSEC_RR_NOTCOVERED;
 			goto out;
 		}
 		else if (LDNS_STATUS_DNSSEC_NSEC_WILDCARD_NOT_COVERED == status)
 		{
 			zbx_snprintf(err, err_size, "wildcard not covered by the given NSEC RRs");
-			*dnssec_ec = ZBX_EC_DNSSEC_WILD_NOTCOVERED;
+			*dnssec_ec = RSM_EC_DNSSEC_WILD_NOTCOVERED;
 			goto out;
 		}
 		else if (LDNS_STATUS_NSEC3_ERR == status)
 		{
 			zbx_snprintf(err, err_size, "error in NSEC3 denial of existence proof");
-			*dnssec_ec = ZBX_EC_DNSSEC_NSEC3_ERROR;
+			*dnssec_ec = RSM_EC_DNSSEC_NSEC3_ERROR;
 			goto out;
 		}
 		else if (LDNS_STATUS_OK != status)
 		{
 			zbx_snprintf(err, err_size, UNEXPECTED_LDNS_ERROR " \"%s\"", ldns_get_errorstr_by_id(status));
-			*dnssec_ec = ZBX_EC_DNSSEC_INTERNAL;
+			*dnssec_ec = RSM_EC_DNSSEC_INTERNAL;
 			goto out;
 		}
 	}
@@ -782,7 +782,7 @@ static int	rsm_dns_in_a_query(ldns_pkt **pkt, ldns_resolver *res, const ldns_rdf
 	if (NULL == opt_buf)
 	{
 		zbx_snprintf(err, err_size, "memory error in ldns_buffer_new()");
-		*ec = ZBX_NS_QUERY_INTERNAL;
+		*ec = RSM_NS_QUERY_INTERNAL;
 		goto out;
 	}
 
@@ -795,7 +795,7 @@ static int	rsm_dns_in_a_query(ldns_pkt **pkt, ldns_resolver *res, const ldns_rdf
 	if (NULL == send_nsid)
 	{
 		zbx_snprintf(err, err_size, "memory error in ldns_rdf_new_frm_data()");
-		*ec = ZBX_NS_QUERY_INTERNAL;
+		*ec = RSM_NS_QUERY_INTERNAL;
 		goto out;
 	}
 
@@ -834,7 +834,7 @@ err:
 			/* UDP */
 			if (!ldns_resolver_usevc(res))
 			{
-				*ec = ZBX_NS_QUERY_NOREPLY;
+				*ec = RSM_NS_QUERY_NOREPLY;
 			}
 			/* TCP */
 			else
@@ -847,32 +847,32 @@ err:
 
 				if (0 <= sec && zbx_time() - sec >= tv.tv_sec * retry)
 				{
-					*ec = ZBX_NS_QUERY_TO;
+					*ec = RSM_NS_QUERY_TO;
 				}
 				else
 				{
-					*ec = ZBX_NS_QUERY_ECON;
+					*ec = RSM_NS_QUERY_ECON;
 				}
 			}
 
 			break;
 		case LDNS_STATUS_WIRE_INCOMPLETE_HEADER:
-			*ec = ZBX_NS_QUERY_INC_HEADER;
+			*ec = RSM_NS_QUERY_INC_HEADER;
 			break;
 		case LDNS_STATUS_WIRE_INCOMPLETE_QUESTION:
-			*ec = ZBX_NS_QUERY_INC_QUESTION;
+			*ec = RSM_NS_QUERY_INC_QUESTION;
 			break;
 		case LDNS_STATUS_WIRE_INCOMPLETE_ANSWER:
-			*ec = ZBX_NS_QUERY_INC_ANSWER;
+			*ec = RSM_NS_QUERY_INC_ANSWER;
 			break;
 		case LDNS_STATUS_WIRE_INCOMPLETE_AUTHORITY:
-			*ec = ZBX_NS_QUERY_INC_AUTHORITY;
+			*ec = RSM_NS_QUERY_INC_AUTHORITY;
 			break;
 		case LDNS_STATUS_WIRE_INCOMPLETE_ADDITIONAL:
-			*ec = ZBX_NS_QUERY_INC_ADDITIONAL;
+			*ec = RSM_NS_QUERY_INC_ADDITIONAL;
 			break;
 		default:
-			*ec = ZBX_NS_QUERY_CATCHALL;
+			*ec = RSM_NS_QUERY_CATCHALL;
 	}
 out:
 	if (NULL != opt_buf)
@@ -901,7 +901,7 @@ static int	rsm_verify_rr_class(const ldns_rr_list *rr_list, rsm_rr_class_error_t
 		if (NULL == (rr = ldns_rr_list_rr(rr_list, i)))
 		{
 			zbx_strlcpy(err, UNEXPECTED_LDNS_MEM_ERROR, err_size);
-			*ec = ZBX_EC_RR_CLASS_INTERNAL;
+			*ec = RSM_EC_RR_CLASS_INTERNAL;
 			return FAIL;
 		}
 
@@ -918,13 +918,13 @@ static int	rsm_verify_rr_class(const ldns_rr_list *rr_list, rsm_rr_class_error_t
 			switch (rr_class)
 			{
 				case LDNS_RR_CLASS_CH:
-					*ec = ZBX_EC_RR_CLASS_CHAOS;
+					*ec = RSM_EC_RR_CLASS_CHAOS;
 					break;
 				case LDNS_RR_CLASS_HS:
-					*ec = ZBX_EC_RR_CLASS_HESIOD;
+					*ec = RSM_EC_RR_CLASS_HESIOD;
 					break;
 				default:
-					*ec = ZBX_EC_RR_CLASS_CATCHALL;
+					*ec = RSM_EC_RR_CLASS_CATCHALL;
 					break;
 			}
 
@@ -946,28 +946,28 @@ static int	rsm_domain_in_question_section(const ldns_pkt *pkt, const char *domai
 	if (NULL == (rr_list = ldns_pkt_rr_list_by_type(pkt, LDNS_RR_TYPE_A, LDNS_SECTION_QUESTION)))
 	{
 		zbx_strlcpy(err, "no A record in QUESTION section", err_size);
-		*ec = ZBX_NS_ANSWER_ERROR_NODOMAIN;
+		*ec = RSM_NS_ANSWER_ERROR_NODOMAIN;
 		goto out;
 	}
 
 	if (NULL == (owner_rdf = ldns_rr_list_owner(rr_list)))
 	{
 		zbx_strlcpy(err, "no A RR owner in QUESTION section", err_size);
-		*ec = ZBX_NS_ANSWER_ERROR_NODOMAIN;
+		*ec = RSM_NS_ANSWER_ERROR_NODOMAIN;
 		goto out;
 	}
 
 	if (NULL == (owner = ldns_rdf2str(owner_rdf)))
 	{
 		zbx_strlcpy(err, UNEXPECTED_LDNS_MEM_ERROR, err_size);
-		*ec = ZBX_NS_ANSWER_INTERNAL;
+		*ec = RSM_NS_ANSWER_INTERNAL;
 		goto out;
 	}
 
 	if (0 != strcasecmp(domain, owner))
 	{
 		zbx_snprintf(err, err_size, "A RR owner \"%s\" does not match expected \"%s\"", owner, domain);
-		*ec = ZBX_NS_ANSWER_ERROR_NODOMAIN;
+		*ec = RSM_NS_ANSWER_ERROR_NODOMAIN;
 		goto out;
 	}
 
@@ -991,7 +991,7 @@ static int	rsm_check_dnssec_no_epp(const ldns_pkt *pkt, const ldns_rr_list *keys
 			&&  SUCCEED != rsm_pkt_section_has_rr_type(pkt, LDNS_RR_TYPE_RRSIG, LDNS_SECTION_ADDITIONAL))
 	{
 		zbx_strlcpy(err, "no RRSIGs where found in any section", err_size);
-		*dnssec_ec = ZBX_EC_DNSSEC_RRSIG_NONE;
+		*dnssec_ec = RSM_EC_DNSSEC_RRSIG_NONE;
 		return FAIL;
 	}
 
@@ -1004,7 +1004,7 @@ static int	rsm_check_dnssec_no_epp(const ldns_pkt *pkt, const ldns_rr_list *keys
 	if (0 == auth_has_nsec && 0 == auth_has_nsec3)
 	{
 		zbx_strlcpy(err, "no NSEC/NSEC3 RRs were found in the authority section", err_size);
-		*dnssec_ec = ZBX_EC_DNSSEC_NO_NSEC_IN_AUTH;
+		*dnssec_ec = RSM_EC_DNSSEC_NO_NSEC_IN_AUTH;
 		return FAIL;
 	}
 
@@ -1014,10 +1014,10 @@ static int	rsm_check_dnssec_no_epp(const ldns_pkt *pkt, const ldns_rr_list *keys
 	if (SUCCEED == ret && 1 == auth_has_nsec3)
 		ret = rsm_verify_rrsigs(pkt, LDNS_RR_TYPE_NSEC3, keys, ns, ip, dnssec_ec, err, err_size);
 
-	/* we want to override the previous ZBX_EC_DNSSEC_RRSIG_NOT_SIGNED error with this one, if it fails */
-	if (SUCCEED == ret || ZBX_EC_DNSSEC_RRSIG_NOT_SIGNED == *dnssec_ec)
+	/* we want to override the previous RSM_EC_DNSSEC_RRSIG_NOT_SIGNED error with this one, if it fails */
+	if (SUCCEED == ret || RSM_EC_DNSSEC_RRSIG_NOT_SIGNED == *dnssec_ec)
 	{
-		char			err2[ZBX_ERR_BUF_SIZE];
+		char			err2[RSM_ERR_BUF_SIZE];
 		rsm_dnssec_error_t	dnssec_ec2;
 
 		if (SUCCEED != rsm_verify_denial_of_existence(pkt, &dnssec_ec2, err2, sizeof(err2)))
@@ -1094,14 +1094,14 @@ static int	rsm_get_ns_ip_values(ldns_resolver *res, const char *ns, const char *
 	/* change the resolver */
 	if (SUCCEED != rsm_change_resolver(res, ns, ip, port, ipv4_enabled, ipv6_enabled, err, err_size))
 	{
-		*rtt = DNS[DNS_PROTO(res)].ns_query_error(ZBX_NS_QUERY_INTERNAL);
+		*rtt = DNS[DNS_PROTO(res)].ns_query_error(RSM_NS_QUERY_INTERNAL);
 		goto out;
 	}
 
 	if (NULL == (testedname_rdf = ldns_rdf_new_frm_str(LDNS_RDF_TYPE_DNAME, testedname)))
 	{
 		zbx_strlcpy(err, UNEXPECTED_LDNS_MEM_ERROR, err_size);
-		*rtt = DNS[DNS_PROTO(res)].ns_query_error(ZBX_NS_QUERY_INTERNAL);
+		*rtt = DNS[DNS_PROTO(res)].ns_query_error(RSM_NS_QUERY_INTERNAL);
 		goto out;
 	}
 
@@ -1138,7 +1138,7 @@ static int	rsm_get_ns_ip_values(ldns_resolver *res, const char *ns, const char *
 	if (0 == ldns_pkt_aa(pkt))
 	{
 		zbx_strlcpy(err, "AA flag is not set in the answer from nameserver", err_size);
-		*rtt = DNS[DNS_PROTO(res)].ns_answer_error(ZBX_NS_ANSWER_ERROR_NOAAFLAG);
+		*rtt = DNS[DNS_PROTO(res)].ns_answer_error(RSM_NS_ANSWER_ERROR_NOAAFLAG);
 		goto out;
 	}
 
@@ -1156,14 +1156,14 @@ static int	rsm_get_ns_ip_values(ldns_resolver *res, const char *ns, const char *
 		/* PREFIX, e.g. "somedomain" when querying for "blahblah.somedomain.example." */
 		if (SUCCEED != rsm_get_last_label(testedname, &last_label, err, err_size))
 		{
-			*rtt = ZBX_EC_EPP_NOT_IMPLEMENTED;
+			*rtt = RSM_EC_EPP_NOT_IMPLEMENTED;
 			goto out;
 		}
 
 		if (NULL == (last_label_rdf = ldns_rdf_new_frm_str(LDNS_RDF_TYPE_DNAME, last_label)))
 		{
 			zbx_strlcpy(err, UNEXPECTED_LDNS_MEM_ERROR, err_size);
-			*rtt = ZBX_EC_EPP_NOT_IMPLEMENTED;
+			*rtt = RSM_EC_EPP_NOT_IMPLEMENTED;
 			goto out;
 		}
 
@@ -1172,7 +1172,7 @@ static int	rsm_get_ns_ip_values(ldns_resolver *res, const char *ns, const char *
 		{
 			zbx_snprintf(err, err_size, "no NS records of \"%s\" at nameserver \"%s\" (%s)", last_label,
 					ns, ip);
-			*rtt = ZBX_EC_EPP_NOT_IMPLEMENTED;
+			*rtt = RSM_EC_EPP_NOT_IMPLEMENTED;
 			goto out;
 		}
 
@@ -1190,7 +1190,7 @@ static int	rsm_get_ns_ip_values(ldns_resolver *res, const char *ns, const char *
 			{
 				zbx_snprintf(err, err_size, "cannot extract Unix timestamp from %s", host);
 				zbx_free(host);
-				*upd = ZBX_EC_EPP_NOT_IMPLEMENTED;
+				*upd = RSM_EC_EPP_NOT_IMPLEMENTED;
 				goto out;
 			}
 
@@ -1202,7 +1202,7 @@ static int	rsm_get_ns_ip_values(ldns_resolver *res, const char *ns, const char *
 						"Unix timestamp of %s is in the future (current: %ld)",
 						host, now);
 				zbx_free(host);
-				*upd = ZBX_EC_EPP_NOT_IMPLEMENTED;
+				*upd = RSM_EC_EPP_NOT_IMPLEMENTED;
 				goto out;
 			}
 
@@ -1275,7 +1275,7 @@ static int	rsm_get_dnskeys(ldns_resolver *res, const char *domain, const char *r
 	if (NULL == (domain_rdf = ldns_rdf_new_frm_str(LDNS_RDF_TYPE_DNAME, domain)))
 	{
 		zbx_strlcpy(err, UNEXPECTED_LDNS_MEM_ERROR, err_size);
-		*ec = ZBX_DNSKEYS_INTERNAL;
+		*ec = RSM_DNSKEYS_INTERNAL;
 		goto out;
 	}
 
@@ -1289,7 +1289,7 @@ static int	rsm_get_dnskeys(ldns_resolver *res, const char *domain, const char *r
 	{
 		zbx_snprintf(err, err_size, "cannot connect to resolver \"%s\": %s", resolver,
 				ldns_get_errorstr_by_id(status));
-		*ec = ZBX_DNSKEYS_NOREPLY;
+		*ec = RSM_DNSKEYS_NOREPLY;
 		goto out;
 	}
 
@@ -1301,7 +1301,7 @@ static int	rsm_get_dnskeys(ldns_resolver *res, const char *domain, const char *r
 	{
 		zbx_snprintf(err, err_size, "AD bit not present in the answer of \"%s\" from resolver \"%s\"",
 				domain, resolver);
-		*ec = ZBX_DNSKEYS_NOADBIT;
+		*ec = RSM_DNSKEYS_NOADBIT;
 		goto out;
 	}
 
@@ -1316,10 +1316,10 @@ static int	rsm_get_dnskeys(ldns_resolver *res, const char *domain, const char *r
 		switch (rcode)
 		{
 			case LDNS_RCODE_NXDOMAIN:
-				*ec = ZBX_DNSKEYS_NXDOMAIN;
+				*ec = RSM_DNSKEYS_NXDOMAIN;
 				break;
 			default:
-				*ec = ZBX_DNSKEYS_CATCHALL;
+				*ec = RSM_DNSKEYS_CATCHALL;
 		}
 
 		goto out;
@@ -1331,7 +1331,7 @@ static int	rsm_get_dnskeys(ldns_resolver *res, const char *domain, const char *r
 	{
 		zbx_snprintf(err, err_size, "no DNSKEY records of domain \"%s\" from resolver \"%s\"", domain,
 				resolver);
-		*ec = ZBX_DNSKEYS_NONE;
+		*ec = RSM_DNSKEYS_NONE;
 		goto out;
 	}
 
@@ -1450,7 +1450,7 @@ static int	rsm_get_nameservers(char *name_servers_list, rsm_ns_t **nss, size_t *
 
 		ns_entry->ips[ns_entry->ips_num].ip = zbx_strdup(NULL, ip_buf);
 		ns_entry->ips[ns_entry->ips_num].port = port;
-		ns_entry->ips[ns_entry->ips_num].upd = ZBX_NO_VALUE;
+		ns_entry->ips[ns_entry->ips_num].upd = RSM_NO_VALUE;
 		ns_entry->ips[ns_entry->ips_num].nsid = NULL;
 
 		ns_entry->ips_num++;
@@ -1525,10 +1525,10 @@ static void	set_dns_test_results(rsm_ns_t *nss, size_t nss_num, int rtt_limit, u
 				ip_dns_result = FAIL;
 
 			if (dnssec_status != NULL && (
-					(ZBX_EC_DNS_UDP_DNSSEC_FIRST >= nss[i].ips[j].rtt &&
-						nss[i].ips[j].rtt >= ZBX_EC_DNS_UDP_DNSSEC_LAST) ||
-					(ZBX_EC_DNS_TCP_DNSSEC_FIRST >= nss[i].ips[j].rtt &&
-						nss[i].ips[j].rtt >= ZBX_EC_DNS_TCP_DNSSEC_LAST)
+					(RSM_EC_DNS_UDP_DNSSEC_FIRST >= nss[i].ips[j].rtt &&
+						nss[i].ips[j].rtt >= RSM_EC_DNS_UDP_DNSSEC_LAST) ||
+					(RSM_EC_DNS_TCP_DNSSEC_FIRST >= nss[i].ips[j].rtt &&
+						nss[i].ips[j].rtt >= RSM_EC_DNS_TCP_DNSSEC_LAST)
 			))
 			{
 				ip_dnssec_result = FAIL;	/* this name server failed dnssec check */
@@ -1836,10 +1836,10 @@ static int	get_dns_minns_from_value(time_t now, const char *value, unsigned int 
 int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, int nextcheck,
 		const AGENT_REQUEST *request, AGENT_RESULT *result, FILE *output_fd)
 {
-	char			err[ZBX_ERR_BUF_SIZE], protocol, *rsmhost, *testprefix, *name_servers_list,
+	char			err[RSM_ERR_BUF_SIZE], protocol, *rsmhost, *testprefix, *name_servers_list,
 				*resolver_str,
-				resolver_ip[ZBX_HOST_BUF_SIZE],
-				testedname[ZBX_HOST_BUF_SIZE], *minns_value;
+				resolver_ip[RSM_BUF_SIZE],
+				testedname[RSM_BUF_SIZE], *minns_value;
 	rsm_dnskeys_error_t	ec_dnskeys;
 	ldns_resolver		*res = NULL;
 	ldns_rr_list		*keys = NULL;
@@ -1899,7 +1899,7 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 	GET_PARAM_NEMPTY(minns_value      , 16, "minimum number of working name servers");
 
 	/* open log file */
-	if (SUCCEED != start_test(&log_fd, output_fd, host, rsmhost, ZBX_DNS_LOG_PREFIX, err, sizeof(err)))
+	if (SUCCEED != start_test(&log_fd, output_fd, host, rsmhost, RSM_DNS_LOGPREFIX, err, sizeof(err)))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
 		goto out;
@@ -2092,7 +2092,7 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 
 				if (0 != last_test_failed)
 				{
-					nss[i].ips[j].rtt = DNS[DNS_PROTO(res)].ns_query_error(ZBX_NS_QUERY_INTERNAL);
+					nss[i].ips[j].rtt = DNS[DNS_PROTO(res)].ns_query_error(RSM_NS_QUERY_INTERNAL);
 
 					continue;
 				}
@@ -2107,7 +2107,7 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 						close(fd[1]);
 					}
 
-					nss[i].ips[j].rtt = DNS[DNS_PROTO(res)].ns_query_error(ZBX_NS_QUERY_INTERNAL);
+					nss[i].ips[j].rtt = DNS[DNS_PROTO(res)].ns_query_error(RSM_NS_QUERY_INTERNAL);
 					last_test_failed = 1;
 
 					continue;
@@ -2124,7 +2124,7 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 					close(log_pipe[0]);
 					close(log_pipe[1]);
 
-					nss[i].ips[j].rtt = DNS[DNS_PROTO(res)].ns_query_error(ZBX_NS_QUERY_INTERNAL);
+					nss[i].ips[j].rtt = DNS[DNS_PROTO(res)].ns_query_error(RSM_NS_QUERY_INTERNAL);
 					last_test_failed = 1;
 
 					continue;
@@ -2144,7 +2144,7 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 						rsm_errf(log_fd, "cannot open log pipe: %s", zbx_strerror(errno));
 
 						nss[i].ips[j].rtt =
-							DNS[DNS_PROTO(res)].ns_query_error(ZBX_NS_QUERY_INTERNAL);
+							DNS[DNS_PROTO(res)].ns_query_error(RSM_NS_QUERY_INTERNAL);
 					}
 
 					if (NULL != th_log_fd && SUCCEED != rsm_get_ns_ip_values(res,

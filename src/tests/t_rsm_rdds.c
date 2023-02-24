@@ -48,8 +48,8 @@ int	main(int argc, char *argv[])
 			ipv4_enabled = 0,
 			ipv6_enabled = 0,
 			*json_file = NULL, key[8192],
-			res_host_buf[ZBX_HOST_BUF_SIZE], rdds43_host_buf[ZBX_HOST_BUF_SIZE],
-			rdds80_host_buf[ZBX_HOST_BUF_SIZE];
+			res_host_buf[RSM_BUF_SIZE], rdds43_host_buf[RSM_BUF_SIZE],
+			rdds80_host_buf[RSM_BUF_SIZE];
 	const char	*res_ip = DEFAULT_RES_IP,
 			*testprefix = DEFAULT_TESTPREFIX;
 	int		c, index,

@@ -24,7 +24,7 @@
 #include "log.h"
 #include "rsm.h"
 
-#define ZBX_HTTP_RESPONSE_OK	200L
+#define RSM_HTTP_RESPONSE_OK	200L
 
 typedef struct
 {
@@ -36,8 +36,8 @@ rsm_ipv_t;
 
 static const rsm_ipv_t	ipvs[] =
 {
-	{"IPv4",	ZBX_FLAG_IPV4_ENABLED,	LDNS_RR_TYPE_A},
-	{"IPv6",	ZBX_FLAG_IPV6_ENABLED,	LDNS_RR_TYPE_AAAA},
+	{"IPv4",	RSM_FLAG_IPV4_ENABLED,	LDNS_RR_TYPE_A},
+	{"IPv6",	RSM_FLAG_IPV6_ENABLED,	LDNS_RR_TYPE_AAAA},
 	{NULL}
 };
 
@@ -46,7 +46,7 @@ static const char	*rsm_log_prefixes[] = { "Empty", "Fatal", "Error", "Warning", 
 void	rsm_logf(FILE *log_fd, int level, const char *fmt, ...)
 {
 	va_list		args;
-	char		fmt_buf[ZBX_ERR_BUF_SIZE];
+	char		fmt_buf[RSM_ERR_BUF_SIZE];
 	struct timeval	current_time;
 	struct tm	*tm;
 	long		ms;
@@ -288,14 +288,14 @@ void	get_host_and_port_from_str(const char *str, char delim, char *host, size_t 
 
 rsm_subtest_result_t	rsm_subtest_result(int rtt, int rtt_limit)
 {
-	if (ZBX_NO_VALUE == rtt)
+	if (RSM_NO_VALUE == rtt)
 		return RSM_SUBTEST_SUCCESS;
 
 	/* knock-down the probe if we are hitting internal errors */
-	if (ZBX_EC_DNS_UDP_INTERNAL_GENERAL == rtt)
+	if (RSM_EC_DNS_UDP_INTERNAL_GENERAL == rtt)
 		rsm_dc_errors_inc();
 
-	if (rtt <= ZBX_EC_DNS_UDP_INTERNAL_GENERAL && ZBX_EC_INTERNAL_LAST <= rtt)
+	if (rtt <= RSM_EC_DNS_UDP_INTERNAL_GENERAL && RSM_EC_INTERNAL_LAST <= rtt)
 		return RSM_SUBTEST_SUCCESS;
 
 	return (0 > rtt || rtt > rtt_limit ? RSM_SUBTEST_FAIL : RSM_SUBTEST_SUCCESS);
@@ -488,7 +488,7 @@ void	rsm_print_nameserver(FILE *log_fd, const ldns_resolver *res)
  *                                                                            *
  * Parameters: res          - [IN]  resolver object to use for resolving      *
  *             extras       - [IN]  bitmask of optional checks (a combination *
- *                                  of ZBX_RESOLVER_CHECK_* defines)          *
+ *                                  of RSM_RESOLVER_CHECK_* defines)          *
  *             host         - [IN]  host name to resolve                      *
  *             ips          - [OUT] IPs resolved from specified host          *
  *             ipv_flags    - [IN]  mask of supported and enabled IP versions *
@@ -513,7 +513,7 @@ int	rsm_resolve_host(ldns_resolver *res, const char *host, zbx_vector_str_t *ips
 	if (NULL == (rdf = ldns_rdf_new_frm_str(LDNS_RDF_TYPE_DNAME, host)))
 	{
 		zbx_strlcpy(err, UNEXPECTED_LDNS_MEM_ERROR, err_size);
-		*ec_res = ZBX_RESOLVER_INTERNAL;
+		*ec_res = RSM_RESOLVER_INTERNAL;
 		return ret;
 	}
 
@@ -532,7 +532,7 @@ int	rsm_resolve_host(ldns_resolver *res, const char *host, zbx_vector_str_t *ips
 		{
 			zbx_snprintf(err, err_size, "cannot resolve host \"%s\" to %s address: %s", host, ipv->name,
 					ldns_get_errorstr_by_id(status));
-			*ec_res = ZBX_RESOLVER_NOREPLY;
+			*ec_res = RSM_RESOLVER_NOREPLY;
 			goto out;
 		}
 
@@ -549,13 +549,13 @@ int	rsm_resolve_host(ldns_resolver *res, const char *host, zbx_vector_str_t *ips
 			switch (rcode)
 			{
 				case LDNS_RCODE_SERVFAIL:
-					*ec_res = ZBX_RESOLVER_SERVFAIL;
+					*ec_res = RSM_RESOLVER_SERVFAIL;
 					break;
 				case LDNS_RCODE_NXDOMAIN:
-					*ec_res = ZBX_RESOLVER_NXDOMAIN;
+					*ec_res = RSM_RESOLVER_NXDOMAIN;
 					break;
 				default:
-					*ec_res = ZBX_RESOLVER_CATCHALL;
+					*ec_res = RSM_RESOLVER_CATCHALL;
 			}
 
 			ldns_pkt_free(pkt);
@@ -633,7 +633,7 @@ void	rsm_get_strings_from_list(zbx_vector_str_t *strings, char *list, char delim
 /* http://www.iana.org/assignments/http-status-codes/http-status-codes.xhtml */
 int	map_http_code(long http_code)
 {
-#if ZBX_HTTP_RESPONSE_OK != 200L
+#if RSM_HTTP_RESPONSE_OK != 200L
 #	error "Mapping of HTTP statuses to error codes is based on assumption that status 200 is not an error."
 #endif
 
@@ -762,7 +762,7 @@ int	map_http_code(long http_code)
 	}
 }
 
-#define ZBX_FLAG_CURL_VERBOSE	0x1
+#define RSM_FLAG_CURL_VERBOSE	0x1
 
 /* Helper function for Web-based RDDS80 and RDAP checks. Adds host to header, connects to URL obeying timeout and */
 /* max redirect settings, stores web page contents using provided callback, checks for OK response and calculates */
@@ -776,7 +776,7 @@ int	rsm_http_test(const char *host, const char *url, long timeout, long maxredir
 	CURL			*easyhandle;
 	CURLcode		curl_err;
 	CURLoption		opt;
-	char			host_buf[ZBX_HOST_BUF_SIZE];
+	char			host_buf[RSM_BUF_SIZE];
 	double			total_time;
 	long			response_code, curlopt_verbose;
 	struct curl_slist	*slist = NULL;
@@ -787,7 +787,7 @@ int	rsm_http_test(const char *host, const char *url, long timeout, long maxredir
 	if (NULL == (easyhandle = curl_easy_init()))
 	{
 		ec_http->type = PRE_HTTP_STATUS_ERROR;
-		ec_http->error.pre_status_error = ZBX_EC_PRE_STATUS_ERROR_INTERNAL;
+		ec_http->error.pre_status_error = RSM_EC_PRE_STATUS_ERROR_INTERNAL;
 
 		zbx_strlcpy(err, "cannot init cURL library", err_size);
 		goto out;
@@ -797,13 +797,13 @@ int	rsm_http_test(const char *host, const char *url, long timeout, long maxredir
 	if (NULL == (slist = curl_slist_append(slist, host_buf)))
 	{
 		ec_http->type = PRE_HTTP_STATUS_ERROR;
-		ec_http->error.pre_status_error = ZBX_EC_PRE_STATUS_ERROR_INTERNAL;
+		ec_http->error.pre_status_error = RSM_EC_PRE_STATUS_ERROR_INTERNAL;
 
 		zbx_strlcpy(err, "cannot generate cURL list of HTTP headers", err_size);
 		goto out;
 	}
 
-	curlopt_verbose = (0 != (curl_flags & ZBX_FLAG_CURL_VERBOSE) ? 1L : 0L);
+	curlopt_verbose = (0 != (curl_flags & RSM_FLAG_CURL_VERBOSE) ? 1L : 0L);
 
 	if (CURLE_OK != (curl_err = curl_easy_setopt(easyhandle, opt = CURLOPT_FOLLOWLOCATION, 1L)) ||
 			CURLE_OK != (curl_err = curl_easy_setopt(easyhandle, opt = CURLOPT_USERAGENT, "Zabbix " ZABBIX_VERSION)) ||
@@ -818,7 +818,7 @@ int	rsm_http_test(const char *host, const char *url, long timeout, long maxredir
 			CURLE_OK != (curl_err = curl_easy_setopt(easyhandle, opt = CURLOPT_WRITEFUNCTION, writefunction)))
 	{
 		ec_http->type = PRE_HTTP_STATUS_ERROR;
-		ec_http->error.pre_status_error = ZBX_EC_PRE_STATUS_ERROR_INTERNAL;
+		ec_http->error.pre_status_error = RSM_EC_PRE_STATUS_ERROR_INTERNAL;
 
 		zbx_snprintf(err, err_size, "cannot set cURL option [%d] (%s)", (int)opt, curl_easy_strerror(curl_err));
 		goto out;
@@ -831,19 +831,19 @@ int	rsm_http_test(const char *host, const char *url, long timeout, long maxredir
 		switch (curl_err)
 		{
 			case CURLE_OPERATION_TIMEDOUT:
-				ec_http->error.pre_status_error = ZBX_EC_PRE_STATUS_ERROR_TO;
+				ec_http->error.pre_status_error = RSM_EC_PRE_STATUS_ERROR_TO;
 				break;
 			case CURLE_COULDNT_CONNECT:
-				ec_http->error.pre_status_error = ZBX_EC_PRE_STATUS_ERROR_ECON;
+				ec_http->error.pre_status_error = RSM_EC_PRE_STATUS_ERROR_ECON;
 				break;
 			case CURLE_TOO_MANY_REDIRECTS:
-				ec_http->error.pre_status_error = ZBX_EC_PRE_STATUS_ERROR_EMAXREDIRECTS;
+				ec_http->error.pre_status_error = RSM_EC_PRE_STATUS_ERROR_EMAXREDIRECTS;
 				break;
 			default:
 				if (0 == strncmp(url, "http://", ZBX_CONST_STRLEN("http://")))
-					ec_http->error.pre_status_error = ZBX_EC_PRE_STATUS_ERROR_EHTTP;
+					ec_http->error.pre_status_error = RSM_EC_PRE_STATUS_ERROR_EHTTP;
 				else	/* if (0 == strncmp(url, "https://", ZBX_CONST_STRLEN("https://"))) */
-					ec_http->error.pre_status_error = ZBX_EC_PRE_STATUS_ERROR_EHTTPS;
+					ec_http->error.pre_status_error = RSM_EC_PRE_STATUS_ERROR_EHTTPS;
 		}
 
 		zbx_strlcpy(err, curl_easy_strerror(curl_err), err_size);
@@ -853,18 +853,18 @@ int	rsm_http_test(const char *host, const char *url, long timeout, long maxredir
 	if (CURLE_OK != (curl_err = curl_easy_getinfo(easyhandle, CURLINFO_RESPONSE_CODE, &response_code)))
 	{
 		ec_http->type = PRE_HTTP_STATUS_ERROR;
-		ec_http->error.pre_status_error = ZBX_EC_PRE_STATUS_ERROR_NOCODE;
+		ec_http->error.pre_status_error = RSM_EC_PRE_STATUS_ERROR_NOCODE;
 
 		zbx_snprintf(err, err_size, "cannot get HTTP response code (%s)", curl_easy_strerror(curl_err));
 		goto out;
 	}
 
-	if (ZBX_HTTP_RESPONSE_OK != response_code)
+	if (RSM_HTTP_RESPONSE_OK != response_code)
 	{
 		ec_http->type = HTTP_STATUS_ERROR;
 		ec_http->error.response_code = response_code;
 
-		zbx_snprintf(err, err_size, "invalid HTTP response code, expected %ld, got %ld", ZBX_HTTP_RESPONSE_OK,
+		zbx_snprintf(err, err_size, "invalid HTTP response code, expected %ld, got %ld", RSM_HTTP_RESPONSE_OK,
 				response_code);
 		goto out;
 	}
@@ -872,7 +872,7 @@ int	rsm_http_test(const char *host, const char *url, long timeout, long maxredir
 	if (CURLE_OK != (curl_err = curl_easy_getinfo(easyhandle, CURLINFO_TOTAL_TIME, &total_time)))
 	{
 		ec_http->type = PRE_HTTP_STATUS_ERROR;
-		ec_http->error.pre_status_error = ZBX_EC_PRE_STATUS_ERROR_INTERNAL;
+		ec_http->error.pre_status_error = RSM_EC_PRE_STATUS_ERROR_INTERNAL;
 
 		zbx_snprintf(err, err_size, "cannot get HTTP request time (%s)", curl_easy_strerror(curl_err));
 		goto out;
@@ -889,7 +889,7 @@ out:
 		curl_easy_cleanup(easyhandle);
 #else
 	ec_http->type = PRE_HTTP_STATUS_ERROR;
-	ec_http->error.pre_status_error = ZBX_EC_PRE_STATUS_ERROR_INTERNAL;
+	ec_http->error.pre_status_error = RSM_EC_PRE_STATUS_ERROR_INTERNAL;
 
 	zbx_strlcpy(err, "zabbix is not compiled with libcurl support (--with-libcurl)", err_size);
 #endif

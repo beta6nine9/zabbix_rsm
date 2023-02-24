@@ -20,7 +20,7 @@
 #include "log.h"
 #include "checks_simple_rsm.h"
 
-#define ZBX_PROBESTATUS_LOG_PREFIX	"probestatus"	/* file will be <LOGDIR>/<PROBE>-ZBX_PROBESTATUS_LOG_PREFIX.log */
+#define RSM_PROBESTATUS_LOG_PREFIX	"probestatus"	/* file will be <LOGDIR>/<PROBE>-RSM_PROBESTATUS_LOG_PREFIX.log */
 
 static char	rsm_validate_host_list(const char *list, char delim)
 {
@@ -36,11 +36,11 @@ static char	rsm_validate_host_list(const char *list, char delim)
 
 int	check_rsm_probe_status(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *result)
 {
-	char			err[ZBX_ERR_BUF_SIZE],
+	char			err[RSM_ERR_BUF_SIZE],
 				*check_mode,
 				*ipv4_rootservers,
 				*ipv6_rootservers,
-				test_status = ZBX_EC_PROBE_UNSUPPORTED;
+				test_status = RSM_EC_PROBE_UNSUPPORTED;
 	const char		*ip;
 	zbx_vector_str_t	ips4, ips6;
 	ldns_resolver		*res = NULL;
@@ -63,7 +63,7 @@ int	check_rsm_probe_status(const char *host, const AGENT_REQUEST *request, AGENT
 	zbx_vector_str_create(&ips6);
 
 	/* open log file */
-	if (SUCCEED != start_test(&log_fd, NULL, host, NULL, ZBX_PROBESTATUS_LOG_PREFIX, err, sizeof(err)))
+	if (SUCCEED != start_test(&log_fd, NULL, host, NULL, RSM_PROBESTATUS_LOG_PREFIX, err, sizeof(err)))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
 		goto out;
@@ -162,7 +162,7 @@ int	check_rsm_probe_status(const char *host, const AGENT_REQUEST *request, AGENT
 			rsm_warnf(log_fd, "status OFFLINE. IPv4 protocol check failed, %d out of %d root servers"
 					" replied successfully, minimum required %d",
 					ok_servers, ips4.values_num, ipv4_min_servers);
-			test_status = ZBX_EC_PROBE_OFFLINE;
+			test_status = RSM_EC_PROBE_OFFLINE;
 			goto out;
 		}
 	}
@@ -214,24 +214,24 @@ int	check_rsm_probe_status(const char *host, const AGENT_REQUEST *request, AGENT
 			rsm_warnf(log_fd, "status OFFLINE. IPv6 protocol check failed, %d out of %d root servers"
 					" replied successfully, minimum required %d",
 					ok_servers, ips6.values_num, ipv6_min_servers);
-			test_status = ZBX_EC_PROBE_OFFLINE;
+			test_status = RSM_EC_PROBE_OFFLINE;
 			goto out;
 		}
 	}
 
-	test_status = ZBX_EC_PROBE_ONLINE;
+	test_status = RSM_EC_PROBE_ONLINE;
 out:
 	/* The value @online_delay controlls how many seconds must the check be successful in order */
 	/* to switch from OFFLINE to ONLINE. This is why we keep last online time in the cache.     */
-	if (ZBX_EC_PROBE_UNSUPPORTED != test_status)
+	if (RSM_EC_PROBE_UNSUPPORTED != test_status)
 	{
 		ret = SYSINFO_RET_OK;
 
-		if (ZBX_EC_PROBE_OFFLINE == test_status)
+		if (RSM_EC_PROBE_OFFLINE == test_status)
 		{
 			DCset_probe_online_since(0);
 		}
-		else if (ZBX_EC_PROBE_ONLINE == test_status && ZBX_EC_PROBE_OFFLINE == DCget_probe_last_status())
+		else if (RSM_EC_PROBE_ONLINE == test_status && RSM_EC_PROBE_OFFLINE == DCget_probe_last_status())
 		{
 			time_t	probe_online_since, now;
 
@@ -248,7 +248,7 @@ out:
 				{
 					rsm_warnf(log_fd, "probe status successful for % seconds, still OFFLINE",
 							now - probe_online_since);
-					test_status = ZBX_EC_PROBE_OFFLINE;
+					test_status = RSM_EC_PROBE_OFFLINE;
 				}
 				else
 				{

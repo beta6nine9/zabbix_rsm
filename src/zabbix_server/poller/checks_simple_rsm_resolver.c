@@ -20,12 +20,12 @@
 #include "log.h"
 #include "checks_simple_rsm.h"
 
-#define ZBX_RESOLVERSTATUS_LOG_PREFIX	"resolverstatus"	/* file will be <LOGDIR>/<PROBE>-ZBX_RESOLVERSTATUS_LOG_PREFIX.log */
+#define RSM_RESOLVERSTATUS_LOG_PREFIX	"resolverstatus"	/* file will be <LOGDIR>/<PROBE>-RSM_RESOLVERSTATUS_LOG_PREFIX.log */
 
 int	check_rsm_resolver_status(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *result)
 {
 	char		*resolver_ip,
-			err[ZBX_ERR_BUF_SIZE];
+			err[RSM_ERR_BUF_SIZE];
 	ldns_resolver	*res = NULL;
 	ldns_rdf	*query_rdf = NULL;
 	FILE		*log_fd = NULL;
@@ -39,7 +39,7 @@ int	check_rsm_resolver_status(const char *host, const AGENT_REQUEST *request, AG
 			ret = SYSINFO_RET_FAIL;
 
 	/* open log file */
-	if (SUCCEED != start_test(&log_fd, NULL, host, NULL, ZBX_RESOLVERSTATUS_LOG_PREFIX, err, sizeof(err)))
+	if (SUCCEED != start_test(&log_fd, NULL, host, NULL, RSM_RESOLVERSTATUS_LOG_PREFIX, err, sizeof(err)))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
 		goto out;

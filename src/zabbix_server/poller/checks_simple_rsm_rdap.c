@@ -20,18 +20,18 @@
 #include "log.h"
 #include "checks_simple_rsm.h"
 
-#define ZBX_RDAP_LOG_PREFIX	"rdap"	/* file will be <LOGDIR>/<PROBE>-<TLD>-ZBX_RDAP_LOG_PREFIX.log */
+#define RSM_RDAP_LOG_PREFIX	"rdap"	/* file will be <LOGDIR>/<PROBE>-<TLD>-RSM_RDAP_LOG_PREFIX.log */
 
 /* FIXME Currently this error code is missing in specification for RDAP. Hopefully, it will be introduced later. */
-#ifdef ZBX_EC_RDAP_NOCODE
-#	error "please remove temporary definition of ZBX_EC_RDAP_NOCODE, seems like it was added to the header file"
+#ifdef RSM_EC_RDAP_NOCODE
+#	error "please remove temporary definition of RSM_EC_RDAP_NOCODE, seems like it was added to the header file"
 #else
-#	define ZBX_EC_RDAP_NOCODE	ZBX_EC_RDAP_INTERNAL_GENERAL
+#	define RSM_EC_RDAP_NOCODE	RSM_EC_RDAP_INTERNAL_GENERAL
 #endif
 
-ZBX_DEFINE_RESOLVER_ERROR_TO(RDAP)
-ZBX_DEFINE_HTTP_PRE_STATUS_ERROR_TO(RDAP)
-ZBX_DEFINE_HTTP_ERROR_TO(RDAP)
+RSM_DEFINE_RESOLVER_ERROR_TO(RDAP)
+RSM_DEFINE_HTTP_PRE_STATUS_ERROR_TO(RDAP)
+RSM_DEFINE_HTTP_ERROR_TO(RDAP)
 
 /* used in libcurl callback function to store webpage contents in memory */
 typedef struct
@@ -85,10 +85,10 @@ int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 				*path = NULL,
 				*formed_url = NULL,
 				*value_str = NULL,
-				err[ZBX_ERR_BUF_SIZE],
+				err[RSM_ERR_BUF_SIZE],
 				is_ipv4,
 				query[64],
-				resolver_ip[ZBX_HOST_BUF_SIZE];
+				resolver_ip[RSM_BUF_SIZE];
 	const char		*ip = NULL;
 	size_t			value_alloc = 0;
 	rsm_http_error_t	ec_http;
@@ -102,7 +102,7 @@ int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 				ipv_flags = 0,
 				curl_flags = 0,
 				port,
-				rtt = ZBX_NO_VALUE,
+				rtt = RSM_NO_VALUE,
 				ret = SYSINFO_RET_FAIL;
 
 	zbx_vector_str_create(&ips);
@@ -126,7 +126,7 @@ int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 	GET_PARAM_NEMPTY(resolver_str        , 9, "IP address of local resolver");
 
 	/* open log file */
-	if (SUCCEED != start_test(&log_fd, output_fd, host, rsmhost, ZBX_RDAP_LOG_PREFIX, err, sizeof(err)))
+	if (SUCCEED != start_test(&log_fd, output_fd, host, rsmhost, RSM_RDAP_LOG_PREFIX, err, sizeof(err)))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
 		goto out;
@@ -190,7 +190,7 @@ int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 	if (0 == strcmp(base_url, "not listed"))
 	{
 		rsm_err(log_fd, "The TLD is not listed in the Bootstrap Service Registry for Domain Name Space");
-		rtt = ZBX_EC_RDAP_NOTLISTED;
+		rtt = RSM_EC_RDAP_NOTLISTED;
 		goto out;
 	}
 
@@ -198,14 +198,14 @@ int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 	{
 		rsm_err(log_fd, "The RDAP base URL obtained from Bootstrap Service Registry for Domain Name Space"
 				" does not use HTTPS");
-		rtt = ZBX_EC_RDAP_NOHTTPS;
+		rtt = RSM_EC_RDAP_NOHTTPS;
 		goto out;
 	}
 
 	if (0 != ipv4_enabled)
-		ipv_flags |= ZBX_FLAG_IPV4_ENABLED;
+		ipv_flags |= RSM_FLAG_IPV4_ENABLED;
 	if (0 != ipv6_enabled)
-		ipv_flags |= ZBX_FLAG_IPV6_ENABLED;
+		ipv_flags |= RSM_FLAG_IPV6_ENABLED;
 
 	/* resolve domain to IPs */
 	if (SUCCEED != rsm_resolve_host(res, domain, &ips, ipv_flags, log_fd, &ec_res, err, sizeof(err)))
@@ -217,7 +217,7 @@ int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 
 	if (0 == ips.values_num)
 	{
-		rtt = ZBX_EC_RDAP_INTERNAL_IP_UNSUP;
+		rtt = RSM_EC_RDAP_INTERNAL_IP_UNSUP;
 		rsm_errf(log_fd, "IP address(es) of host \"%s\" are not supported on this Probe", domain);
 		goto out;
 	}
@@ -227,7 +227,7 @@ int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 
 	if (SUCCEED != rsm_validate_ip(ip, ipv4_enabled, ipv6_enabled, NULL, &is_ipv4))
 	{
-		rtt = ZBX_EC_RDAP_INTERNAL_GENERAL;
+		rtt = RSM_EC_RDAP_INTERNAL_GENERAL;
 		rsm_errf(log_fd, "internal error, selected unsupported IP of \"%s\": \"%s\"", domain, ip);
 		goto out;
 	}
@@ -256,21 +256,21 @@ int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 
 	if (NULL == data.buf || '\0' == *data.buf || SUCCEED != zbx_json_open(data.buf, &jp))
 	{
-		rtt = ZBX_EC_RDAP_EJSON;
+		rtt = RSM_EC_RDAP_EJSON;
 		rsm_errf(log_fd, "invalid JSON format in response of \"%s\" (%s)", base_url, ip);
 		goto out;
 	}
 
 	if (SUCCEED != zbx_json_value_by_name_dyn(&jp, "ldhName", &value_str, &value_alloc, NULL))
 	{
-		rtt = ZBX_EC_RDAP_NONAME;
+		rtt = RSM_EC_RDAP_NONAME;
 		rsm_errf(log_fd, "ldhName member not found in response of \"%s\" (%s)", base_url, ip);
 		goto out;
 	}
 
 	if (NULL == value_str || 0 != strcmp(value_str, testedname))
 	{
-		rtt = ZBX_EC_RDAP_ENAME;
+		rtt = RSM_EC_RDAP_ENAME;
 		rsm_errf(log_fd, "ldhName member doesn't match query in response of \"%s\" (%s)", base_url, ip);
 		goto out;
 	}

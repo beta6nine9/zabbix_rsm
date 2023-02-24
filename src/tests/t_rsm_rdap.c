@@ -33,7 +33,7 @@ int	main(int argc, char *argv[])
 	char		*testedname = NULL, *base_url = NULL, *res_ip = NULL,
 			ipv4_enabled = 0, ipv6_enabled = 0, *json_file = NULL,
 			key[8192],
-			res_host_buf[ZBX_HOST_BUF_SIZE];
+			res_host_buf[RSM_BUF_SIZE];
 	AGENT_REQUEST	request;
 	AGENT_RESULT	result;
 
