@@ -328,7 +328,7 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 
 	/* create resolver, note: it's used in both RDDS43 and RDDS80 tests */
 	if (SUCCEED != rsm_create_resolver(&res, "resolver", resolver_ip, resolver_port, RSM_TCP, ipv4_enabled,
-			ipv6_enabled, RESOLVER_EXTRAS_NONE, RSM_TCP_TIMEOUT, RSM_TCP_RETRY, log_fd, err, sizeof(err)))
+			ipv6_enabled, RESOLVER_EXTRAS_NONE, RSM_TCP_TIMEOUT, RSM_TCP_RETRY, err, sizeof(err)))
 	{
 		/* exception, item becomes UNSUPPORTED */
 		SET_MSG_RESULT(result, zbx_dsprintf(NULL, "cannot create resolver: %s", err));
@@ -499,9 +499,6 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 		rsm_infof(log_fd, "end RDDS80 test (rtt:%d)", rtt80);
 	}
 out:
-	if (0 != ISSET_MSG(result))
-		rsm_err(log_fd, result->msg);
-
 	if (SYSINFO_RET_OK == ret && (0 != rsmhost_rdds43_enabled || 0 != rsmhost_rdds80_enabled) && 0 != probe_rdds_enabled)
 	{
 		int	rdds43_status, rdds80_status;
@@ -529,8 +526,6 @@ out:
 
 		SET_TEXT_RESULT(result, zbx_strdup(NULL, json.buffer));
 
-		rsm_infof(log_fd, "%s", json.buffer);
-
 		zbx_json_free(&json);
 	}
 
@@ -552,7 +547,7 @@ out:
 	rsm_vector_str_clean_and_destroy(&ips80);
 	rsm_vector_str_clean_and_destroy(&ips43);
 
-	end_test(log_fd, output_fd);
+	end_test(log_fd, output_fd, result);
 
 	return ret;
 }

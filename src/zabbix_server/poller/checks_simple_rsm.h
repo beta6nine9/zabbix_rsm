@@ -373,21 +373,22 @@ int	check_rsm_resolver_status(const char *host, const AGENT_REQUEST *request, AG
 
 int	start_test(FILE **log_fd, FILE *output_fd, const char *probe, const char *rsmhost, const char *suffix,
 		char *err, size_t err_size);
-void	end_test(FILE *log_fd, FILE *output_fd);
+void	end_test(FILE *log_fd, FILE *output_fd, AGENT_RESULT *result);
 
 int	rsm_validate_ip(const char *ip, int ipv4_enabled, int ipv6_enabled, ldns_rdf **ip_rdf_out, char *is_ipv4);
 void	rsm_get_strings_from_list(zbx_vector_str_t *strings, char *list, char delim);
 int	rsm_create_resolver(ldns_resolver **res, const char *name, const char *ip, uint16_t port, char protocol,
-		int ipv4_enabled, int ipv6_enabled, unsigned int extras, int timeout, unsigned char tries, FILE *log_fd,
-		char *err, size_t err_size);
+		int ipv4_enabled, int ipv6_enabled, unsigned int extras, int timeout, unsigned char tries, char *err,
+		size_t err_size);
+int	rsm_change_resolver(ldns_resolver *res, const char *name, const char *ip, uint16_t port, int ipv4_enabled,
+		int ipv6_enabled, char *err, size_t err_size);
 size_t	rsm_random(size_t max_values);
+void	rsm_print_nameserver(FILE *log_fd, const ldns_resolver *res);
 int	rsm_resolve_host(ldns_resolver *res, const char *host, zbx_vector_str_t *ips, int ipv_flags,
 		FILE *log_fd, rsm_resolver_error_t *ec_res, char *err, size_t err_size);
 void	rsm_vector_str_clean_and_destroy(zbx_vector_str_t *v);
 void	get_host_and_port_from_str(const char *str, char delim, char *host, size_t host_size, unsigned short *port,
 		unsigned short default_port);
-int	rsm_change_resolver(ldns_resolver *res, const char *name, const char *ip, uint16_t port, int ipv4_enabled,
-		int ipv6_enabled, FILE *log_fd, char *err, size_t err_size);
 int	rsm_get_ts_from_host(const char *host, time_t *ts);
 int	rsm_split_url(const char *url, char **scheme, char **domain, int *port, char **path, char *err, size_t err_size);
 

@@ -72,7 +72,7 @@ int	check_rsm_resolver_status(const char *host, const AGENT_REQUEST *request, AG
 
 	/* create resolver */
 	if (SUCCEED != rsm_create_resolver(&res, "resolver", resolver_ip, resolver_port, RSM_UDP, ipv4_enabled,
-			ipv6_enabled, extras, RSM_UDP_TIMEOUT, RSM_UDP_RETRY, log_fd, err, sizeof(err)))
+			ipv6_enabled, extras, RSM_UDP_TIMEOUT, RSM_UDP_RETRY, err, sizeof(err)))
 	{
 		SET_MSG_RESULT(result, zbx_dsprintf(NULL, "Cannot create resolver: %s.", err));
 		goto out;
@@ -112,8 +112,6 @@ int	check_rsm_resolver_status(const char *host, const AGENT_REQUEST *request, AG
 
 	test_status = 1;
 out:
-	if (0 != ISSET_MSG(result))
-		rsm_err(log_fd, result->msg);
 
 	if (SYSINFO_RET_OK == ret)
 	{
@@ -137,7 +135,7 @@ out:
 			ldns_resolver_free(res);
 	}
 
-	end_test(log_fd, NULL);
+	end_test(log_fd, NULL, result);
 
 	return ret;
 }

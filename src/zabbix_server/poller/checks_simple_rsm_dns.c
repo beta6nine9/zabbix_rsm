@@ -768,7 +768,7 @@ static void	extract_nsid(ldns_rdf *edns_data, char **nsid)
 }
 
 static int	rsm_dns_in_a_query(ldns_pkt **pkt, ldns_resolver *res, const ldns_rdf *testname_rdf, char **nsid,
-		rsm_ns_query_error_t *ec, char *err, size_t err_size)
+		rsm_ns_query_error_t *ec, FILE *log_fd, char *err, size_t err_size)
 {
 	ldns_status	status;
 	double		sec = -1;
@@ -810,6 +810,8 @@ static int	rsm_dns_in_a_query(ldns_pkt **pkt, ldns_resolver *res, const ldns_rdf
 	ldns_pkt_set_edns_data(query, send_nsid);
 
 	sec = zbx_time();
+
+	rsm_print_nameserver(log_fd, res);
 
 	status = ldns_resolver_send_pkt(pkt, res, query);
 
@@ -1090,7 +1092,7 @@ static int	rsm_get_ns_ip_values(ldns_resolver *res, const char *ns, const char *
 	int			ret = FAIL;
 
 	/* change the resolver */
-	if (SUCCEED != rsm_change_resolver(res, ns, ip, port, ipv4_enabled, ipv6_enabled, log_fd, err, err_size))
+	if (SUCCEED != rsm_change_resolver(res, ns, ip, port, ipv4_enabled, ipv6_enabled, err, err_size))
 	{
 		*rtt = DNS[DNS_PROTO(res)].ns_query_error(ZBX_NS_QUERY_INTERNAL);
 		goto out;
@@ -1104,7 +1106,7 @@ static int	rsm_get_ns_ip_values(ldns_resolver *res, const char *ns, const char *
 	}
 
 	/* IN A query */
-	if (SUCCEED != rsm_dns_in_a_query(&pkt, res, testedname_rdf, nsid, &query_ec, err, err_size))
+	if (SUCCEED != rsm_dns_in_a_query(&pkt, res, testedname_rdf, nsid, &query_ec, log_fd, err, err_size))
 	{
 		*rtt = DNS[DNS_PROTO(res)].ns_query_error(query_ec);
 		goto out;
@@ -1262,7 +1264,7 @@ out:
 }
 
 static int	rsm_get_dnskeys(ldns_resolver *res, const char *domain, const char *resolver,
-		ldns_rr_list **keys, FILE *pkt_file, rsm_dnskeys_error_t *ec, char *err, size_t err_size)
+		ldns_rr_list **keys, FILE *log_fd, rsm_dnskeys_error_t *ec, char *err, size_t err_size)
 {
 	ldns_pkt	*pkt = NULL;
 	ldns_rdf	*domain_rdf = NULL;
@@ -1277,6 +1279,8 @@ static int	rsm_get_dnskeys(ldns_resolver *res, const char *domain, const char *r
 		goto out;
 	}
 
+	rsm_print_nameserver(log_fd, res);
+
 	/* query domain records */
 	status = ldns_resolver_query_status(&pkt, res, domain_rdf, LDNS_RR_TYPE_DNSKEY, LDNS_RR_CLASS_IN,
 			LDNS_RD | LDNS_AD);
@@ -1290,7 +1294,7 @@ static int	rsm_get_dnskeys(ldns_resolver *res, const char *domain, const char *r
 	}
 
 	/* log the packet */
-	ldns_pkt_print(pkt_file, pkt);
+	ldns_pkt_print(log_fd, pkt);
 
 	/* check the AD bit */
 	if (0 == ldns_pkt_ad(pkt))
@@ -1999,11 +2003,18 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 			DEFAULT_RESOLVER_PORT);
 
 	/* create resolver */
-	if (SUCCEED != rsm_create_resolver(&res, "resolver", resolver_ip, resolver_port, protocol, ipv4_enabled,
+	if (SUCCEED != rsm_create_resolver(
+			&res,
+			"resolver",
+			resolver_ip,
+			resolver_port,
+			protocol,
+			ipv4_enabled,
 			ipv6_enabled, extras,
 			(RSM_UDP == protocol ? RSM_UDP_TIMEOUT : RSM_TCP_TIMEOUT),
 			(RSM_UDP == protocol ? RSM_UDP_RETRY   : RSM_TCP_RETRY),
-			log_fd, err, sizeof(err)))
+			err,
+			sizeof(err)))
 	{
 		SET_MSG_RESULT(result, zbx_dsprintf(NULL, "cannot create resolver: %s", err));
 		goto out;
@@ -2241,13 +2252,8 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 
 	SET_TEXT_RESULT(result, zbx_strdup(NULL, json.buffer));
 
-	rsm_infof(log_fd, "test result %s", json.buffer);
-
 	zbx_json_free(&json);
 out:
-	if (0 != ISSET_MSG(result))
-		rsm_err(log_fd, result->msg);
-
 	if (0 != nss_num)
 	{
 		rsm_clean_nss(nss, nss_num);
@@ -2265,7 +2271,7 @@ out:
 			ldns_resolver_free(res);
 	}
 
-	end_test(log_fd, output_fd);
+	end_test(log_fd, output_fd, result);
 
 	return ret;
 }

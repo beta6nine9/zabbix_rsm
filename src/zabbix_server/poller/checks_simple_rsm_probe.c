@@ -134,7 +134,7 @@ int	check_rsm_probe_status(const char *host, const AGENT_REQUEST *request, AGENT
 			ip = ips4.values[i];
 
 			if (SUCCEED != rsm_create_resolver(&res, "root server", ip, resolver_port, RSM_UDP, ipv4_enabled,
-					ipv6_enabled, extras, RSM_UDP_TIMEOUT, RSM_UDP_RETRY, log_fd, err, sizeof(err)))
+					ipv6_enabled, extras, RSM_UDP_TIMEOUT, RSM_UDP_RETRY, err, sizeof(err)))
 			{
 				SET_MSG_RESULT(result, zbx_dsprintf(NULL, "cannot instantiate LDNS resolver: %s", err));
 				goto out;
@@ -186,7 +186,7 @@ int	check_rsm_probe_status(const char *host, const AGENT_REQUEST *request, AGENT
 			ip = ips6.values[i];
 
 			if (SUCCEED != rsm_create_resolver(&res, "root server", ip, resolver_port, RSM_UDP, ipv4_enabled,
-					ipv6_enabled, extras, RSM_UDP_TIMEOUT, RSM_UDP_RETRY, log_fd, err, sizeof(err)))
+					ipv6_enabled, extras, RSM_UDP_TIMEOUT, RSM_UDP_RETRY, err, sizeof(err)))
 			{
 				SET_MSG_RESULT(result, zbx_dsprintf(NULL, "cannot instantiate LDNS resolver: %s", err));
 				goto out;
@@ -221,9 +221,6 @@ int	check_rsm_probe_status(const char *host, const AGENT_REQUEST *request, AGENT
 
 	test_status = ZBX_EC_PROBE_ONLINE;
 out:
-	if (0 != ISSET_MSG(result))
-		rsm_err(log_fd, result->msg);
-
 	/* The value @online_delay controlls how many seconds must the check be successful in order */
 	/* to switch from OFFLINE to ONLINE. This is why we keep last online time in the cache.     */
 	if (ZBX_EC_PROBE_UNSUPPORTED != test_status)
@@ -285,7 +282,7 @@ out:
 	if (NULL != query_rdf)
 		ldns_rdf_deep_free(query_rdf);
 
-	end_test(log_fd, NULL);
+	end_test(log_fd, NULL, result);
 
 	return ret;
 }

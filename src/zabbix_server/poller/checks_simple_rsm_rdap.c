@@ -163,8 +163,7 @@ int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 
 		/* create resolver */
 		if (SUCCEED != rsm_create_resolver(&res, "resolver", resolver_ip, resolver_port, RSM_TCP, ipv4_enabled,
-				ipv6_enabled, RESOLVER_EXTRAS_DNSSEC, RSM_TCP_TIMEOUT, RSM_TCP_RETRY, log_fd,
-				err, sizeof(err)))
+				ipv6_enabled, RESOLVER_EXTRAS_DNSSEC, RSM_TCP_TIMEOUT, RSM_TCP_RETRY, err, sizeof(err)))
 		{
 			SET_MSG_RESULT(result, zbx_dsprintf(NULL, "Cannot create resolver: %s.", err));
 			goto out;
@@ -278,9 +277,6 @@ int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 
 	rsm_infof(log_fd, "end test of \"%s\" (%s) (rtt:%d)", base_url, ZBX_NULL2STR(ip), rtt);
 out:
-	if (0 != ISSET_MSG(result))
-		rsm_err(log_fd, result->msg);
-
 	if (SYSINFO_RET_OK == ret && 0 != rsmhost_rdap_enabled && 0 != probe_rdap_enabled)
 	{
 		int		subtest_result;
@@ -298,8 +294,6 @@ out:
 		create_rdap_json(&json, ip, rtt, base_url, testedname, subtest_result);
 
 		SET_TEXT_RESULT(result, zbx_strdup(NULL, json.buffer));
-
-		rsm_infof(log_fd, "%s", json.buffer);
 
 		zbx_json_free(&json);
 	}
@@ -321,7 +315,7 @@ out:
 
 	rsm_vector_str_clean_and_destroy(&ips);
 
-	end_test(log_fd, output_fd);
+	end_test(log_fd, output_fd, result);
 
 	return ret;
 }

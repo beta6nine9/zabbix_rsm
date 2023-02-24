@@ -203,15 +203,33 @@ int	start_test(FILE **log_fd, FILE *output_fd, const char *probe, const char *rs
 	return SUCCEED;
 }
 
-void	end_test(FILE *log_fd, FILE *output_fd)
+void	end_test(FILE *log_fd, FILE *output_fd, AGENT_RESULT *result)
 {
-	/* no need to log if the log file wasn't opened */
+	/* nothing to do if the log file wasn't even opened */
 	if (log_fd == NULL)
 		return;
 
-	rsm_info(log_fd, ">>> END TEST <<<");
+	if (0 != ISSET_MSG(result))
+	{
+		rsm_errf(log_fd, "Could not perform test: %s", result->msg);
+	}
+	else if (0 != ISSET_TEXT(result))
+	{
+		rsm_infof(log_fd, "Test result: %s", result->text);
+	}
+	else if (0 != ISSET_UI64(result))
+	{
+		rsm_infof(log_fd, "Test result: " ZBX_FS_UI64, result->ui64);
+	}
+	else
+	{
+		/* this should never be possible */
+		rsm_err(log_fd, "INTERNAL ERROR: no result at the end of RSM test!");
+		__zbx_zabbix_log(LOG_LEVEL_CRIT, "%s", "INTERNAL ERROR: no result at the end of RSM test!");
+		exit(EXIT_FAILURE);
+	}
 
-	fflush(log_fd);
+	rsm_info(log_fd, ">>> END TEST <<<");
 
 	/* no need to close the stdout file descriptor */
 	if (log_fd == output_fd)
@@ -283,8 +301,8 @@ rsm_subtest_result_t	rsm_subtest_result(int rtt, int rtt_limit)
 	return (0 > rtt || rtt > rtt_limit ? RSM_SUBTEST_FAIL : RSM_SUBTEST_SUCCESS);
 }
 
-static int	rsm_set_resolver(ldns_resolver *res, const char *name, const char *ip, uint16_t port,
-		int ipv4_enabled, int ipv6_enabled, FILE *log_fd, char *err, size_t err_size)
+static int	rsm_set_resolver(ldns_resolver *res, const char *name, const char *ip, uint16_t port, int ipv4_enabled,
+		int ipv6_enabled, char *err, size_t err_size)
 {
 	ldns_rdf	*ip_rdf;
 	ldns_status	status;
@@ -307,13 +325,11 @@ static int	rsm_set_resolver(ldns_resolver *res, const char *name, const char *ip
 		return FAIL;
 	}
 
-	rsm_infof(log_fd, "using %s (%s, port:%hu)", name, ip, port);
-
 	return SUCCEED;
 }
 
 int	rsm_change_resolver(ldns_resolver *res, const char *name, const char *ip, uint16_t port, int ipv4_enabled,
-		int ipv6_enabled, FILE *log_fd, char *err, size_t err_size)
+		int ipv6_enabled, char *err, size_t err_size)
 {
 	ldns_rdf	*pop;
 
@@ -321,7 +337,7 @@ int	rsm_change_resolver(ldns_resolver *res, const char *name, const char *ip, ui
 	while (NULL != (pop = ldns_resolver_pop_nameserver(res)))
 		ldns_rdf_deep_free(pop);
 
-	return rsm_set_resolver(res, name, ip, port, ipv4_enabled, ipv6_enabled, log_fd, err, err_size);
+	return rsm_set_resolver(res, name, ip, port, ipv4_enabled, ipv6_enabled, err, err_size);
 }
 
 static unsigned char	ip_support(int ipv4_enabled, int ipv6_enabled)
@@ -336,13 +352,13 @@ static unsigned char	ip_support(int ipv4_enabled, int ipv6_enabled)
 }
 
 int	rsm_create_resolver(ldns_resolver **res, const char *name, const char *ip, uint16_t port, char protocol,
-		int ipv4_enabled, int ipv6_enabled, unsigned int extras, int timeout, unsigned char tries, FILE *log_fd,
-		char *err, size_t err_size)
+		int ipv4_enabled, int ipv6_enabled, unsigned int extras, int timeout, unsigned char tries, char *err,
+		size_t err_size)
 {
 	struct timeval	tv = {.tv_usec = 0, .tv_sec = timeout};
 
 	if (NULL != *res)
-		return rsm_change_resolver(*res, name, ip, port, ipv4_enabled, ipv6_enabled, log_fd, err, err_size);
+		return rsm_change_resolver(*res, name, ip, port, ipv4_enabled, ipv6_enabled, err, err_size);
 
 	/* create a new resolver */
 	if (NULL == (*res = ldns_resolver_new()))
@@ -352,7 +368,7 @@ int	rsm_create_resolver(ldns_resolver **res, const char *name, const char *ip, u
 	}
 
 	/* push nameserver to it */
-	if (SUCCEED != rsm_set_resolver(*res, name, ip, port, ipv4_enabled, ipv6_enabled, log_fd, err, err_size))
+	if (SUCCEED != rsm_set_resolver(*res, name, ip, port, ipv4_enabled, ipv6_enabled, err, err_size))
 		return FAIL;
 
 	/* set timeout of one try */
@@ -439,6 +455,31 @@ size_t	rsm_random(size_t max_values)
 	return (size_t)rand() % max_values;
 }
 
+void	rsm_print_nameserver(FILE *log_fd, const ldns_resolver *res)
+{
+	if (ldns_resolver_nameserver_count(res) == 0)
+	{
+		/* this should never be possible */
+		rsm_err(log_fd, "INTERNAL ERROR: attempt to print nameserver while zero found!");
+		__zbx_zabbix_log(LOG_LEVEL_CRIT, "%s", "INTERNAL ERROR: attempt to print nameserver while zero found!");
+		exit(EXIT_FAILURE);
+	}
+
+	if (ldns_resolver_nameserver_count(res) != 1)
+	{
+		/* this should never be possible */
+		rsm_err(log_fd, "INTERNAL ERROR: attempt to print nameserver while more than one found!");
+		__zbx_zabbix_log(LOG_LEVEL_CRIT, "%s", "INTERNAL ERROR: attempt to print nameserver while more than one found!");
+		exit(EXIT_FAILURE);
+	}
+
+	char	*p = ldns_rdf2str(ldns_resolver_nameservers(res)[0]);
+
+	rsm_infof(log_fd, "making DNS query to %s:%u", p, ldns_resolver_port(res));
+
+	zbx_free(p);
+}
+
 /******************************************************************************
  *                                                                            *
  * Function: rsm_resolve_host                                                 *
@@ -482,6 +523,8 @@ int	rsm_resolve_host(ldns_resolver *res, const char *host, zbx_vector_str_t *ips
 		ldns_rr_list	*rr_list;
 		ldns_pkt_rcode	rcode;
 		ldns_status	status;
+
+		rsm_print_nameserver(log_fd, res);
 
 		status = ldns_resolver_query_status(&pkt, res, rdf, ipv->rr_type, LDNS_RR_CLASS_IN, LDNS_RD);
 
@@ -942,6 +985,8 @@ int	rsm_check_dns_connection(const ldns_resolver *res, ldns_rdf *query_rdf, unsi
 
 	if (0 != (flags & CHECK_DNS_CONN_RECURSIVE))
 		query_flags = LDNS_RD;
+
+	rsm_print_nameserver(log_fd, res);
 
 	if (NULL == (pkt = ldns_resolver_query(res, query_rdf, LDNS_RR_TYPE_SOA, LDNS_RR_CLASS_IN, query_flags)))
 	{

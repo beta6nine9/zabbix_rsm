@@ -923,7 +923,7 @@ int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *
 
 	/* create resolver */
 	if (SUCCEED != rsm_create_resolver(&res, "resolver", res_ip, resolver_port, RSM_TCP, ipv4_enabled, ipv6_enabled,
-			extras, RSM_TCP_TIMEOUT, RSM_TCP_RETRY, log_fd, err, sizeof(err)))
+			extras, RSM_TCP_TIMEOUT, RSM_TCP_RETRY, err, sizeof(err)))
 	{
 		SET_MSG_RESULT(result, zbx_dsprintf(NULL, "cannot create resolver: %s", err));
 		goto out;
@@ -1117,17 +1117,8 @@ int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *
 	if (SUCCEED != command_logout(epp_commands, COMMAND_LOGOUT, ssl, log_fd, err, sizeof(err)))
 		rsm_err(log_fd, err);
 
-	rsm_infof(log_fd, "end EPP test (ip %s):SUCCESS", ip);
-out:
-	if (0 != ISSET_MSG(result))
-	{
-		rsm_err(log_fd, result->msg);
-	}
-	else
-	{
-		/* TODO: save result: ip, rtt1, rtt2, rtt3 */
-	}
-
+	/* TODO: save result: ip, rtt1, rtt2, rtt3 */
+ out:
 	zbx_free(epp_servercertmd5);
 	zbx_free(epp_testprefix);
 	zbx_free(epp_serverid);
@@ -1162,7 +1153,7 @@ out:
 	rsm_vector_str_clean_and_destroy(&epp_ips);
 	rsm_vector_str_clean_and_destroy(&epp_hosts);
 
-	end_test(log_fd, NULL);
+	end_test(log_fd, NULL, result);
 
 	return ret;
 }
