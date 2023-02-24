@@ -59,14 +59,14 @@ int	check_rsm_resolver_status(const char *host, const AGENT_REQUEST *request, AG
 	GET_PARAM_UINT  (ipv6_enabled, 4, "IPv6 enabled");
 
 	/* print test details */
-	rsm_infof(log_fd, "timeout:%d"
-			", tries:%d"
-			", IPv4:%s"
-			", IPv6:%s",
-			timeout,
-			tries,
+	rsm_infof(log_fd, "IPv4:%s"
+			", IPv6:%s"
+			", timeout:%d"
+			", tries:%d",
 			ENABLED(ipv4_enabled),
-			ENABLED(ipv6_enabled));
+			ENABLED(ipv6_enabled),
+			timeout,
+			tries);
 
 	extras = RESOLVER_EXTRAS_DNSSEC;
 

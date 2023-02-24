@@ -287,30 +287,38 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 	/* print test details */
 	rsm_infof(log_fd, "probe_RDDS:%s"
 			", RDDS43:%s"
-			"%s%s%s%s"
-			"%s%s%s%s"
 			", RDDS80:%s"
+			", IPv4:%s"
+			", IPv6:%s"
+			"%s%s%s%s"
+			"%s%s%s%s"
+			"%s%s%s%s"
 			", resolver:%s"
 			", rtt_limit:%d"
-			", maxredirs:%d"
-			", IPv4:%s"
-			", IPv6:%s",
+			", maxredirs:%d",
 			ENABLED(probe_rdds_enabled),
-			(rsmhost_rdds43_enabled ? rdds43_server_str : "DISABLED"),
+			ENABLED(rsmhost_rdds43_enabled),
+			ENABLED(rsmhost_rdds80_enabled),
+			ENABLED(ipv4_enabled),
+			ENABLED(ipv6_enabled),
+			/* rdds43_testedname */
 			(rsmhost_rdds43_enabled ? ", " : ""),
 			(rsmhost_rdds43_enabled ? "RDDS43_testedname" : ""),
 			(rsmhost_rdds43_enabled ? ":" : ""),
 			(rsmhost_rdds43_enabled ? rdds43_testedname : ""),
+			/* rdds43_ns_string */
 			(rsmhost_rdds43_enabled ? ", " : ""),
 			(rsmhost_rdds43_enabled ? "RDDS43_ns_string" : ""),
 			(rsmhost_rdds43_enabled ? ":" : ""),
 			(rsmhost_rdds43_enabled ? rdds43_ns_string : ""),
-			(rsmhost_rdds80_enabled ? rdds80_url : "DISABLED"),
+			/* rdds80_url */
+			(rsmhost_rdds80_enabled ? ", " : ""),
+			(rsmhost_rdds80_enabled ? "RDDS80_url" : ""),
+			(rsmhost_rdds80_enabled ? ":" : ""),
+			(rsmhost_rdds80_enabled ? rdds80_url : ""),
 			resolver_str,
 			rtt_limit,
-			maxredirs,
-			ENABLED(ipv4_enabled),
-			ENABLED(ipv6_enabled));
+			maxredirs);
 
 	get_host_and_port_from_str(resolver_str, ';', resolver_ip, sizeof(resolver_ip), &resolver_port,
 			DEFAULT_RESOLVER_PORT);

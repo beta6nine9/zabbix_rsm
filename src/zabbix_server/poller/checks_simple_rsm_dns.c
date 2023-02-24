@@ -1956,24 +1956,19 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 	}
 
 	/* print test details */
-	rsm_infof(log_fd, "mode:%s"
-			", protocol:%s"
-			", rtt_limit:%d"
-			", tcp_ratio:%d"
-			", minns:%d"
-			", DNSSEC:%s"
+	rsm_infof(log_fd, "DNSSEC:%s"
 			", RDDS43:%s"
 			", RDDS80:%s"
 			", UDP:%s"
 			", TCP:%s"
 			", IPv4:%s"
 			", IPv6:%s"
+			", mode:%s"
+			", protocol:%s"
+			", rtt_limit:%d"
+			", tcp_ratio:%d"
+			", minns:%d"
 			", testprefix:%s",
-			(CURRENT_MODE_NORMAL == current_mode ? "normal" : "critical"),
-			(protocol == RSM_UDP ? "UDP" : "TCP"),
-			rtt_limit,
-			tcp_ratio,
-			minns,
 			ENABLED(dnssec_enabled),
 			ENABLED(rdds43_enabled),
 			ENABLED(rdds80_enabled),
@@ -1981,6 +1976,11 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 			ENABLED(tcp_enabled),
 			ENABLED(ipv4_enabled),
 			ENABLED(ipv6_enabled),
+			(CURRENT_MODE_NORMAL == current_mode ? "normal" : "critical"),
+			(protocol == RSM_UDP ? "UDP" : "TCP"),
+			rtt_limit,
+			tcp_ratio,
+			minns,
 			testprefix);
 
 	if (current_mode != CURRENT_MODE_NORMAL)
