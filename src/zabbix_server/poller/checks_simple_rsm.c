@@ -455,8 +455,10 @@ size_t	rsm_random(size_t max_values)
 	return (size_t)rand() % max_values;
 }
 
-void	rsm_print_nameserver(FILE *log_fd, const ldns_resolver *res)
+void	rsm_print_nameserver(FILE *log_fd, const ldns_resolver *res, const char *details)
 {
+	char	*name;
+
 	if (ldns_resolver_nameserver_count(res) == 0)
 	{
 		/* this should never be possible */
@@ -473,11 +475,11 @@ void	rsm_print_nameserver(FILE *log_fd, const ldns_resolver *res)
 		exit(EXIT_FAILURE);
 	}
 
-	char	*p = ldns_rdf2str(ldns_resolver_nameservers(res)[0]);
+	name = ldns_rdf2str(ldns_resolver_nameservers(res)[0]);
 
-	rsm_infof(log_fd, "making DNS query to %s:%u", p, ldns_resolver_port(res));
+	rsm_infof(log_fd, "making DNS query to %s:%u to %s", name, ldns_resolver_port(res), details);
 
-	zbx_free(p);
+	zbx_free(name);
 }
 
 /******************************************************************************
@@ -524,7 +526,7 @@ int	rsm_resolve_host(ldns_resolver *res, const char *host, zbx_vector_str_t *ips
 		ldns_pkt_rcode	rcode;
 		ldns_status	status;
 
-		rsm_print_nameserver(log_fd, res);
+		rsm_print_nameserver(log_fd, res, "resolve a host");
 
 		status = ldns_resolver_query_status(&pkt, res, rdf, ipv->rr_type, LDNS_RR_CLASS_IN, LDNS_RD);
 
@@ -986,7 +988,7 @@ int	rsm_check_dns_connection(const ldns_resolver *res, ldns_rdf *query_rdf, unsi
 	if (0 != (flags & CHECK_DNS_CONN_RECURSIVE))
 		query_flags = LDNS_RD;
 
-	rsm_print_nameserver(log_fd, res);
+	rsm_print_nameserver(log_fd, res, "test the nameserver");
 
 	if (NULL == (pkt = ldns_resolver_query(res, query_rdf, LDNS_RR_TYPE_SOA, LDNS_RR_CLASS_IN, query_flags)))
 	{

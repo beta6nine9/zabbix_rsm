@@ -360,7 +360,7 @@ int	rsm_create_resolver(ldns_resolver **res, const char *name, const char *ip, u
 int	rsm_change_resolver(ldns_resolver *res, const char *name, const char *ip, uint16_t port, int ipv4_enabled,
 		int ipv6_enabled, char *err, size_t err_size);
 size_t	rsm_random(size_t max_values);
-void	rsm_print_nameserver(FILE *log_fd, const ldns_resolver *res);
+void	rsm_print_nameserver(FILE *log_fd, const ldns_resolver *res, const char *details);
 int	rsm_resolve_host(ldns_resolver *res, const char *host, zbx_vector_str_t *ips, int ipv_flags,
 		FILE *log_fd, rsm_resolver_error_t *ec_res, char *err, size_t err_size);
 void	rsm_vector_str_clean_and_destroy(zbx_vector_str_t *v);

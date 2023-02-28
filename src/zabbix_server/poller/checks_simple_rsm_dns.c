@@ -427,7 +427,7 @@ static void	rsm_destroy_owners(zbx_vector_ptr_t *owners)
 	zbx_vector_ptr_destroy(owners);
 }
 
-static int	rsm_verify_rrsigs(const ldns_pkt *pkt, ldns_rr_type covered_type, const ldns_rr_list *keys,
+static int	rsm_verify_rrsigs(const ldns_pkt *pkt, ldns_rr_type covered_type, const ldns_rr_list *dnskeys,
 		const char *ns, const char *ip, rsm_dnssec_error_t *dnssec_ec, char *err, size_t err_size)
 {
 	zbx_vector_ptr_t	owners;
@@ -500,7 +500,7 @@ static int	rsm_verify_rrsigs(const ldns_pkt *pkt, ldns_rr_type covered_type, con
 		}
 
 		/* verify RRSIGs */
-		if (LDNS_STATUS_OK != (status = ldns_verify(rrset, rrsigs, keys, NULL)))
+		if (LDNS_STATUS_OK != (status = ldns_verify(rrset, rrsigs, dnskeys, NULL)))
 		{
 			const char *error_description;
 
@@ -566,7 +566,7 @@ static int	rsm_verify_rrsigs(const ldns_pkt *pkt, ldns_rr_type covered_type, con
 					(unsigned int)ldns_rr_list_rr_count(rrset),
 					rsm_covered_to_str(covered_type),
 					(unsigned int)ldns_rr_list_rr_count(rrsigs),
-					(unsigned int)ldns_rr_list_rr_count(keys),
+					(unsigned int)ldns_rr_list_rr_count(dnskeys),
 					ldns_get_errorstr_by_id(status));
 
 			goto out;
@@ -811,7 +811,7 @@ static int	rsm_dns_in_a_query(ldns_pkt **pkt, ldns_resolver *res, const ldns_rdf
 
 	sec = zbx_time();
 
-	rsm_print_nameserver(log_fd, res);
+	rsm_print_nameserver(log_fd, res, "query a non-existent domain");
 
 	status = ldns_resolver_send_pkt(pkt, res, query);
 
@@ -981,7 +981,7 @@ out:
 	return ret;
 }
 
-static int	rsm_check_dnssec_no_epp(const ldns_pkt *pkt, const ldns_rr_list *keys, const char *ns, const char *ip,
+static int	rsm_check_dnssec_no_epp(const ldns_pkt *pkt, const ldns_rr_list *dnskeys, const char *ns, const char *ip,
 		rsm_dnssec_error_t *dnssec_ec, char *err, size_t err_size)
 {
 	int	ret = SUCCEED, auth_has_nsec = 0, auth_has_nsec3 = 0;
@@ -1009,10 +1009,10 @@ static int	rsm_check_dnssec_no_epp(const ldns_pkt *pkt, const ldns_rr_list *keys
 	}
 
 	if (1 == auth_has_nsec)
-		ret = rsm_verify_rrsigs(pkt, LDNS_RR_TYPE_NSEC, keys, ns, ip, dnssec_ec, err, err_size);
+		ret = rsm_verify_rrsigs(pkt, LDNS_RR_TYPE_NSEC, dnskeys, ns, ip, dnssec_ec, err, err_size);
 
 	if (SUCCEED == ret && 1 == auth_has_nsec3)
-		ret = rsm_verify_rrsigs(pkt, LDNS_RR_TYPE_NSEC3, keys, ns, ip, dnssec_ec, err, err_size);
+		ret = rsm_verify_rrsigs(pkt, LDNS_RR_TYPE_NSEC3, dnskeys, ns, ip, dnssec_ec, err, err_size);
 
 	/* we want to override the previous RSM_EC_DNSSEC_RRSIG_NOT_SIGNED error with this one, if it fails */
 	if (SUCCEED == ret || RSM_EC_DNSSEC_RRSIG_NOT_SIGNED == *dnssec_ec)
@@ -1074,8 +1074,8 @@ static int	rsm_get_last_label(const char *name, char **last_label, char *err, si
 
 #define DNS_PROTO(RES)	ldns_resolver_usevc(RES) ? RSM_TCP : RSM_UDP
 
-static int	rsm_get_ns_ip_values(ldns_resolver *res, const char *ns, const char *ip, uint16_t port,
-		const ldns_rr_list *keys, const char *testedname, FILE *log_fd, int *rtt, char **nsid, int *upd,
+static int	test_nameserver(ldns_resolver *res, const char *ns, const char *ip, uint16_t port,
+		const ldns_rr_list *dnskeys, const char *testedname, FILE *log_fd, int *rtt, char **nsid, int *upd,
 		int ipv4_enabled, int ipv6_enabled, int epp_enabled, char *err, size_t err_size)
 {
 	char			*host, *last_label = NULL;
@@ -1137,7 +1137,7 @@ static int	rsm_get_ns_ip_values(ldns_resolver *res, const char *ns, const char *
 
 	if (0 == ldns_pkt_aa(pkt))
 	{
-		zbx_strlcpy(err, "AA flag is not set in the answer from nameserver", err_size);
+		zbx_strlcpy(err, "aa flag is not present in the answer", err_size);
 		*rtt = DNS[DNS_PROTO(res)].ns_answer_error(RSM_NS_ANSWER_ERROR_NOAAFLAG);
 		goto out;
 	}
@@ -1212,9 +1212,9 @@ static int	rsm_get_ns_ip_values(ldns_resolver *res, const char *ns, const char *
 			*upd = (int)(now - ts);
 		}
 
-		if (NULL != keys)	/* EPP enabled, DNSSEC enabled */
+		if (NULL != dnskeys)	/* EPP enabled, DNSSEC enabled */
 		{
-			if (SUCCEED != rsm_verify_rrsigs(pkt, LDNS_RR_TYPE_DS, keys, ns, ip, &dnssec_ec,
+			if (SUCCEED != rsm_verify_rrsigs(pkt, LDNS_RR_TYPE_DS, dnskeys, ns, ip, &dnssec_ec,
 					err, err_size))
 			{
 				*rtt = DNS[DNS_PROTO(res)].dnssec_error(dnssec_ec);
@@ -1222,9 +1222,9 @@ static int	rsm_get_ns_ip_values(ldns_resolver *res, const char *ns, const char *
 			}
 		}
 	}
-	else if (NULL != keys)		/* EPP disabled, DNSSEC enabled */
+	else if (NULL != dnskeys)		/* EPP disabled, DNSSEC enabled */
 	{
-		if (SUCCEED != rsm_check_dnssec_no_epp(pkt, keys, ns, ip, &dnssec_ec, err, err_size))
+		if (SUCCEED != rsm_check_dnssec_no_epp(pkt, dnskeys, ns, ip, &dnssec_ec, err, err_size))
 		{
 			*rtt = DNS[DNS_PROTO(res)].dnssec_error(dnssec_ec);
 			goto out;
@@ -1234,14 +1234,27 @@ static int	rsm_get_ns_ip_values(ldns_resolver *res, const char *ns, const char *
 	/* successful rtt */
 	*rtt = (int)ldns_pkt_querytime(pkt);
 
+	if (NULL == upd || RSM_NO_VALUE == *upd)
+	{
+		rsm_infof(log_fd, "\"%s\" (%s) RTT:%d NSID:%s",
+				ns,
+				ip,
+				*rtt,
+				ZBX_NULL2STR(*nsid));
+	}
+	else
+	{
+		rsm_infof(log_fd, "\"%s\" (%s) RTT:%d NSID:%s UPD:%d",
+				ns,
+				ip,
+				*rtt,
+				ZBX_NULL2STR(*nsid),
+				*upd);
+	}
+
 	/* no errors */
 	ret = SUCCEED;
 out:
-	if (NULL != upd)
-		rsm_infof(log_fd, "RSM DNS \"%s\" (%s) RTT:%d UPD:%d NSID:%s", ns, ip, *rtt, *upd, ZBX_NULL2STR(*nsid));
-	else
-		rsm_infof(log_fd, "RSM DNS \"%s\" (%s) RTT:%d NSID:%s", ns, ip, *rtt, ZBX_NULL2STR(*nsid));
-
 	if (NULL != nsset)
 		ldns_rr_list_deep_free(nsset);
 
@@ -1263,32 +1276,31 @@ out:
 	return ret;
 }
 
-static int	rsm_get_dnskeys(ldns_resolver *res, const char *domain, const char *resolver,
-		ldns_rr_list **keys, FILE *log_fd, rsm_dnskeys_error_t *ec, char *err, size_t err_size)
+static int	rsm_get_dnskeys(ldns_resolver *res, const char *rsmhost, ldns_rr_list **dnskeys, FILE *log_fd,
+		rsm_dnskeys_error_t *ec, char *err, size_t err_size)
 {
 	ldns_pkt	*pkt = NULL;
-	ldns_rdf	*domain_rdf = NULL;
+	ldns_rdf	*rsmhost_rdf = NULL;
 	ldns_status	status;
 	ldns_pkt_rcode	rcode;
 	int		ret = FAIL;
 
-	if (NULL == (domain_rdf = ldns_rdf_new_frm_str(LDNS_RDF_TYPE_DNAME, domain)))
+	if (NULL == (rsmhost_rdf = ldns_rdf_new_frm_str(LDNS_RDF_TYPE_DNAME, rsmhost)))
 	{
 		zbx_strlcpy(err, UNEXPECTED_LDNS_MEM_ERROR, err_size);
 		*ec = RSM_DNSKEYS_INTERNAL;
 		goto out;
 	}
 
-	rsm_print_nameserver(log_fd, res);
+	rsm_print_nameserver(log_fd, res, "get DNSKEY records");
 
-	/* query domain records */
-	status = ldns_resolver_query_status(&pkt, res, domain_rdf, LDNS_RR_TYPE_DNSKEY, LDNS_RR_CLASS_IN,
+	/* query DNSKEY records */
+	status = ldns_resolver_query_status(&pkt, res, rsmhost_rdf, LDNS_RR_TYPE_DNSKEY, LDNS_RR_CLASS_IN,
 			LDNS_RD | LDNS_AD);
 
 	if (LDNS_STATUS_OK != status)
 	{
-		zbx_snprintf(err, err_size, "cannot connect to resolver \"%s\": %s", resolver,
-				ldns_get_errorstr_by_id(status));
+		zbx_snprintf(err, err_size, "cannot connect: %s", ldns_get_errorstr_by_id(status));
 		*ec = RSM_DNSKEYS_NOREPLY;
 		goto out;
 	}
@@ -1299,8 +1311,7 @@ static int	rsm_get_dnskeys(ldns_resolver *res, const char *domain, const char *r
 	/* check the AD bit */
 	if (0 == ldns_pkt_ad(pkt))
 	{
-		zbx_snprintf(err, err_size, "AD bit not present in the answer of \"%s\" from resolver \"%s\"",
-				domain, resolver);
+		zbx_strlcpy(err, "ad flag not present in the answer", err_size);
 		*ec = RSM_DNSKEYS_NOADBIT;
 		goto out;
 	}
@@ -1326,19 +1337,18 @@ static int	rsm_get_dnskeys(ldns_resolver *res, const char *domain, const char *r
 	}
 
 	/* get the DNSKEY records */
-	if (NULL == (*keys = ldns_pkt_rr_list_by_name_and_type(pkt, domain_rdf, LDNS_RR_TYPE_DNSKEY,
+	if (NULL == (*dnskeys = ldns_pkt_rr_list_by_name_and_type(pkt, rsmhost_rdf, LDNS_RR_TYPE_DNSKEY,
 			LDNS_SECTION_ANSWER)))
 	{
-		zbx_snprintf(err, err_size, "no DNSKEY records of domain \"%s\" from resolver \"%s\"", domain,
-				resolver);
+		zbx_strlcpy(err, "no DNSKEY records found in reply", err_size);
 		*ec = RSM_DNSKEYS_NONE;
 		goto out;
 	}
 
 	ret = SUCCEED;
 out:
-	if (NULL != domain_rdf)
-		ldns_rdf_deep_free(domain_rdf);
+	if (NULL != rsmhost_rdf)
+		ldns_rdf_deep_free(rsmhost_rdf);
 
 	if (NULL != pkt)
 		ldns_pkt_free(pkt);
@@ -1567,11 +1577,10 @@ static void	set_dns_test_results(rsm_ns_t *nss, size_t nss_num, int rtt_limit, u
 		{
 			if (SUCCEED == ip_dnssec_result)
 			{
-				rsm_infof(log_fd, "%s: DNSSEC OK", nss[i].name);
 				dnssec_nssok++;
 			}
 			else
-				rsm_infof(log_fd, "%s: DNSSEC failed", nss[i].name);
+				rsm_infof(log_fd, "%s: DNSSEC error", nss[i].name);
 		}
 	}
 
@@ -1833,6 +1842,49 @@ static int	get_dns_minns_from_value(time_t now, const char *value, unsigned int 
 	return SUCCEED;
 }
 
+static void	print_ds_records(ldns_resolver *res, const char *rsmhost, FILE *log_fd)
+{
+	ldns_pkt	*pkt = NULL;
+	ldns_rdf	*rsmhost_rdf = NULL;
+	ldns_status	status;
+	ldns_pkt_rcode	rcode;
+
+	if (NULL == (rsmhost_rdf = ldns_rdf_new_frm_str(LDNS_RDF_TYPE_DNAME, rsmhost)))
+	{
+		rsm_err(log_fd, "unexpected ldns error");
+		goto out;
+	}
+
+	rsm_print_nameserver(log_fd, res, "print DS records");
+
+	/* query DNSKEY records */
+	status = ldns_resolver_query_status(&pkt, res, rsmhost_rdf, LDNS_RR_TYPE_DS, LDNS_RR_CLASS_IN, 0);
+
+	if (LDNS_STATUS_OK != status)
+	{
+		rsm_warnf(log_fd, "cannot connect: %s", ldns_get_errorstr_by_id(status));
+		goto out;
+	}
+
+	/* log the packet */
+	ldns_pkt_print(log_fd, pkt);
+
+	if (LDNS_RCODE_NOERROR != (rcode = ldns_pkt_get_rcode(pkt)))
+	{
+		char    *rcode_str;
+
+		rcode_str = ldns_pkt_rcode2str(rcode);
+		rsm_warnf(log_fd, "expected NOERROR got %s", rcode_str);
+		zbx_free(rcode_str);
+	}
+out:
+	if (NULL != rsmhost_rdf)
+		ldns_rdf_deep_free(rsmhost_rdf);
+
+	if (NULL != pkt)
+		ldns_pkt_free(pkt);
+}
+
 int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, int nextcheck,
 		const AGENT_REQUEST *request, AGENT_RESULT *result, FILE *output_fd)
 {
@@ -1842,7 +1894,7 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 				testedname[RSM_BUF_SIZE], *minns_value;
 	rsm_dnskeys_error_t	ec_dnskeys;
 	ldns_resolver		*res = NULL;
-	ldns_rr_list		*keys = NULL;
+	ldns_rr_list		*dnskeys = NULL;
 	FILE			*log_fd = NULL;
 	rsm_ns_t		*nss = NULL;
 	size_t			i, j, nss_num = 0;
@@ -1854,8 +1906,6 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 	struct zbx_json		json;
 	uint16_t		resolver_port;
 	int			dnssec_enabled,
-				rdds43_enabled,
-				rdds80_enabled,
 				udp_enabled,
 				tcp_enabled,
 				ipv4_enabled,
@@ -1865,7 +1915,6 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 				tcp_ratio,
 				test_recover_udp,
 				test_recover_tcp,
-				rdds_enabled,
 				rtt_limit,
 				successful_tests,
 				test_recover,
@@ -1884,8 +1933,8 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 	GET_PARAM_NEMPTY(testprefix       , 1 , "Test prefix");
 	GET_PARAM_NEMPTY(name_servers_list, 2 , "List of Name Servers");
 	GET_PARAM_UINT  (dnssec_enabled   , 3 , "DNSSEC enabled on rsmhost");
-	GET_PARAM_UINT  (rdds43_enabled   , 4 , "RDDS43 enabled on rsmhost");
-	GET_PARAM_UINT  (rdds80_enabled   , 5 , "RDDS80 enabled on rsmhost");
+	/*GET_PARAM_UINT  (rdds43_enabled   , 4 , "RDDS43 enabled on rsmhost"); obsoleted: remove in the future */
+	/*GET_PARAM_UINT  (rdds80_enabled   , 5 , "RDDS80 enabled on rsmhost"); obsoleted: remove in the future */
 	GET_PARAM_UINT  (udp_enabled      , 6 , "DNS UDP enabled");
 	GET_PARAM_UINT  (tcp_enabled      , 7 , "DNS TCP enabled");
 	GET_PARAM_UINT  (ipv4_enabled     , 8 , "IPv4 enabled");
@@ -1961,8 +2010,6 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 
 	/* print test details */
 	rsm_infof(log_fd, "DNSSEC:%s"
-			", RDDS43:%s"
-			", RDDS80:%s"
 			", UDP:%s"
 			", TCP:%s"
 			", IPv4:%s"
@@ -1974,8 +2021,6 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 			", minns:%d"
 			", testprefix:%s",
 			ENABLED(dnssec_enabled),
-			ENABLED(rdds43_enabled),
-			ENABLED(rdds80_enabled),
 			ENABLED(udp_enabled),
 			ENABLED(tcp_enabled),
 			ENABLED(ipv4_enabled),
@@ -1989,12 +2034,10 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 
 	if (current_mode != CURRENT_MODE_NORMAL)
 	{
-		rsm_infof(log_fd, "successful_so_far:%d"
-				", required_for_udp:%d"
-				", required_for_tcp:%d",
+		rsm_infof(log_fd, "critical test mode details: successful:%d"
+				", required:%d",
 				successful_tests,
-				test_recover_udp,
-				test_recover_tcp);
+				(protocol == RSM_UDP ? test_recover_udp : test_recover_tcp));
 	}
 
 	extras = (dnssec_enabled ? RESOLVER_EXTRAS_DNSSEC : RESOLVER_EXTRAS_NONE);
@@ -2044,9 +2087,13 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 	else
 		zbx_snprintf(testedname, sizeof(testedname), "%s.", testprefix);
 
-	rdds_enabled = (rdds43_enabled || rdds80_enabled);
+	if (0 != dnssec_enabled)
+	{
+		/* print additional information: DS records of the Rsmhost */
+		print_ds_records(res, rsmhost, log_fd);
+	}
 
-	if (0 != dnssec_enabled && SUCCEED != rsm_get_dnskeys(res, rsmhost, resolver_ip, &keys, log_fd, &ec_dnskeys,
+	if (0 != dnssec_enabled && SUCCEED != rsm_get_dnskeys(res, rsmhost, &dnskeys, log_fd, &ec_dnskeys,
 			err, sizeof(err)))
 	{
 		/* failed to get DNSKEY records */
@@ -2147,17 +2194,16 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 							DNS[DNS_PROTO(res)].ns_query_error(RSM_NS_QUERY_INTERNAL);
 					}
 
-					if (NULL != th_log_fd && SUCCEED != rsm_get_ns_ip_values(res,
+					if (NULL != th_log_fd && SUCCEED != test_nameserver(res,
 							nss[i].name,
 							nss[i].ips[j].ip,
 							nss[i].ips[j].port,
-							keys,
+							dnskeys,
 							testedname,
 							th_log_fd,
 							&nss[i].ips[j].rtt,
 							&nss[i].ips[j].nsid,
-							(RSM_UDP == protocol &&
-									0 != rdds_enabled ? &nss[i].ips[j].upd : NULL),
+							(0 != epp_enabled ? &nss[i].ips[j].upd : NULL),
 							ipv4_enabled,
 							ipv6_enabled,
 							epp_enabled,
@@ -2260,8 +2306,8 @@ out:
 		zbx_free(nss);
 	}
 
-	if (NULL != keys)
-		ldns_rr_list_deep_free(keys);
+	if (NULL != dnskeys)
+		ldns_rr_list_deep_free(dnskeys);
 
 	if (NULL != res)
 	{
