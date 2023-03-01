@@ -301,7 +301,7 @@ rsm_subtest_result_t	rsm_subtest_result(int rtt, int rtt_limit)
 	return (0 > rtt || rtt > rtt_limit ? RSM_SUBTEST_FAIL : RSM_SUBTEST_SUCCESS);
 }
 
-static int	rsm_set_resolver(ldns_resolver *res, const char *name, const char *ip, uint16_t port, int ipv4_enabled,
+static int	set_resolver(ldns_resolver *res, const char *name, const char *ip, uint16_t port, int ipv4_enabled,
 		int ipv6_enabled, char *err, size_t err_size)
 {
 	ldns_rdf	*ip_rdf;
@@ -337,7 +337,7 @@ int	rsm_change_resolver(ldns_resolver *res, const char *name, const char *ip, ui
 	while (NULL != (pop = ldns_resolver_pop_nameserver(res)))
 		ldns_rdf_deep_free(pop);
 
-	return rsm_set_resolver(res, name, ip, port, ipv4_enabled, ipv6_enabled, err, err_size);
+	return set_resolver(res, name, ip, port, ipv4_enabled, ipv6_enabled, err, err_size);
 }
 
 static unsigned char	ip_support(int ipv4_enabled, int ipv6_enabled)
@@ -368,7 +368,7 @@ int	rsm_create_resolver(ldns_resolver **res, const char *name, const char *ip, u
 	}
 
 	/* push nameserver to it */
-	if (SUCCEED != rsm_set_resolver(*res, name, ip, port, ipv4_enabled, ipv6_enabled, err, err_size))
+	if (SUCCEED != set_resolver(*res, name, ip, port, ipv4_enabled, ipv6_enabled, err, err_size))
 		return FAIL;
 
 	/* set timeout of one try */

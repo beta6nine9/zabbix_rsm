@@ -22,7 +22,7 @@
 
 #define RSM_PROBESTATUS_LOG_PREFIX	"probestatus"	/* file will be <LOGDIR>/<PROBE>-RSM_PROBESTATUS_LOG_PREFIX.log */
 
-static char	rsm_validate_host_list(const char *list, char delim)
+static char	validate_host_list(const char *list, char delim)
 {
 	const char	*p;
 
@@ -119,7 +119,7 @@ int	check_rsm_probe_status(const char *host, const AGENT_REQUEST *request, AGENT
 	{
 		char	c;
 
-		if ('\0' != (c = rsm_validate_host_list(ipv4_rootservers, ',')))
+		if ('\0' != (c = validate_host_list(ipv4_rootservers, ',')))
 		{
 			SET_MSG_RESULT(result, zbx_dsprintf(NULL, "invalid character in IPv4 root servers list: %c", c));
 			goto out;
@@ -171,7 +171,7 @@ int	check_rsm_probe_status(const char *host, const AGENT_REQUEST *request, AGENT
 	{
 		char	c;
 
-		if ('\0' != (c = rsm_validate_host_list(ipv6_rootservers, ',')))
+		if ('\0' != (c = validate_host_list(ipv6_rootservers, ',')))
 		{
 			SET_MSG_RESULT(result, zbx_dsprintf(NULL, "invalid character in IPv6 root servers list: %c", c));
 			goto out;

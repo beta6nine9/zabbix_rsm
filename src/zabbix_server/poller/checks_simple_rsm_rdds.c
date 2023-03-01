@@ -30,7 +30,7 @@ RSM_DEFINE_RESOLVER_ERROR_TO(RDDS80)
 RSM_DEFINE_HTTP_PRE_STATUS_ERROR_TO(RDDS80)
 RSM_DEFINE_HTTP_ERROR_TO(RDDS80)
 
-static int	rsm_ec_noerror(int ec)
+static int	ec_noerror(int ec)
 {
 	if (0 <= ec || RSM_NO_VALUE == ec)
 		return SUCCEED;
@@ -88,7 +88,7 @@ static void	create_rdds_json(struct zbx_json *json, const char *ip43, int rtt43,
 	zbx_json_addint64(json, "status", rdds_status);
 }
 
-static int	rsm_rdds43_test(const char *request, const char *ip, unsigned short port, int timeout, char **answer,
+static int	rdds43_test(const char *request, const char *ip, unsigned short port, int timeout, char **answer,
 		int *rtt, char *err, size_t err_size)
 {
 	zbx_socket_t	s;
@@ -141,7 +141,7 @@ out:
 	return ret;
 }
 
-static void	rsm_get_rdds43_nss(zbx_vector_str_t *nss, const char *recv_buf, const char *rdds43_ns_string,
+static void	get_rdds43_nss(zbx_vector_str_t *nss, const char *recv_buf, const char *rdds43_ns_string,
 		FILE *log_fd)
 {
 	const char	*p;
@@ -168,7 +168,7 @@ static void	rsm_get_rdds43_nss(zbx_vector_str_t *nss, const char *recv_buf, cons
 		if (sizeof(ns_buf) == ns_buf_len)
 		{
 			/* internal error, ns buffer not enough */
-			rsm_errf(log_fd, "RSM RDDS internal error, NS buffer too small (%u bytes)"
+			rsm_errf(log_fd, "internal error, name server buffer too small (%u bytes)"
 					" for host in \"%.*s...\"", sizeof(ns_buf), sizeof(ns_buf), p);
 			continue;
 		}
@@ -357,55 +357,57 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 
 	if (0 != rsmhost_rdds43_enabled)
 	{
+		rsm_infof(log_fd, "start RDDS43 test (server %s)", rdds43_server);
+
 		/* start RDDS43 test, resolve host to ips */
 		if (SUCCEED != rsm_resolve_host(res, rdds43_server, &ips43, ipv_flags, log_fd, &ec_res,
 				err, sizeof(err)))
 		{
 			rtt43 = rsm_resolver_error_to_RDDS43(ec_res);
-			rsm_errf(log_fd, "RDDS43 \"%s\": %s", rdds43_server, err);
+			rsm_err(log_fd, err);
 		}
 
 		/* if RDDS43 fails we should still process RDDS80 */
 
-		if (SUCCEED == rsm_ec_noerror(rtt43))
+		if (SUCCEED == ec_noerror(rtt43))
 		{
 			if (0 == ips43.values_num)
 			{
 				rtt43 = RSM_EC_RDDS43_INTERNAL_IP_UNSUP;
-				rsm_errf(log_fd, "RDDS43 \"%s\": IP address(es) of host not supported by the Probe",
-						rdds43_server);
+				rsm_err(log_fd, "found no IP addresses supported by the Probe");
 			}
 		}
 
-		if (SUCCEED == rsm_ec_noerror(rtt43))
+		if (SUCCEED == ec_noerror(rtt43))
 		{
 			/* choose random IP */
 			ip43 = ips43.values[rsm_random((size_t)ips43.values_num)];
 
-			rsm_infof(log_fd, "start RDDS43 test (ip %s, request \"%s\", expected NS string \"%s\")",
+			rsm_infof(log_fd, "the following details will be used in the test:"
+					" ip:%s, request:%s, name server prefix:\"%s\"",
 					ip43, rdds43_testedname, rdds43_ns_string);
 
-			if (SUCCEED != rsm_rdds43_test(rdds43_testedname, ip43, rdds43_port, RSM_TCP_TIMEOUT, &answer,
+			if (SUCCEED != rdds43_test(rdds43_testedname, ip43, rdds43_port, RSM_TCP_TIMEOUT, &answer,
 					&rtt43, err, sizeof(err)))
 			{
-				rsm_errf(log_fd, "RDDS43 of \"%s\" (%s) failed: %s", rdds43_server, ip43, err);
+				rsm_err(log_fd, err);
 			}
 		}
 
-		if (SUCCEED == rsm_ec_noerror(rtt43))
+		if (SUCCEED == ec_noerror(rtt43))
 		{
-			rsm_get_rdds43_nss(&nss, answer, rdds43_ns_string, log_fd);
+			get_rdds43_nss(&nss, answer, rdds43_ns_string, log_fd);
 
 			if (0 == nss.values_num)
 			{
 				rtt43 = RSM_EC_RDDS43_NONS;
-				rsm_errf(log_fd, "no Name Servers found in the output of RDDS43 server \"%s\""
-						" (%s) for query \"%s\" (expecting prefix \"%s\")",
-						rdds43_server, ip43, rdds43_testedname, rdds43_ns_string);
+				rsm_errf(log_fd, "no Name Servers found in the output from %s"
+						" (queried \"%s\", used prefix \"%s\")",
+						ip43, rdds43_testedname, rdds43_ns_string);
 			}
 		}
 
-		if (SUCCEED == rsm_ec_noerror(rtt43))
+		if (SUCCEED == ec_noerror(rtt43))
 		{
 			if (0 != epp_enabled)
 			{
@@ -442,12 +444,12 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 					upd43 = (int)(now - ts);
 				}
 
-				rsm_infof(log_fd, "===>\n%.*s\n<=== end RDDS43 test (rtt:%d upd43:%d)",
+				rsm_infof(log_fd, "===>\n%.*s\n<=== end of output (rtt:%d upd43:%d)",
 						RESPONSE_PREVIEW_SIZE, answer, rtt43, upd43);
 			}
 			else
 			{
-				rsm_infof(log_fd, "===>\n%.*s\n<=== end RDDS43 test (rtt:%d)",
+				rsm_infof(log_fd, "===>\n%.*s\n<=== end of output (rtt:%d)",
 						RESPONSE_PREVIEW_SIZE, answer, rtt43);
 			}
 		}
@@ -461,14 +463,14 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 		if (SUCCEED != rsm_resolve_host(res, domain, &ips80, ipv_flags, log_fd, &ec_res, err, sizeof(err)))
 		{
 			rtt80 = rsm_resolver_error_to_RDDS80(ec_res);
-			rsm_errf(log_fd, "RDDS80 \"%s\": %s", domain, err);
+			rsm_err(log_fd, err);
 			goto out;
 		}
 
 		if (0 == ips80.values_num)
 		{
 			rtt80 = RSM_EC_RDDS80_INTERNAL_IP_UNSUP;
-			rsm_errf(log_fd, "RDDS80 \"%s\": IP address(es) of host not supported by the Probe", rdds80_url);
+			rsm_err(log_fd, "found no IP addresses supported by the Probe");
 			goto out;
 		}
 
@@ -478,7 +480,7 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 		if (SUCCEED != rsm_validate_ip(ip80, ipv4_enabled, ipv6_enabled, NULL, &is_ipv4))
 		{
 			rtt80 = RSM_EC_RDDS80_INTERNAL_GENERAL;
-			rsm_errf(log_fd, "internal error, selected unsupported IP of \"%s\": \"%s\"", rdds80_url, ip80);
+			rsm_errf(log_fd, "internal error, should not be using unsupported IP %s", ip80);
 			goto out;
 		}
 
@@ -487,13 +489,13 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 		else
 			formed_url = zbx_dsprintf(formed_url, "%s%s:%d%s", scheme, ip80, port, path);
 
-		rsm_infof(log_fd, "domain \"%s\" was resolved to %s, using URL \"%s\".", domain, ip80, formed_url);
+		rsm_infof(log_fd, "the following URL was generated for the test: %s", formed_url);
 
 		if (SUCCEED != rsm_http_test(domain, formed_url, RSM_TCP_TIMEOUT, maxredirs, &ec_http, &rtt80, NULL,
 						curl_devnull, curl_flags, err, sizeof(err)))
 		{
 			rtt80 = rsm_http_error_to_RDDS80(ec_http);
-			rsm_errf(log_fd, "RDDS80 of \"%s\" (%s) failed: %s (%d)", rdds80_url, formed_url, err, rtt80);
+			rsm_errf(log_fd, "%s (%d)", err, rtt80);
 		}
 
 		rsm_infof(log_fd, "end RDDS80 test (rtt:%d)", rtt80);

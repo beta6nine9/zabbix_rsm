@@ -93,7 +93,7 @@ RSM_DEFINE_NS_QUERY_ERROR_TO(DNS_TCP)
 
 #undef RSM_DEFINE_NS_QUERY_ERROR_TO
 
-#define RSM_DEFINE_DNSSEC_ERROR_TO(__interface)					\
+#define RSM_DEFINE_DNSSEC_ERROR_TO(__interface)						\
 static int	rsm_dnssec_error_to_ ## __interface (rsm_dnssec_error_t err)		\
 {											\
 	switch (err)									\
@@ -217,7 +217,7 @@ RSM_DEFINE_NS_ANSWER_ERROR_TO(DNS_TCP)
 /* definitions of RCODE 16-23 are missing from ldns library */
 /* https://open.nlnetlabs.nl/pipermail/ldns-users/2018-March/000912.html */
 
-#define RSM_DEFINE_RCODE_NOT_NXDOMAIN_TO(__interface)			\
+#define RSM_DEFINE_RCODE_NOT_NXDOMAIN_TO(__interface)				\
 static int	rsm_rcode_not_nxdomain_to_ ## __interface (ldns_pkt_rcode rcode)\
 {										\
 	switch (rcode)								\
@@ -307,7 +307,7 @@ static const char	*rsm_covered_to_str(ldns_rr_type covered_type)
 	}
 }
 
-static int	rsm_get_covered_rrsigs(const ldns_pkt *pkt, const ldns_rdf *owner, ldns_pkt_section s,
+static int	get_covered_rrsigs(const ldns_pkt *pkt, const ldns_rdf *owner, ldns_pkt_section s,
 		ldns_rr_type covered_type, ldns_rr_list **result, rsm_dnssec_error_t *dnssec_ec,
 		char *err, size_t err_size)
 {
@@ -392,7 +392,7 @@ out:
 	return ret;
 }
 
-static void	rsm_get_owners(const ldns_rr_list *rr_list, zbx_vector_ptr_t *owners)
+static void	get_owners(const ldns_rr_list *rr_list, zbx_vector_ptr_t *owners)
 {
 	size_t	i, count;
 
@@ -417,7 +417,7 @@ static void	rsm_get_owners(const ldns_rr_list *rr_list, zbx_vector_ptr_t *owners
 	}
 }
 
-static void	rsm_destroy_owners(zbx_vector_ptr_t *owners)
+static void	destroy_owners(zbx_vector_ptr_t *owners)
 {
 	int	i;
 
@@ -427,7 +427,7 @@ static void	rsm_destroy_owners(zbx_vector_ptr_t *owners)
 	zbx_vector_ptr_destroy(owners);
 }
 
-static int	rsm_verify_rrsigs(const ldns_pkt *pkt, ldns_rr_type covered_type, const ldns_rr_list *dnskeys,
+static int	verify_rrsigs(const ldns_pkt *pkt, ldns_rr_type covered_type, const ldns_rr_list *dnskeys,
 		const char *ns, const char *ip, rsm_dnssec_error_t *dnssec_ec, char *err, size_t err_size)
 {
 	zbx_vector_ptr_t	owners;
@@ -439,13 +439,13 @@ static int	rsm_verify_rrsigs(const ldns_pkt *pkt, ldns_rr_type covered_type, con
 	zbx_vector_ptr_create(&owners);
 
 	/* get all RRSIGs just to collect the owners */
-	if (SUCCEED != rsm_get_covered_rrsigs(pkt, NULL, LDNS_SECTION_AUTHORITY, covered_type, &rrsigs,
+	if (SUCCEED != get_covered_rrsigs(pkt, NULL, LDNS_SECTION_AUTHORITY, covered_type, &rrsigs,
 			dnssec_ec, err, err_size))
 	{
 		goto out;
 	}
 
-	rsm_get_owners(rrsigs, &owners);
+	get_owners(rrsigs, &owners);
 
 	if (0 == owners.values_num)
 	{
@@ -493,7 +493,7 @@ static int	rsm_verify_rrsigs(const ldns_pkt *pkt, ldns_rr_type covered_type, con
 		}
 
 		/* now get RRSIGs of that owner, we know at least one exists */
-		if (SUCCEED != rsm_get_covered_rrsigs(pkt, owner_rdf, LDNS_SECTION_AUTHORITY, covered_type, &rrsigs,
+		if (SUCCEED != get_covered_rrsigs(pkt, owner_rdf, LDNS_SECTION_AUTHORITY, covered_type, &rrsigs,
 				dnssec_ec, err, err_size))
 		{
 			goto out;
@@ -575,7 +575,7 @@ static int	rsm_verify_rrsigs(const ldns_pkt *pkt, ldns_rr_type covered_type, con
 
 	ret = SUCCEED;
 out:
-	rsm_destroy_owners(&owners);
+	destroy_owners(&owners);
 
 	if (NULL != rrset)
 		ldns_rr_list_deep_free(rrset);
@@ -586,7 +586,7 @@ out:
 	return ret;
 }
 
-static int	rsm_pkt_section_has_rr_type(const ldns_pkt *pkt, ldns_rr_type t, ldns_pkt_section s)
+static int	pkt_section_has_rr_type(const ldns_pkt *pkt, ldns_rr_type t, ldns_pkt_section s)
 {
 	ldns_rr_list	*rrlist;
 
@@ -598,7 +598,7 @@ static int	rsm_pkt_section_has_rr_type(const ldns_pkt *pkt, ldns_rr_type t, ldns
 	return SUCCEED;
 }
 
-static int	rsm_verify_denial_of_existence(const ldns_pkt *pkt, rsm_dnssec_error_t *dnssec_ec, char *err, size_t err_size)
+static int	verify_denial_of_existence(const ldns_pkt *pkt, rsm_dnssec_error_t *dnssec_ec, char *err, size_t err_size)
 {
 	ldns_rr_list	*question = NULL, *rrsigs = NULL, *nsecs = NULL, *nsec3s = NULL;
 	ldns_status	status;
@@ -767,7 +767,7 @@ static void	extract_nsid(ldns_rdf *edns_data, char **nsid)
 	}
 }
 
-static int	rsm_dns_in_a_query(ldns_pkt **pkt, ldns_resolver *res, const ldns_rdf *testname_rdf, char **nsid,
+static int	dns_in_a_query(ldns_pkt **pkt, ldns_resolver *res, const ldns_rdf *testname_rdf, char **nsid,
 		rsm_ns_query_error_t *ec, FILE *log_fd, char *err, size_t err_size)
 {
 	ldns_status	status;
@@ -887,7 +887,7 @@ out:
 /* Check every RR in rr_set, return  */
 /* SUCCEED - all have expected class */
 /* FAIL    - otherwise               */
-static int	rsm_verify_rr_class(const ldns_rr_list *rr_list, rsm_rr_class_error_t *ec, char *err, size_t err_size)
+static int	verify_rr_class(const ldns_rr_list *rr_list, rsm_rr_class_error_t *ec, char *err, size_t err_size)
 {
 	size_t	i, rr_count;
 
@@ -935,7 +935,7 @@ static int	rsm_verify_rr_class(const ldns_rr_list *rr_list, rsm_rr_class_error_t
 	return SUCCEED;
 }
 
-static int	rsm_domain_in_question_section(const ldns_pkt *pkt, const char *domain, rsm_ns_answer_error_t *ec,
+static int	domain_in_question_section(const ldns_pkt *pkt, const char *domain, rsm_ns_answer_error_t *ec,
 		char *err, size_t err_size)
 {
 	ldns_rr_list	*rr_list = NULL;
@@ -981,24 +981,24 @@ out:
 	return ret;
 }
 
-static int	rsm_check_dnssec_no_epp(const ldns_pkt *pkt, const ldns_rr_list *dnskeys, const char *ns, const char *ip,
+static int	check_dnssec_no_epp(const ldns_pkt *pkt, const ldns_rr_list *dnskeys, const char *ns, const char *ip,
 		rsm_dnssec_error_t *dnssec_ec, char *err, size_t err_size)
 {
 	int	ret = SUCCEED, auth_has_nsec = 0, auth_has_nsec3 = 0;
 
-	if (SUCCEED != rsm_pkt_section_has_rr_type(pkt, LDNS_RR_TYPE_RRSIG, LDNS_SECTION_ANSWER)
-			&&  SUCCEED != rsm_pkt_section_has_rr_type(pkt, LDNS_RR_TYPE_RRSIG, LDNS_SECTION_AUTHORITY)
-			&&  SUCCEED != rsm_pkt_section_has_rr_type(pkt, LDNS_RR_TYPE_RRSIG, LDNS_SECTION_ADDITIONAL))
+	if (SUCCEED != pkt_section_has_rr_type(pkt, LDNS_RR_TYPE_RRSIG, LDNS_SECTION_ANSWER)
+			&&  SUCCEED != pkt_section_has_rr_type(pkt, LDNS_RR_TYPE_RRSIG, LDNS_SECTION_AUTHORITY)
+			&&  SUCCEED != pkt_section_has_rr_type(pkt, LDNS_RR_TYPE_RRSIG, LDNS_SECTION_ADDITIONAL))
 	{
 		zbx_strlcpy(err, "no RRSIGs where found in any section", err_size);
 		*dnssec_ec = RSM_EC_DNSSEC_RRSIG_NONE;
 		return FAIL;
 	}
 
-	if (SUCCEED == rsm_pkt_section_has_rr_type(pkt, LDNS_RR_TYPE_NSEC, LDNS_SECTION_AUTHORITY))
+	if (SUCCEED == pkt_section_has_rr_type(pkt, LDNS_RR_TYPE_NSEC, LDNS_SECTION_AUTHORITY))
 		auth_has_nsec = 1;
 
-	if (SUCCEED == rsm_pkt_section_has_rr_type(pkt, LDNS_RR_TYPE_NSEC3, LDNS_SECTION_AUTHORITY))
+	if (SUCCEED == pkt_section_has_rr_type(pkt, LDNS_RR_TYPE_NSEC3, LDNS_SECTION_AUTHORITY))
 		auth_has_nsec3 = 1;
 
 	if (0 == auth_has_nsec && 0 == auth_has_nsec3)
@@ -1009,10 +1009,10 @@ static int	rsm_check_dnssec_no_epp(const ldns_pkt *pkt, const ldns_rr_list *dnsk
 	}
 
 	if (1 == auth_has_nsec)
-		ret = rsm_verify_rrsigs(pkt, LDNS_RR_TYPE_NSEC, dnskeys, ns, ip, dnssec_ec, err, err_size);
+		ret = verify_rrsigs(pkt, LDNS_RR_TYPE_NSEC, dnskeys, ns, ip, dnssec_ec, err, err_size);
 
 	if (SUCCEED == ret && 1 == auth_has_nsec3)
-		ret = rsm_verify_rrsigs(pkt, LDNS_RR_TYPE_NSEC3, dnskeys, ns, ip, dnssec_ec, err, err_size);
+		ret = verify_rrsigs(pkt, LDNS_RR_TYPE_NSEC3, dnskeys, ns, ip, dnssec_ec, err, err_size);
 
 	/* we want to override the previous RSM_EC_DNSSEC_RRSIG_NOT_SIGNED error with this one, if it fails */
 	if (SUCCEED == ret || RSM_EC_DNSSEC_RRSIG_NOT_SIGNED == *dnssec_ec)
@@ -1020,7 +1020,7 @@ static int	rsm_check_dnssec_no_epp(const ldns_pkt *pkt, const ldns_rr_list *dnsk
 		char			err2[RSM_ERR_BUF_SIZE];
 		rsm_dnssec_error_t	dnssec_ec2;
 
-		if (SUCCEED != rsm_verify_denial_of_existence(pkt, &dnssec_ec2, err2, sizeof(err2)))
+		if (SUCCEED != verify_denial_of_existence(pkt, &dnssec_ec2, err2, sizeof(err2)))
 		{
 			zbx_strlcpy(err, err2, err_size);
 			*dnssec_ec = dnssec_ec2;
@@ -1031,7 +1031,7 @@ static int	rsm_check_dnssec_no_epp(const ldns_pkt *pkt, const ldns_rr_list *dnsk
 	return ret;
 }
 
-static int	rsm_get_last_label(const char *name, char **last_label, char *err, size_t err_size)
+static int	get_last_label(const char *name, char **last_label, char *err, size_t err_size)
 {
 	const char	*last_label_start;
 
@@ -1106,7 +1106,7 @@ static int	test_nameserver(ldns_resolver *res, const char *ns, const char *ip, u
 	}
 
 	/* IN A query */
-	if (SUCCEED != rsm_dns_in_a_query(&pkt, res, testedname_rdf, nsid, &query_ec, log_fd, err, err_size))
+	if (SUCCEED != dns_in_a_query(&pkt, res, testedname_rdf, nsid, &query_ec, log_fd, err, err_size))
 	{
 		*rtt = DNS[DNS_PROTO(res)].ns_query_error(query_ec);
 		goto out;
@@ -1116,7 +1116,7 @@ static int	test_nameserver(ldns_resolver *res, const char *ns, const char *ip, u
 
 	all_rr_list = ldns_pkt_all(pkt);
 
-	if (SUCCEED != rsm_verify_rr_class(all_rr_list, &rr_class_ec, err, err_size))
+	if (SUCCEED != verify_rr_class(all_rr_list, &rr_class_ec, err, err_size))
 	{
 		*rtt = DNS[DNS_PROTO(res)].rr_class_error(rr_class_ec);
 		goto out;
@@ -1142,7 +1142,7 @@ static int	test_nameserver(ldns_resolver *res, const char *ns, const char *ip, u
 		goto out;
 	}
 
-	if (SUCCEED != rsm_domain_in_question_section(pkt, testedname, &answer_ec, err, err_size))
+	if (SUCCEED != domain_in_question_section(pkt, testedname, &answer_ec, err, err_size))
 	{
 		*rtt = DNS[DNS_PROTO(res)].ns_answer_error(answer_ec);
 		goto out;
@@ -1154,7 +1154,7 @@ static int	test_nameserver(ldns_resolver *res, const char *ns, const char *ip, u
 
 		/* the AUTHORITY section should contain at least one NS RR for the last label in  */
 		/* PREFIX, e.g. "somedomain" when querying for "blahblah.somedomain.example." */
-		if (SUCCEED != rsm_get_last_label(testedname, &last_label, err, err_size))
+		if (SUCCEED != get_last_label(testedname, &last_label, err, err_size))
 		{
 			*rtt = RSM_EC_EPP_NOT_IMPLEMENTED;
 			goto out;
@@ -1214,7 +1214,7 @@ static int	test_nameserver(ldns_resolver *res, const char *ns, const char *ip, u
 
 		if (NULL != dnskeys)	/* EPP enabled, DNSSEC enabled */
 		{
-			if (SUCCEED != rsm_verify_rrsigs(pkt, LDNS_RR_TYPE_DS, dnskeys, ns, ip, &dnssec_ec,
+			if (SUCCEED != verify_rrsigs(pkt, LDNS_RR_TYPE_DS, dnskeys, ns, ip, &dnssec_ec,
 					err, err_size))
 			{
 				*rtt = DNS[DNS_PROTO(res)].dnssec_error(dnssec_ec);
@@ -1224,7 +1224,7 @@ static int	test_nameserver(ldns_resolver *res, const char *ns, const char *ip, u
 	}
 	else if (NULL != dnskeys)		/* EPP disabled, DNSSEC enabled */
 	{
-		if (SUCCEED != rsm_check_dnssec_no_epp(pkt, dnskeys, ns, ip, &dnssec_ec, err, err_size))
+		if (SUCCEED != check_dnssec_no_epp(pkt, dnskeys, ns, ip, &dnssec_ec, err, err_size))
 		{
 			*rtt = DNS[DNS_PROTO(res)].dnssec_error(dnssec_ec);
 			goto out;
@@ -1276,7 +1276,7 @@ out:
 	return ret;
 }
 
-static int	rsm_get_dnskeys(ldns_resolver *res, const char *rsmhost, ldns_rr_list **dnskeys, FILE *log_fd,
+static int	get_dnskeys(ldns_resolver *res, const char *rsmhost, ldns_rr_list **dnskeys, FILE *log_fd,
 		rsm_dnskeys_error_t *ec, char *err, size_t err_size)
 {
 	ldns_pkt	*pkt = NULL;
@@ -1358,13 +1358,13 @@ out:
 
 /******************************************************************************
  *                                                                            *
- * Function: rsm_get_nameservers                                              *
+ * Function: get_nameservers                                              *
  *                                                                            *
  * Purpose: Parse string "<NS>,<IP> ..." and return list of Name Servers with *
  *          their IPs in rsm_ns_t structure.                                  *
  *                                                                            *
  ******************************************************************************/
-static int	rsm_get_nameservers(char *name_servers_list, rsm_ns_t **nss, size_t *nss_num, int ipv4_enabled,
+static int	get_nameservers(char *name_servers_list, rsm_ns_t **nss, size_t *nss_num, int ipv4_enabled,
 		int ipv6_enabled, unsigned short default_port, FILE *log_fd, char *err, size_t err_size)
 {
 	char		*ns, *ip, *ns_next, ip_buf[INTERFACE_IP_LEN_MAX];
@@ -1471,7 +1471,7 @@ next_ns:
 	return SUCCEED;
 }
 
-static void	rsm_clean_nss(rsm_ns_t *nss, size_t nss_num)
+static void	clean_nss(rsm_ns_t *nss, size_t nss_num)
 {
 	size_t	i, j;
 
@@ -2065,7 +2065,7 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 
 	/* get list of Name Servers and IPs, by default it will set every Name Server */
 	/* as working so if we have no IPs the result of Name Server will be SUCCEED  */
-	if (SUCCEED != rsm_get_nameservers(name_servers_list, &nss, &nss_num, ipv4_enabled, ipv6_enabled,
+	if (SUCCEED != get_nameservers(name_servers_list, &nss, &nss_num, ipv4_enabled, ipv6_enabled,
 			DEFAULT_NAMESERVER_PORT, log_fd, err, sizeof(err)))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
@@ -2093,7 +2093,7 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 		print_ds_records(res, rsmhost, log_fd);
 	}
 
-	if (0 != dnssec_enabled && SUCCEED != rsm_get_dnskeys(res, rsmhost, &dnskeys, log_fd, &ec_dnskeys,
+	if (0 != dnssec_enabled && SUCCEED != get_dnskeys(res, rsmhost, &dnskeys, log_fd, &ec_dnskeys,
 			err, sizeof(err)))
 	{
 		/* failed to get DNSKEY records */
@@ -2302,7 +2302,7 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 out:
 	if (0 != nss_num)
 	{
-		rsm_clean_nss(nss, nss_num);
+		clean_nss(nss, nss_num);
 		zbx_free(nss);
 	}
 
