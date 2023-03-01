@@ -211,14 +211,14 @@ int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 	if (SUCCEED != rsm_resolve_host(res, domain, &ips, ipv_flags, log_fd, &ec_res, err, sizeof(err)))
 	{
 		rtt = rsm_resolver_error_to_RDAP(ec_res);
-		rsm_errf(log_fd, "trying to resolve \"%s\": %s", domain, err);
+		rsm_err(log_fd, err);
 		goto out;
 	}
 
 	if (0 == ips.values_num)
 	{
 		rtt = RSM_EC_RDAP_INTERNAL_IP_UNSUP;
-		rsm_errf(log_fd, "IP address(es) of host \"%s\" are not supported on this Probe", domain);
+		rsm_err(log_fd, "found no IP addresses supported by the Probe");
 		goto out;
 	}
 
@@ -228,7 +228,7 @@ int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 	if (SUCCEED != rsm_validate_ip(ip, ipv4_enabled, ipv6_enabled, NULL, &is_ipv4))
 	{
 		rtt = RSM_EC_RDAP_INTERNAL_GENERAL;
-		rsm_errf(log_fd, "internal error, selected unsupported IP of \"%s\": \"%s\"", domain, ip);
+		rsm_errf(log_fd, "internal error, should not be using unsupported IP %s", ip);
 		goto out;
 	}
 
@@ -242,40 +242,38 @@ int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 	else
 		formed_url = zbx_dsprintf(formed_url, "%s%s:%d%s%s/%s", scheme, ip, port, path, query, testedname);
 
-	rsm_infof(log_fd, "domain \"%s\" was resolved to %s, using URL \"%s\".", domain, ip, formed_url);
+	rsm_infof(log_fd, "the following URL was generated for the test: %s", formed_url);
 
 	if (SUCCEED != rsm_http_test(domain, formed_url, RSM_TCP_TIMEOUT, maxredirs, &ec_http, &rtt, &data,
 			curl_memory, curl_flags, err, sizeof(err)))
 	{
 		rtt = rsm_http_error_to_RDAP(ec_http);
-		rsm_errf(log_fd, "test of \"%s\" (%s) failed: %s (%d)", base_url, formed_url, err, rtt);
+		rsm_errf(log_fd, "%s (%d)", err, rtt);
 		goto out;
 	}
 
-	rsm_infof(log_fd, "got response ===>\n%.*s\n<===", RESPONSE_PREVIEW_SIZE, ZBX_NULL2STR(data.buf));
+	rsm_infof(log_fd, "response ===>\n%s\n<===", ZBX_NULL2STR(data.buf));
 
 	if (NULL == data.buf || '\0' == *data.buf || SUCCEED != zbx_json_open(data.buf, &jp))
 	{
 		rtt = RSM_EC_RDAP_EJSON;
-		rsm_errf(log_fd, "invalid JSON format in response of \"%s\" (%s)", base_url, ip);
+		rsm_err(log_fd, "invalid JSON format in response");
 		goto out;
 	}
 
 	if (SUCCEED != zbx_json_value_by_name_dyn(&jp, "ldhName", &value_str, &value_alloc, NULL))
 	{
 		rtt = RSM_EC_RDAP_NONAME;
-		rsm_errf(log_fd, "ldhName member not found in response of \"%s\" (%s)", base_url, ip);
+		rsm_err(log_fd, "ldhName member not found in response");
 		goto out;
 	}
 
 	if (NULL == value_str || 0 != strcmp(value_str, testedname))
 	{
 		rtt = RSM_EC_RDAP_ENAME;
-		rsm_errf(log_fd, "ldhName member doesn't match query in response of \"%s\" (%s)", base_url, ip);
+		rsm_err(log_fd, "ldhName member doesn't match the domain being requested");
 		goto out;
 	}
-
-	rsm_infof(log_fd, "end test of \"%s\" (%s) (rtt:%d)", base_url, ZBX_NULL2STR(ip), rtt);
 out:
 	if (SYSINFO_RET_OK == ret && 0 != rsmhost_rdap_enabled && 0 != probe_rdap_enabled)
 	{

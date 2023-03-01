@@ -420,8 +420,6 @@ extern const char	*CONFIG_LOG_FILE;
 #define UNEXPECTED_LDNS_ERROR		"unexpected LDNS error"
 #define UNEXPECTED_LDNS_MEM_ERROR	UNEXPECTED_LDNS_ERROR " (out of memory?)"
 
-#define RESPONSE_PREVIEW_SIZE	100
-
 #define ENABLED(state)	((state) ? "ENABLED" : "DISABLED")
 
 typedef int	(*rsm_ns_query_error_func_t)(rsm_ns_query_error_t);

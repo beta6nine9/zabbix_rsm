@@ -380,6 +380,8 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 
 		if (SUCCEED == ec_noerror(rtt43))
 		{
+			int	rv;
+
 			/* choose random IP */
 			ip43 = ips43.values[rsm_random((size_t)ips43.values_num)];
 
@@ -387,11 +389,14 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 					" ip:%s, request:%s, name server prefix:\"%s\"",
 					ip43, rdds43_testedname, rdds43_ns_string);
 
-			if (SUCCEED != rdds43_test(rdds43_testedname, ip43, rdds43_port, RSM_TCP_TIMEOUT, &answer,
-					&rtt43, err, sizeof(err)))
-			{
+			rv = rdds43_test(rdds43_testedname, ip43, rdds43_port, RSM_TCP_TIMEOUT, &answer, &rtt43, err,
+					sizeof(err));
+
+			if (answer != NULL)
+				rsm_infof(log_fd, "response ===>\n%s\n<===", answer);
+
+			if (rv != SUCCEED)
 				rsm_err(log_fd, err);
-			}
 		}
 
 		if (SUCCEED == ec_noerror(rtt43))
@@ -401,9 +406,7 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 			if (0 == nss.values_num)
 			{
 				rtt43 = RSM_EC_RDDS43_NONS;
-				rsm_errf(log_fd, "no Name Servers found in the output from %s"
-						" (queried \"%s\", used prefix \"%s\")",
-						ip43, rdds43_testedname, rdds43_ns_string);
+				rsm_err(log_fd, "no Name Servers found in the output");
 			}
 		}
 
@@ -443,14 +446,6 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 					/* successful UPD */
 					upd43 = (int)(now - ts);
 				}
-
-				rsm_infof(log_fd, "===>\n%.*s\n<=== end of output (rtt:%d upd43:%d)",
-						RESPONSE_PREVIEW_SIZE, answer, rtt43, upd43);
-			}
-			else
-			{
-				rsm_infof(log_fd, "===>\n%.*s\n<=== end of output (rtt:%d)",
-						RESPONSE_PREVIEW_SIZE, answer, rtt43);
 			}
 		}
 	}
