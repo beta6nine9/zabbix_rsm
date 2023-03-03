@@ -449,8 +449,7 @@ static int	verify_rrsigs(const ldns_pkt *pkt, ldns_rr_type covered_type, const l
 
 	if (0 == owners.values_num)
 	{
-		zbx_snprintf(err, err_size, "no RRSIG records covering %s found at nameserver \"%s\" (%s)",
-				rsm_covered_to_str(covered_type), ns, ip);
+		zbx_snprintf(err, err_size, "no RRSIG records covering %s found", rsm_covered_to_str(covered_type));
 		*dnssec_ec = RSM_EC_DNSSEC_RRSIG_NOTCOVERED;
 		goto out;
 	}

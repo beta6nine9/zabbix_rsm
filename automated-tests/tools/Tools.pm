@@ -8,6 +8,10 @@ use lib "$FindBin::RealBin/../lib/perl";
 
 use Net::DNS::NameserverCustom;
 
+use Net::DNS::ZoneFile;
+use Net::DNS::SEC;
+use Net::DNS::RR::RRSIG;
+
 use IO::Socket::INET;
 use threads;
 
@@ -17,6 +21,8 @@ our @EXPORT = qw(
 	write_file
 	start_dns_server
 	start_tcp_server
+	get_dnskey_rr
+	get_rrsig_rr
 	inf
 	err
 );
@@ -148,6 +154,41 @@ sub start_tcp_server($$$$)
 	}
 
 	$socket->close();
+}
+
+sub get_dnskey_rr($)
+{
+	my $owner = shift;
+
+	# we have 2 keyid's 58672 and 52500
+	my $keypath;
+	foreach my $keyid (58672, 52500)
+	{
+		$keypath = "$FindBin::RealBin/../K$owner.+013+$keyid.key";
+		last if (-r $keypath);
+	}
+
+	my $zonefile = Net::DNS::ZoneFile->new($keypath);
+
+	my @dnskey_rrs = $zonefile->read;
+
+	return $dnskey_rrs[0];
+}
+
+sub get_rrsig_rr($$)
+{
+	my $owner = shift;
+	my $dnskeyrr = shift;
+
+	# we have 2 keyid's 58672 and 52500
+	my $keypath;
+	foreach my $keyid (58672, 52500)
+	{
+		$keypath = "$FindBin::RealBin/../K$owner.+013+$keyid.private";
+		last if (-r $keypath);
+	}
+
+	return Net::DNS::RR::RRSIG->create([$dnskeyrr], $keypath);
 }
 
 sub inf(@)

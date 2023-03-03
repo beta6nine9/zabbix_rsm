@@ -7,9 +7,6 @@ use FindBin;
 use lib "$FindBin::RealBin/..";
 use Tools;
 
-use Net::DNS::SEC;
-use Net::DNS::RR::RRSIG;
-
 use constant PORT => 5054;
 
 my $pid_file   = $ARGV[0];
@@ -69,21 +66,13 @@ sub reply_handler
 	);
 
 	# AUTHORITY section
-	my $keypath = "$FindBin::RealBin/Krsa.$config->{'owner'}.+010+36026.private";
-	die("cannot find key file \"$keypath\"") unless (-r $keypath);
+	my $nsecrr = Net::DNS::RR->new("example NSEC $qname A AAAA RRSIG");
 
-	my $rr = Net::DNS::RR->new
-	(
-		owner   => $config->{'owner'},
-		name    => $config->{'owner'},
-		ttl     => 86400,
-		class   => 'IN',
-		type    => 'NSEC',
-	);
+	push(@authority, $nsecrr);
 
-	push(@authority, $rr);
+	my $rrsigrr = get_rrsig_rr($qname, $nsecrr);
 
-	push(@authority, Net::DNS::RR::RRSIG->create([$rr], $keypath));
+	push(@authority, $rrsigrr);
 
 	# specify EDNS options  { option => value }
 	my $optionmask =
