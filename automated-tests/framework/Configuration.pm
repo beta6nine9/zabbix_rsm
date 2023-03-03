@@ -21,7 +21,6 @@ my $config;
 
 sub initialize_config()
 {
-	$config = Config::Tiny->new;
 	$config = Config::Tiny->read(CONFIG_FILE);
 
 	if (!defined($config))
