@@ -13,49 +13,32 @@ return [
 			'username'    => 'provisioning-api-readonly',
 			'password'    => '$2y$10$nD9fJYeWFsktv7wOMcg52Ob0LRgwrj4JWevPpemErLUo78FDp7WXK',
 			'permissions' => [
-				'request_methods' => [
-					'GET',
-				],
-				'endpoints' => [
-					'tlds',
-					'tlds/.+',
-					'registrars',
-					'registrars/.+',
-					'probeNodes',
-					'probeNodes/.+',
-				],
+				'tlds'          => ['GET'],
+				'tlds/.+'       => ['GET'],
+				'registrars'    => ['GET'],
+				'registrars/.+' => ['GET'],
+				'probeNodes'    => ['GET'],
+				'probeNodes/.+' => ['GET'],
 			],
 		],
 		'readwrite' => [
 			'username'    => 'provisioning-api-readwrite',
 			'password'    => '$2y$10$nD9fJYeWFsktv7wOMcg52Ob0LRgwrj4JWevPpemErLUo78FDp7WXK',
 			'permissions' => [
-				'request_methods' => [
-					'GET',
-					'PUT',
-					'DELETE',
-				],
-				'endpoints' => [
-					'tlds',
-					'tlds/.+',
-					'registrars',
-					'registrars/.+',
-					'probeNodes',
-					'probeNodes/.+',
-				],
+				'tlds'          => ['GET', 'PUT'],
+				'tlds/.+'       => ['GET', 'PUT', 'DELETE'],
+				'registrars'    => ['GET', 'PUT'],
+				'registrars/.+' => ['GET', 'PUT', 'DELETE'],
+				'probeNodes'    => ['GET', 'PUT'],
+				'probeNodes/.+' => ['GET', 'PUT', 'DELETE'],
 			],
 		],
 		'alerts' => [
 			'username'    => 'alerts',
 			'password'    => '$2y$10$nD9fJYeWFsktv7wOMcg52Ob0LRgwrj4JWevPpemErLUo78FDp7WXK',
 			'permissions' => [
-				'request_methods' => [
-					'POST',
-				],
-				'endpoints' => [
-					'alerts',
-					'alerts/.+',
-				],
+				'alerts'    => [],
+				'alerts/.+' => ['POST'],
 			],
 		],
 	],

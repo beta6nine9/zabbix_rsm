@@ -62,32 +62,25 @@ class User
 
 	private static function validatePermissions(): void
 	{
+		$valid = false;
+
 		$permissions = getConfig('users', self::$user, 'permissions');
 
-		if (!self::isRequestMethodAllowed($permissions) || !self::isEndpointAllowed($permissions))
-		{
-			throw new RsmException(403, 'Forbidden');
-		}
-	}
-
-	private static function isRequestMethodAllowed(array $permissions): bool
-	{
-		return in_array($_SERVER['REQUEST_METHOD'], $permissions['request_methods'], true);
-	}
-
-	private static function isEndpointAllowed(array $permissions): bool
-	{
-		$forbidden = false;
-
-		foreach ($permissions['endpoints'] as $endpointPattern)
+		foreach ($permissions as $endpointPattern => $requestMethods)
 		{
 			if (preg_match('#^' . $endpointPattern . '$#', Input::getEndpoint()) === 1)
 			{
-				$forbidden = false;
+				if (in_array($_SERVER['REQUEST_METHOD'], $requestMethods))
+				{
+					$valid = true;
+				}
 				break;
 			}
 		}
 
-		return !$forbidden;
+		if (!$valid)
+		{
+			throw new RsmException(403, 'Forbidden');
+		}
 	}
 }
