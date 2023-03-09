@@ -18,8 +18,8 @@
 
 [rsm-api]
 
-"/"           ,"GET",404,"readonly","","0xx-error-outputs/006-invalid-endpoint.json"
-"/nonexistent","GET",404,"readonly","","0xx-error-outputs/006-invalid-endpoint.json"
+"/"           ,"GET",403,"readonly","","0xx-error-outputs/006-invalid-endpoint.json"
+"/nonexistent","GET",403,"readonly","","0xx-error-outputs/006-invalid-endpoint.json"
 
-"/"           ,"GET",404,"readwrite","","0xx-error-outputs/006-invalid-endpoint.json"
-"/nonexistent","GET",404,"readwrite","","0xx-error-outputs/006-invalid-endpoint.json"
+"/"           ,"GET",403,"readwrite","","0xx-error-outputs/006-invalid-endpoint.json"
+"/nonexistent","GET",403,"readwrite","","0xx-error-outputs/006-invalid-endpoint.json"
