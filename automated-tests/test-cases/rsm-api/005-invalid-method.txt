@@ -18,14 +18,14 @@
 
 [rsm-api]
 
-"/"           ,"TEST",405,"readonly","","0xx-error-outputs/005-invalid-method.json"
-"/nonexistent","TEST",405,"readonly","","0xx-error-outputs/005-invalid-method.json"
-"/tlds"       ,"TEST",405,"readonly","","0xx-error-outputs/005-invalid-method.json"
-"/registrars" ,"TEST",405,"readonly","","0xx-error-outputs/005-invalid-method.json"
-"/probeNodes" ,"TEST",405,"readonly","","0xx-error-outputs/005-invalid-method.json"
+"/"           ,"TEST",403,"readonly","","0xx-error-outputs/005-invalid-method.json"
+"/nonexistent","TEST",403,"readonly","","0xx-error-outputs/005-invalid-method.json"
+"/tlds"       ,"TEST",403,"readonly","","0xx-error-outputs/005-invalid-method.json"
+"/registrars" ,"TEST",403,"readonly","","0xx-error-outputs/005-invalid-method.json"
+"/probeNodes" ,"TEST",403,"readonly","","0xx-error-outputs/005-invalid-method.json"
 
-"/"           ,"TEST",405,"readwrite","","0xx-error-outputs/005-invalid-method.json"
-"/nonexistent","TEST",405,"readwrite","","0xx-error-outputs/005-invalid-method.json"
-"/tlds"       ,"TEST",405,"readwrite","","0xx-error-outputs/005-invalid-method.json"
-"/registrars" ,"TEST",405,"readwrite","","0xx-error-outputs/005-invalid-method.json"
-"/probeNodes" ,"TEST",405,"readwrite","","0xx-error-outputs/005-invalid-method.json"
+"/"           ,"TEST",403,"readwrite","","0xx-error-outputs/005-invalid-method.json"
+"/nonexistent","TEST",403,"readwrite","","0xx-error-outputs/005-invalid-method.json"
+"/tlds"       ,"TEST",403,"readwrite","","0xx-error-outputs/005-invalid-method.json"
+"/registrars" ,"TEST",403,"readwrite","","0xx-error-outputs/005-invalid-method.json"
+"/probeNodes" ,"TEST",403,"readwrite","","0xx-error-outputs/005-invalid-method.json"

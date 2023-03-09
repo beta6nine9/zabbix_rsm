@@ -1,6 +1,6 @@
 {
-    "resultCode": 405,
-    "title": "Method Not Allowed",
+    "resultCode": 403,
+    "title": "Forbidden",
     "description": null,
     "details": null,
     "updatedObject": null
