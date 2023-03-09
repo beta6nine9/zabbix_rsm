@@ -182,6 +182,8 @@ function RsmValidateProbeIdentifier($rule, &$data, $path, &$error): bool
 
 function RsmValidateTldIdentifier($rule, &$data, $path, &$error): bool
 {
+	// Must be kept in sync with checks in forwarder's isValidTldId().
+
 	// allow "." TLD
 	if ($data === '.')
 	{
@@ -198,11 +200,14 @@ function RsmValidateTldIdentifier($rule, &$data, $path, &$error): bool
 		$error = $rule['error'];
 		return false;
 	}
-	// if 3rd and 4th characters are '--', then 1st and 2nd characters must be 'xn' (i.e., 'xn--')
-    if (strlen($data) >= 4 && ($data[0] != 'x' || $data[1] != 'n') && $data[2] == '-' && $data[3] == '-')
+	// if 3rd and 4th characters are '--', then 1st and 2nd characters must be 'xn' or 'zz' (i.e., 'xn--' or 'zz--')
+	if (strlen($data) >= 4 && $data[2] == '-' && $data[3] == '-')
 	{
-		$error = $rule['error'];
-		return false;
+		if (($data[0] != 'x' || $data[1] != 'n') && ($data[0] != 'z' || $data[1] != 'z'))
+		{
+			$error = $rule['error'];
+			return false;
+		}
 	}
 	return true;
 }
