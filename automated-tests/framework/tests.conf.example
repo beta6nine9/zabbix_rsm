@@ -23,3 +23,5 @@ username_readonly=provisioning-api-readonly
 password_readonly=password
 username_readwrite=provisioning-api-readwrite
 password_readwrite=password
+username_alerts=alerts
+password_alerts=password

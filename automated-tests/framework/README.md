@@ -329,11 +329,12 @@ Argument `expected_code` describes expected HTTP response status code, e.g., `20
 Argument `user` specifies user for Basic Authentication. Exact usernames and passwords are configured in framework's configuration file. Supported users are:
 * `readonly` - user with Provisioning API "read only" permissions;
 * `readwrite` - user with Provisioning API "read and write" permissions;
+* `alerts` - user with "send alert" permissions;
 * `invalid_password` - user that is registered, but with invalid password;
 * `nonexistent` - user that is not registered in RSM API;
 * `''` (empty string) - for skipping authentication).
 
-Argument `request` specifies filename of the payload for the request. This argument is optional. It is usually used only with `PUT` requests.
+Argument `request` specifies filename of the payload for the request. This argument is optional. It is usually used with `PUT` and `POST` requests.
 
 Argument `response` specifies filename of the expected response's payload. This argument is optional. If this argument is not specified, validation of the response's payload is skipped.
 

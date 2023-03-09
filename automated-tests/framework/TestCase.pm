@@ -1120,12 +1120,15 @@ sub __cmd_rsm_api($)
 			'username' => get_config('rsm-api', 'username_readwrite'),
 			'password' => get_config('rsm-api', 'password_readwrite'),
 		},
+		'alerts' => {
+			'username' => get_config('rsm-api', 'username_alerts'),
+			'password' => get_config('rsm-api', 'password_alerts'),
 		},
 	};
 
 	if (!exists($users->{$user}))
 	{
-		fail("unsupported user '$user', supported users: '', 'nonexistent', 'invalid_password', 'readonly', 'readwrite'");
+		fail("unsupported user '$user', supported users: '', 'nonexistent', 'invalid_password', 'readonly', 'readwrite', 'alerts'");
 	}
 
 	if ($request ne '')
@@ -1180,7 +1183,7 @@ sub __cmd_rsm_api($)
 
 	if ($response ne '')
 	{
-		# uncomment write_file() to update outputs after changes in Provisioning API implementation
+		# uncomment write_file() to update outputs after changes in RSM API implementation
 		#write_file($response, $response_body);
 
 		my $expected_response_body = read_file($response);
