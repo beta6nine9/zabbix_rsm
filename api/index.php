@@ -971,7 +971,7 @@ function getMaxObjectCount(string $objectType): int
 
 function logFailure(array $exceptionDetails): void
 {
-	openlog('ProvisioningAPI', LOG_CONS | LOG_NDELAY | LOG_PID | LOG_PERROR, LOG_LOCAL0);
+	openlog(getConfig('settings')['syslog_ident'], LOG_CONS | LOG_NDELAY | LOG_PID | LOG_PERROR, LOG_LOCAL0);
 
 	writeLog($_SERVER['REQUEST_METHOD'] . ' ' . $_SERVER['REQUEST_URI']);
 

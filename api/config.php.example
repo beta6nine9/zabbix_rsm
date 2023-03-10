@@ -63,6 +63,7 @@ return [
 		],
 	],
 	'settings' => [
+		'syslog_ident'           => 'RsmApi',
 		'curl_timeout'           => 3,
 		'max_tlds'               => 400,
 		'max_registrars'         => 10,
