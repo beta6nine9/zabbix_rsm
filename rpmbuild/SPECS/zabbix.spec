@@ -327,7 +327,7 @@ Group:				Applications/Internet
 BuildArch:			noarch
 
 %description rsm-api
-This package provides RSM API (Forwarder), that works with
+This package provides RSM API, that works with
 Provisioning API (frontend module) and implements Alerts API.
 
 
@@ -591,8 +591,8 @@ install -d $RPM_BUILD_ROOT%{_datadir}/selinux/packages
 install -m 0644 $MODULES \
     $RPM_BUILD_ROOT%{_datadir}/selinux/packages
 
-# RSM API aka "Forwarder"
-mv api $RPM_BUILD_ROOT%{_datadir}/rsm-api
+# RSM API
+mv rsm-api $RPM_BUILD_ROOT%{_datadir}/rsm-api
 
 %clean
 rm -rf $RPM_BUILD_ROOT
