@@ -18,6 +18,6 @@
 "nameserver","/tmp/nameserver.pid"
 "resolver","/tmp/resolver.pid"
 
-[compare-files]
+[compare-file]
 
-"/tmp/simple-check-test","109-output.tar.gz"
+"/tmp/simple-check-test/status.json","${file:109-status-output.json}"

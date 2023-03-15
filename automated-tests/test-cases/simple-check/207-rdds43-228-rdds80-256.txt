@@ -16,6 +16,6 @@
 
 "resolver","/tmp/resolver.pid"
 
-[compare-files]
+[compare-file]
 
-"/tmp/simple-check-test","207-output.tar.gz"
+"/tmp/simple-check-test/status.json","${file:207-status-output.json}"

@@ -8,6 +8,6 @@
 "","mkdir -p /tmp/simple-check-test"
 "","${cfg:paths:build_dir}/bin/t_rsm_rdap -r 127.0.0.1 -o 5053 -u 'not listed' -d example.example -4 -j /tmp/simple-check-test/status.json"
 
-[compare-files]
+[compare-file]
 
-"/tmp/simple-check-test","302-output.tar.gz"
+"/tmp/simple-check-test/status.json","${file:302-status-output.json}"

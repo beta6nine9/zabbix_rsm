@@ -1,5 +1,3 @@
-%define	namespace	50
-
 # we don't need the build-id files
 %define _build_id_links none
 
@@ -194,7 +192,10 @@ Requires(post):			%{_sbindir}/update-alternatives
 Requires(preun):		%{_sbindir}/update-alternatives
 
 %description web
-Zabbix web frontend common package.
+This package provides Zabbix web frontend (with few monidications)
+and includes the following frontend modules:
+ - RSM (frontend modifications, including menu and custom pages)
+ - RsmProvisioningApi (REST API for managing SLAM configuration)
 
 %package web-mysql
 Summary:			Zabbix web frontend for MySQL
@@ -326,7 +327,8 @@ Group:				Applications/Internet
 BuildArch:			noarch
 
 %description rsm-api
-This package provides RSM API for managing SLAM configuration.
+This package provides RSM API, that works with
+Provisioning API (frontend module) and implements Alerts API.
 
 
 %prep
@@ -403,7 +405,6 @@ export CXXFLAGS
 # Build proxy with SQLite support
 #
 
-set -x
 %configure $build_flags --with-sqlite3 --enable-proxy
 make -s %{?_smp_mflags}
 
@@ -425,8 +426,10 @@ mv src/zabbix_server/zabbix_server src/zabbix_server/zabbix%{namespace}_server_m
 
 touch src/zabbix_server/zabbix%{namespace}_server
 
-# add namespace to selinux modules
 cd selinux
+
+# add namespace to selinux modules
+%if "%{namespace}" != "%{nil}"
 sed -i "s,module zabbix_proxy,module zabbix%{namespace}_proxy,"   zabbix_proxy.te
 sed -i "s,module zabbix_server,module zabbix%{namespace}_server," zabbix_server.te
 sed -i "s,module zabbix_agent,module zabbix%{namespace}_agent,"   zabbix_agent.te
@@ -434,6 +437,7 @@ sed -i "s,module zabbix_agent,module zabbix%{namespace}_agent,"   zabbix_agent.t
 mv zabbix_proxy.te zabbix%{namespace}_proxy.te
 mv zabbix_server.te zabbix%{namespace}_server.te
 mv zabbix_agent.te zabbix%{namespace}_agent.te
+%endif
 
 make SHARE="%{_datadir}" TARGETS="%{modulenames}"
 
@@ -463,7 +467,9 @@ rm $RPM_BUILD_ROOT%{_sbindir}/zabbix_server
 rm $RPM_BUILD_ROOT%{_sysconfdir}/zabbix%{namespace}/zabbix_server.conf
 
 # add namespace prefix to the man pages
+%if "%{namespace}" != "%{nil}"
 mv $RPM_BUILD_ROOT%{_mandir}/man8/zabbix_server.8 $RPM_BUILD_ROOT%{_mandir}/man8/zabbix%{namespace}_server.8
+%endif
 
 # remove unneeded utilities
 rm -f $RPM_BUILD_ROOT%{_bindir}/rsm_epp_dec
@@ -585,8 +591,8 @@ install -d $RPM_BUILD_ROOT%{_datadir}/selinux/packages
 install -m 0644 $MODULES \
     $RPM_BUILD_ROOT%{_datadir}/selinux/packages
 
-# Provisioning API
-mv api $RPM_BUILD_ROOT%{_datadir}/rsm-api
+# RSM API
+mv rsm-api $RPM_BUILD_ROOT%{_datadir}/rsm-api
 
 %clean
 rm -rf $RPM_BUILD_ROOT
