@@ -16,6 +16,6 @@
 
 "nameserver","/tmp/nameserver.pid"
 
-[compare-files]
+[compare-file]
 
-"/tmp/simple-check-test","006-output.tar.gz"
+"/tmp/simple-check-test/status.json","${file:006-status-output.json}"

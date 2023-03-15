@@ -130,6 +130,14 @@ Extracts archive file into a directory. Archive should be filename of a compress
 
 Compares contents of an archive file with contents on the filesystem. Archive should be filename of a compressed tar file, relative to the test case file (e.g., `001-test-case-input-files.tar.gz`).
 
+### compare-file
+
+*filename,contents*
+
+Compares contents of the file with expected contents.
+
+Argument `contents` is optional. If it contains a string that is enclosed in `//`, this string is used as a regex pattern, otherwise contents of the file have to be the same as the string (in this case, trailing whitespaces are ignored).
+
 ### prepare-server-database
 
 *(ignored)*
@@ -225,7 +233,7 @@ Examples:
 
 Executes external command and validates exit status, STDOUT and STDERR.
 
-Arguments `expected_stdout` and `expected_stderr` are optional. If they contain a string that is enclosed in `//`, this string is used as a regex pattern, otherwise the whole output has to be the same as the string (in this case, trailing newlines are ignored).
+Arguments `expected_stdout` and `expected_stderr` are optional. If they contain a string that is enclosed in `//`, this string is used as a regex pattern, otherwise the whole output has to be the same as the string (in this case, trailing whitespaces are ignored).
 
 ### start-server
 
@@ -306,30 +314,31 @@ Argument `description` must match trigger's description rather than actual event
 
 See the example in the description of the `check-incident` command.
 
-### provisioning-api
+### rsm-api
 
 *endpoint,method,expected_code,user,request,response*
 
-Sends request to Porvisioning API. For this to work, framework must be properly configured.
+Sends request to RSM API. For this to work, framework must be properly configured.
 
-Argument `endpoint` points to an endpoint of Provisioning API (e.g., `"/tlds/tld1"`).
+Argument `endpoint` points to an endpoint of RSM API (e.g., `"/tlds/tld1"`).
 
 Argument `method` describes HTTP request method, usually `GET`, `PUT` or `DELETE`.
 
 Argument `expected_code` describes expected HTTP response status code, e.g., `200` (for "OK") or `404` (for "Not Found").
 
 Argument `user` specifies user for Basic Authentication. Exact usernames and passwords are configured in framework's configuration file. Supported users are:
-* `readonly` - user with "read only" permissions;
-* `readwrite` - user with "read and write" permissions;
+* `readonly` - user with Provisioning API "read only" permissions;
+* `readwrite` - user with Provisioning API "read and write" permissions;
+* `alerts` - user with "send alert" permissions;
 * `invalid_password` - user that is registered, but with invalid password;
-* `nonexistent` - user that is not registered in Provisioning API;
+* `nonexistent` - user that is not registered in RSM API;
 * `''` (empty string) - for skipping authentication).
 
-Argument `request` specifies filename of the payload for the request. This argument is optional. It is usually used only with `PUT` requests.
+Argument `request` specifies filename of the payload for the request. This argument is optional. It is usually used with `PUT` and `POST` requests.
 
 Argument `response` specifies filename of the expected response's payload. This argument is optional. If this argument is not specified, validation of the response's payload is skipped.
 
-Tip: when massive changes are required in expected responses, the handler of `provisioning-api` command can be modified to write the response files before doing the validation.
+Tip: when massive changes are required in expected responses, the handler of `rsm-api` command can be modified to write the response files before doing the validation.
 
 ### start-tool
 

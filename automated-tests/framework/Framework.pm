@@ -26,6 +26,7 @@ our @EXPORT = qw(
 	tar_unpack
 	tar_compare
 	str_starts_with
+	str_matches
 	ltrim
 	rtrim
 	format_table
@@ -742,6 +743,40 @@ sub str_starts_with($$)
 	{
 		return 0;
 	}
+}
+
+sub str_matches($$)
+{
+	my $string  = shift;
+	my $pattern = shift;
+
+	my $result = 1;
+
+	if ($pattern =~ m{^/(.*)/$})
+	{
+		# if pattern is enclosed in //, treat it as regex pattern
+		if ($string !~ /$1/)
+		{
+			$result = 0;
+		}
+	}
+	else
+	{
+		# if pattern is not enclosed in //, compare it directly to the string
+		if ($string ne $pattern)
+		{
+			# substring was not found, trim trailing newlines and try again
+			$string  =~ s/\s+$//mg;
+			$pattern =~ s/\s+$//mg;
+
+			if ($string ne $pattern)
+			{
+				$result = 0;
+			}
+		}
+	}
+
+	return $result;
 }
 
 sub ltrim($;$)

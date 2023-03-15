@@ -20,6 +20,6 @@
 "rdds80-server","/tmp/rdds80-server.pid"
 "rdds43-server","/tmp/rdds43-server.pid"
 
-[compare-files]
+[compare-file]
 
-"/tmp/simple-check-test","206-output.tar.gz"
+"/tmp/simple-check-test/status.json","${file:206-status-output.json}"
