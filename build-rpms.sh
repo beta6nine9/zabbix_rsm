@@ -1,6 +1,6 @@
 #!/bin/bash
 
-RSM_VERSION="rsm3.0.0"	# MAJOR.PROD.QA
+RSM_VERSION="rsm3.1.0rc1"	# MAJOR.PROD.QA
 RPM_NAMESPACE="50"
 RPMDIR="rpmbuild"
 SRV_VERSION_FILE="include/version.h"
