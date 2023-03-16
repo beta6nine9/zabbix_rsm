@@ -196,6 +196,7 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 				*domain = NULL,
 				*path = NULL,
 				*formed_url = NULL,
+				*details = NULL,
 				is_ipv4, err[RSM_ERR_BUF_SIZE],
 				rdds43_server[RSM_BUF_SIZE],
 				resolver_ip[RSM_BUF_SIZE];
@@ -452,6 +453,8 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 
 	if (0 != rsmhost_rdds80_enabled)
 	{
+		int	rv;
+
 		rsm_infof(log_fd, "start RDDS80 test (url %s)", rdds80_url);
 
 		/* start RDDS80 test, resolve domain to ips */
@@ -486,8 +489,13 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 
 		rsm_infof(log_fd, "the following URL was generated for the test: %s", formed_url);
 
-		if (SUCCEED != rsm_http_test(domain, formed_url, RSM_TCP_TIMEOUT, maxredirs, &ec_http, &rtt80, NULL,
-						curl_devnull, curl_flags, err, sizeof(err)))
+		rv = rsm_http_test(domain, formed_url, RSM_TCP_TIMEOUT, maxredirs, &ec_http, &rtt80, NULL,
+				curl_devnull, curl_flags, &details, err, sizeof(err));
+
+		if (details != NULL)
+			rsm_infof(log_fd, "Transfer details:%s", details);
+
+		if (rv != SUCCEED)
 		{
 			rtt80 = rsm_http_error_to_RDDS80(ec_http);
 			rsm_errf(log_fd, "%s (%d)", err, rtt80);
@@ -534,6 +542,7 @@ out:
 			ldns_resolver_free(res);
 	}
 
+	zbx_free(details);
 	zbx_free(answer);
 	zbx_free(scheme);
 	zbx_free(domain);

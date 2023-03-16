@@ -31,13 +31,14 @@ typedef struct
 	const char	*name;
 	int		flag;
 	ldns_rr_type	rr_type;
+	const char	*resolve_reason;
 }
 rsm_ipv_t;
 
 static const rsm_ipv_t	ipvs[] =
 {
-	{"IPv4",	RSM_FLAG_IPV4_ENABLED,	LDNS_RR_TYPE_A},
-	{"IPv6",	RSM_FLAG_IPV6_ENABLED,	LDNS_RR_TYPE_AAAA},
+	{"IPv4",	RSM_FLAG_IPV4_ENABLED,	LDNS_RR_TYPE_A,		"resolve a host to IPv4 addresses"},
+	{"IPv6",	RSM_FLAG_IPV6_ENABLED,	LDNS_RR_TYPE_AAAA,	"resolve a host to IPv6 addresses"},
 	{NULL}
 };
 
@@ -526,7 +527,7 @@ int	rsm_resolve_host(ldns_resolver *res, const char *host, zbx_vector_str_t *ips
 		ldns_pkt_rcode	rcode;
 		ldns_status	status;
 
-		rsm_print_nameserver(log_fd, res, "resolve a host");
+		rsm_print_nameserver(log_fd, res, ipv->resolve_reason);
 
 		status = ldns_resolver_query_status(&pkt, res, rdf, ipv->rr_type, LDNS_RR_CLASS_IN, LDNS_RD);
 
@@ -764,6 +765,49 @@ int	map_http_code(long http_code)
 	}
 }
 
+/* allocates memory and returns a buffer to the details */
+static char	*get_curl_details(CURL *easyhandle)
+{
+	char		*string, *output = NULL;
+	long		number;
+	double		precision;
+	CURLcode	curl_err;
+
+#define GET_DETAIL(FIELD, name, var, fmt)										\
+	do														\
+	{														\
+		if (CURLE_OK != (curl_err = curl_easy_getinfo(easyhandle, CURLINFO_ ## FIELD, &var)))			\
+		{													\
+			output = zbx_strdcatf(output, "\n  Error: cannot get \"%s\" from response (%s)",		\
+					name, curl_easy_strerror(curl_err));						\
+			return output;											\
+		}													\
+		output = zbx_strdcatf(output, "\n  %s=" fmt, name, var);						\
+	}														\
+	while (0)
+
+	GET_DETAIL(CONTENT_TYPE      , "content_type"      , string   , "%s");
+	GET_DETAIL(RESPONSE_CODE     , "http_code"         , number   , "%ld");
+	GET_DETAIL(LOCAL_IP          , "local_ip"          , string   , "%s");
+	GET_DETAIL(LOCAL_PORT        , "local_port"        , number   , "%ld");
+	GET_DETAIL(REDIRECT_COUNT    , "num_redirects"     , number   , "%ld");
+	GET_DETAIL(PRIMARY_IP        , "remote_ip"         , string   , "%s");
+	GET_DETAIL(PRIMARY_PORT      , "remote_port"       , number   , "%ld");
+	GET_DETAIL(SIZE_DOWNLOAD     , "size_download"     , precision, "%.0f");
+	GET_DETAIL(HEADER_SIZE       , "size_header"       , number   , "%ld");
+	GET_DETAIL(APPCONNECT_TIME   , "time_appconnect"   , precision, "%.2f");
+	GET_DETAIL(CONNECT_TIME      , "time_connect"      , precision, "%.2f");
+	GET_DETAIL(NAMELOOKUP_TIME   , "time_namelookup"   , precision, "%.2f");
+	GET_DETAIL(PRETRANSFER_TIME  , "time_pretransfer"  , precision, "%.2f");
+	GET_DETAIL(REDIRECT_TIME     , "time_redirect"     , precision, "%.2f");
+	GET_DETAIL(STARTTRANSFER_TIME, "time_starttransfer", precision, "%.2f");
+	GET_DETAIL(TOTAL_TIME        , "time_total"        , precision, "%.3f");
+	GET_DETAIL(EFFECTIVE_URL     , "url_effective"     , string   , "%s");
+
+	return output;
+#undef GET_DETAIL
+}
+
 #define RSM_FLAG_CURL_VERBOSE	0x1
 
 /* Helper function for Web-based RDDS80 and RDAP checks. Adds host to header, connects to URL obeying timeout and */
@@ -771,8 +815,8 @@ int	map_http_code(long http_code)
 /* round-trip time. When function succeeds it returns RTT in milliseconds. When function fails it returns source  */
 /* of error in provided RTT parameter. Does not verify certificates.                                              */
 int	rsm_http_test(const char *host, const char *url, long timeout, long maxredirs, rsm_http_error_t *ec_http,
-		int *rtt, void *writedata, size_t (*writefunction)(char *, size_t, size_t, void *),
-		int curl_flags, char *err, size_t err_size)
+		int *rtt, void *writedata, size_t (*writefunction)(char *, size_t, size_t, void *), int curl_flags,
+		char **details, char *err, size_t err_size)
 {
 #ifdef HAVE_LIBCURL
 	CURL			*easyhandle;
@@ -852,6 +896,19 @@ int	rsm_http_test(const char *host, const char *url, long timeout, long maxredir
 		goto out;
 	}
 
+	*details = get_curl_details(easyhandle);
+
+	/* total time */
+	if (CURLE_OK != (curl_err = curl_easy_getinfo(easyhandle, CURLINFO_TOTAL_TIME, &total_time)))
+	{
+		ec_http->type = PRE_HTTP_STATUS_ERROR;
+		ec_http->error.pre_status_error = RSM_EC_PRE_STATUS_ERROR_INTERNAL;
+
+		zbx_snprintf(err, err_size, "cannot get HTTP request time (%s)", curl_easy_strerror(curl_err));
+		goto out;
+	}
+
+	/* HTTP status code */
 	if (CURLE_OK != (curl_err = curl_easy_getinfo(easyhandle, CURLINFO_RESPONSE_CODE, &response_code)))
 	{
 		ec_http->type = PRE_HTTP_STATUS_ERROR;
@@ -868,15 +925,6 @@ int	rsm_http_test(const char *host, const char *url, long timeout, long maxredir
 
 		zbx_snprintf(err, err_size, "invalid HTTP response code, expected %ld, got %ld", RSM_HTTP_RESPONSE_OK,
 				response_code);
-		goto out;
-	}
-
-	if (CURLE_OK != (curl_err = curl_easy_getinfo(easyhandle, CURLINFO_TOTAL_TIME, &total_time)))
-	{
-		ec_http->type = PRE_HTTP_STATUS_ERROR;
-		ec_http->error.pre_status_error = RSM_EC_PRE_STATUS_ERROR_INTERNAL;
-
-		zbx_snprintf(err, err_size, "cannot get HTTP request time (%s)", curl_easy_strerror(curl_err));
 		goto out;
 	}
 

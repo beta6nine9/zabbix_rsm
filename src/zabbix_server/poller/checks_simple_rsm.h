@@ -370,8 +370,8 @@ int	rsm_get_ts_from_host(const char *host, time_t *ts);
 int	rsm_split_url(const char *url, char **scheme, char **domain, int *port, char **path, char *err, size_t err_size);
 
 int	rsm_http_test(const char *host, const char *url, long timeout, long maxredirs, rsm_http_error_t *ec_http,
-		int *rtt, void *writedata, size_t (*writefunction)(char *, size_t, size_t, void *),
-		int curl_flags, char *err, size_t err_size);
+		int *rtt, void *writedata, size_t (*writefunction)(char *, size_t, size_t, void *), int curl_flags,
+		char **details, char *err, size_t err_size);
 int	map_http_code(long http_code);
 
 #define CHECK_DNS_CONN_RRSIGS		0x1u

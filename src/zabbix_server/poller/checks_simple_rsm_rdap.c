@@ -40,12 +40,12 @@ typedef struct
 	size_t	alloc;
 	size_t	offset;
 }
-curl_data_t;
+writedata_t;
 
-/* store the curl output in memory */
-static size_t	curl_memory(char *ptr, size_t size, size_t nmemb, void *userdata)
+/* callback for curl to store the response */
+static size_t	writefunction(char *ptr, size_t size, size_t nmemb, void *userdata)
 {
-	curl_data_t	*data = (curl_data_t *)userdata;
+	writedata_t	*data = (writedata_t *)userdata;
 	size_t		r_size = size * nmemb;
 
 	zbx_strncpy_alloc(&data->buf, &data->alloc, &data->offset, (const char *)ptr, r_size);
@@ -72,7 +72,7 @@ int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 {
 	ldns_resolver		*res = NULL;
 	rsm_resolver_error_t	ec_res;
-	curl_data_t		data = {NULL, 0, 0};
+	writedata_t		writedata = {NULL, 0, 0};
 	zbx_vector_str_t	ips;
 	struct zbx_json_parse	jp;
 	FILE			*log_fd = NULL;
@@ -85,6 +85,7 @@ int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 				*path = NULL,
 				*formed_url = NULL,
 				*value_str = NULL,
+				*details = NULL,
 				err[RSM_ERR_BUF_SIZE],
 				is_ipv4,
 				query[64],
@@ -103,6 +104,7 @@ int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 				curl_flags = 0,
 				port,
 				rtt = RSM_NO_VALUE,
+				rv,
 				ret = SYSINFO_RET_FAIL;
 
 	zbx_vector_str_create(&ips);
@@ -244,17 +246,20 @@ int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 
 	rsm_infof(log_fd, "the following URL was generated for the test: %s", formed_url);
 
-	if (SUCCEED != rsm_http_test(domain, formed_url, RSM_TCP_TIMEOUT, maxredirs, &ec_http, &rtt, &data,
-			curl_memory, curl_flags, err, sizeof(err)))
+	rv = rsm_http_test(domain, formed_url, RSM_TCP_TIMEOUT, maxredirs, &ec_http, &rtt, &writedata, writefunction,
+			curl_flags, &details, err, sizeof(err));
+
+	if (details != NULL)
+		rsm_infof(log_fd, "Transfer details:%s\nBody:\n%s", details, ZBX_NULL2STR(writedata.buf));
+
+	if (rv != SUCCEED)
 	{
 		rtt = rsm_http_error_to_RDAP(ec_http);
 		rsm_errf(log_fd, "%s (%d)", err, rtt);
 		goto out;
 	}
 
-	rsm_infof(log_fd, "response ===>\n%s\n<===", ZBX_NULL2STR(data.buf));
-
-	if (NULL == data.buf || '\0' == *data.buf || SUCCEED != zbx_json_open(data.buf, &jp))
+	if (NULL == writedata.buf || '\0' == *writedata.buf || SUCCEED != zbx_json_open(writedata.buf, &jp))
 	{
 		rtt = RSM_EC_RDAP_EJSON;
 		rsm_err(log_fd, "invalid JSON format in response");
@@ -304,12 +309,13 @@ out:
 			ldns_resolver_free(res);
 	}
 
+	zbx_free(details);
 	zbx_free(scheme);
 	zbx_free(domain);
 	zbx_free(path);
 	zbx_free(formed_url);
 	zbx_free(value_str);
-	zbx_free(data.buf);
+	zbx_free(writedata.buf);
 
 	rsm_vector_str_clean_and_destroy(&ips);
 
