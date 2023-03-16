@@ -18,6 +18,6 @@
 "rdds80-server","/tmp/rdds80-server.pid"
 "resolver","/tmp/resolver.pid"
 
-[compare-files]
+[compare-file]
 
-"/tmp/simple-check-test","208-output.tar.gz"
+"/tmp/simple-check-test/status.json","${file:208-status-output.json}"

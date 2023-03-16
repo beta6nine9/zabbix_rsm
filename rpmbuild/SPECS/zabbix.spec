@@ -192,7 +192,10 @@ Requires(post):			%{_sbindir}/update-alternatives
 Requires(preun):		%{_sbindir}/update-alternatives
 
 %description web
-Zabbix web frontend common package.
+This package provides Zabbix web frontend (with few monidications)
+and includes the following frontend modules:
+ - RSM (frontend modifications, including menu and custom pages)
+ - RsmProvisioningApi (REST API for managing SLAM configuration)
 
 %package web-mysql
 Summary:			Zabbix web frontend for MySQL
@@ -324,7 +327,8 @@ Group:				Applications/Internet
 BuildArch:			noarch
 
 %description rsm-api
-This package provides RSM API for managing SLAM configuration.
+This package provides RSM API, that works with
+Provisioning API (frontend module) and implements Alerts API.
 
 
 %prep
@@ -587,8 +591,8 @@ install -d $RPM_BUILD_ROOT%{_datadir}/selinux/packages
 install -m 0644 $MODULES \
     $RPM_BUILD_ROOT%{_datadir}/selinux/packages
 
-# Provisioning API
-mv api $RPM_BUILD_ROOT%{_datadir}/rsm-api
+# RSM API
+mv rsm-api $RPM_BUILD_ROOT%{_datadir}/rsm-api
 
 %clean
 rm -rf $RPM_BUILD_ROOT
