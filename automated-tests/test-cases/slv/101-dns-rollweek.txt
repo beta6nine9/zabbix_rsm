@@ -21,7 +21,7 @@
 # reduce DNS rollweek SLA to 50 minutes; 10% - 5, 25% - 12.5, 50% - 25, 75% - 37.5, 100% - 50
 "{$RSM.DNS.ROLLWEEK.SLA}","50"
 
-[provisioning-api]
+[rsm-api]
 
 "/probeNodes/Probe1-Server1","PUT",200,"readwrite","000-input-probe1.json",""
 
@@ -44,7 +44,7 @@
 "update history      set clock=floor(unix_timestamp()/300)*300 where clock=0"
 "update history_uint set clock=floor(unix_timestamp()/300)*300 where clock=0"
 
-[provisioning-api]
+[rsm-api]
 
 "/tlds/tld6","PUT",200,"readwrite","000-input-tld-disabled.json",""
 
