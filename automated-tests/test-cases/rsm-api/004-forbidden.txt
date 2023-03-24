@@ -1,6 +1,6 @@
 [test-case]
 
-"Forbidden for readonly user"
+"Forbidden"
 
 [prepare-server-database]
 
@@ -29,3 +29,8 @@
 "/tlds"       ,"DELETE",403,"readonly","","0xx-error-outputs/004-forbidden.json"
 "/registrars" ,"DELETE",403,"readonly","","0xx-error-outputs/004-forbidden.json"
 "/probeNodes" ,"DELETE",403,"readonly","","0xx-error-outputs/004-forbidden.json"
+
+"/alerts"        , "POST",403,"readonly","","0xx-error-outputs/004-forbidden.json"
+"/alerts/alert-1", "POST",403,"readonly","","0xx-error-outputs/004-forbidden.json"
+"/alerts"        , "POST",403,"readwrite","","0xx-error-outputs/004-forbidden.json"
+"/alerts/alert-1", "POST",403,"readwrite","","0xx-error-outputs/004-forbidden.json"
