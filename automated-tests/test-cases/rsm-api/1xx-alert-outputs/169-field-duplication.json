@@ -1,0 +1,7 @@
+{
+    "resultCode": 400,
+    "title": "JSON does not comply with definition",
+    "description": "JSON contains duplicate keys",
+    "details": null,
+    "updatedObject": null
+}

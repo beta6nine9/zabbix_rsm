@@ -1,0 +1,7 @@
+[test-case]
+
+"Alert, invalid inputs - object fields"
+
+[rsm-api]
+
+"/alerts/alert-1","POST",400,"alerts","1xx-invalid-alert-inputs/167-obj-value.json","1xx-alert-outputs/167-obj-value.json"

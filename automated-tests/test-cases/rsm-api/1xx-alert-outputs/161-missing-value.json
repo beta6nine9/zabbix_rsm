@@ -1,0 +1,7 @@
+{
+    "resultCode": 400,
+    "title": "JSON does not comply with definition",
+    "description": "JSON must contain only \"value\" element",
+    "details": null,
+    "updatedObject": null
+}
