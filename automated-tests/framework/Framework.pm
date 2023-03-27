@@ -32,6 +32,7 @@ our @EXPORT = qw(
 	format_table
 	start_tool
 	stop_tool
+	stop_tools
 );
 
 use Archive::Tar;
@@ -57,7 +58,6 @@ sub initialize()
 {
 	initialize_log(!opt('nolog'), 1, \&finalize);
 	initialize_config();
-	initialize_tools();
 	info("command line: %s %s", $0, join(' ', map(index($_, ' ') == -1 ? $_ : "'$_'", @ARGV)));
 }
 
@@ -853,11 +853,6 @@ sub format_table($$)
 	return $table;
 }
 
-sub initialize_tools()
-{
-	execute(dirname(__FILE__) . "/@{[TOOLS_DIR]}/stop-tools.sh");
-}
-
 sub start_tool($$$)
 {
 	my $tool       = shift;
@@ -934,6 +929,11 @@ sub stop_tool($$)
 	}
 
 	unlink($pid_file);
+}
+
+sub stop_tools()
+{
+	execute(dirname(__FILE__) . "/@{[TOOLS_DIR]}/stop-tools.sh");
 }
 
 sub __get_pid($)
