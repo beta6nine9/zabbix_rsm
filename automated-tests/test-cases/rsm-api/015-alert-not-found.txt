@@ -1,0 +1,7 @@
+[test-case]
+
+"Alert type not found (ry)"
+
+[rsm-api]
+
+"/alerts/some-alert","POST",404,"alerts","000-input-alert.json","0xx-error-outputs/015-alert-not-found.json"

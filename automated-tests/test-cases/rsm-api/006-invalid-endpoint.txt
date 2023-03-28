@@ -23,3 +23,6 @@
 
 "/"           ,"GET",403,"readwrite","","0xx-error-outputs/006-invalid-endpoint.json"
 "/nonexistent","GET",403,"readwrite","","0xx-error-outputs/006-invalid-endpoint.json"
+
+"/"           ,"GET",403,"alerts","","0xx-error-outputs/006-invalid-endpoint.json"
+"/nonexistent","GET",403,"alerts","","0xx-error-outputs/006-invalid-endpoint.json"
