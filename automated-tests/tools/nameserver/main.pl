@@ -52,8 +52,6 @@ sub reply_handler
 		sleep($config->{'sleep'});
 	}
 
-	# if ($qname eq EXISTING_DOMAIN)
-
 	# ANSWER section
 	push(@answer, Net::DNS::RR->new
 		(
@@ -65,12 +63,12 @@ sub reply_handler
 		)
 	);
 
-	# AUTHORITY section
-	my $nsecrr = Net::DNS::RR->new("example NSEC $qname A AAAA RRSIG");
+	# AUTHORITY section            "owner              NSEC nxtdname            typelist"
+	my $nsecrr = Net::DNS::RR->new("$config->{'owner'} NSEC $config->{'owner'}z A AAAA RRSIG");
 
 	push(@authority, $nsecrr);
 
-	my $rrsigrr = get_rrsig_rr($qname, $nsecrr);
+	my $rrsigrr = get_rrsig_rr($config->{'owner'}, $nsecrr, $config->{'keyid'});
 
 	push(@authority, $rrsigrr);
 

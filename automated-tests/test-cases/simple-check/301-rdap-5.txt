@@ -4,7 +4,7 @@
 
 [start-tool]
 
-"resolver","/tmp/resolver.pid","301-resolver-input.json"
+"resolver","/tmp/resolver.pid","xxx-resolver-input-formerr.json"
 
 [execute]
 

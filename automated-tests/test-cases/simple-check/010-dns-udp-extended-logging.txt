@@ -1,0 +1,23 @@
+[test-case]
+
+"DNS UDP - Extended logging of DNS test of DNSSEC-enabled TLD"
+
+[start-tool]
+
+"resolver","/tmp/resolver.pid","xxx-resolver-input-generic.json"
+"nameserver","/tmp/nameserver.pid","xxx-nameserver-input-generic.json"
+
+[execute]
+
+"","rm -rf   /tmp/simple-check-test"
+"","mkdir -p /tmp/simple-check-test"
+"","${cfg:paths:build_dir}/bin/t_rsm_dns -m -t example -n ns1.example -i 127.0.0.1 -4 -r 127.0.0.1 -o 5053 -s 5054 -d > /tmp/simple-check-test/test.out"
+
+[stop-tool]
+
+"nameserver","/tmp/nameserver.pid"
+"resolver","/tmp/resolver.pid"
+
+[compare-file]
+
+"/tmp/simple-check-test/test.out","/${file:010-test.out}/"

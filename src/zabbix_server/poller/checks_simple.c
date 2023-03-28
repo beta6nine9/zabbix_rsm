@@ -189,6 +189,7 @@ int	get_value_simple(const DC_ITEM *item, AGENT_RESULT *result, zbx_vector_ptr_t
 
 	request.lastlogsize = item->lastlogsize;
 
+	/* RSM specifics: additional keys */
 	if (0 == strcmp(request.key, "rsm.dns"))
 	{
 		if (SYSINFO_RET_OK == check_rsm_dns(item->host.hostid, item->itemid, item->host.host, item->nextcheck,
@@ -227,6 +228,7 @@ int	get_value_simple(const DC_ITEM *item, AGENT_RESULT *result, zbx_vector_ptr_t
 		if (SYSINFO_RET_OK == check_rsm_resolver_status(item->host.host, &request, result))
 			ret = SUCCEED;
 	}
+	/* RSM specifics: end */
 	else if (0 == strcmp(request.key, "net.tcp.service") || 0 == strcmp(request.key, "net.udp.service"))
 	{
 		if (SYSINFO_RET_OK == check_service(&request, item->interface.addr, result, 0))

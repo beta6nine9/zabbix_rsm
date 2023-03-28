@@ -156,17 +156,15 @@ sub start_tcp_server($$$$)
 	$socket->close();
 }
 
-sub get_dnskey_rr($)
+# we have 2 keyid's 58672 and 19937 in this directory, use the first one as default
+use constant KEYID	=> 58672;
+
+sub get_dnskey_rr($;$)
 {
 	my $owner = shift;
+	my $keyid = shift // KEYID;
 
-	# we have 2 keyid's 58672 and 52500
-	my $keypath;
-	foreach my $keyid (58672, 52500)
-	{
-		$keypath = "$FindBin::RealBin/../K$owner.+013+$keyid.key";
-		last if (-r $keypath);
-	}
+	my $keypath = "$FindBin::RealBin/../K$owner.+013+$keyid.key";
 
 	my $zonefile = Net::DNS::ZoneFile->new($keypath);
 
@@ -175,18 +173,13 @@ sub get_dnskey_rr($)
 	return $dnskey_rrs[0];
 }
 
-sub get_rrsig_rr($$)
+sub get_rrsig_rr($$;$)
 {
 	my $owner = shift;
 	my $dnskeyrr = shift;
+	my $keyid = shift // KEYID;
 
-	# we have 2 keyid's 58672 and 52500
-	my $keypath;
-	foreach my $keyid (58672, 52500)
-	{
-		$keypath = "$FindBin::RealBin/../K$owner.+013+$keyid.private";
-		last if (-r $keypath);
-	}
+	my $keypath = "$FindBin::RealBin/../K$owner.+013+$keyid.private";
 
 	return Net::DNS::RR::RRSIG->create([$dnskeyrr], $keypath);
 }

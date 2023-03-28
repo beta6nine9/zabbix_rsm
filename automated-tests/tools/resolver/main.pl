@@ -69,10 +69,10 @@ sub reply_handler
 		$query->print();
 		inf("------------------------------ </QUERY> ----------------------------------");
 
-		my $dnskeyrr = get_dnskey_rr($qname);
+		my $dnskeyrr = get_dnskey_rr($config->{'owner'} // $qname);
 		push(@answer, $dnskeyrr);
 
-		my $rrsigrr = get_rrsig_rr($qname, $dnskeyrr);
+		my $rrsigrr = get_rrsig_rr($config->{'owner'} // $qname, $dnskeyrr);
 		push(@answer, $rrsigrr);
 
 		# specify EDNS options  { option => value }
@@ -83,7 +83,7 @@ sub reply_handler
 	}
 	elsif ($qtype eq 'DS')
 	{
-		my $dsrr = Net::DNS::RR::DS->create(get_dnskey_rr($qname));
+		my $dsrr = Net::DNS::RR::DS->create(get_dnskey_rr($config->{'owner'} // $qname));
 
 		push(@answer, $dsrr);
 	}
@@ -91,7 +91,7 @@ sub reply_handler
 	{
 		my $rr = Net::DNS::RR->new
 		(
-			owner   => 'example',
+			owner   => $config->{'owner'} // $qname,
 			type    => 'A',
 			address => '127.0.0.1'
 		);
@@ -102,7 +102,7 @@ sub reply_handler
 	{
 		my $rr = Net::DNS::RR->new
 		(
-			owner   => 'example',
+			owner   => $config->{'owner'} // $qname,
 			type    => 'AAAA',
 			address => '::1'
 		);
