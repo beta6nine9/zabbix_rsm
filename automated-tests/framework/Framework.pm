@@ -753,10 +753,10 @@ sub str_matches($$)
 
 	my $result = 1;
 
-	if ($pattern =~ m{^/(.*)/$})
+	if ($pattern =~ m{^/(.*)/$}s)
 	{
 		# if pattern is enclosed in //, treat it as regex pattern
-		if ($string !~ /$1/)
+		if ($string !~ /$1/s)
 		{
 			$result = 0;
 		}
