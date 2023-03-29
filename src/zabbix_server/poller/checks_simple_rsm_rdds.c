@@ -191,6 +191,7 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 				*rdds80_url,
 				*resolver_str,
 				*rdds43_ns_string,
+				*maxredirs_str,
 				*answer = NULL,
 				*scheme = NULL,
 				*domain = NULL,
@@ -252,7 +253,14 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 	GET_PARAM_UINT  (ipv6_enabled          , 9 ,   "IPv6 enabled");
 	GET_PARAM_NEMPTY(resolver_str          , 10,   "IP address of local resolver");
 	GET_PARAM_UINT  (rtt_limit             , 11,   "RTT limit");
-	GET_PARAM_UINT  (maxredirs             , 12,   "max redirects");
+	GET_PARAM       (maxredirs_str         , 12);/* max redirects      */
+
+	/* we need maxredirs as string for printing it in test details later */
+	if (SUCCEED != is_uint31(maxredirs_str, &maxredirs))
+	{
+		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid parameter #13: max redirects must be integer."));
+		goto out;
+	}
 
 	/* open log file */
 	if (SUCCEED != start_test(&log_fd, output_fd, host, rsmhost, RSM_RDDS_LOG_PREFIX, err, sizeof(err)))
@@ -285,18 +293,24 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 		}
 	}
 
+	if (SUCCEED != is_uint31(maxredirs_str, &maxredirs))
+	{
+		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid parameter #13: max redirects must be integer."));
+		goto out;
+	}
+
 	/* print test details */
 	rsm_infof(log_fd, "probe_RDDS:%s"
 			", RDDS43:%s"
 			", RDDS80:%s"
 			", IPv4:%s"
 			", IPv6:%s"
-			"%s%s%s%s"
-			"%s%s%s%s"
-			"%s%s%s%s"
+			"%s%s%s"
+			"%s%s%s"
+			"%s%s%s"
+			"%s%s%s"
 			", resolver:%s"
-			", rtt_limit:%d"
-			", maxredirs:%d",
+			", rtt_limit:%d",
 			ENABLED(probe_rdds_enabled),
 			ENABLED(rsmhost_rdds43_enabled),
 			ENABLED(rsmhost_rdds80_enabled),
@@ -304,22 +318,22 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 			ENABLED(ipv6_enabled),
 			/* rdds43_testedname */
 			(rsmhost_rdds43_enabled ? ", " : ""),
-			(rsmhost_rdds43_enabled ? "RDDS43_testedname" : ""),
-			(rsmhost_rdds43_enabled ? ":" : ""),
+			(rsmhost_rdds43_enabled ? "RDDS43_testedname:" : ""),
 			(rsmhost_rdds43_enabled ? rdds43_testedname : ""),
 			/* rdds43_ns_string */
 			(rsmhost_rdds43_enabled ? ", " : ""),
-			(rsmhost_rdds43_enabled ? "RDDS43_ns_string" : ""),
-			(rsmhost_rdds43_enabled ? ":" : ""),
+			(rsmhost_rdds43_enabled ? "RDDS43_ns_string:" : ""),
 			(rsmhost_rdds43_enabled ? rdds43_ns_string : ""),
 			/* rdds80_url */
 			(rsmhost_rdds80_enabled ? ", " : ""),
-			(rsmhost_rdds80_enabled ? "RDDS80_url" : ""),
-			(rsmhost_rdds80_enabled ? ":" : ""),
+			(rsmhost_rdds80_enabled ? "RDDS80_url:" : ""),
 			(rsmhost_rdds80_enabled ? rdds80_url : ""),
+			/* max redirs (http) */
+			(rsmhost_rdds80_enabled ? ", " : ""),
+			(rsmhost_rdds80_enabled ? "maxredirs:" : ""),
+			(rsmhost_rdds80_enabled ? maxredirs_str : ""),
 			resolver_str,
-			rtt_limit,
-			maxredirs);
+			rtt_limit);
 
 	get_host_and_port_from_str(resolver_str, ';', resolver_ip, sizeof(resolver_ip), &resolver_port,
 			DEFAULT_RESOLVER_PORT);
