@@ -253,14 +253,8 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 	GET_PARAM_UINT  (ipv6_enabled          , 9 ,   "IPv6 enabled");
 	GET_PARAM_NEMPTY(resolver_str          , 10,   "IP address of local resolver");
 	GET_PARAM_UINT  (rtt_limit             , 11,   "RTT limit");
-	GET_PARAM       (maxredirs_str         , 12);/* max redirects      */
-
-	/* we need maxredirs as string for printing it in test details later */
-	if (SUCCEED != is_uint31(maxredirs_str, &maxredirs))
-	{
-		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid parameter #13: max redirects must be integer."));
-		goto out;
-	}
+	GET_PARAM_UINT  (maxredirs             , 12,   "maximal number of redirections allowed");
+	GET_PARAM       (maxredirs_str         , 12); /* for printing in test details */
 
 	/* open log file */
 	if (SUCCEED != start_test(&log_fd, output_fd, host, rsmhost, RSM_RDDS_LOG_PREFIX, err, sizeof(err)))
@@ -291,12 +285,6 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 			SET_MSG_RESULT(result, zbx_dsprintf(NULL, "\"%s\": %s", rdds80_url, err));
 			goto out;
 		}
-	}
-
-	if (SUCCEED != is_uint31(maxredirs_str, &maxredirs))
-	{
-		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid parameter #13: max redirects must be integer."));
-		goto out;
 	}
 
 	/* print test details */
@@ -407,10 +395,10 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 			rv = rdds43_test(rdds43_testedname, ip43, rdds43_port, RSM_TCP_TIMEOUT, &answer, &rtt43, err,
 					sizeof(err));
 
-			if (answer != NULL)
+			if (NULL != answer)
 				rsm_infof(log_fd, "response ===>\n%s\n<===", answer);
 
-			if (rv != SUCCEED)
+			if (SUCCEED != rv)
 				rsm_err(log_fd, err);
 		}
 
@@ -444,7 +432,7 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 							random_ns);
 				}
 
-				if (upd43 == RSM_NO_VALUE)
+				if (RSM_NO_VALUE == upd43)
 				{
 					now = time(NULL);
 
@@ -456,7 +444,7 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 					}
 				}
 
-				if (upd43 == RSM_NO_VALUE)
+				if (RSM_NO_VALUE == upd43)
 				{
 					/* successful UPD */
 					upd43 = (int)(now - ts);
@@ -506,10 +494,10 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 		rv = rsm_http_test(domain, formed_url, RSM_TCP_TIMEOUT, maxredirs, &ec_http, &rtt80, NULL,
 				curl_devnull, curl_flags, &details, err, sizeof(err));
 
-		if (details != NULL)
+		if (NULL != details)
 			rsm_infof(log_fd, "Transfer details:%s", details);
 
-		if (rv != SUCCEED)
+		if (SUCCEED != rv)
 		{
 			rtt80 = rsm_http_error_to_RDDS80(ec_http);
 			rsm_errf(log_fd, "%s (%d)", err, rtt80);

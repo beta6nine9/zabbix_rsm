@@ -249,10 +249,10 @@ int	check_rsm_rdap(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 	rv = rsm_http_test(domain, formed_url, RSM_TCP_TIMEOUT, maxredirs, &ec_http, &rtt, &writedata, writefunction,
 			curl_flags, &details, err, sizeof(err));
 
-	if (details != NULL)
+	if (NULL != details)
 		rsm_infof(log_fd, "Transfer details:%s\nBody:\n%s", details, ZBX_NULL2STR(writedata.buf));
 
-	if (rv != SUCCEED)
+	if (SUCCEED != rv)
 	{
 		rtt = rsm_http_error_to_RDAP(ec_http);
 		rsm_errf(log_fd, "%s (%d)", err, rtt);

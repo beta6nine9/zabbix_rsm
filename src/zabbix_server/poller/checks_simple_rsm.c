@@ -207,7 +207,7 @@ int	start_test(FILE **log_fd, FILE *output_fd, const char *probe, const char *rs
 void	end_test(FILE *log_fd, FILE *output_fd, AGENT_RESULT *result)
 {
 	/* nothing to do if the log file wasn't even opened */
-	if (log_fd == NULL)
+	if (NULL == log_fd)
 		return;
 
 	if (0 != ISSET_MSG(result))
@@ -460,7 +460,7 @@ void	rsm_print_nameserver(FILE *log_fd, const ldns_resolver *res, const char *de
 {
 	char	*name;
 
-	if (ldns_resolver_nameserver_count(res) == 0)
+	if (0 == ldns_resolver_nameserver_count(res))
 	{
 		/* this should never be possible */
 		rsm_err(log_fd, "INTERNAL ERROR: attempt to print nameserver while zero found!");
@@ -468,7 +468,7 @@ void	rsm_print_nameserver(FILE *log_fd, const ldns_resolver *res, const char *de
 		exit(EXIT_FAILURE);
 	}
 
-	if (ldns_resolver_nameserver_count(res) != 1)
+	if (1 != ldns_resolver_nameserver_count(res))
 	{
 		/* this should never be possible */
 		rsm_err(log_fd, "INTERNAL ERROR: attempt to print nameserver while more than one found!");
@@ -804,8 +804,9 @@ static char	*get_curl_details(CURL *easyhandle)
 	GET_DETAIL(TOTAL_TIME        , "time_total"        , precision, "%.3f");
 	GET_DETAIL(EFFECTIVE_URL     , "url_effective"     , string   , "%s");
 
-	return output;
 #undef GET_DETAIL
+
+	return output;
 }
 
 #define RSM_FLAG_CURL_VERBOSE	0x1

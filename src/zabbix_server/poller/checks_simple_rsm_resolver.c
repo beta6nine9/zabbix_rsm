@@ -107,7 +107,7 @@ int	check_rsm_resolver_status(const char *host, const AGENT_REQUEST *request, AG
 
 		/* will try again */
 		rsm_errf(log_fd, "dns check of local resolver %s failed: %s, will try %d more time%s",
-				resolver_ip, err, tries, (tries == 1 ? "" : "s"));
+				resolver_ip, err, tries, (1 == tries ? "" : "s"));
 	}
 
 	test_status = 1;

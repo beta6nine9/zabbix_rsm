@@ -403,7 +403,7 @@ static void	get_owners(const ldns_rr_list *rr_list, zbx_vector_ptr_t *owners)
 		int		j;
 		ldns_rdf	*owner = ldns_rr_owner(ldns_rr_list_rr(rr_list, i));
 
-		if (owner == NULL)
+		if (NULL == owner)
 			continue;
 
 		for (j = 0; j < owners->values_num; j++)
@@ -1316,7 +1316,7 @@ static int	get_dnskeys(ldns_resolver *res, const char *rsmhost, ldns_rr_list **d
 	/* log the packet */
 	ldns_pkt_print(log_fd, pkt);
 
-	/* check the AD bit */
+	/* check the ad flag */
 	if (0 == ldns_pkt_ad(pkt))
 	{
 		zbx_strlcpy(err, "ad flag not present in the answer", err_size);
@@ -1542,7 +1542,7 @@ static void	set_dns_test_results(rsm_ns_t *nss, size_t nss_num, int rtt_limit, u
 			if (RSM_SUBTEST_SUCCESS != rsm_subtest_result(nss[i].ips[j].rtt, rtt_limit))
 				ip_dns_result = FAIL;
 
-			if (dnssec_status != NULL && (
+			if (NULL != dnssec_status && (
 					(RSM_EC_DNS_UDP_DNSSEC_FIRST >= nss[i].ips[j].rtt &&
 						nss[i].ips[j].rtt >= RSM_EC_DNS_UDP_DNSSEC_LAST) ||
 					(RSM_EC_DNS_TCP_DNSSEC_FIRST >= nss[i].ips[j].rtt &&
@@ -1554,14 +1554,14 @@ static void	set_dns_test_results(rsm_ns_t *nss, size_t nss_num, int rtt_limit, u
 		}
 
 		/* Name Server status (minding all its IPs) */
-		if (ip_dns_result == FAIL)
+		if (FAIL == ip_dns_result)
 		{
 			/* DNS DOWN, DNSSEC varies */
-			if (dnssec_status == NULL)
+			if (NULL == dnssec_status)
 			{
 				nss[i].result = DNS_DOWN_DNSSEC_DISABLED;
 			}
-			else if (ip_dnssec_result == FAIL)
+			else if (FAIL == ip_dnssec_result)
 			{
 				nss[i].result = DNS_DOWN_DNSSEC_DOWN;
 			}
@@ -1573,7 +1573,7 @@ static void	set_dns_test_results(rsm_ns_t *nss, size_t nss_num, int rtt_limit, u
 			/* DNS UP, DNSSEC varies */
 			dns_nssok++;
 
-			if (dnssec_status == NULL)
+			if (NULL == dnssec_status)
 			{
 				nss[i].result = DNS_UP_DNSSEC_DISABLED;
 			}
@@ -1581,7 +1581,7 @@ static void	set_dns_test_results(rsm_ns_t *nss, size_t nss_num, int rtt_limit, u
 				nss[i].result = DNS_UP_DNSSEC_UP;
 		}
 
-		if (dnssec_status != NULL)
+		if (NULL != dnssec_status)
 		{
 			if (SUCCEED == ip_dnssec_result)
 			{
@@ -1594,7 +1594,7 @@ static void	set_dns_test_results(rsm_ns_t *nss, size_t nss_num, int rtt_limit, u
 
 	*dns_status = (dns_nssok >= minns ? 1 : 0);
 
-	if (dnssec_status != NULL)
+	if (NULL != dnssec_status)
 		*dnssec_status = (dnssec_nssok >= minns ? 1 : 0);
 }
 
@@ -1615,7 +1615,7 @@ static void	create_dns_json(struct zbx_json *json, rsm_ns_t *nss, size_t nss_num
 			zbx_json_addstring(json, "ns"      , nss[i].name, ZBX_JSON_TYPE_STRING);
 			zbx_json_addstring(json, "ip"      , nss[i].ips[j].ip, ZBX_JSON_TYPE_STRING);
 			zbx_json_addstring(json, "nsid"    , nss[i].ips[j].nsid, ZBX_JSON_TYPE_STRING);
-			zbx_json_addstring(json, "protocol", (protocol == RSM_UDP ? "udp" : "tcp"),
+			zbx_json_addstring(json, "protocol", (RSM_UDP == protocol ? "udp" : "tcp"),
 					ZBX_JSON_TYPE_STRING);
 			zbx_json_addint64(json, "rtt"      , nss[i].ips[j].rtt);
 			zbx_json_close(json);
@@ -1638,10 +1638,10 @@ static void	create_dns_json(struct zbx_json *json, rsm_ns_t *nss, size_t nss_num
 
 	zbx_json_adduint64(json, "mode", current_mode);
 	zbx_json_adduint64(json, "status", dns_status);
-	zbx_json_adduint64(json, "protocol", (protocol == RSM_UDP ? 0 : 1));
+	zbx_json_adduint64(json, "protocol", (RSM_UDP == protocol ? 0 : 1));
 	zbx_json_addstring(json, "testedname", testedname, ZBX_JSON_TYPE_STRING);
 
-	if (dnssec_status != NULL)
+	if (NULL != dnssec_status)
 		zbx_json_adduint64(json, "dnssecstatus", *dnssec_status);
 
 	zbx_json_close(json);
@@ -1659,7 +1659,7 @@ static int	metadata_file_exists(const char *rsmhost, int *file_exists, char *err
 	{
 		*file_exists = S_ISREG(buf.st_mode) ? 1 : 0;
 	}
-	else if (errno == ENOENT)
+	else if (ENOENT == errno)
 	{
 		*file_exists = 0;
 	}
@@ -1998,11 +1998,11 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 	{
 		/* Add noise (hostid + itemid) to avoid using TCP by all proxies simultaneously. */
 		/* This should balance usage of TCP protocol and avoid abusing the Name Servers. */
-		protocol = (((zbx_uint64_t)nextcheck / 60 + hostid + itemid) % (zbx_uint64_t)tcp_ratio) == 0 ? RSM_TCP : RSM_UDP;
+		protocol = 0 == (((zbx_uint64_t)nextcheck / 60 + hostid + itemid) % (zbx_uint64_t)tcp_ratio) ? RSM_TCP : RSM_UDP;
 	}
 	else
 	{
-		protocol = (current_mode == CURRENT_MODE_CRITICAL_TCP ? RSM_TCP : RSM_UDP);
+		protocol = (CURRENT_MODE_CRITICAL_TCP == current_mode ? RSM_TCP : RSM_UDP);
 	}
 
 	if (RSM_UDP == protocol)
@@ -2034,18 +2034,18 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 			ENABLED(ipv4_enabled),
 			ENABLED(ipv6_enabled),
 			(CURRENT_MODE_NORMAL == current_mode ? "normal" : "critical"),
-			(protocol == RSM_UDP ? "UDP" : "TCP"),
+			(RSM_UDP == protocol ? "UDP" : "TCP"),
 			rtt_limit,
 			tcp_ratio,
 			minns,
 			testprefix);
 
-	if (current_mode != CURRENT_MODE_NORMAL)
+	if (CURRENT_MODE_NORMAL != current_mode)
 	{
 		rsm_infof(log_fd, "critical test mode details: successful:%d"
 				", required:%d",
 				successful_tests,
-				(protocol == RSM_UDP ? test_recover_udp : test_recover_tcp));
+				(RSM_UDP == protocol ? test_recover_udp : test_recover_tcp));
 	}
 
 	extras = (dnssec_enabled ? RESOLVER_EXTRAS_DNSSEC : RESOLVER_EXTRAS_NONE);
@@ -2080,7 +2080,7 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 		goto out;
 	}
 
-	if (nss_num == 0)
+	if (0 == nss_num)
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "nothing to do, no Name Servers to test"));
 		goto out;

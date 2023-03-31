@@ -17,9 +17,7 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include "sysinfo.h"
 #include "base64.h"
-#include "md5.h"
 #include "rsm.h"
 #include "log.h"
 #include "checks_simple_rsm.h"
@@ -1003,7 +1001,7 @@ int	check_rsm_epp(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *
 		goto out;
 	}
 
-	if (epp_cert_b64 == NULL)
+	if (NULL == epp_cert_b64)
 	{
 		rtt1 = rtt2 = rtt3 = RSM_EC_EPP_INTERNAL_GENERAL;
 		rsm_err(log_fd, "no EPP certificate");
