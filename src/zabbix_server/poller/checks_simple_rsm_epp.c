@@ -578,7 +578,7 @@ out:
 	return ret;
 }
 
-static char	*rsm_parse_time(char *str, size_t str_size, int *i)
+static char	*parse_time(char *str, size_t str_size, int *i)
 {
 	char	*p_end;
 	char	c;
@@ -642,42 +642,42 @@ static int	parse_asn1time(ASN1_TIME *asn1time, time_t *time, char *err, size_t e
 	memset(&tm, 0, sizeof(tm));
 
 	/* year */
-	if (NULL == (p = rsm_parse_time(buf, 4, &tm.tm_year)) || '\0' == *p)
+	if (NULL == (p = parse_time(buf, 4, &tm.tm_year)) || '\0' == *p)
 	{
 		zbx_strlcpy(err, "invalid year", err_size);
 		goto out;
 	}
 
 	/* month */
-	if (NULL == (p = rsm_parse_time(p, 2, &tm.tm_mon)) || '\0' == *p)
+	if (NULL == (p = parse_time(p, 2, &tm.tm_mon)) || '\0' == *p)
 	{
 		zbx_strlcpy(err, "invalid month", err_size);
 		goto out;
 	}
 
 	/* day of month */
-	if (NULL == (p = rsm_parse_time(p, 2, &tm.tm_mday)) || '\0' == *p)
+	if (NULL == (p = parse_time(p, 2, &tm.tm_mday)) || '\0' == *p)
 	{
 		zbx_strlcpy(err, "invalid day of month", err_size);
 		goto out;
 	}
 
 	/* hours */
-	if (NULL == (p = rsm_parse_time(p, 2, &tm.tm_hour)) || '\0' == *p)
+	if (NULL == (p = parse_time(p, 2, &tm.tm_hour)) || '\0' == *p)
 	{
 		zbx_strlcpy(err, "invalid hours", err_size);
 		goto out;
 	}
 
 	/* minutes */
-	if (NULL == (p = rsm_parse_time(p, 2, &tm.tm_min)) || '\0' == *p)
+	if (NULL == (p = parse_time(p, 2, &tm.tm_min)) || '\0' == *p)
 	{
 		zbx_strlcpy(err, "invalid minutes", err_size);
 		goto out;
 	}
 
 	/* seconds */
-	if (NULL == (p = rsm_parse_time(p, 2, &tm.tm_sec)) || '\0' != *p)
+	if (NULL == (p = parse_time(p, 2, &tm.tm_sec)) || '\0' != *p)
 	{
 		zbx_strlcpy(err, "invalid seconds", err_size);
 		goto out;

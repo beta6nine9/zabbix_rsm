@@ -375,8 +375,8 @@ int	rsm_http_test(const char *host, const char *url, long timeout, long maxredir
 int	map_http_code(long http_code);
 
 #define CHECK_DNS_CONN_RRSIGS		0x1u
-#define	CHECK_DNS_CONN_RTT		0x2u
-#define	CHECK_DNS_CONN_RECURSIVE	0x4u
+#define CHECK_DNS_CONN_RTT		0x2u
+#define CHECK_DNS_CONN_RECURSIVE	0x4u
 
 int	rsm_check_dns_connection(const ldns_resolver *res, ldns_rdf *query_rdf, unsigned int flags, int reply_ms,
 		FILE *log_fd, char *err, size_t err_size);
@@ -396,7 +396,7 @@ void	rsm_logf(FILE *log_fd, int level, const char *fmt, ...);
 
 extern const char	*CONFIG_LOG_FILE;
 
-#define RSM_BUF_SIZE	128
+#define RSM_BUF_SIZE		128
 #define RSM_ERR_BUF_SIZE	8192
 #define DEFAULT_RESOLVER_PORT	53
 

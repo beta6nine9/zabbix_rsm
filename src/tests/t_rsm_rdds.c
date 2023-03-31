@@ -158,7 +158,7 @@ int	main(int argc, char *argv[])
 
 	zbx_snprintf(key, sizeof(key), "rsm.rdds[%s,%s,%s,%s,%s,%d,%d,%d,%d,%d,%s,%d,%d]",
 			tld,		/* Rsmhost */
-			rdds43_host_buf,/* rdds43_host:port */	
+			rdds43_host_buf,/* rdds43_host:port */
 			rdds80_host_buf,/* rdds80_host:port */
 			testprefix,
 			"Name Server:",	/* {$RSM.RDDS.NS.STRING} */

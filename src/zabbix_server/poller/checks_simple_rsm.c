@@ -33,16 +33,16 @@ typedef struct
 	ldns_rr_type	rr_type;
 	const char	*resolve_reason;
 }
-rsm_ipv_t;
+ipv_t;
 
-static const rsm_ipv_t	ipvs[] =
+static const ipv_t	ipvs[] =
 {
 	{"IPv4",	RSM_FLAG_IPV4_ENABLED,	LDNS_RR_TYPE_A,		"resolve a host to IPv4 addresses"},
 	{"IPv6",	RSM_FLAG_IPV6_ENABLED,	LDNS_RR_TYPE_AAAA,	"resolve a host to IPv6 addresses"},
 	{NULL}
 };
 
-static const char	*rsm_log_prefixes[] = { "Empty", "Fatal", "Error", "Warning", "Info", "Debug" };
+static const char	*log_prefixes[] = { "Empty", "Fatal", "Error", "Warning", "Info", "Debug" };
 
 void	rsm_logf(FILE *log_fd, int level, const char *fmt, ...)
 {
@@ -78,7 +78,7 @@ void	rsm_logf(FILE *log_fd, int level, const char *fmt, ...)
 			tm->tm_min,
 			tm->tm_sec,
 			ms,
-			rsm_log_prefixes[level],
+			log_prefixes[level],
 			fmt);
 
 	vfprintf(log_fd, fmt_buf, args);
@@ -118,7 +118,7 @@ void	rsm_log(FILE *log_fd, int level, const char *text)
 			tm->tm_min,
 			tm->tm_sec,
 			ms,
-			rsm_log_prefixes[level],
+			log_prefixes[level],
 			text);
 }
 
@@ -509,7 +509,7 @@ void	rsm_print_nameserver(FILE *log_fd, const ldns_resolver *res, const char *de
 int	rsm_resolve_host(ldns_resolver *res, const char *host, zbx_vector_str_t *ips, int ipv_flags,
 		FILE *log_fd, rsm_resolver_error_t *ec_res, char *err, size_t err_size)
 {
-	const rsm_ipv_t	*ipv;
+	const ipv_t	*ipv;
 	ldns_rdf	*rdf;
 	int		ret = FAIL;
 

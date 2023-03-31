@@ -21,7 +21,7 @@
 #include "log.h"
 #include "checks_simple_rsm.h"
 
-#define RSM_DNS_LOGPREFIX	"dns"	/* file will be <LOGDIR>/<PROBE>-<TLD>-RSM_DNS_LOGPREFIX-<udp|tcp>.log */
+#define RSM_DNS_LOG_PREFIX	"dns"	/* file will be <LOGDIR>/<PROBE>-<TLD>-RSM_DNS_LOG_PREFIX-<udp|tcp>.log */
 
 #define LDNS_EDNS_NSID		3	/* NSID option code, from RFC5001 */
 #define NSID_MAX_LENGTH		127	/* hex representation of NSID must fit into 255 characters */
@@ -61,7 +61,7 @@ typedef struct
 writer_thread_t;
 
 #define RSM_DEFINE_NS_QUERY_ERROR_TO(__interface)					\
-static int	rsm_ns_query_error_to_ ## __interface (rsm_ns_query_error_t err)	\
+static int	ns_query_error_to_ ## __interface (rsm_ns_query_error_t err)	\
 {											\
 	switch (err)									\
 	{										\
@@ -94,7 +94,7 @@ RSM_DEFINE_NS_QUERY_ERROR_TO(DNS_TCP)
 #undef RSM_DEFINE_NS_QUERY_ERROR_TO
 
 #define RSM_DEFINE_DNSSEC_ERROR_TO(__interface)						\
-static int	rsm_dnssec_error_to_ ## __interface (rsm_dnssec_error_t err)		\
+static int	dnssec_error_to_ ## __interface (rsm_dnssec_error_t err)		\
 {											\
 	switch (err)									\
 	{										\
@@ -139,7 +139,7 @@ RSM_DEFINE_DNSSEC_ERROR_TO(DNS_TCP)
 #undef RSM_DEFINE_DNSSEC_ERROR_TO
 
 #define RSM_DEFINE_RR_CLASS_ERROR_TO(__interface)					\
-static int	rsm_rr_class_error_to_ ## __interface (rsm_rr_class_error_t err)	\
+static int	rr_class_error_to_ ## __interface (rsm_rr_class_error_t err)	\
 {											\
 	switch (err)									\
 	{										\
@@ -163,7 +163,7 @@ RSM_DEFINE_RR_CLASS_ERROR_TO(DNS_TCP)
 #undef RSM_DEFINE_RR_CLASS_ERROR_TO
 
 #define RSM_DEFINE_DNSKEYS_ERROR_TO(__interface)					\
-static int	rsm_dnskeys_error_to_ ## __interface (rsm_dnskeys_error_t err)		\
+static int	dnskeys_error_to_ ## __interface (rsm_dnskeys_error_t err)		\
 {											\
 	switch (err)									\
 	{										\
@@ -193,7 +193,7 @@ RSM_DEFINE_DNSKEYS_ERROR_TO(DNS_TCP)
 /* map generic name server errors to interface specific ones */
 
 #define RSM_DEFINE_NS_ANSWER_ERROR_TO(__interface)					\
-static int	rsm_ns_answer_error_to_ ## __interface (rsm_ns_answer_error_t err)	\
+static int	ns_answer_error_to_ ## __interface (rsm_ns_answer_error_t err)	\
 {											\
 	switch (err)									\
 	{										\
@@ -218,7 +218,7 @@ RSM_DEFINE_NS_ANSWER_ERROR_TO(DNS_TCP)
 /* https://open.nlnetlabs.nl/pipermail/ldns-users/2018-March/000912.html */
 
 #define RSM_DEFINE_RCODE_NOT_NXDOMAIN_TO(__interface)				\
-static int	rsm_rcode_not_nxdomain_to_ ## __interface (ldns_pkt_rcode rcode)\
+static int	rcode_not_nxdomain_to_ ## __interface (ldns_pkt_rcode rcode)\
 {										\
 	switch (rcode)								\
 	{									\
@@ -252,20 +252,20 @@ RSM_DEFINE_RCODE_NOT_NXDOMAIN_TO(DNS_TCP)
 
 const rsm_error_functions_t DNS[] = {
 	{
-		rsm_dnskeys_error_to_DNS_UDP,
-		rsm_ns_answer_error_to_DNS_UDP,
-		rsm_dnssec_error_to_DNS_UDP,
-		rsm_rr_class_error_to_DNS_UDP,
-		rsm_ns_query_error_to_DNS_UDP,
-		rsm_rcode_not_nxdomain_to_DNS_UDP
+		dnskeys_error_to_DNS_UDP,
+		ns_answer_error_to_DNS_UDP,
+		dnssec_error_to_DNS_UDP,
+		rr_class_error_to_DNS_UDP,
+		ns_query_error_to_DNS_UDP,
+		rcode_not_nxdomain_to_DNS_UDP
 	},
 	{
-		rsm_dnskeys_error_to_DNS_TCP,
-		rsm_ns_answer_error_to_DNS_TCP,
-		rsm_dnssec_error_to_DNS_TCP,
-		rsm_rr_class_error_to_DNS_TCP,
-		rsm_ns_query_error_to_DNS_TCP,
-		rsm_rcode_not_nxdomain_to_DNS_TCP
+		dnskeys_error_to_DNS_TCP,
+		ns_answer_error_to_DNS_TCP,
+		dnssec_error_to_DNS_TCP,
+		rr_class_error_to_DNS_TCP,
+		ns_query_error_to_DNS_TCP,
+		rcode_not_nxdomain_to_DNS_TCP
 	}
 };
 
@@ -292,7 +292,7 @@ static int	unpack_values(size_t *v1, size_t *v2, int *v3, int *v4, char *nsid, c
 	return SUCCEED;
 }
 
-static const char	*rsm_covered_to_str(ldns_rr_type covered_type)
+static const char	*covered_to_str(ldns_rr_type covered_type)
 {
 	switch (covered_type)
 	{
@@ -331,7 +331,7 @@ static int	get_covered_rrsigs(const ldns_pkt *pkt, const ldns_rdf *owner, ldns_p
 			else
 			{
 				zbx_snprintf(err, err_size, "no %s RRSIG records for owner \"%s\" found in reply",
-						rsm_covered_to_str(covered_type), owner_str);
+						covered_to_str(covered_type), owner_str);
 				*dnssec_ec = RSM_EC_DNSSEC_RRSIG_NONE;
 			}
 
@@ -343,7 +343,7 @@ static int	get_covered_rrsigs(const ldns_pkt *pkt, const ldns_rdf *owner, ldns_p
 		if (NULL == (rrsigs = ldns_pkt_rr_list_by_type(pkt, LDNS_RR_TYPE_RRSIG, s)))
 		{
 			zbx_snprintf(err, err_size, "no %s RRSIG records found in reply",
-					rsm_covered_to_str(covered_type));
+					covered_to_str(covered_type));
 			*dnssec_ec = RSM_EC_DNSSEC_RRSIG_NONE;
 			return FAIL;
 		}
@@ -449,7 +449,7 @@ static int	verify_rrsigs(const ldns_pkt *pkt, ldns_rr_type covered_type, const l
 
 	if (0 == owners.values_num)
 	{
-		zbx_snprintf(err, err_size, "no RRSIG records covering %s found", rsm_covered_to_str(covered_type));
+		zbx_snprintf(err, err_size, "no RRSIG records covering %s found", covered_to_str(covered_type));
 		*dnssec_ec = RSM_EC_DNSSEC_RRSIG_NOTCOVERED;
 		goto out;
 	}
@@ -480,7 +480,7 @@ static int	verify_rrsigs(const ldns_pkt *pkt, ldns_rr_type covered_type, const l
 		{
 			zbx_snprintf(err, err_size, "no %s records covering RRSIG of \"%s\""
 					" found at nameserver \"%s\" (%s)",
-					rsm_covered_to_str(covered_type), owner_buf, ns, ip);
+					covered_to_str(covered_type), owner_buf, ns, ip);
 			*dnssec_ec = RSM_EC_DNSSEC_RRSIG_NOTCOVERED;
 			goto out;
 		}
@@ -559,11 +559,11 @@ static int	verify_rrsigs(const ldns_pkt *pkt, ldns_rr_type covered_type, const l
 
 			zbx_snprintf(err, err_size, "cannot verify %s RRSIGs of \"%s\": %s"
 					" (used %u %s, %u RRSIG and %u DNSKEY RRs). LDNS returned \"%s\"",
-					rsm_covered_to_str(covered_type),
+					covered_to_str(covered_type),
 					owner_buf,
 					error_description,
 					(unsigned int)ldns_rr_list_rr_count(rrset),
-					rsm_covered_to_str(covered_type),
+					covered_to_str(covered_type),
 					(unsigned int)ldns_rr_list_rr_count(rrsigs),
 					(unsigned int)ldns_rr_list_rr_count(dnskeys),
 					ldns_get_errorstr_by_id(status));
@@ -1030,6 +1030,15 @@ static int	check_dnssec_no_epp(const ldns_pkt *pkt, const ldns_rr_list *dnskeys,
 	return ret;
 }
 
+/***************************************/
+/* Return last label of @name. E. g.:  */
+/*                                     */
+/* [IN] name        | [OUT] last_label */
+/* -----------------+----------------- */
+/* www.foo.bar.com  | bar.com          */
+/* www.foo.bar.com. | com.             */
+/*                                     */
+/***************************************/
 static int	get_last_label(const char *name, char **last_label, char *err, size_t err_size)
 {
 	const char	*last_label_start;
@@ -1947,7 +1956,7 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 	GET_PARAM_NEMPTY(minns_value      , 16, "minimum number of working name servers");
 
 	/* open log file */
-	if (SUCCEED != start_test(&log_fd, output_fd, host, rsmhost, RSM_DNS_LOGPREFIX, err, sizeof(err)))
+	if (SUCCEED != start_test(&log_fd, output_fd, host, rsmhost, RSM_DNS_LOG_PREFIX, err, sizeof(err)))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
 		goto out;
