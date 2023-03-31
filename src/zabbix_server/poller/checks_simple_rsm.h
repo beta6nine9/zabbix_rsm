@@ -230,14 +230,6 @@ rsm_resolver_error_t;
 
 typedef enum
 {
-	RSM_INTERNAL_GENERAL,
-	RSM_INTERNAL_IP_UNSUP,
-	RSM_INTERNAL_RES_CATCHALL
-}
-rsm_internal_error_t;
-
-typedef enum
-{
 	RSM_DNSKEYS_INTERNAL,
 	RSM_DNSKEYS_NOREPLY,
 	RSM_DNSKEYS_NONE,
