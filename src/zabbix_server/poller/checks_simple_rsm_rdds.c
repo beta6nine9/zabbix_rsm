@@ -256,13 +256,6 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 	GET_PARAM_UINT  (maxredirs             , 12,   "maximal number of redirections allowed");
 	GET_PARAM       (maxredirs_str         , 12); /* for printing in test details */
 
-	/* open log file */
-	if (SUCCEED != start_test(&log_fd, output_fd, host, rsmhost, RSM_RDDS_LOG_PREFIX, err, sizeof(err)))
-	{
-		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
-		goto out;
-	}
-
 	if (0 != rsmhost_rdds43_enabled)
 	{
 		if ('\0' == *rdds43_server_str)
@@ -285,6 +278,13 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 			SET_MSG_RESULT(result, zbx_dsprintf(NULL, "\"%s\": %s", rdds80_url, err));
 			goto out;
 		}
+	}
+
+	/* open log file */
+	if (SUCCEED != start_test(&log_fd, output_fd, host, rsmhost, RSM_RDDS_LOG_PREFIX, err, sizeof(err)))
+	{
+		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
+		goto out;
 	}
 
 	/* print test details */

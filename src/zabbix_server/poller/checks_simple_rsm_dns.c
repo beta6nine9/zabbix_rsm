@@ -33,6 +33,10 @@
 
 #define METADATA_FILE_PREFIX	"/tmp/dns-test-metadata"	/* /tmp/dns-test-metadata-<TLD>.bin */
 
+#define CURRENT_MODE_NORMAL		0
+#define CURRENT_MODE_CRITICAL_UDP	1
+#define CURRENT_MODE_CRITICAL_TCP	2
+
 typedef struct
 {
 	char		*ip;
@@ -1760,10 +1764,6 @@ out:
 	return ret;
 }
 
-#define CURRENT_MODE_NORMAL		0
-#define CURRENT_MODE_CRITICAL_UDP	1
-#define CURRENT_MODE_CRITICAL_TCP	2
-
 static int	update_metadata(int file_exists, const char *rsmhost, unsigned int dns_status, int test_recover,
 		char protocol, unsigned int *current_mode, int *successful_tests, FILE *log_fd, char *err,
 		size_t err_size)
@@ -1955,13 +1955,6 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 	GET_PARAM_UINT  (test_recover_tcp , 15, "successful tests to recover from critical mode (TCP)");
 	GET_PARAM_NEMPTY(minns_value      , 16, "minimum number of working name servers");
 
-	/* open log file */
-	if (SUCCEED != start_test(&log_fd, output_fd, host, rsmhost, RSM_DNS_LOG_PREFIX, err, sizeof(err)))
-	{
-		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
-		goto out;
-	}
-
 	if (SUCCEED != get_dns_minns_from_value((time_t)nextcheck, minns_value, &minns))
 	{
 		SET_MSG_RESULT(result, zbx_dsprintf(NULL, "unexpected format of parameter #17: %s", minns_value));
@@ -2014,6 +2007,13 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 	{
 		rtt_limit = tcp_rtt_limit;
 		test_recover = test_recover_tcp;
+	}
+
+	/* open log file */
+	if (SUCCEED != start_test(&log_fd, output_fd, host, rsmhost, RSM_DNS_LOG_PREFIX, err, sizeof(err)))
+	{
+		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
+		goto out;
 	}
 
 	/* print test details */
@@ -2329,7 +2329,3 @@ out:
 
 	return ret;
 }
-
-#undef CURRENT_MODE_NORMAL
-#undef CURRENT_MODE_CRITICAL_UDP
-#undef CURRENT_MODE_CRITICAL_TCP

@@ -38,13 +38,6 @@ int	check_rsm_resolver_status(const char *host, const AGENT_REQUEST *request, AG
 			test_status = 0,
 			ret = SYSINFO_RET_FAIL;
 
-	/* open log file */
-	if (SUCCEED != start_test(&log_fd, NULL, host, NULL, RSM_RESOLVERSTATUS_LOG_PREFIX, err, sizeof(err)))
-	{
-		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
-		goto out;
-	}
-
 	if (5 != request->nparam)
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid number of parameters."));
@@ -57,6 +50,13 @@ int	check_rsm_resolver_status(const char *host, const AGENT_REQUEST *request, AG
 	GET_PARAM_UINT  (tries       , 2, "maximum number of tries");
 	GET_PARAM_UINT  (ipv4_enabled, 3, "IPv4 enabled");
 	GET_PARAM_UINT  (ipv6_enabled, 4, "IPv6 enabled");
+
+	/* open log file */
+	if (SUCCEED != start_test(&log_fd, NULL, host, NULL, RSM_RESOLVERSTATUS_LOG_PREFIX, err, sizeof(err)))
+	{
+		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
+		goto out;
+	}
 
 	/* print test details */
 	rsm_infof(log_fd, "IPv4:%s"

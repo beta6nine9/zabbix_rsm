@@ -62,13 +62,6 @@ int	check_rsm_probe_status(const char *host, const AGENT_REQUEST *request, AGENT
 	zbx_vector_str_create(&ips4);
 	zbx_vector_str_create(&ips6);
 
-	/* open log file */
-	if (SUCCEED != start_test(&log_fd, NULL, host, NULL, RSM_PROBESTATUS_LOG_PREFIX, err, sizeof(err)))
-	{
-		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
-		goto out;
-	}
-
 	if (10 != request->nparam)
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "Invalid number of parameters."));
@@ -89,6 +82,13 @@ int	check_rsm_probe_status(const char *host, const AGENT_REQUEST *request, AGENT
 	if (0 != strcmp("automatic", check_mode))
 	{
 		SET_MSG_RESULT(result, zbx_strdup(NULL, "first parameter has to be \"automatic\""));
+		goto out;
+	}
+
+	/* open log file */
+	if (SUCCEED != start_test(&log_fd, NULL, host, NULL, RSM_PROBESTATUS_LOG_PREFIX, err, sizeof(err)))
+	{
+		SET_MSG_RESULT(result, zbx_strdup(NULL, err));
 		goto out;
 	}
 
@@ -276,11 +276,11 @@ out:
 			ldns_resolver_free(res);
 	}
 
-	rsm_vector_str_clean_and_destroy(&ips6);
-	rsm_vector_str_clean_and_destroy(&ips4);
-
 	if (NULL != query_rdf)
 		ldns_rdf_deep_free(query_rdf);
+
+	rsm_vector_str_clean_and_destroy(&ips6);
+	rsm_vector_str_clean_and_destroy(&ips4);
 
 	end_test(log_fd, NULL, result);
 
