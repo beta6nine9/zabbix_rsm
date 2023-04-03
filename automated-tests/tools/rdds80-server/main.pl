@@ -60,12 +60,17 @@ sub reply_handler()
 
 	my $reply = "HTTP/1.1 $config->{'reply-status'}";
 
-	foreach my $header (keys(%{$config->{'reply-headers'}}))
+	foreach my $key (keys(%{$config->{'reply-headers'}}))
 	{
-		$reply .= "\r\n$header";
+		$reply .= "\r\n$key: " . $config->{'reply-headers'}{$key};
 	}
 
 	$reply .= "\r\n\r\n";
+
+	if ($config->{'reply-body'})
+	{
+		$reply .= $config->{'reply-body'};
+	}
 
 	inf("replying with [$reply]");
 

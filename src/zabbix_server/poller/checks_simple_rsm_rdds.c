@@ -38,15 +38,6 @@ static int	ec_noerror(int ec)
 	return FAIL;
 }
 
-/* discard the curl output (using inline to hide "unused" compiler warning when -Wunused) */
-static inline size_t	curl_devnull(char *ptr, size_t size, size_t nmemb, void *userdata)
-{
-	(void)ptr;
-	(void)userdata;
-
-	return size * nmemb;
-}
-
 static void	create_rdds_json(struct zbx_json *json, const char *ip43, int rtt43, int upd43,
 		const char *rdds43_server, const char *rdds43_testedname, const char *ip80, int rtt80,
 		const char *rdds80_url, int rdds43_status, int rdds80_status, int rdds_status)
@@ -212,6 +203,7 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 	rsm_resolver_error_t	ec_res;
 	time_t			ts, now;
 	rsm_http_error_t	ec_http;
+	writedata_t		writedata = {NULL, 0, 0};
 	struct zbx_json		json;
 	uint16_t		resolver_port,
 				rdds43_port;
@@ -388,15 +380,11 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 			/* choose random IP */
 			ip43 = ips43.values[rsm_random((size_t)ips43.values_num)];
 
-			rsm_infof(log_fd, "the following details will be used in the test:"
-					" ip:%s, request:%s, name server prefix:\"%s\"",
-					ip43, rdds43_testedname, rdds43_ns_string);
-
 			rv = rdds43_test(rdds43_testedname, ip43, rdds43_port, RSM_TCP_TIMEOUT, &answer, &rtt43, err,
 					sizeof(err));
 
 			if (NULL != answer)
-				rsm_infof(log_fd, "response ===>\n%s\n<===", answer);
+				rsm_infof(log_fd, "Body:\n%s", answer);
 
 			if (SUCCEED != rv)
 				rsm_err(log_fd, err);
@@ -451,6 +439,8 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 				}
 			}
 		}
+
+		rsm_infof(log_fd, "end RDDS43 test (rtt:%d)", rtt43);
 	}
 
 	if (0 != rsmhost_rdds80_enabled)
@@ -491,11 +481,11 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 
 		rsm_infof(log_fd, "the following URL was generated for the test: %s", formed_url);
 
-		rv = rsm_http_test(domain, formed_url, RSM_TCP_TIMEOUT, maxredirs, &ec_http, &rtt80, NULL,
-				curl_devnull, curl_flags, &details, err, sizeof(err));
+		rv = rsm_http_test(domain, formed_url, RSM_TCP_TIMEOUT, maxredirs, &ec_http, &rtt80, &writedata,
+				writefunction, curl_flags, &details, err, sizeof(err));
 
 		if (NULL != details)
-			rsm_infof(log_fd, "Transfer details:%s", details);
+			rsm_infof(log_fd, "Transfer details:%s\nBody:\n%s", details, ZBX_NULL2STR(writedata.buf));
 
 		if (SUCCEED != rv)
 		{
@@ -550,6 +540,7 @@ out:
 	zbx_free(domain);
 	zbx_free(path);
 	zbx_free(formed_url);
+	zbx_free(writedata.buf);
 
 	rsm_vector_str_clean_and_destroy(&nss);
 	rsm_vector_str_clean_and_destroy(&ips80);

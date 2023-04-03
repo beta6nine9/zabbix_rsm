@@ -4,7 +4,7 @@
 
 [start-tool]
 
-"resolver","/tmp/resolver.pid","xxx-resolver-input-no-flags.json"
+"resolver","/tmp/resolver.pid","000-resolver-input-no-flags.json"
 
 [execute]
 

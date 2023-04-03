@@ -89,25 +89,33 @@ sub reply_handler
 	}
 	elsif ($qtype eq 'A')
 	{
-		my $rr = Net::DNS::RR->new
-		(
-			owner   => $config->{'owner'} // $qname,
-			type    => 'A',
-			address => '127.0.0.1'
-		);
+		my $addrs = $config->{'ipv4-addresses'} // ['127.0.0.1'];
 
-		push(@answer, $rr);
+		foreach (@{$addrs})
+		{
+			push(@answer, Net::DNS::RR->new
+				(
+					owner   => $config->{'owner'} // $qname,
+					type    => $qtype,
+					address => $_
+				)
+			);
+		}
 	}
 	elsif ($qtype eq 'AAAA')
 	{
-		my $rr = Net::DNS::RR->new
-		(
-			owner   => $config->{'owner'} // $qname,
-			type    => 'AAAA',
-			address => '::1'
-		);
+		my $addrs = $config->{'ipv6-addresses'} // ['::1'];
 
-		push(@answer, $rr);
+		foreach (@{$addrs})
+		{
+			push(@answer, Net::DNS::RR->new
+				(
+					owner   => $config->{'owner'} // $qname,
+					type    => $qtype,
+					address => $_
+				)
+			);
+		}
 	}
 	else
 	{

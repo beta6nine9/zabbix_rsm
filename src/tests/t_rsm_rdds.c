@@ -25,8 +25,8 @@ static void	exit_usage(const char *program)
 	fprintf(stderr, "       -t <tld>          TLD to test\n");
 	fprintf(stderr, "       -a <testedname43> WHOIS server to use for RDDS43 test\n");
 	fprintf(stderr, "       -w <testedname80> WEB-WHOIS URL to use for RDDS80 test\n");
-	fprintf(stderr, "       -s <rdds43_port>  WHOIS server port\n");
-	fprintf(stderr, "       -g <rdds80_port>  WEB-WHOIS server port\n");
+	fprintf(stderr, "       -s <rdds43_port>  WHOIS server port (default: %d)\n", DEFAULT_RDDS43_PORT);
+	fprintf(stderr, "       -g <rdds80_port>  WEB-WHOIS server port (default: %d)\n", DEFAULT_RDDS80_PORT);
 	fprintf(stderr, "       -4                enable IPv4\n");
 	fprintf(stderr, "       -6                enable IPv6\n");
 	fprintf(stderr, "       -r <res_ip>       IP address of resolver to use (default: %s)\n", DEFAULT_RES_IP);
@@ -47,6 +47,8 @@ int	main(int argc, char *argv[])
 	char		*tld = NULL, *testedname43 = NULL, *testedname80 = NULL,
 			ipv4_enabled = 0,
 			ipv6_enabled = 0,
+			rdds43_enabled = 0,
+			rdds80_enabled = 0,
 			*json_file = NULL, key[8192],
 			res_host_buf[RSM_BUF_SIZE], rdds43_host_buf[RSM_BUF_SIZE],
 			rdds80_host_buf[RSM_BUF_SIZE];
@@ -132,23 +134,17 @@ int	main(int argc, char *argv[])
 		exit_usage(argv[0]);
 	}
 
-	if (NULL == testedname43)
-	{
-		fprintf(stderr, "WHOIS server [-a] must be specified\n");
-		exit_usage(argv[0]);
-	}
-
-	if (NULL == testedname80)
-	{
-		fprintf(stderr, "WEB-WHOIS server [-w] must be specified\n");
-		exit_usage(argv[0]);
-	}
-
 	if (0 == ipv4_enabled && 0 == ipv6_enabled)
 	{
 		fprintf(stderr, "at least one IP version [-4, -6] must be specified\n");
 		exit_usage(argv[0]);
 	}
+
+	if (NULL != testedname43)
+		rdds43_enabled = 1;
+
+	if (NULL != testedname80)
+		rdds80_enabled = 1;
 
 	init_request(&request);
 
@@ -163,8 +159,8 @@ int	main(int argc, char *argv[])
 			testprefix,
 			"Name Server:",	/* {$RSM.RDDS.NS.STRING} */
 			1,		/* probe:rdds */
-			1,		/* tld:rdds43 */
-			1,		/* tld:rdds80 */
+			rdds43_enabled,	/* tld:rdds43 */
+			rdds80_enabled,	/* tld:rdds80 */
 			ipv4_enabled,	/* probe:ipv4 */
 			ipv6_enabled,	/* probe:ipv6 */
 			res_host_buf,	/* resolver ip */

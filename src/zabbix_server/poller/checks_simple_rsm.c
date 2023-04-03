@@ -520,7 +520,7 @@ int	rsm_resolve_host(ldns_resolver *res, const char *host, zbx_vector_str_t *ips
 		return ret;
 	}
 
-	for (ipv = ipvs; NULL != ipv->name; ipv++)
+	for (ipv = ipvs; (NULL != ipv->name && 0 != (ipv_flags & ipv->flag)); ipv++)
 	{
 		ldns_pkt	*pkt;
 		ldns_rr_list	*rr_list;
@@ -565,8 +565,7 @@ int	rsm_resolve_host(ldns_resolver *res, const char *host, zbx_vector_str_t *ips
 			goto out;
 		}
 
-		if (0 != (ipv_flags & ipv->flag) &&
-				NULL != (rr_list = ldns_pkt_rr_list_by_type(pkt, ipv->rr_type, LDNS_SECTION_ANSWER)))
+		if (NULL != (rr_list = ldns_pkt_rr_list_by_type(pkt, ipv->rr_type, LDNS_SECTION_ANSWER)))
 		{
 			size_t	rr_count, i;
 
@@ -763,6 +762,17 @@ int	map_http_code(long http_code)
 		default:	/* catch-all for newly assigned HTTP status codes that may not have an association */
 			return 60;
 	}
+}
+
+/* callback for curl to store the response body */
+size_t	writefunction(char *ptr, size_t size, size_t nmemb, void *userdata)
+{
+	writedata_t	*data = (writedata_t *)userdata;
+	size_t		r_size = size * nmemb;
+
+	zbx_strncpy_alloc(&data->buf, &data->alloc, &data->offset, (const char *)ptr, r_size);
+
+	return r_size;
 }
 
 /* allocates memory and returns a buffer to the details */

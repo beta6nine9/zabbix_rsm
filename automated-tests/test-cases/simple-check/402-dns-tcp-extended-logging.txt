@@ -1,0 +1,21 @@
+[test-case]
+
+"DNS TCP - Extended logging of the DNSSEC-disabled test"
+
+[start-tool]
+
+"nameserver","/tmp/nameserver.pid","000-nameserver-input-generic.json"
+
+[execute]
+
+"","rm -rf   /tmp/simple-check-test"
+"","mkdir -p /tmp/simple-check-test"
+"","${cfg:paths:build_dir}/bin/t_rsm_dns -m -t example -n ns1.example -4 -i 127.0.0.1 -s 5054 -c | tee /tmp/simple-check-test/test.out"
+
+[stop-tool]
+
+"nameserver","/tmp/nameserver.pid"
+
+[compare-file]
+
+"/tmp/simple-check-test/test.out","/${file:402-test.out}/"

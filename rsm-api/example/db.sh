@@ -5,6 +5,18 @@ set -o nounset
 set -o pipefail
 #set -o xtrace
 
+: ${DB_NAME_SERVER:=rsm_server}
+: ${DB_NAME_PROXY_PROBE1:=rsm_proxy_probe1}
+: ${DB_NAME_PROXY_PROBE2:=rsm_proxy_probe2}
+: ${DB_USER:=zabbix}
+: ${DB_PASSWORD=password}
+
+: ${DB_NAME_SERVER:=dimir_icann_feature_dev_921_extended_logging}
+: ${DB_NAME_PROXY_PROBE1:=dimir_icann_feature_dev_921_extended_logging_prx}
+: ${DB_NAME_PROXY_PROBE2:=dimir_icann_qa_test_prx2}
+: ${DB_USER:=zabbix}
+: ${DB_PASSWORD:=password}
+
 declare monitoring_target
 declare source_path
 
@@ -20,26 +32,26 @@ fi
 (
 	cd "${source_path}/database/mysql/"
 
-	export MYSQL_PWD=password
+	export MYSQL_PWD="$DB_PASSWORD"
 
 	echo 'Dropping databases...'
-	mysql -u 'zabbix' -e 'drop database rsm_server'
-	mysql -u 'zabbix' -e 'drop database rsm_proxy_probe1'
-	mysql -u 'zabbix' -e 'drop database rsm_proxy_probe2'
+	mysql -u $DB_USER -e 'drop database '$DB_NAME_SERVER       || true
+	mysql -u $DB_USER -e 'drop database '$DB_NAME_PROXY_PROBE1 || true
+	mysql -u $DB_USER -e 'drop database '$DB_NAME_PROXY_PROBE2 || true
 
 	echo 'Creating databases...'
-	mysql -u 'zabbix' -e 'create database rsm_server character set utf8 collate utf8_bin'
-	mysql -u 'zabbix' -e 'create database rsm_proxy_probe1 character set utf8 collate utf8_bin'
-	mysql -u 'zabbix' -e 'create database rsm_proxy_probe2 character set utf8 collate utf8_bin'
+	mysql -u $DB_USER -e 'create database '$DB_NAME_SERVER' character set utf8 collate utf8_bin'
+	mysql -u $DB_USER -e 'create database '$DB_NAME_PROXY_PROBE1' character set utf8 collate utf8_bin'
+	mysql -u $DB_USER -e 'create database '$DB_NAME_PROXY_PROBE2' character set utf8 collate utf8_bin'
 
 	echo 'Filling server database...'
-	mysql -u 'zabbix' 'rsm_server' < schema.sql
-	mysql -u 'zabbix' 'rsm_server' < images.sql
-	mysql -u 'zabbix' 'rsm_server' < data.sql
+	mysql -u $DB_USER $DB_NAME_SERVER < schema.sql
+	mysql -u $DB_USER $DB_NAME_SERVER < images.sql
+	mysql -u $DB_USER $DB_NAME_SERVER < data.sql
 
 	echo 'Filling proxy databases...'
-	mysql -u 'zabbix' 'rsm_proxy_probe1' < schema.sql
-	mysql -u 'zabbix' 'rsm_proxy_probe2' < schema.sql
+	mysql -u $DB_USER $DB_NAME_PROXY_PROBE1 < schema.sql
+	mysql -u $DB_USER $DB_NAME_PROXY_PROBE2 < schema.sql
 )
 
 echo 'Updating macros...'

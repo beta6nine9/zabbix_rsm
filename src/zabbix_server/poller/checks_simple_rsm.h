@@ -332,6 +332,15 @@ typedef enum
 }
 rsm_subtest_result_t;
 
+/* used in libcurl callback function to store webpage contents in memory */
+typedef struct
+{
+	char	*buf;
+	size_t	alloc;
+	size_t	offset;
+}
+writedata_t;
+
 int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, int nextcheck,
 		const AGENT_REQUEST *request, AGENT_RESULT *result, FILE *output_fd);
 int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT *result, FILE *output_fd);
@@ -365,6 +374,7 @@ int	rsm_http_test(const char *host, const char *url, long timeout, long maxredir
 		int *rtt, void *writedata, size_t (*writefunction)(char *, size_t, size_t, void *), int curl_flags,
 		char **details, char *err, size_t err_size);
 int	map_http_code(long http_code);
+size_t	writefunction(char *ptr, size_t size, size_t nmemb, void *userdata);
 
 #define CHECK_DNS_CONN_RRSIGS		0x1u
 #define CHECK_DNS_CONN_RTT		0x2u

@@ -4,7 +4,7 @@
 
 [start-tool]
 
-"resolver","/tmp/resolver.pid","202-resolver-input.json"
+"resolver","/tmp/resolver.pid","000-resolver-input-rdds.json"
 "rdds43-server","/tmp/rdds43-server.pid","202-rdds43-server-input.json"
 
 [execute]

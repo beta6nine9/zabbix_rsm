@@ -6,7 +6,7 @@
 
 "rdds43-server","/tmp/rdds43-server.pid","206-rdds43-server-input.json"
 "rdds80-server","/tmp/rdds80-server.pid","206-rdds80-server-input.json"
-"resolver","/tmp/resolver.pid","000-resolver-example.example-noerror.json"
+"resolver","/tmp/resolver.pid","000-resolver-input-example.example.json"
 
 [execute]
 

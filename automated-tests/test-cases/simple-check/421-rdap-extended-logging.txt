@@ -1,0 +1,23 @@
+[test-case]
+
+"RDAP - Extended logging of the test"
+
+[start-tool]
+
+"resolver","/tmp/resolver.pid","000-resolver-input-example.example.json"
+"rdap-server","/tmp/rdap-server.pid","000-rdap-server-generic.json"
+
+[execute]
+
+"","rm -rf   /tmp/simple-check-test"
+"","mkdir -p /tmp/simple-check-test"
+"","${cfg:paths:build_dir}/bin/t_rsm_rdap -r 127.0.0.1 -o 5053 -u http://example.example:4380/rdap -d example.example -4 | tee /tmp/simple-check-test/test.out"
+
+[stop-tool]
+
+"rdap-server","/tmp/rdap-server.pid"
+"resolver","/tmp/resolver.pid"
+
+[compare-file]
+
+"/tmp/simple-check-test/test.out","/${file:421-test.out}/"

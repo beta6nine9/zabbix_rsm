@@ -1,0 +1,38 @@
+\d+:\d{8}:\d{6}\.\d{3} Info: >>> START TEST <<<
+\d+:\d{8}:\d{6}\.\d{3} Info: probe_RDDS:ENABLED, RDDS43:ENABLED, RDDS80:ENABLED, IPv4:ENABLED, IPv6:DISABLED, RDDS43_testedname:example.example, RDDS43_ns_string:Name Server:, RDDS80_url:http:\/\/example.example:4380, maxredirs:10, resolver:127.0.0.1;5053, rtt_limit:10000
+\d+:\d{8}:\d{6}\.\d{3} Info: start RDDS43 test \(server example.example\)
+\d+:\d{8}:\d{6}\.\d{3} Info: making DNS query to 127.0.0.1:5053 to resolve a host to IPv4 addresses
+.*
+\d+:\d{8}:\d{6}\.\d{3} Info: Body:
+
+Name server: 127.0.0.1
+Name server: 127.0.0.2
+\d+:\d{8}:\d{6}\.\d{3} Info: end RDDS43 test \(rtt:\d+\)
+\d+:\d{8}:\d{6}\.\d{3} Info: start RDDS80 test \(url http:\/\/example.example:4380\)
+\d+:\d{8}:\d{6}\.\d{3} Info: making DNS query to 127.0.0.1:5053 to resolve a host to IPv4 addresses
+.*
+\d+:\d{8}:\d{6}\.\d{3} Info: the following URL was generated for the test: http:\/\/127.0.0.1:4380
+\d+:\d{8}:\d{6}\.\d{3} Info: Transfer details:
+  content_type=text\/html; charset=UTF-8
+  http_code=200
+  local_ip=127.0.0.1
+  local_port=\d+
+  num_redirects=0
+  remote_ip=127.0.0.1
+  remote_port=4380
+  size_download=\d+
+  size_header=\d+
+  time_appconnect=\d+\.\d+
+  time_connect=\d+\.\d+
+  time_namelookup=\d+\.\d+
+  time_pretransfer=\d+\.\d+
+  time_redirect=\d+\.\d+
+  time_starttransfer=\d+\.\d+
+  time_total=\d+\.\d+
+  url_effective=http:\/\/127.0.0.1:4380\/
+Body:
+Hello
+world!
+\d+:\d{8}:\d{6}\.\d{3} Info: end RDDS80 test \(rtt:\d+\)
+\d+:\d{8}:\d{6}\.\d{3} Info: Test result: \{"rdds43":\{"rtt":\d+,"ip":"127.0.0.1","target":"example.example","testedname":"example.example","status":1},"rdds80":\{"rtt":\d+,"ip":"127.0.0.1","target":"http:\/\/example.example:4380","status":1},"status":1}
+\d+:\d{8}:\d{6}\.\d{3} Info: >>> END TEST <<<

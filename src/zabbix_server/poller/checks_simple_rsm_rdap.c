@@ -33,26 +33,6 @@ RSM_DEFINE_RESOLVER_ERROR_TO(RDAP)
 RSM_DEFINE_HTTP_PRE_STATUS_ERROR_TO(RDAP)
 RSM_DEFINE_HTTP_ERROR_TO(RDAP)
 
-/* used in libcurl callback function to store webpage contents in memory */
-typedef struct
-{
-	char	*buf;
-	size_t	alloc;
-	size_t	offset;
-}
-writedata_t;
-
-/* callback for curl to store the response */
-static size_t	writefunction(char *ptr, size_t size, size_t nmemb, void *userdata)
-{
-	writedata_t	*data = (writedata_t *)userdata;
-	size_t		r_size = size * nmemb;
-
-	zbx_strncpy_alloc(&data->buf, &data->alloc, &data->offset, (const char *)ptr, r_size);
-
-	return r_size;
-}
-
 static void	create_rdap_json(struct zbx_json *json, const char *ip, int rtt, const char *target,
 		const char *testedname, int status)
 {

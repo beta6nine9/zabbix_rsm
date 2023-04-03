@@ -47,7 +47,7 @@ return [
 		1 => [
 			'host'       => 'localhost',
 			'port'       => null,
-			'database'   => 'rsm_server',
+			'database'   => 'dimir_icann_feature_dev_922_dynamic_rdap',
 			'user'       => 'zabbix',
 			'password'   => 'password',
 			'ssl_key'    => null,
@@ -59,7 +59,7 @@ return [
 	],
 	'frontends' => [
 		1 => [
-			'url' => 'http://127.0.0.1/ui',
+			'url' => 'http://192.168.6.85/icann/feature/dev/922-dynamic-rdap/ui',
 		],
 	],
 	'settings' => [

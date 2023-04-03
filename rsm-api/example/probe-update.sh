@@ -17,9 +17,9 @@ function get_json()
     ],
     "zabbixProxyParameters": {
         "ipv4Enable": true,
-        "ipv6Enable": true,
-        "proxyIp": "127.0.1.$i",
-        "proxyPort": 1006$i,
+        "ipv6Enable": false,
+        "proxyIp": "192.168.6.85",
+        "proxyPort": 1005${i},
         "proxyPskIdentity": "test",
         "proxyPsk": "b23f30b5aa0d274c88c2d1ebf17ee48e"
     },
@@ -31,3 +31,5 @@ JSON
 for ((i = $min; i <= $max; i++)); do
 	provisioning_api readwrite put probeNodes "Probe${i}-Server1" "$(get_json)"
 done
+
+db-exec.sh "update hosts set tls_connect=1 where status=6"

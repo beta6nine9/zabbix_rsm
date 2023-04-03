@@ -13,38 +13,64 @@ function get_json()
 {
     "tldType": "gTLD",
     "servicesStatus": [
-        { "service": "dnsUDP", "enabled": true },
-        { "service": "dnsTCP", "enabled": true },
-        { "service": "rdds43", "enabled": true },
-        { "service": "rdds80", "enabled": true },
-        { "service": "rdap"  , "enabled": true }
+        { "service": "dnsUDP", "enabled": $dnsudp },
+        { "service": "dnsTCP", "enabled": $dnstcp },
+        { "service": "rdds43", "enabled": $rdds43 },
+        { "service": "rdds80", "enabled": $rdds80 },
+        { "service": "rdap"  , "enabled": $rdap }
     ],
     "dnsParameters": {
-        "nsIps": [
-            { "ns": "a.ns.tld${i}", "ip": "127.0.0.1" },
-            { "ns": "b.ns.tld${i}", "ip": "127.0.0.3" },
-            { "ns": "b.ns.tld${i}", "ip": "0:0:0:0:0:ffff:7f00:0004" },
-            { "ns": "b.ns.tld${i}", "ip": "127.0.0.2" },
-            { "ns": "c.ns.tld${i}", "ip": "127.0.0.1" },
-            { "ns": "d.ns.tld${i}", "ip": "127.0.0.3" },
-            { "ns": "d.ns.tld${i}", "ip": "0:0:0:0:0:ffff:7f00:0004" },
-            { "ns": "d.ns.tld${i}", "ip": "127.0.0.2" },
-            { "ns": "e.ns.tld${i}", "ip": "127.0.0.1" },
-            { "ns": "f.ns.tld${i}", "ip": "127.0.0.3" },
-            { "ns": "f.ns.tld${i}", "ip": "0:0:0:0:0:ffff:7f00:0004" },
-            { "ns": "f.ns.tld${i}", "ip": "127.0.0.2" }
+JSON
+        echo -n '        "nsIps": ['
+	if [ $ipv4 = "true" ]; then
+		echo -n '
+            { "ns": "a.ns.tld'${i}'", "ip": "192.168.3.11" },
+            { "ns": "b.ns.tld'${i}'", "ip": "192.168.3.130" },
+            { "ns": "c.ns.tld'${i}'", "ip": "192.168.6.85" }'
+		if [ $ipv6 = "true" ]; then
+			echo -n ','
+		fi
+	fi
+	if [ $ipv6 = "true" ]; then
+		echo -n '
+            { "ns": "b.ns.tld'${i}'", "ip": "0:0:0:0:0:ffff:7f00:0004" },
+            { "ns": "c.ns.tld'${i}'", "ip": "0:0:0:0:0:ffff:7f00:0005" }'
+	fi
+
+	echo
+
+	cat << JSON
         ],
-        "dnssecEnabled": true,
+        "dnssecEnabled": $dnssec,
         "nsTestPrefix": "www.zz--icann-monitoring.example",
-        "minNs": 2
-    },
+        "minNs": $minns
+JSON
+	if [[ $rdds43 = "true" || $rdds80 = "true" || $rdap = "true" ]]; then
+		echo -n '    },
     "rddsParameters": {
-        "rdds43Server": "whois.nic.example",
+'
+	fi
+
+	if [ $rdds43 = "true" ]; then
+		echo -n '        "rdds43Server": "whois.nic.example",
         "rdds43TestedDomain": "nic.example",
-        "rdds80Url": "https://whois.nic.example",
-        "rdapUrl": "https://www.nic.example/domain",
-        "rdapTestedDomain": "nic.example",
-        "rdds43NsString": "Name Server:"
+        "rdds43NsString": "Name Server:"'
+	fi
+	if [ $rdds80 = "true" ]; then
+		[[ $rdds43 = "true" ]] && echo ','
+		echo -n '        "rdds80Url": "https://whois.nic.example"'
+	fi
+	if [ $rdap = "true" ]; then
+		[[ $rdds43 = "true" || $rdds80 = "true" ]] && echo ','
+		echo -n '        "rdapUrl": "https://www.nic.example/domain",
+        "rdapTestedDomain": "nic.example"'
+	fi
+
+	if [[ $rdds43 = "true" || $rdds80 = "true" || $rdap = "true" ]]; then
+		echo
+	fi
+
+	cat << JSON
     }
 }
 JSON

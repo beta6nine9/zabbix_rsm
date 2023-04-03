@@ -4,7 +4,7 @@
 
 [start-tool]
 
-"resolver","/tmp/resolver.pid","xxx-resolver-input-generic.json"
+"resolver","/tmp/resolver.pid","000-resolver-input-generic.json"
 "nameserver","/tmp/nameserver.pid","103-nameserver-input.json"
 
 [execute]

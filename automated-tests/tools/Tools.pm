@@ -101,7 +101,7 @@ sub start_dns_server($$$$$$)
 
 	my $ns = Net::DNS::NameserverCustom->new(%opts) || die("cannot create nameserver object\n");
 
-	inf("started");
+	inf("started on port $port");
 
 	$ns->main_loop();
 }

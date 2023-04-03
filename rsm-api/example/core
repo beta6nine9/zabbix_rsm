@@ -5,25 +5,94 @@ set -o nounset
 set -o pipefail
 #set -o xtrace
 
-. 'config'
+function usage()
+{
+	if [ -n "${1+x}" ]; then
+	        echo $1
+	        echo
+	fi
 
-if [[ "$0" == *"-update"* || "$0" == *"-disable"* || "$0" == *"-delete"* ]]; then
-	declare -i min
-	declare -i max
+	echo "usage: $0 <[--dns-udp] [--dns-tcp]> <[--ipv4] [--ipv6]> [--dnssec] [--rdds43] [--rdds80] [--rdap] [--min <n>] [--minns <n>] [--max <n>]"
+	exit 1
+}
 
-	if [[ $# -eq 0 ]]; then
-		min=1
-		max=1
-	elif [[ $# -eq 1 ]]; then
-		min=$1
-		max=$1
-	elif [[ $# -eq 2 ]]; then
-		min=$1
-		max=$2
-	else
-		echo "Usage:"
-		echo "$0 [min] [max]"
-		exit 1
+. config
+
+if [[ "$0" = *"-update"* || "$0" = *"-disable"* || "$0" = *"-delete"* ]]; then
+	declare dnsudp=false
+	declare dnstcp=false
+	declare ipv4=false
+	declare ipv6=false
+	declare dnssec=false
+	declare rdds43=false
+	declare rdds80=false
+	declare rdap=false
+	declare -i minns=2
+
+	declare -i min=1
+	declare max=
+
+	while [ -n "${1+x}" ]; do
+		case "$1" in
+			--dns-udp)
+				dnsudp=true
+				;;
+			--dns-tcp)
+				dnstcp=true
+				;;
+			--ipv4)
+				ipv4=true
+				;;
+			--ipv6)
+				ipv6=true
+				;;
+			--dnssec)
+				dnssec=true
+				;;
+			--rdds43)
+				rdds43=true
+				;;
+			--rdds80)
+				rdds80=true
+			        ;;
+			--rdap)
+				rdap=true
+				;;
+			--minns)
+				shift
+				minns=$1
+				;;
+			--min)
+				shift
+				min=$1
+				;;
+			--max)
+				shift
+				max=$1
+				;;
+			*)
+				usage "unknown option: \"$1\""
+				;;
+		esac
+		shift
+	done
+
+	if [ -z "$max" ]; then
+		max=$min
+	fi
+
+	if [ $max -lt $min ]; then
+		usage "max ($max) cannot be less than min ($min)"
+	fi
+
+	if [[ "$0" != *"probe-"* ]] && [[ "$0" = *"-update"* ]]; then
+		if [[ $dnsudp = "false" ]] && [[ $dnstcp = "false" ]]; then
+			usage "at least one of \"--dns-udp\" and \"--dns-tcp\" must be specified"
+		fi
+
+		if [[ $ipv4 = "false" ]] && [[ $ipv6 = "false" ]]; then
+			usage "at least one of \"--ipv4\" and \"--ipv6\" must be specified"
+		fi
 	fi
 fi
 
@@ -76,7 +145,6 @@ function provisioning_api()
 	fi
 
 	curl                                         \
-		--no-progress-meter                  \
 		--no-buffer                          \
 		--include                            \
 		--styled-output                      \

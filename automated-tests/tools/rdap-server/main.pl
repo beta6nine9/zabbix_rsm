@@ -30,7 +30,7 @@ die("\"expected-request\" must be defined") unless ($config->{'expected-request'
 die("\"reply-status\" must be defined")     unless ($config->{'reply-status'});
 die("\"reply-headers\" must be defined")    unless ($config->{'reply-headers'});
 die("\"reply-headers\" must be a hash")     unless (ref($config->{'reply-headers'}) eq 'HASH');
-die("\"reply-data\" must be defined")       unless (defined($config->{'reply-data'}));
+die("\"reply-body\" must be defined")       unless (defined($config->{'reply-body'}));
 
 sub reply_handler()
 {
@@ -64,12 +64,12 @@ sub reply_handler()
 
 	my $reply = "HTTP/1.1 $config->{'reply-status'}";
 
-	foreach my $header (keys(%{$config->{'reply-headers'}}))
+	foreach my $key (keys(%{$config->{'reply-headers'}}))
 	{
-		$reply .= "\r\n$header";
+		$reply .= "\r\n$key: " . $config->{'reply-headers'}{$key};
 	}
 
-	$reply .= "\r\n\r\n$config->{'reply-data'}";
+	$reply .= "\r\n\r\n$config->{'reply-body'}";
 
 	inf("replying with [$reply]");
 

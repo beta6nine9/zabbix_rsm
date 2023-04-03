@@ -1,0 +1,12 @@
+\d+:\d{8}:\d{6}\.\d{3} Info: >>> START TEST <<<
+\d+:\d{8}:\d{6}\.\d{3} Info: probe_RDDS:ENABLED, RDDS43:ENABLED, RDDS80:DISABLED, IPv4:ENABLED, IPv6:DISABLED, RDDS43_testedname:example.example, RDDS43_ns_string:Name Server:, resolver:127.0.0.1;5053, rtt_limit:10000
+\d+:\d{8}:\d{6}\.\d{3} Info: start RDDS43 test \(server example.example\)
+\d+:\d{8}:\d{6}\.\d{3} Info: making DNS query to 127.0.0.1:5053 to resolve a host to IPv4 addresses
+.*
+\d+:\d{8}:\d{6}\.\d{3} Info: Body:
+
+Name server: 127.0.0.1
+Name server: 127.0.0.2
+\d+:\d{8}:\d{6}\.\d{3} Info: end RDDS43 test \(rtt:\d+\)
+\d+:\d{8}:\d{6}\.\d{3} Info: Test result: \{"rdds43":\{"rtt":\d+,"ip":"127.0.0.1","target":"example.example","testedname":"example.example","status":1},"status":1}
+\d+:\d{8}:\d{6}\.\d{3} Info: >>> END TEST <<<

@@ -1,0 +1,11 @@
+\d+:\d{8}:\d{6}\.\d{3} Info: >>> START TEST <<<
+\d+:\d{8}:\d{6}\.\d{3} Info: DNSSEC:ENABLED, UDP:ENABLED, TCP:DISABLED, IPv4:ENABLED, IPv6:DISABLED, mode:normal, protocol:UDP, rtt_limit:5000, tcp_ratio:10, minns:1, testprefix:www.zz--rsm-monitoring
+\d+:\d{8}:\d{6}\.\d{3} Info: making DNS query to 127.0.0.1:5053 to print DS records
+.*
+\d+:\d{8}:\d{6}\.\d{3} Info: making DNS query to 127.0.0.1:5053 to get DNSKEY records
+.*
+\d+:\d{8}:\d{6}\.\d{3} Info: making DNS query to 127.0.0.1:5054 to query a non-existent domain
+.*
+\d+:\d{8}:\d{6}\.\d{3} Info: "ns1.example" \(127.0.0.1\) RTT:\d+ NSID:666f6f2d6e732d6964
+\d+:\d{8}:\d{6}\.\d{3} Info: Test result: \{"nsips":\[\{"ns":"ns1.example","ip":"127.0.0.1","nsid":"666f6f2d6e732d6964","protocol":"udp","rtt":\d+}],"nss":\[\{"ns":"ns1.example","status":6}],"mode":0,"status":1,"protocol":0,"testedname":"www.zz--rsm-monitoring.example.","dnssecstatus":1}
+\d+:\d{8}:\d{6}\.\d{3} Info: >>> END TEST <<<

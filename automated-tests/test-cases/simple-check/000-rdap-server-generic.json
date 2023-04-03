@@ -1,0 +1,8 @@
+{
+	"expected-request" : "GET /rdap/domain/example.example HTTP/1.1",
+	"reply-status"     : 200,
+	"reply-headers"    : {
+		"Content-Type" : "text/html; charset=UTF-8"
+	},
+	"reply-body"       : "{\"ldhName\" : \"example.example\"}"
+}
