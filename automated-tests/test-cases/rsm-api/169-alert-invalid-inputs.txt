@@ -1,0 +1,9 @@
+[test-case]
+
+"Alert, invalid inputs - misc scenarios"
+
+[rsm-api]
+
+"/alerts/alert-1","POST",400,"alerts","1xx-invalid-alert-inputs/169-field-duplication.json","1xx-alert-outputs/169-field-duplication.json"
+"/alerts/alert-1","POST",400,"alerts","1xx-invalid-alert-inputs/169-invalid-field.json"    ,"1xx-alert-outputs/169-invalid-field.json"
+"/alerts/alert-1","POST",400,"alerts","1xx-invalid-alert-inputs/169-invalid-syntax.json"   ,"1xx-alert-outputs/169-invalid-syntax.json"

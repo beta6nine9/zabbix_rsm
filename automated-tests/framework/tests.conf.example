@@ -19,6 +19,7 @@ username=Admin
 
 [rsm-api]
 url=
+alerts_dir=
 username_readonly=provisioning-api-readonly
 password_readonly=password
 username_readwrite=provisioning-api-readwrite
