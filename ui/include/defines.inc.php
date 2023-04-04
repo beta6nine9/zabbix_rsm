@@ -19,7 +19,7 @@
 **/
 
 /* RSM specifics: specific defines */
-define('ZABBIX_DB_VERSION_RSM',		0);
+define('ZABBIX_DB_VERSION_RSM',		22);
 /* RSM specifics: end */
 
 define('ZABBIX_VERSION',		'6.0.8');
