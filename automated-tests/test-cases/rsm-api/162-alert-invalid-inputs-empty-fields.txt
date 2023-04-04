@@ -1,0 +1,7 @@
+[test-case]
+
+"Alert, invalid inputs - empty fields"
+
+[rsm-api]
+
+"/alerts/alert-1","POST",200,"alerts","1xx-invalid-alert-inputs/162-empty-value.json","1xx-alert-outputs/162-empty-value.json"
