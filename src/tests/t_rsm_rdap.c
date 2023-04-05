@@ -1,6 +1,7 @@
-#include "../zabbix_server/poller/checks_simple_rsm.c"
 #include "t_rsm_decl.h"
 #include "t_rsm.h"
+
+#include "../zabbix_server/poller/checks_simple_rsm_rdap.c"
 
 #define DEFAULT_RES_PORT	53
 #define DEFAULT_MAXREDIRS	10
