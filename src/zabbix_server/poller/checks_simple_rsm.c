@@ -520,12 +520,15 @@ int	rsm_resolve_host(ldns_resolver *res, const char *host, zbx_vector_str_t *ips
 		return ret;
 	}
 
-	for (ipv = ipvs; (NULL != ipv->name && 0 != (ipv_flags & ipv->flag)); ipv++)
+	for (ipv = ipvs; NULL != ipv->name; ipv++)
 	{
 		ldns_pkt	*pkt;
 		ldns_rr_list	*rr_list;
 		ldns_pkt_rcode	rcode;
 		ldns_status	status;
+
+		if (0 == (ipv_flags & ipv->flag))
+			continue;
 
 		rsm_print_nameserver(log_fd, res, ipv->resolve_reason);
 
