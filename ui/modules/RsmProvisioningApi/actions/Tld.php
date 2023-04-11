@@ -913,17 +913,26 @@ class Tld extends MonitoringTarget
 
 	private function compareIp(string $a, string $b): int
 	{
-		$a = inet_pton($a);
-		$b = inet_pton($b);
+		$a_packed = inet_pton($a);
+		$b_packed = inet_pton($b);
 
-		if (strlen($a) != strlen($b))
+		if (strlen($a_packed) != strlen($b_packed))
 		{
 			// put IPv4 before IPv6
-			return strlen($a) - strlen($b);
+			return strlen($a_packed) - strlen($b_packed);
 		}
 		else
 		{
-			return strcmp($a, $b);
+			if ($a_packed == $b_packed)
+			{
+				// sort identical addresses by their human readable representations
+				return strcmp($a, $b);
+			}
+			else
+			{
+				// sort identical addresses by their packed in_addr representations
+				return strcmp($a_packed, $b_packed);
+			}
 		}
 	}
 
