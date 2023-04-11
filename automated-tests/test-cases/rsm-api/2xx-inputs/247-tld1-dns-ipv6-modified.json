@@ -1,0 +1,18 @@
+{
+    "tldType": "gTLD",
+    "servicesStatus": [
+        { "service": "dnsUDP", "enabled": true },
+        { "service": "dnsTCP", "enabled": true },
+        { "service": "rdds43", "enabled": false },
+        { "service": "rdds80", "enabled": false },
+        { "service": "rdap"  , "enabled": false }
+    ],
+    "dnsParameters": {
+        "nsIps": [
+            { "ns": "localhost", "ip": "0:0:0:0:0:0:0:1" }
+        ],
+        "dnssecEnabled": true,
+        "nsTestPrefix": "www.monitoring.example",
+        "minNs": 2
+    }
+}
