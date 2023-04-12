@@ -93,11 +93,8 @@ int	check_rsm_resolver_status(const char *host, const AGENT_REQUEST *request, AG
 
 	while (tries--)
 	{
-		if (SUCCEED == rsm_check_dns_connection(res, query_rdf, CHECK_DNS_CONN_RECURSIVE, 0, log_fd,
-				err, sizeof(err)))
-		{
+		if (SUCCEED == rsm_soa_query(res, query_rdf, RSM_SOA_QUERY_RECURSIVE, 0, log_fd, err, sizeof(err)))
 			break;
-		}
 
 		if (!tries)
 		{

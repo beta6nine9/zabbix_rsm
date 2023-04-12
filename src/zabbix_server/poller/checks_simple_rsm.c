@@ -1039,18 +1039,18 @@ int	rsm_split_url(const char *url, char **scheme, char **domain, int *port, char
 	return SUCCEED;
 }
 
-int	rsm_check_dns_connection(const ldns_resolver *res, ldns_rdf *query_rdf, unsigned int flags, int reply_ms,
-		FILE *log_fd, char *err, size_t err_size)
+int	rsm_soa_query(const ldns_resolver *res, ldns_rdf *query_rdf, unsigned int flags, int reply_ms, FILE *log_fd,
+		char *err, size_t err_size)
 {
 	ldns_pkt	*pkt = NULL;
 	ldns_rr_list	*rrset = NULL;
 	uint16_t	query_flags = 0;
 	int		ret = FAIL;
 
-	if (0 != (flags & CHECK_DNS_CONN_RECURSIVE))
+	if (0 != (flags & RSM_SOA_QUERY_RECURSIVE))
 		query_flags = LDNS_RD;
 
-	rsm_print_nameserver(log_fd, res, "test the nameserver");
+	rsm_print_nameserver(log_fd, res, "get resource records of type SOA");
 
 	if (NULL == (pkt = ldns_resolver_query(res, query_rdf, LDNS_RR_TYPE_SOA, LDNS_RR_CLASS_IN, query_flags)))
 	{
@@ -1069,14 +1069,14 @@ int	rsm_check_dns_connection(const ldns_resolver *res, ldns_rdf *query_rdf, unsi
 	ldns_rr_list_deep_free(rrset);
 	rrset = NULL;
 
-	if (0 != (flags & CHECK_DNS_CONN_RRSIGS) &&
+	if (0 != (flags & RSM_SOA_QUERY_RRSIGS) &&
 			NULL == (rrset = ldns_pkt_rr_list_by_type(pkt, LDNS_RR_TYPE_RRSIG, LDNS_SECTION_ANSWER)))
 	{
 		zbx_strlcpy(err, "no RRSIG records found", err_size);
 		goto out;
 	}
 
-	if (0 != (flags & CHECK_DNS_CONN_RTT) && ldns_pkt_querytime(pkt) > (uint32_t)reply_ms)
+	if (0 != (flags & RSM_SOA_QUERY_RTT) && ldns_pkt_querytime(pkt) > (uint32_t)reply_ms)
 	{
 		zbx_snprintf(err, err_size, "query RTT %u over limit (%d)", ldns_pkt_querytime(pkt), reply_ms);
 		goto out;

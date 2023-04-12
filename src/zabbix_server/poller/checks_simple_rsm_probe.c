@@ -140,8 +140,7 @@ int	check_rsm_probe_status(const char *host, const AGENT_REQUEST *request, AGENT
 				goto out;
 			}
 
-			if (SUCCEED == rsm_check_dns_connection(res, query_rdf,
-					(CHECK_DNS_CONN_RRSIGS | CHECK_DNS_CONN_RTT),
+			if (SUCCEED == rsm_soa_query(res, query_rdf, (RSM_SOA_QUERY_RRSIGS | RSM_SOA_QUERY_RTT),
 					ipv4_reply_ms, log_fd, err, sizeof(err)))
 			{
 				ok_servers++;
@@ -192,8 +191,7 @@ int	check_rsm_probe_status(const char *host, const AGENT_REQUEST *request, AGENT
 				goto out;
 			}
 
-			if (SUCCEED == rsm_check_dns_connection(res, query_rdf,
-					(CHECK_DNS_CONN_RRSIGS | CHECK_DNS_CONN_RTT),
+			if (SUCCEED == rsm_soa_query(res, query_rdf, (RSM_SOA_QUERY_RRSIGS | RSM_SOA_QUERY_RTT),
 					ipv6_reply_ms, log_fd, err, sizeof(err)))
 			{
 				ok_servers++;

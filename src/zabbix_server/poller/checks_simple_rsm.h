@@ -376,12 +376,12 @@ int	rsm_http_test(const char *host, const char *url, long timeout, long maxredir
 int	map_http_code(long http_code);
 size_t	writefunction(char *ptr, size_t size, size_t nmemb, void *userdata);
 
-#define CHECK_DNS_CONN_RRSIGS		0x1u
-#define CHECK_DNS_CONN_RTT		0x2u
-#define CHECK_DNS_CONN_RECURSIVE	0x4u
+#define RSM_SOA_QUERY_RRSIGS	0x1u	/* treat no RRSIG resource records in answer as an error */
+#define RSM_SOA_QUERY_RTT	0x2u	/* treat an RTT over limit as an error                   */
+#define RSM_SOA_QUERY_RECURSIVE	0x4u	/* set "rd" flag (Recursion Desired) in request          */
 
-int	rsm_check_dns_connection(const ldns_resolver *res, ldns_rdf *query_rdf, unsigned int flags, int reply_ms,
-		FILE *log_fd, char *err, size_t err_size);
+int	rsm_soa_query(const ldns_resolver *res, ldns_rdf *query_rdf, unsigned int flags, int reply_ms, FILE *log_fd,
+		char *err, size_t err_size);
 
 rsm_subtest_result_t	rsm_subtest_result(int rtt, int rtt_limit);
 
