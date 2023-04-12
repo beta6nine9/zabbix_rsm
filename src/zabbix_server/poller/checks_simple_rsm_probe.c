@@ -108,6 +108,11 @@ int	check_rsm_probe_status(const char *host, const AGENT_REQUEST *request, AGENT
 			ipv6_reply_ms,
 			online_delay);
 
+	if (0 != ipv4_enabled)
+		rsm_infof(log_fd, "IPv4 root servers to be tested: %s", ipv4_rootservers);
+	if (0 != ipv6_enabled)
+		rsm_infof(log_fd, "IPv6 root servers to be tested: %s", ipv6_rootservers);
+
 	/* create query to check the connection */
 	if (NULL == (query_rdf = ldns_rdf_new_frm_str(LDNS_RDF_TYPE_DNAME, ".")))
 	{

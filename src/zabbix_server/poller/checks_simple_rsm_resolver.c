@@ -88,9 +88,6 @@ int	check_rsm_resolver_status(const char *host, const AGENT_REQUEST *request, AG
 	/* from this point item will not become NOTSUPPORTED */
 	ret = SYSINFO_RET_OK;
 
-	rsm_infof(log_fd, "IPv4:%s IPv6:%s", 0 == ipv4_enabled ? "DISABLED" : "ENABLED",
-			0 == ipv6_enabled ? "DISABLED" : "ENABLED");
-
 	while (tries--)
 	{
 		if (SUCCEED == rsm_soa_query(res, query_rdf, RSM_SOA_QUERY_RECURSIVE, 0, log_fd, err, sizeof(err)))
