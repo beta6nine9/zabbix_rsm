@@ -768,7 +768,7 @@ int	map_http_code(long http_code)
 }
 
 /* callback for curl to store the response body */
-size_t	writefunction(char *ptr, size_t size, size_t nmemb, void *userdata)
+static size_t	response_function(char *ptr, size_t size, size_t nmemb, void *userdata)
 {
 	writedata_t	*data = (writedata_t *)userdata;
 	size_t		r_size = size * nmemb;
@@ -776,6 +776,20 @@ size_t	writefunction(char *ptr, size_t size, size_t nmemb, void *userdata)
 	zbx_strncpy_alloc(&data->buf, &data->alloc, &data->offset, (const char *)ptr, r_size);
 
 	return r_size;
+}
+
+/* this is a pointer to a user-passed writedata_t object */
+static writedata_t	*debugdata;
+
+static int	request_headers_function(CURL *handle, curl_infotype type, char *data, size_t size, void *userp)
+{
+	ZBX_UNUSED(handle);
+	ZBX_UNUSED(userp);
+
+	if (CURLINFO_HEADER_OUT == type)
+		zbx_strncpy_alloc(&debugdata->buf, &debugdata->alloc, &debugdata->offset, data, size);
+
+	return 0;
 }
 
 /* allocates memory and returns a buffer to the details */
@@ -822,15 +836,12 @@ static char	*get_curl_details(CURL *easyhandle)
 	return output;
 }
 
-#define RSM_FLAG_CURL_VERBOSE	0x1
-
 /* Helper function for Web-based RDDS80 and RDAP checks. Adds host to header, connects to URL obeying timeout and */
 /* max redirect settings, stores web page contents using provided callback, checks for OK response and calculates */
 /* round-trip time. When function succeeds it returns RTT in milliseconds. When function fails it returns source  */
 /* of error in provided RTT parameter. Does not verify certificates.                                              */
-int	rsm_http_test(const char *host, const char *url, long timeout, long maxredirs, rsm_http_error_t *ec_http,
-		int *rtt, void *writedata, size_t (*writefunction)(char *, size_t, size_t, void *), int curl_flags,
-		char **details, char *err, size_t err_size)
+int	rsm_http_test(const char *host, const char *url, long timeout, long maxredirs, rsm_http_error_t *ec_http, int *rtt,
+		writedata_t *request_headers, void *response, char **transfer_details, char *err, size_t err_size)
 {
 #ifdef HAVE_LIBCURL
 	CURL			*easyhandle;
@@ -838,12 +849,15 @@ int	rsm_http_test(const char *host, const char *url, long timeout, long maxredir
 	CURLoption		opt;
 	char			host_buf[RSM_BUF_SIZE];
 	double			total_time;
-	long			response_code, curlopt_verbose;
+	long			response_code;
 	struct curl_slist	*slist = NULL;
 #endif
 	int			ret = FAIL;
 
 #ifdef HAVE_LIBCURL
+	/* point it to the user passed object to be used in the request_headers_function() callback */
+	debugdata = request_headers;
+
 	if (NULL == (easyhandle = curl_easy_init()))
 	{
 		ec_http->type = PRE_HTTP_STATUS_ERROR;
@@ -863,19 +877,18 @@ int	rsm_http_test(const char *host, const char *url, long timeout, long maxredir
 		goto out;
 	}
 
-	curlopt_verbose = (0 != (curl_flags & RSM_FLAG_CURL_VERBOSE) ? 1L : 0L);
-
 	if (CURLE_OK != (curl_err = curl_easy_setopt(easyhandle, opt = CURLOPT_FOLLOWLOCATION, 1L)) ||
 			CURLE_OK != (curl_err = curl_easy_setopt(easyhandle, opt = CURLOPT_USERAGENT, "Zabbix " ZABBIX_VERSION)) ||
-			CURLE_OK != (curl_err = curl_easy_setopt(easyhandle, opt = CURLOPT_VERBOSE, curlopt_verbose)) ||
+			CURLE_OK != (curl_err = curl_easy_setopt(easyhandle, opt = CURLOPT_VERBOSE, 1L)) || /* this must be turned on for debugfunction */
 			CURLE_OK != (curl_err = curl_easy_setopt(easyhandle, opt = CURLOPT_MAXREDIRS, maxredirs)) ||
 			CURLE_OK != (curl_err = curl_easy_setopt(easyhandle, opt = CURLOPT_URL, url)) ||
 			CURLE_OK != (curl_err = curl_easy_setopt(easyhandle, opt = CURLOPT_TIMEOUT, timeout)) ||
 			CURLE_OK != (curl_err = curl_easy_setopt(easyhandle, opt = CURLOPT_HTTPHEADER, slist)) ||
 			CURLE_OK != (curl_err = curl_easy_setopt(easyhandle, opt = CURLOPT_SSL_VERIFYPEER, 0L)) ||
 			CURLE_OK != (curl_err = curl_easy_setopt(easyhandle, opt = CURLOPT_SSL_VERIFYHOST, 0L)) ||
-			CURLE_OK != (curl_err = curl_easy_setopt(easyhandle, opt = CURLOPT_WRITEDATA, writedata)) ||
-			CURLE_OK != (curl_err = curl_easy_setopt(easyhandle, opt = CURLOPT_WRITEFUNCTION, writefunction)))
+			CURLE_OK != (curl_err = curl_easy_setopt(easyhandle, opt = CURLOPT_WRITEDATA, response)) ||
+			CURLE_OK != (curl_err = curl_easy_setopt(easyhandle, opt = CURLOPT_WRITEFUNCTION, response_function)) ||
+			CURLE_OK != (curl_err = curl_easy_setopt(easyhandle, opt = CURLOPT_DEBUGFUNCTION, request_headers_function)))
 	{
 		ec_http->type = PRE_HTTP_STATUS_ERROR;
 		ec_http->error.pre_status_error = RSM_EC_PRE_STATUS_ERROR_INTERNAL;
@@ -910,7 +923,7 @@ int	rsm_http_test(const char *host, const char *url, long timeout, long maxredir
 		goto out;
 	}
 
-	*details = get_curl_details(easyhandle);
+	*transfer_details = get_curl_details(easyhandle);
 
 	/* total time */
 	if (CURLE_OK != (curl_err = curl_easy_getinfo(easyhandle, CURLINFO_TOTAL_TIME, &total_time)))

@@ -370,11 +370,9 @@ void	get_host_and_port_from_str(const char *str, char delim, char *host, size_t 
 int	rsm_get_ts_from_host(const char *host, time_t *ts);
 int	rsm_split_url(const char *url, char **scheme, char **domain, int *port, char **path, char *err, size_t err_size);
 
-int	rsm_http_test(const char *host, const char *url, long timeout, long maxredirs, rsm_http_error_t *ec_http,
-		int *rtt, void *writedata, size_t (*writefunction)(char *, size_t, size_t, void *), int curl_flags,
-		char **details, char *err, size_t err_size);
+int	rsm_http_test(const char *host, const char *url, long timeout, long maxredirs, rsm_http_error_t *ec_http, int *rtt,
+		writedata_t *request_headers, void *response, char **transfer_details, char *err, size_t err_size);
 int	map_http_code(long http_code);
-size_t	writefunction(char *ptr, size_t size, size_t nmemb, void *userdata);
 
 #define RSM_SOA_QUERY_RRSIGS	0x1u	/* treat no RRSIG resource records in answer as an error */
 #define RSM_SOA_QUERY_RTT	0x2u	/* treat an RTT over limit as an error                   */

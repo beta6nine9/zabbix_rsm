@@ -188,7 +188,7 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 				*domain = NULL,
 				*path = NULL,
 				*formed_url = NULL,
-				*details = NULL,
+				*transfer_details = NULL,
 				is_ipv4, err[RSM_ERR_BUF_SIZE],
 				rdds43_server[RSM_BUF_SIZE],
 				resolver_ip[RSM_BUF_SIZE];
@@ -203,7 +203,7 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 	rsm_resolver_error_t	ec_res;
 	time_t			ts, now;
 	rsm_http_error_t	ec_http;
-	writedata_t		writedata = {NULL, 0, 0};
+	writedata_t		request_headers = {NULL, 0, 0}, response = {NULL, 0, 0};
 	struct zbx_json		json;
 	uint16_t		resolver_port,
 				rdds43_port;
@@ -219,7 +219,6 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 				rtt80 = RSM_NO_VALUE,
 				epp_enabled = 0,
 				ipv_flags = 0,
-				curl_flags = 0,
 				port,
 				ret = SYSINFO_RET_FAIL;
 
@@ -481,11 +480,11 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 
 		rsm_infof(log_fd, "the following URL was generated for the test: %s", formed_url);
 
-		rv = rsm_http_test(domain, formed_url, RSM_TCP_TIMEOUT, maxredirs, &ec_http, &rtt80, &writedata,
-				writefunction, curl_flags, &details, err, sizeof(err));
+		rv = rsm_http_test(domain, formed_url, RSM_TCP_TIMEOUT, maxredirs, &ec_http, &rtt80, &request_headers,
+				&response, &transfer_details, err, sizeof(err));
 
-		if (NULL != details)
-			rsm_infof(log_fd, "Transfer details:%s\nBody:\n%s", details, ZBX_NULL2STR(writedata.buf));
+		rsm_infof(log_fd, "Request headers:\n%s", ZBX_NULL2STR(request_headers.buf));
+		rsm_infof(log_fd, "Transfer details:%s\nBody:\n%s", ZBX_NULL2STR(transfer_details), ZBX_NULL2STR(response.buf));
 
 		if (SUCCEED != rv)
 		{
@@ -534,13 +533,14 @@ out:
 			ldns_resolver_free(res);
 	}
 
-	zbx_free(details);
 	zbx_free(answer);
 	zbx_free(scheme);
 	zbx_free(domain);
 	zbx_free(path);
 	zbx_free(formed_url);
-	zbx_free(writedata.buf);
+	zbx_free(request_headers.buf);
+	zbx_free(response.buf);
+	zbx_free(transfer_details);
 
 	rsm_vector_str_clean_and_destroy(&nss);
 	rsm_vector_str_clean_and_destroy(&ips80);
