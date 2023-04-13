@@ -1,3 +1,9 @@
+Changes for rsm3.2.0rc1
+
+New features:
+....I..... [921] added Extended Logging functionality to simple checks (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm3.1.2
 
 Bug fixes:
