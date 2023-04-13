@@ -923,6 +923,9 @@ int	rsm_http_test(const char *host, const char *url, long timeout, long maxredir
 		goto out;
 	}
 
+	/* strip endline symbol */
+	zbx_rtrim(debugdata->buf, "\n");
+
 	*transfer_details = get_curl_details(easyhandle);
 
 	/* total time */

@@ -12,6 +12,12 @@ Name server: 127.0.0.2
 \d+:\d{8}:\d{6}\.\d{3} Info: making DNS query to 127.0.0.1:5053 to resolve a host to IPv4 addresses
 .*
 \d+:\d{8}:\d{6}\.\d{3} Info: the following URL was generated for the test: http:\/\/127.0.0.1:4380
+\d+:\d{8}:\d{6}\.\d{3} Info: Request headers:
+GET \/ HTTP\/1.1
+Host: example.example
+User-Agent: Zabbix \d+\.\d+\.\d+
+Accept: \*\/\*
+
 \d+:\d{8}:\d{6}\.\d{3} Info: Transfer details:
   content_type=text\/html; charset=UTF-8
   http_code=200
