@@ -4,7 +4,7 @@
 
 [start-tool]
 
-"resolver","/tmp/resolver.pid","000-resolver-example.example-noerror.json"
+"resolver","/tmp/resolver.pid","000-resolver-input-example.example.json"
 "rdds80-server","/tmp/rdds80-server.pid","208-rdds80-server-input.json"
 
 [execute]
