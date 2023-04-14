@@ -347,7 +347,8 @@
 		</exec>
 	</target>
 
-	<target name="init-frontend-mysql" depends="create-configs,create-saml-configs,make-dbschema,make-gettext,create-db-mysql,init-frontend-modules">
+	<!-- RSM specifics: remove create-saml-configs dependency -->
+	<target name="init-frontend-mysql" depends="create-configs,make-dbschema,make-gettext,create-db-mysql,init-frontend-modules">
 		<exec executable="mysql" input="ui/tests/selenium/data/data_test_rsm.dump" failonerror="on">
 			<env key="MYSQL_PWD" value="${dbpassword}"/>
 			<arg line="--host=${dbhost}"/>
