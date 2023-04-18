@@ -18,6 +18,6 @@
 "rdds43-server","/tmp/rdds43-server.pid"
 "resolver","/tmp/resolver.pid"
 
-[compare-files]
+[compare-file]
 
-"/tmp/simple-check-test","202-output.tar.gz"
+"/tmp/simple-check-test/status.json","${file:202-status-output.json}"

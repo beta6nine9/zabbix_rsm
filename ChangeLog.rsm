@@ -1,3 +1,26 @@
+Changes for rsm3.1.2
+
+Bug fixes:
+....I..... [927] fixed comparing IPv6 addresses in Provisioning API (asitals)
+
+--------------------------------------------------------------------------------
+Changes for rsm3.1.1
+
+New features:
+....I..... [919] added last portion of automated test cases for alerts API (asitals)
+
+--------------------------------------------------------------------------------
+Changes for rsm3.1.0
+
+rsm3.1.0rc1 was released as rsm3.1.0 without any changes
+
+--------------------------------------------------------------------------------
+Changes for rsm3.1.0rc1
+
+New features:
+....I..... [919] alerts API (asitals)
+
+--------------------------------------------------------------------------------
 Changes for rsm3.0.0
 
 New features:

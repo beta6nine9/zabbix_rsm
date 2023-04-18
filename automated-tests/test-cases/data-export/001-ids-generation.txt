@@ -24,7 +24,7 @@
 
 "2020-12-31 00:00:00","/opt/zabbix/scripts/standalone-rdap.pl --enable"
 
-[provisioning-api]
+[rsm-api]
 
 "/probeNodes/Probe1-Server1","PUT",200,"readwrite","000-input-probe1-rdap-rdds.json",""
 "/probeNodes/Probe2-Server1","PUT",200,"readwrite","000-input-probe2-rdap-rdds.json",""
