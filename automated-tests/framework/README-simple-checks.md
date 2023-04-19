@@ -2,10 +2,10 @@
 Preparation
 ===========
 
-Checkout `qa` branch:
+Checkout `master` branch:
 
-    git clone -b qa --single-branch ssh://git@git.zabbix.lan:7999/icann/icann.git icann-qa
-    cd icann-qa
+    git clone -b master --single-branch <URL> git-tests
+    cd git-tests
 
 Create configuration file `tests.conf` and edit it:
 

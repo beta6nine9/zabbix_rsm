@@ -35,7 +35,7 @@ function get_json()
             { "ns": "f.ns.tld${i}", "ip": "127.0.0.2" }
         ],
         "dnssecEnabled": true,
-        "nsTestPrefix": "www.zz--icann-monitoring.example",
+        "nsTestPrefix": "www.zz--rsm-monitoring.example",
         "minNs": 2
     },
     "rddsParameters": {
