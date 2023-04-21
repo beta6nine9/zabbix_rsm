@@ -1,7 +1,5 @@
 #!/usr/bin/env perl
 
-# TODO: requires DBD/SQLite.pm
-
 use strict;
 use warnings;
 
@@ -128,8 +126,6 @@ sub main()
 
 sub initialize()
 {
-	# TODO: remove
-	push(@ARGV, '--nolog');
 	parse_opts();
 
 	if (opt('debug'))
@@ -139,14 +135,13 @@ sub initialize()
 
 	usage("--config is missing", 1) if (!opt('config'));
 
-	info("command line: %s %s", $0, join(' ', map(index($_, ' ') == -1 ? $_ : "'$_'", @ARGV)));
-
 	initialize_config();
 	validate_config();
+	initialize_log(!opt('nolog') && !opt('dry-run'));
+
+	info("command line: %s %s", $0, join(' ', map(index($_, ' ') == -1 ? $_ : "'$_'", @ARGV)));
 
 	set_max_execution_time(get_config('time_limits', 'script'), 1, "script running for too long, terminating...");
-
-	initialize_log(!opt('nolog') && !opt('dry-run'));
 }
 
 sub initialize_config()
@@ -208,8 +203,8 @@ sub validate_config()
 	dbg();
 	dbg("[resolver]");
 	dbg("queue_size      = %s", get_config('resolver', 'queue_size'));
-	dbg("retries         = %s", get_config('resolver', 'retries'));
 	dbg("timeout         = %s", get_config('resolver', 'timeout'));
+	dbg("retries         = %s", get_config('resolver', 'retries'));
 	dbg();
 	dbg("[mtr]");
 	dbg("options         = %s", get_config('mtr', 'options'));
@@ -632,8 +627,8 @@ sub resolve_hosts($$$)
 
 	my $resolver = new Net::DNS::Async(
 		QueueSize => get_config('resolver', 'queue_size'),
-		Retries   => get_config('resolver', 'retries'),
 		Timeout   => get_config('resolver', 'timeout'),
+		Retries   => get_config('resolver', 'retries'),
 	);
 
 	foreach my $host (keys(%hosts))
@@ -1500,31 +1495,23 @@ __END__
 
 =head1 NAME
 
-tlds-notification.pl - calls script.py.
+tracerouter-mtr.pl - calls mtr for all monitored IP addresses.
 
 =head1 SYNOPSIS
 
-tlds-notification.pl --send-to <receiver> --event-id <event-id> [--nolog] [--dry-run] [--debug] [--help]
+tracerouter-mtr.pl --config <file> [--nolog] [--debug] [--help]
 
 =head1 OPTIONS
 
 =over 8
 
-=item B<--send-to> string
+=item B<--config> string
 
-Specify receiver
-
-=item B<--event-id> int
-
-Specify event ID.
+Configuration file for the tool.
 
 =item B<--nolog>
 
 Print output to stdout and stderr instead of a log file.
-
-=item B<--dry-run>
-
-Print data to the screen, do not change anything in the system.
 
 =item B<--debug>
 

@@ -1,0 +1,19 @@
+[paths]
+log_file        = /var/log/zabbix/tracerouter.log
+proxy_config    =
+work_dir        =
+output_dir      =
+
+[time_limits]
+script          = 295
+mtr_term        = 30
+mtr_kill        = 40
+output_handling = 10
+
+[resolver]
+queue_size      = 20
+timeout         = 4
+retries         = 3
+
+[mtr]
+options         = --json --no-dns --aslookup --max-ttl 30 --report-cycles 10 --interval 1.0 --gracetime 5.0
