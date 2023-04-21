@@ -11,6 +11,7 @@ use DBI;
 use Data::Dumper;
 use Devel::StackTrace;
 use Fcntl qw(:flock SEEK_END);
+use File::Path qw(rmtree);
 use Getopt::Long qw(GetOptionsFromArray);
 use IO::Select;
 use JSON::XS;
@@ -19,13 +20,14 @@ use Net::DNS::Async;
 use Parallel::ForkManager;
 use Pod::Usage;
 use Socket;
-use Time::HiRes qw(time sleep);
+use Time::HiRes;
 
 use constant MONITORING_TARGET_REGISTRY  => 'registry';
 use constant MONITORING_TARGET_REGISTRAR => 'registrar';
 
 my $json_xs;
 my $config;
+my $probe_name;
 
 ################################################################################
 # main
@@ -43,7 +45,7 @@ sub main()
 	# get data from local proxy database
 
 	info("reading data from proxy database...");
-	$time_start = time();
+	$time_start = Time::HiRes::time();
 
 	db_connect();
 
@@ -54,47 +56,74 @@ sub main()
 
 	db_disconnect();
 
+	set_probe_name($proxy_name);
+	initialize_work_dir();
+
 	my $ipv4 = $proxy_data{'ipv4'};
 	my $ipv6 = $proxy_data{'ipv6'};
 
 	$ipv6 = 0;
 
-	$time_end = time();
+	$time_end = Time::HiRes::time();
 	info("finished reading data from proxy database in %.3fs", $time_end - $time_start);
 
 	# resolve RDAP, RDDS hostnames
 
 	info("resolving hostnames...");
-	$time_start = time();
+	$time_start = Time::HiRes::time();
 
 	my %hosts_to_resolve = get_rdap_rdds_hosts(\%proxy_data, \%rsmhost_data);
 	my %resolved_hosts = resolve_hosts(\%hosts_to_resolve, $ipv4, $ipv6);
 
-	$time_end = time();
+	$time_end = Time::HiRes::time();
 	info("finished resolving hostnames in %.3fs", $time_end - $time_start);
 
 	# write configuration to JSON files
 
-	write_file(get_config('paths', 'work_dir') . '/proxy-data.json'    , format_json(\%proxy_data));
-	write_file(get_config('paths', 'work_dir') . '/rsmhost-data.json'  , format_json(\%rsmhost_data));
-	write_file(get_config('paths', 'work_dir') . '/resolved-hosts.json', format_json(\%resolved_hosts));
+	write_file(get_cycle_work_dir() . '/config-proxy.json'  , format_json(\%proxy_data));
+	write_file(get_cycle_work_dir() . '/config-rsmhost.json', format_json(\%rsmhost_data));
+	write_file(get_cycle_work_dir() . '/resolved-hosts.json', format_json(\%resolved_hosts));
 
 	# preform tracerouting
 
 	info("doing traceroutes...");
-	$time_start = time();
+	$time_start = Time::HiRes::time();
 
 	my %ip_rsmhost_mapping = create_ip_rsmhost_mapping(\%rsmhost_data, \%hosts_to_resolve, \%resolved_hosts, $ipv4, $ipv6);
 	my @ip_list = create_ip_list(\%rsmhost_data, \%resolved_hosts, $ipv4, $ipv6);
 
 	traceroute(\@ip_list, \%ip_rsmhost_mapping);
 
-	$time_end = time();
+	$time_end = Time::HiRes::time();
 	info("finished doing traceroutes in %.3fs", $time_end - $time_start);
 
 	# compress output
 
-	#...;
+	info("compressing outputs...");
+	$time_start = Time::HiRes::time();
+
+	my $cycle_work_dir  = get_cycle_work_dir();
+	my $output_file_tmp = get_base_work_dir() . '/' . get_output_filename();
+	my $output_file     = get_config('paths', 'output_dir') . '/' . get_output_filename();
+	my $verbose         = opt('debug') ? '-v' : '';
+
+	if (!execute("ls -1 '$cycle_work_dir' | tar $verbose -C '$cycle_work_dir' --remove-files -cf '$output_file_tmp' -T - -z"))
+	{
+		fail("failed to compress output files");
+	}
+
+	if (!rename($output_file_tmp, $output_file))
+	{
+		fail("failed to move archive: $!");
+	}
+
+	if (!rmtree($cycle_work_dir))
+	{
+		fail("failed to remove work dir: $!");
+	}
+
+	$time_end = Time::HiRes::time();
+	info("finished compressing outputs in %.3fs", $time_end - $time_start);
 }
 
 sub initialize()
@@ -160,7 +189,8 @@ sub get_config($$)
 
 sub validate_config()
 {
-	# use dbg() not only for printing config, but also for checking if all required config options are present
+	# use dbg() not only for printing config, but also for checking if all required config options are present,
+	# get_config() fails if config option does not exist or is empty
 
 	dbg("config:");
 	dbg();
@@ -184,33 +214,18 @@ sub validate_config()
 	dbg("[mtr]");
 	dbg("options         = %s", get_config('mtr', 'options'));
 	dbg();
-
-	validate_work_dir(get_config('paths', 'work_dir'));
 }
 
-sub validate_work_dir($)
+sub initialize_work_dir()
 {
-	my $work_dir = shift;
+	my $base_work_dir = get_base_work_dir();
+	my $cycle_work_dir = get_cycle_work_dir();
 
-	fail("work dir '$work_dir' does not exist")              if (! -e $work_dir);
-	fail("work dir '$work_dir' is not a directory")          if (! -d $work_dir);
-	fail("work dir '$work_dir' is not a writable directory") if (! -w $work_dir);
+	fail("work dir '$base_work_dir' does not exist")              if (! -e $base_work_dir);
+	fail("work dir '$base_work_dir' is not a directory")          if (! -d $base_work_dir);
+	fail("work dir '$base_work_dir' is not a writable directory") if (! -w $base_work_dir);
 
-	my $file;
-
-	opendir(my $dir_handle, $work_dir) or fail("failed to open directory '$work_dir': $!");
-
-	while (defined($file = readdir($dir_handle)))
-	{
-		last if ($file ne '.' && $file ne '..');
-	}
-
-	closedir($dir_handle) or fail("failed to close directory '$work_dir': $!");
-
-	if (defined($file))
-	{
-		fail("work dir '$work_dir' is not empty");
-	}
+	mkdir($cycle_work_dir) or fail("failed to create work dir '$cycle_work_dir': $!");
 }
 
 sub set_max_execution_time($$$)
@@ -392,6 +407,49 @@ sub create_ip_list($$$$)
 	}
 
 	return keys(%ip_list);
+}
+
+sub set_probe_name($)
+{
+	$probe_name = shift;
+}
+
+sub get_probe_name()
+{
+	if (!defined($probe_name))
+	{
+		fail("get_probe_name() called before set_probe_name()");
+	}
+	return $probe_name;
+}
+
+sub get_base_work_dir()
+{
+	return get_config('paths', 'work_dir');
+}
+
+sub get_cycle_work_dir()
+{
+	# sec, min, hour, mday, mon, year, wday, yday, isdst
+	my ($sec, $min, $hour, $mday, $mon, $year) = localtime(get_cycle_timestamp());
+
+	return sprintf("%s/%04d%02d%02d-%02d%02d%02d-%s", get_base_work_dir(), $year + 1900, $mon + 1, $mday, $hour, $min, $sec, get_probe_name());
+}
+
+sub get_cycle_timestamp()
+{
+	return $^T - ($^T % 60);
+}
+
+sub get_current_timestamp()
+{
+	return time();
+}
+
+sub get_output_filename()
+{
+	my ($sec, $min, $hour, $mday, $mon, $year) = localtime(get_cycle_timestamp());
+	return sprintf("%04d%02d%02d-%02d%02d%02d-%s.tar.gz", $year + 1900, $mon + 1, $mday, $hour, $min, $sec, get_probe_name());
 }
 
 ################################################################################
@@ -690,10 +748,10 @@ sub traceroute($$)
 	foreach my $task (@tasks)
 	{
 		# wait until it's time to process the task
-		my $sleep_duration = $task->{'time'} - time();
+		my $sleep_duration = $task->{'time'} - Time::HiRes::time();
 		if ($sleep_duration > 0)
 		{
-			sleep($sleep_duration);
+			Time::HiRes::sleep($sleep_duration);
 		}
 
 		# reap failed workers, if any, and call "on finish" callbacks
@@ -725,11 +783,11 @@ sub create_tasks($)
 	@ip_list = shuffle(@ip_list);
 
 	my $seconds = get_config('time_limits', 'script')		# max execution time
-	            - (time() - $^T)					# time spent on initialization, resolving hostnames etc
+	            - (Time::HiRes::time() - $^T)			# time spent on initialization, resolving hostnames etc
 	            - get_config('time_limits', 'mtr_kill')		# time reserved for timeouts
 	            - get_config('time_limits', 'output_handling');	# time reserved for output handling (compressing etc)
 
-	my $now = time();
+	my $now = Time::HiRes::time();
 
 	my @tasks = ();
 
@@ -821,7 +879,6 @@ sub do_work($)
 
 	local $ENV{'MTR_OPTIONS'} = get_config('mtr', 'options');
 
-	my $work_dir = get_config('paths', 'work_dir');
 	my $select = IO::Select->new($socket);
 
 	while (1)
@@ -850,10 +907,15 @@ sub do_work($)
 		}
 
 		dbg("starting mtr for '%s'", $ip);
-		my $start = time();
+		my $start = Time::HiRes::time();
 
+		my $work_dir    = get_cycle_work_dir();
+		my $probe_name  = get_probe_name();
+		my $cycle_ts    = get_cycle_timestamp();
+		my $current_ts  = get_current_timestamp();
+
+		my $output_file = sprintf("%s/%s-%s-%s-%s.json", $work_dir, $probe_name, $ip, $cycle_ts, $current_ts);
 		my $mtr_error = undef;
-		my $output_file = "$work_dir/mtr-$ip.json";
 
 		if (!execute("$timeout mtr '$ip' > '$output_file'"))
 		{
@@ -872,7 +934,7 @@ sub do_work($)
 			unlink($output_file);
 		}
 
-		my $end = time();
+		my $end = Time::HiRes::time();
 		my $duration = $end - $start;
 		dbg("finished mtr for '%s' in %.3f seconds", $ip, $duration);
 	}
