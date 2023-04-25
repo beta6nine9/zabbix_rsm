@@ -11,6 +11,7 @@ use Devel::StackTrace;
 use Fcntl qw(:flock SEEK_END);
 use File::Path qw(rmtree);
 use Getopt::Long qw(GetOptionsFromArray);
+use IO::Compress::Gzip qw(gzip $GzipError);
 use IO::Select;
 use JSON::XS;
 use List::Util qw(shuffle);
@@ -60,8 +61,6 @@ sub main()
 	my $ipv4 = $proxy_data{'ipv4'};
 	my $ipv6 = $proxy_data{'ipv6'};
 
-	$ipv6 = 0;
-
 	$time_end = Time::HiRes::time();
 	info("finished reading data from proxy database in %.3fs", $time_end - $time_start);
 
@@ -78,9 +77,9 @@ sub main()
 
 	# write configuration to JSON files
 
-	write_file(get_cycle_work_dir() . '/config-proxy.json'  , format_json(\%proxy_data));
-	write_file(get_cycle_work_dir() . '/config-rsmhost.json', format_json(\%rsmhost_data));
-	write_file(get_cycle_work_dir() . '/resolved-hosts.json', format_json(\%resolved_hosts));
+	write_gz_file(get_cycle_work_dir() . '/config-proxy.json.gz'  , format_json(\%proxy_data));
+	write_gz_file(get_cycle_work_dir() . '/config-rsmhost.json.gz', format_json(\%rsmhost_data));
+	write_gz_file(get_cycle_work_dir() . '/resolved-hosts.json.gz', format_json(\%resolved_hosts));
 
 	# preform tracerouting
 
@@ -95,9 +94,9 @@ sub main()
 	$time_end = Time::HiRes::time();
 	info("finished doing traceroutes in %.3fs", $time_end - $time_start);
 
-	# compress output
+	# create tarball
 
-	info("compressing outputs...");
+	info("creating tarball...");
 	$time_start = Time::HiRes::time();
 
 	my $cycle_work_dir  = get_cycle_work_dir();
@@ -105,7 +104,7 @@ sub main()
 	my $output_file     = get_config('paths', 'output_dir') . '/' . get_output_filename();
 	my $verbose         = opt('debug') ? '-v' : '';
 
-	if (!execute("ls -1 '$cycle_work_dir' | tar $verbose -C '$cycle_work_dir' --remove-files -cf '$output_file_tmp' -T - -z"))
+	if (!execute("ls -1 '$cycle_work_dir' | tar $verbose -C '$cycle_work_dir' --remove-files -cf '$output_file_tmp' -T -"))
 	{
 		fail("failed to compress output files");
 	}
@@ -121,7 +120,7 @@ sub main()
 	}
 
 	$time_end = Time::HiRes::time();
-	info("finished compressing outputs in %.3fs", $time_end - $time_start);
+	info("finished creating tarball in %.3fs", $time_end - $time_start);
 }
 
 sub initialize()
@@ -261,16 +260,14 @@ sub format_json($)
 	return $json_xs->encode($data);
 }
 
-sub write_file($$)
+sub write_gz_file($$)
 {
 	my $filename = shift;
-	my $text     = shift;
+	my $contents = shift;
 
-	my $fh;
-
-	open($fh, '>', $filename) or fail("cannot open file '$filename': $!");
-	print({$fh} $text)        or fail("cannot write to '$filename': $!");
-	close($fh)                or fail("cannot close file '$filename': $!");
+	my $gz = IO::Compress::Gzip->new($filename) or fail("IO::Compress::Gzip failed: $GzipError");
+	$gz->write($contents);
+	$gz->close();
 }
 
 sub get_rdap_rdds_hosts($$)
@@ -444,7 +441,7 @@ sub get_current_timestamp()
 sub get_output_filename()
 {
 	my ($sec, $min, $hour, $mday, $mon, $year) = localtime(get_cycle_timestamp());
-	return sprintf("%04d%02d%02d-%02d%02d%02d-%s.tar.gz", $year + 1900, $mon + 1, $mday, $hour, $min, $sec, get_probe_name());
+	return sprintf("%04d%02d%02d-%02d%02d%02d-%s.tar", $year + 1900, $mon + 1, $mday, $hour, $min, $sec, get_probe_name());
 }
 
 ################################################################################
@@ -909,16 +906,17 @@ sub do_work($)
 		my $cycle_ts    = get_cycle_timestamp();
 		my $current_ts  = get_current_timestamp();
 
-		my $output_file = sprintf("%s/%s-%s-%s-%s.json", $work_dir, $probe_name, $ip, $cycle_ts, $current_ts);
+		my $output_filename = sprintf("%s-%s-%s-%s.json.gz", $probe_name, $ip, $cycle_ts, $current_ts);
+		my $output_file = $work_dir . '/' . $output_filename;
 		my $mtr_error = undef;
 
-		if (!execute("$timeout mtr '$ip' > '$output_file'"))
+		if (!execute("$timeout mtr '$ip' | gzip > '$output_file'"))
 		{
 			$mtr_error = "executing mtr failed";
 		}
-		elsif (-z $output_file)
+		elsif (-s $output_file < 32)
 		{
-			$mtr_error = "mtr generated empty report";
+			$mtr_error = "looks like mtr generated empty report";
 		}
 
 		if (defined($mtr_error))
