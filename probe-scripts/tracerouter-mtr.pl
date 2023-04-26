@@ -77,9 +77,9 @@ sub main()
 
 	# write configuration to JSON files
 
-	write_gz_file(get_cycle_work_dir() . '/config-proxy.json.gz'  , format_json(\%proxy_data));
-	write_gz_file(get_cycle_work_dir() . '/config-rsmhost.json.gz', format_json(\%rsmhost_data));
-	write_gz_file(get_cycle_work_dir() . '/resolved-hosts.json.gz', format_json(\%resolved_hosts));
+	write_gz_file(get_json_file_path('proxy', 0), format_json(\%proxy_data));
+	write_gz_file(get_json_file_path('rsmhosts', 0), format_json(\%rsmhost_data));
+	write_gz_file(get_json_file_path('resolved_hosts', 0), format_json(\%resolved_hosts));
 
 	# preform tracerouting
 
@@ -99,10 +99,19 @@ sub main()
 	info("creating tarball...");
 	$time_start = Time::HiRes::time();
 
-	my $cycle_work_dir  = get_cycle_work_dir();
-	my $output_file_tmp = get_base_work_dir() . '/' . get_output_filename();
-	my $output_file     = get_config('paths', 'output_dir') . '/' . get_output_filename();
+	my $cycle_work_dir  = get_cycle_work_dir();                            # directory with measurement files
+	my $output_file_tmp = get_base_work_dir() . '/' . get_tar_file_name(); # where to create an archive
+	my $output_file     = get_output_dir() . '/' . get_tar_file_name();    # where to move an archive after creating it
 	my $verbose         = opt('debug') ? '-v' : '';
+
+	if (-f $output_file_tmp)
+	{
+		fail("file already exists: $output_file_tmp");
+	}
+	if (-f $output_file)
+	{
+		fail("file already exists: $output_file");
+	}
 
 	if (!execute("ls -1 '$cycle_work_dir' | tar $verbose -C '$cycle_work_dir' --remove-files -cf '$output_file_tmp' -T -"))
 	{
@@ -428,6 +437,33 @@ sub get_cycle_work_dir()
 	return sprintf("%s/%04d%02d%02d-%02d%02d%02d-%s", get_base_work_dir(), $year + 1900, $mon + 1, $mday, $hour, $min, $sec, get_probe_name());
 }
 
+sub get_output_dir()
+{
+	return get_config('paths', 'output_dir');
+}
+
+sub get_json_file_path($$)
+{
+	my $name                      = shift; # IP address or name of config/mapping/something
+	my $include_current_timestamp = shift;
+
+	my $path = get_cycle_work_dir() . '/';
+	$path .= get_probe_name();
+	$path .= '-' . $name;
+	$path .= '-' . get_cycle_timestamp();
+	$path .= '-' . get_current_timestamp() if ($include_current_timestamp);
+	$path .= '.json';
+	$path .= '.gz';
+
+	return $path;
+}
+
+sub get_tar_file_name()
+{
+	my ($sec, $min, $hour, $mday, $mon, $year) = localtime(get_cycle_timestamp());
+	return sprintf("%04d%02d%02d-%02d%02d%02d-%s.tar", $year + 1900, $mon + 1, $mday, $hour, $min, $sec, get_probe_name());
+}
+
 sub get_cycle_timestamp()
 {
 	return $^T - ($^T % 60);
@@ -436,12 +472,6 @@ sub get_cycle_timestamp()
 sub get_current_timestamp()
 {
 	return time();
-}
-
-sub get_output_filename()
-{
-	my ($sec, $min, $hour, $mday, $mon, $year) = localtime(get_cycle_timestamp());
-	return sprintf("%04d%02d%02d-%02d%02d%02d-%s.tar", $year + 1900, $mon + 1, $mday, $hour, $min, $sec, get_probe_name());
 }
 
 ################################################################################
@@ -901,13 +931,7 @@ sub do_work($)
 		dbg("starting mtr for '%s'", $ip);
 		my $start = Time::HiRes::time();
 
-		my $work_dir    = get_cycle_work_dir();
-		my $probe_name  = get_probe_name();
-		my $cycle_ts    = get_cycle_timestamp();
-		my $current_ts  = get_current_timestamp();
-
-		my $output_filename = sprintf("%s-%s-%s-%s.json.gz", $probe_name, $ip, $cycle_ts, $current_ts);
-		my $output_file = $work_dir . '/' . $output_filename;
+		my $output_file = get_json_file_path($ip, 1);
 		my $mtr_error = undef;
 
 		if (!execute("$timeout mtr '$ip' | gzip > '$output_file'"))
