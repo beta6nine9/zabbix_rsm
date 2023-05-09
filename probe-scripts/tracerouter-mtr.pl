@@ -50,16 +50,16 @@ sub main()
 
 	my $monitoring_target = get_monitoring_target();
 	my $proxy_name = get_proxy_name();
-	my %proxy_data = get_proxy_data($proxy_name);
-	my %rsmhost_data = get_rsmhost_data($monitoring_target);
+	my %proxy_config = get_proxy_config($proxy_name);
+	my %rsmhosts_config = get_rsmhosts_config($monitoring_target);
 
 	db_disconnect();
 
 	set_probe_name($proxy_name);
 	initialize_work_dir();
 
-	my $ipv4 = $proxy_data{'ipv4'};
-	my $ipv6 = $proxy_data{'ipv6'};
+	my $ipv4 = $proxy_config{'ipv4'};
+	my $ipv6 = $proxy_config{'ipv6'};
 
 	$time_end = Time::HiRes::time();
 	info("finished reading data from proxy database in %.3fs", $time_end - $time_start);
@@ -69,7 +69,7 @@ sub main()
 	info("resolving hostnames...");
 	$time_start = Time::HiRes::time();
 
-	my %hosts_to_resolve = get_rdap_rdds_hosts(\%proxy_data, \%rsmhost_data);
+	my %hosts_to_resolve = get_rdap_rdds_hosts(\%proxy_config, \%rsmhosts_config);
 	my %resolved_hosts = resolve_hosts(\%hosts_to_resolve, $ipv4, $ipv6);
 
 	$time_end = Time::HiRes::time();
@@ -77,8 +77,8 @@ sub main()
 
 	# write configuration to JSON files
 
-	write_gz_file(get_json_file_path('proxy', 0), format_json(\%proxy_data));
-	write_gz_file(get_json_file_path('rsmhosts', 0), format_json(\%rsmhost_data));
+	write_gz_file(get_json_file_path('proxy', 0), format_json(\%proxy_config));
+	write_gz_file(get_json_file_path('rsmhosts', 0), format_json(\%rsmhosts_config));
 	write_gz_file(get_json_file_path('resolved_hosts', 0), format_json(\%resolved_hosts));
 
 	# preform tracerouting
@@ -86,8 +86,8 @@ sub main()
 	info("doing traceroutes...");
 	$time_start = Time::HiRes::time();
 
-	my %ip_rsmhost_mapping = create_ip_rsmhost_mapping(\%rsmhost_data, \%hosts_to_resolve, \%resolved_hosts, $ipv4, $ipv6);
-	my @ip_list = create_ip_list(\%rsmhost_data, \%resolved_hosts, $ipv4, $ipv6);
+	my %ip_rsmhost_mapping = create_ip_rsmhost_mapping(\%rsmhosts_config, \%hosts_to_resolve, \%resolved_hosts, $ipv4, $ipv6);
+	my @ip_list = create_ip_list(\%rsmhosts_config, \%resolved_hosts, $ipv4, $ipv6);
 
 	traceroute(\@ip_list, \%ip_rsmhost_mapping);
 
@@ -281,24 +281,24 @@ sub write_gz_file($$)
 
 sub get_rdap_rdds_hosts($$)
 {
-	my %proxy_data   = %{+shift};
-	my %rsmhost_data = %{+shift};
+	my %proxy_config    = %{+shift};
+	my %rsmhosts_config = %{+shift};
 
 	my %hosts = ();
 
-	foreach my $rsmhost (keys(%rsmhost_data))
+	foreach my $rsmhost (keys(%rsmhosts_config))
 	{
-		if ($proxy_data{'rdds'} && $rsmhost_data{$rsmhost}{'rdds43'})
+		if ($proxy_config{'rdds'} && $rsmhosts_config{$rsmhost}{'rdds43'})
 		{
-			$hosts{$rsmhost_data{$rsmhost}{'rdds43_server'}}{$rsmhost} = undef;
+			$hosts{$rsmhosts_config{$rsmhost}{'rdds43_server'}}{$rsmhost} = undef;
 		}
-		if ($proxy_data{'rdds'} && $rsmhost_data{$rsmhost}{'rdds80'})
+		if ($proxy_config{'rdds'} && $rsmhosts_config{$rsmhost}{'rdds80'})
 		{
-			$hosts{$rsmhost_data{$rsmhost}{'rdds80_server'}}{$rsmhost} = undef;
+			$hosts{$rsmhosts_config{$rsmhost}{'rdds80_server'}}{$rsmhost} = undef;
 		}
-		if ($proxy_data{'rdap'} && $rsmhost_data{$rsmhost}{'rdap'})
+		if ($proxy_config{'rdap'} && $rsmhosts_config{$rsmhost}{'rdap'})
 		{
-			$hosts{$rsmhost_data{$rsmhost}{'rdap_server'}}{$rsmhost} = undef;
+			$hosts{$rsmhosts_config{$rsmhost}{'rdap_server'}}{$rsmhost} = undef;
 		}
 	}
 
@@ -312,7 +312,7 @@ sub get_rdap_rdds_hosts($$)
 
 sub create_ip_rsmhost_mapping($$$$$)
 {
-	my %rsmhost_data     = %{+shift};
+	my %rsmhosts_config  = %{+shift};
 	my %hosts_to_resolve = %{+shift};
 	my %resolved_hosts   = %{+shift};
 	my $ipv4             = shift;
@@ -320,9 +320,9 @@ sub create_ip_rsmhost_mapping($$$$$)
 
 	my %mapping = ();
 
-	foreach my $rsmhost (keys(%rsmhost_data))
+	foreach my $rsmhost (keys(%rsmhosts_config))
 	{
-		foreach my $nsip (@{$rsmhost_data{$rsmhost}{'nsip_list'}})
+		foreach my $nsip (@{$rsmhosts_config{$rsmhost}{'nsip_list'}})
 		{
 			my $ip = $nsip->[1];
 			my $is_ipv4 = ($ip =~ m/^\d+\.\d+\.\d+\.\d+$/);
@@ -364,14 +364,14 @@ sub create_ip_rsmhost_mapping($$$$$)
 
 sub create_ip_list($$$$)
 {
-	my %rsmhost_data   = %{+shift};
-	my %resolved_hosts = %{+shift};
-	my $ipv4           = shift;
-	my $ipv6           = shift;
+	my %rsmhosts_config = %{+shift};
+	my %resolved_hosts  = %{+shift};
+	my $ipv4            = shift;
+	my $ipv6            = shift;
 
 	my %ip_list = ();
 
-	foreach (values(%rsmhost_data))
+	foreach (values(%rsmhosts_config))
 	{
 		foreach my $nsip (@{$_->{'nsip_list'}})
 		{
@@ -508,7 +508,7 @@ sub get_proxy_name()
 	return db_select_value($query, $params);
 }
 
-sub get_proxy_data($)
+sub get_proxy_config($)
 {
 	my $proxy_name = shift;
 
@@ -548,7 +548,7 @@ sub get_proxy_data($)
 	);
 }
 
-sub get_rsmhost_data($)
+sub get_rsmhosts_config($)
 {
 	my $monitoring_target = shift;
 
