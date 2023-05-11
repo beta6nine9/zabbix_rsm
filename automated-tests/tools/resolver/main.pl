@@ -12,17 +12,12 @@ use constant PORT => 5053;
 my $pid_file   = $ARGV[0];
 my $input_file = $ARGV[1];
 
-die("usage $0 <pid file> <input file>") unless ($pid_file);
-die("usage $0 <pid file> <input file>") unless ($input_file);
-
-if (! -r $input_file)
-{
-	$input_file = "$FindBin::RealBin/../../test-cases/simple-check/$input_file";
-}
-
+die("usage $0 <pid file> <input file>")                                  unless ($pid_file);
+die("usage $0 <pid file> <input file>")                                  unless ($input_file);
 die("usage $0 <pid file> <input file> (invalid input file $input_file)") unless (-r $input_file);
 
 my $config = read_json_file($input_file);
+
 die("\"expected-qname\" must be defined")  unless ($config->{'expected-qname'});
 die("\"expected-qtypes\" must be defined") unless ($config->{'expected-qtypes'});
 die("\"rcode\" must be defined")           unless ($config->{'rcode'});

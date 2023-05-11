@@ -404,14 +404,7 @@ sub __cmd_extract_files($)
 
 	info("extracting archive '$archive'");
 
-	if (!File::Spec->file_name_is_absolute($archive))
-	{
-		my (undef, $test_case_dir, undef) = File::Spec->splitpath($test_case_filename);
-
-		$archive = File::Spec->catfile($test_case_dir, $archive);
-	}
-
-	tar_unpack($archive, $directory);
+	tar_unpack(__normalize_file_path($archive), $directory);
 }
 
 sub __cmd_compare_files($)
@@ -425,12 +418,7 @@ sub __cmd_compare_files($)
 
 	info("comparing directory '%s' with archive '%s'", $directory, basename($archive));
 
-	if (!File::Spec->file_name_is_absolute($archive))
-	{
-		my (undef, $test_case_dir, undef) = File::Spec->splitpath($test_case_filename);
-
-		$archive = File::Spec->catfile($test_case_dir, $archive);
-	}
+	$archive = __normalize_file_path($archive);
 
 	if (!tar_compare($archive, $directory))
 	{
@@ -449,14 +437,7 @@ sub __cmd_compare_file($)
 
 	info("comparing contents of file '%s'", $filename);
 
-	if (!File::Spec->file_name_is_absolute($filename))
-	{
-		my (undef, $test_case_dir, undef) = File::Spec->splitpath($test_case_filename);
-
-		$filename = File::Spec->catfile($test_case_dir, $filename);
-	}
-
-	my $contents = read_file($filename);
+	my $contents = read_file(__normalize_file_path($filename));
 
 	if ($expected_contents ne "" && !str_matches($contents, $expected_contents))
 	{
@@ -1164,23 +1145,13 @@ sub __cmd_rsm_api($)
 	{
 		info("request payload file: '%s'", $request);
 
-		if (!File::Spec->file_name_is_absolute($request))
-		{
-			my (undef, $test_case_dir, undef) = File::Spec->splitpath($test_case_filename);
-
-			$request = File::Spec->catfile($test_case_dir, $request);
-		}
+		$request = __normalize_file_path($request);
 	}
 	if ($response ne '')
 	{
 		info("response payload file: '%s'", $response);
 
-		if (!File::Spec->file_name_is_absolute($response))
-		{
-			my (undef, $test_case_dir, undef) = File::Spec->splitpath($test_case_filename);
-
-			$response = File::Spec->catfile($test_case_dir, $response);
-		}
+		$response = __normalize_file_path($response);
 	}
 
 	my $payload = $request eq '' ? undef : read_file($request);
@@ -1234,7 +1205,7 @@ sub __cmd_start_tool($)
 
 	my ($tool_name, $pid_file, $input_file) = __unpack($args, 3);
 
-	start_tool($tool_name, $pid_file, $input_file);
+	start_tool($tool_name, $pid_file, __normalize_file_path($input_file));
 }
 
 sub __cmd_stop_tool($)
@@ -2131,6 +2102,17 @@ sub __compare_db_row($$$$)
 	}
 
 	fail("internal error") if (scalar(keys(%{$expected_values})) > 0);
+}
+
+sub __normalize_file_path($)
+{
+	my $file = shift;
+
+	return $file if (File::Spec->file_name_is_absolute($file));
+
+	my (undef, $test_case_dir, undef) = File::Spec->splitpath($test_case_filename);
+
+	return File::Spec->catfile($test_case_dir, $file);
 }
 
 ################################################################################
