@@ -7,9 +7,6 @@ use FindBin;
 use lib "$FindBin::RealBin/..";
 use Tools;
 
-use Net::DNS::SEC;
-use Net::DNS::RR::RRSIG;
-
 use constant PORT => 5053;
 
 my $pid_file   = $ARGV[0];
@@ -52,7 +49,10 @@ sub reply_handler
 		}
 	}
 
-	die("unexpected query type: \"$qtype\"") unless ($expected_qtype);
+	if (!$expected_qtype)
+	{
+		die("unexpected query type: \"$qtype\"");
+	}
 
 	my (@answer, @authority, @additional, $optionmask);
 
@@ -69,20 +69,11 @@ sub reply_handler
 		$query->print();
 		inf("------------------------------ </QUERY> ----------------------------------");
 
-		my $keypath = "$FindBin::RealBin/Krsa.example.+010+36026.private";
-		die("cannot find key file \"$keypath\"") unless (-r $keypath);
+		my $dnskeyrr = get_dnskey_rr($config->{'owner'} // $qname);
+		push(@answer, $dnskeyrr);
 
-		my $rr = Net::DNS::RR->new
-		(
-			owner   => $qname,
-			ttl     => 86400,
-			class   => 'IN',
-			type    => 'DNSKEY',
-		);
-
-		push(@answer, $rr);
-
-		push(@answer, Net::DNS::RR::RRSIG->create([$rr], $keypath));
+		my $rrsigrr = get_rrsig_rr($config->{'owner'} // $qname, $dnskeyrr);
+		push(@answer, $rrsigrr);
 
 		# specify EDNS options  { option => value }
 		$optionmask =
@@ -90,31 +81,45 @@ sub reply_handler
 			nsid => 'foo-ns-id',
 		};
 	}
+	elsif ($qtype eq 'DS')
+	{
+		my $dsrr = Net::DNS::RR::DS->create(get_dnskey_rr($config->{'owner'} // $qname));
+
+		push(@answer, $dsrr);
+	}
 	elsif ($qtype eq 'A')
 	{
-		my $rr = Net::DNS::RR->new
-		(
-			owner   => 'example',
-			type    => 'A',
-			address => '127.0.0.1'
-		);
+		my $addrs = $config->{'ipv4-addresses'} // ['127.0.0.1'];
 
-		push(@answer, $rr);
+		foreach (@{$addrs})
+		{
+			push(@answer, Net::DNS::RR->new
+				(
+					owner   => $config->{'owner'} // $qname,
+					type    => $qtype,
+					address => $_
+				)
+			);
+		}
 	}
 	elsif ($qtype eq 'AAAA')
 	{
-		my $rr = Net::DNS::RR->new
-		(
-			owner   => 'example',
-			type    => 'AAAA',
-			address => '::1'
-		);
+		my $addrs = $config->{'ipv6-addresses'} // ['::1'];
 
-		push(@answer, $rr);
+		foreach (@{$addrs})
+		{
+			push(@answer, Net::DNS::RR->new
+				(
+					owner   => $config->{'owner'} // $qname,
+					type    => $qtype,
+					address => $_
+				)
+			);
+		}
 	}
 	else
 	{
-		die("unsupported query type: \"$qtype\"");
+		die("handling query type \"$qtype\" is not implemented");
 	}
 
 	return ($config->{'rcode'}, \@answer, \@authority, \@additional, $config->{'flags'}, $optionmask);

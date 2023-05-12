@@ -4,7 +4,7 @@
 
 [start-tool]
 
-"resolver","/tmp/resolver.pid","000-resolver-example.example-noerror.json"
+"resolver","/tmp/resolver.pid","000-resolver-input-example.example.json"
 "rdap-server","/tmp/rdap-server.pid","312-rdap-server-input.json"
 
 [execute]

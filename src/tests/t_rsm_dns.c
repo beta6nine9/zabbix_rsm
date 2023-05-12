@@ -1,6 +1,7 @@
-#include "../zabbix_server/poller/checks_simple_rsm.c"
 #include "t_rsm_decl.h"
 #include "t_rsm.h"
+
+#include "../zabbix_server/poller/checks_simple_rsm_dns.c"
 
 #define DEFAULT_RES_IP		"127.0.0.1"
 #define DEFAULT_RES_PORT	53
@@ -41,10 +42,10 @@ int	main(int argc, char *argv[])
 	char		*tld = NULL, *ns = NULL, *ns_ip = NULL, proto = RSM_UDP,
 			ipv4_enabled = 0, ipv6_enabled = 0,
 			delete_metadata_file = 0,
-			testedname[ZBX_HOST_BUF_SIZE], dnssec_enabled = 0,
+			testedname[RSM_BUF_SIZE], dnssec_enabled = 0,
 			*json_file = NULL,
-			res_host_buf[ZBX_HOST_BUF_SIZE],
-			nsip_buf[ZBX_HOST_BUF_SIZE],
+			res_host_buf[RSM_BUF_SIZE],
+			nsip_buf[RSM_BUF_SIZE],
 			err_buf[1024],
 			key[8192];
 	const char	*res_ip = DEFAULT_RES_IP,

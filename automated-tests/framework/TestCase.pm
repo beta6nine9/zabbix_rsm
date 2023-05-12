@@ -16,6 +16,7 @@ use File::Basename;
 use File::Copy;
 use File::Path qw(make_path);
 use File::Spec;
+use File::Temp qw(tempfile);
 use Text::CSV_XS qw(csv);
 use Text::Diff;
 
@@ -1902,6 +1903,7 @@ sub __unpack($$;$)
 		return get_config($1, $2) if ($variable =~ /^cfg:([\w\-]+):([\w\-]+)$/);
 		return read_file(File::Spec->catfile(dirname($test_case_filename), $1)) if ($variable =~ /^file:(.+)$/);
 		return str2time($1) if ($variable =~ /^ts:(.+)$/);
+		return __create_temp_file($1) if ($variable =~ /tempfile:(.+)/);
 		return $test_case_variables->{$variable} if (exists($test_case_variables->{$variable}));
 		return $match;
 	};
@@ -1927,6 +1929,15 @@ sub __unpack($$;$)
 	}
 
 	return @values;
+}
+
+sub __create_temp_file($)
+{
+	my $name = shift;
+
+	my (undef, $path) = tempfile('UNLINK' => 1, 'TEMPLATE' => "/tmp/tests-$$-$name.XXXX");
+
+	return $path;
 }
 
 sub __expect($$$)

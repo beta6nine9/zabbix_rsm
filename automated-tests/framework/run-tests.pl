@@ -70,6 +70,8 @@ sub main()
 		unlink(XML_REPORT_FILE) or fail("cannot unlink file '%s': %s", XML_REPORT_FILE, $!);
 	}
 
+	stop_tools();
+
 	if (!opt("skip-build"))
 	{
 		my @directories = (

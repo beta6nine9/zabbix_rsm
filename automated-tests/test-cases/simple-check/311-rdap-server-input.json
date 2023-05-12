@@ -2,5 +2,5 @@
 	"expected-request" : "GET /rdap/domain/example.example HTTP/1.1",
 	"reply-status"     : 200,
 	"reply-headers"    : {},
-	"reply-data"       : "{\"ldhName\" : \"non-example\"}"
+	"reply-body"       : "{\"ldhName\" : \"non-example\"}"
 }

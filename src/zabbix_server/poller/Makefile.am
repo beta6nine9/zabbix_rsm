@@ -33,7 +33,15 @@ libzbxpoller_a_SOURCES = \
 	poller.h
 
 # RSM specifics
-libzbxpoller_a_SOURCES += checks_simple_rsm.c checks_simple_rsm.h
+libzbxpoller_a_SOURCES += \
+	checks_simple_rsm.h \
+	checks_simple_rsm.c \
+	checks_simple_rsm_epp.c \
+	checks_simple_rsm_dns.c \
+	checks_simple_rsm_rdds.c \
+	checks_simple_rsm_rdap.c \
+	checks_simple_rsm_probe.c \
+	checks_simple_rsm_resolver.c
 
 libzbxpoller_server_a_SOURCES = \
 	checks_internal.h \

@@ -1000,8 +1000,8 @@ void	DCset_probe_last_status(char status);
 time_t	DCget_probe_online_since(void);
 char	DCget_probe_last_status(void);
 
-void		zbx_dc_rsm_errors_inc(void);
-zbx_uint64_t	zbx_dc_rsm_errors_get(void);
+void		rsm_dc_errors_inc(void);
+zbx_uint64_t	rsm_dc_errors_get(void);
 
 unsigned char	zbx_dc_set_macro_env(unsigned char env);
 
