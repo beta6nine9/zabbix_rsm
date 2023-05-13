@@ -62,7 +62,8 @@ Supported special variables are:
 * `${cfg:<section>:<property>}` - returns value from framework's configuration file;
 * `${file:<filename>}` - returns contents of the file, `filename` must be relative to the test case file;
 * `${tempfile:<filename>}` - creates temporary file in /tmp and creates its file path; use `set-variable` command to store the filename of the temporary file;
-* `${ts:<datetime>}` - returns unix timestamp for the given datetime, see https://metacpan.org/pod/Date::Parse for supported formats.
+* `${ts:<datetime>}` - returns unix timestamp for the given datetime, see https://metacpan.org/pod/Date::Parse for supported formats;
+* `${test_case_dir}` - returns path to the directory where the current test case is located.
 
 If named variable does not exist, it won't be expanded. If special variable cannot be expanded, the result is undefined (e.g., it can expand to unexpected values or fail the test case).
 

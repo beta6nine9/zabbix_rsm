@@ -1904,6 +1904,7 @@ sub __unpack($$;$)
 		return read_file(File::Spec->catfile(dirname($test_case_filename), $1)) if ($variable =~ /^file:(.+)$/);
 		return str2time($1) if ($variable =~ /^ts:(.+)$/);
 		return __create_temp_file($1) if ($variable =~ /tempfile:(.+)/);
+		return __get_test_case_dir() if ($variable eq 'test_case_dir');
 		return $test_case_variables->{$variable} if (exists($test_case_variables->{$variable}));
 		return $match;
 	};
@@ -1938,6 +1939,13 @@ sub __create_temp_file($)
 	my (undef, $path) = tempfile('UNLINK' => 1, 'TEMPLATE' => "/tmp/tests-$$-$name.XXXX");
 
 	return $path;
+}
+
+sub __get_test_case_dir()
+{
+	my (undef, $test_case_dir, undef) = File::Spec->splitpath($test_case_filename);
+
+	return $test_case_dir;
 }
 
 sub __expect($$$)
