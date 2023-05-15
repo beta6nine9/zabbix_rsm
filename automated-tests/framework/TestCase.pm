@@ -70,6 +70,7 @@ my %command_handlers = (
 );
 
 my $test_case_filename;
+my $test_case_dir;
 my $test_case_name;
 my $test_case_variables;
 
@@ -79,8 +80,11 @@ my $test_case_variables;
 
 sub run_test_case($)
 {
-	# set global variable to make it available in command handlers
+	# set global variables to make them available in command handlers
 	$test_case_filename = shift;
+
+	(undef, $test_case_dir, undef) = File::Spec->splitpath($test_case_filename);
+	$test_case_dir = rtrim($test_case_dir, '/');
 
 	# skip test cases that have "." in front of the filename, but read the name of the test case to include in the report
 	my $skip_test_case = str_starts_with([File::Spec->splitpath($test_case_filename)]->[2], ".");
@@ -1904,7 +1908,7 @@ sub __unpack($$;$)
 		return read_file(File::Spec->catfile(dirname($test_case_filename), $1)) if ($variable =~ /^file:(.+)$/);
 		return str2time($1) if ($variable =~ /^ts:(.+)$/);
 		return __create_temp_file($1) if ($variable =~ /tempfile:(.+)/);
-		return __get_test_case_dir() if ($variable eq 'test_case_dir');
+		return $test_case_dir if ($variable eq 'test_case_dir');
 		return $test_case_variables->{$variable} if (exists($test_case_variables->{$variable}));
 		return $match;
 	};
@@ -1939,13 +1943,6 @@ sub __create_temp_file($)
 	my (undef, $path) = tempfile('UNLINK' => 1, 'TEMPLATE' => "/tmp/tests-$$-$name.XXXX");
 
 	return $path;
-}
-
-sub __get_test_case_dir()
-{
-	my (undef, $test_case_dir, undef) = File::Spec->splitpath($test_case_filename);
-
-	return $test_case_dir;
 }
 
 sub __expect($$$)
