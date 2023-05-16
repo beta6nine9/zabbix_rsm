@@ -916,6 +916,8 @@ sub __cmd_update_ini_file($)
 
 	my ($filename, $section, $property, $value) = __unpack($args, 4);
 
+	info("updating '%s', setting '%s.%s' to '%s'", $filename, $section, $property, $value);
+
 	update_ini_file($filename, $filename, {"$section.$property" => $value});
 }
 
