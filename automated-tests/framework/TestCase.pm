@@ -51,7 +51,7 @@ my %command_handlers = (
 	'execute-ex'              => [\&__cmd_execute_ex             , 1, 1], # datetime,status,expected_stdout,expected_stderr,command[,arg,arg,arg,...]
 	'start-server'            => [\&__cmd_start_server           , 1, 1], # datetime,key=value,key=value,...
 	'stop-server'             => [\&__cmd_stop_server            , 0, 1], # (void)
-	'update-rsm-conf'         => [\&__cmd_update_rsm_conf        , 1, 1], # section,property,value
+	'update-ini-file'         => [\&__cmd_update_ini_file        , 1, 1], # filename,section,property,value
 	'create-incident'         => [\&__cmd_create_incident        , 1, 1], # rsmhost,description,from,till,false_positive
 	'check-incident'          => [\&__cmd_check_incident         , 1, 1], # rsmhost,description,from,till
 	'check-event-count'       => [\&__cmd_check_event_count      , 1, 1], # rsmhost,description,count
@@ -70,6 +70,7 @@ my %command_handlers = (
 );
 
 my $test_case_filename;
+my $test_case_dir;
 my $test_case_name;
 my $test_case_variables;
 
@@ -79,8 +80,11 @@ my $test_case_variables;
 
 sub run_test_case($)
 {
-	# set global variable to make it available in command handlers
+	# set global variables to make them available in command handlers
 	$test_case_filename = shift;
+
+	(undef, $test_case_dir, undef) = File::Spec->splitpath($test_case_filename);
+	$test_case_dir = rtrim($test_case_dir, '/');
 
 	# skip test cases that have "." in front of the filename, but read the name of the test case to include in the report
 	my $skip_test_case = str_starts_with([File::Spec->splitpath($test_case_filename)]->[2], ".");
@@ -888,19 +892,16 @@ sub __cmd_stop_server()
 	zbx_stop_server();
 }
 
-sub __cmd_update_rsm_conf($)
+sub __cmd_update_ini_file($)
 {
 	my $args = shift;
 
-	# [update-rsm-conf]
-	# section,property,value
+	# [update-ini-file]
+	# filename,section,property,value
 
-	my ($section, $property, $value) = __unpack($args, 3);
+	my ($filename, $section, $property, $value) = __unpack($args, 3);
 
-	my $source_dir = get_config('paths', 'source_dir');
-	my $config_file = $source_dir . "/opt/zabbix/scripts/rsm.conf";
-
-	rsm_update_config($config_file, $config_file, {"$section.$property" => $value});
+	update_ini_file($filename, $filename, {"$section.$property" => $value});
 }
 
 sub __cmd_create_incident($)
@@ -1321,10 +1322,10 @@ sub __cmd_check_proxy($)
 
 		my ($interface_type, $useip, $ip, $port) = @{$rows->[0]};
 
-		__expect($interface_type, INTERFACE_TYPE_UNKNOWN       , "unexpected interface type '%d', expected '%d'");
-		__expect($useip         , INTERFACE_USE_IP             , "unexpected value of interface.useip '%d', expected '%d'");
-		__expect($ip            , $expected_ip                 , "unexpected ip '%s', expected '%s'");
-		__expect($port          , $expected_port               , "unexpected port '%d', expected '%d'");
+		__expect($interface_type, INTERFACE_TYPE_UNKNOWN, "unexpected interface type '%d', expected '%d'");
+		__expect($useip         , INTERFACE_USE_IP      , "unexpected value of interface.useip '%d', expected '%d'");
+		__expect($ip            , $expected_ip          , "unexpected ip '%s', expected '%s'");
+		__expect($port          , $expected_port        , "unexpected port '%d', expected '%d'");
 	}
 	else
 	{
@@ -1904,7 +1905,7 @@ sub __unpack($$;$)
 		return read_file(File::Spec->catfile(dirname($test_case_filename), $1)) if ($variable =~ /^file:(.+)$/);
 		return str2time($1) if ($variable =~ /^ts:(.+)$/);
 		return __create_temp_file($1) if ($variable =~ /tempfile:(.+)/);
-		return __get_test_case_dir() if ($variable eq 'test_case_dir');
+		return $test_case_dir if ($variable eq 'test_case_dir');
 		return $test_case_variables->{$variable} if (exists($test_case_variables->{$variable}));
 		return $match;
 	};
@@ -1939,13 +1940,6 @@ sub __create_temp_file($)
 	my (undef, $path) = tempfile('UNLINK' => 1, 'TEMPLATE' => "/tmp/tests-$$-$name.XXXX");
 
 	return $path;
-}
-
-sub __get_test_case_dir()
-{
-	my (undef, $test_case_dir, undef) = File::Spec->splitpath($test_case_filename);
-
-	return $test_case_dir;
 }
 
 sub __expect($$$)
