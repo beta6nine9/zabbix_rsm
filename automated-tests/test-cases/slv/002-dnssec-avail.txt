@@ -47,9 +47,9 @@
 
 "Template Rsmhost Config tld1","{$RSM.TLD.CONFIG.TIMES}",1617235230
 
-[update-rsm-conf]
+[update-ini-file]
 
-"slv","reconfig_duration",10
+"/opt/zabbix/scripts/rsm.conf","slv","reconfig_duration",10
 
 [fill-history]
 

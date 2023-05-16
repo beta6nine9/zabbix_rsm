@@ -253,11 +253,11 @@ Arguments `key=value` are optional key-value pairs to be updated in `zabbix_serv
 
 Stops Zabbix server.
 
-### update-rsm-conf
+### update-ini-file
 
-*section,property,value*
+*filename,section,property,value*
 
-Updates configuration value in `rsm.conf`.
+Updates configuration value in the INI file.
 
 ### create-incident
 

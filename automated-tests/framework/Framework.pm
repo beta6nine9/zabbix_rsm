@@ -22,7 +22,7 @@ our @EXPORT = qw(
 	zbx_get_server_pid
 	zbx_start_server
 	zbx_stop_server
-	rsm_update_config
+	update_ini_file
 	tar_unpack
 	tar_compare
 	str_starts_with
@@ -325,7 +325,7 @@ sub zbx_build($$$)
 		);
 	}
 
-	rsm_update_config(
+	update_ini_file(
 		$source_dir . "/opt/zabbix/scripts/rsm.conf.example",
 		$source_dir . "/opt/zabbix/scripts/rsm.conf.default",
 		{
@@ -583,7 +583,7 @@ sub zbx_stop_server()
 	}
 }
 
-sub rsm_update_config($$$)
+sub update_ini_file($$$)
 {
 	my $template_filename = shift;
 	my $config_filename   = shift;

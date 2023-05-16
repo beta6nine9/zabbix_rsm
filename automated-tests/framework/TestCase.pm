@@ -51,7 +51,7 @@ my %command_handlers = (
 	'execute-ex'              => [\&__cmd_execute_ex             , 1, 1], # datetime,status,expected_stdout,expected_stderr,command[,arg,arg,arg,...]
 	'start-server'            => [\&__cmd_start_server           , 1, 1], # datetime,key=value,key=value,...
 	'stop-server'             => [\&__cmd_stop_server            , 0, 1], # (void)
-	'update-rsm-conf'         => [\&__cmd_update_rsm_conf        , 1, 1], # section,property,value
+	'update-ini-file'         => [\&__cmd_update_ini_file        , 1, 1], # filename,section,property,value
 	'create-incident'         => [\&__cmd_create_incident        , 1, 1], # rsmhost,description,from,till,false_positive
 	'check-incident'          => [\&__cmd_check_incident         , 1, 1], # rsmhost,description,from,till
 	'check-event-count'       => [\&__cmd_check_event_count      , 1, 1], # rsmhost,description,count
@@ -892,19 +892,16 @@ sub __cmd_stop_server()
 	zbx_stop_server();
 }
 
-sub __cmd_update_rsm_conf($)
+sub __cmd_update_ini_file($)
 {
 	my $args = shift;
 
-	# [update-rsm-conf]
-	# section,property,value
+	# [update-ini-file]
+	# filename,section,property,value
 
-	my ($section, $property, $value) = __unpack($args, 3);
+	my ($filename, $section, $property, $value) = __unpack($args, 3);
 
-	my $source_dir = get_config('paths', 'source_dir');
-	my $config_file = $source_dir . "/opt/zabbix/scripts/rsm.conf";
-
-	rsm_update_config($config_file, $config_file, {"$section.$property" => $value});
+	update_ini_file($filename, $filename, {"$section.$property" => $value});
 }
 
 sub __cmd_create_incident($)
@@ -1325,10 +1322,10 @@ sub __cmd_check_proxy($)
 
 		my ($interface_type, $useip, $ip, $port) = @{$rows->[0]};
 
-		__expect($interface_type, INTERFACE_TYPE_UNKNOWN       , "unexpected interface type '%d', expected '%d'");
-		__expect($useip         , INTERFACE_USE_IP             , "unexpected value of interface.useip '%d', expected '%d'");
-		__expect($ip            , $expected_ip                 , "unexpected ip '%s', expected '%s'");
-		__expect($port          , $expected_port               , "unexpected port '%d', expected '%d'");
+		__expect($interface_type, INTERFACE_TYPE_UNKNOWN, "unexpected interface type '%d', expected '%d'");
+		__expect($useip         , INTERFACE_USE_IP      , "unexpected value of interface.useip '%d', expected '%d'");
+		__expect($ip            , $expected_ip          , "unexpected ip '%s', expected '%s'");
+		__expect($port          , $expected_port        , "unexpected port '%d', expected '%d'");
 	}
 	else
 	{
