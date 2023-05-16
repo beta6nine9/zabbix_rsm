@@ -38,6 +38,7 @@ my %command_handlers = (
 	'extract-files'           => [\&__cmd_extract_files          , 1, 1], # directory,archive
 	'compare-files'           => [\&__cmd_compare_files          , 1, 1], # directory,archive
 	'compare-file'            => [\&__cmd_compare_file           , 1, 1], # filename,contents
+	'copy-file'               => [\&__cmd_copy_file              , 1, 1], # source,destination
 	'prepare-server-database' => [\&__cmd_prepare_server_database, 0, 1], # (void)
 	'execute-sql-query'       => [\&__cmd_execute_sql_query      , 1, 1], # query,param,param,param,...
 	'compare-sql-query'       => [\&__cmd_compare_sql_query      , 1, 1], # query,value,value,value,...
@@ -463,6 +464,20 @@ sub __cmd_compare_file($)
 		print(diff(\$expected_contents, \$contents), "\n");
 		fail("file contents don't match expected pattern")
 	}
+}
+
+sub __cmd_copy_file($)
+{
+	my $args = shift;
+
+	# [copy-file]
+	# source,destination
+
+	my ($src, $dst) = __unpack($args, 2);
+
+	info("copying file '%s' to '%s'", $src, $dst);
+
+	copy($src, $dst) or fail("cannot copy file: %s", $!);
 }
 
 sub __cmd_prepare_server_database()
@@ -899,7 +914,7 @@ sub __cmd_update_ini_file($)
 	# [update-ini-file]
 	# filename,section,property,value
 
-	my ($filename, $section, $property, $value) = __unpack($args, 3);
+	my ($filename, $section, $property, $value) = __unpack($args, 4);
 
 	update_ini_file($filename, $filename, {"$section.$property" => $value});
 }

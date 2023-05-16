@@ -613,7 +613,11 @@ sub update_ini_file($$$)
 		my ($section, $property) = split(/\./, $key);
 		my $value = $changes->{$key};
 
-		${$config_refs{$section}{$property}} = "$property = $value";
+		# uncomment property
+		${$config_refs{$section}{$property}} = ltrim(${$config_refs{$section}{$property}}, ';');
+
+		# replace value and maintain space character - if there's space before '=', put it also after '='
+		${$config_refs{$section}{$property}} =~ s/( ?)=.*$/\1=\1$value/;
 	}
 
 	write_file($config_filename, join("\n", @config_text) . "\n");
