@@ -808,7 +808,12 @@ sub __cmd_execute($)
 
 		if (scalar(@command) == 1)
 		{
-			execute("faketime -f '\@$datetime' $command[0]");
+			my $command = $command[0];
+
+			# when $command starts with setting environment variables, put them before "faketime"
+			$command =~ s/^((?:\w+=[^ ]* )*)(.*)$/$1faketime -f '\@$datetime' $2/;
+
+			execute($command);
 		}
 		else
 		{
@@ -846,7 +851,12 @@ sub __cmd_execute_ex($)
 
 		if (scalar(@command) == 1)
 		{
-			($exit_status, $stdout, $stderr) = execute_ex("faketime -f '\@$datetime' $command[0]");
+			my $command = $command[0];
+
+			# when $command starts with setting environment variables, put them before "faketime"
+			$command =~ s/^((?:\w+=[^ ]* )*)(.*)$/$1faketime -f '\@$datetime' $2/;
+
+			($exit_status, $stdout, $stderr) = execute_ex($command);
 		}
 		else
 		{
@@ -915,6 +925,8 @@ sub __cmd_update_ini_file($)
 	# filename,section,property,value
 
 	my ($filename, $section, $property, $value) = __unpack($args, 4);
+
+	info("updating '%s', setting '%s.%s' to '%s'", $filename, $section, $property, $value);
 
 	update_ini_file($filename, $filename, {"$section.$property" => $value});
 }
