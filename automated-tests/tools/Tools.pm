@@ -8,6 +8,10 @@ use lib "$FindBin::RealBin/../lib/perl";
 
 use Net::DNS::NameserverCustom;
 
+use Net::DNS::ZoneFile;
+use Net::DNS::SEC;
+use Net::DNS::RR::RRSIG;
+
 use IO::Socket::INET;
 use threads;
 
@@ -17,6 +21,8 @@ our @EXPORT = qw(
 	write_file
 	start_dns_server
 	start_tcp_server
+	get_dnskey_rr
+	get_rrsig_rr
 	inf
 	err
 );
@@ -95,7 +101,7 @@ sub start_dns_server($$$$$$)
 
 	my $ns = Net::DNS::NameserverCustom->new(%opts) || die("cannot create nameserver object\n");
 
-	inf("started");
+	inf("started on port $port");
 
 	$ns->main_loop();
 }
@@ -148,6 +154,34 @@ sub start_tcp_server($$$$)
 	}
 
 	$socket->close();
+}
+
+# we have 2 keyid's 58672 and 19937 in this directory, use the first one as default
+use constant KEYID	=> 58672;
+
+sub get_dnskey_rr($;$)
+{
+	my $owner = shift;
+	my $keyid = shift // KEYID;
+
+	my $keypath = "$FindBin::RealBin/../K$owner.+013+$keyid.key";
+
+	my $zonefile = Net::DNS::ZoneFile->new($keypath);
+
+	my @dnskey_rrs = $zonefile->read;
+
+	return $dnskey_rrs[0];
+}
+
+sub get_rrsig_rr($$;$)
+{
+	my $owner = shift;
+	my $dnskeyrr = shift;
+	my $keyid = shift // KEYID;
+
+	my $keypath = "$FindBin::RealBin/../K$owner.+013+$keyid.private";
+
+	return Net::DNS::RR::RRSIG->create([$dnskeyrr], $keypath);
 }
 
 sub inf(@)

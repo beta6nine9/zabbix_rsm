@@ -1,0 +1,33 @@
+\d+:\d{8}:\d{6}\.\d{3} Info: >>> START TEST <<<
+\d+:\d{8}:\d{6}\.\d{3} Info: probe_RDAP:ENABLED, RDAP:ENABLED, IPv4:ENABLED, IPv6:DISABLED, base_url:http:\/\/example.example:4380\/rdap, testedname:example.example, rtt_limit:10000, maxredirs:10
+\d+:\d{8}:\d{6}\.\d{3} Info: making DNS query to 127.0.0.1:5053 to resolve a host to IPv4 addresses
+.*
+\d+:\d{8}:\d{6}\.\d{3} Info: the following URL was generated for the test: http:\/\/127.0.0.1:4380\/rdap\/domain\/example.example
+\d+:\d{8}:\d{6}\.\d{3} Info: Request headers:
+GET \/rdap\/domain\/example.example HTTP\/1.1[\r\n]*
+Host: example.example[\r\n]*
+User-Agent: Zabbix \d+\.\d+\.\d+[\r\n]*
+Accept: \*\/\*[\r\n]*
+[\r\n]*
+\d+:\d{8}:\d{6}\.\d{3} Info: Transfer details:
+  content_type=text\/html; charset=UTF-8
+  http_code=200
+  local_ip=127.0.0.1
+  local_port=\d+
+  num_redirects=0
+  remote_ip=127.0.0.1
+  remote_port=4380
+  size_download=\d+
+  size_header=\d+
+  time_appconnect=\d+\.\d+
+  time_connect=\d+\.\d+
+  time_namelookup=\d+\.\d+
+  time_pretransfer=\d+\.\d+
+  time_redirect=\d+\.\d+
+  time_starttransfer=\d+\.\d+
+  time_total=\d+\.\d+
+  url_effective=http:\/\/127.0.0.1:4380\/rdap\/domain\/example.example
+Body:
+\{"ldhName" : "example.example"}
+\d+:\d{8}:\d{6}\.\d{3} Info: Test result: \{"ip":"127.0.0.1","rtt":\d+,"target":"http:\/\/example.example:4380\/rdap","testedname":"example.example","status":1}
+\d+:\d{8}:\d{6}\.\d{3} Info: >>> END TEST <<<

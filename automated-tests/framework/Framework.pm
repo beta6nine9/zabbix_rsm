@@ -32,6 +32,7 @@ our @EXPORT = qw(
 	format_table
 	start_tool
 	stop_tool
+	stop_tools
 );
 
 use Archive::Tar;
@@ -928,6 +929,11 @@ sub stop_tool($$)
 	}
 
 	unlink($pid_file);
+}
+
+sub stop_tools()
+{
+	execute(dirname(__FILE__) . "/@{[TOOLS_DIR]}/stop-tools.sh");
 }
 
 sub __get_pid($)

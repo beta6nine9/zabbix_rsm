@@ -744,7 +744,7 @@ abstract class ActionBase extends CController
 
 		if (is_null($result))
 		{
-			throw new RsmException(500, 'General error', 'Could not find server id');
+			throw new RsmException(500, 'General error', 'Could not determine server section in configuration file zabbix.conf.php');
 		}
 
 		return $result;

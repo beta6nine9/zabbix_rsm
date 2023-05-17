@@ -11741,7 +11741,7 @@ char	DCget_probe_last_status(void)
 	return status;
 }
 
-void	zbx_dc_rsm_errors_inc(void)
+void	rsm_dc_errors_inc(void)
 {
 	WRLOCK_CACHE;
 
@@ -11750,7 +11750,7 @@ void	zbx_dc_rsm_errors_inc(void)
 	UNLOCK_CACHE;
 }
 
-zbx_uint64_t	zbx_dc_rsm_errors_get(void)
+zbx_uint64_t	rsm_dc_errors_get(void)
 {
 	zbx_uint64_t	errors;
 

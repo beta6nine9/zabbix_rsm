@@ -52,7 +52,7 @@ out:
 	return ret;
 }
 
-void	zbx_ssl_get_error(char *err, size_t err_size)
+void	rsm_ssl_get_error(char *err, size_t err_size)
 {
 	const char	*reason;
 	unsigned long	e;
@@ -84,14 +84,14 @@ int	encrypt(const EVP_CIPHER *cipher, unsigned char *plaintext, int plaintext_le
 	/* Initialise the encryption operation. NB! Ensure you use a key and IV size appropriate for your cipher. */
 	if (1 != EVP_EncryptInit_ex(ctx, cipher, NULL, key, iv))
 	{
-		zbx_ssl_get_error(err, err_size);
+		rsm_ssl_get_error(err, err_size);
 		goto out;
 	}
 
 	/* provide the message to be encrypted, and obtain the ecrypted output */
 	if (1 != EVP_EncryptUpdate(ctx, ciphertext, &len, plaintext, plaintext_len))
 	{
-		zbx_ssl_get_error(err, err_size);
+		rsm_ssl_get_error(err, err_size);
 		goto out;
 	}
 
@@ -100,7 +100,7 @@ int	encrypt(const EVP_CIPHER *cipher, unsigned char *plaintext, int plaintext_le
 	/* finalise the encryption, further ciphertext bytes may be written at this stage */
 	if (1 != EVP_EncryptFinal_ex(ctx, ciphertext + len, &len))
 	{
-		zbx_ssl_get_error(err, err_size);
+		rsm_ssl_get_error(err, err_size);
 		goto out;
 	}
 
@@ -130,14 +130,14 @@ static int	decrypt(const EVP_CIPHER *cipher, unsigned char *ciphertext, int ciph
 	/* Initialise the decryption operation. NB! Ensure you use a key and IV size appropriate for your cipher. */
 	if (1 != EVP_DecryptInit_ex(ctx, cipher, NULL, key, iv))
 	{
-		zbx_ssl_get_error(err, err_size);
+		rsm_ssl_get_error(err, err_size);
 		goto out;
 	}
 
 	/* provide the message to be decrypted, and obtain the plaintext output */
 	if (1 != EVP_DecryptUpdate(ctx, plaintext, &len, ciphertext, ciphertext_len))
 	{
-		zbx_ssl_get_error(err, err_size);
+		rsm_ssl_get_error(err, err_size);
 		goto out;
 	}
 
@@ -146,7 +146,7 @@ static int	decrypt(const EVP_CIPHER *cipher, unsigned char *ciphertext, int ciph
 	/* finalise the encryption, further plaintext bytes may be written at this stage */
 	if (1 != EVP_DecryptFinal_ex(ctx, plaintext + len, &len))
 	{
-		zbx_ssl_get_error(err, err_size);
+		rsm_ssl_get_error(err, err_size);
 		goto out;
 	}
 

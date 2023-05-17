@@ -1,6 +1,7 @@
-#include "../zabbix_server/poller/checks_simple_rsm.c"
 #include "t_rsm_decl.h"
 #include "t_rsm.h"
+
+#include "../zabbix_server/poller/checks_simple_rsm_rdap.c"
 
 #define DEFAULT_RES_PORT	53
 #define DEFAULT_MAXREDIRS	10
@@ -33,7 +34,7 @@ int	main(int argc, char *argv[])
 	char		*testedname = NULL, *base_url = NULL, *res_ip = NULL,
 			ipv4_enabled = 0, ipv6_enabled = 0, *json_file = NULL,
 			key[8192],
-			res_host_buf[ZBX_HOST_BUF_SIZE];
+			res_host_buf[RSM_BUF_SIZE];
 	AGENT_REQUEST	request;
 	AGENT_RESULT	result;
 
