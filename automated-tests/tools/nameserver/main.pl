@@ -12,15 +12,9 @@ use constant PORT => 5054;
 my $pid_file   = $ARGV[0];
 my $input_file = $ARGV[1];
 
-die("usage $0 <pid file> <input file> (no pid file)") unless ($pid_file);
+die("usage $0 <pid file> <input file> (no pid file)")                             unless ($pid_file);
 die("usage $0 <pid file> <input file> (no input file), args: ", join(',', @ARGV)) unless ($input_file);
-
-if (! -r $input_file)
-{
-	$input_file = "$FindBin::RealBin/../../test-cases/simple-check/$input_file";
-}
-
-die("usage $0 <pid file> <input file> (invalid input file $input_file)") unless (-r $input_file);
+die("usage $0 <pid file> <input file> (invalid input file $input_file)")          unless (-r $input_file);
 
 my $config = read_json_file($input_file);
 
