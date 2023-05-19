@@ -2108,11 +2108,12 @@ sub __normalize_file_path($)
 {
 	my $file = shift;
 
-	return $file if (File::Spec->file_name_is_absolute($file));
+	if (!File::Spec->file_name_is_absolute($file))
+	{
+		$file = File::Spec->catfile($test_case_dir, $file);
+	}
 
-	my (undef, $test_case_dir, undef) = File::Spec->splitpath($test_case_filename);
-
-	return File::Spec->catfile($test_case_dir, $file);
+	return $file;
 }
 
 ################################################################################
