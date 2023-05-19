@@ -1,6 +1,7 @@
 {
-	"expected-qname"  : "example.example",
-	"expected-qtypes" : ["A", "AAAA"],
-	"rcode"           : "NXDOMAIN",
-	"flags"           : {}
+	"example.example": {
+		"expected-qtypes" : ["A", "AAAA"],
+		"rcode"           : "NXDOMAIN",
+		"flags"           : {}
+	}
 }

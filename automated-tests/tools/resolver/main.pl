@@ -18,24 +18,32 @@ die("usage $0 <pid file> <input file> (invalid input file $input_file)") unless 
 
 my $config = read_json_file($input_file);
 
-die("\"expected-qname\" must be defined")  unless ($config->{'expected-qname'});
-die("\"expected-qtypes\" must be defined") unless ($config->{'expected-qtypes'});
-die("\"rcode\" must be defined")           unless ($config->{'rcode'});
-die("\"flags\" must be defined")           unless ($config->{'flags'});
-die("\"flags\" must be a hash")            unless (ref($config->{'flags'}) eq 'HASH');
+die("config must be a hash") unless (ref($config) eq 'HASH');
+
+foreach my $qname (keys(%{$config}))
+{
+	die("config{\"$qname\"} must be a hash")                       unless (ref($config->{$qname}) eq 'HASH');
+	die("config{\"$qname\"}{\"expected-qtypes\"} must be defined") unless ($config->{$qname}{'expected-qtypes'});
+	die("config{\"$qname\"}{\"rcode\"} must be defined")           unless ($config->{$qname}{'rcode'});
+	die("config{\"$qname\"}{\"flags\"} must be defined")           unless ($config->{$qname}{'flags'});
+	die("config{\"$qname\"}{\"flags\"} must be a hash")            unless (ref($config->{$qname}{'flags'}) eq 'HASH');
+}
 
 sub reply_handler
 {
 	# qname  - query name, e. g. ns1.example.com
 	my ($qname, $qclass, $qtype, $peerhost, $query, $conn) = @_;
 
-	if ($qname ne $config->{'expected-qname'})
+	if (!exists($config->{$qname}))
 	{
-		die("unexpected query name \"$qname\", expected \"$config->{'expected-qname'}\"");
+		my $qnames = '"' . join('", "', keys(%{$config})) . '"';
+		die("unexpected query name \"$qname\", expected one of: $qnames");
 	}
 
+	my $query_config = $config->{$qname};
+
 	my $expected_qtype;
-	foreach (@{$config->{'expected-qtypes'}})
+	foreach (@{$query_config->{'expected-qtypes'}})
 	{
 		if ($qtype eq $_)
 		{
@@ -51,9 +59,9 @@ sub reply_handler
 
 	my (@answer, @authority, @additional, $optionmask);
 
-	if ($config->{'sleep'})
+	if ($query_config->{'sleep'})
 	{
-		sleep($config->{'sleep'});
+		sleep($query_config->{'sleep'});
 	}
 
 	if ($qtype eq 'DNSKEY')
@@ -64,10 +72,10 @@ sub reply_handler
 		$query->print();
 		inf("------------------------------ </QUERY> ----------------------------------");
 
-		my $dnskeyrr = get_dnskey_rr($config->{'owner'} // $qname);
+		my $dnskeyrr = get_dnskey_rr($query_config->{'owner'} // $qname);
 		push(@answer, $dnskeyrr);
 
-		my $rrsigrr = get_rrsig_rr($config->{'owner'} // $qname, $dnskeyrr);
+		my $rrsigrr = get_rrsig_rr($query_config->{'owner'} // $qname, $dnskeyrr);
 		push(@answer, $rrsigrr);
 
 		# specify EDNS options  { option => value }
@@ -78,19 +86,19 @@ sub reply_handler
 	}
 	elsif ($qtype eq 'DS')
 	{
-		my $dsrr = Net::DNS::RR::DS->create(get_dnskey_rr($config->{'owner'} // $qname));
+		my $dsrr = Net::DNS::RR::DS->create(get_dnskey_rr($query_config->{'owner'} // $qname));
 
 		push(@answer, $dsrr);
 	}
 	elsif ($qtype eq 'A')
 	{
-		my $addrs = $config->{'ipv4-addresses'} // ['127.0.0.1'];
+		my $addrs = $query_config->{'ipv4-addresses'} // ['127.0.0.1'];
 
 		foreach (@{$addrs})
 		{
 			push(@answer, Net::DNS::RR->new
 				(
-					owner   => $config->{'owner'} // $qname,
+					owner   => $query_config->{'owner'} // $qname,
 					type    => $qtype,
 					address => $_
 				)
@@ -99,13 +107,13 @@ sub reply_handler
 	}
 	elsif ($qtype eq 'AAAA')
 	{
-		my $addrs = $config->{'ipv6-addresses'} // ['::1'];
+		my $addrs = $query_config->{'ipv6-addresses'} // ['::1'];
 
 		foreach (@{$addrs})
 		{
 			push(@answer, Net::DNS::RR->new
 				(
-					owner   => $config->{'owner'} // $qname,
+					owner   => $query_config->{'owner'} // $qname,
 					type    => $qtype,
 					address => $_
 				)
@@ -117,7 +125,7 @@ sub reply_handler
 		die("handling query type \"$qtype\" is not implemented");
 	}
 
-	return ($config->{'rcode'}, \@answer, \@authority, \@additional, $config->{'flags'}, $optionmask);
+	return ($query_config->{'rcode'}, \@answer, \@authority, \@additional, $query_config->{'flags'}, $optionmask);
 }
 
 # name, port, pid_file, verbose, reply_handler, additional options to NameserverCustom

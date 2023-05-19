@@ -1,6 +1,7 @@
 {
-	"expected-qname"  : "example.example",
-	"expected-qtypes" : ["A", "AAAA"],
-	"rcode"           : "NOERROR",
-	"flags"           : {}
+	"example.example": {
+		"expected-qtypes" : ["A", "AAAA"],
+		"rcode"           : "NOERROR",
+		"flags"           : {}
+	}
 }
