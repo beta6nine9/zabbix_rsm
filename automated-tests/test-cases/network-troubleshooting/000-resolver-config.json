@@ -1,0 +1,30 @@
+{
+	"rdds.tld2": {
+		"expected-qtypes" : ["A", "AAAA"],
+		"rcode"           : "NOERROR",
+		"flags"           : {},
+		"ipv4-addresses"  : ["127.0.2.101", "127.0.2.102"],
+		"ipv6-addresses"  : ["0000:0000:0000:0000:0000:0000:0000:0002"]
+	},
+	"rdap.tld4": {
+		"expected-qtypes" : ["A", "AAAA"],
+		"rcode"           : "NOERROR",
+		"flags"           : {},
+		"ipv4-addresses"  : ["127.0.4.101", "127.0.4.102"],
+		"ipv6-addresses"  : ["0000:0000:0000:0000:0000:0000:0000:0004"]
+	},
+	"rdds.tld5": {
+		"expected-qtypes" : ["A", "AAAA"],
+		"rcode"           : "NOERROR",
+		"flags"           : {},
+		"ipv4-addresses"  : ["127.0.5.101"],
+		"ipv6-addresses"  : []
+	},
+	"rdap.tld5": {
+		"expected-qtypes" : ["A", "AAAA"],
+		"rcode"           : "NOERROR",
+		"flags"           : {},
+		"ipv4-addresses"  : ["127.0.5.101"],
+		"ipv6-addresses"  : []
+	}
+}
