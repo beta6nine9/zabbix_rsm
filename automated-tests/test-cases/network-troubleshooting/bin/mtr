@@ -1,18 +1,5 @@
 #!/usr/bin/env bash
 
-SCRIPT_DIR=$(dirname "$0")
-
-if [[ " $@ " = *" 127.0.0.1 "* ]]; then
-	cat "$SCRIPT_DIR/127.0.0.1.json"
-	exit 0
-fi
-if [[ " $@ " = *" 127.0.0.2 "* ]]; then
-	exit 0
-fi
-if [[ " $@ " = *" 127.0.0.3 "* ]]; then
-	exit 1
-fi
-
 echo '{
     "report": {
         "mtr": {
