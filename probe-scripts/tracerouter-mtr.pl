@@ -113,7 +113,7 @@ sub main()
 		fail("file already exists: $output_file");
 	}
 
-	if (!execute("ls -1 '$cycle_work_dir' | tar $verbose -C '$cycle_work_dir' --remove-files -cf '$output_file_tmp' -T -"))
+	if (!execute("ls -1 '$cycle_work_dir' | tar $verbose -C '$cycle_work_dir' --remove-files --owner=0 --group=0 -cf '$output_file_tmp' -T -"))
 	{
 		fail("failed to compress output files");
 	}
@@ -676,7 +676,7 @@ sub resolver_callback($$$)
 	my $rr_type  = shift;
 	my $response = shift;
 
-	my $rsmhosts = join(', ', @rsmhosts);
+	my $rsmhosts = join(', ', sort(@rsmhosts));
 
 	if (!defined($response))
 	{
@@ -687,7 +687,7 @@ sub resolver_callback($$$)
 	}
 
 	my $rcode = $response->header->rcode;
-	my $log_message = sprintf("host: %s; rcode: %s; records: %d; rsmhosts: %s", $host, $rcode, scalar($response->answer), $rsmhosts);
+	my $log_message = sprintf("host: %s; rr_type: %s; rcode: %s; records: %d; rsmhosts: %s", $host, $rr_type, $rcode, scalar($response->answer), $rsmhosts);
 	if ($rcode eq 'NOERROR' || $rcode eq 'NXDOMAIN')
 	{
 		dbg($log_message);
@@ -787,7 +787,7 @@ sub traceroute($$)
 
 		# pass task to the worker
 		my $ip = $task->{'ip'};
-		my $rsmhosts = join(", ", @{$ip_rsmhost_mapping{$task->{'ip'}}});
+		my $rsmhosts = join(", ", sort(@{$ip_rsmhost_mapping{$task->{'ip'}}}));
 		print $socket "$ip;$rsmhosts\n";
 	}
 
@@ -1138,7 +1138,7 @@ sub __log
 		$caller = " " . ($caller =~ s/^.*:://r) . "()";
 	}
 
-	my $message_prefix = sprintf("%6d:%s [%s]%s", $$, $log_time_str, $log_level_str, $caller);
+	my $message_prefix = sprintf("%7d:%s [%s]%s", $$, $log_time_str, $log_level_str, $caller);
 
 	my $output_handle;
 
