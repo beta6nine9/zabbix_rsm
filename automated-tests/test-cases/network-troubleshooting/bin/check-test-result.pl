@@ -25,7 +25,7 @@ sub main()
 	usage("--rsmhosts is missing" , 1) if (!opt("rsmhosts"));
 	usage("--resolved is missing" , 1) if (!opt("resolved"));
 
-	check_archive("Probe1-Server1", getopt("archive"), getopt("timestamp"));
+	check_archive("Probe1", getopt("archive"), getopt("timestamp"));
 }
 
 sub check_archive($$$)

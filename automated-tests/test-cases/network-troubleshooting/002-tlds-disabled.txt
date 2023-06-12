@@ -22,7 +22,7 @@
 
 [update-ini-file]
 
-"${tracerouter.conf}","paths","proxy_config","${zabbix_proxy.conf}"
+"${tracerouter.conf}","paths","proxy_config_files","${zabbix_proxy.conf}"
 "${tracerouter.conf}","paths","work_dir","${work_dir}"
 "${tracerouter.conf}","paths","output_dir","${output_dir}"
 "${tracerouter.conf}","time_limits","script","60"
@@ -65,4 +65,4 @@
 "","[ -z ""$(ls -A '${work_dir}' || echo 'fail')"" ]"
 
 # check the contents of the archive
-"","${test_case_dir}/bin/check-test-result.pl --archive '${output_dir}/20230501-120000-Probe1-Server1.tar' --timestamp 1682942400 --proxy '${test_case_dir}/output/002-proxy.json' --rsmhosts '${test_case_dir}/output/002-rsmhosts.json' --resolved '${test_case_dir}/output/002-resolved_hosts.json'"
+"","${test_case_dir}/bin/check-test-result.pl --archive '${output_dir}/20230501-120000-Probe1.tar' --timestamp 1682942400 --proxy '${test_case_dir}/output/002-proxy.json' --rsmhosts '${test_case_dir}/output/002-rsmhosts.json' --resolved '${test_case_dir}/output/002-resolved_hosts.json'"
