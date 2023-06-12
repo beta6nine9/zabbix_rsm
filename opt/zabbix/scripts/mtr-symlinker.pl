@@ -96,6 +96,8 @@ sub main()
 			my $src_file = $mtr_dir . '/' . $filename;
 			my $dst_file = $sla_dir . '/' . $filename;
 
+			dbg("creating symlink, '$src_file' -> '$dst_file'");
+
 			if (!symlink($src_file, $dst_file))
 			{
 				log_stacktrace(0);

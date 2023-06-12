@@ -41,28 +41,58 @@ sub main()
 
 	initialize();
 
-	# get data from local proxy database
+	# get data from local proxy databases
 
-	info("reading data from proxy database...");
+	info("reading data from proxy databases...");
 	$time_start = Time::HiRes::time();
 
-	db_connect();
+	my $probe_name;
+	my $monitoring_target;
+	my %proxy_config;
+	my %rsmhosts_config;
 
-	my $monitoring_target = get_monitoring_target();
-	my $proxy_name = get_proxy_name();
-	my %proxy_config = get_proxy_config($proxy_name);
-	my %rsmhosts_config = get_rsmhosts_config($monitoring_target);
+	my @db_configs = get_db_configs();
 
-	db_disconnect();
+	foreach my $db_config (@db_configs)
+	{
+		db_connect($db_config);
 
-	set_probe_name($proxy_name);
+		my $monitoring_target_tmp = get_monitoring_target();
+		my $proxy_name = get_proxy_name();
+		my $probe_name_tmp = substr($proxy_name, 0, rindex($proxy_name, '-')); # strip '-Server#' part from the proxy name
+
+		if (!defined($monitoring_target))
+		{
+			$monitoring_target = $monitoring_target_tmp;
+		}
+		elsif ($monitoring_target ne $monitoring_target_tmp)
+		{
+			fail("different monitoring targets found in proxy databases ('%s', '%s')", $monitoring_target, $monitoring_target_tmp);
+		}
+
+		if (!defined($probe_name))
+		{
+			$probe_name = $probe_name_tmp;
+		}
+		elsif ($probe_name ne $probe_name_tmp)
+		{
+			fail("different probe names found in proxy databases ('%s', '%s')", $probe_name, $probe_name_tmp);
+		}
+
+		get_proxy_config(\%proxy_config, $proxy_name);
+		get_rsmhosts_config(\%rsmhosts_config, $monitoring_target);
+
+		db_disconnect();
+	}
+
+	set_probe_name($probe_name);
 	initialize_work_dir();
 
 	my $ipv4 = $proxy_config{'ipv4'};
 	my $ipv6 = $proxy_config{'ipv6'};
 
 	$time_end = Time::HiRes::time();
-	info("finished reading data from proxy database in %.3fs", $time_end - $time_start);
+	info("finished reading data from proxy databases in %.3fs", $time_end - $time_start);
 
 	# resolve RDAP, RDDS hostnames
 
@@ -198,24 +228,24 @@ sub validate_config()
 	dbg("config:");
 	dbg();
 	dbg("[paths]");
-	dbg("log_file        = %s", get_config('paths', 'log_file'));
-	dbg("proxy_config    = %s", get_config('paths', 'proxy_config'));
-	dbg("work_dir        = %s", get_config('paths', 'work_dir'));
-	dbg("output_dir      = %s", get_config('paths', 'output_dir'));
+	dbg("log_file           = %s", get_config('paths', 'log_file'));
+	dbg("proxy_config_files = %s", get_config('paths', 'proxy_config_files'));
+	dbg("work_dir           = %s", get_config('paths', 'work_dir'));
+	dbg("output_dir         = %s", get_config('paths', 'output_dir'));
 	dbg();
 	dbg("[time_limits]");
-	dbg("script          = %s", get_config('time_limits', 'script'));
-	dbg("mtr_term        = %s", get_config('time_limits', 'mtr_term'));
-	dbg("mtr_kill        = %s", get_config('time_limits', 'mtr_kill'));
-	dbg("output_handling = %s", get_config('time_limits', 'output_handling'));
+	dbg("script             = %s", get_config('time_limits', 'script'));
+	dbg("mtr_term           = %s", get_config('time_limits', 'mtr_term'));
+	dbg("mtr_kill           = %s", get_config('time_limits', 'mtr_kill'));
+	dbg("output_handling    = %s", get_config('time_limits', 'output_handling'));
 	dbg();
 	dbg("[resolver]");
-	dbg("queue_size      = %s", get_config('resolver', 'queue_size'));
-	dbg("timeout         = %s", get_config('resolver', 'timeout'));
-	dbg("retries         = %s", get_config('resolver', 'retries'));
+	dbg("queue_size         = %s", get_config('resolver', 'queue_size'));
+	dbg("timeout            = %s", get_config('resolver', 'timeout'));
+	dbg("retries            = %s", get_config('resolver', 'retries'));
 	dbg();
 	dbg("[mtr]");
-	dbg("options         = %s", get_config('mtr', 'options'));
+	dbg("options            = %s", get_config('mtr', 'options'));
 	dbg();
 }
 
@@ -508,9 +538,10 @@ sub get_proxy_name()
 	return db_select_value($query, $params);
 }
 
-sub get_proxy_config($)
+sub get_proxy_config($$)
 {
-	my $proxy_name = shift;
+	my $proxy_config = shift;
+	my $proxy_name   = shift;
 
 	my @macros = (
 		'{$RSM.IP4.ENABLED}',
@@ -540,16 +571,30 @@ sub get_proxy_config($)
 		fail("missing probe config macro '$macro'") if (!exists($macros{$macro}));
 	}
 
-	return (
-		'ipv4' => $macros{'{$RSM.IP4.ENABLED}'}  eq '1' ? 1 : 0,
-		'ipv6' => $macros{'{$RSM.IP6.ENABLED}'}  eq '1' ? 1 : 0,
-		'rdap' => $macros{'{$RSM.RDAP.ENABLED}'} eq '1' ? 1 : 0,
-		'rdds' => $macros{'{$RSM.RDDS.ENABLED}'} eq '1' ? 1 : 0,
-	);
+	my $ipv4 = $macros{'{$RSM.IP4.ENABLED}'}  eq '1' ? 1 : 0;
+	my $ipv6 = $macros{'{$RSM.IP6.ENABLED}'}  eq '1' ? 1 : 0;
+	my $rdap = $macros{'{$RSM.RDAP.ENABLED}'} eq '1' ? 1 : 0;
+	my $rdds = $macros{'{$RSM.RDDS.ENABLED}'} eq '1' ? 1 : 0;
+
+	if (scalar(%{$proxy_config}) == 0)
+	{
+		$proxy_config->{'ipv4'} = $ipv4;
+		$proxy_config->{'ipv6'} = $ipv6;
+		$proxy_config->{'rdap'} = $rdap;
+		$proxy_config->{'rdds'} = $rdds;
+	}
+	else
+	{
+		fail("different proxy configuration option 'ipv4' found in proxy databases") if ($proxy_config->{'ipv4'} ne $ipv4);
+		fail("different proxy configuration option 'ipv6' found in proxy databases") if ($proxy_config->{'ipv6'} ne $ipv6);
+		fail("different proxy configuration option 'rdap' found in proxy databases") if ($proxy_config->{'rdap'} ne $rdap);
+		fail("different proxy configuration option 'rdds' found in proxy databases") if ($proxy_config->{'rdds'} ne $rdds);
+	}
 }
 
-sub get_rsmhosts_config($)
+sub get_rsmhosts_config($$)
 {
+	my $rsmhosts_config = shift;
 	my $monitoring_target = shift;
 
 	# list of host macros that need to be selected for each rsmhost
@@ -596,8 +641,6 @@ sub get_rsmhosts_config($)
 
 	# check for failures while retrieving macros, convert "macro => value" to easier-to-use format
 
-	my %data_by_rsmhost = ();
-
 	foreach my $hostid (keys(%data_by_hostid))
 	{
 		my %macros = %{$data_by_hostid{$hostid}};
@@ -607,7 +650,14 @@ sub get_rsmhosts_config($)
 			fail("missing rsmhost config macro '$macro' for hostid '$hostid'") if (!exists($macros{$macro}));
 		}
 
-		$data_by_rsmhost{$macros{'{$RSM.TLD}'}} = {
+		my $rsmhost = $macros{'{$RSM.TLD}'};
+
+		if (exists($rsmhosts_config->{$rsmhost}))
+		{
+			fail("found rsmhost '$rsmhost' in multiple proxy databases");
+		}
+
+		$rsmhosts_config->{$rsmhost} = {
 			'dns_tcp'       => $macros{'{$RSM.TLD.DNS.TCP.ENABLED}'},
 			'dns_udp'       => $macros{'{$RSM.TLD.DNS.UDP.ENABLED}'},
 			'rdds43'        => $macros{'{$RSM.TLD.RDDS43.ENABLED}'},
@@ -619,8 +669,6 @@ sub get_rsmhosts_config($)
 			'rdap_server'   => get_hostname($macros{'{$RDAP.BASE.URL}'}),
 		};
 	}
-
-	return %data_by_rsmhost;
 }
 
 sub get_hostname($)
@@ -809,6 +857,8 @@ sub create_tasks($)
 	            - get_config('time_limits', 'mtr_kill')		# time reserved for timeouts
 	            - get_config('time_limits', 'output_handling');	# time reserved for output handling (compressing etc)
 
+	dbg("time limit for distributing tasks - %.3f", $seconds);
+
 	my $now = Time::HiRes::time();
 
 	my @tasks = ();
@@ -820,6 +870,14 @@ sub create_tasks($)
 			'time' => $now + $seconds / (scalar(@ip_list) - 1) * $i,
 		};
 		push(@tasks, $task);
+
+		if (opt('debug'))
+		{
+			my ($sec, $min, $hour, $mday, $mon, $year) = localtime($task->{'time'});
+			my $time_str = sprintf("%04d-%02d-%02d %02d:%02d:%02d", $year + 1900, $mon + 1, $mday, $hour, $min, $sec);
+
+			dbg("starting time for task #%d - %s (%.3f, %.3f), %s", $i + 1, $time_str, $task->{'time'} - $now, $task->{'time'}, $task->{'ip'});
+		}
 	}
 
 	return @tasks;
@@ -1202,14 +1260,20 @@ sub usage($$)
 
 my $db_handle;
 
-sub db_connect()
+sub db_connect($)
 {
+	my %db_config = %{+shift};
+
+	my $db_host         = $db_config{'host'};
+	my $db_name         = $db_config{'name'};
+	my $db_user         = $db_config{'user'};
+	my $db_pswd         = $db_config{'pswd'};
+	my $db_tls_settings = $db_config{'tls'};
+
 	if (defined($db_handle))
 	{
 		fail("already connected to the database");
 	}
-
-	my ($db_host, $db_name, $db_user, $db_pswd, $db_tls_settings) = __get_db_config();
 
 	if (defined($db_name) && -f $db_name)
 	{
@@ -1412,60 +1476,74 @@ sub db_exec($;$)
 	return $sth->{mysql_insertid};
 }
 
-sub __get_db_config()
+sub get_db_configs()
 {
-	my $config_file = get_config('paths', 'proxy_config');
+	my @config_files = split(/\s+/, get_config('paths', 'proxy_config_files'));
+	my @configs;
 
-	my $db_host = 'localhost';
-	my $db_name = undef;
-	my $db_user = '';
-	my $db_pswd = '';
-
-	my $db_tls_key_file  = undef;
-	my $db_tls_cert_file = undef;
-	my $db_tls_ca_file   = undef;
-	my $db_tls_cipher    = undef;
-
-	open(my $fh, '<', $config_file) or fail("cannot open $config_file: $!");
-
-	while (<$fh>)
+	foreach my $config_file (@config_files)
 	{
-		if (/^(DB.*)=(.*)$/)
+		my $db_host = 'localhost';
+		my $db_name = undef;
+		my $db_user = '';
+		my $db_pswd = '';
+
+		my $db_tls_key_file  = undef;
+		my $db_tls_cert_file = undef;
+		my $db_tls_ca_file   = undef;
+		my $db_tls_cipher    = undef;
+
+		open(my $fh, '<', $config_file) or fail("cannot open $config_file: $!");
+
+		while (<$fh>)
 		{
-			my $key   = $1;
-			my $value = $2;
+			if (/^(DB.*)=(.*)$/)
+			{
+				my $key   = $1;
+				my $value = $2;
 
-			$db_host = $value if ($key eq 'DBHost');
-			$db_name = $value if ($key eq 'DBName');
-			$db_user = $value if ($key eq 'DBUser');
-			$db_pswd = $value if ($key eq 'DBPassword');
+				$db_host = $value if ($key eq 'DBHost');
+				$db_name = $value if ($key eq 'DBName');
+				$db_user = $value if ($key eq 'DBUser');
+				$db_pswd = $value if ($key eq 'DBPassword');
 
-			$db_tls_key_file  = $value if ($key eq 'DBTLSKeyFile');
-			$db_tls_cert_file = $value if ($key eq 'DBTLSCertFile');
-			$db_tls_ca_file   = $value if ($key eq 'DBTLSCAFile');
-			$db_tls_cipher    = $value if ($key eq 'DBTLSCipher13');
+				$db_tls_key_file  = $value if ($key eq 'DBTLSKeyFile');
+				$db_tls_cert_file = $value if ($key eq 'DBTLSCertFile');
+				$db_tls_ca_file   = $value if ($key eq 'DBTLSCAFile');
+				$db_tls_cipher    = $value if ($key eq 'DBTLSCipher13');
+			}
 		}
+
+		close($fh) or fail("cannot close $config_file: $!");
+
+		my $db_tls_settings = "";
+
+		$db_tls_settings .= "mysql_ssl_client_key="  . $db_tls_key_file  . ";" if (defined($db_tls_key_file));
+		$db_tls_settings .= "mysql_ssl_client_cert=" . $db_tls_cert_file . ";" if (defined($db_tls_cert_file));
+		$db_tls_settings .= "mysql_ssl_ca_file="     . $db_tls_ca_file   . ";" if (defined($db_tls_ca_file));
+		$db_tls_settings .= "mysql_ssl_cipher="      . $db_tls_cipher    . ";" if (defined($db_tls_cipher));
+
+		if ($db_tls_settings)
+		{
+			$db_tls_settings = "mysql_ssl=1;" . $db_tls_settings;
+		}
+		else
+		{
+			$db_tls_settings = "mysql_ssl=0;";
+		}
+
+		my $config = {
+			'host' => $db_host,
+			'name' => $db_name,
+			'user' => $db_user,
+			'pswd' => $db_pswd,
+			'tls'  => $db_tls_settings,
+		};
+
+		push(@configs, $config);
 	}
 
-	close($fh) or fail("cannot close $config_file: $!");
-
-	my $db_tls_settings = "";
-
-	$db_tls_settings .= "mysql_ssl_client_key="  . $db_tls_key_file  . ";" if (defined($db_tls_key_file));
-	$db_tls_settings .= "mysql_ssl_client_cert=" . $db_tls_cert_file . ";" if (defined($db_tls_cert_file));
-	$db_tls_settings .= "mysql_ssl_ca_file="     . $db_tls_ca_file   . ";" if (defined($db_tls_ca_file));
-	$db_tls_settings .= "mysql_ssl_cipher="      . $db_tls_cipher    . ";" if (defined($db_tls_cipher));
-
-	if ($db_tls_settings)
-	{
-		$db_tls_settings = "mysql_ssl=1;" . $db_tls_settings;
-	}
-	else
-	{
-		$db_tls_settings = "mysql_ssl=0;";
-	}
-
-	return $db_host, $db_name, $db_user, $db_pswd, $db_tls_settings;
+	return @configs;
 }
 
 sub __handle_db_error($$$)
