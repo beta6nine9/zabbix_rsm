@@ -1,0 +1,68 @@
+[test-case]
+
+"tracerouter, probe and tlds disabled"
+
+[set-variable]
+
+"create_table_sed_address","/^CREATE TABLE (globalmacro|hosts|hosts_templates|hostmacro) /,/\);$/"
+"create_index_sed_address","/^CREATE (UNIQUE )?INDEX \w+ ON (globalmacro|hosts|hosts_templates|hostmacro) /"
+
+"proxy.sql","${tempfile:proxy.sql}"
+"proxy.db","${tempfile:proxy.db}"
+
+"source_dir","${cfg:paths:source_dir}"
+"work_dir","${tempdir:mtr_work}"
+"output_dir","${tempdir:mtr_output}"
+"tracerouter.conf","${tempfile:tracerouter.conf}"
+"zabbix_proxy.conf","${tempfile:zabbix_proxy.conf}"
+
+[copy-file]
+
+"${source_dir}/probe-scripts/tracerouter.conf.example","${tracerouter.conf}"
+
+[update-ini-file]
+
+"${tracerouter.conf}","paths","proxy_config_files","${zabbix_proxy.conf}"
+"${tracerouter.conf}","paths","work_dir","${work_dir}"
+"${tracerouter.conf}","paths","output_dir","${output_dir}"
+"${tracerouter.conf}","time_limits","script","60"
+
+[copy-file]
+
+"${test_case_dir}/000-zabbix_proxy.conf","${zabbix_proxy.conf}"
+
+[update-ini-file]
+
+"${zabbix_proxy.conf}","","DBName","${proxy.db}"
+
+[execute]
+
+"","sed -n -E '${create_table_sed_address}p' '${source_dir}/database/sqlite3/schema.sql' >> '${proxy.sql}'"
+"","sed -n -E '${create_index_sed_address}p' '${source_dir}/database/sqlite3/schema.sql' >> '${proxy.sql}'"
+
+"","sqlite3 '${proxy.db}' < '${proxy.sql}'"
+"","sqlite3 '${proxy.db}' < '${test_case_dir}/000-db-data.sql'"
+"","sqlite3 '${proxy.db}' < '${test_case_dir}/001-db-data.sql'"
+
+[start-tool]
+
+"resolver","/tmp/resolver.pid","000-resolver-config.json"
+
+[execute]
+
+"2023-05-01 12:00:00","PATH=${test_case_dir}/bin:$PATH '${source_dir}/probe-scripts/tracerouter-mtr.pl' --config '${tracerouter.conf}' --nolog"
+
+[stop-tool]
+
+"resolver","/tmp/resolver.pid"
+
+[execute]
+
+"","ls -al ${work_dir}"
+"","ls -al ${output_dir}"
+
+# contents of ${work_dir} must be archived and deleted
+"","[ -z ""$(ls -A '${work_dir}' || echo 'fail')"" ]"
+
+# check the contents of the archive
+"","${test_case_dir}/bin/check-test-result.pl --archive '${output_dir}/20230501-120000-Probe1.tar' --timestamp 1682942400 --proxy '${test_case_dir}/output/001-proxy.json' --rsmhosts '${test_case_dir}/output/001-rsmhosts.json' --resolved '${test_case_dir}/output/001-resolved_hosts.json'"

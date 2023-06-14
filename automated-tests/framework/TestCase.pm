@@ -16,6 +16,7 @@ use File::Basename;
 use File::Copy;
 use File::Path qw(make_path);
 use File::Spec;
+use File::Temp qw(tempdir tempfile);
 use Text::CSV_XS qw(csv);
 use Text::Diff;
 
@@ -37,6 +38,7 @@ my %command_handlers = (
 	'extract-files'           => [\&__cmd_extract_files          , 1, 1], # directory,archive
 	'compare-files'           => [\&__cmd_compare_files          , 1, 1], # directory,archive
 	'compare-file'            => [\&__cmd_compare_file           , 1, 1], # filename,contents
+	'copy-file'               => [\&__cmd_copy_file              , 1, 1], # source,destination
 	'prepare-server-database' => [\&__cmd_prepare_server_database, 0, 1], # (void)
 	'execute-sql-query'       => [\&__cmd_execute_sql_query      , 1, 1], # query,param,param,param,...
 	'compare-sql-query'       => [\&__cmd_compare_sql_query      , 1, 1], # query,value,value,value,...
@@ -50,7 +52,7 @@ my %command_handlers = (
 	'execute-ex'              => [\&__cmd_execute_ex             , 1, 1], # datetime,status,expected_stdout,expected_stderr,command[,arg,arg,arg,...]
 	'start-server'            => [\&__cmd_start_server           , 1, 1], # datetime,key=value,key=value,...
 	'stop-server'             => [\&__cmd_stop_server            , 0, 1], # (void)
-	'update-rsm-conf'         => [\&__cmd_update_rsm_conf        , 1, 1], # section,property,value
+	'update-ini-file'         => [\&__cmd_update_ini_file        , 1, 1], # filename,section,property,value
 	'create-incident'         => [\&__cmd_create_incident        , 1, 1], # rsmhost,description,from,till,false_positive
 	'check-incident'          => [\&__cmd_check_incident         , 1, 1], # rsmhost,description,from,till
 	'check-event-count'       => [\&__cmd_check_event_count      , 1, 1], # rsmhost,description,count
@@ -69,6 +71,7 @@ my %command_handlers = (
 );
 
 my $test_case_filename;
+my $test_case_dir;
 my $test_case_name;
 my $test_case_variables;
 
@@ -78,8 +81,11 @@ my $test_case_variables;
 
 sub run_test_case($)
 {
-	# set global variable to make it available in command handlers
+	# set global variables to make them available in command handlers
 	$test_case_filename = shift;
+
+	(undef, $test_case_dir, undef) = File::Spec->splitpath($test_case_filename);
+	$test_case_dir = rtrim($test_case_dir, '/');
 
 	# skip test cases that have "." in front of the filename, but read the name of the test case to include in the report
 	my $skip_test_case = str_starts_with([File::Spec->splitpath($test_case_filename)]->[2], ".");
@@ -398,14 +404,7 @@ sub __cmd_extract_files($)
 
 	info("extracting archive '$archive'");
 
-	if (!File::Spec->file_name_is_absolute($archive))
-	{
-		my (undef, $test_case_dir, undef) = File::Spec->splitpath($test_case_filename);
-
-		$archive = File::Spec->catfile($test_case_dir, $archive);
-	}
-
-	tar_unpack($archive, $directory);
+	tar_unpack(__normalize_file_path($archive), $directory);
 }
 
 sub __cmd_compare_files($)
@@ -419,12 +418,7 @@ sub __cmd_compare_files($)
 
 	info("comparing directory '%s' with archive '%s'", $directory, basename($archive));
 
-	if (!File::Spec->file_name_is_absolute($archive))
-	{
-		my (undef, $test_case_dir, undef) = File::Spec->splitpath($test_case_filename);
-
-		$archive = File::Spec->catfile($test_case_dir, $archive);
-	}
+	$archive = __normalize_file_path($archive);
 
 	if (!tar_compare($archive, $directory))
 	{
@@ -443,14 +437,7 @@ sub __cmd_compare_file($)
 
 	info("comparing contents of file '%s'", $filename);
 
-	if (!File::Spec->file_name_is_absolute($filename))
-	{
-		my (undef, $test_case_dir, undef) = File::Spec->splitpath($test_case_filename);
-
-		$filename = File::Spec->catfile($test_case_dir, $filename);
-	}
-
-	my $contents = read_file($filename);
+	my $contents = read_file(__normalize_file_path($filename));
 
 	if ($expected_contents ne "" && !str_matches($contents, $expected_contents))
 	{
@@ -458,6 +445,20 @@ sub __cmd_compare_file($)
 		print(diff(\$expected_contents, \$contents), "\n");
 		fail("file contents don't match expected pattern")
 	}
+}
+
+sub __cmd_copy_file($)
+{
+	my $args = shift;
+
+	# [copy-file]
+	# source,destination
+
+	my ($src, $dst) = __unpack($args, 2);
+
+	info("copying file '%s' to '%s'", $src, $dst);
+
+	copy($src, $dst) or fail("cannot copy file: %s", $!);
 }
 
 sub __cmd_prepare_server_database()
@@ -788,7 +789,12 @@ sub __cmd_execute($)
 
 		if (scalar(@command) == 1)
 		{
-			execute("faketime -f '\@$datetime' $command[0]");
+			my $command = $command[0];
+
+			# when $command starts with setting environment variables, put them before "faketime"
+			$command =~ s/^((?:\w+=[^ ]* )*)(.*)$/$1faketime -f '\@$datetime' $2/;
+
+			execute($command);
 		}
 		else
 		{
@@ -826,7 +832,12 @@ sub __cmd_execute_ex($)
 
 		if (scalar(@command) == 1)
 		{
-			($exit_status, $stdout, $stderr) = execute_ex("faketime -f '\@$datetime' $command[0]");
+			my $command = $command[0];
+
+			# when $command starts with setting environment variables, put them before "faketime"
+			$command =~ s/^((?:\w+=[^ ]* )*)(.*)$/$1faketime -f '\@$datetime' $2/;
+
+			($exit_status, $stdout, $stderr) = execute_ex($command);
 		}
 		else
 		{
@@ -887,19 +898,18 @@ sub __cmd_stop_server()
 	zbx_stop_server();
 }
 
-sub __cmd_update_rsm_conf($)
+sub __cmd_update_ini_file($)
 {
 	my $args = shift;
 
-	# [update-rsm-conf]
-	# section,property,value
+	# [update-ini-file]
+	# filename,section,property,value
 
-	my ($section, $property, $value) = __unpack($args, 3);
+	my ($filename, $section, $property, $value) = __unpack($args, 4);
 
-	my $source_dir = get_config('paths', 'source_dir');
-	my $config_file = $source_dir . "/opt/zabbix/scripts/rsm.conf";
+	info("updating '%s', setting '%s.%s' to '%s'", $filename, $section, $property, $value);
 
-	rsm_update_config($config_file, $config_file, {"$section.$property" => $value});
+	update_ini_file($filename, $filename, {"$section.$property" => $value});
 }
 
 sub __cmd_create_incident($)
@@ -1135,23 +1145,13 @@ sub __cmd_rsm_api($)
 	{
 		info("request payload file: '%s'", $request);
 
-		if (!File::Spec->file_name_is_absolute($request))
-		{
-			my (undef, $test_case_dir, undef) = File::Spec->splitpath($test_case_filename);
-
-			$request = File::Spec->catfile($test_case_dir, $request);
-		}
+		$request = __normalize_file_path($request);
 	}
 	if ($response ne '')
 	{
 		info("response payload file: '%s'", $response);
 
-		if (!File::Spec->file_name_is_absolute($response))
-		{
-			my (undef, $test_case_dir, undef) = File::Spec->splitpath($test_case_filename);
-
-			$response = File::Spec->catfile($test_case_dir, $response);
-		}
+		$response = __normalize_file_path($response);
 	}
 
 	my $payload = $request eq '' ? undef : read_file($request);
@@ -1205,7 +1205,7 @@ sub __cmd_start_tool($)
 
 	my ($tool_name, $pid_file, $input_file) = __unpack($args, 3);
 
-	start_tool($tool_name, $pid_file, $input_file);
+	start_tool($tool_name, $pid_file, __normalize_file_path($input_file));
 }
 
 sub __cmd_stop_tool($)
@@ -1320,10 +1320,10 @@ sub __cmd_check_proxy($)
 
 		my ($interface_type, $useip, $ip, $port) = @{$rows->[0]};
 
-		__expect($interface_type, INTERFACE_TYPE_UNKNOWN       , "unexpected interface type '%d', expected '%d'");
-		__expect($useip         , INTERFACE_USE_IP             , "unexpected value of interface.useip '%d', expected '%d'");
-		__expect($ip            , $expected_ip                 , "unexpected ip '%s', expected '%s'");
-		__expect($port          , $expected_port               , "unexpected port '%d', expected '%d'");
+		__expect($interface_type, INTERFACE_TYPE_UNKNOWN, "unexpected interface type '%d', expected '%d'");
+		__expect($useip         , INTERFACE_USE_IP      , "unexpected value of interface.useip '%d', expected '%d'");
+		__expect($ip            , $expected_ip          , "unexpected ip '%s', expected '%s'");
+		__expect($port          , $expected_port        , "unexpected port '%d', expected '%d'");
 	}
 	else
 	{
@@ -1902,6 +1902,9 @@ sub __unpack($$;$)
 		return get_config($1, $2) if ($variable =~ /^cfg:([\w\-]+):([\w\-]+)$/);
 		return read_file(File::Spec->catfile(dirname($test_case_filename), $1)) if ($variable =~ /^file:(.+)$/);
 		return str2time($1) if ($variable =~ /^ts:(.+)$/);
+		return __create_temp_dir($1) if ($variable =~ /tempdir:(.+)/);
+		return __create_temp_file($1) if ($variable =~ /tempfile:(.+)/);
+		return $test_case_dir if ($variable eq 'test_case_dir');
 		return $test_case_variables->{$variable} if (exists($test_case_variables->{$variable}));
 		return $match;
 	};
@@ -1927,6 +1930,22 @@ sub __unpack($$;$)
 	}
 
 	return @values;
+}
+
+sub __create_temp_dir($)
+{
+	my $name = shift;
+
+	return tempdir('CLEANUP' => 1, 'TEMPLATE' => "/tmp/tests-$$-$name.XXXX");
+}
+
+sub __create_temp_file($)
+{
+	my $name = shift;
+
+	my (undef, $path) = tempfile('UNLINK' => 1, 'TEMPLATE' => "/tmp/tests-$$-$name.XXXX");
+
+	return $path;
 }
 
 sub __expect($$$)
@@ -2083,6 +2102,18 @@ sub __compare_db_row($$$$)
 	}
 
 	fail("internal error") if (scalar(keys(%{$expected_values})) > 0);
+}
+
+sub __normalize_file_path($)
+{
+	my $file = shift;
+
+	if (!File::Spec->file_name_is_absolute($file))
+	{
+		$file = File::Spec->catfile($test_case_dir, $file);
+	}
+
+	return $file;
 }
 
 ################################################################################

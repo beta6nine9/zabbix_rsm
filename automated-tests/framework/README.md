@@ -61,7 +61,10 @@ There are two types of variables:
 Supported special variables are:
 * `${cfg:<section>:<property>}` - returns value from framework's configuration file;
 * `${file:<filename>}` - returns contents of the file, `filename` must be relative to the test case file;
-* `${ts:<datetime>}` - returns unix timestamp for the given datetime, see https://metacpan.org/pod/Date::Parse for supported formats.
+* `${tempdir:<filename>}` - creates temporary directory in /tmp and returns its path; use `set-variable` command to store the path of the temporary directory;
+* `${tempfile:<filename>}` - creates temporary file in /tmp and returns its path; use `set-variable` command to store the path of the temporary file;
+* `${ts:<datetime>}` - returns unix timestamp for the given datetime, see https://metacpan.org/pod/Date::Parse for supported formats;
+* `${test_case_dir}` - returns path to the directory where the current test case is located.
 
 If named variable does not exist, it won't be expanded. If special variable cannot be expanded, the result is undefined (e.g., it can expand to unexpected values or fail the test case).
 
@@ -78,7 +81,7 @@ Example test case:
 
 [execute]
 
-# execute "date" command
+# print values of the variables
 "","echo 'this is ${str1}'"
 "","echo 'this is ${str2}'"
 "","echo 'this is ${str3}'"
@@ -137,6 +140,12 @@ Compares contents of an archive file with contents on the filesystem. Archive sh
 Compares contents of the file with expected contents.
 
 Argument `contents` is optional. If it contains a string that is enclosed in `//`, this string is used as a regex pattern, otherwise contents of the file have to be the same as the string (in this case, trailing whitespaces are ignored).
+
+### copy-file
+
+*source,destination*
+
+Copies file `source` to `destination`.
 
 ### prepare-server-database
 
@@ -251,11 +260,11 @@ Arguments `key=value` are optional key-value pairs to be updated in `zabbix_serv
 
 Stops Zabbix server.
 
-### update-rsm-conf
+### update-ini-file
 
-*section,property,value*
+*filename,section,property,value*
 
-Updates configuration value in `rsm.conf`.
+Updates configuration value in the INI file.
 
 ### create-incident
 
