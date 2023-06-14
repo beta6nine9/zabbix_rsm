@@ -352,6 +352,11 @@ sub create_ip_rsmhost_mapping($$$$$)
 
 	foreach my $rsmhost (keys(%rsmhosts_config))
 	{
+		if (!exists($rsmhosts_config{$rsmhost}{'nsip_list'}))
+		{
+			last;
+		}
+
 		foreach my $nsip (@{$rsmhosts_config{$rsmhost}{'nsip_list'}})
 		{
 			my $ip = $nsip->[1];
@@ -403,6 +408,11 @@ sub create_ip_list($$$$)
 
 	foreach (values(%rsmhosts_config))
 	{
+		if (!exists($_->{'nsip_list'}))
+		{
+			last;
+		}
+
 		foreach my $nsip (@{$_->{'nsip_list'}})
 		{
 			my $ip = $nsip->[1];
@@ -599,18 +609,35 @@ sub get_rsmhosts_config($$)
 
 	# list of host macros that need to be selected for each rsmhost
 
-	my @macros = (
-		'{$RSM.TLD}',
-		'{$RSM.TLD.DNS.TCP.ENABLED}',
-		'{$RSM.TLD.DNS.UDP.ENABLED}',
-		'{$RSM.TLD.RDDS43.ENABLED}',
-		'{$RSM.TLD.RDDS80.ENABLED}',
-		'{$RDAP.TLD.ENABLED}',
-		'{$RSM.DNS.NAME.SERVERS}',
-		'{$RSM.TLD.RDDS43.SERVER}',
-		'{$RSM.TLD.RDDS80.URL}',
-		'{$RDAP.BASE.URL}',
-	);
+	my @macros;
+
+	if ($monitoring_target eq MONITORING_TARGET_REGISTRY)
+	{
+		@macros = (
+			'{$RSM.TLD}',
+			'{$RSM.TLD.DNS.TCP.ENABLED}',
+			'{$RSM.TLD.DNS.UDP.ENABLED}',
+			'{$RSM.TLD.RDDS43.ENABLED}',
+			'{$RSM.TLD.RDDS80.ENABLED}',
+			'{$RDAP.TLD.ENABLED}',
+			'{$RSM.DNS.NAME.SERVERS}',
+			'{$RSM.TLD.RDDS43.SERVER}',
+			'{$RSM.TLD.RDDS80.URL}',
+			'{$RDAP.BASE.URL}',
+		);
+	}
+	elsif ($monitoring_target eq MONITORING_TARGET_REGISTRAR)
+	{
+		@macros = (
+			'{$RSM.TLD}',
+			'{$RSM.TLD.RDDS43.ENABLED}',
+			'{$RSM.TLD.RDDS80.ENABLED}',
+			'{$RDAP.TLD.ENABLED}',
+			'{$RSM.TLD.RDDS43.SERVER}',
+			'{$RSM.TLD.RDDS80.URL}',
+			'{$RDAP.BASE.URL}',
+		);
+	}
 
 	# get data from DB
 
@@ -657,17 +684,26 @@ sub get_rsmhosts_config($$)
 			fail("found rsmhost '$rsmhost' in multiple proxy databases");
 		}
 
-		$rsmhosts_config->{$rsmhost} = {
-			'dns_tcp'       => $macros{'{$RSM.TLD.DNS.TCP.ENABLED}'},
-			'dns_udp'       => $macros{'{$RSM.TLD.DNS.UDP.ENABLED}'},
+		my %config = (
 			'rdds43'        => $macros{'{$RSM.TLD.RDDS43.ENABLED}'},
 			'rdds80'        => $macros{'{$RSM.TLD.RDDS80.ENABLED}'},
 			'rdap'          => $macros{'{$RDAP.TLD.ENABLED}'},
-			'nsip_list'     => [map([split(/,/)], split(/ /, $macros{'{$RSM.DNS.NAME.SERVERS}'}))],
 			'rdds43_server' => $macros{'{$RSM.TLD.RDDS43.SERVER}'},
 			'rdds80_server' => get_hostname($macros{'{$RSM.TLD.RDDS80.URL}'}),
 			'rdap_server'   => get_hostname($macros{'{$RDAP.BASE.URL}'}),
-		};
+		);
+
+		if ($monitoring_target eq MONITORING_TARGET_REGISTRY)
+		{
+			%config = (
+				%config,
+				'dns_tcp'   => $macros{'{$RSM.TLD.DNS.TCP.ENABLED}'},
+				'dns_udp'   => $macros{'{$RSM.TLD.DNS.UDP.ENABLED}'},
+				'nsip_list' => [map([split(/,/)], split(/ /, $macros{'{$RSM.DNS.NAME.SERVERS}'}))],
+			);
+		}
+
+		$rsmhosts_config->{$rsmhost} = \%config;
 	}
 }
 
