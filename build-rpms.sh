@@ -55,6 +55,8 @@ fail()
 	exit $FAILURE
 }
 
+trap restore_bak_files EXIT
+
 OPT_FORCE=0
 OPT_CLEAN=0
 OPT_SET_ONLY=0

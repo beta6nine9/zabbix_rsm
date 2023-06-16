@@ -330,6 +330,14 @@ BuildArch:			noarch
 This package provides RSM API, that works with
 Provisioning API (frontend module) and implements Alerts API.
 
+%package probe-scripts
+Summary:			Set of scripts for running on a probe node
+Group:				Applications/Internet
+BuildArch:			noarch
+
+%description probe-scripts
+This package provides the set of scripts for running on a probe node.
+
 
 %prep
 
@@ -529,9 +537,12 @@ sed -i "$NAMESPACE_PATTERN" conf/zabbix_agentd.conf
 
 # install scripts
 install -d $RPM_BUILD_ROOT/opt/zabbix%{namespace}
-install -d $RPM_BUILD_ROOT/opt/zabbix%{namespace}/data
 cp -r opt/zabbix/* $RPM_BUILD_ROOT/opt/zabbix%{namespace}/
 
+# install probe-scripts
+cp -r probe-scripts $RPM_BUILD_ROOT/opt/zabbix%{namespace}/
+
+# fix namespace
 sed -i "$NAMESPACE_PATTERN" $(find $RPM_BUILD_ROOT/opt/zabbix%{namespace} -type f -name '*.pl' -o -name '*.pm' -o -name '*.php' -o -name '*.sh')
 
 # install rsyslog configuration file
@@ -836,8 +847,10 @@ systemctl restart rsyslog
 %doc AUTHORS ChangeLog COPYING NEWS README
 %doc database/mysql/create.sql.gz
 %attr(0640,root,zabbix) %config(noreplace) %{_sysconfdir}/zabbix%{namespace}/zabbix_server.conf
-%dir %{_libdir}/zabbix%{namespace}/alertscripts
-%dir %{_libdir}/zabbix%{namespace}/externalscripts
+%dir /opt/zabbix%{namespace}/alertscripts
+%dir /opt/zabbix%{namespace}/externalscripts
+/opt/zabbix%{namespace}/alertscripts/*
+/opt/zabbix%{namespace}/externalscripts/*
 %{_sysconfdir}/logrotate.d/zabbix%{namespace}-server
 %attr(0755,zabbix,zabbix) %dir %{_localstatedir}/log/zabbix%{namespace}
 %attr(0755,zabbix,zabbix) %dir %{_localstatedir}/log/zabbix%{namespace}/slv
@@ -888,7 +901,10 @@ systemctl restart rsyslog
 
 %files scripts
 %defattr(-,zabbix,zabbix,0755)
-/opt/zabbix%{namespace}/*
+%dir /opt/zabbix%{namespace}/scripts
+%dir /opt/zabbix%{namespace}/data
+%dir /opt/zabbix%{namespace}/mtr
+/opt/zabbix%{namespace}/scripts/*
 %defattr(-,root,root,0755)
 %{_sysconfdir}/rsyslog.d/rsm%{namespace}.slv.conf
 %attr(0755,zabbix,zabbix) %dir %{_localstatedir}/log/zabbix%{namespace}
@@ -909,6 +925,10 @@ systemctl restart rsyslog
 %{_datadir}/rsm-api/constants.php
 %{_datadir}/rsm-api/index.php
 %{_datadir}/rsm-api/example
+
+%files probe-scripts
+%dir /opt/zabbix%{namespace}/probe-scripts
+/opt/zabbix%{namespace}/probe-scripts/*
 
 
 %changelog
