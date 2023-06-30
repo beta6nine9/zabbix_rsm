@@ -267,10 +267,24 @@ sub zbx_build($$$)
 
 	if ($enable_server || $enable_proxy || $enable_agent)
 	{
+		my $with_libpcre;
+		if (-f '/usr/include/pcre2.h')
+		{
+			$with_libpcre = '--with-libpcre2';
+		}
+		elsif (-f '/usr/include/pcre.h')
+		{
+			$with_libpcre = '--with-libpcre';
+		}
+		else
+		{
+			fail("could not find pcre.h header file");
+		}
+
 		push(@configure_args, '--prefix=' . get_config('paths', 'build_dir'));
 		push(@configure_args, '--enable-dependency-tracking');
 		push(@configure_args, '--with-libevent');
-		push(@configure_args, '--with-libpcre');
+		push(@configure_args, $with_libpcre);
 		push(@configure_args, '--with-libcurl');
 		push(@configure_args, '--with-openssl');
 		push(@configure_args, '--with-mysql');
