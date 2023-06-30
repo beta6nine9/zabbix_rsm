@@ -59,13 +59,13 @@ rsm_ns_t;
 typedef struct
 {
 	pid_t	pid;
-	int	fd;	/* read from this file descriptor */
-	int	log_fd;	/* read logs from this file descriptor */
+	int	ipc_data_fd;	/* read data from this file descriptor */
+	int	ipc_log_fd;	/* read logs from this file descriptor */
 }
 writer_thread_t;
 
 #define RSM_DEFINE_NS_QUERY_ERROR_TO(__interface)					\
-static int	ns_query_error_to_ ## __interface (rsm_ns_query_error_t err)	\
+static int	ns_query_error_to_ ## __interface (rsm_ns_query_error_t err)		\
 {											\
 	switch (err)									\
 	{										\
@@ -2141,9 +2141,8 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 		{
 			for (j = 0; j < nss[i].ips_num; j++)
 			{
-				int	fd[2];		/* reader and writer fd for data */
-				int	log_pipe[2];	/* reader and writer fd for logs */
-				int	rv_fd, rv_log_pipe = 0;
+				int	ipc_data_fds[2];	/* reader and writer file descriptors for data */
+				int	ipc_log_fds[2];		/* reader and writer file descriptors for logs */
 
 				if (0 != last_test_failed)
 				{
@@ -2152,18 +2151,23 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 					continue;
 				}
 
-				if (-1 == (rv_fd = pipe(fd)) || -1 == (rv_log_pipe = pipe(log_pipe)))
+				if (-1 == pipe(ipc_log_fds))
 				{
 					rsm_errf(log_fd, "cannot create pipe: %s", zbx_strerror(errno));
-
-					if (-1 == rv_log_pipe)
-					{
-						close(fd[0]);
-						close(fd[1]);
-					}
-
 					nss[i].ips[j].rtt = DNS[DNS_PROTO(res)].ns_query_error(RSM_NS_QUERY_INTERNAL);
 					last_test_failed = 1;
+
+					continue;
+				}
+
+				if (-1 == pipe(ipc_data_fds))
+				{
+					rsm_errf(log_fd, "cannot create pipe: %s", zbx_strerror(errno));
+					nss[i].ips[j].rtt = DNS[DNS_PROTO(res)].ns_query_error(RSM_NS_QUERY_INTERNAL);
+					last_test_failed = 1;
+
+					close(ipc_log_fds[0]);
+					close(ipc_log_fds[1]);
 
 					continue;
 				}
@@ -2172,12 +2176,14 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 
 				if (0 > pid)
 				{
+					/* parent, an error occurred */
+
 					rsm_errf(log_fd, "cannot create process: %s", zbx_strerror(errno));
 
-					close(fd[0]);
-					close(fd[1]);
-					close(log_pipe[0]);
-					close(log_pipe[1]);
+					close(ipc_data_fds[0]);
+					close(ipc_data_fds[1]);
+					close(ipc_log_fds[0]);
+					close(ipc_log_fds[1]);
 
 					nss[i].ips[j].rtt = DNS[DNS_PROTO(res)].ns_query_error(RSM_NS_QUERY_INTERNAL);
 					last_test_failed = 1;
@@ -2188,27 +2194,42 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 				{
 					/* child */
 
-					FILE	*th_log_fd;
+					/* We already have an open file descriptor for sending logs */
+					/* to the parent process (ipc_log_fds[1]) but we would like */
+					/* to use existing functions to do that (e. g. rsm_infof()) */
+					/* and since they use FILE pointer we create one and        */
+					/* associate the file descriptor with it by using fdopen(). */
+					FILE	*ipc_log_fp;
 
-					close(fd[0]);		/* child does not need data reader fd */
-					close(log_pipe[0]);	/* child does not need log reader fd */
-					fclose(log_fd);		/* child does not need log writer */
+					close(ipc_data_fds[0]);	/* child does not read data, it sends it to parent */
+					close(ipc_log_fds[0]);	/* child does not read logs, it sends those to parent */
+					fclose(log_fd);		/* child does not write to the log file of parent */
 
-					if (NULL == (th_log_fd = fdopen(log_pipe[1], "w")))
+					if (NULL == (ipc_log_fp = fdopen(ipc_log_fds[1], "w")))
 					{
-						rsm_errf(log_fd, "cannot open log pipe: %s", zbx_strerror(errno));
+						char	*error = NULL;
+
+						/* this is the only place where we use ipc_log_fds[1] to send the log */
+						/* to parent instead of ipc_log_fp because of the error creating it   */
+
+						error = zbx_dsprintf(error, "fdopen() failed: %s", zbx_strerror(errno));
+
+						/* no need to check for error here because we have no way to send it */
+						write(ipc_log_fds[1], error, strlen(error) + 1);
+
+						zbx_free(error);
 
 						nss[i].ips[j].rtt =
 							DNS[DNS_PROTO(res)].ns_query_error(RSM_NS_QUERY_INTERNAL);
 					}
 
-					if (NULL != th_log_fd && SUCCEED != test_nameserver(res,
+					if (NULL != ipc_log_fp && SUCCEED != test_nameserver(res,
 							nss[i].name,
 							nss[i].ips[j].ip,
 							nss[i].ips[j].port,
 							dnskeys,
 							testedname,
-							th_log_fd,
+							ipc_log_fp,
 							&nss[i].ips[j].rtt,
 							&nss[i].ips[j].nsid,
 							(0 != epp_enabled ? &nss[i].ips[j].upd : NULL),
@@ -2218,18 +2239,18 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 							err,
 							sizeof(err)))
 					{
-						rsm_err(th_log_fd, err);
+						rsm_err(ipc_log_fp, err);
 					}
 
 					pack_values(i, j, nss[i].ips[j].rtt, nss[i].ips[j].upd, nss[i].ips[j].nsid,
 							buf, sizeof(buf));
 
-					if (-1 == write(fd[1], buf, strlen(buf) + 1))
-						rsm_errf(th_log_fd, "cannot write to pipe: %s", zbx_strerror(errno));
+					if (-1 == write(ipc_data_fds[1], buf, strlen(buf) + 1))
+						rsm_errf(ipc_log_fp, "cannot write to pipe: %s", zbx_strerror(errno));
 
-					fclose(th_log_fd);
-					close(fd[1]);
-					close(log_pipe[1]);
+					fclose(ipc_log_fp);
+					close(ipc_data_fds[1]);
+					close(ipc_log_fds[1]);
 
 					exit(EXIT_SUCCESS);
 				}
@@ -2237,12 +2258,12 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 				{
 					/* parent */
 
-					close(fd[1]);		/* parent does not need data writer fd */
-					close(log_pipe[1]);	/* parent does not need log writer fd */
+					close(ipc_data_fds[1]);	/* parent does not send data, it receives it from child */
+					close(ipc_log_fds[1]);	/* parent does not send logs, it receives them from child */
 
 					threads[th_num].pid = pid;
-					threads[th_num].fd = fd[0];
-					threads[th_num].log_fd = log_pipe[0];
+					threads[th_num].ipc_data_fd = ipc_data_fds[0];
+					threads[th_num].ipc_log_fd = ipc_log_fds[0];
 
 					th_num++;
 				}
@@ -2257,7 +2278,7 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 			if (0 == threads[th_num].pid)
 				continue;
 
-			if (-1 != read(threads[th_num].fd, buf, sizeof(buf)))
+			if (-1 != read(threads[th_num].ipc_data_fd, buf, sizeof(buf)))
 			{
 				int	rtt, upd;
 				char	nsid[NSID_MAX_LENGTH * 2 + 1];	/* hex representation + terminating null char */
@@ -2269,13 +2290,13 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 				nss[i].ips[j].nsid = zbx_strdup(nss[i].ips[j].nsid, nsid);
 			}
 			else
-				rsm_errf(log_fd, "cannot read from pipe: %s", zbx_strerror(errno));
+				rsm_errf(log_fd, "cannot read data from child: %s", zbx_strerror(errno));
 
-			while (0 != (bytes = read(threads[th_num].log_fd, buf, sizeof(buf))))
+			while (0 != (bytes = read(threads[th_num].ipc_log_fd, buf, sizeof(buf))))
 			{
 				if (-1 == bytes)
 				{
-					rsm_errf(log_fd, "cannot read logs from pipe: %s", zbx_strerror(errno));
+					rsm_errf(log_fd, "cannot read logs from child: %s", zbx_strerror(errno));
 					break;
 				}
 
@@ -2285,8 +2306,8 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 			if (0 >= waitpid(threads[th_num].pid, &status, 0))
 				rsm_err(log_fd, "error on thread waiting");
 
-			close(threads[th_num].fd);
-			close(threads[th_num].log_fd);
+			close(threads[th_num].ipc_data_fd);
+			close(threads[th_num].ipc_log_fd);
 		}
 
 		zbx_free(threads);
