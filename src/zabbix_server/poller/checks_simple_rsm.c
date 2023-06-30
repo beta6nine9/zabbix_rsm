@@ -840,8 +840,9 @@ static char	*get_curl_details(CURL *easyhandle)
 /* max redirect settings, stores web page contents using provided callback, checks for OK response and calculates */
 /* round-trip time. When function succeeds it returns RTT in milliseconds. When function fails it returns source  */
 /* of error in provided RTT parameter. Does not verify certificates.                                              */
-int	rsm_http_test(const char *host, const char *url, long timeout, long maxredirs, rsm_http_error_t *ec_http, int *rtt,
-		writedata_t *request_headers, void *response, char **transfer_details, char *err, size_t err_size)
+int	rsm_http_test(const char *host, const char *url, long timeout, long maxredirs, rsm_http_error_t *ec_http,
+		int *rtt, writedata_t *request_headers, void *response, char **transfer_details, int ipv4_enabled,
+		int ipv6_enabled, char *err, size_t err_size)
 {
 #ifdef HAVE_LIBCURL
 	CURL			*easyhandle;
@@ -849,7 +850,7 @@ int	rsm_http_test(const char *host, const char *url, long timeout, long maxredir
 	CURLoption		opt;
 	char			host_buf[RSM_BUF_SIZE];
 	double			total_time;
-	long			response_code;
+	long			response_code, resolve;
 	struct curl_slist	*slist = NULL;
 #endif
 	int			ret = FAIL;
@@ -877,11 +878,19 @@ int	rsm_http_test(const char *host, const char *url, long timeout, long maxredir
 		goto out;
 	}
 
+	if (0 != ipv4_enabled && 0 != ipv6_enabled)
+		resolve = CURL_IPRESOLVE_WHATEVER;
+	else if (0 != ipv4_enabled)
+		resolve = CURL_IPRESOLVE_V4;
+	else
+		resolve = CURL_IPRESOLVE_V6;
+
 	if (CURLE_OK != (curl_err = curl_easy_setopt(easyhandle, opt = CURLOPT_FOLLOWLOCATION, 1L)) ||
 			CURLE_OK != (curl_err = curl_easy_setopt(easyhandle, opt = CURLOPT_USERAGENT, "Zabbix " ZABBIX_VERSION)) ||
 			CURLE_OK != (curl_err = curl_easy_setopt(easyhandle, opt = CURLOPT_VERBOSE, 1L)) || /* this must be turned on for debugfunction */
 			CURLE_OK != (curl_err = curl_easy_setopt(easyhandle, opt = CURLOPT_MAXREDIRS, maxredirs)) ||
 			CURLE_OK != (curl_err = curl_easy_setopt(easyhandle, opt = CURLOPT_URL, url)) ||
+			CURLE_OK != (curl_err = curl_easy_setopt(easyhandle, opt = CURLOPT_IPRESOLVE, resolve)) ||
 			CURLE_OK != (curl_err = curl_easy_setopt(easyhandle, opt = CURLOPT_TIMEOUT, timeout)) ||
 			CURLE_OK != (curl_err = curl_easy_setopt(easyhandle, opt = CURLOPT_HTTPHEADER, slist)) ||
 			CURLE_OK != (curl_err = curl_easy_setopt(easyhandle, opt = CURLOPT_SSL_VERIFYPEER, 0L)) ||

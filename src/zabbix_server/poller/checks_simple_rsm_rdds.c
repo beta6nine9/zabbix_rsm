@@ -481,7 +481,7 @@ int	check_rsm_rdds(const char *host, const AGENT_REQUEST *request, AGENT_RESULT 
 		rsm_infof(log_fd, "the following URL was generated for the test: %s", formed_url);
 
 		rv = rsm_http_test(domain, formed_url, RSM_TCP_TIMEOUT, maxredirs, &ec_http, &rtt80, &request_headers,
-				&response, &transfer_details, err, sizeof(err));
+				&response, &transfer_details, ipv4_enabled, ipv6_enabled, err, sizeof(err));
 
 		rsm_infof(log_fd, "Request headers:\n%s", ZBX_NULL2STR(request_headers.buf));
 		rsm_infof(log_fd, "Transfer details:%s\nBody:\n%s", ZBX_NULL2STR(transfer_details), ZBX_NULL2STR(response.buf));
