@@ -320,15 +320,18 @@ sub get_rdap_rdds_hosts($$)
 	{
 		if ($proxy_config{'rdds'} && $rsmhosts_config{$rsmhost}{'rdds43'})
 		{
-			$hosts{$rsmhosts_config{$rsmhost}{'rdds43_server'}}{$rsmhost} = undef;
+			my $server = $rsmhosts_config{$rsmhost}{'rdds43_server'};
+			$hosts{$server}{$rsmhost} = undef;
 		}
 		if ($proxy_config{'rdds'} && $rsmhosts_config{$rsmhost}{'rdds80'})
 		{
-			$hosts{$rsmhosts_config{$rsmhost}{'rdds80_server'}}{$rsmhost} = undef;
+			my $server = $rsmhosts_config{$rsmhost}{'rdds80_server'};
+			$hosts{$server}{$rsmhost} = undef;
 		}
 		if ($proxy_config{'rdap'} && $rsmhosts_config{$rsmhost}{'rdap'})
 		{
-			$hosts{$rsmhosts_config{$rsmhost}{'rdap_server'}}{$rsmhost} = undef;
+			my $server = $rsmhosts_config{$rsmhost}{'rdap_server'};
+			$hosts{$server}{$rsmhost} = undef if ($server ne 'not listed' && $server ne 'no https');
 		}
 	}
 
@@ -696,8 +699,8 @@ sub get_rsmhosts_config($$)
 			'rdds80'        => $macros{'{$RSM.TLD.RDDS80.ENABLED}'},
 			'rdap'          => $macros{'{$RDAP.TLD.ENABLED}'},
 			'rdds43_server' => $macros{'{$RSM.TLD.RDDS43.SERVER}'},
-			'rdds80_server' => get_hostname($macros{'{$RSM.TLD.RDDS80.URL}'}),
-			'rdap_server'   => get_hostname($macros{'{$RDAP.BASE.URL}'}),
+			'rdds80_server' => get_hostname($macros{'{$RSM.TLD.RDDS80.URL}'}, undef),
+			'rdap_server'   => get_hostname($macros{'{$RDAP.BASE.URL}'}, ['not listed', 'no https']),
 		);
 
 		if ($monitoring_target eq MONITORING_TARGET_REGISTRY)
@@ -714,14 +717,20 @@ sub get_rsmhosts_config($$)
 	}
 }
 
-sub get_hostname($)
+sub get_hostname($$)
 {
-	my $url = shift;
+	my $url           = shift;
+	my @valid_strings = @{shift // []};
 
 	# TODO: consider removing 'http:///'
 	if ($url eq '' || $url eq 'http:///')
 	{
 		return '';
+	}
+
+	if (grep { $url eq $_ } @valid_strings)
+	{
+		return $url;
 	}
 
 	my ($hostname) = $url =~ m!^\w+://([^/:]+)!;

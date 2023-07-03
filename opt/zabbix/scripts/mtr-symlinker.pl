@@ -265,15 +265,18 @@ sub create_ip_rsmhosts_mapping($$$)
 
 		if ($proxy_config{'rdds'} && $rsmhosts_config{$rsmhost}{'rdds43'})
 		{
-			$hosts{$rsmhosts_config{$rsmhost}{'rdds43_server'}} = undef;
+			my $server = $rsmhosts_config{$rsmhost}{'rdds43_server'};
+			$hosts{$server} = undef;
 		}
 		if ($proxy_config{'rdds'} && $rsmhosts_config{$rsmhost}{'rdds80'})
 		{
-			$hosts{$rsmhosts_config{$rsmhost}{'rdds80_server'}} = undef;
+			my $server = $rsmhosts_config{$rsmhost}{'rdds80_server'};
+			$hosts{$server} = undef;
 		}
 		if ($proxy_config{'rdap'} && $rsmhosts_config{$rsmhost}{'rdap'})
 		{
-			$hosts{$rsmhosts_config{$rsmhost}{'rdap_server'}} = undef;
+			my $server = $rsmhosts_config{$rsmhost}{'rdap_server'};
+			$hosts{$server} = undef if ($server ne 'not listed' && $server ne 'no https');
 		}
 
 		my @ip_list = ();
