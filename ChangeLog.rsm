@@ -1,3 +1,13 @@
+Changes for rsm3.3.0rc2
+
+Bug fixes:
+....I..... [934] don't process ns,ip pairs for disabled rsmhosts (asitals)
+....I..... [935] treat "not listed" and "no https" as valid strings for RDAP server in network troubleshooting (asitals)
+....I..... [937] fixed illegal division by zero when there is only one IP address in the system (asitals)
+....I..... [938] don't duplicate mtr tests for duplicate IPv6 addresses in different formats (short and long) (asitals)
+....I..... [939] fixed validation of filenames in mtr-symlinker.pl (asitals)
+
+--------------------------------------------------------------------------------
 Changes for rsm3.3.0rc1
 
 New features:
