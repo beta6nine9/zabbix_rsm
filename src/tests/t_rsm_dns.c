@@ -1,3 +1,5 @@
+#define _GNU_SOURCE
+
 #include "t_rsm_decl.h"
 #include "t_rsm.h"
 

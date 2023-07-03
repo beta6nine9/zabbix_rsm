@@ -17,6 +17,8 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
+#define _GNU_SOURCE
+
 #include "threads.h"
 #include "log.h"
 #include "checks_simple_rsm.h"
@@ -31,6 +33,12 @@
 #define PACK_NUM_VARS	5
 #define PACK_FORMAT	ZBX_FS_SIZE_T "|" ZBX_FS_SIZE_T "|%d|%d|%s"
 
+/* This file contains additional persistent data relted to DNS test. */
+/* The file is optional, in "normal" mode it is deleted. When mode   */
+/* is "critical" it includes the following 2 integer values:         */
+/*   - current mode (normal or critical)                             */
+/*   - number of successful tests                                    */
+/* The file holds binary data.                                       */
 #define METADATA_FILE_PREFIX	"/tmp/dns-test-metadata"	/* /tmp/dns-test-metadata-<TLD>.bin */
 
 #define CURRENT_MODE_NORMAL		0
@@ -2042,10 +2050,8 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 
 	if (CURRENT_MODE_NORMAL != current_mode)
 	{
-		rsm_infof(log_fd, "critical test mode details: successful:%d"
-				", required:%d",
-				successful_tests,
-				(RSM_UDP == protocol ? test_recover_udp : test_recover_tcp));
+		rsm_infof(log_fd, "critical test mode details: successful:%d, required:%d",
+				successful_tests, (RSM_UDP == protocol ? test_recover_udp : test_recover_tcp));
 	}
 
 	extras = (dnssec_enabled ? RESOLVER_EXTRAS_DNSSEC : RESOLVER_EXTRAS_NONE);
@@ -2143,6 +2149,7 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 			{
 				int	ipc_data_fds[2];	/* reader and writer file descriptors for data */
 				int	ipc_log_fds[2];		/* reader and writer file descriptors for logs */
+				int	rv;
 
 				if (0 != last_test_failed)
 				{
@@ -2155,6 +2162,23 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 				{
 					rsm_errf(log_fd, "cannot create pipe: %s", zbx_strerror(errno));
 					nss[i].ips[j].rtt = DNS[DNS_PROTO(res)].ns_query_error(RSM_NS_QUERY_INTERNAL);
+					last_test_failed = 1;
+
+					continue;
+				}
+
+				/* increase buffer size for logs, they might get pretty big */
+				if (ZBX_MEBIBYTE != (rv = fcntl(ipc_log_fds[1], F_SETPIPE_SZ, ZBX_MEBIBYTE)))
+				{
+					if (-1 == rv)
+						rsm_errf(log_fd, "cannot change pipe buffer size to %d: %s", ZBX_MEBIBYTE, zbx_strerror(errno));
+					else
+						rsm_errf(log_fd, "cannot change pipe buffer size to %d", ZBX_MEBIBYTE);
+
+					nss[i].ips[j].rtt = DNS[DNS_PROTO(res)].ns_query_error(RSM_NS_QUERY_INTERNAL);
+
+					close(ipc_log_fds[0]);
+					close(ipc_log_fds[1]);
 					last_test_failed = 1;
 
 					continue;
@@ -2176,7 +2200,7 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 
 				if (0 > pid)
 				{
-					/* parent, an error occurred */
+					/* cannot create child */
 
 					rsm_errf(log_fd, "cannot create process: %s", zbx_strerror(errno));
 
@@ -2203,7 +2227,7 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 
 					close(ipc_data_fds[0]);	/* child does not read data, it sends it to parent */
 					close(ipc_log_fds[0]);	/* child does not read logs, it sends those to parent */
-					fclose(log_fd);		/* child does not write to the log file of parent */
+					fclose(log_fd);		/* child does not write to the main log file */
 
 					if (NULL == (ipc_log_fp = fdopen(ipc_log_fds[1], "w")))
 					{
@@ -2242,15 +2266,21 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 						rsm_err(ipc_log_fp, err);
 					}
 
+					/* we've done writing logs */
+					fclose(ipc_log_fp);
+					close(ipc_log_fds[1]);
+
 					pack_values(i, j, nss[i].ips[j].rtt, nss[i].ips[j].upd, nss[i].ips[j].nsid,
 							buf, sizeof(buf));
 
 					if (-1 == write(ipc_data_fds[1], buf, strlen(buf) + 1))
-						rsm_errf(ipc_log_fp, "cannot write to pipe: %s", zbx_strerror(errno));
+					{
+						zabbix_log(LOG_LEVEL_WARNING, "RSM In %s(): cannot write to pipe: %s",
+								__func__, zbx_strerror(errno));
+					}
 
-					fclose(ipc_log_fp);
+					/* we've done writing data */
 					close(ipc_data_fds[1]);
-					close(ipc_log_fds[1]);
 
 					exit(EXIT_SUCCESS);
 				}
@@ -2278,20 +2308,7 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 			if (0 == threads[th_num].pid)
 				continue;
 
-			if (-1 != read(threads[th_num].ipc_data_fd, buf, sizeof(buf)))
-			{
-				int	rtt, upd;
-				char	nsid[NSID_MAX_LENGTH * 2 + 1];	/* hex representation + terminating null char */
-
-				unpack_values(&i, &j, &rtt, &upd, nsid, buf, log_fd);
-
-				nss[i].ips[j].rtt = rtt;
-				nss[i].ips[j].upd = upd;
-				nss[i].ips[j].nsid = zbx_strdup(nss[i].ips[j].nsid, nsid);
-			}
-			else
-				rsm_errf(log_fd, "cannot read data from child: %s", zbx_strerror(errno));
-
+			/* first read the logs */
 			while (0 != (bytes = read(threads[th_num].ipc_log_fd, buf, sizeof(buf))))
 			{
 				if (-1 == bytes)
@@ -2303,11 +2320,35 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 				rsm_dump(log_fd, "%.*s", (int)bytes, buf);
 			}
 
-			if (0 >= waitpid(threads[th_num].pid, &status, 0))
-				rsm_err(log_fd, "error on thread waiting");
+			close(threads[th_num].ipc_log_fd);
+
+			/* now read the data */
+			while (0 != (bytes = read(threads[th_num].ipc_data_fd, buf, sizeof(buf))))
+			{
+				if (-1 == bytes)
+				{
+					rsm_errf(log_fd, "cannot read data from child: %s", zbx_strerror(errno));
+					break;
+				}
+
+			}
 
 			close(threads[th_num].ipc_data_fd);
-			close(threads[th_num].ipc_log_fd);
+
+			if (0 == bytes)
+			{
+				int	rtt, upd;
+				char	nsid[NSID_MAX_LENGTH * 2 + 1];	/* hex representation + terminating null char */
+
+				unpack_values(&i, &j, &rtt, &upd, nsid, buf, log_fd);
+
+				nss[i].ips[j].rtt = rtt;
+				nss[i].ips[j].upd = upd;
+				nss[i].ips[j].nsid = zbx_strdup(nss[i].ips[j].nsid, nsid);
+			}
+
+			if (0 >= waitpid(threads[th_num].pid, &status, 0))
+				rsm_err(log_fd, "error on thread waiting");
 		}
 
 		zbx_free(threads);
