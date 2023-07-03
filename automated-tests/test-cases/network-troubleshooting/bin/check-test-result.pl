@@ -96,7 +96,7 @@ sub compare_file_contents($$$)
 	if ($archived_output ne $expected_output)
 	{
 		print("--- expected VS generated:\n");
-		print(diff(\$archived_output, \$expected_output), "\n");
+		print(diff(\$expected_output, \$archived_output), "\n");
 
 		die("contents of '$archived_output_filename' don't match expected contents of '$expected_output_filename'");
 	}
