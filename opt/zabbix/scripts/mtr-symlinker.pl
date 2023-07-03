@@ -77,7 +77,7 @@ sub main()
 
 	foreach my $filename (@file_list)
 	{
-		if ($filename !~ /^$probe-(\d+\.\d+\.\d+\.\d+|[\d:]+)-\d+-\d+\.json\.gz$/)
+		if ($filename !~ /^$probe-(\d+\.\d+\.\d+\.\d+|[a-f\d:]+)-\d+-\d+\.json\.gz$/)
 		{
 			fail("unexpected structure of filename, expected '<probe>-<ip>-<cycle_timestamp>-<metric_timestamp>.json.gz', got '$filename'");
 		}
