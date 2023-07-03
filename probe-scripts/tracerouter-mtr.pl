@@ -408,7 +408,14 @@ sub create_ip_list($$$$)
 
 	foreach (values(%rsmhosts_config))
 	{
+		# registrars don't have nsip_list
 		if (!exists($_->{'nsip_list'}))
+		{
+			last;
+		}
+
+		# skip disabled TLDs
+		if (!$_->{"dns_tcp"} && !$_->{"dns_udp"})
 		{
 			last;
 		}

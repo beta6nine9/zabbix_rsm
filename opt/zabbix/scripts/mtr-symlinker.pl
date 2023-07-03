@@ -244,17 +244,20 @@ sub create_ip_rsmhosts_mapping($$$)
 
 	foreach my $rsmhost (keys(%rsmhosts_config))
 	{
-		foreach my $nsip (@{$rsmhosts_config{$rsmhost}{'nsip_list'}})
+		if ($rsmhosts_config{$rsmhost}{"dns_tcp"} || $rsmhosts_config{$rsmhost}{"dns_udp"})
 		{
-			my $ip = $nsip->[1];
+			foreach my $nsip (@{$rsmhosts_config{$rsmhost}{'nsip_list'}})
+			{
+				my $ip = $nsip->[1];
 
-			if ($proxy_config{'ipv4'} && is_ipv4($ip))
-			{
-				$mapping{$ip}{$rsmhost} = undef;
-			}
-			if ($proxy_config{'ipv6'} && is_ipv6($ip))
-			{
-				$mapping{$ip}{$rsmhost} = undef;
+				if ($proxy_config{'ipv4'} && is_ipv4($ip))
+				{
+					$mapping{$ip}{$rsmhost} = undef;
+				}
+				if ($proxy_config{'ipv6'} && is_ipv6($ip))
+				{
+					$mapping{$ip}{$rsmhost} = undef;
+				}
 			}
 		}
 

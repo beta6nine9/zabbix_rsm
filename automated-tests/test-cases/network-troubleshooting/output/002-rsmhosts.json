@@ -2,7 +2,12 @@
    "tld1" : {
       "dns_tcp" : "0",
       "dns_udp" : "0",
-      "nsip_list" : [],
+      "nsip_list" : [
+         [
+            "ns1.tld1",
+            "127.0.1.1"
+         ]
+      ],
       "rdap" : "0",
       "rdap_server" : "",
       "rdds43" : "0",
@@ -13,31 +18,50 @@
    "tld2" : {
       "dns_tcp" : "0",
       "dns_udp" : "0",
-      "nsip_list" : [],
+      "nsip_list" : [
+         [
+            "ns1.tld2",
+            "127.0.2.1"
+         ]
+      ],
       "rdap" : "0",
       "rdap_server" : "",
       "rdds43" : "0",
-      "rdds43_server" : "",
+      "rdds43_server" : "rdds.tld2",
       "rdds80" : "0",
       "rdds80_server" : ""
    },
    "tld3" : {
       "dns_tcp" : "0",
       "dns_udp" : "0",
-      "nsip_list" : [],
+      "nsip_list" : [
+         [
+            "ns1.tld3",
+            "127.0.3.1"
+         ]
+      ],
       "rdap" : "0",
       "rdap_server" : "",
       "rdds43" : "0",
       "rdds43_server" : "",
       "rdds80" : "0",
-      "rdds80_server" : ""
+      "rdds80_server" : "rdds.tld2"
    },
    "tld4" : {
       "dns_tcp" : "0",
       "dns_udp" : "0",
-      "nsip_list" : [],
+      "nsip_list" : [
+         [
+            "ns1.tld1",
+            "127.0.1.1"
+         ],
+         [
+            "ns1.tld4",
+            "127.0.4.1"
+         ]
+      ],
       "rdap" : "0",
-      "rdap_server" : "",
+      "rdap_server" : "rdap.tld4",
       "rdds43" : "0",
       "rdds43_server" : "",
       "rdds80" : "0",
@@ -46,12 +70,17 @@
    "tld5" : {
       "dns_tcp" : "0",
       "dns_udp" : "0",
-      "nsip_list" : [],
+      "nsip_list" : [
+         [
+            "ns1.tld1",
+            "127.0.1.1"
+         ]
+      ],
       "rdap" : "0",
-      "rdap_server" : "",
+      "rdap_server" : "rdap.tld5",
       "rdds43" : "0",
-      "rdds43_server" : "",
+      "rdds43_server" : "rdds.tld5",
       "rdds80" : "0",
-      "rdds80_server" : ""
+      "rdds80_server" : "rdds.tld5"
    }
 }
