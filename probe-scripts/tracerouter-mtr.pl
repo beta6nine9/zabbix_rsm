@@ -4,7 +4,7 @@ use strict;
 use warnings;
 
 use Config::Tiny;
-use DBD::SQLite::Constants qw/:file_open/;
+use DBD::SQLite::Constants qw(:file_open);
 use DBI;
 use Data::Dumper;
 use Devel::StackTrace;
@@ -16,6 +16,7 @@ use IO::Select;
 use JSON::XS;
 use List::Util qw(max shuffle);
 use Net::DNS::Async;
+use Net::IP qw(ip_is_ipv6 ip_expand_address);
 use Parallel::ForkManager;
 use Pod::Usage;
 use Socket;
@@ -705,11 +706,21 @@ sub get_rsmhosts_config($$)
 
 		if ($monitoring_target eq MONITORING_TARGET_REGISTRY)
 		{
+			my @nsip_list = map([split(/,/)], split(/ /, $macros{'{$RSM.DNS.NAME.SERVERS}'}));
+
+			foreach my $nsip (@nsip_list)
+			{
+				if (ip_is_ipv6($nsip->[1]))
+				{
+					$nsip->[1] = ip_expand_address($nsip->[1], 6);
+				}
+			}
+
 			%config = (
 				%config,
 				'dns_tcp'   => $macros{'{$RSM.TLD.DNS.TCP.ENABLED}'},
 				'dns_udp'   => $macros{'{$RSM.TLD.DNS.UDP.ENABLED}'},
-				'nsip_list' => [map([split(/,/)], split(/ /, $macros{'{$RSM.DNS.NAME.SERVERS}'}))],
+				'nsip_list' => \@nsip_list,
 			);
 		}
 
@@ -813,7 +824,7 @@ sub resolver_callback($$$)
 		elsif ($rr->type eq 'AAAA')
 		{
 			dbg("owner: %s, ipv6: %s", $rr->owner, $rr->address);
-			push(@{$result->{$host}{'ipv6'}}, $rr->address);
+			push(@{$result->{$host}{'ipv6'}}, ip_expand_address($rr->address, 6));
 		}
 		else
 		{

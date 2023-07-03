@@ -55,8 +55,8 @@ sub check_archive($$$)
 	{
 		die("ipv4 is enabled in proxy, but mtr outputs for ipv4 are missing")  if ($proxy_config->{"ipv4"} && !has_mtr_outputs(\%archive, "ipv4"));
 		die("ipv4 is disabled in proxy, but mtr outputs for ipv4 are present") if (!$proxy_config->{"ipv4"} && has_mtr_outputs(\%archive, "ipv4"));
-		die("ipv4 is enabled in proxy, but mtr outputs for ipv4 are missing")  if ($proxy_config->{"ipv6"} && !has_mtr_outputs(\%archive, "ipv6"));
-		die("ipv4 is disabled in proxy, but mtr outputs for ipv4 are present") if (!$proxy_config->{"ipv6"} && has_mtr_outputs(\%archive, "ipv6"));
+		die("ipv6 is enabled in proxy, but mtr outputs for ipv6 are missing")  if ($proxy_config->{"ipv6"} && !has_mtr_outputs(\%archive, "ipv6"));
+		die("ipv6 is disabled in proxy, but mtr outputs for ipv6 are present") if (!$proxy_config->{"ipv6"} && has_mtr_outputs(\%archive, "ipv6"));
 	}
 	else
 	{
@@ -144,7 +144,7 @@ sub has_mtr_outputs($$)
 	my $ip_pattern;
 
 	$ip_pattern = '\d+\.\d+\.\d+\.\d+' if ($ip_version eq "ipv4");
-	$ip_pattern = '[0-9a-fA-F]*(:[:0-9a-fA-F])+' if ($ip_version eq "ipv6");
+	$ip_pattern = '[0-9a-fA-F]*(:[:0-9a-fA-F]+)+' if ($ip_version eq "ipv6");
 
 	die("unsupported IP version: '$ip_version'") if (!defined($ip_pattern));
 
