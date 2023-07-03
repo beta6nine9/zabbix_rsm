@@ -420,7 +420,7 @@ sub create_ip_list($$$$)
 		# skip disabled TLDs
 		if (!$_->{"dns_tcp"} && !$_->{"dns_udp"})
 		{
-			last;
+			next;
 		}
 
 		foreach my $nsip (@{$_->{'nsip_list'}})
