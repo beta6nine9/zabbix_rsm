@@ -14,7 +14,7 @@ use Getopt::Long qw(GetOptionsFromArray);
 use IO::Compress::Gzip qw(gzip $GzipError);
 use IO::Select;
 use JSON::XS;
-use List::Util qw(shuffle);
+use List::Util qw(max shuffle);
 use Net::DNS::Async;
 use Parallel::ForkManager;
 use Pod::Usage;
@@ -919,7 +919,7 @@ sub create_tasks($)
 	{
 		my $task = {
 			'ip'   => $ip_list[$i],
-			'time' => $now + $seconds / (scalar(@ip_list) - 1) * $i,
+			'time' => $now + $seconds / (max(1, scalar(@ip_list) - 1)) * $i,
 		};
 		push(@tasks, $task);
 
