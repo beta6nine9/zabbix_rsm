@@ -135,7 +135,7 @@ sub validate_config()
 	dbg("config:");
 	dbg();
 	dbg("[network_troubleshooting]");
-	dbg("output_dir = %s", get_config('network_troubleshooting', 'output_dir'));
+	dbg("output_dir = " . get_config('network_troubleshooting', 'output_dir'));
 	dbg();
 }
 
