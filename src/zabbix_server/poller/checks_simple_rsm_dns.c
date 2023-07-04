@@ -33,12 +33,13 @@
 #define PACK_NUM_VARS	5
 #define PACK_FORMAT	ZBX_FS_SIZE_T "|" ZBX_FS_SIZE_T "|%d|%d|%s"
 
-/* This file contains additional persistent data relted to DNS test. */
-/* The file is optional, in "normal" mode it is deleted. When mode   */
-/* is "critical" it includes the following 2 integer values:         */
-/*   - current mode (normal or critical)                             */
-/*   - number of successful tests                                    */
-/* The file holds binary data.                                       */
+/* This file contains additional persistent data related to DNS test. */
+/* The file is optional, in "normal" operational mode it is deleted.  */
+/* The file includes the following 2 integer values:                  */
+/*   - current operational mode (normal (0) or critical (1))          */
+/*   - number of successful tests (while still in critical mode)      */
+/*                                                                    */
+/* The file holds binary data.                                        */
 #define METADATA_FILE_PREFIX	"/tmp/dns-test-metadata"	/* /tmp/dns-test-metadata-<TLD>.bin */
 
 #define CURRENT_MODE_NORMAL		0
@@ -1901,6 +1902,27 @@ out:
 		ldns_pkt_free(pkt);
 }
 
+static int	write_to_fd(int fd, const char *buf, size_t n, char *err, size_t err_size)
+{
+	while (0 < n)
+	{
+		ssize_t	ret;
+
+		if (-1 != (ret = write(fd, buf, n)))
+		{
+			buf += ret;
+			n -= (size_t)ret;
+		}
+		else
+		{
+			zbx_snprintf(err, err_size, "cannot write: %s", zbx_strerror(errno));
+			return FAIL;
+		}
+	}
+
+	return SUCCEED;
+}
+
 int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, int nextcheck,
 		const AGENT_REQUEST *request, AGENT_RESULT *result, FILE *output_fd)
 {
@@ -2246,8 +2268,7 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 						nss[i].ips[j].rtt =
 							DNS[DNS_PROTO(res)].ns_query_error(RSM_NS_QUERY_INTERNAL);
 					}
-
-					if (NULL != ipc_log_fp && SUCCEED != test_nameserver(res,
+					else if (SUCCEED != test_nameserver(res,
 							nss[i].name,
 							nss[i].ips[j].ip,
 							nss[i].ips[j].port,
@@ -2267,17 +2288,15 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 					}
 
 					/* we've done writing logs */
-					fclose(ipc_log_fp);
+					if (NULL != ipc_log_fp)
+						fclose(ipc_log_fp);
 					close(ipc_log_fds[1]);
 
 					pack_values(i, j, nss[i].ips[j].rtt, nss[i].ips[j].upd, nss[i].ips[j].nsid,
 							buf, sizeof(buf));
 
-					if (-1 == write(ipc_data_fds[1], buf, strlen(buf) + 1))
-					{
-						zabbix_log(LOG_LEVEL_WARNING, "RSM In %s(): cannot write to pipe: %s",
-								__func__, zbx_strerror(errno));
-					}
+					if (-1 == write_to_fd(ipc_data_fds[1], buf, strlen(buf) + 1, err, sizeof(err)))
+						zabbix_log(LOG_LEVEL_WARNING, "RSM In %s(): %s", __func__, err);
 
 					/* we've done writing data */
 					close(ipc_data_fds[1]);
@@ -2300,10 +2319,12 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 			}
 		}
 
+		/* collect logs and data from child processes */
 		for (th_num = 0; th_num < threads_num; th_num++)
 		{
 			ssize_t	bytes;
 			int	status;
+			char	*received_data = NULL;
 
 			if (0 == threads[th_num].pid)
 				continue;
@@ -2331,6 +2352,7 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 					break;
 				}
 
+				received_data = zbx_strdcat(received_data, buf);
 			}
 
 			close(threads[th_num].ipc_data_fd);
@@ -2340,12 +2362,14 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 				int	rtt, upd;
 				char	nsid[NSID_MAX_LENGTH * 2 + 1];	/* hex representation + terminating null char */
 
-				unpack_values(&i, &j, &rtt, &upd, nsid, buf, log_fd);
+				unpack_values(&i, &j, &rtt, &upd, nsid, received_data, log_fd);
 
 				nss[i].ips[j].rtt = rtt;
 				nss[i].ips[j].upd = upd;
 				nss[i].ips[j].nsid = zbx_strdup(nss[i].ips[j].nsid, nsid);
 			}
+
+			zbx_free(received_data);
 
 			if (0 >= waitpid(threads[th_num].pid, &status, 0))
 				rsm_err(log_fd, "error on thread waiting");
