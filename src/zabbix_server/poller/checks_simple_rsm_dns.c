@@ -1902,27 +1902,6 @@ out:
 		ldns_pkt_free(pkt);
 }
 
-static int	write_to_fd(int fd, const char *buf, size_t n, char *err, size_t err_size)
-{
-	while (0 < n)
-	{
-		ssize_t	ret;
-
-		if (-1 != (ret = write(fd, buf, n)))
-		{
-			buf += ret;
-			n -= (size_t)ret;
-		}
-		else
-		{
-			zbx_snprintf(err, err_size, "cannot write: %s", zbx_strerror(errno));
-			return FAIL;
-		}
-	}
-
-	return SUCCEED;
-}
-
 int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, int nextcheck,
 		const AGENT_REQUEST *request, AGENT_RESULT *result, FILE *output_fd)
 {
@@ -2246,6 +2225,8 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 					/* and since they use FILE pointer we create one and        */
 					/* associate the file descriptor with it by using fdopen(). */
 					FILE	*ipc_log_fp;
+					ssize_t	wrote;
+					size_t	buf_len;
 
 					close(ipc_data_fds[0]);	/* child does not read data, it sends it to parent */
 					close(ipc_log_fds[0]);	/* child does not read logs, it sends those to parent */
@@ -2253,17 +2234,8 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 
 					if (NULL == (ipc_log_fp = fdopen(ipc_log_fds[1], "w")))
 					{
-						char	*error = NULL;
-
-						/* this is the only place where we use ipc_log_fds[1] to send the log */
-						/* to parent instead of ipc_log_fp because of the error creating it   */
-
-						error = zbx_dsprintf(error, "fdopen() failed: %s", zbx_strerror(errno));
-
-						/* no need to check for error here because we have no way to send it */
-						write(ipc_log_fds[1], error, strlen(error) + 1);
-
-						zbx_free(error);
+						zabbix_log(LOG_LEVEL_WARNING, "RSM In %s(): fdopen() failed: %s",
+								__func__, zbx_strerror(errno));
 
 						nss[i].ips[j].rtt =
 							DNS[DNS_PROTO(res)].ns_query_error(RSM_NS_QUERY_INTERNAL);
@@ -2295,8 +2267,19 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 					pack_values(i, j, nss[i].ips[j].rtt, nss[i].ips[j].upd, nss[i].ips[j].nsid,
 							buf, sizeof(buf));
 
-					if (-1 == write_to_fd(ipc_data_fds[1], buf, strlen(buf) + 1, err, sizeof(err)))
-						zabbix_log(LOG_LEVEL_WARNING, "RSM In %s(): %s", __func__, err);
+					buf_len = strlen(buf) + 1;
+
+					if (-1 == (wrote = write(ipc_data_fds[1], buf, buf_len)))
+					{
+						zabbix_log(LOG_LEVEL_WARNING, "RSM In %s(): cannot write to data pipe: %s",
+								__func__, zbx_strerror(errno));
+					}
+					else if ((size_t)wrote != buf_len)
+					{
+						zabbix_log(LOG_LEVEL_WARNING, "RSM In %s(): error writing to data pipe"
+								", wrote: %ld, intended to write: %lu",
+								__func__, wrote, buf_len);
+					}
 
 					/* we've done writing data */
 					close(ipc_data_fds[1]);
