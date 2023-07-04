@@ -325,7 +325,7 @@ mtr-symlinker.pl - unpacks archive and make symlinks in SLA API directories.
 
 =head1 SYNOPSIS
 
-tracerouter-mtr.pl --archive <file> [--nolog] [--debug] [--help]
+mtr-symlinker.pl --archive <file> [--nolog] [--debug] [--help]
 
 =head1 OPTIONS
 
