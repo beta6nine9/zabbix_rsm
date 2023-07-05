@@ -1332,8 +1332,6 @@ sub __get_probe_times($$$)
 
 	foreach my $probe (sort(keys(%{$probes_ref})))
 	{
-		next unless ($probes_ref->{$probe}->{'status'} == HOST_STATUS_MONITORED);
-
 		my $status;
 		my $prev_status = DOWN;
 
@@ -1463,7 +1461,6 @@ sub __get_incidents2
 		"select distinct t.triggerid".
 		" from triggers t,functions f".
 		" where t.triggerid=f.triggerid".
-			" and t.status<>".TRIGGER_STATUS_DISABLED.
 			" and f.itemid=$itemid".
 			" and t.priority=".TRIGGER_SEVERITY_NOT_CLASSIFIED);
 

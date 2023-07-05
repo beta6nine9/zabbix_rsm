@@ -1109,8 +1109,6 @@ sub get_test_items($)
 		" from items i,hosts h,hosts_groups hg".
 		" where h.hostid=i.hostid".
 			" and hg.hostid=h.hostid".
-			" and h.status=".HOST_STATUS_MONITORED.
-			" and i.status<>".ITEM_STATUS_DISABLED.
 			" and hg.groupid=" . TLD_PROBE_RESULTS_GROUPID . " and h.host like '$rsmhost %'"
 	);
 
