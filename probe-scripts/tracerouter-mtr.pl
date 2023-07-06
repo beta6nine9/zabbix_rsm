@@ -1352,6 +1352,8 @@ sub db_connect_sqlite($)
 {
 	my $db_file = shift;
 
+	dbg("connecting to database '$db_file'");
+
 	my $data_source = "DBI:SQLite:uri=file:$db_file?mode=ro";
 
 	my $connect_opts = {
@@ -1370,6 +1372,8 @@ sub db_connect_mysql($$$$$)
 	my $db_user         = shift;
 	my $db_pswd         = shift;
 	my $db_tls_settings = shift;
+
+	dbg("connecting to database '$db_host:$db_name'");
 
 	my $data_source = "DBI:mysql:";
 
@@ -1416,6 +1420,8 @@ sub db_disconnect()
 	{
 		return;
 	}
+
+	dbg("disconnecting database");
 
 	my @active_handles = ();
 
