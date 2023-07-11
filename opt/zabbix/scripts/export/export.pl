@@ -55,7 +55,7 @@ sub __get_test_nsid_data($$$);
 sub __save_csv_data($$$);
 sub __get_probe_changes($$);
 
-parse_opts('probe=s', 'service=s', 'tld=s', 'date=s', 'day=i', 'shift=i', 'force', 'max-children=i');
+parse_opts('probe=s', 'service=s', 'tld=s', 'ignore-tlds=s', 'date=s', 'day=i', 'shift=i', 'force', 'max-children=i');
 
 setopt('nolog');
 
@@ -64,7 +64,6 @@ set_slv_config($config);
 
 my @server_keys = get_rsm_server_keys($config);
 
-validate_tld(getopt('tld'), \@server_keys) if (opt('tld'));
 validate_service(getopt('service')) if (opt('service'));
 
 db_connect();
@@ -240,7 +239,13 @@ db_connect($server_key);
 my $check_probes_from = $from - PROBE_DELAY;
 $probes_data->{$server_key} = get_probes();
 
-my $tlds_ref = [];
+my %ignore_tlds;
+if (opt('ignore-tlds'))
+{
+	map {$ignore_tlds{$_} = 1} (split(',', getopt('ignore-tlds')));
+}
+
+my %tlds;
 if (opt('tld'))
 {
 	foreach my $t (split(',', getopt('tld')))
@@ -257,14 +262,17 @@ if (opt('tld'))
 			next;
 		}
 
-		push(@{$tlds_ref}, $t);
+		$tlds{$t} = 1 unless (exists($ignore_tlds{$t}));
 	}
 
-	next if (scalar(@{$tlds_ref}) == 0);
+	# jump to the next server_key
+	next if (scalar(keys(%tlds)) == 0);
 }
 else
 {
-	$tlds_ref = get_tlds(undef, $from, USE_CACHE_TRUE);
+	my $tlds_ref = get_tlds(undef, $from, USE_CACHE_TRUE);
+
+	map {$tlds{$_} = 1 unless (exists($ignore_tlds{$_}))} (@{$tlds_ref});
 }
 
 # Prepare the cache for function tld_service_enabled(). Make sure this is called before creating child processes!
@@ -276,7 +284,7 @@ db_disconnect();
 # unset TLD (for the logs)
 undef($tld);
 
-foreach my $tld_for_a_child_to_process (@{$tlds_ref})
+foreach my $tld_for_a_child_to_process (sort(keys(%tlds)))
 {
 		goto WAIT_CHILDREN if ($child_failed);	# break from both server and TLD loops
 
@@ -1678,7 +1686,7 @@ export.pl - export data from Zabbix database in CSV format
 
 =head1 SYNOPSIS
 
-export.pl --date <dd/mm/yyyy> [--warnslow <seconds>] [--dry-run] [--debug] [--probe <name>] [--tld <name>] [--service <name>] [--day <seconds>] [--shift <seconds>] [--help]
+export.pl --date <dd/mm/yyyy> [--warnslow <seconds>] [--dry-run] [--debug] [--probe <name>] [--tld <rsmhost>[,rsmhost,...]] [--ignore-tlds <rsmhost>[,rsmhost,...]] [--service <name>] [--day <seconds>] [--shift <seconds>] [--help]
 
 =head1 OPTIONS
 
@@ -1707,9 +1715,13 @@ Specify probe name. All other probes will be ignored.
 
 Implies option --dry-run.
 
-=item B<--tld> name
+=item B<--tld> rsmhosts
 
-Specify TLD. All other TLDs will be ignored.
+Specify comma-separated list of Rsmhosts. All other Rsmhosts will be ignored.
+
+=item B<--ignore-tlds> rsmhosts
+
+Specify comma-separated list of Rsmhosts to ignore.
 
 Implies option --dry-run.
 
