@@ -1190,6 +1190,8 @@ sub validate_tld($$)
 	my $tld = shift;
 	my $server_keys = shift;
 
+	my $current_server_key = $_server_key;
+
 	foreach my $server_key (@{$server_keys})
 	{
 		db_connect($server_key);
@@ -1202,14 +1204,10 @@ sub validate_tld($$)
 		{
 			dbg("tld $tld found on $server_key");
 
+			db_connect($current_server_key) if ($current_server_key);
+
 			return;
 		}
-	}
-
-	if (scalar(@{$server_keys}) && defined($_server_key))
-	{
-		# connect back
-		db_connect($_server_key);
 	}
 
 	fail("tld \"$tld\" does not exist");
