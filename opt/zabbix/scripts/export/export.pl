@@ -242,7 +242,7 @@ $probes_data->{$server_key} = get_probes();
 my %ignore_tlds;
 if (opt('ignore-tlds'))
 {
-	map {$ignore_tlds{$_} = 1} (split(',', getopt('ignore-tlds')));
+	map {$ignore_tlds{$_} = undef} (split(',', getopt('ignore-tlds')));
 }
 
 my %tlds;
@@ -262,7 +262,7 @@ if (opt('tld'))
 			next;
 		}
 
-		$tlds{$t} = 1 unless (exists($ignore_tlds{$t}));
+		$tlds{$t} = undef unless (exists($ignore_tlds{$t}));
 	}
 
 	# jump to the next server_key
@@ -452,7 +452,7 @@ sub __validate_input
 		$error_found = 1;
 	}
 
-	foreach my $opt ('probe', 'tld', 'service', 'day', 'shift')
+	foreach my $opt ('probe', 'tld', 'ignore-tlds', 'service', 'day', 'shift')
 	{
 		if (opt($opt) && !opt('dry-run'))
 		{
