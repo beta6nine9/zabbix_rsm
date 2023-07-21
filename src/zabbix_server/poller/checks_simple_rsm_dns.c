@@ -1477,6 +1477,7 @@ static void	test_nameservers(const rsm_ns_t *nss, size_t nss_num, ldns_resolver 
 	if (-1 == (epoll_fd = epoll_create1(0)))
 	{
 		rsm_err(log_fd, "cannot create epoll instance");
+		kill(0, SIGTERM);
 	}
 
 	/* add the read ends of the pipes to the epoll instance */
@@ -1513,89 +1514,138 @@ static void	test_nameservers(const rsm_ns_t *nss, size_t nss_num, ldns_resolver 
 			rsm_errf(log_fd, "epoll wait error: %s", zbx_strerror(errno));
 		}
 
+		rsm_infof(log_fd, "DIMBUG received #%d events", ready_events);
+
 		/* handle the events */
 		for (e = 0; e < ready_events; e++)
 		{
+			char		*received_data = NULL;
+			int		is_log;
+			ssize_t		bytes, total_read = 0;
+			child_info_t	*childp = NULL;
+
+			while ((bytes = read(events[e].data.fd, buf, sizeof(buf))) > 0)
+			{
+				total_read += bytes;
+
+				received_data = zbx_strdcatf(received_data, "%.*s", (int)bytes, buf);
+			}
+
+			rsm_infof(log_fd, "DIMBUG event #%d: read %d bytes", e, total_read);
+
+			if (-1 == bytes)
+			{
+				rsm_errf(log_fd, "cannot read from child: %s", zbx_strerror(errno));
+				zbx_free(received_data);
+			}
+
+			if (0 == total_read)
+			{
+				rsm_infof(log_fd, "DIMBUG event #%d: closing fd...", e);
+
+				if (epoll_ctl(epoll_fd, EPOLL_CTL_DEL, events[e].data.fd, NULL) == -1)
+				{
+					rsm_errf(log_fd, "cannot remove file descriptor from"
+							" epoll instance: %s", zbx_strerror(errno));
+				}
+
+				close(events[e].data.fd);
+
+				rsm_infof(log_fd, "DIMBUG event #%d: closed!", e);
+			}
+
 			for (child_num = 0; child_num < child_info_size; child_num++)
 			{
-				ssize_t	bytes;
-
+				/* let's use the reference to identify the child and the data it sent */
 				if (events[e].data.fd == child_info[child_num].ipc_log_fd)
 				{
-					ssize_t	total_read = 0;
+					is_log = 1;
+					childp = &child_info[child_num];
 
-					while ((bytes = read(child_info[child_num].ipc_log_fd, buf, sizeof(buf))) > 0)
-					{
-						total_read += bytes;
+					rsm_infof(log_fd, "DIMBUG event #%d: found child pid %d, is log", e, childp->pid);
 
-						child_info[child_num].log_buf = zbx_strdcatf(child_info[child_num].log_buf,
-								"%.*s", (int)bytes, buf);
-					}
-
-					if (-1 == bytes)
-						rsm_errf(log_fd, "cannot read from child: %s", zbx_strerror(errno));
-
-					if (0 == total_read)
-					{
-						if (epoll_ctl(epoll_fd, EPOLL_CTL_DEL, child_info[child_num].ipc_log_fd,
-								NULL) == -1)
-						{
-							rsm_errf(log_fd, "cannot remove file descriptor from"
-									" epoll instance: %s", zbx_strerror(errno));
-						}
-
-						close(child_info[child_num].ipc_log_fd);
-						child_info[child_num].ipc_log_fd = 0;
-
-						rsm_dump(log_fd, "%s", child_info[child_num].log_buf);
-						zbx_free(child_info[child_num].log_buf);
-					}
+					break;
 				}
-				else if (events[e].data.fd == child_info[child_num].ipc_data_fd)
+
+				if (events[e].data.fd == child_info[child_num].ipc_data_fd)
 				{
-					ssize_t	total_read = 0;
+					is_log = 0;
+					childp = &child_info[child_num];
 
-					while ((bytes = read(child_info[child_num].ipc_data_fd, buf, sizeof(buf))) > 0)
+					rsm_infof(log_fd, "DIMBUG event #%d: found child pid %d, is data", e, childp->pid);
+
+					break;
+				}
+			}
+
+			if (NULL == childp)
+			{
+				rsm_err(log_fd, "internal error, cannot identify child by epoll event");
+				kill(0, SIGTERM);
+			}
+
+			rsm_infof(log_fd, "DIMBUG event #%d: found child pid %d, is data", e, childp->pid);
+
+			/* now we know the child that has sent the us something */
+			if (-1 == bytes)
+			{
+				kill(childp->pid, SIGTERM);
+				waitpid(childp->pid, &status, 0);
+				childp->pid = 0;
+
+				children_running--;
+			}
+			else
+			{
+				/* collect the portion we received */
+				if (NULL != received_data)
+				{
+					rsm_infof(log_fd, "DIMBUG event #%d: collecting received data", e);
+
+					if (is_log)
+						childp->log_buf = zbx_strdcat(childp->log_buf, received_data);
+					else
+						childp->data_buf = zbx_strdcat(childp->data_buf, received_data);
+
+					zbx_free(received_data);
+				}
+
+				/* let's handle the child that has finished writing */
+				if (0 == total_read)
+				{
+					rsm_infof(log_fd, "DIMBUG event #%d: processing all the received data", e);
+
+					if (is_log)
 					{
-						total_read += bytes;
-
-						child_info[child_num].data_buf = zbx_strdcatf(child_info[child_num].data_buf,
-								"%.*s", (int)bytes, buf);
+						childp->ipc_log_fd = 0;
+						rsm_dump(log_fd, "%s", childp->log_buf);
+						zbx_free(childp->log_buf);
 					}
-
-					if (-1 == bytes)
-						rsm_errf(log_fd, "cannot read from child: %s", zbx_strerror(errno));
-
-					if (0 == total_read)
+					else
 					{
 						int	rtt, upd;
 						char	nsid[NSID_MAX_LENGTH * 2 + 1];	/* hex representation + terminating null char */
 
-						if (epoll_ctl(epoll_fd, EPOLL_CTL_DEL, child_info[child_num].ipc_data_fd,
-								NULL) == -1)
-						{
-							rsm_errf(log_fd, "cannot remove file descriptor from"
-									" epoll instance: %s", zbx_strerror(errno));
-						}
-
-						close(child_info[child_num].ipc_data_fd);
-						child_info[child_num].ipc_data_fd = 0;
-
-						unpack_values(&i, &j, &rtt, &upd, nsid, child_info[child_num].data_buf, log_fd);
+						childp->ipc_data_fd = 0;
+						unpack_values(&i, &j, &rtt, &upd, nsid, childp->data_buf, log_fd);
+						zbx_free(childp->data_buf);
 
 						nss[i].ips[j].rtt = rtt;
 						nss[i].ips[j].upd = upd;
 						nss[i].ips[j].nsid = zbx_strdup(nss[i].ips[j].nsid, nsid);
 					}
+
+					rsm_infof(log_fd, "DIMBUG event #%d: processed the event", e);
 				}
 
-				if (child_info[child_num].ipc_log_fd == 0 && child_info[child_num].ipc_data_fd == 0
-						&& child_info[child_num].pid != 0)
+				if (childp->ipc_log_fd == 0 && childp->ipc_data_fd == 0 && childp->pid != 0)
 				{
-					if (0 >= waitpid(child_info[child_num].pid, &status, 0))
-						rsm_err(log_fd, "error on thread waiting");
+					rsm_infof(log_fd, "DIMBUG event #%d: waiting for %d, since just received the remaining data", e, childp->pid);
 
-					child_info[child_num].pid = 0;
+					if (0 >= waitpid(childp->pid, &status, 0))
+						rsm_err(log_fd, "error on process waiting");
+
+					childp->pid = 0;
 
 					children_running--;
 				}
@@ -1609,11 +1659,15 @@ static void	test_nameservers(const rsm_ns_t *nss, size_t nss_num, ldns_resolver 
 		if (child_info[child_num].pid == 0)
 			continue;
 
+		rsm_infof(log_fd, "DIMBUG waiting for %d in the last loop", child_info[child_num].pid);
+
 		if (0 >= waitpid(child_info[child_num].pid, &status, 0))
-			rsm_err(log_fd, "error on thread waiting");
+			rsm_err(log_fd, "error on process waiting");
 	}
 
 	free_child_info(&child_info, child_info_size);
+
+	rsm_info(log_fd, "DIMBUG all done!");
 }
 
 static int	get_dnskeys(ldns_resolver *res, const char *rsmhost, ldns_rr_list **dnskeys, FILE *log_fd,
