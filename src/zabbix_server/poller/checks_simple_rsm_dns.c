@@ -33,6 +33,8 @@
 #define PACK_NUM_VARS	5
 #define PACK_FORMAT	ZBX_FS_SIZE_T "|" ZBX_FS_SIZE_T "|%d|%d|%s"
 
+#define MAX_EPOLL_EVENTS	10
+
 /* This file contains additional persistent data related to DNS test. */
 /* The file is optional, in "normal" operational mode it is deleted.  */
 /* The file includes the following 2 integer values:                  */
@@ -1314,14 +1316,11 @@ static void	free_child_info(child_info_t **children, size_t child_info_size)
 	zbx_free(*children);
 }
 
-#define MAX_EVENTS	10
-
 static void	test_nameservers(const rsm_ns_t *nss, size_t nss_num, ldns_resolver *res, const char *testedname,
 		const ldns_rr_list *dnskeys, int epp_enabled, int ipv4_enabled, int ipv6_enabled, FILE *log_fd)
 {
 	size_t			i, j, child_num = 0, child_info_size = 0;
 	int			last_test_failed = 0, epoll_fd, e, ready_events, children_running, status;
-	struct epoll_event	ev, events[MAX_EVENTS];
 	char			buf[2048], err[RSM_ERR_BUF_SIZE];
 	pid_t			pid;
 	child_info_t		*child_info = NULL;
@@ -1333,16 +1332,8 @@ static void	test_nameservers(const rsm_ns_t *nss, size_t nss_num, ldns_resolver 
 	}
 
 	child_info = (child_info_t *)zbx_calloc(child_info, child_info_size, sizeof(*child_info));
-	memset(child_info, 0, child_info_size * sizeof(*child_info));
 
 	fflush(log_fd);
-
-	/* create an epoll instance */
-	if (-1 == (epoll_fd = epoll_create1(0)))
-	{
-		rsm_err(log_fd, "cannot create epoll instance");
-		exit(EXIT_FAILURE);
-	}
 
 	for (i = 0; i < nss_num; i++)
 	{
@@ -1407,6 +1398,7 @@ static void	test_nameservers(const rsm_ns_t *nss, size_t nss_num, ldns_resolver 
 				/* and since they use FILE pointer we create one and        */
 				/* associate the file descriptor with it by using fdopen(). */
 				FILE	*ipc_log_fp;
+
 				ssize_t	wrote;
 				size_t	buf_len;
 
@@ -1481,9 +1473,17 @@ static void	test_nameservers(const rsm_ns_t *nss, size_t nss_num, ldns_resolver 
 		}
 	}
 
+	/* create an epoll instance */
+	if (-1 == (epoll_fd = epoll_create1(0)))
+	{
+		rsm_err(log_fd, "cannot create epoll instance");
+	}
+
 	/* add the read ends of the pipes to the epoll instance */
 	for (child_num = 0; child_num < child_info_size; child_num++)
 	{
+		struct epoll_event	ev;
+
 		ev.events = EPOLLIN;
 		ev.data.fd = child_info[child_num].ipc_log_fd;
 
@@ -1505,8 +1505,10 @@ static void	test_nameservers(const rsm_ns_t *nss, size_t nss_num, ldns_resolver 
 	/* collect logs and data from child processes */
 	while (children_running > 0)
 	{
+		struct epoll_event	events[MAX_EPOLL_EVENTS];
+
 		/* wait for the events */
-		if ((ready_events = epoll_wait(epoll_fd, events, MAX_EVENTS, -1)) == -1)
+		if ((ready_events = epoll_wait(epoll_fd, events, MAX_EPOLL_EVENTS, -1)) == -1)
 		{
 			rsm_errf(log_fd, "epoll wait error: %s", zbx_strerror(errno));
 		}
@@ -1535,6 +1537,13 @@ static void	test_nameservers(const rsm_ns_t *nss, size_t nss_num, ldns_resolver 
 
 					if (0 == total_read)
 					{
+						if (epoll_ctl(epoll_fd, EPOLL_CTL_DEL, child_info[child_num].ipc_log_fd,
+								NULL) == -1)
+						{
+							rsm_errf(log_fd, "cannot remove file descriptor from"
+									" epoll instance: %s", zbx_strerror(errno));
+						}
+
 						close(child_info[child_num].ipc_log_fd);
 						child_info[child_num].ipc_log_fd = 0;
 
@@ -1561,6 +1570,13 @@ static void	test_nameservers(const rsm_ns_t *nss, size_t nss_num, ldns_resolver 
 					{
 						int	rtt, upd;
 						char	nsid[NSID_MAX_LENGTH * 2 + 1];	/* hex representation + terminating null char */
+
+						if (epoll_ctl(epoll_fd, EPOLL_CTL_DEL, child_info[child_num].ipc_data_fd,
+								NULL) == -1)
+						{
+							rsm_errf(log_fd, "cannot remove file descriptor from"
+									" epoll instance: %s", zbx_strerror(errno));
+						}
 
 						close(child_info[child_num].ipc_data_fd);
 						child_info[child_num].ipc_data_fd = 0;
