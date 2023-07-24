@@ -1,3 +1,9 @@
+Changes for rsm3.2.1rc2
+
+Bug fixes:
+.......PS. [936] rewrote the IPC of the DNS Test by using polling method (asitals, dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm3.2.1rc1
 
 Bug fixes:

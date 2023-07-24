@@ -1489,7 +1489,8 @@ static void	collect_children_output(child_info_t *child_info, size_t child_info_
 
 	while (0 < children_running)
 	{
-		int ready = poll(pollfds, pollfds_size, -1);
+		int	ready = poll(pollfds, pollfds_size, -1);
+
 		if (-1 == ready)
 		{
 			zabbix_log(LOG_LEVEL_CRIT, "RSM In %s(): poll() failed", __func__);
@@ -1505,7 +1506,7 @@ static void	collect_children_output(child_info_t *child_info, size_t child_info_
 
 			child_num = i / 2;
 
-			if (pollfds[i].revents & POLLIN) // there is data to read
+			if (pollfds[i].revents & POLLIN) /* there is data to read */
 			{
 				char	buffer[PIPE_BUF + 1];
 				ssize_t	bytes_received;
@@ -1539,7 +1540,7 @@ static void	collect_children_output(child_info_t *child_info, size_t child_info_
 					exit(EXIT_FAILURE);
 				}
 			}
-			else if (pollfds[i].revents & POLLHUP) // child has closed its end of the pipe
+			else if (pollfds[i].revents & POLLHUP) /* child has closed its end of the pipe */
 			{
 				if (pollfds[i].fd == child_info[child_num].ipc_log_fd)
 				{
