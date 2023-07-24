@@ -17,7 +17,7 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-#include <sys/epoll.h>
+#include <poll.h>
 
 #include "threads.h"
 #include "log.h"
@@ -30,10 +30,8 @@
 
 #define DEFAULT_NAMESERVER_PORT	53
 
-#define PACK_NUM_VARS	5
-#define PACK_FORMAT	ZBX_FS_SIZE_T "|" ZBX_FS_SIZE_T "|%d|%d|%s"
-
-#define MAX_EPOLL_EVENTS	10
+#define PACK_NUM_VARS		5
+#define PACK_FORMAT		ZBX_FS_SIZE_T "|" ZBX_FS_SIZE_T "|%d|%d|%s"
 
 /* This file contains additional persistent data related to DNS test. */
 /* The file is optional, in "normal" operational mode it is deleted.  */
@@ -1303,41 +1301,85 @@ out:
 	return ret;
 }
 
-static void	free_child_info(child_info_t **children, size_t child_info_size)
+static void	run_child_proc(int ipc_data_fds[2], int ipc_log_fds[2], const rsm_ns_t *nss, size_t i, size_t j,
+		ldns_resolver *res, const char *testedname, const ldns_rr_list *dnskeys, int epp_enabled,
+		int ipv4_enabled, int ipv6_enabled, FILE *log_fd)
 {
-	size_t	i;
+	/* We already have an open file descriptor for sending logs */
+	/* to the parent process (ipc_log_fds[1]) but we would like */
+	/* to use existing functions to do that (e. g. rsm_infof()) */
+	/* and since they use FILE pointer we create one and        */
+	/* associate the file descriptor with it by using fdopen(). */
+	FILE	*ipc_log_fp;
 
-	for (i = 0; i < child_info_size; i++)
+	char	err[RSM_ERR_BUF_SIZE];
+	char	buf[2048];
+	ssize_t	wrote;
+	size_t	buf_len;
+
+	close(ipc_data_fds[0]);	/* child does not read data, it sends it to parent */
+	close(ipc_log_fds[0]);	/* child does not read logs, it sends those to parent */
+	fclose(log_fd);		/* child does not write to the main log file */
+
+	if (NULL == (ipc_log_fp = fdopen(ipc_log_fds[1], "w")))
 	{
-		zbx_free((*children)[i].data_buf);
-		zbx_free((*children)[i].log_buf);
+		zabbix_log(LOG_LEVEL_WARNING, "RSM In %s(): fdopen() failed: %s", __func__, zbx_strerror(errno));
+
+		nss[i].ips[j].rtt = DNS[DNS_PROTO(res)].ns_query_error(RSM_NS_QUERY_INTERNAL);
+	}
+	else if (SUCCEED != test_nameserver(res,
+			nss[i].name,
+			nss[i].ips[j].ip,
+			nss[i].ips[j].port,
+			dnskeys,
+			testedname,
+			ipc_log_fp,
+			&nss[i].ips[j].rtt,
+			&nss[i].ips[j].nsid,
+			(0 != epp_enabled ? &nss[i].ips[j].upd : NULL),
+			ipv4_enabled,
+			ipv6_enabled,
+			epp_enabled,
+			err,
+			sizeof(err)))
+	{
+		rsm_err(ipc_log_fp, err);
 	}
 
-	zbx_free(*children);
+	/* we've done writing logs */
+	if (NULL != ipc_log_fp)
+		fclose(ipc_log_fp);
+	close(ipc_log_fds[1]);
+
+	buf_len = pack_values(i, j, nss[i].ips[j].rtt, nss[i].ips[j].upd, nss[i].ips[j].nsid, buf, sizeof(buf));
+
+	if (-1 == (wrote = write(ipc_data_fds[1], buf, buf_len)))
+	{
+		zabbix_log(LOG_LEVEL_WARNING, "RSM In %s(): cannot write to data pipe: %s",
+				__func__, zbx_strerror(errno));
+	}
+	else if ((size_t)wrote != buf_len)
+	{
+		zabbix_log(LOG_LEVEL_WARNING, "RSM In %s(): error writing to data pipe"
+				", wrote: %ld, intended to write: %lu",
+				__func__, wrote, buf_len);
+		}
+
+	/* we've done writing data */
+	close(ipc_data_fds[1]);
 }
 
-static void	test_nameservers(const rsm_ns_t *nss, size_t nss_num, ldns_resolver *res, const char *testedname,
-		const ldns_rr_list *dnskeys, int epp_enabled, int ipv4_enabled, int ipv6_enabled, FILE *log_fd)
+static void	start_children(child_info_t *child_info, size_t child_info_size, const rsm_ns_t *nss, size_t nss_num,
+		ldns_resolver *res, const char *testedname, const ldns_rr_list *dnskeys, int epp_enabled,
+		int ipv4_enabled, int ipv6_enabled, FILE *log_fd)
 {
-	size_t			i, j, child_num = 0, child_info_size = 0;
-	int			last_test_failed = 0, epoll_fd, e, ready_events, children_running, status;
-	char			buf[2048], err[RSM_ERR_BUF_SIZE];
-	pid_t			pid;
-	child_info_t		*child_info = NULL;
+	size_t	child_num = 0;
+	int	last_test_failed = 0;
+	pid_t	pid;
 
-	for (i = 0; i < nss_num; i++)
+	for (size_t i = 0; i < nss_num; i++)
 	{
-		for (j = 0; j < nss[i].ips_num; j++)
-			child_info_size++;
-	}
-
-	child_info = (child_info_t *)zbx_calloc(child_info, child_info_size, sizeof(*child_info));
-
-	fflush(log_fd);
-
-	for (i = 0; i < nss_num; i++)
-	{
-		for (j = 0; j < nss[i].ips_num; j++)
+		for (size_t j = 0; j < nss[i].ips_num; j++)
 		{
 			int	ipc_data_fds[2];	/* reader and writer file descriptors for data */
 			int	ipc_log_fds[2];		/* reader and writer file descriptors for logs */
@@ -1345,6 +1387,15 @@ static void	test_nameservers(const rsm_ns_t *nss, size_t nss_num, ldns_resolver 
 			if (0 != last_test_failed)
 			{
 				nss[i].ips[j].rtt = DNS[DNS_PROTO(res)].ns_query_error(RSM_NS_QUERY_INTERNAL);
+
+				continue;
+			}
+
+			if (child_num == child_info_size)
+			{
+				rsm_errf(log_fd, "cannot create process: child_info_size too small");
+				nss[i].ips[j].rtt = DNS[DNS_PROTO(res)].ns_query_error(RSM_NS_QUERY_INTERNAL);
+				last_test_failed = 1;
 
 				continue;
 			}
@@ -1377,297 +1428,198 @@ static void	test_nameservers(const rsm_ns_t *nss, size_t nss_num, ldns_resolver 
 				/* cannot create child */
 
 				rsm_errf(log_fd, "cannot create process: %s", zbx_strerror(errno));
+				nss[i].ips[j].rtt = DNS[DNS_PROTO(res)].ns_query_error(RSM_NS_QUERY_INTERNAL);
+				last_test_failed = 1;
 
 				close(ipc_data_fds[0]);
 				close(ipc_data_fds[1]);
 				close(ipc_log_fds[0]);
 				close(ipc_log_fds[1]);
 
-				nss[i].ips[j].rtt = DNS[DNS_PROTO(res)].ns_query_error(RSM_NS_QUERY_INTERNAL);
-				last_test_failed = 1;
-
 				continue;
 			}
-			else if (0 == pid)
+
+			if (0 == pid)
 			{
 				/* child */
 
-				/* We already have an open file descriptor for sending logs */
-				/* to the parent process (ipc_log_fds[1]) but we would like */
-				/* to use existing functions to do that (e. g. rsm_infof()) */
-				/* and since they use FILE pointer we create one and        */
-				/* associate the file descriptor with it by using fdopen(). */
-				FILE	*ipc_log_fp;
-
-				ssize_t	wrote;
-				size_t	buf_len;
-
-				close(ipc_data_fds[0]);	/* child does not read data, it sends it to parent */
-				close(ipc_log_fds[0]);	/* child does not read logs, it sends those to parent */
-				fclose(log_fd);		/* child does not write to the main log file */
-
-				if (NULL == (ipc_log_fp = fdopen(ipc_log_fds[1], "w")))
-				{
-					zabbix_log(LOG_LEVEL_WARNING, "RSM In %s(): fdopen() failed: %s",
-							__func__, zbx_strerror(errno));
-
-					nss[i].ips[j].rtt = DNS[DNS_PROTO(res)].ns_query_error(RSM_NS_QUERY_INTERNAL);
-				}
-				else if (SUCCEED != test_nameserver(res,
-						nss[i].name,
-						nss[i].ips[j].ip,
-						nss[i].ips[j].port,
-						dnskeys,
-						testedname,
-						ipc_log_fp,
-						&nss[i].ips[j].rtt,
-						&nss[i].ips[j].nsid,
-						(0 != epp_enabled ? &nss[i].ips[j].upd : NULL),
-						ipv4_enabled,
-						ipv6_enabled,
-						epp_enabled,
-						err,
-						sizeof(err)))
-				{
-					rsm_err(ipc_log_fp, err);
-				}
-
-				/* we've done writing logs */
-				if (NULL != ipc_log_fp)
-					fclose(ipc_log_fp);
-				close(ipc_log_fds[1]);
-
-				pack_values(i, j, nss[i].ips[j].rtt, nss[i].ips[j].upd, nss[i].ips[j].nsid,
-						buf, sizeof(buf));
-
-				buf_len = strlen(buf) + 1;
-
-				if (-1 == (wrote = write(ipc_data_fds[1], buf, buf_len)))
-				{
-					zabbix_log(LOG_LEVEL_WARNING, "RSM In %s(): cannot write to data pipe: %s",
-							__func__, zbx_strerror(errno));
-				}
-				else if ((size_t)wrote != buf_len)
-				{
-					zabbix_log(LOG_LEVEL_WARNING, "RSM In %s(): error writing to data pipe"
-							", wrote: %ld, intended to write: %lu",
-							__func__, wrote, buf_len);
-					}
-
-				/* we've done writing data */
-				close(ipc_data_fds[1]);
-
+				run_child_proc(ipc_data_fds, ipc_log_fds, nss, i, j, res, testedname, dnskeys,
+						epp_enabled, ipv4_enabled, ipv6_enabled, log_fd);
 				exit(EXIT_SUCCESS);
-			}
-
-			/* parent */
-
-			close(ipc_data_fds[1]);	/* parent does not send data, it receives it from child */
-			close(ipc_log_fds[1]);	/* parent does not send logs, it receives them from child */
-
-			child_info[child_num].pid = pid;
-			child_info[child_num].ipc_data_fd = ipc_data_fds[0];
-			child_info[child_num].ipc_log_fd = ipc_log_fds[0];
-
-			child_num++;
-		}
-	}
-
-	/* create an epoll instance */
-	if (-1 == (epoll_fd = epoll_create1(0)))
-	{
-		rsm_err(log_fd, "cannot create epoll instance");
-		kill(0, SIGTERM);
-	}
-
-	/* add the read ends of the pipes to the epoll instance */
-	for (child_num = 0; child_num < child_info_size; child_num++)
-	{
-		struct epoll_event	ev;
-
-		ev.events = EPOLLIN;
-		ev.data.fd = child_info[child_num].ipc_log_fd;
-
-		if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, child_info[child_num].ipc_log_fd, &ev) == -1)
-		{
-			rsm_errf(log_fd, "cannot add file descriptor to epoll instance: %s", zbx_strerror(errno));
-		}
-
-		ev.data.fd = child_info[child_num].ipc_data_fd;
-
-		if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, child_info[child_num].ipc_data_fd, &ev) == -1)
-		{
-			rsm_errf(log_fd, "cannot add file descriptor to epoll instance: %s", zbx_strerror(errno));
-		}
-	}
-
-	children_running = child_info_size;
-
-	/* collect logs and data from child processes */
-	while (children_running > 0)
-	{
-		struct epoll_event	events[MAX_EPOLL_EVENTS];
-
-		/* wait for the events */
-		if ((ready_events = epoll_wait(epoll_fd, events, MAX_EPOLL_EVENTS, -1)) == -1)
-		{
-			rsm_errf(log_fd, "epoll wait error: %s", zbx_strerror(errno));
-		}
-
-		rsm_infof(log_fd, "DIMBUG received #%d events", ready_events);
-
-		/* handle the events */
-		for (e = 0; e < ready_events; e++)
-		{
-			char		*received_data = NULL;
-			int		is_log;
-			ssize_t		bytes, total_read = 0;
-			child_info_t	*childp = NULL;
-
-			while ((bytes = read(events[e].data.fd, buf, sizeof(buf))) > 0)
-			{
-				total_read += bytes;
-
-				received_data = zbx_strdcatf(received_data, "%.*s", (int)bytes, buf);
-			}
-
-			rsm_infof(log_fd, "DIMBUG event #%d: read %d bytes", e, total_read);
-
-			if (-1 == bytes)
-			{
-				rsm_errf(log_fd, "cannot read from child: %s", zbx_strerror(errno));
-				zbx_free(received_data);
-			}
-
-			if (0 == total_read)
-			{
-				rsm_infof(log_fd, "DIMBUG event #%d: closing fd...", e);
-
-				if (epoll_ctl(epoll_fd, EPOLL_CTL_DEL, events[e].data.fd, NULL) == -1)
-				{
-					rsm_errf(log_fd, "cannot remove file descriptor from"
-							" epoll instance: %s", zbx_strerror(errno));
-				}
-
-				close(events[e].data.fd);
-
-				rsm_infof(log_fd, "DIMBUG event #%d: closed!", e);
-			}
-
-			for (child_num = 0; child_num < child_info_size; child_num++)
-			{
-				/* let's use the reference to identify the child and the data it sent */
-				if (events[e].data.fd == child_info[child_num].ipc_log_fd)
-				{
-					is_log = 1;
-					childp = &child_info[child_num];
-
-					rsm_infof(log_fd, "DIMBUG event #%d: found child pid %d, is log", e, childp->pid);
-
-					break;
-				}
-
-				if (events[e].data.fd == child_info[child_num].ipc_data_fd)
-				{
-					is_log = 0;
-					childp = &child_info[child_num];
-
-					rsm_infof(log_fd, "DIMBUG event #%d: found child pid %d, is data", e, childp->pid);
-
-					break;
-				}
-			}
-
-			if (NULL == childp)
-			{
-				rsm_err(log_fd, "internal error, cannot identify child by epoll event");
-				kill(0, SIGTERM);
-			}
-
-			rsm_infof(log_fd, "DIMBUG event #%d: found child pid %d, is data", e, childp->pid);
-
-			/* now we know the child that has sent the us something */
-			if (-1 == bytes)
-			{
-				kill(childp->pid, SIGTERM);
-				waitpid(childp->pid, &status, 0);
-				childp->pid = 0;
-
-				children_running--;
 			}
 			else
 			{
-				/* collect the portion we received */
-				if (NULL != received_data)
-				{
-					rsm_infof(log_fd, "DIMBUG event #%d: collecting received data", e);
+				/* parent */
 
-					if (is_log)
-						childp->log_buf = zbx_strdcat(childp->log_buf, received_data);
-					else
-						childp->data_buf = zbx_strdcat(childp->data_buf, received_data);
+				close(ipc_data_fds[1]);	/* parent does not send data, it receives it from child */
+				close(ipc_log_fds[1]);	/* parent does not send logs, it receives them from child */
 
-					zbx_free(received_data);
-				}
+				child_info[child_num].pid = pid;
+				child_info[child_num].ipc_data_fd = ipc_data_fds[0];
+				child_info[child_num].ipc_log_fd = ipc_log_fds[0];
 
-				/* let's handle the child that has finished writing */
-				if (0 == total_read)
-				{
-					rsm_infof(log_fd, "DIMBUG event #%d: processing all the received data", e);
-
-					if (is_log)
-					{
-						childp->ipc_log_fd = 0;
-						rsm_dump(log_fd, "%s", childp->log_buf);
-						zbx_free(childp->log_buf);
-					}
-					else
-					{
-						int	rtt, upd;
-						char	nsid[NSID_MAX_LENGTH * 2 + 1];	/* hex representation + terminating null char */
-
-						childp->ipc_data_fd = 0;
-						unpack_values(&i, &j, &rtt, &upd, nsid, childp->data_buf, log_fd);
-						zbx_free(childp->data_buf);
-
-						nss[i].ips[j].rtt = rtt;
-						nss[i].ips[j].upd = upd;
-						nss[i].ips[j].nsid = zbx_strdup(nss[i].ips[j].nsid, nsid);
-					}
-
-					rsm_infof(log_fd, "DIMBUG event #%d: processed the event", e);
-				}
-
-				if (childp->ipc_log_fd == 0 && childp->ipc_data_fd == 0 && childp->pid != 0)
-				{
-					rsm_infof(log_fd, "DIMBUG event #%d: waiting for %d, since just received the remaining data", e, childp->pid);
-
-					if (0 >= waitpid(childp->pid, &status, 0))
-						rsm_err(log_fd, "error on process waiting");
-
-					childp->pid = 0;
-
-					children_running--;
-				}
+				child_num++;
 			}
 		}
 	}
 
-	/* handle possibly failed processes of reading data from children */
+	if (child_num != child_info_size)
+	{
+		zabbix_log(LOG_LEVEL_CRIT, "RSM In %s(): child_num differs from child_info_size "
+				"(child_num: %lu, child_info_size: %lu)", __func__, child_num, child_info_size);
+	}
+}
+
+static void	collect_children_output(child_info_t *child_info, size_t child_info_size)
+{
+	struct pollfd	*pollfds;
+	size_t		pollfds_size = child_info_size * 2;
+	size_t		children_running = child_info_size;
+	size_t		child_num;
+
+	pollfds = (struct pollfd *)zbx_calloc(NULL, pollfds_size, sizeof(struct pollfd));
+
 	for (child_num = 0; child_num < child_info_size; child_num++)
 	{
-		if (child_info[child_num].pid == 0)
-			continue;
-
-		rsm_infof(log_fd, "DIMBUG waiting for %d in the last loop", child_info[child_num].pid);
-
-		if (0 >= waitpid(child_info[child_num].pid, &status, 0))
-			rsm_err(log_fd, "error on process waiting");
+		pollfds[child_num * 2 + 0].fd = child_info[child_num].ipc_log_fd;
+		pollfds[child_num * 2 + 0].events = POLLIN;
+		pollfds[child_num * 2 + 1].fd = child_info[child_num].ipc_data_fd;
+		pollfds[child_num * 2 + 1].events = POLLIN;
 	}
 
-	free_child_info(&child_info, child_info_size);
+	while (0 < children_running)
+	{
+		int ready = poll(pollfds, pollfds_size, -1);
+		if (-1 == ready)
+		{
+			zabbix_log(LOG_LEVEL_CRIT, "RSM In %s(): poll() failed", __func__);
+			exit(EXIT_FAILURE);
+		}
 
-	rsm_info(log_fd, "DIMBUG all done!");
+		for (size_t i = 0; i < pollfds_size; i++)
+		{
+			if (0 == pollfds[i].revents)
+			{
+				continue;
+			}
+
+			child_num = i / 2;
+
+			if (pollfds[i].revents & POLLIN) // there is data to read
+			{
+				char	buffer[PIPE_BUF + 1];
+				ssize_t	bytes_received;
+
+				bytes_received = read(pollfds[i].fd, buffer, sizeof(buffer) - 1);
+
+				if (-1 == bytes_received)
+				{
+					zabbix_log(LOG_LEVEL_CRIT, "RSM In %s(): read() returned -1", __func__);
+					exit(EXIT_FAILURE);
+				}
+				if (0 == bytes_received)
+				{
+					zabbix_log(LOG_LEVEL_CRIT, "RSM In %s(): read() returned 0", __func__);
+					exit(EXIT_FAILURE);
+				}
+
+				buffer[bytes_received] = '\0';
+
+				if (pollfds[i].fd == child_info[child_num].ipc_log_fd)
+				{
+					child_info[child_num].log_buf = zbx_strdcat(child_info[child_num].log_buf, buffer);
+				}
+				else if (pollfds[i].fd == child_info[child_num].ipc_data_fd)
+				{
+					child_info[child_num].data_buf = zbx_strdcat(child_info[child_num].data_buf, buffer);
+				}
+				else
+				{
+					zabbix_log(LOG_LEVEL_CRIT, "RSM In %s(): file descriptor in pollfds does not match file descriptors in child_info", __func__);
+					exit(EXIT_FAILURE);
+				}
+			}
+			else if (pollfds[i].revents & POLLHUP) // child has closed its end of the pipe
+			{
+				if (pollfds[i].fd == child_info[child_num].ipc_log_fd)
+				{
+					child_info[child_num].ipc_log_fd = 0;
+				}
+				else if (pollfds[i].fd == child_info[child_num].ipc_data_fd)
+				{
+					child_info[child_num].ipc_data_fd = 0;
+				}
+				else
+				{
+					zabbix_log(LOG_LEVEL_CRIT, "RSM In %s(): file descriptor in pollfds does not match file descriptors in child_info", __func__);
+					exit(EXIT_FAILURE);
+				}
+
+				close(pollfds[i].fd);
+				pollfds[i].fd = -1;
+
+				if (0 == child_info[child_num].ipc_log_fd && 0 == child_info[child_num].ipc_data_fd)
+				{
+					int	status;
+
+					waitpid(child_info[child_num].pid, &status, 0);
+					child_info[child_num].pid = 0;
+					children_running--;
+				}
+			}
+			else
+			{
+				zabbix_log(LOG_LEVEL_CRIT, "RSM In %s(): unexpected pollfds[].revents: %d", __func__, pollfds[i].revents);
+				exit(EXIT_FAILURE);
+			}
+		}
+	}
+
+	zbx_free(pollfds);
+}
+
+static void	process_children_output(child_info_t *child_info, size_t child_info_size, const rsm_ns_t *nss, FILE *log_fd)
+{
+	for (size_t i = 0; i < child_info_size; i++)
+	{
+		int	rtt, upd;
+		char	nsid[NSID_MAX_LENGTH * 2 + 1];	/* hex representation + terminating null char */
+		size_t	ns_num;
+		size_t	ip_num;
+
+		rsm_dump(log_fd, "%s", child_info[i].log_buf);
+		zbx_free(child_info[i].log_buf);
+
+		unpack_values(&ns_num, &ip_num, &rtt, &upd, nsid, child_info[i].data_buf, log_fd);
+		zbx_free(child_info[i].data_buf);
+
+		nss[ns_num].ips[ip_num].rtt = rtt;
+		nss[ns_num].ips[ip_num].upd = upd;
+		nss[ns_num].ips[ip_num].nsid = zbx_strdup(nss[ns_num].ips[ip_num].nsid, nsid);
+	}
+}
+
+static void	test_nameservers(const rsm_ns_t *nss, size_t nss_num, ldns_resolver *res, const char *testedname,
+		const ldns_rr_list *dnskeys, int epp_enabled, int ipv4_enabled, int ipv6_enabled, FILE *log_fd)
+{
+	size_t		child_info_size = 0;
+	child_info_t	*child_info = NULL;
+
+	for (size_t i = 0; i < nss_num; i++)
+	{
+		child_info_size += nss[i].ips_num;
+	}
+
+	child_info = (child_info_t *)zbx_calloc(child_info, child_info_size, sizeof(*child_info));
+
+	fflush(log_fd);
+
+	start_children(child_info, child_info_size, nss, nss_num, res, testedname, dnskeys, epp_enabled, ipv4_enabled,
+			ipv6_enabled, log_fd);
+	collect_children_output(child_info, child_info_size);
+	process_children_output(child_info, child_info_size, nss, log_fd);
+
+	zbx_free(child_info);
 }
 
 static int	get_dnskeys(ldns_resolver *res, const char *rsmhost, ldns_rr_list **dnskeys, FILE *log_fd,
@@ -2016,7 +1968,7 @@ static void	create_dns_json(struct zbx_json *json, rsm_ns_t *nss, size_t nss_num
 	{
 		zbx_json_addobject(json, NULL);
 		zbx_json_addstring(json, "ns", nss[i].name, ZBX_JSON_TYPE_STRING);
-		zbx_json_adduint64(json, "status", nss[i].result);
+		zbx_json_addint64(json, "status", nss[i].result);
 		zbx_json_close(json);
 	}
 
