@@ -1,3 +1,17 @@
+Changes for rsm3.2.1rc2
+
+Bug fixes:
+.......PS. [936] rewrote the IPC of the DNS Test by using polling method (asitals, dimir)
+
+--------------------------------------------------------------------------------
+Changes for rsm3.2.1rc1
+
+Bug fixes:
+.......PS. [932] fixed IP version support when performing cURL call with redirection turned on (dimir)
+.......PS. [936] fixed possible deadlock in IPC implementation of DNS Test (dimir)
+....I..... [931] fixed data export collecting DNS Test data when set of Name Servers changes (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm3.2.0
 
 rsm3.2.0rc1 was released as rsm3.2.0 without any changes

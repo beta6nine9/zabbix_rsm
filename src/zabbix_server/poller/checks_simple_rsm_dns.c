@@ -17,6 +17,8 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
+#include <poll.h>
+
 #include "threads.h"
 #include "log.h"
 #include "checks_simple_rsm.h"
@@ -28,9 +30,16 @@
 
 #define DEFAULT_NAMESERVER_PORT	53
 
-#define PACK_NUM_VARS	5
-#define PACK_FORMAT	ZBX_FS_SIZE_T "|" ZBX_FS_SIZE_T "|%d|%d|%s"
+#define PACK_NUM_VARS		5
+#define PACK_FORMAT		ZBX_FS_SIZE_T "|" ZBX_FS_SIZE_T "|%d|%d|%s"
 
+/* This file contains additional persistent data related to DNS test. */
+/* The file is optional, in "normal" operational mode it is deleted.  */
+/* The file includes the following 2 integer values:                  */
+/*   - current operational mode (normal (0) or critical (1))          */
+/*   - number of successful tests (while still in critical mode)      */
+/*                                                                    */
+/* The file holds binary data.                                        */
 #define METADATA_FILE_PREFIX	"/tmp/dns-test-metadata"	/* /tmp/dns-test-metadata-<TLD>.bin */
 
 #define CURRENT_MODE_NORMAL		0
@@ -59,13 +68,15 @@ rsm_ns_t;
 typedef struct
 {
 	pid_t	pid;
-	int	fd;	/* read from this file descriptor */
-	int	log_fd;	/* read logs from this file descriptor */
+	int	ipc_data_fd;	/* read data from this file descriptor */
+	int	ipc_log_fd;	/* read logs from this file descriptor */
+	char	*data_buf;	/* write data to this buffer */
+	char	*log_buf;	/* write logs to this buffer */
 }
-writer_thread_t;
+child_info_t;
 
 #define RSM_DEFINE_NS_QUERY_ERROR_TO(__interface)					\
-static int	ns_query_error_to_ ## __interface (rsm_ns_query_error_t err)	\
+static int	ns_query_error_to_ ## __interface (rsm_ns_query_error_t err)		\
 {											\
 	switch (err)									\
 	{										\
@@ -280,7 +291,9 @@ static size_t	pack_values(size_t v1, size_t v2, int v3, int v4, char *nsid, char
 
 static int	unpack_values(size_t *v1, size_t *v2, int *v3, int *v4, char *nsid, char *buf, FILE *log_fd)
 {
-	int rv = sscanf(buf, PACK_FORMAT, v1, v2, v3, v4, nsid);
+	int	rv;
+
+	rv = sscanf(buf, PACK_FORMAT, v1, v2, v3, v4, nsid);
 
 	if (PACK_NUM_VARS == rv + 1)
 	{
@@ -1288,6 +1301,328 @@ out:
 	return ret;
 }
 
+static void	run_child_proc(int ipc_data_fds[2], int ipc_log_fds[2], const rsm_ns_t *nss, size_t i, size_t j,
+		ldns_resolver *res, const char *testedname, const ldns_rr_list *dnskeys, int epp_enabled,
+		int ipv4_enabled, int ipv6_enabled, FILE *log_fd)
+{
+	/* We already have an open file descriptor for sending logs */
+	/* to the parent process (ipc_log_fds[1]) but we would like */
+	/* to use existing functions to do that (e. g. rsm_infof()) */
+	/* and since they use FILE pointer we create one and        */
+	/* associate the file descriptor with it by using fdopen(). */
+	FILE	*ipc_log_fp;
+
+	char	err[RSM_ERR_BUF_SIZE];
+	char	buf[2048];
+	ssize_t	wrote;
+	size_t	buf_len;
+
+	close(ipc_data_fds[0]);	/* child does not read data, it sends it to parent */
+	close(ipc_log_fds[0]);	/* child does not read logs, it sends those to parent */
+	fclose(log_fd);		/* child does not write to the main log file */
+
+	if (NULL == (ipc_log_fp = fdopen(ipc_log_fds[1], "w")))
+	{
+		zabbix_log(LOG_LEVEL_WARNING, "RSM In %s(): fdopen() failed: %s", __func__, zbx_strerror(errno));
+
+		nss[i].ips[j].rtt = DNS[DNS_PROTO(res)].ns_query_error(RSM_NS_QUERY_INTERNAL);
+	}
+	else if (SUCCEED != test_nameserver(res,
+			nss[i].name,
+			nss[i].ips[j].ip,
+			nss[i].ips[j].port,
+			dnskeys,
+			testedname,
+			ipc_log_fp,
+			&nss[i].ips[j].rtt,
+			&nss[i].ips[j].nsid,
+			(0 != epp_enabled ? &nss[i].ips[j].upd : NULL),
+			ipv4_enabled,
+			ipv6_enabled,
+			epp_enabled,
+			err,
+			sizeof(err)))
+	{
+		rsm_err(ipc_log_fp, err);
+	}
+
+	/* we've done writing logs */
+	if (NULL != ipc_log_fp)
+		fclose(ipc_log_fp);
+	close(ipc_log_fds[1]);
+
+	buf_len = pack_values(i, j, nss[i].ips[j].rtt, nss[i].ips[j].upd, nss[i].ips[j].nsid, buf, sizeof(buf));
+
+	if (-1 == (wrote = write(ipc_data_fds[1], buf, buf_len)))
+	{
+		zabbix_log(LOG_LEVEL_WARNING, "RSM In %s(): cannot write to data pipe: %s",
+				__func__, zbx_strerror(errno));
+	}
+	else if ((size_t)wrote != buf_len)
+	{
+		zabbix_log(LOG_LEVEL_WARNING, "RSM In %s(): error writing to data pipe"
+				", wrote: %ld, intended to write: %lu",
+				__func__, wrote, buf_len);
+		}
+
+	/* we've done writing data */
+	close(ipc_data_fds[1]);
+}
+
+static void	start_children(child_info_t *child_info, size_t child_info_size, const rsm_ns_t *nss, size_t nss_num,
+		ldns_resolver *res, const char *testedname, const ldns_rr_list *dnskeys, int epp_enabled,
+		int ipv4_enabled, int ipv6_enabled, FILE *log_fd)
+{
+	size_t	child_num = 0;
+	int	last_test_failed = 0;
+	pid_t	pid;
+
+	for (size_t i = 0; i < nss_num; i++)
+	{
+		for (size_t j = 0; j < nss[i].ips_num; j++)
+		{
+			int	ipc_data_fds[2];	/* reader and writer file descriptors for data */
+			int	ipc_log_fds[2];		/* reader and writer file descriptors for logs */
+
+			if (0 != last_test_failed)
+			{
+				nss[i].ips[j].rtt = DNS[DNS_PROTO(res)].ns_query_error(RSM_NS_QUERY_INTERNAL);
+
+				continue;
+			}
+
+			if (child_num == child_info_size)
+			{
+				rsm_errf(log_fd, "cannot create process: child_info_size too small");
+				nss[i].ips[j].rtt = DNS[DNS_PROTO(res)].ns_query_error(RSM_NS_QUERY_INTERNAL);
+				last_test_failed = 1;
+
+				continue;
+			}
+
+			if (-1 == pipe(ipc_log_fds))
+			{
+				rsm_errf(log_fd, "cannot create pipe: %s", zbx_strerror(errno));
+				nss[i].ips[j].rtt = DNS[DNS_PROTO(res)].ns_query_error(RSM_NS_QUERY_INTERNAL);
+				last_test_failed = 1;
+
+				continue;
+			}
+
+			if (-1 == pipe(ipc_data_fds))
+			{
+				rsm_errf(log_fd, "cannot create pipe: %s", zbx_strerror(errno));
+				nss[i].ips[j].rtt = DNS[DNS_PROTO(res)].ns_query_error(RSM_NS_QUERY_INTERNAL);
+				last_test_failed = 1;
+
+				close(ipc_log_fds[0]);
+				close(ipc_log_fds[1]);
+
+				continue;
+			}
+
+			zbx_child_fork(&pid);
+
+			if (0 > pid)
+			{
+				/* cannot create child */
+
+				rsm_errf(log_fd, "cannot create process: %s", zbx_strerror(errno));
+				nss[i].ips[j].rtt = DNS[DNS_PROTO(res)].ns_query_error(RSM_NS_QUERY_INTERNAL);
+				last_test_failed = 1;
+
+				close(ipc_data_fds[0]);
+				close(ipc_data_fds[1]);
+				close(ipc_log_fds[0]);
+				close(ipc_log_fds[1]);
+
+				continue;
+			}
+
+			if (0 == pid)
+			{
+				/* child */
+
+				run_child_proc(ipc_data_fds, ipc_log_fds, nss, i, j, res, testedname, dnskeys,
+						epp_enabled, ipv4_enabled, ipv6_enabled, log_fd);
+				exit(EXIT_SUCCESS);
+			}
+			else
+			{
+				/* parent */
+
+				close(ipc_data_fds[1]);	/* parent does not send data, it receives it from child */
+				close(ipc_log_fds[1]);	/* parent does not send logs, it receives them from child */
+
+				child_info[child_num].pid = pid;
+				child_info[child_num].ipc_data_fd = ipc_data_fds[0];
+				child_info[child_num].ipc_log_fd = ipc_log_fds[0];
+
+				child_num++;
+			}
+		}
+	}
+
+	if (child_num != child_info_size)
+	{
+		zabbix_log(LOG_LEVEL_CRIT, "RSM In %s(): child_num differs from child_info_size "
+				"(child_num: %lu, child_info_size: %lu)", __func__, child_num, child_info_size);
+	}
+}
+
+static void	collect_children_output(child_info_t *child_info, size_t child_info_size)
+{
+	struct pollfd	*pollfds;
+	size_t		pollfds_size = child_info_size * 2;
+	size_t		children_running = child_info_size;
+	size_t		child_num;
+
+	pollfds = (struct pollfd *)zbx_calloc(NULL, pollfds_size, sizeof(struct pollfd));
+
+	for (child_num = 0; child_num < child_info_size; child_num++)
+	{
+		pollfds[child_num * 2 + 0].fd = child_info[child_num].ipc_log_fd;
+		pollfds[child_num * 2 + 0].events = POLLIN;
+		pollfds[child_num * 2 + 1].fd = child_info[child_num].ipc_data_fd;
+		pollfds[child_num * 2 + 1].events = POLLIN;
+	}
+
+	while (0 < children_running)
+	{
+		int	ready = poll(pollfds, pollfds_size, -1);
+
+		if (-1 == ready)
+		{
+			zabbix_log(LOG_LEVEL_CRIT, "RSM In %s(): poll() failed", __func__);
+			exit(EXIT_FAILURE);
+		}
+
+		for (size_t i = 0; i < pollfds_size; i++)
+		{
+			if (0 == pollfds[i].revents)
+			{
+				continue;
+			}
+
+			child_num = i / 2;
+
+			if (pollfds[i].revents & POLLIN) /* there is data to read */
+			{
+				char	buffer[PIPE_BUF + 1];
+				ssize_t	bytes_received;
+
+				bytes_received = read(pollfds[i].fd, buffer, sizeof(buffer) - 1);
+
+				if (-1 == bytes_received)
+				{
+					zabbix_log(LOG_LEVEL_CRIT, "RSM In %s(): read() returned -1", __func__);
+					exit(EXIT_FAILURE);
+				}
+				if (0 == bytes_received)
+				{
+					zabbix_log(LOG_LEVEL_CRIT, "RSM In %s(): read() returned 0", __func__);
+					exit(EXIT_FAILURE);
+				}
+
+				buffer[bytes_received] = '\0';
+
+				if (pollfds[i].fd == child_info[child_num].ipc_log_fd)
+				{
+					child_info[child_num].log_buf = zbx_strdcat(child_info[child_num].log_buf, buffer);
+				}
+				else if (pollfds[i].fd == child_info[child_num].ipc_data_fd)
+				{
+					child_info[child_num].data_buf = zbx_strdcat(child_info[child_num].data_buf, buffer);
+				}
+				else
+				{
+					zabbix_log(LOG_LEVEL_CRIT, "RSM In %s(): file descriptor in pollfds does not match file descriptors in child_info", __func__);
+					exit(EXIT_FAILURE);
+				}
+			}
+			else if (pollfds[i].revents & POLLHUP) /* child has closed its end of the pipe */
+			{
+				if (pollfds[i].fd == child_info[child_num].ipc_log_fd)
+				{
+					child_info[child_num].ipc_log_fd = 0;
+				}
+				else if (pollfds[i].fd == child_info[child_num].ipc_data_fd)
+				{
+					child_info[child_num].ipc_data_fd = 0;
+				}
+				else
+				{
+					zabbix_log(LOG_LEVEL_CRIT, "RSM In %s(): file descriptor in pollfds does not match file descriptors in child_info", __func__);
+					exit(EXIT_FAILURE);
+				}
+
+				close(pollfds[i].fd);
+				pollfds[i].fd = -1;
+
+				if (0 == child_info[child_num].ipc_log_fd && 0 == child_info[child_num].ipc_data_fd)
+				{
+					int	status;
+
+					waitpid(child_info[child_num].pid, &status, 0);
+					child_info[child_num].pid = 0;
+					children_running--;
+				}
+			}
+			else
+			{
+				zabbix_log(LOG_LEVEL_CRIT, "RSM In %s(): unexpected pollfds[].revents: %d", __func__, pollfds[i].revents);
+				exit(EXIT_FAILURE);
+			}
+		}
+	}
+
+	zbx_free(pollfds);
+}
+
+static void	process_children_output(child_info_t *child_info, size_t child_info_size, const rsm_ns_t *nss, FILE *log_fd)
+{
+	for (size_t i = 0; i < child_info_size; i++)
+	{
+		int	rtt, upd;
+		char	nsid[NSID_MAX_LENGTH * 2 + 1];	/* hex representation + terminating null char */
+		size_t	ns_num;
+		size_t	ip_num;
+
+		rsm_dump(log_fd, "%s", child_info[i].log_buf);
+		zbx_free(child_info[i].log_buf);
+
+		unpack_values(&ns_num, &ip_num, &rtt, &upd, nsid, child_info[i].data_buf, log_fd);
+		zbx_free(child_info[i].data_buf);
+
+		nss[ns_num].ips[ip_num].rtt = rtt;
+		nss[ns_num].ips[ip_num].upd = upd;
+		nss[ns_num].ips[ip_num].nsid = zbx_strdup(nss[ns_num].ips[ip_num].nsid, nsid);
+	}
+}
+
+static void	test_nameservers(const rsm_ns_t *nss, size_t nss_num, ldns_resolver *res, const char *testedname,
+		const ldns_rr_list *dnskeys, int epp_enabled, int ipv4_enabled, int ipv6_enabled, FILE *log_fd)
+{
+	size_t		child_info_size = 0;
+	child_info_t	*child_info = NULL;
+
+	for (size_t i = 0; i < nss_num; i++)
+	{
+		child_info_size += nss[i].ips_num;
+	}
+
+	child_info = (child_info_t *)zbx_calloc(child_info, child_info_size, sizeof(*child_info));
+
+	fflush(log_fd);
+
+	start_children(child_info, child_info_size, nss, nss_num, res, testedname, dnskeys, epp_enabled, ipv4_enabled,
+			ipv6_enabled, log_fd);
+	collect_children_output(child_info, child_info_size);
+	process_children_output(child_info, child_info_size, nss, log_fd);
+
+	zbx_free(child_info);
+}
+
 static int	get_dnskeys(ldns_resolver *res, const char *rsmhost, ldns_rr_list **dnskeys, FILE *log_fd,
 		rsm_dnskeys_error_t *ec, char *err, size_t err_size)
 {
@@ -1634,7 +1969,7 @@ static void	create_dns_json(struct zbx_json *json, rsm_ns_t *nss, size_t nss_num
 	{
 		zbx_json_addobject(json, NULL);
 		zbx_json_addstring(json, "ns", nss[i].name, ZBX_JSON_TYPE_STRING);
-		zbx_json_adduint64(json, "status", nss[i].result);
+		zbx_json_addint64(json, "status", nss[i].result);
 		zbx_json_close(json);
 	}
 
@@ -2042,10 +2377,8 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 
 	if (CURRENT_MODE_NORMAL != current_mode)
 	{
-		rsm_infof(log_fd, "critical test mode details: successful:%d"
-				", required:%d",
-				successful_tests,
-				(RSM_UDP == protocol ? test_recover_udp : test_recover_tcp));
+		rsm_infof(log_fd, "critical test mode details: successful:%d, required:%d",
+				successful_tests, (RSM_UDP == protocol ? test_recover_udp : test_recover_tcp));
 	}
 
 	extras = (dnssec_enabled ? RESOLVER_EXTRAS_DNSSEC : RESOLVER_EXTRAS_NONE);
@@ -2120,176 +2453,7 @@ int	check_rsm_dns(zbx_uint64_t hostid, zbx_uint64_t itemid, const char *host, in
 	}
 	else
 	{
-		size_t		th_num = 0, threads_num = 0;
-		int		last_test_failed = 0;
-		char		buf[2048];
-		pid_t		pid;
-		writer_thread_t	*threads = NULL;
-
-		for (i = 0; i < nss_num; i++)
-		{
-			for (j = 0; j < nss[i].ips_num; j++)
-				threads_num++;
-		}
-
-		threads = (writer_thread_t *)zbx_calloc(threads, threads_num, sizeof(*threads));
-		memset(threads, 0, threads_num * sizeof(*threads));
-
-		fflush(log_fd);
-
-		for (i = 0; i < nss_num; i++)
-		{
-			for (j = 0; j < nss[i].ips_num; j++)
-			{
-				int	fd[2];		/* reader and writer fd for data */
-				int	log_pipe[2];	/* reader and writer fd for logs */
-				int	rv_fd, rv_log_pipe = 0;
-
-				if (0 != last_test_failed)
-				{
-					nss[i].ips[j].rtt = DNS[DNS_PROTO(res)].ns_query_error(RSM_NS_QUERY_INTERNAL);
-
-					continue;
-				}
-
-				if (-1 == (rv_fd = pipe(fd)) || -1 == (rv_log_pipe = pipe(log_pipe)))
-				{
-					rsm_errf(log_fd, "cannot create pipe: %s", zbx_strerror(errno));
-
-					if (-1 == rv_log_pipe)
-					{
-						close(fd[0]);
-						close(fd[1]);
-					}
-
-					nss[i].ips[j].rtt = DNS[DNS_PROTO(res)].ns_query_error(RSM_NS_QUERY_INTERNAL);
-					last_test_failed = 1;
-
-					continue;
-				}
-
-				zbx_child_fork(&pid);
-
-				if (0 > pid)
-				{
-					rsm_errf(log_fd, "cannot create process: %s", zbx_strerror(errno));
-
-					close(fd[0]);
-					close(fd[1]);
-					close(log_pipe[0]);
-					close(log_pipe[1]);
-
-					nss[i].ips[j].rtt = DNS[DNS_PROTO(res)].ns_query_error(RSM_NS_QUERY_INTERNAL);
-					last_test_failed = 1;
-
-					continue;
-				}
-				else if (0 == pid)
-				{
-					/* child */
-
-					FILE	*th_log_fd;
-
-					close(fd[0]);		/* child does not need data reader fd */
-					close(log_pipe[0]);	/* child does not need log reader fd */
-					fclose(log_fd);		/* child does not need log writer */
-
-					if (NULL == (th_log_fd = fdopen(log_pipe[1], "w")))
-					{
-						rsm_errf(log_fd, "cannot open log pipe: %s", zbx_strerror(errno));
-
-						nss[i].ips[j].rtt =
-							DNS[DNS_PROTO(res)].ns_query_error(RSM_NS_QUERY_INTERNAL);
-					}
-
-					if (NULL != th_log_fd && SUCCEED != test_nameserver(res,
-							nss[i].name,
-							nss[i].ips[j].ip,
-							nss[i].ips[j].port,
-							dnskeys,
-							testedname,
-							th_log_fd,
-							&nss[i].ips[j].rtt,
-							&nss[i].ips[j].nsid,
-							(0 != epp_enabled ? &nss[i].ips[j].upd : NULL),
-							ipv4_enabled,
-							ipv6_enabled,
-							epp_enabled,
-							err,
-							sizeof(err)))
-					{
-						rsm_err(th_log_fd, err);
-					}
-
-					pack_values(i, j, nss[i].ips[j].rtt, nss[i].ips[j].upd, nss[i].ips[j].nsid,
-							buf, sizeof(buf));
-
-					if (-1 == write(fd[1], buf, strlen(buf) + 1))
-						rsm_errf(th_log_fd, "cannot write to pipe: %s", zbx_strerror(errno));
-
-					fclose(th_log_fd);
-					close(fd[1]);
-					close(log_pipe[1]);
-
-					exit(EXIT_SUCCESS);
-				}
-				else
-				{
-					/* parent */
-
-					close(fd[1]);		/* parent does not need data writer fd */
-					close(log_pipe[1]);	/* parent does not need log writer fd */
-
-					threads[th_num].pid = pid;
-					threads[th_num].fd = fd[0];
-					threads[th_num].log_fd = log_pipe[0];
-
-					th_num++;
-				}
-			}
-		}
-
-		for (th_num = 0; th_num < threads_num; th_num++)
-		{
-			ssize_t	bytes;
-			int	status;
-
-			if (0 == threads[th_num].pid)
-				continue;
-
-			if (-1 != read(threads[th_num].fd, buf, sizeof(buf)))
-			{
-				int	rtt, upd;
-				char	nsid[NSID_MAX_LENGTH * 2 + 1];	/* hex representation + terminating null char */
-
-				unpack_values(&i, &j, &rtt, &upd, nsid, buf, log_fd);
-
-				nss[i].ips[j].rtt = rtt;
-				nss[i].ips[j].upd = upd;
-				nss[i].ips[j].nsid = zbx_strdup(nss[i].ips[j].nsid, nsid);
-			}
-			else
-				rsm_errf(log_fd, "cannot read from pipe: %s", zbx_strerror(errno));
-
-			while (0 != (bytes = read(threads[th_num].log_fd, buf, sizeof(buf))))
-			{
-				if (-1 == bytes)
-				{
-					rsm_errf(log_fd, "cannot read logs from pipe: %s", zbx_strerror(errno));
-					break;
-				}
-
-				rsm_dump(log_fd, "%.*s", (int)bytes, buf);
-			}
-
-			if (0 >= waitpid(threads[th_num].pid, &status, 0))
-				rsm_err(log_fd, "error on thread waiting");
-
-			close(threads[th_num].fd);
-			close(threads[th_num].log_fd);
-		}
-
-		zbx_free(threads);
+		test_nameservers(nss, nss_num, res, testedname, dnskeys, epp_enabled, ipv4_enabled, ipv6_enabled, log_fd);
 	}
 
 	set_dns_test_results(nss, nss_num, rtt_limit, minns, &dns_status,

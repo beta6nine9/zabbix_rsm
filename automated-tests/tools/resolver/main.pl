@@ -78,7 +78,8 @@ sub reply_handler
 		# specify EDNS options  { option => value }
 		$optionmask =
 		{
-			nsid => 'foo-ns-id',
+			# "foo-ns-id" in hex
+			nsid => '666f6f2d6e732d6964',
 		};
 	}
 	elsif ($qtype eq 'DS')
