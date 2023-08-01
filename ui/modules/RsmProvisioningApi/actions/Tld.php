@@ -622,7 +622,7 @@ class Tld extends MonitoringTarget
 				];
 			}
 
-			// check which items already exist; enable them, remove from pseudo-configs
+			// check which items already exist; enable them, remove from pseudo-configs; remove from $createNsIp
 
 			$enableItemIds = [];
 
@@ -631,6 +631,7 @@ class Tld extends MonitoringTarget
 				'hostids' => $this->statusHostId,
 				'filter'  => ['key_' => array_keys($statusItems)],
 			]);
+
 			if (!empty($data))
 			{
 				$foundItems = array_column($data, 'itemid', 'key_');
@@ -641,9 +642,21 @@ class Tld extends MonitoringTarget
 
 				foreach ($foundItems as $key => $itemid)
 				{
-					if (preg_match('/^rsm\.slv\.dns\.ns\.downtime\[.*,.*\]$/', $key))
+					if (preg_match('/^rsm\.slv\.dns\.ns\.downtime\[(.*),(.*)\]$/', $key, $matches))
 					{
 						$this->updateRsmhostDnsNsLog($itemid, self::RSMHOST_DNS_NS_LOG_ACTION_ENABLE);
+
+						$ns = $matches[1];
+						$ip = $matches[2];
+
+						foreach ($createNsIp as $i => $nsip)
+						{
+							if ($nsip['ns'] == $ns && $nsip['ip'] == $ip)
+							{
+								unset($createNsIp[$i]);
+								break;
+							}
+						}
 					}
 				}
 			}
@@ -725,11 +738,11 @@ class Tld extends MonitoringTarget
 				// create triggers
 
 				$thresholds = [
-					['threshold' =>  '10', 'priority' => 2],
-					['threshold' =>  '25', 'priority' => 3],
-					['threshold' =>  '50', 'priority' => 3],
-					['threshold' =>  '75', 'priority' => 4],
-					['threshold' => '100', 'priority' => 5],
+					['threshold' =>  '10', 'priority' => TRIGGER_SEVERITY_WARNING],
+					['threshold' =>  '25', 'priority' => TRIGGER_SEVERITY_AVERAGE],
+					['threshold' =>  '50', 'priority' => TRIGGER_SEVERITY_AVERAGE],
+					['threshold' =>  '75', 'priority' => TRIGGER_SEVERITY_HIGH],
+					['threshold' => '100', 'priority' => TRIGGER_SEVERITY_DISASTER],
 				];
 
 				$triggerConfigs = [];
