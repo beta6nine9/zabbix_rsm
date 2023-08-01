@@ -75,8 +75,7 @@ sub reply_handler
 	# specify EDNS options  { option => value }
 	my $optionmask =
 	{
-		# "foo-ns-id" in hex
-		nsid => '666f6f2d6e732d6964',
+		nsid => 'foo-ns-id',
 	};
 
 	return ($config->{'rcode'}, \@answer, \@authority, \@additional, $config->{'flags'}, $optionmask);
