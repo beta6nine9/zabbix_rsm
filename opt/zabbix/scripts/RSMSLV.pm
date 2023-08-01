@@ -1109,8 +1109,6 @@ sub get_test_items($)
 		" from items i,hosts h,hosts_groups hg".
 		" where h.hostid=i.hostid".
 			" and hg.hostid=h.hostid".
-			" and h.status=".HOST_STATUS_MONITORED.
-			" and i.status<>".ITEM_STATUS_DISABLED.
 			" and hg.groupid=" . TLD_PROBE_RESULTS_GROUPID . " and h.host like '$rsmhost %'"
 	);
 
@@ -1163,7 +1161,7 @@ sub get_hostid
 	return $rows_ref->[0][0];
 }
 
-sub tld_exists_locally($)
+sub tld_exists($)
 {
 	my $tld = shift;
 
@@ -1182,11 +1180,6 @@ sub tld_exists_locally($)
 	return 1;
 }
 
-sub tld_exists($)
-{
-	return tld_exists_locally(shift);
-}
-
 sub validate_tld($$)
 {
 	my $tld = shift;
@@ -1196,7 +1189,7 @@ sub validate_tld($$)
 	{
 		db_connect($server_key);
 
-		my $rv = tld_exists_locally($tld);
+		my $rv = tld_exists($tld);
 
 		db_disconnect();
 
@@ -1206,12 +1199,6 @@ sub validate_tld($$)
 
 			return;
 		}
-	}
-
-	if (scalar(@{$server_keys}) && defined($_server_key))
-	{
-		# connect back
-		db_connect($_server_key);
 	}
 
 	fail("tld \"$tld\" does not exist");
@@ -1638,7 +1625,7 @@ sub db_connect
 {
 	$_server_key = shift;
 
-	fail("Error: no database configuration") unless (defined($config));
+	fail("no database configuration") unless (defined($config));
 
 	db_disconnect() if (defined($dbh));
 
