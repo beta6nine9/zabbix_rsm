@@ -1470,7 +1470,7 @@ static void	start_children(child_info_t *child_info, size_t child_info_size, con
 	}
 }
 
-static void	collect_children_output(child_info_t *child_info, size_t child_info_size)
+static void	collect_children_output(child_info_t *child_info, size_t child_info_size, FILE *log_fd)
 {
 	struct pollfd	*pollfds;
 	size_t		pollfds_size = child_info_size * 2;
@@ -1563,7 +1563,12 @@ static void	collect_children_output(child_info_t *child_info, size_t child_info_
 				{
 					int	status;
 
-					waitpid(child_info[child_num].pid, &status, 0);
+					if (0 >= waitpid(child_info[child_num].pid, &status, 0))
+					{
+// TODO: remove
+zabbix_log(LOG_LEVEL_CRIT, "%s(): waitpid() failed, child_num = %lu, pid = %d, status = %d", __func__, child_num, (int)child_info[child_num].pid, status);
+						rsm_err(log_fd, "error on thread waiting");
+					}
 					child_info[child_num].pid = 0;
 					children_running--;
 				}
@@ -1587,6 +1592,16 @@ static void	process_children_output(child_info_t *child_info, size_t child_info_
 		char	nsid[NSID_MAX_LENGTH * 2 + 1];	/* hex representation + terminating null char */
 		size_t	ns_num;
 		size_t	ip_num;
+
+// TODO: remove
+if (NULL == child_info[i].log_buf)
+{
+	zabbix_log(LOG_LEVEL_CRIT, "%s(): child_info[%lu].log_buf is NULL", __func__, i);
+}
+if (NULL == child_info[i].data_buf)
+{
+	zabbix_log(LOG_LEVEL_CRIT, "%s(): child_info[%lu].data_buf is NULL", __func__, i);
+}
 
 		rsm_dump(log_fd, "%s", child_info[i].log_buf);
 		zbx_free(child_info[i].log_buf);
@@ -1617,7 +1632,7 @@ static void	test_nameservers(const rsm_ns_t *nss, size_t nss_num, ldns_resolver 
 
 	start_children(child_info, child_info_size, nss, nss_num, res, testedname, dnskeys, epp_enabled, ipv4_enabled,
 			ipv6_enabled, log_fd);
-	collect_children_output(child_info, child_info_size);
+	collect_children_output(child_info, child_info_size, log_fd);
 	process_children_output(child_info, child_info_size, nss, log_fd);
 
 	zbx_free(child_info);
