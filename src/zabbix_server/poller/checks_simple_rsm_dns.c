@@ -1606,6 +1606,13 @@ if (NULL == child_info[i].data_buf)
 		rsm_dump(log_fd, "%s", child_info[i].log_buf);
 		zbx_free(child_info[i].log_buf);
 
+// TODO: remove
+rsm_dump(log_fd, "%s", "----------------------------------------");
+rsm_dump(log_fd, "size: %lu", strlen(child_info[i].data_buf));
+rsm_dump(log_fd, "%s", child_info[i].data_buf);
+rsm_dump(log_fd, "%s", "----------------------------------------");
+
+
 		unpack_values(&ns_num, &ip_num, &rtt, &upd, nsid, child_info[i].data_buf, log_fd);
 		zbx_free(child_info[i].data_buf);
 
