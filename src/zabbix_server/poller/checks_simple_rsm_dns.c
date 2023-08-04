@@ -1381,8 +1381,8 @@ static void	start_children(child_info_t *child_info, size_t child_info_size, con
 	{
 		for (size_t j = 0; j < nss[i].ips_num; j++)
 		{
-			int	ipc_data_fds[2];	/* reader and writer file descriptors for data */
 			int	ipc_log_fds[2];		/* reader and writer file descriptors for logs */
+			int	ipc_data_fds[2];	/* reader and writer file descriptors for data */
 
 			if (0 != last_test_failed)
 			{
@@ -1470,6 +1470,62 @@ static void	start_children(child_info_t *child_info, size_t child_info_size, con
 	}
 }
 
+static void read_child_pipe(int fd, child_info_t *child_info, int single_read)
+{
+	char	buffer[PIPE_BUF + 1];
+	ssize_t	bytes_received;
+
+	while (0 != (bytes_received = read(fd, buffer, sizeof(buffer) - 1)))
+	{
+		if (-1 == bytes_received)
+		{
+			zabbix_log(LOG_LEVEL_CRIT, "RSM In %s(): read() returned -1", __func__);
+			exit(EXIT_FAILURE);
+		}
+
+		buffer[bytes_received] = '\0';
+
+		if (fd == child_info->ipc_log_fd)
+		{
+			child_info->log_buf = zbx_strdcat(child_info->log_buf, buffer);
+		}
+		else if (fd == child_info->ipc_data_fd)
+		{
+			child_info->data_buf = zbx_strdcat(child_info->data_buf, buffer);
+		}
+		else
+		{
+			zabbix_log(LOG_LEVEL_CRIT, "RSM In %s(): fd does not match file descriptors in child_info", __func__);
+			exit(EXIT_FAILURE);
+		}
+
+		if (single_read)
+		{
+			break;
+		}
+	}
+
+}
+
+static void close_child_pipe(int fd, child_info_t *child_info)
+{
+	if (fd == child_info->ipc_log_fd)
+	{
+		child_info->ipc_log_fd = 0;
+	}
+	else if (fd == child_info->ipc_data_fd)
+	{
+		child_info->ipc_data_fd = 0;
+	}
+	else
+	{
+		zabbix_log(LOG_LEVEL_CRIT, "RSM In %s(): fd does not match file descriptors in child_info", __func__);
+		exit(EXIT_FAILURE);
+	}
+
+	close(fd);
+}
+
 static void	collect_children_output(child_info_t *child_info, size_t child_info_size, FILE *log_fd)
 {
 	struct pollfd	*pollfds;
@@ -1508,55 +1564,13 @@ static void	collect_children_output(child_info_t *child_info, size_t child_info_
 
 			if (pollfds[i].revents & POLLIN) /* there is data to read */
 			{
-				char	buffer[PIPE_BUF + 1];
-				ssize_t	bytes_received;
-
-				bytes_received = read(pollfds[i].fd, buffer, sizeof(buffer) - 1);
-
-				if (-1 == bytes_received)
-				{
-					zabbix_log(LOG_LEVEL_CRIT, "RSM In %s(): read() returned -1", __func__);
-					exit(EXIT_FAILURE);
-				}
-				if (0 == bytes_received)
-				{
-					zabbix_log(LOG_LEVEL_CRIT, "RSM In %s(): read() returned 0", __func__);
-					exit(EXIT_FAILURE);
-				}
-
-				buffer[bytes_received] = '\0';
-
-				if (pollfds[i].fd == child_info[child_num].ipc_log_fd)
-				{
-					child_info[child_num].log_buf = zbx_strdcat(child_info[child_num].log_buf, buffer);
-				}
-				else if (pollfds[i].fd == child_info[child_num].ipc_data_fd)
-				{
-					child_info[child_num].data_buf = zbx_strdcat(child_info[child_num].data_buf, buffer);
-				}
-				else
-				{
-					zabbix_log(LOG_LEVEL_CRIT, "RSM In %s(): file descriptor in pollfds does not match file descriptors in child_info", __func__);
-					exit(EXIT_FAILURE);
-				}
+				read_child_pipe(pollfds[i].fd, &child_info[child_num], 1);
 			}
 			else if (pollfds[i].revents & POLLHUP) /* child has closed its end of the pipe */
 			{
-				if (pollfds[i].fd == child_info[child_num].ipc_log_fd)
-				{
-					child_info[child_num].ipc_log_fd = 0;
-				}
-				else if (pollfds[i].fd == child_info[child_num].ipc_data_fd)
-				{
-					child_info[child_num].ipc_data_fd = 0;
-				}
-				else
-				{
-					zabbix_log(LOG_LEVEL_CRIT, "RSM In %s(): file descriptor in pollfds does not match file descriptors in child_info", __func__);
-					exit(EXIT_FAILURE);
-				}
+				read_child_pipe(pollfds[i].fd, &child_info[child_num], 0);
+				close_child_pipe(pollfds[i].fd, &child_info[child_num]);
 
-				close(pollfds[i].fd);
 				pollfds[i].fd = -1;
 
 				if (0 == child_info[child_num].ipc_log_fd && 0 == child_info[child_num].ipc_data_fd)
@@ -1565,8 +1579,6 @@ static void	collect_children_output(child_info_t *child_info, size_t child_info_
 
 					if (0 >= waitpid(child_info[child_num].pid, &status, 0))
 					{
-// TODO: remove
-zabbix_log(LOG_LEVEL_CRIT, "%s(): waitpid() failed, child_num = %lu, pid = %d, status = %d", __func__, child_num, (int)child_info[child_num].pid, status);
 						rsm_err(log_fd, "error on thread waiting");
 					}
 					child_info[child_num].pid = 0;
@@ -1593,25 +1605,8 @@ static void	process_children_output(child_info_t *child_info, size_t child_info_
 		size_t	ns_num;
 		size_t	ip_num;
 
-// TODO: remove
-if (NULL == child_info[i].log_buf)
-{
-	zabbix_log(LOG_LEVEL_CRIT, "%s(): child_info[%lu].log_buf is NULL", __func__, i);
-}
-if (NULL == child_info[i].data_buf)
-{
-	zabbix_log(LOG_LEVEL_CRIT, "%s(): child_info[%lu].data_buf is NULL", __func__, i);
-}
-
 		rsm_dump(log_fd, "%s", child_info[i].log_buf);
 		zbx_free(child_info[i].log_buf);
-
-// TODO: remove
-rsm_dump(log_fd, "%s", "----------------------------------------");
-rsm_dump(log_fd, "size: %lu", strlen(child_info[i].data_buf));
-rsm_dump(log_fd, "%s", child_info[i].data_buf);
-rsm_dump(log_fd, "%s", "----------------------------------------");
-
 
 		unpack_values(&ns_num, &ip_num, &rtt, &upd, nsid, child_info[i].data_buf, log_fd);
 		zbx_free(child_info[i].data_buf);
