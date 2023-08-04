@@ -1504,7 +1504,6 @@ static void read_child_pipe(int fd, child_info_t *child_info, int single_read)
 			break;
 		}
 	}
-
 }
 
 static void close_child_pipe(int fd, child_info_t *child_info)
