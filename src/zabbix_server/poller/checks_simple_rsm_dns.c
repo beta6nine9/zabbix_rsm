@@ -1470,7 +1470,7 @@ static void	start_children(child_info_t *child_info, size_t child_info_size, con
 	}
 }
 
-static void read_child_pipe(int fd, child_info_t *child_info, int single_read)
+static void	read_child_pipe(int fd, child_info_t *child_info, int single_read)
 {
 	char	buffer[PIPE_BUF + 1];
 	ssize_t	bytes_received;
@@ -1506,7 +1506,7 @@ static void read_child_pipe(int fd, child_info_t *child_info, int single_read)
 	}
 }
 
-static void close_child_pipe(int fd, child_info_t *child_info)
+static void	close_child_pipe(int fd, child_info_t *child_info)
 {
 	if (fd == child_info->ipc_log_fd)
 	{
