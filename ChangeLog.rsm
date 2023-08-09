@@ -14,6 +14,12 @@ New features:
 ....I..... [920] added Network troubleshooting for contracted parties (asitals)
 
 --------------------------------------------------------------------------------
+Changes for rsm3.2.3
+
+Bug fixes:
+.......P.. [943] fixed reading data from worker processes during DNS tests (asitals)
+
+--------------------------------------------------------------------------------
 Changes for rsm3.2.2
 
 Bug fixes:
