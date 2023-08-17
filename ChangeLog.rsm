@@ -1,3 +1,10 @@
+Changes for rsm3.2.4
+
+Bug fixes:
+....I..... [944] removed foreign keys from table rsm_false_positive (asitals, dimir)
+....I..... [941] increased max NSID in Data Export 32767 -> 65534 (asitals, dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm3.2.3
 
 Bug fixes:
