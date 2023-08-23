@@ -80,19 +80,19 @@ our @EXPORT = qw(
 );
 
 my %_MAX_IDS = (
-	ID_PROBE() => 32767,
-	ID_TLD() => 32767,
-	ID_NS_NAME() => 32767,
-	ID_NS_IP() => 32767,
-	ID_NSID() => 32767,
+	ID_PROBE()              => 32767,
+	ID_TLD()                => 32767,
+	ID_NS_NAME()            => 32767,
+	ID_NS_IP()              => 32767,
+	ID_NSID()               => 65535,
 	ID_TRANSPORT_PROTOCOL() => 127,
-	ID_TEST_TYPE() => 127,
-	ID_SERVICE_CATEGORY() => 127,
-	ID_TLD_TYPE() => 127,
-	ID_STATUS_MAP() => 127,
-	ID_IP_VERSION() => 127,
-	ID_TARGET() => 32767,
-	ID_TESTEDNAME() => 32767,
+	ID_TEST_TYPE()          => 127,
+	ID_SERVICE_CATEGORY()   => 127,
+	ID_TLD_TYPE()           => 127,
+	ID_STATUS_MAP()         => 127,
+	ID_IP_VERSION()         => 127,
+	ID_TARGET()             => 32767,
+	ID_TESTEDNAME()         => 32767,
 );
 
 # this is needed to construct Cycle ID
