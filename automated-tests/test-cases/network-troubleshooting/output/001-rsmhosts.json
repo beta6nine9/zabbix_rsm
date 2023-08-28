@@ -1,0 +1,57 @@
+{
+   "tld1" : {
+      "dns_tcp" : "0",
+      "dns_udp" : "0",
+      "nsip_list" : [],
+      "rdap" : "0",
+      "rdap_server" : "",
+      "rdds43" : "0",
+      "rdds43_server" : "",
+      "rdds80" : "0",
+      "rdds80_server" : ""
+   },
+   "tld2" : {
+      "dns_tcp" : "0",
+      "dns_udp" : "0",
+      "nsip_list" : [],
+      "rdap" : "0",
+      "rdap_server" : "",
+      "rdds43" : "0",
+      "rdds43_server" : "",
+      "rdds80" : "0",
+      "rdds80_server" : ""
+   },
+   "tld3" : {
+      "dns_tcp" : "0",
+      "dns_udp" : "0",
+      "nsip_list" : [],
+      "rdap" : "0",
+      "rdap_server" : "",
+      "rdds43" : "0",
+      "rdds43_server" : "",
+      "rdds80" : "0",
+      "rdds80_server" : ""
+   },
+   "tld4" : {
+      "dns_tcp" : "0",
+      "dns_udp" : "0",
+      "nsip_list" : [],
+      "rdap" : "0",
+      "rdap_server" : "",
+      "rdds43" : "0",
+      "rdds43_server" : "",
+      "rdds80" : "0",
+      "rdds80_server" : ""
+   },
+   "tld5" : {
+      "dns_tcp" : "0",
+      "dns_udp" : "0",
+      "nsip_list" : [],
+      "rdap" : "0",
+      "rdap_server" : "",
+      "rdds43" : "0",
+      "rdds43_server" : "",
+      "rdds80" : "0",
+      "rdds80_server" : ""
+   }
+}

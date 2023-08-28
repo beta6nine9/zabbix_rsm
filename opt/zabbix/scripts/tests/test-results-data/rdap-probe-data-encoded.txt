@@ -1,1 +1,0 @@
-{"100298":{"clock":1586262700,"key":"rdap.target","value_type":1},"100299":{"clock":1586262700,"value_type":1,"key":"rdap.testedname"},"100297":{"clock":1586262700,"value_type":0,"key":"rdap.rtt"},"400283":{"clock":1586262700,"key":"rdap.status","value_type":3}}

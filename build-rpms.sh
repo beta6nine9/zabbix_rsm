@@ -1,6 +1,6 @@
 #!/bin/bash
 
-RSM_VERSION="rsm3.2.4"	# MAJOR.PROD.QA
+RSM_VERSION="rsm3.3.0rc2"	# MAJOR.PROD.QA
 RPM_NAMESPACE="50"
 RPMDIR="rpmbuild"
 SRV_VERSION_FILE="include/version.h"
@@ -54,6 +54,8 @@ fail()
 
 	exit $FAILURE
 }
+
+trap restore_bak_files EXIT
 
 OPT_FORCE=0
 OPT_CLEAN=0

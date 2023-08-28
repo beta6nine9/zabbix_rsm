@@ -1,24 +1,24 @@
-\d+:\d{8}:\d{6}\.\d{3} Info: >>> START TEST <<<
-\d+:\d{8}:\d{6}\.\d{3} Info: probe_RDDS:ENABLED, RDDS43:ENABLED, RDDS80:ENABLED, IPv4:ENABLED, IPv6:DISABLED, RDDS43_testedname:example.example, RDDS43_ns_string:Name Server:, RDDS80_url:http:\/\/example.example:4380, maxredirs:10, resolver:127.0.0.1;5053, rtt_limit:10000
-\d+:\d{8}:\d{6}\.\d{3} Info: start RDDS43 test \(server example.example\)
-\d+:\d{8}:\d{6}\.\d{3} Info: making DNS query to 127.0.0.1:5053 to resolve a host to IPv4 addresses
+ *\d+:\d{8}:\d{6}\.\d{3} Info: >>> START TEST <<<
+ *\d+:\d{8}:\d{6}\.\d{3} Info: probe_RDDS:ENABLED, RDDS43:ENABLED, RDDS80:ENABLED, IPv4:ENABLED, IPv6:DISABLED, RDDS43_testedname:example.example, RDDS43_ns_string:Name Server:, RDDS80_url:http:\/\/example.example:4380, maxredirs:10, resolver:127.0.0.1;5053, rtt_limit:10000
+ *\d+:\d{8}:\d{6}\.\d{3} Info: start RDDS43 test \(server example.example\)
+ *\d+:\d{8}:\d{6}\.\d{3} Info: making DNS query to 127.0.0.1:5053 to resolve a host to IPv4 addresses
 .*
-\d+:\d{8}:\d{6}\.\d{3} Info: Body:
+ *\d+:\d{8}:\d{6}\.\d{3} Info: Body:
 
 Name server: 127.0.0.1
 Name server: 127.0.0.2
-\d+:\d{8}:\d{6}\.\d{3} Info: end RDDS43 test \(rtt:\d+\)
-\d+:\d{8}:\d{6}\.\d{3} Info: start RDDS80 test \(url http:\/\/example.example:4380\)
-\d+:\d{8}:\d{6}\.\d{3} Info: making DNS query to 127.0.0.1:5053 to resolve a host to IPv4 addresses
+ *\d+:\d{8}:\d{6}\.\d{3} Info: end RDDS43 test \(rtt:\d+\)
+ *\d+:\d{8}:\d{6}\.\d{3} Info: start RDDS80 test \(url http:\/\/example.example:4380\)
+ *\d+:\d{8}:\d{6}\.\d{3} Info: making DNS query to 127.0.0.1:5053 to resolve a host to IPv4 addresses
 .*
-\d+:\d{8}:\d{6}\.\d{3} Info: the following URL was generated for the test: http:\/\/127.0.0.1:4380
-\d+:\d{8}:\d{6}\.\d{3} Info: Request headers:
+ *\d+:\d{8}:\d{6}\.\d{3} Info: the following URL was generated for the test: http:\/\/127.0.0.1:4380
+ *\d+:\d{8}:\d{6}\.\d{3} Info: Request headers:
 GET \/ HTTP\/1.1[\r\n]*
 Host: example.example[\r\n]*
 User-Agent: Zabbix \d+\.\d+\.\d+[\r\n]*
 Accept: \*\/\*[\r\n]*
 [\r\n]*
-\d+:\d{8}:\d{6}\.\d{3} Info: Transfer details:
+ *\d+:\d{8}:\d{6}\.\d{3} Info: Transfer details:
   content_type=text\/html; charset=UTF-8
   http_code=200
   local_ip=127.0.0.1
@@ -39,6 +39,6 @@ Accept: \*\/\*[\r\n]*
 Body:
 Hello
 world!
-\d+:\d{8}:\d{6}\.\d{3} Info: end RDDS80 test \(rtt:\d+\)
-\d+:\d{8}:\d{6}\.\d{3} Info: Test result: \{"rdds43":\{"rtt":\d+,"ip":"127.0.0.1","target":"example.example","testedname":"example.example","status":1},"rdds80":\{"rtt":\d+,"ip":"127.0.0.1","target":"http:\/\/example.example:4380","status":1},"status":1}
-\d+:\d{8}:\d{6}\.\d{3} Info: >>> END TEST <<<
+ *\d+:\d{8}:\d{6}\.\d{3} Info: end RDDS80 test \(rtt:\d+\)
+ *\d+:\d{8}:\d{6}\.\d{3} Info: Test result: \{"rdds43":\{"rtt":\d+,"ip":"127.0.0.1","target":"example.example","testedname":"example.example","status":1},"rdds80":\{"rtt":\d+,"ip":"127.0.0.1","target":"http:\/\/example.example:4380","status":1},"status":1}
+ *\d+:\d{8}:\d{6}\.\d{3} Info: >>> END TEST <<<

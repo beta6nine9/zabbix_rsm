@@ -1,0 +1,24 @@
+[test-case]
+
+"symlinker"
+
+[empty-directory]
+
+"/opt/zabbix/mtr"
+"/opt/zabbix/sla"
+
+[execute]
+
+# mtr-symlinker.pl expects archive's filename to be '<yyyymmdd>-<hhmmss>-<probe>.tar'
+# Normally, archive would be in some "external" directory. For the sake of simplicity, put it into /opt/zabbix/mtr for testing purposes.
+"","cp ${test_case_dir}/101-symlinker-input.tar /opt/zabbix/mtr/20230501-120000-Probe1.tar"
+
+"","/opt/zabbix/scripts/mtr-symlinker.pl --archive '/opt/zabbix/mtr/20230501-120000-Probe1.tar' --nolog"
+
+# Normally, archive would not be located in /opt/zabbix/mtr. Delete it.
+"","unlink /opt/zabbix/mtr/20230501-120000-Probe1.tar"
+
+[compare-files]
+
+"/opt/zabbix/mtr","101-symlinker-output-mtr.tar.gz"
+"/opt/zabbix/sla","101-symlinker-output-sla.tar.gz"

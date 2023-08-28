@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+
+echo '{
+    "report": {
+        "mtr": {
+            "src": "ubuntu",
+            "dst": "'$@'",
+            "tos": 0,
+            "tests": 10,
+            "psize": "64",
+            "bitpattern": "0x00"
+        },
+        "hubs": [
+            {
+                "count": 1,
+                "host": "'$@'",
+                "ASN": "AS???",
+                "Loss%": 0.0,
+                "Snt": 10,
+                "Last": 0.035,
+                "Avg": 0.05,
+                "Best": 0.035,
+                "Wrst": 0.064,
+                "StDev": 0.01
+            }
+        ]
+    }
+}'

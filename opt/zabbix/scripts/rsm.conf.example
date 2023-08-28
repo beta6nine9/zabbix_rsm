@@ -52,6 +52,9 @@ allow_missing_measurements = 60
 ; seconds, if the metric is not in cache and no measurements within this period, start generating them from this period in the past
 initial_measurements_limit = 7200
 
+[network_troubleshooting]
+output_dir = /opt/zabbix/mtr
+
 [data_export]
 output_dir = /opt/zabbix/export
 
