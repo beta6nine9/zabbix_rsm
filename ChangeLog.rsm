@@ -1,3 +1,12 @@
+Changes for rsm3.3.1
+
+New features:
+....I..... [947] added rsm.conf option to specify directory for mtr symlinks (asitals)
+
+Bug fixes:
+....I..... [946] use "zz--root" directory for "." TLD when creating symlinks of mtr reports (asitals)
+
+--------------------------------------------------------------------------------
 Changes for rsm3.3.0
 
 rsm3.3.0rc2 was released as rsm3.3.0 without any changes
