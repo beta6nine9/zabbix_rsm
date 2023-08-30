@@ -29,8 +29,8 @@ sub main()
 
 	initialize();
 
-	my $mtr_dir_base = get_config('network_troubleshooting', 'output_dir');
-	my $sla_dir_base = get_config('sla_api', 'output_dir');
+	my $reports_dir_base  = get_config('network_troubleshooting', 'reports_dir');
+	my $symlinks_dir_base = get_config('network_troubleshooting', 'symlinks_dir');
 
 	my $archive_file = getopt('archive');
 	my $archive_filename = basename($archive_file);
@@ -47,14 +47,14 @@ sub main()
 
 	my ($y, $m, $d, $probe) = ($1, $2, $3, $4);
 
-	my $mtr_dir = "$mtr_dir_base/$y/$m/$d";
+	my $reports_dir = "$reports_dir_base/$y/$m/$d";
 
-	if (!-d $mtr_dir)
+	if (!-d $reports_dir)
 	{
-		create_dir($mtr_dir);
+		create_dir($reports_dir);
 	}
 
-	my $file_list = execute("tar", "-C", $mtr_dir, "-vxf", $archive_file);
+	my $file_list = execute("tar", "-C", $reports_dir, "-vxf", $archive_file);
 	my @file_list = split(/\n/, $file_list);
 
 	my $proxy_config_filename    = (grep { /.*-proxy-.*\.gz/ } @file_list)[0];
@@ -71,9 +71,9 @@ sub main()
 		$_ ne $resolved_hosts_filename
 	} @file_list;
 
-	my $proxy_config    = decode_json(read_gzip($mtr_dir . '/' . $proxy_config_filename));
-	my $rsmhosts_config = decode_json(read_gzip($mtr_dir . '/' . $rsmhosts_config_filename));
-	my $resolved_hosts  = decode_json(read_gzip($mtr_dir . '/' . $resolved_hosts_filename));
+	my $proxy_config    = decode_json(read_gzip($reports_dir . '/' . $proxy_config_filename));
+	my $rsmhosts_config = decode_json(read_gzip($reports_dir . '/' . $rsmhosts_config_filename));
+	my $resolved_hosts  = decode_json(read_gzip($reports_dir . '/' . $resolved_hosts_filename));
 
 	my %ip_rsmhosts = create_ip_rsmhosts_mapping($proxy_config, $rsmhosts_config, $resolved_hosts);
 
@@ -93,15 +93,15 @@ sub main()
 				$rsmhost = ROOT_ZONE_DIR;
 			}
 
-			my $sla_dir = "$sla_dir_base/v2/$rsmhost/networkTroubleshooting/mtr/$y/$m/$d";
+			my $symlinks_dir = "$symlinks_dir_base/v2/$rsmhost/networkTroubleshooting/mtr/$y/$m/$d";
 
-			if (!-d $sla_dir)
+			if (!-d $symlinks_dir)
 			{
-				create_dir($sla_dir);
+				create_dir($symlinks_dir);
 			}
 
-			my $src_file = $mtr_dir . '/' . $filename;
-			my $dst_file = $sla_dir . '/' . $filename;
+			my $src_file = $reports_dir  . '/' . $filename;
+			my $dst_file = $symlinks_dir . '/' . $filename;
 
 			dbg("creating symlink, '$src_file' -> '$dst_file'");
 
@@ -142,7 +142,8 @@ sub validate_config()
 	dbg("config:");
 	dbg();
 	dbg("[network_troubleshooting]");
-	dbg("output_dir = " . get_config('network_troubleshooting', 'output_dir'));
+	dbg("reports_dir  = " . get_config('network_troubleshooting', 'reports_dir'));
+	dbg("symlinks_dir = " . get_config('network_troubleshooting', 'symlinks_dir'));
 	dbg();
 }
 

@@ -53,7 +53,8 @@ allow_missing_measurements = 60
 initial_measurements_limit = 7200
 
 [network_troubleshooting]
-output_dir = /opt/zabbix/mtr
+reports_dir = /opt/zabbix/mtr
+symlinks_dir = /opt/zabbix/sla
 
 [data_export]
 output_dir = /opt/zabbix/export
