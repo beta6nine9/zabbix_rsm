@@ -14,6 +14,8 @@ use JSON::XS;
 use RSM;
 use RSMSLV;
 
+use constant ROOT_ZONE_DIR => 'zz--root';	# map root zone name (.) to something human readable
+
 my $config;
 
 ################################################################################
@@ -86,6 +88,11 @@ sub main()
 
 		foreach my $rsmhost (@{$ip_rsmhosts{$ip}})
 		{
+			if ($rsmhost eq ".")
+			{
+				$rsmhost = ROOT_ZONE_DIR;
+			}
+
 			my $sla_dir = "$sla_dir_base/v2/$rsmhost/networkTroubleshooting/mtr/$y/$m/$d";
 
 			if (!-d $sla_dir)
