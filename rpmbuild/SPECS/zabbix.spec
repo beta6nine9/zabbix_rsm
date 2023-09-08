@@ -457,7 +457,7 @@ make SHARE="%{_datadir}" TARGETS="%{modulenames}"
 rm -rf $RPM_BUILD_ROOT
 
 # install
-make DESTDIR=$RPM_BUILD_ROOT install
+make DESTDIR=$RPM_BUILD_ROOT ALERT_SCRIPTS_PATH=/opt/zabbix%{namespace}/alertscripts EXTERNAL_SCRIPTS_PATH=/opt/zabbix%{namespace}/externalscripts install
 
 # install necessary directories
 mkdir -p $RPM_BUILD_ROOT%{_localstatedir}/log/zabbix%{namespace}
@@ -489,14 +489,11 @@ rm -f $RPM_BUILD_ROOT%{_bindir}/t_rsm_rdap
 rm -f $RPM_BUILD_ROOT%{_libdir}/debug/%{_bindir}/rsm_epp_*.debug
 rm -f $RPM_BUILD_ROOT%{_libdir}/debug/%{_bindir}/t_rsm_*.debug
 
-# install directories for scripts
-mkdir -p $RPM_BUILD_ROOT%{_libdir}/zabbix%{namespace}
-mv $RPM_BUILD_ROOT%{_datadir}/zabbix/alertscripts    $RPM_BUILD_ROOT%{_libdir}/zabbix%{namespace}
-mv $RPM_BUILD_ROOT%{_datadir}/zabbix/externalscripts $RPM_BUILD_ROOT%{_libdir}/zabbix%{namespace}
-
 # install frontend files
 find ui -name '*.orig' | xargs rm -f
-cp -a ui/* $RPM_BUILD_ROOT%{_datadir}/zabbix
+install -d $RPM_BUILD_ROOT%{_datadir}
+install -d $RPM_BUILD_ROOT%{_datadir}/zabbix
+cp -a ui/* $RPM_BUILD_ROOT%{_datadir}/zabbix/
 
 chmod -x opt/zabbix/scripts/CSlaReport.php
 
@@ -541,6 +538,9 @@ cp -r opt/zabbix/* $RPM_BUILD_ROOT/opt/zabbix%{namespace}/
 
 # install probe-scripts
 cp -r probe-scripts $RPM_BUILD_ROOT/opt/zabbix%{namespace}/
+
+# directory for proxy package
+install -d $RPM_BUILD_ROOT%{_libdir}/zabbix%{namespace}/externalscripts
 
 # fix namespace
 sed -i "$NAMESPACE_PATTERN" $(find $RPM_BUILD_ROOT/opt/zabbix%{namespace} -type f -name '*.pl' -o -name '*.pm' -o -name '*.php' -o -name '*.sh')
@@ -849,7 +849,6 @@ systemctl restart rsyslog
 %attr(0640,root,zabbix) %config(noreplace) %{_sysconfdir}/zabbix%{namespace}/zabbix_server.conf
 %dir /opt/zabbix%{namespace}/alertscripts
 %dir /opt/zabbix%{namespace}/externalscripts
-/opt/zabbix%{namespace}/alertscripts/*
 /opt/zabbix%{namespace}/externalscripts/*
 %{_sysconfdir}/logrotate.d/zabbix%{namespace}-server
 %attr(0755,zabbix,zabbix) %dir %{_localstatedir}/log/zabbix%{namespace}
