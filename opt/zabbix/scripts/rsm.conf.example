@@ -59,10 +59,6 @@ symlinks_dir = /opt/zabbix/sla
 [data_export]
 output_dir = /opt/zabbix/export
 
-[salesforce]
-username = someone@example.com
-password = password
-
 [redis]
 enabled = 0
 
