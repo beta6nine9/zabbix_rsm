@@ -1,3 +1,9 @@
+Changes for rsm3.3.2
+
+Bug fixes:
+....I..... [945] removed dependency in obsoleted Perl module WWW::Salesforce (dimir)
+
+--------------------------------------------------------------------------------
 Changes for rsm3.3.1
 
 New features:
